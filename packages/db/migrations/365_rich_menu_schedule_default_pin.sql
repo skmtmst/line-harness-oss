@@ -9,3 +9,9 @@ ALTER TABLE rich_menu_schedules ADD COLUMN restore_default_state TEXT
 ALTER TABLE rich_menu_schedules ADD COLUMN restore_default_line_id TEXT;
 ALTER TABLE rich_menu_groups ADD COLUMN publishing_owner TEXT;
 ALTER TABLE rich_menu_groups ADD COLUMN publishing_expires_at TEXT;
+-- 取得のたびに1つ増える世代。解放しても戻さない(単調増加)。
+-- owner は解放・公開確定で NULL に戻るため、「自分のあとに誰かが取ったか」を
+-- owner だけでは区別できない (NULL が「誰も取っていない」と「誰かが取って
+-- 手放した」の両方を意味してしまう)。確定は世代一致を書込み条件にして、
+-- 回収に負けた旧holderが確定できないようにする。
+ALTER TABLE rich_menu_groups ADD COLUMN publishing_generation INTEGER NOT NULL DEFAULT 0;

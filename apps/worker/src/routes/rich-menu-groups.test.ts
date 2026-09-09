@@ -1165,7 +1165,7 @@ describe('POST /api/rich-menu-groups/:groupId/publish', () => {
     });
     dbMocks.getLineAccountById.mockResolvedValue({ channel_access_token: 'tk' });
     dbMocks.isPublishLeaseHeld.mockResolvedValue(false);
-    dbMocks.acquirePublishLease.mockResolvedValue(true);
+    dbMocks.acquirePublishLease.mockResolvedValue(1);
 
     const app = setupApp();
     const res = await app.request('/api/rich-menu-groups/gid12345-aaaa/publish', { method: 'POST' });
@@ -1175,7 +1175,11 @@ describe('POST /api/rich-menu-groups/:groupId/publish', () => {
       error: 'ページ「基本メニュー」のタップ領域1: 送信テキストを入力してください',
     });
     // 所有者付きで解放する。
-    expect(dbMocks.releasePublishLease).toHaveBeenCalledWith(expect.anything(), 'gid12345-aaaa', expect.stringMatching(/^manual-/));
+    expect(dbMocks.releasePublishLease).toHaveBeenCalledWith(
+      expect.anything(),
+      'gid12345-aaaa',
+      { owner: expect.stringMatching(/^manual-/), generation: 1 },
+    );
   });
 
   test('500 when LINE fetch throws — releases lock', async () => {
@@ -1193,12 +1197,16 @@ describe('POST /api/rich-menu-groups/:groupId/publish', () => {
     });
     dbMocks.getLineAccountById.mockResolvedValue({ channel_access_token: 'tk' });
     dbMocks.isPublishLeaseHeld.mockResolvedValue(false);
-    dbMocks.acquirePublishLease.mockResolvedValue(true);
+    dbMocks.acquirePublishLease.mockResolvedValue(1);
 
     const app = setupApp();
     const res = await app.request('/api/rich-menu-groups/gid12345-aaaa/publish', { method: 'POST' });
     expect(res.status).toBe(500);
-    expect(dbMocks.releasePublishLease).toHaveBeenCalledWith(expect.anything(), 'gid12345-aaaa', expect.stringMatching(/^manual-/));
+    expect(dbMocks.releasePublishLease).toHaveBeenCalledWith(
+      expect.anything(),
+      'gid12345-aaaa',
+      { owner: expect.stringMatching(/^manual-/), generation: 1 },
+    );
   });
 });
 

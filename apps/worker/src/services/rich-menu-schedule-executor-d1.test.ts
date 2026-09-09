@@ -191,6 +191,38 @@ function asD1(sqlite: Database.Database): D1Database {
   } as unknown as D1Database
 }
 
+/**
+ * 指定文が実行される直前に一度だけ割り込む。
+ * 「Aがこの1文を書く直前にBが回収した」を実際に作るために使う。
+ */
+function hookedDb(db: D1Database, match: RegExp, hook: () => Promise<void>): D1Database {
+  let fired = false
+  const runHook = async () => {
+    if (fired) return
+    fired = true
+    await hook()
+  }
+  type Bound = { run(): Promise<unknown>; first<T>(): Promise<T>; all<T>(): Promise<T> }
+  const wrapBound = (bound: Bound) => ({
+    async run() { await runHook(); return bound.run() },
+    async first<T,>() { await runHook(); return bound.first<T>() },
+    async all<T,>() { await runHook(); return bound.all<T>() },
+  })
+  return {
+    ...(db as unknown as Record<string, unknown>),
+    prepare: (query: string) => {
+      const real = (db as unknown as { prepare(q: string): { bind(...p: unknown[]): Bound } & Bound }).prepare(query)
+      if (!match.test(query)) return real
+      return {
+        bind: (...p: unknown[]) => wrapBound(real.bind(...p)),
+        run: () => wrapBound(real).run(),
+        first: <T,>() => wrapBound(real).first<T>(),
+        all: <T,>() => wrapBound(real).all<T>(),
+      }
+    },
+  } as unknown as D1Database
+}
+
 /** 指定文に一致するprepareをN回だけ失敗させるD1失敗注入。 */
 function failingDb(db: D1Database, match: RegExp, times = 1): D1Database {
   let remaining = times
@@ -400,24 +432,41 @@ function depsFor(
 const T0 = new Date('2026-09-10T01:00:00.000Z')
 const T0_ISO = '2026-09-10T01:00:00.000Z'
 
+/**
+ * 進められる実時間の時計。lease の期限はここから刻まれる。
+ * cron の tick 時刻(`now`)とは別。実行に何分かかったかを試験から作るために使う。
+ */
+function makeClock(start: Date = T0) {
+  let at = start.getTime()
+  return {
+    now: () => new Date(at),
+    iso: () => new Date(at).toISOString(),
+    advance(ms: number) {
+      at += ms
+    },
+  }
+}
+
 describe('executor 段階公開（実D1 + fake LINE）', () => {
   let sqlite: Database.Database
   let db: D1Database
   let line: FakeLine
   let unlinked: string[]
+  let clock: ReturnType<typeof makeClock>
 
   beforeEach(() => {
     sqlite = setupSqlite()
     db = asD1(sqlite)
     line = makeFakeLine()
     unlinked = []
+    clock = makeClock()
   })
 
   test('正常系：作る→journal→切替→反映→旧削除で完了する', async () => {
     insertGroup(sqlite, { id: 'menu-1', isDefault: true, pages: [{ id: 'p1' }] })
     insertSchedule(sqlite, { id: 'ok-1', definition_snapshot: snapshotFor('menu-1', ['p1'], true) })
 
-    const result = await processDueRichMenuSchedules(db, depsFor(sqlite, db, line, unlinked) as never, { now: T0 })
+    const result = await processDueRichMenuSchedules(db, depsFor(sqlite, db, line, unlinked) as never, { now: T0, clock: clock.now })
     expect(result).toMatchObject({ processed: 1, succeeded: 1 })
     // LINEは切替わっている。
     expect(line.aliases.get('lhx-menu-1-0')).toMatch(/^line-new-/)
@@ -436,7 +485,7 @@ describe('executor 段階公開（実D1 + fake LINE）', () => {
     insertSchedule(sqlite, { id: 'jfail-1', definition_snapshot: snapshotFor('menu-1', ['p1'], true) })
 
     const result = await processDueRichMenuSchedules(
-      failingDb(db, /INTO rich_menu_schedule_publications/), depsFor(sqlite, db, line, unlinked) as never, { now: T0 },
+      failingDb(db, /INTO rich_menu_schedule_publications/), depsFor(sqlite, db, line, unlinked) as never, { now: T0, clock: clock.now },
     )
     expect(result).toMatchObject({ retried: 1 })
     // 作りかけは消え、liveは何も変わらない。
@@ -447,8 +496,12 @@ describe('executor 段階公開（実D1 + fake LINE）', () => {
     const row = scheduleRow(sqlite, 'jfail-1')
     expect(row.status).toBe('scheduled')
     expect(row.next_retry_at).not.toBeNull()
-    // 再試行で完了する。
-    const retry = await processDueRichMenuSchedules(db, depsFor(sqlite, db, line, unlinked) as never, { now: new Date('2026-09-10T01:05:00.000Z') })
+    // 再試行で完了する（5分後）。
+    clock.advance(5 * 60_000)
+    const retry = await processDueRichMenuSchedules(
+      db, depsFor(sqlite, db, line, unlinked) as never,
+      { now: new Date('2026-09-10T01:05:00.000Z'), clock: clock.now },
+    )
     expect(retry).toMatchObject({ succeeded: 1 })
     expect(scheduleRow(sqlite, 'jfail-1').status).toBe('completed')
   })
@@ -471,7 +524,7 @@ describe('executor 段階公開（実D1 + fake LINE）', () => {
     line.failUpsertOn = 2
     insertSchedule(sqlite, { id: 'comp-1', definition_snapshot: snapshotFor('menu-1', ['a', 'b'], true) })
 
-    const result = await processDueRichMenuSchedules(db, depsFor(sqlite, db, line, unlinked) as never, { now: T0 })
+    const result = await processDueRichMenuSchedules(db, depsFor(sqlite, db, line, unlinked) as never, { now: T0, clock: clock.now })
     expect(result).toMatchObject({ retried: 1 })
     // 旧へ戻っている。
     expect(line.aliases.get('lhx-menu-1-0')).toBe('line-old-a')
@@ -489,13 +542,17 @@ describe('executor 段階公開（実D1 + fake LINE）', () => {
 
     // 反映の1手目で停止した想定。切替は済み、DB反映だけ残る。
     const first = await processDueRichMenuSchedules(
-      failingDb(db, /UPDATE rich_menu_pages SET line_richmenu_id/), depsFor(sqlite, db, line, unlinked) as never, { now: T0 },
+      failingDb(db, /UPDATE rich_menu_pages SET line_richmenu_id/), depsFor(sqlite, db, line, unlinked) as never, { now: T0, clock: clock.now },
     )
     expect(first).toMatchObject({ retried: 1 })
     expect(line.calls.create).toBe(1)
     expect((sqlite.prepare(`SELECT COUNT(*) AS n FROM rich_menu_schedule_publications`).get() as { n: number }).n).toBe(1)
 
-    const second = await processDueRichMenuSchedules(db, depsFor(sqlite, db, line, unlinked) as never, { now: new Date('2026-09-10T01:05:00.000Z') })
+    clock.advance(5 * 60_000)
+    const second = await processDueRichMenuSchedules(
+      db, depsFor(sqlite, db, line, unlinked) as never,
+      { now: new Date('2026-09-10T01:05:00.000Z'), clock: clock.now },
+    )
     expect(second).toMatchObject({ succeeded: 1 })
     // 作り直しはしない。
     expect(line.calls.create).toBe(1)
@@ -508,14 +565,18 @@ describe('executor 段階公開（実D1 + fake LINE）', () => {
     insertGroup(sqlite, { id: 'menu-1', isDefault: true, pages: [{ id: 'p1' }] })
     insertSchedule(sqlite, { id: 'take-1', definition_snapshot: snapshotFor('menu-1', ['p1'], true) })
     const { acquirePublishLease } = await import('@line-crm/db')
-    expect(await acquirePublishLease(db, 'menu-1', 'run-A', T0_ISO)).toBe(true)
+    expect(await acquirePublishLease(db, 'menu-1', 'run-A', T0_ISO)).toBe(1)
 
-    const first = await processDueRichMenuSchedules(db, depsFor(sqlite, db, line, unlinked) as never, { now: T0 })
+    const first = await processDueRichMenuSchedules(db, depsFor(sqlite, db, line, unlinked) as never, { now: T0, clock: clock.now })
     expect(first).toMatchObject({ retried: 1 })
     expect(line.calls.create).toBe(0)
 
     // 11分後：期限切れを回収して進む。
-    const second = await processDueRichMenuSchedules(db, depsFor(sqlite, db, line, unlinked) as never, { now: new Date('2026-09-10T01:11:00.000Z') })
+    clock.advance(11 * 60_000)
+    const second = await processDueRichMenuSchedules(
+      db, depsFor(sqlite, db, line, unlinked) as never,
+      { now: new Date('2026-09-10T01:11:00.000Z'), clock: clock.now },
+    )
     expect(second).toMatchObject({ succeeded: 1 })
     expect(line.calls.create).toBe(1)
     expect(scheduleRow(sqlite, 'take-1').status).toBe('completed')
@@ -530,7 +591,7 @@ describe('executor 段階公開（実D1 + fake LINE）', () => {
       definition_snapshot: snapshotFor('menu-1', ['p1'], true),
     })
 
-    const published = await processDueRichMenuSchedules(db, depsFor(sqlite, db, line, unlinked) as never, { now: T0 })
+    const published = await processDueRichMenuSchedules(db, depsFor(sqlite, db, line, unlinked) as never, { now: T0, clock: clock.now })
     expect(published).toMatchObject({ succeeded: 1 })
     expect(scheduleRow(sqlite, 'ext-1').restore_default_state).toBe('captured')
     expect(scheduleRow(sqlite, 'ext-1').restore_default_line_id).toBe('line-old')
@@ -587,7 +648,7 @@ describe('executor 段階公開（実D1 + fake LINE）', () => {
       definition_snapshot: snapshotFor('menu-1', ['p1'], false),
     })
 
-    const published = await processDueRichMenuSchedules(db, depsFor(sqlite, db, line, unlinked) as never, { now: T0 })
+    const published = await processDueRichMenuSchedules(db, depsFor(sqlite, db, line, unlinked) as never, { now: T0, clock: clock.now })
     expect(published).toMatchObject({ succeeded: 1 })
     expect(scheduleRow(sqlite, 'exp-1').status).toBe('published')
 
@@ -615,7 +676,7 @@ describe('executor 段階公開（実D1 + fake LINE）', () => {
     line.defaultId = 'line-old-1'
     insertSchedule(sqlite, { id: 'old-del-1', definition_snapshot: snapshotFor('menu-1', ['p1'], true) })
 
-    const result = await processDueRichMenuSchedules(db, depsFor(sqlite, db, line, unlinked) as never, { now: T0 })
+    const result = await processDueRichMenuSchedules(db, depsFor(sqlite, db, line, unlinked) as never, { now: T0, clock: clock.now })
     expect(result).toMatchObject({ processed: 1, succeeded: 1 })
     const newId = line.aliases.get('lhx-menu-1-0') as string
     expect(newId).toMatch(/^line-new-/)
@@ -637,7 +698,7 @@ describe('executor 段階公開（実D1 + fake LINE）', () => {
       },
     })
 
-    const result = await processDueRichMenuSchedules(db, deps as never, { now: T0 })
+    const result = await processDueRichMenuSchedules(db, deps as never, { now: T0, clock: clock.now })
     expect(result).toMatchObject({ processed: 1, retried: 1 })
     // 作ったのは1枚。片付いてLINE側に残っていない。
     expect(line.calls.create).toBe(1)
@@ -669,7 +730,7 @@ describe('executor 段階公開（実D1 + fake LINE）', () => {
     line.setDefaultPlan = ['apply-then-throw', 'throw']
     insertSchedule(sqlite, { id: 'defrestore-1', definition_snapshot: snapshotFor('menu-1', ['a', 'b'], true) })
 
-    const result = await processDueRichMenuSchedules(db, depsFor(sqlite, db, line, unlinked) as never, { now: T0 })
+    const result = await processDueRichMenuSchedules(db, depsFor(sqlite, db, line, unlinked) as never, { now: T0, clock: clock.now })
     // 結果に「defaultを戻し切れていない」が出る。
     expect(result).toMatchObject({ processed: 1, retried: 1, defaultRestoreIncomplete: 1 })
     // aliasは旧へ戻っている。
@@ -695,10 +756,12 @@ describe('executor 段階公開（実D1 + fake LINE）', () => {
     const depsA = depsFor(sqlite, db, line, unlinked, {
       // Aが外部へ作っている最中にBのtickが走る（lease期限内）。
       createLineShells: async (snapshot: unknown) => {
+        // Aの作成中に1分だけ経つ。leaseはまだ切れていない。
+        clock.advance(60_000)
         bResult = await processDueRichMenuSchedules(
           dbB,
           depsFor(sqlite, dbB, line, unlinked) as never,
-          { now: new Date(T0.getTime() + 60_000), runIdPrefix: 'B' },
+          { now: T0, clock: clock.now, runIdPrefix: 'B' },
         )
         const { shells } = await createRichMenuShells(snapshot as never, line as never, fakeR2 as never)
         return shells.map((shell) => ({
@@ -710,7 +773,7 @@ describe('executor 段階公開（実D1 + fake LINE）', () => {
       },
     })
 
-    const aResult = await processDueRichMenuSchedules(db, depsA as never, { now: T0, runIdPrefix: 'A' })
+    const aResult = await processDueRichMenuSchedules(db, depsA as never, { now: T0, clock: clock.now, runIdPrefix: 'A' })
     // Bは触れない（claim済みでdueに出ず、leaseも期限内）。
     expect(bResult).toMatchObject({ processed: 0, succeeded: 0, reclaimed: 0 })
     expect(aResult).toMatchObject({ processed: 1, succeeded: 1 })
@@ -732,10 +795,12 @@ describe('executor 段階公開（実D1 + fake LINE）', () => {
       createLineShells: async (snapshot: unknown) => {
         const { shells } = await createRichMenuShells(snapshot as never, line as never, fakeR2 as never)
         for (const shell of shells) aCreated.push(shell.newRichMenuId)
+        // Aの作成が11分かかり、leaseが切れる。
+        clock.advance(11 * 60_000)
         bResult = await processDueRichMenuSchedules(
           dbB,
           depsFor(sqlite, dbB, line, unlinked) as never,
-          { now: new Date(T0.getTime() + 11 * 60_000), runIdPrefix: 'B' },
+          { now: T0, clock: clock.now, runIdPrefix: 'B' },
         )
         return shells.map((shell) => ({
           pageId: shell.pageId,
@@ -746,7 +811,7 @@ describe('executor 段階公開（実D1 + fake LINE）', () => {
       },
     })
 
-    const aResult = await processDueRichMenuSchedules(db, depsA as never, { now: T0, runIdPrefix: 'A' })
+    const aResult = await processDueRichMenuSchedules(db, depsA as never, { now: T0, clock: clock.now, runIdPrefix: 'A' })
 
     // Bが回収して完了させた。
     expect(bResult).toMatchObject({ reclaimed: 1, processed: 1, succeeded: 1 })
@@ -775,6 +840,151 @@ describe('executor 段階公開（実D1 + fake LINE）', () => {
     const group = sqlite.prepare(`SELECT publishing_owner, publishing_expires_at FROM rich_menu_groups WHERE id = 'menu-1'`).get() as { publishing_owner: string | null; publishing_expires_at: string | null }
     expect(group.publishing_owner).toBeNull()
     expect(group.publishing_expires_at).toBeNull()
+  })
+
+  test('2実行主体interleave：Aの反映直前に手動公開が引き継ぐと、Aは反映もできずleaseも壊さない', async () => {
+    // 予約実行Aと手動公開Mは別の実行主体で、Mは予約行を触らない。
+    // つまりAの「予約行のrun一致」だけでは守れない。group leaseの世代で守る。
+    insertGroup(sqlite, {
+      id: 'menu-1', status: 'published', isDefault: true,
+      pages: [{ id: 'p1', order: 0, lineId: 'line-old-1' }],
+    })
+    line.menus.set('line-old-1', { name: 'old-1' })
+    line.aliases.set('lhx-menu-1-0', 'line-old-1')
+    line.defaultId = 'line-old-1'
+    insertSchedule(sqlite, { id: 'refl-1', definition_snapshot: snapshotFor('menu-1', ['p1'], true) })
+
+    const dbM = asD1(sqlite)
+    let manualFence: { owner: string; generation: number } | null = null
+    const { acquirePublishLease } = await import('@line-crm/db')
+
+    // Aが「pageへ新IDを書く」1文の直前で、期限切れの隙にMがleaseを取る。
+    const dbA = hookedDb(db, /UPDATE rich_menu_pages SET line_richmenu_id = \?/, async () => {
+      clock.advance(11 * 60_000)
+      const generation = await acquirePublishLease(dbM, 'menu-1', 'manual-M', clock.iso())
+      manualFence = generation === null ? null : { owner: 'manual-M', generation }
+    })
+
+    const aResult = await processDueRichMenuSchedules(
+      dbA, depsFor(sqlite, db, line, unlinked) as never,
+      { now: T0, clock: clock.now, runIdPrefix: 'A' },
+    )
+
+    // Mは確かにleaseを取れている（Aの世代1の次）。
+    expect(manualFence).toEqual({ owner: 'manual-M', generation: 2 })
+    // Aは反映も確定もできない。
+    expect(aResult).toMatchObject({ processed: 1, succeeded: 0, skipped: 1 })
+    const page = sqlite.prepare(`SELECT line_richmenu_id AS v FROM rich_menu_pages WHERE id = 'p1'`).get() as { v: string }
+    expect(page.v).toBe('line-old-1')
+    // AはMのleaseを消していない。Mはまだ守られている。
+    const group = sqlite.prepare(`SELECT publishing_owner AS o, publishing_generation AS g FROM rich_menu_groups WHERE id = 'menu-1'`).get() as { o: string | null; g: number }
+    expect(group.o).toBe('manual-M')
+    expect(group.g).toBe(2)
+    // 予約は完了になっていない（あとで回収されてやり直す）。
+    const row = scheduleRow(sqlite, 'refl-1')
+    expect(row.status).toBe('publishing')
+  })
+
+  test('2実行主体interleave：Aの確定直前に手動公開が引き継ぐと、Aは確定できない', async () => {
+    // Aの公開確定でleaseは空くので、Mは期限を待たずに取れる。
+    // owner だけ見ていると「誰も持っていない」に見えて旧holderが確定してしまう。
+    insertGroup(sqlite, {
+      id: 'menu-1', status: 'published', isDefault: true,
+      pages: [{ id: 'p1', order: 0, lineId: 'line-old-1' }],
+    })
+    line.menus.set('line-old-1', { name: 'old-1' })
+    line.aliases.set('lhx-menu-1-0', 'line-old-1')
+    line.defaultId = 'line-old-1'
+    insertSchedule(sqlite, { id: 'fin-1', definition_snapshot: snapshotFor('menu-1', ['p1'], true) })
+
+    const dbM = asD1(sqlite)
+    let manualGeneration: number | null = null
+    const { acquirePublishLease } = await import('@line-crm/db')
+
+    // Aが「予約を完了にする」1文を書く直前にMが割り込む。
+    const dbA = hookedDb(
+      db,
+      /UPDATE rich_menu_schedules\s+SET status = \?, ended_run_id = \?/,
+      async () => {
+        manualGeneration = await acquirePublishLease(dbM, 'menu-1', 'manual-M', clock.iso())
+      },
+    )
+
+    const aResult = await processDueRichMenuSchedules(
+      dbA, depsFor(sqlite, db, line, unlinked) as never,
+      { now: T0, clock: clock.now, runIdPrefix: 'A' },
+    )
+
+    expect(manualGeneration).toBe(2)
+    // Aは確定できない。予約は publishing のまま残り、あとで回収される。
+    expect(aResult).toMatchObject({ processed: 1, succeeded: 0, skipped: 1 })
+    const row = scheduleRow(sqlite, 'fin-1')
+    expect(row.status).toBe('publishing')
+    expect(String(row.started_run_id)).toMatch(/^A-/)
+    // AはMのleaseを消していない。
+    const group = sqlite.prepare(`SELECT publishing_owner AS o, publishing_generation AS g FROM rich_menu_groups WHERE id = 'menu-1'`).get() as { o: string | null; g: number }
+    expect(group.o).toBe('manual-M')
+    expect(group.g).toBe(2)
+  })
+
+  test('renewは実時間で期限を延ばす：9分かかってもBは11分後に割り込めない', async () => {
+    insertGroup(sqlite, { id: 'menu-1', isDefault: true, pages: [{ id: 'p1' }] })
+    insertSchedule(sqlite, { id: 'renew-1', definition_snapshot: snapshotFor('menu-1', ['p1'], true) })
+    const dbB = asD1(sqlite)
+    let bResult: Awaited<ReturnType<typeof processDueRichMenuSchedules>> | null = null
+    let expiresAtSwitch = ''
+
+    const depsA = depsFor(sqlite, db, line, unlinked, {
+      // 作成に9分かかる。tick開始の時刻を使い回していると期限が伸びない。
+      createLineShells: async (snapshot: unknown) => {
+        clock.advance(9 * 60_000)
+        const { shells } = await createRichMenuShells(snapshot as never, line as never, fakeR2 as never)
+        return shells.map((shell) => ({
+          pageId: shell.pageId,
+          orderIndex: shell.orderIndex,
+          newRichMenuId: shell.newRichMenuId,
+          oldLineRichMenuId: null,
+        }))
+      },
+      // 切替の直前（=renew済み）に、実際に刻まれた期限とBの割り込みを見る。
+      switchLiveTo: async (input: { groupId: string; setDefault: boolean; shells: Array<{ pageId: string; orderIndex: number; newRichMenuId: string; oldLineRichMenuId: string | null }> }) => {
+        expiresAtSwitch = (sqlite.prepare(`SELECT publishing_expires_at AS e FROM rich_menu_groups WHERE id = 'menu-1'`).get() as { e: string }).e
+        clock.advance(2 * 60_000)
+        bResult = await processDueRichMenuSchedules(
+          dbB,
+          depsFor(sqlite, dbB, line, unlinked) as never,
+          { now: T0, clock: clock.now, runIdPrefix: 'B' },
+        )
+        await switchRichMenuLive(line as never, {
+          id: input.groupId,
+          size: 'large',
+          chatBarText: '',
+          isDefaultForAll: input.setDefault,
+          pages: input.shells.map((shell) => ({
+            id: shell.pageId, orderIndex: shell.orderIndex, name: '',
+            imageR2Key: null, imageContentType: null,
+            lineRichMenuId: shell.oldLineRichMenuId, areas: [],
+          })),
+        } as never, input.shells.map((shell) => ({
+          pageId: shell.pageId, orderIndex: shell.orderIndex, newRichMenuId: shell.newRichMenuId,
+        })))
+      },
+    })
+
+    const aResult = await processDueRichMenuSchedules(
+      db, depsA as never, { now: T0, clock: clock.now, runIdPrefix: 'A' },
+    )
+
+    // 9分時点のrenewで期限が T0+10分 より先へ進んでいる。
+    expect(expiresAtSwitch > new Date(T0.getTime() + 10 * 60_000).toISOString()).toBe(true)
+    // だからT0+11分のBは、予約行もgroup leaseも取れない。
+    expect(bResult).toMatchObject({ reclaimed: 0, processed: 0, succeeded: 0 })
+    // Aがそのまま最後まで通す。
+    expect(aResult).toMatchObject({ processed: 1, succeeded: 1 })
+    expect(line.calls.create).toBe(1)
+    const row = scheduleRow(sqlite, 'renew-1')
+    expect(row.status).toBe('completed')
+    expect(String(row.started_run_id)).toMatch(/^A-/)
   })
 
   test('run A/B fencing：古いrunは新しいclaim後に書けない（実D1）', async () => {

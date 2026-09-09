@@ -8,17 +8,20 @@ import {
   markRichMenuGroupPublished,
   markRichMenuGroupUnpublished,
   publishLeaseExpiresAt,
-  publishLeaseNotTakenByOther,
   releasePublishLease,
   renewPublishLease,
+  setPageRichMenuId,
 } from '../src/rich-menus.js'
 import {
+  claimRichMenuSchedule,
   clearSchedulePublications,
   createRichMenuScheduleAtomic,
   getSchedulePublications,
   getScheduleRestoreDefaultPin,
   pinScheduleRestoreDefault,
+  recordRichMenuScheduleSuccess,
   recordSchedulePublications,
+  renewScheduleLease,
 } from '../src/rich-menu-schedules.js'
 
 function setup() {
@@ -159,59 +162,111 @@ describe('365 default固定とlease所有権（実D1）', () => {
     ).rejects.toThrow()
   })
 
-  test('leaseは所有者付きで取り、他人は期限内は取れない', async () => {
-    expect(await acquirePublishLease(db, 'menu-1', 'run-A', NOW)).toBe(true)
+  test('leaseは所有者と世代付きで取り、他人は期限内は取れない', async () => {
+    const genA = await acquirePublishLease(db, 'menu-1', 'run-A', NOW)
+    expect(genA).toBe(1)
     expect(await isPublishLeaseHeld(db, 'menu-1', NOW)).toBe(true)
-    expect(await acquirePublishLease(db, 'menu-1', 'run-B', NOW)).toBe(false)
-    const row = sqlite.prepare(`SELECT publishing_owner, publishing_expires_at FROM rich_menu_groups WHERE id = 'menu-1'`).get() as Record<string, string>
+    expect(await acquirePublishLease(db, 'menu-1', 'run-B', NOW)).toBeNull()
+    const row = sqlite.prepare(`SELECT publishing_owner, publishing_expires_at, publishing_generation FROM rich_menu_groups WHERE id = 'menu-1'`).get() as Record<string, string | number>
     expect(row.publishing_owner).toBe('run-A')
     expect(row.publishing_expires_at).toBe(publishLeaseExpiresAt(NOW))
+    expect(row.publishing_generation).toBe(1)
   })
 
   test('期限切れは別runが回収でき、旧所有者はrenewも解放もできない', async () => {
-    expect(await acquirePublishLease(db, 'menu-1', 'run-A', NOW)).toBe(true)
+    const genA = (await acquirePublishLease(db, 'menu-1', 'run-A', NOW)) as number
+    const fenceA = { owner: 'run-A', generation: genA }
     // 期限内は旧所有者が延ばせる。
-    expect(await renewPublishLease(db, 'menu-1', 'run-A', NOW)).toBe(true)
-    // 期限切れ（11分後）は別runが回収できる。
-    expect(await acquirePublishLease(db, 'menu-1', 'run-B', LATER)).toBe(true)
-    // 回収後に旧所有者は延ばせず、開けられず、確定もできない。
-    expect(await renewPublishLease(db, 'menu-1', 'run-A', LATER)).toBe(false)
-    expect(await releasePublishLease(db, 'menu-1', 'run-A')).toBe(false)
-    expect(await releasePublishLease(db, 'menu-1', 'run-B')).toBe(true)
+    expect(await renewPublishLease(db, 'menu-1', fenceA, NOW)).toBe(true)
+    // 期限切れ（11分後）は別runが回収でき、世代が1つ進む。
+    const genB = (await acquirePublishLease(db, 'menu-1', 'run-B', LATER)) as number
+    expect(genB).toBe(genA + 1)
+    const fenceB = { owner: 'run-B', generation: genB }
+    // 回収後に旧所有者は延ばせず、開けられない。
+    expect(await renewPublishLease(db, 'menu-1', fenceA, LATER)).toBe(false)
+    expect(await releasePublishLease(db, 'menu-1', fenceA)).toBe(false)
+    expect(await releasePublishLease(db, 'menu-1', fenceB)).toBe(true)
     expect(await isPublishLeaseHeld(db, 'menu-1', LATER)).toBe(false)
+  })
+
+  test('renewは渡した実現在時刻から期限を延ばす（入口の時刻を使い回さない）', async () => {
+    // 実行が長引いた場合に、延ばしているつもりで期限が前に進まないと、
+    // 途中で別の実行に回収される。renew は「そのときの時刻」から延ばす。
+    const gen = (await acquirePublishLease(db, 'menu-1', 'run-A', NOW)) as number
+    const fence = { owner: 'run-A', generation: gen }
+    const nineMinutesLater = new Date(Date.parse(NOW) + 9 * 60_000).toISOString()
+    expect(await renewPublishLease(db, 'menu-1', fence, nineMinutesLater)).toBe(true)
+
+    const expires = (sqlite.prepare(`SELECT publishing_expires_at AS e FROM rich_menu_groups WHERE id = 'menu-1'`).get() as { e: string }).e
+    expect(expires).toBe(publishLeaseExpiresAt(nineMinutesLater))
+    // 取得から11分後でも、9分時点で延ばしてあるので他人は取れない。
+    expect(await acquirePublishLease(db, 'menu-1', 'run-B', LATER)).toBeNull()
+    expect(await renewPublishLease(db, 'menu-1', fence, LATER)).toBe(true)
   })
 
   test('旧形式(publishing_atのみ)の残留lockは回収できる', async () => {
     // 旧コードが停止時に残した想定。ownerも期限もない。
     sqlite.prepare(`UPDATE rich_menu_groups SET publishing_at = '2026-09-09T00:00:00+09:00' WHERE id = 'menu-1'`).run()
     expect(await isPublishLeaseHeld(db, 'menu-1', NOW)).toBe(false)
-    expect(await acquirePublishLease(db, 'menu-1', 'run-new', NOW)).toBe(true)
+    expect(await acquirePublishLease(db, 'menu-1', 'run-new', NOW)).toBe(1)
   })
 
   test('公開確定でleaseが空き、未公開化でも空く', async () => {
-    expect(await acquirePublishLease(db, 'menu-1', 'run-A', NOW)).toBe(true)
-    await markRichMenuGroupPublished(db, 'menu-1')
+    const genA = (await acquirePublishLease(db, 'menu-1', 'run-A', NOW)) as number
+    await markRichMenuGroupPublished(db, 'menu-1', { owner: 'run-A', generation: genA })
     expect(await isPublishLeaseHeld(db, 'menu-1', NOW)).toBe(false)
-    expect(await acquirePublishLease(db, 'menu-1', 'run-B', NOW)).toBe(true)
-    await markRichMenuGroupUnpublished(db, 'menu-1')
+    const genB = (await acquirePublishLease(db, 'menu-1', 'run-B', NOW)) as number
+    await markRichMenuGroupUnpublished(db, 'menu-1', { owner: 'run-B', generation: genB })
     expect(await isPublishLeaseHeld(db, 'menu-1', NOW)).toBe(false)
   })
 
-  test('確定直前の所有確認：自分か空きなら通し、別の所有者なら止める', async () => {
-    // 誰も持っていない。
-    expect(await publishLeaseNotTakenByOther(db, 'menu-1', 'run-A', NOW)).toBe(true)
-    // 自分が持っている。
-    expect(await acquirePublishLease(db, 'menu-1', 'run-A', NOW)).toBe(true)
-    expect(await publishLeaseNotTakenByOther(db, 'menu-1', 'run-A', NOW)).toBe(true)
-    // 公開確定でleaseは空く。空きは「取られていない」なので確定してよい。
-    await markRichMenuGroupPublished(db, 'menu-1')
-    expect(await publishLeaseNotTakenByOther(db, 'menu-1', 'run-A', NOW)).toBe(true)
-    // 期限切れで別runが回収したあとは、旧holderは確定できない。
-    expect(await acquirePublishLease(db, 'menu-1', 'run-B', NOW)).toBe(true)
-    expect(await publishLeaseNotTakenByOther(db, 'menu-1', 'run-A', NOW)).toBe(false)
-    expect(await publishLeaseNotTakenByOther(db, 'menu-1', 'run-B', NOW)).toBe(true)
-    // 別runの期限が切れていれば、もう塞がない。
-    expect(await publishLeaseNotTakenByOther(db, 'menu-1', 'run-A', LATER)).toBe(true)
+  test('回収に負けた旧holderは新しい所有者のleaseを消せず、確定もできない', async () => {
+    insertSchedule(sqlite, { id: 'fence-gen', status: 'publishing', started_run_id: 'run-A' })
+    const genA = (await acquirePublishLease(db, 'menu-1', 'run-A', NOW)) as number
+    const fenceA = { owner: 'run-A', generation: genA }
+    // 期限切れでBが回収。世代が進む。
+    const genB = (await acquirePublishLease(db, 'menu-1', 'run-B', LATER)) as number
+    const fenceB = { owner: 'run-B', generation: genB }
+
+    // 旧holder Aの公開確定は、Bのleaseを消さない。
+    expect(await markRichMenuGroupPublished(db, 'menu-1', fenceA)).toBe(false)
+    const held = sqlite.prepare(`SELECT publishing_owner AS o, publishing_generation AS g FROM rich_menu_groups WHERE id = 'menu-1'`).get() as { o: string; g: number }
+    expect(held.o).toBe('run-B')
+    expect(held.g).toBe(genB)
+    // 旧holder Aのpage反映も通らない。
+    expect(await setPageRichMenuId(db, 'p1', 'line-from-A', fenceA)).toBe(false)
+    expect((sqlite.prepare(`SELECT line_richmenu_id AS v FROM rich_menu_pages WHERE id = 'p1'`).get() as { v: string }).v).toBe('line-old-1')
+    // 旧holder Aの確定も、世代が変わっているので通らない。
+    expect(await recordRichMenuScheduleSuccess(db, 'fence-gen', 'account-1', 'run-A', 'completed', {
+      groupId: 'menu-1', generation: genA,
+    })).toBe(false)
+    // 新しい所有者Bは、自分の世代で確定できる。
+    expect(await markRichMenuGroupPublished(db, 'menu-1', fenceB)).toBe(true)
+    expect(await recordRichMenuScheduleSuccess(db, 'fence-gen', 'account-1', 'run-A', 'completed', {
+      groupId: 'menu-1', generation: genB,
+    })).toBe(true)
+  })
+
+  test('自分の公開確定でownerがNULLに戻っても、世代一致なら確定できる', async () => {
+    insertSchedule(sqlite, { id: 'fence-self', status: 'publishing', started_run_id: 'run-A' })
+    const genA = (await acquirePublishLease(db, 'menu-1', 'run-A', NOW)) as number
+    await markRichMenuGroupPublished(db, 'menu-1', { owner: 'run-A', generation: genA })
+    // ownerはNULLだが、自分のあとに誰も取っていないので確定してよい。
+    expect(await recordRichMenuScheduleSuccess(db, 'fence-self', 'account-1', 'run-A', 'completed', {
+      groupId: 'menu-1', generation: genA,
+    })).toBe(true)
+  })
+
+  test('予約leaseは実現在時刻から延ばせる', async () => {
+    insertSchedule(sqlite, { id: 'slease-1' })
+    expect(await claimRichMenuSchedule(db, 'slease-1', 'account-1', 'run-A', NOW)).toBe(true)
+    const before = (sqlite.prepare(`SELECT lease_expires_at AS e FROM rich_menu_schedules WHERE id = 'slease-1'`).get() as { e: string }).e
+    const nineMinutesLater = new Date(Date.parse(NOW) + 9 * 60_000).toISOString()
+    expect(await renewScheduleLease(db, 'slease-1', 'account-1', 'run-A', nineMinutesLater)).toBe(true)
+    const after = (sqlite.prepare(`SELECT lease_expires_at AS e FROM rich_menu_schedules WHERE id = 'slease-1'`).get() as { e: string }).e
+    expect(after > before).toBe(true)
+    // 別のrunは延ばせない。
+    expect(await renewScheduleLease(db, 'slease-1', 'account-1', 'run-B', nineMinutesLater)).toBe(false)
   })
 
   test('journalの削除は指定kindだけ消す', async () => {

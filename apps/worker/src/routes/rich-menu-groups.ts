@@ -1629,10 +1629,15 @@ richMenuGroups.post('/api/rich-menu-groups/:groupId/publish', requireRole('owner
   const account = await getLineAccountById(c.env.DB, group.account_id);
   if (!account) return c.json({ success: false, error: 'line account not found' }, 500);
 
-  // 手動公開も予約実行と同じlease取得関数を使う(所有者付き・期限付き)。
+  // 手動公開も予約実行と同じlease取得関数を使う(所有者付き・期限付き・世代付き)。
   const publishOwner = `manual-${crypto.randomUUID()}`;
-  const locked = await acquirePublishLease(c.env.DB, groupId, publishOwner, new Date().toISOString());
-  if (!locked) return c.json({ success: false, error: 'failed to acquire publish lock' }, 409);
+  const publishGeneration = await acquirePublishLease(
+    c.env.DB, groupId, publishOwner, new Date().toISOString(),
+  );
+  if (publishGeneration === null) {
+    return c.json({ success: false, error: 'failed to acquire publish lock' }, 409);
+  }
+  const publishFence = { owner: publishOwner, generation: publishGeneration };
 
   try {
     const line = createLineClient(account.channel_access_token);
@@ -1688,13 +1693,14 @@ richMenuGroups.post('/api/rich-menu-groups/:groupId/publish', requireRole('owner
     };
     const result = await publishRichMenuGroup(groupInput, line, r2Adapter);
     for (const r of result.pages) {
-      await setPageRichMenuId(c.env.DB, r.pageId, r.newRichMenuId);
+      // 札付きで書く。回収されていたら書かない(新しい所有者の反映を壊さない)。
+      await setPageRichMenuId(c.env.DB, r.pageId, r.newRichMenuId, publishFence);
     }
-    // 確定と同時にleaseも空く(mark側で掃除)。失敗時は下のcatchで所有者付き解放。
-    await markRichMenuGroupPublished(c.env.DB, groupId);
+    // 確定と同時にleaseも空く(mark側で掃除)。空けてよいのは持ち主だけなので札を渡す。
+    await markRichMenuGroupPublished(c.env.DB, groupId, publishFence);
     return c.json({ success: true, data: result });
   } catch (e) {
-    await releasePublishLease(c.env.DB, groupId, publishOwner);
+    await releasePublishLease(c.env.DB, groupId, publishFence);
     const message = e instanceof Error ? e.message : String(e);
     if (e instanceof RichMenuValidationError) {
       return c.json({ success: false, error: message }, 400);

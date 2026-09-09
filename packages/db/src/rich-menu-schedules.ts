@@ -160,12 +160,20 @@ export async function getDueRichMenuScheduleRestores(
  * 二重実行を防ぐための排他取得。同じ行を2つのcronが掴んでも、
  * status='scheduled' の1行だけが publishing へ変わる。
  */
+/**
+ * due の予約を自分の run のものにする。
+ *
+ * `nowIso` は「いつの予約を拾うか」の時刻 (cron の tick 時刻)。
+ * `leaseNowIso` は lease 期限を刻む**実現在時刻**で、既定は `nowIso`。
+ * 実行が長引く場合は renewScheduleLease で実時間から延ばす。
+ */
 export async function claimRichMenuSchedule(
   db: D1Database,
   id: string,
   accountId: string,
   runId: string,
   nowIso: string,
+  leaseNowIso: string = nowIso,
 ): Promise<boolean> {
   const result = await db
     .prepare(
@@ -177,7 +185,34 @@ export async function claimRichMenuSchedule(
           AND starts_at <= ?
           AND (next_retry_at IS NULL OR next_retry_at <= ?)`,
     )
-    .bind(runId, jstNow(), scheduleLeaseExpiresAt(nowIso), id, accountId, nowIso, nowIso)
+    .bind(runId, jstNow(), scheduleLeaseExpiresAt(leaseNowIso), id, accountId, nowIso, nowIso)
+    .run();
+  return (result.meta?.changes ?? 0) > 0;
+}
+
+/**
+ * 実行中の予約 lease を実現在時刻から延ばす。自分の run でなければ false。
+ *
+ * claim のときに一度刻んだきりにすると、長い公開の途中で予約行だけ
+ * 回収され、group lease を持ったまま予約の所有権を失う。外部工程の
+ * 直前に group lease と一緒に延ばす。
+ */
+export async function renewScheduleLease(
+  db: D1Database,
+  id: string,
+  accountId: string,
+  runId: string,
+  leaseNowIso: string,
+): Promise<boolean> {
+  const result = await db
+    .prepare(
+      `UPDATE rich_menu_schedules
+          SET lease_expires_at = ?
+        WHERE id = ? AND account_id = ?
+          AND ((status = 'publishing' AND started_run_id = ?)
+            OR (status = 'restoring' AND ended_run_id = ?))`,
+    )
+    .bind(scheduleLeaseExpiresAt(leaseNowIso), id, accountId, runId, runId)
     .run();
   return (result.meta?.changes ?? 0) > 0;
 }
@@ -188,6 +223,7 @@ export async function claimRichMenuScheduleRestore(
   accountId: string,
   runId: string,
   nowIso: string,
+  leaseNowIso: string = nowIso,
 ): Promise<boolean> {
   // started_run_idは開始runのまま残し、復元runはended_run_idへ書く。
   // 開始runと復元runを別々に追跡するため。lease期限もこのrunへ付け替える。
@@ -199,7 +235,7 @@ export async function claimRichMenuScheduleRestore(
               lease_expires_at = ?
         WHERE id = ? AND account_id = ? AND status = 'published'`,
     )
-    .bind(runId, jstNow(), scheduleLeaseExpiresAt(nowIso), id, accountId)
+    .bind(runId, jstNow(), scheduleLeaseExpiresAt(leaseNowIso), id, accountId)
     .run();
   return (result.meta?.changes ?? 0) > 0;
 }
@@ -220,12 +256,34 @@ export async function getRichMenuScheduleById(
  * 成功記録は lease fencing 付き。claimしたrunだけが書ける。
  * staleなrun Aがrun Bのclaim後に書こうとしても changes=0 で失敗し false を返す。
  */
+/**
+ * 確定を守る group lease の札。世代だけを見る。
+ *
+ * owner は自分の公開確定 (markRichMenuGroupPublished) で NULL に戻るため、
+ * 確定の時点では owner 一致を条件にできない。世代が取得時のままであれば
+ * 「自分のあとに誰も lease を取っていない」と言えるので、これを確定の
+ * 書込み条件にする。先に確認してから書くと、確認と書込みの間の回収を
+ * 取りこぼす。
+ */
+export type ScheduleGroupFence = { groupId: string; generation: number };
+
+function groupFenceClause(fence: ScheduleGroupFence | undefined): string {
+  if (!fence) return '';
+  return ` AND EXISTS (SELECT 1 FROM rich_menu_groups g
+                        WHERE g.id = ? AND g.publishing_generation = ?)`;
+}
+
+function groupFenceBinds(fence: ScheduleGroupFence | undefined): unknown[] {
+  return fence ? [fence.groupId, fence.generation] : [];
+}
+
 export async function recordRichMenuScheduleSuccess(
   db: D1Database,
   id: string,
   accountId: string,
   runId: string,
   nextStatus: 'completed' | 'published',
+  groupFence?: ScheduleGroupFence,
 ): Promise<boolean> {
   if (nextStatus === 'published') {
     // 期間モードの開始成功。復元の再試行回数を開始と独立させるため
@@ -238,9 +296,9 @@ export async function recordRichMenuScheduleSuccess(
                 attempt_count = 0, next_retry_at = NULL, lease_expires_at = NULL,
                 updated_at = ?
           WHERE id = ? AND account_id = ? AND status = 'publishing'
-            AND started_run_id = ?`,
+            AND started_run_id = ?${groupFenceClause(groupFence)}`,
       )
-      .bind(jstNow(), id, accountId, runId)
+      .bind(jstNow(), id, accountId, runId, ...groupFenceBinds(groupFence))
       .run();
     return (result.meta?.changes ?? 0) > 0;
   }
@@ -250,9 +308,9 @@ export async function recordRichMenuScheduleSuccess(
           SET status = ?, ended_run_id = ?, last_error_code = NULL,
               next_retry_at = NULL, lease_expires_at = NULL, updated_at = ?
         WHERE id = ? AND account_id = ? AND status = 'publishing'
-          AND started_run_id = ?`,
+          AND started_run_id = ?${groupFenceClause(groupFence)}`,
     )
-    .bind(nextStatus, runId, jstNow(), id, accountId, runId)
+    .bind(nextStatus, runId, jstNow(), id, accountId, runId, ...groupFenceBinds(groupFence))
     .run();
   return (result.meta?.changes ?? 0) > 0;
 }
@@ -262,6 +320,7 @@ export async function recordRichMenuScheduleRestoreSuccess(
   id: string,
   accountId: string,
   runId: string,
+  groupFence?: ScheduleGroupFence,
 ): Promise<boolean> {
   const result = await db
     .prepare(
@@ -269,9 +328,9 @@ export async function recordRichMenuScheduleRestoreSuccess(
           SET status = 'completed', ended_run_id = ?, last_error_code = NULL,
               next_retry_at = NULL, lease_expires_at = NULL, updated_at = ?
         WHERE id = ? AND account_id = ? AND status = 'restoring'
-          AND ended_run_id = ?`,
+          AND ended_run_id = ?${groupFenceClause(groupFence)}`,
     )
-    .bind(runId, jstNow(), id, accountId, runId)
+    .bind(runId, jstNow(), id, accountId, runId, ...groupFenceBinds(groupFence))
     .run();
   return (result.meta?.changes ?? 0) > 0;
 }

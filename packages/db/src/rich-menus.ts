@@ -873,35 +873,61 @@ export function publishLeaseExpiresAt(nowIso: string, ttlMs = PUBLISH_LEASE_MS):
   return new Date(time + ttlMs).toISOString();
 }
 
+/**
+ * publish lease の持ち主を表す札。
+ *
+ * owner だけでは足りない。公開確定 (markRichMenuGroupPublished) や解放で
+ * owner は NULL に戻るため、「まだ自分のものか」と「自分のあとに誰かが取って
+ * 手放したか」を区別できない。世代 (取得のたびに +1、戻さない) を併せて持ち、
+ * 確定は世代一致を書込み条件にする。
+ */
+export type PublishLeaseFence = { owner: string; generation: number };
+
+/**
+ * lease を取る。取れたらその世代を返し、取れなければ null。
+ *
+ * 有効期限内の他人所有だけが null (HTTP 409 用)。期限切れ・未所有・
+ * 旧形式(publishing_atのみ)の行は回収して取り直す。停止したWorkerが
+ * 残したlockで再試行と手動公開が塞がれないようにする。
+ * 手動公開も予約実行も同じ関数を使う。
+ */
 export async function acquirePublishLease(
   db: D1Database,
   groupId: string,
   owner: string,
   nowIso: string,
   ttlMs = PUBLISH_LEASE_MS,
-): Promise<boolean> {
-  const result = await db
+): Promise<number | null> {
+  // 取得と世代の採番を1文にする。別々にすると、間に割り込んだ取得の世代を
+  // 自分のものと取り違える。
+  const row = await db
     .prepare(
       `UPDATE rich_menu_groups
-         SET publishing_at = ?, publishing_owner = ?, publishing_expires_at = ?
+         SET publishing_at = ?, publishing_owner = ?, publishing_expires_at = ?,
+             publishing_generation = publishing_generation + 1
        WHERE id = ?
          AND (publishing_owner IS NULL
            OR publishing_expires_at IS NULL
-           OR publishing_expires_at <= ?)`,
+           OR publishing_expires_at <= ?)
+       RETURNING publishing_generation`,
     )
     .bind(jstNow(), owner, publishLeaseExpiresAt(nowIso, ttlMs), groupId, nowIso)
-    .run();
-  return (result.meta?.changes ?? 0) > 0;
+    .first<{ publishing_generation: number }>();
+  return row ? row.publishing_generation : null;
 }
 
 /**
- * 外部工程(LINE切替)の直前に期限を延ばす。所有者が変わっていたら false。
- * falseのrunはlive切替もDB確定もしてはいけない(回収した新所有者に任せる)。
+ * 外部工程(LINE呼び出し)の直前に期限を延ばす。所有者か世代が変わっていたら false。
+ *
+ * `nowIso` は**そのときの実現在時刻**を渡す。処理の入口で一度作った時刻を
+ * 使い回すと、延ばしているつもりで期限が前に進まず、長い公開の途中で
+ * lease が切れて別の実行に回収される。
+ * false の run は live 切替も DB 確定もしてはいけない(回収した新所有者に任せる)。
  */
 export async function renewPublishLease(
   db: D1Database,
   groupId: string,
-  owner: string,
+  fence: PublishLeaseFence,
   nowIso: string,
   ttlMs = PUBLISH_LEASE_MS,
 ): Promise<boolean> {
@@ -909,59 +935,31 @@ export async function renewPublishLease(
     .prepare(
       `UPDATE rich_menu_groups
          SET publishing_at = ?, publishing_expires_at = ?
-       WHERE id = ? AND publishing_owner = ?`,
+       WHERE id = ? AND publishing_owner = ? AND publishing_generation = ?`,
     )
-    .bind(jstNow(), publishLeaseExpiresAt(nowIso, ttlMs), groupId, owner)
+    .bind(jstNow(), publishLeaseExpiresAt(nowIso, ttlMs), groupId, fence.owner, fence.generation)
     .run();
   return (result.meta?.changes ?? 0) > 0;
 }
 
 /**
- * 所有者だけが開けられる解放。所有者が変わっていたら何もせず false。
- * falseはleaseを失った合図で、呼び出し側は切替・確定をやめる。
+ * 持ち主だけが開けられる解放。所有者か世代が変わっていたら何もせず false。
+ * false は lease を失った合図で、呼び出し側は切替・確定をやめる。
  */
 export async function releasePublishLease(
   db: D1Database,
   groupId: string,
-  owner: string,
+  fence: PublishLeaseFence,
 ): Promise<boolean> {
   const result = await db
     .prepare(
       `UPDATE rich_menu_groups
          SET publishing_at = NULL, publishing_owner = NULL, publishing_expires_at = NULL
-       WHERE id = ? AND publishing_owner = ?`,
+       WHERE id = ? AND publishing_owner = ? AND publishing_generation = ?`,
     )
-    .bind(groupId, owner)
+    .bind(groupId, fence.owner, fence.generation)
     .run();
   return (result.meta?.changes ?? 0) > 0;
-}
-
-/**
- * 「別の所有者に取られていない」ことの確認。自分が持っている、または
- * 誰も持っていないなら true。
- *
- * 公開確定 (markRichMenuGroupPublished / markRichMenuGroupUnpublished) は
- * lease も空けるため、確定後の成功記録を renew で守ることはできない。
- * そこで確定の直前だけはこちらで「回収されて別のrunが所有者になっていない」
- * ことを確かめる。旧holderの確定を止める目的は renew と同じ。
- */
-export async function publishLeaseNotTakenByOther(
-  db: D1Database,
-  groupId: string,
-  owner: string,
-  nowIso: string,
-): Promise<boolean> {
-  const row = await db
-    .prepare(
-      `SELECT 1 AS hit FROM rich_menu_groups
-        WHERE id = ?
-          AND publishing_owner IS NOT NULL
-          AND publishing_owner <> ?
-          AND (publishing_expires_at IS NULL OR publishing_expires_at > ?)`,
-    )
-    .bind(groupId, owner, nowIso)
-    .first<{ hit: number }>();
-  return !row;
 }
 
 /**
@@ -984,34 +982,59 @@ export async function isPublishLeaseHeld(
   return !!row;
 }
 
+/**
+ * lease を持っている run だけが書けるようにする条件句。
+ * 札を渡さない呼び出し(lease を取らない初期公開など)は条件なしで書く。
+ */
+function fenceClause(fence: PublishLeaseFence | undefined, groupIdColumn: string): string {
+  if (!fence) return '';
+  return ` AND EXISTS (SELECT 1 FROM rich_menu_groups g
+                        WHERE g.id = ${groupIdColumn}
+                          AND g.publishing_owner = ?
+                          AND g.publishing_generation = ?)`;
+}
+
+function fenceBinds(fence: PublishLeaseFence | undefined): unknown[] {
+  return fence ? [fence.owner, fence.generation] : [];
+}
+
 export async function setPageRichMenuId(
   db: D1Database,
   pageId: string,
   lineRichMenuId: string,
-): Promise<void> {
-  await db
+  fence?: PublishLeaseFence,
+): Promise<boolean> {
+  // 札があるときは「まだ自分が lease を持っている」ことを同じ1文の条件にする。
+  // 先に確認してから書くと、確認と書込みの間に回収された旧holderが
+  // 新しい所有者の反映を古いIDで上書きできてしまう。
+  const result = await db
     .prepare(
-      `UPDATE rich_menu_pages SET line_richmenu_id = ?, updated_at = ? WHERE id = ?`,
+      `UPDATE rich_menu_pages SET line_richmenu_id = ?, updated_at = ?
+        WHERE id = ?${fenceClause(fence, 'rich_menu_pages.group_id')}`,
     )
-    .bind(lineRichMenuId, jstNow(), pageId)
+    .bind(lineRichMenuId, jstNow(), pageId, ...fenceBinds(fence))
     .run();
+  return (result.meta?.changes ?? 0) > 0;
 }
 
 export async function markRichMenuGroupPublished(
   db: D1Database,
   groupId: string,
-): Promise<void> {
-  // 公開の確定と同時にleaseも空ける。呼ぶ側はlease所有者(手動公開・予約実行)の
-  // ため、無条件の掃除でよい。旧holderの確定はrenew確認で止める流儀。
-  await db
+  fence?: PublishLeaseFence,
+): Promise<boolean> {
+  // 公開の確定と同時に lease も空ける。ただし空けてよいのは持ち主だけ。
+  // 無条件に消すと、回収に負けた旧holderが新しい所有者の lease を消してしまい、
+  // 新所有者が守られないまま third party に割り込まれる。
+  const result = await db
     .prepare(
       `UPDATE rich_menu_groups
          SET status = 'published', publishing_at = NULL,
              publishing_owner = NULL, publishing_expires_at = NULL, updated_at = ?
-       WHERE id = ?`,
+       WHERE id = ?${fence ? ' AND publishing_owner = ? AND publishing_generation = ?' : ''}`,
     )
-    .bind(jstNow(), groupId)
+    .bind(jstNow(), groupId, ...fenceBinds(fence))
     .run();
+  return (result.meta?.changes ?? 0) > 0;
 }
 
 // Unpublish 完了時の DB 整合: 全 page の line_richmenu_id を null に戻し、
@@ -1021,25 +1044,28 @@ export async function markRichMenuGroupPublished(
 export async function markRichMenuGroupUnpublished(
   db: D1Database,
   groupId: string,
+  fence?: PublishLeaseFence,
 ): Promise<void> {
   const now = jstNow();
+  // page と group を1回のbatchで揃える。札があるときは両方に同じ条件を付け、
+  // 回収に負けた旧holderが新しい所有者の lease と反映を壊さないようにする。
   await db.batch([
     db
       .prepare(
         `UPDATE rich_menu_pages
             SET line_richmenu_id = NULL, updated_at = ?
-          WHERE group_id = ?`,
+          WHERE group_id = ?${fenceClause(fence, 'rich_menu_pages.group_id')}`,
       )
-      .bind(now, groupId),
+      .bind(now, groupId, ...fenceBinds(fence)),
     db
       .prepare(
         `UPDATE rich_menu_groups
             SET status = 'draft', publishing_at = NULL,
                 publishing_owner = NULL, publishing_expires_at = NULL,
                 is_default_for_all = 0, updated_at = ?
-          WHERE id = ?`,
+          WHERE id = ?${fence ? ' AND publishing_owner = ? AND publishing_generation = ?' : ''}`,
       )
-      .bind(now, groupId),
+      .bind(now, groupId, ...fenceBinds(fence)),
   ]);
 }
 

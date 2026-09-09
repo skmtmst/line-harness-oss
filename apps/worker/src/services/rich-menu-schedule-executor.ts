@@ -20,7 +20,6 @@ import {
   markRichMenuGroupUnpublished,
   nextRichMenuScheduleRetryAt,
   pinScheduleRestoreDefault,
-  publishLeaseNotTakenByOther,
   reclaimStalePublishingSchedule,
   reclaimStaleRestoringSchedule,
   recordRichMenuSchedulePermanentFailure,
@@ -31,7 +30,9 @@ import {
   recordSchedulePublications,
   releasePublishLease,
   renewPublishLease,
+  renewScheduleLease,
   setPageRichMenuId,
+  type PublishLeaseFence,
   type RestoreDefaultPin,
   type RichMenuScheduleRow,
   type RichMenuGroupWithPages,
@@ -92,6 +93,16 @@ export type ScheduleSwitchCompensation = {
 
 /** 1回のtickで積む付帯結果。default復元の未完了を表へ出すために使う。 */
 type ExecutionStats = { defaultRestoreIncomplete: number };
+
+/**
+ * lease の期限に使う実時間。
+ *
+ * cron の tick 時刻 (`options.now`) は「どの予約が来たか」を決めるためのもので、
+ * 処理が何分かかったかは表さない。入口で作った時刻を renew に使い回すと、
+ * 延ばしているつもりで期限が前に進まず、長い公開の途中で別の実行に
+ * 回収される。lease はここから取った**そのときの**時刻で刻む。
+ */
+type LeaseClock = () => string;
 
 export type RichMenuScheduleExecutorDeps = {
   getGroupWithPages: (db: D1Database, groupId: string) => Promise<RichMenuGroupWithPages | null>;
@@ -250,14 +261,15 @@ function makeFailRecorder(
   attemptCount: number,
   recordTransient: (db: D1Database, id: string, accountId: string, runId: string, code: string, retryAt: string) => Promise<boolean>,
   recordPermanent: (db: D1Database, id: string, accountId: string, runId: string, code: string) => Promise<boolean>,
-  leaseGroupId?: string,
+  lease?: { groupId: string; fence: PublishLeaseFence },
 ): FailRecorder {
   return async (error: unknown) => {
     try {
-      // leaseを持っていたら開ける。持っていなければ何も起きない。
+      // leaseを持っていたら開ける。所有者と世代が一致するときだけ開くので、
+      // 回収に負けた旧holderが新しい所有者のleaseを消すことはない。
       // 開けずに帰ると停止時の残留lockになり、再試行と手動公開を塞ぐ。
-      if (leaseGroupId) {
-        await releasePublishLease(db, leaseGroupId, runId);
+      if (lease) {
+        await releasePublishLease(db, lease.groupId, lease.fence);
       }
     } catch {
       // 解放の失敗は元の失敗を隠さない。期限切れで回収される。
@@ -324,24 +336,50 @@ async function runPhasedPublish(input: {
   createShells: () => Promise<ScheduleShell[]>;
   /** 切替対象の現在page(旧IDとorderIndexの材料)。DB反映前のため旧値のまま。 */
   loadTargetPages: () => Promise<Array<{ id: string; orderIndex: number; lineRichMenuId: string | null }>>;
-  /** DB反映: journalのIDをpageへ書き、group状態を進める。 */
-  reflect: (shells: ScheduleShell[]) => Promise<void>;
-  recordSuccess: () => Promise<boolean>;
+  /** DB反映: journalのIDをpageへ書き、group状態を進める。札で書込みを守る。 */
+  reflect: (shells: ScheduleShell[], fence: PublishLeaseFence) => Promise<void>;
+  /** 確定。札(世代)を書込み条件に入れ、負けた旧holderは確定できない。 */
+  recordSuccess: (fence: PublishLeaseFence) => Promise<boolean>;
   fail: FailRecorder;
   stats: ExecutionStats;
+  /** lease期限に使う実時間。 */
+  leaseClock: LeaseClock;
 }): Promise<'succeeded' | 'retried' | 'failed' | 'skipped'> {
-  const { db, schedule, now, deps, runId, kind, targetGroupId } = input;
-  const nowIso = now.toISOString();
+  const { db, schedule, now, deps, runId, kind, targetGroupId, leaseClock } = input;
 
-  const locked = await acquirePublishLease(db, targetGroupId, runId, nowIso);
-  if (!locked) return input.fail(publishLeaseTakenError(targetGroupId));
+  const generation = await acquirePublishLease(db, targetGroupId, runId, leaseClock());
+  if (generation === null) return input.fail(publishLeaseTakenError(targetGroupId));
+  const fence: PublishLeaseFence = { owner: runId, generation };
 
   /**
-   * 所有の確認と期限の延長。外部工程(LINE呼び出し)とDB確定の直前に必ず通す。
+   * 所有の確認と期限の延長。外部工程(LINE呼び出し)とDB書込みの直前に必ず通す。
+   *
+   * 期限は**そのときの実現在時刻**から延ばす。入口の時刻を使い回すと期限が
+   * 前に進まず、長い公開の途中で回収される。予約行の lease も一緒に延ばす
+   * (group だけ延ばしても予約行を取られたら所有権を失う)。
    * false は「回収されて別のrunが所有者になった」の合図で、旧holderは
    * ここから先の切替・確定・後片付けをしない(新所有者に任せる)。
    */
-  const holdsLease = () => renewPublishLease(db, targetGroupId, runId, nowIso);
+  const holdsLease = async (): Promise<boolean> => {
+    const leaseNow = leaseClock();
+    if (!(await renewPublishLease(db, targetGroupId, fence, leaseNow))) return false;
+    await renewScheduleLease(db, schedule.id, schedule.account_id, runId, leaseNow);
+    return true;
+  };
+
+  /**
+   * ここから先の失敗は、自分が取ったleaseを札付きで開けてから記録する。
+   * 開けずに帰ると期限(10分)まで再試行と手動公開を塞ぐ。
+   * 札が合わなければ何も起きない(回収した新しい所有者のleaseは消さない)。
+   */
+  const fail: FailRecorder = async (error) => {
+    try {
+      await releasePublishLease(db, targetGroupId, fence);
+    } catch {
+      // 解放の失敗は元の失敗を隠さない。期限切れで回収される。
+    }
+    return input.fail(error);
+  };
 
   const loadPrev = async (): Promise<SchedulePreSwitchState> => {
     const pages = await input.loadTargetPages();
@@ -361,7 +399,7 @@ async function runPhasedPublish(input: {
     if (journal.length === 0) {
       // journal未確定の新規実行: 作って→固定して→journalへ残す。
       // LINEへ作る前に所有を確かめる(旧holderがメニューを作り散らさない)。
-      if (!(await holdsLease())) return input.fail(publishLeaseTakenError(targetGroupId));
+      if (!(await holdsLease())) return fail(publishLeaseTakenError(targetGroupId));
       const created = await input.createShells();
       // ここから先で失敗したら、まだliveでない新メニューを必ず片付ける。
       // pinの失敗で作りっぱなしにすると、LINE側に参照されないメニューが残る。
@@ -396,7 +434,7 @@ async function runPhasedPublish(input: {
     for (const entry of journal) {
       const current = byPageId.get(entry.page_id);
       if (!current) {
-        return input.fail(
+        return fail(
           new Error(`snapshot drift: journal page ${entry.page_id} was deleted, restore target lost`),
         );
       }
@@ -417,7 +455,7 @@ async function runPhasedPublish(input: {
       .filter((id) => !shells.some((shell) => shell.newRichMenuId === id));
 
     // 外部工程の直前にleaseを延ばす。失っていたら旧holderとして手を引く。
-    if (!(await holdsLease())) return input.fail(publishLeaseTakenError(targetGroupId));
+    if (!(await holdsLease())) return fail(publishLeaseTakenError(targetGroupId));
 
     try {
       await deps.switchLiveTo({ schedule, groupId: targetGroupId, setDefault: input.setDefault, shells });
@@ -461,34 +499,32 @@ async function runPhasedPublish(input: {
     // うちにLINE側の旧メニューを消す。反映(DB)の後に回すと、page行が新IDへ
     // 変わっていて旧IDを引けず、LINE側に参照されないメニューが残り続ける。
     if (oldIdsBeforeReflect.length > 0) {
-      if (!(await holdsLease())) return input.fail(publishLeaseTakenError(targetGroupId));
+      if (!(await holdsLease())) return fail(publishLeaseTakenError(targetGroupId));
       await deps.deleteLineShells(schedule, oldIdsBeforeReflect);
     }
 
     // DB反映の直前にもう一度所有を確認する。
     // 失っていたら手を引く(journalありの再開が反映を終わらせる)。
-    if (!(await holdsLease())) return input.fail(publishLeaseTakenError(targetGroupId));
+    if (!(await holdsLease())) return fail(publishLeaseTakenError(targetGroupId));
 
-    await input.reflect(shells);
+    await input.reflect(shells, fence);
     // 反映が落ちたときは補償しない。aliasは正しく新IDを向いているので、
     // journalありの再開が反映だけやり直す。
 
-    // 反映(公開確定)はleaseも空けるため、ここから先はrenewでは守れない。
-    // 確定の直前は「回収されて別の所有者になっていない」ことを確かめる。
-    if (!(await publishLeaseNotTakenByOther(db, targetGroupId, runId, nowIso))) {
-      return input.fail(publishLeaseTakenError(targetGroupId));
-    }
-    const recorded = await input.recordSuccess();
-    // 成功後は所有者条件でleaseを開ける。開けずに帰ると期限(10分)まで
+    // 反映(公開確定)は自分のleaseを空けるため、ここから先はrenewでは守れない。
+    // 確定は「自分が取ったあと誰もleaseを取っていない」を書込み条件にする
+    // (先に確かめてから書くと、その隙間の回収を取りこぼす)。
+    const recorded = await input.recordSuccess(fence);
+    // 成功後は札付きでleaseを開ける。開けずに帰ると期限(10分)まで
     // 再試行と手動公開を塞ぐ(反映で既に空いていれば何も起きない)。
     try {
-      await releasePublishLease(db, targetGroupId, runId);
+      await releasePublishLease(db, targetGroupId, fence);
     } catch {
       // 解放の失敗は成功を隠さない。期限切れで回収される。
     }
     return recorded ? 'succeeded' : 'skipped';
   } catch (error) {
-    return input.fail(error);
+    return fail(error);
   }
 }
 
@@ -499,8 +535,11 @@ async function handleOneSchedule(
   deps: RichMenuScheduleExecutorDeps,
   runId: string,
   stats: ExecutionStats,
+  leaseClock: LeaseClock,
 ): Promise<'succeeded' | 'retried' | 'failed' | 'skipped'> {
-  const claimed = await claimRichMenuSchedule(db, schedule.id, schedule.account_id, runId, now.toISOString());
+  const claimed = await claimRichMenuSchedule(
+    db, schedule.id, schedule.account_id, runId, now.toISOString(), leaseClock(),
+  );
   if (!claimed) return 'skipped';
 
   // claim直後の行を読み直す。引数のscheduleはdue取得時の古い写しのため、
@@ -509,6 +548,8 @@ async function handleOneSchedule(
   if (!fresh || fresh.status !== 'publishing' || fresh.started_run_id !== runId) {
     return 'skipped';
   }
+  // ここでの失敗はまだ lease を取る前(または runPhasedPublish が自分で開ける)。
+  // 札を持たない解放はしない。
   const fail = makeFailRecorder(
     db,
     schedule,
@@ -517,7 +558,6 @@ async function handleOneSchedule(
     fresh.attempt_count,
     recordRichMenuScheduleTransientFailure,
     recordRichMenuSchedulePermanentFailure,
-    schedule.group_id,
   );
 
   try {
@@ -555,22 +595,24 @@ async function handleOneSchedule(
           lineRichMenuId: page.line_richmenu_id,
         }));
       },
-      reflect: async (shells) => {
+      reflect: async (shells, fence) => {
         for (const shell of shells) {
-          await setPageRichMenuId(db, shell.pageId, shell.newRichMenuId);
+          await setPageRichMenuId(db, shell.pageId, shell.newRichMenuId, fence);
         }
-        await markRichMenuGroupPublished(db, fresh.group_id);
+        await markRichMenuGroupPublished(db, fresh.group_id, fence);
       },
-      recordSuccess: () =>
+      recordSuccess: (fence) =>
         recordRichMenuScheduleSuccess(
           db,
           fresh.id,
           fresh.account_id,
           runId,
           fresh.mode === 'period' ? 'published' : 'completed',
+          { groupId: fresh.group_id, generation: fence.generation },
         ),
       fail,
       stats,
+      leaseClock,
     });
     return outcome;
   } catch (error) {
@@ -590,8 +632,11 @@ async function handleOneRestore(
   deps: RichMenuScheduleExecutorDeps,
   runId: string,
   stats: ExecutionStats,
+  leaseClock: LeaseClock,
 ): Promise<'restored' | 'retried' | 'failed' | 'skipped'> {
-  const claimed = await claimRichMenuScheduleRestore(db, schedule.id, schedule.account_id, runId, now.toISOString());
+  const claimed = await claimRichMenuScheduleRestore(
+    db, schedule.id, schedule.account_id, runId, now.toISOString(), leaseClock(),
+  );
   if (!claimed) return 'skipped';
 
   const fresh = await getRichMenuScheduleById(db, schedule.id, schedule.account_id);
@@ -613,7 +658,6 @@ async function handleOneRestore(
         db, schedule, runId, now, fresh.attempt_count,
         recordRichMenuScheduleRestoreTransientFailure,
         recordRichMenuSchedulePermanentFailure,
-        fresh.group_id,
       )(new Error(preconditionError));
     }
     const scheduledGroup = await deps.getGroupWithPages(db, fresh.group_id);
@@ -622,22 +666,20 @@ async function handleOneRestore(
         db, schedule, runId, now, fresh.attempt_count,
         recordRichMenuScheduleRestoreTransientFailure,
         recordRichMenuSchedulePermanentFailure,
-        fresh.group_id,
       )(new Error('schedule group not found'));
     }
 
     // 明示の戻し先がある場合は、そのgroupを段階公開で戻す。
     // 戻し先が消える・非公開化は恒久失敗(要対応)に残し、勝手に解除しない。
     if (fresh.restore_group_id) {
-      return handleExplicitRestore(db, fresh, now, deps, runId, unlinkAndClearAssignments, stats);
+      return handleExplicitRestore(db, fresh, now, deps, runId, unlinkAndClearAssignments, stats, leaseClock);
     }
-    return handlePinnedRestore(db, fresh, now, deps, runId, unlinkAndClearAssignments);
+    return handlePinnedRestore(db, fresh, now, deps, runId, unlinkAndClearAssignments, leaseClock);
   } catch (error) {
     return makeFailRecorder(
       db, schedule, runId, now, fresh.attempt_count,
       recordRichMenuScheduleRestoreTransientFailure,
       recordRichMenuSchedulePermanentFailure,
-      fresh.group_id,
     )(error);
   }
 }
@@ -654,13 +696,14 @@ async function handleExplicitRestore(
   runId: string,
   unlinkAndClearAssignments: () => Promise<void>,
   stats: ExecutionStats,
+  leaseClock: LeaseClock,
 ): Promise<'restored' | 'retried' | 'failed' | 'skipped'> {
   const restoreGroupId = fresh.restore_group_id as string;
+  // lease は runPhasedPublish が取って自分で開ける。ここでの失敗記録は札なし。
   const fail = makeFailRecorder(
     db, fresh, runId, now, fresh.attempt_count,
     recordRichMenuScheduleRestoreTransientFailure,
     recordRichMenuSchedulePermanentFailure,
-    restoreGroupId,
   );
   try {
     const restore = await deps.getGroupWithPages(db, restoreGroupId);
@@ -685,21 +728,27 @@ async function handleExplicitRestore(
           lineRichMenuId: page.line_richmenu_id,
         }));
       },
-      reflect: async (shells) => {
+      reflect: async (shells, fence) => {
         // 期限切れメニューの個別割当をLINE側で外してからD1を消す。
         // 公開確定(mark*)はleaseを空けるため、LINEを呼ぶこの工程を先に置く。
         await unlinkAndClearAssignments();
         for (const shell of shells) {
-          await setPageRichMenuId(db, shell.pageId, shell.newRichMenuId);
+          await setPageRichMenuId(db, shell.pageId, shell.newRichMenuId, fence);
         }
-        await markRichMenuGroupPublished(db, restoreGroupId);
+        await markRichMenuGroupPublished(db, restoreGroupId, fence);
         if (restoreGroupId !== fresh.group_id) {
+          // 期限切れgroupのleaseは持っていないので札は付けない。
           await markRichMenuGroupUnpublished(db, fresh.group_id);
         }
       },
-      recordSuccess: () => recordRichMenuScheduleRestoreSuccess(db, fresh.id, fresh.account_id, runId),
+      recordSuccess: (fence) =>
+        recordRichMenuScheduleRestoreSuccess(db, fresh.id, fresh.account_id, runId, {
+          groupId: restoreGroupId,
+          generation: fence.generation,
+        }),
       fail,
       stats,
+      leaseClock,
     });
     return outcome === 'succeeded' ? 'restored' : outcome;
   } catch (error) {
@@ -719,14 +768,17 @@ async function handlePinnedRestore(
   deps: RichMenuScheduleExecutorDeps,
   runId: string,
   unlinkAndClearAssignments: () => Promise<void>,
+  leaseClock: LeaseClock,
 ): Promise<'restored' | 'retried' | 'failed' | 'skipped'> {
-  const nowIso = now.toISOString();
-  const fail = makeFailRecorder(
-    db, fresh, runId, now, fresh.attempt_count,
-    recordRichMenuScheduleRestoreTransientFailure,
-    recordRichMenuSchedulePermanentFailure,
-    fresh.group_id,
-  );
+  // lease を取る前の失敗は札なしで記録する。取ったあとは fenced に差し替える。
+  let lease: { groupId: string; fence: PublishLeaseFence } | undefined;
+  const fail: FailRecorder = (error) =>
+    makeFailRecorder(
+      db, fresh, runId, now, fresh.attempt_count,
+      recordRichMenuScheduleRestoreTransientFailure,
+      recordRichMenuSchedulePermanentFailure,
+      lease,
+    )(error);
   try {
     const pin: RestoreDefaultPin | null =
       fresh.restore_default_state === 'captured' || fresh.restore_default_state === 'no_default'
@@ -735,10 +787,20 @@ async function handlePinnedRestore(
     if (!pin) {
       return fail(new Error('no_default_pin: restore default was never pinned, needs attention'));
     }
-    const locked = await acquirePublishLease(db, fresh.group_id, runId, nowIso);
-    if (!locked) return fail(publishLeaseTakenError(fresh.group_id));
-    const renewed = await renewPublishLease(db, fresh.group_id, runId, nowIso);
-    if (!renewed) return fail(publishLeaseTakenError(fresh.group_id));
+    const generation = await acquirePublishLease(db, fresh.group_id, runId, leaseClock());
+    if (generation === null) return fail(publishLeaseTakenError(fresh.group_id));
+    const fence: PublishLeaseFence = { owner: runId, generation };
+    lease = { groupId: fresh.group_id, fence };
+
+    /** 外部工程・DB書込みの直前に、実現在時刻で期限を延ばして所有を確かめる。 */
+    const holdsLease = async (): Promise<boolean> => {
+      const leaseNow = leaseClock();
+      if (!(await renewPublishLease(db, fresh.group_id, fence, leaseNow))) return false;
+      await renewScheduleLease(db, fresh.id, fresh.account_id, runId, leaseNow);
+      return true;
+    };
+
+    if (!(await holdsLease())) return fail(publishLeaseTakenError(fresh.group_id));
     if (pin.state === 'captured') {
       if (!pin.lineId) {
         return fail(new Error('no_default_pin: pinned default id is missing, needs attention'));
@@ -749,22 +811,20 @@ async function handlePinnedRestore(
       await deps.clearAccountDefault(fresh);
     }
     // 個別割当の解除もLINEを呼ぶ外部工程。leaseを持っているうちに済ませる。
-    const renewedForUnlink = await renewPublishLease(db, fresh.group_id, runId, nowIso);
-    if (!renewedForUnlink) return fail(publishLeaseTakenError(fresh.group_id));
+    if (!(await holdsLease())) return fail(publishLeaseTakenError(fresh.group_id));
     await unlinkAndClearAssignments();
 
-    const renewedForReflect = await renewPublishLease(db, fresh.group_id, runId, nowIso);
-    if (!renewedForReflect) return fail(publishLeaseTakenError(fresh.group_id));
-    await markRichMenuGroupUnpublished(db, fresh.group_id);
+    if (!(await holdsLease())) return fail(publishLeaseTakenError(fresh.group_id));
+    await markRichMenuGroupUnpublished(db, fresh.group_id, fence);
 
-    // 未公開化はleaseも空けるため、確定の直前は「別の所有者に取られて
-    // いない」ことを確かめる(旧holderの確定を止める目的は renew と同じ)。
-    if (!(await publishLeaseNotTakenByOther(db, fresh.group_id, runId, nowIso))) {
-      return fail(publishLeaseTakenError(fresh.group_id));
-    }
-    const recorded = await recordRichMenuScheduleRestoreSuccess(db, fresh.id, fresh.account_id, runId);
+    // 未公開化は自分のleaseを空けるため、ここから先はrenewでは守れない。
+    // 確定は「自分が取ったあと誰もleaseを取っていない」を書込み条件にする。
+    const recorded = await recordRichMenuScheduleRestoreSuccess(db, fresh.id, fresh.account_id, runId, {
+      groupId: fresh.group_id,
+      generation,
+    });
     try {
-      await releasePublishLease(db, fresh.group_id, runId);
+      await releasePublishLease(db, fresh.group_id, fence);
     } catch {
       // 解放の失敗は成功を隠さない。期限切れで回収される。
     }
@@ -776,11 +836,12 @@ async function handlePinnedRestore(
 
 async function reclaimStaleClaims(
   db: D1Database,
-  now: Date,
+  leaseNowIso: string,
   limit: number,
 ): Promise<number> {
   // lease期限(UTCのISO8601)で回収する。形式違いの文字列比較はしない。
-  const nowIso = now.toISOString();
+  // 比べる時刻は claim / renew が刻んだのと同じ実時間の時計から取る。
+  const nowIso = leaseNowIso;
   let reclaimed = 0;
   const publishing = await getStalePublishingSchedules(db, nowIso, limit);
   for (const row of publishing) {
@@ -798,9 +859,22 @@ async function reclaimStaleClaims(
 export async function processDueRichMenuSchedules(
   db: D1Database,
   deps: RichMenuScheduleExecutorDeps,
-  options: { now?: Date; limit?: number; runIdPrefix?: string } = {},
+  options: {
+    now?: Date;
+    limit?: number;
+    runIdPrefix?: string;
+    /**
+     * lease の期限に使う実時間。既定は本物の時計。
+     * `now` (cron の tick 時刻) は「どの予約が来たか」を決めるためのもので、
+     * 処理にかかった実時間は表さないため分けている。
+     * 試験は進められる時計を渡して経過を作る。
+     */
+    clock?: () => Date;
+  } = {},
 ): Promise<RichMenuScheduleProcessResult> {
   const now = options.now ?? new Date();
+  const clock = options.clock ?? (() => new Date());
+  const leaseClock: LeaseClock = () => clock().toISOString();
   const limit = options.limit ?? 20;
   const result: RichMenuScheduleProcessResult = {
     processed: 0,
@@ -816,7 +890,7 @@ export async function processDueRichMenuSchedules(
 
   // staleなclaimを先に戻して永久停止させない。回収後に通常のdue取得へ含める。
   try {
-    result.reclaimed = await reclaimStaleClaims(db, now, limit);
+    result.reclaimed = await reclaimStaleClaims(db, leaseClock(), limit);
   } catch (error) {
     console.error('rich-menu schedule reclaim error:', error);
   }
@@ -825,7 +899,7 @@ export async function processDueRichMenuSchedules(
   for (const schedule of due) {
     result.processed += 1;
     const runId = `${options.runIdPrefix ?? 'rms'}-${schedule.id}-${Date.now()}`;
-    const outcome = await handleOneSchedule(db, schedule, now, deps, runId, stats);
+    const outcome = await handleOneSchedule(db, schedule, now, deps, runId, stats, leaseClock);
     if (outcome === 'succeeded') result.succeeded += 1;
     else if (outcome === 'retried') result.retried += 1;
     else if (outcome === 'failed') result.failed += 1;
@@ -836,7 +910,7 @@ export async function processDueRichMenuSchedules(
   for (const schedule of restores) {
     result.processed += 1;
     const runId = `${options.runIdPrefix ?? 'rms'}-${schedule.id}-restore-${Date.now()}`;
-    const outcome = await handleOneRestore(db, schedule, now, deps, runId, stats);
+    const outcome = await handleOneRestore(db, schedule, now, deps, runId, stats, leaseClock);
     if (outcome === 'restored') result.restored += 1;
     else if (outcome === 'retried') result.retried += 1;
     else if (outcome === 'failed') result.failed += 1;

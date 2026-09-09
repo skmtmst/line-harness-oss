@@ -24,8 +24,8 @@ const dbMocks = vi.hoisted(() => ({
   recordRichMenuSchedulePermanentFailure: vi.fn(),
   acquirePublishLease: vi.fn(),
   renewPublishLease: vi.fn(),
+  renewScheduleLease: vi.fn(),
   releasePublishLease: vi.fn(),
-  publishLeaseNotTakenByOther: vi.fn(),
   setPageRichMenuId: vi.fn(),
   markRichMenuGroupPublished: vi.fn(),
   markRichMenuGroupUnpublished: vi.fn(),
@@ -158,10 +158,10 @@ beforeEach(() => {
   dbMocks.clearSchedulePublications.mockImplementation(async (_db: unknown, scheduleId: string, kind: string) => {
     journalStore.delete(`${scheduleId}:${kind}`);
   });
-  dbMocks.acquirePublishLease.mockResolvedValue(true);
+  dbMocks.acquirePublishLease.mockResolvedValue(1);
   dbMocks.renewPublishLease.mockResolvedValue(true);
+  dbMocks.renewScheduleLease.mockResolvedValue(true);
   dbMocks.releasePublishLease.mockResolvedValue(true);
-  dbMocks.publishLeaseNotTakenByOther.mockResolvedValue(true);
   dbMocks.setPageRichMenuId.mockResolvedValue(undefined);
   dbMocks.markRichMenuGroupPublished.mockResolvedValue(undefined);
   dbMocks.markRichMenuGroupUnpublished.mockResolvedValue(undefined);
@@ -211,6 +211,8 @@ describe('rich menu schedule executor', () => {
     expect(d.switchLiveTo).toHaveBeenCalledTimes(1);
     expect(dbMocks.recordRichMenuScheduleSuccess).toHaveBeenCalledWith(
       db, 'schedule-1', 'account-1', expect.any(String), 'completed',
+      // 確定は「自分が取ったあと誰もleaseを取っていない」を書込み条件にする。
+      { groupId: 'menu-1', generation: 1 },
     );
     expect(result).toMatchObject({ processed: 1, succeeded: 1 });
   });
@@ -227,7 +229,7 @@ describe('rich menu schedule executor', () => {
 
   test('leaseを取れなければ作らず次回へ回す', async () => {
     dbMocks.getDueRichMenuSchedules.mockResolvedValue([schedule()]);
-    dbMocks.acquirePublishLease.mockResolvedValue(false);
+    dbMocks.acquirePublishLease.mockResolvedValue(null);
     const d = deps();
 
     const result = await processDueRichMenuSchedules(db, d, { now });
@@ -419,6 +421,7 @@ describe('rich menu schedule executor', () => {
     const result = await processDueRichMenuSchedules(db, d, { now });
     expect(dbMocks.recordRichMenuScheduleSuccess).toHaveBeenCalledWith(
       db, 'period-1', 'account-1', expect.any(String), 'published',
+      { groupId: 'menu-1', generation: 1 },
     );
     expect(d.createRestoreShells).toHaveBeenCalledTimes(1);
     expect(dbMocks.recordRichMenuScheduleRestoreSuccess).toHaveBeenCalled();
