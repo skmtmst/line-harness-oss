@@ -281,6 +281,10 @@ describe('POST /webhook — 送信の結末を分ける (#622)', () => {
       routing_status: 'partial_failed', delivery_count: 0, error_code: 'send_failed',
     });
 
+    // 届いていないので cron の再試行に載せる（claim を返す）
+    expect(raw.prepare(
+      `SELECT status FROM friend_scenarios WHERE friend_id = 'friend-1'`,
+    ).get()).toEqual({ status: 'active' });
     // 届いていないと言い切れるので、再送制限は数えない。次の追加で送り直せる。
     await expect(isFriendAddResendSuppressed(db, {
       lineAccountId: 'account-1', friendId: 'friend-1',
@@ -307,6 +311,12 @@ describe('POST /webhook — 送信の結末を分ける (#622)', () => {
       lineAccountId: 'account-1', friendId: 'friend-1',
       resendSuppressionHours: 24, now: new Date(),
     })).resolves.toBe(true);
+    // cron に送り直させない（届いていたら2通目になる）。1通目は送り終えた扱い。
+    // 1通しかないシナリオなので「読み終えた」へ進む。active/delivering に
+    // 戻さない＝cronが1通目を拾い直さない。
+    expect(raw.prepare(
+      `SELECT status FROM friend_scenarios WHERE friend_id = 'friend-1'`,
+    ).get()).toEqual({ status: 'completed' });
     // 予約は掴んだまま残す（TTLまで別の実行を止める）
     const claim = raw.prepare(`SELECT event_id FROM friend_add_send_claims`).get() as { event_id: string };
     const event = raw.prepare(

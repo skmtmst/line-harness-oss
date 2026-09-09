@@ -87,6 +87,18 @@ export interface ImmediatePushOptions {
    * 送信そのものを試みなかったとき（配信対象外・再送見送りなど）は呼ばない。
    */
   onSendOutcome?: (outcome: 'delivered' | 'failed' | 'unknown') => void;
+  /**
+   * 結末の分からない送信（通信断・タイムアウト・429・5xx）のあと、
+   * この登録をどう扱うか。
+   *
+   *   retry（既定） … claim を返し、cron が改めて1通目を送る。従来どおり。
+   *   stop          … 1通目を送り終えた扱いにして先へ進め、cron に
+   *                   送り直させない。届いていたときに2通目を出さない。
+   *
+   * 台帳へ「送達不明」を残して人が確かめる呼び出し（友だち追加時配信）は
+   * stop を渡す。自動で送り直すと、同じ人に同じ案内が2通届く。
+   */
+  unknownSendPolicy?: 'retry' | 'stop';
 }
 
 /**
@@ -378,10 +390,21 @@ export async function pushImmediateFirstStep(
       }
     } catch (err) {
       // 4xx は LINE が断ったので届いていない。それ以外は結末が分からない。
-      // どちらでも claim は返して cron の再試行に載せるが、呼ぶ側には
-      // 区別して伝える（送達不明を自動再送に載せないため）。
+      const outcome = classifySendFailure(err);
+      options?.onSendOutcome?.(outcome);
+      if (outcome === 'unknown' && options?.unknownSendPolicy === 'stop' && advanceTargetId) {
+        /*
+         * 届いたかもしれないので cron に送り直させない。1通目を送り終えた
+         * 扱いにして先へ進める。到達タグは付けない（届いた確証がない）。
+         * 呼ぶ側は台帳へ送達不明を残し、人が確かめる。
+         */
+        console.error('[immediate-first-step] send outcome unknown, stopping retry:', err);
+        await advancePastFirstStep(advanceTargetId);
+        claimedEnrollmentId = null; // advance が claim を返している
+        return false;
+      }
+      // 届いていない（4xx）・従来どおりの呼び出しは claim を返して cron へ。
       console.error('[immediate-first-step] send failed, releasing claim:', err);
-      options?.onSendOutcome?.(classifySendFailure(err));
       await releaseClaim();
       return false;
     }

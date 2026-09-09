@@ -508,6 +508,8 @@ async function handleEvent(
               reply: { client: lineClient, replyToken: event.replyToken },
               skipCooldown: true,
               onSendOutcome: noteSendOutcome,
+              // 送達不明のまま cron に送り直させない（二重に届く）。
+              unknownSendPolicy: 'stop' as const,
             },
           );
           if (sent) {
@@ -565,6 +567,8 @@ async function handleEvent(
               reply: { client: lineClient, replyToken: event.replyToken },
               skipCooldown: true,
               onSendOutcome: noteSendOutcome,
+              // 送達不明のまま cron に送り直させない（二重に届く）。
+              unknownSendPolicy: 'stop' as const,
             },
           );
           if (sent) {
