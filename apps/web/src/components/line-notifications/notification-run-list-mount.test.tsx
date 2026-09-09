@@ -105,13 +105,23 @@ async function drainMicrotasks(): Promise<void> {
 }
 
 /*
- * Reactのpassive effect(useEffect)は、act()で包まない限りマイクロタスクより
- * 後のマクロタスクとして動く（実機のブラウザと同じ挙動。診断済み: render()
- * 直後はまだeffectが走っておらず、Promiseのマイクロタスクの方が先に処理
- * される）。account切替を`act()`で包まずに生の`root.render()`で行うと、
- * 「切替のレンダーは終わっているが、次のuseEffect(load)はまだ動いていない」
- * という司令塔差し戻しの窓を、実際のスケジューリングのまま再現できる。
+ * `root.render()` をactで包まずに生で呼ぶと、Reactはcommit(DOMへの反映)と
+ * passive effectのflush(load()を呼ぶuseEffect)を別のタスクとして積む。
+ * MutationObserverのコールバックはDOM変異の直後にマイクロタスクとして
+ * 呼ばれる。passive effectはさらに後のマクロタスクでしか動かないため
+ * （固定回数のtick待ちは実行環境の負荷でcommitとeffect-flushが同じtickへ
+ * 丸まり不安定だった）、commit直後のこの1点で必ず「commitは終わっている・
+ * useEffect(load)はまだ動いていない」瞬間を捕まえられる。
  */
+function waitForCommit(container: HTMLDivElement): Promise<void> {
+  return new Promise((resolve) => {
+    const observer = new MutationObserver(() => {
+      observer.disconnect()
+      resolve()
+    })
+    observer.observe(container, { attributes: true, subtree: true, childList: true, characterData: true })
+  })
+}
 
 async function setup() {
   // 店長権限を即答にしておき、再試行ボタンを常に出す。
@@ -188,7 +198,7 @@ describe('LINE通知一覧のReact実mount試験', () => {
     ['403', 403, '送信の再試行は店長だけができます。'] as const,
     ['409', 409, 'ほかの担当者が先に再試行しました。最新の記録を読み直してください。'] as const,
     ['500', 500, '送信を再試行できませんでした。時間をおいて読み直してください。'] as const,
-  ])('B切替後にAの再試行が%sで戻っても、Bには漏れず、Aの読み直しも始めない', async (_label, status, failureText) => {
+  ])('Bのレンダーは終わりuseEffect(load)がまだ動いていない瞬間にAが%sで戻っても、Bには漏れず、Aの読み直しも始めない', async (_label, status, failureText) => {
     const { container, deliveryCalls, nextDelivery, retryDeferreds } = await setup()
 
     await act(async () => {
@@ -201,29 +211,38 @@ describe('LINE通知一覧のReact実mount試験', () => {
     expect(retryDeferreds).toHaveLength(1)
     expect(container.textContent).toContain('再試行中')
 
-    // account切替のレンダーとuseEffect(load)まで進める。
-    await act(async () => {
-      root!.render(<NotificationRunList lineAccountId="account-b" mode="failures" />)
-      await drainMicrotasks()
-    })
-    expect(container.querySelector('[data-list-state]')?.getAttribute('data-list-state')).toBe('loading')
-    expect(deliveryCalls).toEqual([{ lineAccountId: 'account-a' }, { lineAccountId: 'account-b' }])
+    // actで包まない生のrender()。commit直後にMutationObserverで止めると、
+    // 「Bのレンダーはcommit済み・load()を呼ぶuseEffectはまだ未実行」という
+    // 司令塔差し戻しの窓に正確に止まる。
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const committed = waitForCommit(container)
+    root!.render(<NotificationRunList lineAccountId="account-b" mode="failures" />)
+    await committed
 
-    // ここでAの再試行の応答が戻る。Bへ切り替わったあとの応答。
-    await act(async () => {
-      if (status === 200) {
-        retryDeferreds[0].resolve({ success: true } as RetryResult)
-      } else {
-        retryDeferreds[0].reject(new ApiError(status, 'retry failed'))
-      }
-      await drainMicrotasks()
-    })
+    // Bのcommitは終わっている(表示は切り替わっている)。
+    expect(container.querySelector('[data-list-state]')?.getAttribute('data-list-state')).toBe('loading')
+    // だがuseEffect(load)はまだ動いていない。deliveriesはAの1回だけ。
+    expect(deliveryCalls).toHaveLength(1)
+
+    // まさにこの窓でAの再試行の応答が戻る。
+    if (status === 200) {
+      retryDeferreds[0].resolve({ success: true } as RetryResult)
+    } else {
+      retryDeferreds[0].reject(new ApiError(status, 'retry failed'))
+    }
+    await drainMicrotasks()
+    errorSpy.mockRestore()
 
     // Aの再試行は処理されたが、Bの画面には知らせが出ない。
     expect(noticeText(container)).toBeNull()
-    // Aの読み直しは始めない。deliveriesはA・Bの2回のまま。
-    expect(deliveryCalls).toHaveLength(2)
+    // Aの読み直しは始めない。Bのload()もまだ始まっていない。
+    expect(deliveryCalls).toHaveLength(1)
     if (failureText) expect(container.textContent).not.toContain(failureText)
+
+    // ここで初めてBのuseEffect(load)を実際に動かす。
+    await act(async () => { await drainMicrotasks() })
+    expect(deliveryCalls).toEqual([{ lineAccountId: 'account-a' }, { lineAccountId: 'account-b' }])
+    expect(noticeText(container)).toBeNull()
 
     await act(async () => {
       nextDelivery('account-b').resolve(ok([run('Bの通知')], 2))
