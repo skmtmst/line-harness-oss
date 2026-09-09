@@ -16,6 +16,7 @@ const apiMocks = vi.hoisted(() => {
 
   return {
     ApiError: MockApiError,
+    extractApiErrorCode: vi.fn(() => null),
     fetchApi: vi.fn(),
     get: vi.fn(),
     editor: vi.fn(),
@@ -34,6 +35,7 @@ const navigationMocks = vi.hoisted(() => ({ query: 'id=webinar-1' }))
 
 vi.mock('@/lib/api', () => ({
   ApiError: apiMocks.ApiError,
+  extractApiErrorCode: apiMocks.extractApiErrorCode,
   fetchApi: apiMocks.fetchApi,
   webinarApi: {
     get: apiMocks.get,
@@ -210,6 +212,7 @@ class FakeDocument extends FakeNode {
 
 let documentStub: FakeDocument
 let createRoot: typeof import('react-dom/client').createRoot
+let flushSync: typeof import('react-dom').flushSync
 const mountedRoots: Root[] = []
 
 beforeAll(async () => {
@@ -232,6 +235,7 @@ beforeAll(async () => {
     IS_REACT_ACT_ENVIRONMENT: true,
   })
   ;({ createRoot } = await import('react-dom/client'))
+  ;({ flushSync } = await import('react-dom'))
 })
 
 beforeEach(() => {
@@ -258,6 +262,17 @@ async function flush(): Promise<void> {
   })
 }
 
+/*
+  「切替直後」を見るための一コマ。`flushSync` で描画だけ先に確定させ、
+  useEffect が走る前の画面をそのまま写す。ここに前のウェビナーの中身が
+  写っていたら、利用者は一瞬でもそれを見て触れることになる。
+*/
+type Frame = { text: string; options: string[]; inputs: string[] }
+
+function frameOf(container: FakeElement): Frame {
+  return { text: container.textContent, options: optionLabels(container), inputs: inputValues(container) }
+}
+
 async function mount(element: ReactElement) {
   const container = documentStub.createElement('div')
   documentStub.body.appendChild(container)
@@ -267,9 +282,15 @@ async function mount(element: ReactElement) {
   await flush()
   return {
     container,
-    rerender: async (next: ReactElement) => {
-      await act(async () => { root.render(next) })
+    /* 返すのは切替の一コマ目。反映後の画面は container から読む。 */
+    rerender: async (next: ReactElement): Promise<Frame> => {
+      let firstFrame: Frame = { text: '', options: [], inputs: [] }
+      await act(async () => {
+        flushSync(() => { root.render(next) })
+        firstFrame = frameOf(container)
+      })
       await flush()
+      return firstFrame
     },
   }
 }
@@ -281,14 +302,53 @@ function elements(root: FakeNode): FakeElement[] {
   ])
 }
 
-async function clickButton(container: FakeElement, label: string): Promise<void> {
+function reactProps(element: FakeElement): Record<string, unknown> | undefined {
+  const key = Object.keys(element).find((name) => name.startsWith('__reactProps$'))
+  return key ? (element as unknown as Record<string, Record<string, unknown>>)[key] : undefined
+}
+
+function findButton(container: FakeElement, label: string): FakeElement {
   const button = elements(container).find((element) => element.tagName === 'BUTTON' && element.textContent.includes(label))
   if (!button) throw new Error(`button not found: ${label}`)
-  const key = Object.keys(button).find((name) => name.startsWith('__reactProps$'))
-  const props = key ? (button as unknown as Record<string, Record<string, unknown>>)[key] : undefined
-  const onClick = props?.onClick
+  return button
+}
+
+function findExactButton(container: FakeElement, label: string): FakeElement {
+  const button = elements(container).find((element) => element.tagName === 'BUTTON' && element.textContent === label)
+  if (!button) throw new Error(`button not found: ${label}`)
+  return button
+}
+
+/* 押せないことは属性でも性質でも表れる。両方見る。 */
+function isDisabled(button: FakeElement): boolean {
+  return button.disabled === true || button.getAttribute('disabled') !== null
+}
+
+/* CTA カードの見出しは入力欄の値。textContent には出ないので値で見る。 */
+function inputValues(container: FakeElement): string[] {
+  return elements(container)
+    .filter((element) => element.tagName === 'INPUT')
+    .map((element) => element.value || element.getAttribute('value') || '')
+}
+
+function optionLabels(container: FakeElement): string[] {
+  return elements(container).filter((element) => element.tagName === 'OPTION').map((element) => element.textContent)
+}
+
+async function clickButton(container: FakeElement, label: string): Promise<void> {
+  const button = findButton(container, label)
+  const onClick = reactProps(button)?.onClick
   if (typeof onClick !== 'function') throw new Error(`button has no onClick: ${label}`)
   await act(async () => { onClick({ currentTarget: button, target: button, preventDefault: () => undefined }) })
+  await flush()
+}
+
+async function changeSelect(container: FakeElement, ariaLabel: string, value: string): Promise<void> {
+  const select = elements(container).find((element) => element.tagName === 'SELECT' && element.getAttribute('aria-label') === ariaLabel)
+  if (!select) throw new Error(`select not found: ${ariaLabel}`)
+  const onChange = reactProps(select)?.onChange
+  if (typeof onChange !== 'function') throw new Error(`select has no onChange: ${ariaLabel}`)
+  await act(async () => { onChange({ currentTarget: { value }, target: { value } }) })
   await flush()
 }
 
@@ -316,6 +376,14 @@ const editor = {
   publicPage: { liffId: null, url: null, unavailableReason: null, description: '', test: null, form: null },
   publication: { status: 'draft' as const, draftVersion: 3, publishedVersion: null, publishedAt: null },
   monitoring: { notificationFailures: 0, duplicateRegistrations: 0, viewSegmentFailures: 0, actionFailures: 0 },
+}
+
+type FormsResponse = { success: boolean; data: Array<{ id: string; name: string; isActive: boolean }> }
+type CtaCardFixture = { atSeconds: number; kind: 'form' | 'url'; title: string; body: string | null; buttonLabel: string; autoOpen: boolean; formId: string | null; url: string | null }
+type CtaListResponse = { data: CtaCardFixture[] }
+
+function ctaCard(title: string, atSeconds: number, formId: string): CtaCardFixture {
+  return { atSeconds, kind: 'form', title, body: null, buttonLabel: '開く', autoOpen: false, formId, url: null }
 }
 
 const analytics = {
@@ -401,6 +469,153 @@ describe('Issue #674 ウェビナー編集の実挙動', () => {
     navigationMocks.query = 'id=webinar-active&pane=participants'
     await view.rerender(<EditWebinarPage />)
     expect(view.container.textContent).toContain('公開中')
+  })
+
+  it('初期loadが逆順で届いても、切替後のウェビナーだけを描く', async () => {
+    const loadA = deferred<{ data: typeof webinar }>()
+    const loadB = deferred<{ data: typeof webinar }>()
+    navigationMocks.query = 'id=webinar-a&pane=review'
+    apiMocks.publishValidation.mockResolvedValue({ data: { version: 3, checks: [], blockers: [], warnings: [] } })
+    apiMocks.get.mockImplementation((id: string) => (id === 'webinar-a' ? loadA.promise : loadB.promise))
+
+    const view = await mount(<EditWebinarPage />)
+    expect(view.container.textContent).toContain('読み込み中...')
+
+    navigationMocks.query = 'id=webinar-b&pane=review'
+    const frame = await view.rerender(<EditWebinarPage />)
+    /* 切替の一コマ目から、前のウェビナーの中身を出さない。 */
+    expect(frame.text).toContain('読み込み中...')
+
+    /* 前のウェビナーの応答が先に届く。 */
+    loadA.resolve({ data: { ...webinar, id: 'webinar-a', title: '前のウェビナーA' } })
+    await flush()
+    expect(view.container.textContent).not.toContain('前のウェビナーA')
+    expect(view.container.textContent).toContain('読み込み中...')
+
+    loadB.resolve({ data: { ...webinar, id: 'webinar-b', title: '後のウェビナーB' } })
+    await flush()
+    expect(view.container.textContent).toContain('後のウェビナーB')
+    expect(view.container.textContent).not.toContain('前のウェビナーA')
+  })
+
+  it('切替前の読み込み失敗は、切替後の成功で消える', async () => {
+    navigationMocks.query = 'id=webinar-a&pane=review'
+    apiMocks.publishValidation.mockResolvedValue({ data: { version: 3, checks: [], blockers: [], warnings: [] } })
+    apiMocks.get.mockImplementation((id: string) => (id === 'webinar-a'
+      ? Promise.reject(new apiMocks.ApiError(404, 'not_found'))
+      : Promise.resolve({ data: { ...webinar, id, title: '後のウェビナーB' } })))
+
+    const view = await mount(<EditWebinarPage />)
+    expect(view.container.textContent).toContain('見つかりませんでした。開き直してください。')
+
+    navigationMocks.query = 'id=webinar-b&pane=review'
+    const frame = await view.rerender(<EditWebinarPage />)
+    /* 切替の一コマ目に前の失敗文を持ち越さない。 */
+    expect(frame.text).toContain('読み込み中...')
+    expect(frame.text).not.toContain('見つかりませんでした')
+    expect(view.container.textContent).toContain('後のウェビナーB')
+    expect(view.container.textContent).not.toContain('見つかりませんでした。開き直してください。')
+  })
+
+  it('切替直後は前のウェビナーの候補とCTAを出さず、揃うまで保存も止める', async () => {
+    const formsA = deferred<FormsResponse>()
+    const formsB = deferred<FormsResponse>()
+    const ctasA = deferred<CtaListResponse>()
+    const ctasB = deferred<CtaListResponse>()
+    navigationMocks.query = 'id=webinar-a&pane=cta'
+    apiMocks.get.mockImplementation((id: string) => Promise.resolve({ data: { ...webinar, id, accountId: id === 'webinar-a' ? 'account-a' : 'account-b' } }))
+    apiMocks.fetchApi.mockImplementation((url: string) => (url.includes('account-a') ? formsA.promise : formsB.promise))
+    apiMocks.ctas.mockImplementation((id: string) => (id === 'webinar-a' ? ctasA.promise : ctasB.promise))
+
+    const view = await mount(<EditWebinarPage />)
+    formsA.resolve({ success: true, data: [{ id: 'form-a', name: '旧フォームA', isActive: true }] })
+    ctasA.resolve({ data: [ctaCard('旧CTA・A', 30, 'form-a')] })
+    await flush()
+    expect(optionLabels(view.container)).toContain('旧フォームA')
+    expect(inputValues(view.container)).toContain('旧CTA・A')
+
+    navigationMocks.query = 'id=webinar-b&pane=cta'
+    const frame = await view.rerender(<EditWebinarPage />)
+
+    /* 切替の一コマ目から、前のウェビナーの候補もCTAも画面に無い。 */
+    expect(frame.options).not.toContain('旧フォームA')
+    expect(frame.inputs).not.toContain('旧CTA・A')
+
+    /* B の候補も CTA もまだ届いていない間。 */
+    expect(optionLabels(view.container)).not.toContain('旧フォームA')
+    expect(inputValues(view.container)).not.toContain('旧CTA・A')
+    expect(view.container.textContent).toContain('回答フォームを読み込んでいます。')
+    expect(isDisabled(findButton(view.container, '申込フォームを保存'))).toBe(true)
+    expect(isDisabled(findExactButton(view.container, '保存'))).toBe(true)
+
+    formsB.resolve({ success: true, data: [{ id: 'form-b', name: '新フォームB', isActive: true }] })
+    ctasB.resolve({ data: [ctaCard('新CTA・B', 60, 'form-b')] })
+    await flush()
+    expect(optionLabels(view.container)).toContain('新フォームB')
+    expect(inputValues(view.container)).toContain('新CTA・B')
+    expect(optionLabels(view.container)).not.toContain('旧フォームA')
+    expect(inputValues(view.container)).not.toContain('旧CTA・A')
+  })
+
+  it('候補とCTAが逆順で届いても、切替後のウェビナーの分だけが残る', async () => {
+    const formsA = deferred<FormsResponse>()
+    const formsB = deferred<FormsResponse>()
+    const ctasA = deferred<CtaListResponse>()
+    const ctasB = deferred<CtaListResponse>()
+    navigationMocks.query = 'id=webinar-a&pane=cta'
+    apiMocks.get.mockImplementation((id: string) => Promise.resolve({ data: { ...webinar, id, accountId: id === 'webinar-a' ? 'account-a' : 'account-b' } }))
+    apiMocks.fetchApi.mockImplementation((url: string) => (url.includes('account-a') ? formsA.promise : formsB.promise))
+    apiMocks.ctas.mockImplementation((id: string) => (id === 'webinar-a' ? ctasA.promise : ctasB.promise))
+
+    const view = await mount(<EditWebinarPage />)
+    navigationMocks.query = 'id=webinar-b&pane=cta'
+    const frame = await view.rerender(<EditWebinarPage />)
+    expect(frame.options).not.toContain('旧フォームA')
+    expect(frame.inputs).not.toContain('旧CTA・A')
+
+    /* 前のウェビナーの応答が、後のウェビナーの応答より先に届く。 */
+    formsA.resolve({ success: true, data: [{ id: 'form-a', name: '旧フォームA', isActive: true }] })
+    ctasA.resolve({ data: [ctaCard('旧CTA・A', 30, 'form-a')] })
+    await flush()
+    expect(optionLabels(view.container)).not.toContain('旧フォームA')
+    expect(inputValues(view.container)).not.toContain('旧CTA・A')
+    expect(view.container.textContent).toContain('回答フォームを読み込んでいます。')
+
+    formsB.resolve({ success: true, data: [{ id: 'form-b', name: '新フォームB', isActive: true }] })
+    ctasB.resolve({ data: [ctaCard('新CTA・B', 60, 'form-b')] })
+    await flush()
+    expect(optionLabels(view.container)).toContain('新フォームB')
+    expect(inputValues(view.container)).toContain('新CTA・B')
+    expect(optionLabels(view.container)).not.toContain('旧フォームA')
+    expect(inputValues(view.container)).not.toContain('旧CTA・A')
+  })
+
+  it('候補を取り直す間は前の候補を消し、揃うまで申込フォームを保存できない', async () => {
+    const retry = deferred<FormsResponse>()
+    navigationMocks.query = 'id=webinar-1&pane=cta'
+    /* CTA カードのフォーム選択にも候補が出る。取り直しの間はそこからも消す。 */
+    apiMocks.ctas.mockResolvedValue({ data: [ctaCard('相談', 30, 'form-a')] })
+    apiMocks.fetchApi
+      .mockResolvedValueOnce({ success: true, data: [{ id: 'form-a', name: '旧フォームA', isActive: true }] })
+      .mockImplementationOnce(() => retry.promise)
+    apiMocks.saveEditor.mockRejectedValue(new apiMocks.ApiError(409, 'form_inactive_or_missing'))
+
+    const view = await mount(<EditWebinarPage />)
+    expect(optionLabels(view.container)).toContain('旧フォームA')
+
+    await changeSelect(view.container, '申込に使う回答フォーム', 'form-a')
+    await clickButton(view.container, '申込フォームを保存')
+
+    /* サーバーが拒否したので候補を取り直す。取り直しの間は前の候補を出さない。 */
+    expect(apiMocks.fetchApi).toHaveBeenCalledTimes(2)
+    expect(optionLabels(view.container)).not.toContain('旧フォームA')
+    expect(view.container.textContent).toContain('回答フォームを読み込んでいます。')
+    expect(isDisabled(findButton(view.container, '申込フォームを保存'))).toBe(true)
+
+    retry.resolve({ success: true, data: [{ id: 'form-c', name: '選び直し用フォームC', isActive: true }] })
+    await flush()
+    expect(optionLabels(view.container)).toContain('選び直し用フォームC')
+    expect(isDisabled(findButton(view.container, '申込フォームを保存'))).toBe(false)
   })
 
   it('分析の見かけだけのタブを、実際の節へ移動するリンクとして描画する', async () => {

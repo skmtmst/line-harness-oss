@@ -1025,12 +1025,32 @@ function NotificationDesignStep({ webinarId, registrations }: { webinarId: strin
 
 type FormCandidateState = 'idle' | 'loading' | 'ready' | 'error' | 'forbidden'
 
+/*
+  CTA の編集状態は「どのウェビナーの分か」を必ず一緒に持つ。
+  ウェビナーを切り替えた瞬間から前のウェビナーの CTA は出さない・保存させない。
+*/
+type CtaEditing = { webinarId: string; loaded: boolean; ctas: WebinarCtaCard[]; times: string[]; message: string | null }
+
+function emptyCtaEditing(webinarId: string): CtaEditing {
+  return { webinarId, loaded: false, ctas: [], times: [], message: null }
+}
+
 function CtasTab({ webinarId, forms, formsState, onRetryForms, onCtasLoaded }: { webinarId: string; forms: Array<{ id: string; name: string }>; formsState: FormCandidateState; onRetryForms: () => void; onCtasLoaded?: (ctas: WebinarCtaCard[] | null) => void }) {
-  const [ctas, setCtas] = useState<WebinarCtaCard[]>([])
-  const [times, setTimes] = useState<string[]>([])
-  const [message, setMessage] = useState<string | null>(null)
+  const [editing, setEditing] = useState<CtaEditing>(() => emptyCtaEditing(webinarId))
   const [saving, setSaving] = useState(false)
-  const [loaded, setLoaded] = useState(false)
+  /* 取得の世代印。切替後に遅れて届いた前のウェビナーの応答はここで捨てる。 */
+  const ctaRequestId = useRef(0)
+
+  /* 描くのは今のウェビナーの分だけ。印が違えば「まだ何も無い」として描く。 */
+  const current = editing.webinarId === webinarId ? editing : emptyCtaEditing(webinarId)
+  const { ctas, times, message, loaded } = current
+  /* 編集も今のウェビナーの分にだけ効かせる。 */
+  const editCurrent = useCallback((update: (prev: CtaEditing) => CtaEditing) => {
+    setEditing((prev) => (prev.webinarId === webinarId ? update(prev) : prev))
+  }, [webinarId])
+  const setMessage = useCallback((next: string | null) => {
+    editCurrent((prev) => ({ ...prev, message: next }))
+  }, [editCurrent])
 
   /*
     CTA の取得はここに一本化し、親の概要段は報告を受けて件数だけ描く。
@@ -1039,8 +1059,13 @@ function CtasTab({ webinarId, forms, formsState, onRetryForms, onCtasLoaded }: {
   const loadCtas = useCallback(async () => {
     // ロード失敗時に空の状態で保存すると all-or-nothing 置換で既存 CTA を消して
     // しまうため、初回 GET が成功するまで保存を無効化する
+    const requestId = ++ctaRequestId.current
+    /* 取得を始めた時点で前の中身を捨てる。読み込み中に旧 CTA を触らせない。 */
+    setEditing(emptyCtaEditing(webinarId))
     try {
       const res = await webinarApi.ctas(webinarId)
+      /* 先に世代印を見る。切替後に届いた前の応答はここで終わり。 */
+      if (requestId !== ctaRequestId.current) return
       /*
         **配列で来なかったら、読めなかったこととして扱う。**
         口の契約は配列（`apps/worker/src/routes/webinars.ts:904` が
@@ -1049,24 +1074,26 @@ function CtasTab({ webinarId, forms, formsState, onRetryForms, onCtasLoaded }: {
         そのまま保存に進むと、置き換えで既存のCTAを消してしまう。
       */
       if (!Array.isArray(res.data)) throw new Error('cta_list_not_array')
-      setCtas(res.data)
-      setTimes(res.data.map((c) => fmtMinSec(c.atSeconds)))
-      setLoaded(true)
+      setEditing({ webinarId, loaded: true, ctas: res.data, times: res.data.map((c) => fmtMinSec(c.atSeconds)), message: null })
       onCtasLoaded?.(res.data)
     } catch {
-      setMessage('CTAカードを読み込めませんでした。もう一度読み込んでください。読み込めるまで保存はできません。')
+      if (requestId !== ctaRequestId.current) return
+      setEditing({ webinarId, loaded: false, ctas: [], times: [], message: 'CTAカードを読み込めませんでした。もう一度読み込んでください。読み込めるまで保存はできません。' })
       onCtasLoaded?.(null)
     }
   }, [webinarId, onCtasLoaded])
 
   useEffect(() => {
     void loadCtas()
+    return () => { ctaRequestId.current += 1 }
   }, [loadCtas])
 
   const update = (i: number, patch: Partial<WebinarCtaCard>) =>
-    setCtas((prev) => prev.map((c, j) => (j === i ? { ...c, ...patch } : c)))
+    editCurrent((prev) => ({ ...prev, ctas: prev.ctas.map((c, j) => (j === i ? { ...c, ...patch } : c)) }))
 
   const save = async () => {
+    /* 読めていない間は保存しない（空で全置換して既存 CTA を消さない）。 */
+    if (!loaded) return
     setMessage(null)
     const merged: WebinarCtaCard[] = []
     for (let i = 0; i < ctas.length; i++) {
@@ -1081,8 +1108,7 @@ function CtasTab({ webinarId, forms, formsState, onRetryForms, onCtasLoaded }: {
     try {
       const sorted = [...merged].sort((a, b) => a.atSeconds - b.atSeconds)
       await webinarApi.saveCtas(webinarId, sorted)
-      setCtas(sorted)
-      setTimes(sorted.map((c) => fmtMinSec(c.atSeconds)))
+      editCurrent((prev) => ({ ...prev, ctas: sorted, times: sorted.map((c) => fmtMinSec(c.atSeconds)) }))
       /* 保存した中身を親の概要段へ流す。取り直しの GET は要らない。 */
       onCtasLoaded?.(sorted)
       setMessage(`${sorted.length}件保存しました`)
@@ -1115,7 +1141,7 @@ function CtasTab({ webinarId, forms, formsState, onRetryForms, onCtasLoaded }: {
               <input
                 value={times[i] ?? ''}
                 onChange={(e) =>
-                  setTimes((prev) => prev.map((t, j) => (j === i ? e.target.value : t)))
+                  editCurrent((prev) => ({ ...prev, times: prev.times.map((t, j) => (j === i ? e.target.value : t)) }))
                 }
                 placeholder="45:00"
                 className="w-20 rounded border px-2 py-1"
@@ -1157,8 +1183,7 @@ function CtasTab({ webinarId, forms, formsState, onRetryForms, onCtasLoaded }: {
             )}
             <button
               onClick={() => {
-                setCtas((prev) => prev.filter((_, j) => j !== i))
-                setTimes((prev) => prev.filter((_, j) => j !== i))
+                editCurrent((prev) => ({ ...prev, ctas: prev.ctas.filter((_, j) => j !== i), times: prev.times.filter((_, j) => j !== i) }))
               }}
               className="ml-auto text-red-500"
             >
@@ -1189,11 +1214,14 @@ function CtasTab({ webinarId, forms, formsState, onRetryForms, onCtasLoaded }: {
         <>
         <button
           onClick={() => {
-            setCtas((prev) => [...prev, {
-              atSeconds: 0, kind: 'form', title: '', body: null,
-              buttonLabel: '', autoOpen: false, formId: null, url: null,
-            }])
-            setTimes((prev) => [...prev, '0:00'])
+            editCurrent((prev) => ({
+              ...prev,
+              ctas: [...prev.ctas, {
+                atSeconds: 0, kind: 'form', title: '', body: null,
+                buttonLabel: '', autoOpen: false, formId: null, url: null,
+              }],
+              times: [...prev.times, '0:00'],
+            }))
           }}
           className="rounded border px-3 py-1 text-sm"
         >
@@ -1214,48 +1242,63 @@ function CtasTab({ webinarId, forms, formsState, onRetryForms, onCtasLoaded }: {
 
 type RegistrationFormOption = { id: string; name: string; isActive: boolean }
 
+/*
+  フォーム候補は「どの account の分か」を必ず一緒に持つ。
+  account を切り替えた瞬間から前の account の候補は出さない・選ばせない・保存させない。
+*/
+type FormCandidates = { accountId: string | null; state: FormCandidateState; items: RegistrationFormOption[] }
+
+function emptyFormCandidates(accountId: string | null): FormCandidates {
+  return { accountId, state: accountId ? 'loading' : 'idle', items: [] }
+}
+
 function CtaDesignStep({ webinarId, accountId, editor, registrations, onEditorChange }: { webinarId: string; accountId: string | null; editor: WebinarEditor; registrations: number | null; onEditorChange: (editor: WebinarEditor) => void }) {
-  const [ctas, setCtas] = useState<WebinarCtaCard[]>([])
+  /* 子から受け取った CTA も「どのウェビナーの分か」を一緒に持つ。 */
+  const [reportedCtas, setReportedCtas] = useState<{ webinarId: string; items: WebinarCtaCard[] }>(() => ({ webinarId, items: [] }))
+  const ctas = reportedCtas.webinarId === webinarId ? reportedCtas.items : []
   /*
     申込フォームの候補。CTA内で使うフォームとは別の選択肢。
     公開中のものだけを候補にし、停止・削除・別アカウントは選ばせない。
   */
-  const [registrationForms, setRegistrationForms] = useState<RegistrationFormOption[]>([])
-  const [registrationFormState, setRegistrationFormState] = useState<FormCandidateState>(accountId ? 'loading' : 'idle')
+  const [formCandidates, setFormCandidates] = useState<FormCandidates>(() => emptyFormCandidates(accountId))
   const [selectedRegistrationFormId, setSelectedRegistrationFormId] = useState<string>(editor.registrationFormId ?? '')
   const [savingRegistrationForm, setSavingRegistrationForm] = useState(false)
   const [registrationNotice, setRegistrationNotice] = useState('')
   const [registrationError, setRegistrationError] = useState('')
+  /* 取得の世代印。切替後に遅れて届いた前の account の応答はここで捨てる。 */
   const formRequestId = useRef(0)
+
+  /* 描くのは今の account の分だけ。印が違えば「これから読む」として描く。 */
+  const currentFormCandidates = formCandidates.accountId === accountId ? formCandidates : emptyFormCandidates(accountId)
+  const registrationForms = currentFormCandidates.items
+  const registrationFormState = currentFormCandidates.state
 
   /*
     CTA の取得は子の編集タブ(`CtasTab`)に一本化し、親は報告を受けて
     件数だけ描く。同じ口を親子で2回叩かない。
   */
   const handleCtasLoaded = useCallback((next: WebinarCtaCard[] | null) => {
-    setCtas(next ?? [])
-  }, [])
+    setReportedCtas({ webinarId, items: next ?? [] })
+  }, [webinarId])
 
   const loadRegistrationForms = useCallback(() => {
     const requestId = ++formRequestId.current
     if (!accountId) {
-      setRegistrationForms([])
-      setRegistrationFormState('idle')
+      setFormCandidates({ accountId, state: 'idle', items: [] })
       return
     }
-    setRegistrationFormState('loading')
+    /* 取得を始めた時点で前の候補を捨てる。読み込み中に旧候補を出さない。 */
+    setFormCandidates({ accountId, state: 'loading', items: [] })
     fetchApi<{ success: boolean; data: Array<{ id: string; name: string; isActive?: boolean }> }>(`/api/forms?account_id=${encodeURIComponent(accountId)}`)
       .then((response) => {
         if (requestId !== formRequestId.current) return
         const items = Array.isArray(response.data) ? response.data : []
-        setRegistrationForms(items.map((form) => ({ id: form.id, name: form.name, isActive: form.isActive === true })))
-        setRegistrationFormState('ready')
+        setFormCandidates({ accountId, state: 'ready', items: items.map((form) => ({ id: form.id, name: form.name, isActive: form.isActive === true })) })
       })
       .catch((cause) => {
         if (requestId !== formRequestId.current) return
-        setRegistrationForms([])
         /* 口自体は同一アカウントに絞っている。403・404 は権限不足、それ以外は取得失敗。 */
-        setRegistrationFormState(cause instanceof ApiError && (cause.status === 403 || cause.status === 404) ? 'forbidden' : 'error')
+        setFormCandidates({ accountId, state: cause instanceof ApiError && (cause.status === 403 || cause.status === 404) ? 'forbidden' : 'error', items: [] })
       })
   }, [accountId])
 
@@ -1264,7 +1307,22 @@ function CtaDesignStep({ webinarId, accountId, editor, registrations, onEditorCh
     return () => { formRequestId.current += 1 }
   }, [loadRegistrationForms])
 
+  /* 候補は公開中だけ。停止中は一覧に混ぜない。 */
+  const publishedRegistrationForms = registrationForms.filter((form) => form.isActive)
+
   const saveRegistrationForm = async () => {
+    /* 今の account の候補が揃うまで保存しない。切替直後に旧候補のIDを書き込ませない。 */
+    if (registrationFormState !== 'ready') {
+      setRegistrationNotice('')
+      setRegistrationError('回答フォームの候補を読み込んでから保存してください。')
+      return
+    }
+    /* 選択が今の候補に無いなら送らない。前の account の選択を新しい相手に保存させない。 */
+    if (selectedRegistrationFormId && !publishedRegistrationForms.some((form) => form.id === selectedRegistrationFormId)) {
+      setRegistrationNotice('')
+      setRegistrationError('選んだ申込フォームは今の候補にありません。公開中のフォームを選び直してください。')
+      return
+    }
     setSavingRegistrationForm(true)
     setRegistrationNotice('')
     setRegistrationError('')
@@ -1289,8 +1347,6 @@ function CtaDesignStep({ webinarId, accountId, editor, registrations, onEditorCh
   const primary = ctas[0]
   const forms = registrationForms.map(({ id, name }) => ({ id, name }))
   const selectedForm = forms.find((form) => form.id === primary?.formId)
-  /* 候補は公開中だけ。停止中は一覧に混ぜない。 */
-  const publishedRegistrationForms = registrationForms.filter((form) => form.isActive)
   /* 保存済みだが候補に無い = 停止・削除・別アカウント。拒否理由と選び直しを出す。 */
   const savedRegistrationFormMissing = Boolean(
     editor.registrationFormId && !publishedRegistrationForms.some((form) => form.id === editor.registrationFormId),
@@ -1684,13 +1740,26 @@ function EditWebinarInner() {
   const searchParams = useSearchParams()
   const id = searchParams.get('id')
   const { accounts, loading: accountsLoading } = useAccount()
-  const [webinar, setWebinar] = useState<Webinar | null>(null)
-  const [editor, setEditor] = useState<WebinarEditor | null>(null)
+  /*
+    読み込んだ中身も失敗も「どのウェビナーの分か」を一緒に持つ。
+    別のウェビナーへ切り替えた瞬間から、前のウェビナーの中身も失敗文も画面に出さない。
+  */
+  const [loadedWebinar, setLoadedWebinar] = useState<{ id: string; webinar: Webinar; editor: WebinarEditor } | null>(null)
+  const [loadFailure, setLoadFailure] = useState<{ id: string; message: string } | null>(null)
   const [analytics, setAnalytics] = useState<WebinarAnalytics | null>(null)
   const [analyticsState, setAnalyticsState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
   const [analyticsId, setAnalyticsId] = useState<string | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [loadError, setLoadError] = useState<string | null>(null)
+  /* 取得の世代印。切替後に遅れて届いた前のウェビナーの応答はここで捨てる。 */
+  const loadRequestId = useRef(0)
+
+  const webinar = loadedWebinar && loadedWebinar.id === id ? loadedWebinar.webinar : null
+  const editor = loadedWebinar && loadedWebinar.id === id ? loadedWebinar.editor : null
+  const loadError = loadFailure && loadFailure.id === id ? loadFailure.message : null
+  /* 今のウェビナーの中身も失敗も無い間が読み込み中。切替の1コマ目から前の中身を描かない。 */
+  const loading = webinar === null && loadError === null
+  const setEditor = useCallback((next: WebinarEditor) => {
+    setLoadedWebinar((prev) => (prev && prev.id === id ? { ...prev, editor: next } : prev))
+  }, [id])
   /*
     **編集画面なので、開いた直後は設定の1段目**。前は「概要・分析」を先頭に
     置いていたので、直しに来た人が結果の画面から始めることになっていた。
@@ -1717,14 +1786,24 @@ function EditWebinarInner() {
 
   useEffect(() => {
     if (!id) return
-    setLoading(true)
+    const requestId = ++loadRequestId.current
+    /* 切替時は集計も前のウェビナーの分を捨てる（申込数は段をまたいで出る）。 */
+    setAnalytics(null)
+    setAnalyticsId(null)
+    setAnalyticsState('idle')
     Promise.all([webinarApi.get(id), webinarApi.editor(id)])
       .then(([webinarResponse, editorResponse]) => {
-        setWebinar(webinarResponse.data)
-        setEditor(editorResponse.data)
+        /* 先に世代印を見る。切替後に届いた前の応答はここで終わり。 */
+        if (requestId !== loadRequestId.current) return
+        /* 読めたら前の失敗文は消す。直ったのに赤い文が残らない。 */
+        setLoadFailure(null)
+        setLoadedWebinar({ id, webinar: webinarResponse.data, editor: editorResponse.data })
       })
-      .catch((err) => setLoadError(webinarErrorText(err, '読み込めませんでした。開き直してください。')))
-      .finally(() => setLoading(false))
+      .catch((err) => {
+        if (requestId !== loadRequestId.current) return
+        setLoadFailure({ id, message: webinarErrorText(err, '読み込めませんでした。開き直してください。') })
+      })
+    return () => { loadRequestId.current += 1 }
   }, [id])
 
   /*
