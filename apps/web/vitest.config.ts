@@ -2,15 +2,6 @@ import { defineConfig } from 'vitest/config'
 import { fileURLToPath } from 'node:url'
 
 export default defineConfig({
-  /*
-   * Next.jsのSWCビルドは自動JSXランタイムを使うため、shared配下の
-   * コンポーネントは `React` を自前でimportしていない。試験だけ
-   * classicへ倒すと「実コンポーネントをmount」する試験がその配下を
-   * 描画した瞬間に落ちる。ビルド本体と同じ自動ランタイムに合わせる。
-   */
-  esbuild: {
-    jsx: 'automatic',
-  },
   resolve: {
     /*
      * `@/` は画面のコードが普通に使っている書き方。ここに無いと、
@@ -20,6 +11,15 @@ export default defineConfig({
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
+  },
+  /*
+   * 画面と同じJSXの書き方で読む。Next は自動runtime(React を import
+   * しなくてもJSXが書ける)なので、試験だけ古い runtime にすると
+   * `React is not defined` で落ちる。落ち方が中身と関係ないので、
+   * 原因を探すのに時間がかかる(#630)。
+   */
+  esbuild: {
+    jsx: 'automatic',
   },
   test: {
     environment: 'node',
