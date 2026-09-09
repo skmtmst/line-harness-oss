@@ -4,8 +4,8 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { api, type OutgoingWebhookOverview } from '@/lib/api'
 import type { IncomingWebhook, WebhookInteractionSummary } from '@line-crm/shared'
 import { Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
-import NotificationsPage from '@/app/notifications/page'
 import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -17,6 +17,12 @@ import { MIN_SECRET_LENGTH, generateSecret } from './secret'
 
 type Tab = 'incoming' | 'outgoing'
 type LoadStatus = 'loading' | 'ready' | 'error'
+type ToggleKind = 'incoming' | 'outgoing'
+type ToggleFailure = { kind: ToggleKind; id: string; name: string; message: string }
+
+function toggleKey(kind: ToggleKind, id: string): string {
+  return `${kind}:${id}`
+}
 
 function isHttpsUrl(value: string): boolean {
   try {
@@ -26,6 +32,11 @@ function isHttpsUrl(value: string): boolean {
   }
 }
 
+/*
+  `notify` というキーは旧URL（/notifications → /webhooks?tab=notify）のために残す。
+  中身は通知機能ではなく、下の見本（WebhookSamples）を開く。
+  「見本 14」という表示は設計（V6 26-1 ノード k3WxrO）の指定なので変えない。
+*/
 const MERGED_TABS = [
   { key: 'outgoing', label: 'こちらから送る 6' },
   { key: 'incoming', label: 'こちらで受け取る 3' },
@@ -54,11 +65,82 @@ const SOURCE_PRESETS = [
 /** 見本に無い「その他」を選んだときだけ、自由入力に切り替える印。 */
 const SOURCE_OTHER = '__other__'
 
+/*
+  送る側の見本（いつ送るか・何を送るか）。一覧の表示文言とそろえている。
+  送り先の作成は /webhooks/new で行うので、ここでは行き先の案内だけ持つ。
+*/
+const OUTGOING_SAMPLES = [
+  { event: 'friend.added', when: '友だちが追加されたとき', payload: '名前・追加日・流入元' },
+  { event: 'form.submitted', when: 'フォームが送られたとき', payload: '回答のすべて' },
+  { event: 'booking.created', when: '予約が入ったとき', payload: '予約日時・メニュー・担当' },
+  { event: 'conversion.confirmed', when: '注文が確定したとき', payload: '注文番号・金額・お客様名' },
+] as const
+
+/*
+  見本タブの中身（N-381）。以前は別機能の通知画面を埋め込んでいたが、
+  外部連携の見本として、受け取る側の種類と送る側のきっかけを並べ、
+  それぞれ作成の入口へつなげる。通知機能への導線は置かない。
+*/
+function WebhookSamples() {
+  return (
+    <div>
+      <p className="bg-accent-soft text-ink-secondary rounded-card mb-4 px-4 py-3 text-sm leading-6">
+        よくあるつなぎ方の見本です。使いたい見本を選ぶと、作成画面がその内容で開きます。
+      </p>
+      <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-2">
+        <section className="bg-canvas border-hairline rounded-card border p-5" aria-label="受け取る見本">
+          <h2 className="text-ink mb-1 text-lg font-bold">受け取る見本</h2>
+          <p className="text-ink-secondary mb-4 text-sm">相手のサービスで起きたことをうちに取り込みます。</p>
+          <ul className="space-y-3">
+            {SOURCE_PRESETS.map((preset) => (
+              <li key={preset.value} className="bg-canvas-sunken rounded-control flex flex-wrap items-center justify-between gap-3 p-4">
+                <div className="min-w-0">
+                  <strong className="text-ink block text-sm">{preset.label}</strong>
+                  <span className="text-ink-secondary mt-1 block text-xs">{preset.hint}</span>
+                </div>
+                <Button variant="secondary" href={`/webhooks?tab=incoming&source=${preset.value}`}>
+                  この見本で作る
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </section>
+        <section className="bg-canvas border-hairline rounded-card border p-5" aria-label="送る見本">
+          <h2 className="text-ink mb-1 text-lg font-bold">送る見本</h2>
+          <p className="text-ink-secondary mb-4 text-sm">うちで起きたことを相手のサービスに知らせます。</p>
+          <ul className="space-y-3">
+            {OUTGOING_SAMPLES.map((sample) => (
+              <li key={sample.event} className="bg-canvas-sunken rounded-control flex flex-wrap items-center justify-between gap-3 p-4">
+                <div className="min-w-0">
+                  <strong className="text-ink block text-sm">{sample.when}</strong>
+                  <span className="text-ink-secondary mt-1 block text-xs">送るもの：{sample.payload}</span>
+                </div>
+                <Button variant="secondary" href="/webhooks/new">
+                  送り先を作る
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      </div>
+    </div>
+  )
+}
+
 function WebhooksPageInner({ tab }: { tab: Tab }) {
   const { selectedAccountId } = useAccount()
   const selectedAccountIdRef = useRef(selectedAccountId)
   selectedAccountIdRef.current = selectedAccountId
+  // 初回は AccountProvider が null → 保存済みアカウントの順で復元する。
+  // その復元を「利用者が切り替えた」と誤認せず、最後に表示した実アカウントだけを覚える。
+  const lastLoadedAccountIdRef = useRef<string | null>(null)
   const loadGenerationRef = useRef(0)
+  /*
+    開始/停止の送信中の行ID（N-382）。二重押しの2回目は受け付けない。
+    stateではなくrefで持つ。stateは次の描画まで古い値が見えるため、
+    素早い二重押しを2回とも通してしまう。行ごとに持つので、他の行の操作は止めない。
+  */
+  const togglingIdsRef = useRef<Set<string>>(new Set())
   const [incoming, setIncoming] = useState<IncomingWebhook[]>([])
   const [outgoing, setOutgoing] = useState<OutgoingWebhookOverview[]>([])
   const [incomingStatus, setIncomingStatus] = useState<LoadStatus>('loading')
@@ -67,9 +149,18 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
   const [summaryStatus, setSummaryStatus] = useState<LoadStatus>('loading')
   const [loadedAccountId, setLoadedAccountId] = useState<string | null>(null)
   const [error, setError] = useState('')
-  const [showCreate, setShowCreate] = useState(false)
+  // 一つの失敗を別行の成功で消さないよう、開始・停止の失敗だけは行ごとに持つ。
+  const [toggleFailures, setToggleFailures] = useState<Record<string, ToggleFailure>>({})
+  const searchParams = useSearchParams()
+  // 見本タブから `?source=` 付きで来たときだけ、受け取る設定の種類を先に選んでおく。
+  // 知らない値は無視して空のままにする。
+  const requestedSource = searchParams.get('source') ?? ''
+  const initialSource = SOURCE_PRESETS.some((preset) => preset.value === requestedSource)
+    ? requestedSource
+    : ''
+  const [showCreate, setShowCreate] = useState(initialSource !== '')
 
-  const [inForm, setInForm] = useState({ name: '', sourceType: '', secret: '' })
+  const [inForm, setInForm] = useState({ name: '', sourceType: initialSource, secret: '' })
   // 見本に無いものを選んだときだけ、自由入力に切り替える。
   const [sourceIsOther, setSourceIsOther] = useState(false)
   const selectedPreset = sourceIsOther
@@ -164,14 +255,20 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
   }, [selectedAccountId])
 
   useEffect(() => {
+    const accountChanged = lastLoadedAccountIdRef.current !== null
+      && lastLoadedAccountIdRef.current !== selectedAccountId
     loadGenerationRef.current += 1
     setCreatedSecret(null)
     setSecretCopied(false)
     setRotateTarget(null)
     setRotateSecretValue('')
-    setShowCreate(false)
-    setInForm({ name: '', sourceType: '', secret: '' })
-    setSourceIsOther(false)
+    if (accountChanged) {
+      setShowCreate(false)
+      setInForm({ name: '', sourceType: '', secret: '' })
+      setSourceIsOther(false)
+      setToggleFailures({})
+    }
+    if (selectedAccountId !== null) lastLoadedAccountIdRef.current = selectedAccountId
     void load()
   }, [load, selectedAccountId])
 
@@ -180,14 +277,44 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
     if (!requestAccountId || loadedAccountId !== requestAccountId) {
       return setError('LINEアカウントの一覧を読み直してください')
     }
+    const key = toggleKey('incoming', id)
+    // 送信中の行の再押下は受け付けない。二重押しで止める→動かすと逆になる。
+    if (togglingIdsRef.current.has(key)) return
+    togglingIdsRef.current.add(key)
+    setToggleFailures((current) => {
+      if (!(key in current)) return current
+      const next = { ...current }
+      delete next[key]
+      return next
+    })
     try {
       const res = await api.webhooks.incoming.update(id, requestAccountId, { isActive: !currentActive })
       if (selectedAccountIdRef.current !== requestAccountId) return
-      if (!res.success) return setError(res.error)
+      // 失敗時は一覧を変えず、次に何をすればよいか出す。成功時だけ読み直してサーバ状態へ寄せる。
+      if (!res.success) {
+        const name = incoming.find((item) => item.id === id)?.name ?? 'この受け取り口'
+        setToggleFailures((current) => ({
+          ...current,
+          [key]: {
+            kind: 'incoming', id, name,
+            message: '切り替えできませんでした。状態は変わっていません。確かめてから、もう一度お試しください。',
+          },
+        }))
+        return
+      }
       if (selectedAccountIdRef.current === requestAccountId) await load()
     } catch {
       if (selectedAccountIdRef.current !== requestAccountId) return
-      setError('更新に失敗しました')
+      const name = incoming.find((item) => item.id === id)?.name ?? 'この受け取り口'
+      setToggleFailures((current) => ({
+        ...current,
+        [key]: {
+          kind: 'incoming', id, name,
+          message: '切り替えに失敗しました。状態は変わっていません。時間をおいて、もう一度お試しください。',
+        },
+      }))
+    } finally {
+      togglingIdsRef.current.delete(key)
     }
   }
 
@@ -196,14 +323,44 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
     if (!requestAccountId || loadedAccountId !== requestAccountId) {
       return setError('LINEアカウントの一覧を読み直してください')
     }
+    const key = toggleKey('outgoing', id)
+    // 送信中の行の再押下は受け付けない。二重押しで止める→動かすと逆になる。
+    if (togglingIdsRef.current.has(key)) return
+    togglingIdsRef.current.add(key)
+    setToggleFailures((current) => {
+      if (!(key in current)) return current
+      const next = { ...current }
+      delete next[key]
+      return next
+    })
     try {
       const res = await api.webhooks.outgoing.update(id, requestAccountId, { isActive: !currentActive })
       if (selectedAccountIdRef.current !== requestAccountId) return
-      if (!res.success) return setError(res.error)
+      // 失敗時は一覧を変えず、次に何をすればよいか出す。成功時だけ読み直してサーバ状態へ寄せる。
+      if (!res.success) {
+        const name = outgoing.find((item) => item.id === id)?.name ?? 'この送り先'
+        setToggleFailures((current) => ({
+          ...current,
+          [key]: {
+            kind: 'outgoing', id, name,
+            message: '切り替えできませんでした。状態は変わっていません。確かめてから、もう一度お試しください。',
+          },
+        }))
+        return
+      }
       if (selectedAccountIdRef.current === requestAccountId) await load()
     } catch {
       if (selectedAccountIdRef.current !== requestAccountId) return
-      setError('更新に失敗しました')
+      const name = outgoing.find((item) => item.id === id)?.name ?? 'この送り先'
+      setToggleFailures((current) => ({
+        ...current,
+        [key]: {
+          kind: 'outgoing', id, name,
+          message: '切り替えに失敗しました。状態は変わっていません。時間をおいて、もう一度お試しください。',
+        },
+      }))
+    } finally {
+      togglingIdsRef.current.delete(key)
     }
   }
 
@@ -443,6 +600,16 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
           {error}
         </div>
       )}
+      {Object.entries(toggleFailures).map(([key, failure]) => (
+        <div
+          key={key}
+          role="alert"
+          data-webhook-toggle-error={key}
+          className="mb-4 p-4 bg-danger-bg border border-danger-bg rounded-lg text-danger text-sm"
+        >
+          「{failure.name}」を{failure.kind === 'incoming' ? '受け取る設定' : '送る設定'}：{failure.message}
+        </div>
+      ))}
 
       {/* Create forms */}
       {showCreate && tab === 'incoming' && (
@@ -596,7 +763,7 @@ function WebhooksPageHost() {
     <div>
       <MergedTabs basePath="/webhooks" paramName="tab" tabs={MERGED_TABS} active={tab} />
       {tab === 'interactions' && <WebhookInteractions />}
-      {tab === 'notify' && <NotificationsPage />}
+      {tab === 'notify' && <WebhookSamples />}
     </div>
   )
 }
