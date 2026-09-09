@@ -12,6 +12,7 @@ import {
   pageBelongsToGroup,
   acquirePublishLease,
   releasePublishLease,
+  renewPublishLease,
   isPublishLeaseHeld,
   setPageRichMenuId,
   markRichMenuGroupPublished,
@@ -54,6 +55,7 @@ import {
   publishRichMenuGroup,
   unpublishRichMenuGroup,
   linkRichMenuBulkChunked,
+  PublishLeaseLostError,
   RichMenuValidationError,
   type LineRichMenuClient,
   type R2Like,
@@ -638,26 +640,62 @@ richMenuGroups.post('/api/rich-menu-groups/import', requireRole('owner', 'admin'
   await setRichMenuPageImage(c.env.DB, newPage.id, r2Key, contentType);
 
   // 7. line_richmenu_id を埋めて status='published' に
-  await setPageRichMenuId(c.env.DB, newPage.id, richMenuId);
-  await markRichMenuGroupPublished(c.env.DB, created.id);
-
-  // 8. alias を upsert (今後の再 publish 時の安定 ID として)
-  const aliasId = `lhx-${created.id.slice(0, 8)}-0`;
-  try {
-    await fetch(`https://api.line.me/v2/bot/richmenu/alias/${aliasId}`, {
-      method: 'DELETE',
-      headers: { Authorization: auth },
-    });
-  } catch {
-    // 無視
+  //    作ったばかりの group だが、group の状態を変える経路は例外なく
+  //    同じ lease 契約に乗せる(経路ごとに流儀が違うと穴の元になる)。
+  const importOwner = `import-${crypto.randomUUID()}`;
+  const importGeneration = await acquirePublishLease(
+    c.env.DB, created.id, importOwner, new Date().toISOString(),
+  );
+  if (importGeneration === null) {
+    return c.json({ success: false, error: 'failed to acquire publish lock' }, 409);
   }
-  await fetch('https://api.line.me/v2/bot/richmenu/alias', {
-    method: 'POST',
-    headers: { Authorization: auth, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ richMenuAliasId: aliasId, richMenuId }),
-  });
+  const importFence = { owner: importOwner, generation: importGeneration };
+  try {
+    // 8. alias を upsert (今後の再 publish 時の安定 ID として)。
+    //    外部操作なので lease を持っているうちに済ませ、直前に実時刻で延ばす。
+    //    確定のあとに回すと、解放後の無防備な外部操作になる。
+    if (!(await renewPublishLease(c.env.DB, created.id, importFence, new Date().toISOString()))) {
+      throw new PublishLeaseLostError();
+    }
+    const aliasId = `lhx-${created.id.slice(0, 8)}-0`;
+    try {
+      await fetch(`https://api.line.me/v2/bot/richmenu/alias/${aliasId}`, {
+        method: 'DELETE',
+        headers: { Authorization: auth },
+      });
+    } catch {
+      // 既に無い場合は無視。作り直しは次の POST で行う。
+    }
+    await fetch('https://api.line.me/v2/bot/richmenu/alias', {
+      method: 'POST',
+      headers: { Authorization: auth, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ richMenuAliasId: aliasId, richMenuId }),
+    });
 
-  return c.json({ success: true, data: { id: created.id, name: created.name } });
+    // 9. line_richmenu_id を埋めて status='published' に。
+    //    札付き書込みの false は失権。無視して成功応答にしない。
+    if (!(await renewPublishLease(c.env.DB, created.id, importFence, new Date().toISOString()))) {
+      throw new PublishLeaseLostError();
+    }
+    if (!(await setPageRichMenuId(c.env.DB, newPage.id, richMenuId, importFence))) {
+      throw new PublishLeaseLostError();
+    }
+    if (!(await markRichMenuGroupPublished(c.env.DB, created.id, importFence))) {
+      throw new PublishLeaseLostError();
+    }
+    // 確定と解放は別。ここまで来て初めて lease を手放す。
+    await releasePublishLease(c.env.DB, created.id, importFence);
+    return c.json({ success: true, data: { id: created.id, name: created.name } });
+  } catch (e) {
+    await releasePublishLease(c.env.DB, created.id, importFence);
+    if (e instanceof PublishLeaseLostError) {
+      return c.json(
+        { success: false, error: '公開の担当が別の処理へ移りました。最新の状態を確認して、もう一度お試しください。' },
+        409,
+      );
+    }
+    throw e;
+  }
 });
 
 // LINE 公式アカウント上のリッチメニュー実態と admin 管理状態を突き合わせて返す。
@@ -1691,17 +1729,43 @@ richMenuGroups.post('/api/rich-menu-groups/:groupId/publish', requireRole('owner
         })),
       })),
     };
-    const result = await publishRichMenuGroup(groupInput, line, r2Adapter);
+    /*
+     * LINE への公開はページ数ぶんの作成・画像upload・alias切替・旧削除で
+     * 何分もかかる。その間ずっと lease を延ばさないと、自分が動いている最中に
+     * 期限切れで予約実行や別の手動公開に回収される。外部呼び出しの直前ごとに
+     * 実時刻で延ばし、失権していたらそこで止める。
+     */
+    const heartbeat = async () => {
+      const alive = await renewPublishLease(
+        c.env.DB, groupId, publishFence, new Date().toISOString(),
+      );
+      if (!alive) throw new PublishLeaseLostError();
+    };
+    const result = await publishRichMenuGroup(groupInput, line, r2Adapter, heartbeat);
     for (const r of result.pages) {
       // 札付きで書く。回収されていたら書かない(新しい所有者の反映を壊さない)。
-      await setPageRichMenuId(c.env.DB, r.pageId, r.newRichMenuId, publishFence);
+      if (!(await setPageRichMenuId(c.env.DB, r.pageId, r.newRichMenuId, publishFence))) {
+        throw new PublishLeaseLostError();
+      }
     }
     // 確定と同時にleaseも空く(mark側で掃除)。空けてよいのは持ち主だけなので札を渡す。
-    await markRichMenuGroupPublished(c.env.DB, groupId, publishFence);
+    // false は失権。ここを無視すると、書けていないのに成功と返してしまう。
+    if (!(await markRichMenuGroupPublished(c.env.DB, groupId, publishFence))) {
+      throw new PublishLeaseLostError();
+    }
+    // 確定と解放は別。ここまで来て初めて lease を手放す。
+    await releasePublishLease(c.env.DB, groupId, publishFence);
     return c.json({ success: true, data: result });
   } catch (e) {
     await releasePublishLease(c.env.DB, groupId, publishFence);
     const message = e instanceof Error ? e.message : String(e);
+    if (e instanceof PublishLeaseLostError) {
+      // 別の公開に引き継がれた。成功扱いにはしない。
+      return c.json(
+        { success: false, error: '公開の担当が別の処理へ移りました。最新の状態を確認して、もう一度お試しください。' },
+        409,
+      );
+    }
     if (e instanceof RichMenuValidationError) {
       return c.json({ success: false, error: message }, 400);
     }
@@ -1724,6 +1788,17 @@ richMenuGroups.post('/api/rich-menu-groups/:groupId/unpublish', requireRole('own
   const account = await getLineAccountById(c.env.DB, group.account_id);
   if (!account) return c.json({ success: false, error: 'line account not found' }, 500);
 
+  // 停止も group の状態を変える経路なので、公開と同じ lease 契約で行う。
+  // lease なしで畳むと、同じ group を公開中の実行の owner と期限を消してしまう。
+  const unpublishOwner = `unpublish-${crypto.randomUUID()}`;
+  const unpublishGeneration = await acquirePublishLease(
+    c.env.DB, groupId, unpublishOwner, new Date().toISOString(),
+  );
+  if (unpublishGeneration === null) {
+    return c.json({ success: false, error: 'already publishing' }, 409);
+  }
+  const unpublishFence = { owner: unpublishOwner, generation: unpublishGeneration };
+
   const line = createLineClient(account.channel_access_token);
   const groupInput: GroupInput = {
     id: group.id,
@@ -1741,11 +1816,30 @@ richMenuGroups.post('/api/rich-menu-groups/:groupId/unpublish', requireRole('own
     })),
   };
   try {
-    const result = await unpublishRichMenuGroup(groupInput, line);
-    await markRichMenuGroupUnpublished(c.env.DB, groupId);
+    // ページ数ぶんの削除で時間がかかる。外部呼び出しの直前ごとに実時刻で延ばす。
+    const heartbeat = async () => {
+      const alive = await renewPublishLease(
+        c.env.DB, groupId, unpublishFence, new Date().toISOString(),
+      );
+      if (!alive) throw new PublishLeaseLostError();
+    };
+    const result = await unpublishRichMenuGroup(groupInput, line, heartbeat);
+    // false は失権。書けていないのに成功と返さない。
+    if (!(await markRichMenuGroupUnpublished(c.env.DB, groupId, unpublishFence))) {
+      throw new PublishLeaseLostError();
+    }
     await clearRichMenuAssignmentsForGroup(c.env.DB, groupId);
+    // 確定と解放は別。ここまで来て初めて lease を手放す。
+    await releasePublishLease(c.env.DB, groupId, unpublishFence);
     return c.json({ success: true, data: result });
   } catch (e) {
+    await releasePublishLease(c.env.DB, groupId, unpublishFence);
+    if (e instanceof PublishLeaseLostError) {
+      return c.json(
+        { success: false, error: '公開の担当が別の処理へ移りました。最新の状態を確認して、もう一度お試しください。' },
+        409,
+      );
+    }
     const message = e instanceof Error ? e.message : String(e);
     return c.json({ success: false, error: message }, 500);
   }

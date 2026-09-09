@@ -127,6 +127,8 @@ export type RichMenuScheduleExecutorDeps = {
   createLineShells: (
     snapshot: unknown,
     schedule: RichMenuScheduleRow,
+    /** 長いLINE処理の途中で担当を確かめる合図。失権していたら投げる。 */
+    heartbeat: () => Promise<void>,
   ) => Promise<ScheduleShell[]>;
   /**
    * 明示の戻し先がある期間復元用: 戻し先groupの現内容から新規作成だけ行う。
@@ -135,6 +137,7 @@ export type RichMenuScheduleExecutorDeps = {
   createRestoreShells: (
     restoreGroup: RichMenuGroupWithPages,
     schedule: RichMenuScheduleRow,
+    heartbeat: () => Promise<void>,
   ) => Promise<ScheduleShell[]>;
   /** 切替直前の実LINE defaultを読む。固定(pin)の材料にする。 */
   readCurrentDefaultId: (schedule: RichMenuScheduleRow) => Promise<string | null>;
@@ -147,6 +150,7 @@ export type RichMenuScheduleExecutorDeps = {
     groupId: string;
     setDefault: boolean;
     shells: ScheduleShell[];
+    heartbeat: () => Promise<void>;
   }) => Promise<void>;
   /**
    * 切替失敗の補償: aliasを旧へ戻し、defaultを切替前へ戻す。
@@ -332,8 +336,8 @@ async function runPhasedPublish(input: {
   targetGroupId: string;
   /** defaultに設定するか(そのgroupのisDefaultForAll相当)。 */
   setDefault: boolean;
-  /** 第一段: 新規作成だけ行う。 */
-  createShells: () => Promise<ScheduleShell[]>;
+  /** 第一段: 新規作成だけ行う。合図を受け取り、工程ごとに担当を確かめる。 */
+  createShells: (heartbeat: () => Promise<void>) => Promise<ScheduleShell[]>;
   /** 切替対象の現在page(旧IDとorderIndexの材料)。DB反映前のため旧値のまま。 */
   loadTargetPages: () => Promise<Array<{ id: string; orderIndex: number; lineRichMenuId: string | null }>>;
   /** DB反映: journalのIDをpageへ書き、group状態を進める。札で書込みを守る。 */
@@ -362,9 +366,17 @@ async function runPhasedPublish(input: {
    */
   const holdsLease = async (): Promise<boolean> => {
     const leaseNow = leaseClock();
-    if (!(await renewPublishLease(db, targetGroupId, fence, leaseNow))) return false;
-    await renewScheduleLease(db, schedule.id, schedule.account_id, runId, leaseNow);
-    return true;
+    // group と予約行の両方を延ばせたときだけ続ける。片方でも取られていたら
+    // 手を引く。予約行をBが回収したあとにAが副作用を続けないため、
+    // renewScheduleLease の戻り値も必ず見る。
+    const group = await renewPublishLease(db, targetGroupId, fence, leaseNow);
+    const row = await renewScheduleLease(db, schedule.id, schedule.account_id, runId, leaseNow);
+    return group && row;
+  };
+
+  /** 外部呼び出しの直前に担当を確かめる合図。失権していたら投げて止める。 */
+  const heartbeat = async (): Promise<void> => {
+    if (!(await holdsLease())) throw publishLeaseTakenError(targetGroupId);
   };
 
   /**
@@ -400,7 +412,7 @@ async function runPhasedPublish(input: {
       // journal未確定の新規実行: 作って→固定して→journalへ残す。
       // LINEへ作る前に所有を確かめる(旧holderがメニューを作り散らさない)。
       if (!(await holdsLease())) return fail(publishLeaseTakenError(targetGroupId));
-      const created = await input.createShells();
+      const created = await input.createShells(heartbeat);
       // ここから先で失敗したら、まだliveでない新メニューを必ず片付ける。
       // pinの失敗で作りっぱなしにすると、LINE側に参照されないメニューが残る。
       try {
@@ -458,7 +470,9 @@ async function runPhasedPublish(input: {
     if (!(await holdsLease())) return fail(publishLeaseTakenError(targetGroupId));
 
     try {
-      await deps.switchLiveTo({ schedule, groupId: targetGroupId, setDefault: input.setDefault, shells });
+      await deps.switchLiveTo({
+        schedule, groupId: targetGroupId, setDefault: input.setDefault, shells, heartbeat,
+      });
     } catch (error) {
       // 切替途中失敗の補償。journalを先に消してから旧へ戻し、新メニューを片付ける。
       // journalを消せなければ補償自体をやめ、journalありの再開に任せる
@@ -586,7 +600,7 @@ async function handleOneSchedule(
       kind: 'publish',
       targetGroupId: fresh.group_id,
       setDefault: isGroupDefaultForAll(group),
-      createShells: () => deps.createLineShells(parsed.value, fresh),
+      createShells: (heartbeat) => deps.createLineShells(parsed.value, fresh, heartbeat),
       loadTargetPages: async () => {
         const current = await deps.getGroupWithPages(db, fresh.group_id);
         return (current?.pages ?? []).map((page) => ({
@@ -597,9 +611,13 @@ async function handleOneSchedule(
       },
       reflect: async (shells, fence) => {
         for (const shell of shells) {
-          await setPageRichMenuId(db, shell.pageId, shell.newRichMenuId, fence);
+          if (!(await setPageRichMenuId(db, shell.pageId, shell.newRichMenuId, fence))) {
+            throw publishLeaseTakenError(fresh.group_id);
+          }
         }
-        await markRichMenuGroupPublished(db, fresh.group_id, fence);
+        if (!(await markRichMenuGroupPublished(db, fresh.group_id, fence))) {
+          throw publishLeaseTakenError(fresh.group_id);
+        }
       },
       recordSuccess: (fence) =>
         recordRichMenuScheduleSuccess(
@@ -608,7 +626,7 @@ async function handleOneSchedule(
           fresh.account_id,
           runId,
           fresh.mode === 'period' ? 'published' : 'completed',
-          { groupId: fresh.group_id, generation: fence.generation },
+          { groupId: fresh.group_id, owner: fence.owner, generation: fence.generation },
         ),
       fail,
       stats,
@@ -719,7 +737,7 @@ async function handleExplicitRestore(
       kind: 'restore',
       targetGroupId: restoreGroupId,
       setDefault: isGroupDefaultForAll(restore),
-      createShells: () => deps.createRestoreShells(restore, fresh),
+      createShells: (heartbeat) => deps.createRestoreShells(restore, fresh, heartbeat),
       loadTargetPages: async () => {
         const current = await deps.getGroupWithPages(db, restoreGroupId);
         return (current?.pages ?? []).map((page) => ({
@@ -729,21 +747,52 @@ async function handleExplicitRestore(
         }));
       },
       reflect: async (shells, fence) => {
-        // 期限切れメニューの個別割当をLINE側で外してからD1を消す。
-        // 公開確定(mark*)はleaseを空けるため、LINEを呼ぶこの工程を先に置く。
-        await unlinkAndClearAssignments();
-        for (const shell of shells) {
-          await setPageRichMenuId(db, shell.pageId, shell.newRichMenuId, fence);
-        }
-        await markRichMenuGroupPublished(db, restoreGroupId, fence);
+        // 期限切れgroupは戻し先とは別のgroup。こちらにも同じ契約でleaseを取り、
+        // 札付きで畳む。leaseなしで畳むと、その期限切れgroupを触っている
+        // 別の実行(手動公開・別予約)のownerと期限を消してしまう。
         if (restoreGroupId !== fresh.group_id) {
-          // 期限切れgroupのleaseは持っていないので札は付けない。
-          await markRichMenuGroupUnpublished(db, fresh.group_id);
+          const expiringGeneration = await acquirePublishLease(
+            db, fresh.group_id, runId, leaseClock(),
+          );
+          if (expiringGeneration === null) throw publishLeaseTakenError(fresh.group_id);
+          const expiringFence: PublishLeaseFence = { owner: runId, generation: expiringGeneration };
+          try {
+            // 個別割当の解除はLINEを呼ぶ外部工程。直前に実時刻で延ばす。
+            if (!(await renewPublishLease(db, fresh.group_id, expiringFence, leaseClock()))) {
+              throw publishLeaseTakenError(fresh.group_id);
+            }
+            await unlinkAndClearAssignments();
+            if (!(await renewPublishLease(db, fresh.group_id, expiringFence, leaseClock()))) {
+              throw publishLeaseTakenError(fresh.group_id);
+            }
+            if (!(await markRichMenuGroupUnpublished(db, fresh.group_id, expiringFence))) {
+              throw publishLeaseTakenError(fresh.group_id);
+            }
+          } finally {
+            try {
+              // 畳めていれば mark 側で空いている。取れなかった経路のための後始末。
+              await releasePublishLease(db, fresh.group_id, expiringFence);
+            } catch {
+              // 解放の失敗は元の結果を隠さない。期限切れで回収される。
+            }
+          }
+        } else {
+          // 戻し先が同じgroup。runPhasedPublish が持っている札で足りる。
+          await unlinkAndClearAssignments();
+        }
+        for (const shell of shells) {
+          if (!(await setPageRichMenuId(db, shell.pageId, shell.newRichMenuId, fence))) {
+            throw publishLeaseTakenError(restoreGroupId);
+          }
+        }
+        if (!(await markRichMenuGroupPublished(db, restoreGroupId, fence))) {
+          throw publishLeaseTakenError(restoreGroupId);
         }
       },
       recordSuccess: (fence) =>
         recordRichMenuScheduleRestoreSuccess(db, fresh.id, fresh.account_id, runId, {
           groupId: restoreGroupId,
+          owner: fence.owner,
           generation: fence.generation,
         }),
       fail,
@@ -795,9 +844,10 @@ async function handlePinnedRestore(
     /** 外部工程・DB書込みの直前に、実現在時刻で期限を延ばして所有を確かめる。 */
     const holdsLease = async (): Promise<boolean> => {
       const leaseNow = leaseClock();
-      if (!(await renewPublishLease(db, fresh.group_id, fence, leaseNow))) return false;
-      await renewScheduleLease(db, fresh.id, fresh.account_id, runId, leaseNow);
-      return true;
+      // group と予約行の両方を延ばせたときだけ続ける。
+      const group = await renewPublishLease(db, fresh.group_id, fence, leaseNow);
+      const row = await renewScheduleLease(db, fresh.id, fresh.account_id, runId, leaseNow);
+      return group && row;
     };
 
     if (!(await holdsLease())) return fail(publishLeaseTakenError(fresh.group_id));
@@ -815,12 +865,15 @@ async function handlePinnedRestore(
     await unlinkAndClearAssignments();
 
     if (!(await holdsLease())) return fail(publishLeaseTakenError(fresh.group_id));
-    await markRichMenuGroupUnpublished(db, fresh.group_id, fence);
+    if (!(await markRichMenuGroupUnpublished(db, fresh.group_id, fence))) {
+      return fail(publishLeaseTakenError(fresh.group_id));
+    }
 
     // 未公開化は自分のleaseを空けるため、ここから先はrenewでは守れない。
     // 確定は「自分が取ったあと誰もleaseを取っていない」を書込み条件にする。
     const recorded = await recordRichMenuScheduleRestoreSuccess(db, fresh.id, fresh.account_id, runId, {
       groupId: fresh.group_id,
+      owner: runId,
       generation,
     });
     try {

@@ -1872,13 +1872,15 @@ async function scheduled(
           tenantId: staff.tenant_id,
         } as never, [accountId]);
       },
-      createLineShells: async (snapshot, schedule) => {
+      createLineShells: async (snapshot, schedule, heartbeat) => {
         // 第一段: 予約スナップショットから新規作成だけ行い、新IDを返す。
         // alias/defaultは触らない。DB反映は実行役がjournal確定後に行う。
+        // ページ数ぶんの作成と画像uploadで時間がかかるため、1枚ごとに
+        // group と予約行の lease を実時刻で延ばす(heartbeat)。
         const built = await buildGroupInput(snapshot, schedule.group_id);
         if (!built.account) throw new Error('line account not found');
         const line = createScheduleLineClient(`Bearer ${built.account.channel_access_token}`);
-        const { shells } = await createRichMenuShells(built.input as never, line, r2Adapter);
+        const { shells } = await createRichMenuShells(built.input as never, line, r2Adapter, heartbeat);
         const oldByPageId = new Map(
           (built.input.pages as Array<{ id: string; lineRichMenuId: string | null }>).map((page) => [page.id, page.lineRichMenuId]),
         );
@@ -1889,7 +1891,7 @@ async function scheduled(
           oldLineRichMenuId: oldByPageId.get(shell.pageId) ?? null,
         }));
       },
-      createRestoreShells: async (restoreGroup, schedule) => {
+      createRestoreShells: async (restoreGroup, schedule, heartbeat) => {
         // 明示の戻し先の現内容から新規作成だけ行う。alias/defaultは触らない。
         const account = await getLineAccountById(env.DB, restoreGroup.account_id);
         if (!account) throw new Error('line account not found');
@@ -1925,7 +1927,7 @@ async function scheduled(
             })),
           })),
         };
-        const { shells } = await createRichMenuShells(input as never, line, r2Adapter);
+        const { shells } = await createRichMenuShells(input as never, line, r2Adapter, heartbeat);
         const oldByPageId = new Map(
           (input.pages as Array<{ id: string; lineRichMenuId: string | null }>).map((page) => [page.id, page.lineRichMenuId]),
         );
@@ -1943,7 +1945,7 @@ async function scheduled(
         const line = createScheduleLineClient(`Bearer ${account.channel_access_token}`);
         return line.getCurrentDefaultRichMenuId();
       },
-      switchLiveTo: async ({ schedule, groupId, setDefault, shells }) => {
+      switchLiveTo: async ({ schedule, groupId, setDefault, shells, heartbeat }) => {
         // 第二段: alias切替+default設定/解除。失敗時は投げるだけで補償しない。
         const account = await getLineAccountById(env.DB, schedule.account_id);
         if (!account) throw new Error('line account not found');
@@ -1966,7 +1968,7 @@ async function scheduled(
           pageId: shell.pageId,
           orderIndex: shell.orderIndex,
           newRichMenuId: shell.newRichMenuId,
-        })));
+        })), heartbeat);
       },
       compensateSwitchToPrevious: async ({ schedule, groupId, prev, newIds }) => {
         // 切替失敗の補償: journalを消した後に呼ばれ、旧へ戻す。決して投げない。

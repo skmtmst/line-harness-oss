@@ -1017,19 +1017,23 @@ export async function setPageRichMenuId(
   return (result.meta?.changes ?? 0) > 0;
 }
 
+/**
+ * 公開の確定。札があるときは持ち主だけが通る1文で、ここが唯一の分かれ目。
+ *
+ * lease はここでは開けない。確定と解放を1文に混ぜると、
+ * (1) 解放後に続く外部操作が無防備になり、
+ * (2) 「自分が開けた」と「他人に取られた」が owner=NULL で見分けられなくなる。
+ * 解放は所有者付きの releasePublishLease で別に行う。
+ */
 export async function markRichMenuGroupPublished(
   db: D1Database,
   groupId: string,
   fence?: PublishLeaseFence,
 ): Promise<boolean> {
-  // 公開の確定と同時に lease も空ける。ただし空けてよいのは持ち主だけ。
-  // 無条件に消すと、回収に負けた旧holderが新しい所有者の lease を消してしまい、
-  // 新所有者が守られないまま third party に割り込まれる。
   const result = await db
     .prepare(
       `UPDATE rich_menu_groups
-         SET status = 'published', publishing_at = NULL,
-             publishing_owner = NULL, publishing_expires_at = NULL, updated_at = ?
+         SET status = 'published', updated_at = ?
        WHERE id = ?${fence ? ' AND publishing_owner = ? AND publishing_generation = ?' : ''}`,
     )
     .bind(jstNow(), groupId, ...fenceBinds(fence))
@@ -1041,32 +1045,41 @@ export async function markRichMenuGroupPublished(
 // group.status を 'draft' に戻す。is_default_for_all も 0 に戻す
 // (LINE 側で default unlink された前提)。LINE 側で alias / richmenu / default
 // の削除が成功した後に呼ばれる想定。
+/**
+ * 停止の確定。**分かれ目は group の1文だけ**にする。
+ *
+ * 以前は page を先に消してから group を落としていた。その間に別の接続へ
+ * 引き継がれると、負けた旧holderが page ID だけ消して group はそのまま、
+ * という中途半端な状態を作れた(公開中の page ID が null になる)。
+ * 札が合わなければ**何も書かない**ようにするため、まず group を1文で決め、
+ * 通ったときだけ page を掃除する。page 側にも同じ札を付けるので、
+ * 決めたあとに引き継がれても新しい所有者の反映は消さない。
+ * lease はここでは開けない(所有者付きの releasePublishLease で別に開ける)。
+ */
 export async function markRichMenuGroupUnpublished(
   db: D1Database,
   groupId: string,
   fence?: PublishLeaseFence,
-): Promise<void> {
+): Promise<boolean> {
   const now = jstNow();
-  // page と group を1回のbatchで揃える。札があるときは両方に同じ条件を付け、
-  // 回収に負けた旧holderが新しい所有者の lease と反映を壊さないようにする。
-  await db.batch([
-    db
-      .prepare(
-        `UPDATE rich_menu_pages
-            SET line_richmenu_id = NULL, updated_at = ?
-          WHERE group_id = ?${fenceClause(fence, 'rich_menu_pages.group_id')}`,
-      )
-      .bind(now, groupId, ...fenceBinds(fence)),
-    db
-      .prepare(
-        `UPDATE rich_menu_groups
-            SET status = 'draft', publishing_at = NULL,
-                publishing_owner = NULL, publishing_expires_at = NULL,
-                is_default_for_all = 0, updated_at = ?
-          WHERE id = ?${fence ? ' AND publishing_owner = ? AND publishing_generation = ?' : ''}`,
-      )
-      .bind(now, groupId, ...fenceBinds(fence)),
-  ]);
+  const decided = await db
+    .prepare(
+      `UPDATE rich_menu_groups
+          SET status = 'draft', is_default_for_all = 0, updated_at = ?
+        WHERE id = ?${fence ? ' AND publishing_owner = ? AND publishing_generation = ?' : ''}`,
+    )
+    .bind(now, groupId, ...fenceBinds(fence))
+    .run();
+  if ((decided.meta?.changes ?? 0) === 0) return false;
+  await db
+    .prepare(
+      `UPDATE rich_menu_pages
+          SET line_richmenu_id = NULL, updated_at = ?
+        WHERE group_id = ?${fenceClause(fence, 'rich_menu_pages.group_id')}`,
+    )
+    .bind(now, groupId, ...fenceBinds(fence))
+    .run();
+  return true;
 }
 
 // =============================================================================

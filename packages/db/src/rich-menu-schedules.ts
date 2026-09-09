@@ -257,24 +257,24 @@ export async function getRichMenuScheduleById(
  * staleなrun Aがrun Bのclaim後に書こうとしても changes=0 で失敗し false を返す。
  */
 /**
- * 確定を守る group lease の札。世代だけを見る。
+ * 確定を守る group lease の札。
  *
- * owner は自分の公開確定 (markRichMenuGroupPublished) で NULL に戻るため、
- * 確定の時点では owner 一致を条件にできない。世代が取得時のままであれば
- * 「自分のあとに誰も lease を取っていない」と言えるので、これを確定の
- * 書込み条件にする。先に確認してから書くと、確認と書込みの間の回収を
- * 取りこぼす。
+ * 確定は「まだ自分が lease を持っている」ことを同じ UPDATE の条件に入れる。
+ * 公開確定 (markRichMenuGroupPublished) は lease を開けなくなったので、
+ * 確定の時点でも owner と世代の両方で見られる。先に確認してから書くと、
+ * 確認と書込みの間の回収を取りこぼす。
  */
-export type ScheduleGroupFence = { groupId: string; generation: number };
+export type ScheduleGroupFence = { groupId: string; owner: string; generation: number };
 
 function groupFenceClause(fence: ScheduleGroupFence | undefined): string {
   if (!fence) return '';
   return ` AND EXISTS (SELECT 1 FROM rich_menu_groups g
-                        WHERE g.id = ? AND g.publishing_generation = ?)`;
+                        WHERE g.id = ? AND g.publishing_owner = ?
+                          AND g.publishing_generation = ?)`;
 }
 
 function groupFenceBinds(fence: ScheduleGroupFence | undefined): unknown[] {
-  return fence ? [fence.groupId, fence.generation] : [];
+  return fence ? [fence.groupId, fence.owner, fence.generation] : [];
 }
 
 export async function recordRichMenuScheduleSuccess(
