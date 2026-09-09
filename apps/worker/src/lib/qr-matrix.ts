@@ -36,6 +36,9 @@ const NUM_ERROR_CORRECTION_BLOCKS: readonly (readonly number[])[] = [
   [-1, 1, 1, 2, 4, 4, 4, 5, 6, 8, 8, 11, 11, 16, 16, 18, 16, 19, 21, 25, 25, 25, 34, 30, 32, 35, 37, 40, 42, 45, 48, 51, 54, 57, 60, 63, 66, 70, 74, 77, 81], // H
 ];
 
+/** (a * b) % 3 の表。a, b は 0〜2。マスク 5〜7 で使う。 */
+const MOD3_PRODUCT = Uint8Array.from([0, 0, 0, 0, 1, 2, 0, 2, 1]);
+
 const MIN_VERSION = 1;
 const MAX_VERSION = 40;
 
@@ -43,6 +46,62 @@ const PENALTY_N1 = 3;
 const PENALTY_N2 = 3;
 const PENALTY_N3 = 40;
 const PENALTY_N4 = 10;
+
+/**
+ * 直近 7 本の連続の長さ。
+ *
+ * 配列の pop/unshift で回すと、減点法だけで QR 1 枚あたり数ミリ秒かかる。
+ * 公開口は 1 要求あたりの CPU 枠が厳しいので、7 個の数値として持つ。
+ */
+class RunHistory {
+  private h0 = 0;
+  private h1 = 0;
+  private h2 = 0;
+  private h3 = 0;
+  private h4 = 0;
+  private h5 = 0;
+  private h6 = 0;
+
+  reset(): void {
+    this.h0 = 0;
+    this.h1 = 0;
+    this.h2 = 0;
+    this.h3 = 0;
+    this.h4 = 0;
+    this.h5 = 0;
+    this.h6 = 0;
+  }
+
+  add(runLength: number, size: number): void {
+    // 最初の 1 本は、外側の白い余白と地続きとして数える。
+    const length = this.h0 === 0 ? runLength + size : runLength;
+    this.h6 = this.h5;
+    this.h5 = this.h4;
+    this.h4 = this.h3;
+    this.h3 = this.h2;
+    this.h2 = this.h1;
+    this.h1 = this.h0;
+    this.h0 = length;
+  }
+
+  /** 1:1:3:1:1 の位置検出もどきが何個あるか。 */
+  countFinderPatterns(): number {
+    const n = this.h1;
+    const core = n > 0 && this.h2 === n && this.h3 === n * 3 && this.h4 === n && this.h5 === n;
+    if (!core) return 0;
+    return (this.h0 >= n * 4 && this.h6 >= n ? 1 : 0) + (this.h6 >= n * 4 && this.h0 >= n ? 1 : 0);
+  }
+
+  terminate(runColor: number, runLength: number, size: number): number {
+    let length = runLength;
+    if (runColor === 1) {
+      this.add(length, size);
+      length = 0;
+    }
+    this.add(length + size, size);
+    return this.countFinderPatterns();
+  }
+}
 
 /**
  * 呼び出し側の指定が原因で QR を作れないときの基底。
@@ -192,6 +251,11 @@ class SymbolBuilder {
   readonly size: number;
   readonly modules: Uint8Array;
   private readonly isFunction: Uint8Array;
+  /** マスクの採点用の作業盤。本盤へ 8 回塗って戻すより 1 回書き写す方が速い。 */
+  private readonly scratch: Uint8Array;
+  /** 座標を 3 で割った余りと商。マスク条件の除算を無くすために先に作る。 */
+  private readonly mod3: Uint8Array;
+  private readonly div3: Int32Array;
 
   constructor(
     readonly version: number,
@@ -200,6 +264,13 @@ class SymbolBuilder {
     this.size = version * 4 + 17;
     this.modules = new Uint8Array(this.size * this.size);
     this.isFunction = new Uint8Array(this.size * this.size);
+    this.scratch = new Uint8Array(this.size * this.size);
+    this.mod3 = new Uint8Array(this.size);
+    this.div3 = new Int32Array(this.size);
+    for (let i = 0; i < this.size; i++) {
+      this.mod3[i] = i % 3;
+      this.div3[i] = (i / 3) | 0;
+    }
   }
 
   private set(x: number, y: number, dark: boolean): void {
@@ -261,23 +332,41 @@ class SymbolBuilder {
     }
   }
 
-  drawFormatBits(mask: number): void {
+  /** 形式情報が載る 31 個の位置と値を順に渡す。書き込み先で使い分ける。 */
+  private formatCells(mask: number, write: (x: number, y: number, dark: boolean) => void): void {
     const data = (ECC_FORMAT_BITS[this.ecc] << 3) | mask;
     let rem = data;
     for (let i = 0; i < 10; i++) rem = (rem << 1) ^ ((rem >>> 9) * 0x537);
     const bits = ((data << 10) | rem) ^ 0x5412;
 
-    for (let i = 0; i <= 5; i++) this.setFunction(8, i, getBit(bits, i));
-    this.setFunction(8, 7, getBit(bits, 6));
-    this.setFunction(8, 8, getBit(bits, 7));
-    this.setFunction(7, 8, getBit(bits, 8));
-    for (let i = 9; i < 15; i++) this.setFunction(14 - i, 8, getBit(bits, i));
+    for (let i = 0; i <= 5; i++) write(8, i, getBit(bits, i));
+    write(8, 7, getBit(bits, 6));
+    write(8, 8, getBit(bits, 7));
+    write(7, 8, getBit(bits, 8));
+    for (let i = 9; i < 15; i++) write(14 - i, 8, getBit(bits, i));
 
-    for (let i = 0; i < 8; i++) this.setFunction(this.size - 1 - i, 8, getBit(bits, i));
-    for (let i = 8; i < 15; i++) this.setFunction(8, this.size - 15 + i, getBit(bits, i));
-    this.setFunction(8, this.size - 8, true);
+    for (let i = 0; i < 8; i++) write(this.size - 1 - i, 8, getBit(bits, i));
+    for (let i = 8; i < 15; i++) write(8, this.size - 15 + i, getBit(bits, i));
+    write(8, this.size - 8, true);
   }
 
+  drawFormatBits(mask: number): void {
+    this.formatCells(mask, (x, y, dark) => this.setFunction(x, y, dark));
+  }
+
+  /**
+   * マスク 1 通りぶんの減点を出す。
+   *
+   * 本盤へ塗って採点して塗り直すと、升目を 2 回なぞることになる。
+   * 作業盤へ 1 回書き写すだけにして、8 通りで 8 回に収める。
+   */
+  /**
+   * マスク 1 通りぶんの減点を出す。
+   *
+   * 4 つの規則を別々に回すと升目を 5 周することになる。公開口は 1 要求
+   * あたりの CPU 枠が厳しいので、横方向の周回に「塗り・横の並び・2x2・
+   * 黒の割合」をまとめ、縦の並びだけ 2 周目にする。
+   */
   private drawVersionBits(): void {
     if (this.version < 7) return;
     let rem = this.version;
@@ -311,114 +400,122 @@ class SymbolBuilder {
   }
 
   applyMask(mask: number): void {
-    for (let y = 0; y < this.size; y++) {
-      for (let x = 0; x < this.size; x++) {
-        if (this.isFunction[y * this.size + x] === 1) continue;
+    const { size, modules, isFunction, mod3, div3 } = this;
+    if (mask < 0 || mask > 7) throw new Error('unreachable mask');
+    for (let y = 0; y < size; y++) {
+      const rowBase = y * size;
+      for (let x = 0; x < size; x++) {
+        const index = rowBase + x;
+        if (isFunction[index] === 1) continue;
+        // 剰余と商は表から引く。ここは升目数だけ回るので、除算が効く。
+        const productMod3 = MOD3_PRODUCT[mod3[x] * 3 + mod3[y]];
+        const sumMod3 = mod3[x] + mod3[y];
         let invert: boolean;
         switch (mask) {
-          case 0: invert = (x + y) % 2 === 0; break;
-          case 1: invert = y % 2 === 0; break;
-          case 2: invert = x % 3 === 0; break;
-          case 3: invert = (x + y) % 3 === 0; break;
-          case 4: invert = (Math.floor(x / 3) + Math.floor(y / 2)) % 2 === 0; break;
-          case 5: invert = ((x * y) % 2) + ((x * y) % 3) === 0; break;
-          case 6: invert = (((x * y) % 2) + ((x * y) % 3)) % 2 === 0; break;
-          case 7: invert = (((x + y) % 2) + ((x * y) % 3)) % 2 === 0; break;
-          default: throw new Error('unreachable mask');
+          case 0: invert = ((x + y) & 1) === 0; break;
+          case 1: invert = (y & 1) === 0; break;
+          case 2: invert = mod3[x] === 0; break;
+          case 3: invert = sumMod3 === 0 || sumMod3 === 3; break;
+          case 4: invert = ((div3[x] + (y >> 1)) & 1) === 0; break;
+          case 5: invert = (x & y & 1) + productMod3 === 0; break;
+          case 6: invert = (((x & y & 1) + productMod3) & 1) === 0; break;
+          default: invert = ((((x + y) & 1) + productMod3) & 1) === 0; break;
         }
-        if (invert) this.modules[y * this.size + x] ^= 1;
+        if (invert) modules[index] ^= 1;
       }
     }
   }
 
-  penaltyScore(): number {
+  scoreMask(mask: number, best: number): number {
+    const { size, modules, isFunction, scratch, mod3, div3 } = this;
+    // 形式情報は機能部品なのでマスクをかけないが、並びの数え方には効く。
+    // 本盤へ先に置いてから塗る。最後に選んだマスクの分で上書きされる。
+    this.drawFormatBits(mask);
+    const history = new RunHistory();
     let result = 0;
-    const size = this.size;
+    let dark = 0;
 
     for (let y = 0; y < size; y++) {
-      let runColor = false;
+      const rowBase = y * size;
+      const previousBase = rowBase - size;
+      history.reset();
+      let runColor = 0;
       let runLen = 0;
-      const history = [0, 0, 0, 0, 0, 0, 0];
       for (let x = 0; x < size; x++) {
-        if (this.get(x, y) === runColor) {
+        const index = rowBase + x;
+        let color: number;
+        if (isFunction[index] === 1) {
+          color = modules[index];
+        } else {
+          const productMod3 = MOD3_PRODUCT[mod3[x] * 3 + mod3[y]];
+          const sumMod3 = mod3[x] + mod3[y];
+          let invert: boolean;
+          switch (mask) {
+            case 0: invert = ((x + y) & 1) === 0; break;
+            case 1: invert = (y & 1) === 0; break;
+            case 2: invert = mod3[x] === 0; break;
+            case 3: invert = sumMod3 === 0 || sumMod3 === 3; break;
+            case 4: invert = ((div3[x] + (y >> 1)) & 1) === 0; break;
+            case 5: invert = (x & y & 1) + productMod3 === 0; break;
+            case 6: invert = (((x & y & 1) + productMod3) & 1) === 0; break;
+            default: invert = ((((x + y) & 1) + productMod3) & 1) === 0; break;
+          }
+          color = invert ? modules[index] ^ 1 : modules[index];
+        }
+        scratch[index] = color;
+        dark += color;
+
+        // 同じ色が 2x2 で固まっている数。1 つ上の行はもう塗り終わっている。
+        if (y > 0 && x > 0) {
+          const upper = scratch[previousBase + x];
+          if (color === upper && color === scratch[index - 1] && color === scratch[previousBase + x - 1]) {
+            result += PENALTY_N2;
+          }
+        }
+
+        if (color === runColor) {
           runLen++;
           if (runLen === 5) result += PENALTY_N1;
           else if (runLen > 5) result++;
         } else {
-          this.finderPenaltyAddHistory(runLen, history);
-          if (!runColor) result += this.finderPenaltyCountPatterns(history) * PENALTY_N3;
-          runColor = this.get(x, y);
+          history.add(runLen, size);
+          if (runColor === 0) result += history.countFinderPatterns() * PENALTY_N3;
+          runColor = color;
           runLen = 1;
         }
       }
-      result += this.finderPenaltyTerminateAndCount(runColor, runLen, history) * PENALTY_N3;
+      result += history.terminate(runColor, runLen, size) * PENALTY_N3;
+      // 減点は足すだけなので、ここで最良を超えたらこのマスクは選ばれない。
+      // 途中で止めても、選ぶマスクは変わらない。
+      if (result > best) return result;
     }
 
     for (let x = 0; x < size; x++) {
-      let runColor = false;
+      history.reset();
+      let runColor = 0;
       let runLen = 0;
-      const history = [0, 0, 0, 0, 0, 0, 0];
       for (let y = 0; y < size; y++) {
-        if (this.get(x, y) === runColor) {
+        const color = scratch[y * size + x];
+        if (color === runColor) {
           runLen++;
           if (runLen === 5) result += PENALTY_N1;
           else if (runLen > 5) result++;
         } else {
-          this.finderPenaltyAddHistory(runLen, history);
-          if (!runColor) result += this.finderPenaltyCountPatterns(history) * PENALTY_N3;
-          runColor = this.get(x, y);
+          history.add(runLen, size);
+          if (runColor === 0) result += history.countFinderPatterns() * PENALTY_N3;
+          runColor = color;
           runLen = 1;
         }
       }
-      result += this.finderPenaltyTerminateAndCount(runColor, runLen, history) * PENALTY_N3;
+      result += history.terminate(runColor, runLen, size) * PENALTY_N3;
+      if (result > best) return result;
     }
 
-    for (let y = 0; y < size - 1; y++) {
-      for (let x = 0; x < size - 1; x++) {
-        const c = this.get(x, y);
-        if (c === this.get(x + 1, y) && c === this.get(x, y + 1) && c === this.get(x + 1, y + 1)) {
-          result += PENALTY_N2;
-        }
-      }
-    }
-
-    let dark = 0;
-    for (let i = 0; i < this.modules.length; i++) dark += this.modules[i];
     const total = size * size;
     const k = Math.ceil(Math.abs(dark * 20 - total * 10) / total) - 1;
     return result + k * PENALTY_N4;
   }
 
-  private finderPenaltyCountPatterns(history: readonly number[]): number {
-    const n = history[1];
-    const core = n > 0 && history[2] === n && history[3] === n * 3 && history[4] === n && history[5] === n;
-    return (
-      (core && history[0] >= n * 4 && history[6] >= n ? 1 : 0) +
-      (core && history[6] >= n * 4 && history[0] >= n ? 1 : 0)
-    );
-  }
-
-  private finderPenaltyTerminateAndCount(
-    currentRunColor: boolean,
-    currentRunLength: number,
-    history: number[],
-  ): number {
-    let runLen = currentRunLength;
-    if (currentRunColor) {
-      this.finderPenaltyAddHistory(runLen, history);
-      runLen = 0;
-    }
-    runLen += this.size;
-    this.finderPenaltyAddHistory(runLen, history);
-    return this.finderPenaltyCountPatterns(history);
-  }
-
-  private finderPenaltyAddHistory(currentRunLength: number, history: number[]): void {
-    let runLen = currentRunLength;
-    if (history[0] === 0) runLen += this.size;
-    history.pop();
-    history.unshift(runLen);
-  }
 }
 
 /** バイト列をデータコード語へ詰める。終端・パディングまで規格どおり。 */
@@ -481,14 +578,11 @@ export function encodeQr(text: string, options: QrEncodeOptions = {}): QrSymbol 
   if (chosen === undefined) {
     let minPenalty = Infinity;
     for (let mask = 0; mask < 8; mask++) {
-      builder.applyMask(mask);
-      builder.drawFormatBits(mask);
-      const penalty = builder.penaltyScore();
+      const penalty = builder.scoreMask(mask, minPenalty);
       if (penalty < minPenalty) {
         chosen = mask;
         minPenalty = penalty;
       }
-      builder.applyMask(mask); // 2回かけると元へ戻る
     }
   }
   const mask = chosen as number;

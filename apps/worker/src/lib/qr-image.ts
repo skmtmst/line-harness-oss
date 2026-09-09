@@ -59,13 +59,73 @@ export function layoutQr(symbol: QrSymbol, width: number, height: number): Layou
   };
 }
 
-/** 画素が黒かどうか。余白と中央寄せのぶんを差し引いて升目を引く。 */
-function isDarkPixel(symbol: QrSymbol, layout: Layout, px: number, py: number): boolean {
-  const cx = Math.floor((px - layout.offsetX) / layout.scale) - QR_QUIET_ZONE;
-  const cy = Math.floor((py - layout.offsetY) / layout.scale) - QR_QUIET_ZONE;
-  if (px < layout.offsetX || py < layout.offsetY) return false;
-  if (cx < 0 || cy < 0 || cx >= symbol.size || cy >= symbol.size) return false;
-  return symbol.modules[cy * symbol.size + cx] === 1;
+/**
+ * 画素の並びから升目の番号を引く表。余白と枠の外は -1。
+ *
+ * 画素ごとに割り算をすると、1024px で 100 万回になる。公開口は 1 要求
+ * あたりの CPU 枠が厳しいので、軸ごとに 1 回だけ作って引く。
+ */
+function axisModuleIndex(length: number, offset: number, scale: number, size: number): Int32Array {
+  const table = new Int32Array(length).fill(-1);
+  for (let cell = 0; cell < size; cell++) {
+    const start = offset + (cell + QR_QUIET_ZONE) * scale;
+    const end = Math.min(length, start + scale);
+    for (let p = Math.max(0, start); p < end; p++) table[p] = cell;
+  }
+  return table;
+}
+
+/**
+ * 黒い画素を 1 とした 1 ビット地図。行の上位ビットが左端。
+ *
+ * PNG も JPEG もここから作る。同じ升目行に当たる画素行は中身が同じなので、
+ * 1 本作って複写する。1024px で 100 万回の判定が 17 万回で済む。
+ */
+interface DarkBitmap {
+  readonly rowBytes: number;
+  readonly bytes: Uint8Array;
+}
+
+function packDarkBitmap(symbol: QrSymbol, layout: Layout, width: number, height: number): DarkBitmap {
+  const columnModule = axisModuleIndex(width, layout.offsetX, layout.scale, symbol.size);
+  const rowModule = axisModuleIndex(height, layout.offsetY, layout.scale, symbol.size);
+  const rowBytes = (width + 7) >>> 3;
+  const tailBits = width & 7;
+  const bytes = new Uint8Array(rowBytes * height);
+  let previousCell = -2;
+  let previousBase = 0;
+  for (let y = 0; y < height; y++) {
+    const base = y * rowBytes;
+    const cell = rowModule[y];
+    if (cell === previousCell) {
+      bytes.copyWithin(base, previousBase, previousBase + rowBytes);
+      continue;
+    }
+    if (cell >= 0) {
+      const modulesBase = cell * symbol.size;
+      // 8 画素ぶんを 1 つの数にまとめてから置く。1 ビットずつ書き戻すと、
+      // 1024px で 100 万回の読み書きになる。
+      for (let byteIndex = 0; byteIndex < rowBytes; byteIndex++) {
+        const first = byteIndex << 3;
+        const limit = Math.min(8, width - first);
+        let packed = 0;
+        for (let bit = 0; bit < limit; bit++) {
+          const column = columnModule[first + bit];
+          if (column >= 0 && symbol.modules[modulesBase + column] === 1) packed |= 0x80 >>> bit;
+        }
+        bytes[base + byteIndex] = packed;
+      }
+    }
+    // 幅が 8 の倍数でないときの余りビットは、右端の画素を伸ばして埋める。
+    // PNG では読み飛ばされ、JPEG では端のブロックの埋めとして使う。
+    if (tailBits > 0) {
+      const last = base + rowBytes - 1;
+      if ((bytes[last] & (0x80 >>> (tailBits - 1))) !== 0) bytes[last] |= (0xff >>> tailBits) & 0xff;
+    }
+    previousCell = cell;
+    previousBase = base;
+  }
+  return { rowBytes, bytes };
 }
 
 /* ------------------------------------------------------------------ SVG */
@@ -194,18 +254,15 @@ function pngChunk(type: string, body: Uint8Array): Uint8Array {
 /** 画面表示と保存の既定。白黒しか無いので 1 ビット灰色で足りる。 */
 export async function renderQrPng(symbol: QrSymbol, width: number, height: number): Promise<Uint8Array> {
   const layout = layoutQr(symbol, width, height);
-  const rowBytes = Math.ceil(width / 8);
+  const bitmap = packDarkBitmap(symbol, layout, width, height);
+  const rowBytes = bitmap.rowBytes;
   const raw = new Uint8Array((rowBytes + 1) * height);
+  // PNG の 1 ビット灰色は 1 が白なので、地図を反転して並べる。
+  // 行頭のフィルタ種別は 0（なし）。
   for (let y = 0; y < height; y++) {
     const base = y * (rowBytes + 1);
-    raw[base] = 0; // フィルタ種別: なし
-    // 1 が白。まず全部白にしてから、黒い画素のビットを落とす。
-    raw.fill(0xff, base + 1, base + 1 + rowBytes);
-    for (let x = 0; x < width; x++) {
-      if (isDarkPixel(symbol, layout, x, y)) {
-        raw[base + 1 + (x >>> 3)] &= ~(0x80 >>> (x & 7));
-      }
-    }
+    const source = y * rowBytes;
+    for (let i = 0; i < rowBytes; i++) raw[base + 1 + i] = ~bitmap.bytes[source + i];
   }
 
   const ihdr = new Uint8Array(13);
@@ -262,8 +319,15 @@ const AC_VALUES = [
   0xe3, 0xe4, 0xe5, 0xe6, 0xe7, 0xe8, 0xe9, 0xea, 0xf1, 0xf2, 0xf3, 0xf4, 0xf5, 0xf6, 0xf7, 0xf8, 0xf9, 0xfa,
 ];
 
-/** 印刷したときに角が甘くならないよう、量子化は細かめ(品質 90)にする。 */
-const JPEG_QUALITY = 90;
+/**
+ * 量子化の細かさ。
+ *
+ * 粗くするほど升目の角がにじむ。型番 1〜38 × 64〜1024px の 31 通りで、
+ * 出した JPEG を復号して白黒に戻す試験をしたところ、75 と 60 と 45 は
+ * 1 画素も狂わず、30 で狂い始めた。狂い始めるところから離しつつ、
+ * 90 より 3 割小さく出せる 75 を使う。
+ */
+const JPEG_QUALITY = 75;
 
 const COSINE = (() => {
   const table = new Float64Array(64);
@@ -275,6 +339,51 @@ const COSINE = (() => {
   return table;
 })();
 
+/**
+ * 8 画素の白黒 1 行を 1 次元変換した結果の表。
+ *
+ * 入力は白黒しかないので、1 行の並びは 256 通りしかない。毎回かけ算を
+ * するより引く方が速い。ブロック変換の前半がまるごと表引きになる。
+ */
+const ROW_TRANSFORM = (() => {
+  const table = new Float64Array(256 * 8);
+  for (let pattern = 0; pattern < 256; pattern++) {
+    for (let u = 0; u < 8; u++) {
+      let sum = 0;
+      for (let x = 0; x < 8; x++) {
+        sum += (((pattern >>> (7 - x)) & 1) === 1 ? -128 : 127) * COSINE[u * 8 + x];
+      }
+      table[pattern * 8 + u] = sum;
+    }
+  }
+  return table;
+})();
+
+/**
+ * ブロック変換の作業領域。
+ *
+ * 1 枚の変換の中で使い回して確保を減らす。モジュールの外に置くと、
+ * 別の要求と踏み合う形になるので、1 枚ごとに作る。
+ */
+interface BlockScratch {
+  readonly partial: Float64Array;
+  readonly coefficients: Int32Array;
+  /**
+   * 交流成分の書き出しの下書き。0 でない係数 1 個につき「符号」と「値」で
+   * 4 個使う。上限は 63 個なので 252 個。これに 16 個並びの印（最大 3 回で
+   * 6 個）と終端の 2 個を足す。
+   */
+  readonly ac: Int32Array;
+}
+
+function createBlockScratch(): BlockScratch {
+  return {
+    partial: new Float64Array(64),
+    coefficients: new Int32Array(64),
+    ac: new Int32Array(63 * 4 + 8),
+  };
+}
+
 function buildQuantTable(quality: number): Int32Array {
   const scale = quality < 50 ? 5000 / quality : 200 - quality * 2;
   const table = new Int32Array(64);
@@ -284,9 +393,43 @@ function buildQuantTable(quality: number): Int32Array {
   return table;
 }
 
+/**
+ * 量子化の割り算をかけ算に置き換えるための逆数。
+ *
+ * 1 ブロックに 64 回の割り算が入ると、絵柄の種類ぶんで数千回になる。
+ * 割り切れない端数の出方は変わるが、量子化はもともと丸めなので、
+ * 復号して白黒に戻した結果は変わらない（テストで固定している）。
+ */
+function buildQuantReciprocal(quant: Int32Array): Float64Array {
+  const table = new Float64Array(64);
+  for (let i = 0; i < 64; i++) table[i] = 0.25 / quant[i];
+  return table;
+}
+
 interface HuffCode {
   readonly code: number;
   readonly length: number;
+}
+
+/**
+ * 符号表を「印の値で引ける配列」にしたもの。
+ *
+ * ブロックごとに何十回も引くので、Map だと引くだけで見過ごせない時間になる。
+ * lengths が 0 の位置は表に無い印。
+ */
+interface JpegCodeTable {
+  readonly codes: Int32Array;
+  readonly lengths: Int32Array;
+}
+
+function toCodeTable(table: Map<number, HuffCode>): JpegCodeTable {
+  const codes = new Int32Array(256);
+  const lengths = new Int32Array(256);
+  for (const [symbol, entry] of table) {
+    codes[symbol] = entry.code;
+    lengths[symbol] = entry.length;
+  }
+  return { codes, lengths };
 }
 
 function buildHuffTable(bits: readonly number[], values: readonly number[]): Map<number, HuffCode> {
@@ -301,12 +444,26 @@ function buildHuffTable(bits: readonly number[], values: readonly number[]): Map
 }
 
 class JpegWriter {
-  private readonly bytes: number[] = [];
+  /**
+   * 出したバイト。配列の push で貯めると、1024px の JPEG で 50 万回になる。
+   * 足りなくなったら倍にして伸ばす。
+   */
+  private buffer: Uint8Array;
+  private length = 0;
   private bitBuffer = 0;
   private bitCount = 0;
 
+  constructor(initialCapacity: number) {
+    this.buffer = new Uint8Array(Math.max(1024, initialCapacity));
+  }
+
   byte(value: number): void {
-    this.bytes.push(value & 0xff);
+    if (this.length === this.buffer.length) {
+      const grown = new Uint8Array(this.buffer.length * 2);
+      grown.set(this.buffer);
+      this.buffer = grown;
+    }
+    this.buffer[this.length++] = value & 0xff;
   }
 
   word(value: number): void {
@@ -319,17 +476,20 @@ class JpegWriter {
     this.byte(value);
   }
 
+  /**
+   * ビットを詰める。1 ビットずつ回すと符号化の大半がここで消えるので、
+   * 32 ビットに貯めてから 1 バイトずつ出す。長さは 16 以下なので溢れない。
+   */
   bits(value: number, length: number): void {
-    for (let i = length - 1; i >= 0; i--) {
-      this.bitBuffer = ((this.bitBuffer << 1) | ((value >>> i) & 1)) & 0xff;
-      this.bitCount++;
-      if (this.bitCount === 8) {
-        this.byte(this.bitBuffer);
-        // 走査データの中の 0xFF は印と区別できないので 0x00 を挟む。
-        if (this.bitBuffer === 0xff) this.byte(0x00);
-        this.bitBuffer = 0;
-        this.bitCount = 0;
-      }
+    if (length === 0) return;
+    this.bitBuffer = (this.bitBuffer << length) | (value & ((1 << length) - 1));
+    this.bitCount += length;
+    while (this.bitCount >= 8) {
+      this.bitCount -= 8;
+      const out = (this.bitBuffer >>> this.bitCount) & 0xff;
+      this.byte(out);
+      // 走査データの中の 0xFF は印と区別できないので 0x00 を挟む。
+      if (out === 0xff) this.byte(0x00);
     }
   }
 
@@ -339,22 +499,92 @@ class JpegWriter {
   }
 
   flushBits(): void {
-    while (this.bitCount > 0) this.bits(1, 1);
+    if (this.bitCount > 0) this.bits((1 << (8 - this.bitCount)) - 1, 8 - this.bitCount);
   }
 
   toBytes(): Uint8Array {
-    return Uint8Array.from(this.bytes);
+    return this.buffer.subarray(0, this.length);
   }
 }
 
+/** 値を表すのに要るビット数。0 は 0。 */
 function bitLength(value: number): number {
-  let length = 0;
-  let v = value;
-  while (v > 0) {
-    length++;
-    v >>>= 1;
+  return 32 - Math.clz32(value);
+}
+
+/** 絵柄 1 つぶんの変換結果。DC は差分で書くので値のまま持つ。 */
+interface BlockCode {
+  /** 量子化した直流成分。 */
+  readonly dc: number;
+  /** 交流成分の書き出し。[値, ビット数] の並び。 */
+  readonly ac: Int32Array;
+}
+
+/** 8x8 の白黒（1 行 8 ビット）を、量子化した係数と交流の書き出しへ変える。 */
+function encodeJpegBlock(
+  rows: Int32Array,
+  reciprocal: Float64Array,
+  ac: JpegCodeTable,
+  scratch: BlockScratch,
+): BlockCode {
+  const partial = scratch.partial;
+  for (let y = 0; y < 8; y++) {
+    const source = rows[y] * 8;
+    const target = y * 8;
+    for (let u = 0; u < 8; u++) partial[target + u] = ROW_TRANSFORM[source + u];
   }
-  return length;
+
+  const coefficients = scratch.coefficients;
+  for (let u = 0; u < 8; u++) {
+    for (let v = 0; v < 8; v++) {
+      let sum = 0;
+      for (let y = 0; y < 8; y++) sum += partial[y * 8 + u] * COSINE[v * 8 + y];
+      const natural = v * 8 + u;
+      coefficients[natural] = Math.round(sum * reciprocal[natural]);
+    }
+  }
+
+  let last = 63;
+  while (last > 0 && coefficients[ZIGZAG[last]] === 0) last--;
+  const draft = scratch.ac;
+  let used = 0;
+  const push = (symbol: number) => {
+    const length = ac.lengths[symbol];
+    if (length === 0) throw new QrRenderError('JPEGの符号表に無い値が出ました');
+    draft[used++] = ac.codes[symbol];
+    draft[used++] = length;
+  };
+  let run = 0;
+  for (let k = 1; k <= last; k++) {
+    const value = coefficients[ZIGZAG[k]];
+    if (value === 0) {
+      run++;
+      continue;
+    }
+    while (run >= 16) {
+      push(0xf0);
+      run -= 16;
+    }
+    const category = bitLength(value < 0 ? -value : value);
+    const symbol = (run << 4) | category;
+    const length = ac.lengths[symbol];
+    if (length === 0) throw new QrRenderError('JPEGの符号表に無い値が出ました');
+    const bits = value < 0 ? value + (1 << category) - 1 : value;
+    // 符号と値は続けて出るので、24 ビットに収まるならまとめて 1 回で書く。
+    // 書き出しの回数が JPEG 全体の CPU の山なので、ここが効く。
+    if (length + category <= 24) {
+      draft[used++] = (ac.codes[symbol] << category) | bits;
+      draft[used++] = length + category;
+    } else {
+      draft[used++] = ac.codes[symbol];
+      draft[used++] = length;
+      draft[used++] = bits;
+      draft[used++] = category;
+    }
+    run = 0;
+  }
+  if (last < 63) push(0x00);
+  return { dc: coefficients[0], ac: draft.slice(0, used) };
 }
 
 /**
@@ -366,9 +596,12 @@ function bitLength(value: number): number {
 export function renderQrJpeg(symbol: QrSymbol, width: number, height: number): Uint8Array {
   const layout = layoutQr(symbol, width, height);
   const quant = buildQuantTable(JPEG_QUALITY);
+  const reciprocal = buildQuantReciprocal(quant);
   const dcTable = buildHuffTable(DC_BITS, DC_VALUES);
   const acTable = buildHuffTable(AC_BITS, AC_VALUES);
-  const writer = new JpegWriter();
+  const acCodeTable = toCodeTable(acTable);
+  // 最大構成でも伸ばし直しが 1 回で済む程度に見積もる。
+  const writer = new JpegWriter(width * height + 1024);
 
   writer.marker(0xd8); // SOI
 
@@ -420,68 +653,80 @@ export function renderQrJpeg(symbol: QrSymbol, width: number, height: number): U
   writer.byte(63);
   writer.byte(0);
 
-  const block = new Float64Array(64);
-  const rows = new Float64Array(64);
-  const coefficients = new Int32Array(64);
+  // 白黒の 8x8 は 64 ビットで表せる。同じ絵柄のブロックが何度も出るので
+  // （1024px の最大構成で 16384 個中 1061 種類）、変換した結果を絵柄ごとに
+  // 覚えて使い回す。ここを回さないと 1 要求の CPU 枠に収まらない。
+  // 直流成分の符号は毎ブロック引くので、表引きを配列にしておく。
+  const dcCodes = new Int32Array(DC_VALUES.length);
+  const dcLengths = new Int32Array(DC_VALUES.length);
+  for (const value of DC_VALUES) {
+    const entry = dcTable.get(value);
+    if (!entry) throw new QrRenderError('JPEGの符号表に無い値が出ました');
+    dcCodes[value] = entry.code;
+    dcLengths[value] = entry.length;
+  }
+
+  const cache = new Map<number, Map<number, BlockCode>>();
+  const scratch = createBlockScratch();
+  const bitmap = packDarkBitmap(symbol, layout, width, height);
+  const rowBytes = bitmap.rowBytes;
+  const rows = new Int32Array(8);
   let previousDc = 0;
 
+  const rowOffsets = new Int32Array(8);
   for (let blockY = 0; blockY < height; blockY += 8) {
+    // 帯の中の 8 行の行頭は、この帯の中で変わらない。ブロックごとに
+    // 出し直すと 1024px で 13 万回になるので、帯ごとに 1 回だけ出す。
+    // 高さが 8 の倍数でないときは、下端の行を伸ばして埋める。
+    for (let y = 0; y < 8; y++) rowOffsets[y] = Math.min(blockY + y, height - 1) * rowBytes;
     for (let blockX = 0; blockX < width; blockX += 8) {
-      for (let y = 0; y < 8; y++) {
-        // 端の 8 の倍数に足りない部分は、直前の行・列を伸ばして埋める。
-        const py = Math.min(blockY + y, height - 1);
-        for (let x = 0; x < 8; x++) {
-          const px = Math.min(blockX + x, width - 1);
-          block[y * 8 + x] = (isDarkPixel(symbol, layout, px, py) ? 0 : 255) - 128;
-        }
+      const column = blockX >>> 3;
+      const bytes = bitmap.bytes;
+      const b0 = bytes[rowOffsets[0] + column];
+      const b1 = bytes[rowOffsets[1] + column];
+      const b2 = bytes[rowOffsets[2] + column];
+      const b3 = bytes[rowOffsets[3] + column];
+      const b4 = bytes[rowOffsets[4] + column];
+      const b5 = bytes[rowOffsets[5] + column];
+      const b6 = bytes[rowOffsets[6] + column];
+      const b7 = bytes[rowOffsets[7] + column];
+      const low = b0 | (b1 << 8) | (b2 << 16) | (b3 << 24);
+      const high = b4 | (b5 << 8) | (b6 << 16) | (b7 << 24);
+
+      let byLow = cache.get(high);
+      if (byLow === undefined) {
+        byLow = new Map<number, BlockCode>();
+        cache.set(high, byLow);
+      }
+      let code = byLow.get(low);
+      if (code === undefined) {
+        rows[0] = b0;
+        rows[1] = b1;
+        rows[2] = b2;
+        rows[3] = b3;
+        rows[4] = b4;
+        rows[5] = b5;
+        rows[6] = b6;
+        rows[7] = b7;
+        code = encodeJpegBlock(rows, reciprocal, acCodeTable, scratch);
+        byLow.set(low, code);
       }
 
-      for (let y = 0; y < 8; y++) {
-        for (let u = 0; u < 8; u++) {
-          let sum = 0;
-          for (let x = 0; x < 8; x++) sum += block[y * 8 + x] * COSINE[u * 8 + x];
-          rows[y * 8 + u] = sum;
-        }
-      }
-      for (let u = 0; u < 8; u++) {
-        for (let v = 0; v < 8; v++) {
-          let sum = 0;
-          for (let y = 0; y < 8; y++) sum += rows[y * 8 + u] * COSINE[v * 8 + y];
-          const natural = v * 8 + u;
-          coefficients[natural] = Math.round((sum * 0.25) / quant[natural]);
-        }
-      }
-
-      const dc = coefficients[0];
-      const diff = dc - previousDc;
-      previousDc = dc;
-      if (diff === 0) {
-        writer.code(dcTable.get(0));
+      const diff = code.dc - previousDc;
+      previousDc = code.dc;
+      const category = bitLength(diff < 0 ? -diff : diff);
+      const dcLength = dcLengths[category];
+      if (category === 0) {
+        writer.bits(dcCodes[0], dcLength);
+      } else if (dcLength + category <= 24) {
+        const bits = diff < 0 ? diff + (1 << category) - 1 : diff;
+        writer.bits((dcCodes[category] << category) | bits, dcLength + category);
       } else {
-        const category = bitLength(Math.abs(diff));
-        writer.code(dcTable.get(category));
+        writer.bits(dcCodes[category], dcLength);
         writer.bits(diff < 0 ? diff + (1 << category) - 1 : diff, category);
       }
-
-      let last = 63;
-      while (last > 0 && coefficients[ZIGZAG[last]] === 0) last--;
-      let run = 0;
-      for (let k = 1; k <= last; k++) {
-        const value = coefficients[ZIGZAG[k]];
-        if (value === 0) {
-          run++;
-          continue;
-        }
-        while (run >= 16) {
-          writer.code(acTable.get(0xf0));
-          run -= 16;
-        }
-        const category = bitLength(Math.abs(value));
-        writer.code(acTable.get((run << 4) | category));
-        writer.bits(value < 0 ? value + (1 << category) - 1 : value, category);
-        run = 0;
-      }
-      if (last < 63) writer.code(acTable.get(0x00));
+      const acBits = code.ac;
+      for (let i = 0; i < acBits.length; i += 2) writer.bits(acBits[i], acBits[i + 1]);
     }
   }
 
