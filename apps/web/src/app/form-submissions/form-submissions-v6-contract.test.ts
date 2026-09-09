@@ -21,9 +21,9 @@ describe('V6回答フォーム一覧', () => {
   it('初回空・検索0件・読込中・失敗を言い分ける', () => {
     expect(PAGE).toContain("kind=\"loading\"")
     expect(PAGE).toContain("kind=\"error\"")
-    expect(PAGE).toContain('フォームがまだ1つも無いときの見え方です。')
     expect(PAGE).toContain('まだフォームがありません')
     expect(PAGE).toContain('最初の1つを作ると、集まった回答もここから見られます。')
+    expect(PAGE).not.toContain('見え方です。')
     expect(PAGE).toContain('条件に合うフォームはありません')
     expect(PAGE).toContain('onRetry={() => void loadForms()}')
   })
@@ -74,6 +74,54 @@ describe('V6回答フォーム一覧', () => {
     expect(PAGE).toContain('account_id=${encodeURIComponent(selectedAccountId)}')
     expect(PAGE).toContain('LINE公式アカウントを選んでください')
     expect(API).toContain('createDraft: (accountId: string')
+  })
+})
+
+describe('#676 一覧の並び・件数・回答導線（N-172/N-173/N-180/N-181）', () => {
+  it('並び順と表示件数を実際の一覧へ効かせ、URLへ残す', () => {
+    // 何で並べるか・何件出すかは試験で固定しない。
+    // 「選んだ値が一覧とURLへ届く」ことだけを見る。
+    expect(PAGE).toContain('aria-label="並び順"')
+    expect(PAGE).toContain('FORM_PAGE_SIZES')
+    expect(PAGE).toContain('router.replace(')
+    expect(PAGE).not.toContain('onChange={() => undefined}')
+    expect(PAGE).toContain('visibleForms.map((form)')
+  })
+
+  it('回答の導線はその行のフォームを指し、先頭固定の帯を置かない', () => {
+    expect(PAGE).not.toContain('forms[0]')
+    expect(PAGE).toContain('responses?id=${encodeURIComponent(form.id)}')
+    expect(PAGE).toContain('の集まった回答を見る`}')
+  })
+
+  it('更新列は作成日ではなく更新日時を出し、無い状態を区別する', () => {
+    expect(PAGE).toContain('displayUpdatedAt(form.updatedAt)')
+    expect(PAGE).toContain('更新日時を取得できません')
+    expect(PAGE).not.toContain('new Date(form.createdAt).toLocaleDateString')
+  })
+
+  it('staffへはフォルダ追加を出さず、owner/adminへは止めて置く（N-175 は #688）', () => {
+    // 役割の判定は自分で書き直さず、1か所に寄せてあるものを読む。
+    expect(PAGE).toContain("from '@/components/automations/use-can-manage'")
+    // staff（false）と読み取り前（null）は要素ごと出さない。
+    expect(PAGE).toContain('addFolderDisabled={canAddFolder === true}')
+    expect(PAGE).toContain('addFolderTitle=')
+    expect(PAGE).not.toContain('FolderAddDialog')
+    expect(PAGE).not.toContain('onAddFolder')
+    // 画面の中で数え方を作らない。フォルダの件数はAPIが返す値だけを出す。
+    expect(PAGE).not.toContain('folderCounts')
+    expect(PAGE).not.toContain("form.folderId || 'unfiled'")
+  })
+
+  it('実ブラウザ検査は通信が止まるのを待たず、画面が出す印で待つ', () => {
+    const BROWSER = readFileSync(join(HERE, 'form-submissions-browser-behavior.mjs'), 'utf8')
+    // 通信が止まる瞬間は管理画面では来ないことがある。待つ条件にしない。
+    expect(BROWSER).not.toMatch(/waitUntil:\s*'networkidle'/)
+    expect(BROWSER).toContain("waitUntil: 'domcontentloaded'")
+    expect(BROWSER).toContain('data-design-node="EMBIK"')
+    expect(BROWSER).toContain('data-list-state="loading"')
+    // 実在しない `folderId` を混ぜた模擬データへ戻らないようにする。
+    expect(BROWSER).not.toContain('folderId:')
   })
 })
 

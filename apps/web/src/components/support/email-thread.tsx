@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { ApiError, fetchApi } from '@/lib/api'
 import { IdempotencyKeyStore } from '@/lib/idempotency-key-store'
+import { createPollGeneration, startVisiblePoll, type VisiblePollHandle } from '@/lib/visible-polling'
 import TemplatePicker from '@/components/chats/template-picker'
 
 /**
@@ -127,33 +128,99 @@ export default function EmailThread({
     }
   }, [])
 
+  // 世代で古い応答を捨てる。threadIdが変わった後の遅い応答が
+  // 新しい会話を上書きしない(順序逆転防止、#630)。
+  const genRef = useRef(createPollGeneration())
+  const latestThreadRef = useRef(threadId)
+  latestThreadRef.current = threadId
+
+  // 静かな取り直しは成否を返す。失敗の数え直し・待ちの延長は startVisiblePoll が持つ。
+  // 古い取得の応答は捨て、失敗にも数えない(新しい取得が届ける)。
   const load = useCallback(
-    async (quiet = false) => {
+    async (quiet = false): Promise<boolean> => {
+      const myThread = threadId
+      const mySeq = genRef.current.next()
+      const isStale = () =>
+        genRef.current.isStale(mySeq) || myThread !== latestThreadRef.current
       try {
         const res = await fetchApi<{ success: boolean; data: EmailDetail }>(
           `/api/support/email/threads/${encodeURIComponent(threadId)}`,
         )
+        if (isStale()) return true
         if (res.success) {
           setDetail(res.data)
           if (!quiet) {
             window.setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
           }
+          return true
         }
+        return false
       } catch {
-        setError('メールの会話を読み込めませんでした')
+        if (isStale()) return true
+        if (!quiet) setError('メールの会話を読み込めませんでした')
+        return false
       }
     },
     [threadId],
   )
 
+  // 相手からの返信が届いたら出したい。未解決の間だけ5秒起点の1本で
+  // 取り直す。非表示では止め、連続失敗は待ちを延ばして
+  // 上限後は再試行を出す。対応済みになったら止める(#630)。
+  const [threadStalled, setThreadStalled] = useState(false)
+  const [threadRetryKey, setThreadRetryKey] = useState(0)
+  /**
+   * いま出ている会話の状態を「どのスレッドのものか」と一緒に持つ(#630)。
+   *
+   * 状態だけを持つと、対応済みAから未対応Bへ切り替えた直後の描画で
+   * まだAの `detail` が残っているため、Bのループが「対応済みだから
+   * 休む」と判断して1度も取りに行かず、会話が読み込み中のまま止まる。
+   * effect の `setDetail(null)` が効くのは次の描画で、判断はそれより先。
+   */
+  const threadStatusRef = useRef<{ threadId: string; status: ThreadStatus } | null>(null)
+  threadStatusRef.current = detail ? { threadId: detail.thread.id, status: detail.thread.status } : null
+  /** 表示中のスレッドの状態。別スレッドのものは見ない。 */
+  const currentThreadStatus = (): ThreadStatus | undefined => {
+    const seen = threadStatusRef.current
+    return seen && seen.threadId === latestThreadRef.current ? seen.status : undefined
+  }
+  // 対応済みで休んだあと再オープンされたら起こす。effectを作り直すと
+  // `setDetail(null)` で会話が消えて読み込み中に戻るので、同じ1本を起こす。
+  const pollRef = useRef<VisiblePollHandle | null>(null)
   useEffect(() => {
     setDetail(null)
     setReply('')
-    void load()
-    // 相手からの返信が届いたら出したい。5秒ごとに静かに取り直す。
-    const timer = window.setInterval(() => void load(true), 5_000)
-    return () => window.clearInterval(timer)
-  }, [load])
+    setThreadStalled(false)
+    // 初回も同じ1本に載せる。初回だけ外に別走させると
+    // 初回と5秒後の取得が重複する。初回だけ表示あり、2回目から静かに。
+    let first = true
+    const poll = startVisiblePoll({
+      immediate: true,
+      shouldPoll: () => currentThreadStatus() !== 'resolved',
+      work: async () => {
+        const loud = first
+        first = false
+        const ok = await load(!loud)
+        if (!ok) throw new Error('メールの会話を読み込めませんでした')
+      },
+      onGiveUp: () => setThreadStalled(true),
+      onRecovered: () => setThreadStalled(false),
+    })
+    pollRef.current = poll
+    return () => {
+      if (pollRef.current === poll) pollRef.current = null
+      poll.stop()
+    }
+    // currentThreadStatus は ref を読むだけなので deps に入れない。
+    // 入れると会話を取り直すたびにループを作り直してしまう。
+  }, [load, threadRetryKey])
+
+  // 再オープン(対応済み→未対応など)で止まっていたループを起こす。
+  useEffect(() => {
+    if (detail && detail.thread.id === threadId && detail.thread.status !== 'resolved') {
+      pollRef.current?.wake()
+    }
+  }, [detail, threadId])
 
   /**
    * 対応の状態を変える。
@@ -479,6 +546,18 @@ export default function EmailThread({
           document.body,
         )}
 
+        {threadStalled && (
+          <p className="text-danger mb-2 text-xs">
+            会話の更新を一時停止しています（接続できません）。
+            <button
+              type="button"
+              onClick={() => setThreadRetryKey((key) => key + 1)}
+              className="font-bold underline"
+            >
+              再試行する
+            </button>
+          </p>
+        )}
         {error && <p className="text-danger mb-2 text-xs">{error}</p>}
         <div className="rounded-[10px] border border-[#D0D5DD] bg-canvas p-2 focus-within:border-[#06C755] focus-within:ring-2 focus-within:ring-[#06C755]/15">
           <textarea
