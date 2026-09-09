@@ -1,0 +1,405 @@
+import React, { act, type ReactElement } from 'react'
+import type { Root } from 'react-dom/client'
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+
+const apiMocks = vi.hoisted(() => ({
+  listBookings: vi.fn(),
+  getEvent: vi.fn(),
+  getBookingSummary: vi.fn(),
+  updateBooking: vi.fn(),
+  decideBooking: vi.fn(),
+  adminCancelBooking: vi.fn(),
+  listEvents: vi.fn(),
+}))
+
+const accountMock = vi.hoisted(() => ({ selectedAccountId: 'account-a' }))
+
+vi.mock('@/lib/api', () => ({ eventsApi: apiMocks }))
+vi.mock('next/navigation', () => ({
+  useSearchParams: () => new URLSearchParams('id=event-1'),
+}))
+vi.mock('next/link', () => ({
+  default: ({ children, ...props }: React.ComponentProps<'a'>) => <a {...props}>{children}</a>,
+}))
+vi.mock('@/contexts/account-context', () => ({
+  useAccount: () => ({
+    selectedAccountId: accountMock.selectedAccountId,
+    accounts: [
+      { id: 'account-a', name: 'A店' },
+      { id: 'account-b', name: 'B店' },
+    ],
+  }),
+}))
+vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined }))
+vi.mock('@/components/shared/confirm-dialog', () => ({
+  default: ({ open, children }: { open: boolean; children?: React.ReactNode }) => (
+    open ? <div>{children}</div> : null
+  ),
+}))
+vi.mock('@/components/shared/button', () => ({
+  default: ({ children, ...props }: React.ComponentProps<'button'>) => (
+    <button {...props}>{children}</button>
+  ),
+}))
+vi.mock('@/components/shared/list-state', () => ({
+  default: ({ kind }: { kind: string }) => <div>{kind}</div>,
+}))
+vi.mock('@/components/shared/pagination', () => ({ default: () => <div>ページ送り</div> }))
+vi.mock('@/components/shared/select-field', () => ({
+  default: ({ options, ...props }: React.ComponentProps<'select'> & { options: Array<{ value: string; label: string }> }) => (
+    <select {...props}>
+      {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+    </select>
+  ),
+}))
+
+import EventBookingsPage from './page'
+import EventsListPage from '../page'
+
+type Listener = (event: unknown) => void
+
+class FakeNode {
+  nodeType: number
+  nodeName: string
+  ownerDocument: FakeDocument
+  parentNode: FakeNode | null = null
+  childNodes: FakeNode[] = []
+
+  constructor(nodeType: number, nodeName: string, ownerDocument: FakeDocument) {
+    this.nodeType = nodeType
+    this.nodeName = nodeName
+    this.ownerDocument = ownerDocument
+  }
+
+  appendChild<T extends FakeNode>(child: T): T {
+    if (child.parentNode) child.parentNode.removeChild(child)
+    child.parentNode = this
+    this.childNodes.push(child)
+    return child
+  }
+
+  insertBefore<T extends FakeNode>(child: T, before: FakeNode | null): T {
+    if (before === null) return this.appendChild(child)
+    const index = this.childNodes.indexOf(before)
+    if (index < 0) throw new Error('insert target not found')
+    if (child.parentNode) child.parentNode.removeChild(child)
+    child.parentNode = this
+    this.childNodes.splice(index, 0, child)
+    return child
+  }
+
+  removeChild<T extends FakeNode>(child: T): T {
+    const index = this.childNodes.indexOf(child)
+    if (index < 0) throw new Error('child not found')
+    this.childNodes.splice(index, 1)
+    child.parentNode = null
+    return child
+  }
+
+  get firstChild(): FakeNode | null { return this.childNodes[0] ?? null }
+  get lastChild(): FakeNode | null { return this.childNodes.at(-1) ?? null }
+  get nextSibling(): FakeNode | null {
+    if (!this.parentNode) return null
+    const index = this.parentNode.childNodes.indexOf(this)
+    return this.parentNode.childNodes[index + 1] ?? null
+  }
+  get textContent(): string { return this.childNodes.map((child) => child.textContent).join('') }
+  set textContent(value: string) {
+    this.childNodes = []
+    if (value) this.appendChild(this.ownerDocument.createTextNode(value))
+  }
+}
+
+class FakeText extends FakeNode {
+  nodeValue: string
+  constructor(value: string, ownerDocument: FakeDocument) {
+    super(3, '#text', ownerDocument)
+    this.nodeValue = value
+  }
+  override get textContent(): string { return this.nodeValue }
+  override set textContent(value: string) { this.nodeValue = value }
+}
+
+class FakeElement extends FakeNode {
+  tagName: string
+  namespaceURI = 'http://www.w3.org/1999/xhtml'
+  style: Record<string, string> & { setProperty: (name: string, value: string) => void }
+  attributes = new Map<string, string>()
+  listeners = new Map<string, Set<Listener>>()
+  disabled = false
+  value = ''
+  checked = false
+  selected = false
+  defaultSelected = false
+  multiple = false
+
+  constructor(tagName: string, ownerDocument: FakeDocument) {
+    super(1, tagName.toUpperCase(), ownerDocument)
+    this.tagName = tagName.toUpperCase()
+    const style = {} as FakeElement['style']
+    style.setProperty = (name, value) => { style[name] = value }
+    this.style = style
+  }
+
+  setAttribute(name: string, value: string): void { this.attributes.set(name, String(value)) }
+  removeAttribute(name: string): void { this.attributes.delete(name) }
+  getAttribute(name: string): string | null { return this.attributes.get(name) ?? null }
+  addEventListener(type: string, listener: Listener): void {
+    const listeners = this.listeners.get(type) ?? new Set<Listener>()
+    listeners.add(listener)
+    this.listeners.set(type, listeners)
+  }
+  removeEventListener(type: string, listener: Listener): void { this.listeners.get(type)?.delete(listener) }
+  focus(): void { this.ownerDocument.activeElement = this }
+  get options(): FakeElement[] {
+    return this.childNodes.filter((child): child is FakeElement => (
+      child instanceof FakeElement && child.tagName === 'OPTION'
+    ))
+  }
+}
+
+class FakeDocument extends FakeNode {
+  defaultView: Record<string, unknown>
+  documentElement: FakeElement
+  body: FakeElement
+  activeElement: FakeElement | null = null
+  listeners = new Map<string, Set<Listener>>()
+
+  constructor() {
+    const placeholder = {} as FakeDocument
+    super(9, '#document', placeholder)
+    this.ownerDocument = this
+    this.documentElement = new FakeElement('html', this)
+    this.body = new FakeElement('body', this)
+    this.documentElement.appendChild(this.body)
+    this.defaultView = {}
+  }
+
+  createElement(tagName: string): FakeElement { return new FakeElement(tagName, this) }
+  createElementNS(_namespace: string, tagName: string): FakeElement { return this.createElement(tagName) }
+  createTextNode(value: string): FakeText { return new FakeText(value, this) }
+  createComment(value: string): FakeText { return new FakeText(value, this) }
+  addEventListener(type: string, listener: Listener): void {
+    const listeners = this.listeners.get(type) ?? new Set<Listener>()
+    listeners.add(listener)
+    this.listeners.set(type, listeners)
+  }
+  removeEventListener(type: string, listener: Listener): void { this.listeners.get(type)?.delete(listener) }
+}
+
+let documentStub: FakeDocument
+let createRoot: typeof import('react-dom/client').createRoot
+const mountedRoots: Root[] = []
+
+beforeAll(async () => {
+  documentStub = new FakeDocument()
+  const windowStub = documentStub.defaultView
+  Object.assign(windowStub, {
+    document: documentStub,
+    Node: FakeNode,
+    Element: FakeElement,
+    HTMLElement: FakeElement,
+    HTMLIFrameElement: class extends FakeElement {},
+    getSelection: () => null,
+  })
+  Object.assign(globalThis, {
+    React,
+    window: windowStub,
+    document: documentStub,
+    Node: FakeNode,
+    Element: FakeElement,
+    HTMLElement: FakeElement,
+    IS_REACT_ACT_ENVIRONMENT: true,
+  })
+  ;({ createRoot } = await import('react-dom/client'))
+})
+
+beforeEach(() => {
+  vi.clearAllMocks()
+  accountMock.selectedAccountId = 'account-a'
+  apiMocks.getEvent.mockResolvedValue({ id: 'event-1', name: '相談会', waitlist_enabled: 1 })
+  apiMocks.getBookingSummary.mockResolvedValue({
+    requested: 0,
+    confirmed: 2,
+    rejected: 0,
+    cancelled: 0,
+    expired: 0,
+    attended: 0,
+    no_show: 0,
+    waitlist: 0,
+    totalCapacity: 10,
+  })
+  apiMocks.decideBooking.mockResolvedValue({ ok: true })
+  apiMocks.adminCancelBooking.mockResolvedValue({ ok: true })
+  apiMocks.listEvents.mockResolvedValue({ items: [], total: 0 })
+})
+
+afterEach(async () => {
+  await act(async () => {
+    while (mountedRoots.length > 0) mountedRoots.pop()?.unmount()
+  })
+  documentStub.body.textContent = ''
+})
+
+async function flush(): Promise<void> {
+  await act(async () => {
+    for (let index = 0; index < 8; index += 1) await Promise.resolve()
+  })
+}
+
+async function mount(element: ReactElement) {
+  const container = documentStub.createElement('div')
+  documentStub.body.appendChild(container)
+  const root = createRoot(container as unknown as HTMLElement)
+  mountedRoots.push(root)
+  await act(async () => { root.render(element) })
+  await flush()
+  return {
+    container,
+    rerender: async (next: ReactElement) => {
+      await act(async () => { root.render(next) })
+      await flush()
+    },
+  }
+}
+
+function elements(root: FakeNode): FakeElement[] {
+  return root.childNodes.flatMap((child) => [
+    ...(child instanceof FakeElement ? [child] : []),
+    ...elements(child),
+  ])
+}
+
+function propsOf(element: FakeElement): Record<string, unknown> {
+  const key = Object.keys(element).find((name) => name.startsWith('__reactProps$'))
+  const props = key ? (element as unknown as Record<string, Record<string, unknown>>)[key] : undefined
+  if (!props) throw new Error(`React props not found: ${element.tagName}`)
+  return props
+}
+
+function actionButton(container: FakeElement, bookingId: string, action: string): FakeElement {
+  const found = elements(container).find((element) => (
+    element.tagName === 'BUTTON'
+    && element.getAttribute('data-booking-id') === bookingId
+    && element.getAttribute('data-booking-action') === action
+  ))
+  if (!found) throw new Error(`button not found: ${bookingId}/${action}`)
+  return found
+}
+
+async function click(button: FakeElement): Promise<void> {
+  const onClick = propsOf(button).onClick
+  if (typeof onClick !== 'function') throw new Error('button has no onClick')
+  await act(async () => {
+    onClick({ currentTarget: button, target: button, preventDefault: () => undefined })
+  })
+  await flush()
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  let reject!: (reason: unknown) => void
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise
+    reject = rejectPromise
+  })
+  return { promise, resolve, reject }
+}
+
+function booking(id: string, name: string) {
+  return {
+    id,
+    status: 'confirmed',
+    friend_display_name: name,
+    friend_name: name,
+    line_account_id: accountMock.selectedAccountId,
+    requested_at: '2026-09-09T01:00:00Z',
+    created_at: '2026-09-09T01:00:00Z',
+    slot_starts_at: '2026-09-10T01:00:00Z',
+    companion_note: null,
+    is_first_time: 1,
+  }
+}
+
+describe('Issue #684 イベント予約の実操作', () => {
+  it('同じ行を連打しても更新は1回だけ送る', async () => {
+    const pending = deferred<{ ok: true }>()
+    apiMocks.listBookings.mockResolvedValue({ items: [booking('booking-a', '青木さん')], total: 1 })
+    apiMocks.updateBooking.mockReturnValue(pending.promise)
+    const view = await mount(<EventBookingsPage />)
+    const button = actionButton(view.container, 'booking-a', 'attended')
+    const onClick = propsOf(button).onClick as (event: unknown) => void
+
+    await act(async () => {
+      onClick({})
+      onClick({})
+    })
+    await flush()
+
+    expect(apiMocks.updateBooking).toHaveBeenCalledTimes(1)
+    expect(propsOf(actionButton(view.container, 'booking-a', 'attended')).disabled).toBe(true)
+    pending.resolve({ ok: true })
+    await flush()
+  })
+
+  it('別行は並行更新でき、一方の成功で他方の失敗を消さない', async () => {
+    const first = deferred<{ ok: true }>()
+    const second = deferred<{ ok: true }>()
+    apiMocks.listBookings.mockResolvedValue({
+      items: [booking('booking-a', '青木さん'), booking('booking-b', '井上さん')],
+      total: 2,
+    })
+    apiMocks.updateBooking.mockImplementation((_accountId: string, _eventId: string, id: string) => (
+      id === 'booking-a' ? first.promise : second.promise
+    ))
+    const view = await mount(<EventBookingsPage />)
+
+    await click(actionButton(view.container, 'booking-a', 'attended'))
+    await click(actionButton(view.container, 'booking-b', 'no_show'))
+    expect(apiMocks.updateBooking).toHaveBeenCalledTimes(2)
+
+    first.reject(new Error('late failure'))
+    await flush()
+    expect(view.container.textContent).toContain('来場・不参加の記録を変えられませんでした。')
+
+    second.resolve({ ok: true })
+    await flush()
+    expect(view.container.textContent).toContain('来場・不参加の記録を変えられませんでした。')
+  })
+
+  it('切替前の遅延失敗は、切替後の同じ行の成功表示を上書きしない', async () => {
+    const oldFailure = deferred<{ ok: true }>()
+    const newSuccess = deferred<{ ok: true }>()
+    apiMocks.listBookings.mockImplementation(() => Promise.resolve({
+      items: [booking('booking-a', accountMock.selectedAccountId === 'account-a' ? '青木さん' : '井上さん')],
+      total: 1,
+    }))
+    apiMocks.updateBooking.mockImplementation((accountId: string) => (
+      accountId === 'account-a' ? oldFailure.promise : newSuccess.promise
+    ))
+    const view = await mount(<EventBookingsPage />)
+    await click(actionButton(view.container, 'booking-a', 'attended'))
+
+    accountMock.selectedAccountId = 'account-b'
+    await view.rerender(<EventBookingsPage />)
+    await click(actionButton(view.container, 'booking-a', 'attended'))
+    newSuccess.resolve({ ok: true })
+    await flush()
+    oldFailure.reject(new Error('old delayed failure'))
+    await flush()
+
+    expect(apiMocks.updateBooking).toHaveBeenCalledTimes(2)
+    expect(view.container.textContent).not.toContain('来場・不参加の記録を変えられませんでした。')
+  })
+
+  it('一覧上部の件数は「表示のみ」で、タブやボタンとして扱わない', async () => {
+    const view = await mount(<EventsListPage />)
+    const summary = elements(view.container).find((element) => (
+      element.getAttribute('data-event-count-summary') !== null
+    ))
+    expect(summary).toBeDefined()
+    expect(summary?.getAttribute('aria-label')).toBe('一覧の集計（表示のみ）')
+    expect(summary?.textContent).toContain('一覧の集計（表示のみ）')
+    expect(summary && elements(summary).some((element) => ['BUTTON', 'A'].includes(element.tagName))).toBe(false)
+  })
+})

@@ -55,6 +55,10 @@ function formatJp(iso: string | null | undefined, fallback: string): string {
   })
 }
 
+function bookingActionKey(accountId: string, eventId: string, bookingId: string): string {
+  return JSON.stringify([accountId, eventId, bookingId])
+}
+
 function BookingsInner() {
   const params = useSearchParams()
   const eventId = params.get('id')
@@ -76,6 +80,14 @@ function BookingsInner() {
   const [loadStatus, setLoadStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [busy, setBusy] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
+  const [markingKeys, setMarkingKeys] = useState<ReadonlySet<string>>(() => new Set())
+  const [markErrors, setMarkErrors] = useState<Record<string, string>>({})
+  /*
+   * 画面更新を待たずに同じ行の二度押しを止める。state だけでは、最初の
+   * click の再描画より先に二度目の click が入り、2本ともAPIへ届く。
+   */
+  const markingKeysRef = useRef(new Set<string>())
+  const markRequestRef = useRef(new Map<string, number>())
   /** 切り替え前の遅い応答を、次のイベント・次の絞り込みの一覧へ混ぜない。 */
   const loadRequestRef = useRef(0)
   const summaryRequestRef = useRef(0)
@@ -277,14 +289,37 @@ function BookingsInner() {
 
   async function markStatus(id: string, status: 'attended' | 'no_show') {
     if (!selectedAccountId || !eventId) return
-    setBusy(true)
+    const actionKey = bookingActionKey(selectedAccountId, eventId, id)
+    if (markingKeysRef.current.has(actionKey)) return
+    const requestId = (markRequestRef.current.get(actionKey) ?? 0) + 1
+    markRequestRef.current.set(actionKey, requestId)
+    markingKeysRef.current.add(actionKey)
+    setMarkingKeys(new Set(markingKeysRef.current))
+    setMarkErrors((current) => {
+      if (!(actionKey in current)) return current
+      const next = { ...current }
+      delete next[actionKey]
+      return next
+    })
+    const isLatest = () => markRequestRef.current.get(actionKey) === requestId
     try {
       await eventsApi.updateBooking(selectedAccountId, eventId, id, { status })
+      if (!isLatest()) return
+      setItems((current) => current.map((booking) => (
+        booking.id === id ? { ...booking, status } : booking
+      )))
       await Promise.all([refresh(), refreshSummary()])
     } catch {
-      setActionError('来場・不参加の記録を変えられませんでした。一覧を読み直してから、もう一度お試しください。')
+      if (!isLatest()) return
+      setMarkErrors((current) => ({
+        ...current,
+        [actionKey]: '来場・不参加の記録を変えられませんでした。一覧を読み直してから、もう一度お試しください。',
+      }))
     } finally {
-      setBusy(false)
+      if (isLatest()) {
+        markingKeysRef.current.delete(actionKey)
+        setMarkingKeys(new Set(markingKeysRef.current))
+      }
     }
   }
 
@@ -456,6 +491,10 @@ function BookingsInner() {
                   {items.map((b) => {
                     const acct = accounts.find((a) => a.id === b.line_account_id)
                     const friendName = b.friend_display_name ?? b.friend_name
+                    const actionKey = selectedAccountId
+                      ? bookingActionKey(selectedAccountId, eventId, b.id)
+                      : ''
+                    const marking = markingKeys.has(actionKey)
                     const accountLabel = acct
                       ? `${acct.country ? acct.country + ' ' : ''}${acct.name}`
                       : b.line_account_name
@@ -512,18 +551,22 @@ function BookingsInner() {
                         {b.status === 'confirmed' && (
                           <div className="ml-2 inline-flex gap-1.5">
                             <button
+                              data-booking-id={b.id}
+                              data-booking-action="attended"
                               onClick={() => markStatus(b.id, 'attended')}
-                              disabled={busy}
+                              disabled={busy || marking}
                               className="bg-accent-deep text-on-accent rounded-control px-3 py-1 text-xs font-medium hover:brightness-95 disabled:opacity-50"
                             >
-                              参加済
+                              {marking ? '記録中…' : '参加済'}
                             </button>
                             <button
+                              data-booking-id={b.id}
+                              data-booking-action="no_show"
                               onClick={() => markStatus(b.id, 'no_show')}
-                              disabled={busy}
+                              disabled={busy || marking}
                               className="bg-danger text-on-accent rounded-control px-3 py-1 text-xs font-medium hover:brightness-95 disabled:opacity-50"
                             >
-                              無断
+                              {marking ? '記録中…' : '無断'}
                             </button>
                             <button
                               data-qa-open="i5SN2j-cancel"
@@ -537,6 +580,11 @@ function BookingsInner() {
                             >
                               キャンセル
                             </button>
+                            {markErrors[actionKey] && (
+                              <span className="text-danger block max-w-64 text-left text-xs" role="alert">
+                                {markErrors[actionKey]}
+                              </span>
+                            )}
                           </div>
                         )}
                       </td>
