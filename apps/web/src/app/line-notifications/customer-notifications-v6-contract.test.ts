@@ -92,8 +92,18 @@ describe('V6 顧客へのお知らせの寸法', () => {
   })
 
   it('保存・公開の応答は、返った時点のアカウント世代でしか画面へ書かない', () => {
-    expect(PAGE).toContain('const stale = () => args.generation !== args.currentGeneration()')
+    expect(PAGE).toContain('function isStale(guard: CustomerMutationGuard): boolean')
     expect(PAGE).toContain('currentGeneration: () => loadGeneration.current')
     expect(PAGE).toContain("if (outcome.kind === 'stale' || generation !== loadGeneration.current) return")
+  })
+
+  it('端末の控えと未保存の印は、送った文面がそのまま画面に残っているときだけ片づける', () => {
+    // 保存中も入力できる。押した時点の写しで「保存済み」にすると、足した分が消える。
+    expect(PAGE).toContain('function customerDraftFingerprint(draft: CustomerEditorDraft): string')
+    expect(PAGE).toContain('currentFingerprint: () => editFingerprintRef.current.get(setting.eventType)')
+    expect(PAGE).toContain('return guard.currentFingerprint() === guard.sentFingerprint')
+    expect(PAGE).toContain('if (outcome.settleDraft) {')
+    // 1打ごとに指紋を進め、飛んでいる保存を古いものにする。
+    expect(PAGE).toContain('editFingerprintRef.current.set(eventType, customerDraftFingerprint(draft))')
   })
 })
