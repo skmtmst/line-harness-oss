@@ -296,4 +296,36 @@ describe('受信箱deep-linkのアカウント切替競合(#673)', () => {
     expect(talkPaneText()).toContain('A社あての問い合わせ')
     expect(talkPaneText()).not.toContain(OTHER_ACCOUNT_NOTICE)
   })
+
+  it('B選択中にfriend Aの照会が完了しても、受信箱は空状態のままで会話詳細APIを呼ばない', async () => {
+    const friendCalls: string[] = []
+    net.handler = baseHandler({
+      friendHandler: (id) => {
+        friendCalls.push(id)
+        // 照会は保留にせず即座に完了させる。B選択中にA社所属の応答が
+        // 返ってきた「後」でも境界チェックが会話APIを止めることを見る。
+        return Promise.resolve({ success: true, data: friendDetail(id, 'account-a') })
+      },
+      chatDetails: {
+        'friend-a': chatDetail('friend-a', 'A社 太郎', 'A社あての問い合わせ'),
+      },
+    })
+
+    fixture.accountId = 'account-b'
+    fixture.params = new URLSearchParams('friend=friend-a')
+    await render()
+    await flush()
+    await flush()
+
+    // 会話詳細APIは一度も呼ばれていない。呼べば別アカウントの
+    // 中身がそのまま見えてしまう。境界判定が壊れたときに真っ先に
+    // 崩れる箇所なので、他のアサーションより先に見る。
+    // `limit=` 等のクエリが付くため前方一致で見る。
+    expect(net.calls.some((c) => c.startsWith('GET /api/chats/friend-a'))).toBe(false)
+    // 受信箱は空状態のまま。別人の中身はどこにも出ない。
+    expect(talkPaneText()).not.toContain('A社あての問い合わせ')
+    expect(talkPaneText()).toContain(OTHER_ACCOUNT_NOTICE)
+    // 照会そのものは行われ、完了している(境界判定のために必要な1回)。
+    expect(friendCalls).toContain('friend-a')
+  })
 })
