@@ -81,7 +81,38 @@ const overview = {
   },
 }
 
-async function openEc(page, waitFor = 'networkidle') {
+/*
+ * 共通レイアウト(トップバー・サイドバー)が呼ぶ、この試験の対象外のAPI。
+ * モックしないと実ネットワークへ到達を試み、ローカルのwrangler devポートや
+ * CI環境のステージング到達性に依存してしまい、`waitUntil: 'networkidle'` が
+ * 到達しない(#685実装ノードで実際に発生・原因特定済み)。空応答で即終わらせる。
+ */
+async function stubUnrelatedApis(page) {
+  const paths = [
+    '**/admin/version',
+    '**/api/public/brand',
+    '**/api/inbox/unanswered/count',
+    '**/api/settings/features*',
+    '**/api/nen-members/overview',
+    '**/api/accounts/health-summary',
+    '**/api/ec-commerce/identity-candidates*',
+    '**/api/ec-commerce/subscriptions*',
+  ]
+  for (const path of paths) {
+    await page.route(path, (route) => route.fulfill({ status: 404, json: { success: false, error: 'not_mocked' } }))
+  }
+}
+
+/*
+ * `networkidle` は使わない。Next.jsの静的出力はプリフェッチ等でネットワークが
+ * 完全に静まらないことがあり、Playwright公式でも非推奨とされている。
+ * 実際にこの試験でも、共通レイアウトの未対象APIを個別モックしてもなお
+ * `networkidle` へ到達しないことを確認済み(#685実装ノードで原因特定済み)。
+ * 各テストはこの後 `expect(...).toBeVisible()` で実データの出現を待つので、
+ * `domcontentloaded` で十分。
+ */
+async function openEc(page, waitFor = 'domcontentloaded') {
+  await stubUnrelatedApis(page)
   await page.route('**/api/auth/session', (route) => route.fulfill({
     json: {
       success: true,
@@ -287,7 +318,7 @@ test('切替後に届いた前のアカウントの遅い返事を、新しい�
     return route.fulfill({ json: { success: true, data: { items: [record(1)], total: 1, summary } } })
   })
 
-  await openEc(page, 'domcontentloaded')
+  await openEc(page)
   /* Aの返事はまだ届いていない。 */
   await expect(page.getByLabel('LINEアカウント')).toBeVisible()
   await expect(page.getByText('111件', { exact: true })).toHaveCount(0)

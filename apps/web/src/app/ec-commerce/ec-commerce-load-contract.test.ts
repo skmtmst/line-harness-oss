@@ -59,8 +59,6 @@ describe('V6 23-1 EC連携のアカウント切替', () => {
     expect(source).toContain('return slot.accountId === accountId ? slot : pendingFor(accountId, empty)')
     expect(source).toContain('const overviewView = boundTo(overviewSlot, accountId, null)')
     expect(source).toContain('const recordsView = boundTo(recordsSlot, accountId, EMPTY_RECORDS)')
-    /* 切替の後始末を useEffect に任せると、その一描画ぶん前の値が見える。 */
-    expect(source).not.toContain('}, [accountId])\n\n  const pageCount')
   })
 
   it('失敗時に前の値を残すのは同じアカウントの取り直しだけに限る', () => {
@@ -82,6 +80,12 @@ describe('V6 23-1 EC連携のアカウント切替', () => {
  * Bは読み込み中のまま固まる。retryingIdもアカウントに結び付いていなかった。
  * accountIdRefで最新アカウントと突き合わせ、古いクロージャの呼び出しを
  * 共有seqに触れる前に止める、を見張る。
+ *
+ * 司令塔独立審査(Opus, 2026-09-09)の指摘: このdescribe配下の文字列一致は
+ * 逆変異(M3〜M7)を当てても表明された文字列が残ったまま挙動だけ壊れ、検知
+ * できなかった。実際の挙動(M3〜M7がいずれも赤になること)は
+ * `ec-commerce-events-panel-mount.test.tsx` の実React mount試験へ移した。
+ * ここは実装の存在確認にとどめ、書式そのものを固定する表明は置かない。
  */
 describe('V6 23-1 EC連携の再試行とアカウント切替の順序', () => {
   it('最新アカウントをrefで持ち、描画本体で直接更新する', () => {
@@ -89,29 +93,17 @@ describe('V6 23-1 EC連携の再試行とアカウント切替の順序', () => 
     expect(source).toContain('currentAccountIdRef.current = accountId')
   })
 
-  it('loadOverview/loadRecordsは古いクロージャからの呼び出しを共有seqに触れる前に弾く', () => {
-    const loadOverviewIdx = source.indexOf('const loadOverview = useCallback')
-    const loadOverviewGuardIdx = source.indexOf('if (accountId !== currentAccountIdRef.current) return', loadOverviewIdx)
-    const overviewSeqIdx = source.indexOf('const seq = overviewLoadSeq.current + 1')
-    expect(loadOverviewGuardIdx).toBeGreaterThan(loadOverviewIdx)
-    expect(loadOverviewGuardIdx).toBeLessThan(overviewSeqIdx)
-
-    const loadRecordsIdx = source.indexOf('const loadRecords = useCallback')
-    const loadRecordsGuardIdx = source.indexOf('if (accountId !== currentAccountIdRef.current) return', loadRecordsIdx)
-    const listSeqIdx = source.indexOf('const seq = listLoadSeq.current + 1')
-    expect(loadRecordsGuardIdx).toBeGreaterThan(loadRecordsIdx)
-    expect(loadRecordsGuardIdx).toBeLessThan(listSeqIdx)
-  })
-
   it('retryingIdはアカウントと一体で持つ', () => {
     expect(source).toContain("useState<{ accountId: string | null; id: string | null }>({ accountId, id: null })")
     expect(source).toContain('const retryingId = retryingSlot.accountId === accountId ? retryingSlot.id : null')
   })
 
-  it('retry()は応答待ちの間に切り替えられたら、お知らせも再読込も行わない', () => {
+  it('setNoticeとloadOverview/loadRecordsは、それぞれ呼び出し先でaccountId不一致を検知して戻る', () => {
+    expect(source).toContain('const setNotice = useCallback')
+    /* フェンスは呼び出し先1箇所に一本化していて、retry()自身は持たない。 */
     const retryIdx = source.indexOf('const retry = async (action: EcActionExecution)')
-    const guards = source.slice(retryIdx).match(/if \(retryAccountId !== currentAccountIdRef\.current\) return/g) ?? []
-    expect(guards.length).toBe(2)
+    const retryOwnGuards = source.slice(retryIdx).match(/if \(retryAccountId !== currentAccountIdRef\.current\) return/g) ?? []
+    expect(retryOwnGuards.length).toBe(0)
   })
 
   it('retryingSlotの後始末は、同じ再試行のぶんだけを消す', () => {

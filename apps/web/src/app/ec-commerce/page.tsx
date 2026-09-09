@@ -138,7 +138,11 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
   const notice = noticeSlot.accountId === accountId ? noticeSlot.notice : null
   const setPage = useCallback((next: number) => setPageSlot({ accountId, page: next }), [accountId])
   const setNotice = useCallback(
-    (next: { tone: 'success' | 'error'; text: string } | null) => setNoticeSlot({ accountId, notice: next }),
+    (next: { tone: 'success' | 'error'; text: string } | null) => {
+      /* retry() が抱えた古い accountId のクロージャから呼ばれたら、通知も出さない。 */
+      if (accountId !== currentAccountIdRef.current) return
+      setNoticeSlot({ accountId, notice: next })
+    },
     [accountId],
   )
 
@@ -247,15 +251,13 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
       )
       if (!response.success) throw new Error('retry_failed')
       /*
-       * APIの応答を待つ間にBへ切り替えられていたら、Aのお知らせを出さず、
-       * Aの一覧再読込も行わない(loadRecords自身もaccountId不一致で弾くが、
-       * ここで止めれば無駄な通信も起きない)。
+       * APIの応答を待つ間にBへ切り替えられていても、ここでは弾かない。
+       * setNotice・loadRecordsのそれぞれが呼び出し先でaccountId不一致を
+       * 自己判定して戻る(フェンスは呼び出し先1箇所に一本化する)。
        */
-      if (retryAccountId !== currentAccountIdRef.current) return
       setNotice({ tone: 'success', text: '失敗した処理だけを、もう一度行う待ち行列へ戻しました。' })
       await loadRecords(false)
     } catch (error) {
-      if (retryAccountId !== currentAccountIdRef.current) return
       if (error instanceof ApiError && error.status === 409) await loadRecords(false)
       setNotice({
         tone: 'error',
