@@ -68,6 +68,12 @@ export default function PhotoReviewsPage() {
   const [bulkReviewing, setBulkReviewing] = useState(false)
   const [bulkFailed, setBulkFailed] = useState<Array<{ photoId: string; petName: string; error: string }>>([])
   const loadSequence = useRef(0)
+  /*
+   * 操作を始めたときのLINEアカウント世代。Aの審査・再送の応答が遅れて
+   * 戻ってきたとき、すでにBへ切り替わっていればB画面へは反映しない。
+   * 一覧の loadSequence と同じ考え方を、書き込み操作にも当てる。
+   */
+  const accountGeneration = useRef(0)
 
   const load = useCallback(async () => {
     const sequence = ++loadSequence.current
@@ -112,6 +118,7 @@ export default function PhotoReviewsPage() {
   }, [selectedAccountId])
   useEffect(() => { void load() }, [load])
   useEffect(() => {
+    accountGeneration.current += 1
     setNotice('')
     setRejectingPhotoId(null)
     setRejectingPhotoDetail(null)
@@ -257,6 +264,7 @@ export default function PhotoReviewsPage() {
       setNotice('LINEアカウントを選んでください。')
       return
     }
+    const generation = accountGeneration.current
     setReviewing(id)
     try {
       const response = await api.nenMembers.reviewPhoto(id, {
@@ -268,6 +276,7 @@ export default function PhotoReviewsPage() {
         ),
         ...(rejection ?? {}),
       })
+      if (generation !== accountGeneration.current) return
       if (!response.success) throw new Error(response.error)
       const notification = response.data.notificationStatus === 'sent'
         ? '投稿者へLINEで通知しました。'
@@ -282,8 +291,12 @@ export default function PhotoReviewsPage() {
       setReasonError('')
       await load()
       setView('list')
-    } catch (error) { setNotice(photoNoticeFor(error, '審査結果を保存できませんでした。')) }
-    finally { setReviewing(null) }
+    } catch (error) {
+      if (generation === accountGeneration.current) {
+        setNotice(photoNoticeFor(error, '審査結果を保存できませんでした。'))
+      }
+    }
+    finally { if (generation === accountGeneration.current) setReviewing(null) }
   }
 
   const bulkReview = async (
@@ -291,6 +304,7 @@ export default function PhotoReviewsPage() {
     rejection?: { reasonCode: ReviewReasonCode; reasonNote: string },
   ) => {
     if (!selectedAccountId || selectedPendingPhotos.length === 0) return
+    const generation = accountGeneration.current
     setBulkReviewing(true)
     try {
       const response = await api.nenMembers.bulkReviewPhotos({
@@ -303,6 +317,7 @@ export default function PhotoReviewsPage() {
           reasonNote: rejection?.reasonNote || null,
         })),
       }, crypto.randomUUID())
+      if (generation !== accountGeneration.current) return
       if (!response.success) throw new Error(response.error)
       /*
        * 一括審査の口は審査の確定と通知の送達を分けて返す。審査はこの時点で
@@ -329,9 +344,11 @@ export default function PhotoReviewsPage() {
       setReasonError('')
       await load()
     } catch (error) {
-      setNotice(photoNoticeFor(error, 'まとめて審査できませんでした。'))
+      if (generation === accountGeneration.current) {
+        setNotice(photoNoticeFor(error, 'まとめて審査できませんでした。'))
+      }
     } finally {
-      setBulkReviewing(false)
+      if (generation === accountGeneration.current) setBulkReviewing(false)
     }
   }
 
@@ -423,17 +440,21 @@ export default function PhotoReviewsPage() {
 
   const retryNotification = async (id: string) => {
     if (!selectedAccountId) return
+    const generation = accountGeneration.current
     setReviewing(id)
     try {
       const response = await api.nenMembers.retryPhotoReviewNotification(id, selectedAccountId)
+      if (generation !== accountGeneration.current) return
       if (!response.success) throw new Error(response.error)
       setNotice('審査結果を投稿者へLINEで再送しました。')
       setBulkFailed((current) => current.filter((item) => item.photoId !== id))
       await load()
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : 'LINE通知を再送できませんでした。')
+      if (generation === accountGeneration.current) {
+        setNotice(error instanceof Error ? error.message : 'LINE通知を再送できませんでした。')
+      }
     } finally {
-      setReviewing(null)
+      if (generation === accountGeneration.current) setReviewing(null)
     }
   }
 
