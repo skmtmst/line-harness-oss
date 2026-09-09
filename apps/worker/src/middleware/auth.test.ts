@@ -1,7 +1,13 @@
 import { describe, expect, test, vi } from 'vitest';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
-import { authMiddleware, isPublicApiBoundary, isStaffExplicitAllow, isStaffSelfEndpoint, permissionForApiPath } from './auth.js';
+import {
+  authMiddleware,
+  isPublicApiBoundary,
+  isStaffExplicitAllow,
+  isStaffSelfEndpoint,
+  permissionForApiPath,
+} from './auth.js';
 import { resolveCorsOrigin } from './admin-auth-config.js';
 import { adminAuth } from '../routes/admin-auth.js';
 import { encryptTotpSecret, totpAtStep } from '../lib/totp.js';
@@ -144,6 +150,11 @@ function app() {
   a.get('/api/media/md-1/download', (c) => c.json({ success: true }));
   a.get('/api/media/md-1/content', (c) => c.json({ success: true }));
   a.get('/api/rich-menu-groups', (c) => c.json({ success: true }));
+  // 本人IDと同じ動的 path だけ通り、将来追加される固定1セグメント path は閉じる。
+  a.get('/api/staff/friends-1', (c) => c.json({ success: true }));
+  a.patch('/api/staff/friends-1', (c) => c.json({ success: true }));
+  a.get('/api/staff/export', (c) => c.json({ success: true }));
+  a.patch('/api/staff/policy', (c) => c.json({ success: true }));
   // N-423 の未登録経路。permissionForApiPath が null を返す口。
   a.get('/api/coverage-unmapped-demo', (c) => c.json({ success: true }));
   a.post('/api/coverage-unmapped-demo', (c) => c.json({ success: true }));
@@ -874,11 +885,11 @@ describe('N-423 staff deny-by-default (#670)', () => {
       ['GET', '/api/settings/features'],
       ['POST', '/api/images'],
     ] as const) {
-      expect(isStaffSelfEndpoint(method, path)).toBe(true);
+      expect(isStaffSelfEndpoint(method, path, 'abc')).toBe(true);
     }
   });
 
-  test('本人・自組織の口の method 違いと他人宛ては通さない', () => {
+  test('本人・自組織の口の method 違い・他人宛て・固定path候補は通さない', () => {
     for (const [method, path] of [
       ['POST', '/api/auth/session'],
       ['GET', '/api/auth/step-up'],
@@ -897,8 +908,30 @@ describe('N-423 staff deny-by-default (#670)', () => {
       ['GET', '/api/images'],
       ['DELETE', '/api/images/abc'],
       ['GET', '/api/operations/health'],
+      ['GET', '/api/staff/export'],
+      ['PATCH', '/api/staff/policy'],
     ] as const) {
-      expect(isStaffSelfEndpoint(method, path)).toBe(false);
+      expect(isStaffSelfEndpoint(method, path, 'abc')).toBe(false);
+    }
+    expect(isStaffSelfEndpoint('GET', '/api/staff/other', 'abc')).toBe(false);
+    expect(isStaffSelfEndpoint('PATCH', '/api/staff/other', 'abc')).toBe(false);
+  });
+
+  test('実リクエストは本人IDだけ通し、同じ形の固定pathと他人IDを403にする', async () => {
+    expect((await app().request('/api/staff/friends-1', staffBearer('friends-key'), crossSiteEnv())).status).toBe(200);
+    expect((await app().request('/api/staff/friends-1', {
+      ...staffBearer('friends-key'), method: 'PATCH',
+    }, crossSiteEnv())).status).toBe(200);
+
+    for (const [method, path, token] of [
+      ['GET', '/api/staff/export', 'friends-key'],
+      ['PATCH', '/api/staff/policy', 'friends-key'],
+      ['GET', '/api/staff/friends-1', 'no-permissions-key'],
+      ['PATCH', '/api/staff/friends-1', 'no-permissions-key'],
+    ] as const) {
+      const res = await app().request(path, { ...staffBearer(token), method }, crossSiteEnv());
+      expect(res.status).toBe(403);
+      expect((await res.json() as { error: string }).error).toBe('この機能を操作する権限がありません');
     }
   });
 

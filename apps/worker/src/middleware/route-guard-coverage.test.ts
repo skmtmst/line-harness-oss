@@ -8,7 +8,12 @@ vi.mock('@line-crm/db', () => ({
   getStaffByApiKey: async () => null,
 }));
 
-import { isPublicApiBoundary, isStaffExplicitAllow, isStaffSelfEndpoint, permissionForApiPath } from './auth.js';
+import {
+  isPublicApiBoundary,
+  isStaffExplicitAllow,
+  isStaffSelfRouteTemplate,
+  permissionForApiPath,
+} from './auth.js';
 
 /**
  * 更新系の経路に、役割の指定が付いているかを機械的に確かめる。
@@ -128,7 +133,18 @@ describe('更新系の権限ガードの網羅', () => {
  */
 const API_ROUTE_CALL = /\.(get|post|put|patch|delete|options|all)\(\s*['"](\/api\/[^'"]+)['"]/g;
 
-function collectStaffApiClassification(): { all: string[]; failClosed: string[] } {
+function isStaffApiFailClosed(entry: string): boolean {
+  const space = entry.indexOf(' ');
+  const method = entry.slice(0, space);
+  const path = entry.slice(space + 1);
+  if (isPublicApiBoundary(method, path)) return false;
+  if (isStaffSelfRouteTemplate(method, path)) return false;
+  if (isStaffExplicitAllow(method, path)) return false;
+  if (permissionForApiPath(path) !== null) return false;
+  return true;
+}
+
+function collectStaffApiClassification(extraRoutes: string[] = []): { all: string[]; failClosed: string[] } {
   const srcDir = join(dirname(fileURLToPath(import.meta.url)), '..');
   const files = readdirSync(join(srcDir, 'routes'))
     .filter((entry) => entry.endsWith('.ts') && !entry.includes('.test.'))
@@ -141,17 +157,9 @@ function collectStaffApiClassification(): { all: string[]; failClosed: string[] 
       seen.add(`${match[1].toUpperCase()} ${match[2]}`);
     }
   }
+  for (const route of extraRoutes) seen.add(route);
   const all = [...seen].sort();
-  const failClosed = all.filter((entry) => {
-    const space = entry.indexOf(' ');
-    const method = entry.slice(0, space);
-    const path = entry.slice(space + 1);
-    if (isPublicApiBoundary(method, path)) return false;
-    if (isStaffSelfEndpoint(method, path)) return false;
-    if (isStaffExplicitAllow(method, path)) return false;
-    if (permissionForApiPath(path) !== null) return false;
-    return true;
-  });
+  const failClosed = all.filter(isStaffApiFailClosed);
   return { all, failClosed };
 }
 
@@ -375,5 +383,12 @@ describe('staff 権限の deny-by-default の網羅 (N-423 #670)', () => {
       stale,
       `消えた経路が SNAPSHOT に残っています: ${stale.join(', ')}`,
     ).toEqual([]);
+  });
+
+  it('staff配下の固定1セグメント管理routeを本人用:idとして除外しないこと', () => {
+    const fixedRoutes = ['GET /api/staff/export', 'PATCH /api/staff/policy'];
+    const { failClosed } = collectStaffApiClassification(fixedRoutes);
+    expect(failClosed).toEqual([...STAFF_FAIL_CLOSED_SNAPSHOT, ...fixedRoutes].sort());
+    expect(failClosed).not.toEqual(STAFF_FAIL_CLOSED_SNAPSHOT);
   });
 });

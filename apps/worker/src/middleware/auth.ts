@@ -241,22 +241,45 @@ const STAFF_SELF_ENDPOINTS: Array<[method: string, path: string]> = [
 ];
 
 /**
- * `/api/staff/:id` 配下のうち handler 内で本人か管理者に絞っている口。
- * 一覧・招待・他人への操作は含めない。
+ * route 定義を静的検査するときだけ本人系として扱う template。
+ * 固定 path を `:id` と同じ形で判定しないため、実リクエスト用の判定とは分ける。
  */
-const STAFF_SELF_PATTERNS: Array<[method: string, pattern: RegExp]> = [
-  // 自分の表示・自分の設定変更。handler が本人または管理者に絞る。
-  ['GET', /^\/api\/staff\/[^/]+$/],
-  ['PATCH', /^\/api\/staff\/[^/]+$/],
-  // 自分の二段階認証の設定・確定・解除。handler が本人に絞る。
-  ['POST', /^\/api\/staff\/[^/]+\/two-factor(?:\/[^/]+)?$/],
-  ['DELETE', /^\/api\/staff\/[^/]+\/two-factor(?:\/[^/]+)?$/],
+const STAFF_SELF_ROUTE_TEMPLATES: Array<[method: string, path: string]> = [
+  ['GET', '/api/staff/:id'],
+  ['PATCH', '/api/staff/:id'],
+  ['POST', '/api/staff/:id/two-factor/setup'],
+  ['POST', '/api/staff/:id/two-factor/confirm'],
+  ['DELETE', '/api/staff/:id/two-factor'],
 ];
 
-export function isStaffSelfEndpoint(method: string, path: string): boolean {
+export function isStaffSelfRouteTemplate(method: string, path: string): boolean {
   const normalizedMethod = method.toUpperCase();
   if (STAFF_SELF_ENDPOINTS.some(([m, p]) => m === normalizedMethod && p === path)) return true;
-  return STAFF_SELF_PATTERNS.some(([m, pattern]) => m === normalizedMethod && pattern.test(path));
+  return STAFF_SELF_ROUTE_TEMPLATES.some(([m, p]) => m === normalizedMethod && p === path);
+}
+
+/**
+ * `/api/staff/:id` 配下の本人操作。
+ *
+ * URL の形だけでは本人系にしない。将来 `/api/staff/export` のような固定 path が
+ * 追加されても permission 検査を迂回しないよう、path 内の id と認証済み staff.id
+ * が一致する場合だけ通す。
+ */
+const STAFF_SELF_PATH_PATTERNS: Array<[method: string, pattern: RegExp]> = [
+  ['GET', /^\/api\/staff\/([^/]+)$/],
+  ['PATCH', /^\/api\/staff\/([^/]+)$/],
+  ['POST', /^\/api\/staff\/([^/]+)\/two-factor\/(?:setup|confirm)$/],
+  ['DELETE', /^\/api\/staff\/([^/]+)\/two-factor$/],
+];
+
+export function isStaffSelfEndpoint(method: string, path: string, staffId?: string): boolean {
+  const normalizedMethod = method.toUpperCase();
+  if (STAFF_SELF_ENDPOINTS.some(([m, p]) => m === normalizedMethod && p === path)) return true;
+  if (!staffId) return false;
+  return STAFF_SELF_PATH_PATTERNS.some(([m, pattern]) => {
+    if (m !== normalizedMethod) return false;
+    return pattern.exec(path)?.[1] === staffId;
+  });
 }
 
 /**
@@ -476,7 +499,7 @@ export async function authMiddleware(c: Context<Env>, next: Next): Promise<Respo
 
   // N-423 (#670): staff は deny-by-default。権限表に無い管理 API は
   // 本人・自組織と明示許可の口以外すべて 403。owner/admin は従来どおり通す。
-  if (staff.role === 'staff' && !isStaffSelfEndpoint(method, path) && !isStaffExplicitAllow(method, path)) {
+  if (staff.role === 'staff' && !isStaffSelfEndpoint(method, path, staff.id) && !isStaffExplicitAllow(method, path)) {
     const requiredPermission = permissionForApiPath(path);
     if (!requiredPermission || !staff.permissionKeys?.includes(requiredPermission)) {
       return c.json({ success: false, error: 'この機能を操作する権限がありません' }, 403);
