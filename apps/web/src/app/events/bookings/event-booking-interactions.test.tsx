@@ -392,6 +392,107 @@ describe('Issue #684 イベント予約の実操作', () => {
     expect(view.container.textContent).not.toContain('来場・不参加の記録を変えられませんでした。')
   })
 
+  it('切替前に押した成功が後から返っても、切替後の画面へ前のアカウントの予約・件数を入れない', async () => {
+    const oldSuccess = deferred<{ ok: true }>()
+    // 同じ予約IDを両方に置き、行の書き換えが混ざるかどうかまで見る。
+    apiMocks.listBookings.mockImplementation((accountId: string) => Promise.resolve({
+      items: [booking('booking-a', accountId === 'account-a' ? '青木さん' : '井上さん')],
+      total: 1,
+    }))
+    apiMocks.getEvent.mockImplementation((accountId: string) => Promise.resolve({
+      id: 'event-1',
+      name: accountId === 'account-a' ? '相談会A' : '相談会B',
+      waitlist_enabled: 1,
+    }))
+    apiMocks.getBookingSummary.mockImplementation((accountId: string) => Promise.resolve({
+      requested: accountId === 'account-a' ? 7 : 0,
+      confirmed: 2,
+      rejected: 0,
+      cancelled: 0,
+      expired: 0,
+      attended: 0,
+      no_show: 0,
+      waitlist: 0,
+      totalCapacity: 10,
+    }))
+    apiMocks.updateBooking.mockReturnValue(oldSuccess.promise)
+
+    const view = await mount(<EventBookingsPage />)
+    await click(actionButton(view.container, 'booking-a', 'attended'))
+    expect(apiMocks.updateBooking).toHaveBeenCalledTimes(1)
+    expect(apiMocks.updateBooking.mock.calls[0][0]).toBe('account-a')
+
+    accountMock.selectedAccountId = 'account-b'
+    await view.rerender(<EventBookingsPage />)
+    expect(view.container.textContent).toContain('井上さん')
+    expect(view.container.textContent).toContain('相談会B')
+
+    const callsFor = (mock: { mock: { calls: unknown[][] } }, accountId: string) => (
+      mock.mock.calls.filter((call) => call[0] === accountId).length
+    )
+    const before = {
+      list: callsFor(apiMocks.listBookings, 'account-a'),
+      event: callsFor(apiMocks.getEvent, 'account-a'),
+      summary: callsFor(apiMocks.getBookingSummary, 'account-a'),
+    }
+
+    // ここでようやく旧アカウントの更新が成功で返る。
+    oldSuccess.resolve({ ok: true })
+    await flush()
+
+    // 前のアカウントの取り直しも集計も走らせない。
+    expect(callsFor(apiMocks.listBookings, 'account-a')).toBe(before.list)
+    expect(callsFor(apiMocks.getEvent, 'account-a')).toBe(before.event)
+    expect(callsFor(apiMocks.getBookingSummary, 'account-a')).toBe(before.summary)
+    // 画面はBのまま。Aの予約者・イベント名・承認待ち件数を出さない。
+    expect(view.container.textContent).toContain('井上さん')
+    expect(view.container.textContent).not.toContain('青木さん')
+    expect(view.container.textContent).toContain('相談会B')
+    expect(view.container.textContent).not.toContain('相談会A')
+    expect(view.container.textContent).toContain('確認待ちはありません')
+    expect(view.container.textContent).not.toContain('対応が必要：7件を確認してください')
+    // Bの行を勝手に参加済へ書き換えない（書き換わると操作ボタンが消える）。
+    expect(() => actionButton(view.container, 'booking-a', 'attended')).not.toThrow()
+    expect(propsOf(actionButton(view.container, 'booking-a', 'attended')).disabled).toBe(false)
+    expect(view.container.textContent).not.toContain('来場・不参加の記録を変えられませんでした。')
+  })
+
+  it('切り替えて戻ったあとの押し直しを、前の応答が終わらせない', async () => {
+    const stale = deferred<{ ok: true }>()
+    const fresh = deferred<{ ok: true }>()
+    let updateCalls = 0
+    apiMocks.listBookings.mockImplementation((accountId: string) => Promise.resolve({
+      items: [booking('booking-a', accountId === 'account-a' ? '青木さん' : '井上さん')],
+      total: 1,
+    }))
+    apiMocks.updateBooking.mockImplementation(() => {
+      updateCalls += 1
+      return updateCalls === 1 ? stale.promise : fresh.promise
+    })
+
+    const view = await mount(<EventBookingsPage />)
+    await click(actionButton(view.container, 'booking-a', 'attended'))
+
+    accountMock.selectedAccountId = 'account-b'
+    await view.rerender(<EventBookingsPage />)
+    accountMock.selectedAccountId = 'account-a'
+    await view.rerender(<EventBookingsPage />)
+
+    // 切替で世代が変わったので、同じ行をもう一度押せる。
+    expect(propsOf(actionButton(view.container, 'booking-a', 'attended')).disabled).toBe(false)
+    await click(actionButton(view.container, 'booking-a', 'attended'))
+    expect(updateCalls).toBe(2)
+
+    // 前の世代の応答は、今の「記録中…」を解かない。
+    stale.resolve({ ok: true })
+    await flush()
+    expect(propsOf(actionButton(view.container, 'booking-a', 'attended')).disabled).toBe(true)
+
+    fresh.resolve({ ok: true })
+    await flush()
+    expect(view.container.textContent).not.toContain('来場・不参加の記録を変えられませんでした。')
+  })
+
   it('一覧上部の件数は「表示のみ」で、タブやボタンとして扱わない', async () => {
     const view = await mount(<EventsListPage />)
     const summary = elements(view.container).find((element) => (
