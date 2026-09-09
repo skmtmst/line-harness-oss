@@ -29,6 +29,44 @@ function openMigratedDb(): D1Database {
   return asD1(sqlite);
 }
 
+/** 347 が参照する、適用直前の所有関係だけを持つ実SQLite。 */
+function openPre347Db(): Database.Database {
+  const sqlite = new Database(':memory:');
+  sqlite.exec(`
+    CREATE TABLE line_accounts (id TEXT PRIMARY KEY);
+    CREATE TABLE templates (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      category TEXT NOT NULL DEFAULT 'general',
+      message_type TEXT NOT NULL,
+      message_content TEXT NOT NULL,
+      carousel_actions_json TEXT,
+      carousel_tap_limit_mode TEXT NOT NULL DEFAULT 'none',
+      carousel_tap_limit_text TEXT,
+      question_json TEXT,
+      question_status TEXT NOT NULL DEFAULT 'published',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      line_account_id TEXT,
+      folder_id TEXT
+    );
+    CREATE TABLE auto_replies (template_id TEXT, line_account_id TEXT);
+    CREATE TABLE scenarios (id TEXT PRIMARY KEY, line_account_id TEXT);
+    CREATE TABLE scenario_steps (template_id TEXT, scenario_id TEXT);
+    CREATE TABLE reminders (id TEXT PRIMARY KEY, line_account_id TEXT);
+    CREATE TABLE reminder_steps (template_id TEXT, reminder_id TEXT);
+    CREATE TABLE rich_menu_groups (id TEXT PRIMARY KEY, account_id TEXT NOT NULL);
+    CREATE TABLE rich_menu_pages (id TEXT PRIMARY KEY, group_id TEXT NOT NULL);
+    CREATE TABLE rich_menu_areas (template_id TEXT, page_id TEXT NOT NULL);
+    CREATE TABLE automations (actions TEXT NOT NULL DEFAULT '[]', line_account_id TEXT);
+    CREATE TABLE common_actions (id TEXT PRIMARY KEY, line_account_id TEXT NOT NULL);
+    CREATE TABLE common_action_versions (common_action_id TEXT NOT NULL, action_config TEXT NOT NULL DEFAULT '[]');
+    CREATE TABLE friend_bulk_runs (id TEXT PRIMARY KEY, operation_json TEXT NOT NULL);
+    CREATE TABLE friend_bulk_run_items (run_id TEXT NOT NULL, line_account_id TEXT);
+  `);
+  return sqlite;
+}
+
 function createUnpublishedTemplate(db: D1Database, messageContent = '最初の本文') {
   // 持ち主なし(関連付け口の reminders と同じ約束で通す古い形)。
   return createTemplate(db, { name: 'あいさつ', messageType: 'text', messageContent });
@@ -388,42 +426,60 @@ describe('migration 347 テンプレートの公開版固定(#645 / N-131・差�
     expect(row.draft_message_content).toBe('公開したい本文');
   });
 
-  it('347 適用前の行は公開済みになり、参照先なしを作らない', () => {
-    const sqlite = new Database(':memory:');
-    // 347 より前の templates の形だけ作る。
+  it('旧NULL所有者をリッチメニューの持ち主へ補完し、公開版を実送信で読める', async () => {
+    const sqlite = openPre347Db();
     sqlite.exec(`
-      CREATE TABLE templates (
-        id TEXT PRIMARY KEY,
-        name TEXT NOT NULL,
-        category TEXT NOT NULL DEFAULT 'general',
-        message_type TEXT NOT NULL,
-        message_content TEXT NOT NULL,
-        carousel_actions_json TEXT,
-        carousel_tap_limit_mode TEXT NOT NULL DEFAULT 'none',
-        carousel_tap_limit_text TEXT,
-        question_json TEXT,
-        question_status TEXT NOT NULL DEFAULT 'published',
-        created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL,
-        line_account_id TEXT,
-        folder_id TEXT
-      );
+      INSERT INTO line_accounts (id) VALUES ('account-1'), ('account-2');
       INSERT INTO templates
         (id, name, message_type, message_content, created_at, updated_at)
       VALUES
         ('tpl-legacy', '昔の挨拶', 'text', '公開中の本文',
          '2026-09-01T00:00:00+09:00', '2026-09-02T00:00:00+09:00');
+      INSERT INTO rich_menu_groups (id, account_id) VALUES ('group-1', 'account-1');
+      INSERT INTO rich_menu_pages (id, group_id) VALUES ('page-1', 'group-1');
+      INSERT INTO rich_menu_areas (template_id, page_id) VALUES ('tpl-legacy', 'page-1');
     `);
     sqlite.exec(migration347);
 
     const row = sqlite.prepare(`SELECT * FROM templates WHERE id = ?`).get('tpl-legacy') as Record<string, unknown>;
-    // 公開版のまま。下書きはなし。
+    // 公開版のまま、参照元と同じ持ち主になり、実送信の取得口でも読める。
+    expect(row['line_account_id']).toBe('account-1');
     expect(row['message_content']).toBe('公開中の本文');
     expect(row['published_version']).toBe(1);
     expect(row['published_at']).toBe('2026-09-02T00:00:00+09:00');
     expect(row['draft_message_content']).toBeNull();
     expect(row['draft_revision']).toBe(0);
     expect(hasTemplateDraft(row as unknown as TemplateRow)).toBe(false);
+    expect(await getSendableTemplate(asD1(sqlite), 'tpl-legacy', 'account-1')).toMatchObject({
+      id: 'tpl-legacy',
+      message_content: '公開中の本文',
+      line_account_id: 'account-1',
+      published_version: 1,
+    });
+  });
+
+  it('旧NULL所有者が複数アカウントに参照される移行は、ALTER前にfail-closeする', () => {
+    const sqlite = openPre347Db();
+    sqlite.exec(`
+      INSERT INTO line_accounts (id) VALUES ('account-1'), ('account-2');
+      INSERT INTO templates
+        (id, name, message_type, message_content, created_at, updated_at)
+      VALUES
+        ('tpl-conflict', '共有されていた挨拶', 'text', '本文', '2026-09-01', '2026-09-02');
+      INSERT INTO rich_menu_groups (id, account_id)
+      VALUES ('group-1', 'account-1'), ('group-2', 'account-2');
+      INSERT INTO rich_menu_pages (id, group_id)
+      VALUES ('page-1', 'group-1'), ('page-2', 'group-2');
+      INSERT INTO rich_menu_areas (template_id, page_id)
+      VALUES ('tpl-conflict', 'page-1'), ('tpl-conflict', 'page-2');
+    `);
+
+    expect(() => sqlite.exec(migration347)).toThrow(/malformed JSON/i);
+    const columns = sqlite.prepare(`PRAGMA table_info(templates)`).all() as Array<{ name: string }>;
+    expect(columns.some((column) => column.name === 'published_version')).toBe(false);
+    expect(sqlite.prepare(
+      `SELECT line_account_id FROM templates WHERE id = 'tpl-conflict'`,
+    ).get()).toEqual({ line_account_id: null });
   });
 });
 

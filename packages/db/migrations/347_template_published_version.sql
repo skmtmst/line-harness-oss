@@ -5,6 +5,142 @@
 -- 以後は編集を draft_* 列(下書き)へだけ書き、公開操作で live 列へ写す。
 -- 送信側(auto_reply / step_delivery / event_bus / reminder_delivery など)は
 -- live 列を読み続けるので、公開版だけを参照する。参照先の id は変わらない。
+
+-- migration 183 より前からあるテンプレートは line_account_id が NULL のまま。
+-- 347 の公開版ガードだけを先に入れると、既存の自動送信やリッチメニューが
+-- テンプレートを読めず無応答になる。参照元の持ち主が一意に決まる行だけを
+-- 補完する。複数アカウントにまたがる、または参照元にも持ち主がない行は、
+-- ALTER より前に migration 自体を止める（不完全な公開版へ進めない）。
+WITH owner_candidates(template_id, line_account_id) AS (
+  -- 1アカウントだけの環境では、全NULL行の持ち主が一意に決まる。
+  SELECT t.id, la.id
+    FROM templates t
+    JOIN line_accounts la
+   WHERE t.line_account_id IS NULL
+     AND (SELECT COUNT(*) FROM line_accounts) = 1
+  UNION ALL
+  SELECT ar.template_id, ar.line_account_id
+    FROM auto_replies ar
+   WHERE ar.template_id IS NOT NULL AND ar.line_account_id IS NOT NULL
+  UNION ALL
+  SELECT ss.template_id, s.line_account_id
+    FROM scenario_steps ss
+    JOIN scenarios s ON s.id = ss.scenario_id
+   WHERE ss.template_id IS NOT NULL AND s.line_account_id IS NOT NULL
+  UNION ALL
+  SELECT rs.template_id, r.line_account_id
+    FROM reminder_steps rs
+    JOIN reminders r ON r.id = rs.reminder_id
+   WHERE rs.template_id IS NOT NULL AND r.line_account_id IS NOT NULL
+  UNION ALL
+  SELECT rma.template_id, rmg.account_id
+    FROM rich_menu_areas rma
+    JOIN rich_menu_pages rmp ON rmp.id = rma.page_id
+    JOIN rich_menu_groups rmg ON rmg.id = rmp.group_id
+   WHERE rma.template_id IS NOT NULL
+  UNION ALL
+  SELECT CAST(j.value AS TEXT), a.line_account_id
+    FROM automations a
+    JOIN json_tree(a.actions) j
+      ON j.key IN ('templateId', 'template_id') AND j.type = 'text'
+   WHERE a.line_account_id IS NOT NULL
+  UNION ALL
+  SELECT CAST(j.value AS TEXT), ca.line_account_id
+    FROM common_action_versions cav
+    JOIN common_actions ca ON ca.id = cav.common_action_id
+    JOIN json_tree(cav.action_config) j
+      ON j.key IN ('templateId', 'template_id') AND j.type = 'text'
+  UNION ALL
+  SELECT CAST(json_extract(fbr.operation_json, '$.templateId') AS TEXT), fbri.line_account_id
+    FROM friend_bulk_runs fbr
+    JOIN friend_bulk_run_items fbri ON fbri.run_id = fbr.id
+   WHERE json_extract(fbr.operation_json, '$.kind') = 'send_message'
+     AND json_type(fbr.operation_json, '$.templateId') = 'text'
+     AND fbri.line_account_id IS NOT NULL
+),
+referenced_templates(template_id) AS (
+  SELECT template_id FROM auto_replies WHERE template_id IS NOT NULL
+  UNION SELECT template_id FROM scenario_steps WHERE template_id IS NOT NULL
+  UNION SELECT template_id FROM reminder_steps WHERE template_id IS NOT NULL
+  UNION SELECT template_id FROM rich_menu_areas WHERE template_id IS NOT NULL
+  UNION SELECT CAST(j.value AS TEXT) FROM automations a JOIN json_tree(a.actions) j
+    ON j.key IN ('templateId', 'template_id') AND j.type = 'text'
+  UNION SELECT CAST(j.value AS TEXT) FROM common_action_versions cav JOIN json_tree(cav.action_config) j
+    ON j.key IN ('templateId', 'template_id') AND j.type = 'text'
+  UNION SELECT CAST(json_extract(operation_json, '$.templateId') AS TEXT)
+    FROM friend_bulk_runs
+   WHERE json_extract(operation_json, '$.kind') = 'send_message'
+     AND json_type(operation_json, '$.templateId') = 'text'
+)
+SELECT CASE WHEN EXISTS (
+  SELECT 1
+    FROM templates t
+    JOIN referenced_templates r ON r.template_id = t.id
+   WHERE t.line_account_id IS NULL
+     AND (SELECT COUNT(DISTINCT oc.line_account_id)
+            FROM owner_candidates oc
+           WHERE oc.template_id = t.id) <> 1
+) THEN json('MIGRATION_347_TEMPLATE_OWNER_UNRESOLVED') ELSE json('null') END;
+
+WITH owner_candidates(template_id, line_account_id) AS (
+  SELECT t.id, la.id
+    FROM templates t
+    JOIN line_accounts la
+   WHERE t.line_account_id IS NULL
+     AND (SELECT COUNT(*) FROM line_accounts) = 1
+  UNION ALL
+  SELECT ar.template_id, ar.line_account_id
+    FROM auto_replies ar
+   WHERE ar.template_id IS NOT NULL AND ar.line_account_id IS NOT NULL
+  UNION ALL
+  SELECT ss.template_id, s.line_account_id
+    FROM scenario_steps ss
+    JOIN scenarios s ON s.id = ss.scenario_id
+   WHERE ss.template_id IS NOT NULL AND s.line_account_id IS NOT NULL
+  UNION ALL
+  SELECT rs.template_id, r.line_account_id
+    FROM reminder_steps rs
+    JOIN reminders r ON r.id = rs.reminder_id
+   WHERE rs.template_id IS NOT NULL AND r.line_account_id IS NOT NULL
+  UNION ALL
+  SELECT rma.template_id, rmg.account_id
+    FROM rich_menu_areas rma
+    JOIN rich_menu_pages rmp ON rmp.id = rma.page_id
+    JOIN rich_menu_groups rmg ON rmg.id = rmp.group_id
+   WHERE rma.template_id IS NOT NULL
+  UNION ALL
+  SELECT CAST(j.value AS TEXT), a.line_account_id
+    FROM automations a
+    JOIN json_tree(a.actions) j
+      ON j.key IN ('templateId', 'template_id') AND j.type = 'text'
+   WHERE a.line_account_id IS NOT NULL
+  UNION ALL
+  SELECT CAST(j.value AS TEXT), ca.line_account_id
+    FROM common_action_versions cav
+    JOIN common_actions ca ON ca.id = cav.common_action_id
+    JOIN json_tree(cav.action_config) j
+      ON j.key IN ('templateId', 'template_id') AND j.type = 'text'
+  UNION ALL
+  SELECT CAST(json_extract(fbr.operation_json, '$.templateId') AS TEXT), fbri.line_account_id
+    FROM friend_bulk_runs fbr
+    JOIN friend_bulk_run_items fbri ON fbri.run_id = fbr.id
+   WHERE json_extract(fbr.operation_json, '$.kind') = 'send_message'
+     AND json_type(fbr.operation_json, '$.templateId') = 'text'
+     AND fbri.line_account_id IS NOT NULL
+),
+resolved_owners AS (
+  SELECT template_id, MIN(line_account_id) AS line_account_id
+    FROM owner_candidates
+   GROUP BY template_id
+  HAVING COUNT(DISTINCT line_account_id) = 1
+)
+UPDATE templates
+   SET line_account_id = (
+     SELECT ro.line_account_id FROM resolved_owners ro WHERE ro.template_id = templates.id
+   )
+ WHERE line_account_id IS NULL
+   AND id IN (SELECT template_id FROM resolved_owners);
+
 ALTER TABLE templates ADD COLUMN published_version INTEGER NOT NULL DEFAULT 1;
 ALTER TABLE templates ADD COLUMN published_at TEXT;
 ALTER TABLE templates ADD COLUMN draft_message_type TEXT;
