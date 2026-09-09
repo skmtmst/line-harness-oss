@@ -37,7 +37,6 @@ import {
   type TargetMode,
 } from '@/lib/broadcast-audience'
 import type { SegmentCondition } from '@/lib/segment-condition'
-import { filterSendableTemplates } from '@/lib/template-send-scope'
 import { newBroadcastDraftSession, persistBroadcastDraft } from '@/lib/broadcast-draft'
 import ConditionBuilder from '@/components/shared/condition-builder'
 import SegmentPresetControls from '@/components/broadcasts/segment-preset-controls'
@@ -615,20 +614,15 @@ export default function BroadcastForm({
   useEffect(() => {
     Promise.all([
       api.broadcastMessageAssets.list({ accountId: selectedAccountId || undefined }),
-      // #645 差し戻し: 選んでいるアカウントを必ず渡す。口の主文は公開版だけが返り、
-      // 未公開・他アカウントは候補にしない。初回引用の検索も同じ候補から行う。
-      api.templates.list(undefined, selectedAccountId || undefined),
+      api.templates.list(),
     ]).then(([assetResult, templateResult]) => {
       if (assetResult.success) setAssets(assetResult.data)
-      const sendable = templateResult.success
-        ? filterSendableTemplates(templateResult.data, selectedAccountId || undefined)
-        : []
       if (templateResult.success) {
-        setMessageTemplates(sendable.filter((template) => ['text', 'image', 'flex'].includes(template.messageType)))
+        setMessageTemplates(templateResult.data.filter((template) => ['text', 'image', 'flex'].includes(template.messageType)))
       }
       if (!appliedInitialTemplate.current) {
         const template = templateResult.success
-          ? sendable.find((item) => item.id === initialTemplateId)
+          ? templateResult.data.find((item) => item.id === initialTemplateId)
           : undefined
         const contentTemplate = assetResult.success
           ? assetResult.data.find((item) => item.id === initialContentTemplateId)

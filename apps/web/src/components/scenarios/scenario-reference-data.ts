@@ -57,10 +57,8 @@ export const scenarioReferenceData = {
     cache.delete(`scenario-stats:${id}`)
   },
   tags: (_accountId?: string | null) => cache.load('tags:visible', () => api.tags.list()),
-  // #645 差し戻し: 渡されたアカウントを口へ必ず渡す(渡されなければ従来どおり全部)。
-  templates: (accountId?: string | null) =>
-    cache.load(`templates:${scopeKey(accountId)}`, () =>
-      api.templates.list(undefined, accountId || undefined)),
+  templates: (_accountId?: string | null) =>
+    cache.load('templates:visible', () => api.templates.list()),
   friendFields: (accountId: string) =>
     cache.load(`friend-fields:${accountId}`, () => api.friendFields.list(accountId)),
   supportMarks: (accountId: string) =>

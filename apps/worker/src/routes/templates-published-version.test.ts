@@ -6,9 +6,8 @@ import type { Env } from '../index.js';
  * テンプレートの公開版固定(#645 / 点検#497 N-131)の口の契約。
  *
  * - 編集・保存(PUTの送信文)は下書きへだけ書き、公開版は変えない
- * - 一覧の主 messageType/messageContent は公開版だけを返す
- * - 公開は確認キー必須・版が1つ進む・再試行は同じ結果(別下書きを出さない)
- * - 同時更新の負けと下書きの書き換わりは409
+ * - 公開は確認キー必須・版が1つ進む・再試行は同じ結果
+ * - 同時更新の負けとキーの使い回しは409
  * - 別アカウントの公開は存在しないものとして返す
  */
 
@@ -72,7 +71,6 @@ function liveRow(overrides: Record<string, unknown> = {}) {
     draft_carousel_tap_limit_text: null,
     draft_question_json: null,
     draft_question_status: null,
-    draft_revision: 0,
     publish_idempotency_key: null,
     created_at: '2026-09-01T00:00:00+09:00',
     updated_at: '2026-09-01T00:00:00+09:00',
@@ -108,15 +106,7 @@ beforeEach(() => {
   mocks.getCarouselTapTotals.mockResolvedValue(new Map());
   mocks.getTemplateSendCounts.mockResolvedValue(new Map());
   mocks.hasTemplateDraft.mockImplementation((row) =>
-    row != null && (
-      row.draft_message_type != null
-      || row.draft_message_content != null
-      || row.draft_carousel_actions_json != null
-      || row.draft_carousel_tap_limit_mode != null
-      || row.draft_carousel_tap_limit_text != null
-      || row.draft_question_json != null
-      || row.draft_question_status != null
-    ),
+    row != null && (row.draft_message_content != null || row.draft_message_type != null),
   );
   mocks.getFolderById.mockResolvedValue(null);
 });
@@ -211,7 +201,6 @@ describe('公開口の契約', () => {
     expect(response.status).toBe(200);
     expect(mocks.publishTemplate).toHaveBeenCalledWith(bindings.DB, 'tpl-1', {
       expectedVersion: 1,
-      expectedDraftRevision: undefined,
       idempotencyKey: 'publish-key-0001',
     });
     expect(await response.json()).toMatchObject({
@@ -259,50 +248,15 @@ describe('公開口の契約', () => {
     });
   });
 
-  it('下書きが書き換わっていたら409で止め、開き直しを求める', async () => {
-    mocks.getTemplateById.mockResolvedValue(
-      liveRow({ draft_message_content: '確認していない本文', draft_revision: 3 }),
-    );
-    mocks.publishTemplate.mockRejectedValue(new Error('TEMPLATE_DRAFT_CONFLICT'));
-
-    const response = await publish({ expectedVersion: 1, expectedDraftRevision: 2 });
-
-    expect(response.status).toBe(409);
-    expect(await response.json()).toMatchObject({
-      error: '下書きが書き換わっています。開き直して確認してください',
-    });
-  });
-
-  it('後日の同キー再試行は別の下書きを公開せず、成功済みの結果を返す', async () => {
-    mocks.getTemplateById.mockResolvedValue(
-      liveRow({
-        message_content: '最初の公開',
-        published_version: 1,
-        draft_message_content: '次の編集',
-      }),
-    );
-    mocks.publishTemplate.mockResolvedValue({
-      row: liveRow({
-        message_content: '最初の公開',
-        published_version: 1,
-        draft_message_content: '次の編集',
-      }),
-      published: false,
-      replayed: true,
-    });
+  it('確認キーの使い回しは409で止める', async () => {
+    mocks.getTemplateById.mockResolvedValue(liveRow({ draft_message_content: '次の編集' }));
+    mocks.publishTemplate.mockRejectedValue(new Error('TEMPLATE_PUBLISH_KEY_CONFLICT'));
 
     const response = await publish();
 
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(409);
     expect(await response.json()).toMatchObject({
-      success: true,
-      data: {
-        messageContent: '最初の公開',
-        publishedVersion: 1,
-        published: false,
-        replayed: true,
-        hasDraft: true,
-      },
+      error: '同じ確認キーが別の公開操作で使われています',
     });
   });
 
@@ -314,28 +268,12 @@ describe('公開口の契約', () => {
     expect(response.status).toBe(400);
     expect(mocks.publishTemplate).not.toHaveBeenCalled();
   });
-
-  it('下書き版の番号が数でなければ400で止める', async () => {
-    mocks.getTemplateById.mockResolvedValue(liveRow({ draft_message_content: '編集中' }));
-
-    const response = await publish({ expectedDraftRevision: '最新' });
-
-    expect(response.status).toBe(400);
-    expect(mocks.publishTemplate).not.toHaveBeenCalled();
-  });
 });
 
-describe('一覧は公開版だけを主に返し、詳細は下書きも返す', () => {
-  it('一覧は編集中の下書きがあっても公開版を主に返す', async () => {
+describe('一覧・詳細は下書きと公開版の両方を返す', () => {
+  it('一覧は編集中の内容と公開版・版番号を返す', async () => {
     mocks.getTemplatesWithUsageCount.mockResolvedValue({
-      items: [{
-        ...liveRow({
-          draft_message_type: 'text',
-          draft_message_content: '編集中の本文',
-          draft_revision: 2,
-        }),
-        usage_count: 0,
-      }],
+      items: [{ ...liveRow(), usage_count: 0 }],
       total: 1,
     });
 
@@ -345,38 +283,9 @@ describe('一覧は公開版だけを主に返し、詳細は下書きも返す'
     const body = await response.json() as { data: Array<Record<string, unknown>> };
     expect(body.data[0]).toMatchObject({
       messageContent: '公開中の本文',
-      hasDraft: true,
+      hasDraft: false,
       publishedVersion: 1,
-      draftRevision: 2,
       published: { messageContent: '公開中の本文' },
-    });
-  });
-
-  it('一覧は未公開を版0・公開日時なしで返し、送信候補の目印にする', async () => {
-    mocks.getTemplatesWithUsageCount.mockResolvedValue({
-      items: [{
-        ...liveRow({
-          message_content: '最初の本文',
-          published_version: 0,
-          published_at: null,
-          draft_message_type: 'text',
-          draft_message_content: '最初の本文',
-          draft_revision: 1,
-        }),
-        usage_count: 0,
-      }],
-      total: 1,
-    });
-
-    const response = await app().request('/api/templates?account_id=account-1', {}, bindings);
-
-    expect(response.status).toBe(200);
-    const body = await response.json() as { data: Array<Record<string, unknown>> };
-    expect(body.data[0]).toMatchObject({
-      hasDraft: true,
-      publishedVersion: 0,
-      publishedAt: null,
-      draftRevision: 1,
     });
   });
 

@@ -99,9 +99,6 @@ function questionValue(raw: string | null): ScenarioQuestion | null {
  * 347: 画面に見せる「編集中の内容」。下書きがあれば下書き、なければ公開版。
  * 送信側はこの口を通らず live 列を直接読むので、ここが下書きを返しても
  * 実送信文は公開版のまま。
- *
- * 差し戻し対応(要件2): 消せる項目(質問・カルーセル・制限超過文)は行単位で見る。
- * 下書きがある行の draft 列 NULL は「削除した」であり、公開版へ落とさない。
  */
 function draftMessageTypeOf(t: TemplateRow): string {
   return t.draft_message_type ?? t.message_type;
@@ -112,25 +109,16 @@ function draftMessageContentOf(t: TemplateRow): string {
 }
 
 function draftQuestionJsonOf(t: TemplateRow): string | null {
-  return hasTemplateDraft(t) ? t.draft_question_json : t.question_json;
+  return t.draft_question_json ?? t.question_json;
 }
 
 function draftQuestionStatusOf(t: TemplateRow): 'draft' | 'published' {
-  return (hasTemplateDraft(t) ? t.draft_question_status ?? t.question_status : t.question_status);
+  return t.draft_question_status ?? t.question_status;
 }
 
 function draftCarouselActionsOf(t: TemplateRow): unknown {
-  const raw = hasTemplateDraft(t) ? t.draft_carousel_actions_json : t.carousel_actions_json;
+  const raw = t.draft_carousel_actions_json ?? t.carousel_actions_json;
   return raw ? JSON.parse(raw) : null;
-}
-
-function draftCarouselTapLimitModeOf(t: TemplateRow): string {
-  return (hasTemplateDraft(t) ? t.draft_carousel_tap_limit_mode ?? t.carousel_tap_limit_mode : t.carousel_tap_limit_mode)
-    ?? 'none';
-}
-
-function draftCarouselTapLimitTextOf(t: TemplateRow): string | null {
-  return hasTemplateDraft(t) ? t.draft_carousel_tap_limit_text : t.carousel_tap_limit_text;
 }
 
 /** 347: 公開版の固定情報。編集・保存では変わらない。 */
@@ -146,9 +134,8 @@ function publishedInfoOf(t: TemplateRow) {
 function versionInfoOf(t: TemplateRow) {
   return {
     hasDraft: hasTemplateDraft(t),
-    publishedVersion: Number(t.published_version ?? 0),
+    publishedVersion: Number(t.published_version ?? 1),
     publishedAt: t.published_at ?? null,
-    draftRevision: Number(t.draft_revision ?? 0),
     published: publishedInfoOf(t),
   };
 }
@@ -236,21 +223,15 @@ templates.get('/api/templates', async (c) => {
       // 集計だけ取れないときも、テンプレートそのものは操作できるようにする。
       console.error('GET /api/templates — failed to count template sends', err);
     }
-    /*
-     * 差し戻し対応(要件1): 一覧の主 messageType/messageContent は公開版だけを返す。
-     * 編集中の下書きがあってもここには出さず、実送信の候補選びが
-     * 未公開の下書きを掴まないようにする。編集中の内容は編集画面が
-     * 詳細口で読む。未公開(版0・公開日時なし)は候補から外す目印付きで返す。
-     */
     const serialized = items.map((t) => ({
       id: t.id,
       accountId: t.line_account_id,
       name: t.name,
       category: t.category,
-      messageType: t.message_type,
-      messageContent: t.message_content,
-      question: questionValue(t.question_json),
-      questionStatus: t.question_status,
+      messageType: draftMessageTypeOf(t),
+      messageContent: draftMessageContentOf(t),
+      question: questionValue(draftQuestionJsonOf(t)),
+      questionStatus: draftQuestionStatusOf(t),
       folderId: t.folder_id ?? null,
       usageCount: t.usage_count,
       /** 162: 選択肢が押された回数の合計。押される仕掛けが無いものは 0。 */
@@ -303,8 +284,11 @@ templates.get('/api/templates/:id', async (c) => {
         questionStatus: draftQuestionStatusOf(item),
         folderId: item.folder_id ?? null,
         carouselActions: draftCarouselActionsOf(item),
-        carouselTapLimitMode: draftCarouselTapLimitModeOf(item),
-        carouselTapLimitText: draftCarouselTapLimitTextOf(item),
+        carouselTapLimitMode: item.draft_carousel_tap_limit_mode
+          ?? item.carousel_tap_limit_mode
+          ?? 'none',
+        carouselTapLimitText: item.draft_carousel_tap_limit_text
+          ?? item.carousel_tap_limit_text,
         ...versionInfoOf(item),
         usedBy,
         createdAt: item.created_at,
@@ -426,8 +410,7 @@ templates.post('/api/templates', requireRole('owner', 'admin'), async (c) => {
         : {}),
     });
     // 作成の返しも更新と同じ形にする。将来使うときにハマらないため（#497 軽11）。
-    // 差し戻し対応(要件4): 作った直後は未公開(版0・公開日時なし・下書きあり)。
-    return c.json({ success: true, data: { id: item.id, name: item.name, category: item.category, messageType: item.message_type, messageContent: item.message_content, question: questionValue(item.question_json), questionStatus: item.question_status, folderId: item.folder_id ?? null, hasDraft: true, publishedVersion: 0, publishedAt: null, draftRevision: 1, createdAt: item.created_at, updatedAt: item.updated_at } }, 201);
+    return c.json({ success: true, data: { id: item.id, name: item.name, category: item.category, messageType: item.message_type, messageContent: item.message_content, question: questionValue(item.question_json), questionStatus: item.question_status, folderId: item.folder_id ?? null, createdAt: item.created_at, updatedAt: item.updated_at } }, 201);
   } catch (err) {
     console.error('POST /api/templates error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
@@ -534,8 +517,11 @@ templates.put('/api/templates/:id', requireRole('owner', 'admin'), async (c) => 
         questionStatus: draftQuestionStatusOf(updated),
         folderId: updated.folder_id ?? null,
         carouselActions: draftCarouselActionsOf(updated),
-        carouselTapLimitMode: draftCarouselTapLimitModeOf(updated),
-        carouselTapLimitText: draftCarouselTapLimitTextOf(updated),
+        carouselTapLimitMode: updated.draft_carousel_tap_limit_mode
+          ?? updated.carousel_tap_limit_mode
+          ?? 'none',
+        carouselTapLimitText: updated.draft_carousel_tap_limit_text
+          ?? updated.carousel_tap_limit_text,
         ...versionInfoOf(updated),
         createdAt: updated.created_at,
         updatedAt: updated.updated_at,
@@ -553,9 +539,8 @@ function validPublishKey(value: string | null | undefined): value is string {
 
 /**
  * 347: 下書きを公開版へ写す。送信側が読む live 列はここでしか変わらない。
- * 同じ確認キーでの再試行は成功済みの結果をそのまま返し(下書きなしの成功も記録)、
- * 別の下書きを公開しない。公開版・下書き版の両方を確認できる(自動応答の
- * POST /api/auto-replies/:id/publish より厳しい約束)。
+ * 同じ確認キーでの再試行は公開済みの結果をそのまま返す(自動応答の
+ * POST /api/auto-replies/:id/publish と同じ約束)。
  */
 templates.post('/api/templates/:id/publish', requireRole('owner', 'admin'), async (c) => {
   try {
@@ -570,21 +555,12 @@ templates.post('/api/templates/:id/publish', requireRole('owner', 'admin'), asyn
     )) {
       return c.json({ success: false, error: 'Template not found' }, 404);
     }
-    const body: { expectedVersion?: unknown; expectedDraftRevision?: unknown } =
-      await c.req.json().catch(() => ({}));
+    const body: { expectedVersion?: unknown } = await c.req.json().catch(() => ({}));
     const expectedVersion = body.expectedVersion === undefined || body.expectedVersion === null
       ? undefined
       : Number(body.expectedVersion);
     if (expectedVersion !== undefined && !Number.isInteger(expectedVersion)) {
       return c.json({ success: false, error: '版の番号を確認してください' }, 400);
-    }
-    // 差し戻し対応(要件3): 検査したときの下書き版も受け取り、別人による
-    // 書き換え後の公開を止める。
-    const expectedDraftRevision = body.expectedDraftRevision === undefined || body.expectedDraftRevision === null
-      ? undefined
-      : Number(body.expectedDraftRevision);
-    if (expectedDraftRevision !== undefined && !Number.isInteger(expectedDraftRevision)) {
-      return c.json({ success: false, error: '下書きの版を確認してください' }, 400);
     }
     // 公開する版も保存時と同じ検査を通す。下書きは保存時に検査済みだが、
     // 検査基準が変わった後に残った下書きをそのまま出さないため。
@@ -603,7 +579,6 @@ templates.post('/api/templates/:id/publish', requireRole('owner', 'admin'), asyn
     }
     const result = await publishTemplate(c.env.DB, id, {
       expectedVersion,
-      expectedDraftRevision,
       idempotencyKey: requestKey,
     });
     const row = result.row;
@@ -619,7 +594,6 @@ templates.post('/api/templates/:id/publish', requireRole('owner', 'admin'), asyn
         published: result.published,
         replayed: result.replayed,
         hasDraft: hasTemplateDraft(row),
-        draftRevision: Number(row.draft_revision ?? 0),
       },
     });
   } catch (err) {
@@ -627,8 +601,8 @@ templates.post('/api/templates/:id/publish', requireRole('owner', 'admin'), asyn
     if (code === 'TEMPLATE_VERSION_CONFLICT') {
       return c.json({ success: false, error: 'ほかの人が先に公開しました。開き直して確認してください' }, 409);
     }
-    if (code === 'TEMPLATE_DRAFT_CONFLICT') {
-      return c.json({ success: false, error: '下書きが書き換わっています。開き直して確認してください' }, 409);
+    if (code === 'TEMPLATE_PUBLISH_KEY_CONFLICT') {
+      return c.json({ success: false, error: '同じ確認キーが別の公開操作で使われています' }, 409);
     }
     console.error('POST /api/templates/:id/publish error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
