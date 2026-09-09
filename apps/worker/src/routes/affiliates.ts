@@ -522,24 +522,16 @@ affiliates.post('/api/affiliates', requireRole('owner', 'admin'), async (c) => {
         ? body.issueInitialLink
         : Boolean(friendId);
 
-    // A response-loss retry recovers the same `item` via operationId above, but
-    // would otherwise issue a SECOND initial link for it every retry. Reuse the
-    // earliest offer-less link already on the affiliate instead of minting a new
-    // one (#686).
-    const priorLinks = operationId
-      ? (await listAffiliateLinks(c.env.DB, item.id, { lineAccountId }))
-        .filter((l) => l.offer_id == null)
-        .sort((a, b) => a.created_at.localeCompare(b.created_at))
-      : [];
-
+    // 応答だけ失われた再送は、上の operationId で同じ `item` を回収する。
+    // リンク発行も同じ操作UUIDを渡し、DB側の部分UNIQUEで1本に収める（#686）。
+    // ここを「一覧を読んで無ければ作る」で書くと、同時2実行で両方が
+    // 「まだ無い」と読んでそれぞれ発行し、リンクが2本できる。
     let link: { refCode: string; url: string } | undefined;
-    if (priorLinks.length > 0) {
-      const baseUrl = await resolveLinkBaseUrl(c.env.DB, c.env);
-      link = { refCode: priorLinks[0].ref_code, url: `${baseUrl}/${priorLinks[0].ref_code}` };
-    } else if (shouldIssueLink) {
+    if (shouldIssueLink) {
       const created = await createAffiliateLink(c.env.DB, {
         affiliateId: item.id,
         lineAccountId,
+        operationId: operationId || undefined,
       });
       const baseUrl = await resolveLinkBaseUrl(c.env.DB, c.env);
       link = { refCode: created.ref_code, url: `${baseUrl}/${created.ref_code}` };

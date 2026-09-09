@@ -69,6 +69,17 @@ function seed(sqlite: Database.Database) {
      VALUES ('scoped-staff', ?, '2026-01-01T00:00:00.000')`,
   ).run(ACCOUNT_A);
 
+  // account-b だけを見られるスタッフ。操作UUIDの回収が account を跨がない
+  // ことを確かめる側（#686 審査3）。
+  sqlite.prepare(
+    `INSERT INTO staff_members (id, name, role, api_key, tenant_id, account_scope)
+     VALUES ('scoped-staff-b', '担当者B', 'admin', 'key-scoped-staff-b', ?, 'accounts')`,
+  ).run(TENANT_ID);
+  sqlite.prepare(
+    `INSERT INTO staff_account_scopes (staff_id, line_account_id, created_at)
+     VALUES ('scoped-staff-b', ?, '2026-01-01T00:00:00.000')`,
+  ).run(ACCOUNT_B);
+
   sqlite.prepare(
     `INSERT INTO tags (id, name, line_account_id, created_at) VALUES (?, ?, ?, '2026-01-01T00:00:00.000')`,
   ).run('tag-a1', 'account-aのタグ', ACCOUNT_A);
@@ -90,6 +101,7 @@ function makeApp(db: D1Database, staff: { id: string; role: 'owner' | 'admin' | 
 
 const OWNER = { id: 'env-owner', role: 'owner' as const };
 const SCOPED = { id: 'scoped-staff', role: 'admin' as const };
+const SCOPED_B = { id: 'scoped-staff-b', role: 'admin' as const };
 
 let sqlite: Database.Database;
 let db: D1Database;
@@ -167,6 +179,64 @@ describe('POST /api/affiliate-offers — cross-account への作成を拒む (#6
     const count = sqlite.prepare(`SELECT COUNT(*) AS n FROM affiliate_offers WHERE name = '越境確認案件2'`)
       .get() as { n: number };
     expect(count.n).toBe(0);
+  });
+
+  /*
+   * 案件側も、操作UUIDの回収を LINEアカウントの内側だけで効かせる（#686 審査3）。
+   * 回収SELECTから line_account_id を落とすと、別アカウントのスタッフが
+   * 他店の operationId を送っただけで他店の案件（名前・報酬額）が返る。
+   */
+  test('別アカウントのスタッフが同じ operationId を送っても、他店の案件は返らない', async () => {
+    const SHARED_OPERATION = 'shared-offer-operation-across-accounts';
+
+    const a = makeApp(db, SCOPED);
+    const created = await a.app.request('/api/affiliate-offers', {
+      method: 'POST',
+      body: JSON.stringify({
+        name: 'A店の秘密案件',
+        rewardAmount: 9999,
+        lineAccountId: ACCOUNT_A,
+        operationId: SHARED_OPERATION,
+      }),
+    }, a.env);
+    expect(created.status).toBe(201);
+    const createdJson = await created.json() as {
+      data: { id: string; name: string; rewardAmount: number; lineAccountId: string }
+    };
+    expect(createdJson.data.lineAccountId).toBe(ACCOUNT_A);
+
+    const b = makeApp(db, SCOPED_B);
+    const crossed = await b.app.request('/api/affiliate-offers', {
+      method: 'POST',
+      body: JSON.stringify({
+        name: 'B店の案件',
+        rewardAmount: 100,
+        lineAccountId: ACCOUNT_B,
+        operationId: SHARED_OPERATION,
+      }),
+    }, b.env);
+    expect(crossed.status).toBe(201);
+    const crossedJson = await crossed.json() as {
+      data: { id: string; name: string; rewardAmount: number; lineAccountId: string }
+    };
+
+    expect(crossedJson.data.id).not.toBe(createdJson.data.id);
+    expect(crossedJson.data.lineAccountId).toBe(ACCOUNT_B);
+    expect(crossedJson.data.name).toBe('B店の案件');
+    expect(crossedJson.data.rewardAmount).toBe(100);
+    expect(crossedJson.data.rewardAmount).not.toBe(9999);
+
+    const rowA = sqlite.prepare(
+      `SELECT name, reward_amount, line_account_id FROM affiliate_offers WHERE id = ?`,
+    ).get(createdJson.data.id) as { name: string; reward_amount: number; line_account_id: string };
+    expect(rowA.name).toBe('A店の秘密案件');
+    expect(rowA.reward_amount).toBe(9999);
+    expect(rowA.line_account_id).toBe(ACCOUNT_A);
+
+    const total = sqlite.prepare(
+      `SELECT COUNT(*) AS n FROM affiliate_offers WHERE operation_id = ?`,
+    ).get(SHARED_OPERATION) as { n: number };
+    expect(total.n).toBe(2);
   });
 
   test('【対比】同じスタッフは自分の見える account-a へは作成できる', async () => {

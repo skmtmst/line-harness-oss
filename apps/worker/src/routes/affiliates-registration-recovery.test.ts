@@ -77,6 +77,17 @@ function seed(sqlite: Database.Database) {
      VALUES ('scoped-staff', ?, '2026-01-01T00:00:00.000')`,
   ).run(ACCOUNT_A);
 
+  // account-b だけを見られるスタッフ。操作UUIDの回収が account を跨がない
+  // ことを確かめる側（#686 審査3）。
+  sqlite.prepare(
+    `INSERT INTO staff_members (id, name, role, api_key, tenant_id, account_scope)
+     VALUES ('scoped-staff-b', '担当者B', 'admin', 'key-scoped-staff-b', ?, 'accounts')`,
+  ).run(TENANT_ID);
+  sqlite.prepare(
+    `INSERT INTO staff_account_scopes (staff_id, line_account_id, created_at)
+     VALUES ('scoped-staff-b', ?, '2026-01-01T00:00:00.000')`,
+  ).run(ACCOUNT_B);
+
   sqlite.prepare(
     `INSERT INTO friends (id, line_user_id, display_name, line_account_id, is_following, created_at, updated_at)
      VALUES (?, ?, ?, ?, 1, '2026-01-01T00:00:00.000', '2026-01-01T00:00:00.000')`,
@@ -103,6 +114,7 @@ function makeApp(db: D1Database, staff: { id: string; role: 'owner' | 'admin' | 
 // is used only for the "unrestricted" side of each test.
 const OWNER = { id: 'env-owner', role: 'owner' as const };
 const SCOPED = { id: 'scoped-staff', role: 'admin' as const };
+const SCOPED_B = { id: 'scoped-staff-b', role: 'admin' as const };
 
 let sqlite: Database.Database;
 let db: D1Database;
@@ -142,6 +154,40 @@ describe('POST /api/affiliates — response-loss retry recovers the same registr
 
     const affiliateCount = sqlite.prepare(
       `SELECT COUNT(*) AS n FROM affiliates WHERE friend_id = 'friend-a1'`,
+    ).get() as { n: number };
+    expect(affiliateCount.n).toBe(1);
+
+    const linkCount = sqlite.prepare(
+      `SELECT COUNT(*) AS n FROM affiliate_links WHERE affiliate_id = ?`,
+    ).get(firstJson.data.id) as { n: number };
+    expect(linkCount.n).toBe(1);
+  });
+
+  test('同じ operationId の同時2実行でも、紹介者もリンクも1本に収まる', async () => {
+    const { app, env } = makeApp(db, OWNER);
+    const body = {
+      name: '同時実行パートナー',
+      lineAccountId: ACCOUNT_A,
+      issueInitialLink: true,
+      operationId: 'concurrent-operation-0001',
+    };
+
+    // 逐次の再送ではなく、同じ操作UUIDを2本まとめて投げる。read-then-write
+    // だと両方が「まだリンクが無い」と読み、リンクが2本できる（#686 審査2）。
+    const [first, second] = await Promise.all([
+      app.request('/api/affiliates', { method: 'POST', body: JSON.stringify(body) }, env),
+      app.request('/api/affiliates', { method: 'POST', body: JSON.stringify(body) }, env),
+    ]);
+    expect(first.status).toBe(201);
+    expect(second.status).toBe(201);
+    const firstJson = await first.json() as { data: { id: string }; link: { refCode: string } | null };
+    const secondJson = await second.json() as { data: { id: string }; link: { refCode: string } | null };
+
+    expect(secondJson.data.id).toBe(firstJson.data.id);
+    expect(secondJson.link?.refCode).toBe(firstJson.link?.refCode);
+
+    const affiliateCount = sqlite.prepare(
+      `SELECT COUNT(*) AS n FROM affiliates WHERE name = '同時実行パートナー'`,
     ).get() as { n: number };
     expect(affiliateCount.n).toBe(1);
 
@@ -198,6 +244,73 @@ describe('POST /api/affiliates — cross-account への作成を拒む (#686)', 
       body: JSON.stringify({ name: '正常系確認', lineAccountId: ACCOUNT_A }),
     }, env);
     expect(res.status).toBe(201);
+  });
+
+  /*
+   * 操作UUIDの回収は、tenant と LINEアカウントの内側だけで効かせる（#686 審査3）。
+   *
+   * 回収SELECTから tenant_id / line_account_id を落とすと、operation_id だけで
+   * 引くことになる。そうすると別アカウントのスタッフが他店の operationId を
+   * 送っただけで、他店の紹介者の名前・コード・報酬率がそのまま返る。
+   * 作成の入口ガードは lineAccountId を見ているので通ってしまい、
+   * 回収の一手前で漏れる。ここはその経路だけを見張る。
+   */
+  test('別アカウントのスタッフが同じ operationId を送っても、他店の紹介者は返らない', async () => {
+    const SHARED_OPERATION = 'shared-operation-across-accounts';
+
+    // account-a 側で、見分けのつく値を持つ紹介者を作る。
+    const a = makeApp(db, SCOPED);
+    const created = await a.app.request('/api/affiliates', {
+      method: 'POST',
+      body: JSON.stringify({
+        name: 'A店の秘密パートナー',
+        commissionRate: 42,
+        lineAccountId: ACCOUNT_A,
+        operationId: SHARED_OPERATION,
+      }),
+    }, a.env);
+    expect(created.status).toBe(201);
+    const createdJson = await created.json() as {
+      data: { id: string; name: string; code: string; commissionRate: number; lineAccountId: string }
+    };
+    expect(createdJson.data.lineAccountId).toBe(ACCOUNT_A);
+
+    // account-b しか見えないスタッフが、同じ operationId を送る。
+    const b = makeApp(db, SCOPED_B);
+    const crossed = await b.app.request('/api/affiliates', {
+      method: 'POST',
+      body: JSON.stringify({
+        name: 'B店のパートナー',
+        lineAccountId: ACCOUNT_B,
+        operationId: SHARED_OPERATION,
+      }),
+    }, b.env);
+    expect(crossed.status).toBe(201);
+    const crossedJson = await crossed.json() as {
+      data: { id: string; name: string; code: string; commissionRate: number; lineAccountId: string }
+    };
+
+    // A店の登録が回収されて返っていないこと。返るのはB店の自分の登録。
+    expect(crossedJson.data.id).not.toBe(createdJson.data.id);
+    expect(crossedJson.data.lineAccountId).toBe(ACCOUNT_B);
+    expect(crossedJson.data.name).toBe('B店のパートナー');
+    expect(crossedJson.data.name).not.toBe(createdJson.data.name);
+    expect(crossedJson.data.code).not.toBe(createdJson.data.code);
+    expect(crossedJson.data.commissionRate).not.toBe(42);
+
+    // A店側の行は触られていない。
+    const rowA = sqlite.prepare(
+      `SELECT name, commission_rate, line_account_id FROM affiliates WHERE id = ?`,
+    ).get(createdJson.data.id) as { name: string; commission_rate: number; line_account_id: string };
+    expect(rowA.name).toBe('A店の秘密パートナー');
+    expect(rowA.commission_rate).toBe(42);
+    expect(rowA.line_account_id).toBe(ACCOUNT_A);
+
+    // 同じ operationId でも、アカウントが違えば別の行として残る。
+    const total = sqlite.prepare(
+      `SELECT COUNT(*) AS n FROM affiliates WHERE operation_id = ?`,
+    ).get(SHARED_OPERATION) as { n: number };
+    expect(total.n).toBe(2);
   });
 });
 

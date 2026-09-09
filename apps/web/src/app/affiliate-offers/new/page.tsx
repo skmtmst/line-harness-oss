@@ -1,7 +1,7 @@
 'use client'
 
 import SelectField from '@/components/shared/select-field'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { Tag, Scenario } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
@@ -61,6 +61,25 @@ export default function NewAffiliateOfferPage() {
   // UUID（Issue #686）。押し直しても同じ値のままにするため onSave では
   // 作らず、ここと onReset だけで作り直す。
   const [operationId, setOperationId] = useState(() => crypto.randomUUID())
+
+  /*
+   * 途中保存の続きは、保存したときのLINEアカウントの中でだけ有効（#686）。
+   *
+   * ヘッダで別のアカウントへ切り替えても作りかけの `createdId` を持ち越すと、
+   * 画面はBを指したまま「下書きへの変更を再開する」でAの案件をPUTで
+   * 更新できてしまう。切り替わったら登録の身元（createdId・操作UUID・
+   * 途中保存の印）と、他アカウントでは結べないタグ・シナリオの選択を捨てる。
+   */
+  const draftAccountRef = useRef(selectedAccountId)
+  useEffect(() => {
+    if (draftAccountRef.current === selectedAccountId) return
+    draftAccountRef.current = selectedAccountId
+    setCreatedId(null)
+    setPartialSave(false)
+    setOperationId(crypto.randomUUID())
+    setTagId('')
+    setScenarioId('')
+  }, [selectedAccountId])
 
   useEffect(() => {
     let cancelled = false

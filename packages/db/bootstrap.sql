@@ -246,7 +246,7 @@ CREATE TABLE affiliate_links (
   is_active       INTEGER NOT NULL DEFAULT 1,
   created_at      TEXT NOT NULL,
   click_count     INTEGER NOT NULL DEFAULT 0
-);
+, operation_id TEXT);
 
 CREATE TABLE affiliate_offers (
   id              TEXT PRIMARY KEY,
@@ -5144,6 +5144,10 @@ CREATE INDEX idx_affiliate_clicks_affiliate ON affiliate_clicks (affiliate_id);
 CREATE INDEX idx_affiliate_links_affiliate ON affiliate_links (affiliate_id);
 
 CREATE INDEX idx_affiliate_links_offer ON affiliate_links (offer_id);
+
+CREATE UNIQUE INDEX idx_affiliate_links_operation_id
+  ON affiliate_links(affiliate_id, operation_id)
+  WHERE operation_id IS NOT NULL;
 
 CREATE UNIQUE INDEX idx_affiliate_offers_operation_id
   ON affiliate_offers(line_account_id, operation_id)
