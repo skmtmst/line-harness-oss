@@ -62,6 +62,32 @@ type ImportAction = EcActionExecution & {
   order: EcOrder | null
 }
 type ImportList = Omit<EcActionExecutionList, 'items'> & { items: ImportAction[] }
+type ImportRecords = {
+  items: ImportAction[]
+  summary: EcActionExecutionList['summary'] | null
+  total: number
+}
+/*
+ * 取得した値は「どのLINEアカウントで取ったか」と必ず一体で持つ。
+ * 描く前に取得元と今の選択を突き合わせ、違えば捨てる。これで
+ * アカウントAの集計がBへ切り替えた画面に残ることがない(#685)。
+ */
+type AccountBound<T> = { accountId: string | null; state: LoadState; data: T }
+
+const EMPTY_RECORDS: ImportRecords = { items: [], summary: null, total: 0 }
+
+function pendingFor<T>(accountId: string | null, data: T): AccountBound<T> {
+  return { accountId, state: accountId ? 'loading' : 'empty', data }
+}
+
+/*
+ * 取得元が今の選択と同じときだけ、持っている値をそのまま使う。
+ * 切替は再描画と同時に起きるので、消去は同期的で、待ち時間中に
+ * 前のアカウントの数字が見えることはない。
+ */
+function boundTo<T>(slot: AccountBound<T>, accountId: string | null, empty: T): AccountBound<T> {
+  return slot.accountId === accountId ? slot : pendingFor(accountId, empty)
+}
 
 /*
  * タブの絞りはサーバ側へ渡し、その後でページを切る(共通一覧契約)。
@@ -74,32 +100,51 @@ function actionServerFilter(status: ActionTab): { status?: 'succeeded' | 'skippe
 }
 
 function EventsPanel({ accountId }: { accountId: string | null }) {
-  const [overview, setOverview] = useState<OverviewWithLatency | null>(null)
-  const [overviewState, setOverviewState] = useState<LoadState>('loading')
-  const [actions, setActions] = useState<ImportAction[]>([])
-  const [actionSummary, setActionSummary] = useState<EcActionExecutionList['summary'] | null>(null)
-  const [actionTotal, setActionTotal] = useState(0)
-  const [listState, setListState] = useState<LoadState>('loading')
+  const [overviewSlot, setOverviewSlot] = useState<AccountBound<OverviewWithLatency | null>>(() => pendingFor(accountId, null))
+  const [recordsSlot, setRecordsSlot] = useState<AccountBound<ImportRecords>>(() => pendingFor(accountId, EMPTY_RECORDS))
+  const [pageSlot, setPageSlot] = useState<{ accountId: string | null; page: number }>({ accountId, page: 1 })
   const [query, setQuery] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const [status, setStatus] = useState<ActionTab>('all')
-  const [page, setPage] = useState(1)
   const [sort, setSort] = useState<'newest' | 'oldest'>('newest')
   const [retryingId, setRetryingId] = useState<string | null>(null)
-  const [notice, setNotice] = useState<{ tone: 'success' | 'error'; text: string } | null>(null)
+  const [noticeSlot, setNoticeSlot] = useState<{ accountId: string | null; notice: { tone: 'success' | 'error'; text: string } | null }>({ accountId, notice: null })
   /* 絞りとページを同時に変えたとき、古い読み込みの返事で上書きしない。 */
   const overviewLoadSeq = useRef(0)
   const listLoadSeq = useRef(0)
+
+  /*
+   * ここが「同期的な消去」。アカウントが変わった描画では、取得元の違う値は
+   * 一度も画面に出ないまま読み込み中へ戻る。効果(useEffect)を待たない。
+   */
+  const overviewView = boundTo(overviewSlot, accountId, null)
+  const recordsView = boundTo(recordsSlot, accountId, EMPTY_RECORDS)
+  const overview = overviewView.data
+  const overviewState = overviewView.state
+  const actions = recordsView.data.items
+  const actionSummary = recordsView.data.summary
+  const actionTotal = recordsView.data.total
+  const listState = recordsView.state
+  const page = pageSlot.accountId === accountId ? pageSlot.page : 1
+  const notice = noticeSlot.accountId === accountId ? noticeSlot.notice : null
+  const setPage = useCallback((next: number) => setPageSlot({ accountId, page: next }), [accountId])
+  const setNotice = useCallback(
+    (next: { tone: 'success' | 'error'; text: string } | null) => setNoticeSlot({ accountId, notice: next }),
+    [accountId],
+  )
 
   const loadOverview = useCallback(async (showLoading = true) => {
     const seq = overviewLoadSeq.current + 1
     overviewLoadSeq.current = seq
     if (!accountId) {
-      setOverview(null)
-      setOverviewState('empty')
+      setOverviewSlot({ accountId: null, state: 'empty', data: null })
       return
     }
-    if (showLoading) setOverviewState('loading')
+    /*
+     * 取り直しの間に前の値を残すのは、同じアカウントの取り直しだけ。
+     * 取得元が違えば null から始める。
+     */
+    if (showLoading) setOverviewSlot((prev) => ({ accountId, state: 'loading', data: prev.accountId === accountId ? prev.data : null }))
     try {
       const overviewResponse = await api.ecCommerce.overview(accountId) as ApiResponse<OverviewWithLatency>
       if (seq !== overviewLoadSeq.current) return
@@ -109,11 +154,15 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
         && overviewData !== null
         && !Array.isArray(overviewData)
       if (!hasOverview) throw new Error('invalid_ec_overview')
-      setOverview(overviewData)
-      setOverviewState('ready')
+      setOverviewSlot({ accountId, state: 'ready', data: overviewData })
     } catch (error) {
       if (seq !== overviewLoadSeq.current) return
-      setOverviewState(error instanceof ApiError && error.status === 403 ? 'forbidden' : 'error')
+      setOverviewSlot((prev) => ({
+        accountId,
+        state: error instanceof ApiError && error.status === 403 ? 'forbidden' : 'error',
+        /* 失敗時に数字を残すのは、同じアカウントで一度取れているときだけ。 */
+        data: prev.accountId === accountId ? prev.data : null,
+      }))
     }
   }, [accountId])
 
@@ -121,13 +170,10 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
     const seq = listLoadSeq.current + 1
     listLoadSeq.current = seq
     if (!accountId) {
-      setActions([])
-      setActionSummary(null)
-      setActionTotal(0)
-      setListState('empty')
+      setRecordsSlot({ accountId: null, state: 'empty', data: EMPTY_RECORDS })
       return
     }
-    if (showLoading) setListState('loading')
+    if (showLoading) setRecordsSlot((prev) => ({ accountId, state: 'loading', data: prev.accountId === accountId ? prev.data : EMPTY_RECORDS }))
     const params = new URLSearchParams({
       lineAccountId: accountId,
       view: 'actions',
@@ -143,13 +189,18 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
       const response = await fetchApi<ApiResponse<ImportList>>(`/api/ec-commerce/events?${params}`)
       if (seq !== listLoadSeq.current) return
       if (!response.success || !Array.isArray(response.data?.items)) throw new Error('invalid_ec_records')
-      setActions(response.data.items)
-      setActionSummary(response.data.summary)
-      setActionTotal(response.data.total)
-      setListState(response.data.items.length ? 'ready' : 'empty')
+      setRecordsSlot({
+        accountId,
+        state: response.data.items.length ? 'ready' : 'empty',
+        data: { items: response.data.items, summary: response.data.summary, total: response.data.total },
+      })
     } catch (error) {
       if (seq !== listLoadSeq.current) return
-      setListState(error instanceof ApiError && error.status === 403 ? 'forbidden' : 'error')
+      setRecordsSlot((prev) => ({
+        accountId,
+        state: error instanceof ApiError && error.status === 403 ? 'forbidden' : 'error',
+        data: prev.accountId === accountId ? prev.data : EMPTY_RECORDS,
+      }))
     }
   }, [accountId, page, searchQuery, sort, status])
 
@@ -161,8 +212,8 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
       setSearchQuery(query.trim())
     }, 300)
     return () => window.clearTimeout(timer)
-  }, [query])
-  useEffect(() => { setPage(1) }, [accountId])
+  }, [query, setPage])
+  /* ページ・お知らせもアカウントと一体で持つので、切替の効果で戻す必要はない。 */
 
   const pageCount = Math.max(1, Math.ceil(actionTotal / ACTION_PAGE_SIZE))
 

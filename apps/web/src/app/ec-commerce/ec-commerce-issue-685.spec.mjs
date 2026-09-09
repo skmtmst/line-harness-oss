@@ -2,6 +2,9 @@ import { expect, test } from '@playwright/test'
 
 const BASE = process.env.EC_685_BASE ?? 'http://127.0.0.1:3151'
 
+const ACCOUNT_A = 'visual-qa-account'
+const ACCOUNT_B = 'visual-qa-account-b'
+
 const summary = {
   pending: 0,
   processing: 0,
@@ -78,7 +81,7 @@ const overview = {
   },
 }
 
-async function openEc(page) {
+async function openEc(page, waitFor = 'networkidle') {
   await page.route('**/api/auth/session', (route) => route.fulfill({
     json: {
       success: true,
@@ -89,23 +92,68 @@ async function openEc(page) {
   await page.route('**/api/line-accounts', (route) => route.fulfill({
     json: {
       success: true,
-      data: [{
-        id: 'visual-qa-account',
-        channelId: 'channel-a',
-        name: '本店',
-        isActive: true,
-        country: 'JP',
-        role: null,
-        displayOrder: 0,
-      }],
+      data: [
+        {
+          id: ACCOUNT_A,
+          channelId: 'channel-a',
+          name: '本店',
+          isActive: true,
+          country: 'JP',
+          role: null,
+          displayOrder: 0,
+        },
+        {
+          id: ACCOUNT_B,
+          channelId: 'channel-b',
+          name: '支店',
+          isActive: true,
+          country: 'JP',
+          role: null,
+          displayOrder: 1,
+        },
+      ],
     },
   }))
   await page.addInitScript(() => {
     window.sessionStorage.setItem('lh_auth_selection_cleared', '1')
     window.localStorage.setItem('lh_selected_account', 'visual-qa-account')
   })
-  await page.goto(`${BASE}/ec-commerce.html`, { waitUntil: 'networkidle' })
+  await page.goto(`${BASE}/ec-commerce.html`, { waitUntil: waitFor })
   await expect(page).toHaveURL(/\/ec-commerce\.html/)
+}
+
+/* 集計の返事。件数を変えて「どのアカウントの値か」を画面の数字で見分ける。 */
+function overviewFor(count) {
+  return {
+    success: true,
+    data: {
+      total: count,
+      processed: count,
+      identityPending: count,
+      failed: count,
+      skipped: 0,
+      last24h: count,
+      lastReceivedAt: '2026-09-09T00:00:30.000Z',
+      averageDeliverySeconds: 30,
+      latencySampleCount: count,
+      byType: [{ eventType: 'ec.order.confirmed', label: '注文完了', count }],
+    },
+  }
+}
+
+function accountOf(route) {
+  return new URL(route.request().url()).searchParams.get('lineAccountId')
+}
+
+/* 3枚のKPIが「—件」なら、集計の数字は画面から消えている。 */
+async function expectNoOverviewNumbers(page) {
+  await expect(page.getByText('—件', { exact: true })).toHaveCount(3)
+  await expect(page.getByText('内訳は未取得', { exact: true })).toBeVisible()
+  await expect(page.getByText('到着時間は測定できません', { exact: true })).toBeVisible()
+}
+
+async function switchAccount(page, accountId) {
+  await page.getByLabel('LINEアカウント').selectOption(accountId)
 }
 
 test('21件目の商品、未知種別、サーバ検索を実際の画面操作で確認する', async ({ page }) => {
@@ -152,4 +200,106 @@ test('集計だけ失敗しても一覧を残し、画面の再読み込み操�
   await expect(page.getByText('集計だけを読み込めませんでした。一覧は取得できた範囲で表示しています。')).toBeVisible()
   await page.getByRole('button', { name: '集計をもう一度読む' }).click()
   await expect(page.getByText('直近24時間の平均 30秒（21件）')).toBeVisible()
+})
+
+/*
+ * 差し戻し(2026-09-09): アカウントAで集計111件を出したあとBへ切り替え、Bの集計が
+ * 500になると、Aの111件がBの数字として残っていた。切替の時点で消えることを見る。
+ */
+test('アカウントを切り替えて集計が500になっても、前のアカウントの数字を残さない', async ({ page }) => {
+  let overviewFailsForB = true
+  await page.route('**/api/ec-commerce/overview*', (route) => {
+    if (accountOf(route) === ACCOUNT_A) return route.fulfill({ json: overviewFor(111) })
+    return overviewFailsForB
+      ? route.fulfill({ status: 500, json: { success: false, error: '集計に失敗' } })
+      : route.fulfill({ json: overviewFor(7) })
+  })
+  await page.route('**/api/ec-commerce/events*', (route) => route.fulfill({
+    json: {
+      success: true,
+      data: {
+        items: [record(accountOf(route) === ACCOUNT_A ? 1 : 77)],
+        total: 1,
+        summary,
+      },
+    },
+  }))
+
+  await openEc(page)
+  await expect(page.getByText('111件', { exact: true }).first()).toBeVisible()
+  await expect(page.getByText('商品1 × 1')).toBeVisible()
+
+  await switchAccount(page, ACCOUNT_B)
+  await expect(page.getByText('集計だけを読み込めませんでした。一覧は取得できた範囲で表示しています。')).toBeVisible()
+  await expect(page.getByText('111件', { exact: true })).toHaveCount(0)
+  await expectNoOverviewNumbers(page)
+  /* 一覧はBの取得ぶんへ入れ替わっている。 */
+  await expect(page.getByText('商品77 × 1')).toBeVisible()
+  await expect(page.getByText('商品1 × 1')).toHaveCount(0)
+
+  /* 取得済みの値を残してよいのは、同じアカウントの取り直しだけ。 */
+  overviewFailsForB = false
+  await page.getByRole('button', { name: '集計をもう一度読む' }).click()
+  await expect(page.getByText('7件', { exact: true }).first()).toBeVisible()
+  await expect(page.getByText('111件', { exact: true })).toHaveCount(0)
+})
+
+test('アカウントを切り替えて集計が403になっても、前のアカウントの数字を残さない', async ({ page }) => {
+  await page.route('**/api/ec-commerce/overview*', (route) => (
+    accountOf(route) === ACCOUNT_A
+      ? route.fulfill({ json: overviewFor(111) })
+      : route.fulfill({ status: 403, json: { success: false, error: 'forbidden' } })
+  ))
+  await page.route('**/api/ec-commerce/events*', (route) => route.fulfill({
+    json: {
+      success: true,
+      data: {
+        items: [record(accountOf(route) === ACCOUNT_A ? 1 : 77)],
+        total: 1,
+        summary,
+      },
+    },
+  }))
+
+  await openEc(page)
+  await expect(page.getByText('111件', { exact: true }).first()).toBeVisible()
+
+  await switchAccount(page, ACCOUNT_B)
+  await expect(page.getByText('集計を表示する権限がありません。一覧は取得できた範囲で表示しています。')).toBeVisible()
+  await expect(page.getByText('111件', { exact: true })).toHaveCount(0)
+  await expectNoOverviewNumbers(page)
+  /* 権限が無いので取り直しは出さない。 */
+  await expect(page.getByRole('button', { name: '集計をもう一度読む' })).toHaveCount(0)
+  await expect(page.getByText('商品77 × 1')).toBeVisible()
+})
+
+test('切替後に届いた前のアカウントの遅い返事を、新しいアカウントの値にしない', async ({ page }) => {
+  await page.route('**/api/ec-commerce/overview*', async (route) => {
+    if (accountOf(route) !== ACCOUNT_A) return route.fulfill({ json: overviewFor(7) })
+    await new Promise((resolve) => setTimeout(resolve, 3000))
+    return route.fulfill({ json: overviewFor(111) })
+  })
+  await page.route('**/api/ec-commerce/events*', async (route) => {
+    if (accountOf(route) !== ACCOUNT_A) {
+      return route.fulfill({ json: { success: true, data: { items: [record(77)], total: 1, summary } } })
+    }
+    await new Promise((resolve) => setTimeout(resolve, 3000))
+    return route.fulfill({ json: { success: true, data: { items: [record(1)], total: 1, summary } } })
+  })
+
+  await openEc(page, 'domcontentloaded')
+  /* Aの返事はまだ届いていない。 */
+  await expect(page.getByLabel('LINEアカウント')).toBeVisible()
+  await expect(page.getByText('111件', { exact: true })).toHaveCount(0)
+
+  await switchAccount(page, ACCOUNT_B)
+  await expect(page.getByText('7件', { exact: true }).first()).toBeVisible()
+  await expect(page.getByText('商品77 × 1')).toBeVisible()
+
+  /* Aの遅い返事が届いたあとも、Bの値のまま。 */
+  await page.waitForTimeout(4000)
+  await expect(page.getByText('111件', { exact: true })).toHaveCount(0)
+  await expect(page.getByText('商品1 × 1')).toHaveCount(0)
+  await expect(page.getByText('7件', { exact: true }).first()).toBeVisible()
+  await expect(page.getByText('商品77 × 1')).toBeVisible()
 })
