@@ -726,6 +726,30 @@ describe('#667 N-197 編集・削除のAPIはowner/adminのみ', () => {
     expect(res.status).toBe(200);
     expect(mocks.deleteMedia).toHaveBeenCalled();
   });
+
+  it('ownerの名前変更は通る', async () => {
+    const res = await req('/api/media/md-1?accountId=account-1', 'PATCH', { filename: 'b.png' }, 'owner');
+    expect(res.status).toBe(200);
+    expect(mocks.updateMedia).toHaveBeenCalled();
+  });
+
+  it('ownerの削除は通る（使われていなければ）', async () => {
+    const res = await req('/api/media/md-1?accountId=account-1', 'DELETE', undefined, 'owner');
+    expect(res.status).toBe(200);
+    expect(mocks.deleteMedia).toHaveBeenCalled();
+  });
+
+  it('ownerの影響確認は通る', async () => {
+    const res = await req('/api/media/md-1/delete-impact?accountId=account-1', 'GET', undefined, 'owner');
+    expect(res.status).toBe(200);
+    expect(mocks.getMediaDeleteImpact).toHaveBeenCalled();
+  });
+
+  /* 読める操作まで取り上げない。読取権限と編集権限を混同しないための一行。 */
+  it('staffでも一覧は読める', async () => {
+    const res = await req('/api/media?accountId=account-1', 'GET', undefined, 'staff');
+    expect(res.status).toBe(200);
+  });
 });
 
 describe('#637 N-195 メディアのダウンロードは認証済み口だけ', () => {
