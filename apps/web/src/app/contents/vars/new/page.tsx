@@ -52,6 +52,32 @@ const TYPES: Array<{ key: string; label: string; mark: string; note: string; pla
 
 const NAME_MAX = 200
 const VALUE_MAX = 200
+const MEMO_MAX = 1000
+
+const SENSITIVE_VALUE_PATTERNS = [
+  /-----BEGIN [A-Z ]*PRIVATE KEY-----/i,
+  /\b(?:password|passwd|pwd|secret|token|api[_ -]?key|access[_ -]?key|channel[_ -]?secret|パスワード|秘密鍵|トークン)\s*[=:：]\s*\S{4,}/i,
+  /\b(?:AKIA[0-9A-Z]{16}|gh[pousr]_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,}|xox[baprs]-[A-Za-z0-9-]{10,})\b/,
+  /\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b/,
+  /\b(?:sk|rk|pk)_(?:live|test)_[A-Za-z0-9]{12,}\b/i,
+] as const
+
+/**
+ * 共通情報は配信文へ差し込む場所なので、接続用の鍵を置かない。
+ *
+ * 一般的な文章まで止めないよう、「token」という単語だけでは警告せず、
+ * 値を伴う書式か、代表的な秘密値の形式に合う場合だけを対象にする。
+ */
+function looksLikeSensitiveValue(input: string): boolean {
+  return SENSITIVE_VALUE_PATTERNS.some((pattern) => pattern.test(input))
+}
+
+function sensitiveFieldLabels(value: string, memo: string): string[] {
+  return [
+    ...(looksLikeSensitiveValue(value) ? ['値'] : []),
+    ...(looksLikeSensitiveValue(memo) ? ['社内メモ'] : []),
+  ]
+}
 
 /**
  * 名前から差し込み名の候補を作る。
@@ -81,8 +107,13 @@ export default function NewCommonVarPage() {
   const [keyTouched, setKeyTouched] = useState(false)
   const [type, setType] = useState('text')
   const [value, setValue] = useState('')
+  const [memo, setMemo] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [secretWarningFields, setSecretWarningFields] = useState<string[] | null>(null)
+  const valueRef = useRef<HTMLInputElement>(null)
+  const memoRef = useRef<HTMLTextAreaElement>(null)
+  const secretWarningRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     void api.folders
@@ -95,10 +126,14 @@ export default function NewCommonVarPage() {
       })
   }, [])
 
+  useEffect(() => {
+    if (secretWarningFields) secretWarningRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }, [secretWarningFields])
+
   // 種別は内部stateからのみ選ぶが、見つからないときは先頭へ倒す（非null断言を使わない）。
   const spec = TYPES.find((t) => t.key === type) ?? TYPES[0]
 
-  const save = async () => {
+  const save = async (allowSensitive = false) => {
     if (saving) return
     if (!selectedAccountId) {
       setError('LINEアカウントを選択してください')
@@ -113,17 +148,26 @@ export default function NewCommonVarPage() {
       setError('差し込み名を入力してください')
       return
     }
+    const sensitiveFields = sensitiveFieldLabels(value, memo)
+    if (sensitiveFields.length > 0 && !allowSensitive) {
+      setSecretWarningFields(sensitiveFields)
+      setError('')
+      return
+    }
     setSaving(true)
+    setSecretWarningFields(null)
     setError('')
     try {
-      const res = await api.commonVars.create({
+      const payload = {
         accountId: accountAtRequest,
         name: name.trim(),
         varKey: varKey.trim(),
         type,
         value,
+        memo,
         folderId: folderId || null,
-      })
+      }
+      const res = await api.commonVars.create(payload)
       if (accountAtRequest !== latestAccountRef.current) return
       if (!res.success) {
         setError(res.error)
@@ -159,6 +203,14 @@ export default function NewCommonVarPage() {
       </nav>
 
       <div className="bg-canvas rounded-card border-hairline max-w-3xl space-y-6 border p-6">
+        <div className="bg-warning-bg text-warning rounded-control border border-current/20 p-4 text-sm" role="note">
+          <p className="font-semibold">秘密値は保存しないでください</p>
+          <p className="mt-1 leading-relaxed">
+            パスワード、APIトークン、秘密鍵などは共通情報に入力しないでください。
+            配信文へ誤って差し込まれるおそれがあります。
+          </p>
+        </div>
+
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <label htmlFor="cv-name" className="text-ink-secondary mb-1 block text-sm font-medium">
@@ -271,11 +323,15 @@ export default function NewCommonVarPage() {
             値
           </label>
           <input
+            ref={valueRef}
             id="cv-value"
             type={type === 'number' ? 'number' : 'text'}
             maxLength={type === 'number' ? undefined : VALUE_MAX}
             value={value}
-            onChange={(e) => setValue(e.target.value)}
+            onChange={(e) => {
+              setValue(e.target.value)
+              setSecretWarningFields(null)
+            }}
             placeholder={spec.placeholder}
             className="border-hairline rounded-control w-full max-w-md border px-3 py-2 text-sm"
           />
@@ -288,6 +344,64 @@ export default function NewCommonVarPage() {
             日付を決めて自動で書き換える設定は、登録したあとの編集画面から足せます。
           </p>
         </div>
+
+        <div>
+          <label htmlFor="cv-memo" className="text-ink-secondary mb-1 block text-sm font-medium">
+            社内メモ <span className="text-ink-faint text-xs font-normal">任意</span>
+          </label>
+          <textarea
+            ref={memoRef}
+            id="cv-memo"
+            rows={3}
+            maxLength={MEMO_MAX}
+            value={memo}
+            onChange={(e) => {
+              setMemo(e.target.value)
+              setSecretWarningFields(null)
+            }}
+            placeholder="この共通情報を使う目的や、更新時の注意点"
+            className="border-hairline rounded-control w-full max-w-xl border px-3 py-2 text-sm"
+          />
+          <p className="text-ink-faint mt-1 max-w-xl text-right text-xs tabular-nums">
+            {memo.length}/{MEMO_MAX}
+          </p>
+          <p className="text-ink-faint mt-1 text-xs">友だちには表示されません。</p>
+        </div>
+
+        {secretWarningFields && (
+          <div
+            ref={secretWarningRef}
+            role="alertdialog"
+            aria-labelledby="cv-secret-warning-title"
+            aria-describedby="cv-secret-warning-description"
+            className="border-danger bg-danger-bg rounded-card border p-4"
+          >
+            <h2 id="cv-secret-warning-title" className="text-danger text-base font-bold">
+              秘密値の可能性がある内容を確認してください
+            </h2>
+            <p id="cv-secret-warning-description" className="text-ink-secondary mt-2 text-sm leading-relaxed">
+              {secretWarningFields.join('・')}に、パスワードやトークンなどの秘密値らしい内容があります。
+              共通情報には保存せず、安全な保管場所へ移してください。
+            </p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant="primary"
+                onClick={() => {
+                  const firstField = secretWarningFields[0]
+                  setSecretWarningFields(null)
+                  if (firstField === '社内メモ') memoRef.current?.focus()
+                  else valueRef.current?.focus()
+                }}
+              >
+                入力に戻って修正する
+              </Button>
+              <Button type="button" disabled={saving} onClick={() => void save(true)}>
+                内容を確認して登録する
+              </Button>
+            </div>
+          </div>
+        )}
 
         {error && <p className="text-danger text-sm">{error}</p>}
       </div>
