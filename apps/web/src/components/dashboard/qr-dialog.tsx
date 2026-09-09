@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import QRCode from 'qrcode'
 import { QrCode } from 'lucide-react'
 import type { EntryRoute } from '@line-crm/shared'
@@ -19,8 +19,15 @@ import SelectField from '@/components/shared/select-field'
  * 選べば、外部サービスへデータを送らずにPDF化できる。
  */
 
+/*
+ * 選べる大きさ（#689）。
+ *
+ * Worker の /api/qr は 64〜1024px、かつ縦×横が 1,048,576 まで（`normalizeQrSize`）。
+ * 以前は「大」を 1200px にしていたため、正しく選んだ人だけが 400 で保存できなかった。
+ * ここに足すときは、必ず 1024px 以下・面積 1,048,576 以下にする。
+ */
 const SIZES = [
-  { value: '1200x1200', label: '大（1200px）', note: '印刷向け' },
+  { value: '1024x1024', label: '大（1024px）', note: '印刷向け' },
   { value: '600x600', label: '中（600px）', note: '画面向け' },
   { value: '300x300', label: '小（300px）', note: '確認用' },
 ]
@@ -343,7 +350,7 @@ export default function QrDialog({
             <div className="border-hairline bg-surface-pearl rounded-control border p-4">
               <h3 className="text-ink text-sm font-bold">使うときのヒント</h3>
               <ul className="text-ink-faint mt-2 space-y-1 text-xs leading-relaxed">
-                <li>・印刷は 1200px 以上を推奨します（小さいと読み取れないことがあります）</li>
+                <li>・印刷には「大（1024px）」を選んでください（小さいと読み取れないことがあります）</li>
                 <li>・流入経路ごとにリンクを分けると、どこから来たかを計測できます</li>
                 <li>・QRの周囲は余白を1cm以上あけてください</li>
               </ul>

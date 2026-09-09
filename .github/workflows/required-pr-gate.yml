@@ -400,6 +400,16 @@ jobs:
           --filter @line-harness/update-engine
           build
       - run: pnpm --filter web build
+      # 画面の権限は「文字列がある」では確かめられない。書き出した `out` を
+      # 本番と同じ当て方で配り、実ブラウザで owner/admin/staff を動かす（N-197）。
+      # vitest は `.test.ts(x)` しか見ないので、ここから呼ばないと必須ゲートの
+      # 外に落ちる。
+      - name: Install Chromium for the media permission contract test
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Verify media permissions on the built admin
+        run: >-
+          pnpm exec playwright test
+          --config apps/web/src/app/contents/contents-permission-behavior.config.mjs
       - run: pnpm --filter web verify:design
 
   required-pr-gate:
