@@ -256,8 +256,41 @@ async function mount(element: ReactElement) {
   await flush()
   return {
     container,
+    root,
     rerender: async (next: ReactElement) => {
       await act(async () => { root.render(next) })
+      await flush()
+    },
+    /*
+     * **commit と effect の隙間で応答を返す。** `flushSync` で新しい
+     * アカウントの描画だけを確定させ、後片付けの effect がまだ動いて
+     * いないところで `duringGap` を呼ぶ。切替の失効が effect 任せだと、
+     * この隙間で旧アカウントの応答が「今の宛先」と判断されてしまう。
+     */
+    commitThen: async (next: ReactElement, duringGap: () => void) => {
+      /*
+        **`act` や `flushSync` では隙間が作れない。** どちらも描画の
+        確定に続けて後片付け(useEffect)まで同じ塊で流してしまう。
+        そこで act を外して普通に描画させ、**確定の最中に動く
+        `useLayoutEffect`** で合図を取る。合図はマイクロタスクなので、
+        後片付け（Reactが次の巡回＝マクロタスクへ積む）より先に戻って
+        くる。そこが「Bを描き終えたが後片付けはまだ」の隙間。
+      */
+      const actEnvironment = Reflect.get(globalThis, 'IS_REACT_ACT_ENVIRONMENT')
+      Reflect.set(globalThis, 'IS_REACT_ACT_ENVIRONMENT', false)
+      try {
+        const committed = deferred<void>()
+        function CommitProbe(): null {
+          React.useLayoutEffect(() => { committed.resolve() }, [])
+          return null
+        }
+        root.render(<>{next}<CommitProbe /></>)
+        await committed.promise
+        duringGap()
+        for (let index = 0; index < 8; index += 1) await Promise.resolve()
+      } finally {
+        Reflect.set(globalThis, 'IS_REACT_ACT_ENVIRONMENT', actEnvironment)
+      }
       await flush()
     },
   }
@@ -452,6 +485,67 @@ describe('Issue #684 イベント予約の実操作', () => {
     expect(view.container.textContent).toContain('確認待ちはありません')
     expect(view.container.textContent).not.toContain('対応が必要：7件を確認してください')
     // Bの行を勝手に参加済へ書き換えない（書き換わると操作ボタンが消える）。
+    expect(() => actionButton(view.container, 'booking-a', 'attended')).not.toThrow()
+    expect(propsOf(actionButton(view.container, 'booking-a', 'attended')).disabled).toBe(false)
+    expect(view.container.textContent).not.toContain('来場・不参加の記録を変えられませんでした。')
+  })
+
+  it('切替の描画が確定した直後、後片付けが走る前にAの成功が返っても混ざらない', async () => {
+    const oldSuccess = deferred<{ ok: true }>()
+    apiMocks.listBookings.mockImplementation((accountId: string) => Promise.resolve({
+      items: [booking('booking-a', accountId === 'account-a' ? '青木さん' : '井上さん')],
+      total: 1,
+    }))
+    apiMocks.getEvent.mockImplementation((accountId: string) => Promise.resolve({
+      id: 'event-1',
+      name: accountId === 'account-a' ? '相談会A' : '相談会B',
+      waitlist_enabled: 1,
+    }))
+    apiMocks.getBookingSummary.mockImplementation((accountId: string) => Promise.resolve({
+      requested: accountId === 'account-a' ? 7 : 0,
+      confirmed: 2,
+      rejected: 0,
+      cancelled: 0,
+      expired: 0,
+      attended: 0,
+      no_show: 0,
+      waitlist: 0,
+      totalCapacity: 10,
+    }))
+    apiMocks.updateBooking.mockReturnValue(oldSuccess.promise)
+
+    const view = await mount(<EventBookingsPage />)
+    await click(actionButton(view.container, 'booking-a', 'attended'))
+    expect(apiMocks.updateBooking).toHaveBeenCalledTimes(1)
+
+    const callsFor = (mock: { mock: { calls: unknown[][] } }, accountId: string) => (
+      mock.mock.calls.filter((call) => call[0] === accountId).length
+    )
+    const before = {
+      list: callsFor(apiMocks.listBookings, 'account-a'),
+      event: callsFor(apiMocks.getEvent, 'account-a'),
+      summary: callsFor(apiMocks.getBookingSummary, 'account-a'),
+    }
+
+    /*
+      Bの描画を確定させたその場で、まだ後片付けが動いていないうちに
+      旧Aの更新が成功で返る。失効が描画の時点で効いていないと、
+      ここで旧Aの宛先が「今の宛先」と読まれる。
+    */
+    accountMock.selectedAccountId = 'account-b'
+    await view.commitThen(<EventBookingsPage />, () => {
+      oldSuccess.resolve({ ok: true })
+    })
+
+    expect(callsFor(apiMocks.listBookings, 'account-a')).toBe(before.list)
+    expect(callsFor(apiMocks.getEvent, 'account-a')).toBe(before.event)
+    expect(callsFor(apiMocks.getBookingSummary, 'account-a')).toBe(before.summary)
+    expect(view.container.textContent).toContain('井上さん')
+    expect(view.container.textContent).not.toContain('青木さん')
+    expect(view.container.textContent).toContain('相談会B')
+    expect(view.container.textContent).not.toContain('相談会A')
+    expect(view.container.textContent).toContain('確認待ちはありません')
+    expect(view.container.textContent).not.toContain('対応が必要：7件を確認してください')
     expect(() => actionButton(view.container, 'booking-a', 'attended')).not.toThrow()
     expect(propsOf(actionButton(view.container, 'booking-a', 'attended')).disabled).toBe(false)
     expect(view.container.textContent).not.toContain('来場・不参加の記録を変えられませんでした。')

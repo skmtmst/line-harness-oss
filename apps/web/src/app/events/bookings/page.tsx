@@ -68,6 +68,10 @@ function bookingActionKey(accountId: string, eventId: string, bookingId: string)
   return JSON.stringify([accountId, eventId, bookingId])
 }
 
+/** 切替のたびに新しい入れ物を作らないための空。中身は書き換えない。 */
+const EMPTY_MARKING_KEYS: ReadonlySet<string> = new Set<string>()
+const EMPTY_MARK_ERRORS: Record<string, string> = {}
+
 function BookingsInner() {
   const params = useSearchParams()
   const eventId = params.get('id')
@@ -121,23 +125,31 @@ function BookingsInner() {
    * 成功で返ると、前は行の書き換えと再取得・集計がそのまま走り、
    * **Bの画面へAの予約者と件数が入り込んだ。** 誰の予約を見ているのか
    * 分からないまま、Bの承認待ちを見落とす。世代を上げて、旧アカウント
-   * の応答には一切書かせない。行の「記録中…」と失敗文もここで畳む。
+   * の応答には一切書かせない。
    *
-   * 一覧・詳細・集計の取り直しより先に置く。あとに置くと、切替直後の
-   * 取得が古い宛先のまま照合を通る。
+   * **描いている時点で失効させる。** これを `useEffect` に置くと、
+   * Bを描き終えてから後片付けが動くまでの隙間ができる。**その隙間で
+   * Aの応答が返ると、まだAのままの宛先を「今の宛先」と読んでしまい、
+   * 行の書き換えとAの取り直しへ進む。** 描画のたびに宛先を見て、
+   * 変わっていれば同じ描画のうちに世代を上げる。
    */
-  useEffect(() => {
-    const scope = bookingScopeKey(selectedAccountId, eventId)
-    if (scopeRef.current === scope) return
+  const scope = bookingScopeKey(selectedAccountId, eventId)
+  if (scopeRef.current !== scope) {
     scopeRef.current = scope
     markGenerationRef.current += 1
     markRequestRef.current.clear()
-    if (markingKeysRef.current.size > 0) {
-      markingKeysRef.current.clear()
-      setMarkingKeys(new Set<string>())
-    }
-    setMarkErrors((current) => (Object.keys(current).length === 0 ? current : {}))
-  }, [selectedAccountId, eventId])
+    markingKeysRef.current.clear()
+  }
+  /*
+   * 行の「記録中…」と失敗文も、Bを画面へ出す前に畳む。描画中に
+   * 直すので、切替後の最初の絵から前のアカウントの操作跡が消える。
+   */
+  const [markScope, setMarkScope] = useState(scope)
+  if (markScope !== scope) {
+    setMarkScope(scope)
+    setMarkingKeys(EMPTY_MARKING_KEYS)
+    setMarkErrors(EMPTY_MARK_ERRORS)
+  }
   /*
    * **ブラウザの `confirm()` を使わない。**
    *
@@ -170,7 +182,6 @@ function BookingsInner() {
       **今の画面へ前のアカウントの一覧を書き込む。** 番号を見たあと、
       始めた時点の宛先(`scope`)と今の宛先も照らし合わせる。
     */
-    const scope = bookingScopeKey(selectedAccountId, eventId)
     setLoadStatus('loading')
     setActionError(null)
     try {
@@ -203,14 +214,13 @@ function BookingsInner() {
       setBookingsTotal(0)
       setLoadStatus('error')
     }
-  }, [selectedAccountId, eventId, tab, page])
+  }, [selectedAccountId, eventId, scope, tab, page])
 
   // 詳細はイベント/アカウント変更時のみ取り直す(点検#520軽13)。
   // 待ち列の件数は概要(summary)から取るようになったため、ここでは読まない。
   const refreshMeta = useCallback(async () => {
     if (!selectedAccountId || !eventId) return
     const requestId = ++loadRequestRef.current
-    const scope = bookingScopeKey(selectedAccountId, eventId)
     try {
       /*
         **前のイベントの控えを使い回さない。** `event` が入っていれば取りに
@@ -227,7 +237,7 @@ function BookingsInner() {
       if (scopeRef.current !== scope) return
       setEvent(null)
     }
-  }, [selectedAccountId, eventId])
+  }, [selectedAccountId, eventId, scope])
 
   const refresh = useCallback(async () => {
     await refreshMeta()
@@ -246,7 +256,6 @@ function BookingsInner() {
   const refreshSummary = useCallback(async () => {
     if (!selectedAccountId || !eventId) return
     const requestId = ++summaryRequestRef.current
-    const scope = bookingScopeKey(selectedAccountId, eventId)
     setSummaryStatus('loading')
     try {
       const [eventRes, summaryRes] = await Promise.all([
@@ -265,7 +274,7 @@ function BookingsInner() {
       setSummary(null)
       setSummaryStatus('error')
     }
-  }, [selectedAccountId, eventId])
+  }, [selectedAccountId, eventId, scope])
 
   useEffect(() => {
     void refreshSummary()
@@ -362,7 +371,8 @@ function BookingsInner() {
   async function markStatus(id: string, status: 'attended' | 'no_show') {
     const accountId = selectedAccountId
     if (!accountId || !eventId) return
-    const scope = bookingScopeKey(accountId, eventId)
+    // `scope` は今描いている宛先。押した時点の値をそのまま持ち回る。
+    const startedScope = scope
     const actionKey = bookingActionKey(accountId, eventId, id)
     if (markingKeysRef.current.has(actionKey)) return
     const generation = markGenerationRef.current
@@ -378,7 +388,7 @@ function BookingsInner() {
     })
     const isCurrent = () => (
       markGenerationRef.current === generation
-      && scopeRef.current === scope
+      && scopeRef.current === startedScope
       && markRequestRef.current.get(actionKey) === requestId
     )
     try {
