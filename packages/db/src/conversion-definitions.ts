@@ -726,10 +726,22 @@ export async function replaceConversionDefinitionUsages(
   const affectedUsages = Number(usageRow?.total ?? 0);
   const now = jstNow();
   const operationId = crypto.randomUUID();
+  // 事前確認は読んだ瞬間の姿でしかない。置換先を別の要求が停止・版更新・削除
+  // しても旧地点のCASだけなら通ってしまい、利用先が停止済みや旧版の置換先へ
+  // 移る。置換先のID・版・稼働中・同アカウントを旧地点のCAS文そのものへ
+  // EXISTSで入れ、同じtransaction内で1文として固定する。
   const results = await db.batch([
-    db.prepare(`UPDATE conversion_points SET status = 'stopped', stopped_at = ?,
-      updated_at = ?, version = version + 1 WHERE id = ? AND version = ? AND status = 'active'`)
-      .bind(now, now, input.id, input.expectedVersion),
+    db.prepare(`UPDATE conversion_points AS source SET status = 'stopped', stopped_at = ?,
+      updated_at = ?, version = version + 1
+      WHERE source.id = ? AND source.version = ? AND source.status = 'active'
+        AND EXISTS (
+          SELECT 1 FROM conversion_points AS replacement
+          WHERE replacement.id = ? AND replacement.version = ?
+            AND replacement.status = 'active' AND replacement.id <> source.id
+            AND (replacement.line_account_id = source.line_account_id
+              OR (replacement.line_account_id IS NULL AND source.line_account_id IS NULL))
+        )`)
+      .bind(now, now, input.id, input.expectedVersion, input.replacementId, input.replacementExpectedVersion),
     db.prepare(`INSERT INTO conversion_definition_operations
       (id, conversion_point_id, action, replacement_id, affected_usages, reason, performed_by, created_at)
       SELECT ?, ?, 'replace', ?, ?, ?, ?, ? WHERE changes() = 1`)
@@ -748,6 +760,15 @@ export async function replaceConversionDefinitionUsages(
       .bind(input.replacementId, input.replacementExpectedVersion, now, input.id, operationId),
   ]);
   if ((results[0]?.meta.changes ?? 0) !== 1 || (results[1]?.meta.changes ?? 0) !== 1) {
+    // 敗者には、旧地点と置換先のどちらを読み直すのかを分けて伝える。
+    const latestReplacement = await currentDefinitionForMutation(db, input.replacementId, input.scope);
+    if (!latestReplacement) {
+      throw new ConversionDefinitionError('replacement_not_found', '置換先の成果地点が見つかりません。読み直してください', 409);
+    }
+    if (Number(latestReplacement.version) !== input.replacementExpectedVersion
+      || latestReplacement.status !== 'active') {
+      throw new ConversionDefinitionError('replacement_conflict', '置換先の成果地点が更新されています。読み直してください', 409);
+    }
     throw new ConversionDefinitionError('version_conflict', '成果地点が更新されています。読み直してください', 409);
   }
   return {
