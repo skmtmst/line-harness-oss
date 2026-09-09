@@ -76,7 +76,9 @@ describe('V6 機能20 分析', () => {
   it('結果待ちは打ち切りと間隔延長があり、無限に叩かない(点検#508の中2)', () => {
     expect(PAGE).not.toContain('setInterval')
     // board #633独立差し戻し: 2分で止めず5分cronを待つ。打ち切りは最短目安+余裕(上限あり)。
-    expect(PAGE).toContain('Date.now() >= deadline')
+    // board #633独立審査: 確認失敗のbackoffを積む前にも打ち切りを見る。
+    expect(PAGE).toContain('stopIfDeadlinePassed')
+    expect(PAGE).toContain('Date.now() < deadline')
     expect(PAGE).toContain('CROSS_AUTO_POLL_MAX_MS')
     // board #633独立再審査: 打ち切り後もrunを保持し再接続する。新規の送り直しは促さない。
     expect(PAGE).toContain('自動の確認を止めました')

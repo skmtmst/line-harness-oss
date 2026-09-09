@@ -47,7 +47,9 @@ describe('クロス分析の待ち順と処理目安 (Issue #633)', () => {
     expect(PAGE).toContain('3 * 60_000')
     expect(PAGE).toContain('CROSS_AUTO_POLL_MAX_MS')
     expect(PAGE).toContain('15 * 60_000')
-    expect(PAGE).toContain('Date.now() >= deadline')
+    // 打ち切りの判定は1か所にまとめ、成功でも失敗でも次の確認を積む前に通す。
+    expect(PAGE).toContain('stopIfDeadlinePassed')
+    expect(PAGE).toContain('Date.now() < deadline')
     expect(PAGE).toContain('waitMs + CROSS_AUTO_POLL_MARGIN_MS')
     // 間隔は後半ほど空ける(点検#508の中2)。40回・約2分の旧上限は残さない。
     expect(PAGE).toContain('attempts < 10 ? 3000 : 10000')
@@ -61,6 +63,15 @@ describe('クロス分析の待ち順と処理目安 (Issue #633)', () => {
     expect(PAGE).toContain('pollErrors')
     expect(PAGE).toContain('CROSS_POLL_ERROR_BACKOFF_MS')
     expect(PAGE).toContain('Math.min(pollErrors')
+    // 失敗の待ち時間を積む前に打ち切りを見る(見ないと上限15分を越えて叩き続ける)。
+    expect(PAGE).toMatch(/stopIfDeadlinePassed\(\)\) return\n\s*\/\/ 失敗が続くほど間隔を空ける/)
+  })
+
+  it('アカウント切替で作り直し、前のアカウントの遅延応答を表示へ入れない', () => {
+    // 画面ごと作り直す(key)。加えて世代fenceで、切替前に投げた通信の応答を落とす。
+    expect(PAGE).toContain('<CrossTab key={selectedAccountId} accountId={selectedAccountId}')
+    expect(PAGE).toContain('viewGeneration')
+    expect(PAGE).toContain('viewGeneration.current !== generation')
   })
 
   it('実行中は待ち目安を出さず、待機中は実行中分を加算しない', () => {

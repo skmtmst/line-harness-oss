@@ -771,6 +771,7 @@ async function loadRunRow(
   id: string; line_account_id: string; query_json: string; state: string;
   result_json: string; error_code: string | null; period_from: string; period_to: string;
   time_zone: string; data_cutoff_at: string; created_at: string;
+  lease_generation: number; result_generation: number | null;
 } | null> {
   const sql = lineAccountId
     ? `SELECT * FROM analytics_cross_runs WHERE id = ? AND line_account_id = ?`
@@ -840,17 +841,42 @@ export async function touchAnalyticsCrossRunLease(
   if (Number(touched.meta?.changes ?? 0) !== 1) throw new Error('analytics_cross_run_lease_stolen');
 }
 
+// 対象者行はclaimで得た世代のstagingへ書く。期限回収で生き返った旧実行が同じ
+// runへ書き込んでも、世代が違うため主キーが衝突せず、互いの行を消さない。
+// 読み取り(対象者の作成)は確定した世代(result_generation)だけを見る。
+async function clearAnalyticsCrossStaging(
+  db: D1Database,
+  runId: string,
+  leaseGeneration: number,
+): Promise<void> {
+  await db.prepare(
+    `DELETE FROM analytics_cross_run_members WHERE run_id = ? AND lease_generation = ?`,
+  ).bind(runId, leaseGeneration).run();
+}
+
 export async function completeAnalyticsCrossRun(
   db: D1Database,
   runId: string,
   leaseGeneration: number,
   result: AnalyticsCrossResult,
 ): Promise<void> {
+  // 確定は1文のCAS。結果と「どの世代の対象者行を採用したか」を同時に書くため、
+  // 読み手が結果だけ新しく対象者行だけ古い、という組み合わせを見ることはない。
   const done = await db.prepare(
-    `UPDATE analytics_cross_runs SET state = ?, result_json = ?, error_code = NULL, completed_at = ?
+    `UPDATE analytics_cross_runs
+        SET state = ?, result_json = ?, error_code = NULL, completed_at = ?,
+            result_generation = ?
       WHERE id = ? AND state = 'running' AND lease_generation = ?`,
-  ).bind(result.state, JSON.stringify(result), new Date().toISOString(), runId, leaseGeneration).run();
+  ).bind(
+    result.state, JSON.stringify(result), new Date().toISOString(),
+    leaseGeneration, runId, leaseGeneration,
+  ).run();
   if (Number(done.meta?.changes ?? 0) !== 1) throw new Error('analytics_cross_run_lease_stolen');
+  // 勝った後の片付け。負けた世代のstagingを消す。ここで落ちても読み取りは
+  // result_generationで絞るため、結果が汚れることはない。
+  await db.prepare(
+    `DELETE FROM analytics_cross_run_members WHERE run_id = ? AND lease_generation <> ?`,
+  ).bind(runId, leaseGeneration).run();
 }
 
 export async function failAnalyticsCrossRun(
@@ -864,6 +890,10 @@ export async function failAnalyticsCrossRun(
       WHERE id = ? AND state = 'running' AND lease_generation = ?`,
   ).bind(errorCode, new Date().toISOString(), runId, leaseGeneration).run();
   if (Number(done.meta?.changes ?? 0) !== 1) throw new Error('analytics_cross_run_lease_stolen');
+  // 失敗で終わったrunに採用する結果はない。どの世代のstagingも残さない。
+  await db.prepare(
+    `DELETE FROM analytics_cross_run_members WHERE run_id = ?`,
+  ).bind(runId).run();
 }
 
 export async function processAnalyticsCrossRun(
@@ -873,13 +903,10 @@ export async function processAnalyticsCrossRun(
   const { leaseGeneration } = await claimAnalyticsCrossRun(db, runId);
   const row = await loadRunRow(db, runId);
   if (!row) throw new Error('analytics_cross_run_not_found');
-  // 再実行の安全: クラッシュした前世代の途中書き込みが残っていても、同じ
-  // 主キー(run_id, row_key, col_key, friend_id)で重複失敗しないよう、書き直し
-  // の前にこのrunの対象者行を消す。claim済み(この世代が実行権を持つ)の後のため、
-  // 他の実行の行を消すことはない。
-  await db.prepare(
-    `DELETE FROM analytics_cross_run_members WHERE run_id = ?`,
-  ).bind(runId).run();
+  // 再実行の安全: 書き込み先はこの世代のstagingだけにする。期限回収で生き返った
+  // 旧実行の途中書き込みは別の世代にあるので触らない(旧実行が後から書いても
+  // 主キーは衝突しない)。この世代に残骸があれば消してから書き直す。
+  await clearAnalyticsCrossStaging(db, runId, leaseGeneration);
   // 長時間の集計でも期限回収に誤って戻されないよう、重い工程の合間で生存確認する。
   const heartbeat = async (): Promise<void> => {
     await touchAnalyticsCrossRunLease(db, runId, leaseGeneration);
@@ -974,9 +1001,12 @@ export async function processAnalyticsCrossRun(
     for (let index = 0; index < evaluated.memberRows.length; index += 90) {
       await db.batch(evaluated.memberRows.slice(index, index + 90).map((member) => db.prepare(
         `INSERT INTO analytics_cross_run_members (
-           run_id, line_account_id, row_key, col_key, friend_id
-         ) VALUES (?, ?, ?, ?, ?)`,
-      ).bind(runId, row.line_account_id, member.rowKey, member.columnKey, member.friendId)));
+           run_id, line_account_id, lease_generation, row_key, col_key, friend_id
+         ) VALUES (?, ?, ?, ?, ?, ?)`,
+      ).bind(
+        runId, row.line_account_id, leaseGeneration,
+        member.rowKey, member.columnKey, member.friendId,
+      )));
       // 対象者が多い集計ほど書き込みが長引くため、10束ごとに生存確認する。
       if ((index / 90) % 10 === 0) await heartbeat();
     }
@@ -1003,10 +1033,17 @@ export async function processAnalyticsCrossRun(
     await completeAnalyticsCrossRun(db, runId, leaseGeneration, result);
     return result;
   } catch (error) {
-    await failAnalyticsCrossRun(
-      db, runId, leaseGeneration,
-      error instanceof Error ? error.message.slice(0, 160) : 'analytics_cross_failed',
-    );
+    try {
+      await failAnalyticsCrossRun(
+        db, runId, leaseGeneration,
+        error instanceof Error ? error.message.slice(0, 160) : 'analytics_cross_failed',
+      );
+    } catch (rejected) {
+      // 世代を奪われていた(期限回収→新実行が確定した)場合。勝った世代の結果と
+      // 対象者行には触れず、この実行が書いた自分の世代のstagingだけ片付ける。
+      await clearAnalyticsCrossStaging(db, runId, leaseGeneration);
+      throw rejected;
+    }
     throw error;
   }
 }
@@ -1148,10 +1185,17 @@ export async function createAnalyticsCrossAudience(
   if (!result.cells.some((cell) => cell.rowKey === rowKey && cell.columnKey === columnKey)) {
     throw new Error('analytics_cross_cell_not_found');
   }
+  // 対象者は確定した世代のstagingだけから作る。期限回収で生き返った旧実行が
+  // 同じrunへ書いた行(別の世代)は数にも中身にも入れない。移行前に完了していた
+  // runはresult_generationがNULLで、既存行の世代0と対応する。
+  const publishedGeneration = Number(run.result_generation ?? 0);
   const count = await db.prepare(
     `SELECT COUNT(*) AS count FROM analytics_cross_run_members
-      WHERE run_id = ? AND line_account_id = ? AND row_key = ? AND col_key = ?`,
-  ).bind(input.runId, input.lineAccountId, rowKey, columnKey).first<{ count: number }>();
+      WHERE run_id = ? AND line_account_id = ? AND lease_generation = ?
+        AND row_key = ? AND col_key = ?`,
+  ).bind(
+    input.runId, input.lineAccountId, publishedGeneration, rowKey, columnKey,
+  ).first<{ count: number }>();
   const id = crypto.randomUUID();
   const createdAt = input.now.toISOString();
   const expiresAt = new Date(input.now.getTime() + DAY_MS).toISOString();
@@ -1168,8 +1212,9 @@ export async function createAnalyticsCrossAudience(
     db.prepare(
       `INSERT INTO analytics_result_audience_members (audience_id, friend_id)
        SELECT ?, friend_id FROM analytics_cross_run_members
-        WHERE run_id = ? AND line_account_id = ? AND row_key = ? AND col_key = ?`,
-    ).bind(id, input.runId, input.lineAccountId, rowKey, columnKey),
+        WHERE run_id = ? AND line_account_id = ? AND lease_generation = ?
+          AND row_key = ? AND col_key = ?`,
+    ).bind(id, input.runId, input.lineAccountId, publishedGeneration, rowKey, columnKey),
   ]);
   return { id, memberCount: Number(count?.count ?? 0), expiresAt };
 }

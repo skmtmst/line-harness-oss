@@ -390,10 +390,11 @@ CREATE TABLE affiliates (
 CREATE TABLE analytics_cross_run_members (
   run_id           TEXT NOT NULL REFERENCES analytics_cross_runs(id) ON DELETE CASCADE,
   line_account_id  TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  lease_generation INTEGER NOT NULL DEFAULT 0,
   row_key          TEXT NOT NULL,
   col_key          TEXT NOT NULL,
   friend_id        TEXT NOT NULL REFERENCES friends(id) ON DELETE CASCADE,
-  PRIMARY KEY (run_id, row_key, col_key, friend_id)
+  PRIMARY KEY (run_id, lease_generation, row_key, col_key, friend_id)
 );
 
 CREATE TABLE analytics_cross_runs (
@@ -412,7 +413,7 @@ CREATE TABLE analytics_cross_runs (
   created_at        TEXT NOT NULL,
   started_at        TEXT,
   completed_at      TEXT
-, lease_generation INTEGER NOT NULL DEFAULT 0);
+, lease_generation INTEGER NOT NULL DEFAULT 0, result_generation INTEGER);
 
 CREATE TABLE analytics_daily_metrics (
   line_account_id  TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
@@ -5152,7 +5153,7 @@ CREATE INDEX idx_affiliates_tenant_account_created
   ON affiliates(tenant_id, line_account_id, created_at DESC);
 
 CREATE INDEX idx_analytics_cross_members_selection
-  ON analytics_cross_run_members(run_id, row_key, col_key, friend_id);
+  ON analytics_cross_run_members(run_id, lease_generation, row_key, col_key, friend_id);
 
 CREATE INDEX idx_analytics_cross_runs_account_time
   ON analytics_cross_runs(line_account_id, created_at DESC, id DESC);
