@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import {
   getAccountHealthLogs,
   getLatestRiskLevel,
+  getLatestRiskLevels,
   getAccountMigrations,
   getAccountMigrationById,
   createAccountMigration,
@@ -25,6 +26,31 @@ health.get('/health', (c) => c.json(LIVENESS_BODY));
 health.get('/api/health', (c) => c.json(LIVENESS_BODY));
 
 // ========== アカウントヘルス ==========
+
+// サイドバーの N+1 解消用。staff 可視範囲のアカウントだけを対象に、
+// 最新 riskLevel だけを1回で返す。ログ本文は含めない。
+health.get('/api/accounts/health-summary', async (c) => {
+  try {
+    const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+    const levels = await getLatestRiskLevels(c.env.DB, scope.allowedAccountIds);
+    const byId = new Map(levels.map((level) => [level.line_account_id, level.risk_level]));
+    const items = scope.allowedAccountIds.map((lineAccountId) => ({
+      lineAccountId,
+      riskLevel: byId.get(lineAccountId) ?? null,
+    }));
+    return c.json({
+      success: true,
+      data: {
+        items,
+        warningCount: items.filter((item) => item.riskLevel === 'warning').length,
+        dangerCount: items.filter((item) => item.riskLevel === 'danger').length,
+      },
+    });
+  } catch (err) {
+    console.error('GET /api/accounts/health-summary error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
 
 health.get('/api/accounts/:id/health', async (c) => {
   try {
