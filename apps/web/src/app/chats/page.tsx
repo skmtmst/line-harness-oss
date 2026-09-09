@@ -374,20 +374,40 @@ function isSafeFriendIdForInbox(value: string): boolean {
   return /^[A-Za-z0-9_-]+$/.test(value)
 }
 
+/**
+ * URLで会話を開けなかった理由ごとの案内文。
+ *
+ * どれも「別人を開かない」で揃える。理由を混ぜると、権限が無いのか
+ * 選んでいるアカウントが違うのかが読み手に伝わらない(#673)。
+ */
+const DEEP_LINK_NOTICE = {
+  /** IDの形が壊れている。口は呼ばない。 */
+  malformed: '指定の会話を開けませんでした。URLの指定が正しくありません。友だち詳細の「受信箱で開く」から開き直してください。',
+  /** 存在しない、または見る権限が無い。 */
+  unavailable: '指定の会話を開けませんでした。存在しないか、見る権限がありません。URLを確かめるか、友だち詳細の「受信箱で開く」から開き直してください。',
+  /** 見る権限はあるが、いま選んでいるアカウントの相手ではない。 */
+  otherAccount: '指定の会話は、いま選んでいるLINEアカウントの相手ではありません。返信の送信元が変わって別のアカウントから送ってしまうため、開きません。上のアカウント切替で相手のアカウントに変えてから開き直してください。',
+} as const
+
 function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   const router = useRouter()
   const params = useSearchParams()
-  const { selectedAccountId, selectedAccount } = useAccount()
+  const { selectedAccountId, selectedAccount, loading: accountsLoading } = useAccount()
   const [chats, setChats] = useState<Chat[]>([])
   /**
    * URLで指定された会話が開けなかったときの案内。
    *
-   * 不正・存在しない・別アカウントのIDでも別人を開かず、
-   * 空のまま理由と戻り先を出す(#673)。
+   * 不正・存在しない・別アカウント・選択中と違うアカウントのIDでも
+   * 別人を開かず、空のまま理由と戻り先を出す(#673)。
    */
   const [deepLinkNotice, setDeepLinkNotice] = useState('')
   /** URL由来で開こうとしているID。手選びと区別するための目印。 */
   const deepLinkIdRef = useRef<string | null>(null)
+  /**
+   * URL指定の解決の世代。遅い友だち照会が、新しいURLやアカウント切替で
+   * 始まった解決を上書きしないようにする(#673)。
+   */
+  const deepLinkRequestIdRef = useRef(0)
   /**
    * メールの問い合わせ。LINEのトークと同じ一覧に混ぜる。
    *
@@ -818,18 +838,14 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
         setError('会話を読み込めませんでした。時間を置いてもう一度お試しください。')
         // 存在しない・別アカウントのIDでも別人を開かず、案内を出す(#673)。
         // 口は存在の有無を404に倒すので、ここでは区別しない。
-        if (deepLinkIdRef.current === chatId) {
-          setDeepLinkNotice('指定の会話を開けませんでした。存在しないか、見る権限がありません。URLを確かめるか、友だち詳細の「受信箱で開く」から開き直してください。')
-        }
+        if (deepLinkIdRef.current === chatId) setDeepLinkNotice(DEEP_LINK_NOTICE.unavailable)
       }
     } catch {
       if (requestId !== detailRequestIdRef.current) return
       setChatDetail(null)
       setMessagesHasMore(false)
       setError('会話を読み込めませんでした。時間を置いてもう一度お試しください。')
-      if (deepLinkIdRef.current === chatId) {
-        setDeepLinkNotice('指定の会話を開けませんでした。存在しないか、見る権限がありません。URLを確かめるか、友だち詳細の「受信箱で開く」から開き直してください。')
-      }
+      if (deepLinkIdRef.current === chatId) setDeepLinkNotice(DEEP_LINK_NOTICE.unavailable)
     } finally {
       if (requestId === detailRequestIdRef.current) setDetailLoading(false)
     }
@@ -900,10 +916,18 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   // and shared URLs keep the target; reload works because the target lives
   // in the URL (#673). Manual selection never rewrites the URL, so a
   // state-only change never triggers this.
+  //
+  // 会話を開く前に、対象の友だちが「いま選んでいるLINEアカウント」の相手か
+  // を必ず確かめる。`GET /api/chats/:id` は見る権限だけを見ており、画面で
+  // 選んでいるアカウントは見ない(apps/worker の requireVisibleChat)。
+  // A社とB社の両方を見られる担当者がB選択中にA社の友だちのURLを開くと、
+  // 会話はA社なのに送信元の表示はB社になり、そのまま返信すると別アカウント
+  // から送ってしまう。だからここで選択中アカウントへ固定する(#673)。
   useEffect(() => {
     const threadId = (params.get('thread') ?? '').trim()
     const rawFriend = (params.get('friend') ?? params.get('friendId') ?? '').trim()
     if (threadId) {
+      deepLinkRequestIdRef.current += 1
       deepLinkIdRef.current = null
       setDeepLinkNotice('')
       setSelectedChatId(null)
@@ -913,20 +937,62 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     }
     // URLに対象が無いときは何もしない。手で選んだ会話を消さない。
     if (!rawFriend) return
+    const requestId = deepLinkRequestIdRef.current + 1
+    deepLinkRequestIdRef.current = requestId
     if (!isSafeFriendIdForInbox(rawFriend)) {
       // 不正なIDは口へ渡さず、別人も開かない。案内だけ出す。
       deepLinkIdRef.current = rawFriend
       setSelectedThreadId(null)
       setSelectedFriendId(null)
       setSelectedChatId(null)
-      setDeepLinkNotice('指定の会話を開けませんでした。URLの指定が正しくありません。友だち詳細の「受信箱で開く」から開き直してください。')
+      setDeepLinkNotice(DEEP_LINK_NOTICE.malformed)
       return
     }
+    // アカウント一覧が届くまでは判定できない。届いてから同じ効果が
+    // もう一度動くので、ここでは開かずに待つ。先に開くと、照合前の
+    // 会話が一瞬見えてしまう。
+    if (accountsLoading) return
+
     deepLinkIdRef.current = rawFriend
-    setDeepLinkNotice('')
     setSelectedThreadId(null)
-    setSelectedChatId(rawFriend)
-  }, [params])
+    setSelectedFriendId(null)
+    // 照合できるまでは会話を選ばない。ここで選ぶと `api.chats.get` が
+    // 走り、別アカウントの会話が表示されてしまう。
+    setSelectedChatId(null)
+    setDeepLinkNotice('')
+
+    let cancelled = false
+    void (async () => {
+      let friendAccountId: string | null = null
+      try {
+        const res = await api.friends.get(rawFriend)
+        if (!res.success) {
+          if (!cancelled && deepLinkRequestIdRef.current === requestId) {
+            setDeepLinkNotice(DEEP_LINK_NOTICE.unavailable)
+          }
+          return
+        }
+        // `lineAccountId` は `GET /api/friends/:id` の実応答にあるが、
+        // 共有の型にはまだ無い。ここだけで読む。
+        friendAccountId = (res.data as { lineAccountId?: string | null }).lineAccountId ?? null
+      } catch {
+        if (!cancelled && deepLinkRequestIdRef.current === requestId) {
+          setDeepLinkNotice(DEEP_LINK_NOTICE.unavailable)
+        }
+        return
+      }
+      if (cancelled || deepLinkRequestIdRef.current !== requestId) return
+      // アカウントを選んでいないときは送信元も出ないので、取り違えは
+      // 起きない。一覧も全アカウント分を出しているので、ここは通す。
+      if (selectedAccountId && friendAccountId !== selectedAccountId) {
+        setDeepLinkNotice(DEEP_LINK_NOTICE.otherAccount)
+        return
+      }
+      setDeepLinkNotice('')
+      setSelectedChatId(rawFriend)
+    })()
+    return () => { cancelled = true }
+  }, [params, selectedAccountId, accountsLoading])
 
   useEffect(() => {
     if (selectedChatId) {
@@ -1020,6 +1086,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   // 案内付きの空状態から一覧へ戻る。URLの指定も外す。
   // 外さないと再読込で同じ指定が復活する(#673)。
   const clearDeepLink = () => {
+    deepLinkRequestIdRef.current += 1
     deepLinkIdRef.current = null
     setDeepLinkNotice('')
     setSelectedChatId(null)
@@ -1029,6 +1096,9 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   const handleSelectChat = (chatId: string) => {
     // 手選びはURL指定を上書きする。古い案内とURL状態を残さない。
     // friend / thread を残すと、再読込で手選び前の会話へ戻る(#673)。
+    // 世代も進める。進めないと、走っている友だち照会が後から
+    // 手で選んだ会話を上書きする。
+    deepLinkRequestIdRef.current += 1
     deepLinkIdRef.current = null
     setDeepLinkNotice('')
     setSelectedChatId(chatId)
@@ -1687,6 +1757,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                         // LINEの選択を外す。両方開いていると中央に何を
                         // 出すのか決まらない。URL指定の案内とURL状態も外す。
                         // friend を残すと、再読込で古いLINE会話へ戻る(#673)。
+                        deepLinkRequestIdRef.current += 1
                         deepLinkIdRef.current = null
                         setDeepLinkNotice('')
                         setSelectedChatId(null)

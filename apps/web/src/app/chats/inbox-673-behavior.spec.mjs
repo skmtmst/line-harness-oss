@@ -7,6 +7,12 @@
  *
  * 静的出力したReact画面を本物のChromiumで描画し、routerのsearch paramsと
  * ブラウザ上のAPI応答を操作する。page.tsxの文字列は検査しない。
+ *
+ * 応答は apps/worker の本物のルートに合わせる。とくに `GET /api/chats/:id`
+ * は「見る権限」しか見ないので、別アカウントの相手でも 200 で返す。
+ * ここを固定の403にすると、画面が守っているアカウント境界を試験が
+ * 肩代わりしてしまい、何も証明できない。実ルートがそう振る舞うことは
+ * inbox-673-account-boundary.test.ts が本物のルートを載せて確かめている。
  */
 import { createReadStream, existsSync } from 'node:fs'
 import { createServer } from 'node:http'
@@ -26,6 +32,11 @@ const CONTENT_TYPES = {
   '.txt': 'text/plain; charset=utf-8',
   '.woff2': 'font/woff2',
 }
+
+/** 作業中に選んでいるLINEアカウント。 */
+const SELECTED_ACCOUNT = 'account-b'
+/** 同じ担当者が見られる、もう1つのLINEアカウント。 */
+const OTHER_ACCOUNT = 'account-a'
 
 let server
 let baseUrl
@@ -125,13 +136,33 @@ async function fulfillJson(route, body, status = 200) {
   await route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) })
 }
 
+function lineAccount(id, name, order) {
+  return {
+    id, channelId: `channel-${id}`, name, displayName: name,
+    isActive: true, country: 'JP', role: 'owner', displayOrder: order,
+  }
+}
+
+/**
+ * 受信箱の口を用意する。
+ *
+ * options:
+ *   selectedAccount  画面で選んでいるLINEアカウント。既定は SELECTED_ACCOUNT。
+ *   friendAccounts   友だちIDごとの所属アカウント。'missing' で404。
+ *                    未指定の友だちは選択中アカウントの相手として返す。
+ *   details          `GET /api/chats/:id` の返し方。
+ *   onChatDetail     `GET /api/chats/:id` を自分で捌く。
+ */
 async function prepareInbox(page, options = {}) {
   const detailCalls = []
+  const friendCalls = []
   const details = options.details ?? {}
-  await page.addInitScript(() => {
-    window.localStorage.setItem('lh_selected_account', 'visual-qa-account')
+  const friendAccounts = options.friendAccounts ?? {}
+  const selectedAccount = options.selectedAccount ?? SELECTED_ACCOUNT
+  await page.addInitScript((accountId) => {
+    window.localStorage.setItem('lh_selected_account', accountId)
     window.sessionStorage.setItem('lh_auth_selection_cleared', '1')
-  })
+  }, selectedAccount)
   await page.route('**/api/**', async (route) => {
     const request = route.request()
     const url = new URL(request.url())
@@ -145,10 +176,12 @@ async function prepareInbox(page, options = {}) {
       return
     }
     if (path === '/api/line-accounts') {
-      await fulfillJson(route, { success: true, data: [{
-        id: 'visual-qa-account', channelId: 'channel-1', name: '試験アカウント',
-        isActive: true, country: 'JP', role: 'owner', displayOrder: 1,
-      }] })
+      // 同じ担当者がA社とB社の両方を見られる。実ルートでも両方に権限が
+      // ある担当者は存在する（inbox-673-account-boundary.test.ts）。
+      await fulfillJson(route, { success: true, data: [
+        lineAccount(SELECTED_ACCOUNT, 'B社アカウント', 1),
+        lineAccount(OTHER_ACCOUNT, 'A社アカウント', 2),
+      ] })
       return
     }
     if (path === '/api/settings/features') {
@@ -222,10 +255,18 @@ async function prepareInbox(page, options = {}) {
     const friendMatch = path.match(/^\/api\/friends\/([^/]+)$/)
     if (friendMatch) {
       const id = decodeURIComponent(friendMatch[1])
+      friendCalls.push(id)
+      const configured = friendAccounts[id]
+      if (configured === 'missing') {
+        await fulfillJson(route, { success: false, error: 'Friend not found' }, 404)
+        return
+      }
       await fulfillJson(route, { success: true, data: {
         id, displayName: id, pictureUrl: null, isFollowing: true, metadata: {},
+        // 実ルート `GET /api/friends/:id` が返す所属アカウント。
+        lineAccountId: configured ?? selectedAccount,
         realName: null, systemDisplayName: null, refCode: null,
-        createdAt: '2026-09-01T00:00:00.000Z', tags: [], formSubmissions: [],
+        createdAt: '2026-09-01T00:00:00.000Z', tags: [], formSubmissions: [], support: null,
       } })
       return
     }
@@ -245,7 +286,7 @@ async function prepareInbox(page, options = {}) {
     }
     await fulfillJson(route, { success: true, data: [] })
   })
-  return { detailCalls }
+  return { detailCalls, friendCalls }
 }
 
 async function openFriend(page, friendId) {
@@ -254,6 +295,14 @@ async function openFriend(page, friendId) {
 
 function talkText(page, text) {
   return page.locator('[data-inbox-v4="talk-pane"]').getByText(text, { exact: true })
+}
+
+/** ブラウザから口を直に叩いて、応答の状態番号だけ取る。 */
+function apiStatus(page, path) {
+  return page.evaluate(async (target) => {
+    const response = await fetch(target, { credentials: 'include' })
+    return response.status
+  }, `${process.env.NEXT_PUBLIC_API_URL ?? 'http://127.0.0.1:8800'}${path}`)
 }
 
 test('正常なfriend URLで対象会話を選び、再読込でも維持する', async ({ page }) => {
@@ -287,16 +336,54 @@ test('戻る・進むでURLの対象会話を選び直す', async ({ page }) => 
   await expect(talkText(page, '二人目の会話')).toBeVisible()
 })
 
-for (const [label, status] of [['存在しない', 404], ['別アカウント', 403]]) {
-  test(`${label}friendでは別人を開かず案内を出す`, async ({ page }) => {
-    await prepareInbox(page, { details: { blocked: { status } } })
-    await openFriend(page, 'blocked')
-    await expect(talkText(page, '会話を開けませんでした')).toBeVisible()
-    await expect(page.getByRole('button', { name: '受信箱の一覧へ戻る' })).toBeVisible()
-    await expect(page.getByText('手動選択 次郎', { exact: true }).first()).toBeVisible()
-    await expect(page.getByText('手動選択 次郎の会話', { exact: true })).toHaveCount(0)
+test('存在しないfriendでは別人を開かず案内を出し、会話詳細も呼ばない', async ({ page }) => {
+  const { detailCalls } = await prepareInbox(page, { friendAccounts: { blocked: 'missing' } })
+  await openFriend(page, 'blocked')
+  await expect(talkText(page, '会話を開けませんでした')).toBeVisible()
+  await expect(page.getByRole('button', { name: '受信箱の一覧へ戻る' })).toBeVisible()
+  await expect(page.getByText('手動選択 次郎', { exact: true }).first()).toBeVisible()
+  await expect(page.getByText('手動選択 次郎の会話', { exact: true })).toHaveCount(0)
+  expect(detailCalls).not.toContain('blocked')
+})
+
+test('会話詳細が失敗しても別人を開かず案内を出す', async ({ page }) => {
+  await prepareInbox(page, { details: { broken: { status: 404 } } })
+  await openFriend(page, 'broken')
+  await expect(talkText(page, '会話を開けませんでした')).toBeVisible()
+  await expect(page.getByText('手動選択 次郎の会話', { exact: true })).toHaveCount(0)
+})
+
+test('選択中と違うアカウントの友だちは、口が200でも開かず案内を出す', async ({ page }) => {
+  const { detailCalls } = await prepareInbox(page, {
+    selectedAccount: SELECTED_ACCOUNT,
+    friendAccounts: { 'friend-a': OTHER_ACCOUNT },
+    details: { 'friend-a': { data: chatDetail('friend-a', 'A社 太郎', 'A社あての問い合わせ') } },
   })
-}
+  await openFriend(page, 'friend-a')
+
+  await expect(talkText(page, '会話を開けませんでした')).toBeVisible()
+  await expect(page.getByText('いま選んでいるLINEアカウントの相手ではありません')).toBeVisible()
+  // 別人の中身はどこにも出ない。
+  await expect(page.getByText('A社あての問い合わせ')).toHaveCount(0)
+  // 会話詳細そのものを呼んでいない。呼べば見えてしまう。
+  expect(detailCalls).not.toContain('friend-a')
+  // 送信欄も出さない。出ると送信元B社のまま返信できてしまう。
+  await expect(page.getByPlaceholder('メッセージを入力')).toHaveCount(0)
+
+  // 止めているのは画面。口は同じ要求に 200 を返す。
+  expect(await apiStatus(page, '/api/chats/friend-a')).toBe(200)
+})
+
+test('相手のアカウントに切り替えれば同じURLで開ける', async ({ page }) => {
+  const { detailCalls } = await prepareInbox(page, {
+    selectedAccount: OTHER_ACCOUNT,
+    friendAccounts: { 'friend-a': OTHER_ACCOUNT },
+    details: { 'friend-a': { data: chatDetail('friend-a', 'A社 太郎', 'A社あての問い合わせ') } },
+  })
+  await openFriend(page, 'friend-a')
+  await expect(talkText(page, 'A社あての問い合わせ')).toBeVisible()
+  expect(detailCalls).toContain('friend-a')
+})
 
 test('不正IDでは会話詳細APIを呼ばない', async ({ page }) => {
   const { detailCalls } = await prepareInbox(page)

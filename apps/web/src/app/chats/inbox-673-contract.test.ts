@@ -1,11 +1,17 @@
 /*
  * #673（点検 #617 N-033）の再発防止の契約テスト（受け側）。
  *
+ * これは**書き方の見張り**で、動きの証拠ではない。実際の動きは
+ *   - inbox-673-behavior.spec.mjs（Chromiumで描画して操作する）
+ *   - inbox-673-account-boundary.test.ts（apps/worker の本物のルート）
+ * が受け持つ。ここは、後から手を入れたときに約束の骨組みが黙って
+ * 消えていないかだけを見る。
+ *
  * 受信箱は `?friend=` を読むが、送り側が `?friendId=` で渡していた
  * ため対象が引き継がれなかった。受け側の約束をここで固定する。
  * 正常: URLの対象を選び、再読込・共有URL・戻るでも維持する。
  * 不正: 口へ渡さず別人も開かず、案内を出す。
- * 別物: 存在しない・別アカウントは別人を開かず、案内を出す。
+ * 別物: 存在しない・別アカウント・選択中と違うアカウントは別人を開かず案内。
  */
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -28,7 +34,7 @@ function region(source: string, start: string, end: string): string {
 }
 
 describe('#673-受け URLから対象者を読み、会話を選ぶ', () => {
-  const deepLink = region(PAGE, '// Deep-link from other pages.', '}, [params])')
+  const deepLink = region(PAGE, '// Deep-link from other pages.', '}, [params, selectedAccountId, accountsLoading])')
 
   it('`?friend=` を読み、旧い `?friendId=` の共有URLも受ける', () => {
     expect(deepLink).toContain("params.get('friend')")
@@ -39,7 +45,7 @@ describe('#673-受け URLから対象者を読み、会話を選ぶ', () => {
 
   it('URLの変化（戻る・進む）で選び直す。再読込はURLに残る対象で復元する', () => {
     // 依存配列は区間の終わり印に含まれるため、PAGE全体で見る。
-    expect(PAGE).toContain('}, [params])')
+    expect(PAGE).toContain('}, [params, selectedAccountId, accountsLoading])')
     expect(deepLink).toContain('setSelectedChatId(rawFriend)')
   })
 
@@ -49,7 +55,7 @@ describe('#673-受け URLから対象者を読み、会話を選ぶ', () => {
 })
 
 describe('#673-受け 不正IDは口へ渡さず別人も開かない', () => {
-  const deepLink = region(PAGE, '// Deep-link from other pages.', '}, [params])')
+  const deepLink = region(PAGE, '// Deep-link from other pages.', '}, [params, selectedAccountId, accountsLoading])')
 
   it('IDの形を見て、素のまま path へ入らない値を弾く', () => {
     expect(PAGE).toContain('function isSafeFriendIdForInbox(value: string): boolean')
@@ -97,5 +103,39 @@ describe('#673-受け 存在しない・別アカウントは案内の空状態�
     const manual = region(PAGE, 'const handleSelectChat = (chatId: string) => {', 'void api.chats.markRead')
     expect(manual).toContain('deepLinkIdRef.current = null')
     expect(manual).toContain("setDeepLinkNotice('')")
+  })
+})
+
+describe('#673-受け 選択中のLINEアカウントへ固定する', () => {
+  const deepLink = region(PAGE, '// Deep-link from other pages.', '}, [params, selectedAccountId, accountsLoading])')
+
+  it('会話を選ぶ前に、友だちの所属アカウントを口で確かめる', () => {
+    expect(deepLink).toContain('await api.friends.get(rawFriend)')
+    expect(deepLink).toContain('lineAccountId')
+  })
+
+  it('選択中と違うアカウントの相手は選ばず、専用の案内を出す', () => {
+    expect(deepLink).toContain('friendAccountId !== selectedAccountId')
+    expect(deepLink).toContain('DEEP_LINK_NOTICE.otherAccount')
+    expect(PAGE).toContain('いま選んでいるLINEアカウントの相手ではありません')
+  })
+
+  it('照合より先に会話を選ばない', () => {
+    // 照合前に選ぶと `api.chats.get` が走り、別アカウントの会話が出る。
+    const verdict = deepLink.indexOf('friendAccountId !== selectedAccountId')
+    const select = deepLink.indexOf('setSelectedChatId(rawFriend)')
+    expect(verdict).toBeGreaterThan(-1)
+    expect(select).toBeGreaterThan(verdict)
+  })
+
+  it('アカウントの切替と一覧の読み込み待ちでやり直す', () => {
+    expect(deepLink).toContain('if (accountsLoading) return')
+    expect(PAGE).toContain('}, [params, selectedAccountId, accountsLoading])')
+  })
+
+  it('遅い照会が新しい選択を上書きしない', () => {
+    expect(deepLink).toContain('deepLinkRequestIdRef.current !== requestId')
+    const manual = region(PAGE, 'const handleSelectChat = (chatId: string) => {', 'void api.chats.markRead')
+    expect(manual).toContain('deepLinkRequestIdRef.current += 1')
   })
 })
