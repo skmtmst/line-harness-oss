@@ -25,6 +25,27 @@ const W_CODE = 'w-[320px] max-w-full'
 const W_EMAIL = 'w-[340px] max-w-full'
 const W_RATE = 'w-[200px] max-w-full tabular-nums'
 const W_HOLD = 'w-[220px] max-w-full tabular-nums'
+const FRIEND_PAGE_SIZE = 20
+const AFFILIATE_LIST_PATH = '/conversions?tab=affiliates'
+
+function friendSearchParams(search: string, page: number) {
+  return {
+    limit: FRIEND_PAGE_SIZE,
+    offset: String((Math.max(1, page) - 1) * FRIEND_PAGE_SIZE),
+    search: search.trim() || undefined,
+    includeTags: false,
+  }
+}
+
+function commissionRateError(payoutKind: PayoutKind, value: string): string | null {
+  if (payoutKind !== 'rate') return null
+  if (!value.trim()) return '売上に対する割合を入力してください'
+  const rate = Number(value)
+  if (!Number.isFinite(rate) || rate < 0 || rate > 100) {
+    return '売上に対する割合は0から100の間で入力してください'
+  }
+  return null
+}
 
 /**
  * 決められない項目の出し方。
@@ -73,38 +94,57 @@ export default function NewAffiliatePage() {
   const [startTracking, setStartTracking] = useState(true)
   const [friends, setFriends] = useState<Friend[]>([])
   const [friendId, setFriendId] = useState('')
+  const [selectedFriend, setSelectedFriend] = useState<Friend | null>(null)
+  const [friendSearchInput, setFriendSearchInput] = useState('')
+  const [friendSearch, setFriendSearch] = useState('')
+  const [friendPage, setFriendPage] = useState(1)
+  const [friendTotal, setFriendTotal] = useState(0)
+  const [friendLoading, setFriendLoading] = useState(true)
+  const [friendError, setFriendError] = useState('')
+  const [friendReload, setFriendReload] = useState(0)
   const [copied, setCopied] = useState(false)
   // 作成後の追加情報保存だけが失敗した場合、再押下で同じ紹介者を増やさず
   // 追加情報の保存だけをやり直す。
   const [createdId, setCreatedId] = useState<string | null>(null)
+  const [partialSave, setPartialSave] = useState(false)
 
   useEffect(() => {
     let cancelled = false
-    void Promise.allSettled([
-      api.friends.list({ limit: 20, includeTags: false }),
-    ]).then(([friendResult]) => {
+    setFriendLoading(true)
+    setFriendError('')
+    void api.friends.list(friendSearchParams(friendSearch, friendPage)).then((result) => {
       if (cancelled) return
-      if (friendResult.status === 'fulfilled' && friendResult.value.success) {
-        setFriends(friendResult.value.data.items as unknown as Friend[])
-      }
+      if (!result.success) throw new Error('friends_failed')
+      setFriends(result.data.items as unknown as Friend[])
+      setFriendTotal(result.data.total)
+    }).catch(() => {
+      if (cancelled) return
+      setFriends([])
+      setFriendTotal(0)
+      setFriendError('友だちを読み込めませんでした。条件を変えるか、もう一度お試しください。')
+    }).finally(() => {
+      if (!cancelled) setFriendLoading(false)
     })
-      .catch(() => {
-        // アカウントが引けなくても、登録はできる。
-      })
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [friendPage, friendReload, friendSearch])
 
   const workerBase = process.env.NEXT_PUBLIC_API_URL ?? ''
   const previewUrl = code.trim() ? `${workerBase}/r/${code.trim()}` : null
+  const friendPageCount = Math.max(1, Math.ceil(friendTotal / FRIEND_PAGE_SIZE))
+  const friendOptions = selectedFriend && !friends.some((friend) => friend.id === selectedFriend.id)
+    ? [selectedFriend, ...friends]
+    : friends
 
   return (
     <CreatePage
       title="アフィリエイターを登録する"
       description="紹介してくれる方に専用のリンクを渡し、成果と報酬を記録します。"
-      parent={['成果とアフィリエイト', '/conversions?tab=affiliates']}
-      saveLabel="登録して、紹介リンクを発行する"
+      parent={['成果とアフィリエイト', AFFILIATE_LIST_PATH]}
+      successHref={(id) => `${AFFILIATE_LIST_PATH}&highlight=${encodeURIComponent(String(id))}`}
+      saveLabel={partialSave ? '追加情報の保存を再開する' : '登録して、紹介リンクを発行する'}
+      statusLabel={partialSave ? '基本情報は保存済み・追加情報は未保存' : undefined}
       variant="v6"
       designNode="xqT1Z"
       validate={() => {
@@ -113,15 +153,8 @@ export default function NewAffiliatePage() {
         if (code.trim() && !/^[A-Za-z0-9]{4,}$/.test(code.trim())) {
           return '紹介コードは英数字4文字以上で入力してください'
         }
-        if (payoutKind === 'rate' && !commissionRate.trim()) {
-          return '売上に対する割合を入力してください'
-        }
-        if (payoutKind === 'rate') {
-          const rate = Number(commissionRate)
-          if (!Number.isFinite(rate) || rate <= 0 || rate > 100) {
-            return '売上に対する割合は0から100の間で入力してください'
-          }
-        }
+        const rateError = commissionRateError(payoutKind, commissionRate)
+        if (rateError) return rateError
         if (holdDays.trim()) {
           const days = Number(holdDays)
           if (!Number.isInteger(days) || days < 0 || days > 365) {
@@ -139,10 +172,12 @@ export default function NewAffiliatePage() {
         setHoldDays('30')
         setPayoutCycle('')
         setFriendId('')
+        setSelectedFriend(null)
         setNotifyOnConversion(true)
         setStartTracking(true)
         setCopied(false)
         setCreatedId(null)
+        setPartialSave(false)
       }}
       onSave={async () => {
         let affiliateId = createdId
@@ -175,8 +210,10 @@ export default function NewAffiliatePage() {
           })
           if (!update.success) throw new Error('update_failed')
         } catch {
+          setPartialSave(true)
           throw new Error('基本情報は登録済みですが、追加情報を保存できませんでした。もう一度押すと、追加情報だけを保存します。')
         }
+        setPartialSave(false)
         return affiliateId
       }}
       aside={
@@ -214,6 +251,20 @@ export default function NewAffiliatePage() {
       }
     >
       <FormSection step={1} label="だれを登録するか">
+        {partialSave && createdId ? (
+          <div role="alert" className="border-warning bg-warning-bg rounded-control border px-3 py-2 text-sm">
+            <p className="text-ink font-semibold">基本情報は保存済みです</p>
+            <p className="text-ink-secondary mt-1">
+              下の「追加情報の保存を再開する」で続けるか、未保存の追加情報を破棄して一覧へ戻れます。
+            </p>
+            <a
+              href={`${AFFILIATE_LIST_PATH}&highlight=${encodeURIComponent(createdId)}`}
+              className="text-danger mt-2 inline-block font-semibold underline"
+            >
+              未保存の追加情報を破棄して一覧へ戻る
+            </a>
+          </div>
+        ) : null}
         <div className="grid gap-3 lg:grid-cols-3">
         <Field label="名前・屋号" htmlFor="af-name" required>
           <TextInput
@@ -253,18 +304,77 @@ export default function NewAffiliatePage() {
         </Field>
         </div>
 
-        <Field label="LINEの友だちと結びつける（任意）" htmlFor="af-friend" note="結びつけると、成果が出たときに本人へ知らせられます。">
+        <Field label="LINEの友だちと結びつける（任意）" htmlFor="af-friend" note="名前で絞り込み、20件ずつ確認できます。結びつけると、成果が出たときに本人へ知らせられます。">
+          <form
+            className="mb-2 flex max-w-lg flex-wrap gap-2"
+            onSubmit={(event) => {
+              event.preventDefault()
+              setFriendPage(1)
+              setFriendSearch(friendSearchInput.trim())
+              setFriendReload((value) => value + 1)
+            }}
+          >
+            <TextInput
+              aria-label="友だちの名前で検索"
+              value={friendSearchInput}
+              onChange={(event) => setFriendSearchInput(event.target.value)}
+              placeholder="友だちの名前で探す"
+              className="min-w-56 flex-1"
+            />
+            <button
+              type="submit"
+              className="text-accent hover:bg-accent-soft rounded-control px-4 py-2 text-sm font-semibold"
+            >
+              検索
+            </button>
+          </form>
           <SelectField
             id="af-friend"
             aria-label="LINEの友だちと結びつける"
             value={friendId}
-            onChange={(event) => setFriendId(event.target.value)}
+            onChange={(event) => {
+              const nextId = event.target.value
+              setFriendId(nextId)
+              setSelectedFriend(friendOptions.find((friend) => friend.id === nextId) ?? null)
+            }}
             className="w-full max-w-lg"
             options={[
-              { value: '', label: '友だちの名前で探す' },
-              ...friends.map((friend) => ({ value: friend.id, label: friend.displayName })),
+              { value: '', label: friendLoading ? '読み込んでいます' : '結びつけない' },
+              ...friendOptions.map((friend) => ({ value: friend.id, label: friend.displayName })),
             ]}
           />
+          {friendError ? (
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
+              <p className="text-danger">{friendError}</p>
+              <button
+                type="button"
+                onClick={() => setFriendReload((value) => value + 1)}
+                className="text-accent hover:bg-accent-soft rounded-control px-3 py-1 font-semibold"
+              >
+                もう一度読み込む
+              </button>
+            </div>
+          ) : (
+            <div className="mt-2 flex max-w-lg flex-wrap items-center justify-between gap-2">
+              <p className="text-ink-faint text-xs tabular-nums">
+                {friendLoading ? '友だちを読み込んでいます' : `全${friendTotal.toLocaleString('ja-JP')}件`}
+              </p>
+              {friendPageCount > 1 ? (
+                <SelectField
+                  id="af-friend-page"
+                  aria-label="友だち候補のページ"
+                  value={String(friendPage)}
+                  onChange={(event) => setFriendPage(Number(event.target.value))}
+                  disabled={friendLoading}
+                  className="w-40"
+                  options={Array.from({ length: friendPageCount }, (_, index) => ({
+                    value: String(index + 1),
+                    label: `${index + 1} / ${friendPageCount}ページ`,
+                  }))}
+                />
+              ) : null}
+            </div>
+          )}
         </Field>
       </FormSection>
 

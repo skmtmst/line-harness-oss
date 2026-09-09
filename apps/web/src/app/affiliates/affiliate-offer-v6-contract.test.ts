@@ -220,7 +220,8 @@ describe('V6 アフィリエイターを追加する（xqT1Z）', () => {
     for (const label of ['1件あたりの上限', '振込先の登録', '成果時の動き']) {
       expect(NEW_PAGE).toContain(`label="${label}"`)
     }
-    expect(NEW_PAGE).toContain('api.friends.list({ limit: 20, includeTags: false })')
+    expect(NEW_PAGE).toContain('api.friends.list(friendSearchParams(friendSearch, friendPage))')
+    expect(NEW_PAGE).toContain('aria-label="友だち候補のページ"')
     expect(NEW_PAGE).toContain('friendId: friendId || undefined')
     // 押せない入力欄を残していない。
     expect(NEW_PAGE).not.toMatch(/<TextInput\s+disabled/)
@@ -246,7 +247,8 @@ describe('V6 アフィリエイターを追加する（xqT1Z）', () => {
   })
 
   it('割合と保留期間をWorkerが受ける範囲で止める', () => {
-    expect(NEW_PAGE).toContain('rate <= 0 || rate > 100')
+    expect(NEW_PAGE).toContain('rate < 0 || rate > 100')
+    expect(NEW_PAGE).not.toContain('rate <= 0')
     expect(NEW_PAGE).toContain('!Number.isInteger(days) || days < 0 || days > 365')
   })
 

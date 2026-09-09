@@ -11,6 +11,21 @@ import CreatePage, {
   inputClass,
 } from '@/components/shared/create-page'
 
+const OFFER_LIST_PATH = '/conversions?tab=offers'
+
+function rewardIntegerError(value: string, kind: 'amount' | 'miles'): string | null {
+  if (!value.trim()) return null
+  const reward = Number(value)
+  const label = kind === 'amount' ? '報酬額' : '報酬マイル'
+  if (!Number.isFinite(reward) || reward < 0) return `${label}は0以上で入力してください`
+  if (!Number.isInteger(reward)) {
+    return kind === 'amount'
+      ? '報酬額は小数ではなく、1円単位の整数で入力してください'
+      : '報酬マイルは小数ではなく、整数で入力してください'
+  }
+  return null
+}
+
 /**
  * 案件を作る（設計 V6 `GPWzq`）。
  *
@@ -38,6 +53,7 @@ export default function NewAffiliateOfferPage() {
   const [scenarioId, setScenarioId] = useState('')
   const [publishNow, setPublishNow] = useState(true)
   const [createdId, setCreatedId] = useState<string | null>(null)
+  const [partialSave, setPartialSave] = useState(false)
   const [tags, setTags] = useState<Tag[]>([])
   const [scenarios, setScenarios] = useState<Scenario[]>([])
   const [accounts, setAccounts] = useState<LineAccount[]>([])
@@ -72,8 +88,10 @@ export default function NewAffiliateOfferPage() {
     <CreatePage
       title="案件を作る"
       description="何を成果として数え、いくら払うかを決めます。"
-      parent={['案件', '/conversions?tab=offers']}
-      saveLabel={publishNow ? '公開する' : '下書きに保存'}
+      parent={['案件', OFFER_LIST_PATH]}
+      successHref={(id) => `${OFFER_LIST_PATH}&highlight=${encodeURIComponent(String(id))}`}
+      saveLabel={partialSave ? '下書きへの変更を再開する' : publishNow ? '公開する' : '下書きに保存'}
+      statusLabel={partialSave ? '案件は公開済み・下書きへの変更は未完了' : undefined}
       variant="v6"
       designNode="GPWzq"
       validate={() => {
@@ -82,12 +100,10 @@ export default function NewAffiliateOfferPage() {
         // 選べる先が複数あるときは、押す前に選ばせる（#505 重大1）。
         if (!lineAccountId && accounts.length > 1) return 'LINEアカウントを選んでください'
         if (!rewardAmount && !rewardMiles) return '報酬（円かマイル）のどちらかを入れてください'
-        if (rewardAmount && (!Number.isFinite(Number(rewardAmount)) || Number(rewardAmount) < 0)) {
-          return '報酬額は0円以上で入力してください'
-        }
-        if (rewardMiles && (!Number.isFinite(Number(rewardMiles)) || Number(rewardMiles) < 0)) {
-          return '報酬マイルは0以上で入力してください'
-        }
+        const amountError = rewardIntegerError(rewardAmount, 'amount')
+        if (amountError) return amountError
+        const milesError = rewardIntegerError(rewardMiles, 'miles')
+        if (milesError) return milesError
         return null
       }}
       onReset={() => {
@@ -100,6 +116,7 @@ export default function NewAffiliateOfferPage() {
         setScenarioId('')
         setPublishNow(true)
         setCreatedId(null)
+        setPartialSave(false)
       }}
       onSave={async () => {
         let offerId = createdId
@@ -120,11 +137,15 @@ export default function NewAffiliateOfferPage() {
         // 作成は必ず公開中で入る（DB の INSERT が is_active=1 固定）。
         // 下書きにしたいときだけ、続けて閉じる。
         if (!publishNow) {
-          const update = await api.affiliateOffers.update(offerId, { isActive: false })
-          if (!update.success) {
+          try {
+            const update = await api.affiliateOffers.update(offerId, { isActive: false })
+            if (!update.success) throw new Error('update_failed')
+          } catch {
+            setPartialSave(true)
             throw new Error('案件は作成済みですが、下書きにできませんでした。もう一度押すと下書きへの変更だけをやり直します。')
           }
         }
+        setPartialSave(false)
         return offerId
       }}
       aside={
@@ -177,6 +198,20 @@ export default function NewAffiliateOfferPage() {
       }
     >
       <FormSection step={1} label="どんな案件か">
+        {partialSave && createdId ? (
+          <div role="alert" className="border-warning bg-warning-bg rounded-control border px-3 py-2 text-sm">
+            <p className="text-ink font-semibold">案件は公開済みです</p>
+            <p className="text-ink-secondary mt-1">
+              下の「下書きへの変更を再開する」で続けるか、変更を破棄して公開のまま一覧へ戻れます。
+            </p>
+            <a
+              href={`${OFFER_LIST_PATH}&highlight=${encodeURIComponent(createdId)}`}
+              className="text-danger mt-2 inline-block font-semibold underline"
+            >
+              下書きへの変更を破棄し、公開のまま一覧へ戻る
+            </a>
+          </div>
+        ) : null}
         <div className="grid gap-3 lg:grid-cols-2">
         <Field label="案件名" htmlFor="of-name" required>
           <input
@@ -227,6 +262,7 @@ export default function NewAffiliateOfferPage() {
               id="of-amount"
               type="number"
               min={0}
+              step={1}
               value={rewardAmount}
               onChange={(e) => setRewardAmount(e.target.value)}
               placeholder="1000"
@@ -238,6 +274,7 @@ export default function NewAffiliateOfferPage() {
               id="of-miles"
               type="number"
               min={0}
+              step={1}
               value={rewardMiles}
               onChange={(e) => setRewardMiles(e.target.value)}
               placeholder="200"
