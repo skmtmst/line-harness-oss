@@ -261,7 +261,7 @@ notifications.post('/api/notifications/operator-events', requireRole('owner', 'a
   }
 });
 
-notifications.get('/api/notifications/operator-event-types', requireRole('owner', 'admin', 'staff'), async (c) => {
+notifications.get('/api/notifications/operator-event-types', requireRole('owner', 'admin'), async (c) => {
   try {
     const lineAccountId = c.req.query('lineAccountId')?.trim();
     if (!lineAccountId) return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
