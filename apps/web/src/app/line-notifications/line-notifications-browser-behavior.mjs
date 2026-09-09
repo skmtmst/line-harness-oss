@@ -18,11 +18,17 @@
  * accountを描画の境界で同期反映する ref（selectedAccountRef）を作り、
  * guard がそれも見るようにした（page.tsx の isStale）。
  *
- * この道理そのものは page.tsx 内の純粋関数レベルで確定的に固定できる
- * （line-notifications-n678-contract.test.tsx の「Bを選んだ直後・Bのload
- * 未発火でも…」テスト。generation はまだ古いまま・currentAccountId だけ
- * 動かした guard を直接組み立てて確認しており、account の照合を外す
- * 逆変異で確実に落ちる）。
+ * account照合の必要性そのものは、実物の LineNotificationsPage を
+ * mountした試験（line-notifications-n678-contract.test.tsx の「実物の
+ * LineNotificationsPageをmountし、layout境界（Bへコミット直後・load()の
+ * useEffect発火前）で…」）で確定的に固定している。account context の
+ * 切替を act() を経由しない生の setState として起こし、同じ木に置いた
+ * useLayoutEffect の探針で「Bへコミットした・load()の useEffect はまだ
+ * 一度も発火していない」瞬間を検出して、そこで旧Aの保存応答を解放する。
+ * レイアウトeffectは同じコミット内の受動effectより必ず先に走るという
+ * Reactの保証に基づくため、タイミングの偶然に頼っていない。
+ * account照合を外す逆変異でこの試験は確実に落ちる（Aの下書きが
+ * 元の内容へ巻き戻ることを確認済み）。
  *
  * 一方、ここ（実ブラウザ）では、この画面の実際の挙動として
  * loadGeneration の更新がアカウント切替の描画と「事実上ほぼ同時」に
@@ -33,7 +39,6 @@
  * 状態を実物のブラウザで再現し、その状態でもAの控えが守られることを
  * 確かめるものであり、account照合だけを外す逆変異を単体でこの試験だけに
  * かけても、この試験は落ちない（generationの照合が既に十分なため）。
- * account照合の必要性そのものは、上記の純粋関数の試験が担う。
  *
  * apps/web/src/app/automations/automation-browser-behavior.mjs と同じ作りにしている。
  */
@@ -402,8 +407,9 @@ try {
 
     await page.getByLabel('LINEアカウント').selectOption('account-b')
     // Bへ切り替わった描画（アカウント選択欄）は済んでいるが、
-    // 一覧はまだ「読み込み中」——ここが指摘された窓。
-    await page.waitForSelector('[data-list-state="loading"]', { timeout: 15_000 }).catch(() => {})
+    // 一覧はまだ「読み込み中」——ここが指摘された窓。見つからなければ
+    // 窓を通せていないということなので、握り潰さず試験自体を落とす。
+    await page.waitForSelector('[data-list-state="loading"]', { timeout: 15_000 })
     await page.waitForTimeout(150)
 
     // まさにこの窓のうちに、古いAの応答を返す。

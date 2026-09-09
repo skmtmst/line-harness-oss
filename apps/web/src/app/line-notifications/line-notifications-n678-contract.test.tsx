@@ -17,6 +17,7 @@ import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen, within, fireEvent, waitFor, cleanup } from '@testing-library/react'
+import { act } from 'react'
 
 const fixture = vi.hoisted(() => ({
   selectedAccountId: 'account-a' as string | null,
@@ -39,8 +40,29 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
 }))
 
+/*
+ * account切替を「実物のReact再レンダー」として起こすための、購読可能な口。
+ * `commitAccountSwitch` は React のイベント・act() を経由しない生の
+ * setState呼び出しで、レンダー（layout境界）と受動effect（load()の発火）を
+ * 別のタスクへ切り離す——本番のブラウザで account切替の描画コミットと
+ * load() の useEffect 発火が別々に起きるのと同じ非同期境界を保つ。
+ */
+const accountSetters = new Set<(id: string | null) => void>()
+function useControllableAccount(): string | null {
+  const [id, setId] = React.useState(fixture.selectedAccountId)
+  React.useEffect(() => {
+    accountSetters.add(setId)
+    return () => { accountSetters.delete(setId) }
+  }, [])
+  return id
+}
+function commitAccountSwitch(id: string | null): void {
+  fixture.selectedAccountId = id
+  accountSetters.forEach((setId) => setId(id))
+}
+
 vi.mock('@/contexts/account-context', () => ({
-  useAccount: () => ({ selectedAccountId: fixture.selectedAccountId }),
+  useAccount: () => ({ selectedAccountId: useControllableAccount() }),
 }))
 
 vi.mock('@/components/layout/merged-tabs', () => ({
@@ -527,34 +549,113 @@ describe('#678 Bを選んだ直後・Bのload未発火でも、旧Aの応答か�
     expect(outcome).toEqual({ kind: 'stale', contentSaved: true, settleDraft: false })
   })
 
-  it('実React描画: Aの下書きと未保存の印は、Bへ移った直後の旧A応答では書き換わらない', async () => {
-    const sent = setting({ introText: 'Aで保存を押した時点の本文' })
-    const editor = editorState(sent, 'account-a')
-    const slowSave = deferred<{ success: boolean; data: LineNotificationDefinition }>()
-    fixture.updateDraft.mockReturnValue(slowSave.promise)
+  /*
+   * 司令塔の独立再審査REJECT（2026-09-09、2回目）。
+   *
+   * 直前の版は、helper（saveCustomerNotification）の戻り値を、別の
+   * CustomerNotificationEditor の静的markupへ手で渡していただけで、
+   * 実物の LineNotificationsPage は一度もmountしていなかった——
+   * 「回帰証拠が不足」というご指摘はそのとおりだった。
+   *
+   * ここでは実物の LineNotificationsPage をmountし、account context を
+   * 実物のReact再レンダーとしてA→Bへ動かす。`commitAccountSwitch` は
+   * act()・React由来イベントを経由しない生のsetState呼び出しで、
+   * レンダー（layout境界）と load() の受動effect（useEffect）の発火を
+   * 別のタスクへ切り離す。同じ木に置いた層効果（useLayoutEffect）の探針が
+   * 「Bへコミットした」瞬間を検出し、そこ——load()のuseEffectがまだ
+   * 一度も発火していない・loadGenerationが据え置きのままの
+   * layout境界——で旧Aの保存応答を解放する。
+   */
+  it('実物のLineNotificationsPageをmountし、layout境界（Bへコミット直後・load()のuseEffect発火前）で旧Aの応答を返しても、Aの控え・dirtyは保持されBへ漏れない', async () => {
+    fixture.settings.mockImplementation((accountId: string) => Promise.resolve({
+      success: true,
+      data: [setting({
+        title: accountId === 'account-b' ? 'B店の注文受付' : 'A店の注文受付',
+        introText: accountId === 'account-b' ? 'B店の本文' : 'A店の本文',
+      })],
+    }))
+    fixture.overview.mockResolvedValue({ success: true, data: { last24h: 0, failed: 0, byType: [] } })
+    fixture.operatorList.mockResolvedValue({ success: true, data: { summary: { total: 0 } } })
+    fixture.definitions.mockResolvedValue({ success: true, data: [] })
+    fixture.metrics.mockResolvedValue({ success: true, data: { items: [] } })
 
-    const guard = editor.guard(sent)
-    const running = saveCustomerNotification({
-      api: mutationApi(),
-      accountId: 'account-a',
-      setting: sent,
-      definition: definition(),
-      enabled: true,
-      guard,
+    let releaseA: (value: { success: boolean }) => void = () => {
+      throw new Error('releaseA が呼ばれる前に保存応答を解放しようとした')
+    }
+    const heldA = new Promise<{ success: boolean }>((resolve) => { releaseA = resolve })
+    fixture.updateSetting.mockReturnValue(heldA)
+
+    let committedToB = false
+    let releaseLayoutCommitted: () => void = () => {}
+    const layoutCommitted = new Promise<void>((resolve) => { releaseLayoutCommitted = resolve })
+
+    function LayoutBoundaryProbe() {
+      const account = useControllableAccount()
+      const seen = React.useRef<string | null>(null)
+      React.useLayoutEffect(() => {
+        if (seen.current === account || account !== 'account-b') return
+        seen.current = account
+        committedToB = true
+        // ここが本題。layout effect は「同じコミット内の受動effect（load()の
+        // useEffect）より必ず先に」実行される——React が保証する順序であり、
+        // タイミングの偶然に頼っていない。
+        releaseA({ success: true })
+        releaseLayoutCommitted()
+      }, [account])
+      return null
+    }
+
+    render(<>
+      <LayoutBoundaryProbe />
+      <LineNotificationsPage />
+    </>)
+    await waitFor(() => expect(screen.getByText('A店の注文受付')).toBeTruthy())
+
+    fireEvent.click(screen.getByRole('button', { name: '内容を編集' }))
+    const introBox = await screen.findByLabelText('ご案内文') as HTMLTextAreaElement
+    fireEvent.change(introBox, { target: { value: 'Aで保存を押した時点の本文' } })
+    await waitFor(() => expect(screen.getByText('未保存の変更があります')).toBeTruthy())
+
+    fireEvent.click(screen.getByRole('button', { name: 'お知らせを保存' }))
+    expect(committedToB).toBe(false)
+
+    // act() を経由しない生の setState。レンダーと load() の受動effectが
+    // 別タスクへ分かれることを、この境界試験そのものが要求している。
+    commitAccountSwitch('account-b')
+
+    await layoutCommitted
+    expect(committedToB).toBe(true)
+
+    // load()（受動effect）はこの時点でまだ一度も発火していない。
+    // レイアウトeffectは同じコミット内の受動effectより必ず先に走るという
+    // Reactの保証により、ここでは待ち合わせではなく確定した事実として言える。
+    expect(fixture.operatorList).not.toHaveBeenCalledWith('account-b')
+    expect(fixture.settings).not.toHaveBeenCalledWith('account-b')
+
+    // まさにこの窓――load()のuseEffectがまだ発火していない――のうちに
+    // 解放された旧Aの応答では、Aの控えは消えていない。
+    const stored = window.localStorage.getItem(customerDraftKey('account-a', 'order.confirmed'))
+    expect(stored).not.toBeNull()
+    expect(JSON.parse(stored!).introText).toBe('Aで保存を押した時点の本文')
+
+    // 残りは普通に進める。Bが正しく読み込まれ、Aの内容がBへ漏れていないことも確かめる。
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)) })
+    await waitFor(() => {
+      const box = screen.getByLabelText('ご案内文') as HTMLTextAreaElement
+      expect(box.value).toBe('B店の本文')
     })
-    editor.moveRenderToAccountBeforeReload('account-b')
-    slowSave.resolve({ success: true, data: definition({ version: 5 }) })
-    const outcome = await running
+    expect((screen.getByLabelText('ご案内文') as HTMLTextAreaElement).value).not.toBe('Aで保存を押した時点の本文')
 
-    // applyOutcome の判断材料である settleDraft が false のときに、
-    // 画面側が実際に描くのは「未保存のまま」。実物のReactでそれを確かめる。
-    const html = renderToStaticMarkup(<CustomerNotificationEditor
-      {...editorFixture}
-      setting={sent}
-      hasUnsaved={!outcome.settleDraft}
-    />)
-    expect(html).toContain('Aで保存を押した時点の本文')
-    expect(html).toContain('未保存の変更があります')
+    // Aへ戻ると、消されなかった控えが復元され、未保存の印も戻る。
+    commitAccountSwitch('account-a')
+    await waitFor(() => {
+      const box = screen.getByLabelText('ご案内文') as HTMLTextAreaElement
+      expect(box.value).toBe('Aで保存を押した時点の本文')
+    })
+    expect(
+      screen.queryByText('未保存の変更があります') !== null
+        || screen.queryByText(/未保存の編集を.*件復元しました/) !== null,
+    ).toBe(true)
   })
 })
 
