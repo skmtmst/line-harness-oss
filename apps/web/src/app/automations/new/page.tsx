@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import type { Automation } from '@line-crm/shared'
-import { api, ApiError, type AutomationDraftDetail } from '@/lib/api'
+import { api, ApiError, type AutomationDraftAction, type AutomationDraftDetail } from '@/lib/api'
 import Breadcrumb from '@/components/shared/breadcrumb'
 import StickyBar from '@/components/shared/sticky-bar'
 import { TextArea, TextField } from '@/components/shared/text-field'
@@ -112,15 +112,9 @@ const newActionDraft = (): ActionDraft => ({
  */
 const DRAFT_STORAGE_KEY = 'lh-automation-new-draft-v1'
 
-interface SavedActionPreview {
-  contents: string[]
-  effects: string[]
-}
-
 interface StoredDraft {
   id: string
   draftVersionId: string
-  preview?: SavedActionPreview
 }
 
 type StoredDrafts = Record<string, StoredDraft>
@@ -178,6 +172,62 @@ const clearStoredDraft = (accountId: string): void => {
   }
 }
 
+/**
+ * 中身をそのまま表す文字列（N-358）。
+ *
+ * 鍵の並び順を固定するので、**同じ中身なら必ず同じ文字列**になる。
+ */
+const canonicalJson = (value: unknown): string => {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`
+  if (value && typeof value === 'object') {
+    return `{${Object.entries(value as Record<string, unknown>)
+      .filter(([, item]) => item !== undefined)
+      .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
+      .map(([key, item]) => `${JSON.stringify(key)}:${canonicalJson(item)}`)
+      .join(',')}}`
+  }
+  return JSON.stringify(value === undefined ? null : value)
+}
+
+/**
+ * 1人テストで実際に動く部分の指紋（N-358）。
+ *
+ * **版の番号だけでは「確認したときと同じ中身か」を判定できない。**
+ * `apps/worker/src/services/automation-drafts.ts` の `updateAutomationDraft` は
+ * `automation_versions` の**同じ行を書き換える**ので、下書きを何度更新しても
+ * `draftVersionId` は変わらない。別のタブで書き換えられた後でも、古い確認画面が
+ * 持っている版の番号はそのまま通ってしまい、`runAutomationTest` はそのとき
+ * DBにある新しい中身を送る。だから中身そのものを指紋にして確認へ結びつける。
+ *
+ * 名前と説明は送信結果を変えないので入れない。
+ */
+const draftFingerprint = (
+  draft: Pick<AutomationDraftDetail, 'eventType' | 'triggerConfig' | 'conditions' | 'actions'>,
+): string => canonicalJson({
+  eventType: draft.eventType,
+  triggerConfig: draft.triggerConfig,
+  conditions: draft.conditions,
+  actions: draft.actions,
+})
+
+/**
+ * 「この内容で送る」と押したときに送る中身を、押す前に固めた控え（N-358）。
+ *
+ * 画面の状態ではなく**この控えだけ**を送信に使う。送る直前にサーバーの
+ * いまの中身と突き合わせ、1文字でも違えば送らずに 409 として扱う。
+ */
+interface TestConfirmation {
+  accountId: string
+  draftId: string
+  draftVersionId: string
+  fingerprint: string
+  /** 画面の入力とのずれを出すためだけの、すること部分の指紋。 */
+  actionsFingerprint: string
+  friendId: string
+  contents: string[]
+  effects: string[]
+}
+
 export default function NewAutomationPage() {
   usePageTitle('ルールを作る')
   const router = useRouter()
@@ -199,13 +249,15 @@ export default function NewAutomationPage() {
   const [tagsFailed, setTagsFailed] = useState(false)
   const [saving, setSaving] = useState(false)
   const [testing, setTesting] = useState(false)
-  const [confirmingTest, setConfirmingTest] = useState(false)
+  const [preparingTest, setPreparingTest] = useState(false)
+  const [testConfirmation, setTestConfirmation] = useState<TestConfirmation | null>(null)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [existingAutomations, setExistingAutomations] = useState<Automation[]>([])
   // 画面の描き直しを待たずに二重押しを止める鍵（N-357・N-358）。
   const saveRunningRef = useRef(false)
   const testRunningRef = useRef(false)
+  const prepareRunningRef = useRef(false)
   const selectedAccountRef = useRef(selectedAccountId)
   selectedAccountRef.current = selectedAccountId
 
@@ -260,17 +312,15 @@ export default function NewAutomationPage() {
 
   // N-357: 再読込・「戻る」でも同じ下書きを使い回す。店が替わったら
   // 別の店の下書きを触らないよう、控えが一致するときだけ引き継ぐ。
+  // 店を替えたら、前の店の確認・結果・見込み人数は残さない（N-358）。
+  // 走っている途中の保存・1人テストは、返ってきても自分の店でなければ
+  // 何も書かない（`selectedAccountRef` で見張る）。
   useEffect(() => {
-    if (!selectedAccountId) {
-      setSavedDraft(null)
-      setConfirmingTest(false)
-      return
-    }
-    setSavedDraft(readStoredDraft(selectedAccountId))
     setPreviewCount(null)
     setError('')
     setNotice('')
-    setConfirmingTest(false)
+    setTestConfirmation(null)
+    setSavedDraft(selectedAccountId ? readStoredDraft(selectedAccountId) : null)
   }, [selectedAccountId])
 
   const selectedEvent = EVENTS.find((event) => event.value === eventType) ?? EVENTS[0]
@@ -287,16 +337,37 @@ export default function NewAutomationPage() {
     return row.message.trim() ? '入力したメッセージを送る' : 'メッセージを送る'
   }).join('、')
 
-  // N-358: 1人テストは「いま入力中」ではなく、最後に保存できた実内容を見せる。
-  const actionPreview = (): SavedActionPreview => ({
-    contents: actions.map((row) => {
-      if (row.type === 'send_message') return `メッセージ「${row.message.trim()}」`
-      const tagName = tags.find((tag) => tag.id === row.tagId)?.name ?? row.tagId
-      return `タグ「${tagName}」を付ける`
+  /** 保存で送る「すること」。確認画面とのずれを見るときも同じ形を使う。 */
+  const draftActions = (): AutomationDraftAction[] => actions.map((row, index) => (
+    row.type === 'add_tag'
+      ? { id: `step-${index + 1}`, type: 'add_tag' as const, params: { tagId: row.tagId }, onFailure: 'stop' as const }
+      : {
+          id: `step-${index + 1}`,
+          type: 'send_message' as const,
+          params: { messageType: 'text', content: row.message.trim() },
+          onFailure: 'stop' as const,
+        }
+  ))
+
+  /**
+   * 確認に出す「実際に送られる中身」（N-358）。
+   *
+   * **画面の入力からは作らない。** サーバーが持っている下書きから作る。
+   * 入力中で未保存の文面が確認へ混ざると、見た内容と送る内容がずれる。
+   */
+  const describeDraftActions = (list: AutomationDraftAction[]): { contents: string[]; effects: string[] } => ({
+    contents: list.map((step) => {
+      if (step.type === 'send_message') return `メッセージ「${String(step.params.content ?? '')}」`
+      if (step.type === 'add_tag') {
+        const tagId = String(step.params.tagId ?? '')
+        return `タグ「${tags.find((tag) => tag.id === tagId)?.name ?? tagId}」を付ける`
+      }
+      return `シナリオ「${String(step.params.scenarioId ?? '')}」を始める`
     }),
     effects: [
-      actions.some((row) => row.type === 'send_message') ? 'メッセージが相手に届きます' : null,
-      actions.some((row) => row.type === 'add_tag') ? 'タグが相手に付きます' : null,
+      list.some((step) => step.type === 'send_message') ? 'メッセージが相手に届きます' : null,
+      list.some((step) => step.type === 'add_tag') ? 'タグが相手に付きます' : null,
+      list.some((step) => step.type === 'start_scenario') ? 'シナリオが相手に始まります' : null,
     ].filter((item): item is string => item !== null),
   })
 
@@ -398,22 +469,11 @@ export default function NewAutomationPage() {
         conditions,
         // すること（アクション）は { type, params } の形で持つ。
         // params の中身は type ごとに違う。
-        actions: actions.map(
-          (row, index) =>
-            row.type === 'add_tag'
-              ? { id: `step-${index + 1}`, type: 'add_tag', params: { tagId: row.tagId }, onFailure: 'stop' as const }
-              : {
-                  id: `step-${index + 1}`,
-                  type: 'send_message',
-                  params: { messageType: 'text', content: row.message.trim() },
-                  onFailure: 'stop' as const,
-                },
-        ),
+        actions: draftActions(),
       })
       if (!res.success) throw new Error(res.error)
-      const saved = { ...draft, preview: actionPreview() }
-      writeStoredDraft(accountId, saved)
-      if (selectedAccountRef.current === accountId) setSavedDraft(saved)
+      writeStoredDraft(accountId, draft)
+      if (selectedAccountRef.current === accountId) setSavedDraft(draft)
       const preview = await api.automations.audiencePreview(draft.id, accountId, draft.draftVersionId)
       if (preview.success && selectedAccountRef.current === accountId) setPreviewCount(preview.data.matched)
       if (!activate) {
@@ -453,38 +513,106 @@ export default function NewAutomationPage() {
    * N-358: 1人テストは2段階にする。
    *
    * 以前はIDを入れて押すとすぐ本番送信していた。送り先・送る内容・
-   * 起きることを見せてから送る。送信中は鍵をかけて二重押しを防ぐ。
+   * 起きることを見せてから送る。**見せる中身はサーバーから取り直す**ので、
+   * 画面に残っている古い記憶や未保存の入力は確認へ混ざらない。
    */
-  const askOnePersonTest = () => {
-    if (!savedDraft?.preview) {
+  const askOnePersonTest = async () => {
+    const accountId = selectedAccountId
+    const friendId = testFriendId.trim()
+    const draft = savedDraft
+    if (!draft || !accountId) {
       setError('実際に送る内容を確認するため、先に下書きを保存してください')
       return
     }
-    if (!testFriendId.trim()) {
+    if (!friendId) {
       setError('試す友だちのIDを入力してください')
       return
     }
+    if (prepareRunningRef.current) return
+    prepareRunningRef.current = true
+    setPreparingTest(true)
     setError('')
-    setConfirmingTest(true)
+    setNotice('')
+    try {
+      const detail = await api.automations.getDraft(draft.id, accountId)
+      if (!detail.success) throw new Error(detail.error)
+      // 別のタブで作り直されていたら、こちらの控えも新しい版へ合わせる。
+      if (detail.data.draftVersionId !== draft.draftVersionId) {
+        const refreshed = { id: draft.id, draftVersionId: detail.data.draftVersionId }
+        writeStoredDraft(accountId, refreshed)
+        if (selectedAccountRef.current === accountId) setSavedDraft(refreshed)
+      }
+      if (selectedAccountRef.current !== accountId) return
+      const described = describeDraftActions(detail.data.actions)
+      setTestConfirmation({
+        accountId,
+        draftId: draft.id,
+        draftVersionId: detail.data.draftVersionId,
+        fingerprint: draftFingerprint(detail.data),
+        actionsFingerprint: canonicalJson(detail.data.actions),
+        friendId,
+        contents: described.contents,
+        effects: described.effects,
+      })
+    } catch (caught) {
+      if (selectedAccountRef.current !== accountId) return
+      setError(
+        caught instanceof ApiError || caught instanceof Error
+          ? caught.message
+          : '送る内容を確認できませんでした',
+      )
+    } finally {
+      prepareRunningRef.current = false
+      setPreparingTest(false)
+    }
   }
 
+  /**
+   * 確認した中身だけを送る（N-358）。
+   *
+   * 送る直前にサーバーのいまの中身を取り直し、確認したときの指紋と
+   * **1文字でも違えば送らない**。別のタブで書き換えられていても、
+   * 見せた内容と違うものが相手へ届くことはない。
+   *
+   * 取り直してから送るまでのごく短い間に書き換えられる可能性までは、
+   * 画面側だけでは消せない（Worker に「この指紋のときだけ送る」口が無い）。
+   * その口ができたら、この突き合わせをそちらへ渡す。
+   */
   const runOnePersonTest = async () => {
-    if (testRunningRef.current || testing) return
-    if (!savedDraft || !selectedAccountId || !testFriendId.trim()) {
-      setError('下書きを保存して、試す友だちのIDを入力してください')
-      setConfirmingTest(false)
-      return
-    }
+    const pending = testConfirmation
+    if (!pending || testRunningRef.current) return
     testRunningRef.current = true
     setTesting(true)
     setError('')
+    const sameAccount = () => selectedAccountRef.current === pending.accountId
     try {
-      const result = await api.automations.test(savedDraft.id, selectedAccountId, testFriendId.trim(), savedDraft.draftVersionId)
+      const latest = await api.automations.getDraft(pending.draftId, pending.accountId)
+      if (!latest.success) throw new Error(latest.error)
+      if (
+        latest.data.draftVersionId !== pending.draftVersionId
+        || draftFingerprint(latest.data) !== pending.fingerprint
+      ) {
+        if (sameAccount()) {
+          setTestConfirmation(null)
+          setError('確認したあとに下書きが変わりました。送っていません。もう一度、送る内容を確認してください')
+        }
+        return
+      }
+      const result = await api.automations.test(
+        pending.draftId, pending.accountId, pending.friendId, pending.draftVersionId,
+      )
       if (!result.success) throw new Error(result.error)
-      setConfirmingTest(false)
+      if (!sameAccount()) return
+      setTestConfirmation(null)
       setNotice(`1人テストを受け付けました（状態: ${result.data.status}）`)
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : '1人テストを実行できませんでした')
+      // 待っている間に店を替えたら、前の店の成否をこの画面へ書かない。
+      if (!sameAccount()) return
+      setError(
+        caught instanceof ApiError || caught instanceof Error
+          ? caught.message
+          : '1人テストを実行できませんでした',
+      )
     } finally {
       testRunningRef.current = false
       setTesting(false)
@@ -727,24 +855,32 @@ export default function NewAutomationPage() {
             </p>
             <div className="mt-3 space-y-2">
               <TextField aria-label="1人テストの友だちID" value={testFriendId} onChange={(event) => setTestFriendId(event.target.value)} placeholder="試す友だちID" />
-              <Button onClick={askOnePersonTest} disabled={saving || testing || !savedDraft || !testFriendId.trim()}>1人で試す</Button>
+              <Button
+                onClick={() => void askOnePersonTest()}
+                disabled={saving || testing || preparingTest || !savedDraft || !testFriendId.trim()}
+              >
+                {preparingTest ? '確認中...' : '1人で試す'}
+              </Button>
               <p className="mt-1 text-xs font-medium leading-relaxed text-ink-faint">保存した時点の内容で試します。変えた後は保存し直してから試してください。</p>
             </div>
-            {confirmingTest && savedDraft?.preview ? (
+            {testConfirmation ? (
               <div className="mt-3 space-y-2 rounded-control border border-hairline bg-canvas-sunken p-3" role="dialog" aria-label="1人テストの確認">
                 <p className="text-xs font-bold text-ink">送る前に確認してください</p>
-                <p className="text-xs leading-5 text-ink-secondary">送り先：{testFriendId.trim()}</p>
+                <p className="text-xs leading-5 text-ink-secondary">送り先：{testConfirmation.friendId}</p>
                 <div className="text-xs leading-5 text-ink-secondary">
                   <p>送る内容：</p>
                   <ul className="list-disc pl-5">
-                    {savedDraft.preview.contents.map((content, index) => <li key={`${index}-${content}`}>{content}</li>)}
+                    {testConfirmation.contents.map((content, index) => <li key={`${index}-${content}`}>{content}</li>)}
                   </ul>
                 </div>
-                <p className="text-xs leading-5 text-ink-secondary">起きること：{savedDraft.preview.effects.join('、')}。取り消せません。</p>
+                <p className="text-xs leading-5 text-ink-secondary">起きること：{testConfirmation.effects.join('、')}。取り消せません。</p>
+                {canonicalJson(draftActions()) !== testConfirmation.actionsFingerprint ? (
+                  <p className="text-xs font-bold leading-5 text-ink">画面の入力は、ここに出ている内容と違います。送られるのは、保存済みのこの内容です。</p>
+                ) : null}
                 <div className="flex gap-2">
                   <Button
                     variant="secondary"
-                    onClick={() => setConfirmingTest(false)}
+                    onClick={() => setTestConfirmation(null)}
                   >
                     やめる
                   </Button>
