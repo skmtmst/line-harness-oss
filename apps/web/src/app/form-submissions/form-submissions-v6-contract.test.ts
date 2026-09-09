@@ -100,15 +100,28 @@ describe('#676 一覧の並び・件数・回答導線（N-172/N-173/N-180/N-181
     expect(PAGE).not.toContain('new Date(form.createdAt).toLocaleDateString')
   })
 
-  it('フォルダは保存先が未接続なので、押せる追加口を渡さない（N-175 は #688）', () => {
-    // オーナー指示 #582 の追加操作は残したまま、押せる状態にはしない。
-    expect(PAGE).toContain('addFolderDisabled')
+  it('staffへはフォルダ追加を出さず、owner/adminへは止めて置く（N-175 は #688）', () => {
+    // 役割の判定は自分で書き直さず、1か所に寄せてあるものを読む。
+    expect(PAGE).toContain("from '@/components/automations/use-can-manage'")
+    // staff（false）と読み取り前（null）は要素ごと出さない。
+    expect(PAGE).toContain('addFolderDisabled={canAddFolder === true}')
     expect(PAGE).toContain('addFolderTitle=')
     expect(PAGE).not.toContain('FolderAddDialog')
     expect(PAGE).not.toContain('onAddFolder')
     // 画面の中で数え方を作らない。フォルダの件数はAPIが返す値だけを出す。
     expect(PAGE).not.toContain('folderCounts')
     expect(PAGE).not.toContain("form.folderId || 'unfiled'")
+  })
+
+  it('実ブラウザ検査は通信が止まるのを待たず、画面が出す印で待つ', () => {
+    const BROWSER = readFileSync(join(HERE, 'form-submissions-browser-behavior.mjs'), 'utf8')
+    // 通信が止まる瞬間は管理画面では来ないことがある。待つ条件にしない。
+    expect(BROWSER).not.toMatch(/waitUntil:\s*'networkidle'/)
+    expect(BROWSER).toContain("waitUntil: 'domcontentloaded'")
+    expect(BROWSER).toContain('data-design-node="EMBIK"')
+    expect(BROWSER).toContain('data-list-state="loading"')
+    // 実在しない `folderId` を混ぜた模擬データへ戻らないようにする。
+    expect(BROWSER).not.toContain('folderId:')
   })
 })
 

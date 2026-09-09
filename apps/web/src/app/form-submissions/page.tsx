@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { fetchApi } from '@/lib/api'
 import { api, type FormDeleteImpact } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
+import { useCanManage } from '@/components/automations/use-can-manage'
 import { displayFormName, sortFormsByLatestAnswer } from './form-list'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -118,6 +119,14 @@ export default function FormSubmissionsPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { selectedAccountId, loading: accountLoading } = useAccount()
+  /**
+   * フォルダを作れるのは owner / admin だけ（`POST /api/folders` の
+   * `requireRole('owner', 'admin')`）。**staff には口ごと出さない。**
+   * 押せない灰色の口を置くと「権限を足せば使える操作」に見えるが、
+   * staff にとっては永久に押せない。役割の判定は1か所に寄せてある。
+   * 読み取り前（null）は出さない側へ倒す。
+   */
+  const canAddFolder = useCanManage()
   const [forms, setForms] = useState<Form[]>([])
   const [folders, setFolders] = useState<FormFolder[]>([])
   const [formTotal, setFormTotal] = useState(0)
@@ -371,10 +380,10 @@ export default function FormSubmissionsPage() {
             setActiveFolderId(folder)
             updateListState({ page: 1 })
           }}
-          // フォルダの保存先（forms.folder_id）がまだ無いので、押せる口は置かない。
+          // 保存先（forms.folder_id）がまだ無いので、owner / admin でも押せない。
           // オーナー指示 #582 は追加操作をこの欄へ置くことを求めるので、
-          // 消さずに止めて、なぜ押せないかを添える。実データは #688（migration 372）。
-          addFolderDisabled
+          // 消さずに止めて理由を添える。実データは #688（migration 372）。
+          addFolderDisabled={canAddFolder === true}
           addFolderTitle="フォームのフォルダ保存先は未接続です"
           rows={[
             { id: 'all', label: 'すべて', count: loading || loadError ? 0 : formTotal },
