@@ -400,6 +400,10 @@ jobs:
           --filter @line-harness/update-engine
           build
       - run: pnpm --filter web build
+      - name: LINE notifications real-browser behavior (#678)
+        run: |
+          pnpm exec playwright install --with-deps chromium
+          node apps/web/src/app/line-notifications/line-notifications-browser-behavior.mjs
       - run: pnpm --filter web verify:design
 
   required-pr-gate:

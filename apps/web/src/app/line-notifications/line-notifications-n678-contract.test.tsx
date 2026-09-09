@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 /*
  * #678 N-337/N-338/N-340/N-341 の実挙動。
  *
@@ -5,10 +6,17 @@
  * 実物の Promise を遅らせて逆順に返す。画面の中の呼び出し口を
  * そのまま呼ぶので、実APIと同じ非同期境界で保存・公開・
  * アカウント切替が確かめられる。
+ *
+ * 追加受入条件（0件・担当者0人・403/500取得失敗と再試行・長文入力）は、
+ * 静的HTMLやhelper関数の直接呼び出しでは固定できない。実物のDOM
+ * （happy-dom）へ実物のReactを `@testing-library/react` でマウントし、
+ * 実物のクリック・入力・再読込ボタンを操作して確かめる
+ * （下の「#678 実DOMへマウントした画面全体」）。
  */
 import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { render, screen, within, fireEvent, waitFor, cleanup } from '@testing-library/react'
 
 const fixture = vi.hoisted(() => ({
   selectedAccountId: 'account-a' as string | null,
@@ -78,7 +86,7 @@ vi.mock('@/lib/api', () => {
   }
 })
 
-import { type EcNotificationSetting, type LineNotificationDefinition } from '@/lib/api'
+import { ApiError, type EcNotificationSetting, type LineNotificationDefinition } from '@/lib/api'
 import LineNotificationsPage from './page'
 
 const {
@@ -224,7 +232,9 @@ beforeEach(() => {
   // vitest は esbuild の既定で古い JSX 変換になる。画面側は React を import
   // しない書き方なので、実物の React を大域に置いて実描画させる。
   vi.stubGlobal('React', React)
-  vi.stubGlobal('window', { localStorage: storage })
+  // happy-dom の実物の window/document は壊さない。localStorage だけ
+  // 差し替える（window ごと差し替えると、実DOM試験の screen/waitFor が壊れる）。
+  Object.defineProperty(window, 'localStorage', { value: storage, configurable: true, writable: true })
 })
 
 afterEach(() => {
@@ -705,6 +715,124 @@ describe('#678 実Reactで描いた画面全体', () => {
     expect(operatorTabCountLabel('loading', null)).toBe('—')
     expect(operatorTabCountLabel('error', null)).toBe('取得失敗')
     expect(operatorTabCountLabel('forbidden', null)).toBe('取得失敗')
+  })
+})
+
+/*
+ * #678 追加受入条件。0件・担当者0人・403/500取得失敗と再試行・長文入力を、
+ * helperの直接呼び出しや静的HTMLではなく、実DOM（happy-dom）へ実物のReactを
+ * マウントして固定する。fetchは `@/lib/api` の境界だけを差し替え、
+ * クリック・入力・再読込は実物のイベントで起こす。
+ */
+describe('#678 実DOMへマウントした画面全体', () => {
+  afterEach(cleanup)
+
+  it('0件: 顧客のお知らせも運用者件数も「0」であり、「—」でも「取得失敗」でもない', async () => {
+    fixture.settings.mockResolvedValue({ success: true, data: [] })
+    fixture.overview.mockResolvedValue({ success: true, data: { last24h: 0, failed: 0, byType: [] } })
+    fixture.operatorList.mockResolvedValue({ success: true, data: { summary: { total: 0 } } })
+
+    render(<LineNotificationsPage />)
+
+    await waitFor(() => expect(screen.getByText('顧客へのお知らせはまだありません')).toBeTruthy())
+    // タブの数字は「まだ読めていない」でも「取れなかった」でもなく、実際に0件だと分かる形。
+    expect(screen.getByText('顧客へのお知らせ 0')).toBeTruthy()
+    expect(screen.getByText('運用者へのお知らせ 0')).toBeTruthy()
+    expect(screen.queryByText('顧客へのお知らせ —')).toBeNull()
+    expect(screen.queryByText('運用者へのお知らせ 取得失敗')).toBeNull()
+  })
+
+  it('担当者0人: 顧客のお知らせ自体はあっても、運用者タブの実数は0のまま出す', async () => {
+    fixture.settings.mockResolvedValue({ success: true, data: [setting()] })
+    fixture.overview.mockResolvedValue({
+      success: true,
+      data: { last24h: 3, failed: 0, byType: [{ eventType: 'order.confirmed', label: '注文受付', count: 3 }] },
+    })
+    fixture.operatorList.mockResolvedValue({ success: true, data: { summary: { total: 0 } } })
+
+    render(<LineNotificationsPage />)
+
+    await waitFor(() => expect(screen.getByText('注文を受け付けました')).toBeTruthy())
+    expect(screen.getByText('運用者へのお知らせ 0')).toBeTruthy()
+  })
+
+  it('403: 顧客のお知らせは「表示する権限がありません」を出し、再読み込みは出さない', async () => {
+    fixture.settings.mockRejectedValue(new ApiError(403))
+    fixture.overview.mockResolvedValue({ success: true, data: { last24h: 0, failed: 0, byType: [] } })
+    fixture.operatorList.mockResolvedValue({ success: true, data: { summary: { total: 0 } } })
+
+    render(<LineNotificationsPage />)
+
+    await waitFor(() => expect(screen.getByText('表示する権限がありません')).toBeTruthy())
+    expect(screen.queryByRole('button', { name: '再読み込み' })).toBeNull()
+  })
+
+  it('500: 「表示できませんでした」を出し、実物の再読み込みボタンを押すと実物のfetchをやり直して復旧する', async () => {
+    fixture.settings.mockRejectedValueOnce(new Error('internal error'))
+    fixture.overview.mockResolvedValue({ success: true, data: { last24h: 0, failed: 0, byType: [] } })
+    fixture.operatorList.mockResolvedValue({ success: true, data: { summary: { total: 0 } } })
+
+    render(<LineNotificationsPage />)
+
+    await waitFor(() => expect(screen.getByText('顧客へのお知らせを表示できませんでした')).toBeTruthy())
+    expect(fixture.settings).toHaveBeenCalledTimes(1)
+
+    // 2回目からは成功する応答へ差し替えてから、実物のボタンを押す。
+    fixture.settings.mockResolvedValueOnce({ success: true, data: [setting()] })
+    fireEvent.click(screen.getByRole('button', { name: '再読み込み' }))
+
+    await waitFor(() => expect(screen.getByText('注文を受け付けました')).toBeTruthy())
+    expect(fixture.settings).toHaveBeenCalledTimes(2)
+    expect(screen.queryByText('顧客へのお知らせを表示できませんでした')).toBeNull()
+  })
+
+  it('運用者だけ403/500になっても、顧客のお知らせは表示を続け、タブの数字だけ「取得失敗」にする', async () => {
+    fixture.settings.mockResolvedValue({ success: true, data: [setting()] })
+    fixture.overview.mockResolvedValue({ success: true, data: { last24h: 0, failed: 0, byType: [] } })
+    fixture.operatorList.mockRejectedValueOnce(new ApiError(403))
+
+    const { unmount } = render(<LineNotificationsPage />)
+    await waitFor(() => expect(screen.getByText('注文を受け付けました')).toBeTruthy())
+    expect(screen.getByText('運用者へのお知らせ 取得失敗')).toBeTruthy()
+    unmount()
+
+    fixture.operatorList.mockRejectedValueOnce(new Error('internal error'))
+    render(<LineNotificationsPage />)
+    await waitFor(() => expect(screen.getByText('運用者へのお知らせ 取得失敗')).toBeTruthy())
+    expect(screen.getByText('注文を受け付けました')).toBeTruthy()
+  })
+
+  it('長文入力: 実物のtextareaへ実物のonChangeで打ち込み、未保存表示・端末控え・保存APIへ渡す中身まで実物のまま追う', async () => {
+    const longIntro = 'ご注文ありがとうございます。'.repeat(40)
+    fixture.settings.mockResolvedValue({ success: true, data: [setting()] })
+    fixture.overview.mockResolvedValue({ success: true, data: { last24h: 0, failed: 0, byType: [] } })
+    fixture.operatorList.mockResolvedValue({ success: true, data: { summary: { total: 0 } } })
+    fixture.updateSetting.mockResolvedValue({ success: true, data: {} })
+
+    render(<LineNotificationsPage />)
+    await waitFor(() => expect(screen.getByText('注文を受け付けました')).toBeTruthy())
+
+    fireEvent.click(screen.getByRole('button', { name: '内容を編集' }))
+    const introBox = await screen.findByLabelText('ご案内文') as HTMLTextAreaElement
+
+    fireEvent.change(introBox, { target: { value: longIntro } })
+
+    // 打ち込んだ全文が、実物のcontrolled inputへそのまま反映される。
+    expect(introBox.value).toBe(longIntro)
+    expect(introBox.value.length).toBe(longIntro.length)
+    await waitFor(() => expect(screen.getByText('未保存の変更があります')).toBeTruthy())
+
+    const stored = window.localStorage.getItem(customerDraftKey('account-a', 'order.confirmed'))
+    expect(stored).not.toBeNull()
+    expect(JSON.parse(stored!).introText).toBe(longIntro)
+
+    fireEvent.click(screen.getByRole('button', { name: 'お知らせを保存' }))
+    await waitFor(() => expect(fixture.updateSetting).toHaveBeenCalledTimes(1))
+    // 保存APIへ渡した中身も、打ち込んだ長文のまま欠けたり切れたりしない。
+    expect(fixture.updateSetting).toHaveBeenCalledWith(
+      'account-a', 'order.confirmed', expect.objectContaining({ introText: longIntro }),
+    )
+    await waitFor(() => expect(screen.queryByText('未保存の変更があります')).toBeNull())
   })
 })
 
