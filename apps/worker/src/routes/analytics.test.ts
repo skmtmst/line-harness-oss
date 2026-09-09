@@ -189,6 +189,7 @@ beforeEach(() => {
     id: 'cross-1', state: 'available', errorCode: null,
     result: { state: 'available', cells: [], totalValue: 0 },
     createdAt: '2026-08-26T00:00:00.000Z',
+    queuePosition: null, pendingAhead: 0, estimatedWaitMs: null, nextTickAt: null,
   });
   mocks.getAnalyticsFriendsOverview.mockResolvedValue({ lineAccountId: 'account-a', data: {} });
   mocks.getAnalyticsReactionsOverview.mockResolvedValue({ lineAccountId: 'account-a', data: {} });
@@ -370,6 +371,30 @@ describe('V6クロス分析API', () => {
     const res = await req(`/api/analytics/cross/results/cross-1?${ACCOUNT}`);
     expect(res.status).toBe(200);
     expect(mocks.getAnalyticsCrossRun).toHaveBeenCalledWith(env.DB, 'account-a', 'cross-1');
+  });
+
+  it('待ち順と目安を同一アカウントの範囲だけで返す', async () => {
+    mocks.getAnalyticsCrossRun.mockResolvedValueOnce({
+      id: 'cross-1', state: 'pending', errorCode: null, result: null,
+      createdAt: '2026-08-26T00:00:00.000Z',
+      queuePosition: 1, pendingAhead: 0, estimatedWaitMs: 300_000,
+      nextTickAt: '2026-08-26T00:06:00.000Z',
+    });
+    const res = await req(`/api/analytics/cross/results/cross-1?${ACCOUNT}`);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      data: {
+        id: 'cross-1', state: 'pending',
+        queuePosition: 1, pendingAhead: 0, estimatedWaitMs: 300_000,
+        nextTickAt: '2026-08-26T00:06:00.000Z',
+      },
+    });
+  });
+
+  it('別アカウントの結果は存在ごと404にする', async () => {
+    mocks.getAnalyticsCrossRun.mockResolvedValueOnce(null);
+    const res = await req(`/api/analytics/cross/results/cross-1?${ACCOUNT}`);
+    expect(res.status).toBe(404);
   });
 
   it('セルから友だちIDではなく24時間の対象者IDを返す', async () => {
