@@ -1,7 +1,7 @@
 # 機能監査418件の対応状況
 
 > 正本: [機能監査 #617](https://github.com/kentavndng/line-harness-board/issues/617)、[Phase 0 #618](https://github.com/kentavndng/line-harness-board/issues/618)、修正Issue #619〜#660、統合・検証窓口 [#264](https://github.com/kentavndng/line-harness-board/issues/264)、各PR。
-> 観測時点: 2026-09-09 07:00 JST。Pencil・V6の見た目比較・`/restaurant-test` は対象外。
+> 観測時点: 2026-09-09 12:10 JST。Pencil・V6の見た目比較・`/restaurant-test` は対象外。
 > `unmapped` は「Issue/PRとの明示対応を一次資料から証明できない」という意味です。未修正・未起票とは断定しません。
 
 旧デザイン点検610件の台帳は[移行直前の履歴](https://github.com/skmtmst/line-harness-oss/blob/534136f9722fc4ba3e32e7af063e0ed5ecd4839d/docs/audit-status.md)と[作成PR #1386](https://github.com/skmtmst/line-harness-oss/pull/1386)に残し、この418件へは混ぜません。
@@ -21,14 +21,12 @@
 
 | 追跡状態 | 件数 | 意味 |
 | --- | ---: | --- |
-| 本流統合 | 10 | codex/developmentへの列車統合を確認 |
-| PR審査 | 19 | PRあり。統合・検証反映は未完了 |
-| 修正中 | 3 | 差し戻し・実装中・依存待ち |
-| 票あり | 1 | Issueあり。PR未作成 |
-| unmapped | 385 | 明示対応を一次資料から証明できない |
+| 本流統合・検証反映済み | 20 | codex/developmentへの統合と検証環境反映を確認 |
+| 未統合の票・PR | 73 | Issue/PRとの一意な対応あり。審査・差し戻し・依存待ちを含む |
+| unmapped | 325 | 明示対応を一次資料から証明できない |
 | **合計** | **418** | |
 
-本流統合済み10件を含め、検証環境へ反映済みと確認できたIDは0件です。列車202〜207は[#264](https://github.com/kentavndng/line-harness-board/issues/264)でrelease 48待ち、列車208は統合済みで検証反映の確認待ちです。N-065のPR #1444は列車外で直接統合され、独立再審査の残件を#654/PR #1476で追補中です。
+本流統合済み20件は、列車212・検証環境51回目まで反映を確認しています。残りは398件です。個別行の状態・列車・staging欄はGitHub Issue/PRと照合しながら更新中で、上の集計を現在値の正本とします。N-065のPR #1444は列車外で直接統合され、独立再審査の残件を#654/PR #1476で追補中です。
 
 #629〜#635は監査後の横断改善ですが、418件のN/E-IDを付与されていないため、根拠なく個別行へ結び付けていません。#660/PR #1478は、N-366の安全設定を実build生成物で配備するための関連対応としてN-366行へ併記しています。
 
