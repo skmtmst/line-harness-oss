@@ -41,12 +41,14 @@ describe('429 の次回実行（N-374）', () => {
     expect(at!.getTime()).toBeLessThanOrEqual(now.getTime() + 90_000);
   });
 
-  it('上限を超える指定は既定の間隔へ丸める', () => {
+  it('再試行台帳へ渡す60秒は保ち、3600秒は30分へクランプする', () => {
     const now = new Date('2026-09-08T12:00:00.000Z');
-    // 3600秒（60分）は上限30分を超えるので、1回目の既定（1分後）になる。
-    expect(externalDeliveryRetryAt(rateLimited('3600'), 1, now, true)?.getTime())
+    expect(externalDeliveryRetryAt(rateLimited('60'), 1, now, true)?.getTime())
       .toBe(now.getTime() + 60_000);
-    // 2時間後の日付も同じく既定になる。
+    // 3600秒（60分）は上限30分を超えるため、安全上限を次回時刻にする。
+    expect(externalDeliveryRetryAt(rateLimited('3600'), 1, now, true)?.getTime())
+      .toBe(now.getTime() + 30 * 60_000);
+    // 2時間後の日付も同じく30分上限になる。
     expect(
       externalDeliveryRetryAt(
         rateLimited(new Date(now.getTime() + 2 * 3_600_000).toUTCString()),
@@ -54,7 +56,7 @@ describe('429 の次回実行（N-374）', () => {
         now,
         true,
       )?.getTime(),
-    ).toBe(now.getTime() + 60_000);
+    ).toBe(now.getTime() + 30 * 60_000);
   });
 
   it('読めない・過去の指定は既定の間隔へ丸める', () => {

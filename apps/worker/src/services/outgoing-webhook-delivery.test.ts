@@ -3,6 +3,7 @@ import {
   checkWebhookUrlSafety,
   deliverWebhook,
   isSafeWebhookUrl,
+  postWebhookSafely,
   retryAfterDelayMs,
   retryDelayMs,
   shouldRetryStatus,
@@ -567,6 +568,59 @@ describe('送信の打ち切り(N-373)', () => {
     expect(vi.mocked(fetch)).toHaveBeenCalledTimes(3);
   });
 
+  it('呼び出し側の非発火signalがあっても内部timeoutで打ち切る', async () => {
+    const external = new AbortController();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (_input: unknown, init?: RequestInit) => {
+        const signal = init?.signal as AbortSignal;
+        await new Promise((_resolve, reject) => {
+          signal.addEventListener(
+            'abort',
+            () => reject(new DOMException('The operation was aborted.', 'AbortError')),
+            { once: true },
+          );
+        });
+        throw new Error('ここには来ない');
+      }),
+    );
+
+    await expect(postWebhookSafely(
+      WEBHOOK.url,
+      { headers: {}, body: '{}', signal: external.signal },
+      { lookupHost: publicOnlyLookup, timeoutMs: 20 },
+    )).rejects.toMatchObject({ name: 'AbortError' });
+    expect(external.signal.aborted).toBe(false);
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1);
+  });
+
+  it('転送を辿っている途中でも試行全体のtimeoutで打ち切る', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: unknown, init?: RequestInit) => {
+        if (String(input) === WEBHOOK.url) {
+          return new Response('', { status: 302, headers: { location: '/next' } });
+        }
+        const signal = init?.signal as AbortSignal;
+        await new Promise((_resolve, reject) => {
+          signal.addEventListener(
+            'abort',
+            () => reject(new DOMException('The operation was aborted.', 'AbortError')),
+            { once: true },
+          );
+        });
+        throw new Error('ここには来ない');
+      }),
+    );
+
+    await expect(postWebhookSafely(
+      WEBHOOK.url,
+      { headers: {}, body: '{}' },
+      { lookupHost: publicOnlyLookup, timeoutMs: 20 },
+    )).rejects.toMatchObject({ name: 'AbortError' });
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(2);
+  });
+
   it('打ち切り前に返事があれば成功する', async () => {
     const count = stubFetch([200]);
     const res = await deliverWebhook(WEBHOOK, '{}', {
@@ -594,16 +648,17 @@ describe('Retry-After の読み取り(N-374)', () => {
     expect(wait).toBeLessThanOrEqual(3000);
   });
 
-  it('読めない・過去・上限超えは既定の待ちへ丸める', () => {
+  it('読めない・過去は既定値、60秒・3600秒は安全上限へ丸める', () => {
     expect(retryAfterDelayMs(null, 500)).toBe(500);
     expect(retryAfterDelayMs('', 500)).toBe(500);
     expect(retryAfterDelayMs('soon', 500)).toBe(500);
     expect(retryAfterDelayMs('-5', 500)).toBe(500);
-    // 上限（8秒）を超える指定は待たない。
-    expect(retryAfterDelayMs('3600', 500)).toBe(500);
-    expect(retryAfterDelayMs('9', 500)).toBe(500);
+    expect(retryAfterDelayMs('60', 500)).toBe(WEBHOOK_RETRY_AFTER_MAX_MS);
+    expect(retryAfterDelayMs('3600', 500)).toBe(WEBHOOK_RETRY_AFTER_MAX_MS);
+    expect(retryAfterDelayMs('9', 500)).toBe(WEBHOOK_RETRY_AFTER_MAX_MS);
     expect(retryAfterDelayMs(new Date(Date.now() - 60_000).toUTCString(), 500)).toBe(500);
-    expect(retryAfterDelayMs(new Date(Date.now() + 3_600_000).toUTCString(), 500)).toBe(500);
+    expect(retryAfterDelayMs(new Date(Date.now() + 3_600_000).toUTCString(), 500))
+      .toBe(WEBHOOK_RETRY_AFTER_MAX_MS);
     expect(WEBHOOK_RETRY_AFTER_MAX_MS).toBe(8_000);
   });
 
@@ -645,7 +700,7 @@ describe('Retry-After の読み取り(N-374)', () => {
     expect(waits[0]).toBeLessThanOrEqual(3000);
   });
 
-  it('429 の過大な指定は既定の指数待ちへ丸める（回数は増やさない）', async () => {
+  it('429 の過大な指定は安全上限まで待つ（回数は増やさない）', async () => {
     respond429Then200('3600');
     const waits: number[] = [];
     const res = await deliverWebhook({ ...WEBHOOK, max_retries: 1 }, '{}', {
@@ -653,7 +708,7 @@ describe('Retry-After の読み取り(N-374)', () => {
       lookupHost: publicOnlyLookup,
     });
     expect(res).toMatchObject({ ok: true, attempts: 2 });
-    expect(waits).toEqual([retryDelayMs(0)]);
+    expect(waits).toEqual([WEBHOOK_RETRY_AFTER_MAX_MS]);
   });
 
   it('429 で指定がなければ従来どおり指数待ち', async () => {

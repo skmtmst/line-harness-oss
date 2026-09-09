@@ -34,7 +34,7 @@ export const WEBHOOK_FETCH_TIMEOUT_MS_MAX = 30_000;
  *
  * N-374: 混雑時の再送が相手の指定を無視して空振りしていた。指定どおりに
  * 待つが、Worker の実行時間に限りがあるため、この上限を超える指定は
- * 待たずに既定の指数待ちへ丸める（安全側に倒す）。
+ * 上限まで待つ。短い指数待ちへ戻すと、相手の混雑中に再送を早めてしまう。
  */
 export const WEBHOOK_RETRY_AFTER_MAX_MS = 8_000;
 
@@ -48,7 +48,8 @@ export function webhookFetchTimeoutMs(value: unknown): number {
 /**
  * Retry-After 応答頭を読む。秒数形式と HTTP-date 形式の両方を受け付ける。
  *
- * 読めない・過去・上限超えの指定は fallbackMs（既定の指数待ち）へ丸める。
+ * 読めない・過去の指定は fallbackMs（既定の指数待ち）へ丸める。
+ * 上限超えの指定は安全上限へ丸め、相手の指定より極端に早く再送しない。
  * 送り直しの回数は増やさない（待つ長さを変えるだけ）。
  */
 export function retryAfterDelayMs(
@@ -61,14 +62,14 @@ export function retryAfterDelayMs(
   if (!text) return fallbackMs;
   if (/^\d+(\.\d+)?$/.test(text)) {
     const ms = Number(text) * 1000;
-    if (Number.isFinite(ms) && ms >= 0 && ms <= WEBHOOK_RETRY_AFTER_MAX_MS) return ms;
+    if (Number.isFinite(ms) && ms >= 0) return Math.min(ms, WEBHOOK_RETRY_AFTER_MAX_MS);
     return fallbackMs;
   }
   const at = Date.parse(text);
   if (!Number.isFinite(at)) return fallbackMs;
   const ms = at - nowMs;
-  if (ms < 0 || ms > WEBHOOK_RETRY_AFTER_MAX_MS) return fallbackMs;
-  return ms;
+  if (ms < 0) return fallbackMs;
+  return Math.min(ms, WEBHOOK_RETRY_AFTER_MAX_MS);
 }
 
 /**
@@ -408,7 +409,7 @@ export interface SafePostOptions {
   maxRedirects?: number;
   /**
    * 1回の送信試行の打ち切り（ミリ秒）。未指定は既定10秒、上限30秒。
-   * 呼び出し側が signal を渡したときはそちらを優先する。
+   * 呼び出し側が signal を渡したときも内部の打ち切りと合成する。
    */
   timeoutMs?: number;
 }
@@ -464,9 +465,12 @@ export async function postWebhookSafely(
 ): Promise<SafePostOutcome> {
   const fetchImpl = opts.fetchImpl ?? fetch;
   const maxRedirects = opts.maxRedirects ?? 5;
-  // N-373: 呼び出し側の指定がなければ既定10秒で打ち切る。試行ごとに
-  // 作り直すので、送り直しの待ち時間は打ち切りに含まれない。
-  const signal = init.signal ?? AbortSignal.timeout(webhookFetchTimeoutMs(opts.timeoutMs));
+  // N-373: 呼び出し側の signal があっても内部timeoutを外さない。1つの
+  // 合成signalを全転送段で使うため、転送を繰り返しても試行全体が上限内で止まる。
+  const timeoutSignal = AbortSignal.timeout(webhookFetchTimeoutMs(opts.timeoutMs));
+  const signal = init.signal
+    ? AbortSignal.any([init.signal, timeoutSignal])
+    : timeoutSignal;
   let current = url;
   let method = 'POST';
   let headers = { ...init.headers };
@@ -538,7 +542,7 @@ export interface DeliveryResult {
  *
  * | 応答 | 扱い | 次までの待ち |
  * | 2xx | 成功 | 待たない |
- * | 429 | 送り直す。Retry-After があれば上限8秒まで指定どおりに待つ | Retry-After／指数待ち |
+ * | 429 | 送り直す。Retry-After があれば上限8秒へクランプして待つ | Retry-After／指数待ち |
  * | 5xx | 送り直す | 指数待ち（0.5→1→2→4→8秒） |
  * | タイムアウト（既定10秒）・接続失敗 | 送り直す。lastStatus=null で失敗台帳に残る | 指数待ち |
  * | その他の 4xx | 恒久失敗。残りの回数を使わずに諦める | — |
