@@ -1,5 +1,10 @@
 -- Generated from schema.sql + migrations by scripts/generate-bootstrap.mjs.
 -- Do not edit manually. Run `pnpm --dir packages/db generate:bootstrap`.
+CREATE TABLE _migrations (
+  name TEXT PRIMARY KEY,
+  applied_at TEXT NOT NULL
+);
+
 CREATE TABLE account_handover_decisions (
   id              TEXT PRIMARY KEY,
   handover_id     TEXT NOT NULL REFERENCES account_handovers(id) ON DELETE CASCADE,

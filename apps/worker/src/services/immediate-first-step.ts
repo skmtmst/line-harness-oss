@@ -75,6 +75,31 @@ export interface ImmediatePushOptions {
    * fence every same-flow race there.
    */
   skipCooldown?: boolean;
+  /**
+   * 送信の結末を呼ぶ側へ伝える。戻り値の false は「送っていない」と
+   * 「送ったかどうか分からない」を区別できないため、台帳へ結末を残す
+   * 呼び出し（友だち追加時配信）だけがこれを渡す。
+   *
+   *   delivered … LINE が受け付けた
+   *   failed    … LINE が要求を断った（4xx）。届いていない
+   *   unknown   … 通信断・タイムアウト・429・5xx。届いたかもしれない
+   *
+   * 送信そのものを試みなかったとき（配信対象外・再送見送りなど）は呼ばない。
+   */
+  onSendOutcome?: (outcome: 'delivered' | 'failed' | 'unknown') => void;
+}
+
+/**
+ * 送信の例外を「届いていない」と「届いたかもしれない」に分ける。
+ *
+ * LINE が 4xx で断ったときは要求が受け付けられていないので届いていない。
+ * 通信断・タイムアウト・429・5xx は、こちらが結果を知らないだけで
+ * 届いていることがある。自動で送り直すと二重に届く。
+ */
+function classifySendFailure(error: unknown): 'failed' | 'unknown' {
+  const status = (error as { status?: unknown } | null)?.status;
+  if (typeof status === 'number' && status >= 400 && status < 500 && status !== 429) return 'failed';
+  return 'unknown';
 }
 
 /**
@@ -352,13 +377,16 @@ export async function pushImmediateFirstStep(
         await lineClient.pushMessage(pushTarget, messages);
       }
     } catch (err) {
-      // The message never left LINE's API — release so the cron retries on
-      // schedule.
+      // 4xx は LINE が断ったので届いていない。それ以外は結末が分からない。
+      // どちらでも claim は返して cron の再試行に載せるが、呼ぶ側には
+      // 区別して伝える（送達不明を自動再送に載せないため）。
       console.error('[immediate-first-step] send failed, releasing claim:', err);
+      options?.onSendOutcome?.(classifySendFailure(err));
       await releaseClaim();
       return false;
     }
     sent = true;
+    options?.onSendOutcome?.('delivered');
     settleAfterSend = async () => {
       if (advanceTargetId) {
         await advancePastFirstStep(advanceTargetId);

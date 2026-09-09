@@ -46,10 +46,19 @@ function wrap(raw: Database.Database, sql: string, args: unknown[]) {
   }
 }
 
-/** bootstrap.sql を流した空のDBを作る。 */
-export function createTestD1(options?: { foreignKeys?: boolean }): SqliteD1 {
-  const raw = new Database(':memory:')
-  raw.exec(readFileSync(join(DB_PKG_ROOT, 'bootstrap.sql'), 'utf8'))
+/**
+ * bootstrap.sql を流した空のDBを作る。
+ *
+ * `file` を渡すとファイルのDBを開く。**別々の接続を2本開けば、
+ * 2つの実行主体が同じDBを取り合う競合を実際に再現できる。**
+ * `attach` を渡した場合は既にあるDBへ繋ぐだけで、schemaは流さない。
+ */
+export function createTestD1(
+  options?: { foreignKeys?: boolean; file?: string; attach?: boolean },
+): SqliteD1 {
+  const raw = new Database(options?.file ?? ':memory:')
+  if (!options?.attach) raw.exec(readFileSync(join(DB_PKG_ROOT, 'bootstrap.sql'), 'utf8'))
+  if (options?.file) raw.pragma('busy_timeout = 2000')
   // 参照整合性は本番の D1 と同じく既定で切っておく。ここだけ厳しくすると
   // テストのためだけに余分な行を用意することになり、読みにくくなる。
   // ただし外部キーに関わる不整合 (誤った通 ID の保存など) は OFF では隠れる。

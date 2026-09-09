@@ -23,6 +23,8 @@ import {
   isInFriendAddTimeWindows,
   isTimeInFriendAddWindow,
 } from './friend-add-routing.js';
+import { parseFriendAddConditionAst } from './friend-add-routing.js';
+import { buildSegmentWhere, parseCondition } from './segment-query.js';
 import { friendAddRules } from '../routes/friend-add-rules.js';
 import { toJstParts } from '@line-crm/shared';
 
@@ -386,6 +388,79 @@ describe('競合確認と本番で同じ重なり関数', () => {
   });
 });
 
+/*
+ * 条件木の検証は最外だけでは足りない、という再現。
+ * 旧来の入口 `parseCondition` は入れ子を見ないため、operator の抜けた
+ * グループを通す。通ると `buildSegmentWhere` は既定の OR で組み立てる。
+ */
+describe('条件木の再帰検証（純粋関数）', () => {
+  // 入れ子側は「タグ2とタグ3の両方を持つ人」のつもり。operator が抜けている。
+  const nestedWithoutOperator = JSON.stringify({
+    operator: 'AND',
+    rules: [],
+    groups: [
+      { operator: 'AND', rules: [{ type: 'tag_exists', value: 'tag-1' }] },
+      {
+        rules: [
+          { type: 'tag_exists', value: 'tag-2' },
+          { type: 'tag_exists', value: 'tag-3' },
+        ],
+      },
+    ],
+  });
+
+  test('旧来の入口は入れ子の operator 欠落を通し、ORとして組み立ててしまう', () => {
+    const parsed = parseCondition(nestedWithoutOperator);
+    expect(parsed).not.toBeNull();
+    // 「両方を満たす人」のつもりが OR でつながり、片方だけの人にも届く
+    const sql = buildSegmentWhere(parsed!).sql;
+    expect(sql).toContain(' OR ');
+    expect(sql).not.toContain('ft.tag_id = ? AND EXISTS');
+  });
+
+  test('再帰検証は同じ条件を断る', () => {
+    expect(parseFriendAddConditionAst(nestedWithoutOperator)).toEqual({
+      ok: false, error: 'bad_operator',
+    });
+  });
+
+  test('空・自由文・壊れたJSON・深すぎる入れ子・大きすぎる条件を見分ける', () => {
+    expect(parseFriendAddConditionAst('')).toEqual({ ok: true, condition: null });
+    // 自由文（旧形式のメモ）と、書こうとして壊れたJSONを分ける。
+    // 前者は保存を止めず実行時に抑止、後者は保存時に断る。
+    expect(parseFriendAddConditionAst('タグ「店頭QR者」')).toEqual({ ok: false, error: 'legacy_text' });
+    expect(parseFriendAddConditionAst('{"operator":')).toEqual({ ok: false, error: 'not_json' });
+    expect(parseFriendAddConditionAst('[]')).toEqual({ ok: false, error: 'not_object' });
+    expect(parseFriendAddConditionAst('{"operator":"AND"}')).toEqual({ ok: false, error: 'bad_rules' });
+    expect(parseFriendAddConditionAst('{"operator":"AND","rules":[],"groups":{}}'))
+      .toEqual({ ok: false, error: 'bad_groups' });
+    expect(parseFriendAddConditionAst(
+      JSON.stringify({ operator: 'AND', rules: [{ type: 'tag_exists', value: '' }] }),
+    )).toEqual({ ok: false, error: 'unbuildable' });
+
+    // 深さの上限（9段）を超える入れ子
+    let deep: Record<string, unknown> = { operator: 'AND', rules: [] };
+    for (let i = 0; i < 9; i++) deep = { operator: 'AND', rules: [], groups: [deep] };
+    expect(parseFriendAddConditionAst(JSON.stringify(deep))).toEqual({ ok: false, error: 'too_deep' });
+
+    // ノード数の上限（201件）を超える条件
+    const many = {
+      operator: 'AND',
+      rules: Array.from({ length: 201 }, () => ({ type: 'tag_exists', value: 'tag-1' })),
+    };
+    expect(parseFriendAddConditionAst(JSON.stringify(many))).toEqual({ ok: false, error: 'too_large' });
+  });
+
+  test('正しい入れ子は通す', () => {
+    const ok = parseFriendAddConditionAst(JSON.stringify({
+      operator: 'AND',
+      rules: [{ type: 'is_following', value: true }],
+      groups: [{ operator: 'OR', rules: [{ type: 'tag_exists', value: 'tag-1' }] }],
+    }));
+    expect(ok.ok).toBe(true);
+  });
+});
+
 describe('本番の振り分け: 曜日・時間帯・条件・再送制限', () => {
   let testDb: SqliteD1;
   let raw: Database.Database;
@@ -742,7 +817,7 @@ describe('本番の振り分け: 曜日・時間帯・条件・再送制限', ()
       { entryRouteId: 'route-1', now: MON_10 },
     );
     expect(result).toMatchObject({
-      routed: true, suppressed: true, suppressReason: 'friend_condition_unreadable',
+      routed: true, suppressed: true, suppressReason: 'friend_condition_invalid',
     });
     expect(result.enrollments).toEqual([]);
   });
@@ -831,6 +906,173 @@ describe('本番の振り分け: 曜日・時間帯・条件・再送制限', ()
     // 自動生成の受け皿（シナリオ未選択）は安全側で抑止する
     expect(unknown).toMatchObject({ routed: true, suppressed: true });
   });
+
+  /*
+   * 条件木は入れ子まで検証する。`parseCondition` は最外だけを見るため、
+   * 入れ子グループの operator が抜けていても通り、実行時に既定の OR へ
+   * 読み替わる。「両方を満たす人」で絞ったつもりが「どちらかを満たす人
+   * すべて」に広がり、送ってはいけない相手に届く。
+   */
+  describe('条件木の再帰検証', () => {
+    test('入れ子グループの operator が無い条件は送らない（ORへ読み替えない）', async () => {
+      const nested = JSON.stringify({
+        operator: 'AND',
+        rules: [],
+        groups: [
+          { operator: 'AND', rules: [{ type: 'tag_exists', value: 'tag-1' }] },
+          // operator が抜けている。旧実装はこれを OR として扱った。
+          { rules: [{ type: 'tag_exists', value: 'tag-2' }] },
+        ],
+      });
+      seedRule({ friendCondition: nested, resendSuppressionHours: 0 });
+      const result = await applyFriendAddRouting(
+        db, 'acc-1', { id: 'friend-1', unfollow_count: 0 }, undefined,
+        { entryRouteId: 'route-1', now: MON_10 },
+      );
+      expect(result).toMatchObject({
+        routed: true, suppressed: true, suppressReason: 'friend_condition_invalid',
+      });
+      expect(result.enrollments).toEqual([]);
+    });
+
+    test('入れ子グループの operator が不正な文字列でも送らない', async () => {
+      const nested = JSON.stringify({
+        operator: 'AND',
+        rules: [],
+        groups: [{ operator: 'and', rules: [{ type: 'tag_exists', value: 'tag-1' }] }],
+      });
+      seedRule({ friendCondition: nested, resendSuppressionHours: 0 });
+      const result = await applyFriendAddRouting(
+        db, 'acc-1', { id: 'friend-1', unfollow_count: 0 }, undefined,
+        { entryRouteId: 'route-1', now: MON_10 },
+      );
+      expect(result).toMatchObject({ suppressed: true, suppressReason: 'friend_condition_invalid' });
+    });
+
+    test('入れ子の中に使えない種別があれば送らない', async () => {
+      const nested = JSON.stringify({
+        operator: 'AND',
+        rules: [],
+        groups: [{
+          operator: 'OR',
+          rules: [{ type: 'tag_exists', value: 'tag-1' }],
+          groups: [{ operator: 'AND', rules: [{ type: 'sql_injection', value: 'x' }] }],
+        }],
+      });
+      seedRule({ friendCondition: nested, resendSuppressionHours: 0 });
+      const result = await applyFriendAddRouting(
+        db, 'acc-1', { id: 'friend-1', unfollow_count: 0 }, undefined,
+        { entryRouteId: 'route-1', now: MON_10 },
+      );
+      expect(result).toMatchObject({ suppressed: true, suppressReason: 'friend_condition_invalid' });
+    });
+
+    test('入れ子の中に値の足りない行があれば送らない', async () => {
+      const nested = JSON.stringify({
+        operator: 'AND',
+        rules: [],
+        groups: [{ operator: 'AND', rules: [{ type: 'tag_all', value: [] }] }],
+      });
+      seedRule({ friendCondition: nested, resendSuppressionHours: 0 });
+      const result = await applyFriendAddRouting(
+        db, 'acc-1', { id: 'friend-1', unfollow_count: 0 }, undefined,
+        { entryRouteId: 'route-1', now: MON_10 },
+      );
+      expect(result).toMatchObject({ suppressed: true, suppressReason: 'friend_condition_invalid' });
+    });
+
+    test('正しい入れ子は通し、実データで評価する', async () => {
+      raw.prepare(`INSERT INTO tags (id, name, line_account_id) VALUES ('tag-1', '来店', 'acc-1')`).run();
+      raw.prepare(`INSERT INTO friend_tags (friend_id, tag_id) VALUES ('friend-1', 'tag-1')`).run();
+      const nested = JSON.stringify({
+        operator: 'AND',
+        rules: [],
+        groups: [{
+          operator: 'OR',
+          rules: [{ type: 'tag_exists', value: 'tag-1' }],
+          groups: [{ operator: 'AND', rules: [{ type: 'is_following', value: true }] }],
+        }],
+      });
+      seedRule({ friendCondition: nested, resendSuppressionHours: 0 });
+      const result = await applyFriendAddRouting(
+        db, 'acc-1', { id: 'friend-1', unfollow_count: 0 }, undefined,
+        { entryRouteId: 'route-1', now: MON_10 },
+      );
+      expect(result).toMatchObject({ suppressed: false, suppressReason: null });
+      expect(result.enrollments).toHaveLength(1);
+    });
+  });
+
+  /*
+   * 保存のあとでもタグ・シナリオは消せる・別アカウントへ移せる。
+   * 公開版のスナップショットは古い参照を抱えたまま動くので、実行時にも
+   * 持ち物かを確かめる。別アカウントの持ち物を指していたら送らない。
+   */
+  describe('参照の所属（実行時）', () => {
+    test('友だち条件が別アカウントのタグを指していたら送らない', async () => {
+      setupBase('acc-2', 'scenario-2');
+      raw.prepare(`INSERT INTO tags (id, name, line_account_id) VALUES ('tag-x', '他店タグ', 'acc-2')`).run();
+      seedRule({
+        friendCondition: JSON.stringify({
+          operator: 'AND', rules: [{ type: 'tag_exists', value: 'tag-x' }],
+        }),
+        resendSuppressionHours: 0,
+      });
+      const result = await applyFriendAddRouting(
+        db, 'acc-1', { id: 'friend-1', unfollow_count: 0 }, undefined,
+        { entryRouteId: 'route-1', now: MON_10 },
+      );
+      expect(result).toMatchObject({
+        routed: true, suppressed: true, suppressReason: 'reference_out_of_account',
+      });
+      expect(result.enrollments).toEqual([]);
+    });
+
+    test('配信するシナリオが別アカウントの持ち物になったら送らない', async () => {
+      setupBase('acc-2', 'scenario-2');
+      seedRule({ scenarioId: 'scenario-2', resendSuppressionHours: 0 });
+      const result = await applyFriendAddRouting(
+        db, 'acc-1', { id: 'friend-1', unfollow_count: 0 }, undefined,
+        { entryRouteId: 'route-1', now: MON_10 },
+      );
+      expect(result).toMatchObject({ suppressed: true, suppressReason: 'reference_out_of_account' });
+      expect(result.enrollments).toEqual([]);
+      // 他アカウントのシナリオへ登録していない
+      expect(raw.prepare(`SELECT COUNT(*) AS n FROM friend_scenarios`).get()).toEqual({ n: 0 });
+    });
+
+    test('所有者が未設定の古いタグは越境ではないので通す', async () => {
+      raw.prepare(`INSERT INTO tags (id, name, line_account_id) VALUES ('tag-legacy', '旧タグ', NULL)`).run();
+      raw.prepare(`INSERT INTO friend_tags (friend_id, tag_id) VALUES ('friend-1', 'tag-legacy')`).run();
+      seedRule({
+        friendCondition: JSON.stringify({
+          operator: 'AND', rules: [{ type: 'tag_exists', value: 'tag-legacy' }],
+        }),
+        resendSuppressionHours: 0,
+      });
+      const result = await applyFriendAddRouting(
+        db, 'acc-1', { id: 'friend-1', unfollow_count: 0 }, undefined,
+        { entryRouteId: 'route-1', now: MON_10 },
+      );
+      expect(result).toMatchObject({ suppressed: false, suppressReason: null });
+    });
+
+    test('消えたタグ1つで配信全体は止めない（越境ではない）', async () => {
+      seedRule({
+        friendCondition: JSON.stringify({
+          operator: 'AND', rules: [{ type: 'tag_exists', value: 'tag-deleted' }],
+        }),
+        resendSuppressionHours: 0,
+      });
+      const result = await applyFriendAddRouting(
+        db, 'acc-1', { id: 'friend-1', unfollow_count: 0 }, undefined,
+        { entryRouteId: 'route-1', now: MON_10 },
+      );
+      // 条件に当たらないだけ。理由は「条件外」で、越境の理由にはしない。
+      expect(result).toMatchObject({ suppressed: true, suppressReason: 'friend_condition_not_met' });
+    });
+  });
+
 });
 
 describe('競合確認API: 日跨ぎの重なりも同じ関数で見る', () => {

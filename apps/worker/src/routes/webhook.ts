@@ -401,6 +401,23 @@ async function handleEvent(
     let claimGeneration = 0;
     let claimError = false;
     let fencedOut = false;
+    /*
+     * 送信の結末。**「送っていない」と「送ったか分からない」を分ける。**
+     * 分けないと、届いたかもしれない実行を自動で送り直して二重に届く。
+     *   none      … 外部送信を試みていない
+     *   failed    … LINE が断った（届いていない）。自動再送してよい
+     *   unknown   … 通信断・タイムアウト・5xx。届いたかもしれない
+     *   delivered … 送れた
+     */
+    const sendState: { outcome: FollowSendOutcome } = { outcome: 'none' };
+    const noteSendOutcome = (outcome: 'delivered' | 'failed' | 'unknown'): void => {
+      const current = sendState.outcome;
+      if (outcome === 'delivered') { sendState.outcome = 'delivered'; return; }
+      if (current === 'delivered') return;
+      if (outcome === 'unknown') { sendState.outcome = 'unknown'; return; }
+      if (current === 'none') sendState.outcome = 'failed';
+    };
+    const currentSendOutcome = (): FollowSendOutcome => sendState.outcome;
     if (friendAddEventId && lineAccountId) {
       try {
         const claim = await claimFriendAddSendRight(db, {
@@ -449,6 +466,8 @@ async function handleEvent(
             entryRouteId: currentAttribution?.entryRouteId ?? referralRoute?.id ?? null,
             sendRight,
             claimError,
+            // 登録・アクションも送信と同じ予約の下で行う。
+            fence: stillSendRightHolder,
           })
         : null;
     } catch (err) {
@@ -488,6 +507,7 @@ async function handleEvent(
               enrollment,
               reply: { client: lineClient, replyToken: event.replyToken },
               skipCooldown: true,
+              onSendOutcome: noteSendOutcome,
             },
           );
           if (sent) {
@@ -544,6 +564,7 @@ async function handleEvent(
               enrollment: friendScenario,
               reply: { client: lineClient, replyToken: event.replyToken },
               skipCooldown: true,
+              onSendOutcome: noteSendOutcome,
             },
           );
           if (sent) {
@@ -556,60 +577,20 @@ async function handleEvent(
       }
     }
 
-    // 台帳の確定の直前にも持ち主を確かめる。回収されていたら古い持ち主
-    // として確定しない（持ち主が確定する）。
-    if (claimedSendRight && !claimError && friendAddEventId && lineAccountId) {
-      await stillSendRightHolder();
-    }
-
-    let ledgerFinalized = false;
-    if (friendAddEventId && lineAccountId && !fencedOut) {
-      try {
-        /*
-         * 送れなかった実行を completed にしない。completed は「送った」印で、
-         * 再送制限が数える。送っていないのに completed にすると、送れなかった
-         * 人が再送制限に数えられて永久に送れなくなる。再送可能にするため
-         * partial_failed にし、理由を残す。
-         */
-        const delivered = friendAddDeliveryCount > 0;
-        await markFriendAddEventRouting(db, {
-          eventId: friendAddEventId,
-          lineAccountId,
-          status: routing?.suppressed ? 'suppressed' : (delivered ? 'completed' : 'partial_failed'),
-          routingRuleId: routing?.ruleId ?? null,
-          winningRuleVersionId: routing?.ruleVersionId ?? null,
-          errorCode: routing?.suppressReason
-            ?? (claimError ? 'send_claim_unavailable' : (!sendRight ? 'duplicate_in_flight' : (delivered ? null : 'send_failed'))),
-          scenarioEnrollmentId,
-          deliveryCount: friendAddDeliveryCount,
-        });
-        ledgerFinalized = true;
-      } catch (err) {
-        logWebhookStepFailure('friend_add_event_mark_complete', err, lineAccountId, event);
-      }
-    }
-
     /*
-     * 予約の解放は台帳の確定まで待つ。外部送信のあと確定に失敗しても
-     * （送達不明）、予約を掴んだままにするため別の実行は引く。二重送信に
-     * ならない。確定できなかった実行は次の追加で送り直せる
-     * （completed だけが再送制限に数える）。
+     * 流入リンクの付随処理（案内の送信・専用シナリオ）と友だち追加クーポン。
+     *
+     * **どちらも外部送信なので、シナリオ配信と同じ送信権の下で行う。**
+     * 以前はここが予約の外にあり、並行follow の負けた側も案内を押していた。
+     * 同じ人に同じ案内が2通届く。
      */
-    if (claimedSendRight && !claimError && ledgerFinalized && friendAddEventId && lineAccountId) {
-      try {
-        await releaseFriendAddSendRight(db, {
-          lineAccountId,
-          friendId: friend.id,
-          eventId: friendAddEventId,
-          generation: claimGeneration,
-        });
-      } catch (err) {
-        logWebhookStepFailure('friend_add_send_release', err, lineAccountId, event);
-      }
-    }
-
+    const mayRunFollowSideEffects = async (): Promise<boolean> => {
+      if (!sendRight) return false;
+      if (friendAddEventId == null || lineAccountId == null) return true;
+      return stillSendRightHolder();
+    };
     // Referral link side-effects (intro push + dedicated scenario)
-    if (referralRoute) {
+    if (referralRoute && await mayRunFollowSideEffects()) {
       // Intro push from referral link
       if (referralRoute.intro_template_id) {
         try {
@@ -651,7 +632,7 @@ async function handleEvent(
 
     // NENの友だち追加クーポンは、アカウント別設定が有効な場合だけ初回追加時に発行する。
     // 再フォローとWebhook再送は発行台帳の一意制約でも二重発行を防ぐ。
-    if ('first_time' === friendKind && lineAccountId && ecommerce) {
+    if ('first_time' === friendKind && lineAccountId && ecommerce && await mayRunFollowSideEffects()) {
       try {
         await issueFriendAddCoupon(db, {
           lineAccountId,
@@ -663,6 +644,79 @@ async function handleEvent(
         });
       } catch (err) {
         logWebhookStepFailure('friend_add_coupon', err, lineAccountId, event);
+      }
+    }
+
+    /*
+     * 台帳の確定。
+     *
+     * 予約を持って進んだ実行は、**確定の1文の中で**持ち主かを確かめる
+     * （markFriendAddEventRouting の fence）。確かめてから書く2文にすると
+     * その隙に回収されて、古い持ち主が結果を上書きできる。
+     *
+     * 状態と理由の決め方:
+     *   送れた                   … completed（再送制限が数える）
+     *   送ったか分からない       … partial_failed / delivery_unknown
+     *                              **自動再送しない。** 送り直すと二重に届く。
+     *   送っていない・断られた   … partial_failed / send_failed（再送できる）
+     *   条件などで送らなかった   … suppressed（理由つき）
+     */
+    const delivered = friendAddDeliveryCount > 0;
+    const deliveryUnknown = !delivered && currentSendOutcome() === 'unknown';
+    const ledgerErrorCode = routing?.suppressReason
+      ?? (claimError
+        ? 'send_claim_unavailable'
+        : (!sendRight
+          ? 'duplicate_in_flight'
+          : (delivered ? null : (deliveryUnknown ? 'delivery_unknown' : 'send_failed'))));
+    let ledgerFinalized = false;
+    if (friendAddEventId && lineAccountId && !fencedOut) {
+      try {
+        ledgerFinalized = await markFriendAddEventRouting(db, {
+          eventId: friendAddEventId,
+          lineAccountId,
+          status: routing?.suppressed ? 'suppressed' : (delivered ? 'completed' : 'partial_failed'),
+          routingRuleId: routing?.ruleId ?? null,
+          winningRuleVersionId: routing?.ruleVersionId ?? null,
+          errorCode: ledgerErrorCode,
+          scenarioEnrollmentId,
+          deliveryCount: friendAddDeliveryCount,
+          // 予約を持って進んだ実行だけ、同じ予約の下で確定する。
+          fence: claimedSendRight && !claimError && claimGeneration > 0
+            ? { friendId: friend.id, generation: claimGeneration }
+            : undefined,
+        });
+        if (!ledgerFinalized) {
+          // 回収されていた。勝った側が確定するのでここでは何も書かない。
+          fencedOut = true;
+          console.warn('[friend-add] ledger finalize fenced out (send right revoked)');
+        }
+      } catch (err) {
+        logWebhookStepFailure('friend_add_event_mark_complete', err, lineAccountId, event);
+      }
+    }
+
+    /*
+     * 予約の解放。
+     *
+     * 台帳を確定できて、かつ**送達不明でない**ときだけ返す。
+     * 送達不明のまま返すと、次のfollowが予約を取って送り直し、
+     * 二重に届く。掴んだまま残し、TTL を過ぎるまで別の実行を止める。
+     * 確定できなかった実行（送信後にDBが落ちた等）も掴んだままにする。
+     */
+    if (
+      claimedSendRight && !claimError && ledgerFinalized && !deliveryUnknown
+      && friendAddEventId && lineAccountId
+    ) {
+      try {
+        await releaseFriendAddSendRight(db, {
+          lineAccountId,
+          friendId: friend.id,
+          eventId: friendAddEventId,
+          generation: claimGeneration,
+        });
+      } catch (err) {
+        logWebhookStepFailure('friend_add_send_release', err, lineAccountId, event);
       }
     }
 
@@ -1099,5 +1153,11 @@ async function handleEvent(
     return;
   }
 }
+
+/**
+ * follow の外部送信の結末。「送っていない」と「送ったか分からない」を
+ * 分けて持つ。分けないと、届いたかもしれない実行を自動で送り直す。
+ */
+type FollowSendOutcome = 'none' | 'failed' | 'unknown' | 'delivered';
 
 export { webhook };

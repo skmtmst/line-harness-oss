@@ -20,9 +20,12 @@ import { requireRole } from '../middleware/role-guard.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
 import {
   areFriendAddConditionsOverlapping,
+  collectFriendAddReferences,
   doFriendAddTimeWindowsOverlap,
   doFriendAddWeekdaySetsOverlap,
+  findFriendAddForeignReferences,
   isValidFriendAddHhmm,
+  parseFriendAddConditionAst,
 } from '../services/friend-add-routing.js';
 
 const friendAddRules = new Hono<Env>();
@@ -209,6 +212,24 @@ function toRule(row: FriendAddRuleRow, routeNames: Map<string, string>, scenario
   };
 }
 
+type ConditionAstError = Exclude<ReturnType<typeof parseFriendAddConditionAst>, { ok: true }>['error'];
+
+/**
+ * 条件が読めなかった理由を、設定した人が直せる言葉にする。
+ * 旧形式の自由文（`legacy_text`）はここに無い。保存を止めないため。
+ */
+const CONDITION_AST_MESSAGES: Record<Exclude<ConditionAstError, 'legacy_text'>, string> = {
+  not_json: '友だち条件のJSONが壊れています。条件ビルダーで作り直してください。',
+  not_object: '友だち条件の形が正しくありません。条件ビルダーで作り直してください。',
+  bad_operator: '友だち条件の「すべて／いずれか」の指定が抜けているグループがあります。',
+  bad_rules: '友だち条件の中に、条件の一覧が入っていないグループがあります。',
+  bad_rule: '友だち条件に、使えない条件が含まれています。',
+  bad_groups: '友だち条件の入れ子グループの形が正しくありません。',
+  too_deep: '友だち条件の入れ子が深すぎます。もっと浅い形にしてください。',
+  too_large: '友だち条件が大きすぎます。条件の数を減らしてください。',
+  unbuildable: '友だち条件に、値が足りない条件があります。',
+};
+
 function validateInput(body: RuleInput): string | null {
   if (!body.name?.trim()) return '設定名が必要です';
   if (body.name.trim().length > 60) return '設定名は60文字以内で入力してください';
@@ -226,6 +247,19 @@ function validateInput(body: RuleInput): string | null {
         return '時間帯は00:00〜23:59の形で入力してください';
       }
     }
+  }
+  /*
+   * 友だち条件は入れ子まで検証する。入れ子グループの operator を省いた形は
+   * 実行時に OR へ読み替わり、「両方を満たす人だけ」のつもりが
+   * 「どちらかを満たす人すべて」へ広がる。保存させない。
+   */
+  const conditionAst = parseFriendAddConditionAst(body.definition?.friendCondition);
+  /*
+   * 旧形式の自由文だけは保存を止めない。止めると、その設定の名前や
+   * 時間帯すら直せなくなる。配信は実行時に止め、画面で作り直しを促す。
+   */
+  if (!conditionAst.ok && conditionAst.error !== 'legacy_text') {
+    return CONDITION_AST_MESSAGES[conditionAst.error];
   }
   return null;
 }
@@ -305,6 +339,24 @@ async function validateReferences(
   const skipsScenario = friendKind === 'returning' && definition.returningMode === 'none';
   if (!definition.scenarioId && !skipsScenario) {
     push(friendKind, '実際に配信するシナリオを決めてください。');
+  }
+  /*
+   * 友だち条件の中で指しているタグ・シナリオ・友だち情報欄も、
+   * このアカウントの持ち物かを確かめる。ここを見ないと、別アカウントの
+   * タグで絞った条件がそのまま保存され、実行時に誰にも当たらない
+   * （あるいは他アカウントの持ち物を読む）設定ができてしまう。
+   */
+  const conditionRefs = collectFriendAddReferences({
+    scenarioId: null,
+    routeIds: [],
+    actions: [],
+    friendCondition: definition.friendCondition,
+  });
+  const foreign = await findFriendAddForeignReferences(db, accountId, conditionRefs, {
+    requireExists: true,
+  });
+  if (foreign.length > 0) {
+    push(friendKind, 'このLINEアカウントで使えないタグ・シナリオ・友だち情報欄が友だち条件に含まれています。');
   }
   return messages;
 }

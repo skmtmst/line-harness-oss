@@ -33,7 +33,13 @@ import {
 import { toJstString } from '@line-crm/db';
 import { attachTagAndFireSideEffects } from './friend-tag-attach.js';
 import type { ImmediatePushContext } from './immediate-first-step.js';
-import { matchesCondition, parseCondition, type SegmentCondition } from './segment-query.js';
+import {
+  buildSegmentWhere,
+  matchesCondition,
+  parseCondition,
+  type SegmentCondition,
+  type SegmentRule,
+} from './segment-query.js';
 
 export const FRIEND_ADD_ROUTING_KEY = 'friend_add_routing';
 
@@ -224,7 +230,13 @@ export type FriendAddSuppressReason =
   | 'resend_suppressed'
   | 'delivery_disabled'
   | 'duplicate_in_flight'
-  | 'send_claim_unavailable';
+  | 'send_claim_unavailable'
+  /** 条件木が読めない・組み立てられない（入れ子まで再帰検証して弾いた）。 */
+  | 'friend_condition_invalid'
+  /** 設定が別アカウントのタグ・シナリオ・友だち情報欄を指している。 */
+  | 'reference_out_of_account'
+  /** 送信権を回収された古い持ち主。勝った側が送るのでここでは送らない。 */
+  | 'send_right_revoked';
 
 /** JSTの現在時刻を "HH:MM" で返す。WorkersはUTCで動くので自前でずらす。 */
 export function friendAddJstHhmm(at: Date): string {
@@ -857,15 +869,311 @@ export function areFriendAddConditionsOverlapping(a: unknown, b: unknown): boole
   return Boolean(left) && left === right;
 }
 
+/*
+ * 条件木（AST）の再帰検証と、参照しているIDの所属確認。
+ *
+ * `parseCondition` は**いちばん外側しか見ない**。入れ子グループの
+ * `operator` は見ないため、`"and"`（小文字）や欠落のような値がそのまま
+ * 通り、`buildSegmentWhere` の既定で **OR** に読み替わる。「AとBの両方」で
+ * 絞ったつもりの設定が「AまたはB」になり、送ってはいけない相手へ届く。
+ * ここで木の全段を検証し、読めないものは配信を止める。
+ */
+
+/** 検証で許す入れ子の深さ。Condition Builder が作る木はこれより浅い。 */
+export const FRIEND_ADD_CONDITION_MAX_DEPTH = 8;
+/** 検証で許すノード数。壊れた巨大JSONで実行時間を使い切らせない。 */
+export const FRIEND_ADD_CONDITION_MAX_NODES = 200;
+
+/**
+ * 条件で使えるルール種別。segment-query の `SegmentRule['type']` と
+ * 1対1で持つ。片方だけ増えたら型検査で落ちる（下の網羅チェック）。
+ */
+const SEGMENT_RULE_TYPE_MAP: Record<SegmentRule['type'], true> = {
+  tag_exists: true,
+  tag_not_exists: true,
+  tag_all: true,
+  tag_not_all: true,
+  metadata_equals: true,
+  metadata_not_equals: true,
+  ref_code: true,
+  is_following: true,
+  scenario_subscribed: true,
+  name: true,
+  private_memo: true,
+  status_message: true,
+  registered_at: true,
+  support_mark: true,
+  is_hidden: true,
+  friend_field: true,
+  scenario_state: true,
+  form_answered: true,
+  last_reaction_at: true,
+  reaction_state: true,
+  score_range: true,
+};
+const SEGMENT_RULE_TYPES = new Set<string>(Object.keys(SEGMENT_RULE_TYPE_MAP));
+
+export type FriendAddConditionAstError =
+  /** JSONを書こうとした形跡がない自由文。旧形式の社内メモ混じり。 */
+  | 'legacy_text'
+  | 'not_json'
+  | 'not_object'
+  | 'bad_operator'
+  | 'bad_rules'
+  | 'bad_rule'
+  | 'bad_groups'
+  | 'too_deep'
+  | 'too_large'
+  | 'unbuildable';
+
+function checkConditionNode(
+  node: unknown,
+  depth: number,
+  counter: { n: number },
+): FriendAddConditionAstError | null {
+  if (depth > FRIEND_ADD_CONDITION_MAX_DEPTH) return 'too_deep';
+  if (!node || typeof node !== 'object' || Array.isArray(node)) return 'not_object';
+  const record = node as Record<string, unknown>;
+  // 入れ子でも operator を必ず見る。既定の OR へ落とすと絞り込みが緩む。
+  if (record.operator !== 'AND' && record.operator !== 'OR') return 'bad_operator';
+  if (!Array.isArray(record.rules)) return 'bad_rules';
+  for (const rule of record.rules) {
+    counter.n += 1;
+    if (counter.n > FRIEND_ADD_CONDITION_MAX_NODES) return 'too_large';
+    if (!rule || typeof rule !== 'object' || Array.isArray(rule)) return 'bad_rule';
+    const type = (rule as { type?: unknown }).type;
+    if (typeof type !== 'string' || !SEGMENT_RULE_TYPES.has(type)) return 'bad_rule';
+  }
+  if (record.groups !== undefined) {
+    if (!Array.isArray(record.groups)) return 'bad_groups';
+    for (const group of record.groups) {
+      counter.n += 1;
+      if (counter.n > FRIEND_ADD_CONDITION_MAX_NODES) return 'too_large';
+      const error = checkConditionNode(group, depth + 1, counter);
+      if (error) return error;
+    }
+  }
+  return null;
+}
+
+/**
+ * 条件JSONを木の全段まで検証して読む。
+ * 空（絞り込みなし）は `{ ok: true, condition: null }`。
+ * 読めないものは理由つきで断る。保存側は400、実行側は抑止に使う。
+ */
+export function parseFriendAddConditionAst(
+  value: unknown,
+): { ok: true; condition: SegmentCondition | null } | { ok: false; error: FriendAddConditionAstError } {
+  const raw = normalizeFriendAddCondition(value);
+  if (!raw) return { ok: true, condition: null };
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    /*
+     * `{` `[` で始まらない値は、条件を書こうとしたものではなく旧形式の
+     * 自由文（社内メモ）。**保存は止めない**（止めると、条件以外の項目も
+     * 直せなくなる）。実行時に抑止し、画面で作り直しを促す。
+     * 書こうとして壊れている値は保存時に断る。
+     */
+    return { ok: false, error: /^[{[]/.test(raw) ? 'not_json' : 'legacy_text' };
+  }
+  const structural = checkConditionNode(parsed, 1, { n: 0 });
+  if (structural) return { ok: false, error: structural };
+  const condition = parsed as SegmentCondition;
+  // 値の形（タグIDが空、期間が両方未指定など）は WHERE を組み立てて確かめる。
+  // 実行時と同じ組み立て器を通すので、判定と実行の意味がずれない。
+  try {
+    buildSegmentWhere(condition);
+  } catch {
+    return { ok: false, error: 'unbuildable' };
+  }
+  return { ok: true, condition };
+}
+
+/** 設定が参照しているID。アカウントの持ち物かを確かめるために集める。 */
+export interface FriendAddReferenceIds {
+  tagIds: string[];
+  scenarioIds: string[];
+  friendFieldIds: string[];
+  routeIds: string[];
+}
+
+function pushId(into: Set<string>, value: unknown): void {
+  if (typeof value === 'string' && value.trim()) into.add(value.trim());
+}
+
+function collectConditionReferences(
+  node: unknown,
+  depth: number,
+  acc: { tags: Set<string>; scenarios: Set<string>; fields: Set<string> },
+): void {
+  if (depth > FRIEND_ADD_CONDITION_MAX_DEPTH) return;
+  if (!node || typeof node !== 'object' || Array.isArray(node)) return;
+  const record = node as Record<string, unknown>;
+  if (Array.isArray(record.rules)) {
+    for (const rule of record.rules) {
+      if (!rule || typeof rule !== 'object' || Array.isArray(rule)) continue;
+      const { type, value } = rule as { type?: unknown; value?: unknown };
+      if (type === 'tag_exists' || type === 'tag_not_exists') pushId(acc.tags, value);
+      else if (type === 'tag_all' || type === 'tag_not_all') {
+        if (Array.isArray(value)) for (const id of value) pushId(acc.tags, id);
+      } else if (type === 'scenario_subscribed') pushId(acc.scenarios, value);
+      else if (type === 'scenario_state') {
+        pushId(acc.scenarios, (value as { scenarioId?: unknown } | null)?.scenarioId);
+      } else if (type === 'friend_field') {
+        pushId(acc.fields, (value as { fieldId?: unknown } | null)?.fieldId);
+      }
+    }
+  }
+  if (Array.isArray(record.groups)) {
+    for (const group of record.groups) collectConditionReferences(group, depth + 1, acc);
+  }
+}
+
+/**
+ * 設定が指しているIDを全部集める。配信するシナリオ・流入リンク・
+ * アクションの対象・友だち条件の中のタグ／シナリオ／友だち情報欄まで。
+ */
+export function collectFriendAddReferences(
+  definition: Pick<FriendAddRuleDefinition, 'scenarioId' | 'routeIds' | 'actions' | 'friendCondition'>,
+): FriendAddReferenceIds {
+  const tags = new Set<string>();
+  const scenarios = new Set<string>();
+  const fields = new Set<string>();
+  const routes = new Set<string>();
+  pushId(scenarios, definition.scenarioId);
+  if (Array.isArray(definition.routeIds)) for (const id of definition.routeIds) pushId(routes, id);
+  if (Array.isArray(definition.actions)) {
+    for (const action of definition.actions) {
+      if (!action || typeof action !== 'object') continue;
+      const { type, targetId, config } = action as {
+        type?: unknown; targetId?: unknown; config?: unknown;
+      };
+      if (type === 'add_tag' || type === 'remove_tag') pushId(tags, targetId);
+      else if (type === 'start_scenario' || type === 'stop_scenario') pushId(scenarios, targetId);
+      // 行アクション（保存形が config を持つ形）も同じ持ち物検査に載せる。
+      const rowConfig = (config && typeof config === 'object' ? config : null) as
+        | Record<string, unknown>
+        | null;
+      if (rowConfig) {
+        if (Array.isArray(rowConfig.tagIds)) for (const id of rowConfig.tagIds) pushId(tags, id);
+        pushId(scenarios, rowConfig.scenarioId);
+        pushId(fields, rowConfig.fieldId);
+      }
+    }
+  }
+  const parsedCondition = (() => {
+    const raw = normalizeFriendAddCondition(definition.friendCondition);
+    if (!raw) return null;
+    try {
+      return JSON.parse(raw) as unknown;
+    } catch {
+      return null;
+    }
+  })();
+  if (parsedCondition) {
+    collectConditionReferences(parsedCondition, 1, { tags, scenarios, fields });
+  }
+  return {
+    tagIds: [...tags],
+    scenarioIds: [...scenarios],
+    friendFieldIds: [...fields],
+    routeIds: [...routes],
+  };
+}
+
+async function selectIds(
+  db: D1Database,
+  ids: string[],
+  build: (placeholders: string) => { sql: string; bindings: unknown[] },
+): Promise<Set<string>> {
+  if (ids.length === 0) return new Set();
+  const { sql, bindings } = build(ids.map(() => '?').join(','));
+  const rows = await db.prepare(sql).bind(...bindings).all<{ id: string }>();
+  return new Set((rows.results ?? []).map((row) => row.id));
+}
+
+/**
+ * 参照しているIDのうち、**別アカウントの持ち物**を返す。
+ *
+ * `requireExists` を立てると、見つからないIDも「使えない」として返す。
+ * 保存時は立てる（打ち間違い・消し忘れをその場で直せる）。実行時は立てない。
+ * 実行時に消えたタグ1つで配信全体を止めるのは行き過ぎで、
+ * 消えたIDは条件に当たらないだけで越境にはならない。
+ *
+ * 所有者が未設定（line_account_id / tenant_id が NULL）の古い行は、
+ * 流入リンクと同じく互換のデータとして通す。越境ではないため。
+ *
+ * フォーム・対応マークは所有アカウントを持たない設計のため、ここでは見ない。
+ */
+export async function findFriendAddForeignReferences(
+  db: D1Database,
+  accountId: string,
+  refs: FriendAddReferenceIds,
+  options?: { requireExists?: boolean },
+): Promise<string[]> {
+  const tenantOfAccount = '(SELECT tenant_id FROM line_accounts WHERE id = ?)';
+  const [tags, scenarios, fields, routes] = await Promise.all([
+    selectIds(db, refs.tagIds, (p) => ({
+      sql: `SELECT id FROM tags
+             WHERE id IN (${p}) AND line_account_id IS NOT NULL AND line_account_id != ?`,
+      bindings: [...refs.tagIds, accountId],
+    })),
+    selectIds(db, refs.scenarioIds, (p) => ({
+      sql: `SELECT id FROM scenarios
+             WHERE id IN (${p}) AND line_account_id IS NOT NULL AND line_account_id != ?`,
+      bindings: [...refs.scenarioIds, accountId],
+    })),
+    selectIds(db, refs.friendFieldIds, (p) => ({
+      sql: `SELECT id FROM friend_fields
+             WHERE id IN (${p}) AND tenant_id IS NOT NULL AND tenant_id != ${tenantOfAccount}`,
+      bindings: [...refs.friendFieldIds, accountId],
+    })),
+    selectIds(db, refs.routeIds, (p) => ({
+      sql: `SELECT id FROM entry_routes
+             WHERE id IN (${p})
+               AND ((line_account_id IS NOT NULL AND line_account_id != ?)
+                    OR (line_account_id IS NULL
+                        AND tenant_id IS NOT NULL AND tenant_id != ${tenantOfAccount}))`,
+      bindings: [...refs.routeIds, accountId, accountId],
+    })),
+  ]);
+  const foreign = [...tags, ...scenarios, ...fields, ...routes];
+  if (!options?.requireExists) return foreign;
+
+  const [knownTags, knownScenarios, knownFields, knownRoutes] = await Promise.all([
+    selectIds(db, refs.tagIds, (p) => ({
+      sql: `SELECT id FROM tags WHERE id IN (${p})`, bindings: [...refs.tagIds],
+    })),
+    selectIds(db, refs.scenarioIds, (p) => ({
+      sql: `SELECT id FROM scenarios WHERE id IN (${p})`, bindings: [...refs.scenarioIds],
+    })),
+    selectIds(db, refs.friendFieldIds, (p) => ({
+      sql: `SELECT id FROM friend_fields WHERE id IN (${p})`, bindings: [...refs.friendFieldIds],
+    })),
+    selectIds(db, refs.routeIds, (p) => ({
+      sql: `SELECT id FROM entry_routes WHERE id IN (${p})`, bindings: [...refs.routeIds],
+    })),
+  ]);
+  const missing = [
+    ...refs.tagIds.filter((id) => !knownTags.has(id)),
+    ...refs.scenarioIds.filter((id) => !knownScenarios.has(id)),
+    ...refs.friendFieldIds.filter((id) => !knownFields.has(id)),
+    ...refs.routeIds.filter((id) => !knownRoutes.has(id)),
+  ];
+  return [...new Set([...foreign, ...missing])];
+}
+
 /**
  * 友だち条件を実データで評価する。
  *
  * - 空は制限なし（通す）。
- * - Segment条件JSONとして読める値は friends 実データで評価する。
+ * - Segment条件JSONは**入れ子まで再帰検証**してから実データで評価する。
  * - JSON以外の自由文（旧形式の社内メモ混じり）は安全側に抑止する。
  *   通すと「絞ったつもりが全員に届く」事故になる。社内メモは
  *   `internalMemo` へ分離し、画面で再設定を促す。
- * - 読めないJSON（`{` `[` で始まるのに壊れている）も通さない。
+ * - 入れ子グループの operator 欠落のように、通すと絞り込みが緩む形も抑止する。
  */
 export async function evaluateFriendAddFriendCondition(
   db: D1Database,
@@ -873,30 +1181,46 @@ export async function evaluateFriendAddFriendCondition(
   friendId: string,
 ): Promise<{
   matched: boolean;
-  reason: Extract<FriendAddSuppressReason, 'friend_condition_not_met' | 'friend_condition_unreadable'> | null;
+  reason: Extract<
+    FriendAddSuppressReason,
+    'friend_condition_not_met' | 'friend_condition_unreadable' | 'friend_condition_invalid'
+  > | null;
 }> {
-  const raw = normalizeFriendAddCondition(definition.friendCondition);
-  if (!raw) return { matched: true, reason: null };
-  const condition = parseCondition(raw);
-  if (!condition) {
-    console.error('[friend-add-routing] unreadable friendCondition — skipped the rule');
-    return { matched: false, reason: 'friend_condition_unreadable' };
+  const ast = parseFriendAddConditionAst(definition.friendCondition);
+  if (!ast.ok) {
+    console.error(`[friend-add-routing] friendCondition rejected (${ast.error}) — skipped the rule`);
+    // 旧形式の自由文は「作り直してほしい」を画面へ出すため従来の理由のまま。
+    // 木の形が壊れているものは別の理由で分ける。
+    return {
+      matched: false,
+      reason: ast.error === 'legacy_text' || ast.error === 'not_json'
+        ? 'friend_condition_unreadable'
+        : 'friend_condition_invalid',
+    };
   }
+  if (!ast.condition) return { matched: true, reason: null };
   try {
-    const matches = await matchesCondition(db, friendId, condition);
+    const matches = await matchesCondition(db, friendId, ast.condition);
     return matches
       ? { matched: true, reason: null }
       : { matched: false, reason: 'friend_condition_not_met' };
   } catch {
-    console.error('[friend-add-routing] unreadable friendCondition — skipped the rule');
-    return { matched: false, reason: 'friend_condition_unreadable' };
+    console.error('[friend-add-routing] friendCondition evaluation failed — skipped the rule');
+    return { matched: false, reason: 'friend_condition_invalid' };
   }
 }
 
 /**
- * 再送制限にかかっているか。直近に「送信済み（completed）」の実行があれば抑止する。
- * 抑止された実行（suppressed）・失敗・処理中は数えない。送っていないものを
- * 数えると、送れなかった人が永久に送れなくなる。
+ * 再送制限にかかっているか。
+ *
+ * 数えるのは「**届いた形跡がある実行**」だけ。
+ *   - `completed`（送った印）
+ *   - 送信の記録が残っている行（delivery_count > 0 / first_delivery_sent_at あり）
+ *   - 送達不明（`delivery_unknown`）— 送ったかもしれない実行。
+ *     自動で送り直すと二重に届くため、ここで止めて人の確認に回す。
+ *
+ * 逆に、送っていないことがはっきりしている実行（`send_failed`・抑止・
+ * 処理中）は数えない。数えると、送れなかった人が永久に送れなくなる。
  * 時間数は公開版の値を使い、未設定は24時間（保存側の既定と同じ）に倒す。
  */
 export async function isFriendAddResendSuppressed(
@@ -913,7 +1237,13 @@ export async function isFriendAddResendSuppressed(
     const row = await db.prepare(
       `SELECT 1 AS ok FROM friend_add_events
         WHERE line_account_id = ? AND friend_id = ?
-          AND occurred_at >= ? AND routing_status = 'completed'
+          AND occurred_at >= ?
+          AND (
+            routing_status = 'completed'
+            OR COALESCE(delivery_count, 0) > 0
+            OR first_delivery_sent_at IS NOT NULL
+            OR error_code = 'delivery_unknown'
+          )
         LIMIT 1`,
     ).bind(input.lineAccountId, input.friendId, threshold).first<{ ok: number }>();
     return row != null;
@@ -925,9 +1255,9 @@ export async function isFriendAddResendSuppressed(
 }
 
 /**
- * 1つの公開版が「いま・この人」に動くか。安い順（曜日・時間帯→友だち条件→
- * 再送制限）に見て、最初に止めた理由だけを返す。競合確認の表示と本番の
- * 判定で意味がずれないよう、どちらもこの関数群を通す。
+ * 1つの公開版が「いま・この人」に動くか。安い順（曜日・時間帯→参照の
+ * 持ち物確認→友だち条件→再送制限）に見て、最初に止めた理由だけを返す。
+ * 競合確認の表示と本番の判定で意味がずれないよう、どちらもこの関数群を通す。
  */
 export async function evaluateFriendAddRuleConditions(
   db: D1Database,
@@ -940,6 +1270,22 @@ export async function evaluateFriendAddRuleConditions(
 ): Promise<{ matched: boolean; reason: FriendAddSuppressReason | null }> {
   const schedule = evaluateFriendAddSchedule(input.definition, input.now);
   if (!schedule.matched) return { matched: false, reason: schedule.reason };
+  /*
+   * 保存時に確かめていても、実行時にもう一度確かめる。タグやシナリオは
+   * 保存のあとで消せる・別アカウントへ移せるため、公開版のスナップショットが
+   * 他アカウントの持ち物を指したまま動くことがある。
+   */
+  const foreign = await findFriendAddForeignReferences(
+    db,
+    input.lineAccountId,
+    collectFriendAddReferences(input.definition),
+  );
+  if (foreign.length > 0) {
+    console.error(
+      `[friend-add-routing] rule references ids outside the account — skipped: ${foreign.join(', ')}`,
+    );
+    return { matched: false, reason: 'reference_out_of_account' };
+  }
   const condition = await evaluateFriendAddFriendCondition(db, input.definition, input.friendId);
   if (!condition.matched) return { matched: false, reason: condition.reason };
   const suppressed = await isFriendAddResendSuppressed(db, {
@@ -1220,7 +1566,18 @@ export async function applyFriendAddRouting(
   accountId: string | null,
   friend: FriendAddSubject,
   push?: ImmediatePushContext,
-  routingContext?: { entryRouteId?: string | null; now?: Date; sendRight?: boolean; claimError?: boolean },
+  routingContext?: {
+    entryRouteId?: string | null;
+    now?: Date;
+    sendRight?: boolean;
+    claimError?: boolean;
+    /**
+     * 送信権の持ち主かを確かめる関数（fencing）。登録・アクション・送信の
+     * どれかを始める直前に呼ぶ。false なら回収されているので何もしない。
+     * 渡さないときは確かめない（画面のテスト実行など、副作用が無い呼び出し）。
+     */
+    fence?: () => Promise<boolean>;
+  },
 ): Promise<FriendAddRoutingResult> {
   const none: FriendAddRoutingResult = {
     routed: false,
@@ -1296,6 +1653,25 @@ export async function applyFriendAddRouting(
       } satisfies FriendAddRouting
     : await loadFriendAddRouting(db, accountId);
   if (!routing) return none;
+
+  /*
+   * ここから先は登録・アクション・送信の副作用に入る。**外部送信と同じ
+   * fence をくぐらせる。** 条件の評価に時間がかかった間に予約を回収されて
+   * いたら、勝った側が送るのでこちらは何もしない。アクションだけ実行して
+   * 送信はしない、という食い違いを作らない。
+   */
+  if (routingContext?.fence && !(await routingContext.fence())) {
+    return {
+      routed: true,
+      kind,
+      enrollments: [],
+      timing: matchedRule?.definition.timing ?? routing.firstTime.timing,
+      suppressed: true,
+      suppressReason: 'send_right_revoked',
+      ruleId: matchedRule?.ruleId ?? null,
+      ruleVersionId: matchedRule?.versionId ?? null,
+    };
+  }
 
   const timing = routing.firstTime.timing;
   const classifiedKind = matchedRule ? kind : classifyFriend(friend, routing.criteria.firstTime);

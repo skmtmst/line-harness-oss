@@ -65,13 +65,18 @@ const rule = {
 function makeEnv() {
   const prepare = vi.fn((sql: string) => ({
     bind: vi.fn(() => ({
-      all: vi.fn().mockResolvedValue(sql.includes('entry_routes')
-        ? { results: [{ id: 'route-1', name: '紹介QR', kind: 'QR' }] }
-        : sql.includes('scenarios')
-          ? { results: [{ id: 'scenario-1', name: '初回案内' }] }
-          : sql.includes('tags')
-            ? { results: [{ id: 'tag-1', name: '紹介' }] }
-            : { results: [] }),
+      // 「別アカウントの持ち物か」を見る問い合わせは、このアカウントの
+      // 持ち物しか無い前提で空を返す。ここを一律に返すと、自分のタグを
+      // 越境扱いにしてしまう。
+      all: vi.fn().mockResolvedValue(sql.includes('line_account_id != ') || sql.includes('tenant_id != ')
+        ? { results: [] }
+        : sql.includes('entry_routes')
+          ? { results: [{ id: 'route-1', name: '紹介QR', kind: 'QR' }] }
+          : sql.includes('scenarios')
+            ? { results: [{ id: 'scenario-1', name: '初回案内' }] }
+            : sql.includes('tags')
+              ? { results: [{ id: 'tag-1', name: '紹介' }] }
+              : { results: [] }),
       first: vi.fn().mockResolvedValue(sql.includes('FROM scenarios')
         ? { id: 'scenario-1' }
         : { today: 1, captured: 1, unknown_route: 0, delivered: 1, failed: 0 }),
@@ -184,6 +189,59 @@ describe('friend add rules API', () => {
     }, makeEnv());
     expect(response.status).toBe(400);
     expect(db.createFriendAddRuleDraft).not.toHaveBeenCalled();
+  });
+
+  test('入れ子グループの operator が抜けた友だち条件は保存させない', async () => {
+    const nested = JSON.stringify({
+      operator: 'AND',
+      rules: [],
+      // 入れ子側に operator が無い。実行時に既定の OR へ読み替わり、
+      // 「両方を満たす人」で絞ったつもりが全体へ広がる。
+      groups: [{ rules: [{ type: 'tag_exists', value: 'tag-1' }] }],
+    });
+    const response = await app.request('/api/friend-add-rules/drafts', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'Idempotency-Key': 'friend-rule-create-0004' },
+      body: JSON.stringify({
+        accountId: 'account-1', friendKind: 'first_time', name: '紹介QR', priority: 1,
+        definition: { ...definition, friendCondition: nested },
+      }),
+    }, makeEnv());
+    expect(response.status).toBe(400);
+    expect(db.createFriendAddRuleDraft).not.toHaveBeenCalled();
+  });
+
+  test('値の足りない友だち条件は保存させない', async () => {
+    const response = await app.request('/api/friend-add-rules/drafts', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'Idempotency-Key': 'friend-rule-create-0005' },
+      body: JSON.stringify({
+        accountId: 'account-1', friendKind: 'first_time', name: '紹介QR', priority: 1,
+        definition: {
+          ...definition,
+          friendCondition: JSON.stringify({ operator: 'AND', rules: [{ type: 'tag_exists', value: '' }] }),
+        },
+      }),
+    }, makeEnv());
+    expect(response.status).toBe(400);
+    expect(db.createFriendAddRuleDraft).not.toHaveBeenCalled();
+  });
+
+  test('正しい入れ子の友だち条件は保存できる', async () => {
+    const nested = JSON.stringify({
+      operator: 'AND',
+      rules: [],
+      groups: [{ operator: 'OR', rules: [{ type: 'tag_exists', value: 'tag-1' }] }],
+    });
+    const response = await app.request('/api/friend-add-rules/drafts', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'Idempotency-Key': 'friend-rule-create-0006' },
+      body: JSON.stringify({
+        accountId: 'account-1', friendKind: 'first_time', name: '紹介QR', priority: 1,
+        definition: { ...definition, friendCondition: nested },
+      }),
+    }, makeEnv());
+    expect(response.status).toBe(201);
   });
 
   test('公開は冪等キーをDB処理へ渡す', async () => {

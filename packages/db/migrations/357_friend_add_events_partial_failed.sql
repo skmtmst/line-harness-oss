@@ -78,14 +78,40 @@ DROP TABLE friend_add_events;
 ALTER TABLE friend_add_events_new RENAME TO friend_add_events;
 ALTER TABLE friend_add_action_runs_new RENAME TO friend_add_action_runs;
 
--- 旧completed かつ一度も送っていない行は、送れなかった行として
--- partial_failed へ移し、再送可能にする。送った行は触らない。
--- 再送制限が数えるのは completed だけのため、この移行で送れなかった人が
--- 送り直せるようになる。理由が無い行だけ send_failed を補う。
+-- 旧データの移し替え（安全側）。
+--
+-- 「completed なのに送っていない」行だけを partial_failed へ移して再送可能に
+-- したい。しかし delivery_count と first_delivery_sent_at は migration 308 で
+-- 足した列で、**それ以前に作られた行は送っていても 0 / NULL** になる。
+-- 単純に「delivery_count=0 なら送っていない」と読むと、既に案内が届いている
+-- 人を再送可能に戻し、同じ案内を2通届けてしまう。
+--
+-- そこで 308 が適用された時刻より後に作られた行だけを対象にする。その行は
+-- 送信のたびに delivery_count が入る仕組みの下で作られているので、
+-- 0 かつ first_delivery_sent_at が空なら送っていないと言い切れる。
+-- 308 の適用時刻が分からない環境（記録表が無い・記録が無い）では
+-- 1行も動かさない。分からないときは触らないほうが安全。
+--
+-- _migrations は配備script が作る適用記録（name, applied_at）。
+-- 手元やテストのように記録が無い場合でも参照できるよう、先に用意する。
+CREATE TABLE IF NOT EXISTS _migrations (
+  name TEXT PRIMARY KEY,
+  applied_at TEXT NOT NULL
+);
+
 UPDATE friend_add_events
    SET routing_status = 'partial_failed',
        error_code = COALESCE(error_code, 'send_failed')
- WHERE routing_status = 'completed' AND COALESCE(delivery_count, 0) = 0;
+ WHERE routing_status = 'completed'
+   AND COALESCE(delivery_count, 0) = 0
+   AND first_delivery_sent_at IS NULL
+   AND created_at > (
+         -- applied_at は UTC の 'YYYY-MM-DD HH:MM:SS'。行の created_at は
+         -- JST の 'YYYY-MM-DDTHH:MM:SS.fff' なので、同じ書式へそろえて比べる。
+         SELECT strftime('%Y-%m-%dT%H:%M:%f', m.applied_at, '+9 hours')
+           FROM _migrations m
+          WHERE m.name = '308_friend_add_rule_data_contract.sql'
+       );
 
 -- 表の再構築前と同じ索引名だと適用判定で飛ばされるため、357 固有名で貼り直す。
 CREATE INDEX idx_friend_add_events_v357_account_time

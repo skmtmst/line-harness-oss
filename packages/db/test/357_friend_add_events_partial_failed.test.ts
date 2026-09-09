@@ -86,34 +86,111 @@ describe('357 friend_add_events partial_failed', () => {
     ).toEqual({ routing_status: 'completed' });
   });
 
-  it('旧completed かつ未送信の行を partial_failed へ移して再送可能にする', () => {
-    db.prepare(
-      `INSERT INTO friend_add_events
-        (id, line_account_id, friend_id, webhook_event_id, friend_kind, routing_status, occurred_at, delivery_count, error_code)
-       VALUES ('event-unsent', 'account-1', 'friend-1', 'webhook-unsent', 'first_time', 'completed', '2026-09-01T10:00:00.000+09:00', 0, NULL)`,
-    ).run();
-    db.prepare(
-      `INSERT INTO friend_add_events
-        (id, line_account_id, friend_id, webhook_event_id, friend_kind, routing_status, occurred_at, delivery_count, error_code)
-       VALUES ('event-sent', 'account-1', 'friend-1', 'webhook-sent', 'first_time', 'completed', '2026-09-01T10:00:00.000+09:00', 1, NULL)`,
-    ).run();
-    db.prepare(
-      `INSERT INTO friend_add_events
-        (id, line_account_id, friend_id, webhook_event_id, friend_kind, routing_status, occurred_at, delivery_count, error_code)
-       VALUES ('event-coded', 'account-1', 'friend-1', 'webhook-coded', 'first_time', 'completed', '2026-09-01T10:00:00.000+09:00', 0, 'resend_suppressed')`,
-    ).run();
-    execSafe(
-      db,
-      readFileSync(join(MIGRATIONS_DIR, '357_friend_add_events_partial_failed.sql'), 'utf8'),
-    );
-    // 送っていない行だけ partial_failed へ。理由が無い行だけ補う
-    expect(db.prepare(`SELECT routing_status, error_code FROM friend_add_events WHERE id = 'event-unsent'`).get())
-      .toEqual({ routing_status: 'partial_failed', error_code: 'send_failed' });
-    expect(db.prepare(`SELECT routing_status, error_code FROM friend_add_events WHERE id = 'event-coded'`).get())
-      .toEqual({ routing_status: 'partial_failed', error_code: 'resend_suppressed' });
-    // 送った行は触らない
-    expect(db.prepare(`SELECT routing_status FROM friend_add_events WHERE id = 'event-sent'`).get())
-      .toEqual({ routing_status: 'completed' });
+  /*
+   * 旧データの移し替えは「送っていないと言い切れる行」だけを動かす。
+   * delivery_count / first_delivery_sent_at は migration 308 で足した列なので、
+   * それ以前に作られた行は**送っていても 0 / NULL**。動かすと既に案内が
+   * 届いている人へ2通目が届く。
+   */
+  describe('旧データの移し替え', () => {
+    const APPLIED_308 = '2026-09-05 01:00:00'; // UTC。JSTでは 2026-09-05T10:00:00
+    const migration357 = () =>
+      readFileSync(join(MIGRATIONS_DIR, '357_friend_add_events_partial_failed.sql'), 'utf8');
+
+    function freshDb(options?: { record308?: boolean }): Database.Database {
+      const fresh = setupDbThrough('343_messages_log_broadcast_recipient_index.sql');
+      fresh.prepare(
+        `INSERT INTO line_accounts (id, channel_id, name, channel_access_token, channel_secret)
+         VALUES ('account-1', 'channel-1', '店舗1', 'token-1', 'secret-1')`,
+      ).run();
+      fresh.prepare(
+        `INSERT INTO friends (id, line_user_id, line_account_id)
+         VALUES ('friend-1', 'U-1', 'account-1')`,
+      ).run();
+      if (options?.record308 !== false) {
+        fresh.exec(`CREATE TABLE IF NOT EXISTS _migrations (name TEXT PRIMARY KEY, applied_at TEXT NOT NULL)`);
+        fresh.prepare(`INSERT INTO _migrations (name, applied_at) VALUES (?, ?)`)
+          .run('308_friend_add_rule_data_contract.sql', APPLIED_308);
+      }
+      return fresh;
+    }
+
+    function seedEvent(
+      target: Database.Database,
+      row: {
+        id: string; createdAt: string; deliveryCount?: number;
+        firstDeliverySentAt?: string | null; errorCode?: string | null;
+        status?: string;
+      },
+    ): void {
+      target.prepare(
+        `INSERT INTO friend_add_events
+          (id, line_account_id, friend_id, webhook_event_id, friend_kind, routing_status,
+           occurred_at, created_at, delivery_count, first_delivery_sent_at, error_code)
+         VALUES (?, 'account-1', 'friend-1', ?, 'first_time', ?, '2026-09-01T10:00:00.000+09:00', ?, ?, ?, ?)`,
+      ).run(
+        row.id, `webhook-${row.id}`, row.status ?? 'completed', row.createdAt,
+        row.deliveryCount ?? 0, row.firstDeliverySentAt ?? null, row.errorCode ?? null,
+      );
+    }
+
+    function statusOf(target: Database.Database, id: string): { routing_status: string; error_code: string | null } {
+      return target.prepare(
+        `SELECT routing_status, error_code FROM friend_add_events WHERE id = ?`,
+      ).get(id) as { routing_status: string; error_code: string | null };
+    }
+
+    it('308適用後に作られた未送信の行だけ partial_failed へ移す', () => {
+      const target = freshDb();
+      try {
+        seedEvent(target, { id: 'event-unsent', createdAt: '2026-09-06T10:00:00.000' });
+        seedEvent(target, { id: 'event-coded', createdAt: '2026-09-06T10:00:00.000', errorCode: 'resend_suppressed' });
+        seedEvent(target, { id: 'event-sent', createdAt: '2026-09-06T10:00:00.000', deliveryCount: 1 });
+        seedEvent(target, {
+          id: 'event-stamped', createdAt: '2026-09-06T10:00:00.000',
+          firstDeliverySentAt: '2026-09-06T10:00:01.000',
+        });
+        execSafe(target, migration357());
+
+        expect(statusOf(target, 'event-unsent'))
+          .toEqual({ routing_status: 'partial_failed', error_code: 'send_failed' });
+        // 理由が既にある行は上書きしない
+        expect(statusOf(target, 'event-coded'))
+          .toEqual({ routing_status: 'partial_failed', error_code: 'resend_suppressed' });
+        // 送った印がある行は触らない
+        expect(statusOf(target, 'event-sent')).toMatchObject({ routing_status: 'completed' });
+        expect(statusOf(target, 'event-stamped')).toMatchObject({ routing_status: 'completed' });
+      } finally {
+        target.close();
+      }
+    });
+
+    it('308より前に作られた行は、delivery_count が 0 でも動かさない（送信済みの可能性がある）', () => {
+      const target = freshDb();
+      try {
+        seedEvent(target, { id: 'event-pre308', createdAt: '2026-09-04T10:00:00.000' });
+        // 適用のちょうど同時刻も「308以前の書き方かもしれない」ため動かさない
+        seedEvent(target, { id: 'event-boundary', createdAt: '2026-09-05T10:00:00.000' });
+        execSafe(target, migration357());
+
+        expect(statusOf(target, 'event-pre308')).toEqual({ routing_status: 'completed', error_code: null });
+        expect(statusOf(target, 'event-boundary')).toEqual({ routing_status: 'completed', error_code: null });
+      } finally {
+        target.close();
+      }
+    });
+
+    it('308の適用記録が無い環境では1行も動かさない', () => {
+      const target = freshDb({ record308: false });
+      try {
+        seedEvent(target, { id: 'event-unknown-era', createdAt: '2026-09-06T10:00:00.000' });
+        execSafe(target, migration357());
+
+        expect(statusOf(target, 'event-unknown-era')).toEqual({ routing_status: 'completed', error_code: null });
+      } finally {
+        target.close();
+      }
+    });
   });
 
   it('partial_failed を受け付け、未知の状態は拒否する', () => {

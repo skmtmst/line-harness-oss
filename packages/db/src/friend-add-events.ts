@@ -213,103 +213,93 @@ export const FRIEND_ADD_SEND_CLAIM_TTL_MINUTES = 2;
 /**
  * 別webhook IDで並行に届いたfollowの二重送信を防ぐ送信権の予約。
  * (line_account_id, friend_id) に1行だけ置き、先に置いた実行だけが送る。
- * true＝送ってよい。false＝別の実行が送るので送らずに引く。
  */
 export interface FriendAddSendClaim {
   /** 送ってよいか。 */
   held: boolean;
   /**
-   * 予約の世代。回収（奪い直し）のたびに進む。送信・確定のたびに持ち主と
-   * 合っているか確かめ、ずれたら古い持ち主として引く（fencing）。
-   * 0 は fencing なし（予約表がない短い時間の互換）。
+   * 予約の世代。回収（奪い直し）のたびに1つ進む。外部送信・アクション・
+   * 台帳の確定はすべて (event_id, generation) の組で持ち主を確かめてから
+   * 行う。回収された古い持ち主はここで弾かれる（fencing）。
+   * 取れなかったときは 0。
    */
   generation: number;
 }
 
 /**
- * 別webhook IDで並行に届いたfollowの二重送信を防ぐ送信権の予約。
- * (line_account_id, friend_id) に1行だけ置き、先に置いた実行だけが進む。
+ * 送信権の予約を**1文の CAS（compare-and-set）**で取る。
+ *
+ * 空いていれば置く。誰かの予約があっても、古い（TTL超過）ときだけ
+ * 自分の event_id へ書き換えて世代を1つ進める。**取れた行そのものを
+ * RETURNING で受け取る**ので、「置いた」あとに別の実行が奪って、
+ * その世代を自分のものと読み違える隙が無い。
+ *
+ * 予約表が読めないときは投げる。呼ぶ側は送らない（fail-closed）。
+ * ここで「送ってよい」に倒すと、fencing の無い実行が二重送信する。
  */
 export async function claimFriendAddSendRight(
   db: D1Database,
   input: { lineAccountId: string; friendId: string; eventId: string; now?: string },
 ): Promise<FriendAddSendClaim> {
   const now = input.now ?? jstNow();
-  try {
-    const inserted = await db.prepare(
-      `INSERT OR IGNORE INTO friend_add_send_claims (line_account_id, friend_id, event_id, generation, claimed_at)
-       VALUES (?, ?, ?, 1, ?)`,
-    ).bind(input.lineAccountId, input.friendId, input.eventId, now).run();
-    if ((inserted.meta?.changes ?? 0) === 1) return { held: true, generation: 1 };
-  } catch (error) {
-    // 移行が遅れて表が無い短い時間は、従来どおり送る（予約なし・fencingなし）。
-    if (error instanceof Error && error.message.includes('no such table: friend_add_send_claims')) {
-      return { held: true, generation: 0 };
-    }
-    throw error;
-  }
-  // 既に誰かの予約がある。古い予約（処理中に落ちた残り）だけ奪い直す。
   const cutoff = addMinutes(now, -FRIEND_ADD_SEND_CLAIM_TTL_MINUTES);
-  const stolen = await db.prepare(
-    `UPDATE friend_add_send_claims
-        SET event_id = ?, generation = generation + 1, claimed_at = ?
-      WHERE line_account_id = ? AND friend_id = ? AND claimed_at < ?`,
-  ).bind(input.eventId, now, input.lineAccountId, input.friendId, cutoff).run();
-  if ((stolen.meta?.changes ?? 0) !== 1) return { held: false, generation: 0 };
-  const row = await db.prepare(
-    `SELECT generation FROM friend_add_send_claims
-      WHERE line_account_id = ? AND friend_id = ?`,
-  ).bind(input.lineAccountId, input.friendId).first<{ generation: number }>();
-  return { held: true, generation: row?.generation ?? 1 };
+  const won = await db.prepare(
+    `INSERT INTO friend_add_send_claims (line_account_id, friend_id, event_id, generation, claimed_at)
+     VALUES (?, ?, ?, 1, ?)
+     ON CONFLICT (line_account_id, friend_id) DO UPDATE
+        SET event_id = excluded.event_id,
+            generation = friend_add_send_claims.generation + 1,
+            claimed_at = excluded.claimed_at
+      WHERE friend_add_send_claims.claimed_at < ?
+     RETURNING event_id, generation`,
+  ).bind(input.lineAccountId, input.friendId, input.eventId, now, cutoff)
+    .first<{ event_id: string; generation: number }>();
+  // 他人の予約が生きている（DO UPDATE の WHERE が偽）ときは行が返らない。
+  if (!won || won.event_id !== input.eventId) return { held: false, generation: 0 };
+  return { held: true, generation: won.generation };
 }
 
 /**
- * 今も予約の持ち主か。回収で世代が進んでいたら古い持ち主として false。
- * 予約表がない短い時間は fencing できないため true。
+ * 今も予約の持ち主か。event_id と generation の両方が合ったときだけ true。
+ * 回収で世代が進んでいたら古い持ち主として false。
+ * 読めないときは投げる。呼ぶ側は送らない（fail-closed）。
  */
 export async function isFriendAddSendRightHolder(
   db: D1Database,
   input: { lineAccountId: string; friendId: string; eventId: string; generation: number },
 ): Promise<boolean> {
-  if (input.generation === 0) return true;
-  try {
-    const row = await db.prepare(
-      `SELECT event_id, generation FROM friend_add_send_claims
-        WHERE line_account_id = ? AND friend_id = ?`,
-    ).bind(input.lineAccountId, input.friendId).first<{ event_id: string; generation: number }>();
-    return !!row && row.event_id === input.eventId && row.generation === input.generation;
-  } catch (error) {
-    if (error instanceof Error && error.message.includes('no such table: friend_add_send_claims')) return true;
-    throw error;
-  }
+  if (!Number.isInteger(input.generation) || input.generation < 1) return false;
+  const row = await db.prepare(
+    `SELECT event_id, generation FROM friend_add_send_claims
+      WHERE line_account_id = ? AND friend_id = ?`,
+  ).bind(input.lineAccountId, input.friendId).first<{ event_id: string; generation: number }>();
+  return !!row && row.event_id === input.eventId && row.generation === input.generation;
 }
 
 /**
- * 使い終わった予約を消す。自分の世代の予約だけ消す。
+ * 使い終わった予約を消す。**自分の event_id と世代の行だけ**消す。
  * 回収で世代が進んでいたら（別の持ち主の行になっていたら）消さない。
  */
 export async function releaseFriendAddSendRight(
   db: D1Database,
-  input: { lineAccountId: string; friendId: string; eventId: string; generation?: number },
+  input: { lineAccountId: string; friendId: string; eventId: string; generation: number },
 ): Promise<void> {
-  try {
-    if (input.generation == null || input.generation === 0) {
-      await db.prepare(
-        `DELETE FROM friend_add_send_claims
-          WHERE line_account_id = ? AND friend_id = ? AND event_id = ?`,
-      ).bind(input.lineAccountId, input.friendId, input.eventId).run();
-      return;
-    }
-    await db.prepare(
-      `DELETE FROM friend_add_send_claims
-        WHERE line_account_id = ? AND friend_id = ? AND event_id = ? AND generation = ?`,
-    ).bind(input.lineAccountId, input.friendId, input.eventId, input.generation).run();
-  } catch (error) {
-    if (error instanceof Error && error.message.includes('no such table: friend_add_send_claims')) return;
-    throw error;
-  }
+  if (!Number.isInteger(input.generation) || input.generation < 1) return;
+  await db.prepare(
+    `DELETE FROM friend_add_send_claims
+      WHERE line_account_id = ? AND friend_id = ? AND event_id = ? AND generation = ?`,
+  ).bind(input.lineAccountId, input.friendId, input.eventId, input.generation).run();
 }
 
+/**
+ * 台帳の確定。
+ *
+ * `fence` を渡すと、**同じ1文の中で**送信権の予約（event_id と世代）を
+ * 突き合わせ、持ち主でなければ1行も書かない。確かめてから書く2文にすると
+ * その隙に回収されることがあり、回収後の古い持ち主が結果を上書きできる。
+ *
+ * 戻り値は書けたかどうか。false は「持ち主でなくなっていた」を表す。
+ */
 export async function markFriendAddEventRouting(
   db: D1Database,
   input: {
@@ -321,19 +311,16 @@ export async function markFriendAddEventRouting(
     errorCode?: string | null;
     scenarioEnrollmentId?: string | null;
     deliveryCount?: number;
+    fence?: { friendId: string; generation: number };
   },
-): Promise<void> {
-  await db.prepare(
-    `UPDATE friend_add_events
-        SET routing_status = ?, routing_rule_id = ?, winning_rule_version_id = ?,
-            error_code = ?, scenario_enrollment_id = ?, delivery_count = ?,
-            first_delivery_sent_at = CASE
-              WHEN ? > 0 THEN COALESCE(first_delivery_sent_at, ?)
-              ELSE first_delivery_sent_at
-            END,
-            processed_at = ?
-      WHERE id = ? AND line_account_id = ?`,
-  ).bind(
+): Promise<boolean> {
+  const fence = input.fence;
+  const fenceSql = fence
+    ? ` AND EXISTS (SELECT 1 FROM friend_add_send_claims c
+                     WHERE c.line_account_id = ? AND c.friend_id = ?
+                       AND c.event_id = ? AND c.generation = ?)`
+    : '';
+  const bindings: unknown[] = [
     input.status,
     input.routingRuleId ?? null,
     input.winningRuleVersionId ?? null,
@@ -345,7 +332,22 @@ export async function markFriendAddEventRouting(
     jstNow(),
     input.eventId,
     input.lineAccountId,
-  ).run();
+  ];
+  if (fence) {
+    bindings.push(input.lineAccountId, fence.friendId, input.eventId, fence.generation);
+  }
+  const result = await db.prepare(
+    `UPDATE friend_add_events
+        SET routing_status = ?, routing_rule_id = ?, winning_rule_version_id = ?,
+            error_code = ?, scenario_enrollment_id = ?, delivery_count = ?,
+            first_delivery_sent_at = CASE
+              WHEN ? > 0 THEN COALESCE(first_delivery_sent_at, ?)
+              ELSE first_delivery_sent_at
+            END,
+            processed_at = ?
+      WHERE id = ? AND line_account_id = ?${fenceSql}`,
+  ).bind(...bindings).run();
+  if ((result.meta?.changes ?? 0) !== 1) return false;
   // 取得待ちを閉じた直後に届いた候補を、次回の再追加へ持ち越さない。
   await db.prepare(
     `UPDATE friend_add_attribution_candidates
@@ -357,6 +359,7 @@ export async function markFriendAddEventRouting(
     input.lineAccountId, input.eventId, input.lineAccountId,
     input.eventId, input.lineAccountId,
   ).run();
+  return true;
 }
 
 export async function listFriendAddEvents(

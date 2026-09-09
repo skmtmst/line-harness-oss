@@ -127,14 +127,13 @@ function breakOnceOn(useDb: D1Database, needle: string, error: Error): { db: D1D
           ...statement,
           bind: (...args: unknown[]) => {
             const bound = statement.bind(...args);
-            return {
-              ...bound,
-              run: async () => {
-                calls += 1;
-                armed = false;
-                throw error;
-              },
+            const fail = async () => {
+              calls += 1;
+              armed = false;
+              throw error;
             };
+            // RETURNING を使う文は first で走るので、両方を壊す。
+            return { ...bound, run: fail, first: fail };
           },
         };
       };
@@ -266,10 +265,11 @@ describe('POST /webhook — 古い予約と予約失敗 (#622)', () => {
   });
 });
 
-describe('POST /webhook — 送信失敗は再送可能 (#622)', () => {
-  test('送れなかった実行は partial_failed で残し、次の追加を止めない', async () => {
-    lineClientMocks.replyMessage.mockRejectedValueOnce(new Error('LINE down'));
-    lineClientMocks.pushMessage.mockRejectedValue(new Error('LINE down'));
+describe('POST /webhook — 送信の結末を分ける (#622)', () => {
+  test('LINEが断った送信（4xx）は send_failed で残し、次の追加を止めない', async () => {
+    const rejected = Object.assign(new Error('LINE API error: 400'), { status: 400 });
+    lineClientMocks.replyMessage.mockRejectedValueOnce(rejected);
+    lineClientMocks.pushMessage.mockRejectedValue(rejected);
     await postFollow('webhook-fail');
 
     const sends = lineClientMocks.replyMessage.mock.calls.length
@@ -281,10 +281,111 @@ describe('POST /webhook — 送信失敗は再送可能 (#622)', () => {
       routing_status: 'partial_failed', delivery_count: 0, error_code: 'send_failed',
     });
 
-    // 再送制限は送れなかった実行を数えない。次の追加では選び直す。
+    // 届いていないと言い切れるので、再送制限は数えない。次の追加で送り直せる。
     await expect(isFriendAddResendSuppressed(db, {
       lineAccountId: 'account-1', friendId: 'friend-1',
       resendSuppressionHours: 24, now: new Date(),
     })).resolves.toBe(false);
+    // 予約は返す（次の実行が取れる）
+    expect(raw.prepare(`SELECT COUNT(*) AS n FROM friend_add_send_claims`).get()).toEqual({ n: 0 });
+  });
+
+  test('通信断のように結末が分からない送信は delivery_unknown にし、自動で送り直さない', async () => {
+    // status を持たない例外＝こちらが結果を知らないだけで、届いたかもしれない。
+    lineClientMocks.replyMessage.mockRejectedValueOnce(new Error('network timeout'));
+    lineClientMocks.pushMessage.mockRejectedValue(new Error('network timeout'));
+    await postFollow('webhook-unknown');
+
+    const rows = eventRows();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      routing_status: 'partial_failed', delivery_count: 0, error_code: 'delivery_unknown',
+    });
+
+    // 自動再送の対象から外す。送り直すと二重に届く。
+    await expect(isFriendAddResendSuppressed(db, {
+      lineAccountId: 'account-1', friendId: 'friend-1',
+      resendSuppressionHours: 24, now: new Date(),
+    })).resolves.toBe(true);
+    // 予約は掴んだまま残す（TTLまで別の実行を止める）
+    const claim = raw.prepare(`SELECT event_id FROM friend_add_send_claims`).get() as { event_id: string };
+    const event = raw.prepare(
+      `SELECT id FROM friend_add_events WHERE webhook_event_id = 'webhook-unknown'`,
+    ).get() as { id: string };
+    expect(claim).toEqual({ event_id: event.id });
+  });
+
+  test('送達不明のあとの再追加は送らず、理由を残す', async () => {
+    lineClientMocks.replyMessage.mockRejectedValueOnce(new Error('network timeout'));
+    lineClientMocks.pushMessage.mockRejectedValueOnce(new Error('network timeout'));
+    await postFollow('webhook-unknown');
+    const before = sendCount();
+
+    // 予約のTTLを過ぎさせて「別の実行が取れる」状態にしても、
+    // 台帳の送達不明が再送制限として効く。
+    raw.prepare(
+      `UPDATE friend_add_send_claims SET claimed_at = '2026-09-01T10:00:00.000+09:00'`,
+    ).run();
+    lineClientMocks.replyMessage.mockResolvedValue(undefined);
+    lineClientMocks.pushMessage.mockResolvedValue(undefined);
+    await postFollow('webhook-after-unknown');
+
+    expect(sendCount()).toBe(before);
+    const rows = eventRows();
+    const latest = rows.find((row) => row.error_code === 'resend_suppressed');
+    expect(latest).toMatchObject({ routing_status: 'suppressed', delivery_count: 0 });
+  });
+});
+
+describe('POST /webhook — 流入リンクの案内も同じ送信権の下 (#622)', () => {
+  function seedIntroTemplate(): void {
+    raw.prepare(
+      `INSERT INTO message_templates (id, name, message_type, message_content)
+       VALUES ('tpl-1', '紹介あいさつ', 'text', '{"text":"ご紹介ありがとうございます"}')`,
+    ).run();
+    raw.prepare(`UPDATE entry_routes SET intro_template_id = 'tpl-1' WHERE id = 'route-1'`).run();
+  }
+
+  test('並行followの負けた側は流入リンクの案内も押さない', async () => {
+    seedIntroTemplate();
+    lineClientMocks.replyMessage.mockImplementation(
+      async () => { await new Promise((resolve) => setTimeout(resolve, 50)); },
+    );
+    await Promise.all([postFollow('webhook-a'), postFollow('webhook-b')]);
+
+    // シナリオ1通（reply）＋ 流入リンクの案内1通（push）。負けた側は0通。
+    expect(lineClientMocks.replyMessage.mock.calls.length).toBe(1);
+    expect(lineClientMocks.pushMessage.mock.calls.length).toBe(1);
+  });
+
+  test('送信権を持つ実行がいるときは、単独のfollowでも案内を押さない', async () => {
+    seedIntroTemplate();
+    raw.prepare(
+      `INSERT INTO friend_add_send_claims (line_account_id, friend_id, event_id, generation, claimed_at)
+       VALUES ('account-1', 'friend-1', 'webhook-holder', 1, '2999-01-01T00:00:00.000+09:00')`,
+    ).run();
+    await postFollow('webhook-new');
+    expect(sendCount()).toBe(0);
+  });
+
+  test('回収された旧持ち主は、案内も台帳の確定もしない', async () => {
+    seedIntroTemplate();
+    // 送信のあいだに予約を奪われる状況を作る。
+    lineClientMocks.replyMessage.mockImplementation(async () => {
+      raw.prepare(
+        `UPDATE friend_add_send_claims SET event_id = 'webhook-thief', generation = generation + 1`,
+      ).run();
+    });
+    await postFollow('webhook-a');
+
+    // 送ってしまった1通は取り消せないが、そのあとの案内は押さない
+    expect(lineClientMocks.pushMessage.mock.calls.length).toBe(0);
+    // 台帳は勝った側が確定する。回収された側は書かない。
+    const rows = eventRows();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ routing_status: 'pending' });
+    // 予約は奪った側のまま
+    expect(raw.prepare(`SELECT event_id FROM friend_add_send_claims`).get())
+      .toEqual({ event_id: 'webhook-thief' });
   });
 });
