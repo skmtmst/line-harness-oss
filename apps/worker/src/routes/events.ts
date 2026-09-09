@@ -1088,6 +1088,9 @@ events.post('/api/liff/events/me/:bookingId/cancel', async (c) => {
       }
       throw error;
     }
+    // 初回の途中失敗で旧表だけ未取消のまま残ることがある。同じ取消要求の
+    // 再送でそろえる (V6 fence 成功後なので 409 で巻き戻す物は無い)。
+    await cancelPendingRemindersFor(c.env.DB, row.id);
     await enqueueEventWaitlistPromotion(c.env.DB, waitlistParams);
     return c.json({ ok: true });
   }
@@ -2180,6 +2183,9 @@ events.post('/api/events/admin/events/:id/bookings/:bookingId/cancel', requireRo
       }
       throw error;
     }
+    // 初回の途中失敗で旧表だけ未取消のまま残ることがある。同じ取消要求の
+    // 再送でそろえる (V6 fence 成功後なので 409 で巻き戻す物は無い)。
+    await cancelPendingRemindersFor(c.env.DB, booking.id);
     // 初回の取消確定後に待機者ジョブ登録だけ失敗しても、
     // 同じ取消要求の再送で復旧する。source_key が重複登録を吸収する。
     await enqueueEventWaitlistPromotion(c.env.DB, {

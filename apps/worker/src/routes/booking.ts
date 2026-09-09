@@ -2613,6 +2613,24 @@ booking.get('/api/booking/admin/requests-summary', async (c) => {
   });
 });
 
+/**
+ * 旧表 (booking_reminders) の未送信を止める。
+ *
+ * 再送でも同じ結果になるよう1文にまとめ、本線と再送枝の両方から呼ぶ。
+ * 一時失敗の 'failed' も止める: 取消ずみの予約は送らないため、'pending' だけ
+ * 止めると管理画面に未取消の予定が残り続ける (expirer も両方止めている)。
+ * V6 fence の成功後にだけ呼ぶ (409 では旧表も含めて巻き戻す)。
+ */
+async function cancelLegacyBookingReminders(db: D1Database, bookingId: string): Promise<void> {
+  await db
+    .prepare(
+      `UPDATE booking_reminders SET status='cancelled'
+        WHERE booking_id = ? AND status IN ('pending', 'failed')`,
+    )
+    .bind(bookingId)
+    .run();
+}
+
 booking.patch('/api/booking/admin/requests/:id', requireRole('owner', 'admin', 'staff'), async (c) => {
   const accountId = await resolveAccountIdAdmin(c);
   if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
@@ -2661,6 +2679,9 @@ booking.patch('/api/booking/admin/requests/:id', requireRole('owner', 'admin', '
     }
     // 却下では Calendar 予定を作らないため削除の再試行は要らない。
     if (isCancelRetry) {
+      // 初回の途中失敗で旧表だけ未取消のまま残ることがある。同じ取消要求の
+      // 再送でそろえる (V6 fence 成功後なので 409 で巻き戻す物は無い)。
+      await cancelLegacyBookingReminders(c.env.DB, id);
       // 台帳行が durable に残るまで成功応答しない。enqueue の DB 失敗は
       // 落とさず投げ (連続失敗でも台帳なし200にしない)、再送で回復する。
       // 行さえあれば実行の一時失敗は retry_wait に残り cron が拾う。
@@ -2787,12 +2808,7 @@ booking.patch('/api/booking/admin/requests/:id', requireRole('owner', 'admin', '
       }
       throw error;
     }
-    await c.env.DB
-      .prepare(
-        `UPDATE booking_reminders SET status='cancelled' WHERE booking_id = ? AND status = 'pending'`,
-      )
-      .bind(id)
-      .run();
+    await cancelLegacyBookingReminders(c.env.DB, id);
     // Calendar 削除は台帳駆動 (安定キーで1行)。V6 の fence 成功後に登録する:
     // 送信権の貸出中で巻き戻した 409 の後に queued 行が残ると、cron が確定
     // ずみの予約の予定を消してしまう。登録の失敗は落とさず投げる

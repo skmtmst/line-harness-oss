@@ -23,8 +23,10 @@ import {
   claimReminderDeliveryRun,
   verifyClaimedRunBeforeSend,
 } from '@line-crm/db';
+import type { LineClient } from '@line-crm/line-sdk';
 import type { Env } from '../index.js';
 import { processPendingCalendarDeleteOperations } from '../services/booking-calendar-sync.js';
+import { processReminderDeliveries } from '../services/reminder-delivery.js';
 
 const accountAccessMocks = vi.hoisted(() => ({
   canAccessAllLineAccounts: vi.fn(async () => true),
@@ -62,6 +64,8 @@ const BOOTSTRAP = readFileSync(
 );
 
 type Fault = (sql: string) => boolean;
+/** 実行直後に割り込む口 (SQL文の実行と実行の間に別接続の変更を挟む)。 */
+type AfterRun = (sql: string) => void;
 
 /** 同じDBファイルへの2接続 (route側と割込み/cron側)。逐次に使う。 */
 function openDualDb() {
@@ -73,7 +77,7 @@ function openDualDb() {
   raw1.pragma('foreign_keys = OFF');
   const raw2 = new Database(file);
   raw2.pragma('foreign_keys = OFF');
-  const wrap = (raw: Database.Database, fault?: Fault): D1Database => {
+  const wrap = (raw: Database.Database, fault?: Fault, afterRun?: AfterRun): D1Database => {
     const prepare = (sql: string): D1PreparedStatement => {
       const make = (params: unknown[]): D1PreparedStatement => ({
         bind: (...next: unknown[]) => make(next),
@@ -88,6 +92,7 @@ function openDualDb() {
         run: async <T>() => {
           if (fault?.(sql)) throw new Error('injected-db-failure');
           const info = raw.prepare(sql).run(...params);
+          afterRun?.(sql);
           return { success: true, results: [], meta: { changes: info.changes } } as T;
         },
         raw: async () => [],
@@ -113,6 +118,7 @@ function openDualDb() {
   return {
     db1: wrap(raw1),
     faultyDb1: (fault: Fault) => wrap(raw1, fault),
+    hookedDb1: (afterRun: AfterRun) => wrap(raw1, undefined, afterRun),
     db2: wrap(raw2),
     raw1,
     raw2,
@@ -903,6 +909,481 @@ describe('LIFF本人取消の両分岐strict fence (再審査-2)', () => {
       expect(dual.raw1.prepare(`SELECT status FROM friend_reminders WHERE id = 'FR-l1'`).get()).toEqual({
         status: 'cancelled',
       });
+    } finally {
+      dual.cleanup();
+    }
+  });
+});
+
+// =============================================================================
+// 自主検証 (再審査の指摘): 取消後の実配信・部分失敗の再実行・送達不明の扱い
+//
+// ここは「緑の試験を信用しない」ための独立検証。db 関数の直接呼び出しでは
+// なく、実 route と実配信ループ (processReminderDeliveries) を通し、LINE へ
+// 実際に push が渡ったかどうかで判定する。
+// =============================================================================
+
+/** LINE push の受け口。userId と X-Line-Retry-Key を記録する。 */
+function makePushRecorder(
+  behaviour: (call: number) => { requestId: string | null } | never = () => ({ requestId: 'REQ' }),
+) {
+  const pushes: Array<{ userId: string; retryKey: string | undefined }> = [];
+  const client = {
+    async pushMessageWithRequestId(userId: string, _messages: unknown[], retryKey?: string) {
+      pushes.push({ userId, retryKey });
+      return { data: {}, ...behaviour(pushes.length) };
+    },
+  } as unknown as LineClient;
+  return { pushes, client };
+}
+
+const noPause = async () => undefined;
+
+/** V6 登録 + 旧表の未送信を1件ずつ足す (予約 RB9 きっかけ)。 */
+function seedBookingReminderPair(raw: Database.Database) {
+  raw.exec(`
+    INSERT INTO friend_reminders
+      (id, friend_id, reminder_id, target_date, status, source_kind, source_id, source_event_id)
+    VALUES ('FR-d1','f1','rb-rule','2026-09-20T01:00:00.000Z','active','booking','RB9','RB9');
+    INSERT INTO booking_reminders (id, booking_id, kind, scheduled_at, status, retry_count)
+    VALUES ('LEG-d1','RB9','day_before','2026-09-19T01:00:00.000Z','pending',0);
+  `);
+}
+
+const EXEC_CTX = {
+  waitUntil: () => undefined,
+  passThroughOnException: () => undefined,
+} as unknown as ExecutionContext;
+
+function cancelBooking(db: D1Database) {
+  const { app, env } = makeBookingApp(db);
+  return app.request(
+    '/api/booking/admin/requests/RB9?account_id=acc1',
+    {
+      method: 'PATCH',
+      body: JSON.stringify({ action: 'cancel' }),
+      headers: { 'Content-Type': 'application/json' },
+    },
+    env,
+    EXEC_CTX,
+  );
+}
+
+// 送信予定は target_date-60分 = 2026-09-20T00:00Z。cron はその後に回る。
+const SEND_AT_PASSED = new Date('2026-09-20T00:30:00.000Z');
+
+describe('取消後に外部送信が走らない (自主検証)', () => {
+  it('予約取消の後、実配信cronは1通もLINEへ渡さない', async () => {
+    const dual = openDualDb();
+    try {
+      seedBookingCancelTarget(dual.raw1);
+      seedBookingReminderPair(dual.raw1);
+
+      expect((await cancelBooking(dual.db1)).status).toBe(200);
+      expect(dual.raw1.prepare(`SELECT status FROM friend_reminders WHERE id = 'FR-d1'`).get())
+        .toEqual({ status: 'cancelled' });
+      expect(dual.raw1.prepare(`SELECT status FROM booking_reminders WHERE id = 'LEG-d1'`).get())
+        .toEqual({ status: 'cancelled' });
+
+      // 別接続の配信cronが送信時刻を過ぎてから回っても送らない。
+      const { pushes, client } = makePushRecorder();
+      const result = await processReminderDeliveries(dual.db2, client, {
+        now: SEND_AT_PASSED,
+        pause: noPause,
+        resolveClient: async () => client,
+      });
+      expect(pushes).toEqual([]);
+      expect(result.succeeded).toBe(0);
+      expect(dual.raw1.prepare(
+        `SELECT COUNT(*) AS c FROM reminder_delivery_runs WHERE status = 'succeeded'`,
+      ).get()).toEqual({ c: 0 });
+    } finally {
+      dual.cleanup();
+    }
+  });
+
+  it('イベント取消 (LIFF本人) の後も、実配信cronは1通も渡さない', async () => {
+    const dual = openDualDb();
+    try {
+      seedLiffCancelTarget(dual.raw1);
+      const { app, env } = makeEventsApp(dual.db1);
+      const cancelled = await app.request('/api/liff/events/me/eb-l1/cancel?liffId=L9', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer test' },
+      }, env);
+      expect(cancelled.status).toBe(200);
+      expect(dual.raw1.prepare(`SELECT status FROM friend_reminders WHERE id = 'FR-l1'`).get())
+        .toEqual({ status: 'cancelled' });
+      expect(dual.raw1.prepare(`SELECT status FROM event_booking_reminders WHERE id = 'LEG-l1'`).get())
+        .toEqual({ status: 'cancelled' });
+
+      const { pushes, client } = makePushRecorder();
+      const result = await processReminderDeliveries(dual.db2, client, {
+        // FR-l1 の送信予定 (2099-06-01T09:00Z) を過ぎた時刻。
+        now: new Date('2099-06-01T09:30:00.000Z'),
+        pause: noPause,
+        resolveClient: async () => client,
+      });
+      expect(pushes).toEqual([]);
+      expect(result.succeeded).toBe(0);
+    } finally {
+      dual.cleanup();
+    }
+  });
+
+  it('claim後・push直前に別接続で取消が確定したら送らずに止める', async () => {
+    const dual = openDualDb();
+    try {
+      seedBookingCancelTarget(dual.raw1);
+      seedBookingReminderPair(dual.raw1);
+      const { pushes, client } = makePushRecorder();
+      const result = await processReminderDeliveries(dual.db1, client, {
+        now: SEND_AT_PASSED,
+        pause: noPause,
+        resolveClient: async () => client,
+        // 送信権の再検証を通った直後に、別接続の取消が確定する。
+        // (収束経路の取消。route の strict fence は貸出中を 409 で弾く)
+        beforePush: async () => {
+          dual.raw2.prepare(
+            `UPDATE friend_reminders SET status = 'cancelled', cancel_reason = 'race'
+              WHERE id = 'FR-d1'`,
+          ).run();
+        },
+      });
+      expect(pushes).toEqual([]);
+      expect(result).toEqual({ succeeded: 0, skipped: 1, retrying: 0, failed: 0 });
+      expect(dual.raw1.prepare(
+        `SELECT status FROM reminder_delivery_runs WHERE friend_reminder_id = 'FR-d1'`,
+      ).get()).toEqual({ status: 'cancelled' });
+    } finally {
+      dual.cleanup();
+    }
+  });
+});
+
+describe('部分失敗の再実行で二重送信にならない (自主検証)', () => {
+  it('送達不明の自動再試行は同じ再送キーで送り、実行行も配信済みも1件のまま', async () => {
+    const dual = openDualDb();
+    try {
+      seedBookingCancelTarget(dual.raw1);
+      seedBookingReminderPair(dual.raw1);
+      // 1回目は送達不明 (タイムアウト)。外部に届いたかは分からない。
+      const { pushes, client } = makePushRecorder((call) => {
+        if (call === 1) throw new Error('network timeout');
+        return { requestId: 'REQ-2' };
+      });
+
+      const first = await processReminderDeliveries(dual.db1, client, {
+        now: SEND_AT_PASSED,
+        pause: noPause,
+        resolveClient: async () => client,
+      });
+      expect(first).toEqual({ succeeded: 0, skipped: 0, retrying: 1, failed: 0 });
+      expect(dual.raw1.prepare(
+        `SELECT status FROM reminder_delivery_runs WHERE friend_reminder_id = 'FR-d1'`,
+      ).get()).toEqual({ status: 'retry_wait' });
+
+      // 自動再試行。同じ X-Line-Retry-Key で送るため、LINE 側が重複を吸収する。
+      const second = await processReminderDeliveries(dual.db1, client, {
+        now: new Date(SEND_AT_PASSED.getTime() + 2 * 60_000),
+        pause: noPause,
+        resolveClient: async () => client,
+      });
+      expect(second).toEqual({ succeeded: 1, skipped: 0, retrying: 0, failed: 0 });
+      expect(pushes).toHaveLength(2);
+      expect(pushes[0].retryKey).toBeTruthy();
+      expect(pushes[1].retryKey).toBe(pushes[0].retryKey);
+      // 実行行は増えない (登録・通・予定時刻の冪等キーで1本に集まる)。
+      expect(dual.raw1.prepare(
+        `SELECT COUNT(*) AS c FROM reminder_delivery_runs WHERE friend_reminder_id = 'FR-d1'`,
+      ).get()).toEqual({ c: 1 });
+      expect(dual.raw1.prepare(
+        `SELECT COUNT(*) AS c FROM friend_reminder_deliveries WHERE friend_reminder_id = 'FR-d1'`,
+      ).get()).toEqual({ c: 1 });
+
+      // 送信ずみの後にもう一度回しても送らない。
+      const third = await processReminderDeliveries(dual.db1, client, {
+        now: new Date(SEND_AT_PASSED.getTime() + 30 * 60_000),
+        pause: noPause,
+        resolveClient: async () => client,
+      });
+      expect(third.succeeded).toBe(0);
+      expect(pushes).toHaveLength(2);
+    } finally {
+      dual.cleanup();
+    }
+  });
+
+  it('push後・確定前の取消は成功にせず、自動再送可能な状態にも混ぜない', async () => {
+    const dual = openDualDb();
+    try {
+      seedBookingCancelTarget(dual.raw1);
+      seedBookingReminderPair(dual.raw1);
+      // 外部送信の直後・確定の直前に、別接続の取消が確定する。
+      // 届いたかどうかが曖昧なため、送り直させてはいけない。
+      const { pushes, client } = makePushRecorder(() => {
+        dual.raw2.prepare(
+          `UPDATE friend_reminders SET status = 'cancelled' WHERE id = 'FR-d1'`,
+        ).run();
+        return { requestId: 'REQ-1' };
+      });
+
+      await processReminderDeliveries(dual.db1, client, {
+        now: SEND_AT_PASSED,
+        pause: noPause,
+        resolveClient: async () => client,
+      });
+      expect(pushes).toHaveLength(1);
+      const run = dual.raw1.prepare(
+        `SELECT status FROM reminder_delivery_runs WHERE friend_reminder_id = 'FR-d1'`,
+      ).get() as { status: string };
+      // 取消後の送信を成功として記録しない。
+      expect(run.status).not.toBe('succeeded');
+      // cron が拾い直す状態にも戻さない (送達不明を自動再送と混ぜない)。
+      expect(['queued', 'retry_wait']).not.toContain(run.status);
+
+      const again = await processReminderDeliveries(dual.db2, client, {
+        now: new Date(SEND_AT_PASSED.getTime() + 30 * 60_000),
+        pause: noPause,
+        resolveClient: async () => client,
+      });
+      expect(pushes).toHaveLength(1);
+      expect(again.succeeded).toBe(0);
+    } finally {
+      dual.cleanup();
+    }
+  });
+});
+
+describe('途中失敗の後の再実行で全通知が取消へそろう (自主検証)', () => {
+  it('予約: 旧表の取消だけ落ちても、同じ取消要求の再送でそろう', async () => {
+    const dual = openDualDb();
+    try {
+      seedBookingCancelTarget(dual.raw1);
+      seedBookingReminderPair(dual.raw1);
+      // 旧表の取消だけ1回落とす。V6 fence は通り、予約は取消ずみになる。
+      let failOnce = true;
+      const faulty = dual.faultyDb1((sql) =>
+        sql.includes('UPDATE booking_reminders') && failOnce ? (failOnce = false, true) : false,
+      );
+      expect((await cancelBooking(faulty)).status).toBe(500);
+      expect(dual.raw1.prepare(`SELECT status FROM bookings WHERE id = 'RB9'`).get())
+        .toEqual({ status: 'cancelled' });
+      expect(dual.raw1.prepare(`SELECT status FROM friend_reminders WHERE id = 'FR-d1'`).get())
+        .toEqual({ status: 'cancelled' });
+      // 途中失敗の残り: 旧表だけ未取消。
+      expect(dual.raw1.prepare(`SELECT status FROM booking_reminders WHERE id = 'LEG-d1'`).get())
+        .toEqual({ status: 'pending' });
+
+      // 同じ取消要求の再送で、旧表も取消へそろう。
+      expect((await cancelBooking(dual.db1)).status).toBe(200);
+      expect(dual.raw1.prepare(`SELECT status FROM booking_reminders WHERE id = 'LEG-d1'`).get())
+        .toEqual({ status: 'cancelled' });
+    } finally {
+      dual.cleanup();
+    }
+  });
+
+  it('予約: 一時失敗で failed に落ちた旧表も取消でそろう', async () => {
+    const dual = openDualDb();
+    try {
+      seedBookingCancelTarget(dual.raw1);
+      seedBookingReminderPair(dual.raw1);
+      // 送信の一時失敗で failed に落ちた行 (再試行の残りあり)。
+      dual.raw1.prepare(
+        `UPDATE booking_reminders SET status = 'failed', retry_count = 1 WHERE id = 'LEG-d1'`,
+      ).run();
+      expect((await cancelBooking(dual.db1)).status).toBe(200);
+      expect(dual.raw1.prepare(`SELECT status FROM booking_reminders WHERE id = 'LEG-d1'`).get())
+        .toEqual({ status: 'cancelled' });
+    } finally {
+      dual.cleanup();
+    }
+  });
+
+  it('イベント (LIFF本人): 旧表の取消だけ落ちても、再送でそろう', async () => {
+    const dual = openDualDb();
+    try {
+      seedLiffCancelTarget(dual.raw1);
+      const cancel = (db: D1Database) => {
+        const { app, env } = makeEventsApp(db);
+        return app.request('/api/liff/events/me/eb-l1/cancel?liffId=L9', {
+          method: 'POST',
+          headers: { Authorization: 'Bearer test' },
+        }, env);
+      };
+      let failOnce = true;
+      const faulty = dual.faultyDb1((sql) =>
+        sql.includes('UPDATE event_booking_reminders') && failOnce
+          ? (failOnce = false, true)
+          : false,
+      );
+      expect((await cancel(faulty)).status).toBe(500);
+      expect(dual.raw1.prepare(`SELECT status FROM event_bookings WHERE id = 'eb-l1'`).get())
+        .toEqual({ status: 'cancelled' });
+      expect(dual.raw1.prepare(`SELECT status FROM friend_reminders WHERE id = 'FR-l1'`).get())
+        .toEqual({ status: 'cancelled' });
+      expect(dual.raw1.prepare(`SELECT status FROM event_booking_reminders WHERE id = 'LEG-l1'`).get())
+        .toEqual({ status: 'pending' });
+
+      expect((await cancel(dual.db1)).status).toBe(200);
+      expect(dual.raw1.prepare(`SELECT status FROM event_booking_reminders WHERE id = 'LEG-l1'`).get())
+        .toEqual({ status: 'cancelled' });
+    } finally {
+      dual.cleanup();
+    }
+  });
+
+  it('イベント (管理者取消): 旧表の取消だけ落ちても、再送でそろう', async () => {
+    const dual = openDualDb();
+    try {
+      seedLiffCancelTarget(dual.raw1);
+      const cancel = (db: D1Database) => {
+        const { app, env } = makeEventsApp(db);
+        return app.request(
+          '/api/events/admin/events/ev-9/bookings/eb-l1/cancel?account_id=account-9',
+          { method: 'POST' },
+          env,
+        );
+      };
+      let failOnce = true;
+      const faulty = dual.faultyDb1((sql) =>
+        sql.includes('UPDATE event_booking_reminders') && failOnce
+          ? (failOnce = false, true)
+          : false,
+      );
+      expect((await cancel(faulty)).status).toBe(500);
+      expect(dual.raw1.prepare(`SELECT status FROM event_bookings WHERE id = 'eb-l1'`).get())
+        .toEqual({ status: 'cancelled' });
+      expect(dual.raw1.prepare(`SELECT status FROM event_booking_reminders WHERE id = 'LEG-l1'`).get())
+        .toEqual({ status: 'pending' });
+
+      expect((await cancel(dual.db1)).status).toBe(200);
+      expect(dual.raw1.prepare(`SELECT status FROM event_booking_reminders WHERE id = 'LEG-l1'`).get())
+        .toEqual({ status: 'cancelled' });
+    } finally {
+      dual.cleanup();
+    }
+  });
+});
+
+// 逆変異で赤にならなかった保護の見張りを足す。
+// (C4 claim時のactive確認 / C6 配信ループ先頭のactive確認 /
+//  C7 Calendar実行直前の予約状態の再確認 が素通りしていた)
+describe('取消チェックの各層を個別に見張る (自主検証)', () => {
+  it('取消ずみの登録には送信権を渡さない (claimの原子的確認)', async () => {
+    const dual = openDualDb();
+    try {
+      seedBookingCancelTarget(dual.raw1);
+      seedBookingReminderPair(dual.raw1);
+      // 配信対象の読み出し (active) から claim までの間に取消が確定した状況。
+      dual.raw2.prepare(
+        `UPDATE friend_reminders SET status = 'cancelled' WHERE id = 'FR-d1'`,
+      ).run();
+
+      const run = await claimReminderDeliveryRun(dual.db1, {
+        lineAccountId: 'acc1',
+        reminderId: 'rb-rule',
+        friendReminderId: 'FR-d1',
+        friendId: 'f1',
+        reminderStepId: 'rb-step',
+        scheduledAt: '2026-09-20T00:00:00.000Z',
+        now: '2026-09-20T00:30:00.000Z',
+        leaseExpiresAt: '2026-09-20T00:35:00.000Z',
+      });
+      // 握れない。残った実行行はその場で止め、貸出も残さない。
+      expect(run).toBeNull();
+      expect(dual.raw1.prepare(
+        `SELECT status, lease_expires_at FROM reminder_delivery_runs
+          WHERE friend_reminder_id = 'FR-d1'`,
+      ).get()).toEqual({ status: 'cancelled', lease_expires_at: null });
+    } finally {
+      dual.cleanup();
+    }
+  });
+
+  it('claim後に取消が確定した登録は、残りの通に実行行を作らず登録ごと飛ばす', async () => {
+    const dual = openDualDb();
+    try {
+      seedBookingCancelTarget(dual.raw1);
+      dual.raw1.exec(`
+        INSERT INTO friends (id, line_user_id, display_name, line_account_id, is_following)
+        VALUES ('f2','U2','次郎','acc1',1);
+        INSERT INTO reminders
+          (id, name, line_account_id, is_active, trigger_type, delivery_mode, lifecycle_status)
+        VALUES ('rb-rule2','rule2','acc1',1,'booking','countdown','published');
+        INSERT INTO reminder_steps (id, reminder_id, offset_minutes, message_type, message_content)
+        VALUES ('rb2-step1','rb-rule2',-120,'text','1通目'),
+               ('rb2-step2','rb-rule2',-60,'text','2通目');
+        INSERT INTO friend_reminders
+          (id, friend_id, reminder_id, target_date, status, source_kind, source_id, source_event_id)
+        VALUES ('FR-d1','f1','rb-rule','2026-09-20T01:00:00.000Z','active','booking','RB9','RB9'),
+               ('FR-d2','f2','rb-rule2','2026-09-20T01:00:00.000Z','active','booking','RB10','RB10');
+      `);
+      // 1件目の送信が済んだら武装し、2件目の claim が成立した直後に
+      // 別接続の取消を割り込ませる (claim と登録確認の間の窓)。
+      let armed = false;
+      const { pushes, client } = makePushRecorder(() => {
+        armed = true;
+        return { requestId: 'REQ-1' };
+      });
+      const hooked = dual.hookedDb1((sql) => {
+        if (!armed || !sql.includes("SET status = 'claimed'")) return;
+        armed = false;
+        dual.raw2.prepare(
+          `UPDATE friend_reminders SET status = 'cancelled' WHERE id = 'FR-d2'`,
+        ).run();
+      });
+
+      const result = await processReminderDeliveries(hooked, client, {
+        now: SEND_AT_PASSED,
+        pause: noPause,
+        resolveClient: async () => client,
+      });
+
+      expect(pushes.map((p) => p.userId)).toEqual(['U1']);
+      expect(result).toEqual({ succeeded: 1, skipped: 1, retrying: 0, failed: 0 });
+      // 取消ずみの登録は残りの通へ進まない (実行行を増やさない)。
+      expect(dual.raw1.prepare(
+        `SELECT COUNT(*) AS c FROM reminder_delivery_runs WHERE friend_reminder_id = 'FR-d2'`,
+      ).get()).toEqual({ c: 1 });
+      expect(dual.raw1.prepare(
+        `SELECT status FROM reminder_delivery_runs WHERE friend_reminder_id = 'FR-d2'`,
+      ).get()).toEqual({ status: 'cancelled' });
+      expect(dual.raw1.prepare(
+        `SELECT COUNT(*) AS c FROM friend_reminder_deliveries WHERE friend_reminder_id = 'FR-d2'`,
+      ).get()).toEqual({ c: 0 });
+    } finally {
+      dual.cleanup();
+    }
+  });
+
+  it('確定のままの予約は、Calendar削除の台帳行があっても予定を消さない', async () => {
+    const dual = openDualDb();
+    try {
+      seedBookingCancelTarget(dual.raw1);
+      // RB10 は confirmed かつ外部予定つき。409 で巻き戻した後の残留台帳や、
+      // 再確定した予約に古い行が残った状況を表す。
+      const { enqueueCalendarDeleteOperation } = await import(
+        '../services/booking-calendar-sync.js'
+      );
+      await enqueueCalendarDeleteOperation(dual.db1, { bookingId: 'RB10', lineAccountId: 'acc1' });
+      const removed: string[] = [];
+      const drained = await processPendingCalendarDeleteOperations(dual.db2, {
+        now: new Date('2026-09-10T00:00:00.000Z'),
+        remove: async (bookingId) => {
+          removed.push(bookingId);
+        },
+      });
+      // 実行の直前に予約状態を見るため、外部削除は呼ばれない。
+      expect(removed).toEqual([]);
+      expect(drained).toEqual({ processed: 1, succeeded: 0, retrying: 0, skipped: 1 });
+      expect(dual.raw1.prepare(
+        `SELECT status FROM booking_operation_runs WHERE booking_id = 'RB10'`,
+      ).get()).toEqual({ status: 'skipped' });
+      expect(dual.raw1.prepare(
+        `SELECT external_event_id FROM bookings WHERE id = 'RB10'`,
+      ).get()).toEqual({ external_event_id: 'gcal-ev-10' });
     } finally {
       dual.cleanup();
     }
