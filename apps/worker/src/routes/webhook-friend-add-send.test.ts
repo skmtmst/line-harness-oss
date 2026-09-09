@@ -32,6 +32,9 @@ vi.mock('../services/event-bus.js', () => ({
   logOutgoingMessage: vi.fn().mockResolvedValue(undefined),
 }));
 
+const eccubeMocks = vi.hoisted(() => ({ createEccubeCoupon: vi.fn() }));
+vi.mock('../services/eccube-coupon.js', () => eccubeMocks);
+
 import { verifySignature } from '@line-crm/line-sdk';
 import { webhook } from './webhook.js';
 
@@ -85,7 +88,11 @@ function seedBase(): void {
   });
 }
 
-async function postFollow(webhookEventId: string, useDb: D1Database = db): Promise<void> {
+async function postFollow(
+  webhookEventId: string,
+  useDb: D1Database = db,
+  extraEnv: Record<string, unknown> = {},
+): Promise<void> {
   const app = new Hono();
   app.route('/', webhook);
   const waitUntil = vi.fn();
@@ -99,7 +106,7 @@ async function postFollow(webhookEventId: string, useDb: D1Database = db): Promi
         follow: { isUnblocked: false },
       }],
     }),
-  }, { ...env(), DB: useDb }, { waitUntil, passThroughOnException: vi.fn(), props: {} } as unknown as ExecutionContext);
+  }, { ...env(), ...extraEnv, DB: useDb }, { waitUntil, passThroughOnException: vi.fn(), props: {} } as unknown as ExecutionContext);
   expect(response.status).toBe(200);
   await waitUntil.mock.calls[0]?.[0];
 }
@@ -368,6 +375,68 @@ describe('POST /webhook — 送信の結末を分ける (#622)', () => {
  * 別の1通が送れたからといって「送れた」に丸めると、予約を返してしまい、
  * 不明だった通を次のfollowが送り直す（届いていたら2通目になる）。
  */
+/*
+ * クーポンの本文送信も外部送信なので、**送るひとつ手前**で関門を通す。
+ * まとめて1回だけ確認していると、クーポンの作成（外部API）に時間がかかった
+ * 間に予約を奪われても気づけず、奪った側と両方が送ってしまう。
+ */
+describe('POST /webhook — クーポン本文の送信も直前の関門をくぐる (#622)', () => {
+  const EC_ENV = { NEN_EC_BASE_URL: 'https://ec.example', ECCUBE_WEBHOOK_SECRET: 'ec-secret' };
+
+  function enableCoupon(): void {
+    raw.prepare(
+      `INSERT INTO account_settings (line_account_id, key, value)
+       VALUES ('account-1', 'nen.friend_add_coupon', ?)`,
+    ).run(JSON.stringify({
+      isEnabled: true, deliveryMode: 'generated', codePrefix: 'NENLINE',
+      discountRate: 5, validityDays: 31, couponName: 'LINE友だち追加 5%OFF',
+    }));
+  }
+
+  function couponPushCount(): number {
+    return lineClientMocks.pushMessage.mock.calls.filter(
+      (call) => JSON.stringify(call[1] ?? '').includes('5%OFF'),
+    ).length;
+  }
+
+  test('クーポン作成中に予約を奪われたら、本文を送らない', async () => {
+    enableCoupon();
+    // 作成（外部API）の最中に、別の実行が予約を奪う。
+    eccubeMocks.createEccubeCoupon.mockImplementation(async () => {
+      raw.prepare(
+        `UPDATE friend_add_send_claims
+            SET event_id = 'stolen-by-other', generation = generation + 1`,
+      ).run();
+    });
+
+    await postFollow('webhook-coupon-fenced', db, EC_ENV);
+
+    expect(eccubeMocks.createEccubeCoupon).toHaveBeenCalledTimes(1);
+    // 奪われているので本文は送らない
+    expect(couponPushCount()).toBe(0);
+    // 台帳も奪った側のもの。旧持ち主は書かない。
+    expect(raw.prepare(
+      `SELECT routing_status FROM friend_add_events WHERE webhook_event_id = 'webhook-coupon-fenced'`,
+    ).get()).toEqual({ routing_status: 'pending' });
+    // 発行台帳は「作成済み・未送信」で残る（送っていないので sent にしない）
+    expect(raw.prepare(
+      `SELECT status FROM nen_friend_add_coupon_issues WHERE friend_id = 'friend-1'`,
+    ).get()).toEqual({ status: 'coupon_created' });
+  });
+
+  test('奪われていなければクーポン本文を送る', async () => {
+    enableCoupon();
+    eccubeMocks.createEccubeCoupon.mockResolvedValue(undefined);
+
+    await postFollow('webhook-coupon-ok', db, EC_ENV);
+
+    expect(couponPushCount()).toBe(1);
+    expect(raw.prepare(
+      `SELECT status FROM nen_friend_add_coupon_issues WHERE friend_id = 'friend-1'`,
+    ).get()).toEqual({ status: 'sent' });
+  });
+});
+
 describe('POST /webhook — 複数送信の結末は不明を最優先 (#622)', () => {
   function seedIntroTemplateOn(raw2: typeof raw): void {
     raw2.prepare(

@@ -247,6 +247,15 @@ export async function issueFriendAddCoupon(
     ).bind(createdAt, createdAt, input.lineAccountId, input.friendId).run();
   } catch (error) {
     /*
+     * **送信を見送った（送信権を失った）ときは状態を書き換えない。**
+     * 送っていないので `sent` は誤りだし、`failed_send` にすると、
+     * 送信権を持っている別の実行が送ったクーポンを次の追加で送り直す。
+     * 作成済みのまま残し、権利を持つ側に送らせる。
+     */
+    if ((error as { friendAddSendAborted?: unknown } | null)?.friendAddSendAborted === true) {
+      throw error;
+    }
+    /*
      * 届いたか分からない送信は `failed_send` にしない。`failed_send` は
      * 次の友だち追加で送り直す印で、届いていた人に2通目が出る。
      * 送った可能性がある側へ倒し（`sent`）、理由だけ残して人が確かめる。

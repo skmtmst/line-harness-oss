@@ -715,7 +715,12 @@ async function handleEvent(
           createCoupon: (coupon) => createEccubeCoupon(ecommerce.baseUrl, ecommerce.secret, coupon),
           sendText: async (text) => {
             // クーポンの本文も外部送信。直前に関門を通し、結末を分けて残す。
-            if (!(await holdSendRight({ external: true }))) throw new Error('friend_add_coupon_fenced_out');
+            if (!(await holdSendRight({ external: true }))) {
+              // 送信権を失った。**送っていない**ので、クーポンの状態は変えさせない。
+              throw Object.assign(new Error('friend_add_coupon_fenced_out'), {
+                friendAddSendAborted: true,
+              });
+            }
             try {
               await lineClient.pushMessage(userId, [{ type: 'text', text }], sendRetryKey('coupon'));
             } catch (pushErr) {
