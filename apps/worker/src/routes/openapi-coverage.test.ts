@@ -122,11 +122,11 @@ function formatKeys(keys: string[]): string {
  * - ALLOWLIST_MAX: 未記載負債はここより増やせない
  * 後続票で記載を増やしたら、実測に合わせて両方を同じ PR で更新する。
  */
-const DOCUMENTED_MIN = 83;
+const DOCUMENTED_MIN = 84;
 const ALLOWLIST_MAX = 777;
 
 /**
- * PR #1456 時点の記載済み 83 件の基準一覧。
+ * PR #1456 時点の記載済み 83 件 + #630 の health-summary 1 件の基準一覧。
  * 既存仕様を ALLOWLIST へ移して後退させる変更を落とすためのもの。
  * 件数が変わらなくても、ここにある1件が消えたら落ちる。
  * 後続票で記載を増やしたら、増えた分をここへ足す。
@@ -143,6 +143,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'DELETE /api/scenarios/{id}/steps/{stepId}',
   'DELETE /api/tags/{id}',
   'DELETE /api/users/{id}',
+  'GET /api/accounts/health-summary',
   'GET /api/affiliates',
   'GET /api/affiliates/{id}',
   'GET /api/affiliates/{id}/report',

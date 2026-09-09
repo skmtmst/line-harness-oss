@@ -3614,6 +3614,13 @@ export type PhotoReviewMetrics = {
   attentionCount: number
 }
 
+/** GET /api/accounts/health-summary の応答。ログ本文は含まない。 */
+export type AccountHealthSummary = {
+  items: Array<{ lineAccountId: string; riskLevel: string | null }>
+  warningCount: number
+  dangerCount: number
+}
+
 export type PhotoAssetRun = {
   id: string
   photoId: string
@@ -4739,6 +4746,10 @@ export const api = {
         errorCode: string | null
         result: AnalyticsCrossResult | null
         createdAt: string
+        queuePosition: number | null
+        pendingAhead: number
+        estimatedWaitMs: number | null
+        nextTickAt: string | null
       }>>(`/api/analytics/cross/results/${id}?account_id=${encodeURIComponent(accountId)}`),
     createResultAudience: (accountId: string, resultId: string, data: {
       sourceKind: 'cross' | 'funnel'
@@ -8171,6 +8182,9 @@ export const api = {
       fetchApi<ApiResponse<{ riskLevel: string; logs: AccountHealthLog[] }>>(
         `/api/accounts/${accountId}/health`,
       ),
+    /** サイドバーの警告数用。staff可視範囲の最新riskLevelだけを1回で取る。ログ本文なし。 */
+    summary: () =>
+      fetchApi<ApiResponse<AccountHealthSummary>>('/api/accounts/health-summary'),
     migrations: () =>
       fetchApi<ApiResponse<AccountMigration[]>>('/api/accounts/migrations'),
     migrate: (fromAccountId: string, data: { toAccountId: string }) =>
@@ -9123,6 +9137,12 @@ export interface BookingAvailabilitySlot {
   date: string;
   start: string;
   end: string;
+  /** 店舗タイムゾーン名。表示・送信はこの zone で読む。 */
+  timeZone: string;
+  /** 開始 instant（offset 付き ISO。fold 日の重複壁時刻も一意になる）。 */
+  startUtc: string;
+  /** 終了 instant（開始＋所要分。offset 付き ISO）。 */
+  endUtc: string;
   capacity: number;
   remaining: number;
   state: 'available' | 'limited' | 'full' | 'closed';
