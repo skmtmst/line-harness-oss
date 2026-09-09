@@ -426,4 +426,17 @@ describe('成果の受付の境界(N-255)', () => {
     });
     expect(res.status).toBe(409);
   });
+
+  it('事前確認後にhelperがaccount交差を検出しても403にする', async () => {
+    mockTrackAccounts('acc-a', 'acc-a');
+    mocks.trackConversion.mockRejectedValueOnce(new Error('conversion_account_mismatch'));
+    const res = await req('/api/conversions/track', 'POST', {
+      conversionPointId: 'cp-1', friendId: 'friend-a',
+    });
+    expect(res.status).toBe(403);
+    expect(await res.json()).toMatchObject({
+      success: false,
+      error: '地点と友だちのアカウントが違うため記録できません',
+    });
+  });
 });

@@ -1137,6 +1137,21 @@ describe('extractApiErrorData', () => {
     expect(extractApiErrorData(JSON.stringify({ data: commonVarImpact }))).toEqual(commonVarImpact)
     expect(extractApiErrorData('<html>proxy error</html>')).toBeUndefined()
   })
+
+  it('旧成果地点APIの409 currentVersionを画面用dataへ渡す', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+      success: false,
+      error: '成果地点が更新されています。読み直してください',
+      currentVersion: 7,
+    }), { status: 409, headers: { 'Content-Type': 'application/json' } })))
+
+    await expect(fetchApi('/api/conversions/points/point-1', { method: 'PUT' }))
+      .rejects.toMatchObject({
+        name: 'ApiError',
+        status: 409,
+        data: { currentVersion: 7 },
+      })
+  })
 })
 
 describe('fetchApi error response', () => {

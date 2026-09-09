@@ -398,7 +398,6 @@ CREATE TABLE IF NOT EXISTS conversion_events (
   event_type_snapshot  TEXT,
   value_snapshot       REAL,
   idempotency_key      TEXT,
-  once_key             TEXT,
   created_at           TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
 
@@ -409,8 +408,20 @@ CREATE INDEX IF NOT EXISTS idx_conversion_events_affiliate ON conversion_events 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_conversion_events_point_idempotency
   ON conversion_events(conversion_point_id, idempotency_key)
   WHERE idempotency_key IS NOT NULL;
-CREATE UNIQUE INDEX IF NOT EXISTS idx_conversion_events_once_key
-  ON conversion_events(once_key) WHERE once_key IS NOT NULL;
+CREATE TABLE IF NOT EXISTS conversion_event_dedup_claims (
+  conversion_point_id TEXT NOT NULL REFERENCES conversion_points(id) ON DELETE CASCADE,
+  friend_id           TEXT NOT NULL REFERENCES friends(id) ON DELETE CASCADE,
+  mode                TEXT NOT NULL CHECK (mode IN ('lifetime', 'window')),
+  window_days         INTEGER CHECK (window_days IS NULL OR window_days BETWEEN 1 AND 365),
+  last_event_id       TEXT NOT NULL,
+  last_at             TEXT NOT NULL,
+  updated_at          TEXT NOT NULL,
+  PRIMARY KEY (conversion_point_id, friend_id),
+  CHECK ((mode = 'lifetime' AND window_days IS NULL)
+      OR (mode = 'window' AND window_days IS NOT NULL))
+);
+CREATE INDEX IF NOT EXISTS idx_conversion_event_dedup_claims_event
+  ON conversion_event_dedup_claims(last_event_id);
 CREATE INDEX IF NOT EXISTS idx_conversion_points_status ON conversion_points(status, created_at DESC);
 
 CREATE TRIGGER IF NOT EXISTS conversion_points_prevent_delete

@@ -12,6 +12,7 @@ export function applyConversionTestSchema(db: Database.Database): void {
     );
     CREATE TABLE friends (
       id TEXT PRIMARY KEY, line_user_id TEXT UNIQUE NOT NULL, display_name TEXT,
+      line_account_id TEXT,
       created_at TEXT NOT NULL, updated_at TEXT NOT NULL
     );
     CREATE TABLE affiliates (
@@ -44,7 +45,13 @@ export function applyConversionTestSchema(db: Database.Database): void {
       affiliate_id TEXT, attributed_ref_code TEXT,
       approval_status TEXT, approved_at TEXT,
       point_name_snapshot TEXT, event_type_snapshot TEXT, value_snapshot REAL,
-      idempotency_key TEXT, once_key TEXT, created_at TEXT NOT NULL
+      idempotency_key TEXT, created_at TEXT NOT NULL
+    );
+    CREATE TABLE conversion_event_dedup_claims (
+      conversion_point_id TEXT NOT NULL, friend_id TEXT NOT NULL,
+      mode TEXT NOT NULL, window_days INTEGER,
+      last_event_id TEXT NOT NULL, last_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+      PRIMARY KEY (conversion_point_id, friend_id)
     );
     CREATE TABLE conversion_definition_usages (
       id TEXT PRIMARY KEY, conversion_point_id TEXT NOT NULL,
@@ -59,7 +66,5 @@ export function applyConversionTestSchema(db: Database.Database): void {
     );
     CREATE UNIQUE INDEX idx_conversion_events_point_idempotency
       ON conversion_events(conversion_point_id, idempotency_key) WHERE idempotency_key IS NOT NULL;
-    CREATE UNIQUE INDEX idx_conversion_events_once_key
-      ON conversion_events(once_key) WHERE once_key IS NOT NULL;
   `);
 }

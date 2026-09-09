@@ -10,21 +10,39 @@ import {
 } from '../src/conversion-definitions.js';
 import { asD1 } from './d1-test-helper.js';
 
-/**
- * 実D1相当の適合器。D1 の batch は失敗時に巻き戻さないため、
- * 共通の試験helper(まとめて巻き戻す)ではなく1文ずつ実行する。
- * 版不一致で副作用が残る実装は、この適合器で必ず落ちる。
- */
-function asNonAtomicD1(sqlite: DatabaseType.Database): D1Database {
-  const d1 = asD1(sqlite);
-  async function batch(statements: D1PreparedStatement[]): Promise<D1Result<unknown>[]> {
-    const results: D1Result<unknown>[] = [];
-    for (const statement of statements) results.push(await statement.run());
-    return results;
+/** Cloudflare D1 batchの「1文失敗で全体rollback」を再現し、指定文を故障注入する。 */
+function asAtomicD1(sqlite: DatabaseType.Database, failSql?: RegExp): D1Database {
+  type TestStatement = D1PreparedStatement & { runSync: () => D1Result<unknown> };
+  function prepare(query: string): TestStatement {
+    let params: unknown[] = [];
+    const statement = {
+      bind(...next: unknown[]) {
+        params = next;
+        return statement;
+      },
+      runSync() {
+        if (failSql?.test(query)) throw new Error(`injected statement failure: ${query.trim().slice(0, 40)}`);
+        const info = sqlite.prepare(query).run(...params);
+        return { success: true, meta: { changes: info.changes }, results: [] } as unknown as D1Result<unknown>;
+      },
+      async run<T>() { return statement.runSync() as T; },
+      async all<T>() {
+        return { results: sqlite.prepare(query).all(...params) as T[], success: true, meta: {} };
+      },
+      async first<T>() {
+        return (sqlite.prepare(query).get(...params) as T | undefined) ?? null;
+      },
+      raw: async () => [],
+    } as unknown as TestStatement;
+    return statement;
   }
   return {
-    prepare: (...args: Parameters<D1Database['prepare']>) => d1.prepare(...args),
-    batch: batch as unknown as D1Database['batch'],
+    prepare,
+    async batch<T>(statements: D1PreparedStatement[]) {
+      const results = sqlite.transaction(() =>
+        statements.map((statement) => (statement as TestStatement).runSync()))();
+      return results as T;
+    },
   } as unknown as D1Database;
 }
 
@@ -80,23 +98,9 @@ function pointState(db: Database.Database, id: string): { status: string; versio
 }
 
 describe('定義操作のCAS不一致は副作用なし', () => {
-  it('試験台自体がbatchを巻き戻さないことの校正', async () => {
-    const db = setup();
-    const d1 = asNonAtomicD1(db);
-    await expect(d1.batch([
-      d1.prepare(`INSERT INTO conversion_definition_operations
-        (id, conversion_point_id, action, affected_usages, performed_by, created_at)
-        VALUES ('op-1', 'missing', 'stop', 0, 's', 't')`),
-      d1.prepare(`INSERT INTO conversion_definition_operations (id) VALUES ('op-1')`),
-    ])).rejects.toThrow();
-    // 巻き戻らない適合器なら最初の1文が残る。旧実装(CAS後に副作用)の
-    // 残存を検出できる試験台であることの証拠。
-    expect(operationCount(db)).toBe(1);
-  });
-
   it('stopの競合は利用先もログも変えない', async () => {
     const db = setup();
-    const d1 = asNonAtomicD1(db);
+    const d1 = asAtomicD1(db);
     const id = await createPoint(db, '地点A');
     addUsage(db, id, 'scenario-1');
     await expect(stopConversionDefinition(d1, {
@@ -115,7 +119,7 @@ describe('定義操作のCAS不一致は副作用なし', () => {
 
   it('replaceの競合は利用先の移動もログもしない', async () => {
     const db = setup();
-    const d1 = asNonAtomicD1(db);
+    const d1 = asAtomicD1(db);
     const source = await createPoint(db, '地点A');
     const replacement = await createPoint(db, '地点B');
     addUsage(db, source, 'scenario-1');
@@ -138,7 +142,7 @@ describe('定義操作のCAS不一致は副作用なし', () => {
 
   it('deleteの競合は削除もログもしない', async () => {
     const db = setup();
-    const d1 = asNonAtomicD1(db);
+    const d1 = asAtomicD1(db);
     const id = await createPoint(db, '地点A');
     await expect(deleteUnusedConversionDefinition(d1, {
       id, scope: SCOPE, expectedVersion: 99, staffId: 'staff-1',
@@ -156,7 +160,7 @@ describe('定義操作のCAS不一致は副作用なし', () => {
 describe('定義操作の同時二重実行は勝者だけが副作用を残す', () => {
   it('stopの同時実行はログ1件だけ', async () => {
     const db = setup();
-    const d1 = asNonAtomicD1(db);
+    const d1 = asAtomicD1(db);
     const id = await createPoint(db, '地点A');
     const settled = await Promise.allSettled([
       stopConversionDefinition(d1, { id, scope: SCOPE, expectedVersion: 1, staffId: 'staff-1' }),
@@ -170,7 +174,7 @@ describe('定義操作の同時二重実行は勝者だけが副作用を残す'
 
   it('replaceの同時実行は利用先1回移動・ログ1件だけ', async () => {
     const db = setup();
-    const d1 = asNonAtomicD1(db);
+    const d1 = asAtomicD1(db);
     const source = await createPoint(db, '地点A');
     const replacement = await createPoint(db, '地点B');
     addUsage(db, source, 'scenario-1');
@@ -193,7 +197,7 @@ describe('定義操作の同時二重実行は勝者だけが副作用を残す'
 
   it('deleteの同時実行はログ1件だけ', async () => {
     const db = setup();
-    const d1 = asNonAtomicD1(db);
+    const d1 = asAtomicD1(db);
     const id = await createPoint(db, '地点A');
     const settled = await Promise.allSettled([
       deleteUnusedConversionDefinition(d1, { id, scope: SCOPE, expectedVersion: 1, staffId: 'staff-1' }),
@@ -202,5 +206,45 @@ describe('定義操作の同時二重実行は勝者だけが副作用を残す'
     expect(settled.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
     expect(settled.filter((r) => r.status === 'rejected')).toHaveLength(1);
     expect(operationCount(db)).toBe(1);
+  });
+});
+
+describe('定義操作は後続文の失敗時にCASも含めてrollbackする', () => {
+  it('stopのログ失敗で停止と版を戻す', async () => {
+    const db = setup();
+    const id = await createPoint(db, '地点A');
+    await expect(stopConversionDefinition(asAtomicD1(db, /INSERT INTO conversion_definition_operations/), {
+      id, scope: SCOPE, expectedVersion: 1, staffId: 'staff-1',
+    })).rejects.toThrow('injected statement failure');
+    expect(pointState(db, id)).toEqual({ status: 'active', version: 1 });
+    expect(operationCount(db)).toBe(0);
+  });
+
+  it.each([
+    ['重複利用先の整理', /DELETE FROM conversion_definition_usages/],
+    ['利用先の移動', /UPDATE conversion_definition_usages/],
+    ['操作ログ', /INSERT INTO conversion_definition_operations/],
+  ])('replaceの%s失敗で停止・利用先・ログをすべて戻す', async (_label, failSql) => {
+    const db = setup();
+    const source = await createPoint(db, '地点A');
+    const replacement = await createPoint(db, '地点B');
+    addUsage(db, source, 'scenario-1');
+    await expect(replaceConversionDefinitionUsages(asAtomicD1(db, failSql), {
+      id: source, replacementId: replacement, scope: SCOPE,
+      expectedVersion: 1, replacementExpectedVersion: 1, staffId: 'staff-1',
+    })).rejects.toThrow('injected statement failure');
+    expect(pointState(db, source)).toEqual({ status: 'active', version: 1 });
+    expect(usagePointIds(db)).toEqual([source]);
+    expect(operationCount(db)).toBe(0);
+  });
+
+  it('deleteのログ失敗で削除を戻す', async () => {
+    const db = setup();
+    const id = await createPoint(db, '地点A');
+    await expect(deleteUnusedConversionDefinition(asAtomicD1(db, /INSERT INTO conversion_definition_operations/), {
+      id, scope: SCOPE, expectedVersion: 1, staffId: 'staff-1',
+    })).rejects.toThrow('injected statement failure');
+    expect(pointState(db, id)).toEqual({ status: 'active', version: 1 });
+    expect(operationCount(db)).toBe(0);
   });
 });

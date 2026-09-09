@@ -936,6 +936,14 @@ conversions.post('/api/conversions/track', requireRole('owner', 'admin'), async 
     if (err instanceof Error && err.message === 'conversion_idempotency_key_conflict') {
       return c.json({ success: false, error: 'このキーは別の内容で既に使われています' }, 409);
     }
+    // helper内部の境界判定は公開 /t/:linkId を含む全callerで共通。
+    // 管理口では競合中にaccountが変わった場合も権限エラーとして返す。
+    if (err instanceof Error && err.message === 'conversion_account_mismatch') {
+      return c.json({ success: false, error: '地点と友だちのアカウントが違うため記録できません' }, 403);
+    }
+    if (err instanceof Error && err.message === 'conversion_friend_not_found') {
+      return c.json({ success: false, error: 'このコンバージョンを記録する権限がありません' }, 403);
+    }
     console.error('POST /api/conversions/track error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }

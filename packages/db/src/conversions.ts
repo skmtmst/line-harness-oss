@@ -1,4 +1,4 @@
-import { boundedListLimit, jstNow, nonNegativeListOffset } from './utils.js';
+import { boundedListLimit, jstNow, nonNegativeListOffset, toJstString } from './utils.js';
 import { resolveAffiliateAttribution } from './affiliate-attribution.js';
 // =============================================================================
 // Conversion Points & Events — CV Tracking
@@ -50,8 +50,6 @@ export interface ConversionEvent {
   event_type_snapshot: string | null;
   value_snapshot: number | null;
   idempotency_key: string | null;
-  /** 1人1回地点の行だけに入る重複防止キー。NULLの行は制約の対象外。 */
-  once_key: string | null;
 }
 
 // ── Conversion Points CRUD ──────────────────────────────────────────────────
@@ -333,35 +331,6 @@ export function resolveDedupPolicy(point: {
 
 const JST_DAY_MS = 86_400_000;
 
-/** 日本日の通日を期間日数で区切った番号。同時刻の同時到着は必ず同じ区切りになる。 */
-export function dedupWindowBucket(windowDays: number, at = Date.now()): number {
-  return Math.floor(Math.floor((at + 9 * 3_600_000) / JST_DAY_MS) / windowDays);
-}
-
-/**
- * 同時到着の片方を弾く鍵。every は鍵なし(何件でも数える)。
- * 期間を変えたら鍵も変わるよう、window は日数を含める。
- */
-export function dedupKeyFor(
-  policy: ConversionDedupPolicy,
-  conversionPointId: string,
-  friendId: string,
-  at = Date.now(),
-): string | null {
-  if (policy.kind === 'lifetime') return `${conversionPointId}|${friendId}`;
-  if (policy.kind === 'window') {
-    return `${conversionPointId}|${friendId}|w${policy.windowDays}:${dedupWindowBucket(policy.windowDays, at)}`;
-  }
-  return null;
-}
-
-/** 記録日時が期間内か。読めない日時は厳しい側(期間内=重複扱い)に倒す。 */
-export function createdWithinWindowDays(createdAt: string, windowDays: number, now: number): boolean {
-  const at = Date.parse(createdAt);
-  if (Number.isNaN(at)) return true;
-  return now - at <= windowDays * JST_DAY_MS;
-}
-
 /**
  * 成果の記録先アカウントの一致条件。地点のアカウントが NULL
  * (全アカウント対象)のときだけ交差を許可する。それ以外は地点と
@@ -405,70 +374,43 @@ async function findEventByIdempotencyKey(
     .first<ConversionEvent>();
 }
 
-async function findFirstFriendEvent(
+async function findClaimedEvent(
   db: D1Database,
   conversionPointId: string,
   friendId: string,
 ): Promise<ConversionEvent | null> {
-  return db
-    .prepare(
-      `SELECT * FROM conversion_events
-        WHERE conversion_point_id = ? AND friend_id = ?
-        ORDER BY created_at ASC LIMIT 1`,
-    )
+  return db.prepare(`SELECT ce.* FROM conversion_event_dedup_claims claim
+    JOIN conversion_events ce ON ce.id = claim.last_event_id
+    WHERE claim.conversion_point_id = ? AND claim.friend_id = ?
+      AND ce.conversion_point_id = claim.conversion_point_id
+      AND ce.friend_id = claim.friend_id`)
     .bind(conversionPointId, friendId)
     .first<ConversionEvent>();
-}
-
-async function findLatestFriendEvent(
-  db: D1Database,
-  conversionPointId: string,
-  friendId: string,
-): Promise<ConversionEvent | null> {
-  return db
-    .prepare(
-      `SELECT * FROM conversion_events
-        WHERE conversion_point_id = ? AND friend_id = ?
-        ORDER BY created_at DESC, id DESC LIMIT 1`,
-    )
-    .bind(conversionPointId, friendId)
-    .first<ConversionEvent>();
-}
-
-/**
- * 数え方に合った既存の1件を探す。lifetime は最初の1件、window は
- * 期間内の最新の1件、every は探さない(何件でも数える)。
- */
-async function findDedupedEvent(
-  db: D1Database,
-  policy: ConversionDedupPolicy,
-  conversionPointId: string,
-  friendId: string,
-  now: number,
-): Promise<ConversionEvent | null> {
-  if (policy.kind === 'lifetime') {
-    return findFirstFriendEvent(db, conversionPointId, friendId);
-  }
-  if (policy.kind === 'window') {
-    const latest = await findLatestFriendEvent(db, conversionPointId, friendId);
-    if (latest && createdWithinWindowDays(latest.created_at, policy.windowDays, now)) {
-      return latest;
-    }
-    return null;
-  }
-  return null;
 }
 
 export async function trackConversion(
   db: D1Database,
   input: TrackConversionInput,
+  runtime?: { now?: number },
 ): Promise<ConversionEvent> {
   const id = crypto.randomUUID();
-  const now = jstNow();
+  const nowMs = runtime?.now ?? Date.now();
+  const now = toJstString(new Date(nowMs));
 
-  const point = await getConversionPointById(db, input.conversionPointId);
+  const [point, friend] = await Promise.all([
+    getConversionPointById(db, input.conversionPointId),
+    db.prepare('SELECT line_account_id FROM friends WHERE id = ?')
+      .bind(input.friendId)
+      .first<{ line_account_id: string | null }>(),
+  ]);
   if (!point) throw new Error('conversion_point_not_found');
+  if (!friend) throw new Error('conversion_friend_not_found');
   if (point.status === 'stopped') throw new Error('conversion_point_stopped');
+  // 管理API・公開 /t/:linkId・将来のcallerすべてに同じ境界を適用する。
+  // 地点が全アカウント対象(NULL)の場合だけ、別accountの友だちを許可する。
+  if (!canRecordConversion(point.line_account_id, friend.line_account_id)) {
+    throw new Error('conversion_account_mismatch');
+  }
 
   if (input.idempotencyKey) {
     const existing = await findEventByIdempotencyKey(db, input.conversionPointId, input.idempotencyKey);
@@ -478,14 +420,7 @@ export async function trackConversion(
     }
   }
 
-  // 数え方に合った既存の1件があれば、それを返して終わる。
-  // 例外にしないのは、二重に踏むのは利用者にとって普通の行動で、
-  // 呼び出し側に異常として扱わせるとログが埋まるため。
-  // 読み取り後の同時到着は once_key のUNIQUE制約で片方を弾く(N-255)。
-  const nowMs = Date.now();
   const policy = resolveDedupPolicy(point);
-  const deduped = await findDedupedEvent(db, policy, input.conversionPointId, input.friendId, nowMs);
-  if (deduped) return deduped;
 
   // Resolve last-touch affiliate attribution before inserting the event.
   // 地点ごとに期間を狭めたい場合があるので attribution_days を渡す
@@ -498,39 +433,89 @@ export async function trackConversion(
   // CVs leave approval_status NULL (the approval flow only applies to attributed rows).
   const approvalStatus = attr ? 'pending' : null;
 
-  // lifetime と window の地点だけ重複防止キーを付ける。繰返し数える
-  // 地点は NULL のまま制約の対象外にする(050号の dedup_key と同じ流儀)。
-  const onceKey = dedupKeyFor(policy, input.conversionPointId, input.friendId, nowMs);
+  const eventValues = [
+    id,
+    input.conversionPointId,
+    input.friendId,
+    input.userId ?? null,
+    input.affiliateCode ?? null,
+    input.metadata ?? null,
+    now,
+    attr?.affiliateId ?? null,
+    attr?.refCode ?? null,
+    approvalStatus,
+    point.name,
+    point.event_type,
+    point.value,
+    input.idempotencyKey ?? null,
+  ];
   try {
-    await db
-      .prepare(
-        `INSERT INTO conversion_events
-       (id, conversion_point_id, friend_id, user_id, affiliate_code, metadata, created_at,
-        affiliate_id, attributed_ref_code, approval_status, point_name_snapshot,
-        event_type_snapshot, value_snapshot, idempotency_key, once_key)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      )
-      .bind(
-        id,
-        input.conversionPointId,
-        input.friendId,
-        input.userId ?? null,
-        input.affiliateCode ?? null,
-        input.metadata ?? null,
-        now,
-        attr?.affiliateId ?? null,
-        attr?.refCode ?? null,
-        approvalStatus,
-        point.name,
-        point.event_type,
-        point.value,
-        input.idempotencyKey ?? null,
-        onceKey,
-      )
-      .run();
+    if (policy.kind === 'every') {
+      await db.prepare(`INSERT INTO conversion_events
+        (id, conversion_point_id, friend_id, user_id, affiliate_code, metadata, created_at,
+         affiliate_id, attributed_ref_code, approval_status, point_name_snapshot,
+         event_type_snapshot, value_snapshot, idempotency_key)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+        .bind(...eventValues)
+        .run();
+    } else {
+      const windowDays = policy.kind === 'window' ? policy.windowDays : null;
+      const cutoff = policy.kind === 'window'
+        ? toJstString(new Date(nowMs - policy.windowDays * JST_DAY_MS))
+        : null;
+      const claim = db.prepare(`INSERT INTO conversion_event_dedup_claims
+          (conversion_point_id, friend_id, mode, window_days, last_event_id, last_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(conversion_point_id, friend_id) DO UPDATE SET
+          mode = excluded.mode,
+          window_days = excluded.window_days,
+          last_event_id = excluded.last_event_id,
+          last_at = excluded.last_at,
+          updated_at = excluded.updated_at
+        WHERE conversion_event_dedup_claims.mode != excluded.mode
+           OR conversion_event_dedup_claims.window_days IS NOT excluded.window_days
+           OR (excluded.mode = 'window' AND conversion_event_dedup_claims.last_at < ?)`)
+        .bind(
+          input.conversionPointId,
+          input.friendId,
+          policy.kind,
+          windowDays,
+          id,
+          now,
+          now,
+          cutoff,
+        );
+      const insertIfClaimed = db.prepare(`INSERT INTO conversion_events
+          (id, conversion_point_id, friend_id, user_id, affiliate_code, metadata, created_at,
+           affiliate_id, attributed_ref_code, approval_status, point_name_snapshot,
+           event_type_snapshot, value_snapshot, idempotency_key)
+        SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+         WHERE EXISTS (
+           SELECT 1 FROM conversion_event_dedup_claims
+            WHERE conversion_point_id = ? AND friend_id = ? AND last_event_id = ?
+         )`)
+        .bind(...eventValues, input.conversionPointId, input.friendId, id);
+      const results = await db.batch([claim, insertIfClaimed]);
+      if ((results[1]?.meta.changes ?? 0) === 0) {
+        if (input.idempotencyKey) {
+          const existingByKey = await findEventByIdempotencyKey(
+            db,
+            input.conversionPointId,
+            input.idempotencyKey,
+          );
+          if (existingByKey) {
+            requireSameIdempotencyContent(existingByKey, input);
+            return existingByKey;
+          }
+        }
+        const claimed = await findClaimedEvent(db, input.conversionPointId, input.friendId);
+        if (claimed) return claimed;
+        throw new Error('conversion_dedup_claim_missing');
+      }
+    }
   } catch (error) {
-    // 同時到着で制約に当たった側は、先に書けた1件を返して終わる。
-    // 制約以外の失敗(接続切れなど)はそのまま投げて再試行させる。
+    // every地点の同一冪等キー競合、またはclaim取得後のINSERT競合を回収する。
+    // batch内の失敗はclaim更新も含めてD1がrollbackする。
     if (isUniqueViolation(error)) {
       if (input.idempotencyKey) {
         const existing = await findEventByIdempotencyKey(db, input.conversionPointId, input.idempotencyKey);
@@ -539,10 +524,8 @@ export async function trackConversion(
           return existing;
         }
       }
-      if (policy.kind !== 'every') {
-        const existing = await findDedupedEvent(db, policy, input.conversionPointId, input.friendId, Date.now());
-        if (existing) return existing;
-      }
+      const claimed = await findClaimedEvent(db, input.conversionPointId, input.friendId);
+      if (claimed) return claimed;
     }
     throw error;
   }
