@@ -166,11 +166,11 @@ function BookingsInner() {
     const requestId = ++loadRequestRef.current
     /*
       **番号だけでは足りない。** 切り替え前に押した記録の成功から
-      呼ばれると、この取得自体が古い宛先のまま最新の番号を取る。
-      始めた時点の宛先と今の宛先も照らし合わせる。
+      呼ばれると、この取得自体が古い宛先のまま最新の番号を取り、
+      **今の画面へ前のアカウントの一覧を書き込む。** 番号を見たあと、
+      始めた時点の宛先(`scope`)と今の宛先も照らし合わせる。
     */
     const scope = bookingScopeKey(selectedAccountId, eventId)
-    const isCurrent = () => requestId === loadRequestRef.current && scopeRef.current === scope
     setLoadStatus('loading')
     setActionError(null)
     try {
@@ -181,7 +181,8 @@ function BookingsInner() {
         page,
         limit: PAGE_SIZE,
       })
-      if (!isCurrent()) return
+      if (requestId !== loadRequestRef.current) return
+      if (scopeRef.current !== scope) return
       /*
         **器の形を確かめてから入れる。** `items` が無い返事をそのまま
         入れると、下の `filter` で**画面ごと落ちる。** 取れなかったのと
@@ -192,7 +193,8 @@ function BookingsInner() {
       setBookingsTotal(typeof listRes.total === 'number' ? listRes.total : listRes.items.length)
       setLoadStatus('ready')
     } catch {
-      if (!isCurrent()) return
+      if (requestId !== loadRequestRef.current) return
+      if (scopeRef.current !== scope) return
       /*
         **数を持ち越さない。** 前の絞り込みの行を残したまま失敗を出すと、
         古い数の上に「取れませんでした」が乗って、どちらが本当か読めない。
@@ -209,7 +211,6 @@ function BookingsInner() {
     if (!selectedAccountId || !eventId) return
     const requestId = ++loadRequestRef.current
     const scope = bookingScopeKey(selectedAccountId, eventId)
-    const isCurrent = () => requestId === loadRequestRef.current && scopeRef.current === scope
     try {
       /*
         **前のイベントの控えを使い回さない。** `event` が入っていれば取りに
@@ -218,10 +219,12 @@ function BookingsInner() {
         申込を見ているのか読み違える。毎回取り直す。
       */
       const evRes = await eventsApi.getEvent(selectedAccountId, eventId)
-      if (!isCurrent()) return
+      if (requestId !== loadRequestRef.current) return
+      if (scopeRef.current !== scope) return
       setEvent((current) => (typeof evRes?.name === 'string' ? evRes : current))
     } catch {
-      if (!isCurrent()) return
+      if (requestId !== loadRequestRef.current) return
+      if (scopeRef.current !== scope) return
       setEvent(null)
     }
   }, [selectedAccountId, eventId])
@@ -244,19 +247,20 @@ function BookingsInner() {
     if (!selectedAccountId || !eventId) return
     const requestId = ++summaryRequestRef.current
     const scope = bookingScopeKey(selectedAccountId, eventId)
-    const isCurrent = () => requestId === summaryRequestRef.current && scopeRef.current === scope
     setSummaryStatus('loading')
     try {
       const [eventRes, summaryRes] = await Promise.all([
         eventsApi.getEvent(selectedAccountId, eventId),
         eventsApi.getBookingSummary(selectedAccountId, eventId),
       ])
-      if (!isCurrent()) return
+      if (requestId !== summaryRequestRef.current) return
+      if (scopeRef.current !== scope) return
       setEvent(eventRes)
       setSummary(summaryRes)
       setSummaryStatus('ready')
     } catch {
-      if (!isCurrent()) return
+      if (requestId !== summaryRequestRef.current) return
+      if (scopeRef.current !== scope) return
       setEvent(null)
       setSummary(null)
       setSummaryStatus('error')
