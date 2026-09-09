@@ -5,7 +5,12 @@ import { Suspense, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { api } from '@/lib/api'
-import type { Folder } from '@line-crm/shared'
+import {
+  listInterpolations,
+  type CommonVar,
+  type Folder,
+  type FriendField,
+} from '@line-crm/shared'
 import { Field, inputClass } from '@/components/shared/create-page'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
@@ -17,6 +22,272 @@ const TYPES = [
   { value: 'image', label: '画像' },
 ]
 
+const DATE_OPTIONS = [
+  { value: '{{date}}', label: '月日と曜日（8月20日(水)）' },
+  { value: '{{date:ymd_w}}', label: '年月日と曜日（2026年8月20日(水)）' },
+  { value: '{{date:md}}', label: '月日（8月20日）' },
+  { value: '{{date:ymd}}', label: '年月日（2026年8月20日）' },
+  { value: '{{date:slash_md_w}}', label: '月日と曜日（8/20(水)）' },
+  { value: '{{date:slash_ymd_w}}', label: '年月日と曜日（2026/8/20(水)）' },
+  { value: '{{date:slash_md}}', label: '月日（8/20）' },
+  { value: '{{date:slash_ymd}}', label: '年月日（2026/8/20）' },
+]
+
+const OTHER_OPTIONS = [
+  { value: '{{liff_id}}', label: 'LIFF ID' },
+  { value: '{{date+1}}', label: '配信日の1日後' },
+  { value: '{{date+3}}', label: '配信日の3日後' },
+  { value: '{{date+7}}', label: '配信日の7日後' },
+  { value: '{{date+14}}', label: '配信日の14日後' },
+  { value: '{{date+30}}', label: '配信日の30日後' },
+]
+
+type ReferenceState = 'idle' | 'loading' | 'ready' | 'failed'
+
+interface TemplateReferences {
+  friendFields: FriendField[]
+  commonVars: CommonVar[]
+}
+
+interface ReferenceLoaders {
+  friendFields: (accountId: string) => ReturnType<typeof api.friendFields.list>
+  commonVars: (accountId: string) => ReturnType<typeof api.commonVars.list>
+}
+
+async function loadTemplateReferences(
+  accountId: string,
+  loaders: ReferenceLoaders = {
+    friendFields: (id) => api.friendFields.list(id),
+    commonVars: (id) => api.commonVars.list(id),
+  },
+): Promise<TemplateReferences> {
+  const [fieldResponse, varResponse] = await Promise.all([
+    loaders.friendFields(accountId),
+    loaders.commonVars(accountId),
+  ])
+  if (!fieldResponse.success || !varResponse.success) {
+    throw new Error('差し込み項目を読み込めませんでした')
+  }
+  return {
+    friendFields: fieldResponse.data.filter((field) => field.canInsertText !== false),
+    commonVars: varResponse.data,
+  }
+}
+
+function jstDateParts(date: Date): { year: number; month: number; day: number; weekday: string } {
+  const parts = new Intl.DateTimeFormat('ja-JP', {
+    timeZone: 'Asia/Tokyo',
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+    weekday: 'short',
+  }).formatToParts(date)
+  const value = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value ?? ''
+  return {
+    year: Number(value('year')),
+    month: Number(value('month')),
+    day: Number(value('day')),
+    weekday: value('weekday'),
+  }
+}
+
+function previewDateValue(name: string, deliveredAt: Date): string | null {
+  const daysUntil = /^days_until:(\d{4})-(\d{2})-(\d{2})$/.exec(name)
+  if (daysUntil) {
+    const current = jstDateParts(deliveredAt)
+    const currentDay = Date.UTC(current.year, current.month - 1, current.day)
+    const targetDay = Date.UTC(Number(daysUntil[1]), Number(daysUntil[2]) - 1, Number(daysUntil[3]))
+    return String(Math.ceil((targetDay - currentDay) / 86_400_000))
+  }
+
+  const dateToken = /^date(?:([+-])(\d+))?(?::([a-z_]+))?$/.exec(name)
+  if (!dateToken) return null
+  const direction = dateToken[1] === '-' ? -1 : 1
+  const offset = Number(dateToken[2] ?? 0) * direction
+  const parts = jstDateParts(new Date(deliveredAt.getTime() + offset * 86_400_000))
+  const format = dateToken[3] ?? 'md_w'
+  const ymd = `${parts.year}年${parts.month}月${parts.day}日`
+  const md = `${parts.month}月${parts.day}日`
+  const slashYmd = `${parts.year}/${parts.month}/${parts.day}`
+  const slashMd = `${parts.month}/${parts.day}`
+  switch (format) {
+    case 'ymd_w': return `${ymd}(${parts.weekday})`
+    case 'ymd': return ymd
+    case 'md': return md
+    case 'slash_ymd_w': return `${slashYmd}(${parts.weekday})`
+    case 'slash_ymd': return slashYmd
+    case 'slash_md_w': return `${slashMd}(${parts.weekday})`
+    case 'slash_md': return slashMd
+    default: return `${md}(${parts.weekday})`
+  }
+}
+
+interface TemplatePreviewResult {
+  content: string
+  unresolved: string[]
+}
+
+function buildTemplatePreview(
+  content: string,
+  references: TemplateReferences,
+  deliveredAt = new Date(),
+): TemplatePreviewResult {
+  const fields = new Map(references.friendFields.map((field) => [field.fieldKey, field]))
+  const commonVars = new Map(references.commonVars.map((item) => [item.varKey, item]))
+  const unresolved = new Set<string>()
+  const interpolation = /\{\{\s*([^{}]+?)\s*\}\}/g
+
+  const preview = content.replace(interpolation, (token, rawName: string) => {
+    const name = rawName.trim()
+    if (name === 'name') return '山田 太郎'
+    if (name === 'liff_id') return '［LIFF ID］'
+
+    const fieldKey = /^field\.([a-z][a-z0-9_]*)$/.exec(name)?.[1]
+    if (fieldKey) {
+      const field = fields.get(fieldKey)
+      if (!field) {
+        unresolved.add(name)
+        return token
+      }
+      return field.defaultValue?.trim() || `［${field.name}の値］`
+    }
+
+    const varKey = /^var\.([a-z][a-z0-9_]*)$/.exec(name)?.[1]
+    if (varKey) {
+      const commonVar = commonVars.get(varKey)
+      if (!commonVar) {
+        unresolved.add(name)
+        return token
+      }
+      return commonVar.value || `［${commonVar.name}は空です］`
+    }
+
+    const dateValue = previewDateValue(name, deliveredAt)
+    if (dateValue !== null) return dateValue
+    unresolved.add(name)
+    return token
+  })
+
+  // 括弧の書きかけなど、置換用の正規表現に入らないものも一覧へ残す。
+  for (const name of listInterpolations(content)) {
+    if (preview.includes(`{{${name}}}`)) unresolved.add(name)
+  }
+  return { content: preview, unresolved: [...unresolved] }
+}
+
+function extractMessageUrls(content: string): string[] {
+  return [...new Set(content.match(/https?:\/\/[^\s<>"'）)]+/g) ?? [])]
+}
+
+interface InsertControlsProps extends TemplateReferences {
+  accountId: string | null
+  state: ReferenceState
+  onInsert: (token: string) => void
+}
+
+function TemplateInsertControls({
+  accountId,
+  state,
+  friendFields,
+  commonVars,
+  onInsert,
+}: InsertControlsProps) {
+  const [targetDate, setTargetDate] = useState('')
+  const choose = (value: string) => {
+    if (value) onInsert(value)
+  }
+  return (
+    <div aria-label="利用できる差し込み項目" className="space-y-2">
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={() => onInsert('{{name}}')}
+          className="border-hairline text-ink-secondary rounded-pill hover:bg-canvas-sunken border px-3 py-1 text-xs"
+        >
+          名前
+        </button>
+        <SelectField
+          aria-label="友だち情報を差し込む"
+          value=""
+          disabled={!accountId || state !== 'ready' || friendFields.length === 0}
+          onChange={(event) => choose(event.target.value)}
+          options={[
+            { value: '', label: state === 'loading' ? '友だち情報を読込中' : '友だち情報を選ぶ' },
+            ...friendFields.map((field) => ({ value: `{{field.${field.fieldKey}}}`, label: field.name })),
+          ]}
+        />
+        <SelectField
+          aria-label="共通情報を差し込む"
+          value=""
+          disabled={!accountId || state !== 'ready' || commonVars.length === 0}
+          onChange={(event) => choose(event.target.value)}
+          options={[
+            { value: '', label: state === 'loading' ? '共通情報を読込中' : '共通情報を選ぶ' },
+            ...commonVars.map((item) => ({ value: `{{var.${item.varKey}}}`, label: item.name })),
+          ]}
+        />
+        <SelectField
+          aria-label="配信日を差し込む"
+          value=""
+          onChange={(event) => choose(event.target.value)}
+          options={[{ value: '', label: '配信日を選ぶ' }, ...DATE_OPTIONS]}
+        />
+        <SelectField
+          aria-label="その他の差し込みを選ぶ"
+          value=""
+          onChange={(event) => choose(event.target.value)}
+          options={[{ value: '', label: 'その他を選ぶ' }, ...OTHER_OPTIONS]}
+        />
+        <label className="flex items-center gap-2 text-xs text-ink-secondary">
+          目標日
+          <input
+            aria-label="日数を数える目標日"
+            type="date"
+            value={targetDate}
+            onChange={(event) => setTargetDate(event.target.value)}
+            className="border-hairline rounded-control border bg-canvas px-2 py-1 text-xs text-ink"
+          />
+        </label>
+        <button
+          type="button"
+          disabled={!targetDate}
+          onClick={() => onInsert(`{{days_until:${targetDate}}}`)}
+          className="border-hairline text-ink-secondary rounded-pill hover:bg-canvas-sunken border px-3 py-1 text-xs disabled:opacity-40"
+        >
+          目標日までの日数
+        </button>
+      </div>
+      <p className="text-ink-faint text-xs">
+        フォーム回答は直接差し込めません。回答を保存した友だち情報を選んでください。
+      </p>
+      {!accountId && (
+        <p className="text-ink-faint text-xs">LINE公式アカウントを選ぶと、友だち情報と共通情報を選べます。</p>
+      )}
+      {state === 'failed' && (
+        <p role="alert" className="text-danger text-xs">差し込み項目を読み込めませんでした。画面を再読み込みしてください。</p>
+      )}
+    </div>
+  )
+}
+
+function TemplatePreviewMessage({ preview }: { preview: TemplatePreviewResult }) {
+  return (
+    <>
+      <p className="text-ink rounded-2xl bg-canvas px-4 py-3 text-sm leading-6 whitespace-pre-wrap">
+        {preview.content || '（本文がまだありません）'}
+      </p>
+      {preview.unresolved.length > 0 && (
+        <div role="alert" className="mt-2 rounded-control bg-canvas px-3 py-2 text-xs text-danger">
+          <p className="font-semibold">値を確認できない差し込みがあります</p>
+          <ul className="mt-1 list-disc pl-4">
+            {preview.unresolved.map((name) => <li key={name}>{`{{${name}}}`}</li>)}
+          </ul>
+        </div>
+      )}
+    </>
+  )
+}
+
 function TemplateEditInner() {
   const router = useRouter()
   const { selectedAccountId } = useAccount()
@@ -27,9 +298,12 @@ function TemplateEditInner() {
   usePageTitle(id ? 'メッセージを編集' : 'メッセージを作る')
 
   const [name, setName] = useState(visual ? '定期便 初回のご案内' : '')
-  const [category, setCategory] = useState(visual ? '01_定期便' : '')
+  // category は旧一覧との互換用に保存だけ続ける。運用者が選ぶ分類は folderId に一本化する。
+  const [category, setCategory] = useState('general')
   const [folderId, setFolderId] = useState<string | null>(null)
   const [folders, setFolders] = useState<Folder[]>([])
+  const [references, setReferences] = useState<TemplateReferences>({ friendFields: [], commonVars: [] })
+  const [referenceState, setReferenceState] = useState<ReferenceState>('idle')
   const [messageType, setMessageType] = useState('text')
   const [messageContent, setMessageContent] = useState(
     visual
@@ -45,11 +319,38 @@ function TemplateEditInner() {
   // 置き場の選択肢。category 文字列とは別に folderId で保存する。
   useEffect(() => {
     let cancelled = false
-    void api.folders.list('template').then((res) => {
-      if (!cancelled && res.success) setFolders(res.data)
-    })
+    void api.folders.list('template')
+      .then((res) => {
+        if (!cancelled && res.success) setFolders(res.data)
+      })
+      .catch(() => undefined)
     return () => { cancelled = true }
   }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    setReferences({ friendFields: [], commonVars: [] })
+    if (!selectedAccountId) {
+      setReferenceState('idle')
+      return () => { cancelled = true }
+    }
+
+    setReferenceState('loading')
+    void loadTemplateReferences(selectedAccountId)
+      .then((next) => {
+        if (!cancelled) {
+          setReferences(next)
+          setReferenceState('ready')
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setReferences({ friendFields: [], commonVars: [] })
+          setReferenceState('failed')
+        }
+      })
+    return () => { cancelled = true }
+  }, [selectedAccountId])
 
   useEffect(() => {
     if (!id) return
@@ -103,7 +404,8 @@ function TemplateEditInner() {
   // 保存はできる。何通に分かれるかだけ伝える。
   const SPLIT_AT = 4500
   const willSplit = messageContent.length > SPLIT_AT
-  const previewContent = messageContent.replaceAll('{{name}}', '山田 太郎')
+  const preview = buildTemplatePreview(messageContent, references)
+  const messageUrls = extractMessageUrls(messageContent)
 
   const save = async () => {
     if (loadFailed) {
@@ -178,17 +480,7 @@ function TemplateEditInner() {
             />
           </Field>
 
-          <Field label="フォルダ" htmlFor="tp-category" note="一覧での並びに使います。">
-            <input
-              id="tp-category"
-              type="text"
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              className={inputClass}
-            />
-          </Field>
-
-          <Field label="置き場" htmlFor="tp-folder" note="フォルダで絞ると、ここで選んだ置き場に入ります。">
+          <Field label="置き場" htmlFor="tp-folder" note="一覧のフォルダ分けと絞り込みに使います。">
             <SelectField
               id="tp-folder"
               value={folderId ?? ''}
@@ -215,34 +507,13 @@ function TemplateEditInner() {
 
           <div>
             <p className="text-ink-secondary mb-1 text-sm font-medium">差し込む</p>
-            <div className="flex flex-wrap gap-1.5">
-              {[
-                { label: '名前', token: '{{name}}' },
-                { label: '友だち情報', token: '{{field.項目名}}' },
-                { label: '共通情報', token: '{{var.差し込み名}}' },
-              ].map((t) => (
-                <button
-                  key={t.label}
-                  type="button"
-                  onClick={() => insert(t.token)}
-                  className="border-hairline text-ink-secondary rounded-pill hover:bg-canvas-sunken border px-3 py-1 text-xs"
-                >
-                  {t.label}
-                </button>
-              ))}
-              {/* フォーム回答・配信日を本文に差し込む仕組みが無い。 */}
-              {['フォーム回答', '配信日', 'その他'].map((label) => (
-                <button
-                  key={label}
-                  type="button"
-                  disabled
-                  title="この差し込みは準備中です"
-                  className="border-hairline text-ink-faint rounded-pill border px-3 py-1 text-xs opacity-50"
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
+            <TemplateInsertControls
+              accountId={selectedAccountId}
+              state={referenceState}
+              friendFields={references.friendFields}
+              commonVars={references.commonVars}
+              onInsert={insert}
+            />
           </div>
 
           <Field
@@ -251,8 +522,8 @@ function TemplateEditInner() {
             required
             note={
               <>
-                差し込みが使えます。{'{{name}}'} は友だちの表示名、
-                {'{{field.差し込み名}}'} は友だち情報欄、{'{{var.差し込み名}}'} は共通情報です。
+                差し込みは上の選択肢から入れられます。名前と友だち情報は受け取る人ごと、
+                共通情報と配信日は送る時点の値に置き換わります。
                 <br />
                 カルーセルを作るときは{' '}
                 <Link href="/templates/carousel" className="text-accent hover:underline">
@@ -289,9 +560,15 @@ function TemplateEditInner() {
               <div className="bg-canvas-sunken grid grid-cols-3 gap-3 px-3 py-2 font-semibold text-ink-secondary">
                 <span>本文の中のURL</span><span>リンク名（計測に出る名前）</span><span>流入リンクにする</span>
               </div>
-              <div className="grid grid-cols-3 gap-3 px-3 py-3 text-ink">
-                <span className="truncate">https://example.co.jp/first-delivery</span><span>初回お届け案内</span><span className="text-accent-deep">18-x で発行済み</span>
-              </div>
+              {messageUrls.length === 0 ? (
+                <p className="text-ink-faint px-3 py-3">本文にURLはありません。</p>
+              ) : messageUrls.map((url) => (
+                <div key={url} className="grid grid-cols-3 gap-3 px-3 py-3 text-ink">
+                  <span className="truncate" title={url}>{url}</span>
+                  <span className="text-ink-faint">配信時に自動作成</span>
+                  <span className="text-ink-faint">配信時に自動発行</span>
+                </div>
+              ))}
             </div>
           </section>
 
@@ -335,14 +612,10 @@ function TemplateEditInner() {
             <p className="text-on-accent mx-auto mt-2 mb-2 w-fit rounded-pill bg-line-preview-label px-3 py-1 text-xs">差し込み後の見え方（山田 太郎さんの場合）</p>
             <div className="bg-canvas-sunken rounded-card mt-3 p-3">
               <p className="text-ink-faint mb-1 text-xs">然-NEN-</p>
-              <p className="text-ink rounded-2xl bg-white px-4 py-3 text-sm leading-6 whitespace-pre-wrap">
-                {previewContent || '（本文がまだありません）'}
-              </p>
+              <TemplatePreviewMessage preview={preview} />
             </div>
-            {/* 差し込みは送るときに実際の値へ置き換わる。ここでは記法のまま
-                出す。適当な人の値を当てはめると、その人に送るように見える。 */}
             <p className="text-on-accent mt-2 text-xs leading-relaxed">
-              このプレビューでは、差し込みを山田 太郎さんの見本の値に置き換えています。
+              名前は山田 太郎さん、友だち情報は項目の既定値、共通情報は現在値で表示しています。
             </p>
             <p className="text-on-accent mt-1 text-xs">URLは短縮され、クリックが計測されます</p>
           </section>
