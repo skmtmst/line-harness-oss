@@ -169,3 +169,74 @@ test('警告表示中にアカウントを切り替えると、前アカウン�
   // account-1 で入力していた秘密値らしい社内メモは、どのアカウントへも送信されない。
   expect(posted.some((body) => body.memo === 'password: hunter2')).toBe(false)
 })
+
+test('日本語の秘密値ラベルを社内メモに書くと、送信前に警告して止める', async ({ page }) => {
+  const posted: PostedCommonVar[] = []
+  await preparePage(page, posted)
+
+  await page.getByLabel('共通情報名 *').fill('日本語ラベル確認')
+  // 日本語名からは差し込み名を自動生成できないため、明示的に入れる。
+  await page.getByLabel('差し込み名 *').fill('ja_label_check')
+  await page.getByRole('textbox', { name: '値', exact: true }).fill('通常値')
+  await page.getByLabel('社内メモ 任意').fill('パスワード: hunter2')
+  await page.getByRole('button', { name: '登録', exact: true }).click()
+
+  const warning = page.getByRole('alertdialog')
+  await expect(warning).toContainText('秘密値の可能性がある内容を確認してください')
+  await expect(warning).toContainText('社内メモ')
+  expect(posted).toHaveLength(0)
+})
+
+test('保存した社内メモは、編集画面を開き直すと再表示される', async ({ page }) => {
+  const posted: PostedCommonVar[] = []
+  await preparePage(page, posted)
+
+  await page.getByLabel('共通情報名 *').fill('再表示確認用')
+  // 日本語名からは差し込み名を自動生成できないため、明示的に入れる。
+  await page.getByLabel('差し込み名 *').fill('redisplay_check')
+  await page.getByRole('textbox', { name: '値', exact: true }).fill('平日 10:00〜18:00')
+  await page.getByLabel('社内メモ 任意').fill('更新は毎月1日に確認する')
+  await page.getByRole('button', { name: '登録', exact: true }).click()
+  await expect.poll(() => posted.length).toBe(1)
+  const created = posted[0]
+
+  // 保存した内容を、編集画面を開き直したときの詳細・予約一覧として返す。
+  await page.route('**/api/common-vars/**', async (route: Route) => {
+    const request = route.request()
+    const url = new URL(request.url())
+    const headers = {
+      'access-control-allow-origin': new URL(WEB_URL).origin,
+      'access-control-allow-credentials': 'true',
+      'content-type': 'application/json',
+    }
+    if (request.method() === 'GET' && url.pathname === '/api/common-vars/var-1') {
+      await route.fulfill({
+        status: 200,
+        headers,
+        body: JSON.stringify({
+          success: true,
+          data: {
+            id: 'var-1',
+            name: created.name,
+            varKey: created.varKey,
+            type: created.type,
+            value: created.value,
+            memo: created.memo,
+            folderId: null,
+            version: 1,
+            history: [],
+          },
+        }),
+      })
+      return
+    }
+    if (request.method() === 'GET' && url.pathname === '/api/common-vars/var-1/schedules') {
+      await route.fulfill({ status: 200, headers, body: JSON.stringify({ success: true, data: [] }) })
+      return
+    }
+    await route.fallback()
+  })
+
+  await page.goto(`${WEB_URL}/contents/vars/edit?id=var-1`)
+  await expect(page.getByPlaceholder('運用上の注意や、この値の使い方を書きます')).toHaveValue(String(created.memo))
+})

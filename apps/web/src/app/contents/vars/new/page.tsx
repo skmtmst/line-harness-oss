@@ -56,7 +56,10 @@ const MEMO_MAX = 1000
 
 const SENSITIVE_VALUE_PATTERNS = [
   /-----BEGIN [A-Z ]*PRIVATE KEY-----/i,
-  /\b(?:password|passwd|pwd|secret|token|api[_ -]?key|access[_ -]?key|channel[_ -]?secret|パスワード|秘密鍵|トークン)\s*[=:：]\s*\S{4,}/i,
+  /\b(?:password|passwd|pwd|secret|token|api[_ -]?key|access[_ -]?key|channel[_ -]?secret)\s*[=:：]\s*\S{4,}/i,
+  // 日本語のラベルは \w に含まれず \b が成立しないため、英字ラベルとは別条にする
+  // (\b(?:...パスワード...) は常に不一致になり検知されなかった)。
+  /(?:パスワード|秘密鍵|トークン)\s*[=:：]\s*\S{4,}/,
   /\b(?:AKIA[0-9A-Z]{16}|gh[pousr]_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,}|xox[baprs]-[A-Za-z0-9-]{10,})\b/,
   /\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b/,
   /\b(?:sk|rk|pk)_(?:live|test)_[A-Za-z0-9]{12,}\b/i,
