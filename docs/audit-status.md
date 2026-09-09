@@ -21,14 +21,14 @@
 
 | 追跡状態 | 件数 | 意味 |
 | --- | ---: | --- |
-| 本流統合・検証反映済み | 42 | codex/developmentへの統合と検証環境反映を確認 |
+| 本流統合・検証反映済み | 40 | codex/developmentへの統合と検証環境反映を確認 |
 | 未統合の票・PR | 59 | Issue/PRとの一意な対応あり。審査・差し戻し・依存待ちを含む |
-| unmapped | 317 | 明示対応を一次資料から証明できない |
+| unmapped | 319 | 明示対応を一次資料から証明できない |
 | **合計** | **418** | |
 
-本流統合済み42件は、列車219・検証環境反映56回目まで反映を確認しています。残りは376件です。個別行の状態・列車・staging欄はGitHub Issue/PRと照合しながら更新中で、上の集計を現在値の正本とします。N-065のPR #1444は列車外で直接統合され、独立再審査の残件を#654/PR #1476で追補中です。
+本流統合済み40件は、列車219・検証環境反映56回目まで反映を確認しています。残りは378件です。個別行の状態・列車・staging欄はGitHub Issue/PRと照合しながら更新中で、上の集計を現在値の正本とします。N-065のPR #1444は列車外で直接統合され、独立再審査の残件を#654/PR #1476で追補中です。
 
-列車217（統合PR #1519、元PR #1503、Issue #676、反映54回目）でN-172/N-173/N-180/N-181を、列車219（統合PR #1521、反映56回目）で元PR #1498（Issue #680、E-10/N-335/N-336/N-339）・元PR #1473（Issue #647、N-206）・元PR #1471（Issue #651、N-402）の計10件を本流統合・検証反映済みへ更新しました。列車218（統合PR #1520、元PR #1452、Issue #633、反映55回目）は418件のN/E-IDを付与されていない横断改善のため、個別行を更新していません。
+列車217（統合PR #1519、元PR #1503、Issue #676、反映54回目）でN-172/N-173/N-180/N-181を、列車219（統合PR #1521、反映56回目）で元PR #1498（Issue #680、N-336/N-339）・元PR #1473（Issue #647、N-206）・元PR #1471（Issue #651、N-402）の計8件を本流統合・検証反映済みへ更新しました。列車218（統合PR #1520、元PR #1452、Issue #633、反映55回目）は418件のN/E-IDを付与されていない横断改善のため、個別行を更新していません。Issue #680は司令塔裁定でN-336/N-339だけへ縮小され、E-10/N-335は依存票 #683（OPEN）へ分離済みのため、この2件はunmappedのままとしています。
 
 #629〜#635は監査後の横断改善ですが、418件のN/E-IDを付与されていないため、根拠なく個別行へ結び付けていません。#660/PR #1478は、N-366の安全設定を実build生成物で配備するための関連対応としてN-366行へ併記しています。
 
@@ -447,13 +447,13 @@
 
 | ID | 重大度 | 機能 | 所見 | 状態 | Issue | PR | train | staging | evidence |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| E-10 | 中 | 24 LINE通知 | 安全な再送・詳細・送信枠・顧客テスト・対応済み操作がなくretryだけしかない | 本流統合・検証反映済み | [#680](https://github.com/kentavndng/line-harness-board/issues/680) | [#1498](https://github.com/skmtmst/line-harness-oss/pull/1498) | 219/[#1521](https://github.com/skmtmst/line-harness-oss/pull/1521) | 56回目 | phase0-m7 E-10／LINE通知の全9口・画面・DB・要件を照合、Worker13件PASS／#509・#618 |
+| E-10 | 中 | 24 LINE通知 | 安全な再送・詳細・送信枠・顧客テスト・対応済み操作がなくretryだけしかない | unmapped | — | — | — | — | phase0-m7 E-10／LINE通知の全9口・画面・DB・要件を照合、Worker13件PASS／#509・#618 |
 | N-327 | 重大 | 24 LINE通知 | 運用者通知が業務イベントから自動で飛ばない | unmapped | — | — | — | — | consolidated §2 F24-S-1／feature-24.md／ルール公開→業務イベント→記録確認。apps/worker/src/routes/notifications.ts:559／69件PASS（Worker28・Web41）／コード読み／確度高／#617 |
 | N-328 | 中 | 24 LINE通知 | 顧客のEC送信が共通送信台帳に書かれない | unmapped | — | — | — | — | consolidated §2 F24-S-2／feature-24.md／EC送信後にhistory・failures確認。apps/worker/src/routes/ec-commerce.ts:532／69件PASS／コード読み／確度高／#617 |
 | N-330 | 中 | 24 LINE通知 | 顧客編集の保存先が新旧2つに分かれる | unmapped | — | — | — | — | consolidated §2 F24-M-2／feature-24.md／定義有無で編集保存比較。apps/web/src/app/line-notifications/page.tsx:336／69件PASS／コード読み／確度高／#617 |
 | N-332 | 中 | 24 LINE通知 | 運用者作成のきっかけが4件だけで1件は誤表示 | unmapped | — | — | — | — | consolidated §2 F24-M-4／feature-24.md／operator/newのきっかけ確認。apps/web/src/app/line-notifications/operator/new/page.tsx:15／69件PASS／コード読み／確度高／#617 |
 | N-333 | 中 | 24 LINE通知 | 公開ボタンが出すのまま | unmapped | — | — | — | — | consolidated §2 F24-M-5／feature-24.md／operator/new下部バー確認。同:268／69件PASS／コード読み／確度高／#617 |
-| N-335 | 中 | 24 LINE通知 | 月間送信枠の残りが通知画面のどこにも出ない | 本流統合・検証反映済み | [#680](https://github.com/kentavndng/line-harness-board/issues/680) | [#1498](https://github.com/skmtmst/line-harness-oss/pull/1498) | 219/[#1521](https://github.com/skmtmst/line-harness-oss/pull/1521) | 56回目 | consolidated §2 F24-M-7／feature-24.md／4タブ＋作成のKPI確認。apps/web/src/app/line-notifications/customer-kpis.ts／69件PASS／コード読み／確度高／#617 |
+| N-335 | 中 | 24 LINE通知 | 月間送信枠の残りが通知画面のどこにも出ない | unmapped | — | — | — | — | consolidated §2 F24-M-7／feature-24.md／4タブ＋作成のKPI確認。apps/web/src/app/line-notifications/customer-kpis.ts／69件PASS／コード読み／確度高／#617 |
 | N-336 | 中 | 24 LINE通知 | 失敗タブの絞り込みが足りない | 本流統合・検証反映済み | [#680](https://github.com/kentavndng/line-harness-board/issues/680) | [#1498](https://github.com/skmtmst/line-harness-oss/pull/1498) | 219/[#1521](https://github.com/skmtmst/line-harness-oss/pull/1521) | 56回目 | consolidated §2 F24-M-8／feature-24.md／failures絞りと要件比較。同notification-run-list.tsx:157／69件PASS／コード読み／確度高／#617 |
 | N-337 | 軽 | 24 LINE通知 | 編集画面が狭い幅で横にはみ出す | unmapped | — | — | — | — | consolidated §2 F24-L-1／feature-24.md／編集レイアウト確認。apps/web/src/app/line-notifications/page.tsx:144／69件PASS／コード読み／確度高（見え方は要実機）／#617 |
 | N-338 | 軽 | 24 LINE通知 | 送った数が多い順と書いてあるが並べ替えていない | unmapped | — | — | — | — | consolidated §2 F24-L-2／feature-24.md／注記とvisible比較。同:460／69件PASS／コード読み／確度高／#617 |
