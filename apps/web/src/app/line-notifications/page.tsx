@@ -6,6 +6,7 @@ import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import NotificationRunList from '@/components/line-notifications/notification-run-list'
 import OperatorNotificationRules from './operator-notification-rules'
 import Button from '@/components/shared/button'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
 import {
@@ -72,6 +73,330 @@ function timingLabel(setting: EcNotificationSetting): string {
   return `${setting.label}らすぐ`
 }
 
+/**
+ * N-338: 一覧の「送った数が多い順」は、行の「今日」列と同じ数で降順に並べる。
+ *
+ * 集計がまだ無い行は末尾へ寄せる。同数は受け取った設定順のまま
+ *（`Array.prototype.sort` は安定）。
+ */
+function sortCustomerSettingsBySentCount(
+  settings: EcNotificationSetting[],
+  countOf: (eventType: string) => number | null,
+): EcNotificationSetting[] {
+  return [...settings].sort((a, b) => (countOf(b.eventType) ?? -1) - (countOf(a.eventType) ?? -1))
+}
+
+/** N-340: 編集中の下書きは入力欄の6項目だけを残す。出・止めの切替は即保存なので入れない。 */
+type CustomerEditorDraft = Pick<
+  EcNotificationSetting, 'title' | 'introText' | 'outroText' | 'buttonLabel' | 'buttonUrl' | 'imageUrl'
+>
+
+function pickCustomerDraft(setting: EcNotificationSetting): CustomerEditorDraft {
+  return {
+    title: setting.title,
+    introText: setting.introText,
+    outroText: setting.outroText,
+    buttonLabel: setting.buttonLabel,
+    buttonUrl: setting.buttonUrl,
+    imageUrl: setting.imageUrl,
+  }
+}
+
+function isSameCustomerDraft(setting: EcNotificationSetting, draft: CustomerEditorDraft): boolean {
+  const current = pickCustomerDraft(setting)
+  return (Object.keys(current) as (keyof CustomerEditorDraft)[]).every((key) => current[key] === draft[key])
+}
+
+/**
+ * N-340: 保存・公開の応答が返った時点で「送った文面」と「いま画面にある文面」が
+ * 同じかを見るための指紋。
+ *
+ * 保存は押した瞬間の写しを送る。押したあとも入力欄は動くので、応答が返るころには
+ * 画面の文面が先へ進んでいることがある。写しと指紋が違えば、その保存は
+ * 「いまの文面」を保存したものではない。端末の控えを消したり未保存の印を外すと、
+ * 進んだぶんの入力が再読込で消える。
+ */
+function customerDraftFingerprint(draft: CustomerEditorDraft): string {
+  return JSON.stringify([
+    draft.title ?? '', draft.introText, draft.outroText,
+    draft.buttonLabel, draft.buttonUrl, draft.imageUrl,
+  ])
+}
+
+/**
+ * N-340: 再読込で編集中身が消えないよう、端末内に下書きを置く。
+ * 鍵にアカウントを入れる。別アカウントの切替で混ざらないため。
+ */
+function customerDraftKey(lineAccountId: string, eventType: string): string {
+  return `line-notifications:draft:v1:${lineAccountId}:${eventType}`
+}
+
+function readStorage(): Storage | null {
+  try {
+    if (typeof window === 'undefined') return null
+    return window.localStorage
+  } catch { return null }
+}
+
+function readCustomerDraft(lineAccountId: string, eventType: string): CustomerEditorDraft | null {
+  const storage = readStorage()
+  if (!storage) return null
+  try {
+    const raw = storage.getItem(customerDraftKey(lineAccountId, eventType))
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as Partial<CustomerEditorDraft>
+    if (typeof parsed.introText !== 'string' || typeof parsed.outroText !== 'string') return null
+    return {
+      title: typeof parsed.title === 'string' ? parsed.title : null,
+      introText: parsed.introText,
+      outroText: parsed.outroText,
+      buttonLabel: typeof parsed.buttonLabel === 'string' ? parsed.buttonLabel : '',
+      buttonUrl: typeof parsed.buttonUrl === 'string' ? parsed.buttonUrl : '',
+      imageUrl: typeof parsed.imageUrl === 'string' ? parsed.imageUrl : '',
+    }
+  } catch { return null }
+}
+
+function writeCustomerDraft(lineAccountId: string, eventType: string, draft: CustomerEditorDraft): void {
+  try { readStorage()?.setItem(customerDraftKey(lineAccountId, eventType), JSON.stringify(draft)) } catch { /* 端末に置けないときは警告だけで続ける */ }
+}
+
+function clearCustomerDraft(lineAccountId: string, eventType: string): void {
+  try { readStorage()?.removeItem(customerDraftKey(lineAccountId, eventType)) } catch { /* 同上 */ }
+}
+
+/**
+ * N-341: 運用者タブの件数。読み込み前は `—`、取れなかったときは
+ * `取得失敗` と出し、0件・読み込み中と区別する。
+ */
+type OperatorTabState = 'loading' | 'ready' | 'error' | 'forbidden'
+
+function operatorTabCountLabel(state: OperatorTabState, count: number | null): string {
+  if (state === 'ready' && count !== null) return `${count}`
+  if (state === 'loading') return '—'
+  return '取得失敗'
+}
+
+/**
+ * N-340: 保存・公開の呼び出し口。実APIと同じ非同期境界を持たせ、
+ * 遅れて返った応答や逆順応答を試験で再現できるようにする。
+ */
+type CustomerMutationApi = {
+  updateDraft: typeof api.lineNotifications.updateDraft
+  publishDefinition: typeof api.lineNotifications.publishDefinition
+  stopDefinition: typeof api.lineNotifications.stopDefinition
+  updateSetting: typeof api.ecCommerce.updateSetting
+}
+
+/**
+ * `stale` は「サーバへの反映は終わったが、画面はもう別のアカウントを見ている」状態。
+ * このときは画面へ一切書かない。前のアカウントの応答で、いま見ている
+ * アカウントの設定・定義・未保存の印を上書きしないため。
+ *
+ * `contentSaved` は、送った文面がサーバに入ったかどうか。
+ *
+ * `settleDraft` は「その保存をもって、端末の控えを消し、未保存の印を外し、
+ * 戻し先を更新してよいか」。文面が入っていて、なおかつ応答の時点でも
+ * 同じアカウントの同じ文面のままのときだけ真になる。保存中に足された入力や、
+ * アカウントを往復したあとの再編集を、古い応答で消さないための錠。
+ */
+type CustomerMutationOutcome =
+  | {
+      kind: 'applied'
+      definition: LineNotificationDefinition | null
+      enabled: boolean
+      tone: 'success' | 'error'
+      message: string
+      contentSaved: boolean
+      settleDraft: boolean
+    }
+  | { kind: 'stale'; contentSaved: boolean; settleDraft: false }
+  | { kind: 'failed'; message: string; contentSaved: boolean; settleDraft: false }
+
+/**
+ * 送った文面が、いまも画面の文面と同じアカウント・同じ中身で残っているか。
+ *
+ * `generation`/`currentGeneration` は同一アカウント内での読み直し
+ * （再読み込みボタンなど）を見分ける。`forAccountId`/`currentAccountId` は
+ * アカウント切替そのものを見分ける——`currentAccountId` は描画のたびに
+ * 同期して更新される ref を指すので、切替後の load() が実際に走るより前の
+ * 応答でも、ここだけで正しく古いと分かる（`loadGeneration` の発火待ちに
+ * 頼らない）。
+ */
+type CustomerMutationGuard = {
+  generation: number
+  currentGeneration: () => number
+  forAccountId: string
+  currentAccountId: () => string | null
+  sentFingerprint: string
+  currentFingerprint: () => string | undefined
+}
+
+function isStale(guard: CustomerMutationGuard): boolean {
+  return guard.generation !== guard.currentGeneration() || guard.forAccountId !== guard.currentAccountId()
+}
+
+function canSettleDraft(guard: CustomerMutationGuard, contentSaved: boolean): boolean {
+  if (!contentSaved) return false
+  if (isStale(guard)) return false
+  return guard.currentFingerprint() === guard.sentFingerprint
+}
+
+/** 保存できたが画面の文面が先へ進んでいるときは、そのことを言い添える。 */
+function savedNotice(base: string, settled: boolean): string {
+  return settled ? base : `${base}そのあとに入力した分は、まだ保存していません。`
+}
+
+function customerDraftPayload(setting: EcNotificationSetting, definition: LineNotificationDefinition) {
+  return {
+    lineAccountId: definition.lineAccountId,
+    expectedVersion: definition.version,
+    name: setting.title || setting.label,
+    category: definition.category,
+    sourceEventType: definition.sourceEventType,
+    draft: {
+      ...definition.draft,
+      title: setting.title,
+      introText: setting.introText,
+      outroText: setting.outroText,
+      buttonLabel: setting.buttonLabel,
+      buttonUrl: setting.buttonUrl,
+      imageUrl: setting.imageUrl,
+    },
+  }
+}
+
+/**
+ * テスト送信の呼び出し口。保存・公開と同じ isStale を使う——生成した文面
+ * ではなく、応答が返った時点の account・世代の一致だけを見ればよいので、
+ * 指紋の一致は問わない（呼び出し側は保存・公開と同じ guardFor を渡す）。
+ */
+async function sendCustomerTestNotification(args: {
+  api: { testSend: typeof api.ecCommerce.testSend }
+  setting: EcNotificationSetting
+  accountId: string
+  guard: CustomerMutationGuard
+}): Promise<
+  | { kind: 'applied'; tone: 'success' | 'error'; message: string }
+  | { kind: 'stale' }
+> {
+  const { setting, accountId, guard } = args
+  try {
+    const result = await args.api.testSend({
+      eventType: setting.eventType, accountId, title: setting.title || '',
+      introText: setting.introText, outroText: setting.outroText, buttonLabel: setting.buttonLabel,
+      buttonUrl: setting.buttonUrl, imageUrl: setting.imageUrl,
+    })
+    if (!result.success) throw new Error(result.error)
+    // 別アカウントへ切り替わった後の応答は、いまの画面へ出さない。
+    if (isStale(guard)) return { kind: 'stale' }
+    return { kind: 'applied', tone: 'success', message: `テスト受信者 ${result.data.sent}名へ送信しました。` }
+  } catch {
+    if (isStale(guard)) return { kind: 'stale' }
+    return { kind: 'applied', tone: 'error', message: 'テスト送信できませんでした。テスト受信者の設定をご確認ください。' }
+  }
+}
+
+async function saveCustomerNotification(args: {
+  api: CustomerMutationApi
+  accountId: string
+  setting: EcNotificationSetting
+  definition: LineNotificationDefinition | null
+  enabled: boolean
+  guard: CustomerMutationGuard
+}): Promise<CustomerMutationOutcome> {
+  const { setting, definition, enabled, guard } = args
+  try {
+    if (definition && enabled === setting.isEnabled) {
+      const result = await args.api.updateDraft(definition.id, customerDraftPayload(setting, definition))
+      if (!result.success) throw new Error('save failed')
+      if (isStale(guard)) return { kind: 'stale', contentSaved: true, settleDraft: false }
+      const settleDraft = canSettleDraft(guard, true)
+      return {
+        kind: 'applied', definition: result.data, enabled, tone: 'success',
+        message: savedNotice(`${setting.label}の下書きを保存しました。`, settleDraft),
+        contentSaved: true, settleDraft,
+      }
+    }
+    if (definition) {
+      const result = enabled
+        ? await args.api.publishDefinition(definition.id, { lineAccountId: definition.lineAccountId, expectedVersion: definition.version })
+        : await args.api.stopDefinition(definition.id, { lineAccountId: definition.lineAccountId, expectedVersion: definition.version })
+      if (!result.success) throw new Error('status failed')
+      // 出す・止めるの切替は文面を送っていない。編集中の文面には触れない。
+      if (isStale(guard)) return { kind: 'stale', contentSaved: false, settleDraft: false }
+      return {
+        kind: 'applied', definition: result.data, enabled, tone: 'success',
+        message: `${setting.label}を保存しました。`, contentSaved: false, settleDraft: false,
+      }
+    }
+    await args.api.updateSetting(args.accountId, setting.eventType, {
+      // 見出しは呼び出し側で入力済みを確かめている。型の上の null だけをここで畳む。
+      isEnabled: enabled, title: setting.title ?? '', introText: setting.introText, outroText: setting.outroText,
+      buttonLabel: setting.buttonLabel, buttonUrl: setting.buttonUrl, imageUrl: setting.imageUrl,
+    })
+    if (isStale(guard)) return { kind: 'stale', contentSaved: true, settleDraft: false }
+    const settleDraft = canSettleDraft(guard, true)
+    return {
+      kind: 'applied', definition: null, enabled, tone: 'success',
+      message: savedNotice(`${setting.label}を保存しました。`, settleDraft),
+      contentSaved: true, settleDraft,
+    }
+  } catch {
+    if (isStale(guard)) return { kind: 'stale', contentSaved: false, settleDraft: false }
+    return { kind: 'failed', message: `${setting.label}を保存できませんでした。`, contentSaved: false, settleDraft: false }
+  }
+}
+
+/**
+ * 公開は「いま編集している内容」を出すもの。
+ * 先に下書きを保存し、その成功で返った版番号で公開する。
+ *
+ * 保存を挟まないと、編集中の内容を捨てて古い公開版をもう一度出したうえで
+ * 端末の控えまで消してしまい、編集内容が失われる。保存できなければ公開しない。
+ */
+async function publishCustomerNotification(args: {
+  api: CustomerMutationApi
+  setting: EcNotificationSetting
+  definition: LineNotificationDefinition
+  guard: CustomerMutationGuard
+}): Promise<CustomerMutationOutcome> {
+  const { setting, definition, guard } = args
+  let saved: LineNotificationDefinition
+  try {
+    const result = await args.api.updateDraft(definition.id, customerDraftPayload(setting, definition))
+    if (!result.success) throw new Error('save before publish failed')
+    saved = result.data
+  } catch {
+    if (isStale(guard)) return { kind: 'stale', contentSaved: false, settleDraft: false }
+    return {
+      kind: 'failed',
+      message: `${setting.label}の下書きを保存できなかったため、公開していません。編集内容はそのまま残しています。`,
+      contentSaved: false, settleDraft: false,
+    }
+  }
+  try {
+    const result = await args.api.publishDefinition(saved.id, { lineAccountId: saved.lineAccountId, expectedVersion: saved.version })
+    if (!result.success) throw new Error('publish failed')
+    if (isStale(guard)) return { kind: 'stale', contentSaved: true, settleDraft: false }
+    const settleDraft = canSettleDraft(guard, true)
+    return {
+      kind: 'applied', definition: result.data, enabled: true, tone: settleDraft ? 'success' : 'error',
+      message: savedNotice(`${setting.label}を公開しました。`, settleDraft),
+      contentSaved: true, settleDraft,
+    }
+  } catch {
+    // 下書きは入った。残っているのは公開だけ。
+    if (isStale(guard)) return { kind: 'stale', contentSaved: true, settleDraft: false }
+    const settleDraft = canSettleDraft(guard, true)
+    return {
+      kind: 'applied', definition: saved, enabled: setting.isEnabled, tone: 'error',
+      message: savedNotice(`${setting.label}を公開できませんでした。編集内容は下書きとして保存済みです。もう一度公開を押してください。`, settleDraft),
+      contentSaved: true, settleDraft,
+    }
+  }
+}
+
 const TABS = [
   { key: 'customer', label: '顧客へのお知らせ' },
   { key: 'operator', label: '運用者へのお知らせ' },
@@ -119,6 +444,7 @@ function CustomerNotificationEditor({
   onSave,
   onTestSend,
   notice,
+  hasUnsaved,
 }: {
   setting: EcNotificationSetting
   definition: LineNotificationDefinition | null
@@ -129,19 +455,22 @@ function CustomerNotificationEditor({
   onSave: () => void
   onTestSend: () => void
   notice: { tone: 'success' | 'error'; text: string } | null
+  hasUnsaved: boolean
 }) {
-  return <main data-design-node="Q55bb" className="space-y-4 pb-24">
+  return <main data-design-node="Q55bb" className="min-w-0 space-y-4 pb-48 sm:pb-24">
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div>
         <p className="text-xs font-semibold text-accent">LINE通知　›　お知らせの種類</p>
         <p className="mt-2 text-xl font-bold text-ink">「{setting.title?.trim() || setting.label}」を編集する</p>
         <p className="mt-1 text-xs text-ink-faint">{definition ? `公開版 ${definition.currentVersionNumber ? `v${definition.currentVersionNumber}` : 'なし'} ／ 編集中の下書き` : '公開中の内容を編集します。保存した内容は次の通知から使われます。'}</p>
+        {hasUnsaved ? <p className="mt-1 text-xs font-semibold text-warning">未保存の変更があります</p> : null}
       </div>
       <Button onClick={onTestSend} disabled={busy}>自分にテスト送信</Button>
     </div>
     {notice && <div className={`rounded-control border px-4 py-3 text-sm ${notice.tone === 'success' ? 'border-success bg-success-bg text-success' : 'border-danger bg-danger-bg text-danger'}`}>{notice.text}</div>}
 
-    <div className="grid min-w-0 gap-4" style={{ gridTemplateColumns: 'minmax(0, 1fr) 390px' }}>
+    {/* N-337: 狭い幅では見本を下に回す。390pxを無条件に横置きしない。 */}
+    <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_390px]">
       <div className="min-w-0 space-y-4">
         <section className="rounded-card border border-hairline bg-canvas p-4">
           <h2 className="font-bold text-ink">いつ送りますか</h2>
@@ -196,18 +525,34 @@ function CustomerNotificationEditor({
       </aside>
     </div>
 
-    <div className="fixed bottom-0 left-0 right-0 z-20 border-t border-hairline bg-canvas px-6 py-3 shadow-lg">
-      <div className="ml-auto flex flex-wrap items-center justify-between gap-3" style={{ maxWidth: 1584 }}>
-        <p className="text-xs text-ink-faint">{definition ? '下書きの保存だけでは公開中の内容は変わりません。確認後に公開してください。' : '出しています。保存すると、次のお知らせから新しい文面が使われます。'}</p>
-        <div className="flex gap-2"><Button onClick={onClose}>キャンセル</Button><Button onClick={onTestSend} disabled={busy}>自分にテスト送信</Button><Button onClick={onSave} disabled={busy}>{definition ? '下書きを保存' : 'お知らせを保存'}</Button>{definition ? <Button variant="primary" onClick={onPublish} disabled={busy}>顧客へのお知らせを公開</Button> : null}</div>
+    {/*
+      * N-337: 固定フッターの主要操作。ボタンの文字は部品側で `nowrap` なので、
+      * 375px級では並びを折り返さないと横にはみ出す。入れ物を `min-w-0` にし、
+      * 操作列を `flex-wrap` で複数行に落とす。左右の余白も狭幅では詰める。
+      */}
+    <div data-design="editor-footer" className="fixed bottom-0 left-0 right-0 z-20 min-w-0 border-t border-hairline bg-canvas px-4 py-3 shadow-lg sm:px-6">
+      <div className="ml-auto flex min-w-0 flex-wrap items-center justify-between gap-3" style={{ maxWidth: 1584 }}>
+        <p className="min-w-0 text-xs text-ink-faint">{definition ? '下書きの保存だけでは公開中の内容は変わりません。確認後に公開してください。' : '出しています。保存すると、次のお知らせから新しい文面が使われます。'}</p>
+        <div data-design="editor-footer-actions" className="flex min-w-0 flex-wrap justify-end gap-2"><Button onClick={onClose}>キャンセル</Button><Button onClick={onTestSend} disabled={busy}>自分にテスト送信</Button><Button onClick={onSave} disabled={busy}>{definition ? '下書きを保存' : 'お知らせを保存'}</Button>{definition ? <Button variant="primary" onClick={onPublish} disabled={busy}>顧客へのお知らせを公開</Button> : null}</div>
       </div>
     </div>
   </main>
 }
 
-export default function LineNotificationsPage() {
+function LineNotificationsPage() {
   const router = useRouter()
   const { selectedAccountId } = useAccount()
+  /*
+   * N-340: `loadGeneration` は load() の useEffect の中でしか進まない。
+   * アカウント切替の描画コミットと、その useEffect が実際に発火する瞬間の
+   * 間には隙間がある（渡された値が変わった描画そのものは同期的に終わるが、
+   * useEffect は後回しになる）。保存・公開の応答がその隙間で返ると、
+   * 世代はまだ古いままなのに画面はもう別アカウントを向いてしまっている。
+   * ここは描画のたびに同期して合わせ、useEffect の発火を待たずに
+   * 「いま向いているアカウント」を握っておく（保存応答の照合に使う）。
+   */
+  const selectedAccountRef = useRef(selectedAccountId)
+  selectedAccountRef.current = selectedAccountId
   const tab = useMergedTab(TABS, 'tab', 'customer')
   const [settings, setSettings] = useState<EcNotificationSetting[]>([])
   const [overview, setOverview] = useState<EcCommerceOverview | null>(null)
@@ -219,6 +564,17 @@ export default function LineNotificationsPage() {
   const [loadState, setLoadState] = useState<CustomerLoadState>('loading')
   const [busy, setBusy] = useState<string | null>(null)
   const [notice, setNotice] = useState<{ tone: 'success' | 'error'; text: string } | null>(null)
+  const [closeConfirmOpen, setCloseConfirmOpen] = useState(false)
+  // N-341: 運用者タブの件数は実データで出す。子部品とは別に親で取る。
+  const [operatorCount, setOperatorCount] = useState<number | null>(null)
+  const [operatorState, setOperatorState] = useState<OperatorTabState>('loading')
+  // N-340: 保存していない編集のあるお知らせ。離脱警告と復元の目印。
+  const [dirtyEvents, setDirtyEvents] = useState<readonly string[]>([])
+  // N-340: 保存済みの姿。編集中に戻るときの戻し先。
+  const lastSavedRef = useRef(new Map<string, EcNotificationSetting>())
+  // N-340: いま画面にある文面の指紋。保存の応答が「いまの文面のものか」を見る。
+  // 描画ではなく操作の中で見るので、state ではなく ref に置く。
+  const editFingerprintRef = useRef(new Map<string, string>())
   const loadGeneration = useRef(0)
 
   const load = useCallback(async () => {
@@ -231,9 +587,28 @@ export default function LineNotificationsPage() {
     setDefinitions([])
     setMetrics([])
     setNotice(null)
+    setCloseConfirmOpen(false)
+    setOperatorCount(null)
+    setOperatorState('loading')
+    setDirtyEvents([])
+    setBusy(null)
+    lastSavedRef.current = new Map()
+    editFingerprintRef.current = new Map()
     if (!selectedAccountId) {
       setLoadState('ready')
       return
+    }
+    // N-341: 運用者タブの件数だけ先に実数で取る。顧客タブの成否とは切り分ける。
+    try {
+      const operatorRes = await api.notifications.operatorRules.list(selectedAccountId)
+      if (generation !== loadGeneration.current) return
+      if (!operatorRes.success) throw new Error('operator count failed')
+      setOperatorCount(operatorRes.data.summary.total)
+      setOperatorState('ready')
+    } catch (error) {
+      if (generation !== loadGeneration.current) return
+      setOperatorCount(null)
+      setOperatorState(error instanceof ApiError && error.status === 403 ? 'forbidden' : 'error')
     }
     // 顧客タブだけが定義・集計を読む。運用者・記録タブは子部品が自前で取る（#509 軽1）。
     // 設定口は列車側で店別になったため、持ち回しはしない。
@@ -278,11 +653,30 @@ export default function LineNotificationsPage() {
           updatedAt: definition.updatedAt,
         }
       })
-      setSettings(mergedSettings)
+      // N-340: 保存済みの姿を覚え、端末に残った下書きがあれば重ねる。
+      lastSavedRef.current = new Map(mergedSettings.map((setting) => [setting.eventType, setting]))
+      const restoredEvents: string[] = []
+      const withDrafts = selectedAccountId ? mergedSettings.map((setting) => {
+        const draft = readCustomerDraft(selectedAccountId, setting.eventType)
+        if (!draft) return setting
+        if (isSameCustomerDraft(setting, draft)) {
+          clearCustomerDraft(selectedAccountId, setting.eventType)
+          return setting
+        }
+        restoredEvents.push(setting.eventType)
+        return { ...setting, ...draft }
+      }) : mergedSettings
+      editFingerprintRef.current = new Map(withDrafts.map((setting) =>
+        [setting.eventType, customerDraftFingerprint(pickCustomerDraft(setting))]))
+      setSettings(withDrafts)
       setOverview(overviewRes.data)
       setDefinitions(loadedDefinitions)
       setMetrics(metricRes?.success ? metricRes.data.items : [])
-      setExpanded((current) => mergedSettings.some((setting) => setting.eventType === current) ? current : null)
+      setExpanded((current) => withDrafts.some((setting) => setting.eventType === current) ? current : null)
+      if (restoredEvents.length > 0) {
+        setDirtyEvents(restoredEvents)
+        setNotice({ tone: 'success', text: `未保存の編集を${restoredEvents.length}件復元しました。確認して保存してください。` })
+      }
       setLoadState('ready')
     } catch (error) {
       if (generation === loadGeneration.current) {
@@ -293,12 +687,15 @@ export default function LineNotificationsPage() {
   }, [selectedAccountId, tab])
   useEffect(() => { void load() }, [load])
 
-  const visible = useMemo(() => settings.filter((setting) => {
+  // N-338: 行の「今日」列と同じ数で多い順に並べ、説明文と一致させる。
+  const sentCountOf = useCallback((eventType: string): number | null =>
+    overview?.byType.find((item) => item.eventType === eventType)?.count ?? null, [overview])
+  const visible = useMemo(() => sortCustomerSettingsBySentCount(settings.filter((setting) => {
     if (filter === 'enabled') return setting.isEnabled
     if (filter === 'stopped') return !setting.isEnabled
     if (filter === 'incomplete') return isIncomplete(setting)
     return true
-  }), [filter, settings])
+  }), sentCountOf), [filter, settings, sentCountOf])
   const customerPageCount = Math.max(1, Math.ceil(visible.length / CUSTOMER_PAGE_SIZE))
   const visiblePage = visible.slice((customerPage - 1) * CUSTOMER_PAGE_SIZE, customerPage * CUSTOMER_PAGE_SIZE)
   const expandedSetting = settings.find((setting) => setting.eventType === expanded) ?? null
@@ -327,85 +724,138 @@ export default function LineNotificationsPage() {
   })
   const tabsWithCounts = TABS.map((item) => {
     if (item.key === 'customer') return { ...item, label: `${item.label} ${loadState === 'ready' ? settings.length : '—'}` }
-    if (item.key === 'operator') return { ...item, label: `${item.label} —` }
+    // N-341: 運用者タブの件数は実データ。取れなかったときは「取得失敗」と区別する。
+    if (item.key === 'operator') return { ...item, label: `${item.label} ${operatorTabCountLabel(operatorState, operatorCount)}` }
     if (item.key === 'failures') return { ...item, label: `${item.label} ${overview?.failed ?? '—'}` }
     return item
   })
   const update = (eventType: string, patch: Partial<EcNotificationSetting>) => setSettings((current) => current.map((setting) => setting.eventType === eventType ? { ...setting, ...patch } : setting))
+  // N-340: 入力のたびに端末へ下書きを置き、未保存の印を付ける。
+  const edit = (eventType: string, patch: Partial<EcNotificationSetting>) => {
+    const current = settings.find((setting) => setting.eventType === eventType)
+    if (current) {
+      const draft = pickCustomerDraft({ ...current, ...patch })
+      if (selectedAccountId) writeCustomerDraft(selectedAccountId, eventType, draft)
+      // 保存中でも入力は続けられる。1打ごとに指紋を進め、飛んでいる保存を古いものにする。
+      editFingerprintRef.current.set(eventType, customerDraftFingerprint(draft))
+    }
+    update(eventType, patch)
+    setDirtyEvents((prev) => prev.includes(eventType) ? prev : [...prev, eventType])
+  }
+  // N-340: 編集中に戻るとき、未保存があれば警告し、閉じるなら保存済みへ戻す。
+  const closeEditor = (setting: EcNotificationSetting) => {
+    if (!dirtyEvents.includes(setting.eventType)) { setExpanded(null); return }
+    setCloseConfirmOpen(true)
+  }
+  const discardEditorChanges = (setting: EcNotificationSetting) => {
+    const saved = lastSavedRef.current.get(setting.eventType)
+    if (saved) {
+      update(setting.eventType, { ...saved })
+      editFingerprintRef.current.set(setting.eventType, customerDraftFingerprint(pickCustomerDraft(saved)))
+    }
+    if (selectedAccountId) clearCustomerDraft(selectedAccountId, setting.eventType)
+    setDirtyEvents((prev) => prev.filter((value) => value !== setting.eventType))
+    setCloseConfirmOpen(false)
+    setExpanded(null)
+  }
+  // N-340: 未保存のまま再読込・タブを閉じるときは警告する。
+  useEffect(() => {
+    if (dirtyEvents.length === 0) return
+    const handler = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = '' }
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [dirtyEvents.length])
+
+  /*
+   * N-340/N-341: 応答が返った時点で、まだ同じアカウントを見ているときだけ画面へ書く。
+   * 端末の控えを消す・未保存の印を外すのは、送った文面がそのまま画面に残っている
+   * ときだけ（`settleDraft`）。保存中に足された入力を消さないため。
+   */
+  const mutationApi: CustomerMutationApi = {
+    updateDraft: api.lineNotifications.updateDraft,
+    publishDefinition: api.lineNotifications.publishDefinition,
+    stopDefinition: api.lineNotifications.stopDefinition,
+    updateSetting: api.ecCommerce.updateSetting,
+  }
+  const guardFor = (setting: EcNotificationSetting): CustomerMutationGuard => ({
+    generation: loadGeneration.current,
+    currentGeneration: () => loadGeneration.current,
+    forAccountId: selectedAccountId ?? '',
+    currentAccountId: () => selectedAccountRef.current,
+    sentFingerprint: customerDraftFingerprint(pickCustomerDraft(setting)),
+    currentFingerprint: () => editFingerprintRef.current.get(setting.eventType),
+  })
+  const applyOutcome = (
+    accountId: string,
+    setting: EcNotificationSetting,
+    generation: number,
+    outcome: CustomerMutationOutcome,
+  ) => {
+    if (outcome.settleDraft) {
+      // 送った文面がそのまま画面に残っている。ここで初めて「保存済み」にする。
+      clearCustomerDraft(accountId, setting.eventType)
+      lastSavedRef.current.set(setting.eventType, { ...setting, isEnabled: outcome.enabled })
+      setDirtyEvents((prev) => prev.filter((value) => value !== setting.eventType))
+    }
+    if (outcome.kind === 'stale' || generation !== loadGeneration.current) return
+    if (outcome.kind === 'failed') { setNotice({ tone: 'error', text: outcome.message }); return }
+    const saved = outcome.definition
+    if (saved) setDefinitions((current) => current.map((item) => item.id === saved.id ? saved : item))
+    update(setting.eventType, { isEnabled: outcome.enabled })
+    if (!outcome.contentSaved) {
+      // 出す・止めるの切替は文面を送っていない。戻し先の出・止めだけを直し、文面は触らない。
+      const previous = lastSavedRef.current.get(setting.eventType)
+      if (previous) lastSavedRef.current.set(setting.eventType, { ...previous, isEnabled: outcome.enabled })
+    }
+    setNotice({ tone: outcome.tone, text: outcome.message })
+  }
 
   const save = async (setting: EcNotificationSetting, enabled = setting.isEnabled) => {
     if (!setting.title?.trim()) { setNotice({ tone: 'error', text: '通知の見出しを入力してください。' }); return }
     if (!selectedAccountId) { setNotice({ tone: 'error', text: 'LINEアカウントを選択してください。' }); return }
+    const accountId = selectedAccountId
+    const guard = guardFor(setting)
     setBusy(setting.eventType)
-    try {
-      const definition = definitionByEvent.get(setting.eventType)
-      if (definition && enabled === setting.isEnabled) {
-        const result = await api.lineNotifications.updateDraft(definition.id, {
-          lineAccountId: definition.lineAccountId,
-          expectedVersion: definition.version,
-          name: setting.title || setting.label,
-          category: definition.category,
-          sourceEventType: definition.sourceEventType,
-          draft: {
-            ...definition.draft,
-            title: setting.title,
-            introText: setting.introText,
-            outroText: setting.outroText,
-            buttonLabel: setting.buttonLabel,
-            buttonUrl: setting.buttonUrl,
-            imageUrl: setting.imageUrl,
-          },
-        })
-        if (!result.success) throw new Error('save failed')
-        setDefinitions((current) => current.map((item) => item.id === result.data.id ? result.data : item))
-      } else if (definition) {
-        const result = enabled
-          ? await api.lineNotifications.publishDefinition(definition.id, { lineAccountId: definition.lineAccountId, expectedVersion: definition.version })
-          : await api.lineNotifications.stopDefinition(definition.id, { lineAccountId: definition.lineAccountId, expectedVersion: definition.version })
-        if (!result.success) throw new Error('status failed')
-        setDefinitions((current) => current.map((item) => item.id === result.data.id ? result.data : item))
-      } else {
-        await api.ecCommerce.updateSetting(selectedAccountId, setting.eventType, {
-          isEnabled: enabled, title: setting.title, introText: setting.introText, outroText: setting.outroText,
-          buttonLabel: setting.buttonLabel, buttonUrl: setting.buttonUrl, imageUrl: setting.imageUrl,
-        })
-      }
-      update(setting.eventType, { isEnabled: enabled })
-      setNotice({ tone: 'success', text: definition && enabled === setting.isEnabled ? `${setting.label}の下書きを保存しました。` : `${setting.label}を保存しました。` })
-    } catch { setNotice({ tone: 'error', text: `${setting.label}を保存できませんでした。` }) }
-    finally { setBusy(null) }
+    const outcome = await saveCustomerNotification({
+      api: mutationApi,
+      accountId,
+      setting,
+      definition: definitionByEvent.get(setting.eventType) ?? null,
+      enabled,
+      guard,
+    })
+    applyOutcome(accountId, setting, guard.generation, outcome)
+    if (guard.generation === loadGeneration.current) setBusy(null)
   }
 
   const publish = async (setting: EcNotificationSetting) => {
     const definition = definitionByEvent.get(setting.eventType)
     if (!definition) return
+    if (!selectedAccountId) { setNotice({ tone: 'error', text: 'LINEアカウントを選択してください。' }); return }
+    const accountId = selectedAccountId
+    const guard = guardFor(setting)
     setBusy(setting.eventType)
-    try {
-      const result = await api.lineNotifications.publishDefinition(definition.id, {
-        lineAccountId: definition.lineAccountId,
-        expectedVersion: definition.version,
-      })
-      if (!result.success) throw new Error('publish failed')
-      setDefinitions((current) => current.map((item) => item.id === result.data.id ? result.data : item))
-      update(setting.eventType, { isEnabled: true })
-      setNotice({ tone: 'success', text: `${setting.label}を公開しました。` })
-    } catch { setNotice({ tone: 'error', text: `${setting.label}を公開できませんでした。下書きの内容を確認してください。` }) }
-    finally { setBusy(null) }
+    const outcome = await publishCustomerNotification({ api: mutationApi, setting, definition, guard })
+    applyOutcome(accountId, setting, guard.generation, outcome)
+    if (guard.generation === loadGeneration.current) setBusy(null)
   }
 
   const testSend = async (setting: EcNotificationSetting) => {
     if (!selectedAccountId) { setNotice({ tone: 'error', text: 'LINEアカウントを選択してください。' }); return }
+    const accountId = selectedAccountId
+    // 保存・公開とまったく同じ見張りを渡す。テスト送信の結果も「返った時点で
+    // 同じアカウント・同じ世代を見ているか」で入れる・入れないを決める。
+    const guard = guardFor(setting)
     setBusy(setting.eventType)
-    try {
-      const result = await api.ecCommerce.testSend({
-        eventType: setting.eventType, accountId: selectedAccountId, title: setting.title || '',
-        introText: setting.introText, outroText: setting.outroText, buttonLabel: setting.buttonLabel,
-        buttonUrl: setting.buttonUrl, imageUrl: setting.imageUrl,
-      })
-      if (!result.success) throw new Error(result.error)
-      setNotice({ tone: 'success', text: `テスト受信者 ${result.data.sent}名へ送信しました。` })
-    } catch { setNotice({ tone: 'error', text: 'テスト送信できませんでした。テスト受信者の設定をご確認ください。' }) }
-    finally { setBusy(null) }
+    const outcome = await sendCustomerTestNotification({
+      api: { testSend: api.ecCommerce.testSend },
+      setting,
+      accountId,
+      guard,
+    })
+    if (outcome.kind === 'stale') return
+    setNotice({ tone: outcome.tone, text: outcome.message })
+    setBusy(null)
   }
 
   return <>
@@ -413,17 +863,30 @@ export default function LineNotificationsPage() {
     {tab === 'failures' ? <NotificationRunList lineAccountId={selectedAccountId} mode="failures" /> : null}
     {tab === 'history' ? <NotificationRunList lineAccountId={selectedAccountId} mode="history" /> : null}
     {tab === 'operator' ? <OperatorNotificationRules lineAccountId={selectedAccountId} /> : null}
-    {tab === 'customer' && expandedSetting ? <CustomerNotificationEditor
-      setting={expandedSetting}
-      definition={definitionByEvent.get(expandedSetting.eventType) ?? null}
-      busy={busy === expandedSetting.eventType}
-      onChange={(patch) => update(expandedSetting.eventType, patch)}
-      onClose={() => setExpanded(null)}
-      onPublish={() => void publish(expandedSetting)}
-      onSave={() => void save(expandedSetting)}
-      onTestSend={() => void testSend(expandedSetting)}
-      notice={notice}
-    /> : null}
+    {tab === 'customer' && expandedSetting ? <>
+      <CustomerNotificationEditor
+        setting={expandedSetting}
+        definition={definitionByEvent.get(expandedSetting.eventType) ?? null}
+        busy={busy === expandedSetting.eventType}
+        onChange={(patch) => edit(expandedSetting.eventType, patch)}
+        onClose={() => closeEditor(expandedSetting)}
+        onPublish={() => void publish(expandedSetting)}
+        onSave={() => void save(expandedSetting)}
+        onTestSend={() => void testSend(expandedSetting)}
+        notice={notice}
+        hasUnsaved={dirtyEvents.includes(expandedSetting.eventType)}
+      />
+      <ConfirmDialog
+        open={closeConfirmOpen}
+        title="保存していない編集を破棄しますか？"
+        description="破棄すると、入力中の内容は保存済みの内容へ戻ります。この操作は取り消せません。"
+        confirmLabel="編集を破棄"
+        cancelLabel="編集を続ける"
+        destructive
+        onConfirm={() => discardEditorChanges(expandedSetting)}
+        onCancel={() => setCloseConfirmOpen(false)}
+      />
+    </> : null}
     {tab === 'customer' && !expandedSetting ? <main
       data-design-node="festr"
       data-list-state={loadState === 'ready' && settings.length === 0 ? 'empty' : loadState}
@@ -499,3 +962,29 @@ export default function LineNotificationsPage() {
     </main> : null}
   </>
 }
+
+/*
+ * 試験からは実物の部品と実物の呼び出し口を使う。
+ * 画面の hook を作り替えず、実APIと同じ非同期境界のまま
+ * 逆順応答・保存失敗・狭幅の並びを確かめられるようにする。
+ */
+const LineNotificationsPageWithTestSupport = Object.assign(LineNotificationsPage, {
+  __testing: {
+    CustomerNotificationEditor,
+    clearCustomerDraft,
+    canSettleDraft,
+    customerDraftFingerprint,
+    customerDraftKey,
+    isSameCustomerDraft,
+    operatorTabCountLabel,
+    pickCustomerDraft,
+    publishCustomerNotification,
+    readCustomerDraft,
+    saveCustomerNotification,
+    sendCustomerTestNotification,
+    sortCustomerSettingsBySentCount,
+    writeCustomerDraft,
+  },
+})
+
+export default LineNotificationsPageWithTestSupport
