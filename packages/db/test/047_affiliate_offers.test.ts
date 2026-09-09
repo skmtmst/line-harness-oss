@@ -27,16 +27,7 @@ function execSafe(db: Database.Database, sql: string): void {
 /**
  * Build an in-memory DB by applying schema.sql + all migrations through 047.
  */
-/*
- * 移行の再生は全部同期で走る。テストごとに繰り返すとその間ワーカーが
- * 止まり、CI が vitest の状況報告待ちで落ちる。1度だけ組み立てて中身を
- * 控え、以後は写しから起こす。写しは独立したDBなので、テスト同士は
- * 影響し合わない。
- */
-let migratedSnapshot: Buffer | null = null;
-
 function setupDbWithMigrations(): Database.Database {
-  if (migratedSnapshot) return new Database(migratedSnapshot);
   const db = new Database(':memory:');
   execSafe(db, readFileSync(join(PKG_ROOT, 'schema.sql'), 'utf8'));
 
@@ -48,7 +39,6 @@ function setupDbWithMigrations(): Database.Database {
     execSafe(db, readFileSync(join(MIGRATIONS_DIR, file), 'utf8'));
   }
 
-    migratedSnapshot = db.serialize();
   return db;
 }
 
