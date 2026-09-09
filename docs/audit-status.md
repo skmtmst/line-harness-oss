@@ -1,7 +1,7 @@
 # 機能監査418件の対応状況
 
 > 正本: [機能監査 #617](https://github.com/kentavndng/line-harness-board/issues/617)、[Phase 0 #618](https://github.com/kentavndng/line-harness-board/issues/618)、修正Issue #619〜#660、統合・検証窓口 [#264](https://github.com/kentavndng/line-harness-board/issues/264)、各PR。
-> 観測時点: 2026-09-09 07:00 JST。Pencil・V6の見た目比較・`/restaurant-test` は対象外。
+> 観測時点: 2026-09-09 13:10 JST。Pencil・V6の見た目比較・`/restaurant-test` は対象外。
 > `unmapped` は「Issue/PRとの明示対応を一次資料から証明できない」という意味です。未修正・未起票とは断定しません。
 
 旧デザイン点検610件の台帳は[移行直前の履歴](https://github.com/skmtmst/line-harness-oss/blob/534136f9722fc4ba3e32e7af063e0ed5ecd4839d/docs/audit-status.md)と[作成PR #1386](https://github.com/skmtmst/line-harness-oss/pull/1386)に残し、この418件へは混ぜません。
@@ -21,14 +21,12 @@
 
 | 追跡状態 | 件数 | 意味 |
 | --- | ---: | --- |
-| 本流統合 | 10 | codex/developmentへの列車統合を確認 |
-| PR審査 | 19 | PRあり。統合・検証反映は未完了 |
-| 修正中 | 3 | 差し戻し・実装中・依存待ち |
-| 票あり | 1 | Issueあり。PR未作成 |
-| unmapped | 385 | 明示対応を一次資料から証明できない |
+| 本流統合・検証反映済み | 27 | codex/developmentへの統合と検証環境反映を確認 |
+| 未統合の票・PR | 66 | Issue/PRとの一意な対応あり。審査・差し戻し・依存待ちを含む |
+| unmapped | 325 | 明示対応を一次資料から証明できない |
 | **合計** | **418** | |
 
-本流統合済み10件を含め、検証環境へ反映済みと確認できたIDは0件です。列車202〜207は[#264](https://github.com/kentavndng/line-harness-board/issues/264)でrelease 48待ち、列車208は統合済みで検証反映の確認待ちです。N-065のPR #1444は列車外で直接統合され、独立再審査の残件を#654/PR #1476で追補中です。
+本流統合済み27件は、列車213・検証環境52回目まで反映を確認しています。残りは391件です。個別行の状態・列車・staging欄はGitHub Issue/PRと照合しながら更新中で、上の集計を現在値の正本とします。N-065のPR #1444は列車外で直接統合され、独立再審査の残件を#654/PR #1476で追補中です。
 
 #629〜#635は監査後の横断改善ですが、418件のN/E-IDを付与されていないため、根拠なく個別行へ結び付けていません。#660/PR #1478は、N-366の安全設定を実build生成物で配備するための関連対応としてN-366行へ併記しています。
 
@@ -186,14 +184,14 @@
 | N-114 | 中 | 10 ウェビナー | CTAが旧単体方式とカード方式で二重管理され利用者が迷う | unmapped | — | — | — | — | consolidated §2 F10-M-01／feature-10.md／apps/web/src/components/webinars/webinar-form.tsx:56-59／現実行223件PASS＋コード読み／確度高／#617 |
 | N-115 | 中 | 10 ウェビナー | 動画がR2プレフィックス手入力のみで連携がない | unmapped | — | — | — | — | consolidated §2 F10-M-02／feature-10.md／apps/web/src/components/webinars/webinar-form.tsx:208-211／現実行223件PASS＋コード読み／確度高／#617 |
 | N-116 | 中 | 10 ウェビナー | 視聴後アクションの参照先が自由入力で存在検査がない | unmapped | — | — | — | — | consolidated §2 F10-M-03／feature-10.md／apps/worker/src/routes/webinars.ts:940-962／現実行223件PASS＋コード読み／確度高／#617 |
-| N-117 | 中 | 10 ウェビナー | 公開前検査の取得失敗に再試行がなく公開ボタンが固まる | unmapped | — | — | — | — | consolidated §2 F10-M-04／feature-10.md／apps/web/src/app/webinars/edit/page.tsx:1476-1480／現実行223件PASS＋コード読み／確度高／#617 |
+| N-117 | 中 | 10 ウェビナー | 公開前検査の取得失敗に再試行がなく公開ボタンが固まる | 本流統合・検証反映済み | [#674](https://github.com/kentavndng/line-harness-board/issues/674) | [#1499](https://github.com/skmtmst/line-harness-oss/pull/1499) | 213/[#1513](https://github.com/skmtmst/line-harness-oss/pull/1513) | 52回目 | consolidated §2 F10-M-04／feature-10.md／apps/web/src/app/webinars/edit/page.tsx:1476-1480／現実行223件PASS＋コード読み／確度高／#617 |
 | N-118 | 中 | 10 ウェビナー | 個人視聴履歴に役割の絞りがなくstaffも全員分見える | unmapped | — | — | — | — | consolidated §2 F10-M-05／feature-10.md／apps/worker/src/routes/webinars.ts:1825-1857／現実行223件PASS＋コード読み／確度高／#617 |
 | N-119 | 中 | 10 ウェビナー | CTAなしでは公開できないのに画面に書いていない | unmapped | — | — | — | — | consolidated §2 F10-M-06／feature-10.md／apps/worker/src/routes/webinars.ts:1239-1246／コード読み／確度中（意図要確認）／#617 |
-| N-120 | 中 | 10 ウェビナー | CTA段のフォーム候補の取得失敗が沈黙する | unmapped | — | — | — | — | consolidated §2 F10-M-07／feature-10.md／apps/web/src/app/webinars/edit/page.tsx:1057-1068／現実行223件PASS＋コード読み／確度高／#617 |
+| N-120 | 中 | 10 ウェビナー | CTA段のフォーム候補の取得失敗が沈黙する | 本流統合・検証反映済み | [#674](https://github.com/kentavndng/line-harness-board/issues/674) | [#1499](https://github.com/skmtmst/line-harness-oss/pull/1499) | 213/[#1513](https://github.com/skmtmst/line-harness-oss/pull/1513) | 52回目 | consolidated §2 F10-M-07／feature-10.md／apps/web/src/app/webinars/edit/page.tsx:1057-1068／現実行223件PASS＋コード読み／確度高／#617 |
 | N-124 | 軽 | 10 ウェビナー | 検索で1文字打つたびに一覧が読込表示に消える | unmapped | — | — | — | — | consolidated §2 F10-L-04／feature-10.md／apps/web/src/app/webinars/page.tsx:162-208／現実行223件PASS＋コード読み／確度高／#617 |
-| N-125 | 軽 | 10 ウェビナー | 参加者管理の「稼働状況」が実状態と無関係の固定表示 | unmapped | — | — | — | — | consolidated §2 F10-L-05／feature-10.md／apps/web/src/app/webinars/edit/page.tsx:431-432／現実行223件PASS＋コード読み／確度高／#617 |
-| N-126 | 軽 | 10 ウェビナー | 分析のタブ風表示が押せない | unmapped | — | — | — | — | consolidated §2 F10-L-06／feature-10.md／apps/web/src/app/webinars/edit/page.tsx:445／現実行223件PASS＋コード読み／確度高／#617 |
-| N-127 | 軽 | 10 ウェビナー | 視聴秒0の人を「視聴エラー」と表示する | unmapped | — | — | — | — | consolidated §2 F10-L-07／feature-10.md／apps/web/src/app/webinars/edit/page.tsx:416／現実行223件PASS＋コード読み／確度高／#617 |
+| N-125 | 軽 | 10 ウェビナー | 参加者管理の「稼働状況」が実状態と無関係の固定表示 | 本流統合・検証反映済み | [#674](https://github.com/kentavndng/line-harness-board/issues/674) | [#1499](https://github.com/skmtmst/line-harness-oss/pull/1499) | 213/[#1513](https://github.com/skmtmst/line-harness-oss/pull/1513) | 52回目 | consolidated §2 F10-L-05／feature-10.md／apps/web/src/app/webinars/edit/page.tsx:431-432／現実行223件PASS＋コード読み／確度高／#617 |
+| N-126 | 軽 | 10 ウェビナー | 分析のタブ風表示が押せない | 本流統合・検証反映済み | [#674](https://github.com/kentavndng/line-harness-board/issues/674) | [#1499](https://github.com/skmtmst/line-harness-oss/pull/1499) | 213/[#1513](https://github.com/skmtmst/line-harness-oss/pull/1513) | 52回目 | consolidated §2 F10-L-06／feature-10.md／apps/web/src/app/webinars/edit/page.tsx:445／現実行223件PASS＋コード読み／確度高／#617 |
+| N-127 | 軽 | 10 ウェビナー | 視聴秒0の人を「視聴エラー」と表示する | 本流統合・検証反映済み | [#674](https://github.com/kentavndng/line-harness-board/issues/674) | [#1499](https://github.com/skmtmst/line-harness-oss/pull/1499) | 213/[#1513](https://github.com/skmtmst/line-harness-oss/pull/1513) | 52回目 | consolidated §2 F10-L-07／feature-10.md／apps/web/src/app/webinars/edit/page.tsx:416／現実行223件PASS＋コード読み／確度高／#617 |
 | N-129 | 軽 | 10 ウェビナー | アーカイブ対話に「公開中は先に停止」の事前案内がない | unmapped | — | — | — | — | consolidated §2 F10-L-09／feature-10.md／apps/web/src/app/webinars/page.tsx:502-515／現実行223件PASS＋コード読み／確度高／#617 |
 | N-130 | 軽 | 10 ウェビナー | 動画の長さ0秒をサーバーが許す | unmapped | — | — | — | — | consolidated §2 F10-L-10／feature-10.md／apps/worker/src/routes/webinars.ts:979-983／現実行223件PASS＋コード読み／確度高／#617 |
 
@@ -556,8 +554,8 @@
 | N-417 | 中 | 29 イベント予約 | 申込者への一斉送信・CSV・個別トークの口がない | unmapped | — | — | — | — | consolidated §2 F29-M-1／feature-29.md／apps/web/src/app/events/bookings/page.tsx:315、apps/worker/src/routes/events.ts（export/broadcastなし）／Worker117件＋Web122件＋DB10件PASS/コード読み/確度高／#617 |
 | N-418 | 中 | 29 イベント予約 | 公開後の変更が版なしで上書きされ過去の申込表示まで変わる | unmapped | — | — | — | — | consolidated §2 F29-M-2／feature-29.md／apps/worker/src/routes/events.ts:413／Worker117件＋Web122件＋DB10件PASS/コード読み/確度高／#617 |
 | N-419 | 中 | 29 イベント予約 | 待ちの行・順番・手動案内が管理画面に出ない | unmapped | — | — | — | — | consolidated §2 F29-M-3／feature-29.md／apps/web/src/app/events/event-load-state-contract.test.ts:65（listWaitlist未使用を固定）／Worker117件＋Web122件＋DB10件PASS/コード読み/確度高／#617 |
-| N-420 | 軽 | 29 イベント予約 | 参加済・無断ボタンの連打で成功しても失敗文が出る | unmapped | — | — | — | — | consolidated §2 F29-L-1／feature-29.md／apps/web/src/app/events/bookings/page.tsx:278／Worker117件＋Web122件＋DB10件PASS/コード読み/確度中（連打実機は未実施）／#617 |
-| N-421 | 軽 | 29 イベント予約 | 一覧上部の件数帯がタブに見えるが押せない | unmapped | — | — | — | — | consolidated §2 F29-L-2／feature-29.md／apps/web/src/app/events/page.tsx:148／Worker117件＋Web122件＋DB10件PASS/コード読み/確度中（見た目解釈含む）／#617 |
+| N-420 | 軽 | 29 イベント予約 | 参加済・無断ボタンの連打で成功しても失敗文が出る | 本流統合・検証反映済み | [#684](https://github.com/kentavndng/line-harness-board/issues/684) | [#1500](https://github.com/skmtmst/line-harness-oss/pull/1500) | 213/[#1513](https://github.com/skmtmst/line-harness-oss/pull/1513) | 52回目 | consolidated §2 F29-L-1／feature-29.md／apps/web/src/app/events/bookings/page.tsx:278／Worker117件＋Web122件＋DB10件PASS/コード読み/確度中（連打実機は未実施）／#617 |
+| N-421 | 軽 | 29 イベント予約 | 一覧上部の件数帯がタブに見えるが押せない | 本流統合・検証反映済み | [#684](https://github.com/kentavndng/line-harness-board/issues/684) | [#1500](https://github.com/skmtmst/line-harness-oss/pull/1500) | 213/[#1513](https://github.com/skmtmst/line-harness-oss/pull/1513) | 52回目 | consolidated §2 F29-L-2／feature-29.md／apps/web/src/app/events/page.tsx:148／Worker117件＋Web122件＋DB10件PASS/コード読み/確度中（見た目解釈含む）／#617 |
 | N-422 | 軽 | 29 イベント予約 | 承認期限が固定24時間でイベントごとに変えられない | unmapped | — | — | — | — | consolidated §2 F29-L-3／feature-29.md／apps/worker/src/services/event-booking-types.ts:104、apps/worker/src/services/event-booking-expirer.ts:20／Worker117件＋Web122件＋DB10件PASS/コード読み/確度高／#617 |
 
 ### 機能30 ログインユーザー
