@@ -58,7 +58,12 @@ export function createTestD1(
 ): SqliteD1 {
   const raw = new Database(options?.file ?? ':memory:')
   if (!options?.attach) raw.exec(readFileSync(join(DB_PKG_ROOT, 'bootstrap.sql'), 'utf8'))
-  if (options?.file) raw.pragma('busy_timeout = 2000')
+  if (options?.file) {
+    // 実DBと同じ見え方のまま、テストのディスク待ちだけ削る。
+    raw.pragma('journal_mode = WAL')
+    raw.pragma('synchronous = OFF')
+    raw.pragma('busy_timeout = 2000')
+  }
   // 参照整合性は本番の D1 と同じく既定で切っておく。ここだけ厳しくすると
   // テストのためだけに余分な行を用意することになり、読みにくくなる。
   // ただし外部キーに関わる不整合 (誤った通 ID の保存など) は OFF では隠れる。

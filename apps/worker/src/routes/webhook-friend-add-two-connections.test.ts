@@ -6,10 +6,10 @@
  * 同時に follow を処理する。送るのは1回だけで、負けた側は登録も送信も
  * 台帳の上書きもしないことを確かめる。
  */
-import { describe, expect, test, vi, beforeEach, afterEach } from 'vitest';
+import { describe, expect, test, vi, beforeAll, afterAll, beforeEach, afterEach } from 'vitest';
 import { Hono } from 'hono';
 import Database from 'better-sqlite3';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { copyFileSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { Env } from '../index.js';
@@ -39,6 +39,12 @@ vi.mock('../services/event-bus.js', () => ({
 import { verifySignature } from '@line-crm/line-sdk';
 import { webhook } from './webhook.js';
 
+/*
+ * schema を流すのは重い（実ファイルへ何千ものDDL）。1度だけ雛形を作り、
+ * テストごとにその写しを置く。写しは別のファイルなので影響し合わない。
+ */
+let templateDir: string;
+let templateFile: string;
 let dir: string;
 let file: string;
 /** 実行主体A・Bの接続。共有しない。 */
@@ -116,11 +122,22 @@ function sendCount(): number {
   return lineClientMocks.replyMessage.mock.calls.length + lineClientMocks.pushMessage.mock.calls.length;
 }
 
+beforeAll(() => {
+  templateDir = mkdtempSync(join(tmpdir(), 'friend-add-webhook-tpl-'));
+  templateFile = join(templateDir, 'template.sqlite');
+  const setup = createTestD1({ file: templateFile });
+  seedBase(setup.raw);
+  setup.raw.pragma('wal_checkpoint(TRUNCATE)');
+  setup.raw.close();
+});
+
+afterAll(() => rmSync(templateDir, { recursive: true, force: true }));
+
 beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), 'friend-add-webhook-'));
   file = join(dir, 'test.sqlite');
-  connA = createTestD1({ file });
-  seedBase(connA.raw);
+  copyFileSync(templateFile, file);
+  connA = createTestD1({ file, attach: true });
   connB = createTestD1({ file, attach: true });
   observer = new Database(file);
   vi.mocked(verifySignature).mockResolvedValue(true);

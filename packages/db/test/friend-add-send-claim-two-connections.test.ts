@@ -6,9 +6,9 @@
  * 取り合わせる。片方が置いた行を、もう片方の接続が同じ1文の中で見て
  * 判断できていること（原子的な CAS）を確かめる。
  */
-import { describe, expect, it, beforeEach, afterEach } from 'vitest';
+import { describe, expect, it, beforeAll, afterAll, beforeEach, afterEach } from 'vitest';
 import Database from 'better-sqlite3';
-import { mkdtempSync, rmSync, readFileSync } from 'node:fs';
+import { copyFileSync, mkdtempSync, rmSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -52,6 +52,13 @@ const NOW = '2026-09-08T10:00:00.000+09:00';
 const LATER = '2026-09-08T10:10:00.000+09:00';
 
 describe('送信権の予約 — 独立2接続 (#622)', () => {
+  /*
+   * schema を流すのは重い（実ファイルへ何千ものDDL）。1度だけ雛形を作り、
+   * テストごとにその写しを置く。写しは別のファイルなのでテスト同士は
+   * 影響し合わない。
+   */
+  let templateDir: string;
+  let templatePath: string;
   let dir: string;
   let path: string;
   /** 実行主体A・Bの接続。共有しない。 */
@@ -60,10 +67,19 @@ describe('送信権の予約 — 独立2接続 (#622)', () => {
   let dbA: D1Database;
   let dbB: D1Database;
 
-  beforeEach(() => {
-    dir = mkdtempSync(join(tmpdir(), 'friend-add-claims-'));
-    path = join(dir, 'test.sqlite');
-    const setup = new Database(path);
+  /** 実DBと同じ見え方のまま、テストのディスク待ちだけ削る。 */
+  function openFast(file: string): Database.Database {
+    const conn = new Database(file);
+    conn.pragma('journal_mode = WAL');
+    conn.pragma('synchronous = OFF');
+    conn.pragma('busy_timeout = 2000');
+    return conn;
+  }
+
+  beforeAll(() => {
+    templateDir = mkdtempSync(join(tmpdir(), 'friend-add-claims-tpl-'));
+    templatePath = join(templateDir, 'template.sqlite');
+    const setup = openFast(templatePath);
     setup.exec(readFileSync(join(PKG_ROOT, 'bootstrap.sql'), 'utf8'));
     setup.prepare(
       `INSERT INTO line_accounts (id, channel_id, name, channel_access_token, channel_secret)
@@ -80,13 +96,19 @@ describe('送信権の予約 — 独立2接続 (#622)', () => {
          VALUES (?, 'account-1', 'friend-1', ?, 'first_time', 'pending', ?)`,
       ).run(eventId, `webhook-${eventId}`, NOW);
     }
+    // WAL を畳んで、写しても中身が揃っている状態にする。
+    setup.pragma('wal_checkpoint(TRUNCATE)');
     setup.close();
+  });
 
-    connA = new Database(path);
-    connB = new Database(path);
-    // D1 と同じく、書き込みは短い待ちで直列化される。
-    connA.pragma('busy_timeout = 2000');
-    connB.pragma('busy_timeout = 2000');
+  afterAll(() => rmSync(templateDir, { recursive: true, force: true }));
+
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), 'friend-add-claims-'));
+    path = join(dir, 'test.sqlite');
+    copyFileSync(templatePath, path);
+    connA = openFast(path);
+    connB = openFast(path);
     dbA = asD1(connA);
     dbB = asD1(connB);
   });
