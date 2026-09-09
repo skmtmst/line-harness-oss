@@ -220,7 +220,7 @@ describe('V6 アフィリエイターを追加する（xqT1Z）', () => {
     for (const label of ['1件あたりの上限', '振込先の登録', '成果時の動き']) {
       expect(NEW_PAGE).toContain(`label="${label}"`)
     }
-    expect(NEW_PAGE).toContain('api.friends.list(friendSearchParams(friendSearch, friendPage))')
+    expect(NEW_PAGE).toContain('api.friends.list(friendSearchParams(friendSearch, friendPage, selectedAccountId))')
     expect(NEW_PAGE).toContain('aria-label="友だち候補のページ"')
     expect(NEW_PAGE).toContain('friendId: friendId || undefined')
     // 押せない入力欄を残していない。

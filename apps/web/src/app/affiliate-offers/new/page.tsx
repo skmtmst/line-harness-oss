@@ -2,8 +2,9 @@
 
 import SelectField from '@/components/shared/select-field'
 import { useEffect, useState } from 'react'
-import type { Tag, Scenario, LineAccount } from '@line-crm/shared'
+import type { Tag, Scenario } from '@line-crm/shared'
 import { api } from '@/lib/api'
+import { useAccount } from '@/contexts/account-context'
 import CreatePage, {
   AsideCard,
   Field,
@@ -44,11 +45,11 @@ function Unavailable({ label, reason }: { label: string; reason: string }) {
 }
 
 export default function NewAffiliateOfferPage() {
+  const { selectedAccountId, selectedAccount } = useAccount()
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [rewardAmount, setRewardAmount] = useState('')
   const [rewardMiles, setRewardMiles] = useState('')
-  const [lineAccountId, setLineAccountId] = useState('')
   const [tagId, setTagId] = useState('')
   const [scenarioId, setScenarioId] = useState('')
   const [publishNow, setPublishNow] = useState(true)
@@ -56,23 +57,19 @@ export default function NewAffiliateOfferPage() {
   const [partialSave, setPartialSave] = useState(false)
   const [tags, setTags] = useState<Tag[]>([])
   const [scenarios, setScenarios] = useState<Scenario[]>([])
-  const [accounts, setAccounts] = useState<LineAccount[]>([])
+  // 作成の再送で二重登録にしないための、この登録試行1回分の安定した操作
+  // UUID（Issue #686）。押し直しても同じ値のままにするため onSave では
+  // 作らず、ここと onReset だけで作り直す。
+  const [operationId, setOperationId] = useState(() => crypto.randomUUID())
 
   useEffect(() => {
     let cancelled = false
-    void Promise.allSettled([api.tags.list(), api.scenarios.list(), api.lineAccounts.list()]).then(
-      ([t, s, a]) => {
+    void Promise.allSettled([api.tags.list(), api.scenarios.list()]).then(
+      ([t, s]) => {
         if (cancelled) return
         if (t.status === 'fulfilled' && t.value.success) setTags(t.value.data)
         if (s.status === 'fulfilled' && s.value.success) {
           setScenarios(s.value.data as unknown as Scenario[])
-        }
-        if (a.status === 'fulfilled' && a.value.success) {
-          const list = a.value.data as unknown as LineAccount[]
-          setAccounts(list)
-          // 選べるアカウントが1つだけなら最初から選んでおく。
-          // 空のまま押すと口が 400 で落とす（#505 重大1）。
-          if (list.length === 1) setLineAccountId(list[0].id)
         }
       },
     )
@@ -96,9 +93,7 @@ export default function NewAffiliateOfferPage() {
       designNode="GPWzq"
       validate={() => {
         if (!name.trim()) return '案件名を入力してください'
-        // 「すべてのアカウント」のまま送ると口が 400 で落とす。
-        // 選べる先が複数あるときは、押す前に選ばせる（#505 重大1）。
-        if (!lineAccountId && accounts.length > 1) return 'LINEアカウントを選んでください'
+        if (!selectedAccountId) return 'LINEアカウントを選んでください（画面上部で選べます）'
         if (!rewardAmount && !rewardMiles) return '報酬（円かマイル）のどちらかを入れてください'
         const amountError = rewardIntegerError(rewardAmount, 'amount')
         if (amountError) return amountError
@@ -111,14 +106,17 @@ export default function NewAffiliateOfferPage() {
         setDescription('')
         setRewardAmount('')
         setRewardMiles('')
-        setLineAccountId('')
         setTagId('')
         setScenarioId('')
         setPublishNow(true)
         setCreatedId(null)
         setPartialSave(false)
+        setOperationId(crypto.randomUUID())
       }}
       onSave={async () => {
+        if (!selectedAccountId) {
+          throw new Error('LINEアカウントを選んでください（画面上部で選べます）')
+        }
         let offerId = createdId
         if (!offerId) {
           const res = await api.affiliateOffers.create({
@@ -126,19 +124,30 @@ export default function NewAffiliateOfferPage() {
             description: description.trim() || null,
             rewardAmount: rewardAmount ? Number(rewardAmount) : undefined,
             rewardMiles: rewardMiles ? Number(rewardMiles) : undefined,
-            lineAccountId: lineAccountId || null,
+            lineAccountId: selectedAccountId,
             tagId: tagId || null,
             scenarioId: scenarioId || null,
+            operationId,
           })
           if (!res.success) throw new Error('案件を作成できませんでした。LINEアカウントを選び直してください')
           offerId = res.data.id
           setCreatedId(offerId)
         }
         // 作成は必ず公開中で入る（DB の INSERT が is_active=1 固定）。
-        // 下書きにしたいときだけ、続けて閉じる。
+        // 下書きにしたいときだけ、続けて閉じる。名前・報酬・タグ・シナリオも
+        // 更新APIが受けるので、途中保存後にここを直して再開した分も
+        // まとめて送る（isActiveだけだと画面上の変更を失う、Issue #686）。
         if (!publishNow) {
           try {
-            const update = await api.affiliateOffers.update(offerId, { isActive: false })
+            const update = await api.affiliateOffers.update(offerId, {
+              name: name.trim(),
+              description: description.trim() || null,
+              rewardAmount: rewardAmount ? Number(rewardAmount) : undefined,
+              rewardMiles: rewardMiles ? Number(rewardMiles) : undefined,
+              tagId: tagId || null,
+              scenarioId: scenarioId || null,
+              isActive: false,
+            })
             if (!update.success) throw new Error('update_failed')
           } catch {
             setPartialSave(true)
@@ -294,17 +303,14 @@ export default function NewAffiliateOfferPage() {
           </p>
         </Field>
 
-        <Field label="誘導するLINEアカウント" htmlFor="of-account" note="紹介リンクを開いた方を、このアカウントへ案内します。">
-          <SelectField
-            id="of-account"
-            value={lineAccountId}
-            onChange={(e) => setLineAccountId(e.target.value)}
-            options={accounts.length > 1
-              // 複数あるときの空欄は「全部」ではなく「未選択」。
-              // そのまま送ると口が 400 で落とすので、選ばせる文言にする。
-              ? [{ value: '', label: '選んでください' }, ...accounts.map((a) => ({ value: a.id, label: a.name }))]
-              : [...accounts.map((a) => ({ value: a.id, label: a.name }))]}
-          />
+        <Field
+          label="誘導するLINEアカウント"
+          htmlFor="of-account"
+          note="紹介リンクを開いた方を、このアカウントへ案内します。画面上部で選んでいるLINEアカウントに固定されます（他のアカウントに作りたいときは、先に上部で切り替えてください）。"
+        >
+          <p id="of-account" className="bg-canvas-sunken text-ink rounded-control px-3 py-2 text-sm">
+            {selectedAccount ? selectedAccount.name : '未選択（画面上部で選んでください）'}
+          </p>
         </Field>
       </FormSection>
 

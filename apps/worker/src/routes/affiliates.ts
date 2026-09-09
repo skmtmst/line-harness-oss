@@ -392,6 +392,7 @@ affiliates.post('/api/affiliates', requireRole('owner', 'admin'), async (c) => {
       friendId?: string;
       issueInitialLink?: boolean;
       lineAccountId?: string;
+      operationId?: string;
     }>();
 
     const name = typeof body.name === 'string' ? body.name.trim() : '';
@@ -400,6 +401,12 @@ affiliates.post('/api/affiliates', requireRole('owner', 'admin'), async (c) => {
     const requestedLineAccountId = typeof body.lineAccountId === 'string'
       ? body.lineAccountId.trim()
       : '';
+    // 安定した操作UUID（#686）。commit後に応答だけ失われて再送されても、
+    // packages/db 側が同じIDで既存行を回収するため二重登録にならない。
+    const operationId = typeof body.operationId === 'string' ? body.operationId.trim() : '';
+    if (operationId && (operationId.length < 8 || operationId.length > 200)) {
+      return c.json({ success: false, error: 'もう一度、最初からやり直してください' }, 400);
+    }
     const { visible, scope } = await getAffiliateScope(c);
 
     // Require at least one of name / code / friendId to identify the affiliate.
@@ -463,6 +470,7 @@ affiliates.post('/api/affiliates', requireRole('owner', 'admin'), async (c) => {
           name: resolvedName,
           code,
           commissionRate: body.commissionRate,
+          operationId: operationId || undefined,
         });
         return c.json({ success: true, data: serializeAffiliate(item) }, 201);
       } catch (err) {
@@ -490,6 +498,7 @@ affiliates.post('/api/affiliates', requireRole('owner', 'admin'), async (c) => {
         name: resolvedName,
         commissionRate: body.commissionRate,
         friendId: friendId || null,
+        operationId: operationId || undefined,
       });
     } catch (err) {
       // The friend_id partial UNIQUE index throws when the friend already has an
@@ -513,8 +522,21 @@ affiliates.post('/api/affiliates', requireRole('owner', 'admin'), async (c) => {
         ? body.issueInitialLink
         : Boolean(friendId);
 
+    // A response-loss retry recovers the same `item` via operationId above, but
+    // would otherwise issue a SECOND initial link for it every retry. Reuse the
+    // earliest offer-less link already on the affiliate instead of minting a new
+    // one (#686).
+    const priorLinks = operationId
+      ? (await listAffiliateLinks(c.env.DB, item.id, { lineAccountId }))
+        .filter((l) => l.offer_id == null)
+        .sort((a, b) => a.created_at.localeCompare(b.created_at))
+      : [];
+
     let link: { refCode: string; url: string } | undefined;
-    if (shouldIssueLink) {
+    if (priorLinks.length > 0) {
+      const baseUrl = await resolveLinkBaseUrl(c.env.DB, c.env);
+      link = { refCode: priorLinks[0].ref_code, url: `${baseUrl}/${priorLinks[0].ref_code}` };
+    } else if (shouldIssueLink) {
       const created = await createAffiliateLink(c.env.DB, {
         affiliateId: item.id,
         lineAccountId,

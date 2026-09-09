@@ -260,7 +260,7 @@ CREATE TABLE affiliate_offers (
   scenario_id     TEXT REFERENCES scenarios (id),
   is_active       INTEGER NOT NULL DEFAULT 1,
   created_at      TEXT NOT NULL
-);
+, operation_id TEXT);
 
 CREATE TABLE affiliate_payout_batch_lines (
   id TEXT PRIMARY KEY,
@@ -403,7 +403,7 @@ CREATE TABLE affiliates (
   friend_id       TEXT REFERENCES friends (id),
   created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 , email TEXT, hold_days INTEGER, payout_cycle TEXT, notify_on_conversion INTEGER NOT NULL DEFAULT 0, tenant_id TEXT REFERENCES tenants(id), line_account_id TEXT REFERENCES line_accounts(id), lifecycle_status TEXT NOT NULL DEFAULT 'active'
-  CHECK (lifecycle_status IN ('active', 'paused', 'archived')), archived_at TEXT);
+  CHECK (lifecycle_status IN ('active', 'paused', 'archived')), archived_at TEXT, operation_id TEXT);
 
 CREATE TABLE analytics_cross_run_members (
   run_id           TEXT NOT NULL REFERENCES analytics_cross_runs(id) ON DELETE CASCADE,
@@ -5145,6 +5145,10 @@ CREATE INDEX idx_affiliate_links_affiliate ON affiliate_links (affiliate_id);
 
 CREATE INDEX idx_affiliate_links_offer ON affiliate_links (offer_id);
 
+CREATE UNIQUE INDEX idx_affiliate_offers_operation_id
+  ON affiliate_offers(line_account_id, operation_id)
+  WHERE operation_id IS NOT NULL;
+
 CREATE UNIQUE INDEX idx_affiliate_payout_batches_idempotency
   ON affiliate_payout_batches(organization_id, line_account_id, idempotency_key)
   WHERE idempotency_key IS NOT NULL;
@@ -5169,6 +5173,10 @@ CREATE UNIQUE INDEX idx_affiliate_statements_idempotency
   WHERE idempotency_key IS NOT NULL;
 
 CREATE UNIQUE INDEX idx_affiliates_friend ON affiliates (friend_id) WHERE friend_id IS NOT NULL;
+
+CREATE UNIQUE INDEX idx_affiliates_operation_id
+  ON affiliates(tenant_id, line_account_id, operation_id)
+  WHERE operation_id IS NOT NULL;
 
 CREATE INDEX idx_affiliates_tenant_account_created
   ON affiliates(tenant_id, line_account_id, created_at DESC);

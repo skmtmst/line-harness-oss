@@ -38,38 +38,80 @@ export interface CreateAffiliateOfferInput {
   lineAccountId?: string | null;
   tagId?: string | null;
   scenarioId?: string | null;
+  /**
+   * Stable per-attempt UUID from the client (#686). When the create commits
+   * but the response is lost, the client retries with the SAME operationId;
+   * this lets the retry recover the original row instead of creating a
+   * duplicate offer.
+   */
+  operationId?: string | null;
+}
+
+/** Look up a prior create by its client-supplied operation UUID (idempotent replay, #686). */
+async function findAffiliateOfferByOperationId(
+  db: D1Database,
+  lineAccountId: string | null,
+  operationId: string,
+): Promise<AffiliateOffer | null> {
+  return db
+    .prepare(
+      `SELECT * FROM affiliate_offers WHERE line_account_id IS ? AND operation_id = ?`,
+    )
+    .bind(lineAccountId, operationId)
+    .first<AffiliateOffer>();
+}
+
+function isOperationIdConflict(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return /UNIQUE constraint failed/i.test(msg) && /affiliate_offers\.operation_id/i.test(msg);
 }
 
 export async function createAffiliateOffer(
   db: D1Database,
   input: CreateAffiliateOfferInput,
 ): Promise<AffiliateOffer> {
+  const lineAccountId = input.lineAccountId ?? null;
+  if (input.operationId) {
+    const existing = await findAffiliateOfferByOperationId(db, lineAccountId, input.operationId);
+    if (existing) return existing;
+  }
+
   const id = crypto.randomUUID();
   const now = jstNow();
   if (!input.mileageProgramId || input.mileageProgramId === 'default') {
     await ensureDefaultMileageProgram(db);
   }
 
-  await db
-    .prepare(
-      `INSERT INTO affiliate_offers
-         (id, name, description, reward_amount, reward_miles, mileage_program_id,
-          line_account_id, tag_id, scenario_id, is_active, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)`,
-    )
-    .bind(
-      id,
-      input.name,
-      input.description ?? null,
-      input.rewardAmount ?? 0,
-      input.rewardMiles ?? 0,
-      input.mileageProgramId ?? 'default',
-      input.lineAccountId ?? null,
-      input.tagId ?? null,
-      input.scenarioId ?? null,
-      now,
-    )
-    .run();
+  try {
+    await db
+      .prepare(
+        `INSERT INTO affiliate_offers
+           (id, name, description, reward_amount, reward_miles, mileage_program_id,
+            line_account_id, tag_id, scenario_id, is_active, created_at, operation_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
+      )
+      .bind(
+        id,
+        input.name,
+        input.description ?? null,
+        input.rewardAmount ?? 0,
+        input.rewardMiles ?? 0,
+        input.mileageProgramId ?? 'default',
+        lineAccountId,
+        input.tagId ?? null,
+        input.scenarioId ?? null,
+        now,
+        input.operationId ?? null,
+      )
+      .run();
+  } catch (err) {
+    // A concurrent retry of the same operationId won the race; recover its row.
+    if (input.operationId && isOperationIdConflict(err)) {
+      const winner = await findAffiliateOfferByOperationId(db, lineAccountId, input.operationId);
+      if (winner) return winner;
+    }
+    throw err;
+  }
 
   return (await getAffiliateOfferById(db, id))!;
 }

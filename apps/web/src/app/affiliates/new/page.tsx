@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import type { Friend } from '@line-crm/shared'
 import { api } from '@/lib/api'
+import { useAccount } from '@/contexts/account-context'
 import CreatePage, {
   AsideCard,
   ChoiceCard,
@@ -28,12 +29,16 @@ const W_HOLD = 'w-[220px] max-w-full tabular-nums'
 const FRIEND_PAGE_SIZE = 20
 const AFFILIATE_LIST_PATH = '/conversions?tab=affiliates'
 
-function friendSearchParams(search: string, page: number) {
+function friendSearchParams(search: string, page: number, accountId: string) {
   return {
     limit: FRIEND_PAGE_SIZE,
     offset: String((Math.max(1, page) - 1) * FRIEND_PAGE_SIZE),
     search: search.trim() || undefined,
     includeTags: false,
+    // 画面上部で選んでいるLINEアカウントへ検索を固定する。指定しないと
+    // 他アカウントの友だちが混ざり、そのまま結びつけると登録先が
+    // 選択中アカウントと食い違う（Issue #686 cross-account）。
+    accountId,
   }
 }
 
@@ -83,6 +88,7 @@ const PAYOUT_KINDS: Array<{ value: PayoutKind; label: string; note: string }> = 
 ]
 
 export default function NewAffiliatePage() {
+  const { selectedAccountId, selectedAccount } = useAccount()
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [code, setCode] = useState('')
@@ -107,12 +113,23 @@ export default function NewAffiliatePage() {
   // 追加情報の保存だけをやり直す。
   const [createdId, setCreatedId] = useState<string | null>(null)
   const [partialSave, setPartialSave] = useState(false)
+  // 作成の再送で二重登録にしないための、この登録試行1回分の安定した操作
+  // UUID（Issue #686）。押し直しても同じ値のままにするため onSave では
+  // 作らず、ここと onReset だけで作り直す。
+  const [operationId, setOperationId] = useState(() => crypto.randomUUID())
 
   useEffect(() => {
+    if (!selectedAccountId) {
+      setFriends([])
+      setFriendTotal(0)
+      setFriendLoading(false)
+      setFriendError('')
+      return
+    }
     let cancelled = false
     setFriendLoading(true)
     setFriendError('')
-    void api.friends.list(friendSearchParams(friendSearch, friendPage)).then((result) => {
+    void api.friends.list(friendSearchParams(friendSearch, friendPage, selectedAccountId)).then((result) => {
       if (cancelled) return
       if (!result.success) throw new Error('friends_failed')
       setFriends(result.data.items as unknown as Friend[])
@@ -128,7 +145,7 @@ export default function NewAffiliatePage() {
     return () => {
       cancelled = true
     }
-  }, [friendPage, friendReload, friendSearch])
+  }, [friendPage, friendReload, friendSearch, selectedAccountId])
 
   const workerBase = process.env.NEXT_PUBLIC_API_URL ?? ''
   const previewUrl = code.trim() ? `${workerBase}/r/${code.trim()}` : null
@@ -148,6 +165,7 @@ export default function NewAffiliatePage() {
       variant="v6"
       designNode="xqT1Z"
       validate={() => {
+        if (!selectedAccountId) return 'LINEアカウントを選んでください（画面上部で選べます）'
         if (!name.trim()) return '名前・屋号を入力してください'
         // worker の CODE_RE は英数字4文字以上。ハイフンは弾かれる。
         if (code.trim() && !/^[A-Za-z0-9]{4,}$/.test(code.trim())) {
@@ -178,8 +196,12 @@ export default function NewAffiliatePage() {
         setCopied(false)
         setCreatedId(null)
         setPartialSave(false)
+        setOperationId(crypto.randomUUID())
       }}
       onSave={async () => {
+        if (!selectedAccountId) {
+          throw new Error('LINEアカウントを選んでください（画面上部で選べます）')
+        }
         let affiliateId = createdId
         if (!affiliateId) {
           try {
@@ -190,6 +212,8 @@ export default function NewAffiliatePage() {
                 payoutKind === 'rate' && commissionRate.trim() ? Number(commissionRate) : undefined,
               friendId: friendId || undefined,
               issueInitialLink: true,
+              lineAccountId: selectedAccountId,
+              operationId,
             })
             if (!res.success) throw new Error('create_failed')
             affiliateId = res.data.id
@@ -200,8 +224,14 @@ export default function NewAffiliatePage() {
         }
         // 連絡先・保留期間・支払いサイクル・通知・計測の開始は作成のAPIが
         // 受けないので、続けて更新する。1つの操作として見えるようにまとめる。
+        // 名前・報酬率も更新APIが受けるので、途中保存後にここを直して
+        // 再開した分もまとめて送る（一部項目だけだと画面上の変更を失う、
+        // Issue #686）。
         try {
           const update = await api.affiliates.update(affiliateId, {
+            name: name.trim(),
+            commissionRate:
+              payoutKind === 'rate' && commissionRate.trim() ? Number(commissionRate) : undefined,
             email: email.trim() || null,
             holdDays: holdDays.trim() ? Number(holdDays) : null,
             payoutCycle: payoutCycle.trim() || null,
@@ -304,76 +334,90 @@ export default function NewAffiliatePage() {
         </Field>
         </div>
 
-        <Field label="LINEの友だちと結びつける（任意）" htmlFor="af-friend" note="名前で絞り込み、20件ずつ確認できます。結びつけると、成果が出たときに本人へ知らせられます。">
-          <form
-            className="mb-2 flex max-w-lg flex-wrap gap-2"
-            onSubmit={(event) => {
-              event.preventDefault()
-              setFriendPage(1)
-              setFriendSearch(friendSearchInput.trim())
-              setFriendReload((value) => value + 1)
-            }}
-          >
-            <TextInput
-              aria-label="友だちの名前で検索"
-              value={friendSearchInput}
-              onChange={(event) => setFriendSearchInput(event.target.value)}
-              placeholder="友だちの名前で探す"
-              className="min-w-56 flex-1"
-            />
-            <button
-              type="submit"
-              className="text-accent hover:bg-accent-soft rounded-control px-4 py-2 text-sm font-semibold"
-            >
-              検索
-            </button>
-          </form>
-          <SelectField
-            id="af-friend"
-            aria-label="LINEの友だちと結びつける"
-            value={friendId}
-            onChange={(event) => {
-              const nextId = event.target.value
-              setFriendId(nextId)
-              setSelectedFriend(friendOptions.find((friend) => friend.id === nextId) ?? null)
-            }}
-            className="w-full max-w-lg"
-            options={[
-              { value: '', label: friendLoading ? '読み込んでいます' : '結びつけない' },
-              ...friendOptions.map((friend) => ({ value: friend.id, label: friend.displayName })),
-            ]}
-          />
-          {friendError ? (
-            <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
-              <p className="text-danger">{friendError}</p>
-              <button
-                type="button"
-                onClick={() => setFriendReload((value) => value + 1)}
-                className="text-accent hover:bg-accent-soft rounded-control px-3 py-1 font-semibold"
-              >
-                もう一度読み込む
-              </button>
-            </div>
+        <Field
+          label="LINEの友だちと結びつける（任意）"
+          htmlFor="af-friend"
+          note={
+            selectedAccount
+              ? `「${selectedAccount.name}」の友だちだけを、名前で絞り込み20件ずつ確認できます。結びつけると、成果が出たときに本人へ知らせられます。`
+              : '名前で絞り込み、20件ずつ確認できます。結びつけると、成果が出たときに本人へ知らせられます。'
+          }
+        >
+          {!selectedAccountId ? (
+            <p className="text-ink-faint text-sm">画面上部でLINEアカウントを選ぶと、友だちを検索できます。</p>
           ) : (
-            <div className="mt-2 flex max-w-lg flex-wrap items-center justify-between gap-2">
-              <p className="text-ink-faint text-xs tabular-nums">
-                {friendLoading ? '友だちを読み込んでいます' : `全${friendTotal.toLocaleString('ja-JP')}件`}
-              </p>
-              {friendPageCount > 1 ? (
-                <SelectField
-                  id="af-friend-page"
-                  aria-label="友だち候補のページ"
-                  value={String(friendPage)}
-                  onChange={(event) => setFriendPage(Number(event.target.value))}
-                  disabled={friendLoading}
-                  className="w-40"
-                  options={Array.from({ length: friendPageCount }, (_, index) => ({
-                    value: String(index + 1),
-                    label: `${index + 1} / ${friendPageCount}ページ`,
-                  }))}
+            <>
+              <form
+                className="mb-2 flex max-w-lg flex-wrap gap-2"
+                onSubmit={(event) => {
+                  event.preventDefault()
+                  setFriendPage(1)
+                  setFriendSearch(friendSearchInput.trim())
+                  setFriendReload((value) => value + 1)
+                }}
+              >
+                <TextInput
+                  aria-label="友だちの名前で検索"
+                  value={friendSearchInput}
+                  onChange={(event) => setFriendSearchInput(event.target.value)}
+                  placeholder="友だちの名前で探す"
+                  className="min-w-56 flex-1"
                 />
-              ) : null}
-            </div>
+                <button
+                  type="submit"
+                  className="text-accent hover:bg-accent-soft rounded-control px-4 py-2 text-sm font-semibold"
+                >
+                  検索
+                </button>
+              </form>
+              <SelectField
+                id="af-friend"
+                aria-label="LINEの友だちと結びつける"
+                value={friendId}
+                onChange={(event) => {
+                  const nextId = event.target.value
+                  setFriendId(nextId)
+                  setSelectedFriend(friendOptions.find((friend) => friend.id === nextId) ?? null)
+                }}
+                className="w-full max-w-lg"
+                options={[
+                  { value: '', label: friendLoading ? '読み込んでいます' : '結びつけない' },
+                  ...friendOptions.map((friend) => ({ value: friend.id, label: friend.displayName })),
+                ]}
+              />
+              {friendError ? (
+                <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
+                  <p className="text-danger">{friendError}</p>
+                  <button
+                    type="button"
+                    onClick={() => setFriendReload((value) => value + 1)}
+                    className="text-accent hover:bg-accent-soft rounded-control px-3 py-1 font-semibold"
+                  >
+                    もう一度読み込む
+                  </button>
+                </div>
+              ) : (
+                <div className="mt-2 flex max-w-lg flex-wrap items-center justify-between gap-2">
+                  <p className="text-ink-faint text-xs tabular-nums">
+                    {friendLoading ? '友だちを読み込んでいます' : `全${friendTotal.toLocaleString('ja-JP')}件`}
+                  </p>
+                  {friendPageCount > 1 ? (
+                    <SelectField
+                      id="af-friend-page"
+                      aria-label="友だち候補のページ"
+                      value={String(friendPage)}
+                      onChange={(event) => setFriendPage(Number(event.target.value))}
+                      disabled={friendLoading}
+                      className="w-40"
+                      options={Array.from({ length: friendPageCount }, (_, index) => ({
+                        value: String(index + 1),
+                        label: `${index + 1} / ${friendPageCount}ページ`,
+                      }))}
+                    />
+                  ) : null}
+                </div>
+              )}
+            </>
           )}
         </Field>
       </FormSection>
