@@ -388,6 +388,28 @@ async function findClaimedEvent(
     .first<ConversionEvent>();
 }
 
+/**
+ * 一括操作など、claimを通さずに直接書かれた成果を拾う。
+ *
+ * `conversion_event_dedup_claims` は claim を通った計上しか知らない。
+ * `friend-bulk-runs` の `add_conversion` は成果表へ直接INSERTするため、
+ * claimだけを見ていると「1人1回」の不変条件が破れる。数え方の権威は
+ * 成果表そのものに置き、claimはその上の直列化装置として扱う。
+ */
+async function findBlockingEvent(
+  db: D1Database,
+  conversionPointId: string,
+  friendId: string,
+  cutoff: string | null,
+): Promise<ConversionEvent | null> {
+  return db.prepare(`SELECT * FROM conversion_events
+    WHERE conversion_point_id = ? AND friend_id = ?
+      AND (? IS NULL OR created_at >= ?)
+    ORDER BY created_at ASC, id ASC LIMIT 1`)
+    .bind(conversionPointId, friendId, cutoff, cutoff)
+    .first<ConversionEvent>();
+}
+
 export async function trackConversion(
   db: D1Database,
   input: TrackConversionInput,
@@ -463,9 +485,19 @@ export async function trackConversion(
       const cutoff = policy.kind === 'window'
         ? toJstString(new Date(nowMs - policy.windowDays * JST_DAY_MS))
         : null;
+      // claimを取る条件そのものに「数えてはいけない成果が無いこと」を入れる。
+      // 一括操作の直接INSERTで入った成果もここで見えるため、claimを通らない
+      // 経路があっても二重計上にならない。窓方式は期間内の成果だけを見る。
+      // 併せて、claimが指す成果が消えている場合（一括削除の後に残る孤児）は
+      // 不在として扱い、同じ1文でclaimを奪い直す。
       const claim = db.prepare(`INSERT INTO conversion_event_dedup_claims
           (conversion_point_id, friend_id, mode, window_days, last_event_id, last_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        SELECT ?, ?, ?, ?, ?, ?, ?
+         WHERE NOT EXISTS (
+           SELECT 1 FROM conversion_events
+            WHERE conversion_point_id = ? AND friend_id = ?
+              AND (? IS NULL OR created_at >= ?)
+         )
         ON CONFLICT(conversion_point_id, friend_id) DO UPDATE SET
           mode = excluded.mode,
           window_days = excluded.window_days,
@@ -474,7 +506,11 @@ export async function trackConversion(
           updated_at = excluded.updated_at
         WHERE conversion_event_dedup_claims.mode != excluded.mode
            OR conversion_event_dedup_claims.window_days IS NOT excluded.window_days
-           OR (excluded.mode = 'window' AND conversion_event_dedup_claims.last_at < ?)`)
+           OR (excluded.mode = 'window' AND conversion_event_dedup_claims.last_at < ?)
+           OR NOT EXISTS (
+                SELECT 1 FROM conversion_events
+                 WHERE id = conversion_event_dedup_claims.last_event_id
+              )`)
         .bind(
           input.conversionPointId,
           input.friendId,
@@ -483,6 +519,10 @@ export async function trackConversion(
           id,
           now,
           now,
+          input.conversionPointId,
+          input.friendId,
+          cutoff,
+          cutoff,
           cutoff,
         );
       const insertIfClaimed = db.prepare(`INSERT INTO conversion_events
@@ -493,8 +533,22 @@ export async function trackConversion(
          WHERE EXISTS (
            SELECT 1 FROM conversion_event_dedup_claims
             WHERE conversion_point_id = ? AND friend_id = ? AND last_event_id = ?
-         )`)
-        .bind(...eventValues, input.conversionPointId, input.friendId, id);
+         )
+           AND NOT EXISTS (
+             SELECT 1 FROM conversion_events
+              WHERE conversion_point_id = ? AND friend_id = ?
+                AND (? IS NULL OR created_at >= ?)
+           )`)
+        .bind(
+          ...eventValues,
+          input.conversionPointId,
+          input.friendId,
+          id,
+          input.conversionPointId,
+          input.friendId,
+          cutoff,
+          cutoff,
+        );
       const results = await db.batch([claim, insertIfClaimed]);
       if ((results[1]?.meta.changes ?? 0) === 0) {
         if (input.idempotencyKey) {
@@ -510,6 +564,10 @@ export async function trackConversion(
         }
         const claimed = await findClaimedEvent(db, input.conversionPointId, input.friendId);
         if (claimed) return claimed;
+        // claimを通らずに直接書かれた成果は claim からは辿れない。
+        // 数え方の権威である成果表を直接見て、既存の1件を返す。
+        const blocking = await findBlockingEvent(db, input.conversionPointId, input.friendId, cutoff);
+        if (blocking) return blocking;
         throw new Error('conversion_dedup_claim_missing');
       }
     }
@@ -526,6 +584,18 @@ export async function trackConversion(
       }
       const claimed = await findClaimedEvent(db, input.conversionPointId, input.friendId);
       if (claimed) return claimed;
+      // every地点は何度でも数えるので、既存の成果で置き換えてはいけない。
+      if (policy.kind !== 'every') {
+        const blocking = await findBlockingEvent(
+          db,
+          input.conversionPointId,
+          input.friendId,
+          policy.kind === 'window'
+            ? toJstString(new Date(nowMs - policy.windowDays * JST_DAY_MS))
+            : null,
+        );
+        if (blocking) return blocking;
+      }
     }
     throw error;
   }
