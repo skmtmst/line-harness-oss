@@ -411,6 +411,59 @@ async function healBulkDecisionReceipt(
 }
 
 /*
+ * 一括の1対象ぶんの通知。ここで投げた例外は呼び出し側が対象単位で受け止め、
+ * 残りの対象の通知は続ける。
+ */
+async function notifyOneBulkDecision(
+  c: Context<Env>,
+  input: {
+    lineAccountId: string;
+    item: BulkPhotoDecisionItem;
+    decision: BulkPhotoDecision | undefined;
+  },
+): Promise<BulkNotifiedItem> {
+  const { item, decision } = input;
+  const recipient = await loadPhotoReviewRecipient(c.env.DB, {
+    photoId: item.photoId, lineAccountId: input.lineAccountId,
+  }).catch(() => null);
+  if (!recipient) {
+    const notificationError = '通知先が見つかりません';
+    // 送達台帳へ失敗として残す。ここで残せなくても再送口は pending を拾える。
+    try {
+      const claimed = await claimPhotoNotificationDelivery(c.env.DB, {
+        decisionId: item.decisionId, lineAccountId: input.lineAccountId,
+        leaseId: crypto.randomUUID(),
+        leaseExpiresAt: new Date(Date.now() + 5 * 60_000).toISOString(),
+      });
+      if (claimed) {
+        await completePhotoNotificationDelivery(c.env.DB, {
+          decisionId: item.decisionId, lineAccountId: input.lineAccountId,
+          generation: claimed.generation, status: 'failed', error: notificationError,
+        });
+      }
+    } catch (error) {
+      console.error('bulk photo decision recipient failure record failed', item.decisionId, error);
+    }
+    return { ...item, notificationStatus: 'failed', notificationError };
+  }
+  const delivery = await deliverPhotoReviewNotification(c.env.DB, c, recipient, {
+    lineAccountId: input.lineAccountId,
+    photoId: item.photoId,
+    status: decision?.decision === 'approve' ? 'adopted' : 'rejected',
+    reasonCode: decision?.decision === 'approve'
+      ? null
+      : (decision?.reasonCode ?? null) as PhotoReviewReasonCode | null,
+    reasonNote: decision?.reasonNote ?? null,
+    decisionId: item.decisionId,
+  });
+  return {
+    ...item,
+    notificationStatus: delivery.notificationStatus,
+    ...(delivery.notificationError ? { notificationError: delivery.notificationError } : {}),
+  };
+}
+
+/*
  * 一括審査の各対象へ、単票と同じ送達状態機械でLINE通知を送る。
  * 一部が失敗しても残りを続け、失敗分は既存の通知再送口で再試行できる。
  * 通知フェーズの成否は審査自体の確定（201）を覆さない。
@@ -430,49 +483,23 @@ async function notifyBulkPhotoDecisions(
   const notified: BulkNotifiedItem[] = [];
   const notificationFailures: Array<{ photoId: string; error: string }> = [];
   for (const item of items) {
-    const decision = byPhoto.get(item.photoId);
-    const recipient = await loadPhotoReviewRecipient(c.env.DB, {
-      photoId: item.photoId, lineAccountId: input.lineAccountId,
-    }).catch(() => null);
-    if (!recipient) {
-      const notificationError = '通知先が見つかりません';
-      // 送達台帳へ失敗として残す。pendingのままでは再送口の拾い上げ対象外になる。
-      try {
-        const claimed = await claimPhotoNotificationDelivery(c.env.DB, {
-          decisionId: item.decisionId, lineAccountId: input.lineAccountId,
-          leaseId: crypto.randomUUID(),
-          leaseExpiresAt: new Date(Date.now() + 5 * 60_000).toISOString(),
-        });
-        if (claimed) {
-          await completePhotoNotificationDelivery(c.env.DB, {
-            decisionId: item.decisionId, lineAccountId: input.lineAccountId,
-            generation: claimed.generation, status: 'failed', error: notificationError,
-          });
-        }
-      } catch (error) {
-        console.error('bulk photo decision recipient failure record failed', item.decisionId, error);
-      }
-      notified.push({ ...item, notificationStatus: 'failed', notificationError });
-      notificationFailures.push({ photoId: item.photoId, error: notificationError });
-      continue;
+    let outcome: BulkNotifiedItem;
+    try {
+      outcome = await notifyOneBulkDecision(c, {
+        lineAccountId: input.lineAccountId, item, decision: byPhoto.get(item.photoId),
+      });
+    } catch (error) {
+      // 対象1件の想定外の失敗で、後続対象の通知まで止めない（対象単位の分離）。
+      // 送達台帳は pending か sending のまま残るが、どちらも再送口の拾い上げ対象。
+      console.error('bulk photo decision notify failed', item.decisionId, error);
+      outcome = {
+        ...item, notificationStatus: 'failed',
+        notificationError: '通知を実行できませんでした。再送してください。',
+      };
     }
-    const delivery = await deliverPhotoReviewNotification(c.env.DB, c, recipient, {
-      lineAccountId: input.lineAccountId,
-      photoId: item.photoId,
-      status: decision?.decision === 'approve' ? 'adopted' : 'rejected',
-      reasonCode: decision?.decision === 'approve'
-        ? null
-        : (decision?.reasonCode ?? null) as PhotoReviewReasonCode | null,
-      reasonNote: decision?.reasonNote ?? null,
-      decisionId: item.decisionId,
-    });
-    notified.push({
-      ...item,
-      notificationStatus: delivery.notificationStatus,
-      ...(delivery.notificationError ? { notificationError: delivery.notificationError } : {}),
-    });
-    if (delivery.notificationStatus === 'failed' && delivery.notificationError) {
-      notificationFailures.push({ photoId: item.photoId, error: delivery.notificationError });
+    notified.push(outcome);
+    if (outcome.notificationStatus === 'failed' && outcome.notificationError) {
+      notificationFailures.push({ photoId: item.photoId, error: outcome.notificationError });
     }
   }
   const updatedCount = typeof (input.result as { updatedCount?: unknown }).updatedCount === 'number'

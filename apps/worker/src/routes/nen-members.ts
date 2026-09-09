@@ -1157,6 +1157,9 @@ nenMembers.post('/api/nen-members/photos/:id/notification/retry', requireRole('o
     return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
   }
   const now = new Date().toISOString();
+  // 拾い上げる状態は claimPhotoNotificationDelivery の送信権条件と揃える。
+  // pending（一括の通知準備で落ちた対象など、まだ一度も送れていないもの）を
+  // 外すと、画面に失敗と出ているのに再送だけ 409 で断る食い違いが起きる。
   const row = await c.env.DB.prepare(
     `SELECT ps.id, ps.friend_id, f.line_user_id, f.line_account_id, f.is_following,
             a.channel_access_token, a.channel_access_token_encrypted,
@@ -1166,7 +1169,7 @@ nenMembers.post('/api/nen-members/photos/:id/notification/retry', requireRole('o
        JOIN line_accounts a ON a.id = f.line_account_id
        JOIN nen_photo_review_events e ON e.photo_id = ps.id
       WHERE ps.id = ? AND ps.line_account_id = ? AND f.line_account_id = ?
-        AND (e.notification_status = 'failed'
+        AND (e.notification_status IN ('pending', 'failed')
           OR (e.notification_status = 'sending'
             AND (e.notification_lease_expires_at IS NULL OR e.notification_lease_expires_at <= ?)))
       ORDER BY e.created_at DESC LIMIT 1`,
