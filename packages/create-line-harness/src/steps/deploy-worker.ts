@@ -8,6 +8,7 @@ import {
 } from "node:fs";
 import { dirname, join } from "node:path";
 import { execa } from "execa";
+import { WORKER_COMPATIBILITY_FLAGS } from "@line-harness/update-engine";
 import { wrangler, WranglerError } from "../lib/wrangler.js";
 import {
   renderInstalledWranglerToml,
@@ -166,6 +167,52 @@ async function deployWorkerBundle(
   throw new Error("Worker デプロイの再試行回数を超えました");
 }
 
+export interface DeployWranglerTomlArgs {
+  workerName: string;
+  accountId: string;
+  d1DatabaseName: string;
+  d1DatabaseId: string;
+  r2BucketName: string;
+  main: string;
+  noBundle: boolean;
+}
+
+/**
+ * Temporary deploy config for the initial setup passes. Exported so
+ * contract tests can pin the compatibility flags: this file is what
+ * actually gets deployed, so it must carry the strict-public boundary
+ * even if setup is interrupted before the final config lands.
+ */
+export function renderDeployWranglerToml(args: DeployWranglerTomlArgs): string {
+  return `name = "${args.workerName}"
+main = "${args.main}"
+${args.noBundle ? 'no_bundle = true\n' : ""}compatibility_date = "2024-12-01"
+compatibility_flags = [${WORKER_COMPATIBILITY_FLAGS.map((flag) => `"${flag}"`).join(", ")}]
+workers_dev = true
+account_id = "${args.accountId}"
+
+# Static assets (LIFF pages) served by Workers Assets.
+# Worker runs first so bot UAs get OGP HTML injection; normal UAs are
+# served the SPA via env.ASSETS.fetch() in the Worker's notFound handler.
+[assets]
+directory = "dist/client"
+binding = "ASSETS"
+run_worker_first = true
+
+[[d1_databases]]
+binding = "DB"
+database_name = "${args.d1DatabaseName}"
+database_id = "${args.d1DatabaseId}"
+
+[[r2_buckets]]
+binding = "IMAGES"
+bucket_name = "${args.r2BucketName}"
+
+[triggers]
+crons = ["*/5 * * * *", "0 */6 * * *"]
+`;
+}
+
 export async function deployWorker(
   options: DeployWorkerOptions,
 ): Promise<DeployWorkerResult> {
@@ -180,34 +227,19 @@ export async function deployWorker(
   // Deploy config template. `main` differs between the build pass (the
   // @cloudflare/vite-plugin needs the source entry to produce dist/client)
   // and the bundle deploy pass (ships the official release artifact
-  // verbatim via no_bundle).
-  const renderDeployToml = (main: string, noBundle: boolean) => `name = "${options.workerName}"
-main = "${main}"
-${noBundle ? 'no_bundle = true\n' : ""}compatibility_date = "2024-12-01"
-compatibility_flags = ["nodejs_compat"]
-workers_dev = true
-account_id = "${options.accountId}"
-
-# Static assets (LIFF pages) served by Workers Assets.
-# Worker runs first so bot UAs get OGP HTML injection; normal UAs are
-# served the SPA via env.ASSETS.fetch() in the Worker's notFound handler.
-[assets]
-directory = "dist/client"
-binding = "ASSETS"
-run_worker_first = true
-
-[[d1_databases]]
-binding = "DB"
-database_name = "${options.d1DatabaseName}"
-database_id = "${options.d1DatabaseId}"
-
-[[r2_buckets]]
-binding = "IMAGES"
-bucket_name = "${options.r2BucketName}"
-
-[triggers]
-crons = ["*/5 * * * *", "0 */6 * * *"]
-`;
+  // verbatim via no_bundle). Shared renderer keeps compatibility flags
+  // in lockstep so an interrupted setup cannot leave a Worker behind
+  // without the strict-public boundary.
+  const renderDeployToml = (main: string, noBundle: boolean) =>
+    renderDeployWranglerToml({
+      workerName: options.workerName,
+      accountId: options.accountId,
+      d1DatabaseName: options.d1DatabaseName,
+      d1DatabaseId: options.d1DatabaseId,
+      r2BucketName: options.r2BucketName,
+      main,
+      noBundle,
+    });
 
   // Build pass config: vite needs the source entrypoint.
   writeFileSync(tomlPath, renderDeployToml("src/index.ts", false));
