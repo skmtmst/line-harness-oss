@@ -304,7 +304,9 @@
     "340_staff_two_factor_setup_attempts.sql",
     "341_ec_notification_settings_account_scope.sql",
     "343_messages_log_broadcast_recipient_index.sql",
-    "347_template_published_version.sql"
+    "347_template_published_version.sql",
+    "351_scenario_published_versions.sql",
+    "364_scenario_version_ownership.sql"
   ],
-  "migrationCount": 305
+  "migrationCount": 307
 }

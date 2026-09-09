@@ -16,11 +16,46 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
  *   delivery_type='reply' (derived — no separate option)
  */
 
+const PINNED1 = {
+  id: 'v-1:1',
+  step_order: 1,
+  delay_minutes: 0,
+  message_type: 'text',
+  message_content: 'welcome!',
+  on_reach_tag_id: null,
+  live_step_id: 'step-1',
+  template_id_at_send: null,
+  question_json: null,
+  is_draft: 0,
+};
+const PINNED2 = {
+  id: 'v-1:2',
+  step_order: 2,
+  delay_minutes: 60,
+  message_type: 'text',
+  message_content: 'second',
+  on_reach_tag_id: null,
+  live_step_id: 'step-2',
+  template_id_at_send: null,
+  question_json: null,
+  is_draft: 0,
+};
+const PINNED_SOURCE = {
+  deliveryMode: 'relative',
+  audienceConditionJson: null,
+  onCompleteMode: 'pause',
+  onCompleteScenarioId: null,
+  steps: [PINNED1, PINNED2],
+  pinnedVersionId: 'v-1',
+};
+
 const dbMocks = vi.hoisted(() => ({
   getScenarioById: vi.fn(),
+  getScenarioPublishedVersion: vi.fn(),
+  getStepsForDelivery: vi.fn(),
+  scenarioStepExists: vi.fn(),
   getFriendById: vi.fn(),
   computeNextDeliveryAt: vi.fn(),
-  resolveStepContent: vi.fn(),
   advanceFriendScenario: vi.fn(),
   completeFriendScenario: vi.fn(),
   claimFriendScenarioForDelivery: vi.fn(),
@@ -73,7 +108,7 @@ interface DbCall {
  * `cooldownHit` backs the messages_log probe; `enrollmentLookup` backs the
  * friend_scenarios fallback lookup.
  */
-function makeDb(opts: { cooldownHit?: boolean; enrollmentLookup?: { id: string; current_step_order: number } | null } = {}) {
+function makeDb(opts: { cooldownHit?: boolean; enrollmentLookup?: { id: string; current_step_order: number; published_version_id?: string | null } | null } = {}) {
   const calls: DbCall[] = [];
   const db = {
     prepare: (sql: string) => ({
@@ -82,7 +117,11 @@ function makeDb(opts: { cooldownHit?: boolean; enrollmentLookup?: { id: string; 
         return {
           first: async () => {
             if (sql.includes('FROM messages_log')) return opts.cooldownHit ? { 1: 1 } : null;
-            if (sql.includes('FROM friend_scenarios')) return opts.enrollmentLookup ?? null;
+            if (sql.includes('FROM friend_scenarios')) {
+              return opts.enrollmentLookup === undefined
+                ? { id: 'fs-1', current_step_order: 0, published_version_id: 'v-1' }
+                : opts.enrollmentLookup;
+            }
             return null;
           },
           run: async () => ({ meta: { changes: 1 } }),
@@ -116,8 +155,10 @@ beforeEach(() => {
     id: 'scn-1',
     is_active: 1,
     delivery_mode: 'relative',
-    steps: [STEP1, STEP2],
   });
+  dbMocks.getScenarioPublishedVersion.mockResolvedValue({ id: 'v-1', scenario_id: 'scn-1' });
+  dbMocks.getStepsForDelivery.mockResolvedValue(PINNED_SOURCE);
+  dbMocks.scenarioStepExists.mockResolvedValue(true);
   dbMocks.getFriendById.mockResolvedValue({
     id: 'friend-1',
     line_user_id: 'U-1',
@@ -125,14 +166,8 @@ beforeEach(() => {
     user_id: null,
     metadata: '{}',
   });
-  dbMocks.resolveStepContent.mockResolvedValue({
-    messageType: 'text',
-    messageContent: 'welcome!',
-    templateIdAtSend: null,
-    questionJson: null,
-  });
   dbMocks.claimFriendScenarioForDelivery.mockResolvedValue(true);
-  dbMocks.enrollFriendInScenario.mockResolvedValue({ id: 'fs-1', current_step_order: 0 });
+  dbMocks.enrollFriendInScenario.mockResolvedValue({ id: 'fs-1', current_step_order: 0, published_version_id: 'v-1' });
   lineClientMock.pushMessage.mockResolvedValue({});
   lineClientMock.replyMessage.mockResolvedValue({});
   autoTrackMocks.decorateForFriendPush.mockImplementation(
@@ -159,16 +194,22 @@ describe("mode 'once' (default) — claim protocol with the cron", () => {
   });
 
   it('sends and logs every message in a question template used as the immediate first step', async () => {
-    dbMocks.resolveStepContent.mockResolvedValue({
-      messageType: 'text',
-      messageContent: '続けますか？',
-      templateIdAtSend: 'question-template-1',
-      questionJson: JSON.stringify({
-        intro: '{{name}}さんへ確認です',
-        text: '続けますか？',
-        tapMode: 'single',
-        choices: [{ label: 'はい', behavior: 'none' }],
-      }),
+    dbMocks.getStepsForDelivery.mockResolvedValue({
+      ...PINNED_SOURCE,
+      steps: [
+        {
+          ...PINNED1,
+          message_content: '続けますか？',
+          template_id_at_send: 'question-template-1',
+          question_json: JSON.stringify({
+            intro: '{{name}}さんへ確認です',
+            text: '続けますか？',
+            tapMode: 'single',
+            choices: [{ label: 'はい', behavior: 'none' }],
+          }),
+        },
+        PINNED2,
+      ],
     });
     const { db, calls } = makeDb();
     const sent = await pushImmediateFirstStep(db, 'friend-1', 'scn-1', ctx, {
@@ -254,7 +295,12 @@ describe("mode 'once' (default) — claim protocol with the cron", () => {
         bind: () => {
           calls.push({ sql });
           return {
-            first: async () => null,
+            first: async () => {
+              if (sql.includes('FROM friend_scenarios')) {
+                return { id: 'fs-1', current_step_order: 0, published_version_id: 'v-1' };
+              }
+              return null;
+            },
             run: async () => {
               if (sql.includes('INSERT INTO messages_log')) throw new Error('D1 transient');
               return { meta: { changes: 1 } };
@@ -274,11 +320,9 @@ describe("mode 'once' (default) — claim protocol with the cron", () => {
   });
 
   it('returns before claiming when step 1 is not immediate (delay > 0)', async () => {
-    dbMocks.getScenarioById.mockResolvedValue({
-      id: 'scn-1',
-      is_active: 1,
-      delivery_mode: 'relative',
-      steps: [{ ...STEP1, delay_minutes: 30 }],
+    dbMocks.getStepsForDelivery.mockResolvedValue({
+      ...PINNED_SOURCE,
+      steps: [{ ...PINNED1, delay_minutes: 30 }, PINNED2],
     });
     const { db } = makeDb();
     const sent = await pushImmediateFirstStep(db, 'friend-1', 'scn-1', ctx, {
@@ -313,12 +357,7 @@ describe("mode 'once' (default) — claim protocol with the cron", () => {
   });
 
   it('completes the enrollment when the scenario has a single step', async () => {
-    dbMocks.getScenarioById.mockResolvedValue({
-      id: 'scn-1',
-      is_active: 1,
-      delivery_mode: 'relative',
-      steps: [STEP1],
-    });
+    dbMocks.getStepsForDelivery.mockResolvedValue({ ...PINNED_SOURCE, steps: [PINNED1] });
     const { db } = makeDb();
     const sent = await pushImmediateFirstStep(db, 'friend-1', 'scn-1', ctx, {
       enrollment: { id: 'fs-1', current_step_order: 0 },
@@ -367,7 +406,7 @@ describe("mode 'every-click' — click-campaign re-delivery", () => {
 
   it('re-click (already enrolled and advanced): pushes again but leaves the enrollment alone', async () => {
     dbMocks.enrollFriendInScenario.mockResolvedValue(null); // INSERT OR IGNORE no-op
-    const { db } = makeDb({ enrollmentLookup: { id: 'fs-1', current_step_order: 1 } });
+    const { db } = makeDb({ enrollmentLookup: { id: 'fs-1', current_step_order: 1, published_version_id: 'v-1' } });
     const sent = await pushImmediateFirstStep(db, 'friend-1', 'scn-1', ctx, everyClick);
     expect(sent).toBe(true);
     expect(lineClientMock.pushMessage).toHaveBeenCalled();
@@ -378,7 +417,7 @@ describe("mode 'every-click' — click-campaign re-delivery", () => {
 
   it('repairs a stale behind row: re-click with an active step-0 enrollment advances it', async () => {
     dbMocks.enrollFriendInScenario.mockResolvedValue(null);
-    const { db } = makeDb({ enrollmentLookup: { id: 'fs-stale', current_step_order: 0 } });
+    const { db } = makeDb({ enrollmentLookup: { id: 'fs-stale', current_step_order: 0, published_version_id: 'v-1' } });
     const sent = await pushImmediateFirstStep(db, 'friend-1', 'scn-1', ctx, everyClick);
     expect(sent).toBe(true);
     expect(dbMocks.advanceFriendScenario).toHaveBeenCalledWith(db, 'fs-stale', 1, expect.any(String));
@@ -548,11 +587,9 @@ describe('decoration — cron parity via the shared decorateForFriendPush pipeli
 
 describe('on_reach_tag', () => {
   it('attaches the reach tag after advancing', async () => {
-    dbMocks.getScenarioById.mockResolvedValue({
-      id: 'scn-1',
-      is_active: 1,
-      delivery_mode: 'relative',
-      steps: [{ ...STEP1, on_reach_tag_id: 'tag-9' }, STEP2],
+    dbMocks.getStepsForDelivery.mockResolvedValue({
+      ...PINNED_SOURCE,
+      steps: [{ ...PINNED1, on_reach_tag_id: 'tag-9' }, PINNED2],
     });
     const { db } = makeDb();
     await pushImmediateFirstStep(db, 'friend-1', 'scn-1', ctx, {
