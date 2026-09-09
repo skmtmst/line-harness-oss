@@ -77,6 +77,41 @@ describe('V6回答フォーム一覧', () => {
   })
 })
 
+describe('#676 一覧の並び・件数・回答導線（N-172/N-173/N-180/N-181）', () => {
+  it('並び順と表示件数を実際の一覧へ効かせ、URLへ残す', () => {
+    // 何で並べるか・何件出すかは試験で固定しない。
+    // 「選んだ値が一覧とURLへ届く」ことだけを見る。
+    expect(PAGE).toContain('aria-label="並び順"')
+    expect(PAGE).toContain('FORM_PAGE_SIZES')
+    expect(PAGE).toContain('router.replace(')
+    expect(PAGE).not.toContain('onChange={() => undefined}')
+    expect(PAGE).toContain('visibleForms.map((form)')
+  })
+
+  it('回答の導線はその行のフォームを指し、先頭固定の帯を置かない', () => {
+    expect(PAGE).not.toContain('forms[0]')
+    expect(PAGE).toContain('responses?id=${encodeURIComponent(form.id)}')
+    expect(PAGE).toContain('の集まった回答を見る`}')
+  })
+
+  it('更新列は作成日ではなく更新日時を出し、無い状態を区別する', () => {
+    expect(PAGE).toContain('displayUpdatedAt(form.updatedAt)')
+    expect(PAGE).toContain('更新日時を取得できません')
+    expect(PAGE).not.toContain('new Date(form.createdAt).toLocaleDateString')
+  })
+
+  it('フォルダは保存先が未接続なので、押せる追加口を渡さない（N-175 は #688）', () => {
+    // オーナー指示 #582 の追加操作は残したまま、押せる状態にはしない。
+    expect(PAGE).toContain('addFolderDisabled')
+    expect(PAGE).toContain('addFolderTitle=')
+    expect(PAGE).not.toContain('FolderAddDialog')
+    expect(PAGE).not.toContain('onAddFolder')
+    // 画面の中で数え方を作らない。フォルダの件数はAPIが返す値だけを出す。
+    expect(PAGE).not.toContain('folderCounts')
+    expect(PAGE).not.toContain("form.folderId || 'unfiled'")
+  })
+})
+
 describe('V6回答フォームの未実装3画面', () => {
   it('vCqUj は12種の追加口・顧客プレビュー・作成元を表示する', () => {
     expect(EDIT_PAGE).toContain('ブロックを追加（12種）')

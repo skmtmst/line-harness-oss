@@ -9,7 +9,6 @@ import { useAccount } from '@/contexts/account-context'
 import { displayFormName, sortFormsByLatestAnswer } from './form-list'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import ListState from '@/components/shared/list-state'
 import Select from '@/components/shared/select'
 import type { FormLayout } from '@line-crm/shared'
@@ -49,7 +48,7 @@ interface Form {
 interface FormFolder {
   id: string
   name: string
-  color?: string | null
+  formCount: number
 }
 
 type FormListResponse = Form[] | {
@@ -121,7 +120,8 @@ export default function FormSubmissionsPage() {
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const [forms, setForms] = useState<Form[]>([])
   const [folders, setFolders] = useState<FormFolder[]>([])
-  const [activeFolderId, setActiveFolderId] = useState(() => searchParams.get('folder') || 'all')
+  const [formTotal, setFormTotal] = useState(0)
+  const [activeFolderId, setActiveFolderId] = useState('all')
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
   const [query, setQuery] = useState(() => searchParams.get('q') || '')
@@ -141,7 +141,6 @@ export default function FormSubmissionsPage() {
   const [deleteError, setDeleteError] = useState('')
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState('')
-  const [folderDialogOpen, setFolderDialogOpen] = useState(false)
   const formRequest = useRef(0)
 
   const loadForms = useCallback(async () => {
@@ -149,6 +148,7 @@ export default function FormSubmissionsPage() {
     if (!selectedAccountId) {
       setForms([])
       setFolders([])
+      setFormTotal(0)
       setLoading(false)
       return
     }
@@ -165,11 +165,13 @@ export default function FormSubmissionsPage() {
       const items = Array.isArray(res.data) ? res.data : res.data.items
       setForms(items)
       setFolders(folderRes.data)
+      setFormTotal(Array.isArray(res.data) ? items.length : res.data.total)
     } catch {
       if (request !== formRequest.current) return
       setLoadError('回答フォームを読み込めませんでした。')
       setForms([])
       setFolders([])
+      setFormTotal(0)
     } finally {
       if (request === formRequest.current) setLoading(false)
     }
@@ -182,7 +184,6 @@ export default function FormSubmissionsPage() {
   const searchKey = searchParams.toString()
   useEffect(() => {
     const params = new URLSearchParams(searchKey)
-    setActiveFolderId(params.get('folder') || 'all')
     setQuery(params.get('q') || '')
     setFormFilter(validFilter(params.get('filter')))
     setFormSort(validSort(params.get('sort')))
@@ -191,7 +192,6 @@ export default function FormSubmissionsPage() {
   }, [searchKey])
 
   const updateListState = (next: Partial<{
-    folder: string
     query: string
     filter: FormFilter
     sort: FormSort
@@ -199,14 +199,12 @@ export default function FormSubmissionsPage() {
     page: number
   }>) => {
     const state = {
-      folder: next.folder ?? activeFolderId,
       query: next.query ?? query,
       filter: next.filter ?? formFilter,
       sort: next.sort ?? formSort,
       pageSize: next.pageSize ?? pageSize,
       page: next.page ?? page,
     }
-    if (next.folder !== undefined) setActiveFolderId(next.folder)
     if (next.query !== undefined) setQuery(next.query)
     if (next.filter !== undefined) setFormFilter(next.filter)
     if (next.sort !== undefined) setFormSort(next.sort)
@@ -214,7 +212,6 @@ export default function FormSubmissionsPage() {
     if (next.page !== undefined) setPage(next.page)
 
     const params = new URLSearchParams()
-    if (state.folder !== 'all') params.set('folder', state.folder)
     if (state.query) params.set('q', state.query)
     if (state.filter !== 'all') params.set('filter', state.filter)
     if (state.sort !== 'latest-answer') params.set('sort', state.sort)
@@ -356,15 +353,6 @@ export default function FormSubmissionsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadError, loading, page, pageCount])
 
-  const folderCounts = useMemo(() => {
-    const counts = new Map<string, number>()
-    for (const form of forms) {
-      const folder = form.folderId || 'unfiled'
-      counts.set(folder, (counts.get(folder) ?? 0) + 1)
-    }
-    return counts
-  }, [forms])
-
   return (
     <div data-design-node="EMBIK">
       <div data-design="Bar" className="mb-4 flex flex-wrap items-center justify-between gap-2">
@@ -377,14 +365,21 @@ export default function FormSubmissionsPage() {
 
       <div style={FOLDER_RAIL_STYLE} className="grid items-start gap-4 lg:grid-cols-[var(--folder-rail-width)_minmax(0,1fr)]">
         <FolderPanel
-          total={loading || loadError ? '— 件' : `${forms.length} 件`}
+          total={loading || loadError ? '— 件' : `${formTotal} 件`}
           activeId={activeFolderId}
-          onSelect={(folder) => updateListState({ folder, page: 1 })}
-          onAddFolder={() => setFolderDialogOpen(true)}
+          onSelect={(folder) => {
+            setActiveFolderId(folder)
+            updateListState({ page: 1 })
+          }}
+          // フォルダの保存先（forms.folder_id）がまだ無いので、押せる口は置かない。
+          // オーナー指示 #582 は追加操作をこの欄へ置くことを求めるので、
+          // 消さずに止めて、なぜ押せないかを添える。実データは #688（migration 372）。
+          addFolderDisabled
+          addFolderTitle="フォームのフォルダ保存先は未接続です"
           rows={[
-            { id: 'all', label: 'すべて', count: loading || loadError ? 0 : forms.length },
-            ...folders.map((folder) => ({ id: folder.id, label: folder.name, count: folderCounts.get(folder.id) ?? 0, color: folder.color })),
-            { id: 'unfiled', label: '未分類', count: loading || loadError ? 0 : folderCounts.get('unfiled') ?? 0 },
+            { id: 'all', label: 'すべて', count: loading || loadError ? 0 : formTotal },
+            ...folders.map((folder) => ({ id: folder.id, label: folder.name, count: folder.formCount })),
+            { id: 'unfiled', label: '未分類', count: loading || loadError ? 0 : Math.max(0, formTotal - folders.reduce((sum, folder) => sum + folder.formCount, 0)) },
           ]}
         />
 
@@ -515,7 +510,7 @@ export default function FormSubmissionsPage() {
                   </td>
                   <td className="px-3 py-2.5 text-xs tabular-nums" title={form.updatedAt ? undefined : '更新日時を取得できません'}>{displayUpdatedAt(form.updatedAt)}</td>
                   <td className="px-3 py-2.5 text-right text-xs">
-                    <Link href={`/form-submissions/responses?id=${encodeURIComponent(form.id)}`} aria-label={`${normalizedName}の回答を見る`} className="text-accent hover:underline">集まった回答を見る</Link>
+                    <Link href={`/form-submissions/responses?id=${encodeURIComponent(form.id)}`} aria-label={`${normalizedName}の集まった回答を見る`} className="text-accent hover:underline whitespace-nowrap">回答を見る</Link>
                     <button type="button" onClick={() => openRename(form)} className="ml-2 text-accent hover:underline">編集</button>
                     <button type="button" onClick={() => void openDelete(form)} className="ml-2 text-danger hover:underline" aria-label={`${normalizedName}を削除`} title="回答フォームを削除">削除</button>
                   </td>
@@ -530,7 +525,7 @@ export default function FormSubmissionsPage() {
           {!loading && !loadError && forms.length > 0 ? (
             <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
               <p className="text-xs text-ink-faint">
-                {filteredForms.length.toLocaleString('ja-JP')}件中 {filteredForms.length === 0 ? 0 : pageStart + 1}〜{Math.min(pageStart + pageSize, filteredForms.length).toLocaleString('ja-JP')}件を表示
+                {filteredForms.length.toLocaleString('ja-JP')}件中 {(filteredForms.length === 0 ? 0 : pageStart + 1).toLocaleString('ja-JP')}〜{Math.min(pageStart + pageSize, filteredForms.length).toLocaleString('ja-JP')}件を表示
               </p>
               <nav aria-label="回答フォームのページ送り" className="flex items-center gap-2 text-xs">
                 <Button
@@ -557,16 +552,6 @@ export default function FormSubmissionsPage() {
           ) : null}
         </section>
       </div>
-
-      {folderDialogOpen ? (
-        <FolderAddDialog
-          kind="form"
-          note="フォームを整理するフォルダです。"
-          placeholder="例：営業"
-          onClose={() => setFolderDialogOpen(false)}
-          onAdded={() => void loadForms()}
-        />
-      ) : null}
 
       {/* Rename dialog */}
       {editingForm && (
