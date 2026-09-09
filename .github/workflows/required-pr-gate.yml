@@ -275,6 +275,7 @@ jobs:
           pnpm --filter @line-crm/shared test
           TZ=Asia/Bangkok pnpm --filter @line-crm/shared test
       - run: pnpm --filter liff typecheck
+      - run: pnpm --filter liff test
 
   worker-checks:
     name: Worker typecheck and tests
