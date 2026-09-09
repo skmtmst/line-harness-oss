@@ -9,6 +9,11 @@ const migration = readFileSync(
   join(import.meta.dirname, '..', 'migrations', '252_template_questions.sql'),
   'utf8',
 )
+// 347 は 252 の後ろに積む。本番のDBもこの順で進化する。
+const migration347 = readFileSync(
+  join(import.meta.dirname, '..', 'migrations', '347_template_published_version.sql'),
+  'utf8',
+)
 
 function setup() {
   const sqlite = new Database(':memory:')
@@ -29,6 +34,7 @@ function setup() {
     );
   `)
   sqlite.exec(migration)
+  sqlite.exec(migration347)
   return sqlite
 }
 

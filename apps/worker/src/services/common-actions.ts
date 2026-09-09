@@ -203,8 +203,10 @@ async function requireResource(
   input: { table: string; id: unknown; lineAccountId: string; field: string; label: string },
 ): Promise<string> {
   const id = requiredString(input.id, input.field, input.label);
+  // 再審査対応(#645): テンプレートは同一アカウントに加え、公開版があること。
+  const publishedClause = input.table === 'templates' ? ' AND published_version > 0' : '';
   const row = await db.prepare(
-    `SELECT id FROM ${input.table} WHERE id = ? AND line_account_id = ? LIMIT 1`,
+    `SELECT id FROM ${input.table} WHERE id = ? AND line_account_id = ?${publishedClause} LIMIT 1`,
   ).bind(id, input.lineAccountId).first<{ id: string }>();
   if (!row) {
     throw new CommonActionValidationError('resource_not_found', `${input.label}が見つからないか、別のLINE公式アカウントにあります`, input.field);
