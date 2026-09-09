@@ -1,7 +1,7 @@
 'use client'
 
 import SelectField from '@/components/shared/select-field'
-import { useState, useEffect, useCallback, useRef } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { api } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
@@ -69,6 +69,86 @@ type PendingAction = {
   accountId: string | null
 }
 
+type AutomationActionLock = {
+  tryAcquire: () => boolean
+  release: () => void
+}
+
+/** React の再描画より先に連打を止める、画面内だけの単一実行ロック。 */
+function createAutomationActionLock(): AutomationActionLock {
+  let locked = false
+  return {
+    tryAcquire: () => {
+      if (locked) return false
+      locked = true
+      return true
+    },
+    release: () => { locked = false },
+  }
+}
+
+/**
+ * 一覧操作を1回だけ実行し、その操作を始めたアカウントが表示中なら再取得する。
+ * APIが失敗しても再取得し、サーバへ届いたか分からない表示を残さない。
+ */
+async function performAutomationAction({
+  lock,
+  actionAccountId,
+  getSelectedAccountId,
+  request,
+  reload,
+  onStart,
+  onFinish,
+}: {
+  lock: AutomationActionLock
+  actionAccountId: string | null
+  getSelectedAccountId: () => string | null
+  request: () => Promise<void>
+  reload: () => Promise<void>
+  onStart: () => void
+  onFinish: () => void
+}): Promise<'completed' | 'ignored'> {
+  if (actionAccountId !== getSelectedAccountId() || !lock.tryAcquire()) return 'ignored'
+  onStart()
+  try {
+    await request()
+    if (getSelectedAccountId() === actionAccountId) await reload()
+    return 'completed'
+  } catch (error) {
+    if (getSelectedAccountId() === actionAccountId) await reload()
+    throw error
+  } finally {
+    lock.release()
+    onFinish()
+  }
+}
+
+function AutomationRowActions({
+  automationId,
+  automationName,
+  canManage,
+  onToggle,
+}: {
+  automationId: string
+  automationName: string
+  canManage: boolean | null
+  onToggle: () => void
+}) {
+  return (
+    <div className="flex flex-wrap items-center justify-end gap-2">
+      <Button href={`/automations/runs?search=${encodeURIComponent(automationName)}`} className="whitespace-nowrap">動いた記録を見る</Button>
+      {canManage ? (
+        <>
+          <Button href={`/automations/drafts?id=${encodeURIComponent(automationId)}`} className="whitespace-nowrap">中身を見る</Button>
+          <Button onClick={onToggle} className="whitespace-nowrap">止める・動かす</Button>
+        </>
+      ) : canManage === false ? (
+        <span className="text-xs text-ink-faint">操作する権限がありません</span>
+      ) : null}
+    </div>
+  )
+}
+
 function conditionLabel(conditions: Record<string, unknown>): string {
   const keyword = typeof conditions.keyword === 'string' ? conditions.keyword.trim() : ''
   if (keyword) return `「${keyword}」を含む人`
@@ -97,6 +177,13 @@ export default function AutomationsPage() {
   const tab = useMergedTab(MERGED_TABS)
   usePageTitle(tab === 'templates' ? '見本から作る' : 'オートメーション')
   const canManageAutomations = useCanManageAutomations()
+  /*
+   * 閲覧のみの利用者（N-361、要件 §4-1・§4-9）。
+   *
+   * `null` は権限を読み終わる前。共通アクション一覧と同じく、読めるまでは
+   * 操作を出さない。`false` と分かった行・帯だけ理由を1行出す。
+   */
+  const viewerOnly = canManageAutomations === false
   const [automations, setAutomations] = useState<Automation[]>([])
   const [loadStatus, setLoadStatus] = useState<LoadStatus>('loading')
   const [error, setError] = useState('')
@@ -123,6 +210,14 @@ export default function AutomationsPage() {
   /** 押したあとにアカウントが変わったか。変わっていたら実行させない。 */
   const accountChanged = pending !== null && pending.accountId !== selectedAccountId
   const loadRequestRef = useRef(0)
+  /*
+   * state の反映を待つ一瞬にも2回目を通さないための同期ロック。
+   * `working` は表示用、こちらは同じクリック列からAPIを1回だけ呼ぶために使う。
+   */
+  const actionLockRef = useRef(createAutomationActionLock())
+  /* 実行中にアカウントが切り替わったとき、古い一覧を新しい画面へ戻さない。 */
+  const selectedAccountIdRef = useRef(selectedAccountId)
+  selectedAccountIdRef.current = selectedAccountId
 
   const loadAutomations = useCallback(async () => {
     const requestId = ++loadRequestRef.current
@@ -184,20 +279,17 @@ export default function AutomationsPage() {
     if (!res.success) throw new Error(res.error)
   }
 
-  const handleToggleActive = async (target: Automation) => {
-    // 全アカウント共通のルールは、1つのアカウントの画面から触っても
-    // すべてのアカウントに効く。ここだけ確認を挟む。
-    if (target.lineAccountId === null) {
-      setActionError('')
-      setPending({ kind: 'toggle', automation: target, accountId: selectedAccountId })
-      return
-    }
-    try {
-      await applyToggle(target)
-      await loadAutomations()
-    } catch {
-      setError('稼働を切り替えられませんでした。状態を読み直してから、もう一度お試しください。')
-    }
+  /*
+   * 稼働の切り替えはすべて確認窓を経由する（要件 §4-1、N-360）。
+   *
+   * 通常ルールだけ直接PUTを投げていたため、二重押しで ON→OFF→ON と往復し、
+   * 最終状態が意図と逆になり得た。窓の `runPending` は処理中の再受け付けを
+   * 止めているので、ここでは投げずに窓へ預けるだけにする。
+   * 全アカウント共通のルールは窓の中で注意書きを出す（下のダイアログ）。
+   */
+  const handleToggleActive = (target: Automation) => {
+    setActionError('')
+    setPending({ kind: 'toggle', automation: target, accountId: selectedAccountId })
   }
 
   const handleDelete = (target: Automation) => {
@@ -214,26 +306,36 @@ export default function AutomationsPage() {
    * 読み取れない。
    */
   const runPending = async () => {
-    if (!pending || working || accountChanged) return
-    setWorking(true)
-    setActionError('')
+    if (!pending) return
+    const action = pending
     try {
-      if (pending.kind === 'delete') {
-        const res = await api.automations.delete(pending.automation.id)
-        if (!res.success) throw new Error(res.error)
-      } else {
-        await applyToggle(pending.automation)
-      }
+      const result = await performAutomationAction({
+        lock: actionLockRef.current,
+        actionAccountId: action.accountId,
+        getSelectedAccountId: () => selectedAccountIdRef.current,
+        request: async () => {
+          if (action.kind === 'delete') {
+            const res = await api.automations.delete(action.automation.id)
+            if (!res.success) throw new Error(res.error)
+          } else {
+            await applyToggle(action.automation)
+          }
+        },
+        reload: loadAutomations,
+        onStart: () => {
+          setWorking(true)
+          setActionError('')
+        },
+        onFinish: () => setWorking(false),
+      })
+      if (result === 'ignored') return
       setPending(null)
-      await loadAutomations()
     } catch {
       setActionError(
-        pending.kind === 'delete'
+        action.kind === 'delete'
           ? 'このルールを削除できませんでした。状態を読み直してから、もう一度お試しください。'
           : '稼働を切り替えられませんでした。状態を読み直してから、もう一度お試しください。',
       )
-    } finally {
-      setWorking(false)
     }
   }
 
@@ -256,7 +358,8 @@ export default function AutomationsPage() {
       <div data-design-node="WjYAC">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm text-ink-faint">自動化 ＞ オートメーション ＞ 見本</p>
-          <Button href="/automations/new">はじめから作る</Button>
+          {/* 作成は owner/admin だけ（N-361）。見本の閲覧と「これで作る」の出し分けは画廊側で行う。 */}
+          {canManageAutomations ? <Button href="/automations/new">はじめから作る</Button> : null}
         </div>
         <div className="mb-4">
           <MergedTabs basePath="/automations" paramName="tab" tabs={tabs} active={tab} />
@@ -339,10 +442,16 @@ export default function AutomationsPage() {
         <div className="flex flex-wrap gap-2">
           <Button href="/common-actions">共通アクションを見る</Button>
           <Button href="/automations?tab=templates">見本から作る</Button>
-          <Button href="/automations/new" variant="primary">ルールを作成</Button>
+          {/* 作成は owner/admin だけ。閲覧のみには出さず、下で理由を出す（N-361）。 */}
+          {canManageAutomations ? <Button href="/automations/new" variant="primary">ルールを作成</Button> : null}
           <Button href="/support">マニュアル</Button>
         </div>
       </div>
+      {viewerOnly ? (
+        <p className="mb-4 rounded-control border border-hairline bg-canvas-sunken px-4 py-3 text-sm text-ink-secondary" role="note">
+          閲覧のみのため、ルールの作成・変更はできません。操作する権限がありません。
+        </p>
+      ) : null}
 
       <p className="mb-4 text-sm text-ink-faint">「〜のとき、〜する」を登録して自動で実行します。友だち一覧から手で実行したり、毎日決まった時刻に動かすこともできます。</p>
       <p className="sr-only">共通アクションは友だち一覧からの手動実行にも使えます。</p>
@@ -444,7 +553,7 @@ export default function AutomationsPage() {
             ? (tab === 'stopped' ? '止めているオートメーションはありません。' : '動いているオートメーションはありません。')
             : '条件に合うオートメーションはありません。'}
           description={automations.length === 0 ? 'きっかけ・だれに・することの3つを決めると動きます。' : '検索語や絞り込みを変えてください。'}
-          action={tab === 'active' ? <Button href="/automations/new" variant="primary">オートメーションをつくる</Button> : undefined}
+          action={tab === 'active' && canManageAutomations ? <Button href="/automations/new" variant="primary">オートメーションをつくる</Button> : undefined}
         />
       ) : (
         <div className="overflow-hidden rounded-card border border-hairline bg-canvas shadow-sm">
@@ -464,10 +573,13 @@ export default function AutomationsPage() {
                 {automation.failureCount30d > 0 ? <span className="text-danger block text-[11px]">失敗が{automation.failureCount30d}回</span> : null}
               </div>
               <span className={automation.isActive ? 'font-semibold text-accent-deep' : 'font-semibold text-ink-faint'}>{automation.isActive ? '動いています' : '止めています'}</span>
-              <div className="flex justify-end gap-2">
-                <Button href={`/automations/drafts?id=${encodeURIComponent(automation.id)}`} className="whitespace-nowrap">中身を見る</Button>
-                <Button onClick={() => void handleToggleActive(automation)} className="whitespace-nowrap">止める・動かす</Button>
-              </div>
+              {/* 見るだけの導線は閲覧のみにも出す。検索語にこの行の名前を載せて実対象を引き継ぐ（#677で承認されたN-352の導線部分）。 */}
+              <AutomationRowActions
+                automationId={automation.id}
+                automationName={automation.name}
+                canManage={canManageAutomations}
+                onToggle={() => handleToggleActive(automation)}
+              />
             </div>
           ))}
           <div className="flex items-center justify-between border-t border-hairline px-4 py-3 text-xs text-ink-faint">
