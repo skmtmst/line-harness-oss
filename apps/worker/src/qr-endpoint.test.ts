@@ -1,4 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { readdirSync, readFileSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { Hono } from 'hono';
 
 // index.ts はモジュール読み込み時に @line-crm/db の関数を掴む。QR は DB を
@@ -166,5 +169,105 @@ describe('GET /api/qr — 公開口としての境界', () => {
     }
     // data が違えば絵も違う。取り違えが起きていない証拠。
     expect(new Set(parallel.map((b) => new Uint8Array(b).join(','))).size).toBe(links.length);
+  });
+});
+
+/*
+ * 呼び出し元が /api/qr へ渡せる大きさの上限。
+ *
+ * QR 生成の重さは「data の長さ」と「頼む画素数・形式」で決まる。大きい絵と
+ * 長い data がそろったときだけ重くなるので、その組み合わせが呼び出し元から
+ * 出てこないことを、思い込みではなく検査で押さえておく。
+ *
+ * 呼び出し箇所を数え上げているので、新しく増えたらこの試験が落ちる。
+ */
+
+const repoRoot = fileURLToPath(new URL('../../..', import.meta.url));
+const read = (relative: string) => readFileSync(path.join(repoRoot, relative), 'utf8');
+
+/**
+ * /api/qr の URL を組み立てている箇所。
+ *
+ * bounded: data の長さがコード上の決まりで抑えられている呼び出し元。
+ * 画素数や形式を選べるのはこちらだけ。
+ * passthrough: 受け取ったクエリをそのまま QR に載せる呼び出し元。
+ * data は /api/qr の 2KiB 上限までしか抑えられていないので、
+ * 頼む絵の大きさが固定であることが効いてくる。
+ */
+const QR_CALL_SITES = [
+  { file: 'apps/web/src/app/inflow-links/page.tsx', kind: 'bounded', fixedSize: '320x320' },
+  { file: 'apps/web/src/components/dashboard/qr-dialog.tsx', kind: 'bounded', fixedSize: null },
+  { file: 'apps/worker/src/index.ts', kind: 'passthrough', fixedSize: '240x240' },
+  { file: 'apps/worker/src/routes/liff.ts', kind: 'passthrough', fixedSize: '240x240' },
+] as const;
+
+function sourceFilesUnder(directory: string): string[] {
+  const found: string[] = [];
+  const walk = (current: string) => {
+    for (const entry of readdirSync(path.join(repoRoot, current), { withFileTypes: true })) {
+      const relative = `${current}/${entry.name}`;
+      if (entry.isDirectory()) {
+        if (entry.name === 'node_modules' || entry.name === '.next' || entry.name === 'dist') continue;
+        walk(relative);
+      } else if (/\.tsx?$/.test(entry.name) && !/\.test\.tsx?$/.test(entry.name)) {
+        found.push(relative);
+      }
+    }
+  };
+  walk(directory);
+  return found;
+}
+
+describe('/api/qr を呼ぶ側が渡せる大きさ', () => {
+  it('QRのURLを組み立てている箇所は数え上げたものだけ', () => {
+    // 増えたらここに足して、その呼び出し元の上限も下の検査へ入れる。
+    const builders = [...sourceFilesUnder('apps/web/src'), ...sourceFilesUnder('apps/worker/src')].filter((file) =>
+      read(file).includes('/api/qr?'),
+    );
+    expect(builders.sort()).toEqual(QR_CALL_SITES.map((site) => site.file).sort());
+  });
+
+  it('受け取ったクエリをそのまま載せる呼び出し元は、240x240のPNGしか頼まない', () => {
+    // ここは data を 2KiB まで伸ばせるので、絵の大きさと形式が固定であることが
+    // 1 要求あたりの重さの歯止めになっている。
+    for (const site of QR_CALL_SITES.filter((entry) => entry.kind === 'passthrough')) {
+      const source = read(site.file);
+      const urls = source.match(/\/api\/qr\?[^"'`]*/g) ?? [];
+      expect(urls.length).toBeGreaterThan(0);
+      for (const url of urls) {
+        expect(url).toContain(`size=${site.fixedSize}`);
+        expect(url).not.toContain('format=');
+      }
+    }
+  });
+
+  it('画素数や形式を選べる呼び出し元が渡すdataは200バイト未満', () => {
+    // 選べる側が渡すのは「土台のURL + /r/ + 流入経路の合言葉」だけ。
+    // 合言葉の長さは経路を作るときの検査で決まる。
+    const entryRoutes = read('apps/worker/src/routes/entry-routes.ts');
+    const refCodeRule = /\/\^\[A-Za-z0-9_-\]\{1,(\d+)\}\$\//.exec(entryRoutes);
+    expect(refCodeRule).not.toBeNull();
+    const refCodeMax = Number((refCodeRule as RegExpExecArray)[1]);
+    expect(refCodeMax).toBe(64);
+
+    // 土台のURLは配備の設定で決まるので、実際に配っている値のうち長い方を使う。
+    const bases = ['apps/worker/wrangler.toml', 'apps/worker/wrangler.staging.toml'].map((file) => {
+      const matched = /WORKER_PUBLIC_URL = "([^"]+)"/.exec(read(file));
+      expect(matched).not.toBeNull();
+      return (matched as RegExpExecArray)[1];
+    });
+    const longestBase = bases.reduce((a, b) => (a.length >= b.length ? a : b));
+
+    const worst = `${longestBase}/r/${'a'.repeat(refCodeMax)}`;
+    expect(new TextEncoder().encode(worst).byteLength).toBeLessThan(200);
+  });
+
+  it('選べる側の最大のdataでも、1024pxのJPEGまで作れる', async () => {
+    // 上の上限どおりの data で、いちばん重い頼み方が通ることを実際に確かめる。
+    const worst = `https://nen-line-stg.skmtmst.workers.dev/r/${'a'.repeat(64)}`;
+    const res = await call(`size=1024x1024&format=jpg&data=${encodeURIComponent(worst)}`);
+    expect(res.status).toBe(200);
+    expect(res.headers.get('Content-Type')).toBe('image/jpeg');
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 });
