@@ -21,9 +21,9 @@ describe('V6回答フォーム一覧', () => {
   it('初回空・検索0件・読込中・失敗を言い分ける', () => {
     expect(PAGE).toContain("kind=\"loading\"")
     expect(PAGE).toContain("kind=\"error\"")
-    expect(PAGE).toContain('フォームがまだ1つも無いときの見え方です。')
     expect(PAGE).toContain('まだフォームがありません')
     expect(PAGE).toContain('最初の1つを作ると、集まった回答もここから見られます。')
+    expect(PAGE).not.toContain('見え方です。')
     expect(PAGE).toContain('条件に合うフォームはありません')
     expect(PAGE).toContain('onRetry={() => void loadForms()}')
   })
