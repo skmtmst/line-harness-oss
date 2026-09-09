@@ -93,6 +93,6 @@ describe('一覧の状態（設計 10-1-L `zCQXe`）', () => {
      * 口の契約は頁形式(`{items,total}`)だが、器だけ違う返事が来ると
      * `items.map is not a function` で**一覧が白い画面になる**。
      */
-    expect(PAGE).toContain('if (!res.data || !Array.isArray(res.data.items) || typeof res.data.total !==')
+    expect(PAGE).toContain('if (!res || !res.data || !Array.isArray(res.data.items) || typeof res.data.total !==')
   })
 })
