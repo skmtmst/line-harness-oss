@@ -53,9 +53,12 @@ export type FriendAddCouponDependencies = {
   createCoupon: (coupon: EccubeCouponInput) => Promise<void>;
   sendText: (text: string) => Promise<void>;
   /**
-   * 送信の例外を「届いていない（failed）」と「届いたかもしれない（unknown）」に
-   * 分ける。渡さないと従来どおり全部「届いていない」扱いで、次の友だち追加で
-   * 送り直す。通信断のあとに送り直すと、届いていた人へ2通目が出る。
+   * 外部呼び出しの例外を「実行されていない（failed）」と「実行されたかも
+   * しれない（unknown）」に分ける。クーポンの作成と本文の送信の両方で使う。
+   *
+   * 渡さないと従来どおり全部「実行されていない」扱いになり、次の友だち追加で
+   * 作り直し・送り直しをする。通信が切れただけの場合は**もう作られている・
+   * もう届いている**ので、やり直すとクーポンが二重に作られ、案内が2通届く。
    */
   classifySendFailure?: (error: unknown) => 'failed' | 'unknown';
 };
@@ -203,7 +206,24 @@ export async function issueFriendAddCoupon(
             SET status = 'coupon_created', last_error = NULL, issued_at = ?, updated_at = ?
           WHERE line_account_id = ? AND friend_id = ?`,
       ).bind(createdAt, createdAt, input.lineAccountId, input.friendId).run();
-    } catch {
+    } catch (error) {
+      /*
+       * 作れたか分からない呼び出しを `failed_create` にすると、次の友だち追加で
+       * **同じコードの作成をもう一度投げる**。通信が切れただけで実際は
+       * 作られていた場合、EC側に二重に作られる。作られた可能性がある側へ
+       * 倒し（`coupon_created`）、理由だけ残して人が確かめる。
+       * この実行では送らない（コードが実在するか確かめられていないため）。
+       */
+      const outcome = dependencies.classifySendFailure?.(error) ?? 'failed';
+      if ('unknown' === outcome) {
+        await db.prepare(
+          `UPDATE nen_friend_add_coupon_issues
+              SET status = 'coupon_created', last_error = 'coupon_create_unknown',
+                  issued_at = COALESCE(issued_at, ?), updated_at = ?
+            WHERE line_account_id = ? AND friend_id = ?`,
+        ).bind(createdAt, createdAt, input.lineAccountId, input.friendId).run();
+        throw new Error('friend_add_coupon_create_unknown');
+      }
       await db.prepare(
         `UPDATE nen_friend_add_coupon_issues
             SET status = 'failed_create', last_error = 'coupon_create_failed', updated_at = ?

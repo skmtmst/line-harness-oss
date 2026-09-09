@@ -419,12 +419,22 @@ async function handleEvent(
      *   delivered … 送れた
      */
     const sendState: { outcome: FollowSendOutcome } = { outcome: 'none' };
+    /*
+     * 1回のfollowで複数の送信を行う（初回案内・紹介リンクの案内・専用シナリオ・
+     * クーポン）。**まとめた結末は「不明」を最優先にする。**
+     *
+     * 1通が送れたからといって、結末の分からない別の1通が「送れていない」に
+     * なるわけではない。不明を成功で上書きすると、その実行を送り終えた扱いに
+     * して予約を返してしまい、届いていたかもしれない通を次のfollowが送り直す。
+     * 優先順位: unknown > delivered > failed > none。
+     */
+    const SEND_OUTCOME_RANK: Record<FollowSendOutcome, number> = {
+      none: 0, failed: 1, delivered: 2, unknown: 3,
+    };
     const noteSendOutcome = (outcome: 'delivered' | 'failed' | 'unknown'): void => {
-      const current = sendState.outcome;
-      if (outcome === 'delivered') { sendState.outcome = 'delivered'; return; }
-      if (current === 'delivered') return;
-      if (outcome === 'unknown') { sendState.outcome = 'unknown'; return; }
-      if (current === 'none') sendState.outcome = 'failed';
+      if (SEND_OUTCOME_RANK[outcome] > SEND_OUTCOME_RANK[sendState.outcome]) {
+        sendState.outcome = outcome;
+      }
     };
     const currentSendOutcome = (): FollowSendOutcome => sendState.outcome;
     if (friendAddLedgerUnavailable) {
@@ -737,7 +747,12 @@ async function handleEvent(
      *   条件などで送らなかった   … suppressed（理由つき）
      */
     const delivered = friendAddDeliveryCount > 0;
-    const deliveryUnknown = !delivered && currentSendOutcome() === 'unknown';
+    /*
+     * **結末の分からない送信が1つでもあれば送達不明。** 別の通が送れていても
+     * 変わらない。ここで「送れた」に丸めると予約を返してしまい、不明だった
+     * 通を次のfollowが送り直す。
+     */
+    const deliveryUnknown = currentSendOutcome() === 'unknown';
     const ledgerErrorCode = routing?.suppressReason
       ?? (claimError
         ? 'send_claim_unavailable'
@@ -745,7 +760,7 @@ async function handleEvent(
           ? 'delivery_unknown'
           : (!sendRight
             ? 'duplicate_in_flight'
-            : (delivered ? null : (deliveryUnknown ? 'delivery_unknown' : 'send_failed')))));
+            : (deliveryUnknown ? 'delivery_unknown' : (delivered ? null : 'send_failed')))));
     let ledgerFinalized = false;
     if (friendAddEventId && lineAccountId && !fencedOut) {
       try {

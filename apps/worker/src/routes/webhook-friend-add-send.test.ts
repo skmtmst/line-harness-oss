@@ -363,6 +363,72 @@ describe('POST /webhook — 送信の結末を分ける (#622)', () => {
   });
 });
 
+/*
+ * 1回のfollowで複数の送信を行う。**1通でも結末が分からなければ送達不明。**
+ * 別の1通が送れたからといって「送れた」に丸めると、予約を返してしまい、
+ * 不明だった通を次のfollowが送り直す（届いていたら2通目になる）。
+ */
+describe('POST /webhook — 複数送信の結末は不明を最優先 (#622)', () => {
+  function seedIntroTemplateOn(raw2: typeof raw): void {
+    raw2.prepare(
+      `INSERT INTO message_templates (id, name, message_type, message_content)
+       VALUES ('tpl-1', '紹介あいさつ', 'text', '{"text":"ご紹介ありがとうございます"}')`,
+    ).run();
+    raw2.prepare(`UPDATE entry_routes SET intro_template_id = 'tpl-1' WHERE id = 'route-1'`).run();
+  }
+
+  test('初回案内が不明・紹介リンクの案内が成功でも、送達不明として扱う', async () => {
+    seedIntroTemplateOn(raw);
+    // 初回案内（reply）は通信断。紹介リンクの案内（push）は成功。
+    lineClientMocks.replyMessage.mockRejectedValueOnce(new Error('network timeout'));
+    lineClientMocks.pushMessage.mockResolvedValue(undefined);
+
+    await postFollow('webhook-mixed');
+
+    // 紹介リンクの案内は届いている
+    expect(lineClientMocks.pushMessage.mock.calls.length).toBeGreaterThan(0);
+    const rows = eventRows();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ error_code: 'delivery_unknown' });
+    // 予約は掴んだまま（返すと不明だった初回案内を次のfollowが送り直す）
+    const claim = raw.prepare(`SELECT COUNT(*) AS n FROM friend_add_send_claims`).get();
+    expect(claim).toEqual({ n: 1 });
+    // 自動再送の対象から外れている
+    await expect(isFriendAddResendSuppressed(db, {
+      lineAccountId: 'account-1', friendId: 'friend-1',
+      resendSuppressionHours: 24, now: new Date(),
+    })).resolves.toBe(true);
+  });
+
+  test('逆順（先に成功、あとで不明）でも送達不明として扱う', async () => {
+    seedIntroTemplateOn(raw);
+    // 初回案内（reply）は成功。紹介リンクの案内（push）が通信断。
+    lineClientMocks.replyMessage.mockResolvedValue(undefined);
+    lineClientMocks.pushMessage.mockRejectedValue(new Error('network timeout'));
+
+    await postFollow('webhook-mixed-reverse');
+
+    const rows = eventRows();
+    expect(rows).toHaveLength(1);
+    // 1通は確かに送れているので送信数は残しつつ、結末は不明で残す
+    expect(rows[0]).toMatchObject({ delivery_count: 1, error_code: 'delivery_unknown' });
+    expect(raw.prepare(`SELECT COUNT(*) AS n FROM friend_add_send_claims`).get()).toEqual({ n: 1 });
+  });
+
+  test('すべて成功なら従来どおり completed で予約を返す', async () => {
+    seedIntroTemplateOn(raw);
+    lineClientMocks.replyMessage.mockResolvedValue(undefined);
+    lineClientMocks.pushMessage.mockResolvedValue(undefined);
+
+    await postFollow('webhook-all-ok');
+
+    expect(eventRows()[0]).toMatchObject({
+      routing_status: 'completed', delivery_count: 1, error_code: null,
+    });
+    expect(raw.prepare(`SELECT COUNT(*) AS n FROM friend_add_send_claims`).get()).toEqual({ n: 0 });
+  });
+});
+
 describe('POST /webhook — 流入リンクの案内も同じ送信権の下 (#622)', () => {
   function seedIntroTemplate(): void {
     raw.prepare(

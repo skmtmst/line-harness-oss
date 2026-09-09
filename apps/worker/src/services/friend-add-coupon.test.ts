@@ -33,6 +33,14 @@ function asTestD1(sqlite: Database.Database): D1Database {
   return { prepare } as unknown as D1Database;
 }
 
+/** 4xx は実行されていない。通信断・429・5xx は実行されたかもしれない。 */
+function classifyByStatus(error: unknown): 'failed' | 'unknown' {
+  const status = (error as { status?: unknown } | null)?.status;
+  return typeof status === 'number' && status >= 400 && status < 500 && status !== 429
+    ? 'failed'
+    : 'unknown';
+}
+
 describe('NEN friend-add coupon', () => {
   let sqlite: Database.Database;
   let db: D1Database;
@@ -94,22 +102,74 @@ describe('NEN friend-add coupon', () => {
    * 友だち追加で送り直す。届いていた人へ2通目のクーポン案内が出るので、
    * 送った可能性がある側へ倒して人の確認に回す。
    */
+  /*
+   * N-101(#622): 作れたか分からない作成呼び出しを `failed_create` にすると、
+   * 次の友だち追加で同じコードの作成をもう一度投げ、EC側に二重に作られる。
+   */
+  it('作成の通信断は作り直さない（作られた可能性がある側へ倒す）', async () => {
+    sqlite.prepare(`INSERT INTO friends (id) VALUES ('friend-create-unknown')`).run();
+    const createCoupon = vi.fn(async (_coupon: EccubeCouponInput) => {
+      throw new Error('network timeout');
+    });
+    const sendText = vi.fn(async (_text: string) => undefined);
+    const input = {
+      lineAccountId: 'nen-account', friendId: 'friend-create-unknown',
+      now: new Date('2026-09-02T02:00:00.000Z'),
+    };
+
+    await expect(issueFriendAddCoupon(db, input, {
+      createCoupon, sendText, classifySendFailure: classifyByStatus,
+    })).rejects.toThrow('friend_add_coupon_create_unknown');
+    expect(sqlite.prepare(
+      `SELECT status, last_error FROM nen_friend_add_coupon_issues WHERE friend_id = 'friend-create-unknown'`,
+    ).get()).toEqual({ status: 'coupon_created', last_error: 'coupon_create_unknown' });
+    // この実行では送らない（コードが実在するか確かめられていない）
+    expect(sendText).not.toHaveBeenCalled();
+
+    // 次の友だち追加でも作成APIを投げ直さない
+    const retryCreate = vi.fn(async (_coupon: EccubeCouponInput) => undefined);
+    const retrySend = vi.fn(async (_text: string) => undefined);
+    await expect(issueFriendAddCoupon(db, input, {
+      createCoupon: retryCreate, sendText: retrySend, classifySendFailure: classifyByStatus,
+    })).resolves.toBe('sent');
+    expect(retryCreate).not.toHaveBeenCalled();
+    expect(retrySend).toHaveBeenCalledTimes(1);
+  });
+
+  it('ECが断った作成（4xx）は従来どおり作り直せる', async () => {
+    sqlite.prepare(`INSERT INTO friends (id) VALUES ('friend-create-rejected')`).run();
+    const rejected = Object.assign(new Error('EC error: 400'), { status: 400 });
+    const createCoupon = vi.fn(async (_coupon: EccubeCouponInput) => { throw rejected; });
+    const sendText = vi.fn(async (_text: string) => undefined);
+    const input = {
+      lineAccountId: 'nen-account', friendId: 'friend-create-rejected',
+      now: new Date('2026-09-02T02:00:00.000Z'),
+    };
+
+    await expect(issueFriendAddCoupon(db, input, {
+      createCoupon, sendText, classifySendFailure: classifyByStatus,
+    })).rejects.toThrow('friend_add_coupon_create_failed');
+    expect(sqlite.prepare(
+      `SELECT status FROM nen_friend_add_coupon_issues WHERE friend_id = 'friend-create-rejected'`,
+    ).get()).toEqual({ status: 'failed_create' });
+
+    const retryCreate = vi.fn(async (_coupon: EccubeCouponInput) => undefined);
+    await expect(issueFriendAddCoupon(db, input, {
+      createCoupon: retryCreate, sendText, classifySendFailure: classifyByStatus,
+    })).resolves.toBe('sent');
+    expect(retryCreate).toHaveBeenCalledTimes(1);
+  });
+
   it('通信断のように結末が分からない送信は送り直さない（送達不明）', async () => {
     const createCoupon = vi.fn(async (_coupon: EccubeCouponInput) => undefined);
     const sendText = vi.fn(async (_text: string) => { throw new Error('network timeout'); });
-    const classifySendFailure = (error: unknown): 'failed' | 'unknown' => {
-      const status = (error as { status?: unknown } | null)?.status;
-      return typeof status === 'number' && status >= 400 && status < 500 && status !== 429
-        ? 'failed'
-        : 'unknown';
-    };
     sqlite.prepare(`INSERT INTO friends (id) VALUES ('friend-unknown')`).run();
     const input = {
       lineAccountId: 'nen-account', friendId: 'friend-unknown',
       now: new Date('2026-09-02T02:00:00.000Z'),
     };
 
-    await expect(issueFriendAddCoupon(db, input, { createCoupon, sendText, classifySendFailure }))
+    await expect(issueFriendAddCoupon(db, input, { createCoupon, sendText, classifySendFailure: classifyByStatus }))
       .rejects.toThrow('friend_add_coupon_send_unknown');
     expect(sqlite.prepare(
       `SELECT status, last_error FROM nen_friend_add_coupon_issues WHERE friend_id = 'friend-unknown'`,
@@ -118,7 +178,7 @@ describe('NEN friend-add coupon', () => {
     // 次の友だち追加では送り直さない
     const retrySend = vi.fn(async (_text: string) => undefined);
     await expect(issueFriendAddCoupon(db, input, {
-      createCoupon, sendText: retrySend, classifySendFailure,
+      createCoupon, sendText: retrySend, classifySendFailure: classifyByStatus,
     })).resolves.toBe('already_sent');
     expect(retrySend).not.toHaveBeenCalled();
   });
@@ -127,19 +187,13 @@ describe('NEN friend-add coupon', () => {
     const createCoupon = vi.fn(async (_coupon: EccubeCouponInput) => undefined);
     const rejected = Object.assign(new Error('LINE API error: 400'), { status: 400 });
     const sendText = vi.fn(async (_text: string) => { throw rejected; });
-    const classifySendFailure = (error: unknown): 'failed' | 'unknown' => {
-      const status = (error as { status?: unknown } | null)?.status;
-      return typeof status === 'number' && status >= 400 && status < 500 && status !== 429
-        ? 'failed'
-        : 'unknown';
-    };
     sqlite.prepare(`INSERT INTO friends (id) VALUES ('friend-rejected')`).run();
     const input = {
       lineAccountId: 'nen-account', friendId: 'friend-rejected',
       now: new Date('2026-09-02T02:00:00.000Z'),
     };
 
-    await expect(issueFriendAddCoupon(db, input, { createCoupon, sendText, classifySendFailure }))
+    await expect(issueFriendAddCoupon(db, input, { createCoupon, sendText, classifySendFailure: classifyByStatus }))
       .rejects.toThrow('friend_add_coupon_send_failed');
     expect(sqlite.prepare(
       `SELECT status FROM nen_friend_add_coupon_issues WHERE friend_id = 'friend-rejected'`,
@@ -147,7 +201,7 @@ describe('NEN friend-add coupon', () => {
 
     const retrySend = vi.fn(async (_text: string) => undefined);
     await expect(issueFriendAddCoupon(db, input, {
-      createCoupon, sendText: retrySend, classifySendFailure,
+      createCoupon, sendText: retrySend, classifySendFailure: classifyByStatus,
     })).resolves.toBe('sent');
     expect(retrySend).toHaveBeenCalledTimes(1);
   });
