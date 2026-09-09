@@ -1,59 +1,199 @@
-import { readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
-import { describe, expect, it } from 'vitest'
+import React from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
+import { describe, expect, it, vi } from 'vitest'
+import EmergencyPage from './page'
 
-const dir = dirname(fileURLToPath(import.meta.url))
-const page = readFileSync(join(dir, 'page.tsx'), 'utf8')
-const worker = readFileSync(join(dir, '..', '..', '..', '..', '..', 'apps', 'worker', 'src', 'routes', 'operations.ts'), 'utf8')
+const {
+  EmergencyControlFeedback,
+  emergencySafetyTransition,
+  isEmergencyMutationLocked,
+  runCurrentRequest,
+} = EmergencyPage.__test
 
-describe('N-453 止められない理由を画面に出す', () => {
-  it('停止不可の機械コードを口と画面で同じ文字で連携する', () => {
-    for (const code of ['EMERGENCY_CONTROL_FORBIDDEN', 'EMERGENCY_SCOPE_FORBIDDEN']) {
-      expect(worker).toContain(`code: '${code}'`)
-      expect(page).toContain(code)
-    }
-    expect(worker).toContain('reasonCode')
-    expect(page).toContain('reasonCode')
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  let reject!: (error: unknown) => void
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise
+    reject = rejectPromise
+  })
+  return { promise, resolve, reject }
+}
+
+function renderFeedback({
+  tone = 'warning',
+  text,
+  needsReload,
+  reloading = false,
+  previewSettled = false,
+  stopBlockers = [],
+}: {
+  tone?: 'success' | 'warning' | 'danger'
+  text: string
+  needsReload: boolean
+  reloading?: boolean
+  previewSettled?: boolean
+  stopBlockers?: Array<'unavailable' | 'forbidden' | 'scope' | 'empty' | 'stopped'>
+}) {
+  return renderToStaticMarkup(React.createElement(EmergencyControlFeedback, {
+    message: { tone, text },
+    needsReload,
+    reloading,
+    previewSettled,
+    stopBlockers,
+    onReload: vi.fn(),
+  }))
+}
+
+describe('N-453/N-455 緊急コントロールの実挙動', () => {
+  it('遅いAアカウントの応答を、Bへ切り替えた後に反映しない', async () => {
+    let generation = 0
+    let visibleAccount = '未取得'
+    const accountA = deferred<string>()
+    const accountB = deferred<string>()
+
+    const requestA = ++generation
+    const pendingA = runCurrentRequest({
+      request: () => accountA.promise,
+      isCurrent: () => generation === requestA,
+      onSuccess: (account) => { visibleAccount = account },
+      onError: vi.fn(),
+    })
+
+    const requestB = ++generation
+    const pendingB = runCurrentRequest({
+      request: () => accountB.promise,
+      isCurrent: () => generation === requestB,
+      onSuccess: (account) => { visibleAccount = account },
+      onError: vi.fn(),
+    })
+
+    accountB.resolve('Bアカウント')
+    await pendingB
+    accountA.resolve('Aアカウント')
+    await pendingA
+
+    expect(visibleAccount).toBe('Bアカウント')
+    const html = renderFeedback({ tone: 'success', text: visibleAccount, needsReload: false })
+    expect(html).toContain('Bアカウント')
+    expect(html).not.toContain('Aアカウント')
   })
 
-  it('権限がないとき運用者向け文言と次の行動を表示する', () => {
-    expect(page).toContain('いまは緊急停止できません')
-    expect(page).toContain('オーナーに権限付与を依頼してください')
-    expect(page).toContain('対象アカウントを選び直すか、オーナーに確認してください')
-    expect(page).toContain('停止する配信を1つ以上選んでください')
+  it('切替前リクエストの遅い失敗も、Bの成功表示を壊さない', async () => {
+    let generation = 0
+    let visible = '未取得'
+    const errors: string[] = []
+    const accountA = deferred<string>()
+    const accountB = deferred<string>()
+
+    const requestA = ++generation
+    const pendingA = runCurrentRequest({
+      request: () => accountA.promise,
+      isCurrent: () => generation === requestA,
+      onSuccess: (value) => { visible = value },
+      onError: (error) => { errors.push(String(error)) },
+    })
+    const requestB = ++generation
+    const pendingB = runCurrentRequest({
+      request: () => accountB.promise,
+      isCurrent: () => generation === requestB,
+      onSuccess: (value) => { visible = value },
+      onError: (error) => { errors.push(String(error)) },
+    })
+
+    accountB.resolve('Bの最新状態')
+    await pendingB
+    accountA.reject(new Error('Aの遅い失敗'))
+    await pendingA
+
+    expect(visible).toBe('Bの最新状態')
+    expect(errors).toEqual([])
   })
 
-  it('403は機械コードで文言を選び、口の文言をそのまま出さない', () => {
-    expect(page).toContain('error.status === 403')
-    expect(page).toContain('operationBlockedText(error.code)')
+  it('409後は再読込だけを表示し、停止・復旧・本人確認をロックする', () => {
+    const state = emergencySafetyTransition('conflict')
+    const html = renderFeedback({
+      tone: state.message?.tone,
+      text: state.message?.text ?? '',
+      needsReload: state.needsReload,
+    })
+
+    expect(state.clearPreview).toBe(true)
+    expect(state.closeDialogs).toBe(true)
+    expect(html).toContain('最新の状態を読み直す')
+    expect(isEmergencyMutationLocked(state.needsReload, false)).toBe(true)
+    expect(isEmergencyMutationLocked(false, true)).toBe(true)
+    expect(isEmergencyMutationLocked(false, false)).toBe(false)
   })
 
-  it('取得失敗時も理由を出し、読み込み中だけ出さない', () => {
-    expect(page).toContain('previewSettled')
-    expect(page).toContain('impact !== null || impactFailed')
-  })
-})
+  it('再読込成功後は競合表示を消し、再試行できる', async () => {
+    const generation = 1
+    let state = emergencySafetyTransition('conflict')
+    const reload = deferred<string>()
 
-describe('N-455 競合後に読み直してやり直せる', () => {
-  it('競合の機械コードと最新状態を口が返す', () => {
-    expect(worker).toContain("code: 'VERSION_CONFLICT'")
-    expect(worker).toContain('data: result.control')
+    await Promise.all([
+      runCurrentRequest({
+        request: () => reload.promise,
+        isCurrent: () => generation === 1,
+        onSuccess: () => { state = emergencySafetyTransition('reload-success') },
+        onError: vi.fn(),
+      }),
+      Promise.resolve().then(() => reload.resolve('最新の状態を読み直しました。内容を確認して、もう一度実行してください。')),
+    ])
+
+    const html = renderFeedback({ tone: state.message?.tone, text: state.message?.text ?? '', needsReload: state.needsReload })
+    expect(html).toContain('もう一度実行してください')
+    expect(html).not.toContain('最新の状態を読み直す</button>')
+    expect(isEmergencyMutationLocked(state.needsReload, false)).toBe(false)
   })
 
-  it('409で読み直し操作を表示し、成功後は確認をやり直せる', () => {
-    expect(page).toContain('error.status === 409')
-    expect(page).toContain('setNeedsReload(true)')
-    expect(page).toContain('最新の状態を読み直す')
-    expect(page).toContain('別の管理者が先に変更しました')
-    // 成功・読み直し成功では合図を消し、確認ダイアログは閉じない(やり直せる)。
-    expect(page).toContain('setNeedsReload(false)')
-    expect(page).toContain('最新の状態を読み直しました。内容を確認して、もう一度実行してください。')
+  it('再読込失敗時は古い確認内容を破棄し、再読込導線を残す', async () => {
+    const generation = 1
+    let oldPreview: string | null = 'Aの古い確認内容'
+    let state = emergencySafetyTransition('conflict')
+    const reload = deferred<string>()
+
+    state = emergencySafetyTransition('reload-start')
+    if (state.clearPreview) oldPreview = null
+    const pending = runCurrentRequest({
+      request: () => reload.promise,
+      isCurrent: () => generation === 1,
+      onSuccess: vi.fn(),
+      onError: () => { state = emergencySafetyTransition('reload-failure') },
+    })
+    reload.reject(new Error('network error'))
+    await pending
+
+    expect(oldPreview).toBeNull()
+    expect(state.clearPreview).toBe(true)
+    expect(state.closeDialogs).toBe(true)
+    const html = renderFeedback({ tone: state.message?.tone, text: state.message?.text ?? '', needsReload: state.needsReload, previewSettled: true, stopBlockers: ['unavailable'] })
+    expect(html).toContain('読み直せませんでした')
+    expect(html).toContain('最新の状態を読み直す')
+    expect(html).toContain('停止・復旧を実行できません')
+    expect(html).not.toContain('Aの古い確認内容')
   })
 
-  it('読み直しは対象切替と同じ口を使い、失敗も黙らせない', () => {
-    expect(page).toContain('api.operations.preview(accountId)')
-    expect(page).toContain('reloadControl')
-    expect(page).toContain('最新の状態を読み直せませんでした。時間をおいてもう一度読み直してください。')
+  it('失敗後の再試行が成功すれば、最新内容だけを表示する', async () => {
+    const generation = 1
+    let visible: string | null = null
+    let state = emergencySafetyTransition('reload-failure')
+    const retry = deferred<string>()
+
+    const pending = runCurrentRequest({
+      request: () => retry.promise,
+      isCurrent: () => generation === 1,
+      onSuccess: (value) => {
+        visible = value
+        state = emergencySafetyTransition('reload-success')
+      },
+      onError: vi.fn(),
+    })
+    retry.resolve('Bの再取得内容')
+    await pending
+
+    const html = renderFeedback({ tone: state.message?.tone, text: visible ?? '', needsReload: state.needsReload })
+    expect(html).toContain('Bの再取得内容')
+    expect(isEmergencyMutationLocked(state.needsReload, false)).toBe(false)
   })
 })
