@@ -738,7 +738,9 @@ export async function listCommonActionResources(
       `SELECT id, name FROM scenarios WHERE line_account_id = ? AND is_active = 1 ORDER BY name ASC`,
     ).bind(input.lineAccountId).all<{ id: string; name: string }>(),
     db.prepare(
-      `SELECT id, name FROM templates WHERE line_account_id = ? ORDER BY name ASC`,
+      `SELECT id, name FROM templates
+        WHERE line_account_id = ? AND published_version > 0
+        ORDER BY name ASC`,
     ).bind(input.lineAccountId).all<{ id: string; name: string }>(),
     db.prepare(
       `SELECT sm.id, sm.name

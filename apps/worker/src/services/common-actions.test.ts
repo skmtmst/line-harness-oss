@@ -142,6 +142,33 @@ describe('V6共通アクション', () => {
     expect(published.versionNumber).toBe(1);
   });
 
+  it('テンプレート候補は同一アカウントの公開版だけを返す', async () => {
+    const unpublished = await createTemplate(testDb.db, {
+      name: '編集中', messageType: 'text', messageContent: '下書き', lineAccountId: 'account-1',
+    });
+    const published = await createTemplate(testDb.db, {
+      name: '公開中', messageType: 'text', messageContent: '公開版', lineAccountId: 'account-1',
+    });
+    const other = await createTemplate(testDb.db, {
+      name: '別アカウント', messageType: 'text', messageContent: '公開版', lineAccountId: 'account-2',
+    });
+    await publishTemplate(testDb.db, published.id, {
+      expectedVersion: 0,
+      expectedDraftRevision: 1,
+      idempotencyKey: 'common-resource-publish-1',
+    });
+    await publishTemplate(testDb.db, other.id, {
+      expectedVersion: 0,
+      expectedDraftRevision: 1,
+      idempotencyKey: 'common-resource-publish-2',
+    });
+
+    const resources = await listCommonActionResources(testDb.db, { lineAccountId: 'account-1' });
+    expect(resources.templates).toEqual([{ id: published.id, name: '公開中' }]);
+    expect(resources.templates).not.toContainEqual({ id: unpublished.id, name: '編集中' });
+    expect(resources.templates).not.toContainEqual({ id: other.id, name: '別アカウント' });
+  });
+
   it('未知の処理を保存も公開もしない', async () => {
     await expect(createCommonAction(testDb.db, {
       lineAccountId: 'account-1',

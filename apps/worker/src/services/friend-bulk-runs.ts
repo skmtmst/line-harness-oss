@@ -298,6 +298,25 @@ async function requireAccountResource(
   return row.line_account_id;
 }
 
+async function requirePublishedTemplateAccount(
+  db: D1Database,
+  id: string,
+): Promise<string | null> {
+  const row = await db.prepare(
+    `SELECT line_account_id
+       FROM templates
+      WHERE id = ? AND published_version > 0`,
+  ).bind(id).first<{ line_account_id: string | null }>();
+  if (!row) {
+    throw new FriendBulkRunError(
+      'template_not_published',
+      '公開済みのテンプレートが見つかりません',
+      409,
+    );
+  }
+  return row.line_account_id;
+}
+
 async function flattenCommonAction(
   db: D1Database,
   input: { commonActionId: string; versionId?: string; depth?: number; seen?: Set<string> },
@@ -381,7 +400,7 @@ async function prepareOperation(db: D1Database, operation: FriendBulkOperation):
       return { operation, resourceAccountId: await requireAccountResource(db, 'reminders', operation.reminderId, 'リマインダ'), reversible: true };
     case 'send_message': {
       const accountId = operation.templateId
-        ? await requireAccountResource(db, 'templates', operation.templateId, 'テンプレート')
+        ? await requirePublishedTemplateAccount(db, operation.templateId)
         : undefined;
       return { operation, resourceAccountId: accountId, reversible: false };
     }
