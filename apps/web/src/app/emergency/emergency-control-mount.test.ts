@@ -573,6 +573,35 @@ function dialogs(root: FakeNode): FakeElement[] {
   return allElements(root).filter((element) => element.getAttribute('role') === 'dialog')
 }
 
+/*
+ * 画面を覆う層。`fixed inset-0` は viewport 全面を覆うので、その外側は
+ * 運用者から見えないし押せない。DOM全体の textContent は「裏に文字がある」
+ * ことしか言わないため、見えているかどうかはこの覆いで判定する。
+ */
+function overlay(root: FakeNode): FakeElement | null {
+  return allElements(root).find((element) => {
+    const classes = element.className.split(/\s+/)
+    return classes.includes('fixed') && classes.includes('inset-0')
+  }) ?? null
+}
+
+/** 運用者に実際に見えている文字だけ。覆いがあれば覆いの中だけ。 */
+function visibleText(root: FakeElement): string {
+  const covering = overlay(root)
+  return covering ? covering.textContent : root.textContent
+}
+
+/**
+ * 画面のいちばん上に出る知らせの帯。停止不可の欄（`role="status"`）とは別物で、
+ * 押した直後に目に入るのはこちら。ここに理由が載っているかを別に確かめる。
+ */
+function noticeBanner(root: FakeNode): FakeElement | null {
+  return allElements(root).find((element) =>
+    element.tagName === 'DIV'
+    && element.className.split(/\s+/).includes('rounded-control')
+    && (element.firstChild as FakeElement | null)?.tagName === 'P') ?? null
+}
+
 function checkboxes(root: FakeNode): FakeElement[] {
   return allElements(root).filter((element) => element.tagName === 'INPUT' && element.getAttribute('type') === 'checkbox')
 }
@@ -655,6 +684,7 @@ async function choose(node: FakeElement, value: string): Promise<boolean> {
 type Host = {
   container: FakeElement
   text: () => string
+  visibleText: () => string
   unmount: () => void
 }
 
@@ -693,6 +723,7 @@ async function installReactHost(accounts: LineAccount[]): Promise<Host> {
   return {
     container,
     text: () => container.textContent,
+    visibleText: () => visibleText(container),
     unmount: () => {
       act(() => {
         root.unmount()
@@ -816,18 +847,69 @@ describe('EmergencyControlPanel を実際に mount して操作する', () => {
     host.unmount()
   })
 
-  it('停止の403は、機械コードのまま運用者向けの文言と次の行動になる', async () => {
+  it('停止の403は、本人確認の窓を閉じて理由を前面に出し、送り直せなくする', async () => {
     const host = await installReactHost(ACCOUNTS)
     await answerPreview(0, previewPayload({ mark: 400 }))
     const { ApiError } = await import('@/lib/api')
     bench.stopResult = () => Promise.reject(new ApiError(403, 'forbidden', 'EMERGENCY_CONTROL_FORBIDDEN'))
 
-    await runStopFlow(host)
+    // 送る直前は本人確認の窓が前面にあり、後ろは見えていない。
+    await click(button(host.container, '緊急停止する'))
+    await type(byId(host.container, 'emergency-confirm-word'), '停止')
+    await click(button(host.container, '配信を緊急停止する'))
+    await type(byId(host.container, 'emergency-step-up-code'), '123456')
+    expect(host.visibleText()).toContain('認証アプリで本人確認')
+    expect(host.visibleText()).not.toContain('止めるとどうなるか')
 
+    expect(await click(button(host.container, '本人確認して停止'))).toBe(true)
     expect(bench.stopCalls).toHaveLength(1)
-    expect(host.text()).toContain('緊急停止を実行する権限がありません。オーナーに権限付与を依頼してください。')
+
+    // 窓が閉じ、理由と次の行動が覆いの裏ではなく前面に出る。
+    expect(dialogs(host.container)).toHaveLength(0)
+    expect(overlay(host.container)).toBeNull()
+    const visible = host.visibleText()
+    expect(visible).toContain('緊急停止を実行する権限がありません。オーナーに権限付与を依頼してください。')
+    expect(visible).toContain('いまは緊急停止できません')
+    // 帯にも、停止不可の欄にも、口の機械コードから引いた理由が載る。
+    expect(noticeBanner(host.container)?.textContent).toContain('緊急停止を実行する権限がありません。オーナーに権限付与を依頼してください。')
     // 403は競合ではないので、読み直しは求めない。
     expect(optionalButton(host.container, '最新の状態を読み直す')).toBeNull()
+
+    // 送り直せない。入力も要求鍵も残っていない。
+    expect(optionalButton(host.container, '本人確認して停止')).toBeNull()
+    expect(allElements(host.container).some((element) => element.getAttribute('id') === 'emergency-step-up-code')).toBe(false)
+    expect(allElements(host.container).some((element) => element.getAttribute('id') === 'emergency-confirm-word')).toBe(false)
+    expect(button(host.container, '緊急停止する').hasAttribute('disabled')).toBe(true)
+    expect(await click(button(host.container, '緊急停止する'))).toBe(false)
+    expect(dialogs(host.container)).toHaveLength(0)
+    expect(bench.stopCalls).toHaveLength(1)
+    expect(bench.stepUpCalls).toHaveLength(1)
+
+    host.unmount()
+  })
+
+  it('復旧の403も同じく窓を閉じ、範囲の理由を前面に出して送り直せなくする', async () => {
+    const host = await installReactHost(ACCOUNTS)
+    await answerPreview(0, previewPayload({ mark: 700, activeIncidentId: 'incident-9' }))
+    const { ApiError } = await import('@/lib/api')
+    bench.restoreResult = () => Promise.reject(new ApiError(403, 'forbidden', 'EMERGENCY_SCOPE_FORBIDDEN'))
+
+    expect(await click(button(host.container, '復旧する'))).toBe(true)
+    await type(byId(host.container, 'emergency-confirm-word'), '復旧')
+    expect(await click(button(host.container, '復旧を実行する'))).toBe(true)
+    await type(byId(host.container, 'emergency-step-up-code'), '123456')
+    expect(host.visibleText()).toContain('認証アプリで本人確認')
+    expect(await click(button(host.container, '本人確認して復旧'))).toBe(true)
+
+    expect(bench.restoreCalls).toHaveLength(1)
+    expect(dialogs(host.container)).toHaveLength(0)
+    expect(overlay(host.container)).toBeNull()
+    expect(host.visibleText()).toContain('この範囲を操作する権限がありません。対象アカウントを選び直すか、オーナーに確認してください。')
+    expect(noticeBanner(host.container)?.textContent).toContain('この範囲を操作する権限がありません。対象アカウントを選び直すか、オーナーに確認してください。')
+    expect(optionalButton(host.container, '本人確認して復旧')).toBeNull()
+    expect(button(host.container, '復旧する').hasAttribute('disabled')).toBe(true)
+    expect(await click(button(host.container, '復旧する'))).toBe(false)
+    expect(bench.restoreCalls).toHaveLength(1)
 
     host.unmount()
   })
@@ -843,7 +925,8 @@ describe('EmergencyControlPanel を実際に mount して操作する', () => {
 
     expect(bench.stopCalls).toHaveLength(1)
     expect(dialogs(host.container)).toHaveLength(0)
-    expect(host.text()).toContain('別の管理者が先に変更しました')
+    expect(overlay(host.container)).toBeNull()
+    expect(host.visibleText()).toContain('別の管理者が先に変更しました')
     expect(host.text()).not.toContain('111件')
     expect(optionalButton(host.container, '最新の状態を読み直す')).not.toBeNull()
 

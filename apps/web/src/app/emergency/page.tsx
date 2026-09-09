@@ -116,7 +116,7 @@ function isEmergencyMutationLocked(needsReload: boolean, running: boolean): bool
   return needsReload || running
 }
 
-type EmergencySafetyEvent = 'conflict' | 'reload-start' | 'reload-success' | 'reload-failure'
+type EmergencySafetyEvent = 'conflict' | 'forbidden' | 'reload-start' | 'reload-success' | 'reload-failure'
 
 function emergencySafetyTransition(event: EmergencySafetyEvent): {
   clearPreview: boolean
@@ -131,6 +131,18 @@ function emergencySafetyTransition(event: EmergencySafetyEvent): {
     needsReload: true,
     reloading: false,
     message: { tone: 'warning', text: '別の管理者が先に変更しました。最新の状態を読み直してから、もう一度確認してください。' },
+  }
+  /*
+   * N-453: 403は「押した本人に権限が無い」。本人確認の窓を開けたままだと、
+   * 理由と次の行動が窓の裏へ回って見えず、同じ要求をもう一度送れてしまう。
+   * 窓と入力と要求鍵を閉じて、理由を前面に出し、送り直せなくする。
+   */
+  if (event === 'forbidden') return {
+    clearPreview: false,
+    closeDialogs: true,
+    needsReload: false,
+    reloading: false,
+    message: null,
   }
   if (event === 'reload-start') return {
     clearPreview: true,
@@ -589,6 +601,18 @@ function EmergencyControlPanel({ accounts }: { accounts: LineAccount[] }) {
     applySafetyTransition('conflict')
   }, [applySafetyTransition])
 
+  /*
+   * 403のあとは口の判断を画面へ持ち帰る。`canControl` を落とすことで
+   * 停止・復旧のボタンが押せなくなり、理由は常に見えている停止不可の欄に出る。
+   * 対象アカウントを選び直せば `preview` を取り直して復帰する。
+   */
+  const handleForbidden = useCallback((code: string | null | undefined) => {
+    applySafetyTransition('forbidden')
+    setCanControl(false)
+    setPreviewBlockedCode(code ?? null)
+    setMessage({ tone: 'warning', text: operationBlockedText(code) ?? 'この操作を行う権限がありません。オーナーに確認してください。' })
+  }, [applySafetyTransition])
+
   const selectedTargets = (Object.keys(targets) as StopTarget[]).filter((key) => targets[key])
   const selectedCapabilities = selectedTargets.flatMap((key) => TARGET_CAPABILITIES[key])
   const isStopped = Boolean(control?.activeIncidentId)
@@ -639,7 +663,7 @@ function EmergencyControlPanel({ accounts }: { accounts: LineAccount[] }) {
       if (error instanceof ApiError && error.status === 409) {
         handleConflict()
       } else if (error instanceof ApiError && error.status === 403) {
-        setMessage({ tone: 'warning', text: operationBlockedText(error.code) ?? 'この操作を行う権限がありません。オーナーに確認してください。' })
+        handleForbidden(error.code)
       } else {
         setMessage({ tone: 'danger', text: '緊急停止を保存できませんでした。最新の停止状態を読み直して、もう一度確認してください。' })
       }
@@ -665,7 +689,7 @@ function EmergencyControlPanel({ accounts }: { accounts: LineAccount[] }) {
       if (error instanceof ApiError && error.status === 409) {
         handleConflict()
       } else if (error instanceof ApiError && error.status === 403) {
-        setMessage({ tone: 'warning', text: operationBlockedText(error.code) ?? 'この操作を行う権限がありません。オーナーに確認してください。' })
+        handleForbidden(error.code)
       } else {
         setMessage({ tone: 'danger', text: '復旧できませんでした。最新の停止状態を読み直して、もう一度確認してください。' })
       }
