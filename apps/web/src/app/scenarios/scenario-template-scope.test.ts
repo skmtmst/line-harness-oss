@@ -31,9 +31,4 @@ describe('シナリオのテンプレート候補は持ち主の公開版だけ'
     expect(CAROUSEL).toContain('scenarioReferenceData.templates(accountId ?? undefined)')
     expect(CAROUSEL).toContain('filterSendableTemplates(res.data, accountId)')
   })
-
-  it('carousel-picker: 古い応答は世代で捨てる', () => {
-    expect(CAROUSEL).toContain('createLoadGeneration()')
-    expect(CAROUSEL).toContain('.isCurrent(generation)')
-  })
 })

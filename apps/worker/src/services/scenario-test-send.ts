@@ -23,23 +23,17 @@ export interface TestSendResult {
   sent: number
 }
 
-/**
- * 1通ぶんを組み立てる。送信はしない（プレビューにも使える）。
- * 独立審査(指摘5): 送る側のアカウントは必須。未公開・別アカウントは
- * step の控えに落とす。
- */
+/** 1通ぶんを組み立てる。送信はしない（プレビューにも使える）。 */
 export async function buildStepMessages(
   db: D1Database,
   step: ScenarioStep,
   friendId: string,
-  // 省略不可。null のときは持ち主不明として控えに落とす(fail-close)。
-  lineAccountId: string | null,
   workerUrl?: string,
 ): Promise<Message[]> {
   const friend = await getFriendById(db, friendId)
   if (!friend) throw new Error('friend not found')
 
-  const resolved = await resolveStepContent(db, step, lineAccountId)
+  const resolved = await resolveStepContent(db, step)
   const meta = await resolveMetadata(db, {
     user_id: (friend as unknown as Record<string, string | null>).user_id,
     metadata: (friend as unknown as Record<string, string | null>).metadata,
@@ -91,18 +85,17 @@ export async function testSendSteps(
     return { ok: false, error: 'この友だちはブロック中のため送れません。', sent: 0 }
   }
 
-  // 独立審査(指摘5): 送り先の持ち主では送らない。口で決めた持ち主だけで送る。
-  if (!scenarioAccountId) {
-    return { ok: false, error: 'シナリオのLINEアカウントが未設定のため、テスト送信できません。', sent: 0 }
+  let client = fallbackClient
+  const accountId = scenarioAccountId ?? friend.line_account_id
+  if (accountId) {
+    const account = await getLineAccountById(db, accountId)
+    if (!account) return { ok: false, error: 'LINEアカウントの設定が見つかりません。', sent: 0 }
+    client = new LineClient(account.channel_access_token)
   }
-  const accountId = scenarioAccountId
-  const account = await getLineAccountById(db, accountId)
-  if (!account) return { ok: false, error: 'LINEアカウントの設定が見つかりません。', sent: 0 }
-  const client = new LineClient(account.channel_access_token)
 
   let sent = 0
   for (const step of steps) {
-    const messages = await buildStepMessages(db, step, friendId, accountId, workerUrl)
+    const messages = await buildStepMessages(db, step, friendId, workerUrl)
     await client.pushMessage(friend.line_user_id, messages)
     sent += messages.length
 

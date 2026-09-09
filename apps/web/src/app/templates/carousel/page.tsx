@@ -101,20 +101,11 @@ function CarouselEditorInner() {
 
   useEffect(() => {
     if (!id) return
-    let cancelled = false
-    const requestAccountId = selectedAccountId
     void api.templates
       .get(id)
       .then((res) => {
-        if (cancelled) return
         if (!res.success) {
           markLoadFailed()
-          return
-        }
-        // 独立審査(指摘4): アカウント切替で別アカウントの編集内容を残さない。
-        if (requestAccountId && res.data.accountId && res.data.accountId !== requestAccountId) {
-          setLoadFailed(true)
-          setError('選んでいるLINEアカウントのテンプレートではありません。開き直してください。')
           return
         }
         setName(res.data.name)
@@ -161,10 +152,9 @@ function CarouselEditorInner() {
           setError('いまの中身を読み取れませんでした。保存すると上書きされます。')
         }
       })
-      .catch(() => { if (!cancelled) markLoadFailed() })
-      .finally(() => { if (!cancelled) setLoading(false) })
-    return () => { cancelled = true }
-  }, [id, selectedAccountId])
+      .catch(markLoadFailed)
+      .finally(() => setLoading(false))
+  }, [id])
 
   const update = (index: number, patch: Partial<Panel>) =>
     setPanels((prev) => prev.map((p, i) => (i === index ? { ...p, ...patch } : p)))

@@ -21,7 +21,7 @@ import { isScenarioActionComplete } from '../services/scenario-actions.js';
 import {
   resolveStepContent,
   getScenarioTriggers,
-  getAssociableTemplate,
+  getSendableTemplate,
   addScenarioTrigger,
   removeScenarioTrigger,
 } from '@line-crm/db';
@@ -732,7 +732,7 @@ scenarios.post('/api/scenarios/:id/steps', requireRole('owner', 'admin'), async 
     // templateId / onReachTagId 参照整合性チェック
     // 再審査対応(#645): ID存在だけでなく、同一アカウントかつ公開版であること。
     if (body.templateId != null) {
-      const tpl = await getAssociableTemplate(
+      const tpl = await getSendableTemplate(
         c.env.DB, body.templateId, scenarioRow.line_account_id ?? null,
       );
       if (!tpl) return c.json({ success: false, error: 'templateId not found' }, 400);
@@ -870,7 +870,7 @@ scenarios.put('/api/scenarios/:id/steps/:stepId', requireRole('owner', 'admin'),
         .bind(scenarioId)
         .first<{ line_account_id: string | null }>();
       if (!putScenario) return c.json({ success: false, error: 'Scenario not found' }, 404);
-      const tpl = await getAssociableTemplate(c.env.DB, body.templateId, putScenario.line_account_id);
+      const tpl = await getSendableTemplate(c.env.DB, body.templateId, putScenario.line_account_id);
       if (!tpl) return c.json({ success: false, error: 'templateId not found' }, 400);
       templateSnapshot = { message_type: tpl.message_type, message_content: tpl.message_content };
     }
@@ -1691,15 +1691,7 @@ async function runTestSend(
   if (!friend || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [friendAccountId])) {
     return c.json({ success: false, error: '送り先の友だちが見つかりません。' }, 404);
   }
-  // 独立審査(指摘5): アカウント未定のシナリオはテスト送信しない。
-  // 送り先の持ち主で送ると、別アカウントの下書きや公開版が混ざる。
-  if (!scenario.line_account_id) {
-    return c.json(
-      { success: false, error: 'このシナリオはLINEアカウントが未設定のため、テスト送信できません。' },
-      422,
-    );
-  }
-  if (friendAccountId !== scenario.line_account_id) {
+  if (scenario.line_account_id && friendAccountId !== scenario.line_account_id) {
     return c.json(
       { success: false, error: 'このシナリオと同じLINEアカウントの友だちを選んでください。' },
       422,

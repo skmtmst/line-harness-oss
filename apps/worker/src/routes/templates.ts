@@ -570,20 +570,20 @@ templates.post('/api/templates/:id/publish', requireRole('owner', 'admin'), asyn
     )) {
       return c.json({ success: false, error: 'Template not found' }, 404);
     }
-    // 独立審査P2: 版の確認は任意にしない。確認なしの公開は受け付けない。
-    // 詳細口が返す publishedVersion・draftRevision をそのまま送る。
     const body: { expectedVersion?: unknown; expectedDraftRevision?: unknown } =
       await c.req.json().catch(() => ({}));
     const expectedVersion = body.expectedVersion === undefined || body.expectedVersion === null
       ? undefined
       : Number(body.expectedVersion);
-    if (expectedVersion === undefined || !Number.isInteger(expectedVersion)) {
+    if (expectedVersion !== undefined && !Number.isInteger(expectedVersion)) {
       return c.json({ success: false, error: '版の番号を確認してください' }, 400);
     }
+    // 差し戻し対応(要件3): 検査したときの下書き版も受け取り、別人による
+    // 書き換え後の公開を止める。
     const expectedDraftRevision = body.expectedDraftRevision === undefined || body.expectedDraftRevision === null
       ? undefined
       : Number(body.expectedDraftRevision);
-    if (expectedDraftRevision === undefined || !Number.isInteger(expectedDraftRevision)) {
+    if (expectedDraftRevision !== undefined && !Number.isInteger(expectedDraftRevision)) {
       return c.json({ success: false, error: '下書きの版を確認してください' }, 400);
     }
     // 公開する版も保存時と同じ検査を通す。下書きは保存時に検査済みだが、

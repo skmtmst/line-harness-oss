@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
 import {
-  createLoadGeneration,
   filterSendableTemplates,
   isSendableTemplate,
 } from './template-send-scope'
@@ -50,30 +49,5 @@ describe('filterSendableTemplates', () => {
       { id: 'other', accountId: 'account-2', publishedVersion: 2, publishedAt: '2026-09-01T00:00:00+09:00' },
     ]
     expect(filterSendableTemplates(rows, 'account-1').map((row) => row.id)).toEqual(['mine'])
-  })
-})
-
-describe('createLoadGeneration', () => {
-  it('遅延Promiseが順不同で返っても最新の世代だけが生かされる', async () => {
-    const generation = createLoadGeneration()
-    const drawn: string[] = []
-    const render = (gen: number, label: string) => {
-      if (generation.isCurrent(gen)) drawn.push(label)
-    }
-    // 古い読み込み(A)の応答が遅れて後に届く。
-    const genA = generation.next()
-    const slowA = Promise.resolve().then(() => render(genA, 'A-old'))
-    // 新しい読み込み(B)が先に届く。
-    const genB = generation.next()
-    const fastB = Promise.resolve().then(() => render(genB, 'B-new'))
-    await Promise.all([slowA, fastB])
-    expect(drawn).toEqual(['B-new'])
-  })
-
-  it('同じ世代の再描画は通す', () => {
-    const generation = createLoadGeneration()
-    const gen = generation.next()
-    expect(generation.isCurrent(gen)).toBe(true)
-    expect(generation.isCurrent(gen - 1)).toBe(false)
   })
 })

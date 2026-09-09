@@ -20,7 +20,7 @@ import {
   getTrackedLinkById,
   getRichMenuTapStats,
   getRichMenuAudienceStats,
-  getAssociableTemplate,
+  getSendableTemplate,
   recordRichMenuAssignmentsByLineUserIds,
   clearRichMenuAssignmentsForGroup,
   jstNow,
@@ -327,7 +327,7 @@ async function validateAreaTemplates(
   for (const page of pages) {
     for (const area of page.areas ?? []) {
       if (area.intent === 'template' && area.templateId) {
-        const tpl = await getAssociableTemplate(db, area.templateId, accountId);
+        const tpl = await getSendableTemplate(db, area.templateId, accountId);
         if (!tpl) return '選んだテンプレートを確認できません';
       }
     }

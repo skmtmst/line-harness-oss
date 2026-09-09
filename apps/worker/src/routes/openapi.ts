@@ -1093,10 +1093,9 @@ const spec = {
         ],
         requestBody: { content: { 'application/json': { schema: {
           type: 'object',
-          required: ['expectedVersion', 'expectedDraftRevision'],
           properties: {
-            expectedVersion: { type: 'integer', minimum: 0, description: '確認したときの公開版。必須。進んでいたら409。' },
-            expectedDraftRevision: { type: 'integer', minimum: 0, description: '確認したときの下書き版。必須。書き換わっていたら409。' },
+            expectedVersion: { type: 'integer', minimum: 0, description: '確認したときの公開版。進んでいたら409。' },
+            expectedDraftRevision: { type: 'integer', minimum: 0, description: '確認したときの下書き版。書き換わっていたら409。' },
           },
         } } } },
         responses: {

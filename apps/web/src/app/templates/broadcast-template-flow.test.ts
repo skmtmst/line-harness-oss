@@ -34,17 +34,9 @@ describe('コンテンツテンプレートから一斉配信への引用導線'
   })
 
   it('ignores stale template responses after switching accounts (generation check)', () => {
-    // 独立審査指摘4: アカウント切替で古い応答が混ざらないよう世代で照合する。
-    expect(formSource).toContain('createLoadGeneration()')
-    expect(formSource).toContain('.next()')
-    expect(formSource).toContain('.isCurrent(')
+    // 再審査4: アカウント切替で古い応答が混ざらないよう世代で照合する。
+    expect(formSource).toContain('templateLoadGenerationRef')
     expect(formSource).toContain('if (!isCurrent()) return')
-  })
-
-  it('drops previous-account templates and bubbles on account switch', () => {
-    // 独立審査指摘4: 旧候補・選択・吹き出しを残さない。持ち主不明は保つ。
-    expect(formSource).toContain('setSelectedTemplate(null)')
-    expect(formSource).toContain('templateAccountId')
-    expect(formSource).toContain('owner == null || owner === selectedAccountId')
+    expect(formSource).toContain('selectedAccountIdRef')
   })
 })

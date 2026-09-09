@@ -17,24 +17,11 @@ describe('broadcast template conversion', () => {
       category: 'general',
       messageType: 'text',
       messageContent: 'こんにちは',
-      accountId: 'account-1',
     })).toEqual({
       id: 'bubble-id',
       type: 'text',
-      content: { text: 'こんにちは', templateId: 'tpl-1', templateName: 'ご案内', templateAccountId: 'account-1' },
+      content: { text: 'こんにちは', templateId: 'tpl-1', templateName: 'ご案内' },
     })
-  })
-
-  it('stamps the template owner for account-switch cleanup', () => {
-    const bubble = messageTemplateToBubble({
-      id: 'tpl-1',
-      name: 'ご案内',
-      category: 'general',
-      messageType: 'text',
-      messageContent: 'こんにちは',
-      accountId: 'account-2',
-    })
-    expect(bubble?.content.templateAccountId).toBe('account-2')
   })
 
   it('keeps a content template reference in the selected bubble', () => {

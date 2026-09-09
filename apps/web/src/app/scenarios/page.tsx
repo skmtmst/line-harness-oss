@@ -256,12 +256,6 @@ export default function ScenariosPage() {
    */
   const handleCreate = async () => {
     if (creating) return
-    // 独立審査(指摘3): 持ち主未定のシナリオは作らない。作ると、
-    // テンプレートを結べずテスト送信もできない行き止まりになる。
-    if (!selectedAccountId) {
-      setActionError('LINEアカウントを選んでから作成してください。')
-      return
-    }
     setCreating(true)
     setActionError('')
     const res = await api.scenarios.create({

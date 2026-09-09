@@ -37,7 +37,7 @@ import {
   type TargetMode,
 } from '@/lib/broadcast-audience'
 import type { SegmentCondition } from '@/lib/segment-condition'
-import { createLoadGeneration, filterSendableTemplates } from '@/lib/template-send-scope'
+import { filterSendableTemplates } from '@/lib/template-send-scope'
 import { newBroadcastDraftSession, persistBroadcastDraft } from '@/lib/broadcast-draft'
 import ConditionBuilder from '@/components/shared/condition-builder'
 import SegmentPresetControls from '@/components/broadcasts/segment-preset-controls'
@@ -472,8 +472,8 @@ export default function BroadcastForm({
    */
   const draftSession = useRef(newBroadcastDraftSession())
   const appliedInitialTemplate = useRef(false)
-  // 独立審査(指摘4): テンプレート読み込みの世代照合と選択中アカウントの記録。
-  const templateLoadGenerationRef = useRef(createLoadGeneration())
+  // 再審査対応(#645-4): テンプレート読み込みの世代照合と選択中アカウントの記録。
+  const templateLoadGenerationRef = useRef(0)
   const selectedAccountIdRef = useRef(selectedAccountId)
   selectedAccountIdRef.current = selectedAccountId
   const searchParams = useSearchParams()
@@ -620,14 +620,11 @@ export default function BroadcastForm({
   }, [selectedAccountId])
 
   useEffect(() => {
-    // 独立審査(指摘4): アカウント切替で古い応答が混ざらないよう世代で照合する。
+    // 再審査対応(#645-4): アカウント切替で古い応答が混ざらないよう世代で照合する。
     const requestAccountId = selectedAccountId || undefined
-    // 独立審査(指摘4): 新しい応答が来るまで旧アカウントの候補を見せない。
-    setMessageTemplates([])
-    setAssets([])
-    const requestGeneration = templateLoadGenerationRef.current.next()
+    const requestGeneration = ++templateLoadGenerationRef.current
     const isCurrent = () =>
-      templateLoadGenerationRef.current.isCurrent(requestGeneration)
+      templateLoadGenerationRef.current === requestGeneration
       && (selectedAccountIdRef.current ?? undefined) === requestAccountId
     Promise.all([
       api.broadcastMessageAssets.list({ accountId: requestAccountId }),
@@ -641,18 +638,7 @@ export default function BroadcastForm({
         ? filterSendableTemplates(templateResult.data, requestAccountId)
         : []
       if (templateResult.success) {
-        setMessageTemplates(sendable
-          .filter((template) => ['text', 'image', 'flex'].includes(template.messageType))
-          .map((template) => ({
-            id: template.id,
-            name: template.name,
-            category: template.category,
-            messageType: template.messageType,
-            messageContent: template.messageContent,
-            usageCount: template.usageCount,
-            updatedAt: template.updatedAt,
-            accountId: template.accountId,
-          })))
+        setMessageTemplates(sendable.filter((template) => ['text', 'image', 'flex'].includes(template.messageType)))
       }
       if (!appliedInitialTemplate.current) {
         const template = templateResult.success
@@ -675,16 +661,6 @@ export default function BroadcastForm({
       }
     }).catch(() => undefined)
   }, [initialContentTemplateId, initialTemplateId, selectedAccountId])
-
-  // 独立審査(指摘4): アカウント切替で旧候補・選択・吹き出しを残さない。
-  // 持ち主の分かる吹き出しだけ落とし、手書き・素材は保つ。
-  useEffect(() => {
-    setSelectedTemplate(null)
-    setBubbles((items) => items.filter((bubble) => {
-      const owner = bubble.content.templateAccountId
-      return owner == null || owner === selectedAccountId
-    }))
-  }, [selectedAccountId])
 
   useEffect(() => {
     if (!selectedAccountId) {

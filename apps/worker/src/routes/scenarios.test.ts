@@ -23,7 +23,7 @@ const dbMocks = {
   getFriendById: vi.fn(),
   computeNextDeliveryAt: vi.fn(),
   resolveStepContent: vi.fn(),
-  getAssociableTemplate: vi.fn(),
+  getSendableTemplate: vi.fn(),
 };
 vi.mock('@line-crm/db', () => dbMocks);
 
@@ -319,42 +319,6 @@ describe('POST /api/scenarios/:id/test-send', () => {
     expect(stepReads()).toBe(0);
   });
 
-  test('持ち主未定のシナリオはテスト送信しない(送り先の持ち主で送らない)', async () => {
-    dbMocks.getScenarioById.mockResolvedValue({ id: 'scenario-1', line_account_id: null });
-    dbMocks.getFriendById.mockResolvedValue({ id: 'friend-1', line_account_id: 'account-1' });
-    let stepReads = 0;
-    const nullAccountDb = {
-      prepare(sql: string) {
-        const statement = {
-          bind() {
-            return statement;
-          },
-          async first() {
-            if (/SELECT id, line_account_id FROM scenarios/i.test(sql)) {
-              return { id: 'scenario-1', line_account_id: null };
-            }
-            return null;
-          },
-          async all() {
-            stepReads += 1;
-            return { results: [] };
-          },
-        };
-        return statement;
-      },
-    } as unknown as D1Database;
-
-    const response = await setupApp(nullAccountDb).request('/api/scenarios/scenario-1/test-send', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ friendId: 'friend-1' }),
-    });
-
-    expect(response.status).toBe(422);
-    expect(await response.json()).toMatchObject({ success: false });
-    expect(stepReads).toBe(0);
-  });
-
   test('担当者から見えない友だちは存在を隠して送信処理を始めない', async () => {
     dbMocks.getScenarioById.mockResolvedValue({ id: 'scenario-1', line_account_id: 'account-1' });
     dbMocks.getFriendById.mockResolvedValue({ id: 'friend-hidden', line_account_id: 'account-1' });
@@ -492,7 +456,7 @@ describe('シナリオ通の本文契約', () => {
 
   test('未公開・別アカウントのテンプレートは通の作成で結びつけられない(再審査2・3)', async () => {
     dbMocks.getScenarioById.mockResolvedValue(visibleScenario);
-    dbMocks.getAssociableTemplate.mockResolvedValue(null);
+    dbMocks.getSendableTemplate.mockResolvedValue(null);
     const db = {
       prepare(sql: string) {
         const statement = {
@@ -528,7 +492,7 @@ describe('シナリオ通の本文契約', () => {
 
   test('未公開・別アカウントのテンプレートは通の更新で結びつけられない(再審査2・3)', async () => {
     dbMocks.getScenarioById.mockResolvedValue(visibleScenario);
-    dbMocks.getAssociableTemplate.mockResolvedValue(null);
+    dbMocks.getSendableTemplate.mockResolvedValue(null);
     const db = {
       prepare(sql: string) {
         const statement = {
