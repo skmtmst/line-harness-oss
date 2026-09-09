@@ -304,7 +304,8 @@
     "340_staff_two_factor_setup_attempts.sql",
     "341_ec_notification_settings_account_scope.sql",
     "343_messages_log_broadcast_recipient_index.sql",
-    "349_affiliate_settlement_snapshot.sql"
+    "349_affiliate_settlement_snapshot.sql",
+    "354_analytics_cross_lease_generation.sql"
   ],
-  "migrationCount": 305
+  "migrationCount": 306
 }
