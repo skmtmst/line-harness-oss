@@ -15,7 +15,7 @@ import { fileURLToPath } from 'node:url';
 
 import {
   claimFriendAddSendRight,
-  isFriendAddSendRightHolder,
+  touchFriendAddSendClaim,
   releaseFriendAddSendRight,
   markFriendAddEventRouting,
 } from '../src/friend-add-events.js';
@@ -132,7 +132,7 @@ describe('送信権の予約 — 独立2接続 (#622)', () => {
     const winner = a.held ? a : b;
     expect(winner.generation).toBe(1);
     const loser = a.held ? b : a;
-    expect(loser).toEqual({ held: false, generation: 0 });
+    expect(loser).toEqual({ held: false, generation: 0, previousDispatchUnknown: false });
     expect(connA.prepare(`SELECT COUNT(*) AS n FROM friend_add_send_claims`).get()).toEqual({ n: 1 });
   });
 
@@ -140,16 +140,16 @@ describe('送信権の予約 — 独立2接続 (#622)', () => {
     const a = await claimFriendAddSendRight(dbA, {
       lineAccountId: 'account-1', friendId: 'friend-1', eventId: 'event-a', now: NOW,
     });
-    expect(a).toEqual({ held: true, generation: 1 });
+    expect(a).toEqual({ held: true, generation: 1, previousDispatchUnknown: false });
 
     // Aが処理中に落ちたとみなされる時刻。Bが別接続から奪い直す。
     const b = await claimFriendAddSendRight(dbB, {
       lineAccountId: 'account-1', friendId: 'friend-1', eventId: 'event-b', now: LATER,
     });
-    expect(b).toEqual({ held: true, generation: 2 });
+    expect(b).toEqual({ held: true, generation: 2, previousDispatchUnknown: false });
 
     // Aは自分の接続で見ても、もう持ち主ではない
-    await expect(isFriendAddSendRightHolder(dbA, {
+    await expect(touchFriendAddSendClaim(dbA, {
       lineAccountId: 'account-1', friendId: 'friend-1', eventId: 'event-a', generation: a.generation,
     })).resolves.toBe(false);
 

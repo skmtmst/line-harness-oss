@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 import {
   claimFriendAddSendRight,
-  isFriendAddSendRightHolder,
+  touchFriendAddSendClaim,
   releaseFriendAddSendRight,
 } from '../src/friend-add-events.js';
 
@@ -99,15 +99,15 @@ describe('358 friend_add_send_claims', () => {
   it('先に予約した実行だけが送れる', async () => {
     await expect(
       claimFriendAddSendRight(db, { lineAccountId: 'account-1', friendId: 'friend-1', eventId: 'event-a', now: NOW }),
-    ).resolves.toEqual({ held: true, generation: 1 });
+    ).resolves.toEqual({ held: true, generation: 1, previousDispatchUnknown: false });
     // 別webhook IDの並行実行は引く
     await expect(
       claimFriendAddSendRight(db, { lineAccountId: 'account-1', friendId: 'friend-1', eventId: 'event-b', now: NOW }),
-    ).resolves.toEqual({ held: false, generation: 0 });
+    ).resolves.toEqual({ held: false, generation: 0, previousDispatchUnknown: false });
     // 別の友だちは関係ない
     await expect(
       claimFriendAddSendRight(db, { lineAccountId: 'account-1', friendId: 'friend-2', eventId: 'event-c', now: NOW }),
-    ).resolves.toEqual({ held: true, generation: 1 });
+    ).resolves.toEqual({ held: true, generation: 1, previousDispatchUnknown: false });
   });
 
   it('解放したら次の実行が予約できる', async () => {
@@ -116,11 +116,11 @@ describe('358 friend_add_send_claims', () => {
     await releaseFriendAddSendRight(db, { lineAccountId: 'account-1', friendId: 'friend-1', eventId: 'event-x', generation: first.generation });
     await expect(
       claimFriendAddSendRight(db, { lineAccountId: 'account-1', friendId: 'friend-1', eventId: 'event-b', now: NOW }),
-    ).resolves.toEqual({ held: false, generation: 0 });
+    ).resolves.toEqual({ held: false, generation: 0, previousDispatchUnknown: false });
     await releaseFriendAddSendRight(db, { lineAccountId: 'account-1', friendId: 'friend-1', eventId: 'event-a', generation: first.generation });
     await expect(
       claimFriendAddSendRight(db, { lineAccountId: 'account-1', friendId: 'friend-1', eventId: 'event-b', now: NOW }),
-    ).resolves.toEqual({ held: true, generation: 1 });
+    ).resolves.toEqual({ held: true, generation: 1, previousDispatchUnknown: false });
   });
 
   it('古い予約（処理中に落ちた残り）は世代を進めて奪い直せる', async () => {
@@ -130,17 +130,17 @@ describe('358 friend_add_send_claims', () => {
     ).run();
     await expect(
       claimFriendAddSendRight(db, { lineAccountId: 'account-1', friendId: 'friend-1', eventId: 'event-new', now: NOW }),
-    ).resolves.toEqual({ held: true, generation: 2 });
+    ).resolves.toEqual({ held: true, generation: 2, previousDispatchUnknown: false });
   });
 
   it('回収後の旧持ち主は持ち主でない', async () => {
     const first = await claimFriendAddSendRight(db, { lineAccountId: 'account-1', friendId: 'friend-1', eventId: 'event-a', now: NOW });
     await expect(
-      isFriendAddSendRightHolder(db, { lineAccountId: 'account-1', friendId: 'friend-1', eventId: 'event-a', generation: first.generation }),
+      touchFriendAddSendClaim(db, { lineAccountId: 'account-1', friendId: 'friend-1', eventId: 'event-a', generation: first.generation }),
     ).resolves.toBe(true);
     // 別の持ち主は持ち主でない
     await expect(
-      isFriendAddSendRightHolder(db, { lineAccountId: 'account-1', friendId: 'friend-1', eventId: 'event-b', generation: first.generation }),
+      touchFriendAddSendClaim(db, { lineAccountId: 'account-1', friendId: 'friend-1', eventId: 'event-b', generation: first.generation }),
     ).resolves.toBe(false);
     // 予約を古くして回収させると世代が進み、旧持ち主は弾かれる
     raw.prepare(
@@ -151,17 +151,17 @@ describe('358 friend_add_send_claims', () => {
       lineAccountId: 'account-1', friendId: 'friend-1', eventId: 'event-b',
       now: '2026-09-08T10:10:00.000+09:00',
     });
-    expect(stolen).toEqual({ held: true, generation: 2 });
+    expect(stolen).toEqual({ held: true, generation: 2, previousDispatchUnknown: false });
     await expect(
-      isFriendAddSendRightHolder(db, { lineAccountId: 'account-1', friendId: 'friend-1', eventId: 'event-a', generation: first.generation }),
+      touchFriendAddSendClaim(db, { lineAccountId: 'account-1', friendId: 'friend-1', eventId: 'event-a', generation: first.generation }),
     ).resolves.toBe(false);
     await expect(
-      isFriendAddSendRightHolder(db, { lineAccountId: 'account-1', friendId: 'friend-1', eventId: 'event-b', generation: stolen.generation }),
+      touchFriendAddSendClaim(db, { lineAccountId: 'account-1', friendId: 'friend-1', eventId: 'event-b', generation: stolen.generation }),
     ).resolves.toBe(true);
     // 回収で進んだ世代の予約は、旧世代では消せない
     await releaseFriendAddSendRight(db, { lineAccountId: 'account-1', friendId: 'friend-1', eventId: 'event-b', generation: first.generation });
     await expect(
-      isFriendAddSendRightHolder(db, { lineAccountId: 'account-1', friendId: 'friend-1', eventId: 'event-b', generation: stolen.generation }),
+      touchFriendAddSendClaim(db, { lineAccountId: 'account-1', friendId: 'friend-1', eventId: 'event-b', generation: stolen.generation }),
     ).resolves.toBe(true);
   });
 });
