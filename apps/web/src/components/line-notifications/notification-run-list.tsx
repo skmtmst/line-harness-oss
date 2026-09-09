@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ApiError, api, type EcNotificationRun, type EcNotificationRunList } from '@/lib/api'
 import Button from '@/components/shared/button'
 import FilterChip from '@/components/shared/filter-chip'
@@ -51,13 +51,26 @@ function formatJst(value: string | null): string {
 }
 
 type LoadState = 'loading' | 'ready' | 'error' | 'forbidden'
+
+/**
+ * 表示中のLINEアカウント・タブを指す世代。`key` はアカウントとタブの組。
+ * 切り替えるたびに `generation` をレンダー中に同期して1つ進める。
+ * useEffectで進めると、直前のPromiseがマイクロタスクとしてuseEffectより
+ * 先にほどけたとき、古い世代のままisCurrent判定を通してしまい、
+ * notice・retrying・reloadが新しい画面へ漏れる（司令塔差し戻しの実例）。
+ */
+export type NotificationRunScope = { key: string; generation: number }
+
 export type ScopedLoadState = {
-  scope: string
+  generation: number
   state: LoadState
   result: EcNotificationRunList | null
   total: number
 }
 export type NotificationRunNotice = { tone: 'success' | 'error'; text: string } | null
+export type ScopedNotice = { generation: number; notice: NotificationRunNotice }
+export type ScopedRetrying = { generation: number; id: string | null }
+
 export type RunFilter = 'all' | 'failed' | 'excluded' | 'clicked'
 export type RecipientFilter = 'all' | EcNotificationRun['recipientType']
 export type PeriodFilter = 'all' | '24h' | '7d' | '30d'
@@ -102,36 +115,37 @@ export type NotificationRunPorts = {
 }
 
 /**
- * 読み込みと再試行が共有する足場。
- * `requestRef` は読み込みを始めた回数、`scopeRef` は最後に読み込みを始めた
- * LINEアカウントとタブ。この2つが「今どの画面を見ているか」の唯一の目印で、
- * 待っている間に切り替わったかどうかはここだけで判断する。
+ * 読み込みと再試行が共有する足場。`scopeRef` は今どの世代を表示しているか
+ * の唯一の目印で、レンダー本体で同期して更新する（コンポーネント側を
+ * 参照）。待っている間に世代が進んだかどうかはここだけで判断する。
  */
 export type NotificationRunEnv = {
   requestRef: { current: number }
-  scopeRef: { current: string }
+  scopeRef: { current: NotificationRunScope }
   ports: NotificationRunPorts
   setLoaded: (next: ScopedLoadState) => void
-  setNotice: (next: NotificationRunNotice) => void
-  setRetrying: (update: (current: string | null) => string | null) => void
+  setNotice: (next: ScopedNotice) => void
+  setRetrying: (update: (current: ScopedRetrying) => ScopedRetrying) => void
 }
 
 export type NotificationRunLoadParams = {
-  scope: string
+  generation: number
   lineAccountId: string | null
   mode: 'history' | 'failures'
   page: number
 }
 
 export async function loadNotificationRuns(env: NotificationRunEnv, params: NotificationRunLoadParams): Promise<void> {
+  const { generation } = params
   const request = ++env.requestRef.current
-  env.scopeRef.current = params.scope
+  // 同じ世代の中でも、後から始めた読み込みだけを採用する（ページ送りなど）。
+  const isCurrentRequest = () => request === env.requestRef.current
   if (!params.lineAccountId) {
-    env.setLoaded({ scope: params.scope, state: 'ready', result: null, total: 0 })
+    env.setLoaded({ generation, state: 'ready', result: null, total: 0 })
     return
   }
-  // scope・状態・結果を1つの更新で切り替え、前scopeの成功結果を再表示しない。
-  env.setLoaded({ scope: params.scope, state: 'loading', result: null, total: 0 })
+  // 世代・状態・結果を1つの更新で切り替え、前世代の成功結果を再表示しない。
+  env.setLoaded({ generation, state: 'loading', result: null, total: 0 })
   try {
     const query = {
       lineAccountId: params.lineAccountId,
@@ -153,18 +167,18 @@ export async function loadNotificationRuns(env: NotificationRunEnv, params: Noti
     const response = !fellBack && (!primary.pagination || primary.data.coverage?.source !== 'notification_delivery_ledger')
       ? await env.ports.notificationRuns(query)
       : primary
-    if (request !== env.requestRef.current) return
+    if (!isCurrentRequest()) return
     if (!response.success) throw new Error('load failed')
     env.setLoaded({
-      scope: params.scope,
+      generation,
       state: 'ready',
       result: response.data,
       total: response.pagination.total,
     })
   } catch (error) {
-    if (request !== env.requestRef.current) return
+    if (!isCurrentRequest()) return
     env.setLoaded({
-      scope: params.scope,
+      generation,
       state: error instanceof ApiError && error.status === 403 ? 'forbidden' : 'error',
       result: null,
       total: 0,
@@ -172,35 +186,32 @@ export async function loadNotificationRuns(env: NotificationRunEnv, params: Noti
   }
 }
 
-export async function retryNotificationRun(
-  env: NotificationRunEnv,
-  params: {
-    scope: string
-    lineAccountId: string | null
-    item: EcNotificationRun
-    reload: () => Promise<void>
-  },
-): Promise<void> {
-  const { item, lineAccountId } = params
+export type NotificationRunRetryParams = {
+  generation: number
+  lineAccountId: string | null
+  item: EcNotificationRun
+  reload: () => Promise<void>
+}
+
+export async function retryNotificationRun(env: NotificationRunEnv, params: NotificationRunRetryParams): Promise<void> {
+  const { item, lineAccountId, generation } = params
   if (!lineAccountId || !item.retryAvailable) return
   /*
-   * 再試行の応答は、押した時のLINEアカウントとタブへだけ返す。
-   * 待っている間に切り替わっていたら、知らせも読み直しも捨てる。
-   * 捨てないと、押した時の読み直しが次のアカウントの読み込みを打ち消し、
-   * 画面が読み込み中のまま止まる。失敗の文言も前のアカウントの分が出る。
+   * 再試行の応答は、押した時の世代へだけ返す。待っている間に世代が
+   * 進んでいたら、知らせも読み直しも捨てる。env.scopeRef.current は
+   * コンポーネントのレンダー本体で世代切替と同期して更新されるため、
+   * useEffectの発火を待たずに正しい判定ができる。
    */
-  const startRequest = env.requestRef.current
-  const startScope = params.scope
-  const isCurrent = () => env.requestRef.current === startRequest && env.scopeRef.current === startScope
-  env.setRetrying(() => item.id)
-  env.setNotice(null)
+  const isCurrent = () => env.scopeRef.current.generation === generation
+  env.setRetrying(() => ({ generation, id: item.id }))
+  env.setNotice({ generation, notice: null })
   try {
     await env.ports.retryDelivery(item.id, {
       lineAccountId,
       expectedVersion: item.recordVersion,
     })
     if (!isCurrent()) return
-    env.setNotice({ tone: 'success', text: '同じ通知の送信を安全に再試行しました。' })
+    env.setNotice({ generation, notice: { tone: 'success', text: '同じ通知の送信を安全に再試行しました。' } })
     await params.reload()
   } catch (error) {
     if (!isCurrent()) return
@@ -209,10 +220,10 @@ export async function retryNotificationRun(
       : error instanceof ApiError && error.status === 409
         ? 'ほかの担当者が先に再試行しました。最新の記録を読み直してください。'
         : '送信を再試行できませんでした。時間をおいて読み直してください。'
-    env.setNotice({ tone: 'error', text })
+    env.setNotice({ generation, notice: { tone: 'error', text } })
   } finally {
     // 切替後に別の行で始まった再試行の表示までは消さない。
-    env.setRetrying((current) => (current === item.id ? null : current))
+    env.setRetrying((current) => (current.generation === generation && current.id === item.id ? { generation, id: null } : current))
   }
 }
 
@@ -224,23 +235,33 @@ export default function NotificationRunList({
   mode: 'history' | 'failures'
 }) {
   const [page, setPage] = useState(1)
-  const [loaded, setLoaded] = useState<ScopedLoadState>({
-    scope: '',
-    state: 'loading',
-    result: null,
-    total: 0,
-  })
+  const currentScopeKey = `${lineAccountId ?? 'none'}:${mode}`
+
+  const [scope, setScope] = useState<NotificationRunScope>(() => ({ key: currentScopeKey, generation: 0 }))
+  if (scope.key !== currentScopeKey) {
+    /*
+     * レンダー本体で同期して世代を進める（Reactが公式に認める
+     * 「レンダー中にstateを調整する」形）。useEffectへ回すと、
+     * このレンダーから次のuseEffectが動くまでの窓で先に解決した
+     * Promiseが古い世代のままisCurrent判定を通してしまう。
+     */
+    setScope({ key: currentScopeKey, generation: scope.generation + 1 })
+  }
+  // env越しに非同期処理から読める、世代の同期ミラー。
+  const scopeRef = useRef(scope)
+  scopeRef.current = scope
+  const generation = scope.generation
+
+  const [loaded, setLoaded] = useState<ScopedLoadState>({ generation: -1, state: 'loading', result: null, total: 0 })
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<RunFilter>('all')
   const [recipientFilter, setRecipientFilter] = useState<RecipientFilter>('all')
   const [periodFilter, setPeriodFilter] = useState<PeriodFilter>('all')
-  const [retryingId, setRetryingId] = useState<string | null>(null)
-  const [notice, setNotice] = useState<NotificationRunNotice>(null)
+  const [retrying, setRetrying] = useState<ScopedRetrying>({ generation: -1, id: null })
+  const [notice, setNotice] = useState<ScopedNotice>({ generation: -1, notice: null })
   // 再試行口は店長専用。担当者にはボタンを出さない。
   const [canRetry, setCanRetry] = useState(false)
   const requestRef = useRef(0)
-  const currentScope = `${lineAccountId ?? 'none'}:${mode}`
-  const scopeRef = useRef(currentScope)
   const env = useMemo<NotificationRunEnv>(() => ({
     requestRef,
     scopeRef,
@@ -251,7 +272,7 @@ export default function NotificationRunList({
     },
     setLoaded,
     setNotice,
-    setRetrying: setRetryingId,
+    setRetrying,
   }), [])
 
   useEffect(() => {
@@ -268,19 +289,17 @@ export default function NotificationRunList({
     setFilter('all')
     setRecipientFilter('all')
     setPeriodFilter('all')
-    setNotice(null)
-    setRetryingId(null)
   }, [lineAccountId, mode])
 
   const load = useCallback(
-    () => loadNotificationRuns(env, { scope: currentScope, lineAccountId, mode, page }),
-    [currentScope, env, lineAccountId, mode, page],
+    () => loadNotificationRuns(env, { generation, lineAccountId, mode, page }),
+    [env, generation, lineAccountId, mode, page],
   )
 
   useEffect(() => { void load() }, [load])
 
   const retry = (item: EcNotificationRun) => retryNotificationRun(env, {
-    scope: currentScope,
+    generation,
     lineAccountId,
     item,
     reload: load,
@@ -288,10 +307,12 @@ export default function NotificationRunList({
 
   const title = mode === 'failures' ? '送れなかったもの' : 'お知らせの記録'
   const nodeId = mode === 'failures' ? 'X8JCA5' : 'Se65i'
-  // アカウント切替の直後は、useEffectが動く前でも前アカウントの行を描かない。
-  const visibleState: LoadState = loaded.scope === currentScope ? loaded.state : lineAccountId ? 'loading' : 'ready'
-  const scopedResult = loaded.scope === currentScope ? loaded.result : null
-  const scopedTotal = loaded.scope === currentScope ? loaded.total : 0
+  // 前世代の書き込みは、いつ届いても表示に反映しない（レンダー時点の比較だけで決める）。
+  const visibleState: LoadState = loaded.generation === generation ? loaded.state : lineAccountId ? 'loading' : 'ready'
+  const scopedResult = loaded.generation === generation ? loaded.result : null
+  const scopedTotal = loaded.generation === generation ? loaded.total : 0
+  const visibleNotice = notice.generation === generation ? notice.notice : null
+  const visibleRetryingId = retrying.generation === generation ? retrying.id : null
   const items = useMemo(() => scopedResult?.items ?? [], [scopedResult])
   const summary = scopedResult?.summary ?? null
   const pageCount = Math.max(1, Math.ceil(scopedTotal / PAGE_SIZE))
@@ -339,7 +360,7 @@ export default function NotificationRunList({
         <span className="mt-1 block text-xs">個人の既読は取得できません。試行回数と次の再試行予定は送信台帳の記録を表示します。</span>
       </div>
 
-      {notice ? <div className={`rounded-control border px-4 py-3 text-sm ${notice.tone === 'success' ? 'border-success bg-success-bg text-success' : 'border-danger bg-danger-bg text-danger'}`}>{notice.text}</div> : null}
+      {visibleNotice ? <div className={`rounded-control border px-4 py-3 text-sm ${visibleNotice.tone === 'success' ? 'border-success bg-success-bg text-success' : 'border-danger bg-danger-bg text-danger'}`}>{visibleNotice.text}</div> : null}
 
       <div className="flex flex-wrap items-center gap-2">
         <label className="min-w-64 flex-1">
@@ -438,8 +459,8 @@ export default function NotificationRunList({
                       </Link>
                     ) : null}
                     {mode === 'failures' && item.retryAvailable && canRetry ? (
-                      <Button className="mt-2" disabled={retryingId === item.id} onClick={() => void retry(item)}>
-                        {retryingId === item.id ? '再試行中' : '送信を再試行'}
+                      <Button className="mt-2" disabled={visibleRetryingId === item.id} onClick={() => void retry(item)}>
+                        {visibleRetryingId === item.id ? '再試行中' : '送信を再試行'}
                       </Button>
                     ) : null}
                   </Td>

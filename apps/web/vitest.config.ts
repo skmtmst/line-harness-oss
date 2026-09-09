@@ -2,6 +2,15 @@ import { defineConfig } from 'vitest/config'
 import { fileURLToPath } from 'node:url'
 
 export default defineConfig({
+  /*
+   * Next.jsのSWCビルドは自動JSXランタイムを使うため、shared配下の
+   * コンポーネントは `React` を自前でimportしていない。試験だけ
+   * classicへ倒すと「実コンポーネントをmount」する試験がその配下を
+   * 描画した瞬間に落ちる。ビルド本体と同じ自動ランタイムに合わせる。
+   */
+  esbuild: {
+    jsx: 'automatic',
+  },
   resolve: {
     /*
      * `@/` は画面のコードが普通に使っている書き方。ここに無いと、

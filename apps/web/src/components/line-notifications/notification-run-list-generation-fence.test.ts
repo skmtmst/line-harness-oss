@@ -4,9 +4,11 @@ import {
   loadNotificationRuns,
   retryNotificationRun,
   type NotificationRunEnv,
-  type NotificationRunNotice,
   type NotificationRunPorts,
+  type NotificationRunScope,
   type ScopedLoadState,
+  type ScopedNotice,
+  type ScopedRetrying,
 } from './notification-run-list'
 
 type DeliveriesResult = Awaited<ReturnType<NotificationRunPorts['deliveries']>>
@@ -85,10 +87,10 @@ function ok(items: EcNotificationRun[], failed: number): DeliveriesResult {
 
 function harness() {
   const requestRef = { current: 0 }
-  const scopeRef = { current: '' }
+  const scopeRef: { current: NotificationRunScope } = { current: { key: '', generation: 0 } }
   const loads: ScopedLoadState[] = []
-  const notices: NotificationRunNotice[] = []
-  let retryingId: string | null = null
+  const notices: ScopedNotice[] = []
+  const retryings: ScopedRetrying[] = []
   const deliveryCalls: Array<{ lineAccountId: string; deferred: Deferred<DeliveriesResult> }> = []
   const retryCalls: Array<{ id: string; lineAccountId: string; deferred: Deferred<RetryResult> }> = []
 
@@ -111,11 +113,13 @@ function harness() {
     },
     setLoaded: (next) => { loads.push(next) },
     setNotice: (next) => { notices.push(next) },
-    setRetrying: (update) => { retryingId = update(retryingId) },
+    setRetrying: (update) => { retryings.push(update(retryings[retryings.length - 1] ?? { generation: -1, id: null })) },
   }
 
-  const start = (scope: string, lineAccountId: string | null) =>
-    loadNotificationRuns(env, { scope, lineAccountId, mode: 'failures', page: 1 })
+  /** 実コンポーネントのレンダー本体がやる、世代の同期切替を模す。 */
+  const enterGeneration = (generation: number, key: string) => {
+    scopeRef.current = { key, generation }
+  }
 
   return {
     env,
@@ -123,117 +127,124 @@ function harness() {
     retryCalls,
     loads,
     notices,
-    start,
-    retry: (scope: string, lineAccountId: string, item: EcNotificationRun) =>
-      retryNotificationRun(env, { scope, lineAccountId, item, reload: () => start(scope, lineAccountId) }),
-    retryingId: () => retryingId,
-    /** 画面が実際に見せている状態。scopeが合わない結果は描かれない。 */
-    visible: (scope: string) => {
+    retryings,
+    enterGeneration,
+    load: (generation: number, lineAccountId: string | null) =>
+      loadNotificationRuns(env, { generation, lineAccountId, mode: 'failures', page: 1 }),
+    retry: (generation: number, lineAccountId: string, item: EcNotificationRun, reload: () => Promise<void>) =>
+      retryNotificationRun(env, { generation, lineAccountId, item, reload }),
+    /** 画面が実際に見せている状態。世代が合わない結果は描かれない。 */
+    visible: (generation: number) => {
       const last = loads[loads.length - 1]
-      if (!last || last.scope !== scope) return { state: 'loading' as const, items: [] as EcNotificationRun[], failed: null }
+      if (!last || last.generation !== generation) return { state: 'loading' as const, items: [] as EcNotificationRun[], failed: null }
       return { state: last.state, items: last.result?.items ?? [], failed: last.result?.summary.failed ?? null }
+    },
+    visibleNotice: (generation: number) => {
+      const last = notices[notices.length - 1]
+      return last && last.generation === generation ? last.notice : null
     },
   }
 }
 
-const A = 'account-a:failures'
-const B = 'account-b:failures'
-
-describe('LINE通知一覧のアカウント切替と再試行', () => {
+describe('LINE通知一覧の世代フェンス（純粋関数レベル）', () => {
   it('Aの表示後にBへ切り替えると、Bの応答が来るまでAの行と集計を出さない', async () => {
     const h = harness()
-    void h.start(A, 'account-a')
+    h.enterGeneration(0, 'account-a:failures')
+    void h.load(0, 'account-a')
     h.deliveryCalls[0].deferred.resolve(ok([run('Aの通知')], 7))
     await settle()
-    expect(h.visible(A)).toMatchObject({ state: 'ready', failed: 7 })
+    expect(h.visible(0)).toMatchObject({ state: 'ready', failed: 7 })
 
-    void h.start(B, 'account-b')
+    h.enterGeneration(1, 'account-b:failures')
+    void h.load(1, 'account-b')
     await settle()
-    expect(h.visible(B).state).toBe('loading')
-    expect(h.loads.filter((entry) => entry.scope === B && entry.result !== null)).toEqual([])
+    expect(h.visible(1).state).toBe('loading')
 
     h.deliveryCalls[1].deferred.resolve(ok([run('Bの通知')], 2))
     await settle()
-    expect(h.visible(B)).toMatchObject({ state: 'ready', failed: 2 })
-    expect(h.visible(B).items.map((item) => item.id)).toEqual(['Bの通知'])
+    expect(h.visible(1)).toMatchObject({ state: 'ready', failed: 2 })
   })
 
   it('Aの遅い応答はB成功後の行と集計を上書きしない', async () => {
     const h = harness()
-    void h.start(A, 'account-a')
-    void h.start(B, 'account-b')
+    h.enterGeneration(0, 'account-a:failures')
+    void h.load(0, 'account-a')
+    h.enterGeneration(1, 'account-b:failures')
+    void h.load(1, 'account-b')
     h.deliveryCalls[1].deferred.resolve(ok([run('B成功通知')], 2))
     await settle()
-    expect(h.visible(B)).toMatchObject({ state: 'ready', failed: 2 })
+    expect(h.visible(1)).toMatchObject({ state: 'ready', failed: 2 })
 
     h.deliveryCalls[0].deferred.resolve(ok([run('A遅延通知')], 9))
     await settle()
-    expect(h.visible(B)).toMatchObject({ state: 'ready', failed: 2 })
-    expect(h.visible(B).items.map((item) => item.id)).toEqual(['B成功通知'])
+    expect(h.visible(1)).toMatchObject({ state: 'ready', failed: 2 })
   })
 
-  it('再試行の待機中にBへ切り替えると、Aの成功でBを読み込み中のまま止めない', async () => {
+  it('レンダー本体で世代を同期して進めていれば、世代切替後の再試行は読み直しを始めない', async () => {
     const h = harness()
-    void h.start(A, 'account-a')
+    h.enterGeneration(0, 'account-a:failures')
+    void h.load(0, 'account-a')
     h.deliveryCalls[0].deferred.resolve(ok([run('Aの通知')], 7))
     await settle()
 
-    void h.retry(A, 'account-a', run('Aの通知'))
-    void h.start(B, 'account-b')
+    let reloadCalls = 0
+    const reloadA = async () => { reloadCalls += 1; await h.load(0, 'account-a') }
+    void h.retry(0, 'account-a', run('Aの通知'), reloadA)
+    // レンダー本体は、次のuseEffectが動く前に同期して世代を進める。
+    h.enterGeneration(1, 'account-b:failures')
+    void h.load(1, 'account-b')
     await settle()
 
     h.retryCalls[0].deferred.resolve({ success: true } as RetryResult)
     await settle()
+    // 世代がすでに進んでいるため、Aの成功はAの読み直しを一度も呼ばない。
+    expect(reloadCalls).toBe(0)
+    expect(h.deliveryCalls).toHaveLength(2)
+    expect(h.visibleNotice(1)).toBeNull()
 
     h.deliveryCalls[1].deferred.resolve(ok([run('Bの通知')], 2))
     await settle()
-    // Bの応答は必ず採用する。Aの読み直しが割り込むと読み込み中のまま止まる。
-    expect(h.visible(B)).toMatchObject({ state: 'ready', failed: 2 })
-    expect(h.visible(B).items.map((item) => item.id)).toEqual(['Bの通知'])
-    // Aの読み直しは始めない。Aの成功の知らせもBには出さない。
-    expect(h.deliveryCalls).toHaveLength(2)
-    expect(h.notices.filter(Boolean)).toEqual([])
+    expect(h.visible(1)).toMatchObject({ state: 'ready', failed: 2 })
   })
 
-  it('再試行が失敗しても、切り替えた後のアカウントに前のアカウントの知らせを出さない', async () => {
-    for (const status of [403, 409, 500]) {
+  it('世代切替後は、Aの再試行の成功・403・409・500いずれも新しい世代へ知らせを出さない', async () => {
+    for (const status of [403, 409, 500, 'success'] as const) {
       const h = harness()
-      void h.start(A, 'account-a')
+      h.enterGeneration(0, 'account-a:failures')
+      void h.load(0, 'account-a')
       h.deliveryCalls[0].deferred.resolve(ok([run('Aの通知')], 7))
       await settle()
 
-      void h.retry(A, 'account-a', run('Aの通知'))
-      void h.start(B, 'account-b')
+      let reloadCalls = 0
+      void h.retry(0, 'account-a', run('Aの通知'), async () => { reloadCalls += 1 })
+      h.enterGeneration(1, 'account-b:failures')
+      void h.load(1, 'account-b')
       await settle()
 
-      h.retryCalls[0].deferred.reject(new ApiError(status, 'retry failed'))
+      if (status === 'success') {
+        h.retryCalls[0].deferred.resolve({ success: true } as RetryResult)
+      } else {
+        h.retryCalls[0].deferred.reject(new ApiError(status, 'retry failed'))
+      }
       await settle()
-      expect(h.notices.filter(Boolean)).toEqual([])
-      expect(h.deliveryCalls).toHaveLength(2)
-
-      h.deliveryCalls[1].deferred.resolve(ok([run('Bの通知')], 2))
-      await settle()
-      expect(h.visible(B)).toMatchObject({ state: 'ready', failed: 2 })
+      expect(h.visibleNotice(1)).toBeNull()
+      expect(reloadCalls).toBe(0)
     }
   })
 
-  it('切り替えていなければ、再試行の成功と失敗をこれまでどおり知らせる', async () => {
+  it('世代を進めなければ、これまでどおり再試行の成功・失敗を知らせ、読み直す', async () => {
     const h = harness()
-    void h.start(A, 'account-a')
+    h.enterGeneration(0, 'account-a:failures')
+    void h.load(0, 'account-a')
     h.deliveryCalls[0].deferred.resolve(ok([run('Aの通知')], 7))
     await settle()
 
-    void h.retry(A, 'account-a', run('Aの通知'))
+    let reloadCalls = 0
+    void h.retry(0, 'account-a', run('Aの通知'), async () => { reloadCalls += 1 })
     h.retryCalls[0].deferred.resolve({ success: true } as RetryResult)
     await settle()
-    expect(h.notices[h.notices.length - 1]).toEqual({ tone: 'success', text: '同じ通知の送信を安全に再試行しました。' })
-    expect(h.deliveryCalls).toHaveLength(2)
-    // 読み直しが終わるまでは再試行中のまま。二重押しを防ぐ。
-    expect(h.retryingId()).toBe('Aの通知')
-    h.deliveryCalls[1].deferred.resolve(ok([run('Aの通知', { attemptCount: 2 })], 7))
-    await settle()
-    expect(h.retryingId()).toBeNull()
-    expect(h.visible(A).items.map((item) => item.attemptCount)).toEqual([2])
+    expect(h.visibleNotice(0)).toEqual({ tone: 'success', text: '同じ通知の送信を安全に再試行しました。' })
+    expect(reloadCalls).toBe(1)
 
     for (const [status, text] of [
       [403, '送信の再試行は店長だけができます。'],
@@ -241,73 +252,43 @@ describe('LINE通知一覧のアカウント切替と再試行', () => {
       [500, '送信を再試行できませんでした。時間をおいて読み直してください。'],
     ] as const) {
       const failing = harness()
-      void failing.start(A, 'account-a')
+      failing.enterGeneration(0, 'account-a:failures')
+      void failing.load(0, 'account-a')
       failing.deliveryCalls[0].deferred.resolve(ok([run('Aの通知')], 7))
       await settle()
-      void failing.retry(A, 'account-a', run('Aの通知'))
+      void failing.retry(0, 'account-a', run('Aの通知'), async () => {})
       failing.retryCalls[0].deferred.reject(new ApiError(status, 'retry failed'))
       await settle()
-      expect(failing.notices[failing.notices.length - 1]).toEqual({ tone: 'error', text })
-      expect(failing.retryingId()).toBeNull()
+      expect(failing.visibleNotice(0)).toEqual({ tone: 'error', text })
     }
-  })
-
-  it('切替後に別の行で始めた再試行の表示を、前のアカウントの応答で消さない', async () => {
-    const h = harness()
-    void h.start(A, 'account-a')
-    h.deliveryCalls[0].deferred.resolve(ok([run('Aの通知')], 7))
-    await settle()
-
-    void h.retry(A, 'account-a', run('Aの通知'))
-    void h.start(B, 'account-b')
-    h.deliveryCalls[1].deferred.resolve(ok([run('Bの通知')], 2))
-    await settle()
-    void h.retry(B, 'account-b', run('Bの通知'))
-    expect(h.retryingId()).toBe('Bの通知')
-
-    h.retryCalls[0].deferred.resolve({ success: true } as RetryResult)
-    await settle()
-    expect(h.retryingId()).toBe('Bの通知')
   })
 
   it('取得失敗・権限なし・実値0を別の状態として区別する', async () => {
     const failure = harness()
-    void failure.start(A, 'account-a')
+    failure.enterGeneration(0, 'account-a:failures')
+    void failure.load(0, 'account-a')
     failure.deliveryCalls[0].deferred.reject(new ApiError(500, 'server error'))
     await settle()
-    expect(failure.visible(A)).toMatchObject({ state: 'error', items: [], failed: null })
+    expect(failure.visible(0)).toMatchObject({ state: 'error', items: [], failed: null })
 
     const forbidden = harness()
-    void forbidden.start(A, 'account-a')
+    forbidden.enterGeneration(0, 'account-a:failures')
+    void forbidden.load(0, 'account-a')
     forbidden.deliveryCalls[0].deferred.reject(new ApiError(403, 'forbidden'))
     await settle()
-    expect(forbidden.visible(A).state).toBe('forbidden')
+    expect(forbidden.visible(0).state).toBe('forbidden')
 
     const empty = harness()
-    void empty.start(A, 'account-a')
+    empty.enterGeneration(0, 'account-a:failures')
+    void empty.load(0, 'account-a')
     empty.deliveryCalls[0].deferred.resolve(ok([], 0))
     await settle()
-    expect(empty.visible(A)).toMatchObject({ state: 'ready', items: [], failed: 0 })
+    expect(empty.visible(0)).toMatchObject({ state: 'ready', items: [], failed: 0 })
 
     const noAccount = harness()
-    await noAccount.start('none:failures', null)
+    noAccount.enterGeneration(0, 'none:failures')
+    await noAccount.load(0, null)
     expect(noAccount.deliveryCalls).toHaveLength(0)
-    expect(noAccount.visible('none:failures')).toMatchObject({ state: 'ready', items: [] })
-  })
-})
-
-describe('一覧の配線', () => {
-  it('読み込みと再試行に、今見ているアカウントとタブを渡している', async () => {
-    const { readFileSync } = await import('node:fs')
-    const { dirname, join } = await import('node:path')
-    const { fileURLToPath } = await import('node:url')
-    const source = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'notification-run-list.tsx'), 'utf8')
-
-    expect(source).toContain('loadNotificationRuns(env, { scope: currentScope, lineAccountId, mode, page })')
-    expect(source).toContain('retryNotificationRun(env, {')
-    expect(source).toContain('scope: currentScope,')
-    // 足場は作り直さない。作り直すと開始時と応答時で目印がずれる。
-    expect(source).toContain('useMemo<NotificationRunEnv>(() => ({')
-    expect(source).toContain('}), [])')
+    expect(noAccount.visible(0)).toMatchObject({ state: 'ready', items: [] })
   })
 })
