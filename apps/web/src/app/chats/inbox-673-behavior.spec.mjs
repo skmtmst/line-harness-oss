@@ -306,12 +306,18 @@ function apiStatus(page, path) {
 }
 
 test('正常なfriend URLで対象会話を選び、再読込でも維持する', async ({ page }) => {
-  const { detailCalls } = await prepareInbox(page, {
+  const { detailCalls, friendCalls } = await prepareInbox(page, {
     details: { target: { data: chatDetail('target', '対象 太郎', '対象の会話です') } },
   })
   await openFriend(page, 'target')
   await expect(talkText(page, '対象の会話です')).toBeVisible()
   expect(detailCalls).toContain('target')
+
+  // 照合は繰り返さない。URLが変わらない限り、描画のたびに口を叩くと
+  // 受信箱を開いているだけで所属確認が流れ続ける。
+  await page.waitForTimeout(500)
+  expect(friendCalls.filter((id) => id === 'target').length).toBeLessThanOrEqual(2)
+  expect(detailCalls.filter((id) => id === 'target').length).toBeLessThanOrEqual(2)
 
   await page.reload({ waitUntil: 'domcontentloaded' })
   await expect(talkText(page, '対象の会話です')).toBeVisible()
