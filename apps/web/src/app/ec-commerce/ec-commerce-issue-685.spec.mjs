@@ -303,3 +303,61 @@ test('切替後に届いた前のアカウントの遅い返事を、新しい�
   await expect(page.getByText('7件', { exact: true }).first()).toBeVisible()
   await expect(page.getByText('商品77 × 1')).toBeVisible()
 })
+
+/*
+ * 差し戻し(2026-09-09 2回目): Aで再試行を始め、応答が返る前にBへ切り替えると、
+ * retry()が抱えたA向けのloadRecords(false)が共有listLoadSeqを進め、Bの正常な
+ * 一覧応答をseq不一致で捨てていた。Bは読み込み中のまま固まる。
+ * accountIdRefで古いクロージャの呼び出しを共有seqへ触れる前に止めることを見る。
+ */
+test('Aで再試行の応答を待つ間にBへ切り替えても、Bの一覧が読み込み中のまま固まらない', async ({ page }) => {
+  const failedRecord = {
+    ...record(1),
+    status: 'retryable_failed',
+    retryAvailable: true,
+    version: 1,
+    attemptCount: 1,
+    errorMessage: '送信に失敗しました',
+  }
+  let retryRequested = false
+  let retryResolved = false
+
+  await page.route('**/api/ec-commerce/overview*', (route) => (
+    accountOf(route) === ACCOUNT_A ? route.fulfill({ json: overviewFor(111) }) : route.fulfill({ json: overviewFor(7) })
+  ))
+  await page.route('**/api/ec-commerce/events*', (route) => (
+    accountOf(route) === ACCOUNT_A
+      ? route.fulfill({ json: { success: true, data: { items: [failedRecord], total: 1, summary } } })
+      : route.fulfill({ json: { success: true, data: { items: [record(77)], total: 1, summary } } })
+  ))
+  await page.route('**/api/ec-commerce/action-executions/*/retry', async (route) => {
+    retryRequested = true
+    /* Bへ切り替わったあとに届く、遅いAの再試行応答を模す。 */
+    await new Promise((resolve) => setTimeout(resolve, 2000))
+    retryResolved = true
+    return route.fulfill({
+      json: { success: true, data: { ...failedRecord, status: 'pending', retryAvailable: false, version: 2 } },
+    })
+  })
+
+  await openEc(page)
+  await expect(page.getByText('111件', { exact: true }).first()).toBeVisible()
+  await page.getByRole('button', { name: 'もう一度やる' }).click()
+  await expect.poll(() => retryRequested).toBe(true)
+  await expect(page.getByRole('button', { name: '戻しています…' })).toBeVisible()
+
+  /* Aの再試行応答(2秒後)が届く前にBへ切り替える。 */
+  await switchAccount(page, ACCOUNT_B)
+  /* Bの一覧・集計は遅延なしで返るので、読み込み中で固まらず短時間で表示されるはず。 */
+  await expect(page.getByText('商品77 × 1')).toBeVisible({ timeout: 1500 })
+  await expect(page.getByText('7件', { exact: true }).first()).toBeVisible({ timeout: 1500 })
+  await expect(page.getByText('取り込みの記録を読み込めませんでした')).toHaveCount(0)
+
+  /* Aの遅い再試行応答が届いたあとも、Bの表示は崩れない。 */
+  await page.waitForTimeout(2500)
+  expect(retryResolved).toBe(true)
+  await expect(page.getByText('商品77 × 1')).toBeVisible()
+  await expect(page.getByText('7件', { exact: true }).first()).toBeVisible()
+  await expect(page.getByText('111件', { exact: true })).toHaveCount(0)
+  await expect(page.getByText('商品1 × 1')).toHaveCount(0)
+})

@@ -107,11 +107,20 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
   const [searchQuery, setSearchQuery] = useState('')
   const [status, setStatus] = useState<ActionTab>('all')
   const [sort, setSort] = useState<'newest' | 'oldest'>('newest')
-  const [retryingId, setRetryingId] = useState<string | null>(null)
+  const [retryingSlot, setRetryingSlot] = useState<{ accountId: string | null; id: string | null }>({ accountId, id: null })
   const [noticeSlot, setNoticeSlot] = useState<{ accountId: string | null; notice: { tone: 'success' | 'error'; text: string } | null }>({ accountId, notice: null })
+  const retryingId = retryingSlot.accountId === accountId ? retryingSlot.id : null
   /* 絞りとページを同時に変えたとき、古い読み込みの返事で上書きしない。 */
   const overviewLoadSeq = useRef(0)
   const listLoadSeq = useRef(0)
+  /*
+   * 常に「今どのアカウントが選ばれているか」を持つ。retry() のような
+   * awaitをまたぐ処理は、開始時のaccountIdをクロージャで抱えたまま切替後も
+   * 動き続けるので、この ref と突き合わせて古い方を弾く(#685再差し戻し)。
+   * 効果(useEffect)ではなく描画本体で直接更新し、次のawait再開までに必ず最新化する。
+   */
+  const currentAccountIdRef = useRef(accountId)
+  currentAccountIdRef.current = accountId
 
   /*
    * ここが「同期的な消去」。アカウントが変わった描画では、取得元の違う値は
@@ -134,6 +143,12 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
   )
 
   const loadOverview = useCallback(async (showLoading = true) => {
+    /*
+     * retry() が抱えた古い accountId のクロージャから呼ばれた場合はここで止める。
+     * 共有の overviewLoadSeq を進めてしまうと、あとから来る新アカウントの
+     * 正常な返事がその進んだ seq と食い違って捨てられ、読み込み中のまま固まる。
+     */
+    if (accountId !== currentAccountIdRef.current) return
     const seq = overviewLoadSeq.current + 1
     overviewLoadSeq.current = seq
     if (!accountId) {
@@ -167,6 +182,8 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
   }, [accountId])
 
   const loadRecords = useCallback(async (showLoading = true) => {
+    /* 同上。古いアカウントのretry()が共有listLoadSeqを進めて新アカウントの一覧取得を無効化しない。 */
+    if (accountId !== currentAccountIdRef.current) return
     const seq = listLoadSeq.current + 1
     listLoadSeq.current = seq
     if (!accountId) {
@@ -219,18 +236,26 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
 
   const retry = async (action: EcActionExecution) => {
     if (!accountId || !action.retryAvailable) return
-    setRetryingId(action.id)
+    const retryAccountId = accountId
+    setRetryingSlot({ accountId: retryAccountId, id: action.id })
     setNotice(null)
     try {
       const response = await api.ecCommerce.retryActionExecution(
         action.id,
-        { lineAccountId: accountId, expectedVersion: action.version },
+        { lineAccountId: retryAccountId, expectedVersion: action.version },
         crypto.randomUUID(),
       )
       if (!response.success) throw new Error('retry_failed')
+      /*
+       * APIの応答を待つ間にBへ切り替えられていたら、Aのお知らせを出さず、
+       * Aの一覧再読込も行わない(loadRecords自身もaccountId不一致で弾くが、
+       * ここで止めれば無駄な通信も起きない)。
+       */
+      if (retryAccountId !== currentAccountIdRef.current) return
       setNotice({ tone: 'success', text: '失敗した処理だけを、もう一度行う待ち行列へ戻しました。' })
       await loadRecords(false)
     } catch (error) {
+      if (retryAccountId !== currentAccountIdRef.current) return
       if (error instanceof ApiError && error.status === 409) await loadRecords(false)
       setNotice({
         tone: 'error',
@@ -239,7 +264,8 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
           : '処理をもう一度行う準備ができませんでした。時間をおいてやり直してください。',
       })
     } finally {
-      setRetryingId(null)
+      /* 別のretryが同じアカウントで既に始まっていたら、それを消さない。 */
+      setRetryingSlot((prev) => (prev.accountId === retryAccountId && prev.id === action.id ? { accountId: retryAccountId, id: null } : prev))
     }
   }
 

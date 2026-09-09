@@ -74,3 +74,49 @@ describe('V6 23-1 EC連携のアカウント切替', () => {
     expect(source).toContain('const notice = noticeSlot.accountId === accountId ? noticeSlot.notice : null')
   })
 })
+
+/*
+ * 起きたこと(2026-09-09, #685再差し戻し): アカウントAで再試行を始め、応答が
+ * 返る前にBへ切り替えると、retry()が抱えたA向けのloadRecords(false)が
+ * 共有listLoadSeqを進め、Bの正常な一覧応答をseq不一致で捨てていた。
+ * Bは読み込み中のまま固まる。retryingIdもアカウントに結び付いていなかった。
+ * accountIdRefで最新アカウントと突き合わせ、古いクロージャの呼び出しを
+ * 共有seqに触れる前に止める、を見張る。
+ */
+describe('V6 23-1 EC連携の再試行とアカウント切替の順序', () => {
+  it('最新アカウントをrefで持ち、描画本体で直接更新する', () => {
+    expect(source).toContain('const currentAccountIdRef = useRef(accountId)')
+    expect(source).toContain('currentAccountIdRef.current = accountId')
+  })
+
+  it('loadOverview/loadRecordsは古いクロージャからの呼び出しを共有seqに触れる前に弾く', () => {
+    const loadOverviewIdx = source.indexOf('const loadOverview = useCallback')
+    const loadOverviewGuardIdx = source.indexOf('if (accountId !== currentAccountIdRef.current) return', loadOverviewIdx)
+    const overviewSeqIdx = source.indexOf('const seq = overviewLoadSeq.current + 1')
+    expect(loadOverviewGuardIdx).toBeGreaterThan(loadOverviewIdx)
+    expect(loadOverviewGuardIdx).toBeLessThan(overviewSeqIdx)
+
+    const loadRecordsIdx = source.indexOf('const loadRecords = useCallback')
+    const loadRecordsGuardIdx = source.indexOf('if (accountId !== currentAccountIdRef.current) return', loadRecordsIdx)
+    const listSeqIdx = source.indexOf('const seq = listLoadSeq.current + 1')
+    expect(loadRecordsGuardIdx).toBeGreaterThan(loadRecordsIdx)
+    expect(loadRecordsGuardIdx).toBeLessThan(listSeqIdx)
+  })
+
+  it('retryingIdはアカウントと一体で持つ', () => {
+    expect(source).toContain("useState<{ accountId: string | null; id: string | null }>({ accountId, id: null })")
+    expect(source).toContain('const retryingId = retryingSlot.accountId === accountId ? retryingSlot.id : null')
+  })
+
+  it('retry()は応答待ちの間に切り替えられたら、お知らせも再読込も行わない', () => {
+    const retryIdx = source.indexOf('const retry = async (action: EcActionExecution)')
+    const guards = source.slice(retryIdx).match(/if \(retryAccountId !== currentAccountIdRef\.current\) return/g) ?? []
+    expect(guards.length).toBe(2)
+  })
+
+  it('retryingSlotの後始末は、同じ再試行のぶんだけを消す', () => {
+    expect(source).toContain(
+      'setRetryingSlot((prev) => (prev.accountId === retryAccountId && prev.id === action.id ? { accountId: retryAccountId, id: null } : prev))',
+    )
+  })
+})
