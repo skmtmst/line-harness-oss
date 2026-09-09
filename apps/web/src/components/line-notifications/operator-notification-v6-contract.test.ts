@@ -41,8 +41,8 @@ describe('V6 運用者へのお知らせ — 宛先・送信・実行記録の�
   })
 
   it('新しいルールはDBで明示的に停止状態へ置く', () => {
-    expect(db).toContain('line_account_id, is_active, created_at')
-    expect(db).toContain('VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?)')
+    expect(db).toContain('line_account_id, is_active, version, created_at')
+    expect(db).toContain('VALUES (?, ?, ?, ?, ?, ?, 0, 1, ?, ?)')
   })
 
   it('公開は専用APIだけで宛先を再検証し、実行記録を重複させない', () => {
