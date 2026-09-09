@@ -1,7 +1,7 @@
 'use client'
 
 import SelectField from '@/components/shared/select-field'
-import { Suspense, useEffect, useRef, useState } from 'react'
+import React, { Suspense, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { api } from '@/lib/api'
@@ -74,6 +74,133 @@ async function loadTemplateReferences(
   }
 }
 
+const EMPTY_REFERENCES: TemplateReferences = { friendFields: [], commonVars: [] }
+
+/**
+ * 編集画面が見ている LINE 公式アカウントの組み合わせ。
+ *
+ * 「上のバーで選んでいるもの」と「開いているテンプレートの所属」は別物。
+ * この2つを1つの変数で扱うと、切り替えた瞬間に取り違える。
+ */
+interface TemplateAccountBinding {
+  templateId: string | null
+  /** テンプレートの取得が終わったか。終わる前は所属が分からない。 */
+  templateLoaded: boolean
+  templateAccountId: string | null
+  selectedAccountId: string | null
+}
+
+const ACCOUNT_MISMATCH_MESSAGE =
+  '別のLINE公式アカウントに切り替わっています。上のバーでこのテンプレートのアカウントへ戻すと保存できます。'
+
+/**
+ * 差し込み候補を読むアカウント。**既存テンプレートは所属へ固定する。**
+ *
+ * 上のバーで A から B へ替えても、A のテンプレートを開いている限り
+ * 候補は A のまま。替えた先の候補を出すと、A のテンプレートへ B の
+ * 項目キーを書き込める。書き込めても A の友だちにその項目は無いので、
+ * 配信時に `{{field.…}}` が置き換わらないまま相手へ届く。
+ *
+ * 取得が終わるまでは `null`。終わる前に選択中アカウントで読むと、
+ * 一瞬だけ別アカウントの候補が並び、その隙に選べてしまう。
+ */
+function resolveEditorAccountId(binding: TemplateAccountBinding): string | null {
+  if (!binding.templateId) return binding.selectedAccountId
+  if (!binding.templateLoaded) return null
+  // 所属を持たない旧データだけ、選択中アカウントの候補で編集する。
+  return binding.templateAccountId ?? binding.selectedAccountId
+}
+
+/** 開いているテンプレートの所属と、上のバーの選択が食い違っているか。 */
+function templateAccountMismatch(binding: TemplateAccountBinding): boolean {
+  if (!binding.templateId || !binding.templateLoaded) return false
+  if (!binding.templateAccountId || !binding.selectedAccountId) return false
+  return binding.templateAccountId !== binding.selectedAccountId
+}
+
+/**
+ * 差し込み候補の取り込み。**遅れて届いた古い応答は捨てる。**
+ *
+ * A から B へ替えると、A への問い合わせのほうが後に返ることがある。
+ * 届いた順に入れると、B を編集しているのに A の候補が並ぶ。
+ * 出した順番を持ち、いちばん新しい要求以外は結果を返さない。
+ *
+ * 捨てたときは `null`、読めなかったときは `'failed'`。
+ */
+async function requestTemplateReferences(request: {
+  load: (accountId: string) => Promise<TemplateReferences>
+  accountId: string
+  generation: number
+  currentGeneration: () => number
+}): Promise<TemplateReferences | 'failed' | null> {
+  try {
+    const references = await request.load(request.accountId)
+    return request.generation === request.currentGeneration() ? references : null
+  } catch {
+    return request.generation === request.currentGeneration() ? 'failed' : null
+  }
+}
+
+interface TemplateSaveInput extends TemplateAccountBinding {
+  loadFailed: boolean
+  name: string
+  category: string
+  messageType: string
+  messageContent: string
+  folderId: string | null
+}
+
+/**
+ * 保存してよいか。**駄目な理由を返す。`null` なら保存してよい。**
+ *
+ * 所属と選択の食い違いをここで止める。止めないと、B の候補を挿した本文が
+ * A のテンプレートとして保存される。保存する口 (`PUT /api/templates/:id`)
+ * は所属アカウントを受け取らないので、サーバー側では気づけない。
+ */
+function validateTemplateSave(input: TemplateSaveInput): string | null {
+  if (input.loadFailed) return '読み込めませんでした。開き直してください。'
+  if (templateAccountMismatch(input)) return ACCOUNT_MISMATCH_MESSAGE
+  if (!input.templateId && !input.selectedAccountId) return '上のバーでLINE公式アカウントを選んでください'
+  if (!input.name.trim()) return '名前を入力してください'
+  if (!input.messageContent.trim()) return '本文を入力してください'
+  return null
+}
+
+interface TemplateSaveOps {
+  create: typeof api.templates.create
+  update: typeof api.templates.update
+}
+
+/**
+ * 保存する。**断る条件に当たったら、APIを一度も呼ばない。**
+ *
+ * 画面側でボタンを塞ぐだけだと、状態が入れ替わる途中の押下を拾えない。
+ * 送る直前にもう一度確かめる。
+ */
+async function saveTemplateEdit(
+  input: TemplateSaveInput,
+  ops: TemplateSaveOps = { create: api.templates.create, update: api.templates.update },
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const blocked = validateTemplateSave(input)
+  if (blocked) return { ok: false, error: blocked }
+
+  const payload = {
+    name: input.name.trim(),
+    category: input.category,
+    messageType: input.messageType,
+    messageContent: input.messageContent,
+    folderId: input.folderId,
+  }
+  try {
+    const res = input.templateId
+      ? await ops.update(input.templateId, payload)
+      : await ops.create({ accountId: input.selectedAccountId as string, ...payload })
+    return res.success ? { ok: true } : { ok: false, error: res.error }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : '保存に失敗しました' }
+  }
+}
+
 function jstDateParts(date: Date): { year: number; month: number; day: number; weekday: string } {
   const parts = new Intl.DateTimeFormat('ja-JP', {
     timeZone: 'Asia/Tokyo',
@@ -97,7 +224,13 @@ function previewDateValue(name: string, deliveredAt: Date): string | null {
     const current = jstDateParts(deliveredAt)
     const currentDay = Date.UTC(current.year, current.month - 1, current.day)
     const targetDay = Date.UTC(Number(daysUntil[1]), Number(daysUntil[2]) - 1, Number(daysUntil[3]))
-    return String(Math.ceil((targetDay - currentDay) / 86_400_000))
+    /*
+     * 過ぎた日を負の数で見せない。実際に送るときは
+     * `apps/worker/src/services/interpolation-date.ts` の `daysUntil` が
+     * `diff > 0 ? diff : 0` を返す。見本だけ `-3` と出すと、運用する人は
+     * 「マイナスで届く」と読む。**見本と実配信で違う数を見せない。**
+     */
+    return String(Math.max(0, Math.round((targetDay - currentDay) / 86_400_000)))
   }
 
   const dateToken = /^date(?:([+-])(\d+))?(?::([a-z_]+))?$/.exec(name)
@@ -182,17 +315,27 @@ function extractMessageUrls(content: string): string[] {
 interface InsertControlsProps extends TemplateReferences {
   accountId: string | null
   state: ReferenceState
+  /** 候補がどのアカウントのものか。既存テンプレートでは所属アカウントの名前。 */
+  accountLabel?: string | null
+  /*
+   * 目標日は親が持つ。この並びに状態を持たせると、差し込みを選んだ拍子に
+   * 入れ直した日付が消えることがある。状態を1か所に寄せる。
+   */
+  targetDate: string
+  onTargetDateChange: (value: string) => void
   onInsert: (token: string) => void
 }
 
 function TemplateInsertControls({
   accountId,
   state,
+  accountLabel,
+  targetDate,
+  onTargetDateChange,
   friendFields,
   commonVars,
   onInsert,
 }: InsertControlsProps) {
-  const [targetDate, setTargetDate] = useState('')
   const choose = (value: string) => {
     if (value) onInsert(value)
   }
@@ -244,7 +387,7 @@ function TemplateInsertControls({
             aria-label="日数を数える目標日"
             type="date"
             value={targetDate}
-            onChange={(event) => setTargetDate(event.target.value)}
+            onChange={(event) => onTargetDateChange(event.target.value)}
             className="border-hairline rounded-control border bg-canvas px-2 py-1 text-xs text-ink"
           />
         </label>
@@ -260,12 +403,47 @@ function TemplateInsertControls({
       <p className="text-ink-faint text-xs">
         フォーム回答は直接差し込めません。回答を保存した友だち情報を選んでください。
       </p>
+      {accountLabel && (
+        <p className="text-ink-faint text-xs">
+          候補は「{accountLabel}」の友だち情報と共通情報です。
+        </p>
+      )}
       {!accountId && (
         <p className="text-ink-faint text-xs">LINE公式アカウントを選ぶと、友だち情報と共通情報を選べます。</p>
       )}
       {state === 'failed' && (
         <p role="alert" className="text-danger text-xs">差し込み項目を読み込めませんでした。画面を再読み込みしてください。</p>
       )}
+    </div>
+  )
+}
+
+/**
+ * 所属アカウントと選択中アカウントが食い違っているときの知らせ。
+ *
+ * 「保存できません」だけでは戻し方が分からない。どのアカウントのものか、
+ * 候補は何のままかを一緒に出す。
+ */
+function TemplateAccountNotice({
+  binding,
+  templateAccountLabel,
+  selectedAccountLabel,
+}: {
+  binding: TemplateAccountBinding
+  templateAccountLabel: string | null
+  selectedAccountLabel: string | null
+}) {
+  if (!templateAccountMismatch(binding)) return null
+  return (
+    <div role="alert" className="border-hairline rounded-control border bg-canvas-sunken px-3 py-2 text-xs">
+      <p className="text-danger font-semibold">{ACCOUNT_MISMATCH_MESSAGE}</p>
+      <p className="text-ink-secondary mt-1">
+        このテンプレートは「{templateAccountLabel ?? binding.templateAccountId}」のものです。
+        いま選んでいるのは「{selectedAccountLabel ?? binding.selectedAccountId}」です。
+      </p>
+      <p className="text-ink-secondary mt-1">
+        差し込み候補は「{templateAccountLabel ?? binding.templateAccountId}」のまま出しています。
+      </p>
     </div>
   )
 }
@@ -290,7 +468,7 @@ function TemplatePreviewMessage({ preview }: { preview: TemplatePreviewResult })
 
 function TemplateEditInner() {
   const router = useRouter()
-  const { selectedAccountId } = useAccount()
+  const { accounts, selectedAccountId } = useAccount()
   const params = useSearchParams()
   const id = params.get('id')
   const assetKind = params.get('kind')
@@ -315,6 +493,21 @@ function TemplateEditInner() {
   const [error, setError] = useState('')
   // 読み込めていない本文のまま保存すると、空で上書きする危険がある。
   const [loadFailed, setLoadFailed] = useState(false)
+  const [targetDate, setTargetDate] = useState('')
+  /* 開いているテンプレートの所属アカウント。上のバーの選択とは別に持つ。 */
+  const [templateAccountId, setTemplateAccountId] = useState<string | null>(null)
+  const [templateLoaded, setTemplateLoaded] = useState(!id)
+
+  const binding: TemplateAccountBinding = {
+    templateId: id,
+    templateLoaded,
+    templateAccountId,
+    selectedAccountId,
+  }
+  const editorAccountId = resolveEditorAccountId(binding)
+  const accountMismatch = templateAccountMismatch(binding)
+  const accountName = (accountId: string | null) =>
+    accounts.find((account) => account.id === accountId)?.name ?? null
 
   // 置き場の選択肢。category 文字列とは別に folderId で保存する。
   useEffect(() => {
@@ -327,52 +520,70 @@ function TemplateEditInner() {
     return () => { cancelled = true }
   }, [])
 
+  /*
+   * 出した順番。片付けのたびに1つ進めるので、画面から離れたあとの応答も、
+   * アカウントを替える前に出した応答も、いちばん新しい要求と一致しない。
+   */
+  const referenceGeneration = useRef(0)
+
   useEffect(() => {
-    let cancelled = false
-    setReferences({ friendFields: [], commonVars: [] })
-    if (!selectedAccountId) {
+    setReferences(EMPTY_REFERENCES)
+    const generation = ++referenceGeneration.current
+    if (!editorAccountId) {
       setReferenceState('idle')
-      return () => { cancelled = true }
+      return
     }
 
     setReferenceState('loading')
-    void loadTemplateReferences(selectedAccountId)
-      .then((next) => {
-        if (!cancelled) {
-          setReferences(next)
-          setReferenceState('ready')
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setReferences({ friendFields: [], commonVars: [] })
-          setReferenceState('failed')
-        }
-      })
-    return () => { cancelled = true }
-  }, [selectedAccountId])
+    void requestTemplateReferences({
+      load: loadTemplateReferences,
+      accountId: editorAccountId,
+      generation,
+      currentGeneration: () => referenceGeneration.current,
+    }).then((result) => {
+      if (result === null) return
+      if (result === 'failed') {
+        setReferences(EMPTY_REFERENCES)
+        setReferenceState('failed')
+        return
+      }
+      setReferences(result)
+      setReferenceState('ready')
+    })
+    return () => { referenceGeneration.current += 1 }
+  }, [editorAccountId])
 
   useEffect(() => {
     if (!id) return
+    let cancelled = false
     void api.templates
       .get(id)
       .then((res) => {
+        if (cancelled) return
         if (res.success) {
           setName(res.data.name)
           setCategory(res.data.category ?? '')
           setFolderId(res.data.folderId ?? null)
           setMessageType(res.data.messageType)
           setMessageContent(res.data.messageContent)
+          // 所属アカウントは、差し込み候補と保存可否の両方の土台になる。
+          setTemplateAccountId(res.data.accountId ?? null)
         } else {
           setLoadFailed(true)
           setError('読み込めませんでした。開き直してください。')
         }
+        setTemplateLoaded(true)
       })
       .catch(() => {
+        if (cancelled) return
         setLoadFailed(true)
         setError('読み込めませんでした。開き直してください。')
+        setTemplateLoaded(true)
       })
-      .finally(() => setLoading(false))
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => { cancelled = true }
   }, [id])
 
   const contentRef = useRef<HTMLTextAreaElement | null>(null)
@@ -408,42 +619,29 @@ function TemplateEditInner() {
   const messageUrls = extractMessageUrls(messageContent)
 
   const save = async () => {
-    if (loadFailed) {
-      setError('読み込めませんでした。開き直してください。')
-      return
+    const input: TemplateSaveInput = {
+      ...binding,
+      loadFailed,
+      name,
+      category,
+      messageType,
+      messageContent,
+      folderId,
     }
-    if (!id && !selectedAccountId) {
-      setError('上のバーでLINE公式アカウントを選んでください')
-      return
-    }
-    if (!name.trim()) {
-      setError('名前を入力してください')
-      return
-    }
-    if (!messageContent.trim()) {
-      setError('本文を入力してください')
+    const blocked = validateTemplateSave(input)
+    if (blocked) {
+      setError(blocked)
       return
     }
     setSaving(true)
     setError('')
     try {
-      const res = id
-        ? await api.templates.update(id, { name: name.trim(), category, messageType, messageContent, folderId })
-        : await api.templates.create({
-            accountId: selectedAccountId!,
-            name: name.trim(),
-            category,
-            messageType,
-            messageContent,
-            folderId,
-          })
-      if (!res.success) {
+      const res = await saveTemplateEdit(input)
+      if (!res.ok) {
         setError(res.error)
         return
       }
       router.push('/templates')
-    } catch (e) {
-      setError(e instanceof Error ? e.message : '保存に失敗しました')
     } finally {
       setSaving(false)
     }
@@ -505,11 +703,20 @@ function TemplateEditInner() {
             />
           </Field>
 
+          <TemplateAccountNotice
+            binding={binding}
+            templateAccountLabel={accountName(templateAccountId)}
+            selectedAccountLabel={accountName(selectedAccountId)}
+          />
+
           <div>
             <p className="text-ink-secondary mb-1 text-sm font-medium">差し込む</p>
             <TemplateInsertControls
-              accountId={selectedAccountId}
+              accountId={editorAccountId}
               state={referenceState}
+              accountLabel={accountMismatch ? accountName(editorAccountId) : null}
+              targetDate={targetDate}
+              onTargetDateChange={setTargetDate}
               friendFields={references.friendFields}
               commonVars={references.commonVars}
               onInsert={insert}
@@ -585,7 +792,8 @@ function TemplateEditInner() {
           <div className="flex flex-wrap gap-2">
             <button
               onClick={save}
-              disabled={saving || loadFailed}
+              disabled={saving || loadFailed || accountMismatch}
+              title={accountMismatch ? ACCOUNT_MISMATCH_MESSAGE : undefined}
               className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-4 py-2 text-sm font-medium transition-colors disabled:opacity-40"
             >
               {saving ? '保存中...' : '保存'}
@@ -626,7 +834,7 @@ function TemplateEditInner() {
   )
 }
 
-export default function TemplateEditPage() {
+function TemplateEditPage() {
   // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
   return (
     <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中...</div>}>
@@ -634,3 +842,25 @@ export default function TemplateEditPage() {
     </Suspense>
   )
 }
+
+/*
+ * 試験から触れる口。**画面を組み立て直さずに、実際に動く部品を呼ぶ。**
+ * ここに出すのは、画面本体がそのまま使っている関数と部品だけ。
+ */
+const TemplateEditPageWithTestSupport = Object.assign(TemplateEditPage, {
+  __testing: {
+    ACCOUNT_MISMATCH_MESSAGE,
+    TemplateAccountNotice,
+    TemplateInsertControls,
+    buildTemplatePreview,
+    loadTemplateReferences,
+    previewDateValue,
+    requestTemplateReferences,
+    resolveEditorAccountId,
+    saveTemplateEdit,
+    templateAccountMismatch,
+    validateTemplateSave,
+  },
+})
+
+export default TemplateEditPageWithTestSupport
