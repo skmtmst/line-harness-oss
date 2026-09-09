@@ -51,12 +51,13 @@ function formatJst(value: string | null): string {
 }
 
 type LoadState = 'loading' | 'ready' | 'error' | 'forbidden'
-type ScopedLoadState = {
+export type ScopedLoadState = {
   scope: string
   state: LoadState
   result: EcNotificationRunList | null
   total: number
 }
+export type NotificationRunNotice = { tone: 'success' | 'error'; text: string } | null
 export type RunFilter = 'all' | 'failed' | 'excluded' | 'clicked'
 export type RecipientFilter = 'all' | EcNotificationRun['recipientType']
 export type PeriodFilter = 'all' | '24h' | '7d' | '30d'
@@ -93,6 +94,128 @@ export function filterNotificationRuns(
   })
 }
 
+/** 一覧が叩く口。試験では応答を保留できる偽物へ差し替える。 */
+export type NotificationRunPorts = {
+  deliveries: typeof api.lineNotifications.deliveries
+  notificationRuns: typeof api.ecCommerce.notificationRuns
+  retryDelivery: typeof api.lineNotifications.retryDelivery
+}
+
+/**
+ * 読み込みと再試行が共有する足場。
+ * `requestRef` は読み込みを始めた回数、`scopeRef` は最後に読み込みを始めた
+ * LINEアカウントとタブ。この2つが「今どの画面を見ているか」の唯一の目印で、
+ * 待っている間に切り替わったかどうかはここだけで判断する。
+ */
+export type NotificationRunEnv = {
+  requestRef: { current: number }
+  scopeRef: { current: string }
+  ports: NotificationRunPorts
+  setLoaded: (next: ScopedLoadState) => void
+  setNotice: (next: NotificationRunNotice) => void
+  setRetrying: (update: (current: string | null) => string | null) => void
+}
+
+export type NotificationRunLoadParams = {
+  scope: string
+  lineAccountId: string | null
+  mode: 'history' | 'failures'
+  page: number
+}
+
+export async function loadNotificationRuns(env: NotificationRunEnv, params: NotificationRunLoadParams): Promise<void> {
+  const request = ++env.requestRef.current
+  env.scopeRef.current = params.scope
+  if (!params.lineAccountId) {
+    env.setLoaded({ scope: params.scope, state: 'ready', result: null, total: 0 })
+    return
+  }
+  // scope・状態・結果を1つの更新で切り替え、前scopeの成功結果を再表示しない。
+  env.setLoaded({ scope: params.scope, state: 'loading', result: null, total: 0 })
+  try {
+    const query = {
+      lineAccountId: params.lineAccountId,
+      view: params.mode === 'failures' ? 'failures' as const : 'all' as const,
+      limit: PAGE_SIZE,
+      offset: (params.page - 1) * PAGE_SIZE,
+    }
+    // 古い検証用モックと段階移行中の環境だけ、互換口へ戻す（404のとき1回だけ）。
+    let fellBack = false
+    const primary = await env.ports.deliveries(query).catch((error: unknown) => {
+      if (error instanceof ApiError && error.status === 404) {
+        fellBack = true
+        return env.ports.notificationRuns(query)
+      }
+      throw error
+    })
+    if (!primary.success) throw new Error('load failed')
+    // 互換口の結果をもう一度取り直さない。毎回2要求になるのを防ぐ。
+    const response = !fellBack && (!primary.pagination || primary.data.coverage?.source !== 'notification_delivery_ledger')
+      ? await env.ports.notificationRuns(query)
+      : primary
+    if (request !== env.requestRef.current) return
+    if (!response.success) throw new Error('load failed')
+    env.setLoaded({
+      scope: params.scope,
+      state: 'ready',
+      result: response.data,
+      total: response.pagination.total,
+    })
+  } catch (error) {
+    if (request !== env.requestRef.current) return
+    env.setLoaded({
+      scope: params.scope,
+      state: error instanceof ApiError && error.status === 403 ? 'forbidden' : 'error',
+      result: null,
+      total: 0,
+    })
+  }
+}
+
+export async function retryNotificationRun(
+  env: NotificationRunEnv,
+  params: {
+    scope: string
+    lineAccountId: string | null
+    item: EcNotificationRun
+    reload: () => Promise<void>
+  },
+): Promise<void> {
+  const { item, lineAccountId } = params
+  if (!lineAccountId || !item.retryAvailable) return
+  /*
+   * 再試行の応答は、押した時のLINEアカウントとタブへだけ返す。
+   * 待っている間に切り替わっていたら、知らせも読み直しも捨てる。
+   * 捨てないと、押した時の読み直しが次のアカウントの読み込みを打ち消し、
+   * 画面が読み込み中のまま止まる。失敗の文言も前のアカウントの分が出る。
+   */
+  const startRequest = env.requestRef.current
+  const startScope = params.scope
+  const isCurrent = () => env.requestRef.current === startRequest && env.scopeRef.current === startScope
+  env.setRetrying(() => item.id)
+  env.setNotice(null)
+  try {
+    await env.ports.retryDelivery(item.id, {
+      lineAccountId,
+      expectedVersion: item.recordVersion,
+    })
+    if (!isCurrent()) return
+    env.setNotice({ tone: 'success', text: '同じ通知の送信を安全に再試行しました。' })
+    await params.reload()
+  } catch (error) {
+    if (!isCurrent()) return
+    const text = error instanceof ApiError && error.status === 403
+      ? '送信の再試行は店長だけができます。'
+      : error instanceof ApiError && error.status === 409
+        ? 'ほかの担当者が先に再試行しました。最新の記録を読み直してください。'
+        : '送信を再試行できませんでした。時間をおいて読み直してください。'
+    env.setNotice({ tone: 'error', text })
+  } finally {
+    // 切替後に別の行で始まった再試行の表示までは消さない。
+    env.setRetrying((current) => (current === item.id ? null : current))
+  }
+}
+
 export default function NotificationRunList({
   lineAccountId,
   mode,
@@ -112,11 +235,24 @@ export default function NotificationRunList({
   const [recipientFilter, setRecipientFilter] = useState<RecipientFilter>('all')
   const [periodFilter, setPeriodFilter] = useState<PeriodFilter>('all')
   const [retryingId, setRetryingId] = useState<string | null>(null)
-  const [notice, setNotice] = useState<{ tone: 'success' | 'error'; text: string } | null>(null)
+  const [notice, setNotice] = useState<NotificationRunNotice>(null)
   // 再試行口は店長専用。担当者にはボタンを出さない。
   const [canRetry, setCanRetry] = useState(false)
   const requestRef = useRef(0)
   const currentScope = `${lineAccountId ?? 'none'}:${mode}`
+  const scopeRef = useRef(currentScope)
+  const env = useMemo<NotificationRunEnv>(() => ({
+    requestRef,
+    scopeRef,
+    ports: {
+      deliveries: api.lineNotifications.deliveries,
+      notificationRuns: api.ecCommerce.notificationRuns,
+      retryDelivery: api.lineNotifications.retryDelivery,
+    },
+    setLoaded,
+    setNotice,
+    setRetrying: setRetryingId,
+  }), [])
 
   useEffect(() => {
     let active = true
@@ -133,80 +269,22 @@ export default function NotificationRunList({
     setRecipientFilter('all')
     setPeriodFilter('all')
     setNotice(null)
+    setRetryingId(null)
   }, [lineAccountId, mode])
 
-  const load = useCallback(async () => {
-    const request = ++requestRef.current
-    if (!lineAccountId) {
-      setLoaded({ scope: currentScope, state: 'ready', result: null, total: 0 })
-      return
-    }
-    // scope・状態・結果を1つの更新で切り替え、前scopeの成功結果を再表示しない。
-    setLoaded({ scope: currentScope, state: 'loading', result: null, total: 0 })
-    try {
-      const params = {
-        lineAccountId,
-        view: mode === 'failures' ? 'failures' as const : 'all' as const,
-        limit: PAGE_SIZE,
-        offset: (page - 1) * PAGE_SIZE,
-      }
-      // 古い検証用モックと段階移行中の環境だけ、互換口へ戻す（404のとき1回だけ）。
-      let fellBack = false
-      const primary = await api.lineNotifications.deliveries(params).catch((error: unknown) => {
-        if (error instanceof ApiError && error.status === 404) {
-          fellBack = true
-          return api.ecCommerce.notificationRuns(params)
-        }
-        throw error
-      })
-      if (!primary.success) throw new Error('load failed')
-      // 互換口の結果をもう一度取り直さない。毎回2要求になるのを防ぐ。
-      const response = !fellBack && (!primary.pagination || primary.data.coverage?.source !== 'notification_delivery_ledger')
-        ? await api.ecCommerce.notificationRuns(params)
-        : primary
-      if (request !== requestRef.current) return
-      if (!response.success) throw new Error('load failed')
-      setLoaded({
-        scope: currentScope,
-        state: 'ready',
-        result: response.data,
-        total: response.pagination.total,
-      })
-    } catch (error) {
-      if (request !== requestRef.current) return
-      setLoaded({
-        scope: currentScope,
-        state: error instanceof ApiError && error.status === 403 ? 'forbidden' : 'error',
-        result: null,
-        total: 0,
-      })
-    }
-  }, [currentScope, lineAccountId, mode, page])
+  const load = useCallback(
+    () => loadNotificationRuns(env, { scope: currentScope, lineAccountId, mode, page }),
+    [currentScope, env, lineAccountId, mode, page],
+  )
 
   useEffect(() => { void load() }, [load])
 
-  const retry = async (item: EcNotificationRun) => {
-    if (!lineAccountId || !item.retryAvailable) return
-    setRetryingId(item.id)
-    setNotice(null)
-    try {
-      await api.lineNotifications.retryDelivery(item.id, {
-        lineAccountId,
-        expectedVersion: item.recordVersion,
-      })
-      setNotice({ tone: 'success', text: '同じ通知の送信を安全に再試行しました。' })
-      await load()
-    } catch (error) {
-      const text = error instanceof ApiError && error.status === 403
-        ? '送信の再試行は店長だけができます。'
-        : error instanceof ApiError && error.status === 409
-          ? 'ほかの担当者が先に再試行しました。最新の記録を読み直してください。'
-          : '送信を再試行できませんでした。時間をおいて読み直してください。'
-      setNotice({ tone: 'error', text })
-    } finally {
-      setRetryingId(null)
-    }
-  }
+  const retry = (item: EcNotificationRun) => retryNotificationRun(env, {
+    scope: currentScope,
+    lineAccountId,
+    item,
+    reload: load,
+  })
 
   const title = mode === 'failures' ? '送れなかったもの' : 'お知らせの記録'
   const nodeId = mode === 'failures' ? 'X8JCA5' : 'Se65i'
