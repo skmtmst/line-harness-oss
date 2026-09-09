@@ -17,11 +17,7 @@ describe('resolveStepContent question template', () => {
       choices: [{ label: 'はい', behavior: 'none' }],
     })
     const result = await resolveStepContent(
-      mockDb({
-        message_type: 'text', message_content: '続けますか？', question_json: latest,
-        // 公開済みの持ち主なし行(関連付け口の reminders と同じ約束)。
-        published_version: 1, line_account_id: null,
-      }),
+      mockDb({ message_type: 'text', message_content: '続けますか？', question_json: latest }),
       {
         template_id: 'question-template-1',
         message_type: 'text',

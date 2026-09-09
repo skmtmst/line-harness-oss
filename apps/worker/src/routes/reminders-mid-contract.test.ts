@@ -243,44 +243,4 @@ describe('下書き保存時の空本文の拒否（#489 中16）', () => {
     expect(response.status).toBe(200)
     expect(dbMocks.saveReminderDraftVersion).toHaveBeenCalled()
   })
-
-  it('未公開・別アカウントの型紙は422で止め、公開版の確認を口へ含める(再審査2・3)', async () => {
-    const seenSql: string[] = []
-    const strictApp = new Hono<any>()
-    strictApp.use('*', async (c, next) => {
-      c.set('staff', { id: 'staff-1', role: 'owner', readOnly: false, tenantId: 'tenant-a' })
-      c.env = {
-        DB: {
-          prepare: (sql: string) => {
-            seenSql.push(sql)
-            return {
-              bind: () => ({
-                // 型紙の確認だけ見つからない(未公開・別アカウント扱い)にする。
-                first: async () => (/FROM templates/i.test(sql) ? null : { id: 'x' }),
-                all: async () => ({ results: [] }),
-                run: async () => ({}),
-              }),
-            }
-          },
-        },
-      }
-      await next()
-    })
-    strictApp.route('/', reminders)
-    const response = await strictApp.request('/api/reminders/reminder-1/draft', {
-      method: 'PUT',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        ...baseSettings,
-        steps: [{ ...textStep, messageContent: '', templateId: 'template-1' }],
-      }),
-    })
-    expect(response.status).toBe(422)
-    expect(await response.json()).toMatchObject({
-      success: false,
-      error: '通知に使うテンプレートが見つかりません',
-    })
-    expect(dbMocks.saveReminderDraftVersion).not.toHaveBeenCalled()
-    expect(seenSql.some((sql) => /FROM templates/i.test(sql) && sql.includes('published_version > 0'))).toBe(true)
-  })
 })

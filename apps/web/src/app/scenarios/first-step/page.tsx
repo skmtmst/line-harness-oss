@@ -12,7 +12,6 @@ import {
   type Template,
 } from '@line-crm/shared'
 import { api } from '@/lib/api'
-import { filterSendableTemplates } from '@/lib/template-send-scope'
 import { scenarioReferenceData } from '@/components/scenarios/scenario-reference-data'
 import ImageUploader, { type ImageUploaderValue } from '@/components/shared/image-uploader'
 import MessageTypeTabs, { type StepMessageKind } from '@/components/scenarios/message-type-tabs'
@@ -118,10 +117,6 @@ function FirstStepContent() {
         return
       }
       setScenario(res.data)
-      // 再審査対応(#645): 初回一覧もシナリオのアカウントで絞り、未公開・他アカウントを候補にしない。
-      void scenarioReferenceData.templates(res.data.lineAccountId).then(tpl => {
-        if (tpl.success) setTemplates(filterSendableTemplates(tpl.data, res.data.lineAccountId))
-      })
       const first = [...res.data.steps].sort((a, b) => a.stepOrder - b.stepOrder)[0]
       if (first) {
         // 作成フローを途中で閉じて戻った場合は、既存の1通目を再表示する。
@@ -154,6 +149,9 @@ function FirstStepContent() {
     })
     void scenarioReferenceData.tags().then(res => {
       if (res.success) setTags(res.data)
+    })
+    void scenarioReferenceData.templates().then(res => {
+      if (res.success) setTemplates(res.data as unknown as Template[])
     })
   }, [id])
 
@@ -531,7 +529,7 @@ function FirstStepContent() {
                   （組み立てが重く、編集画面を2つ持つと片方だけ直して食い違う）。
                 */}
                 {kind === 'carousel' && (
-                  <CarouselPicker value={templateId} accountId={scenario?.lineAccountId} onChange={(id) => setTemplateId(id)} />
+                  <CarouselPicker value={templateId} onChange={(id) => setTemplateId(id)} />
                 )}
               </MessageTypeTabs>
             ) : (

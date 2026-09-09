@@ -1,5 +1,3 @@
-import { isTemplateSendable } from './templates.js';
-
 export interface StepLike {
   template_id: string | null;
   message_type: string;
@@ -36,14 +34,11 @@ function normalizeMessageType(type: string): string {
 
 /**
  * step.template_id がセットされていれば templates テーブルから内容を resolve。
- * テンプレが見つからない (削除直後のレース等)・未公開・別アカウントは
- * step 側にフォールバックして配信を止めない。再審査対応(#645):
- * 未公開の下書きや別アカウントの公開版を送らない。
+ * テンプレが見つからない (削除直後のレース等) は step 側にフォールバックして配信を止めない。
  */
 export async function resolveStepContent(
   db: D1Database,
   step: StepLike,
-  lineAccountId?: string | null,
 ): Promise<ResolvedContent> {
   if (!step.template_id) {
     return {
@@ -54,15 +49,10 @@ export async function resolveStepContent(
     };
   }
   const tpl = await db
-    .prepare(`SELECT message_type, message_content, question_json,
-                     published_version, line_account_id
-                FROM templates WHERE id = ?`)
+    .prepare('SELECT message_type, message_content, question_json FROM templates WHERE id = ?')
     .bind(step.template_id)
-    .first<{
-      message_type: string; message_content: string; question_json: string | null;
-      published_version: number; line_account_id: string | null;
-    }>();
-  if (!tpl || !isTemplateSendable(tpl, lineAccountId)) {
+    .first<{ message_type: string; message_content: string; question_json: string | null }>();
+  if (!tpl) {
     return {
       messageType: step.message_type,
       messageContent: step.message_content,

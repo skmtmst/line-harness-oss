@@ -20,7 +20,6 @@ import {
   getTrackedLinkById,
   getRichMenuTapStats,
   getRichMenuAudienceStats,
-  getSendableTemplate,
   recordRichMenuAssignmentsByLineUserIds,
   clearRichMenuAssignmentsForGroup,
   jstNow,
@@ -313,26 +312,6 @@ function parsePages(raw: unknown): Parsed<RichMenuPageInput[]> {
     }
   }
   return { ok: true, value: pages };
-}
-
-/**
- * 再審査対応(#645): ボタンに結びつけるテンプレートは、同一アカウントかつ
- * 公開版であること。未公開・別アカウントは結びつけられない。
- */
-async function validateAreaTemplates(
-  db: D1Database,
-  accountId: string,
-  pages: RichMenuPageInput[],
-): Promise<string | null> {
-  for (const page of pages) {
-    for (const area of page.areas ?? []) {
-      if (area.intent === 'template' && area.templateId) {
-        const tpl = await getSendableTemplate(db, area.templateId, accountId);
-        if (!tpl) return '選んだテンプレートを確認できません';
-      }
-    }
-  }
-  return null;
 }
 
 // create では input.page.id がそのまま DB 投入されない (新 UUID で再生成) ため、
@@ -1246,8 +1225,6 @@ richMenuGroups.post('/api/rich-menu-groups', requireRole('owner', 'admin'), asyn
   }
   const switcherRejection = rejectRichmenuswitchInCreate(parsed.value.pages);
   if (switcherRejection) return c.json({ success: false, error: switcherRejection }, 400);
-  const areaTemplateError = await validateAreaTemplates(c.env.DB, parsed.value.accountId, parsed.value.pages);
-  if (areaTemplateError) return c.json({ success: false, error: areaTemplateError }, 400);
   const created = await createRichMenuGroup(c.env.DB, parsed.value);
   return c.json({ success: true, data: serializeGroupWithPages(created) });
 });
@@ -1270,8 +1247,6 @@ richMenuGroups.patch('/api/rich-menu-groups/:groupId', requireRole('owner', 'adm
 
   await updateRichMenuGroupMeta(c.env.DB, groupId, parsed.value.meta);
   if (parsed.value.pages) {
-    const areaTemplateError = await validateAreaTemplates(c.env.DB, existing.account_id, parsed.value.pages);
-    if (areaTemplateError) return c.json({ success: false, error: areaTemplateError }, 400);
     await replaceRichMenuPages(c.env.DB, groupId, parsed.value.pages);
   }
   const refreshed = await getRichMenuGroupWithPages(c.env.DB, groupId);

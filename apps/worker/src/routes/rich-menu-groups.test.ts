@@ -11,7 +11,6 @@ const dbMocks = {
   getRichMenuTapStats: vi.fn(),
   recordRichMenuAssignmentsByLineUserIds: vi.fn(),
   clearRichMenuAssignmentsForGroup: vi.fn(),
-  getSendableTemplate: vi.fn(),
   jstNow: vi.fn(),
   createRichMenuGroup: vi.fn(),
   updateRichMenuGroupMeta: vi.fn(),
@@ -482,30 +481,6 @@ describe('POST /api/rich-menu-groups', () => {
       body: JSON.stringify({ accountId: 'a', name: 'x', chatBarText: 'x', size: 'huge', pages: [{ name: 'p', orderIndex: 0, areas: [] }] }),
     });
     expect(res.status).toBe(400);
-  });
-
-  test('未公開・別アカウントのテンプレートはボタンに結びつけられない(再審査2・3)', async () => {
-    accountAccessMocks.canAccessAllLineAccounts.mockResolvedValue(true);
-    dbMocks.getSendableTemplate.mockResolvedValue(null);
-    const app = setupApp();
-    const res = await app.request('/api/rich-menu-groups', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        accountId: 'account-1', name: 'x', chatBarText: 'x', size: 'large',
-        pages: [{
-          name: 'p', orderIndex: 0,
-          areas: [{
-            boundsX: 0, boundsY: 0, boundsWidth: 100, boundsHeight: 100,
-            actionType: 'message', actionData: { text: 'x' },
-            intent: 'template', templateId: 'tpl-unpublished',
-          }],
-        }],
-      }),
-    });
-
-    expect(res.status).toBe(400);
-    expect(dbMocks.createRichMenuGroup).not.toHaveBeenCalled();
   });
 
   test('rejects pages with non-sequential orderIndex', async () => {

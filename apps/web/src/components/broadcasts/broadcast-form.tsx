@@ -238,10 +238,8 @@ function BubblePreview({ bubble, buttons = [] }: { bubble: BroadcastBubble; butt
   return <div className="w-[82%] overflow-hidden rounded-card bg-canvas shadow-sm">{imageUrl && <img src={imageUrl} alt="素材プレビュー" className="h-32 w-full object-cover" />}<div className="p-3"><p className="text-xs font-bold">{String(bubble.content.assetName ?? TYPE_LABELS[bubble.type])}</p><p className="mt-1 text-[11px] text-ink-faint">{TYPE_LABELS[bubble.type]}のプレビュー</p></div></div>
 }
 
-function BubbleEditor({ bubble, index, total, assets, accountId, onChange, onMove, onDelete }: {
+function BubbleEditor({ bubble, index, total, assets, onChange, onMove, onDelete }: {
   bubble: BroadcastBubble; index: number; total: number; assets: BroadcastMessageAsset[];
-  /** 選んでいるLINEアカウント。カルーセル候補の絞り込みに使う。 */
-  accountId?: string | null;
   onChange: (bubble: BroadcastBubble) => void; onMove: (direction: -1 | 1) => void; onDelete: () => void
 }) {
   const availableAssets = assets.filter((asset) => asset.kind === bubble.type)
@@ -299,7 +297,6 @@ function BubbleEditor({ bubble, index, total, assets, accountId, onChange, onMov
       {bubble.type === 'carousel' && (
         <CarouselPicker
           value={String(bubble.content.templateId ?? '')}
-          accountId={accountId}
           onChange={(templateId, template) => onChange({
             ...bubble,
             content: {
@@ -472,10 +469,6 @@ export default function BroadcastForm({
    */
   const draftSession = useRef(newBroadcastDraftSession())
   const appliedInitialTemplate = useRef(false)
-  // 再審査対応(#645-4): テンプレート読み込みの世代照合と選択中アカウントの記録。
-  const templateLoadGenerationRef = useRef(0)
-  const selectedAccountIdRef = useRef(selectedAccountId)
-  selectedAccountIdRef.current = selectedAccountId
   const searchParams = useSearchParams()
   const appliedDuplicateFrom = useRef(false)
   const [title, setTitle] = useState(visualQaAugustCampaign ? '8月キャンペーンのお知らせ' : '')
@@ -620,22 +613,15 @@ export default function BroadcastForm({
   }, [selectedAccountId])
 
   useEffect(() => {
-    // 再審査対応(#645-4): アカウント切替で古い応答が混ざらないよう世代で照合する。
-    const requestAccountId = selectedAccountId || undefined
-    const requestGeneration = ++templateLoadGenerationRef.current
-    const isCurrent = () =>
-      templateLoadGenerationRef.current === requestGeneration
-      && (selectedAccountIdRef.current ?? undefined) === requestAccountId
     Promise.all([
-      api.broadcastMessageAssets.list({ accountId: requestAccountId }),
+      api.broadcastMessageAssets.list({ accountId: selectedAccountId || undefined }),
       // #645 差し戻し: 選んでいるアカウントを必ず渡す。口の主文は公開版だけが返り、
       // 未公開・他アカウントは候補にしない。初回引用の検索も同じ候補から行う。
-      api.templates.list(undefined, requestAccountId),
+      api.templates.list(undefined, selectedAccountId || undefined),
     ]).then(([assetResult, templateResult]) => {
-      if (!isCurrent()) return
       if (assetResult.success) setAssets(assetResult.data)
       const sendable = templateResult.success
-        ? filterSendableTemplates(templateResult.data, requestAccountId)
+        ? filterSendableTemplates(templateResult.data, selectedAccountId || undefined)
         : []
       if (templateResult.success) {
         setMessageTemplates(sendable.filter((template) => ['text', 'image', 'flex'].includes(template.messageType)))
@@ -1445,7 +1431,7 @@ export default function BroadcastForm({
             onChange={(next) => updateBubble(index, next)}
           />
         ) : (
-          <BubbleEditor key={bubble.id} bubble={bubble} index={index} total={bubbles.length} assets={assets} accountId={selectedAccountId} onChange={(next) => updateBubble(index, next)} onMove={(direction) => moveBubble(index, direction)} onDelete={() => setBubbles((items) => items.filter((_, i) => i !== index))} />
+          <BubbleEditor key={bubble.id} bubble={bubble} index={index} total={bubbles.length} assets={assets} onChange={(next) => updateBubble(index, next)} onMove={(direction) => moveBubble(index, direction)} onDelete={() => setBubbles((items) => items.filter((_, i) => i !== index))} />
         ))}
         {!showTemplatePicker && <div className="mt-4 flex flex-wrap gap-2">
           <Button type="button" disabled={bubbles.length >= MAX_BUBBLES} onClick={() => setBubbles((items) => [...items, emptyBubble()])}><Plus size={15} aria-hidden /> メッセージを追加</Button>

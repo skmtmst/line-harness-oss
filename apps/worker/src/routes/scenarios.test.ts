@@ -23,7 +23,6 @@ const dbMocks = {
   getFriendById: vi.fn(),
   computeNextDeliveryAt: vi.fn(),
   resolveStepContent: vi.fn(),
-  getSendableTemplate: vi.fn(),
 };
 vi.mock('@line-crm/db', () => dbMocks);
 
@@ -398,8 +397,8 @@ describe('シナリオ通の本文契約', () => {
             return statement;
           },
           async first() {
-            if (/SELECT delivery_mode.*FROM scenarios/i.test(sql)) {
-              return { delivery_mode: 'relative', line_account_id: 'account-1' };
+            if (/SELECT delivery_mode FROM scenarios/i.test(sql)) {
+              return { delivery_mode: 'relative' };
             }
             if (/SELECT id FROM scenario_steps/i.test(sql)) return null;
             return null;
@@ -452,75 +451,6 @@ describe('シナリオ通の本文契約', () => {
 
     expect(response.status).toBe(201);
     expect(dbMocks.createScenarioStep).toHaveBeenCalledTimes(1);
-  });
-
-  test('未公開・別アカウントのテンプレートは通の作成で結びつけられない(再審査2・3)', async () => {
-    dbMocks.getScenarioById.mockResolvedValue(visibleScenario);
-    dbMocks.getSendableTemplate.mockResolvedValue(null);
-    const db = {
-      prepare(sql: string) {
-        const statement = {
-          bind() {
-            return statement;
-          },
-          async first() {
-            if (/SELECT delivery_mode.*FROM scenarios/i.test(sql)) {
-              return { delivery_mode: 'relative', line_account_id: 'account-1' };
-            }
-            return null;
-          },
-        };
-        return statement;
-      },
-    } as unknown as D1Database;
-
-    const response = await setupApp(db).request('/api/scenarios/scenario-1/steps', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        stepOrder: 1,
-        delayMinutes: 0,
-        messageType: 'text',
-        messageContent: '本文',
-        templateId: 'tpl-unpublished',
-      }),
-    });
-
-    expect(response.status).toBe(400);
-    expect(dbMocks.createScenarioStep).not.toHaveBeenCalled();
-  });
-
-  test('未公開・別アカウントのテンプレートは通の更新で結びつけられない(再審査2・3)', async () => {
-    dbMocks.getScenarioById.mockResolvedValue(visibleScenario);
-    dbMocks.getSendableTemplate.mockResolvedValue(null);
-    const db = {
-      prepare(sql: string) {
-        const statement = {
-          bind() {
-            return statement;
-          },
-          async first() {
-            if (/SELECT line_account_id FROM scenarios/i.test(sql)) {
-              return { line_account_id: 'account-1' };
-            }
-            return null;
-          },
-        };
-        return statement;
-      },
-    } as unknown as D1Database;
-
-    const response = await setupApp(db).request(
-      '/api/scenarios/scenario-1/steps/step-1',
-      {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ templateId: 'tpl-other-account' }),
-      },
-    );
-
-    expect(response.status).toBe(400);
-    expect(dbMocks.updateScenarioStep).not.toHaveBeenCalled();
   });
 });
 

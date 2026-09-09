@@ -17,7 +17,7 @@ import {
   failReminderDeliveryRun,
   getFriendById,
   getLineAccountById,
-  getSendableTemplate,
+  getTemplateById,
   skipReminderDeliveryRun,
   verifyClaimedRunBeforeSend,
 } from '@line-crm/db';
@@ -72,8 +72,7 @@ export async function buildReminderStepMessage(
   let messageType = step.message_type;
   let messageContent = step.message_content;
   if (step.template_id) {
-    // 再審査対応(#645): 未公開・別アカウントは step の控えに落とす。
-    const template = await getSendableTemplate(db, step.template_id, friend.line_account_id);
+    const template = await getTemplateById(db, step.template_id);
     if (template) {
       messageType = template.message_type;
       messageContent = template.message_content;

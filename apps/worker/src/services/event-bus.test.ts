@@ -55,7 +55,7 @@ vi.mock('@line-crm/db', async () => {
     enrollFriendInScenario: vi.fn().mockResolvedValue(undefined),
     jstNow: () => '2026-05-08T00:00:00.000+09:00',
     getFriendScore: vi.fn().mockResolvedValue(0),
-    getSendableTemplate: vi.fn().mockResolvedValue(null),
+    getTemplateById: vi.fn().mockResolvedValue(null),
     recordAnalyticsEvent: vi.fn().mockResolvedValue({ id: 'analytics-event-1' }),
     createWebhookInteraction: vi.fn().mockResolvedValue({ id: 'webhook-run-1' }),
     finishWebhookInteraction: vi.fn().mockResolvedValue(undefined),
@@ -222,7 +222,7 @@ describe('fireEvent — send_message action logging', () => {
         ]),
       },
     ]);
-    (db.getSendableTemplate as unknown as { mockResolvedValue: (v: unknown) => void }).mockResolvedValue({
+    (db.getTemplateById as unknown as { mockResolvedValue: (v: unknown) => void }).mockResolvedValue({
       id: 'tpl-1',
       name: 'test-tpl',
       category: 'general',

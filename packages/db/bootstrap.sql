@@ -4629,11 +4629,6 @@ CREATE TABLE template_publish_keys (
   published_version INTEGER NOT NULL,
   draft_revision INTEGER NOT NULL,
   created_at TEXT NOT NULL,
-  -- 再審査対応: 同キー再試行の内容比較用指紋と、固定応答の控え。
-  -- 指紋が違えば別操作の使い回しとして409。応答は記録時の版・本文を返す。
-  draft_fingerprint TEXT NOT NULL DEFAULT '',
-  message_type TEXT,
-  message_content TEXT,
   PRIMARY KEY (template_id, idempotency_key)
 );
 

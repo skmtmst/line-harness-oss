@@ -630,9 +630,6 @@ templates.post('/api/templates/:id/publish', requireRole('owner', 'admin'), asyn
     if (code === 'TEMPLATE_DRAFT_CONFLICT') {
       return c.json({ success: false, error: '下書きが書き換わっています。開き直して確認してください' }, 409);
     }
-    if (code === 'TEMPLATE_PUBLISH_KEY_CONFLICT') {
-      return c.json({ success: false, error: '同じ確認キーが別の公開操作で使われています' }, 409);
-    }
     console.error('POST /api/templates/:id/publish error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }

@@ -444,9 +444,8 @@ async function executeAction(
       let resolvedContent = action.params.content ?? '';
       const tplId = action.params.template_id;
       if (tplId) {
-        // 再審査対応(#645): 未公開・別アカウントは inline の控えのまま送る。
-        const { getSendableTemplate } = await import('@line-crm/db');
-        const tpl = await getSendableTemplate(db, tplId, lineAccountId);
+        const { getTemplateById } = await import('@line-crm/db');
+        const tpl = await getTemplateById(db, tplId);
         if (tpl) {
           resolvedType = tpl.message_type;
           resolvedContent = tpl.message_content;

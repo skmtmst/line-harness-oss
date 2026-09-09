@@ -9,7 +9,7 @@ import {
   getAutoReplyHitCounts,
   getAutoReplyHitCountSince,
   getFriendById,
-  getSendableTemplate,
+  getTemplateById,
   autoReplyRowFromDraftSettings,
   createAutoReplyWithDraftVersion,
   getAutoReplyDraftVersion,
@@ -565,8 +565,7 @@ async function readDraftSettings(db: D1Database, raw: unknown): Promise<DraftRea
   let responseType = typeof body.responseType === 'string' && body.responseType ? body.responseType : 'text';
   let responseContent = typeof body.responseContent === 'string' ? body.responseContent : '';
   if (templateId) {
-    // 再審査対応(#645): 同一アカウントかつ公開版であること。
-    const template = await getSendableTemplate(db, templateId, body.lineAccountId as string);
+    const template = await getTemplateById(db, templateId);
     if (!template) return { ok: false, error: '選んだテンプレートを確認できません' };
     if (!responseType) responseType = template.message_type;
     if (!responseContent) responseContent = template.message_content;
@@ -791,9 +790,7 @@ async function validateDraft(
   if (settings.responseType !== 'silent' && !settings.templateId && !settings.responseContent) {
     errors.push('返信する内容を入力してください');
   }
-  // 再審査対応(#645): 同一アカウントかつ公開版であること。
-  if (settings.templateId
-    && !await getSendableTemplate(db, settings.templateId, settings.lineAccountId)) {
+  if (settings.templateId && !await getTemplateById(db, settings.templateId)) {
     errors.push('選んだテンプレートを確認できません');
   }
   const conflicts = await conflictsForDraft(db, version.auto_reply_id, settings);
@@ -1371,14 +1368,6 @@ autoReplies.post('/api/auto-replies', requireRole('owner', 'admin'), async (c) =
     if (!body.templateId && !body.responseContent && body.responseType !== 'silent') {
       return c.json({ success: false, error: 'templateId or responseContent required (unless responseType=silent)' }, 400);
     }
-    // 再審査対応(#645): 関連付け時に同一アカウントかつ公開版であること。
-    if (body.templateId) {
-      const { getSendableTemplate } = await import('@line-crm/db');
-      const sendable = await getSendableTemplate(c.env.DB, body.templateId, body.lineAccountId ?? null);
-      if (!sendable) {
-        return c.json({ success: false, error: '選んだテンプレートを確認できません' }, 400);
-      }
-    }
 
     const activeFrom = parseHhmm(body.activeFrom);
     const activeUntil = parseHhmm(body.activeUntil);
@@ -1410,9 +1399,8 @@ autoReplies.post('/api/auto-replies', requireRole('owner', 'admin'), async (c) =
     let resolvedResponseType = body.responseType ?? 'text';
     let resolvedResponseContent = body.responseContent ?? '';
     if (body.templateId && (!body.responseContent || !body.responseType)) {
-      // 再審査対応(#645): 未公開・別アカウントの本文を控えにしない。
-      const { getSendableTemplate } = await import('@line-crm/db');
-      const tpl = await getSendableTemplate(c.env.DB, body.templateId, body.lineAccountId ?? null);
+      const { getTemplateById } = await import('@line-crm/db');
+      const tpl = await getTemplateById(c.env.DB, body.templateId);
       if (tpl) {
         if (!body.responseType) resolvedResponseType = tpl.message_type;
         if (!body.responseContent) resolvedResponseContent = tpl.message_content;
@@ -1483,18 +1471,6 @@ autoReplies.put('/api/auto-replies/:id', requireRole('owner', 'admin'), async (c
       input.responseContent = body.responseContent;
     }
     if ('templateId' in body) input.templateId = body.templateId;
-    // 再審査対応(#645): 関連付け時に同一アカウントかつ公開版であること。
-    if (body.templateId) {
-      const { getSendableTemplate } = await import('@line-crm/db');
-      const target = await getAutoReplyById(c.env.DB, id);
-      if (!target) return c.json({ success: false, error: 'Auto-reply not found' }, 404);
-      const sendable = await getSendableTemplate(
-        c.env.DB, body.templateId, body.lineAccountId ?? target.line_account_id,
-      );
-      if (!sendable) {
-        return c.json({ success: false, error: '選んだテンプレートを確認できません' }, 400);
-      }
-    }
     if ('lineAccountId' in body) {
       if (body.lineAccountId !== null && body.lineAccountId !== undefined) {
         if (!body.lineAccountId
@@ -1548,15 +1524,9 @@ autoReplies.put('/api/auto-replies/:id', requireRole('owner', 'admin'), async (c
 
     // templateId が新たに set されて responseContent が来てない場合は template の
     // 現在値を inline snapshot として書き込む (ON DELETE SET NULL の fallback 用)。
-    // 再審査対応(#645): 未公開・別アカウントの本文を控えにしない。
-    // アカウントは body がなければ既存ルールのものを見る。
     if (body.templateId && body.responseContent === undefined) {
-      const { getSendableTemplate } = await import('@line-crm/db');
-      const existing = await getAutoReplyById(c.env.DB, id);
-      if (!existing) return c.json({ success: false, error: 'Auto-reply not found' }, 404);
-      const tpl = await getSendableTemplate(
-        c.env.DB, body.templateId, body.lineAccountId ?? existing.line_account_id,
-      );
+      const { getTemplateById } = await import('@line-crm/db');
+      const tpl = await getTemplateById(c.env.DB, body.templateId);
       if (tpl) {
         input.responseContent = tpl.message_content;
         if (body.responseType === undefined) input.responseType = tpl.message_type;

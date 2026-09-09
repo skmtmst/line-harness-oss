@@ -273,10 +273,20 @@ describe('公開口の契約', () => {
     });
   });
 
-  it('同じ内容の同キー再試行は記録時の版・本文をそのまま返す(固定応答)', async () => {
-    mocks.getTemplateById.mockResolvedValue(liveRow({ message_content: '2回目の公開' }));
+  it('後日の同キー再試行は別の下書きを公開せず、成功済みの結果を返す', async () => {
+    mocks.getTemplateById.mockResolvedValue(
+      liveRow({
+        message_content: '最初の公開',
+        published_version: 1,
+        draft_message_content: '次の編集',
+      }),
+    );
     mocks.publishTemplate.mockResolvedValue({
-      row: liveRow({ message_content: '最初の公開', published_version: 1 }),
+      row: liveRow({
+        message_content: '最初の公開',
+        published_version: 1,
+        draft_message_content: '次の編集',
+      }),
       published: false,
       replayed: true,
     });
@@ -291,26 +301,8 @@ describe('公開口の契約', () => {
         publishedVersion: 1,
         published: false,
         replayed: true,
-        hasDraft: false,
+        hasDraft: true,
       },
-    });
-  });
-
-  it('同じ確認キーで別の下書きを出す使い回しは409で止める', async () => {
-    mocks.getTemplateById.mockResolvedValue(
-      liveRow({
-        message_content: '最初の公開',
-        published_version: 1,
-        draft_message_content: '次の編集',
-      }),
-    );
-    mocks.publishTemplate.mockRejectedValue(new Error('TEMPLATE_PUBLISH_KEY_CONFLICT'));
-
-    const response = await publish();
-
-    expect(response.status).toBe(409);
-    expect(await response.json()).toMatchObject({
-      error: '同じ確認キーが別の公開操作で使われています',
     });
   });
 

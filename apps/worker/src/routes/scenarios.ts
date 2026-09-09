@@ -21,7 +21,6 @@ import { isScenarioActionComplete } from '../services/scenario-actions.js';
 import {
   resolveStepContent,
   getScenarioTriggers,
-  getSendableTemplate,
   addScenarioTrigger,
   removeScenarioTrigger,
 } from '@line-crm/db';
@@ -716,9 +715,9 @@ scenarios.post('/api/scenarios/:id/steps', requireRole('owner', 'admin'), async 
     }
 
     const scenarioRow = await c.env.DB
-      .prepare(`SELECT delivery_mode, line_account_id FROM scenarios WHERE id = ?`)
+      .prepare(`SELECT delivery_mode FROM scenarios WHERE id = ?`)
       .bind(scenarioId)
-      .first<{ delivery_mode: DeliveryMode; line_account_id: string | null }>();
+      .first<{ delivery_mode: DeliveryMode }>();
     if (!scenarioRow) {
       return c.json({ success: false, error: 'Scenario not found' }, 404);
     }
@@ -730,11 +729,11 @@ scenarios.post('/api/scenarios/:id/steps', requireRole('owner', 'admin'), async 
     if (!cv.ok) return c.json({ success: false, error: cv.error }, 400);
 
     // templateId / onReachTagId 参照整合性チェック
-    // 再審査対応(#645): ID存在だけでなく、同一アカウントかつ公開版であること。
     if (body.templateId != null) {
-      const tpl = await getSendableTemplate(
-        c.env.DB, body.templateId, scenarioRow.line_account_id ?? null,
-      );
+      const tpl = await c.env.DB
+        .prepare(`SELECT id FROM templates WHERE id = ?`)
+        .bind(body.templateId)
+        .first<{ id: string }>();
       if (!tpl) return c.json({ success: false, error: 'templateId not found' }, 400);
     }
     if (body.onReachTagId != null) {
@@ -862,15 +861,12 @@ scenarios.put('/api/scenarios/:id/steps/:stepId', requireRole('owner', 'admin'),
 
     // templateId / onReachTagId 参照整合性チェック (null は解除を意図、bypass)
     // templateId が指定された場合は内容も取得して snapshot 更新に使う。
-    // 再審査対応(#645): ID存在だけでなく、同一アカウントかつ公開版であること。
     let templateSnapshot: { message_type: string; message_content: string } | null = null;
     if (body.templateId !== undefined && body.templateId !== null) {
-      const putScenario = await c.env.DB
-        .prepare(`SELECT line_account_id FROM scenarios WHERE id = ?`)
-        .bind(scenarioId)
-        .first<{ line_account_id: string | null }>();
-      if (!putScenario) return c.json({ success: false, error: 'Scenario not found' }, 404);
-      const tpl = await getSendableTemplate(c.env.DB, body.templateId, putScenario.line_account_id);
+      const tpl = await c.env.DB
+        .prepare(`SELECT id, message_type, message_content FROM templates WHERE id = ?`)
+        .bind(body.templateId)
+        .first<{ id: string; message_type: string; message_content: string }>();
       if (!tpl) return c.json({ success: false, error: 'templateId not found' }, 400);
       templateSnapshot = { message_type: tpl.message_type, message_content: tpl.message_content };
     }
@@ -1130,9 +1126,9 @@ scenarios.get('/api/scenarios/:id/preview', scenarioPermission('view'), async (c
     }
     const scenarioId = c.req.param('id');
     const scenarioRow = await c.env.DB
-      .prepare(`SELECT delivery_mode, line_account_id FROM scenarios WHERE id = ?`)
+      .prepare(`SELECT delivery_mode FROM scenarios WHERE id = ?`)
       .bind(scenarioId)
-      .first<{ delivery_mode: DeliveryMode; line_account_id: string | null }>();
+      .first<{ delivery_mode: DeliveryMode }>();
     if (!scenarioRow) return c.json({ success: false, error: 'Scenario not found' }, 404);
 
     const stepsResult = await c.env.DB
@@ -1158,10 +1154,9 @@ scenarios.get('/api/scenarios/:id/preview', scenarioPermission('view'), async (c
 
     // 配信時と同じ resolveStepContent を呼んで、template_id があれば templates から
     // 最新内容を取って preview に返す。これで配信と preview の表示が一致する。
-    // 未公開・別アカウントは配信と同じく step の控えに落とす。
     const resolvedSteps = await Promise.all(
       steps.map(async (step) => {
-        const resolved = await resolveStepContent(c.env.DB, step, scenarioRow.line_account_id);
+        const resolved = await resolveStepContent(c.env.DB, step);
         return { step, resolved };
       }),
     );

@@ -2,7 +2,7 @@ import type { LineClient } from '@line-crm/line-sdk';
 import {
   ensureAutoReplyPublishedVersion,
   finishAutoReplyActionRun,
-  getSendableTemplate,
+  getTemplateById,
   markAutoReplyEvaluationFinished,
   markAutoReplyEvaluationMatched,
   markAutoReplyEvaluationSkipped,
@@ -178,11 +178,9 @@ export function matchesMessageKind(
 export async function resolveAutoReplyContent(
   db: D1Database,
   rule: Pick<AutoReply, 'template_id' | 'response_type' | 'response_content'>,
-  lineAccountId?: string | null,
 ): Promise<{ messageType: string; content: string }> {
   if (rule.template_id) {
-    // 再審査対応(#645): 未公開・別アカウントは inline の控えに落とす。
-    const tpl = await getSendableTemplate(db, rule.template_id, lineAccountId);
+    const tpl = await getTemplateById(db, rule.template_id);
     if (tpl) {
       return { messageType: tpl.message_type, content: tpl.message_content };
     }
@@ -198,7 +196,7 @@ export async function previewAutoReplyContent(
   workerUrl?: string,
 ): Promise<{ messageType: string; content: string }> {
   const resolvedMeta = await resolveMetadata(db, friend);
-  const resolved = await resolveAutoReplyContent(db, rule, friend.line_account_id);
+  const resolved = await resolveAutoReplyContent(db, rule);
   const extra = await resolveInterpolationExtra(db, friend.id, resolved.content);
   return {
     messageType: resolved.messageType,

@@ -1,6 +1,6 @@
 import {
   getRichMenuAreaTapTarget,
-  getSendableTemplate,
+  getTemplateById,
   addScore,
   recordRichMenuAreaTap,
   type RichMenuAreaTapTarget,
@@ -128,8 +128,7 @@ export async function handleRichMenuTap(
   let replyTokenConsumed = false;
   if (target.intent === 'template' && target.templateId) {
     try {
-      // 再審査対応(#645): 未公開・別アカウントの応答は送らない。
-      const tpl = await getSendableTemplate(db, target.templateId, lineAccountId);
+      const tpl = await getTemplateById(db, target.templateId);
       const message = tpl
         ? buildTemplateMessage(tpl.message_type, tpl.message_content, tpl.name)
         : null;
