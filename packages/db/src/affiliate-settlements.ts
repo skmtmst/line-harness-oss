@@ -61,8 +61,8 @@ interface SettlementEntry {
   commissionRate: number | null;
   baseAmount: number | null;
   fixedReward: number | null;
-  /** 承認時に作られた版があるときだけ入る。ある場合は金額・条件・対象をここから読む。 */
-  calculationId: string | null;
+  /** 承認時(または移行)に作られた版。金額・条件・対象はここだけから読む。 */
+  calculationId: string;
 }
 
 async function sha256Hex(value: string): Promise<string> {
@@ -79,7 +79,8 @@ async function sha256Hex(value: string): Promise<string> {
  * 変わらないようにする。
  *
  * 版を作れない曖昧な状態(所属の不整合・組織の未解決・既に確定済み)は
- * null を返し、偽の版を作らない。締め側はその場合に現在値で計算する。
+ * null を返し、偽の版を作らない。版が無い行は締め・支払い・レポートの
+ * どこからも金額として出ない(fail-closed。現在値では計算しない)。
  */
 export async function ensureConversionRewardSnapshot(
   db: D1Database,
@@ -97,6 +98,9 @@ export async function ensureConversionRewardSnapshot(
             a.line_account_id AS affiliate_account_id,
             f.line_account_id AS friend_account_id,
             cp.value AS point_value,
+            cp.line_account_id AS point_account_id,
+            al.line_account_id AS link_account_id,
+            off.line_account_id AS offer_account_id,
             off.id AS offer_id,
             COALESCE(off.name, ce.point_name_snapshot, cp.name, '') AS offer_name,
             off.reward_amount AS fixed_reward
@@ -122,13 +126,23 @@ export async function ensureConversionRewardSnapshot(
     affiliate_account_id: string | null;
     friend_account_id: string | null;
     point_value: number | null;
+    point_account_id: string | null;
+    link_account_id: string | null;
+    offer_account_id: string | null;
     offer_id: string | null;
     offer_name: string;
     fixed_reward: number | null;
   }>();
   if (!row || !row.affiliate_account_id) return null;
-  // 友だちと紹介者の所属が食い違う行に版を作らない(締め側も対象外にする)。
-  if (row.friend_account_id !== row.affiliate_account_id) return null;
+  // 版に入る入力(友だち・成果地点・リンク・案件)は、すべて紹介者と同じ
+  // LINE公式アカウントのものでなければならない。1つでも別アカウントの行が
+  // 混ざったら版を作らない(fail-closed)。版が無い行は締め・支払い・レポートの
+  // どこからも金額として出ないため、別アカウントの金額が確定へ回らない。
+  const accountId = row.affiliate_account_id;
+  if (row.friend_account_id !== accountId) return null;
+  if (row.point_account_id !== null && row.point_account_id !== accountId) return null;
+  if (row.link_account_id !== null && row.link_account_id !== accountId) return null;
+  if (row.offer_account_id !== null && row.offer_account_id !== accountId) return null;
   // 所有tenantが決まらない行は版を作らない(fail-closed)。移行でaccountから
   // 決定できる行は埋めてあるため、ここに残るNULLは本当に曖昧な行。
   const organizationId = row.tenant_id;
@@ -224,8 +238,218 @@ export async function ensureConversionRewardSnapshot(
   };
 }
 
+export interface AffiliateRewardReversal {
+  /** 取り消された確定(credit)のentry。 */
+  creditEntryId: string;
+  /** 相殺のために起こしたdebit entry。 */
+  reversalEntryId: string;
+  amountMinor: number;
+}
+
+/**
+ * 確定済みの成果が後から取り消されたときの反対仕訳。
+ *
+ * 締めが終わった金額は「その時点で約束した額」なので、確定を消して
+ * なかったことにはしない(締めの合計が後から変わると説明できなくなる)。
+ * 代わりに同額のdebitを起こし、元のcreditを reversed にする。支払い画面の
+ * 確定済みはcredit - debitで相殺され、締めの記録はそのまま残る。
+ *
+ * 書込みは fence 付き: 成果が本当に rejected のときだけ起票する。debitは
+ * 成果ごとに1件(UNIQUE)なので、二重押し・再送では既存の反対仕訳へ回収する。
+ */
+export async function reverseSettledRewardOnRejection(
+  db: D1Database,
+  eventId: string,
+  now = new Date().toISOString(),
+): Promise<AffiliateRewardReversal | null> {
+  const credit = await db.prepare(
+    `SELECT re.id AS id
+       FROM affiliate_reward_entries re
+       JOIN conversion_events ce ON ce.id = re.conversion_event_id
+      WHERE re.conversion_event_id = ?
+        AND re.entry_type = 'credit'
+        AND re.status <> 'reversed'
+        AND COALESCE(ce.approval_status, 'pending') = 'rejected'`,
+  ).bind(eventId).first<{ id: string }>();
+  if (!credit) return null;
+
+  try {
+    await db.batch([
+      db.prepare(
+        `INSERT INTO affiliate_reward_entries
+           (id, organization_id, line_account_id, affiliate_id, conversion_event_id,
+            offer_id, reward_calculation_id, entry_type, amount_minor, currency, status,
+            approved_at, payable_at, idempotency_key, created_at)
+         SELECT ?, re.organization_id, re.line_account_id, re.affiliate_id, re.conversion_event_id,
+                re.offer_id, re.reward_calculation_id, 'debit', re.amount_minor, re.currency,
+                'reversed', re.approved_at, NULL, ?, ?
+           FROM affiliate_reward_entries re
+           JOIN conversion_events ce ON ce.id = re.conversion_event_id
+          WHERE re.id = ?
+            AND re.entry_type = 'credit'
+            AND re.status <> 'reversed'
+            AND COALESCE(ce.approval_status, 'pending') = 'rejected'`,
+      ).bind(crypto.randomUUID(), `reversal:${credit.id}`, now, credit.id),
+      db.prepare(
+        `UPDATE affiliate_reward_entries
+            SET status = 'reversed'
+          WHERE id = ?
+            AND status <> 'reversed'
+            AND EXISTS (
+              SELECT 1 FROM affiliate_reward_entries d
+               WHERE d.conversion_event_id = affiliate_reward_entries.conversion_event_id
+                 AND d.entry_type = 'debit'
+            )`,
+      ).bind(credit.id),
+    ]);
+  } catch (error) {
+    // 並行する取消が先に反対仕訳を書いた場合は、その結果へ回収する(冪等)。
+    if (!/UNIQUE|constraint|busy|locked/i.test(error instanceof Error ? error.message : String(error))) throw error;
+  }
+
+  const reversal = await db.prepare(
+    `SELECT id, amount_minor FROM affiliate_reward_entries
+      WHERE conversion_event_id = ? AND entry_type = 'debit'`,
+  ).bind(eventId).first<{ id: string; amount_minor: number }>();
+  if (!reversal) return null;
+  return {
+    creditEntryId: credit.id,
+    reversalEntryId: reversal.id,
+    amountMinor: Number(reversal.amount_minor),
+  };
+}
+
 interface SettlementPreviewInternal extends AffiliateSettlementPreview {
   entries: SettlementEntry[];
+}
+
+/** 締めで1件確定する対象。読取時に決まり、書込み時にもう一度照合される。 */
+export interface SettlementWriteTarget {
+  conversionEventId: string;
+  affiliateId: string;
+  calculationId: string;
+  amount: number;
+  approvedAt: string;
+}
+
+/**
+ * 個別締めと全体締めが共有する「書込み時fence」。
+ *
+ * 対象を読んでから確定を書くまでの間に、別の接続が承認を取り消したり、
+ * 対象を別アカウントへ移したり、先に確定したりできる。読取時の検査だけでは
+ * その隙を塞げないため、確定の書込みそのものを条件付きにする:
+ *
+ * - 明細(credit)のINSERTは `INSERT ... SELECT` で、書込みの瞬間に
+ *   承認状態・承認時刻・紹介者のtenant/account・友だちのaccount・版の
+ *   所属と金額・未確定であることを、すべて満たす行だけを書く。
+ * - 締め明細行は、その credit が実際に書けたときだけ書く。
+ * - 最後の3文で「書けた件数が想定と違うなら、この確定をまるごと取り消す」。
+ *   D1のbatchは1トランザクションなので、部分確定は残らない。
+ *
+ * 呼出側はbatchの後にheaderの存在を読み、消えていれば `changed` を返す。
+ * 途中で失敗した確定は「何も起きなかった」状態になり、操作者は最新の
+ * プレビューを取り直してやり直せる。
+ */
+export function settlementWriteStatements(
+  db: D1Database,
+  input: {
+    tenantId: string;
+    lineAccountId: string;
+    settlementId: string;
+    targets: SettlementWriteTarget[];
+    now: string;
+  },
+): D1PreparedStatement[] {
+  const entryKeyPrefix = `settlement:${input.settlementId}:`;
+  const statements: D1PreparedStatement[] = [];
+  for (const target of input.targets) {
+    const entryId = crypto.randomUUID();
+    statements.push(
+      db.prepare(
+        `INSERT INTO affiliate_reward_entries
+           (id, organization_id, line_account_id, affiliate_id, conversion_event_id,
+            offer_id, reward_calculation_id, entry_type, amount_minor, currency, status,
+            approved_at, payable_at, idempotency_key, created_at)
+         SELECT ?, a.tenant_id, a.line_account_id, a.id, ce.id,
+                calc.offer_id, calc.id, 'credit', calc.amount_minor, 'JPY', 'settled',
+                ce.approved_at, ?, ?, ?
+           FROM conversion_events ce
+           JOIN affiliates a
+             ON a.id = ?
+            AND a.tenant_id = ?
+            AND a.line_account_id = ?
+            AND (ce.affiliate_id = a.id OR (ce.affiliate_id IS NULL AND ce.affiliate_code = a.code))
+           JOIN friends f ON f.id = ce.friend_id AND f.line_account_id = a.line_account_id
+           JOIN affiliate_reward_calculations calc
+             ON calc.id = ?
+            AND calc.conversion_event_id = ce.id
+            AND calc.organization_id = a.tenant_id
+            AND calc.line_account_id = a.line_account_id
+            AND calc.affiliate_id = a.id
+            AND calc.amount_minor = ?
+          WHERE ce.id = ?
+            AND COALESCE(ce.approval_status, 'pending') = 'approved'
+            AND ce.approved_at IS ?
+            AND NOT EXISTS (
+              SELECT 1 FROM affiliate_reward_entries re
+               WHERE re.conversion_event_id = ce.id AND re.entry_type = 'credit'
+            )`,
+      ).bind(
+        entryId,
+        input.now,
+        `${entryKeyPrefix}${target.conversionEventId}`,
+        input.now,
+        target.affiliateId,
+        input.tenantId,
+        input.lineAccountId,
+        target.calculationId,
+        target.amount,
+        target.conversionEventId,
+        target.approvedAt,
+      ),
+      db.prepare(
+        `INSERT INTO affiliate_settlement_lines
+           (id, settlement_id, affiliate_id, entry_id, amount_minor, status, created_at)
+         SELECT ?, ?, re.affiliate_id, re.id, re.amount_minor, 'included', ?
+           FROM affiliate_reward_entries re
+          WHERE re.id = ?`,
+      ).bind(crypto.randomUUID(), input.settlementId, input.now, entryId),
+    );
+  }
+
+  // 巻き戻しの3文。fenceを通らなかった対象が1件でもあれば、この確定で
+  // 書いた明細行 → credit → header の順に消す(子から先に消してFKを壊さない)。
+  // 述語はいずれも「自分が消す表」を数えないため、途中経過に左右されない。
+  const writtenEntries =
+    `(SELECT COUNT(*) FROM affiliate_reward_entries re
+       WHERE substr(re.idempotency_key, 1, ?) = ?)`;
+  const noLinesLeft =
+    `NOT EXISTS (SELECT 1 FROM affiliate_settlement_lines sl WHERE sl.settlement_id = ?)`;
+  statements.push(
+    db.prepare(
+      `DELETE FROM affiliate_settlement_lines
+        WHERE settlement_id = ? AND ${writtenEntries} <> ?`,
+    ).bind(input.settlementId, entryKeyPrefix.length, entryKeyPrefix, input.targets.length),
+    db.prepare(
+      `DELETE FROM affiliate_reward_entries
+        WHERE substr(idempotency_key, 1, ?) = ? AND ${noLinesLeft}`,
+    ).bind(entryKeyPrefix.length, entryKeyPrefix, input.settlementId),
+    db.prepare(
+      `DELETE FROM affiliate_settlements WHERE id = ? AND ${noLinesLeft}`,
+    ).bind(input.settlementId, input.settlementId),
+  );
+  return statements;
+}
+
+/** 巻き戻しの3文が走った(=fenceで確定が取り消された)かどうかを読む。 */
+export async function settlementSurvived(
+  db: D1Database,
+  settlementId: string,
+): Promise<boolean> {
+  const row = await db.prepare(
+    `SELECT 1 AS ok FROM affiliate_settlements WHERE id = ?`,
+  ).bind(settlementId).first<{ ok: number }>();
+  return row !== null;
 }
 
 async function settlementEntries(
@@ -263,6 +487,9 @@ async function settlementEntries(
        JOIN affiliate_reward_calculations calc
          ON calc.conversion_event_id = ce.id
         AND calc.formula IN ('rate', 'fixed')
+        AND calc.organization_id = a.tenant_id
+        AND calc.line_account_id = a.line_account_id
+        AND calc.affiliate_id = a.id
       WHERE (ce.affiliate_id = a.id OR (ce.affiliate_id IS NULL AND ce.affiliate_code = a.code))
         AND COALESCE(ce.approval_status, 'pending') = 'approved'
         AND ce.approved_at IS NOT NULL
@@ -503,45 +730,22 @@ export async function confirmAffiliateSettlement(
     ),
   ];
 
-  for (const entry of preview.entries) {
-    const entryId = crypto.randomUUID();
-    // 版は承認時と移行で作り済みのため、ここでは紐付けるだけ(作らない)。
-    const calculationId = entry.calculationId;
-    statements.push(
-      db.prepare(
-        `INSERT INTO affiliate_reward_entries
-           (id, organization_id, line_account_id, affiliate_id, conversion_event_id,
-            offer_id, reward_calculation_id, entry_type, amount_minor, currency, status, approved_at,
-            payable_at, idempotency_key, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, 'credit', ?, 'JPY', 'settled', ?, ?, ?, ?)`,
-      ).bind(
-        entryId,
-        input.tenantId,
-        input.lineAccountId,
-        input.affiliateId,
-        entry.conversionEventId,
-        entry.offerId,
-        calculationId,
-        entry.amount,
-        entry.approvedAt,
-        now,
-        `settlement:${settlementId}:${entry.conversionEventId}`,
-        now,
-      ),
-      db.prepare(
-        `INSERT INTO affiliate_settlement_lines
-           (id, settlement_id, affiliate_id, entry_id, amount_minor, status, created_at)
-         VALUES (?, ?, ?, ?, ?, 'included', ?)`,
-      ).bind(
-        crypto.randomUUID(),
-        settlementId,
-        input.affiliateId,
-        entryId,
-        entry.amount,
-        now,
-      ),
-    );
-  }
+  // 版は承認時と移行で作り済みのため、ここでは紐付けるだけ(作らない)。
+  // 書込みは fence 付き(承認状態・承認時刻・所属・版・未確定を書込みの
+  // 瞬間に照合)。1件でも通らなければこの確定はまるごと巻き戻る。
+  statements.push(...settlementWriteStatements(db, {
+    tenantId: input.tenantId,
+    lineAccountId: input.lineAccountId,
+    settlementId,
+    now,
+    targets: preview.entries.map((entry) => ({
+      conversionEventId: entry.conversionEventId,
+      affiliateId: input.affiliateId,
+      calculationId: entry.calculationId,
+      amount: entry.amount,
+      approvedAt: entry.approvedAt,
+    })),
+  }));
 
   try {
     await db.batch(statements);
@@ -584,6 +788,9 @@ export async function confirmAffiliateSettlement(
     }
     throw error;
   }
+  // fenceが1件でも落ちていれば、この確定は同じトランザクションで巻き戻り
+  // headerごと消えている。金額を保証できないので確定にはしない。
+  if (!await settlementSurvived(db, settlementId)) return { kind: 'changed' };
   return {
     kind: 'created',
     settlementId,

@@ -1,3 +1,5 @@
+import { settlementSurvived, settlementWriteStatements } from './affiliate-settlements.js';
+
 export type AffiliateBankAccountType = 'ordinary' | 'checking';
 
 export interface AffiliateBankProfile {
@@ -195,6 +197,9 @@ async function eligibleRewards(
        JOIN affiliate_reward_calculations calc
          ON calc.conversion_event_id = ce.id
         AND calc.formula IN ('rate', 'fixed')
+        AND calc.organization_id = a.tenant_id
+        AND calc.line_account_id = a.line_account_id
+        AND calc.affiliate_id = a.id
        LEFT JOIN affiliate_bank_profiles bp
          ON bp.affiliate_id = a.id AND bp.organization_id = a.tenant_id
         AND bp.line_account_id = a.line_account_id
@@ -313,32 +318,22 @@ export async function closeAffiliateAccountSettlement(
     settlementId, input.tenantId, input.lineAccountId, input.periodFrom, input.periodTo,
     totalAmount, input.actorId, input.idempotencyKey, now, now, input.requestFingerprint,
   )];
-  for (const row of rows) {
-    const entryId = crypto.randomUUID();
-    const amount = Math.round(Number(row.reward_amount));
-    // 版は承認時と移行で作り済みのため、ここでは紐付けるだけ(作らない)。
-    statements.push(
-      db.prepare(
-        `INSERT INTO affiliate_reward_entries
-           (id, organization_id, line_account_id, affiliate_id, conversion_event_id,
-            offer_id, reward_calculation_id, entry_type, amount_minor, currency, status, approved_at,
-            payable_at, idempotency_key, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, 'credit', ?, 'JPY', 'settled', ?, ?, ?, ?)`,
-      ).bind(
-        entryId, input.tenantId, input.lineAccountId, row.affiliate_id,
-        row.conversion_event_id, row.offer_id, row.calculation_id, amount,
-        row.approved_at, now, `settlement:${settlementId}:${row.conversion_event_id}`, now,
-      ),
-      db.prepare(
-        `INSERT INTO affiliate_settlement_lines
-           (id, settlement_id, affiliate_id, entry_id, amount_minor, status, created_at)
-         VALUES (?, ?, ?, ?, ?, 'included', ?)`,
-      ).bind(
-        crypto.randomUUID(), settlementId, row.affiliate_id, entryId,
-        amount, now,
-      ),
-    );
-  }
+  // 版は承認時と移行で作り済みのため、ここでは紐付けるだけ(作らない)。
+  // 個別締めと同じ書込み時fenceを通す。読取後に別接続が承認を取り消したり
+  // 対象を別アカウントへ移したりした場合、この締めはまるごと巻き戻る。
+  statements.push(...settlementWriteStatements(db, {
+    tenantId: input.tenantId,
+    lineAccountId: input.lineAccountId,
+    settlementId,
+    now,
+    targets: rows.map((row) => ({
+      conversionEventId: row.conversion_event_id,
+      affiliateId: row.affiliate_id,
+      calculationId: row.calculation_id,
+      amount: Math.round(Number(row.reward_amount)),
+      approvedAt: row.approved_at,
+    })),
+  }));
   try {
     await db.batch(statements);
   } catch (error) {
@@ -364,6 +359,9 @@ export async function closeAffiliateAccountSettlement(
     }
     return { kind: 'changed' };
   }
+  // fenceが1件でも落ちていれば、この締めは同じトランザクションで巻き戻り
+  // headerごと消えている。金額を保証できないので確定にはしない。
+  if (!await settlementSurvived(db, settlementId)) return { kind: 'changed' };
   return {
     kind: 'created', settlementId, totalAmount,
     conversionCount: rows.length, version: 1, closedAt: now,

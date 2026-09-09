@@ -207,6 +207,110 @@ describe('migration 349 承認済み報酬の版固定', () => {
     });
   });
 
+  it('別アカウントの成果地点・リンク・案件が混ざる行には版を作らない', async () => {
+    const { setConversionApproval } = await import('../src/affiliate-offers.js');
+    sqlite.exec(`
+      INSERT INTO tenants (id, name) VALUES ('00000000-0000-4000-8000-000000000002', '別法人');
+      INSERT INTO line_accounts (id, channel_id, name, channel_access_token, channel_secret, tenant_id)
+      VALUES ('account-2', 'channel-2', '別店', 'token2', 'secret2', '00000000-0000-4000-8000-000000000002');
+      INSERT INTO conversion_points (id, name, event_type, value, line_account_id)
+      VALUES ('point-2', '購入(別店)', 'purchase', 50000, 'account-2');
+      INSERT INTO affiliate_offers (id, name, reward_amount, line_account_id, created_at)
+      VALUES ('offer-2', '別店の案件', 90000, 'account-2', '2026-08-01');
+      INSERT INTO affiliate_links (id, affiliate_id, ref_code, line_account_id, offer_id, created_at)
+      VALUES ('link-2', 'affiliate-fixed', 'ref-2', 'account-2', 'offer-2', '2026-08-01');
+      INSERT INTO conversion_events
+        (id, conversion_point_id, friend_id, affiliate_id, attributed_ref_code,
+         approval_status, approved_at, value_snapshot)
+      VALUES
+        ('cv-cross-point', 'point-2', 'friend-1', 'affiliate-rate', NULL, 'pending', NULL, NULL),
+        ('cv-cross-offer', 'point-1', 'friend-2', 'affiliate-fixed', 'ref-2', 'pending', NULL, 10000);
+    `);
+    // 承認そのものは通るが、別アカウントの入力が混ざる行に版は作らせない。
+    expect(await setConversionApproval(db, 'cv-cross-point', 'approved')).toBe(true);
+    expect(await setConversionApproval(db, 'cv-cross-offer', 'approved')).toBe(true);
+    expect(sqlite.prepare(
+      `SELECT COUNT(*) AS c FROM affiliate_reward_calculations
+        WHERE conversion_event_id IN ('cv-cross-point', 'cv-cross-offer')`,
+    ).get()).toEqual({ c: 0 });
+    // 版が無いので締め対象にも入らない(別店の90000円が確定へ回らない)。
+    expect(await previewAffiliateSettlement(db, {
+      tenantId: TENANT_ID, affiliateId: 'affiliate-fixed', lineAccountId: 'account-1',
+    })).toMatchObject({ amount: 3000, conversionCount: 1 });
+  });
+
+  it('別アカウントの版は締めにも支払いにも使わない', async () => {
+    sqlite.exec(`
+      INSERT INTO tenants (id, name) VALUES ('00000000-0000-4000-8000-000000000002', '別法人');
+      INSERT INTO line_accounts (id, channel_id, name, channel_access_token, channel_secret, tenant_id)
+      VALUES ('account-2', 'channel-2', '別店', 'token2', 'secret2', '00000000-0000-4000-8000-000000000002');
+      INSERT INTO friends (id, line_user_id, display_name, line_account_id)
+      VALUES ('friend-3', 'U3', '鈴木', 'account-1');
+      INSERT INTO conversion_events
+        (id, conversion_point_id, friend_id, affiliate_id, attributed_ref_code,
+         approval_status, approved_at, value_snapshot)
+      VALUES ('cv-foreign-calc', 'point-1', 'friend-3', 'affiliate-rate', NULL,
+        'approved', '2026-08-12T00:00:00.000Z', 10000);
+      -- 別アカウント帰属の版が紛れ込んだ状態(データ不整合)を作る。
+      INSERT INTO affiliate_reward_calculations
+        (id, organization_id, line_account_id, affiliate_id, conversion_event_id,
+         offer_id, formula, commission_rate_snapshot, base_amount_snapshot,
+         fixed_reward_snapshot, offer_name_snapshot, amount_minor, currency, created_at)
+      VALUES ('calc-foreign', '00000000-0000-4000-8000-000000000002', 'account-2',
+        'affiliate-rate', 'cv-foreign-calc', NULL, 'rate', 10, 500000, NULL,
+        '別店', 50000, 'JPY', '2026-08-12T00:00:00.000Z');
+    `);
+    // 締めは自アカウントの版だけを見る(50000円は入らない)。
+    expect(await previewAffiliateSettlement(db, {
+      tenantId: TENANT_ID, affiliateId: 'affiliate-rate', lineAccountId: 'account-1',
+    })).toMatchObject({ amount: 1000, conversionCount: 1 });
+    // 全体締めのプレビューも同じ。
+    const { previewAffiliateAccountSettlement } = await import('../src/affiliate-payouts.js');
+    expect(await previewAffiliateAccountSettlement(db, {
+      tenantId: TENANT_ID, lineAccountId: 'account-1',
+      periodFrom: '2026-01-01T00:00:00.000Z', periodTo: '2099-01-01T00:00:00.000Z',
+    })).toMatchObject({ totalAmount: 4000, conversionCount: 2 });
+    // 支払い画面の承認済みにも別アカウントの版は足さない。
+    const { getAffiliatePaymentSummaries } = await import('../src/affiliate-payments.js');
+    const summaries = await getAffiliatePaymentSummaries(db, 'account-1', TENANT_ID, '2026-09-01T00:00:00.000Z');
+    expect(summaries.find((s) => s.affiliateId === 'affiliate-rate')).toMatchObject({
+      approvedConversions: 2, approvedReward: 1000,
+    });
+  });
+
+  it('確定後に取り消すと反対仕訳で相殺し、締めの記録は残す', async () => {
+    const { setConversionApproval } = await import('../src/affiliate-offers.js');
+    const { getAffiliatePaymentSummaries } = await import('../src/affiliate-payments.js');
+    const created = await confirmRate('reversal-key-1');
+    expect(created).toMatchObject({ kind: 'created', amount: 1000 });
+
+    expect(await setConversionApproval(db, 'conversion-rate-1', 'rejected')).toBe(true);
+    const entries = sqlite.prepare(
+      `SELECT entry_type, amount_minor, status FROM affiliate_reward_entries
+        WHERE conversion_event_id = 'conversion-rate-1' ORDER BY entry_type`,
+    ).all();
+    expect(entries).toEqual([
+      { entry_type: 'credit', amount_minor: 1000, status: 'reversed' },
+      { entry_type: 'debit', amount_minor: 1000, status: 'reversed' },
+    ]);
+    // 締めの記録(header・明細・金額)は書き換えない。
+    expect(sqlite.prepare(
+      `SELECT total_amount_minor AS t FROM affiliate_settlements`,
+    ).get()).toEqual({ t: 1000 });
+    expect(sqlite.prepare(`SELECT COUNT(*) AS c FROM affiliate_settlement_lines`).get()).toEqual({ c: 1 });
+    // 支払い画面の確定済みは相殺されて0になる。
+    const summaries = await getAffiliatePaymentSummaries(db, 'account-1', TENANT_ID, '2026-09-01T00:00:00.000Z');
+    expect(summaries.find((s) => s.affiliateId === 'affiliate-rate')).toMatchObject({
+      settledConversions: 0, settledReward: 0,
+    });
+
+    // 取消の再送は同じ反対仕訳へ回収する(二重に起票しない)。
+    expect(await setConversionApproval(db, 'conversion-rate-1', 'rejected')).toBe('already_set');
+    expect(sqlite.prepare(
+      `SELECT COUNT(*) AS c FROM affiliate_reward_entries WHERE entry_type = 'debit'`,
+    ).get()).toEqual({ c: 1 });
+  });
+
   it('同じキーで別紹介者を確定しようとすると競合になる', async () => {
     expect((await confirmRate('shared-key-1')).kind).toBe('created');
     expect(await confirmAffiliateSettlement(db, {
@@ -407,6 +511,37 @@ describe('migration 349 承認済み報酬の版固定', () => {
   });
 });
 
+/**
+ * 「読んだ直後」に別接続の書込みを割り込ませる包み。
+ *
+ * marker を含むSELECTが1回目に結果を返した直後だけ action を実行する。
+ * 締め対象の読取と確定の書込みのあいだで、別の管理者が承認を取り消す —
+ * という実際に起きる順序を、共有ファイルDBの2接続で決定的に再現する。
+ */
+function interleaveAfterRead(inner: D1Database, marker: string, action: () => Promise<void>): D1Database {
+  let fired = false;
+  return {
+    prepare(query: string) {
+      const wrap = (stmt: D1PreparedStatement): D1PreparedStatement => ({
+        bind: (...args: unknown[]) => wrap(stmt.bind(...args)),
+        async all<T>() {
+          const result = await stmt.all<T>();
+          if (!fired && query.includes(marker)) {
+            fired = true;
+            await action();
+          }
+          return result;
+        },
+        first: <T>() => stmt.first<T>(),
+        run: <T>() => stmt.run<T>() as Promise<T>,
+        raw: <T>() => stmt.raw<T>(),
+      } as unknown as D1PreparedStatement);
+      return wrap(inner.prepare(query));
+    },
+    batch: <T>(statements: D1PreparedStatement[]) => inner.batch<T>(statements),
+  } as unknown as D1Database;
+}
+
 describe('複数接続の競合 — 共有ファイルDBで直列化と回収を実検査', () => {
   const TENANT_ID = '00000000-0000-4000-8000-000000000001';
   let dir: string;
@@ -498,6 +633,63 @@ describe('複数接続の競合 — 共有ファイルDBで直列化と回収を
     const probe = new Database(join(dir, 'shared.db'));
     try {
       expect(probe.prepare(`SELECT COUNT(*) AS c FROM affiliate_settlements`).get()).toEqual({ c: 1 });
+    } finally {
+      probe.close();
+    }
+    // CIの並列負荷でもロック待ちを許す。
+  }, 30000);
+
+  it('締め対象を読んだ直後に別接続でrejectされたら個別締めは確定しない', async () => {
+    const { a, b } = await setupShared();
+    // aが締め対象を読み終えた瞬間に、bが同じ成果を却下する。
+    // 読取時の検査だけでは防げないので、書込み時fenceが止めることを見る。
+    const raced = interleaveAfterRead(a, 'ORDER BY ce.approved_at ASC, ce.id ASC', async () => {
+      await b.prepare(
+        `UPDATE conversion_events SET approval_status = 'rejected' WHERE id = ?`,
+      ).bind('conversion-race-1').run();
+    });
+    const result = await confirmAffiliateSettlement(raced, {
+      tenantId: TENANT_ID, lineAccountId: 'account-1', affiliateId: 'affiliate-rate',
+      actorId: 'staff-1', idempotencyKey: 'reject-race-key', expectedAmount: 1000,
+    });
+    expect(result.kind).toBe('changed');
+    const probe = new Database(join(dir, 'shared.db'));
+    try {
+      // 部分確定が残らない: header・credit・明細のどれも書かれていない。
+      expect(probe.prepare(`SELECT COUNT(*) AS c FROM affiliate_settlements`).get()).toEqual({ c: 0 });
+      expect(probe.prepare(`SELECT COUNT(*) AS c FROM affiliate_reward_entries`).get()).toEqual({ c: 0 });
+      expect(probe.prepare(`SELECT COUNT(*) AS c FROM affiliate_settlement_lines`).get()).toEqual({ c: 0 });
+    } finally {
+      probe.close();
+    }
+    // CIの並列負荷でもロック待ちを許す。
+  }, 30000);
+
+  it('締め対象を読んだ直後に別接続でrejectされたら全体締めも確定しない', async () => {
+    const { a, b } = await setupShared();
+    const { previewAffiliateAccountSettlement, closeAffiliateAccountSettlement } =
+      await import('../src/affiliate-payouts.js');
+    const period = {
+      tenantId: TENANT_ID, lineAccountId: 'account-1',
+      periodFrom: '2026-01-01T00:00:00.000Z', periodTo: '2099-01-01T00:00:00.000Z',
+    };
+    const preview = await previewAffiliateAccountSettlement(a, period);
+    expect(preview.totalAmount).toBe(1000);
+    const raced = interleaveAfterRead(a, 'ORDER BY a.id, ce.approved_at, ce.id', async () => {
+      await b.prepare(
+        `UPDATE conversion_events SET approval_status = 'rejected' WHERE id = ?`,
+      ).bind('conversion-race-1').run();
+    });
+    const result = await closeAffiliateAccountSettlement(raced, {
+      ...period, actorId: 'staff-1', expectedPreviewVersion: preview.previewVersion,
+      idempotencyKey: 'reject-close-key', requestFingerprint: 'reject-close-fp',
+    });
+    expect(result.kind).toBe('changed');
+    const probe = new Database(join(dir, 'shared.db'));
+    try {
+      expect(probe.prepare(`SELECT COUNT(*) AS c FROM affiliate_settlements`).get()).toEqual({ c: 0 });
+      expect(probe.prepare(`SELECT COUNT(*) AS c FROM affiliate_reward_entries`).get()).toEqual({ c: 0 });
+      expect(probe.prepare(`SELECT COUNT(*) AS c FROM affiliate_settlement_lines`).get()).toEqual({ c: 0 });
     } finally {
       probe.close();
     }

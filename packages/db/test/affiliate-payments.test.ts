@@ -62,8 +62,9 @@ describe('getAffiliatePaymentSummaries', () => {
         approval_status TEXT, approved_at TEXT, value_snapshot REAL, point_name_snapshot TEXT
       );
       CREATE TABLE affiliate_reward_entries (
-        id TEXT PRIMARY KEY, conversion_event_id TEXT NOT NULL, entry_type TEXT NOT NULL,
-        affiliate_id TEXT, line_account_id TEXT, amount_minor INTEGER NOT NULL DEFAULT 0
+        id TEXT PRIMARY KEY, organization_id TEXT, conversion_event_id TEXT NOT NULL,
+        entry_type TEXT NOT NULL, affiliate_id TEXT, line_account_id TEXT,
+        status TEXT NOT NULL DEFAULT 'settled', amount_minor INTEGER NOT NULL DEFAULT 0
       );
       CREATE TABLE affiliate_reward_calculations (
         id TEXT PRIMARY KEY, organization_id TEXT, line_account_id TEXT, affiliate_id TEXT,

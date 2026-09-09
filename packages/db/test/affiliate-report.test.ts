@@ -602,25 +602,30 @@ describe('getAffiliateReportV2 — approval breakdown + confirmedReward + byOffe
     expect(r.revenue).toBe(6000);
   });
 
-  test('confirmedReward = SUM(approved CV × offer reward_amount); offer-less approved adds 0', async () => {
+  test('版が無い承認済みは確定額に入らない(現在の案件額へfallbackしない)', async () => {
     const r = (await getAffiliateReportV2(db, 'aff-A', { identityKeySql: IDENTITY_KEY_SQL }))!;
-    // off-1: 2 approved × 30000 = 60000. off-2: 1 approved × 5000 = 5000.
-    // generic approved (c6) → 0. Total = 65000.
-    expect(r.confirmedReward).toBe(65000);
+    // このfixtureは所属アカウントが決まらない古い形なので、承認時の版が作れない。
+    // 版が無い行は0(支払い画面と同じfail-closed契約)。現在の案件額
+    // (off-1=30000 / off-2=5000)を掛けて確定額を作らない。
+    expect(r.confirmedReward).toBe(0);
+    expect(r.unlinkedReward).toBe(0);
+    expect(r.unlinkedConversions).toBe(0);
   });
 
-  test('byOffer breaks down approved/pending + confirmedReward per offer (offer-less excluded)', async () => {
+  test('byOffer breaks down approved/pending; 版が無い分の確定額は0のまま', async () => {
     const r = (await getAffiliateReportV2(db, 'aff-A', { identityKeySql: IDENTITY_KEY_SQL }))!;
     const byId = new Map(r.byOffer.map((o) => [o.offerId, o]));
     // generic link CV must NOT create a byOffer bucket.
     expect(r.byOffer.length).toBe(2);
+    // 件数と1件あたりの表示額は現在の設定値。確定額だけが版に依存し、
+    // 版が無いこのfixtureでは0(件数×単価で作らない)。
     expect(byId.get('off-1')).toEqual({
       offerId: 'off-1', offerName: 'Freelance導入', rewardAmount: 30000,
-      conversionsApproved: 2, conversionsPending: 1, confirmedReward: 60000,
+      conversionsApproved: 2, conversionsPending: 1, confirmedReward: 0,
     });
     expect(byId.get('off-2')).toEqual({
       offerId: 'off-2', offerName: 'Small案件', rewardAmount: 5000,
-      conversionsApproved: 1, conversionsPending: 1, confirmedReward: 5000,
+      conversionsApproved: 1, conversionsPending: 1, confirmedReward: 0,
     });
   });
 
@@ -694,7 +699,7 @@ describe('getAffiliateReport — CV via affiliate_id OR affiliate_code', () => {
     expect(rows[0].totalRevenue).toBe(1000);
   });
 
-  test('all-affiliates report includes approved offer-fixed rewards', async () => {
+  test('版が無い承認済みはv1の確定額にも入らない(fail-closed)', async () => {
     insertOffer(sqlite, { id: 'offer-fixed', name: 'Fixed reward', rewardAmount: 3000 });
     sqlite.prepare(`UPDATE affiliate_links SET offer_id = 'offer-fixed' WHERE id = 'link-A1'`).run();
     insertFriend(sqlite, 'friend-fixed', { createdAt: jstDaysAgo(10) });
@@ -708,7 +713,9 @@ describe('getAffiliateReport — CV via affiliate_id OR affiliate_code', () => {
     });
 
     const rows = await getAffiliateReport(db, 'aff-A');
-    expect(rows[0].confirmedReward).toBe(3000);
+    // 所属アカウントが決まらない古い行は承認時の版が作れない。v1の確定額も
+    // 現在の案件額(3000)へfallbackせず0にする(支払い画面と同じ契約)。
+    expect(rows[0].confirmedReward).toBe(0);
   });
 });
 

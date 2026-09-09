@@ -455,20 +455,14 @@ export async function getAffiliateReport(
           WHERE (ce.affiliate_id = a.id OR ce.affiliate_code = a.code)
             AND cef.line_account_id IS a.line_account_id
             AND cp.line_account_id IS a.line_account_id${cvDateCond}) as total_revenue,
-         (SELECT COALESCE(SUM(COALESCE(calc.amount_minor,
-              CASE WHEN off.id IS NOT NULL THEN off.reward_amount ELSE 0 END)), 0)
+         (SELECT COALESCE(SUM(COALESCE(calc.amount_minor, 0)), 0)
             FROM conversion_events ce
             JOIN friends cef ON cef.id = ce.friend_id
-            LEFT JOIN affiliate_links al
-              ON al.ref_code = ce.attributed_ref_code
-             AND al.affiliate_id = a.id
-             AND al.line_account_id IS a.line_account_id
-            LEFT JOIN affiliate_offers off
-              ON off.id = al.offer_id
-             AND off.line_account_id IS a.line_account_id
             LEFT JOIN affiliate_reward_calculations calc
               ON calc.conversion_event_id = ce.id
              AND calc.formula IN ('rate', 'fixed', 'legacy')
+             AND calc.line_account_id IS a.line_account_id
+             AND calc.affiliate_id = a.id
            WHERE (ce.affiliate_id = a.id OR ce.affiliate_code = a.code)
              AND cef.line_account_id IS a.line_account_id
              AND EXISTS (

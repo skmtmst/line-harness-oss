@@ -95,8 +95,22 @@ export async function getAffiliatePaymentSummaries(
             WHERE re.conversion_event_id = ce.id AND re.entry_type = 'credit'
          ) THEN COALESCE(snap.amount_minor, 0) ELSE 0 END
        ), 0) AS unsettled_reward
-       , COUNT(re.conversion_event_id) AS settled_conversions
-       , COALESCE(SUM(re.amount_minor), 0) AS settled_reward
+       -- 確定済みは台帳(affiliate_reward_entries)が正本。成果の現在の承認状態
+       -- では数えない。確定後に取り消された分は反対仕訳(debit)で相殺され、
+       -- 締めの記録そのものは残る。
+       , (SELECT COUNT(*)
+            FROM affiliate_reward_entries sre
+           WHERE sre.affiliate_id = a.id
+             AND sre.line_account_id = a.line_account_id
+             AND sre.organization_id = a.tenant_id
+             AND sre.entry_type = 'credit'
+             AND sre.status <> 'reversed') AS settled_conversions
+       , (SELECT COALESCE(SUM(CASE WHEN sre.entry_type = 'credit'
+                                   THEN sre.amount_minor ELSE -sre.amount_minor END), 0)
+            FROM affiliate_reward_entries sre
+           WHERE sre.affiliate_id = a.id
+             AND sre.line_account_id = a.line_account_id
+             AND sre.organization_id = a.tenant_id) AS settled_reward
      FROM affiliates a
      JOIN scoped_affiliate_ids scoped ON scoped.id = a.id
      LEFT JOIN conversion_events ce
@@ -110,25 +124,17 @@ export async function getAffiliatePaymentSummaries(
         SELECT 1 FROM conversion_points csp
          WHERE csp.id = ce.conversion_point_id AND csp.line_account_id = ?
       )
-     LEFT JOIN conversion_points cp ON cp.id = ce.conversion_point_id
-     LEFT JOIN affiliate_links al
-       ON al.ref_code = ce.attributed_ref_code
-      AND al.affiliate_id = a.id
-      AND al.line_account_id = ?
-     LEFT JOIN affiliate_offers off
-       ON off.id = al.offer_id
-      AND off.line_account_id = ?
-     LEFT JOIN affiliate_reward_entries re
-       ON re.conversion_event_id = ce.id
-      AND re.entry_type = 'credit'
-      AND re.affiliate_id = a.id
-      AND re.line_account_id = ?
      -- 承認/保留/未確定の金額は現在値で再計算せず、承認時の版を正本にする。
-     -- 版が無い行は0(約束できない金額は盛らない)。
+     -- 版が無い行は0(約束できない金額は盛らない)。版は紹介者と同じ
+     -- tenant/account/紹介者のものだけを採る(別アカウントの版で払わない)。
      LEFT JOIN affiliate_reward_calculations snap
        ON snap.conversion_event_id = ce.id
       AND snap.formula IN ('rate', 'fixed', 'legacy')
-     GROUP BY a.id, a.name, a.code, a.hold_days, a.payout_cycle, a.commission_rate
+      AND snap.organization_id = a.tenant_id
+      AND snap.line_account_id = a.line_account_id
+      AND snap.affiliate_id = a.id
+     GROUP BY a.id, a.name, a.code, a.hold_days, a.payout_cycle, a.commission_rate,
+              a.line_account_id, a.tenant_id
      ORDER BY approved_reward DESC, a.name ASC`,
   ).bind(
     lineAccountId,
@@ -137,9 +143,6 @@ export async function getAffiliatePaymentSummaries(
     now,
     now,
     now,
-    lineAccountId,
-    lineAccountId,
-    lineAccountId,
     lineAccountId,
     lineAccountId,
   ).all<{
