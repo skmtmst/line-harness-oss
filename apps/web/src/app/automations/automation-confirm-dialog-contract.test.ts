@@ -42,12 +42,13 @@ describe('オートメーションの確認窓', () => {
   })
 
   it('実行の本体が二度押しを止め、返事を確かめ、finally で戻す', () => {
+    const guarded = slice(PAGE, 'async function performAutomationAction', '\nfunction AutomationRowActions')
     const body = slice(PAGE, 'const runPending = async', '\n  return (')
-    expect(body, '処理中でも受け付けてしまう').toContain('if (!pending || working || accountChanged) return')
+    expect(guarded, '同期ロックを取らず処理中でも受け付けてしまう').toContain('!lock.tryAcquire()')
     expect(body, '返事を確かめていない').toContain('if (!res.success) throw new Error(res.error)')
     expect(body, '失敗を握りつぶしている').toContain('setActionError(')
     expect(body, '生のAPIエラーをそのまま出している').not.toContain('setActionError(res.error)')
-    expect(body, 'finally で処理中を戻していない').toMatch(/finally \{\s*setWorking\(false\)/)
+    expect(guarded, 'finally で同期ロックを戻していない').toMatch(/finally \{[\s\S]*lock\.release\(\)[\s\S]*onFinish\(\)/)
   })
 
   it('押した時点のアカウントを窓に固定する', () => {
