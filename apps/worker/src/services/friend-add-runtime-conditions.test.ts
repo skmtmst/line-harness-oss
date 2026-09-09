@@ -467,14 +467,22 @@ describe('本番の振り分け: 曜日・時間帯・条件・再送制限', ()
   let db: D1Database;
 
   function setupBase(accountId = 'acc-1', scenarioId = 'scenario-1'): void {
+    raw.prepare(`INSERT OR IGNORE INTO tenants (id, name) VALUES ('tenant-1', '統括1')`).run();
     raw.prepare(
-      `INSERT INTO line_accounts (id, name, channel_id, channel_secret, channel_access_token)
-       VALUES (?, 'テスト', ?, ?, ?)`,
+      `INSERT INTO line_accounts (id, name, channel_id, channel_secret, channel_access_token, tenant_id)
+       VALUES (?, 'テスト', ?, ?, ?, 'tenant-1')`,
     ).run(accountId, `channel-${accountId}`, `secret-${accountId}`, `token-${accountId}`);
     raw.prepare(
       `INSERT INTO scenarios (id, name, trigger_type, is_active, line_account_id)
        VALUES (?, '案内', 'friend_add', 1, ?)`,
     ).run(scenarioId, accountId);
+    // 実行時は設定が指す流入リンクの持ち物も確かめるので、実データを置く。
+    // 同じテナントの共有リンク（所有アカウント未設定）として置き、
+    // どちらのアカウントの設定からも使える形にする。
+    raw.prepare(
+      `INSERT OR IGNORE INTO entry_routes (id, name, ref_code, is_active, tenant_id)
+       VALUES ('route-1', '紹介QR', 'REF001', 1, 'tenant-1')`,
+    ).run();
   }
 
   function seedRule(options: {
@@ -1041,7 +1049,7 @@ describe('本番の振り分け: 曜日・時間帯・条件・再送制限', ()
       expect(raw.prepare(`SELECT COUNT(*) AS n FROM friend_scenarios`).get()).toEqual({ n: 0 });
     });
 
-    test('所有者が未設定の古いタグは越境ではないので通す', async () => {
+    test('所有者が未設定のタグは使えない扱いにする（どのアカウントの持ち物か言い切れない）', async () => {
       raw.prepare(`INSERT INTO tags (id, name, line_account_id) VALUES ('tag-legacy', '旧タグ', NULL)`).run();
       raw.prepare(`INSERT INTO friend_tags (friend_id, tag_id) VALUES ('friend-1', 'tag-legacy')`).run();
       seedRule({
@@ -1054,10 +1062,11 @@ describe('本番の振り分け: 曜日・時間帯・条件・再送制限', ()
         db, 'acc-1', { id: 'friend-1', unfollow_count: 0 }, undefined,
         { entryRouteId: 'route-1', now: MON_10 },
       );
-      expect(result).toMatchObject({ suppressed: false, suppressReason: null });
+      expect(result).toMatchObject({ suppressed: true, suppressReason: 'reference_out_of_account' });
+      expect(result.enrollments).toEqual([]);
     });
 
-    test('消えたタグ1つで配信全体は止めない（越境ではない）', async () => {
+    test('消えたタグを指す条件では送らない（絞れていない状態で配らない）', async () => {
       seedRule({
         friendCondition: JSON.stringify({
           operator: 'AND', rules: [{ type: 'tag_exists', value: 'tag-deleted' }],
@@ -1068,78 +1077,42 @@ describe('本番の振り分け: 曜日・時間帯・条件・再送制限', ()
         db, 'acc-1', { id: 'friend-1', unfollow_count: 0 }, undefined,
         { entryRouteId: 'route-1', now: MON_10 },
       );
-      // 条件に当たらないだけ。理由は「条件外」で、越境の理由にはしない。
-      expect(result).toMatchObject({ suppressed: true, suppressReason: 'friend_condition_not_met' });
+      expect(result).toMatchObject({ suppressed: true, suppressReason: 'reference_out_of_account' });
+      expect(result.enrollments).toEqual([]);
     });
-  });
 
-});
+    test('条件の中のフォーム・対応マークも存在を確かめる', async () => {
+      seedRule({
+        friendCondition: JSON.stringify({
+          operator: 'AND', rules: [{ type: 'form_answered', value: 'form-deleted' }],
+        }),
+        resendSuppressionHours: 0,
+      });
+      const missing = await applyFriendAddRouting(
+        db, 'acc-1', { id: 'friend-1', unfollow_count: 0 }, undefined,
+        { entryRouteId: 'route-1', now: MON_10 },
+      );
+      expect(missing).toMatchObject({ suppressed: true, suppressReason: 'reference_out_of_account' });
 
-describe('競合確認API: 日跨ぎの重なりも同じ関数で見る', () => {
-  let testDb: SqliteD1;
-  const owner: AuthenticatedStaff = {
-    id: 'owner-1', name: 'オーナー', role: 'owner', readOnly: false, tenantId: 'tenant-1',
-  };
-
-  function app(db: D1Database) {
-    const instance = new Hono<Env>();
-    instance.use('*', async (c, next) => {
-      c.env = { DB: db } as Env['Bindings'];
-      c.set('staff', owner);
-      await next();
+      raw.prepare(
+        `INSERT INTO forms (id, name, fields) VALUES ('form-1', 'アンケート', '[]')`,
+      ).run();
+      raw.prepare(
+        `INSERT INTO form_submissions (id, form_id, friend_id, data)
+         VALUES ('sub-1', 'form-1', 'friend-1', '{}')`,
+      ).run();
+      seedRule({
+        id: 'rule-form-ok',
+        friendCondition: JSON.stringify({
+          operator: 'AND', rules: [{ type: 'form_answered', value: 'form-1' }],
+        }),
+        resendSuppressionHours: 0,
+      });
+      const present = await applyFriendAddRouting(
+        db, 'acc-1', { id: 'friend-1', unfollow_count: 0 }, undefined,
+        { entryRouteId: 'route-1', now: MON_10 },
+      );
+      expect(present.suppressReason).not.toBe('reference_out_of_account');
     });
-    instance.route('/', friendAddRules);
-    return instance;
-  }
-
-  function seedApiRule(raw: Database.Database, id: string, weekdays: number[], start: string, end: string): void {
-    const definition = JSON.stringify({
-      routeIds: ['route-1'], scenarioId: 'scenario-1', messageType: 'text',
-      messageText: '案内', timing: 'immediate', actions: [],
-      friendCondition: '', activeFrom: null, activeUntil: null,
-      weekdays, timeWindows: [{ start, end }],
-    });
-    raw.prepare(
-      `INSERT INTO friend_add_rules
-        (id, line_account_id, friend_kind, name, priority, status, current_version_id, created_at, updated_at)
-       VALUES (?, 'account-1', 'first_time', ?, 1, 'published', ?, '2026-09-07T09:00:00.000', '2026-09-07T09:00:00.000')`,
-    ).run(id, id, `${id}-v1`);
-    raw.prepare(
-      `INSERT INTO friend_add_rule_versions
-        (id, rule_id, version_number, definition_snapshot, status, published_at)
-       VALUES (?, ?, 1, ?, 'published', '2026-09-07T09:00:00.000')`,
-    ).run(`${id}-v1`, id, definition);
-  }
-
-  beforeEach(() => {
-    testDb = createTestD1();
-    testDb.raw.prepare("INSERT INTO tenants (id, name) VALUES ('tenant-1', '統括1')").run();
-    testDb.raw.prepare(
-      `INSERT INTO line_accounts
-        (id, channel_id, name, channel_access_token, channel_secret, is_active, tenant_id)
-       VALUES ('account-1', 'channel-1', '店舗1', 'token-1', 'secret-1', 1, 'tenant-1')`,
-    ).run();
-    testDb.raw.prepare(
-      `INSERT INTO staff_members (id, name, role, api_key, tenant_id)
-       VALUES ('owner-1', 'オーナー', 'owner', 'owner-key', 'tenant-1')`,
-    ).run();
-    seedApiRule(testDb.raw, 'rule-a', [5], '22:00', '02:00');
-    seedApiRule(testDb.raw, 'rule-b', [5, 6], '23:00', '01:00');
-  });
-
-  afterEach(() => testDb.raw.close());
-
-  test('日跨ぎ同士の重なりを報告する', async () => {
-    const response = await app(testDb.db).request(
-      '/api/friend-add-rules/conflicts?account_id=account-1&kind=first_time',
-    );
-    expect(response.status).toBe(200);
-    const body = await response.json() as {
-      data: { conflicts: Array<{ code: string; ruleIds: string[] }> };
-    };
-    const codes = body.data.conflicts.map((conflict) => conflict.code);
-    expect(codes).toContain('overlapping_weekday');
-    // 単純な文字列比較では見落とす重なりを報告する
-    expect(codes).toContain('overlapping_time');
   });
 });

@@ -341,8 +341,9 @@ describe('POST /webhook — 送信の結末を分ける (#622)', () => {
     await postFollow('webhook-after-unknown');
 
     expect(sendCount()).toBe(before);
+    // 奪い直せても、前の持ち主の「送り始めた」印が残っているので送らない。
     const rows = eventRows();
-    const latest = rows.find((row) => row.error_code === 'resend_suppressed');
+    const latest = rows.find((row) => row.error_code === 'delivery_unknown' && row.routing_status === 'suppressed');
     expect(latest).toMatchObject({ routing_status: 'suppressed', delivery_count: 0 });
   });
 });

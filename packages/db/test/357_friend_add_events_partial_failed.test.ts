@@ -190,6 +190,107 @@ describe('357 friend_add_events partial_failed', () => {
       }
     });
 
+    /*
+     * delivery_count はその場で送った通数しか数えない。時間差のシナリオ・
+     * 流入リンクの案内・友だち追加クーポンは後から届くので、届いた形跡が
+     * ある行を再送可能に戻すと同じ人へ2通目が出る。
+     */
+    it('時間差で送信記録がある行は動かさない（messages_log）', () => {
+      const target = freshDb();
+      try {
+        seedEvent(target, { id: 'event-delayed', createdAt: '2026-09-06T10:00:00.000' });
+        target.prepare(
+          `INSERT INTO messages_log (id, friend_id, direction, message_type, content, created_at)
+           VALUES ('log-1', 'friend-1', 'outgoing', 'text', 'ようこそ', '2026-09-01T10:00:05.000')`,
+        ).run();
+        execSafe(target, migration357());
+
+        expect(statusOf(target, 'event-delayed')).toEqual({ routing_status: 'completed', error_code: null });
+      } finally {
+        target.close();
+      }
+    });
+
+    it('実行より前の送信記録は形跡にしない（その実行とは無関係）', () => {
+      const target = freshDb();
+      try {
+        seedEvent(target, { id: 'event-unrelated', createdAt: '2026-09-06T10:00:00.000' });
+        target.prepare(
+          `INSERT INTO messages_log (id, friend_id, direction, message_type, content, created_at)
+           VALUES ('log-old', 'friend-1', 'outgoing', 'text', '前の配信', '2026-08-01T10:00:00.000')`,
+        ).run();
+        execSafe(target, migration357());
+
+        expect(statusOf(target, 'event-unrelated'))
+          .toEqual({ routing_status: 'partial_failed', error_code: 'send_failed' });
+      } finally {
+        target.close();
+      }
+    });
+
+    it('時間差シナリオの購読がある行は動かさない（cronがこれから／もう送る）', () => {
+      const target = freshDb();
+      try {
+        seedEvent(target, { id: 'event-scenario', createdAt: '2026-09-06T10:00:00.000' });
+        target.prepare(
+          `INSERT INTO scenarios (id, name, trigger_type, is_active) VALUES ('sc-1', '案内', 'friend_add', 1)`,
+        ).run();
+        target.prepare(
+          `INSERT INTO friend_scenarios (id, friend_id, scenario_id, status, started_at, updated_at)
+           VALUES ('fs-1', 'friend-1', 'sc-1', 'active', '2026-09-01T10:00:01.000', '2026-09-01T10:00:01.000')`,
+        ).run();
+        execSafe(target, migration357());
+
+        expect(statusOf(target, 'event-scenario')).toEqual({ routing_status: 'completed', error_code: null });
+      } finally {
+        target.close();
+      }
+    });
+
+    it('台帳に購読が結び付いている行は動かさない', () => {
+      const target = freshDb();
+      try {
+        target.prepare(
+          `INSERT INTO scenarios (id, name, trigger_type, is_active) VALUES ('sc-2', '案内', 'friend_add', 1)`,
+        ).run();
+        target.prepare(
+          `INSERT INTO friend_scenarios (id, friend_id, scenario_id, status, started_at, updated_at)
+           VALUES ('fs-2', 'friend-1', 'sc-2', 'active', '2026-08-01T10:00:00.000', '2026-08-01T10:00:00.000')`,
+        ).run();
+        target.prepare(
+          `INSERT INTO friend_add_events
+            (id, line_account_id, friend_id, webhook_event_id, friend_kind, routing_status,
+             occurred_at, created_at, delivery_count, scenario_enrollment_id)
+           VALUES ('event-enrolled', 'account-1', 'friend-1', 'webhook-enrolled', 'first_time',
+                   'completed', '2026-09-01T10:00:00.000+09:00', '2026-09-06T10:00:00.000', 0, 'fs-2')`,
+        ).run();
+        execSafe(target, migration357());
+
+        expect(statusOf(target, 'event-enrolled')).toEqual({ routing_status: 'completed', error_code: null });
+      } finally {
+        target.close();
+      }
+    });
+
+    it('友だち追加クーポンを送った記録がある行は動かさない', () => {
+      const target = freshDb();
+      try {
+        seedEvent(target, { id: 'event-coupon', createdAt: '2026-09-06T10:00:00.000' });
+        target.prepare(
+          `INSERT INTO nen_friend_add_coupon_issues
+            (id, line_account_id, friend_id, coupon_code, discount_rate, valid_from, expires_at,
+             status, created_at, updated_at)
+           VALUES ('ci-1', 'account-1', 'friend-1', 'NEN-1', 10, '2026-09-01', '2026-10-01',
+                   'sent', '2026-09-01T10:00:00.000', '2026-09-01T10:00:00.000')`,
+        ).run();
+        execSafe(target, migration357());
+
+        expect(statusOf(target, 'event-coupon')).toEqual({ routing_status: 'completed', error_code: null });
+      } finally {
+        target.close();
+      }
+    });
+
     it('308の適用記録が無い環境では1行も動かさない', () => {
       const target = freshDb({ record308: false });
       try {

@@ -99,6 +99,13 @@ export interface ImmediatePushOptions {
    * stop を渡す。自動で送り直すと、同じ人に同じ案内が2通届く。
    */
   unknownSendPolicy?: 'retry' | 'stop';
+  /**
+   * LINE へ渡す再試行キー（`X-Line-Retry-Key`）。同じキーの2回目は LINE 側が
+   * 受け付け済みとして 409 を返し、**二重に届かない**。予約と fence をすり抜けた
+   * 万一の同時送信に対する最後の砦として、友だち追加の経路だけが渡す。
+   * reply は token が1回きりなので不要。
+   */
+  retryKey?: string;
 }
 
 /**
@@ -386,7 +393,7 @@ export async function pushImmediateFirstStep(
           if (acct?.channel_access_token) accessToken = acct.channel_access_token;
         }
         const lineClient = new LineClient(accessToken);
-        await lineClient.pushMessage(pushTarget, messages);
+        await lineClient.pushMessage(pushTarget, messages, options?.retryKey);
       }
     } catch (err) {
       // 4xx は LINE が断ったので届いていない。それ以外は結末が分からない。

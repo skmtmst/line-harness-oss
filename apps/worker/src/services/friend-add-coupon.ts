@@ -52,6 +52,12 @@ type IssueRow = {
 export type FriendAddCouponDependencies = {
   createCoupon: (coupon: EccubeCouponInput) => Promise<void>;
   sendText: (text: string) => Promise<void>;
+  /**
+   * 送信の例外を「届いていない（failed）」と「届いたかもしれない（unknown）」に
+   * 分ける。渡さないと従来どおり全部「届いていない」扱いで、次の友だち追加で
+   * 送り直す。通信断のあとに送り直すと、届いていた人へ2通目が出る。
+   */
+  classifySendFailure?: (error: unknown) => 'failed' | 'unknown';
 };
 
 function jstIsoDate(date: Date): string {
@@ -219,7 +225,21 @@ export async function issueFriendAddCoupon(
           SET status = 'sent', last_error = NULL, sent_at = ?, updated_at = ?
         WHERE line_account_id = ? AND friend_id = ?`,
     ).bind(createdAt, createdAt, input.lineAccountId, input.friendId).run();
-  } catch {
+  } catch (error) {
+    /*
+     * 届いたか分からない送信は `failed_send` にしない。`failed_send` は
+     * 次の友だち追加で送り直す印で、届いていた人に2通目が出る。
+     * 送った可能性がある側へ倒し（`sent`）、理由だけ残して人が確かめる。
+     */
+    const outcome = dependencies.classifySendFailure?.(error) ?? 'failed';
+    if ('unknown' === outcome) {
+      await db.prepare(
+        `UPDATE nen_friend_add_coupon_issues
+            SET status = 'sent', last_error = 'line_send_unknown', sent_at = ?, updated_at = ?
+          WHERE line_account_id = ? AND friend_id = ?`,
+      ).bind(createdAt, createdAt, input.lineAccountId, input.friendId).run();
+      throw new Error('friend_add_coupon_send_unknown');
+    }
     await db.prepare(
       `UPDATE nen_friend_add_coupon_issues
           SET status = 'failed_send', last_error = 'line_send_failed', updated_at = ?

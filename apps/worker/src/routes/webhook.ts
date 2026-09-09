@@ -23,7 +23,7 @@ import {
   captureFriendAddEventAttribution,
   markFriendAddEventRouting,
   claimFriendAddSendRight,
-  isFriendAddSendRightHolder,
+  touchFriendAddSendClaim,
   releaseFriendAddSendRight,
   toJstString,
   recordAnalyticsEvent,
@@ -293,6 +293,8 @@ async function handleEvent(
     // V6台帳はWebhookイベント単位。初回流入 friends.ref_code とは分離し、
     // 再追加でも「今回開いたリンク」が取れた場合だけ候補を結び付ける。
     let friendAddEventId: string | null = null;
+    /** 台帳の行を作れなかった。送信権を持てないので外部送信はしない。 */
+    let friendAddLedgerUnavailable = false;
     if (lineAccountId) {
       try {
         friendAddEventId = await recordFriendAddEvent(db, {
@@ -307,7 +309,12 @@ async function handleEvent(
           occurredAt: toJstString(new Date(event.timestamp)),
         });
       } catch (err) {
-        // 台帳の移行が遅れても、既存の友だち追加配信は止めない。
+        /*
+         * 台帳の行が作れないと、送信権の予約も結果の記録もできない。
+         * ここで送ると、並行する別の実行と二重に届き、しかも記録が
+         * 残らないので誰も気づけない。**送らない**（fail-closed）。
+         */
+        friendAddLedgerUnavailable = true;
         logWebhookStepFailure('friend_add_event_record', err, lineAccountId, event);
       }
     }
@@ -401,6 +408,8 @@ async function handleEvent(
     let claimGeneration = 0;
     let claimError = false;
     let fencedOut = false;
+    /** 奪い直した予約に、前の持ち主の「送り始めた」印が残っていた。 */
+    let previousDispatchUnknown = false;
     /*
      * 送信の結末。**「送っていない」と「送ったか分からない」を分ける。**
      * 分けないと、届いたかもしれない実行を自動で送り直して二重に届く。
@@ -418,7 +427,11 @@ async function handleEvent(
       if (current === 'none') sendState.outcome = 'failed';
     };
     const currentSendOutcome = (): FollowSendOutcome => sendState.outcome;
-    if (friendAddEventId && lineAccountId) {
+    if (friendAddLedgerUnavailable) {
+      // 台帳が作れていない＝送信権を持てない。何も送らない。
+      claimError = true;
+      sendRight = false;
+    } else if (friendAddEventId && lineAccountId) {
       try {
         const claim = await claimFriendAddSendRight(db, {
           lineAccountId,
@@ -428,6 +441,14 @@ async function handleEvent(
         claimedSendRight = claim.held;
         claimGeneration = claim.generation;
         sendRight = claim.held;
+        if (claim.held && claim.previousDispatchUnknown) {
+          /*
+           * 前の持ち主が送信を始めたまま消えていた。届いたかどうか分からない。
+           * ここで送り直すと、届いていた人へ2通目が出る。送らない。
+           */
+          sendRight = false;
+          previousDispatchUnknown = true;
+        }
       } catch (err) {
         // 予約が取れないときは送らない（fail-closed）。振り分けは抑止側に倒す。
         claimError = true;
@@ -436,17 +457,26 @@ async function handleEvent(
       }
     }
     /*
-     * 回収で世代が進んでいたら古い持ち主として引く（fencing）。
-     * 確認できないときも送らない（fail-closed）。
+     * **外部効果の直前に必ず通す関門。**
+     *
+     * 1文で「まだ予約の持ち主か」を確かめ、同時に貸出期限を延ばす
+     * （heartbeat）。確認と延長を分けると、確認したあと送信に時間がかかる
+     * 間に期限切れとみなされて別の実行に奪われる。ここを通すたびに期限が
+     * 延びるので、処理が長引いても奪われない。
+     *
+     * `external` を渡すと「送り始めた」印も立てる。途中で消えても、
+     * 奪った側がこの印を見て送らないため、二重に届かない。
+     * 回収済み・確認できないときは送らない（fail-closed）。
      */
-    const stillSendRightHolder = async (): Promise<boolean> => {
+    const holdSendRight = async (options?: { external?: boolean }): Promise<boolean> => {
       if (!sendRight || friendAddEventId == null || lineAccountId == null) return sendRight;
       try {
-        const held = await isFriendAddSendRightHolder(db, {
+        const held = await touchFriendAddSendClaim(db, {
           lineAccountId,
           friendId: friend.id,
           eventId: friendAddEventId,
           generation: claimGeneration,
+          markDispatching: options?.external === true,
         });
         if (!held) fencedOut = true;
         return held;
@@ -456,6 +486,13 @@ async function handleEvent(
         return false;
       }
     };
+    /*
+     * LINE へ渡す再試行キー。予約と関門をすり抜けた万一の同時送信でも、
+     * 同じキーの2回目は LINE 側で受け付け済みになり二重に届かない。
+     * 友だち・用途ごとに決まる値にする（実行が違っても同じキーになる）。
+     */
+    const sendRetryKey = (purpose: string): string =>
+      stableRetryKey(`friend-add:${lineAccountId ?? 'none'}:${friend.id}:${purpose}`);
     let routing: Awaited<ReturnType<typeof applyFriendAddRouting>> | null = null;
     try {
       routing = runAccountScenarios
@@ -466,17 +503,26 @@ async function handleEvent(
             entryRouteId: currentAttribution?.entryRouteId ?? referralRoute?.id ?? null,
             sendRight,
             claimError,
+            dispatchUnknown: previousDispatchUnknown,
             // 登録・アクションも送信と同じ予約の下で行う。
-            fence: stillSendRightHolder,
+            fence: holdSendRight,
           })
         : null;
     } catch (err) {
       if (friendAddEventId && lineAccountId) {
         try {
+          /*
+           * 失敗の記録も、勝った側の結果を上書きしないよう同じ予約の下で書く。
+           * 予約を持たずに書くと、回収されたあとの実行が勝った側の
+           * `completed` を `failed` に塗り替えてしまう。
+           */
           await markFriendAddEventRouting(db, {
             eventId: friendAddEventId,
             lineAccountId,
             status: 'failed',
+            fence: claimedSendRight && !claimError && claimGeneration > 0
+              ? { friendId: friend.id, generation: claimGeneration }
+              : undefined,
           });
         } catch (ledgerErr) {
           logWebhookStepFailure('friend_add_event_mark_failed', ledgerErr, lineAccountId, event);
@@ -497,7 +543,8 @@ async function handleEvent(
           if (resumed) continue;
           if (routing.timing !== 'immediate') continue;
           // 回収されていたら古い持ち主として送らない。
-          if (!(await stillSendRightHolder())) break;
+          // 送る直前に関門を通す（持ち主の確認・期限の延長・送信の印）。
+          if (!(await holdSendRight({ external: true }))) break;
           const sent = await pushImmediateFirstStep(
             db,
             friend.id,
@@ -510,6 +557,7 @@ async function handleEvent(
               onSendOutcome: noteSendOutcome,
               // 送達不明のまま cron に送り直させない（二重に届く）。
               unknownSendPolicy: 'stop' as const,
+              retryKey: sendRetryKey(`routed:${scenarioId}`),
             },
           );
           if (sent) {
@@ -542,7 +590,8 @@ async function handleEvent(
       if (friendAddIds.has(scenario.id) && scenarioAccountMatch) {
         try {
           // 回収されていたら古い持ち主として登録も送信もしない。
-          if (!(await stillSendRightHolder())) break;
+          // この経路は登録の直後に送るので、送信の印もここで立てる。
+          if (!(await holdSendRight({ external: true }))) break;
           // INSERT OR IGNORE handles dedup via UNIQUE(friend_id, scenario_id)
           const friendScenario = await enrollFriendInScenario(db, friend.id, scenario.id);
           if (!friendScenario) continue; // already enrolled
@@ -569,6 +618,7 @@ async function handleEvent(
               onSendOutcome: noteSendOutcome,
               // 送達不明のまま cron に送り直させない（二重に届く）。
               unknownSendPolicy: 'stop' as const,
+              retryKey: sendRetryKey(`scenario:${scenario.id}`),
             },
           );
           if (sent) {
@@ -584,24 +634,27 @@ async function handleEvent(
     /*
      * 流入リンクの付随処理（案内の送信・専用シナリオ）と友だち追加クーポン。
      *
-     * **どちらも外部送信なので、シナリオ配信と同じ送信権の下で行う。**
-     * 以前はここが予約の外にあり、並行follow の負けた側も案内を押していた。
-     * 同じ人に同じ案内が2通届く。
+     * **どれも外部送信なので、シナリオ配信と同じ送信権の下で行う。**
+     * しかも「まとめて1回だけ確認」では足りない。確認したあと前の送信に
+     * 時間がかかると、その間に奪われて双方が送る。**外部効果のひとつ手前で
+     * 毎回**関門を通し、そのたびに期限を延ばし、送信の印を立てる。
      */
-    const mayRunFollowSideEffects = async (): Promise<boolean> => {
-      if (!sendRight) return false;
-      if (friendAddEventId == null || lineAccountId == null) return true;
-      return stillSendRightHolder();
-    };
     // Referral link side-effects (intro push + dedicated scenario)
-    if (referralRoute && await mayRunFollowSideEffects()) {
+    if (referralRoute) {
       // Intro push from referral link
-      if (referralRoute.intro_template_id) {
+      if (referralRoute.intro_template_id && await holdSendRight({ external: true })) {
         try {
           const template = await getMessageTemplateById(db, referralRoute.intro_template_id);
           if (template) {
             const message = buildMessage(template.message_type, template.message_content);
-            await lineClient.pushMessage(userId, [message]);
+            try {
+              await lineClient.pushMessage(userId, [message], sendRetryKey(`referral-intro:${referralRoute.id}`));
+            } catch (pushErr) {
+              // 4xx は届いていない。それ以外は届いたかもしれない（送達不明）。
+              noteSendOutcome(classifyFollowSendFailure(pushErr));
+              throw pushErr;
+            }
+            noteSendOutcome('delivered');
             console.log(`[follow] referral intro push sent route=${referralRoute.id}`);
           }
         } catch (err) {
@@ -615,17 +668,23 @@ async function handleEvent(
       // waited for the next cron tick). pushMessage, not reply: the reply
       // token may already be consumed by an account friend_add scenario
       // above, and the intro push on this path uses pushMessage too.
-      if (referralRoute.scenario_id) {
+      if (referralRoute.scenario_id && await holdSendRight()) {
         try {
           const enrollment = await enrollFriendInScenario(db, friend.id, referralRoute.scenario_id);
           console.log(`[follow] referral scenario enrolled scenario=${referralRoute.scenario_id}`);
-          if (enrollment) {
+          if (enrollment && await holdSendRight({ external: true })) {
             await pushImmediateFirstStep(
               db,
               friend.id,
               referralRoute.scenario_id,
               { defaultAccessToken: lineAccessToken, workerUrl },
-              { enrollment },
+              {
+                enrollment,
+                onSendOutcome: noteSendOutcome,
+                // 送達不明のまま cron に送り直させない（二重に届く）。
+                unknownSendPolicy: 'stop' as const,
+                retryKey: sendRetryKey(`referral-scenario:${referralRoute.scenario_id}`),
+              },
             );
           }
         } catch (err) {
@@ -636,7 +695,7 @@ async function handleEvent(
 
     // NENの友だち追加クーポンは、アカウント別設定が有効な場合だけ初回追加時に発行する。
     // 再フォローとWebhook再送は発行台帳の一意制約でも二重発行を防ぐ。
-    if ('first_time' === friendKind && lineAccountId && ecommerce && await mayRunFollowSideEffects()) {
+    if ('first_time' === friendKind && lineAccountId && ecommerce && await holdSendRight({ external: true })) {
       try {
         await issueFriendAddCoupon(db, {
           lineAccountId,
@@ -644,7 +703,19 @@ async function handleEvent(
           now: new Date(event.timestamp),
         }, {
           createCoupon: (coupon) => createEccubeCoupon(ecommerce.baseUrl, ecommerce.secret, coupon),
-          sendText: (text) => lineClient.pushMessage(userId, [{ type: 'text', text }]).then(() => undefined),
+          sendText: async (text) => {
+            // クーポンの本文も外部送信。直前に関門を通し、結末を分けて残す。
+            if (!(await holdSendRight({ external: true }))) throw new Error('friend_add_coupon_fenced_out');
+            try {
+              await lineClient.pushMessage(userId, [{ type: 'text', text }], sendRetryKey('coupon'));
+            } catch (pushErr) {
+              noteSendOutcome(classifyFollowSendFailure(pushErr));
+              throw pushErr;
+            }
+            noteSendOutcome('delivered');
+          },
+          // 送ったか分からないときは、次の追加で送り直さない（届いていたら2通目になる）。
+          classifySendFailure: classifyFollowSendFailure,
         });
       } catch (err) {
         logWebhookStepFailure('friend_add_coupon', err, lineAccountId, event);
@@ -670,9 +741,11 @@ async function handleEvent(
     const ledgerErrorCode = routing?.suppressReason
       ?? (claimError
         ? 'send_claim_unavailable'
-        : (!sendRight
-          ? 'duplicate_in_flight'
-          : (delivered ? null : (deliveryUnknown ? 'delivery_unknown' : 'send_failed'))));
+        : (previousDispatchUnknown
+          ? 'delivery_unknown'
+          : (!sendRight
+            ? 'duplicate_in_flight'
+            : (delivered ? null : (deliveryUnknown ? 'delivery_unknown' : 'send_failed')))));
     let ledgerFinalized = false;
     if (friendAddEventId && lineAccountId && !fencedOut) {
       try {
@@ -710,6 +783,9 @@ async function handleEvent(
      */
     if (
       claimedSendRight && !claimError && ledgerFinalized && !deliveryUnknown
+      // 前の持ち主が送り始めた印が残っている予約は返さない。返すと次の
+      // follow が取って送り直し、届いていた人へ2通目が出る。
+      && !previousDispatchUnknown
       && friendAddEventId && lineAccountId
     ) {
       try {
@@ -1163,5 +1239,40 @@ async function handleEvent(
  * 分けて持つ。分けないと、届いたかもしれない実行を自動で送り直す。
  */
 type FollowSendOutcome = 'none' | 'failed' | 'unknown' | 'delivered';
+
+/**
+ * 送信の例外を「届いていない」と「届いたかもしれない」に分ける。
+ * LINE が 4xx で断ったときは受け付けられていないので届いていない。
+ * 通信断・タイムアウト・429・5xx は結果を知らないだけで届いていることがある。
+ */
+function classifyFollowSendFailure(error: unknown): 'failed' | 'unknown' {
+  const status = (error as { status?: unknown } | null)?.status;
+  if (typeof status === 'number' && status >= 400 && status < 500 && status !== 429) return 'failed';
+  return 'unknown';
+}
+
+/**
+ * 同じ意味の送信に、実行が違っても同じ値になるキーを作る（`X-Line-Retry-Key`）。
+ * LINE は同じキーの2回目を受け付け済みとして扱うので、予約と関門をすり抜けた
+ * 万一の同時送信でも二重に届かない。UUID の形にそろえる。
+ */
+function stableRetryKey(seed: string): string {
+  // FNV-1a を4本、別の初期値で回して128bitぶんの桁を作る。
+  const offsets = [0x811c9dc5, 0x01000193, 0x9e3779b9, 0x85ebca6b];
+  const words = offsets.map((offset) => {
+    let hash = offset >>> 0;
+    for (let i = 0; i < seed.length; i++) {
+      hash ^= seed.charCodeAt(i);
+      hash = Math.imul(hash, 0x01000193) >>> 0;
+    }
+    return hash.toString(16).padStart(8, '0');
+  });
+  const hex = words.join('');
+  return [
+    hex.slice(0, 8), hex.slice(8, 12), `4${hex.slice(13, 16)}`,
+    `${((parseInt(hex[16] ?? '0', 16) & 0x3) | 0x8).toString(16)}${hex.slice(17, 20)}`,
+    hex.slice(20, 32),
+  ].join('-');
+}
 
 export { webhook };

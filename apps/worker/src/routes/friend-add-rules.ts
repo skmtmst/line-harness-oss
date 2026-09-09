@@ -23,7 +23,7 @@ import {
   collectFriendAddReferences,
   doFriendAddTimeWindowsOverlap,
   doFriendAddWeekdaySetsOverlap,
-  findFriendAddForeignReferences,
+  findFriendAddUnusableReferences,
   isValidFriendAddHhmm,
   parseFriendAddConditionAst,
 } from '../services/friend-add-routing.js';
@@ -352,11 +352,9 @@ async function validateReferences(
     actions: [],
     friendCondition: definition.friendCondition,
   });
-  const foreign = await findFriendAddForeignReferences(db, accountId, conditionRefs, {
-    requireExists: true,
-  });
-  if (foreign.length > 0) {
-    push(friendKind, 'このLINEアカウントで使えないタグ・シナリオ・友だち情報欄が友だち条件に含まれています。');
+  const unusable = await findFriendAddUnusableReferences(db, accountId, conditionRefs);
+  if (unusable.length > 0) {
+    push(friendKind, 'このLINEアカウントで使えないタグ・シナリオ・友だち情報欄・フォーム・対応マークが友だち条件に含まれています。');
   }
   return messages;
 }

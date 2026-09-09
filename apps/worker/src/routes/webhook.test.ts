@@ -35,8 +35,8 @@ vi.mock('@line-crm/db', () => ({
   recordFriendAddEvent: vi.fn().mockResolvedValue('friend-add-event-1'),
   captureFriendAddEventAttribution: vi.fn().mockResolvedValue(null),
   markFriendAddEventRouting: vi.fn().mockResolvedValue(undefined),
-  claimFriendAddSendRight: vi.fn().mockResolvedValue({ held: true, generation: 1 }),
-  isFriendAddSendRightHolder: vi.fn().mockResolvedValue(true),
+  claimFriendAddSendRight: vi.fn().mockResolvedValue({ held: true, generation: 1, previousDispatchUnknown: false }),
+  touchFriendAddSendClaim: vi.fn().mockResolvedValue(true),
   releaseFriendAddSendRight: vi.fn().mockResolvedValue(undefined),
   recordAnalyticsEvent: vi.fn().mockResolvedValue({ id: 'analytics-event-1' }),
   recordAutoReplyHit: vi.fn().mockResolvedValue(undefined),
@@ -115,7 +115,7 @@ import {
   captureFriendAddEventAttribution,
   markFriendAddEventRouting,
   claimFriendAddSendRight,
-  isFriendAddSendRightHolder,
+  touchFriendAddSendClaim,
   releaseFriendAddSendRight,
   recordAnalyticsEvent,
 } from '@line-crm/db';
@@ -803,7 +803,7 @@ describe('POST /webhook — friend-add抑止理由の台帳記録 (#622)', () =>
   });
 
   test('送信権を取れなかった実行は送らず duplicate_in_flight で引く', async () => {
-    vi.mocked(claimFriendAddSendRight).mockResolvedValueOnce({ held: false, generation: 0 });
+    vi.mocked(claimFriendAddSendRight).mockResolvedValueOnce({ held: false, generation: 0, previousDispatchUnknown: false });
     await sendFollowWithRouting({
       routed: true, kind: 'first_time',
       enrollments: [{ scenarioId: 'scenario-1', enrollment: { id: 'enrollment-1' }, resumed: false }],
@@ -832,7 +832,7 @@ describe('POST /webhook — friend-add抑止理由の台帳記録 (#622)', () =>
   });
 
   test('回収で旧持ち主になったら送信も確定もしない', async () => {
-    vi.mocked(isFriendAddSendRightHolder).mockResolvedValueOnce(false);
+    vi.mocked(touchFriendAddSendClaim).mockResolvedValueOnce(false);
     await sendFollowWithRouting({
       routed: true, kind: 'returning',
       enrollments: [{ scenarioId: 'scenario-1', enrollment: { id: 'enrollment-1' }, resumed: false }],

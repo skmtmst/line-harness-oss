@@ -81,16 +81,20 @@ ALTER TABLE friend_add_action_runs_new RENAME TO friend_add_action_runs;
 -- 旧データの移し替え（安全側）。
 --
 -- 「completed なのに送っていない」行だけを partial_failed へ移して再送可能に
--- したい。しかし delivery_count と first_delivery_sent_at は migration 308 で
--- 足した列で、**それ以前に作られた行は送っていても 0 / NULL** になる。
--- 単純に「delivery_count=0 なら送っていない」と読むと、既に案内が届いている
--- 人を再送可能に戻し、同じ案内を2通届けてしまう。
+-- したい。ただし「送っていない」と言い切れる材料は少ない。
 --
--- そこで 308 が適用された時刻より後に作られた行だけを対象にする。その行は
--- 送信のたびに delivery_count が入る仕組みの下で作られているので、
--- 0 かつ first_delivery_sent_at が空なら送っていないと言い切れる。
--- 308 の適用時刻が分からない環境（記録表が無い・記録が無い）では
--- 1行も動かさない。分からないときは触らないほうが安全。
+-- (1) delivery_count / first_delivery_sent_at は migration 308 で足した列で、
+--     **それ以前に作られた行は送っていても 0 / NULL**。308 の適用時刻より後に
+--     作られた行だけを見る。適用記録が無い環境では1行も動かさない。
+-- (2) delivery_count は「その場で送った通数」しか数えない。**時間差の
+--     シナリオ配信・流入リンクの案内・友だち追加クーポン**は、この列を
+--     増やさないまま後から届く。届いた形跡がある行を再送可能に戻すと、
+--     同じ人へ2通目が出る。次の形跡がある行は動かさない。
+--       - その友だちへの送信記録（messages_log の outgoing）が
+--         その実行の時刻以降にある
+--       - その友だちの購読（friend_scenarios）がその実行の時刻以降にある
+--         （時間差の1通目を cron がこれから出す／もう出した）
+--       - 友だち追加クーポンを送った記録がある
 --
 -- _migrations は配備script が作る適用記録（name, applied_at）。
 -- 手元やテストのように記録が無い場合でも参照できるよう、先に用意する。
@@ -105,12 +109,31 @@ UPDATE friend_add_events
  WHERE routing_status = 'completed'
    AND COALESCE(delivery_count, 0) = 0
    AND first_delivery_sent_at IS NULL
+   AND scenario_enrollment_id IS NULL
    AND created_at > (
          -- applied_at は UTC の 'YYYY-MM-DD HH:MM:SS'。行の created_at は
          -- JST の 'YYYY-MM-DDTHH:MM:SS.fff' なので、同じ書式へそろえて比べる。
          SELECT strftime('%Y-%m-%dT%H:%M:%f', m.applied_at, '+9 hours')
            FROM _migrations m
           WHERE m.name = '308_friend_add_rule_data_contract.sql'
+       )
+   -- 時間差で届いた（届く）可能性がある行は動かさない。
+   AND NOT EXISTS (
+         SELECT 1 FROM messages_log ml
+          WHERE ml.friend_id = friend_add_events.friend_id
+            AND ml.direction = 'outgoing'
+            AND ml.created_at >= friend_add_events.occurred_at
+       )
+   AND NOT EXISTS (
+         SELECT 1 FROM friend_scenarios fs
+          WHERE fs.friend_id = friend_add_events.friend_id
+            AND COALESCE(fs.started_at, fs.updated_at) >= friend_add_events.occurred_at
+       )
+   AND NOT EXISTS (
+         SELECT 1 FROM nen_friend_add_coupon_issues ci
+          WHERE ci.line_account_id = friend_add_events.line_account_id
+            AND ci.friend_id = friend_add_events.friend_id
+            AND ci.status = 'sent'
        );
 
 -- 表の再構築前と同じ索引名だと適用判定で飛ばされるため、357 固有名で貼り直す。

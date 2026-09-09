@@ -236,7 +236,12 @@ export type FriendAddSuppressReason =
   /** 設定が別アカウントのタグ・シナリオ・友だち情報欄を指している。 */
   | 'reference_out_of_account'
   /** 送信権を回収された古い持ち主。勝った側が送るのでここでは送らない。 */
-  | 'send_right_revoked';
+  | 'send_right_revoked'
+  /**
+   * 送ったかどうか分からない。前の持ち主が送信を始めたまま消えた、
+   * あるいは送信の結末を確かめられなかった。自動では送り直さない。
+   */
+  | 'delivery_unknown';
 
 /** JSTの現在時刻を "HH:MM" で返す。WorkersはUTCで動くので自前でずらす。 */
 export function friendAddJstHhmm(at: Date): string {
@@ -997,6 +1002,8 @@ export interface FriendAddReferenceIds {
   scenarioIds: string[];
   friendFieldIds: string[];
   routeIds: string[];
+  formIds: string[];
+  supportMarkIds: string[];
 }
 
 function pushId(into: Set<string>, value: unknown): void {
@@ -1006,7 +1013,10 @@ function pushId(into: Set<string>, value: unknown): void {
 function collectConditionReferences(
   node: unknown,
   depth: number,
-  acc: { tags: Set<string>; scenarios: Set<string>; fields: Set<string> },
+  acc: {
+    tags: Set<string>; scenarios: Set<string>; fields: Set<string>;
+    forms: Set<string>; marks: Set<string>;
+  },
 ): void {
   if (depth > FRIEND_ADD_CONDITION_MAX_DEPTH) return;
   if (!node || typeof node !== 'object' || Array.isArray(node)) return;
@@ -1023,6 +1033,12 @@ function collectConditionReferences(
         pushId(acc.scenarios, (value as { scenarioId?: unknown } | null)?.scenarioId);
       } else if (type === 'friend_field') {
         pushId(acc.fields, (value as { fieldId?: unknown } | null)?.fieldId);
+      } else if (type === 'form_answered') {
+        // 空文字は「どれか1つでも回答があれば」の意味。IDではない。
+        pushId(acc.forms, value);
+      } else if (type === 'support_mark') {
+        const markIds = (value as { markIds?: unknown } | null)?.markIds;
+        if (Array.isArray(markIds)) for (const id of markIds) pushId(acc.marks, id);
       }
     }
   }
@@ -1042,6 +1058,8 @@ export function collectFriendAddReferences(
   const scenarios = new Set<string>();
   const fields = new Set<string>();
   const routes = new Set<string>();
+  const forms = new Set<string>();
+  const marks = new Set<string>();
   pushId(scenarios, definition.scenarioId);
   if (Array.isArray(definition.routeIds)) for (const id of definition.routeIds) pushId(routes, id);
   if (Array.isArray(definition.actions)) {
@@ -1073,13 +1091,15 @@ export function collectFriendAddReferences(
     }
   })();
   if (parsedCondition) {
-    collectConditionReferences(parsedCondition, 1, { tags, scenarios, fields });
+    collectConditionReferences(parsedCondition, 1, { tags, scenarios, fields, forms, marks });
   }
   return {
     tagIds: [...tags],
     scenarioIds: [...scenarios],
     friendFieldIds: [...fields],
     routeIds: [...routes],
+    formIds: [...forms],
+    supportMarkIds: [...marks],
   };
 }
 
@@ -1095,74 +1115,62 @@ async function selectIds(
 }
 
 /**
- * 参照しているIDのうち、**別アカウントの持ち物**を返す。
+ * 参照しているIDのうち、**このアカウントで使えないもの**を返す。
  *
- * `requireExists` を立てると、見つからないIDも「使えない」として返す。
- * 保存時は立てる（打ち間違い・消し忘れをその場で直せる）。実行時は立てない。
- * 実行時に消えたタグ1つで配信全体を止めるのは行き過ぎで、
- * 消えたIDは条件に当たらないだけで越境にはならない。
+ * 使えない＝「消えている」か「別アカウント・別テナントの持ち物」。
+ * 公開版のスナップショットは保存後もそのまま動くので、保存時に正しくても
+ * 実行時には消えている・移っていることがある。どちらの場合も配信しない。
  *
- * 所有者が未設定（line_account_id / tenant_id が NULL）の古い行は、
- * 流入リンクと同じく互換のデータとして通す。越境ではないため。
- *
- * フォーム・対応マークは所有アカウントを持たない設計のため、ここでは見ない。
+ * 所有者が未設定（NULL）のタグ・シナリオ・友だち情報欄も**使えない扱い**に
+ * する。どのアカウントの持ち物か言い切れないものを、このアカウントの
+ * 配信条件として読むと、他店の友だちを数える形になりうる。
+ * 流入リンクだけは、保存時の契約（未設定＋同一テナントは可）にそろえる。
+ * フォーム・対応マークは所有列が無いので、存在だけを確かめる。
  */
-export async function findFriendAddForeignReferences(
+export async function findFriendAddUnusableReferences(
   db: D1Database,
   accountId: string,
   refs: FriendAddReferenceIds,
-  options?: { requireExists?: boolean },
 ): Promise<string[]> {
   const tenantOfAccount = '(SELECT tenant_id FROM line_accounts WHERE id = ?)';
-  const [tags, scenarios, fields, routes] = await Promise.all([
+  const [tags, scenarios, fields, routes, forms, marks] = await Promise.all([
     selectIds(db, refs.tagIds, (p) => ({
-      sql: `SELECT id FROM tags
-             WHERE id IN (${p}) AND line_account_id IS NOT NULL AND line_account_id != ?`,
+      sql: `SELECT id FROM tags WHERE id IN (${p}) AND line_account_id = ?`,
       bindings: [...refs.tagIds, accountId],
     })),
     selectIds(db, refs.scenarioIds, (p) => ({
-      sql: `SELECT id FROM scenarios
-             WHERE id IN (${p}) AND line_account_id IS NOT NULL AND line_account_id != ?`,
+      sql: `SELECT id FROM scenarios WHERE id IN (${p}) AND line_account_id = ?`,
       bindings: [...refs.scenarioIds, accountId],
     })),
     selectIds(db, refs.friendFieldIds, (p) => ({
       sql: `SELECT id FROM friend_fields
-             WHERE id IN (${p}) AND tenant_id IS NOT NULL AND tenant_id != ${tenantOfAccount}`,
+             WHERE id IN (${p}) AND tenant_id IS NOT NULL AND tenant_id = ${tenantOfAccount}`,
       bindings: [...refs.friendFieldIds, accountId],
     })),
     selectIds(db, refs.routeIds, (p) => ({
       sql: `SELECT id FROM entry_routes
              WHERE id IN (${p})
-               AND ((line_account_id IS NOT NULL AND line_account_id != ?)
-                    OR (line_account_id IS NULL
-                        AND tenant_id IS NOT NULL AND tenant_id != ${tenantOfAccount}))`,
+               AND (line_account_id = ?
+                    OR (line_account_id IS NULL AND tenant_id = ${tenantOfAccount}))`,
       bindings: [...refs.routeIds, accountId, accountId],
     })),
-  ]);
-  const foreign = [...tags, ...scenarios, ...fields, ...routes];
-  if (!options?.requireExists) return foreign;
-
-  const [knownTags, knownScenarios, knownFields, knownRoutes] = await Promise.all([
-    selectIds(db, refs.tagIds, (p) => ({
-      sql: `SELECT id FROM tags WHERE id IN (${p})`, bindings: [...refs.tagIds],
+    selectIds(db, refs.formIds, (p) => ({
+      sql: `SELECT id FROM forms WHERE id IN (${p})`,
+      bindings: [...refs.formIds],
     })),
-    selectIds(db, refs.scenarioIds, (p) => ({
-      sql: `SELECT id FROM scenarios WHERE id IN (${p})`, bindings: [...refs.scenarioIds],
-    })),
-    selectIds(db, refs.friendFieldIds, (p) => ({
-      sql: `SELECT id FROM friend_fields WHERE id IN (${p})`, bindings: [...refs.friendFieldIds],
-    })),
-    selectIds(db, refs.routeIds, (p) => ({
-      sql: `SELECT id FROM entry_routes WHERE id IN (${p})`, bindings: [...refs.routeIds],
+    selectIds(db, refs.supportMarkIds, (p) => ({
+      sql: `SELECT id FROM support_marks WHERE id IN (${p})`,
+      bindings: [...refs.supportMarkIds],
     })),
   ]);
-  const missing = [
-    ...refs.tagIds.filter((id) => !knownTags.has(id)),
-    ...refs.scenarioIds.filter((id) => !knownScenarios.has(id)),
-    ...refs.friendFieldIds.filter((id) => !knownFields.has(id)),
-    ...refs.routeIds.filter((id) => !knownRoutes.has(id)),
+  return [
+    ...refs.tagIds.filter((id) => !tags.has(id)),
+    ...refs.scenarioIds.filter((id) => !scenarios.has(id)),
+    ...refs.friendFieldIds.filter((id) => !fields.has(id)),
+    ...refs.routeIds.filter((id) => !routes.has(id)),
+    ...refs.formIds.filter((id) => !forms.has(id)),
+    ...refs.supportMarkIds.filter((id) => !marks.has(id)),
   ];
-  return [...new Set([...foreign, ...missing])];
 }
 
 /**
@@ -1271,18 +1279,34 @@ export async function evaluateFriendAddRuleConditions(
   const schedule = evaluateFriendAddSchedule(input.definition, input.now);
   if (!schedule.matched) return { matched: false, reason: schedule.reason };
   /*
+   * 条件木の形は DB を見ずに確かめられるので先に見る。壊れた木から
+   * 参照IDを拾っても意味が無いし、理由も「条件が読めない」が正しい。
+   */
+  const ast = parseFriendAddConditionAst(input.definition.friendCondition);
+  if (!ast.ok) {
+    console.error(`[friend-add-routing] friendCondition rejected (${ast.error}) — skipped the rule`);
+    return {
+      matched: false,
+      reason: ast.error === 'legacy_text' || ast.error === 'not_json'
+        ? 'friend_condition_unreadable'
+        : 'friend_condition_invalid',
+    };
+  }
+  /*
    * 保存時に確かめていても、実行時にもう一度確かめる。タグやシナリオは
    * 保存のあとで消せる・別アカウントへ移せるため、公開版のスナップショットが
-   * 他アカウントの持ち物を指したまま動くことがある。
+   * 使えない参照を抱えたまま動くことがある。消えた参照で絞ると
+   * 「誰にも当たらない」ではなく「絞れていない」に化けることもあるため、
+   * 消えている場合も配信しない（fail-closed）。
    */
-  const foreign = await findFriendAddForeignReferences(
+  const unusable = await findFriendAddUnusableReferences(
     db,
     input.lineAccountId,
     collectFriendAddReferences(input.definition),
   );
-  if (foreign.length > 0) {
+  if (unusable.length > 0) {
     console.error(
-      `[friend-add-routing] rule references ids outside the account — skipped: ${foreign.join(', ')}`,
+      `[friend-add-routing] rule references ids this account cannot use — skipped: ${unusable.join(', ')}`,
     );
     return { matched: false, reason: 'reference_out_of_account' };
   }
@@ -1305,6 +1329,12 @@ async function runActions(
   friendId: string,
   actions: FriendAddAction[],
   push?: ImmediatePushContext,
+  /**
+   * 外部効果の直前に通す関門。アクションはタグ付けの副作用で外へ送ることが
+   * あるため、**ひとつ手前で毎回**持ち主かを確かめる。まとめて1回では、
+   * 前のアクションに時間がかかった間に奪われたことに気づけない。
+   */
+  fence?: () => Promise<boolean>,
 ): Promise<void> {
   /*
    * シナリオと同じアクションは、シナリオと同じところで実行する。
@@ -1327,7 +1357,7 @@ async function runActions(
       condition_json: null,
       repeat_on_refire: 1,
     }));
-  if (rows.length > 0) {
+  if (rows.length > 0 && (!fence || await fence())) {
     try {
       const { runActionRows } = await import('./scenario-actions.js');
       await runActionRows(db, rows as never, friendId);
@@ -1338,6 +1368,7 @@ async function runActions(
   }
 
   for (const action of actions) {
+    if (fence && !(await fence())) break;
     try {
       if (action.kind === 'tag') {
         // 読み込みで row へ直しているので、ここへは来ない。古い保存を
@@ -1572,6 +1603,11 @@ export async function applyFriendAddRouting(
     sendRight?: boolean;
     claimError?: boolean;
     /**
+     * 奪い直した予約に、前の持ち主の「送り始めた」印が残っていた。
+     * 送ったかもしれないので送らず、理由を送達不明として残す。
+     */
+    dispatchUnknown?: boolean;
+    /**
      * 送信権の持ち主かを確かめる関数（fencing）。登録・アクション・送信の
      * どれかを始める直前に呼ぶ。false なら回収されているので何もしない。
      * 渡さないときは確かめない（画面のテスト実行など、副作用が無い呼び出し）。
@@ -1613,7 +1649,9 @@ export async function applyFriendAddRouting(
       enrollments: [],
       timing: selection.evaluated.definition.timing,
       suppressed: true,
-      suppressReason: routingContext?.claimError === true ? 'send_claim_unavailable' : 'duplicate_in_flight',
+      suppressReason: routingContext?.claimError === true
+        ? 'send_claim_unavailable'
+        : (routingContext?.dispatchUnknown === true ? 'delivery_unknown' : 'duplicate_in_flight'),
       ruleId: selection.evaluated.ruleId,
       ruleVersionId: selection.evaluated.versionId,
     };
@@ -1678,7 +1716,7 @@ export async function applyFriendAddRouting(
 
   // ② で「配信しない」を選んでいる
   if (classifiedKind === 'returning' && routing.returning.mode === 'none') {
-    await runActions(db, friend.id, routing.returning.actions, push);
+    await runActions(db, friend.id, routing.returning.actions, push, routingContext?.fence);
     return {
       routed: true,
       kind: classifiedKind,
@@ -1712,7 +1750,7 @@ export async function applyFriendAddRouting(
    */
   if (!branch.scenarioId) {
     if (matchedRule) {
-      await runActions(db, friend.id, branch.actions, push);
+      await runActions(db, friend.id, branch.actions, push, routingContext?.fence);
       return {
         routed: true,
         kind: classifiedKind,
@@ -1729,7 +1767,7 @@ export async function applyFriendAddRouting(
         `[friend-add-routing] ②で「別のシナリオ」を選んでシナリオが未設定のため配信しません`
         + `（friend=${friend.id}）。画面の設定を見直してください。`,
       );
-      await runActions(db, friend.id, routing.returning.actions, push);
+      await runActions(db, friend.id, routing.returning.actions, push, routingContext?.fence);
       return {
         routed: true,
         kind: classifiedKind,
@@ -1764,6 +1802,19 @@ export async function applyFriendAddRouting(
   const enrollments: FriendAddEnrollment[] = [];
   let record: FriendScenario | null = null;
   let resumed = false;
+  // 登録は cron の配信につながる外部効果。書く直前にもう一度確かめる。
+  if (routingContext?.fence && !(await routingContext.fence())) {
+    return {
+      routed: true,
+      kind: classifiedKind,
+      enrollments: [],
+      timing,
+      suppressed: true,
+      suppressReason: 'send_right_revoked',
+      ruleId: matchedRule?.ruleId ?? null,
+      ruleVersionId: matchedRule?.versionId ?? null,
+    };
+  }
   if (wantResume) {
     record = await resumeFriendScenario(db, friend.id, branch.scenarioId);
     resumed = record !== null;
@@ -1776,7 +1827,7 @@ export async function applyFriendAddRouting(
     enrollments.push({ scenarioId: branch.scenarioId, enrollment: record, resumed });
   }
 
-  await runActions(db, friend.id, branch.actions, push);
+  await runActions(db, friend.id, branch.actions, push, routingContext?.fence);
 
   return {
     routed: true,

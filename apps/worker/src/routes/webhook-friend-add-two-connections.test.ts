@@ -154,6 +154,35 @@ afterEach(() => {
   rmSync(dir, { recursive: true, force: true });
 });
 
+/** 予約の貸出を古くする（前の持ち主が止まったように見せる）。 */
+const STALE = '2026-09-01T10:00:00.000+09:00';
+
+function makeDeferred(): { promise: Promise<void>; resolve: () => void } {
+  let resolve!: () => void;
+  const promise = new Promise<void>((r) => { resolve = r; });
+  return { promise, resolve };
+}
+
+function claimRow(): { event_id: string; generation: number; dispatched_at: string | null } | undefined {
+  return observer.prepare(
+    `SELECT event_id, generation, dispatched_at FROM friend_add_send_claims`,
+  ).get() as { event_id: string; generation: number; dispatched_at: string | null } | undefined;
+}
+
+function eventRow(webhookEventId: string): { routing_status: string; delivery_count: number; error_code: string | null } {
+  return observer.prepare(
+    `SELECT routing_status, delivery_count, error_code FROM friend_add_events WHERE webhook_event_id = ?`,
+  ).get(webhookEventId) as { routing_status: string; delivery_count: number; error_code: string | null };
+}
+
+function seedIntroTemplate(): void {
+  observer.prepare(
+    `INSERT INTO message_templates (id, name, message_type, message_content)
+     VALUES ('tpl-1', '紹介あいさつ', 'text', '{"text":"ご紹介ありがとうございます"}')`,
+  ).run();
+  observer.prepare(`UPDATE entry_routes SET intro_template_id = 'tpl-1' WHERE id = 'route-1'`).run();
+}
+
 describe('POST /webhook — 独立2接続の並行follow (#622)', () => {
   test('別接続の2実行が同時に届いても、送るのは1回だけ', async () => {
     // 送信を遅らせて競合の窓を広げる。
@@ -178,6 +207,90 @@ describe('POST /webhook — 独立2接続の並行follow (#622)', () => {
     // 登録も1本だけ（負けた側は登録を作らない）
     expect(observer.prepare(`SELECT COUNT(*) AS n FROM friend_scenarios`).get()).toEqual({ n: 1 });
     // 予約のゴミを残さない
+    expect(observer.prepare(`SELECT COUNT(*) AS n FROM friend_add_send_claims`).get()).toEqual({ n: 0 });
+  });
+
+  /*
+   * 核心の逆交差。**旧Aを送信の途中で止めたまま、新Bを最後まで走らせ、
+   * そのあと旧Aも最後まで走らせる。** Bは貸出が古いので予約を奪えるが、
+   * Aが立てた「送り始めた」印が残っているので送らない。Aは送り終えるが、
+   * 世代が進んでいるので台帳も後続の外部効果も行わない。届くのは1通。
+   */
+  describe.each([
+    { label: '正: Aが先に予約', first: 'a', second: 'b' },
+    { label: '逆: Bが先に予約', first: 'b', second: 'a' },
+  ])('$label', ({ first, second }) => {
+    test('送信中に奪われても、双方合わせて送るのは1回だけ', async () => {
+      seedIntroTemplate();
+      const firstDb = first === 'a' ? connA.db : connB.db;
+      const secondDb = second === 'a' ? connA.db : connB.db;
+      const midSend = makeDeferred();
+      const releaseSend = makeDeferred();
+
+      lineClientMocks.replyMessage.mockImplementation(async () => {
+        // 送信の最中に貸出が古くなる（実行が長く止まった状況）。
+        observer.prepare(`UPDATE friend_add_send_claims SET claimed_at = ?`).run(STALE);
+        midSend.resolve();
+        await releaseSend.promise;
+      });
+
+      // 旧: 送信の途中で待たせる
+      const older = postFollow(`webhook-${first}`, firstDb);
+      await midSend.promise;
+
+      // 印が立っていることを確かめてから、新を最後まで走らせる
+      expect(claimRow()?.dispatched_at).not.toBeNull();
+      await postFollow(`webhook-${second}`, secondDb);
+
+      // 新は予約を奪えたが、印が残っているので送らない
+      expect(sendCount()).toBe(1);
+      expect(claimRow()).toMatchObject({ event_id: expect.any(String), generation: 2 });
+      expect(eventRow(`webhook-${second}`)).toMatchObject({
+        routing_status: 'suppressed', delivery_count: 0, error_code: 'delivery_unknown',
+      });
+
+      // 旧も最後まで走らせる。送り終えるが、台帳も後続の案内も行わない。
+      releaseSend.resolve();
+      await older;
+
+      expect(sendCount()).toBe(1);
+      expect(lineClientMocks.pushMessage.mock.calls.length).toBe(0);
+      expect(eventRow(`webhook-${first}`)).toMatchObject({ routing_status: 'pending' });
+      // 登録は旧の1本だけ。新は作らない。
+      expect(observer.prepare(`SELECT COUNT(*) AS n FROM friend_scenarios`).get()).toEqual({ n: 1 });
+    });
+  });
+
+  test('前の持ち主が送り始めたまま消えたら、奪った側は送らない', async () => {
+    observer.prepare(
+      `INSERT INTO friend_add_send_claims
+        (line_account_id, friend_id, event_id, generation, claimed_at, dispatched_at)
+       VALUES ('account-1', 'friend-1', 'webhook-crashed', 1, ?, ?)`,
+    ).run(STALE, STALE);
+
+    await postFollow('webhook-new', connB.db);
+
+    expect(sendCount()).toBe(0);
+    expect(eventRow('webhook-new')).toMatchObject({
+      routing_status: 'suppressed', delivery_count: 0, error_code: 'delivery_unknown',
+    });
+    expect(observer.prepare(`SELECT COUNT(*) AS n FROM friend_scenarios`).get()).toEqual({ n: 0 });
+  });
+
+  test('送り始める前に消えていたら、奪った側が実際に送る', async () => {
+    observer.prepare(
+      `INSERT INTO friend_add_send_claims
+        (line_account_id, friend_id, event_id, generation, claimed_at, dispatched_at)
+       VALUES ('account-1', 'friend-1', 'webhook-crashed', 1, ?, NULL)`,
+    ).run(STALE);
+
+    await postFollow('webhook-new', connB.db);
+
+    expect(sendCount()).toBe(1);
+    expect(eventRow('webhook-new')).toMatchObject({
+      routing_status: 'completed', delivery_count: 1, error_code: null,
+    });
+    // 送り終えたので予約は返す
     expect(observer.prepare(`SELECT COUNT(*) AS n FROM friend_add_send_claims`).get()).toEqual({ n: 0 });
   });
 
@@ -211,11 +324,8 @@ describe('POST /webhook — 独立2接続の並行follow (#622)', () => {
     await postFollow('webhook-a', connA.db);
 
     // 旧持ち主は台帳を書かない（勝った側が書く）
-    expect(observer.prepare(
-      `SELECT routing_status FROM friend_add_events WHERE webhook_event_id = 'webhook-a'`,
-    ).get()).toEqual({ routing_status: 'pending' });
+    expect(eventRow('webhook-a')).toMatchObject({ routing_status: 'pending' });
     // 予約は奪った側のまま。旧持ち主は消さない。
-    expect(observer.prepare(`SELECT event_id, generation FROM friend_add_send_claims`).get())
-      .toEqual({ event_id: 'stolen-by-b', generation: 2 });
+    expect(claimRow()).toMatchObject({ event_id: 'stolen-by-b', generation: 2 });
   });
 });

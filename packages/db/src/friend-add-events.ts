@@ -218,6 +218,12 @@ export interface FriendAddSendClaim {
   /** 送ってよいか。 */
   held: boolean;
   /**
+   * 奪い直したとき、**前の持ち主が外部送信を始めた印が残っていた**か。
+   * true なら送ったかもしれないので、奪った側は送らない（送達不明）。
+   * 送り直すと同じ人へ2通届く。
+   */
+  previousDispatchUnknown: boolean;
+  /**
    * 予約の世代。回収（奪い直し）のたびに1つ進む。外部送信・アクション・
    * 台帳の確定はすべて (event_id, generation) の組で持ち主を確かめてから
    * 行う。回収された古い持ち主はここで弾かれる（fencing）。
@@ -244,36 +250,68 @@ export async function claimFriendAddSendRight(
   const now = input.now ?? jstNow();
   const cutoff = addMinutes(now, -FRIEND_ADD_SEND_CLAIM_TTL_MINUTES);
   const won = await db.prepare(
-    `INSERT INTO friend_add_send_claims (line_account_id, friend_id, event_id, generation, claimed_at)
-     VALUES (?, ?, ?, 1, ?)
+    `INSERT INTO friend_add_send_claims
+       (line_account_id, friend_id, event_id, generation, claimed_at, dispatched_at)
+     VALUES (?, ?, ?, 1, ?, NULL)
      ON CONFLICT (line_account_id, friend_id) DO UPDATE
         SET event_id = excluded.event_id,
             generation = friend_add_send_claims.generation + 1,
             claimed_at = excluded.claimed_at
       WHERE friend_add_send_claims.claimed_at < ?
-     RETURNING event_id, generation`,
+     RETURNING event_id, generation, dispatched_at`,
   ).bind(input.lineAccountId, input.friendId, input.eventId, now, cutoff)
-    .first<{ event_id: string; generation: number }>();
+    .first<{ event_id: string; generation: number; dispatched_at: string | null }>();
   // 他人の予約が生きている（DO UPDATE の WHERE が偽）ときは行が返らない。
-  if (!won || won.event_id !== input.eventId) return { held: false, generation: 0 };
-  return { held: true, generation: won.generation };
+  if (!won || won.event_id !== input.eventId) {
+    return { held: false, generation: 0, previousDispatchUnknown: false };
+  }
+  /*
+   * 奪い直したときに前の持ち主の「送り始めた」印が残っていたら、
+   * その実行は送ったかもしれない。予約は持てても送らない。
+   * DO UPDATE で dispatched_at を触らないのは、この判断のために残すため。
+   */
+  return {
+    held: true,
+    generation: won.generation,
+    previousDispatchUnknown: won.dispatched_at != null,
+  };
 }
 
 /**
- * 今も予約の持ち主か。event_id と generation の両方が合ったときだけ true。
- * 回収で世代が進んでいたら古い持ち主として false。
- * 読めないときは投げる。呼ぶ側は送らない（fail-closed）。
+ * まだ予約の持ち主かを確かめ、**同じ1文で貸出期限を延ばす**（heartbeat）。
+ *
+ * 外部送信の直前に必ず通す。確認と延長を別の文に分けると、確認して
+ * から送っている最中に期限切れとみなされ、別の実行に奪われる。奪った側も
+ * 送るため、同じ人に2通届く。TTL より長くかかる送信でも、この1文を
+ * くぐるたびに期限が延びるので奪われない。
+ *
+ * 戻り値 false は「もう持ち主ではない」。呼ぶ側は外部効果を行わない。
  */
-export async function isFriendAddSendRightHolder(
+export async function touchFriendAddSendClaim(
   db: D1Database,
-  input: { lineAccountId: string; friendId: string; eventId: string; generation: number },
+  input: {
+    lineAccountId: string; friendId: string; eventId: string;
+    generation: number; now?: string;
+    /**
+     * これから外部へ送る場合は true。予約に「送り始めた」印を立てる。
+     * 途中で消えても、奪った側がこの印を見て送らないようにするため。
+     * DBだけを触る効果（登録・アクション）では立てない。
+     */
+    markDispatching?: boolean;
+  },
 ): Promise<boolean> {
   if (!Number.isInteger(input.generation) || input.generation < 1) return false;
-  const row = await db.prepare(
-    `SELECT event_id, generation FROM friend_add_send_claims
-      WHERE line_account_id = ? AND friend_id = ?`,
-  ).bind(input.lineAccountId, input.friendId).first<{ event_id: string; generation: number }>();
-  return !!row && row.event_id === input.eventId && row.generation === input.generation;
+  const now = input.now ?? jstNow();
+  const result = await db.prepare(
+    `UPDATE friend_add_send_claims
+        SET claimed_at = ?,
+            dispatched_at = CASE WHEN ? = 1 THEN COALESCE(dispatched_at, ?) ELSE dispatched_at END
+      WHERE line_account_id = ? AND friend_id = ? AND event_id = ? AND generation = ?`,
+  ).bind(
+    now, input.markDispatching ? 1 : 0, now,
+    input.lineAccountId, input.friendId, input.eventId, input.generation,
+  ).run();
+  return (result.meta?.changes ?? 0) === 1;
 }
 
 /**

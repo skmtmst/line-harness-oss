@@ -5,6 +5,12 @@
 -- partial_failed）の確定まで掴んだままにし、確定できなかったときは掴んだまま
 -- 残す（送達不明）。並行する実行は引くため、外部送信のあとDBが落ちても
 -- 別の実行が二重に送らない。処理が終われば予約を消す。
+--
+-- dispatched_at は「外部へ送り始めた」印。送信のひとつ手前で立て、
+-- 回収（奪い直し）のときも消さない。前の持ち主が送信の途中で消えた場合、
+-- 奪った側はこの印を見て**送らない**。印が残っているということは
+-- 「送ったかもしれない」であり、送り直すと同じ人へ2通届く。
+-- 正常に終われば予約ごと消えるので、印も残らない。
 
 CREATE TABLE IF NOT EXISTS friend_add_send_claims (
   line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
@@ -12,6 +18,7 @@ CREATE TABLE IF NOT EXISTS friend_add_send_claims (
   event_id        TEXT NOT NULL,
   generation      INTEGER NOT NULL DEFAULT 1 CHECK (generation >= 1),
   claimed_at      TEXT NOT NULL,
+  dispatched_at   TEXT,
   PRIMARY KEY (line_account_id, friend_id)
 );
 

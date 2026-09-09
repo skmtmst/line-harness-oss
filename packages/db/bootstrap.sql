@@ -2076,6 +2076,7 @@ CREATE TABLE friend_add_send_claims (
   event_id        TEXT NOT NULL,
   generation      INTEGER NOT NULL DEFAULT 1 CHECK (generation >= 1),
   claimed_at      TEXT NOT NULL,
+  dispatched_at   TEXT,
   PRIMARY KEY (line_account_id, friend_id)
 );
 
