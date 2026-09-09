@@ -2180,6 +2180,14 @@ events.post('/api/events/admin/events/:id/bookings/:bookingId/cancel', requireRo
       }
       throw error;
     }
+    // 初回の取消確定後に待機者ジョブ登録だけ失敗しても、
+    // 同じ取消要求の再送で復旧する。source_key が重複登録を吸収する。
+    await enqueueEventWaitlistPromotion(c.env.DB, {
+      lineAccountId: booking.line_account_id,
+      eventId: booking.event_id,
+      occurrenceId: booking.slot_id,
+      sourceKey: `booking:${booking.id}:cancelled`,
+    });
     return c.json({ ok: true });
   }
   if (!canTransition(booking.status as never, 'cancel')) return bad(c, 'invalid_state', 409);

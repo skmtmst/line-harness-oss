@@ -1,11 +1,11 @@
 /**
  * N-065追補 (#654) の回帰テスト。3点の部分失敗を本物に近い形で固定する。
  *
- * - 取消と送信claimの原子化: live確認と取消UPDATEの間に別接続からclaimが
- *   割り込むと、0件成功にせず REMINDER_SEND_IN_FLIGHT を投げる。
+ * - 取消と送信claimの原子化: live確認後に別接続で実claim・最終verifyが
+ *   割り込んでも、取消を成功させず送信権を守る。
  * - Calendar台帳の初期DB失敗: 先行登録の失敗は落とさず、再送で回復する。
  *   行さえあればcronも拾える。
- * - event却下の再送: 待機者ジョブの再登録を受け付け、二重登録しない。
+ * - event却下・管理者取消の再送: 待機者ジョブを復旧し、二重登録しない。
  *
  * 1ファイルで2接続 (route側と割込み/cron側) を同じDBファイルに張る。
  * 外部 LINE・Google へは送らない。
@@ -18,7 +18,11 @@ import Database from 'better-sqlite3';
 import { Hono } from 'hono';
 import { describe, expect, it, vi } from 'vitest';
 
-import { cancelV6RemindersForSource } from '@line-crm/db';
+import {
+  cancelV6RemindersForSource,
+  claimReminderDeliveryRun,
+  verifyClaimedRunBeforeSend,
+} from '@line-crm/db';
 import type { Env } from '../index.js';
 import { processPendingCalendarDeleteOperations } from '../services/booking-calendar-sync.js';
 
@@ -161,7 +165,7 @@ function seedDeliveryRun(
 }
 
 describe('取消と送信claimの原子化 (#654-1)', () => {
-  it('確認後に別接続からclaimが割り込むと0件成功にせず投げる', async () => {
+  it('実claim→最終verify後の取消割込みは409相当で拒否し、push権を守る', async () => {
     const dual = openDualDb();
     try {
       seedAccountsAndFriends(dual.raw1);
@@ -170,28 +174,48 @@ describe('取消と送信claimの原子化 (#654-1)', () => {
           (id, friend_id, reminder_id, target_date, status, source_kind, source_id, source_event_id)
         VALUES ('FR-1','f1','rb-rule','2026-09-20T01:00:00.000Z','active','booking','B1','B1');
       `);
-      // live確認を通ってから、取消UPDATEの前に別接続が送信権を取る。
-      // 旧実装は行単位の除外で取消0件を成功扱いし、取消確定後の送信が起きた。
-      // 新実装は選んだ行を無条件で止め、割込み貸出は claim 時・送信直前の
-      // active 確認で送らせない (all-or-none)。
-      const done = await cancelV6RemindersForSource(dual.db1, {
+      const pushMessageWithRequestId = vi.fn(async (..._args: unknown[]) => ({ requestId: 'REQ-1' }));
+      let finalVerifyPassed = false;
+      // 取消側が対象選択・live COUNT=0を済ませた後に、別接続の
+      // 実配信プロトコルで claim と最終verifyを通す。取消がここから
+      // 成功すると、その後のLINE pushが「取消確定後の送信」になる。
+      const cancellation = cancelV6RemindersForSource(dual.db1, {
         sourceId: 'B1',
         sourceEventId: 'B1',
         cancelReason: 'test',
         now: '2026-09-10T00:00:00.000Z',
         failOnSendInFlight: true,
         beforeFlip: async () => {
-          seedDeliveryRun(dual.raw2);
+          const run = await claimReminderDeliveryRun(dual.db2, {
+            lineAccountId: 'acc1',
+            reminderId: 'rb-rule',
+            friendReminderId: 'FR-1',
+            friendId: 'f1',
+            reminderStepId: 'rb-step',
+            scheduledAt: '2026-09-09T23:00:00.000Z',
+            now: '2026-09-10T00:00:00.000Z',
+            leaseExpiresAt: '2026-09-10T00:05:00.000Z',
+          });
+          expect(run).not.toBeNull();
+          finalVerifyPassed = await verifyClaimedRunBeforeSend(dual.db2, {
+            id: run!.id,
+            friendReminderId: 'FR-1',
+            now: '2026-09-10T00:00:00.000Z',
+            leaseExpiresAt: '2026-09-10T00:05:00.000Z',
+          });
         },
       });
-      expect(done.cancelledEnrollments).toBe(1);
+      await expect(cancellation).rejects.toThrow('REMINDER_SEND_IN_FLIGHT');
+      expect(finalVerifyPassed).toBe(true);
+      // 取消が拒否された後だけ、最終verify済みの送信権を使える。
+      await pushMessageWithRequestId('U1', [{ type: 'text', text: 'ご来店をお待ちしています' }], 'retry-1');
+      expect(pushMessageWithRequestId).toHaveBeenCalledOnce();
       expect(dual.raw1.prepare(
         `SELECT status FROM friend_reminders WHERE id = 'FR-1'`,
-      ).get()).toEqual({ status: 'cancelled' });
-      // 割込みの貸出も止まり、送られない。
+      ).get()).toEqual({ status: 'active' });
       expect(dual.raw1.prepare(
-        `SELECT status FROM reminder_delivery_runs WHERE id = 'RUN-1'`,
-      ).get()).toEqual({ status: 'cancelled' });
+        `SELECT status FROM reminder_delivery_runs WHERE friend_reminder_id = 'FR-1'`,
+      ).get()).toEqual({ status: 'claimed' });
     } finally {
       dual.cleanup();
     }
@@ -209,8 +233,8 @@ describe('取消と送信claimの原子化 (#654-1)', () => {
       `);
       // 1件だけに割込みclaimが入る。旧実装は行単位の除外で割込み行だけ残し、
       // 1件止まった成功で残るactive+claimedを抱えたまま成功した。
-      // 新実装は両方止め、割込み貸出も送らせない。
-      const done = await cancelV6RemindersForSource(dual.db1, {
+      // 新実装は取消の一部確定を戻し、両方activeのまま再試行させる。
+      const cancellation = cancelV6RemindersForSource(dual.db1, {
         sourceId: 'B1',
         cancelReason: 'test',
         now: '2026-09-10T00:00:00.000Z',
@@ -219,16 +243,16 @@ describe('取消と送信claimの原子化 (#654-1)', () => {
           seedDeliveryRun(dual.raw2, { id: 'RUN-2', friend_reminder_id: 'FR-2' });
         },
       });
-      expect(done.cancelledEnrollments).toBe(2);
+      await expect(cancellation).rejects.toThrow('REMINDER_SEND_IN_FLIGHT');
       expect(dual.raw1.prepare(
         `SELECT status FROM friend_reminders WHERE id = 'FR-1'`,
-      ).get()).toEqual({ status: 'cancelled' });
+      ).get()).toEqual({ status: 'active' });
       expect(dual.raw1.prepare(
         `SELECT status FROM friend_reminders WHERE id = 'FR-2'`,
-      ).get()).toEqual({ status: 'cancelled' });
+      ).get()).toEqual({ status: 'active' });
       expect(dual.raw1.prepare(
         `SELECT status FROM reminder_delivery_runs WHERE id = 'RUN-2'`,
-      ).get()).toEqual({ status: 'cancelled' });
+      ).get()).toEqual({ status: 'claimed' });
     } finally {
       dual.cleanup();
     }
@@ -729,6 +753,54 @@ function seedLiffCancelTarget(raw: Database.Database) {
     VALUES ('LEG-l1','eb-l1','day_before','2099-05-31T10:00:00.000Z','pending',0);
   `);
 }
+
+describe('管理者イベント取消の待機者再登録 (再審査-3)', () => {
+  it('初回のenqueue失敗を同じ取消要求の再送で復旧する', async () => {
+    const dual = openDualDb();
+    try {
+      seedLiffCancelTarget(dual.raw1);
+      const cancel = (db: D1Database) => {
+        const { app, env } = makeEventsApp(db);
+        return app.request(
+          '/api/events/admin/events/ev-9/bookings/eb-l1/cancel?account_id=account-9',
+          { method: 'POST' },
+          env,
+        );
+      };
+      let failOnce = true;
+      const faulty = dual.faultyDb1((sql) =>
+        sql.includes('INSERT OR IGNORE INTO event_waitlist_promotion_jobs') && failOnce
+          ? (failOnce = false, true)
+          : false,
+      );
+
+      const failed = await cancel(faulty);
+      expect(failed.status).toBe(500);
+      expect(dual.raw1.prepare(
+        `SELECT status FROM event_bookings WHERE id = 'eb-l1'`,
+      ).get()).toEqual({ status: 'cancelled' });
+      expect(dual.raw1.prepare(
+        `SELECT COUNT(*) AS c FROM event_waitlist_promotion_jobs
+          WHERE source_key = 'booking:eb-l1:cancelled'`,
+      ).get()).toEqual({ c: 0 });
+
+      const retried = await cancel(dual.db1);
+      expect(retried.status).toBe(200);
+      expect(dual.raw1.prepare(
+        `SELECT status FROM event_waitlist_promotion_jobs
+          WHERE source_key = 'booking:eb-l1:cancelled'`,
+      ).get()).toEqual({ status: 'pending' });
+
+      expect((await cancel(dual.db1)).status).toBe(200);
+      expect(dual.raw1.prepare(
+        `SELECT COUNT(*) AS c FROM event_waitlist_promotion_jobs
+          WHERE source_key = 'booking:eb-l1:cancelled'`,
+      ).get()).toEqual({ c: 1 });
+    } finally {
+      dual.cleanup();
+    }
+  });
+});
 
 describe('LIFF本人取消の両分岐strict fence (再審査-2)', () => {
   it('初回も再送も貸出中は409で巻き戻し、再試行で取消せる', async () => {
