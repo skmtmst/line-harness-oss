@@ -12,8 +12,37 @@
 
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { createLoadGeneration, filterSendableTemplates } from '@/lib/template-send-scope'
 import { scenarioReferenceData } from './scenario-reference-data'
+
+interface SendableTemplateCandidate {
+  accountId?: string | null
+  publishedVersion?: number | null
+  publishedAt?: string | null
+}
+
+/** 公開済みかつ選択中アカウントの候補だけを、元の順番で返す。 */
+export function filterSendableTemplates<T extends SendableTemplateCandidate>(
+  templates: T[],
+  selectedAccountId?: string | null,
+): T[] {
+  return templates.filter((template) => {
+    if (template.publishedAt === null || template.publishedVersion === 0) return false
+    return !selectedAccountId
+      || template.accountId === selectedAccountId
+  })
+}
+
+/** 遅れて返った古い読み込み結果を描画しないための世代番号。 */
+export function createLoadGeneration() {
+  let current = 0
+  return {
+    next: () => {
+      current += 1
+      return current
+    },
+    isCurrent: (generation: number) => generation === current,
+  }
+}
 
 export interface CarouselTemplate {
   id: string

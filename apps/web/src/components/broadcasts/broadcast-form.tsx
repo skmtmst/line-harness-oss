@@ -37,7 +37,6 @@ import {
   type TargetMode,
 } from '@/lib/broadcast-audience'
 import type { SegmentCondition } from '@/lib/segment-condition'
-import { createLoadGeneration, filterSendableTemplates } from '@/lib/template-send-scope'
 import { newBroadcastDraftSession, persistBroadcastDraft } from '@/lib/broadcast-draft'
 import ConditionBuilder from '@/components/shared/condition-builder'
 import SegmentPresetControls from '@/components/broadcasts/segment-preset-controls'
@@ -48,7 +47,10 @@ import MessageKindFields, {
   type MessageKind,
   type MessageKindState,
 } from '@/components/scenarios/message-kind-fields'
-import CarouselPicker from '@/components/scenarios/carousel-picker'
+import CarouselPicker, {
+  createLoadGeneration,
+  filterSendableTemplates,
+} from '@/components/scenarios/carousel-picker'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Button from '@/components/shared/button'
 import BroadcastStepRail from '@/components/broadcasts/broadcast-step-rail'
