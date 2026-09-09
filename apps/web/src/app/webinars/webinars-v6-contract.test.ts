@@ -53,7 +53,7 @@ describe('V6 ウェビナー一覧の契約', () => {
 
   it('選択中のLINEアカウントだけを読み、新規作成にも所属を保存する', () => {
     expect(PAGE).toContain('webinarApi.list(accountId, {')
-    expect(PAGE).toContain('requestGeneration.current !== generation')
+    expect(PAGE).toContain('currentGeneration: () => requestGeneration.current')
     expect(PAGE).toContain('loadedAccountId === selectedAccountId ? items : []')
     expect(PAGE).toContain('folderRequestGeneration.current === generation')
     expect(PAGE).toContain('上のバーでLINE公式アカウントを選んでください')
@@ -63,7 +63,7 @@ describe('V6 ウェビナー一覧の契約', () => {
   it('一覧は頁ごとに取り、取った頁を絞り直さない', () => {
     expect(PAGE).toContain("import Pagination from '@/components/shared/pagination'")
     expect(PAGE).toContain('limit: pageSize')
-    expect(PAGE).toContain('q: query.trim() || undefined')
+    expect(PAGE).toContain('q: debouncedQuery.trim() || undefined')
     expect(PAGE).toContain('folder: selectedFolder || undefined')
     expect(PAGE).toContain('sort: sortKey')
     expect(PAGE).toContain('!Array.isArray(res.data.items) || typeof res.data.total !==')
@@ -80,11 +80,11 @@ describe('V6 ウェビナー一覧の契約', () => {
     expect(FAILURE).toContain('ウェビナーを表示できませんでした')
     expect(FAILURE).toContain('通信状態を確認して、もう一度読み込んでください。')
     expect(PAGE).not.toContain('e instanceof Error ? e.message')
-    expect(PAGE).toContain('onClick={() => void refresh()}')
+    expect(PAGE).toContain('onRetry={() => void refresh()}')
     expect(PAGE).toContain('もう一度読み込む')
     /* 失敗の1枚と、空の1枚が別であること。 */
-    expect(PAGE).toContain(') : loadFailure ? (')
-    expect(PAGE).toContain(') : visibleItems.length === 0 ? (')
+    expect(PAGE).toContain('if (loadFailure)')
+    expect(PAGE).toContain('if (visibleItems.length === 0)')
   })
 
   it('物理削除ではなく履歴を残すアーカイブ確認を使う', () => {
