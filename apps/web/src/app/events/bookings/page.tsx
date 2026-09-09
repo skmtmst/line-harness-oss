@@ -55,6 +55,23 @@ function formatJp(iso: string | null | undefined, fallback: string): string {
   })
 }
 
+/**
+ * 記録の宛先。**押した時点のLINEアカウントとイベントを鍵に含める。**
+ * 予約IDだけで数えると、切り替えたあとの画面でも同じ鍵になり、前の
+ * アカウントへ投げた更新が今の行の状態として扱われる。
+ */
+function bookingScopeKey(accountId: string | null, eventId: string | null): string {
+  return JSON.stringify([accountId, eventId])
+}
+
+function bookingActionKey(accountId: string, eventId: string, bookingId: string): string {
+  return JSON.stringify([accountId, eventId, bookingId])
+}
+
+/** 切替のたびに新しい入れ物を作らないための空。中身は書き換えない。 */
+const EMPTY_MARKING_KEYS: ReadonlySet<string> = new Set<string>()
+const EMPTY_MARK_ERRORS: Record<string, string> = {}
+
 function BookingsInner() {
   const params = useSearchParams()
   const eventId = params.get('id')
@@ -76,9 +93,63 @@ function BookingsInner() {
   const [loadStatus, setLoadStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [busy, setBusy] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
+  const [markingKeys, setMarkingKeys] = useState<ReadonlySet<string>>(() => new Set())
+  const [markErrors, setMarkErrors] = useState<Record<string, string>>({})
+  /*
+   * 画面更新を待たずに同じ行の二度押しを止める。state だけでは、最初の
+   * click の再描画より先に二度目の click が入り、2本ともAPIへ届く。
+   */
+  const markingKeysRef = useRef(new Set<string>())
+  const markRequestRef = useRef(new Map<string, number>())
+  /*
+   * 送った順に番号を振る。行ごとの数え上げだと、切り替えて戻ってから
+   * 同じ行を押し直したときに番号が振り出しへ戻り、**まだ返ってきて
+   * いない前の応答が「最新」に見える。**
+   */
+  const markSeqRef = useRef(0)
+  /*
+   * 記録の世代。アカウントかイベントが変わるたびに上げ、**切替前に
+   * 押した更新の応答を、成功でも失敗でも画面へ書かせない。**
+   */
+  const markGenerationRef = useRef(0)
+  /** 今どのアカウントの、どのイベントを見ているか。応答の照合に使う。 */
+  const scopeRef = useRef(bookingScopeKey(selectedAccountId, eventId))
   /** 切り替え前の遅い応答を、次のイベント・次の絞り込みの一覧へ混ぜない。 */
   const loadRequestRef = useRef(0)
   const summaryRequestRef = useRef(0)
+
+  /*
+   * **アカウント・イベントを切り替えたら、進行中の記録を失効させる。**
+   *
+   * Aで「参加済」を押したまま切り替えてBを表示し、そのあとAの更新が
+   * 成功で返ると、前は行の書き換えと再取得・集計がそのまま走り、
+   * **Bの画面へAの予約者と件数が入り込んだ。** 誰の予約を見ているのか
+   * 分からないまま、Bの承認待ちを見落とす。世代を上げて、旧アカウント
+   * の応答には一切書かせない。
+   *
+   * **描いている時点で失効させる。** これを `useEffect` に置くと、
+   * Bを描き終えてから後片付けが動くまでの隙間ができる。**その隙間で
+   * Aの応答が返ると、まだAのままの宛先を「今の宛先」と読んでしまい、
+   * 行の書き換えとAの取り直しへ進む。** 描画のたびに宛先を見て、
+   * 変わっていれば同じ描画のうちに世代を上げる。
+   */
+  const scope = bookingScopeKey(selectedAccountId, eventId)
+  if (scopeRef.current !== scope) {
+    scopeRef.current = scope
+    markGenerationRef.current += 1
+    markRequestRef.current.clear()
+    markingKeysRef.current.clear()
+  }
+  /*
+   * 行の「記録中…」と失敗文も、Bを画面へ出す前に畳む。描画中に
+   * 直すので、切替後の最初の絵から前のアカウントの操作跡が消える。
+   */
+  const [markScope, setMarkScope] = useState(scope)
+  if (markScope !== scope) {
+    setMarkScope(scope)
+    setMarkingKeys(EMPTY_MARKING_KEYS)
+    setMarkErrors(EMPTY_MARK_ERRORS)
+  }
   /*
    * **ブラウザの `confirm()` を使わない。**
    *
@@ -105,6 +176,12 @@ function BookingsInner() {
   const refreshList = useCallback(async () => {
     if (!selectedAccountId || !eventId) return
     const requestId = ++loadRequestRef.current
+    /*
+      **番号だけでは足りない。** 切り替え前に押した記録の成功から
+      呼ばれると、この取得自体が古い宛先のまま最新の番号を取り、
+      **今の画面へ前のアカウントの一覧を書き込む。** 番号を見たあと、
+      始めた時点の宛先(`scope`)と今の宛先も照らし合わせる。
+    */
     setLoadStatus('loading')
     setActionError(null)
     try {
@@ -116,6 +193,7 @@ function BookingsInner() {
         limit: PAGE_SIZE,
       })
       if (requestId !== loadRequestRef.current) return
+      if (scopeRef.current !== scope) return
       /*
         **器の形を確かめてから入れる。** `items` が無い返事をそのまま
         入れると、下の `filter` で**画面ごと落ちる。** 取れなかったのと
@@ -127,6 +205,7 @@ function BookingsInner() {
       setLoadStatus('ready')
     } catch {
       if (requestId !== loadRequestRef.current) return
+      if (scopeRef.current !== scope) return
       /*
         **数を持ち越さない。** 前の絞り込みの行を残したまま失敗を出すと、
         古い数の上に「取れませんでした」が乗って、どちらが本当か読めない。
@@ -135,7 +214,7 @@ function BookingsInner() {
       setBookingsTotal(0)
       setLoadStatus('error')
     }
-  }, [selectedAccountId, eventId, tab, page])
+  }, [selectedAccountId, eventId, scope, tab, page])
 
   // 詳細はイベント/アカウント変更時のみ取り直す(点検#520軽13)。
   // 待ち列の件数は概要(summary)から取るようになったため、ここでは読まない。
@@ -151,12 +230,14 @@ function BookingsInner() {
       */
       const evRes = await eventsApi.getEvent(selectedAccountId, eventId)
       if (requestId !== loadRequestRef.current) return
+      if (scopeRef.current !== scope) return
       setEvent((current) => (typeof evRes?.name === 'string' ? evRes : current))
     } catch {
       if (requestId !== loadRequestRef.current) return
+      if (scopeRef.current !== scope) return
       setEvent(null)
     }
-  }, [selectedAccountId, eventId])
+  }, [selectedAccountId, eventId, scope])
 
   const refresh = useCallback(async () => {
     await refreshMeta()
@@ -182,16 +263,18 @@ function BookingsInner() {
         eventsApi.getBookingSummary(selectedAccountId, eventId),
       ])
       if (requestId !== summaryRequestRef.current) return
+      if (scopeRef.current !== scope) return
       setEvent(eventRes)
       setSummary(summaryRes)
       setSummaryStatus('ready')
     } catch {
       if (requestId !== summaryRequestRef.current) return
+      if (scopeRef.current !== scope) return
       setEvent(null)
       setSummary(null)
       setSummaryStatus('error')
     }
-  }, [selectedAccountId, eventId])
+  }, [selectedAccountId, eventId, scope])
 
   useEffect(() => {
     void refreshSummary()
@@ -275,16 +358,63 @@ function BookingsInner() {
     }
   }
 
+  /**
+   * 来場・不参加を記録する。
+   *
+   * **宛先を押した時点で固定する。** `selectedAccountId` は待っている間に
+   * 変わるので、更新の送信先も、返ってきたあとの照合も、押した時点の
+   * 値で行う。返事が届いたら、行の書き換え・一覧の取り直し・集計の
+   * 取り直しの**どれを行う前にも**、押した時点の宛先と世代が今も
+   * 生きているかを確かめる。**旧アカウントの成功をBの画面へ
+   * 書き込ませない。**
+   */
   async function markStatus(id: string, status: 'attended' | 'no_show') {
-    if (!selectedAccountId || !eventId) return
-    setBusy(true)
+    const accountId = selectedAccountId
+    if (!accountId || !eventId) return
+    // `scope` は今描いている宛先。押した時点の値をそのまま持ち回る。
+    const startedScope = scope
+    const actionKey = bookingActionKey(accountId, eventId, id)
+    if (markingKeysRef.current.has(actionKey)) return
+    const generation = markGenerationRef.current
+    const requestId = ++markSeqRef.current
+    markRequestRef.current.set(actionKey, requestId)
+    markingKeysRef.current.add(actionKey)
+    setMarkingKeys(new Set(markingKeysRef.current))
+    setMarkErrors((current) => {
+      if (!(actionKey in current)) return current
+      const next = { ...current }
+      delete next[actionKey]
+      return next
+    })
+    const isCurrent = () => (
+      markGenerationRef.current === generation
+      && scopeRef.current === startedScope
+      && markRequestRef.current.get(actionKey) === requestId
+    )
     try {
-      await eventsApi.updateBooking(selectedAccountId, eventId, id, { status })
+      await eventsApi.updateBooking(accountId, eventId, id, { status })
+      if (!isCurrent()) return
+      setItems((current) => current.map((booking) => (
+        booking.id === id ? { ...booking, status } : booking
+      )))
+      /*
+        `refresh` と `refreshSummary` は押した時点のアカウントを掴んで
+        いる。切り替わったあとに呼ぶと、**前のアカウントの一覧と件数を
+        取りに行き、今の画面へ入れてしまう。** 呼ぶ直前にもう一度見る。
+      */
+      if (!isCurrent()) return
       await Promise.all([refresh(), refreshSummary()])
     } catch {
-      setActionError('来場・不参加の記録を変えられませんでした。一覧を読み直してから、もう一度お試しください。')
+      if (!isCurrent()) return
+      setMarkErrors((current) => ({
+        ...current,
+        [actionKey]: '来場・不参加の記録を変えられませんでした。一覧を読み直してから、もう一度お試しください。',
+      }))
     } finally {
-      setBusy(false)
+      if (isCurrent()) {
+        markingKeysRef.current.delete(actionKey)
+        setMarkingKeys(new Set(markingKeysRef.current))
+      }
     }
   }
 
@@ -456,6 +586,10 @@ function BookingsInner() {
                   {items.map((b) => {
                     const acct = accounts.find((a) => a.id === b.line_account_id)
                     const friendName = b.friend_display_name ?? b.friend_name
+                    const actionKey = selectedAccountId
+                      ? bookingActionKey(selectedAccountId, eventId, b.id)
+                      : ''
+                    const marking = markingKeys.has(actionKey)
                     const accountLabel = acct
                       ? `${acct.country ? acct.country + ' ' : ''}${acct.name}`
                       : b.line_account_name
@@ -512,18 +646,22 @@ function BookingsInner() {
                         {b.status === 'confirmed' && (
                           <div className="ml-2 inline-flex gap-1.5">
                             <button
+                              data-booking-id={b.id}
+                              data-booking-action="attended"
                               onClick={() => markStatus(b.id, 'attended')}
-                              disabled={busy}
+                              disabled={busy || marking}
                               className="bg-accent-deep text-on-accent rounded-control px-3 py-1 text-xs font-medium hover:brightness-95 disabled:opacity-50"
                             >
-                              参加済
+                              {marking ? '記録中…' : '参加済'}
                             </button>
                             <button
+                              data-booking-id={b.id}
+                              data-booking-action="no_show"
                               onClick={() => markStatus(b.id, 'no_show')}
-                              disabled={busy}
+                              disabled={busy || marking}
                               className="bg-danger text-on-accent rounded-control px-3 py-1 text-xs font-medium hover:brightness-95 disabled:opacity-50"
                             >
-                              無断
+                              {marking ? '記録中…' : '無断'}
                             </button>
                             <button
                               data-qa-open="i5SN2j-cancel"
@@ -537,6 +675,11 @@ function BookingsInner() {
                             >
                               キャンセル
                             </button>
+                            {markErrors[actionKey] && (
+                              <span className="text-danger block max-w-64 text-left text-xs" role="alert">
+                                {markErrors[actionKey]}
+                              </span>
+                            )}
                           </div>
                         )}
                       </td>
