@@ -24,7 +24,12 @@ describe('点検・中: テンプレートの画面契約', () => {
     for (const page of [EDIT, CAROUSEL]) {
       expect(page).toContain('読み込めませんでした。開き直してください')
       expect(page).toContain('loadFailed')
-      expect(page).toContain('disabled={saving || loadFailed}')
+      /*
+       * 止める理由は増える（例: 所属アカウントとの食い違い）。
+       * 完全一致で見張ると、理由を足しただけで落ちる。**「読み込めて
+       * いないときに保存を止めている」ことだけを見る。**
+       */
+      expect(page).toContain('disabled={saving || loadFailed')
     }
   })
 

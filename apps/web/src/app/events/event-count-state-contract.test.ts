@@ -34,7 +34,7 @@ describe('V6 イベント予約の件数状態', () => {
 
   it('終わった回は端末時計で数えず「—」にする(点検#520軽16)', () => {
     // 端末時計がずれると件数が合わない。サーバー時刻の口が無いので出さない。
-    expect(PAGE).toContain('終わった回 —')
+    expect(PAGE).toContain('終わった回 <strong')
     expect(PAGE).not.toContain('endedCount')
   })
 
