@@ -86,6 +86,14 @@ describe('V6 顧客へのお知らせの寸法', () => {
 
   it('EC通知の既定設定も選択中のLINEアカウントに限定して読み書きする', () => {
     expect(PAGE).toContain('api.ecCommerce.settings(selectedAccountId)')
-    expect(PAGE).toContain('api.ecCommerce.updateSetting(selectedAccountId, setting.eventType')
+    // 書き込みは呼び出し口へ渡したアカウントだけに向ける。渡す側は選択中のアカウントを掴む。
+    expect(PAGE).toContain('args.api.updateSetting(args.accountId, setting.eventType')
+    expect(PAGE).toContain('const accountId = selectedAccountId')
+  })
+
+  it('保存・公開の応答は、返った時点のアカウント世代でしか画面へ書かない', () => {
+    expect(PAGE).toContain('const stale = () => args.generation !== args.currentGeneration()')
+    expect(PAGE).toContain('currentGeneration: () => loadGeneration.current')
+    expect(PAGE).toContain("if (outcome.kind === 'stale' || generation !== loadGeneration.current) return")
   })
 })
