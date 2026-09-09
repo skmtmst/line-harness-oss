@@ -1027,10 +1027,12 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   }
 
   const handleSelectChat = (chatId: string) => {
-    // 手選びはURL指定を上書きする。古い案内を残さない(#673)。
+    // 手選びはURL指定を上書きする。古い案内とURL状態を残さない。
+    // friend / thread を残すと、再読込で手選び前の会話へ戻る(#673)。
     deepLinkIdRef.current = null
     setDeepLinkNotice('')
     setSelectedChatId(chatId)
+    router.replace(channel === 'all' ? '/chats' : `/chats?channel=${channel}`)
     // 既読はログイン中の担当者だけに反映する。対応状況は変えない。
     setChats((prev) => prev.map((chat) => (
       chat.id === chatId ? { ...chat, isUnread: false } : chat
@@ -1683,12 +1685,14 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                       key={item.id}
                       onClick={() => {
                         // LINEの選択を外す。両方開いていると中央に何を
-                        // 出すのか決まらない。URL指定の案内も外す(#673)。
+                        // 出すのか決まらない。URL指定の案内とURL状態も外す。
+                        // friend を残すと、再読込で古いLINE会話へ戻る(#673)。
                         deepLinkIdRef.current = null
                         setDeepLinkNotice('')
                         setSelectedChatId(null)
                         setSelectedFriendId(null)
                         setSelectedThreadId(item.threadId)
+                        router.replace(channel === 'all' ? '/chats' : `/chats?channel=${channel}`)
                         setEmailItems((prev) => prev.map((email) => (
                           email.threadId === item.threadId ? { ...email, isUnread: false } : email
                         )))
@@ -1921,6 +1925,19 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
               onBack={() => setSelectedFriendId(null)}
               onSent={() => { setSelectedFriendId(null); loadChats(); }}
             />
+          ) : deepLinkNotice ? (
+            // URL指定の会話が開けなかったときの空状態。別人は開かず、
+            // 理由と戻り先だけ出す(#673)。不正IDではselectedChatIdがnullに
+            // なるため、通常の「選択してください」より先に判定する。
+            <div className="flex flex-1 items-center justify-center p-8">
+              <div className="max-w-md text-center">
+                <p className="text-ink text-sm font-semibold">会話を開けませんでした</p>
+                <p className="text-ink-secondary mt-2 text-sm leading-relaxed">{deepLinkNotice}</p>
+                <Button onClick={clearDeepLink} className="mt-4">
+                  受信箱の一覧へ戻る
+                </Button>
+              </div>
+            </div>
           ) : !selectedChatId ? (
             <div className="flex-1 flex items-center justify-center">
               <p className="text-ink-faint text-sm">チャットを選択してください</p>
@@ -2429,18 +2446,6 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                 </div>
               </div>
             </>
-          ) : deepLinkNotice ? (
-            // URL指定の会話が開けなかったときの空状態。別人は開かず、
-            // 理由と戻り先だけ出す(#673)。
-            <div className="flex flex-1 items-center justify-center p-8">
-              <div className="max-w-md text-center">
-                <p className="text-ink text-sm font-semibold">会話を開けませんでした</p>
-                <p className="text-ink-secondary mt-2 text-sm leading-relaxed">{deepLinkNotice}</p>
-                <Button onClick={clearDeepLink} className="mt-4">
-                  受信箱の一覧へ戻る
-                </Button>
-              </div>
-            </div>
           ) : null}
         </div>
 
