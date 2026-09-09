@@ -29,12 +29,12 @@ describe('N-381 見本タブは外部連携の中で開く', () => {
 
 describe('N-382 開始/停止の二重押しで意図と逆にならない', () => {
   test('送信中の行の再押下を受け付けない（受信・送信の2つ）', () => {
-    expect(source.match(/if \(togglingIdsRef\.current\.has\(id\)\) return/g)).toHaveLength(2)
-    expect(source.match(/togglingIdsRef\.current\.add\(id\)/g)).toHaveLength(2)
+    expect(source.match(/if \(togglingIdsRef\.current\.has\(key\)\) return/g)).toHaveLength(2)
+    expect(source.match(/togglingIdsRef\.current\.add\(key\)/g)).toHaveLength(2)
   })
 
   test('応答の成否にかかわらず送信中の印を外す（受信・送信の2つ）', () => {
-    expect(source.match(/togglingIdsRef\.current\.delete\(id\)/g)).toHaveLength(2)
+    expect(source.match(/togglingIdsRef\.current\.delete\(key\)/g)).toHaveLength(2)
     expect(source).toContain('finally')
   })
 
@@ -49,5 +49,7 @@ describe('N-382 開始/停止の二重押しで意図と逆にならない', () 
 
   test('行ごとに印を持つので他の行の操作は止めない', () => {
     expect(source).toContain('useRef<Set<string>>(new Set())')
+    expect(source).toContain('setToggleFailures((current) => ({')
+    expect(source).toContain('data-webhook-toggle-error={key}')
   })
 })

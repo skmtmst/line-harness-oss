@@ -17,6 +17,12 @@ import { MIN_SECRET_LENGTH, generateSecret } from './secret'
 
 type Tab = 'incoming' | 'outgoing'
 type LoadStatus = 'loading' | 'ready' | 'error'
+type ToggleKind = 'incoming' | 'outgoing'
+type ToggleFailure = { kind: ToggleKind; id: string; name: string; message: string }
+
+function toggleKey(kind: ToggleKind, id: string): string {
+  return `${kind}:${id}`
+}
 
 function isHttpsUrl(value: string): boolean {
   try {
@@ -125,6 +131,9 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
   const { selectedAccountId } = useAccount()
   const selectedAccountIdRef = useRef(selectedAccountId)
   selectedAccountIdRef.current = selectedAccountId
+  // 初回は AccountProvider が null → 保存済みアカウントの順で復元する。
+  // その復元を「利用者が切り替えた」と誤認せず、最後に表示した実アカウントだけを覚える。
+  const lastLoadedAccountIdRef = useRef<string | null>(null)
   const loadGenerationRef = useRef(0)
   /*
     開始/停止の送信中の行ID（N-382）。二重押しの2回目は受け付けない。
@@ -140,6 +149,8 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
   const [summaryStatus, setSummaryStatus] = useState<LoadStatus>('loading')
   const [loadedAccountId, setLoadedAccountId] = useState<string | null>(null)
   const [error, setError] = useState('')
+  // 一つの失敗を別行の成功で消さないよう、開始・停止の失敗だけは行ごとに持つ。
+  const [toggleFailures, setToggleFailures] = useState<Record<string, ToggleFailure>>({})
   const searchParams = useSearchParams()
   // 見本タブから `?source=` 付きで来たときだけ、受け取る設定の種類を先に選んでおく。
   // 知らない値は無視して空のままにする。
@@ -244,14 +255,20 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
   }, [selectedAccountId])
 
   useEffect(() => {
+    const accountChanged = lastLoadedAccountIdRef.current !== null
+      && lastLoadedAccountIdRef.current !== selectedAccountId
     loadGenerationRef.current += 1
     setCreatedSecret(null)
     setSecretCopied(false)
     setRotateTarget(null)
     setRotateSecretValue('')
-    setShowCreate(false)
-    setInForm({ name: '', sourceType: '', secret: '' })
-    setSourceIsOther(false)
+    if (accountChanged) {
+      setShowCreate(false)
+      setInForm({ name: '', sourceType: '', secret: '' })
+      setSourceIsOther(false)
+      setToggleFailures({})
+    }
+    if (selectedAccountId !== null) lastLoadedAccountIdRef.current = selectedAccountId
     void load()
   }, [load, selectedAccountId])
 
@@ -260,20 +277,44 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
     if (!requestAccountId || loadedAccountId !== requestAccountId) {
       return setError('LINEアカウントの一覧を読み直してください')
     }
+    const key = toggleKey('incoming', id)
     // 送信中の行の再押下は受け付けない。二重押しで止める→動かすと逆になる。
-    if (togglingIdsRef.current.has(id)) return
-    togglingIdsRef.current.add(id)
+    if (togglingIdsRef.current.has(key)) return
+    togglingIdsRef.current.add(key)
+    setToggleFailures((current) => {
+      if (!(key in current)) return current
+      const next = { ...current }
+      delete next[key]
+      return next
+    })
     try {
       const res = await api.webhooks.incoming.update(id, requestAccountId, { isActive: !currentActive })
       if (selectedAccountIdRef.current !== requestAccountId) return
       // 失敗時は一覧を変えず、次に何をすればよいか出す。成功時だけ読み直してサーバ状態へ寄せる。
-      if (!res.success) return setError(`切り替えできませんでした（${res.error}）。状態は変わっていません。確かめてから、もう一度お試しください。`)
+      if (!res.success) {
+        const name = incoming.find((item) => item.id === id)?.name ?? 'この受け取り口'
+        setToggleFailures((current) => ({
+          ...current,
+          [key]: {
+            kind: 'incoming', id, name,
+            message: '切り替えできませんでした。状態は変わっていません。確かめてから、もう一度お試しください。',
+          },
+        }))
+        return
+      }
       if (selectedAccountIdRef.current === requestAccountId) await load()
     } catch {
       if (selectedAccountIdRef.current !== requestAccountId) return
-      setError('切り替えに失敗しました。状態は変わっていません。時間をおいて、もう一度お試しください。')
+      const name = incoming.find((item) => item.id === id)?.name ?? 'この受け取り口'
+      setToggleFailures((current) => ({
+        ...current,
+        [key]: {
+          kind: 'incoming', id, name,
+          message: '切り替えに失敗しました。状態は変わっていません。時間をおいて、もう一度お試しください。',
+        },
+      }))
     } finally {
-      togglingIdsRef.current.delete(id)
+      togglingIdsRef.current.delete(key)
     }
   }
 
@@ -282,20 +323,44 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
     if (!requestAccountId || loadedAccountId !== requestAccountId) {
       return setError('LINEアカウントの一覧を読み直してください')
     }
+    const key = toggleKey('outgoing', id)
     // 送信中の行の再押下は受け付けない。二重押しで止める→動かすと逆になる。
-    if (togglingIdsRef.current.has(id)) return
-    togglingIdsRef.current.add(id)
+    if (togglingIdsRef.current.has(key)) return
+    togglingIdsRef.current.add(key)
+    setToggleFailures((current) => {
+      if (!(key in current)) return current
+      const next = { ...current }
+      delete next[key]
+      return next
+    })
     try {
       const res = await api.webhooks.outgoing.update(id, requestAccountId, { isActive: !currentActive })
       if (selectedAccountIdRef.current !== requestAccountId) return
       // 失敗時は一覧を変えず、次に何をすればよいか出す。成功時だけ読み直してサーバ状態へ寄せる。
-      if (!res.success) return setError(`切り替えできませんでした（${res.error}）。状態は変わっていません。確かめてから、もう一度お試しください。`)
+      if (!res.success) {
+        const name = outgoing.find((item) => item.id === id)?.name ?? 'この送り先'
+        setToggleFailures((current) => ({
+          ...current,
+          [key]: {
+            kind: 'outgoing', id, name,
+            message: '切り替えできませんでした。状態は変わっていません。確かめてから、もう一度お試しください。',
+          },
+        }))
+        return
+      }
       if (selectedAccountIdRef.current === requestAccountId) await load()
     } catch {
       if (selectedAccountIdRef.current !== requestAccountId) return
-      setError('切り替えに失敗しました。状態は変わっていません。時間をおいて、もう一度お試しください。')
+      const name = outgoing.find((item) => item.id === id)?.name ?? 'この送り先'
+      setToggleFailures((current) => ({
+        ...current,
+        [key]: {
+          kind: 'outgoing', id, name,
+          message: '切り替えに失敗しました。状態は変わっていません。時間をおいて、もう一度お試しください。',
+        },
+      }))
     } finally {
-      togglingIdsRef.current.delete(id)
+      togglingIdsRef.current.delete(key)
     }
   }
 
@@ -535,6 +600,16 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
           {error}
         </div>
       )}
+      {Object.entries(toggleFailures).map(([key, failure]) => (
+        <div
+          key={key}
+          role="alert"
+          data-webhook-toggle-error={key}
+          className="mb-4 p-4 bg-danger-bg border border-danger-bg rounded-lg text-danger text-sm"
+        >
+          「{failure.name}」を{failure.kind === 'incoming' ? '受け取る設定' : '送る設定'}：{failure.message}
+        </div>
+      ))}
 
       {/* Create forms */}
       {showCreate && tab === 'incoming' && (
