@@ -100,6 +100,35 @@ describe('getAvailability の実DB E2E（NY）', () => {
     expect(result.by_staff[0].slots.map((s) => s.start)).toEqual(['02:00']);
   });
 
+  test('UTC より遅れた店舗の夜の予約も、既存予約の取得範囲に入る', async () => {
+    // NY 10/10 21:00 は 10/11 01:00Z。暦日を UTC の 00:00 と見なして
+    // 前後 1 日を足す取り方だと `starts_at < 10/11 00:00Z` に当たらず、
+    // 埋まっているのに空き枠として出ていた（#651 の夜間二重予約）。
+    sqlite.exec(`
+      UPDATE staff_shifts SET start_time = '19:00', end_time = '23:00'
+       WHERE id = 'shift-ny-2';
+      INSERT INTO bookings
+        (id, line_account_id, friend_id, staff_id, menu_id, starts_at, ends_at,
+         block_ends_at, status, price_at_booking, requested_at)
+      VALUES
+        ('booking-night', 'account-ny', 'friend-ny', 'staff-ny', 'menu-other',
+         '2026-10-11T01:00:00.000Z', '2026-10-11T02:00:00.000Z',
+         '2026-10-11T02:00:00.000Z', 'confirmed', 5000,
+         '2026-10-01T00:00:00.000Z');
+    `);
+    const result = await getAvailability(db, {
+      lineAccountId: 'account-ny',
+      menuId: 'menu-ny',
+      from: '2026-10-10',
+      to: '2026-10-10',
+      now: new Date('2026-10-09T00:00:00Z'),
+      minLeadTimeMinutes: 0,
+    });
+    const starts = result.by_staff[0].slots.map((slot) => slot.start);
+    expect(starts).toEqual(['19:00', '19:30', '20:00', '22:00']);
+    expect(starts).not.toContain('21:00');
+  });
+
   test('店舗休業の例外日は実DBでも枠を出さない', async () => {
     sqlite.exec(`
       INSERT INTO booking_availability_exceptions

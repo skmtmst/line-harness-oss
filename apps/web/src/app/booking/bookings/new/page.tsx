@@ -30,27 +30,35 @@ const NODE_BY_STEP: Record<Step, string> = {
 }
 
 // 候補の instant 契約。サーバは各枠へ店舗 timezone と offset 付き instant を
-// 付ける。送信・表示は壁時刻の組み立て直しではなく instant を使う。
-// startUtc が無い形（映像確認の mock など）は従来の +09:00 組み立てへ落とす。
-function toUtcIso(date: string, time: string): string {
-  return new Date(`${date}T${time}:00+09:00`).toISOString()
+// 付ける。表示も送信も、壁時刻を組み立て直さずこの instant だけを使う。
+//
+// 以前は startUtc が無いときに、日付と時刻を JST 固定のずれで読み直して
+// いた。これは店舗が JST のときだけ正しい。America/New_York の 10:00 を
+// 9 時間進んだ場所として読むと前日 21:00 の instant になり、休業日・
+// 営業時間外・Google の予定を迂回した予約を送ってしまう。その退路は
+// 残さず、読めない候補は使わない（fail-closed）。
+function slotInstant(slot?: { startUtc?: string | null } | null): string | null {
+  const raw = slot?.startUtc
+  if (typeof raw !== 'string' || raw.trim() === '') return null
+  const ms = new Date(raw).getTime()
+  return Number.isFinite(ms) ? new Date(ms).toISOString() : null
 }
 
-function dateLabel(date: string, time: string, timeZone = 'Asia/Tokyo', startUtc?: string): string {
-  if (!date || !time) return '—'
-  return new Date(startUtc ?? toUtcIso(date, time)).toLocaleString('ja-JP', {
+function dateLabel(startUtc: string, timeZone = 'Asia/Tokyo'): string {
+  if (!startUtc) return '—'
+  return new Date(startUtc).toLocaleString('ja-JP', {
     year: 'numeric', month: 'long', day: 'numeric', weekday: 'short',
     hour: '2-digit', minute: '2-digit', timeZone,
   })
 }
 
 function timeRangeLabel(
-  date: string, time: string, minutes: number, timeZone = 'Asia/Tokyo', startUtc?: string, endUtc?: string,
+  startUtc: string, minutes: number, timeZone = 'Asia/Tokyo', endUtc?: string | null,
 ): string {
-  if (!date || !time) return '—'
-  const startsAt = new Date(startUtc ?? toUtcIso(date, time))
+  if (!startUtc) return '—'
+  const startsAt = new Date(startUtc)
   const endsAt = endUtc ? new Date(endUtc) : new Date(startsAt.getTime() + minutes * 60_000)
-  return `${dateLabel(date, time, timeZone, startsAt.toISOString())} 〜 ${endsAt.toLocaleTimeString('ja-JP', {
+  return `${dateLabel(startUtc, timeZone)} 〜 ${endsAt.toLocaleTimeString('ja-JP', {
     hour: '2-digit', minute: '2-digit', timeZone,
   })}`
 }
@@ -100,6 +108,8 @@ export default function NewProxyBookingPage() {
   const [result, setResult] = useState<ProxyBookingResult | null>(null)
   const [customerContext, setCustomerContext] = useState<BookingCustomerContext | null>(null)
   const [conflictAlternatives, setConflictAlternatives] = useState<BookingConflictAlternatives | null>(null)
+  // 確認へ進む直前に読み直した枠。ここから先の表示・送信はこれだけを使う。
+  const [confirmedSlot, setConfirmedSlot] = useState<BookingAvailabilitySlot | null>(null)
   const [reminderPreview, setReminderPreview] = useState<Array<{ kind: 'day_before' | 'hours_before'; scheduledAt: string }>>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -113,13 +123,15 @@ export default function NewProxyBookingPage() {
   const selectedStaff = staff.find((item) => item.id === staffId) ?? null
   const customerLabel = friend?.displayName ?? customer?.display_name ?? (customerName.trim() || 'お客様')
   const selectedSlot = slots.find((item) => item.date === date && item.start === time) ?? null
-  const slotTimeZone = selectedSlot?.timeZone ?? 'Asia/Tokyo'
-  const slotStartIso = selectedSlot?.startUtc ?? (date && time ? toUtcIso(date, time) : '')
-  const occupiedMinutes = selectedSlot?.startUtc && selectedSlot?.endUtc
-    ? (new Date(selectedSlot.endUtc).getTime() - new Date(selectedSlot.startUtc).getTime()) / 60_000
-    : selectedSlot
-      ? (new Date(`${date}T${selectedSlot.end}:00+09:00`).getTime() - new Date(`${date}T${selectedSlot.start}:00+09:00`).getTime()) / 60_000
-      : selectedStaff?.duration_minutes ?? 0
+  // 確認済みの枠があればそれを優先する。入力画面で見えた古い instant を
+  // 確認・完了・競合の画面へ持ち越さない。
+  const activeSlot = confirmedSlot ?? selectedSlot
+  const slotTimeZone = activeSlot?.timeZone ?? 'Asia/Tokyo'
+  const slotStartIso = slotInstant(activeSlot) ?? ''
+  const slotEndIso = activeSlot?.endUtc ?? null
+  const occupiedMinutes = activeSlot?.startUtc && activeSlot?.endUtc
+    ? (new Date(activeSlot.endUtc).getTime() - new Date(activeSlot.startUtc).getTime()) / 60_000
+    : selectedStaff?.duration_minutes ?? 0
   const confirmationOperation = result?.operations.find((item) => item.kind === 'confirmation_line') ?? null
   const automaticOperations = result?.operations.filter((item) => ['conversion', 'mileage', 'automation'].includes(item.kind)) ?? []
 
@@ -144,6 +156,13 @@ export default function NewProxyBookingPage() {
     setLoading(false)
     setError('')
   }, [selectedAccountId])
+
+  // 選択（アカウント・客・メニュー・担当・日時）が変わったら、確認済みの
+  // 枠を捨てる。前の選択の instant がそのまま次の確定に乗ると、画面の
+  // 表示と送る時刻がずれる。
+  useEffect(() => {
+    setConfirmedSlot(null)
+  }, [selectionKey])
 
   useEffect(() => {
     // どちらの客かを先に束ねる(点検#516軽5)。`customer!` の断言では、将来の分岐変更でnullが紛れ込む。
@@ -296,23 +315,38 @@ export default function NewProxyBookingPage() {
         to: date,
       })
       if (latestSelectionKey.current !== requestKey) return
+      // 読み直した結果の枠そのものを持つ。「空いていた」だけを見て古い
+      // instant を送ると、店舗タイムゾーンや夏時間の切替をまたいだとき
+      // 別の瞬間の予約になる。
       const available = latest.by_staff
         .find((item) => item.staff_id === selectedStaff.id)
-        ?.slots.some((slot) => slot.date === date && slot.start === time)
+        ?.slots.find((slot) => slot.date === date && slot.start === time) ?? null
       if (!available) {
-        const alternatives = await bookingApi.getAlternatives(selectedAccountId, {
-          menuId: menu.id,
-          staffId: selectedStaff.id,
-          startsAt: slotStartIso,
-        })
+        const staleStartIso = slotInstant(selectedSlot)
+        const alternatives = staleStartIso
+          ? await bookingApi.getAlternatives(selectedAccountId, {
+            menuId: menu.id,
+            staffId: selectedStaff.id,
+            startsAt: staleStartIso,
+          })
+          : null
         if (latestSelectionKey.current !== requestKey) return
+        setConfirmedSlot(null)
         setConflictAlternatives(alternatives)
         setStep('conflict')
         setError('選んだ時間は、ほかの予約で埋まりました')
         return
       }
-      const preview = await bookingApi.previewReminders(selectedAccountId, slotStartIso)
+      // 開始 instant を受け取れない枠は確定させない（fail-closed）。
+      const freshStartIso = slotInstant(available)
+      if (!freshStartIso) {
+        setConfirmedSlot(null)
+        setError('この時間の開始時刻を受け取れませんでした。時間を選び直してください。')
+        return
+      }
+      const preview = await bookingApi.previewReminders(selectedAccountId, freshStartIso)
       if (latestSelectionKey.current !== requestKey) return
+      setConfirmedSlot(available)
       setReminderPreview(preview.reminders)
       setIdempotencyKey(crypto.randomUUID())
       setStep('confirm')
@@ -330,6 +364,12 @@ export default function NewProxyBookingPage() {
     // 空キーで送ると400になる(点検#516軽5)。無ければここで作る。
     const key = idempotencyKey || crypto.randomUUID()
     if (!idempotencyKey) setIdempotencyKey(key)
+    // 送るのは確認直前に読み直した枠の instant だけ。無ければ送らない。
+    const startsAtIso = slotInstant(confirmedSlot)
+    if (!startsAtIso) {
+      setError('確認した開始時刻が見つかりません。日時を選び直してください。')
+      return
+    }
     const requestKey = selectionKey
     setLoading(true)
     setError('')
@@ -338,7 +378,7 @@ export default function NewProxyBookingPage() {
         ...customerPart,
         menu_id: menu.id,
         staff_id: selectedStaff.id,
-        starts_at: slotStartIso,
+        starts_at: startsAtIso,
         customer_note: customerNote.trim() || undefined,
       }, key)
       if (latestSelectionKey.current !== requestKey) return
@@ -365,6 +405,7 @@ export default function NewProxyBookingPage() {
   async function recoverConflict() {
     setStep('input')
     setTime('')
+    setConfirmedSlot(null)
     setConflictAlternatives(null)
     await loadSlots()
   }
@@ -477,7 +518,7 @@ export default function NewProxyBookingPage() {
               </div>
               {date && time && selectedStaff && menu ? (
                 <div className="border-success bg-success-bg text-success mt-3 rounded-control border px-3 py-2 text-xs font-semibold">
-                  {dateLabel(date, time, slotTimeZone, selectedSlot?.startUtc)} は空いています。{selectedStaff.duration_minutes}分のメニューです。
+                  {dateLabel(slotStartIso, slotTimeZone)} は空いています。{selectedStaff.duration_minutes}分のメニューです。
                 </div>
               ) : null}
             </Card>
@@ -511,7 +552,7 @@ export default function NewProxyBookingPage() {
                 <div className="rounded-card bg-canvas p-4 text-sm leading-6">
                   <p>{friend?.displayName ?? 'お客様'}さま</p>
                   <p className="font-semibold">ご予約を承りました。</p>
-                  <p className="mt-3">{date && time ? dateLabel(date, time, slotTimeZone, selectedSlot?.startUtc) : '日時を選ぶと表示されます'}</p>
+                  <p className="mt-3">{slotStartIso ? dateLabel(slotStartIso, slotTimeZone) : '日時を選ぶと表示されます'}</p>
                   <p>{menu?.name ?? 'メニューを選ぶと表示されます'} ／ 担当 {selectedStaff?.display_name ?? '—'}</p>
                 </div>
               </div>
@@ -550,7 +591,7 @@ export default function NewProxyBookingPage() {
               <Summary label="LINEとの結びつき" value={friend ? '結びついています' : '未連携の電話客'} />
             </Card>
             <Card title="いつ・何を">
-              <Summary label="日時" value={timeRangeLabel(date, time, occupiedMinutes, slotTimeZone, selectedSlot?.startUtc, selectedSlot?.endUtc)} />
+              <Summary label="日時" value={timeRangeLabel(slotStartIso, occupiedMinutes, slotTimeZone, slotEndIso)} />
               <Summary label="メニュー" value={`${menu.name}（${occupiedMinutes}分）`} />
               <Summary label="担当" value={selectedStaff.display_name} />
               <Summary label="お客様からのご希望" value={customerNote.trim() || '記入なし'} />
@@ -568,7 +609,7 @@ export default function NewProxyBookingPage() {
           </div>
           <aside data-design="Right" className="space-y-4">
             <Card title={`${customerLabel}さんにはこう届きます`} note="送る前に、文面をそのまま確かめられます。">
-              <LinePreview friendName={customerLabel} menuName={menu.name} staffName={selectedStaff.display_name} date={date} time={time} timeZone={slotTimeZone} startUtc={selectedSlot?.startUtc} deliveryStatus="not_sent" />
+              <LinePreview friendName={customerLabel} menuName={menu.name} staffName={selectedStaff.display_name} timeZone={slotTimeZone} startUtc={slotStartIso} deliveryStatus="not_sent" />
             </Card>
             <WarningCard title="気をつけること" lines={['LINEと結びついていない方には、自動のお知らせは届きません', 'あとで時間を変えたときは、もう一度お知らせを送ってください']} />
             <RelatedLinks includeConversion={false} />
@@ -580,7 +621,7 @@ export default function NewProxyBookingPage() {
         <>
           <section className="border-danger bg-danger-bg text-danger flex flex-wrap items-center justify-between gap-3 rounded-card border px-4 py-3">
             <div>
-              <p className="text-sm font-semibold">{dateLabel(date, time, slotTimeZone, selectedSlot?.startUtc)} は {selectedStaff.display_name} がふさがっています</p>
+              <p className="text-sm font-semibold">{dateLabel(slotStartIso, slotTimeZone)} は {selectedStaff.display_name} がふさがっています</p>
               <p className="mt-1 text-xs">
                 {conflictAlternatives
                   ? `${scheduleLabel(conflictAlternatives.conflict.from, slotTimeZone)}〜${scheduleLabel(conflictAlternatives.conflict.to, slotTimeZone)}に${conflictAlternatives.conflict.count}件重なっています（${conflictAlternatives.conflict.source === 'internal_booking' ? '店内予約' : conflictAlternatives.conflict.source === 'google_calendar' ? 'Google予定' : '受付時間外'}）。`
@@ -595,7 +636,7 @@ export default function NewProxyBookingPage() {
               <Card title="だれの予約か"><Summary label="お客様" value={customerLabel} /><Summary label="LINEとの結びつき" value={friend ? '結びついています' : '未連携の電話客'} /></Card>
               <Card title="いつ・何を" note="時間が重なっています。右の空いている時間から選べます。">
                 <Summary label="メニュー" value={`${menu.name}（${occupiedMinutes}分）`} />
-                <Summary label="日付" value={dateLabel(date, time, slotTimeZone, selectedSlot?.startUtc).split(' ')[0]} />
+                <Summary label="日付" value={dateLabel(slotStartIso, slotTimeZone).split(' ')[0]} />
                 <Summary label="時刻" value={time} />
                 <Summary label="担当" value={selectedStaff.display_name} />
                 <p className="text-danger mt-3 text-xs">選んだ時間は、ほかの予約で埋まりました。</p>
@@ -631,13 +672,13 @@ export default function NewProxyBookingPage() {
       {step === 'done' && result && (friend || customer) && menu && selectedStaff && (
         <>
           <section className="bg-action-soft text-action rounded-card px-4 py-3 text-xs font-semibold">
-            {timeRangeLabel(date, time, occupiedMinutes, slotTimeZone, selectedSlot?.startUtc, selectedSlot?.endUtc)} の枠を押さえました。お知らせはリマインダから自動で届きます。
+            {timeRangeLabel(slotStartIso, occupiedMinutes, slotTimeZone, slotEndIso)} の枠を押さえました。お知らせはリマインダから自動で届きます。
           </section>
           <div data-design="Body" className="grid gap-4 xl:grid-cols-4">
             <div data-design="Left" className="min-w-0 space-y-4 xl:col-span-3">
               <Card title="入れた予約">
                 <Summary label="お客様" value={customerLabel} />
-                <Summary label="日時" value={timeRangeLabel(date, time, occupiedMinutes, slotTimeZone, selectedSlot?.startUtc, selectedSlot?.endUtc)} />
+                <Summary label="日時" value={timeRangeLabel(slotStartIso, occupiedMinutes, slotTimeZone, slotEndIso)} />
                 <Summary label="メニュー" value={`${menu.name}（${occupiedMinutes}分）`} />
                 <Summary label="担当" value={selectedStaff.display_name} />
                 <Summary label="受けかた" value="電話（代理で入力）" />
@@ -659,7 +700,7 @@ export default function NewProxyBookingPage() {
               </Card>
             </div>
             <aside data-design="Right" className="space-y-4">
-              <Card title="お客様に届くもの" note="案内処理の実績と同じ状態を表示しています。"><LinePreview friendName={customerLabel} menuName={menu.name} staffName={selectedStaff.display_name} date={date} time={time} timeZone={slotTimeZone} startUtc={selectedSlot?.startUtc} deliveryStatus={confirmationOperation?.status ?? result.line_notification} /></Card>
+              <Card title="お客様に届くもの" note="案内処理の実績と同じ状態を表示しています。"><LinePreview friendName={customerLabel} menuName={menu.name} staffName={selectedStaff.display_name} timeZone={slotTimeZone} startUtc={slotStartIso} deliveryStatus={confirmationOperation?.status ?? result.line_notification} /></Card>
               <RelatedLinks includeConversion />
             </aside>
           </div>
@@ -710,14 +751,12 @@ function NoticeRow({ title, detail }: { title: string; detail: string }) {
   )
 }
 
-function LinePreview({ friendName, menuName, staffName, date, time, timeZone, startUtc, deliveryStatus }: {
+function LinePreview({ friendName, menuName, staffName, timeZone, startUtc, deliveryStatus }: {
   friendName: string
   menuName: string
   staffName: string
-  date: string
-  time: string
   timeZone?: string
-  startUtc?: string
+  startUtc: string
   deliveryStatus: string
 }) {
   const deliveryLabel = deliveryStatus === 'succeeded' ? '送信済み・開封状況は受信箱で確認できます'
@@ -732,7 +771,7 @@ function LinePreview({ friendName, menuName, staffName, date, time, timeZone, st
       <p className="bg-ink/25 text-on-action mx-auto mt-3 w-fit rounded-pill px-3 py-1 text-xs">{deliveryLabel}</p>
       <div className="bg-canvas rounded-card mt-3 p-4 text-sm leading-6">
         <p>{friendName}さま</p>
-        <p>{dateLabel(date, time, timeZone, startUtc)} から、{menuName}をお受けしました。</p>
+        <p>{dateLabel(startUtc, timeZone)} から、{menuName}をお受けしました。</p>
         <p>担当は{staffName}です。ご来店をお待ちしています。</p>
         <Button href="/booking/bookings" variant="primary" className="mt-3 w-full">予約内容を確認する</Button>
       </div>

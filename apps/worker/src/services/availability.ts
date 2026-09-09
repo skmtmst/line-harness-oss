@@ -441,11 +441,16 @@ export async function getAvailability(
     .bind(...staffIds)
     .all<{ staff_id: string; weekday: number; start_time: string; end_time: string }>();
 
-  // Coarse range filter: from の前日 00:00 UTC 〜 to の翌日 00:00 UTC で十分な余裕
-  const rangeStart = new Date(`${params.from}T00:00:00Z`);
-  rangeStart.setUTCDate(rangeStart.getUTCDate() - 1);
-  const rangeEnd = new Date(`${params.to}T00:00:00Z`);
-  rangeEnd.setUTCDate(rangeEnd.getUTCDate() + 1);
+  // 既存予約を読む範囲は、店舗タイムゾーンの暦日の境界そのものにする。
+  // 暦日を UTC の 00:00 と見なして前後 1 日ずつ足す形だと、UTC より
+  // 遅れた店舗（America/New_York = UTC-5）の夜の予約が範囲から落ちる。
+  // NY の 11/02 20:00 は 11/03 01:00Z で、`to+1 の 00:00Z` を越えるため
+  // `starts_at < ?` に当たらず、埋まっているのに空き枠として出ていた。
+  // 端点は zonedTimeToUtcMs で求めるので、夏時間の切替日でもずれない。
+  // 前後の余裕は要らない。`starts_at < 終端 AND block_ends_at > 始端` が
+  // 範囲と重なる予約をすべて拾う（日を跨いで始まった予約も含む）。
+  const rangeStart = new Date(zonedTimeToUtcMs(timeZone, params.from, '00:00'));
+  const rangeEnd = new Date(zonedTimeToUtcMs(timeZone, addDays(params.to, 1), '00:00'));
 
   const bookings = await db
     .prepare(
