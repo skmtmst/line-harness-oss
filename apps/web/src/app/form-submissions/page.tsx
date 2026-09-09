@@ -2,10 +2,11 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { fetchApi } from '@/lib/api'
 import { api, type FormDeleteImpact } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
+import { useCanManage } from '@/components/automations/use-can-manage'
 import { displayFormName, sortFormsByLatestAnswer } from './form-list'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -40,6 +41,7 @@ interface Form {
   folderId?: string | null
   destinationSummary?: { friendFieldCount: number; tagCount: number }
   createdAt: string
+  updatedAt: string | null
   lastSubmittedAt: string | null
   usedByAccounts: UsedByAccount[]
 }
@@ -58,18 +60,84 @@ type FormListResponse = Form[] | {
 }
 
 type FormFilter = 'all' | 'published' | 'draft' | 'stored'
+type FormSort = 'latest-answer' | 'answers' | 'updated' | 'name'
+
+const FORM_PAGE_SIZES = [20, 50, 100] as const
+
+function formAnswerCount(form: Form): number {
+  return form.submitCount ?? form.usedByAccounts.reduce((sum, account) => sum + account.count, 0)
+}
+
+function validSort(value: string | null): FormSort {
+  return value === 'answers' || value === 'updated' || value === 'name' ? value : 'latest-answer'
+}
+
+function validFilter(value: string | null): FormFilter {
+  return value === 'published' || value === 'draft' || value === 'stored' ? value : 'all'
+}
+
+function validPageSize(value: string | null): number {
+  const parsed = Number(value)
+  return FORM_PAGE_SIZES.includes(parsed as (typeof FORM_PAGE_SIZES)[number]) ? parsed : 20
+}
+
+function validPage(value: string | null): number {
+  const parsed = Number(value)
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : 1
+}
+
+function compareDatesNewest(first: string | null | undefined, second: string | null | undefined): number {
+  if (first && second) return new Date(second).getTime() - new Date(first).getTime()
+  if (first) return -1
+  if (second) return 1
+  return 0
+}
+
+function sortForms(forms: Form[], sort: FormSort): Form[] {
+  if (sort === 'latest-answer') return sortFormsByLatestAnswer(forms)
+  return [...forms].sort((first, second) => {
+    if (sort === 'answers') {
+      const countDifference = formAnswerCount(second) - formAnswerCount(first)
+      if (countDifference !== 0) return countDifference
+      return compareDatesNewest(first.updatedAt, second.updatedAt) || first.id.localeCompare(second.id)
+    }
+    if (sort === 'updated') {
+      return compareDatesNewest(first.updatedAt, second.updatedAt) || first.id.localeCompare(second.id)
+    }
+    return displayFormName(first.name).localeCompare(displayFormName(second.name), 'ja-JP') || first.id.localeCompare(second.id)
+  })
+}
+
+function displayUpdatedAt(value: string | null): string {
+  if (!value) return '—'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '—'
+  return date.toLocaleDateString('ja-JP', { month: '2-digit', day: '2-digit' })
+}
 
 export default function FormSubmissionsPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { selectedAccountId, loading: accountLoading } = useAccount()
+  /**
+   * フォルダを作れるのは owner / admin だけ（`POST /api/folders` の
+   * `requireRole('owner', 'admin')`）。**staff には口ごと出さない。**
+   * 押せない灰色の口を置くと「権限を足せば使える操作」に見えるが、
+   * staff にとっては永久に押せない。役割の判定は1か所に寄せてある。
+   * 読み取り前（null）は出さない側へ倒す。
+   */
+  const canAddFolder = useCanManage()
   const [forms, setForms] = useState<Form[]>([])
   const [folders, setFolders] = useState<FormFolder[]>([])
   const [formTotal, setFormTotal] = useState(0)
   const [activeFolderId, setActiveFolderId] = useState('all')
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
-  const [query, setQuery] = useState('')
-  const [formFilter, setFormFilter] = useState<FormFilter>('all')
+  const [query, setQuery] = useState(() => searchParams.get('q') || '')
+  const [formFilter, setFormFilter] = useState<FormFilter>(() => validFilter(searchParams.get('filter')))
+  const [formSort, setFormSort] = useState<FormSort>(() => validSort(searchParams.get('sort')))
+  const [pageSize, setPageSize] = useState(() => validPageSize(searchParams.get('limit')))
+  const [page, setPage] = useState(() => validPage(searchParams.get('page')))
   const [editingForm, setEditingForm] = useState<Form | null>(null)
   const [editingName, setEditingName] = useState('')
   const [savingName, setSavingName] = useState(false)
@@ -121,6 +189,46 @@ export default function FormSubmissionsPage() {
   useEffect(() => {
     void loadForms()
   }, [loadForms])
+
+  const searchKey = searchParams.toString()
+  useEffect(() => {
+    const params = new URLSearchParams(searchKey)
+    setQuery(params.get('q') || '')
+    setFormFilter(validFilter(params.get('filter')))
+    setFormSort(validSort(params.get('sort')))
+    setPageSize(validPageSize(params.get('limit')))
+    setPage(validPage(params.get('page')))
+  }, [searchKey])
+
+  const updateListState = (next: Partial<{
+    query: string
+    filter: FormFilter
+    sort: FormSort
+    pageSize: number
+    page: number
+  }>) => {
+    const state = {
+      query: next.query ?? query,
+      filter: next.filter ?? formFilter,
+      sort: next.sort ?? formSort,
+      pageSize: next.pageSize ?? pageSize,
+      page: next.page ?? page,
+    }
+    if (next.query !== undefined) setQuery(next.query)
+    if (next.filter !== undefined) setFormFilter(next.filter)
+    if (next.sort !== undefined) setFormSort(next.sort)
+    if (next.pageSize !== undefined) setPageSize(next.pageSize)
+    if (next.page !== undefined) setPage(next.page)
+
+    const params = new URLSearchParams()
+    if (state.query) params.set('q', state.query)
+    if (state.filter !== 'all') params.set('filter', state.filter)
+    if (state.sort !== 'latest-answer') params.set('sort', state.sort)
+    if (state.pageSize !== 20) params.set('limit', String(state.pageSize))
+    if (state.page !== 1) params.set('page', String(state.page))
+    const queryString = params.toString()
+    router.replace(queryString ? `/form-submissions?${queryString}` : '/form-submissions', { scroll: false })
+  }
 
   const createDraft = async () => {
     if (creating || !selectedAccountId) return
@@ -224,7 +332,7 @@ export default function FormSubmissionsPage() {
     }
   }
 
-  const sortedForms = useMemo(() => sortFormsByLatestAnswer(forms), [forms])
+  const sortedForms = useMemo(() => sortForms(forms, formSort), [formSort, forms])
   const filteredForms = useMemo(() => {
     const normalizedQuery = query.trim().toLocaleLowerCase('ja-JP')
     return sortedForms.filter((form) => {
@@ -242,6 +350,18 @@ export default function FormSubmissionsPage() {
     })
   }, [activeFolderId, formFilter, query, sortedForms])
 
+  const pageCount = Math.max(1, Math.ceil(filteredForms.length / pageSize))
+  const visiblePage = Math.min(page, pageCount)
+  const pageStart = (visiblePage - 1) * pageSize
+  const visibleForms = filteredForms.slice(pageStart, pageStart + pageSize)
+
+  useEffect(() => {
+    if (!loading && !loadError && page > pageCount) updateListState({ page: pageCount })
+    // updateListState intentionally uses the current list state. Running only when the
+    // calculated last page changes avoids replacing the URL after unrelated renders.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadError, loading, page, pageCount])
+
   return (
     <div data-design-node="EMBIK">
       <div data-design="Bar" className="mb-4 flex flex-wrap items-center justify-between gap-2">
@@ -250,21 +370,20 @@ export default function FormSubmissionsPage() {
             {creating ? '下書きを作成中' : 'フォームを作る'}
           </Button>
         </div>
-        {forms[0] ? (
-          <Button href={`/form-submissions/responses?id=${encodeURIComponent(forms[0].id)}`}>
-            集まった回答を見る
-          </Button>
-        ) : (
-          <Button disabled>集まった回答を見る</Button>
-        )}
       </div>
 
       <div style={FOLDER_RAIL_STYLE} className="grid items-start gap-4 lg:grid-cols-[var(--folder-rail-width)_minmax(0,1fr)]">
         <FolderPanel
           total={loading || loadError ? '— 件' : `${formTotal} 件`}
           activeId={activeFolderId}
-          onSelect={setActiveFolderId}
-          addFolderDisabled
+          onSelect={(folder) => {
+            setActiveFolderId(folder)
+            updateListState({ page: 1 })
+          }}
+          // 保存先（forms.folder_id）がまだ無いので、owner / admin でも押せない。
+          // オーナー指示 #582 は追加操作をこの欄へ置くことを求めるので、
+          // 消さずに止めて理由を添える。実データは #688（migration 372）。
+          addFolderDisabled={canAddFolder === true}
           addFolderTitle="フォームのフォルダ保存先は未接続です"
           rows={[
             { id: 'all', label: 'すべて', count: loading || loadError ? 0 : formTotal },
@@ -278,18 +397,28 @@ export default function FormSubmissionsPage() {
             <input
               type="search"
               value={query}
-              onChange={(event) => setQuery(event.target.value)}
+              onChange={(event) => updateListState({ query: event.target.value, page: 1 })}
               placeholder="フォーム名・質問文で検索"
               aria-label="フォーム名・質問文で検索"
               className="border-hairline rounded-control focus:ring-accent min-w-60 flex-1 border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
             />
-            <span className="text-xs text-ink-faint">回答が多い順</span>
+            <Select
+              aria-label="並び順"
+              value={formSort}
+              options={[
+                { value: 'latest-answer', label: '最新の回答順' },
+                { value: 'answers', label: '回答が多い順' },
+                { value: 'updated', label: '更新が新しい順' },
+                { value: 'name', label: '名前順' },
+              ]}
+              onChange={(value) => updateListState({ sort: value as FormSort, page: 1 })}
+            />
             <Select
               aria-label="表示件数"
               size="page-size"
-              value="20"
-              options={[{ value: '20', label: '20件表示' }]}
-              onChange={() => undefined}
+              value={String(pageSize)}
+              options={FORM_PAGE_SIZES.map((size) => ({ value: String(size), label: `${size}件表示` }))}
+              onChange={(value) => updateListState({ pageSize: Number(value), page: 1 })}
             />
           </div>
 
@@ -304,7 +433,7 @@ export default function FormSubmissionsPage() {
               const active = formFilter === value
               return (
                 <label key={value} className={`rounded-pill cursor-pointer border px-3 py-1 text-xs ${active ? 'border-accent bg-accent-soft text-ink' : 'border-hairline bg-white text-ink-secondary'}`}>
-                  <input type="radio" name="form-filter" value={value} checked={active} onChange={() => setFormFilter(value)} className="sr-only" />
+                  <input type="radio" name="form-filter" value={value} checked={active} onChange={() => updateListState({ filter: value, page: 1 })} className="sr-only" />
                   {label}
                 </label>
               )
@@ -334,21 +463,16 @@ export default function FormSubmissionsPage() {
             onRetry={() => void loadForms()}
           />
         ) : forms.length === 0 ? (
-          <div className="space-y-3">
-            <p className="rounded-control bg-accent-soft px-3 py-2 text-xs text-ink-secondary">
-              フォームがまだ1つも無いときの見え方です。「フォームを作る」から最初の1つを作ると、ここに一覧が並びます。
-            </p>
-            <ListState
-              kind="empty"
-              title="まだフォームがありません"
-              description="最初の1つを作ると、集まった回答もここから見られます。"
-              action={(
-                <Button variant="primary" onClick={createDraft} disabled={creating}>
-                  {creating ? '下書きを作成中' : 'フォームを作る'}
-                </Button>
-              )}
-            />
-          </div>
+          <ListState
+            kind="empty"
+            title="まだフォームがありません"
+            description="最初の1つを作ると、集まった回答もここから見られます。"
+            action={(
+              <Button variant="primary" onClick={createDraft} disabled={creating}>
+                {creating ? '下書きを作成中' : 'フォームを作る'}
+              </Button>
+            )}
+          />
         ) : (
           filteredForms.length === 0 ? (
             <ListState
@@ -370,7 +494,7 @@ export default function FormSubmissionsPage() {
                 </TableHeadRow>
               </thead>
               <tbody className="divide-hairline divide-y">
-            {filteredForms.map((form) => {
+            {visibleForms.map((form) => {
               const totalCount = form.usedByAccounts.reduce((sum, a) => sum + a.count, 0)
               const displayCount = form.submitCount ?? totalCount
               const normalizedName = displayFormName(form.name)
@@ -393,9 +517,9 @@ export default function FormSubmissionsPage() {
                     <span className="block">{displayCount ? `${displayCount.toLocaleString('ja-JP')}件` : '—'}</span>
                     {form.weeklySubmitCount ? <span className="block text-ink-faint">今週 {form.weeklySubmitCount.toLocaleString('ja-JP')}件</span> : null}
                   </td>
-                  <td className="px-3 py-2.5 text-xs tabular-nums">{new Date(form.createdAt).toLocaleDateString('ja-JP', { month: '2-digit', day: '2-digit' })}</td>
+                  <td className="px-3 py-2.5 text-xs tabular-nums" title={form.updatedAt ? undefined : '更新日時を取得できません'}>{displayUpdatedAt(form.updatedAt)}</td>
                   <td className="px-3 py-2.5 text-right text-xs">
-                    <Link href={`/form-submissions/responses?id=${encodeURIComponent(form.id)}`} className="text-accent hover:underline">回答</Link>
+                    <Link href={`/form-submissions/responses?id=${encodeURIComponent(form.id)}`} aria-label={`${normalizedName}の集まった回答を見る`} className="text-accent hover:underline whitespace-nowrap">回答を見る</Link>
                     <button type="button" onClick={() => openRename(form)} className="ml-2 text-accent hover:underline">編集</button>
                     <button type="button" onClick={() => void openDelete(form)} className="ml-2 text-danger hover:underline" aria-label={`${normalizedName}を削除`} title="回答フォームを削除">削除</button>
                   </td>
@@ -408,9 +532,32 @@ export default function FormSubmissionsPage() {
           )
         )}
           {!loading && !loadError && forms.length > 0 ? (
-            <p className="mt-3 text-xs text-ink-faint">
-              {formTotal.toLocaleString('ja-JP')}件中 1〜{filteredForms.length.toLocaleString('ja-JP')}件を表示
-            </p>
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+              <p className="text-xs text-ink-faint">
+                {filteredForms.length.toLocaleString('ja-JP')}件中 {(filteredForms.length === 0 ? 0 : pageStart + 1).toLocaleString('ja-JP')}〜{Math.min(pageStart + pageSize, filteredForms.length).toLocaleString('ja-JP')}件を表示
+              </p>
+              <nav aria-label="回答フォームのページ送り" className="flex items-center gap-2 text-xs">
+                <Button
+                  type="button"
+                  aria-label="前のページ"
+                  disabled={visiblePage <= 1}
+                  onClick={() => updateListState({ page: visiblePage - 1 })}
+                >
+                  前へ
+                </Button>
+                <span className="min-w-16 text-center tabular-nums text-ink-faint">
+                  {visiblePage} / {pageCount}
+                </span>
+                <Button
+                  type="button"
+                  aria-label="次のページ"
+                  disabled={visiblePage >= pageCount}
+                  onClick={() => updateListState({ page: visiblePage + 1 })}
+                >
+                  次へ
+                </Button>
+              </nav>
+            </div>
           ) : null}
         </section>
       </div>
