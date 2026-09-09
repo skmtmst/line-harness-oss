@@ -7,6 +7,7 @@ import Button from '@/components/shared/button'
 import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
+import Select from '@/components/shared/select'
 import SummaryCard from '@/components/shared/summary-card'
 import { DataTable, NameCell, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 
@@ -50,7 +51,41 @@ function formatJst(value: string | null): string {
 }
 
 type LoadState = 'loading' | 'ready' | 'error' | 'forbidden'
-type RunFilter = 'all' | 'failed' | 'excluded' | 'clicked'
+export type RunFilter = 'all' | 'failed' | 'excluded' | 'clicked'
+export type RecipientFilter = 'all' | EcNotificationRun['recipientType']
+export type PeriodFilter = 'all' | '24h' | '7d' | '30d'
+
+const PERIOD_MILLISECONDS: Record<Exclude<PeriodFilter, 'all'>, number> = {
+  '24h': 24 * 60 * 60 * 1000,
+  '7d': 7 * 24 * 60 * 60 * 1000,
+  '30d': 30 * 24 * 60 * 60 * 1000,
+}
+
+export function filterNotificationRuns(
+  items: EcNotificationRun[],
+  filters: {
+    query: string
+    status: RunFilter
+    recipient: RecipientFilter
+    period: PeriodFilter
+  },
+  now = Date.now(),
+): EcNotificationRun[] {
+  const normalized = filters.query.trim().toLocaleLowerCase('ja-JP')
+  return items.filter((item) => {
+    if (filters.status === 'clicked' && !item.clickedAt) return false
+    if (filters.status === 'failed' && item.status !== 'failed') return false
+    if (filters.status === 'excluded' && item.status !== 'excluded') return false
+    if (filters.recipient !== 'all' && item.recipientType !== filters.recipient) return false
+    if (filters.period !== 'all') {
+      const receivedAt = new Date(item.receivedAt).getTime()
+      if (!Number.isFinite(receivedAt) || receivedAt > now || now - receivedAt > PERIOD_MILLISECONDS[filters.period]) return false
+    }
+    if (!normalized) return true
+    return [item.notificationName, item.friendName, item.orderNumber, item.reason, item.source]
+      .some((value) => value?.toLocaleLowerCase('ja-JP').includes(normalized))
+  })
+}
 
 export default function NotificationRunList({
   lineAccountId,
@@ -65,11 +100,15 @@ export default function NotificationRunList({
   const [total, setTotal] = useState(0)
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<RunFilter>('all')
+  const [recipientFilter, setRecipientFilter] = useState<RecipientFilter>('all')
+  const [periodFilter, setPeriodFilter] = useState<PeriodFilter>('all')
   const [retryingId, setRetryingId] = useState<string | null>(null)
   const [notice, setNotice] = useState<{ tone: 'success' | 'error'; text: string } | null>(null)
   // 再試行口は店長専用。担当者にはボタンを出さない。
   const [canRetry, setCanRetry] = useState(false)
+  const [loadedScope, setLoadedScope] = useState('')
   const requestRef = useRef(0)
+  const currentScope = `${lineAccountId ?? 'none'}:${mode}`
 
   useEffect(() => {
     let active = true
@@ -79,10 +118,18 @@ export default function NotificationRunList({
     return () => { active = false }
   }, [])
 
-  useEffect(() => setPage(1), [lineAccountId, mode])
+  useEffect(() => {
+    setPage(1)
+    setQuery('')
+    setFilter('all')
+    setRecipientFilter('all')
+    setPeriodFilter('all')
+    setNotice(null)
+  }, [lineAccountId, mode])
 
   const load = useCallback(async () => {
     const request = ++requestRef.current
+    setLoadedScope(currentScope)
     if (!lineAccountId) {
       setResult(null)
       setTotal(0)
@@ -122,7 +169,7 @@ export default function NotificationRunList({
       setTotal(0)
       setState(error instanceof ApiError && error.status === 403 ? 'forbidden' : 'error')
     }
-  }, [lineAccountId, mode, page])
+  }, [currentScope, lineAccountId, mode, page])
 
   useEffect(() => { void load() }, [load])
 
@@ -151,50 +198,53 @@ export default function NotificationRunList({
 
   const title = mode === 'failures' ? '送れなかったもの' : 'お知らせの記録'
   const nodeId = mode === 'failures' ? 'X8JCA5' : 'Se65i'
-  const items = result?.items ?? []
-  const summary = result?.summary ?? null
-  const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE))
+  // アカウント切替の直後は、useEffectが動く前でも前アカウントの行を描かない。
+  const visibleState: LoadState = loadedScope === currentScope ? state : lineAccountId ? 'loading' : 'ready'
+  const scopedResult = loadedScope === currentScope ? result : null
+  const scopedTotal = loadedScope === currentScope ? total : 0
+  const items = useMemo(() => scopedResult?.items ?? [], [scopedResult])
+  const summary = scopedResult?.summary ?? null
+  const pageCount = Math.max(1, Math.ceil(scopedTotal / PAGE_SIZE))
+  const summaryDetail = (ready: string): string => {
+    if (!lineAccountId) return 'LINEアカウントを選択すると表示します'
+    if (visibleState === 'error') return '取得できませんでした'
+    if (visibleState === 'forbidden') return '見る権限がありません'
+    return ready
+  }
   const filters: Array<{ value: RunFilter; label: string }> = mode === 'failures'
     ? [{ value: 'all', label: 'すべて' }, { value: 'failed', label: '送信できなかった' }, { value: 'excluded', label: '送信対象外' }]
     : [{ value: 'all', label: 'すべて' }, { value: 'clicked', label: 'クリック記録あり' }, { value: 'failed', label: '送れなかった' }]
-  const visibleItems = useMemo(() => {
-    const normalized = query.trim().toLocaleLowerCase('ja-JP')
-    return items.filter((item) => {
-      if (filter === 'clicked' && !item.clickedAt) return false
-      if (filter === 'failed' && item.status !== 'failed') return false
-      if (filter === 'excluded' && item.status !== 'excluded') return false
-      if (!normalized) return true
-      return [item.notificationName, item.friendName, item.orderNumber, item.reason]
-        .some((value) => value?.toLocaleLowerCase('ja-JP').includes(normalized))
-    })
-  }, [filter, items, query])
+  const visibleItems = useMemo(() => filterNotificationRuns(items, {
+    query,
+    status: filter,
+    recipient: recipientFilter,
+    period: periodFilter,
+  }), [filter, items, periodFilter, query, recipientFilter])
   const listState = !lineAccountId
     ? 'account-required'
-    : state === 'ready' && items.length === 0
+    : visibleState === 'ready' && items.length === 0
       ? 'empty'
-      : state === 'ready' && visibleItems.length === 0
+      : visibleState === 'ready' && visibleItems.length === 0
         ? 'filtered-empty'
-        : state
+        : visibleState
 
   return (
     <section className="space-y-4" data-design-node={nodeId} data-list-state={listState} aria-label={title}>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className={`grid grid-cols-1 gap-4 sm:grid-cols-2 ${mode === 'history' ? 'xl:grid-cols-4' : ''}`}>
         {mode === 'failures' ? <>
-          <SummaryCard title="届かなかった" value={summary?.failed ?? null} unit="通" detail="確認と連絡が必要" variant="v6" loading={state === 'loading'} badgeTone="danger" />
-          <SummaryCard title="送信対象外" value={summary?.excluded ?? null} unit="通" detail="つながりや設定を確認" variant="v6" loading={state === 'loading'} />
-          <SummaryCard title="メールで届いた" value={null} unit="通" detail="メール送信記録の接続後に表示" variant="v6" />
-          <SummaryCard title="まだ連絡できていない" value={null} unit="通" detail="代替連絡の記録接続後に表示" variant="v6" />
+          <SummaryCard title="届かなかった" value={summary?.failed ?? null} unit="通" detail={summaryDetail('確認と連絡が必要')} variant="v6" loading={visibleState === 'loading'} badgeTone="danger" />
+          <SummaryCard title="送信対象外" value={summary?.excluded ?? null} unit="通" detail={summaryDetail('つながりや設定を確認')} variant="v6" loading={visibleState === 'loading'} />
         </> : <>
-          <SummaryCard title="お知らせの記録" value={state === 'ready' ? total : null} unit="件" detail="選択中のLINEアカウント" variant="v6" loading={state === 'loading'} />
-          <SummaryCard title="LINE API受付済み" value={summary?.accepted ?? null} unit="通" detail="LINEへの受付まで確認" variant="v6" loading={state === 'loading'} />
-          <SummaryCard title="押された" value={null} unit="通" detail="自社の短縮URL集計を接続後に表示" variant="v6" />
-          <SummaryCard title="送れなかった" value={summary?.failed ?? null} unit="通" detail="対応が必要なもの" variant="v6" loading={state === 'loading'} badgeTone="danger" />
+          <SummaryCard title="お知らせの記録" value={lineAccountId && visibleState === 'ready' ? scopedTotal : null} unit="件" detail={summaryDetail('選択中のLINEアカウント')} variant="v6" loading={visibleState === 'loading'} />
+          <SummaryCard title="LINE API受付済み" value={summary?.accepted ?? null} unit="通" detail={summaryDetail('LINEへの受付まで確認')} variant="v6" loading={visibleState === 'loading'} />
+          <SummaryCard title="送信処理中" value={summary?.pending ?? null} unit="通" detail={summaryDetail('送信台帳に記録済み')} variant="v6" loading={visibleState === 'loading'} />
+          <SummaryCard title="送れなかった" value={summary?.failed ?? null} unit="通" detail={summaryDetail('対応が必要なもの')} variant="v6" loading={visibleState === 'loading'} badgeTone="danger" />
         </>}
       </div>
 
       <div className="rounded-control border border-warning bg-warning-bg px-4 py-3 text-sm leading-6 text-warning">
         {mode === 'failures'
-          ? '発送や返金のお知らせが届いていない場合は、その日のうちに受信箱など別の手だてで連絡してください。メール結果と対応済みの記録は、送信台帳の接続後に表示します。'
+          ? '発送や返金のお知らせが届いていない場合は、その日のうちに受信箱など別の手だてで連絡してください。対応済みの記録は、送信台帳に項目が追加された後に表示します。'
           : '選択中のLINEアカウントと結び付きを確認できたEC通知だけを表示します。個人の既読は取得せず、押されたかどうかは自社の短縮URLだけで数えます。'}
         <span className="mt-1 block text-xs">個人の既読は取得できません。試行回数と次の再試行予定は送信台帳の記録を表示します。</span>
       </div>
@@ -207,21 +257,44 @@ export default function NotificationRunList({
           <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="お客様の名前・注文番号で検索（表示中の20件のみ）" className="min-h-10 w-full rounded-control border border-hairline bg-canvas px-3 text-sm outline-none focus:border-accent" />
         </label>
         {filters.map((item) => <FilterChip key={item.value} selected={filter === item.value} onChange={() => setFilter(item.value)}>{item.label}</FilterChip>)}
-        <span className="text-xs text-ink-faint" title="検索は表示中のページの中だけに効きます">20件表示</span>
+        <Select
+          aria-label="対象を絞り込み"
+          label="対象"
+          value={recipientFilter}
+          onChange={(value) => setRecipientFilter(value as RecipientFilter)}
+          options={[
+            { value: 'all', label: 'すべて' },
+            { value: 'customer', label: '顧客' },
+            { value: 'operator', label: '運用者' },
+          ]}
+        />
+        <Select
+          aria-label="期間を絞り込み"
+          label="期間"
+          value={periodFilter}
+          onChange={(value) => setPeriodFilter(value as PeriodFilter)}
+          options={[
+            { value: 'all', label: 'すべて' },
+            { value: '24h', label: '24時間以内' },
+            { value: '7d', label: '7日以内' },
+            { value: '30d', label: '30日以内' },
+          ]}
+        />
+        <span className="text-xs text-ink-faint" title="検索と絞り込みは表示中のページの中だけに効きます">表示中の20件を絞り込み</span>
       </div>
 
       {!lineAccountId ? (
         <ListState kind="empty" title="LINEアカウントを選択してください" description="上のアカウント切り替えから、確認するLINEアカウントを選んでください。" />
-      ) : state === 'loading' ? (
+      ) : visibleState === 'loading' ? (
         <ListState kind="loading" title={`${title}を読み込んでいます`} />
-      ) : state === 'error' ? (
+      ) : visibleState === 'error' ? (
         <ListState
           kind="error"
           title={`${title}を表示できませんでした`}
           description="登録済みの記録は消えていません。時間をおいて読み直してください。"
           action={<Button onClick={() => void load()}>記録を再読み込み</Button>}
         />
-      ) : state === 'forbidden' ? (
+      ) : visibleState === 'forbidden' ? (
         <ListState kind="forbidden" />
       ) : items.length === 0 ? (
         <ListState
@@ -256,7 +329,7 @@ export default function NotificationRunList({
               {visibleItems.map((item) => (
                 <Tr key={item.id}>
                   <NameCell name={item.notificationName} sub={item.orderNumber ? `注文 ${item.orderNumber}` : item.source} />
-                  <NameCell name={item.friendName || '名前は未取得'} sub="顧客へのお知らせ" />
+                  <NameCell name={item.friendName || '名前は未取得'} sub={item.recipientType === 'customer' ? '顧客へのお知らせ' : '運用者へのお知らせ'} />
                   <Td><StatusBadge status={item.status} /></Td>
                   <Td>
                     <span className="block whitespace-nowrap text-sm">{formatJst(item.receivedAt)}</span>
@@ -286,7 +359,7 @@ export default function NotificationRunList({
           </DataTable>
           <div className="flex items-center justify-between gap-4">
             <p className="text-xs text-ink-faint">
-              {(page - 1) * PAGE_SIZE + 1}〜{Math.min(page * PAGE_SIZE, total)}件 / 全{total.toLocaleString('ja-JP')}件
+              {(page - 1) * PAGE_SIZE + 1}〜{Math.min(page * PAGE_SIZE, scopedTotal)}件 / 全{scopedTotal.toLocaleString('ja-JP')}件
             </p>
             <Pagination page={page} pageCount={pageCount} onPageChange={setPage} />
           </div>
