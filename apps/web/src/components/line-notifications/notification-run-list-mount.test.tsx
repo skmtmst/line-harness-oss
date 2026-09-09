@@ -1,11 +1,11 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { ApiError, api, type EcNotificationRun, type EcNotificationRunList } from '@/lib/api'
 import NotificationRunList from './notification-run-list'
 
-// createRoot/actがjsdom環境をReactのact対応と認識するための明示フラグ。
+// createRoot/actがhappy-dom環境をReactのact対応と認識するための明示フラグ。
 beforeAll(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 })
