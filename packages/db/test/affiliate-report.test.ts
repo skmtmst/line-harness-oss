@@ -602,25 +602,30 @@ describe('getAffiliateReportV2 — approval breakdown + confirmedReward + byOffe
     expect(r.revenue).toBe(6000);
   });
 
-  test('confirmedReward = SUM(approved CV × offer reward_amount); offer-less approved adds 0', async () => {
+  test('版が無い承認済みは確定額に入らない(現在の案件額へfallbackしない)', async () => {
     const r = (await getAffiliateReportV2(db, 'aff-A', { identityKeySql: IDENTITY_KEY_SQL }))!;
-    // off-1: 2 approved × 30000 = 60000. off-2: 1 approved × 5000 = 5000.
-    // generic approved (c6) → 0. Total = 65000.
-    expect(r.confirmedReward).toBe(65000);
+    // このfixtureは所属アカウントが決まらない古い形なので、承認時の版が作れない。
+    // 版が無い行は0(支払い画面と同じfail-closed契約)。現在の案件額
+    // (off-1=30000 / off-2=5000)を掛けて確定額を作らない。
+    expect(r.confirmedReward).toBe(0);
+    expect(r.unlinkedReward).toBe(0);
+    expect(r.unlinkedConversions).toBe(0);
   });
 
-  test('byOffer breaks down approved/pending + confirmedReward per offer (offer-less excluded)', async () => {
+  test('byOffer breaks down approved/pending; 版が無い分の確定額は0のまま', async () => {
     const r = (await getAffiliateReportV2(db, 'aff-A', { identityKeySql: IDENTITY_KEY_SQL }))!;
     const byId = new Map(r.byOffer.map((o) => [o.offerId, o]));
     // generic link CV must NOT create a byOffer bucket.
     expect(r.byOffer.length).toBe(2);
+    // 件数と1件あたりの表示額は現在の設定値。確定額だけが版に依存し、
+    // 版が無いこのfixtureでは0(件数×単価で作らない)。
     expect(byId.get('off-1')).toEqual({
       offerId: 'off-1', offerName: 'Freelance導入', rewardAmount: 30000,
-      conversionsApproved: 2, conversionsPending: 1, confirmedReward: 60000,
+      conversionsApproved: 2, conversionsPending: 1, confirmedReward: 0,
     });
     expect(byId.get('off-2')).toEqual({
       offerId: 'off-2', offerName: 'Small案件', rewardAmount: 5000,
-      conversionsApproved: 1, conversionsPending: 1, confirmedReward: 5000,
+      conversionsApproved: 1, conversionsPending: 1, confirmedReward: 0,
     });
   });
 
@@ -694,7 +699,7 @@ describe('getAffiliateReport — CV via affiliate_id OR affiliate_code', () => {
     expect(rows[0].totalRevenue).toBe(1000);
   });
 
-  test('all-affiliates report includes approved offer-fixed rewards', async () => {
+  test('版が無い承認済みはv1の確定額にも入らない(fail-closed)', async () => {
     insertOffer(sqlite, { id: 'offer-fixed', name: 'Fixed reward', rewardAmount: 3000 });
     sqlite.prepare(`UPDATE affiliate_links SET offer_id = 'offer-fixed' WHERE id = 'link-A1'`).run();
     insertFriend(sqlite, 'friend-fixed', { createdAt: jstDaysAgo(10) });
@@ -708,6 +713,91 @@ describe('getAffiliateReport — CV via affiliate_id OR affiliate_code', () => {
     });
 
     const rows = await getAffiliateReport(db, 'aff-A');
-    expect(rows[0].confirmedReward).toBe(3000);
+    // 所属アカウントが決まらない古い行は承認時の版が作れない。v1の確定額も
+    // 現在の案件額(3000)へfallbackせず0にする(支払い画面と同じ契約)。
+    expect(rows[0].confirmedReward).toBe(0);
+  });
+});
+
+describe('report confirmedReward — 承認時の版を確定額に使う', () => {
+  const TENANT_ID = '00000000-0000-4000-8000-000000000001';
+  let sqlite: Database.Database;
+  let db: D1Database;
+
+  beforeEach(() => {
+    sqlite = setupDb();
+    // このファイル共有のasD1はmeta.changesを返さないため、承認の成否が
+    // 判定できない。ここだけ変更件数を返す包みを使う。
+    db = {
+      prepare(query: string) {
+        return {
+          bind(...params: unknown[]) {
+            const stmt = sqlite.prepare(query);
+            return {
+              async run() {
+                const info = stmt.run(...params);
+                return { results: [], success: true, meta: { changes: info.changes } };
+              },
+              async first<T>() {
+                return (stmt.get(...params) as T) ?? null;
+              },
+              async all<T>() {
+                return { results: stmt.all(...params) as T[], success: true, meta: {} };
+              },
+            };
+          },
+        };
+      },
+    } as unknown as D1Database;
+    sqlite.exec(`
+      INSERT INTO line_accounts (id, channel_id, name, channel_access_token, channel_secret, tenant_id)
+      VALUES ('account-1', 'ch-1', '本店', 'token', 'secret', '${TENANT_ID}');
+      INSERT INTO friends (id, line_user_id, display_name, line_account_id, created_at, updated_at)
+      VALUES ('fr-1', 'U0001', 'T', 'account-1', '2026-01-01T00:00:00.000+09:00', '2026-01-01T00:00:00.000+09:00');
+      INSERT INTO affiliates (id, name, code, commission_rate, is_active, created_at, tenant_id, line_account_id)
+      VALUES ('aff-r', 'R', 'code-r', 0, 1, '2026-01-01T00:00:00.000+09:00', '${TENANT_ID}', 'account-1');
+      INSERT INTO conversion_points (id, name, event_type, value, created_at, line_account_id)
+      VALUES ('cp-r', '購入', 'purchase', 10000, '2026-01-01T00:00:00.000+09:00', 'account-1');
+      INSERT INTO affiliate_offers (id, name, reward_amount, is_active, created_at, line_account_id)
+      VALUES ('offer-r', '定期便', 3000, 1, '2026-01-01T00:00:00.000+09:00', 'account-1');
+      INSERT INTO affiliate_links (id, affiliate_id, ref_code, line_account_id, is_active, created_at, click_count, offer_id)
+      VALUES ('link-r', 'aff-r', 'ref-r', 'account-1', 1, '2026-01-01T00:00:00.000+09:00', 0, 'offer-r');
+      INSERT INTO conversion_events (id, conversion_point_id, friend_id, affiliate_id, attributed_ref_code, created_at, approval_status)
+      VALUES ('cv-r', 'cp-r', 'fr-1', 'aff-r', 'ref-r', '2026-02-01T00:00:00.000+09:00', 'pending');
+    `);
+  });
+
+  test('案件なしrateの版も確定額に含み、編集で変わらない', async () => {
+    const { setConversionApproval } = await import('../src/affiliate-offers.js');
+    sqlite.exec(`
+      INSERT INTO affiliates (id, name, code, commission_rate, is_active, created_at, tenant_id, line_account_id)
+      VALUES ('aff-offerless', 'L', 'code-l', 10, 1, '2026-01-01T00:00:00.000+09:00', '${TENANT_ID}', 'account-1');
+      INSERT INTO friends (id, line_user_id, display_name, line_account_id, created_at, updated_at)
+      VALUES ('fr-2', 'U0002', 'S', 'account-1', '2026-01-01T00:00:00.000+09:00', '2026-01-01T00:00:00.000+09:00');
+      INSERT INTO conversion_events (id, conversion_point_id, friend_id, affiliate_id, created_at, approval_status, value_snapshot)
+      VALUES ('cv-less', 'cp-r', 'fr-2', 'aff-offerless', '2026-02-02T00:00:00.000+09:00', 'pending', 20000);
+    `);
+    expect(await setConversionApproval(db, 'cv-less', 'approved')).toBe(true);
+    const before = await getAffiliateReportV2(db, 'aff-offerless', { identityKeySql: IDENTITY_KEY_SQL, lineAccountId: 'account-1' });
+    expect(before).toMatchObject({ confirmedReward: 2000, unlinkedReward: 2000, unlinkedConversions: 1, byOffer: [] });
+    sqlite.exec(`UPDATE affiliates SET commission_rate = 50 WHERE id = 'aff-offerless'`);
+    const after = await getAffiliateReportV2(db, 'aff-offerless', { identityKeySql: IDENTITY_KEY_SQL, lineAccountId: 'account-1' });
+    expect(after).toMatchObject({ confirmedReward: 2000, unlinkedReward: 2000, unlinkedConversions: 1 });
+  });
+
+  test('v1/v2の確定額は承認後の案件編集で変わらない', async () => {
+    const { setConversionApproval } = await import('../src/affiliate-offers.js');
+    expect(await setConversionApproval(db, 'cv-r', 'approved')).toBe(true);
+    const scope = { tenantId: TENANT_ID, allowedLineAccountIds: ['account-1'] };
+    expect((await getAffiliateReport(db, 'aff-r', { scope }))[0]?.confirmedReward).toBe(3000);
+    expect((await getAffiliateReportV2(db, 'aff-r', { identityKeySql: IDENTITY_KEY_SQL, lineAccountId: 'account-1' }))?.confirmedReward).toBe(3000);
+
+    sqlite.exec(`UPDATE affiliate_offers SET reward_amount = 99999 WHERE id = 'offer-r'`);
+
+    const v1 = await getAffiliateReport(db, 'aff-r', { scope });
+    expect(v1[0]?.confirmedReward).toBe(3000);
+    const v2 = await getAffiliateReportV2(db, 'aff-r', { identityKeySql: IDENTITY_KEY_SQL, lineAccountId: 'account-1' });
+    expect(v2?.confirmedReward).toBe(3000);
+    expect(v2?.byOffer).toMatchObject([{ conversionsApproved: 1, confirmedReward: 3000 }]);
   });
 });
