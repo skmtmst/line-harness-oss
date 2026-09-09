@@ -460,3 +460,60 @@ describe('A-8 friends tenant scope', () => {
     expect(stringBinds).toContain('%a\\%b%');
   });
 });
+
+describe('N-032 friend stats account scope (#664)', () => {
+  const hiddenPaths = [
+    '/api/friends/add-breakdown?lineAccountId=other',
+    '/api/friends/count?lineAccountId=other',
+    '/api/friends/ref-stats?lineAccountId=other',
+    '/api/friends/stats?accountId=other',
+  ] as const;
+
+  test.each(hiddenPaths)('%s refuses an invisible account without touching its data', async (path) => {
+    const prepared: Array<{ sql: string; binds: unknown[] }> = [];
+    const response = await createApp(prepared).request(path);
+    expect(response.status).toBe(404);
+    expect(await response.json()).toEqual({ success: false, error: 'Not found' });
+    // ガードが集計より先に動くので、指定IDでSQLを1本も投げない
+    expect(prepared).toHaveLength(0);
+    expect(mocks.canAccess).toHaveBeenCalled();
+    expect(mocks.canAccess.mock.calls[0][2]).toEqual(['other']);
+  });
+
+  test.each([
+    ['owner', '/api/friends/count?lineAccountId=other'],
+    ['admin', '/api/friends/count?lineAccountId=other'],
+    ['staff', '/api/friends/count?lineAccountId=other'],
+  ] as const)('%s role: %s refuses an invisible account', async (role, path) => {
+    const response = await createApp([], [], undefined, role).request(path);
+    expect(response.status).toBe(404);
+  });
+
+  test.each(hiddenPaths)('%s hides a nonexistent account exactly like an invisible one', async (path) => {
+    const first = await createApp([]).request(path);
+    const second = await createApp([]).request(path.replace('other', 'ghost-no-such-account'));
+    expect(first.status).toBe(404);
+    expect(second.status).toBe(404);
+    // 存在の有無で返しを変えない(件数も存在も漏らさない)
+    expect(await second.json()).toEqual(await first.json());
+  });
+
+  test.each([
+    '/api/friends/add-breakdown?lineAccountId=own',
+    '/api/friends/count?lineAccountId=own',
+    '/api/friends/ref-stats?lineAccountId=own',
+    '/api/friends/stats?accountId=own',
+  ] as const)('%s still aggregates a visible account', async (path) => {
+    mocks.canAccess.mockResolvedValue(true);
+    const response = await createApp([]).request(path);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ success: true });
+  });
+
+  test('empty scope aggregates nothing instead of leaking', async () => {
+    mocks.getScope.mockResolvedValue({ allowedAccountIds: [], canSeeUnassigned: false, ids: [], accounts: [] });
+    const response = await createApp([]).request('/api/friends/count');
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ success: true, data: { count: 0 } });
+  });
+});
