@@ -147,3 +147,53 @@ describe('共通情報の新規作成(実React)', () => {
     expect(api.create.mock.calls.some((call) => call[0].memo === 'password: hunter2')).toBe(false)
   })
 })
+
+/*
+ * #687 再差し戻し: 「パスワード・秘密鍵・トークン」の3語限定かつ
+ * `[=:：]` の区切り記号必須という設計のため、それ以外のよくある表記
+ * ("APIキー"などの語彙違い、区切り記号なしの自然な日本語)を素通りして
+ * いた。司令塔の独立審査が実際に node で確かめた未検知6例と、
+ * 引き続き誤検知してはいけない通常文を、実mountで両方とも試験する。
+ */
+describe('日本語の秘密値検知(限定語彙+区切り記号必須という設計そのものの見直し)', () => {
+  const shouldWarn: Array<[memo: string, note: string]> = [
+    ['APIキー: sk-abcdefghij', '語彙: パスワード・秘密鍵・トークン以外のラベル'],
+    ['合言葉: sesame1234', '語彙: パスワード・秘密鍵・トークン以外のラベル'],
+    ['シークレット: abcdefgh', '語彙: パスワード・秘密鍵・トークン以外のラベル'],
+    ['暗証番号: 123456', '語彙: パスワード・秘密鍵・トークン以外のラベル'],
+    ['アカウントのパスワードはhunter2です', '書式: 区切り記号なしの自然文(助詞「は」)'],
+    ['パスワード hunter2', '書式: 半角スペース区切り(区切り記号なし)'],
+  ]
+
+  it.each(shouldWarn)('検知する: "%s"(%s)', async (memo) => {
+    await render()
+    await setValue(byId('cv-name'), '営業時間')
+    await setValue(byId('cv-key'), 'shop_hours')
+    await setValue(byId('cv-memo'), memo)
+    await click(byExactText('button', '登録'))
+
+    expect(host.querySelector('[role="alertdialog"]')).not.toBeNull()
+    expect(api.create).not.toHaveBeenCalled()
+  })
+
+  const shouldNotWarn: Array<[memo: string, note: string]> = [
+    ['パスワードの使い方を説明します', '既知の通常文(値を伴わない説明)'],
+    ['パスワードが分かりません', '助詞「が」の通常文(値が続かない)'],
+    ['暗証番号を忘れた場合はサポートへ連絡してください', '助詞「を」の通常文'],
+    ['トークンの発行方法について説明します', 'ラベル語彙を含むが値を伴わない説明文'],
+    ['営業時間は10:00〜18:00です', 'ラベル語彙自体を含まない通常文'],
+  ]
+
+  it.each(shouldNotWarn)('誤検知しない: "%s"(%s)', async (memo) => {
+    await render()
+    await setValue(byId('cv-name'), '営業時間')
+    await setValue(byId('cv-key'), 'shop_hours2')
+    await setValue(byId('cv-memo'), memo)
+    await click(byExactText('button', '登録'))
+
+    // 誤検知していなければ、警告を出さずにそのまま送信まで進む。
+    expect(host.querySelector('[role="alertdialog"]')).toBeNull()
+    expect(api.create).toHaveBeenCalledTimes(1)
+    expect(api.create.mock.calls[0][0]).toMatchObject({ memo })
+  })
+})

@@ -54,12 +54,38 @@ const NAME_MAX = 200
 const VALUE_MAX = 200
 const MEMO_MAX = 1000
 
+/**
+ * 秘密値ラベル(日本語)。ここに無い言い回しは検知できないため、書式側
+ * (JP_SECRET_SEPARATOR / JP_SECRET_VALUE)で「限定語彙+区切り記号必須」
+ * という設計そのものの弱さを補う(#687 再差し戻し)。
+ */
+const JP_SECRET_LABELS = [
+  'パスワード', '合言葉', '暗証番号', 'ピン', 'PIN',
+  '秘密鍵', 'シークレット', 'クライアントシークレット',
+  'トークン', 'アクセストークン', 'リフレッシュトークン',
+  'APIキー', 'API鍵', 'アクセスキー', '認証コード',
+] as const
+
+/**
+ * ラベルと値の間。区切り記号(`=` `:` `：`)・空白・助詞(「は」「が」、
+ * 「〜のパスワードは」のような「の」付きも可)のどれかを許し、無くても
+ * 良い(「パスワードhunter2」のように直接続く自然文にも当たるため)。
+ * 「」『』などの引用符も、区切りの直後にあれば読み飛ばす。
+ */
+const JP_SECRET_SEPARATOR = String.raw`(?:\s*[=:：]\s*|[\s　]+|の?は\s*|が\s*)?[「『"'　]*`
+
+/**
+ * 値らしいトークン。ASCII英数字始まりで4文字以上。日本語の地の文
+ * (「使い方」「分かりません」など)はこの形に当たらないため、
+ * 「パスワードの使い方」のような通常文では続けて誤検知しない。
+ */
+const JP_SECRET_VALUE = String.raw`[A-Za-z0-9][A-Za-z0-9_.+/=-]{3,}`
+
 const SENSITIVE_VALUE_PATTERNS = [
   /-----BEGIN [A-Z ]*PRIVATE KEY-----/i,
   /\b(?:password|passwd|pwd|secret|token|api[_ -]?key|access[_ -]?key|channel[_ -]?secret)\s*[=:：]\s*\S{4,}/i,
-  // 日本語のラベルは \w に含まれず \b が成立しないため、英字ラベルとは別条にする
-  // (\b(?:...パスワード...) は常に不一致になり検知されなかった)。
-  /(?:パスワード|秘密鍵|トークン)\s*[=:：]\s*\S{4,}/,
+  // 日本語のラベルは \w に含まれず \b が成立しないため、英字ラベルとは別条にする。
+  new RegExp(`(?:${JP_SECRET_LABELS.join('|')})${JP_SECRET_SEPARATOR}${JP_SECRET_VALUE}`),
   /\b(?:AKIA[0-9A-Z]{16}|gh[pousr]_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,}|xox[baprs]-[A-Za-z0-9-]{10,})\b/,
   /\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b/,
   /\b(?:sk|rk|pk)_(?:live|test)_[A-Za-z0-9]{12,}\b/i,
