@@ -1089,6 +1089,46 @@ const spec = {
         responses: { '201': { description: 'Recorded' } },
       },
     },
+    // ── Operator notifications ──────────────────────────────────────────────
+    '/api/notifications/operator-event-types': {
+      get: {
+        tags: ['Operator notifications'],
+        summary: '運用者通知が自動発火できるきっかけ一覧',
+        description: '公開済みルールが反応できる業務イベントと、実producerへの接続状況を返す。connected=false は未接続で、そのきっかけでは自動発火しない。',
+        parameters: [
+          { name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: 'きっかけ一覧（items[].connected と publishedRules、summary の接続済み・未接続件数）' },
+          '400': { description: 'lineAccountId が無い' },
+          '403': { description: 'このLINEアカウントを表示する権限がない' },
+        },
+      },
+    },
+    '/api/notifications/operator-outbox/sweep': {
+      post: {
+        tags: ['Operator notifications'],
+        summary: '送り残した運用者通知の回収と再送',
+        description: 'Worker中断や一時失敗で pending / retry_wait のまま残った送達を拾い直して送る。冪等キーで取るため同時実行でも二重送信しない。',
+        requestBody: {
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  lineAccountId: { type: 'string', description: '省略時は権限内の全アカウントを対象にする' },
+                  limit: { type: 'integer', minimum: 1, maximum: 100, default: 20 },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': { description: '回収結果（swept, accepted, excluded, failed, pending）' },
+          '403': { description: 'このLINEアカウントを変更する権限がない' },
+        },
+      },
+    },
     // ── Webhook ─────────────────────────────────────────────────────────────
     '/webhook': {
       post: {
@@ -1110,6 +1150,7 @@ const spec = {
     { name: 'LINE Accounts', description: 'マルチLINEアカウント管理' },
     { name: 'Conversions', description: 'コンバージョン計測' },
     { name: 'Affiliates', description: 'アフィリエイト管理' },
+    { name: 'Operator notifications', description: '運用者へのお知らせの自動実行' },
     { name: 'Webhook', description: 'LINE Webhook' },
   ],
 };
