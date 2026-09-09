@@ -6,6 +6,7 @@ import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import NotificationRunList from '@/components/line-notifications/notification-run-list'
 import OperatorNotificationRules from './operator-notification-rules'
 import Button from '@/components/shared/button'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
 import {
@@ -72,6 +73,94 @@ function timingLabel(setting: EcNotificationSetting): string {
   return `${setting.label}らすぐ`
 }
 
+/**
+ * N-338: 一覧の「送った数が多い順」は、行の「今日」列と同じ数で降順に並べる。
+ *
+ * 集計がまだ無い行は末尾へ寄せる。同数は受け取った設定順のまま
+ *（`Array.prototype.sort` は安定）。
+ */
+function sortCustomerSettingsBySentCount(
+  settings: EcNotificationSetting[],
+  countOf: (eventType: string) => number | null,
+): EcNotificationSetting[] {
+  return [...settings].sort((a, b) => (countOf(b.eventType) ?? -1) - (countOf(a.eventType) ?? -1))
+}
+
+/** N-340: 編集中の下書きは入力欄の6項目だけを残す。出・止めの切替は即保存なので入れない。 */
+type CustomerEditorDraft = Pick<
+  EcNotificationSetting, 'title' | 'introText' | 'outroText' | 'buttonLabel' | 'buttonUrl' | 'imageUrl'
+>
+
+function pickCustomerDraft(setting: EcNotificationSetting): CustomerEditorDraft {
+  return {
+    title: setting.title,
+    introText: setting.introText,
+    outroText: setting.outroText,
+    buttonLabel: setting.buttonLabel,
+    buttonUrl: setting.buttonUrl,
+    imageUrl: setting.imageUrl,
+  }
+}
+
+function isSameCustomerDraft(setting: EcNotificationSetting, draft: CustomerEditorDraft): boolean {
+  const current = pickCustomerDraft(setting)
+  return (Object.keys(current) as (keyof CustomerEditorDraft)[]).every((key) => current[key] === draft[key])
+}
+
+/**
+ * N-340: 再読込で編集中身が消えないよう、端末内に下書きを置く。
+ * 鍵にアカウントを入れる。別アカウントの切替で混ざらないため。
+ */
+function customerDraftKey(lineAccountId: string, eventType: string): string {
+  return `line-notifications:draft:v1:${lineAccountId}:${eventType}`
+}
+
+function readStorage(): Storage | null {
+  try {
+    if (typeof window === 'undefined') return null
+    return window.localStorage
+  } catch { return null }
+}
+
+function readCustomerDraft(lineAccountId: string, eventType: string): CustomerEditorDraft | null {
+  const storage = readStorage()
+  if (!storage) return null
+  try {
+    const raw = storage.getItem(customerDraftKey(lineAccountId, eventType))
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as Partial<CustomerEditorDraft>
+    if (typeof parsed.introText !== 'string' || typeof parsed.outroText !== 'string') return null
+    return {
+      title: typeof parsed.title === 'string' ? parsed.title : null,
+      introText: parsed.introText,
+      outroText: parsed.outroText,
+      buttonLabel: typeof parsed.buttonLabel === 'string' ? parsed.buttonLabel : '',
+      buttonUrl: typeof parsed.buttonUrl === 'string' ? parsed.buttonUrl : '',
+      imageUrl: typeof parsed.imageUrl === 'string' ? parsed.imageUrl : '',
+    }
+  } catch { return null }
+}
+
+function writeCustomerDraft(lineAccountId: string, eventType: string, draft: CustomerEditorDraft): void {
+  try { readStorage()?.setItem(customerDraftKey(lineAccountId, eventType), JSON.stringify(draft)) } catch { /* 端末に置けないときは警告だけで続ける */ }
+}
+
+function clearCustomerDraft(lineAccountId: string, eventType: string): void {
+  try { readStorage()?.removeItem(customerDraftKey(lineAccountId, eventType)) } catch { /* 同上 */ }
+}
+
+/**
+ * N-341: 運用者タブの件数。読み込み前は `—`、取れなかったときは
+ * `取得失敗` と出し、0件・読み込み中と区別する。
+ */
+type OperatorTabState = 'loading' | 'ready' | 'error' | 'forbidden'
+
+function operatorTabCountLabel(state: OperatorTabState, count: number | null): string {
+  if (state === 'ready' && count !== null) return `${count}`
+  if (state === 'loading') return '—'
+  return '取得失敗'
+}
+
 const TABS = [
   { key: 'customer', label: '顧客へのお知らせ' },
   { key: 'operator', label: '運用者へのお知らせ' },
@@ -119,6 +208,7 @@ function CustomerNotificationEditor({
   onSave,
   onTestSend,
   notice,
+  hasUnsaved,
 }: {
   setting: EcNotificationSetting
   definition: LineNotificationDefinition | null
@@ -129,6 +219,7 @@ function CustomerNotificationEditor({
   onSave: () => void
   onTestSend: () => void
   notice: { tone: 'success' | 'error'; text: string } | null
+  hasUnsaved: boolean
 }) {
   return <main data-design-node="Q55bb" className="space-y-4 pb-24">
     <div className="flex flex-wrap items-start justify-between gap-3">
@@ -136,12 +227,14 @@ function CustomerNotificationEditor({
         <p className="text-xs font-semibold text-accent">LINE通知　›　お知らせの種類</p>
         <p className="mt-2 text-xl font-bold text-ink">「{setting.title?.trim() || setting.label}」を編集する</p>
         <p className="mt-1 text-xs text-ink-faint">{definition ? `公開版 ${definition.currentVersionNumber ? `v${definition.currentVersionNumber}` : 'なし'} ／ 編集中の下書き` : '公開中の内容を編集します。保存した内容は次の通知から使われます。'}</p>
+        {hasUnsaved ? <p className="mt-1 text-xs font-semibold text-warning">未保存の変更があります</p> : null}
       </div>
       <Button onClick={onTestSend} disabled={busy}>自分にテスト送信</Button>
     </div>
     {notice && <div className={`rounded-control border px-4 py-3 text-sm ${notice.tone === 'success' ? 'border-success bg-success-bg text-success' : 'border-danger bg-danger-bg text-danger'}`}>{notice.text}</div>}
 
-    <div className="grid min-w-0 gap-4" style={{ gridTemplateColumns: 'minmax(0, 1fr) 390px' }}>
+    {/* N-337: 狭い幅では見本を下に回す。390pxを無条件に横置きしない。 */}
+    <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_390px]">
       <div className="min-w-0 space-y-4">
         <section className="rounded-card border border-hairline bg-canvas p-4">
           <h2 className="font-bold text-ink">いつ送りますか</h2>
@@ -219,6 +312,14 @@ export default function LineNotificationsPage() {
   const [loadState, setLoadState] = useState<CustomerLoadState>('loading')
   const [busy, setBusy] = useState<string | null>(null)
   const [notice, setNotice] = useState<{ tone: 'success' | 'error'; text: string } | null>(null)
+  const [closeConfirmOpen, setCloseConfirmOpen] = useState(false)
+  // N-341: 運用者タブの件数は実データで出す。子部品とは別に親で取る。
+  const [operatorCount, setOperatorCount] = useState<number | null>(null)
+  const [operatorState, setOperatorState] = useState<OperatorTabState>('loading')
+  // N-340: 保存していない編集のあるお知らせ。離脱警告と復元の目印。
+  const [dirtyEvents, setDirtyEvents] = useState<readonly string[]>([])
+  // N-340: 保存済みの姿。編集中に戻るときの戻し先。
+  const lastSavedRef = useRef(new Map<string, EcNotificationSetting>())
   const loadGeneration = useRef(0)
 
   const load = useCallback(async () => {
@@ -231,9 +332,26 @@ export default function LineNotificationsPage() {
     setDefinitions([])
     setMetrics([])
     setNotice(null)
+    setCloseConfirmOpen(false)
+    setOperatorCount(null)
+    setOperatorState('loading')
+    setDirtyEvents([])
+    lastSavedRef.current = new Map()
     if (!selectedAccountId) {
       setLoadState('ready')
       return
+    }
+    // N-341: 運用者タブの件数だけ先に実数で取る。顧客タブの成否とは切り分ける。
+    try {
+      const operatorRes = await api.notifications.operatorRules.list(selectedAccountId)
+      if (generation !== loadGeneration.current) return
+      if (!operatorRes.success) throw new Error('operator count failed')
+      setOperatorCount(operatorRes.data.summary.total)
+      setOperatorState('ready')
+    } catch (error) {
+      if (generation !== loadGeneration.current) return
+      setOperatorCount(null)
+      setOperatorState(error instanceof ApiError && error.status === 403 ? 'forbidden' : 'error')
     }
     // 顧客タブだけが定義・集計を読む。運用者・記録タブは子部品が自前で取る（#509 軽1）。
     // 設定口は列車側で店別になったため、持ち回しはしない。
@@ -278,11 +396,28 @@ export default function LineNotificationsPage() {
           updatedAt: definition.updatedAt,
         }
       })
-      setSettings(mergedSettings)
+      // N-340: 保存済みの姿を覚え、端末に残った下書きがあれば重ねる。
+      lastSavedRef.current = new Map(mergedSettings.map((setting) => [setting.eventType, setting]))
+      const restoredEvents: string[] = []
+      const withDrafts = selectedAccountId ? mergedSettings.map((setting) => {
+        const draft = readCustomerDraft(selectedAccountId, setting.eventType)
+        if (!draft) return setting
+        if (isSameCustomerDraft(setting, draft)) {
+          clearCustomerDraft(selectedAccountId, setting.eventType)
+          return setting
+        }
+        restoredEvents.push(setting.eventType)
+        return { ...setting, ...draft }
+      }) : mergedSettings
+      setSettings(withDrafts)
       setOverview(overviewRes.data)
       setDefinitions(loadedDefinitions)
       setMetrics(metricRes?.success ? metricRes.data.items : [])
-      setExpanded((current) => mergedSettings.some((setting) => setting.eventType === current) ? current : null)
+      setExpanded((current) => withDrafts.some((setting) => setting.eventType === current) ? current : null)
+      if (restoredEvents.length > 0) {
+        setDirtyEvents(restoredEvents)
+        setNotice({ tone: 'success', text: `未保存の編集を${restoredEvents.length}件復元しました。確認して保存してください。` })
+      }
       setLoadState('ready')
     } catch (error) {
       if (generation === loadGeneration.current) {
@@ -293,12 +428,15 @@ export default function LineNotificationsPage() {
   }, [selectedAccountId, tab])
   useEffect(() => { void load() }, [load])
 
-  const visible = useMemo(() => settings.filter((setting) => {
+  // N-338: 行の「今日」列と同じ数で多い順に並べ、説明文と一致させる。
+  const sentCountOf = useCallback((eventType: string): number | null =>
+    overview?.byType.find((item) => item.eventType === eventType)?.count ?? null, [overview])
+  const visible = useMemo(() => sortCustomerSettingsBySentCount(settings.filter((setting) => {
     if (filter === 'enabled') return setting.isEnabled
     if (filter === 'stopped') return !setting.isEnabled
     if (filter === 'incomplete') return isIncomplete(setting)
     return true
-  }), [filter, settings])
+  }), sentCountOf), [filter, settings, sentCountOf])
   const customerPageCount = Math.max(1, Math.ceil(visible.length / CUSTOMER_PAGE_SIZE))
   const visiblePage = visible.slice((customerPage - 1) * CUSTOMER_PAGE_SIZE, customerPage * CUSTOMER_PAGE_SIZE)
   const expandedSetting = settings.find((setting) => setting.eventType === expanded) ?? null
@@ -327,11 +465,44 @@ export default function LineNotificationsPage() {
   })
   const tabsWithCounts = TABS.map((item) => {
     if (item.key === 'customer') return { ...item, label: `${item.label} ${loadState === 'ready' ? settings.length : '—'}` }
-    if (item.key === 'operator') return { ...item, label: `${item.label} —` }
+    // N-341: 運用者タブの件数は実データ。取れなかったときは「取得失敗」と区別する。
+    if (item.key === 'operator') return { ...item, label: `${item.label} ${operatorTabCountLabel(operatorState, operatorCount)}` }
     if (item.key === 'failures') return { ...item, label: `${item.label} ${overview?.failed ?? '—'}` }
     return item
   })
   const update = (eventType: string, patch: Partial<EcNotificationSetting>) => setSettings((current) => current.map((setting) => setting.eventType === eventType ? { ...setting, ...patch } : setting))
+  // N-340: 入力のたびに端末へ下書きを置き、未保存の印を付ける。
+  const edit = (eventType: string, patch: Partial<EcNotificationSetting>) => {
+    const current = settings.find((setting) => setting.eventType === eventType)
+    if (current && selectedAccountId) writeCustomerDraft(selectedAccountId, eventType, pickCustomerDraft({ ...current, ...patch }))
+    update(eventType, patch)
+    setDirtyEvents((prev) => prev.includes(eventType) ? prev : [...prev, eventType])
+  }
+  const markSaved = (eventType: string, setting: EcNotificationSetting, enabled: boolean) => {
+    if (selectedAccountId) clearCustomerDraft(selectedAccountId, eventType)
+    lastSavedRef.current.set(eventType, { ...setting, isEnabled: enabled })
+    setDirtyEvents((prev) => prev.filter((value) => value !== eventType))
+  }
+  // N-340: 編集中に戻るとき、未保存があれば警告し、閉じるなら保存済みへ戻す。
+  const closeEditor = (setting: EcNotificationSetting) => {
+    if (!dirtyEvents.includes(setting.eventType)) { setExpanded(null); return }
+    setCloseConfirmOpen(true)
+  }
+  const discardEditorChanges = (setting: EcNotificationSetting) => {
+    const saved = lastSavedRef.current.get(setting.eventType)
+    if (saved) update(setting.eventType, { ...saved })
+    if (selectedAccountId) clearCustomerDraft(selectedAccountId, setting.eventType)
+    setDirtyEvents((prev) => prev.filter((value) => value !== setting.eventType))
+    setCloseConfirmOpen(false)
+    setExpanded(null)
+  }
+  // N-340: 未保存のまま再読込・タブを閉じるときは警告する。
+  useEffect(() => {
+    if (dirtyEvents.length === 0) return
+    const handler = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = '' }
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [dirtyEvents.length])
 
   const save = async (setting: EcNotificationSetting, enabled = setting.isEnabled) => {
     if (!setting.title?.trim()) { setNotice({ tone: 'error', text: '通知の見出しを入力してください。' }); return }
@@ -371,6 +542,7 @@ export default function LineNotificationsPage() {
         })
       }
       update(setting.eventType, { isEnabled: enabled })
+      markSaved(setting.eventType, setting, enabled)
       setNotice({ tone: 'success', text: definition && enabled === setting.isEnabled ? `${setting.label}の下書きを保存しました。` : `${setting.label}を保存しました。` })
     } catch { setNotice({ tone: 'error', text: `${setting.label}を保存できませんでした。` }) }
     finally { setBusy(null) }
@@ -388,6 +560,7 @@ export default function LineNotificationsPage() {
       if (!result.success) throw new Error('publish failed')
       setDefinitions((current) => current.map((item) => item.id === result.data.id ? result.data : item))
       update(setting.eventType, { isEnabled: true })
+      markSaved(setting.eventType, setting, true)
       setNotice({ tone: 'success', text: `${setting.label}を公開しました。` })
     } catch { setNotice({ tone: 'error', text: `${setting.label}を公開できませんでした。下書きの内容を確認してください。` }) }
     finally { setBusy(null) }
@@ -413,17 +586,30 @@ export default function LineNotificationsPage() {
     {tab === 'failures' ? <NotificationRunList lineAccountId={selectedAccountId} mode="failures" /> : null}
     {tab === 'history' ? <NotificationRunList lineAccountId={selectedAccountId} mode="history" /> : null}
     {tab === 'operator' ? <OperatorNotificationRules lineAccountId={selectedAccountId} /> : null}
-    {tab === 'customer' && expandedSetting ? <CustomerNotificationEditor
-      setting={expandedSetting}
-      definition={definitionByEvent.get(expandedSetting.eventType) ?? null}
-      busy={busy === expandedSetting.eventType}
-      onChange={(patch) => update(expandedSetting.eventType, patch)}
-      onClose={() => setExpanded(null)}
-      onPublish={() => void publish(expandedSetting)}
-      onSave={() => void save(expandedSetting)}
-      onTestSend={() => void testSend(expandedSetting)}
-      notice={notice}
-    /> : null}
+    {tab === 'customer' && expandedSetting ? <>
+      <CustomerNotificationEditor
+        setting={expandedSetting}
+        definition={definitionByEvent.get(expandedSetting.eventType) ?? null}
+        busy={busy === expandedSetting.eventType}
+        onChange={(patch) => edit(expandedSetting.eventType, patch)}
+        onClose={() => closeEditor(expandedSetting)}
+        onPublish={() => void publish(expandedSetting)}
+        onSave={() => void save(expandedSetting)}
+        onTestSend={() => void testSend(expandedSetting)}
+        notice={notice}
+        hasUnsaved={dirtyEvents.includes(expandedSetting.eventType)}
+      />
+      <ConfirmDialog
+        open={closeConfirmOpen}
+        title="保存していない編集を破棄しますか？"
+        description="破棄すると、入力中の内容は保存済みの内容へ戻ります。この操作は取り消せません。"
+        confirmLabel="編集を破棄"
+        cancelLabel="編集を続ける"
+        destructive
+        onConfirm={() => discardEditorChanges(expandedSetting)}
+        onCancel={() => setCloseConfirmOpen(false)}
+      />
+    </> : null}
     {tab === 'customer' && !expandedSetting ? <main
       data-design-node="festr"
       data-list-state={loadState === 'ready' && settings.length === 0 ? 'empty' : loadState}
