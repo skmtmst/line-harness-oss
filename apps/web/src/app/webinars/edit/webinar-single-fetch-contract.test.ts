@@ -21,7 +21,7 @@ describe('V6 ウェビナー通知・CTAの取得一本化の契約', () => {
   it('CTAの取得口は子の編集タブの1か所だけ', () => {
     expect(PAGE.match(/webinarApi\.ctas\(/g)).toHaveLength(1)
     expect(PAGE).toContain('onCtasLoaded?.(res.data)')
-    expect(PAGE).toContain('<CtasTab webinarId={webinarId} accountId={accountId} onCtasLoaded={handleCtasLoaded} />')
+    expect(PAGE).toContain('<CtasTab webinarId={webinarId} forms={forms} formsState={registrationFormState} onRetryForms={loadRegistrationForms} onCtasLoaded={handleCtasLoaded} />')
   })
 
   it('保存したら取り直しのGETを挟まず親へ流す', () => {
