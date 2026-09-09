@@ -8,6 +8,7 @@ import {
   finishBookingOperation,
   queueBookingOperation,
 } from './booking-operation-runs.js';
+import { createFeatureJobGate } from './feature-enforcement.js';
 
 export interface StaffCalendarConnection {
   id: string;
@@ -233,18 +234,44 @@ export async function processPendingCalendarDeleteOperations(
     now.getTime() - (input.staleAfterMinutes ?? 10) * 60_000,
   ).toISOString();
   const limit = input.limit ?? 20;
+  /*
+   * 予約機能がオフのアカウントは claim もしない (#643)。
+   *
+   * claim してから判定すると opened_at を書き換えてしまい、オフ中でも
+   * 状態が動く。候補を読むだけの SELECT を先に置き、機能が動いている
+   * アカウントの行だけを claim する。オフの行は opened_at も status も
+   * 変えず、Google Calendar も呼ばない。skipped 監査だけ残し、
+   * 再オン後の tick でそのまま拾い直す。
+   */
+  const candidates = await db.prepare(
+    `SELECT id, booking_id, line_account_id FROM booking_operation_runs
+      WHERE kind = 'google_calendar'
+        AND json_extract(result_json, '$.direction') = 'delete'
+        AND status IN ('queued', 'retry_wait')
+        AND (opened_at IS NULL OR opened_at < ?)
+      ORDER BY updated_at ASC LIMIT ?`,
+  ).bind(staleCutoff, limit).all<{ id: string; booking_id: string; line_account_id: string }>();
+  const result = { processed: 0, succeeded: 0, retrying: 0, skipped: 0 };
+  const gate = createFeatureJobGate();
+  const runnableIds: string[] = [];
+  for (const candidate of candidates.results ?? []) {
+    if (await gate.canRun(db, candidate.line_account_id, 'booking', 'booking calendar delete retry')) {
+      runnableIds.push(candidate.id);
+    }
+  }
+  if (runnableIds.length === 0) return result;
+  // claim 条件は候補と同じ述語を残す。別 worker が先に取った行は
+  // ここで 0 行になり、二重に外部を呼ばない。
   const claimed = await db.prepare(
     `UPDATE booking_operation_runs SET opened_at = ?, updated_at = ?
-      WHERE id IN (
-        SELECT id FROM booking_operation_runs
-         WHERE kind = 'google_calendar'
-           AND json_extract(result_json, '$.direction') = 'delete'
-           AND status IN ('queued', 'retry_wait')
-           AND (opened_at IS NULL OR opened_at < ?)
-         ORDER BY updated_at ASC LIMIT ?
-      ) RETURNING id, booking_id, line_account_id`,
-  ).bind(nowIso, nowIso, staleCutoff, limit).all<{ id: string; booking_id: string; line_account_id: string }>();
-  const result = { processed: 0, succeeded: 0, retrying: 0, skipped: 0 };
+      WHERE id IN (${runnableIds.map(() => '?').join(', ')})
+        AND kind = 'google_calendar'
+        AND json_extract(result_json, '$.direction') = 'delete'
+        AND status IN ('queued', 'retry_wait')
+        AND (opened_at IS NULL OR opened_at < ?)
+      RETURNING id, booking_id, line_account_id`,
+  ).bind(nowIso, nowIso, ...runnableIds, staleCutoff)
+    .all<{ id: string; booking_id: string; line_account_id: string }>();
   for (const op of claimed.results ?? []) {
     result.processed++;
     const outcome = await runCalendarDeleteOperation(db, {

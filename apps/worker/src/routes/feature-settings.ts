@@ -143,11 +143,6 @@ type OffConfirmation = {
   expiresAt: number;
 };
 
-async function countRows(db: D1Database, sql: string, ...params: unknown[]): Promise<number> {
-  const row = await db.prepare(sql).bind(...params).first<{ total: number | string | null }>();
-  return Number(row?.total ?? 0);
-}
-
 /**
  * 一斉配信のアカウント結び付け。複数アカウント宛て(重複除き)は
  * account_ids の JSON 配列にも対象が入る。一覧取得と同じ条件。
@@ -653,19 +648,26 @@ async function collectFeatureImpact(
   const items: FeatureImpactItemWithIds[] = [];
   for (const source of entry.sources) {
     const params = source.params === 2 ? [accountId, accountId] : [accountId];
-    const count = await countRows(db, `SELECT COUNT(*) AS total ${source.fromWhere}`, ...params);
-    if (count === 0) continue;
+    /*
+     * 対象IDは上限なしの1回の読取で全件そろえ、件数もその全IDから数える(#643)。
+     *
+     * COUNT(*) とID読取を別々に投げると、間に1件増えただけで
+     * 「件数はN、照合はN+1件分」という食い違いが起きる。結合を含む
+     * 数え先ではCOUNT(*)が重複を数えることもある。数える対象と
+     * 照合する対象は必ず同じ全IDにする。
+     */
     const rows = await db
       .prepare(
         `SELECT ${source.idColumn} AS id ${source.fromWhere} ORDER BY ${source.idColumn}`,
       )
       .bind(...params)
       .all<{ id: string }>();
-    const fingerprintIds = [...new Set(rows.results.map((row) => row.id))].sort();
+    const fingerprintIds = [...new Set(rows.results.map((row) => String(row.id)))].sort();
+    if (fingerprintIds.length === 0) continue;
     items.push({
       kind: source.kind,
       targetType: source.targetType,
-      count,
+      count: fingerprintIds.length,
       ids: fingerprintIds.slice(0, IMPACT_IDS_LIMIT),
       truncated: fingerprintIds.length > IMPACT_IDS_LIMIT,
       fingerprintIds,
@@ -1080,12 +1082,25 @@ featureSettings.put('/api/settings/features', requireRole('owner', 'admin'), asy
     const hasBundleUpdate = body.features !== undefined
       || body.sidebarOrder !== undefined
       || body.sidebarItemOrder !== undefined;
-    // 機能・順序の保存は版なしでは受け付けない。版なし逐次保存は
-    // 途中失敗で部分反映になり、版付きGETとの不整合を起こすため。
+    /*
+     * 機能・順序の保存は版なしでは受け付けない(#643)。版なし逐次保存は
+     * 途中失敗で部分反映になり、版付きGETとの不整合を起こすため。
+     *
+     * ただし断るだけでは呼び出し側が次に何を送ればよいか分からない。
+     * 機械可読な code と、そのまま送り返せる現在の版を必ず添えて、
+     * 1往復で正しい保存へ進めるようにする。
+     */
     if (hasBundleUpdate && body.expectedVersion === undefined) {
+      const current = await loadFeatureSettings(
+        c.env.DB,
+        accountId,
+        restaurantTestEnabled(c.env),
+      );
       return c.json({
         success: false,
         error: 'expectedVersion が必要です。最新の設定を読み直してください。',
+        code: 'EXPECTED_VERSION_REQUIRED',
+        data: { currentVersion: current.version },
       }, 400);
     }
     if (body.expectedVersion !== undefined
@@ -1192,33 +1207,32 @@ featureSettings.put('/api/settings/features', requireRole('owner', 'admin'), asy
         accountId,
         FEATURE_SETTINGS_BUNDLE_KEY,
       ) !== null;
-      const statements: D1PreparedStatement[] = [
-        bundleExists
-          ? c.env.DB.prepare(
-            `UPDATE account_settings
-                SET value = ?, updated_at = ?
-              WHERE line_account_id = ? AND key = ?
-                AND json_valid(value)
-                AND CAST(json_extract(value, '$.version') AS INTEGER) = ?`,
-          ).bind(bundleValue, now, accountId, FEATURE_SETTINGS_BUNDLE_KEY, current.version)
-          : c.env.DB.prepare(
-            `INSERT OR IGNORE INTO account_settings
-              (id, line_account_id, key, value, created_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?)`,
-          ).bind(
-            crypto.randomUUID(),
-            accountId,
-            FEATURE_SETTINGS_BUNDLE_KEY,
-            bundleValue,
-            now,
-            now,
-          ),
-      ];
+      /*
+       * 同時保存の敗者は1行も書かない(#643)。
+       *
+       * 一括設定のCASだけを条件にすると、負けた側でも専用カタログの
+       * 上書きと確認トークンの削除だけが残り、409を返しながら別の
+       * 変更が効いてしまう。そこで同じ版の判定式を全statementに付け、
+       * 版が動いていれば「どれも0行」にする。判定式は一括設定の行しか
+       * 見ないので、最後に置いた一括設定の更新までは同じ結果になる。
+       */
+      const versionGuard = bundleExists
+        ? `EXISTS (SELECT 1 FROM account_settings guard
+             WHERE guard.line_account_id = ? AND guard.key = ?
+               AND json_valid(guard.value)
+               AND CAST(json_extract(guard.value, '$.version') AS INTEGER) = ?)`
+        : `NOT EXISTS (SELECT 1 FROM account_settings guard
+             WHERE guard.line_account_id = ? AND guard.key = ?)`;
+      const guardParams = bundleExists
+        ? [accountId, FEATURE_SETTINGS_BUNDLE_KEY, current.version]
+        : [accountId, FEATURE_SETTINGS_BUNDLE_KEY];
+      const statements: D1PreparedStatement[] = [];
       if (catalog !== undefined) {
         statements.push(c.env.DB.prepare(
           `INSERT INTO account_settings (id, line_account_id, key, value, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?)
-           ON CONFLICT (line_account_id, key) DO UPDATE SET value = ?, updated_at = ?`,
+           SELECT ?, ?, ?, ?, ?, ? WHERE ${versionGuard}
+           ON CONFLICT (line_account_id, key)
+             DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
         ).bind(
           crypto.randomUUID(),
           accountId,
@@ -1226,17 +1240,52 @@ featureSettings.put('/api/settings/features', requireRole('owner', 'admin'), asy
           JSON.stringify(catalog),
           now,
           now,
-          JSON.stringify(catalog),
-          now,
+          ...guardParams,
         ));
       }
       if (presentedToken !== null) {
         statements.push(c.env.DB.prepare(
-          'DELETE FROM account_settings WHERE line_account_id = ? AND key = ?',
-        ).bind(accountId, OFF_CONFIRM_KEY));
+          `DELETE FROM account_settings
+            WHERE line_account_id = ? AND key = ? AND ${versionGuard}`,
+        ).bind(accountId, OFF_CONFIRM_KEY, ...guardParams));
       }
+      // 一括設定の更新は最後に置く。先に置くと後続の判定式が
+      // 「新しい版」を見てしまい、同じ前提で揃わなくなる。
+      const casIndex = statements.length;
+      statements.push(bundleExists
+        ? c.env.DB.prepare(
+          `UPDATE account_settings
+              SET value = ?, updated_at = ?
+            WHERE line_account_id = ? AND key = ?
+              AND json_valid(value)
+              AND CAST(json_extract(value, '$.version') AS INTEGER) = ?`,
+        ).bind(bundleValue, now, accountId, FEATURE_SETTINGS_BUNDLE_KEY, current.version)
+        : c.env.DB.prepare(
+          `INSERT OR IGNORE INTO account_settings
+            (id, line_account_id, key, value, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?)`,
+        ).bind(
+          crypto.randomUUID(),
+          accountId,
+          FEATURE_SETTINGS_BUNDLE_KEY,
+          bundleValue,
+          now,
+          now,
+        ));
       const results = await c.env.DB.batch(statements);
-      if (((results[0] as D1Result | undefined)?.meta?.changes ?? 0) !== 1) {
+      const changed = (index: number): number =>
+        Number((results[index] as D1Result | undefined)?.meta?.changes ?? 0);
+      if (changed(casIndex) !== 1) {
+        // 判定式を共有しているので、負けたときは他のstatementも0行のはず。
+        // 万一残っていれば契約が壊れているため、監視できるよう記録する。
+        const leaked = results
+          .map((_, index) => index)
+          .filter((index) => index !== casIndex && changed(index) > 0);
+        if (leaked.length > 0) {
+          console.error('PUT /api/settings/features CAS partial write:', JSON.stringify({
+            accountId, expectedVersion: current.version, leaked,
+          }));
+        }
         const reread = await loadFeatureSettings(
           c.env.DB,
           accountId,

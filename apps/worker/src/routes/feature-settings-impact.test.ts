@@ -427,8 +427,14 @@ describe('feature off impact check', () => {
       expect(first.status).toBe(200);
 
       // 版なしの逐次保存は途中失敗で部分反映になるため受け付けない。
+      // 断るだけにせず、次に送るべき版を機械可読な形で返す。
       const legacy = await putFeatures(testDb, { features: { scenarios: false } });
       expect(legacy.status).toBe(400);
+      expect(legacy.body).toMatchObject({
+        success: false,
+        code: 'EXPECTED_VERSION_REQUIRED',
+        data: { currentVersion: 1 },
+      });
 
       // 実効値も版も変わっていない。
       const loaded = await app().request(
@@ -440,6 +446,78 @@ describe('feature off impact check', () => {
         success: true,
         data: { version: 1, features: { scenarios: true, media: false } },
       });
+    } finally {
+      testDb.raw.close();
+    }
+  });
+
+  it('版なし拒否で返した版をそのまま添えれば1往復で保存できる', async () => {
+    const testDb = createTestD1();
+    try {
+      expect((await putFeatures(testDb, { expectedVersion: 0, features: { media: false } })).status)
+        .toBe(200);
+      const rejected = await putFeatures(testDb, { features: { scenarios: false } });
+      expect(rejected.status).toBe(400);
+      const saved = await putFeatures(testDb, {
+        expectedVersion: rejected.body.data.currentVersion,
+        features: { scenarios: false },
+      });
+      expect(saved.status).toBe(200);
+      expect(saved.body).toMatchObject({ success: true, data: { version: 2 } });
+    } finally {
+      testDb.raw.close();
+    }
+  });
+
+  it('影響集計は対象ごとに上限なしの1回読取で、件数も同じ全IDから数える', async () => {
+    const testDb = createTestD1();
+    try {
+      const values = Array.from({ length: 150 }, (_, index) => {
+        const id = `b-${String(index).padStart(4, '0')}`;
+        return `('${id}', '予約配信', 'text', '本文', 'all', 'scheduled', 'account-1')`;
+      }).join(',\n');
+      testDb.raw.exec(
+        `INSERT INTO broadcasts (id, title, message_type, message_content, target_type, status, line_account_id)
+         VALUES ${values};`,
+      );
+
+      // 影響集計が実際に投げたSQLを記録する。
+      const executed: string[] = [];
+      const spyDb = new Proxy(testDb.db, {
+        get(target, prop, receiver) {
+          if (prop === 'prepare') {
+            return (sql: string) => {
+              executed.push(sql);
+              return target.prepare(sql);
+            };
+          }
+          return Reflect.get(target, prop, receiver) as unknown;
+        },
+      }) as D1Database;
+
+      const response = await app().request(
+        '/api/settings/features/impact?account_id=account-1',
+        {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ expectedVersion: 0, features: { broadcasts: false } }),
+        },
+        { DB: spyDb, ...ENV },
+      );
+      expect(response.status).toBe(200);
+      const body = await response.json() as Record<string, any>;
+      const scheduled = (body.data.impacts[0].items as Array<{ targetType: string; count: number; ids: string[]; truncated: boolean }>)
+        .find((item) => item.targetType === '予約済みの配信')!;
+      // 件数は全件。応答IDは上限までで、欠けていることが分かる。
+      expect(scheduled.count).toBe(150);
+      expect(scheduled.ids).toHaveLength(100);
+      expect(scheduled.truncated).toBe(true);
+
+      // 数え先ごとの読取は1回だけ。COUNT(*)の別読取も、IDのLIMITも無い。
+      const scheduledReads = executed.filter((sql) => sql.includes("b.status = 'scheduled'"));
+      expect(scheduledReads).toHaveLength(1);
+      expect(scheduledReads[0]).not.toMatch(/COUNT\(\*\)/);
+      expect(scheduledReads[0]).not.toMatch(/\bLIMIT\b/);
     } finally {
       testDb.raw.close();
     }
