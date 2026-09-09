@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ApiError, fetchApi } from '@/lib/api'
 import { IdempotencyKeyStore } from '@/lib/idempotency-key-store'
+import { createPollGeneration, startVisiblePoll } from '@/lib/visible-polling'
 
 type Channel = 'all' | 'line' | 'email'
 type ThreadStatus = 'unread' | 'in_progress' | 'on_hold' | 'resolved'
@@ -47,6 +48,22 @@ type EmailDetail = {
   messages: EmailMessage[]
 }
 
+/**
+ * 選択中メールの詳細を取り直すか(#630)。
+ *
+ * 一覧が未解決フィルターで回っていても、選んでいるスレッド自体が
+ * 対応済みなら詳細は変わらないので取り直さない。`selected`(一覧の
+ * 取り直しで更新)と `detail`(詳細の取り直しで更新)のどちらかが
+ * 対応済みと言っていれば対応済みとみなす(更新の順番が前後するため)。
+ */
+export function shouldRefetchSelectedDetail(
+  selected: Pick<InboxItem, 'channel' | 'status'> | null,
+  detailStatus: ThreadStatus | null | undefined,
+): boolean {
+  if (selected?.channel !== 'email') return false
+  return selected.status !== 'resolved' && detailStatus !== 'resolved'
+}
+
 const statusLabel: Record<ThreadStatus, string> = {
   unread: '未対応',
   in_progress: '対応中',
@@ -83,6 +100,10 @@ export default function SupportInbox({ channel = 'email' }: { channel?: Channel 
   const [query, setQuery] = useState('')
   const [items, setItems] = useState<InboxItem[]>([])
   const [selected, setSelected] = useState<InboxItem | null>(null)
+  // 選択の最新値はrefで読む。選択オブジェクトの更新で polling effect を
+  // 作り直すと、旧取得の実行中に新制御器が次取得を始めて二重になる(#630)。
+  const selectedRef = useRef(selected)
+  selectedRef.current = selected
   const [detail, setDetail] = useState<EmailDetail | null>(null)
   const [reply, setReply] = useState('')
   const [loading, setLoading] = useState(true)
@@ -90,53 +111,114 @@ export default function SupportInbox({ channel = 'email' }: { channel?: Channel 
   const [error, setError] = useState('')
   const bottomRef = useRef<HTMLDivElement>(null)
 
-  const loadInbox = useCallback(async (quiet = false) => {
+  // 世代で古い応答を捨てる。一覧の絞り込み・選択の切替より後に戻った
+  // 遅い応答が、新しい一覧・会話を上書きしない(順序逆転防止、#630)。
+  const genRef = useRef(createPollGeneration())
+
+  // 静かな取り直しは成否を返す。失敗の数え直し・待ちの延長は startVisiblePoll が持つ。
+  // 古い取得の応答は捨て、失敗にも数えない(新しい取得が届ける)。
+  const loadInbox = useCallback(async (quiet = false): Promise<boolean> => {
+    const mySeq = genRef.current.next()
+    const isStale = () => genRef.current.isStale(mySeq)
     if (!quiet) setLoading(true)
     try {
       const params = new URLSearchParams({ channel, status, limit: '200' })
       if (query.trim()) params.set('q', query.trim())
       const response = await fetchApi<{ success: boolean; data: { items: InboxItem[] } }>(`/api/support/inbox?${params}`)
+      if (isStale()) return true
       if (response.success) {
         setItems(response.data.items)
-        if (selected) {
-          const refreshed = response.data.items.find((item) => item.id === selected.id)
+        const current = selectedRef.current
+        if (current) {
+          const refreshed = response.data.items.find((item) => item.id === current.id)
           if (refreshed) setSelected(refreshed)
         }
+        return true
       }
+      return false
     } catch {
-      setError('お問い合わせ一覧を読み込めませんでした')
+      if (isStale()) return true
+      if (!quiet) setError('お問い合わせ一覧を読み込めませんでした')
+      return false
     } finally {
-      if (!quiet) setLoading(false)
+      if (!quiet && !isStale()) setLoading(false)
     }
-  }, [channel, query, selected, status])
+  }, [channel, query, status])
 
-  const loadDetail = useCallback(async (threadId: string, quiet = false) => {
+  const loadDetail = useCallback(async (threadId: string, quiet = false): Promise<boolean> => {
+    const mySeq = genRef.current.next()
+    // 選択切替後の遅い応答は捨てる。世代と選択IDの両方で見る。
+    const isStale = () =>
+      genRef.current.isStale(mySeq) || selectedRef.current?.threadId !== threadId
     try {
       const response = await fetchApi<{ success: boolean; data: EmailDetail }>(`/api/support/email/threads/${encodeURIComponent(threadId)}`)
+      if (isStale()) return true
       if (response.success) {
         setDetail(response.data)
         if (!quiet) window.setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
+        return true
       }
+      return false
     } catch {
-      setError('メールの会話を読み込めませんでした')
+      if (isStale()) return true
+      if (!quiet) setError('メールの会話を読み込めませんでした')
+      return false
     }
   }, [])
 
-  useEffect(() => { void loadInbox() }, [channel, status, query]) // eslint-disable-line react-hooks/exhaustive-deps
+  // 未解決だけを5秒起点の1本で取り直す。初回も同じ1本に載せ、
+  // 別の effect で初回取得だけ外に走らせない(重複防止)。
+  // 非表示では止め、連続失敗は待ちを延ばして上限後は再試行を出す。
+  // 対応済み・すべて表示では、初回の1回だけ取ってから止める(#630)。
+  const [inboxStalled, setInboxStalled] = useState(false)
+  const [inboxRetryKey, setInboxRetryKey] = useState(0)
+  /**
+   * いま出ている会話の状態を「どのスレッドのものか」と一緒に持つ(#630)。
+   *
+   * 状態だけを持つと、対応済みAから未対応Bへ選び直した直後に、まだ
+   * Aの状態を見て「対応済みだから取らない」と判断してしまい、Bの会話が
+   * 読み込み中のまま止まる。deps には入れない(取り直すたびに待ちが
+   * 振り出しに戻り、失敗の数え直しが壊れる)。
+   */
+  const detailStatusRef = useRef<{ threadId: string; status: ThreadStatus } | null>(null)
+  detailStatusRef.current = detail ? { threadId: detail.thread.id, status: detail.thread.status } : null
   useEffect(() => {
-    const timer = window.setInterval(() => {
-      void loadInbox(true)
-      if (selected?.channel === 'email') void loadDetail(selected.threadId, true)
-    }, 5_000)
-    return () => window.clearInterval(timer)
-  }, [loadDetail, loadInbox, selected])
+    setInboxStalled(false)
+    // 初回だけ表示あり(スピナー・エラー)、2回目から静かに。
+    let first = true
+    const poll = startVisiblePoll({
+      // 「対応済み」「すべて」は5秒更新の対象外だが、初回の1回は取る。
+      // 絞り込みを変えた直後に取らないと、前の絞り込みの一覧が残る(#630)。
+      immediate: true,
+      shouldPoll: () => status === 'open' || status === 'unread' || status === 'in_progress' || status === 'on_hold',
+      work: async () => {
+        const loud = first
+        first = false
+        const inboxOk = await loadInbox(!loud)
+        // 未解決フィルターでも、選んでいるスレッド自体が対応済みなら
+        // 詳細は取り直さない(#630)。選択はrefで読む(effectを作り直さない)。
+        const current = selectedRef.current
+        const seen = detailStatusRef.current
+        const detailStatus = seen && current && seen.threadId === current.threadId ? seen.status : undefined
+        const detailOk = current && shouldRefetchSelectedDetail(current, detailStatus)
+          ? await loadDetail(current.threadId, true)
+          : true
+        if (!inboxOk || !detailOk) throw new Error('お問い合わせ一覧を読み込めませんでした')
+      },
+      onGiveUp: () => setInboxStalled(true),
+      onRecovered: () => setInboxStalled(false),
+    })
+    return () => poll.stop()
+  }, [loadDetail, loadInbox, status, inboxRetryKey])
 
 
   const choose = (item: InboxItem) => {
     setSelected(item)
     setError('')
+    // 選択切替時は旧詳細を捨てる。残すと、前スレッドの対応済み状態が
+    // detailStatusRef に残り、未解決の新スレッドの再取得を止めてしまう(#630)。
+    setDetail(null)
     if (item.channel === 'email') void loadDetail(item.threadId)
-    else setDetail(null)
   }
 
   const updateStatus = async (next: ThreadStatus) => {
@@ -191,6 +273,18 @@ export default function SupportInbox({ channel = 'email' }: { channel?: Channel 
       {error && (
         <div className="bg-danger-bg border-danger-bg text-danger rounded-card mb-4 border px-4 py-3 text-sm">
           {error}
+        </div>
+      )}
+      {inboxStalled && (
+        <div className="bg-danger-bg border-danger-bg text-danger rounded-card mb-4 border px-4 py-3 text-sm">
+          お問い合わせ一覧の更新を一時停止しています（接続できません）。
+          <button
+            type="button"
+            onClick={() => setInboxRetryKey((key) => key + 1)}
+            className="font-bold underline"
+          >
+            再試行する
+          </button>
         </div>
       )}
 
