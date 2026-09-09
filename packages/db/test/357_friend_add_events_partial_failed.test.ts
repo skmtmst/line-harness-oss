@@ -24,8 +24,17 @@ function execSafe(db: Database.Database, sql: string): void {
   }
 }
 
+/*
+ * 移行の再生は全部同期で走るので、テストごとに繰り返すとその間ワーカーが
+ * 止まる。1度だけ組み立てて中身を控え、以後はその写しから起こす。
+ * 写しは独立したDBなので、テスト同士は影響し合わない。
+ */
+const migratedSnapshots = new Map<string, Buffer>();
+
 /** schema.sql + 指定ファイルまでの移行を順に適用する。 */
 function setupDbThrough(maxFile: string): Database.Database {
+  const cached = migratedSnapshots.get(maxFile);
+  if (cached) return new Database(cached);
   const db = new Database(':memory:');
   execSafe(db, readFileSync(join(PKG_ROOT, 'schema.sql'), 'utf8'));
   const migrationFiles = readdirSync(MIGRATIONS_DIR)
@@ -35,6 +44,7 @@ function setupDbThrough(maxFile: string): Database.Database {
   for (const file of migrationFiles) {
     execSafe(db, readFileSync(join(MIGRATIONS_DIR, file), 'utf8'));
   }
+  migratedSnapshots.set(maxFile, db.serialize());
   return db;
 }
 
