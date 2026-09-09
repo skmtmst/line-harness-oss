@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { ApiError, fetchApi } from '@/lib/api'
 import { IdempotencyKeyStore } from '@/lib/idempotency-key-store'
-import { createPollGeneration, startVisiblePoll } from '@/lib/visible-polling'
+import { createPollGeneration, startVisiblePoll, type VisiblePollHandle } from '@/lib/visible-polling'
 import TemplatePicker from '@/components/chats/template-picker'
 
 /**
@@ -169,8 +169,24 @@ export default function EmailThread({
   // 上限後は再試行を出す。対応済みになったら止める(#630)。
   const [threadStalled, setThreadStalled] = useState(false)
   const [threadRetryKey, setThreadRetryKey] = useState(0)
-  const threadStatusRef = useRef(detail?.thread.status)
-  threadStatusRef.current = detail?.thread.status
+  /**
+   * いま出ている会話の状態を「どのスレッドのものか」と一緒に持つ(#630)。
+   *
+   * 状態だけを持つと、対応済みAから未対応Bへ切り替えた直後の描画で
+   * まだAの `detail` が残っているため、Bのループが「対応済みだから
+   * 休む」と判断して1度も取りに行かず、会話が読み込み中のまま止まる。
+   * effect の `setDetail(null)` が効くのは次の描画で、判断はそれより先。
+   */
+  const threadStatusRef = useRef<{ threadId: string; status: ThreadStatus } | null>(null)
+  threadStatusRef.current = detail ? { threadId: detail.thread.id, status: detail.thread.status } : null
+  /** 表示中のスレッドの状態。別スレッドのものは見ない。 */
+  const currentThreadStatus = (): ThreadStatus | undefined => {
+    const seen = threadStatusRef.current
+    return seen && seen.threadId === latestThreadRef.current ? seen.status : undefined
+  }
+  // 対応済みで休んだあと再オープンされたら起こす。effectを作り直すと
+  // `setDetail(null)` で会話が消えて読み込み中に戻るので、同じ1本を起こす。
+  const pollRef = useRef<VisiblePollHandle | null>(null)
   useEffect(() => {
     setDetail(null)
     setReply('')
@@ -178,9 +194,9 @@ export default function EmailThread({
     // 初回も同じ1本に載せる。初回だけ外に別走させると
     // 初回と5秒後の取得が重複する。初回だけ表示あり、2回目から静かに。
     let first = true
-    const stop = startVisiblePoll({
+    const poll = startVisiblePoll({
       immediate: true,
-      shouldPoll: () => threadStatusRef.current !== 'resolved',
+      shouldPoll: () => currentThreadStatus() !== 'resolved',
       work: async () => {
         const loud = first
         first = false
@@ -190,8 +206,21 @@ export default function EmailThread({
       onGiveUp: () => setThreadStalled(true),
       onRecovered: () => setThreadStalled(false),
     })
-    return stop
+    pollRef.current = poll
+    return () => {
+      if (pollRef.current === poll) pollRef.current = null
+      poll.stop()
+    }
+    // currentThreadStatus は ref を読むだけなので deps に入れない。
+    // 入れると会話を取り直すたびにループを作り直してしまう。
   }, [load, threadRetryKey])
+
+  // 再オープン(対応済み→未対応など)で止まっていたループを起こす。
+  useEffect(() => {
+    if (detail && detail.thread.id === threadId && detail.thread.status !== 'resolved') {
+      pollRef.current?.wake()
+    }
+  }, [detail, threadId])
 
   /**
    * 対応の状態を変える。

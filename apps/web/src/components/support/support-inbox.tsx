@@ -169,18 +169,26 @@ export default function SupportInbox({ channel = 'email' }: { channel?: Channel 
   // 未解決だけを5秒起点の1本で取り直す。初回も同じ1本に載せ、
   // 別の effect で初回取得だけ外に走らせない(重複防止)。
   // 非表示では止め、連続失敗は待ちを延ばして上限後は再試行を出す。
-  // 対応済み・すべて表示では止める(#630)。
+  // 対応済み・すべて表示では、初回の1回だけ取ってから止める(#630)。
   const [inboxStalled, setInboxStalled] = useState(false)
   const [inboxRetryKey, setInboxRetryKey] = useState(0)
-  // 詳細の状態はループを止めずに読む。deps に入れると取り直すたびに
-  // 待ちが振り出しに戻り、失敗の数え直しが壊れる。
-  const detailStatusRef = useRef(detail?.thread.status)
-  detailStatusRef.current = detail?.thread.status
+  /**
+   * いま出ている会話の状態を「どのスレッドのものか」と一緒に持つ(#630)。
+   *
+   * 状態だけを持つと、対応済みAから未対応Bへ選び直した直後に、まだ
+   * Aの状態を見て「対応済みだから取らない」と判断してしまい、Bの会話が
+   * 読み込み中のまま止まる。deps には入れない(取り直すたびに待ちが
+   * 振り出しに戻り、失敗の数え直しが壊れる)。
+   */
+  const detailStatusRef = useRef<{ threadId: string; status: ThreadStatus } | null>(null)
+  detailStatusRef.current = detail ? { threadId: detail.thread.id, status: detail.thread.status } : null
   useEffect(() => {
     setInboxStalled(false)
     // 初回だけ表示あり(スピナー・エラー)、2回目から静かに。
     let first = true
-    const stop = startVisiblePoll({
+    const poll = startVisiblePoll({
+      // 「対応済み」「すべて」は5秒更新の対象外だが、初回の1回は取る。
+      // 絞り込みを変えた直後に取らないと、前の絞り込みの一覧が残る(#630)。
       immediate: true,
       shouldPoll: () => status === 'open' || status === 'unread' || status === 'in_progress' || status === 'on_hold',
       work: async () => {
@@ -190,7 +198,9 @@ export default function SupportInbox({ channel = 'email' }: { channel?: Channel 
         // 未解決フィルターでも、選んでいるスレッド自体が対応済みなら
         // 詳細は取り直さない(#630)。選択はrefで読む(effectを作り直さない)。
         const current = selectedRef.current
-        const detailOk = current && shouldRefetchSelectedDetail(current, detailStatusRef.current)
+        const seen = detailStatusRef.current
+        const detailStatus = seen && current && seen.threadId === current.threadId ? seen.status : undefined
+        const detailOk = current && shouldRefetchSelectedDetail(current, detailStatus)
           ? await loadDetail(current.threadId, true)
           : true
         if (!inboxOk || !detailOk) throw new Error('お問い合わせ一覧を読み込めませんでした')
@@ -198,7 +208,7 @@ export default function SupportInbox({ channel = 'email' }: { channel?: Channel 
       onGiveUp: () => setInboxStalled(true),
       onRecovered: () => setInboxStalled(false),
     })
-    return stop
+    return () => poll.stop()
   }, [loadDetail, loadInbox, status, inboxRetryKey])
 
 

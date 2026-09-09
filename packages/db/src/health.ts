@@ -41,9 +41,15 @@ export async function createAccountHealthLog(
   return (await db.prepare(`SELECT * FROM account_health_logs WHERE id = ?`).bind(id).first<AccountHealthLogRow>())!;
 }
 
-/** 最新のリスクレベルを取得 */
+/**
+ * 最新のリスクレベルを取得。
+ *
+ * 同じ時刻のログが複数あるときは id の大きい方を採る。まとめて取る
+ * `getLatestRiskLevels` と同じ並びにしておかないと、サイドバーの要約と
+ * 個別画面で違うレベルが出る(#630)。
+ */
 export async function getLatestRiskLevel(db: D1Database, lineAccountId: string): Promise<string | null> {
-  const row = await db.prepare(`SELECT risk_level FROM account_health_logs WHERE line_account_id = ? ORDER BY created_at DESC LIMIT 1`)
+  const row = await db.prepare(`SELECT risk_level FROM account_health_logs WHERE line_account_id = ? ORDER BY created_at DESC, id DESC LIMIT 1`)
     .bind(lineAccountId).first<{ risk_level: string }>();
   return row?.risk_level ?? null;
 }
@@ -56,6 +62,12 @@ export interface LatestAccountRiskRow {
 /**
  * 複数アカウントの最新リスクレベルを1クエリで取得する(サイドバーの N+1 解消用)。
  * ログ本文は返さない。呼び出し側が staff 可視範囲の ID だけを渡すこと。
+ *
+ * `GROUP BY` に対して裸の `risk_level` を並べる書き方はしない。SQLite は
+ * それを通してしまうが、同じ時刻のログが2件あるとどちらの値が返るかは
+ * 決まらない。危険と正常が同時刻で並んだときにサイドバーの警告が
+ * 出たり出なかったりするので、順位付け(時刻の新しい順、同着は id の
+ * 大きい順)で1件に決めてから取り出す(#630)。
  */
 export async function getLatestRiskLevels(
   db: D1Database,
@@ -63,17 +75,18 @@ export async function getLatestRiskLevels(
 ): Promise<LatestAccountRiskRow[]> {
   if (lineAccountIds.length === 0) return [];
   const result = await db.prepare(
-    `SELECT ahl.line_account_id AS line_account_id, ahl.risk_level AS risk_level
-       FROM account_health_logs ahl
-       INNER JOIN (
-         SELECT line_account_id AS aid, MAX(created_at) AS max_created
+    `SELECT line_account_id, risk_level
+       FROM (
+         SELECT line_account_id,
+                risk_level,
+                ROW_NUMBER() OVER (
+                  PARTITION BY line_account_id
+                  ORDER BY created_at DESC, id DESC
+                ) AS rn
            FROM account_health_logs
           WHERE line_account_id IN (SELECT value FROM json_each(?))
-          GROUP BY line_account_id
-       ) latest
-          ON ahl.line_account_id = latest.aid
-         AND ahl.created_at = latest.max_created
-      GROUP BY ahl.line_account_id`,
+       )
+      WHERE rn = 1`,
   ).bind(JSON.stringify([...lineAccountIds])).all<LatestAccountRiskRow>();
   return result.results;
 }

@@ -55,7 +55,7 @@ describe('visiblePollDelayMs', () => {
 describe('startVisiblePoll', () => {
   it('5秒起点で繰り返し、止めたらそれ以上呼ばない', async () => {
     const work = vi.fn(async () => undefined)
-    const stop = startVisiblePoll({ work })
+    const { stop } = startVisiblePoll({ work })
 
     expect(work).not.toHaveBeenCalled()
     await vi.advanceTimersByTimeAsync(VISIBLE_POLL_BASE_MS)
@@ -134,11 +134,80 @@ describe('startVisiblePoll', () => {
     expect(work).toHaveBeenCalledTimes(2)
   })
 
-  it('immediateでも対象が終わっていたら走らせない', async () => {
+  it('immediateなら対象が終わっていても初回の1回は取り、そのあとは回さない', async () => {
+    // 画面や絞り込みを変えた直後は、いま出ている中身が前の対象のもの。
+    // 1回も取らずに休むと古い一覧が残る(#630)。
     const work = vi.fn(async () => undefined)
     startVisiblePoll({ shouldPoll: () => false, work, immediate: true })
 
+    await vi.advanceTimersByTimeAsync(0)
+    expect(work).toHaveBeenCalledTimes(1)
+    await vi.advanceTimersByTimeAsync(VISIBLE_POLL_BASE_MS * 6)
+    expect(work).toHaveBeenCalledTimes(1)
+  })
+
+  it('immediateでないなら対象が終わっていたら初回も走らせない', async () => {
+    const work = vi.fn(async () => undefined)
+    startVisiblePoll({ shouldPoll: () => false, work })
+
     await vi.advanceTimersByTimeAsync(VISIBLE_POLL_BASE_MS * 3)
+    expect(work).not.toHaveBeenCalled()
+  })
+
+  it('非表示で開いたimmediateは、表示に戻った時点で待たずに取る', async () => {
+    const doc = stubDocument(true)
+    const work = vi.fn(async () => undefined)
+    startVisiblePoll({ work, immediate: true })
+
+    await vi.advanceTimersByTimeAsync(VISIBLE_POLL_BASE_MS * 3)
+    expect(work).not.toHaveBeenCalled()
+
+    // ここで5秒待たせると、そのあいだ画面は「読み込み中」のまま(#630)。
+    doc.hidden = false
+    doc.dispatch('visibilitychange')
+    await vi.advanceTimersByTimeAsync(0)
+    expect(work).toHaveBeenCalledTimes(1)
+  })
+
+  it('休んだあと wake で再開する(対応済み→再オープン)', async () => {
+    let active = true
+    const work = vi.fn(async () => undefined)
+    const poll = startVisiblePoll({ shouldPoll: () => active, work })
+
+    await vi.advanceTimersByTimeAsync(VISIBLE_POLL_BASE_MS)
+    expect(work).toHaveBeenCalledTimes(1)
+
+    // 休む。次を予約しないので、いくら待っても増えない。
+    active = false
+    await vi.advanceTimersByTimeAsync(60000)
+    expect(work).toHaveBeenCalledTimes(1)
+
+    // 再開したら5秒起点に戻る。
+    active = true
+    poll.wake()
+    await vi.advanceTimersByTimeAsync(VISIBLE_POLL_BASE_MS)
+    expect(work).toHaveBeenCalledTimes(2)
+    await vi.advanceTimersByTimeAsync(VISIBLE_POLL_BASE_MS)
+    expect(work).toHaveBeenCalledTimes(3)
+  })
+
+  it('wake は動いている間は何もしない(二重に回さない)', async () => {
+    const work = vi.fn(async () => undefined)
+    const poll = startVisiblePoll({ work })
+
+    poll.wake()
+    poll.wake()
+    poll.wake()
+    await vi.advanceTimersByTimeAsync(VISIBLE_POLL_BASE_MS)
+    expect(work).toHaveBeenCalledTimes(1)
+  })
+
+  it('止めたあとの wake では回さない', async () => {
+    const work = vi.fn(async () => undefined)
+    const poll = startVisiblePoll({ work })
+    poll.stop()
+    poll.wake()
+    await vi.advanceTimersByTimeAsync(60000)
     expect(work).not.toHaveBeenCalled()
   })
 
@@ -277,7 +346,7 @@ describe('startVisiblePoll', () => {
   it('止めたら待ち受けも外す', async () => {
     const doc = stubDocument(false)
     const work = vi.fn(async () => undefined)
-    const stop = startVisiblePoll({ work })
+    const { stop } = startVisiblePoll({ work })
     stop()
     expect(doc.removeEventListener).toHaveBeenCalledWith('visibilitychange', expect.any(Function))
     await vi.advanceTimersByTimeAsync(60000)

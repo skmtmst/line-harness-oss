@@ -68,8 +68,13 @@ export default function BroadcastDetail({ broadcastId }: BroadcastDetailProps) {
       if (res.success && res.data) {
         const fresh = res.data
         // 進捗が先に送信完了を見ていたら、古い全文で戻さない。
+        // 同じ配信のときだけ守る。ID を見ないと、送信済みAから
+        // 送信中Bへ移った瞬間に「Aは送信済み」を理由にBの全文を捨て、
+        // 画面がAのまま残る(#630)。
         setBroadcast((prev) =>
-          prev && prev.status === 'sent' && fresh.status !== 'sent' ? prev : fresh,
+          prev && prev.id === fresh.id && prev.status === 'sent' && fresh.status !== 'sent'
+            ? prev
+            : fresh,
         )
         if (res.data.totalCount > 0) {
           setTargetCount(res.data.totalCount)
@@ -107,7 +112,7 @@ export default function BroadcastDetail({ broadcastId }: BroadcastDetailProps) {
     if (broadcast?.status !== 'sending') return
     setProgressStalled(false)
     let finished = false
-    const stop = startVisiblePoll({
+    const poll = startVisiblePoll({
       shouldPoll: () => !finished,
       work: async () => {
         // 別 broadcast へ移動後の遅い応答は捨て、失敗にも数えない。
@@ -117,7 +122,9 @@ export default function BroadcastDetail({ broadcastId }: BroadcastDetailProps) {
         if (!res.success || !res.data) throw new Error('進捗を読み込めませんでした')
         // 閉じ込めた関数の中では絞り込みが外れるので、先に取り出す。
         const data = res.data
-        setBroadcast(prev => prev ? {
+        // 全文がまだ前の配信のときは混ぜない。別配信の進捗を前の
+        // 全文へ足すと、題名Aに進捗Bという画面になる(#630)。
+        setBroadcast(prev => prev && prev.id === requestId ? {
           ...prev,
           status: data.status as ApiBroadcast['status'],
           totalCount: data.totalCount,
@@ -132,7 +139,7 @@ export default function BroadcastDetail({ broadcastId }: BroadcastDetailProps) {
       onGiveUp: () => setProgressStalled(true),
       onRecovered: () => setProgressStalled(false),
     })
-    return stop
+    return () => poll.stop()
   }, [broadcast?.status, id, load, pollRetryKey])
 
   // Load insight for sent broadcasts

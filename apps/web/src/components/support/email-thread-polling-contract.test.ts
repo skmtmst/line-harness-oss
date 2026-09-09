@@ -12,7 +12,16 @@ describe('メール会話の定期取得 (#630)', () => {
   })
 
   it('未解決の間だけ動かし、対応済みでは回さない', () => {
-    expect(thread).toContain("threadStatusRef.current !== 'resolved'")
+    expect(thread).toContain("currentThreadStatus() !== 'resolved'")
+  })
+
+  it('状態はスレッドIDと組で持ち、前のスレッドのものを見ない(#630)', () => {
+    expect(thread).toContain('threadId: string; status: ThreadStatus')
+    expect(thread).toContain('seen.threadId === latestThreadRef.current')
+  })
+
+  it('再オープンされたら同じ1本を起こす(作り直さない)', () => {
+    expect(thread).toContain('pollRef.current?.wake()')
   })
 
   it('静かな取り直しは成否を返し、失敗は投げて数え直す', () => {

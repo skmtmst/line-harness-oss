@@ -71,7 +71,16 @@ describe('問い合わせ一覧の定期取得 (#630)', () => {
 
   it('詳細の状態はループを止めずに読む(refで追う)', () => {
     expect(inbox).toContain('detailStatusRef')
-    expect(inbox).toContain('shouldRefetchSelectedDetail(current, detailStatusRef.current)')
+    expect(inbox).toContain('shouldRefetchSelectedDetail(current, detailStatus)')
+  })
+
+  it('詳細の状態はスレッドIDと組で持ち、前のスレッドのものを見ない(#630)', () => {
+    expect(inbox).toContain('threadId: string; status: ThreadStatus')
+    expect(inbox).toContain('seen.threadId === current.threadId')
+  })
+
+  it('「対応済み」「すべて」でも初回の1回は取る(前の一覧を残さない、#630)', () => {
+    expect(inbox).toContain('immediate: true')
   })
 
   it('選択更新で制御器を作り直さない(refで読み、depsにselectedを入れない)', () => {

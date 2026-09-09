@@ -6,18 +6,25 @@
  * 叩き続けるので、ここに寄せる。使い方は `startVisiblePoll` だけ。
  *
  * 約束:
- * - 5秒起点、同時に1本だけ。止めるときは返す関数を呼ぶ(unmountで必ず)。
+ * - 5秒起点、同時に1本だけ。止めるときは返す `stop` を呼ぶ(unmountで必ず)。
  *   取得の実行中に表示が戻っても別tickを予約しない(終わったtickが
  *   次を予約するので、ここで足すと遅い取得と二重になる)。
  * - `immediate: true` のときは開始直後に1回すぐ走らせる。初回の取得も
  *   同じ1本に載せるためで、外で `void load()` を別に走らせない(重複と
  *   順序逆転の元)。初回は終わってから次を予約するので二重にならない。
+ * - **初回の1回だけは `shouldPoll` を見ない。** 画面や絞り込みを変えた
+ *   直後に「もう更新しない対象」でも、いま出ている中身は前の対象のもの。
+ *   1回も取らずに休むと古い一覧が残ったままになる(問い合わせの
+ *   「対応済み」「すべて」がそうだった)。取ってから休む。
  * - タブ非表示の間は取得しない。表示に戻ったら失敗回数に応じた
  *   待ちで再開する(固定5秒に戻すと、失敗続きの相手を非表示の往復
- *   だけで速く叩き直してしまう)。
- * - `shouldPoll` が false を返したら止める(次を予約しない)。完了後に
+ *   だけで速く叩き直してしまう)。ただし初回がまだなら待たせない。
+ *   隠れたタブで開いた画面が、表示に戻ってから更に5秒
+ *   「読み込み中」のままになるのを避ける。
+ * - `shouldPoll` が false を返したら休む(次を予約しない)。完了後に
  *   通信しないタイマーを回し続けると、終わった画面が無期限に起き続ける。
- *   再開は effect の作り直しか表示イベントに任せる。
+ *   再開したくなったら `wake()` を呼ぶ(対応済みのスレッドを再オープン
+ *   したときなど)。表示イベントとeffectの作り直しでも再開する。
  * - 連続失敗は 5秒→10秒→20秒→40秒→60秒(上限)と待ちを延ばす。
  * - 5回続けて失敗したら止まり、`onGiveUp` を1回呼ぶ。画面は理由と
  *   再試行ボタンを出す(再試行は `startVisiblePoll` の呼び直し)。
@@ -56,7 +63,7 @@ export function createPollGeneration() {
 }
 
 export type VisiblePollOptions = {
-  /** 対象が処理中/未解決の間だけ true を返す。falseの間は止まる。 */
+  /** 対象が処理中/未解決の間だけ true を返す。falseの間は休む。 */
   shouldPoll?: () => boolean
   /** 1回分の取得。失敗したら例外を投げる。 */
   work: () => Promise<unknown>
@@ -72,20 +79,33 @@ export type VisiblePollOptions = {
   immediate?: boolean
 }
 
-/** 5秒起点の単一ループを始める。返す関数で止める。 */
-export function startVisiblePoll(options: VisiblePollOptions): () => void {
+export type VisiblePollHandle = {
+  /** 止める。unmountで必ず呼ぶ。 */
+  stop: () => void
+  /**
+   * 休んでいたら起こす。`shouldPoll` が true に戻ったときに呼ぶ
+   * (対応済み→再オープンなど)。すでに動いていれば何もしないので、
+   * 二重に回ることはない。
+   */
+  wake: () => void
+}
+
+/** 5秒起点の単一ループを始める。返す `stop` で止める。 */
+export function startVisiblePoll(options: VisiblePollOptions): VisiblePollHandle {
   let timer: ReturnType<typeof setTimeout> | null = null
   let stopped = false
   let failures = 0
   let gaveUp = false
   // 取得の実行中か。表示の往復で別tickを予約しないための印。
   let inFlight = false
+  // 初回の取得がまだ残っているか。初回だけは shouldPoll を見ずに走らせる。
+  let firstPending = options.immediate === true
 
   const isHidden = () =>
     typeof document !== 'undefined' && document.hidden === true
   const hasVisibilityEvents = () =>
     typeof document !== 'undefined' && typeof document.addEventListener === 'function'
-  // falseの間は止める。完了後のタイマー空回りを止めるための判定。
+  // falseの間は休む。完了後のタイマー空回りを止めるための判定。
   const shouldRest = () => options.shouldPoll?.() === false
 
   const clearTimer = () => {
@@ -108,9 +128,10 @@ export function startVisiblePoll(options: VisiblePollOptions): () => void {
     if (stopped || gaveUp) return
     // 非表示の間は取得せず、表示イベントで再開する(タイマーを残さない)。
     if (isHidden()) return
-    // 対象が終わっていたら止める。次を予約しない(完了後の空回り防止)。
-    // 再開は effect の作り直しか表示イベント。
-    if (shouldRest()) return
+    // 対象が終わっていたら休む。次を予約しない(完了後の空回り防止)。
+    // ただし初回の1回だけは取る(古い中身を残さない)。
+    if (!firstPending && shouldRest()) return
+    firstPending = false
     inFlight = true
     try {
       await options.work()
@@ -122,7 +143,9 @@ export function startVisiblePoll(options: VisiblePollOptions): () => void {
         options.onGiveUp?.(failures)
         return
       }
-      schedule(visiblePollDelayMs(failures))
+      // 休みに入ったなら再試行も予約しない。失敗回数は残るので、
+      // `wake()` で再開したときは相応の待ちから始まる。
+      if (!shouldRest()) schedule(visiblePollDelayMs(failures))
       return
     } finally {
       inFlight = false
@@ -131,41 +154,54 @@ export function startVisiblePoll(options: VisiblePollOptions): () => void {
       failures = 0
       options.onRecovered?.()
     }
+    if (shouldRest()) return
     schedule(VISIBLE_POLL_BASE_MS)
+  }
+
+  // 休みから戻すときの共通処理。動いている間は何もしない。
+  const resume = () => {
+    if (stopped || gaveUp) return
+    if (isHidden()) return
+    if (timer !== null || inFlight) return
+    // 初回がまだなら待たせない。隠れたタブで開いた画面が、表示に
+    // 戻ってから更に5秒「読み込み中」のままになるのを避ける。
+    if (firstPending) {
+      void tick()
+      return
+    }
+    if (shouldRest()) return
+    schedule(visiblePollDelayMs(failures))
   }
 
   const onVisibilityChange = () => {
     if (stopped || gaveUp) return
     if (isHidden()) {
       clearTimer()
-    } else if (timer === null && !inFlight) {
-      // 取得中は予約しない。終わったtickが次を予約するので、
-      // ここで足すと遅い取得と二重になる。
-      // 対象が終わっていたら起こさない(完了後の空回り防止)。
-      if (shouldRest()) return
-      schedule(visiblePollDelayMs(failures))
+      return
     }
+    resume()
   }
 
   if (hasVisibilityEvents()) {
     document.addEventListener('visibilitychange', onVisibilityChange)
   }
-  // 開いた瞬間に隠れているタブでは回さない。表示イベントで再開する。
-  // 対象が終わっている画面でも回さない。
-  if (!isHidden() && !shouldRest()) {
-    if (options.immediate) {
+  if (!isHidden()) {
+    if (firstPending) {
       // 初回も同じ1本に載せる。終わってから次を予約するので二重にならない。
       void tick()
-    } else {
+    } else if (!shouldRest()) {
       schedule(VISIBLE_POLL_BASE_MS)
     }
   }
 
-  return () => {
-    stopped = true
-    clearTimer()
-    if (hasVisibilityEvents()) {
-      document.removeEventListener('visibilitychange', onVisibilityChange)
-    }
+  return {
+    stop() {
+      stopped = true
+      clearTimer()
+      if (hasVisibilityEvents()) {
+        document.removeEventListener('visibilitychange', onVisibilityChange)
+      }
+    },
+    wake: resume,
   }
 }
