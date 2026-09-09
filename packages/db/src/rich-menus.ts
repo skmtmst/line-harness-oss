@@ -1045,28 +1045,31 @@ export async function markRichMenuGroupUnpublished(
   db: D1Database,
   groupId: string,
   fence?: PublishLeaseFence,
-): Promise<void> {
+): Promise<boolean> {
   const now = jstNow();
-  // page と group を1回のbatchで揃える。札があるときは両方に同じ条件を付け、
-  // 回収に負けた旧holderが新しい所有者の lease と反映を壊さないようにする。
-  await db.batch([
-    db
-      .prepare(
-        `UPDATE rich_menu_pages
-            SET line_richmenu_id = NULL, updated_at = ?
-          WHERE group_id = ?${fenceClause(fence, 'rich_menu_pages.group_id')}`,
-      )
-      .bind(now, groupId, ...fenceBinds(fence)),
-    db
-      .prepare(
-        `UPDATE rich_menu_groups
-            SET status = 'draft', publishing_at = NULL,
-                publishing_owner = NULL, publishing_expires_at = NULL,
-                is_default_for_all = 0, updated_at = ?
-          WHERE id = ?${fence ? ' AND publishing_owner = ? AND publishing_generation = ?' : ''}`,
-      )
-      .bind(now, groupId, ...fenceBinds(fence)),
-  ]);
+  // 札があるときは両方の文に同じ条件を付け、回収に負けた旧holderが
+  // 新しい所有者の lease と反映を壊さないようにする。
+  // page を先に消してから group を落とす。逆にすると group の文で lease が
+  // 空き、そのあとの page の文が自分の札に一致しなくなる。
+  await db
+    .prepare(
+      `UPDATE rich_menu_pages
+          SET line_richmenu_id = NULL, updated_at = ?
+        WHERE group_id = ?${fenceClause(fence, 'rich_menu_pages.group_id')}`,
+    )
+    .bind(now, groupId, ...fenceBinds(fence))
+    .run();
+  const result = await db
+    .prepare(
+      `UPDATE rich_menu_groups
+          SET status = 'draft', publishing_at = NULL,
+              publishing_owner = NULL, publishing_expires_at = NULL,
+              is_default_for_all = 0, updated_at = ?
+        WHERE id = ?${fence ? ' AND publishing_owner = ? AND publishing_generation = ?' : ''}`,
+    )
+    .bind(now, groupId, ...fenceBinds(fence))
+    .run();
+  return (result.meta?.changes ?? 0) > 0;
 }
 
 // =============================================================================

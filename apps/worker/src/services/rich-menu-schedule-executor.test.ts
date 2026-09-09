@@ -162,9 +162,9 @@ beforeEach(() => {
   dbMocks.renewPublishLease.mockResolvedValue(true);
   dbMocks.renewScheduleLease.mockResolvedValue(true);
   dbMocks.releasePublishLease.mockResolvedValue(true);
-  dbMocks.setPageRichMenuId.mockResolvedValue(undefined);
-  dbMocks.markRichMenuGroupPublished.mockResolvedValue(undefined);
-  dbMocks.markRichMenuGroupUnpublished.mockResolvedValue(undefined);
+  dbMocks.setPageRichMenuId.mockResolvedValue(true);
+  dbMocks.markRichMenuGroupPublished.mockResolvedValue(true);
+  dbMocks.markRichMenuGroupUnpublished.mockResolvedValue(true);
   dbMocks.clearRichMenuAssignmentsForGroup.mockResolvedValue(undefined);
   dbMocks.recordRichMenuScheduleSuccess.mockResolvedValue(true);
   dbMocks.recordRichMenuScheduleRestoreSuccess.mockResolvedValue(true);

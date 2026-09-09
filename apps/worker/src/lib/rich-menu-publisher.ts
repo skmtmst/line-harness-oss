@@ -69,6 +69,24 @@ export type GroupInput = {
   formBaseUrl?: string | null;
 };
 
+/**
+ * 長いLINE処理の途中で「まだ自分が担当か」を確かめる合図。
+ *
+ * 1回のpublishは、ページ数ぶんの作成・画像upload・alias切替・旧削除で
+ * 何分もかかる。その間ずっとleaseを延ばさないと、本人が動いている最中に
+ * 期限切れで別の実行に回収される。外部呼び出しの直前ごとにこれを呼び、
+ * 失権していたら投げてもらう。
+ */
+export type PublishHeartbeat = () => Promise<void>;
+
+/** leaseを失ったので、この実行は続けてはいけない。 */
+export class PublishLeaseLostError extends Error {
+  constructor(message = 'publish lease lost') {
+    super(message);
+    this.name = 'PublishLeaseLostError';
+  }
+}
+
 export class RichMenuValidationError extends Error {
   constructor(message: string) {
     super(message);
@@ -410,6 +428,7 @@ export async function createRichMenuShells(
   group: GroupInput,
   line: LineRichMenuClient,
   r2: R2Like,
+  heartbeat?: PublishHeartbeat,
 ): Promise<{ shells: RichMenuShell[]; pages: PageInput[] }> {
   const resolvedPages = resolveSwitcherActions(group.pages, group.id);
   resolvedPages.sort((a, b) => a.orderIndex - b.orderIndex);
@@ -430,6 +449,7 @@ export async function createRichMenuShells(
 
   try {
     for (const page of resolvedPages) {
+      await heartbeat?.();
       const created = await line.createRichMenu({
         size: dimensions,
         selected: false,
@@ -441,6 +461,7 @@ export async function createRichMenuShells(
         })),
       });
       shells.push({ pageId: page.id, orderIndex: page.orderIndex, newRichMenuId: created.richMenuId });
+      await heartbeat?.();
       await line.uploadRichMenuImage(
         created.richMenuId,
         imageBytes.get(page.id)!,
@@ -467,9 +488,11 @@ export async function switchRichMenuLive(
   line: LineRichMenuClient,
   group: GroupInput,
   shells: RichMenuShell[],
+  heartbeat?: PublishHeartbeat,
 ): Promise<void> {
   const ordered = [...shells].sort((a, b) => a.orderIndex - b.orderIndex);
   for (const shell of ordered) {
+    await heartbeat?.();
     await line.upsertRichMenuAlias(
       buildAliasId(group.id, shell.orderIndex),
       shell.newRichMenuId,
@@ -479,11 +502,13 @@ export async function switchRichMenuLive(
   if (group.isDefaultForAll && shells.length > 0) {
     // orderIndex順に並べた先頭を default にする。
     const first = [...shells].sort((a, b) => a.orderIndex - b.orderIndex)[0];
+    await heartbeat?.();
     await line.setDefaultRichMenu(first.newRichMenuId);
     return;
   }
 
   if (!group.isDefaultForAll) {
+    await heartbeat?.();
     // ベストエフォート: この group の richmenu が現在 LINE の default なら外す。
     // 別 group の default まで壊さないよう、自分のIDに当たるときだけ解除する。
     try {
@@ -621,10 +646,11 @@ export async function publishRichMenuGroup(
   group: GroupInput,
   line: LineRichMenuClient,
   r2: R2Like,
+  heartbeat?: PublishHeartbeat,
 ): Promise<PublishResult> {
   // 一括版(手動公開用)。段階関数と同じ実装を使い、journalは挟まない。
   // 予約実行は段階関数を直接呼び、createと切替の間にjournalを確定する。
-  const { shells, pages: resolvedPages } = await createRichMenuShells(group, line, r2);
+  const { shells, pages: resolvedPages } = await createRichMenuShells(group, line, r2, heartbeat);
   const results = shells.map((shell) => ({ pageId: shell.pageId, newRichMenuId: shell.newRichMenuId }));
   const prev: PreSwitchLiveState = {
     oldIds: resolvedPages.map((page) => ({
@@ -642,7 +668,7 @@ export async function publishRichMenuGroup(
   }
 
   try {
-    await switchRichMenuLive(line, group, shells);
+    await switchRichMenuLive(line, group, shells, heartbeat);
   } catch (error) {
     const unrestored = await restorePreSwitchLive(line, group.id, prev);
     const defaultOutcome = await restorePreSwitchDefault(
@@ -656,6 +682,7 @@ export async function publishRichMenuGroup(
   }
 
   // 公開切替がすべて終わってから旧メニューを削除する。
+  await heartbeat?.();
   await deleteRichMenuShells(
     line,
     prev.oldIds.filter((old) => old.lineRichMenuId).map((old) => old.lineRichMenuId as string),
@@ -707,11 +734,15 @@ export type UnpublishResult = {
 export async function unpublishRichMenuGroup(
   group: GroupInput,
   line: LineRichMenuClient,
+  heartbeat?: PublishHeartbeat,
 ): Promise<UnpublishResult> {
   const warnings: string[] = [];
   const pages: UnpublishResult['pages'] = [];
 
   for (const page of group.pages) {
+    // 外部呼び出しの前に担当を確かめる。失権していたら投げて止める
+    // (warnings へ落とすと、失権に気づかないまま成功応答してしまう)。
+    await heartbeat?.();
     // alias 削除
     const aliasId = buildAliasId(group.id, page.orderIndex);
     try {
@@ -732,6 +763,7 @@ export async function unpublishRichMenuGroup(
     pages.push({ pageId: page.id, clearedRichMenuId: page.lineRichMenuId });
   }
 
+  await heartbeat?.();
   // default が own group のものなら unlink。ベストエフォート (失敗しても unpublish 全体は成功扱い)。
   try {
     const currentDefault = await line.getCurrentDefaultRichMenuId();

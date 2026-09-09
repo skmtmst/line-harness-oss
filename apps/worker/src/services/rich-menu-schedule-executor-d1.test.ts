@@ -9,8 +9,11 @@ import {
   recordRichMenuScheduleSuccess,
 } from '@line-crm/db'
 import {
+  PublishLeaseLostError,
   createRichMenuShells,
   deleteRichMenuShells,
+  publishRichMenuGroup,
+  unpublishRichMenuGroup,
   restorePreSwitchDefault,
   restorePreSwitchLive,
   switchRichMenuLive,
@@ -328,8 +331,8 @@ function depsFor(
     getLineAccount: async () => ({ id: 'account-1', channel_access_token: 'token', is_active: 1, archived_at: null }),
     getRequestingStaff: async () => null,
     isStaffAllowedForAccount: async () => true,
-    createLineShells: async (snapshot: unknown) => {
-      const { shells } = await createRichMenuShells(snapshot as never, line as never, fakeR2 as never)
+    createLineShells: async (snapshot: unknown, _schedule: unknown, heartbeat: () => Promise<void>) => {
+      const { shells } = await createRichMenuShells(snapshot as never, line as never, fakeR2 as never, heartbeat)
       const oldById = new Map(
         ((snapshot as { pages: Array<{ id: string; lineRichmenuId: string | null }> }).pages ?? []).map((page) => [page.id, page.lineRichmenuId ?? null]),
       )
@@ -340,7 +343,7 @@ function depsFor(
         oldLineRichMenuId: oldById.get(shell.pageId) ?? null,
       }))
     },
-    createRestoreShells: async (restoreGroup: never) => {
+    createRestoreShells: async (restoreGroup: never, _schedule: unknown, heartbeat: () => Promise<void>) => {
       const group = restoreGroup as unknown as {
         id: string; is_default_for_all: number;
         pages: Array<{ id: string; order_index: number; name: string; image_r2_key: string | null; image_content_type: string | null; line_richmenu_id: string | null }>;
@@ -361,7 +364,7 @@ function depsFor(
           areas: [],
         })),
       }
-      const { shells } = await createRichMenuShells(input as never, line as never, fakeR2 as never)
+      const { shells } = await createRichMenuShells(input as never, line as never, fakeR2 as never, heartbeat)
       const oldById = new Map(input.pages.map((page) => [page.id, page.lineRichMenuId ?? null]))
       return shells.map((shell) => ({
         pageId: shell.pageId,
@@ -371,7 +374,7 @@ function depsFor(
       }))
     },
     readCurrentDefaultId: async () => line.getCurrentDefaultRichMenuId(),
-    switchLiveTo: async ({ groupId, setDefault, shells }: { groupId: string; setDefault: boolean; shells: Array<{ pageId: string; orderIndex: number; newRichMenuId: string; oldLineRichMenuId: string | null }> }) => {
+    switchLiveTo: async ({ groupId, setDefault, shells, heartbeat }: { groupId: string; setDefault: boolean; shells: Array<{ pageId: string; orderIndex: number; newRichMenuId: string; oldLineRichMenuId: string | null }>; heartbeat: () => Promise<void> }) => {
       await switchRichMenuLive(line as never, {
         id: groupId,
         size: 'large',
@@ -390,7 +393,7 @@ function depsFor(
         pageId: shell.pageId,
         orderIndex: shell.orderIndex,
         newRichMenuId: shell.newRichMenuId,
-      })))
+      })), heartbeat)
     },
     compensateSwitchToPrevious: async ({ groupId, prev, newIds }: { groupId: string; prev: unknown; newIds: string[] }) => {
       const unrestoredPageIds = await restorePreSwitchLive(line as never, groupId, prev as never)
@@ -925,6 +928,247 @@ describe('executor 段階公開（実D1 + fake LINE）', () => {
     const group = sqlite.prepare(`SELECT publishing_owner AS o, publishing_generation AS g FROM rich_menu_groups WHERE id = 'menu-1'`).get() as { o: string | null; g: number }
     expect(group.o).toBe('manual-M')
     expect(group.g).toBe(2)
+  })
+
+  test('別接続：A公開中にBが停止経路を最後まで走らせても、AのleaseもAの反映も壊れない', async () => {
+    // 停止(unpublish)も group の状態を変える経路。lease契約に乗っていないと、
+    // 公開中Aのownerと期限を消してしまう。Bは経路そのものを最後まで走らせる。
+    insertGroup(sqlite, {
+      id: 'menu-1', status: 'published', isDefault: true,
+      pages: [{ id: 'p1', order: 0, lineId: 'line-old-1' }],
+    })
+    line.menus.set('line-old-1', { name: 'old-1' })
+    line.aliases.set('lhx-menu-1-0', 'line-old-1')
+    line.defaultId = 'line-old-1'
+    insertSchedule(sqlite, { id: 'stopwar-1', definition_snapshot: snapshotFor('menu-1', ['p1'], true) })
+
+    const dbB = asD1(sqlite)
+    let stopOutcome: 'blocked' | 'unpublished' = 'unpublished'
+    const {
+      acquirePublishLease, markRichMenuGroupUnpublished, renewPublishLease, releasePublishLease,
+    } = await import('@line-crm/db')
+
+    // Aが切替を終えてDBへ反映する直前に、Bが停止経路を丸ごと走らせる。
+    const dbA = hookedDb(db, /UPDATE rich_menu_pages SET line_richmenu_id = \?/, async () => {
+      // 停止経路(routes)と同じ順番: lease取得 → LINE解除 → 札付きで畳む。
+      const generation = await acquirePublishLease(dbB, 'menu-1', 'unpublish-B', clock.iso())
+      if (generation === null) {
+        stopOutcome = 'blocked'
+        return
+      }
+      const stopFence = { owner: 'unpublish-B', generation }
+      if (!(await renewPublishLease(dbB, 'menu-1', stopFence, clock.iso()))) {
+        stopOutcome = 'blocked'
+        return
+      }
+      await unpublishRichMenuGroup({
+        id: 'menu-1', size: 'large', chatBarText: '', isDefaultForAll: true,
+        pages: [{ id: 'p1', orderIndex: 0, name: '', imageR2Key: null, imageContentType: null, lineRichMenuId: 'line-old-1', areas: [] }],
+      } as never, line as never)
+      if (!(await markRichMenuGroupUnpublished(dbB, 'menu-1', stopFence))) stopOutcome = 'blocked'
+      await releasePublishLease(dbB, 'menu-1', stopFence)
+    })
+
+    const aResult = await processDueRichMenuSchedules(
+      dbA, depsFor(sqlite, db, line, unlinked) as never,
+      { now: T0, clock: clock.now, runIdPrefix: 'A' },
+    )
+
+    // Aはleaseを持ったままなので、Bの停止は取得の時点で弾かれる。
+    expect(stopOutcome).toBe('blocked')
+    // Aは最後まで通る。
+    expect(aResult).toMatchObject({ processed: 1, succeeded: 1 })
+    const liveId = line.aliases.get('lhx-menu-1-0') as string
+    expect(liveId).toMatch(/^line-new-/)
+    const page = sqlite.prepare(`SELECT line_richmenu_id AS v FROM rich_menu_pages WHERE id = 'p1'`).get() as { v: string }
+    expect(page.v).toBe(liveId)
+    const group = sqlite.prepare(`SELECT status AS s FROM rich_menu_groups WHERE id = 'menu-1'`).get() as { s: string }
+    expect(group.s).toBe('published')
+    expect(scheduleRow(sqlite, 'stopwar-1').status).toBe('completed')
+  })
+
+  test('別接続：明示復元が期限切れgroupを畳むとき、そのgroupを持つ実行のleaseを消さない', async () => {
+    // 明示の戻し先がある復元は、期限切れgroupと戻し先groupの2つを触る。
+    // 期限切れgroup側をleaseなしで畳むと、そこを公開中の実行を壊す。
+    insertGroup(sqlite, {
+      id: 'menu-1', status: 'published', isDefault: true,
+      pages: [{ id: 'p1', order: 0, lineId: 'line-exp-1' }],
+    })
+    insertGroup(sqlite, {
+      id: 'menu-back', status: 'published', isDefault: true,
+      pages: [{ id: 'b1', order: 0, lineId: 'line-back-1' }],
+    })
+    line.menus.set('line-exp-1', { name: 'exp' })
+    line.menus.set('line-back-1', { name: 'back' })
+    line.aliases.set('lhx-menu-1-0', 'line-exp-1')
+    line.defaultId = 'line-exp-1'
+    insertSchedule(sqlite, {
+      id: 'exprest-1', mode: 'period', status: 'published',
+      starts_at: '2026-09-10T00:00:00.000Z', ends_at: '2026-09-10T01:00:00.000Z',
+      restore_group_id: 'menu-back', started_run_id: 'old-start',
+      definition_snapshot: snapshotFor('menu-1', ['p1'], true),
+    })
+
+    // 期限切れgroup menu-1 を別の実行主体Mが握っている。
+    const dbM = asD1(sqlite)
+    const { acquirePublishLease } = await import('@line-crm/db')
+    const mGeneration = await acquirePublishLease(dbM, 'menu-1', 'manual-M', clock.iso())
+    expect(mGeneration).toBe(1)
+
+    const result = await processDueRichMenuSchedules(
+      db, depsFor(sqlite, db, line, unlinked) as never,
+      { now: T0, clock: clock.now, runIdPrefix: 'R' },
+    )
+
+    // 復元は期限切れgroupのleaseを取れないので、畳まずに一時失敗へ戻す。
+    expect(result).toMatchObject({ processed: 1, restored: 0, retried: 1 })
+    const expiring = sqlite.prepare(`SELECT status AS s, publishing_owner AS o, publishing_generation AS g FROM rich_menu_groups WHERE id = 'menu-1'`).get() as { s: string; o: string | null; g: number }
+    // Mのleaseは消えていない。期限切れgroupも勝手に draft にされていない。
+    expect(expiring.o).toBe('manual-M')
+    expect(expiring.g).toBe(1)
+    expect(expiring.s).toBe('published')
+    expect(scheduleRow(sqlite, 'exprest-1').status).toBe('published')
+  })
+
+  test('別接続：予約行だけを別実行が回収したら、Aは外部工程を続けない', async () => {
+    // groupのleaseは持っていても、予約行を取られたら所有権は失っている。
+    // 片方だけ見ていると、Aが切替を続けて二重に公開してしまう。
+    insertGroup(sqlite, { id: 'menu-1', isDefault: true, pages: [{ id: 'p1' }] })
+    insertSchedule(sqlite, { id: 'rowtake-1', definition_snapshot: snapshotFor('menu-1', ['p1'], true) })
+
+    const dbB = asD1(sqlite)
+    const { claimRichMenuSchedule, reclaimStalePublishingSchedule } = await import('@line-crm/db')
+    let rowTaken = false
+    let switchCalls = 0
+
+    // Aが作り終えて切替へ入る直前に、予約行だけをBが回収して claim し直す。
+    // 切替は本物どおり動かす。呼ばれてしまったかどうかを数で見る
+    // (投げて止めると「呼ばれた」と「呼ばれなかった」が同じ形になる)。
+    const base = depsFor(sqlite, db, line, unlinked)
+    const depsA = depsFor(sqlite, db, line, unlinked, {
+      switchLiveTo: async (input: never) => {
+        switchCalls += 1
+        await (base as { switchLiveTo: (i: never) => Promise<void> }).switchLiveTo(input)
+      },
+      createLineShells: async (snapshot: unknown, _s: unknown, heartbeat: () => Promise<void>) => {
+        const { shells } = await createRichMenuShells(snapshot as never, line as never, fakeR2 as never, heartbeat)
+        // 予約行のleaseだけ切らして、Bが取り直す（groupのleaseはAのまま）。
+        clock.advance(11 * 60_000)
+        await reclaimStalePublishingSchedule(dbB, 'rowtake-1', 'account-1', clock.iso())
+        rowTaken = await claimRichMenuSchedule(dbB, 'rowtake-1', 'account-1', 'run-B', T0_ISO, clock.iso())
+        return shells.map((shell) => ({
+          pageId: shell.pageId, orderIndex: shell.orderIndex,
+          newRichMenuId: shell.newRichMenuId, oldLineRichMenuId: null,
+        }))
+      },
+    })
+
+    const aResult = await processDueRichMenuSchedules(
+      db, depsA as never, { now: T0, clock: clock.now, runIdPrefix: 'A' },
+    )
+
+    expect(rowTaken).toBe(true)
+    // Aは切替を一度も呼ばない。groupのleaseはAのままでも、予約行を
+    // 取られた時点で所有権は失っている。
+    expect(switchCalls).toBe(0)
+    expect(aResult).toMatchObject({ processed: 1, succeeded: 0, skipped: 1 })
+    expect(line.aliases.size).toBe(0)
+    expect(line.defaultId).toBeNull()
+    // 作った分は片付いている。
+    expect([...line.menus.keys()]).toEqual([])
+    // DBにもAの反映は入っていない。
+    const page = sqlite.prepare(`SELECT line_richmenu_id AS v FROM rich_menu_pages WHERE id = 'p1'`).get() as { v: string | null }
+    expect(page.v).toBeNull()
+    expect((sqlite.prepare(`SELECT status AS s FROM rich_menu_groups WHERE id = 'menu-1'`).get() as { s: string }).s).toBe('draft')
+    // 予約行はBのものになっている。
+    const row = scheduleRow(sqlite, 'rowtake-1')
+    expect(row.started_run_id).toBe('run-B')
+  })
+
+  test('別接続：手動公開が長いLINE処理の途中で失権したら、成功扱いにしない', async () => {
+    // 手動公開はページ数ぶんの作成・uploadで時間がかかる。その間に
+    // renewしないと、自分が動いている最中に予約実行へ回収される。
+    insertGroup(sqlite, {
+      id: 'menu-1', status: 'published', isDefault: true,
+      pages: [
+        { id: 'p1', order: 0, lineId: 'line-old-a' },
+        { id: 'p2', order: 1, lineId: 'line-old-b' },
+      ],
+    })
+    line.menus.set('line-old-a', { name: 'old-a' })
+    line.menus.set('line-old-b', { name: 'old-b' })
+    line.aliases.set('lhx-menu-1-0', 'line-old-a')
+    line.aliases.set('lhx-menu-1-1', 'line-old-b')
+    line.defaultId = 'line-old-a'
+
+    const dbM = asD1(sqlite)
+    const dbR = asD1(sqlite)
+    const {
+      acquirePublishLease, renewPublishLease, markRichMenuGroupPublished, setPageRichMenuId,
+    } = await import('@line-crm/db')
+
+    // 手動公開Mがleaseを取り、1枚目を作ったところで期限が切れる。
+    const mGeneration = await acquirePublishLease(dbM, 'menu-1', 'manual-M', clock.iso()) as number
+    const mFence = { owner: 'manual-M', generation: mGeneration }
+    let robbedGeneration: number | null = null
+    let pageWrites = 0
+    let markResult: boolean | null = null
+
+    const heartbeat = async () => {
+      if (!(await renewPublishLease(dbM, 'menu-1', mFence, clock.iso()))) {
+        throw new PublishLeaseLostError()
+      }
+    }
+
+    const groupInput = {
+      id: 'menu-1', size: 'large' as const, chatBarText: 'test', isDefaultForAll: true,
+      formBaseUrl: null,
+      pages: [
+        { id: 'p1', orderIndex: 0, name: 'p1', imageR2Key: 'img', imageContentType: 'image/jpeg', lineRichMenuId: 'line-old-a', areas: [] },
+        { id: 'p2', orderIndex: 1, name: 'p2', imageR2Key: 'img', imageContentType: 'image/jpeg', lineRichMenuId: 'line-old-b', areas: [] },
+      ],
+    }
+
+    const robbingLine = {
+      ...line,
+      async createRichMenu(payload: unknown) {
+        const created = await line.createRichMenu(payload)
+        if (line.calls.create === 1) {
+          // 1枚目のあとで11分経ち、別の実行主体Rがleaseを奪う。
+          clock.advance(11 * 60_000)
+          robbedGeneration = await acquirePublishLease(dbR, 'menu-1', 'rms-R', clock.iso())
+        }
+        return created
+      },
+    }
+
+    let thrown: unknown = null
+    try {
+      const result = await publishRichMenuGroup(groupInput as never, robbingLine as never, fakeR2 as never, heartbeat)
+      for (const r of result.pages) {
+        if (await setPageRichMenuId(dbM, r.pageId, r.newRichMenuId, mFence)) pageWrites += 1
+      }
+      markResult = await markRichMenuGroupPublished(dbM, 'menu-1', mFence)
+    } catch (e) {
+      thrown = e
+    }
+
+    // Rは確かに奪えている。
+    expect(robbedGeneration).toBe(mGeneration + 1)
+    // Mは途中で止まる。成功応答へ進まない。
+    expect(thrown).toBeInstanceOf(PublishLeaseLostError)
+    expect(pageWrites).toBe(0)
+    expect(markResult).toBeNull()
+    // liveの切替も起きていない。旧メニューのままで、作りかけは片付いている。
+    expect(line.aliases.get('lhx-menu-1-0')).toBe('line-old-a')
+    expect(line.aliases.get('lhx-menu-1-1')).toBe('line-old-b')
+    expect(line.defaultId).toBe('line-old-a')
+    expect([...line.menus.keys()].filter((id) => id.startsWith('line-new-'))).toEqual([])
+    // Rのleaseは無傷。
+    const group = sqlite.prepare(`SELECT publishing_owner AS o, publishing_generation AS g, status AS s FROM rich_menu_groups WHERE id = 'menu-1'`).get() as { o: string; g: number; s: string }
+    expect(group.o).toBe('rms-R')
+    expect(group.g).toBe(robbedGeneration)
+    expect(group.s).toBe('published')
   })
 
   test('renewは実時間で期限を延ばす：9分かかってもBは11分後に割り込めない', async () => {
