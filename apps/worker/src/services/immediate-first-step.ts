@@ -1,10 +1,8 @@
 import {
   getScenarioById,
-  getScenarioPublishedVersion,
-  getStepsForDelivery,
-  scenarioStepExists,
   getFriendById,
   computeNextDeliveryAt,
+  resolveStepContent,
   advanceFriendScenario,
   completeFriendScenario,
   claimFriendScenarioForDelivery,
@@ -15,7 +13,6 @@ import {
   jstNow,
   toJstString,
 } from '@line-crm/db';
-import type { PinnedScenarioStep, ScenarioDeliverySource } from '@line-crm/db';
 import { LineClient, type Message } from '@line-crm/line-sdk';
 import {
   buildMessage,
@@ -39,8 +36,6 @@ export interface ImmediatePushContext {
 export interface EnrollmentRef {
   id: string;
   current_step_order: number;
-  /** 開始時に固定した公開版。無いときは購読行から読み直す。 */
-  published_version_id?: string | null;
 }
 
 export interface ImmediatePushOptions {
@@ -138,46 +133,35 @@ export async function pushImmediateFirstStep(
     // this an entry route pointing at a deactivated campaign would still
     // instant-push its first step.
     if (!scenarioRow.is_active) return false;
+    const steps = scenarioRow.steps;
+    const firstStep = steps[0];
+    if (!firstStep) return false;
 
-    // 送る1通目は、購読開始時に固定した公開版だけから読む（351）。live の
-    // 下書き表は読まない。版が無い・欠損しているときは送らない。
-    const loadPinnedFirstStep = async (
-      pinnedVersionId: string | null | undefined,
-    ): Promise<{ source: ScenarioDeliverySource; firstStep: PinnedScenarioStep } | null> => {
-      const source = await getStepsForDelivery(db, scenarioId, pinnedVersionId ?? null);
-      if (!source) return null;
-      const liveSteps = source.steps.filter((s) => (s.is_draft ?? 0) === 0);
-      const firstStep = liveSteps[0];
-      if (!firstStep) return null;
-      return { source, firstStep };
-    };
-
-    const resolveEnrollmentVersionId = async (
-      enrollment: EnrollmentRef,
-    ): Promise<string | null> => {
-      if (enrollment.published_version_id) return enrollment.published_version_id;
-      const row = await db
-        .prepare(`SELECT published_version_id FROM friend_scenarios WHERE id = ?`)
-        .bind(enrollment.id)
-        .first<{ published_version_id: string | null }>();
-      return row?.published_version_id ?? null;
-    };
+    // Immediate only: delay-0 relative steps schedule at-or-before "now".
+    // elapsed/absolute_time modes have offset/clock-time semantics — cron
+    // owns those. Checked BEFORE claiming/enrolling so non-immediate
+    // enrollments are left untouched.
+    const enrolledAtJst = new Date(Date.now() + 9 * 60 * 60_000);
+    const firstScheduledAt = computeNextDeliveryAt(
+      { delivery_mode: scenarioRow.delivery_mode ?? 'relative' },
+      firstStep,
+      { enrolledAt: enrolledAtJst, previousDeliveredAt: enrolledAtJst, now: enrolledAtJst },
+    );
+    if (firstScheduledAt.getTime() > enrolledAtJst.getTime()) return false;
 
     // Cooldown probe: a racing sender the claim protocol can't see may have
     // just pushed this exact step (click campaign vs follow webhook, double
-    // LIFF load, …). Identity is the version-owned step id — deleting and
-    // re-creating the draft step must not lose the dedup. The live-step leg
-    // covers sends logged before versions existed.
-    const isRecentDuplicate = async (firstStep: PinnedScenarioStep): Promise<boolean> => {
+    // LIFF load, …).
+    const isRecentDuplicate = async (): Promise<boolean> => {
       const cutoff = toJstString(new Date(Date.now() - 60_000));
       const recent = await db
         .prepare(
           `SELECT 1 FROM messages_log
-           WHERE friend_id = ? AND (scenario_version_step_id = ? OR scenario_step_id = ?)
+           WHERE friend_id = ? AND scenario_step_id = ?
              AND direction = 'outgoing' AND created_at > ?
            LIMIT 1`,
         )
-        .bind(friendId, firstStep.id, firstStep.live_step_id ?? firstStep.id, cutoff)
+        .bind(friendId, firstStep.id, cutoff)
         .first();
       return recent !== null;
     };
@@ -185,22 +169,18 @@ export async function pushImmediateFirstStep(
     const lookupEnrollment = () =>
       db
         .prepare(
-          `SELECT id, current_step_order, published_version_id FROM friend_scenarios
+          `SELECT id, current_step_order FROM friend_scenarios
            WHERE friend_id = ? AND scenario_id = ? AND status != 'completed'
            ORDER BY updated_at DESC LIMIT 1`,
         )
         .bind(friendId, scenarioId)
         .first<EnrollmentRef>();
 
-    const advancePastFirstStep = async (
-      enrollmentId: string,
-      source: ScenarioDeliverySource,
-      firstStep: PinnedScenarioStep,
-    ) => {
-      const nextStep = source.steps.filter((s) => (s.is_draft ?? 0) === 0)[1];
+    const advancePastFirstStep = async (enrollmentId: string) => {
+      const nextStep = steps[1];
       if (nextStep) {
         const next = computeNextDeliveryAt(
-          { delivery_mode: source.deliveryMode },
+          { delivery_mode: scenarioRow.delivery_mode ?? 'relative' },
           nextStep,
           { enrolledAt: enrolledAtJst, previousDeliveredAt: enrolledAtJst, now: enrolledAtJst },
         );
@@ -219,7 +199,7 @@ export async function pushImmediateFirstStep(
       }
     };
 
-    const attachReachTag = async (firstStep: PinnedScenarioStep) => {
+    const attachReachTag = async () => {
       if (!firstStep.on_reach_tag_id) return;
       try {
         await addTagToFriend(db, friendId, firstStep.on_reach_tag_id);
@@ -228,32 +208,13 @@ export async function pushImmediateFirstStep(
       }
     };
 
-    // Immediate only: delay-0 relative steps schedule at-or-before "now".
-    // elapsed/absolute_time modes have offset/clock-time semantics — cron
-    // owns those. Checked BEFORE claiming/enrolling so non-immediate
-    // enrollments are left untouched.
-    const enrolledAtJst = new Date(Date.now() + 9 * 60 * 60_000);
-    const isImmediate = (source: ScenarioDeliverySource, firstStep: PinnedScenarioStep) => {
-      const firstScheduledAt = computeNextDeliveryAt(
-        { delivery_mode: source.deliveryMode },
-        firstStep,
-        { enrolledAt: enrolledAtJst, previousDeliveredAt: enrolledAtJst, now: enrolledAtJst },
-      );
-      return firstScheduledAt.getTime() <= enrolledAtJst.getTime();
-    };
-
     // Which row to advance after a successful send (null = pure re-click
     // re-delivery: the row is already past step 1, leave it alone).
     let advanceTargetId: string | null = null;
-    let pinned: { source: ScenarioDeliverySource; firstStep: PinnedScenarioStep } | null = null;
 
     if (mode === 'once') {
       const enrollmentRow = options?.enrollment ?? (await lookupEnrollment());
-      if (!enrollmentRow) return false;
-      pinned = await loadPinnedFirstStep(await resolveEnrollmentVersionId(enrollmentRow));
-      if (!pinned) return false;
-      if (enrollmentRow.current_step_order >= pinned.firstStep.step_order) return false;
-      if (!isImmediate(pinned.source, pinned.firstStep)) return false;
+      if (!enrollmentRow || enrollmentRow.current_step_order >= firstStep.step_order) return false;
 
       // Optimistic lock shared with the cron worker: whoever claims first
       // delivers step 1; the loser backs off. Closes the double-send window
@@ -270,10 +231,10 @@ export async function pushImmediateFirstStep(
       // Advance without pushing on a cooldown hit so the row is neither
       // stranded at step -1 nor re-delivered by the cron. The racer
       // delivered step 1, so the reach tag still applies.
-      if (!options?.skipCooldown && (await isRecentDuplicate(pinned.firstStep))) {
-        await advancePastFirstStep(enrollmentRow.id, pinned.source, pinned.firstStep);
+      if (!options?.skipCooldown && (await isRecentDuplicate())) {
+        await advancePastFirstStep(enrollmentRow.id);
         claimedEnrollmentId = null; // the advance released the claim
-        await attachReachTag(pinned.firstStep);
+        await attachReachTag();
         return false;
       }
     } else {
@@ -283,21 +244,13 @@ export async function pushImmediateFirstStep(
       // a fresh active step-0 row behind for the cron worker to pick up
       // (the partial UNIQUE on friend_scenarios is keyed
       // `WHERE status != 'completed'`, so completed runs don't block a new
-      // INSERT). The probe identity comes from the current published version
-      // (read-only — no side effects yet).
-      const currentVersion = await getScenarioPublishedVersion(db, scenarioId);
-      const pre = currentVersion ? await loadPinnedFirstStep(currentVersion.id) : null;
-      if (!pre || !isImmediate(pre.source, pre.firstStep)) return false;
-      if (await isRecentDuplicate(pre.firstStep)) return false;
+      // INSERT).
+      if (await isRecentDuplicate()) return false;
 
       // INSERT OR IGNORE — null on re-clicks (already enrolled), still push.
       const enrollment = await enrollFriendInScenario(db, friendId, scenarioId);
       const row = enrollment ?? (await lookupEnrollment());
-      // Authoritative read: the enrollment's own pinned version (a concurrent
-      // publish may have moved the pointer between the probe and the enroll).
-      pinned = row ? await loadPinnedFirstStep(await resolveEnrollmentVersionId(row)) : null;
-      if (!pinned) return false;
-      if (row && row.current_step_order < pinned.firstStep.step_order) {
+      if (row && row.current_step_order < firstStep.step_order) {
         // This click owes step 1 to the enrollment — join the claim protocol
         // so the cron (the fresh row's next_delivery_at is already due) and
         // the follow-webhook path can't send it concurrently. A failed claim
@@ -311,10 +264,9 @@ export async function pushImmediateFirstStep(
         // Pure re-click re-delivery. Re-probe the cooldown: the first probe
         // ran before the enroll round-trip, and a racing sender may have
         // logged its send in between.
-        if (await isRecentDuplicate(pinned.firstStep)) return false;
+        if (await isRecentDuplicate()) return false;
       }
     }
-    const { source, firstStep } = pinned;
 
     const releaseClaim = async () => {
       if (!claimedEnrollmentId) return;
@@ -335,17 +287,9 @@ export async function pushImmediateFirstStep(
     // reply-token send where latency eats into the token validity window.
     // ctxAccount is the caller-resolved channel (LIFF/OAuth flows), used for
     // both the push token and the tracked-link owner below.
-    //
-    // 文面・質問は固定版の写しをそのまま使う。配信時に templates 表を
-    // 読み直さない（公開後の template 編集を混入させない）。
-    const resolved = {
-      messageType: firstStep.message_type,
-      messageContent: firstStep.message_content,
-      templateIdAtSend: firstStep.template_id_at_send ?? null,
-      questionJson: firstStep.question_json ?? null,
-    };
-    const [resolvedMeta, ctxAccount] = await Promise.all([
+    const [resolvedMeta, resolved, ctxAccount] = await Promise.all([
       resolveMetadata(db, { user_id: friend.user_id, metadata: friend.metadata }),
+      resolveStepContent(db, firstStep, friend.line_account_id),
       ctx.accountChannelId ? getLineAccountByChannelId(db, ctx.accountChannelId) : null,
     ]);
     const friendWithMeta = { ...friend, metadata: resolvedMeta } as Parameters<typeof expandVariables>[1];
@@ -362,10 +306,6 @@ export async function pushImmediateFirstStep(
     // caller-resolved channel — LIFF/OAuth entry points run BEFORE the follow
     // webhook wires friend.line_account_id, and an owner-less link would send
     // that account's friends through the global LIFF consent screen.
-    // live 側の通IDは履歴づけの控え。消されたあとは版所有の通IDに倒す。
-    const liveStepId = (await scenarioStepExists(db, firstStep.live_step_id ?? null))
-      ? firstStep.live_step_id!
-      : null;
     const question = parseQuestion(resolved.questionJson);
     let messages: Message[];
     if (question) {
@@ -377,7 +317,7 @@ export async function pushImmediateFirstStep(
             : question.intro,
           text: expandVariables(question.text, friendWithMeta, ctx.workerUrl, 'text', extra),
         },
-        liveStepId ?? firstStep.id,
+        firstStep.id,
       );
     } else {
       const decorated = await decorateForFriendPush(
@@ -421,36 +361,31 @@ export async function pushImmediateFirstStep(
     sent = true;
     settleAfterSend = async () => {
       if (advanceTargetId) {
-        await advancePastFirstStep(advanceTargetId, source, firstStep);
+        await advancePastFirstStep(advanceTargetId);
         claimedEnrollmentId = null; // the advance released the claim
-        await attachReachTag(firstStep);
+        await attachReachTag();
       }
     };
 
     // Log what was actually delivered (post buildMessage normalization) so
     // the cooldown above sees it on subsequent calls and the dashboard chat
     // view mirrors LINE 1:1. delivery_type mirrors the send channel.
-    //
-    // 二重送信防止の正体は scenario_version_step_id（版所有の通ID）。
-    // scenario_step_id には live が残っているときだけ入れ、消されたあとは
-    // NULL（外部キーを壊さない）。
     for (const sentMessage of messages) {
       const logPayload = messageToLogPayload(sentMessage);
       await db
         .prepare(
-          `INSERT INTO messages_log (id, friend_id, direction, message_type, content, broadcast_id, scenario_step_id, delivery_type, source, template_id_at_send, created_at, scenario_version_step_id)
-           VALUES (?, ?, 'outgoing', ?, ?, NULL, ?, ?, 'scenario', ?, ?, ?)`,
+          `INSERT INTO messages_log (id, friend_id, direction, message_type, content, broadcast_id, scenario_step_id, delivery_type, source, template_id_at_send, created_at)
+           VALUES (?, ?, 'outgoing', ?, ?, NULL, ?, ?, 'scenario', ?, ?)`,
         )
         .bind(
           crypto.randomUUID(),
           friendId,
           logPayload.messageType,
           logPayload.content,
-          liveStepId,
+          firstStep.id,
           options?.reply ? 'reply' : null,
           resolved.templateIdAtSend,
           jstNow(),
-          firstStep.id,
         )
         .run();
     }

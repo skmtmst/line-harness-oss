@@ -122,7 +122,7 @@ function formatKeys(keys: string[]): string {
  * - ALLOWLIST_MAX: 未記載負債はここより増やせない
  * 後続票で記載を増やしたら、実測に合わせて両方を同じ PR で更新する。
  */
-const DOCUMENTED_MIN = 84;
+const DOCUMENTED_MIN = 83;
 const ALLOWLIST_MAX = 777;
 
 /**
@@ -197,7 +197,6 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'POST /api/nen-campaigns/deliveries/{id}/retry',
   'POST /api/scenarios',
   'POST /api/scenarios/{id}/enroll/{friendId}',
-  'POST /api/scenarios/{id}/publish',
   'POST /api/scenarios/{id}/simulate',
   'POST /api/scenarios/{id}/steps',
   'POST /api/tags',

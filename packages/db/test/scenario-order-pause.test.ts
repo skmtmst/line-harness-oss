@@ -9,15 +9,39 @@ import {
   createScenarioStep,
   enrollFriendInScenario,
   pauseFriendScenario,
-  publishScenarioVersion,
   reorderScenarios,
   getScenarios,
 } from '../src/scenarios.js';
 
-import { asD1 } from './d1-test-helper.js';
-
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PKG_ROOT = join(__dirname, '..');
+
+function asD1(sqlite: Database.Database): D1Database {
+  const wrap = (query: string, params: unknown[]) => ({
+    async run() {
+      const info = sqlite.prepare(query).run(...params);
+      return { results: [], success: true, meta: { changes: info.changes } };
+    },
+    async first<T>() {
+      return (sqlite.prepare(query).get(...params) as T) ?? null;
+    },
+    async all<T>() {
+      return { results: sqlite.prepare(query).all(...params) as T[], success: true, meta: {} };
+    },
+  });
+  return {
+    prepare(query: string) {
+      return {
+        bind: (...params: unknown[]) => wrap(query, params),
+        ...wrap(query, []),
+      };
+    },
+    async batch(stmts: Array<{ run: () => Promise<unknown> }>) {
+      for (const st of stmts) await st.run();
+      return [];
+    },
+  } as unknown as D1Database;
+}
 
 let sqlite: Database.Database;
 let db: D1Database;
@@ -91,8 +115,6 @@ describe('送信後 一時停止（113）', () => {
     // 再開したときに続きから流せるよう、どこまで送ったかは残す。
     const sc = await createScenario(db, { name: 'S', triggerType: 'manual' });
     insertFriend('f-1');
-    // 参加には明示公開が要る（351）。
-    await publishScenarioVersion(db, sc.id, { staffId: null, idempotencyKey: 'pause-s' });
     const fs = await enrollFriendInScenario(db, 'f-1', sc.id);
     expect(fs).not.toBeNull();
 

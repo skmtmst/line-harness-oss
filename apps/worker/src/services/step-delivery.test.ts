@@ -378,35 +378,6 @@ describe('condition-false jump (next_step_on_false)', () => {
       next_step_on_false: order === 2 ? opts.nextStepOnFalse : null,
       on_reach_tag_id: null,
     }));
-    // 配信は購読に固定された公開版だけを読む（351）。版の写しを通の正本にし、
-    // live の通IDは控えにだけ残す。
-    const versionRow = {
-      id: 'v-sc1',
-      scenario_id: 'sc1',
-      version_number: 1,
-      delivery_mode: 'relative',
-      audience_condition_json: null,
-      on_complete_mode: 'pause',
-      on_complete_scenario_id: null,
-      steps_snapshot: JSON.stringify(
-        stepRows.map((row) => ({
-          ...row,
-          version_step_id: `v-sc1:${row.step_order}`,
-          template_id_at_send: null,
-          after_send: 'continue',
-          target_condition_json: null,
-          question_json: null,
-          is_draft: 0,
-          live_step_id: row.id,
-          created_at: '2026-01-01T00:00:00+09:00',
-        })),
-      ),
-      status: 'published',
-      published_at: '2026-01-01T00:00:00+09:00',
-      published_by_staff_id: null,
-      created_at: '2026-01-01T00:00:00+09:00',
-      updated_at: '2026-01-01T00:00:00+09:00',
-    };
 
     const db = {
       prepare: (sql: string) => {
@@ -414,9 +385,6 @@ describe('condition-false jump (next_step_on_false)', () => {
           first: async () => {
             if (sql.includes('FROM friend_tags')) {
               return null; // friend does NOT have tag-X → condition fails
-            }
-            if (sql.includes('FROM scenario_versions')) {
-              return versionRow;
             }
             if (sql.includes('FROM friends')) {
               return {
@@ -446,7 +414,6 @@ describe('condition-false jump (next_step_on_false)', () => {
                     status: 'active',
                     next_delivery_at: '2026-01-01T00:00:00+09:00',
                     started_at: '2026-01-01T00:00:00+09:00',
-                    published_version_id: 'v-sc1',
                   },
                 ],
               };

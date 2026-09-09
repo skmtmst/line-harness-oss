@@ -20,7 +20,6 @@ const dbMocks = {
   deleteScenarioStep: vi.fn(),
   enrollFriendInScenario: vi.fn(),
   getFriendById: vi.fn(),
-  getScenarioPublishedVersion: vi.fn(),
   computeNextDeliveryAt: vi.fn(),
   resolveStepContent: vi.fn(),
 };
@@ -55,14 +54,10 @@ function setupApp(db: D1Database) {
 const db = {} as D1Database;
 
 function seed(
-  scenario: { id: string; line_account_id: string | null; is_active?: number },
+  scenario: { id: string; line_account_id: string | null },
   friend: { id: string; line_account_id: string | null; is_following: number },
-  published: boolean = true,
 ) {
-  dbMocks.getScenarioById.mockResolvedValue({ is_active: 1, ...scenario });
-  dbMocks.getScenarioPublishedVersion.mockResolvedValue(
-    published ? { id: 'version-1', scenario_id: scenario.id } : null,
-  );
+  dbMocks.getScenarioById.mockResolvedValue(scenario);
   dbMocks.getFriendById.mockResolvedValue(friend);
   dbMocks.enrollFriendInScenario.mockResolvedValue({
     id: 'enroll-1',
@@ -132,26 +127,5 @@ describe('POST /api/scenarios/:id/enroll/:friendId の友だち側境界', () =>
     const res = await setupApp(db).request('/api/scenarios/s-1/enroll/f-1', { method: 'POST' });
     expect(res.status).toBe(201);
     expect(dbMocks.enrollFriendInScenario).toHaveBeenCalledWith(db, 'f-1', 's-1');
-  });
-
-  test('未公開のシナリオは422で止める（下書きのまま登録しない）', async () => {
-    seed(
-      { id: 's-1', line_account_id: 'acc-1' },
-      { id: 'f-1', line_account_id: 'acc-1', is_following: 1 },
-      false,
-    );
-    const res = await setupApp(db).request('/api/scenarios/s-1/enroll/f-1', { method: 'POST' });
-    expect(res.status).toBe(422);
-    expect(dbMocks.enrollFriendInScenario).not.toHaveBeenCalled();
-  });
-
-  test('停止中のシナリオは422で止める', async () => {
-    seed(
-      { id: 's-1', line_account_id: 'acc-1', is_active: 0 },
-      { id: 'f-1', line_account_id: 'acc-1', is_following: 1 },
-    );
-    const res = await setupApp(db).request('/api/scenarios/s-1/enroll/f-1', { method: 'POST' });
-    expect(res.status).toBe(422);
-    expect(dbMocks.enrollFriendInScenario).not.toHaveBeenCalled();
   });
 });
