@@ -98,6 +98,7 @@ function isKnownUnused(item: MediaItem): boolean {
 
 /** 格子と一覧。**中身は同じ。並べ方だけを切り替える。** */
 type MediaView = 'grid' | 'list'
+type MediaManagementPermission = 'loading' | 'allowed' | 'denied' | 'error'
 
 export default function MediaLibraryPage() {
   const [view, setView] = useState<MediaView>('grid')
@@ -177,6 +178,38 @@ export default function MediaLibraryPage() {
   const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number } | null>(null)
   /** 大きく出している札。押した札の中身を原寸で見せる。 */
   const [preview, setPreview] = useState<MediaItem | null>(null)
+  /*
+    名前変更・削除・フォルダ追加は管理者（owner/admin）だけ（N-197）。
+    staff には押して失敗する口を見せず、理由を添えて無効化する。
+    一覧・ダウンロード・登録・版追加は staff も使えるので混同しない。
+  */
+  const [mediaManagementPermission, setMediaManagementPermission] = useState<MediaManagementPermission>('loading')
+
+  useEffect(() => {
+    let active = true
+    void api.staff.me().then((response) => {
+      if (!active) return
+      if (!response.success) {
+        setMediaManagementPermission('error')
+        return
+      }
+      setMediaManagementPermission(
+        response.data.role === 'owner' || response.data.role === 'admin' ? 'allowed' : 'denied',
+      )
+    }).catch(() => {
+      if (active) setMediaManagementPermission('error')
+    })
+    return () => {
+      active = false
+    }
+  }, [])
+
+  const canManageMedia = mediaManagementPermission === 'allowed'
+  const managementPermissionReason = mediaManagementPermission === 'loading'
+    ? '操作権限を確認しています'
+    : mediaManagementPermission === 'error'
+      ? '操作権限を確認できないため、安全のため管理操作を止めています'
+      : '使用箇所の確認・名前の変更・削除・フォルダの追加は管理者だけができます'
 
   useEffect(() => {
     /*
@@ -571,6 +604,11 @@ export default function MediaLibraryPage() {
             setPage(1)
           }}
           onAddFolder={() => setAddingFolder(true)}
+          addFolderDisabled={!canManageMedia}
+          addFolderTitle={canManageMedia ? undefined : managementPermissionReason}
+          addFolderNote={canManageMedia ? undefined : (
+            <p className="text-ink-faint text-xs">{managementPermissionReason}。</p>
+          )}
           rows={[
             { id: '', label: 'すべて', count: total },
             ...folders.map((folder) => ({
@@ -814,28 +852,30 @@ export default function MediaLibraryPage() {
                 ) : (
                   <>
                     <label className="flex items-start gap-1.5">
-                      <input
-                        type="checkbox"
-                        checked={selected.has(item.id)}
-                        disabled={!isKnownUnused(item)}
-                        onChange={() =>
-                          setSelected((prev) => {
-                            const next = new Set(prev)
-                            if (next.has(item.id)) next.delete(item.id)
-                            else next.add(item.id)
-                            return next
-                          })
-                        }
-                        aria-label={`${item.filename}を選ぶ`}
-                        title={
-                          item.usageCount == null
-                            ? '使用先を確認できないため選べません'
-                            : item.usageCount > 0
-                              ? '使用先から外すまで削除できません'
-                              : undefined
-                        }
-                        className="accent-green-500 mt-0.5"
-                      />
+                      {canManageMedia ? (
+                        <input
+                          type="checkbox"
+                          checked={selected.has(item.id)}
+                          disabled={!isKnownUnused(item)}
+                          onChange={() =>
+                            setSelected((prev) => {
+                              const next = new Set(prev)
+                              if (next.has(item.id)) next.delete(item.id)
+                              else next.add(item.id)
+                              return next
+                            })
+                          }
+                          aria-label={`${item.filename}を選ぶ`}
+                          title={
+                            item.usageCount == null
+                              ? '使用先を確認できないため選べません'
+                              : item.usageCount > 0
+                                ? '使用先から外すまで削除できません'
+                                : undefined
+                          }
+                          className="accent-green-500 mt-0.5"
+                        />
+                      ) : null}
                       <span className="bg-ink-secondary text-on-accent rounded px-1 py-0.5 text-[10px] leading-none">
                         {KINDS.find((k) => k.key === item.kind)?.label ?? 'ファイル'}
                       </span>
@@ -868,12 +908,14 @@ export default function MediaLibraryPage() {
                 <div className="mt-auto flex items-center justify-end gap-1 pt-1">
                   <button
                     onClick={() => setDetailsFor(item)}
-                    title="使用箇所を見る"
+                    disabled={!canManageMedia}
+                    title={canManageMedia ? '使用箇所を見る' : managementPermissionReason}
                     aria-label={`${item.filename}の使用箇所`}
-                    className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded border px-2 py-1 text-[11px]"
+                    className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded border px-2 py-1 text-[11px] disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     使用箇所
                   </button>
+                  {canManageMedia ? (
                   <button
                     onClick={() => { setRenameError(''); setRenaming({ id: item.id, value: item.filename }) }}
                     title="名前を変える"
@@ -882,6 +924,7 @@ export default function MediaLibraryPage() {
                   >
                     編集
                   </button>
+                  ) : null}
                   <button
                     onClick={() => void downloadItem(item)}
                     disabled={downloadingIds.has(item.id)}
@@ -891,6 +934,7 @@ export default function MediaLibraryPage() {
                   >
                     {downloadingIds.has(item.id) ? '取得中…' : 'ダウンロード'}
                   </button>
+                  {canManageMedia ? (
                   <Button
                     type="button"
                     onClick={() => void openDelete(item)}
@@ -899,6 +943,7 @@ export default function MediaLibraryPage() {
                   >
                     削除
                   </Button>
+                  ) : null}
                 </div>
 
               </div>
@@ -1051,30 +1096,36 @@ export default function MediaLibraryPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          <label className="text-ink-secondary flex items-center gap-1.5 text-sm">
-            <input
-              type="checkbox"
-              checked={allSelected}
-              onChange={() =>
-                setSelected((prev) => {
-                  if (allSelected) return new Set<string>()
-                  const next = new Set(prev)
-                  for (const item of removable) next.add(item.id)
-                  return next
-                })
-              }
-              className="accent-green-500"
-            />
-            すべてのメディアを選択
-          </label>
-          <button
-            onClick={() => void removeSelected()}
-            disabled={selected.size === 0}
-            className="border-danger-bg text-danger hover:bg-danger-bg rounded-control border px-3 py-2 text-sm font-medium disabled:opacity-40"
-          >
-            選択したメディアを削除
-            {selected.size > 0 && <span className="tabular-nums">（{selected.size}）</span>}
-          </button>
+          {canManageMedia ? (
+            <label className="text-ink-secondary flex items-center gap-1.5 text-sm">
+              <input
+                type="checkbox"
+                checked={allSelected}
+                onChange={() =>
+                  setSelected((prev) => {
+                    if (allSelected) return new Set<string>()
+                    const next = new Set(prev)
+                    for (const item of removable) next.add(item.id)
+                    return next
+                  })
+                }
+                className="accent-green-500"
+              />
+              すべてのメディアを選択
+            </label>
+          ) : null}
+          {canManageMedia ? (
+            <button
+              onClick={() => void removeSelected()}
+              disabled={selected.size === 0}
+              className="border-danger-bg text-danger hover:bg-danger-bg rounded-control border px-3 py-2 text-sm font-medium disabled:opacity-40"
+            >
+              選択したメディアを削除
+              {selected.size > 0 && <span className="tabular-nums">（{selected.size}）</span>}
+            </button>
+          ) : (
+            <p className="text-ink-faint text-xs">{managementPermissionReason}。</p>
+          )}
         </div>
       </div>
         </div>
