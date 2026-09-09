@@ -84,14 +84,27 @@ const EMPTY_REFERENCES: TemplateReferences = { friendFields: [], commonVars: [] 
  */
 interface TemplateAccountBinding {
   templateId: string | null
-  /** テンプレートの取得が終わったか。終わる前は所属が分からない。 */
-  templateLoaded: boolean
+  /**
+   * **いま画面にある中身が、その `templateId` のものとして確定しているか。**
+   *
+   * `ready` 以外は、所属アカウントも本文も、この id のものだと言えない。
+   * URL の id を A から B へ替えた直後がまさにそれで、画面には A の本文が
+   * 残ったまま送り先だけ B になっている。
+   */
+  templateStatus: TemplateLoadStatus
   templateAccountId: string | null
   selectedAccountId: string | null
 }
 
+type TemplateLoadStatus = 'idle' | 'loading' | 'ready' | 'failed'
+
 const ACCOUNT_MISMATCH_MESSAGE =
   '別のLINE公式アカウントに切り替わっています。上のバーでこのテンプレートのアカウントへ戻すと保存できます。'
+
+const TEMPLATE_LOAD_FAILED_MESSAGE = '読み込めませんでした。開き直してください。'
+
+const TEMPLATE_LOADING_MESSAGE =
+  'テンプレートを読み込んでいます。読み終わるまで保存できません。'
 
 /**
  * 差し込み候補を読むアカウント。**既存テンプレートは所属へ固定する。**
@@ -106,16 +119,37 @@ const ACCOUNT_MISMATCH_MESSAGE =
  */
 function resolveEditorAccountId(binding: TemplateAccountBinding): string | null {
   if (!binding.templateId) return binding.selectedAccountId
-  if (!binding.templateLoaded) return null
+  if (binding.templateStatus !== 'ready') return null
   // 所属を持たない旧データだけ、選択中アカウントの候補で編集する。
   return binding.templateAccountId ?? binding.selectedAccountId
 }
 
 /** 開いているテンプレートの所属と、上のバーの選択が食い違っているか。 */
 function templateAccountMismatch(binding: TemplateAccountBinding): boolean {
-  if (!binding.templateId || !binding.templateLoaded) return false
+  if (!binding.templateId || binding.templateStatus !== 'ready') return false
   if (!binding.templateAccountId || !binding.selectedAccountId) return false
   return binding.templateAccountId !== binding.selectedAccountId
+}
+
+/**
+ * 保存を閉じる理由。**`null` のときだけ保存の口を開ける。**
+ *
+ * 中身の入力（名前・本文）とは分けている。こちらは「その中身を、その
+ * 送り先へ送ってよいか」の話で、押す前から決まる。押してから知らせる
+ * のでは、押せてしまう瞬間があるのと同じ。
+ */
+function templateSaveGuard(binding: TemplateAccountBinding): string | null {
+  if (binding.templateId) {
+    if (binding.templateStatus === 'failed') return TEMPLATE_LOAD_FAILED_MESSAGE
+    /*
+     * 取得が終わるまで閉じる。**ここが開いていると、A を読んだあと URL を
+     * B へ替えた直後に、A の本文を `PUT /api/templates/B` へ送れる。**
+     * 送り先だけ先に切り替わり、中身が追いつくまでの間があるため。
+     */
+    if (binding.templateStatus !== 'ready') return TEMPLATE_LOADING_MESSAGE
+  }
+  if (templateAccountMismatch(binding)) return ACCOUNT_MISMATCH_MESSAGE
+  return null
 }
 
 /**
@@ -142,7 +176,6 @@ async function requestTemplateReferences(request: {
 }
 
 interface TemplateSaveInput extends TemplateAccountBinding {
-  loadFailed: boolean
   name: string
   category: string
   messageType: string
@@ -158,8 +191,8 @@ interface TemplateSaveInput extends TemplateAccountBinding {
  * は所属アカウントを受け取らないので、サーバー側では気づけない。
  */
 function validateTemplateSave(input: TemplateSaveInput): string | null {
-  if (input.loadFailed) return '読み込めませんでした。開き直してください。'
-  if (templateAccountMismatch(input)) return ACCOUNT_MISMATCH_MESSAGE
+  const guard = templateSaveGuard(input)
+  if (guard) return guard
   if (!input.templateId && !input.selectedAccountId) return '上のバーでLINE公式アカウントを選んでください'
   if (!input.name.trim()) return '名前を入力してください'
   if (!input.messageContent.trim()) return '本文を入力してください'
@@ -175,7 +208,7 @@ interface TemplateSaveOps {
  * 保存する。**断る条件に当たったら、APIを一度も呼ばない。**
  *
  * 画面側でボタンを塞ぐだけだと、状態が入れ替わる途中の押下を拾えない。
- * 送る直前にもう一度確かめる。
+ * 送る直前に、送り先と中身が同じテンプレートのものか確かめ直す。
  */
 async function saveTemplateEdit(
   input: TemplateSaveInput,
@@ -448,6 +481,47 @@ function TemplateAccountNotice({
   )
 }
 
+/** 編集中の中身。テンプレート1件分の下書き。 */
+interface TemplateDraft {
+  name: string
+  category: string
+  folderId: string | null
+  messageType: string
+  messageContent: string
+}
+
+/**
+ * 画面が持つ「テンプレート1件分」の状態。
+ *
+ * **`requestedId` と中身を必ず一緒に動かす。** 別々の `useState` に置くと、
+ * URL の id だけ先に変わり、中身が前のテンプレートのまま残る瞬間ができる。
+ * その瞬間に保存すると、前のテンプレートの本文が新しい id へ入る。
+ */
+interface TemplateEditorState {
+  requestedId: string | null
+  status: TemplateLoadStatus
+  templateAccountId: string | null
+  draft: TemplateDraft
+}
+
+function newTemplateEditorState(templateId: string | null, visual: boolean): TemplateEditorState {
+  return {
+    requestedId: templateId,
+    status: templateId ? 'loading' : 'idle',
+    templateAccountId: null,
+    draft: {
+      name: visual ? '定期便 初回のご案内' : '',
+      // category は旧一覧との互換用に保存だけ続ける。分け方は folderId に一本化する。
+      category: 'general',
+      folderId: null,
+      messageType: 'text',
+      messageContent: visual
+        ? '{{name}}さん、いつもありがとうございます。\n初回のお届け予定はこちらです。\nhttps://example.co.jp/first-delivery'
+        : '',
+    },
+  }
+}
+
 function TemplatePreviewMessage({ preview }: { preview: TemplatePreviewResult }) {
   return (
     <>
@@ -475,37 +549,46 @@ function TemplateEditInner() {
   const visual = params.get('visual') === '1'
   usePageTitle(id ? 'メッセージを編集' : 'メッセージを作る')
 
-  const [name, setName] = useState(visual ? '定期便 初回のご案内' : '')
-  // category は旧一覧との互換用に保存だけ続ける。運用者が選ぶ分類は folderId に一本化する。
-  const [category, setCategory] = useState('general')
-  const [folderId, setFolderId] = useState<string | null>(null)
   const [folders, setFolders] = useState<Folder[]>([])
-  const [references, setReferences] = useState<TemplateReferences>({ friendFields: [], commonVars: [] })
+  const [references, setReferences] = useState<TemplateReferences>(EMPTY_REFERENCES)
   const [referenceState, setReferenceState] = useState<ReferenceState>('idle')
-  const [messageType, setMessageType] = useState('text')
-  const [messageContent, setMessageContent] = useState(
-    visual
-      ? '{{name}}さん、いつもありがとうございます。\n初回のお届け予定はこちらです。\nhttps://example.co.jp/first-delivery'
-      : '',
-  )
-  const [loading, setLoading] = useState(Boolean(id))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
-  // 読み込めていない本文のまま保存すると、空で上書きする危険がある。
-  const [loadFailed, setLoadFailed] = useState(false)
   const [targetDate, setTargetDate] = useState('')
-  /* 開いているテンプレートの所属アカウント。上のバーの選択とは別に持つ。 */
-  const [templateAccountId, setTemplateAccountId] = useState<string | null>(null)
-  const [templateLoaded, setTemplateLoaded] = useState(!id)
+  const [editorState, setEditor] = useState<TemplateEditorState>(() => newTemplateEditorState(id, visual))
+
+  /*
+   * URL の id が変わった瞬間に、前のテンプレートの中身を捨てる。
+   *
+   * **`useEffect` で捨てるのでは遅い。** 効果が動くまでの1回の描画で
+   * 「本文は A・所属は A・送り先は B」という組み合わせが画面に出てしまい、
+   * そこで保存すると A の本文が `PUT /api/templates/B` へ流れる。
+   * 描画の途中で捨てれば、その組み合わせは一度も現れない。
+   * （描画中の `setState` は React が認めている「props に合わせて状態を
+   *  直す」書き方。この描画は捨てられ、すぐ新しい状態で描き直される。）
+   */
+  let editor = editorState
+  if (editor.requestedId !== id) {
+    editor = newTemplateEditorState(id, visual)
+    setEditor(editor)
+  }
+
+  const { name, category, folderId, messageType, messageContent } = editor.draft
+  const updateDraft = (patch: Partial<TemplateDraft>) =>
+    setEditor((prev) => ({ ...prev, draft: { ...prev.draft, ...patch } }))
 
   const binding: TemplateAccountBinding = {
     templateId: id,
-    templateLoaded,
-    templateAccountId,
+    templateStatus: editor.status,
+    templateAccountId: editor.templateAccountId,
     selectedAccountId,
   }
   const editorAccountId = resolveEditorAccountId(binding)
   const accountMismatch = templateAccountMismatch(binding)
+  const saveGuard = templateSaveGuard(binding)
+  // 読み込めていない本文のまま保存すると、空で上書きする危険がある。
+  const loadFailed = editor.status === 'failed'
+  const loading = Boolean(id) && (editor.status === 'idle' || editor.status === 'loading')
   const accountName = (accountId: string | null) =>
     accounts.find((account) => account.id === accountId)?.name ?? null
 
@@ -553,37 +636,44 @@ function TemplateEditInner() {
     return () => { referenceGeneration.current += 1 }
   }, [editorAccountId])
 
+  /*
+   * 取得の世代。id を替えるたびに1つ進める。片付けでも進めるので、
+   * 前の id への応答も、画面を離れたあとの応答も、現世代と一致しない。
+   */
+  const templateGeneration = useRef(0)
+
   useEffect(() => {
     if (!id) return
-    let cancelled = false
+    const generation = ++templateGeneration.current
+    /** 現世代で、いまも同じ id を開いているときだけ書き込む。 */
+    const accept = (next: (prev: TemplateEditorState) => TemplateEditorState) => {
+      if (generation !== templateGeneration.current) return
+      setEditor((prev) => (prev.requestedId === id ? next(prev) : prev))
+    }
     void api.templates
       .get(id)
       .then((res) => {
-        if (cancelled) return
-        if (res.success) {
-          setName(res.data.name)
-          setCategory(res.data.category ?? '')
-          setFolderId(res.data.folderId ?? null)
-          setMessageType(res.data.messageType)
-          setMessageContent(res.data.messageContent)
-          // 所属アカウントは、差し込み候補と保存可否の両方の土台になる。
-          setTemplateAccountId(res.data.accountId ?? null)
-        } else {
-          setLoadFailed(true)
-          setError('読み込めませんでした。開き直してください。')
+        if (!res.success) {
+          accept((prev) => ({ ...prev, status: 'failed' }))
+          return
         }
-        setTemplateLoaded(true)
+        // 所属アカウントと本文は、同じ応答から一度に入れる。片方だけ先に
+        // 入れると、その間だけ食い違いの判定が別の答えを出す。
+        accept(() => ({
+          requestedId: id,
+          status: 'ready',
+          templateAccountId: res.data.accountId ?? null,
+          draft: {
+            name: res.data.name,
+            category: res.data.category ?? '',
+            folderId: res.data.folderId ?? null,
+            messageType: res.data.messageType,
+            messageContent: res.data.messageContent,
+          },
+        }))
       })
-      .catch(() => {
-        if (cancelled) return
-        setLoadFailed(true)
-        setError('読み込めませんでした。開き直してください。')
-        setTemplateLoaded(true)
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false)
-      })
-    return () => { cancelled = true }
+      .catch(() => accept((prev) => ({ ...prev, status: 'failed' })))
+    return () => { templateGeneration.current += 1 }
   }, [id])
 
   const contentRef = useRef<HTMLTextAreaElement | null>(null)
@@ -597,13 +687,13 @@ function TemplateEditInner() {
   const insert = (token: string) => {
     const el = contentRef.current
     if (!el) {
-      setMessageContent((v) => v + token)
+      updateDraft({ messageContent: messageContent + token })
       return
     }
     const start = el.selectionStart ?? messageContent.length
     const end = el.selectionEnd ?? start
     const next = messageContent.slice(0, start) + token + messageContent.slice(end)
-    setMessageContent(next)
+    updateDraft({ messageContent: next })
     // 入れた直後にカーソルを token の後ろへ。続けて書けるようにする。
     requestAnimationFrame(() => {
       el.focus()
@@ -621,7 +711,6 @@ function TemplateEditInner() {
   const save = async () => {
     const input: TemplateSaveInput = {
       ...binding,
-      loadFailed,
       name,
       category,
       messageType,
@@ -673,7 +762,7 @@ function TemplateEditInner() {
               id="tp-name"
               type="text"
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={(e) => updateDraft({ name: e.target.value })}
               className={inputClass}
             />
           </Field>
@@ -682,7 +771,7 @@ function TemplateEditInner() {
             <SelectField
               id="tp-folder"
               value={folderId ?? ''}
-              onChange={(e) => setFolderId(e.target.value || null)}
+              onChange={(e) => updateDraft({ folderId: e.target.value || null })}
               options={[{ value: '', label: '未分類' }, ...folders.map((folder) => ({ value: folder.id, label: folder.name }))]}
             />
           </Field>
@@ -697,7 +786,7 @@ function TemplateEditInner() {
             <SelectField
               id="tp-type"
               value={messageType}
-              onChange={(e) => setMessageType(e.target.value)}
+              onChange={(e) => updateDraft({ messageType: e.target.value })}
               options={TYPES.map((t) => ({ value: t.value, label: t.label }))}
               className={inputClass}
             />
@@ -705,7 +794,7 @@ function TemplateEditInner() {
 
           <TemplateAccountNotice
             binding={binding}
-            templateAccountLabel={accountName(templateAccountId)}
+            templateAccountLabel={accountName(editor.templateAccountId)}
             selectedAccountLabel={accountName(selectedAccountId)}
           />
 
@@ -745,7 +834,7 @@ function TemplateEditInner() {
               ref={contentRef}
               rows={messageType === 'flex' ? 14 : 6}
               value={messageContent}
-              onChange={(e) => setMessageContent(e.target.value)}
+              onChange={(e) => updateDraft({ messageContent: e.target.value })}
               className={`${inputClass} resize-y ${messageType === 'flex' ? 'font-mono text-xs' : ''}`}
             />
             <p className="text-ink-faint mt-1 text-xs tabular-nums">
@@ -787,13 +876,19 @@ function TemplateEditInner() {
             </p>
           </section>
 
-          {error && <p className="text-danger text-sm">{error}</p>}
+          {(loadFailed ? TEMPLATE_LOAD_FAILED_MESSAGE : error) && (
+            <p className="text-danger text-sm">{loadFailed ? TEMPLATE_LOAD_FAILED_MESSAGE : error}</p>
+          )}
+
+          {saveGuard && !loadFailed && !accountMismatch && (
+            <p role="status" className="text-ink-secondary text-sm">{saveGuard}</p>
+          )}
 
           <div className="flex flex-wrap gap-2">
             <button
               onClick={save}
-              disabled={saving || loadFailed || accountMismatch}
-              title={accountMismatch ? ACCOUNT_MISMATCH_MESSAGE : undefined}
+              disabled={saving || loadFailed || saveGuard !== null}
+              title={saveGuard ?? undefined}
               className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-4 py-2 text-sm font-medium transition-colors disabled:opacity-40"
             >
               {saving ? '保存中...' : '保存'}
@@ -850,7 +945,10 @@ function TemplateEditPage() {
 const TemplateEditPageWithTestSupport = Object.assign(TemplateEditPage, {
   __testing: {
     ACCOUNT_MISMATCH_MESSAGE,
+    TEMPLATE_LOADING_MESSAGE,
+    TEMPLATE_LOAD_FAILED_MESSAGE,
     TemplateAccountNotice,
+    TemplateEditInner,
     TemplateInsertControls,
     buildTemplatePreview,
     loadTemplateReferences,
@@ -859,6 +957,7 @@ const TemplateEditPageWithTestSupport = Object.assign(TemplateEditPage, {
     resolveEditorAccountId,
     saveTemplateEdit,
     templateAccountMismatch,
+    templateSaveGuard,
     validateTemplateSave,
   },
 })

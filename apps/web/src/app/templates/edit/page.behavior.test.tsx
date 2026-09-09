@@ -196,7 +196,7 @@ function deferred() {
 
 const binding = (overrides: Partial<Parameters<Testing['resolveEditorAccountId']>[0]> = {}) => ({
   templateId: 'template-a',
-  templateLoaded: true,
+  templateStatus: 'ready' as const,
   templateAccountId: 'account-a',
   selectedAccountId: 'account-a',
   ...overrides,
@@ -204,7 +204,6 @@ const binding = (overrides: Partial<Parameters<Testing['resolveEditorAccountId']
 
 const saveInput = (overrides: Partial<Parameters<Testing['validateTemplateSave']>[0]> = {}) => ({
   ...binding(),
-  loadFailed: false,
   name: '初回のご案内',
   category: 'general',
   messageType: 'text',
@@ -267,7 +266,7 @@ describe('既存テンプレートの所属アカウント', () => {
   })
 
   it('取得が終わるまでは、どちらの候補も読みにいかない', () => {
-    expect(T.resolveEditorAccountId(binding({ templateLoaded: false, selectedAccountId: 'account-b' }))).toBeNull()
+    expect(T.resolveEditorAccountId(binding({ templateStatus: 'loading', selectedAccountId: 'account-b' }))).toBeNull()
   })
 
   it('新規作成は、上のバーで選んでいるアカウントで読む', () => {
@@ -284,7 +283,7 @@ describe('既存テンプレートの所属アカウント', () => {
   it('食い違いを見分ける', () => {
     expect(T.templateAccountMismatch(binding())).toBe(false)
     expect(T.templateAccountMismatch(binding({ selectedAccountId: 'account-b' }))).toBe(true)
-    expect(T.templateAccountMismatch(binding({ templateLoaded: false, selectedAccountId: 'account-b' }))).toBe(false)
+    expect(T.templateAccountMismatch(binding({ templateStatus: 'loading', selectedAccountId: 'account-b' }))).toBe(false)
     expect(T.templateAccountMismatch(binding({ selectedAccountId: null }))).toBe(false)
   })
 })
@@ -316,9 +315,9 @@ describe('食い違ったまま保存させない', () => {
   })
 
   it('読み込めなかったテンプレートは、空の本文で上書きしない', async () => {
-    const result = await T.saveTemplateEdit(saveInput({ loadFailed: true, messageContent: '' }))
+    const result = await T.saveTemplateEdit(saveInput({ templateStatus: 'failed', messageContent: '' }))
 
-    expect(result).toEqual({ ok: false, error: '読み込めませんでした。開き直してください。' })
+    expect(result).toEqual({ ok: false, error: T.TEMPLATE_LOAD_FAILED_MESSAGE })
     expect(calls).toHaveLength(0)
   })
 
@@ -331,6 +330,23 @@ describe('食い違ったまま保存させない', () => {
 
     expect(result).toEqual({ ok: false, error: '上のバーでLINE公式アカウントを選んでください' })
     expect(calls).toHaveLength(0)
+  })
+
+  it('取得が終わっていないテンプレートへは、APIを呼ばずに断る', async () => {
+    for (const status of ['idle', 'loading'] as const) {
+      const input = saveInput({ templateStatus: status })
+      expect(T.templateSaveGuard(input)).toBe(T.TEMPLATE_LOADING_MESSAGE)
+      expect(T.validateTemplateSave(input)).toBe(T.TEMPLATE_LOADING_MESSAGE)
+      await expect(T.saveTemplateEdit(input))
+        .resolves.toEqual({ ok: false, error: T.TEMPLATE_LOADING_MESSAGE })
+    }
+    // 送り先だけ新しい id、中身は前のまま——という組み合わせを一度も通さない。
+    expect(calls).toHaveLength(0)
+  })
+
+  it('新規作成は取得を待たない', () => {
+    const input = saveInput({ templateId: null, templateStatus: 'idle', templateAccountId: null })
+    expect(T.templateSaveGuard(input)).toBeNull()
   })
 
   it('名前と本文が空のまま保存しない', () => {
