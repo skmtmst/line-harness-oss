@@ -8,6 +8,7 @@ import {
   markRichMenuGroupPublished,
   markRichMenuGroupUnpublished,
   publishLeaseExpiresAt,
+  publishLeaseNotTakenByOther,
   releasePublishLease,
   renewPublishLease,
 } from '../src/rich-menus.js'
@@ -194,6 +195,23 @@ describe('365 default固定とlease所有権（実D1）', () => {
     expect(await acquirePublishLease(db, 'menu-1', 'run-B', NOW)).toBe(true)
     await markRichMenuGroupUnpublished(db, 'menu-1')
     expect(await isPublishLeaseHeld(db, 'menu-1', NOW)).toBe(false)
+  })
+
+  test('確定直前の所有確認：自分か空きなら通し、別の所有者なら止める', async () => {
+    // 誰も持っていない。
+    expect(await publishLeaseNotTakenByOther(db, 'menu-1', 'run-A', NOW)).toBe(true)
+    // 自分が持っている。
+    expect(await acquirePublishLease(db, 'menu-1', 'run-A', NOW)).toBe(true)
+    expect(await publishLeaseNotTakenByOther(db, 'menu-1', 'run-A', NOW)).toBe(true)
+    // 公開確定でleaseは空く。空きは「取られていない」なので確定してよい。
+    await markRichMenuGroupPublished(db, 'menu-1')
+    expect(await publishLeaseNotTakenByOther(db, 'menu-1', 'run-A', NOW)).toBe(true)
+    // 期限切れで別runが回収したあとは、旧holderは確定できない。
+    expect(await acquirePublishLease(db, 'menu-1', 'run-B', NOW)).toBe(true)
+    expect(await publishLeaseNotTakenByOther(db, 'menu-1', 'run-A', NOW)).toBe(false)
+    expect(await publishLeaseNotTakenByOther(db, 'menu-1', 'run-B', NOW)).toBe(true)
+    // 別runの期限が切れていれば、もう塞がない。
+    expect(await publishLeaseNotTakenByOther(db, 'menu-1', 'run-A', LATER)).toBe(true)
   })
 
   test('journalの削除は指定kindだけ消す', async () => {

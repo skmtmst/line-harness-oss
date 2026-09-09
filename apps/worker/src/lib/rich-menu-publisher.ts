@@ -533,25 +533,73 @@ export async function restorePreSwitchLive(
 }
 
 /**
+ * default 復元の結果。呼び出し側は「戻し切れていない新メニューを消さない」
+ * ためにこれを見る。復元できたかどうかを飲み込むと、default が新メニューを
+ * 指したまま後片付けでその新メニューを消し、公開中の表示が消える。
+ */
+export type DefaultRestoreOutcome =
+  /** 現 default は今回の新メニューではない。こちらは何も触っていない。 */
+  | { state: 'untouched' }
+  /** 切替前の値へ戻した(または解除した)。 */
+  | { state: 'restored' }
+  /**
+   * 戻せなかった。retainedId は default が指したままの新メニューID。
+   * default を読めなかった場合は null で、どれが指されているか分からない。
+   */
+  | { state: 'failed'; retainedId: string | null };
+
+/**
  * 切替前の default へ戻す。現在の default が今回作った新メニューのときだけ
  * 戻す/外す(その間に外から変わっていたら触らない)。
+ * 決して投げない。戻せたかどうかは戻り値で伝える(飲み込まない)。
  */
 export async function restorePreSwitchDefault(
   line: LineRichMenuClient,
   prev: PreSwitchLiveState,
   newIds: string[],
-): Promise<void> {
+): Promise<DefaultRestoreOutcome> {
+  let current: string | null;
   try {
-    const current = await line.getCurrentDefaultRichMenuId();
-    if (!current || !newIds.includes(current)) return;
+    current = await line.getCurrentDefaultRichMenuId();
+  } catch (e) {
+    // 読めない = 新メニューを指したままかもしれない。どれかも分からないので、
+    // 新メニューは1つも消さない(消すと default がリンク切れになる)。
+    console.warn(`[restorePreSwitchDefault] default lookup failed (non-fatal):`, e);
+    return { state: 'failed', retainedId: null };
+  }
+  if (!current || !newIds.includes(current)) return { state: 'untouched' };
+  try {
     if (prev.previousDefaultId) {
       await line.setDefaultRichMenu(prev.previousDefaultId);
     } else {
       await line.clearDefaultRichMenu();
     }
+    return { state: 'restored' };
   } catch (e) {
     console.warn(`[restorePreSwitchDefault] default restore failed (non-fatal):`, e);
+    return { state: 'failed', retainedId: current };
   }
+}
+
+/**
+ * 補償のあとで消してよい新メニューID。
+ * - alias を旧へ戻せなかったページの新メニューは消さない(alias がリンク切れになる)
+ * - default 復元が終わっていない新メニューも消さない(全友だちの表示が消える)
+ * - default をそもそも読めなかったときは、どれが指されているか分からないので1つも消さない
+ */
+export function deletableAfterCompensation(
+  shells: Array<{ pageId: string; newRichMenuId: string }>,
+  unrestoredPageIds: Set<string>,
+  defaultOutcome: DefaultRestoreOutcome,
+): string[] {
+  if (defaultOutcome.state === 'failed' && !defaultOutcome.retainedId) return [];
+  const retained =
+    defaultOutcome.state === 'failed' && defaultOutcome.retainedId
+      ? new Set([defaultOutcome.retainedId])
+      : new Set<string>();
+  return shells
+    .filter((shell) => !unrestoredPageIds.has(shell.pageId) && !retained.has(shell.newRichMenuId))
+    .map((shell) => shell.newRichMenuId);
 }
 
 /** 新メニュー/旧メニューの削除。404は許容し、失敗は飲み込む(後片付け用)。 */
@@ -597,11 +645,13 @@ export async function publishRichMenuGroup(
     await switchRichMenuLive(line, group, shells);
   } catch (error) {
     const unrestored = await restorePreSwitchLive(line, group.id, prev);
-    await restorePreSwitchDefault(line, prev, shells.map((shell) => shell.newRichMenuId));
-    await deleteRichMenuShells(
+    const defaultOutcome = await restorePreSwitchDefault(
       line,
-      shells.filter((shell) => !unrestored.has(shell.pageId)).map((shell) => shell.newRichMenuId),
+      prev,
+      shells.map((shell) => shell.newRichMenuId),
     );
+    // default を戻し切れていない新メニューは消さない(消すと全友だちの表示が消える)。
+    await deleteRichMenuShells(line, deletableAfterCompensation(shells, unrestored, defaultOutcome));
     throw error;
   }
 

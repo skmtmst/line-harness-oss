@@ -25,6 +25,7 @@ const dbMocks = vi.hoisted(() => ({
   acquirePublishLease: vi.fn(),
   renewPublishLease: vi.fn(),
   releasePublishLease: vi.fn(),
+  publishLeaseNotTakenByOther: vi.fn(),
   setPageRichMenuId: vi.fn(),
   markRichMenuGroupPublished: vi.fn(),
   markRichMenuGroupUnpublished: vi.fn(),
@@ -110,7 +111,10 @@ function deps(overrides = {}) {
     ]),
     readCurrentDefaultId: vi.fn().mockResolvedValue(null),
     switchLiveTo: vi.fn().mockResolvedValue(undefined),
-    compensateSwitchToPrevious: vi.fn().mockResolvedValue(new Set()),
+    compensateSwitchToPrevious: vi.fn().mockResolvedValue({
+      unrestoredPageIds: new Set(),
+      defaultRestore: { state: 'restored' },
+    }),
     deleteLineShells: vi.fn().mockResolvedValue(undefined),
     restoreCapturedDefault: vi.fn().mockResolvedValue(undefined),
     clearAccountDefault: vi.fn().mockResolvedValue(undefined),
@@ -157,6 +161,7 @@ beforeEach(() => {
   dbMocks.acquirePublishLease.mockResolvedValue(true);
   dbMocks.renewPublishLease.mockResolvedValue(true);
   dbMocks.releasePublishLease.mockResolvedValue(true);
+  dbMocks.publishLeaseNotTakenByOther.mockResolvedValue(true);
   dbMocks.setPageRichMenuId.mockResolvedValue(undefined);
   dbMocks.markRichMenuGroupPublished.mockResolvedValue(undefined);
   dbMocks.markRichMenuGroupUnpublished.mockResolvedValue(undefined);
@@ -295,7 +300,10 @@ describe('rich menu schedule executor', () => {
       journalStore.delete(`${scheduleId}:${kind}`);
       clearOrder.push('clear-journal');
     });
-    d.compensateSwitchToPrevious.mockImplementation(async () => { clearOrder.push('compensate'); return new Set(); });
+    d.compensateSwitchToPrevious.mockImplementation(async () => {
+      clearOrder.push('compensate');
+      return { unrestoredPageIds: new Set(), defaultRestore: { state: 'restored' } };
+    });
     d.deleteLineShells.mockImplementation(async () => { clearOrder.push('delete-shells'); });
 
     const result = await processDueRichMenuSchedules(db, d, { now });
@@ -323,7 +331,10 @@ describe('rich menu schedule executor', () => {
     dbMocks.getDueRichMenuSchedules.mockResolvedValue([schedule()]);
     const d = deps({
       switchLiveTo: vi.fn().mockRejectedValue(new Error('LINE alias 500, try again')),
-      compensateSwitchToPrevious: vi.fn().mockResolvedValue(new Set(['p1'])),
+      compensateSwitchToPrevious: vi.fn().mockResolvedValue({
+        unrestoredPageIds: new Set(['p1']),
+        defaultRestore: { state: 'restored' },
+      }),
     });
 
     await processDueRichMenuSchedules(db, d, { now });
@@ -347,10 +358,13 @@ describe('rich menu schedule executor', () => {
 
   test('leaseを失った旧holderはDB確定せず手を引く', async () => {
     dbMocks.getDueRichMenuSchedules.mockResolvedValue([schedule()]);
-    // 切替までは持ち、反映前のrenewで失う。
-    dbMocks.renewPublishLease
-      .mockResolvedValueOnce(true)
-      .mockResolvedValueOnce(false);
+    // 作成・pin・journal・切替までは持ち、反映前のrenewで失う。
+    // renewは外部工程とDB確定の直前に毎回入るため、切替の次で false にする。
+    let renewCalls = 0;
+    dbMocks.renewPublishLease.mockImplementation(async () => {
+      renewCalls += 1;
+      return renewCalls <= 4;
+    });
     const d = deps();
 
     const result = await processDueRichMenuSchedules(db, d, { now });

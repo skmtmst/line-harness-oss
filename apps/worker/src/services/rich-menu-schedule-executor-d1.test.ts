@@ -24,6 +24,11 @@ type FakeLine = {
   seq: number;
   calls: { create: number; upsert: number; setDefault: number; clear: number; del: number; getDefault: number };
   failUpsertOn: number;
+  /**
+   * setDefaultRichMenu の1回ごとの振る舞い。先頭から消費し、無ければ 'ok'。
+   * 'apply-then-throw' は「LINE側には効いたが応答が返らなかった」を再現する。
+   */
+  setDefaultPlan: Array<'ok' | 'apply-then-throw' | 'throw'>;
   createRichMenu(payload: unknown): Promise<{ richMenuId: string }>;
   uploadRichMenuImage(richMenuId: string, image: Uint8Array, contentType: string): Promise<void>;
   deleteRichMenuAlias(aliasId: string): Promise<void>;
@@ -44,6 +49,7 @@ function makeFakeLine(): FakeLine {
     seq: 0,
     calls: { create: 0, upsert: 0, setDefault: 0, clear: 0, del: 0, getDefault: 0 },
     failUpsertOn: 0,
+    setDefaultPlan: [],
     async createRichMenu(payload: unknown) {
       line.calls.create += 1;
       const id = `line-new-${++line.seq}`;
@@ -71,7 +77,13 @@ function makeFakeLine(): FakeLine {
     async setDefaultRichMenu(richMenuId: string) {
       line.calls.setDefault += 1;
       if (!line.menus.has(richMenuId)) throw new Error(`LINE setDefaultRichMenu failed: 404`);
+      const plan = line.setDefaultPlan.shift() ?? 'ok';
+      if (plan === 'throw') throw new Error('LINE setDefaultRichMenu failed: 500, try again');
       line.defaultId = richMenuId;
+      if (plan === 'apply-then-throw') {
+        // LINEには効いたが応答が返らなかった。呼び出し側からは失敗に見える。
+        throw new Error('LINE setDefaultRichMenu failed: fetch failed');
+      }
     },
     async clearDefaultRichMenu() {
       line.calls.clear += 1;
@@ -267,7 +279,13 @@ function scheduleRow(sqlite: Database.Database, id: string) {
   return sqlite.prepare(`SELECT * FROM rich_menu_schedules WHERE id = ?`).get(id) as Record<string, unknown>
 }
 
-function depsFor(sqlite: Database.Database, db: D1Database, line: FakeLine, unlinked: string[]) {
+function depsFor(
+  sqlite: Database.Database,
+  db: D1Database,
+  line: FakeLine,
+  unlinked: string[],
+  overrides: Record<string, unknown> = {},
+) {
   return {
     getGroupWithPages: async (_db: unknown, groupId: string) => {
       const group = sqlite.prepare(`SELECT * FROM rich_menu_groups WHERE id = ?`).get(groupId) as Record<string, unknown> | undefined
@@ -343,9 +361,9 @@ function depsFor(sqlite: Database.Database, db: D1Database, line: FakeLine, unli
       })))
     },
     compensateSwitchToPrevious: async ({ groupId, prev, newIds }: { groupId: string; prev: unknown; newIds: string[] }) => {
-      const unrestored = await restorePreSwitchLive(line as never, groupId, prev as never)
-      await restorePreSwitchDefault(line as never, prev as never, newIds)
-      return unrestored
+      const unrestoredPageIds = await restorePreSwitchLive(line as never, groupId, prev as never)
+      const defaultRestore = await restorePreSwitchDefault(line as never, prev as never, newIds)
+      return { unrestoredPageIds, defaultRestore }
     },
     deleteLineShells: async (_schedule: unknown, ids: string[]) => {
       await deleteRichMenuShells(line as never, ids)
@@ -375,6 +393,7 @@ function depsFor(sqlite: Database.Database, db: D1Database, line: FakeLine, unli
       for (const target of targets) unlinked.push(target.lineUserId)
       return targets.length
     },
+    ...overrides,
   }
 }
 
@@ -580,6 +599,182 @@ describe('executor 段階公開（実D1 + fake LINE）', () => {
     expect(restoreAlias).toMatch(/^line-new-/)
     expect(scheduleRow(sqlite, 'exp-1').status).toBe('completed')
     expect((sqlite.prepare(`SELECT status FROM rich_menu_groups WHERE id = 'menu-1'`).get() as { status: string }).status).toBe('draft')
+  })
+
+  test('旧メニューは反映前のIDで消える（LINE側に置き去りにしない）', async () => {
+    // 反映(DB)のあとに page 行を読み直して旧IDを引くと、もう新IDへ変わっていて
+    // 旧メニューが1つも消えない。反映前に控えたIDで消すことを固定する。
+    insertGroup(sqlite, {
+      id: 'menu-1',
+      status: 'published',
+      isDefault: true,
+      pages: [{ id: 'p1', order: 0, lineId: 'line-old-1' }],
+    })
+    line.menus.set('line-old-1', { name: 'old-1' })
+    line.aliases.set('lhx-menu-1-0', 'line-old-1')
+    line.defaultId = 'line-old-1'
+    insertSchedule(sqlite, { id: 'old-del-1', definition_snapshot: snapshotFor('menu-1', ['p1'], true) })
+
+    const result = await processDueRichMenuSchedules(db, depsFor(sqlite, db, line, unlinked) as never, { now: T0 })
+    expect(result).toMatchObject({ processed: 1, succeeded: 1 })
+    const newId = line.aliases.get('lhx-menu-1-0') as string
+    expect(newId).toMatch(/^line-new-/)
+    // 旧メニューはLINEから消えている。残っているのは新メニューだけ。
+    expect([...line.menus.keys()]).toEqual([newId])
+    expect(line.defaultId).toBe(newId)
+    const page = sqlite.prepare(`SELECT line_richmenu_id FROM rich_menu_pages WHERE id = 'p1'`).get() as { line_richmenu_id: string }
+    expect(page.line_richmenu_id).toBe(newId)
+  })
+
+  test('pin失敗：作成済みの新メニューを片付けてから一時失敗にする', async () => {
+    // 実LINE defaultの読み取り(pin)が落ちたとき、作ったメニューを消さないと
+    // 参照されないメニューがLINE側に溜まり続ける。
+    insertGroup(sqlite, { id: 'menu-1', isDefault: true, pages: [{ id: 'p1' }] })
+    insertSchedule(sqlite, { id: 'pin-fail-1', definition_snapshot: snapshotFor('menu-1', ['p1'], true) })
+    const deps = depsFor(sqlite, db, line, unlinked, {
+      readCurrentDefaultId: async () => {
+        throw new Error('LINE getCurrentDefaultRichMenu failed: 500, try again')
+      },
+    })
+
+    const result = await processDueRichMenuSchedules(db, deps as never, { now: T0 })
+    expect(result).toMatchObject({ processed: 1, retried: 1 })
+    // 作ったのは1枚。片付いてLINE側に残っていない。
+    expect(line.calls.create).toBe(1)
+    expect([...line.menus.keys()]).toEqual([])
+    // 切替もjournalもしていない。
+    expect(line.aliases.size).toBe(0)
+    expect((sqlite.prepare(`SELECT COUNT(*) AS n FROM rich_menu_schedule_publications`).get() as { n: number }).n).toBe(0)
+    expect(scheduleRow(sqlite, 'pin-fail-1').status).toBe('scheduled')
+  })
+
+  test('default復元に失敗したら、defaultが指したままの新メニューを消さない', async () => {
+    // 切替の default 設定はLINEに効いたが応答が返らず、補償の戻しも落ちた。
+    // ここで新メニューを消すと全友だちのメニューがリンク切れになる。
+    insertGroup(sqlite, {
+      id: 'menu-1',
+      status: 'published',
+      isDefault: true,
+      pages: [
+        { id: 'a', order: 0, lineId: 'line-old-a' },
+        { id: 'b', order: 1, lineId: 'line-old-b' },
+      ],
+    })
+    line.menus.set('line-old-a', { name: 'old-a' })
+    line.menus.set('line-old-b', { name: 'old-b' })
+    line.aliases.set('lhx-menu-1-0', 'line-old-a')
+    line.aliases.set('lhx-menu-1-1', 'line-old-b')
+    line.defaultId = 'line-old-a'
+    // 1回目(切替): LINEには効くが応答が返らない。2回目(補償の戻し): 失敗。
+    line.setDefaultPlan = ['apply-then-throw', 'throw']
+    insertSchedule(sqlite, { id: 'defrestore-1', definition_snapshot: snapshotFor('menu-1', ['a', 'b'], true) })
+
+    const result = await processDueRichMenuSchedules(db, depsFor(sqlite, db, line, unlinked) as never, { now: T0 })
+    // 結果に「defaultを戻し切れていない」が出る。
+    expect(result).toMatchObject({ processed: 1, retried: 1, defaultRestoreIncomplete: 1 })
+    // aliasは旧へ戻っている。
+    expect(line.aliases.get('lhx-menu-1-0')).toBe('line-old-a')
+    expect(line.aliases.get('lhx-menu-1-1')).toBe('line-old-b')
+    // defaultはまだ新メニューを指したまま。そのメニューは消さずに残す。
+    const retained = line.defaultId as string
+    expect(retained).toMatch(/^line-new-/)
+    expect(line.menus.has(retained)).toBe(true)
+    // 指されていないもう1枚の新メニューは片付ける。
+    expect([...line.menus.keys()].filter((id) => id.startsWith('line-new-'))).toEqual([retained])
+    // 失敗理由からも「defaultが戻っていない」と分かる。
+    expect(String(scheduleRow(sqlite, 'defrestore-1').last_error_code)).toContain('default_restore_incomplete')
+  })
+
+  test('2実行主体interleave：期限内はBが割り込めず、Aがそのまま完了する', async () => {
+    insertGroup(sqlite, { id: 'menu-1', isDefault: true, pages: [{ id: 'p1' }] })
+    insertSchedule(sqlite, { id: 'inter-1', definition_snapshot: snapshotFor('menu-1', ['p1'], true) })
+    // Bは別接続(別のD1ハンドル)から同じ行を見る。
+    const dbB = asD1(sqlite)
+    let bResult: Awaited<ReturnType<typeof processDueRichMenuSchedules>> | null = null
+
+    const depsA = depsFor(sqlite, db, line, unlinked, {
+      // Aが外部へ作っている最中にBのtickが走る（lease期限内）。
+      createLineShells: async (snapshot: unknown) => {
+        bResult = await processDueRichMenuSchedules(
+          dbB,
+          depsFor(sqlite, dbB, line, unlinked) as never,
+          { now: new Date(T0.getTime() + 60_000), runIdPrefix: 'B' },
+        )
+        const { shells } = await createRichMenuShells(snapshot as never, line as never, fakeR2 as never)
+        return shells.map((shell) => ({
+          pageId: shell.pageId,
+          orderIndex: shell.orderIndex,
+          newRichMenuId: shell.newRichMenuId,
+          oldLineRichMenuId: null,
+        }))
+      },
+    })
+
+    const aResult = await processDueRichMenuSchedules(db, depsA as never, { now: T0, runIdPrefix: 'A' })
+    // Bは触れない（claim済みでdueに出ず、leaseも期限内）。
+    expect(bResult).toMatchObject({ processed: 0, succeeded: 0, reclaimed: 0 })
+    expect(aResult).toMatchObject({ processed: 1, succeeded: 1 })
+    expect(line.calls.create).toBe(1)
+    const row = scheduleRow(sqlite, 'inter-1')
+    expect(row.status).toBe('completed')
+    expect(String(row.started_run_id)).toMatch(/^A-/)
+  })
+
+  test('2実行主体interleave：期限切れでBが引き継ぎ、旧holder Aは切替も確定もせず作った分を片付ける', async () => {
+    insertGroup(sqlite, { id: 'menu-1', isDefault: true, pages: [{ id: 'p1' }] })
+    insertSchedule(sqlite, { id: 'inter-2', definition_snapshot: snapshotFor('menu-1', ['p1'], true) })
+    const dbB = asD1(sqlite)
+    let bResult: Awaited<ReturnType<typeof processDueRichMenuSchedules>> | null = null
+    const aCreated: string[] = []
+
+    const depsA = depsFor(sqlite, db, line, unlinked, {
+      // Aは作成に手間取り、その間にleaseが切れてBが回収して完了させる。
+      createLineShells: async (snapshot: unknown) => {
+        const { shells } = await createRichMenuShells(snapshot as never, line as never, fakeR2 as never)
+        for (const shell of shells) aCreated.push(shell.newRichMenuId)
+        bResult = await processDueRichMenuSchedules(
+          dbB,
+          depsFor(sqlite, dbB, line, unlinked) as never,
+          { now: new Date(T0.getTime() + 11 * 60_000), runIdPrefix: 'B' },
+        )
+        return shells.map((shell) => ({
+          pageId: shell.pageId,
+          orderIndex: shell.orderIndex,
+          newRichMenuId: shell.newRichMenuId,
+          oldLineRichMenuId: null,
+        }))
+      },
+    })
+
+    const aResult = await processDueRichMenuSchedules(db, depsA as never, { now: T0, runIdPrefix: 'A' })
+
+    // Bが回収して完了させた。
+    expect(bResult).toMatchObject({ reclaimed: 1, processed: 1, succeeded: 1 })
+    // Aは切替も確定もせず、自分が作った分だけ片付けて手を引く。
+    expect(aResult).toMatchObject({ processed: 1, succeeded: 0, skipped: 1 })
+    expect(aCreated).toHaveLength(1)
+    expect(line.menus.has(aCreated[0])).toBe(false)
+    // liveなのはBの1枚だけ。aliasもdefaultもBの分を指す。
+    const liveId = line.aliases.get('lhx-menu-1-0') as string
+    expect(liveId).toMatch(/^line-new-/)
+    expect(liveId).not.toBe(aCreated[0])
+    expect([...line.menus.keys()]).toEqual([liveId])
+    expect(line.defaultId).toBe(liveId)
+    // journalはBのrunの1行だけ。予約はBのrunで completed。
+    const journal = sqlite.prepare(`SELECT run_id, line_richmenu_id FROM rich_menu_schedule_publications`).all() as Array<{ run_id: string; line_richmenu_id: string }>
+    expect(journal).toHaveLength(1)
+    expect(journal[0].run_id).toMatch(/^B-/)
+    expect(journal[0].line_richmenu_id).toBe(liveId)
+    const row = scheduleRow(sqlite, 'inter-2')
+    expect(row.status).toBe('completed')
+    expect(String(row.started_run_id)).toMatch(/^B-/)
+    // 反映されたのもBのID。Aの古いIDでDBを上書きしていない。
+    const page = sqlite.prepare(`SELECT line_richmenu_id FROM rich_menu_pages WHERE id = 'p1'`).get() as { line_richmenu_id: string }
+    expect(page.line_richmenu_id).toBe(liveId)
+    // 引き継ぎ後、leaseは開いている（次の手動公開・再試行を塞がない）。
+    const group = sqlite.prepare(`SELECT publishing_owner, publishing_expires_at FROM rich_menu_groups WHERE id = 'menu-1'`).get() as { publishing_owner: string | null; publishing_expires_at: string | null }
+    expect(group.publishing_owner).toBeNull()
+    expect(group.publishing_expires_at).toBeNull()
   })
 
   test('run A/B fencing：古いrunは新しいclaim後に書けない（実D1）', async () => {

@@ -7,6 +7,7 @@ import {
   switchRichMenuLive,
   restorePreSwitchLive,
   restorePreSwitchDefault,
+  deletableAfterCompensation,
   deleteRichMenuShells,
   RichMenuValidationError,
   validateRichMenuGroupForPublish,
@@ -1097,6 +1098,46 @@ describe('段階公開 (E-08 #621 案A)', () => {
     expect(line.calls).toEqual(['get-default']);
     expect(line.calls).not.toContain('set-default');
     expect(line.calls).not.toContain('clear-default');
+  });
+
+  it('default復元の結果を返し、戻せなかった新メニューは消せる集合から外す', async () => {
+    const line = makeMockLineClient({ currentDefault: 'lm-1' });
+    line.setDefaultRichMenu = vi.fn(async () => {
+      throw new Error('LINE setDefaultRichMenu failed: 500');
+    });
+    const outcome = await restorePreSwitchDefault(
+      line,
+      { oldIds: [], previousDefaultId: 'old-default-1' },
+      ['lm-1', 'lm-2'],
+    );
+    expect(outcome).toEqual({ state: 'failed', retainedId: 'lm-1' });
+    // defaultが指したままの lm-1 は消さない。指されていない lm-2 は消す。
+    expect(
+      deletableAfterCompensation(
+        [
+          { pageId: 'p1', newRichMenuId: 'lm-1' },
+          { pageId: 'p2', newRichMenuId: 'lm-2' },
+        ],
+        new Set<string>(),
+        outcome,
+      ),
+    ).toEqual(['lm-2']);
+  });
+
+  it('defaultを読めなければ、どれが指されているか分からないので1つも消さない', async () => {
+    const line = makeMockLineClient({ currentDefault: 'lm-1' });
+    line.getCurrentDefaultRichMenuId = vi.fn(async () => {
+      throw new Error('LINE getCurrentDefaultRichMenu failed: 500');
+    });
+    const outcome = await restorePreSwitchDefault(
+      line,
+      { oldIds: [], previousDefaultId: 'old-default-1' },
+      ['lm-1'],
+    );
+    expect(outcome).toEqual({ state: 'failed', retainedId: null });
+    expect(
+      deletableAfterCompensation([{ pageId: 'p1', newRichMenuId: 'lm-1' }], new Set<string>(), outcome),
+    ).toEqual([]);
   });
 
   it('deleteRichMenuShells は失敗を飲み込む', async () => {

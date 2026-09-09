@@ -20,6 +20,7 @@ import {
   markRichMenuGroupUnpublished,
   nextRichMenuScheduleRetryAt,
   pinScheduleRestoreDefault,
+  publishLeaseNotTakenByOther,
   reclaimStalePublishingSchedule,
   reclaimStaleRestoringSchedule,
   recordRichMenuSchedulePermanentFailure,
@@ -35,6 +36,10 @@ import {
   type RichMenuScheduleRow,
   type RichMenuGroupWithPages,
 } from '@line-crm/db';
+import {
+  deletableAfterCompensation,
+  type DefaultRestoreOutcome,
+} from '../lib/rich-menu-publisher.js';
 
 // E-08 (#621): 保存済み公開予約を時刻到来時に実行する。
 // 読むcronが無かったため時刻を過ぎても公開されなかった問題を直す。
@@ -76,6 +81,17 @@ export type SchedulePreSwitchState = {
   oldIds: Array<{ pageId: string; orderIndex: number; lineRichMenuId: string | null }>;
   previousDefaultId: string | null;
 };
+
+/** 切替失敗の補償結果。default 復元の可否を飲み込まずに返す。 */
+export type ScheduleSwitchCompensation = {
+  /** aliasを旧へ戻せなかったページ。新メニューを消してはいけない。 */
+  unrestoredPageIds: Set<string>;
+  /** default 復元の結果。'failed' なら指したままの新メニューを消さない。 */
+  defaultRestore: DefaultRestoreOutcome;
+};
+
+/** 1回のtickで積む付帯結果。default復元の未完了を表へ出すために使う。 */
+type ExecutionStats = { defaultRestoreIncomplete: number };
 
 export type RichMenuScheduleExecutorDeps = {
   getGroupWithPages: (db: D1Database, groupId: string) => Promise<RichMenuGroupWithPages | null>;
@@ -123,14 +139,15 @@ export type RichMenuScheduleExecutorDeps = {
   }) => Promise<void>;
   /**
    * 切替失敗の補償: aliasを旧へ戻し、defaultを切替前へ戻す。
-   * 決して投げない。戻せなかった pageId の集合を返す。
+   * 決して投げない。戻せなかった pageId と default 復元の結果を返す。
+   * default を戻し切れていない新メニューは呼び出し側が消さない。
    */
   compensateSwitchToPrevious: (input: {
     schedule: RichMenuScheduleRow;
     groupId: string;
     prev: SchedulePreSwitchState;
     newIds: string[];
-  }) => Promise<Set<string>>;
+  }) => Promise<ScheduleSwitchCompensation>;
   /**
    * 作った分・旧分の削除。404許容で決して投げない(後片付け用)。
    * 本番は deleteRichMenuShells を呼ぶ。
@@ -163,6 +180,12 @@ export type RichMenuScheduleProcessResult = {
   failed: number;
   skipped: number;
   reclaimed: number;
+  /**
+   * 切替失敗の補償で「切替前のdefaultへ戻し切れなかった」回数。
+   * 0 でなければLINEの全体defaultが宙に浮いている可能性があり、
+   * 指したままの新メニューは消さずに残してある(要対応)。
+   */
+  defaultRestoreIncomplete: number;
 };
 
 function parseSnapshot(snapshot: string): { ok: true; value: unknown } | { ok: false; error: string } {
@@ -305,12 +328,20 @@ async function runPhasedPublish(input: {
   reflect: (shells: ScheduleShell[]) => Promise<void>;
   recordSuccess: () => Promise<boolean>;
   fail: FailRecorder;
+  stats: ExecutionStats;
 }): Promise<'succeeded' | 'retried' | 'failed' | 'skipped'> {
   const { db, schedule, now, deps, runId, kind, targetGroupId } = input;
   const nowIso = now.toISOString();
 
   const locked = await acquirePublishLease(db, targetGroupId, runId, nowIso);
   if (!locked) return input.fail(publishLeaseTakenError(targetGroupId));
+
+  /**
+   * 所有の確認と期限の延長。外部工程(LINE呼び出し)とDB確定の直前に必ず通す。
+   * false は「回収されて別のrunが所有者になった」の合図で、旧holderは
+   * ここから先の切替・確定・後片付けをしない(新所有者に任せる)。
+   */
+  const holdsLease = () => renewPublishLease(db, targetGroupId, runId, nowIso);
 
   const loadPrev = async (): Promise<SchedulePreSwitchState> => {
     const pages = await input.loadTargetPages();
@@ -329,18 +360,28 @@ async function runPhasedPublish(input: {
     let journal = await getSchedulePublications(db, schedule.id, kind);
     if (journal.length === 0) {
       // journal未確定の新規実行: 作って→固定して→journalへ残す。
+      // LINEへ作る前に所有を確かめる(旧holderがメニューを作り散らさない)。
+      if (!(await holdsLease())) return input.fail(publishLeaseTakenError(targetGroupId));
       const created = await input.createShells();
-      // pinはjournalより先に固定する。journalあり・pinなしの再開は
-      // 切替後の値で固定し直す危険があるため、この順番を守る。
-      await ensureRestoreDefaultPin(db, schedule, deps);
+      // ここから先で失敗したら、まだliveでない新メニューを必ず片付ける。
+      // pinの失敗で作りっぱなしにすると、LINE側に参照されないメニューが残る。
       try {
+        // pinはjournalより先に固定する。journalあり・pinなしの再開は
+        // 切替後の値で固定し直す危険があるため、この順番を守る。
+        // 実LINE defaultの読み取りも外部工程なので所有を確かめてから行う。
+        if (!(await holdsLease())) throw publishLeaseTakenError(targetGroupId);
+        await ensureRestoreDefaultPin(db, schedule, deps);
+        // journalは「このrunがLINEへ作った」の確定。書く前に所有を確かめる。
+        if (!(await holdsLease())) throw publishLeaseTakenError(targetGroupId);
         await recordSchedulePublications(db, schedule.id, kind, runId, toJournalPages(created));
       } catch (error) {
         // まだliveでない新メニューだけ消す。alias/defaultは触っていない。
+        // ここの片付けはleaseを確かめない。自分が作った分の始末なので、
+        // 所有を失っていても残すより消すほうが安全(誰も参照していない)。
         try {
           await deps.deleteLineShells(schedule, created.map((shell) => shell.newRichMenuId));
         } catch {
-          // 片付けの失敗は元のjournal失敗を隠さない。残留は無害(参照されない)。
+          // 片付けの失敗は元の失敗を隠さない。残留は無害(参照されない)。
         }
         throw error;
       }
@@ -367,9 +408,16 @@ async function runPhasedPublish(input: {
       });
     }
 
+    // 反映前の旧メニューIDをここで控える。反映後にDBを読み直すと新IDに
+    // 変わっていて、旧メニューが1つも消えずLINE側に残り続ける。
+    const oldIdsBeforeReflect = shells
+      .map((shell) => shell.oldLineRichMenuId)
+      .filter((id): id is string => !!id)
+      // journalの新IDと重なるものは消さない(同ID再利用の安全弁)。
+      .filter((id) => !shells.some((shell) => shell.newRichMenuId === id));
+
     // 外部工程の直前にleaseを延ばす。失っていたら旧holderとして手を引く。
-    const renewed = await renewPublishLease(db, targetGroupId, runId, nowIso);
-    if (!renewed) return input.fail(publishLeaseTakenError(targetGroupId));
+    if (!(await holdsLease())) return input.fail(publishLeaseTakenError(targetGroupId));
 
     try {
       await deps.switchLiveTo({ schedule, groupId: targetGroupId, setDefault: input.setDefault, shells });
@@ -382,43 +430,62 @@ async function runPhasedPublish(input: {
       } catch {
         throw error;
       }
+      // 補償はleaseを確かめずに必ず行う。自分が変えたlive状態の巻き戻しで、
+      // ここで手を引くと切替途中のまま放置される(所有者が代わっても直せない)。
       const prev = await loadPrev();
-      const unrestored = await deps.compensateSwitchToPrevious({
+      const compensation = await deps.compensateSwitchToPrevious({
         schedule,
         groupId: targetGroupId,
         prev,
         newIds: shells.map((shell) => shell.newRichMenuId),
       });
+      // defaultを戻し切れていない新メニューは消さない。消すと全友だちの
+      // トーク画面からメニューが消える(リンク切れ)。
       await deps.deleteLineShells(
         schedule,
-        shells.filter((shell) => !unrestored.has(shell.pageId)).map((shell) => shell.newRichMenuId),
+        deletableAfterCompensation(shells, compensation.unrestoredPageIds, compensation.defaultRestore),
       );
+      if (compensation.defaultRestore.state === 'failed') {
+        input.stats.defaultRestoreIncomplete += 1;
+        // 結果と失敗理由の両方へ出す。運用者が「defaultが戻っていない」と
+        // 分かるようにし、残した新メニューを手で片付けられるようにする。
+        throw new Error(
+          `default_restore_incomplete(${compensation.defaultRestore.retainedId ?? 'unknown'}): ` +
+            (error instanceof Error ? error.message : String(error)),
+        );
+      }
       throw error;
     }
 
-    // 切替済み。DB反映の直前にもう一度所有を確認する。
+    // 切替が終わり、旧メニューはaliasから外れた。まだleaseを持っている
+    // うちにLINE側の旧メニューを消す。反映(DB)の後に回すと、page行が新IDへ
+    // 変わっていて旧IDを引けず、LINE側に参照されないメニューが残り続ける。
+    if (oldIdsBeforeReflect.length > 0) {
+      if (!(await holdsLease())) return input.fail(publishLeaseTakenError(targetGroupId));
+      await deps.deleteLineShells(schedule, oldIdsBeforeReflect);
+    }
+
+    // DB反映の直前にもう一度所有を確認する。
     // 失っていたら手を引く(journalありの再開が反映を終わらせる)。
-    const renewedForReflect = await renewPublishLease(db, targetGroupId, runId, nowIso);
-    if (!renewedForReflect) return input.fail(publishLeaseTakenError(targetGroupId));
+    if (!(await holdsLease())) return input.fail(publishLeaseTakenError(targetGroupId));
 
-    try {
-      await input.reflect(shells);
-    } catch (error) {
-      // aliasは正しく新IDを向いている。反映だけやり直せばよいので補償しない。
-      // 再試行はjournalありの再開で反映を終わらせる。
-      throw error;
+    await input.reflect(shells);
+    // 反映が落ちたときは補償しない。aliasは正しく新IDを向いているので、
+    // journalありの再開が反映だけやり直す。
+
+    // 反映(公開確定)はleaseも空けるため、ここから先はrenewでは守れない。
+    // 確定の直前は「回収されて別の所有者になっていない」ことを確かめる。
+    if (!(await publishLeaseNotTakenByOther(db, targetGroupId, runId, nowIso))) {
+      return input.fail(publishLeaseTakenError(targetGroupId));
     }
-
-    // DB確定のあとで旧メニューを消す。残っても参照されず、次回の清掃対象。
-    const prev = await loadPrev();
-    const oldIds = prev.oldIds
-      .map((old) => old.lineRichMenuId)
-      .filter((id): id is string => !!id)
-      // journalの新IDと重なるものは消さない(同ID再利用の安全弁)。
-      .filter((id) => !shells.some((shell) => shell.newRichMenuId === id));
-    await deps.deleteLineShells(schedule, oldIds);
-
     const recorded = await input.recordSuccess();
+    // 成功後は所有者条件でleaseを開ける。開けずに帰ると期限(10分)まで
+    // 再試行と手動公開を塞ぐ(反映で既に空いていれば何も起きない)。
+    try {
+      await releasePublishLease(db, targetGroupId, runId);
+    } catch {
+      // 解放の失敗は成功を隠さない。期限切れで回収される。
+    }
     return recorded ? 'succeeded' : 'skipped';
   } catch (error) {
     return input.fail(error);
@@ -431,6 +498,7 @@ async function handleOneSchedule(
   now: Date,
   deps: RichMenuScheduleExecutorDeps,
   runId: string,
+  stats: ExecutionStats,
 ): Promise<'succeeded' | 'retried' | 'failed' | 'skipped'> {
   const claimed = await claimRichMenuSchedule(db, schedule.id, schedule.account_id, runId, now.toISOString());
   if (!claimed) return 'skipped';
@@ -502,6 +570,7 @@ async function handleOneSchedule(
           fresh.mode === 'period' ? 'published' : 'completed',
         ),
       fail,
+      stats,
     });
     return outcome;
   } catch (error) {
@@ -520,6 +589,7 @@ async function handleOneRestore(
   now: Date,
   deps: RichMenuScheduleExecutorDeps,
   runId: string,
+  stats: ExecutionStats,
 ): Promise<'restored' | 'retried' | 'failed' | 'skipped'> {
   const claimed = await claimRichMenuScheduleRestore(db, schedule.id, schedule.account_id, runId, now.toISOString());
   if (!claimed) return 'skipped';
@@ -559,7 +629,7 @@ async function handleOneRestore(
     // 明示の戻し先がある場合は、そのgroupを段階公開で戻す。
     // 戻し先が消える・非公開化は恒久失敗(要対応)に残し、勝手に解除しない。
     if (fresh.restore_group_id) {
-      return handleExplicitRestore(db, fresh, now, deps, runId, unlinkAndClearAssignments);
+      return handleExplicitRestore(db, fresh, now, deps, runId, unlinkAndClearAssignments, stats);
     }
     return handlePinnedRestore(db, fresh, now, deps, runId, unlinkAndClearAssignments);
   } catch (error) {
@@ -583,6 +653,7 @@ async function handleExplicitRestore(
   deps: RichMenuScheduleExecutorDeps,
   runId: string,
   unlinkAndClearAssignments: () => Promise<void>,
+  stats: ExecutionStats,
 ): Promise<'restored' | 'retried' | 'failed' | 'skipped'> {
   const restoreGroupId = fresh.restore_group_id as string;
   const fail = makeFailRecorder(
@@ -615,6 +686,9 @@ async function handleExplicitRestore(
         }));
       },
       reflect: async (shells) => {
+        // 期限切れメニューの個別割当をLINE側で外してからD1を消す。
+        // 公開確定(mark*)はleaseを空けるため、LINEを呼ぶこの工程を先に置く。
+        await unlinkAndClearAssignments();
         for (const shell of shells) {
           await setPageRichMenuId(db, shell.pageId, shell.newRichMenuId);
         }
@@ -622,11 +696,10 @@ async function handleExplicitRestore(
         if (restoreGroupId !== fresh.group_id) {
           await markRichMenuGroupUnpublished(db, fresh.group_id);
         }
-        // 終了時に期限切れメニューの個別割当をLINE側で外してからD1を消す。
-        await unlinkAndClearAssignments();
       },
       recordSuccess: () => recordRichMenuScheduleRestoreSuccess(db, fresh.id, fresh.account_id, runId),
       fail,
+      stats,
     });
     return outcome === 'succeeded' ? 'restored' : outcome;
   } catch (error) {
@@ -675,16 +748,26 @@ async function handlePinnedRestore(
     } else {
       await deps.clearAccountDefault(fresh);
     }
+    // 個別割当の解除もLINEを呼ぶ外部工程。leaseを持っているうちに済ませる。
+    const renewedForUnlink = await renewPublishLease(db, fresh.group_id, runId, nowIso);
+    if (!renewedForUnlink) return fail(publishLeaseTakenError(fresh.group_id));
+    await unlinkAndClearAssignments();
+
     const renewedForReflect = await renewPublishLease(db, fresh.group_id, runId, nowIso);
     if (!renewedForReflect) return fail(publishLeaseTakenError(fresh.group_id));
     await markRichMenuGroupUnpublished(db, fresh.group_id);
-    await unlinkAndClearAssignments();
+
+    // 未公開化はleaseも空けるため、確定の直前は「別の所有者に取られて
+    // いない」ことを確かめる(旧holderの確定を止める目的は renew と同じ)。
+    if (!(await publishLeaseNotTakenByOther(db, fresh.group_id, runId, nowIso))) {
+      return fail(publishLeaseTakenError(fresh.group_id));
+    }
+    const recorded = await recordRichMenuScheduleRestoreSuccess(db, fresh.id, fresh.account_id, runId);
     try {
       await releasePublishLease(db, fresh.group_id, runId);
     } catch {
       // 解放の失敗は成功を隠さない。期限切れで回収される。
     }
-    const recorded = await recordRichMenuScheduleRestoreSuccess(db, fresh.id, fresh.account_id, runId);
     return recorded ? 'restored' : 'skipped';
   } catch (error) {
     return fail(error);
@@ -727,7 +810,9 @@ export async function processDueRichMenuSchedules(
     failed: 0,
     skipped: 0,
     reclaimed: 0,
+    defaultRestoreIncomplete: 0,
   };
+  const stats: ExecutionStats = { defaultRestoreIncomplete: 0 };
 
   // staleなclaimを先に戻して永久停止させない。回収後に通常のdue取得へ含める。
   try {
@@ -740,7 +825,7 @@ export async function processDueRichMenuSchedules(
   for (const schedule of due) {
     result.processed += 1;
     const runId = `${options.runIdPrefix ?? 'rms'}-${schedule.id}-${Date.now()}`;
-    const outcome = await handleOneSchedule(db, schedule, now, deps, runId);
+    const outcome = await handleOneSchedule(db, schedule, now, deps, runId, stats);
     if (outcome === 'succeeded') result.succeeded += 1;
     else if (outcome === 'retried') result.retried += 1;
     else if (outcome === 'failed') result.failed += 1;
@@ -751,13 +836,14 @@ export async function processDueRichMenuSchedules(
   for (const schedule of restores) {
     result.processed += 1;
     const runId = `${options.runIdPrefix ?? 'rms'}-${schedule.id}-restore-${Date.now()}`;
-    const outcome = await handleOneRestore(db, schedule, now, deps, runId);
+    const outcome = await handleOneRestore(db, schedule, now, deps, runId, stats);
     if (outcome === 'restored') result.restored += 1;
     else if (outcome === 'retried') result.retried += 1;
     else if (outcome === 'failed') result.failed += 1;
     else result.skipped += 1;
   }
 
+  result.defaultRestoreIncomplete = stats.defaultRestoreIncomplete;
   return result;
 }
 

@@ -937,6 +937,34 @@ export async function releasePublishLease(
 }
 
 /**
+ * 「別の所有者に取られていない」ことの確認。自分が持っている、または
+ * 誰も持っていないなら true。
+ *
+ * 公開確定 (markRichMenuGroupPublished / markRichMenuGroupUnpublished) は
+ * lease も空けるため、確定後の成功記録を renew で守ることはできない。
+ * そこで確定の直前だけはこちらで「回収されて別のrunが所有者になっていない」
+ * ことを確かめる。旧holderの確定を止める目的は renew と同じ。
+ */
+export async function publishLeaseNotTakenByOther(
+  db: D1Database,
+  groupId: string,
+  owner: string,
+  nowIso: string,
+): Promise<boolean> {
+  const row = await db
+    .prepare(
+      `SELECT 1 AS hit FROM rich_menu_groups
+        WHERE id = ?
+          AND publishing_owner IS NOT NULL
+          AND publishing_owner <> ?
+          AND (publishing_expires_at IS NULL OR publishing_expires_at > ?)`,
+    )
+    .bind(groupId, owner, nowIso)
+    .first<{ hit: number }>();
+  return !row;
+}
+
+/**
  * いま他人が有効に持っているか。手動公開の事前409判定用。
  * 期限切れ・旧形式の残留は「持っていない」扱いで、取得時に回収される。
  */

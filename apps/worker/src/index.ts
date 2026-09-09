@@ -1972,13 +1972,17 @@ async function scheduled(
         // 切替失敗の補償: journalを消した後に呼ばれ、旧へ戻す。決して投げない。
         const account = await getLineAccountById(env.DB, schedule.account_id);
         if (!account?.channel_access_token) {
-          // 補償手段がない。何も消さないよう全滅扱いで返す。
-          return new Set(prev.oldIds.map((old) => old.pageId));
+          // 補償手段がない。何も消さないよう全滅扱いで返す
+          // (defaultも読めないので retainedId は不明扱い)。
+          return {
+            unrestoredPageIds: new Set(prev.oldIds.map((old) => old.pageId)),
+            defaultRestore: { state: 'failed' as const, retainedId: null },
+          };
         }
         const line = createScheduleLineClient(`Bearer ${account.channel_access_token}`);
-        const unrestored = await restorePreSwitchLive(line, groupId, prev);
-        await restorePreSwitchDefault(line, prev, newIds);
-        return unrestored;
+        const unrestoredPageIds = await restorePreSwitchLive(line, groupId, prev);
+        const defaultRestore = await restorePreSwitchDefault(line, prev, newIds);
+        return { unrestoredPageIds, defaultRestore };
       },
       deleteLineShells: async (schedule, lineRichMenuIds) => {
         // 作った分・旧分の後片付け。404許容で決して投げない。

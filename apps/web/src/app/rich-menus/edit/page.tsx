@@ -16,6 +16,7 @@ import type { SegmentCondition } from '@/lib/segment-condition'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { RICH_MENU_DIMENSIONS } from '@line-crm/shared'
 import { datetimeLocalJstToUtcIso } from '@/lib/jst-datetime'
+import { useScheduleSubmit } from './schedule-submit'
 
 /**
  * 保存されている条件を読む。
@@ -215,6 +216,23 @@ function Editor({
   const [confirmError, setConfirmError] = useState('')
   /** 登録・取り下げの結果。`alert()` の代わりに画面へ残す。 */
   const [notice, setNotice] = useState('')
+  /*
+   * 公開予約の保存。1操作の Idempotency-Key を応答が確定するまで持ち続ける
+   * (押し直しで同じ予約が2件にならないようにする)。中身は schedule-submit.ts。
+   */
+  const scheduleSubmit = useScheduleSubmit({
+    groupId: group?.id ?? '',
+    persistDraft: () => persistDraft(),
+    onSaving: setSaving,
+    onSaved: (message) => {
+      setError(null)
+      setNotice(message)
+    },
+    onFailed: (message) => {
+      setNotice('')
+      setError(message)
+    },
+  })
   /**
    * 下見で押したときに「何が起きるか」。
    *
@@ -668,25 +686,7 @@ function Editor({
         publishing={publishing}
         onSave={() => void handleSave()}
         onPublishNow={() => void handlePublish()}
-        onSchedule={async (input) => {
-          setSaving(true)
-          setNotice('')
-          setError(null)
-          try {
-            await persistDraft()
-            const response = await api.richMenuGroups.schedule(
-              group.id,
-              input,
-              crypto.randomUUID(),
-            )
-            if (!response.success) throw new Error(response.error)
-            setNotice('公開予約を保存しました。予約時点の内容で公開します。')
-          } catch {
-            setError('公開予約を保存できませんでした。入力と通信状態を確認して、もう一度お試しください。')
-          } finally {
-            setSaving(false)
-          }
-        }}
+        onSchedule={scheduleSubmit}
       />
     )
   }
@@ -1579,3 +1579,9 @@ function PublishStep({
     </main>
   )
 }
+
+/**
+ * 試験からだけ使う出し口。公開手順の画面を、本物のReactで単体で動かして
+ * 「押したときに実際どうなるか」を確かめるために使う（#621）。
+ */
+RichMenuEditPage.__testing = { PublishStep }
