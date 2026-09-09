@@ -114,6 +114,10 @@ export default function NewCommonVarPage() {
   const valueRef = useRef<HTMLInputElement>(null)
   const memoRef = useRef<HTMLTextAreaElement>(null)
   const secretWarningRef = useRef<HTMLDivElement>(null)
+  // 入力欄と秘密値警告は「表示時のLINEアカウント」に紐づく。切替後は
+  // 別アカウント向けの内容を残さない（前アカウントの値を誤って新アカウントへ
+  // 登録しないため）。
+  const boundAccountRef = useRef(selectedAccountId)
 
   useEffect(() => {
     void api.folders
@@ -127,6 +131,23 @@ export default function NewCommonVarPage() {
   }, [])
 
   useEffect(() => {
+    if (selectedAccountId === boundAccountRef.current) return
+    const hadDraft = Boolean(name || varKey || value || memo || secretWarningFields)
+    boundAccountRef.current = selectedAccountId
+    setName('')
+    setFolderId('')
+    setVarKey('')
+    setKeyTouched(false)
+    setType('text')
+    setValue('')
+    setMemo('')
+    setSecretWarningFields(null)
+    setSaving(false)
+    setError(hadDraft ? 'LINEアカウントが切り替わったため、入力をやり直してください' : '')
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 切替検知のみに使うため、フォーム値は依存に入れない
+  }, [selectedAccountId])
+
+  useEffect(() => {
     if (secretWarningFields) secretWarningRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
   }, [secretWarningFields])
 
@@ -137,6 +158,12 @@ export default function NewCommonVarPage() {
     if (saving) return
     if (!selectedAccountId) {
       setError('LINEアカウントを選択してください')
+      return
+    }
+    if (selectedAccountId !== boundAccountRef.current) {
+      // 表示中の入力・警告は別アカウント向けなので、そのまま確認扱いにしない。
+      setSecretWarningFields(null)
+      setError('LINEアカウントが切り替わったため、入力をやり直してください')
       return
     }
     const accountAtRequest = selectedAccountId

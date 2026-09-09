@@ -5174,6 +5174,7 @@ export const api = {
       varKey: string
       type?: string
       value?: string
+      memo?: string
       folderId?: string | null
     }) =>
       fetchApi<ApiResponse<CommonVar>>('/api/common-vars', {
