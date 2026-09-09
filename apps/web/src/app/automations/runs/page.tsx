@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useAccount } from '@/contexts/account-context'
 import { fetchApi } from '@/lib/api'
 import Button from '@/components/shared/button'
@@ -70,12 +71,28 @@ function formatDuration(value: number | null): string {
   return value >= 1000 ? `${(value / 1000).toFixed(1)}秒` : `${value}ミリ秒`
 }
 
+function automationRunsSearchUrl(
+  pathname: string,
+  currentParams: string,
+  value: string,
+): string {
+  const next = new URLSearchParams(currentParams)
+  if (value) next.set('search', value)
+  else next.delete('search')
+  const suffix = next.toString()
+  return suffix ? `${pathname}?${suffix}` : pathname
+}
+
 export default function AutomationRunsPage() {
   usePageTitle('オートメーション')
   const { selectedAccountId, loading: accountLoading } = useAccount()
+  const pathname = usePathname()
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const searchFromUrl = searchParams.get('search') ?? ''
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [data, setData] = useState<RunsResponse | null>(null)
-  const [query, setQuery] = useState('')
+  const [query, setQuery] = useState(searchFromUrl)
   const [resultFilter, setResultFilter] = useState<'all' | 'executed' | 'skipped' | 'problems'>('all')
   const [selectedRun, setSelectedRun] = useState<AutomationRun | null>(null)
   const [retryingId, setRetryingId] = useState<string | null>(null)
@@ -83,6 +100,19 @@ export default function AutomationRunsPage() {
 
   // 検索の連打で古い応答が新しい表示を上書きしないよう世代で守る（#519 軽）。
   const loadGeneration = useRef(0)
+
+  /*
+   * 一覧から来た検索語と、ブラウザの戻る・進むで変わったURLを入力欄へ戻す。
+   * URLにも入力値を残すので、再読み込みしても対象を見失わない。
+   */
+  useEffect(() => {
+    setQuery(searchFromUrl)
+  }, [searchFromUrl])
+
+  const changeQuery = (value: string) => {
+    setQuery(value)
+    router.replace(automationRunsSearchUrl(pathname, searchParams.toString(), value), { scroll: false })
+  }
 
   const load = useCallback(async () => {
     if (accountLoading) return
@@ -158,7 +188,7 @@ export default function AutomationRunsPage() {
       {retryNotice ? <p className="mb-4 rounded-control border border-hairline bg-canvas-sunken px-4 py-3 text-sm text-ink-secondary" role="status">{retryNotice}</p> : null}
 
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-        <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="友だちの名前・オートメーションの名前で検索" className="h-10 w-full max-w-lg rounded-control border border-hairline bg-canvas px-3 text-sm outline-none focus:border-info" />
+        <input type="search" value={query} onChange={(event) => changeQuery(event.target.value)} placeholder="友だちの名前・オートメーションの名前で検索" className="h-10 w-full max-w-lg rounded-control border border-hairline bg-canvas px-3 text-sm outline-none focus:border-info" />
         <div className="flex items-center gap-2">
           <p className="text-sm text-ink-secondary">この30日・20件表示</p>
         </div>
