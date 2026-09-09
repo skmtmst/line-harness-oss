@@ -73,6 +73,7 @@ async function openHarness(browser, role) {
     listCalls: [],
     runSearches: [],
     failNextUpdate: false,
+    listDelayMs: {},
   }
   const context = await browser.newContext()
   await context.addInitScript(() => {
@@ -108,8 +109,10 @@ async function openHarness(browser, role) {
     }
     if (path === '/api/line-accounts') return json({ success: true, data: accounts })
     if (path === '/api/automations' && request.method() === 'GET') {
-      state.listCalls.push(url.searchParams.get('lineAccountId'))
       const selected = url.searchParams.get('lineAccountId')
+      state.listCalls.push(selected)
+      const delay = state.listDelayMs[selected ?? ''] ?? 0
+      if (delay > 0) await new Promise((resolve) => setTimeout(resolve, delay))
       const data = selected === 'account-b' ? [automation('automation-c', 'B店フォロー')] : state.items
       return json({
         success: true,
@@ -223,6 +226,27 @@ try {
     assert.equal(await search.inputValue(), '失敗した通知')
     await page.waitForTimeout(500)
     assert.equal(state.runSearches.at(-1), '失敗した通知')
+    await context.close()
+  }
+
+  {
+    /*
+     * 逆順応答（account境界）。切り替える前に投げたA店の一覧が、B店の応答より
+     * あとに届いても、B店の画面をA店の中身へ戻さないことを実ブラウザで確かめる。
+     */
+    const { context, page, state } = await openHarness(browser, 'owner')
+    state.listDelayMs['account-a'] = 2_000
+    const lateListA = page.waitForResponse((response) =>
+      response.url().includes('/api/automations?') && response.url().includes('lineAccountId=account-a'))
+    await page.goto(`${baseUrl}/automations`)
+    const accountSelect = page.getByLabel('LINEアカウント')
+    await accountSelect.waitFor()
+    await accountSelect.selectOption('account-b')
+    await page.getByText('B店フォロー', { exact: true }).waitFor()
+    await lateListA
+    await page.waitForTimeout(500)
+    assert.equal(await page.getByText('購入後フォロー', { exact: true }).count(), 0, '切替前の遅い応答を新しいアカウントの一覧へ混ぜない')
+    assert.equal(await page.getByText('B店フォロー', { exact: true }).count(), 1, '切替後の一覧が残っていない')
     await context.close()
   }
 
