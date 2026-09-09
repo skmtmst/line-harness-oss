@@ -145,18 +145,16 @@ export default function EventsListPage() {
         </p>
       </div>
 
-      <div className="border-hairline mb-4 flex flex-wrap gap-6 border-b">
-        <span className="border-accent text-accent border-b-2 px-1 pb-3 text-sm font-semibold">
-          これからの回 {dataReady ? attention.upcoming.length : '—'}
-        </span>
-        <span className="text-ink-secondary px-1 pb-3 text-sm font-medium">
-          受付前 {dataReady ? unpublishedCount : '—'}
-        </span>
-        <span className="text-ink-secondary px-1 pb-3 text-sm font-medium">
-          終わった回 —
-        </span>
-        <span className="text-ink-secondary px-1 pb-3 text-sm font-medium">申込者</span>
-      </div>
+      <section
+        data-event-count-summary
+        aria-label="一覧の集計（表示のみ）"
+        className="bg-canvas-sunken text-ink-secondary mb-4 flex flex-wrap items-center gap-x-6 gap-y-2 rounded-control px-4 py-3 text-sm"
+      >
+        <span className="text-ink-faint text-xs font-medium">一覧の集計（表示のみ）</span>
+        <span>これからの回 <strong className="text-ink">{dataReady ? attention.upcoming.length : '—'}</strong></span>
+        <span>受付前 <strong className="text-ink">{dataReady ? unpublishedCount : '—'}</strong></span>
+        <span>終わった回 <strong className="text-ink">—</strong></span>
+      </section>
 
       <div data-design="KPIs" className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">
         <Kpi
