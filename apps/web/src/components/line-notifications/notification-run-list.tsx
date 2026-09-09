@@ -51,6 +51,12 @@ function formatJst(value: string | null): string {
 }
 
 type LoadState = 'loading' | 'ready' | 'error' | 'forbidden'
+type ScopedLoadState = {
+  scope: string
+  state: LoadState
+  result: EcNotificationRunList | null
+  total: number
+}
 export type RunFilter = 'all' | 'failed' | 'excluded' | 'clicked'
 export type RecipientFilter = 'all' | EcNotificationRun['recipientType']
 export type PeriodFilter = 'all' | '24h' | '7d' | '30d'
@@ -95,9 +101,12 @@ export default function NotificationRunList({
   mode: 'history' | 'failures'
 }) {
   const [page, setPage] = useState(1)
-  const [state, setState] = useState<LoadState>('loading')
-  const [result, setResult] = useState<EcNotificationRunList | null>(null)
-  const [total, setTotal] = useState(0)
+  const [loaded, setLoaded] = useState<ScopedLoadState>({
+    scope: '',
+    state: 'loading',
+    result: null,
+    total: 0,
+  })
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<RunFilter>('all')
   const [recipientFilter, setRecipientFilter] = useState<RecipientFilter>('all')
@@ -106,7 +115,6 @@ export default function NotificationRunList({
   const [notice, setNotice] = useState<{ tone: 'success' | 'error'; text: string } | null>(null)
   // 再試行口は店長専用。担当者にはボタンを出さない。
   const [canRetry, setCanRetry] = useState(false)
-  const [loadedScope, setLoadedScope] = useState('')
   const requestRef = useRef(0)
   const currentScope = `${lineAccountId ?? 'none'}:${mode}`
 
@@ -129,14 +137,12 @@ export default function NotificationRunList({
 
   const load = useCallback(async () => {
     const request = ++requestRef.current
-    setLoadedScope(currentScope)
     if (!lineAccountId) {
-      setResult(null)
-      setTotal(0)
-      setState('ready')
+      setLoaded({ scope: currentScope, state: 'ready', result: null, total: 0 })
       return
     }
-    setState('loading')
+    // scope・状態・結果を1つの更新で切り替え、前scopeの成功結果を再表示しない。
+    setLoaded({ scope: currentScope, state: 'loading', result: null, total: 0 })
     try {
       const params = {
         lineAccountId,
@@ -160,14 +166,20 @@ export default function NotificationRunList({
         : primary
       if (request !== requestRef.current) return
       if (!response.success) throw new Error('load failed')
-      setResult(response.data)
-      setTotal(response.pagination.total)
-      setState('ready')
+      setLoaded({
+        scope: currentScope,
+        state: 'ready',
+        result: response.data,
+        total: response.pagination.total,
+      })
     } catch (error) {
       if (request !== requestRef.current) return
-      setResult(null)
-      setTotal(0)
-      setState(error instanceof ApiError && error.status === 403 ? 'forbidden' : 'error')
+      setLoaded({
+        scope: currentScope,
+        state: error instanceof ApiError && error.status === 403 ? 'forbidden' : 'error',
+        result: null,
+        total: 0,
+      })
     }
   }, [currentScope, lineAccountId, mode, page])
 
@@ -199,9 +211,9 @@ export default function NotificationRunList({
   const title = mode === 'failures' ? '送れなかったもの' : 'お知らせの記録'
   const nodeId = mode === 'failures' ? 'X8JCA5' : 'Se65i'
   // アカウント切替の直後は、useEffectが動く前でも前アカウントの行を描かない。
-  const visibleState: LoadState = loadedScope === currentScope ? state : lineAccountId ? 'loading' : 'ready'
-  const scopedResult = loadedScope === currentScope ? result : null
-  const scopedTotal = loadedScope === currentScope ? total : 0
+  const visibleState: LoadState = loaded.scope === currentScope ? loaded.state : lineAccountId ? 'loading' : 'ready'
+  const scopedResult = loaded.scope === currentScope ? loaded.result : null
+  const scopedTotal = loaded.scope === currentScope ? loaded.total : 0
   const items = useMemo(() => scopedResult?.items ?? [], [scopedResult])
   const summary = scopedResult?.summary ?? null
   const pageCount = Math.max(1, Math.ceil(scopedTotal / PAGE_SIZE))
