@@ -20,6 +20,9 @@ const TEST_SEND_COOLDOWN_MS = 30_000;
 const testSendAt = new Map<string, number>();
 const EVENT_TYPE_SET = new Set<string>(EC_EVENT_TYPES);
 const STATUS_SET = new Set(['received', 'identity_pending', 'processing', 'processed', 'skipped', 'failed']);
+const ACTION_STATUS_SET = new Set([
+  'pending', 'processing', 'succeeded', 'skipped', 'retryable_failed', 'permanent_failed',
+]);
 const CONNECTOR_PROVIDERS = new Set(['ec_cube', 'shopify']);
 const CONNECTOR_STATUSES = new Set(['connected', 'degraded', 'paused', 'auth_expired', 'rate_limited']);
 const IDENTITY_RULES = new Set(['verified_email', 'verified_phone', 'manual_name_postal']);
@@ -93,6 +96,10 @@ function isValidHttpsUrl(value: string): boolean {
   try { return new URL(value).protocol === 'https:'; } catch { return false; }
 }
 
+function escapeLike(value: string): string {
+  return value.replace(/[\\%_]/g, (character) => `\\${character}`);
+}
+
 function testEvent(eventType: string): EcEvent {
   const base: EcEvent = {
     event_id: `test-${crypto.randomUUID()}`,
@@ -152,11 +159,24 @@ ecCommerce.get(
        SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) AS failed,
        SUM(CASE WHEN status = 'skipped' THEN 1 ELSE 0 END) AS skipped,
        SUM(CASE WHEN datetime(received_at) >= datetime('now', '-1 day') THEN 1 ELSE 0 END) AS last_24h,
-       MAX(received_at) AS last_received_at
+       MAX(received_at) AS last_received_at,
+       AVG(CASE
+         WHEN datetime(received_at) >= datetime('now', '-1 day')
+          AND json_type(payload, '$.occurred_at') = 'text'
+          AND julianday(received_at) >= julianday(json_extract(payload, '$.occurred_at'))
+         THEN (julianday(received_at) - julianday(json_extract(payload, '$.occurred_at'))) * 86400
+       END) AS average_delivery_seconds,
+       SUM(CASE
+         WHEN datetime(received_at) >= datetime('now', '-1 day')
+          AND json_type(payload, '$.occurred_at') = 'text'
+          AND julianday(received_at) >= julianday(json_extract(payload, '$.occurred_at'))
+         THEN 1 ELSE 0
+       END) AS latency_sample_count
      FROM ec_events WHERE ${accountWhere}`,
   ).bind(...accountBindings).first<{
     total: number; processed: number; identity_pending: number; failed: number; skipped: number;
     last_24h: number; last_received_at: string | null;
+    average_delivery_seconds: number | null; latency_sample_count: number;
   }>();
   const types = await c.env.DB.prepare(
     `SELECT event_type, COUNT(*) AS count FROM ec_events
@@ -173,6 +193,10 @@ ecCommerce.get(
       skipped: summary?.skipped ?? 0,
       last24h: summary?.last_24h ?? 0,
       lastReceivedAt: summary?.last_received_at ?? null,
+      averageDeliverySeconds: summary?.average_delivery_seconds == null
+        ? null
+        : Math.max(0, Math.round(Number(summary.average_delivery_seconds))),
+      latencySampleCount: Number(summary?.latency_sample_count ?? 0),
       byType: types.results.map((row) => ({
         eventType: row.event_type,
         label: ecEventLabel(row.event_type, row.event_type),
@@ -203,6 +227,176 @@ ecCommerce.get(
   const offset = Number.isInteger(requestedOffset) ? Math.max(requestedOffset, 0) : 0;
   const eventType = c.req.query('eventType') || '';
   const status = c.req.query('status') || '';
+  const view = c.req.query('view') || '';
+
+  if (view === 'actions') {
+    const statusGroup = c.req.query('statusGroup') || '';
+    const search = c.req.query('query')?.trim().slice(0, 100) || '';
+    const sort = c.req.query('sort') === 'oldest' ? 'oldest' : 'newest';
+    if (status && !ACTION_STATUS_SET.has(status)) {
+      return c.json({ success: false, error: '処理の状態が正しくありません' }, 400);
+    }
+    const groupedStatuses: Record<string, string[]> = {
+      processing: ['pending', 'processing'],
+      failed: ['retryable_failed', 'permanent_failed'],
+    };
+    if (statusGroup && !(statusGroup in groupedStatuses)) {
+      return c.json({ success: false, error: '処理の状態が正しくありません' }, 400);
+    }
+
+    const actionClauses: string[] = [accountClause];
+    const actionBindings: Array<string | number> = lineAccountId ? [lineAccountId] : scope?.allowedAccountIds ?? [];
+    if (status) {
+      actionClauses.push('a.status = ?');
+      actionBindings.push(status);
+    }
+    if (statusGroup) {
+      const statuses = groupedStatuses[statusGroup];
+      actionClauses.push(`a.status IN (${statuses.map(() => '?').join(',')})`);
+      actionBindings.push(...statuses);
+    }
+    if (search) {
+      const like = `%${escapeLike(search)}%`;
+      const matchingEventTypes = EC_EVENT_TYPES.filter((type) => (
+        ecEventLabel(type, type).toLocaleLowerCase('ja-JP').includes(search.toLocaleLowerCase('ja-JP'))
+      ));
+      actionClauses.push(`(
+        e.event_type LIKE ? ESCAPE '\\'
+        OR COALESCE(json_extract(e.payload, '$.order.number'), '') LIKE ? ESCAPE '\\'
+        OR COALESCE(f.display_name, '') LIKE ? ESCAPE '\\'
+        OR EXISTS (
+          SELECT 1 FROM ec_order_lines search_line
+           WHERE search_line.order_id = o.id
+             AND search_line.product_name LIKE ? ESCAPE '\\'
+        )
+        ${matchingEventTypes.length ? `OR e.event_type IN (${matchingEventTypes.map(() => '?').join(',')})` : ''}
+      )`);
+      actionBindings.push(like, like, like, like, ...matchingEventTypes);
+    }
+    const actionWhere = `WHERE ${actionClauses.join(' AND ')}`;
+    const joins = `
+      FROM ec_action_executions a
+      JOIN ec_events e ON e.id = a.event_id
+      LEFT JOIN friends f ON f.id = e.friend_id
+      LEFT JOIN ec_orders o
+        ON o.line_account_id = e.line_account_id
+       AND o.source_key = e.source
+       AND o.external_order_id = json_extract(e.payload, '$.order.number')`;
+    const actionRowsQuery = c.env.DB.prepare(
+      `SELECT a.id, a.event_id, a.action_type, a.rule_version, a.status,
+              a.attempt_count, a.max_attempts, a.error_code, a.error_message_safe,
+              a.last_attempted_at, a.next_retry_at, a.version,
+              e.event_type, e.received_at, e.friend_id, f.display_name AS customer_name,
+              json_extract(e.payload, '$.order.number') AS order_number,
+              o.id AS order_id, o.line_account_id AS order_line_account_id,
+              o.external_order_id, o.customer_id AS order_customer_id,
+              o.friend_id AS order_friend_id, o.normalized_status AS order_status,
+              o.provider_status, o.currency, o.total_amount_minor, o.refunded_amount_minor,
+              o.ordered_at, o.detail_url, o.version AS order_version
+         ${joins}
+         ${actionWhere}
+        ORDER BY e.received_at ${sort === 'oldest' ? 'ASC' : 'DESC'}, a.created_at ${sort === 'oldest' ? 'ASC' : 'DESC'}
+        LIMIT ? OFFSET ?`,
+    ).bind(...actionBindings, limit, offset);
+    const [actionRows, actionCount, summaryRows] = await Promise.all([
+      actionRowsQuery.all<Record<string, unknown>>(),
+      c.env.DB.prepare(`SELECT COUNT(*) AS count ${joins} ${actionWhere}`)
+        .bind(...actionBindings).first<{ count: number }>(),
+      c.env.DB.prepare(
+        `SELECT a.status, COUNT(*) AS count
+           FROM ec_action_executions a
+           JOIN ec_events e ON e.id = a.event_id
+          WHERE ${accountClause}
+          GROUP BY a.status`,
+      ).bind(...(lineAccountId ? [lineAccountId] : scope?.allowedAccountIds ?? []))
+        .all<{ status: string; count: number }>(),
+    ]);
+    const orderIds = [...new Set(actionRows.results.flatMap((row) => (
+      row.order_id == null ? [] : [String(row.order_id)]
+    )))];
+    const orderLines = orderIds.length
+      ? await c.env.DB.prepare(
+        `SELECT id, order_id, external_product_id, product_name, quantity,
+                unit_amount_minor, line_amount_minor, product_url
+           FROM ec_order_lines
+          WHERE order_id IN (${orderIds.map(() => '?').join(',')})
+          ORDER BY order_id, line_index`,
+      ).bind(...orderIds).all<Record<string, unknown>>()
+      : { results: [] as Record<string, unknown>[] };
+    const linesByOrder = new Map<string, Array<Record<string, unknown>>>();
+    for (const line of orderLines.results) {
+      const orderId = String(line.order_id);
+      const lines = linesByOrder.get(orderId) ?? [];
+      lines.push({
+        id: String(line.id),
+        productId: line.external_product_id == null ? null : String(line.external_product_id),
+        productName: String(line.product_name),
+        quantity: Number(line.quantity),
+        unitAmount: line.unit_amount_minor == null ? null : Number(line.unit_amount_minor),
+        lineAmount: line.line_amount_minor == null ? null : Number(line.line_amount_minor),
+        productUrl: line.product_url == null ? null : String(line.product_url),
+      });
+      linesByOrder.set(orderId, lines);
+    }
+    const actionSummary: Record<string, number> = {
+      pending: 0, processing: 0, succeeded: 0, skipped: 0, retryable_failed: 0, permanent_failed: 0,
+    };
+    for (const row of summaryRows.results) {
+      if (ACTION_STATUS_SET.has(row.status)) actionSummary[row.status] = Number(row.count);
+    }
+    return c.json({
+      success: true,
+      data: {
+        items: actionRows.results.map((row) => {
+          const orderId = row.order_id == null ? null : String(row.order_id);
+          return {
+            id: String(row.id),
+            eventId: String(row.event_id),
+            eventType: String(row.event_type),
+            eventLabel: ecEventLabel(String(row.event_type), String(row.event_type)),
+            actionType: String(row.action_type),
+            ruleVersion: String(row.rule_version),
+            status: String(row.status),
+            attemptCount: Number(row.attempt_count),
+            maxAttempts: Number(row.max_attempts),
+            errorCode: row.error_code == null ? null : String(row.error_code),
+            errorMessage: row.error_message_safe == null ? null : String(row.error_message_safe),
+            lastAttemptedAt: row.last_attempted_at == null ? null : String(row.last_attempted_at),
+            nextRetryAt: row.next_retry_at == null ? null : String(row.next_retry_at),
+            version: Number(row.version),
+            receivedAt: String(row.received_at),
+            orderNumber: row.order_number == null ? null : String(row.order_number),
+            customerName: row.customer_name == null ? null : String(row.customer_name),
+            friendId: row.friend_id == null ? null : String(row.friend_id),
+            retryAvailable: row.status === 'retryable_failed' && Number(row.attempt_count) < Number(row.max_attempts),
+            order: orderId == null ? null : {
+              id: orderId,
+              lineAccountId: String(row.order_line_account_id),
+              externalOrderId: String(row.external_order_id),
+              orderNumber: String(row.order_number),
+              customerId: row.order_customer_id == null ? null : String(row.order_customer_id),
+              friendId: row.order_friend_id == null ? null : String(row.order_friend_id),
+              customerName: row.customer_name == null ? null : String(row.customer_name),
+              status: String(row.order_status),
+              providerStatus: String(row.provider_status),
+              currency: String(row.currency),
+              totalAmount: row.total_amount_minor == null ? null : Number(row.total_amount_minor),
+              refundedAmount: row.refunded_amount_minor == null ? null : Number(row.refunded_amount_minor),
+              orderedAt: String(row.ordered_at),
+              detailUrl: row.detail_url == null ? null : String(row.detail_url),
+              version: Number(row.order_version),
+              orderLines: linesByOrder.get(orderId) ?? [],
+            },
+          };
+        }),
+        total: Number(actionCount?.count ?? 0),
+        summary: actionSummary,
+      },
+      pagination: { total: Number(actionCount?.count ?? 0), limit, offset },
+    });
+  }
+
+  if (view) return c.json({ success: false, error: '表示方法が正しくありません' }, 400);
   if (eventType && !EVENT_TYPE_SET.has(eventType)) return c.json({ success: false, error: 'Invalid eventType' }, 400);
   if (status && !STATUS_SET.has(status)) return c.json({ success: false, error: 'Invalid status' }, 400);
 

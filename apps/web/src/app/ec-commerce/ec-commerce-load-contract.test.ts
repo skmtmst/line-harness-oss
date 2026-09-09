@@ -18,28 +18,26 @@ import { describe, expect, it } from 'vitest'
 const source = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'page.tsx'), 'utf8')
 
 describe('V6 23-1 EC連携の読み込み', () => {
-  it('注文と個別処理が配列であることを確かめてから state に入れる', () => {
-    expect(source).toContain('Array.isArray(ordersResponse.data?.items)')
-    expect(source).toContain('Array.isArray(actionsResponse.data?.items)')
-    expect(source).toContain("typeof overviewResponse.data === 'object'")
-    expect(source).toContain('!Array.isArray(overviewResponse.data)')
+  it('集計と取込一覧を別々に読み込み、片方の失敗で両方を消さない', () => {
+    expect(source).toContain('const loadOverview = useCallback')
+    expect(source).toContain('const loadRecords = useCallback')
+    expect(source).toContain('setOverviewState')
+    expect(source).toContain('setListState')
+    expect(source).not.toContain('Promise.all([')
   })
 
-  it('形の確認は注文と処理を state に入れるより前に置く', () => {
-    // 後ろに置くと、確かめる前に非配列が state に入って描画が落ちる。
-    for (const [guardText, assignText] of [
-      ['Array.isArray(ordersResponse.data?.items)', 'setOrders(ordersResponse.data.items)'],
-      ['Array.isArray(actionsResponse.data?.items)', 'setActions(actionsResponse.data.items)'],
-    ]) {
-      const guard = source.indexOf(guardText)
-      const assign = source.indexOf(assignText)
-      expect(guard).toBeGreaterThan(-1)
-      expect(assign).toBeGreaterThan(-1)
-      expect(guard).toBeLessThan(assign)
-    }
+  it('取込一覧の形を確かめてからstateへ入れる', () => {
+    const guard = source.indexOf('Array.isArray(response.data?.items)')
+    const assign = source.indexOf('setActions(response.data.items)')
+    expect(guard).toBeGreaterThan(-1)
+    expect(assign).toBeGreaterThan(-1)
+    expect(guard).toBeLessThan(assign)
   })
 
-  it('読めなかった理由を本文に出す', () => {
-    expect(source).toContain('ECデータ連携の情報を読み込めませんでした')
+  it('失敗箇所と、それぞれの再読み込み操作を本文に出す', () => {
+    expect(source).toContain('集計だけを読み込めませんでした')
+    expect(source).toContain('集計をもう一度読む')
+    expect(source).toContain('取り込みの記録を読み込めませんでした')
+    expect(source).toContain('onRetry={listState')
   })
 })
