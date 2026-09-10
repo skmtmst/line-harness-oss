@@ -106,6 +106,23 @@ const STALE_DELIVERY_LEASE_MS = 5 * 60 * 1000;
 /** 一瞬の書き込み失敗は、その場で数回だけやり直す。長引く障害は待つ。 */
 const CONFIRM_RETRIES = 3;
 
+/**
+ * **送っていないことが確かなまま譲る合図。**
+ *
+ * 別の走者が手順の貸出を握っているだけで、こちらは外部へ1バイトも
+ * 送っていない。`MileageRedemptionConfirmError` と混ぜると
+ * 「特典の送信は終わっています」と事実に反する返事をし、しかも交換が
+ * `delivering` に残って「届かなかった交換」の一覧から消える。
+ * 押した人からは何が起きたか分からなくなるので、別の合図にして
+ * 交換を押す前の状態へ戻す(#641 司令塔独立審査の差し戻し)。
+ */
+class RedemptionStepBusyError extends Error {
+  constructor() {
+    super('ほかの処理が同じ交換を送信中です');
+    this.name = 'RedemptionStepBusyError';
+  }
+}
+
 async function sleep(ms: number): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -196,6 +213,8 @@ export async function deliverMileageReward(
   // この走者の名札。手順の貸出はこの名札で取り、確定も名札と fence で通す。
   const stepOwner = crypto.randomUUID();
   const stepLeaseExpiresAt = new Date(new Date(now).getTime() + STALE_DELIVERY_LEASE_MS).toISOString();
+  // 押す前の状態。送らずに譲るときはここへ戻す(一覧から消さないため)。
+  const statusBeforeClaim = plan.redemption.status;
   const claim = await db.prepare(
     `UPDATE mileage_redemptions SET status = 'delivering', updated_at = ?
       WHERE id = ? AND (status IN ('reserved', 'delivery_failed')
@@ -242,9 +261,13 @@ export async function deliverMileageReward(
          */
         const step = await claimRedemptionStep(db, stepLease);
         if (step === 'sent') continue;
-        if (step === 'busy' || step === 'reconcile') {
-          // 別の走者が送信中か、送ったか確かめられない行。
-          // 送らずに待ち、貸出期限の回収も送り直さない。
+        if (step === 'busy') {
+          // 別の走者が貸出を握っている。こちらは送っていない。
+          // 送ったとは言わず、交換も押す前の状態へ戻す。
+          throw new RedemptionStepBusyError();
+        }
+        if (step === 'reconcile') {
+          // 送ったか確かめられない行。送らず、勝手に確定もせず待つ。
           throw new MileageRedemptionConfirmError();
         }
         const stepConfirmation = {
@@ -299,6 +322,24 @@ export async function deliverMileageReward(
       failurePolicy: plan.failurePolicy, message: null,
     };
   } catch (error) {
+    if (error instanceof RedemptionStepBusyError) {
+      /*
+       * 送っていない。失敗中の交換を `delivering` に残すと一覧から
+       * 消えて追跡が切れ、次に押しても409で閉じ込められる。
+       * 押す前の状態へ戻し、そのまま失敗中として見えるようにする。
+       */
+      await db.prepare(
+        `UPDATE mileage_redemptions SET status = ?, updated_at = ?
+          WHERE id = ? AND status = 'delivering'`,
+      ).bind(statusBeforeClaim, now, redemptionId).run();
+      return {
+        status: 'delivery_failed', rewardName: plan.rewardName,
+        customerMessage: plan.customerMessage, rewardCode: null,
+        retryAt: plan.redemption.nextRetryAt,
+        failurePolicy: plan.failurePolicy,
+        message: 'ほかの処理が同じ交換を進めています。少し待ってからもう一度お試しください。',
+      };
+    }
     if (error instanceof MileageRedemptionConfirmError) {
       /*
        * 外部送信は終わっているかもしれない。失敗に落とすとやり直しで

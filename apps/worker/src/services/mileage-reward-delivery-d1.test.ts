@@ -751,4 +751,59 @@ describe('交換配送の二重送信防止(実D1)', () => {
       `SELECT status FROM mileage_redemptions WHERE id = ?`,
     ).get(reserved.redemption.id)).toEqual({ status: 'delivering' });
   });
+  /*
+   * 上の2手順の試験は `now` を +10分へ進めてやり直しており、手順の貸出が
+   * 切れたあとの道しか通っていなかった。**ルートは `now` を渡さず実時計を
+   * 使う**ので、管理画面から押す道はそこでは踏まれない(#641 司令塔独立審査)。
+   * ここは `now` を一切渡さず、失敗した直後にそのまま押す。
+   */
+  it('実時計のまま失敗直後にやり直しても、前半は送り直さず後半だけ送る', async () => {
+    const { db, raw } = createTestD1();
+    seedAccount(raw);
+    seedTwoStepAction(raw);
+    const rewardId = await seedTwoStepReward(db);
+    const reserved = await reserveMileageRewardRedemption(db, {
+      lineAccountId: 'account-1', friendId: 'friend-1', rewardId,
+      idempotencyKey: 'e2e-two-step-realtime', requestFingerprint: 'fp-two-step-realtime',
+    });
+
+    const counter = countFetchesByHost((host, calls) => (
+      host === 'example.org' && calls === 1
+        ? new Response('ng', { status: 500 })
+        : new Response('{}', { status: 200 })
+    ));
+
+    // 初回。`now` を渡さない=実時計。
+    const failed = await deliverMileageReward(db, reserved.redemption.id, {
+      fetch: counter.fetch,
+    });
+    expect(failed).toMatchObject({ status: 'delivery_failed' });
+    expect(counter.count('example.com')).toBe(1);
+    expect(counter.count('example.org')).toBe(1);
+    // 2手順目は送っていないことが決まり、貸出も返っている。
+    expect(raw.prepare(
+      `SELECT status, needs_reconcile AS needsReconcile, owner,
+              lease_expires_at AS leaseExpiresAt
+         FROM mileage_redemption_step_deliveries
+        WHERE redemption_id = ? AND step_key = '1:w2'`,
+    ).get(reserved.redemption.id)).toMatchObject({
+      status: 'started', needsReconcile: 0, owner: null, leaseExpiresAt: null,
+    });
+
+    // **失敗した直後にやり直す。時計は進めない。**
+    const retried = await deliverMileageReward(db, reserved.redemption.id, {
+      fetch: counter.fetch,
+    });
+    expect(retried.status).toBe('succeeded');
+    // 前半は送り直さない。後半だけ送り直す。空振りもしない。
+    expect(counter.count('example.com')).toBe(1);
+    expect(counter.count('example.org')).toBe(2);
+    expect(raw.prepare(
+      `SELECT available FROM mileage_wallets
+        WHERE program_id = 'default' AND beneficiary_key = 'user:user-1'`,
+    ).get()).toEqual({ available: 700 });
+    expect(raw.prepare(
+      `SELECT COUNT(*) AS count FROM mileage_ledger WHERE entry_type = 'spend'`,
+    ).get()).toEqual({ count: 1 });
+  });
 });

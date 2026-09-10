@@ -469,18 +469,41 @@ describe('V6 mileage rewards', () => {
       redemptionId: reserved.redemption.id, stepKey: '0:w1',
       owner: 'owner-a', fenceToken: 'fence-a1', now: '2026-09-09T00:01:00.000Z',
     });
-    // 証言なし・貸出中の別走者は、送らずに待つ(busy)。
-    expect(await claimRedemptionStep(db, lease('owner-b', 'fence-b1', '2026-09-09T00:02:00.000Z'))).toBe('busy');
-    // 証言を消した行の確定は通らない(送っていないので確定できない)。
+    /*
+     * 証言を消したら**貸出も返っている**。持ち主と期限を残すと、行は
+     * 「送っていないのに誰かが送信中」に見え、次の走者は貸出が切れるまで
+     * `'busy'` しか受け取れない。失敗した直後の管理画面のやり直しが
+     * 貸出の残り時間ぶん空振りする(#641 司令塔独立審査で実測)。
+     */
+    expect(sqlite.prepare(
+      `SELECT owner, lease_expires_at AS leaseExpiresAt, needs_reconcile AS needsReconcile
+         FROM mileage_redemption_step_deliveries
+        WHERE redemption_id = ? AND step_key = '0:w1'`,
+    ).get(reserved.redemption.id)).toEqual({
+      owner: null, leaseExpiresAt: null, needsReconcile: 0,
+    });
+    // 送っていないことが決まっているので、次の走者は貸出中でも送れる。
+    expect(await claimRedemptionStep(db, lease('owner-b', 'fence-b1', '2026-09-09T00:02:00.000Z'))).toBe('send');
+    // 引き継ぎなので世代が進み、持ち主が替わっている。
+    expect(sqlite.prepare(
+      `SELECT owner, generation, needs_reconcile AS needsReconcile
+         FROM mileage_redemption_step_deliveries
+        WHERE redemption_id = ? AND step_key = '0:w1'`,
+    ).get(reserved.redemption.id)).toEqual({
+      owner: 'owner-b', generation: 2, needsReconcile: 1,
+    });
+    // 証言を消した古い走者の確定は通らない(送っていないので確定できない)。
     await expect(markRedemptionStepSent(db, {
       redemptionId: reserved.redemption.id, stepKey: '0:w1',
       owner: 'owner-a', fenceToken: 'fence-a1', now: '2026-09-09T00:02:00.000Z',
     })).rejects.toMatchObject({ name: 'MileageRedemptionConfirmError' });
-    // 証言消しは一度きり。二度目は通らない。
+    // 証言消しは一度きり。古い走者は二度目を通せない。
     await expect(clearRedemptionStepIntent(db, {
       redemptionId: reserved.redemption.id, stepKey: '0:w1',
       owner: 'owner-a', fenceToken: 'fence-a1', now: '2026-09-09T00:03:00.000Z',
     })).rejects.toMatchObject({ name: 'MileageRedemptionConfirmError' });
+    // 引き継いだ走者が持っている間は、さらに別の走者は送れない。
+    expect(await claimRedemptionStep(db, lease('owner-c', 'fence-c1', '2026-09-09T00:04:00.000Z'))).toBe('reconcile');
   });
 
   it('takes over an expired lease with a new generation and rejects the slow old owner', async () => {

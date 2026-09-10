@@ -127,23 +127,59 @@ describe('mileage reward delivery', () => {
     });
   });
 
-  it('waits without sending while another runner holds the step lease', async () => {
+  /*
+   * 貸出が取れないときは**送っていない**。送ったとは言わず、交換も押す前の
+   * 状態へ戻す。戻さないと `delivering` のまま「届かなかった交換」の一覧から
+   * 消え、次に押しても409で閉じ込められる(#641 司令塔独立審査)。
+   */
+  it('waits without sending and puts the redemption back when the step lease is held', async () => {
+    const statements: Array<{ sql: string; binds: unknown[] }> = [];
+    const recordingDb = {
+      prepare: (sql: string) => ({
+        bind: (...binds: unknown[]) => {
+          statements.push({ sql, binds });
+          return { run: async () => ({ meta: { changes: 1 } }) };
+        },
+      }),
+    } as unknown as D1Database;
+
     dbMocks.getMileageRewardDeliveryPlan.mockResolvedValueOnce(plan({
       rewardKind: 'tag',
+      redemption: {
+        id: 'redemption-1', status: 'delivery_failed', attemptCount: 1,
+        nextRetryAt: '2026-08-29T00:01:00.000Z',
+        lineAccountId: 'account-1', rewardId: 'reward-1', rewardVersionId: 'version-1',
+        beneficiaryFriendId: 'friend-1',
+      },
       actionConfig: JSON.stringify([{
         id: 'step-1', type: 'add_tag', params: { tagId: 'tag-1' }, onFailure: 'stop',
       }]),
     }));
     dbMocks.claimRedemptionStep.mockResolvedValueOnce('busy');
-    const result = await deliverMileageReward(db, 'redemption-1', {
+    const result = await deliverMileageReward(recordingDb, 'redemption-1', {
       now: () => '2026-08-29T00:00:00.000Z',
     });
+
     expect(result).toMatchObject({ status: 'delivery_failed' });
-    expect(result.message ?? '').toContain('確認しています');
+    // 送っていないので「送信は終わっています」と言わない。
+    expect(result.message ?? '').not.toContain('送信は終わっています');
+    expect(result.message ?? '').toContain('もう一度');
+    // やり直しの目安は元の行のものを残す(消さない)。
+    expect(result.retryAt).toBe('2026-08-29T00:01:00.000Z');
     expect(execute).not.toHaveBeenCalled();
-    expect(dbMocks.recordMileageRedemptionAttempt).not.toHaveBeenCalledWith(db, expect.objectContaining({
-      status: 'failed',
-    }));
+    expect(dbMocks.markRedemptionStepSent).not.toHaveBeenCalled();
+    expect(dbMocks.recordMileageRedemptionAttempt).not.toHaveBeenCalledWith(
+      recordingDb, expect.objectContaining({ status: 'failed' }),
+    );
+    // 押す前の状態へ戻す書き込みが出ている。
+    // claim 側の SQL も `status = 'delivering'` を含むので、戻す側の
+    // 「状態を差し替える」形(`SET status = ?`)で選ぶ。
+    const restore = statements.find((statement) =>
+      statement.sql.includes('UPDATE mileage_redemptions')
+      && statement.sql.includes('SET status = ?'));
+    expect(restore).toBeDefined();
+    expect(restore?.binds[0]).toBe('delivery_failed');
+    expect(restore?.binds[2]).toBe('redemption-1');
   });
 
   it('waits without sending or confirming an uncertain step', async () => {

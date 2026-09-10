@@ -1327,6 +1327,13 @@ export async function markRedemptionStepSent(
  * 送らなかった手順の証言を消す。実行器が送る前に失敗したときだけ使う。
  * 消せたら回収は送り直してよい(送っていないことが決まった)。
  * 消せなければ照合待ちのまま残し、送り直さない。
+ *
+ * **貸出も一緒に返す。** 証言を消すだけで持ち主と期限を残すと、行は
+ * 「送っていないのに、まだ誰かが送信中」に見える。次の走者は貸出が
+ * 生きている間 `'busy'` しか受け取れず、失敗した直後のやり直しが
+ * 貸出の残り時間ぶん空振りする(#641 司令塔独立審査で実測: 失敗から
+ * 5分間、管理画面のやり直しが1回も送らない)。送らないことが決まった
+ * 行に貸出を握らせない。
  */
 export async function clearRedemptionStepIntent(
   db: D1Database,
@@ -1334,7 +1341,7 @@ export async function clearRedemptionStepIntent(
 ): Promise<void> {
   const result = await db.prepare(
     `UPDATE mileage_redemption_step_deliveries
-        SET needs_reconcile = 0, updated_at = ?
+        SET needs_reconcile = 0, owner = NULL, lease_expires_at = NULL, updated_at = ?
       WHERE redemption_id = ? AND step_key = ?
         AND status = 'started' AND needs_reconcile = 1
         AND owner = ? AND fence_token = ?`,
