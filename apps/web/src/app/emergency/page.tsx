@@ -2,12 +2,13 @@
 
 import SelectField from '@/components/shared/select-field'
 import Link from 'next/link'
-import { Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import React, { Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import type { LineAccount } from '@line-crm/shared'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import PageHeader from '@/components/shared/page-header'
 import {
   api,
+  ApiError,
   type OperationCapability,
   type OperationControl,
   type OperationHealthCheckKey,
@@ -59,7 +60,162 @@ const CAPABILITY_LABEL: Record<OperationCapability, string> = {
   webhook_outgoing: '外部への通知',
   ad_postback: '広告への成果通知',
 }
+
+/*
+ * N-453/N-455: 止められない理由と競合後の再読込。
+ *
+ * 止められない理由はサーバーが返す機械コード(`code`)で受け取り、運用者向けの
+ * 文言と次の行動は画面側が持つ。理由の中身を固定の作り置きで捏造しない。
+ * コードは `apps/worker/src/routes/operations.ts` の応答と1対1に対応する。
+ */
+const OPERATION_BLOCKED_CODES = {
+  controlForbidden: 'EMERGENCY_CONTROL_FORBIDDEN',
+  scopeForbidden: 'EMERGENCY_SCOPE_FORBIDDEN',
+} as const
+
+function operationBlockedText(code: string | null | undefined): string | null {
+  if (code === OPERATION_BLOCKED_CODES.scopeForbidden) return 'この範囲を操作する権限がありません。対象アカウントを選び直すか、オーナーに確認してください。'
+  if (code === OPERATION_BLOCKED_CODES.controlForbidden) return '緊急停止を実行する権限がありません。オーナーに権限付与を依頼してください。'
+  return null
+}
+
+/*
+ * N-453(3回目の差し戻し): 403・409(版競合)以外で落ちたときの理由。
+ *
+ * 口の `error` は400/409/422/428でだけ運用者向け文言として保証される
+ * (`apps/web/src/lib/api.ts` の `BODY_MESSAGE_STATUSES`)。429・5xxでは
+ * `ApiError.message` が `API error: <status>` という内部向けの作り置きに
+ * 落ちるため、それをそのまま出さず固定の案内文へ倒す。
+ */
+function operationFailureText(error: unknown, fallback: string): string {
+  if (error instanceof ApiError && error.message && !/^API error: \d+$/.test(error.message)) {
+    return error.message
+  }
+  return fallback
+}
 type ConfirmMode = 'stop' | 'restore' | null
+type ControlMessage = { tone: 'success' | 'warning' | 'danger'; text: string }
+type StopBlocker = 'unavailable' | 'forbidden' | 'scope' | 'empty' | 'stopped'
+
+type CurrentRequestOptions<T> = {
+  request: () => Promise<T>
+  isCurrent: () => boolean
+  onSuccess: (value: T) => void
+  onError: (error: unknown) => void
+  onSettled?: () => void
+}
+
+/**
+ * Apply an asynchronous result only while it still belongs to the selected
+ * account/request generation. This is exported for the behavior test because
+ * the important contract is the ordering, not the source text.
+ */
+async function runCurrentRequest<T>({
+  request,
+  isCurrent,
+  onSuccess,
+  onError,
+  onSettled,
+}: CurrentRequestOptions<T>): Promise<void> {
+  try {
+    const value = await request()
+    if (isCurrent()) onSuccess(value)
+  } catch (error) {
+    if (isCurrent()) onError(error)
+  } finally {
+    if (isCurrent()) onSettled?.()
+  }
+}
+
+function isEmergencyMutationLocked(needsReload: boolean, running: boolean): boolean {
+  return needsReload || running
+}
+
+type EmergencySafetyEvent = 'conflict' | 'forbidden' | 'operation-failed' | 'reload-start' | 'reload-success' | 'reload-failure'
+
+function emergencySafetyTransition(event: EmergencySafetyEvent): {
+  clearPreview: boolean
+  closeDialogs: boolean
+  needsReload: boolean
+  reloading: boolean
+  message: ControlMessage | null
+} {
+  if (event === 'conflict') return {
+    clearPreview: true,
+    closeDialogs: true,
+    needsReload: true,
+    reloading: false,
+    message: { tone: 'warning', text: '別の管理者が先に変更しました。最新の状態を読み直してから、もう一度確認してください。' },
+  }
+  /*
+   * N-453: 403は「押した本人に権限が無い」。本人確認の窓を開けたままだと、
+   * 理由と次の行動が窓の裏へ回って見えず、同じ要求をもう一度送れてしまう。
+   * 窓と入力と要求鍵を閉じて、理由を前面に出し、送り直せなくする。
+   */
+  if (event === 'forbidden') return {
+    clearPreview: false,
+    closeDialogs: true,
+    needsReload: false,
+    reloading: false,
+    message: null,
+  }
+  /*
+   * N-453(3回目の差し戻し): 403・409(版競合)以外の失敗(400/429/5xx等)は
+   * 本人確認の窓が `fixed inset-0` の覆いつきで開いたままだと、帯(理由)が
+   * 覆いの裏へ回って運用者から見えない。403と同じく窓を閉じて理由を前面へ出す。
+   */
+  if (event === 'operation-failed') return {
+    clearPreview: false,
+    closeDialogs: true,
+    needsReload: false,
+    reloading: false,
+    message: null,
+  }
+  if (event === 'reload-start') return {
+    clearPreview: true,
+    closeDialogs: true,
+    needsReload: true,
+    reloading: true,
+    message: null,
+  }
+  if (event === 'reload-success') return {
+    clearPreview: false,
+    closeDialogs: false,
+    needsReload: false,
+    reloading: false,
+    message: { tone: 'success', text: '最新の状態を読み直しました。内容を確認して、もう一度実行してください。' },
+  }
+  return {
+    clearPreview: true,
+    closeDialogs: true,
+    needsReload: true,
+    reloading: false,
+    message: { tone: 'danger', text: '最新の状態を読み直せませんでした。時間をおいてもう一度読み直してください。' },
+  }
+}
+
+/** Visible feedback is kept as a real React component so request-state tests
+ * verify what the operator sees, instead of inspecting this file as text. */
+function EmergencyControlFeedback({
+  message,
+  needsReload,
+  reloading,
+  previewSettled,
+  stopBlockers,
+  onReload,
+}: {
+  message: ControlMessage | null
+  needsReload: boolean
+  reloading: boolean
+  previewSettled: boolean
+  stopBlockers: StopBlocker[]
+  onReload: () => void
+}) {
+  return <>
+    {message && <div className={`rounded-control flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-xs font-bold ${message.tone === 'success' ? 'bg-success-bg text-success' : message.tone === 'warning' ? 'bg-warning-bg text-warning' : 'bg-danger-bg text-danger'}`}><p>{message.text}</p>{needsReload && <button type="button" onClick={onReload} disabled={reloading} className="rounded-control border border-current px-3 py-1.5 font-bold hover:opacity-80 disabled:opacity-50">{reloading ? '読み直しています…' : '最新の状態を読み直す'}</button>}</div>}
+    {previewSettled && stopBlockers.length > 0 && <div className="border-warning rounded-card border bg-warning-bg px-4 py-3 text-xs leading-relaxed text-warning" role="status"><p className="font-bold">いまは緊急停止できません</p><ul className="mt-1 list-disc space-y-1 pl-5">{stopBlockers.includes('unavailable') && <li>停止状態を確認できないため、停止・復旧を実行できません。<button type="button" onClick={onReload} disabled={reloading} className="font-bold underline disabled:opacity-50">{reloading ? '読み直しています…' : 'もう一度読む'}</button></li>}{stopBlockers.includes('forbidden') && <li>緊急停止を実行する権限がありません。オーナーに権限付与を依頼してください。</li>}{stopBlockers.includes('scope') && <li>この範囲を操作する権限がありません。対象アカウントを選び直すか、オーナーに確認してください。</li>}{stopBlockers.includes('empty') && <li>停止する配信を1つ以上選んでください。</li>}{stopBlockers.includes('stopped') && <li>停止中です。新しい停止は復旧のあとに行えます。</li>}</ul></div>}
+  </>
+}
 
 type HealthCheckId = 'line' | 'quota' | 'api' | 'webhook' | 'delivery' | 'friends'
 
@@ -342,10 +498,20 @@ function EmergencyControlPanel({ accounts }: { accounts: LineAccount[] }) {
   const [stepUpCode, setStepUpCode] = useState('')
   const [requestKey, setRequestKey] = useState('')
   const [running, setRunning] = useState(false)
-  const [message, setMessage] = useState<{ tone: 'success' | 'warning' | 'danger'; text: string } | null>(null)
+  const [message, setMessage] = useState<ControlMessage | null>(null)
   const [control, setControl] = useState<OperationControl | null>(null)
   const [canControl, setCanControl] = useState(false)
   const [calculatedAt, setCalculatedAt] = useState<string | null>(null)
+  /*
+   * N-453: 停止できない理由の機械コード。口の `preview` が返す
+   * `permissions.reasonCode` をそのまま保持し、文言への変換は
+   * `operationBlockedText` で行う。口が古い版で欄が無いときは null。
+   */
+  const [previewBlockedCode, setPreviewBlockedCode] = useState<string | null>(null)
+  // N-455: 競合(409)後に最新状態の読み直しが必要な合図。成功後は消す。
+  const [needsReload, setNeedsReload] = useState(false)
+  const [reloading, setReloading] = useState(false)
+  const previewRequestGeneration = useRef(0)
 
   /*
     **止める前に、何本止まって何人に関わるかを実測で出す。**
@@ -358,30 +524,137 @@ function EmergencyControlPanel({ accounts }: { accounts: LineAccount[] }) {
   */
   const [impact, setImpact] = useState<OperationImpactPreview | null>(null)
   const [impactFailed, setImpactFailed] = useState(false)
+  /*
+   * N-455: 最新状態の読み直しは、対象切替の自動取得と競合後の手動取得で
+   * 同じ口(`preview`)を使う。成功すれば競合の合図は消える。
+   */
+  const requestPreview = useCallback(async (accountId: string | null) => {
+    const response = await api.operations.preview(accountId)
+    if (!response.success) throw new Error(response.error)
+    if (response.data?.impact && response.data?.control && response.data?.permissions) {
+      return response.data
+    }
+    throw new Error('invalid preview')
+  }, [])
+
+  const clearPreview = useCallback(() => {
+    setImpact(null)
+    setImpactFailed(false)
+    setControl(null)
+    setCanControl(false)
+    setPreviewBlockedCode(null)
+    setCalculatedAt(null)
+  }, [])
+
+  const applyPreview = useCallback((preview: Awaited<ReturnType<typeof requestPreview>>) => {
+    setImpact(preview.impact)
+    setImpactFailed(false)
+    setControl(preview.control)
+    setCanControl(preview.permissions.canControl)
+    setPreviewBlockedCode((preview.permissions as { canControl: boolean; reasonCode?: string | null }).reasonCode ?? null)
+    setCalculatedAt(preview.calculatedAt)
+  }, [])
+
+  const applySafetyTransition = useCallback((event: EmergencySafetyEvent) => {
+    const next = emergencySafetyTransition(event)
+    if (next.clearPreview) clearPreview()
+    if (next.closeDialogs) {
+      setConfirmMode(null)
+      setConfirmWord('')
+      setStepUpMode(null)
+      setStepUpCode('')
+      setRequestKey('')
+    }
+    setNeedsReload(next.needsReload)
+    setReloading(next.reloading)
+    if (next.message) setMessage(next.message)
+  }, [clearPreview])
+
   useEffect(() => {
-    let cancelled = false
-    setImpact(null); setImpactFailed(false)
+    const requestGeneration = ++previewRequestGeneration.current
     const accountId = targetAccountId === 'all' ? null : targetAccountId
-    api.operations.preview(accountId)
-      .then((response) => {
-        if (cancelled) return
-        if (response.success && response.data?.impact && response.data?.control && response.data?.permissions) {
-          setImpact(response.data.impact)
-          setControl(response.data.control)
-          setCanControl(response.data.permissions.canControl)
-          setCalculatedAt(response.data.calculatedAt)
-        }
-        else setImpactFailed(true)
-      })
-      .catch(() => { if (!cancelled) setImpactFailed(true) })
-    return () => { cancelled = true }
-  }, [targetAccountId])
+    clearPreview()
+    setNeedsReload(false)
+    setReloading(false)
+    setConfirmMode(null)
+    setConfirmWord('')
+    setStepUpMode(null)
+    setStepUpCode('')
+    setRequestKey('')
+    void runCurrentRequest({
+      request: () => requestPreview(accountId),
+      isCurrent: () => previewRequestGeneration.current === requestGeneration,
+      onSuccess: applyPreview,
+      onError: (error) => {
+        setImpactFailed(true)
+        setPreviewBlockedCode(error instanceof ApiError ? (error.code ?? null) : null)
+      },
+    })
+    return () => {
+      if (previewRequestGeneration.current === requestGeneration) previewRequestGeneration.current += 1
+    }
+  }, [applyPreview, clearPreview, requestPreview, targetAccountId])
+
+  const reloadControl = useCallback(async () => {
+    const requestGeneration = ++previewRequestGeneration.current
+    const accountId = targetAccountId === 'all' ? null : targetAccountId
+    applySafetyTransition('reload-start')
+    await runCurrentRequest({
+      request: () => requestPreview(accountId),
+      isCurrent: () => previewRequestGeneration.current === requestGeneration,
+      onSuccess: (preview) => {
+        applyPreview(preview)
+        applySafetyTransition('reload-success')
+      },
+      onError: (error) => {
+        applySafetyTransition('reload-failure')
+        setImpactFailed(true)
+        setPreviewBlockedCode(error instanceof ApiError ? (error.code ?? null) : null)
+      },
+      onSettled: () => setReloading(false),
+    })
+  }, [applyPreview, applySafetyTransition, requestPreview, targetAccountId])
+
+  const handleTargetAccountChange = useCallback((accountId: string) => {
+    // Invalidate the old account synchronously. Waiting for the next effect
+    // leaves a window where a slow response can still overwrite this choice.
+    previewRequestGeneration.current += 1
+    clearPreview()
+    setTargetAccountId(accountId)
+  }, [clearPreview])
+
+  const handleConflict = useCallback(() => {
+    previewRequestGeneration.current += 1
+    applySafetyTransition('conflict')
+  }, [applySafetyTransition])
+
+  /*
+   * 403のあとは口の判断を画面へ持ち帰る。`canControl` を落とすことで
+   * 停止・復旧のボタンが押せなくなり、理由は常に見えている停止不可の欄に出る。
+   * 対象アカウントを選び直せば `preview` を取り直して復帰する。
+   */
+  const handleForbidden = useCallback((code: string | null | undefined) => {
+    applySafetyTransition('forbidden')
+    setCanControl(false)
+    setPreviewBlockedCode(code ?? null)
+    setMessage({ tone: 'warning', text: operationBlockedText(code) ?? 'この操作を行う権限がありません。オーナーに確認してください。' })
+  }, [applySafetyTransition])
+
+  /*
+   * 403・409(版競合)以外の失敗はここへ倒す。本人確認の窓を閉じて理由を
+   * 前面へ出すことで、`fixed inset-0` の覆いの裏に理由が隠れないようにする。
+   */
+  const handleOperationFailure = useCallback((text: string) => {
+    applySafetyTransition('operation-failed')
+    setMessage({ tone: 'danger', text })
+  }, [applySafetyTransition])
 
   const selectedTargets = (Object.keys(targets) as StopTarget[]).filter((key) => targets[key])
   const selectedCapabilities = selectedTargets.flatMap((key) => TARGET_CAPABILITIES[key])
   const isStopped = Boolean(control?.activeIncidentId)
   const accountName = targetAccountId === 'all' ? 'すべてのアカウント' : accounts.find((account) => account.id === targetAccountId)?.name ?? '選択したアカウント'
   const fullReason = reasonDetail.trim() ? `${reason}: ${reasonDetail.trim()}` : reason
+  const mutationLocked = isEmergencyMutationLocked(needsReload, running)
   const targetLabels: Record<StopTarget, { label: string; note: string }> = {
     broadcasts: { label: '予約中の一斉配信', note: '予約を下書きに戻します' },
     scenarios: { label: 'シナリオ配信', note: '稼働中のものを止めます' },
@@ -396,6 +669,7 @@ function EmergencyControlPanel({ accounts }: { accounts: LineAccount[] }) {
   }
 
   const openStopConfirm = () => {
+    if (needsReload) { setMessage({ tone: 'warning', text: '最新の状態を読み直してから、もう一度確認してください。' }); return }
     if (!control || impactFailed || !impact) { setMessage({ tone: 'warning', text: '停止状態と影響を確認できるまで実行できません。' }); return }
     if (!canControl) { setMessage({ tone: 'warning', text: '緊急停止を実行する権限がありません。' }); return }
     if (selectedTargets.length === 0) { setMessage({ tone: 'warning', text: '停止する配信を1つ以上選んでください。' }); return }
@@ -403,7 +677,7 @@ function EmergencyControlPanel({ accounts }: { accounts: LineAccount[] }) {
   }
 
   const runStop = async () => {
-    if (!/^\d{6}$/.test(stepUpCode) || !control || !requestKey) return
+    if (needsReload || !/^\d{6}$/.test(stepUpCode) || !control || !requestKey) return
     setRunning(true); setMessage(null)
     try {
       const grant = await api.operations.stepUp(stepUpCode)
@@ -418,15 +692,22 @@ function EmergencyControlPanel({ accounts }: { accounts: LineAccount[] }) {
       }, grant.data.token, requestKey)
       if (!response.success) throw new Error(response.error)
       setControl(response.data.control)
+      setNeedsReload(false)
       setMessage({ tone: 'success', text: 'サーバー共通の停止状態を更新しました。別の端末にも同じ状態が表示されます。' })
       setStepUpMode(null); setStepUpCode(''); setRequestKey('')
-    } catch {
-      setMessage({ tone: 'danger', text: '緊急停止を保存できませんでした。最新の停止状態を読み直して、もう一度確認してください。' })
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 409 && error.code === 'VERSION_CONFLICT') {
+        handleConflict()
+      } else if (error instanceof ApiError && error.status === 403) {
+        handleForbidden(error.code)
+      } else {
+        handleOperationFailure(operationFailureText(error, '緊急停止を保存できませんでした。最新の停止状態を読み直して、もう一度確認してください。'))
+      }
     } finally { setRunning(false) }
   }
 
   const runRestore = async () => {
-    if (!control?.activeIncidentId || !/^\d{6}$/.test(stepUpCode) || !requestKey) return
+    if (needsReload || !control?.activeIncidentId || !/^\d{6}$/.test(stepUpCode) || !requestKey) return
     setRunning(true); setMessage(null)
     try {
       const grant = await api.operations.stepUp(stepUpCode)
@@ -437,38 +718,60 @@ function EmergencyControlPanel({ accounts }: { accounts: LineAccount[] }) {
       }, grant.data.token, requestKey)
       if (!response.success) throw new Error(response.error)
       setControl(response.data.control)
+      setNeedsReload(false)
       setMessage({ tone: 'success', text: 'サーバー共通の停止状態を復旧しました。期限を過ぎた予約は自動では送りません。' })
       setStepUpMode(null); setStepUpCode(''); setRequestKey('')
-    } catch {
-      setMessage({ tone: 'danger', text: '復旧できませんでした。最新の停止状態を読み直して、もう一度確認してください。' })
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 409 && error.code === 'VERSION_CONFLICT') {
+        handleConflict()
+      } else if (error instanceof ApiError && error.status === 403) {
+        handleForbidden(error.code)
+      } else {
+        handleOperationFailure(operationFailureText(error, '復旧できませんでした。最新の停止状態を読み直して、もう一度確認してください。'))
+      }
     } finally { setRunning(false) }
+  }
+
+  /*
+   * N-453: 止められない理由は黙ってボタンを薄くするだけにしない。
+   * 理由ごとに運用者向け文言と次の行動を出す。口の機械コードがあるときは
+   * それを優先し、古い口で欄が無いときは画面の状態から文言を出す。
+   * 初回の取得が終わるまでは出さない。取得失敗時も `control` が空でも出す。
+   */
+  const previewSettled = impact !== null || impactFailed
+  const stopBlockers: StopBlocker[] = []
+  if (previewSettled) {
+    if (impactFailed) stopBlockers.push(previewBlockedCode === OPERATION_BLOCKED_CODES.scopeForbidden ? 'scope' : 'unavailable')
+    else if (!canControl) stopBlockers.push(previewBlockedCode === OPERATION_BLOCKED_CODES.scopeForbidden ? 'scope' : 'forbidden')
+    if (!impactFailed && selectedTargets.length === 0) stopBlockers.push('empty')
+    if (isStopped) stopBlockers.push('stopped')
   }
 
   return (
     <div className="space-y-4" data-design="V3 Emergency control">
-      {message && <div className={`rounded-control px-4 py-3 text-xs font-bold ${message.tone === 'success' ? 'bg-success-bg text-success' : message.tone === 'warning' ? 'bg-warning-bg text-warning' : 'bg-danger-bg text-danger'}`}>{message.text}</div>}
+      <EmergencyControlFeedback message={message} needsReload={needsReload} reloading={reloading} previewSettled={previewSettled} stopBlockers={stopBlockers} onReload={() => void reloadControl()} />
       <div className="flex flex-col items-start gap-4 xl:flex-row">
         <div className="min-w-0 flex-1 space-y-4">
-          <section className={`border-hairline rounded-card overflow-hidden border bg-canvas ${isStopped ? 'pointer-events-none opacity-50' : ''}`}>
+          <section className={`border-hairline rounded-card overflow-hidden border bg-canvas ${isStopped || needsReload ? 'pointer-events-none opacity-50' : ''}`}>
             <div className="border-hairline border-b px-4 py-4"><h2 className="text-base font-bold text-ink">何を止めますか</h2><p className="mt-1 text-xs text-ink-faint">停止前に、何本と何人に関わるかを実測で確認します。</p></div>
-            <div>{(Object.keys(targetLabels) as StopTarget[]).map((key) => <label key={key} className="flex cursor-pointer items-center gap-3 border-b border-hairline px-4 py-3 last:border-0 hover:bg-canvas-sunken"><input type="checkbox" checked={targets[key]} onChange={(event) => setTargets((current) => ({ ...current, [key]: event.target.checked }))} className="h-4 w-4 accent-danger" /><span className="min-w-0 flex-1"><span className="block text-sm font-bold text-ink">{targetLabels[key].label}</span><span className="block text-xs text-ink-faint">{targetLabels[key].note}</span></span><span className="max-w-md shrink-0 text-right text-xs font-bold text-ink-secondary">{impactText(key)}</span></label>)}</div>
+            <div>{(Object.keys(targetLabels) as StopTarget[]).map((key) => <label key={key} className="flex cursor-pointer items-center gap-3 border-b border-hairline px-4 py-3 last:border-0 hover:bg-canvas-sunken"><input type="checkbox" checked={targets[key]} onChange={(event) => setTargets((current) => ({ ...current, [key]: event.target.checked }))} disabled={mutationLocked || isStopped} className="h-4 w-4 accent-danger" /><span className="min-w-0 flex-1"><span className="block text-sm font-bold text-ink">{targetLabels[key].label}</span><span className="block text-xs text-ink-faint">{targetLabels[key].note}</span></span><span className="max-w-md shrink-0 text-right text-xs font-bold text-ink-secondary">{impactText(key)}</span></label>)}</div>
           </section>
 
-          <section className={`border-hairline rounded-card border bg-canvas p-4 ${isStopped ? 'pointer-events-none opacity-50' : ''}`}>
+          <section className={`border-hairline rounded-card border bg-canvas p-4 ${isStopped || needsReload ? 'pointer-events-none opacity-50' : ''}`}>
             <h2 className="text-base font-bold text-ink">どのアカウントを、なぜ止めますか</h2>
-            <div className="mt-4 grid grid-cols-1 gap-5 lg:grid-cols-2"><div><label className="text-xs font-bold text-ink-secondary" htmlFor="emergency-account">対象アカウント</label><SelectField id="emergency-account" value={targetAccountId} onChange={(event) => setTargetAccountId(event.target.value)} aria-label="緊急停止の対象アカウント" className="border-hairline rounded-control mt-2 min-h-11 w-full border bg-canvas px-3 text-sm" options={[{ value: 'all', label: 'すべてのアカウント' }, ...accounts.map((account) => ({ value: account.id, label: account.name }))]} /></div><div><label className="text-xs font-bold text-ink-secondary" htmlFor="emergency-reason">停止理由</label><SelectField id="emergency-reason" value={reason} onChange={(event) => setReason(event.target.value)} aria-label="緊急停止の理由" className="border-hairline rounded-control mt-2 min-h-11 w-full border bg-canvas px-3 text-sm" options={['障害対応', '誤配信の防止', 'アカウント異常', 'メンテナンス', 'その他'].map((label) => ({ value: label, label }))} /></div></div>
+            <div className="mt-4 grid grid-cols-1 gap-5 lg:grid-cols-2"><div><label className="text-xs font-bold text-ink-secondary" htmlFor="emergency-account">対象アカウント</label><SelectField id="emergency-account" value={targetAccountId} onChange={(event) => handleTargetAccountChange(event.target.value)} disabled={mutationLocked || isStopped} aria-label="緊急停止の対象アカウント" className="border-hairline rounded-control mt-2 min-h-11 w-full border bg-canvas px-3 text-sm" options={[{ value: 'all', label: 'すべてのアカウント' }, ...accounts.map((account) => ({ value: account.id, label: account.name }))]} /></div><div><label className="text-xs font-bold text-ink-secondary" htmlFor="emergency-reason">停止理由</label><SelectField id="emergency-reason" value={reason} onChange={(event) => setReason(event.target.value)} disabled={mutationLocked || isStopped} aria-label="緊急停止の理由" className="border-hairline rounded-control mt-2 min-h-11 w-full border bg-canvas px-3 text-sm" options={['障害対応', '誤配信の防止', 'アカウント異常', 'メンテナンス', 'その他'].map((label) => ({ value: label, label }))} /></div></div>
           </section>
 
-          <section className={`border-hairline rounded-card border bg-canvas p-4 ${isStopped ? 'pointer-events-none opacity-50' : ''}`}>
+          <section className={`border-hairline rounded-card border bg-canvas p-4 ${isStopped || needsReload ? 'pointer-events-none opacity-50' : ''}`}>
             <div className="flex items-baseline justify-between gap-2">
               <label className="text-base font-bold text-ink" htmlFor="emergency-detail">補足（任意）</label>
               <p className="text-xs tabular-nums text-ink-faint">あと{1000 - reasonDetail.length}文字</p>
             </div>
-            <textarea id="emergency-detail" value={reasonDetail} onChange={(event) => setReasonDetail(event.target.value)} rows={2} maxLength={1000} placeholder="発生していることを短く入力" className="border-hairline rounded-control mt-3 w-full border px-3 py-2 text-sm" />
+            <textarea id="emergency-detail" value={reasonDetail} onChange={(event) => setReasonDetail(event.target.value)} disabled={mutationLocked || isStopped} rows={2} maxLength={1000} placeholder="発生していることを短く入力" className="border-hairline rounded-control mt-3 w-full border px-3 py-2 text-sm" />
           </section>
 
           <section className={`rounded-card border p-4 ${isStopped ? 'border-info bg-info-bg' : impactFailed ? 'border-warning bg-warning-bg' : 'border-info bg-info-bg'}`}>
-            <div className="flex flex-wrap items-center justify-between gap-4"><div><h2 className={`text-base font-bold ${impactFailed ? 'text-warning' : 'text-info'}`}>復旧</h2><p className={`mt-1 text-xs ${impactFailed ? 'text-warning' : 'text-info'}`}>{isStopped ? '停止前に動いていたものだけを戻します。期限を過ぎた予約配信は安全のため再開しません。' : impactFailed ? '停止状態を確認できないため、停止・復旧を実行できません。' : `いまは止めていません。復旧できるものはありません。${calculatedAt ? `${formatOperationDate(calculatedAt)}に確認しました。` : ''}`}</p></div>{isStopped && <button onClick={() => { setConfirmWord(''); setStepUpCode(''); setRequestKey(crypto.randomUUID()); setConfirmMode('restore') }} disabled={running || !canControl} className="rounded-control border border-info bg-canvas px-4 py-2 text-xs font-bold text-info hover:bg-info-bg disabled:opacity-50">復旧する</button>}</div>
+            <div className="flex flex-wrap items-center justify-between gap-4"><div><h2 className={`text-base font-bold ${impactFailed ? 'text-warning' : 'text-info'}`}>復旧</h2><p className={`mt-1 text-xs ${impactFailed ? 'text-warning' : 'text-info'}`}>{isStopped ? '停止前に動いていたものだけを戻します。期限を過ぎた予約配信は安全のため再開しません。' : impactFailed ? '停止状態を確認できないため、停止・復旧を実行できません。' : `いまは止めていません。復旧できるものはありません。${calculatedAt ? `${formatOperationDate(calculatedAt)}に確認しました。` : ''}`}</p></div>{isStopped && <button onClick={() => { setConfirmWord(''); setStepUpCode(''); setRequestKey(crypto.randomUUID()); setConfirmMode('restore') }} disabled={mutationLocked || !canControl} className="rounded-control border border-info bg-canvas px-4 py-2 text-xs font-bold text-info hover:bg-info-bg disabled:opacity-50">復旧する</button>}</div>
           </section>
         </div>
 
@@ -493,7 +796,7 @@ function EmergencyControlPanel({ accounts }: { accounts: LineAccount[] }) {
 
       <div className="border-hairline rounded-card sticky bottom-0 z-20 flex flex-wrap items-center justify-between gap-3 border bg-canvas px-4 py-3 shadow-lg">
         <p className="text-xs font-semibold text-ink-faint">4つのうち{selectedTargets.length}つを選択 ／ {accountName} ／ 理由「{reason}」</p>
-        <div className="flex items-center gap-2"><button type="button" onClick={() => { setTargets({ broadcasts: true, scenarios: true, reminders: true, automations: false }); setReason('障害対応'); setReasonDetail('') }} disabled={running || isStopped} className="rounded-control min-h-10 px-4 text-xs font-bold text-action hover:bg-action-soft disabled:opacity-50">キャンセル</button><button onClick={openStopConfirm} disabled={running || isStopped || impactFailed || !impact || !control || !canControl} className="rounded-control min-h-10 bg-danger px-4 text-xs font-bold text-on-accent hover:opacity-90 disabled:opacity-50">緊急停止する</button></div>
+        <div className="flex items-center gap-2"><button type="button" onClick={() => { setTargets({ broadcasts: true, scenarios: true, reminders: true, automations: false }); setReason('障害対応'); setReasonDetail('') }} disabled={mutationLocked || isStopped} className="rounded-control min-h-10 px-4 text-xs font-bold text-action hover:bg-action-soft disabled:opacity-50">キャンセル</button><button onClick={openStopConfirm} disabled={mutationLocked || isStopped || impactFailed || !impact || !control || !canControl} className="rounded-control min-h-10 bg-danger px-4 text-xs font-bold text-on-accent hover:opacity-90 disabled:opacity-50">緊急停止する</button></div>
       </div>
 
       {confirmMode && <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/35 p-4" role="dialog" aria-modal="true" aria-labelledby="emergency-confirm-title">
@@ -506,10 +809,10 @@ function EmergencyControlPanel({ accounts }: { accounts: LineAccount[] }) {
           </> : <section className="rounded-control border border-info bg-info-bg p-4 text-info"><p className="font-bold">{accountName}</p><p className="mt-1">期限を過ぎた予約は自動では送りません。</p></section>}
             <div><label className="block text-sm font-bold text-ink-secondary" htmlFor="emergency-confirm-word">確認のため「{confirmMode === 'stop' ? '停止' : '復旧'}」と入力</label><input id="emergency-confirm-word" value={confirmWord} onChange={(event) => setConfirmWord(event.target.value)} autoFocus className="mt-2 min-h-11 rounded-control border border-hairline px-3 text-sm" style={{ width: 280 }} /><p className="mt-2 text-xs text-ink-faint">この操作は記録に残り、ログインユーザーへ通知されます。</p></div>
           </div>
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-hairline px-6 py-4" style={{ minHeight: 84 }}><p className="max-w-sm text-xs text-ink-faint">止めたことは、ログインユーザー全員のLINEとメールへ知らせます。</p><div className="flex gap-2"><button onClick={() => { setConfirmMode(null); setConfirmWord('') }} disabled={running} className="min-h-11 rounded-control px-4 text-sm font-bold text-action hover:bg-action-soft">キャンセル</button><button onClick={() => { setStepUpMode(confirmMode); setConfirmMode(null); setStepUpCode('') }} disabled={running || confirmWord !== (confirmMode === 'stop' ? '停止' : '復旧')} className={`min-h-11 rounded-control px-4 text-sm font-bold text-on-accent disabled:opacity-40 ${confirmMode === 'stop' ? 'bg-danger' : 'bg-info'}`}>{confirmMode === 'stop' ? '配信を緊急停止する' : '復旧を実行する'}</button></div></div>
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-hairline px-6 py-4" style={{ minHeight: 84 }}><p className="max-w-sm text-xs text-ink-faint">止めたことは、ログインユーザー全員のLINEとメールへ知らせます。</p><div className="flex gap-2"><button onClick={() => { setConfirmMode(null); setConfirmWord('') }} disabled={mutationLocked} className="min-h-11 rounded-control px-4 text-sm font-bold text-action hover:bg-action-soft">キャンセル</button><button onClick={() => { setStepUpMode(confirmMode); setConfirmMode(null); setStepUpCode('') }} disabled={mutationLocked || confirmWord !== (confirmMode === 'stop' ? '停止' : '復旧')} className={`min-h-11 rounded-control px-4 text-sm font-bold text-on-accent disabled:opacity-40 ${confirmMode === 'stop' ? 'bg-danger' : 'bg-info'}`}>{confirmMode === 'stop' ? '配信を緊急停止する' : '復旧を実行する'}</button></div></div>
         </div>
       </div>}
-      {stepUpMode && <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/50 p-4" role="dialog" aria-modal="true" aria-labelledby="emergency-step-up-title"><div className="rounded-card w-full max-w-md bg-canvas p-6 shadow-2xl"><h2 id="emergency-step-up-title" className="text-lg font-bold text-ink">認証アプリで本人確認</h2><p className="mt-2 text-xs leading-relaxed text-ink-faint">この操作専用に、5分以内に1回だけ使える6桁コードを確認します。</p><label className="mt-5 block text-sm font-bold text-ink-secondary" htmlFor="emergency-step-up-code">認証アプリの6桁コード</label><input id="emergency-step-up-code" value={stepUpCode} onChange={(event) => setStepUpCode(event.target.value.replace(/\D/g, '').slice(0, 6))} inputMode="numeric" autoFocus className="border-hairline rounded-control mt-2 min-h-11 w-full border px-3 text-center text-lg font-bold tracking-[0.4em]" placeholder="000000" /><div className="mt-6 flex justify-end gap-2"><button onClick={() => { setStepUpMode(null); setStepUpCode('') }} disabled={running} className="rounded-control min-h-11 px-4 text-sm font-bold text-action">戻る</button><button onClick={() => void (stepUpMode === 'stop' ? runStop() : runRestore())} disabled={running || !/^\d{6}$/.test(stepUpCode)} className={`rounded-control min-h-11 px-4 text-sm font-bold text-on-accent disabled:opacity-40 ${stepUpMode === 'stop' ? 'bg-danger' : 'bg-info'}`}>{running ? '確認中...' : stepUpMode === 'stop' ? '本人確認して停止' : '本人確認して復旧'}</button></div></div></div>}
+      {stepUpMode && <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/50 p-4" role="dialog" aria-modal="true" aria-labelledby="emergency-step-up-title"><div className="rounded-card w-full max-w-md bg-canvas p-6 shadow-2xl"><h2 id="emergency-step-up-title" className="text-lg font-bold text-ink">認証アプリで本人確認</h2><p className="mt-2 text-xs leading-relaxed text-ink-faint">この操作専用に、5分以内に1回だけ使える6桁コードを確認します。</p><label className="mt-5 block text-sm font-bold text-ink-secondary" htmlFor="emergency-step-up-code">認証アプリの6桁コード</label><input id="emergency-step-up-code" value={stepUpCode} onChange={(event) => setStepUpCode(event.target.value.replace(/\D/g, '').slice(0, 6))} disabled={mutationLocked} inputMode="numeric" autoFocus className="border-hairline rounded-control mt-2 min-h-11 w-full border px-3 text-center text-lg font-bold tracking-[0.4em]" placeholder="000000" /><div className="mt-6 flex justify-end gap-2"><button onClick={() => { setStepUpMode(null); setStepUpCode('') }} disabled={mutationLocked} className="rounded-control min-h-11 px-4 text-sm font-bold text-action">戻る</button><button onClick={() => void (stepUpMode === 'stop' ? runStop() : runRestore())} disabled={mutationLocked || !/^\d{6}$/.test(stepUpCode)} className={`rounded-control min-h-11 px-4 text-sm font-bold text-on-accent disabled:opacity-40 ${stepUpMode === 'stop' ? 'bg-danger' : 'bg-info'}`}>{running ? '確認中...' : stepUpMode === 'stop' ? '本人確認して停止' : '本人確認して復旧'}</button></div></div></div>}
     </div>
   )
 }
@@ -677,6 +980,16 @@ function EmergencyPageInner() {
   return <div><OperationPageHeader description={tab === 'history' ? '' : description} action={headerAction} />{accountsFailed ? <div className="bg-warning-bg mt-3 flex flex-wrap items-center justify-between gap-2 rounded-control px-4 py-3 text-xs font-medium text-warning" role="alert"><p>アカウント一覧を取得できませんでした。個別のアカウントを選べず、全体が対象になります。</p><button type="button" onClick={() => loadAccounts()} className="rounded-control border border-warning px-3 py-1.5 font-bold hover:opacity-80">もう一度読む</button></div> : null}<MergedTabs basePath="/emergency" tabs={TABS} active={tab} />{tab === 'health' && <HealthPanel accountId={selectedAccountId} manualRunRequest={manualRunRequest} onSeverity={setSeverity} />}{tab === 'control' && <EmergencyControlPanel accounts={accounts} />}{tab === 'history' && <HistoryPanel />}</div>
 }
 
-export default function EmergencyPage() {
+function EmergencyPage() {
   return <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中...</div>}><EmergencyPageInner /></Suspense>
 }
+
+EmergencyPage.__test = {
+  EmergencyControlFeedback,
+  EmergencyControlPanel,
+  emergencySafetyTransition,
+  isEmergencyMutationLocked,
+  runCurrentRequest,
+}
+
+export default EmergencyPage
