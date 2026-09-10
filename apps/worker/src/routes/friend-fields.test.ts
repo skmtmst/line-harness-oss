@@ -29,6 +29,7 @@ const mocks = {
   getFriendById: vi.fn(),
   setFriendFieldValue: vi.fn(),
   recordLoginAudit: vi.fn(),
+  validateFriendFieldValue: vi.fn(),
   validateFieldKey: (key: unknown) =>
     typeof key === 'string' && /^[a-z][a-z0-9_]{0,31}$/.test(key) && key !== 'name'
       ? { ok: true as const }
@@ -62,10 +63,15 @@ vi.mock('../services/account-access.js', () => ({
 
 const { friendFields } = await import('./friend-fields.js');
 
-function makeApp(role: 'owner' | 'admin' | 'staff' = 'owner') {
+// 口の契約テストは本物の検証関数で動かす。検証のすり替えでは
+// 「型違いを422で止める」契約を証明できないため。
+const { validateFriendFieldValue: realValidateFriendFieldValue } =
+  await vi.importActual<typeof import('@line-crm/db')>('@line-crm/db');
+
+function makeApp(role: 'owner' | 'admin' | 'staff' = 'owner', tenantId: string | null = 'tenant-1') {
   const app = new Hono<Env>();
   app.use('*', async (c, next) => {
-    c.set('staff', { id: 'u-1', name: 'テスト', role, readOnly: false, tenantId: 'tenant-1' });
+    c.set('staff', { id: 'u-1', name: 'テスト', role, readOnly: false, tenantId });
     return next();
   });
   app.route('/', friendFields);
@@ -138,6 +144,7 @@ beforeEach(() => {
   mocks.executeFieldMigration.mockResolvedValue(undefined);
   mocks.getFolderById.mockResolvedValue({ id: 'folder-1', kind: 'friend_field' });
   mocks.getFriendFieldsWithValues.mockResolvedValue([{ ...FIELD, value: null, updated_by: null }]);
+  mocks.validateFriendFieldValue.mockImplementation(realValidateFriendFieldValue);
 });
 
 describe('項目の作成', () => {
@@ -740,5 +747,196 @@ describe('一括変更のアカウント境界（N-043）', () => {
     expect(first.status).toBe(200);
     expect(second.status).toBe(200);
     expect(mocks.setFriendFieldValue).toHaveBeenCalledTimes(4);
+  });
+});
+
+const NUMBER_FIELD = {
+  ...FIELD,
+  id: 'ff-num',
+  name: '頭数',
+  field_key: 'head_count',
+  type: 'number',
+};
+
+const SELECT_FIELD = {
+  ...FIELD,
+  id: 'ff-sel',
+  name: '犬種',
+  field_key: 'breed',
+  type: 'select',
+  options_json: JSON.stringify([
+    { id: 'opt-1', label: '柴犬', color: null, status: 'active', displayOrder: 0 },
+    { id: 'opt-2', label: '猫', color: null, status: 'active', displayOrder: 1 },
+  ]),
+};
+
+const DATE_FIELD = {
+  ...FIELD,
+  id: 'ff-date',
+  name: '誕生日',
+  field_key: 'birthday',
+  type: 'date',
+};
+
+describe('値の型検証（N-042 単票）', () => {
+  it('数値項目に文字列は422で何も保存しない', async () => {
+    mocks.getFriendFields.mockResolvedValue([NUMBER_FIELD]);
+    const res = await req(makeApp(), '/api/friends/f-1/fields', 'PUT', {
+      values: { 'ff-num': 'たくさん' },
+    });
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as {
+      code: string;
+      errors: Array<{ fieldId: string; message: string }>;
+    };
+    expect(body.code).toBe('FIELD_VALUE_INVALID');
+    expect(body.errors[0].fieldId).toBe('ff-num');
+    expect(mocks.setFriendFieldValue).not.toHaveBeenCalled();
+  });
+
+  it('正しい項目が混ざっても部分保存しない', async () => {
+    mocks.getFriendFields.mockResolvedValue([FIELD, NUMBER_FIELD]);
+    const res = await req(makeApp(), '/api/friends/f-1/fields', 'PUT', {
+      values: { 'ff-1': 'ポチ', 'ff-num': 'たくさん' },
+    });
+    expect(res.status).toBe(422);
+    expect(mocks.setFriendFieldValue).not.toHaveBeenCalled();
+  });
+
+  it('通った値は正規化して保存する', async () => {
+    mocks.getFriendFields.mockResolvedValue([NUMBER_FIELD, SELECT_FIELD]);
+    const res = await req(makeApp(), '/api/friends/f-1/fields', 'PUT', {
+      values: { 'ff-num': '1,000', 'ff-sel': '柴犬' },
+    });
+    expect(res.status).toBe(200);
+    expect(mocks.setFriendFieldValue).toHaveBeenCalledTimes(2);
+    expect(mocks.setFriendFieldValue).toHaveBeenCalledWith(expect.anything(), {
+      friendId: 'f-1',
+      fieldId: 'ff-num',
+      value: '1000',
+      updatedBy: 'u-1',
+      field: expect.objectContaining({ type: 'number' }),
+    });
+    expect(mocks.setFriendFieldValue).toHaveBeenCalledWith(expect.anything(), {
+      friendId: 'f-1',
+      fieldId: 'ff-sel',
+      value: 'opt-1',
+      updatedBy: 'u-1',
+      field: expect.objectContaining({ type: 'select' }),
+    });
+  });
+
+  it('選択肢外は422で保存しない', async () => {
+    mocks.getFriendFields.mockResolvedValue([SELECT_FIELD]);
+    const res = await req(makeApp(), '/api/friends/f-1/fields', 'PUT', {
+      values: { 'ff-sel': 'ドラゴン' },
+    });
+    expect(res.status).toBe(422);
+    expect(mocks.setFriendFieldValue).not.toHaveBeenCalled();
+  });
+
+  it('曖昧な日付と存在しない日付は422で保存しない', async () => {
+    mocks.getFriendFields.mockResolvedValue([DATE_FIELD]);
+    for (const value of ['2026/9/1', '2026-02-30', '昨日']) {
+      const res = await req(makeApp(), '/api/friends/f-1/fields', 'PUT', {
+        values: { 'ff-date': value },
+      });
+      expect(res.status).toBe(422);
+    }
+    expect(mocks.setFriendFieldValue).not.toHaveBeenCalled();
+  });
+
+  it('NaN・Infinity・真偽値は数値として422で保存しない', async () => {
+    mocks.getFriendFields.mockResolvedValue([NUMBER_FIELD]);
+    for (const value of ['NaN', 'Infinity', true, {}]) {
+      const res = await req(makeApp(), '/api/friends/f-1/fields', 'PUT', {
+        values: { 'ff-num': value },
+      });
+      expect(res.status).toBe(422);
+    }
+    expect(mocks.setFriendFieldValue).not.toHaveBeenCalled();
+  });
+
+  it('同じ値を2回保存しても2回とも残る', async () => {
+    mocks.getFriendFields.mockResolvedValue([NUMBER_FIELD]);
+    const body = { values: { 'ff-num': '1,000' } };
+    const first = await req(makeApp(), '/api/friends/f-1/fields', 'PUT', body);
+    const second = await req(makeApp(), '/api/friends/f-1/fields', 'PUT', body);
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+    expect(mocks.setFriendFieldValue).toHaveBeenCalledTimes(2);
+    expect(mocks.setFriendFieldValue).toHaveBeenLastCalledWith(expect.anything(), {
+      friendId: 'f-1',
+      fieldId: 'ff-num',
+      value: '1000',
+      updatedBy: 'u-1',
+      field: expect.objectContaining({ type: 'number' }),
+    });
+  });
+
+  it('空文字は消す扱いで保存する', async () => {
+    mocks.getFriendFields.mockResolvedValue([FIELD]);
+    const res = await req(makeApp(), '/api/friends/f-1/fields', 'PUT', {
+      values: { 'ff-1': '' },
+    });
+    expect(res.status).toBe(200);
+    expect(mocks.setFriendFieldValue).toHaveBeenCalledWith(expect.anything(), {
+      friendId: 'f-1',
+      fieldId: 'ff-1',
+      value: null,
+      updatedBy: 'u-1',
+      field: expect.objectContaining({ type: 'text' }),
+    });
+  });
+});
+
+describe('値の型検証（N-042 一括）', () => {
+  const bulk = (fieldId: string, value: unknown) => ({
+    lineAccountId: 'account-1',
+    friendIds: ['f-1', 'f-2'],
+    fieldId,
+    value,
+  });
+
+  it('型違いは422で誰にも保存しない', async () => {
+    mocks.getFriendFieldByIdForScope.mockResolvedValue({ ...NUMBER_FIELD, line_account_id: 'account-1', tenant_id: 'tenant-1', is_inherited: 0 });
+    const res = await req(makeApp(), '/api/friend-fields/bulk', 'POST', bulk('ff-num', 'たくさん'));
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { code: string };
+    expect(body.code).toBe('FIELD_VALUE_INVALID');
+    expect(mocks.setFriendFieldValue).not.toHaveBeenCalled();
+  });
+
+  it('通った値は正規化して人数ぶん保存する', async () => {
+    mocks.getFriendFieldByIdForScope.mockResolvedValue({ ...NUMBER_FIELD, line_account_id: 'account-1', tenant_id: 'tenant-1', is_inherited: 0 });
+    const res = await req(makeApp(), '/api/friend-fields/bulk', 'POST', bulk('ff-num', '1,000'));
+    expect(res.status).toBe(200);
+    expect(mocks.setFriendFieldValue).toHaveBeenCalledTimes(2);
+    expect(mocks.setFriendFieldValue).toHaveBeenCalledWith(expect.anything(), {
+      friendId: 'f-1',
+      fieldId: 'ff-num',
+      value: '1000',
+      updatedBy: 'u-1',
+      field: expect.objectContaining({ type: 'number' }),
+    });
+  });
+
+  it('選択肢の表示名はIDへ直して保存する', async () => {
+    mocks.getFriendFieldByIdForScope.mockResolvedValue({ ...SELECT_FIELD, line_account_id: 'account-1', tenant_id: 'tenant-1', is_inherited: 0 });
+    const res = await req(makeApp(), '/api/friend-fields/bulk', 'POST', bulk('ff-sel', '柴犬'));
+    expect(res.status).toBe(200);
+    expect(mocks.setFriendFieldValue).toHaveBeenCalledWith(expect.anything(), {
+      friendId: 'f-1',
+      fieldId: 'ff-sel',
+      value: 'opt-1',
+      updatedBy: 'u-1',
+      field: expect.objectContaining({ type: 'select' }),
+    });
+  });
+
+  it('所属がなければ403で保存しない', async () => {
+    const res = await req(makeApp('owner', null), '/api/friend-fields/bulk', 'POST', bulk('ff-1', 'ポチ'));
+    expect(res.status).toBe(403);
+    expect(mocks.setFriendFieldValue).not.toHaveBeenCalled();
   });
 });
