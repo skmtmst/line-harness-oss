@@ -5,6 +5,7 @@ import {
   ApiError,
   api,
   type PhotoAssetStatus,
+  type PhotoBulkReviewResult,
   type PhotoDerivatives,
   type PhotoReviewMetrics,
 } from '@/lib/api'
@@ -65,7 +66,14 @@ export default function PhotoReviewsPage() {
   const [bulkApproveOpen, setBulkApproveOpen] = useState(false)
   const [bulkReturnOpen, setBulkReturnOpen] = useState(false)
   const [bulkReviewing, setBulkReviewing] = useState(false)
+  const [bulkFailed, setBulkFailed] = useState<Array<{ photoId: string; petName: string; error: string }>>([])
   const loadSequence = useRef(0)
+  /*
+   * 操作を始めたときのLINEアカウント世代。Aの審査・再送の応答が遅れて
+   * 戻ってきたとき、すでにBへ切り替わっていればB画面へは反映しない。
+   * 一覧の loadSequence と同じ考え方を、書き込み操作にも当てる。
+   */
+  const accountGeneration = useRef(0)
 
   const load = useCallback(async () => {
     const sequence = ++loadSequence.current
@@ -110,6 +118,7 @@ export default function PhotoReviewsPage() {
   }, [selectedAccountId])
   useEffect(() => { void load() }, [load])
   useEffect(() => {
+    accountGeneration.current += 1
     setNotice('')
     setRejectingPhotoId(null)
     setRejectingPhotoDetail(null)
@@ -124,6 +133,7 @@ export default function PhotoReviewsPage() {
     setSelectedPhotoIds([])
     setBulkApproveOpen(false)
     setBulkReturnOpen(false)
+    setBulkFailed([])
   }, [selectedAccountId])
 
   const counts = useMemo(() => ({
@@ -254,6 +264,7 @@ export default function PhotoReviewsPage() {
       setNotice('LINEアカウントを選んでください。')
       return
     }
+    const generation = accountGeneration.current
     setReviewing(id)
     try {
       const response = await api.nenMembers.reviewPhoto(id, {
@@ -265,6 +276,7 @@ export default function PhotoReviewsPage() {
         ),
         ...(rejection ?? {}),
       })
+      if (generation !== accountGeneration.current) return
       if (!response.success) throw new Error(response.error)
       const notification = response.data.notificationStatus === 'sent'
         ? '投稿者へLINEで通知しました。'
@@ -279,7 +291,11 @@ export default function PhotoReviewsPage() {
       setReasonError('')
       await load()
       setView('list')
-    } catch (error) { setNotice(photoNoticeFor(error, '審査結果を保存できませんでした。')) }
+    } catch (error) {
+      if (generation === accountGeneration.current) {
+        setNotice(photoNoticeFor(error, '審査結果を保存できませんでした。'))
+      }
+    }
     finally { setReviewing(null) }
   }
 
@@ -288,6 +304,7 @@ export default function PhotoReviewsPage() {
     rejection?: { reasonCode: ReviewReasonCode; reasonNote: string },
   ) => {
     if (!selectedAccountId || selectedPendingPhotos.length === 0) return
+    const generation = accountGeneration.current
     setBulkReviewing(true)
     try {
       const response = await api.nenMembers.bulkReviewPhotos({
@@ -300,15 +317,25 @@ export default function PhotoReviewsPage() {
           reasonNote: rejection?.reasonNote || null,
         })),
       }, crypto.randomUUID())
+      if (generation !== accountGeneration.current) return
       if (!response.success) throw new Error(response.error)
       /*
-       * 一括審査の口は `{updatedCount, items}` を返し、通知は `pending` で
-       * 積むだけでその場では送らない（#500）。「送信しました」と書くと
-       * 実際と違うので、件数と順次送信の旨だけ出す。
+       * 一括審査の口は審査の確定と通知の送達を分けて返す。審査はこの時点で
+       * 保存済みで、通知だけ送れなかった分は一覧とここから再送できる。
        */
-      const updated = (response.data as { updatedCount?: unknown }).updatedCount
-      const count = typeof updated === 'number' ? updated : selectedPendingPhotos.length
-      setNotice(`${count}枚の審査結果を保存しました（通知は順次送信）。`)
+      const data = response.data as Partial<PhotoBulkReviewResult>
+      const count = typeof data.updatedCount === 'number' ? data.updatedCount : selectedPendingPhotos.length
+      const names = new Map(selectedPendingPhotos.map((photo) => [text(photo.id), photoPetDisplayName(photo.pet_name)]))
+      const failed = Array.isArray(data.notificationFailures) ? data.notificationFailures : []
+      const failedPhotos = failed.map((item) => {
+        const photoId = text((item as { photoId?: unknown })?.photoId)
+        const error = text((item as { error?: unknown })?.error) || '通知できませんでした'
+        return { photoId, petName: names.get(photoId) ?? '写真', error }
+      }).filter((item) => item.photoId)
+      setBulkFailed(failedPhotos)
+      setNotice(failedPhotos.length === 0
+        ? `${count}枚の審査結果を保存し、投稿者へLINEで通知しました。`
+        : `${count}枚の審査結果は保存済みです。${failedPhotos.length}枚のLINE通知は送れませんでした（通知だけ再送できます）。`)
       setSelectedPhotoIds([])
       setBulkApproveOpen(false)
       setBulkReturnOpen(false)
@@ -317,8 +344,12 @@ export default function PhotoReviewsPage() {
       setReasonError('')
       await load()
     } catch (error) {
-      setNotice(photoNoticeFor(error, 'まとめて審査できませんでした。'))
+      if (generation === accountGeneration.current) {
+        setNotice(photoNoticeFor(error, 'まとめて審査できませんでした。'))
+      }
     } finally {
+      // 処理中の掛け金は世代に関係なく必ず外す。ここを世代で守ると、
+      // 切替先で「まとめて通す」が押せないまま残る。
       setBulkReviewing(false)
     }
   }
@@ -411,14 +442,19 @@ export default function PhotoReviewsPage() {
 
   const retryNotification = async (id: string) => {
     if (!selectedAccountId) return
+    const generation = accountGeneration.current
     setReviewing(id)
     try {
       const response = await api.nenMembers.retryPhotoReviewNotification(id, selectedAccountId)
+      if (generation !== accountGeneration.current) return
       if (!response.success) throw new Error(response.error)
       setNotice('審査結果を投稿者へLINEで再送しました。')
+      setBulkFailed((current) => current.filter((item) => item.photoId !== id))
       await load()
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : 'LINE通知を再送できませんでした。')
+      if (generation === accountGeneration.current) {
+        setNotice(error instanceof Error ? error.message : 'LINE通知を再送できませんでした。')
+      }
     } finally {
       setReviewing(null)
     }
@@ -433,6 +469,22 @@ export default function PhotoReviewsPage() {
   return <>
     <main className="mx-auto flex max-w-full flex-col gap-4 p-4 sm:p-6">
       {notice && <div className="rounded-control border border-accent-border bg-accent-soft px-4 py-3 text-sm text-accent-hover">{notice}</div>}
+      {bulkFailed.length > 0 && <div className="rounded-control border border-hairline bg-canvas px-4 py-3">
+        <p className="text-sm font-bold text-ink">LINE通知を送れなかった写真（{bulkFailed.length}枚）</p>
+        <p className="mt-1 text-xs text-ink-secondary">審査は保存済みです。通知だけ再送できます。</p>
+        <ul className="mt-2 space-y-2">
+          {bulkFailed.map((item) => <li key={item.photoId} className="flex flex-wrap items-center justify-between gap-2 rounded-control bg-canvas-sunken px-3 py-2">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold text-ink">{item.petName}</p>
+              <p className="truncate text-xs text-ink-faint">{item.error}</p>
+            </div>
+            <div className="flex shrink-0 gap-2">
+              <Button variant="secondary" onClick={() => void openDetail(item.photoId)}>大きく見る</Button>
+              <Button variant="secondary" disabled={reviewing === item.photoId} onClick={() => void retryNotification(item.photoId)}>{reviewing === item.photoId ? '再送中...' : 'LINE通知を再送'}</Button>
+            </div>
+          </li>)}
+        </ul>
+      </div>}
 
       {/*
         * 状態の切り替えはタブ帯（高さ44）で出す。設計 `Qu6Vk` は共通の

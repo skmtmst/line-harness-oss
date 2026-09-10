@@ -3670,6 +3670,20 @@ export type PhotoBulkDecision = {
   reasonNote: string | null
 }
 
+export type PhotoBulkReviewResult = {
+  updatedCount: number
+  items: Array<{
+    photoId: string
+    decision: 'approve' | 'return' | 'reject'
+    reviewVersion: number
+    decisionId: string
+    notificationStatus: 'sent' | 'failed'
+    notificationError?: string
+  }>
+  notificationFailures: Array<{ photoId: string; error: string }>
+  reconciled?: boolean
+}
+
 export type AdPlatform = {
   id: string
   /** meta / x / google / tiktok */
@@ -6330,6 +6344,8 @@ export const api = {
       friendId?: string
       issueInitialLink?: boolean
       lineAccountId?: string
+      /** 安定した操作UUID（#686）。同じ値での再送は同じ登録を返す。 */
+      operationId?: string
     }) =>
       fetchApi<ApiResponse<Affiliate> & { link?: { refCode: string; url: string } | null }>(
         '/api/affiliates',
@@ -7474,7 +7490,7 @@ export const api = {
     bulkReviewPhotos: (
       data: { lineAccountId: string; decisions: PhotoBulkDecision[] },
       idempotencyKey: string,
-    ) => fetchApi<ApiResponse<{ updatedCount: number; awardedPoints: number; notificationFailures: number }>>(
+    ) => fetchApi<ApiResponse<PhotoBulkReviewResult>>(
       '/api/nen-members/photos/decisions/bulk',
       { method: 'POST', headers: { 'Idempotency-Key': idempotencyKey }, body: JSON.stringify(data) },
     ),
@@ -8715,6 +8731,8 @@ export const api = {
       lineAccountId?: string | null
       tagId?: string | null
       scenarioId?: string | null
+      /** 安定した操作UUID（#686）。同じ値での再送は同じ登録を返す。 */
+      operationId?: string
     }) =>
       fetchApi<{ success: boolean; data: AffiliateOffer }>('/api/affiliate-offers', {
         method: 'POST',
