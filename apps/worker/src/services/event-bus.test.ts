@@ -439,6 +439,94 @@ describe('fireEvent — 送信Webhookのアカウント解決', () => {
   });
 });
 
+describe('fireEvent — EC正規化イベントのV6連携', () => {
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    const dbModule = await import('@line-crm/db');
+    (dbModule.getActiveAutomationsByEvent as unknown as { mockResolvedValue: (v: unknown) => void })
+      .mockResolvedValue([]);
+    actionScoreMocks.applyActionScoreEvent.mockResolvedValue({
+      configured: false,
+      status: 'legacy',
+      applications: [],
+    });
+  });
+
+  function ecPayload() {
+    return {
+      sourceEventId: 'event-12345678',
+      sourceKind: 'eccube',
+      occurredAt: '2026-08-27T16:00:00.000Z',
+      friendId: 'friend-1',
+      eventData: { orderNumber: 'NEN-1001', orderTotal: 2860 },
+    };
+  }
+
+  it('自動化・分析・スコアへ同一イベントIDで渡す', async () => {
+    const dbModule = await import('@line-crm/db');
+    const triggers = await import('./automation-triggers.js');
+    const db = fakeDb({ capturedInserts: [] });
+
+    await fireEvent(db, 'ec.order.confirmed', ecPayload(), 'account-token', 'account-a');
+
+    expect(dbModule.recordAnalyticsEvent).toHaveBeenCalledWith(db, expect.objectContaining({
+      lineAccountId: 'account-a',
+      friendId: 'friend-1',
+      eventType: 'ec.order.confirmed',
+      sourceKind: 'eccube',
+      sourceId: 'event-12345678',
+      occurredAt: '2026-08-27T16:00:00.000Z',
+    }));
+    expect(actionScoreMocks.applyActionScoreEvent).toHaveBeenCalledWith(db, expect.objectContaining({
+      lineAccountId: 'account-a',
+      friendId: 'friend-1',
+      eventType: 'ec.order.confirmed',
+      source: 'eccube',
+      sourceEventId: 'event-12345678',
+    }));
+    expect(triggers.dispatchAutomationEventWithLogging).toHaveBeenCalledWith(db, expect.objectContaining({
+      lineAccountId: 'account-a',
+      eventType: 'ec.order.confirmed',
+      sourceEventId: 'event-12345678',
+      friendId: 'friend-1',
+    }));
+  });
+
+  it('分析の記録に失敗しても自動化への連携は止めない', async () => {
+    const dbModule = await import('@line-crm/db');
+    const triggers = await import('./automation-triggers.js');
+    (dbModule.recordAnalyticsEvent as unknown as { mockRejectedValueOnce: (e: unknown) => void })
+      .mockRejectedValueOnce(new Error('analytics_event_type_unknown:ec.order.cancelled'));
+    const db = fakeDb({ capturedInserts: [] });
+    const errorLog = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    await fireEvent(db, 'ec.order.cancelled', {
+      ...ecPayload(),
+      sourceEventId: 'event-cancel-1',
+    }, 'account-token', 'account-a');
+
+    expect(triggers.dispatchAutomationEventWithLogging).toHaveBeenCalledWith(db, expect.objectContaining({
+      lineAccountId: 'account-a',
+      eventType: 'ec.order.cancelled',
+      sourceEventId: 'event-cancel-1',
+    }));
+    errorLog.mockRestore();
+  });
+
+  it('アカウントが分からないイベントはV6自動化へ渡さない', async () => {
+    const triggers = await import('./automation-triggers.js');
+    const db = fakeDb({ capturedInserts: [] });
+
+    await fireEvent(db, 'ec.order.confirmed', {
+      sourceEventId: 'event-no-account',
+      friendId: 'friend-1',
+      eventData: { orderNumber: 'NEN-1001' },
+    }, 'account-token');
+
+    expect(triggers.dispatchAutomationEventWithLogging).not.toHaveBeenCalled();
+  });
+});
+
 describe('fireEvent — 旧式 send_webhook は共通の安全送信へ通す', () => {
   beforeEach(() => {
     vi.clearAllMocks();

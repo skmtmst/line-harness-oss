@@ -1,6 +1,7 @@
 import { applyPublishedActionScoreRules } from '@line-crm/db';
 import type { ActionScoreApplication } from '@line-crm/db';
 import { dispatchAutomationEventWithLogging } from './automation-triggers.js';
+import { featureJobCanRun } from './feature-enforcement.js';
 
 const BAND_RANK = { low: 0, normal: 1, high: 2 } as const;
 
@@ -34,6 +35,12 @@ export async function applyActionScoreEvent(
     lineAccessToken?: string;
   },
 ) {
+  // 機能オフ中は適用(状態更新)も自動化への受け渡しもしない。
+  // dispatch側のgateだけでは適用が先に進むため、ここで止める。
+  // OFF中は不変で、再ON後の新しい元イベントから再開する。
+  if (!await featureJobCanRun(db, { accountId: input.lineAccountId, featureId: 'mileage', job: 'action score event application' })) {
+    return { configured: false, status: 'legacy' as const, applications: [] };
+  }
   const result = await applyPublishedActionScoreRules(db, input);
   await dispatchActionScoreApplications(db, {
     lineAccountId: input.lineAccountId,
@@ -53,6 +60,10 @@ export async function dispatchActionScoreApplications(
     lineAccessToken?: string;
   },
 ): Promise<void> {
+  // 機能オフ中は適用も自動化への受け渡しもしない。
+  if (!await featureJobCanRun(db, { accountId: input.lineAccountId, featureId: 'mileage', job: 'action score applications' })) {
+    return;
+  }
   for (const application of input.applications) {
     if (application.replayed || application.bandBefore === application.bandAfter) continue;
     const eventData = {

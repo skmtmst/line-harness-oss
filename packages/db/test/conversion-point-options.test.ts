@@ -11,6 +11,7 @@ import {
   getUrlReachConversionPoints,
   trackConversion,
 } from '../src/conversions.js';
+import { asD1 } from './d1-test-helper.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PKG_ROOT = join(__dirname, '..');
@@ -41,40 +42,6 @@ function setupDb(): Database.Database {
     execSafe(db, readFileSync(join(MIGRATIONS_DIR, file), 'utf8'));
   }
   return db;
-}
-
-function asD1(sqlite: Database.Database): D1Database {
-  return {
-    prepare(query: string) {
-      return {
-        bind(...params: unknown[]) {
-          const stmt = sqlite.prepare(query);
-          return {
-            async run() {
-              stmt.run(...params);
-              return { results: [], success: true, meta: {} };
-            },
-            async first<T>() {
-              return (stmt.get(...params) as T) ?? null;
-            },
-            async all<T>() {
-              return { results: stmt.all(...params) as T[], success: true, meta: {} };
-            },
-          };
-        },
-        async run() {
-          sqlite.prepare(query).run();
-          return { results: [], success: true, meta: {} };
-        },
-        async first<T>() {
-          return (sqlite.prepare(query).get() as T) ?? null;
-        },
-        async all<T>() {
-          return { results: sqlite.prepare(query).all() as T[], success: true, meta: {} };
-        },
-      };
-    },
-  } as unknown as D1Database;
 }
 
 function insertFriend(sqlite: Database.Database, id: string): void {

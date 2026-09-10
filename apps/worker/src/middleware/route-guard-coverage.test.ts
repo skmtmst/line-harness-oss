@@ -337,6 +337,7 @@ const STAFF_FAIL_CLOSED_SNAPSHOT: string[] = [
     'POST /api/restaurant-test/tables',
     'POST /api/restaurant-test/terms-agreement',
     'POST /api/segments/count',
+    'POST /api/settings/features/impact',
     'POST /api/site/link',
     'POST /api/staff',
     'POST /api/tenants',
