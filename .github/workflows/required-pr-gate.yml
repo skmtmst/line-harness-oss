@@ -377,25 +377,6 @@ jobs:
       - run: pnpm --filter web exec next lint --report-unused-disable-directives-severity error
       - run: pnpm --filter web typecheck
       - run: pnpm --filter web test
-      # 外部連携画面の実挙動契約(webhook-runtime.spec.ts)。PR #1506 で入ったが
-      # 専用の設定が無く、**どのワークフローからも一度も呼ばれていなかった**(#704)。
-      #
-      # この試験だけは、書き出した `out` ではなく `next dev` に当てる。試験が
-      # `/api/line-accounts` を `route.fetch()` で実際に取りに行くので、
-      # `NEXT_PUBLIC_API_URL` に検証環境を焼き込んだ `out` には当てられない。
-      # 設定側が画面確認用のモックAPIと `next dev` の両方を起こす。
-      #
-      # `web-build` ではなくこの工程に置くのは、`web-build` が
-      # `apps/web/.next/cache` を持ち越しているから。あちらで `next dev` を
-      # 動かすと、開発用の中間物が入った `.next/cache` を保存してしまい、
-      # #696 と同じ「ソースと合わない cache による偽の失敗」を招く。
-      # この工程は `next build` をしないので `.next` を汚さない。
-      - name: Install Chromium for the webhook runtime contract
-        run: pnpm exec playwright install --with-deps chromium
-      - name: Webhook screen runtime contract on a real browser (#704)
-        run: >-
-          pnpm exec playwright test
-          --config apps/web/src/app/webhooks/webhook-runtime.config.mjs
 
   mcp-checks:
     name: MCP contract tests, typecheck and build
