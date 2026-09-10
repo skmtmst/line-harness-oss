@@ -192,4 +192,35 @@ describe('buildNenFlexMessage', () => {
       expect(errorSpy).not.toHaveBeenCalled();
     });
   });
+
+  describe('コラム紹介文の切り詰め（#711司令塔裁定: 発動したら記録に残す）', () => {
+    afterEach(() => { vi.restoreAllMocks() });
+
+    it('固定文言を足すと1500字を超える入力は切られ、発動したことを記録する', () => {
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const title = 'あ'.repeat(2000);
+      const intro = buildDefaultColumnIntro(title, '');
+
+      expect(intro.length).toBe(1500);
+      // 末尾の結び文は消えている（切り詰めが本当に起きている証拠）。
+      expect(intro).not.toContain('ぜひご覧ください。');
+
+      expect(errorSpy).toHaveBeenCalledTimes(1);
+      const logged = JSON.parse(errorSpy.mock.calls[0][0] as string);
+      expect(logged).toMatchObject({
+        event: 'nen_column_intro_truncated',
+        title: title.slice(0, 120),
+        afterLength: 1500,
+      });
+      expect(logged.beforeLength).toBeGreaterThan(1500);
+      expect(logged.droppedLength).toBe(logged.beforeLength - 1500);
+    });
+
+    it('1500字に収まる入力はそのまま切られず、記録も残さない', () => {
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const intro = buildDefaultColumnIntro('鹿肉の選び方', '原材料表示の基本をご紹介します。');
+      expect(intro.length).toBeLessThan(1500);
+      expect(errorSpy).not.toHaveBeenCalled();
+    });
+  });
 });
