@@ -56,11 +56,29 @@ describe('V6 友だち追加時配信・実行結果の契約', () => {
     expect(PAGE).not.toContain("'公式QRから追加'")
   })
 
-  it('4つの処理状態を利用者の言葉で表示する', () => {
+  it('5つの処理状態を利用者の言葉で表示する', () => {
     expect(PAGE).toContain("pending: { label: 'テスト待ち'")
     expect(PAGE).toContain("completed: { label: '成功'")
     expect(PAGE).toContain("failed: { label: 'エラー'")
     expect(PAGE).toContain("suppressed: { label: '配信なし'")
+    expect(PAGE).toContain("partial_failed: { label: '再送待ち'")
+    expect(PAGE).toContain("{ value: 'partial_failed', label: '再送待ち' }")
+  })
+
+  it('送達不明は「再送待ち」と別に見せる（自動では送り直さない）', () => {
+    expect(PAGE).toContain("const DELIVERY_UNKNOWN_CODE = 'delivery_unknown'")
+    expect(PAGE).toContain("DELIVERY_UNKNOWN_LABEL = { label: '送達不明', tone: 'danger' }")
+    expect(PAGE).toContain('送達不明・要確認（自動では送り直しません）')
+    // 一覧の見出し・行動文・CSVのどれも同じ判定を通す
+    expect(PAGE).toContain('routingLabel(item.status, item.errorCode)')
+    expect(PAGE).toContain('routingAction(item.status, item.errorCode)')
+    expect(PAGE).not.toContain('ROUTING_LABELS[item.status] ??')
+    expect(PAGE).not.toContain('ROUTING_ACTIONS[item.status] ??')
+  })
+
+  it('将来の状態が来ても描画を落とさない', () => {
+    expect(PAGE).toContain('UNKNOWN_ROUTING_LABEL')
+    expect(PAGE).toContain('UNKNOWN_ROUTING_ACTION')
   })
 
   it('カーソルを積んだページ送りで前後へ移動できる', () => {

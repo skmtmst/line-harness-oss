@@ -2030,9 +2030,9 @@ CREATE TABLE forms (
   CHECK (status IN ('active', 'archived')), archived_at TEXT, revision INTEGER NOT NULL DEFAULT 1
   CHECK (revision >= 1));
 
-CREATE TABLE friend_add_action_runs (
+CREATE TABLE "friend_add_action_runs" (
   id                  TEXT PRIMARY KEY,
-  event_id            TEXT NOT NULL REFERENCES friend_add_events(id) ON DELETE CASCADE,
+  event_id            TEXT NOT NULL REFERENCES "friend_add_events"(id) ON DELETE CASCADE,
   action_stable_id    TEXT NOT NULL,
   idempotency_key     TEXT NOT NULL UNIQUE,
   status              TEXT NOT NULL CHECK (status IN ('pending', 'running', 'completed', 'failed')),
@@ -2059,7 +2059,7 @@ CREATE TABLE friend_add_attribution_candidates (
   created_at           TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
 
-CREATE TABLE friend_add_events (
+CREATE TABLE "friend_add_events" (
   id                    TEXT PRIMARY KEY,
   line_account_id       TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
   friend_id             TEXT NOT NULL REFERENCES friends(id) ON DELETE CASCADE,
@@ -2073,11 +2073,16 @@ CREATE TABLE friend_add_events (
   candidate_id          TEXT REFERENCES friend_add_attribution_candidates(id) ON DELETE SET NULL,
   routing_rule_id       TEXT,
   routing_status        TEXT NOT NULL DEFAULT 'pending'
-                          CHECK (routing_status IN ('pending', 'completed', 'failed', 'suppressed')),
+                          CHECK (routing_status IN ('pending', 'completed', 'failed', 'suppressed', 'partial_failed')),
   occurred_at           TEXT NOT NULL,
   processed_at          TEXT,
-  created_at            TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')), winning_rule_version_id TEXT, error_code TEXT, scenario_enrollment_id TEXT REFERENCES friend_scenarios(id) ON DELETE SET NULL, delivery_count INTEGER NOT NULL DEFAULT 0
-  CHECK (delivery_count >= 0), first_delivery_sent_at TEXT,
+  created_at            TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  winning_rule_version_id TEXT,
+  error_code            TEXT,
+  scenario_enrollment_id TEXT REFERENCES friend_scenarios(id) ON DELETE SET NULL,
+  delivery_count        INTEGER NOT NULL DEFAULT 0
+                          CHECK (delivery_count >= 0),
+  first_delivery_sent_at TEXT,
   UNIQUE (line_account_id, webhook_event_id)
 );
 
@@ -2149,6 +2154,16 @@ CREATE TABLE friend_add_rules (
   updated_at                 TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 , lock_version INTEGER NOT NULL DEFAULT 1
   CHECK (lock_version > 0), stop_idempotency_key TEXT, stopped_at TEXT, stopped_by_staff_id TEXT, created_from_recipe_id TEXT REFERENCES recipes(id), recipe_clone_run_id TEXT REFERENCES recipe_clone_runs(id));
+
+CREATE TABLE friend_add_send_claims (
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  friend_id       TEXT NOT NULL REFERENCES friends(id) ON DELETE CASCADE,
+  event_id        TEXT NOT NULL,
+  generation      INTEGER NOT NULL DEFAULT 1 CHECK (generation >= 1),
+  claimed_at      TEXT NOT NULL,
+  dispatched_at   TEXT,
+  PRIMARY KEY (line_account_id, friend_id)
+);
 
 CREATE TABLE friend_bulk_run_items (
   id                TEXT PRIMARY KEY,
@@ -4740,6 +4755,20 @@ CREATE TABLE tags (
   CHECK (linked_enabled IN (0, 1)), status TEXT NOT NULL DEFAULT 'active'
   CHECK (status IN ('active', 'archived')), version INTEGER NOT NULL DEFAULT 1 CHECK (version > 0), created_by TEXT, updated_by TEXT, updated_at TEXT, created_from_recipe_id TEXT REFERENCES recipes(id), recipe_clone_run_id TEXT REFERENCES recipe_clone_runs(id));
 
+CREATE TABLE template_publish_keys (
+  template_id TEXT NOT NULL REFERENCES templates(id) ON DELETE CASCADE,
+  idempotency_key TEXT NOT NULL,
+  published_version INTEGER NOT NULL,
+  draft_revision INTEGER NOT NULL,
+  created_at TEXT NOT NULL,
+  -- 再審査対応: 同キー再試行の内容比較用指紋と、固定応答の控え。
+  -- 指紋が違えば別操作の使い回しとして409。応答は記録時の版・本文を返す。
+  draft_fingerprint TEXT NOT NULL DEFAULT '',
+  message_type TEXT,
+  message_content TEXT,
+  PRIMARY KEY (template_id, idempotency_key)
+);
+
 CREATE TABLE templates (
   id              TEXT PRIMARY KEY,
   name            TEXT NOT NULL,
@@ -4758,7 +4787,9 @@ CREATE TABLE templates (
   question_status TEXT NOT NULL DEFAULT 'published' CHECK (question_status IN ('draft', 'published')),
   created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-, folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL, display_order INTEGER NOT NULL DEFAULT 0, line_account_id TEXT REFERENCES line_accounts(id), created_from_recipe_id TEXT REFERENCES recipes(id), recipe_clone_run_id TEXT REFERENCES recipe_clone_runs(id));
+, folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL, display_order INTEGER NOT NULL DEFAULT 0, line_account_id TEXT REFERENCES line_accounts(id), created_from_recipe_id TEXT REFERENCES recipes(id), recipe_clone_run_id TEXT REFERENCES recipe_clone_runs(id), published_version INTEGER NOT NULL DEFAULT 1, published_at TEXT, draft_message_type TEXT, draft_message_content TEXT, draft_carousel_actions_json TEXT, draft_carousel_tap_limit_mode TEXT, draft_carousel_tap_limit_text TEXT, draft_question_json TEXT
+  CHECK (draft_question_json IS NULL OR json_valid(draft_question_json)), draft_question_status TEXT
+  CHECK (draft_question_status IS NULL OR draft_question_status IN ('draft', 'published')), publish_idempotency_key TEXT, draft_revision INTEGER NOT NULL DEFAULT 0);
 
 CREATE TABLE tenants (
   id TEXT PRIMARY KEY,
@@ -5740,11 +5771,11 @@ CREATE INDEX idx_form_submissions_friend ON form_submissions (friend_id);
 CREATE INDEX idx_forms_status_updated
   ON forms(status, updated_at DESC);
 
-CREATE INDEX idx_friend_add_action_runs_event_status
+CREATE INDEX idx_friend_add_action_runs_v357_event_status
   ON friend_add_action_runs(event_id, status, created_at, id);
 
-CREATE INDEX idx_friend_add_action_runs_retry
-  ON friend_add_action_runs (status, next_retry_at);
+CREATE INDEX idx_friend_add_action_runs_v357_retry
+  ON friend_add_action_runs(status, next_retry_at);
 
 CREATE INDEX idx_friend_add_candidates_expiry
   ON friend_add_attribution_candidates(status, expires_at);
@@ -5752,16 +5783,16 @@ CREATE INDEX idx_friend_add_candidates_expiry
 CREATE INDEX idx_friend_add_candidates_match
   ON friend_add_attribution_candidates(line_account_id, friend_id, status, occurred_at DESC);
 
-CREATE INDEX idx_friend_add_events_account_state
+CREATE INDEX idx_friend_add_events_v357_account_state
   ON friend_add_events(line_account_id, friend_kind, attribution_status, routing_status);
 
-CREATE INDEX idx_friend_add_events_account_time
+CREATE INDEX idx_friend_add_events_v357_account_time
   ON friend_add_events(line_account_id, occurred_at DESC, id DESC);
 
-CREATE INDEX idx_friend_add_events_friend
+CREATE INDEX idx_friend_add_events_v357_friend
   ON friend_add_events(line_account_id, friend_id, occurred_at DESC);
 
-CREATE INDEX idx_friend_add_events_rule_time
+CREATE INDEX idx_friend_add_events_v357_rule_time
   ON friend_add_events(line_account_id, routing_rule_id, occurred_at DESC, id DESC);
 
 CREATE UNIQUE INDEX idx_friend_add_routing_one_draft
@@ -5800,6 +5831,9 @@ CREATE UNIQUE INDEX idx_friend_add_rules_stop_idempotency
 CREATE UNIQUE INDEX idx_friend_add_rules_unknown_fallback
   ON friend_add_rules (line_account_id, friend_kind)
   WHERE is_unknown_route_fallback = 1 AND archived_at IS NULL;
+
+CREATE INDEX idx_friend_add_send_claims_stale
+  ON friend_add_send_claims(claimed_at);
 
 CREATE INDEX idx_friend_bulk_run_items_work
   ON friend_bulk_run_items(run_id, status, retry_at, lease_expires_at, ordinal);
@@ -6493,6 +6527,8 @@ CREATE INDEX idx_templates_category ON templates (category);
 
 CREATE INDEX idx_templates_line_account
   ON templates(line_account_id, display_order, id);
+
+CREATE INDEX idx_templates_publish_key ON templates (publish_idempotency_key);
 
 CREATE UNIQUE INDEX idx_tracked_links_dedup_key
   ON tracked_links (dedup_key) WHERE dedup_key IS NOT NULL;

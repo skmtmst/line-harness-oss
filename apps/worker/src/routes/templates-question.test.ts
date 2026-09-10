@@ -9,6 +9,9 @@ const mocks = vi.hoisted(() => ({
   getTemplateUsage: vi.fn(),
   createTemplate: vi.fn(),
   updateTemplate: vi.fn(),
+  saveTemplateDraft: vi.fn(),
+  publishTemplate: vi.fn(),
+  hasTemplateDraft: vi.fn().mockReturnValue(false),
   deleteTemplate: vi.fn(),
   getCarouselTapTotals: vi.fn(),
 }))

@@ -29,6 +29,7 @@ const ROUTING_LABELS: Record<FriendAddEventRoutingStatus, { label: string; tone:
   completed: { label: '成功', tone: 'success' },
   failed: { label: 'エラー', tone: 'danger' },
   suppressed: { label: '配信なし', tone: 'neutral' },
+  partial_failed: { label: '再送待ち', tone: 'warning' },
 }
 
 const ROUTING_ACTIONS: Record<FriendAddEventRoutingStatus, string> = {
@@ -36,6 +37,33 @@ const ROUTING_ACTIONS: Record<FriendAddEventRoutingStatus, string> = {
   completed: '初回案内を実行',
   failed: '配信・処理に失敗',
   suppressed: '配信・処理なし',
+  partial_failed: '送れず再送待ち',
+}
+
+/** 将来の状態が来ても描画を落とさない受け皿。 */
+const UNKNOWN_ROUTING_LABEL = { label: '不明', tone: 'neutral' } as const
+const UNKNOWN_ROUTING_ACTION = '状態を確認中'
+
+/*
+ * 送達不明。送信は試したが、届いたかどうか分からない実行。
+ * **自動では送り直さない**（送り直すと二重に届く）。「再送待ち」と同じ
+ * 見た目にすると、放っておけばそのうち届くと読めてしまう。分けて出す。
+ */
+const DELIVERY_UNKNOWN_CODE = 'delivery_unknown'
+const DELIVERY_UNKNOWN_LABEL = { label: '送達不明', tone: 'danger' } as const
+const DELIVERY_UNKNOWN_ACTION = '送達不明・要確認（自動では送り直しません）'
+
+function routingLabel(
+  status: FriendAddEventRoutingStatus,
+  errorCode: string | null,
+): { label: string; tone: StatusBadgeTone } {
+  if (errorCode === DELIVERY_UNKNOWN_CODE) return DELIVERY_UNKNOWN_LABEL
+  return ROUTING_LABELS[status] ?? UNKNOWN_ROUTING_LABEL
+}
+
+function routingAction(status: FriendAddEventRoutingStatus, errorCode: string | null): string {
+  if (errorCode === DELIVERY_UNKNOWN_CODE) return DELIVERY_UNKNOWN_ACTION
+  return ROUTING_ACTIONS[status] ?? UNKNOWN_ROUTING_ACTION
 }
 
 /** DBにはJSTの時刻をオフセットなしで保存した古い行がある。UTCへ読み替えず、そのままJSTとして表示する。 */
@@ -225,7 +253,7 @@ export default function FriendAddRunsPage() {
         item.friend.displayName || '名前は未取得',
         item.friendKind === 'first_time' ? 'はじめて' : '再追加・ブロック解除',
         routeName,
-        ROUTING_LABELS[item.status].label,
+        routingLabel(item.status, item.errorCode).label,
         formatJstDateTime(item.processedAt),
       ]
     })
@@ -279,6 +307,7 @@ export default function FriendAddRunsPage() {
                   { value: 'pending', label: 'テスト待ち' },
                   { value: 'failed', label: 'エラー' },
                   { value: 'suppressed', label: '配信なし' },
+                  { value: 'partial_failed', label: '再送待ち' },
                 ]}
               />
               <Button onClick={() => void load()} disabled={loading}>一覧を更新</Button>
@@ -327,7 +356,7 @@ export default function FriendAddRunsPage() {
             </div>
             <div className="divide-y divide-hairline px-4">
               {visibleItems.map((item) => {
-                const status = ROUTING_LABELS[item.status]
+                const status = routingLabel(item.status, item.errorCode)
                 const routeName = item.attribution.status === 'captured'
                   ? item.attribution.routeName || item.attribution.reason || '選択した経路'
                   : '経路は取得できません'
@@ -338,7 +367,7 @@ export default function FriendAddRunsPage() {
                     ? `初回案内を${item.deliveryCount}通送信`
                     : item.actions.total > 0
                       ? `${item.actions.total}件の処理を実行`
-                      : ROUTING_ACTIONS[item.status]
+                      : routingAction(item.status, item.errorCode)
                 return (
                   <div key={item.id} className="flex min-w-0 items-center gap-3 py-3">
                     <span className="grid size-9 shrink-0 place-items-center rounded-full bg-status-success-soft text-xs font-bold text-status-success-deep" aria-hidden="true">

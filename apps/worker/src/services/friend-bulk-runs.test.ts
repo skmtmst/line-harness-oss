@@ -1,6 +1,11 @@
 import type Database from 'better-sqlite3';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { createFriendBulkRun, getFriendBulkRunDetail } from '@line-crm/db';
+import {
+  createFriendBulkRun,
+  createTemplate,
+  getFriendBulkRunDetail,
+  publishTemplate,
+} from '@line-crm/db';
 import { AutomationActionError, type AutomationActionExecutor } from './automation-engine';
 import { createTestD1, insertFriend, type SqliteD1 } from '../test-utils/d1-sqlite';
 import {
@@ -59,6 +64,46 @@ describe('V6 友だち一括操作', () => {
       { reason: '選んだ操作とLINE公式アカウントが異なります', count: 1 },
     ]));
     expect(result.targets).toEqual([{ friendId: 'friend-1', lineAccountId: 'account-1' }]);
+  });
+
+  it('未公開テンプレートは対象確定・一括実行を開始しない', async () => {
+    const template = await createTemplate(testDb.db, {
+      name: '編集中のお知らせ',
+      messageType: 'text',
+      messageContent: 'まだ公開していない本文',
+      lineAccountId: 'account-1',
+    });
+    const operation = { kind: 'send_message' as const, templateId: template.id };
+
+    await expect(previewFriendBulkRun(
+      testDb.db,
+      staff,
+      { kind: 'explicit', friendIds: ['friend-1'] },
+      operation,
+    )).rejects.toMatchObject({ code: 'template_not_published', status: 409 });
+    await expect(startFriendBulkRun(testDb.db, staff, {
+      selection: { kind: 'explicit', friendIds: ['friend-1'] },
+      operation,
+      idempotencyKey: crypto.randomUUID(),
+      confirmIrreversible: true,
+      now: NOW,
+    })).rejects.toMatchObject({ code: 'template_not_published', status: 409 });
+    expect(testDb.raw.prepare(`SELECT COUNT(*) AS count FROM friend_bulk_runs`).get())
+      .toEqual({ count: 0 });
+
+    await publishTemplate(testDb.db, template.id, {
+      expectedVersion: 0,
+      expectedDraftRevision: 1,
+      idempotencyKey: 'friend-bulk-publish-1',
+    });
+    const started = await startFriendBulkRun(testDb.db, staff, {
+      selection: { kind: 'explicit', friendIds: ['friend-1'] },
+      operation,
+      idempotencyKey: crypto.randomUUID(),
+      confirmIrreversible: true,
+      now: NOW,
+    });
+    expect(started.run).toMatchObject({ targetCount: 1, status: 'queued' });
   });
 
   it('対象IDを固定してタグを冪等実行し、あとから増えた友だちは触らない', async () => {

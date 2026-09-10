@@ -308,12 +308,15 @@
     "344_rich_menu_schedule_publications.sql",
     "345_ad_platform_account_scope.sql",
     "346_ad_conversion_idempotency_and_backfill.sql",
+    "347_template_published_version.sql",
     "349_affiliate_settlement_snapshot.sql",
     "350_webhook_secret_encrypted.sql",
     "352_photo_notification_delivery.sql",
     "354_analytics_cross_lease_generation.sql",
     "355_rich_menu_schedule_lease.sql",
     "356_entry_route_stop_suppressions.sql",
+    "357_friend_add_events_partial_failed.sql",
+    "358_friend_add_send_claims.sql",
     "359_ad_platform_account_required_and_dedup.sql",
     "361_ec_v6_dispatches.sql",
     "362_entry_route_stop_suppression_dedup.sql",
@@ -327,5 +330,5 @@
     "374_mileage_redemption_step_outbox.sql",
     "375_mileage_redemption_step_lease.sql"
   ],
-  "migrationCount": 326
+  "migrationCount": 329
 }
