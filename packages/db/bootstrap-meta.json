@@ -309,7 +309,11 @@
     "349_affiliate_settlement_snapshot.sql",
     "354_analytics_cross_lease_generation.sql",
     "355_rich_menu_schedule_lease.sql",
-    "365_rich_menu_schedule_default_pin.sql"
+    "356_entry_route_stop_suppressions.sql",
+    "361_ec_v6_dispatches.sql",
+    "362_entry_route_stop_suppression_dedup.sql",
+    "365_rich_menu_schedule_default_pin.sql",
+    "367_conversion_once_dedup_guard.sql"
   ],
-  "migrationCount": 310
+  "migrationCount": 314
 }

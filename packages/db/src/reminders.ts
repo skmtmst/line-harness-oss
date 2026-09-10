@@ -837,6 +837,9 @@ export async function getFriendReminderStatus(
 //   active を再確認し (reminder-delivery 側)、取消済みなら送らない。
 // - 取消理由・元イベントID・実行者を cancel_reason に残す (移行なしで追跡するため)。
 // - 同じ取消・変更通知の再送は何も変えない (active が無ければ 0 件で返す)。
+//   ただし failOnSendInFlight 指定では、書換え後に最初に選んだ全 ID が
+//   非 active か確かめ、1件でも残れば投げる (部分割込みの 0 件成功にしない。
+//   呼び出し側は状態を巻き戻して再試行させる)。
 // - lineAccountId を渡したときは、そのアカウントの友だちの登録だけを見る。
 // - 移行前の行 (source 未記録) を探すときは、同時刻の別予約・手動登録を
 //   巻き込まないよう source 未記録かつ同じきっかけ種別の行だけを見る。
@@ -879,11 +882,12 @@ function v6SourceCondition(matcher: V6SourceMatcher, bindings: unknown[]): strin
   if (matcher.sourceEventId != null) keys.push(`fr.source_event_id = ?`);
   if (keys.length === 0) return null;
   const either = keys.length === 1 ? keys[0] : `(${keys.join(' OR ')})`;
-  if (matcher.sourceKind == null) return either;
-  // 束縛は SQL の出現順 (kind → 鍵) に積む。
-  bindings.push(matcher.sourceKind);
+  // 束縛は SQL の出現順 (kind → 鍵) に積む。kind 無しでも鍵の束縛は要る
+  // (積まないと placeholder 不足で落ちる)。
+  if (matcher.sourceKind != null) bindings.push(matcher.sourceKind);
   if (matcher.sourceId != null) bindings.push(matcher.sourceId);
   if (matcher.sourceEventId != null) bindings.push(matcher.sourceEventId);
+  if (matcher.sourceKind == null) return either;
   return `(fr.source_kind = ? AND ${either})`;
 }
 
@@ -997,37 +1001,93 @@ export async function cancelV6RemindersForSource(
   }
   if (ids.length === 0) return { cancelledEnrollments: 0, cancelledRuns: 0 };
 
+  // D1/SQLite のbind上限に左右されず、選んだ全IDを1文で扱う。
+  // 取消と送信権claimの境界を1つのUPDATEに置くため、分割しない。
+  const idsJson = JSON.stringify(ids);
+
   // 送信権の貸出中は取消を確定させない。貸出 (claim/再検証) と取消確定の
   // 順序はこの確認と各1文で直列化される: 貸出が先なら取消は拒否・残置し、
   // 取消が先なら貸出側の active 確認が失敗して送らない。
   // lease 無し (NULL) は貸出取得前の行のため対象にする。
-  if (input.failOnSendInFlight) {
+  const countLiveClaims = async (): Promise<number> => {
+    // lease (UTC Z 書き) と now (+09:00 書き) を TEXT 比較すると、実時間で
+    // live でも偽になり fence を抜ける。UTC epoch で比べる。
     const live = await db.prepare(
       `SELECT COUNT(*) AS c FROM reminder_delivery_runs
-        WHERE friend_reminder_id IN (${chunkPlaceholders(ids)})
+        WHERE friend_reminder_id IN (SELECT value FROM json_each(?))
           AND status = 'claimed'
-          AND lease_expires_at IS NOT NULL AND lease_expires_at > ?`,
-    ).bind(...ids, now).first<{ c: number }>();
-    if ((live?.c ?? 0) > 0) throw new Error('REMINDER_SEND_IN_FLIGHT');
+          AND lease_expires_at IS NOT NULL
+          AND strftime('%s', lease_expires_at) > strftime('%s', ?)`,
+    ).bind(idsJson, now).first<{ c: number }>();
+    return live?.c ?? 0;
+  };
+  if (input.failOnSendInFlight && (await countLiveClaims()) > 0) {
+    throw new Error('REMINDER_SEND_IN_FLIGHT');
+  }
+
+  if (input.failOnSendInFlight) {
+    // strict fence: 「最終送信権が1件も無い」と「対象全件を取消」を
+    // 1つのSQL文で直列化する。COUNT後に claim/verify が割り込んでも、
+    // 取消UPDATEが先ならclaim側のactive確認が失敗し、claimが先なら
+    // NOT EXISTSが全件の書き換えを拒否する。json_eachで分割UPDATEを避け、
+    // 複数登録もall-or-noneにする。
+    const cancelled = await db.prepare(
+      `UPDATE friend_reminders
+          SET status = 'cancelled', cancel_reason = ?, updated_at = ?
+        WHERE status = 'active'
+          AND id IN (SELECT value FROM json_each(?))
+          AND NOT EXISTS (
+            SELECT 1 FROM reminder_delivery_runs r
+             WHERE r.friend_reminder_id IN (SELECT value FROM json_each(?))
+               AND r.status = 'claimed'
+               AND r.lease_expires_at IS NOT NULL
+               AND strftime('%s', r.lease_expires_at) > strftime('%s', ?))`,
+    ).bind(input.cancelReason, now, idsJson, idsJson, now).run();
+
+    const remaining = await db.prepare(
+      `SELECT COUNT(*) AS c FROM friend_reminders
+        WHERE status = 'active' AND id IN (SELECT value FROM json_each(?))`,
+    ).bind(idsJson).first<{ c: number }>();
+    if ((remaining?.c ?? 0) > 0) throw new Error('REMINDER_SEND_IN_FLIGHT');
+
+    // 登録が全件非activeになった後だけ実行行を止める。
+    // 送信側は登録activeを再確認するため、この2文の間に停止しても
+    // 外部送信は起きない。
+    const cancelledRuns = await db.prepare(
+      `UPDATE reminder_delivery_runs
+          SET status = 'cancelled', completed_at = ?, updated_at = ?
+        WHERE status IN ('queued', 'retry_wait', 'claimed')
+          AND friend_reminder_id IN (SELECT value FROM json_each(?))
+          AND NOT EXISTS (
+            SELECT 1 FROM friend_reminders fr
+             WHERE fr.id = reminder_delivery_runs.friend_reminder_id AND fr.status = 'active')`,
+    ).bind(now, now, idsJson).run();
+    return {
+      cancelledEnrollments: Number(cancelled.meta?.changes ?? 0),
+      cancelledRuns: Number(cancelledRuns.meta?.changes ?? 0),
+    };
   }
 
   const statements: D1PreparedStatement[] = [];
   for (let offset = 0; offset < ids.length; offset += 50) {
     const chunk = ids.slice(offset, offset + 50);
     const placeholders = chunkPlaceholders(chunk);
+    // 最善努力 (cron 等) は従来どおり貸出中を残し、次回で収束させる。
+    const liveGuard = `AND NOT EXISTS (
+           SELECT 1 FROM reminder_delivery_runs r
+            WHERE r.friend_reminder_id = friend_reminders.id
+              AND r.status = 'claimed'
+              AND r.lease_expires_at IS NOT NULL
+              AND strftime('%s', r.lease_expires_at) > strftime('%s', ?))`;
+    const enrollmentBindings = [input.cancelReason, now, ...chunk, now];
     statements.push(
       db.prepare(
         `UPDATE friend_reminders
             SET status = 'cancelled', cancel_reason = ?, updated_at = ?
           WHERE status = 'active' AND id IN (${placeholders})
-            AND NOT EXISTS (
-              SELECT 1 FROM reminder_delivery_runs r
-               WHERE r.friend_reminder_id = friend_reminders.id
-                 AND r.status = 'claimed'
-                 AND r.lease_expires_at IS NOT NULL AND r.lease_expires_at > ?)`,
-      ).bind(input.cancelReason, now, ...chunk, now),
+          ${liveGuard}`,
+      ).bind(...enrollmentBindings),
       // 送信済みは残す。止めるのは active でなくなった登録の行だけ。
-      // 貸出中の行は残し、送信直前の再確認と確定時 active 確認で守る。
       db.prepare(
         `UPDATE reminder_delivery_runs
             SET status = 'cancelled', completed_at = ?, updated_at = ?
@@ -1039,13 +1099,16 @@ export async function cancelV6RemindersForSource(
     );
   }
   const results = await db.batch(statements);
-  return {
-    cancelledEnrollments: Number(results[0]?.meta?.changes ?? 0),
-    cancelledRuns: results.slice(1).reduce((sum, result, index) => {
-      // 実行行の UPDATE は奇数番目 (登録 UPDATE の次) に積んである。
-      return index % 2 === 0 ? sum + Number(result.meta?.changes ?? 0) : sum;
-    }, 0),
-  };
+  // 文は (登録 UPDATE, 実行行 UPDATE) の対で積んである。偶数番目が登録側。
+  const cancelledEnrollments = results.reduce(
+    (sum, result, index) => (index % 2 === 0 ? sum + Number(result.meta?.changes ?? 0) : sum),
+    0,
+  );
+  const cancelledRuns = results.reduce(
+    (sum, result, index) => (index % 2 === 1 ? sum + Number(result.meta?.changes ?? 0) : sum),
+    0,
+  );
+  return { cancelledEnrollments, cancelledRuns };
 }
 
 export interface V6TargetDateMove {

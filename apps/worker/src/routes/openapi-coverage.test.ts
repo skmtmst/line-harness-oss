@@ -200,6 +200,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'POST /api/scenarios/{id}/enroll/{friendId}',
   'POST /api/scenarios/{id}/simulate',
   'POST /api/scenarios/{id}/steps',
+  'POST /api/settings/features/impact',
   'POST /api/tags',
   'POST /api/tags/import',
   'POST /api/tags/import/preview',
@@ -1198,7 +1199,7 @@ describe('OpenAPIと公開APIの同期', () => {
     ).toEqual([]);
   });
 
-  test('記載済みoperation数は86以上（後退禁止）', async () => {
+  test('記載済みoperation数は87以上（後退禁止）', async () => {
     const spec = await loadSpec();
     const count = documentedKeys(spec).size;
     expect(
@@ -1216,7 +1217,7 @@ describe('OpenAPIと公開APIの同期', () => {
     ).toBe(true);
   });
 
-  test('基準の記載86件が残っている（allowlistへの移し替え検出）', async () => {
+  test('基準の記載87件が残っている（allowlistへの移し替え検出）', async () => {
     const spec = await loadSpec();
     const documented = documentedKeys(spec);
     const lost = [...BASELINE_DOCUMENTED].filter((key) => !documented.has(key)).sort();

@@ -37,6 +37,7 @@ export * from './automations';
 export * from './automation-migration';
 export * from './entry-routes';
 export * from './entry-route-genres';
+export * from './entry-route-stop-suppressions';
 export * from './tracked-links';
 export * from './forms';
 export * from './ad-platforms';

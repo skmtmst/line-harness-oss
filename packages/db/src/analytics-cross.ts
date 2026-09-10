@@ -1,3 +1,4 @@
+import { accountFeatureOffExclusionSql, isAccountFeatureEnabled } from './account-settings.js';
 import { ANALYTICS_EVENT_TYPES, type AnalyticsEventType } from './analytics-event-types.js';
 
 const DAY_MS = 86_400_000;
@@ -1053,13 +1054,21 @@ export async function processPendingAnalyticsCrossRuns(
   limit = 2,
 ): Promise<{ processed: number; failed: number }> {
   const safeLimit = Math.max(1, Math.min(Math.floor(limit), 5));
+  // 機能オフ中のアカウントの行は LIMIT を数える前に外す。後で弾くと、
+  // オフの古い行が先頭を占めたままON中の他アカウントが永久に回らない。
   const rows = await db.prepare(
-    `SELECT id FROM analytics_cross_runs WHERE state = 'pending'
+    `SELECT id, line_account_id FROM analytics_cross_runs WHERE state = 'pending'
+        AND NOT ${accountFeatureOffExclusionSql('analytics_cross_runs.line_account_id', 'analytics')}
       ORDER BY created_at, id LIMIT ?`,
-  ).bind(safeLimit).all<{ id: string }>();
+  ).bind(safeLimit).all<{ id: string; line_account_id: string }>();
   let processed = 0;
   let failed = 0;
   for (const row of rows.results) {
+    // 機能オフ中はclaim(状態更新)も集計もしない。pendingのまま残し、
+    // 再オンで再開する。
+    if (!await isAccountFeatureEnabled(db, row.line_account_id, 'analytics')) {
+      continue;
+    }
     try {
       await processAnalyticsCrossRun(db, row.id);
       processed += 1;
@@ -1082,11 +1091,13 @@ export async function recoverStalledAnalyticsCrossRuns(
 ): Promise<number> {
   const cutoff = new Date(now.getTime() - 10 * 60_000).toISOString();
   // 回収も世代を1つ進める。旧実行の完了・失敗は古い世代では書き込めない。
+  // 機能オフ中のアカウントの行は状態を戻さない。OFF中は不変のまま残す。
   const result = await db.prepare(
     `UPDATE analytics_cross_runs
         SET state = 'pending', started_at = NULL, error_code = NULL,
             lease_generation = lease_generation + 1
-      WHERE state = 'running' AND started_at < ?`,
+      WHERE state = 'running' AND started_at < ?
+        AND NOT ${accountFeatureOffExclusionSql('analytics_cross_runs.line_account_id', 'analytics')}`,
   ).bind(cutoff).run();
   return Number(result.meta?.changes ?? 0);
 }
