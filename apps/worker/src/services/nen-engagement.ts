@@ -218,16 +218,43 @@ export function readNenCampaignSnapshot(value: string | null, campaignKey: strin
   }
 }
 
+/*
+ * 1500: `c7069559b`（2026-08-13）で導入。根拠の記録は無い。動かす前提が
+ * 出てきたら、この数値そのものを見直すこと（#711 の司令塔裁定で確認済み）。
+ */
+const NEN_COLUMN_INTRO_MAX_LENGTH = 1500;
+
+/**
+ * 保存時の多重防御としての切り詰め。入口（EC-Cube Webhookのtitle ≤120字、
+ * 管理画面のtitle ≤120字・excerpt ≤500字）が効いていれば、固定文言を足しても
+ * ここで実際に切ることは起きないはず。**発動したのなら、入口の検査をすり
+ * 抜けたか、固定文言が伸びたなど、どこかに不具合があるということ。** 黙って
+ * 切ると、紹介文の結びが途中で消えたことに誰も気づけない。`truncateForSend`
+ * （#659）と同じ考え方で、切ったときだけ記録する。
+ */
+function truncateColumnIntro(value: string, maxLength: number, context: { title: string }): string {
+  if (value.length <= maxLength) return value;
+  console.error(JSON.stringify({
+    event: 'nen_column_intro_truncated',
+    title: context.title.slice(0, 120),
+    beforeLength: value.length,
+    afterLength: maxLength,
+    droppedLength: value.length - maxLength,
+  }));
+  return value.slice(0, maxLength);
+}
+
 export function buildDefaultColumnIntro(title: string, excerpt: string): string {
   const summary = excerpt.trim();
-  return [
+  const text = [
     'こんにちは、然-NEN-です🌿',
     '',
     `今回のNENコラムでは「${title.trim()}」についてご紹介します。`,
     summary,
     '',
     '愛犬・愛猫との毎日に役立つ内容です。ぜひご覧ください。',
-  ].filter((line, index, lines) => line || (index > 0 && lines[index - 1])).join('\n').slice(0, 1500);
+  ].filter((line, index, lines) => line || (index > 0 && lines[index - 1])).join('\n');
+  return truncateColumnIntro(text, NEN_COLUMN_INTRO_MAX_LENGTH, { title });
 }
 
 function flexMessage(campaign: CampaignRow, payload: Record<string, unknown>): Message {

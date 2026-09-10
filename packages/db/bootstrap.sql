@@ -2386,6 +2386,22 @@ CREATE TABLE friend_scores (
 , line_account_id TEXT REFERENCES line_accounts(id), event_type TEXT, source TEXT, source_event_id TEXT, subject_key TEXT, frequency_key TEXT, rule_key TEXT, rule_version_id TEXT REFERENCES action_score_rule_versions(id), idempotency_key TEXT, operation TEXT
   CHECK (operation IS NULL OR operation IN ('delta', 'set', 'manual_adjustment')), score_before INTEGER, score_after INTEGER, occurred_at TEXT, executed_by_staff_id TEXT, executed_by_staff_name TEXT);
 
+CREATE TABLE friend_tag_side_effect_runs (
+  friend_id       TEXT NOT NULL REFERENCES friends(id) ON DELETE CASCADE,
+  tag_id          TEXT NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
+  step_key        TEXT NOT NULL
+                    CHECK (step_key IN ('mileage', 'scenario_enroll', 'event_tag_change')),
+  assigned_at     TEXT NOT NULL,
+  status          TEXT NOT NULL DEFAULT 'pending'
+                    CHECK (status IN ('pending', 'running', 'failed', 'completed')),
+  attempt_count   INTEGER NOT NULL DEFAULT 0 CHECK (attempt_count >= 0),
+  last_error      TEXT,
+  last_attempt_at TEXT,
+  created_at      TEXT NOT NULL,
+  updated_at      TEXT NOT NULL,
+  PRIMARY KEY (friend_id, tag_id, step_key)
+);
+
 CREATE TABLE friend_tags (
   friend_id   TEXT NOT NULL REFERENCES friends (id) ON DELETE CASCADE,
   tag_id      TEXT NOT NULL REFERENCES tags (id) ON DELETE CASCADE,
@@ -5935,6 +5951,9 @@ CREATE INDEX idx_friend_scores_rule_frequency
 
 CREATE INDEX idx_friend_scores_source_event
   ON friend_scores(line_account_id, source, source_event_id);
+
+CREATE INDEX idx_friend_tag_side_effect_runs_unfinished
+  ON friend_tag_side_effect_runs(status, updated_at);
 
 CREATE INDEX idx_friend_tags_tag_id ON friend_tags (tag_id);
 

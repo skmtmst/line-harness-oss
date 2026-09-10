@@ -772,6 +772,20 @@ nenCampaigns.post('/api/integrations/eccube/columns', async (c) => {
       || (body.image_url && (typeof body.image_url !== 'string' || !isUrl(body.image_url)))) {
     return c.json({ success: false, error: 'Invalid column' }, 400);
   }
+  // 120: 管理画面経路（validateNenColumnCreateBody）と同じ値に揃えた。送信元の
+  // EC-Cube側フォームも独立に120字で制約している（JournalController.php の
+  // titleフィールド、Assert\Length(max:120)）が、それはLHが保証されたもの
+  // ではない。#711 の司令塔裁定で、経路ごとに違う上限を持たないことを優先し、
+  // 管理画面と同じ120を採った。
+  if (body.title.length > 120) {
+    console.error(JSON.stringify({
+      event: 'nen_eccube_column_title_rejected',
+      slug: body.slug,
+      titleLength: body.title.length,
+      maxLength: 120,
+    }));
+    return c.json({ success: false, error: 'title_invalid' }, 400);
+  }
   const lineAccountId = typeof body.line_account_id === 'string' ? body.line_account_id : null;
   if (lineAccountId && !await getLineAccountById(c.env.DB, lineAccountId)) {
     return c.json({ success: false, error: 'LINE account not found' }, 404);
@@ -792,6 +806,11 @@ nenCampaigns.post('/api/integrations/eccube/columns', async (c) => {
     imageUrl: typeof body.image_url === 'string' ? body.image_url : null,
     publishedAt: typeof body.published_at === 'string' ? body.published_at : null,
   });
+  // intro_textはON CONFLICTのSET句に含めない（意図的）。EC-Cubeはintro_textを
+  // 送らないので、再同期のたびに既定文で上書きすると、LHの画面で人が直した
+  // 紹介文が消える。既定文のまま古くなるより、人が直した内容が消えるほうが
+  // 害が大きいという判断（未確認・推測）。#711 の司令塔裁定を参照。
+  // https://github.com/kentavndng/line-harness-board/issues/711
   await c.env.DB.prepare(
     `INSERT INTO nen_columns
       (id, external_id, slug, title, category, excerpt, intro_text, article_url, image_url, published_at, delivery_status, line_account_id, created_at, updated_at)
