@@ -115,6 +115,8 @@ describe('bootstrap.sql', () => {
 
       expect(readSchemaObjects(bootstrapDb)).toEqual(readSchemaObjects(replayDb));
     },
+    // 既定の5秒では足りない。CI実測で2件合わせて8.2〜9.8秒、setImmediateの
+    // 待ちぶん所要が伸びる方向でもある。試験1が元から60_000を持っているのと揃えた。
     60_000,
   );
 });
