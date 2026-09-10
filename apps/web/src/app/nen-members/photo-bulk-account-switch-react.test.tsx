@@ -123,6 +123,18 @@ async function click(label: string, index = 0) {
   await act(async () => { target.click() })
 }
 
+/**
+ * 一覧の一括ボタン。処理中は文字が「処理中...」へ変わるので、どちらでも拾う。
+ * 確認窓は portal で body へ出るため、一覧側だけを見る host から探す。
+ */
+function bulkButton(): HTMLButtonElement {
+  const found = Array.from(host.querySelectorAll('button')).find(
+    (item) => ['まとめて通す', '処理中...'].includes(item.textContent?.trim() ?? ''),
+  )
+  if (!found) throw new Error(`一括のボタンが見つかりません: ${host.textContent}`)
+  return found as HTMLButtonElement
+}
+
 async function selectPhoto(index: number) {
   const boxes = Array.from(host.querySelectorAll('input[type="checkbox"]')) as HTMLInputElement[]
   const target = boxes[index]
@@ -179,6 +191,48 @@ describe('一括審査中にアカウントを切り替えたときの画面(#63
     expect(host.textContent).toContain('ソラ')
     // Aの応答でBの一覧を読み直さない。
     expect(bulkCalls()).toBe(1)
+  })
+
+  it('切り替えた先で一括審査をもう一度押せる（処理中の掛け金が残らない）', async () => {
+    const late = deferred<unknown>()
+    const bulkBodies: string[] = []
+    net.handler = listHandler((path, init) => {
+      if (path === '/api/nen-members/photos/decisions/bulk') {
+        bulkBodies.push(String(init?.body ?? ''))
+        return bulkBodies.length === 1 ? late.promise : Promise.resolve({
+          success: true,
+          data: { updatedCount: 1, items: [], notificationFailures: [] },
+        })
+      }
+      return Promise.reject(new Error(`未設定: ${path}`))
+    })
+
+    await render()
+    await selectPhoto(0)
+    await selectPhoto(1)
+    await click('まとめて通す')
+    await click('まとめて通す', 1)
+    expect(bulkCalls()).toBe(1)
+
+    // Aの応答が返らないうちにBへ切り替え、そのあとAの応答が遅れて返る。
+    fixture.accountId = 'account-b'
+    await render()
+    await act(async () => { late.resolve({ success: true, data: { updatedCount: 2, items: [], notificationFailures: [] } }) })
+    await act(async () => { await Promise.resolve() })
+
+    // Bの写真を選ぶと、一括のボタンは押せる形になっている。
+    await selectPhoto(0)
+    const bulk = bulkButton()
+    expect(bulk.textContent?.trim()).toBe('まとめて通す')
+    expect(bulk.disabled).toBe(false)
+
+    // 実際に押すと確認窓が開き、Bのアカウントで一括審査を送れる。
+    await click('まとめて通す')
+    expect(buttons('まとめて通す')).toHaveLength(2)
+    await click('まとめて通す', 1)
+    expect(bulkCalls()).toBe(2)
+    expect(bulkBodies[1]).toContain('account-b')
+    expect(bulkBodies[1]).toContain('photo-b1')
   })
 
   it('前のアカウントの一括失敗を、切り替えた先の画面へ出さない', async () => {

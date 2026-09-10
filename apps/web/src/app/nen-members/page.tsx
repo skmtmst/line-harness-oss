@@ -296,7 +296,7 @@ export default function PhotoReviewsPage() {
         setNotice(photoNoticeFor(error, '審査結果を保存できませんでした。'))
       }
     }
-    finally { if (generation === accountGeneration.current) setReviewing(null) }
+    finally { setReviewing(null) }
   }
 
   const bulkReview = async (
@@ -348,7 +348,9 @@ export default function PhotoReviewsPage() {
         setNotice(photoNoticeFor(error, 'まとめて審査できませんでした。'))
       }
     } finally {
-      if (generation === accountGeneration.current) setBulkReviewing(false)
+      // 処理中の掛け金は世代に関係なく必ず外す。ここを世代で守ると、
+      // 切替先で「まとめて通す」が押せないまま残る。
+      setBulkReviewing(false)
     }
   }
 
@@ -454,7 +456,7 @@ export default function PhotoReviewsPage() {
         setNotice(error instanceof Error ? error.message : 'LINE通知を再送できませんでした。')
       }
     } finally {
-      if (generation === accountGeneration.current) setReviewing(null)
+      setReviewing(null)
     }
   }
 
