@@ -1125,7 +1125,8 @@ async function selectIds(
  * どのアカウントの持ち物か言い切れないものを、このアカウントの配信条件と
  * して読むと、他店の友だちを数える形になりうる。
  * 流入リンクだけは、保存時の契約（未設定＋同一テナントは可）にそろえる。
- * 友だち情報欄・フォーム・対応マークは所有列が無いので、存在だけを確かめる。
+ * 友だち情報欄は `friend_field_scopes` の所属を見る（所属が無ければ共通）。
+ * フォーム・対応マークは所属の置き場が無いので、存在だけを確かめる。
  */
 export async function findFriendAddUnusableReferences(
   db: D1Database,
@@ -1142,11 +1143,17 @@ export async function findFriendAddUnusableReferences(
       sql: `SELECT id FROM scenarios WHERE id IN (${p}) AND line_account_id = ?`,
       bindings: [...refs.scenarioIds, accountId],
     })),
-    // 友だち情報欄はフォーム・対応マークと同じく所有アカウントの列を持たない
-    // （テナント共通）。存在だけを確かめる。
+    /*
+     * 友だち情報欄は表そのものに所有の列を持たないが、`friend_field_scopes`
+     * が所属を持つ（migration 198）。所属が無い行はテナント共通なので通し、
+     * 他アカウントに所属する行は止める。`reminders.ts` の同じ検査と同じ形。
+     */
     selectIds(db, refs.friendFieldIds, (p) => ({
-      sql: `SELECT id FROM friend_fields WHERE id IN (${p})`,
-      bindings: [...refs.friendFieldIds],
+      sql: `SELECT ff.id FROM friend_fields ff
+             LEFT JOIN friend_field_scopes ffs ON ffs.field_id = ff.id
+            WHERE ff.id IN (${p})
+              AND (ffs.line_account_id = ? OR ffs.line_account_id IS NULL)`,
+      bindings: [...refs.friendFieldIds, accountId],
     })),
     selectIds(db, refs.routeIds, (p) => ({
       sql: `SELECT id FROM entry_routes

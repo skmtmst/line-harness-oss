@@ -361,6 +361,35 @@ export async function releaseFriendAddSendRight(
 }
 
 /**
+ * **送れたという事実だけを、確定とは別の1文で先に残す。**
+ *
+ * 台帳の確定（`markFriendAddEventRouting`）は、状態・理由・規則・購読まで
+ * まとめて書く大きな1文で、そこが落ちると行は `pending` のまま残る。
+ * `pending` は再送制限が数える材料（`completed` / `delivery_count > 0` /
+ * `first_delivery_sent_at` / `delivery_unknown`）のどれにも当たらないので、
+ * 「送り始めた印」の期限が切れたあと、次の追加が**もう1通送ってしまう**。
+ *
+ * そこで、送れたと分かったその場で、送信の事実だけを小さな1文で残す。
+ * 確定が落ちても、この行が再送制限の材料になって2通目を止める。
+ *
+ * 世代で締めない（fence を取らない）のは、これが**自分のイベント行**への
+ * 「自分が送った」という記録だから。回収されていても、送った事実は事実で、
+ * 残すほうが安全側になる。
+ */
+export async function recordFriendAddDelivery(
+  db: D1Database,
+  input: { eventId: string; lineAccountId: string; sentAt?: string },
+): Promise<void> {
+  const sentAt = input.sentAt ?? jstNow();
+  await db.prepare(
+    `UPDATE friend_add_events
+        SET delivery_count = delivery_count + 1,
+            first_delivery_sent_at = COALESCE(first_delivery_sent_at, ?)
+      WHERE id = ? AND line_account_id = ?`,
+  ).bind(sentAt, input.eventId, input.lineAccountId).run();
+}
+
+/**
  * 台帳の確定。
  *
  * `fence` を渡すと、**同じ1文の中で**送信権の予約（event_id と世代）を

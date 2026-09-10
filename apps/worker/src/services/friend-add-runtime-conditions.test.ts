@@ -1134,6 +1134,58 @@ describe('本番の振り分け: 曜日・時間帯・条件・再送制限', ()
       }
     });
 
+    /*
+     * 友だち情報欄は表に所有の列を持たないが、friend_field_scopes が所属を
+     * 持つ。存在確認だけにすると、他店に所属する欄が素通りする。
+     * reminders.ts の同じ検査と同じ形（所属が無ければテナント共通として通す）。
+     */
+    test('友だち情報欄は所属まで見る（消えた・他店は止め、自店・共通は通す）', async () => {
+      setupBase('acc-2', 'scenario-2');
+      raw.prepare(`INSERT INTO tenants (id, name) VALUES ('tenant-9', '別統括')`).run();
+      for (const [id, name] of [['field-mine', '自店欄'], ['field-other', '他店欄'], ['field-shared', '共通欄']]) {
+        raw.prepare(
+          `INSERT INTO friend_fields (id, name, field_key, type) VALUES (?, ?, ?, 'text')`,
+        ).run(id, name, id.replace('-', '_'));
+      }
+      raw.prepare(
+        `INSERT INTO friend_field_scopes (field_id, tenant_id, line_account_id, created_at)
+         VALUES ('field-mine', 'tenant-1', 'acc-1', '2026-09-01T00:00:00.000')`,
+      ).run();
+      raw.prepare(
+        `INSERT INTO friend_field_scopes (field_id, tenant_id, line_account_id, created_at)
+         VALUES ('field-other', 'tenant-1', 'acc-2', '2026-09-01T00:00:00.000')`,
+      ).run();
+      // 共通欄は所属アカウントを持たない（テナント共通）
+      raw.prepare(
+        `INSERT INTO friend_field_scopes (field_id, tenant_id, line_account_id, created_at)
+         VALUES ('field-shared', 'tenant-1', NULL, '2026-09-01T00:00:00.000')`,
+      ).run();
+
+      const check = async (fieldId: string, ruleId: string) => {
+        seedRule({
+          id: ruleId,
+          friendCondition: JSON.stringify({
+            operator: 'AND',
+            rules: [{ type: 'friend_field', value: { fieldId, op: 'exists', text: '' } }],
+          }),
+          resendSuppressionHours: 0,
+        });
+        const result = await applyFriendAddRouting(
+          db, 'acc-1', { id: 'friend-1', unfollow_count: 0 }, undefined,
+          { entryRouteId: 'route-1', now: MON_10 },
+        );
+        raw.prepare(`DELETE FROM friend_add_rules WHERE id = ?`).run(ruleId);
+        return result.suppressReason;
+      };
+
+      // 消えた欄・他店の欄は止める
+      expect(await check('field-gone', 'rule-ff-gone')).toBe('reference_out_of_account');
+      expect(await check('field-other', 'rule-ff-other')).toBe('reference_out_of_account');
+      // 自店の欄・テナント共通の欄は通す（条件そのものは当たらなくてよい）
+      expect(await check('field-mine', 'rule-ff-mine')).not.toBe('reference_out_of_account');
+      expect(await check('field-shared', 'rule-ff-shared')).not.toBe('reference_out_of_account');
+    });
+
     test('条件の中のフォーム・対応マークも存在を確かめる', async () => {
       seedRule({
         friendCondition: JSON.stringify({

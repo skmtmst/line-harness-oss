@@ -209,7 +209,8 @@ describe('POST /webhook — 並行followの単一化 (#622)', () => {
 describe('POST /webhook — 送信後の台帳確定失敗 (#622)', () => {
   test('送ったあと確定に失敗しても別webhookは二重送信しない（送達不明契約）', async () => {
     // 最初の確定UPDATEだけ壊す。送信は通るが台帳は pending のまま残る。
-    const sabotage = breakOnceOn(db, 'UPDATE friend_add_events', new Error('DB down after send'));
+    // 状態を書く大きな1文（確定）だけを壊す。送信の事実を残す1文とは別。
+    const sabotage = breakOnceOn(db, 'SET routing_status', new Error('DB down after send'));
     await postFollow('webhook-a', sabotage.db);
     expect(sabotage.calls()).toBe(1);
     expect(sendCount()).toBe(1);
@@ -400,6 +401,151 @@ describe('POST /webhook — 送信の結末を分ける (#622)', () => {
  * ここが関門の外にあると、回収されたあとの実行が購読を作ってしまい、
  * cron がそれを拾って勝った側と二重に配信する。
  */
+/*
+ * 台帳の確定が落ちた実行の、**印の期限が切れたあと**。
+ *
+ * 確定はまとめて書く大きな1文で、そこが落ちると行は pending のまま残る。
+ * pending は再送制限が数える材料のどれにも当たらないので、印が落ちたあとに
+ * 次の追加がもう1通送ってしまう。しかもこの経路の2通目は replyMessage で、
+ * 再試行キーが付かないので LINE 側でも弾かれない。
+ * 送れた事実だけを確定とは別の1文で先に残して塞ぐ。
+ */
+/*
+ * 観点(4)の「action」側。登録の直前の関門を通っても、そのあと購読の書き込みを
+ * 挟むので奪われる窓がある。そこを抜けたアクションは、タグ付けの副作用や
+ * シナリオ開始から**外へ送りえる**。アクションのひとつ手前でも関門を通す。
+ */
+describe('POST /webhook — アクションのひとつ手前でも関門を通す (#622)', () => {
+  /** 初回案内のルールへ「タグを付ける」アクションを足す。 */
+  function seedTagAction(): void {
+    raw.prepare(
+      `INSERT INTO tags (id, name, line_account_id) VALUES ('tag-1', '見込み客', 'account-1')`,
+    ).run();
+    // 公開版は書き換えられない（トリガーで不変）。新しい版を作って差し替える。
+    const definition = JSON.parse(raw.prepare(
+      `SELECT definition_snapshot FROM friend_add_rule_versions WHERE id = 'version-1'`,
+    ).pluck().get() as string) as Record<string, unknown>;
+    definition.actions = [{ type: 'add_tag', targetId: 'tag-1' }];
+    // 公開版は1ルールに1つ。先に旧版を下書きへ落としてから新版を公開する。
+    raw.prepare(
+      `UPDATE friend_add_rule_versions SET status = 'draft' WHERE id = 'version-1'`,
+    ).run();
+    raw.prepare(
+      `INSERT INTO friend_add_rule_versions
+        (id, rule_id, version_number, definition_snapshot, status)
+       VALUES ('version-2', 'rule-1', 2, ?, 'published')`,
+    ).run(JSON.stringify(definition));
+    raw.prepare(
+      `UPDATE friend_add_rules SET current_version_id = 'version-2' WHERE id = 'rule-1'`,
+    ).run();
+  }
+
+  function tagCount(): number {
+    return (raw.prepare(
+      `SELECT COUNT(*) AS n FROM friend_tags WHERE friend_id = 'friend-1' AND tag_id = 'tag-1'`,
+    ).get() as { n: number }).n;
+  }
+
+  test('購読を書いたあとに奪われたら、アクションは実行しない', async () => {
+    seedTagAction();
+    // 登録の直前の関門は通し、購読の書き込みで奪う。
+    let stolen = false;
+    const proxy = new Proxy(db, {
+      get(target, prop, receiver) {
+        if (prop !== 'prepare') return Reflect.get(target, prop, receiver);
+        return (sql: string) => {
+          if (!stolen && sql.includes('INSERT') && sql.includes('friend_scenarios')) {
+            stolen = true;
+            raw.prepare(
+              `UPDATE friend_add_send_claims
+                  SET event_id = 'stolen-by-other', generation = generation + 1`,
+            ).run();
+          }
+          return (target.prepare as unknown as (q: string) => unknown)(sql);
+        };
+      },
+    }) as D1Database;
+
+    await postFollow('webhook-action-fenced', proxy);
+
+    expect(stolen).toBe(true);
+    // アクションは動かない
+    expect(tagCount()).toBe(0);
+    // 送信もしない・台帳も書かない（勝った側が書く）
+    expect(sendCount()).toBe(0);
+    expect(raw.prepare(
+      `SELECT routing_status FROM friend_add_events WHERE webhook_event_id = 'webhook-action-fenced'`,
+    ).get()).toEqual({ routing_status: 'pending' });
+  });
+
+  test('奪われていなければアクションは実行する', async () => {
+    seedTagAction();
+    await postFollow('webhook-action-ok');
+    expect(tagCount()).toBe(1);
+    expect(sendCount()).toBe(1);
+  });
+});
+
+describe('POST /webhook — 確定に失敗しても、期限の先で2通目を送らない (#622)', () => {
+  function ageEverything(minutesAgo: number): void {
+    const at = new Date(Date.now() - minutesAgo * 60_000);
+    const jst = new Date(at.getTime() + 9 * 60 * 60 * 1000)
+      .toISOString().replace('Z', '+09:00');
+    raw.prepare(`UPDATE friend_add_send_claims SET claimed_at = ?, dispatched_at = ?`).run(jst, jst);
+    raw.prepare(`UPDATE friend_add_events SET occurred_at = ?, created_at = ?`).run(jst, jst);
+  }
+
+  test('確定が落ちても送信の事実は残り、期限切れ後の追加でも送らない', async () => {
+    // 状態を書く大きな1文（確定）だけを壊す。送信は通る。
+    const sabotage = breakOnceOn(db, 'SET routing_status', new Error('DB down after send'));
+    await postFollow('webhook-ledger-down', sabotage.db);
+    expect(sabotage.calls()).toBe(1);
+    expect(sendCount()).toBe(1);
+
+    // 台帳は pending のまま。ただし送信の事実は残っている。
+    const row = raw.prepare(
+      `SELECT routing_status, delivery_count, first_delivery_sent_at IS NOT NULL AS stamped
+         FROM friend_add_events WHERE webhook_event_id = 'webhook-ledger-down'`,
+    ).get() as { routing_status: string; delivery_count: number; stamped: number };
+    expect(row).toMatchObject({ routing_status: 'pending', delivery_count: 1, stamped: 1 });
+
+    /*
+     * **印の期限（30分）は過ぎ、再送制限（24時間）の窓はまだ内側**という
+     * 区間で追加し直す。ここが今回の穴。台帳に送信の記録が無いと、
+     * 印が落ちた瞬間から2通目が出る。
+     */
+    ageEverything(60);
+    lineClientMocks.replyMessage.mockResolvedValue(undefined);
+    await postFollow('webhook-after-ledger-down');
+
+    // 2通目は出ない
+    expect(sendCount()).toBe(1);
+    expect(raw.prepare(
+      `SELECT routing_status, error_code FROM friend_add_events
+        WHERE webhook_event_id = 'webhook-after-ledger-down'`,
+    ).get()).toEqual({ routing_status: 'suppressed', error_code: 'resend_suppressed' });
+  });
+
+  test('送信の事実は、確定より先に残る（順序）', async () => {
+    const order: string[] = [];
+    const proxy = new Proxy(db, {
+      get(target, prop, receiver) {
+        if (prop !== 'prepare') return Reflect.get(target, prop, receiver);
+        return (sql: string) => {
+          if (sql.includes('delivery_count = delivery_count + 1')) order.push('sent-fact');
+          if (sql.includes('SET routing_status')) order.push('finalize');
+          return (target.prepare as unknown as (q: string) => unknown)(sql);
+        };
+      },
+    }) as D1Database;
+
+    await postFollow('webhook-order', proxy);
+
+    expect(order.indexOf('sent-fact')).toBeGreaterThanOrEqual(0);
+    expect(order.indexOf('sent-fact')).toBeLessThan(order.lastIndexOf('finalize'));
+  });
+});
+
 describe('POST /webhook — 振り分けの登録・アクションも関門の下 (#622)', () => {
   test('登録の直前に予約を奪われたら、購読を作らず台帳も書かない', async () => {
     // 振り分けの評価中（＝登録より前）に、別の実行が予約を奪う。
