@@ -425,7 +425,15 @@ describe('POST /webhook — アクションのひとつ手前でも関門を通�
     const definition = JSON.parse(raw.prepare(
       `SELECT definition_snapshot FROM friend_add_rule_versions WHERE id = 'version-1'`,
     ).pluck().get() as string) as Record<string, unknown>;
-    definition.actions = [{ type: 'add_tag', targetId: 'tag-1' }];
+    /*
+     * 行アクション（タグ）と、行ではないアクション（マイル）の両方を置く。
+     * 前者は `runActionRows` の手前、後者はアクションごとのループの手前で
+     * 関門を通るので、どちらの関門も見張れる。
+     */
+    definition.actions = [
+      { type: 'add_tag', targetId: 'tag-1' },
+      { kind: 'mile', amount: 5 },
+    ];
     // 公開版は1ルールに1つ。先に旧版を下書きへ落としてから新版を公開する。
     raw.prepare(
       `UPDATE friend_add_rule_versions SET status = 'draft' WHERE id = 'version-1'`,
@@ -443,6 +451,13 @@ describe('POST /webhook — アクションのひとつ手前でも関門を通�
   function tagCount(): number {
     return (raw.prepare(
       `SELECT COUNT(*) AS n FROM friend_tags WHERE friend_id = 'friend-1' AND tag_id = 'tag-1'`,
+    ).get() as { n: number }).n;
+  }
+
+  function mileCount(): number {
+    return (raw.prepare(
+      `SELECT COUNT(*) AS n FROM mileage_ledger WHERE beneficiary_friend_id = 'friend-1'
+        AND source = 'friend_add_routing'`,
     ).get() as { n: number }).n;
   }
 
@@ -469,8 +484,9 @@ describe('POST /webhook — アクションのひとつ手前でも関門を通�
     await postFollow('webhook-action-fenced', proxy);
 
     expect(stolen).toBe(true);
-    // アクションは動かない
+    // 行アクションも、アクションごとのループのぶんも動かない
     expect(tagCount()).toBe(0);
+    expect(mileCount()).toBe(0);
     // 送信もしない・台帳も書かない（勝った側が書く）
     expect(sendCount()).toBe(0);
     expect(raw.prepare(
@@ -482,6 +498,7 @@ describe('POST /webhook — アクションのひとつ手前でも関門を通�
     seedTagAction();
     await postFollow('webhook-action-ok');
     expect(tagCount()).toBe(1);
+    expect(mileCount()).toBe(1);
     expect(sendCount()).toBe(1);
   });
 });
