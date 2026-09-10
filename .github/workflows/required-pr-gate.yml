@@ -403,13 +403,15 @@ jobs:
       # 画面の権限は「文字列がある」では確かめられない。書き出した `out` を
       # 本番と同じ当て方で配り、実ブラウザで owner/admin/staff を動かす（N-197）。
       # vitest は `.test.ts(x)` しか見ないので、ここから呼ばないと必須ゲートの
-      # 外に落ちる。
-      - name: Install Chromium for the media permission contract test
+      # 外に落ちる。同じChromiumを、LINE通知画面の実ブラウザ検査（#678）でも使う。
+      - name: Install Chromium for the browser behavior tests
         run: pnpm exec playwright install --with-deps chromium
       - name: Verify media permissions on the built admin
         run: >-
           pnpm exec playwright test
           --config apps/web/src/app/contents/contents-permission-behavior.config.mjs
+      - name: LINE notifications real-browser behavior (#678)
+        run: node apps/web/src/app/line-notifications/line-notifications-browser-behavior.mjs
       - run: pnpm --filter web verify:design
       # 画面の実挙動は、書き出した本番と同じ中身をブラウザで押して見る。
       # 型と文字列の検査だけでは、押せない口や取り違えた導線が残る。
