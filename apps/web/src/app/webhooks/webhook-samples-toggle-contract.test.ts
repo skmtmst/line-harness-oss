@@ -38,6 +38,8 @@ describe('N-382 開始/停止の二重押しで意図と逆にならない', () 
   */
   test('送信中の行の再押下は送らずに戻る（受信・送信の2つ）', () => {
     expect(source.match(/if \(togglingIdsRef\.current\.has\(key\)\) \{/g)).toHaveLength(2)
+    /* 案内を出したあと必ず return する（落とすと素通りして二重に送る）。 */
+    expect(source.match(/setToggleBusyNotices\(\(current\) => \(\{ \.\.\.current, \[key\][^\n]*\n {6}return\n {4}\}/g)).toHaveLength(2)
     expect(source.match(/^ {4}beginToggle\(key\)$/gm)).toHaveLength(2)
     expect(source).toContain('togglingIdsRef.current.add(key)')
   })
