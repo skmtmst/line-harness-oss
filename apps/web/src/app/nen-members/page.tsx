@@ -1,9 +1,11 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import type { ApiResponse } from '@line-crm/shared'
 import {
   ApiError,
   api,
+  fetchApi,
   type PhotoAssetStatus,
   type PhotoBulkReviewResult,
   type PhotoDerivatives,
@@ -21,10 +23,22 @@ import { PhotoPublications } from './photo-publications'
 import { safePhotoSrc } from './photo-src'
 import { photoPetDisplayName } from '@/components/shared/photo-display-name'
 import { photoNoticeFor } from './photo-notice'
+import { photoReviewEntryFrom } from './photo-review-query'
 import { reviewVersionOf, text } from './photo-text'
 import styles from './photo-review.module.css'
 
 type PhotoStatus = 'pending' | 'adopted' | 'rejected'
+/*
+ * 一度に取る枚数。口の上限と同じにしておく。ちょうどこの数だけ返って
+ * きたら、まだ先がある可能性があるので「さらに読み込む」を出す。
+ */
+const PHOTO_PAGE_SIZE = 200
+function photoPagePath(accountId: string, offset: number): string {
+  const params = new URLSearchParams({ accountId, limit: String(PHOTO_PAGE_SIZE) })
+  if (offset > 0) params.set('offset', String(offset))
+  return `/api/nen-members/photos?${params.toString()}`
+}
+type PhotoPageResponse = ApiResponse<Array<Record<string, unknown>>>
 type ReviewReasonCode = 'quality' | 'privacy' | 'unrelated' | 'duplicate' | 'other'
 const REVIEW_REASONS: Array<{ value: ReviewReasonCode; label: string; message: string }> = [
   { value: 'privacy', label: 'ほかの人の顔が写っています', message: 'うしろに他のお客様が写っているようです。もう一度お願いできますか。' },
@@ -56,6 +70,9 @@ export default function PhotoReviewsPage() {
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
   const [loadForbidden, setLoadForbidden] = useState(false)
+  /* まだ先の写真があるか（前のページがちょうど上限枚数だったか）。 */
+  const [hasMorePhotos, setHasMorePhotos] = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [selectedPhotoIds, setSelectedPhotoIds] = useState<string[]>([])
   const [reviewing, setReviewing] = useState<string | null>(null)
   const [rejectingPhotoId, setRejectingPhotoId] = useState<string | null>(null)
@@ -81,6 +98,7 @@ export default function PhotoReviewsPage() {
       setPhotos([])
       setReviewMetrics(null)
       setLoadError('')
+      setHasMorePhotos(false)
       setLoading(false)
       return
     }
@@ -88,8 +106,9 @@ export default function PhotoReviewsPage() {
     setReviewMetrics(null)
     setLoadError('')
     setLoadForbidden(false)
+    setHasMorePhotos(false)
     const [photosResult, metricsResult] = await Promise.allSettled([
-      api.nenMembers.photos(selectedAccountId),
+      fetchApi<PhotoPageResponse>(photoPagePath(selectedAccountId, 0)),
       api.nenMembers.photoReviewMetrics(selectedAccountId),
     ])
     if (sequence !== loadSequence.current) return
@@ -105,9 +124,11 @@ export default function PhotoReviewsPage() {
       if (sequence !== loadSequence.current) return
       if (!response.success) throw new Error('load_failed')
       setPhotos(response.data)
+      setHasMorePhotos(response.data.length === PHOTO_PAGE_SIZE)
     } catch (error) {
       if (sequence === loadSequence.current) {
         setPhotos([])
+        setHasMorePhotos(false)
         const forbidden = error instanceof ApiError && error.status === 403
         setLoadForbidden(forbidden)
         setLoadError(forbidden ? '写真を見る権限がありません。' : '写真を読み込めませんでした。')
@@ -117,6 +138,29 @@ export default function PhotoReviewsPage() {
     }
   }, [selectedAccountId])
   useEffect(() => { void load() }, [load])
+  /*
+   * 続きを取る。ダッシュボードの「確認待ち N件」に対して、ここが 200 枚で
+   * 止まっていると 201 枚目以降へ行けない（#666 差し戻し）。
+   * offset は今まで読んだ枚数。読み込み中に勘定が変わったら捨てる。
+   */
+  const loadMore = useCallback(async () => {
+    if (!selectedAccountId || loadingMore || !hasMorePhotos) return
+    const sequence = loadSequence.current
+    setLoadingMore(true)
+    try {
+      const response = await fetchApi<PhotoPageResponse>(photoPagePath(selectedAccountId, photos.length))
+      if (sequence !== loadSequence.current) return
+      if (!response.success) throw new Error('load_failed')
+      setPhotos((current) => [...current, ...response.data])
+      setHasMorePhotos(response.data.length === PHOTO_PAGE_SIZE)
+    } catch (error) {
+      if (sequence === loadSequence.current) {
+        setNotice(photoNoticeFor(error, '続きの写真を読み込めませんでした。'))
+      }
+    } finally {
+      if (sequence === loadSequence.current) setLoadingMore(false)
+    }
+  }, [hasMorePhotos, loadingMore, photos.length, selectedAccountId])
   useEffect(() => {
     accountGeneration.current += 1
     setNotice('')
@@ -135,6 +179,16 @@ export default function PhotoReviewsPage() {
     setBulkReturnOpen(false)
     setBulkFailed([])
   }, [selectedAccountId])
+  /*
+   * ダッシュボードから `?tab=photos&status=pending_review` で来たときに、
+   * その札を開く。読まないと押した理由（審査待ちだけ見たい）が消える。
+   * 出来上がった画面で1度だけ読む（サーバ側描画では window がない）。
+   */
+  useEffect(() => {
+    const entry = photoReviewEntryFrom(window.location.search)
+    setStatus(entry.status)
+    setView(entry.view)
+  }, [])
 
   const counts = useMemo(() => ({
     all: photos.length,
@@ -494,7 +548,12 @@ export default function PhotoReviewsPage() {
       <Tabs
         items={[
           ...STATUS_TABS.map(([value, label]) => ({
-            label: `${label}（${countsReady ? counts[value] : '—'}）`,
+            /*
+             * まだ続きがあるときは `200+` のように出す。読み込んだ分だけの
+             * 数を確定値のように見せると、上の「見ていない写真」とずれる。
+             * 取れていないときは今までどおり `—`。0件と読み替えない。
+             */
+            label: `${label}（${countsReady ? counts[value] : '—'}${countsReady && hasMorePhotos ? '+' : ''}）`,
             current: status === value,
             onClick: () => {
               setStatus(value)
@@ -586,6 +645,12 @@ export default function PhotoReviewsPage() {
           </div>
         </article>})}
       </section>}
+      {!loading && !loadError && hasMorePhotos && <div className="flex flex-col items-center gap-1 pt-2">
+        <Button variant="secondary" disabled={loadingMore} onClick={() => void loadMore()}>
+          {loadingMore ? '読み込み中...' : `さらに読み込む（いま${photos.length}枚）`}
+        </Button>
+        <p className="text-xs text-ink-faint">一度に{PHOTO_PAGE_SIZE}枚ずつ読み込みます。続きがあるあいだ、札の件数には「+」が付きます。</p>
+      </div>}
       </div>
 
       <div data-design="Right" className={styles.stack}>
