@@ -3670,6 +3670,20 @@ export type PhotoBulkDecision = {
   reasonNote: string | null
 }
 
+export type PhotoBulkReviewResult = {
+  updatedCount: number
+  items: Array<{
+    photoId: string
+    decision: 'approve' | 'return' | 'reject'
+    reviewVersion: number
+    decisionId: string
+    notificationStatus: 'sent' | 'failed'
+    notificationError?: string
+  }>
+  notificationFailures: Array<{ photoId: string; error: string }>
+  reconciled?: boolean
+}
+
 export type AdPlatform = {
   id: string
   /** meta / x / google / tiktok */
@@ -7474,7 +7488,7 @@ export const api = {
     bulkReviewPhotos: (
       data: { lineAccountId: string; decisions: PhotoBulkDecision[] },
       idempotencyKey: string,
-    ) => fetchApi<ApiResponse<{ updatedCount: number; awardedPoints: number; notificationFailures: number }>>(
+    ) => fetchApi<ApiResponse<PhotoBulkReviewResult>>(
       '/api/nen-members/photos/decisions/bulk',
       { method: 'POST', headers: { 'Idempotency-Key': idempotencyKey }, body: JSON.stringify(data) },
     ),

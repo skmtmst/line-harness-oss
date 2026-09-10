@@ -7,12 +7,18 @@ const mocks = vi.hoisted(() => ({
   syncTags: vi.fn(),
   resolveCredential: vi.fn(),
   jstNow: vi.fn(() => '2026-08-28 03:00:00'),
+  claim: vi.fn(),
+  complete: vi.fn(),
+  getState: vi.fn(),
 }));
 
 vi.mock('@line-crm/db', () => ({
   getFriendByLineUserIdForAccount: vi.fn(),
   jstNow: mocks.jstNow,
   resolveLineCredential: mocks.resolveCredential,
+  claimPhotoNotificationDelivery: mocks.claim,
+  completePhotoNotificationDelivery: mocks.complete,
+  getPhotoNotificationState: mocks.getState,
 }));
 vi.mock('../services/account-access.js', () => ({
   canAccessAllLineAccounts: mocks.canAccess,
@@ -25,7 +31,7 @@ vi.mock('../services/nen-tag-sync.js', () => ({
   syncNenPetTags: vi.fn(), syncNenPhotoTags: mocks.syncTags,
 }));
 
-const { nenMembers } = await import('./nen-members.js');
+const { nenMembers, loadPhotoReviewRecipient } = await import('./nen-members.js');
 
 type Entry = { query: string; bindings: unknown[] };
 
@@ -34,9 +40,12 @@ function harness(options: {
   duplicate?: boolean;
   customerId?: string | null;
   permissionKeys?: string[];
+  retryRow?: boolean;
+  settledState?: Record<string, unknown> | null;
 } = {}) {
   const statements: Entry[] = [];
   const batches: Entry[][] = [];
+  const runs: Entry[] = [];
   const photoAccount = options.photoAccount ?? 'account-a';
   const db = {
     prepare(query: string) {
@@ -63,7 +72,11 @@ function harness(options: {
               last_idempotency_key: null,
             };
           }
+          if (query.includes('SELECT e.notification_status')) {
+            return options.settledState ?? null;
+          }
           if (query.includes('JOIN nen_photo_review_events')) {
+            if (options.retryRow === false) return null;
             if (entry.bindings[1] !== photoAccount || entry.bindings[2] !== photoAccount) return null;
             return {
               id: 'photo-1', friend_id: 'friend-1', line_user_id: 'U1', line_account_id: photoAccount,
@@ -97,7 +110,10 @@ function harness(options: {
           if (query.includes('ORDER BY ps.created_at')) return { results: [{ id: 'photo-1' }] };
           return { results: [] };
         },
-        async run() { return { success: true, meta: { changes: 1 } }; },
+        async run() {
+          runs.push({ query, bindings: [...entry.bindings] });
+          return { success: true, meta: { changes: 1 } };
+        },
       };
       return statement;
     },
@@ -121,7 +137,7 @@ function harness(options: {
     await next();
   });
   app.route('/', nenMembers);
-  return { app, statements, batches };
+  return { app, statements, batches, runs };
 }
 
 beforeEach(() => {
@@ -130,6 +146,9 @@ beforeEach(() => {
   mocks.resolveCredential.mockResolvedValue('resolved-token');
   mocks.push.mockResolvedValue(undefined);
   mocks.syncTags.mockResolvedValue(undefined);
+  mocks.claim.mockResolvedValue({ generation: 1 });
+  mocks.complete.mockResolvedValue(true);
+  mocks.getState.mockResolvedValue(null);
 });
 
 describe('NEN photo review', () => {
@@ -253,8 +272,33 @@ describe('NEN photo review', () => {
     expect(mocks.push).toHaveBeenCalledWith(
       'https://worker.example', 'resolved-token', 'U1',
       [{ type: 'text', text: expect.stringContaining('人の顔や個人情報が写っている') }],
-      expect.stringMatching(/^nen-photo-review:/), expect.any(Function),
+      // X-Line-Retry-Key はLINE仕様でUUID形式が必須。接頭辞付きは実送信で失敗する。
+      expect.stringMatching(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i),
+      expect.any(Function),
     );
+  });
+
+  it('loads the notification recipient only inside the same LINE account', async () => {
+    const seen: Array<{ query: string; bindings: unknown[] }> = [];
+    const stubDb = {
+      prepare(query: string) {
+        const entry = { query, bindings: [] as unknown[] };
+        seen.push(entry);
+        return {
+          bind(...bindings: unknown[]) { entry.bindings = bindings; return this; },
+          async first() { return { id: 'photo-1', friend_id: 'friend-1' }; },
+        };
+      },
+    };
+    const row = await loadPhotoReviewRecipient(stubDb as unknown as D1Database, {
+      photoId: 'photo-1', lineAccountId: 'account-a',
+    });
+    expect(row).toMatchObject({ id: 'photo-1' });
+    expect(seen).toHaveLength(1);
+    // 写真・LINEアカウント・友だちの所属の3点を同じ値で絞る。
+    expect(seen[0].query).toContain('ps.id = ? AND ps.line_account_id = ? AND f.line_account_id = ?');
+    expect(seen[0].bindings).toEqual(['photo-1', 'account-a', 'account-a']);
+    expect(seen[0].query).not.toContain('r2_key');
   });
 
   it('does not review a photo owned by another account', async () => {
@@ -279,18 +323,19 @@ describe('NEN photo review', () => {
 
   it('keeps the review saved and records a failed LINE notification', async () => {
     mocks.push.mockRejectedValueOnce(new Error('LINE unavailable'));
-    const { app, batches } = harness();
+    const { app, batches, runs } = harness();
     const response = await app.request('/api/nen-members/photos/photo-1/review', {
       method: 'PUT', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ accountId: 'account-a', status: 'rejected', expectedVersion: 1, reasonCode: 'quality' }),
     });
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ data: { notificationStatus: 'failed' } });
-    expect(batches[1][0].bindings[0]).toBe('failed');
-    expect(batches[1][1].bindings).toEqual([
-      'failed', 'LINE unavailable', '2026-08-28 03:00:00', null,
-      '2026-08-28 03:00:00', expect.any(String),
-    ]);
+    expect(mocks.complete).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      decisionId: expect.any(String), generation: 1, status: 'failed', error: 'LINE unavailable',
+    }));
+    const mirror = runs.find((entry) => entry.query.includes('review_notification_status'));
+    expect(mirror?.bindings[0]).toBe('failed');
+    expect(batches).toHaveLength(1);
   });
 
   it('returns a conflict when another reviewer decided first', async () => {
@@ -321,20 +366,123 @@ describe('NEN photo review', () => {
   });
 
   it('retries a failed notification with the recorded decision text', async () => {
-    const { app, batches } = harness();
+    const { app, runs } = harness();
     const response = await app.request('/api/nen-members/photos/photo-1/notification/retry', {
       method: 'POST', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ accountId: 'account-a' }),
     });
     expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ data: { notificationStatus: 'sent', resent: true } });
     expect(mocks.push).toHaveBeenCalledWith(
       'https://worker.example', 'resolved-token', 'U1',
       [{ type: 'text', text: expect.stringContaining('人の顔や個人情報が写っている') }],
-      'nen-photo-review:decision-1', expect.any(Function),
+      // 再送も安定したUUID鍵（審査イベントID）で送る。
+      'decision-1', expect.any(Function),
     );
-    expect(batches[0][0].query).toContain("review_notification_status = 'sent'");
-    expect(batches[0][1].query).toContain("notification_status = 'sent'");
-    expect(batches[0][1].query).toContain('notification_attempt_count = notification_attempt_count + 1');
-    expect(batches[0][1].query).not.toContain('notification_error = NULL');
+    const mirror = runs.find((entry) => entry.query.includes('review_notification_status'));
+    expect(mirror?.bindings[0]).toBe('sent');
+    expect(mocks.claim).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      decisionId: 'decision-1', lineAccountId: 'account-a',
+    }));
+    expect(mocks.complete).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      decisionId: 'decision-1', generation: 1, status: 'sent',
+    }));
+  });
+
+  it('does not resend when the notification is already settled as sent', async () => {
+    const { app } = harness({
+      retryRow: false,
+      settledState: { notification_status: 'sent' },
+    });
+    const response = await app.request('/api/nen-members/photos/photo-1/notification/retry', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ accountId: 'account-a' }),
+    });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ data: { notificationStatus: 'sent', resent: false } });
+    expect(mocks.push).not.toHaveBeenCalled();
+  });
+
+  it('sends only once when two retries race on the same failed notification', async () => {
+    // claimと確定を条件付きで原子に動かす行の代役。同期内に読み書きする。
+    const row = { status: 'failed', generation: 0, error: null as string | null };
+    let releasePush!: () => void;
+    const pushGate = new Promise<void>((resolve) => { releasePush = resolve; });
+    mocks.push.mockImplementationOnce(() => pushGate.then(() => undefined));
+    mocks.claim.mockImplementation(async () => {
+      if (row.status !== 'failed') return null;
+      row.status = 'sending';
+      row.generation += 1;
+      return { generation: row.generation };
+    });
+    mocks.complete.mockImplementation(async (_db: unknown, input: {
+      generation: number; status: 'sent' | 'failed'; error?: string | null;
+    }) => {
+      if (row.status !== 'sending' || input.generation !== row.generation) return false;
+      row.status = input.status;
+      row.error = input.status === 'failed' ? (input.error ?? '') : null;
+      return true;
+    });
+    mocks.getState.mockImplementation(async () => ({
+      decisionId: 'decision-1', status: row.status, error: row.error, generation: row.generation,
+      leaseId: 'lease-x', leaseExpiresAt: null, attemptCount: 1,
+    }));
+    const { app } = harness();
+    const body = JSON.stringify({ accountId: 'account-a' });
+    const headers = { 'content-type': 'application/json' };
+    const first = app.request('/api/nen-members/photos/photo-1/notification/retry', { method: 'POST', headers, body });
+    const second = app.request('/api/nen-members/photos/photo-1/notification/retry', { method: 'POST', headers, body });
+    await Promise.resolve();
+    await Promise.resolve();
+    releasePush();
+    const [firstResponse, secondResponse] = await Promise.all([first, second]);
+    expect(mocks.push).toHaveBeenCalledTimes(1);
+    expect([firstResponse.status, secondResponse.status].sort()).toEqual([200, 409]);
+    expect(row.status).toBe('sent');
+  });
+
+  it('a late failure does not overwrite a concurrent success', async () => {
+    const row = { status: 'sending', generation: 6, error: null as string | null };
+    mocks.claim.mockResolvedValueOnce({ generation: 6 });
+    mocks.push.mockImplementationOnce(async () => {
+      // 送信中にleaseが切れ、別の処理が送達を確定させた想定にする。
+      row.status = 'sent';
+      row.generation = 7;
+      throw new Error('late boom');
+    });
+    // 古い世代の確定は通らない。
+    mocks.complete.mockResolvedValueOnce(false);
+    mocks.getState.mockImplementation(async () => ({
+      decisionId: 'decision-1', status: row.status, error: row.error, generation: row.generation,
+      leaseId: null, leaseExpiresAt: null, attemptCount: 2,
+    }));
+    const { app, runs } = harness();
+    const response = await app.request('/api/nen-members/photos/photo-1/notification/retry', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ accountId: 'account-a' }),
+    });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ data: { notificationStatus: 'sent' } });
+    // 遅い失敗で上書きされず、成功が残る。
+    expect(row).toMatchObject({ status: 'sent', generation: 7 });
+    const mirror = runs.find((entry) => entry.query.includes('review_notification_status'));
+    expect(mirror?.bindings[0]).toBe('sent');
+  });
+
+  it('returns a busy message instead of sending when another process holds the lease', async () => {
+    mocks.claim.mockResolvedValueOnce(null);
+    mocks.getState.mockResolvedValueOnce({
+      decisionId: 'decision-1', status: 'sending', error: null, generation: 1,
+      leaseId: 'lease-other', leaseExpiresAt: '2099-01-01T00:00:00.000Z', attemptCount: 1,
+    });
+    const { app } = harness();
+    // 再送口のSELECTは失敗行を返すが、claimで負ける想定にする。
+    const response = await app.request('/api/nen-members/photos/photo-1/notification/retry', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ accountId: 'account-a' }),
+    });
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ error: expect.stringContaining('実行中') });
+    expect(mocks.push).not.toHaveBeenCalled();
   });
 });
