@@ -1153,11 +1153,13 @@ friends.get(
         return c.json({ success: false, error: 'ページ位置が正しくありません' }, 400);
       }
       const friendId = c.req.param('id');
+      // N-717: 8項のcompound SELECTはD1の SQLITE_MAX_COMPOUND_SELECT(既定5)を
+      // 超えて "too many terms in compound SELECT" になる（better-sqlite3の
+      // 既定上限は500なので手元試験は通ってしまい、D1でだけ落ちる）。
+      // 4項ずつのCTEへ割り、外側で2項のUNION ALLへまとめて5項以下に収める。
+      // UNION ALLのみを使い、順序・重複の扱いは変えていない。
       const result = await c.env.DB.prepare(
-        `SELECT timeline.id, timeline.event_type, timeline.summary,
-                timeline.source_kind, timeline.source_id, timeline.occurred_at,
-                timeline.line_account_id, la.name AS line_account_name
-           FROM (
+        `WITH group_a AS (
              SELECT ml.id,
                     CASE WHEN ml.direction = 'incoming' THEN 'message_received' ELSE 'message_sent' END AS event_type,
                     CASE WHEN ml.direction = 'incoming' THEN 'メッセージを受信しました' ELSE 'メッセージを送信しました' END AS summary,
@@ -1179,7 +1181,8 @@ friends.get(
                     'calendar_booking', cb.id, COALESCE(cb.updated_at, cb.created_at), f.line_account_id
                FROM calendar_bookings cb JOIN friends f ON f.id = cb.friend_id
               WHERE cb.friend_id = ?
-             UNION ALL
+           ),
+           group_b AS (
              SELECT eb.id, 'event_booking', 'イベント予約が更新されました',
                     'event_booking', eb.id, COALESCE(eb.updated_at, eb.requested_at), eb.line_account_id
                FROM event_bookings eb WHERE eb.friend_id = ?
@@ -1200,6 +1203,14 @@ friends.get(
              SELECT ae.id, ae.event_type, '共通イベントを記録しました',
                     ae.source_kind, ae.source_id, ae.occurred_at, ae.line_account_id
                FROM analytics_events ae WHERE ae.friend_id = ?
+           )
+         SELECT timeline.id, timeline.event_type, timeline.summary,
+                timeline.source_kind, timeline.source_id, timeline.occurred_at,
+                timeline.line_account_id, la.name AS line_account_name
+           FROM (
+             SELECT * FROM group_a
+             UNION ALL
+             SELECT * FROM group_b
            ) timeline
            LEFT JOIN line_accounts la ON la.id = timeline.line_account_id
           ORDER BY timeline.occurred_at DESC, timeline.id DESC
