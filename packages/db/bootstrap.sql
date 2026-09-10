@@ -311,6 +311,24 @@ CREATE TABLE affiliate_payout_results (
   imported_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+CREATE TABLE affiliate_reward_calculations (
+  id TEXT PRIMARY KEY,
+  organization_id TEXT NOT NULL REFERENCES tenants(id),
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id),
+  affiliate_id TEXT NOT NULL REFERENCES affiliates(id),
+  conversion_event_id TEXT NOT NULL REFERENCES conversion_events(id),
+  offer_id TEXT REFERENCES affiliate_offers(id),
+  formula TEXT NOT NULL CHECK (formula IN ('rate', 'fixed', 'legacy')),
+  commission_rate_snapshot REAL,
+  base_amount_snapshot REAL,
+  fixed_reward_snapshot INTEGER,
+  offer_name_snapshot TEXT NOT NULL DEFAULT '',
+  amount_minor INTEGER NOT NULL,
+  currency TEXT NOT NULL DEFAULT 'JPY' CHECK (currency = 'JPY'),
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE (conversion_event_id)
+);
+
 CREATE TABLE affiliate_reward_entries (
   id TEXT PRIMARY KEY,
   organization_id TEXT NOT NULL REFERENCES tenants(id),
@@ -390,10 +408,11 @@ CREATE TABLE affiliates (
 CREATE TABLE analytics_cross_run_members (
   run_id           TEXT NOT NULL REFERENCES analytics_cross_runs(id) ON DELETE CASCADE,
   line_account_id  TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  lease_generation INTEGER NOT NULL DEFAULT 0,
   row_key          TEXT NOT NULL,
   col_key          TEXT NOT NULL,
   friend_id        TEXT NOT NULL REFERENCES friends(id) ON DELETE CASCADE,
-  PRIMARY KEY (run_id, row_key, col_key, friend_id)
+  PRIMARY KEY (run_id, lease_generation, row_key, col_key, friend_id)
 );
 
 CREATE TABLE analytics_cross_runs (
@@ -412,7 +431,7 @@ CREATE TABLE analytics_cross_runs (
   created_at        TEXT NOT NULL,
   started_at        TEXT,
   completed_at      TEXT
-);
+, lease_generation INTEGER NOT NULL DEFAULT 0, result_generation INTEGER);
 
 CREATE TABLE analytics_daily_metrics (
   line_account_id  TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
@@ -1421,6 +1440,19 @@ CREATE TABLE conversion_definition_usages (
   updated_at               TEXT NOT NULL
 );
 
+CREATE TABLE conversion_event_dedup_claims (
+  conversion_point_id TEXT NOT NULL REFERENCES conversion_points(id) ON DELETE CASCADE,
+  friend_id           TEXT NOT NULL REFERENCES friends(id) ON DELETE CASCADE,
+  mode                TEXT NOT NULL CHECK (mode IN ('lifetime', 'window')),
+  window_days         INTEGER CHECK (window_days IS NULL OR window_days BETWEEN 1 AND 365),
+  last_event_id       TEXT NOT NULL,
+  last_at             TEXT NOT NULL,
+  updated_at          TEXT NOT NULL,
+  PRIMARY KEY (conversion_point_id, friend_id),
+  CHECK ((mode = 'lifetime' AND window_days IS NULL)
+      OR (mode = 'window' AND window_days IS NOT NULL))
+);
+
 CREATE TABLE conversion_events (
   id                   TEXT PRIMARY KEY,
   conversion_point_id  TEXT NOT NULL REFERENCES conversion_points (id) ON DELETE CASCADE,
@@ -1663,6 +1695,18 @@ CREATE TABLE ec_orders (
   UNIQUE (line_account_id, source_key, external_order_id)
 );
 
+CREATE TABLE ec_v6_dispatches (
+  event_id        TEXT NOT NULL REFERENCES ec_events(id) ON DELETE CASCADE,
+  subscriber      TEXT NOT NULL CHECK (subscriber IN ('notification', 'v6')),
+  status          TEXT NOT NULL DEFAULT 'pending'
+                    CHECK (status IN ('pending', 'sent', 'failed')),
+  attempt_count   INTEGER NOT NULL DEFAULT 0,
+  last_error      TEXT,
+  idempotency_key TEXT NOT NULL,
+  updated_at      TEXT NOT NULL,
+  PRIMARY KEY (event_id, subscriber)
+);
+
 CREATE TABLE engagement_events (
   id                TEXT PRIMARY KEY,
   program_id        TEXT NOT NULL REFERENCES mileage_programs(id),
@@ -1687,6 +1731,18 @@ CREATE TABLE entry_route_genres (
   name TEXT NOT NULL UNIQUE,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
+);
+
+CREATE TABLE entry_route_stop_suppressions (
+  id              TEXT PRIMARY KEY,
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  line_user_id    TEXT NOT NULL,
+  friend_id       TEXT REFERENCES friends(id) ON DELETE SET NULL,
+  ref_code        TEXT NOT NULL,
+  source          TEXT NOT NULL,
+  occurred_at     TEXT NOT NULL,
+  expires_at      TEXT NOT NULL,
+  created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
 
 CREATE TABLE entry_routes (
@@ -5130,6 +5186,9 @@ CREATE UNIQUE INDEX idx_affiliate_payout_batches_idempotency
   ON affiliate_payout_batches(organization_id, line_account_id, idempotency_key)
   WHERE idempotency_key IS NOT NULL;
 
+CREATE INDEX idx_affiliate_reward_calculations_scope
+  ON affiliate_reward_calculations(organization_id, line_account_id, affiliate_id);
+
 CREATE INDEX idx_affiliate_reward_entries_scope_status
   ON affiliate_reward_entries(organization_id, line_account_id, affiliate_id, status, created_at DESC);
 
@@ -5152,7 +5211,7 @@ CREATE INDEX idx_affiliates_tenant_account_created
   ON affiliates(tenant_id, line_account_id, created_at DESC);
 
 CREATE INDEX idx_analytics_cross_members_selection
-  ON analytics_cross_run_members(run_id, row_key, col_key, friend_id);
+  ON analytics_cross_run_members(run_id, lease_generation, row_key, col_key, friend_id);
 
 CREATE INDEX idx_analytics_cross_runs_account_time
   ON analytics_cross_runs(line_account_id, created_at DESC, id DESC);
@@ -5434,6 +5493,9 @@ CREATE UNIQUE INDEX idx_conversion_definition_usages_reference
     COALESCE(ref_version_id, '')
   );
 
+CREATE INDEX idx_conversion_event_dedup_claims_event
+  ON conversion_event_dedup_claims(last_event_id);
+
 CREATE INDEX idx_conversion_events_affiliate ON conversion_events (affiliate_code);
 
 CREATE INDEX idx_conversion_events_created_friend ON conversion_events(created_at, friend_id);
@@ -5492,6 +5554,9 @@ CREATE INDEX idx_ec_orders_account_ordered
 
 CREATE INDEX idx_ec_orders_customer
   ON ec_orders(line_account_id, customer_id, ordered_at DESC);
+
+CREATE UNIQUE INDEX idx_ec_v6_dispatches_idempotency
+  ON ec_v6_dispatches (idempotency_key);
 
 CREATE INDEX idx_engagement_events_actor_friend
   ON engagement_events(program_id, actor_friend_id, occurred_at DESC);
@@ -6272,6 +6337,12 @@ CREATE INDEX idx_staff_members_tenant
 
 CREATE INDEX idx_staff_notification_reads_staff
   ON staff_notification_reads(staff_id, read_at DESC);
+
+CREATE UNIQUE INDEX idx_stop_suppressions_dedup
+  ON entry_route_stop_suppressions (line_account_id, line_user_id, ref_code);
+
+CREATE INDEX idx_stop_suppressions_lookup
+  ON entry_route_stop_suppressions (line_account_id, line_user_id, expires_at);
 
 CREATE INDEX idx_stripe_events_friend ON stripe_events (friend_id);
 

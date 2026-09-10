@@ -86,6 +86,43 @@ describe('V6 顧客へのお知らせの寸法', () => {
 
   it('EC通知の既定設定も選択中のLINEアカウントに限定して読み書きする', () => {
     expect(PAGE).toContain('api.ecCommerce.settings(selectedAccountId)')
-    expect(PAGE).toContain('api.ecCommerce.updateSetting(selectedAccountId, setting.eventType')
+    // 書き込みは呼び出し口へ渡したアカウントだけに向ける。渡す側は選択中のアカウントを掴む。
+    expect(PAGE).toContain('args.api.updateSetting(args.accountId, setting.eventType')
+    expect(PAGE).toContain('const accountId = selectedAccountId')
+  })
+
+  it('保存・公開の応答は、返った時点のアカウント世代でしか画面へ書かない', () => {
+    expect(PAGE).toContain('function isStale(guard: CustomerMutationGuard): boolean')
+    expect(PAGE).toContain('currentGeneration: () => loadGeneration.current')
+    expect(PAGE).toContain("if (outcome.kind === 'stale' || generation !== loadGeneration.current) return")
+  })
+
+  it('テスト送信の完了判定も、保存・公開と同じ見張り（世代とアカウント）を通す', () => {
+    // testSend だけ loadGeneration しか見ていないと、A→Bの描画コミット後・
+    // Bのload()発火前に返った旧Aの結果がBの画面へ入りうる。
+    expect(PAGE).toContain('async function sendCustomerTestNotification(args: {')
+    expect(PAGE).toContain('if (isStale(guard)) return { kind: \'stale\' }')
+    expect(PAGE).toContain('const outcome = await sendCustomerTestNotification({')
+    expect(PAGE).toContain("if (outcome.kind === 'stale') return")
+  })
+
+  it('世代の照合はuseEffectの発火待ちに頼らない。選択中accountを描画のたびに同期させたrefでも見る', () => {
+    // loadGeneration は load() の useEffect の中でしか進まない。切替の描画コミットと
+    // その発火の間には隙間があるため、世代だけでなく account の一致も独立して見る。
+    expect(PAGE).toContain('const selectedAccountRef = useRef(selectedAccountId)')
+    expect(PAGE).toContain('selectedAccountRef.current = selectedAccountId')
+    expect(PAGE).toContain("guard.forAccountId !== guard.currentAccountId()")
+    expect(PAGE).toContain('currentAccountId: () => selectedAccountRef.current')
+    expect(PAGE).toContain("forAccountId: selectedAccountId ?? ''")
+  })
+
+  it('端末の控えと未保存の印は、送った文面がそのまま画面に残っているときだけ片づける', () => {
+    // 保存中も入力できる。押した時点の写しで「保存済み」にすると、足した分が消える。
+    expect(PAGE).toContain('function customerDraftFingerprint(draft: CustomerEditorDraft): string')
+    expect(PAGE).toContain('currentFingerprint: () => editFingerprintRef.current.get(setting.eventType)')
+    expect(PAGE).toContain('return guard.currentFingerprint() === guard.sentFingerprint')
+    expect(PAGE).toContain('if (outcome.settleDraft) {')
+    // 1打ごとに指紋を進め、飛んでいる保存を古いものにする。
+    expect(PAGE).toContain('editFingerprintRef.current.set(eventType, customerDraftFingerprint(draft))')
   })
 })
