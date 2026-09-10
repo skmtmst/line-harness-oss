@@ -22,13 +22,13 @@ export interface ScheduleContext {
 
 function addMinutes(date: Date, minutes: number): Date {
   const next = new Date(date);
-  next.setMinutes(next.getMinutes() + minutes);
+  next.setUTCMinutes(next.getUTCMinutes() + minutes);
   return next;
 }
 
 function addDays(date: Date, days: number): Date {
   const next = new Date(date);
-  next.setDate(next.getDate() + days);
+  next.setUTCDate(next.getUTCDate() + days);
   return next;
 }
 
@@ -57,7 +57,7 @@ export function computeNextDeliveryAt(
     case 'absolute_time': {
       const target = addDays(context.enrolledAt, step.offset_days ?? 0);
       const [h, m] = (step.delivery_time ?? '00:00').split(':').map(Number);
-      target.setHours(h, m, 0, 0);
+      target.setUTCHours(h, m, 0, 0);
       return target < context.now ? context.now : target;
     }
   }
