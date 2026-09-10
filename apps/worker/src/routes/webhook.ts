@@ -24,6 +24,7 @@ import {
   markFriendAddEventRouting,
   claimFriendAddSendRight,
   touchFriendAddSendClaim,
+  recordFriendAddDelivery,
   releaseFriendAddSendRight,
   toJstString,
   recordAnalyticsEvent,
@@ -495,6 +496,23 @@ async function handleEvent(
       }
     };
     const currentSendOutcome = (): FollowSendOutcome => sendState.outcome;
+    /*
+     * 送れたと分かったその場で、**送信の事実だけ**を台帳へ残す。
+     * まとめて書く確定が落ちても、この行が再送制限の材料になり、
+     * 印の期限が切れたあとの2通目を止める。ここが落ちても送信は続ける
+     * （送れたことは変わらないので、記録の失敗で配信を止めない）。
+     */
+    const noteDelivered = async (): Promise<void> => {
+      if (friendAddEventId == null || lineAccountId == null) return;
+      try {
+        await recordFriendAddDelivery(db, {
+          eventId: friendAddEventId,
+          lineAccountId,
+        });
+      } catch (err) {
+        logWebhookStepFailure('friend_add_delivery_record', err, lineAccountId, event);
+      }
+    };
     if (friendAddLedgerUnavailable) {
       // 台帳が作れていない＝送信権を持てない。何も送らない。
       claimError = true;
@@ -630,6 +648,7 @@ async function handleEvent(
           );
           if (sent) {
             friendAddDeliveryCount += 1;
+            await noteDelivered();
             console.log(`Immediate delivery (routed): sent scenario ${scenarioId} step 1`);
           }
         } catch (err) {
@@ -691,6 +710,7 @@ async function handleEvent(
           );
           if (sent) {
             friendAddDeliveryCount += 1;
+            await noteDelivered();
             console.log(`Immediate delivery: sent scenario ${scenario.id} step 1`);
           }
         } catch (err) {
