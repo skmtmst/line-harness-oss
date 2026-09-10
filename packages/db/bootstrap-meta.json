@@ -313,6 +313,8 @@
     "354_analytics_cross_lease_generation.sql",
     "355_rich_menu_schedule_lease.sql",
     "356_entry_route_stop_suppressions.sql",
+    "357_friend_add_events_partial_failed.sql",
+    "358_friend_add_send_claims.sql",
     "359_ad_platform_account_required_and_dedup.sql",
     "361_ec_v6_dispatches.sql",
     "362_entry_route_stop_suppression_dedup.sql",

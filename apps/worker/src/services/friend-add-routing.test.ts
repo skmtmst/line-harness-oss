@@ -85,6 +85,11 @@ describe('V6の流入経路別ルール', () => {
     insertFriend(raw, 'friend-v6', { line_account_id: 'acc-v6', unfollow_count: 0 })
     raw.prepare(`INSERT INTO scenarios (id, name, trigger_type, is_active, line_account_id)
                  VALUES ('scenario-v6', 'ようこそ', 'friend_add', 1, 'acc-v6')`).run()
+    // 実行時は設定が指す流入リンクの持ち物も確かめるので、実データを置く。
+    for (const [index, routeId] of routeIds.entries()) {
+      raw.prepare(`INSERT OR IGNORE INTO entry_routes (id, name, ref_code, is_active, line_account_id)
+                   VALUES (?, ?, ?, 1, 'acc-v6')`).run(routeId, routeId, `REF-${index}-${routeId}`)
+    }
     const ruleId = options.fallback ? 'rule-fallback' : 'rule-route'
     const versionId = `${ruleId}-v1`
     raw.prepare(`INSERT INTO friend_add_rules

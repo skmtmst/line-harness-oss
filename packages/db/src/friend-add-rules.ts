@@ -18,6 +18,8 @@ export interface FriendAddRuleDefinition {
   timing: 'immediate' | 'scenario';
   actions: FriendAddRuleAction[];
   friendCondition: string;
+  /** 社内メモ。配信の条件には使わない。表示専用。 */
+  internalMemo?: string;
   activeFrom: string | null;
   activeUntil: string | null;
   returningMode?: 'none' | 'same' | 'other';
