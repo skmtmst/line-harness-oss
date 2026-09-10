@@ -403,7 +403,11 @@ describe('V6オートメーションの既存処理接続', () => {
     const ok = await execute(testDb, {
       accountId: 'account-1', friendId: 'friend-1',
       action: { id: 'webhook', type: 'send_webhook', params: { webhookId: 'enc-hook' }, onFailure: 'stop' },
-      executors: createAutomationActionExecutors({ fetch: fetchMock as typeof fetch, credentialEncryptionKey: AUTO_KEY }),
+      executors: createAutomationActionExecutors({
+        fetch: fetchMock as typeof fetch,
+        credentialEncryptionKey: AUTO_KEY,
+        lookupHost: async () => ['93.184.216.34'],
+      }),
     });
     expect(ok.status).toBe('success');
     const sent = fetchMock.mock.calls[0]?.[1] as { headers: Record<string, string>; body: string };
@@ -413,7 +417,11 @@ describe('V6オートメーションの既存処理接続', () => {
     const ng = await execute(testDb, {
       accountId: 'account-1', friendId: 'friend-1',
       action: { id: 'webhook', type: 'send_webhook', params: { webhookId: 'enc-hook' }, onFailure: 'stop' },
-      executors: createAutomationActionExecutors({ fetch: fetchBlocked as typeof fetch }),
+      // 送り先は安全。止まる理由をsecretが読めないことだけに絞る。
+      executors: createAutomationActionExecutors({
+        fetch: fetchBlocked as typeof fetch,
+        lookupHost: async () => ['93.184.216.34'],
+      }),
     });
     expect(ng.status).toBe('failed');
     expect(fetchBlocked).not.toHaveBeenCalled();

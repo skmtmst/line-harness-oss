@@ -1619,6 +1619,28 @@ describe('#650 fail-closed: 鍵不足・復号失敗は安全に止める', () =
     );
     expect(broken.status).toBe(503);
     expect(await broken.text()).not.toContain('v1-broken-xyz');
+
+    // 旧平文が残っている行でも、暗号文が読めないなら旧平文へ落ちない。
+    // 落ちると、鍵から外した古い secret の署名がいつまでも通ってしまう。
+    const staleSecret = 'l'.repeat(32);
+    vi.mocked(getIncomingWebhookById).mockResolvedValueOnce({
+      ...incomingWebhookRow(), secret: staleSecret, secret_encrypted: 'v1-broken-xyz',
+    });
+    const stale = await setupApp().request(
+      '/api/webhooks/incoming/iwh-1/receive',
+      {
+        method: 'POST', headers: {
+          'Content-Type': 'application/json',
+          'X-Webhook-Signature': await signedWith(staleSecret, okBody),
+        },
+        body: okBody,
+      },
+      keyedEnv,
+    );
+    expect(stale.status).toBe(503);
+    const staleBody = await stale.text();
+    expect(staleBody).not.toContain(staleSecret);
+    expect(staleBody).not.toContain('v1-broken-xyz');
   });
 });
 

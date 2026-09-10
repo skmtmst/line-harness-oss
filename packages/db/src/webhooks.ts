@@ -533,9 +533,11 @@ async function countLegacyWebhookSecrets(
   table: WebhookSecretTable,
   lineAccountId?: string,
 ): Promise<number> {
+  // 「平文が残っているか」だけを見る。暗号文が既に入っていても平文が残る行は
+  // 未完了として数える。両方ある行を移行済みと数えると、done が嘘になる。
   const where = lineAccountId === undefined
-    ? `secret IS NOT NULL AND secret_encrypted IS NULL`
-    : `line_account_id = ? AND secret IS NOT NULL AND secret_encrypted IS NULL`;
+    ? `secret IS NOT NULL`
+    : `line_account_id = ? AND secret IS NOT NULL`;
   const binds = lineAccountId === undefined ? [] : [lineAccountId];
   const row = await db.prepare(
     `SELECT COUNT(*) AS count FROM ${table} WHERE ${where}`,
@@ -603,9 +605,11 @@ export async function backfillWebhookSecrets(
   }
 
   for (const table of tables) {
+    // 平文が残っている行と、旧鍵のままの行を拾う。暗号文を入れた後に平文だけ
+    // 消し損ねた行も `secret IS NOT NULL` で拾い直せる(数えるだけで終わらせない)。
     const where = options.lineAccountId === undefined
-      ? `(secret IS NOT NULL AND secret_encrypted IS NULL) OR (secret_encrypted IS NOT NULL AND secret_encrypted NOT LIKE ?)`
-      : `line_account_id = ? AND ((secret IS NOT NULL AND secret_encrypted IS NULL) OR (secret_encrypted IS NOT NULL AND secret_encrypted NOT LIKE ?))`;
+      ? `secret IS NOT NULL OR (secret_encrypted IS NOT NULL AND secret_encrypted NOT LIKE ?)`
+      : `line_account_id = ? AND (secret IS NOT NULL OR (secret_encrypted IS NOT NULL AND secret_encrypted NOT LIKE ?))`;
     const binds = options.lineAccountId === undefined ? [likeCurrent] : [options.lineAccountId, likeCurrent];
     const targets = await db.prepare(
       `SELECT id, secret, secret_encrypted FROM ${table} WHERE ${where} ORDER BY id ASC LIMIT ?`,

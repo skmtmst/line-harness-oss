@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 
 import {
   backfillWebhookSecrets,
@@ -76,7 +76,7 @@ function insertLegacyOutgoing(sqlite: Database.Database, id: string, account: st
 function legacyCount(sqlite: Database.Database, account: string): number {
   const count = (table: string): number => (sqlite.prepare(
     `SELECT COUNT(*) AS n FROM ${table}
-      WHERE line_account_id = ? AND secret IS NOT NULL AND secret_encrypted IS NULL`,
+      WHERE line_account_id = ? AND secret IS NOT NULL`,
   ).get(account) as { n: number }).n;
   return count('incoming_webhooks') + count('outgoing_webhooks');
 }
@@ -215,6 +215,69 @@ describe('migration 350 webhook secret の暗号化保存(#650 再審査)', () =
       createIncomingWebhook(db, { name: '受信', secret: SECRET, lineAccountId: 'acc-new' }),
     ).rejects.toThrow();
     expect(legacyCount(sqlite, 'acc-new')).toBe(0);
+  });
+
+  /**
+   * 「列がNULL」では平文が消えた証拠にならない。SQLiteは解放した領域を
+   * 消さないので、生のDB像に平文が残ることがある。移行と再保存のあと、
+   * DBファイルの生バイトに平文が1度も出ないことをここで見張る(#650)。
+   * この検査に使う印は、この試験だけが入れる値にしてある。
+   */
+  it('移行後のDB像・ログ・例外の本文に平文が1度も出ない', async () => {
+    const marker = `residue-marker-${'q'.repeat(32)}`;
+    const image = (): Buffer => Buffer.from(sqlite.serialize());
+    expect(image().includes(Buffer.from(marker))).toBe(false);
+
+    insertAccount(sqlite, 'acc-residue');
+    sqlite.prepare(
+      `INSERT INTO incoming_webhooks (id, name, secret, line_account_id) VALUES ('res-in-1', '旧受信', ?, 'acc-residue')`,
+    ).run(marker);
+    sqlite.prepare(
+      `INSERT INTO outgoing_webhooks (id, name, url, secret, line_account_id)
+       VALUES ('res-out-1', '旧送信', 'https://example.com/hook', ?, 'acc-residue')`,
+    ).run(marker);
+    expect(image().includes(Buffer.from(marker))).toBe(true);
+
+    const report = await backfillWebhookSecrets(db, {
+      lineAccountId: 'acc-residue', dryRun: false, keys: { current: KEY_A },
+    });
+    expect(report.migrated).toBe(2);
+    expect(report.done).toBe(true);
+    expect(legacyCount(sqlite, 'acc-residue')).toBe(0);
+    // 列だけでなくDB像そのものに平文が残っていないこと。
+    expect(image().includes(Buffer.from(marker))).toBe(false);
+
+    // 新規作成も同じ。平文はどの列にも、DB像にも入らない。
+    const created = `fresh-marker-${'w'.repeat(32)}`;
+    await createOutgoingWebhook(db, {
+      name: '新規', url: 'https://example.com/new', eventTypes: [],
+      secret: created, lineAccountId: 'acc-residue',
+    }, { current: KEY_A });
+    expect(image().includes(Buffer.from(created))).toBe(false);
+
+    // 復号できない行を触ったときのログと例外にも平文・鍵を出さない。
+    const logs: string[] = [];
+    const spy = vi.spyOn(console, 'error').mockImplementation((...args) => {
+      logs.push(args.map((arg) => String(arg)).join(' '));
+    });
+    let thrown = '';
+    try {
+      await resolveWebhookSecret(
+        { id: 'res-broken', secret: null, secret_encrypted: 'k000000000000.v1.zzz.zzz' },
+        { current: KEY_A },
+      );
+    } catch (error) {
+      thrown = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+    } finally {
+      spy.mockRestore();
+    }
+    expect(thrown).not.toBe('');
+    for (const line of [...logs, thrown]) {
+      expect(line).not.toContain(marker);
+      expect(line).not.toContain(created);
+      expect(line).not.toContain(KEY_A);
+      expect(line).not.toContain(SECRET);
+    }
   });
 
   it('hasWebhookSecretは未設定と短い旧平文をfalseにする', () => {
