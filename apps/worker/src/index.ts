@@ -1,4 +1,4 @@
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import { cors } from 'hono/cors';
 import { LineClient } from '@line-crm/line-sdk';
 import {
@@ -161,7 +161,15 @@ import {
   shouldStopCodexQueueRetry,
   type CodexMentionQueueMessage,
 } from './services/codex-cloud-monitor.js';
-import { isQrDataAllowed, normalizeQrSize, qrResponseHeaders, normalizeQrFormat } from './lib/qr-response.js';
+import {
+  createQrImage,
+  isQrDataAllowed,
+  normalizeQrFormat,
+  normalizeQrSize,
+  qrResponseHeaders,
+  QrInputError,
+  QR_MAX_RESPONSE_BYTES,
+} from './lib/qr-response.js';
 import { safeRedirectTarget } from './lib/safe-redirect.js';
 import { isLinkPreviewBot } from './lib/og-bot.js';
 import { buildOgHtml } from './lib/og-html.js';
@@ -452,8 +460,10 @@ app.route('/admin', adminVersion);
 // authMiddleware skips non-/api/ paths so this router owns its own auth gate.
 app.route('/admin/update', adminUpdate);
 
-// Self-hosted QR code proxy — prevents leaking ref tokens to third-party services
-app.get('/api/qr', async (c) => {
+// QR は Worker の中だけで作る。流入 ref や LIFF URL は計測の識別子で、
+// 第三者の生成サービスへ渡す理由がない。以前は data をそのまま
+// api.qrserver.com へ送っていたので、説明と実装が食い違っていた。
+export const qrHandler: (c: Context<Env>) => Promise<Response> = async (c) => {
   const data = c.req.query('data');
   if (!data) return c.text('Missing data param', 400);
   if (!isQrDataAllowed(data)) return c.text('Data param too long', 400);
@@ -461,25 +471,26 @@ app.get('/api/qr', async (c) => {
   if (!size) return c.text('Invalid size', 400);
   // 印刷に使うので svg も出せる。知らない値は png に丸める。
   const format = normalizeQrFormat(c.req.query('format'));
-  const upstream = `https://api.qrserver.com/v1/create-qr-code/?size=${encodeURIComponent(size)}&format=${format}&data=${encodeURIComponent(data)}`;
-  const res = await fetch(upstream, { signal: AbortSignal.timeout(8_000) }).catch(() => null);
-  if (!res) return c.text('QR generation timed out', 504);
-  if (!res.ok) return c.text('QR generation failed', 502);
-  const declaredLength = Number(res.headers.get('content-length') || '0');
-  if (declaredLength > 2 * 1024 * 1024) return c.text('QR response too large', 502);
-  const bytes = await res.arrayBuffer();
-  if (bytes.byteLength > 2 * 1024 * 1024) return c.text('QR response too large', 502);
-  const contentType = res.headers.get('Content-Type');
-  if (!contentType?.toLowerCase().startsWith('image/')) return c.text('Invalid QR response', 502);
-  return new Response(bytes, {
+  let image: Awaited<ReturnType<typeof createQrImage>>;
+  try {
+    image = await createQrImage(data, size, format);
+  } catch (error) {
+    // 指定を直せば通る失敗（小さすぎる・長すぎる）は理由を返す。
+    if (error instanceof QrInputError) return c.text(error.message, 400);
+    return c.text('QR generation failed', 500);
+  }
+  if (image.bytes.byteLength > QR_MAX_RESPONSE_BYTES) return c.text('QR response too large', 500);
+  return new Response(image.bytes, {
     headers: qrResponseHeaders(
-      contentType,
+      image.contentType,
       c.req.query('download') === '1',
       c.req.query('filename') || 'referral-link-qr',
       format,
     ),
   });
-});
+};
+
+app.get('/api/qr', qrHandler);
 
 // Short link: /r/:ref → universal landing page with LINE open button
 // Supports query params: ?form=FORM_ID (auto-push form after friend add)
