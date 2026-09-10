@@ -57,7 +57,21 @@ describe('resolveStepContent', () => {
     });
   });
 
-  it('テンプレ messageType=carousel → flex に coerce (buildMessage 互換)', async () => {
+  /*
+   * carousel は flex に coerce しない。PR #177「カルーセルを送れるように
+   * する(配信が壊れていたのも直す)」(2026-08-19) で意図的に撤回された。
+   *
+   * 撤回の理由: カルーセルの中身は columns の配列で、Flex が要求するのは
+   * bubble か carousel の**オブジェクト**。coerce していた頃は配列のまま
+   * Flex の contents に入れて送っていたため LINE が 400 を返し、400 は
+   * 永続エラー扱いなので pauseFriendScenarioDelivery が走って、その人の
+   * 購読ごと止まっていた(詳細: packages/db/src/scenario-resolve.ts の
+   * normalizeMessageType のコメント)。carousel はそのまま返し、
+   * buildMessage が template メッセージ
+   * ({ type: 'template', template: { type: 'carousel', columns } }) に
+   * 組み立てる。
+   */
+  it('テンプレ messageType=carousel はそのまま carousel で返る(flex へ coerce しない)', async () => {
     const result = await resolveStepContent(
       mockDb({ message_type: 'carousel', message_content: '{"type":"carousel","contents":[]}' }),
       {
@@ -66,7 +80,7 @@ describe('resolveStepContent', () => {
         message_content: 'fallback',
       },
     );
-    expect(result.messageType).toBe('flex');
+    expect(result.messageType).toBe('carousel');
     expect(result.templateIdAtSend).toBe('tpl-carousel');
   });
 
