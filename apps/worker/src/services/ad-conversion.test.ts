@@ -58,6 +58,19 @@ function seedTwoAccounts(): SqliteD1 {
   return testDb;
 }
 
+function outbox(testDb: SqliteD1): Array<{
+  ad_platform_id: string; friend_id: string; line_account_id: string | null;
+  status: string; last_error: string | null;
+}> {
+  return testDb.raw.prepare(
+    `SELECT ad_platform_id, friend_id, line_account_id, status, last_error
+       FROM ad_conversion_outbox ORDER BY ad_platform_id`,
+  ).all() as Array<{
+    ad_platform_id: string; friend_id: string; line_account_id: string | null;
+    status: string; last_error: string | null;
+  }>;
+}
+
 function logs(testDb: SqliteD1): Array<{ ad_platform_id: string; friend_id: string; line_account_id: string | null; status: string }> {
   return testDb.raw.prepare(
     `SELECT ad_platform_id, friend_id, line_account_id, status FROM ad_conversion_logs ORDER BY ad_platform_id`,
@@ -415,6 +428,49 @@ describe('sendAdConversions のアカウント境界(#638)', () => {
     const bodies = sentRequests.map((r) => r.body as { data: Array<{ event_id: string }> });
     expect(bodies[0]?.data[0]?.event_id).toBe('o:evt-1:p1');
     expect(bodies[1]?.data[0]?.event_id).toBe('o:evt-1:p1');
+  });
+
+  it('別アカウントの設定IDを指定しても送らず、待ち行列にも残さない', async () => {
+    const testDb = seedTwoAccounts();
+    mockFetchOk();
+
+    // a1の友だちに対して、a2の設定IDを指定する。境界の外は選べない。
+    await expect(sendAdConversions(testDb.db, 'f1', 'Purchase', 1000, { platformId: 'p2' }))
+      .resolves.toBeUndefined();
+
+    expect(sentRequests).toHaveLength(0);
+    expect(logs(testDb)).toHaveLength(0);
+    expect(outbox(testDb)).toHaveLength(0);
+  });
+
+  it('取り出し時に設定の帰属が変わっていたら、新しい帰属先へは送らない', async () => {
+    const testDb = seedTwoAccounts();
+    seedAccount(testDb, 'a3');
+    let fail = true;
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init?: { body?: string }) => {
+      sentRequests.push({ url, body: init?.body ? JSON.parse(init.body) : null });
+      if (fail) return { ok: false, status: 500, text: async (): Promise<string> => 'down' };
+      return { ok: true, text: async (): Promise<string> => 'ok' };
+    }));
+
+    await sendAdConversions(testDb.db, 'f1', 'Purchase', 1000, { idempotencyKey: 'moved:evt-1' });
+    expect(sentRequests).toHaveLength(1);
+
+    // 待ち行列に残っている間に、設定がa3へ移された。行の帰属はa1のまま。
+    testDb.raw.prepare(`UPDATE ad_platforms SET line_account_id = 'a3' WHERE id = 'p1'`).run();
+    fail = false;
+    testDb.raw.prepare(`UPDATE ad_conversion_outbox SET next_attempt_at = '2000-01-01T00:00:00.000+09:00'`).run();
+
+    expect(await drainAdConversionOutbox(testDb.db)).toMatchObject({ claimed: 1, sent: 0, failed: 1 });
+    // 外部送信は1回も増えない。取り出し側が帰属の変化を見て止める。
+    expect(sentRequests).toHaveLength(1);
+    const row = outbox(testDb)[0];
+    expect(row).toMatchObject({ status: 'failed', line_account_id: 'a1' });
+    expect(String(row?.last_error)).toContain('platform account changed');
+    // 記録も初回の所属のまま。移動先には1行も残らない。
+    expect(logs(testDb)).toEqual([
+      { ad_platform_id: 'p1', friend_id: 'f1', line_account_id: 'a1', status: 'failed' },
+    ]);
   });
 
   it('送信失敗は failed で記録し投げない。1回の呼び出しで1媒体へ1回だけ送る', async () => {
