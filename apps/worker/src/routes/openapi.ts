@@ -1183,6 +1183,35 @@ const spec = {
         responses: { '200': { description: 'OK' } },
       },
     },
+    // ── Rich Menus (publish schedules) ────────────────────────────────────
+    '/api/rich-menu-groups/{groupId}/schedule': {
+      post: {
+        tags: ['Rich Menus'],
+        summary: 'リッチメニューの公開予約を作成',
+        parameters: [{ name: 'groupId', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: { content: { 'application/json': { schema: { type: 'object', properties: { mode: { type: 'string', enum: ['scheduled', 'period'] }, startsAt: { type: 'string', format: 'date-time' }, endsAt: { type: 'string', format: 'date-time' }, restoreGroupId: { type: 'string' } }, required: ['mode', 'startsAt'] } } } },
+        responses: { '201': { description: 'Schedule created' }, '200': { description: 'Same Idempotency-Key content exists' }, '400': { description: 'Invalid input' }, '404': { description: 'Not found' }, '409': { description: 'Idempotency-Key used with different content' } },
+      },
+    },
+    '/api/rich-menu-groups/{groupId}/schedules': {
+      get: {
+        tags: ['Rich Menus'],
+        summary: 'リッチメニューの公開予約一覧を取得',
+        parameters: [{ name: 'groupId', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'Schedules with status and retry info' }, '404': { description: 'Not found' } },
+      },
+    },
+    '/api/rich-menu-groups/{groupId}/schedules/{scheduleId}/cancel': {
+      post: {
+        tags: ['Rich Menus'],
+        summary: '実行前の公開予約を取り消し',
+        parameters: [
+          { name: 'groupId', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'scheduleId', in: 'path', required: true, schema: { type: 'string' } },
+        ],
+        responses: { '200': { description: 'Cancelled' }, '404': { description: 'Not found' }, '409': { description: 'Already started' } },
+      },
+    },
   },
   tags: [
     { name: 'Friends', description: '友だち管理' },
@@ -1194,6 +1223,7 @@ const spec = {
     { name: 'LINE Accounts', description: 'マルチLINEアカウント管理' },
     { name: 'Conversions', description: 'コンバージョン計測' },
     { name: 'Affiliates', description: 'アフィリエイト管理' },
+    { name: 'Rich Menus', description: 'リッチメニュー公開予約' },
     { name: 'Settings', description: '機能設定' },
     { name: 'Webhook', description: 'LINE Webhook' },
   ],
