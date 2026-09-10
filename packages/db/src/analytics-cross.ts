@@ -1054,8 +1054,11 @@ export async function processPendingAnalyticsCrossRuns(
   limit = 2,
 ): Promise<{ processed: number; failed: number }> {
   const safeLimit = Math.max(1, Math.min(Math.floor(limit), 5));
+  // 機能オフ中のアカウントの行は LIMIT を数える前に外す。後で弾くと、
+  // オフの古い行が先頭を占めたままON中の他アカウントが永久に回らない。
   const rows = await db.prepare(
     `SELECT id, line_account_id FROM analytics_cross_runs WHERE state = 'pending'
+        AND NOT ${accountFeatureOffExclusionSql('analytics_cross_runs.line_account_id', 'analytics')}
       ORDER BY created_at, id LIMIT ?`,
   ).bind(safeLimit).all<{ id: string; line_account_id: string }>();
   let processed = 0;
@@ -1094,7 +1097,7 @@ export async function recoverStalledAnalyticsCrossRuns(
         SET state = 'pending', started_at = NULL, error_code = NULL,
             lease_generation = lease_generation + 1
       WHERE state = 'running' AND started_at < ?
-        AND NOT ${accountFeatureOffExclusionSql('line_account_id', 'analytics')}`,
+        AND NOT ${accountFeatureOffExclusionSql('analytics_cross_runs.line_account_id', 'analytics')}`,
   ).bind(cutoff).run();
   return Number(result.meta?.changes ?? 0);
 }

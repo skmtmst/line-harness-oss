@@ -1501,6 +1501,20 @@ export interface MileageQueueResult {
   granted: number;
 }
 
+/**
+ * 付与キューの行の持ち主(=イベントの友だちが属するアカウント)が
+ * マイル機能オフかをSQL内で判定する式。持ち主不明の旧行は偽になり、
+ * 従来どおり進む。
+ */
+function mileageOwnerOffSql(eventIdColumn: string): string {
+  return `EXISTS (
+    SELECT 1 FROM engagement_events ee
+      JOIN friends f ON f.id = ee.actor_friend_id
+     WHERE ee.id = ${eventIdColumn}
+       AND ${accountFeatureOffExclusionSql('f.line_account_id', 'mileage')}
+  )`;
+}
+
 /** Drain a bounded batch. Safe for retries and overlapping cron invocations. */
 export async function processPendingMileageEvents(
   db: D1Database,
@@ -1508,16 +1522,21 @@ export async function processPendingMileageEvents(
 ): Promise<MileageQueueResult> {
   const limit = Math.min(250, Math.max(1, options.limit ?? 100));
   const now = options.now ?? jstNow();
+  // 停滞回収も機能オフ中のアカウントには当てない。OFF中は status も
+  // processing_started_at も updated_at も動かさず、再オンで回収する。
   await db
     .prepare(
       `UPDATE mileage_event_queue
           SET status = 'pending', processing_started_at = NULL, updated_at = ?
         WHERE status = 'processing'
-          AND datetime(processing_started_at) < datetime(?, '-10 minutes')`,
+          AND datetime(processing_started_at) < datetime(?, '-10 minutes')
+          AND NOT ${mileageOwnerOffSql('mileage_event_queue.engagement_event_id')}`,
     )
     .bind(now, now)
     .run();
 
+  // 機能オフ中の行は LIMIT を数える前に外す。後で弾くと、オフの古い行が
+  // 先頭を占めたままON中の他アカウントが永久に回らない。
   const due = await db
     .prepare(
       `SELECT q.engagement_event_id
@@ -1525,6 +1544,7 @@ export async function processPendingMileageEvents(
         WHERE q.status IN ('pending','failed')
           AND q.attempts < 5
           AND datetime(q.available_at) <= datetime(?)
+          AND NOT ${mileageOwnerOffSql('q.engagement_event_id')}
         ORDER BY q.created_at ASC, q.engagement_event_id ASC
         LIMIT ?`,
     )

@@ -6,6 +6,11 @@
  */
 import { featureCatalogEntry, type FeatureId } from '@line-crm/shared';
 
+// SQL だけを組み立てる関数は D1 の型に触れないよう別ファイルへ置く。
+// scripts の型検査は Workers 型を読み込まないため、この表から
+// 直接 import されると壊れる。従来の import 先はそのまま使える。
+export { accountFeatureOffExclusionSql } from './account-feature-sql.js';
+
 /**
  * Retrieve a raw setting value (JSON string) for an account.
  * Returns null when the key is not set.
@@ -145,30 +150,6 @@ export async function isAccountFeatureEnabled(
   }
   const entry = featureCatalogEntry(featureId as FeatureId);
   return entry?.defaultEnabled ?? true;
-}
-
-/**
- * 機能オフ中のアカウントかをSQL内で判定する条件式。
- * 一括設定・個別設定のどちらかで明示オフなら真。使う側で
- * `AND NOT (...)` の形で足す。持ち主不明(NULL)は偽になる。
- * featureとaccountColumnは呼び出し側の固定文字列にすること。
- */
-export function accountFeatureOffExclusionSql(
-  accountColumn: string,
-  feature: string,
-): string {
-  return `(
-    EXISTS (SELECT 1 FROM account_settings s
-      WHERE s.line_account_id = ${accountColumn}
-        AND s.key = 'feature.settings_bundle_v1'
-        AND json_valid(s.value)
-        AND json_extract(s.value, '$.data.features.${feature}') = 0)
-    OR EXISTS (SELECT 1 FROM account_settings s
-      WHERE s.line_account_id = ${accountColumn}
-        AND s.key = 'feature.${feature}'
-        AND json_valid(s.value)
-        AND (json_extract(s.value, '$.enabled') = 0 OR json_extract(s.value, '$') = 0))
-  )`;
 }
 
 export async function getVersionedAccountSetting<T>(

@@ -4,12 +4,18 @@ const dbMocks = vi.hoisted(() => ({
   getFriendById: vi.fn(),
   getLineAccountById: vi.fn(),
   jstNow: vi.fn(() => '2026-08-28 01:00:00'),
+  // 取り出しのSQLに混ぜる「機能オフのアカウントを外す」条件式。
+  // ここでは常に偽(=誰も外さない)にして、この試験の関心事だけを見る。
+  accountFeatureOffExclusionSql: vi.fn(() => '(0)'),
 }));
 const pushViaHarnessProxy = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
 const logOutgoingMessage = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
 
 vi.mock('@line-crm/db', () => dbMocks);
-vi.mock('./feature-enforcement.js', () => ({ featureJobCanRun: async () => true }));
+vi.mock('./feature-enforcement.js', () => ({
+  featureJobCanRun: async () => true,
+  createFeatureJobGate: () => ({ canRun: async () => true }),
+}));
 vi.mock('./line-proxy-send.js', () => ({ pushViaHarnessProxy }));
 vi.mock('./event-bus.js', () => ({ logOutgoingMessage }));
 
@@ -44,6 +50,10 @@ function createDb(lineAccountId = 'account-a', retryGeneration = 0) {
       return {
         bind(...bound: unknown[]) { values = bound; return this; },
         async all() {
+          // 機能オフの行だけを読む監査用の問い合わせ。ここでは0件。
+          if (sql.includes('SELECT line_account_id FROM nen_delivery_jobs')) {
+            return { results: [] };
+          }
           if (sql.includes('FROM nen_delivery_jobs')) return { results: [job] };
           return { results: [] };
         },

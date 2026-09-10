@@ -59,7 +59,11 @@ export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
     enforcement: {
       mode: 'gated',
       sources: ['apps/worker/src/services/mileage-reward-delivery.ts'],
-      markers: ["job: 'mileage reward delivery retry'", "job: 'mileage reward delivery'"],
+      markers: [
+        "job: 'mileage reward delivery retry'",
+        "job: 'mileage reward delivery'",
+        "accountFeatureOffExclusionSql('mileage_redemptions.line_account_id', 'mileage')",
+      ],
     },
   },
   {
@@ -70,7 +74,8 @@ export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
       sources: ['packages/db/src/analytics-cross.ts'],
       markers: [
         "isAccountFeatureEnabled(db, row.line_account_id, 'analytics')",
-        "accountFeatureOffExclusionSql('line_account_id', 'analytics')",
+        // 取り出し(LIMIT前)と停滞回収の両方をSQLで止める。
+        "accountFeatureOffExclusionSql('analytics_cross_runs.line_account_id', 'analytics')",
       ],
     },
   },
@@ -80,7 +85,12 @@ export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
     enforcement: {
       mode: 'gated',
       sources: ['packages/db/src/mileage.ts'],
-      markers: ["isAccountFeatureEnabled(db, owner.line_account_id, 'mileage')"],
+      markers: [
+        "isAccountFeatureEnabled(db, owner.line_account_id, 'mileage')",
+        // 取り出し(LIMIT前)と停滞回収の両方をSQLで止める。
+        'function mileageOwnerOffSql(',
+        'AND NOT ${mileageOwnerOffSql(',
+      ],
     },
   },
   {
@@ -89,7 +99,10 @@ export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
     enforcement: {
       mode: 'gated',
       sources: ['packages/db/src/analytics-url-exposures.ts'],
-      markers: ["isAccountFeatureEnabled(db, item.line_account_id, 'analytics')"],
+      markers: [
+        "isAccountFeatureEnabled(db, item.line_account_id, 'analytics')",
+        "accountFeatureOffExclusionSql('analytics_url_exposure_queue.line_account_id', 'analytics')",
+      ],
     },
   },
   {
@@ -299,7 +312,10 @@ export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
     enforcement: {
       mode: 'gated',
       sources: ['apps/worker/src/services/nen-engagement.ts'],
-      markers: ["job: 'NEN campaign deliveries'"],
+      markers: [
+        "job: 'NEN campaign deliveries'",
+        "accountFeatureOffExclusionSql('nen_delivery_jobs.line_account_id', 'nen_campaigns')",
+      ],
     },
   },
   {
@@ -316,8 +332,16 @@ export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
     classification: { kind: 'feature', featureId: 'scenarios' },
     enforcement: {
       mode: 'gated',
-      sources: ['apps/worker/src/services/step-delivery.ts'],
-      markers: ["job: 'scenario deliveries'"],
+      sources: [
+        'apps/worker/src/services/step-delivery.ts',
+        'packages/db/src/scenario-delivery-timestamps.ts',
+        'packages/db/src/scenarios.ts',
+      ],
+      markers: [
+        "job: 'scenario deliveries'",
+        // 取り出し(LIMIT前)と停滞回収の両方をSQLで止める。
+        "accountFeatureOffExclusionSql('s.line_account_id', 'scenarios')",
+      ],
     },
   },
   {
@@ -344,7 +368,11 @@ export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
     enforcement: {
       mode: 'gated',
       sources: ['apps/worker/src/services/booking-calendar-sync.ts'],
-      markers: ["'booking', 'booking calendar delete retry'"],
+      markers: [
+        "'booking', 'booking calendar delete retry'",
+        // 候補読取(LIMIT前)でオフのアカウントを外す。
+        "accountFeatureOffExclusionSql('booking_operation_runs.line_account_id', 'booking')",
+      ],
     },
   },
 ];

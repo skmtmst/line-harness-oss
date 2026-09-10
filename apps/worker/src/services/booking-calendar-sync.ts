@@ -8,6 +8,7 @@ import {
   finishBookingOperation,
   queueBookingOperation,
 } from './booking-operation-runs.js';
+import { accountFeatureOffExclusionSql } from '@line-crm/db';
 import { createFeatureJobGate } from './feature-enforcement.js';
 
 export interface StaffCalendarConnection {
@@ -242,19 +243,41 @@ export async function processPendingCalendarDeleteOperations(
    * アカウントの行だけを claim する。オフの行は opened_at も status も
    * 変えず、Google Calendar も呼ばない。skipped 監査だけ残し、
    * 再オン後の tick でそのまま拾い直す。
+   *
+   * オフ判定は LIMIT を数える前に SQL で行う。読んでから弾くと、
+   * オフの古い行が上限ぶん先頭を占めたままになり、後ろに並ぶ
+   * 動作中アカウントの行が永久に処理されない。
    */
-  const candidates = await db.prepare(
-    `SELECT id, booking_id, line_account_id FROM booking_operation_runs
-      WHERE kind = 'google_calendar'
+  const dueWhere = `kind = 'google_calendar'
         AND json_extract(result_json, '$.direction') = 'delete'
         AND status IN ('queued', 'retry_wait')
-        AND (opened_at IS NULL OR opened_at < ?)
+        AND (opened_at IS NULL OR opened_at < ?)`;
+  const bookingOff = accountFeatureOffExclusionSql('booking_operation_runs.line_account_id', 'booking');
+  const candidates = await db.prepare(
+    `SELECT id, booking_id, line_account_id FROM booking_operation_runs
+      WHERE ${dueWhere}
+        AND NOT ${bookingOff}
       ORDER BY updated_at ASC LIMIT ?`,
   ).bind(staleCutoff, limit).all<{ id: string; booking_id: string; line_account_id: string }>();
   const result = { processed: 0, succeeded: 0, retrying: 0, skipped: 0 };
   const gate = createFeatureJobGate();
+  /*
+   * 止めた事実は監査に残す。行は読むだけで、状態は一切変えない。
+   * 監査は日・アカウント・機能・job で1件にまとまるため、
+   * アカウントごとに1行だけ読めば足りる。
+   */
+  const offOwners = await db.prepare(
+    `SELECT DISTINCT line_account_id FROM booking_operation_runs
+      WHERE ${dueWhere}
+        AND ${bookingOff}
+      ORDER BY line_account_id LIMIT ?`,
+  ).bind(staleCutoff, limit).all<{ line_account_id: string }>();
+  for (const owner of offOwners.results ?? []) {
+    await gate.canRun(db, owner.line_account_id, 'booking', 'booking calendar delete retry');
+  }
   const runnableIds: string[] = [];
   for (const candidate of candidates.results ?? []) {
+    // カタログ既定や設定の壊れ方に備え、claim 前にもう一度だけ確かめる。
     if (await gate.canRun(db, candidate.line_account_id, 'booking', 'booking calendar delete retry')) {
       runnableIds.push(candidate.id);
     }
@@ -265,10 +288,8 @@ export async function processPendingCalendarDeleteOperations(
   const claimed = await db.prepare(
     `UPDATE booking_operation_runs SET opened_at = ?, updated_at = ?
       WHERE id IN (${runnableIds.map(() => '?').join(', ')})
-        AND kind = 'google_calendar'
-        AND json_extract(result_json, '$.direction') = 'delete'
-        AND status IN ('queued', 'retry_wait')
-        AND (opened_at IS NULL OR opened_at < ?)
+        AND ${dueWhere}
+        AND NOT ${bookingOff}
       RETURNING id, booking_id, line_account_id`,
   ).bind(nowIso, nowIso, ...runnableIds, staleCutoff)
     .all<{ id: string; booking_id: string; line_account_id: string }>();
