@@ -24,6 +24,170 @@ function fingerprint(update: (push: (byte: number) => void) => void): string {
 }
 
 /**
+ * 升目から元の文字列へ戻す、qr-matrix.ts とは独立した復号器（型番1〜4・バイトモード専用）。
+ *
+ * ここが Issue #697 の core。手打ちの升目と1280通りの指紋は「別実装との一致」を
+ * 固定するだけで、その別実装（あるいは手打ち）がそもそも正しいかは証明しない。
+ * 復号器を実装本体を一切 import せずに書き、規格の手順（形式情報15bit・機能
+ * パターン・蛇行読み出し・8種のマスク式・ブロックの並べ替え戻し・バイトモード
+ * の解釈）だけで升目から文字列を取り戻せることを示す。誤り訂正による訂正は
+ * 行わない（このテストの入力に誤りはない前提）。
+ *
+ * 本物であることの確認は下の「復号器が本物であることの確認」で行う。
+ */
+function decodeQr(symbol: { size: number; modules: Uint8Array }): string {
+  const size = symbol.size;
+  const version = (size - 17) / 4;
+  if (!Number.isInteger(version) || version < 1 || version > 4) {
+    throw new Error(`この復号器は型番1〜4のみ対応(size=${size})`);
+  }
+  const get = (x: number, y: number) => symbol.modules[y * size + x] === 1;
+
+  // 機能パターン（位置検出・タイミング・位置合わせ・形式情報）の座標を、
+  // 規格の記述から独立に再現する。ここに乗る升目はデータではない。
+  const isFunction = new Uint8Array(size * size);
+  const markFunction = (x: number, y: number): void => {
+    isFunction[y * size + x] = 1;
+  };
+  for (let i = 0; i < size; i++) {
+    markFunction(6, i);
+    markFunction(i, 6);
+  }
+  const markFinder = (cx: number, cy: number): void => {
+    for (let dy = -4; dy <= 4; dy++) {
+      for (let dx = -4; dx <= 4; dx++) {
+        const x = cx + dx;
+        const y = cy + dy;
+        if (x >= 0 && x < size && y >= 0 && y < size) markFunction(x, y);
+      }
+    }
+  };
+  markFinder(3, 3);
+  markFinder(size - 4, 3);
+  markFinder(3, size - 4);
+  // 型番2〜4は位置合わせパターンが1個だけ。中心座標は規格の表（型番7以上は複数になる）。
+  const ALIGN_CENTER: Record<number, number> = { 2: 18, 3: 22, 4: 26 };
+  if (version >= 2) {
+    const c = ALIGN_CENTER[version];
+    for (let dy = -2; dy <= 2; dy++) {
+      for (let dx = -2; dx <= 2; dx++) markFunction(c + dx, c + dy);
+    }
+  }
+  for (let i = 0; i <= 5; i++) markFunction(8, i);
+  markFunction(8, 7);
+  markFunction(8, 8);
+  markFunction(7, 8);
+  for (let i = 9; i < 15; i++) markFunction(14 - i, 8);
+  for (let i = 0; i < 8; i++) markFunction(size - 1 - i, 8);
+  for (let i = 8; i < 15; i++) markFunction(8, size - 15 + i);
+  markFunction(8, size - 8);
+
+  // 形式情報15bit（誤り訂正の強さ2bit + マスク3bit + BCH10bit）を読む。
+  // 冗長な2箇所のうち左上側だけを読む。誤りは無い前提なのでBCH訂正はしない。
+  let bits = 0;
+  for (let i = 0; i <= 5; i++) bits |= (get(8, i) ? 1 : 0) << i;
+  bits |= (get(8, 7) ? 1 : 0) << 6;
+  bits |= (get(8, 8) ? 1 : 0) << 7;
+  bits |= (get(7, 8) ? 1 : 0) << 8;
+  for (let i = 9; i < 15; i++) bits |= (get(14 - i, 8) ? 1 : 0) << i;
+  const dataBits = (bits ^ 0x5412) >>> 10;
+  const mask = dataBits & 0b111;
+  const eccFormatBits = dataBits >>> 3;
+  const ECC_BY_FORMAT_BITS: Record<number, QrEccLevel> = { 1: 'L', 0: 'M', 3: 'Q', 2: 'H' };
+  const ecc = ECC_BY_FORMAT_BITS[eccFormatBits];
+  if (!ecc) throw new Error(`不正な誤り訂正レベル(bits=${eccFormatBits})`);
+
+  // マスク8種。規格の式をそのまま書き起こす（qr-matrix.ts の表引き・ビット演算とは別の書き方）。
+  const maskInvert = (x: number, y: number): boolean => {
+    switch (mask) {
+      case 0: return (x + y) % 2 === 0;
+      case 1: return y % 2 === 0;
+      case 2: return x % 3 === 0;
+      case 3: return (x + y) % 3 === 0;
+      case 4: return (Math.floor(x / 3) + Math.floor(y / 2)) % 2 === 0;
+      case 5: return (x * y) % 2 + (x * y) % 3 === 0;
+      case 6: return ((x * y) % 2 + (x * y) % 3) % 2 === 0;
+      case 7: return ((x + y) % 2 + (x * y) % 3) % 2 === 0;
+      default: throw new Error(`不正なマスク(${mask})`);
+    }
+  };
+
+  // 蛇行読み出し。右から2列ずつ、column6は飛ばす。機能パターンは読み飛ばす。
+  const bitStream: number[] = [];
+  for (let right = size - 1; right >= 1; right -= 2) {
+    if (right === 6) right = 5;
+    for (let vert = 0; vert < size; vert++) {
+      for (let j = 0; j < 2; j++) {
+        const x = right - j;
+        const upward = ((right + 1) & 2) === 0;
+        const y = upward ? size - 1 - vert : vert;
+        if (isFunction[y * size + x] === 0) {
+          const raw = get(x, y);
+          const bit = maskInvert(x, y) ? !raw : raw;
+          bitStream.push(bit ? 1 : 0);
+        }
+      }
+    }
+  }
+  const codewords: number[] = [];
+  for (let i = 0; i + 8 <= bitStream.length; i += 8) {
+    let byte = 0;
+    for (let j = 0; j < 8; j++) byte = (byte << 1) | bitStream[i + j];
+    codewords.push(byte);
+  }
+
+  // ブロックの並べ替えを戻す。表は規格の公表値をここへ独立に書き起こす
+  // （qr-matrix.ts の ECC_CODEWORDS_PER_BLOCK / NUM_ERROR_CORRECTION_BLOCKS とは別の配列）。
+  const ECC_BLOCKS: Record<QrEccLevel, number[]> = {
+    L: [1, 1, 1, 1], M: [1, 1, 1, 2], Q: [1, 1, 2, 2], H: [1, 1, 2, 4],
+  };
+  const ECC_LEN: Record<QrEccLevel, number[]> = {
+    L: [7, 10, 15, 20], M: [10, 16, 26, 18], Q: [13, 22, 18, 26], H: [17, 28, 22, 16],
+  };
+  const numBlocks = ECC_BLOCKS[ecc][version - 1];
+  const blockEccLen = ECC_LEN[ecc][version - 1];
+  const rawCodewords = codewords.length;
+  const numShortBlocks = numBlocks - (rawCodewords % numBlocks);
+  const shortBlockLen = Math.floor(rawCodewords / numBlocks);
+  const blockLens: number[] = [];
+  for (let i = 0; i < numBlocks; i++) {
+    blockLens.push(shortBlockLen - blockEccLen + (i < numShortBlocks ? 0 : 1));
+  }
+  const blockData: number[][] = Array.from({ length: numBlocks }, () => []);
+  let p = 0;
+  for (let i = 0; i <= shortBlockLen; i++) {
+    for (let j = 0; j < numBlocks; j++) {
+      if (i === shortBlockLen - blockEccLen && j < numShortBlocks) continue;
+      const cw = codewords[p++];
+      if (cw === undefined) throw new Error('コード語が足りない');
+      if (i < blockLens[j]) blockData[j].push(cw);
+    }
+  }
+  const dataCodewords: number[] = [];
+  for (let j = 0; j < numBlocks; j++) dataCodewords.push(...blockData[j]);
+
+  // バイトモードの解釈: mode(4bit) → 文字数(型番1〜9は8bit) → バイト列。
+  let bp = 0;
+  const readBits = (n: number): number => {
+    let v = 0;
+    for (let k = 0; k < n; k++) {
+      const byteIdx = bp >> 3;
+      if (byteIdx >= dataCodewords.length) throw new Error('データが尽きた');
+      const byte = dataCodewords[byteIdx];
+      v = (v << 1) | ((byte >>> (7 - (bp & 7))) & 1);
+      bp++;
+    }
+    return v;
+  };
+  const mode = readBits(4);
+  if (mode !== 0b0100) throw new Error(`バイトモードでない(mode=${mode})`);
+  const len = readBits(version <= 9 ? 8 : 16);
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) bytes[i] = readBits(8);
+  return new TextDecoder().decode(bytes);
+}
+
+/**
  * 公表されているバイトモードの容量表（型番 1〜40 × L/M/Q/H）。
  *
  * 誤り訂正の表を1か所でも取り違えると、ここが合わなくなる。
@@ -92,6 +256,9 @@ describe('型番の選び方', () => {
   });
 });
 
+// 手打ちの升目の出どころ: npm の `qrcode` 1.5.4（QRCode.create）の出力を
+// 目視で書き起こした（PR #1509 の Verification に記載の別実装と同一バージョン）。
+// この升目自体の正しさは下の「round-trip（升目→文字列、独立復号器）」で別角度から確認する。
 describe('升目（別実装の出力を正解として固定）', () => {
   it('型番1・M・マスク3', () => {
     expect(art(encodeQr('LH', { ecc: 'M', mask: 3 }))).toEqual([
@@ -174,6 +341,89 @@ describe('升目（別実装の出力を正解として固定）', () => {
       }
     });
     expect(digest).toBe('0xfee839c9');
+  });
+});
+
+describe('復号器が本物であることの確認', () => {
+  // Issue #697: 何も読まずに常に成功する復号器では round-trip を正解として使えない。
+  // 形式情報のうち誤り訂正の強さ・マスクを運ぶ実ビット（row8, col0〜4）を1bit反転すると、
+  // 壊れた文字列になるか例外を投げる（＝実際に升目を読んでいる）ことを先に確認する。
+  it('形式情報のマスクを運ぶビットを1bit反転すると壊れる', () => {
+    const text = 'https://example.com/r/abc123';
+    const symbol = encodeQr(text, { ecc: 'M' });
+    expect(decodeQr(symbol)).toBe(text);
+
+    // (x=2, y=8) はマスク3bitのうち1bitを運ぶ。ここを反転すると別のマスクとして
+    // 解かれ、規格上「必ずバイトモード(0b0100)にはならない」入力になる。
+    const corrupted = Uint8Array.from(symbol.modules);
+    corrupted[8 * symbol.size + 2] ^= 1;
+    expect(() => decodeQr({ size: symbol.size, modules: corrupted })).toThrow(/バイトモードでない/);
+  });
+
+  it('形式情報の誤り訂正レベルを運ぶビットを1bit反転すると壊れる（例外または別内容）', () => {
+    const text = 'https://example.com/r/abc123';
+    const symbol = encodeQr(text, { ecc: 'M' });
+
+    // (x=0, y=8) は誤り訂正レベル2bitのうち1bitを運ぶ。M→H に変わり、
+    // ブロック数・誤り訂正語数の前提が崩れて元の文字列には戻らない。
+    const corrupted = Uint8Array.from(symbol.modules);
+    corrupted[8 * symbol.size + 0] ^= 1;
+    let decoded: string | undefined;
+    let threw = false;
+    try {
+      decoded = decodeQr({ size: symbol.size, modules: corrupted });
+    } catch {
+      threw = true;
+    }
+    expect(threw || decoded !== text).toBe(true);
+  });
+
+  it('データ領域を1bit反転すると壊れる（升目の実データを読んでいる証拠）', () => {
+    const text = 'https://example.com/r/abc123';
+    const symbol = encodeQr(text, { ecc: 'M' });
+    expect(decodeQr(symbol)).toBe(text);
+
+    // 機能パターンではない実座標。ペイロードのバイトを直接崩す。
+    const corrupted = Uint8Array.from(symbol.modules);
+    corrupted[10 * symbol.size + 20] ^= 1;
+    let decoded: string | undefined;
+    let threw = false;
+    try {
+      decoded = decodeQr({ size: symbol.size, modules: corrupted });
+    } catch {
+      threw = true;
+    }
+    expect(threw || decoded !== text).toBe(true);
+  });
+});
+
+describe('round-trip（升目→文字列、独立復号器）', () => {
+  // 手打ちの升目・1280通りの指紋は「別実装との一致」を固定するだけで、
+  // その升目自体が最初から正しいかは証明しない（Issue #697）。
+  // ここでは qr-matrix.ts を import せずに書いた復号器で、升目から元の
+  // 文字列を実際に取り戻せることを固定する。復号器が本物であることは
+  // 上の「復号器が本物であることの確認」で示した。
+
+  it('流入リンクの実例（型番3・M・マスク2）', () => {
+    const text = 'https://example.com/r/abc123';
+    const symbol = encodeQr(text, { ecc: 'M', mask: 2 });
+    expect(symbol.version).toBe(3);
+    expect(decodeQr(symbol)).toBe(text);
+  });
+
+  it('実際の REF_LINK（qr-endpoint.test.ts と同じ値）', () => {
+    // apps/worker/src/qr-endpoint.test.ts の REF_LINK と同一の文字列。
+    const text = 'https://worker.example.com/r/spring-campaign-2026';
+    const symbol = encodeQr(text, { ecc: 'M' });
+    expect(decodeQr(symbol)).toBe(text);
+  });
+
+  it('マスクを自動選択しても、明示しても、同じ文字列に戻る', () => {
+    const text = 'https://worker.example.com/r/spring-campaign-2026';
+    for (let mask = 0; mask < 8; mask++) {
+      const symbol = encodeQr(text, { ecc: 'M', mask });
+      expect(decodeQr(symbol)).toBe(text);
+    }
   });
 });
 

@@ -1,15 +1,31 @@
 'use client'
 
 import SelectField from '@/components/shared/select-field'
-import { useEffect, useState } from 'react'
-import type { Tag, Scenario, LineAccount } from '@line-crm/shared'
+import { useEffect, useRef, useState } from 'react'
+import type { Tag, Scenario } from '@line-crm/shared'
 import { api } from '@/lib/api'
+import { useAccount } from '@/contexts/account-context'
 import CreatePage, {
   AsideCard,
   Field,
   FormSection,
   inputClass,
 } from '@/components/shared/create-page'
+
+const OFFER_LIST_PATH = '/conversions?tab=offers'
+
+function rewardIntegerError(value: string, kind: 'amount' | 'miles'): string | null {
+  if (!value.trim()) return null
+  const reward = Number(value)
+  const label = kind === 'amount' ? '報酬額' : '報酬マイル'
+  if (!Number.isFinite(reward) || reward < 0) return `${label}は0以上で入力してください`
+  if (!Number.isInteger(reward)) {
+    return kind === 'amount'
+      ? '報酬額は小数ではなく、1円単位の整数で入力してください'
+      : '報酬マイルは小数ではなく、整数で入力してください'
+  }
+  return null
+}
 
 /**
  * 案件を作る（設計 V6 `GPWzq`）。
@@ -29,34 +45,50 @@ function Unavailable({ label, reason }: { label: string; reason: string }) {
 }
 
 export default function NewAffiliateOfferPage() {
+  const { selectedAccountId, selectedAccount } = useAccount()
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [rewardAmount, setRewardAmount] = useState('')
   const [rewardMiles, setRewardMiles] = useState('')
-  const [lineAccountId, setLineAccountId] = useState('')
   const [tagId, setTagId] = useState('')
   const [scenarioId, setScenarioId] = useState('')
   const [publishNow, setPublishNow] = useState(true)
   const [createdId, setCreatedId] = useState<string | null>(null)
+  const [partialSave, setPartialSave] = useState(false)
   const [tags, setTags] = useState<Tag[]>([])
   const [scenarios, setScenarios] = useState<Scenario[]>([])
-  const [accounts, setAccounts] = useState<LineAccount[]>([])
+  // 作成の再送で二重登録にしないための、この登録試行1回分の安定した操作
+  // UUID（Issue #686）。押し直しても同じ値のままにするため onSave では
+  // 作らず、ここと onReset だけで作り直す。
+  const [operationId, setOperationId] = useState(() => crypto.randomUUID())
+
+  /*
+   * 途中保存の続きは、保存したときのLINEアカウントの中でだけ有効（#686）。
+   *
+   * ヘッダで別のアカウントへ切り替えても作りかけの `createdId` を持ち越すと、
+   * 画面はBを指したまま「下書きへの変更を再開する」でAの案件をPUTで
+   * 更新できてしまう。切り替わったら登録の身元（createdId・操作UUID・
+   * 途中保存の印）と、他アカウントでは結べないタグ・シナリオの選択を捨てる。
+   */
+  const draftAccountRef = useRef(selectedAccountId)
+  useEffect(() => {
+    if (draftAccountRef.current === selectedAccountId) return
+    draftAccountRef.current = selectedAccountId
+    setCreatedId(null)
+    setPartialSave(false)
+    setOperationId(crypto.randomUUID())
+    setTagId('')
+    setScenarioId('')
+  }, [selectedAccountId])
 
   useEffect(() => {
     let cancelled = false
-    void Promise.allSettled([api.tags.list(), api.scenarios.list(), api.lineAccounts.list()]).then(
-      ([t, s, a]) => {
+    void Promise.allSettled([api.tags.list(), api.scenarios.list()]).then(
+      ([t, s]) => {
         if (cancelled) return
         if (t.status === 'fulfilled' && t.value.success) setTags(t.value.data)
         if (s.status === 'fulfilled' && s.value.success) {
           setScenarios(s.value.data as unknown as Scenario[])
-        }
-        if (a.status === 'fulfilled' && a.value.success) {
-          const list = a.value.data as unknown as LineAccount[]
-          setAccounts(list)
-          // 選べるアカウントが1つだけなら最初から選んでおく。
-          // 空のまま押すと口が 400 で落とす（#505 重大1）。
-          if (list.length === 1) setLineAccountId(list[0].id)
         }
       },
     )
@@ -72,22 +104,20 @@ export default function NewAffiliateOfferPage() {
     <CreatePage
       title="案件を作る"
       description="何を成果として数え、いくら払うかを決めます。"
-      parent={['案件', '/conversions?tab=offers']}
-      saveLabel={publishNow ? '公開する' : '下書きに保存'}
+      parent={['案件', OFFER_LIST_PATH]}
+      successHref={(id) => `${OFFER_LIST_PATH}&highlight=${encodeURIComponent(String(id))}`}
+      saveLabel={partialSave ? '下書きへの変更を再開する' : publishNow ? '公開する' : '下書きに保存'}
+      statusLabel={partialSave ? '案件は公開済み・下書きへの変更は未完了' : undefined}
       variant="v6"
       designNode="GPWzq"
       validate={() => {
         if (!name.trim()) return '案件名を入力してください'
-        // 「すべてのアカウント」のまま送ると口が 400 で落とす。
-        // 選べる先が複数あるときは、押す前に選ばせる（#505 重大1）。
-        if (!lineAccountId && accounts.length > 1) return 'LINEアカウントを選んでください'
+        if (!selectedAccountId) return 'LINEアカウントを選んでください（画面上部で選べます）'
         if (!rewardAmount && !rewardMiles) return '報酬（円かマイル）のどちらかを入れてください'
-        if (rewardAmount && (!Number.isFinite(Number(rewardAmount)) || Number(rewardAmount) < 0)) {
-          return '報酬額は0円以上で入力してください'
-        }
-        if (rewardMiles && (!Number.isFinite(Number(rewardMiles)) || Number(rewardMiles) < 0)) {
-          return '報酬マイルは0以上で入力してください'
-        }
+        const amountError = rewardIntegerError(rewardAmount, 'amount')
+        if (amountError) return amountError
+        const milesError = rewardIntegerError(rewardMiles, 'miles')
+        if (milesError) return milesError
         return null
       }}
       onReset={() => {
@@ -95,13 +125,17 @@ export default function NewAffiliateOfferPage() {
         setDescription('')
         setRewardAmount('')
         setRewardMiles('')
-        setLineAccountId('')
         setTagId('')
         setScenarioId('')
         setPublishNow(true)
         setCreatedId(null)
+        setPartialSave(false)
+        setOperationId(crypto.randomUUID())
       }}
       onSave={async () => {
+        if (!selectedAccountId) {
+          throw new Error('LINEアカウントを選んでください（画面上部で選べます）')
+        }
         let offerId = createdId
         if (!offerId) {
           const res = await api.affiliateOffers.create({
@@ -109,22 +143,37 @@ export default function NewAffiliateOfferPage() {
             description: description.trim() || null,
             rewardAmount: rewardAmount ? Number(rewardAmount) : undefined,
             rewardMiles: rewardMiles ? Number(rewardMiles) : undefined,
-            lineAccountId: lineAccountId || null,
+            lineAccountId: selectedAccountId,
             tagId: tagId || null,
             scenarioId: scenarioId || null,
+            operationId,
           })
           if (!res.success) throw new Error('案件を作成できませんでした。LINEアカウントを選び直してください')
           offerId = res.data.id
           setCreatedId(offerId)
         }
         // 作成は必ず公開中で入る（DB の INSERT が is_active=1 固定）。
-        // 下書きにしたいときだけ、続けて閉じる。
+        // 下書きにしたいときだけ、続けて閉じる。名前・報酬・タグ・シナリオも
+        // 更新APIが受けるので、途中保存後にここを直して再開した分も
+        // まとめて送る（isActiveだけだと画面上の変更を失う、Issue #686）。
         if (!publishNow) {
-          const update = await api.affiliateOffers.update(offerId, { isActive: false })
-          if (!update.success) {
+          try {
+            const update = await api.affiliateOffers.update(offerId, {
+              name: name.trim(),
+              description: description.trim() || null,
+              rewardAmount: rewardAmount ? Number(rewardAmount) : undefined,
+              rewardMiles: rewardMiles ? Number(rewardMiles) : undefined,
+              tagId: tagId || null,
+              scenarioId: scenarioId || null,
+              isActive: false,
+            })
+            if (!update.success) throw new Error('update_failed')
+          } catch {
+            setPartialSave(true)
             throw new Error('案件は作成済みですが、下書きにできませんでした。もう一度押すと下書きへの変更だけをやり直します。')
           }
         }
+        setPartialSave(false)
         return offerId
       }}
       aside={
@@ -177,6 +226,20 @@ export default function NewAffiliateOfferPage() {
       }
     >
       <FormSection step={1} label="どんな案件か">
+        {partialSave && createdId ? (
+          <div role="alert" className="border-warning bg-warning-bg rounded-control border px-3 py-2 text-sm">
+            <p className="text-ink font-semibold">案件は公開済みです</p>
+            <p className="text-ink-secondary mt-1">
+              下の「下書きへの変更を再開する」で続けるか、変更を破棄して公開のまま一覧へ戻れます。
+            </p>
+            <a
+              href={`${OFFER_LIST_PATH}&highlight=${encodeURIComponent(createdId)}`}
+              className="text-danger mt-2 inline-block font-semibold underline"
+            >
+              下書きへの変更を破棄し、公開のまま一覧へ戻る
+            </a>
+          </div>
+        ) : null}
         <div className="grid gap-3 lg:grid-cols-2">
         <Field label="案件名" htmlFor="of-name" required>
           <input
@@ -227,6 +290,7 @@ export default function NewAffiliateOfferPage() {
               id="of-amount"
               type="number"
               min={0}
+              step={1}
               value={rewardAmount}
               onChange={(e) => setRewardAmount(e.target.value)}
               placeholder="1000"
@@ -238,6 +302,7 @@ export default function NewAffiliateOfferPage() {
               id="of-miles"
               type="number"
               min={0}
+              step={1}
               value={rewardMiles}
               onChange={(e) => setRewardMiles(e.target.value)}
               placeholder="200"
@@ -257,17 +322,14 @@ export default function NewAffiliateOfferPage() {
           </p>
         </Field>
 
-        <Field label="誘導するLINEアカウント" htmlFor="of-account" note="紹介リンクを開いた方を、このアカウントへ案内します。">
-          <SelectField
-            id="of-account"
-            value={lineAccountId}
-            onChange={(e) => setLineAccountId(e.target.value)}
-            options={accounts.length > 1
-              // 複数あるときの空欄は「全部」ではなく「未選択」。
-              // そのまま送ると口が 400 で落とすので、選ばせる文言にする。
-              ? [{ value: '', label: '選んでください' }, ...accounts.map((a) => ({ value: a.id, label: a.name }))]
-              : [...accounts.map((a) => ({ value: a.id, label: a.name }))]}
-          />
+        <Field
+          label="誘導するLINEアカウント"
+          htmlFor="of-account"
+          note="紹介リンクを開いた方を、このアカウントへ案内します。画面上部で選んでいるLINEアカウントに固定されます（他のアカウントに作りたいときは、先に上部で切り替えてください）。"
+        >
+          <p id="of-account" className="bg-canvas-sunken text-ink rounded-control px-3 py-2 text-sm">
+            {selectedAccount ? selectedAccount.name : '未選択（画面上部で選んでください）'}
+          </p>
         </Field>
       </FormSection>
 
