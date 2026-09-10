@@ -23,6 +23,15 @@ describe('D1 migration workflow safety', () => {
     expect(manualWorkflow).toContain('name: ${{ inputs.environment }}');
   });
 
+  it('can select one exact migration without applying other pending files', () => {
+    expect(manualWorkflow).toMatch(/migration:\n[\s\S]*?type: string/);
+    expect(manualWorkflow).toContain('TARGET_MIGRATION: ${{ inputs.migration }}');
+    expect(manualWorkflow).toContain("grep -Eq '^[0-9]{3,}_[A-Za-z0-9_-]+\\.sql$'");
+    expect(manualWorkflow).toContain('grep -qxF "$target_path" "$all_pending_file"');
+    expect(manualWorkflow).toContain('printf \'%s\\n\' "$target_path" > "$apply_file"');
+    expect(manualWorkflow).toContain('cp "$all_pending_file" "$apply_file"');
+  });
+
   it('accepts the Environment-scoped Cloudflare secret names', () => {
     expect(manualWorkflow).toContain(
       'CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN || secrets.CLOUDFLARE_API_TOKEN }}',
