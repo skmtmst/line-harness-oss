@@ -13,4 +13,8 @@ describe('template message contract', () => {
   it('サロゲートペアの絵文字を1文字として数える', () => {
     expect(countTemplateTextCharacters('あ🌿い')).toBe(3);
   });
+
+  it('改行を1文字として数える', () => {
+    expect(countTemplateTextCharacters('一行目\n二行目')).toBe(7);
+  });
 });
