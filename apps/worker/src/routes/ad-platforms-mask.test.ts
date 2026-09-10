@@ -4,9 +4,14 @@ import type { Env } from '../index.js';
 
 const mocks = {
   createAdPlatform: vi.fn(),
-  updateAdPlatform: vi.fn(),
+  updateAdPlatformCAS: vi.fn(),
+  getAdPlatformById: vi.fn(),
 };
 vi.mock('@line-crm/db', () => mocks);
+vi.mock('../services/account-access.js', () => ({
+  canAccessAllLineAccounts: vi.fn(async () => true),
+  getVisibleLineAccountScope: vi.fn(async () => ({ allowedAccountIds: [], canSeeUnassigned: true })),
+}));
 
 const { adPlatforms } = await import('./ad-platforms.js');
 const app = new Hono<Env>();
@@ -34,7 +39,7 @@ describe('POST/PUT /api/ad-platforms の応答マスク', () => {
     const response = await app.fetch(new Request('https://example.com/api/ad-platforms', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: 'meta', config }),
+      body: JSON.stringify({ name: 'meta', config, lineAccountId: 'a1' }),
     }), env);
     expect(response.status).toBe(201);
     const body = await response.json() as { data: { config: Record<string, unknown> } };
@@ -45,10 +50,14 @@ describe('POST/PUT /api/ad-platforms の応答マスク', () => {
 
   it('更新応答の長い文字列も伏せる', async () => {
     const config = { access_token: 'another-secret-99999' };
-    mocks.updateAdPlatform.mockResolvedValue({
-      id: 'platform-1', name: 'meta', display_name: 'Meta広告',
-      config: JSON.stringify(config), is_active: 1,
-      created_at: '2026-09-08T10:00:00.000', updated_at: '2026-09-08T11:00:00.000',
+    mocks.getAdPlatformById.mockResolvedValue({ id: 'platform-1', line_account_id: 'a1' });
+    mocks.updateAdPlatformCAS.mockResolvedValue({
+      applied: true,
+      platform: {
+        id: 'platform-1', name: 'meta', display_name: 'Meta広告',
+        config: JSON.stringify(config), is_active: 1,
+        created_at: '2026-09-08T10:00:00.000', updated_at: '2026-09-08T11:00:00.000',
+      },
     });
     const response = await app.fetch(new Request('https://example.com/api/ad-platforms/platform-1', {
       method: 'PUT',
