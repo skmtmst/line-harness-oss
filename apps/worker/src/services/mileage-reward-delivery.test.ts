@@ -17,6 +17,8 @@ vi.mock('./automation-engine.js', () => ({
   AutomationActionError: class AutomationActionError extends Error {},
 }));
 
+vi.mock('./feature-enforcement.js', () => ({ featureJobCanRun: async () => true }));
+
 const { deliverMileageReward } = await import('./mileage-reward-delivery.js');
 
 const db = {
