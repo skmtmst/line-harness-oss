@@ -124,10 +124,11 @@ describe('Webhookの安全な送り直し', () => {
 
     await retryWebhookInteraction(db, original, 'test-key');
     expect(resolveWebhookSecret).toHaveBeenCalledWith(expect.objectContaining({ id: 'wh-1' }), 'test-key');
+    // 署名用の復号は deliverWebhook が行う。鍵がそのまま渡ることを固定する。
     expect(deliverWebhook).toHaveBeenCalledWith(
-      expect.objectContaining({ id: 'wh-1', secret: 'r'.repeat(32) }),
+      expect.objectContaining({ id: 'wh-1' }),
       original.request_body_json,
-      { idempotencyKey: 'delivery-1' },
+      { idempotencyKey: 'delivery-1', credentialKeys: 'test-key' },
     );
   });
 

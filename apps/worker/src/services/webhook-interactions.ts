@@ -87,8 +87,11 @@ export async function retryWebhookInteraction(
       idempotencyKey: original.idempotency_key,
       retryOfId: original.id,
     });
-    const result = await deliverWebhook({ ...webhook, secret: sendSecret }, original.request_body_json, {
+    // 署名用の復号は deliverWebhook が行う。ここでの復号は、送り直しを
+    // 始める前に止めるための事前確認(#650 再審査)。
+    const result = await deliverWebhook(webhook, original.request_body_json, {
       idempotencyKey: original.idempotency_key,
+      credentialKeys: keys,
     });
     await finishWebhookInteraction(db, retry.id, original.line_account_id, {
       status: result.ok ? 'succeeded' : 'failed',

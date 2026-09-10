@@ -1107,7 +1107,7 @@ describe('POST /api/webhooks/outgoing/:id/test', () => {
     expect(deliverWebhook).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'wh-1' }),
       expect.stringContaining('webhook.test'),
-      { idempotencyKey: 'interaction-1' },
+      { idempotencyKey: 'interaction-1', credentialKeys: { current: undefined, previous: undefined } },
     );
     expect(finishWebhookInteraction).toHaveBeenCalledWith(
       baseEnv.DB, 'interaction-1', ACCOUNT_ID,
@@ -1570,10 +1570,13 @@ describe('#650 fail-closed: 鍵不足・復号失敗は安全に止める', () =
     );
     expect(res.status).toBe(200);
     expect(resolveWebhookSecret).toHaveBeenCalledWith(expect.objectContaining({ id: 'wh-1' }), { current: TEST_KEY, previous: undefined });
+    // 署名用の復号は deliverWebhook が行う。ここでは鍵がそのまま渡ることを見る。
+    // 呼び出し元で復号した値を詰め替える形に戻すと、鍵を渡し忘れた経路が
+    // 黙って署名なしで送るので、鍵の受け渡しの方を固定する(#650 再審査)。
     expect(deliverWebhook).toHaveBeenCalledWith(
-      expect.objectContaining({ id: 'wh-1', secret: 'r'.repeat(32) }),
+      expect.objectContaining({ id: 'wh-1', secret_encrypted: 'v1-enc-abc' }),
       expect.stringContaining('webhook.test'),
-      { idempotencyKey: 'interaction-1' },
+      { idempotencyKey: 'interaction-1', credentialKeys: { current: TEST_KEY, previous: undefined } },
     );
 
     vi.mocked(canAccessAllLineAccounts).mockResolvedValueOnce(false);

@@ -837,7 +837,12 @@ webhooks.post('/api/webhooks/outgoing/:id/test', requireRole('owner', 'admin'), 
       eventType: 'webhook.test', triggerSummary: '管理画面から1回試した', requestBodyJson: body,
     });
     const started = Date.now();
-    const result = await deliverWebhook({ ...webhook, secret: sendSecret }, body, { idempotencyKey: interaction.id });
+    // 署名用の復号は deliverWebhook が行う。ここは早い段階で 503 を返すための
+    // 事前確認だけに使い、鍵はそのまま渡す(#650 再審査)。
+    const result = await deliverWebhook(webhook, body, {
+      idempotencyKey: interaction.id,
+      credentialKeys: webhookKeysOf(c),
+    });
     await finishWebhookInteraction(c.env.DB, interaction.id, lineAccountId, {
       status: result.ok ? 'succeeded' : 'failed',
       responseStatus: result.lastStatus ?? null,
