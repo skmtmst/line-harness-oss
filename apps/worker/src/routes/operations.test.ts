@@ -444,3 +444,217 @@ describe('運用状態checkと配備履歴', () => {
     });
   });
 });
+
+describe('停止不可理由の機械コード(N-453/N-455)', () => {
+  async function grant(token: string, staffId: string): Promise<void> {
+    const expiresAt = new Date(Date.now() + 60 * 60_000).toISOString();
+    testDb.raw.prepare(
+      `INSERT INTO auth_step_up_grants (token_hash, staff_id, purpose, expires_at, created_at)
+       VALUES (?, ?, 'operations.control', ?, ?)`,
+    ).run(await hash(token), staffId, expiresAt, new Date().toISOString());
+  }
+
+  function stopBody(overrides: Record<string, unknown> = {}): string {
+    return JSON.stringify({
+      lineAccountId: 'account-1',
+      capabilities: ['broadcast_dispatch'],
+      reason: '障害対応',
+      expectedVersion: 0,
+      confirmation: '停止',
+      ...overrides,
+    });
+  }
+
+  function stopInit(stepUpToken: string, key: string, body: string): RequestInit {
+    return {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-confirm-irreversible': 'operation-stop',
+        'x-step-up-token': stepUpToken,
+        'idempotency-key': key,
+      },
+      body,
+    };
+  }
+
+  it('停止可のときpreviewは理由コードなし、停止不可のとき理由コード付きで返す', async () => {
+    const ownerPreview = await app('owner').request(
+      '/api/operations/control/preview?account_id=account-1', {}, bindings(),
+    );
+    expect(ownerPreview.status).toBe(200);
+    expect(await ownerPreview.json()).toMatchObject({
+      success: true,
+      data: { permissions: { canControl: true, reasonCode: null } },
+    });
+
+    const blockedPreview = await app('admin', false).request(
+      '/api/operations/control/preview?account_id=account-1', {}, bindings(),
+    );
+    expect(blockedPreview.status).toBe(200);
+    expect(await blockedPreview.json()).toMatchObject({
+      success: true,
+      data: { permissions: { canControl: false, reasonCode: 'EMERGENCY_CONTROL_FORBIDDEN' } },
+    });
+  });
+
+  it('停止不可の403に機械コードを付けて返す', async () => {
+    const forbidden = await app('admin', false).request(
+      '/api/operations/incidents', stopRequest('account-1'), bindings(),
+    );
+    expect(forbidden.status).toBe(403);
+    expect(await forbidden.json()).toMatchObject({
+      success: false,
+      code: 'EMERGENCY_CONTROL_FORBIDDEN',
+    });
+
+    const outOfScope = await app('admin').request(
+      '/api/operations/incidents', stopRequest(null, 'step-up-admin'), bindings(),
+    );
+    expect(outOfScope.status).toBe(403);
+    expect(await outOfScope.json()).toMatchObject({
+      success: false,
+      code: 'EMERGENCY_SCOPE_FORBIDDEN',
+    });
+  });
+
+  it('古い版の停止を409と最新状態で返す', async () => {
+    const first = await app().request(
+      '/api/operations/incidents', stopRequest('account-1'), bindings(),
+    );
+    expect(first.status).toBe(201);
+
+    await grant('step-up-stop-2', 'owner-1');
+    const stale = await app().request(
+      '/api/operations/incidents',
+      stopInit('step-up-stop-2', 'stop-request-2', stopBody({ expectedVersion: 0 })),
+      bindings(),
+    );
+    expect(stale.status).toBe(409);
+    const staleBody = await stale.json() as {
+      success: boolean; code: string; data: { version: number };
+    };
+    expect(staleBody).toMatchObject({
+      success: false,
+      code: 'VERSION_CONFLICT',
+      data: { version: 1 },
+    });
+  });
+
+  it('停止→復旧のあと古い版で停止すると、activeIncidentIdに頼らず版比較だけで409になる', async () => {
+    // 1. 停止(expectedVersion:0) → version=1, activeIncidentIdが付く。
+    const stopped = await app().request(
+      '/api/operations/incidents', stopRequest('account-1'), bindings(),
+    );
+    expect(stopped.status).toBe(201);
+    const stoppedBody = await stopped.json() as {
+      data: { control: { version: number }; incident: { id: string } };
+    };
+    expect(stoppedBody.data.control.version).toBe(1);
+
+    // 2. 復旧(expectedVersion:1) → version=2, activeIncidentIdはnullへ戻る。
+    const restored = await app().request(
+      `/api/operations/incidents/${stoppedBody.data.incident.id}/restore`,
+      {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-confirm-irreversible': 'operation-restore',
+          'x-step-up-token': 'step-up-restore',
+          'idempotency-key': 'restore-request-1',
+        },
+        body: JSON.stringify({ expectedVersion: 1, confirmation: '復旧' }),
+      },
+      bindings(),
+    );
+    expect(restored.status).toBe(200);
+    const restoredBody = await restored.json() as {
+      data: { control: { version: number; activeIncidentId: string | null } };
+    };
+    expect(restoredBody.data.control.version).toBe(2);
+    expect(restoredBody.data.control.activeIncidentId).toBeNull();
+
+    // 3. activeIncidentIdがnullのまま、古い版(1)で再び停止を試みる。
+    //    ここでの409はactiveIncidentIdの門を通らないので、版比較だけが理由になる。
+    await grant('step-up-stop-3', 'owner-1');
+    const stale = await app().request(
+      '/api/operations/incidents',
+      stopInit('step-up-stop-3', 'stop-request-3', stopBody({ expectedVersion: 1 })),
+      bindings(),
+    );
+    expect(stale.status).toBe(409);
+    const staleBody = await stale.json() as {
+      success: boolean; code: string; data: { version: number; activeIncidentId: string | null };
+    };
+    expect(staleBody).toMatchObject({ success: false, code: 'VERSION_CONFLICT' });
+    // 版比較だけが効いたことの証拠: 競合を返した時点でactiveIncidentIdはnullのまま。
+    expect(staleBody.data.activeIncidentId).toBeNull();
+    expect(staleBody.data.version).toBe(2);
+  });
+
+  it('再実行キーの使い回しを409と機械コードで返す', async () => {
+    expect((await app().request(
+      '/api/operations/incidents', stopRequest('account-1'), bindings(),
+    )).status).toBe(201);
+
+    await grant('step-up-stop-2', 'owner-1');
+    const reused = await app().request(
+      '/api/operations/incidents',
+      stopInit('step-up-stop-2', 'stop-request-1', stopBody({ reason: '別の理由' })),
+      bindings(),
+    );
+    expect(reused.status).toBe(409);
+    expect(await reused.json()).toMatchObject({
+      success: false,
+      code: 'IDEMPOTENCY_CONFLICT',
+    });
+  });
+
+  it('停止していない復旧を409と機械コードで返す', async () => {
+    const stopped = await app().request(
+      '/api/operations/incidents', stopRequest('account-1'), bindings(),
+    );
+    const stoppedBody = await stopped.json() as {
+      data: { control: { version: number }; incident: { id: string } };
+    };
+    const restoreHeaders = {
+      'content-type': 'application/json',
+      'x-confirm-irreversible': 'operation-restore',
+      'x-step-up-token': 'step-up-restore',
+      'idempotency-key': 'restore-request-1',
+    };
+    const restored = await app().request(
+      `/api/operations/incidents/${stoppedBody.data.incident.id}/restore`,
+      {
+        method: 'POST',
+        headers: restoreHeaders,
+        body: JSON.stringify({
+          expectedVersion: stoppedBody.data.control.version,
+          confirmation: '復旧',
+        }),
+      },
+      bindings(),
+    );
+    expect(restored.status).toBe(200);
+
+    await grant('step-up-restore-2', 'owner-1');
+    const again = await app().request(
+      `/api/operations/incidents/${stoppedBody.data.incident.id}/restore`,
+      {
+        method: 'POST',
+        headers: {
+          ...restoreHeaders,
+          'x-step-up-token': 'step-up-restore-2',
+          'idempotency-key': 'restore-request-2',
+        },
+        body: JSON.stringify({ expectedVersion: 2, confirmation: '復旧' }),
+      },
+      bindings(),
+    );
+    expect(again.status).toBe(409);
+    expect(await again.json()).toMatchObject({
+      success: false,
+      code: 'OPERATION_NOT_STOPPED',
+    });
+  });
+});
