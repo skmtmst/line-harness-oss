@@ -616,7 +616,7 @@ const ALLOWLIST = new Set<string>([
   'PUT /api/broadcast-message-assets/{id}',
   'PUT /api/broadcasts/notification-settings',
 
-  // 機能「nen_campaigns」の管理画面用API（OpenAPI未記載・順次記載）（20件）
+  // 機能「nen_campaigns」の管理画面用API（OpenAPI未記載・順次記載）（21件）
   'DELETE /api/nen-campaigns/pets/{id}',
   'GET /api/nen-campaigns/birthday-coupon',
   'GET /api/nen-campaigns/columns',
@@ -637,6 +637,7 @@ const ALLOWLIST = new Set<string>([
   'PUT /api/nen-campaigns/columns/{id}/message',
   'PUT /api/nen-campaigns/pets/{id}',
   'PUT /api/nen-campaigns/settings/{campaignKey}',
+  'PUT /api/nen-campaigns/settings/{campaignKey}/enabled',
 
   // 機能「events」の管理画面用API（OpenAPI未記載・順次記載）（18件）
   'DELETE /api/events/admin/events/{id}',
