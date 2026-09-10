@@ -366,7 +366,15 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
       </div>
       </>}
 
-      {editing && <EditMenuModal menu={editing} tags={tags} onSave={save} onClose={() => setEditing(null)} />}
+      {editing && (
+        <EditMenuModal
+          menu={editing}
+          tags={tags}
+          accountId={selectedAccountId}
+          onSave={save}
+          onClose={() => setEditing(null)}
+        />
+      )}
 
       <ConfirmDialog
         open={visibilityTarget !== null}
@@ -454,17 +462,38 @@ function Kpi({
 function EditMenuModal({
   menu,
   tags,
+  accountId,
   onSave,
   onClose,
 }: {
   menu: BookingMenu
   tags: Tag[]
+  accountId: string | null
   onSave: (m: BookingMenu) => Promise<void>
   onClose: () => void
 }) {
   const [form, setForm] = useState<BookingMenu>(menu)
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState<string | null>(null)
+
+  /*
+   * 候補は「今のアカウントの有効なタグ」だけ。api.tags.list() は見えている
+   * アカウント全部と整理済み(archived)まで返すので、そのまま並べると別アカウントの
+   * タグが選べてしまい、保存時に Worker が tag_not_found で落とす。新規作成画面
+   * (new/page.tsx)と同じ絞り方にそろえ、保存側の検証と二重化する。
+   */
+  const tagCandidates = tags.filter(
+    (t) => t.lineAccountId === accountId && t.status !== 'archived',
+  )
+  /*
+   * 設定した後にタグが整理された既存メニューは、候補に無い ID を抱えたまま開く。
+   * 黙って「なし」に見せると気付かないまま保存で消えるので、選択は残したまま
+   * 何が起きたかを出して選び直させる。保存し直せば Worker 側の active 検証で
+   * 400 になるため、ここで先に知らせる。
+   */
+  const storedTagId = form.auto_tag_id ?? null
+  const danglingAutoTag = storedTagId != null && !tagCandidates.some((t) => t.id === storedTagId)
+  const danglingTagName = tags.find((t) => t.id === storedTagId)?.name ?? null
 
   /** 数値欄に文字列が入らないよう、鍵と値の型をそろえる。 */
   function set<K extends keyof BookingMenu>(k: K, v: BookingMenu[K]) {
@@ -556,8 +585,27 @@ function EditMenuModal({
             <SelectField
               value={form.auto_tag_id ?? ''}
               onChange={(e) => set('auto_tag_id', e.target.value === '' ? null : e.target.value)}
-              options={[{ value: '', label: '— なし —' }, ...tags.map((t) => ({ value: t.id, label: t.name }))]}
+              options={[
+                { value: '', label: '— なし —' },
+                ...(danglingAutoTag
+                  ? [{
+                      value: storedTagId as string,
+                      label: `${danglingTagName ?? '不明なタグ'}（今は使えません）`,
+                    }]
+                  : []),
+                ...tagCandidates.map((t) => ({ value: t.id, label: t.name })),
+              ]}
             />
+            {danglingAutoTag && (
+              <p className="mt-1 text-xs text-danger">
+                設定されていたタグは整理済みか、このアカウントのタグではありません。選び直すか「なし」にしてください。
+              </p>
+            )}
+            {!danglingAutoTag && tagCandidates.length === 0 && (
+              <p className="mt-1 text-xs text-ink-faint">
+                このアカウントに使えるタグがありません。タグなしで保存できます。
+              </p>
+            )}
             <p className="mt-1 text-xs text-ink-faint">
               このメニューが予約されると、申込者の友だちに自動でこのタグが付きます。タグは既存のものから選択してください (友だち画面 / シナリオ等で使われているタグ)。
             </p>
