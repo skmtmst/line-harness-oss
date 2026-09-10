@@ -1730,3 +1730,138 @@ describe('旧表の送信直前に予約状態そのものを見る (自主検�
     }
   });
 });
+
+// =============================================================================
+// 恒久失敗の打ち切り (再審査-退行)
+//
+// 旧表 cron の due SELECT は LIMIT 100 で ORDER BY が無い。直らない行を
+// failed のまま溜めると、正常なリマインダが押し出されて送られなくなる。
+// REMINDER_MAX_RETRY で failed_permanent へ打ち切る保証を見張る。
+// fence の前で投げた失敗 (資格情報が復号できない等) も数に入れること。
+// =============================================================================
+
+/** 復号できない資格情報。fence より前の resolveLineCredential で投げる。 */
+function breakAccountCredential(raw: Database.Database, accountId: string) {
+  raw.prepare(
+    `UPDATE line_accounts
+        SET channel_access_token = '', channel_access_token_encrypted = 'not-decryptable'
+      WHERE id = ?`,
+  ).run(accountId);
+}
+
+describe('旧表の恒久失敗を上限で打ち切る (自主検証)', () => {
+  it('予約: fence前の失敗でも回数を数え、上限で failed_permanent にして滞留させない', async () => {
+    const dual = openDualDb();
+    try {
+      seedBookingCancelTarget(dual.raw1);
+      seedLegacyBookingReminder(dual.raw1);
+      breakAccountCredential(dual.raw1, 'acc1');
+      const sentTo: string[] = [];
+      const run = () => processDueReminders(dual.db1, {
+        now: LEGACY_NOW,
+        reminderHoursBefore: 24,
+        sender: async (p) => {
+          sentTo.push(p.toLineUserId);
+        },
+      });
+      const readRow = () => dual.raw1.prepare(
+        `SELECT status, retry_count FROM booking_reminders WHERE id = 'LEG-b1'`,
+      ).get();
+
+      // 1回目・2回目は再試行余地あり。回数が伸びることが打ち切りの前提。
+      expect(await run()).toEqual({ sent: 0, failed: 1 });
+      expect(readRow()).toEqual({ status: 'failed', retry_count: 1 });
+      expect(await run()).toEqual({ sent: 0, failed: 1 });
+      expect(readRow()).toEqual({ status: 'failed', retry_count: 2 });
+      // 3回目 (= REMINDER_MAX_RETRY) で打ち切る。
+      expect(await run()).toEqual({ sent: 0, failed: 1 });
+      expect(readRow()).toEqual({ status: 'failed_permanent', retry_count: 3 });
+      // 以後は対象に入らない (滞留しない)。
+      expect(await run()).toEqual({ sent: 0, failed: 0 });
+      expect(readRow()).toEqual({ status: 'failed_permanent', retry_count: 3 });
+      expect(sentTo).toEqual([]);
+    } finally {
+      dual.cleanup();
+    }
+  });
+
+  it('イベント: fence前の失敗でも回数を数え、上限で failed_permanent にする', async () => {
+    const dual = openDualDb();
+    try {
+      seedLiffCancelTarget(dual.raw1);
+      dual.raw1.prepare(
+        `UPDATE event_bookings SET status = 'confirmed' WHERE id = 'eb-l1'`,
+      ).run();
+      breakAccountCredential(dual.raw1, 'account-9');
+      const sentTo: string[] = [];
+      const run = () => processDueEventReminders(dual.db1, {
+        now: new Date('2099-05-31T12:00:00.000Z'),
+        sender: async (p) => {
+          sentTo.push(p.toLineUserId);
+        },
+      });
+      const readRow = () => dual.raw1.prepare(
+        `SELECT status, retry_count FROM event_booking_reminders WHERE id = 'LEG-l1'`,
+      ).get();
+
+      expect(await run()).toEqual({ sent: 0, failed: 1 });
+      expect(readRow()).toEqual({ status: 'failed', retry_count: 1 });
+      expect(await run()).toEqual({ sent: 0, failed: 1 });
+      expect(readRow()).toEqual({ status: 'failed', retry_count: 2 });
+      expect(await run()).toEqual({ sent: 0, failed: 1 });
+      expect(readRow()).toEqual({ status: 'failed_permanent', retry_count: 3 });
+      expect(await run()).toEqual({ sent: 0, failed: 0 });
+      expect(sentTo).toEqual([]);
+    } finally {
+      dual.cleanup();
+    }
+  });
+
+  it('予約: 直らない行が溜まっても、正常なリマインダを押し出さない', async () => {
+    const dual = openDualDb();
+    try {
+      seedBookingCancelTarget(dual.raw1);
+      breakAccountCredential(dual.raw1, 'acc1');
+      // 直らない行を1件と、後から復旧するアカウントの正常な行を1件。
+      dual.raw1.exec(`
+        INSERT INTO line_accounts (id, channel_id, name, channel_access_token, channel_secret)
+        VALUES ('acc2','channel-2','B店','token2','secret2');
+        INSERT INTO friends (id, line_user_id, display_name, line_account_id, is_following)
+        VALUES ('f3','U3','三郎','acc2',1);
+        INSERT INTO bookings (
+          id, line_account_id, friend_id, staff_id, menu_id,
+          starts_at, ends_at, block_ends_at, status, price_at_booking, requested_at
+        ) VALUES (
+          'RB11','acc2','f3','s1','m1',
+          '2026-09-20T03:00:00.000Z','2026-09-20T04:00:00.000Z','2026-09-20T04:00:00.000Z',
+          'confirmed',8000,'2026-09-01T00:00:00.000Z'
+        );
+        INSERT INTO booking_reminders (id, booking_id, kind, scheduled_at, status, retry_count)
+        VALUES ('LEG-b1','RB9','hours_before','2026-09-19T01:00:00.000Z','pending',0),
+               ('LEG-b2','RB11','hours_before','2026-09-19T01:00:00.000Z','pending',0);
+      `);
+      const sentTo: string[] = [];
+      const run = () => processDueReminders(dual.db1, {
+        now: LEGACY_NOW,
+        reminderHoursBefore: 24,
+        sender: async (p) => {
+          sentTo.push(p.toLineUserId);
+        },
+      });
+      // 正常な行は初回で送れる。壊れた行だけが失敗する。
+      expect(await run()).toEqual({ sent: 1, failed: 1 });
+      expect(sentTo).toEqual(['U3']);
+      // 壊れた行は上限まで数えて終端へ落ち、以後は対象から外れる。
+      await run();
+      await run();
+      expect(dual.raw1.prepare(
+        `SELECT status FROM booking_reminders WHERE id = 'LEG-b1'`,
+      ).get()).toEqual({ status: 'failed_permanent' });
+      expect(dual.raw1.prepare(
+        `SELECT COUNT(*) AS c FROM booking_reminders WHERE status IN ('pending','failed')`,
+      ).get()).toEqual({ c: 0 });
+    } finally {
+      dual.cleanup();
+    }
+  });
+});
