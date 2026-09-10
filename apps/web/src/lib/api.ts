@@ -6564,6 +6564,14 @@ export const api = {
         /** Monthly and lifetime delivery totals. null when unavailable. */
         monthlySendCount: number | null;
         totalSendCount: number | null;
+        /** 347: 公開待ちの下書きがあるか。 */
+        hasDraft: boolean;
+        /** 347: 公開版の版番号。未公開は0。 */
+        publishedVersion: number;
+        /** 347: 最後に公開した日時。未公開はnull。 */
+        publishedAt: string | null;
+        /** 347: いまの下書き版。公開で0に戻る。 */
+        draftRevision: number;
         createdAt: string;
         updatedAt: string;
       }>>>(
@@ -6597,8 +6605,40 @@ export const api = {
         };
         createdAt: string;
         updatedAt: string;
+        /** 347: 公開待ちの下書きがあるか。 */
+        hasDraft: boolean;
+        /** 347: 公開版の版番号。未公開は0。 */
+        publishedVersion: number;
+        /** 347: 最後に公開した日時。未公開はnull。 */
+        publishedAt: string | null;
+        /** 347: いまの下書き版。公開で0に戻る。 */
+        draftRevision: number;
       }>>(
         `/api/templates/${id}`,
+      ),
+    /**
+     * 独立審査(指摘6): 下書きを公開版へ写す。確認キーは自動で振る。
+     * 詳細口が返す publishedVersion・draftRevision をそのまま渡す。
+     */
+    publish: (id: string, data: { expectedVersion: number; expectedDraftRevision: number }) =>
+      fetchApi<ApiResponse<{
+        id: string;
+        accountId: string | null;
+        messageType: string;
+        messageContent: string;
+        publishedVersion: number;
+        publishedAt: string | null;
+        published: boolean;
+        replayed: boolean;
+        hasDraft: boolean;
+        draftRevision: number;
+      }>>(
+        `/api/templates/${id}/publish`,
+        {
+          method: 'POST',
+          headers: { 'Idempotency-Key': crypto.randomUUID() },
+          body: JSON.stringify(data),
+        },
       ),
     create: (data: {
       accountId: string

@@ -1,8 +1,9 @@
 'use client'
 
 import SelectField from '@/components/shared/select-field'
+import StatusBadge from '@/components/shared/status-badge'
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { api, type BroadcastAssetKind, type TemplateQuestion } from '@/lib/api'
+import { api, ApiError, type BroadcastAssetKind, type TemplateQuestion } from '@/lib/api'
 import FlexPreviewComponent from '@/components/flex-preview'
 import ImageUploader from '@/components/shared/image-uploader'
 import BroadcastAssetManager from '@/components/broadcasts/broadcast-asset-manager'
@@ -56,6 +57,14 @@ interface TemplateDetail {
   question: TemplateQuestion | null
   questionStatus: 'draft' | 'published'
   folderId: string | null
+  /** 347: 公開待ちの下書きがあるか。撮影用モックには無いことがある。 */
+  hasDraft?: boolean
+  /** 347: 公開版の版番号。未公開は0。 */
+  publishedVersion?: number
+  /** 347: 最後に公開した日時。未公開はnull。 */
+  publishedAt?: string | null
+  /** 347: いまの下書き版。公開で0に戻る。 */
+  draftRevision?: number
   usedBy: {
     autoReplies: Array<{ id: string; keyword: string; matchType: 'exact' | 'contains'; lineAccountId: string | null }>
     automations: Array<{ id: string; name: string; eventType: string }>
@@ -161,6 +170,9 @@ export default function TemplatesPage() {
   const [editContent, setEditContent] = useState<string | null>(null)
   const [editName, setEditName] = useState<string | null>(null)
   const [savingEdit, setSavingEdit] = useState(false)
+  /** 独立審査(指摘6): 公開の実行中と失敗の帯。 */
+  const [publishing, setPublishing] = useState(false)
+  const [publishError, setPublishError] = useState<string | null>(null)
 
   useEffect(() => {
     activeAccountRef.current = selectedAccountId
@@ -224,11 +236,12 @@ export default function TemplatesPage() {
 
   // Drawer fetch
   useEffect(() => {
-    if (!drawerId) { setDrawerData(null); setDrawerError(null); return }
+    if (!drawerId) { setDrawerData(null); setDrawerError(null); setPublishError(null); return }
     let cancelled = false
     setDrawerLoading(true)
     setDrawerError(null)
     setDrawerData(null)
+    setPublishError(null)
     api.templates.get(drawerId).then((detailRes) => {
       if (cancelled) return
       if (detailRes.success && detailRes.data) {
@@ -388,6 +401,35 @@ export default function TemplatesPage() {
       setError('更新に失敗しました')
     }
     setSavingEdit(false)
+  }
+
+  /**
+   * 独立審査(指摘6): 表示中の版で公開する。他の人が先に直していたら
+   * サーバーが 409 で止めるので、状態を読み直してやり直してもらう。
+   * モック行（版なし）の公開ボタンは出ないので、ここでは弾かない。
+   */
+  const handlePublish = async (detail: TemplateDetail) => {
+    setPublishing(true)
+    setPublishError(null)
+    try {
+      const res = await api.templates.publish(detail.id, {
+        expectedVersion: detail.publishedVersion ?? 0,
+        expectedDraftRevision: detail.draftRevision ?? 0,
+      })
+      if (!res.success) throw new Error(res.error ?? '公開できませんでした')
+      const r = await api.templates.get(detail.id)
+      if (r.success && r.data) setDrawerData(r.data)
+      load()
+    } catch (e) {
+      const r = await api.templates.get(detail.id)
+      if (r.success && r.data) setDrawerData(r.data)
+      setPublishError(
+        e instanceof ApiError && e.status === 409
+          ? '他の人が先に更新したため、公開を止めました。最新の状態を確認して、もう一度お試しください。'
+          : '公開できませんでした。もう一度お試しください。',
+      )
+    }
+    setPublishing(false)
   }
 
   // 押しただけでは消さない。窓を開くだけにする。使用中なら使用先へ送る。
@@ -943,7 +985,26 @@ export default function TemplatesPage() {
                   <span className="text-[10px] text-ink-faint">
                     更新: {formatDate(drawerData.updatedAt)}
                   </span>
+                  {/* 独立審査(指摘6): 公開状態と公開ボタン。版の確認つきで公開する。 */}
+                  <StatusBadge
+                    tone={drawerData.publishedAt == null ? 'warning' : drawerData.hasDraft ? 'info' : 'neutral'}
+                    size="compact"
+                  >
+                    {drawerData.publishedAt == null ? '未公開' : drawerData.hasDraft ? '編集中' : `公開版${drawerData.publishedVersion ?? ''}`}
+                  </StatusBadge>
+                  {drawerData.hasDraft && (
+                    <Button
+                      variant="primary"
+                      onClick={() => void handlePublish(drawerData)}
+                      disabled={publishing}
+                    >
+                      {publishing ? '公開中...' : '公開する'}
+                    </Button>
+                  )}
                 </div>
+                {publishError && (
+                  <p role="alert" className="text-xs text-red-600">{publishError}</p>
+                )}
 
                 <div>
                   <label className="mb-1.5 block text-[11px] font-medium text-ink-faint" htmlFor="template-folder-select">

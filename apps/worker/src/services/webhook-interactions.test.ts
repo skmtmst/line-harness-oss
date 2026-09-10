@@ -5,6 +5,13 @@ vi.mock('@line-crm/db', () => ({
   createWebhookInteraction: vi.fn(),
   finishWebhookInteraction: vi.fn(),
   getOutgoingWebhookById: vi.fn(),
+  resolveWebhookSecret: vi.fn(async (row: { secret?: unknown; secret_encrypted?: unknown }) => {
+    if (typeof row?.secret_encrypted === 'string') {
+      if (row.secret_encrypted.startsWith('v1-broken')) throw new Error('Unable to decrypt webhook secret');
+      return 'r'.repeat(32);
+    }
+    return (row?.secret as string | null) ?? null;
+  }),
   restoreWebhookInteractionFailure: vi.fn(),
 }));
 
@@ -18,6 +25,7 @@ import {
   createWebhookInteraction,
   finishWebhookInteraction,
   getOutgoingWebhookById,
+  resolveWebhookSecret,
   restoreWebhookInteractionFailure,
   type WebhookInteractionRow,
 } from '@line-crm/db';
@@ -98,6 +106,43 @@ describe('Webhookの安全な送り直し', () => {
     vi.mocked(createWebhookInteraction).mockRejectedValue(new Error('database unavailable'));
     await expect(retryWebhookInteraction({} as D1Database, original)).rejects.toThrow('database unavailable');
     expect(restoreWebhookInteractionFailure).toHaveBeenCalledWith(expect.anything(), 'run-1', 'account-a');
+  });
+
+  it('暗号化された送り先は鍵で復号して送り直す(#650)', async () => {
+    vi.mocked(getOutgoingWebhookById).mockResolvedValue({
+      id: 'wh-1', name: '顧客管理', url: 'https://example.com/hook', event_types: '["*"]',
+      secret: null, secret_encrypted: 'v1-enc-abc', is_active: 1, max_retries: 0,
+      consecutive_failures: 0, last_failed_at: null, line_account_id: 'account-a',
+      created_at: '2026-08-29', updated_at: '2026-08-29',
+    });
+    vi.mocked(deliverWebhook).mockResolvedValue({ ok: true, attempts: 1, lastStatus: 200 });
+    const db = {
+      prepare: vi.fn(() => ({
+        bind: vi.fn(() => ({ first: vi.fn().mockResolvedValue({ ...retryRow, status: 'succeeded' }) })),
+      })),
+    } as unknown as D1Database;
+
+    await retryWebhookInteraction(db, original, 'test-key');
+    expect(resolveWebhookSecret).toHaveBeenCalledWith(expect.objectContaining({ id: 'wh-1' }), 'test-key');
+    // 署名用の復号は deliverWebhook が行う。鍵がそのまま渡ることを固定する。
+    expect(deliverWebhook).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'wh-1' }),
+      original.request_body_json,
+      { idempotencyKey: 'delivery-1', credentialKeys: 'test-key' },
+    );
+  });
+
+  it('復号できない送り先は送らずwebhook_secret_unavailableで止める(#650)', async () => {
+    vi.mocked(getOutgoingWebhookById).mockResolvedValue({
+      id: 'wh-1', name: '顧客管理', url: 'https://example.com/hook', event_types: '["*"]',
+      secret: null, secret_encrypted: 'v1-broken-xyz', is_active: 1, max_retries: 0,
+      consecutive_failures: 0, last_failed_at: null, line_account_id: 'account-a',
+      created_at: '2026-08-29', updated_at: '2026-08-29',
+    });
+    await expect(retryWebhookInteraction({} as D1Database, original, 'test-key'))
+      .rejects.toThrow('webhook_secret_unavailable');
+    expect(deliverWebhook).not.toHaveBeenCalled();
+    expect(claimWebhookInteractionRetry).not.toHaveBeenCalled();
   });
 });
 

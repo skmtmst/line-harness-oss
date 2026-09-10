@@ -308,7 +308,9 @@
     "344_rich_menu_schedule_publications.sql",
     "345_ad_platform_account_scope.sql",
     "346_ad_conversion_idempotency_and_backfill.sql",
+    "347_template_published_version.sql",
     "349_affiliate_settlement_snapshot.sql",
+    "350_webhook_secret_encrypted.sql",
     "352_photo_notification_delivery.sql",
     "354_analytics_cross_lease_generation.sql",
     "355_rich_menu_schedule_lease.sql",
@@ -329,5 +331,5 @@
     "375_mileage_redemption_step_lease.sql",
     "376_friend_tag_side_effect_runs.sql"
   ],
-  "migrationCount": 328
+  "migrationCount": 330
 }
