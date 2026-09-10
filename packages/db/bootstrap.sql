@@ -1695,6 +1695,18 @@ CREATE TABLE ec_orders (
   UNIQUE (line_account_id, source_key, external_order_id)
 );
 
+CREATE TABLE ec_v6_dispatches (
+  event_id        TEXT NOT NULL REFERENCES ec_events(id) ON DELETE CASCADE,
+  subscriber      TEXT NOT NULL CHECK (subscriber IN ('notification', 'v6')),
+  status          TEXT NOT NULL DEFAULT 'pending'
+                    CHECK (status IN ('pending', 'sent', 'failed')),
+  attempt_count   INTEGER NOT NULL DEFAULT 0,
+  last_error      TEXT,
+  idempotency_key TEXT NOT NULL,
+  updated_at      TEXT NOT NULL,
+  PRIMARY KEY (event_id, subscriber)
+);
+
 CREATE TABLE engagement_events (
   id                TEXT PRIMARY KEY,
   program_id        TEXT NOT NULL REFERENCES mileage_programs(id),
@@ -1719,6 +1731,18 @@ CREATE TABLE entry_route_genres (
   name TEXT NOT NULL UNIQUE,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
+);
+
+CREATE TABLE entry_route_stop_suppressions (
+  id              TEXT PRIMARY KEY,
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  line_user_id    TEXT NOT NULL,
+  friend_id       TEXT REFERENCES friends(id) ON DELETE SET NULL,
+  ref_code        TEXT NOT NULL,
+  source          TEXT NOT NULL,
+  occurred_at     TEXT NOT NULL,
+  expires_at      TEXT NOT NULL,
+  created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
 
 CREATE TABLE entry_routes (
@@ -5531,6 +5555,9 @@ CREATE INDEX idx_ec_orders_account_ordered
 CREATE INDEX idx_ec_orders_customer
   ON ec_orders(line_account_id, customer_id, ordered_at DESC);
 
+CREATE UNIQUE INDEX idx_ec_v6_dispatches_idempotency
+  ON ec_v6_dispatches (idempotency_key);
+
 CREATE INDEX idx_engagement_events_actor_friend
   ON engagement_events(program_id, actor_friend_id, occurred_at DESC);
 
@@ -6310,6 +6337,12 @@ CREATE INDEX idx_staff_members_tenant
 
 CREATE INDEX idx_staff_notification_reads_staff
   ON staff_notification_reads(staff_id, read_at DESC);
+
+CREATE UNIQUE INDEX idx_stop_suppressions_dedup
+  ON entry_route_stop_suppressions (line_account_id, line_user_id, ref_code);
+
+CREATE INDEX idx_stop_suppressions_lookup
+  ON entry_route_stop_suppressions (line_account_id, line_user_id, expires_at);
 
 CREATE INDEX idx_stripe_events_friend ON stripe_events (friend_id);
 

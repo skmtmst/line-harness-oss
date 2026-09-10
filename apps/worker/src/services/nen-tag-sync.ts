@@ -1,4 +1,5 @@
 import { attachTagAndFireSideEffects, detachTagAndFireSideEffects } from './friend-tag-attach.js';
+import { createFeatureJobGate } from './feature-enforcement.js';
 
 export const NEN_TAG = {
   member: 'nen-tag-member-nen',
@@ -451,7 +452,7 @@ type ScheduledRefreshResult = {
 };
 
 type RefreshState = { lastFriendId: string; cycleStartedAt: string };
-type RefreshFriend = { id: string; user_id: string | null };
+type RefreshFriend = { id: string; user_id: string | null; line_account_id: string | null };
 type SnapshotRow = Snapshot & { friend_id: string };
 type PetRow = Pet & { friend_id: string };
 type HealthLogRow = HealthLog & { friend_id: string };
@@ -499,7 +500,7 @@ async function refreshScheduledNenTags(
     Math.max(1, Math.min(requestedLimit, 1_000)),
   );
   const page = await db.prepare(
-    `SELECT id, user_id FROM friends
+    `SELECT id, user_id, line_account_id FROM friends
       WHERE is_following = 1 AND user_id IS NOT NULL AND user_id <> '' AND id > ?
       ORDER BY id ASC LIMIT ?`,
   ).bind(state.lastFriendId, batchSize + 1).all<RefreshFriend>();
@@ -573,8 +574,13 @@ async function refreshScheduledNenTags(
   const tagsByFriend = rowsByFriend(currentTagPages.flatMap((page) => page.results));
   let added = 0;
   let removed = 0;
+  const gate = createFeatureJobGate();
 
   for (const friend of friends) {
+    // 機能オフ中は付け替えしない。再オンで再開する。
+    if (!await gate.canRun(db, friend.line_account_id, 'photo_review', 'NEN tag refresh')) {
+      continue;
+    }
     const current = new Set((tagsByFriend.get(friend.id) ?? []).map((row) => row.tag_id));
     const ecDesired = deriveEcTagIds(snapshotByFriend.get(friend.id) ?? null, now);
     if (friend.user_id) ecDesired.add(NEN_TAG.ecLinked);
@@ -617,7 +623,7 @@ export async function refreshAllNenTags(
     ? `(line_account_id IN (${assignedIds.map(() => '?').join(',')})${allowedAccountIds.includes(null) ? ' OR line_account_id IS NULL' : ''})`
     : allowedAccountIds.includes(null) ? 'line_account_id IS NULL' : '1 = 0';
   const friends = await db.prepare(
-    `SELECT id FROM friends
+    `SELECT id, user_id, line_account_id FROM friends
       WHERE is_following = 1 AND user_id IS NOT NULL AND user_id <> ''
         AND ${accountWhere}
       ORDER BY updated_at DESC LIMIT ?`,
