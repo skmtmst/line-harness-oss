@@ -811,12 +811,33 @@ nenMembers.put('/api/nen-members/care-flags/:id', requireRole('owner', 'admin', 
   return c.json({ success: true });
 });
 
+/** 1ページの枚数。指定なし・壊れた指定は 200。上限も 200 で頭打ちにする。 */
+function photoPageSize(raw: string | undefined): number {
+  const value = Number(raw);
+  if (!Number.isFinite(value)) return 200;
+  return Math.min(200, Math.max(1, Math.trunc(value)));
+}
+
+/** 何枚目から取るか。指定なし・負・壊れた指定は 0。 */
+function photoPageOffset(raw: string | undefined): number {
+  const value = Number(raw);
+  if (!Number.isFinite(value) || value <= 0) return 0;
+  return Math.trunc(value);
+}
+
 nenMembers.get('/api/nen-members/photos', requirePhotoPermission('photo.submission.view'), async (c) => {
   const accountId = c.req.query('accountId')?.trim();
   if (!accountId) return c.json({ success: false, error: 'accountId is required' }, 400);
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
     return c.json({ success: false, error: 'このLINEアカウントを表示する権限がありません' }, 403);
   }
+  /*
+   * 続きを取れるようにする。前は 200 枚で打ち切りだったので、審査待ちが
+   * 201 枚以上あるとダッシュボードの件数に届かなかった（#666）。
+   * 1ページの上限は 200 のまま。offset で次の 200 枚を取る。
+   */
+  const limit = photoPageSize(c.req.query('limit'));
+  const offset = photoPageOffset(c.req.query('offset'));
   const rows = await c.env.DB.prepare(
     `SELECT ps.id, ps.friend_id, ps.pet_id, ps.review_image_url AS image_url,
             ps.caption, ps.status, ps.awarded_points, ps.created_at, ps.reviewed_at,
@@ -838,8 +859,8 @@ nenMembers.get('/api/nen-members/photos', requirePhotoPermission('photo.submissi
        JOIN nen_pet_profiles p ON p.id = ps.pet_id
        JOIN friends f ON f.id = ps.friend_id
       WHERE ps.line_account_id = ? AND f.line_account_id = ?
-      ORDER BY ps.created_at DESC LIMIT 200`,
-  ).bind(accountId, accountId).all<Record<string, unknown>>();
+      ORDER BY ps.created_at DESC, ps.id DESC LIMIT ? OFFSET ?`,
+  ).bind(accountId, accountId, limit, offset).all<Record<string, unknown>>();
   return c.json({ success: true, data: rows.results });
 });
 

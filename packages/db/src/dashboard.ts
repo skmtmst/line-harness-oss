@@ -90,7 +90,11 @@ export interface DashboardOverview {
     averageFirstReplyMinutes: number | null;
   };
   delivery: {
-    /** 今月に送った通数。見出し「今月の配信」どおり、選んだ期間に関わらず今月1日から数える。 */
+    /**
+     * 今月に送った通数。見出し「今月の配信」どおり、選んだ期間に関わらず
+     * 今月1日から数える。messages_log は送信時に1行足すので created_at が
+     * 送信日時にあたる（予約分を先に書く口はない）。
+     */
     sent: number;
     /**
      * こちらから送った数（プッシュ）と、受信への応答（リプライ）。
@@ -100,7 +104,10 @@ export interface DashboardOverview {
      */
     push: number;
     reply: number;
-    /** 今月の一斉配信の件数。sent と同じく今月1日から数える。 */
+    /**
+     * 今月の一斉配信の件数。sent と同じく今月1日から数える。
+     * 数えるのは送った日（sent_at）。作った日ではない。
+     */
     broadcasts: number;
     /** 今月の送信上限。LINE から取れないときは null。 */
     quotaLimit: number | null;
@@ -661,10 +668,13 @@ export async function getDashboardOverview(
       .first<{ sent: number; reply: number }>()
       .then((value) => value)
       .catch((error) => { partialFailures.push('delivery'); console.error('[dashboard] delivery failed', error); return null; }),
+    // 一斉配信は「作った日」ではなく「送った日」で数える。先月作って今月
+    // 送った配信を先月扱いにすると、見出し「今月の配信」と実際がずれる。
+    // sent_at が無い古い行だけ created_at で代用する（0件へ落とさない）。
     safe('broadcasts', count(
       db,
       `SELECT COUNT(*) AS n FROM broadcasts b
-        WHERE status = 'sent' AND b.created_at >= ? AND ${broadcastScope}`,
+        WHERE status = 'sent' AND COALESCE(b.sent_at, b.created_at) >= ? AND ${broadcastScope}`,
       month, ...broadcastAccount.binds, ...broadcastJsonAccount.binds,
     ), 0),
     safe('operations', operationsPromise, emptyOperations),

@@ -468,38 +468,62 @@ describe('今月の配信(#666 N-003)', () => {
       ).run(id, friend, source, account, createdAt);
     }
     const broadcasts = [
-      // [id, account, createdAt, status, counted]
-      ['b-today', 'account-a', `${today}T09:00:00.000+09:00`, 'sent', true],
-      ['b-edge', 'account-a', `${first}T00:00:00.000+09:00`, 'sent', true],
-      ['b-prev', 'account-a', `${prev}T23:59:59.000+09:00`, 'sent', false],
-      ['b-other', 'account-b', `${today}T09:00:00.000+09:00`, 'sent', false],
-      ['b-draft', 'account-a', `${today}T09:00:00.000+09:00`, 'draft', false],
+      // [id, account, createdAt, sentAt, status, 数えるか]
+      ['b-today', 'account-a', `${today}T09:00:00.000+09:00`, `${today}T09:05:00.000+09:00`, 'sent', true],
+      ['b-edge', 'account-a', `${first}T00:00:00.000+09:00`, `${first}T00:00:00.000+09:00`, 'sent', true],
+      ['b-prev', 'account-a', `${prev}T23:59:59.000+09:00`, `${prev}T23:59:59.000+09:00`, 'sent', false],
+      // 先月作って今月送った分。送った日で数えるので今月に入る。
+      ['b-made-last-month', 'account-a', `${prev}T20:00:00.000+09:00`, `${first}T09:00:00.000+09:00`, 'sent', true],
+      // 今月作ったが送ったのは先月末（予約の作り直しなど）。今月には入れない。
+      ['b-sent-last-month', 'account-a', `${today}T08:00:00.000+09:00`, `${prev}T22:00:00.000+09:00`, 'sent', false],
+      // 送った日時が残っていない古い行。作った日で代用し、0件へ落とさない。
+      ['b-legacy', 'account-a', `${first}T01:00:00.000+09:00`, null, 'sent', true],
+      ['b-other', 'account-b', `${today}T09:00:00.000+09:00`, `${today}T09:00:00.000+09:00`, 'sent', false],
+      ['b-draft', 'account-a', `${today}T09:00:00.000+09:00`, null, 'draft', false],
     ] as const;
-    for (const [id, account, createdAt, status] of broadcasts) {
+    for (const [id, account, createdAt, sentAt, status] of broadcasts) {
       sqlite.prepare(
         `INSERT INTO broadcasts
-          (id, title, message_type, message_content, target_type, status, created_at, line_account_id, account_ids)
-         VALUES (?, ?, 'text', '本文', 'all', ?, ?, ?, NULL)`,
-      ).run(id, id, status, createdAt, account);
+          (id, title, message_type, message_content, target_type, status, created_at, sent_at, line_account_id, account_ids)
+         VALUES (?, ?, 'text', '本文', 'all', ?, ?, ?, ?, NULL)`,
+      ).run(id, id, status, createdAt, sentAt, account);
     }
+    return {
+      countedBroadcasts: broadcasts.filter(([, , , , , counted]) => counted).map(([id]) => id),
+    };
   }
 
   test('期間「今日」でも今月1日からの送信を数え、先月と他アカウントを混ぜない', async () => {
-    seedDelivery();
+    const { countedBroadcasts } = seedDelivery();
     const overview = await getDashboardOverview(db, 'today', { allowedAccountIds: ['account-a'], includeUnassigned: false });
     expect(overview.delivery.sent).toBe(3);
     expect(overview.delivery.reply).toBe(2);
     expect(overview.delivery.push).toBe(1);
-    expect(overview.delivery.broadcasts).toBe(2);
+    // 期待値は仕込みの「数えるか」から作る。定数を書き写すと、仕込みを
+    // 増やしたときに数だけ直して中身の確認が抜ける。
+    expect(overview.delivery.broadcasts).toBe(countedBroadcasts.length);
+    expect(countedBroadcasts).toEqual(['b-today', 'b-edge', 'b-made-last-month', 'b-legacy']);
+  });
+
+  test('一斉配信は送った日で数える。先月作って今月送った分は入り、今月作って先月送った分は入らない', async () => {
+    seedDelivery();
+    const scope = { allowedAccountIds: ['account-a'], includeUnassigned: false } as const;
+    const before = (await getDashboardOverview(db, 'today', scope)).delivery.broadcasts;
+    // 今月送った1本を先月送りへ動かすと、ちょうど1本減る。作った日で
+    // 数えていると created_at は今月のままなので減らない。
+    sqlite.prepare('UPDATE broadcasts SET sent_at = ? WHERE id = ?')
+      .run(`${prevMonthLastDay()}T21:00:00.000+09:00`, 'b-made-last-month');
+    const after = (await getDashboardOverview(db, 'today', scope)).delivery.broadcasts;
+    expect(after).toBe(before - 1);
   });
 
   test('期間を切り替えても「今月の配信」の範囲は変わらず、区画の期間表示は this-month', async () => {
-    seedDelivery();
+    const { countedBroadcasts } = seedDelivery();
     const scope = { allowedAccountIds: ['account-a'], includeUnassigned: false } as const;
     for (const period of ['today', 'last7', 'last28'] as const) {
       const overview = await getDashboardOverview(db, period, scope);
       expect(overview.delivery.sent).toBe(3);
-      expect(overview.delivery.broadcasts).toBe(2);
+      expect(overview.delivery.broadcasts).toBe(countedBroadcasts.length);
       expect(overview.sections.delivery.period).toBe('this-month');
       expect(overview.period).toBe(period);
     }
