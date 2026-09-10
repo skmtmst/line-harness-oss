@@ -7444,6 +7444,11 @@ export const api = {
       fetchApi<{ success: boolean }>(`/api/nen-campaigns/settings/${encodeURIComponent(campaignKey)}?lineAccountId=${encodeURIComponent(accountId)}`, {
         method: 'PUT', body: JSON.stringify(data),
       }),
+    /** 一覧の停止・再開だけを切り替える。本文の長さに関わらず必ず実行できる（#659）。 */
+    setEnabled: (accountId: string, campaignKey: string, isEnabled: boolean) =>
+      fetchApi<{ success: boolean }>(`/api/nen-campaigns/settings/${encodeURIComponent(campaignKey)}/enabled?lineAccountId=${encodeURIComponent(accountId)}`, {
+        method: 'PUT', body: JSON.stringify({ isEnabled }),
+      }),
     testSend: (data: { campaignKey: string; accountId: string; friendId: string }) =>
       fetchApi<{ success: boolean }>('/api/nen-campaigns/test-send', { method: 'POST', body: JSON.stringify(data) }),
     jobs: (accountId: string) => fetchApi<ApiResponse<Array<{

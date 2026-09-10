@@ -1,0 +1,117 @@
+import { beforeEach, describe, expect, test, vi } from 'vitest';
+import { Hono } from 'hono';
+import { NEN_CAMPAIGN_BODY_MAX_LENGTH } from '@line-crm/shared';
+
+const mocks = vi.hoisted(() => ({
+  canAccess: vi.fn(),
+  getLineAccountById: vi.fn(),
+  getNenCampaign: vi.fn(),
+  saveNenCampaignAccountSetting: vi.fn(),
+  prepare: vi.fn(),
+}));
+
+vi.mock('../services/account-access.js', () => ({ canAccessAllLineAccounts: mocks.canAccess }));
+vi.mock('@line-crm/db', () => ({
+  getLineAccountById: mocks.getLineAccountById,
+  jstNow: vi.fn(() => '2026-09-08 12:00:00'),
+}));
+vi.mock('../services/nen-engagement.js', () => ({
+  buildDefaultColumnIntro: vi.fn(),
+  buildNenDeliveryMessages: vi.fn(),
+  getNenCampaign: mocks.getNenCampaign,
+  queueColumnDelivery: vi.fn(),
+  saveNenCampaignAccountSetting: mocks.saveNenCampaignAccountSetting,
+  getNenBirthdayCouponSetting: vi.fn(),
+  saveNenBirthdayCouponSetting: vi.fn(),
+}));
+vi.mock('../services/nen-tag-sync.js', () => ({ syncNenPetTags: vi.fn() }));
+vi.mock('../services/line-proxy-send.js', () => ({ pushViaHarnessProxy: vi.fn() }));
+vi.mock('../services/local-line-proxy.js', () => ({ dispatchLineProxyLocally: vi.fn() }));
+
+const { nenCampaigns } = await import('./nen-campaigns.js');
+
+function app() {
+  const instance = new Hono<{ Bindings: { DB: D1Database } }>();
+  instance.use('*', async (c, next) => {
+    c.env = { DB: { prepare: mocks.prepare } as unknown as D1Database };
+    c.set('staff' as never, { id: 'owner', role: 'owner', tenantId: 'tenant-a' } as never);
+    await next();
+  });
+  instance.route('/', nenCampaigns);
+  return instance;
+}
+
+function putSetting(bodyText: string, accountId = 'own-account') {
+  return app().request(`/api/nen-campaigns/settings/review_request?lineAccountId=${accountId}`, {
+    method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({
+      isEnabled: true, title: '見出し', bodyText,
+      delayDays: 3, deliveryTime: '10:00', buttonLabel: '', buttonUrl: '', imageUrl: '',
+    }),
+  });
+}
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  mocks.canAccess.mockResolvedValue(true);
+  mocks.getNenCampaign.mockResolvedValue({
+    campaign_key: 'review_request', label: '口コミのお願い', category: 'review', trigger_event: 'ec.order.delivered',
+    delay_days: 3, delivery_time: '10:00', is_enabled: 1, title: '見出し', body_text: '本文',
+    button_label: null, button_url: null, image_url: null, updated_at: '2026-09-01 00:00:00',
+  });
+  mocks.saveNenCampaignAccountSetting.mockResolvedValue(undefined);
+});
+
+describe('NEN本文の保存上限（#659）', () => {
+  test('採用上限ちょうど（4500字）は保存できる', async () => {
+    const response = await putSetting('あ'.repeat(NEN_CAMPAIGN_BODY_MAX_LENGTH));
+    expect(response.status).toBe(200);
+    expect(mocks.saveNenCampaignAccountSetting).toHaveBeenCalled();
+  });
+
+  test('旧上限ちょうど（1500字）は保存できる', async () => {
+    const response = await putSetting('あ'.repeat(1500));
+    expect(response.status).toBe(200);
+  });
+
+  test('採用上限の1字超え（4501字）は字数つきの理由で拒否し、保存しない', async () => {
+    const response = await putSetting('あ'.repeat(NEN_CAMPAIGN_BODY_MAX_LENGTH + 1));
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({
+      error: expect.stringContaining('4,500字以内'),
+    });
+    expect(mocks.saveNenCampaignAccountSetting).not.toHaveBeenCalled();
+  });
+
+  test('絵文字はUTF-16 code unitで数える（🌿4500個はUTF-16で9000になり保存できない）', async () => {
+    // #659差し戻し3点目: 旧実装はコードポイントで数えており、この本文が
+    // 誤って保存できてしまっていた（UTF-16では9000で、LINEの実際の
+    // 数え方では大幅な上限超過）。
+    const response = await putSetting('🌿'.repeat(NEN_CAMPAIGN_BODY_MAX_LENGTH));
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({
+      error: expect.stringContaining('9,000字'),
+    });
+    expect(mocks.saveNenCampaignAccountSetting).not.toHaveBeenCalled();
+  });
+
+  test('🌿2250個（UTF-16で4500ちょうど）は保存できる', async () => {
+    const response = await putSetting('🌿'.repeat(NEN_CAMPAIGN_BODY_MAX_LENGTH / 2));
+    expect(response.status).toBe(200);
+  });
+
+  test('家族の絵文字（ZWJ結合、見た目1字がUTF-16で11字）を含む本文も同じ数え方で判定する', async () => {
+    const family = '\u{1F468}‍\u{1F469}‍\u{1F467}‍\u{1F466}'; // 11 UTF-16 code unit
+    // 409個 * 11 = 4499（収まる）、410個 * 11 = 4510（超える）
+    const okResponse = await putSetting(family.repeat(409));
+    expect(okResponse.status).toBe(200);
+    const overResponse = await putSetting(family.repeat(410));
+    expect(overResponse.status).toBe(400);
+  });
+
+  test('他アカウントの保存は権限なしで拒否し、保存しない', async () => {
+    mocks.canAccess.mockResolvedValue(false);
+    const response = await putSetting('あ'.repeat(100), 'other-account');
+    expect(response.status).toBe(403);
+    expect(mocks.saveNenCampaignAccountSetting).not.toHaveBeenCalled();
+  });
+});
