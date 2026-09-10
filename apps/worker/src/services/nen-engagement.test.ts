@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { NEN_CAMPAIGN_BODY_MAX_LENGTH } from '@line-crm/shared';
 import type { FlexMessage } from '@line-crm/line-sdk';
 import {
@@ -151,25 +151,45 @@ describe('buildNenFlexMessage', () => {
     expect(rendered).toContain('2026-08-31');
   });
 
-  it('本文は保存時の上限を通っていても、差し込み展開後は送信直前に採用上限で切る（#659差し戻し1点目: 送信経路に判定がなかった）', () => {
-    // body_text は3,600字（保存時の上限4,500字以内）で、{{pet_name}}を
-    // 300回含む。保存できるペット名の上限いっぱい（40字）で展開すると
-    // 300 * 40 = 12,000字になり、切らなければ大幅に上限を超える。
-    const longPetName = 'あ'.repeat(40);
-    const message = buildNenFlexMessage({
-      ...campaign,
-      body_text: '{{pet_name}}'.repeat(300),
-    }, { pet: { name: longPetName } });
+  describe('送信直前の切り詰め（#659差し戻し1点目・司令塔裁定: 発動したら記録に残す）', () => {
+    afterEach(() => { vi.restoreAllMocks() });
 
-    const bubble = (message as FlexMessage).contents as { body: { contents: Array<{ type: string; text?: string }> } };
-    const bodyNode = bubble.body.contents[1];
-    expect(bodyNode.text?.length).toBe(NEN_CAMPAIGN_BODY_MAX_LENGTH);
-    expect(bodyNode.text?.startsWith(longPetName)).toBe(true);
-  });
+    it('保存時の上限を通っていても、差し込み展開後は送信直前に採用上限で切り、発動したことを記録する', () => {
+      // body_text は3,600字（保存時の上限4,500字以内）で、{{pet_name}}を
+      // 300回含む。保存できるペット名の上限いっぱい（40字）で展開すると
+      // 300 * 40 = 12,000字になり、切らなければ大幅に上限を超える。
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const longPetName = 'あ'.repeat(40);
+      const message = buildNenFlexMessage({
+        ...campaign,
+        body_text: '{{pet_name}}'.repeat(300),
+      }, { pet: { name: longPetName } });
 
-  it('差し込み後に上限内に収まる本文はそのまま切られない', () => {
-    const message = buildNenFlexMessage(campaign, { pet: { name: 'こむぎ' } });
-    const bubble = (message as FlexMessage).contents as { body: { contents: Array<{ type: string; text?: string }> } };
-    expect(bubble.body.contents[1].text).toBe(campaign.body_text);
+      const bubble = (message as FlexMessage).contents as { body: { contents: Array<{ type: string; text?: string }> } };
+      const bodyNode = bubble.body.contents[1];
+      expect(bodyNode.text?.length).toBe(NEN_CAMPAIGN_BODY_MAX_LENGTH);
+      expect(bodyNode.text?.startsWith(longPetName)).toBe(true);
+
+      // この truncate は、保存時の判定が効いていれば絶対に発動しないはず。
+      // 発動したら不具合が起きているということなので、黙って切らず記録する。
+      expect(errorSpy).toHaveBeenCalledTimes(1);
+      const logged = JSON.parse(errorSpy.mock.calls[0][0] as string);
+      expect(logged).toMatchObject({
+        event: 'nen_body_truncated_at_send',
+        campaignKey: campaign.campaign_key,
+        field: 'body',
+        beforeLength: 300 * 40,
+        afterLength: NEN_CAMPAIGN_BODY_MAX_LENGTH,
+        droppedLength: 300 * 40 - NEN_CAMPAIGN_BODY_MAX_LENGTH,
+      });
+    });
+
+    it('差し込み後に上限内に収まる本文はそのまま切られず、記録も残さない', () => {
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const message = buildNenFlexMessage(campaign, { pet: { name: 'こむぎ' } });
+      const bubble = (message as FlexMessage).contents as { body: { contents: Array<{ type: string; text?: string }> } };
+      expect(bubble.body.contents[1].text).toBe(campaign.body_text);
+      expect(errorSpy).not.toHaveBeenCalled();
+    });
   });
 });

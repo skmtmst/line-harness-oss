@@ -33,7 +33,14 @@ export const NEN_CAMPAIGN_BODY_MAX_LENGTH = 4500;
 /** LINEのプレーンテキスト上限（UTF-16 code unit）。採用上限の根拠として公開する。 */
 export const NEN_CAMPAIGN_BODY_SEND_LIMIT = 5000;
 
-/** 差し込み値（ペットの名前）のサーバ側上限（UTF-16 code unit）。保存時の最悪の展開長を有限にする。 */
+/**
+ * 差し込み値（ペットの名前）のサーバ側上限（UTF-16 code unit）。保存時の
+ * 最悪の展開長を有限にする。
+ *
+ * この40という数値に根拠はない。既存の類似フィールド（他機能の「お名前」
+ * 系の項目）に参照できる前例が無く、常識的な範囲で決めた。動かす前提が
+ * 出てきたら、この数値そのものを見直すこと。
+ */
 export const NEN_PET_NAME_MAX_LENGTH = 40;
 
 /**
