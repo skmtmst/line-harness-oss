@@ -315,7 +315,9 @@
     "362_entry_route_stop_suppression_dedup.sql",
     "365_rich_menu_schedule_default_pin.sql",
     "367_conversion_once_dedup_guard.sql",
+    "370_affiliate_registration_operation_idempotency.sql",
+    "372_affiliate_initial_link_operation_idempotency.sql",
     "373_ai_loop_slack_reports.sql"
   ],
-  "migrationCount": 316
+  "migrationCount": 318
 }
