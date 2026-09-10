@@ -25,7 +25,7 @@ describe('resolveStepContent', () => {
       template_id: null,
       message_type: 'text',
       message_content: 'hello',
-    });
+    }, null);
     expect(result).toEqual({
       messageType: 'text',
       messageContent: 'hello',
@@ -57,7 +57,7 @@ describe('resolveStepContent', () => {
       template_id: 'tpl-deleted',
       message_type: 'text',
       message_content: 'fallback',
-    });
+    }, null);
     expect(result).toEqual({
       messageType: 'text',
       messageContent: 'fallback',
