@@ -34,6 +34,7 @@ import {
 } from './external-delivery-retry.js';
 import type { ReminderStepRow } from '@line-crm/db';
 import type { Message } from '@line-crm/line-sdk';
+import { featureJobCanRun } from './feature-enforcement.js';
 
 const LEASE_MINUTES = 5;
 
@@ -147,6 +148,11 @@ export async function processReminderDeliveries(
       ? (friend as unknown as Record<string, string | null>).line_account_id ?? null
       : null;
     const accountId = enrollment.line_account_id ?? friendAccountId;
+    // 機能オフ中はclaimせずactiveのまま残す。再オンで再開する。
+    if (accountId && !await featureJobCanRun(db, { accountId, featureId: 'reminders', job: 'reminder deliveries' })) {
+      result.skipped += enrollment.steps.length;
+      continue;
+    }
 
     for (const step of enrollment.steps) {
       const sendAt = resolveReminderSendAt(

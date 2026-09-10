@@ -5,6 +5,7 @@
 import type { BookingNotificationSender, NotificationKind } from './booking-notifier.js';
 import { REMINDER_MAX_RETRY } from './booking-types.js';
 import { resolveLineCredential } from '@line-crm/db';
+import { featureJobCanRun } from './feature-enforcement.js';
 
 interface DueRow {
   id: string;
@@ -67,6 +68,10 @@ export async function processDueReminders(
   let failed = 0;
   for (const row of due.results) {
     const kind: NotificationKind = row.kind;
+    // 機能オフ中は送らずpendingのまま残す。再オンで再開する。
+    if (row.line_account_id && !await featureJobCanRun(db, { accountId: row.line_account_id, featureId: 'booking', job: 'booking reminders' })) {
+      continue;
+    }
     try {
       const accessToken = await resolveLineCredential(
         row.channel_access_token_encrypted,
