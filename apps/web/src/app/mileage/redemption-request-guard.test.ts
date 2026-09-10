@@ -8,6 +8,7 @@ import {
   createAccountTracker,
   createMileageRewardsFetchGuards,
   createRequestGuard,
+  createSingleFlightLock,
 } from './redemption-request-guard'
 
 /** 世代を取って、しばらくしてから「今の世代なら」採用する。画面の読み方と同じ。 */
@@ -252,5 +253,38 @@ describe('やり直しの店世代（Aで押してBへ切り替え）', () => {
     }
     await expect(retryLikeTab()).resolves.toBe('done')
     expect(applied.sort()).toEqual(['overview-A', 'redemptions-A'])
+  })
+})
+
+describe('やり直しの単発化', () => {
+  it('同じ束の2回目・3回目は通さない', () => {
+    const lock = createSingleFlightLock()
+    expect(lock.acquire('redemption-1')).toBe(true)
+    // 同じ行の連打も、別の行の同時押しも通らない。
+    expect(lock.acquire('redemption-1')).toBe(false)
+    expect(lock.acquire('redemption-2')).toBe(false)
+    expect(lock.holder()).toBe('redemption-1')
+  })
+
+  it('返ってきたら自分の分だけ降ろす', () => {
+    const lock = createSingleFlightLock()
+    expect(lock.acquire('redemption-1')).toBe(true)
+    // 通らなかった側の後片付けで、走っている分を降ろしてしまわない。
+    lock.release('redemption-2')
+    expect(lock.holder()).toBe('redemption-1')
+    lock.release('redemption-1')
+    expect(lock.holder()).toBeNull()
+    expect(lock.acquire('redemption-2')).toBe(true)
+  })
+
+  it('店を替えたら降ろす', () => {
+    const lock = createSingleFlightLock()
+    expect(lock.acquire('redemption-1')).toBe(true)
+    lock.reset()
+    // 前の店の応答待ちで、新しい店のやり直しが押せなくならない。
+    expect(lock.acquire('redemption-9')).toBe(true)
+    // 前の店の後片付けは、新しい持ち主を降ろさない。
+    lock.release('redemption-1')
+    expect(lock.holder()).toBe('redemption-9')
   })
 })

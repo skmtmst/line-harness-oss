@@ -7,7 +7,11 @@ import ListState from '@/components/shared/list-state'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { STATE_TEXT, notConnectedText } from '@/components/shared/not-connected'
 import { formatMileageDate, formatMileageNumber } from './mileage-display'
-import { createAccountTracker, createMileageRewardsFetchGuards } from './redemption-request-guard'
+import {
+  createAccountTracker,
+  createMileageRewardsFetchGuards,
+  createSingleFlightLock,
+} from './redemption-request-guard'
 import {
   api,
   fetchApi,
@@ -112,6 +116,12 @@ export default function MileageRewardsTab({ accountId }: { accountId: string | n
    * あとに新しい世代として A を読み直し、B の画面へ混ぜないためのもの。
    */
   const [accountTracker] = useState(createAccountTracker)
+  /*
+   * やり直しの同時押しを1本にまとめる旗。`retryingId` だけでは止まらない。
+   * 同じ束で走るクリックはどれも同じ描画の閉じ込めを見るので、状態は
+   * まだ null のまま関門を通る（本物のReactで押して確認した）。
+   */
+  const [retryLock] = useState(createSingleFlightLock)
 
   /*
    * 店が替わったら世代を進め、前の店のやり直しの旗を降ろす。
@@ -119,9 +129,10 @@ export default function MileageRewardsTab({ accountId }: { accountId: string | n
    */
   useEffect(() => {
     accountTracker.track(accountId)
+    retryLock.reset()
     setRetryingId(null)
     setRetryError('')
-  }, [accountId, accountTracker])
+  }, [accountId, accountTracker, retryLock])
 
   const load = useCallback(async () => {
     const requestId = overviewGuard.issue()
@@ -195,6 +206,12 @@ export default function MileageRewardsTab({ accountId }: { accountId: string | n
    */
   const retryRedemption = async (redemption: FailedRedemption) => {
     if (!accountId || retryingId) return
+    /*
+     * ここが同時押しの本当の関門。押した瞬間に同期で旗を立てる。
+     * 上の `retryingId` は再描画までは古いままなので、これが無いと
+     * 同じ束の2回目・3回目もそのまま裏側へ飛ぶ。
+     */
+    if (!retryLock.acquire(redemption.id)) return
     const startedAccountId = accountId
     const operation = accountTracker.track(startedAccountId)
     setRetryingId(redemption.id)
@@ -218,6 +235,7 @@ export default function MileageRewardsTab({ accountId }: { accountId: string | n
       if (!accountTracker.isCurrent(operation)) return
       setRetryError('やり直せませんでした。時間をおいてもう一度お試しください。')
     } finally {
+      retryLock.release(redemption.id)
       if (accountTracker.isCurrent(operation)) setRetryingId(null)
     }
   }

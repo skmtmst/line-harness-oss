@@ -75,3 +75,43 @@ export function createAccountTracker(): AccountTracker {
     },
   }
 }
+
+/**
+ * やり直しを1本だけ通す旗。**Reactの状態では同時押しを止められない。**
+ *
+ * 同じ束（1つのイベント処理）で走る複数のクリックは、どれも同じ描画の
+ * 閉じ込めを見る。`retryingId` はまだ null なので、状態だけの関門は
+ * 全部通ってしまい、やり直しが人数ぶん飛ぶ（本物のReactで押して確認）。
+ * `disabled` も再描画のあとにしか効かない。
+ *
+ * そこで旗は描画の外に置き、押した瞬間に同期で立てる。持ち主の交換IDを
+ * 覚えるのは、返ってきたときに自分の分だけ降ろすため。
+ * 店を替えたときは `reset` で降ろす（前の店の応答待ちで新しい店が
+ * 押せなくなるのを避ける。裏側は同じ交換IDを取り合わないので安全）。
+ */
+export interface SingleFlightLock {
+  acquire(id: string): boolean
+  release(id: string): void
+  reset(): void
+  holder(): string | null
+}
+
+export function createSingleFlightLock(): SingleFlightLock {
+  let holder: string | null = null
+  return {
+    acquire(id: string) {
+      if (holder !== null) return false
+      holder = id
+      return true
+    },
+    release(id: string) {
+      if (holder === id) holder = null
+    },
+    reset() {
+      holder = null
+    },
+    holder() {
+      return holder
+    },
+  }
+}

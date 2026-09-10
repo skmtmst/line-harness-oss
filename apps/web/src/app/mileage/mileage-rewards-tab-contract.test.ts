@@ -113,6 +113,18 @@ describe('届かなかった交換', () => {
     expect(code).toMatch(/setRetryingId\(redemption\.id\)/)
   })
 
+  it('同時押しは描画の外の旗で止める', () => {
+    /*
+     * `retryingId` だけでは同じ束のクリックを止められない。状態は再描画まで
+     * 古いままなので、2回目・3回目もそのまま裏側へ飛ぶ（本物のReactで確認）。
+     * 実挙動は mileage-retry-react.test.tsx が当てる。ここは口の形だけ見る。
+     */
+    expect(code).toMatch(/createSingleFlightLock/)
+    expect(code).toMatch(/if \(!retryLock\.acquire\(redemption\.id\)\) return/)
+    expect(code).toMatch(/retryLock\.release\(redemption\.id\)/)
+    expect(code).toMatch(/retryLock\.reset\(\)/)
+  })
+
   it('やり直しのあとは一覧を読み直す', () => {
     expect(code).toMatch(/await loadFailedRedemptions\(\)/)
   })
