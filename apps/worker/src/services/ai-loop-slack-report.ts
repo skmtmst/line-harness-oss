@@ -18,6 +18,7 @@ export type AiLoopReport = {
 };
 
 export type AiLoopSlackConfig = {
+  DB: D1Database;
   SLACK_BOT_TOKEN?: string;
   SLACK_AI_LOOP_CHANNEL_ID?: string;
 };
@@ -39,7 +40,8 @@ type SlackApiResponse = {
 };
 
 const METADATA_TYPE = 'nen_ai_loop_report';
-const MAX_HISTORY_PAGES = 3;
+const RECOVERY_HISTORY_PAGES = 5;
+const CLAIM_TTL_MS = 2 * 60 * 1000;
 
 async function slackApi(
   token: string,
@@ -63,7 +65,8 @@ async function slackApi(
 }
 
 function oneLine(value: string, max: number): string {
-  return value.replace(/[\r\n\t]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, max);
+  return value.replace(/[\r\n\t]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, max)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 function reportKey(report: AiLoopReport): string {
@@ -101,7 +104,7 @@ async function findExisting(
   fetcher: typeof fetch,
 ): Promise<SlackMessage | null> {
   let cursor = '';
-  for (let page = 0; page < MAX_HISTORY_PAGES; page += 1) {
+  for (let page = 0; page < RECOVERY_HISTORY_PAGES; page += 1) {
     const result = await slackApi(token, 'conversations.history', {
       channel,
       limit: 100,
@@ -129,10 +132,41 @@ export async function relayAiLoopReport(
   if (!token || !channel) throw new Error('AI_LOOP_SLACK_REPORT_NOT_CONFIGURED');
 
   const key = reportKey(report);
-  const existing = await findExisting(token, channel, key, fetcher);
-  const previousRevision = Number(existing?.metadata?.event_payload?.revision ?? -1);
-  if (existing?.ts && Number.isFinite(previousRevision) && previousRevision >= report.revision) {
-    return { action: 'ignored', ts: existing.ts };
+  const now = Date.now();
+  const previous = await config.DB.prepare(
+    `SELECT slack_ts, revision, claim_token, claim_expires_at
+       FROM ai_loop_slack_reports WHERE work_key = ?`,
+  ).bind(key).first<{ slack_ts: string | null; revision: number; claim_token: string | null; claim_expires_at: number | null }>();
+  const claimToken = crypto.randomUUID();
+  const claimed = await config.DB.prepare(
+    `INSERT INTO ai_loop_slack_reports
+       (work_key, slack_ts, revision, claim_token, claim_expires_at, updated_at)
+     VALUES (?, NULL, ?, ?, ?, ?)
+     ON CONFLICT(work_key) DO UPDATE SET
+       revision = excluded.revision,
+       claim_token = excluded.claim_token,
+       claim_expires_at = excluded.claim_expires_at,
+       updated_at = excluded.updated_at
+     WHERE (ai_loop_slack_reports.claim_token IS NULL AND ai_loop_slack_reports.revision < excluded.revision)
+        OR (ai_loop_slack_reports.claim_token IS NOT NULL
+            AND ai_loop_slack_reports.claim_expires_at <= ?
+            AND ai_loop_slack_reports.revision <= excluded.revision)`,
+  ).bind(key, report.revision, claimToken, now + CLAIM_TTL_MS, now, now).run();
+  if (Number(claimed.meta.changes ?? 0) !== 1) {
+    const current = await config.DB.prepare(
+      'SELECT slack_ts, revision FROM ai_loop_slack_reports WHERE work_key = ?',
+    ).bind(key).first<{ slack_ts: string | null; revision: number }>();
+    if (current && current.revision < report.revision) {
+      throw new Error('AI_LOOP_SLACK_REPORT_BUSY');
+    }
+    return { action: 'ignored', ...(current?.slack_ts ? { ts: current.slack_ts } : {}) };
+  }
+
+  let slackTs = previous?.slack_ts || null;
+  // A worker may stop after Slack accepted a create but before D1 recorded its ts.
+  // Only that expired-claim recovery path scans recent history; normal updates use D1.
+  if (!slackTs && previous?.claim_token && Number(previous.claim_expires_at ?? 0) <= now) {
+    slackTs = (await findExisting(token, channel, key, fetcher))?.ts || null;
   }
 
   const payload = {
@@ -155,14 +189,21 @@ export async function relayAiLoopReport(
     },
   };
 
-  if (existing?.ts) {
-    await slackApi(token, 'chat.update', { ...payload, ts: existing.ts }, fetcher);
-    return { action: 'updated', ts: existing.ts };
+  if (slackTs) {
+    await slackApi(token, 'chat.update', { ...payload, ts: slackTs }, fetcher);
+  } else {
+    const created = await slackApi(token, 'chat.postMessage', {
+      ...payload,
+      client_msg_id: await stableClientMessageId(key),
+    }, fetcher);
+    if (!created.ts) throw new Error('SLACK_API_FAILED:chat.postMessage:missing_ts');
+    slackTs = created.ts;
   }
-  const created = await slackApi(token, 'chat.postMessage', {
-    ...payload,
-    // Slack also deduplicates concurrent creates carrying the same client id.
-    client_msg_id: await stableClientMessageId(key),
-  }, fetcher);
-  return { action: 'created', ts: created.ts };
+  const finalized = await config.DB.prepare(
+    `UPDATE ai_loop_slack_reports
+        SET slack_ts = ?, claim_token = NULL, claim_expires_at = NULL, updated_at = ?
+      WHERE work_key = ? AND revision = ? AND claim_token = ?`,
+  ).bind(slackTs, Date.now(), key, report.revision, claimToken).run();
+  if (Number(finalized.meta.changes ?? 0) !== 1) throw new Error('AI_LOOP_SLACK_REPORT_CLAIM_LOST');
+  return { action: previous?.slack_ts || previous?.claim_token ? 'updated' : 'created', ts: slackTs };
 }

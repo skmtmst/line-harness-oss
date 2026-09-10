@@ -3,6 +3,7 @@ import { Hono } from 'hono';
 import type { Env } from '../index.js';
 import { signSupportRelay } from '../services/support-relay.js';
 import { aiLoopSlackReports } from './ai-loop-slack-reports.js';
+import { createTestD1 } from '../test-utils/d1-sqlite.js';
 
 const payload = {
   version: 1,
@@ -28,7 +29,7 @@ function app() {
 
 function env(): Env['Bindings'] {
   return {
-    DB: {} as D1Database,
+    DB: createTestD1().db,
     IMAGES: {} as R2Bucket,
     ASSETS: {} as Fetcher,
     LINE_CHANNEL_SECRET: 'line-secret',
@@ -64,7 +65,6 @@ afterEach(() => vi.unstubAllGlobals());
 describe('AI loop Slack report security boundary', () => {
   test('accepts a signed report and never exposes an inbound control route', async () => {
     const fetcher = vi.fn()
-      .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true, messages: [] })))
       .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true, ts: '100.200' })));
     vi.stubGlobal('fetch', fetcher);
     const response = await request(payload);
