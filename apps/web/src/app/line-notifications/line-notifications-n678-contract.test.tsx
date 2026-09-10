@@ -18,7 +18,6 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react'
 import { act } from 'react'
-import { flushSync } from 'react-dom'
 
 const fixture = vi.hoisted(() => ({
   selectedAccountId: 'account-a' as string | null,
@@ -665,28 +664,34 @@ describe('#678 Bを選んだ直後・Bのload未発火でも、旧Aの応答か�
   })
 
   /*
-   * 司令塔の独立審査REJECT（2026-09-09、3回目）。
+   * 司令塔の独立審査REJECT（2026-09-09、3回目）と、その追い直し（Issue #695 T1）。
    *
    * テスト送信の完了判定（testSend）は loadGeneration だけを見ており、
    * selectedAccountRef の照合が無かった。保存・公開と同じ見張り
    * （isStale＝世代とアカウントの両方）を通すよう直した。
    *
-   * 【この2本の役割分担】
-   * 逆変異（isStale から account 照合だけを外す）で赤になる証拠は、
-   * すぐ下の「アカウントが替わっていれば…」——実物の Promise を握って
-   * 解放順を作る関数境界の試験——が担う。account 照合の有無で
-   * `stale` / `applied` がはっきり分かれる。
+   * 【この試験がどう空振りしていたか（Issue #695 T1）】
+   * 前の版は「Bへ描画コミット済み・Bのload()未発火」の隙間で旧Aの応答を
+   * 解放し、`テスト受信者 3名へ送信しました` が出ないことを見ていた。
+   * これは保護を全部外しても緑のままだった。理由は2つ:
+   *   1. `flushSync(() => {})` は空コールバックなので、default lane の
+   *      setNotice を流しきれず DOM に出ない
+   *   2. 次に load() が走ると冒頭で setNotice(null) を呼ぶので、
+   *      仮に入っていたお知らせも消える
+   * つまり判定は保護の有無にかかわらず必ず null だった。
    *
-   * 一方こちらの実mount試験は、逆変異でも赤にならない。理由は実測で
-   * 確かめた: load() は先頭で必ず setNotice(null) を含む状態リセットを
-   * するため、アカウント切替の直後に旧Aの結果が notice へ入っても、
-   * 同じ画面更新の中で load() に消され、画面には一度も出ない
-   * （マイクロタスクを32回進めてから flushSync しても出ない）。
-   * つまり notice 経由の「漏れ」は現状の実装では観測できない。
-   * それでもこの試験は、A→B切替をまたいだ一連の流れでBの画面が
-   * Bの内容だけになることを実物の画面で固定する回帰試験として残す。
+   * 【直し方】
+   * 隙間を狙うのをやめ、B の load() を最後まで終わらせてから旧Aの応答を
+   * 解放する。これなら後から notice を消す load() が無いので、漏れたお知らせは
+   * 画面に残り続ける——競合のタイミングに頼らず決定的に観測できる。
+   *
+   * 観測は文字列ではなく「お知らせ枠が出ているか」で行う。保護
+   * （`if (outcome.kind === 'stale') return`）を外すと outcome は
+   * `{ kind: 'stale' }` なので `setNotice({ tone: undefined, text: undefined })`
+   * となり、**中身が空のお知らせ枠**が出る。文字列では捕まらないため、
+   * role（success なら status／それ以外は alert）で構造として見る。
    */
-  it('実物のLineNotificationsPageをmountし、A送信→B切替→Aの遅延応答の順でも、Bの画面にAの送信結果が出ない', async () => {
+  it('実物のLineNotificationsPageをmountし、A送信→B切替→Bの読み直し完了→Aの遅延応答の順でも、Bの画面にお知らせが出ない', async () => {
     fixture.settings.mockImplementation((accountId: string) => Promise.resolve({
       success: true,
       data: [setting({
@@ -699,68 +704,45 @@ describe('#678 Bを選んだ直後・Bのload未発火でも、旧Aの応答か�
     fixture.definitions.mockResolvedValue({ success: true, data: [] })
     fixture.metrics.mockResolvedValue({ success: true, data: { items: [] } })
 
-    let releaseTestSend: (value: { success: boolean; data: { sent: number } }) => void = () => {
-      throw new Error('releaseTestSend が呼ばれる前にテスト送信応答を解放しようとした')
-    }
-    const heldTestSend = new Promise<{ success: boolean; data: { sent: number } }>((resolve) => { releaseTestSend = resolve })
-    fixture.testSend.mockReturnValue(heldTestSend)
+    const heldTestSend = deferred<{ success: boolean; data: { sent: number } }>()
+    fixture.testSend.mockReturnValue(heldTestSend.promise)
 
-    let committedToB = false
-    let releaseLayoutCommitted: () => void = () => {}
-    const layoutCommitted = new Promise<void>((resolve) => { releaseLayoutCommitted = resolve })
-
-    function LayoutBoundaryProbe() {
-      const account = useControllableAccount()
-      const seen = React.useRef<string | null>(null)
-      React.useLayoutEffect(() => {
-        if (seen.current === account || account !== 'account-b') return
-        seen.current = account
-        committedToB = true
-        // ここが本題。同じコミット内の受動effect（load()のuseEffect）より必ず先に走る。
-        releaseTestSend({ success: true, data: { sent: 3 } })
-        releaseLayoutCommitted()
-      }, [account])
-      return null
-    }
-
-    render(<>
-      <LayoutBoundaryProbe />
-      <LineNotificationsPage />
-    </>)
+    render(<LineNotificationsPage />)
     await waitFor(() => expect(screen.getByText('A店の注文受付')).toBeTruthy())
 
+    // A で編集を開き、テスト送信を投げる（応答はまだ返さない）。
     fireEvent.click(screen.getByRole('button', { name: '内容を編集' }))
     await screen.findByLabelText('ご案内文')
-
     fireEvent.click(screen.getAllByRole('button', { name: '自分にテスト送信' })[0])
     expect(fixture.testSend).toHaveBeenCalledTimes(1)
-    expect(committedToB).toBe(false)
+    expect(fixture.testSend.mock.calls[0][0]).toMatchObject({ accountId: 'account-a' })
 
-    // act() を経由しない生の setState。保存・公開の境界試験と同じ技法。
+    // B へ切り替え、B の読み直しを最後まで終わらせる。
+    // ここまで来ると、あとから notice を消す load() はもう走らない。
     commitAccountSwitch('account-b')
-
-    await layoutCommitted
-    expect(committedToB).toBe(true)
-
-    // load()（受動effect）はこの時点でまだ一度も発火していない。
-    expect(fixture.operatorList).not.toHaveBeenCalledWith('account-b')
-    expect(fixture.settings).not.toHaveBeenCalledWith('account-b')
-
-    // Aの応答（testSendの継続）を最後まで走らせる。act() は抜けるときに
-    // 保留中のeffectまで流してしまうので、ここでは生のPromiseで
-    // マイクロタスクだけを進める。
-    for (let tick = 0; tick < 32; tick += 1) await Promise.resolve()
-    expect(fixture.operatorList).not.toHaveBeenCalledWith('account-b')
-    flushSync(() => {})
-    expect(screen.queryByText(/テスト受信者 3名へ送信しました/)).toBeNull()
-
-    // Bの読み直しまで進めても、画面はBの内容だけになりAの結果は出ない。
     await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)) })
     await waitFor(() => {
       const box = screen.getByLabelText('ご案内文') as HTMLTextAreaElement
       expect(box.value).toBe('B店の本文')
     })
+    expect(fixture.operatorList).toHaveBeenCalledWith('account-b')
+    // B の読み直しが notice を消したあとであることを確かめておく。
+    expect(screen.queryByRole('status')).toBeNull()
+    expect(screen.queryByRole('alert')).toBeNull()
+
+    // ここで初めて、A のテスト送信応答が遅れて返る。
+    heldTestSend.resolve({ success: true, data: { sent: 3 } })
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)) })
+
+    /*
+     * B の画面に、A の応答由来のお知らせが一切出ないこと。
+     * 保護を外すと、中身が空のお知らせ枠（role="alert"）がここで出る。
+     */
+    expect(screen.queryByRole('alert')).toBeNull()
+    expect(screen.queryByRole('status')).toBeNull()
     expect(screen.queryByText(/テスト受信者 3名へ送信しました/)).toBeNull()
+    // B の内容は保たれたまま。
+    expect((screen.getByLabelText('ご案内文') as HTMLTextAreaElement).value).toBe('B店の本文')
   })
 
   /*

@@ -467,7 +467,7 @@ function CustomerNotificationEditor({
       </div>
       <Button onClick={onTestSend} disabled={busy}>自分にテスト送信</Button>
     </div>
-    {notice && <div className={`rounded-control border px-4 py-3 text-sm ${notice.tone === 'success' ? 'border-success bg-success-bg text-success' : 'border-danger bg-danger-bg text-danger'}`}>{notice.text}</div>}
+    {notice && <div role={notice.tone === 'success' ? 'status' : 'alert'} aria-live={notice.tone === 'success' ? 'polite' : 'assertive'} className={`rounded-control border px-4 py-3 text-sm ${notice.tone === 'success' ? 'border-success bg-success-bg text-success' : 'border-danger bg-danger-bg text-danger'}`}>{notice.text}</div>}
 
     {/* N-337: 狭い幅では見本を下に回す。390pxを無条件に横置きしない。 */}
     <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_390px]">
@@ -598,15 +598,24 @@ function LineNotificationsPage() {
       setLoadState('ready')
       return
     }
+    /*
+     * 再開点の見張り。保存・公開・テスト送信の3経路と同じ形にそろえる（#695 T3）。
+     *
+     * 世代（loadGeneration）だけでは、アカウント切替の描画コミット後・この
+     * load() を差し替える次の load() が発火する前の隙間を見分けられない。
+     * 描画のたびに同期する selectedAccountRef も見て、この load() が
+     * 「いま画面が向いているアカウントのものか」を確かめる。
+     */
+    const stale = () => generation !== loadGeneration.current || selectedAccountId !== selectedAccountRef.current
     // N-341: 運用者タブの件数だけ先に実数で取る。顧客タブの成否とは切り分ける。
     try {
       const operatorRes = await api.notifications.operatorRules.list(selectedAccountId)
-      if (generation !== loadGeneration.current) return
+      if (stale()) return
       if (!operatorRes.success) throw new Error('operator count failed')
       setOperatorCount(operatorRes.data.summary.total)
       setOperatorState('ready')
     } catch (error) {
-      if (generation !== loadGeneration.current) return
+      if (stale()) return
       setOperatorCount(null)
       setOperatorState(error instanceof ApiError && error.status === 403 ? 'forbidden' : 'error')
     }
@@ -629,7 +638,7 @@ function LineNotificationsPage() {
             })
           : Promise.resolve(null),
       ])
-      if (generation !== loadGeneration.current) return
+      if (stale()) return
       if (!settingRes.success || !overviewRes.success) throw new Error('load failed')
       const loadedDefinitions = definitionRes?.success ? definitionRes.data : []
       const loadedDefinitionByEvent = new Map(loadedDefinitions.map((definition) => [definition.sourceEventType, definition]))
@@ -679,7 +688,7 @@ function LineNotificationsPage() {
       }
       setLoadState('ready')
     } catch (error) {
-      if (generation === loadGeneration.current) {
+      if (!stale()) {
         setLoadState(error instanceof ApiError && error.status === 403 ? 'forbidden' : 'error')
         setNotice({ tone: 'error', text: 'LINE通知の設定を読み込めませんでした。' })
       }
@@ -923,7 +932,7 @@ function LineNotificationsPage() {
       <p className="text-xs text-ink-faint">送った数が多い順</p>
     </div>
 
-    {notice && <div className={`rounded-control border px-4 py-3 text-sm ${notice.tone === 'success' ? 'border-success bg-success-bg text-success' : 'border-danger bg-danger-bg text-danger'}`}>{notice.text}</div>}
+    {notice && <div role={notice.tone === 'success' ? 'status' : 'alert'} aria-live={notice.tone === 'success' ? 'polite' : 'assertive'} className={`rounded-control border px-4 py-3 text-sm ${notice.tone === 'success' ? 'border-success bg-success-bg text-success' : 'border-danger bg-danger-bg text-danger'}`}>{notice.text}</div>}
 
     <section className="min-w-0 overflow-hidden rounded-card border border-hairline bg-canvas">
       {loadState === 'loading' ? <ListState kind="loading" title="顧客へのお知らせを読み込んでいます" />
