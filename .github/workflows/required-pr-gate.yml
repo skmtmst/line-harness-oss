@@ -418,6 +418,15 @@ jobs:
         run: >-
           pnpm exec playwright test
           --config apps/web/src/app/ec-commerce/ec-commerce-issue-685.config.mjs
+      # 間欠的な失敗(#685)の原因切り分け用。失敗時のDOM(error-context.md)を
+      # artifactとして残し、CIでしか再現しない症状を後から読めるようにする。
+      - name: Upload EC import list failure context
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ec-commerce-issue-685-failure
+          path: apps/web/test-results/
+          retention-days: 7
       - name: LINE notifications real-browser behavior (#678)
         run: node apps/web/src/app/line-notifications/line-notifications-browser-behavior.mjs
       - run: pnpm --filter web verify:design
