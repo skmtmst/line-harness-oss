@@ -121,6 +121,14 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
    */
   const currentAccountIdRef = useRef(accountId)
   currentAccountIdRef.current = accountId
+  /*
+   * 検索debounceのuseEffect([query, setPage])は、マウント直後のqueryの
+   * 初期値('')でも必ず1回実行される。ここをスキップしないと、一覧が出た
+   * 直後にページ送りしたユーザーが、300ms後の無条件setPage(1)で黙って
+   * 1ページ目へ戻される(#685、司令塔切り分け2026-09-10、列車229で実証)。
+   * queryが実際に変わったときだけページを1へ戻す、が本来の意図。
+   */
+  const isFirstQueryEffect = useRef(true)
 
   /*
    * ここが「同期的な消去」。アカウントが変わった描画では、取得元の違う値は
@@ -228,6 +236,10 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
   useEffect(() => { void loadOverview() }, [loadOverview])
   useEffect(() => { void loadRecords() }, [loadRecords])
   useEffect(() => {
+    if (isFirstQueryEffect.current) {
+      isFirstQueryEffect.current = false
+      return
+    }
     const timer = window.setTimeout(() => {
       setPage(1)
       setSearchQuery(query.trim())
