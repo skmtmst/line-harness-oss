@@ -10,6 +10,7 @@ import type {
   EventNotificationKind,
 } from './event-booking-notifier.js';
 import { resolveLineCredential } from '@line-crm/db';
+import { featureJobCanRun } from './feature-enforcement.js';
 
 export interface ComputedReminder {
   kind: EventReminderKind;
@@ -161,6 +162,10 @@ export async function processDueEventReminders(
   let sent = 0;
   let failed = 0;
   for (const row of due.results ?? []) {
+    // 機能オフ中はclaimせずpendingのまま残す。再オンで再開する。
+    if (row.line_account_id && !await featureJobCanRun(db, { accountId: row.line_account_id, featureId: 'events', job: 'event reminders' })) {
+      continue;
+    }
     // 読み出し時点の試行回数。fence の CAS はこの値を epoch に使い、失敗記録も
     // これを基準にする (claim 後に row を読み直さない)。
     // catch へ来るのは自分が失敗したときだけ。握れなかった行は continue で
