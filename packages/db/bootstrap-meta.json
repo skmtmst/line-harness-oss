@@ -306,8 +306,9 @@
     "343_messages_log_broadcast_recipient_index.sql",
     "349_affiliate_settlement_snapshot.sql",
     "354_analytics_cross_lease_generation.sql",
+    "367_conversion_once_dedup_guard.sql",
     "370_affiliate_registration_operation_idempotency.sql",
-    "371_affiliate_initial_link_operation_idempotency.sql"
+    "372_affiliate_initial_link_operation_idempotency.sql"
   ],
-  "migrationCount": 308
+  "migrationCount": 309
 }
