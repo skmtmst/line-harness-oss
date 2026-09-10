@@ -1733,6 +1733,18 @@ CREATE TABLE entry_route_genres (
   updated_at TEXT NOT NULL
 );
 
+CREATE TABLE entry_route_stop_suppressions (
+  id              TEXT PRIMARY KEY,
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  line_user_id    TEXT NOT NULL,
+  friend_id       TEXT REFERENCES friends(id) ON DELETE SET NULL,
+  ref_code        TEXT NOT NULL,
+  source          TEXT NOT NULL,
+  occurred_at     TEXT NOT NULL,
+  expires_at      TEXT NOT NULL,
+  created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+);
+
 CREATE TABLE entry_routes (
   id          TEXT PRIMARY KEY,
   ref_code    TEXT UNIQUE NOT NULL,
@@ -6325,6 +6337,12 @@ CREATE INDEX idx_staff_members_tenant
 
 CREATE INDEX idx_staff_notification_reads_staff
   ON staff_notification_reads(staff_id, read_at DESC);
+
+CREATE UNIQUE INDEX idx_stop_suppressions_dedup
+  ON entry_route_stop_suppressions (line_account_id, line_user_id, ref_code);
+
+CREATE INDEX idx_stop_suppressions_lookup
+  ON entry_route_stop_suppressions (line_account_id, line_user_id, expires_at);
 
 CREATE INDEX idx_stripe_events_friend ON stripe_events (friend_id);
 
