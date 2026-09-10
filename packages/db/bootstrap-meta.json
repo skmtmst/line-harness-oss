@@ -316,7 +316,9 @@
     "363_ad_conversion_lease_and_provider_id.sql",
     "366_ad_conversion_outbox.sql",
     "367_conversion_once_dedup_guard.sql",
+    "370_affiliate_registration_operation_idempotency.sql",
+    "372_affiliate_initial_link_operation_idempotency.sql",
     "373_ai_loop_slack_reports.sql"
   ],
-  "migrationCount": 317
+  "migrationCount": 319
 }
