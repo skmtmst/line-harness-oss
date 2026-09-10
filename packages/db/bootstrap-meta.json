@@ -307,6 +307,7 @@
     "343_messages_log_broadcast_recipient_index.sql",
     "344_rich_menu_schedule_publications.sql",
     "349_affiliate_settlement_snapshot.sql",
+    "352_photo_notification_delivery.sql",
     "354_analytics_cross_lease_generation.sql",
     "355_rich_menu_schedule_lease.sql",
     "356_entry_route_stop_suppressions.sql",
