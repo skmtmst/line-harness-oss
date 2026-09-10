@@ -149,7 +149,7 @@ describe("mode 'once' (default) — claim protocol with the cron", () => {
 
     expect(sent).toBe(true);
     expect(dbMocks.claimFriendScenarioForDelivery).toHaveBeenCalledWith(db, 'fs-1', 0);
-    expect(lineClientMock.pushMessage).toHaveBeenCalledWith('U-1', [{ type: 'text', text: 'welcome!' }]);
+    expect(lineClientMock.pushMessage).toHaveBeenCalledWith('U-1', [{ type: 'text', text: 'welcome!' }], undefined);
     const log = insertedLog(calls);
     expect(log).toBeDefined();
     // delivery_type bind slot (7th value) stays NULL when not specified.
@@ -179,7 +179,7 @@ describe("mode 'once' (default) — claim protocol with the cron", () => {
     expect(lineClientMock.pushMessage).toHaveBeenCalledWith('U-1', [
       { type: 'text', text: '{{name}}さんへ確認です' },
       expect.objectContaining({ type: 'flex', altText: '続けますか？' }),
-    ]);
+    ], undefined);
     expect(calls.filter((call) => call.sql.includes('INSERT INTO messages_log'))).toHaveLength(2);
     expect(autoTrackMocks.decorateForFriendPush).not.toHaveBeenCalled();
   });
@@ -351,7 +351,7 @@ describe("mode 'every-click' — click-campaign re-delivery", () => {
     // could race the push — the claim fences it out.
     expect(dbMocks.claimFriendScenarioForDelivery).toHaveBeenCalledWith(db, 'fs-1', 0);
     // Push target is the id_token-derived LINE user id, not friend.line_user_id.
-    expect(lineClientMock.pushMessage).toHaveBeenCalledWith('U-token', [{ type: 'text', text: 'welcome!' }]);
+    expect(lineClientMock.pushMessage).toHaveBeenCalledWith('U-token', [{ type: 'text', text: 'welcome!' }], undefined);
     expect(insertedLog(calls)).toBeDefined();
     expect(dbMocks.advanceFriendScenario).toHaveBeenCalledWith(db, 'fs-1', 1, expect.any(String));
   });
@@ -458,7 +458,7 @@ describe('decoration — cron parity via the shared decorateForFriendPush pipeli
     // message, mirroring the cron.
     expect(lineClientMock.pushMessage).toHaveBeenCalledWith('U-1', [
       { type: 'flex', text: 'tracked!&f=friend-1' },
-    ]);
+    ], undefined);
     const log = insertedLog(calls);
     expect(log!.args[2]).toBe('flex');
     expect(log!.args[3]).toBe('tracked!&f=friend-1');
@@ -525,7 +525,7 @@ describe('decoration — cron parity via the shared decorateForFriendPush pipeli
       undefined,
       { lineAccountId: null, friendId: 'friend-1' },
     );
-    expect(lineClientMock.pushMessage).toHaveBeenCalledWith('U-1', [{ type: 'text', text: 'welcome!' }]);
+    expect(lineClientMock.pushMessage).toHaveBeenCalledWith('U-1', [{ type: 'text', text: 'welcome!' }], undefined);
   });
 
   it('decorates the reply-token path too — follow-webhook welcomes carry tracked links', async () => {

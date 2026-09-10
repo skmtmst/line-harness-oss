@@ -1,4 +1,9 @@
 import { processAutomationRun, startAutomationRun, type RunStatus } from './automation-engine.js';
+import {
+  automationRevisionToken,
+  parseAutomationRevision,
+  type AutomationVersionContent,
+} from './automation-drafts.js';
 import { createAutomationActionExecutors } from './automation-action-executors.js';
 import { buildSegmentWhere, parseCondition, type SegmentCondition } from './segment-query.js';
 
@@ -175,15 +180,22 @@ export async function listAutomationDefinitions(
   };
 }
 
-interface SelectedVersion {
+interface SelectedVersion extends AutomationVersionContent {
   automation_id: string;
   version_id: string;
-  condition_config: string;
 }
 
+/**
+ * 画面が持っている札（`<版の行のid>.<中身の指紋>`）で版を選ぶ。
+ *
+ * `requireFingerprint` を立てると、**指紋の無い札を受け取らない**。
+ * 送信のように取り消せない口では、中身まで確かめられない札を通すと、
+ * 守っているつもりの穴がそのまま残る。
+ */
 async function requireCurrentVersion(
   db: D1Database,
   input: { automationId: string; versionId: unknown; lineAccountId: string },
+  options: { requireFingerprint?: boolean } = {},
 ): Promise<SelectedVersion> {
   if (typeof input.versionId !== 'string' || !input.versionId.trim()) {
     throw new AutomationDefinitionError('required', '確認する版を選んでください', 'versionId');
@@ -198,17 +210,64 @@ async function requireCurrentVersion(
     current_published_version_id: string | null;
   }>();
   if (!definition) throw new AutomationDefinitionError('not_found', 'オートメーションが見つかりません');
-  const versionId = input.versionId.trim();
+  const requested = parseAutomationRevision(input.versionId);
+  if (options.requireFingerprint && !requested.fingerprint) {
+    throw new AutomationDefinitionError('version_conflict', '送る内容を確認し直してください', 'versionId');
+  }
+  const versionId = requested.versionId;
   if (![definition.current_draft_version_id, definition.current_published_version_id].includes(versionId)) {
     throw new AutomationDefinitionError('version_conflict', '確認中の版が変わりました。再読み込みしてください');
   }
   const version = await db.prepare(
-    `SELECT automation_id, id AS version_id, condition_config
+    `SELECT automation_id, id AS version_id,
+            trigger_type, trigger_config, condition_config, action_config
        FROM automation_versions
       WHERE id = ? AND automation_id = ?`,
   ).bind(versionId, definition.id).first<SelectedVersion>();
   if (!version) throw new AutomationDefinitionError('not_found', '指定した版が見つかりません');
+  // 版の行のidは中身を書き換えても変わらない。**指紋まで見て初めて、
+  // 確認したときの中身と同じかどうかが分かる。**
+  if (requested.fingerprint
+    && await automationRevisionToken(versionId, version) !== `${versionId}.${requested.fingerprint}`) {
+    throw new AutomationDefinitionError(
+      'version_conflict', '確認したあとに下書きが変わりました。もう一度、送る内容を確認してください',
+    );
+  }
   return version;
+}
+
+/** 版の中身が、読んだときのままかを見る。1文字でも違えば当たらない。 */
+async function versionContentUnchanged(
+  db: D1Database,
+  version: SelectedVersion,
+): Promise<boolean> {
+  const row = await db.prepare(
+    `SELECT 1 AS ok FROM automation_versions
+      WHERE id = ? AND automation_id = ?
+        AND trigger_type = ? AND trigger_config = ?
+        AND condition_config = ? AND action_config = ?`,
+  ).bind(
+    version.version_id, version.automation_id,
+    version.trigger_type, version.trigger_config,
+    version.condition_config, version.action_config,
+  ).first<{ ok: number }>();
+  return !!row;
+}
+
+/**
+ * 送る前に取りやめる。
+ *
+ * **実行記録は消せない。** `packages/db/bootstrap.sql` の
+ * `trg_automation_runs_no_delete` / `trg_automation_run_steps_no_delete` が
+ * 削除を禁じている（履歴を消さないという決めごと）。だから取りやめは
+ * 「送らずに取消として閉じる」形にする。
+ */
+async function cancelAutomationRunBeforeSend(db: D1Database, runId: string): Promise<void> {
+  await db.prepare(
+    `UPDATE automation_runs
+        SET status = 'cancelled', completed_at = ?, resume_at = NULL, lease_expires_at = NULL
+      WHERE id = ? AND status IN ('queued', 'skipped_condition')`,
+  ).bind(new Date().toISOString(), runId).run();
 }
 
 function targetCondition(raw: string): SegmentCondition | null {
@@ -262,7 +321,30 @@ export async function runAutomationTest(
     credentialEncryptionKey?: string;
   },
 ): Promise<{ runId: string; versionId: string; status: RunStatus | 'busy' }> {
-  const version = await requireCurrentVersion(db, input);
+  /*
+   * 1人テストは**取り消せない実送信**なので、確認した中身と1文字でも違えば
+   * 送らない。守りは2段。
+   *
+   *   1. 入口で、札の指紋と DB のいまの中身を突き合わせる（`requireFingerprint`）。
+   *      ここで違えば、実行記録すら作らずに 409 で返す（副作用0）。
+   *   2. 実行計画を固めたあと・送る前に、もう一度中身を見る。`startAutomationRun`
+   *      は自分でもう一度 `action_config` を読んで `execution_plan_json` に
+   *      焼き付けるので、1 の後・その読み取りの前に割り込まれると、
+   *      確認していない中身が焼き付く。**送る前に気づいて記録ごと捨てる。**
+   *
+   * ただし 2 は最後の網であって、主役ではない。**主役は版を不変にしたこと**で、
+   * `updateAutomationDraft` は同じ行を書き換えず、新しい版の行を作って
+   * `current_draft_version_id` を差し替える（`automation-drafts.ts`）。
+   * `startAutomationRun` は `v.id IN (現在の下書き, 現在の公開)` を満たす版しか
+   * 拾わないので、割り込みの保存が入った瞬間にこの札の版は外れ、
+   * **実行記録を1行も作らずに** `not_active` で戻る。CAS が実行記録を作る文の
+   * 中にある、という形はこれで満たされる。
+   *
+   * 2 に当たるのは、アプリを通さずDBを直接書き換えた場合だけである。
+   * そのときは送らずに取消として閉じる（実行記録は消せない。理由は
+   * `cancelAutomationRunBeforeSend` の注釈）。
+   */
+  const version = await requireCurrentVersion(db, input, { requireFingerprint: true });
   if (typeof input.friendId !== 'string' || !input.friendId.trim()) {
     throw new AutomationDefinitionError('required', 'テストする友だちを選んでください', 'friendId');
   }
@@ -291,6 +373,14 @@ export async function runAutomationTest(
   });
   if (!started.runId || !started.automationVersionId) {
     throw new AutomationDefinitionError('version_conflict', 'テストする版が変わりました。再読み込みしてください');
+  }
+  // 焼き付けたあと・送る前の最後の見張り（上の 2）。
+  if (started.automationVersionId !== version.version_id
+    || !await versionContentUnchanged(db, version)) {
+    await cancelAutomationRunBeforeSend(db, started.runId);
+    throw new AutomationDefinitionError(
+      'version_conflict', '確認したあとに下書きが変わりました。送っていません。もう一度、送る内容を確認してください',
+    );
   }
   const status = started.status === 'queued'
     ? await processAutomationRun(db, started.runId, {

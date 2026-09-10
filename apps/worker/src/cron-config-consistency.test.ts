@@ -41,6 +41,7 @@ describe('Cron Trigger設定', () => {
       'processDueFriendBulkRuns',
       'processPendingAnalyticsCrossRuns',
       'processPendingMileageEvents',
+      'drainAdConversionOutbox',
       'processPendingAnalyticsUrlExposures',
       'refreshRecentAnalyticsProjections',
       'checkAccountHealth',

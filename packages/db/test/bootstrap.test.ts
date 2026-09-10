@@ -49,6 +49,9 @@ function readSchemaObjects(db: Database.Database) {
         FROM sqlite_master
         WHERE sql IS NOT NULL
           AND name NOT LIKE 'sqlite_%'
+          -- _migrations は配備script が持つ適用記録で、アプリのスキーマでは
+          -- ない。generate-bootstrap.mjs 側でも同じ理由で外している。
+          AND name <> '_migrations'
         ORDER BY
           CASE type
             WHEN 'table' THEN 0

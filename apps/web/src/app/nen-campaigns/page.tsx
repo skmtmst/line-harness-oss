@@ -170,6 +170,19 @@ export default function NenCampaignsPage() {
     try { await api.nenCampaigns.updateSetting(selectedAccountId, setting.campaignKey, { isEnabled: next.isEnabled, title: next.title, bodyText: next.bodyText, delayDays: next.delayDays, deliveryTime: next.deliveryTime, buttonLabel: next.buttonLabel, buttonUrl: next.buttonUrl, imageUrl: next.imageUrl, afterActions: next.afterActions }); updateDraft(setting.campaignKey, next); setNotice({ tone: 'success', text: `${setting.label}の設定を保存しました。` }) }
     catch { setNotice({ tone: 'error', text: `${setting.label}を保存できませんでした。` }) } finally { setSaving(null) }
   }
+  // 停止・再開だけは専用の口を使い、本文などは送り直さない。保存済み本文が
+  // 上限を超えていても停止は必ずできる必要がある（#659差し戻し2点目）。
+  const toggleSetting = async (setting: NenCampaignSetting) => {
+    if (!selectedAccountId) return
+    const nextEnabled = !setting.isEnabled
+    setSaving(setting.campaignKey); setNotice(null)
+    try {
+      await api.nenCampaigns.setEnabled(selectedAccountId, setting.campaignKey, nextEnabled)
+      updateDraft(setting.campaignKey, { isEnabled: nextEnabled })
+      setNotice({ tone: 'success', text: `${setting.label}を${nextEnabled ? '再開' : '停止'}しました。` })
+    } catch { setNotice({ tone: 'error', text: `${setting.label}を切り替えられませんでした。` }) }
+    finally { setSaving(null) }
+  }
   const testSend = async (setting: NenCampaignSetting) => {
     if (!selectedAccountId || !testFriendId) { setNotice({ tone: 'error', text: 'テスト送信先を選択してください。' }); return }
     setTesting(setting.campaignKey)
@@ -304,7 +317,7 @@ export default function NenCampaignsPage() {
         onUpdateColumn={(id, introText) => setColumns((current) => current.map((column) => column.id === id ? { ...column, introText } : column))}
         onSaveColumn={(column) => void saveColumnMessage(column)} onDeliverColumn={(column, scheduledAt) => void deliverColumn(column, scheduledAt)}
         onDuplicateColumn={(column) => void duplicateColumn(column)} onTestColumn={(column) => void testColumn(column)}
-        onToggleSetting={(setting) => void saveSetting(setting, { isEnabled: !setting.isEnabled })} onTestSend={(setting) => void testSend(setting)}
+        onToggleSetting={(setting) => void toggleSetting(setting)} onTestSend={(setting) => void testSend(setting)}
         onPetDraftChange={setPetDraft} onAddPet={() => void addPet()} onDeletePet={(pet) => void deletePet(pet)} onCouponChange={setCoupon} onSaveCoupon={() => void saveCoupon()} savingCoupon={savingCoupon}
         onShowDelivery={(id) => void showDelivery(id)} onRetryDelivery={(id, version, reason) => void retryDelivery(id, version, reason)}
         onChangeDeliveryView={(status, cursor) => void changeDeliveryView(status, cursor)}

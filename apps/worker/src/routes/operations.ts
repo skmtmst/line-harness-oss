@@ -42,6 +42,7 @@ async function requireEmergencyControlPermission(c: Context<Env>, next: Next) {
     return c.json({
       success: false,
       error: '緊急停止・復旧の専用権限がありません。オーナーに権限付与を依頼してください',
+      code: 'EMERGENCY_CONTROL_FORBIDDEN',
     }, 403);
   }
   await next();
@@ -127,7 +128,7 @@ operations.get('/api/operations/health', requireRole('owner', 'admin'), async (c
   const accountId = requestedAccountId(c.req.query('account_id'));
   if (!accountId) return c.json({ success: false, error: 'LINEアカウントを指定してください' }, 400);
   if (!await canReadScope(c, accountId)) {
-    return c.json({ success: false, error: 'このアカウントの運用状態を表示する権限がありません' }, 403);
+    return c.json({ success: false, error: 'このアカウントの運用状態を表示する権限がありません', code: 'EMERGENCY_SCOPE_FORBIDDEN' }, 403);
   }
   try {
     return c.json({ success: true, data: staleHealth(await getLatestOperationHealthRun(c.env.DB, accountId)) });
@@ -145,7 +146,7 @@ operations.post('/api/operations/health/runs', requireRole('owner', 'admin'), as
   }
   const accountId = body.lineAccountId.trim();
   if (!await canReadScope(c, accountId)) {
-    return c.json({ success: false, error: 'このアカウントを確認する権限がありません' }, 403);
+    return c.json({ success: false, error: 'このアカウントを確認する権限がありません', code: 'EMERGENCY_SCOPE_FORBIDDEN' }, 403);
   }
   try {
     const checked = await runOperationHealthChecks(c.env.DB, {
@@ -163,7 +164,7 @@ operations.post('/api/operations/health/runs', requireRole('owner', 'admin'), as
 operations.get('/api/operations/control', requireRole('owner', 'admin'), async (c) => {
   const accountId = requestedAccountId(c.req.query('account_id'));
   if (!await canReadScope(c, accountId)) {
-    return c.json({ success: false, error: 'この範囲の緊急停止状態を表示する権限がありません' }, 403);
+    return c.json({ success: false, error: 'この範囲の緊急停止状態を表示する権限がありません', code: 'EMERGENCY_SCOPE_FORBIDDEN' }, 403);
   }
   try {
     return c.json({ success: true, data: await getOperationControlSet(c.env.DB, accountId) });
@@ -176,10 +177,10 @@ operations.get('/api/operations/control', requireRole('owner', 'admin'), async (
 operations.get('/api/operations/control/preview', requireRole('owner', 'admin'), async (c) => {
   const accountId = requestedAccountId(c.req.query('account_id'));
   if (accountId === null && c.get('staff')?.role !== 'owner') {
-    return c.json({ success: false, error: '全アカウントの影響人数を表示する権限がありません' }, 403);
+    return c.json({ success: false, error: '全アカウントの影響人数を表示する権限がありません', code: 'EMERGENCY_SCOPE_FORBIDDEN' }, 403);
   }
   if (accountId !== null && !await canReadScope(c, accountId)) {
-    return c.json({ success: false, error: 'このアカウントの影響人数を表示する権限がありません' }, 403);
+    return c.json({ success: false, error: 'このアカウントの影響人数を表示する権限がありません', code: 'EMERGENCY_SCOPE_FORBIDDEN' }, 403);
   }
   try {
     const [control, impact] = await Promise.all([
@@ -205,13 +206,19 @@ operations.get('/api/operations/control/preview', requireRole('owner', 'admin'),
         calculatedAt,
       },
     });
+    const canControl = canControlEmergency(c);
     return c.json({
       success: true,
       data: {
         control,
         counts,
         impact,
-        permissions: { canControl: canControlEmergency(c) },
+        // N-453: 停止できない理由を画面が運用者向け文言へ変えるための機械コード。
+        // 権限があるときは null。文言そのものは画面側が持つ。
+        permissions: {
+          canControl,
+          reasonCode: canControl ? null : 'EMERGENCY_CONTROL_FORBIDDEN',
+        },
         calculatedAt,
       },
     });
@@ -271,7 +278,7 @@ operations.get('/api/operations/incidents/:id', requireRole('owner', 'admin'), a
     const incident = await getOperationIncident(c.env.DB, c.req.param('id'));
     if (!incident) return c.json({ success: false, error: '緊急操作の記録が見つかりません' }, 404);
     if (!await canReadScope(c, incident.lineAccountId)) {
-      return c.json({ success: false, error: 'この緊急操作を表示する権限がありません' }, 403);
+      return c.json({ success: false, error: 'この緊急操作を表示する権限がありません', code: 'EMERGENCY_SCOPE_FORBIDDEN' }, 403);
     }
     return c.json({ success: true, data: incident });
   } catch (error) {
@@ -300,7 +307,7 @@ operations.post(
       typeof body.lineAccountId === 'string' ? body.lineAccountId : null,
     );
     if (!await canControlScope(c, accountId)) {
-      return c.json({ success: false, error: 'この範囲を緊急停止する権限がありません' }, 403);
+      return c.json({ success: false, error: 'この範囲を緊急停止する権限がありません', code: 'EMERGENCY_SCOPE_FORBIDDEN' }, 403);
     }
     const capabilities = parseCapabilities(body.capabilities);
     if (!capabilities) {
@@ -331,7 +338,7 @@ operations.post(
     const previous = await getOperationRequestReceipt(c.env.DB, 'stop', actorId, idempotencyKey);
     if (previous) {
       if (previous.requestHash !== requestHash) {
-        return c.json({ success: false, error: '同じ再実行キーが別の内容で使われています' }, 409);
+        return c.json({ success: false, error: '同じ再実行キーが別の内容で使われています', code: 'IDEMPOTENCY_CONFLICT' }, 409);
       }
       const incident = await getOperationIncident(c.env.DB, previous.resourceId);
       if (!incident) return c.json({ success: false, error: '以前の実行結果を取得できませんでした' }, 500);
@@ -360,6 +367,7 @@ operations.post(
         return c.json({
           success: false,
           error: '別の管理者が先に変更しました。最新の状態を読み直してください。',
+          code: 'VERSION_CONFLICT',
           data: result.control,
         }, 409);
       }
@@ -407,7 +415,7 @@ operations.post(
       const incident = await getOperationIncident(c.env.DB, c.req.param('id'));
       if (!incident) return c.json({ success: false, error: '緊急操作の記録が見つかりません' }, 404);
       if (!await canControlScope(c, incident.lineAccountId)) {
-        return c.json({ success: false, error: 'この範囲を復旧する権限がありません' }, 403);
+        return c.json({ success: false, error: 'この範囲を復旧する権限がありません', code: 'EMERGENCY_SCOPE_FORBIDDEN' }, 403);
       }
       const actorId = c.get('staff')!.id;
       const action = `restore:${incident.id}`;
@@ -415,7 +423,7 @@ operations.post(
       const previous = await getOperationRequestReceipt(c.env.DB, action, actorId, idempotencyKey);
       if (previous) {
         if (previous.requestHash !== requestHash) {
-          return c.json({ success: false, error: '同じ再実行キーが別の内容で使われています' }, 409);
+          return c.json({ success: false, error: '同じ再実行キーが別の内容で使われています', code: 'IDEMPOTENCY_CONFLICT' }, 409);
         }
         const replayed = await getOperationIncident(c.env.DB, previous.resourceId);
         if (!replayed) return c.json({ success: false, error: '以前の実行結果を取得できませんでした' }, 500);
@@ -436,12 +444,13 @@ operations.post(
         actorId,
       });
       if (result.status === 'not_found') {
-        return c.json({ success: false, error: '復旧できる緊急停止ではありません' }, 409);
+        return c.json({ success: false, error: '復旧できる緊急停止ではありません', code: 'OPERATION_NOT_STOPPED' }, 409);
       }
       if (result.status === 'conflict') {
         return c.json({
           success: false,
           error: '別の管理者が先に変更しました。最新の状態を読み直してください。',
+          code: 'VERSION_CONFLICT',
           data: result.control,
         }, 409);
       }

@@ -117,17 +117,18 @@ function formatKeys(keys: string[]): string {
  * 後続票で記載済みにした分はここから消す（残っているとテストが落とす）。
  */
 /**
- * 網羅率の後退防止ゲートの基準値（PR #1456 時点の実測）。
+ * 網羅率の後退防止ゲートの基準値（PR #1456 時点の実測＋#1446 の予約3口）。
  * - DOCUMENTED_MIN: 記載済み operation 数はここ未満へ減らせない
  * - ALLOWLIST_MAX: 未記載負債はここより増やせない
  * 後続票で記載を増やしたら、実測に合わせて両方を同じ PR で更新する。
  */
-const DOCUMENTED_MIN = 87;
+// 本流の87件(先行PR合流分)に、この票の secret-backfill 1口を足して88件。
+const DOCUMENTED_MIN = 90;
 const ALLOWLIST_MAX = 777;
 
 /**
- * PR #1456 時点の記載済み 83 件 + #630 の health-summary 1 件
- * + #663 の運用者通知 2 件の基準一覧。
+ * PR #1456 時点の記載済み 83 件＋#630 の health-summary 1 件＋#1446 の予約3口の基準一覧。
+ * さらに #663 の運用者通知2口を足した基準一覧。
  * 既存仕様を ALLOWLIST へ移して後退させる変更を落とすためのもの。
  * 件数が変わらなくても、ここにある1件が消えたら落ちる。
  * 後続票で記載を増やしたら、増えた分をここへ足す。
@@ -162,6 +163,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'GET /api/friends/count',
   'GET /api/line-accounts',
   'GET /api/line-accounts/{id}',
+  'GET /api/mileage/redemptions',
   'GET /api/mileage/rules',
   'GET /api/nen-campaigns/deliveries',
   'GET /api/nen-campaigns/deliveries/{id}',
@@ -207,9 +209,13 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'POST /api/tags',
   'POST /api/tags/import',
   'POST /api/tags/import/preview',
+  'POST /api/rich-menu-groups/{groupId}/schedule',
+  'GET /api/rich-menu-groups/{groupId}/schedules',
+  'POST /api/rich-menu-groups/{groupId}/schedules/{scheduleId}/cancel',
   'POST /api/users',
   'POST /api/users/{id}/link',
   'POST /api/users/match',
+  'POST /api/webhooks/maintenance/secret-backfill',
   'POST /webhook',
   'PUT /api/affiliates/{id}',
   'PUT /api/broadcasts/{id}',
@@ -536,7 +542,6 @@ const ALLOWLIST = new Set<string>([
   'POST /api/rich-menu-groups/{groupId}/pages/{pageId}/image',
   'POST /api/rich-menu-groups/{groupId}/preview-targets',
   'POST /api/rich-menu-groups/{groupId}/publish',
-  'POST /api/rich-menu-groups/{groupId}/schedule',
   'POST /api/rich-menu-groups/{groupId}/unpublish',
   'POST /api/rich-menus',
   'POST /api/rich-menus/{id}/default',
@@ -614,7 +619,7 @@ const ALLOWLIST = new Set<string>([
   'PUT /api/broadcast-message-assets/{id}',
   'PUT /api/broadcasts/notification-settings',
 
-  // 機能「nen_campaigns」の管理画面用API（OpenAPI未記載・順次記載）（20件）
+  // 機能「nen_campaigns」の管理画面用API（OpenAPI未記載・順次記載）（21件）
   'DELETE /api/nen-campaigns/pets/{id}',
   'GET /api/nen-campaigns/birthday-coupon',
   'GET /api/nen-campaigns/columns',
@@ -635,6 +640,7 @@ const ALLOWLIST = new Set<string>([
   'PUT /api/nen-campaigns/columns/{id}/message',
   'PUT /api/nen-campaigns/pets/{id}',
   'PUT /api/nen-campaigns/settings/{campaignKey}',
+  'PUT /api/nen-campaigns/settings/{campaignKey}/enabled',
 
   // 機能「events」の管理画面用API（OpenAPI未記載・順次記載）（18件）
   'DELETE /api/events/admin/events/{id}',
@@ -1200,7 +1206,7 @@ describe('OpenAPIと公開APIの同期', () => {
     ).toEqual([]);
   });
 
-  test('記載済みoperation数は84以上（後退禁止）', async () => {
+  test('記載済みoperation数は87以上（後退禁止）', async () => {
     const spec = await loadSpec();
     const count = documentedKeys(spec).size;
     expect(
@@ -1218,7 +1224,7 @@ describe('OpenAPIと公開APIの同期', () => {
     ).toBe(true);
   });
 
-  test('基準の記載84件が残っている（allowlistへの移し替え検出）', async () => {
+  test('基準の記載87件が残っている（allowlistへの移し替え検出）', async () => {
     const spec = await loadSpec();
     const documented = documentedKeys(spec);
     const lost = [...BASELINE_DOCUMENTED].filter((key) => !documented.has(key)).sort();

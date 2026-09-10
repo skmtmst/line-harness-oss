@@ -34,6 +34,7 @@ import {
   getMileageReward,
   getMileageRewardAdminOverview,
   getMileageRedemption,
+  listMileageRedemptions,
   importMileageRewardCodes,
   publishMileageReward,
   reorderMileageRewards,
@@ -48,6 +49,7 @@ import type {
   ActionScoreSort,
   MileageEntryStatus,
   MileageEntryType,
+  MileageRedemptionListStatus,
   MileageRuleRow,
   MileageRewardDraftInput,
 } from '@line-crm/db';
@@ -434,6 +436,46 @@ scoring.post(
   },
 );
 
+const MILEAGE_REDEMPTION_LIST_STATUSES = new Set<string>([
+  'all', 'reserved', 'delivering', 'succeeded', 'delivery_failed', 'refunded',
+]);
+
+// 交換履歴の一覧。残高を減らしたのに特典が届かなかった交換を、管理画面で
+// 見つけるための口。既定は失敗中だけ。秘密の処理IDは落として返す。
+scoring.get(
+  '/api/mileage/redemptions',
+  requireRole('owner', 'admin', 'staff'),
+  async (c) => {
+    try {
+      const accountId = c.req.query('accountId')?.trim() ?? '';
+      if (!await canUseMileageAccount(c, accountId)) {
+        return c.json({ success: false, error: '交換履歴が見つかりません' }, 404);
+      }
+      const statusValue = c.req.query('status')?.trim() || 'delivery_failed';
+      if (!MILEAGE_REDEMPTION_LIST_STATUSES.has(statusValue)) {
+        return c.json({ success: false, error: 'status is invalid' }, 400);
+      }
+      const requestedLimit = Number(c.req.query('limit') || 20);
+      const requestedOffset = Number(c.req.query('offset') || 0);
+      const listed = await listMileageRedemptions(c.env.DB, {
+        lineAccountId: accountId,
+        status: statusValue as MileageRedemptionListStatus,
+        limit: Number.isFinite(requestedLimit) ? Math.min(100, Math.max(1, requestedLimit)) : 20,
+        offset: Number.isFinite(requestedOffset) ? Math.max(0, requestedOffset) : 0,
+      });
+      return c.json({
+        success: true,
+        data: {
+          items: listed.items.map((item) => publicMileageRedemption(item)),
+          pagination: listed.pagination,
+        },
+      });
+    } catch (error) {
+      return mileageRewardError(c, error);
+    }
+  },
+);
+
 scoring.get(
   '/api/mileage/redemptions/:id',
   requireRole('owner', 'admin', 'staff'),
@@ -467,6 +509,19 @@ scoring.post(
       const redemption = await getMileageRedemption(c.env.DB, c.req.param('id'));
       if (!redemption || redemption.lineAccountId !== accountId) {
         return c.json({ success: false, error: '交換履歴が見つかりません' }, 404);
+      }
+      /*
+       * 失敗中だけやり直せる。成功済み・返金済みの再実行は二重特典の素、
+       * 予約中・配送中の再実行は最初の配送と競合するので、どちらも断る。
+       * やり直しは同じ交換IDを続け、残高の減算はしない
+       * (deliverMileageReward は予約時の減算に触らない)。
+       */
+      if (redemption.status !== 'delivery_failed') {
+        return c.json({
+          success: false,
+          error: '失敗中の交換だけやり直せます',
+          code: 'redemption_not_retryable',
+        }, 409);
       }
       const delivery = await deliverMileageReward(c.env.DB, redemption.id, {
         credentialEncryptionKey: c.env.LINE_CREDENTIAL_ENCRYPTION_KEY,

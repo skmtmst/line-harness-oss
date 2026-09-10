@@ -195,7 +195,10 @@ describe('V6 ルールを作る（Rv8Jv）', () => {
   it('すること（動き）を複数持てる', () => {
     expect(PAGE).toContain('動きを追加')
     expect(PAGE).toContain('この動きを消す')
-    expect(PAGE).toContain('actions: actions.map(')
+    // 送る形は `draftActions()` にまとめた（確認画面とのずれ検出でも同じ形を使う）。
+    // 名前が変わっても「入力の並びをそのまま送る」ことは崩さない。
+    expect(PAGE).toContain('const draftActions = (): AutomationDraftAction[] => actions.map(')
+    expect(PAGE).toContain('actions: draftActions(),')
     // 1つしか送らない形へ戻さない。
     expect(PAGE).not.toContain('actions: [\n')
   })
