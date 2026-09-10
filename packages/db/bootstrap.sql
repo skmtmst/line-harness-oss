@@ -4353,6 +4353,13 @@ CREATE TABLE scenario_drafts (
   updated_at         TEXT NOT NULL
 );
 
+CREATE TABLE scenario_pinned_action_fires (
+  action_key TEXT NOT NULL,
+  friend_id  TEXT NOT NULL REFERENCES friends (id) ON DELETE CASCADE,
+  fired_at   TEXT NOT NULL,
+  PRIMARY KEY (action_key, friend_id)
+);
+
 CREATE TABLE scenario_publish_keys (
   publish_idempotency_key   TEXT PRIMARY KEY,
   scenario_id               TEXT NOT NULL REFERENCES scenarios (id) ON DELETE CASCADE,
@@ -4402,6 +4409,7 @@ CREATE TABLE scenario_versions (
   on_complete_mode          TEXT NOT NULL DEFAULT 'pause',
   on_complete_scenario_id   TEXT,
   steps_snapshot            TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(steps_snapshot)),
+  actions_snapshot          TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(actions_snapshot)),
   status                    TEXT NOT NULL DEFAULT 'published'
     CHECK (status IN ('published', 'retired')),
   published_at              TEXT NOT NULL,
@@ -6278,6 +6286,9 @@ CREATE INDEX idx_scenario_actions_lookup
 CREATE INDEX idx_scenario_drafts_account_updated
   ON scenario_drafts(line_account_id, updated_at DESC, scenario_id);
 
+CREATE INDEX idx_scenario_pinned_action_fires_friend
+  ON scenario_pinned_action_fires (friend_id);
+
 CREATE INDEX idx_scenario_publish_keys_scenario
   ON scenario_publish_keys (scenario_id);
 
@@ -6915,7 +6926,7 @@ BEGIN SELECT RAISE(ABORT, 'published scenario versions cannot be deleted'); END;
 
 CREATE TRIGGER trg_scenario_versions_immutable_update
 BEFORE UPDATE OF scenario_id, version_number, delivery_mode, audience_condition_json,
-  on_complete_mode, on_complete_scenario_id, steps_snapshot
+  on_complete_mode, on_complete_scenario_id, steps_snapshot, actions_snapshot
 ON scenario_versions
 WHEN OLD.status IN ('published', 'retired')
 BEGIN SELECT RAISE(ABORT, 'published scenario versions are immutable'); END;

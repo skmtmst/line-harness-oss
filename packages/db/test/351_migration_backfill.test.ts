@@ -73,6 +73,19 @@ function setupPre351Db(): Database.Database {
       content TEXT NOT NULL,
       created_at TEXT NOT NULL
     );
+    CREATE TABLE scenario_actions (
+      id TEXT PRIMARY KEY,
+      scenario_id TEXT NOT NULL REFERENCES scenarios (id) ON DELETE CASCADE,
+      hook TEXT NOT NULL,
+      step_id TEXT REFERENCES scenario_steps (id) ON DELETE CASCADE,
+      choice_index INTEGER,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      action_type TEXT NOT NULL,
+      config_json TEXT NOT NULL,
+      condition_json TEXT,
+      repeat_on_refire INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL
+    );
   `);
 
   // 稼働中のシナリオ：1通目は template 参照、2通目は直接文。
@@ -89,6 +102,15 @@ function setupPre351Db(): Database.Database {
      VALUES
        ('live-step-1', 'scn-1', 0, 0, 'text', '下書きの控え', 'tpl-1', '2026-08-16'),
        ('live-step-2', 'scn-1', 1, 60, 'text', '2通目', NULL, '2026-08-16')`,
+  ).run();
+  // アクション設定：1通目に紐づくタグ付けと、質問の選択肢に紐づくもの。
+  db.prepare(
+    `INSERT INTO scenario_actions
+       (id, scenario_id, hook, step_id, choice_index, sort_order, action_type, config_json, repeat_on_refire, created_at)
+     VALUES
+       ('act-step', 'scn-1', 'step_sent', 'live-step-1', NULL, 0, 'tag', '{"op":"add","tagIds":["tag-1"]}', 1, '2026-08-16'),
+       ('act-choice', 'scn-1', 'choice_selected', 'live-step-2', 0, 1, 'tag', '{"op":"add","tagIds":["tag-2"]}', 0, '2026-08-16'),
+       ('act-done', 'scn-1', 'scenario_completed', NULL, NULL, 2, 'tag', '{"op":"remove","tagIds":["tag-1"]}', 1, '2026-08-16')`,
   ).run();
   db.prepare(`INSERT INTO friends VALUES ('f-active'), ('f-done')`).run();
   db.prepare(
@@ -195,6 +217,56 @@ describe('migration 351 の適用（#644）', () => {
     expect(
       (sqlite.prepare(`SELECT COUNT(*) AS n FROM friend_scenarios`).get() as { n: number }).n,
     ).toBe(0);
+  });
+
+  test('アクション設定も v1 へ写り、通は版所有の通IDで指す（#644 再審査 2）', () => {
+    apply351();
+    const version = sqlite
+      .prepare(`SELECT id, actions_snapshot AS a FROM scenario_versions WHERE scenario_id = 'scn-1'`)
+      .get() as { id: string; a: string };
+    const actions = JSON.parse(version.a) as Array<Record<string, unknown>>;
+
+    expect(actions.map((a) => a['action_id'])).toEqual(['act-step', 'act-choice', 'act-done']);
+
+    // 通に紐づくアクションは版所有の通ID（`<版ID>:<通番>`）を指す。live の
+    // 通が消えても、版の中で行き先を見失わない。
+    expect(actions[0]!['version_step_id']).toBe(`${version.id}:0`);
+    expect(actions[0]!['live_step_id']).toBe('live-step-1');
+    expect(actions[1]!['version_step_id']).toBe(`${version.id}:1`);
+    expect(actions[1]!['choice_index']).toBe(0);
+    // 通に紐づかないアクション（完了時）は null のまま。
+    expect(actions[2]!['version_step_id']).toBeNull();
+    expect(actions[2]!['hook']).toBe('scenario_completed');
+    // 「1回だけ」の指定も写す。
+    expect(actions[1]!['repeat_on_refire']).toBe(0);
+  });
+
+  test('公開版の actions_snapshot は書き換えられない（不変）', () => {
+    apply351();
+    const versionId = (
+      sqlite.prepare(`SELECT id FROM scenario_versions WHERE scenario_id = 'scn-1'`).get() as { id: string }
+    ).id;
+    expect(() =>
+      sqlite.prepare(`UPDATE scenario_versions SET actions_snapshot = '[]' WHERE id = ?`).run(versionId),
+    ).toThrow(/immutable/);
+  });
+
+  test('版固定の実行済み台帳は live のアクション行が消えても書ける', () => {
+    apply351();
+    sqlite
+      .prepare(
+        `INSERT INTO scenario_pinned_action_fires (action_key, friend_id, fired_at)
+         VALUES ('act-step', 'f-active', '2026-08-16')`,
+      )
+      .run();
+    sqlite.prepare(`DELETE FROM scenario_actions WHERE id = 'act-step'`).run();
+    expect(
+      (
+        sqlite
+          .prepare(`SELECT COUNT(*) AS n FROM scenario_pinned_action_fires WHERE action_key = 'act-step'`)
+          .get() as { n: number }
+      ).n,
+    ).toBe(1);
   });
 
   test('再適用しても増えない（冪等）', () => {

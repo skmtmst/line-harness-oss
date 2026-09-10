@@ -11,7 +11,14 @@
  * 残りと配信そのものは続ける**。タグが1つ付かなかったせいでメッセージが
  * 止まるほうが、運用上はよほど困る。
  */
-import { addTagToFriend, removeTagFromFriend, enrollFriendInScenario, jstNow } from '@line-crm/db'
+import {
+  addTagToFriend,
+  removeTagFromFriend,
+  enrollFriendInScenario,
+  isResourceInScenarioAccount,
+  jstNow,
+  type PinnedScenarioAction,
+} from '@line-crm/db'
 import { matchesCondition, parseCondition } from './segment-query.js'
 
 export type ScenarioActionHook = 'step_sent' | 'scenario_completed' | 'choice_selected'
@@ -38,6 +45,27 @@ export interface ScenarioActionRow {
   config_json: string
   condition_json: string | null
   repeat_on_refire: number
+  /**
+   * 「2回目以降は実行しない」の鍵（版固定の実行で使う）。版に固定された
+   * アクションの `id` は版ごとに変わるので、そのまま鍵にすると
+   * 「1回だけ」が「版ごとに1回」になる。公開時点の live のアクションIDを
+   * 入れて、版をまたいでも同じ鍵にする。
+   */
+  fires_key?: string
+}
+
+export interface RunActionRowsOptions {
+  /**
+   * 実行済み台帳をどちらで持つか。
+   * - `live`   … scenario_action_fires（下書きのアクション行に外部キーで縛られる）
+   * - `pinned` … scenario_pinned_action_fires（版固定の実行用。live 行が消えても書ける）
+   */
+  fires?: 'live' | 'pinned'
+  /**
+   * シナリオの LINE 公式アカウント。タグ・テンプレート・遷移先が別の
+   * アカウントのものなら実行しない。null は共通シナリオ（確かめない）。
+   */
+  accountId?: string | null
 }
 
 /** config_json の形。action_type ごとに違う。 */
@@ -194,6 +222,67 @@ export async function runScenarioActions(
   return runActionRows(db, actions, input.friendId)
 }
 
+/**
+ * 版に固定されたアクションを、実行できる形へ直す。
+ *
+ * `id` は版所有のアクションID（ログ用）。「1回だけ」の鍵は公開時点の
+ * live のアクションID（fires_key）を使う。版をまたいでも同じ鍵にする。
+ */
+export function pinnedActionsToRows(actions: PinnedScenarioAction[]): ScenarioActionRow[] {
+  return actions.map((a) => ({
+    id: a.id,
+    fires_key: a.action_key,
+    scenario_id: a.scenario_id,
+    hook: a.hook as ScenarioActionHook,
+    step_id: a.version_step_id,
+    choice_index: a.choice_index,
+    sort_order: a.sort_order,
+    action_type: a.action_type as ScenarioActionType,
+    config_json: a.config_json,
+    condition_json: a.condition_json,
+    repeat_on_refire: a.repeat_on_refire,
+  }))
+}
+
+export interface RunPinnedActionsInput {
+  /** 版に固定されたアクション一式（版の写しをそのまま渡す）。 */
+  actions: PinnedScenarioAction[]
+  hook: ScenarioActionHook
+  friendId: string
+  /** 版所有の通ID。通に紐づかないアクション（完了時など）は null。 */
+  versionStepId?: string | null
+  choiceIndex?: number | null
+  /** シナリオの LINE 公式アカウント。参照資源の境界に使う。 */
+  accountId?: string | null
+}
+
+/**
+ * 版に固定されたアクションを実行する。
+ *
+ * 旧版に固定された購読でも、**live の scenario_actions は読まない**。
+ * 読むと、公開後にアクションを足した・消した・付け替えたぶんが旧版の
+ * 購読へそのまま混入する（#644 再審査 2）。
+ */
+export async function runPinnedScenarioActions(
+  db: D1Database,
+  input: RunPinnedActionsInput,
+): Promise<RunActionsResult> {
+  const stepId = input.versionStepId ?? null
+  const choiceIndex = input.choiceIndex ?? null
+  const rows = pinnedActionsToRows(input.actions)
+    .filter(
+      (a) =>
+        a.hook === input.hook &&
+        (a.step_id ?? null) === stepId &&
+        (a.choice_index ?? null) === choiceIndex,
+    )
+    .sort((a, b) => a.sort_order - b.sort_order || a.id.localeCompare(b.id))
+  return runActionRows(db, rows, input.friendId, {
+    fires: 'pinned',
+    accountId: input.accountId ?? null,
+  })
+}
+
 function emptyActionsResult(): RunActionsResult {
   return {
     executed: 0,
@@ -224,11 +313,13 @@ export async function runActionRows(
   db: D1Database,
   actions: ScenarioActionRow[],
   friendId: string,
+  options: RunActionRowsOptions = {},
 ): Promise<RunActionsResult> {
   const result = emptyActionsResult()
   if (actions.length === 0) return result
 
   const input = { friendId }
+  const pinned = options.fires === 'pinned'
 
   for (const action of actions) {
     try {
@@ -256,10 +347,26 @@ export async function runActionRows(
       }
 
       if (action.repeat_on_refire === 0) {
-        const fired = await db
-          .prepare(`SELECT 1 AS ok FROM scenario_action_fires WHERE action_id = ? AND friend_id = ?`)
-          .bind(action.id, input.friendId)
-          .first<{ ok: number }>()
+        // 版固定の実行は、版の台帳と（版へ移す前に記録した）下書きの台帳を
+        // 両方見る。片方だけ見ると、公開版へ移した瞬間に全員の「1回だけ」が
+        // 戻ってしまう。
+        const firesKey = action.fires_key ?? action.id
+        const fired = pinned
+          ? await db
+              .prepare(
+                `SELECT 1 AS ok FROM scenario_pinned_action_fires
+                  WHERE action_key = ? AND friend_id = ?
+                 UNION ALL
+                 SELECT 1 AS ok FROM scenario_action_fires
+                  WHERE action_id = ? AND friend_id = ?
+                 LIMIT 1`,
+              )
+              .bind(firesKey, input.friendId, firesKey, input.friendId)
+              .first<{ ok: number }>()
+          : await db
+              .prepare(`SELECT 1 AS ok FROM scenario_action_fires WHERE action_id = ? AND friend_id = ?`)
+              .bind(action.id, input.friendId)
+              .first<{ ok: number }>()
         if (fired) {
           result.skippedByOnce++
           continue
@@ -279,16 +386,19 @@ export async function runActionRows(
         continue
       }
 
-      const touched = await executeAction(db, action, input.friendId)
+      const touched = await executeAction(db, action, input.friendId, options)
       if (touched) result.scenarioTouched = true
       result.executed++
 
       if (action.repeat_on_refire === 0) {
+        const firesKey = action.fires_key ?? action.id
         await db
           .prepare(
-            `INSERT OR IGNORE INTO scenario_action_fires (action_id, friend_id, fired_at) VALUES (?, ?, ?)`,
+            pinned
+              ? `INSERT OR IGNORE INTO scenario_pinned_action_fires (action_key, friend_id, fired_at) VALUES (?, ?, ?)`
+              : `INSERT OR IGNORE INTO scenario_action_fires (action_id, friend_id, fired_at) VALUES (?, ?, ?)`,
           )
-          .bind(action.id, input.friendId, jstNow())
+          .bind(pinned ? firesKey : action.id, input.friendId, jstNow())
           .run()
       }
     } catch (err) {
@@ -306,13 +416,15 @@ async function executeAction(
   db: D1Database,
   action: ScenarioActionRow,
   friendId: string,
+  options: RunActionRowsOptions = {},
 ): Promise<boolean> {
   const config = JSON.parse(action.config_json) as unknown
+  const accountId = options.accountId ?? null
 
   switch (action.action_type) {
     case 'tag': {
       const c = config as TagActionConfig
-      const tagIds = await resolveTagIds(db, c)
+      const tagIds = await resolveTagIds(db, c, accountId)
       for (const tagId of tagIds) {
         if (c.op === 'remove') await removeTagFromFriend(db, friendId, tagId)
         else await addTagToFriend(db, friendId, tagId)
@@ -335,7 +447,19 @@ async function executeAction(
     }
 
     case 'scenario': {
-      await runScenarioOp(db, friendId, action.scenario_id, config as ScenarioActionConfig)
+      const c = config as ScenarioActionConfig
+      // 遷移先が別の LINE 公式アカウントのシナリオなら動かさない。ID を
+      // 直接渡せば他アカウントの人を動かせる、という抜けを塞ぐ。
+      if (
+        c.scenarioId &&
+        !(await isResourceInScenarioAccount(db, 'scenario', c.scenarioId, accountId))
+      ) {
+        console.warn(
+          `[scenario-actions] cross-account scenario action=${action.id} target=${c.scenarioId} — skipped`,
+        )
+        return false
+      }
+      await runScenarioOp(db, friendId, action.scenario_id, c)
       return true
     }
 
@@ -347,8 +471,19 @@ async function executeAction(
     // 送信・予約系は配信本体の専用キューへ委譲する契約。ここでは
     // scenario_actions の保存と実行順を保証し、専用キューが未接続の場合は
     // 配信全体を止めず監査ログへ残す。
+    case 'send_template': {
+      const templateId = (config as { templateId?: string }).templateId ?? null
+      if (!(await isResourceInScenarioAccount(db, 'template', templateId, accountId))) {
+        console.warn(
+          `[scenario-actions] cross-account template action=${action.id} template=${templateId} — skipped`,
+        )
+        return false
+      }
+      console.info(`[scenario-actions] deferred action=${action.id} type=${action.action_type} friend=${friendId}`)
+      return false
+    }
+
     case 'send_message':
-    case 'send_template':
     case 'reminder':
     case 'event_booking':
       console.info(`[scenario-actions] deferred action=${action.id} type=${action.action_type} friend=${friendId}`)
@@ -361,8 +496,18 @@ async function executeAction(
   }
 }
 
-/** タグフォルダ指定なら、その中のタグを全部返す。 */
-async function resolveTagIds(db: D1Database, c: TagActionConfig): Promise<string[]> {
+/**
+ * タグフォルダ指定なら、その中のタグを全部返す。
+ *
+ * シナリオの LINE 公式アカウントが決まっているときは、別アカウントのタグを
+ * 落とす。ID を直接渡せば他アカウントのタグを付けられる、という抜けを
+ * server 側で塞ぐ（画面で選べないだけでは足りない）。
+ */
+async function resolveTagIds(
+  db: D1Database,
+  c: TagActionConfig,
+  accountId: string | null,
+): Promise<string[]> {
   const ids = new Set<string>(Array.isArray(c.tagIds) ? c.tagIds : [])
   if (c.folderId) {
     const rows = await db
@@ -371,7 +516,15 @@ async function resolveTagIds(db: D1Database, c: TagActionConfig): Promise<string
       .all<{ id: string }>()
     for (const row of rows.results ?? []) ids.add(row.id)
   }
-  return [...ids]
+  const allowed: string[] = []
+  for (const id of ids) {
+    if (await isResourceInScenarioAccount(db, 'tag', id, accountId)) {
+      allowed.push(id)
+      continue
+    }
+    console.warn(`[scenario-actions] cross-account tag=${id} — skipped`)
+  }
+  return allowed
 }
 
 /**

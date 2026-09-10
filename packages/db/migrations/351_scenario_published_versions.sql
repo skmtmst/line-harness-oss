@@ -10,6 +10,14 @@
 --   下書きの通を消しても、版の読み・配信ログ・二重送信防止が壊れない。
 -- - template を使う通は、公開時に文面・質問を解決して写す。公開後の
 --   template 編集は、固定済みの版の配信へ混入しない。
+-- - アクション設定 (scenario_actions) も版へ写す (actions_snapshot)。写さないと
+--   旧版に固定された購読でも常に live のアクションが動き、公開後の編集が
+--   混入する。質問の選択肢に紐づくアクションも同じ写しから実行する。
+-- - 参照資源 (テンプレート・タグ・遷移先シナリオ) の LINE アカウント一致は
+--   実行時に強制する。移行では既存の参照をそのまま写す (消すと既存運用が
+--   黙って壊れる)。不一致は実行時に拒否して警告を残し、次に公開した版の
+--   写しからは落ちる。既存の不一致は findScenarioReferenceMismatches で
+--   洗い出せる。
 -- - 冪等キーは scenario_publish_keys 台帳に残す。同keyの再実行は同版を返し、
 --   別内容・別シナリオでの使い回しは 409 (SCENARIO_PUBLISH_KEY_CONFLICT)。
 
@@ -22,6 +30,7 @@ CREATE TABLE IF NOT EXISTS scenario_versions (
   on_complete_mode          TEXT NOT NULL DEFAULT 'pause',
   on_complete_scenario_id   TEXT,
   steps_snapshot            TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(steps_snapshot)),
+  actions_snapshot          TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(actions_snapshot)),
   status                    TEXT NOT NULL DEFAULT 'published'
     CHECK (status IN ('published', 'retired')),
   published_at              TEXT NOT NULL,
@@ -44,6 +53,24 @@ CREATE INDEX IF NOT EXISTS idx_scenario_versions_scenario
 
 CREATE INDEX IF NOT EXISTS idx_scenario_publish_keys_scenario
   ON scenario_publish_keys (scenario_id);
+
+-- 「2回目以降は実行しない」アクションの実行済み台帳（版固定の実行用）。
+--
+-- 既存の scenario_action_fires は action_id に scenario_actions への外部キーが
+-- 付いている。版に固定された購読は、live のアクション行が消えたあとも版の
+-- 写しから実行し続けるため、そこへは書けない（外部キーで落ちる）。
+--
+-- 鍵は「公開時点の live アクションID」にする。版IDを鍵に混ぜると、公開の
+-- たびに鍵が変わり「1回だけ」が「版ごとに1回」になってしまう。
+CREATE TABLE IF NOT EXISTS scenario_pinned_action_fires (
+  action_key TEXT NOT NULL,
+  friend_id  TEXT NOT NULL REFERENCES friends (id) ON DELETE CASCADE,
+  fired_at   TEXT NOT NULL,
+  PRIMARY KEY (action_key, friend_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_scenario_pinned_action_fires_friend
+  ON scenario_pinned_action_fires (friend_id);
 
 ALTER TABLE scenarios ADD COLUMN current_published_version_id TEXT;
 
@@ -70,7 +97,7 @@ CREATE INDEX IF NOT EXISTS idx_messages_log_version_step
 -- 文面・質問を解決して写す (アプリ側の公開処理と同じ解決。無ければ通の控え)。
 INSERT OR IGNORE INTO scenario_versions (
   id, scenario_id, version_number, delivery_mode, audience_condition_json,
-  on_complete_mode, on_complete_scenario_id, steps_snapshot,
+  on_complete_mode, on_complete_scenario_id, steps_snapshot, actions_snapshot,
   status, published_at, created_at, updated_at
 )
 SELECT
@@ -109,6 +136,35 @@ SELECT
       FROM scenario_steps ss
       WHERE ss.scenario_id = s.id
       ORDER BY ss.step_order ASC
+    )
+  ), '[]'),
+  -- アクション設定 (scenario_actions) も版へ写す。写さないと、旧版に固定
+  -- された購読でも常に live のアクションが動き、公開後の編集が混入する。
+  -- 通に紐づくアクションは版所有の通ID (version_step_id) で指す。live の
+  -- 通が消えても、版の中で行き先を見失わない。
+  COALESCE((
+    SELECT json_group_array(json(action_json))
+    FROM (
+      SELECT json_object(
+        'version_action_id', 'scenario-version-v1-' || s.id || '#a' || sa.id,
+        'action_id', sa.id,
+        'hook', sa.hook,
+        'version_step_id',
+          CASE WHEN sa.step_id IS NULL THEN NULL ELSE (
+            SELECT 'scenario-version-v1-' || s.id || ':' || ss2.step_order
+            FROM scenario_steps ss2 WHERE ss2.id = sa.step_id
+          ) END,
+        'live_step_id', sa.step_id,
+        'choice_index', sa.choice_index,
+        'sort_order', sa.sort_order,
+        'action_type', sa.action_type,
+        'config_json', sa.config_json,
+        'condition_json', sa.condition_json,
+        'repeat_on_refire', sa.repeat_on_refire
+      ) AS action_json
+      FROM scenario_actions sa
+      WHERE sa.scenario_id = s.id
+      ORDER BY sa.sort_order ASC, sa.id ASC
     )
   ), '[]'),
   'published',
@@ -151,7 +207,7 @@ WHERE published_version_id IS NULL
 -- 273 (自動応答) と同じく retired も含めて不変にする。復帰・削除も不可。
 CREATE TRIGGER IF NOT EXISTS trg_scenario_versions_immutable_update
 BEFORE UPDATE OF scenario_id, version_number, delivery_mode, audience_condition_json,
-  on_complete_mode, on_complete_scenario_id, steps_snapshot
+  on_complete_mode, on_complete_scenario_id, steps_snapshot, actions_snapshot
 ON scenario_versions
 WHEN OLD.status IN ('published', 'retired')
 BEGIN SELECT RAISE(ABORT, 'published scenario versions are immutable'); END;

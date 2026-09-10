@@ -31,7 +31,11 @@ const QUESTION: ScenarioQuestion = {
 describe('postback の往復', () => {
   it('組み立てた data をそのまま読み戻せる', () => {
     const data = buildQuestionPostbackData('step-abc', 3)
-    expect(parseQuestionPostback(data)).toEqual({ stepId: 'step-abc', choiceIndex: 3 })
+    expect(parseQuestionPostback(data)).toEqual({
+      kind: 'live',
+      stepId: 'step-abc',
+      choiceIndex: 3,
+    })
   })
 
   it('関係のない postback は拾わない', () => {

@@ -377,7 +377,10 @@ export async function pushImmediateFirstStep(
             : question.intro,
           text: expandVariables(question.text, friendWithMeta, ctx.workerUrl, 'text', extra),
         },
-        liveStepId ?? firstStep.id,
+        // 押し口は必ず版所有の通ID。live の通IDを載せると、公開後に直した
+        // 返信・タグ・遷移が旧版の購読へ混入し、下書きの通を消した瞬間に
+        // ボタンが無反応になる（#644 再審査 1）。
+        { kind: 'version', stepId: firstStep.id },
       );
     } else {
       const decorated = await decorateForFriendPush(
