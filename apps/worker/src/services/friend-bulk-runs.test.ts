@@ -308,3 +308,57 @@ describe('V6 友だち一括操作', () => {
     });
   });
 });
+
+describe('一括操作の友だち情報は型どおりに検証する（N-042）', () => {
+  let testDb: SqliteD1;
+
+  beforeEach(() => {
+    testDb = createTestD1();
+    addAccount(testDb.raw, 'account-1');
+    insertFriend(testDb.raw, 'friend-1', { line_account_id: 'account-1', is_following: 1 });
+    testDb.raw.prepare(
+      `INSERT INTO friend_fields (id, name, field_key, type, options_json, ec_is_master)
+       VALUES ('field-num', '頭数', 'head_count', 'number', NULL, 0),
+              ('field-sel', '犬種', 'breed', 'select',
+               '[{"id":"opt-1","label":"柴犬"},{"id":"opt-2","label":"猫"}]', 0)`,
+    ).run();
+  });
+
+  it('型に合わない値は操作の行を作る前に422で止める', async () => {
+    await expect(startFriendBulkRun(testDb.db, staff, {
+      selection: { kind: 'explicit', friendIds: ['friend-1'] },
+      operation: { kind: 'set_friend_fields', values: { 'field-num': 'たくさん' } },
+      idempotencyKey: crypto.randomUUID(), now: NOW,
+    })).rejects.toMatchObject({ code: 'friend_field_value_invalid', status: 422 });
+
+    expect(testDb.raw.prepare(`SELECT COUNT(*) AS count FROM friend_bulk_runs`).get())
+      .toEqual({ count: 0 });
+    expect(testDb.raw.prepare(`SELECT COUNT(*) AS count FROM friend_bulk_run_items`).get())
+      .toEqual({ count: 0 });
+  });
+
+  it('選択肢外は操作の行を作る前に422で止める', async () => {
+    await expect(startFriendBulkRun(testDb.db, staff, {
+      selection: { kind: 'explicit', friendIds: ['friend-1'] },
+      operation: { kind: 'set_friend_fields', values: { 'field-sel': 'ドラゴン' } },
+      idempotencyKey: crypto.randomUUID(), now: NOW,
+    })).rejects.toMatchObject({ code: 'friend_field_value_invalid', status: 422 });
+  });
+
+  it('通った値は正規化して実行時に保存する', async () => {
+    const created = await startFriendBulkRun(testDb.db, staff, {
+      selection: { kind: 'explicit', friendIds: ['friend-1'] },
+      operation: { kind: 'set_friend_fields', values: { 'field-num': '1,000', 'field-sel': '柴犬' } },
+      idempotencyKey: crypto.randomUUID(), now: NOW,
+    });
+    expect(await processFriendBulkRun(testDb.db, created.run.id, { now: NOW }))
+      .toMatchObject({ status: 'success' });
+
+    expect(testDb.raw.prepare(
+      `SELECT field_id, value FROM friend_field_values WHERE friend_id = 'friend-1' ORDER BY field_id`,
+    ).all()).toEqual([
+      { field_id: 'field-num', value: '1000' },
+      { field_id: 'field-sel', value: 'opt-1' },
+    ]);
+  });
+});
