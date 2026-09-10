@@ -161,28 +161,40 @@ export async function processDueEventReminders(
   let sent = 0;
   let failed = 0;
   for (const row of due.results ?? []) {
-    // Optimistic claim: bump retry_count CAS-style on (id, retry_count).
-    // If two cron invocations fetched the same row, only one of them wins
-    // this UPDATE; the other gets changes=0 and skips. retry_count thus
-    // doubles as a claim epoch, sufficient on D1 without a dedicated lock
-    // column or a new migration.
-    const claim = await db
-      .prepare(
-        `UPDATE event_booking_reminders
-            SET retry_count = retry_count + 1
-          WHERE id = ? AND retry_count = ? AND status IN ('pending','failed')`,
-      )
-      .bind(row.id, row.retry_count)
-      .run();
-    if ((claim.meta?.changes ?? 0) === 0) continue;
-    const claimedRetry = row.retry_count + 1;
-
+    let claimedRetry = row.retry_count;
     try {
+      // 送信の準備 (資格情報の復号) は fence の前に済ませる。fence と外部
+      // 送信の間に待つ処理を挟まない (V6 の verifyClaimedRunBeforeSend と
+      // 同じ形。窓を SQL 1文ぶんに詰める)。
       const accessToken = await resolveLineCredential(
         row.channel_access_token_encrypted,
         row.channel_access_token,
         { lineAccountId: row.line_account_id, field: 'channel_access_token' },
       );
+      // Optimistic claim: bump retry_count CAS-style on (id, retry_count).
+      // If two cron invocations fetched the same row, only one of them wins
+      // this UPDATE; the other gets changes=0 and skips. retry_count thus
+      // doubles as a claim epoch, sufficient on D1 without a dedicated lock
+      // column or a new migration.
+      // 併せて取消との直列化も同じ1文で行う。上の SELECT の
+      // b.status='confirmed' は読み出し時にしか効かず、claim 後・送信前の
+      // 取消を止められない。送る直前に予約の状態を確かめ、取消が先なら
+      // 0 件にして送らない。
+      const claim = await db
+        .prepare(
+          `UPDATE event_booking_reminders
+              SET retry_count = retry_count + 1
+            WHERE id = ? AND retry_count = ? AND status IN ('pending','failed')
+              AND EXISTS (
+                SELECT 1 FROM event_bookings b
+                 WHERE b.id = event_booking_reminders.booking_id
+                   AND b.status = 'confirmed')`,
+        )
+        .bind(row.id, row.retry_count)
+        .run();
+      if ((claim.meta?.changes ?? 0) === 0) continue;
+      claimedRetry = row.retry_count + 1;
+
       await params.sender({
         channelAccessToken: accessToken,
         toLineUserId: row.line_user_id,

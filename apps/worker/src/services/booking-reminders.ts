@@ -67,12 +67,38 @@ export async function processDueReminders(
   let failed = 0;
   for (const row of due.results) {
     const kind: NotificationKind = row.kind;
+    // 送信権はこの後の fence で取る。fence 前に投げた場合は誰の担当でもない
+    // ため、失敗記録は読み出し時の retry_count を起点にする。
+    let claimedRetry = row.retry_count;
     try {
+      // 送信の準備 (資格情報の復号) は fence の前に済ませる。fence と外部
+      // 送信の間に待つ処理を挟まない (V6 の verifyClaimedRunBeforeSend と
+      // 同じ形。窓を SQL 1文ぶんに詰める)。
       const accessToken = await resolveLineCredential(
         row.channel_access_token_encrypted,
         row.channel_access_token,
         { lineAccountId: row.line_account_id, field: 'channel_access_token' },
       );
+      // 取消と送信の直列化 (原子的)。上の SELECT の b.status='confirmed' は
+      // 読み出し時にしか効かず、100件ループの全区間で取消を素通りさせる。
+      // 送る直前に1文で「まだ未送信」と「予約がまだ confirmed」を確かめ、
+      // 同時に送信権を握る (retry_count を claim epoch に使う)。
+      // 取消が先なら 0 件になり送らない。0 件は別 cron が担当した場合も
+      // 同じなので、どちらでもこの実行は手を引く。
+      const claim = await db
+        .prepare(
+          `UPDATE booking_reminders
+              SET retry_count = retry_count + 1
+            WHERE id = ? AND retry_count = ? AND status IN ('pending','failed')
+              AND EXISTS (
+                SELECT 1 FROM bookings b
+                 WHERE b.id = booking_reminders.booking_id AND b.status = 'confirmed')`,
+        )
+        .bind(row.id, row.retry_count)
+        .run();
+      if ((claim.meta?.changes ?? 0) === 0) continue;
+      claimedRetry = row.retry_count + 1;
+
       await params.sender({
         channelAccessToken: accessToken,
         toLineUserId: row.line_user_id,
@@ -92,13 +118,13 @@ export async function processDueReminders(
         .run();
       sent++;
     } catch (e) {
-      const newRetry = row.retry_count + 1;
-      const newStatus = newRetry >= REMINDER_MAX_RETRY ? 'failed_permanent' : 'failed';
+      // fence で握れていれば retry_count は加算ずみ。二重に数えない。
+      const newStatus = claimedRetry >= REMINDER_MAX_RETRY ? 'failed_permanent' : 'failed';
       await db
         .prepare(
           `UPDATE booking_reminders SET status = ?, retry_count = ?, last_error = ? WHERE id = ?`,
         )
-        .bind(newStatus, newRetry, e instanceof Error ? e.message : String(e), row.id)
+        .bind(newStatus, claimedRetry, e instanceof Error ? e.message : String(e), row.id)
         .run();
       failed++;
     }

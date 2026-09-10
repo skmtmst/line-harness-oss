@@ -986,12 +986,6 @@ export async function cancelV6RemindersForSource(
      * 未指定時は従来どおり最善努力で止める (貸出中は残し、cron 等の次回で収束)。
      */
     failOnSendInFlight?: boolean;
-    /**
-     * 試験用の割り込み口。live 確認と取消 UPDATE の間に呼ぶ。
-     * 本番では渡さない (渡すとそのぶん競合の窓が広がる)。
-     * 確認後 claim の割込みの再現テストだけに使う。
-     */
-    beforeFlip?: (ids: string[]) => Promise<void>;
   },
 ): Promise<CancelV6RemindersResult> {
   const now = input.now ?? jstNow();
@@ -1030,8 +1024,6 @@ export async function cancelV6RemindersForSource(
   if (input.failOnSendInFlight && (await countLiveClaims()) > 0) {
     throw new Error('REMINDER_SEND_IN_FLIGHT');
   }
-  // 試験用の割り込み口 (本番では未指定)。
-  await input.beforeFlip?.(ids);
 
   if (input.failOnSendInFlight) {
     // strict fence: 「最終送信権が1件も無い」と「対象全件を取消」を
