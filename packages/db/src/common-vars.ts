@@ -1,4 +1,5 @@
 import { jstNow } from './utils.js';
+import { getAccountSetting, getVersionedAccountSetting } from './account-settings.js';
 
 /**
  * 共通情報。
@@ -959,6 +960,31 @@ export async function deleteCommonVarSchedule(
  * 同じ変数に複数の予約が溜まっている場合は古い順に当て、最後のものが残る。
  * 途中を飛ばすと「一度も適用されなかった値」が残るので、順番に当てる。
  */
+/**
+ * このアカウントで共通情報が有効か。worker の accountFeatureIsEnabled と
+ * 同じ順序(一括設定→個別設定→初期値)で読む。正本は worker 側にあり、
+ * ここは dispatcher が db 層だけで止めるための最小複製。
+ */
+export async function isCommonVarsEnabled(db: D1Database, accountId: string): Promise<boolean> {
+  const bundle = await getVersionedAccountSetting<{ features?: Record<string, unknown> }>(
+    db,
+    accountId,
+    'feature.settings_bundle_v1',
+  );
+  const fromBundle = bundle?.data.features?.['common_vars'];
+  if (typeof fromBundle === 'boolean') return fromBundle;
+  const legacy = await getAccountSetting(db, accountId, 'feature.common_vars');
+  if (legacy) {
+    try {
+      const parsed = JSON.parse(legacy) as { enabled?: unknown };
+      if (typeof parsed.enabled === 'boolean') return parsed.enabled;
+    } catch {
+      // 壊れた値は初期値に倒す。
+    }
+  }
+  return true;
+}
+
 export async function applyDueCommonVarSchedules(
   db: D1Database,
   now: string,
@@ -984,11 +1010,16 @@ export async function applyDueCommonVarSchedules(
     // 何も書かず、次回の Cron で当て直す。
     const current = await db
       .prepare(
-        `SELECT name, value, memo, version FROM common_vars
+        `SELECT name, value, memo, version, line_account_id FROM common_vars
           WHERE id = ? AND archived_at IS NULL`,
       )
       .bind(row.var_id)
-      .first<{ name: string; value: string; memo: string | null; version: number }>();
+      .first<{ name: string; value: string; memo: string | null; version: number; line_account_id: string | null }>();
+    // 機能オフ中は適用せず未適用のまま残す。再オンで再開する。
+    // 正本は services/feature-enforcement.ts の accountFeatureIsEnabled。
+    if (current?.line_account_id && !await isCommonVarsEnabled(db, current.line_account_id)) {
+      continue;
+    }
     const stamp = jstNow();
     if (!current) {
       // 変数自体が無い(削除済み等)の予約は、繰り返し拾わないよう印だけ打つ。

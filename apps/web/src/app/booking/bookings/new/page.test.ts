@@ -99,6 +99,34 @@ describe('V6 代理予約の接続契約', () => {
     expect(PAGE).toContain('idempotencyKey || crypto.randomUUID()')
   })
 
+  test('候補は店舗timezone＋offset付きinstantで送受信する(#651)', () => {
+    // 壁時刻の組み立て直し（+09:00 固定）では非JST店舗の予約がずれる。
+    // 送信・表示は候補の instant 契約へ統一する。
+    expect(API).toContain('timeZone: string;')
+    expect(API).toContain('startUtc: string;')
+    expect(API).toContain('endUtc: string;')
+    expect(BOOKING_TYPES).toContain('startUtc: string;')
+    expect(BOOKING_TYPES).toContain('timeZone: string;')
+    expect(PAGE).toContain('slotTimeZone')
+    // 壁時刻から instant を組み立て直す退路を残さない。
+    expect(PAGE).not.toContain('+09:00')
+    expect(PAGE).not.toContain('toUtcIso')
+  })
+
+  test('確定に使うinstantは再取得した最新枠のもので、欠落・不正は止める(#651)', () => {
+    // 入力画面で見えた古い枠の instant は送らない。読み直した枠を持ち、
+    // その startUtc だけを送る。読めなければ確定させない。
+    expect(PAGE).toContain('const [confirmedSlot, setConfirmedSlot]')
+    expect(PAGE).toContain('?.slots.find((slot) => slot.date === date && slot.start === time)')
+    expect(PAGE).toContain('setConfirmedSlot(available)')
+    expect(PAGE).toContain('const startsAtIso = slotInstant(confirmedSlot)')
+    expect(PAGE).toContain('starts_at: startsAtIso')
+    expect(PAGE).toContain('この時間の開始時刻を受け取れませんでした。時間を選び直してください。')
+    expect(PAGE).toContain('確認した開始時刻が見つかりません。日時を選び直してください。')
+    // 選択が変わったら確認済みの枠を捨てる。
+    expect(PAGE).toContain('setConfirmedSlot(null)\n  }, [selectionKey])')
+  })
+
   test('電話番号は桁を先に確かめ、再送中の通知状態を取りこぼさない(点検#516の中3・中4)', () => {
     // サーバと同じ約束。出す直前で落とすと入れ直しになる。
     expect(PAGE).toContain('phoneDigitsError')

@@ -22,6 +22,7 @@ import { resolveInterpolationExtra } from './interpolation-context.js';
 import { createBroadcastRetryKey } from './broadcast-retry-key.js';
 import { evaluateQuota, fetchQuota, shortfallMessage } from './broadcast-quota-guard.js';
 import { recordLineTokenDefaultFallback } from './line-token.js';
+import { featureJobCanRun } from './feature-enforcement.js';
 import {
   assertMessagePartsResolved,
   autoTrackMessageParts,
@@ -448,6 +449,11 @@ export async function processScheduledBroadcasts(
 
   for (const broadcast of scheduled) {
     try {
+      const ownerAccountId = (broadcast as unknown as Record<string, unknown>).line_account_id as string | null;
+      // 機能オフ中はclaimせず予約のまま残す。再オンで再開する。
+      if (ownerAccountId && !await featureJobCanRun(db, { accountId: ownerAccountId, featureId: 'broadcasts', job: 'broadcast deliveries' })) {
+        continue;
+      }
       // Optimistic lock: claim this broadcast (scheduled → sending)
       const lockResult = await db
         .prepare(`UPDATE broadcasts SET status = 'sending' WHERE id = ? AND status = 'scheduled'`)
@@ -536,6 +542,11 @@ export async function processQueuedBroadcasts(
 ): Promise<void> {
   const queued = await getQueuedBroadcasts(db);
   for (const broadcast of queued) {
+    // 機能オフ中は送信中の続きも止める。行は残るため再オンで再開する。
+    const ownerAccountId = (broadcast as unknown as Record<string, unknown>).line_account_id as string | null;
+    if (ownerAccountId && !await featureJobCanRun(db, { accountId: ownerAccountId, featureId: 'broadcasts', job: 'broadcast deliveries' })) {
+      continue;
+    }
     // アカウント別のlineClientを解決
     const accountId = (broadcast as unknown as Record<string, unknown>).line_account_id as string | null;
     let client = lineClient;

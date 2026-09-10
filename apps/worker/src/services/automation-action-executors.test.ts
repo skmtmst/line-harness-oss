@@ -374,7 +374,10 @@ describe('V6オートメーションの既存処理接続', () => {
       action: {
         id: 'webhook', type: 'send_webhook', params: { webhookId: 'webhook-1' }, onFailure: 'stop',
       },
-      executors: createAutomationActionExecutors({ fetch: fetchMock as typeof fetch }),
+      executors: createAutomationActionExecutors({
+        fetch: fetchMock as typeof fetch,
+        lookupHost: async () => ['93.184.216.34'],
+      }),
     });
 
     expect(result.status).toBe('waiting');
@@ -427,20 +430,69 @@ describe('V6オートメーションの既存処理接続', () => {
               ('local-hook', '内部', 'https://[::1]/private', '[]', 1, 'account-1')`,
     ).run();
     const fetchMock = vi.fn();
+    const deps = {
+      fetch: fetchMock as typeof fetch,
+      lookupHost: async () => ['93.184.216.34'],
+    };
     const other = await execute(testDb, {
       accountId: 'account-1', friendId: 'friend-1',
       action: { id: 'other', type: 'send_webhook', params: { webhookId: 'other-hook' }, onFailure: 'stop' },
-      executors: createAutomationActionExecutors({ fetch: fetchMock as typeof fetch }),
+      executors: createAutomationActionExecutors(deps),
     });
     const local = await execute(testDb, {
       accountId: 'account-1', friendId: 'friend-1',
       action: { id: 'local', type: 'send_webhook', params: { webhookId: 'local-hook' }, onFailure: 'stop' },
-      executors: createAutomationActionExecutors({ fetch: fetchMock as typeof fetch }),
+      executors: createAutomationActionExecutors(deps),
     });
 
     expect(other.status).toBe('failed');
     expect(local.status).toBe('failed');
     expect(fetchMock).not.toHaveBeenCalled();
+    // 止めた送り先は秘密値を残さず失敗台帳だけに数える。
+    expect(testDb.raw.prepare(
+      `SELECT consecutive_failures FROM outgoing_webhooks WHERE id = 'local-hook'`,
+    ).get()).toEqual({ consecutive_failures: 1 });
+  });
+
+  it('DNS切替・転送先の内部向きも送らず失敗台帳へ残す', async () => {
+    testDb.raw.prepare(
+      `INSERT INTO outgoing_webhooks
+         (id, name, url, event_types, is_active, line_account_id)
+       VALUES ('rebind-hook', '差替', 'https://hooks.example.com/events', '[]', 1, 'account-1'),
+              ('redirect-hook', '転送', 'https://hooks.example.com/start', '[]', 1, 'account-1')`,
+    ).run();
+    const fetchMock = vi.fn(async (
+      input: RequestInfo | URL,
+    ) => {
+      if (String(input) === 'https://hooks.example.com/start') {
+        return new Response('', { status: 302, headers: { location: 'https://10.9.9.9/inside' } });
+      }
+      throw new Error(`送ってはいけない先: ${String(input)}`);
+    });
+    const rebind = await execute(testDb, {
+      accountId: 'account-1', friendId: 'friend-1',
+      action: { id: 'rebind', type: 'send_webhook', params: { webhookId: 'rebind-hook' }, onFailure: 'stop' },
+      executors: createAutomationActionExecutors({
+        fetch: fetchMock as typeof fetch,
+        lookupHost: async () => ['10.9.9.9'],
+      }),
+    });
+    const redirect = await execute(testDb, {
+      accountId: 'account-1', friendId: 'friend-1',
+      action: { id: 'redirect', type: 'send_webhook', params: { webhookId: 'redirect-hook' }, onFailure: 'stop' },
+      executors: createAutomationActionExecutors({
+        fetch: fetchMock as typeof fetch,
+        lookupHost: async () => ['93.184.216.34'],
+      }),
+    });
+
+    expect(rebind.status).toBe('failed');
+    expect(redirect.status).toBe('failed');
+    // 転送先へは送らないので転送元の1回だけ。
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(testDb.raw.prepare(
+      `SELECT consecutive_failures FROM outgoing_webhooks WHERE id IN ('rebind-hook', 'redirect-hook') ORDER BY id`,
+    ).all()).toEqual([{ consecutive_failures: 1 }, { consecutive_failures: 1 }]);
   });
 
   it('同じアカウントで公開済みのリッチメニューだけを切り替える', async () => {

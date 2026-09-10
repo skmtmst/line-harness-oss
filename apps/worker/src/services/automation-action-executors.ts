@@ -20,7 +20,12 @@ import {
   reserveOutboundSend,
 } from './outbound-idempotency.js';
 import { buildMessage } from './line-message.js';
-import { recordDeliveryOutcome } from './outgoing-webhook-delivery.js';
+import {
+  postWebhookSafely,
+  recordDeliveryOutcome,
+  type SafePostOutcome,
+  type WebhookDnsLookup,
+} from './outgoing-webhook-delivery.js';
 
 interface AutomationLineClient {
   pushMessage(to: string, messages: Message[], retryKey?: string): Promise<unknown>;
@@ -33,6 +38,7 @@ export interface AutomationActionExecutorDependencies {
   resolveLineAccessToken?: (db: D1Database, lineAccountId: string) => Promise<string | null>;
   createLineClient?: (accessToken: string) => AutomationLineClient;
   fetch?: typeof fetch;
+  lookupHost?: WebhookDnsLookup;
   now?: () => string;
 }
 
@@ -420,30 +426,6 @@ async function richMenuExecutor(
   }
 }
 
-function isSafeWebhookUrl(value: string): boolean {
-  try {
-    const url = new URL(value);
-    if (url.protocol !== 'https:' || url.username || url.password) return false;
-    const host = url.hostname.toLowerCase().replace(/\.$/, '').replace(/^\[|\]$/g, '');
-    if (
-      host === 'localhost'
-      || host.endsWith('.localhost')
-      || host.endsWith('.local')
-      || host.endsWith('.internal')
-    ) return false;
-    if (/^(127\.|10\.|0\.|169\.254\.|192\.168\.)/.test(host)) return false;
-    const parts = host.split('.').map(Number);
-    if (parts.length === 4 && parts.every(Number.isInteger)) {
-      if (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) return false;
-      if (parts[0] === 100 && parts[1] >= 64 && parts[1] <= 127) return false;
-    }
-    if (host === '::1' || host.startsWith('fc') || host.startsWith('fd') || host.startsWith('fe80:')) return false;
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 async function signBody(secret: string, body: string): Promise<string> {
   const bytes = new TextEncoder();
   const key = await crypto.subtle.importKey(
@@ -466,7 +448,7 @@ async function webhookExecutor(
       WHERE id = ? AND line_account_id = ? AND is_active = 1`,
   ).bind(webhookId, context.lineAccountId).first<{ id: string; url: string; secret: string | null; secret_encrypted?: string | null }>();
   if (!webhook) throw invalid('webhook_not_active', '動作中の送信Webhookが見つかりません');
-  if (!isSafeWebhookUrl(webhook.url)) throw invalid('webhook_url_unsafe', '送信WebhookのURLが安全ではありません');
+  // 送り先の安全確認はpostWebhookSafelyが送信直前と転送先の各段で行う。
   // 署名は送信直前に復号した値で付ける。secretが設定済みで読めない
   // (鍵不足・復号失敗)ときだけ送らずに止める(#650)。未設定の旧行は従来どおり送る。
   let sendSecret: string | null = null;
@@ -489,11 +471,14 @@ async function webhookExecutor(
     'Idempotency-Key': context.idempotencyKey,
   };
   if (sendSecret) headers['X-Webhook-Signature'] = await signBody(sendSecret, body);
-  let response: Response;
+  // 送信直前の再検査は配送側と共有する。転送先の各段も送る前に確かめる。
+  let outcome: SafePostOutcome;
   try {
-    response = await (dependencies.fetch ?? fetch)(webhook.url, {
-      method: 'POST', headers, body, signal: AbortSignal.timeout(10_000),
-    });
+    outcome = await postWebhookSafely(
+      webhook.url,
+      { headers, body, signal: AbortSignal.timeout(10_000) },
+      { fetchImpl: dependencies.fetch ?? fetch, lookupHost: dependencies.lookupHost },
+    );
   } catch (error) {
     await recordDeliveryOutcome(context.db, webhook.id, false);
     throw new AutomationActionError(
@@ -502,6 +487,12 @@ async function webhookExecutor(
       true,
     );
   }
+  if ('blocked' in outcome) {
+    // 安全でない送り先。秘密値を残さず失敗台帳だけに記録する。
+    await recordDeliveryOutcome(context.db, webhook.id, false);
+    throw invalid('webhook_url_unsafe', '送信WebhookのURLが安全ではありません');
+  }
+  const response = outcome.response;
   if (!response.ok) {
     await recordDeliveryOutcome(context.db, webhook.id, false);
     throw new AutomationActionError(
