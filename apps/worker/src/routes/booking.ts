@@ -746,15 +746,30 @@ booking.post('/api/liff/booking/requests', async (c) => {
   // attachTagAndFireSideEffects は POST /api/friends/:id/tags と同じ side effects
   // (tag_added シナリオ enrollment + tag_change イベント) を発火する。
   // INSERT OR IGNORE で重複を吸収し、新規付与のときだけ side effects を打つ。
+  //
+  // 設定した時点で active でも、予約が入る時点では整理済み(archived)になっている
+  // ことがある。メニューに残っている auto_tag_id をそのまま信じず、付与の直前に
+  // アカウントと status='active' を引き直す。外れていれば付与も後続副作用も打たない
+  // (整理済みのタグが友だちに付き、シナリオ・イベントまで動いてしまうのを止める)。
   if (menuRow.auto_tag_id) {
     const tagId = menuRow.auto_tag_id;
     c.executionCtx.waitUntil(
-      attachTagAndFireSideEffects(c.env.DB, friendId, tagId, {
-        defaultAccessToken: c.env.LINE_CHANNEL_ACCESS_TOKEN,
-        workerUrl: c.env.WORKER_URL,
-      })
-        .then(() => undefined)
-        .catch((err) => console.error('booking auto-tag failed:', err)),
+      (async () => {
+        if (!(await isAssignableAutoTag(c.env.DB, tagId, accountId))) {
+          console.warn(JSON.stringify({
+            event: 'booking_auto_tag_skipped',
+            reason: 'tag_not_active_in_account',
+            tag_id: tagId,
+            line_account_id: accountId,
+            booking_id: bookingId,
+          }));
+          return;
+        }
+        await attachTagAndFireSideEffects(c.env.DB, friendId, tagId, {
+          defaultAccessToken: c.env.LINE_CHANNEL_ACCESS_TOKEN,
+          workerUrl: c.env.WORKER_URL,
+        });
+      })().catch((err) => console.error('booking auto-tag failed:', err)),
     );
   }
 
@@ -1301,6 +1316,49 @@ function toMenuActiveFlag(value: unknown): number {
   return value === false || value === 0 ? 0 : 1;
 }
 
+type AutoTagIdRead =
+  | { ok: true; present: boolean; value: string | null }
+  | { ok: false; error: 'invalid_auto_tag_id' };
+
+/**
+ * auto_tag_id は「文字列」か「null / 未送信」だけを受け付ける。
+ * 数値・真偽値・配列・オブジェクトをそのまま `.trim()` へ流すと TypeError になり、
+ * 入力の不備が 500(サーバ障害)として返ってしまう。呼び手が直せる誤りなので
+ * ここで型を見て 400 に倒す。
+ *
+ * PUT は「送られた項目だけ更新する」ため、未送信(`present: false`)と
+ * 明示的な null(`present: true, value: null`)を呼び出し側で区別できるようにする。
+ */
+function readAutoTagId(body: Record<string, unknown>): AutoTagIdRead {
+  if (!Object.prototype.hasOwnProperty.call(body, 'auto_tag_id')) {
+    return { ok: true, present: false, value: null };
+  }
+  const raw = body.auto_tag_id;
+  if (raw === null || raw === undefined) return { ok: true, present: true, value: null };
+  if (typeof raw !== 'string') return { ok: false, error: 'invalid_auto_tag_id' };
+  const trimmed = raw.trim();
+  return { ok: true, present: true, value: trimmed === '' ? null : trimmed };
+}
+
+/**
+ * 自動タグとして結び付けてよいタグかを、対象アカウント内かつ status='active' で確かめる。
+ *
+ * 整理済み(archived)のタグを受け付けると、二度と使わないタグへメニューが繋がったままになり、
+ * 予約のたびに「付いたはずのタグで絞り込めない」状態を作る。保存時(POST/PUT)と
+ * 実行時(予約成立時)の両方でここを通し、設定した後に整理されたタグも止める。
+ */
+async function isAssignableAutoTag(
+  db: D1Database,
+  tagId: string,
+  accountId: string,
+): Promise<boolean> {
+  const row = await db
+    .prepare(`SELECT 1 FROM tags WHERE id = ? AND line_account_id = ? AND status = 'active'`)
+    .bind(tagId, accountId)
+    .first<{ 1: number }>();
+  return row != null;
+}
+
 booking.post('/api/booking/admin/menus', requireRole('owner', 'admin'), async (c) => {
   const accountId = await resolveAccountIdAdmin(c);
   if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
@@ -1325,13 +1383,11 @@ booking.post('/api/booking/admin/menus', requireRole('owner', 'admin'), async (c
     price_mode: 'fixed', base_price: b.base_price,
   });
   if (!price.ok) return c.json({ error: price.error }, 400);
-  const autoTagId = (b.auto_tag_id ?? '').trim() === '' ? null : (b.auto_tag_id as string);
-  if (autoTagId) {
-    const tagExists = await c.env.DB
-      .prepare(`SELECT 1 FROM tags WHERE id = ? AND line_account_id = ?`)
-      .bind(autoTagId, accountId)
-      .first<{ 1: number }>();
-    if (!tagExists) return c.json({ error: 'tag_not_found' }, 400);
+  const autoTag = readAutoTagId(b as unknown as Record<string, unknown>);
+  if (!autoTag.ok) return c.json({ error: autoTag.error }, 400);
+  const autoTagId = autoTag.value;
+  if (autoTagId && !(await isAssignableAutoTag(c.env.DB, autoTagId, accountId))) {
+    return c.json({ error: 'tag_not_found' }, 400);
   }
   const id = crypto.randomUUID();
   const ruleColumns = Object.keys(rules.value);
@@ -1396,16 +1452,12 @@ booking.put('/api/booking/admin/menus/:id', requireRole('owner', 'admin'), async
   // 古いクライアントは新しい項目を送らない。`undefined` を null として
   // 書き込むと既存設定を消してしまうので、明示的に送られたものだけ更新する。
   // auto_tag_id が以前からこの扱いで、受付条件も同じにそろえた。
-  const hasAutoTagId = Object.prototype.hasOwnProperty.call(b, 'auto_tag_id');
-  const autoTagId = hasAutoTagId
-    ? ((b.auto_tag_id ?? '').trim() === '' ? null : (b.auto_tag_id as string))
-    : null;
-  if (hasAutoTagId && autoTagId) {
-    const tagExists = await c.env.DB
-      .prepare(`SELECT 1 FROM tags WHERE id = ? AND line_account_id = ?`)
-      .bind(autoTagId, accountId)
-      .first<{ 1: number }>();
-    if (!tagExists) return c.json({ error: 'tag_not_found' }, 400);
+  const autoTag = readAutoTagId(b as unknown as Record<string, unknown>);
+  if (!autoTag.ok) return c.json({ error: autoTag.error }, 400);
+  const hasAutoTagId = autoTag.present;
+  const autoTagId = autoTag.value;
+  if (hasAutoTagId && autoTagId && !(await isAssignableAutoTag(c.env.DB, autoTagId, accountId))) {
+    return c.json({ error: 'tag_not_found' }, 400);
   }
 
   // 常に書き込む項目（PUT なので、送られなければ既定値で上書きする）
