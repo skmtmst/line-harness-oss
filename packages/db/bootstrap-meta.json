@@ -306,9 +306,17 @@
     "343_messages_log_broadcast_recipient_index.sql",
     "345_ad_platform_account_scope.sql",
     "346_ad_conversion_idempotency_and_backfill.sql",
+    "349_affiliate_settlement_snapshot.sql",
+    "352_photo_notification_delivery.sql",
+    "354_analytics_cross_lease_generation.sql",
+    "356_entry_route_stop_suppressions.sql",
     "359_ad_platform_account_required_and_dedup.sql",
+    "361_ec_v6_dispatches.sql",
+    "362_entry_route_stop_suppression_dedup.sql",
     "363_ad_conversion_lease_and_provider_id.sql",
-    "366_ad_conversion_outbox.sql"
+    "366_ad_conversion_outbox.sql",
+    "367_conversion_once_dedup_guard.sql",
+    "373_ai_loop_slack_reports.sql"
   ],
-  "migrationCount": 309
+  "migrationCount": 317
 }

@@ -1,5 +1,6 @@
 import { resolveLineCredential } from '@line-crm/db';
 import { sendEventBookingNotification } from './event-booking-notifier.js';
+import { featureJobCanRun } from './feature-enforcement.js';
 
 const DEFAULT_OFFER_HOURS = 24;
 const JOB_RETRY_MAX_MINUTES = 60;
@@ -587,6 +588,10 @@ export async function processEventWaitlistPromotionJobs(
   let promoted = 0;
   let retried = 0;
   for (const job of jobs.results ?? []) {
+    // 機能オフ中はclaimせずpendingのまま残す。再オンで再開する。
+    if (job.line_account_id && !await featureJobCanRun(db, { accountId: job.line_account_id, featureId: 'events', job: 'event waitlist promotions' })) {
+      continue;
+    }
     const claimed = await db
       .prepare(
         `UPDATE event_waitlist_promotion_jobs

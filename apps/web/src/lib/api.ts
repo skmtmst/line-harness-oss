@@ -1876,8 +1876,15 @@ function announceFeatureDisabled(status: number, code: string | undefined, raw: 
 export function extractApiErrorData(raw: string): unknown {
   if (!raw) return undefined
   try {
-    const body = JSON.parse(raw) as { data?: unknown }
-    return body && typeof body === 'object' ? body.data : undefined
+    const body = JSON.parse(raw) as { data?: unknown; currentVersion?: unknown }
+    if (!body || typeof body !== 'object') return undefined
+    if (body.data !== undefined) return body.data
+    // 旧成果地点APIは互換性のため currentVersion を最上位で返す。
+    // 409の機械データとして同じdata口へ正規化し、画面が再取得判断に使えるようにする。
+    if (Number.isSafeInteger(body.currentVersion) && Number(body.currentVersion) >= 1) {
+      return { currentVersion: Number(body.currentVersion) }
+    }
+    return undefined
   } catch {
     return undefined
   }
@@ -3614,6 +3621,13 @@ export type PhotoReviewMetrics = {
   attentionCount: number
 }
 
+/** GET /api/accounts/health-summary の応答。ログ本文は含まない。 */
+export type AccountHealthSummary = {
+  items: Array<{ lineAccountId: string; riskLevel: string | null }>
+  warningCount: number
+  dangerCount: number
+}
+
 export type PhotoAssetRun = {
   id: string
   photoId: string
@@ -3654,6 +3668,20 @@ export type PhotoBulkDecision = {
   expectedVersion: number
   reasonCode: 'quality' | 'privacy' | 'unrelated' | 'duplicate' | 'other' | null
   reasonNote: string | null
+}
+
+export type PhotoBulkReviewResult = {
+  updatedCount: number
+  items: Array<{
+    photoId: string
+    decision: 'approve' | 'return' | 'reject'
+    reviewVersion: number
+    decisionId: string
+    notificationStatus: 'sent' | 'failed'
+    notificationError?: string
+  }>
+  notificationFailures: Array<{ photoId: string; error: string }>
+  reconciled?: boolean
 }
 
 export type AdPlatform = {
@@ -4741,6 +4769,10 @@ export const api = {
         errorCode: string | null
         result: AnalyticsCrossResult | null
         createdAt: string
+        queuePosition: number | null
+        pendingAhead: number
+        estimatedWaitMs: number | null
+        nextTickAt: string | null
       }>>(`/api/analytics/cross/results/${id}?account_id=${encodeURIComponent(accountId)}`),
     createResultAudience: (accountId: string, resultId: string, data: {
       sourceKind: 'cross' | 'funnel'
@@ -5176,6 +5208,7 @@ export const api = {
       varKey: string
       type?: string
       value?: string
+      memo?: string
       folderId?: string | null
     }) =>
       fetchApi<ApiResponse<CommonVar>>('/api/common-vars', {
@@ -6267,7 +6300,7 @@ export const api = {
         method: 'POST',
         body: JSON.stringify(data),
       }),
-    /** 送った項目だけを書き換える。 */
+    /** 送った項目だけを書き換える。版の一致が必須(N-254)。 */
     updatePoint: (id: string, data: {
       name?: string
       eventType?: string
@@ -6277,14 +6310,17 @@ export const api = {
       countRepeat?: boolean
       attributionDays?: number | null
       lineAccountId?: string | null
+      /** 必須。ずれると409 */
+      expectedVersion: number
     }) =>
       fetchApi<ApiResponse<ConversionPoint>>(`/api/conversions/points/${id}`, {
         method: 'PUT',
         body: JSON.stringify(data),
       }),
-    deletePoint: (id: string) =>
-      fetchApi<ApiResponse<null>>(`/api/conversions/points/${id}`, { method: 'DELETE' }),
-    track: (data: { conversionPointId: string; friendId: string; userId?: string | null; affiliateCode?: string | null; metadata?: Record<string, unknown> | null }) =>
+    /** 停止する。版の一致が必須(N-254)。本文が落ちる通信経路でも届くようクエリで送る。 */
+    deletePoint: (id: string, expectedVersion: number) =>
+      fetchApi<ApiResponse<null>>(`/api/conversions/points/${id}?expectedVersion=${expectedVersion}`, { method: 'DELETE' }),
+    track: (data: { conversionPointId: string; friendId: string; userId?: string | null; affiliateCode?: string | null; metadata?: Record<string, unknown> | null; idempotencyKey?: string | null }) =>
       fetchApi<ApiResponse<unknown>>('/api/conversions/track', {
         method: 'POST',
         body: JSON.stringify(data),
@@ -7454,7 +7490,7 @@ export const api = {
     bulkReviewPhotos: (
       data: { lineAccountId: string; decisions: PhotoBulkDecision[] },
       idempotencyKey: string,
-    ) => fetchApi<ApiResponse<{ updatedCount: number; awardedPoints: number; notificationFailures: number }>>(
+    ) => fetchApi<ApiResponse<PhotoBulkReviewResult>>(
       '/api/nen-members/photos/decisions/bulk',
       { method: 'POST', headers: { 'Idempotency-Key': idempotencyKey }, body: JSON.stringify(data) },
     ),
@@ -8173,6 +8209,9 @@ export const api = {
       fetchApi<ApiResponse<{ riskLevel: string; logs: AccountHealthLog[] }>>(
         `/api/accounts/${accountId}/health`,
       ),
+    /** サイドバーの警告数用。staff可視範囲の最新riskLevelだけを1回で取る。ログ本文なし。 */
+    summary: () =>
+      fetchApi<ApiResponse<AccountHealthSummary>>('/api/accounts/health-summary'),
     migrations: () =>
       fetchApi<ApiResponse<AccountMigration[]>>('/api/accounts/migrations'),
     migrate: (fromAccountId: string, data: { toAccountId: string }) =>
@@ -9125,6 +9164,12 @@ export interface BookingAvailabilitySlot {
   date: string;
   start: string;
   end: string;
+  /** 店舗タイムゾーン名。表示・送信はこの zone で読む。 */
+  timeZone: string;
+  /** 開始 instant（offset 付き ISO。fold 日の重複壁時刻も一意になる）。 */
+  startUtc: string;
+  /** 終了 instant（開始＋所要分。offset 付き ISO）。 */
+  endUtc: string;
   capacity: number;
   remaining: number;
   state: 'available' | 'limited' | 'full' | 'closed';

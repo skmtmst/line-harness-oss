@@ -16,6 +16,11 @@ function app(db: D1Database, staff: AuthenticatedStaff) {
   return hono;
 }
 
+/** 札（`<版の行のid>.<中身の指紋>`）から、DBの行のidだけを取り出す。 */
+function versionRowId(revision: string): string {
+  return revision.slice(0, revision.lastIndexOf('.'));
+}
+
 describe('オートメーション下書きAPI', () => {
   let testDb: SqliteD1;
   const admin: AuthenticatedStaff = {
@@ -154,6 +159,9 @@ describe('オートメーション下書きAPI', () => {
       ['daily', { time: '09:00', friendIds: ['friend-1'] }],
       ['weekly', { time: '09:00', weekdays: [1, 3], friendIds: ['friend-1'] }],
     ];
+    // 札には中身の指紋が入っているので、保存するたびに新しくなる。
+    // 前の札を使い回すと「別の人が更新した」として弾かれるのが正しい。
+    let revision = createdBody.data.draftVersionId;
     for (const [eventType, triggerConfig] of cases) {
       const response = await adminApp.request(
         `/api/automation-drafts/${createdBody.data.id}?account_id=account-1`,
@@ -161,7 +169,7 @@ describe('オートメーション下書きAPI', () => {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            expectedDraftVersionId: createdBody.data.draftVersionId,
+            expectedDraftVersionId: revision,
             name: '接続済みきっかけ',
             eventType,
             triggerConfig,
@@ -171,9 +179,12 @@ describe('オートメーション下書きAPI', () => {
         },
       );
       expect(response.status, eventType).toBe(200);
+      const savedBody = await response.json() as { data: { draftVersionId: string } };
+      expect(savedBody.data.draftVersionId, eventType).not.toBe(revision);
+      revision = savedBody.data.draftVersionId;
       expect(testDb.raw.prepare(
         `SELECT trigger_type FROM automation_versions WHERE id = ?`,
-      ).get(createdBody.data.draftVersionId)).toEqual({ trigger_type: eventType });
+      ).get(versionRowId(revision))).toEqual({ trigger_type: eventType });
     }
     const unsupported = await adminApp.request(
       `/api/automation-drafts/${createdBody.data.id}?account_id=account-1`,
@@ -181,7 +192,7 @@ describe('オートメーション下書きAPI', () => {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          expectedDraftVersionId: createdBody.data.draftVersionId,
+          expectedDraftVersionId: revision,
           name: '未接続', eventType: 'unfollow', triggerConfig: {},
           actions: [{ id: 'tag', type: 'add_tag', params: { tagId: 'tag-1' }, onFailure: 'stop' }],
         }),
@@ -216,24 +227,39 @@ describe('オートメーション下書きAPI', () => {
       },
     );
     expect(updated.status).toBe(200);
-    const published = await adminApp.request(
+    const updatedBody = await updated.json() as { data: { draftVersionId: string } };
+
+    // 見ていない中身をそのまま公開させない。保存前の札では公開できない。
+    const stale = await adminApp.request(
       `/api/automation-drafts/${createdBody.data.id}/publish?account_id=account-1`,
       {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ expectedDraftVersionId: createdBody.data.draftVersionId, activate: true }),
       },
     );
+    expect(stale.status).toBe(409);
+    expect(testDb.raw.prepare(
+      `SELECT status FROM automation_definitions WHERE id = ?`,
+    ).get(createdBody.data.id)).toEqual({ status: 'draft' });
+
+    const published = await adminApp.request(
+      `/api/automation-drafts/${createdBody.data.id}/publish?account_id=account-1`,
+      {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ expectedDraftVersionId: updatedBody.data.draftVersionId, activate: true }),
+      },
+    );
     expect(published.status).toBe(200);
     await expect(published.json()).resolves.toMatchObject({
       success: true,
-      data: { id: createdBody.data.id, versionId: createdBody.data.draftVersionId, status: 'active' },
+      data: { id: createdBody.data.id, versionId: versionRowId(updatedBody.data.draftVersionId), status: 'active' },
     });
     expect(testDb.raw.prepare(
       `SELECT status, current_draft_version_id, current_published_version_id
          FROM automation_definitions WHERE id = ?`,
     ).get(createdBody.data.id)).toEqual({
       status: 'active', current_draft_version_id: null,
-      current_published_version_id: createdBody.data.draftVersionId,
+      current_published_version_id: versionRowId(updatedBody.data.draftVersionId),
     });
   });
 

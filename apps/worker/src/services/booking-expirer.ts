@@ -5,6 +5,7 @@ import { purgeExpiredIdempotency } from './booking-idempotency.js';
 import { REQUEST_TTL_HOURS } from './booking-types.js';
 import { cancelByTrigger } from './reminder-trigger.js';
 import { resolveLineCredential } from '@line-crm/db';
+import { featureJobCanRun } from './feature-enforcement.js';
 
 interface StaleRow {
   id: string;
@@ -57,6 +58,10 @@ export async function runExpirer(
 
   let expired = 0;
   for (const row of stale.results) {
+    // 機能オフ中は期限切れにせずrequestedのまま残す。再オンで再開する。
+    if (row.line_account_id && !await featureJobCanRun(db, { accountId: row.line_account_id, featureId: 'booking', job: 'booking expirer' })) {
+      continue;
+    }
     // 条件付き UPDATE: cron 走行中に admin が同じ予約を承認/拒否した場合、
     // requested 行に対してのみ expired 化する。changes=0 なら後続処理（通知/reminders cancel）
     // をスキップして、誤通知を防ぐ。

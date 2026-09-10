@@ -6,6 +6,7 @@
 */
 
 import { matchesCondition, type SegmentCondition } from './segment-query.js';
+import { featureJobCanRun } from './feature-enforcement.js';
 
 const DEFAULT_LEASE_MINUTES = 5;
 const RETRY_DELAYS_MINUTES = [1, 5, 30] as const;
@@ -666,6 +667,14 @@ export async function processAutomationRun(
 ): Promise<RunStatus | 'busy' | 'not_found'> {
   const now = nowIso(options.now);
   const leaseMinutes = options.leaseMinutes ?? DEFAULT_LEASE_MINUTES;
+  // 機能オフ中はclaimせずqueuedのまま残す。再オンで再開する。
+  const ownerRow = await db
+    .prepare(`SELECT line_account_id FROM automation_runs WHERE id = ?`)
+    .bind(runId)
+    .first<{ line_account_id: string | null }>();
+  if (ownerRow?.line_account_id && !await featureJobCanRun(db, { accountId: ownerRow.line_account_id, featureId: 'automations', job: 'automation runs' })) {
+    return 'busy';
+  }
   if (!(await claimRun(db, runId, now, leaseMinutes))) {
     const existing = await getRun(db, runId);
     if (!existing) return 'not_found';
