@@ -303,7 +303,15 @@
     "339_site_event_host.sql",
     "340_staff_two_factor_setup_attempts.sql",
     "341_ec_notification_settings_account_scope.sql",
-    "343_messages_log_broadcast_recipient_index.sql"
+    "343_messages_log_broadcast_recipient_index.sql",
+    "349_affiliate_settlement_snapshot.sql",
+    "352_photo_notification_delivery.sql",
+    "354_analytics_cross_lease_generation.sql",
+    "356_entry_route_stop_suppressions.sql",
+    "361_ec_v6_dispatches.sql",
+    "362_entry_route_stop_suppression_dedup.sql",
+    "367_conversion_once_dedup_guard.sql",
+    "373_ai_loop_slack_reports.sql"
   ],
-  "migrationCount": 304
+  "migrationCount": 311
 }
