@@ -141,6 +141,7 @@ import { siteTracking } from './routes/site-tracking.js';
 import { restaurantTest } from './routes/restaurant-test.js';
 import { tenants } from './routes/tenants.js';
 import { codexSlackEvents } from './routes/codex-slack-events.js';
+import { aiLoopSlackReports } from './routes/ai-loop-slack-reports.js';
 import { clientErrors } from './routes/client-errors.js';
 import { lineWebhookEvents } from './routes/line-webhook-events.js';
 import { operations } from './routes/operations.js';
@@ -269,6 +270,8 @@ export type Env = {
     SLACK_KENTA_USER_ID?: string;
     SLACK_MASATO_USER_ID?: string;
     SLACK_TASK_CHANNEL_ID?: string;
+    /** AI開発ループの一方向レポート専用。Slackからの操作には使用しない。 */
+    SLACK_AI_LOOP_CHANNEL_ID?: string;
     SLACK_SIGNING_SECRET?: string;
     SLACK_USER_TOKEN?: string;
     // Slack mention -> official Codex receipt -> user-authored Slack relay.
@@ -447,6 +450,7 @@ app.route('/', siteTracking);
 app.route('/', restaurantTest);
 app.route('/', tenants);
 app.route('/', codexSlackEvents);
+app.route('/', aiLoopSlackReports);
 app.route('/', clientErrors);
 app.route('/', lineWebhookEvents);
 app.route('/', operations);

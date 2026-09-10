@@ -1100,6 +1100,49 @@ const spec = {
         responses: { '200': { description: 'Feature impacts with target ids and confirmation token' }, '400': { description: 'Unknown feature or invalid value' }, '403': { description: 'Staff role required' }, '409': { description: 'Version conflict, reread required' } },
       },
     },
+    // ── AI development reports ──────────────────────────────────────────────
+    '/api/integrations/ai-loop/reports': {
+      post: {
+        tags: ['Operations'],
+        summary: 'AI開発タスクの状態をSlackへ一方向で報告',
+        description: '署名済みの開始・完了・失敗・人間確認イベントだけを専用チャンネルへ表示する。Slackからの実行指示や承認は受け付けない。',
+        security: [],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                additionalProperties: false,
+                required: ['version', 'eventId', 'taskId', 'repository', 'title', 'commander', 'executor', 'model', 'status', 'summary', 'taskUrl', 'occurredAt', 'revision'],
+                properties: {
+                  version: { type: 'integer', const: 1 },
+                  eventId: { type: 'string', minLength: 3, maxLength: 255 },
+                  taskId: { type: 'string', minLength: 1, maxLength: 120 },
+                  repository: { type: 'string', pattern: '^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$' },
+                  title: { type: 'string', minLength: 1, maxLength: 120 },
+                  commander: { type: 'string', enum: ['codex', 'claude'] },
+                  executor: { type: 'string', enum: ['meta', 'codex'] },
+                  model: { type: 'string', minLength: 1, maxLength: 80 },
+                  status: { type: 'string', enum: ['started', 'completed', 'failed', 'approval'] },
+                  summary: { type: 'string', minLength: 1, maxLength: 500 },
+                  taskUrl: { type: 'string', format: 'uri' },
+                  prUrl: { type: 'string', format: 'uri' },
+                  occurredAt: { type: 'string', format: 'date-time' },
+                  revision: { type: 'integer', minimum: 0 },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': { description: 'Report created, updated, or ignored as stale' },
+          '400': { description: 'Invalid report payload' },
+          '401': { description: 'Invalid signature' },
+          '503': { description: 'Report channel is not configured' },
+        },
+      },
+    },
     // ── Webhook ─────────────────────────────────────────────────────────────
     '/webhook': {
       post: {
