@@ -166,28 +166,47 @@ export async function processDueEventReminders(
     if (row.line_account_id && !await featureJobCanRun(db, { accountId: row.line_account_id, featureId: 'events', job: 'event reminders' })) {
       continue;
     }
-    // Optimistic claim: bump retry_count CAS-style on (id, retry_count).
-    // If two cron invocations fetched the same row, only one of them wins
-    // this UPDATE; the other gets changes=0 and skips. retry_count thus
-    // doubles as a claim epoch, sufficient on D1 without a dedicated lock
-    // column or a new migration.
-    const claim = await db
-      .prepare(
-        `UPDATE event_booking_reminders
-            SET retry_count = retry_count + 1
-          WHERE id = ? AND retry_count = ? AND status IN ('pending','failed')`,
-      )
-      .bind(row.id, row.retry_count)
-      .run();
-    if ((claim.meta?.changes ?? 0) === 0) continue;
-    const claimedRetry = row.retry_count + 1;
-
+    // 読み出し時点の試行回数。fence の CAS はこの値を epoch に使い、失敗記録も
+    // これを基準にする (claim 後に row を読み直さない)。
+    // catch へ来るのは自分が失敗したときだけ。握れなかった行は continue で
+    // 抜けるので catch を通らない。よって fence の前で投げた場合 (資格情報が
+    // 復号できない等) も1回ぶん数える: 数えないと retry_count が伸びず、上限で
+    // failed_permanent へ打ち切れないまま failed で滞留する (due の SELECT は
+    // LIMIT 100 で ORDER BY が無く、滞留行が正常なリマインダを押し出す)。
+    const priorRetry = row.retry_count;
+    const attemptedRetry = priorRetry + 1;
     try {
+      // 送信の準備 (資格情報の復号) は fence の前に済ませる。fence と外部
+      // 送信の間に待つ処理を挟まない (V6 の verifyClaimedRunBeforeSend と
+      // 同じ形。窓を SQL 1文ぶんに詰める)。
       const accessToken = await resolveLineCredential(
         row.channel_access_token_encrypted,
         row.channel_access_token,
         { lineAccountId: row.line_account_id, field: 'channel_access_token' },
       );
+      // Optimistic claim: bump retry_count CAS-style on (id, retry_count).
+      // If two cron invocations fetched the same row, only one of them wins
+      // this UPDATE; the other gets changes=0 and skips. retry_count thus
+      // doubles as a claim epoch, sufficient on D1 without a dedicated lock
+      // column or a new migration.
+      // 併せて取消との直列化も同じ1文で行う。上の SELECT の
+      // b.status='confirmed' は読み出し時にしか効かず、claim 後・送信前の
+      // 取消を止められない。送る直前に予約の状態を確かめ、取消が先なら
+      // 0 件にして送らない。
+      const claim = await db
+        .prepare(
+          `UPDATE event_booking_reminders
+              SET retry_count = retry_count + 1
+            WHERE id = ? AND retry_count = ? AND status IN ('pending','failed')
+              AND EXISTS (
+                SELECT 1 FROM event_bookings b
+                 WHERE b.id = event_booking_reminders.booking_id
+                   AND b.status = 'confirmed')`,
+        )
+        .bind(row.id, priorRetry)
+        .run();
+      if ((claim.meta?.changes ?? 0) === 0) continue;
+
       await params.sender({
         channelAccessToken: accessToken,
         toLineUserId: row.line_user_id,
@@ -209,12 +228,13 @@ export async function processDueEventReminders(
         .run();
       sent++;
     } catch (e) {
-      const newStatus = claimedRetry >= REMINDER_MAX_RETRY ? 'failed_permanent' : 'failed';
+      // fence で握れていれば DB 上も同じ値まで進んでいる (二重に数えない)。
+      const newStatus = attemptedRetry >= REMINDER_MAX_RETRY ? 'failed_permanent' : 'failed';
       await db
         .prepare(
-          `UPDATE event_booking_reminders SET status = ?, last_error = ? WHERE id = ?`,
+          `UPDATE event_booking_reminders SET status = ?, retry_count = ?, last_error = ? WHERE id = ?`,
         )
-        .bind(newStatus, e instanceof Error ? e.message : String(e), row.id)
+        .bind(newStatus, attemptedRetry, e instanceof Error ? e.message : String(e), row.id)
         .run();
       failed++;
     }
