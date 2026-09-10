@@ -1,12 +1,14 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import Button from '@/components/shared/button'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 import PageHeader from '@/components/shared/page-header'
 import Toggle from '@/components/shared/toggle'
 import { useAccount } from '@/contexts/account-context'
-import { api, ApiError, type AnalyticsUsageOverview } from '@/lib/api'
+import { api, ApiError, fetchApi, type AnalyticsUsageOverview } from '@/lib/api'
+import { createAccountRequestGuard } from './account-request-guard'
 import {
   FEATURE_SETTINGS_UPDATED_EVENT,
   groupEnabledCount,
@@ -74,6 +76,39 @@ function groupSummary(group: FeatureGroup, features: Record<string, boolean>) {
 }
 
 type UsageCategory = AnalyticsUsageOverview['data']['categories'][number]
+
+/**
+ * オフ前の影響確認(票643)の応答。件数と対象種別だけを持ち、
+ * 稼働中の行そのもの(宛先・内容)はサーバから出さない。
+ */
+type FeatureImpactItem = {
+  kind: 'published' | 'scheduled' | 'dependent'
+  targetType: string
+  count: number
+}
+
+type FeatureImpactGroup = {
+  feature: string
+  items: FeatureImpactItem[]
+  blocking: boolean
+}
+
+type FeatureImpactResponse = {
+  success: boolean
+  error: string
+  data: {
+    version: number
+    impacts: FeatureImpactGroup[]
+    requiresConfirmation: boolean
+    impactToken: string | null
+  }
+}
+
+type FeatureSaveResponse = {
+  success: boolean
+  error: string
+  data: { version: number }
+}
 
 const USAGE_ITEM_IDS_BY_KEY: Record<string, string[]> = {
   templates: ['templates'],
@@ -318,6 +353,26 @@ export default function SettingsPage() {
   const [settingsVersion, setSettingsVersion] = useState(0)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  /**
+   * オフ前の影響確認(票643)。止まる仕事があるときだけ開く。
+   * トークンは保持せず、押すたびに取り直してから保存する。
+   */
+  const [impactOpen, setImpactOpen] = useState(false)
+  const [impactGroups, setImpactGroups] = useState<FeatureImpactGroup[]>([])
+  const [impactBusy, setImpactBusy] = useState(false)
+  const [impactError, setImpactError] = useState('')
+  /**
+   * 世代guard。アカウントが変わったら古い応答を捨てる。
+   * Aの応答をBの画面へ混ぜないし、Aの版でBへ保存しない。
+   */
+  const accountGuard = useMemo(() => createAccountRequestGuard(), [])
+  const accountRef = useRef(selectedAccountId)
+  useEffect(() => {
+    if (accountRef.current !== selectedAccountId) {
+      accountRef.current = selectedAccountId
+      accountGuard.advance()
+    }
+  }, [selectedAccountId, accountGuard])
 
   /**
    * 利用数だけ後から読む。設定の表示を重い集計で待たせない。
@@ -328,28 +383,33 @@ export default function SettingsPage() {
    */
   const loadUsage = useCallback(async () => {
     if (!selectedAccountId) return
+    const ticket = accountGuard.issue(selectedAccountId)
     setUsageFailed(false)
     try {
       const usageResponse = await api.analytics.usageOverview(selectedAccountId)
+      if (!accountGuard.isCurrent(ticket, selectedAccountId)) return
       if (usageResponse?.success) {
         setUsageCategories(usageResponse.data.data.categories)
       } else {
         setUsageFailed(true)
       }
     } catch {
+      if (!accountGuard.isCurrent(ticket, selectedAccountId)) return
       setUsageFailed(true)
     }
-  }, [selectedAccountId])
+  }, [selectedAccountId, accountGuard])
 
   const load = useCallback(async () => {
     if (!selectedAccountId) {
       setLoading(false)
       return
     }
+    const ticket = accountGuard.issue(selectedAccountId)
     setLoading(true)
     setError('')
     try {
       const response = await api.featureSettings.get(selectedAccountId)
+      if (!accountGuard.isCurrent(ticket, selectedAccountId)) return
       if (!response.success) {
         setError(response.error)
         return
@@ -365,11 +425,12 @@ export default function SettingsPage() {
       // 設定を先に出し、利用数は後から足す（表示を集計で待たせない）。
       void loadUsage()
     } catch (error) {
+      if (!accountGuard.isCurrent(ticket, selectedAccountId)) return
       setError(featureSettingsErrorMessage(error instanceof ApiError ? error.status : undefined, 'load'))
     } finally {
-      setLoading(false)
+      if (accountGuard.isCurrent(ticket, selectedAccountId)) setLoading(false)
     }
-  }, [selectedAccountId, loadUsage])
+  }, [selectedAccountId, loadUsage, accountGuard])
 
   useEffect(() => { void load() }, [load])
 
@@ -441,20 +502,96 @@ export default function SettingsPage() {
     setNotice('')
   }
 
-  const save = async () => {
-    if (!selectedAccountId || !dirty) return
+  /** 機能の目印→表示名。確認ダイアログで内部IDを出さないために使う。 */
+  const featureLabelByKey = useMemo(() => {
+    const labels = new Map<string, string>()
+    for (const group of groups) {
+      for (const item of group.items) {
+        for (const key of item.keys) {
+          if (!labels.has(key)) labels.set(key, item.label)
+        }
+      }
+    }
+    return labels
+  }, [groups])
+
+  /** 最新の保存済み状態を読み直す。編集中身は残す。 */
+  const reloadSaved = useCallback(async () => {
+    if (!selectedAccountId) return
+    const ticket = accountGuard.issue(selectedAccountId)
+    try {
+      const latest = await api.featureSettings.get(selectedAccountId)
+      if (!accountGuard.isCurrent(ticket, selectedAccountId)) return
+      if (latest.success) {
+        setSavedFeatures(normalizeFeatureSettings(latest.data.features))
+        setSavedItemOrder(latest.data.sidebarItemOrder ?? {})
+        setSettingsVersion(latest.data.version ?? 0)
+      }
+    } catch {
+      // 読み直しに失敗しても編集中身は残す。
+    }
+  }, [selectedAccountId, accountGuard])
+
+  /**
+   * オフ前の影響確認(票643)。変更案だけ送り、保存はしない。
+   * 版が古ければ読み直して null を返す(呼び出し側は保存へ進まない)。
+   * 途中でアカウントが変わったら捨てて null を返す。
+   */
+  const checkImpact = useCallback(async () => {
+    if (!selectedAccountId) return null
+    const ticket = accountGuard.issue(selectedAccountId)
+    try {
+      const impact = await fetchApi<FeatureImpactResponse>(
+        `/api/settings/features/impact?account_id=${encodeURIComponent(selectedAccountId)}`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ features, expectedVersion: settingsVersion }),
+        },
+      )
+      if (!accountGuard.isCurrent(ticket, selectedAccountId)) return null
+      if (!impact.success) {
+        setError(impact.error)
+        return null
+      }
+      return impact.data
+    } catch (error) {
+      if (!accountGuard.isCurrent(ticket, selectedAccountId)) return null
+      // ほかの管理者が先に保存したときは、編集中身は残したまま
+      // 最新を読み直し、内容を確認してもう一度保存してもらう。
+      if (error instanceof ApiError && error.status === 409) {
+        await reloadSaved()
+        setError(FEATURE_SETTINGS_CONFLICT_MESSAGE)
+        return null
+      }
+      setError(featureSettingsErrorMessage(error instanceof ApiError ? error.status : undefined, 'save'))
+      return null
+    }
+  }, [selectedAccountId, features, settingsVersion, reloadSaved, accountGuard])
+
+  const persist = async (impactToken?: string): Promise<boolean> => {
+    if (!selectedAccountId) return false
+    const ticket = accountGuard.issue(selectedAccountId)
     setSaving(true)
     setError('')
     setNotice('')
     try {
-      const response = await api.featureSettings.save(selectedAccountId, {
-        features,
-        sidebarItemOrder: currentOrder,
-        expectedVersion: settingsVersion,
-      })
+      const response = await fetchApi<FeatureSaveResponse>(
+        `/api/settings/features?account_id=${encodeURIComponent(selectedAccountId)}`,
+        {
+          method: 'PUT',
+          body: JSON.stringify({
+            features,
+            sidebarItemOrder: currentOrder,
+            expectedVersion: settingsVersion,
+            ...(impactToken ? { impactToken } : {}),
+          }),
+        },
+      )
+      // 途中でアカウントが変わったら、応答を捨てて保存へ進まない。
+      if (!accountGuard.isCurrent(ticket, selectedAccountId)) return false
       if (!response.success) {
         setError(response.error)
-        return
+        return false
       }
       /*
        * 保存したつもりの値をそのまま確定しない。サーバーが正した値
@@ -463,6 +600,7 @@ export default function SettingsPage() {
        */
       try {
         const latest = await api.featureSettings.get(selectedAccountId)
+        if (!accountGuard.isCurrent(ticket, selectedAccountId)) return false
         if (latest.success) {
           const serverFeatures = normalizeFeatureSettings(latest.data.features)
           setSavedFeatures(serverFeatures)
@@ -486,28 +624,99 @@ export default function SettingsPage() {
       }
       setNotice('機能設定を保存しました。サイドメニューにも反映されています。')
       window.dispatchEvent(new CustomEvent(FEATURE_SETTINGS_UPDATED_EVENT, { detail: { accountId: selectedAccountId } }))
+      return true
     } catch (error) {
+      if (!accountGuard.isCurrent(ticket, selectedAccountId)) return false
+      // 確認後に稼働中が変わったときは、最新の影響で確認し直す。
+      // 編集中身は残したまま、ダイアログを開き直す。
+      if (error instanceof ApiError && error.status === 409
+        && error.code === 'IMPACT_CONFIRMATION_REQUIRED') {
+        const data = error.data as { impacts?: FeatureImpactGroup[] } | undefined
+        if (data?.impacts) {
+          setImpactGroups(data.impacts)
+          setImpactError('状態が変わったため、内容を確認し直してください。')
+          setImpactOpen(true)
+        } else {
+          setError(featureSettingsErrorMessage(error.status, 'save'))
+        }
+        await reloadSaved()
+        return false
+      }
       // ほかの管理者が先に保存したときは、編集中身は残したまま
       // 最新を読み直し、内容を確認してもう一度保存してもらう。
       if (error instanceof ApiError && error.status === 409) {
-        try {
-          const latest = await api.featureSettings.get(selectedAccountId)
-          if (latest.success) {
-            setSavedFeatures(normalizeFeatureSettings(latest.data.features))
-            setSavedItemOrder(latest.data.sidebarItemOrder ?? {})
-            setSettingsVersion(latest.data.version ?? 0)
-          }
-        } catch {
-          // 読み直しに失敗しても編集中身は残す。
-        }
+        await reloadSaved()
         setError(FEATURE_SETTINGS_CONFLICT_MESSAGE)
-        return
+        return false
       }
       setError(featureSettingsErrorMessage(error instanceof ApiError ? error.status : undefined, 'save'))
+      return false
     } finally {
       setSaving(false)
     }
   }
+
+  /**
+   * 保存ボタン。オフに変わる機能があるときだけ先に影響確認し、
+   * 止まる仕事があるときは確認ダイアログを開いて止める。
+   */
+  const save = async () => {
+    if (!selectedAccountId || !dirty) return
+    const offKeys = Object.keys(features).filter(
+      (key) => savedFeatures[key] === true && features[key] === false,
+    )
+    if (offKeys.length === 0) {
+      await persist()
+      return
+    }
+    setSaving(true)
+    setError('')
+    try {
+      const data = await checkImpact()
+      if (!data) return
+      if (data.requiresConfirmation) {
+        setImpactGroups(data.impacts)
+        setImpactError('')
+        setImpactOpen(true)
+        return
+      }
+      await persist()
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  /**
+   * 確認ダイアログの「確認して保存」。押すたびに影響を取り直し、
+   * その場のトークンで保存する。トークンの持ち回しはしない。
+   */
+  const confirmImpactSave = async () => {
+    if (impactBusy || !selectedAccountId) return
+    setImpactBusy(true)
+    setImpactError('')
+    try {
+      const data = await checkImpact()
+      if (!data) {
+        setImpactError('確認を取り直せませんでした。閉じてもう一度保存してください。')
+        return
+      }
+      if (!data.requiresConfirmation || !data.impactToken) {
+        setImpactOpen(false)
+        await persist()
+        return
+      }
+      setImpactGroups(data.impacts)
+      setImpactOpen(true)
+      const ok = await persist(data.impactToken)
+      if (ok) setImpactOpen(false)
+    } finally {
+      setImpactBusy(false)
+    }
+  }
+
+  const impactSummary = (group: FeatureImpactGroup) => group.items
+    .map((item) => `${item.targetType} ${item.count.toLocaleString('ja-JP')}件`)
+    .join('、')
 
   return (
     <div>
@@ -620,6 +829,39 @@ export default function SettingsPage() {
           )}
         </>
       )}
+
+      {/*
+        オフ前の影響確認(票643)。止まる仕事の件数と対象種別を並べ、
+        確認したうえで保存する。標準の確認窓は使わない。
+      */}
+      <ConfirmDialog
+        open={impactOpen}
+        title="オフにする前に確認"
+        description="止まる仕事があります。オフにしてもデータは削除されず、再度オンにすると再開できます。公開中のページや動いている配信・予約は、それぞれの画面で止めてからオフにしてください。"
+        confirmLabel="確認して保存"
+        destructive
+        busy={impactBusy || saving}
+        error={impactError || undefined}
+        onCancel={() => {
+          if (impactBusy || saving) return
+          setImpactOpen(false)
+          setImpactError('')
+        }}
+        onConfirm={() => void confirmImpactSave()}
+      >
+        <div className="space-y-3">
+          {impactGroups.map((group) => (
+            <div key={group.feature}>
+              <p className="text-sm font-bold text-ink">
+                {featureLabelByKey.get(group.feature) ?? group.feature}
+              </p>
+              <p className="mt-1 text-xs leading-relaxed text-ink-secondary">
+                {impactSummary(group)}
+              </p>
+            </div>
+          ))}
+        </div>
+      </ConfirmDialog>
     </div>
   )
 }

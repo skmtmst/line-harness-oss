@@ -1,12 +1,13 @@
 'use client'
 
 import Link from 'next/link'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ApiError, api, type EcNotificationRun, type EcNotificationRunList } from '@/lib/api'
 import Button from '@/components/shared/button'
 import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
+import Select from '@/components/shared/select'
 import SummaryCard from '@/components/shared/summary-card'
 import { DataTable, NameCell, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 
@@ -50,7 +51,181 @@ function formatJst(value: string | null): string {
 }
 
 type LoadState = 'loading' | 'ready' | 'error' | 'forbidden'
-type RunFilter = 'all' | 'failed' | 'excluded' | 'clicked'
+
+/**
+ * 表示中のLINEアカウント・タブを指す世代。`key` はアカウントとタブの組。
+ * 切り替えるたびに `generation` をレンダー中に同期して1つ進める。
+ * useEffectで進めると、直前のPromiseがマイクロタスクとしてuseEffectより
+ * 先にほどけたとき、古い世代のままisCurrent判定を通してしまい、
+ * notice・retrying・reloadが新しい画面へ漏れる（司令塔差し戻しの実例）。
+ */
+export type NotificationRunScope = { key: string; generation: number }
+
+export type ScopedLoadState = {
+  generation: number
+  state: LoadState
+  result: EcNotificationRunList | null
+  total: number
+}
+export type NotificationRunNotice = { tone: 'success' | 'error'; text: string } | null
+export type ScopedNotice = { generation: number; notice: NotificationRunNotice }
+export type ScopedRetrying = { generation: number; id: string | null }
+
+export type RunFilter = 'all' | 'failed' | 'excluded' | 'clicked'
+export type RecipientFilter = 'all' | EcNotificationRun['recipientType']
+export type PeriodFilter = 'all' | '24h' | '7d' | '30d'
+
+const PERIOD_MILLISECONDS: Record<Exclude<PeriodFilter, 'all'>, number> = {
+  '24h': 24 * 60 * 60 * 1000,
+  '7d': 7 * 24 * 60 * 60 * 1000,
+  '30d': 30 * 24 * 60 * 60 * 1000,
+}
+
+export function filterNotificationRuns(
+  items: EcNotificationRun[],
+  filters: {
+    query: string
+    status: RunFilter
+    recipient: RecipientFilter
+    period: PeriodFilter
+  },
+  now = Date.now(),
+): EcNotificationRun[] {
+  const normalized = filters.query.trim().toLocaleLowerCase('ja-JP')
+  return items.filter((item) => {
+    if (filters.status === 'clicked' && !item.clickedAt) return false
+    if (filters.status === 'failed' && item.status !== 'failed') return false
+    if (filters.status === 'excluded' && item.status !== 'excluded') return false
+    if (filters.recipient !== 'all' && item.recipientType !== filters.recipient) return false
+    if (filters.period !== 'all') {
+      const receivedAt = new Date(item.receivedAt).getTime()
+      if (!Number.isFinite(receivedAt) || receivedAt > now || now - receivedAt > PERIOD_MILLISECONDS[filters.period]) return false
+    }
+    if (!normalized) return true
+    return [item.notificationName, item.friendName, item.orderNumber, item.reason, item.source]
+      .some((value) => value?.toLocaleLowerCase('ja-JP').includes(normalized))
+  })
+}
+
+/** 一覧が叩く口。試験では応答を保留できる偽物へ差し替える。 */
+export type NotificationRunPorts = {
+  deliveries: typeof api.lineNotifications.deliveries
+  notificationRuns: typeof api.ecCommerce.notificationRuns
+  retryDelivery: typeof api.lineNotifications.retryDelivery
+}
+
+/**
+ * 読み込みと再試行が共有する足場。`scopeRef` は今どの世代を表示しているか
+ * の唯一の目印で、レンダー本体で同期して更新する（コンポーネント側を
+ * 参照）。待っている間に世代が進んだかどうかはここだけで判断する。
+ */
+export type NotificationRunEnv = {
+  requestRef: { current: number }
+  scopeRef: { current: NotificationRunScope }
+  ports: NotificationRunPorts
+  setLoaded: (next: ScopedLoadState) => void
+  setNotice: (next: ScopedNotice) => void
+  setRetrying: (update: (current: ScopedRetrying) => ScopedRetrying) => void
+}
+
+export type NotificationRunLoadParams = {
+  generation: number
+  lineAccountId: string | null
+  mode: 'history' | 'failures'
+  page: number
+}
+
+export async function loadNotificationRuns(env: NotificationRunEnv, params: NotificationRunLoadParams): Promise<void> {
+  const { generation } = params
+  const request = ++env.requestRef.current
+  // 同じ世代の中でも、後から始めた読み込みだけを採用する（ページ送りなど）。
+  const isCurrentRequest = () => request === env.requestRef.current
+  if (!params.lineAccountId) {
+    env.setLoaded({ generation, state: 'ready', result: null, total: 0 })
+    return
+  }
+  // 世代・状態・結果を1つの更新で切り替え、前世代の成功結果を再表示しない。
+  env.setLoaded({ generation, state: 'loading', result: null, total: 0 })
+  try {
+    const query = {
+      lineAccountId: params.lineAccountId,
+      view: params.mode === 'failures' ? 'failures' as const : 'all' as const,
+      limit: PAGE_SIZE,
+      offset: (params.page - 1) * PAGE_SIZE,
+    }
+    // 古い検証用モックと段階移行中の環境だけ、互換口へ戻す（404のとき1回だけ）。
+    let fellBack = false
+    const primary = await env.ports.deliveries(query).catch((error: unknown) => {
+      if (error instanceof ApiError && error.status === 404) {
+        fellBack = true
+        return env.ports.notificationRuns(query)
+      }
+      throw error
+    })
+    if (!primary.success) throw new Error('load failed')
+    // 互換口の結果をもう一度取り直さない。毎回2要求になるのを防ぐ。
+    const response = !fellBack && (!primary.pagination || primary.data.coverage?.source !== 'notification_delivery_ledger')
+      ? await env.ports.notificationRuns(query)
+      : primary
+    if (!isCurrentRequest()) return
+    if (!response.success) throw new Error('load failed')
+    env.setLoaded({
+      generation,
+      state: 'ready',
+      result: response.data,
+      total: response.pagination.total,
+    })
+  } catch (error) {
+    if (!isCurrentRequest()) return
+    env.setLoaded({
+      generation,
+      state: error instanceof ApiError && error.status === 403 ? 'forbidden' : 'error',
+      result: null,
+      total: 0,
+    })
+  }
+}
+
+export type NotificationRunRetryParams = {
+  generation: number
+  lineAccountId: string | null
+  item: EcNotificationRun
+  reload: () => Promise<void>
+}
+
+export async function retryNotificationRun(env: NotificationRunEnv, params: NotificationRunRetryParams): Promise<void> {
+  const { item, lineAccountId, generation } = params
+  if (!lineAccountId || !item.retryAvailable) return
+  /*
+   * 再試行の応答は、押した時の世代へだけ返す。待っている間に世代が
+   * 進んでいたら、知らせも読み直しも捨てる。env.scopeRef.current は
+   * コンポーネントのレンダー本体で世代切替と同期して更新されるため、
+   * useEffectの発火を待たずに正しい判定ができる。
+   */
+  const isCurrent = () => env.scopeRef.current.generation === generation
+  env.setRetrying(() => ({ generation, id: item.id }))
+  env.setNotice({ generation, notice: null })
+  try {
+    await env.ports.retryDelivery(item.id, {
+      lineAccountId,
+      expectedVersion: item.recordVersion,
+    })
+    if (!isCurrent()) return
+    env.setNotice({ generation, notice: { tone: 'success', text: '同じ通知の送信を安全に再試行しました。' } })
+    await params.reload()
+  } catch (error) {
+    if (!isCurrent()) return
+    const text = error instanceof ApiError && error.status === 403
+      ? '送信の再試行は店長だけができます。'
+      : error instanceof ApiError && error.status === 409
+        ? 'ほかの担当者が先に再試行しました。最新の記録を読み直してください。'
+        : '送信を再試行できませんでした。時間をおいて読み直してください。'
+    env.setNotice({ generation, notice: { tone: 'error', text } })
+  } finally {
+    // 切替後に別の行で始まった再試行の表示までは消さない。
+    env.setRetrying((current) => (current.generation === generation && current.id === item.id ? { generation, id: null } : current))
+  }
+}
 
 export default function NotificationRunList({
   lineAccountId,
@@ -60,16 +235,45 @@ export default function NotificationRunList({
   mode: 'history' | 'failures'
 }) {
   const [page, setPage] = useState(1)
-  const [state, setState] = useState<LoadState>('loading')
-  const [result, setResult] = useState<EcNotificationRunList | null>(null)
-  const [total, setTotal] = useState(0)
+  const currentScopeKey = `${lineAccountId ?? 'none'}:${mode}`
+
+  const [scope, setScope] = useState<NotificationRunScope>(() => ({ key: currentScopeKey, generation: 0 }))
+  if (scope.key !== currentScopeKey) {
+    /*
+     * レンダー本体で同期して世代を進める（Reactが公式に認める
+     * 「レンダー中にstateを調整する」形）。useEffectへ回すと、
+     * このレンダーから次のuseEffectが動くまでの窓で先に解決した
+     * Promiseが古い世代のままisCurrent判定を通してしまう。
+     */
+    setScope({ key: currentScopeKey, generation: scope.generation + 1 })
+  }
+  // env越しに非同期処理から読める、世代の同期ミラー。
+  const scopeRef = useRef(scope)
+  scopeRef.current = scope
+  const generation = scope.generation
+
+  const [loaded, setLoaded] = useState<ScopedLoadState>({ generation: -1, state: 'loading', result: null, total: 0 })
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<RunFilter>('all')
-  const [retryingId, setRetryingId] = useState<string | null>(null)
-  const [notice, setNotice] = useState<{ tone: 'success' | 'error'; text: string } | null>(null)
+  const [recipientFilter, setRecipientFilter] = useState<RecipientFilter>('all')
+  const [periodFilter, setPeriodFilter] = useState<PeriodFilter>('all')
+  const [retrying, setRetrying] = useState<ScopedRetrying>({ generation: -1, id: null })
+  const [notice, setNotice] = useState<ScopedNotice>({ generation: -1, notice: null })
   // 再試行口は店長専用。担当者にはボタンを出さない。
   const [canRetry, setCanRetry] = useState(false)
   const requestRef = useRef(0)
+  const env = useMemo<NotificationRunEnv>(() => ({
+    requestRef,
+    scopeRef,
+    ports: {
+      deliveries: api.lineNotifications.deliveries,
+      notificationRuns: api.ecCommerce.notificationRuns,
+      retryDelivery: api.lineNotifications.retryDelivery,
+    },
+    setLoaded,
+    setNotice,
+    setRetrying,
+  }), [])
 
   useEffect(() => {
     let active = true
@@ -79,127 +283,84 @@ export default function NotificationRunList({
     return () => { active = false }
   }, [])
 
-  useEffect(() => setPage(1), [lineAccountId, mode])
+  useEffect(() => {
+    setPage(1)
+    setQuery('')
+    setFilter('all')
+    setRecipientFilter('all')
+    setPeriodFilter('all')
+  }, [lineAccountId, mode])
 
-  const load = useCallback(async () => {
-    const request = ++requestRef.current
-    if (!lineAccountId) {
-      setResult(null)
-      setTotal(0)
-      setState('ready')
-      return
-    }
-    setState('loading')
-    try {
-      const params = {
-        lineAccountId,
-        view: mode === 'failures' ? 'failures' as const : 'all' as const,
-        limit: PAGE_SIZE,
-        offset: (page - 1) * PAGE_SIZE,
-      }
-      // 古い検証用モックと段階移行中の環境だけ、互換口へ戻す（404のとき1回だけ）。
-      let fellBack = false
-      const primary = await api.lineNotifications.deliveries(params).catch((error: unknown) => {
-        if (error instanceof ApiError && error.status === 404) {
-          fellBack = true
-          return api.ecCommerce.notificationRuns(params)
-        }
-        throw error
-      })
-      if (!primary.success) throw new Error('load failed')
-      // 互換口の結果をもう一度取り直さない。毎回2要求になるのを防ぐ。
-      const response = !fellBack && (!primary.pagination || primary.data.coverage?.source !== 'notification_delivery_ledger')
-        ? await api.ecCommerce.notificationRuns(params)
-        : primary
-      if (request !== requestRef.current) return
-      if (!response.success) throw new Error('load failed')
-      setResult(response.data)
-      setTotal(response.pagination.total)
-      setState('ready')
-    } catch (error) {
-      if (request !== requestRef.current) return
-      setResult(null)
-      setTotal(0)
-      setState(error instanceof ApiError && error.status === 403 ? 'forbidden' : 'error')
-    }
-  }, [lineAccountId, mode, page])
+  const load = useCallback(
+    () => loadNotificationRuns(env, { generation, lineAccountId, mode, page }),
+    [env, generation, lineAccountId, mode, page],
+  )
 
   useEffect(() => { void load() }, [load])
 
-  const retry = async (item: EcNotificationRun) => {
-    if (!lineAccountId || !item.retryAvailable) return
-    setRetryingId(item.id)
-    setNotice(null)
-    try {
-      await api.lineNotifications.retryDelivery(item.id, {
-        lineAccountId,
-        expectedVersion: item.recordVersion,
-      })
-      setNotice({ tone: 'success', text: '同じ通知の送信を安全に再試行しました。' })
-      await load()
-    } catch (error) {
-      const text = error instanceof ApiError && error.status === 403
-        ? '送信の再試行は店長だけができます。'
-        : error instanceof ApiError && error.status === 409
-          ? 'ほかの担当者が先に再試行しました。最新の記録を読み直してください。'
-          : '送信を再試行できませんでした。時間をおいて読み直してください。'
-      setNotice({ tone: 'error', text })
-    } finally {
-      setRetryingId(null)
-    }
-  }
+  const retry = (item: EcNotificationRun) => retryNotificationRun(env, {
+    generation,
+    lineAccountId,
+    item,
+    reload: load,
+  })
 
   const title = mode === 'failures' ? '送れなかったもの' : 'お知らせの記録'
   const nodeId = mode === 'failures' ? 'X8JCA5' : 'Se65i'
-  const items = result?.items ?? []
-  const summary = result?.summary ?? null
-  const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE))
+  // 前世代の書き込みは、いつ届いても表示に反映しない（レンダー時点の比較だけで決める）。
+  const visibleState: LoadState = loaded.generation === generation ? loaded.state : lineAccountId ? 'loading' : 'ready'
+  const scopedResult = loaded.generation === generation ? loaded.result : null
+  const scopedTotal = loaded.generation === generation ? loaded.total : 0
+  const visibleNotice = notice.generation === generation ? notice.notice : null
+  const visibleRetryingId = retrying.generation === generation ? retrying.id : null
+  const items = useMemo(() => scopedResult?.items ?? [], [scopedResult])
+  const summary = scopedResult?.summary ?? null
+  const pageCount = Math.max(1, Math.ceil(scopedTotal / PAGE_SIZE))
+  const summaryDetail = (ready: string): string => {
+    if (!lineAccountId) return 'LINEアカウントを選択すると表示します'
+    if (visibleState === 'error') return '取得できませんでした'
+    if (visibleState === 'forbidden') return '見る権限がありません'
+    return ready
+  }
   const filters: Array<{ value: RunFilter; label: string }> = mode === 'failures'
     ? [{ value: 'all', label: 'すべて' }, { value: 'failed', label: '送信できなかった' }, { value: 'excluded', label: '送信対象外' }]
     : [{ value: 'all', label: 'すべて' }, { value: 'clicked', label: 'クリック記録あり' }, { value: 'failed', label: '送れなかった' }]
-  const visibleItems = useMemo(() => {
-    const normalized = query.trim().toLocaleLowerCase('ja-JP')
-    return items.filter((item) => {
-      if (filter === 'clicked' && !item.clickedAt) return false
-      if (filter === 'failed' && item.status !== 'failed') return false
-      if (filter === 'excluded' && item.status !== 'excluded') return false
-      if (!normalized) return true
-      return [item.notificationName, item.friendName, item.orderNumber, item.reason]
-        .some((value) => value?.toLocaleLowerCase('ja-JP').includes(normalized))
-    })
-  }, [filter, items, query])
+  const visibleItems = useMemo(() => filterNotificationRuns(items, {
+    query,
+    status: filter,
+    recipient: recipientFilter,
+    period: periodFilter,
+  }), [filter, items, periodFilter, query, recipientFilter])
   const listState = !lineAccountId
     ? 'account-required'
-    : state === 'ready' && items.length === 0
+    : visibleState === 'ready' && items.length === 0
       ? 'empty'
-      : state === 'ready' && visibleItems.length === 0
+      : visibleState === 'ready' && visibleItems.length === 0
         ? 'filtered-empty'
-        : state
+        : visibleState
 
   return (
     <section className="space-y-4" data-design-node={nodeId} data-list-state={listState} aria-label={title}>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className={`grid grid-cols-1 gap-4 sm:grid-cols-2 ${mode === 'history' ? 'xl:grid-cols-4' : ''}`}>
         {mode === 'failures' ? <>
-          <SummaryCard title="届かなかった" value={summary?.failed ?? null} unit="通" detail="確認と連絡が必要" variant="v6" loading={state === 'loading'} badgeTone="danger" />
-          <SummaryCard title="送信対象外" value={summary?.excluded ?? null} unit="通" detail="つながりや設定を確認" variant="v6" loading={state === 'loading'} />
-          <SummaryCard title="メールで届いた" value={null} unit="通" detail="メール送信記録の接続後に表示" variant="v6" />
-          <SummaryCard title="まだ連絡できていない" value={null} unit="通" detail="代替連絡の記録接続後に表示" variant="v6" />
+          <SummaryCard title="届かなかった" value={summary?.failed ?? null} unit="通" detail={summaryDetail('確認と連絡が必要')} variant="v6" loading={visibleState === 'loading'} badgeTone="danger" />
+          <SummaryCard title="送信対象外" value={summary?.excluded ?? null} unit="通" detail={summaryDetail('つながりや設定を確認')} variant="v6" loading={visibleState === 'loading'} />
         </> : <>
-          <SummaryCard title="お知らせの記録" value={state === 'ready' ? total : null} unit="件" detail="選択中のLINEアカウント" variant="v6" loading={state === 'loading'} />
-          <SummaryCard title="LINE API受付済み" value={summary?.accepted ?? null} unit="通" detail="LINEへの受付まで確認" variant="v6" loading={state === 'loading'} />
-          <SummaryCard title="押された" value={null} unit="通" detail="自社の短縮URL集計を接続後に表示" variant="v6" />
-          <SummaryCard title="送れなかった" value={summary?.failed ?? null} unit="通" detail="対応が必要なもの" variant="v6" loading={state === 'loading'} badgeTone="danger" />
+          <SummaryCard title="お知らせの記録" value={lineAccountId && visibleState === 'ready' ? scopedTotal : null} unit="件" detail={summaryDetail('選択中のLINEアカウント')} variant="v6" loading={visibleState === 'loading'} />
+          <SummaryCard title="LINE API受付済み" value={summary?.accepted ?? null} unit="通" detail={summaryDetail('LINEへの受付まで確認')} variant="v6" loading={visibleState === 'loading'} />
+          <SummaryCard title="送信処理中" value={summary?.pending ?? null} unit="通" detail={summaryDetail('送信台帳に記録済み')} variant="v6" loading={visibleState === 'loading'} />
+          <SummaryCard title="送れなかった" value={summary?.failed ?? null} unit="通" detail={summaryDetail('対応が必要なもの')} variant="v6" loading={visibleState === 'loading'} badgeTone="danger" />
         </>}
       </div>
 
       <div className="rounded-control border border-warning bg-warning-bg px-4 py-3 text-sm leading-6 text-warning">
         {mode === 'failures'
-          ? '発送や返金のお知らせが届いていない場合は、その日のうちに受信箱など別の手だてで連絡してください。メール結果と対応済みの記録は、送信台帳の接続後に表示します。'
+          ? '発送や返金のお知らせが届いていない場合は、その日のうちに受信箱など別の手だてで連絡してください。対応済みの記録は、送信台帳に項目が追加された後に表示します。'
           : '選択中のLINEアカウントと結び付きを確認できたEC通知だけを表示します。個人の既読は取得せず、押されたかどうかは自社の短縮URLだけで数えます。'}
         <span className="mt-1 block text-xs">個人の既読は取得できません。試行回数と次の再試行予定は送信台帳の記録を表示します。</span>
       </div>
 
-      {notice ? <div className={`rounded-control border px-4 py-3 text-sm ${notice.tone === 'success' ? 'border-success bg-success-bg text-success' : 'border-danger bg-danger-bg text-danger'}`}>{notice.text}</div> : null}
+      {visibleNotice ? <div className={`rounded-control border px-4 py-3 text-sm ${visibleNotice.tone === 'success' ? 'border-success bg-success-bg text-success' : 'border-danger bg-danger-bg text-danger'}`}>{visibleNotice.text}</div> : null}
 
       <div className="flex flex-wrap items-center gap-2">
         <label className="min-w-64 flex-1">
@@ -207,21 +368,44 @@ export default function NotificationRunList({
           <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="お客様の名前・注文番号で検索（表示中の20件のみ）" className="min-h-10 w-full rounded-control border border-hairline bg-canvas px-3 text-sm outline-none focus:border-accent" />
         </label>
         {filters.map((item) => <FilterChip key={item.value} selected={filter === item.value} onChange={() => setFilter(item.value)}>{item.label}</FilterChip>)}
-        <span className="text-xs text-ink-faint" title="検索は表示中のページの中だけに効きます">20件表示</span>
+        <Select
+          aria-label="対象を絞り込み"
+          label="対象"
+          value={recipientFilter}
+          onChange={(value) => setRecipientFilter(value as RecipientFilter)}
+          options={[
+            { value: 'all', label: 'すべて' },
+            { value: 'customer', label: '顧客' },
+            { value: 'operator', label: '運用者' },
+          ]}
+        />
+        <Select
+          aria-label="期間を絞り込み"
+          label="期間"
+          value={periodFilter}
+          onChange={(value) => setPeriodFilter(value as PeriodFilter)}
+          options={[
+            { value: 'all', label: 'すべて' },
+            { value: '24h', label: '24時間以内' },
+            { value: '7d', label: '7日以内' },
+            { value: '30d', label: '30日以内' },
+          ]}
+        />
+        <span className="text-xs text-ink-faint" title="検索と絞り込みは表示中のページの中だけに効きます">表示中の20件を絞り込み</span>
       </div>
 
       {!lineAccountId ? (
         <ListState kind="empty" title="LINEアカウントを選択してください" description="上のアカウント切り替えから、確認するLINEアカウントを選んでください。" />
-      ) : state === 'loading' ? (
+      ) : visibleState === 'loading' ? (
         <ListState kind="loading" title={`${title}を読み込んでいます`} />
-      ) : state === 'error' ? (
+      ) : visibleState === 'error' ? (
         <ListState
           kind="error"
           title={`${title}を表示できませんでした`}
           description="登録済みの記録は消えていません。時間をおいて読み直してください。"
           action={<Button onClick={() => void load()}>記録を再読み込み</Button>}
         />
-      ) : state === 'forbidden' ? (
+      ) : visibleState === 'forbidden' ? (
         <ListState kind="forbidden" />
       ) : items.length === 0 ? (
         <ListState
@@ -256,7 +440,7 @@ export default function NotificationRunList({
               {visibleItems.map((item) => (
                 <Tr key={item.id}>
                   <NameCell name={item.notificationName} sub={item.orderNumber ? `注文 ${item.orderNumber}` : item.source} />
-                  <NameCell name={item.friendName || '名前は未取得'} sub="顧客へのお知らせ" />
+                  <NameCell name={item.friendName || '名前は未取得'} sub={item.recipientType === 'customer' ? '顧客へのお知らせ' : '運用者へのお知らせ'} />
                   <Td><StatusBadge status={item.status} /></Td>
                   <Td>
                     <span className="block whitespace-nowrap text-sm">{formatJst(item.receivedAt)}</span>
@@ -275,8 +459,8 @@ export default function NotificationRunList({
                       </Link>
                     ) : null}
                     {mode === 'failures' && item.retryAvailable && canRetry ? (
-                      <Button className="mt-2" disabled={retryingId === item.id} onClick={() => void retry(item)}>
-                        {retryingId === item.id ? '再試行中' : '送信を再試行'}
+                      <Button className="mt-2" disabled={visibleRetryingId === item.id} onClick={() => void retry(item)}>
+                        {visibleRetryingId === item.id ? '再試行中' : '送信を再試行'}
                       </Button>
                     ) : null}
                   </Td>
@@ -286,7 +470,7 @@ export default function NotificationRunList({
           </DataTable>
           <div className="flex items-center justify-between gap-4">
             <p className="text-xs text-ink-faint">
-              {(page - 1) * PAGE_SIZE + 1}〜{Math.min(page * PAGE_SIZE, total)}件 / 全{total.toLocaleString('ja-JP')}件
+              {(page - 1) * PAGE_SIZE + 1}〜{Math.min(page * PAGE_SIZE, scopedTotal)}件 / 全{scopedTotal.toLocaleString('ja-JP')}件
             </p>
             <Pagination page={page} pageCount={pageCount} onPageChange={setPage} />
           </div>

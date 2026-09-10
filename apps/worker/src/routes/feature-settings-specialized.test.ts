@@ -81,13 +81,15 @@ describe('専用機能目録 API', () => {
     const response = await app().request('/api/settings/features?account_id=default-account', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ features: { restaurant_test: true } }),
+      body: JSON.stringify({ expectedVersion: 0, features: { restaurant_test: true } }),
     }, bindings);
 
     expect(response.status).toBe(200);
-    expect(testDb.raw.prepare(
-      "SELECT value FROM account_settings WHERE line_account_id = ? AND key = 'feature.restaurant_test'",
-    ).get('default-account')).toEqual({ value: '{"enabled":false}' });
+    const saved = testDb.raw.prepare(
+      "SELECT value FROM account_settings WHERE line_account_id = ? AND key = 'feature.settings_bundle_v1'",
+    ).get('default-account') as { value: string };
+    const parsed = JSON.parse(saved.value) as { data: { features: Record<string, boolean> } };
+    expect(parsed.data.features.restaurant_test).toBe(false);
   });
 
   it('運営が保存した目録を既存GETから取得できる', async () => {
