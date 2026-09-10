@@ -49,6 +49,16 @@ type TabKey = (typeof TABS)[number]['key']
  */
 const BASIC_GROUP = 'basic'
 
+/**
+ * 受信箱への深いリンク。友だちIDはURL状態として安全に渡す。
+ *
+ * 受信箱は `?friend=` を読む。`?friendId=` では着かず既定一覧に
+ * 落ちていた(#673)。IDに記号が混ざっても壊れないよう符号化する。
+ */
+function inboxHrefForFriend(friendId: string) {
+  return `/chats?friend=${encodeURIComponent(friendId)}`
+}
+
 function FieldInput({
   field,
   value,
@@ -315,7 +325,7 @@ function FriendDetailInner() {
         </nav>
         <div className="flex flex-wrap gap-2">
           <Link
-            href={`/chats?friendId=${friendId}`}
+            href={inboxHrefForFriend(friendId)}
             className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-4 py-2 text-sm font-medium transition-colors"
           >
             受信箱で開く
@@ -378,7 +388,7 @@ function FriendDetailInner() {
                 <SectionHead
                   label="対応"
                   actionLabel="編集"
-                  href={`/chats?friendId=${friendId}`}
+                  href={inboxHrefForFriend(friendId)}
                 />
                 <dl className="space-y-1 text-xs">
                   <div className="flex justify-between gap-2">
@@ -403,7 +413,7 @@ function FriendDetailInner() {
 
               {/* ---- 名前 ---- */}
               <div>
-                <SectionHead label="名前" actionLabel="編集" href={`/chats?friendId=${friendId}`} />
+                <SectionHead label="名前" actionLabel="編集" href={inboxHrefForFriend(friendId)} />
                 <dl className="space-y-1 text-xs">
                   <div className="flex justify-between gap-2">
                     <dt className="text-ink-faint">本名</dt>
@@ -420,7 +430,7 @@ function FriendDetailInner() {
               {/* 設計では名前の下。以前はいちばん上にあり、名前より先に
                   タグが目に入っていた。 */}
               <div>
-                <SectionHead label="タグ" actionLabel="編集" href={`/chats?friendId=${friendId}`} />
+                <SectionHead label="タグ" actionLabel="編集" href={inboxHrefForFriend(friendId)} />
                 <div className="flex flex-wrap items-center gap-1">
                   {friend?.tags?.length ? (
                     friend.tags.map((t) => <TagBadge key={t.id} tag={t} />)
@@ -428,7 +438,7 @@ function FriendDetailInner() {
                     <span className="text-ink-faint text-xs">タグはありません</span>
                   )}
                   <Link
-                    href={`/chats?friendId=${friendId}`}
+                    href={inboxHrefForFriend(friendId)}
                     className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-pill border px-2 py-0.5 text-[11px]"
                   >
                     ＋ 追加
@@ -550,7 +560,7 @@ function FriendDetailInner() {
                   <div className="bg-canvas-sunken border-hairline grid border-y px-4 py-3 text-xs font-semibold text-ink-faint" style={{ gridTemplateColumns: '140px 160px 1fr 140px' }}><span>日時</span><span>種別</span><span>内容</span><span>担当者</span></div>
                   <div className="text-ink-secondary grid px-4 py-5 text-xs" style={{ gridTemplateColumns: '140px 160px 1fr 140px' }}><span>{friend?.createdAt ? new Date(friend.createdAt).toLocaleDateString('ja-JP') : '—'}</span><span>友だち追加</span><span>{friend?.firstTrackedLinkName ? `${friend.firstTrackedLinkName}から追加されました` : '友だちに追加されました'}</span><span>システム</span></div>
                 </section>
-                <section className="bg-canvas rounded-card border-hairline border p-4 shadow-card"><h2 className="text-ink text-sm font-bold">この友だちに行う操作</h2><div className="mt-3 flex flex-wrap gap-2"><Button href={`/chats?friendId=${friendId}`} variant="primary" aria-label="個別トークを開く">受信箱で開く</Button><button type="button" disabled className="border-accent text-accent rounded-control border px-3 py-2 text-xs font-semibold">ϟ アクションを実行</button><Button href="/templates">テンプレートを送信</Button><Button href="/scenarios">シナリオを操作</Button><Button href="/reminders">リマインダを設定</Button></div></section>
+                <section className="bg-canvas rounded-card border-hairline border p-4 shadow-card"><h2 className="text-ink text-sm font-bold">この友だちに行う操作</h2><div className="mt-3 flex flex-wrap gap-2"><Button href={inboxHrefForFriend(friendId)} variant="primary" aria-label="個別トークを開く">受信箱で開く</Button><button type="button" disabled className="border-accent text-accent rounded-control border px-3 py-2 text-xs font-semibold">ϟ アクションを実行</button><Button href="/templates">テンプレートを送信</Button><Button href="/scenarios">シナリオを操作</Button><Button href="/reminders">リマインダを設定</Button></div></section>
               </div>
             )}
 

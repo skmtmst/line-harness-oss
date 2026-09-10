@@ -190,6 +190,10 @@ const STAFF_FAIL_CLOSED_SNAPSHOT: string[] = [
     'GET /api/account-settings/test-recipients',
     'GET /api/account-settings/tracked-link-base-url',
     'GET /api/accounts/:id/health',
+    // サイドバーの警告数をまとめて返す口。個別の
+    // `GET /api/accounts/:id/health` と同じ扱い(owner/admin 専用)。
+    // N+1 を1回にしただけで、見える範囲は広げていない(#630)。
+    'GET /api/accounts/health-summary',
     'GET /api/accounts/migrations',
     'GET /api/accounts/migrations/:migrationId',
     'GET /api/ad-platforms',

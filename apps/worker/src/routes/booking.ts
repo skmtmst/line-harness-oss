@@ -33,7 +33,7 @@ import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { cancelByTrigger, enrollByTrigger } from '../services/reminder-trigger.js';
 import { canTransition, nextStatus, type BookingAction } from '../services/booking-state.js';
-import { getAvailability } from '../services/availability.js';
+import { getAccountTimeZone, getAvailability, tzDateStr, tzHHMM } from '../services/availability.js';
 import {
   removeBookingFromGoogle,
   runCalendarDeleteOperation,
@@ -116,6 +116,66 @@ function isValidTimeRange(start: unknown, end: unknown): boolean {
   return isClockTime(start) && isClockTime(end) && minuteOfDay(start) < minuteOfDay(end);
 }
 
+/**
+ * 確定直前の枠照合。
+ *
+ * 要求された instant と、いま計算し直した候補の `startUtc` が同じ瞬間で
+ * あることだけを見る。壁時刻（YYYY-MM-DD + HH:MM）の突合は使わない。
+ * 夏時間の終わる日は同じ壁時刻が2回現れるので、01:30 で照合すると
+ * 「空いている方の 01:30」で「埋まっている方の 01:30」を通してしまう。
+ *
+ * `startUtc` が無い・読めない候補は一致とみなさない（fail-closed）。
+ * 壊れた候補を素通りさせると、営業時間外・休業例外・Google の予定を
+ * 迂回して予約が入る。
+ */
+function findLatestSlotForInstant(
+  slots: Array<{ startUtc?: string | null }> | undefined,
+  startsAt: Date,
+): { startUtc?: string | null } | null {
+  const wantedMs = startsAt.getTime();
+  if (!Number.isFinite(wantedMs)) return null;
+  for (const slot of slots ?? []) {
+    const raw = slot?.startUtc;
+    if (typeof raw !== 'string' || raw.trim() === '') continue;
+    const slotMs = new Date(raw).getTime();
+    if (!Number.isFinite(slotMs)) continue;
+    if (slotMs === wantedMs) return slot;
+  }
+  return null;
+}
+
+/**
+ * 要求 instant を店舗タイムゾーンで読み直し、その暦日の候補と突き合わせる。
+ * 取得範囲は前後 1 日を含める。UTC より進んだ／遅れた店舗では、要求の
+ * instant が隣の暦日に落ちることがあるため。
+ */
+async function reverifyLatestSlot(
+  db: D1Database,
+  env: Env['Bindings'],
+  input: {
+    lineAccountId: string;
+    menuId: string;
+    staffId: string;
+    startsAt: Date;
+    minLeadTimeMinutes: number;
+  },
+): Promise<boolean> {
+  const timeZone = await getAccountTimeZone(db, input.lineAccountId);
+  const date = tzDateStr(timeZone, input.startsAt);
+  const latest = await getAvailability(db, {
+    lineAccountId: input.lineAccountId,
+    menuId: input.menuId,
+    staffId: input.staffId,
+    from: date,
+    to: date,
+    now: new Date(),
+    minLeadTimeMinutes: input.minLeadTimeMinutes,
+    googleCredentials: googleCredentials(env),
+  });
+  const slots = latest.by_staff.find((item) => item.staff_id === input.staffId)?.slots;
+  return findLatestSlotForInstant(slots, input.startsAt) !== null;
+}
+
 async function bookingConflictAlternatives(
   db: D1Database,
   env: Env['Bindings'],
@@ -128,9 +188,12 @@ async function bookingConflictAlternatives(
   },
 ) {
   const endsAt = new Date(input.startsAt.getTime() + input.durationMinutes * 60_000);
-  const jst = new Date(input.startsAt.getTime() + 9 * 3600_000).toISOString();
-  const date = jst.slice(0, 10);
-  const time = jst.slice(11, 16);
+  // 代替候補も店舗タイムゾーンで並べる。+09:00 固定だと NY 店舗で
+  // 「別の日の・別の時刻の枠」を代わりとして出してしまう。
+  const timeZone = await getAccountTimeZone(db, input.lineAccountId);
+  const date = tzDateStr(timeZone, input.startsAt);
+  const time = tzHHMM(timeZone, input.startsAt);
+  const wantedMs = input.startsAt.getTime();
   const [overlap, availability] = await Promise.all([
     db.prepare(
       `SELECT COUNT(*) AS count, MIN(starts_at) AS conflict_from,
@@ -156,18 +219,26 @@ async function bookingConflictAlternatives(
     }),
   ]);
   const selected = availability.by_staff.find((item) => item.staff_id === input.staffId);
+  // 「同じ時刻」は instant で見る。fold 日は壁時刻 01:30 が2回あるため、
+  // 壁時刻だけで拾うと要求とは別の瞬間の枠を「同じ時刻の代わり」に出す。
+  const isRequestedInstant = (slot: { startUtc?: string | null }): boolean => {
+    const raw = slot?.startUtc;
+    if (typeof raw !== 'string' || raw.trim() === '') return false;
+    const ms = new Date(raw).getTime();
+    return Number.isFinite(ms) && ms === wantedMs;
+  };
   const nearbySlots = [...(selected?.slots ?? [])]
-    .filter((slot) => slot.date === date && slot.start !== time)
+    .filter((slot) => slot.date === date && !isRequestedInstant(slot))
     .sort((a, b) => Math.abs(minuteOfDay(a.start) - minuteOfDay(time)) - Math.abs(minuteOfDay(b.start) - minuteOfDay(time)))
     .slice(0, 3);
   const alternateStaff = availability.by_staff
     .filter((item) => item.staff_id !== input.staffId)
-    .filter((item) => item.slots.some((slot) => slot.date === date && slot.start === time))
+    .filter((item) => item.slots.some(isRequestedInstant))
     .slice(0, 3)
     .map((item) => ({
       staffId: item.staff_id,
       displayName: item.display_name,
-      slot: item.slots.find((slot) => slot.date === date && slot.start === time)!,
+      slot: item.slots.find(isRequestedInstant)!,
     }));
   const count = Number(overlap?.count ?? 0);
   const source: BookingConflictSource = count > 0 ? 'internal_booking'
@@ -544,21 +615,15 @@ booking.post('/api/liff/booking/requests', async (c) => {
 
   // Server-side availability 再検証: 曜日受付時間 / Google Calendar /
   // リードタイム / 既存予約を、確定直前にもう一度突合する。
-  const startJstDate = new Date(startsAt.getTime() + 9 * 3600_000).toISOString().slice(0, 10);
-  const startJstHHMM = new Date(startsAt.getTime() + 9 * 3600_000).toISOString().slice(11, 16);
-  const latestAvailability = await getAvailability(c.env.DB, {
+  // 突合は店舗タイムゾーンの暦日で取り直した候補の instant と、要求の
+  // instant の完全一致で行う（+09:00 固定の壁時刻照合ではない）。
+  const slotMatched = await reverifyLatestSlot(c.env.DB, c.env, {
     lineAccountId: accountId,
     menuId: body.menu_id,
     staffId: body.staff_id,
-    from: startJstDate,
-    to: startJstDate,
-    now: new Date(),
+    startsAt,
     minLeadTimeMinutes: DEFAULT_ACCOUNT_SETTINGS.min_lead_time_minutes,
-    googleCredentials: googleCredentials(c.env),
   });
-  const slotMatched = latestAvailability.by_staff[0]?.slots.some(
-    (slot) => slot.date === startJstDate && slot.start === startJstHHMM,
-  );
   if (!slotMatched) return c.json({ error: 'slot_not_available' }, 422);
 
   const bookingId = crypto.randomUUID();
@@ -1742,21 +1807,15 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
   const blockEndsAt = new Date(endsAt.getTime() + menuRow.buffer_after_minutes * 60_000);
 
   // Recurring-hours + Google Calendar + internal-booking validation.
-  const startJstDate = new Date(startsAt.getTime() + 9 * 3600_000).toISOString().slice(0, 10);
-  const startJstHHMM = new Date(startsAt.getTime() + 9 * 3600_000).toISOString().slice(11, 16);
-  const latestAvailability = await getAvailability(c.env.DB, {
+  // LIFF と同じ契約で照合する。店舗タイムゾーンの暦日で取り直した候補の
+  // instant と、要求の instant が完全に一致したときだけ通す。
+  if (!(await reverifyLatestSlot(c.env.DB, c.env, {
     lineAccountId: accountId,
     menuId: body.menu_id,
     staffId: body.staff_id,
-    from: startJstDate,
-    to: startJstDate,
-    now: new Date(),
+    startsAt,
     minLeadTimeMinutes: 0,
-    googleCredentials: googleCredentials(c.env),
-  });
-  if (!latestAvailability.by_staff[0]?.slots.some(
-    (slot) => slot.date === startJstDate && slot.start === startJstHHMM,
-  )) {
+  }))) {
     const alternatives = await bookingConflictAlternatives(c.env.DB, c.env, {
       lineAccountId: accountId,
       menuId: body.menu_id,
