@@ -203,8 +203,10 @@ async function requireResource(
   input: { table: string; id: unknown; lineAccountId: string; field: string; label: string },
 ): Promise<string> {
   const id = requiredString(input.id, input.field, input.label);
+  // 再審査対応(#645): テンプレートは同一アカウントに加え、公開版があること。
+  const publishedClause = input.table === 'templates' ? ' AND published_version > 0' : '';
   const row = await db.prepare(
-    `SELECT id FROM ${input.table} WHERE id = ? AND line_account_id = ? LIMIT 1`,
+    `SELECT id FROM ${input.table} WHERE id = ? AND line_account_id = ?${publishedClause} LIMIT 1`,
   ).bind(id, input.lineAccountId).first<{ id: string }>();
   if (!row) {
     throw new CommonActionValidationError('resource_not_found', `${input.label}が見つからないか、別のLINE公式アカウントにあります`, input.field);
@@ -736,7 +738,9 @@ export async function listCommonActionResources(
       `SELECT id, name FROM scenarios WHERE line_account_id = ? AND is_active = 1 ORDER BY name ASC`,
     ).bind(input.lineAccountId).all<{ id: string; name: string }>(),
     db.prepare(
-      `SELECT id, name FROM templates WHERE line_account_id = ? ORDER BY name ASC`,
+      `SELECT id, name FROM templates
+        WHERE line_account_id = ? AND published_version > 0
+        ORDER BY name ASC`,
     ).bind(input.lineAccountId).all<{ id: string; name: string }>(),
     db.prepare(
       `SELECT sm.id, sm.name

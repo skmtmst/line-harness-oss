@@ -9,6 +9,11 @@ const migration = readFileSync(
   join(import.meta.dirname, '..', 'migrations', '252_template_questions.sql'),
   'utf8',
 )
+// 347 は 252 の後ろに積む。本番のDBもこの順で進化する。
+const migration347 = readFileSync(
+  join(import.meta.dirname, '..', 'migrations', '347_template_published_version.sql'),
+  'utf8',
+)
 
 function setup() {
   const sqlite = new Database(':memory:')
@@ -27,8 +32,26 @@ function setup() {
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
+    CREATE TABLE line_accounts (id TEXT PRIMARY KEY);
+    CREATE TABLE auto_replies (template_id TEXT, line_account_id TEXT);
+    CREATE TABLE scenarios (id TEXT PRIMARY KEY, line_account_id TEXT);
+    CREATE TABLE scenario_steps (template_id TEXT, scenario_id TEXT);
+    CREATE TABLE reminders (id TEXT PRIMARY KEY, line_account_id TEXT);
+    CREATE TABLE reminder_steps (template_id TEXT, reminder_id TEXT);
+    CREATE TABLE rich_menu_groups (id TEXT PRIMARY KEY, account_id TEXT NOT NULL);
+    CREATE TABLE rich_menu_pages (id TEXT PRIMARY KEY, group_id TEXT NOT NULL);
+    CREATE TABLE rich_menu_areas (template_id TEXT, page_id TEXT NOT NULL);
+    CREATE TABLE automations (actions TEXT NOT NULL DEFAULT '[]', line_account_id TEXT);
+    CREATE TABLE common_actions (id TEXT PRIMARY KEY, line_account_id TEXT NOT NULL);
+    CREATE TABLE common_action_versions (
+      common_action_id TEXT NOT NULL,
+      action_config TEXT NOT NULL DEFAULT '[]'
+    );
+    CREATE TABLE friend_bulk_runs (id TEXT PRIMARY KEY, operation_json TEXT NOT NULL);
+    CREATE TABLE friend_bulk_run_items (run_id TEXT NOT NULL, line_account_id TEXT);
   `)
   sqlite.exec(migration)
+  sqlite.exec(migration347)
   return sqlite
 }
 

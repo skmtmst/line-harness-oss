@@ -138,12 +138,19 @@ affiliateOffers.post('/api/affiliate-offers', requireRole('owner', 'admin'), asy
         lineAccountId?: string | null;
         tagId?: string | null;
         scenarioId?: string | null;
+        operationId?: string;
       }>()
       .catch(() => ({}) as Record<string, never>);
 
     const name = typeof body.name === 'string' ? body.name.trim() : '';
     if (!name) {
       return c.json({ success: false, error: 'name is required' }, 400);
+    }
+    // 安定した操作UUID（#686）。commit後に応答だけ失われて再送されても、
+    // packages/db 側が同じIDで既存行を回収するため二重登録にならない。
+    const operationId = typeof body.operationId === 'string' ? body.operationId.trim() : '';
+    if (operationId && (operationId.length < 8 || operationId.length > 200)) {
+      return c.json({ success: false, error: 'もう一度、最初からやり直してください' }, 400);
     }
     if (body.rewardAmount !== undefined && !isValidReward(body.rewardAmount)) {
       return c.json(
@@ -183,6 +190,7 @@ affiliateOffers.post('/api/affiliate-offers', requireRole('owner', 'admin'), asy
       lineAccountId,
       tagId: body.tagId ?? null,
       scenarioId: body.scenarioId ?? null,
+      operationId: operationId || undefined,
     });
     return c.json({ success: true, data: serializeOffer(offer) }, 201);
   } catch (err) {

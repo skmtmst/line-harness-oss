@@ -97,6 +97,14 @@ describe('V6 顧客へのお知らせの寸法', () => {
     expect(PAGE).toContain("if (outcome.kind === 'stale' || generation !== loadGeneration.current) return")
   })
 
+  it('load()の再開点も、世代だけでなく選択中accountを見る（4経路で形をそろえる）', () => {
+    // 保存・公開・テスト送信と同じ形。世代だけでは、切替の描画コミット後・
+    // 次のload()発火前の隙間で前アカウントの一覧応答を見分けられない。
+    expect(PAGE).toContain('const stale = () => generation !== loadGeneration.current || selectedAccountId !== selectedAccountRef.current')
+    // load() の再開点が世代だけの照合へ戻っていないこと。
+    expect(PAGE).not.toContain('if (generation !== loadGeneration.current) return')
+  })
+
   it('テスト送信の完了判定も、保存・公開と同じ見張り（世代とアカウント）を通す', () => {
     // testSend だけ loadGeneration しか見ていないと、A→Bの描画コミット後・
     // Bのload()発火前に返った旧Aの結果がBの画面へ入りうる。

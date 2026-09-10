@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { IncomingWebhook, WebhookInteractionSummary } from '@line-crm/shared'
 import { api, type IncomingWebhookDetail, type OutgoingWebhookOverview } from '@/lib/api'
 import Button from '@/components/shared/button'
@@ -169,6 +169,13 @@ export function OutgoingOverview({
   const [sort, setSort] = useState<OutgoingSort>('volume')
   const [page, setPage] = useState(1)
   const [settingsId, setSettingsId] = useState<string | null>(null)
+  /*
+    開いている行の「設定」ボタンと吹き出しを、まとめて包む入れ物(#705)。
+    外側を押したかどうかは、この入れ物の中かどうかで決める。ボタンまで
+    含めて包むのは、ボタンを押したときに「外側なので閉じる」と
+    「onClick で開き直す」が続けて起きて、閉じられなくなるのを避けるため。
+  */
+  const settingsRef = useRef<HTMLDivElement | null>(null)
   const [testingId, setTestingId] = useState<string | null>(null)
   /**
    * 「1回 試してみる」の結果(#506 中)。
@@ -226,6 +233,36 @@ export function OutgoingOverview({
   useEffect(() => {
     if (page > pageCount) setPage(pageCount)
   }, [page, pageCount])
+
+  /*
+    操作の吹き出しを、外側を押したときと Escape で閉じる(#705)。
+
+    ここは以前「設定」をもう一度押すまで閉じなかった。応答が返っても、
+    画面の他の場所を押しても、Escape でも閉じない。この家の他の一覧
+    (`reminders`・`tags-page-v4` が使う `components/shared/action-menu.tsx`、
+    自前の `components/shared/folder-panel.tsx`)はどれも閉じる仕掛けを
+    持っていて、**webhooks だけが持っていなかった。**同じ形に揃える。
+
+    「選んだら閉じる」は入れない。押した瞬間に「止める」が消えると
+    二重押しそのものが起こせなくなり、二重押し防止(page.tsx の
+    togglingIdsRef)を見張っている試験の当て先が消えるため。送信中の
+    見え方は #707 で別に扱う。
+  */
+  useEffect(() => {
+    if (settingsId === null) return
+    const onPointerDown = (event: PointerEvent) => {
+      if (!settingsRef.current?.contains(event.target as Node)) setSettingsId(null)
+    }
+    const onKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.key === 'Escape') setSettingsId(null)
+    }
+    document.addEventListener('pointerdown', onPointerDown)
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown)
+      document.removeEventListener('keydown', onKeyDown)
+    }
+  }, [settingsId])
 
   return (
     <section aria-label="こちらから送る一覧">
@@ -347,7 +384,7 @@ export function OutgoingOverview({
                         disabled={!lineAccountId || testingId !== null || !item.isActive}
                         onClick={() => void runTest(item)}
                       >{testingId === item.id ? '試しています…' : '1回 試してみる'}</Button>
-                      <div className="relative">
+                      <div className="relative" ref={settingsId === item.id ? settingsRef : null}>
                         <Button
                           variant="secondary"
                           aria-expanded={settingsId === item.id}
@@ -356,7 +393,21 @@ export function OutgoingOverview({
                           設定
                         </Button>
                         {settingsId === item.id ? (
-                          <div className="bg-canvas border-hairline rounded-card absolute right-0 z-10 mt-2 flex min-w-max gap-2 border p-2 shadow-lg">
+                          /*
+                            吹き出しは**自分の行の帯の中**に出す(#705)。
+
+                            以前はボタンの下(`mt-2`)へ垂らしていたので、次の行の
+                            操作ボタンに 14〜25px かぶさっていた。かぶさった所を
+                            押すと、狙った行ではなく**この行の「削除」「合言葉」が
+                            動く。**1280px幅では中心が 4px だけ空いていて偶然
+                            押せていたが、1600px幅では中心も覆われて次の行の
+                            「設定」がまったく押せない。
+
+                            行の高さは58px以上、吹き出しは54px なので、上下中央に
+                            置けば他の行へはみ出さない。応答が返るまで開いたままでも、
+                            奪うのは自分の行の中だけになる。
+                          */
+                          <div className="bg-canvas border-hairline rounded-card absolute top-1/2 right-full z-10 mr-2 flex min-w-max -translate-y-1/2 gap-2 border p-2 shadow-lg">
                           <Button
                             variant="secondary"
                             onClick={() => onToggle(item.id, item.isActive)}

@@ -94,6 +94,14 @@ export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
     },
   },
   {
+    name: 'ad conversion outbox retry',
+    classification: { kind: 'core', reason: '広告成果の送信再試行' },
+    enforcement: {
+      mode: 'exempt',
+      reason: '送信可否はアカウント自身の広告設定だけで決まり、機能設定に属さない',
+    },
+  },
+  {
     name: 'analytics url exposure projection',
     classification: { kind: 'feature', featureId: 'analytics' },
     enforcement: {
