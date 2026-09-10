@@ -52,6 +52,61 @@ const TYPES: Array<{ key: string; label: string; mark: string; note: string; pla
 
 const NAME_MAX = 200
 const VALUE_MAX = 200
+const MEMO_MAX = 1000
+
+/**
+ * 秘密値ラベル(日本語)。ここに無い言い回しは検知できないため、書式側
+ * (JP_SECRET_SEPARATOR / JP_SECRET_VALUE)で「限定語彙+区切り記号必須」
+ * という設計そのものの弱さを補う(#687 再差し戻し)。
+ */
+const JP_SECRET_LABELS = [
+  'パスワード', '合言葉', '暗証番号', 'ピン', 'PIN',
+  '秘密鍵', 'シークレット', 'クライアントシークレット',
+  'トークン', 'アクセストークン', 'リフレッシュトークン',
+  'APIキー', 'API鍵', 'アクセスキー', '認証コード',
+] as const
+
+/**
+ * ラベルと値の間。区切り記号(`=` `:` `：`)・空白・助詞(「は」「が」、
+ * 「〜のパスワードは」のような「の」付きも可)のどれかを許し、無くても
+ * 良い(「パスワードhunter2」のように直接続く自然文にも当たるため)。
+ * 「」『』などの引用符も、区切りの直後にあれば読み飛ばす。
+ */
+const JP_SECRET_SEPARATOR = String.raw`(?:\s*[=:：]\s*|[\s　]+|の?は\s*|が\s*)?[「『"'　]*`
+
+/**
+ * 値らしいトークン。ASCII英数字始まりで4文字以上。日本語の地の文
+ * (「使い方」「分かりません」など)はこの形に当たらないため、
+ * 「パスワードの使い方」のような通常文では続けて誤検知しない。
+ */
+const JP_SECRET_VALUE = String.raw`[A-Za-z0-9][A-Za-z0-9_.+/=-]{3,}`
+
+const SENSITIVE_VALUE_PATTERNS = [
+  /-----BEGIN [A-Z ]*PRIVATE KEY-----/i,
+  /\b(?:password|passwd|pwd|secret|token|api[_ -]?key|access[_ -]?key|channel[_ -]?secret)\s*[=:：]\s*\S{4,}/i,
+  // 日本語のラベルは \w に含まれず \b が成立しないため、英字ラベルとは別条にする。
+  new RegExp(`(?:${JP_SECRET_LABELS.join('|')})${JP_SECRET_SEPARATOR}${JP_SECRET_VALUE}`),
+  /\b(?:AKIA[0-9A-Z]{16}|gh[pousr]_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,}|xox[baprs]-[A-Za-z0-9-]{10,})\b/,
+  /\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b/,
+  /\b(?:sk|rk|pk)_(?:live|test)_[A-Za-z0-9]{12,}\b/i,
+] as const
+
+/**
+ * 共通情報は配信文へ差し込む場所なので、接続用の鍵を置かない。
+ *
+ * 一般的な文章まで止めないよう、「token」という単語だけでは警告せず、
+ * 値を伴う書式か、代表的な秘密値の形式に合う場合だけを対象にする。
+ */
+function looksLikeSensitiveValue(input: string): boolean {
+  return SENSITIVE_VALUE_PATTERNS.some((pattern) => pattern.test(input))
+}
+
+function sensitiveFieldLabels(value: string, memo: string): string[] {
+  return [
+    ...(looksLikeSensitiveValue(value) ? ['値'] : []),
+    ...(looksLikeSensitiveValue(memo) ? ['社内メモ'] : []),
+  ]
+}
 
 /**
  * 名前から差し込み名の候補を作る。
@@ -81,8 +136,17 @@ export default function NewCommonVarPage() {
   const [keyTouched, setKeyTouched] = useState(false)
   const [type, setType] = useState('text')
   const [value, setValue] = useState('')
+  const [memo, setMemo] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [secretWarningFields, setSecretWarningFields] = useState<string[] | null>(null)
+  const valueRef = useRef<HTMLInputElement>(null)
+  const memoRef = useRef<HTMLTextAreaElement>(null)
+  const secretWarningRef = useRef<HTMLDivElement>(null)
+  // 入力欄と秘密値警告は「表示時のLINEアカウント」に紐づく。切替後は
+  // 別アカウント向けの内容を残さない（前アカウントの値を誤って新アカウントへ
+  // 登録しないため）。
+  const boundAccountRef = useRef(selectedAccountId)
 
   useEffect(() => {
     void api.folders
@@ -95,13 +159,40 @@ export default function NewCommonVarPage() {
       })
   }, [])
 
+  useEffect(() => {
+    if (selectedAccountId === boundAccountRef.current) return
+    const hadDraft = Boolean(name || varKey || value || memo || secretWarningFields)
+    boundAccountRef.current = selectedAccountId
+    setName('')
+    setFolderId('')
+    setVarKey('')
+    setKeyTouched(false)
+    setType('text')
+    setValue('')
+    setMemo('')
+    setSecretWarningFields(null)
+    setSaving(false)
+    setError(hadDraft ? 'LINEアカウントが切り替わったため、入力をやり直してください' : '')
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 切替検知のみに使うため、フォーム値は依存に入れない
+  }, [selectedAccountId])
+
+  useEffect(() => {
+    if (secretWarningFields) secretWarningRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }, [secretWarningFields])
+
   // 種別は内部stateからのみ選ぶが、見つからないときは先頭へ倒す（非null断言を使わない）。
   const spec = TYPES.find((t) => t.key === type) ?? TYPES[0]
 
-  const save = async () => {
+  const save = async (allowSensitive = false) => {
     if (saving) return
     if (!selectedAccountId) {
       setError('LINEアカウントを選択してください')
+      return
+    }
+    if (selectedAccountId !== boundAccountRef.current) {
+      // 表示中の入力・警告は別アカウント向けなので、そのまま確認扱いにしない。
+      setSecretWarningFields(null)
+      setError('LINEアカウントが切り替わったため、入力をやり直してください')
       return
     }
     const accountAtRequest = selectedAccountId
@@ -113,17 +204,26 @@ export default function NewCommonVarPage() {
       setError('差し込み名を入力してください')
       return
     }
+    const sensitiveFields = sensitiveFieldLabels(value, memo)
+    if (sensitiveFields.length > 0 && !allowSensitive) {
+      setSecretWarningFields(sensitiveFields)
+      setError('')
+      return
+    }
     setSaving(true)
+    setSecretWarningFields(null)
     setError('')
     try {
-      const res = await api.commonVars.create({
+      const payload = {
         accountId: accountAtRequest,
         name: name.trim(),
         varKey: varKey.trim(),
         type,
         value,
+        memo,
         folderId: folderId || null,
-      })
+      }
+      const res = await api.commonVars.create(payload)
       if (accountAtRequest !== latestAccountRef.current) return
       if (!res.success) {
         setError(res.error)
@@ -159,6 +259,14 @@ export default function NewCommonVarPage() {
       </nav>
 
       <div className="bg-canvas rounded-card border-hairline max-w-3xl space-y-6 border p-6">
+        <div className="bg-warning-bg text-warning rounded-control border border-current/20 p-4 text-sm" role="note">
+          <p className="font-semibold">秘密値は保存しないでください</p>
+          <p className="mt-1 leading-relaxed">
+            パスワード、APIトークン、秘密鍵などは共通情報に入力しないでください。
+            配信文へ誤って差し込まれるおそれがあります。
+          </p>
+        </div>
+
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <label htmlFor="cv-name" className="text-ink-secondary mb-1 block text-sm font-medium">
@@ -271,11 +379,15 @@ export default function NewCommonVarPage() {
             値
           </label>
           <input
+            ref={valueRef}
             id="cv-value"
             type={type === 'number' ? 'number' : 'text'}
             maxLength={type === 'number' ? undefined : VALUE_MAX}
             value={value}
-            onChange={(e) => setValue(e.target.value)}
+            onChange={(e) => {
+              setValue(e.target.value)
+              setSecretWarningFields(null)
+            }}
             placeholder={spec.placeholder}
             className="border-hairline rounded-control w-full max-w-md border px-3 py-2 text-sm"
           />
@@ -288,6 +400,64 @@ export default function NewCommonVarPage() {
             日付を決めて自動で書き換える設定は、登録したあとの編集画面から足せます。
           </p>
         </div>
+
+        <div>
+          <label htmlFor="cv-memo" className="text-ink-secondary mb-1 block text-sm font-medium">
+            社内メモ <span className="text-ink-faint text-xs font-normal">任意</span>
+          </label>
+          <textarea
+            ref={memoRef}
+            id="cv-memo"
+            rows={3}
+            maxLength={MEMO_MAX}
+            value={memo}
+            onChange={(e) => {
+              setMemo(e.target.value)
+              setSecretWarningFields(null)
+            }}
+            placeholder="この共通情報を使う目的や、更新時の注意点"
+            className="border-hairline rounded-control w-full max-w-xl border px-3 py-2 text-sm"
+          />
+          <p className="text-ink-faint mt-1 max-w-xl text-right text-xs tabular-nums">
+            {memo.length}/{MEMO_MAX}
+          </p>
+          <p className="text-ink-faint mt-1 text-xs">友だちには表示されません。</p>
+        </div>
+
+        {secretWarningFields && (
+          <div
+            ref={secretWarningRef}
+            role="alertdialog"
+            aria-labelledby="cv-secret-warning-title"
+            aria-describedby="cv-secret-warning-description"
+            className="border-danger bg-danger-bg rounded-card border p-4"
+          >
+            <h2 id="cv-secret-warning-title" className="text-danger text-base font-bold">
+              秘密値の可能性がある内容を確認してください
+            </h2>
+            <p id="cv-secret-warning-description" className="text-ink-secondary mt-2 text-sm leading-relaxed">
+              {secretWarningFields.join('・')}に、パスワードやトークンなどの秘密値らしい内容があります。
+              共通情報には保存せず、安全な保管場所へ移してください。
+            </p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant="primary"
+                onClick={() => {
+                  const firstField = secretWarningFields[0]
+                  setSecretWarningFields(null)
+                  if (firstField === '社内メモ') memoRef.current?.focus()
+                  else valueRef.current?.focus()
+                }}
+              >
+                入力に戻って修正する
+              </Button>
+              <Button type="button" disabled={saving} onClick={() => void save(true)}>
+                内容を確認して登録する
+              </Button>
+            </div>
+          </div>
+        )}
 
         {error && <p className="text-danger text-sm">{error}</p>}
       </div>

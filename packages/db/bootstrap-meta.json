@@ -307,7 +307,10 @@
     "349_affiliate_settlement_snapshot.sql",
     "352_photo_notification_delivery.sql",
     "354_analytics_cross_lease_generation.sql",
+    "356_entry_route_stop_suppressions.sql",
+    "361_ec_v6_dispatches.sql",
+    "362_entry_route_stop_suppression_dedup.sql",
     "367_conversion_once_dedup_guard.sql"
   ],
-  "migrationCount": 308
+  "migrationCount": 311
 }

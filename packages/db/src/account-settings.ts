@@ -4,6 +4,12 @@
  * The table stores arbitrary key/value pairs keyed by (line_account_id, key).
  * Each setting is a JSON-encoded string so the column type never changes.
  */
+import { featureCatalogEntry, type FeatureId } from '@line-crm/shared';
+
+// SQL だけを組み立てる関数は D1 の型に触れないよう別ファイルへ置く。
+// scripts の型検査は Workers 型を読み込まないため、この表から
+// 直接 import されると壊れる。従来の import 先はそのまま使える。
+export { accountFeatureOffExclusionSql } from './account-feature-sql.js';
 
 /**
  * Retrieve a raw setting value (JSON string) for an account.
@@ -112,6 +118,38 @@ export async function saveVersionedAccountSetting<T>(
   }
 
   return { status: 'saved', setting: next };
+}
+
+/**
+ * このアカウントで機能が有効か。worker の accountFeatureIsEnabled と
+ * 同じ順序(一括設定→個別設定→カタログ初期値)で読む。正本は worker 側に
+ * あり、ここは cron 処理が db 層だけで止めるための最小複製。
+ */
+export async function isAccountFeatureEnabled(
+  db: D1Database,
+  accountId: string,
+  featureId: string,
+): Promise<boolean> {
+  const bundle = await getVersionedAccountSetting<{ features?: Record<string, unknown> }>(
+    db,
+    accountId,
+    'feature.settings_bundle_v1',
+  );
+  const bundled = bundle?.data.features?.[featureId];
+  if (typeof bundled === 'boolean') return bundled;
+
+  const legacy = await getAccountSetting(db, accountId, `feature.${featureId}`);
+  if (legacy) {
+    try {
+      const parsed = JSON.parse(legacy) as boolean | { enabled?: unknown };
+      if (typeof parsed === 'boolean') return parsed;
+      if (typeof parsed.enabled === 'boolean') return parsed.enabled;
+    } catch {
+      // 壊れた旧値はカタログの既定値へ戻す。設定画面の読取と同じ扱い。
+    }
+  }
+  const entry = featureCatalogEntry(featureId as FeatureId);
+  return entry?.defaultEnabled ?? true;
 }
 
 export async function getVersionedAccountSetting<T>(
