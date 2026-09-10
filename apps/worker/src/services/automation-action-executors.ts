@@ -488,7 +488,20 @@ async function webhookExecutor(
       response.status === 429 || response.status >= 500,
     );
   }
-  await recordDeliveryOutcome(context.db, webhook.id, true);
+  try {
+    await recordDeliveryOutcome(context.db, webhook.id, true);
+  } catch {
+    /*
+     * HTTP 200 は受けている。送ったあとの記録だけ失敗した。
+     * 失敗として送り直すと二重に届くので、送達不明として投げる。
+     * 呼び出し側は送らず確定もせず、照合待ちに残す。
+     */
+    throw new AutomationActionError(
+      'delivery_unconfirmed',
+      '送信後の記録に失敗しました',
+      false,
+    );
+  }
   return { output: { status: response.status } };
 }
 

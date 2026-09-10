@@ -3908,6 +3908,7 @@ export type FriendAddRuleDefinition = {
   timing: 'immediate' | 'scenario'
   actions: FriendAddRuleAction[]
   friendCondition: string
+  internalMemo?: string
   activeFrom: string | null
   activeUntil: string | null
   returningMode?: 'none' | 'same' | 'other'

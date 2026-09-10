@@ -2030,9 +2030,9 @@ CREATE TABLE forms (
   CHECK (status IN ('active', 'archived')), archived_at TEXT, revision INTEGER NOT NULL DEFAULT 1
   CHECK (revision >= 1));
 
-CREATE TABLE friend_add_action_runs (
+CREATE TABLE "friend_add_action_runs" (
   id                  TEXT PRIMARY KEY,
-  event_id            TEXT NOT NULL REFERENCES friend_add_events(id) ON DELETE CASCADE,
+  event_id            TEXT NOT NULL REFERENCES "friend_add_events"(id) ON DELETE CASCADE,
   action_stable_id    TEXT NOT NULL,
   idempotency_key     TEXT NOT NULL UNIQUE,
   status              TEXT NOT NULL CHECK (status IN ('pending', 'running', 'completed', 'failed')),
@@ -2059,7 +2059,7 @@ CREATE TABLE friend_add_attribution_candidates (
   created_at           TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
 
-CREATE TABLE friend_add_events (
+CREATE TABLE "friend_add_events" (
   id                    TEXT PRIMARY KEY,
   line_account_id       TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
   friend_id             TEXT NOT NULL REFERENCES friends(id) ON DELETE CASCADE,
@@ -2073,11 +2073,16 @@ CREATE TABLE friend_add_events (
   candidate_id          TEXT REFERENCES friend_add_attribution_candidates(id) ON DELETE SET NULL,
   routing_rule_id       TEXT,
   routing_status        TEXT NOT NULL DEFAULT 'pending'
-                          CHECK (routing_status IN ('pending', 'completed', 'failed', 'suppressed')),
+                          CHECK (routing_status IN ('pending', 'completed', 'failed', 'suppressed', 'partial_failed')),
   occurred_at           TEXT NOT NULL,
   processed_at          TEXT,
-  created_at            TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')), winning_rule_version_id TEXT, error_code TEXT, scenario_enrollment_id TEXT REFERENCES friend_scenarios(id) ON DELETE SET NULL, delivery_count INTEGER NOT NULL DEFAULT 0
-  CHECK (delivery_count >= 0), first_delivery_sent_at TEXT,
+  created_at            TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  winning_rule_version_id TEXT,
+  error_code            TEXT,
+  scenario_enrollment_id TEXT REFERENCES friend_scenarios(id) ON DELETE SET NULL,
+  delivery_count        INTEGER NOT NULL DEFAULT 0
+                          CHECK (delivery_count >= 0),
+  first_delivery_sent_at TEXT,
   UNIQUE (line_account_id, webhook_event_id)
 );
 
@@ -2149,6 +2154,16 @@ CREATE TABLE friend_add_rules (
   updated_at                 TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 , lock_version INTEGER NOT NULL DEFAULT 1
   CHECK (lock_version > 0), stop_idempotency_key TEXT, stopped_at TEXT, stopped_by_staff_id TEXT, created_from_recipe_id TEXT REFERENCES recipes(id), recipe_clone_run_id TEXT REFERENCES recipe_clone_runs(id));
+
+CREATE TABLE friend_add_send_claims (
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  friend_id       TEXT NOT NULL REFERENCES friends(id) ON DELETE CASCADE,
+  event_id        TEXT NOT NULL,
+  generation      INTEGER NOT NULL DEFAULT 1 CHECK (generation >= 1),
+  claimed_at      TEXT NOT NULL,
+  dispatched_at   TEXT,
+  PRIMARY KEY (line_account_id, friend_id)
+);
 
 CREATE TABLE friend_bulk_run_items (
   id                TEXT PRIMARY KEY,
@@ -2958,6 +2973,18 @@ CREATE TABLE mileage_redemption_attempts (
   started_at      TEXT NOT NULL,
   completed_at    TEXT,
   UNIQUE (redemption_id, attempt_number)
+);
+
+CREATE TABLE mileage_redemption_step_deliveries (
+  redemption_id   TEXT NOT NULL REFERENCES mileage_redemptions(id),
+  step_key        TEXT NOT NULL,
+  idempotency_key TEXT NOT NULL,
+  status          TEXT NOT NULL DEFAULT 'started'
+                    CHECK (status IN ('started', 'sent')),
+  attempt_count   INTEGER NOT NULL DEFAULT 1,
+  created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at      TEXT NOT NULL DEFAULT (datetime('now')), owner TEXT, lease_expires_at TEXT, generation INTEGER NOT NULL DEFAULT 1, fence_token TEXT, needs_reconcile INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (redemption_id, step_key)
 );
 
 CREATE TABLE mileage_redemptions (
@@ -5744,11 +5771,11 @@ CREATE INDEX idx_form_submissions_friend ON form_submissions (friend_id);
 CREATE INDEX idx_forms_status_updated
   ON forms(status, updated_at DESC);
 
-CREATE INDEX idx_friend_add_action_runs_event_status
+CREATE INDEX idx_friend_add_action_runs_v357_event_status
   ON friend_add_action_runs(event_id, status, created_at, id);
 
-CREATE INDEX idx_friend_add_action_runs_retry
-  ON friend_add_action_runs (status, next_retry_at);
+CREATE INDEX idx_friend_add_action_runs_v357_retry
+  ON friend_add_action_runs(status, next_retry_at);
 
 CREATE INDEX idx_friend_add_candidates_expiry
   ON friend_add_attribution_candidates(status, expires_at);
@@ -5756,16 +5783,16 @@ CREATE INDEX idx_friend_add_candidates_expiry
 CREATE INDEX idx_friend_add_candidates_match
   ON friend_add_attribution_candidates(line_account_id, friend_id, status, occurred_at DESC);
 
-CREATE INDEX idx_friend_add_events_account_state
+CREATE INDEX idx_friend_add_events_v357_account_state
   ON friend_add_events(line_account_id, friend_kind, attribution_status, routing_status);
 
-CREATE INDEX idx_friend_add_events_account_time
+CREATE INDEX idx_friend_add_events_v357_account_time
   ON friend_add_events(line_account_id, occurred_at DESC, id DESC);
 
-CREATE INDEX idx_friend_add_events_friend
+CREATE INDEX idx_friend_add_events_v357_friend
   ON friend_add_events(line_account_id, friend_id, occurred_at DESC);
 
-CREATE INDEX idx_friend_add_events_rule_time
+CREATE INDEX idx_friend_add_events_v357_rule_time
   ON friend_add_events(line_account_id, routing_rule_id, occurred_at DESC, id DESC);
 
 CREATE UNIQUE INDEX idx_friend_add_routing_one_draft
@@ -5804,6 +5831,9 @@ CREATE UNIQUE INDEX idx_friend_add_rules_stop_idempotency
 CREATE UNIQUE INDEX idx_friend_add_rules_unknown_fallback
   ON friend_add_rules (line_account_id, friend_kind)
   WHERE is_unknown_route_fallback = 1 AND archived_at IS NULL;
+
+CREATE INDEX idx_friend_add_send_claims_stale
+  ON friend_add_send_claims(claimed_at);
 
 CREATE INDEX idx_friend_bulk_run_items_work
   ON friend_bulk_run_items(run_id, status, retry_at, lease_expires_at, ordinal);
@@ -6076,6 +6106,9 @@ CREATE INDEX idx_mileage_rules_match
 
 CREATE INDEX idx_mileage_spend_allocations_grant
   ON mileage_spend_allocations(grant_lot_id);
+
+CREATE INDEX idx_mileage_step_deliveries_reconcile
+  ON mileage_redemption_step_deliveries (needs_reconcile, lease_expires_at);
 
 CREATE INDEX idx_nen_care_flags_friend_status
   ON nen_care_flags(friend_id, status);
@@ -6940,6 +6973,10 @@ BEGIN
 CREATE TRIGGER trg_mileage_redemption_attempts_no_delete
 BEFORE DELETE ON mileage_redemption_attempts
 BEGIN SELECT RAISE(ABORT, 'mileage redemption attempt history cannot be deleted'); END;
+
+CREATE TRIGGER trg_mileage_redemption_step_deliveries_no_delete
+BEFORE DELETE ON mileage_redemption_step_deliveries
+BEGIN SELECT RAISE(ABORT, 'mileage redemption step delivery history cannot be deleted'); END;
 
 CREATE TRIGGER trg_mileage_redemptions_no_delete
 BEFORE DELETE ON mileage_redemptions
