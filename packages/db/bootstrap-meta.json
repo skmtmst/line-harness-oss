@@ -306,8 +306,12 @@
     "343_messages_log_broadcast_recipient_index.sql",
     "349_affiliate_settlement_snapshot.sql",
     "354_analytics_cross_lease_generation.sql",
+    "356_entry_route_stop_suppressions.sql",
     "357_friend_add_events_partial_failed.sql",
-    "358_friend_add_send_claims.sql"
+    "358_friend_add_send_claims.sql",
+    "361_ec_v6_dispatches.sql",
+    "362_entry_route_stop_suppression_dedup.sql",
+    "367_conversion_once_dedup_guard.sql"
   ],
-  "migrationCount": 308
+  "migrationCount": 312
 }

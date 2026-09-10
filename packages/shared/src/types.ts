@@ -1214,6 +1214,8 @@ export interface ConversionPoint {
   attributionDays?: number | null;
   /** 集計対象を1アカウントに絞る場合。null なら全アカウント */
   lineAccountId?: string | null;
+  /** 楽観ロック版。更新・停止にはこの版の一致が要る */
+  version: number;
   /** 作成日時 (ISO 8601) */
   createdAt: string;
 }

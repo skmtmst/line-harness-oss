@@ -1,7 +1,10 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, test } from 'vitest';
 import { FEATURE_IDS } from '@line-crm/shared';
 import { FEATURE_JOB_MANIFEST } from './services/feature-enforcement.js';
+
+const REPO_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 
 describe('feature job manifest', () => {
   test('named scheduled job を全件分類する', () => {
@@ -43,5 +46,53 @@ describe('feature job manifest', () => {
     );
     expect(duplicates).toEqual([]);
     expect(unknown).toEqual([]);
+  });
+
+  /*
+   * #643 機械検査: manifest の job と実装のoff強制を突き合わせる。
+   *
+   * 名前を足しただけで「止まるつもり」になるのを防ぐ。gated の job は
+   * 判定を書いたファイルが実在し、目印が実ソースに残っていることを
+   * 1件ずつ確かめる。判定を消す・別ファイルへ移すとここで落ちる。
+   */
+  test('機能に属する job は全件 gated で、目印が実ソースに残っている', () => {
+    const featureJobs = FEATURE_JOB_MANIFEST.filter(
+      ({ classification }) => classification.kind === 'feature',
+    );
+    // 機能に属する job は例外なく実装側で止める。exempt は core だけ。
+    expect(featureJobs.filter(({ enforcement }) => enforcement.mode !== 'gated').map(({ name }) => name))
+      .toEqual([]);
+
+    const missingSources: string[] = [];
+    const missingMarkers: string[] = [];
+    for (const job of FEATURE_JOB_MANIFEST) {
+      if (job.enforcement.mode !== 'gated') continue;
+      expect(job.enforcement.sources.length).toBeGreaterThan(0);
+      expect(job.enforcement.markers.length).toBeGreaterThan(0);
+      let merged = '';
+      for (const source of job.enforcement.sources) {
+        const path = `${REPO_ROOT}${source}`;
+        if (!existsSync(path)) {
+          missingSources.push(`${job.name}: ${source}`);
+          continue;
+        }
+        merged += readFileSync(path, 'utf8');
+      }
+      for (const marker of job.enforcement.markers) {
+        if (!merged.includes(marker)) missingMarkers.push(`${job.name}: ${marker}`);
+      }
+    }
+    expect(missingSources).toEqual([]);
+    expect(missingMarkers).toEqual([]);
+  });
+
+  test('core の job だけが exempt で、理由を必ず持つ', () => {
+    const exempt = FEATURE_JOB_MANIFEST.filter(({ enforcement }) => enforcement.mode === 'exempt');
+    expect(exempt.filter(({ classification }) => classification.kind !== 'core').map(({ name }) => name))
+      .toEqual([]);
+    expect(
+      exempt.filter(({ enforcement }) => enforcement.mode === 'exempt' && !enforcement.reason.trim())
+        .map(({ name }) => name),
+    ).toEqual([]);
   });
 });
