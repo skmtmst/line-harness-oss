@@ -122,7 +122,7 @@ function formatKeys(keys: string[]): string {
  * - ALLOWLIST_MAX: 未記載負債はここより増やせない
  * 後続票で記載を増やしたら、実測に合わせて両方を同じ PR で更新する。
  */
-const DOCUMENTED_MIN = 86;
+const DOCUMENTED_MIN = 87;
 const ALLOWLIST_MAX = 777;
 
 /**
@@ -203,6 +203,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'POST /api/scenarios/{id}/enroll/{friendId}',
   'POST /api/scenarios/{id}/simulate',
   'POST /api/scenarios/{id}/steps',
+  'POST /api/settings/features/impact',
   'POST /api/tags',
   'POST /api/tags/import',
   'POST /api/tags/import/preview',
@@ -1199,7 +1200,7 @@ describe('OpenAPIと公開APIの同期', () => {
     ).toEqual([]);
   });
 
-  test('記載済みoperation数は83以上（後退禁止）', async () => {
+  test('記載済みoperation数は84以上（後退禁止）', async () => {
     const spec = await loadSpec();
     const count = documentedKeys(spec).size;
     expect(
@@ -1217,7 +1218,7 @@ describe('OpenAPIと公開APIの同期', () => {
     ).toBe(true);
   });
 
-  test('基準の記載83件が残っている（allowlistへの移し替え検出）', async () => {
+  test('基準の記載84件が残っている（allowlistへの移し替え検出）', async () => {
     const spec = await loadSpec();
     const documented = documentedKeys(spec);
     const lost = [...BASELINE_DOCUMENTED].filter((key) => !documented.has(key)).sort();

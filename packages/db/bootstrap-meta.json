@@ -306,7 +306,9 @@
     "343_messages_log_broadcast_recipient_index.sql",
     "349_affiliate_settlement_snapshot.sql",
     "354_analytics_cross_lease_generation.sql",
+    "361_ec_v6_dispatches.sql",
+    "367_conversion_once_dedup_guard.sql",
     "371_operator_notification_rule_versions.sql"
   ],
-  "migrationCount": 307
+  "migrationCount": 309
 }
