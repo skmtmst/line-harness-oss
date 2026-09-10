@@ -1,6 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import type { Env } from '../index.js';
+
+vi.mock('../services/account-access.js', () => ({
+  canAccessAllLineAccounts: vi.fn(async () => true),
+  getVisibleLineAccountScope: vi.fn(async () => ({ allowedAccountIds: [], canSeeUnassigned: true })),
+}));
+
 import { adPlatforms } from './ad-platforms.js';
 
 function statement(value: { first?: unknown; results?: unknown[] }) {
@@ -23,6 +29,10 @@ describe('GET /api/ad-platforms/logs', () => {
     }] });
     const prepare = vi.fn().mockReturnValueOnce(count).mockReturnValueOnce(rows);
     const app = new Hono<Env>();
+    app.use('*', async (c, next) => {
+      c.set('staff', { id: 'owner-1', name: 'Owner', role: 'owner', readOnly: false, tenantId: 'tenant-1' });
+      return next();
+    });
     app.route('/', adPlatforms);
 
     const response = await app.request('/api/ad-platforms/logs?page=2&limit=999999&status=sent', {}, {
