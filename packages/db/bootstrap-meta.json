@@ -307,7 +307,9 @@
     "349_affiliate_settlement_snapshot.sql",
     "351_scenario_published_versions.sql",
     "354_analytics_cross_lease_generation.sql",
-    "364_scenario_version_ownership.sql"
+    "361_ec_v6_dispatches.sql",
+    "364_scenario_version_ownership.sql",
+    "367_conversion_once_dedup_guard.sql"
   ],
-  "migrationCount": 308
+  "migrationCount": 310
 }

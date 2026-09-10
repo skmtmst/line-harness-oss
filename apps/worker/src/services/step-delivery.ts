@@ -25,6 +25,7 @@ import type { Message } from '@line-crm/line-sdk';
 import { jitterDeliveryTime, addJitter, sleep } from './stealth.js';
 import { matchesCondition, parseCondition } from './segment-query.js';
 import { runScenarioActions, resumePreviousScenario, runScenarioOp } from './scenario-actions.js';
+import { featureJobCanRun } from './feature-enforcement.js';
 import { parseQuestion, buildQuestionMessages } from './scenario-question.js';
 import { expandDateVariables } from './interpolation-date.js';
 
@@ -205,6 +206,15 @@ export async function processStepDeliveries(
     const fs = dueFriendScenarios[i];
     attemptCount++;
     try {
+      // 機能オフ中はclaimせずactiveのまま残す。再オンで再開する。
+      // アカウント未割当の旧行は持ち主が分からないため従来どおり進める。
+      const ownerRow = await db
+        .prepare(`SELECT line_account_id FROM scenarios WHERE id = ?`)
+        .bind(fs.scenario_id)
+        .first<{ line_account_id: string | null }>();
+      if (ownerRow?.line_account_id && !await featureJobCanRun(db, { accountId: ownerRow.line_account_id, featureId: 'scenarios', job: 'scenario deliveries' })) {
+        continue;
+      }
       // Stealth: add small random delay between deliveries to avoid burst patterns
       if (i > 0) {
         await sleep(addJitter(50, 200));

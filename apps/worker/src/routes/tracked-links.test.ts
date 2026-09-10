@@ -12,6 +12,8 @@ const dbMocks = {
   recordLinkClick: vi.fn(),
   getLinkClicks: vi.fn(),
   getFriendByLineUserIdForAccount: vi.fn(),
+  getUrlReachConversionPoints: vi.fn(),
+  trackConversion: vi.fn(),
   addTagToFriend: vi.fn(),
   enrollFriendInScenario: vi.fn(),
   getTrackedLinkBaseUrl: vi.fn(),
@@ -114,6 +116,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   dbMocks.recordLinkClick.mockResolvedValue({});
   dbMocks.getTrackedLinkBaseUrl.mockResolvedValue(null);
+  dbMocks.getUrlReachConversionPoints.mockResolvedValue([]);
+  dbMocks.trackConversion.mockResolvedValue({});
 });
 
 describe('GET /t/:linkId — per-account LIFF resolution', () => {
@@ -205,6 +209,41 @@ describe('GET /t/:linkId — per-account LIFF resolution', () => {
 });
 
 describe('GET /t/:linkId — short codes', () => {
+  test('公開リンクも共通helperへ友だちを渡し、account交差時は計上しない', async () => {
+    const waits: Promise<unknown>[] = [];
+    const collectingCtx = {
+      waitUntil: (promise: Promise<unknown>) => waits.push(promise),
+      passThroughOnException: () => {},
+    } as unknown as ExecutionContext;
+    dbMocks.getTrackedLinkByIdOrShortCode.mockResolvedValue(
+      makeLink({ id: 'uuid-link-a', line_account_id: 'acc-a' }),
+    );
+    dbMocks.recordLinkClick.mockResolvedValue({
+      id: 'click-1', clicked_at: '2026-09-09T10:00:00.000+09:00',
+    });
+    dbMocks.getUrlReachConversionPoints.mockResolvedValue([{ id: 'point-a' }]);
+    // 本物のhelper側の決定的試験と同じ拒否。routeはこの例外を握ってeventを作らない。
+    dbMocks.trackConversion.mockRejectedValueOnce(new Error('conversion_account_mismatch'));
+    const env = {
+      DB: makeDb({}),
+      WORKER_URL: 'https://worker.example.com',
+    };
+
+    const res = await trackedLinks.request(
+      'https://worker.example.com/t/link-1?f=friend-b',
+      { headers: { 'user-agent': 'Mozilla/5.0 Safari/605.1.15' }, redirect: 'manual' },
+      env,
+      collectingCtx,
+    );
+    expect(res.status).toBe(302);
+    await Promise.allSettled(waits);
+    expect(dbMocks.trackConversion).toHaveBeenCalledWith(env.DB, {
+      conversionPointId: 'point-a',
+      friendId: 'friend-b',
+      metadata: JSON.stringify({ via: 'tracked_link', trackedLinkId: 'uuid-link-a' }),
+    });
+  });
+
   test('short-code URLs resolve and record the click against the link UUID', async () => {
     const waits: Promise<unknown>[] = [];
     const collectingCtx = {

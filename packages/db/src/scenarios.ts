@@ -1,3 +1,4 @@
+import { accountFeatureOffExclusionSql } from './account-settings.js';
 import { jstNow } from './utils.js';
 import { computeNextDeliveryAt } from './scenario-schedule.js';
 import { resolveStepContent } from './scenario-resolve.js';
@@ -1474,10 +1475,17 @@ export async function claimFriendScenarioForDelivery(
 export async function recoverStuckDeliveries(db: D1Database): Promise<number> {
   const fiveMinAgo = new Date(Date.now() + 9 * 60 * 60_000 - 5 * 60_000);
   const threshold = fiveMinAgo.toISOString().slice(0, -1) + '+09:00';
+  // 機能オフ中のアカウントの行は回収しない。OFF中は status も updated_at も
+  // 動かさず delivering のまま残し、再オンの tick で回収する。
   const result = await db
     .prepare(
       `UPDATE friend_scenarios SET status = 'active', updated_at = ?
-       WHERE status = 'delivering' AND updated_at < ?`,
+       WHERE status = 'delivering' AND updated_at < ?
+         AND NOT EXISTS (
+           SELECT 1 FROM scenarios s
+            WHERE s.id = friend_scenarios.scenario_id
+              AND ${accountFeatureOffExclusionSql('s.line_account_id', 'scenarios')}
+         )`,
     )
     .bind(jstNow(), threshold)
     .run();

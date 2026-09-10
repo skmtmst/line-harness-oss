@@ -1,4 +1,5 @@
 import {
+  accountFeatureOffExclusionSql,
   decryptCredential,
   getMileageRewardDeliveryPlan,
   getReservedMileageRewardCode,
@@ -7,6 +8,7 @@ import {
   type MileageRewardFailurePolicy,
 } from '@line-crm/db';
 import { createAutomationActionExecutors } from './automation-action-executors.js';
+import { featureJobCanRun } from './feature-enforcement.js';
 import { AutomationActionError, type ActionDefinition } from './automation-engine.js';
 
 export interface MileageRewardDeliveryOptions {
@@ -96,6 +98,23 @@ export async function deliverMileageReward(
   options: MileageRewardDeliveryOptions = {},
 ): Promise<MileageRewardDeliveryResult> {
   const plan = await getMileageRewardDeliveryPlan(db, redemptionId);
+  // 機能オフ中はclaim・attempt・付与・状態戻しのいずれもしない。
+  // 状態は不変のまま残し、再ON後の再試行で再開する。
+  if (plan.redemption.lineAccountId && !await featureJobCanRun(db, {
+    accountId: plan.redemption.lineAccountId,
+    featureId: 'mileage',
+    job: 'mileage reward delivery',
+  })) {
+    return {
+      status: 'delivery_failed',
+      rewardName: plan.rewardName,
+      customerMessage: plan.customerMessage,
+      rewardCode: null,
+      retryAt: plan.redemption.nextRetryAt,
+      failurePolicy: plan.failurePolicy,
+      message: 'マイル機能がオフのため保留しています。再開後に処理します。',
+    };
+  }
   if (plan.redemption.status === 'succeeded') {
     const code = await getReservedMileageRewardCode(db, redemptionId);
     return {
@@ -209,14 +228,38 @@ export async function processDueMileageRewardDeliveries(
   options: Omit<MileageRewardDeliveryOptions, 'now'> & { now: string; limit?: number },
 ): Promise<{ processed: number; succeeded: number; failed: number }> {
   const limit = Math.min(100, Math.max(1, options.limit ?? 50));
+  const dueWhere = `status = 'delivery_failed' AND next_retry_at IS NOT NULL AND next_retry_at <= ?`;
+  const mileageOff = accountFeatureOffExclusionSql('mileage_redemptions.line_account_id', 'mileage');
+  // オフ判定は LIMIT を数える前に SQL で行う。読んでから弾くと、オフの行が
+  // 上限ぶん先頭を占めたまま、後ろに並ぶ動作中アカウントの再試行が進まない。
   const due = await db.prepare(
     `SELECT id FROM mileage_redemptions
-      WHERE status = 'delivery_failed' AND next_retry_at IS NOT NULL AND next_retry_at <= ?
+      WHERE ${dueWhere} AND NOT ${mileageOff}
       ORDER BY next_retry_at, created_at LIMIT ?`,
   ).bind(options.now, limit).all<{ id: string }>();
+  // 止めた事実は監査に残す。行は読むだけで状態は変えない。
+  const offOwners = await db.prepare(
+    `SELECT DISTINCT line_account_id FROM mileage_redemptions
+      WHERE ${dueWhere} AND line_account_id IS NOT NULL AND ${mileageOff}
+      ORDER BY line_account_id LIMIT ?`,
+  ).bind(options.now, limit).all<{ line_account_id: string }>();
   let succeeded = 0;
   let failed = 0;
+  for (const owner of offOwners.results) {
+    await featureJobCanRun(db, {
+      accountId: owner.line_account_id, featureId: 'mileage', job: 'mileage reward delivery retry',
+    });
+  }
   for (const item of due.results) {
+    // 機能オフ中は再試行せずdelivery_failedのまま残す。再オンで再開する。
+    const ownerRow = await db
+      .prepare(`SELECT line_account_id FROM mileage_redemptions WHERE id = ?`)
+      .bind(item.id)
+      .first<{ line_account_id: string | null }>();
+    if (ownerRow?.line_account_id && !await featureJobCanRun(db, { accountId: ownerRow.line_account_id, featureId: 'mileage', job: 'mileage reward delivery retry' })) {
+      failed += 1;
+      continue;
+    }
     const result = await deliverMileageReward(db, item.id, {
       credentialEncryptionKey: options.credentialEncryptionKey,
       fetch: options.fetch,

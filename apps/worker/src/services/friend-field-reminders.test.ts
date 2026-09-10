@@ -12,6 +12,8 @@ vi.mock('@line-crm/db', () => ({
   enrollFriendsInReminderOnce: (...a: unknown[]) => enrollFriendsInReminderOnce(...a),
 }));
 
+vi.mock('./feature-enforcement.js', () => ({ featureJobCanRun: async () => true }));
+
 import { processFriendFieldReminders } from './friend-field-reminders.js';
 
 const db = {} as D1Database;
