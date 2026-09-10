@@ -122,7 +122,8 @@ function formatKeys(keys: string[]): string {
  * - ALLOWLIST_MAX: 未記載負債はここより増やせない
  * 後続票で記載を増やしたら、実測に合わせて両方を同じ PR で更新する。
  */
-const DOCUMENTED_MIN = 87;
+// 本流の87件(先行PR合流分)に、この票の secret-backfill 1口を足して88件。
+const DOCUMENTED_MIN = 88;
 const ALLOWLIST_MAX = 777;
 
 /**
@@ -211,6 +212,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'POST /api/users',
   'POST /api/users/{id}/link',
   'POST /api/users/match',
+  'POST /api/webhooks/maintenance/secret-backfill',
   'POST /webhook',
   'PUT /api/affiliates/{id}',
   'PUT /api/broadcasts/{id}',

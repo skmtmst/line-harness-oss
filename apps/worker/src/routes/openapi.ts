@@ -1013,6 +1013,36 @@ const spec = {
         responses: { '200': { description: 'Health summary' } },
       },
     },
+    // ── Webhooks (保守) ──────────────────────────────────────────────────────
+    '/api/webhooks/maintenance/secret-backfill': {
+      post: {
+        tags: ['Webhook'],
+        summary: 'Webhook secret の暗号化移行',
+        description: '旧平文・旧鍵のWebhook secretを現行鍵へ寄せ直す(#650)。dryRunは件数だけ数えて書かない。'
+          + 'べき等なので中断したら同じ条件で呼び直せば残りが進む。秘密値は要求にも応答にも含めない。',
+        requestBody: {
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  lineAccountId: { type: 'string' },
+                  dryRun: { type: 'boolean', default: true },
+                  batchSize: { type: 'integer', minimum: 1, maximum: 500, default: 50 },
+                },
+                required: ['lineAccountId'],
+              },
+            },
+          },
+        },
+        responses: {
+          '200': { description: '件数と成否だけの報告' },
+          '400': { description: 'Invalid request' },
+          '403': { description: 'Forbidden' },
+          '503': { description: '鍵がないため移行できない' },
+        },
+      },
+    },
     // ── Conversions ─────────────────────────────────────────────────────────
     '/api/conversions/points': {
       get: { tags: ['Conversions'], summary: 'CV ポイント一覧', responses: { '200': { description: 'All conversion points' } } },
