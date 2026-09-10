@@ -158,7 +158,8 @@ describe('NEN photo review', () => {
     expect((await app.request('/api/nen-members/photos?accountId=account-a')).status).toBe(200);
     const list = statements.find((entry) => entry.query.includes('ORDER BY ps.created_at'));
     expect(list?.query).toContain('ps.line_account_id = ? AND f.line_account_id = ?');
-    expect(list?.bindings).toEqual(['account-a', 'account-a']);
+    // 絞り込みの2値のあとは、続きを取るための枚数と開始位置（#666）。
+    expect(list?.bindings).toEqual(['account-a', 'account-a', 200, 0]);
   });
 
   it('returns a review derivative and risks without an original object key', async () => {
