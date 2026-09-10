@@ -1101,6 +1101,32 @@ const spec = {
         responses: { '201': { description: 'Recorded' } },
       },
     },
+    // ── Templates (#645 公開版固定) ─────────────────────────────────────────
+    '/api/templates/{id}/publish': {
+      post: {
+        tags: ['Templates'],
+        summary: 'テンプレートの下書きを公開版へ写す',
+        description: 'Idempotency-Key ヘッダ(必須)で再試行を見分ける。下書きがなくても成功し、その確認キーを版・下書き版・下書き指紋つきで記録する。同じ確認キー・同じ内容の再試行は記録時の版・本文をそのまま返す(固定応答)。同じ確認キーで別の下書きを出す使い回しは409。公開版(expectedVersion)・下書き版(expectedDraftRevision)が進んでいたら409。新規作成は未公開(版0)で始まり、初回の公開で版1になる。',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'Idempotency-Key', in: 'header', required: true, schema: { type: 'string', minLength: 8, maxLength: 200 }, description: '公開操作の確認キー。必須。同じキーの再試行は同じ結果を返す。' },
+        ],
+        requestBody: { content: { 'application/json': { schema: {
+          type: 'object',
+          required: ['expectedVersion', 'expectedDraftRevision'],
+          properties: {
+            expectedVersion: { type: 'integer', minimum: 0, description: '確認したときの公開版。必須。進んでいたら409。' },
+            expectedDraftRevision: { type: 'integer', minimum: 0, description: '確認したときの下書き版。必須。書き換わっていたら409。' },
+          },
+        } } } },
+        responses: {
+          '200': { description: '公開成功 { published: true }・再試行 { published: false, replayed: true }・下書きなし成功 { published: false, replayed: false }。data に publishedVersion・publishedAt・hasDraft・draftRevision を返す。' },
+          '400': { description: '確認キー不足・版の番号が数でない' },
+          '404': { description: 'Not found in account scope' },
+          '409': { description: '公開版の同時更新の負け・下書きの書き換わり・確認キーの別操作への使い回し' },
+        },
+      },
+    },
     // ── Settings ─────────────────────────────────────────────────────────────
     '/api/settings/features/impact': {
       post: {
@@ -1205,6 +1231,7 @@ const spec = {
     { name: 'LINE Accounts', description: 'マルチLINEアカウント管理' },
     { name: 'Conversions', description: 'コンバージョン計測' },
     { name: 'Affiliates', description: 'アフィリエイト管理' },
+    { name: 'Templates', description: 'テンプレート公開版' },
     { name: 'Rich Menus', description: 'リッチメニュー公開予約' },
     { name: 'Settings', description: '機能設定' },
     { name: 'Webhook', description: 'LINE Webhook' },
