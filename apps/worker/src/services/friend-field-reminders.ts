@@ -5,6 +5,7 @@ import {
   enrollFriendsInReminderOnce,
 } from '@line-crm/db';
 import { nextAnniversary, isSameJstDay, toJstParts } from '@line-crm/shared';
+import { featureJobCanRun } from './feature-enforcement.js';
 
 /**
  * 友だち情報欄の日付を見て、リマインダのゴール日を立てる。
@@ -43,6 +44,11 @@ export async function processFriendFieldReminders(
 
   for (const reminder of reminders) {
     if (!reminder.trigger_field_id || remaining === 0) {
+      hasMore = true;
+      continue;
+    }
+    // 機能オフ中は走査せず登録も進めない。再オンで再開する。
+    if (reminder.line_account_id && !await featureJobCanRun(db, { accountId: reminder.line_account_id, featureId: 'friend_fields', job: 'friend field reminders' })) {
       hasMore = true;
       continue;
     }
