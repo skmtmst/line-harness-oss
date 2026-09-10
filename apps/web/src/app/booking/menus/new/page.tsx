@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { api, bookingApi, type BookingSettings, type BookingStaff } from '@/lib/api'
+import { api, ApiError, bookingApi, type BookingSettings, type BookingStaff } from '@/lib/api'
+import type { Tag } from '@line-crm/shared'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import CreatePage, {
@@ -10,6 +11,8 @@ import CreatePage, {
   FormSection,
   inputClass,
 } from '@/components/shared/create-page'
+import SelectField from '@/components/shared/select-field'
+import SearchField from '@/components/shared/search-field'
 import Button from '@/components/shared/button'
 import { bookingMenuError } from '../menu-validation'
 
@@ -44,6 +47,12 @@ export default function NewBookingMenuPage() {
   const [createdMenuNeedingStaff, setCreatedMenuNeedingStaff] = useState<string | null>(null)
   /** チェックした担当。保存後に staff_menus へ流し込む。 */
   const [assigned, setAssigned] = useState<Set<string>>(new Set())
+  /** 予約後に自動で付けるタグ。null は「付けない」。 */
+  const [autoTagId, setAutoTagId] = useState<string | null>(null)
+  const [tagQuery, setTagQuery] = useState('')
+  const [tags, setTags] = useState<Tag[]>([])
+  /** タグ候補の取得状態。失敗・未取得でもタグなしの保存は止めない。 */
+  const [tagLoadState, setTagLoadState] = useState<'loading' | 'ready' | 'error'>('loading')
 
   useEffect(() => {
     if (!selectedAccountId) {
@@ -76,6 +85,36 @@ export default function NewBookingMenuPage() {
   }, [selectedAccountId])
 
   useEffect(() => {
+    let cancelled = false
+    setTagLoadState('loading')
+    api.tags
+      .list()
+      .then((r) => {
+        if (cancelled) return
+        // 取得失敗はタグなし保存の妨げにしない。候補が出ないだけで残す。
+        if (r.success) {
+          setTags(r.data)
+          setTagLoadState('ready')
+        } else {
+          setTagLoadState('error')
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setTagLoadState('error')
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  // アカウントを変えたら前の選択を残さない。別アカウントのタグを
+  // そのまま送ると Worker が tag_not_found で落とすうえ、意図しない結び付きになる。
+  useEffect(() => {
+    setAutoTagId(null)
+    setTagQuery('')
+  }, [selectedAccountId])
+
+  useEffect(() => {
     let alive = true
     api.mileage.rules()
       .then((response) => {
@@ -97,6 +136,22 @@ export default function NewBookingMenuPage() {
       return next
     })
   }
+
+  // 候補は「今選んでいるアカウントの有効なタグ」だけ。別アカウントのものと
+  // 整理済み(archived)は選ばせない。保存側の tag_not_found 検証と二重化する。
+  const tagCandidates = tags.filter(
+    (t) => t.lineAccountId === selectedAccountId && t.status !== 'archived',
+  )
+  const trimmedQuery = tagQuery.trim()
+  const visibleTagCandidates = trimmedQuery === ''
+    ? tagCandidates
+    : tagCandidates.filter((t) => t.name.includes(trimmedQuery))
+  // 検索で選んだタグが隠れても選択自体は残す。検索を消せば戻る。
+  const selectedTag = tagCandidates.find((t) => t.id === autoTagId) ?? null
+  const tagOptions = selectedTag != null
+      && !visibleTagCandidates.some((t) => t.id === selectedTag.id)
+    ? [selectedTag, ...visibleTagCandidates]
+    : visibleTagCandidates
 
   const priceMode = basePrice.trim() === ''
     ? 'inquiry'
@@ -128,16 +183,29 @@ export default function NewBookingMenuPage() {
           sortOrder: 0,
           assignedStaffCount: assigned.size,
         })
-        return validationError
+        if (validationError) return validationError
+        // 候補にないタグ(削除済み・別アカウント)は送らない。入力は残して選び直させる。
+        if (
+          autoTagId != null
+          && tagLoadState === 'ready'
+          && !tagCandidates.some((t) => t.id === autoTagId)
+        ) {
+          return '選んだタグは使えなくなりました。選び直すか「なし」にしてください'
+        }
+        return null
       }}
       onReset={() => {
         setName('')
         setDescription('')
         setAssigned(new Set())
+        setAutoTagId(null)
+        setTagQuery('')
         setCreatedMenuNeedingStaff(null)
       }}
       onSave={async () => {
-        const res = await bookingApi.createMenu(selectedAccountId!, {
+        let res
+        try {
+          res = await bookingApi.createMenu(selectedAccountId!, {
           name: name.trim(),
           category_label: categoryLabel.trim() || null,
           description: description.trim() || null,
@@ -153,7 +221,16 @@ export default function NewBookingMenuPage() {
             : null,
           intake_question: intakeQuestion.trim() || null,
           is_active: isActive ? 1 : 0,
-        })
+          auto_tag_id: autoTagId,
+          })
+        } catch (e) {
+          // 選んだ後にタグが消えた場合は Worker が tag_not_found で落とす。
+          // 入力は残る(CreatePage が失敗時に初期化しない)ので選び直せる。
+          if (e instanceof ApiError && e.code === 'tag_not_found') {
+            throw new Error('選んだタグは削除されたため保存できませんでした。タグを選び直してください。')
+          }
+          throw e
+        }
         // 担当の割り当ては staff 側の表に入るので、作ったあとに1人ずつ足す。
         // ここで失敗しても、メニュー自体は作れている。
         try {
@@ -426,6 +503,47 @@ export default function NewBookingMenuPage() {
             href="/mileage/score-rules"
           />
         </div>
+        <Field
+          label="予約後に付けるタグ"
+          htmlFor="bm-auto-tag"
+          note="このメニューで予約が入ると、予約した人の友だちに自動で付きます。付けないときは「なし」のままにしてください。"
+        >
+          {tagLoadState === 'loading' ? (
+            <p className="text-ink-faint text-sm">タグを読み込んでいます…</p>
+          ) : tagLoadState === 'error' ? (
+            <p className="text-ink-faint text-sm">
+              タグを読み込めませんでした。タグなしで保存できます。
+            </p>
+          ) : tagCandidates.length === 0 ? (
+            <p className="text-ink-faint text-sm">
+              このアカウントに使えるタグがありません。タグなしで保存できます。
+            </p>
+          ) : (
+            <div className="space-y-2">
+              <SearchField
+                value={tagQuery}
+                onChange={setTagQuery}
+                onClear={() => setTagQuery('')}
+                placeholder="タグを検索"
+                maxLength={100}
+                aria-label="タグを検索"
+              />
+              <SelectField
+                id="bm-auto-tag"
+                aria-label="予約後に付けるタグ"
+                value={autoTagId ?? ''}
+                onChange={(e) => setAutoTagId(e.target.value === '' ? null : e.target.value)}
+                options={[{ value: '', label: '— なし —' }, ...tagOptions.map((t) => ({ value: t.id, label: t.name }))]}
+                className="w-full"
+              />
+              {trimmedQuery !== '' && visibleTagCandidates.length === 0 && (
+                <p className="text-ink-faint text-xs">
+                  「{trimmedQuery}」に合うタグがありません。
+                </p>
+              )}
+            </div>
+          )}
+        </Field>
       </FormSection>
 
       <FormSection

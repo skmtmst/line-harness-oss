@@ -386,12 +386,14 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
+      # restore-keys でロックファイルのハッシュだけ一致させると、ソースが
+      # まったく違う古い .next/cache を復元してしまい、Next.js の webpack
+      # 永続キャッシュが古い成果物を混入させて偽の失敗を招く(#696)。
+      # 完全一致のときだけキャッシュを使う。
       - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: apps/web/.next/cache
           key: ${{ runner.os }}-next-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('apps/web/**/*.[jt]s', 'apps/web/**/*.[jt]sx') }}
-          restore-keys: |
-            ${{ runner.os }}-next-${{ hashFiles('pnpm-lock.yaml') }}-
       - run: pnpm install --frozen-lockfile
       - name: Build Admin dependencies
         run: >-
@@ -403,13 +405,30 @@ jobs:
       # 画面の権限は「文字列がある」では確かめられない。書き出した `out` を
       # 本番と同じ当て方で配り、実ブラウザで owner/admin/staff を動かす（N-197）。
       # vitest は `.test.ts(x)` しか見ないので、ここから呼ばないと必須ゲートの
-      # 外に落ちる。
-      - name: Install Chromium for the media permission contract test
+      # 外に落ちる。同じChromiumを、LINE通知画面の実ブラウザ検査（#678）でも使う。
+      - name: Install Chromium for the browser behavior tests
         run: pnpm exec playwright install --with-deps chromium
       - name: Verify media permissions on the built admin
         run: >-
           pnpm exec playwright test
           --config apps/web/src/app/contents/contents-permission-behavior.config.mjs
+      # EC取込一覧のアカウント切替・再試行競合(#685)。文字列一致では逆変異を
+      # 検知できないため、実ブラウザ試験をここから呼ぶ(司令塔独立審査の差し戻し)。
+      - name: Verify EC import list account-switch behavior on the built admin
+        run: >-
+          pnpm exec playwright test
+          --config apps/web/src/app/ec-commerce/ec-commerce-issue-685.config.mjs
+      # 間欠的な失敗(#685)の原因切り分け用。失敗時のDOM(error-context.md)を
+      # artifactとして残し、CIでしか再現しない症状を後から読めるようにする。
+      - name: Upload EC import list failure context
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ec-commerce-issue-685-failure
+          path: apps/web/test-results/
+          retention-days: 7
+      - name: LINE notifications real-browser behavior (#678)
+        run: node apps/web/src/app/line-notifications/line-notifications-browser-behavior.mjs
       - run: pnpm --filter web verify:design
       # 画面の実挙動は、書き出した本番と同じ中身をブラウザで押して見る。
       # 型と文字列の検査だけでは、押せない口や取り違えた導線が残る。

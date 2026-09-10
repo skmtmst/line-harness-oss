@@ -152,6 +152,28 @@ CREATE TABLE ad_conversion_logs (
   response_body       TEXT,
   error_message       TEXT,
   created_at          TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+, line_account_id TEXT REFERENCES line_accounts(id) ON DELETE SET NULL, idempotency_key TEXT, lease_token TEXT, provider_event_id TEXT);
+
+CREATE TABLE ad_conversion_outbox (
+  id                TEXT PRIMARY KEY,
+  ad_platform_id    TEXT NOT NULL REFERENCES ad_platforms(id) ON DELETE CASCADE,
+  friend_id         TEXT NOT NULL REFERENCES friends(id) ON DELETE CASCADE,
+  line_account_id   TEXT REFERENCES line_accounts(id) ON DELETE SET NULL,
+  event_name        TEXT NOT NULL,
+  event_value       REAL,
+  currency          TEXT NOT NULL DEFAULT 'JPY',
+  amount_in_minor_unit INTEGER NOT NULL DEFAULT 0,
+  idempotency_key   TEXT NOT NULL,
+  status            TEXT NOT NULL DEFAULT 'pending'
+                    CHECK (status IN ('pending', 'sending', 'sent', 'failed')),
+  attempt_count     INTEGER NOT NULL DEFAULT 0 CHECK (attempt_count >= 0),
+  next_attempt_at   TEXT,
+  lease_token       TEXT,
+  provider_event_id TEXT,
+  last_error        TEXT,
+  created_at        TEXT NOT NULL,
+  updated_at        TEXT NOT NULL,
+  UNIQUE (ad_platform_id, friend_id, event_name, idempotency_key)
 );
 
 CREATE TABLE ad_platforms (
@@ -162,7 +184,7 @@ CREATE TABLE ad_platforms (
   is_active    INTEGER DEFAULT 1,
   created_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-);
+, line_account_id TEXT REFERENCES line_accounts(id) ON DELETE CASCADE);
 
 CREATE TABLE admin_sessions (
   token_hash TEXT PRIMARY KEY,
@@ -246,7 +268,7 @@ CREATE TABLE affiliate_links (
   is_active       INTEGER NOT NULL DEFAULT 1,
   created_at      TEXT NOT NULL,
   click_count     INTEGER NOT NULL DEFAULT 0
-);
+, operation_id TEXT);
 
 CREATE TABLE affiliate_offers (
   id              TEXT PRIMARY KEY,
@@ -260,7 +282,7 @@ CREATE TABLE affiliate_offers (
   scenario_id     TEXT REFERENCES scenarios (id),
   is_active       INTEGER NOT NULL DEFAULT 1,
   created_at      TEXT NOT NULL
-);
+, operation_id TEXT);
 
 CREATE TABLE affiliate_payout_batch_lines (
   id TEXT PRIMARY KEY,
@@ -403,7 +425,19 @@ CREATE TABLE affiliates (
   friend_id       TEXT REFERENCES friends (id),
   created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 , email TEXT, hold_days INTEGER, payout_cycle TEXT, notify_on_conversion INTEGER NOT NULL DEFAULT 0, tenant_id TEXT REFERENCES tenants(id), line_account_id TEXT REFERENCES line_accounts(id), lifecycle_status TEXT NOT NULL DEFAULT 'active'
-  CHECK (lifecycle_status IN ('active', 'paused', 'archived')), archived_at TEXT);
+  CHECK (lifecycle_status IN ('active', 'paused', 'archived')), archived_at TEXT, operation_id TEXT);
+
+CREATE TABLE ai_loop_slack_reports (
+  work_key        TEXT PRIMARY KEY,
+  slack_ts        TEXT,
+  revision        INTEGER NOT NULL,
+  claim_token     TEXT,
+  claim_expires_at INTEGER,
+  updated_at      INTEGER NOT NULL,
+  CHECK (revision >= 946684800000),
+  CHECK ((claim_token IS NULL AND claim_expires_at IS NULL)
+      OR (claim_token IS NOT NULL AND claim_expires_at IS NOT NULL))
+);
 
 CREATE TABLE analytics_cross_run_members (
   run_id           TEXT NOT NULL REFERENCES analytics_cross_runs(id) ON DELETE CASCADE,
@@ -1440,6 +1474,19 @@ CREATE TABLE conversion_definition_usages (
   updated_at               TEXT NOT NULL
 );
 
+CREATE TABLE conversion_event_dedup_claims (
+  conversion_point_id TEXT NOT NULL REFERENCES conversion_points(id) ON DELETE CASCADE,
+  friend_id           TEXT NOT NULL REFERENCES friends(id) ON DELETE CASCADE,
+  mode                TEXT NOT NULL CHECK (mode IN ('lifetime', 'window')),
+  window_days         INTEGER CHECK (window_days IS NULL OR window_days BETWEEN 1 AND 365),
+  last_event_id       TEXT NOT NULL,
+  last_at             TEXT NOT NULL,
+  updated_at          TEXT NOT NULL,
+  PRIMARY KEY (conversion_point_id, friend_id),
+  CHECK ((mode = 'lifetime' AND window_days IS NULL)
+      OR (mode = 'window' AND window_days IS NOT NULL))
+);
+
 CREATE TABLE conversion_events (
   id                   TEXT PRIMARY KEY,
   conversion_point_id  TEXT NOT NULL REFERENCES conversion_points (id) ON DELETE CASCADE,
@@ -1682,6 +1729,18 @@ CREATE TABLE ec_orders (
   UNIQUE (line_account_id, source_key, external_order_id)
 );
 
+CREATE TABLE ec_v6_dispatches (
+  event_id        TEXT NOT NULL REFERENCES ec_events(id) ON DELETE CASCADE,
+  subscriber      TEXT NOT NULL CHECK (subscriber IN ('notification', 'v6')),
+  status          TEXT NOT NULL DEFAULT 'pending'
+                    CHECK (status IN ('pending', 'sent', 'failed')),
+  attempt_count   INTEGER NOT NULL DEFAULT 0,
+  last_error      TEXT,
+  idempotency_key TEXT NOT NULL,
+  updated_at      TEXT NOT NULL,
+  PRIMARY KEY (event_id, subscriber)
+);
+
 CREATE TABLE engagement_events (
   id                TEXT PRIMARY KEY,
   program_id        TEXT NOT NULL REFERENCES mileage_programs(id),
@@ -1706,6 +1765,18 @@ CREATE TABLE entry_route_genres (
   name TEXT NOT NULL UNIQUE,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
+);
+
+CREATE TABLE entry_route_stop_suppressions (
+  id              TEXT PRIMARY KEY,
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  line_user_id    TEXT NOT NULL,
+  friend_id       TEXT REFERENCES friends(id) ON DELETE SET NULL,
+  ref_code        TEXT NOT NULL,
+  source          TEXT NOT NULL,
+  occurred_at     TEXT NOT NULL,
+  expires_at      TEXT NOT NULL,
+  created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
 
 CREATE TABLE entry_routes (
@@ -3340,7 +3411,7 @@ CREATE TABLE nen_photo_publications (
   updated_at TEXT NOT NULL
 );
 
-CREATE TABLE nen_photo_review_events (
+CREATE TABLE "nen_photo_review_events" (
   id TEXT PRIMARY KEY,
   photo_id TEXT NOT NULL REFERENCES nen_photo_submissions(id) ON DELETE CASCADE,
   line_account_id TEXT NOT NULL REFERENCES line_accounts(id),
@@ -3352,12 +3423,16 @@ CREATE TABLE nen_photo_review_events (
   reviewed_by TEXT NOT NULL,
   reviewed_by_name TEXT NOT NULL,
   notification_status TEXT NOT NULL DEFAULT 'pending'
-    CHECK (notification_status IN ('pending', 'sent', 'failed')),
+    CHECK (notification_status IN ('pending', 'sending', 'sent', 'failed')),
   notification_error TEXT,
   notification_attempt_count INTEGER NOT NULL DEFAULT 0
     CHECK (notification_attempt_count >= 0),
   notification_first_failed_at TEXT,
   notification_sent_at TEXT,
+  notification_lease_id TEXT,
+  notification_lease_expires_at TEXT,
+  notification_generation INTEGER NOT NULL DEFAULT 0
+    CHECK (notification_generation >= 0),
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   UNIQUE(photo_id, from_status)
@@ -5116,11 +5191,30 @@ CREATE INDEX idx_action_score_rule_sets_account_status
 CREATE INDEX idx_action_score_rule_versions_set_status
   ON action_score_rule_versions(rule_set_id, status, version_number DESC);
 
+CREATE INDEX idx_ad_conversion_logs_account ON ad_conversion_logs(line_account_id);
+
 CREATE INDEX idx_ad_conversion_logs_friend ON ad_conversion_logs (friend_id);
+
+CREATE INDEX idx_ad_conversion_logs_friend_event_key
+  ON ad_conversion_logs(friend_id, event_name, idempotency_key);
+
+CREATE UNIQUE INDEX idx_ad_conversion_logs_idempotency
+  ON ad_conversion_logs(ad_platform_id, friend_id, event_name, idempotency_key);
 
 CREATE INDEX idx_ad_conversion_logs_platform ON ad_conversion_logs (ad_platform_id);
 
 CREATE INDEX idx_ad_conversion_logs_status ON ad_conversion_logs (status);
+
+CREATE INDEX idx_ad_conversion_outbox_due
+  ON ad_conversion_outbox(status, next_attempt_at);
+
+CREATE INDEX idx_ad_conversion_outbox_friend
+  ON ad_conversion_outbox(friend_id);
+
+CREATE INDEX idx_ad_platforms_account ON ad_platforms(line_account_id);
+
+CREATE UNIQUE INDEX idx_ad_platforms_account_name
+  ON ad_platforms(line_account_id, name);
 
 CREATE INDEX idx_admin_sessions_expires_at ON admin_sessions(expires_at);
 
@@ -5144,6 +5238,14 @@ CREATE INDEX idx_affiliate_clicks_affiliate ON affiliate_clicks (affiliate_id);
 CREATE INDEX idx_affiliate_links_affiliate ON affiliate_links (affiliate_id);
 
 CREATE INDEX idx_affiliate_links_offer ON affiliate_links (offer_id);
+
+CREATE UNIQUE INDEX idx_affiliate_links_operation_id
+  ON affiliate_links(affiliate_id, operation_id)
+  WHERE operation_id IS NOT NULL;
+
+CREATE UNIQUE INDEX idx_affiliate_offers_operation_id
+  ON affiliate_offers(line_account_id, operation_id)
+  WHERE operation_id IS NOT NULL;
 
 CREATE UNIQUE INDEX idx_affiliate_payout_batches_idempotency
   ON affiliate_payout_batches(organization_id, line_account_id, idempotency_key)
@@ -5169,6 +5271,10 @@ CREATE UNIQUE INDEX idx_affiliate_statements_idempotency
   WHERE idempotency_key IS NOT NULL;
 
 CREATE UNIQUE INDEX idx_affiliates_friend ON affiliates (friend_id) WHERE friend_id IS NOT NULL;
+
+CREATE UNIQUE INDEX idx_affiliates_operation_id
+  ON affiliates(tenant_id, line_account_id, operation_id)
+  WHERE operation_id IS NOT NULL;
 
 CREATE INDEX idx_affiliates_tenant_account_created
   ON affiliates(tenant_id, line_account_id, created_at DESC);
@@ -5456,6 +5562,9 @@ CREATE UNIQUE INDEX idx_conversion_definition_usages_reference
     COALESCE(ref_version_id, '')
   );
 
+CREATE INDEX idx_conversion_event_dedup_claims_event
+  ON conversion_event_dedup_claims(last_event_id);
+
 CREATE INDEX idx_conversion_events_affiliate ON conversion_events (affiliate_code);
 
 CREATE INDEX idx_conversion_events_created_friend ON conversion_events(created_at, friend_id);
@@ -5514,6 +5623,9 @@ CREATE INDEX idx_ec_orders_account_ordered
 
 CREATE INDEX idx_ec_orders_customer
   ON ec_orders(line_account_id, customer_id, ordered_at DESC);
+
+CREATE UNIQUE INDEX idx_ec_v6_dispatches_idempotency
+  ON ec_v6_dispatches (idempotency_key);
 
 CREATE INDEX idx_engagement_events_actor_friend
   ON engagement_events(program_id, actor_friend_id, occurred_at DESC);
@@ -6016,12 +6128,12 @@ CREATE UNIQUE INDEX idx_nen_photo_publications_idempotency
   ON nen_photo_publications(line_account_id, last_idempotency_key)
   WHERE last_idempotency_key IS NOT NULL;
 
-CREATE INDEX idx_nen_photo_review_events_account_created
+CREATE INDEX idx_nen_photo_review_events_v352_account_created
   ON nen_photo_review_events(line_account_id, created_at DESC);
 
-CREATE INDEX idx_nen_photo_review_events_notification
+CREATE INDEX idx_nen_photo_review_events_v352_notification
   ON nen_photo_review_events(notification_status, created_at)
-  WHERE notification_status IN ('pending', 'failed');
+  WHERE notification_status IN ('pending', 'sending', 'failed');
 
 CREATE INDEX idx_nen_photo_reward_outbox_pending
   ON nen_photo_reward_outbox(status, next_attempt_at, created_at)
@@ -6295,6 +6407,12 @@ CREATE INDEX idx_staff_members_tenant
 CREATE INDEX idx_staff_notification_reads_staff
   ON staff_notification_reads(staff_id, read_at DESC);
 
+CREATE UNIQUE INDEX idx_stop_suppressions_dedup
+  ON entry_route_stop_suppressions (line_account_id, line_user_id, ref_code);
+
+CREATE INDEX idx_stop_suppressions_lookup
+  ON entry_route_stop_suppressions (line_account_id, line_user_id, expires_at);
+
 CREATE INDEX idx_stripe_events_friend ON stripe_events (friend_id);
 
 CREATE INDEX idx_stripe_events_type ON stripe_events (event_type);
@@ -6490,6 +6608,16 @@ CREATE TRIGGER trg_action_score_published_version_no_delete
 BEFORE DELETE ON action_score_rule_versions
 WHEN OLD.status = 'published'
 BEGIN SELECT RAISE(ABORT, 'published action score version cannot be deleted'); END;
+
+CREATE TRIGGER trg_ad_platforms_account_required_insert
+BEFORE INSERT ON ad_platforms
+WHEN NEW.line_account_id IS NULL
+BEGIN SELECT RAISE(ABORT, 'ad_platforms.line_account_id is required'); END;
+
+CREATE TRIGGER trg_ad_platforms_account_required_update
+BEFORE UPDATE OF line_account_id ON ad_platforms
+WHEN NEW.line_account_id IS NULL
+BEGIN SELECT RAISE(ABORT, 'ad_platforms.line_account_id cannot be cleared'); END;
 
 CREATE TRIGGER trg_analytics_cross_runs_completed_immutable
 BEFORE UPDATE ON analytics_cross_runs

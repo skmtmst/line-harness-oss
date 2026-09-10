@@ -292,4 +292,32 @@ describe('V6オートメーションのきっかけ接続', () => {
     ]));
     expect(record).not.toHaveBeenCalled();
   });
+
+  it('EC受信の全11種をきっかけとして受け付ける', async () => {
+    const { EC_EVENT_TYPES } = await import('@line-crm/shared');
+    expect(EC_EVENT_TYPES).toHaveLength(11);
+    for (const eventType of EC_EVENT_TYPES) {
+      const items = await dispatchAutomationEvent(testDb.db, {
+        lineAccountId: 'account-1', eventType, sourceEventId: `ec-${eventType}`,
+        friendId: 'friend-1', eventData: {},
+      }, { now: NOW, executors });
+      expect(items).toEqual([]);
+    }
+  });
+
+  it('発送完了の公開版を開始し、再配達を二重実行しない', async () => {
+    addAutomation(testDb.raw, { id: 'shipped-follow', triggerType: 'ec.order.shipped' });
+    const input = {
+      lineAccountId: 'account-1', eventType: 'ec.order.shipped', sourceEventId: 'event-ship-1',
+      friendId: 'friend-1', eventData: { orderNumber: 'NEN-1001' },
+    };
+
+    expect(await dispatchAutomationEvent(testDb.db, input, { now: NOW, executors }))
+      .toMatchObject([{ automationId: 'shipped-follow', kind: 'created', status: 'success' }]);
+    expect(await dispatchAutomationEvent(testDb.db, input, { now: NOW, executors }))
+      .toMatchObject([{ automationId: 'shipped-follow', kind: 'existing', status: 'success' }]);
+    expect(record).toHaveBeenCalledTimes(1);
+    expect(testDb.raw.prepare(`SELECT COUNT(*) AS count FROM automation_runs`).get())
+      .toEqual({ count: 1 });
+  });
 });

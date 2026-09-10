@@ -1876,8 +1876,15 @@ function announceFeatureDisabled(status: number, code: string | undefined, raw: 
 export function extractApiErrorData(raw: string): unknown {
   if (!raw) return undefined
   try {
-    const body = JSON.parse(raw) as { data?: unknown }
-    return body && typeof body === 'object' ? body.data : undefined
+    const body = JSON.parse(raw) as { data?: unknown; currentVersion?: unknown }
+    if (!body || typeof body !== 'object') return undefined
+    if (body.data !== undefined) return body.data
+    // 旧成果地点APIは互換性のため currentVersion を最上位で返す。
+    // 409の機械データとして同じdata口へ正規化し、画面が再取得判断に使えるようにする。
+    if (Number.isSafeInteger(body.currentVersion) && Number(body.currentVersion) >= 1) {
+      return { currentVersion: Number(body.currentVersion) }
+    }
+    return undefined
   } catch {
     return undefined
   }
@@ -3663,6 +3670,20 @@ export type PhotoBulkDecision = {
   reasonNote: string | null
 }
 
+export type PhotoBulkReviewResult = {
+  updatedCount: number
+  items: Array<{
+    photoId: string
+    decision: 'approve' | 'return' | 'reject'
+    reviewVersion: number
+    decisionId: string
+    notificationStatus: 'sent' | 'failed'
+    notificationError?: string
+  }>
+  notificationFailures: Array<{ photoId: string; error: string }>
+  reconciled?: boolean
+}
+
 export type AdPlatform = {
   id: string
   /** meta / x / google / tiktok */
@@ -3671,6 +3692,7 @@ export type AdPlatform = {
   /** 鍵は先頭と末尾だけ残して伏せてある。 */
   config: Record<string, unknown>
   isActive: boolean
+  lineAccountId: string | null
   createdAt: string
   updatedAt: string
 }
@@ -3679,6 +3701,7 @@ export type AdConversionLog = {
   id: string
   adPlatformId: string
   friendId: string
+  lineAccountId: string | null
   eventName: string
   clickId: string | null
   clickIdType: string | null
@@ -5185,6 +5208,7 @@ export const api = {
       varKey: string
       type?: string
       value?: string
+      memo?: string
       folderId?: string | null
     }) =>
       fetchApi<ApiResponse<CommonVar>>('/api/common-vars', {
@@ -6276,7 +6300,7 @@ export const api = {
         method: 'POST',
         body: JSON.stringify(data),
       }),
-    /** 送った項目だけを書き換える。 */
+    /** 送った項目だけを書き換える。版の一致が必須(N-254)。 */
     updatePoint: (id: string, data: {
       name?: string
       eventType?: string
@@ -6286,14 +6310,17 @@ export const api = {
       countRepeat?: boolean
       attributionDays?: number | null
       lineAccountId?: string | null
+      /** 必須。ずれると409 */
+      expectedVersion: number
     }) =>
       fetchApi<ApiResponse<ConversionPoint>>(`/api/conversions/points/${id}`, {
         method: 'PUT',
         body: JSON.stringify(data),
       }),
-    deletePoint: (id: string) =>
-      fetchApi<ApiResponse<null>>(`/api/conversions/points/${id}`, { method: 'DELETE' }),
-    track: (data: { conversionPointId: string; friendId: string; userId?: string | null; affiliateCode?: string | null; metadata?: Record<string, unknown> | null }) =>
+    /** 停止する。版の一致が必須(N-254)。本文が落ちる通信経路でも届くようクエリで送る。 */
+    deletePoint: (id: string, expectedVersion: number) =>
+      fetchApi<ApiResponse<null>>(`/api/conversions/points/${id}?expectedVersion=${expectedVersion}`, { method: 'DELETE' }),
+    track: (data: { conversionPointId: string; friendId: string; userId?: string | null; affiliateCode?: string | null; metadata?: Record<string, unknown> | null; idempotencyKey?: string | null }) =>
       fetchApi<ApiResponse<unknown>>('/api/conversions/track', {
         method: 'POST',
         body: JSON.stringify(data),
@@ -6319,6 +6346,8 @@ export const api = {
       friendId?: string
       issueInitialLink?: boolean
       lineAccountId?: string
+      /** 安定した操作UUID（#686）。同じ値での再送は同じ登録を返す。 */
+      operationId?: string
     }) =>
       fetchApi<ApiResponse<Affiliate> & { link?: { refCode: string; url: string } | null }>(
         '/api/affiliates',
@@ -7463,7 +7492,7 @@ export const api = {
     bulkReviewPhotos: (
       data: { lineAccountId: string; decisions: PhotoBulkDecision[] },
       idempotencyKey: string,
-    ) => fetchApi<ApiResponse<{ updatedCount: number; awardedPoints: number; notificationFailures: number }>>(
+    ) => fetchApi<ApiResponse<PhotoBulkReviewResult>>(
       '/api/nen-members/photos/decisions/bulk',
       { method: 'POST', headers: { 'Idempotency-Key': idempotencyKey }, body: JSON.stringify(data) },
     ),
@@ -8704,6 +8733,8 @@ export const api = {
       lineAccountId?: string | null
       tagId?: string | null
       scenarioId?: string | null
+      /** 安定した操作UUID（#686）。同じ値での再送は同じ登録を返す。 */
+      operationId?: string
     }) =>
       fetchApi<{ success: boolean; data: AffiliateOffer }>('/api/affiliate-offers', {
         method: 'POST',

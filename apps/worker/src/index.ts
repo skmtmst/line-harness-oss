@@ -1,4 +1,4 @@
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import { cors } from 'hono/cors';
 import { LineClient } from '@line-crm/line-sdk';
 import {
@@ -8,6 +8,7 @@ import {
   getRandomPoolAccount,
   getPoolAccounts,
   getEntryRouteByRefCode,
+  getEntryRouteByRefCodeAny,
   getLineAccountById,
   getAffiliateLinkByRefCode,
   incrementAffiliateLinkClick,
@@ -140,6 +141,7 @@ import { siteTracking } from './routes/site-tracking.js';
 import { restaurantTest } from './routes/restaurant-test.js';
 import { tenants } from './routes/tenants.js';
 import { codexSlackEvents } from './routes/codex-slack-events.js';
+import { aiLoopSlackReports } from './routes/ai-loop-slack-reports.js';
 import { clientErrors } from './routes/client-errors.js';
 import { lineWebhookEvents } from './routes/line-webhook-events.js';
 import { operations } from './routes/operations.js';
@@ -161,7 +163,15 @@ import {
   shouldStopCodexQueueRetry,
   type CodexMentionQueueMessage,
 } from './services/codex-cloud-monitor.js';
-import { isQrDataAllowed, normalizeQrSize, qrResponseHeaders, normalizeQrFormat } from './lib/qr-response.js';
+import {
+  createQrImage,
+  isQrDataAllowed,
+  normalizeQrFormat,
+  normalizeQrSize,
+  qrResponseHeaders,
+  QrInputError,
+  QR_MAX_RESPONSE_BYTES,
+} from './lib/qr-response.js';
 import { safeRedirectTarget } from './lib/safe-redirect.js';
 import { isLinkPreviewBot } from './lib/og-bot.js';
 import { buildOgHtml } from './lib/og-html.js';
@@ -251,6 +261,8 @@ export type Env = {
     CODEX_SLACK_RELAY_SECRET?: string;
     CODEX_SLACK_RELAY_SECRET_KENTA?: string;
     CODEX_SLACK_RELAY_SECRET_MASATO?: string;
+    /** AI開発ループの報告専用HMAC鍵。既存のCodex中継鍵と共有しない。 */
+    AI_LOOP_SLACK_REPORT_SECRET?: string;
     SLACK_BOT_TOKEN?: string;
     SLACK_COMMAND_CHANNEL_ID?: string;
     SLACK_ERROR_CHANNEL_ID?: string;
@@ -260,6 +272,8 @@ export type Env = {
     SLACK_KENTA_USER_ID?: string;
     SLACK_MASATO_USER_ID?: string;
     SLACK_TASK_CHANNEL_ID?: string;
+    /** AI開発ループの一方向レポート専用。Slackからの操作には使用しない。 */
+    SLACK_AI_LOOP_CHANNEL_ID?: string;
     SLACK_SIGNING_SECRET?: string;
     SLACK_USER_TOKEN?: string;
     // Slack mention -> official Codex receipt -> user-authored Slack relay.
@@ -438,6 +452,7 @@ app.route('/', siteTracking);
 app.route('/', restaurantTest);
 app.route('/', tenants);
 app.route('/', codexSlackEvents);
+app.route('/', aiLoopSlackReports);
 app.route('/', clientErrors);
 app.route('/', lineWebhookEvents);
 app.route('/', operations);
@@ -452,8 +467,10 @@ app.route('/admin', adminVersion);
 // authMiddleware skips non-/api/ paths so this router owns its own auth gate.
 app.route('/admin/update', adminUpdate);
 
-// Self-hosted QR code proxy — prevents leaking ref tokens to third-party services
-app.get('/api/qr', async (c) => {
+// QR は Worker の中だけで作る。流入 ref や LIFF URL は計測の識別子で、
+// 第三者の生成サービスへ渡す理由がない。以前は data をそのまま
+// api.qrserver.com へ送っていたので、説明と実装が食い違っていた。
+export const qrHandler: (c: Context<Env>) => Promise<Response> = async (c) => {
   const data = c.req.query('data');
   if (!data) return c.text('Missing data param', 400);
   if (!isQrDataAllowed(data)) return c.text('Data param too long', 400);
@@ -461,25 +478,31 @@ app.get('/api/qr', async (c) => {
   if (!size) return c.text('Invalid size', 400);
   // 印刷に使うので svg も出せる。知らない値は png に丸める。
   const format = normalizeQrFormat(c.req.query('format'));
-  const upstream = `https://api.qrserver.com/v1/create-qr-code/?size=${encodeURIComponent(size)}&format=${format}&data=${encodeURIComponent(data)}`;
-  const res = await fetch(upstream, { signal: AbortSignal.timeout(8_000) }).catch(() => null);
-  if (!res) return c.text('QR generation timed out', 504);
-  if (!res.ok) return c.text('QR generation failed', 502);
-  const declaredLength = Number(res.headers.get('content-length') || '0');
-  if (declaredLength > 2 * 1024 * 1024) return c.text('QR response too large', 502);
-  const bytes = await res.arrayBuffer();
-  if (bytes.byteLength > 2 * 1024 * 1024) return c.text('QR response too large', 502);
-  const contentType = res.headers.get('Content-Type');
-  if (!contentType?.toLowerCase().startsWith('image/')) return c.text('Invalid QR response', 502);
-  return new Response(bytes, {
+  let image: Awaited<ReturnType<typeof createQrImage>>;
+  try {
+    image = await createQrImage(data, size, format);
+  } catch (error) {
+    // 指定を直せば通る失敗（小さすぎる・長すぎる）は理由を返す。
+    if (error instanceof QrInputError) return c.text(error.message, 400);
+    return c.text('QR generation failed', 500);
+  }
+  if (image.bytes.byteLength > QR_MAX_RESPONSE_BYTES) return c.text('QR response too large', 500);
+  return new Response(image.bytes, {
     headers: qrResponseHeaders(
-      contentType,
+      image.contentType,
       c.req.query('download') === '1',
       c.req.query('filename') || 'referral-link-qr',
       format,
     ),
   });
-});
+};
+
+app.get('/api/qr', qrHandler);
+
+// N-244: 停止した流入経路の公開URLは、active・停止・不存在の区別や
+// 転送先を漏らさない同一の終了応答で止める。ref の echo もしない。
+const ENTRY_ROUTE_STOPPED_HTML =
+  '<!doctype html><html lang="ja"><meta charset="utf-8"><title>このページは利用できません</title><body><main><h1>このページは利用できません</h1><p>公開が終わっているか、アドレスが正しくありません。運用者へ、新しいリンクをご確認ください。</p></main></body></html>';
 
 // Short link: /r/:ref → universal landing page with LINE open button
 // Supports query params: ?form=FORM_ID (auto-push form after friend add)
@@ -508,6 +531,15 @@ app.get('/r/:ref', async (c) => {
   // drop-off (clicks that never reach OAuth) is therefore not visible in the
   // funnel; that limitation is intentional pending a dedicated click table.
   const route = await getEntryRouteByRefCode(c.env.DB, ref);
+  // N-244: 停止した経路は active と同じ受付をしない。転送先があっても
+  // 送らず、紹介リンクやプールの後段にも落とさず、同一の終了応答で止める。
+  // ref が entry_routes の名前空間に属さないときだけ従来の後段へ進む。
+  if (!route) {
+    const anyRoute = await getEntryRouteByRefCodeAny(c.env.DB, ref);
+    if (anyRoute && anyRoute.is_active !== 1) {
+      return c.html(ENTRY_ROUTE_STOPPED_HTML, 410);
+    }
+  }
   // 転送先が設定された経路はそちらへ送る（#514 重大4）。保存はするのに
   // 読まないままだった。危険な形式は safe-redirect が弾き、そのときは
   // 従来どおり友だち追加の着地画面へ進む。
@@ -726,8 +758,17 @@ body{font-family:'Hiragino Sans','Helvetica Neue',system-ui,sans-serif;backgroun
 // Universal Links are blocked. This is the L-Step approach.
 // Method 2 (URL copy → external browser) is the universal fallback.
 // No LINE-Login-web fallback exposed — friction kills conversion.
-app.get('/r/:ref/help', (c) => {
+app.get('/r/:ref/help', async (c) => {
   const ref = c.req.param('ref');
+  // N-244: 停止した経路の回復ページも同じ終了応答で止める。直接開かれても
+  // 受付へ戻さない。属さない ref は従来どおり回復ページを出す。
+  const helpRoute = await getEntryRouteByRefCode(c.env.DB, ref);
+  if (!helpRoute) {
+    const anyRoute = await getEntryRouteByRefCodeAny(c.env.DB, ref);
+    if (anyRoute && anyRoute.is_active !== 1) {
+      return c.html(ENTRY_ROUTE_STOPPED_HTML, 410);
+    }
+  }
   const reqUrl = new URL(c.req.url);
   // Prefer the resolved liff target passed by /r/:ref via ?t= so pooled refs
   // do not re-roll on retry. Fall back to the short /r/:ref URL only when
@@ -1234,6 +1275,16 @@ async function runFrequentHeavyJobs(
           console.log(
             `[mileage-queue] processed=${result.processed} failed=${result.failed} granted=${result.granted}`,
           );
+        }
+      },
+    },
+    {
+      name: 'ad conversion outbox retry',
+      run: async () => {
+        const { drainAdConversionOutbox } = await import('./services/ad-conversion.js');
+        const result = await drainAdConversionOutbox(env.DB, { limit: 50 });
+        if (result.claimed > 0) {
+          console.log(JSON.stringify({ event: 'ad_conversion_outbox_tick', ...result }));
         }
       },
     },
