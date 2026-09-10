@@ -48,6 +48,7 @@ import {
   saveIdempotencyResponse,
 } from '../services/booking-idempotency.js';
 import { sendBookingNotification } from '../services/booking-notifier.js';
+import { dispatchOperatorEvent } from '../services/operator-notification-dispatch.js';
 import {
   buildConfirmationReminderSchedule,
   insertConfirmationReminders,
@@ -740,6 +741,19 @@ booking.post('/api/liff/booking/requests', async (c) => {
     notifyForBooking(c.env.DB, bookingId, 'requested').catch((err) =>
       console.error('booking notify (requested) failed:', err),
     ),
+  );
+
+  // 予約が入ったことを運用者へ知らせる。これも他の副作用と同じ扱いで、
+  // 通知が落ちても予約は成立させる。発生元に予約IDを使うので、同じ予約から
+  // 通知が二重に作られることはない。送り残しは回収口から拾う。
+  c.executionCtx.waitUntil(
+    dispatchOperatorEvent(c.env.DB, c.env, {
+      lineAccountId: accountId,
+      eventType: 'booking_created',
+      sourceEventId: bookingId,
+      message: '新しい予約が入りました',
+      executionMode: 'automatic',
+    }).catch((err) => console.error('booking operator notification failed:', err)),
   );
 
   // notifyForBooking と同じく fire-and-forget。タグ付与失敗は予約成功扱い。

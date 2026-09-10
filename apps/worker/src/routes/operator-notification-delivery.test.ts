@@ -209,7 +209,7 @@ describe('運用者へのお知らせの送信と実行記録', () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({
       data: {
-        summary: { total: 4, connected: 2, unconnected: 2 },
+        summary: { total: 4, connected: 3, unconnected: 1 },
       },
     });
     const body = await (await app(testDb.db).request(
@@ -219,9 +219,9 @@ describe('運用者へのお知らせの送信と実行記録', () => {
       'booking_created', 'broadcast_completed', 'ec_order_received', 'form_submitted',
     ]);
     const connected = body.data.items.filter((item) => item.connected).map((item) => item.eventType).sort();
-    expect(connected).toEqual(['broadcast_completed', 'ec_order_received']);
+    expect(connected).toEqual(['booking_created', 'broadcast_completed', 'ec_order_received']);
     const unconnected = body.data.items.filter((item) => !item.connected).map((item) => item.eventType).sort();
-    expect(unconnected).toEqual(['booking_created', 'form_submitted']);
+    expect(unconnected).toEqual(['form_submitted']);
   });
 
   it('2回目の保存が残り、内容変更で版が上がる', async () => {

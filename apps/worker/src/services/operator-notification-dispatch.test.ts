@@ -87,10 +87,10 @@ describe('運用者通知の自動発火と登録簿', () => {
       'booking_created', 'broadcast_completed', 'ec_order_received', 'form_submitted',
     ]);
     expect(items.filter((item) => item.connected).map((item) => item.eventType).sort())
-      .toEqual(['broadcast_completed', 'ec_order_received']);
-    // 予約とフォームは先行PRと競合中で未接続。接続したらここも変える。
+      .toEqual(['booking_created', 'broadcast_completed', 'ec_order_received']);
+    // フォームは PR #1469 が未統合で未接続。接続したらここも変える。
     expect(items.filter((item) => !item.connected).map((item) => item.eventType).sort())
-      .toEqual(['booking_created', 'form_submitted']);
+      .toEqual(['form_submitted']);
     expect(items.every((item) => item.producer.file.length > 0 && item.producer.route.length > 0)).toBe(true);
   });
 

@@ -29,7 +29,7 @@ export const OPERATOR_NOTIFICATION_EVENT_TYPES: OperatorEventTypeEntry[] = [
       file: 'apps/worker/src/routes/booking.ts',
       route: 'POST /api/liff/booking/requests',
     },
-    connected: false,
+    connected: true,
   },
   {
     eventType: 'broadcast_completed',
