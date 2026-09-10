@@ -80,6 +80,50 @@ export interface ImmediatePushOptions {
    * fence every same-flow race there.
    */
   skipCooldown?: boolean;
+  /**
+   * 送信の結末を呼ぶ側へ伝える。戻り値の false は「送っていない」と
+   * 「送ったかどうか分からない」を区別できないため、台帳へ結末を残す
+   * 呼び出し（友だち追加時配信）だけがこれを渡す。
+   *
+   *   delivered … LINE が受け付けた
+   *   failed    … LINE が要求を断った（4xx）。届いていない
+   *   unknown   … 通信断・タイムアウト・429・5xx。届いたかもしれない
+   *
+   * 送信そのものを試みなかったとき（配信対象外・再送見送りなど）は呼ばない。
+   */
+  onSendOutcome?: (outcome: 'delivered' | 'failed' | 'unknown') => void;
+  /**
+   * 結末の分からない送信（通信断・タイムアウト・429・5xx）のあと、
+   * この登録をどう扱うか。
+   *
+   *   retry（既定） … claim を返し、cron が改めて1通目を送る。従来どおり。
+   *   stop          … 1通目を送り終えた扱いにして先へ進め、cron に
+   *                   送り直させない。届いていたときに2通目を出さない。
+   *
+   * 台帳へ「送達不明」を残して人が確かめる呼び出し（友だち追加時配信）は
+   * stop を渡す。自動で送り直すと、同じ人に同じ案内が2通届く。
+   */
+  unknownSendPolicy?: 'retry' | 'stop';
+  /**
+   * LINE へ渡す再試行キー（`X-Line-Retry-Key`）。同じキーの2回目は LINE 側が
+   * 受け付け済みとして 409 を返し、**二重に届かない**。予約と fence をすり抜けた
+   * 万一の同時送信に対する最後の砦として、友だち追加の経路だけが渡す。
+   * reply は token が1回きりなので不要。
+   */
+  retryKey?: string;
+}
+
+/**
+ * 送信の例外を「届いていない」と「届いたかもしれない」に分ける。
+ *
+ * LINE が 4xx で断ったときは要求が受け付けられていないので届いていない。
+ * 通信断・タイムアウト・429・5xx は、こちらが結果を知らないだけで
+ * 届いていることがある。自動で送り直すと二重に届く。
+ */
+function classifySendFailure(error: unknown): 'failed' | 'unknown' {
+  const status = (error as { status?: unknown } | null)?.status;
+  if (typeof status === 'number' && status >= 400 && status < 500 && status !== 429) return 'failed';
+  return 'unknown';
 }
 
 /**
@@ -412,16 +456,32 @@ export async function pushImmediateFirstStep(
           if (acct?.channel_access_token) accessToken = acct.channel_access_token;
         }
         const lineClient = new LineClient(accessToken);
-        await lineClient.pushMessage(pushTarget, messages);
+        await lineClient.pushMessage(pushTarget, messages, options?.retryKey);
       }
     } catch (err) {
-      // The message never left LINE's API — release so the cron retries on
-      // schedule.
+      // 4xx は LINE が断ったので届いていない。それ以外は結末が分からない。
+      const outcome = classifySendFailure(err);
+      options?.onSendOutcome?.(outcome);
+      if (outcome === 'unknown' && options?.unknownSendPolicy === 'stop' && advanceTargetId) {
+        /*
+         * 届いたかもしれないので cron に送り直させない。1通目を送り終えた
+         * 扱いにして先へ進める。到達タグは付けない（届いた確証がない）。
+         * 呼ぶ側は台帳へ送達不明を残し、人が確かめる。
+         */
+        console.error('[immediate-first-step] send outcome unknown, stopping retry:', err);
+        // 進める先は、この購読が固定している版の通で決める（351）。live の
+        // 下書きを見ると、公開後に順序を変えたぶんだけ飛ばし先がずれる。
+        await advancePastFirstStep(advanceTargetId, source, firstStep);
+        claimedEnrollmentId = null; // advance が claim を返している
+        return false;
+      }
+      // 届いていない（4xx）・従来どおりの呼び出しは claim を返して cron へ。
       console.error('[immediate-first-step] send failed, releasing claim:', err);
       await releaseClaim();
       return false;
     }
     sent = true;
+    options?.onSendOutcome?.('delivered');
     settleAfterSend = async () => {
       if (advanceTargetId) {
         await advancePastFirstStep(advanceTargetId, source, firstStep);

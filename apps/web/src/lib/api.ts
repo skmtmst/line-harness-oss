@@ -3670,6 +3670,20 @@ export type PhotoBulkDecision = {
   reasonNote: string | null
 }
 
+export type PhotoBulkReviewResult = {
+  updatedCount: number
+  items: Array<{
+    photoId: string
+    decision: 'approve' | 'return' | 'reject'
+    reviewVersion: number
+    decisionId: string
+    notificationStatus: 'sent' | 'failed'
+    notificationError?: string
+  }>
+  notificationFailures: Array<{ photoId: string; error: string }>
+  reconciled?: boolean
+}
+
 export type AdPlatform = {
   id: string
   /** meta / x / google / tiktok */
@@ -3678,6 +3692,7 @@ export type AdPlatform = {
   /** 鍵は先頭と末尾だけ残して伏せてある。 */
   config: Record<string, unknown>
   isActive: boolean
+  lineAccountId: string | null
   createdAt: string
   updatedAt: string
 }
@@ -3686,6 +3701,7 @@ export type AdConversionLog = {
   id: string
   adPlatformId: string
   friendId: string
+  lineAccountId: string | null
   eventName: string
   clickId: string | null
   clickIdType: string | null
@@ -3892,6 +3908,7 @@ export type FriendAddRuleDefinition = {
   timing: 'immediate' | 'scenario'
   actions: FriendAddRuleAction[]
   friendCondition: string
+  internalMemo?: string
   activeFrom: string | null
   activeUntil: string | null
   returningMode?: 'none' | 'same' | 'other'
@@ -6330,6 +6347,8 @@ export const api = {
       friendId?: string
       issueInitialLink?: boolean
       lineAccountId?: string
+      /** 安定した操作UUID（#686）。同じ値での再送は同じ登録を返す。 */
+      operationId?: string
     }) =>
       fetchApi<ApiResponse<Affiliate> & { link?: { refCode: string; url: string } | null }>(
         '/api/affiliates',
@@ -6545,6 +6564,14 @@ export const api = {
         /** Monthly and lifetime delivery totals. null when unavailable. */
         monthlySendCount: number | null;
         totalSendCount: number | null;
+        /** 347: 公開待ちの下書きがあるか。 */
+        hasDraft: boolean;
+        /** 347: 公開版の版番号。未公開は0。 */
+        publishedVersion: number;
+        /** 347: 最後に公開した日時。未公開はnull。 */
+        publishedAt: string | null;
+        /** 347: いまの下書き版。公開で0に戻る。 */
+        draftRevision: number;
         createdAt: string;
         updatedAt: string;
       }>>>(
@@ -6578,8 +6605,40 @@ export const api = {
         };
         createdAt: string;
         updatedAt: string;
+        /** 347: 公開待ちの下書きがあるか。 */
+        hasDraft: boolean;
+        /** 347: 公開版の版番号。未公開は0。 */
+        publishedVersion: number;
+        /** 347: 最後に公開した日時。未公開はnull。 */
+        publishedAt: string | null;
+        /** 347: いまの下書き版。公開で0に戻る。 */
+        draftRevision: number;
       }>>(
         `/api/templates/${id}`,
+      ),
+    /**
+     * 独立審査(指摘6): 下書きを公開版へ写す。確認キーは自動で振る。
+     * 詳細口が返す publishedVersion・draftRevision をそのまま渡す。
+     */
+    publish: (id: string, data: { expectedVersion: number; expectedDraftRevision: number }) =>
+      fetchApi<ApiResponse<{
+        id: string;
+        accountId: string | null;
+        messageType: string;
+        messageContent: string;
+        publishedVersion: number;
+        publishedAt: string | null;
+        published: boolean;
+        replayed: boolean;
+        hasDraft: boolean;
+        draftRevision: number;
+      }>>(
+        `/api/templates/${id}/publish`,
+        {
+          method: 'POST',
+          headers: { 'Idempotency-Key': crypto.randomUUID() },
+          body: JSON.stringify(data),
+        },
       ),
     create: (data: {
       accountId: string
@@ -7385,6 +7444,11 @@ export const api = {
       fetchApi<{ success: boolean }>(`/api/nen-campaigns/settings/${encodeURIComponent(campaignKey)}?lineAccountId=${encodeURIComponent(accountId)}`, {
         method: 'PUT', body: JSON.stringify(data),
       }),
+    /** 一覧の停止・再開だけを切り替える。本文の長さに関わらず必ず実行できる（#659）。 */
+    setEnabled: (accountId: string, campaignKey: string, isEnabled: boolean) =>
+      fetchApi<{ success: boolean }>(`/api/nen-campaigns/settings/${encodeURIComponent(campaignKey)}/enabled?lineAccountId=${encodeURIComponent(accountId)}`, {
+        method: 'PUT', body: JSON.stringify({ isEnabled }),
+      }),
     testSend: (data: { campaignKey: string; accountId: string; friendId: string }) =>
       fetchApi<{ success: boolean }>('/api/nen-campaigns/test-send', { method: 'POST', body: JSON.stringify(data) }),
     jobs: (accountId: string) => fetchApi<ApiResponse<Array<{
@@ -7474,7 +7538,7 @@ export const api = {
     bulkReviewPhotos: (
       data: { lineAccountId: string; decisions: PhotoBulkDecision[] },
       idempotencyKey: string,
-    ) => fetchApi<ApiResponse<{ updatedCount: number; awardedPoints: number; notificationFailures: number }>>(
+    ) => fetchApi<ApiResponse<PhotoBulkReviewResult>>(
       '/api/nen-members/photos/decisions/bulk',
       { method: 'POST', headers: { 'Idempotency-Key': idempotencyKey }, body: JSON.stringify(data) },
     ),
@@ -8399,6 +8463,27 @@ export const api = {
         },
       ),
 
+    listSchedules: (groupId: string) =>
+      fetchApi<ApiResponse<Array<{
+        id: string
+        mode: 'scheduled' | 'period'
+        startsAt: string
+        endsAt: string | null
+        restoreGroupId: string | null
+        restoreDefaultState: 'captured' | 'no_default' | null
+        status: string
+        attemptCount: number
+        nextRetryAt: string | null
+        lastErrorCode: string | null
+        createdAt: string
+      }>>>(`/api/rich-menu-groups/${groupId}/schedules`),
+
+    cancelSchedule: (groupId: string, scheduleId: string) =>
+      fetchApi<ApiResponse<{ id: string; status: string }>>(
+        `/api/rich-menu-groups/${groupId}/schedules/${scheduleId}/cancel`,
+        { method: 'POST' },
+      ),
+
     create: (input: {
       accountId: string;
       name: string;
@@ -8715,6 +8800,8 @@ export const api = {
       lineAccountId?: string | null
       tagId?: string | null
       scenarioId?: string | null
+      /** 安定した操作UUID（#686）。同じ値での再送は同じ登録を返す。 */
+      operationId?: string
     }) =>
       fetchApi<{ success: boolean; data: AffiliateOffer }>('/api/affiliate-offers', {
         method: 'POST',

@@ -439,6 +439,97 @@ describe('fireEvent — 送信Webhookのアカウント解決', () => {
   });
 });
 
+describe('fireEvent — 広告成果の配線(#638)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  async function adConversionMock() {
+    return (await import('./ad-conversion.js')).sendAdConversions as unknown as ReturnType<typeof vi.fn>;
+  }
+
+  it('Stripeの購入は安定キー付きで広告成果へ送る', async () => {
+    const db = fakeDb({ friend: { line_user_id: 'U1', line_account_id: 'a1' }, capturedInserts: [] });
+    await fireEvent(db, 'cv_fire', {
+      sourceEventId: 'evt-1',
+      sourceKind: 'stripe',
+      occurredAt: '2026-09-09T00:00:00+09:00',
+      friendId: 'friend-1',
+      eventData: { type: 'purchase', amount: 1000, stripeEventId: 'evt-1' },
+    }, undefined, 'a1');
+
+    expect(await adConversionMock()).toHaveBeenCalledWith(
+      db, 'friend-1', 'Purchase', 1000, { idempotencyKey: 'stripe:evt-1', lineAccountId: 'a1', currency: undefined, amountInMinorUnit: undefined },
+    );
+  });
+
+  it('EC注文確定は発生元IDを安定キーにして送る(正規形・旧形の両方を読む)', async () => {
+    const db = fakeDb({ friend: { line_user_id: 'U1', line_account_id: 'a1' }, capturedInserts: [] });
+    await fireEvent(db, 'ec.order.confirmed', {
+      sourceEventId: 'ev-1',
+      sourceKind: 'eccube',
+      friendId: 'friend-1',
+      eventData: { orderTotal: 2860, order: { number: '123', total: 2860 } },
+    }, 'token', 'a1');
+
+    expect(await adConversionMock()).toHaveBeenCalledWith(
+      db, 'friend-1', 'Purchase', 2860, { idempotencyKey: 'eccube:ev-1', lineAccountId: 'a1', currency: undefined, amountInMinorUnit: undefined },
+    );
+
+    (await adConversionMock()).mockClear();
+    await fireEvent(db, 'ec.order.payment_received', {
+      sourceEventId: 'ev-2',
+      sourceKind: 'eccube',
+      friendId: 'friend-1',
+      eventData: { order: { total: 1000 } },
+    }, 'token', 'a1');
+
+    expect(await adConversionMock()).toHaveBeenCalledWith(
+      db, 'friend-1', 'Purchase', 1000, { idempotencyKey: 'eccube:ev-2', lineAccountId: 'a1', currency: undefined, amountInMinorUnit: undefined },
+    );
+  });
+
+  it('購入に結びつかない通常イベントは送らない', async () => {
+    const db = fakeDb({ friend: { line_user_id: 'U1', line_account_id: 'a1' }, capturedInserts: [] });
+    await fireEvent(db, 'friend_add', { friendId: 'friend-1', eventData: {} }, undefined, 'a1');
+
+    expect(await adConversionMock()).not.toHaveBeenCalled();
+  });
+
+  it('明示の conversionEventName は従来どおり優先する', async () => {
+    const db = fakeDb({ friend: { line_user_id: 'U1', line_account_id: 'a1' }, capturedInserts: [] });
+    await fireEvent(db, 'custom_event', {
+      friendId: 'friend-1',
+      conversionEventName: 'Trial',
+      conversionValue: 100,
+    }, undefined, 'a1');
+
+    expect(await adConversionMock()).toHaveBeenCalledWith(
+      db, 'friend-1', 'Trial', 100, { idempotencyKey: undefined, lineAccountId: 'a1', currency: undefined, amountInMinorUnit: undefined },
+    );
+  });
+
+  it('明示の通貨・単位はそのまま渡す', async () => {
+    const db = fakeDb({ friend: { line_user_id: 'U1', line_account_id: 'a1' }, capturedInserts: [] });
+    await fireEvent(db, 'custom_event', {
+      friendId: 'friend-1',
+      conversionEventName: 'Purchase',
+      conversionValue: 1000,
+      conversionCurrency: 'USD',
+      conversionAmountInMinorUnit: true,
+    }, undefined, 'a1');
+
+    expect(await adConversionMock()).toHaveBeenCalledWith(
+      db, 'friend-1', 'Purchase', 1000,
+      { idempotencyKey: undefined, lineAccountId: 'a1', currency: 'USD', amountInMinorUnit: true },
+    );
+  });
+});
+
 describe('fireEvent — EC正規化イベントのV6連携', () => {
   beforeEach(async () => {
     vi.clearAllMocks();

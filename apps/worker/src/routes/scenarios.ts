@@ -1139,9 +1139,9 @@ scenarios.get('/api/scenarios/:id/preview', scenarioPermission('view'), async (c
     }
     const scenarioId = c.req.param('id');
     const scenarioRow = await c.env.DB
-      .prepare(`SELECT delivery_mode FROM scenarios WHERE id = ?`)
+      .prepare(`SELECT delivery_mode, line_account_id FROM scenarios WHERE id = ?`)
       .bind(scenarioId)
-      .first<{ delivery_mode: DeliveryMode }>();
+      .first<{ delivery_mode: DeliveryMode; line_account_id: string | null }>();
     if (!scenarioRow) return c.json({ success: false, error: 'Scenario not found' }, 404);
 
     const stepsResult = await c.env.DB
@@ -1167,9 +1167,10 @@ scenarios.get('/api/scenarios/:id/preview', scenarioPermission('view'), async (c
 
     // 配信時と同じ resolveStepContent を呼んで、template_id があれば templates から
     // 最新内容を取って preview に返す。これで配信と preview の表示が一致する。
+    // シナリオの line_account_id を渡し、配信時と同じく公開版・同一アカウントだけを解決する。
     const resolvedSteps = await Promise.all(
       steps.map(async (step) => {
-        const resolved = await resolveStepContent(c.env.DB, step);
+        const resolved = await resolveStepContent(c.env.DB, step, scenarioRow.line_account_id);
         return { step, resolved };
       }),
     );

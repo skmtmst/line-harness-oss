@@ -25,6 +25,7 @@ function setupPre351Db(): Database.Database {
       audience_condition_json TEXT,
       on_complete_mode TEXT NOT NULL DEFAULT 'pause',
       on_complete_scenario_id TEXT,
+      line_account_id TEXT,
       created_at TEXT NOT NULL
     );
     CREATE TABLE scenario_steps (
@@ -52,7 +53,11 @@ function setupPre351Db(): Database.Database {
       id TEXT PRIMARY KEY,
       message_type TEXT NOT NULL,
       message_content TEXT NOT NULL,
-      question_json TEXT
+      question_json TEXT,
+      -- 347 は 351 より先に走る（ファイル名順）。移行時の template 解決は
+      -- 公開版と持ち主アカウントを見るので、その形に合わせる。
+      published_version INTEGER NOT NULL DEFAULT 0,
+      line_account_id TEXT
     );
     CREATE TABLE friends (id TEXT PRIMARY KEY);
     CREATE TABLE friend_scenarios (
@@ -90,18 +95,24 @@ function setupPre351Db(): Database.Database {
 
   // 稼働中のシナリオ：1通目は template 参照、2通目は直接文。
   db.prepare(
-    `INSERT INTO scenarios (id, name, delivery_mode, created_at) VALUES ('scn-1', '案内', 'relative', '2026-08-16')`,
+    `INSERT INTO scenarios (id, name, delivery_mode, line_account_id, created_at)
+     VALUES ('scn-1', '案内', 'relative', 'acc-a', '2026-08-16')`,
   ).run();
   db.prepare(
-    `INSERT INTO templates (id, message_type, message_content, question_json)
-     VALUES ('tpl-1', 'text', '公開時の文面', NULL)`,
+    `INSERT INTO templates (id, message_type, message_content, question_json, published_version, line_account_id)
+     VALUES
+       ('tpl-1', 'text', '公開時の文面', NULL, 1, 'acc-a'),
+       ('tpl-other', 'text', 'よそのアカウントの文面', NULL, 1, 'acc-b'),
+       ('tpl-draft', 'text', '未公開の文面', NULL, 0, 'acc-a')`,
   ).run();
   db.prepare(
     `INSERT INTO scenario_steps
        (id, scenario_id, step_order, delay_minutes, message_type, message_content, template_id, created_at)
      VALUES
        ('live-step-1', 'scn-1', 0, 0, 'text', '下書きの控え', 'tpl-1', '2026-08-16'),
-       ('live-step-2', 'scn-1', 1, 60, 'text', '2通目', NULL, '2026-08-16')`,
+       ('live-step-2', 'scn-1', 1, 60, 'text', '2通目', NULL, '2026-08-16'),
+       ('live-step-3', 'scn-1', 2, 60, 'text', 'よそ参照の控え', 'tpl-other', '2026-08-16'),
+       ('live-step-4', 'scn-1', 3, 60, 'text', '未公開参照の控え', 'tpl-draft', '2026-08-16')`,
   ).run();
   // アクション設定：1通目に紐づくタグ付けと、質問の選択肢に紐づくもの。
   db.prepare(
@@ -165,7 +176,7 @@ describe('migration 351 の適用（#644）', () => {
       .prepare(`SELECT steps_snapshot FROM scenario_versions WHERE scenario_id = 'scn-1'`)
       .get() as { steps_snapshot: string };
     const steps = JSON.parse(version.steps_snapshot) as Array<Record<string, unknown>>;
-    expect(steps).toHaveLength(2);
+    expect(steps).toHaveLength(4);
     // template を使う1通目は、公開時の文面が写っている（下書きの控えではない）。
     expect(steps[0].message_content).toBe('公開時の文面');
     expect(steps[0].template_id).toBe('tpl-1');
@@ -174,6 +185,38 @@ describe('migration 351 の適用（#644）', () => {
     expect(steps[0].version_step_id).toBe(`${(sqlite.prepare(`SELECT id FROM scenario_versions WHERE scenario_id = 'scn-1'`).get() as { id: string }).id}:0`);
     expect(steps[0].live_step_id).toBe('live-step-1');
     expect(steps[1].message_content).toBe('2通目');
+  });
+
+  test('移行の template 解決はシナリオの持ち主アカウントの中だけ（#645 と同条件）', () => {
+    apply351();
+
+    const version = sqlite
+      .prepare(`SELECT steps_snapshot FROM scenario_versions WHERE scenario_id = 'scn-1'`)
+      .get() as { steps_snapshot: string };
+    const steps = JSON.parse(version.steps_snapshot) as Array<Record<string, unknown>>;
+
+    // よそのアカウントの template は使わない。通の控えへ倒し、
+    // template_id_at_send も残さない（この版はその template で送っていない）。
+    expect(steps[2].message_content).toBe('よそ参照の控え');
+    expect(steps[2].template_id).toBe('tpl-other');
+    expect(steps[2].template_id_at_send).toBeNull();
+
+    // 未公開の template も同じ。公開版が無いものを版へ焼き付けない。
+    expect(steps[3].message_content).toBe('未公開参照の控え');
+    expect(steps[3].template_id_at_send).toBeNull();
+  });
+
+  test('持ち主が決まっていないシナリオは template を解決しない（fail-close）', () => {
+    sqlite.prepare(`UPDATE scenarios SET line_account_id = NULL WHERE id = 'scn-1'`).run();
+    apply351();
+
+    const version = sqlite
+      .prepare(`SELECT steps_snapshot FROM scenario_versions WHERE scenario_id = 'scn-1'`)
+      .get() as { steps_snapshot: string };
+    const steps = JSON.parse(version.steps_snapshot) as Array<Record<string, unknown>>;
+    // 同じアカウントかどうかを決められないので、通の控えへ倒す。
+    expect(steps[0].message_content).toBe('下書きの控え');
+    expect(steps[0].template_id_at_send).toBeNull();
   });
 
   test('既存の購読（稼働中・完了済み）は v1 へ寄り、live 読みに残らない', () => {

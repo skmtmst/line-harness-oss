@@ -15,7 +15,9 @@ describe('V6 photo review contract', () => {
   });
 
   it('loads and reviews photos for the selected LINE account', () => {
-    expect(page).toContain('api.nenMembers.photos(selectedAccountId)');
+    // 一覧は続きを取れるよう offset 付きで呼ぶ（#666）。呼ぶ先の口は同じ。
+    expect(page).toContain('fetchApi<PhotoPageResponse>(photoPagePath(selectedAccountId, 0))');
+    expect(page).toContain("`/api/nen-members/photos?${params.toString()}`");
     expect(page).toContain('accountId: selectedAccountId');
     expect(page).toContain('loadSequence.current');
     expect(api).toContain('/api/nen-members/photos?accountId=');
@@ -98,12 +100,21 @@ describe('V6 photo review contract', () => {
     expect(page).not.toContain("text(photo.created_at).replace('T', ' ').slice(0, 16)");
   });
 
-  it('does not claim bulk-reviewed photos were notified immediately (#500)', () => {
-    // 一括審査の口は `{updatedCount, items}` を返し、通知は pending で積む
-    // だけ。その場で送っていないのに「送信しました」と書かない。
-    expect(page).toContain('（通知は順次送信）');
-    expect(page).not.toContain('notificationFailures');
-    expect(page).not.toContain('LINE通知も送信しました');
+  it('shows bulk notification failures with resend paths instead of a fixed message (#639)', () => {
+    // 一括審査の口は審査の確定と通知の送達を分けて返す。失敗件数・対象を
+    // 出し、審査保存済みと通知だけの再送導線（移動・再送）を添える。
+    expect(page).toContain('notificationFailures');
+    expect(page).toContain('通知だけ再送できます');
+    expect(page).toContain('LINE通知を送れなかった写真');
+    expect(page).toContain('大きく見る');
+    expect(page).toContain('setBulkFailed');
+    expect(page).not.toContain('（通知は順次送信）');
+  });
+
+  it('types the bulk review result with per-photo delivery outcomes (#639)', () => {
+    expect(api).toContain('PhotoBulkReviewResult');
+    expect(api).toContain('notificationFailures: Array<{ photoId: string; error: string }>');
+    expect(api).toContain("notificationStatus: 'sent' | 'failed'");
   });
 
   it('sends an integer review version so a broken value does not become a 400 (#580)', () => {

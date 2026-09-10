@@ -10,8 +10,10 @@ import {
   deleteRichMenuGroup,
   setRichMenuPageImage,
   pageBelongsToGroup,
-  acquirePublishLock,
-  releasePublishLock,
+  acquirePublishLease,
+  releasePublishLease,
+  renewPublishLease,
+  isPublishLeaseHeld,
   setPageRichMenuId,
   markRichMenuGroupPublished,
   markRichMenuGroupUnpublished,
@@ -22,6 +24,8 @@ import {
   getRichMenuAudienceStats,
   recordRichMenuAssignmentsByLineUserIds,
   clearRichMenuAssignmentsForGroup,
+  listRichMenuSchedulesByGroup,
+  cancelRichMenuSchedule,
   jstNow,
   type RichMenuGroup,
   type RichMenuGroupWithPages,
@@ -51,6 +55,7 @@ import {
   publishRichMenuGroup,
   unpublishRichMenuGroup,
   linkRichMenuBulkChunked,
+  PublishLeaseLostError,
   RichMenuValidationError,
   type LineRichMenuClient,
   type R2Like,
@@ -635,26 +640,62 @@ richMenuGroups.post('/api/rich-menu-groups/import', requireRole('owner', 'admin'
   await setRichMenuPageImage(c.env.DB, newPage.id, r2Key, contentType);
 
   // 7. line_richmenu_id を埋めて status='published' に
-  await setPageRichMenuId(c.env.DB, newPage.id, richMenuId);
-  await markRichMenuGroupPublished(c.env.DB, created.id);
-
-  // 8. alias を upsert (今後の再 publish 時の安定 ID として)
-  const aliasId = `lhx-${created.id.slice(0, 8)}-0`;
-  try {
-    await fetch(`https://api.line.me/v2/bot/richmenu/alias/${aliasId}`, {
-      method: 'DELETE',
-      headers: { Authorization: auth },
-    });
-  } catch {
-    // 無視
+  //    作ったばかりの group だが、group の状態を変える経路は例外なく
+  //    同じ lease 契約に乗せる(経路ごとに流儀が違うと穴の元になる)。
+  const importOwner = `import-${crypto.randomUUID()}`;
+  const importGeneration = await acquirePublishLease(
+    c.env.DB, created.id, importOwner, new Date().toISOString(),
+  );
+  if (importGeneration === null) {
+    return c.json({ success: false, error: 'failed to acquire publish lock' }, 409);
   }
-  await fetch('https://api.line.me/v2/bot/richmenu/alias', {
-    method: 'POST',
-    headers: { Authorization: auth, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ richMenuAliasId: aliasId, richMenuId }),
-  });
+  const importFence = { owner: importOwner, generation: importGeneration };
+  try {
+    // 8. alias を upsert (今後の再 publish 時の安定 ID として)。
+    //    外部操作なので lease を持っているうちに済ませ、直前に実時刻で延ばす。
+    //    確定のあとに回すと、解放後の無防備な外部操作になる。
+    if (!(await renewPublishLease(c.env.DB, created.id, importFence, new Date().toISOString()))) {
+      throw new PublishLeaseLostError();
+    }
+    const aliasId = `lhx-${created.id.slice(0, 8)}-0`;
+    try {
+      await fetch(`https://api.line.me/v2/bot/richmenu/alias/${aliasId}`, {
+        method: 'DELETE',
+        headers: { Authorization: auth },
+      });
+    } catch {
+      // 既に無い場合は無視。作り直しは次の POST で行う。
+    }
+    await fetch('https://api.line.me/v2/bot/richmenu/alias', {
+      method: 'POST',
+      headers: { Authorization: auth, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ richMenuAliasId: aliasId, richMenuId }),
+    });
 
-  return c.json({ success: true, data: { id: created.id, name: created.name } });
+    // 9. line_richmenu_id を埋めて status='published' に。
+    //    札付き書込みの false は失権。無視して成功応答にしない。
+    if (!(await renewPublishLease(c.env.DB, created.id, importFence, new Date().toISOString()))) {
+      throw new PublishLeaseLostError();
+    }
+    if (!(await setPageRichMenuId(c.env.DB, newPage.id, richMenuId, importFence))) {
+      throw new PublishLeaseLostError();
+    }
+    if (!(await markRichMenuGroupPublished(c.env.DB, created.id, importFence))) {
+      throw new PublishLeaseLostError();
+    }
+    // 確定と解放は別。ここまで来て初めて lease を手放す。
+    await releasePublishLease(c.env.DB, created.id, importFence);
+    return c.json({ success: true, data: { id: created.id, name: created.name } });
+  } catch (e) {
+    await releasePublishLease(c.env.DB, created.id, importFence);
+    if (e instanceof PublishLeaseLostError) {
+      return c.json(
+        { success: false, error: '公開の担当が別の処理へ移りました。最新の状態を確認して、もう一度お試しください。' },
+        409,
+      );
+    }
+    throw e;
+  }
 });
 
 // LINE 公式アカウント上のリッチメニュー実態と admin 管理状態を突き合わせて返す。
@@ -1157,9 +1198,13 @@ richMenuGroups.post(
         return c.json({ success: false, error: 'endsAt must be later than startsAt' }, 400);
       }
     }
-    const restoreGroupId = typeof body.restoreGroupId === 'string' && body.restoreGroupId.length > 0
+    const requestedRestoreGroupId = typeof body.restoreGroupId === 'string' && body.restoreGroupId.length > 0
       ? body.restoreGroupId
       : null;
+    // 明示の指定があれば検証して保存する。指定なし(「前のメニューに戻す」)は
+    // nullのまま保存し、実行開始直前・切替前に実LINE defaultを固定する(365)。
+    // 予約時点では確定しない(期間中の管理画面外の変更にずれないようにする)。
+    const restoreGroupId: string | null = requestedRestoreGroupId;
     if (restoreGroupId) {
       const restore = await getRichMenuGroupById(c.env.DB, restoreGroupId);
       if (!restore || restore.account_id !== group.account_id || restore.status !== 'published') {
@@ -1167,38 +1212,89 @@ richMenuGroups.post(
       }
     }
 
-    const existing = await c.env.DB
-      .prepare('SELECT id, status FROM rich_menu_schedules WHERE account_id = ? AND idempotency_key = ?')
-      .bind(group.account_id, idempotencyKey)
-      .first<{ id: string; status: string }>();
-    if (existing) return c.json({ success: true, data: existing });
-
+    // 同時2要求でも片方だけ作るため atomic にINSERTし、同key異内容は成功扱いにしない。
+    const { createRichMenuScheduleAtomic } = await import('@line-crm/db');
     const now = jstNow();
     const id = crypto.randomUUID();
-    await c.env.DB
-      .prepare(
-        `INSERT INTO rich_menu_schedules
-           (id, group_id, account_id, mode, starts_at, ends_at, restore_group_id,
-            definition_snapshot, status, idempotency_key, requested_by_staff_id,
-            created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'scheduled', ?, ?, ?, ?)`,
-      )
-      .bind(
+    const definitionSnapshot = JSON.stringify(serializeGroupWithPages(group));
+    const created = await createRichMenuScheduleAtomic(c.env.DB, {
+      id,
+      groupId: group.id,
+      accountId: group.account_id,
+      mode: body.mode,
+      startsAt: body.startsAt as string,
+      endsAt,
+      restoreGroupId,
+      definitionSnapshot,
+      idempotencyKey,
+      requestedByStaffId: c.get('staff').id,
+      now,
+    });
+    if (created.outcome === 'conflict') {
+      return c.json(
+        { success: false, error: 'Idempotency-Key is already used with different content', id: created.id, status: created.status },
+        409,
+      );
+    }
+    if (created.outcome === 'existing') {
+      return c.json({ success: true, data: { id: created.id, status: created.status } });
+    }
+    return c.json({
+      success: true,
+      data: {
         id,
-        group.id,
-        group.account_id,
-        body.mode,
-        body.startsAt,
-        endsAt,
+        status: 'scheduled',
         restoreGroupId,
-        JSON.stringify(serializeGroupWithPages(group)),
-        idempotencyKey,
-        c.get('staff').id,
-        now,
-        now,
-      )
-      .run();
-    return c.json({ success: true, data: { id, status: 'scheduled' } }, 201);
+        // 戻し先の固定は実行開始直前に行う。予約時点では未確定。
+        restoreDefaultState: null,
+      },
+    }, 201);
+  },
+);
+
+/** 予約一覧と状態確認。実行前取消の判断材料を返す。 */
+richMenuGroups.get('/api/rich-menu-groups/:groupId/schedules', async (c) => {
+  const group = await getRichMenuGroupWithPages(c.env.DB, c.req.param('groupId'));
+  if (!group || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [group.account_id])) {
+    return c.json({ success: false, error: 'not found' }, 404);
+  }
+  const rows = await listRichMenuSchedulesByGroup(c.env.DB, group.id, 50);
+  return c.json({
+    success: true,
+    data: rows.map((row) => ({
+      id: row.id,
+      mode: row.mode,
+      startsAt: row.starts_at,
+      endsAt: row.ends_at,
+      restoreGroupId: row.restore_group_id,
+      // 実行開始直前に固定した切替前defaultの状態。capturedは固定メニューへ
+      // 戻し、no_defaultは明示解除する。nullは未固定(未実行)。
+      restoreDefaultState: row.restore_default_state,
+      status: row.status,
+      attemptCount: row.attempt_count,
+      nextRetryAt: row.next_retry_at,
+      lastErrorCode: row.last_error_code,
+      createdAt: row.created_at,
+    })),
+  });
+});
+
+/** 実行前の取消。publishing/restoring の最中は最新状態付きの409で止める。 */
+richMenuGroups.post(
+  '/api/rich-menu-groups/:groupId/schedules/:scheduleId/cancel',
+  requireRole('owner', 'admin'),
+  async (c) => {
+    const group = await getRichMenuGroupWithPages(c.env.DB, c.req.param('groupId'));
+    if (!group || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [group.account_id])) {
+      return c.json({ success: false, error: 'not found' }, 404);
+    }
+    const scheduleId = c.req.param('scheduleId');
+    const cancelled = await cancelRichMenuSchedule(c.env.DB, scheduleId, group.id, group.account_id);
+    if (cancelled) return c.json({ success: true, data: { id: scheduleId, status: 'cancelled' } });
+    const rows = await listRichMenuSchedulesByGroup(c.env.DB, group.id, 200);
+    const current = rows.find((row) => row.id === scheduleId);
+    if (!current) return c.json({ success: false, error: 'not found' }, 404);
+    return c.json({ success: false, error: 'already started', status: current.status }, 409);
   },
 );
 
@@ -1563,13 +1659,23 @@ richMenuGroups.post('/api/rich-menu-groups/:groupId/publish', requireRole('owner
   if (!group || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [group.account_id])) {
     return c.json({ success: false, error: 'not found' }, 404);
   }
-  if (group.publishing_at) return c.json({ success: false, error: 'already publishing' }, 409);
+  // 有効なlease保持中だけ409。期限切れ・旧形式の残留は取得時に回収される。
+  if (await isPublishLeaseHeld(c.env.DB, groupId, new Date().toISOString())) {
+    return c.json({ success: false, error: 'already publishing' }, 409);
+  }
 
   const account = await getLineAccountById(c.env.DB, group.account_id);
   if (!account) return c.json({ success: false, error: 'line account not found' }, 500);
 
-  const locked = await acquirePublishLock(c.env.DB, groupId);
-  if (!locked) return c.json({ success: false, error: 'failed to acquire publish lock' }, 409);
+  // 手動公開も予約実行と同じlease取得関数を使う(所有者付き・期限付き・世代付き)。
+  const publishOwner = `manual-${crypto.randomUUID()}`;
+  const publishGeneration = await acquirePublishLease(
+    c.env.DB, groupId, publishOwner, new Date().toISOString(),
+  );
+  if (publishGeneration === null) {
+    return c.json({ success: false, error: 'failed to acquire publish lock' }, 409);
+  }
+  const publishFence = { owner: publishOwner, generation: publishGeneration };
 
   try {
     const line = createLineClient(account.channel_access_token);
@@ -1623,15 +1729,43 @@ richMenuGroups.post('/api/rich-menu-groups/:groupId/publish', requireRole('owner
         })),
       })),
     };
-    const result = await publishRichMenuGroup(groupInput, line, r2Adapter);
+    /*
+     * LINE への公開はページ数ぶんの作成・画像upload・alias切替・旧削除で
+     * 何分もかかる。その間ずっと lease を延ばさないと、自分が動いている最中に
+     * 期限切れで予約実行や別の手動公開に回収される。外部呼び出しの直前ごとに
+     * 実時刻で延ばし、失権していたらそこで止める。
+     */
+    const heartbeat = async () => {
+      const alive = await renewPublishLease(
+        c.env.DB, groupId, publishFence, new Date().toISOString(),
+      );
+      if (!alive) throw new PublishLeaseLostError();
+    };
+    const result = await publishRichMenuGroup(groupInput, line, r2Adapter, heartbeat);
     for (const r of result.pages) {
-      await setPageRichMenuId(c.env.DB, r.pageId, r.newRichMenuId);
+      // 札付きで書く。回収されていたら書かない(新しい所有者の反映を壊さない)。
+      if (!(await setPageRichMenuId(c.env.DB, r.pageId, r.newRichMenuId, publishFence))) {
+        throw new PublishLeaseLostError();
+      }
     }
-    await markRichMenuGroupPublished(c.env.DB, groupId);
+    // 確定と同時にleaseも空く(mark側で掃除)。空けてよいのは持ち主だけなので札を渡す。
+    // false は失権。ここを無視すると、書けていないのに成功と返してしまう。
+    if (!(await markRichMenuGroupPublished(c.env.DB, groupId, publishFence))) {
+      throw new PublishLeaseLostError();
+    }
+    // 確定と解放は別。ここまで来て初めて lease を手放す。
+    await releasePublishLease(c.env.DB, groupId, publishFence);
     return c.json({ success: true, data: result });
   } catch (e) {
-    await releasePublishLock(c.env.DB, groupId);
+    await releasePublishLease(c.env.DB, groupId, publishFence);
     const message = e instanceof Error ? e.message : String(e);
+    if (e instanceof PublishLeaseLostError) {
+      // 別の公開に引き継がれた。成功扱いにはしない。
+      return c.json(
+        { success: false, error: '公開の担当が別の処理へ移りました。最新の状態を確認して、もう一度お試しください。' },
+        409,
+      );
+    }
     if (e instanceof RichMenuValidationError) {
       return c.json({ success: false, error: message }, 400);
     }
@@ -1654,6 +1788,17 @@ richMenuGroups.post('/api/rich-menu-groups/:groupId/unpublish', requireRole('own
   const account = await getLineAccountById(c.env.DB, group.account_id);
   if (!account) return c.json({ success: false, error: 'line account not found' }, 500);
 
+  // 停止も group の状態を変える経路なので、公開と同じ lease 契約で行う。
+  // lease なしで畳むと、同じ group を公開中の実行の owner と期限を消してしまう。
+  const unpublishOwner = `unpublish-${crypto.randomUUID()}`;
+  const unpublishGeneration = await acquirePublishLease(
+    c.env.DB, groupId, unpublishOwner, new Date().toISOString(),
+  );
+  if (unpublishGeneration === null) {
+    return c.json({ success: false, error: 'already publishing' }, 409);
+  }
+  const unpublishFence = { owner: unpublishOwner, generation: unpublishGeneration };
+
   const line = createLineClient(account.channel_access_token);
   const groupInput: GroupInput = {
     id: group.id,
@@ -1671,11 +1816,30 @@ richMenuGroups.post('/api/rich-menu-groups/:groupId/unpublish', requireRole('own
     })),
   };
   try {
-    const result = await unpublishRichMenuGroup(groupInput, line);
-    await markRichMenuGroupUnpublished(c.env.DB, groupId);
+    // ページ数ぶんの削除で時間がかかる。外部呼び出しの直前ごとに実時刻で延ばす。
+    const heartbeat = async () => {
+      const alive = await renewPublishLease(
+        c.env.DB, groupId, unpublishFence, new Date().toISOString(),
+      );
+      if (!alive) throw new PublishLeaseLostError();
+    };
+    const result = await unpublishRichMenuGroup(groupInput, line, heartbeat);
+    // false は失権。書けていないのに成功と返さない。
+    if (!(await markRichMenuGroupUnpublished(c.env.DB, groupId, unpublishFence))) {
+      throw new PublishLeaseLostError();
+    }
     await clearRichMenuAssignmentsForGroup(c.env.DB, groupId);
+    // 確定と解放は別。ここまで来て初めて lease を手放す。
+    await releasePublishLease(c.env.DB, groupId, unpublishFence);
     return c.json({ success: true, data: result });
   } catch (e) {
+    await releasePublishLease(c.env.DB, groupId, unpublishFence);
+    if (e instanceof PublishLeaseLostError) {
+      return c.json(
+        { success: false, error: '公開の担当が別の処理へ移りました。最新の状態を確認して、もう一度お試しください。' },
+        409,
+      );
+    }
     const message = e instanceof Error ? e.message : String(e);
     return c.json({ success: false, error: message }, 500);
   }

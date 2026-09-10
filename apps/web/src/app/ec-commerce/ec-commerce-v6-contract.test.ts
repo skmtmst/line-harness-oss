@@ -86,8 +86,8 @@ describe('V6 EC integration screens', () => {
     // 21件目以降の失敗に届かない(#517 中1)。絞りはサーバへ渡し、手元で再絞りしない。
     expect(page).toContain('actionServerFilter(status)')
     expect(page).toContain("statusGroup: status")
-    expect(page).toContain('offset: (page - 1) * ACTION_PAGE_SIZE')
-    expect(page).toContain('setActionTotal(actionsResponse.data.total)')
+    expect(page).toContain('offset: String((page - 1) * ACTION_PAGE_SIZE)')
+    expect(page).toContain('total: response.data.total')
     expect(page).toContain('pageCount > 1 ? <Pagination')
     expect(page).not.toContain("return action.status === status")
     expect(api).toContain("statusGroup?: 'processing' | 'failed'")

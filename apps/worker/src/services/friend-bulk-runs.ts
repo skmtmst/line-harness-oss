@@ -10,7 +10,9 @@ import {
   listDueFriendBulkRunIds,
   refreshFriendBulkRunSummary,
   resetFriendBulkRunFailures,
+  setFriendFieldValue,
   setFriendSupportMark,
+  validateFriendFieldValue,
   updateChat,
   updateFriendBulkRunItem,
   type FriendBulkSnapshotItem,
@@ -298,6 +300,25 @@ async function requireAccountResource(
   return row.line_account_id;
 }
 
+async function requirePublishedTemplateAccount(
+  db: D1Database,
+  id: string,
+): Promise<string | null> {
+  const row = await db.prepare(
+    `SELECT line_account_id
+       FROM templates
+      WHERE id = ? AND published_version > 0`,
+  ).bind(id).first<{ line_account_id: string | null }>();
+  if (!row) {
+    throw new FriendBulkRunError(
+      'template_not_published',
+      '公開済みのテンプレートが見つかりません',
+      409,
+    );
+  }
+  return row.line_account_id;
+}
+
 async function flattenCommonAction(
   db: D1Database,
   input: { commonActionId: string; versionId?: string; depth?: number; seen?: Set<string> },
@@ -381,7 +402,7 @@ async function prepareOperation(db: D1Database, operation: FriendBulkOperation):
       return { operation, resourceAccountId: await requireAccountResource(db, 'reminders', operation.reminderId, 'リマインダ'), reversible: true };
     case 'send_message': {
       const accountId = operation.templateId
-        ? await requireAccountResource(db, 'templates', operation.templateId, 'テンプレート')
+        ? await requirePublishedTemplateAccount(db, operation.templateId)
         : undefined;
       return { operation, resourceAccountId: accountId, reversible: false };
     }
@@ -400,8 +421,9 @@ async function prepareOperation(db: D1Database, operation: FriendBulkOperation):
     case 'set_friend_fields': {
       const ids = Object.keys(operation.values);
       const rows = await db.prepare(
-        `SELECT id, ec_is_master FROM friend_fields WHERE id IN (${ids.map(() => '?').join(',')})`,
-      ).bind(...ids).all<{ id: string; ec_is_master: number }>();
+        `SELECT id, ec_is_master, type, COALESCE(type_v6, type) AS resolved_type, options_json, name
+           FROM friend_fields WHERE id IN (${ids.map(() => '?').join(',')})`,
+      ).bind(...ids).all<{ id: string; ec_is_master: number; resolved_type: string; options_json: string | null; name: string }>();
       if (rows.results.length !== ids.length) throw new FriendBulkRunError('friend_field_not_found', '友だち情報の項目が見つかりません', 404);
       if (rows.results.some((row) => row.ec_is_master === 1)) {
         throw new FriendBulkRunError(
@@ -410,7 +432,31 @@ async function prepareOperation(db: D1Database, operation: FriendBulkOperation):
           409,
         );
       }
-      return { operation, resourceAccountId: undefined, reversible: true };
+      // N-042: 実行（一括操作の行を作る副作用）の前に全値を検証する。
+      // 通らない値が1つでもあれば422で止め、正規化した値を操作へ載せる。
+      const byId = new Map(rows.results.map((row) => [row.id, row]));
+      const normalized: Record<string, string | null> = {};
+      for (const [fieldId, raw] of Object.entries(operation.values)) {
+        const def = byId.get(fieldId);
+        if (!def) throw new FriendBulkRunError('friend_field_not_found', '友だち情報の項目が見つかりません', 404);
+        const checked = validateFriendFieldValue(
+          { type: def.resolved_type, options_json: def.options_json },
+          raw,
+        );
+        if (!checked.ok) {
+          throw new FriendBulkRunError(
+            'friend_field_value_invalid',
+            `「${def.name}」の値を確認してください（${checked.error}）`,
+            422,
+          );
+        }
+        normalized[fieldId] = checked.value;
+      }
+      return {
+        operation: { kind: operation.kind, values: normalized },
+        resourceAccountId: undefined,
+        reversible: true,
+      };
     }
     case 'set_visibility':
       return { operation, resourceAccountId: undefined, reversible: true };
@@ -708,16 +754,30 @@ async function executeOperation(
       ).bind(friend.id, ...ids).all<{ field_id: string; value: string | null }>();
       const before = Object.fromEntries(ids.map((id) => [id, rows.results.find((row) => row.field_id === id)?.value ?? null]));
       if (JSON.stringify(before) === JSON.stringify(operation.values)) return { status: 'skipped', before, after: before };
+      // N-042: 書き込みは中央の口へ寄せ、項目定義で検証・正規化する。
+      // 作成時に検証済みのはずだが、列車合流前の古い操作が残っていても不正値を書かない。
+      const defs = await db.prepare(
+        `SELECT id, COALESCE(type_v6, type) AS resolved_type, options_json
+           FROM friend_fields WHERE id IN (${ids.map(() => '?').join(',')})`,
+      ).bind(...ids).all<{ id: string; resolved_type: string; options_json: string | null }>();
+      const defById = new Map(defs.results.map((row) => [row.id, row]));
       for (const [fieldId, value] of Object.entries(operation.values)) {
-        if (value === null) {
-          await db.prepare(`DELETE FROM friend_field_values WHERE friend_id = ? AND field_id = ?`).bind(friend.id, fieldId).run();
-        } else {
-          await db.prepare(
-            `INSERT INTO friend_field_values (friend_id, field_id, value, updated_at, updated_by)
-             VALUES (?, ?, ?, ?, ?)
-             ON CONFLICT(friend_id, field_id) DO UPDATE SET
-               value = excluded.value, updated_at = excluded.updated_at, updated_by = excluded.updated_by`,
-          ).bind(friend.id, fieldId, value, now, run.created_by).run();
+        const def = defById.get(fieldId);
+        if (!def) throw new ItemExecutionError('friend_field_not_found', '友だち情報の項目が見つかりません', false);
+        try {
+          await setFriendFieldValue(db, {
+            friendId: friend.id,
+            fieldId,
+            value,
+            updatedBy: run.created_by,
+            field: { type: def.resolved_type, options_json: def.options_json },
+          });
+        } catch (error) {
+          throw new ItemExecutionError(
+            'friend_field_value_invalid',
+            error instanceof Error ? error.message.replace(/^invalid friend field value: /, '') : '友だち情報の値が正しくありません',
+            false,
+          );
         }
       }
       return { status: 'success', before, after: operation.values };

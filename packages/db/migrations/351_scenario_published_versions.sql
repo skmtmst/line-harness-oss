@@ -9,7 +9,9 @@
 --   履歴づけの控え (live_step_id) としてだけ残し、配信の判断には使わない。
 --   下書きの通を消しても、版の読み・配信ログ・二重送信防止が壊れない。
 -- - template を使う通は、公開時に文面・質問を解決して写す。公開後の
---   template 編集は、固定済みの版の配信へ混入しない。
+--   template 編集は、固定済みの版の配信へ混入しない。解決は**シナリオの
+--   持ち主アカウントの中だけ**で行う (#645 と同じ条件: 公開版があり、
+--   持ち主が両方はっきりしていて一致する)。外れる参照は通の控えへ倒す。
 -- - アクション設定 (scenario_actions) も版へ写す (actions_snapshot)。写さないと
 --   旧版に固定された購読でも常に live のアクションが動き、公開後の編集が
 --   混入する。質問の選択肢に紐づくアクションも同じ写しから実行する。
@@ -115,8 +117,16 @@ SELECT
         'version_step_id', 'scenario-version-v1-' || s.id || ':' || ss.step_order,
         'step_order', ss.step_order,
         'delay_minutes', ss.delay_minutes,
-        'message_type', COALESCE((SELECT t.message_type FROM templates t WHERE t.id = ss.template_id), ss.message_type),
-        'message_content', COALESCE((SELECT t.message_content FROM templates t WHERE t.id = ss.template_id), ss.message_content),
+        'message_type', COALESCE((SELECT t.message_type FROM templates t WHERE t.id = ss.template_id
+           AND COALESCE(t.published_version, 0) >= 1
+           AND t.line_account_id IS NOT NULL
+           AND s.line_account_id IS NOT NULL
+           AND t.line_account_id = s.line_account_id), ss.message_type),
+        'message_content', COALESCE((SELECT t.message_content FROM templates t WHERE t.id = ss.template_id
+           AND COALESCE(t.published_version, 0) >= 1
+           AND t.line_account_id IS NOT NULL
+           AND s.line_account_id IS NOT NULL
+           AND t.line_account_id = s.line_account_id), ss.message_content),
         'condition_type', ss.condition_type,
         'condition_value', ss.condition_value,
         'next_step_on_false', ss.next_step_on_false,
@@ -124,11 +134,19 @@ SELECT
         'offset_minutes', ss.offset_minutes,
         'delivery_time', ss.delivery_time,
         'template_id', ss.template_id,
-        'template_id_at_send', CASE WHEN EXISTS (SELECT 1 FROM templates t WHERE t.id = ss.template_id) THEN ss.template_id ELSE NULL END,
+        'template_id_at_send', CASE WHEN EXISTS (SELECT 1 FROM templates t WHERE t.id = ss.template_id
+           AND COALESCE(t.published_version, 0) >= 1
+           AND t.line_account_id IS NOT NULL
+           AND s.line_account_id IS NOT NULL
+           AND t.line_account_id = s.line_account_id) THEN ss.template_id ELSE NULL END,
         'on_reach_tag_id', ss.on_reach_tag_id,
         'after_send', ss.after_send,
         'target_condition_json', ss.target_condition_json,
-        'question_json', COALESCE((SELECT t.question_json FROM templates t WHERE t.id = ss.template_id), ss.question_json),
+        'question_json', COALESCE((SELECT t.question_json FROM templates t WHERE t.id = ss.template_id
+           AND COALESCE(t.published_version, 0) >= 1
+           AND t.line_account_id IS NOT NULL
+           AND s.line_account_id IS NOT NULL
+           AND t.line_account_id = s.line_account_id), ss.question_json),
         'is_draft', ss.is_draft,
         'live_step_id', ss.id,
         'created_at', ss.created_at

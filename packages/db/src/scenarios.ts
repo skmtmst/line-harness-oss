@@ -604,10 +604,15 @@ async function buildVersionSnapshotSteps(
   db: D1Database,
   versionId: string,
   steps: ScenarioStep[],
+  lineAccountId: string | null,
 ): Promise<Array<Record<string, unknown>>> {
   const out: Array<Record<string, unknown>> = [];
   for (const s of steps) {
-    const resolved = await resolveStepContent(db, s);
+    // template の解決はシナリオの持ち主アカウントの中だけで行う（#645）。
+    // よそのアカウントの template や未公開の template は使わず、通の控えへ
+    // 倒す。配信時にはもう templates 表を読まないので、境界の判断はここが
+    // 最後の砦になる。
+    const resolved = await resolveStepContent(db, s, lineAccountId);
     out.push({
       version_step_id: `${versionId}:${s.step_order}`,
       step_order: s.step_order,
@@ -1145,7 +1150,7 @@ export async function publishScenarioVersion(
   if (!scenario) throw new Error('SCENARIO_NOT_FOUND');
 
   const steps = await getScenarioSteps(db, scenarioId);
-  const draftSteps = await buildVersionSnapshotSteps(db, '', steps);
+  const draftSteps = await buildVersionSnapshotSteps(db, '', steps, scenario.line_account_id ?? null);
   const draftActions = await buildVersionSnapshotActions(db, '', scenarioId, steps);
   const draftPayload = canonicalPublishPayload(scenario, draftSteps, draftActions);
 
@@ -1191,7 +1196,7 @@ export async function publishScenarioVersion(
     ).bind(scenarioId).first<{ version_number: number }>();
     const versionNumber = Number(next?.version_number ?? 1);
     const id = crypto.randomUUID();
-    const snapshotSteps = await buildVersionSnapshotSteps(db, id, steps);
+    const snapshotSteps = await buildVersionSnapshotSteps(db, id, steps, scenario.line_account_id ?? null);
     const snapshotActions = await buildVersionSnapshotActions(db, id, scenarioId, steps);
     const now = jstNow();
     try {

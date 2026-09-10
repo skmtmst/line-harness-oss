@@ -354,6 +354,7 @@ export function isPublicApiBoundary(method: string, path: string): boolean {
     path === '/api/integrations/eccube/columns' ||
     path === '/api/internal/deployments/events' ||
     path === '/api/integrations/codex-slack/events' ||
+    path === '/api/integrations/ai-loop/reports' ||
     path === '/api/integrations/slack/actions' ||
     path === '/api/integrations/slack/events' ||
     /^\/api\/webhooks\/incoming\/[^/]+\/receive$/.test(path) ||

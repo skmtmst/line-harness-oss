@@ -8,6 +8,8 @@
  * 093 で足した列を使って、送り直しと失敗の記録を入れる。
  */
 
+import { resolveWebhookSecret, type WebhookKeyInput } from '@line-crm/db';
+
 /** 送り直しまでの待ち時間（ミリ秒）。 */
 export function retryDelayMs(attempt: number): number {
   // 1回目 0.5秒、2回目 1秒、3回目 2秒…と倍にして、8秒で頭打ちにする。
@@ -86,7 +88,10 @@ export function shouldRetryStatus(status: number): boolean {
 export interface WebhookRow {
   id: string;
   url: string;
+  /** 旧平文。#650 以降の新規・更新では NULL になる。 */
   secret: string | null;
+  /** AES-GCM 暗号文。#650 以降の正本。署名はここから復号した値で付ける。 */
+  secret_encrypted?: string | null;
   max_retries: number | null;
 }
 
@@ -530,6 +535,8 @@ export interface DeliveryResult {
   lastStatus: number | null;
   blocked?: boolean;
   blockReason?: WebhookBlockReason | null;
+  /** secret を復号できず、署名を付けられないので送らなかった(#650)。 */
+  secretUnavailable?: boolean;
 }
 
 /**
@@ -560,6 +567,11 @@ export async function deliverWebhook(
     fetchImpl?: typeof fetch;
     lookupHost?: WebhookDnsLookup;
     timeoutMs?: number;
+    /**
+     * secret_encrypted を復号する鍵束(#650)。省略すると Worker の bindings
+     * (LINE_CREDENTIAL_ENCRYPTION_KEY / LINE_CREDENTIAL_PREVIOUS_KEYS)を読む。
+     */
+    credentialKeys?: WebhookKeyInput | string;
   } = {},
 ): Promise<DeliveryResult> {
   const sleep = opts.sleep ?? ((ms: number) => new Promise((r) => setTimeout(r, ms)));
@@ -567,8 +579,24 @@ export async function deliverWebhook(
 
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (opts.idempotencyKey) headers['X-Webhook-Delivery-Id'] = opts.idempotencyKey;
-  if (webhook.secret) {
-    headers['X-Webhook-Signature'] = await sign(webhook.secret, body);
+  // 署名はここで組み立てる。secret が暗号文で入っている行(#650 以降の正本)は
+  // ここで復号する。呼び出し側に復号を任せると、忘れた経路が黙って署名なしで
+  // 送ってしまう。設定済みの secret を読めないときは送らない(fail-open 禁止)。
+  if (webhook.secret_encrypted || webhook.secret) {
+    let sendSecret: string | null = null;
+    try {
+      sendSecret = await resolveWebhookSecret(webhook, opts.credentialKeys);
+    } catch {
+      sendSecret = null;
+    }
+    if (!sendSecret) {
+      console.error(JSON.stringify({
+        event: 'outgoing_webhook_secret_unavailable',
+        webhookId: webhook.id,
+      }));
+      return { ok: false, attempts: 0, lastStatus: null, secretUnavailable: true };
+    }
+    headers['X-Webhook-Signature'] = await sign(sendSecret, body);
   }
 
   let lastStatus: number | null = null;

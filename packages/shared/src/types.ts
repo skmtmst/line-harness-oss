@@ -1915,7 +1915,7 @@ export const FRIEND_ADD_ROUTING_DEFAULT: FriendAddRouting = {
 /** V6の友だち追加履歴。Pencil共通デザインはこの契約だけを見て描画する。 */
 export type FriendAddEventKind = "first_time" | "returning";
 export type FriendAddEventAttributionStatus = "captured" | "unavailable";
-export type FriendAddEventRoutingStatus = "pending" | "completed" | "failed" | "suppressed";
+export type FriendAddEventRoutingStatus = "pending" | "completed" | "failed" | "suppressed" | "partial_failed";
 
 export interface FriendAddEventItem {
   id: string;

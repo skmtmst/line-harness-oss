@@ -470,8 +470,17 @@ async function processSingleDelivery(
     return false;
   }
 
+  // 実際に配信するアカウント。リンクの所有アカウント計算
+  // (下の decorateForFriendPush 呼び出し)と同じ値を使う。
+  const friendAccountId = friend.line_account_id;
+  const deliveryAccountId = scenarioRow.line_account_id ?? friendAccountId;
+
   // 通の文面・質問は公開時に確定した写しを使う（351）。配信時に templates 表を
   // 読み直さないので、公開後の template 編集は固定済みの購読へ混入しない。
+  //
+  // テンプレートの公開版をシナリオの持ち主アカウントだけで解決する(#645)のは、
+  // 公開時の写し作り（packages/db/src/scenarios.ts の版snapshot）へ移した。
+  // 配信時にはもう templates 表を読まないので、ここでは解決しない。
   const resolved = {
     messageType: currentStep.message_type,
     messageContent: currentStep.message_content,
@@ -500,8 +509,6 @@ async function processSingleDelivery(
   // Auto-wrap URLs with tracking links + bake f=<friendId> into /t links —
   // shared pipeline with the instant first-step push (immediate-first-step.ts).
   // リンクの所有アカウントは実際に配信するアカウント (= friend の account) に合わせる
-  const friendAccountId = friend.line_account_id;
-  const deliveryAccountId = scenarioRow.line_account_id ?? friendAccountId;
   const { decorateForFriendPush } = await import('./auto-track.js');
   const tracked = await decorateForFriendPush(db, resolved.messageType, expandedContent, workerUrl, {
     lineAccountId: deliveryAccountId ?? null,

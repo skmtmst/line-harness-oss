@@ -7,6 +7,8 @@ import { fileURLToPath } from 'node:url';
 import {
   findScenarioReferenceMismatches,
   isResourceInScenarioAccount,
+  parseScenarioVersionSteps,
+  publishScenarioVersion,
 } from '../src/scenarios.js';
 import { asD1 } from './d1-test-helper.js';
 
@@ -123,6 +125,52 @@ describe('参照資源のアカウント境界', () => {
     // どのアカウントのものかも分かる。
     expect(found.every((f) => f.scenarioAccountId === 'acc-a')).toBe(true);
     expect(found.find((f) => f.resourceId === 'tag-b')!.resourceAccountId).toBe('acc-b');
+  });
+
+  // -------------------------------------------------------------
+  // 公開時の写し作り（#645 の template 境界を版へ引き継ぐ）
+  //
+  // 配信時にはもう templates 表を読まないので、どの文面を焼き付けるかを
+  // 決めるのは公開の1回だけ。ここで境界が抜けると、以後その版は永久に
+  // よそのアカウントの文面を送り続ける。
+  // -------------------------------------------------------------
+
+  async function publishWithTemplateStep(templateId: string): Promise<string[]> {
+    sqlite
+      .prepare(
+        `INSERT INTO scenario_steps
+           (id, scenario_id, step_order, delay_minutes, message_type, message_content, created_at, template_id)
+         VALUES ('step-tpl', 'scn-a', 0, 0, 'text', '通の控え', '2026-08-16', ?)`,
+      )
+      .run(templateId);
+    const version = await publishScenarioVersion(db, 'scn-a', {
+      staffId: null,
+      idempotencyKey: `key-${templateId}`,
+    });
+    const step = parseScenarioVersionSteps(version)[0]!;
+    return [step.message_content, step.template_id_at_send ?? 'null'];
+  }
+
+  test('公開時：同じアカウントの公開済み template は版へ焼き付ける', async () => {
+    sqlite.prepare(`UPDATE templates SET published_version = 1 WHERE id = 'tpl-a'`).run();
+    expect(await publishWithTemplateStep('tpl-a')).toEqual(['A', 'tpl-a']);
+  });
+
+  test('公開時：よそのアカウントの template は版へ入れない（通の控えへ倒す）', async () => {
+    sqlite.prepare(`UPDATE templates SET published_version = 1 WHERE id = 'tpl-b'`).run();
+    expect(await publishWithTemplateStep('tpl-b')).toEqual(['通の控え', 'null']);
+  });
+
+  test('公開時：未公開の template は版へ入れない', async () => {
+    // 347 の既定は 1（既存テンプレは公開済み扱い）なので、明示的に落とす。
+    sqlite.prepare(`UPDATE templates SET published_version = 0 WHERE id = 'tpl-a'`).run();
+    expect(await publishWithTemplateStep('tpl-a')).toEqual(['通の控え', 'null']);
+  });
+
+  test('公開時：持ち主が決まっていないシナリオは template を解決しない', async () => {
+    sqlite.prepare(`UPDATE templates SET published_version = 1 WHERE id = 'tpl-a'`).run();
+    sqlite.prepare(`UPDATE scenarios SET line_account_id = NULL WHERE id = 'scn-a'`).run();
+    expect(await publishWithTemplateStep('tpl-a')).toEqual(['通の控え', 'null']);
   });
 
   test('不一致が無ければ空', async () => {
