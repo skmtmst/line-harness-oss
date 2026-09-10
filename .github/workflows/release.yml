@@ -69,6 +69,23 @@ jobs:
       - name: Migration safety check
         run: pnpm tsx scripts/check-migrations.ts
 
+      # `@line-crm/shared` の入口 (package.json の main / exports) は dist を
+      # 指している。`test:scripts` が読む scripts/verify-staging-operational-path.ts
+      # は packages/db/src 経由で shared を読むので、dist が無いと vite が入口を
+      # 解決できず、**試験を1件も走らせないまま**読み込みの段階で落ちる。
+      #
+      # PR は required-pr-gate.yml の `repository-checks` が install の直後に
+      # 同じ build を置いているため緑になる。本流に入ってこの workflow だけが
+      # 落ちる形になるので、誰も止められない (#719。#714 と同じ穴)。
+      # tag push でこの workflow がまだ一度も走っていないため、実害はまだ
+      # 出ていないが、次に tag を打ったときに必ず落ちる。
+      #
+      # build するのは shared だけでよい。db や line-sdk まで足さなくても
+      # `test:scripts` が緑になることを、dist を消した状態で実際に走らせて
+      # 確かめている (#714 の審査と同じ結論)。
+      - name: Build the shared package
+        run: pnpm --filter @line-crm/shared build
+
       - name: Run unit tests (scripts)
         run: pnpm test:scripts
 

@@ -1,9 +1,12 @@
-import { execFileSync } from 'node:child_process';
+import { execFile } from 'node:child_process';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { promisify } from 'node:util';
 import Database from 'better-sqlite3';
 import { describe, expect, it } from 'vitest';
+
+const execFileAsync = promisify(execFile);
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PKG_ROOT = join(__dirname, '..');
@@ -13,6 +16,19 @@ const MIGRATIONS_DIR = join(PKG_ROOT, 'migrations');
 
 const BENIGN_SQLITE_ERROR = /duplicate column name|already exists/i;
 
+/*
+ * 309→329本まで伸びた migration を1文ずつ同期実行し続けると、vitest worker
+ * のRPC心拍(onTaskUpdate)を1秒以上返せず、心拍タイムアウトで異常終了する
+ * (#698、試験は1件も落ちていないのに `[vitest-worker]: Timeout calling
+ * "onTaskUpdate"` で落ちる)。db.exec自体は同期APIで分割できないため、
+ * 一定件数ごとにsetImmediateへ制御を返し、心拍を通す隙間を作る。
+ */
+const YIELD_EVERY_N_STATEMENTS = 50;
+
+function yieldToEventLoop(): Promise<void> {
+  return new Promise((resolve) => setImmediate(resolve));
+}
+
 function splitSqlStatements(sql: string): string[] {
   return sql
     .split(/;\s*(?:\r?\n|$)/)
@@ -20,12 +36,13 @@ function splitSqlStatements(sql: string): string[] {
     .filter(Boolean);
 }
 
-function applyMigrationReplay(db: Database.Database): void {
+async function applyMigrationReplay(db: Database.Database): Promise<void> {
   db.exec(readFileSync(join(PKG_ROOT, 'schema.sql'), 'utf8'));
   const migrationFiles = readdirSync(MIGRATIONS_DIR)
     .filter((file) => file.endsWith('.sql'))
     .sort();
 
+  let statementsSinceYield = 0;
   for (const file of migrationFiles) {
     const sql = readFileSync(join(MIGRATIONS_DIR, file), 'utf8');
     for (const statement of splitSqlStatements(sql)) {
@@ -36,6 +53,11 @@ function applyMigrationReplay(db: Database.Database): void {
         if (!BENIGN_SQLITE_ERROR.test(message)) {
           throw new Error(`${file}: ${message}`);
         }
+      }
+      statementsSinceYield += 1;
+      if (statementsSinceYield >= YIELD_EVERY_N_STATEMENTS) {
+        statementsSinceYield = 0;
+        await yieldToEventLoop();
       }
     }
   }
@@ -68,25 +90,33 @@ function readSchemaObjects(db: Database.Database) {
 
 describe('bootstrap.sql', () => {
   it(
+    /*
+     * 子プロセスを execFileSync で同期起動すると、node起動+329本の
+     * migration読み込みが終わるまでworkerスレッドが完全に止まり、
+     * 同じ理由でRPC心拍タイムアウトを踏む(#698)。execFile を
+     * promisify して await するだけで、子プロセス待ちの間もイベント
+     * ループが空くため、検査の強さ(非0終了で失敗)は変えずに直る。
+     */
     'stays in sync with schema.sql + migrations',
-    () => {
-      expect(() =>
-        execFileSync('node', [GENERATOR, '--check'], {
-          cwd: PKG_ROOT,
-          stdio: 'pipe',
-        }),
-      ).not.toThrow();
+    async () => {
+      await expect(execFileAsync('node', [GENERATOR, '--check'], { cwd: PKG_ROOT })).resolves.toBeTruthy();
     },
     60_000,
   );
 
-  it('matches the schema produced by replaying all migrations', () => {
-    const bootstrapDb = new Database(':memory:');
-    const replayDb = new Database(':memory:');
+  it(
+    'matches the schema produced by replaying all migrations',
+    async () => {
+      const bootstrapDb = new Database(':memory:');
+      const replayDb = new Database(':memory:');
 
-    bootstrapDb.exec(readFileSync(BOOTSTRAP_PATH, 'utf8'));
-    applyMigrationReplay(replayDb);
+      bootstrapDb.exec(readFileSync(BOOTSTRAP_PATH, 'utf8'));
+      await applyMigrationReplay(replayDb);
 
-    expect(readSchemaObjects(bootstrapDb)).toEqual(readSchemaObjects(replayDb));
-  });
+      expect(readSchemaObjects(bootstrapDb)).toEqual(readSchemaObjects(replayDb));
+    },
+    // 既定の5秒では足りない。CI実測で2件合わせて8.2〜9.8秒、setImmediateの
+    // 待ちぶん所要が伸びる方向でもある。試験1が元から60_000を持っているのと揃えた。
+    60_000,
+  );
 });
