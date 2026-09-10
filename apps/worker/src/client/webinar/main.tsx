@@ -968,7 +968,7 @@ function WebinarApp({ ctx, slug }: { ctx: WebinarContext; slug: string }) {
 // 送信は既存 POST /api/forms/:id/submit — タグ付与・シナリオ発火・回答保存が
 // フォーム機能側でそのまま動く。
 
-function FormSheet({
+export function FormSheet({
   sheet,
   ctx,
   onFunnelEvent,

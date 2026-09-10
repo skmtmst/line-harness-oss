@@ -744,7 +744,7 @@ class FormSubmitConflictError extends Error {
   }
 }
 
-async function postFormSubmit(
+export async function postFormSubmit(
   path: string,
   body: Record<string, unknown>,
   key: string,
