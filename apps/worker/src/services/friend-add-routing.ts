@@ -1121,11 +1121,11 @@ async function selectIds(
  * 公開版のスナップショットは保存後もそのまま動くので、保存時に正しくても
  * 実行時には消えている・移っていることがある。どちらの場合も配信しない。
  *
- * 所有者が未設定（NULL）のタグ・シナリオ・友だち情報欄も**使えない扱い**に
- * する。どのアカウントの持ち物か言い切れないものを、このアカウントの
- * 配信条件として読むと、他店の友だちを数える形になりうる。
+ * 所有者が未設定（NULL）のタグ・シナリオも**使えない扱い**にする。
+ * どのアカウントの持ち物か言い切れないものを、このアカウントの配信条件と
+ * して読むと、他店の友だちを数える形になりうる。
  * 流入リンクだけは、保存時の契約（未設定＋同一テナントは可）にそろえる。
- * フォーム・対応マークは所有列が無いので、存在だけを確かめる。
+ * 友だち情報欄・フォーム・対応マークは所有列が無いので、存在だけを確かめる。
  */
 export async function findFriendAddUnusableReferences(
   db: D1Database,
@@ -1142,10 +1142,11 @@ export async function findFriendAddUnusableReferences(
       sql: `SELECT id FROM scenarios WHERE id IN (${p}) AND line_account_id = ?`,
       bindings: [...refs.scenarioIds, accountId],
     })),
+    // 友だち情報欄はフォーム・対応マークと同じく所有アカウントの列を持たない
+    // （テナント共通）。存在だけを確かめる。
     selectIds(db, refs.friendFieldIds, (p) => ({
-      sql: `SELECT id FROM friend_fields
-             WHERE id IN (${p}) AND tenant_id IS NOT NULL AND tenant_id = ${tenantOfAccount}`,
-      bindings: [...refs.friendFieldIds, accountId],
+      sql: `SELECT id FROM friend_fields WHERE id IN (${p})`,
+      bindings: [...refs.friendFieldIds],
     })),
     selectIds(db, refs.routeIds, (p) => ({
       sql: `SELECT id FROM entry_routes

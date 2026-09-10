@@ -1081,6 +1081,59 @@ describe('本番の振り分け: 曜日・時間帯・条件・再送制限', ()
       expect(result.enrollments).toEqual([]);
     });
 
+    /*
+     * 参照の収集は入れ子グループの中まで降りる必要がある。1段目しか見ないと、
+     * 入れ子に他店のタグを1つ混ぜるだけで所属の検査を素通りできてしまう。
+     */
+    test('入れ子グループの中の他店タグも見つけて止める', async () => {
+      setupBase('acc-2', 'scenario-2');
+      raw.prepare(`INSERT INTO tags (id, name, line_account_id) VALUES ('tag-mine', '自店', 'acc-1')`).run();
+      raw.prepare(`INSERT INTO tags (id, name, line_account_id) VALUES ('tag-far', '他店', 'acc-2')`).run();
+      // 1段目は自店のタグだけ。他店のタグは2段目の入れ子に置く。
+      seedRule({
+        friendCondition: JSON.stringify({
+          operator: 'AND',
+          rules: [{ type: 'tag_exists', value: 'tag-mine' }],
+          groups: [{
+            operator: 'OR',
+            rules: [],
+            groups: [{ operator: 'AND', rules: [{ type: 'tag_exists', value: 'tag-far' }] }],
+          }],
+        }),
+        resendSuppressionHours: 0,
+      });
+      const result = await applyFriendAddRouting(
+        db, 'acc-1', { id: 'friend-1', unfollow_count: 0 }, undefined,
+        { entryRouteId: 'route-1', now: MON_10 },
+      );
+      expect(result).toMatchObject({ suppressed: true, suppressReason: 'reference_out_of_account' });
+      expect(result.enrollments).toEqual([]);
+    });
+
+    test('入れ子グループの中の消えたシナリオ・友だち情報欄も見つけて止める', async () => {
+      raw.prepare(`INSERT INTO tags (id, name, line_account_id) VALUES ('tag-ok', '自店', 'acc-1')`).run();
+      for (const nested of [
+        { type: 'scenario_state', value: { scenarioId: 'scenario-gone', state: 'subscribed' } },
+        { type: 'friend_field', value: { fieldId: 'field-gone', op: 'exists', text: '' } },
+      ]) {
+        seedRule({
+          id: `rule-nested-${nested.type}`,
+          friendCondition: JSON.stringify({
+            operator: 'AND',
+            rules: [{ type: 'tag_exists', value: 'tag-ok' }],
+            groups: [{ operator: 'AND', rules: [nested] }],
+          }),
+          resendSuppressionHours: 0,
+        });
+        const result = await applyFriendAddRouting(
+          db, 'acc-1', { id: 'friend-1', unfollow_count: 0 }, undefined,
+          { entryRouteId: 'route-1', now: MON_10 },
+        );
+        expect(result.suppressReason).toBe('reference_out_of_account');
+        raw.prepare(`DELETE FROM friend_add_rules WHERE id = ?`).run(`rule-nested-${nested.type}`);
+      }
+    });
+
     test('条件の中のフォーム・対応マークも存在を確かめる', async () => {
       seedRule({
         friendCondition: JSON.stringify({

@@ -388,6 +388,55 @@ describe('POST /webhook — 送信の結末を分ける (#622)', () => {
  * 引き金は混雑時の 429 でも起きるので、例外的な事故ではない。
  * 印に有効期限を持たせ、時間が経てば次の追加で届くようにする。
  */
+/*
+ * 振り分けの登録・アクションも、外部送信と同じ予約の下で行う。
+ * ここが関門の外にあると、回収されたあとの実行が購読を作ってしまい、
+ * cron がそれを拾って勝った側と二重に配信する。
+ */
+describe('POST /webhook — 振り分けの登録・アクションも関門の下 (#622)', () => {
+  test('登録の直前に予約を奪われたら、購読を作らず台帳も書かない', async () => {
+    // 振り分けの評価中（＝登録より前）に、別の実行が予約を奪う。
+    // 評価は friend_add_rule_versions を読むので、その読み取りに割り込む。
+    let stolen = false;
+    const proxy = new Proxy(db, {
+      get(target, prop, receiver) {
+        if (prop !== 'prepare') return Reflect.get(target, prop, receiver);
+        return (sql: string) => {
+          const stmt = (target.prepare as unknown as (q: string) => unknown)(sql) as Record<string, unknown>;
+          if (!stolen && sql.includes('friend_add_rule_versions')) {
+            stolen = true;
+            raw.prepare(
+              `UPDATE friend_add_send_claims
+                  SET event_id = 'stolen-by-other', generation = generation + 1`,
+            ).run();
+          }
+          return stmt;
+        };
+      },
+    }) as D1Database;
+
+    await postFollow('webhook-fenced-enroll', proxy);
+
+    expect(stolen).toBe(true);
+    // 送らない・購読を作らない
+    expect(sendCount()).toBe(0);
+    expect(raw.prepare(`SELECT COUNT(*) AS n FROM friend_scenarios`).get()).toEqual({ n: 0 });
+    // 台帳も書かない（勝った側が書く）
+    expect(raw.prepare(
+      `SELECT routing_status FROM friend_add_events WHERE webhook_event_id = 'webhook-fenced-enroll'`,
+    ).get()).toEqual({ routing_status: 'pending' });
+    // 予約は奪った側のまま
+    expect(raw.prepare(`SELECT event_id FROM friend_add_send_claims`).get())
+      .toEqual({ event_id: 'stolen-by-other' });
+  });
+
+  test('奪われていなければ登録して送る', async () => {
+    await postFollow('webhook-normal-enroll');
+    expect(sendCount()).toBe(1);
+    expect(raw.prepare(`SELECT COUNT(*) AS n FROM friend_scenarios`).get()).toEqual({ n: 1 });
+  });
+});
+
 describe('POST /webhook — 送達不明からの復旧 (#622)', () => {
   /** 台帳・予約・購読・送信記録を「じゅうぶん前」の状態にする。 */
   function ageEverything(minutesAgo: number): void {
