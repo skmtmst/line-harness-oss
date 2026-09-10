@@ -11,6 +11,9 @@ const dbMocks = {
   recoverStuckDeliveries: vi.fn(),
   // /r/:ref resolution helpers
   getEntryRouteByRefCode: vi.fn(),
+  // N-244: stopped-route check. Default null keeps every existing case on
+  // the legacy path (active hit / neither-table miss).
+  getEntryRouteByRefCodeAny: vi.fn().mockResolvedValue(null),
   getTrafficPoolBySlug: vi.fn(),
   getTrafficPoolById: vi.fn(),
   getRandomPoolAccount: vi.fn(),

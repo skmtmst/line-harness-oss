@@ -8,6 +8,7 @@ import {
   getRandomPoolAccount,
   getPoolAccounts,
   getEntryRouteByRefCode,
+  getEntryRouteByRefCodeAny,
   getLineAccountById,
   getAffiliateLinkByRefCode,
   incrementAffiliateLinkClick,
@@ -492,6 +493,11 @@ export const qrHandler: (c: Context<Env>) => Promise<Response> = async (c) => {
 
 app.get('/api/qr', qrHandler);
 
+// N-244: 停止した流入経路の公開URLは、active・停止・不存在の区別や
+// 転送先を漏らさない同一の終了応答で止める。ref の echo もしない。
+const ENTRY_ROUTE_STOPPED_HTML =
+  '<!doctype html><html lang="ja"><meta charset="utf-8"><title>このページは利用できません</title><body><main><h1>このページは利用できません</h1><p>公開が終わっているか、アドレスが正しくありません。運用者へ、新しいリンクをご確認ください。</p></main></body></html>';
+
 // Short link: /r/:ref → universal landing page with LINE open button
 // Supports query params: ?form=FORM_ID (auto-push form after friend add)
 // Mobile: single CTA → LIFF URL (Universal Link). No UA detection.
@@ -519,6 +525,15 @@ app.get('/r/:ref', async (c) => {
   // drop-off (clicks that never reach OAuth) is therefore not visible in the
   // funnel; that limitation is intentional pending a dedicated click table.
   const route = await getEntryRouteByRefCode(c.env.DB, ref);
+  // N-244: 停止した経路は active と同じ受付をしない。転送先があっても
+  // 送らず、紹介リンクやプールの後段にも落とさず、同一の終了応答で止める。
+  // ref が entry_routes の名前空間に属さないときだけ従来の後段へ進む。
+  if (!route) {
+    const anyRoute = await getEntryRouteByRefCodeAny(c.env.DB, ref);
+    if (anyRoute && anyRoute.is_active !== 1) {
+      return c.html(ENTRY_ROUTE_STOPPED_HTML, 410);
+    }
+  }
   // 転送先が設定された経路はそちらへ送る（#514 重大4）。保存はするのに
   // 読まないままだった。危険な形式は safe-redirect が弾き、そのときは
   // 従来どおり友だち追加の着地画面へ進む。
@@ -737,8 +752,17 @@ body{font-family:'Hiragino Sans','Helvetica Neue',system-ui,sans-serif;backgroun
 // Universal Links are blocked. This is the L-Step approach.
 // Method 2 (URL copy → external browser) is the universal fallback.
 // No LINE-Login-web fallback exposed — friction kills conversion.
-app.get('/r/:ref/help', (c) => {
+app.get('/r/:ref/help', async (c) => {
   const ref = c.req.param('ref');
+  // N-244: 停止した経路の回復ページも同じ終了応答で止める。直接開かれても
+  // 受付へ戻さない。属さない ref は従来どおり回復ページを出す。
+  const helpRoute = await getEntryRouteByRefCode(c.env.DB, ref);
+  if (!helpRoute) {
+    const anyRoute = await getEntryRouteByRefCodeAny(c.env.DB, ref);
+    if (anyRoute && anyRoute.is_active !== 1) {
+      return c.html(ENTRY_ROUTE_STOPPED_HTML, 410);
+    }
+  }
   const reqUrl = new URL(c.req.url);
   // Prefer the resolved liff target passed by /r/:ref via ?t= so pooled refs
   // do not re-roll on retry. Fall back to the short /r/:ref URL only when

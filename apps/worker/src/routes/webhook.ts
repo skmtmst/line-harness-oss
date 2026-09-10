@@ -26,6 +26,10 @@ import {
   recordAnalyticsEvent,
 } from '@line-crm/db';
 import type { EntryRoute, Friend } from '@line-crm/db';
+import {
+  isStoppedEntryRouteRef,
+  getActiveStopSuppressionSafe,
+} from '../services/entry-route-stop.js';
 import { applyFriendAddRouting } from '../services/friend-add-routing.js';
 import { fireEvent } from '../services/event-bus.js';
 import { matchAndReply } from '../services/auto-reply.js';
@@ -358,6 +362,25 @@ async function handleEvent(
       }
     }
 
+    // N-244競合: 候補保存→経路停止→follow到着の順でも、停止refを
+    // friends.ref_code・計測・友だち追加ルールへ使わない。capture は停止
+    // ref を friend_add_events へ確定させてしまうため、台帳も unavailable
+    // へ戻して計測に残さない。
+    // N-244差戻: 停止ref由来では unknown-route/アカウント共通の友だち追加
+    // シナリオを含めタグ・シナリオを一切開始しないため、破棄したことを覚える。
+    let stoppedRefDiscarded = false;
+    if (currentAttribution?.refCode && (await isStoppedEntryRouteRef(db, currentAttribution.refCode))) {
+      try {
+        await db.prepare(
+          `UPDATE friend_add_events SET attribution_status = 'unavailable', ref_code = NULL, entry_route_id = NULL, candidate_id = NULL WHERE id = ? AND line_account_id = ?`,
+        ).bind(friendAddEventId, lineAccountId).run();
+      } catch (err) {
+        logWebhookStepFailure('friend_add_attribution_discard_stopped', err, lineAccountId, event);
+      }
+      currentAttribution = null;
+      stoppedRefDiscarded = true;
+    }
+
     let friendRefCode = currentAttribution?.refCode
       ?? (friend as { ref_code?: string | null }).ref_code
       ?? null;
@@ -372,11 +395,46 @@ async function handleEvent(
         }
       }
     }
+    // N-244競合: 停止前に LIFF/OAuth が保存した既存 ref も停止済みなら
+    // 使わない。friends.ref_code の停止値は消し、計測・帰属に残さない。
+    if (friendRefCode && (await isStoppedEntryRouteRef(db, friendRefCode))) {
+      try {
+        await db.prepare(
+          `UPDATE friends SET ref_code = NULL, updated_at = ? WHERE id = ? AND ref_code = ?`,
+        ).bind(jstNow(), friend.id, friendRefCode).run();
+      } catch (err) {
+        logWebhookStepFailure('friend_ref_code_discard_stopped', err, lineAccountId, event);
+      }
+      friendRefCode = null;
+      stoppedRefDiscarded = true;
+    }
+    // N-244差戻(再審査): 候補Bが停止済みで破棄した場合、friends.ref_code の
+    // 過去active経路Aへ fallback しない。B由来の follow でAの紹介メッセージ/
+    // 専用scenarioが動くのを止める。A の DB 値は正規の履歴のため残すが、
+    // 今回の follow では使わない。既存ref由来の破棄では既に null のため no-op。
+    if (stoppedRefDiscarded) {
+      friendRefCode = null;
+    }
+    // N-244差戻(台帳): 候補・既存refが無く自然流入に見えても、同一利用者の
+    // 直近の停止試行が抑止台帳にあれば停止由来として抑止する。これで
+    // LIFF/callbackと別followが前後・同時に来ても停止由来が共有される。
+    // 明示の帰属(候補・既存ref)がある場合はそちらが勝ち、ここでは見ない。
+    if (!stoppedRefDiscarded && !currentAttribution && !friendRefCode && lineAccountId && userId) {
+      const suppression = await getActiveStopSuppressionSafe(db, lineAccountId, userId);
+      if (suppression) {
+        stoppedRefDiscarded = true;
+      }
+    }
     const referralRoute: EntryRoute | null = friendRefCode
       ? await getEntryRouteByRefCode(db, friendRefCode)
       : null;
+    // N-244差戻: 停止refを消した後は referralRoute が null になるため、
+    // 従来の条件だけでは unknown-route/アカウント共通の友だち追加ルールへ
+    // 流れてタグ・シナリオが始まる。破棄した場合は振り分けもアカウント共通
+    // シナリオもすべて止める。ref が無い自然流入は従来どおり進める。
     const runAccountScenarios =
-      !referralRoute || referralRoute.run_account_friend_add_scenarios !== 0;
+      !stoppedRefDiscarded &&
+      (!referralRoute || referralRoute.run_account_friend_add_scenarios !== 0);
 
     // 友だち追加時の配信の振り分け（設計 V2 4-6）。
     //
@@ -500,7 +558,10 @@ async function handleEvent(
         await markFriendAddEventRouting(db, {
           eventId: friendAddEventId,
           lineAccountId,
-          status: routing?.suppressed ? 'suppressed' : 'completed',
+          // N-244差戻: 停止ref由来で振り分けを止めた場合は suppressed に倒す。
+          // イベント状態として理由も残す (error_code に停止由来を記録)。
+          status: stoppedRefDiscarded || routing?.suppressed ? 'suppressed' : 'completed',
+          errorCode: stoppedRefDiscarded ? 'entry_route_stopped' : undefined,
           routingRuleId: routing?.ruleId ?? null,
           winningRuleVersionId: routing?.ruleVersionId ?? null,
           scenarioEnrollmentId,
