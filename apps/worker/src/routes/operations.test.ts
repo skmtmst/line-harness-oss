@@ -541,6 +541,57 @@ describe('停止不可理由の機械コード(N-453/N-455)', () => {
     });
   });
 
+  it('停止→復旧のあと古い版で停止すると、activeIncidentIdに頼らず版比較だけで409になる', async () => {
+    // 1. 停止(expectedVersion:0) → version=1, activeIncidentIdが付く。
+    const stopped = await app().request(
+      '/api/operations/incidents', stopRequest('account-1'), bindings(),
+    );
+    expect(stopped.status).toBe(201);
+    const stoppedBody = await stopped.json() as {
+      data: { control: { version: number }; incident: { id: string } };
+    };
+    expect(stoppedBody.data.control.version).toBe(1);
+
+    // 2. 復旧(expectedVersion:1) → version=2, activeIncidentIdはnullへ戻る。
+    const restored = await app().request(
+      `/api/operations/incidents/${stoppedBody.data.incident.id}/restore`,
+      {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-confirm-irreversible': 'operation-restore',
+          'x-step-up-token': 'step-up-restore',
+          'idempotency-key': 'restore-request-1',
+        },
+        body: JSON.stringify({ expectedVersion: 1, confirmation: '復旧' }),
+      },
+      bindings(),
+    );
+    expect(restored.status).toBe(200);
+    const restoredBody = await restored.json() as {
+      data: { control: { version: number; activeIncidentId: string | null } };
+    };
+    expect(restoredBody.data.control.version).toBe(2);
+    expect(restoredBody.data.control.activeIncidentId).toBeNull();
+
+    // 3. activeIncidentIdがnullのまま、古い版(1)で再び停止を試みる。
+    //    ここでの409はactiveIncidentIdの門を通らないので、版比較だけが理由になる。
+    await grant('step-up-stop-3', 'owner-1');
+    const stale = await app().request(
+      '/api/operations/incidents',
+      stopInit('step-up-stop-3', 'stop-request-3', stopBody({ expectedVersion: 1 })),
+      bindings(),
+    );
+    expect(stale.status).toBe(409);
+    const staleBody = await stale.json() as {
+      success: boolean; code: string; data: { version: number; activeIncidentId: string | null };
+    };
+    expect(staleBody).toMatchObject({ success: false, code: 'VERSION_CONFLICT' });
+    // 版比較だけが効いたことの証拠: 競合を返した時点でactiveIncidentIdはnullのまま。
+    expect(staleBody.data.activeIncidentId).toBeNull();
+    expect(staleBody.data.version).toBe(2);
+  });
+
   it('再実行キーの使い回しを409と機械コードで返す', async () => {
     expect((await app().request(
       '/api/operations/incidents', stopRequest('account-1'), bindings(),

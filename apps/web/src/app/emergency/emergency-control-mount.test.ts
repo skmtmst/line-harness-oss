@@ -919,7 +919,7 @@ describe('EmergencyControlPanel を実際に mount して操作する', () => {
     await answerPreview(0, previewPayload({ mark: 111 }))
     expect(host.text()).toContain('111件')
     const { ApiError } = await import('@/lib/api')
-    bench.stopResult = () => Promise.reject(new ApiError(409, 'conflict', 'EMERGENCY_VERSION_CONFLICT'))
+    bench.stopResult = () => Promise.reject(new ApiError(409, '別の管理者が先に変更しました。最新の状態を読み直してください。', 'VERSION_CONFLICT'))
 
     await runStopFlow(host)
 
@@ -951,7 +951,7 @@ describe('EmergencyControlPanel を実際に mount して操作する', () => {
     const host = await installReactHost(ACCOUNTS)
     await answerPreview(0, previewPayload({ mark: 111 }))
     const { ApiError } = await import('@/lib/api')
-    bench.stopResult = () => Promise.reject(new ApiError(409, 'conflict', 'EMERGENCY_VERSION_CONFLICT'))
+    bench.stopResult = () => Promise.reject(new ApiError(409, '別の管理者が先に変更しました。最新の状態を読み直してください。', 'VERSION_CONFLICT'))
     await runStopFlow(host)
 
     const reloadIndex = bench.previewCalls.length
@@ -999,7 +999,7 @@ describe('EmergencyControlPanel を実際に mount して操作する', () => {
     const host = await installReactHost(ACCOUNTS)
     await answerPreview(0, previewPayload({ mark: 111 }))
     const { ApiError } = await import('@/lib/api')
-    bench.stopResult = () => Promise.reject(new ApiError(409, 'conflict', 'EMERGENCY_VERSION_CONFLICT'))
+    bench.stopResult = () => Promise.reject(new ApiError(409, '別の管理者が先に変更しました。最新の状態を読み直してください。', 'VERSION_CONFLICT'))
     await runStopFlow(host)
 
     const reloadIndex = bench.previewCalls.length
@@ -1024,7 +1024,7 @@ describe('EmergencyControlPanel を実際に mount して操作する', () => {
     const host = await installReactHost(ACCOUNTS)
     await answerPreview(0, previewPayload({ mark: 111 }))
     const { ApiError } = await import('@/lib/api')
-    bench.stopResult = () => Promise.reject(new ApiError(409, 'conflict', 'EMERGENCY_VERSION_CONFLICT'))
+    bench.stopResult = () => Promise.reject(new ApiError(409, '別の管理者が先に変更しました。最新の状態を読み直してください。', 'VERSION_CONFLICT'))
     await runStopFlow(host)
 
     const firstReload = bench.previewCalls.length
@@ -1043,6 +1043,62 @@ describe('EmergencyControlPanel を実際に mount して操作する', () => {
     expect(button(host.container, '緊急停止する').hasAttribute('disabled')).toBe(false)
     expect(await click(button(host.container, '緊急停止する'))).toBe(true)
     expect(dialogs(host.container)).toHaveLength(1)
+
+    host.unmount()
+  })
+
+  it('403・409(版競合)以外の失敗(400)は、窓の裏に隠れず理由が見え、押し直せる', async () => {
+    const host = await installReactHost(ACCOUNTS)
+    await answerPreview(0, previewPayload({ mark: 111 }))
+    const { ApiError } = await import('@/lib/api')
+    bench.stopResult = () => Promise.reject(new ApiError(400, '認証コードが正しくありません'))
+
+    await click(button(host.container, '緊急停止する'))
+    await type(byId(host.container, 'emergency-confirm-word'), '停止')
+    await click(button(host.container, '配信を緊急停止する'))
+    await type(byId(host.container, 'emergency-step-up-code'), '123456')
+    // 送る直前は本人確認の窓が前面にあり、後ろの帯は見えていない。
+    expect(host.visibleText()).not.toContain('認証コードが正しくありません')
+
+    expect(await click(button(host.container, '本人確認して停止'))).toBe(true)
+    expect(bench.stopCalls).toHaveLength(1)
+
+    // 窓が閉じ、覆いも無くなり、理由が前面(帯)に実際に見える。
+    expect(dialogs(host.container)).toHaveLength(0)
+    expect(overlay(host.container)).toBeNull()
+    expect(host.visibleText()).toContain('認証コードが正しくありません')
+    expect(noticeBanner(host.container)?.textContent).toContain('認証コードが正しくありません')
+
+    // 版競合ではないのでpreviewは保持され、読み直しは求めない。全操作もロックしない。
+    expect(host.text()).toContain('111件')
+    expect(optionalButton(host.container, '最新の状態を読み直す')).toBeNull()
+    expect(button(host.container, '緊急停止する').hasAttribute('disabled')).toBe(false)
+
+    // 押し直せる(403のような恒久ブロックではない)。
+    expect(await click(button(host.container, '緊急停止する'))).toBe(true)
+    expect(dialogs(host.container)).toHaveLength(1)
+
+    host.unmount()
+  })
+
+  it('409でもVERSION_CONFLICT以外(IDEMPOTENCY_CONFLICT)は、別の管理者が変更したと偽らない', async () => {
+    const host = await installReactHost(ACCOUNTS)
+    await answerPreview(0, previewPayload({ mark: 111 }))
+    const { ApiError } = await import('@/lib/api')
+    bench.stopResult = () => Promise.reject(new ApiError(409, '同じ再実行キーが別の内容で使われています', 'IDEMPOTENCY_CONFLICT'))
+
+    await runStopFlow(host)
+
+    expect(dialogs(host.container)).toHaveLength(0)
+    expect(overlay(host.container)).toBeNull()
+    const visible = host.visibleText()
+    expect(visible).toContain('同じ再実行キーが別の内容で使われています')
+    expect(visible).not.toContain('別の管理者が先に変更しました')
+
+    // 版競合ではないのでpreviewを捨てず、読み直しも求めず、全操作をロックしない。
+    expect(host.text()).toContain('111件')
+    expect(optionalButton(host.container, '最新の状態を読み直す')).toBeNull()
+    expect(button(host.container, '緊急停止する').hasAttribute('disabled')).toBe(false)
 
     host.unmount()
   })

@@ -78,6 +78,21 @@ function operationBlockedText(code: string | null | undefined): string | null {
   if (code === OPERATION_BLOCKED_CODES.controlForbidden) return '緊急停止を実行する権限がありません。オーナーに権限付与を依頼してください。'
   return null
 }
+
+/*
+ * N-453(3回目の差し戻し): 403・409(版競合)以外で落ちたときの理由。
+ *
+ * 口の `error` は400/409/422/428でだけ運用者向け文言として保証される
+ * (`apps/web/src/lib/api.ts` の `BODY_MESSAGE_STATUSES`)。429・5xxでは
+ * `ApiError.message` が `API error: <status>` という内部向けの作り置きに
+ * 落ちるため、それをそのまま出さず固定の案内文へ倒す。
+ */
+function operationFailureText(error: unknown, fallback: string): string {
+  if (error instanceof ApiError && error.message && !/^API error: \d+$/.test(error.message)) {
+    return error.message
+  }
+  return fallback
+}
 type ConfirmMode = 'stop' | 'restore' | null
 type ControlMessage = { tone: 'success' | 'warning' | 'danger'; text: string }
 type StopBlocker = 'unavailable' | 'forbidden' | 'scope' | 'empty' | 'stopped'
@@ -116,7 +131,7 @@ function isEmergencyMutationLocked(needsReload: boolean, running: boolean): bool
   return needsReload || running
 }
 
-type EmergencySafetyEvent = 'conflict' | 'forbidden' | 'reload-start' | 'reload-success' | 'reload-failure'
+type EmergencySafetyEvent = 'conflict' | 'forbidden' | 'operation-failed' | 'reload-start' | 'reload-success' | 'reload-failure'
 
 function emergencySafetyTransition(event: EmergencySafetyEvent): {
   clearPreview: boolean
@@ -138,6 +153,18 @@ function emergencySafetyTransition(event: EmergencySafetyEvent): {
    * 窓と入力と要求鍵を閉じて、理由を前面に出し、送り直せなくする。
    */
   if (event === 'forbidden') return {
+    clearPreview: false,
+    closeDialogs: true,
+    needsReload: false,
+    reloading: false,
+    message: null,
+  }
+  /*
+   * N-453(3回目の差し戻し): 403・409(版競合)以外の失敗(400/429/5xx等)は
+   * 本人確認の窓が `fixed inset-0` の覆いつきで開いたままだと、帯(理由)が
+   * 覆いの裏へ回って運用者から見えない。403と同じく窓を閉じて理由を前面へ出す。
+   */
+  if (event === 'operation-failed') return {
     clearPreview: false,
     closeDialogs: true,
     needsReload: false,
@@ -613,6 +640,15 @@ function EmergencyControlPanel({ accounts }: { accounts: LineAccount[] }) {
     setMessage({ tone: 'warning', text: operationBlockedText(code) ?? 'この操作を行う権限がありません。オーナーに確認してください。' })
   }, [applySafetyTransition])
 
+  /*
+   * 403・409(版競合)以外の失敗はここへ倒す。本人確認の窓を閉じて理由を
+   * 前面へ出すことで、`fixed inset-0` の覆いの裏に理由が隠れないようにする。
+   */
+  const handleOperationFailure = useCallback((text: string) => {
+    applySafetyTransition('operation-failed')
+    setMessage({ tone: 'danger', text })
+  }, [applySafetyTransition])
+
   const selectedTargets = (Object.keys(targets) as StopTarget[]).filter((key) => targets[key])
   const selectedCapabilities = selectedTargets.flatMap((key) => TARGET_CAPABILITIES[key])
   const isStopped = Boolean(control?.activeIncidentId)
@@ -660,12 +696,12 @@ function EmergencyControlPanel({ accounts }: { accounts: LineAccount[] }) {
       setMessage({ tone: 'success', text: 'サーバー共通の停止状態を更新しました。別の端末にも同じ状態が表示されます。' })
       setStepUpMode(null); setStepUpCode(''); setRequestKey('')
     } catch (error) {
-      if (error instanceof ApiError && error.status === 409) {
+      if (error instanceof ApiError && error.status === 409 && error.code === 'VERSION_CONFLICT') {
         handleConflict()
       } else if (error instanceof ApiError && error.status === 403) {
         handleForbidden(error.code)
       } else {
-        setMessage({ tone: 'danger', text: '緊急停止を保存できませんでした。最新の停止状態を読み直して、もう一度確認してください。' })
+        handleOperationFailure(operationFailureText(error, '緊急停止を保存できませんでした。最新の停止状態を読み直して、もう一度確認してください。'))
       }
     } finally { setRunning(false) }
   }
@@ -686,12 +722,12 @@ function EmergencyControlPanel({ accounts }: { accounts: LineAccount[] }) {
       setMessage({ tone: 'success', text: 'サーバー共通の停止状態を復旧しました。期限を過ぎた予約は自動では送りません。' })
       setStepUpMode(null); setStepUpCode(''); setRequestKey('')
     } catch (error) {
-      if (error instanceof ApiError && error.status === 409) {
+      if (error instanceof ApiError && error.status === 409 && error.code === 'VERSION_CONFLICT') {
         handleConflict()
       } else if (error instanceof ApiError && error.status === 403) {
         handleForbidden(error.code)
       } else {
-        setMessage({ tone: 'danger', text: '復旧できませんでした。最新の停止状態を読み直して、もう一度確認してください。' })
+        handleOperationFailure(operationFailureText(error, '復旧できませんでした。最新の停止状態を読み直して、もう一度確認してください。'))
       }
     } finally { setRunning(false) }
   }
