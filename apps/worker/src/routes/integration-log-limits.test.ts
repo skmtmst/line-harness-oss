@@ -5,12 +5,19 @@ import type { Env } from '../index.js';
 const mocks = vi.hoisted(() => ({
   getStripeEvents: vi.fn(),
   getAdConversionLogs: vi.fn(),
+  getAdPlatformById: vi.fn(),
 }));
 
 vi.mock('@line-crm/db', async (importOriginal) => ({
   ...await importOriginal<typeof import('@line-crm/db')>(),
   getStripeEvents: mocks.getStripeEvents,
   getAdConversionLogs: mocks.getAdConversionLogs,
+  getAdPlatformById: mocks.getAdPlatformById,
+}));
+
+vi.mock('../services/account-access.js', () => ({
+  canAccessAllLineAccounts: vi.fn(async () => true),
+  getVisibleLineAccountScope: vi.fn(async () => ({ allowedAccountIds: [], canSeeUnassigned: true })),
 }));
 
 const [{ stripe }, { adPlatforms }] = await Promise.all([
@@ -20,6 +27,10 @@ const [{ stripe }, { adPlatforms }] = await Promise.all([
 
 function app() {
   const app = new Hono<Env>();
+  app.use('*', async (c, next) => {
+    c.set('staff', { id: 'owner-1', name: 'Owner', role: 'owner', readOnly: false, tenantId: 'tenant-1' });
+    return next();
+  });
   app.route('/', stripe);
   app.route('/', adPlatforms);
   return app;
@@ -29,6 +40,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.getStripeEvents.mockResolvedValue([]);
   mocks.getAdConversionLogs.mockResolvedValue([]);
+  mocks.getAdPlatformById.mockResolvedValue({ id: 'platform-1', line_account_id: 'a1' });
 });
 
 describe('外部連携ログの一覧上限', () => {

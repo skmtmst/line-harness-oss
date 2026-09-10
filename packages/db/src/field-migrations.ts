@@ -1,4 +1,5 @@
 import { jstNow } from './utils.js';
+import { validateFriendFieldValue } from './friend-fields.js';
 import type { FriendFieldScope, FriendFieldType, FriendFieldUsageTarget } from './friend-fields.js';
 
 export type FieldMigrationItemStatus = 'convertible' | 'review' | 'invalid' | 'succeeded' | 'failed';
@@ -205,11 +206,31 @@ export async function executeFieldMigration(
   ).bind(runId).all<FieldMigrationItem>();
   const run = await db.prepare(`SELECT * FROM field_migration_runs WHERE id = ?`).bind(runId).first<FieldMigrationRun>();
   if (!run) return;
+  const target = await db.prepare(
+    `SELECT COALESCE(type_v6, type) AS resolved_type, options_json
+       FROM friend_fields WHERE id = ?`,
+  ).bind(run.target_field_id).first<{ resolved_type: string; options_json: string | null }>();
   let succeeded = 0;
   let failed = 0;
+  const failItem = async (friendId: string, reason: string) => {
+    failed += 1;
+    await db.prepare(
+      `UPDATE field_migration_items SET status = 'failed', reason = ?
+        WHERE run_id = ? AND friend_id = ?`,
+    ).bind(reason.slice(0, 300), runId, friendId).run();
+  };
   for (const item of result.results) {
+    // N-042: 変換済みでも保存前に同じ検証へ通す。通らない値は書かず失敗に倒す。
+    const checked = validateFriendFieldValue(
+      { type: target?.resolved_type ?? '', options_json: target?.options_json ?? null },
+      item.converted_value,
+    );
+    if (!checked.ok || checked.value === null) {
+      await failItem(item.friend_id, checked.ok ? '変換結果が空になりました' : checked.error);
+      continue;
+    }
     try {
-      const converted = item.converted_value ?? '';
+      const converted = checked.value;
       const typed = typedColumns(targetType, converted);
       const now = jstNow();
       await db.batch([

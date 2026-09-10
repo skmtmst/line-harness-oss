@@ -3692,6 +3692,7 @@ export type AdPlatform = {
   /** 鍵は先頭と末尾だけ残して伏せてある。 */
   config: Record<string, unknown>
   isActive: boolean
+  lineAccountId: string | null
   createdAt: string
   updatedAt: string
 }
@@ -3700,6 +3701,7 @@ export type AdConversionLog = {
   id: string
   adPlatformId: string
   friendId: string
+  lineAccountId: string | null
   eventName: string
   clickId: string | null
   clickIdType: string | null
@@ -6344,6 +6346,8 @@ export const api = {
       friendId?: string
       issueInitialLink?: boolean
       lineAccountId?: string
+      /** 安定した操作UUID（#686）。同じ値での再送は同じ登録を返す。 */
+      operationId?: string
     }) =>
       fetchApi<ApiResponse<Affiliate> & { link?: { refCode: string; url: string } | null }>(
         '/api/affiliates',
@@ -8729,6 +8733,8 @@ export const api = {
       lineAccountId?: string | null
       tagId?: string | null
       scenarioId?: string | null
+      /** 安定した操作UUID（#686）。同じ値での再送は同じ登録を返す。 */
+      operationId?: string
     }) =>
       fetchApi<{ success: boolean; data: AffiliateOffer }>('/api/affiliate-offers', {
         method: 'POST',
