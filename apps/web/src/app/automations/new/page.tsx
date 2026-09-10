@@ -1,11 +1,11 @@
 'use client'
 
 import SelectField from '@/components/shared/select-field'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import type { Automation } from '@line-crm/shared'
-import { api, ApiError, type AutomationDraftDetail } from '@/lib/api'
+import { api, ApiError, type AutomationDraftAction, type AutomationDraftDetail } from '@/lib/api'
 import Breadcrumb from '@/components/shared/breadcrumb'
 import StickyBar from '@/components/shared/sticky-bar'
 import { TextArea, TextField } from '@/components/shared/text-field'
@@ -53,7 +53,7 @@ const EVENTS: ReadonlyArray<{ value: Automation['eventType']; label: string; not
   {
     value: 'tag_change',
     label: 'タグが付いた・外れたとき',
-    note: '付け外しのどちらでも動きます。付いたときだけに限る条件は、まだ選べません。',
+    note: '選んだタグが付いたとき・外れたときに動きます。下でどちらかを選びます。',
   },
   { value: 'form_submitted', label: 'フォームに回答したとき', note: '回答が保存されたとき。フォームを指定できます。' },
   { value: 'ec.order.confirmed', label: '注文が確定したとき', note: 'EC連携で注文確定が記録された人に動きます。' },
@@ -103,6 +103,131 @@ const newActionDraft = (): ActionDraft => ({
   message: '',
 })
 
+/**
+ * 作りかけの下書きの控え（N-357）。
+ *
+ * 保存した下書きの番号は画面の記憶（`savedDraft`）にしか無かったので、
+ * 再読込や「戻る」で消え、保存のたびに新しい下書きが増えていた。
+ * ブラウザに控えておき、同じ店のときだけ再利用する。
+ */
+const DRAFT_STORAGE_KEY = 'lh-automation-new-draft-v1'
+
+interface StoredDraft {
+  id: string
+  draftVersionId: string
+}
+
+type StoredDrafts = Record<string, StoredDraft>
+
+const isStoredDraft = (value: unknown): value is StoredDraft => {
+  if (!value || typeof value !== 'object') return false
+  const draft = value as Partial<StoredDraft>
+  return typeof draft.id === 'string' && typeof draft.draftVersionId === 'string'
+}
+
+const readStoredDrafts = (): StoredDrafts => {
+  try {
+    const raw = sessionStorage.getItem(DRAFT_STORAGE_KEY)
+    if (!raw) return {}
+    const parsed = JSON.parse(raw) as unknown
+    if (!parsed || typeof parsed !== 'object') return {}
+
+    // 以前の1店舗分だけの控えも読み、次の保存で店舗別の形へ移す。
+    const legacy = parsed as Partial<StoredDraft> & { accountId?: unknown }
+    const legacyAccountId = legacy.accountId
+    if (typeof legacyAccountId === 'string' && isStoredDraft(legacy)) {
+      return { [legacyAccountId]: { id: legacy.id, draftVersionId: legacy.draftVersionId } }
+    }
+
+    return Object.fromEntries(
+      Object.entries(parsed).filter((entry): entry is [string, StoredDraft] => isStoredDraft(entry[1])),
+    )
+  } catch {
+    return {}
+  }
+}
+
+const readStoredDraft = (accountId: string): StoredDraft | null =>
+  readStoredDrafts()[accountId] ?? null
+
+const writeStoredDraft = (accountId: string, draft: StoredDraft): void => {
+  try {
+    sessionStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify({
+      ...readStoredDrafts(),
+      [accountId]: draft,
+    }))
+  } catch {
+    // 控えが書けなくても保存自体は続ける。次は作り直しになるだけ。
+  }
+}
+
+const clearStoredDraft = (accountId: string): void => {
+  try {
+    const drafts = readStoredDrafts()
+    delete drafts[accountId]
+    if (Object.keys(drafts).length === 0) sessionStorage.removeItem(DRAFT_STORAGE_KEY)
+    else sessionStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(drafts))
+  } catch {
+    // 消せなくても害はない。
+  }
+}
+
+/**
+ * 中身をそのまま表す文字列（N-358）。
+ *
+ * 鍵の並び順を固定するので、**同じ中身なら必ず同じ文字列**になる。
+ */
+const canonicalJson = (value: unknown): string => {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`
+  if (value && typeof value === 'object') {
+    return `{${Object.entries(value as Record<string, unknown>)
+      .filter(([, item]) => item !== undefined)
+      .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
+      .map(([key, item]) => `${JSON.stringify(key)}:${canonicalJson(item)}`)
+      .join(',')}}`
+  }
+  return JSON.stringify(value === undefined ? null : value)
+}
+
+/**
+ * 1人テストで実際に動く部分の指紋（N-358）。
+ *
+ * **版の番号だけでは「確認したときと同じ中身か」を判定できない。**
+ * `apps/worker/src/services/automation-drafts.ts` の `updateAutomationDraft` は
+ * `automation_versions` の**同じ行を書き換える**ので、下書きを何度更新しても
+ * `draftVersionId` は変わらない。別のタブで書き換えられた後でも、古い確認画面が
+ * 持っている版の番号はそのまま通ってしまい、`runAutomationTest` はそのとき
+ * DBにある新しい中身を送る。だから中身そのものを指紋にして確認へ結びつける。
+ *
+ * 名前と説明は送信結果を変えないので入れない。
+ */
+const draftFingerprint = (
+  draft: Pick<AutomationDraftDetail, 'eventType' | 'triggerConfig' | 'conditions' | 'actions'>,
+): string => canonicalJson({
+  eventType: draft.eventType,
+  triggerConfig: draft.triggerConfig,
+  conditions: draft.conditions,
+  actions: draft.actions,
+})
+
+/**
+ * 「この内容で送る」と押したときに送る中身を、押す前に固めた控え（N-358）。
+ *
+ * 画面の状態ではなく**この控えだけ**を送信に使う。送る直前にサーバーの
+ * いまの中身と突き合わせ、1文字でも違えば送らずに 409 として扱う。
+ */
+interface TestConfirmation {
+  accountId: string
+  draftId: string
+  draftVersionId: string
+  fingerprint: string
+  /** 画面の入力とのずれを出すためだけの、すること部分の指紋。 */
+  actionsFingerprint: string
+  friendId: string
+  contents: string[]
+  effects: string[]
+}
+
 export default function NewAutomationPage() {
   usePageTitle('ルールを作る')
   const router = useRouter()
@@ -115,7 +240,7 @@ export default function NewAutomationPage() {
   const [conditionValue, setConditionValue] = useState('')
   const [triggerConfig, setTriggerConfig] = useState<Record<string, unknown>>({})
   const [scheduleType, setScheduleType] = useState<'datetime' | 'daily' | 'weekly'>('datetime')
-  const [savedDraft, setSavedDraft] = useState<{ id: string; draftVersionId: string } | null>(null)
+  const [savedDraft, setSavedDraft] = useState<StoredDraft | null>(null)
   const [previewCount, setPreviewCount] = useState<number | null>(null)
   const [testFriendId, setTestFriendId] = useState('')
   const [actions, setActions] = useState<ActionDraft[]>([newActionDraft()])
@@ -123,9 +248,18 @@ export default function NewAutomationPage() {
   const [tagsLoading, setTagsLoading] = useState(true)
   const [tagsFailed, setTagsFailed] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [testing, setTesting] = useState(false)
+  const [preparingTest, setPreparingTest] = useState(false)
+  const [testConfirmation, setTestConfirmation] = useState<TestConfirmation | null>(null)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [existingAutomations, setExistingAutomations] = useState<Automation[]>([])
+  // 画面の描き直しを待たずに二重押しを止める鍵（N-357・N-358）。
+  const saveRunningRef = useRef(false)
+  const testRunningRef = useRef(false)
+  const prepareRunningRef = useRef(false)
+  const selectedAccountRef = useRef(selectedAccountId)
+  selectedAccountRef.current = selectedAccountId
 
   useEffect(() => {
     let cancelled = false
@@ -176,6 +310,19 @@ export default function NewAutomationPage() {
     }
   }, [selectedAccountId])
 
+  // N-357: 再読込・「戻る」でも同じ下書きを使い回す。店が替わったら
+  // 別の店の下書きを触らないよう、控えが一致するときだけ引き継ぐ。
+  // 店を替えたら、前の店の確認・結果・見込み人数は残さない（N-358）。
+  // 走っている途中の保存・1人テストは、返ってきても自分の店でなければ
+  // 何も書かない（`selectedAccountRef` で見張る）。
+  useEffect(() => {
+    setPreviewCount(null)
+    setError('')
+    setNotice('')
+    setTestConfirmation(null)
+    setSavedDraft(selectedAccountId ? readStoredDraft(selectedAccountId) : null)
+  }, [selectedAccountId])
+
   const selectedEvent = EVENTS.find((event) => event.value === eventType) ?? EVENTS[0]
   const usesKeyword = KEYWORD_EVENTS.includes(eventType)
   const hasSameTrigger = existingAutomations.some((item) => item.eventType === selectedEvent.value)
@@ -189,6 +336,40 @@ export default function NewAutomationPage() {
     }
     return row.message.trim() ? '入力したメッセージを送る' : 'メッセージを送る'
   }).join('、')
+
+  /** 保存で送る「すること」。確認画面とのずれを見るときも同じ形を使う。 */
+  const draftActions = (): AutomationDraftAction[] => actions.map((row, index) => (
+    row.type === 'add_tag'
+      ? { id: `step-${index + 1}`, type: 'add_tag' as const, params: { tagId: row.tagId }, onFailure: 'stop' as const }
+      : {
+          id: `step-${index + 1}`,
+          type: 'send_message' as const,
+          params: { messageType: 'text', content: row.message.trim() },
+          onFailure: 'stop' as const,
+        }
+  ))
+
+  /**
+   * 確認に出す「実際に送られる中身」（N-358）。
+   *
+   * **画面の入力からは作らない。** サーバーが持っている下書きから作る。
+   * 入力中で未保存の文面が確認へ混ざると、見た内容と送る内容がずれる。
+   */
+  const describeDraftActions = (list: AutomationDraftAction[]): { contents: string[]; effects: string[] } => ({
+    contents: list.map((step) => {
+      if (step.type === 'send_message') return `メッセージ「${String(step.params.content ?? '')}」`
+      if (step.type === 'add_tag') {
+        const tagId = String(step.params.tagId ?? '')
+        return `タグ「${tags.find((tag) => tag.id === tagId)?.name ?? tagId}」を付ける`
+      }
+      return `シナリオ「${String(step.params.scenarioId ?? '')}」を始める`
+    }),
+    effects: [
+      list.some((step) => step.type === 'send_message') ? 'メッセージが相手に届きます' : null,
+      list.some((step) => step.type === 'add_tag') ? 'タグが相手に付きます' : null,
+      list.some((step) => step.type === 'start_scenario') ? 'シナリオが相手に始まります' : null,
+    ].filter((item): item is string => item !== null),
+  })
 
   useEffect(() => {
     setTriggerConfig({})
@@ -250,6 +431,8 @@ export default function NewAutomationPage() {
   }, [canManage])
 
   const save = async (activate: boolean) => {
+    // N-357: 連打で下書きが2つできないよう、描き直しより先に鍵をかける。
+    if (saveRunningRef.current) return
     if (saving || blockedReason) return
     const invalid = validate()
     if (invalid) {
@@ -257,21 +440,28 @@ export default function NewAutomationPage() {
       setNotice('')
       return
     }
+    saveRunningRef.current = true
     setSaving(true)
     setError('')
     setNotice('')
+    const accountId = selectedAccountId
     try {
-      if (!selectedAccountId) throw new Error('LINE公式アカウントを選んでください')
+      if (!accountId) throw new Error('LINE公式アカウントを選んでください')
+      // N-357: 再読込・「戻る」で同じ下書きへ戻す判定は、店を読むところ
+      // （`setSavedDraft(readStoredDraft(...))`）の1か所だけに置く。
+      // ここでもう一度控えを読むと同じ判定を2つ持つことになり、片方だけ
+      // 直したときに食い違う。**逆変異でも落ちない**ので、見張りにもならない。
       let draft = savedDraft
       if (!draft) {
-        const created = await api.automations.createDraftFromTemplate('received-message-tag', selectedAccountId)
+        const created = await api.automations.createDraftFromTemplate('received-message-tag', accountId)
         if (!created.success) throw new Error(created.error)
         draft = created.data
+        writeStoredDraft(accountId, draft)
       }
       const conditions = {
         ...(conditionType && conditionValue.trim() ? { operator: 'AND' as const, rules: [{ type: conditionType, value: conditionType === 'is_following' || conditionType === 'is_hidden' ? conditionValue.trim() === 'true' : conditionValue.trim() }] } : {}),
       }
-      const res = await api.automations.updateDraft(draft.id, selectedAccountId, {
+      const res = await api.automations.updateDraft(draft.id, accountId, {
         expectedDraftVersionId: draft.draftVersionId,
         name: name.trim(),
         eventType: draftEventType,
@@ -279,55 +469,164 @@ export default function NewAutomationPage() {
         conditions,
         // すること（アクション）は { type, params } の形で持つ。
         // params の中身は type ごとに違う。
-        actions: actions.map(
-          (row, index) =>
-            row.type === 'add_tag'
-              ? { id: `step-${index + 1}`, type: 'add_tag', params: { tagId: row.tagId }, onFailure: 'stop' as const }
-              : {
-                  id: `step-${index + 1}`,
-                  type: 'send_message',
-                  params: { messageType: 'text', content: row.message.trim() },
-                  onFailure: 'stop' as const,
-                },
-        ),
+        actions: draftActions(),
       })
       if (!res.success) throw new Error(res.error)
-      setSavedDraft(draft)
-      const preview = await api.automations.audiencePreview(draft.id, selectedAccountId, draft.draftVersionId)
-      if (preview.success) setPreviewCount(preview.data.matched)
+      // 保存すると中身が変わるので、版の札も新しくなる。取り直してから
+      // 見込み人数と公開へ渡す。古い札のままだと Worker に弾かれる（それが正しい）。
+      const saved = await api.automations.getDraft(draft.id, accountId)
+      if (!saved.success) throw new Error(saved.error)
+      draft = { id: draft.id, draftVersionId: saved.data.draftVersionId }
+      writeStoredDraft(accountId, draft)
+      if (selectedAccountRef.current === accountId) setSavedDraft(draft)
+      const preview = await api.automations.audiencePreview(draft.id, accountId, draft.draftVersionId)
+      if (preview.success && selectedAccountRef.current === accountId) setPreviewCount(preview.data.matched)
       if (!activate) {
-        setNotice('下書きに保存しました。見込み人数を確認して、1人で試せます。')
+        if (selectedAccountRef.current === accountId) {
+          setNotice('下書きに保存しました。見込み人数を確認して、1人で試せます。')
+        }
         return
       }
-      const published = await api.automations.publishDraft(draft.id, selectedAccountId, draft.draftVersionId, true)
+      const published = await api.automations.publishDraft(draft.id, accountId, draft.draftVersionId, true)
       if (!published.success) throw new Error(published.error)
-      router.push(`/automations?highlight=${draft.id}`)
+      // 公開したら下書きは無くなるので控えも捨てる。
+      clearStoredDraft(accountId)
+      if (selectedAccountRef.current === accountId) router.push(`/automations?highlight=${draft.id}`)
     } catch (caught) {
-      setError(
-        caught instanceof ApiError || caught instanceof Error
-          ? caught.message
-          : '保存できませんでした',
-      )
+      // 下書き自体が無くなっていたら控えを捨て、次は作り直す（N-357）。
+      if (
+        caught instanceof ApiError &&
+        (caught.status === 404 || caught.status === 409 || caught.code === 'not_found' || caught.code === 'version_conflict')
+      ) {
+        if (accountId) clearStoredDraft(accountId)
+        if (selectedAccountRef.current === accountId) setSavedDraft(null)
+      }
+      if (selectedAccountRef.current === accountId) {
+        setError(
+          caught instanceof ApiError || caught instanceof Error
+            ? caught.message
+            : '保存できませんでした',
+        )
+      }
     } finally {
+      saveRunningRef.current = false
       setSaving(false)
     }
   }
 
-  const runOnePersonTest = async () => {
-    if (!savedDraft || !selectedAccountId || !testFriendId.trim()) {
-      setError('下書きを保存して、試す友だちのIDを入力してください')
+  /**
+   * N-358: 1人テストは2段階にする。
+   *
+   * 以前はIDを入れて押すとすぐ本番送信していた。送り先・送る内容・
+   * 起きることを見せてから送る。**見せる中身はサーバーから取り直す**ので、
+   * 画面に残っている古い記憶や未保存の入力は確認へ混ざらない。
+   */
+  const askOnePersonTest = async () => {
+    const accountId = selectedAccountId
+    const friendId = testFriendId.trim()
+    const draft = savedDraft
+    if (!draft || !accountId) {
+      setError('実際に送る内容を確認するため、先に下書きを保存してください')
       return
     }
-    setSaving(true)
+    if (!friendId) {
+      setError('試す友だちのIDを入力してください')
+      return
+    }
+    if (prepareRunningRef.current) return
+    prepareRunningRef.current = true
+    setPreparingTest(true)
     setError('')
+    setNotice('')
     try {
-      const result = await api.automations.test(savedDraft.id, selectedAccountId, testFriendId.trim(), savedDraft.draftVersionId)
+      const detail = await api.automations.getDraft(draft.id, accountId)
+      if (!detail.success) throw new Error(detail.error)
+      // 別のタブで作り直されていたら、こちらの控えも新しい版へ合わせる。
+      if (detail.data.draftVersionId !== draft.draftVersionId) {
+        const refreshed = { id: draft.id, draftVersionId: detail.data.draftVersionId }
+        writeStoredDraft(accountId, refreshed)
+        if (selectedAccountRef.current === accountId) setSavedDraft(refreshed)
+      }
+      if (selectedAccountRef.current !== accountId) return
+      const described = describeDraftActions(detail.data.actions)
+      setTestConfirmation({
+        accountId,
+        draftId: draft.id,
+        draftVersionId: detail.data.draftVersionId,
+        fingerprint: draftFingerprint(detail.data),
+        actionsFingerprint: canonicalJson(detail.data.actions),
+        friendId,
+        contents: described.contents,
+        effects: described.effects,
+      })
+    } catch (caught) {
+      if (selectedAccountRef.current !== accountId) return
+      setError(
+        caught instanceof ApiError || caught instanceof Error
+          ? caught.message
+          : '送る内容を確認できませんでした',
+      )
+    } finally {
+      prepareRunningRef.current = false
+      setPreparingTest(false)
+    }
+  }
+
+  /**
+   * 確認した中身だけを送る（N-358）。
+   *
+   * 送る直前にサーバーのいまの中身を取り直し、確認したときの指紋と
+   * **1文字でも違えば送らない**。
+   *
+   * ここでの突き合わせは、利用者へ先に知らせるためのもの。**最後の砦は
+   * Worker 側**にある。`api.automations.test` へ渡す `versionId` は
+   * `getDraft` が返した札（`<版の行のid>.<中身の指紋>`）そのままで、Worker は
+   * 実行記録を作る前にこの指紋と DB の中身を突き合わせ、違えば 409 で返す。
+   * 画面側の突き合わせを外しても実送信は起きない（逆変異で確認済み）。
+   */
+  const runOnePersonTest = async () => {
+    const pending = testConfirmation
+    if (!pending || testRunningRef.current) return
+    testRunningRef.current = true
+    setTesting(true)
+    setError('')
+    const sameAccount = () => selectedAccountRef.current === pending.accountId
+    try {
+      const latest = await api.automations.getDraft(pending.draftId, pending.accountId)
+      if (!latest.success) throw new Error(latest.error)
+      if (
+        latest.data.draftVersionId !== pending.draftVersionId
+        || draftFingerprint(latest.data) !== pending.fingerprint
+      ) {
+        if (sameAccount()) {
+          setTestConfirmation(null)
+          setError('確認したあとに下書きが変わりました。送っていません。もう一度、送る内容を確認してください')
+        }
+        return
+      }
+      const result = await api.automations.test(
+        pending.draftId, pending.accountId, pending.friendId, pending.draftVersionId,
+      )
       if (!result.success) throw new Error(result.error)
+      if (!sameAccount()) return
+      setTestConfirmation(null)
       setNotice(`1人テストを受け付けました（状態: ${result.data.status}）`)
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : '1人テストを実行できませんでした')
+      // 待っている間に店を替えたら、前の店の成否をこの画面へ書かない。
+      if (!sameAccount()) return
+      // Worker が「確認したときと違う」と返したときも、画面側で気づいたときと
+      // 同じ扱いにする。古い確認を開いたままにしない。
+      if (caught instanceof ApiError && (caught.status === 409 || caught.code === 'version_conflict')) {
+        setTestConfirmation(null)
+      }
+      setError(
+        caught instanceof ApiError || caught instanceof Error
+          ? caught.message
+          : '1人テストを実行できませんでした',
+      )
     } finally {
-      setSaving(false)
+      testRunningRef.current = false
+      setTesting(false)
     }
   }
 
@@ -567,9 +866,45 @@ export default function NewAutomationPage() {
             </p>
             <div className="mt-3 space-y-2">
               <TextField aria-label="1人テストの友だちID" value={testFriendId} onChange={(event) => setTestFriendId(event.target.value)} placeholder="試す友だちID" />
-              <Button onClick={() => void runOnePersonTest()} disabled={saving || !savedDraft || !testFriendId.trim()}>1人で試す</Button>
+              <Button
+                onClick={() => void askOnePersonTest()}
+                disabled={saving || testing || preparingTest || !savedDraft || !testFriendId.trim()}
+              >
+                {preparingTest ? '確認中...' : '1人で試す'}
+              </Button>
               <p className="mt-1 text-xs font-medium leading-relaxed text-ink-faint">保存した時点の内容で試します。変えた後は保存し直してから試してください。</p>
             </div>
+            {testConfirmation ? (
+              <div className="mt-3 space-y-2 rounded-control border border-hairline bg-canvas-sunken p-3" role="dialog" aria-label="1人テストの確認">
+                <p className="text-xs font-bold text-ink">送る前に確認してください</p>
+                <p className="text-xs leading-5 text-ink-secondary">送り先：{testConfirmation.friendId}</p>
+                <div className="text-xs leading-5 text-ink-secondary">
+                  <p>送る内容：</p>
+                  <ul className="list-disc pl-5">
+                    {testConfirmation.contents.map((content, index) => <li key={`${index}-${content}`}>{content}</li>)}
+                  </ul>
+                </div>
+                <p className="text-xs leading-5 text-ink-secondary">起きること：{testConfirmation.effects.join('、')}。取り消せません。</p>
+                {canonicalJson(draftActions()) !== testConfirmation.actionsFingerprint ? (
+                  <p className="text-xs font-bold leading-5 text-ink">画面の入力は、ここに出ている内容と違います。送られるのは、保存済みのこの内容です。</p>
+                ) : null}
+                <div className="flex gap-2">
+                  <Button
+                    variant="secondary"
+                    onClick={() => setTestConfirmation(null)}
+                  >
+                    やめる
+                  </Button>
+                  <Button
+                    variant="primary"
+                    disabled={testing}
+                    onClick={() => void runOnePersonTest()}
+                  >
+                    {testing ? '送信中...' : 'この内容で送る'}
+                  </Button>
+                </div>
+              </div>
+            ) : null}
           </section>
 
           <FeatureLinkCard

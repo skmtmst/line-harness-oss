@@ -108,7 +108,7 @@ describe('GET /api/affiliate-payments', () => {
   it('選択中アカウントを再認可して支払い集計を返す', async () => {
     const res = await get('/api/affiliate-payments?lineAccountId=account-1');
     expect(res.status).toBe(200);
-    expect(dbMocks.getAffiliatePaymentSummaries).toHaveBeenCalledWith(env.DB, 'account-1');
+    expect(dbMocks.getAffiliatePaymentSummaries).toHaveBeenCalledWith(env.DB, 'account-1', 'tenant-1');
     expect(await res.json()).toMatchObject({
       success: true,
       data: [{ affiliateId: 'affiliate-1' }],
@@ -226,5 +226,14 @@ describe('支払い確定', () => {
     expect((await post('/api/affiliate-payments/affiliate-1/confirm', {
       lineAccountId: 'account-1', expectedAmount: 72000, idempotencyKey: 'confirm-staff-1',
     }, 'staff')).status).toBe(403);
+  });
+
+  it('同じ再実行キーで別入力が来たら409で別紹介者の確定にしない', async () => {
+    dbMocks.confirmAffiliateSettlement.mockResolvedValueOnce({ kind: 'idempotency_conflict' });
+    const res = await post('/api/affiliate-payments/affiliate-1/confirm', {
+      lineAccountId: 'account-1', expectedAmount: 72000, idempotencyKey: 'confirm-conflict-1',
+    });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ code: 'IDEMPOTENCY_CONFLICT' });
   });
 });

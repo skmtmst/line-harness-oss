@@ -9,6 +9,7 @@ import {
   getPhotoDerivatives,
   getPhotoReviewMetrics,
   issuePhotoOriginalDownload,
+  recordBulkDecisionNotificationResult,
   requestPhotoAssessment,
   requestPhotoAssetProcessing,
 } from '../src/nen-photo-operations.js';
@@ -122,6 +123,41 @@ describe('migration 322 photo review operations', () => {
       { id: 'photo-safe', status: 'adopted', review_version: 2 },
     ]);
     expect(sqlite.prepare('SELECT COUNT(*) count FROM nen_photo_review_events').get()).toEqual({ count: 2 });
+  });
+
+  it('一括結果に審査イベントIDを載せ、通知後の結果を受付票へ上書きする', async () => {
+    const input = {
+      id: 'bulk-notify', lineAccountId: 'account-a', actorId: 'staff-a', actorName: '担当者',
+      idempotencyKey: 'bulk-notify-key', requestFingerprint: 'bulk-notify-fingerprint',
+      decisions: [
+        { photoId: 'photo-safe', decision: 'approve' as const, expectedVersion: 1, reasonCode: null, reasonNote: null },
+      ],
+      now: '2026-09-02T00:00:00.000Z',
+    };
+    const created = await applyBulkPhotoDecisions(db, input);
+    expect(created).toMatchObject({ kind: 'created' });
+    const items = (created as { result: { items: Array<{ decisionId: string }> } }).result.items;
+    expect(items).toHaveLength(1);
+    expect(typeof items[0].decisionId).toBe('string');
+    const eventIds = sqlite.prepare('SELECT id FROM nen_photo_review_events').all() as Array<{ id: string }>;
+    expect(eventIds.map((row) => row.id)).toEqual([items[0].decisionId]);
+
+    const enriched = {
+      updatedCount: 1,
+      items: [{ ...items[0], notificationStatus: 'failed' as const }],
+      notificationFailures: [{ photoId: 'photo-safe', error: 'LINE unavailable' }],
+    };
+    await expect(recordBulkDecisionNotificationResult(db, {
+      receiptId: 'bulk-notify', lineAccountId: 'account-a', actorId: 'staff-a',
+      idempotencyKey: 'bulk-notify-key', result: enriched, now: '2026-09-02T00:01:00.000Z',
+    })).resolves.toBe(true);
+    // 2回目の保存は通知後の結果をそのまま返し、再送の合図にしない。
+    await expect(applyBulkPhotoDecisions(db, input)).resolves.toEqual({ kind: 'duplicate', result: enriched });
+    // 別担当・別鍵では上書きできない。
+    await expect(recordBulkDecisionNotificationResult(db, {
+      receiptId: 'bulk-notify', lineAccountId: 'account-a', actorId: 'staff-other',
+      idempotencyKey: 'bulk-notify-key', result: enriched,
+    })).resolves.toBe(false);
   });
 
   it('危険度を確認できない写真の一括承認と別アカウントの写真を拒否する', async () => {

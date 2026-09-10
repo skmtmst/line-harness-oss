@@ -25,6 +25,7 @@ import type { Message } from '@line-crm/line-sdk';
 import { jitterDeliveryTime, addJitter, sleep } from './stealth.js';
 import { matchesCondition, parseCondition } from './segment-query.js';
 import { runScenarioActions, resumePreviousScenario, runScenarioOp } from './scenario-actions.js';
+import { featureJobCanRun } from './feature-enforcement.js';
 import { parseQuestion, buildQuestionMessages } from './scenario-question.js';
 import { expandDateVariables } from './interpolation-date.js';
 
@@ -205,6 +206,15 @@ export async function processStepDeliveries(
     const fs = dueFriendScenarios[i];
     attemptCount++;
     try {
+      // 機能オフ中はclaimせずactiveのまま残す。再オンで再開する。
+      // アカウント未割当の旧行は持ち主が分からないため従来どおり進める。
+      const ownerRow = await db
+        .prepare(`SELECT line_account_id FROM scenarios WHERE id = ?`)
+        .bind(fs.scenario_id)
+        .first<{ line_account_id: string | null }>();
+      if (ownerRow?.line_account_id && !await featureJobCanRun(db, { accountId: ownerRow.line_account_id, featureId: 'scenarios', job: 'scenario deliveries' })) {
+        continue;
+      }
       // Stealth: add small random delay between deliveries to avoid burst patterns
       if (i > 0) {
         await sleep(addJitter(50, 200));
@@ -442,8 +452,14 @@ async function processSingleDelivery(
     return false;
   }
 
+  // 実際に配信するアカウント。テンプレートの公開版もこのアカウントの
+  // ものだけを解決する(#645 差し戻し対応)。リンクの所有アカウント計算
+  // (下の decorateForFriendPush 呼び出し)と同じ値を使う。
+  const friendAccountId = friend.line_account_id;
+  const deliveryAccountId = scenarioRow.line_account_id ?? friendAccountId;
+
   // Resolve template_id → templates table (参照型). template_id 未設定なら step 値そのまま。
-  const resolved = await resolveStepContent(db, currentStep);
+  const resolved = await resolveStepContent(db, currentStep, deliveryAccountId);
 
   // Expand template variables ({{name}}, {{uid}}, {{auth_url:CHANNEL_ID}}, {{metadata.KEY}}, etc.)
   const resolvedMeta = await resolveMetadata(db, { user_id: (friend as unknown as Record<string, string | null>).user_id, metadata: (friend as unknown as Record<string, string | null>).metadata });
@@ -466,8 +482,6 @@ async function processSingleDelivery(
   // Auto-wrap URLs with tracking links + bake f=<friendId> into /t links —
   // shared pipeline with the instant first-step push (immediate-first-step.ts).
   // リンクの所有アカウントは実際に配信するアカウント (= friend の account) に合わせる
-  const friendAccountId = friend.line_account_id;
-  const deliveryAccountId = scenarioRow.line_account_id ?? friendAccountId;
   const { decorateForFriendPush } = await import('./auto-track.js');
   const tracked = await decorateForFriendPush(db, resolved.messageType, expandedContent, workerUrl, {
     lineAccountId: deliveryAccountId ?? null,

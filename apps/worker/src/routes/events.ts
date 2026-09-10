@@ -1060,17 +1060,38 @@ events.post('/api/liff/events/me/:bookingId/cancel', async (c) => {
       slot_starts_at: string;
     }>();
   if (!row) return bad(c, 'not_found', 404);
-  // 再試行の受付: V6 取消が投げた直後の再送は V6 だけ直す (409 にしない)。
+  const nowIso = new Date().toISOString();
+  const waitlistParams = {
+    lineAccountId: row.line_account_id,
+    eventId: row.event_id,
+    occurrenceId: row.slot_id,
+    sourceKey: `booking:${row.id}:cancelled`,
+  };
+  // 再試行の受付: V6 取消が投げた直後の再送は V6 だけ直す。
+  // 送信権の貸出中は 409 で再試行させる (strict fence。live claim を残して
+  // 成功にしない)。待機者ジョブの再登録も受け付ける (二重登録なし)。
   if (row.status === 'cancelled') {
-    await cancelByTrigger(c.env.DB, {
-      triggerType: 'event',
-      sourceId: row.id,
-      sourceEventId: row.id,
-      friendId: friend.id,
-      startsAtIso: row.slot_starts_at,
-      lineAccountId: row.line_account_id,
-      cancelReason: `event_cancel:${row.id}:by:friend-retry`,
-    });
+    try {
+      await cancelByTrigger(c.env.DB, {
+        triggerType: 'event',
+        sourceId: row.id,
+        sourceEventId: row.id,
+        friendId: friend.id,
+        startsAtIso: row.slot_starts_at,
+        lineAccountId: row.line_account_id,
+        cancelReason: `event_cancel:${row.id}:by:friend-retry`,
+        failOnSendInFlight: true,
+      });
+    } catch (error) {
+      if (error instanceof Error && error.message === 'REMINDER_SEND_IN_FLIGHT') {
+        return bad(c, 'send_in_flight_retry', 409);
+      }
+      throw error;
+    }
+    // 初回の途中失敗で旧表だけ未取消のまま残ることがある。同じ取消要求の
+    // 再送でそろえる (V6 fence 成功後なので 409 で巻き戻す物は無い)。
+    await cancelPendingRemindersFor(c.env.DB, row.id);
+    await enqueueEventWaitlistPromotion(c.env.DB, waitlistParams);
     return c.json({ ok: true });
   }
   if (row.status !== 'requested' && row.status !== 'confirmed') return bad(c, 'invalid_state', 409);
@@ -1079,32 +1100,49 @@ events.post('/api/liff/events/me/:bookingId/cancel', async (c) => {
     new Date(row.slot_starts_at).getTime() - row.cancel_deadline_hours_before * 3600_000;
   if (deadlineMs <= Date.now()) return bad(c, 'cancel_deadline_passed', 409);
 
-  const nowIso = new Date().toISOString();
-  await c.env.DB
+  // 条件付き状態更新: 同時取消の race を防ぐ。0 件なら相手に任せて再試行させる。
+  const priorStatus = row.status;
+  const upd = await c.env.DB
     .prepare(
       `UPDATE event_bookings
           SET status = 'cancelled', cancelled_at = ?, cancelled_by = 'friend', updated_at = ?
-        WHERE id = ?`,
+        WHERE id = ? AND status IN ('requested', 'confirmed')`,
     )
     .bind(nowIso, nowIso, row.id)
     .run();
-  await cancelPendingRemindersFor(c.env.DB, row.id);
+  if ((upd.meta?.changes ?? 0) === 0) return bad(c, 'invalid_state', 409);
   // N-065: V6 の未送信予定だけを止める。送信済み履歴は残す。
-  await cancelByTrigger(c.env.DB, {
-    triggerType: 'event',
-    sourceId: row.id,
-    sourceEventId: row.id,
-    friendId: friend.id,
-    startsAtIso: row.slot_starts_at,
-    lineAccountId: row.line_account_id,
-    cancelReason: `event_cancel:${row.id}:by:friend`,
-  });
-  await enqueueEventWaitlistPromotion(c.env.DB, {
-    lineAccountId: row.line_account_id,
-    eventId: row.event_id,
-    occurrenceId: row.slot_id,
-    sourceKey: `booking:${row.id}:cancelled`,
-  });
+  // 旧表の取消は V6 fence 成功の後に回す (409 では旧表も含めて完全 rollback)。
+  // 送信権の貸出中は状態更新を巻き戻して 409 にする
+  // (取消確定後の送信を起こさない)。
+  try {
+    await cancelByTrigger(c.env.DB, {
+      triggerType: 'event',
+      sourceId: row.id,
+      sourceEventId: row.id,
+      friendId: friend.id,
+      startsAtIso: row.slot_starts_at,
+      lineAccountId: row.line_account_id,
+      cancelReason: `event_cancel:${row.id}:by:friend`,
+      failOnSendInFlight: true,
+    });
+  } catch (error) {
+    if (error instanceof Error && error.message === 'REMINDER_SEND_IN_FLIGHT') {
+      await c.env.DB
+        .prepare(
+          `UPDATE event_bookings
+              SET status = ?, cancelled_at = NULL, cancelled_by = NULL, updated_at = ?
+            WHERE id = ? AND status = 'cancelled'`,
+        )
+        .bind(priorStatus, nowIso, row.id)
+        .run();
+      return bad(c, 'send_in_flight_retry', 409);
+    }
+    throw error;
+  }
+  // 旧表の取消は V6 fence 成功の後 (409 では旧表も含めて完全 rollback)。
+  await cancelPendingRemindersFor(c.env.DB, row.id);
+  await enqueueEventWaitlistPromotion(c.env.DB, waitlistParams);
   return c.json({ ok: true });
 });
 
@@ -1941,6 +1979,15 @@ events.post('/api/events/admin/events/:id/bookings/:bookingId/decide', requireRo
         }
         throw error;
       }
+      // 初回の待機者ジョブ登録が失敗したままのとき、同じ却下要求の再送で
+      // 再登録する (V6修復だけの早期returnでは待機者が進まない)。
+      // source_key が同じため二重登録にならない。
+      await enqueueEventWaitlistPromotion(c.env.DB, {
+        lineAccountId: booking.line_account_id,
+        eventId: booking.event_id,
+        occurrenceId: booking.slot_id,
+        sourceKey: `booking:${booking.id}:rejected`,
+      });
       const updated = await c.env.DB
         .prepare(`SELECT * FROM event_bookings WHERE id = ?`)
         .bind(booking.id)
@@ -1995,6 +2042,14 @@ events.post('/api/events/admin/events/:id/bookings/:bookingId/decide', requireRo
         }
         throw error;
       }
+      // 同時確定の競合敗北後の再送でも、待機者ジョブの再登録を受け付ける
+      // (決定ゲートの再送枝と同趣旨。二重登録は source_key で吸収する)。
+      await enqueueEventWaitlistPromotion(c.env.DB, {
+        lineAccountId: booking.line_account_id,
+        eventId: booking.event_id,
+        occurrenceId: booking.slot_id,
+        sourceKey: `booking:${booking.id}:rejected`,
+      });
       const updated = await c.env.DB
         .prepare(`SELECT * FROM event_bookings WHERE id = ?`)
         .bind(booking.id)
@@ -2128,6 +2183,17 @@ events.post('/api/events/admin/events/:id/bookings/:bookingId/cancel', requireRo
       }
       throw error;
     }
+    // 初回の途中失敗で旧表だけ未取消のまま残ることがある。同じ取消要求の
+    // 再送でそろえる (V6 fence 成功後なので 409 で巻き戻す物は無い)。
+    await cancelPendingRemindersFor(c.env.DB, booking.id);
+    // 初回の取消確定後に待機者ジョブ登録だけ失敗しても、
+    // 同じ取消要求の再送で復旧する。source_key が重複登録を吸収する。
+    await enqueueEventWaitlistPromotion(c.env.DB, {
+      lineAccountId: booking.line_account_id,
+      eventId: booking.event_id,
+      occurrenceId: booking.slot_id,
+      sourceKey: `booking:${booking.id}:cancelled`,
+    });
     return c.json({ ok: true });
   }
   if (!canTransition(booking.status as never, 'cancel')) return bad(c, 'invalid_state', 409);
@@ -2144,12 +2210,12 @@ events.post('/api/events/admin/events/:id/bookings/:bookingId/cancel', requireRo
     .bind(nowIso, nowIso, booking.id, booking.status)
     .run();
   if ((upd.meta?.changes ?? 0) === 0) return bad(c, 'invalid_state', 409);
-  await cancelPendingRemindersFor(c.env.DB, booking.id);
   const slot = await c.env.DB
     .prepare(`SELECT starts_at FROM event_slots WHERE id = ?`)
     .bind(booking.slot_id)
     .first<{ starts_at: string }>();
   // N-065: V6 の未送信予定だけを止める。送信済み履歴は残す。
+  // 旧表の取消は V6 fence 成功の後に回す (409 の完全 rollback のため)。
   // 送信権の貸出中は状態更新を巻き戻して 409 にする (取消確定後の送信を起こさない)。
   try {
     await cancelByTrigger(c.env.DB, {
@@ -2176,6 +2242,8 @@ events.post('/api/events/admin/events/:id/bookings/:bookingId/cancel', requireRo
     }
     throw error;
   }
+  // 旧表の取消は V6 fence 成功の後 (409 では触らない)。
+  await cancelPendingRemindersFor(c.env.DB, booking.id);
   await enqueueEventWaitlistPromotion(c.env.DB, {
     lineAccountId: booking.line_account_id,
     eventId: booking.event_id,

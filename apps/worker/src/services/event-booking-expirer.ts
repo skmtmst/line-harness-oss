@@ -3,6 +3,7 @@
 // notification — spec §7.1 lists no expired-kind notification for events.
 
 import { purgeExpiredEventIdempotency } from './event-booking-idempotency.js';
+import { featureJobCanRun } from './feature-enforcement.js';
 import { REQUESTED_EXPIRE_HOURS } from './event-booking-types.js';
 import { enqueueEventWaitlistPromotion } from './event-waitlist.js';
 import { cancelByTrigger } from './reminder-trigger.js';
@@ -40,6 +41,10 @@ export async function runEventBookingExpirer(
 
   let expired = 0;
   for (const row of stale.results ?? []) {
+    // 機能オフ中は期限切れにせずrequestedのまま残す。再オンで再開する。
+    if (row.line_account_id && !await featureJobCanRun(db, { accountId: row.line_account_id, featureId: 'events', job: 'event booking expirer' })) {
+      continue;
+    }
     // Conditional UPDATE to avoid racing with concurrent admin decide.
     const upd = await db
       .prepare(

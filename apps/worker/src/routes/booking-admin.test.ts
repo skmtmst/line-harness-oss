@@ -17,15 +17,28 @@ vi.mock('@line-crm/db', async (importOriginal) => ({
 
 const availabilityMocks = {
   computeSlots: vi.fn(() => [] as { start: string; end: string }[]),
-  getAvailability: vi.fn(async (_db: unknown, params: { from: string }) => ({
+  // 候補の instant 契約に合わせる。route は壁時刻ではなく startUtc の
+  // 完全一致で確定する（#651）ので、置き換えでも instant を付ける。
+  // この試験の店舗は Asia/Tokyo。
+  getAvailability: vi.fn(async (_db: unknown, params: { from: string; staffId?: string }) => ({
     by_staff: [{
-      staff_id: 's1',
+      staff_id: params.staffId ?? 's1',
       display_name: 'A',
-      slots: availabilityMocks.computeSlots().map((slot) => ({ date: params.from, ...slot })),
+      slots: availabilityMocks.computeSlots().map((slot) => ({
+        date: params.from,
+        ...slot,
+        timeZone: 'Asia/Tokyo',
+        startUtc: `${params.from}T${slot.start}:00+09:00`,
+        endUtc: `${params.from}T${slot.end}:00+09:00`,
+      })),
     }],
   })),
+  getAccountTimeZone: vi.fn(async () => 'Asia/Tokyo'),
 };
-vi.mock('../services/availability.js', () => availabilityMocks);
+vi.mock('../services/availability.js', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../services/availability.js')>(),
+  ...availabilityMocks,
+}));
 
 const notifierMocks = { sendBookingNotification: vi.fn() };
 vi.mock('../services/booking-notifier.js', () => notifierMocks);

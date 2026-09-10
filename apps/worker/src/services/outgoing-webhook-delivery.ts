@@ -8,12 +8,70 @@
  * 093 で足した列を使って、送り直しと失敗の記録を入れる。
  */
 
+import { resolveWebhookSecret, type WebhookKeyInput } from '@line-crm/db';
+
 /** 送り直しまでの待ち時間（ミリ秒）。 */
 export function retryDelayMs(attempt: number): number {
   // 1回目 0.5秒、2回目 1秒、3回目 2秒…と倍にして、8秒で頭打ちにする。
   // Worker の実行時間には限りがあるので、分単位では待たない。
   // 相手が長時間落ちている場合まで面倒を見るなら、キューに積む別の設計が要る。
   return Math.min(8000, 500 * 2 ** attempt);
+}
+
+/**
+ * 1回の送信試行が相手の応答を待つ上限（ミリ秒）。要件26 §6-4 の既定10秒。
+ *
+ * N-373: 以前は deliverWebhook 経路の fetch に打ち切りがなく、無応答の
+ * 送り先があるとその分だけ固まっていた。自動化経路だけ10秒打ち切りが
+ * あり、挙動が違っていた。送る側（このファイル）で既定を付けることで、
+ * 呼び出し側を変えずに全部の経路を10秒にそろえる。
+ */
+export const WEBHOOK_FETCH_TIMEOUT_MS = 10_000;
+
+/** 呼び出し側が延ばせる上限（ミリ秒）。要件26 §6-4 の最大30秒。 */
+export const WEBHOOK_FETCH_TIMEOUT_MS_MAX = 30_000;
+
+/**
+ * Retry-After の指定どおりに Worker 内で待つ上限（ミリ秒）。
+ *
+ * N-374: 混雑時の再送が相手の指定を無視して空振りしていた。指定どおりに
+ * 待つが、Worker の実行時間に限りがあるため、この上限を超える指定は
+ * 上限まで待つ。短い指数待ちへ戻すと、相手の混雑中に再送を早めてしまう。
+ */
+export const WEBHOOK_RETRY_AFTER_MAX_MS = 8_000;
+
+/** fetch の打ち切り時間を決める。不正・未指定は既定、上限超えは上限へ丸める。 */
+export function webhookFetchTimeoutMs(value: unknown): number {
+  const ms = typeof value === 'number' ? value : WEBHOOK_FETCH_TIMEOUT_MS;
+  if (!Number.isFinite(ms) || ms <= 0) return WEBHOOK_FETCH_TIMEOUT_MS;
+  return Math.min(ms, WEBHOOK_FETCH_TIMEOUT_MS_MAX);
+}
+
+/**
+ * Retry-After 応答頭を読む。秒数形式と HTTP-date 形式の両方を受け付ける。
+ *
+ * 読めない・過去の指定は fallbackMs（既定の指数待ち）へ丸める。
+ * 上限超えの指定は安全上限へ丸め、相手の指定より極端に早く再送しない。
+ * 送り直しの回数は増やさない（待つ長さを変えるだけ）。
+ */
+export function retryAfterDelayMs(
+  header: string | null,
+  fallbackMs: number,
+  nowMs: number = Date.now(),
+): number {
+  if (header == null) return fallbackMs;
+  const text = header.trim();
+  if (!text) return fallbackMs;
+  if (/^\d+(\.\d+)?$/.test(text)) {
+    const ms = Number(text) * 1000;
+    if (Number.isFinite(ms) && ms >= 0) return Math.min(ms, WEBHOOK_RETRY_AFTER_MAX_MS);
+    return fallbackMs;
+  }
+  const at = Date.parse(text);
+  if (!Number.isFinite(at)) return fallbackMs;
+  const ms = at - nowMs;
+  if (ms < 0) return fallbackMs;
+  return Math.min(ms, WEBHOOK_RETRY_AFTER_MAX_MS);
 }
 
 /**
@@ -30,7 +88,10 @@ export function shouldRetryStatus(status: number): boolean {
 export interface WebhookRow {
   id: string;
   url: string;
+  /** 旧平文。#650 以降の新規・更新では NULL になる。 */
   secret: string | null;
+  /** AES-GCM 暗号文。#650 以降の正本。署名はここから復号した値で付ける。 */
+  secret_encrypted?: string | null;
   max_retries: number | null;
 }
 
@@ -351,6 +412,11 @@ export interface SafePostOptions {
   fetchImpl?: typeof fetch;
   lookupHost?: WebhookDnsLookup;
   maxRedirects?: number;
+  /**
+   * 1回の送信試行の打ち切り（ミリ秒）。未指定は既定10秒、上限30秒。
+   * 呼び出し側が signal を渡したときも内部の打ち切りと合成する。
+   */
+  timeoutMs?: number;
 }
 
 export type SafePostOutcome = { response: Response } | { blocked: WebhookBlockReason };
@@ -404,6 +470,12 @@ export async function postWebhookSafely(
 ): Promise<SafePostOutcome> {
   const fetchImpl = opts.fetchImpl ?? fetch;
   const maxRedirects = opts.maxRedirects ?? 5;
+  // N-373: 呼び出し側の signal があっても内部timeoutを外さない。1つの
+  // 合成signalを全転送段で使うため、転送を繰り返しても試行全体が上限内で止まる。
+  const timeoutSignal = AbortSignal.timeout(webhookFetchTimeoutMs(opts.timeoutMs));
+  const signal = init.signal
+    ? AbortSignal.any([init.signal, timeoutSignal])
+    : timeoutSignal;
   let current = url;
   let method = 'POST';
   let headers = { ...init.headers };
@@ -432,7 +504,7 @@ export async function postWebhookSafely(
       headers,
       body,
       redirect: 'manual',
-      signal: init.signal,
+      signal,
     });
     if (!REDIRECT_STATUS.has(response.status) || hop >= maxRedirects) return { response };
     const location = response.headers?.get?.('location');
@@ -463,6 +535,8 @@ export interface DeliveryResult {
   lastStatus: number | null;
   blocked?: boolean;
   blockReason?: WebhookBlockReason | null;
+  /** secret を復号できず、署名を付けられないので送らなかった(#650)。 */
+  secretUnavailable?: boolean;
 }
 
 /**
@@ -470,6 +544,19 @@ export interface DeliveryResult {
  *
  * 例外を投げない。呼び出し側は「送れたかどうか」を戻り値で受け取る。
  * 送信の失敗でイベント処理そのものを止めたくないため。
+ *
+ * 応答別の扱い（決定表。要件26 §6-4。N-373/N-374）。
+ *
+ * | 応答 | 扱い | 次までの待ち |
+ * | 2xx | 成功 | 待たない |
+ * | 429 | 送り直す。Retry-After があれば上限8秒へクランプして待つ | Retry-After／指数待ち |
+ * | 5xx | 送り直す | 指数待ち（0.5→1→2→4→8秒） |
+ * | タイムアウト（既定10秒）・接続失敗 | 送り直す。lastStatus=null で失敗台帳に残る | 指数待ち |
+ * | その他の 4xx | 恒久失敗。残りの回数を使わずに諦める | — |
+ * | 安全でない送り先 | 即時停止。送り直さない | — |
+ *
+ * 送り直しの回数は増やさない（最大5回）。同じ配送IDを付け直すので、
+ * 受け手側の二重処理は増えない。無限の即時再送もしない。
  */
 export async function deliverWebhook(
   webhook: WebhookRow,
@@ -479,6 +566,12 @@ export async function deliverWebhook(
     idempotencyKey?: string;
     fetchImpl?: typeof fetch;
     lookupHost?: WebhookDnsLookup;
+    timeoutMs?: number;
+    /**
+     * secret_encrypted を復号する鍵束(#650)。省略すると Worker の bindings
+     * (LINE_CREDENTIAL_ENCRYPTION_KEY / LINE_CREDENTIAL_PREVIOUS_KEYS)を読む。
+     */
+    credentialKeys?: WebhookKeyInput | string;
   } = {},
 ): Promise<DeliveryResult> {
   const sleep = opts.sleep ?? ((ms: number) => new Promise((r) => setTimeout(r, ms)));
@@ -486,24 +579,45 @@ export async function deliverWebhook(
 
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (opts.idempotencyKey) headers['X-Webhook-Delivery-Id'] = opts.idempotencyKey;
-  if (webhook.secret) {
-    headers['X-Webhook-Signature'] = await sign(webhook.secret, body);
+  // 署名はここで組み立てる。secret が暗号文で入っている行(#650 以降の正本)は
+  // ここで復号する。呼び出し側に復号を任せると、忘れた経路が黙って署名なしで
+  // 送ってしまう。設定済みの secret を読めないときは送らない(fail-open 禁止)。
+  if (webhook.secret_encrypted || webhook.secret) {
+    let sendSecret: string | null = null;
+    try {
+      sendSecret = await resolveWebhookSecret(webhook, opts.credentialKeys);
+    } catch {
+      sendSecret = null;
+    }
+    if (!sendSecret) {
+      console.error(JSON.stringify({
+        event: 'outgoing_webhook_secret_unavailable',
+        webhookId: webhook.id,
+      }));
+      return { ok: false, attempts: 0, lastStatus: null, secretUnavailable: true };
+    }
+    headers['X-Webhook-Signature'] = await sign(sendSecret, body);
   }
 
   let lastStatus: number | null = null;
+  let waitMs = 0;
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    if (attempt > 0) await sleep(retryDelayMs(attempt - 1));
+    if (attempt > 0) await sleep(waitMs);
     // 送り直しのたびに検査し直す。古い検査結果は使い回さない。
     let outcome: SafePostOutcome;
     try {
       outcome = await postWebhookSafely(webhook.url, { headers, body }, {
         fetchImpl: opts.fetchImpl,
         lookupHost: opts.lookupHost,
+        timeoutMs: opts.timeoutMs,
       });
     } catch (err) {
-      // 接続そのものが失敗した場合。相手が落ちている可能性が高いので送り直す。
+      // 接続そのものの失敗と、打ち切り（タイムアウト）は同じ扱い。
+      // 相手が落ちている可能性が高いので送り直す。再試行可能な失敗として
+      // lastStatus=null のまま残し、呼び出し側が失敗台帳へ記録する。
       console.error(`送信Webhook ${webhook.id} への接続失敗:`, err);
       lastStatus = null;
+      waitMs = retryDelayMs(attempt);
       continue;
     }
     if ('blocked' in outcome) {
@@ -517,6 +631,11 @@ export async function deliverWebhook(
     if (!shouldRetryStatus(res.status)) {
       return { ok: false, attempts: attempt + 1, lastStatus };
     }
+    // N-374: 429 のときは相手の Retry-After を上限付きで尊重する。
+    // それ以外（5xx）の送り直しは従来どおり指数待ち。
+    waitMs = res.status === 429
+      ? retryAfterDelayMs(res.headers?.get?.('retry-after') ?? null, retryDelayMs(attempt))
+      : retryDelayMs(attempt);
   }
   return { ok: false, attempts: maxRetries + 1, lastStatus };
 }
