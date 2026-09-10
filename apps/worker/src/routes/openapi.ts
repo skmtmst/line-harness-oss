@@ -1129,7 +1129,7 @@ const spec = {
                   taskUrl: { type: 'string', format: 'uri' },
                   prUrl: { type: 'string', format: 'uri' },
                   occurredAt: { type: 'string', format: 'date-time' },
-                  revision: { type: 'integer', minimum: 0 },
+                  revision: { type: 'integer', minimum: 946684800000, description: '状態確定時刻のUnixミリ秒。再実行を含め単調増加させる。' },
                 },
               },
             },

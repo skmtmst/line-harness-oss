@@ -17,7 +17,7 @@ const payload = {
   summary: '報告専用の接続テストを開始しました。',
   taskUrl: 'https://github.com/skmtmst/nen-petfood-eccube/issues/143',
   occurredAt: '2026-09-09T04:00:00.000Z',
-  revision: 10,
+  revision: 1_788_927_600_000,
 };
 
 function app() {
@@ -39,7 +39,7 @@ function env(): Env['Bindings'] {
     LINE_LOGIN_CHANNEL_ID: 'login-channel',
     LINE_LOGIN_CHANNEL_SECRET: 'login-secret',
     WORKER_URL: 'https://worker.example.test',
-    CODEX_SLACK_RELAY_SECRET_MASATO: 'relay-secret',
+    AI_LOOP_SLACK_REPORT_SECRET: 'relay-secret',
     SLACK_BOT_TOKEN: 'xoxb-test',
     SLACK_AI_LOOP_CHANNEL_ID: 'C-AI-LOOP',
   };
@@ -81,11 +81,33 @@ describe('AI loop Slack report security boundary', () => {
   test('rejects unknown fields and non-GitHub links', async () => {
     expect((await request({ ...payload, command: 'merge' })).status).toBe(400);
     expect((await request({ ...payload, taskUrl: 'https://example.com/task/143' })).status).toBe(400);
+    expect((await request({ ...payload, revision: 10 })).status).toBe(400);
+    expect((await request(null)).status).toBe(400);
+  });
+
+  test('rejects oversized signed payloads before parsing', async () => {
+    expect((await request({ ...payload, summary: 'x'.repeat(9_000) })).status).toBe(413);
+  });
+
+  test('returns a safe 502 when Slack rejects the report', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(
+      new Response(JSON.stringify({ ok: false, error: 'not_in_channel' })),
+    ));
+    const response = await request(payload);
+    expect(response.status).toBe(502);
+    expect(await response.json()).toEqual({ success: false, error: 'Slack report failed' });
   });
 
   test('fails closed when the dedicated report channel is missing', async () => {
     const bindings = env();
     delete bindings.SLACK_AI_LOOP_CHANNEL_ID;
+    expect((await request(payload, 'relay-secret', bindings)).status).toBe(503);
+  });
+
+  test('never falls back to the existing Codex relay secret', async () => {
+    const bindings = env();
+    delete bindings.AI_LOOP_SLACK_REPORT_SECRET;
+    bindings.CODEX_SLACK_RELAY_SECRET = 'relay-secret';
     expect((await request(payload, 'relay-secret', bindings)).status).toBe(503);
   });
 });

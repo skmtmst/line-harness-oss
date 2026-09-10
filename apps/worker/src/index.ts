@@ -261,6 +261,8 @@ export type Env = {
     CODEX_SLACK_RELAY_SECRET?: string;
     CODEX_SLACK_RELAY_SECRET_KENTA?: string;
     CODEX_SLACK_RELAY_SECRET_MASATO?: string;
+    /** AI開発ループの報告専用HMAC鍵。既存のCodex中継鍵と共有しない。 */
+    AI_LOOP_SLACK_REPORT_SECRET?: string;
     SLACK_BOT_TOKEN?: string;
     SLACK_COMMAND_CHANNEL_ID?: string;
     SLACK_ERROR_CHANNEL_ID?: string;

@@ -13,12 +13,14 @@ const GITHUB_URL = /^https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/(?
 export const aiLoopSlackReports = new Hono<Env>();
 
 function parseReport(body: string): AiLoopReport | null {
-  let value: Record<string, unknown>;
+  let parsed: unknown;
   try {
-    value = JSON.parse(body) as Record<string, unknown>;
+    parsed = JSON.parse(body);
   } catch {
     return null;
   }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+  const value = parsed as Record<string, unknown>;
   if (Object.keys(value).some((key) => !ALLOWED_KEYS.has(key))) return null;
   if (
     value.version !== 1 ||
@@ -33,14 +35,14 @@ function parseReport(body: string): AiLoopReport | null {
     typeof value.summary !== 'string' || value.summary.length < 1 || value.summary.length > 500 ||
     typeof value.taskUrl !== 'string' || !GITHUB_URL.test(value.taskUrl) ||
     typeof value.occurredAt !== 'string' || !Number.isFinite(Date.parse(value.occurredAt)) ||
-    !Number.isSafeInteger(value.revision) || Number(value.revision) < 0
+    !Number.isSafeInteger(value.revision) || Number(value.revision) < 946_684_800_000
   ) return null;
   if (value.prUrl != null && (typeof value.prUrl !== 'string' || !GITHUB_URL.test(value.prUrl))) return null;
   return value as AiLoopReport;
 }
 
 aiLoopSlackReports.post('/api/integrations/ai-loop/reports', async (c) => {
-  const secret = c.env.CODEX_SLACK_RELAY_SECRET_MASATO ?? c.env.CODEX_SLACK_RELAY_SECRET;
+  const secret = c.env.AI_LOOP_SLACK_REPORT_SECRET;
   if (!secret || !c.env.SLACK_BOT_TOKEN || !c.env.SLACK_AI_LOOP_CHANNEL_ID) {
     return c.json({ success: false, error: 'AI loop Slack report not configured' }, 503);
   }

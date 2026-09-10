@@ -14,7 +14,7 @@ const report: AiLoopReport = {
   summary: '報告専用の接続テストを開始しました。',
   taskUrl: 'https://github.com/skmtmst/nen-petfood-eccube/issues/143',
   occurredAt: '2026-09-09T04:00:00.000Z',
-  revision: 10,
+  revision: 1_788_927_600_000,
 };
 
 function json(value: unknown): Response {
@@ -36,12 +36,13 @@ describe('AI loop Slack report relay', () => {
     const [, request] = fetcher.mock.calls[1] as [string, RequestInit];
     const body = JSON.parse(String(request.body)) as Record<string, unknown>;
     expect(body.channel).toBe('C-AI-LOOP');
+    expect(body.client_msg_id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-a[0-9a-f]{3}-[0-9a-f]{12}$/);
     expect(body).not.toHaveProperty('blocks');
     expect(body).not.toHaveProperty('attachments');
     expect(String(body.text)).not.toMatch(/承認する|差し戻す|実行する/);
     expect(body.metadata).toMatchObject({
       event_type: 'nen_ai_loop_report',
-      event_payload: { work_key: 'ai-loop:skmtmst/nen-petfood-eccube:LOOP-143', revision: '10' },
+      event_payload: { work_key: 'ai-loop:skmtmst/nen-petfood-eccube:LOOP-143', revision: '1788927600000' },
     });
   });
 
@@ -53,7 +54,7 @@ describe('AI loop Slack report relay', () => {
           ts: '100.200',
           metadata: {
             event_type: 'nen_ai_loop_report',
-            event_payload: { work_key: 'ai-loop:skmtmst/nen-petfood-eccube:LOOP-143', revision: '10' },
+            event_payload: { work_key: 'ai-loop:skmtmst/nen-petfood-eccube:LOOP-143', revision: '1788927600000' },
           },
         }],
       }))
@@ -61,7 +62,7 @@ describe('AI loop Slack report relay', () => {
     const result = await relayAiLoopReport({
       SLACK_BOT_TOKEN: 'xoxb-test',
       SLACK_AI_LOOP_CHANNEL_ID: 'C-AI-LOOP',
-    }, { ...report, status: 'completed', revision: 11 }, fetcher);
+    }, { ...report, status: 'completed', revision: 1_788_927_600_001 }, fetcher);
 
     expect(result.action).toBe('updated');
     expect(String(fetcher.mock.calls[1][0]).endsWith('/chat.update')).toBe(true);
@@ -78,15 +79,23 @@ describe('AI loop Slack report relay', () => {
         ts: '100.200',
         metadata: {
           event_type: 'nen_ai_loop_report',
-          event_payload: { work_key: 'ai-loop:skmtmst/nen-petfood-eccube:LOOP-143', revision: '10' },
+          event_payload: { work_key: 'ai-loop:skmtmst/nen-petfood-eccube:LOOP-143', revision: '1788927600000' },
         },
       }],
     }));
     const result = await relayAiLoopReport({
       SLACK_BOT_TOKEN: 'xoxb-test',
       SLACK_AI_LOOP_CHANNEL_ID: 'C-AI-LOOP',
-    }, { ...report, revision: 9 }, fetcher);
+    }, { ...report, revision: 1_788_927_599_999 }, fetcher);
     expect(result).toEqual({ action: 'ignored', ts: '100.200' });
     expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+
+  test('surfaces Slack API failures without leaking report contents', async () => {
+    const fetcher = vi.fn().mockResolvedValueOnce(new Response(JSON.stringify({ ok: false, error: 'not_in_channel' })));
+    await expect(relayAiLoopReport({
+      SLACK_BOT_TOKEN: 'xoxb-test',
+      SLACK_AI_LOOP_CHANNEL_ID: 'C-AI-LOOP',
+    }, report, fetcher)).rejects.toThrow('SLACK_API_FAILED:conversations.history:not_in_channel');
   });
 });

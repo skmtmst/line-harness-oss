@@ -70,6 +70,12 @@ function reportKey(report: AiLoopReport): string {
   return `ai-loop:${report.repository}:${report.taskId}`;
 }
 
+async function stableClientMessageId(key: string): Promise<string> {
+  const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(key)));
+  const hex = Array.from(digest.slice(0, 16), (byte) => byte.toString(16).padStart(2, '0')).join('');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-5${hex.slice(13, 16)}-a${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
+}
+
 function reportText(report: AiLoopReport): string {
   const status = {
     started: '🟦 開始',
@@ -153,6 +159,10 @@ export async function relayAiLoopReport(
     await slackApi(token, 'chat.update', { ...payload, ts: existing.ts }, fetcher);
     return { action: 'updated', ts: existing.ts };
   }
-  const created = await slackApi(token, 'chat.postMessage', payload, fetcher);
+  const created = await slackApi(token, 'chat.postMessage', {
+    ...payload,
+    // Slack also deduplicates concurrent creates carrying the same client id.
+    client_msg_id: await stableClientMessageId(key),
+  }, fetcher);
   return { action: 'created', ts: created.ts };
 }
