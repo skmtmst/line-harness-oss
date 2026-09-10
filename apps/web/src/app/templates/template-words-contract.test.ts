@@ -70,7 +70,8 @@ describe('V6の作成画面', () => {
   it('本文のURLと差し込み後のLINE表示を確認できる', () => {
     expect(EDIT_PAGE).toContain('本文に入れたURLの扱い')
     expect(EDIT_PAGE).toContain('LINEプレビュー')
-    expect(EDIT_PAGE).toContain("replaceAll('{{name}}', '山田 太郎')")
+    expect(EDIT_PAGE).toContain("if (name === 'name') return '山田 太郎'")
+    expect(EDIT_PAGE).toContain('preview.unresolved.length > 0')
     expect(EDIT_PAGE).not.toContain('内容 / JSON')
   })
 
