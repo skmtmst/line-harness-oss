@@ -205,7 +205,17 @@ test('21件目の商品、未知種別、サーバ検索を実際の画面操作
   await expect(page.getByText('商品1 × 1')).toBeVisible()
   await page.getByRole('button', { name: '次のページ' }).click()
   await expect(page.getByText('商品21 × 1')).toBeVisible()
-  await expect(page.getByText('ec.partner.custom_event', { exact: false }).first()).toBeVisible()
+  /*
+   * ページ全体から `ec.partner.custom_event` を探す(.first())のは、
+   * (a) 意図しない別要素に当たる余地があり、(b) 再描画の途中と競合する。
+   * 21件目の行そのものを掴み、その行の「いつ・何が届いたか」欄(種別)に
+   * 生キーが出ていることを表明する(司令塔ご指摘、2026-09-10)。
+   * `／ ec.partner.custom_event` という区切り文字込みで探すのは、
+   * 「したこと」欄の `未対応の出来事（ec.partner.custom_event）` という
+   * 別セルの表示ともこの行では一致してしまう(strict mode違反で発覚)ため。
+   */
+  const row21 = page.locator('tr').filter({ hasText: '商品21 × 1' })
+  await expect(row21.getByText('／ ec.partner.custom_event', { exact: false })).toBeVisible()
   await expect(page.getByText('ECの出来事', { exact: true })).toHaveCount(0)
 
   await page.getByRole('searchbox', { name: '取り込みの記録を検索' }).fill('商品21')
