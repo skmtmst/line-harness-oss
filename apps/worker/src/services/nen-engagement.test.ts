@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { NEN_CAMPAIGN_BODY_MAX_LENGTH } from '@line-crm/shared';
+import type { FlexMessage } from '@line-crm/line-sdk';
 import {
   birthdayDeliveryTarget,
   buildDefaultColumnIntro,
@@ -147,5 +149,27 @@ describe('buildNenFlexMessage', () => {
     expect(rendered).toContain('こむぎちゃん、お誕生日おめでとうございます');
     expect(rendered).toContain('NENBDAY-26-ABC12345');
     expect(rendered).toContain('2026-08-31');
+  });
+
+  it('本文は保存時の上限を通っていても、差し込み展開後は送信直前に採用上限で切る（#659差し戻し1点目: 送信経路に判定がなかった）', () => {
+    // body_text は3,600字（保存時の上限4,500字以内）で、{{pet_name}}を
+    // 300回含む。保存できるペット名の上限いっぱい（40字）で展開すると
+    // 300 * 40 = 12,000字になり、切らなければ大幅に上限を超える。
+    const longPetName = 'あ'.repeat(40);
+    const message = buildNenFlexMessage({
+      ...campaign,
+      body_text: '{{pet_name}}'.repeat(300),
+    }, { pet: { name: longPetName } });
+
+    const bubble = (message as FlexMessage).contents as { body: { contents: Array<{ type: string; text?: string }> } };
+    const bodyNode = bubble.body.contents[1];
+    expect(bodyNode.text?.length).toBe(NEN_CAMPAIGN_BODY_MAX_LENGTH);
+    expect(bodyNode.text?.startsWith(longPetName)).toBe(true);
+  });
+
+  it('差し込み後に上限内に収まる本文はそのまま切られない', () => {
+    const message = buildNenFlexMessage(campaign, { pet: { name: 'こむぎ' } });
+    const bubble = (message as FlexMessage).contents as { body: { contents: Array<{ type: string; text?: string }> } };
+    expect(bubble.body.contents[1].text).toBe(campaign.body_text);
   });
 });

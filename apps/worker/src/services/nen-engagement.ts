@@ -1,4 +1,5 @@
 import { accountFeatureOffExclusionSql, getFriendById, getLineAccountById, jstNow } from '@line-crm/db';
+import { NEN_CAMPAIGN_BODY_MAX_LENGTH } from '@line-crm/shared';
 import type { Message } from '@line-crm/line-sdk';
 import type { EcEvent } from '../routes/ec-integrations.js';
 import { logOutgoingMessage } from './event-bus.js';
@@ -217,7 +218,12 @@ function flexMessage(campaign: CampaignRow, payload: Record<string, unknown>): M
     || (event?.event_type === 'ec.order.shipped' ? event.shipping?.tracking_url : event?.order?.detail_url)
     || campaign.button_url || '');
   const title = renderCampaignCopy(String(article?.title || campaign.title), payload);
-  const body = renderCampaignCopy(String(article?.excerpt || campaign.body_text), payload);
+  // 保存時は差し込み前の本文だけを見ており（#659差し戻し1点目）、差し込み
+  // 値（ペットの名前など）でここまで膨らみうる。保存時の検査だけに頼らず、
+  // 実際にLINEへ送る直前でも同じ採用上限で切る（多重防御）。`.slice` は
+  // JSと同じUTF-16 code unit単位なので、保存時の数え方と揃っている。
+  const body = renderCampaignCopy(String(article?.excerpt || campaign.body_text), payload)
+    .slice(0, NEN_CAMPAIGN_BODY_MAX_LENGTH);
   const details: Array<{ type: 'text'; text: string; size: 'sm'; color: string; wrap: true }> = [];
   if (event?.order?.number) details.push({ type: 'text', text: `注文番号：${event.order.number}`, size: 'sm', color: '#64748B', wrap: true });
   const items = event ? orderSummary(event) : '';

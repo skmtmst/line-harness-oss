@@ -199,4 +199,16 @@ describe('NEN配信本文の上限4500字（実mount・Issue #659）', () => {
     expect(bodyTextarea().value).toBe(overLong)
     expect(bodyTextarea().hasAttribute('maxlength')).toBe(false)
   })
+
+  it('差し込み展開後に長すぎる恐れがある入力では、実際に注意文が出る（#659: 到達不能だった注意文の修正）', async () => {
+    // {{pet_name}} を並べただけの本文。差し込み前は上限に収まる（保存も
+    // できる）が、既定のペット名見本（サーバ側の実際の上限いっぱい）で
+    // 展開すると明確に超える。以前は既定の見本が置換元より短い固定文言
+    // だったため、この注意文は画面上で一度も出せなかった。
+    await mount()
+    await setBody('{{pet_name}}'.repeat(300))
+
+    expect(saveButton().disabled).toBe(false)
+    expect(container.textContent).toContain('差し込む名前が長いと、送るときに長すぎる場合があります。')
+  })
 })

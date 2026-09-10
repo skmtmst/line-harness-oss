@@ -82,9 +82,30 @@ describe('NEN本文の保存上限（#659）', () => {
     expect(mocks.saveNenCampaignAccountSetting).not.toHaveBeenCalled();
   });
 
-  test('絵文字は1字と数える（4500字ぶんの絵文字は保存できる）', async () => {
+  test('絵文字はUTF-16 code unitで数える（🌿4500個はUTF-16で9000になり保存できない）', async () => {
+    // #659差し戻し3点目: 旧実装はコードポイントで数えており、この本文が
+    // 誤って保存できてしまっていた（UTF-16では9000で、LINEの実際の
+    // 数え方では大幅な上限超過）。
     const response = await putSetting('🌿'.repeat(NEN_CAMPAIGN_BODY_MAX_LENGTH));
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({
+      error: expect.stringContaining('9,000字'),
+    });
+    expect(mocks.saveNenCampaignAccountSetting).not.toHaveBeenCalled();
+  });
+
+  test('🌿2250個（UTF-16で4500ちょうど）は保存できる', async () => {
+    const response = await putSetting('🌿'.repeat(NEN_CAMPAIGN_BODY_MAX_LENGTH / 2));
     expect(response.status).toBe(200);
+  });
+
+  test('家族の絵文字（ZWJ結合、見た目1字がUTF-16で11字）を含む本文も同じ数え方で判定する', async () => {
+    const family = '\u{1F468}‍\u{1F469}‍\u{1F467}‍\u{1F466}'; // 11 UTF-16 code unit
+    // 409個 * 11 = 4499（収まる）、410個 * 11 = 4510（超える）
+    const okResponse = await putSetting(family.repeat(409));
+    expect(okResponse.status).toBe(200);
+    const overResponse = await putSetting(family.repeat(410));
+    expect(overResponse.status).toBe(400);
   });
 
   test('他アカウントの保存は権限なしで拒否し、保存しない', async () => {
