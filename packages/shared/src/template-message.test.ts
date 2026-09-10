@@ -17,4 +17,8 @@ describe('template message contract', () => {
   it('改行を1文字として数える', () => {
     expect(countTemplateTextCharacters('一行目\n二行目')).toBe(7);
   });
+
+  it('空文字列を0文字として数える', () => {
+    expect(countTemplateTextCharacters('')).toBe(0);
+  });
 });
