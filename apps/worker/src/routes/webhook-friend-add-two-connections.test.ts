@@ -262,11 +262,14 @@ describe('POST /webhook — 独立2接続の並行follow (#622)', () => {
   });
 
   test('前の持ち主が送り始めたまま消えたら、奪った側は送らない', async () => {
+    // 予約は奪える古さ、印はまだ期限内（＝相手がいま送っている最中かも）。
+    const recentMark = new Date(Date.now() + 9 * 60 * 60 * 1000 - 60_000)
+      .toISOString().replace('Z', '+09:00');
     observer.prepare(
       `INSERT INTO friend_add_send_claims
         (line_account_id, friend_id, event_id, generation, claimed_at, dispatched_at)
        VALUES ('account-1', 'friend-1', 'webhook-crashed', 1, ?, ?)`,
-    ).run(STALE, STALE);
+    ).run(STALE, recentMark);
 
     await postFollow('webhook-new', connB.db);
 

@@ -161,6 +161,13 @@ beforeEach(() => {
   db = testDb.db;
   seedBase();
   vi.mocked(verifySignature).mockResolvedValue(true);
+  /*
+   * `vi.clearAllMocks()` は呼び出し記録しか消さないので、`...Once` の
+   * 待ち行列が残ると次の試験へ漏れる（送れたはずの試験が送達不明になる）。
+   * 送信の口だけは毎回まっさらにしてから既定を敷き直す。
+   */
+  lineClientMocks.replyMessage.mockReset();
+  lineClientMocks.pushMessage.mockReset();
   lineClientMocks.getProfile.mockResolvedValue({ displayName: 'U-1さん' });
   lineClientMocks.replyMessage.mockResolvedValue(undefined);
   lineClientMocks.pushMessage.mockResolvedValue(undefined);
