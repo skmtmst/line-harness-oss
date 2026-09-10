@@ -377,6 +377,36 @@ jobs:
       - run: pnpm --filter web exec next lint --report-unused-disable-directives-severity error
       - run: pnpm --filter web typecheck
       - run: pnpm --filter web test
+      # 外部連携画面の実挙動契約(webhook-runtime.spec.ts)。PR #1506 で入ったが
+      # 専用の設定が無く、**どのワークフローからも一度も呼ばれていなかった**(#704)。
+      # #704 で繋いだところ2試験が落ち、原因が画面側の不具合だと分かったので
+      # (#705)、直したうえでここで繋ぎ直す。
+      #
+      # この試験だけは、書き出した `out` ではなく `next dev` に当てる。試験が
+      # `/api/line-accounts` を `route.fetch()` で実際に取りに行くので、
+      # `NEXT_PUBLIC_API_URL` に検証環境を焼き込んだ `out` には当てられない。
+      # 設定側が画面確認用のモックAPIと `next dev` の両方を起こす。
+      #
+      # `web-build` ではなくこの工程に置くのは、`web-build` が
+      # `apps/web/.next/cache` を持ち越しているから。あちらで `next dev` を
+      # 動かすと、開発用の中間物が入った `.next/cache` を保存してしまい、
+      # #696 と同じ「ソースと合わない cache による偽の失敗」を招く。
+      # この工程は `next build` をしないので `.next` を汚さない。
+      - name: Install Chromium for the webhook runtime contract
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Webhook screen runtime contract on a real browser (#704, #705)
+        run: >-
+          pnpm exec playwright test
+          --config apps/web/src/app/webhooks/webhook-runtime.config.mjs
+      # 失敗したときのDOMを残す。#705 は「吹き出しが次の行のボタンを覆う」という
+      # 見た目の重なりで、後から読めないと原因に辿り着けない種類の失敗だった。
+      - name: Upload webhook runtime contract failure context
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: webhook-runtime-failure
+          path: apps/web/test-results/
+          retention-days: 7
 
   mcp-checks:
     name: MCP contract tests, typecheck and build
