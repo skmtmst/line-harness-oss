@@ -405,6 +405,18 @@ CREATE TABLE affiliates (
 , email TEXT, hold_days INTEGER, payout_cycle TEXT, notify_on_conversion INTEGER NOT NULL DEFAULT 0, tenant_id TEXT REFERENCES tenants(id), line_account_id TEXT REFERENCES line_accounts(id), lifecycle_status TEXT NOT NULL DEFAULT 'active'
   CHECK (lifecycle_status IN ('active', 'paused', 'archived')), archived_at TEXT, operation_id TEXT);
 
+CREATE TABLE ai_loop_slack_reports (
+  work_key        TEXT PRIMARY KEY,
+  slack_ts        TEXT,
+  revision        INTEGER NOT NULL,
+  claim_token     TEXT,
+  claim_expires_at INTEGER,
+  updated_at      INTEGER NOT NULL,
+  CHECK (revision >= 946684800000),
+  CHECK ((claim_token IS NULL AND claim_expires_at IS NULL)
+      OR (claim_token IS NOT NULL AND claim_expires_at IS NOT NULL))
+);
+
 CREATE TABLE analytics_cross_run_members (
   run_id           TEXT NOT NULL REFERENCES analytics_cross_runs(id) ON DELETE CASCADE,
   line_account_id  TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
@@ -3377,7 +3389,7 @@ CREATE TABLE nen_photo_publications (
   updated_at TEXT NOT NULL
 );
 
-CREATE TABLE nen_photo_review_events (
+CREATE TABLE "nen_photo_review_events" (
   id TEXT PRIMARY KEY,
   photo_id TEXT NOT NULL REFERENCES nen_photo_submissions(id) ON DELETE CASCADE,
   line_account_id TEXT NOT NULL REFERENCES line_accounts(id),
@@ -3389,12 +3401,16 @@ CREATE TABLE nen_photo_review_events (
   reviewed_by TEXT NOT NULL,
   reviewed_by_name TEXT NOT NULL,
   notification_status TEXT NOT NULL DEFAULT 'pending'
-    CHECK (notification_status IN ('pending', 'sent', 'failed')),
+    CHECK (notification_status IN ('pending', 'sending', 'sent', 'failed')),
   notification_error TEXT,
   notification_attempt_count INTEGER NOT NULL DEFAULT 0
     CHECK (notification_attempt_count >= 0),
   notification_first_failed_at TEXT,
   notification_sent_at TEXT,
+  notification_lease_id TEXT,
+  notification_lease_expires_at TEXT,
+  notification_generation INTEGER NOT NULL DEFAULT 0
+    CHECK (notification_generation >= 0),
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   UNIQUE(photo_id, from_status)
@@ -6071,12 +6087,12 @@ CREATE UNIQUE INDEX idx_nen_photo_publications_idempotency
   ON nen_photo_publications(line_account_id, last_idempotency_key)
   WHERE last_idempotency_key IS NOT NULL;
 
-CREATE INDEX idx_nen_photo_review_events_account_created
+CREATE INDEX idx_nen_photo_review_events_v352_account_created
   ON nen_photo_review_events(line_account_id, created_at DESC);
 
-CREATE INDEX idx_nen_photo_review_events_notification
+CREATE INDEX idx_nen_photo_review_events_v352_notification
   ON nen_photo_review_events(notification_status, created_at)
-  WHERE notification_status IN ('pending', 'failed');
+  WHERE notification_status IN ('pending', 'sending', 'failed');
 
 CREATE INDEX idx_nen_photo_reward_outbox_pending
   ON nen_photo_reward_outbox(status, next_attempt_at, created_at)
