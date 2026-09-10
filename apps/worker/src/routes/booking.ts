@@ -33,8 +33,9 @@ import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { cancelByTrigger, enrollByTrigger } from '../services/reminder-trigger.js';
 import { canTransition, nextStatus, type BookingAction } from '../services/booking-state.js';
-import { getAvailability } from '../services/availability.js';
+import { getAccountTimeZone, getAvailability, tzDateStr, tzHHMM } from '../services/availability.js';
 import {
+  enqueueCalendarDeleteOperation,
   removeBookingFromGoogle,
   runCalendarDeleteOperation,
   syncConfirmedBookingToGoogle,
@@ -116,6 +117,66 @@ function isValidTimeRange(start: unknown, end: unknown): boolean {
   return isClockTime(start) && isClockTime(end) && minuteOfDay(start) < minuteOfDay(end);
 }
 
+/**
+ * 確定直前の枠照合。
+ *
+ * 要求された instant と、いま計算し直した候補の `startUtc` が同じ瞬間で
+ * あることだけを見る。壁時刻（YYYY-MM-DD + HH:MM）の突合は使わない。
+ * 夏時間の終わる日は同じ壁時刻が2回現れるので、01:30 で照合すると
+ * 「空いている方の 01:30」で「埋まっている方の 01:30」を通してしまう。
+ *
+ * `startUtc` が無い・読めない候補は一致とみなさない（fail-closed）。
+ * 壊れた候補を素通りさせると、営業時間外・休業例外・Google の予定を
+ * 迂回して予約が入る。
+ */
+function findLatestSlotForInstant(
+  slots: Array<{ startUtc?: string | null }> | undefined,
+  startsAt: Date,
+): { startUtc?: string | null } | null {
+  const wantedMs = startsAt.getTime();
+  if (!Number.isFinite(wantedMs)) return null;
+  for (const slot of slots ?? []) {
+    const raw = slot?.startUtc;
+    if (typeof raw !== 'string' || raw.trim() === '') continue;
+    const slotMs = new Date(raw).getTime();
+    if (!Number.isFinite(slotMs)) continue;
+    if (slotMs === wantedMs) return slot;
+  }
+  return null;
+}
+
+/**
+ * 要求 instant を店舗タイムゾーンで読み直し、その暦日の候補と突き合わせる。
+ * 取得範囲は前後 1 日を含める。UTC より進んだ／遅れた店舗では、要求の
+ * instant が隣の暦日に落ちることがあるため。
+ */
+async function reverifyLatestSlot(
+  db: D1Database,
+  env: Env['Bindings'],
+  input: {
+    lineAccountId: string;
+    menuId: string;
+    staffId: string;
+    startsAt: Date;
+    minLeadTimeMinutes: number;
+  },
+): Promise<boolean> {
+  const timeZone = await getAccountTimeZone(db, input.lineAccountId);
+  const date = tzDateStr(timeZone, input.startsAt);
+  const latest = await getAvailability(db, {
+    lineAccountId: input.lineAccountId,
+    menuId: input.menuId,
+    staffId: input.staffId,
+    from: date,
+    to: date,
+    now: new Date(),
+    minLeadTimeMinutes: input.minLeadTimeMinutes,
+    googleCredentials: googleCredentials(env),
+  });
+  const slots = latest.by_staff.find((item) => item.staff_id === input.staffId)?.slots;
+  return findLatestSlotForInstant(slots, input.startsAt) !== null;
+}
+
 async function bookingConflictAlternatives(
   db: D1Database,
   env: Env['Bindings'],
@@ -128,9 +189,12 @@ async function bookingConflictAlternatives(
   },
 ) {
   const endsAt = new Date(input.startsAt.getTime() + input.durationMinutes * 60_000);
-  const jst = new Date(input.startsAt.getTime() + 9 * 3600_000).toISOString();
-  const date = jst.slice(0, 10);
-  const time = jst.slice(11, 16);
+  // 代替候補も店舗タイムゾーンで並べる。+09:00 固定だと NY 店舗で
+  // 「別の日の・別の時刻の枠」を代わりとして出してしまう。
+  const timeZone = await getAccountTimeZone(db, input.lineAccountId);
+  const date = tzDateStr(timeZone, input.startsAt);
+  const time = tzHHMM(timeZone, input.startsAt);
+  const wantedMs = input.startsAt.getTime();
   const [overlap, availability] = await Promise.all([
     db.prepare(
       `SELECT COUNT(*) AS count, MIN(starts_at) AS conflict_from,
@@ -156,18 +220,26 @@ async function bookingConflictAlternatives(
     }),
   ]);
   const selected = availability.by_staff.find((item) => item.staff_id === input.staffId);
+  // 「同じ時刻」は instant で見る。fold 日は壁時刻 01:30 が2回あるため、
+  // 壁時刻だけで拾うと要求とは別の瞬間の枠を「同じ時刻の代わり」に出す。
+  const isRequestedInstant = (slot: { startUtc?: string | null }): boolean => {
+    const raw = slot?.startUtc;
+    if (typeof raw !== 'string' || raw.trim() === '') return false;
+    const ms = new Date(raw).getTime();
+    return Number.isFinite(ms) && ms === wantedMs;
+  };
   const nearbySlots = [...(selected?.slots ?? [])]
-    .filter((slot) => slot.date === date && slot.start !== time)
+    .filter((slot) => slot.date === date && !isRequestedInstant(slot))
     .sort((a, b) => Math.abs(minuteOfDay(a.start) - minuteOfDay(time)) - Math.abs(minuteOfDay(b.start) - minuteOfDay(time)))
     .slice(0, 3);
   const alternateStaff = availability.by_staff
     .filter((item) => item.staff_id !== input.staffId)
-    .filter((item) => item.slots.some((slot) => slot.date === date && slot.start === time))
+    .filter((item) => item.slots.some(isRequestedInstant))
     .slice(0, 3)
     .map((item) => ({
       staffId: item.staff_id,
       displayName: item.display_name,
-      slot: item.slots.find((slot) => slot.date === date && slot.start === time)!,
+      slot: item.slots.find(isRequestedInstant)!,
     }));
   const count = Number(overlap?.count ?? 0);
   const source: BookingConflictSource = count > 0 ? 'internal_booking'
@@ -544,21 +616,15 @@ booking.post('/api/liff/booking/requests', async (c) => {
 
   // Server-side availability 再検証: 曜日受付時間 / Google Calendar /
   // リードタイム / 既存予約を、確定直前にもう一度突合する。
-  const startJstDate = new Date(startsAt.getTime() + 9 * 3600_000).toISOString().slice(0, 10);
-  const startJstHHMM = new Date(startsAt.getTime() + 9 * 3600_000).toISOString().slice(11, 16);
-  const latestAvailability = await getAvailability(c.env.DB, {
+  // 突合は店舗タイムゾーンの暦日で取り直した候補の instant と、要求の
+  // instant の完全一致で行う（+09:00 固定の壁時刻照合ではない）。
+  const slotMatched = await reverifyLatestSlot(c.env.DB, c.env, {
     lineAccountId: accountId,
     menuId: body.menu_id,
     staffId: body.staff_id,
-    from: startJstDate,
-    to: startJstDate,
-    now: new Date(),
+    startsAt,
     minLeadTimeMinutes: DEFAULT_ACCOUNT_SETTINGS.min_lead_time_minutes,
-    googleCredentials: googleCredentials(c.env),
   });
-  const slotMatched = latestAvailability.by_staff[0]?.slots.some(
-    (slot) => slot.date === startJstDate && slot.start === startJstHHMM,
-  );
   if (!slotMatched) return c.json({ error: 'slot_not_available' }, 422);
 
   const bookingId = crypto.randomUUID();
@@ -680,15 +746,30 @@ booking.post('/api/liff/booking/requests', async (c) => {
   // attachTagAndFireSideEffects は POST /api/friends/:id/tags と同じ side effects
   // (tag_added シナリオ enrollment + tag_change イベント) を発火する。
   // INSERT OR IGNORE で重複を吸収し、新規付与のときだけ side effects を打つ。
+  //
+  // 設定した時点で active でも、予約が入る時点では整理済み(archived)になっている
+  // ことがある。メニューに残っている auto_tag_id をそのまま信じず、付与の直前に
+  // アカウントと status='active' を引き直す。外れていれば付与も後続副作用も打たない
+  // (整理済みのタグが友だちに付き、シナリオ・イベントまで動いてしまうのを止める)。
   if (menuRow.auto_tag_id) {
     const tagId = menuRow.auto_tag_id;
     c.executionCtx.waitUntil(
-      attachTagAndFireSideEffects(c.env.DB, friendId, tagId, {
-        defaultAccessToken: c.env.LINE_CHANNEL_ACCESS_TOKEN,
-        workerUrl: c.env.WORKER_URL,
-      })
-        .then(() => undefined)
-        .catch((err) => console.error('booking auto-tag failed:', err)),
+      (async () => {
+        if (!(await isAssignableAutoTag(c.env.DB, tagId, accountId))) {
+          console.warn(JSON.stringify({
+            event: 'booking_auto_tag_skipped',
+            reason: 'tag_not_active_in_account',
+            tag_id: tagId,
+            line_account_id: accountId,
+            booking_id: bookingId,
+          }));
+          return;
+        }
+        await attachTagAndFireSideEffects(c.env.DB, friendId, tagId, {
+          defaultAccessToken: c.env.LINE_CHANNEL_ACCESS_TOKEN,
+          workerUrl: c.env.WORKER_URL,
+        });
+      })().catch((err) => console.error('booking auto-tag failed:', err)),
     );
   }
 
@@ -1235,6 +1316,49 @@ function toMenuActiveFlag(value: unknown): number {
   return value === false || value === 0 ? 0 : 1;
 }
 
+type AutoTagIdRead =
+  | { ok: true; present: boolean; value: string | null }
+  | { ok: false; error: 'invalid_auto_tag_id' };
+
+/**
+ * auto_tag_id は「文字列」か「null / 未送信」だけを受け付ける。
+ * 数値・真偽値・配列・オブジェクトをそのまま `.trim()` へ流すと TypeError になり、
+ * 入力の不備が 500(サーバ障害)として返ってしまう。呼び手が直せる誤りなので
+ * ここで型を見て 400 に倒す。
+ *
+ * PUT は「送られた項目だけ更新する」ため、未送信(`present: false`)と
+ * 明示的な null(`present: true, value: null`)を呼び出し側で区別できるようにする。
+ */
+function readAutoTagId(body: Record<string, unknown>): AutoTagIdRead {
+  if (!Object.prototype.hasOwnProperty.call(body, 'auto_tag_id')) {
+    return { ok: true, present: false, value: null };
+  }
+  const raw = body.auto_tag_id;
+  if (raw === null || raw === undefined) return { ok: true, present: true, value: null };
+  if (typeof raw !== 'string') return { ok: false, error: 'invalid_auto_tag_id' };
+  const trimmed = raw.trim();
+  return { ok: true, present: true, value: trimmed === '' ? null : trimmed };
+}
+
+/**
+ * 自動タグとして結び付けてよいタグかを、対象アカウント内かつ status='active' で確かめる。
+ *
+ * 整理済み(archived)のタグを受け付けると、二度と使わないタグへメニューが繋がったままになり、
+ * 予約のたびに「付いたはずのタグで絞り込めない」状態を作る。保存時(POST/PUT)と
+ * 実行時(予約成立時)の両方でここを通し、設定した後に整理されたタグも止める。
+ */
+async function isAssignableAutoTag(
+  db: D1Database,
+  tagId: string,
+  accountId: string,
+): Promise<boolean> {
+  const row = await db
+    .prepare(`SELECT 1 FROM tags WHERE id = ? AND line_account_id = ? AND status = 'active'`)
+    .bind(tagId, accountId)
+    .first<{ 1: number }>();
+  return row != null;
+}
+
 booking.post('/api/booking/admin/menus', requireRole('owner', 'admin'), async (c) => {
   const accountId = await resolveAccountIdAdmin(c);
   if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
@@ -1259,13 +1383,11 @@ booking.post('/api/booking/admin/menus', requireRole('owner', 'admin'), async (c
     price_mode: 'fixed', base_price: b.base_price,
   });
   if (!price.ok) return c.json({ error: price.error }, 400);
-  const autoTagId = (b.auto_tag_id ?? '').trim() === '' ? null : (b.auto_tag_id as string);
-  if (autoTagId) {
-    const tagExists = await c.env.DB
-      .prepare(`SELECT 1 FROM tags WHERE id = ? AND line_account_id = ?`)
-      .bind(autoTagId, accountId)
-      .first<{ 1: number }>();
-    if (!tagExists) return c.json({ error: 'tag_not_found' }, 400);
+  const autoTag = readAutoTagId(b as unknown as Record<string, unknown>);
+  if (!autoTag.ok) return c.json({ error: autoTag.error }, 400);
+  const autoTagId = autoTag.value;
+  if (autoTagId && !(await isAssignableAutoTag(c.env.DB, autoTagId, accountId))) {
+    return c.json({ error: 'tag_not_found' }, 400);
   }
   const id = crypto.randomUUID();
   const ruleColumns = Object.keys(rules.value);
@@ -1330,16 +1452,12 @@ booking.put('/api/booking/admin/menus/:id', requireRole('owner', 'admin'), async
   // 古いクライアントは新しい項目を送らない。`undefined` を null として
   // 書き込むと既存設定を消してしまうので、明示的に送られたものだけ更新する。
   // auto_tag_id が以前からこの扱いで、受付条件も同じにそろえた。
-  const hasAutoTagId = Object.prototype.hasOwnProperty.call(b, 'auto_tag_id');
-  const autoTagId = hasAutoTagId
-    ? ((b.auto_tag_id ?? '').trim() === '' ? null : (b.auto_tag_id as string))
-    : null;
-  if (hasAutoTagId && autoTagId) {
-    const tagExists = await c.env.DB
-      .prepare(`SELECT 1 FROM tags WHERE id = ? AND line_account_id = ?`)
-      .bind(autoTagId, accountId)
-      .first<{ 1: number }>();
-    if (!tagExists) return c.json({ error: 'tag_not_found' }, 400);
+  const autoTag = readAutoTagId(b as unknown as Record<string, unknown>);
+  if (!autoTag.ok) return c.json({ error: autoTag.error }, 400);
+  const hasAutoTagId = autoTag.present;
+  const autoTagId = autoTag.value;
+  if (hasAutoTagId && autoTagId && !(await isAssignableAutoTag(c.env.DB, autoTagId, accountId))) {
+    return c.json({ error: 'tag_not_found' }, 400);
   }
 
   // 常に書き込む項目（PUT なので、送られなければ既定値で上書きする）
@@ -1742,21 +1860,15 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
   const blockEndsAt = new Date(endsAt.getTime() + menuRow.buffer_after_minutes * 60_000);
 
   // Recurring-hours + Google Calendar + internal-booking validation.
-  const startJstDate = new Date(startsAt.getTime() + 9 * 3600_000).toISOString().slice(0, 10);
-  const startJstHHMM = new Date(startsAt.getTime() + 9 * 3600_000).toISOString().slice(11, 16);
-  const latestAvailability = await getAvailability(c.env.DB, {
+  // LIFF と同じ契約で照合する。店舗タイムゾーンの暦日で取り直した候補の
+  // instant と、要求の instant が完全に一致したときだけ通す。
+  if (!(await reverifyLatestSlot(c.env.DB, c.env, {
     lineAccountId: accountId,
     menuId: body.menu_id,
     staffId: body.staff_id,
-    from: startJstDate,
-    to: startJstDate,
-    now: new Date(),
+    startsAt,
     minLeadTimeMinutes: 0,
-    googleCredentials: googleCredentials(c.env),
-  });
-  if (!latestAvailability.by_staff[0]?.slots.some(
-    (slot) => slot.date === startJstDate && slot.start === startJstHHMM,
-  )) {
+  }))) {
     const alternatives = await bookingConflictAlternatives(c.env.DB, c.env, {
       lineAccountId: accountId,
       menuId: body.menu_id,
@@ -2553,6 +2665,24 @@ booking.get('/api/booking/admin/requests-summary', async (c) => {
   });
 });
 
+/**
+ * 旧表 (booking_reminders) の未送信を止める。
+ *
+ * 再送でも同じ結果になるよう1文にまとめ、本線と再送枝の両方から呼ぶ。
+ * 一時失敗の 'failed' も止める: 取消ずみの予約は送らないため、'pending' だけ
+ * 止めると管理画面に未取消の予定が残り続ける (expirer も両方止めている)。
+ * V6 fence の成功後にだけ呼ぶ (409 では旧表も含めて巻き戻す)。
+ */
+async function cancelLegacyBookingReminders(db: D1Database, bookingId: string): Promise<void> {
+  await db
+    .prepare(
+      `UPDATE booking_reminders SET status='cancelled'
+        WHERE booking_id = ? AND status IN ('pending', 'failed')`,
+    )
+    .bind(bookingId)
+    .run();
+}
+
 booking.patch('/api/booking/admin/requests/:id', requireRole('owner', 'admin', 'staff'), async (c) => {
   const accountId = await resolveAccountIdAdmin(c);
   if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
@@ -2601,6 +2731,13 @@ booking.patch('/api/booking/admin/requests/:id', requireRole('owner', 'admin', '
     }
     // 却下では Calendar 予定を作らないため削除の再試行は要らない。
     if (isCancelRetry) {
+      // 初回の途中失敗で旧表だけ未取消のまま残ることがある。同じ取消要求の
+      // 再送でそろえる (V6 fence 成功後なので 409 で巻き戻す物は無い)。
+      await cancelLegacyBookingReminders(c.env.DB, id);
+      // 台帳行が durable に残るまで成功応答しない。enqueue の DB 失敗は
+      // 落とさず投げ (連続失敗でも台帳なし200にしない)、再送で回復する。
+      // 行さえあれば実行の一時失敗は retry_wait に残り cron が拾う。
+      await enqueueCalendarDeleteOperation(c.env.DB, { bookingId: id, lineAccountId: accountId });
       await runCalendarDeleteOperation(c.env.DB, {
         bookingId: id,
         lineAccountId: accountId,
@@ -2692,14 +2829,11 @@ booking.patch('/api/booking/admin/requests/:id', requireRole('owner', 'admin', '
       ),
     );
   } else if (next === 'cancelled' || next === 'expired') {
-    await c.env.DB
-      .prepare(
-        `UPDATE booking_reminders SET status='cancelled' WHERE booking_id = ? AND status = 'pending'`,
-      )
-      .bind(id)
-      .run();
     // N-065: V6 の未送信予定だけを止める。送信済み履歴は残す。
-    // 送信権の貸出中は 409 で再試行させる (取消確定後の送信を起こさない)。
+    // 旧表の取消は V6 fence 成功の後に回す: fence の 409 では旧表も
+    // 含めて完全 rollback する (先に止めると巻き戻せない)。
+    // 送信権の貸出中は状態更新を巻き戻して 409 にする
+    // (取消確定後の送信を起こさない)。
     try {
       await cancelByTrigger(c.env.DB, {
         triggerType: 'booking',
@@ -2726,8 +2860,14 @@ booking.patch('/api/booking/admin/requests/:id', requireRole('owner', 'admin', '
       }
       throw error;
     }
-    // Calendar 削除は台帳駆動 (安定キーで1行)。一時失敗は retry_wait に残し、
-    // 次の取消再試行で同じ鍵で再実行する。取消処理自体は壊さない。
+    await cancelLegacyBookingReminders(c.env.DB, id);
+    // Calendar 削除は台帳駆動 (安定キーで1行)。V6 の fence 成功後に登録する:
+    // 送信権の貸出中で巻き戻した 409 の後に queued 行が残ると、cron が確定
+    // ずみの予約の予定を消してしまう。登録の失敗は落とさず投げる
+    // (取消再試行で回復できる)。一時失敗は retry_wait に残し、
+    // 次の取消再試行で同じ鍵で再実行する。
+    // 却下では Calendar 予定を作らないため登録しない。
+    await enqueueCalendarDeleteOperation(c.env.DB, { bookingId: id, lineAccountId: accountId });
     c.executionCtx.waitUntil(
       runCalendarDeleteOperation(c.env.DB, {
         bookingId: id,

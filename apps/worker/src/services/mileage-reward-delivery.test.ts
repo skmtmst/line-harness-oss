@@ -29,6 +29,8 @@ vi.mock('./automation-engine.js', () => ({
   },
 }));
 
+vi.mock('./feature-enforcement.js', () => ({ featureJobCanRun: async () => true }));
+
 const { deliverMileageReward } = await import('./mileage-reward-delivery.js');
 
 const db = {

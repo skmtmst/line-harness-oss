@@ -9,6 +9,8 @@ vi.mock('@line-crm/db', () => ({
   applyPublishedActionScoreRules: mocks.applyPublishedActionScoreRules,
 }));
 
+vi.mock('./feature-enforcement.js', () => ({ featureJobCanRun: async () => true }));
+
 vi.mock('./automation-triggers.js', () => ({
   dispatchAutomationEventWithLogging: mocks.dispatchAutomationEventWithLogging,
 }));

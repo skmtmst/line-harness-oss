@@ -1,7 +1,8 @@
-import { getFriendById, getLineAccountById, jstNow } from '@line-crm/db';
+import { accountFeatureOffExclusionSql, getFriendById, getLineAccountById, jstNow } from '@line-crm/db';
 import type { Message } from '@line-crm/line-sdk';
 import type { EcEvent } from '../routes/ec-integrations.js';
 import { logOutgoingMessage } from './event-bus.js';
+import { createFeatureJobGate, featureJobCanRun } from './feature-enforcement.js';
 import { createEccubeCoupon } from './eccube-coupon.js';
 import { pushViaHarnessProxy, type HarnessProxyDispatch } from './line-proxy-send.js';
 
@@ -487,6 +488,10 @@ export async function enqueueBirthdayCoupons(
   let queued = 0;
   for (const pet of pets.results) {
     if (!pet.line_account_id) continue;
+    // 機能オフ中は発行も予約もしない。再オン後の誕生日から再開する。
+    if (!await featureJobCanRun(db, { accountId: pet.line_account_id, featureId: 'nen_campaigns', job: 'birthday coupon enqueue' })) {
+      continue;
+    }
     if (!accountConfiguration.has(pet.line_account_id)) {
       const [setting, campaign] = await Promise.all([
         getNenBirthdayCouponSetting(db, pet.line_account_id),
@@ -581,18 +586,42 @@ export async function processNenDeliveries(
   db: D1Database,
   options: NenDeliveryOptions,
 ): Promise<{ sent: number; failed: number; skipped: number }> {
+  const dueWhere = `status IN ('pending', 'failed') AND datetime(scheduled_at) <= datetime('now')
+        AND attempts < ?`;
+  const campaignsOff = accountFeatureOffExclusionSql('nen_delivery_jobs.line_account_id', 'nen_campaigns');
+  // オフ判定は LIMIT を数える前に SQL で行う。読んでから弾くと、オフの行が
+  // 上限ぶん先頭を占めたまま、後ろに並ぶ動作中アカウントの配信が進まない。
   const jobs = await db.prepare(
     `SELECT id, campaign_key, friend_id, line_account_id, source_key, payload, campaign_snapshot,
             retry_generation
        FROM nen_delivery_jobs
-      WHERE status IN ('pending', 'failed') AND datetime(scheduled_at) <= datetime('now')
-        AND attempts < ?
+      WHERE ${dueWhere}
+        AND NOT ${campaignsOff}
       ORDER BY scheduled_at ASC LIMIT ?`,
   ).bind(MAX_DELIVERY_ATTEMPTS, MAX_JOBS_PER_TICK).all<DeliveryJob>();
+  // 止めた行も同じ上限ぶんだけ読み、skipped に数えて監査を残す。
+  // 読むだけで status も attempts も動かさない。
+  const offJobs = await db.prepare(
+    `SELECT line_account_id FROM nen_delivery_jobs
+      WHERE ${dueWhere}
+        AND line_account_id IS NOT NULL
+        AND ${campaignsOff}
+      ORDER BY scheduled_at ASC LIMIT ?`,
+  ).bind(MAX_DELIVERY_ATTEMPTS, MAX_JOBS_PER_TICK).all<{ line_account_id: string }>();
   let sent = 0;
   let failed = 0;
   let skipped = 0;
+  const offGate = createFeatureJobGate();
+  for (const off of offJobs.results) {
+    await offGate.canRun(db, off.line_account_id, 'nen_campaigns', 'NEN campaign deliveries');
+    skipped += 1;
+  }
   for (const job of jobs.results) {
+    // 機能オフ中はclaimせずpendingのまま残す。再オンで再開する。
+    if (job.line_account_id && !await featureJobCanRun(db, { accountId: job.line_account_id, featureId: 'nen_campaigns', job: 'NEN campaign deliveries' })) {
+      skipped += 1;
+      continue;
+    }
     const claim = await db.prepare(
       `UPDATE nen_delivery_jobs SET status = 'processing', attempts = attempts + 1, updated_at = ?
         WHERE id = ? AND status IN ('pending', 'failed')`,

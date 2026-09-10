@@ -227,10 +227,13 @@ function dueDB(state: { rows: DueRow[] }): D1Database {
             if (r) { r.status = 'sent'; r.sent_at = sent_at; }
             return { success: true, meta: { changes: 1 } };
           }
-          if (sql.startsWith('UPDATE event_booking_reminders SET status = ?, last_error = ?')) {
-            const [status, last_error, id] = bound as [string, string, string];
+          // 失敗記録は retry_count も書き戻す。fence の前で投げた場合
+          // (資格情報が復号できない等) は claim が走っておらず、ここで
+          // 数えないと上限に届かず failed のまま滞留するため。
+          if (sql.startsWith('UPDATE event_booking_reminders SET status = ?, retry_count = ?, last_error = ?')) {
+            const [status, retry_count, last_error, id] = bound as [string, number, string, string];
             const r = state.rows.find((x) => x.id === id);
-            if (r) { r.status = status; r.last_error = last_error; }
+            if (r) { r.status = status; r.retry_count = retry_count; r.last_error = last_error; }
             return { success: true, meta: { changes: 1 } };
           }
           return { success: true, meta: {} };

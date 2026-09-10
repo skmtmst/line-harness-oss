@@ -8,9 +8,12 @@ const workflow = readFileSync(
 );
 
 describe('Deploy Cloudflare Staging workflow', () => {
-  it('is manual-only and defaults to dry-run', () => {
+  it('supports a gated development push and still defaults manual runs to dry-run', () => {
     expect(workflow).toContain('workflow_dispatch:');
-    expect(workflow).not.toMatch(/^\s+push:/m);
+    expect(workflow).toMatch(/^\s+push:/m);
+    expect(workflow).toMatch(/branches:\s*\n\s*- codex\/development/);
+    expect(workflow).toContain("vars.NEN_STAGING_DELIVERY_MODE == 'dry-run'");
+    expect(workflow).toContain("vars.NEN_STAGING_DELIVERY_MODE == 'apply'");
     expect(workflow).toContain('default: dry-run');
     expect(workflow).toContain('default: all');
   });
@@ -23,10 +26,20 @@ describe('Deploy Cloudflare Staging workflow', () => {
     expect(workflow).not.toContain('apps/worker/wrangler.toml');
   });
 
-  it('requires an exact deploy lock before apply', () => {
-    expect(workflow).toContain('if [ "$MODE" = "apply" ]');
+  it('acquires an exact deploy lock for apply and releases only after success', () => {
+    expect(workflow).toContain('id: staging_lock');
+    expect(workflow).toContain("if: env.DELIVERY_MODE == 'apply'");
+    expect(workflow).toContain('pnpm deploy:lock acquire staging');
     expect(workflow).toContain(
       'pnpm deploy:lock verify staging --sha "$GITHUB_SHA" --remote origin',
+    );
+    expect(workflow).toContain("if: success() && steps.staging_lock.outcome == 'success'");
+    expect(workflow).toContain('pnpm deploy:lock release staging --remote origin');
+    expect(workflow.indexOf('pnpm deploy:lock acquire staging')).toBeLessThan(
+      workflow.indexOf('npx wrangler deploy --config apps/worker/wrangler.staging.toml'),
+    );
+    expect(workflow.indexOf('pnpm deploy:lock release staging')).toBeGreaterThan(
+      workflow.indexOf('npx wrangler pages deploy apps/web/out'),
     );
   });
 
@@ -52,9 +65,9 @@ describe('Deploy Cloudflare Staging workflow', () => {
   });
 
   it('can deploy Worker and Admin independently', () => {
-    expect(workflow).toContain("inputs.target != 'admin'");
-    expect(workflow).toContain("inputs.target != 'worker'");
-    expect(workflow).toContain('TARGET: ${{ inputs.target }}');
+    expect(workflow).toContain("env.DELIVERY_TARGET != 'admin'");
+    expect(workflow).toContain("env.DELIVERY_TARGET != 'worker'");
+    expect(workflow).toContain("inputs.target || 'all'");
     expect(workflow).toContain(
       'pnpm --filter @line-harness/update-engine build',
     );

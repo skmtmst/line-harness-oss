@@ -5,6 +5,7 @@ const dbMocks = vi.hoisted(() => ({
   getLineAccountById: vi.fn(),
   jstNow: vi.fn(() => '2026-08-10T20:00:00+09:00'),
 }));
+vi.mock('./feature-enforcement.js', () => ({ featureJobCanRun: async () => true }));
 vi.mock('@line-crm/db', () => dbMocks);
 
 const { buildJourneyFollowupText, processWebinarFollowups } =

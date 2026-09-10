@@ -126,7 +126,7 @@ const DOCUMENTED_MIN = 84;
 const ALLOWLIST_MAX = 777;
 
 /**
- * PR #1456 時点の記載済み 83 件の基準一覧。
+ * PR #1456 時点の記載済み 83 件 + #630 の health-summary 1 件の基準一覧。
  * 既存仕様を ALLOWLIST へ移して後退させる変更を落とすためのもの。
  * 件数が変わらなくても、ここにある1件が消えたら落ちる。
  * 後続票で記載を増やしたら、増えた分をここへ足す。
@@ -143,6 +143,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'DELETE /api/scenarios/{id}/steps/{stepId}',
   'DELETE /api/tags/{id}',
   'DELETE /api/users/{id}',
+  'GET /api/accounts/health-summary',
   'GET /api/affiliates',
   'GET /api/affiliates/{id}',
   'GET /api/affiliates/{id}/report',
@@ -200,6 +201,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'POST /api/scenarios/{id}/enroll/{friendId}',
   'POST /api/scenarios/{id}/simulate',
   'POST /api/scenarios/{id}/steps',
+  'POST /api/settings/features/impact',
   'POST /api/tags',
   'POST /api/tags/import',
   'POST /api/tags/import/preview',
@@ -1214,7 +1216,7 @@ describe('OpenAPIと公開APIの同期', () => {
     ).toBe(true);
   });
 
-  test('基準の記載83件が残っている（allowlistへの移し替え検出）', async () => {
+  test('基準の記載84件が残っている（allowlistへの移し替え検出）', async () => {
     const spec = await loadSpec();
     const documented = documentedKeys(spec);
     const lost = [...BASELINE_DOCUMENTED].filter((key) => !documented.has(key)).sort();
