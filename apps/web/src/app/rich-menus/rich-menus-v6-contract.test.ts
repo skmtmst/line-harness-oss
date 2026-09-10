@@ -102,8 +102,9 @@ describe('V6リッチメニューの公開安全契約', () => {
   })
 
   it('alias切替に失敗したら旧IDへ戻す', () => {
-    expect(PUBLISHER).toContain('const rollbackPublish = async () =>')
-    expect(PUBLISHER).toContain('await line.upsertRichMenuAlias(aliasId, page.lineRichMenuId)')
-    expect(PUBLISHER).toContain('await cleanupNewMenus()')
+    // E-08 #621 案Aで段階公開へ分割。補償は restorePreSwitchLive が担う。
+    expect(PUBLISHER).toContain('export async function restorePreSwitchLive(')
+    expect(PUBLISHER).toContain('await line.upsertRichMenuAlias(aliasId, old.lineRichMenuId)')
+    expect(PUBLISHER).toContain('await deleteRichMenuShells(')
   })
 })

@@ -4048,7 +4048,7 @@ CREATE TABLE rich_menu_groups (
   display_order       INTEGER NOT NULL DEFAULT 0,
   created_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-);
+, publishing_owner TEXT, publishing_expires_at TEXT, publishing_generation INTEGER NOT NULL DEFAULT 0);
 
 CREATE TABLE rich_menu_pages (
   id                 TEXT PRIMARY KEY,
@@ -4062,6 +4062,16 @@ CREATE TABLE rich_menu_pages (
   created_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   UNIQUE (group_id, order_index)
+);
+
+CREATE TABLE rich_menu_schedule_publications (
+  schedule_id      TEXT NOT NULL REFERENCES rich_menu_schedules(id) ON DELETE CASCADE,
+  kind             TEXT NOT NULL DEFAULT 'publish' CHECK (kind IN ('publish', 'restore')),
+  page_id          TEXT NOT NULL,
+  line_richmenu_id TEXT NOT NULL,
+  run_id           TEXT NOT NULL,
+  created_at       TEXT NOT NULL,
+  PRIMARY KEY (schedule_id, kind, page_id)
 );
 
 CREATE TABLE rich_menu_schedules (
@@ -4081,7 +4091,8 @@ CREATE TABLE rich_menu_schedules (
   ended_run_id          TEXT,
   last_error_code       TEXT,
   created_at            TEXT NOT NULL,
-  updated_at            TEXT NOT NULL,
+  updated_at            TEXT NOT NULL, attempt_count INTEGER NOT NULL DEFAULT 0 CHECK (attempt_count >= 0), next_retry_at TEXT, lease_expires_at TEXT, restore_default_state TEXT
+  CHECK (restore_default_state IN ('captured', 'no_default')), restore_default_line_id TEXT,
   CHECK (mode = 'scheduled' OR ends_at IS NOT NULL),
   UNIQUE (account_id, idempotency_key)
 );
@@ -6297,6 +6308,12 @@ CREATE INDEX idx_rich_menu_schedules_due
 CREATE INDEX idx_rich_menu_schedules_group
   ON rich_menu_schedules (group_id, created_at DESC);
 
+CREATE INDEX idx_rich_menu_schedules_lease
+  ON rich_menu_schedules (status, lease_expires_at);
+
+CREATE INDEX idx_rich_menu_schedules_retry
+  ON rich_menu_schedules (status, next_retry_at);
+
 CREATE INDEX idx_rt_approvals_queue ON rt_approval_requests(organization_id, status, created_at DESC);
 
 CREATE INDEX idx_rt_email_digests_store_date
@@ -6380,6 +6397,9 @@ CREATE UNIQUE INDEX idx_scenario_triggers_unique
   ON scenario_triggers (scenario_id, kind, COALESCE(tag_id, ''));
 
 CREATE INDEX idx_scenarios_order ON scenarios (display_order);
+
+CREATE INDEX idx_schedule_publications_schedule
+  ON rich_menu_schedule_publications (schedule_id, kind);
 
 CREATE INDEX idx_shifts_staff_date ON staff_shifts (staff_id, work_date);
 
