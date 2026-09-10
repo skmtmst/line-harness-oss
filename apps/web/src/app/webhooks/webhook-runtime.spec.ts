@@ -1,4 +1,4 @@
-import { expect, type Page, type Route, test } from '@playwright/test'
+import { expect, type Locator, type Page, type Route, test } from '@playwright/test'
 
 const BASE = process.env.WEBHOOK_RUNTIME_BASE ?? 'http://127.0.0.1:3101'
 
@@ -59,6 +59,20 @@ async function toggleRow(page: Page, name: string) {
   await row.getByRole('button', { name: '止める', exact: true }).click()
 }
 
+/*
+  行の中でのボタンの箱(#707)。
+
+  上下は行を基準にする。2回目の押下に返す案内が一覧の上へ増えると、表ごと
+  下がるので絶対座標では比べられない。**押下位置の見張りで見たいのは
+  「行の中でボタンが動いたか」**で、表ごと下がったかどうかではない。
+*/
+async function boxInRow(row: Locator, target: Locator) {
+  const rowBox = await row.boundingBox()
+  const box = await target.boundingBox()
+  if (!rowBox || !box) throw new Error('ボタンの箱を取れませんでした')
+  return { x: box.x, y: box.y - rowBox.y, width: box.width, height: box.height }
+}
+
 function updateById(pending: PendingUpdate[], id: string): PendingUpdate {
   const update = pending.find((item) => item.id === id)
   if (!update) throw new Error(`${id} の更新要求がありません`)
@@ -82,11 +96,38 @@ test('同じ行を素早く二重押ししても更新は1回だけ送る', asyn
   await openWebhooks(page)
   const row = page.getByRole('row').filter({ hasText: 'Googleスプレッドシート ／ 顧客台帳' })
   await row.getByRole('button', { name: '設定', exact: true }).click()
-  await row.getByRole('button', { name: '止める', exact: true }).dblclick()
+  const toggle = row.getByRole('button', { name: '止める', exact: true })
+  /*
+    押す前の箱を控える(#707)。`dblclick` は2発とも**同じ座標**へ落ちるので、
+    1発目のあとにボタンが動くのは危ない。動きをゼロにしてあるかを下で見る。
+
+    いまの吹き出しは `right-full` で右端が固定なので、仮に伸びても押した点は
+    箱の中に残り、2発目は当たる（幅の固定を外した逆変異で確認済み）。
+    **当たっているのは向きに助けられているだけ**なので、向きや並び順を変えた
+    ときに黙って外れないよう、箱が動かないこと自体をここで固定する。
+  */
+  const boxBeforePress = await boxInRow(row, toggle)
+  await toggle.dblclick()
 
   await expect.poll(() => pending.length).toBe(1)
   await page.waitForTimeout(100)
   expect(pending).toHaveLength(1)
+
+  /*
+    ここから下は、上の「1回だけ」が**正しい理由で**緑になっていることの見張り(#707)。
+
+    送信中に `止める` を押せなくしたり、押した瞬間に吹き出しを閉じたりすると、
+    二重押しが起こせなくなる。そうなると二重押し防止(page.tsx の togglingIdsRef)を
+    外しても上の表明は緑のままになる。当て先を残すために、
+    「送信中でも押せる」「箱が動かない」「2回目の押下に返事が出る」を固定する。
+  */
+  const pendingToggle = row.locator('[data-webhook-toggle-pending="outgoing:owh-sheets"]')
+  await expect(pendingToggle).toHaveText('止めています…')
+  await expect(pendingToggle).toHaveAttribute('aria-busy', 'true')
+  await expect(pendingToggle).toBeEnabled()
+  expect(await boxInRow(row, pendingToggle)).toEqual(boxBeforePress)
+  await expect(page.locator('[data-webhook-toggle-busy="outgoing:owh-sheets"]'))
+    .toContainText('返事が来るまでお待ちください')
 
   const reloaded = page.waitForResponse((response) =>
     response.request().method() === 'GET' && new URL(response.url()).pathname === '/api/webhooks/outgoing',
