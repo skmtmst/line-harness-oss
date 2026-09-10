@@ -322,7 +322,9 @@
     "367_conversion_once_dedup_guard.sql",
     "370_affiliate_registration_operation_idempotency.sql",
     "372_affiliate_initial_link_operation_idempotency.sql",
-    "373_ai_loop_slack_reports.sql"
+    "373_ai_loop_slack_reports.sql",
+    "374_mileage_redemption_step_outbox.sql",
+    "375_mileage_redemption_step_lease.sql"
   ],
-  "migrationCount": 323
+  "migrationCount": 325
 }

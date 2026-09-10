@@ -35,6 +35,7 @@ const dbMocks = {
   getMileageReward: vi.fn(),
   getMileageRewardAdminOverview: vi.fn(),
   getMileageRedemption: vi.fn(),
+  listMileageRedemptions: vi.fn(),
   importMileageRewardCodes: vi.fn(),
   publishMileageReward: vi.fn(),
   reorderMileageRewards: vi.fn(),
@@ -265,6 +266,74 @@ describe('mileage admin API', () => {
       method: 'POST', body: JSON.stringify({ accountId: 'account-1' }),
     });
     expect(retry.status).toBe(404);
+    expect(deliveryMocks.deliverMileageReward).not.toHaveBeenCalled();
+  });
+
+  it('lists failed redemptions inside the account boundary without secrets', async () => {
+    dbMocks.listMileageRedemptions.mockResolvedValueOnce({
+      items: [{
+        id: 'redemption-9', lineAccountId: 'account-1', rewardId: 'reward-1',
+        rewardName: '500円引き', status: 'delivery_failed', attemptCount: 2,
+        failureCode: 'reward_delivery_failed', failureMessage: '特典を渡せませんでした',
+        updatedAt: '2026-09-07T01:02:03.000Z', createdAt: '2026-09-07T00:00:00.000Z',
+        idempotencyKey: 'secret-key', requestFingerprint: 'secret-fingerprint',
+      }],
+      pagination: { total: 1, limit: 100, offset: 0 },
+    });
+    const response = await call('/api/mileage/redemptions?accountId=account-1&limit=999');
+    expect(response.status).toBe(200);
+    expect(dbMocks.listMileageRedemptions).toHaveBeenCalledWith(env.DB, {
+      lineAccountId: 'account-1', status: 'delivery_failed', limit: 100, offset: 0,
+    });
+    const body = await response.json() as {
+      data: { items: Array<Record<string, unknown>>; pagination: Record<string, unknown> };
+    };
+    expect(body.data.pagination).toMatchObject({ total: 1 });
+    expect(body.data.items[0]).toMatchObject({
+      id: 'redemption-9', status: 'delivery_failed', attemptCount: 2,
+      failureMessage: '特典を渡せませんでした', updatedAt: '2026-09-07T01:02:03.000Z',
+    });
+    const text = JSON.stringify(body);
+    expect(text).not.toContain('secret-key');
+    expect(text).not.toContain('secret-fingerprint');
+  });
+
+  it('keeps the redemption list inside the account boundary', async () => {
+    expect((await call('/api/mileage/redemptions?accountId=hidden')).status).toBe(404);
+    expect(dbMocks.listMileageRedemptions).not.toHaveBeenCalled();
+    expect((await call('/api/mileage/redemptions?accountId=account-1&status=bogus')).status).toBe(400);
+    expect(dbMocks.listMileageRedemptions).not.toHaveBeenCalled();
+  });
+
+  it('retries only a failed fulfillment and keeps the same redemption', async () => {
+    dbMocks.getMileageRedemption.mockResolvedValue({
+      id: 'redemption-9', lineAccountId: 'account-1', status: 'delivery_failed',
+    });
+    deliveryMocks.deliverMileageReward.mockResolvedValueOnce({
+      status: 'succeeded', rewardName: '500円引き', customerMessage: '',
+      rewardCode: null, retryAt: null, failurePolicy: 'retry', message: null,
+    });
+    const response = await call('/api/mileage/redemptions/redemption-9/retry-fulfillment', {
+      method: 'POST', body: JSON.stringify({ accountId: 'account-1' }),
+    });
+    expect(response.status).toBe(200);
+    expect(deliveryMocks.deliverMileageReward).toHaveBeenCalledTimes(1);
+    expect(deliveryMocks.deliverMileageReward).toHaveBeenCalledWith(
+      env.DB, 'redemption-9', expect.objectContaining({}),
+    );
+  });
+
+  it('refuses to retry a redemption that is not failing', async () => {
+    for (const status of ['reserved', 'delivering', 'succeeded', 'refunded']) {
+      dbMocks.getMileageRedemption.mockResolvedValueOnce({
+        id: `redemption-${status}`, lineAccountId: 'account-1', status,
+      });
+      const response = await call(`/api/mileage/redemptions/redemption-${status}/retry-fulfillment`, {
+        method: 'POST', body: JSON.stringify({ accountId: 'account-1' }),
+      });
+      expect(response.status).toBe(409);
+      expect(await response.json()).toMatchObject({ code: 'redemption_not_retryable' });
+    }
     expect(deliveryMocks.deliverMileageReward).not.toHaveBeenCalled();
   });
 
