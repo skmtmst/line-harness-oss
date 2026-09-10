@@ -22,6 +22,7 @@ shared-button-importer app/booking/bookings/page.tsx
 shared-button-importer app/booking/menus/page.tsx
 shared-button-importer app/booking/staff/page.tsx
 shared-button-importer app/booking/staff/shifts/page.tsx
+shared-button-importer app/booking/staff/shifts/staff-detail.tsx
 shared-button-importer app/broadcasts/detail/page.tsx
 shared-button-importer app/broadcasts/page.tsx
 shared-button-importer app/broadcasts/reserved/page.tsx
