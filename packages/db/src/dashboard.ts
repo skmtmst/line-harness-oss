@@ -90,7 +90,11 @@ export interface DashboardOverview {
     averageFirstReplyMinutes: number | null;
   };
   delivery: {
-    /** 期間内に送った通数。 */
+    /**
+     * 今月に送った通数。見出し「今月の配信」どおり、選んだ期間に関わらず
+     * 今月1日から数える。messages_log は送信時に1行足すので created_at が
+     * 送信日時にあたる（予約分を先に書く口はない）。
+     */
     sent: number;
     /**
      * こちらから送った数（プッシュ）と、受信への応答（リプライ）。
@@ -100,7 +104,10 @@ export interface DashboardOverview {
      */
     push: number;
     reply: number;
-    /** 期間内の一斉配信の件数。 */
+    /**
+     * 今月の一斉配信の件数。sent と同じく今月1日から数える。
+     * 数えるのは送った日（sent_at）。作った日ではない。
+     */
     broadcasts: number;
     /** 今月の送信上限。LINE から取れないときは null。 */
     quotaLimit: number | null;
@@ -174,6 +181,11 @@ export function periodStart(period: DashboardPeriod): string {
   if (period === 'today') return jstDate(0);
   if (period === 'last7') return jstDate(-6);
   return jstDate(-27);
+}
+
+/** 今月の始まり（JSTの日付）。「今月の配信」は選んだ期間に関わらず今月1日から数える。 */
+export function monthStart(): string {
+  return `${jstDate(0).slice(0, 8)}01`;
 }
 
 /** 期間に含まれる日数。推移の折れ線の点の数になる。 */
@@ -550,6 +562,7 @@ export async function getDashboardOverview(
   scope: AccountStatsScope,
 ): Promise<DashboardOverview> {
   const start = periodStart(period);
+  const month = monthStart();
   const partialFailures: string[] = [];
   const safe = async <T>(name: string, run: Promise<T>, fallback: T): Promise<T> => {
     try {
@@ -642,6 +655,7 @@ export async function getDashboardOverview(
     safe('conversions', conversionSummary(db, period, scope), { total: 0, byPoint: [] }),
     // プッシュ（こちらから）と リプライ（受信への応答）を分ける。
     // source は 028 で入っている。auto_reply と manual が応答。
+    // 見出し「今月の配信」どおり、選んだ期間ではなく今月1日から数える。
     db
       .prepare(
         `SELECT
@@ -650,15 +664,18 @@ export async function getDashboardOverview(
          FROM messages_log ml
           WHERE direction = 'outgoing' AND ml.created_at >= ? AND ${messageAccount.sql}`,
       )
-      .bind(start, ...messageAccount.binds)
+      .bind(month, ...messageAccount.binds)
       .first<{ sent: number; reply: number }>()
       .then((value) => value)
       .catch((error) => { partialFailures.push('delivery'); console.error('[dashboard] delivery failed', error); return null; }),
+    // 一斉配信は「作った日」ではなく「送った日」で数える。先月作って今月
+    // 送った配信を先月扱いにすると、見出し「今月の配信」と実際がずれる。
+    // sent_at が無い古い行だけ created_at で代用する（0件へ落とさない）。
     safe('broadcasts', count(
       db,
       `SELECT COUNT(*) AS n FROM broadcasts b
-        WHERE status = 'sent' AND b.created_at >= ? AND ${broadcastScope}`,
-      start, ...broadcastAccount.binds, ...broadcastJsonAccount.binds,
+        WHERE status = 'sent' AND COALESCE(b.sent_at, b.created_at) >= ? AND ${broadcastScope}`,
+      month, ...broadcastAccount.binds, ...broadcastJsonAccount.binds,
     ), 0),
     safe('operations', operationsPromise, emptyOperations),
   ]);
@@ -682,7 +699,7 @@ export async function getDashboardOverview(
   const sections: DashboardOverview['sections'] = {
     friends: status('friends', friends.total === 0, 'latest'),
     inbox: status('inbox', inbox.unanswered + inbox.inProgress + inbox.resolved === 0, 'latest'),
-    delivery: status(['delivery', 'broadcasts'], (sent?.sent ?? 0) === 0 && broadcasts === 0, period),
+    delivery: status(['delivery', 'broadcasts'], (sent?.sent ?? 0) === 0 && broadcasts === 0, 'this-month'),
     quota: { status: 'unavailable', asOf: generatedAt, period: 'this-month' },
     trend: trendStatus,
     conversions: status('conversions', conversions.total === 0, period),

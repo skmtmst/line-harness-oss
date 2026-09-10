@@ -15,7 +15,9 @@ describe('V6 photo review contract', () => {
   });
 
   it('loads and reviews photos for the selected LINE account', () => {
-    expect(page).toContain('api.nenMembers.photos(selectedAccountId)');
+    // 一覧は続きを取れるよう offset 付きで呼ぶ（#666）。呼ぶ先の口は同じ。
+    expect(page).toContain('fetchApi<PhotoPageResponse>(photoPagePath(selectedAccountId, 0))');
+    expect(page).toContain("`/api/nen-members/photos?${params.toString()}`");
     expect(page).toContain('accountId: selectedAccountId');
     expect(page).toContain('loadSequence.current');
     expect(api).toContain('/api/nen-members/photos?accountId=');

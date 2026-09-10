@@ -752,3 +752,84 @@ describe('Retry-After の読み取り(N-374)', () => {
     expect(count()).toBe(1);
   });
 });
+
+// =====================================================
+// #650 再審査: 暗号化済みsecretでも署名が必ず付く
+// =====================================================
+
+describe('#650 暗号文で保存されたsecretでも署名する', () => {
+  const KEY = 'test-key-for-outgoing-webhook-signature-650';
+  const SECRET = 's'.repeat(32);
+
+  /** 送信ヘッダを覗くための fetch。応答は常に 200。 */
+  function captureFetch(): { headers: () => Record<string, string>; calls: () => number } {
+    let seen: Record<string, string> = {};
+    let count = 0;
+    vi.stubGlobal('fetch', vi.fn(async (_url: string, init?: RequestInit) => {
+      count++;
+      seen = (init?.headers ?? {}) as Record<string, string>;
+      return { ok: true, status: 200 } as Response;
+    }));
+    return { headers: () => seen, calls: () => count };
+  }
+
+  it('平文列がNULLで暗号文だけの行でも X-Webhook-Signature が付く', async () => {
+    const { encryptWebhookSecret } = await import('@line-crm/db');
+    const encrypted = await encryptWebhookSecret(SECRET, { current: KEY });
+    const seen = captureFetch();
+    const res = await deliverWebhook(
+      { ...WEBHOOK, secret: null, secret_encrypted: encrypted },
+      '{"a":1}',
+      { sleep: noSleep, lookupHost: publicOnlyLookup, credentialKeys: { current: KEY } },
+    );
+    expect(res.ok).toBe(true);
+    expect(seen.headers()['X-Webhook-Signature']).toBe(await hmacHex(SECRET, '{"a":1}'));
+  });
+
+  it('復号できないときは署名なしで送らず、失敗として返す(fail-closed)', async () => {
+    const seen = captureFetch();
+    const res = await deliverWebhook(
+      { ...WEBHOOK, secret: null, secret_encrypted: 'k000000000000.v1.zzz.zzz' },
+      '{"a":1}',
+      { sleep: noSleep, lookupHost: publicOnlyLookup, credentialKeys: { current: KEY } },
+    );
+    expect(res.ok).toBe(false);
+    expect(res.secretUnavailable).toBe(true);
+    expect(seen.calls()).toBe(0);
+  });
+
+  it('鍵が無いときも送らない(平文へ落ちない)', async () => {
+    const { encryptWebhookSecret } = await import('@line-crm/db');
+    const encrypted = await encryptWebhookSecret(SECRET, { current: KEY });
+    const seen = captureFetch();
+    const res = await deliverWebhook(
+      { ...WEBHOOK, secret: null, secret_encrypted: encrypted },
+      '{"a":1}',
+      { sleep: noSleep, lookupHost: publicOnlyLookup },
+    );
+    expect(res.ok).toBe(false);
+    expect(res.secretUnavailable).toBe(true);
+    expect(seen.calls()).toBe(0);
+  });
+
+  it('secretが未設定の旧行は従来どおり署名なしで送る', async () => {
+    const seen = captureFetch();
+    const res = await deliverWebhook(
+      { ...WEBHOOK, secret: null, secret_encrypted: null },
+      '{"a":1}',
+      { sleep: noSleep, lookupHost: publicOnlyLookup, credentialKeys: { current: KEY } },
+    );
+    expect(res.ok).toBe(true);
+    expect(seen.calls()).toBe(1);
+    expect(seen.headers()['X-Webhook-Signature']).toBeUndefined();
+  });
+});
+
+async function hmacHex(secret: string, body: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    'raw', encoder.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'],
+  );
+  const signature = await crypto.subtle.sign('HMAC', key, encoder.encode(body));
+  return Array.from(new Uint8Array(signature)).map((b) => b.toString(16).padStart(2, '0')).join('');
+}

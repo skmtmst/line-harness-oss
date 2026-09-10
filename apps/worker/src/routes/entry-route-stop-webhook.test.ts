@@ -218,7 +218,9 @@ describe('停止refの競合順序: 候補保存→停止→follow (N-244)', () 
 
     expect(applyFriendAddRouting).toHaveBeenCalledWith(
       baseEnv.DB, 'account-main', expect.anything(), expect.anything(),
-      { entryRouteId: 'route-active' },
+      // N-101(#622) で送信権の関門などが同じ引数へ加わった。ここで見たいのは
+      // 「停止していない経路のIDがそのまま渡ること」なので、経路IDだけを見る。
+      expect.objectContaining({ entryRouteId: 'route-active' }),
     );
     expect(preparedSql.some(
       (sql) => sql.includes('friend_add_events') && sql.includes('unavailable'),
@@ -334,7 +336,7 @@ describe('停止refの競合順序: 候補保存→停止→follow (N-244)', () 
 
     expect(applyFriendAddRouting).toHaveBeenCalledWith(
       baseEnv.DB, 'account-main', expect.anything(), expect.anything(),
-      { entryRouteId: null },
+      expect.objectContaining({ entryRouteId: null }),
     );
     expect(preparedSql.some((sql) => sql.includes('SET ref_code = NULL'))).toBe(false);
   });

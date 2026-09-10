@@ -1,8 +1,12 @@
 import {
   accountFeatureOffExclusionSql,
+  claimRedemptionStep,
+  clearRedemptionStepIntent,
   decryptCredential,
   getMileageRewardDeliveryPlan,
   getReservedMileageRewardCode,
+  markRedemptionStepSent,
+  MileageRedemptionConfirmError,
   recordMileageRedemptionAttempt,
   refundMileageRewardRedemption,
   type MileageRewardFailurePolicy,
@@ -92,6 +96,73 @@ function nextRetry(now: string, attemptCount: number): string | null {
   return date.toISOString();
 }
 
+/**
+ * 取り残し配送の貸出期限。確定書き込みに失敗した交換は `delivering` のまま
+ * 残し、この期限を過ぎたら別の試行が引き継ぐ。証言つきの手順は
+ * 引き継いでも送り直さず、照合待ちに残す。
+ */
+const STALE_DELIVERY_LEASE_MS = 5 * 60 * 1000;
+
+/** 一瞬の書き込み失敗は、その場で数回だけやり直す。長引く障害は待つ。 */
+const CONFIRM_RETRIES = 3;
+
+/**
+ * **送っていないことが確かなまま譲る合図。**
+ *
+ * 別の走者が手順の貸出を握っているだけで、こちらは外部へ1バイトも
+ * 送っていない。`MileageRedemptionConfirmError` と混ぜると
+ * 「特典の送信は終わっています」と事実に反する返事をし、しかも交換が
+ * `delivering` に残って「届かなかった交換」の一覧から消える。
+ * 押した人からは何が起きたか分からなくなるので、別の合図にして
+ * 交換を押す前の状態へ戻す(#641 司令塔独立審査の差し戻し)。
+ */
+class RedemptionStepBusyError extends Error {
+  constructor() {
+    super('ほかの処理が同じ交換を送信中です');
+    this.name = 'RedemptionStepBusyError';
+  }
+}
+
+async function sleep(ms: number): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * 証言つき確定を数回試す。通らなければ照合待ちとして投げる。
+ * DB障害の生エラーはここで確定失敗に包む。包まないと「失敗」扱いになり、
+ * やり直しで送り直して二重に届く。
+ */
+async function confirmStepSentWithRetry(
+  db: D1Database,
+  input: { redemptionId: string; stepKey: string; owner: string; fenceToken: string; now: string },
+): Promise<void> {
+  for (let attempt = 0; attempt < CONFIRM_RETRIES; attempt += 1) {
+    try {
+      await markRedemptionStepSent(db, input);
+      return;
+    } catch {
+      if (attempt + 1 < CONFIRM_RETRIES) await sleep(50 * (attempt + 1));
+    }
+  }
+  throw new MileageRedemptionConfirmError();
+}
+
+/** 証言消しを数回試す。消せなければ照合待ちとして投げる(同上)。 */
+async function clearStepIntentWithRetry(
+  db: D1Database,
+  input: { redemptionId: string; stepKey: string; owner: string; fenceToken: string; now: string },
+): Promise<void> {
+  for (let attempt = 0; attempt < CONFIRM_RETRIES; attempt += 1) {
+    try {
+      await clearRedemptionStepIntent(db, input);
+      return;
+    } catch {
+      if (attempt + 1 < CONFIRM_RETRIES) await sleep(50 * (attempt + 1));
+    }
+  }
+  throw new MileageRedemptionConfirmError();
+}
+
 export async function deliverMileageReward(
   db: D1Database,
   redemptionId: string,
@@ -138,10 +209,17 @@ export async function deliverMileageReward(
   }
 
   const now = options.now?.() ?? new Date().toISOString();
+  const leaseCutoff = new Date(new Date(now).getTime() - STALE_DELIVERY_LEASE_MS).toISOString();
+  // この走者の名札。手順の貸出はこの名札で取り、確定も名札と fence で通す。
+  const stepOwner = crypto.randomUUID();
+  const stepLeaseExpiresAt = new Date(new Date(now).getTime() + STALE_DELIVERY_LEASE_MS).toISOString();
+  // 押す前の状態。送らずに譲るときはここへ戻す(一覧から消さないため)。
+  const statusBeforeClaim = plan.redemption.status;
   const claim = await db.prepare(
     `UPDATE mileage_redemptions SET status = 'delivering', updated_at = ?
-      WHERE id = ? AND status IN ('reserved', 'delivery_failed')`,
-  ).bind(now, redemptionId).run();
+      WHERE id = ? AND (status IN ('reserved', 'delivery_failed')
+        OR (status = 'delivering' AND updated_at < ?))`,
+  ).bind(now, redemptionId, leaseCutoff).run();
   if ((claim.meta?.changes ?? 0) !== 1) {
     return {
       status: 'delivery_failed', rewardName: plan.rewardName,
@@ -169,31 +247,113 @@ export async function deliverMileageReward(
         const executor = executors[action.type];
         if (!executor) throw new Error('交換後の動きを実行できません');
         const stepExecutionId = await stableUuid(`${redemptionId}:${action.id}:${index}`);
-        await executor({
-          db,
-          runId: redemptionId,
-          lineAccountId: plan.redemption.lineAccountId,
-          automationId: `mileage-reward:${plan.redemption.rewardId}`,
-          automationVersionId: plan.redemption.rewardVersionId,
-          friendId: plan.redemption.beneficiaryFriendId,
-          sourceEventId: redemptionId,
-          inputEvent: { kind: 'mileage_reward_redeemed', rewardId: plan.redemption.rewardId },
-          action,
-          stepExecutionId,
-          idempotencyKey: stepExecutionId,
-          attemptNumber: plan.redemption.attemptCount + 1,
-          commonActionVersionId: plan.commonActionVersionId,
-          isTest: false,
-        });
+        const stepKey = `${index}:${action.id}`;
+        const stepFence = crypto.randomUUID();
+        const stepLease = {
+          redemptionId, stepKey, idempotencyKey: stepExecutionId,
+          owner: stepOwner, fenceToken: stepFence,
+          leaseExpiresAt: stepLeaseExpiresAt, now,
+        };
+        /*
+         * 送り直さない：送信済みの手順は飛ばす。貸出中の手順は待つ。
+         * 証言つき(照合待ち)の手順は、送らず勝手に確定もせず待つ。
+         * 受け手側にも同じ冪等キーを渡す。
+         */
+        const step = await claimRedemptionStep(db, stepLease);
+        if (step === 'sent') continue;
+        if (step === 'busy') {
+          // 別の走者が貸出を握っている。こちらは送っていない。
+          // 送ったとは言わず、交換も押す前の状態へ戻す。
+          throw new RedemptionStepBusyError();
+        }
+        if (step === 'reconcile') {
+          // 送ったか確かめられない行。送らず、勝手に確定もせず待つ。
+          throw new MileageRedemptionConfirmError();
+        }
+        const stepConfirmation = {
+          redemptionId, stepKey, owner: stepOwner, fenceToken: stepFence, now,
+        };
+        try {
+          await executor({
+            db,
+            runId: redemptionId,
+            lineAccountId: plan.redemption.lineAccountId,
+            automationId: `mileage-reward:${plan.redemption.rewardId}`,
+            automationVersionId: plan.redemption.rewardVersionId,
+            friendId: plan.redemption.beneficiaryFriendId,
+            sourceEventId: redemptionId,
+            inputEvent: { kind: 'mileage_reward_redeemed', rewardId: plan.redemption.rewardId },
+            action,
+            stepExecutionId,
+            idempotencyKey: stepExecutionId,
+            attemptNumber: plan.redemption.attemptCount + 1,
+            commonActionVersionId: plan.commonActionVersionId,
+            isTest: false,
+          });
+        } catch (error) {
+          if (error instanceof AutomationActionError && error.code === 'delivery_unconfirmed') {
+            // 外部送信は終わっている。証言は送る前に残してあるので、
+            // そのまま照合待ちに残し、送り直さない。
+            throw new MileageRedemptionConfirmError();
+          }
+          /*
+           * 送る前の失敗：証言を消して、やり直し可能に戻す。
+           * 消せなければ送ったか分からないので、照合待ちに残す。
+           */
+          try {
+            await clearStepIntentWithRetry(db, stepConfirmation);
+          } catch {
+            throw new MileageRedemptionConfirmError();
+          }
+          throw error;
+        }
+        // 証言つき確定を数回試す。通らなければ照合待ちに残す。
+        await confirmStepSentWithRetry(db, stepConfirmation);
       }
     }
-    await recordMileageRedemptionAttempt(db, { redemptionId, status: 'succeeded' });
+    try {
+      await recordMileageRedemptionAttempt(db, { redemptionId, status: 'succeeded' });
+    } catch {
+      throw new MileageRedemptionConfirmError();
+    }
     return {
       status: 'succeeded', rewardName: plan.rewardName,
       customerMessage: plan.customerMessage, rewardCode, retryAt: null,
       failurePolicy: plan.failurePolicy, message: null,
     };
   } catch (error) {
+    if (error instanceof RedemptionStepBusyError) {
+      /*
+       * 送っていない。失敗中の交換を `delivering` に残すと一覧から
+       * 消えて追跡が切れ、次に押しても409で閉じ込められる。
+       * 押す前の状態へ戻し、そのまま失敗中として見えるようにする。
+       */
+      await db.prepare(
+        `UPDATE mileage_redemptions SET status = ?, updated_at = ?
+          WHERE id = ? AND status = 'delivering'`,
+      ).bind(statusBeforeClaim, now, redemptionId).run();
+      return {
+        status: 'delivery_failed', rewardName: plan.rewardName,
+        customerMessage: plan.customerMessage, rewardCode: null,
+        retryAt: plan.redemption.nextRetryAt,
+        failurePolicy: plan.failurePolicy,
+        message: 'ほかの処理が同じ交換を進めています。少し待ってからもう一度お試しください。',
+      };
+    }
+    if (error instanceof MileageRedemptionConfirmError) {
+      /*
+       * 外部送信は終わっているかもしれない。失敗に落とすとやり直しで
+       * 再送するので、`delivering` のまま残して回収(cron・貸出期限)に任せる。
+       * 呼び出し側には202相当の「確認中」で返す。
+       */
+      return {
+        status: 'delivery_failed', rewardName: plan.rewardName,
+        customerMessage: plan.customerMessage, rewardCode: null,
+        retryAt: nextRetry(now, plan.redemption.attemptCount),
+        failurePolicy: plan.failurePolicy,
+        message: '特典の送信は終わっています。確定を確認しています。',
+      };
+    }
     const failure = publicFailure(error);
     const retryAt = failure.retryable && plan.failurePolicy === 'retry'
       ? nextRetry(now, plan.redemption.attemptCount)
@@ -222,12 +382,19 @@ export async function deliverMileageReward(
   }
 }
 
-/** Cronから、再試行時刻を過ぎた交換だけを処理する。claimはdeliver側で行う。 */
+/**
+ * Cronから、再試行時刻を過ぎた交換と、確定されず残った交換を処理する。
+ * 後者は貸出期限切れの `delivering` で、引き継いだ試行が outbox を見る。
+ * 証言つきの手順は送り直さず、照合待ちに残す。claimはdeliver側で行う。
+ */
 export async function processDueMileageRewardDeliveries(
   db: D1Database,
   options: Omit<MileageRewardDeliveryOptions, 'now'> & { now: string; limit?: number },
 ): Promise<{ processed: number; succeeded: number; failed: number }> {
   const limit = Math.min(100, Math.max(1, options.limit ?? 50));
+  const leaseCutoff = new Date(
+    new Date(options.now).getTime() - STALE_DELIVERY_LEASE_MS,
+  ).toISOString();
   const dueWhere = `status = 'delivery_failed' AND next_retry_at IS NOT NULL AND next_retry_at <= ?`;
   const mileageOff = accountFeatureOffExclusionSql('mileage_redemptions.line_account_id', 'mileage');
   // オフ判定は LIMIT を数える前に SQL で行う。読んでから弾くと、オフの行が
@@ -243,6 +410,15 @@ export async function processDueMileageRewardDeliveries(
       WHERE ${dueWhere} AND line_account_id IS NOT NULL AND ${mileageOff}
       ORDER BY line_account_id LIMIT ?`,
   ).bind(options.now, limit).all<{ line_account_id: string }>();
+  // 貸出期限切れの delivering も、機能オフのアカウントは SQL で先に外す。
+  const remaining = Math.max(0, limit - due.results.length);
+  const stalled = remaining > 0
+    ? await db.prepare(
+      `SELECT id FROM mileage_redemptions
+        WHERE status = 'delivering' AND updated_at < ? AND NOT ${mileageOff}
+        ORDER BY updated_at, created_at LIMIT ?`,
+    ).bind(leaseCutoff, remaining).all<{ id: string }>()
+    : { results: [] as { id: string }[] };
   let succeeded = 0;
   let failed = 0;
   for (const owner of offOwners.results) {
@@ -250,7 +426,7 @@ export async function processDueMileageRewardDeliveries(
       accountId: owner.line_account_id, featureId: 'mileage', job: 'mileage reward delivery retry',
     });
   }
-  for (const item of due.results) {
+  for (const item of [...due.results, ...stalled.results]) {
     // 機能オフ中は再試行せずdelivery_failedのまま残す。再オンで再開する。
     const ownerRow = await db
       .prepare(`SELECT line_account_id FROM mileage_redemptions WHERE id = ?`)
@@ -268,5 +444,5 @@ export async function processDueMileageRewardDeliveries(
     if (result.status === 'succeeded') succeeded += 1;
     else failed += 1;
   }
-  return { processed: due.results.length, succeeded, failed };
+  return { processed: due.results.length + stalled.results.length, succeeded, failed };
 }

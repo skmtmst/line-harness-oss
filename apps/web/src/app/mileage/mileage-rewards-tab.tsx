@@ -6,13 +6,20 @@ import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { STATE_TEXT, notConnectedText } from '@/components/shared/not-connected'
-import { formatMileageNumber } from './mileage-display'
+import { formatMileageDate, formatMileageNumber } from './mileage-display'
+import {
+  createAccountTracker,
+  createMileageRewardsFetchGuards,
+  createSingleFlightLock,
+} from './redemption-request-guard'
 import {
   api,
+  fetchApi,
   type MileageRewardAdminOverview,
   type MileageRewardKind,
   type MileageRewardSummary,
 } from '@/lib/api'
+import type { ApiResponse } from '@line-crm/shared'
 
 /** ★V6 `qlVLJ` 17-1-B マイルの使い道。 */
 
@@ -50,6 +57,26 @@ function miles(value: number | null | undefined): string {
 }
 
 /**
+ * 届かなかった交換（`GET /api/mileage/redemptions` の行）。
+ * **残高の再減算はしない**ことが口の約束なので、画面は理由・回数・最終日時と
+ * やり直しだけ出す。金額は出さない（減っていないものを減ったように見せる）。
+ */
+interface FailedRedemption {
+  id: string
+  rewardName: string
+  status: string
+  attemptCount: number
+  failureCode: string | null
+  failureMessage: string | null
+  updatedAt: string
+}
+
+interface RedemptionHistory {
+  items: FailedRedemption[]
+  pagination: { total: number; limit: number; offset: number }
+}
+
+/**
  * 数に限りがあるかどうかの一行。
  *
  * **`null` は「限りなし」で、0 ではない。** 0 と書くと「品切れ」に読める。
@@ -72,9 +99,45 @@ export default function MileageRewardsTab({ accountId }: { accountId: string | n
   const [status, setStatus] = useState<LoadStatus>('loading')
   const [busyRewardId, setBusyRewardId] = useState<string | null>(null)
   const [actionError, setActionError] = useState('')
+  const [failedRedemptions, setFailedRedemptions] = useState<FailedRedemption[]>([])
+  const [redemptionsVisible, setRedemptionsVisible] = useState(false)
+  const [retryingId, setRetryingId] = useState<string | null>(null)
+  const [retryError, setRetryError] = useState('')
+  /*
+   * 店を A→B と切り替えたとき、遅れて届いた A の応答で B を上書きしない。
+   * 世代札を取って、入れる直前に今の世代か確かめる。
+   * **2つの取得で1つの札を使い回さない。**開いた瞬間に後が先を古くして
+   * 一覧が loading のまま残るので、取得ごとに札を持つ。
+   */
+  const [fetchGuards] = useState(createMileageRewardsFetchGuards)
+  const { overview: overviewGuard, redemptions: redemptionsGuard } = fetchGuards
+  /*
+   * やり直しボタン用の店の世代札。A で押した古い閉じ込めが、B へ切り替えた
+   * あとに新しい世代として A を読み直し、B の画面へ混ぜないためのもの。
+   */
+  const [accountTracker] = useState(createAccountTracker)
+  /*
+   * やり直しの同時押しを1本にまとめる旗。`retryingId` だけでは止まらない。
+   * 同じ束で走るクリックはどれも同じ描画の閉じ込めを見るので、状態は
+   * まだ null のまま関門を通る（本物のReactで押して確認した）。
+   */
+  const [retryLock] = useState(createSingleFlightLock)
+
+  /*
+   * 店が替わったら世代を進め、前の店のやり直しの旗を降ろす。
+   * 降ろさないと B のボタンが押せないまま残る。
+   */
+  useEffect(() => {
+    accountTracker.track(accountId)
+    retryLock.reset()
+    setRetryingId(null)
+    setRetryError('')
+  }, [accountId, accountTracker, retryLock])
 
   const load = useCallback(async () => {
+    const requestId = overviewGuard.issue()
     if (!accountId) {
+      if (!overviewGuard.isCurrent(requestId)) return
       setOverview(null)
       setStatus('ready')
       return
@@ -82,6 +145,7 @@ export default function MileageRewardsTab({ accountId }: { accountId: string | n
     setStatus('loading')
     try {
       const response = await api.mileage.rewards(accountId)
+      if (!overviewGuard.isCurrent(requestId)) return
       if (!response.success) throw new Error(response.error)
       /*
         **器の形を確かめてから入れる。** `rewards` が配列でない返事を
@@ -91,12 +155,90 @@ export default function MileageRewardsTab({ accountId }: { accountId: string | n
       setOverview(response.data)
       setStatus('ready')
     } catch (reason) {
+      if (!overviewGuard.isCurrent(requestId)) return
       setOverview(null)
       setStatus(reason instanceof Error && reason.message === 'forbidden' ? 'forbidden' : 'error')
     }
-  }, [accountId])
+  }, [accountId, overviewGuard])
 
   useEffect(() => { void load() }, [load])
+
+  /*
+   * 届かなかった交換の一覧。**使い道の一覧とは別に読む。**
+   * こちらが取れなくても使い道は出す。取れないときに「0件」と書くと、
+   * 届いていない交換が無いことになってしまうので、欄ごと出さない。
+   */
+  const loadFailedRedemptions = useCallback(async () => {
+    const requestId = redemptionsGuard.issue()
+    if (!accountId) {
+      if (!redemptionsGuard.isCurrent(requestId)) return
+      setFailedRedemptions([])
+      setRedemptionsVisible(false)
+      return
+    }
+    try {
+      const response = await fetchApi<ApiResponse<RedemptionHistory>>(
+        `/api/mileage/redemptions?accountId=${encodeURIComponent(accountId)}`,
+      )
+      if (!redemptionsGuard.isCurrent(requestId)) return
+      if (!response.success) throw new Error(response.error)
+      if (!Array.isArray(response.data?.items)) throw new Error('malformed')
+      setFailedRedemptions(
+        response.data.items.filter((item) => item.status === 'delivery_failed'),
+      )
+      setRedemptionsVisible(true)
+    } catch {
+      if (!redemptionsGuard.isCurrent(requestId)) return
+      setFailedRedemptions([])
+      setRedemptionsVisible(false)
+    }
+  }, [accountId, redemptionsGuard])
+
+  useEffect(() => { void loadFailedRedemptions() }, [loadFailedRedemptions])
+
+  /*
+   * 届かなかった交換のやり直し。**押した指が離れる前に止める。**
+   * `retryingId` を先に立ててボタンを無効化するので、同時クリック・再送は
+   * 1回にまとまる。口も失敗中だけ受け付け、同じ交換IDを続ける。
+   * **押したときの店を掴んでおく。** POST の最中に B へ切り替えたら、
+   * 古い閉じ込めが新しい世代として A を読み直さない。B の画面は
+   * 切り替え時の取得が読むので、ここでは触らない。
+   */
+  const retryRedemption = async (redemption: FailedRedemption) => {
+    if (!accountId || retryingId) return
+    /*
+     * ここが同時押しの本当の関門。押した瞬間に同期で旗を立てる。
+     * 上の `retryingId` は再描画までは古いままなので、これが無いと
+     * 同じ束の2回目・3回目もそのまま裏側へ飛ぶ。
+     */
+    if (!retryLock.acquire(redemption.id)) return
+    const startedAccountId = accountId
+    const operation = accountTracker.track(startedAccountId)
+    setRetryingId(redemption.id)
+    setRetryError('')
+    try {
+      const response = await fetchApi<ApiResponse<unknown>>(
+        `/api/mileage/redemptions/${encodeURIComponent(redemption.id)}/retry-fulfillment`,
+        { method: 'POST', body: JSON.stringify({ accountId: startedAccountId }) },
+      )
+      if (!response.success) throw new Error(response.error)
+      if (!accountTracker.isCurrent(operation)) return
+      await loadFailedRedemptions()
+      /*
+       * 1つ目の再取得を待っている間に B へ切り替わることがある。
+       * ここで確かめず 2つ目を読むと、古い閉じ込めが新しい世代として
+       * A を発行し、B の画面を上書きする。再取得の直前にも確かめる。
+       */
+      if (!accountTracker.isCurrent(operation)) return
+      await load()
+    } catch {
+      if (!accountTracker.isCurrent(operation)) return
+      setRetryError('やり直せませんでした。時間をおいてもう一度お試しください。')
+    } finally {
+      retryLock.release(redemption.id)
+      if (accountTracker.isCurrent(operation)) setRetryingId(null)
+    }
+  }
 
   const changePublishedState = async (reward: MileageRewardSummary) => {
     if (!accountId || (reward.status !== 'published' && reward.status !== 'draft')) return
@@ -273,6 +415,57 @@ export default function MileageRewardsTab({ accountId }: { accountId: string | n
         <p className="text-ink-faint mt-3 text-xs">
           使い道 {rewards.length}つをすべて表示
         </p>
+      )}
+
+      {/*
+        届かなかった交換。**マイルは減ったまま、特典だけ届いていないもの。**
+        やり直してもマイルはもう減らない（口が同じ交換IDを続ける）。
+        取れなかったときは欄ごと出さない。「0件」と書くと見落とす。
+      */}
+      {redemptionsVisible && failedRedemptions.length > 0 && (
+        <section aria-label="届かなかった交換" className="mt-6">
+          <h2 className="text-ink text-sm font-bold">届かなかった交換</h2>
+          <p className="text-ink-faint mt-1 text-xs leading-5">
+            マイルは減ったまま、特典だけ届いていない交換です。やり直してもマイルはもう減りません。
+          </p>
+          {retryError ? <div className="mt-3 rounded-control border border-danger/30 bg-danger-bg px-4 py-3 text-sm text-danger">{retryError}</div> : null}
+          <div className="mt-3">
+            <DataTable>
+              <thead>
+                <TableHeadRow>
+                  <Th>使い道</Th>
+                  <Th>届かなかった理由</Th>
+                  <Th align="right">試した回数</Th>
+                  <Th>最後の更新</Th>
+                  <Th align="right">操作</Th>
+                </TableHeadRow>
+              </thead>
+              <tbody className="divide-hairline divide-y">
+                {failedRedemptions.map((item) => (
+                  <Tr key={item.id}>
+                    <Td>
+                      <p className="text-ink font-semibold">{item.rewardName}</p>
+                    </Td>
+                    <Td>{item.failureMessage || item.failureCode || '理由を確認できませんでした'}</Td>
+                    <Td align="right" className="tabular-nums">{item.attemptCount.toLocaleString('ja-JP')}回</Td>
+                    <Td>{formatMileageDate(item.updatedAt)}</Td>
+                    <Td align="right">
+                      <Button
+                        disabled={retryingId !== null}
+                        onClick={() => void retryRedemption(item)}
+                      >
+                        {retryingId === item.id ? 'やり直しています' : 'もう一度届ける'}
+                      </Button>
+                    </Td>
+                  </Tr>
+                ))}
+              </tbody>
+            </DataTable>
+            <p className="text-ink-faint mt-3 text-xs">
+              届かなかった交換 {failedRedemptions.length}つをすべて表示
+            </p>
+          </div>
+        </section>
       )}
     </div>
   )

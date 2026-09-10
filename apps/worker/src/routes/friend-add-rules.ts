@@ -18,6 +18,15 @@ import {
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
+import {
+  areFriendAddConditionsOverlapping,
+  collectFriendAddReferences,
+  doFriendAddTimeWindowsOverlap,
+  doFriendAddWeekdaySetsOverlap,
+  findFriendAddUnusableReferences,
+  isValidFriendAddHhmm,
+  parseFriendAddConditionAst,
+} from '../services/friend-add-routing.js';
 
 const friendAddRules = new Hono<Env>();
 const KINDS = new Set<FriendAddRuleKind>(['first_time', 'returning']);
@@ -100,12 +109,13 @@ function normalizeDefinition(raw: Partial<FriendAddRuleDefinition> | undefined):
   const weekdays = Array.isArray(definition.weekdays)
     ? [...new Set(definition.weekdays.filter((day): day is number => Number.isInteger(day) && day >= 0 && day <= 6))]
     : [];
-  const timeWindows = Array.isArray(definition.timeWindows)
-    ? definition.timeWindows.filter((window): window is { start: string; end: string } => (
-        Boolean(window) && typeof window.start === 'string' && /^\d{2}:\d{2}$/.test(window.start)
-        && typeof window.end === 'string' && /^\d{2}:\d{2}$/.test(window.end)
-      ))
-    : [];
+  /*
+   * 時間帯は生のまま残す（落とさない）。99:99 や壊れた値をここで落とすと
+   * 「制限なし」に読み替わり、送ってはいけない相手に送ってしまう。
+   * 保存側の validateInput が新規の不正値を拒否し、既に入った不正値は
+   * 実行時が fail-closed で止める。
+   */
+  const timeWindows = definition.timeWindows as { start: string; end: string }[] | undefined;
   return {
     routeIds: Array.isArray(definition.routeIds)
       ? definition.routeIds.filter((id): id is string => typeof id === 'string' && Boolean(id))
@@ -120,6 +130,9 @@ function normalizeDefinition(raw: Partial<FriendAddRuleDefinition> | undefined):
     friendCondition: typeof definition.friendCondition === 'string'
       ? definition.friendCondition.slice(0, 1000)
       : '',
+    internalMemo: typeof definition.internalMemo === 'string'
+      ? definition.internalMemo.slice(0, 2000)
+      : undefined,
     activeFrom: typeof definition.activeFrom === 'string' && definition.activeFrom ? definition.activeFrom : null,
     activeUntil: typeof definition.activeUntil === 'string' && definition.activeUntil ? definition.activeUntil : null,
     returningMode: definition.returningMode === 'none' || definition.returningMode === 'same' || definition.returningMode === 'other'
@@ -199,11 +212,55 @@ function toRule(row: FriendAddRuleRow, routeNames: Map<string, string>, scenario
   };
 }
 
+type ConditionAstError = Exclude<ReturnType<typeof parseFriendAddConditionAst>, { ok: true }>['error'];
+
+/**
+ * 条件が読めなかった理由を、設定した人が直せる言葉にする。
+ * 旧形式の自由文（`legacy_text`）はここに無い。保存を止めないため。
+ */
+const CONDITION_AST_MESSAGES: Record<Exclude<ConditionAstError, 'legacy_text'>, string> = {
+  not_json: '友だち条件のJSONが壊れています。条件ビルダーで作り直してください。',
+  not_object: '友だち条件の形が正しくありません。条件ビルダーで作り直してください。',
+  bad_operator: '友だち条件の「すべて／いずれか」の指定が抜けているグループがあります。',
+  bad_rules: '友だち条件の中に、条件の一覧が入っていないグループがあります。',
+  bad_rule: '友だち条件に、使えない条件が含まれています。',
+  bad_groups: '友だち条件の入れ子グループの形が正しくありません。',
+  too_deep: '友だち条件の入れ子が深すぎます。もっと浅い形にしてください。',
+  too_large: '友だち条件が大きすぎます。条件の数を減らしてください。',
+  unbuildable: '友だち条件に、値が足りない条件があります。',
+};
+
 function validateInput(body: RuleInput): string | null {
   if (!body.name?.trim()) return '設定名が必要です';
   if (body.name.trim().length > 60) return '設定名は60文字以内で入力してください';
   if (!body.friendKind || !KINDS.has(body.friendKind)) return '判定する人が正しくありません';
   if (!Number.isInteger(body.priority) || Number(body.priority) < 1) return '優先順位は1以上の整数で入力してください';
+  // 不正な時間帯（99:99 など）は保存させない。落として保存すると
+  // 「制限なし」に読み替わり、送ってはいけない相手に送ってしまう。
+  const timeWindows = body.definition?.timeWindows;
+  if (timeWindows != null) {
+    if (!Array.isArray(timeWindows)) return '時間帯の指定が正しくありません';
+    for (const window of timeWindows) {
+      const start = (window as { start?: unknown } | null)?.start;
+      const end = (window as { end?: unknown } | null)?.end;
+      if (!isValidFriendAddHhmm(start) || !isValidFriendAddHhmm(end)) {
+        return '時間帯は00:00〜23:59の形で入力してください';
+      }
+    }
+  }
+  /*
+   * 友だち条件は入れ子まで検証する。入れ子グループの operator を省いた形は
+   * 実行時に OR へ読み替わり、「両方を満たす人だけ」のつもりが
+   * 「どちらかを満たす人すべて」へ広がる。保存させない。
+   */
+  const conditionAst = parseFriendAddConditionAst(body.definition?.friendCondition);
+  /*
+   * 旧形式の自由文だけは保存を止めない。止めると、その設定の名前や
+   * 時間帯すら直せなくなる。配信は実行時に止め、画面で作り直しを促す。
+   */
+  if (!conditionAst.ok && conditionAst.error !== 'legacy_text') {
+    return CONDITION_AST_MESSAGES[conditionAst.error];
+  }
   return null;
 }
 
@@ -283,6 +340,22 @@ async function validateReferences(
   if (!definition.scenarioId && !skipsScenario) {
     push(friendKind, '実際に配信するシナリオを決めてください。');
   }
+  /*
+   * 友だち条件の中で指しているタグ・シナリオ・友だち情報欄も、
+   * このアカウントの持ち物かを確かめる。ここを見ないと、別アカウントの
+   * タグで絞った条件がそのまま保存され、実行時に誰にも当たらない
+   * （あるいは他アカウントの持ち物を読む）設定ができてしまう。
+   */
+  const conditionRefs = collectFriendAddReferences({
+    scenarioId: null,
+    routeIds: [],
+    actions: [],
+    friendCondition: definition.friendCondition,
+  });
+  const unusable = await findFriendAddUnusableReferences(db, accountId, conditionRefs);
+  if (unusable.length > 0) {
+    push(friendKind, 'このLINEアカウントで使えないタグ・シナリオ・友だち情報欄・フォーム・対応マークが友だち条件に含まれています。');
+  }
   return messages;
 }
 
@@ -341,7 +414,7 @@ function makeRunCursor(row: { occurred_at: string; id: string }): string {
   return encodeURIComponent(JSON.stringify({ occurredAt: row.occurred_at, id: row.id }));
 }
 
-const RUN_STATUSES = new Set(['pending', 'completed', 'failed', 'suppressed']);
+const RUN_STATUSES = new Set(['pending', 'completed', 'failed', 'suppressed', 'partial_failed']);
 
 const RUN_ATTRIBUTIONS = new Set(['captured', 'unavailable']);
 
@@ -416,7 +489,7 @@ friendAddRules.get('/api/friend-add-runs', requireRole('owner', 'admin', 'staff'
       c.env.DB.prepare(
         `SELECT COUNT(*) AS total_runs,
                 SUM(delivery_count) AS delivery_count,
-                SUM(CASE WHEN routing_status = 'failed' THEN 1 ELSE 0 END) AS failed_runs,
+                SUM(CASE WHEN routing_status IN ('failed', 'partial_failed') THEN 1 ELSE 0 END) AS failed_runs,
                 AVG(CASE WHEN first_delivery_sent_at IS NOT NULL
                     THEN (julianday(first_delivery_sent_at) - julianday(occurred_at)) * 86400000 END) AS average_send_ms,
                 SUM(CASE WHEN scenario_enrollment_id IS NOT NULL THEN 1 ELSE 0 END) AS scenario_starts
@@ -732,15 +805,14 @@ friendAddRules.get('/api/friend-add-rules/conflicts', requireRole('owner', 'admi
         if (bDefinition.routeIds.some((id) => aRoutes.has(id))) {
           pushConflict('same_route', a, b, '同じ流入リンクを使う設定があります。優先順位が小さい設定だけが動きます。');
         }
-        if (aDefinition.weekdays?.length && bDefinition.weekdays?.some((day) => aDefinition.weekdays?.includes(day))) {
+        // 重なりの見方は本番の実行時評価と同じ関数。片方だけの絞り・空は競合にしない。
+        if (doFriendAddWeekdaySetsOverlap(aDefinition.weekdays, bDefinition.weekdays)) {
           pushConflict('overlapping_weekday', a, b, '同じ曜日に動く設定があります。');
         }
-        if (aDefinition.timeWindows?.length && bDefinition.timeWindows?.some((rightWindow) => (
-          aDefinition.timeWindows?.some((leftWindow) => leftWindow.start < rightWindow.end && rightWindow.start < leftWindow.end)
-        ))) {
+        if (doFriendAddTimeWindowsOverlap(aDefinition.timeWindows, bDefinition.timeWindows)) {
           pushConflict('overlapping_time', a, b, '同じ時間帯に動く設定があります。');
         }
-        if (aDefinition.friendCondition && aDefinition.friendCondition === bDefinition.friendCondition) {
+        if (areFriendAddConditionsOverlapping(aDefinition.friendCondition, bDefinition.friendCondition)) {
           pushConflict('same_friend_condition', a, b, '同じ友だち条件を使う設定があります。');
         }
       }
