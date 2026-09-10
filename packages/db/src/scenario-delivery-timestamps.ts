@@ -1,3 +1,4 @@
+import { accountFeatureOffExclusionSql } from './account-feature-sql.js';
 import { toJstString } from './utils.js';
 
 export const SCENARIO_DELIVERY_BATCH_LIMIT = 40;
@@ -9,10 +10,13 @@ export const SCENARIO_DELIVERY_BATCH_LIMIT = 40;
  */
 export function buildFriendScenariosDueForDeliveryQuery(scopeToScenario: boolean): string {
   const scenarioPredicate = scopeToScenario ? '\n         AND fs.scenario_id = ?' : '';
+  // シナリオ機能オフ中のアカウントの行は LIMIT を数える前に外す。後で弾くと、
+  // オフの古い行が先頭を占めたままON中の他アカウントが永久に配信されない。
   return `SELECT fs.* FROM friend_scenarios fs
        INNER JOIN scenarios s ON fs.scenario_id = s.id
        WHERE fs.status = 'active'
          AND s.is_active = 1
+         AND NOT ${accountFeatureOffExclusionSql('s.line_account_id', 'scenarios')}
          AND fs.next_delivery_at <= ?${scenarioPredicate}
        ORDER BY fs.next_delivery_at ASC, fs.id ASC
        LIMIT ?`;

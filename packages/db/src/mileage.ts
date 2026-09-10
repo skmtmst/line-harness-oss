@@ -1,3 +1,4 @@
+import { accountFeatureOffExclusionSql, isAccountFeatureEnabled } from './account-settings.js';
 import { jstNow } from './utils.js';
 
 export const DEFAULT_MILEAGE_PROGRAM_ID = 'default';
@@ -1500,6 +1501,20 @@ export interface MileageQueueResult {
   granted: number;
 }
 
+/**
+ * 付与キューの行の持ち主(=イベントの友だちが属するアカウント)が
+ * マイル機能オフかをSQL内で判定する式。持ち主不明の旧行は偽になり、
+ * 従来どおり進む。
+ */
+function mileageOwnerOffSql(eventIdColumn: string): string {
+  return `EXISTS (
+    SELECT 1 FROM engagement_events ee
+      JOIN friends f ON f.id = ee.actor_friend_id
+     WHERE ee.id = ${eventIdColumn}
+       AND ${accountFeatureOffExclusionSql('f.line_account_id', 'mileage')}
+  )`;
+}
+
 /** Drain a bounded batch. Safe for retries and overlapping cron invocations. */
 export async function processPendingMileageEvents(
   db: D1Database,
@@ -1507,16 +1522,21 @@ export async function processPendingMileageEvents(
 ): Promise<MileageQueueResult> {
   const limit = Math.min(250, Math.max(1, options.limit ?? 100));
   const now = options.now ?? jstNow();
+  // 停滞回収も機能オフ中のアカウントには当てない。OFF中は status も
+  // processing_started_at も updated_at も動かさず、再オンで回収する。
   await db
     .prepare(
       `UPDATE mileage_event_queue
           SET status = 'pending', processing_started_at = NULL, updated_at = ?
         WHERE status = 'processing'
-          AND datetime(processing_started_at) < datetime(?, '-10 minutes')`,
+          AND datetime(processing_started_at) < datetime(?, '-10 minutes')
+          AND NOT ${mileageOwnerOffSql('mileage_event_queue.engagement_event_id')}`,
     )
     .bind(now, now)
     .run();
 
+  // 機能オフ中の行は LIMIT を数える前に外す。後で弾くと、オフの古い行が
+  // 先頭を占めたままON中の他アカウントが永久に回らない。
   const due = await db
     .prepare(
       `SELECT q.engagement_event_id
@@ -1524,6 +1544,7 @@ export async function processPendingMileageEvents(
         WHERE q.status IN ('pending','failed')
           AND q.attempts < 5
           AND datetime(q.available_at) <= datetime(?)
+          AND NOT ${mileageOwnerOffSql('q.engagement_event_id')}
         ORDER BY q.created_at ASC, q.engagement_event_id ASC
         LIMIT ?`,
     )
@@ -1532,6 +1553,20 @@ export async function processPendingMileageEvents(
 
   const result: MileageQueueResult = { claimed: 0, processed: 0, failed: 0, granted: 0 };
   for (const item of due.results) {
+    // 機能オフ中はclaim(状態更新)も付与もしない。pendingのまま残し、
+    // 再オンで再開する。持ち主が分からない行は従来どおり進める。
+    const owner = await db
+      .prepare(
+        `SELECT f.line_account_id AS line_account_id
+           FROM engagement_events ee LEFT JOIN friends f ON f.id = ee.actor_friend_id
+          WHERE ee.id = ?`,
+      )
+      .bind(item.engagement_event_id)
+      .first<{ line_account_id: string | null }>();
+    if (owner?.line_account_id
+      && !await isAccountFeatureEnabled(db, owner.line_account_id, 'mileage')) {
+      continue;
+    }
     const claim = await db
       .prepare(
         `UPDATE mileage_event_queue
@@ -1612,6 +1647,7 @@ export interface FollowingMileageReconcileResult {
  * Materialize registration/continuous-follow milestones in bounded chunks.
  * Called on the existing 6-hour cron. Historic accounts are gradually caught
  * up without a full-table write spike; normal queue processing remains 5-minutely.
+ * 機能オフ中のアカウントの節目は作らない。再オン後の新しい節目から再開する。
  */
 export async function enqueueFollowingMileageMilestones(
   db: D1Database,
@@ -1649,6 +1685,7 @@ export async function enqueueFollowingMileageMilestones(
            FROM friends f
           WHERE f.is_following = 1
             AND ${eligibilitySql}
+            AND NOT ${accountFeatureOffExclusionSql('f.line_account_id', 'mileage')}
             AND NOT EXISTS (
               SELECT 1 FROM engagement_events ee WHERE ee.id = ${eventIdSql}
             )
@@ -1665,8 +1702,10 @@ export async function enqueueFollowingMileageMilestones(
            (engagement_event_id, status, attempts, available_at, created_at, updated_at)
          SELECT ee.id, 'pending', 0, ?, ?, ?
            FROM engagement_events ee
+           LEFT JOIN friends f ON f.id = ee.actor_friend_id
           WHERE ee.event_type = ?
             AND ee.source = 'line_relationship'
+            AND NOT ${accountFeatureOffExclusionSql('f.line_account_id', 'mileage')}
             AND NOT EXISTS (
               SELECT 1 FROM mileage_event_queue q WHERE q.engagement_event_id = ee.id
             )

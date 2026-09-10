@@ -7,6 +7,7 @@ import {
   saveMediaUsageScanState,
   type MediaRefKind,
 } from '@line-crm/db';
+import { createFeatureJobGate } from './feature-enforcement.js';
 
 /**
  * メディアの使用箇所を数え直す。
@@ -116,13 +117,22 @@ export async function scanMediaUsage(
   const state = await getMediaUsageScanState(db, now);
   const media = await db
     .prepare(
-      `SELECT id, r2_key FROM media
+      `SELECT id, r2_key, line_account_id FROM media
         WHERE created_at <= ?
         ORDER BY created_at DESC, id DESC LIMIT ?`,
     )
     .bind(state.cycleStartedAt, opts.limit ?? 500)
-    .all<{ id: string; r2_key: string }>();
-  if (media.results.length === 0) return { scanned: 0, matched: 0, pruned: 0 };
+    .all<{ id: string; r2_key: string; line_account_id: string | null }>();
+  // 機能オフのアカウントの素材は走査も整理もしない。再オンで再開する。
+  const gate = createFeatureJobGate();
+  const enabledMedia = [];
+  for (const item of media.results) {
+    if (await gate.canRun(db, item.line_account_id, 'media', 'media usage scan')) {
+      enabledMedia.push(item);
+    }
+  }
+  if (enabledMedia.length === 0) return { scanned: 0, matched: 0, pruned: 0 };
+  media.results = enabledMedia;
 
   const stateIsValid = state.sourceIndex >= 0 && state.sourceIndex <= SOURCES.length;
   const sourceIndex = stateIsValid ? state.sourceIndex : 0;
