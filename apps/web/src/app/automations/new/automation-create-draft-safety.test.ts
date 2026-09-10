@@ -187,6 +187,7 @@ type MockDraft = {
 
 async function attachApiMock(page: Page, options: { slowCreate?: boolean; slowTest?: boolean } = {}): Promise<MockApi> {
   let createNumber = 0
+  let revisionNumber = 0
   let releaseCreate = () => {}
   let releaseTest = () => {}
   const createBarrier = new Promise<void>((resolve) => { releaseCreate = resolve })
@@ -240,19 +241,26 @@ async function attachApiMock(page: Page, options: { slowCreate?: boolean; slowTe
     const draftMatch = /^\/api\/automation-drafts\/([^/]+)$/.exec(url.pathname)
     if (draftMatch && request.method() === 'PUT') {
       state.updateCalls.push(call)
-      const draft = drafts.get(draftMatch[1])
-      const patch = body as Partial<MockDraft>
-      if (draft) {
-        // 版の番号は据え置く。本物の Worker が同じ行を書き換えるのと同じ。
-        Object.assign(draft, {
-          name: patch.name ?? draft.name,
-          eventType: patch.eventType ?? draft.eventType,
-          triggerConfig: patch.triggerConfig ?? draft.triggerConfig,
-          conditions: patch.conditions ?? draft.conditions,
-          actions: patch.actions ?? draft.actions,
-        })
+      // 画面に控えだけ残っている下書きも、サーバー側には在るものとして扱う。
+      const draft = drafts.get(draftMatch[1]) ?? {
+        id: draftMatch[1],
+        draftVersionId: `${draftMatch[1]}-v0`,
+        name: '', description: null, eventType: 'message_received',
+        triggerConfig: {}, conditions: {}, actions: [],
       }
-      await json(route, { success: true, data: { updated: true } })
+      drafts.set(draft.id, draft)
+      const patch = body as Partial<MockDraft>
+      revisionNumber += 1
+      // 本物の Worker と同じく、**中身が変われば版の札も変わる**。
+      Object.assign(draft, {
+        draftVersionId: `${draft.id}-r${revisionNumber}`,
+        name: patch.name ?? draft.name,
+        eventType: patch.eventType ?? draft.eventType,
+        triggerConfig: patch.triggerConfig ?? draft.triggerConfig,
+        conditions: patch.conditions ?? draft.conditions,
+        actions: patch.actions ?? draft.actions,
+      })
+      await json(route, { success: true, data: { updated: true, draftVersionId: draft.draftVersionId } })
       return
     }
     if (draftMatch && request.method() === 'GET') {
@@ -279,6 +287,12 @@ async function attachApiMock(page: Page, options: { slowCreate?: boolean; slowTe
     await json(route, { success: true, data: {} })
   })
   return state
+}
+
+/** 札（`<版の行のid>.<中身の指紋>`）から、DBの行のidだけを取り出す。 */
+function versionRowId(revision: string): string {
+  const separator = revision.lastIndexOf('.')
+  return separator <= 0 ? revision : revision.slice(0, separator)
 }
 
 // ========== 本物の Worker ==========
@@ -384,7 +398,18 @@ function draftInDb(harness: WorkerHarness, id: string): { versionId: string; act
   return { versionId: row.version_id, actions: JSON.parse(row.actions) }
 }
 
-async function attachWorkerApi(page: Page, harness: WorkerHarness): Promise<void> {
+/** 実行記録の行数。送った跡が残っていないかを見る。 */
+function runCounts(harness: WorkerHarness): { runs: number; steps: number } {
+  const runs = harness.raw.prepare('SELECT COUNT(*) AS count FROM automation_runs').get() as { count: number }
+  const steps = harness.raw.prepare('SELECT COUNT(*) AS count FROM automation_run_steps').get() as { count: number }
+  return { runs: runs.count, steps: steps.count }
+}
+
+async function attachWorkerApi(
+  page: Page,
+  harness: WorkerHarness,
+  options: { beforeTest?: () => void } = {},
+): Promise<void> {
   const slowTest = (harness as { slowTest?: boolean }).slowTest
   const testBarrier = (harness as { testBarrier?: Promise<void> }).testBarrier
   await page.route(`${API_ORIGIN}/**`, async (route) => {
@@ -404,6 +429,8 @@ async function attachWorkerApi(page: Page, harness: WorkerHarness): Promise<void
     if (url.pathname.startsWith('/api/automation')) {
       if (/^\/api\/automations\/[^/]+\/test$/.test(url.pathname)) {
         harness.testCalls.push(call)
+        // 画面の突き合わせが済んだあと、Worker が受け取る前に割り込む。
+        options.beforeTest?.()
         if (slowTest) await testBarrier
       }
       const response = await harness.request(`${url.pathname}${url.search}`, {
@@ -466,12 +493,16 @@ async function openPage(options: {
   return { page, api }
 }
 
-async function openWorkerPage(options: { slowTest?: boolean } = {}): Promise<{ page: Page; context: BrowserContext; worker: WorkerHarness }> {
+async function openWorkerPage(
+  options: { slowTest?: boolean; beforeTest?: (worker: WorkerHarness) => void } = {},
+): Promise<{ page: Page; context: BrowserContext; worker: WorkerHarness }> {
   const worker = await startWorker(options)
   const context = await browser.newContext()
   contexts.add(context)
   const page = await preparePageIn(context)
-  await attachWorkerApi(page, worker)
+  await attachWorkerApi(page, worker, {
+    beforeTest: options.beforeTest ? () => options.beforeTest?.(worker) : undefined,
+  })
   await settle(page, () => `API: ${worker.calls.map((call) => call.pathname).join(', ')}`)
   return { page, context, worker }
 }
@@ -615,7 +646,10 @@ describe('V6 ルールを作る（Rv8Jv）の誤操作防止（#679）', () => {
     })
     await waitUntil(() => api.testCalls.length === 1, '1人テストAPIが呼ばれませんでした')
     expect(await dialog.locator('button').last().isDisabled()).toBe(true)
-    expect(api.testCalls[0]?.body).toEqual({ versionId: 'version-account-a-1', friendId: 'friend-001' })
+    // 送るのは「確認に使った札」そのもの。保存でできた新しい札である。
+    const storedRevision = (await storedDraftsOf(page))[ACCOUNT_A]?.draftVersionId
+    expect(storedRevision).toBe('draft-account-a-1-r1')
+    expect(api.testCalls[0]?.body).toEqual({ versionId: storedRevision, friendId: 'friend-001' })
     api.releaseTest()
     await page.getByText('1人テストを受け付けました（状態: accepted）').waitFor()
     expect(api.testCalls).toHaveLength(1)
@@ -651,10 +685,12 @@ describe('V6 ルールを作る（Rv8Jv）を本物のWorkerに繋いだとき�
     await fillMessageRule(other, '予約返信', '別タブが書き換えた文面です。')
     await saveDraft(other)
 
-    // 本物の Worker は同じ行を書き換えるので、**版の番号は変わらない**。
-    // だから「版の番号が同じなら安全」とは言えない。中身で見張るしかない。
+    // 保存すると**新しい版の行**ができ、現在の下書きがそちらへ移る。
+    // 確認に使った札はもう現在の版ではないので、そのままでは送れない。
     const afterOther = draftInDb(worker, draftId)
-    expect(afterOther.versionId).toBe(stored[ACCOUNT_A]?.draftVersionId)
+    const confirmedRevision = stored[ACCOUNT_A]?.draftVersionId as string
+    expect(confirmedRevision).toContain('.')
+    expect(afterOther.versionId).not.toBe(versionRowId(confirmedRevision))
     expect(JSON.stringify(afterOther.actions)).toContain('別タブが書き換えた文面です。')
 
     await dialog.getByRole('button', { name: 'この内容で送る' }).click()
@@ -668,7 +704,53 @@ describe('V6 ルールを作る（Rv8Jv）を本物のWorkerに繋いだとき�
     await retried.getByRole('button', { name: 'この内容で送る' }).click()
     await page.getByText('1人テストを受け付けました（状態:', { exact: false }).waitFor()
     expect(worker.testCalls).toHaveLength(1)
-    expect(worker.testCalls[0]?.body).toEqual({ versionId: afterOther.versionId, friendId: FRIEND_A })
+    const retriedRevision = (await storedDraftsOf(page))[ACCOUNT_A]?.draftVersionId
+    expect(versionRowId(retriedRevision as string)).toBe(afterOther.versionId)
+    expect(worker.testCalls[0]?.body).toEqual({ versionId: retriedRevision, friendId: FRIEND_A })
+  }, 90_000)
+
+  /*
+   * 司令塔の独立審査（2026-09-10）の C1 をそのまま試験にしたもの。
+   *
+   * **画面側の突き合わせは通す。** 送る直前の `getDraft` が返ったあと、
+   * `/test` が Worker へ届く前に別接続が中身を差し替える。以前はここで
+   * 「利用者が見ていない文面」が1回送られていた（`testCalls=1`）。
+   */
+  it('画面の確認を通ったあとに別接続が中身を差し替えても、Workerが409で止め跡も残さない', async () => {
+    let interrupted = false
+    const { page, worker } = await openWorkerPage({
+      beforeTest: (harness) => {
+        if (interrupted) return
+        interrupted = true
+        harness.raw.prepare(
+          `UPDATE automation_versions SET action_config = ?
+            WHERE id = (SELECT current_draft_version_id FROM automation_definitions
+                         WHERE line_account_id = ? AND status = 'draft')`,
+        ).run(
+          JSON.stringify([{ id: 'step-1', type: 'send_message', params: { messageType: 'text', content: '割り込みが差し替えた文面です。' }, onFailure: 'stop' }]),
+          ACCOUNT_A,
+        )
+      },
+    })
+    await fillMessageRule(page, '予約返信', '確認したときの文面です。')
+    await saveDraft(page)
+
+    const dialog = await openTestConfirmation(page, FRIEND_A)
+    expect(await dialog.innerText()).toContain('メッセージ「確認したときの文面です。」')
+
+    await dialog.getByRole('button', { name: 'この内容で送る' }).click()
+    await page.getByText('確認したあとに下書きが変わりました', { exact: false }).waitFor()
+
+    // 割り込みは実際に入っている（試験が空振りしていない）。
+    expect(interrupted).toBe(true)
+    const stored = await storedDraftsOf(page)
+    const draftId = stored[ACCOUNT_A]?.id as string
+    expect(JSON.stringify(draftInDb(worker, draftId).actions)).toContain('割り込みが差し替えた文面です。')
+
+    // Worker には届いたが、送られていないし跡も残っていない。
+    expect(worker.testCalls).toHaveLength(1)
+    expect(runCounts(worker)).toEqual({ runs: 0, steps: 0 })
+    expect(await page.getByRole('dialog', { name: '1人テストの確認' }).count()).toBe(0)
   }, 90_000)
 
   it('1人テストの返事を待つ間に店舗を替えても、前の店の成否を次の店へ残さない', async () => {

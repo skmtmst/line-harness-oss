@@ -472,6 +472,11 @@ export default function NewAutomationPage() {
         actions: draftActions(),
       })
       if (!res.success) throw new Error(res.error)
+      // 保存すると中身が変わるので、版の札も新しくなる。取り直してから
+      // 見込み人数と公開へ渡す。古い札のままだと Worker に弾かれる（それが正しい）。
+      const saved = await api.automations.getDraft(draft.id, accountId)
+      if (!saved.success) throw new Error(saved.error)
+      draft = { id: draft.id, draftVersionId: saved.data.draftVersionId }
       writeStoredDraft(accountId, draft)
       if (selectedAccountRef.current === accountId) setSavedDraft(draft)
       const preview = await api.automations.audiencePreview(draft.id, accountId, draft.draftVersionId)
@@ -571,12 +576,13 @@ export default function NewAutomationPage() {
    * 確認した中身だけを送る（N-358）。
    *
    * 送る直前にサーバーのいまの中身を取り直し、確認したときの指紋と
-   * **1文字でも違えば送らない**。別のタブで書き換えられていても、
-   * 見せた内容と違うものが相手へ届くことはない。
+   * **1文字でも違えば送らない**。
    *
-   * 取り直してから送るまでのごく短い間に書き換えられる可能性までは、
-   * 画面側だけでは消せない（Worker に「この指紋のときだけ送る」口が無い）。
-   * その口ができたら、この突き合わせをそちらへ渡す。
+   * ここでの突き合わせは、利用者へ先に知らせるためのもの。**最後の砦は
+   * Worker 側**にある。`api.automations.test` へ渡す `versionId` は
+   * `getDraft` が返した札（`<版の行のid>.<中身の指紋>`）そのままで、Worker は
+   * 実行記録を作る前にこの指紋と DB の中身を突き合わせ、違えば 409 で返す。
+   * 画面側の突き合わせを外しても実送信は起きない（逆変異で確認済み）。
    */
   const runOnePersonTest = async () => {
     const pending = testConfirmation
@@ -608,6 +614,11 @@ export default function NewAutomationPage() {
     } catch (caught) {
       // 待っている間に店を替えたら、前の店の成否をこの画面へ書かない。
       if (!sameAccount()) return
+      // Worker が「確認したときと違う」と返したときも、画面側で気づいたときと
+      // 同じ扱いにする。古い確認を開いたままにしない。
+      if (caught instanceof ApiError && (caught.status === 409 || caught.code === 'version_conflict')) {
+        setTestConfirmation(null)
+      }
       setError(
         caught instanceof ApiError || caught instanceof Error
           ? caught.message
