@@ -3,13 +3,16 @@ import {
   jstNow,
   enqueueMileageEvent,
   getTagAddedScenarioIds,
-  FRIEND_TAG_SIDE_EFFECT_STEPS,
-  isFriendTagSideEffectRetryable,
+  createNotification,
+  claimFriendTagSideEffectRun,
+  canAutoRetryFriendTagSideEffect,
+  getFriendTagSideEffectRun,
+  isFriendTagSideEffectStuck,
   listUnfinishedFriendTagSideEffectRuns,
   markFriendTagSideEffectCompleted,
   markFriendTagSideEffectFailed,
-  markFriendTagSideEffectRunning,
   openFriendTagSideEffectRuns,
+  FRIEND_TAG_SIDE_EFFECT_STEPS,
   type FriendTagSideEffectStep,
 } from '@line-crm/db';
 import { fireEvent } from './event-bus.js';
@@ -33,7 +36,14 @@ import { pushImmediateFirstStep, type ImmediatePushContext } from './immediate-f
 // 次回この経路へ来ても changes=0 で早期 return し、落ちた副作用は二度と走らな
 // かった。工程別の台帳 (friend_tag_side_effect_runs / migration 376) に
 // 「付与は済んだが未了」を残し、次にこの経路へ来たときに未了の工程だけを
-// 走り直す。台帳の設計と状態の意味は migration 376 に書いてある。
+// 走り直す。
+//
+// 走り直してよいかは status ではなく**工程**で決める。外へ出る工程
+// (event_tag_change) は結末が不明なら走り直さない (at-most-once)。判断の根拠と
+// 状態の意味は migration 376 に書いてある。
+//
+// 自動で走り直さない行は、止まった時点で通知センターへ1件残す。放っておくと
+// 「タグは付いているのに副作用だけが黙って永久に欠ける」に戻るため。
 
 /** 工程1本の中身。走り直しでも同じ本体を、同じ assignedAt で呼ぶ。 */
 interface StepDefinition {
@@ -51,11 +61,14 @@ interface StepDefinition {
    * (台帳には failed として残るので、握り潰しにはならない)。
    */
   propagatesFailure: boolean;
+  /** 通知に出す工程の呼び名。 */
+  label: string;
 }
 
 const STEP_DEFINITIONS: Record<FriendTagSideEffectStep, StepDefinition> = {
   mileage: {
     propagatesFailure: false,
+    label: 'マイルの記録',
     async run(db, friendId, tagId, assignedAt) {
       await enqueueMileageEvent(db, {
         eventType: 'tag_added',
@@ -78,6 +91,7 @@ const STEP_DEFINITIONS: Record<FriendTagSideEffectStep, StepDefinition> = {
    */
   scenario_enroll: {
     propagatesFailure: true,
+    label: 'シナリオ登録',
     async run(db, friendId, tagId, _assignedAt, push) {
       for (const scenarioId of await getTagAddedScenarioIds(db, tagId)) {
         const existing = await db
@@ -98,6 +112,7 @@ const STEP_DEFINITIONS: Record<FriendTagSideEffectStep, StepDefinition> = {
 
   event_tag_change: {
     propagatesFailure: true,
+    label: 'タグ変化イベントの発火',
     async run(db, friendId, tagId) {
       await fireEvent(db, 'tag_change', { friendId, eventData: { tagId, action: 'add' } });
     },
@@ -114,20 +129,104 @@ async function recordLedger(what: string, write: () => Promise<void>): Promise<v
 }
 
 /**
- * 工程を1本走らせ、結果を台帳へ書く。落ちた場合はその error を返す。
+ * 止まった行を、運用者が見る場所へ1件出す。
  *
- * 走る前に running を立てるので、処理ごと消えて結末が分からなくなった行は
- * running のまま残る。冪等でない tag_change をそこから走り直さないための印。
+ * 止まるのは「自動では走り直さない状態になった」ときだけなので、1つの工程に
+ * つき1回しか出ない (次の呼び出しは予約が取れず、ここへ来ない)。
+ *
+ * 通知センター (channel='dashboard') は既に画面がある口で、category='error' は
+ * 絞り込みに出る。ここに出しておけば、台帳を SQL で直に引かなくても
+ * 「何が走らなかったか」に気づける。
  */
-async function runStep(
+async function notifyIfStuck(
+  db: D1Database,
+  friendId: string,
+  tagId: string,
+  step: FriendTagSideEffectStep,
+): Promise<void> {
+  try {
+    const run = await getFriendTagSideEffectRun(db, friendId, tagId, step);
+    if (!run || !isFriendTagSideEffectStuck(run)) return;
+
+    const friend = await db
+      .prepare(`SELECT line_account_id FROM friends WHERE id = ?`)
+      .bind(friendId)
+      .first<{ line_account_id: string | null }>();
+
+    await createNotification(db, {
+      eventType: 'friend_tag_side_effect_stuck',
+      title: 'タグ付与後の処理が止まっています',
+      body:
+        `${STEP_DEFINITIONS[step].label}が止まりました。自動では走り直しません。` +
+        `タグは付いたままなので、確認して進めてください。理由: ${run.last_error ?? '不明'}`,
+      channel: 'dashboard',
+      category: 'error',
+      lineAccountId: friend?.line_account_id ?? null,
+      metadata: JSON.stringify({
+        friendId,
+        tagId,
+        stepKey: step,
+        status: run.status,
+        attemptCount: run.attempt_count,
+        lastError: run.last_error,
+      }),
+    });
+  } catch (error) {
+    // ここで投げると、止まったことを知らせられないうえに呼び出し口まで
+    // 巻き添えにする。台帳には残っているので、記録を出して先へ進む。
+    console.error(
+      `tag side effect stuck notice failed (step=${step} friend=${friendId} tag=${tagId}):`,
+      error,
+    );
+  }
+}
+
+type StepOutcome =
+  /** 走って済んだ。 */
+  | 'completed'
+  /** 走って落ちた。 */
+  | 'failed'
+  /** 走らせなかった (予約が取れない・走り直してよい状態でない・上限)。 */
+  | 'skipped';
+
+/**
+ * 工程を1本、**予約を取ってから**走らせる。
+ *
+ * 予約 (claimFriendTagSideEffectRun) が遷移条件と上限を1回の条件付き UPDATE で
+ * 見るので、同時に2本来ても勝った側だけが副作用へ進む。
+ */
+async function claimAndRunStep(
   db: D1Database,
   friendId: string,
   tagId: string,
   step: FriendTagSideEffectStep,
   assignedAt: string,
-  push?: ImmediatePushContext,
-): Promise<unknown | null> {
-  await recordLedger(step, () => markFriendTagSideEffectRunning(db, friendId, tagId, step));
+  push: ImmediatePushContext | undefined,
+  options: { runWhenLedgerMissing: boolean },
+): Promise<{ outcome: StepOutcome; error: unknown | null }> {
+  let claim;
+  try {
+    claim = await claimFriendTagSideEffectRun(db, friendId, tagId, step);
+  } catch (error) {
+    // 予約が取れたか分からない。走らせない。行は元の状態で残るので、
+    // 次にこの経路へ来たときに拾える。
+    console.error(
+      `tag side effect claim failed (step=${step} friend=${friendId} tag=${tagId}):`,
+      error,
+    );
+    return { outcome: 'skipped', error: null };
+  }
+
+  if (claim === 'not_claimable') return { outcome: 'skipped', error: null };
+  if (claim === 'missing') {
+    if (!options.runWhenLedgerMissing) return { outcome: 'skipped', error: null };
+    // 台帳が開けなかった。ここで止めると付与だけが残って以前より悪くなるので、
+    // 従来どおり走らせる。予約なしなので、記録を残しておく。
+    console.error(
+      `tag side effect ledger row missing; running unfenced (step=${step} friend=${friendId} tag=${tagId})`,
+    );
+  }
+
   try {
     await STEP_DEFINITIONS[step].run(db, friendId, tagId, assignedAt, push);
   } catch (error) {
@@ -138,10 +237,11 @@ async function runStep(
     await recordLedger(step, () =>
       markFriendTagSideEffectFailed(db, friendId, tagId, step, error),
     );
-    return error;
+    await notifyIfStuck(db, friendId, tagId, step);
+    return { outcome: 'failed', error };
   }
   await recordLedger(step, () => markFriendTagSideEffectCompleted(db, friendId, tagId, step));
-  return null;
+  return { outcome: 'completed', error: null };
 }
 
 export interface FriendTagSideEffectRetryResult {
@@ -160,7 +260,7 @@ export interface FriendTagSideEffectRetryResult {
  *
  * ここは**例外を投げない**。走り直しは、たまたま通りかかった別の呼び出しに
  * 相乗りして行う後始末であり、失敗させて呼び出し口の本題を巻き添えにしない。
- * 失敗は台帳の failed と console.error に残る。
+ * 失敗は台帳の failed と console.error、止まったなら通知センターに残る。
  */
 export async function retryFriendTagSideEffects(
   db: D1Database,
@@ -178,14 +278,22 @@ export async function retryFriendTagSideEffects(
 
   const result: FriendTagSideEffectRetryResult = { retried: 0, failed: 0 };
   for (const run of unfinished) {
-    // 走り直してよい行だけ。上限を超えた行と、結末が分からない冪等でない行は
-    // 台帳に残したまま触らない (二重に外へ出さない)。
-    if (!isFriendTagSideEffectRetryable(run)) continue;
-    result.retried += 1;
+    // 安いふるい。明らかに走り直さない行で予約を叩かない。
+    // **守りの正本は予約の SQL** で、ここを通っても取れなければ走らない。
+    if (!canAutoRetryFriendTagSideEffect(run)) continue;
     // 冪等キーは付与のときの時刻でなければならない。台帳の assigned_at を使う。
-    if ((await runStep(db, friendId, tagId, run.step_key, run.assigned_at, push)) !== null) {
-      result.failed += 1;
-    }
+    const { outcome, error } = await claimAndRunStep(
+      db,
+      friendId,
+      tagId,
+      run.step_key,
+      run.assigned_at,
+      push,
+      { runWhenLedgerMissing: false },
+    );
+    if (outcome === 'skipped') continue;
+    result.retried += 1;
+    if (error !== null) result.failed += 1;
   }
   return result;
 }
@@ -224,7 +332,9 @@ export async function attachTagAndFireSideEffects(
   // 落ちたことを理由に tag_change まで止める必要はない。
   let propagated: unknown | null = null;
   for (const step of FRIEND_TAG_SIDE_EFFECT_STEPS) {
-    const error = await runStep(db, friendId, tagId, step, assignedAt, push);
+    const { error } = await claimAndRunStep(db, friendId, tagId, step, assignedAt, push, {
+      runWhenLedgerMissing: true,
+    });
     if (error !== null && STEP_DEFINITIONS[step].propagatesFailure && propagated === null) {
       propagated = error;
     }
