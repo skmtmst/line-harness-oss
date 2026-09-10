@@ -29,4 +29,8 @@ describe('template message contract', () => {
   it('ASCII数字文字列123を3文字として数える', () => {
     expect(countTemplateTextCharacters('123')).toBe(3);
   });
+
+  it('日本語とASCIIが混在する文字列然NENを4文字として数える', () => {
+    expect(countTemplateTextCharacters('然NEN')).toBe(4);
+  });
 });
