@@ -202,14 +202,14 @@ describe('運用者へのお知らせの送信と実行記録', () => {
     });
   });
 
-  it('登録簿で一斉配信だけ接続済みと分かる', async () => {
+  it('登録簿で接続済みと未接続を見分けられる', async () => {
     const response = await app(testDb.db).request(
       '/api/notifications/operator-event-types?lineAccountId=account-1',
     );
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({
       data: {
-        summary: { total: 4, connected: 1, unconnected: 3 },
+        summary: { total: 4, connected: 2, unconnected: 2 },
       },
     });
     const body = await (await app(testDb.db).request(
@@ -218,6 +218,10 @@ describe('運用者へのお知らせの送信と実行記録', () => {
     expect(body.data.items.map((item) => item.eventType).sort()).toEqual([
       'booking_created', 'broadcast_completed', 'ec_order_received', 'form_submitted',
     ]);
+    const connected = body.data.items.filter((item) => item.connected).map((item) => item.eventType).sort();
+    expect(connected).toEqual(['broadcast_completed', 'ec_order_received']);
+    const unconnected = body.data.items.filter((item) => !item.connected).map((item) => item.eventType).sort();
+    expect(unconnected).toEqual(['booking_created', 'form_submitted']);
   });
 
   it('2回目の保存が残り、内容変更で版が上がる', async () => {

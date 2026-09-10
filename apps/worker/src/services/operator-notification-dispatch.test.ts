@@ -81,13 +81,16 @@ describe('運用者通知の自動発火と登録簿', () => {
     seedBase(testDb);
   });
 
-  it('登録簿の4件が見え、一斉配信だけ接続済みと分かる', () => {
+  it('登録簿の4件が見え、接続済みと未接続を見分けられる', () => {
     const items = listOperatorEventTypes();
     expect(items.map((item) => item.eventType).sort()).toEqual([
       'booking_created', 'broadcast_completed', 'ec_order_received', 'form_submitted',
     ]);
-    expect(items.filter((item) => item.connected).map((item) => item.eventType))
-      .toEqual(['broadcast_completed']);
+    expect(items.filter((item) => item.connected).map((item) => item.eventType).sort())
+      .toEqual(['broadcast_completed', 'ec_order_received']);
+    // 予約とフォームは先行PRと競合中で未接続。接続したらここも変える。
+    expect(items.filter((item) => !item.connected).map((item) => item.eventType).sort())
+      .toEqual(['booking_created', 'form_submitted']);
     expect(items.every((item) => item.producer.file.length > 0 && item.producer.route.length > 0)).toBe(true);
   });
 

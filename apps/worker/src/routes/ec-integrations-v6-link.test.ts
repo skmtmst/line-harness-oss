@@ -3,6 +3,7 @@ import { Hono } from 'hono';
 import { ecNotificationRetryKey } from '../services/ec-event-publish.js';
 
 const mocks = vi.hoisted(() => ({
+  dispatchOperatorEvent: vi.fn(),
   getAccount: vi.fn(),
   getFriend: vi.fn(),
   pushMessage: vi.fn(),
@@ -28,6 +29,9 @@ vi.mock('@line-crm/line-sdk', () => ({
 vi.mock('../services/event-bus.js', () => ({
   fireEvent: mocks.fireEvent,
   logOutgoingMessage: vi.fn(),
+}));
+vi.mock('../services/operator-notification-dispatch.js', () => ({
+  dispatchOperatorEvent: mocks.dispatchOperatorEvent,
 }));
 vi.mock('../services/nen-tag-sync.js', () => ({
   syncNenEcTags: mocks.syncEcTags,

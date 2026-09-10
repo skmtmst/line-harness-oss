@@ -56,7 +56,7 @@ export const OPERATOR_NOTIFICATION_EVENT_TYPES: OperatorEventTypeEntry[] = [
       file: 'apps/worker/src/routes/ec-integrations.ts',
       route: 'POST /api/integrations/eccube/events',
     },
-    connected: false,
+    connected: true,
   },
 ];
 

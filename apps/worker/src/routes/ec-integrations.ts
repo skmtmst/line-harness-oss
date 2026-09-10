@@ -13,6 +13,7 @@ import { EC_EVENT_TYPES } from '@line-crm/shared';
 import type { Env } from '../index.js';
 import { fireEvent, logOutgoingMessage } from '../services/event-bus.js';
 import { buildEcV6Event, ecDispatchIdempotencyKey, ecNotificationRetryKey } from '../services/ec-event-publish.js';
+import { dispatchOperatorEvent } from '../services/operator-notification-dispatch.js';
 
 export type EcDispatchSubscriber = 'notification' | 'v6';
 
@@ -452,6 +453,25 @@ ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
   }
   if (row.status === 'processed' || row.status === 'skipped') {
     return c.json({ success: true, duplicate: true, status: row.status });
+  }
+
+  // 受注は運用者へ知らせる。LINEの友だちが見つからなくても受注自体は起きて
+  // いるので、この先の照合結果を待たずにここで出す。台帳の行IDを発生元に
+  // 使うため、EC側の再送でも通知は1件しか作られない。
+  if (event.event_type === 'ec.order.confirmed') {
+    try {
+      const orderNumber = event.order?.number?.trim();
+      await dispatchOperatorEvent(c.env.DB, c.env, {
+        lineAccountId,
+        eventType: 'ec_order_received',
+        sourceEventId: row.id,
+        message: orderNumber ? `ECで注文${orderNumber}を受け付けました` : 'ECで新しい注文を受け付けました',
+        executionMode: 'automatic',
+      });
+    } catch (notificationError) {
+      // 受注の取り込みは通知の失敗で止めない。送り残しは回収口から拾う。
+      console.error(`[ec-event] operator notification failed event=${event.event_id}`, notificationError);
+    }
   }
 
   if (!event.line_user_id) {
