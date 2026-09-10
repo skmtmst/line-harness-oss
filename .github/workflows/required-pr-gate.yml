@@ -22,6 +22,7 @@ jobs:
     outputs:
       full_suite: ${{ steps.scope.outputs.full_suite }}
       db_tests: ${{ steps.scope.outputs.db_tests }}
+      docs_tests: ${{ steps.scope.outputs.docs_tests }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -64,6 +65,7 @@ jobs:
           if [ -z "$BASE_SHA" ] || [ -z "$HEAD_SHA" ]; then
             echo "full_suite=true" >> "$GITHUB_OUTPUT"
             echo "db_tests=true" >> "$GITHUB_OUTPUT"
+            echo "docs_tests=true" >> "$GITHUB_OUTPUT"
             echo "PR差分がない手動実行のため、全検査を行います。"
             exit 0
           fi
@@ -77,13 +79,27 @@ jobs:
             echo "db_tests=false" >> "$GITHUB_OUTPUT"
           fi
 
+          full_suite=false
           if [ -n "$changed" ] && printf '%s\n' "$changed" \
             | grep -qvE '^(docs/|\.github/|README\.md$|AGENTS\.md$)'; then
-            echo "full_suite=true" >> "$GITHUB_OUTPUT"
+            full_suite=true
             echo "コードまたは設定の変更があるため、全検査を行います。"
           else
-            echo "full_suite=false" >> "$GITHUB_OUTPUT"
             echo "文書・ワークフローだけの変更のため、高速検査を行います。"
+          fi
+          echo "full_suite=$full_suite" >> "$GITHUB_OUTPUT"
+
+          # apps/docs の試験は、画面の中身だけでなく
+          # `.github/workflows/deploy-cloudflare-docs.yml` を読んで、配り先の枝と
+          # 秘密の扱い（値を出さない・main へ配らない）を見張っている(#704)。
+          # ワークフローだけを変えたPRは full_suite=false になり、いちばん効く場面で
+          # 外れてしまうので、そこだけ別に見る。
+          if [ "$full_suite" = "true" ] || printf '%s\n' "$changed" \
+            | grep -qE '^\.github/workflows/'; then
+            echo "docs_tests=true" >> "$GITHUB_OUTPUT"
+            echo "docs の試験を行います。"
+          else
+            echo "docs_tests=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Reject whitespace errors in the PR diff
@@ -263,6 +279,15 @@ jobs:
       - name: Test database package
         if: needs.changes.outputs.db_tests == 'true'
         run: pnpm --filter @line-crm/db test
+      # 自己更新まわりの2つは release.yml のタグ push でしか動いていなかった。
+      # 取り込んだ後、リリースを打つ段になって初めて失敗が分かる位置にあったので、
+      # PRの必須ゲートへ引き上げる(#704)。この工程はすでに update-engine を
+      # build しているので、依存の追加も待ち時間の追加もほぼない。
+      - name: Test the self-update engine
+        run: pnpm --filter @line-harness/update-engine test
+      # `pretest` が update-engine を build し直す。上の build と同じ内容。
+      - name: Test the setup CLI
+        run: pnpm --filter create-line-harness test
       - run: pnpm test:scripts
       - name: Typecheck repository scripts
         run: |
@@ -352,6 +377,25 @@ jobs:
       - run: pnpm --filter web exec next lint --report-unused-disable-directives-severity error
       - run: pnpm --filter web typecheck
       - run: pnpm --filter web test
+      # 外部連携画面の実挙動契約(webhook-runtime.spec.ts)。PR #1506 で入ったが
+      # 専用の設定が無く、**どのワークフローからも一度も呼ばれていなかった**(#704)。
+      #
+      # この試験だけは、書き出した `out` ではなく `next dev` に当てる。試験が
+      # `/api/line-accounts` を `route.fetch()` で実際に取りに行くので、
+      # `NEXT_PUBLIC_API_URL` に検証環境を焼き込んだ `out` には当てられない。
+      # 設定側が画面確認用のモックAPIと `next dev` の両方を起こす。
+      #
+      # `web-build` ではなくこの工程に置くのは、`web-build` が
+      # `apps/web/.next/cache` を持ち越しているから。あちらで `next dev` を
+      # 動かすと、開発用の中間物が入った `.next/cache` を保存してしまい、
+      # #696 と同じ「ソースと合わない cache による偽の失敗」を招く。
+      # この工程は `next build` をしないので `.next` を汚さない。
+      - name: Install Chromium for the webhook runtime contract
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Webhook screen runtime contract on a real browser (#704)
+        run: >-
+          pnpm exec playwright test
+          --config apps/web/src/app/webhooks/webhook-runtime.config.mjs
 
   mcp-checks:
     name: MCP contract tests, typecheck and build
@@ -368,9 +412,39 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Build MCP dependencies
         run: pnpm --filter @line-harness/sdk build
+      # sdk の 11ファイル53試験は、release.yml にも無く**どのCIからも動いて
+      # いなかった**(#704)。この工程がすでに sdk を build しているので、
+      # ここで続けて動かすのが一番安い。
+      - name: Test the SDK
+        run: pnpm --filter @line-harness/sdk test
       - run: pnpm --filter @line-harness/mcp-server typecheck
       - run: pnpm --filter @line-harness/mcp-server test
       - run: pnpm --filter @line-harness/mcp-server build
+
+  # apps/docs の2ファイル6試験は、`deploy-cloudflare-docs.yml` が呼ぶのが
+  # `test:export`（別のスクリプト）だったため、`vitest run` の `test` はどこからも
+  # 動いていなかった(#704)。しかもそのワークフローは `codex/development` への
+  # push でしか走らず、PRでは走らない。
+  #
+  # 他の3つと違って専用の工程を立てるのは、**走らせたい条件が違う**から。
+  # `deploy-workflow.test.ts` は `.github/workflows/deploy-cloudflare-docs.yml`
+  # 自体を読んで秘密の扱いを見張っており、ワークフローだけを変えたPR
+  # （＝full_suite が false になるPR）でこそ効く。他の工程に相乗りさせると
+  # その場面で外れる。中身は node と yaml だけなので、依存の build は要らない。
+  docs-checks:
+    name: Docs site tests
+    needs: changes
+    if: needs.changes.outputs.docs_tests == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter docs test
 
   web-build:
     name: Admin build and design verification
@@ -448,6 +522,7 @@ jobs:
       - web-checks
       - web-build
       - mcp-checks
+      - docs-checks
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -460,6 +535,7 @@ jobs:
           WEB_CHECKS_RESULT: ${{ needs.web-checks.result }}
           WEB_BUILD_RESULT: ${{ needs.web-build.result }}
           MCP_CHECKS_RESULT: ${{ needs.mcp-checks.result }}
+          DOCS_CHECKS_RESULT: ${{ needs.docs-checks.result }}
         run: |
           failed=0
           for result in \
@@ -469,7 +545,8 @@ jobs:
             "$WORKER_BUILD_RESULT" \
             "$WEB_CHECKS_RESULT" \
             "$WEB_BUILD_RESULT" \
-            "$MCP_CHECKS_RESULT"; do
+            "$MCP_CHECKS_RESULT" \
+            "$DOCS_CHECKS_RESULT"; do
             case "$result" in
               success|skipped) ;;
               *) failed=1 ;;
