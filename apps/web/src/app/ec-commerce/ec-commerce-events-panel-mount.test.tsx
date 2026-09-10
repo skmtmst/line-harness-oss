@@ -238,6 +238,12 @@ function searchInput(el: HTMLDivElement): HTMLInputElement {
   return input as HTMLInputElement
 }
 
+function nextPageButton(el: HTMLDivElement): HTMLButtonElement {
+  const button = Array.from(el.querySelectorAll('button')).find((node) => node.getAttribute('aria-label') === '次のページ')
+  if (!button) throw new Error('「次のページ」ボタンが見つかりません')
+  return button as HTMLButtonElement
+}
+
 describe('EC取込一覧(#685) 逆変異で赤になる実mount試験', () => {
   it('M3: アカウント切替の直後(commit直後・useEffect未実行)は前アカウントの一覧を表示し続けない', async () => {
     const { container: el, root: r } = mount()
@@ -353,5 +359,46 @@ describe('EC取込一覧(#685) 逆変異で赤になる実mount試験', () => {
     await act(async () => { await drainMicrotasks() })
 
     expect(eventsCalls[0]).toContain('view=actions')
+  })
+
+  /*
+   * 司令塔切り分け(2026-09-10、列車229のartifactで実証): 検索欄debounceの
+   * useEffect([query, setPage])は、マウント直後のqueryの初期値('')でも
+   * 必ず1回実行され、300ms後に無条件でsetPage(1)を呼んでいた。一覧が
+   * 表示された直後(300ms以内)に「次のページ」を押した利用者が、その後
+   * このタイマーの発火で黙って1ページ目へ戻される不具合だった。
+   */
+  it('M8: 一覧表示直後に次のページを押しても、検索debounceの初回発火で1ページ目へ戻らない', async () => {
+    const { container: el, root: r } = mount()
+    await render(el, r)
+    await act(async () => { await drainMicrotasks() })
+
+    // 1ページ目を表示する。マウント時の検索debounceタイマーはまだ発火していない(fake timer)。
+    await act(async () => {
+      overviewFor('account-a').resolve(ok(overview(21)))
+      eventsDeferreds[0].resolve(ok(recordsList([action('1')], 21)))
+      await drainMicrotasks()
+    })
+    expect(el.textContent).toContain('商品1')
+
+    // マウント直後、ユーザーが「次のページ」を押す。
+    await act(async () => { nextPageButton(el).click() })
+    expect(eventsCalls).toHaveLength(2)
+
+    await act(async () => {
+      eventsDeferreds[1].resolve(ok(recordsList([action('2')], 21)))
+      await drainMicrotasks()
+    })
+    expect(el.textContent).toContain('商品2')
+    expect(el.textContent).not.toContain('商品1 ×')
+
+    // マウント時にスケジュールされた検索debounceの300msタイマーが、ここでようやく発火する。
+    await act(async () => { await vi.advanceTimersByTimeAsync(300) })
+    await act(async () => { await drainMicrotasks() })
+
+    // 初回発火をスキップしていれば、ここでeventsCallsは増えない(1ページ目への巻き戻しが起きない)。
+    expect(eventsCalls).toHaveLength(2)
+    expect(el.textContent).toContain('商品2')
+    expect(el.textContent).not.toContain('商品1 ×')
   })
 })

@@ -392,6 +392,7 @@ affiliates.post('/api/affiliates', requireRole('owner', 'admin'), async (c) => {
       friendId?: string;
       issueInitialLink?: boolean;
       lineAccountId?: string;
+      operationId?: string;
     }>();
 
     const name = typeof body.name === 'string' ? body.name.trim() : '';
@@ -400,6 +401,12 @@ affiliates.post('/api/affiliates', requireRole('owner', 'admin'), async (c) => {
     const requestedLineAccountId = typeof body.lineAccountId === 'string'
       ? body.lineAccountId.trim()
       : '';
+    // 安定した操作UUID（#686）。commit後に応答だけ失われて再送されても、
+    // packages/db 側が同じIDで既存行を回収するため二重登録にならない。
+    const operationId = typeof body.operationId === 'string' ? body.operationId.trim() : '';
+    if (operationId && (operationId.length < 8 || operationId.length > 200)) {
+      return c.json({ success: false, error: 'もう一度、最初からやり直してください' }, 400);
+    }
     const { visible, scope } = await getAffiliateScope(c);
 
     // Require at least one of name / code / friendId to identify the affiliate.
@@ -463,6 +470,7 @@ affiliates.post('/api/affiliates', requireRole('owner', 'admin'), async (c) => {
           name: resolvedName,
           code,
           commissionRate: body.commissionRate,
+          operationId: operationId || undefined,
         });
         return c.json({ success: true, data: serializeAffiliate(item) }, 201);
       } catch (err) {
@@ -490,6 +498,7 @@ affiliates.post('/api/affiliates', requireRole('owner', 'admin'), async (c) => {
         name: resolvedName,
         commissionRate: body.commissionRate,
         friendId: friendId || null,
+        operationId: operationId || undefined,
       });
     } catch (err) {
       // The friend_id partial UNIQUE index throws when the friend already has an
@@ -513,11 +522,16 @@ affiliates.post('/api/affiliates', requireRole('owner', 'admin'), async (c) => {
         ? body.issueInitialLink
         : Boolean(friendId);
 
+    // 応答だけ失われた再送は、上の operationId で同じ `item` を回収する。
+    // リンク発行も同じ操作UUIDを渡し、DB側の部分UNIQUEで1本に収める（#686）。
+    // ここを「一覧を読んで無ければ作る」で書くと、同時2実行で両方が
+    // 「まだ無い」と読んでそれぞれ発行し、リンクが2本できる。
     let link: { refCode: string; url: string } | undefined;
     if (shouldIssueLink) {
       const created = await createAffiliateLink(c.env.DB, {
         affiliateId: item.id,
         lineAccountId,
+        operationId: operationId || undefined,
       });
       const baseUrl = await resolveLinkBaseUrl(c.env.DB, c.env);
       link = { refCode: created.ref_code, url: `${baseUrl}/${created.ref_code}` };
