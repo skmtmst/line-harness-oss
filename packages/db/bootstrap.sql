@@ -2960,6 +2960,18 @@ CREATE TABLE mileage_redemption_attempts (
   UNIQUE (redemption_id, attempt_number)
 );
 
+CREATE TABLE mileage_redemption_step_deliveries (
+  redemption_id   TEXT NOT NULL REFERENCES mileage_redemptions(id),
+  step_key        TEXT NOT NULL,
+  idempotency_key TEXT NOT NULL,
+  status          TEXT NOT NULL DEFAULT 'started'
+                    CHECK (status IN ('started', 'sent')),
+  attempt_count   INTEGER NOT NULL DEFAULT 1,
+  created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at      TEXT NOT NULL DEFAULT (datetime('now')), owner TEXT, lease_expires_at TEXT, generation INTEGER NOT NULL DEFAULT 1, fence_token TEXT, needs_reconcile INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (redemption_id, step_key)
+);
+
 CREATE TABLE mileage_redemptions (
   id                       TEXT PRIMARY KEY,
   line_account_id          TEXT NOT NULL REFERENCES line_accounts(id),
@@ -6061,6 +6073,9 @@ CREATE INDEX idx_mileage_rules_match
 CREATE INDEX idx_mileage_spend_allocations_grant
   ON mileage_spend_allocations(grant_lot_id);
 
+CREATE INDEX idx_mileage_step_deliveries_reconcile
+  ON mileage_redemption_step_deliveries (needs_reconcile, lease_expires_at);
+
 CREATE INDEX idx_nen_care_flags_friend_status
   ON nen_care_flags(friend_id, status);
 
@@ -6922,6 +6937,10 @@ BEGIN
 CREATE TRIGGER trg_mileage_redemption_attempts_no_delete
 BEFORE DELETE ON mileage_redemption_attempts
 BEGIN SELECT RAISE(ABORT, 'mileage redemption attempt history cannot be deleted'); END;
+
+CREATE TRIGGER trg_mileage_redemption_step_deliveries_no_delete
+BEFORE DELETE ON mileage_redemption_step_deliveries
+BEGIN SELECT RAISE(ABORT, 'mileage redemption step delivery history cannot be deleted'); END;
 
 CREATE TRIGGER trg_mileage_redemptions_no_delete
 BEFORE DELETE ON mileage_redemptions
