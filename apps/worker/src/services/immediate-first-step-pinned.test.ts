@@ -88,8 +88,22 @@ describe('pushImmediateFirstStep の版固定（実D1）', () => {
 
   it('公開後の template 編集は固定版へ混入しない', async () => {
     const scenario = await createScenario(testDb.db, { name: '案内', triggerType: 'manual' });
+    // template の解決は「公開版があり、持ち主が両方はっきりしていて一致する」
+    // ときだけ通る（#645）。その条件を満たす形で置く。
     testDb.raw
-      .prepare(`INSERT INTO templates (id, name, message_type, message_content) VALUES ('tpl-9', '案内', 'text', '公開時の文面')`)
+      .prepare(
+        `INSERT INTO line_accounts (id, channel_id, name, channel_access_token, channel_secret)
+         VALUES ('acc-1', 'ch-1', '店舗1', 'tok-1', 'sec-1')`,
+      )
+      .run();
+    testDb.raw
+      .prepare(`UPDATE scenarios SET line_account_id = 'acc-1' WHERE id = ?`)
+      .run(scenario.id);
+    testDb.raw
+      .prepare(
+        `INSERT INTO templates (id, name, message_type, message_content, published_version, line_account_id)
+         VALUES ('tpl-9', '案内', 'text', '公開時の文面', 1, 'acc-1')`,
+      )
       .run();
     await createScenarioStep(testDb.db, {
       scenarioId: scenario.id,
