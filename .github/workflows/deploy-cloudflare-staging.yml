@@ -1,6 +1,9 @@
 name: Deploy Cloudflare Staging
 
 on:
+  push:
+    branches:
+      - codex/development
   workflow_dispatch:
     inputs:
       mode:
@@ -22,7 +25,7 @@ on:
           - admin
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: cloudflare-staging
@@ -30,10 +33,18 @@ concurrency:
 
 jobs:
   deploy:
-    if: github.repository != 'Shudesu/line-harness-oss' && github.ref == 'refs/heads/codex/development'
+    if: >-
+      github.repository != 'Shudesu/line-harness-oss' &&
+      github.ref == 'refs/heads/codex/development' &&
+      (github.event_name == 'workflow_dispatch' ||
+       vars.NEN_STAGING_DELIVERY_MODE == 'dry-run' ||
+       vars.NEN_STAGING_DELIVERY_MODE == 'apply')
     runs-on: ubuntu-latest
     environment: staging
     env:
+      DELIVERY_MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.mode || vars.NEN_STAGING_DELIVERY_MODE }}
+      DELIVERY_TARGET: ${{ github.event_name == 'workflow_dispatch' && inputs.target || 'all' }}
+      GH_TOKEN: ${{ github.token }}
       WORKER_API_TOKEN: ${{ secrets.CLOUDFLARE_WORKERS_API_TOKEN || secrets.CLOUDFLARE_API_TOKEN || secrets.CF_API_TOKEN }}
       PAGES_API_TOKEN: ${{ secrets.CLOUDFLARE_PAGES_API_TOKEN || secrets.CLOUDFLARE_API_TOKEN || secrets.CF_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID || secrets.CF_ACCOUNT_ID }}
@@ -52,16 +63,15 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       - name: Verify staging boundary and deploy lock
-        env:
-          MODE: ${{ inputs.mode }}
-          TARGET: ${{ inputs.target }}
         run: |
           test "$GITHUB_REF" = "refs/heads/codex/development"
+          test "$DELIVERY_MODE" = "dry-run" -o "$DELIVERY_MODE" = "apply"
+          test "$DELIVERY_TARGET" = "all" -o "$DELIVERY_TARGET" = "worker" -o "$DELIVERY_TARGET" = "admin"
           test -n "$CLOUDFLARE_ACCOUNT_ID"
-          if [ "$TARGET" != "admin" ]; then
+          if [ "$DELIVERY_TARGET" != "admin" ]; then
             test -n "$WORKER_API_TOKEN"
           fi
-          if [ "$TARGET" != "worker" ]; then
+          if [ "$DELIVERY_TARGET" != "worker" ]; then
             test -n "$PAGES_API_TOKEN"
           fi
           grep -q '^name = "nen-line-stg"$' apps/worker/wrangler.staging.toml
@@ -70,9 +80,17 @@ jobs:
             echo "::error::検証Workerでcronが有効です。通知事故を防ぐため中止します。"
             exit 1
           fi
-          if [ "$MODE" = "apply" ]; then
-            pnpm deploy:lock verify staging --sha "$GITHUB_SHA" --remote origin
-          fi
+
+      - name: Acquire the shared staging lock
+        id: staging_lock
+        if: env.DELIVERY_MODE == 'apply'
+        run: |
+          git config user.name "NEN staging delivery"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          pnpm deploy:lock acquire staging \
+            --note "GitHub Actions ${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}" \
+            --remote origin
+          pnpm deploy:lock verify staging --sha "$GITHUB_SHA" --remote origin
 
       - name: Bind the staging Cloudflare account
         run: |
@@ -83,34 +101,34 @@ jobs:
             apps/worker/wrangler.staging.toml
 
       - name: Build Worker and LIFF assets
-        if: inputs.target != 'admin'
+        if: env.DELIVERY_TARGET != 'admin'
         run: pnpm --filter worker build
 
       - name: Check Worker bundle without publishing
-        if: inputs.mode == 'dry-run' && inputs.target != 'admin'
+        if: env.DELIVERY_MODE == 'dry-run' && env.DELIVERY_TARGET != 'admin'
         env:
           CLOUDFLARE_API_TOKEN: ${{ env.WORKER_API_TOKEN }}
         run: npx wrangler deploy --config apps/worker/wrangler.staging.toml --dry-run
 
       - name: Deploy Worker to staging
-        if: inputs.mode == 'apply' && inputs.target != 'admin'
+        if: env.DELIVERY_MODE == 'apply' && env.DELIVERY_TARGET != 'admin'
         env:
           CLOUDFLARE_API_TOKEN: ${{ env.WORKER_API_TOKEN }}
         run: npx wrangler deploy --config apps/worker/wrangler.staging.toml
 
       - name: Build Admin Panel dependencies
-        if: inputs.target != 'worker'
+        if: env.DELIVERY_TARGET != 'worker'
         run: pnpm --filter @line-harness/update-engine build
 
       - name: Build Admin Panel for staging
-        if: inputs.target != 'worker'
+        if: env.DELIVERY_TARGET != 'worker'
         run: pnpm --filter web build
         env:
           NEXT_PUBLIC_API_URL: ${{ env.STAGING_API_URL }}
           NEXT_PUBLIC_RESTAURANT_TEST_ENABLED: 'true'
 
       - name: Deploy Admin Panel to staging
-        if: inputs.mode == 'apply' && inputs.target != 'worker'
+        if: env.DELIVERY_MODE == 'apply' && env.DELIVERY_TARGET != 'worker'
         env:
           CLOUDFLARE_API_TOKEN: ${{ env.PAGES_API_TOKEN }}
         run: |
@@ -122,17 +140,18 @@ jobs:
 
       - name: Summarize
         if: always()
-        env:
-          MODE: ${{ inputs.mode }}
-          TARGET: ${{ inputs.target }}
         run: |
           {
             echo "## 検証環境デプロイ"
             echo
-            echo "- mode: \`$MODE\`"
-            echo "- target: \`$TARGET\`"
+            echo "- mode: \`$DELIVERY_MODE\`"
+            echo "- target: \`$DELIVERY_TARGET\`"
             echo "- commit: \`$GITHUB_SHA\`"
             echo "- Worker: \`nen-line-stg\`"
             echo "- Admin: \`nen-line-stg-admin\`"
             echo "- D1 migration: このWorkflowでは実行しません"
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Release the staging lock after successful verification
+        if: success() && steps.staging_lock.outcome == 'success'
+        run: pnpm deploy:lock release staging --remote origin

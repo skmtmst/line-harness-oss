@@ -1,3 +1,5 @@
+import { isAccountFeatureEnabled } from './account-settings.js';
+
 export type ActionScoreRuleOperation = 'delta' | 'set';
 export type ActionScoreRuleSetStatus = 'draft' | 'published' | 'stopped';
 export type ActionScoreFrequencyKind =
@@ -688,6 +690,10 @@ export async function processActionScoreInactivity(
   let applied = 0;
   const transitions: Array<{ lineAccountId: string; friendId: string; applications: ActionScoreApplication[] }> = [];
   for (const row of rows.results ?? []) {
+    // 機能オフ中は適用(状態更新)しない。再オン後の新しい無反応から再開する。
+    if (!await isAccountFeatureEnabled(db, row.line_account_id, 'mileage')) {
+      continue;
+    }
     const result = await applyPublishedActionScoreRules(db, {
       lineAccountId: row.line_account_id,
       friendId: row.friend_id,

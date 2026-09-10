@@ -17,7 +17,8 @@ function setup(): Database.Database {
       id TEXT PRIMARY KEY, name TEXT NOT NULL, event_type TEXT NOT NULL, value REAL,
       measure_method TEXT NOT NULL DEFAULT 'manual', target_url TEXT,
       count_repeat INTEGER NOT NULL DEFAULT 1, attribution_days INTEGER,
-      line_account_id TEXT, created_at TEXT NOT NULL
+      line_account_id TEXT, version INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL
     );
     CREATE TABLE conversion_events (
       id TEXT PRIMARY KEY, conversion_point_id TEXT NOT NULL REFERENCES conversion_points(id) ON DELETE CASCADE,
@@ -46,7 +47,7 @@ describe('成果地点と過去実績の安全性', () => {
 
   it('停止後も過去成果を残し、新しいURL計測から外す', async () => {
     const sqlite = setup();
-    await stopConversionPoint(asD1(sqlite), 'point-a');
+    await stopConversionPoint(asD1(sqlite), 'point-a', 1);
     expect(sqlite.prepare('SELECT status FROM conversion_points WHERE id = ?').get('point-a'))
       .toEqual({ status: 'stopped' });
     expect(sqlite.prepare('SELECT COUNT(*) AS n FROM conversion_events').get()).toEqual({ n: 1 });
