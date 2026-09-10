@@ -1,3 +1,5 @@
+import { accountFeatureOffExclusionSql } from './account-settings.js';
+
 export interface AnalyticsProjectionRange {
   fromDate: string;
   toDate: string;
@@ -577,59 +579,63 @@ export async function purgeExpiredAnalyticsReadData(
     return deleted;
   };
 
+  // 機能オフ中のアカウントの期限切れ行は消さずに残す。再オン後の
+  // purgeで消える。9表すべてに持ち主列がある。
+  const offAnalytics = (table: string): string =>
+    `AND NOT ${accountFeatureOffExclusionSql(`${table}.line_account_id`, 'analytics')}`;
   const events = await deleteChunk(
     `DELETE FROM analytics_events
       WHERE rowid IN (
-        SELECT rowid FROM analytics_events WHERE occurred_at < ? ORDER BY occurred_at, rowid LIMIT ?
+        SELECT rowid FROM analytics_events WHERE occurred_at < ? ${offAnalytics('analytics_events')} ORDER BY occurred_at, rowid LIMIT ?
       )`,
     eventCutoff,
   );
   const dailyMetrics = await deleteChunk(
     `DELETE FROM analytics_daily_metrics
       WHERE rowid IN (
-        SELECT rowid FROM analytics_daily_metrics WHERE metric_date < ? ORDER BY metric_date, rowid LIMIT ?
+        SELECT rowid FROM analytics_daily_metrics WHERE metric_date < ? ${offAnalytics('analytics_daily_metrics')} ORDER BY metric_date, rowid LIMIT ?
       )`,
     dailyCutoff,
   );
   const reconciliationRuns = await deleteChunk(
     `DELETE FROM analytics_reconciliation_runs
       WHERE rowid IN (
-        SELECT rowid FROM analytics_reconciliation_runs WHERE completed_at < ? ORDER BY completed_at, rowid LIMIT ?
+        SELECT rowid FROM analytics_reconciliation_runs WHERE completed_at < ? ${offAnalytics('analytics_reconciliation_runs')} ORDER BY completed_at, rowid LIMIT ?
       )`,
     eventCutoff,
   );
   const audiences = await deleteChunk(
     `DELETE FROM analytics_result_audiences
       WHERE rowid IN (
-        SELECT rowid FROM analytics_result_audiences WHERE expires_at <= ? ORDER BY expires_at, rowid LIMIT ?
+        SELECT rowid FROM analytics_result_audiences WHERE expires_at <= ? ${offAnalytics('analytics_result_audiences')} ORDER BY expires_at, rowid LIMIT ?
       )`,
     now.toISOString(),
   );
   const funnelRuns = await deleteChunk(
     `DELETE FROM analytics_funnel_runs
       WHERE rowid IN (
-        SELECT rowid FROM analytics_funnel_runs WHERE created_at < ? ORDER BY created_at, rowid LIMIT ?
+        SELECT rowid FROM analytics_funnel_runs WHERE created_at < ? ${offAnalytics('analytics_funnel_runs')} ORDER BY created_at, rowid LIMIT ?
       )`,
     eventCutoff,
   );
   const crossRuns = await deleteChunk(
     `DELETE FROM analytics_cross_runs
       WHERE rowid IN (
-        SELECT rowid FROM analytics_cross_runs WHERE created_at < ? ORDER BY created_at, rowid LIMIT ?
+        SELECT rowid FROM analytics_cross_runs WHERE created_at < ? ${offAnalytics('analytics_cross_runs')} ORDER BY created_at, rowid LIMIT ?
       )`,
     eventCutoff,
   );
   const savedSnapshots = await deleteChunk(
     `DELETE FROM analytics_saved_analysis_snapshots
       WHERE rowid IN (
-        SELECT rowid FROM analytics_saved_analysis_snapshots WHERE created_at < ? ORDER BY created_at, rowid LIMIT ?
+        SELECT rowid FROM analytics_saved_analysis_snapshots WHERE created_at < ? ${offAnalytics('analytics_saved_analysis_snapshots')} ORDER BY created_at, rowid LIMIT ?
       )`,
     eventCutoff,
   );
   const urlExposures = await deleteChunk(
     `DELETE FROM analytics_url_exposures
       WHERE rowid IN (
-        SELECT rowid FROM analytics_url_exposures WHERE sent_at < ? ORDER BY sent_at, rowid LIMIT ?
+        SELECT rowid FROM analytics_url_exposures WHERE sent_at < ? ${offAnalytics('analytics_url_exposures')} ORDER BY sent_at, rowid LIMIT ?
       )`,
     eventCutoff,
   );
@@ -637,7 +643,7 @@ export async function purgeExpiredAnalyticsReadData(
     `DELETE FROM analytics_url_exposure_queue
       WHERE rowid IN (
         SELECT rowid FROM analytics_url_exposure_queue
-         WHERE created_at < ? AND status IN ('processed','failed')
+         WHERE created_at < ? AND status IN ('processed','failed') ${offAnalytics('analytics_url_exposure_queue')}
          ORDER BY created_at, rowid LIMIT ?
       )`,
     eventCutoff,

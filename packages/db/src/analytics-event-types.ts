@@ -18,10 +18,16 @@ export const ANALYTICS_EVENT_TYPE_LIST = [
   'conversion_rejected',
   'automation_completed',
   'ec.order.confirmed',
+  'ec.order.payment_received',
+  'ec.order.bank_transfer_reminder',
   'ec.order.shipped',
+  'ec.order.cancelled',
+  'ec.order.refunded',
   'ec.subscription.upcoming',
   'ec.subscription.payment_failed',
+  'ec.subscription.card_updated',
   'ec.subscription.cancelled',
+  'ec.customer.profile_updated',
 ] as const;
 
 export type AnalyticsEventType = (typeof ANALYTICS_EVENT_TYPE_LIST)[number];
