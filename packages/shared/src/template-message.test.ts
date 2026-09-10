@@ -21,4 +21,8 @@ describe('template message contract', () => {
   it('空文字列を0文字として数える', () => {
     expect(countTemplateTextCharacters('')).toBe(0);
   });
+
+  it('ASCII文字列LINEを4文字として数える', () => {
+    expect(countTemplateTextCharacters('LINE')).toBe(4);
+  });
 });
