@@ -313,7 +313,8 @@
     "361_ec_v6_dispatches.sql",
     "362_entry_route_stop_suppression_dedup.sql",
     "365_rich_menu_schedule_default_pin.sql",
-    "367_conversion_once_dedup_guard.sql"
+    "367_conversion_once_dedup_guard.sql",
+    "373_ai_loop_slack_reports.sql"
   ],
-  "migrationCount": 314
+  "migrationCount": 315
 }

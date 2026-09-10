@@ -405,6 +405,18 @@ CREATE TABLE affiliates (
 , email TEXT, hold_days INTEGER, payout_cycle TEXT, notify_on_conversion INTEGER NOT NULL DEFAULT 0, tenant_id TEXT REFERENCES tenants(id), line_account_id TEXT REFERENCES line_accounts(id), lifecycle_status TEXT NOT NULL DEFAULT 'active'
   CHECK (lifecycle_status IN ('active', 'paused', 'archived')), archived_at TEXT);
 
+CREATE TABLE ai_loop_slack_reports (
+  work_key        TEXT PRIMARY KEY,
+  slack_ts        TEXT,
+  revision        INTEGER NOT NULL,
+  claim_token     TEXT,
+  claim_expires_at INTEGER,
+  updated_at      INTEGER NOT NULL,
+  CHECK (revision >= 946684800000),
+  CHECK ((claim_token IS NULL AND claim_expires_at IS NULL)
+      OR (claim_token IS NOT NULL AND claim_expires_at IS NOT NULL))
+);
+
 CREATE TABLE analytics_cross_run_members (
   run_id           TEXT NOT NULL REFERENCES analytics_cross_runs(id) ON DELETE CASCADE,
   line_account_id  TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,

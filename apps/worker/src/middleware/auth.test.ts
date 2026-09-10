@@ -115,6 +115,7 @@ function app() {
   a.post('/api/forms/:id/partial', (c) => c.json({ success: true }));
   a.post('/api/forms/:id/opened', (c) => c.json({ success: true }));
   a.post('/api/integrations/codex-slack/events', (c) => c.json({ success: true }));
+  a.post('/api/integrations/ai-loop/reports', (c) => c.json({ success: true }));
   a.post('/api/integrations/slack/actions', (c) => c.json({ success: true }));
   a.post('/api/integrations/slack/events', (c) => c.json({ success: true }));
   a.get('/api/public/brand', (c) => c.json({ success: true, staff: c.get('staff') ?? null }));
@@ -649,6 +650,7 @@ describe('公開サイト計測の認証境界', () => {
 describe('署名検証を持つSlack連携入口', () => {
   test.each([
     '/api/integrations/codex-slack/events',
+    '/api/integrations/ai-loop/reports',
     '/api/integrations/slack/actions',
     '/api/integrations/slack/events',
   ])('%s は管理者認証より前へ通す', async (path) => {
