@@ -289,7 +289,8 @@ export async function pushImmediateFirstStep(
     // both the push token and the tracked-link owner below.
     const [resolvedMeta, resolved, ctxAccount] = await Promise.all([
       resolveMetadata(db, { user_id: friend.user_id, metadata: friend.metadata }),
-      resolveStepContent(db, firstStep),
+      // シナリオの持ち主アカウントだけを公開版として解決する(#645 差し戻し対応)。
+      resolveStepContent(db, firstStep, scenarioRow.line_account_id),
       ctx.accountChannelId ? getLineAccountByChannelId(db, ctx.accountChannelId) : null,
     ]);
     const friendWithMeta = { ...friend, metadata: resolvedMeta } as Parameters<typeof expandVariables>[1];
