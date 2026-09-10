@@ -211,6 +211,26 @@ export async function captureFriendAddEventAttribution(
 export const FRIEND_ADD_SEND_CLAIM_TTL_MINUTES = 2;
 
 /**
+ * 「送り始めた」印（dispatched_at）が効く時間（分）。
+ *
+ * この印は「並行して走っている別の実行が、いま送っている最中かもしれない」
+ * ことを表す。守りたいのはその**同時実行の窓**だけで、Workers の実行時間の
+ * 上限を考えれば数分で足りる。ここを無期限にすると、通信が1回切れただけで
+ * その友だちへ**二度と**友だち追加配信が届かなくなる（印を消す経路が
+ * 予約の解放しか無く、送達不明では解放しないため）。混雑時の 429 でも
+ * 起きるので、例外的な事故ではない。
+ *
+ * 期限を過ぎたあとの「送ったかもしれない相手へ送り直さない」は、台帳側の
+ * 再送制限が受け持つ（`delivery_unknown` の行を届いた形跡として数える）。
+ * そちらは運用者が時間を決められる。二重の防ぎ方を、短い同時実行の窓と
+ * 運用者が決める再送の窓に分けている。
+ *
+ * 予約の TTL（2分）より十分に長くとる。長い送信が続いていても、
+ * 関門を通るたびに claimed_at が延びるので予約自体は奪われない。
+ */
+export const FRIEND_ADD_DISPATCH_MARK_TTL_MINUTES = 30;
+
+/**
  * 別webhook IDで並行に届いたfollowの二重送信を防ぐ送信権の予約。
  * (line_account_id, friend_id) に1行だけ置き、先に置いた実行だけが送る。
  */
@@ -249,6 +269,7 @@ export async function claimFriendAddSendRight(
 ): Promise<FriendAddSendClaim> {
   const now = input.now ?? jstNow();
   const cutoff = addMinutes(now, -FRIEND_ADD_SEND_CLAIM_TTL_MINUTES);
+  const dispatchCutoff = addMinutes(now, -FRIEND_ADD_DISPATCH_MARK_TTL_MINUTES);
   const won = await db.prepare(
     `INSERT INTO friend_add_send_claims
        (line_account_id, friend_id, event_id, generation, claimed_at, dispatched_at)
@@ -256,19 +277,29 @@ export async function claimFriendAddSendRight(
      ON CONFLICT (line_account_id, friend_id) DO UPDATE
         SET event_id = excluded.event_id,
             generation = friend_add_send_claims.generation + 1,
-            claimed_at = excluded.claimed_at
+            claimed_at = excluded.claimed_at,
+            -- 期限を過ぎた「送り始めた」印は、奪い直すこの1文で落とす。
+            -- 残したままにすると、通信が1回切れただけでその友だちへ
+            -- 二度と届かなくなる。まだ新しい印はそのまま残す。
+            dispatched_at = CASE
+              WHEN friend_add_send_claims.dispatched_at IS NULL THEN NULL
+              WHEN friend_add_send_claims.dispatched_at < ? THEN NULL
+              ELSE friend_add_send_claims.dispatched_at
+            END
       WHERE friend_add_send_claims.claimed_at < ?
      RETURNING event_id, generation, dispatched_at`,
-  ).bind(input.lineAccountId, input.friendId, input.eventId, now, cutoff)
-    .first<{ event_id: string; generation: number; dispatched_at: string | null }>();
+  ).bind(
+    input.lineAccountId, input.friendId, input.eventId, now, dispatchCutoff, cutoff,
+  ).first<{ event_id: string; generation: number; dispatched_at: string | null }>();
   // 他人の予約が生きている（DO UPDATE の WHERE が偽）ときは行が返らない。
   if (!won || won.event_id !== input.eventId) {
     return { held: false, generation: 0, previousDispatchUnknown: false };
   }
   /*
-   * 奪い直したときに前の持ち主の「送り始めた」印が残っていたら、
-   * その実行は送ったかもしれない。予約は持てても送らない。
-   * DO UPDATE で dispatched_at を触らないのは、この判断のために残すため。
+   * 奪い直したときに、**まだ期限内の**「送り始めた」印が残っていたら、
+   * その実行は送っている最中かもしれない。予約は持てても送らない。
+   * RETURNING は書き換えたあとの値を返すので、期限切れの印はここで
+   * すでに NULL になっている。
    */
   return {
     held: true,

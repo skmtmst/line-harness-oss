@@ -380,6 +380,88 @@ describe('POST /webhook — 送信の結末を分ける (#622)', () => {
  * まとめて1回だけ確認していると、クーポンの作成（外部API）に時間がかかった
  * 間に予約を奪われても気づけず、奪った側と両方が送ってしまう。
  */
+/*
+ * 送達不明のあとの復旧。
+ *
+ * 「送り始めた」印を消す経路が予約の解放しか無く、送達不明では解放しないため、
+ * 印を無期限にすると**1回の送達不明でその友だちへ二度と届かなくなる**。
+ * 引き金は混雑時の 429 でも起きるので、例外的な事故ではない。
+ * 印に有効期限を持たせ、時間が経てば次の追加で届くようにする。
+ */
+describe('POST /webhook — 送達不明からの復旧 (#622)', () => {
+  /** 台帳・予約・購読・送信記録を「じゅうぶん前」の状態にする。 */
+  function ageEverything(minutesAgo: number): void {
+    const at = new Date(Date.now() - minutesAgo * 60_000);
+    const jst = new Date(at.getTime() + 9 * 60 * 60 * 1000)
+      .toISOString().replace('Z', '+09:00');
+    raw.prepare(`UPDATE friend_add_send_claims SET claimed_at = ?, dispatched_at = ?`).run(jst, jst);
+    raw.prepare(`UPDATE friend_add_events SET occurred_at = ?, created_at = ?`).run(jst, jst);
+    raw.prepare(`DELETE FROM friend_scenarios`).run();
+    raw.prepare(`DELETE FROM messages_log`).run();
+  }
+
+  async function makeDeliveryUnknown(): Promise<void> {
+    lineClientMocks.replyMessage.mockRejectedValueOnce(new Error('network timeout'));
+    lineClientMocks.pushMessage.mockRejectedValueOnce(new Error('network timeout'));
+    await postFollow('webhook-unknown-1');
+    expect(eventRows()[0]).toMatchObject({ error_code: 'delivery_unknown' });
+    expect(raw.prepare(`SELECT COUNT(*) AS n FROM friend_add_send_claims`).get()).toEqual({ n: 1 });
+  }
+
+  test('印が期限内のうちは、追加し直しても送らない', async () => {
+    await makeDeliveryUnknown();
+    const before = sendCount();
+    // 予約は奪える古さにするが、印はまだ新しい（10分前）
+    ageEverything(10);
+    lineClientMocks.replyMessage.mockResolvedValue(undefined);
+
+    await postFollow('webhook-retry-soon');
+
+    expect(sendCount()).toBe(before);
+    const row = eventRows().find((r) => r.error_code === 'delivery_unknown' && r.delivery_count === 0);
+    expect(row).toBeTruthy();
+  });
+
+  test('印の期限が切れたあとの追加では、ふつうに届く', async () => {
+    await makeDeliveryUnknown();
+    const before = sendCount();
+    // 30日前まで戻す（台帳の再送制限も予約の印もじゅうぶん古い）
+    ageEverything(60 * 24 * 30);
+    lineClientMocks.replyMessage.mockResolvedValue(undefined);
+
+    await postFollow('webhook-retry-later');
+
+    // 届く
+    expect(sendCount()).toBe(before + 1);
+    const recovered = raw.prepare(
+      `SELECT routing_status, delivery_count, error_code FROM friend_add_events
+        WHERE webhook_event_id = 'webhook-retry-later'`,
+    ).get();
+    expect(recovered).toEqual({ routing_status: 'completed', delivery_count: 1, error_code: null });
+    // 送り終えたので予約は返り、印も残らない
+    expect(raw.prepare(`SELECT COUNT(*) AS n FROM friend_add_send_claims`).get()).toEqual({ n: 0 });
+  });
+
+  test('送達不明を繰り返しても、印が積み残って永久に止まることはない', async () => {
+    await makeDeliveryUnknown();
+    for (const id of ['webhook-again-1', 'webhook-again-2']) {
+      ageEverything(60 * 24 * 30);
+      lineClientMocks.replyMessage.mockRejectedValueOnce(new Error('network timeout'));
+      lineClientMocks.pushMessage.mockRejectedValueOnce(new Error('network timeout'));
+      await postFollow(id);
+    }
+    // 最後にもう一度、こんどは送れる状態で
+    ageEverything(60 * 24 * 30);
+    lineClientMocks.replyMessage.mockResolvedValue(undefined);
+    await postFollow('webhook-again-final');
+
+    expect(raw.prepare(
+      `SELECT routing_status, delivery_count FROM friend_add_events
+        WHERE webhook_event_id = 'webhook-again-final'`,
+    ).get()).toEqual({ routing_status: 'completed', delivery_count: 1 });
+  });
+});
+
 describe('POST /webhook — クーポン本文の送信も直前の関門をくぐる (#622)', () => {
   const EC_ENV = { NEN_EC_BASE_URL: 'https://ec.example', ECCUBE_WEBHOOK_SECRET: 'ec-secret' };
 

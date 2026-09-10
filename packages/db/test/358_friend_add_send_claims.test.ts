@@ -8,6 +8,7 @@ import {
   claimFriendAddSendRight,
   touchFriendAddSendClaim,
   releaseFriendAddSendRight,
+  FRIEND_ADD_DISPATCH_MARK_TTL_MINUTES,
 } from '../src/friend-add-events.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -131,6 +132,67 @@ describe('358 friend_add_send_claims', () => {
     await expect(
       claimFriendAddSendRight(db, { lineAccountId: 'account-1', friendId: 'friend-1', eventId: 'event-new', now: NOW }),
     ).resolves.toEqual({ held: true, generation: 2, previousDispatchUnknown: false });
+  });
+
+  /*
+   * 「送り始めた」印を無期限にすると、通信が1回切れただけでその友だちへ
+   * 二度と友だち追加配信が届かなくなる（印を消す経路が予約の解放しか無く、
+   * 送達不明では解放しないため）。印には有効期限を持たせる。
+   */
+  describe('送り始めた印の有効期限', () => {
+    function markDispatched(at: string): void {
+      raw.prepare(
+        `UPDATE friend_add_send_claims SET dispatched_at = ?, claimed_at = ?
+          WHERE line_account_id = 'account-1' AND friend_id = 'friend-1'`,
+      ).run(at, at);
+    }
+
+    it('期限内の印が残っていたら、奪い直しても送らない', async () => {
+      await claimFriendAddSendRight(db, {
+        lineAccountId: 'account-1', friendId: 'friend-1', eventId: 'event-a', now: NOW,
+      });
+      // 予約は奪える古さ、印はまだ新しい
+      markDispatched('2026-09-08T09:55:00.000+09:00');
+
+      await expect(claimFriendAddSendRight(db, {
+        lineAccountId: 'account-1', friendId: 'friend-1', eventId: 'event-b', now: NOW,
+      })).resolves.toEqual({ held: true, generation: 2, previousDispatchUnknown: true });
+      // 印は残したまま
+      expect(raw.prepare(
+        `SELECT dispatched_at IS NOT NULL AS marked FROM friend_add_send_claims`,
+      ).get()).toEqual({ marked: 1 });
+    });
+
+    it('期限を過ぎた印は落として、次の追加で送れるようにする', async () => {
+      await claimFriendAddSendRight(db, {
+        lineAccountId: 'account-1', friendId: 'friend-1', eventId: 'event-a', now: NOW,
+      });
+      // 期限（30分）より前の印
+      markDispatched('2026-09-08T09:00:00.000+09:00');
+      expect(FRIEND_ADD_DISPATCH_MARK_TTL_MINUTES).toBe(30);
+
+      await expect(claimFriendAddSendRight(db, {
+        lineAccountId: 'account-1', friendId: 'friend-1', eventId: 'event-b', now: NOW,
+      })).resolves.toEqual({ held: true, generation: 2, previousDispatchUnknown: false });
+      // 印は落ちている（残すと以後ずっと送れなくなる）
+      expect(raw.prepare(
+        `SELECT dispatched_at FROM friend_add_send_claims`,
+      ).get()).toEqual({ dispatched_at: null });
+    });
+
+    it('何度奪い直しても、期限切れの印は積み残らない', async () => {
+      await claimFriendAddSendRight(db, {
+        lineAccountId: 'account-1', friendId: 'friend-1', eventId: 'event-a', now: NOW,
+      });
+      markDispatched('2026-09-08T09:00:00.000+09:00');
+      for (const [i, eventId] of ['event-b', 'event-c', 'event-d'].entries()) {
+        const claim = await claimFriendAddSendRight(db, {
+          lineAccountId: 'account-1', friendId: 'friend-1', eventId,
+          now: `2026-09-08T1${i}:00:00.000+09:00`,
+        });
+        expect(claim.previousDispatchUnknown).toBe(false);
+      }
+    });
   });
 
   it('回収後の旧持ち主は持ち主でない', async () => {
