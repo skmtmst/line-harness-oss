@@ -43,7 +43,7 @@ function normalizeMessageType(type: string): string {
 export async function resolveStepContent(
   db: D1Database,
   step: StepLike,
-  lineAccountId?: string | null,
+  lineAccountId: string | null,
 ): Promise<ResolvedContent> {
   if (!step.template_id) {
     return {
