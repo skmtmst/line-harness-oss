@@ -4,7 +4,8 @@ import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { createScenario, enrollFriendInScenario, updateScenario } from '../src/scenarios.js';
+import { createScenario, enrollFriendInScenario, publishScenarioVersion, updateScenario } from '../src/scenarios.js';
+import { asD1 } from './d1-test-helper.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PKG_ROOT = join(__dirname, '..');
@@ -13,40 +14,6 @@ function setupDb(): Database.Database {
   const db = new Database(':memory:');
   db.exec(readFileSync(join(PKG_ROOT, 'bootstrap.sql'), 'utf8'));
   return db;
-}
-
-function asD1(sqlite: Database.Database): D1Database {
-  return {
-    prepare(query: string) {
-      return {
-        bind(...params: unknown[]) {
-          const stmt = sqlite.prepare(query);
-          return {
-            async run() {
-              const info = stmt.run(...params);
-              return { results: [], success: true, meta: { changes: info.changes } };
-            },
-            async first<T>() {
-              return (stmt.get(...params) as T) ?? null;
-            },
-            async all<T>() {
-              return { results: stmt.all(...params) as T[], success: true, meta: {} };
-            },
-          };
-        },
-        async run() {
-          const info = sqlite.prepare(query).run();
-          return { results: [], success: true, meta: { changes: info.changes } };
-        },
-        async first<T>() {
-          return (sqlite.prepare(query).get() as T) ?? null;
-        },
-        async all<T>() {
-          return { results: sqlite.prepare(query).all() as T[], success: true, meta: {} };
-        },
-      };
-    },
-  } as unknown as D1Database;
 }
 
 let sqlite: Database.Database;
@@ -74,6 +41,8 @@ async function withStep(name: string, allowConcurrent?: boolean) {
        VALUES (?, ?, 0, 60, 'text', 'こんにちは')`,
     )
     .run(crypto.randomUUID(), scenario.id);
+  // 参加には明示公開が要る（351）。購読の条件ではなく場の準備。
+  await publishScenarioVersion(db, scenario.id, { staffId: null, idempotencyKey: `conc-${name}` });
   return scenario;
 }
 

@@ -10,6 +10,7 @@ import type Database from 'better-sqlite3';
 import type { Env } from '../index.js';
 import type { AuthenticatedStaff } from '../middleware/auth.js';
 import { createTestD1, insertFriend, type SqliteD1 } from '../test-utils/d1-sqlite.js';
+import { publishScenarioVersion } from '@line-crm/db';
 import {
   applyFriendAddRouting,
   areFriendAddConditionsOverlapping,
@@ -466,7 +467,7 @@ describe('本番の振り分け: 曜日・時間帯・条件・再送制限', ()
   let raw: Database.Database;
   let db: D1Database;
 
-  function setupBase(accountId = 'acc-1', scenarioId = 'scenario-1'): void {
+  async function setupBase(accountId = 'acc-1', scenarioId = 'scenario-1'): Promise<void> {
     raw.prepare(`INSERT OR IGNORE INTO tenants (id, name) VALUES ('tenant-1', '統括1')`).run();
     raw.prepare(
       `INSERT INTO line_accounts (id, name, channel_id, channel_secret, channel_access_token, tenant_id)
@@ -483,6 +484,11 @@ describe('本番の振り分け: 曜日・時間帯・条件・再送制限', ()
       `INSERT OR IGNORE INTO entry_routes (id, name, ref_code, is_active, tenant_id)
        VALUES ('route-1', '紹介QR', 'REF001', 1, 'tenant-1')`,
     ).run();
+    // 参加には明示公開が要る（351 / #644）。稼働中の状態にしてから試す。
+    await publishScenarioVersion(db, scenarioId, {
+      staffId: null,
+      idempotencyKey: `runtime-conditions-${scenarioId}`,
+    });
   }
 
   function seedRule(options: {
@@ -558,11 +564,11 @@ describe('本番の振り分け: 曜日・時間帯・条件・再送制限', ()
     );
   }
 
-  beforeEach(() => {
+  beforeEach(async () => {
     testDb = createTestD1();
     raw = testDb.raw;
     db = testDb.db;
-    setupBase();
+    await setupBase();
     insertFriend(raw, 'friend-1', { line_account_id: 'acc-1', unfollow_count: 0 });
   });
 
@@ -660,6 +666,10 @@ describe('本番の振り分け: 曜日・時間帯・条件・再送制限', ()
   test('初回と再追加で別の公開版を選ぶ', async () => {
     raw.prepare(`INSERT INTO scenarios (id, name, trigger_type, is_active, line_account_id)
       VALUES ('scenario-r', '再追加案内', 'friend_add', 1, 'acc-1')`).run();
+    await publishScenarioVersion(db, 'scenario-r', {
+      staffId: null,
+      idempotencyKey: 'runtime-conditions-scenario-r',
+    });
     seedRule({ id: 'rule-first', routeIds: ['route-1'], scenarioId: 'scenario-1', resendSuppressionHours: 0 });
     seedRule({
       id: 'rule-ret', kind: 'returning', routeIds: ['route-1'],
@@ -737,7 +747,7 @@ describe('本番の振り分け: 曜日・時間帯・条件・再送制限', ()
     );
     expect(unlimited.suppressed).toBe(false);
 
-    setupBase('acc-2', 'scenario-2');
+    await setupBase('acc-2', 'scenario-2');
     insertFriend(raw, 'friend-9', { line_account_id: 'acc-2', unfollow_count: 0 });
     seedRule({ id: 'rule-acc2', accountId: 'acc-2', scenarioId: 'scenario-2', resendSuppressionHours: 24 });
     // 別の友だちの送信済みは数えない（friend-9の実行があってもfriend-8は送る）
@@ -751,7 +761,7 @@ describe('本番の振り分け: 曜日・時間帯・条件・再送制限', ()
   });
 
   test('他アカウントの通常ルールは使わない（アカウント境界）', async () => {
-    setupBase('acc-2', 'scenario-2');
+    await setupBase('acc-2', 'scenario-2');
     seedRule({ id: 'rule-acc2', accountId: 'acc-2', scenarioId: 'scenario-2', resendSuppressionHours: 0 });
     const result = await applyFriendAddRouting(
       db, 'acc-1', { id: 'friend-1', unfollow_count: 0 }, undefined,
@@ -1018,7 +1028,7 @@ describe('本番の振り分け: 曜日・時間帯・条件・再送制限', ()
    */
   describe('参照の所属（実行時）', () => {
     test('友だち条件が別アカウントのタグを指していたら送らない', async () => {
-      setupBase('acc-2', 'scenario-2');
+      await setupBase('acc-2', 'scenario-2');
       raw.prepare(`INSERT INTO tags (id, name, line_account_id) VALUES ('tag-x', '他店タグ', 'acc-2')`).run();
       seedRule({
         friendCondition: JSON.stringify({
@@ -1037,7 +1047,7 @@ describe('本番の振り分け: 曜日・時間帯・条件・再送制限', ()
     });
 
     test('配信するシナリオが別アカウントの持ち物になったら送らない', async () => {
-      setupBase('acc-2', 'scenario-2');
+      await setupBase('acc-2', 'scenario-2');
       seedRule({ scenarioId: 'scenario-2', resendSuppressionHours: 0 });
       const result = await applyFriendAddRouting(
         db, 'acc-1', { id: 'friend-1', unfollow_count: 0 }, undefined,
@@ -1086,7 +1096,7 @@ describe('本番の振り分け: 曜日・時間帯・条件・再送制限', ()
      * 入れ子に他店のタグを1つ混ぜるだけで所属の検査を素通りできてしまう。
      */
     test('入れ子グループの中の他店タグも見つけて止める', async () => {
-      setupBase('acc-2', 'scenario-2');
+      await setupBase('acc-2', 'scenario-2');
       raw.prepare(`INSERT INTO tags (id, name, line_account_id) VALUES ('tag-mine', '自店', 'acc-1')`).run();
       raw.prepare(`INSERT INTO tags (id, name, line_account_id) VALUES ('tag-far', '他店', 'acc-2')`).run();
       // 1段目は自店のタグだけ。他店のタグは2段目の入れ子に置く。
@@ -1140,7 +1150,7 @@ describe('本番の振り分け: 曜日・時間帯・条件・再送制限', ()
      * reminders.ts の同じ検査と同じ形（所属が無ければテナント共通として通す）。
      */
     test('友だち情報欄は所属まで見る（消えた・他店は止め、自店・共通は通す）', async () => {
-      setupBase('acc-2', 'scenario-2');
+      await setupBase('acc-2', 'scenario-2');
       raw.prepare(`INSERT INTO tenants (id, name) VALUES ('tenant-9', '別統括')`).run();
       for (const [id, name] of [['field-mine', '自店欄'], ['field-other', '他店欄'], ['field-shared', '共通欄']]) {
         raw.prepare(

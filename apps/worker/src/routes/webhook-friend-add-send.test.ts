@@ -9,6 +9,7 @@ import { Hono } from 'hono';
 import type Database from 'better-sqlite3';
 import type { Env } from '../index.js';
 import { createTestD1, insertFriend, type SqliteD1 } from '../test-utils/d1-sqlite.js';
+import { publishScenarioVersion } from '@line-crm/db';
 import { isFriendAddResendSuppressed } from '../services/friend-add-routing.js';
 
 const lineClientMocks = vi.hoisted(() => ({
@@ -48,7 +49,7 @@ const env = () => ({
   LINE_CHANNEL_ACCESS_TOKEN: 'token-1',
 }) as Record<string, unknown>;
 
-function seedBase(): void {
+async function seedBase(): Promise<void> {
   raw.prepare(
     `INSERT INTO line_accounts (id, channel_id, name, channel_access_token, channel_secret, is_active)
      VALUES ('account-1', 'channel-1', '店舗1', 'token-1', 'secret-1', 1)`,
@@ -85,6 +86,12 @@ function seedBase(): void {
   ).run(definition);
   insertFriend(raw, 'friend-1', {
     line_user_id: 'U-1', line_account_id: 'account-1', unfollow_count: 0, ref_code: 'REF001',
+  });
+  // 参加には明示公開が要る（351 / #644）。公開していないシナリオへは登録
+  // しないので、ここで1度だけ公開して稼働中の状態にする。
+  await publishScenarioVersion(db, 'scenario-1', {
+    staffId: null,
+    idempotencyKey: 'friend-add-send-seed',
   });
 }
 
@@ -155,11 +162,11 @@ function eventRows(): Array<{ routing_status: string; delivery_count: number; er
   ).all() as Array<{ routing_status: string; delivery_count: number; error_code: string | null }>;
 }
 
-beforeEach(() => {
+beforeEach(async () => {
   testDb = createTestD1();
   raw = testDb.raw;
   db = testDb.db;
-  seedBase();
+  await seedBase();
   vi.mocked(verifySignature).mockResolvedValue(true);
   /*
    * `vi.clearAllMocks()` は呼び出し記録しか消さないので、`...Once` の
