@@ -215,7 +215,8 @@ describe('成果地点の編集の口（N-252）', () => {
  */
 const MUTATING_ENDPOINTS: Array<{
   action: string;
-  request: () => Promise<Response>;
+  /** `hono.request()` は Response をそのまま返すこともあるので、どちらも受ける。 */
+  request: () => Response | Promise<Response>;
 }> = [
   {
     action: 'conversion.definition.create',
