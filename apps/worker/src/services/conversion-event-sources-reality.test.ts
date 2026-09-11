@@ -275,24 +275,21 @@ describe('起点3: 動画を見終えた (webinar_completed)', () => {
       .run();
   }
 
-  function heartbeat(positionSeconds: number) {
+  async function heartbeat(positionSeconds: number): Promise<Response> {
     const app = new Hono<Env>();
     app.route('/', webinarRoutes);
     const exec = makeExecCtx();
-    return app
-      .fetch(
-        new Request('https://worker.example.test/api/liff/webinars/test-webinar/heartbeat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer u' },
-          body: JSON.stringify({ sessionStartAt: SESSION_START, positionSeconds }),
-        }),
-        env(),
-        exec.ctx,
-      )
-      .then(async (res) => {
-        await exec.drain();
-        return res;
-      });
+    const res = await app.fetch(
+      new Request('https://worker.example.test/api/liff/webinars/test-webinar/heartbeat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer u' },
+        body: JSON.stringify({ sessionStartAt: SESSION_START, positionSeconds }),
+      }),
+      env(),
+      exec.ctx,
+    );
+    await exec.drain();
+    return res;
   }
 
   test('視聴完了(90%到達)で成果が1件数えられ、同じ視聴の再送では増えない', async () => {
@@ -332,28 +329,25 @@ describe('起点4: フォームが送信された (form_submitted)', () => {
     `);
   }
 
-  function submit(key: string) {
+  async function submit(key: string): Promise<Response> {
     const app = new Hono<Env>();
     app.route('/', forms);
     const exec = makeExecCtx();
-    return app
-      .fetch(
-        new Request('https://worker.example.test/api/forms/form-1/submit', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: 'Bearer u',
-            'Idempotency-Key': key,
-          },
-          body: JSON.stringify({ data: { full_name: '山田' } }),
-        }),
-        env(),
-        exec.ctx,
-      )
-      .then(async (res) => {
-        await exec.drain();
-        return res;
-      });
+    const res = await app.fetch(
+      new Request('https://worker.example.test/api/forms/form-1/submit', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer u',
+          'Idempotency-Key': key,
+        },
+        body: JSON.stringify({ data: { full_name: '山田' } }),
+      }),
+      env(),
+      exec.ctx,
+    );
+    await exec.drain();
+    return res;
   }
 
   test('回答の保存で成果が1件数えられ、同じキーの再送では増えない', async () => {
@@ -404,30 +398,27 @@ describe('起点5: 予約が確定した (reservation_confirmed)', () => {
     return a;
   }
 
-  function approve() {
+  async function approve(): Promise<Response> {
     const exec = makeExecCtx();
-    return app()
-      .fetch(
-        new Request(
-          'https://worker.example.test/api/booking/admin/requests/booking-1?account_id=account-a',
-          {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: 'approve' }),
-          },
-        ),
-        env(),
-        exec.ctx,
-      )
-      .then(async (res) => {
-        await exec.drain();
-        return res;
-      });
+    const res = await app().fetch(
+      new Request(
+        'https://worker.example.test/api/booking/admin/requests/booking-1?account_id=account-a',
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'approve' }),
+        },
+      ),
+      env(),
+      exec.ctx,
+    );
+    await exec.drain();
+    return res;
   }
 
   const PROXY_START = '2027-06-01T01:00:00.000Z';
 
-  function proxyCreate(key: string) {
+  async function proxyCreate(key: string): Promise<Response> {
     availabilityMocks.getAvailability.mockResolvedValue({
       by_staff: [{
         staff_id: 'staff-1',
@@ -446,26 +437,23 @@ describe('起点5: 予約が確定した (reservation_confirmed)', () => {
       }],
     });
     const exec = makeExecCtx();
-    return app()
-      .fetch(
-        new Request('https://worker.example.test/api/booking/admin/bookings?account_id=account-a', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Idempotency-Key': key },
-          body: JSON.stringify({
-            friend_id: 'friend-1',
-            menu_id: 'menu-1',
-            staff_id: 'staff-1',
-            starts_at: PROXY_START,
-            send_line_confirmation: false,
-          }),
+    const res = await app().fetch(
+      new Request('https://worker.example.test/api/booking/admin/bookings?account_id=account-a', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Idempotency-Key': key },
+        body: JSON.stringify({
+          friend_id: 'friend-1',
+          menu_id: 'menu-1',
+          staff_id: 'staff-1',
+          starts_at: PROXY_START,
+          send_line_confirmation: false,
         }),
-        env(),
-        exec.ctx,
-      )
-      .then(async (res) => {
-        await exec.drain();
-        return res;
-      });
+      }),
+      env(),
+      exec.ctx,
+    );
+    await exec.drain();
+    return res;
   }
 
   test('代理登録(入った時点で確定)でも成果が1件数えられる', async () => {
