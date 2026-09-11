@@ -19,10 +19,10 @@ import {
 
 const WIZARD_STEPS = [
   { number: 1, label: '基本情報' },
-  { number: 2, label: 'Messaging API' },
-  { number: 3, label: 'LINE Login・LIFF' },
-  { number: 4, label: '設定・接続確認' },
-  { number: 5, label: '最終確認' },
+  { number: 2, label: 'LINE準備' },
+  { number: 3, label: 'チャネル設定' },
+  { number: 4, label: '接続確認' },
+  { number: 5, label: '完了' },
 ] as const
 
 type StepNumber = (typeof WIZARD_STEPS)[number]['number']
@@ -31,6 +31,8 @@ type FieldErrors = Record<string, string>
 
 /** LINEアカウントを、接続を確かめてから登録する5段階フロー。 */
 export default function NewLineAccountPage() {
+  const [prepared, setPrepared] = useState<string[]>([])
+  const [accountMethod, setAccountMethod] = useState('existing')
   const [currentStep, setCurrentStep] = useState<StepNumber>(1)
   const [form, setForm] = useState<AccountFormState>(emptyAccountFormState)
   const [timezone, setTimezone] = useState('Asia/Tokyo')
@@ -115,10 +117,6 @@ export default function NewLineAccountPage() {
       setError('入力内容を確認してください。')
       return
     }
-    if (currentStep === 4 && !connectionPassed) {
-      setError('接続確認がすべて通ってから次へ進んでください。')
-      return
-    }
     if (currentStep < 5) setCurrentStep((currentStep + 1) as StepNumber)
   }
 
@@ -129,12 +127,10 @@ export default function NewLineAccountPage() {
   }
 
   const checkConnection = async () => {
-    const messagingErrors = getStepErrors(2, form, timezone)
-    const loginErrors = getStepErrors(3, form, timezone)
-    const nextErrors = { ...messagingErrors, ...loginErrors }
+    const nextErrors = getStepErrors(3, form, timezone)
     if (Object.keys(nextErrors).length > 0) {
       setFieldErrors((current) => ({ ...current, ...nextErrors }))
-      setCurrentStep(Object.keys(messagingErrors).length > 0 ? 2 : 3)
+      setCurrentStep(3)
       setError('接続確認に必要な入力内容を確認してください。')
       return
     }
@@ -170,16 +166,13 @@ export default function NewLineAccountPage() {
   const verifyAndSave = async () => {
     const allErrors = {
       ...getStepErrors(1, form, timezone),
-      ...getStepErrors(2, form, timezone),
       ...getStepErrors(3, form, timezone),
     }
     if (Object.keys(allErrors).length > 0) {
       setFieldErrors((current) => ({ ...current, ...allErrors }))
       const firstInvalidStep = Object.keys(getStepErrors(1, form, timezone)).length > 0
         ? 1
-        : Object.keys(getStepErrors(2, form, timezone)).length > 0
-          ? 2
-          : 3
+        : 3
       setCurrentStep(firstInvalidStep)
       setError('入力内容を確認してください。')
       return
@@ -226,6 +219,8 @@ export default function NewLineAccountPage() {
         return
       }
       setCreatedId(created.data.id)
+      setForm(current => ({ ...current, channelSecret: '', channelAccessToken: '', loginChannelSecret: '' }))
+      setCurrentStep(5)
     } catch {
       setError('登録できませんでした。しばらくおいてから、もう一度お試しください。')
     } finally {
@@ -237,12 +232,38 @@ export default function NewLineAccountPage() {
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (createdId || busyLock.current) return
-    if (currentStep === 5) {
+    if (currentStep === 4) {
+      if (!connectionPassed) {
+        setError('接続確認がすべて通ってから登録してください。')
+        return
+      }
       void verifyAndSave()
       return
     }
     moveNext()
   }
+
+  const accountSummary = (
+    <div className="space-y-4">
+              <ReviewGroup title="基本情報">
+                <ReviewRow label="表示名" value={form.name.trim()} />
+                <ReviewRow label="国・地域" value={country.trim() || '設定しない'} />
+                <ReviewRow label="役割メモ" value={role.trim() || '設定しない'} />
+                <ReviewRow label="親アカウント" value={parentName} />
+                <ReviewRow label="タイムゾーン" value={timezone} />
+              </ReviewGroup>
+              <ReviewGroup title="Messaging API">
+                <ReviewRow label="チャネルID" value={form.channelId.trim()} />
+                <SecretReviewRow label="チャネルシークレット" />
+                <SecretReviewRow label="チャネルアクセストークン" />
+              </ReviewGroup>
+              <ReviewGroup title="LINE Login・LIFF">
+                <ReviewRow label="LoginチャネルID" value={form.loginChannelId.trim()} />
+                <SecretReviewRow label="Loginチャネルシークレット" />
+                <ReviewRow label="LIFF ID" value={form.liffId.trim()} />
+              </ReviewGroup>
+    </div>
+  )
 
   return (
     <div data-design-node="b2NGxk" className="mx-auto w-full max-w-6xl pb-24">
@@ -283,6 +304,7 @@ export default function NewLineAccountPage() {
               <p role="status" className="bg-success-bg text-success rounded-control p-4 text-sm">
                 登録したアカウントの詳細画面から、運用状態を確認できます。
               </p>
+              {accountSummary}
             </SetupSection>
           ) : currentStep === 1 ? (
             <SetupSection
@@ -338,8 +360,30 @@ export default function NewLineAccountPage() {
               />
             </SetupSection>
           ) : currentStep === 2 ? (
-            <SetupSection
-              title="2. Messaging API"
+            <SetupSection title="2. LINE側の準備を確認" description="LINE側で準備するものを確認します。チェックは手順のメモで、接続できたことを意味しません。">
+              <SelectField id="account-method" label="アカウントの用意方法" value={accountMethod} onChange={setAccountMethod} options={[
+                { value: 'existing', label: '既存の公式アカウントを接続' },
+                { value: 'new', label: '新しく公式アカウントを作成' },
+              ]} />
+              <p className="text-ink-secondary text-sm">{accountMethod === 'new' ? 'LINE側で公式アカウントを作成してから、この画面へ戻ってください。' : '接続する公式アカウントの管理権限を確認してください。'}</p>
+              <ul className="space-y-3">{[
+                'LINE公式アカウントを用意',
+                'LINE DevelopersでProviderを確認',
+                'Messaging APIチャネルを用意',
+                'LINE LoginチャネルとLIFFを用意',
+              ].map(label => <li key={label} className="rounded-control border border-hairline p-4">
+                <label className="flex items-center gap-3 text-sm text-ink">
+                  <input type="checkbox" checked={prepared.includes(label)} onChange={event => setPrepared(current => event.target.checked ? [...current, label] : current.filter(item => item !== label))} />
+                  {label}
+                </label>
+              </li>)}</ul>
+              <a href="https://developers.line.biz/console/" target="_blank" rel="noreferrer" className="text-action text-sm">LINE Developersを開く</a>
+              <p className="text-ink-secondary text-xs">チャネル情報は次の画面で入力します。ここまでの入力は、このブラウザの作成画面内でだけ保持しています。</p>
+            </SetupSection>
+          ) : currentStep === 3 ? (
+            <div className="grid gap-4 lg:grid-cols-2">
+<SetupSection
+              title="Messaging API"
               description="LINE公式アカウントからメッセージを送受信するための必須情報です。"
             >
               <Field
@@ -374,9 +418,8 @@ export default function NewLineAccountPage() {
                 秘密値は暗号化して保存し、確認画面・完了画面・エラーには表示しません。
               </p>
             </SetupSection>
-          ) : currentStep === 3 ? (
-            <SetupSection
-              title="3. LINE Login・LIFF"
+<SetupSection
+              title="LINE Login・LIFF"
               description="LINE LoginとLIFFに使う情報です。3項目すべて必須です。"
             >
               <Field
@@ -408,6 +451,7 @@ export default function NewLineAccountPage() {
                 error={fieldErrors.liffId}
               />
             </SetupSection>
+            </div>
           ) : currentStep === 4 ? (
             <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_22rem]">
               <div className="space-y-4">
@@ -450,7 +494,7 @@ export default function NewLineAccountPage() {
                   )}
                   {connectionPassed && (
                     <p role="status" className="bg-success-bg text-success rounded-control p-3 text-xs">
-                      すべての接続を確認できました。次へ進めます。
+                      すべての接続を確認できました。登録できます。
                     </p>
                   )}
                   <Button
@@ -465,6 +509,7 @@ export default function NewLineAccountPage() {
               </div>
 
               <aside className="space-y-4" aria-label="設定時の補足">
+                <details className="rounded-card border border-hairline bg-canvas p-5"><summary className="cursor-pointer text-sm font-bold text-ink">登録内容を確認する</summary><div className="mt-4">{accountSummary}</div></details>
                 <InfoSection title="つながる先">
                   <ul className="space-y-2">
                     <li>友だち追加URL・QR</li>
@@ -483,33 +528,7 @@ export default function NewLineAccountPage() {
                 </InfoSection>
               </aside>
             </div>
-          ) : (
-            <SetupSection
-              title="5. 最終確認"
-              description="登録内容を確認してください。秘密値は安全のため表示しません。保存直前に接続をもう一度確かめます。"
-            >
-              <ReviewGroup title="基本情報">
-                <ReviewRow label="表示名" value={form.name.trim()} />
-                <ReviewRow label="国・地域" value={country.trim() || '設定しない'} />
-                <ReviewRow label="役割メモ" value={role.trim() || '設定しない'} />
-                <ReviewRow label="親アカウント" value={parentName} />
-                <ReviewRow label="タイムゾーン" value={timezone} />
-              </ReviewGroup>
-              <ReviewGroup title="Messaging API">
-                <ReviewRow label="チャネルID" value={form.channelId.trim()} />
-                <SecretReviewRow label="チャネルシークレット" />
-                <SecretReviewRow label="チャネルアクセストークン" />
-              </ReviewGroup>
-              <ReviewGroup title="LINE Login・LIFF">
-                <ReviewRow label="LoginチャネルID" value={form.loginChannelId.trim()} />
-                <SecretReviewRow label="Loginチャネルシークレット" />
-                <ReviewRow label="LIFF ID" value={form.liffId.trim()} />
-              </ReviewGroup>
-              <p className="bg-warning-bg text-warning rounded-control p-3 text-xs leading-relaxed">
-                「接続を確かめて保存」を押すと接続を再確認します。失敗した場合は保存しません。
-              </p>
-            </SetupSection>
-          )}
+          ) : null}
         </div>
 
         {error && (
@@ -526,9 +545,10 @@ export default function NewLineAccountPage() {
               ? '接続を確かめて保存しています'
               : `手順 ${currentStep} / 5`}
           actions={createdId ? (
-            <Button href={`/accounts/detail?id=${encodeURIComponent(createdId)}`} variant="primary">
-              登録したアカウントを見る
-            </Button>
+            <>
+              <Button href={`/accounts/detail?id=${encodeURIComponent(createdId)}`}>登録したアカウントを見る</Button>
+              <Button href="/accounts" variant="primary">アカウント一覧へ</Button>
+            </>
           ) : (
             <>
               {busyAction ? (
@@ -542,7 +562,7 @@ export default function NewLineAccountPage() {
                 </Button>
               )}
               <Button type="submit" variant="primary" disabled={Boolean(busyAction)}>
-                {currentStep === 5
+                {currentStep === 4
                   ? busyAction === 'save' ? '確かめて保存しています…' : '接続を確かめて保存'
                   : '次へ'}
               </Button>
@@ -560,7 +580,7 @@ function getStepErrors(step: StepNumber, form: AccountFormState, timezone: strin
     if (!form.name.trim()) errors.name = '表示名を入力してください。'
     if (!timezone) errors.timezone = 'タイムゾーンを選んでください。'
   }
-  if (step === 2) {
+  if (step === 3) {
     if (!form.channelId.trim()) errors.channelId = 'チャネルIDを入力してください。'
     else if (!/^\d+$/.test(form.channelId.trim())) errors.channelId = 'チャネルIDは半角数字で入力してください。'
     if (!form.channelSecret) errors.channelSecret = 'チャネルシークレットを入力してください。'
