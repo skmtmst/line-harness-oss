@@ -16,7 +16,7 @@ import { fileURLToPath } from 'node:url';
 
 import Database from 'better-sqlite3';
 import { Hono } from 'hono';
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest';
 
 import type { Env } from '../index.js';
 
@@ -25,6 +25,13 @@ const BOOTSTRAP = readFileSync(
   join(HERE, '..', '..', '..', '..', 'packages', 'db', 'bootstrap.sql'),
   'utf8',
 );
+
+/**
+ * bootstrap.sql は900本を超えるDDLで、1本の試験ごとに流すと手元で 42ms かかる。
+ * 試験の数だけ積むと 0.7 秒になり、そのぶん並んで走る他の試験の時間を削る。
+ * 1回だけ流してページを取っておき、各試験はそれを開くだけにする(2ms)。
+ */
+let SCHEMA_TEMPLATE: Buffer;
 
 /** LINE の userId は `U` + 16進32桁。EC の口はこの形を検査する。 */
 const LINE_USER_ID = 'U0123456789abcdef0123456789abcdef';
@@ -187,13 +194,19 @@ function countEvents(eventType: string): number {
   return row.n;
 }
 
+beforeAll(() => {
+  const seed = new Database(':memory:');
+  seed.exec(BOOTSTRAP);
+  SCHEMA_TEMPLATE = seed.serialize();
+  seed.close();
+});
+
 beforeEach(() => {
   vi.clearAllMocks();
-  sqlite = new Database(':memory:');
+  sqlite = new Database(SCHEMA_TEMPLATE);
   // 参照整合性は本番の D1 と同じく既定で切る。EC の口は取り込みの途中で
   // 管理タグを付けに行くが、その tags 行はこの試験では作らない。
   sqlite.pragma('foreign_keys = OFF');
-  sqlite.exec(BOOTSTRAP);
   sqlite.exec(`
     INSERT OR IGNORE INTO tenants (id, name) VALUES ('tenant-1', 'T1');
     INSERT INTO line_accounts
