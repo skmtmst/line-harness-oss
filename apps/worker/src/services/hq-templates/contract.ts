@@ -1,8 +1,12 @@
-export const HQ_TEMPLATE_TYPES = ['tag', 'template', 'rich_menu', 'form'] as const;
-export type HqTemplateType = (typeof HQ_TEMPLATE_TYPES)[number];
+import {
+  HQ_TEMPLATE_DISTRIBUTION_MODES,
+  HQ_TEMPLATE_TYPES,
+  type HqTemplateDistributionMode,
+  type HqTemplateType,
+} from '@line-crm/db';
 
-export const HQ_TEMPLATE_DISTRIBUTION_MODES = ['create', 'overwrite', 'alias'] as const;
-export type HqTemplateDistributionMode = (typeof HQ_TEMPLATE_DISTRIBUTION_MODES)[number];
+export { HQ_TEMPLATE_DISTRIBUTION_MODES, HQ_TEMPLATE_TYPES };
+export type { HqTemplateDistributionMode, HqTemplateType };
 
 export const VERSION_CONFLICT_MESSAGE = '配布先で編集がありました。もう一度確認してください';
 

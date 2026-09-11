@@ -7056,6 +7056,10 @@ WHEN NEW.tenant_id != OLD.tenant_id
   OR NEW.snapshot_token != OLD.snapshot_token
 BEGIN SELECT RAISE(ABORT, 'HQ_TEMPLATE_RESULT_BINDING_IMMUTABLE'); END;
 
+CREATE TRIGGER hq_template_result_consume_preflight
+AFTER INSERT ON hq_template_distribution_results
+BEGIN UPDATE hq_template_preflights SET status = 'consumed' WHERE id = NEW.preflight_id AND tenant_id = NEW.tenant_id AND template_id = NEW.template_id AND template_version_id = NEW.template_version_id AND target_account_id = NEW.target_account_id AND idempotency_fingerprint = NEW.idempotency_fingerprint AND snapshot_token = NEW.snapshot_token AND status = 'ready'; SELECT CASE WHEN changes() != 1 THEN RAISE(ABORT, 'HQ_TEMPLATE_PREFLIGHT_NOT_CONSUMED') END; END;
+
 CREATE TRIGGER hq_template_result_terminal_guard
 BEFORE UPDATE OF status ON hq_template_distribution_results
 WHEN OLD.status IN ('succeeded', 'version_conflict', 'unsupported') AND NEW.status != OLD.status
@@ -7069,6 +7073,10 @@ WHEN NEW.id != OLD.id
   OR NEW.template_version_id != OLD.template_version_id
   OR NEW.idempotency_fingerprint != OLD.idempotency_fingerprint
 BEGIN SELECT RAISE(ABORT, 'HQ_TEMPLATE_RUN_BINDING_IMMUTABLE'); END;
+
+CREATE TRIGGER hq_template_run_no_delete
+BEFORE DELETE ON hq_template_distribution_runs
+BEGIN SELECT RAISE(ABORT, 'HQ_TEMPLATE_RUN_RECOVERY_LEDGER_IMMUTABLE'); END;
 
 CREATE TRIGGER hq_template_run_terminal_guard
 BEFORE UPDATE OF status ON hq_template_distribution_runs

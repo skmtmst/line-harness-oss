@@ -176,6 +176,16 @@ BEFORE UPDATE OF status ON hq_template_distribution_runs
 WHEN OLD.status != 'running' AND NEW.status != OLD.status
 BEGIN SELECT RAISE(ABORT, 'HQ_TEMPLATE_RUN_TERMINAL'); END;
 
+CREATE TRIGGER hq_template_run_no_delete
+BEFORE DELETE ON hq_template_distribution_runs
+BEGIN SELECT RAISE(ABORT, 'HQ_TEMPLATE_RUN_RECOVERY_LEDGER_IMMUTABLE'); END;
+
+-- The result claim and consumption of its exact per-store preflight are one SQLite
+-- statement. Any failed consumption aborts the INSERT and rolls the whole statement back.
+CREATE TRIGGER hq_template_result_consume_preflight
+AFTER INSERT ON hq_template_distribution_results
+BEGIN UPDATE hq_template_preflights SET status = 'consumed' WHERE id = NEW.preflight_id AND tenant_id = NEW.tenant_id AND template_id = NEW.template_id AND template_version_id = NEW.template_version_id AND target_account_id = NEW.target_account_id AND idempotency_fingerprint = NEW.idempotency_fingerprint AND snapshot_token = NEW.snapshot_token AND status = 'ready'; SELECT CASE WHEN changes() != 1 THEN RAISE(ABORT, 'HQ_TEMPLATE_PREFLIGHT_NOT_CONSUMED') END; END;
+
 CREATE TRIGGER hq_template_result_binding_guard
 BEFORE UPDATE ON hq_template_distribution_results
 WHEN NEW.tenant_id != OLD.tenant_id

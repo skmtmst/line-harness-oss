@@ -506,6 +506,8 @@ export async function beginHqTemplateStoreResult(
   | { kind: 'created' | 'reused'; result: HqTemplateDistributionResult }
   | { kind: 'conflict_or_missing' }
 > {
+  // Migration 380's AFTER INSERT trigger consumes the exact preflight in the same
+  // SQLite statement. A failed consume raises and rolls this result INSERT back.
   const inserted = await db.prepare(
     `INSERT OR IGNORE INTO hq_template_distribution_results
        (run_id, tenant_id, template_id, template_version_id, target_account_id, preflight_id,
@@ -547,30 +549,6 @@ export async function beginHqTemplateStoreResult(
     return { kind: 'conflict_or_missing' };
   }
 
-  const consumed = await db.prepare(
-    `UPDATE hq_template_preflights SET status = 'consumed'
-     WHERE id = ? AND tenant_id = ? AND template_id = ? AND template_version_id = ?
-       AND target_account_id = ? AND idempotency_fingerprint = ? AND snapshot_token = ?
-       AND status = 'ready'
-       AND EXISTS (
-         SELECT 1 FROM hq_template_distribution_results d
-         WHERE d.run_id = ? AND d.tenant_id = hq_template_preflights.tenant_id
-           AND d.target_account_id = hq_template_preflights.target_account_id
-           AND d.preflight_id = hq_template_preflights.id
-       )`,
-  ).bind(
-    input.preflightId,
-    input.tenantId,
-    input.templateId,
-    input.templateVersionId,
-    input.targetAccountId,
-    input.idempotencyFingerprint,
-    input.snapshotToken,
-    input.runId,
-  ).run();
-  if ((inserted.meta.changes ?? 0) === 1 && (consumed.meta.changes ?? 0) !== 1) {
-    throw new Error('HQ_TEMPLATE_PREFLIGHT_NOT_CONSUMED');
-  }
   return { kind: (inserted.meta.changes ?? 0) === 1 ? 'created' : 'reused', result };
 }
 

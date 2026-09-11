@@ -207,13 +207,13 @@ describe('migration 380: 統括ひな形の基盤', () => {
        idempotency_fingerprint, snapshot_token, status)
       VALUES ('run-a', 'tenant-a', 'template-a', 'version-a', 'account-a', 'preflight-1',
        'store-fingerprint-a', 'wrong-snapshot', 'pending')`).run())
-      .toThrow(/FOREIGN KEY constraint failed/);
+      .toThrow(/HQ_TEMPLATE_PREFLIGHT_NOT_CONSUMED|FOREIGN KEY constraint failed/);
     expect(() => sqlite.prepare(`INSERT INTO hq_template_distribution_results
       (run_id, tenant_id, template_id, template_version_id, target_account_id, preflight_id,
        idempotency_fingerprint, snapshot_token, status)
       VALUES ('run-a', 'tenant-a', 'template-a', 'version-a', 'account-a', 'preflight-1',
        'wrong-fingerprint', 'snapshot-a', 'pending')`).run())
-      .toThrow(/FOREIGN KEY constraint failed/);
+      .toThrow(/HQ_TEMPLATE_PREFLIGHT_NOT_CONSUMED|FOREIGN KEY constraint failed/);
   });
 
   test('store CASは競合retryを一度だけ進め、成功後の逆遷移を拒否する', async () => {
@@ -252,6 +252,33 @@ describe('migration 380: 統括ひな形の基盤', () => {
     ).run()).toThrow(/HQ_TEMPLATE_RESULT_TERMINAL/);
     expect(sqlite.prepare(`SELECT status FROM hq_template_distribution_results`).pluck().get())
       .toBe('succeeded');
+    expect(() => sqlite.prepare(`DELETE FROM hq_template_distribution_runs WHERE id = 'run-a'`).run())
+      .toThrow(/HQ_TEMPLATE_RUN_RECOVERY_LEDGER_IMMUTABLE/);
+    expect(sqlite.prepare(`SELECT COUNT(*) FROM hq_template_distribution_results`).pluck().get()).toBe(1);
+  });
+
+  test('result claimとpreflight消費は一文で確定し、消費失敗時は片残りしない', async () => {
+    const { sqlite, db } = setup();
+    seedTemplate(sqlite, 'tenant-a', 'template-a', 'version-a');
+    await saveHqTemplatePreflight(db, { ...preflight, status: 'blocked' });
+    await beginHqTemplateDistributionRun(db, {
+      id: 'run-a', tenantId: 'tenant-a', templateId: 'template-a',
+      templateVersionId: 'version-a', idempotencyFingerprint: 'run-fingerprint-a',
+    });
+
+    expect(() => sqlite.prepare(`INSERT INTO hq_template_distribution_results
+      (run_id, tenant_id, template_id, template_version_id, target_account_id, preflight_id,
+       idempotency_fingerprint, snapshot_token, status)
+      VALUES ('run-a', 'tenant-a', 'template-a', 'version-a', 'account-a', 'preflight-1',
+       'store-fingerprint-a', 'snapshot-a', 'pending')`).run())
+      .toThrow(/HQ_TEMPLATE_PREFLIGHT_NOT_CONSUMED/);
+    expect(sqlite.prepare(`SELECT COUNT(*) FROM hq_template_distribution_results`).pluck().get()).toBe(0);
+    expect(sqlite.prepare(`SELECT status FROM hq_template_preflights`).pluck().get()).toBe('blocked');
+
+    expect((await saveHqTemplatePreflight(db, { ...preflight, status: 'ready' })).kind).toBe('saved');
+    expect((await beginHqTemplateStoreResult(db, storeBinding)).kind).toBe('created');
+    expect(sqlite.prepare(`SELECT status FROM hq_template_preflights`).pluck().get()).toBe('consumed');
+    expect(sqlite.prepare(`SELECT COUNT(*) FROM hq_template_distribution_results`).pluck().get()).toBe(1);
   });
 
   test('R2所有権CASは別ownerを拒否し、cleanedから逆戻りしない', async () => {
