@@ -144,8 +144,6 @@ async function type(node: HTMLInputElement, value: string) {
 
 /** 一覧から詳細を開き、編集の窓まで進める。 */
 async function openEditDialog() {
-  // eslint-disable-next-line no-console
-  console.log('[DBG2] bodyButtons=', [...document.body.querySelectorAll('button')].map((b) => JSON.stringify(b.textContent)).join('|'))
   await click(byText('中身を見る'))
   await click(byText('編集'))
 }
