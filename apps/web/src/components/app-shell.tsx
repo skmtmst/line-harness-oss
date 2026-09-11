@@ -16,6 +16,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const isFriendAttributesV2 = pathname === '/tags-v2' || pathname === '/visual-qa/friend-attributes-v2'
   const isFriendAttributesV3 = pathname === '/tags-v3' || pathname === '/visual-qa/friend-attributes-v3'
+  const isAccountCreate = pathname === '/accounts/new'
 
   if (pathname === '/login' || pathname === '/login/two-factor' || pathname === '/staff/invite') {
     return <>{children}</>
@@ -42,23 +43,55 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     <AuthGuard>
       <AccountProvider>
         <PageChromeProvider>
-          <div className={styles.shell}>
-            {/* Cookieが届いていないときの案内。全画面で同じものを1つだけ出す。 */}
-            <SessionLostNotice />
-            {/* Phase 6: banner above sidebar+header so it pins to the top of the
-                admin shell. Renders nothing while loading; one of latest/fork/
-                upgrade once /admin/version + manifest resolve. */}
-            <UpdateBanner />
-            <div className={`${styles.workspace} ${isFriendAttributesV2 ? 'friend-attributes-v2-shell' : ''}`}>
-              <Sidebar friendAttributesV2Mode={isFriendAttributesV2} />
-              <Workspace>
-                <RootLandingGate><StoreSelectionGate><FeatureDisabledGate>{children}</FeatureDisabledGate></StoreSelectionGate></RootLandingGate>
-              </Workspace>
+          {isAccountCreate ? (
+            <AccountCreateWorkspace>{children}</AccountCreateWorkspace>
+          ) : (
+            <div className={styles.shell}>
+              {/* Cookieが届いていないときの案内。全画面で同じものを1つだけ出す。 */}
+              <SessionLostNotice />
+              {/* Phase 6: banner above sidebar+header so it pins to the top of the
+                  admin shell. Renders nothing while loading; one of latest/fork/
+                  upgrade once /admin/version + manifest resolve. */}
+              <UpdateBanner />
+              <div className={`${styles.workspace} ${isFriendAttributesV2 ? 'friend-attributes-v2-shell' : ''}`}>
+                <Sidebar friendAttributesV2Mode={isFriendAttributesV2} />
+                <Workspace>
+                  <GuardedContent>{children}</GuardedContent>
+                </Workspace>
+              </div>
             </div>
-          </div>
+          )}
         </PageChromeProvider>
       </AccountProvider>
     </AuthGuard>
+  )
+}
+
+/** `/accounts/new` 専用。認証とアカウント文脈を保ち、通常のナビゲーションだけを外す。 */
+function AccountCreateWorkspace({ children }: { children: React.ReactNode }) {
+  return (
+    <div className={styles.shell} data-account-create-shell="true">
+      <SessionLostNotice />
+      <UpdateBanner />
+      <main className={styles.main}>
+        <div
+          data-design-shell="account-create"
+          className={`${styles.content} ${styles.contentFull}`}
+        >
+          <GuardedContent>{children}</GuardedContent>
+        </div>
+      </main>
+    </div>
+  )
+}
+
+function GuardedContent({ children }: { children: React.ReactNode }) {
+  return (
+    <RootLandingGate>
+      <StoreSelectionGate>
+        <FeatureDisabledGate>{children}</FeatureDisabledGate>
+      </StoreSelectionGate>
+    </RootLandingGate>
   )
 }
 
