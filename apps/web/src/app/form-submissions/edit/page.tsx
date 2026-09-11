@@ -28,7 +28,7 @@ import {
   type FormTheme,
 } from '@line-crm/shared'
 import { normalizeSectionName } from '@/components/forms/section-name'
-import { api, fetchApi } from '@/lib/api'
+import { api, ApiError, fetchApi } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { Field, inputClass } from '@/components/shared/form-controls'
 import BlockEditor, { BLOCK_MENU } from '@/components/forms/block-editor'
@@ -38,6 +38,8 @@ import { validateLayoutForSave } from './form-validate'
 import OptionsDialog from '@/components/forms/options-dialog'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import StickyBar from '@/components/shared/sticky-bar'
+import SaveConflictBar from '@/components/shared/save-conflict-bar'
+import { conflictMessage } from './form-conflict-message'
 import { EMPTY_REFS, type FormRefs } from '@/components/forms/form-refs'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
@@ -163,6 +165,20 @@ function FormEditInner() {
   const [notice, setNotice] = useState('')
   // 保存済み・読み直し直後の姿。タブ移動やタブを閉じる前の確認に使う。
   const savedSnapshot = useRef<string | null>(null)
+  /**
+   * 読み込んだ時点の編集の版(#723)。保存でそのまま送り返す。
+   *
+   * 押すたびに取り直すと楽観ロックの意味が無くなるので、**読み込みと
+   * 保存成功のときだけ**入れ替える。
+   */
+  const [contentRevision, setContentRevision] = useState<number | null>(null)
+  /**
+   * ほかの人が先に保存していたとき（409）。
+   *
+   * **入力は捨てない。**自動で読み直すと入力が消えるので、読み直すかどうかは
+   * 運用者に決めてもらう。`updatedAt` は相手がいつ保存したかの手がかり。
+   */
+  const [conflict, setConflict] = useState<{ updatedAt: string } | null>(null)
   const [pendingNav, setPendingNav] = useState<string | null>(null)
 
   useEffect(() => {
@@ -200,6 +216,54 @@ function FormEditInner() {
     })
   }
 
+  /**
+   * フォーム本体の読み込み。初回と、競合（409）で運用者が「最新の内容を
+   * 読み込む」を押したときに使う。
+   *
+   * **押されるまで呼ばない。**自動で読み直すと入力が消える。
+   */
+  const loadForm = useCallback(async () => {
+    if (!id || !selectedAccountId) return
+    const res = await api.forms.get(id, selectedAccountId)
+    if (!res.success) return
+    // layout はサーバ側が必ず作って返す（古いフォームは fields から）
+    const nextLayout = res.data.layout ?? emptyLayout()
+    const loaded = {
+      name: res.data.name,
+      description: res.data.description ?? '',
+      isActive: res.data.isActive,
+      onSubmitTagId: res.data.onSubmitTagId ?? '',
+      ogTitle: res.data.ogTitle ?? '',
+      ogDescription: res.data.ogDescription ?? '',
+      ogImageUrl: res.data.ogImageUrl ?? '',
+      layout: nextLayout,
+    }
+    setName(loaded.name)
+    setDescription(loaded.description)
+    setIsActive(loaded.isActive)
+    setSubmitCount(res.data.submitCount ?? 0)
+    setOnSubmitTagId(loaded.onSubmitTagId)
+    setOgTitle(loaded.ogTitle)
+    setOgDescription(loaded.ogDescription)
+    setOgImageUrl(loaded.ogImageUrl)
+    setLayoutState(nextLayout)
+    setContentRevision(res.data.contentRevision)
+    setConflict(null)
+    // 未保存のままタブ移動したときの確認に使う。読み直しが基準。
+    savedSnapshot.current = JSON.stringify(loaded)
+  }, [id, selectedAccountId])
+
+  const reloadAfterConflict = async () => {
+    setError('')
+    setNotice('')
+    try {
+      await loadForm()
+      setNotice('最新の内容を読み込みました')
+    } catch {
+      setError('読み込みに失敗しました')
+    }
+  }
+
   useEffect(() => {
     void (async () => {
       try {
@@ -232,40 +296,14 @@ function FormEditInner() {
             : [],
         })
 
-        if (!id || !selectedAccountId) return
-        const res = await api.forms.get(id, selectedAccountId)
-        if (res.success) {
-          // layout はサーバ側が必ず作って返す（古いフォームは fields から）
-          const nextLayout = res.data.layout ?? emptyLayout()
-          const loaded = {
-            name: res.data.name,
-            description: res.data.description ?? '',
-            isActive: res.data.isActive,
-            onSubmitTagId: res.data.onSubmitTagId ?? '',
-            ogTitle: res.data.ogTitle ?? '',
-            ogDescription: res.data.ogDescription ?? '',
-            ogImageUrl: res.data.ogImageUrl ?? '',
-            layout: nextLayout,
-          }
-          setName(loaded.name)
-          setDescription(loaded.description)
-          setIsActive(loaded.isActive)
-          setSubmitCount(res.data.submitCount ?? 0)
-          setOnSubmitTagId(loaded.onSubmitTagId)
-          setOgTitle(loaded.ogTitle)
-          setOgDescription(loaded.ogDescription)
-          setOgImageUrl(loaded.ogImageUrl)
-          setLayoutState(nextLayout)
-          // 未保存のままタブ移動したときの確認に使う。読み直しが基準。
-          savedSnapshot.current = JSON.stringify(loaded)
-        }
+        await loadForm()
       } catch {
         setError('読み込みに失敗しました')
       } finally {
         setLoading(false)
       }
     })()
-  }, [id, selectedAccountId])
+  }, [id, loadForm, selectedAccountId])
 
   // いま編集している並び（共通ヘッダ か セクション）
   const blocks = useMemo(
@@ -494,6 +532,11 @@ function FormEditInner() {
       return false
     }
 
+    if (contentRevision === null) {
+      setError('読み込みが終わっていません。少し待ってから、もう一度お試しください')
+      return false
+    }
+
     setSaving(true)
     setError('')
     setNotice('')
@@ -507,15 +550,35 @@ function FormEditInner() {
         ogTitle: ogTitle.trim() || null,
         ogDescription: ogDescription.trim() || null,
         ogImageUrl: ogImageUrl.trim() || null,
+        expectedContentRevision: contentRevision,
       })
       if (!res.success) {
         setError(res.error)
         return false
       }
+      // 次の保存はこの版を送る。取り直さないと、続けて保存したときに
+      // 自分の1回目と衝突する。
+      setContentRevision(res.data.contentRevision)
+      setConflict(null)
       setNotice('保存しました')
       savedSnapshot.current = currentSnapshot
       return true
     } catch (e) {
+      /*
+       * #723: ほかの人が先に保存していた（409）。
+       *
+       * **入力はそのまま画面に残す。**読み直すと入力が消えるので、ここでは
+       * 読み直さない。読み直すかどうかは運用者が決める（下のボタン）。
+       * 文言は共通情報の編集（`contents/vars`）と同じ言い方に揃える。
+       * 保管・削除の「影響が変わりました」とは意味が違うので使わない。
+       */
+      if (e instanceof ApiError && e.status === 409) {
+        const data = e.data as { updatedAt?: unknown } | null
+        const updatedAt = typeof data?.updatedAt === 'string' ? data.updatedAt : ''
+        setConflict({ updatedAt })
+        setError(conflictMessage(updatedAt))
+        return false
+      }
       setError(e instanceof Error ? e.message : '保存に失敗しました')
       return false
     } finally {
@@ -570,6 +633,20 @@ function FormEditInner() {
           オプション設定
         </Button>
       </nav>
+
+      {/*
+        #723: 保存の失敗は3つのタブすべてで届かせる。
+        位置と重なりは共通部品が持つので、ここに `z-[60]` を手書きしない。
+        競合のときだけ「最新の内容を読み込む」を添える（押すまで読み直さない）。
+      */}
+      {error && (
+        <SaveConflictBar
+          message={error}
+          actionLabel={conflict ? '最新の内容を読み込む（入力中の内容は消えます）' : undefined}
+          onAction={conflict ? () => void reloadAfterConflict() : undefined}
+          actionQa="form-edit-conflict-reload"
+        />
+      )}
 
       {loading ? (
         <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm">
@@ -865,7 +942,12 @@ function FormEditInner() {
                   />
                 </Field>
 
-                {error && <p className="text-danger text-sm">{error}</p>}
+                {/*
+                  #723: 失敗の知らせは、この中ではなくタブの外（`SaveConflictBar`）へ
+                  出す。ここに書くと、デザイン設定タブでは DOM にも出ず、
+                  オプション設定タブでは覆いの下敷きになる。二重に出さないため
+                  ここからは消してある。
+                */}
                 {notice && <p className="text-success text-sm">{notice}</p>}
               </div>
             </section>

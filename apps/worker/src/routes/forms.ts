@@ -10,6 +10,7 @@ import {
   formBelongsToLineAccount,
   createForm,
   updateForm,
+  type UpdateFormInput,
   archiveFormAtRevision,
   deleteFormAtRevision,
   getFormSubmissions,
@@ -250,6 +251,7 @@ function serializeForm(
     status: row.status,
     archivedAt: row.archived_at,
     revision: row.revision,
+    contentRevision: row.content_revision,
     submitCount: row.submit_count,
     ogTitle: row.og_title,
     ogDescription: row.og_description,
@@ -640,7 +642,29 @@ forms.put('/api/forms/:id', requireRole('owner', 'admin'), async (c) => {
       ogTitle?: string | null;
       ogDescription?: string | null;
       ogImageUrl?: string | null;
+      expectedContentRevision?: unknown;
     }>();
+
+    /*
+     * #723: 確認した編集の版を必ず受け取る。
+     *
+     * 以前はここに版が無く、2人が同時に編集すると後から保存した人の内容で
+     * 黙って上書きされていた。保存は成功と返り、先の人の変更は消えた。
+     *
+     * 見るのは `content_revision`（migration 379）で、`revision` ではない。
+     * `revision` は migration 259 のトリガが来訪・回答で増やす「削除影響の
+     * 確認版」なので、編集の楽観ロックに使うと誰も編集していないのに 409 に
+     * なる。保管・削除は引き続き `revision` を見る。
+     *
+     * 受付停止（一覧の `stopAccepting`）も同じ口を通るので、版を免除しない。
+     * 免除すると、停止したはずのフォームが編集画面の保存で公開中に戻る。
+     */
+    const expectedContentRevision = typeof body.expectedContentRevision === 'number'
+      ? body.expectedContentRevision
+      : Number.NaN;
+    if (!Number.isInteger(expectedContentRevision) || expectedContentRevision < 1) {
+      return c.json({ success: false, error: '確認した版が必要です' }, 400);
+    }
 
     // Only include fields that were explicitly sent (avoid undefined → null conversion)
     const updates: Record<string, unknown> = {};
@@ -670,13 +694,26 @@ forms.put('/api/forms/:id', requireRole('owner', 'admin'), async (c) => {
     if (body.ogDescription !== undefined) updates.ogDescription = body.ogDescription;
     if (body.ogImageUrl !== undefined) updates.ogImageUrl = body.ogImageUrl;
 
-    const updated = await updateForm(c.env.DB, id, updates as any);
+    const updated = await updateForm(c.env.DB, id, updates as UpdateFormInput, expectedContentRevision);
 
-    if (!updated) {
+    if (updated.kind === 'not_found') {
       return c.json({ success: false, error: 'Form not found' }, 404);
     }
+    if (updated.kind === 'conflict') {
+      // 画面は入力を捨てず、この時刻を添えて「ほかの人が先に保存しました」と出す。
+      // `ApiError.data` は 409 のときだけ画面へ渡る作りなので、ここに載せる。
+      return c.json({
+        success: false,
+        error: 'form_content_changed',
+        message: 'ほかの人が先に保存しました。最新の内容を読み込んでから、もう一度お試しください。',
+        data: {
+          contentRevision: updated.form.content_revision,
+          updatedAt: updated.form.updated_at,
+        },
+      }, 409);
+    }
 
-    return c.json({ success: true, data: serializeForm(updated) });
+    return c.json({ success: true, data: serializeForm(updated.form) });
   } catch (err) {
     console.error('PUT /api/forms/:id error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);

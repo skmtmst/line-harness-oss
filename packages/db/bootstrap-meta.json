@@ -333,7 +333,8 @@
     "374_mileage_redemption_step_outbox.sql",
     "375_mileage_redemption_step_lease.sql",
     "376_friend_tag_side_effect_runs.sql",
-    "377_conversion_point_version_edit.sql"
+    "377_conversion_point_version_edit.sql",
+    "379_form_content_revision.sql"
   ],
-  "migrationCount": 334
+  "migrationCount": 335
 }
