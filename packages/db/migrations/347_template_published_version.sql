@@ -11,7 +11,12 @@
 -- テンプレートを読めず無応答になる。参照元の持ち主が一意に決まる行だけを
 -- 補完する。複数アカウントにまたがる、または参照元にも持ち主がない行は、
 -- ALTER より前に migration 自体を止める（不完全な公開版へ進めない）。
-WITH owner_candidates(template_id, line_account_id) AS (
+WITH owner_candidates_a(template_id, line_account_id) AS (
+  -- D1 の複合SELECTは 5 項までしか受け付けない(実測値。手元の SQLite は 500)。
+  -- 8 項を1つの UNION ALL でつなぐと D1 で
+  -- `too many terms in compound SELECT` になり、migration が当たらない(#713)。
+  -- そのため 4 項ずつに分けて、最後に 2 項でまとめる。UNION ALL は結合的なので
+  -- 結果は 1 本につないだときと同じ。ここを1つに戻さないこと。
   -- 1アカウントだけの環境では、全NULL行の持ち主が一意に決まる。
   SELECT t.id, la.id
     FROM templates t
@@ -32,7 +37,8 @@ WITH owner_candidates(template_id, line_account_id) AS (
     FROM reminder_steps rs
     JOIN reminders r ON r.id = rs.reminder_id
    WHERE rs.template_id IS NOT NULL AND r.line_account_id IS NOT NULL
-  UNION ALL
+),
+owner_candidates_b(template_id, line_account_id) AS (
   SELECT rma.template_id, rmg.account_id
     FROM rich_menu_areas rma
     JOIN rich_menu_pages rmp ON rmp.id = rma.page_id
@@ -58,12 +64,21 @@ WITH owner_candidates(template_id, line_account_id) AS (
      AND json_type(fbr.operation_json, '$.templateId') = 'text'
      AND fbri.line_account_id IS NOT NULL
 ),
-referenced_templates(template_id) AS (
+owner_candidates(template_id, line_account_id) AS (
+  SELECT template_id, line_account_id FROM owner_candidates_a
+  UNION ALL
+  SELECT template_id, line_account_id FROM owner_candidates_b
+),
+referenced_templates_a(template_id) AS (
+  -- ここも同じ理由で 4 項と 3 項に分ける(#713)。UNION も結合的なので
+  -- 重複の潰れ方を含めて 1 本につないだときと同じ結果になる。
   SELECT template_id FROM auto_replies WHERE template_id IS NOT NULL
   UNION SELECT template_id FROM scenario_steps WHERE template_id IS NOT NULL
   UNION SELECT template_id FROM reminder_steps WHERE template_id IS NOT NULL
   UNION SELECT template_id FROM rich_menu_areas WHERE template_id IS NOT NULL
-  UNION SELECT CAST(j.value AS TEXT) FROM automations a JOIN json_tree(a.actions) j
+),
+referenced_templates_b(template_id) AS (
+  SELECT CAST(j.value AS TEXT) FROM automations a JOIN json_tree(a.actions) j
     ON j.key IN ('templateId', 'template_id') AND j.type = 'text'
   UNION SELECT CAST(j.value AS TEXT) FROM common_action_versions cav JOIN json_tree(cav.action_config) j
     ON j.key IN ('templateId', 'template_id') AND j.type = 'text'
@@ -71,6 +86,11 @@ referenced_templates(template_id) AS (
     FROM friend_bulk_runs
    WHERE json_extract(operation_json, '$.kind') = 'send_message'
      AND json_type(operation_json, '$.templateId') = 'text'
+),
+referenced_templates(template_id) AS (
+  SELECT template_id FROM referenced_templates_a
+  UNION
+  SELECT template_id FROM referenced_templates_b
 )
 SELECT CASE WHEN EXISTS (
   SELECT 1
@@ -82,7 +102,12 @@ SELECT CASE WHEN EXISTS (
            WHERE oc.template_id = t.id) <> 1
 ) THEN json('MIGRATION_347_TEMPLATE_OWNER_UNRESOLVED') ELSE json('null') END;
 
-WITH owner_candidates(template_id, line_account_id) AS (
+WITH owner_candidates_a(template_id, line_account_id) AS (
+  -- D1 の複合SELECTは 5 項までしか受け付けない(実測値。手元の SQLite は 500)。
+  -- 8 項を1つの UNION ALL でつなぐと D1 で
+  -- `too many terms in compound SELECT` になり、migration が当たらない(#713)。
+  -- そのため 4 項ずつに分けて、最後に 2 項でまとめる。UNION ALL は結合的なので
+  -- 結果は 1 本につないだときと同じ。ここを1つに戻さないこと。
   SELECT t.id, la.id
     FROM templates t
     JOIN line_accounts la
@@ -102,7 +127,8 @@ WITH owner_candidates(template_id, line_account_id) AS (
     FROM reminder_steps rs
     JOIN reminders r ON r.id = rs.reminder_id
    WHERE rs.template_id IS NOT NULL AND r.line_account_id IS NOT NULL
-  UNION ALL
+),
+owner_candidates_b(template_id, line_account_id) AS (
   SELECT rma.template_id, rmg.account_id
     FROM rich_menu_areas rma
     JOIN rich_menu_pages rmp ON rmp.id = rma.page_id
@@ -127,6 +153,11 @@ WITH owner_candidates(template_id, line_account_id) AS (
    WHERE json_extract(fbr.operation_json, '$.kind') = 'send_message'
      AND json_type(fbr.operation_json, '$.templateId') = 'text'
      AND fbri.line_account_id IS NOT NULL
+),
+owner_candidates(template_id, line_account_id) AS (
+  SELECT template_id, line_account_id FROM owner_candidates_a
+  UNION ALL
+  SELECT template_id, line_account_id FROM owner_candidates_b
 ),
 resolved_owners AS (
   SELECT template_id, MIN(line_account_id) AS line_account_id
