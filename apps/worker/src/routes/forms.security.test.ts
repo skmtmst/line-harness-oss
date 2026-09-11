@@ -270,21 +270,39 @@ describe('submission pagination compatibility', () => {
     );
     expect(res.status).toBe(200);
     expect(await res.json()).toMatchObject({ success: true, data: [] });
-    expect(mocks.getFormSubmissions).toHaveBeenCalledWith(bindings.DB, 'form-1');
+    // #722: 切る数は口が渡す。渡した数と名乗る数が同じであることが要点。
+    expect(mocks.getFormSubmissions).toHaveBeenCalledWith(bindings.DB, 'form-1', 200);
     expect(mocks.getFormSubmissionsPage).not.toHaveBeenCalled();
   });
 
-  test('caps the legacy non-paginated shape at 500 with a migration warning', async () => {
-    mocks.getFormSubmissions.mockResolvedValue(
-      Array.from({ length: 600 }, (_, index) => ({
-        id: `submission-${index}`,
-        form_id: 'form-1',
-        friend_id: null,
-        friend_name: null,
-        data: '{}',
-        created_at: '2026-08-04T12:00:00+09:00',
-      })),
-    );
+  /*
+   * #722 で書き換えた表明。
+   *
+   * **元は「DBヘルパが600件返しても口が500件へ切る」を見ていた。**その表明は
+   * 緑のまま通っていたが、実際の DB ヘルパは 200 で切っていたので、
+   * **口の `slice(0, 500)` には一度も仕事が無く、名乗りだけが 500 だった。**
+   * ヘルパを差し替えて 600 件返させたこの試験だけが、500 という数を
+   * 本物のように見せていた。
+   *
+   * 元の表明が捕まえていた壊し方と、いまどこで捕まえるか:
+   *
+   *   (a) ページ分けなしの応答が配列の形でなくなる
+   *       → すぐ上の試験が据え置きで見張る
+   *   (b) 応答が青天井になる（切らない）
+   *       → 切るのは SQL ひとつ。実 D1 の
+   *         `forms-limit-and-opens-guard.test.ts` が 300件仕込んで
+   *         200件で切れることを見張る
+   *   (c) 移行を促す `Warning` が消える
+   *       → 下で据え置き。さらに**名乗る数が実際と同じ**であることも見張る
+   *   (d) ページ分け口が巻き添えで呼ばれる
+   *       → 下で据え置き
+   *
+   * ここではヘルパを差し替えているので「何件で切れるか」は見られない
+   * （差し替えた戻り値をそのまま返すだけになる）。**この層で見るのは
+   * 「口が渡した数と名乗る数が一致していること」**に絞る。
+   */
+  test('asks the helper for exactly the number it names in the warning', async () => {
+    mocks.getFormSubmissions.mockResolvedValue([]);
     const { bindings } = env();
     const res = await app(true).request(
       '/api/forms/form-1/submissions?account_id=account-a',
@@ -292,9 +310,11 @@ describe('submission pagination compatibility', () => {
       bindings,
     );
     expect(res.status).toBe(200);
-    const body = await res.json() as { data: unknown[] };
-    expect(body.data).toHaveLength(500);
-    expect(res.headers.get('warning')).toContain('page/limit');
+    const requestedLimit = mocks.getFormSubmissions.mock.calls[0][2] as number;
+    const warning = res.headers.get('warning') ?? '';
+    expect(warning).toContain('page/limit');
+    expect(warning).toContain(String(requestedLimit));
+    expect(warning).not.toContain('500');
     expect(mocks.getFormSubmissionsPage).not.toHaveBeenCalled();
   });
 
