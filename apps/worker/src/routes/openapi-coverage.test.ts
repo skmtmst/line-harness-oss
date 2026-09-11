@@ -201,6 +201,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'POST /api/nen-campaigns/deliveries/{id}/retry',
   'POST /api/scenarios',
   'POST /api/scenarios/{id}/enroll/{friendId}',
+  'POST /api/scenarios/{id}/publish',
   'POST /api/scenarios/{id}/simulate',
   'POST /api/scenarios/{id}/steps',
   'POST /api/settings/features/impact',

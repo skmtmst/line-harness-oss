@@ -14,6 +14,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { Env } from '../index.js';
 import { createTestD1, insertFriend, type SqliteD1 } from '../test-utils/d1-sqlite.js';
+import { publishScenarioVersion } from '@line-crm/db';
 
 const lineClientMocks = vi.hoisted(() => ({
   getProfile: vi.fn(),
@@ -122,11 +123,16 @@ function sendCount(): number {
   return lineClientMocks.replyMessage.mock.calls.length + lineClientMocks.pushMessage.mock.calls.length;
 }
 
-beforeAll(() => {
+beforeAll(async () => {
   templateDir = mkdtempSync(join(tmpdir(), 'friend-add-webhook-tpl-'));
   templateFile = join(templateDir, 'template.sqlite');
   const setup = createTestD1({ file: templateFile });
   seedBase(setup.raw);
+  // 参加には明示公開が要る（351 / #644）。写し元の時点で稼働中にしておく。
+  await publishScenarioVersion(setup.db, 'scenario-1', {
+    staffId: null,
+    idempotencyKey: 'two-connections-seed',
+  });
   setup.raw.pragma('wal_checkpoint(TRUNCATE)');
   setup.raw.close();
 });

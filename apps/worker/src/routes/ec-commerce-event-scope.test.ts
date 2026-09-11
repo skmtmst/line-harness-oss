@@ -50,7 +50,13 @@ describe('EC event admin account scope', () => {
   it('filters overview and event type counts to the selected account', async () => {
     const { app, statements } = harness();
     expect((await app.request('/api/ec-commerce/overview?lineAccountId=account-a')).status).toBe(200);
-    expect(statements).toHaveLength(2);
+    /*
+     * 3本。出来事の集計・種類別の内訳・定期便の件数(#731)。
+     * 本数を数え続けるのは、**アカウントで絞っていないクエリが紛れ込むのを
+     * 見張るため**。下の2つの表明(絞り込み句があること・渡す値がこのアカウント
+     * だけであること)は、増えた1本にも同じように当たる。
+     */
+    expect(statements).toHaveLength(3);
     for (const statement of statements) {
       expect(statement.query).toContain('line_account_id = ?');
       expect(statement.bindings).toEqual(['account-a']);

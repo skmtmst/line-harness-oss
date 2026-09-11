@@ -51,25 +51,59 @@ function storedStringList(value: unknown, allowed: ReadonlySet<string>): string[
   try { return stringList(JSON.parse(String(value || '[]')), allowed) ?? []; } catch { return []; }
 }
 
-function subscriptionState(value: unknown): 'active' | 'paused' | 'at_risk' | 'cancelled' {
+export type SubscriptionState = 'active' | 'paused' | 'at_risk' | 'cancelled';
+
+/**
+ * 定期便の状態をどう読むかの表(#731)。**上から順に見て、先に当たったものが勝つ。**
+ *
+ * 同じ判定を JS(`subscriptionState`)と SQL(`subscriptionStateSql`)の両方で
+ * 使うので、**表はここ1か所だけに置く。**値が増えたときに片方だけ増える事故を
+ * 防ぐため。ただし表を共有しても**順序までは揃わない**(「解約」と「休止」の
+ * 両方を含む文字列はどちらが勝つか)ので、両者へ同じ入力を食わせて一致を見張る
+ * 試験を別に置いている(`ec-commerce-subscription-state.test.ts`)。
+ *
+ * 判定語はすべて小文字・記号なしにすること。SQL 側は `lower(...) LIKE '%語%'`
+ * へ展開するので、`%` や `_` を含む語を足すと LIKE のワイルドカードとして
+ * 解釈される。日本語は `lower()` で変わらないのでそのまま比べられる。
+ */
+export const SUBSCRIPTION_STATE_RULES: ReadonlyArray<{
+  readonly state: SubscriptionState;
+  readonly needles: readonly string[];
+}> = [
+  { state: 'cancelled', needles: ['cancel', '解約', '停止'] },
+  { state: 'paused', needles: ['pause', '休止'] },
+  { state: 'at_risk', needles: ['failed', '決済'] },
+];
+
+/** どの語にも当たらなかったときの状態。 */
+export const SUBSCRIPTION_STATE_FALLBACK: SubscriptionState = 'active';
+
+export function subscriptionState(value: unknown): SubscriptionState {
   const status = String(value || '').toLowerCase();
-  if (status.includes('cancel') || status.includes('解約') || status.includes('停止')) return 'cancelled';
-  if (status.includes('pause') || status.includes('休止')) return 'paused';
-  if (status.includes('failed') || status.includes('決済')) return 'at_risk';
-  return 'active';
+  for (const rule of SUBSCRIPTION_STATE_RULES) {
+    if (rule.needles.some((needle) => status.includes(needle))) return rule.state;
+  }
+  return SUBSCRIPTION_STATE_FALLBACK;
+}
+
+/**
+ * 上の表から SQL の `CASE` を組み立てる。`expr` は状態の文字列を返す SQL 式。
+ *
+ * `LIKE` は SQLite では ASCII の大小を区別しないが、JS 側が `toLowerCase()`
+ * してから比べているので、ここでも `lower()` を掛けて条件を揃える。
+ */
+export function subscriptionStateSql(expr: string): string {
+  const whens = SUBSCRIPTION_STATE_RULES.map((rule) => {
+    const conditions = rule.needles
+      .map((needle) => `lower(${expr}) LIKE '%${needle}%'`)
+      .join(' OR ');
+    return `WHEN ${conditions} THEN '${rule.state}'`;
+  }).join('\n           ');
+  return `CASE ${whens}\n           ELSE '${SUBSCRIPTION_STATE_FALLBACK}' END`;
 }
 
 function finiteNumber(value: unknown): number | null {
   return typeof value === 'number' && Number.isFinite(value) ? value : null;
-}
-
-function subscriptionContracts(value: unknown): Array<Record<string, unknown>> {
-  try {
-    const parsed = JSON.parse(String(value || 'null')) as { contracts?: unknown } | null;
-    return Array.isArray(parsed?.contracts)
-      ? parsed.contracts.filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object')
-      : [];
-  } catch { return []; }
 }
 
 function subscriptionItems(value: unknown): string | null {
@@ -182,6 +216,27 @@ ecCommerce.get(
     `SELECT event_type, COUNT(*) AS count FROM ec_events
       WHERE ${accountWhere} GROUP BY event_type ORDER BY count DESC`,
   ).bind(...accountBindings).all<{ event_type: string; count: number }>();
+  /*
+   * 定期便の契約数(#731)。タブの数字はここから取る。
+   *
+   * 以前はタブが `/subscriptions?limit=1` を叩いていたが、あの口は行を取って
+   * から JS で数える作りだったので、**`limit=1` でも 500 行ぶん働いていた。**
+   * 件数は行を返さずに数えられる。`json_type` の守りは一覧側と同じで、
+   * 形の違うスナップショットで `json_each` がクエリごと落ちるのを防ぐ。
+   */
+  const friendAccountWhere = lineAccountId
+    ? 'f.line_account_id = ?'
+    : scope?.allowedAccountIds.length
+      ? `(f.line_account_id IN (${scope.allowedAccountIds.map(() => '?').join(',')})${scope.canSeeUnassigned ? ' OR f.line_account_id IS NULL' : ''})`
+      : scope?.canSeeUnassigned ? 'f.line_account_id IS NULL' : '1 = 0';
+  const subscriptionCount = await c.env.DB.prepare(
+    `SELECT COUNT(*) AS count
+       FROM nen_ec_member_snapshots s
+       JOIN friends f ON f.id = s.friend_id,
+            json_each(json_extract(s.subscription_json, '$.contracts')) c
+      WHERE ${friendAccountWhere}
+        AND json_type(s.subscription_json, '$.contracts') = 'array'`,
+  ).bind(...accountBindings).first<{ count: number }>();
 
   return c.json({
     success: true,
@@ -202,6 +257,8 @@ ecCommerce.get(
         label: ecEventLabel(row.event_type, row.event_type),
         count: row.count,
       })),
+      /** 定期便の契約数。タブの数字用(#731)。 */
+      subscriptions: Number(subscriptionCount?.count ?? 0),
     },
   });
 });
@@ -446,6 +503,44 @@ ecCommerce.get(
   });
 });
 
+/**
+ * ページ送りを指定せずに呼ばれたときに返す件数(#731)。
+ *
+ * #722 と同じ考え方で、古い呼び出し側を壊さずに上限を置き、`Warning` で
+ * ページ送りへ誘導する。ページ送りを指定した呼び出しにはこの上限はかからない。
+ */
+const SUBSCRIPTIONS_NON_PAGINATED_MAX = 100;
+
+/**
+ * 契約の状態を読む元の値。JS 側は `contract.status_code || contract.status` で、
+ * 空文字も次へ送るので、SQL でも `nullif(..., '')` で空文字を NULL に倒す。
+ */
+const SUBSCRIPTION_STATUS_EXPR = `coalesce(nullif(json_extract(c.value, '$.status_code'), ''), nullif(json_extract(c.value, '$.status'), ''), '')`;
+
+/**
+ * `monthKey()` と同じ月キーを SQL で作る。`2026-9-01` のような1桁月も
+ * `2026-09` に揃える。文字列でない値は NULL(集計から外れる)。
+ */
+function monthKeySql(expr: string): string {
+  return `CASE
+    WHEN json_type(${expr}) != 'text' THEN NULL
+    WHEN json_extract(${expr}, '$') GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]*'
+      THEN substr(json_extract(${expr}, '$'), 1, 7)
+    WHEN json_extract(${expr}, '$') GLOB '[0-9][0-9][0-9][0-9]-[0-9]*'
+      THEN substr(json_extract(${expr}, '$'), 1, 5) || '0' || substr(json_extract(${expr}, '$'), 6, 1)
+    ELSE NULL END`;
+}
+
+/** 文字列として取り出す。JS 側が `typeof === 'string'` を見ているのに合わせる。 */
+function jsonTextSql(path: string): string {
+  return `CASE WHEN json_type(c.value, '${path}') = 'text' THEN json_extract(c.value, '${path}') END`;
+}
+
+/** 数として取り出す。JS 側の `finiteNumber`(有限の number だけ)に合わせる。 */
+function jsonNumberSql(path: string): string {
+  return `CASE WHEN json_type(c.value, '${path}') IN ('integer', 'real') THEN json_extract(c.value, '${path}') END`;
+}
+
 ecCommerce.get(
   '/api/ec-commerce/subscriptions',
   requireRole('owner', 'admin', 'staff'),
@@ -460,105 +555,188 @@ ecCommerce.get(
   if (!['all', 'active', 'paused', 'at_risk', 'cancelled'].includes(filter)) {
     return c.json({ success: false, error: '表示条件が正しくありません' }, 400);
   }
-  const requestedLimit = Number(c.req.query('limit') || '20');
+  const hasPagination = c.req.query('limit') !== undefined || c.req.query('offset') !== undefined;
+  const requestedLimit = Number(c.req.query('limit') || String(SUBSCRIPTIONS_NON_PAGINATED_MAX));
   const requestedOffset = Number(c.req.query('offset') || '0');
-  const limit = Number.isInteger(requestedLimit) ? Math.min(Math.max(requestedLimit, 1), 100) : 20;
+  const limit = Number.isInteger(requestedLimit)
+    ? Math.min(Math.max(requestedLimit, 1), 100)
+    : SUBSCRIPTIONS_NON_PAGINATED_MAX;
   const offset = Number.isInteger(requestedOffset) ? Math.max(requestedOffset, 0) : 0;
-  const rows = await c.env.DB.prepare(
-    `SELECT s.friend_id, s.subscription_json, s.synced_at,
-            f.display_name AS owner_name,
-            (SELECT p.name FROM nen_pet_profiles p
-              WHERE p.friend_id = s.friend_id ORDER BY p.created_at LIMIT 1) AS pet_name
-       FROM nen_ec_member_snapshots s
-       JOIN friends f ON f.id = s.friend_id
-      WHERE f.line_account_id = ? AND s.subscription_json IS NOT NULL
-      ORDER BY s.synced_at DESC
-      LIMIT 500`,
-  ).bind(lineAccountId).all<{
-    friend_id: string;
-    subscription_json: string;
-    synced_at: string;
-    owner_name: string | null;
-    pet_name: string | null;
-  }>();
 
-  const items = rows.results.flatMap((row) => subscriptionContracts(row.subscription_json).map((contract, index) => {
-    const state = subscriptionState(contract.status_code || contract.status);
-    const id = String(contract.id || contract.contract_number || `${row.friend_id}:${index}`);
-    const amount = finiteNumber(contract.amount);
-    const nextShippingAt = typeof contract.next_shipping_date === 'string'
-      ? contract.next_shipping_date
-      : typeof contract.scheduled_shipping_date === 'string'
-        ? contract.scheduled_shipping_date
-        : null;
+  /*
+   * 契約は1行の JSON 配列に入っているので、`json_each` で行へ展開してから
+   * 数える(#731)。行(=定期便を持つ友だち)を 500 で切って JS で数えていた
+   * ころは、501人目以降の契約が一覧にも集計にも入らず、切ったことを知らせる
+   * 手がかりも無かった。
+   *
+   * **`json_type` の守りは外さないこと。**`contracts` が配列でない行が1つでも
+   * あると `json_each` は `malformed JSON` でクエリ全体を落とす。JS 側は
+   * `try/catch` と `Array.isArray` で守っていたので、SQL へ移すとその守りが
+   * 消える。弾いた行の数は下で別に数えて、応答と記録に残す。
+   */
+  const contractsCte = `
+    WITH contracts AS (
+      SELECT s.friend_id AS friend_id,
+             s.synced_at AS synced_at,
+             f.display_name AS owner_name,
+             c.key AS contract_index,
+             c.value AS contract_json,
+             ${subscriptionStateSql(SUBSCRIPTION_STATUS_EXPR)} AS state,
+             coalesce(${jsonTextSql('$.next_shipping_date')}, ${jsonTextSql('$.scheduled_shipping_date')}) AS next_shipping_at,
+             ${jsonNumberSql('$.amount')} AS amount,
+             ${monthKeySql("c.value, '$.started_at'")} AS started_month,
+             ${monthKeySql("c.value, '$.cancelled_at'")} AS cancelled_month,
+             ${jsonTextSql('$.cancellation_reason')} AS cancellation_reason
+        FROM nen_ec_member_snapshots s
+        JOIN friends f ON f.id = s.friend_id,
+             json_each(json_extract(s.subscription_json, '$.contracts')) c
+       WHERE f.line_account_id = ?
+         AND json_type(s.subscription_json, '$.contracts') = 'array'
+    )`;
+
+  /*
+   * 並び順は、直しても変えないこと。次の発送日が早い順で、日付を持たない
+   * ものは末尾。同じ日付のときは、元の JS が安定ソートだったので
+   * 「同期の新しい行から、行の中の並び順」を保つ。
+   */
+  const orderBy = 'ORDER BY (next_shipping_at IS NULL), next_shipping_at ASC, synced_at DESC, friend_id ASC, contract_index ASC';
+  const stateWhere = filter === 'all' ? '' : 'WHERE state = ?';
+  const stateBindings = filter === 'all' ? [] : [filter];
+
+  const [rows, countRow, stateRows, amountRow, monthRows, cancelRow, reasonRow, malformedRow, syncedRow] = await Promise.all([
+    // 一覧。**ページの行にだけ**ペットの名前を引く。500行ぶん引いていたのをやめる。
+    c.env.DB.prepare(
+      `${contractsCte}
+       SELECT friend_id, owner_name, contract_json, synced_at, state, next_shipping_at,
+              (SELECT p.name FROM nen_pet_profiles p
+                WHERE p.friend_id = contracts.friend_id ORDER BY p.created_at LIMIT 1) AS pet_name,
+              contract_index
+         FROM contracts ${stateWhere} ${orderBy} LIMIT ? OFFSET ?`,
+    ).bind(lineAccountId, ...stateBindings, limit, offset).all<{
+      friend_id: string; owner_name: string | null; contract_json: string; synced_at: string;
+      state: SubscriptionState; next_shipping_at: string | null; pet_name: string | null;
+      contract_index: number;
+    }>(),
+    // 絞り込みに合う総数。ここが正しくないと「N件中M件」が嘘になる。
+    c.env.DB.prepare(`${contractsCte} SELECT COUNT(*) AS count FROM contracts ${stateWhere}`)
+      .bind(lineAccountId, ...stateBindings).first<{ count: number }>(),
+    // 集計は**絞り込みの前**。元の実装と同じ。
+    c.env.DB.prepare(`${contractsCte} SELECT state, COUNT(*) AS count FROM contracts GROUP BY state`)
+      .bind(lineAccountId).all<{ state: SubscriptionState; count: number }>(),
+    c.env.DB.prepare(
+      `${contractsCte}
+       SELECT COUNT(*) AS total, COUNT(amount) AS with_amount, coalesce(SUM(amount), 0) AS sum_amount
+         FROM contracts`,
+    ).bind(lineAccountId).first<{ total: number; with_amount: number; sum_amount: number }>(),
+    c.env.DB.prepare(
+      `${contractsCte}
+       SELECT started_month AS month, COUNT(*) AS count, coalesce(SUM(amount), 0) AS amount
+         FROM contracts WHERE started_month IS NOT NULL GROUP BY started_month ORDER BY started_month ASC`,
+    ).bind(lineAccountId).all<{ month: string; count: number; amount: number }>(),
+    c.env.DB.prepare(
+      `${contractsCte} SELECT COUNT(*) AS count FROM contracts WHERE cancelled_month = ?`,
+    ).bind(lineAccountId, new Date().toISOString().slice(0, 7)).first<{ count: number }>(),
+    c.env.DB.prepare(
+      `${contractsCte}
+       SELECT cancellation_reason AS reason, COUNT(*) AS count FROM contracts
+        WHERE cancellation_reason IS NOT NULL AND cancellation_reason != ''
+        GROUP BY cancellation_reason ORDER BY count DESC, reason ASC LIMIT 1`,
+    ).bind(lineAccountId).first<{ reason: string; count: number }>(),
+    // 弾いた行。**黙って数から落とさない**ための数(#731)。
+    c.env.DB.prepare(
+      `SELECT COUNT(*) AS count
+         FROM nen_ec_member_snapshots s JOIN friends f ON f.id = s.friend_id
+        WHERE f.line_account_id = ? AND s.subscription_json IS NOT NULL
+          AND json_type(s.subscription_json, '$.contracts') != 'array'`,
+    ).bind(lineAccountId).first<{ count: number }>(),
+    c.env.DB.prepare(
+      `SELECT s.synced_at FROM nen_ec_member_snapshots s JOIN friends f ON f.id = s.friend_id
+        WHERE f.line_account_id = ? AND s.subscription_json IS NOT NULL
+        ORDER BY s.synced_at DESC LIMIT 1`,
+    ).bind(lineAccountId).first<{ synced_at: string }>(),
+  ]);
+
+  const malformedSnapshots = Number(malformedRow?.count ?? 0);
+  if (malformedSnapshots > 0) {
+    // 運用者が「なぜ数が合わないのか」を後から追えるようにする。
+    console.warn(JSON.stringify({
+      event: 'ec_subscriptions_malformed_snapshots_skipped',
+      line_account_id: lineAccountId,
+      skipped: malformedSnapshots,
+    }));
+  }
+
+  const items = rows.results.map((row) => {
+    const contract = JSON.parse(row.contract_json || '{}') as Record<string, unknown>;
+    const id = String(contract.id || contract.contract_number || `${row.friend_id}:${row.contract_index}`);
     return {
       id,
       friendId: row.friend_id,
       ownerName: row.owner_name,
       petName: row.pet_name,
       contractNumber: typeof contract.contract_number === 'string' ? contract.contract_number : null,
-      status: state,
-      statusLabel: state === 'active' ? '続いています' : state === 'paused' ? '休止中です'
-        : state === 'at_risk' ? '決済の確認が必要です' : '止まりました',
-      riskReason: state === 'at_risk' ? '定期便のお支払いを確認できませんでした' : null,
-      nextShippingAt,
+      status: row.state,
+      statusLabel: row.state === 'active' ? '続いています' : row.state === 'paused' ? '休止中です'
+        : row.state === 'at_risk' ? '決済の確認が必要です' : '止まりました',
+      riskReason: row.state === 'at_risk' ? '定期便のお支払いを確認できませんでした' : null,
+      nextShippingAt: row.next_shipping_at,
       cycle: typeof contract.cycle === 'string' ? contract.cycle : null,
       items: subscriptionItems(contract.items),
-      amount,
+      amount: finiteNumber(contract.amount),
       continuedCount: finiteNumber(contract.continued_count),
       startedAt: typeof contract.started_at === 'string' ? contract.started_at : null,
       cancelledAt: typeof contract.cancelled_at === 'string' ? contract.cancelled_at : null,
       cancellationReason: typeof contract.cancellation_reason === 'string' ? contract.cancellation_reason : null,
       syncedAt: row.synced_at,
     };
-  })).sort((left, right) => {
-    if (left.nextShippingAt === null) return 1;
-    if (right.nextShippingAt === null) return -1;
-    return left.nextShippingAt.localeCompare(right.nextShippingAt);
   });
-  const visible = filter === 'all' ? items : items.filter((item) => item.status === filter);
-  const knownAmounts = items.map((item) => item.amount).filter((value): value is number => value !== null);
-  const monthly = new Map<string, { count: number; amount: number }>();
-  for (const item of items) {
-    const month = monthKey(item.startedAt);
-    if (!month) continue;
-    const current = monthly.get(month) ?? { count: 0, amount: 0 };
-    current.count += 1;
-    current.amount += item.amount ?? 0;
-    monthly.set(month, current);
+
+  const stateCount = (state: SubscriptionState): number =>
+    Number(stateRows.results.find((row) => row.state === state)?.count ?? 0);
+  const total = Number(amountRow?.total ?? 0);
+  const withAmount = Number(amountRow?.with_amount ?? 0);
+
+  if (!hasPagination) {
+    // Header 値は ASCII のみ。日本語の案内は PR と票に残す(#722 と同じ)。
+    c.header(
+      'Warning',
+      `299 - "non-paginated subscriptions are limited to ${SUBSCRIPTIONS_NON_PAGINATED_MAX} rows; use limit/offset"`,
+    );
   }
-  const currentMonth = new Date().toISOString().slice(0, 7);
-  const cancelledThisMonth = items.filter((item) => monthKey(item.cancelledAt) === currentMonth).length;
-  const cancellationReasons = new Map<string, number>();
-  for (const item of items) if (item.cancellationReason) cancellationReasons.set(item.cancellationReason, (cancellationReasons.get(item.cancellationReason) ?? 0) + 1);
-  const cancellationTopReason = [...cancellationReasons.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
 
   return c.json({
     success: true,
     data: {
-      items: visible.slice(offset, offset + limit),
+      items,
       summary: {
-        total: items.length,
-        active: items.filter((item) => item.status === 'active').length,
-        paused: items.filter((item) => item.status === 'paused').length,
-        atRisk: items.filter((item) => item.status === 'at_risk').length,
-        cancelled: items.filter((item) => item.status === 'cancelled').length,
-        monthlyAmount: items.length > 0 && knownAmounts.length === items.length
-          ? knownAmounts.reduce((sum, value) => sum + value, 0)
-          : null,
-        startedThisMonth: items.filter((item) => monthKey(item.startedAt) === currentMonth).length,
-        cancelledThisMonth,
-        cancellationTopReason,
-        monthlyStats: [...monthly.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([month, value]) => ({ month, ...value })),
+        total,
+        active: stateCount('active'),
+        paused: stateCount('paused'),
+        atRisk: stateCount('at_risk'),
+        cancelled: stateCount('cancelled'),
+        // 元の実装と同じく、**全件に金額があるときだけ**合計を出す。
+        monthlyAmount: total > 0 && withAmount === total ? Number(amountRow?.sum_amount ?? 0) : null,
+        startedThisMonth: Number(
+          monthRows.results.find((row) => row.month === new Date().toISOString().slice(0, 7))?.count ?? 0,
+        ),
+        cancelledThisMonth: Number(cancelRow?.count ?? 0),
+        cancellationTopReason: reasonRow?.reason ?? null,
+        monthlyStats: monthRows.results.map((row) => ({
+          month: row.month,
+          count: Number(row.count),
+          amount: Number(row.amount),
+        })),
       },
+      /** 形が違って読めなかったスナップショットの数。0 でも必ず返す。 */
+      skipped: { malformedSnapshots },
       risk: {
         source: 'payment_status',
         ruleVersion: 'subscription-payment-status-v1',
-        calculatedAt: rows.results[0]?.synced_at ?? null,
+        calculatedAt: syncedRow?.synced_at ?? null,
         predictiveScoreAvailable: false,
       },
     },
-    pagination: { total: visible.length, limit, offset },
+    pagination: { total: Number(countRow?.count ?? 0), limit, offset },
   });
 });
 
