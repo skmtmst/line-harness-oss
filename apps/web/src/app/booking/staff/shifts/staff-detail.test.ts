@@ -57,6 +57,33 @@ describe('担当者別 勤務・シフト・外の予定(N-405)', () => {
     expect(DETAIL).not.toContain('availability.ts')
   })
 
+  /*
+    曜日指定と日付指定の休憩は「同じ理由で同じく予約枠へ反映されない」。
+    片方にだけ注記があると、運用者は注記の無いほうを「反映される」と読む。
+    見出しの直後の説明文だけを切り出して見るので、別の節に同じ文が
+    あっても通らない。文言は2つの節で一字一句そろえる。
+  */
+  const noteUnderHeading = (heading: string): string => {
+    const at = DETAIL.indexOf(heading)
+    expect(at, `見出し「${heading}」が無い`).toBeGreaterThan(-1)
+    const open = DETAIL.indexOf('<p', at)
+    const close = DETAIL.indexOf('</p>', open)
+    expect(open, `「${heading}」の直後に説明文が無い`).toBeGreaterThan(-1)
+    expect(close).toBeGreaterThan(open)
+    return DETAIL.slice(DETAIL.indexOf('>', open) + 1, close)
+  }
+
+  it('休憩は曜日指定も日付指定も、枠へ反映されないことを同じ文言で断る', () => {
+    const NOT_REFLECTED = '保存はできますが、まだ予約枠には反映されません。'
+    const weekly = noteUnderHeading('>休憩</h2>')
+    const byDate = noteUnderHeading('>この日だけの休憩</h3>')
+    expect(weekly).toContain(NOT_REFLECTED)
+    expect(byDate).toContain(NOT_REFLECTED)
+    // 「別の話かもしれない」と読まれないよう、言い換えを許さない。
+    expect(weekly.slice(weekly.indexOf('保存はできますが')))
+      .toBe(byDate.slice(byDate.indexOf('保存はできますが')))
+  })
+
   it('休憩は版付きで保存し、重なったら最新へ描き直す', () => {
     expect(DETAIL).toContain('breaksVersion,')
     expect(DETAIL).toContain('breakDatesVersion,')

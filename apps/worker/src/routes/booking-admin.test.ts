@@ -1119,6 +1119,122 @@ describe('staff breaks API (N-405 #655)', () => {
     }
   });
 
+  /*
+    休憩の4経路（breaks/break-dates の GET・PUT）は、account 境界を
+    assertStaffInAccount だけで守っている。ガードを抜けた後は staff_id だけで
+    読み書きするので、1経路でも落ちれば別店舗の担当者の休憩を覗ける・書ける。
+    GET /breaks は上の試験が見張っているので、残り3経路を1本ずつ持つ。
+    まとめて1本にしないのは、1経路だけ壊れたときに赤くしたいから。
+  */
+
+  // s2(acc2)へ acc1 から書けてしまう状態を作らないため、ガードを外すと
+  // 200 で保存が通ってしまう下地（勤務とシフト）をあらかじめ置く。
+  function seedOtherAccountWorkable(sqlite: Database.Database) {
+    sqlite.exec(`
+      INSERT INTO booking_settings (id, line_account_id, timezone)
+      VALUES ('bs2','acc2','Asia/Tokyo');
+      INSERT INTO staff_availability_rules (id, staff_id, weekday, start_time, end_time, is_active)
+      VALUES ('r3','s2',3,'09:00','19:00',1);
+      INSERT INTO staff_shifts (id, staff_id, work_date, start_time, end_time)
+      VALUES ('sh2','s2','2026-09-23','10:00','17:00');
+    `);
+  }
+
+  const countRows = (sqlite: Database.Database, table: 'staff_breaks' | 'staff_break_dates', staffId: string) =>
+    (sqlite.prepare(`SELECT COUNT(*) AS n FROM ${table} WHERE staff_id = ?`).get(staffId) as { n: number }).n;
+
+  test('PUT /breaks は別アカウントの担当者を404で拒み、1件も書かない', async () => {
+    const sqlite = new Database(':memory:');
+    try {
+      seedBreaks(sqlite);
+      seedOtherAccountWorkable(sqlite);
+      const { app, env } = makeApp(sqliteAsD1(sqlite));
+
+      // 版は acc2 から正しく取る。版ずれで弾かれたのではないことを確かめるため。
+      const own = await app.request(
+        '/api/booking/admin/staff/s2/breaks?account_id=acc2', {}, env as never,
+      );
+      expect(own.status).toBe(200);
+      const { version } = await own.json() as { version: string };
+
+      const crossed = await app.request(
+        '/api/booking/admin/staff/s2/breaks?account_id=acc1',
+        {
+          method: 'PUT',
+          body: JSON.stringify({
+            expectedVersion: version,
+            breaks: [{ weekday: 3, start_time: '12:00', end_time: '13:00' }],
+          }),
+          headers: { 'Content-Type': 'application/json' },
+        },
+        env as never,
+        execCtx,
+      );
+      expect(crossed.status).toBe(404);
+      await expect(crossed.json()).resolves.toEqual({ error: 'staff_not_found_in_account' });
+      expect(countRows(sqlite, 'staff_breaks', 's2')).toBe(0);
+    } finally {
+      sqlite.close();
+    }
+  });
+
+  test('GET /break-dates は別アカウントの担当者を404で拒む', async () => {
+    const sqlite = new Database(':memory:');
+    try {
+      seedBreaks(sqlite);
+      seedOtherAccountWorkable(sqlite);
+      // 覗けたら中身が返ることを示すため、s2 側に1件置いておく。
+      sqlite.exec(`
+        INSERT INTO staff_break_dates
+          (id, staff_id, work_date, start_time, end_time, time_zone, start_utc_offset, end_utc_offset)
+        VALUES ('bd-other','s2','2026-09-23','12:00','13:00','Asia/Tokyo','+09:00','+09:00');
+      `);
+      const { app, env } = makeApp(sqliteAsD1(sqlite));
+
+      const crossed = await app.request(
+        '/api/booking/admin/staff/s2/break-dates?account_id=acc1', {}, env as never,
+      );
+      expect(crossed.status).toBe(404);
+      await expect(crossed.json()).resolves.toEqual({ error: 'staff_not_found_in_account' });
+    } finally {
+      sqlite.close();
+    }
+  });
+
+  test('PUT /break-dates は別アカウントの担当者を404で拒み、1件も書かない', async () => {
+    const sqlite = new Database(':memory:');
+    try {
+      seedBreaks(sqlite);
+      seedOtherAccountWorkable(sqlite);
+      const { app, env } = makeApp(sqliteAsD1(sqlite));
+
+      const own = await app.request(
+        '/api/booking/admin/staff/s2/break-dates?account_id=acc2', {}, env as never,
+      );
+      expect(own.status).toBe(200);
+      const { version } = await own.json() as { version: string };
+
+      const crossed = await app.request(
+        '/api/booking/admin/staff/s2/break-dates?account_id=acc1',
+        {
+          method: 'PUT',
+          body: JSON.stringify({
+            expectedVersion: version,
+            breaks: [{ work_date: '2026-09-23', start_time: '12:00', end_time: '13:00' }],
+          }),
+          headers: { 'Content-Type': 'application/json' },
+        },
+        env as never,
+        execCtx,
+      );
+      expect(crossed.status).toBe(404);
+      await expect(crossed.json()).resolves.toEqual({ error: 'staff_not_found_in_account' });
+      expect(countRows(sqlite, 'staff_break_dates', 's2')).toBe(0);
+    } finally {
+      sqlite.close();
+    }
+  });
+
   test('日付指定の休憩はシフト内なら保存でき、DSTのgapは拒否する', async () => {
     const sqlite = new Database(':memory:');
     try {

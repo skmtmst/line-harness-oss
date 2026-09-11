@@ -943,7 +943,7 @@ export default function StaffDetail({ staffId }: { staffId: string }) {
             </div>
 
             <h3 className="text-ink mt-6 text-sm font-semibold">この日だけの休憩</h3>
-            <p className="text-ink-faint mt-1 text-xs">その日だけ休むときに足します。その日の出る時間の中に入れてください。</p>
+            <p className="text-ink-faint mt-1 text-xs">その日だけ休むときに足します。その日の出る時間の中に入れてください。保存はできますが、まだ予約枠には反映されません。</p>
             <div className="mt-4 space-y-2">
               {dateRows.length === 0 ? (
                 <p className="text-ink-faint text-sm">この日だけの休憩はありません。</p>
