@@ -1,4 +1,4 @@
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import { cors } from 'hono/cors';
 import { LineClient } from '@line-crm/line-sdk';
 import {
@@ -8,6 +8,7 @@ import {
   getRandomPoolAccount,
   getPoolAccounts,
   getEntryRouteByRefCode,
+  getEntryRouteByRefCodeAny,
   getLineAccountById,
   getAffiliateLinkByRefCode,
   incrementAffiliateLinkClick,
@@ -140,6 +141,7 @@ import { siteTracking } from './routes/site-tracking.js';
 import { restaurantTest } from './routes/restaurant-test.js';
 import { tenants } from './routes/tenants.js';
 import { codexSlackEvents } from './routes/codex-slack-events.js';
+import { aiLoopSlackReports } from './routes/ai-loop-slack-reports.js';
 import { clientErrors } from './routes/client-errors.js';
 import { lineWebhookEvents } from './routes/line-webhook-events.js';
 import { operations } from './routes/operations.js';
@@ -161,7 +163,15 @@ import {
   shouldStopCodexQueueRetry,
   type CodexMentionQueueMessage,
 } from './services/codex-cloud-monitor.js';
-import { isQrDataAllowed, normalizeQrSize, qrResponseHeaders, normalizeQrFormat } from './lib/qr-response.js';
+import {
+  createQrImage,
+  isQrDataAllowed,
+  normalizeQrFormat,
+  normalizeQrSize,
+  qrResponseHeaders,
+  QrInputError,
+  QR_MAX_RESPONSE_BYTES,
+} from './lib/qr-response.js';
 import { safeRedirectTarget } from './lib/safe-redirect.js';
 import { isLinkPreviewBot } from './lib/og-bot.js';
 import { buildOgHtml } from './lib/og-html.js';
@@ -251,6 +261,8 @@ export type Env = {
     CODEX_SLACK_RELAY_SECRET?: string;
     CODEX_SLACK_RELAY_SECRET_KENTA?: string;
     CODEX_SLACK_RELAY_SECRET_MASATO?: string;
+    /** AI開発ループの報告専用HMAC鍵。既存のCodex中継鍵と共有しない。 */
+    AI_LOOP_SLACK_REPORT_SECRET?: string;
     SLACK_BOT_TOKEN?: string;
     SLACK_COMMAND_CHANNEL_ID?: string;
     SLACK_ERROR_CHANNEL_ID?: string;
@@ -260,6 +272,8 @@ export type Env = {
     SLACK_KENTA_USER_ID?: string;
     SLACK_MASATO_USER_ID?: string;
     SLACK_TASK_CHANNEL_ID?: string;
+    /** AI開発ループの一方向レポート専用。Slackからの操作には使用しない。 */
+    SLACK_AI_LOOP_CHANNEL_ID?: string;
     SLACK_SIGNING_SECRET?: string;
     SLACK_USER_TOKEN?: string;
     // Slack mention -> official Codex receipt -> user-authored Slack relay.
@@ -438,6 +452,7 @@ app.route('/', siteTracking);
 app.route('/', restaurantTest);
 app.route('/', tenants);
 app.route('/', codexSlackEvents);
+app.route('/', aiLoopSlackReports);
 app.route('/', clientErrors);
 app.route('/', lineWebhookEvents);
 app.route('/', operations);
@@ -452,8 +467,10 @@ app.route('/admin', adminVersion);
 // authMiddleware skips non-/api/ paths so this router owns its own auth gate.
 app.route('/admin/update', adminUpdate);
 
-// Self-hosted QR code proxy — prevents leaking ref tokens to third-party services
-app.get('/api/qr', async (c) => {
+// QR は Worker の中だけで作る。流入 ref や LIFF URL は計測の識別子で、
+// 第三者の生成サービスへ渡す理由がない。以前は data をそのまま
+// api.qrserver.com へ送っていたので、説明と実装が食い違っていた。
+export const qrHandler: (c: Context<Env>) => Promise<Response> = async (c) => {
   const data = c.req.query('data');
   if (!data) return c.text('Missing data param', 400);
   if (!isQrDataAllowed(data)) return c.text('Data param too long', 400);
@@ -461,25 +478,31 @@ app.get('/api/qr', async (c) => {
   if (!size) return c.text('Invalid size', 400);
   // 印刷に使うので svg も出せる。知らない値は png に丸める。
   const format = normalizeQrFormat(c.req.query('format'));
-  const upstream = `https://api.qrserver.com/v1/create-qr-code/?size=${encodeURIComponent(size)}&format=${format}&data=${encodeURIComponent(data)}`;
-  const res = await fetch(upstream, { signal: AbortSignal.timeout(8_000) }).catch(() => null);
-  if (!res) return c.text('QR generation timed out', 504);
-  if (!res.ok) return c.text('QR generation failed', 502);
-  const declaredLength = Number(res.headers.get('content-length') || '0');
-  if (declaredLength > 2 * 1024 * 1024) return c.text('QR response too large', 502);
-  const bytes = await res.arrayBuffer();
-  if (bytes.byteLength > 2 * 1024 * 1024) return c.text('QR response too large', 502);
-  const contentType = res.headers.get('Content-Type');
-  if (!contentType?.toLowerCase().startsWith('image/')) return c.text('Invalid QR response', 502);
-  return new Response(bytes, {
+  let image: Awaited<ReturnType<typeof createQrImage>>;
+  try {
+    image = await createQrImage(data, size, format);
+  } catch (error) {
+    // 指定を直せば通る失敗（小さすぎる・長すぎる）は理由を返す。
+    if (error instanceof QrInputError) return c.text(error.message, 400);
+    return c.text('QR generation failed', 500);
+  }
+  if (image.bytes.byteLength > QR_MAX_RESPONSE_BYTES) return c.text('QR response too large', 500);
+  return new Response(image.bytes, {
     headers: qrResponseHeaders(
-      contentType,
+      image.contentType,
       c.req.query('download') === '1',
       c.req.query('filename') || 'referral-link-qr',
       format,
     ),
   });
-});
+};
+
+app.get('/api/qr', qrHandler);
+
+// N-244: 停止した流入経路の公開URLは、active・停止・不存在の区別や
+// 転送先を漏らさない同一の終了応答で止める。ref の echo もしない。
+const ENTRY_ROUTE_STOPPED_HTML =
+  '<!doctype html><html lang="ja"><meta charset="utf-8"><title>このページは利用できません</title><body><main><h1>このページは利用できません</h1><p>公開が終わっているか、アドレスが正しくありません。運用者へ、新しいリンクをご確認ください。</p></main></body></html>';
 
 // Short link: /r/:ref → universal landing page with LINE open button
 // Supports query params: ?form=FORM_ID (auto-push form after friend add)
@@ -508,6 +531,15 @@ app.get('/r/:ref', async (c) => {
   // drop-off (clicks that never reach OAuth) is therefore not visible in the
   // funnel; that limitation is intentional pending a dedicated click table.
   const route = await getEntryRouteByRefCode(c.env.DB, ref);
+  // N-244: 停止した経路は active と同じ受付をしない。転送先があっても
+  // 送らず、紹介リンクやプールの後段にも落とさず、同一の終了応答で止める。
+  // ref が entry_routes の名前空間に属さないときだけ従来の後段へ進む。
+  if (!route) {
+    const anyRoute = await getEntryRouteByRefCodeAny(c.env.DB, ref);
+    if (anyRoute && anyRoute.is_active !== 1) {
+      return c.html(ENTRY_ROUTE_STOPPED_HTML, 410);
+    }
+  }
   // 転送先が設定された経路はそちらへ送る（#514 重大4）。保存はするのに
   // 読まないままだった。危険な形式は safe-redirect が弾き、そのときは
   // 従来どおり友だち追加の着地画面へ進む。
@@ -726,8 +758,17 @@ body{font-family:'Hiragino Sans','Helvetica Neue',system-ui,sans-serif;backgroun
 // Universal Links are blocked. This is the L-Step approach.
 // Method 2 (URL copy → external browser) is the universal fallback.
 // No LINE-Login-web fallback exposed — friction kills conversion.
-app.get('/r/:ref/help', (c) => {
+app.get('/r/:ref/help', async (c) => {
   const ref = c.req.param('ref');
+  // N-244: 停止した経路の回復ページも同じ終了応答で止める。直接開かれても
+  // 受付へ戻さない。属さない ref は従来どおり回復ページを出す。
+  const helpRoute = await getEntryRouteByRefCode(c.env.DB, ref);
+  if (!helpRoute) {
+    const anyRoute = await getEntryRouteByRefCodeAny(c.env.DB, ref);
+    if (anyRoute && anyRoute.is_active !== 1) {
+      return c.html(ENTRY_ROUTE_STOPPED_HTML, 410);
+    }
+  }
   const reqUrl = new URL(c.req.url);
   // Prefer the resolved liff target passed by /r/:ref via ?t= so pooled refs
   // do not re-roll on retry. Fall back to the short /r/:ref URL only when
@@ -1238,6 +1279,16 @@ async function runFrequentHeavyJobs(
       },
     },
     {
+      name: 'ad conversion outbox retry',
+      run: async () => {
+        const { drainAdConversionOutbox } = await import('./services/ad-conversion.js');
+        const result = await drainAdConversionOutbox(env.DB, { limit: 50 });
+        if (result.claimed > 0) {
+          console.log(JSON.stringify({ event: 'ad_conversion_outbox_tick', ...result }));
+        }
+      },
+    },
+    {
       name: 'analytics url exposure projection',
       run: async () => {
         const { processPendingAnalyticsUrlExposures } = await import('@line-crm/db');
@@ -1666,6 +1717,392 @@ async function scheduled(
     if (applied > 0) console.log(JSON.stringify({ event: 'common_var_schedule_applied', applied }));
   } catch (e) {
     console.error('common-var schedule error:', e);
+  }
+
+  // E-08 (#621): 保存済みリッチメニュー公開予約を時刻到来時に実行する。
+  // 予約時のスナップショットを公開し、期間モードは終了時に元メニューへ戻す。
+  // 失敗しても他の処理は続ける。実LINE送信はここで行うが、DB配備は別工程。
+  try {
+    const { processDueRichMenuSchedules } = await import('./services/rich-menu-schedule-executor.js');
+    const {
+      getRichMenuGroupWithPages,
+      getLineAccountById,
+      getStaffById,
+      getTrackedLinkById,
+    } = await import('@line-crm/db');
+    const { canAccessAllLineAccounts } = await import('./services/account-access.js');
+    const {
+      createRichMenuShells,
+      switchRichMenuLive,
+      restorePreSwitchLive,
+      restorePreSwitchDefault,
+      deleteRichMenuShells,
+    } = await import('./lib/rich-menu-publisher.js');
+    const r2Adapter = {
+      async get(key: string) {
+        const obj = await env.IMAGES.get(key);
+        if (!obj) return null;
+        return { body: obj.body as ReadableStream };
+      },
+    };
+    // routes の createLineClient と同じ実装をここで再現する。
+    const createScheduleLineClient = (auth: string) => ({
+      async createRichMenu(payload: unknown) {
+        const res = await fetch('https://api.line.me/v2/bot/richmenu', {
+          method: 'POST',
+          headers: { Authorization: auth, 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        if (!res.ok) throw new Error(`LINE createRichMenu failed: ${res.status} ${await res.text()}`);
+        return res.json() as Promise<{ richMenuId: string }>;
+      },
+      async uploadRichMenuImage(richMenuId: string, image: Uint8Array, contentType: string) {
+        const res = await fetch(`https://api-data.line.me/v2/bot/richmenu/${richMenuId}/content`, {
+          method: 'POST',
+          headers: { Authorization: auth, 'Content-Type': contentType },
+          body: image,
+        });
+        if (!res.ok) throw new Error(`LINE uploadRichMenuImage failed: ${res.status} ${await res.text()}`);
+      },
+      async deleteRichMenuAlias(aliasId: string) {
+        const res = await fetch(`https://api.line.me/v2/bot/richmenu/alias/${aliasId}`, {
+          method: 'DELETE',
+          headers: { Authorization: auth },
+        });
+        if (!res.ok && res.status !== 404) throw new Error(`LINE deleteRichMenuAlias failed: ${res.status}`);
+      },
+      async createRichMenuAlias(aliasId: string, richMenuId: string) {
+        const res = await fetch('https://api.line.me/v2/bot/richmenu/alias', {
+          method: 'POST',
+          headers: { Authorization: auth, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ richMenuAliasId: aliasId, richMenuId }),
+        });
+        if (!res.ok) throw new Error(`LINE createRichMenuAlias failed: ${res.status}`);
+      },
+      async upsertRichMenuAlias(aliasId: string, richMenuId: string) {
+        const res = await fetch(`https://api.line.me/v2/bot/richmenu/alias/${aliasId}`, {
+          method: 'POST',
+          headers: { Authorization: auth, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ richMenuId }),
+        });
+        if (res.ok) return;
+        if (res.status === 404) {
+          const createRes = await fetch('https://api.line.me/v2/bot/richmenu/alias', {
+            method: 'POST',
+            headers: { Authorization: auth, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ richMenuAliasId: aliasId, richMenuId }),
+          });
+          if (createRes.ok) return;
+          throw new Error(`LINE createRichMenuAlias failed: ${createRes.status}`);
+        }
+        throw new Error(`LINE updateRichMenuAlias failed: ${res.status}`);
+      },
+      async deleteRichMenu(richMenuId: string) {
+        const res = await fetch(`https://api.line.me/v2/bot/richmenu/${richMenuId}`, {
+          method: 'DELETE',
+          headers: { Authorization: auth },
+        });
+        if (!res.ok && res.status !== 404) throw new Error(`LINE deleteRichMenu failed: ${res.status}`);
+      },
+      async setDefaultRichMenu(richMenuId: string) {
+        const res = await fetch(`https://api.line.me/v2/bot/user/all/richmenu/${richMenuId}`, {
+          method: 'POST',
+          headers: { Authorization: auth },
+        });
+        if (!res.ok) throw new Error(`LINE setDefaultRichMenu failed: ${res.status}`);
+      },
+      async clearDefaultRichMenu() {
+        const res = await fetch('https://api.line.me/v2/bot/user/all/richmenu', {
+          method: 'DELETE',
+          headers: { Authorization: auth },
+        });
+        if (!res.ok && res.status !== 404) throw new Error(`LINE clearDefaultRichMenu failed: ${res.status}`);
+      },
+      async getCurrentDefaultRichMenuId() {
+        const res = await fetch('https://api.line.me/v2/bot/user/all/richmenu', {
+          method: 'GET',
+          headers: { Authorization: auth },
+        });
+        if (res.status === 404) return null;
+        if (!res.ok) throw new Error(`LINE getCurrentDefaultRichMenu failed: ${res.status}`);
+        const body = (await res.json()) as { richMenuId?: string };
+        return body.richMenuId ?? null;
+      },
+      async linkRichMenuBulk(richMenuId: string, userIds: string[]) {
+        const res = await fetch('https://api.line.me/v2/bot/richmenu/bulk/link', {
+          method: 'POST',
+          headers: { Authorization: auth, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ richMenuId, userIds }),
+        });
+        if (!res.ok) throw new Error(`LINE linkRichMenuBulk failed: ${res.status}`);
+      },
+    });
+    const buildGroupInput = async (snapshot: unknown, fallbackGroupId: string) => {
+      const record = snapshot as {
+        id?: string; size?: 'large' | 'compact'; chatBarText?: string;
+        isDefaultForAll?: boolean; pages?: Array<{
+          id: string; orderIndex: number; name: string;
+          imageR2Key: string | null; imageContentType: string | null;
+          lineRichmenuId: string | null;
+          areas: Array<{
+            id: string; boundsX: number; boundsY: number; boundsWidth: number; boundsHeight: number;
+            actionType: 'uri' | 'message' | 'postback' | 'richmenuswitch';
+            actionData: Record<string, unknown>; intent: null | string;
+            label: string | null; tagIds: string[]; scoreChange: number | null;
+            templateId: string | null; formId: string | null; trackedLinkId: string | null;
+          }>;
+        }>;
+      };
+      const groupId = typeof record.id === 'string' ? record.id : fallbackGroupId;
+      const group = await getRichMenuGroupWithPages(env.DB, groupId);
+      const account = group ? await getLineAccountById(env.DB, group.account_id) : null;
+      const formBaseUrl = account && (account as { liff_id?: string | null }).liff_id
+        ? `https://liff.line.me/${(account as { liff_id: string }).liff_id}`
+        : (env.LIFF_URL ?? null);
+      const trackedUrls = new Map<string, string>();
+      for (const page of record.pages ?? []) {
+        for (const area of page.areas ?? []) {
+          if (area.trackedLinkId && !trackedUrls.has(area.trackedLinkId)) {
+            const link = await getTrackedLinkById(env.DB, area.trackedLinkId);
+            if (link) trackedUrls.set(area.trackedLinkId, `${formBaseUrl ?? ''}/t/${link.short_code ?? link.id}`);
+          }
+        }
+      }
+      return {
+        groupIdForDb: groupId,
+        account,
+        input: {
+          id: groupId,
+          size: record.size ?? 'large',
+          chatBarText: record.chatBarText ?? '',
+          isDefaultForAll: record.isDefaultForAll ?? false,
+          formBaseUrl,
+          pages: (record.pages ?? []).map((page) => ({
+            id: page.id,
+            orderIndex: page.orderIndex,
+            name: page.name,
+            imageR2Key: page.imageR2Key,
+            imageContentType: page.imageContentType,
+            lineRichMenuId: page.lineRichmenuId,
+            areas: (page.areas ?? []).map((area) => ({
+              id: area.id,
+              bounds: { x: area.boundsX, y: area.boundsY, width: area.boundsWidth, height: area.boundsHeight },
+              actionType: area.actionType,
+              actionData: area.actionData,
+              intent: area.intent as null,
+              label: area.label,
+              tagIds: area.tagIds,
+              scoreChange: area.scoreChange,
+              templateId: area.templateId,
+              formId: area.formId,
+              trackedLinkUrl: area.trackedLinkId ? (trackedUrls.get(area.trackedLinkId) ?? null) : null,
+            })),
+          })),
+        },
+      };
+    };
+    const result = await processDueRichMenuSchedules(env.DB, {
+      getGroupWithPages: (db, groupId) => getRichMenuGroupWithPages(db, groupId),
+      getLineAccount: (db, accountId) => getLineAccountById(db, accountId) as Promise<{
+        id: string; channel_access_token: string | null; is_active: number; archived_at: string | null;
+      } | null>,
+      getRequestingStaff: async (db, staffId) => {
+        const staff = await getStaffById(db, staffId);
+        return staff as unknown as {
+          id: string; role: 'owner' | 'admin' | 'staff'; is_active: number; access_level: string | null;
+        } | null;
+      },
+      isStaffAllowedForAccount: async (db, staffId, accountId) => {
+        const staff = await getStaffById(db, staffId);
+        if (!staff) return false;
+        return canAccessAllLineAccounts(db, {
+          id: staff.id,
+          name: staff.name,
+          role: staff.role,
+          readOnly: staff.access_level === 'read_only',
+          tenantId: staff.tenant_id,
+        } as never, [accountId]);
+      },
+      createLineShells: async (snapshot, schedule, heartbeat) => {
+        // 第一段: 予約スナップショットから新規作成だけ行い、新IDを返す。
+        // alias/defaultは触らない。DB反映は実行役がjournal確定後に行う。
+        // ページ数ぶんの作成と画像uploadで時間がかかるため、1枚ごとに
+        // group と予約行の lease を実時刻で延ばす(heartbeat)。
+        const built = await buildGroupInput(snapshot, schedule.group_id);
+        if (!built.account) throw new Error('line account not found');
+        const line = createScheduleLineClient(`Bearer ${built.account.channel_access_token}`);
+        const { shells } = await createRichMenuShells(built.input as never, line, r2Adapter, heartbeat);
+        const oldByPageId = new Map(
+          (built.input.pages as Array<{ id: string; lineRichMenuId: string | null }>).map((page) => [page.id, page.lineRichMenuId]),
+        );
+        return shells.map((shell) => ({
+          pageId: shell.pageId,
+          orderIndex: shell.orderIndex,
+          newRichMenuId: shell.newRichMenuId,
+          oldLineRichMenuId: oldByPageId.get(shell.pageId) ?? null,
+        }));
+      },
+      createRestoreShells: async (restoreGroup, schedule, heartbeat) => {
+        // 明示の戻し先の現内容から新規作成だけ行う。alias/defaultは触らない。
+        const account = await getLineAccountById(env.DB, restoreGroup.account_id);
+        if (!account) throw new Error('line account not found');
+        const line = createScheduleLineClient(`Bearer ${account.channel_access_token}`);
+        const formBaseUrl = (account as { liff_id?: string | null }).liff_id
+          ? `https://liff.line.me/${(account as { liff_id: string }).liff_id}`
+          : (env.LIFF_URL ?? null);
+        const input = {
+          id: restoreGroup.id,
+          size: restoreGroup.size,
+          chatBarText: restoreGroup.chat_bar_text,
+          isDefaultForAll: restoreGroup.is_default_for_all === 1,
+          formBaseUrl,
+          pages: restoreGroup.pages.map((page) => ({
+            id: page.id,
+            orderIndex: page.order_index,
+            name: page.name,
+            imageR2Key: page.image_r2_key,
+            imageContentType: page.image_content_type,
+            lineRichMenuId: page.line_richmenu_id,
+            areas: page.areas.map((area) => ({
+              id: area.id,
+              bounds: { x: area.bounds_x, y: area.bounds_y, width: area.bounds_width, height: area.bounds_height },
+              actionType: area.action_type,
+              actionData: area.actionData,
+              intent: area.intent,
+              label: area.label,
+              tagIds: area.tagIds,
+              scoreChange: area.score_change,
+              templateId: area.template_id,
+              formId: area.form_id,
+              trackedLinkUrl: null,
+            })),
+          })),
+        };
+        const { shells } = await createRichMenuShells(input as never, line, r2Adapter, heartbeat);
+        const oldByPageId = new Map(
+          (input.pages as Array<{ id: string; lineRichMenuId: string | null }>).map((page) => [page.id, page.lineRichMenuId]),
+        );
+        return shells.map((shell) => ({
+          pageId: shell.pageId,
+          orderIndex: shell.orderIndex,
+          newRichMenuId: shell.newRichMenuId,
+          oldLineRichMenuId: oldByPageId.get(shell.pageId) ?? null,
+        }));
+      },
+      readCurrentDefaultId: async (schedule) => {
+        // 切替直前の実LINE defaultを読む。固定(pin)の材料にする。
+        const account = await getLineAccountById(env.DB, schedule.account_id);
+        if (!account?.channel_access_token) throw new Error('line account not found');
+        const line = createScheduleLineClient(`Bearer ${account.channel_access_token}`);
+        return line.getCurrentDefaultRichMenuId();
+      },
+      switchLiveTo: async ({ schedule, groupId, setDefault, shells, heartbeat }) => {
+        // 第二段: alias切替+default設定/解除。失敗時は投げるだけで補償しない。
+        const account = await getLineAccountById(env.DB, schedule.account_id);
+        if (!account) throw new Error('line account not found');
+        const line = createScheduleLineClient(`Bearer ${account.channel_access_token}`);
+        await switchRichMenuLive(line, {
+          id: groupId,
+          size: 'large',
+          chatBarText: '',
+          isDefaultForAll: setDefault,
+          pages: shells.map((shell) => ({
+            id: shell.pageId,
+            orderIndex: shell.orderIndex,
+            name: '',
+            imageR2Key: null,
+            imageContentType: null,
+            lineRichMenuId: shell.oldLineRichMenuId,
+            areas: [],
+          })),
+        } as never, shells.map((shell) => ({
+          pageId: shell.pageId,
+          orderIndex: shell.orderIndex,
+          newRichMenuId: shell.newRichMenuId,
+        })), heartbeat);
+      },
+      compensateSwitchToPrevious: async ({ schedule, groupId, prev, newIds }) => {
+        // 切替失敗の補償: journalを消した後に呼ばれ、旧へ戻す。決して投げない。
+        const account = await getLineAccountById(env.DB, schedule.account_id);
+        if (!account?.channel_access_token) {
+          // 補償手段がない。何も消さないよう全滅扱いで返す
+          // (defaultも読めないので retainedId は不明扱い)。
+          return {
+            unrestoredPageIds: new Set(prev.oldIds.map((old) => old.pageId)),
+            defaultRestore: { state: 'failed' as const, retainedId: null },
+          };
+        }
+        const line = createScheduleLineClient(`Bearer ${account.channel_access_token}`);
+        const unrestoredPageIds = await restorePreSwitchLive(line, groupId, prev);
+        const defaultRestore = await restorePreSwitchDefault(line, prev, newIds);
+        return { unrestoredPageIds, defaultRestore };
+      },
+      deleteLineShells: async (schedule, lineRichMenuIds) => {
+        // 作った分・旧分の後片付け。404許容で決して投げない。
+        const account = await getLineAccountById(env.DB, schedule.account_id);
+        if (!account?.channel_access_token) return;
+        const line = createScheduleLineClient(`Bearer ${account.channel_access_token}`);
+        await deleteRichMenuShells(line, lineRichMenuIds);
+      },
+      restoreCapturedDefault: async (schedule, lineId) => {
+        // 固定した切替前defaultへ戻す。すでに固定値なら何もしない。
+        // 固定メニューがLINEから消えていたら勝手に解除せず投げる(恒久失敗に残す)。
+        const account = await getLineAccountById(env.DB, schedule.account_id);
+        if (!account?.channel_access_token) throw new Error('line account not found');
+        const line = createScheduleLineClient(`Bearer ${account.channel_access_token}`);
+        const current = await line.getCurrentDefaultRichMenuId();
+        if (current === lineId) return;
+        try {
+          await line.setDefaultRichMenu(lineId);
+        } catch (error) {
+          if (error instanceof Error && /setDefaultRichMenu failed: 404/.test(error.message)) {
+            throw new Error(`no_restore_target: pinned default menu ${lineId} was deleted`);
+          }
+          throw error;
+        }
+      },
+      clearAccountDefault: async (schedule) => {
+        // no_default の明示解除。このgroupのものが現在defaultのときだけ外す。
+        // 別メニューのdefaultまで壊さない。何もなければ成功扱い。
+        const scheduled = await getRichMenuGroupWithPages(env.DB, schedule.group_id);
+        const account = await getLineAccountById(env.DB, schedule.account_id);
+        if (!scheduled || !account?.channel_access_token) throw new Error('schedule group not found');
+        const line = createScheduleLineClient(`Bearer ${account.channel_access_token}`);
+        const ownIds = new Set(
+          scheduled.pages.map((page) => page.line_richmenu_id).filter((id): id is string => !!id),
+        );
+        const current = await line.getCurrentDefaultRichMenuId();
+        if (current && ownIds.has(current)) {
+          await line.clearDefaultRichMenu();
+        }
+      },
+      unlinkIndividualLinks: async (schedule) => {
+        // 期限切れメニューを指す個別割当をLINE側で外し、既定へ戻す。
+        // 解除済み・対象なしは何もしない。D1行の削除より先に呼ぶ。
+        const { listScheduleGroupIndividualLinks } = await import('@line-crm/db');
+        const targets = await listScheduleGroupIndividualLinks(env.DB, schedule.account_id, schedule.group_id);
+        if (targets.length === 0) return 0;
+        const account = await getLineAccountById(env.DB, schedule.account_id);
+        if (!account) throw new Error('line account not found');
+        const auth = `Bearer ${account.channel_access_token}`;
+        let unlinked = 0;
+        for (const target of targets) {
+          const res = await fetch(
+            `https://api.line.me/v2/bot/user/${encodeURIComponent(target.lineUserId)}/richmenu`,
+            { method: 'DELETE', headers: { Authorization: auth } },
+          );
+          if (res.status === 404) continue;
+          if (!res.ok) throw new Error(`LINE unlinkRichMenu failed: ${res.status}`);
+          unlinked += 1;
+        }
+        return unlinked;
+      },
+    }, { now: new Date(event.scheduledTime) });
+    if (result.processed > 0) {
+      console.log(JSON.stringify({ event: 'rich_menu_schedule_tick', ...result }));
+    }
+  } catch (e) {
+    console.error('rich-menu schedule error:', e);
   }
 
   // 予約画面の未予約、予約後の未視聴、フォーム途中離脱、回答後の相談未予約を

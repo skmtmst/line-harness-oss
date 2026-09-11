@@ -820,6 +820,9 @@ friends.get('/api/friends/add-breakdown', async (c) => {
   try {
     const days = Number(c.req.query('days') ?? '30');
     const lineAccountId = c.req.query('lineAccountId') ?? null;
+    if (lineAccountId && !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
     const safeDays = Number.isFinite(days) && days > 0 ? Math.min(days, 365) : 30;
     const statsScope = lineAccountId
       ? { allowedAccountIds: [lineAccountId], includeUnassigned: false }
@@ -838,6 +841,9 @@ friends.get('/api/friends/add-breakdown', async (c) => {
 friends.get('/api/friends/count', async (c) => {
   try {
     const lineAccountId = c.req.query('lineAccountId');
+    if (lineAccountId && !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
     let count: number;
     if (lineAccountId) {
       const row = await c.env.DB.prepare('SELECT COUNT(*) as count FROM friends WHERE is_following = 1 AND line_account_id = ?')
@@ -860,6 +866,9 @@ friends.get('/api/friends/count', async (c) => {
 friends.get('/api/friends/ref-stats', async (c) => {
   try {
     const lineAccountId = c.req.query('lineAccountId');
+    if (lineAccountId && !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
     const accountScope = lineAccountId ? null : await adminAccountScope(c);
     const where = lineAccountId ? 'line_account_id = ?' : accountScope!.where;
     const binds = lineAccountId ? [lineAccountId] : accountScope!.scope.allowedAccountIds;
@@ -926,6 +935,9 @@ friends.get('/api/friends/stats', async (c) => {
   try {
     const { getFriendStats } = await import('@line-crm/db');
     const accountId = c.req.query('accountId') ?? null;
+    if (accountId && !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
     const statsScope = accountId
       ? { allowedAccountIds: [accountId], includeUnassigned: false }
       : await getVisibleLineAccountScope(c.env.DB, c.get('staff')).then((scope) => ({
@@ -1141,11 +1153,13 @@ friends.get(
         return c.json({ success: false, error: 'ページ位置が正しくありません' }, 400);
       }
       const friendId = c.req.param('id');
+      // N-717: 8項のcompound SELECTはD1の SQLITE_MAX_COMPOUND_SELECT(既定5)を
+      // 超えて "too many terms in compound SELECT" になる（better-sqlite3の
+      // 既定上限は500なので手元試験は通ってしまい、D1でだけ落ちる）。
+      // 4項ずつのCTEへ割り、外側で2項のUNION ALLへまとめて5項以下に収める。
+      // UNION ALLのみを使い、順序・重複の扱いは変えていない。
       const result = await c.env.DB.prepare(
-        `SELECT timeline.id, timeline.event_type, timeline.summary,
-                timeline.source_kind, timeline.source_id, timeline.occurred_at,
-                timeline.line_account_id, la.name AS line_account_name
-           FROM (
+        `WITH group_a AS (
              SELECT ml.id,
                     CASE WHEN ml.direction = 'incoming' THEN 'message_received' ELSE 'message_sent' END AS event_type,
                     CASE WHEN ml.direction = 'incoming' THEN 'メッセージを受信しました' ELSE 'メッセージを送信しました' END AS summary,
@@ -1167,7 +1181,8 @@ friends.get(
                     'calendar_booking', cb.id, COALESCE(cb.updated_at, cb.created_at), f.line_account_id
                FROM calendar_bookings cb JOIN friends f ON f.id = cb.friend_id
               WHERE cb.friend_id = ?
-             UNION ALL
+           ),
+           group_b AS (
              SELECT eb.id, 'event_booking', 'イベント予約が更新されました',
                     'event_booking', eb.id, COALESCE(eb.updated_at, eb.requested_at), eb.line_account_id
                FROM event_bookings eb WHERE eb.friend_id = ?
@@ -1188,6 +1203,14 @@ friends.get(
              SELECT ae.id, ae.event_type, '共通イベントを記録しました',
                     ae.source_kind, ae.source_id, ae.occurred_at, ae.line_account_id
                FROM analytics_events ae WHERE ae.friend_id = ?
+           )
+         SELECT timeline.id, timeline.event_type, timeline.summary,
+                timeline.source_kind, timeline.source_id, timeline.occurred_at,
+                timeline.line_account_id, la.name AS line_account_name
+           FROM (
+             SELECT * FROM group_a
+             UNION ALL
+             SELECT * FROM group_b
            ) timeline
            LEFT JOIN line_accounts la ON la.id = timeline.line_account_id
           ORDER BY timeline.occurred_at DESC, timeline.id DESC

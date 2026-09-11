@@ -24,10 +24,17 @@ describe('V6 EC integration screens', () => {
     expect(tabsView).toContain('Promise.allSettled')
     expect(tabsView).toContain('api.ecCommerce.overview(accountId)')
     expect(tabsView).toContain('api.ecCommerce.operationIdentityCandidates')
-    expect(tabsView).toContain('api.ecCommerce.subscriptions')
     expect(tabsView).toContain("overview.status === 'fulfilled' && overview.value.success")
     expect(tabsView).toContain("identities.status === 'fulfilled' && identities.value.success")
-    expect(tabsView).toContain("subscriptions.status === 'fulfilled' && subscriptions.value.success")
+    /*
+     * 定期便の件数は `overview` から取る(#731)。以前は `api.ecCommerce.subscriptions`
+     * を `limit:1` で叩いていたが、**`limit:1` でも 500 行ぶん働く**作りだった。
+     * 元の表明「どの数も API が数えたものだけを出し、失敗を 0 と偽らない」は
+     * ここで保つ——定期便も `overview` の成否判定の中に入るので、失敗時は
+     * `undefined`(タブに数字を出さない)のままになる。
+     */
+    expect(tabsView).toContain('overview.value.data.subscriptions')
+    expect(tabsView).not.toContain('api.ecCommerce.subscriptions')
   })
 
   it('shows the V6 decision information without inventing unavailable values', () => {
@@ -86,8 +93,8 @@ describe('V6 EC integration screens', () => {
     // 21件目以降の失敗に届かない(#517 中1)。絞りはサーバへ渡し、手元で再絞りしない。
     expect(page).toContain('actionServerFilter(status)')
     expect(page).toContain("statusGroup: status")
-    expect(page).toContain('offset: (page - 1) * ACTION_PAGE_SIZE')
-    expect(page).toContain('setActionTotal(actionsResponse.data.total)')
+    expect(page).toContain('offset: String((page - 1) * ACTION_PAGE_SIZE)')
+    expect(page).toContain('total: response.data.total')
     expect(page).toContain('pageCount > 1 ? <Pagination')
     expect(page).not.toContain("return action.status === status")
     expect(api).toContain("statusGroup?: 'processing' | 'failed'")

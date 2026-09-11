@@ -633,6 +633,8 @@ export type OperationImpactMetric = {
   friendCount: number | null
   pendingCount?: number
   nearestScheduledAt?: string | null
+  /** trueのとき、friendCountは代表サンプルだけの合計(下限値)。省略時は全件。 */
+  friendCountIsPartial?: boolean
 }
 
 export type OperationImpactPreview = Record<
@@ -757,6 +759,8 @@ export type FormDeleteImpact = {
   referenceCount: number
   answerUrl: string | null
   revision: number
+  /** 編集の版(#723)。受付停止が updateForm を通るので、ここから渡す。 */
+  contentRevision: number
   checkedAt: string
   canDelete: boolean
   canArchive: boolean
@@ -1876,8 +1880,15 @@ function announceFeatureDisabled(status: number, code: string | undefined, raw: 
 export function extractApiErrorData(raw: string): unknown {
   if (!raw) return undefined
   try {
-    const body = JSON.parse(raw) as { data?: unknown }
-    return body && typeof body === 'object' ? body.data : undefined
+    const body = JSON.parse(raw) as { data?: unknown; currentVersion?: unknown }
+    if (!body || typeof body !== 'object') return undefined
+    if (body.data !== undefined) return body.data
+    // 旧成果地点APIは互換性のため currentVersion を最上位で返す。
+    // 409の機械データとして同じdata口へ正規化し、画面が再取得判断に使えるようにする。
+    if (Number.isSafeInteger(body.currentVersion) && Number(body.currentVersion) >= 1) {
+      return { currentVersion: Number(body.currentVersion) }
+    }
+    return undefined
   } catch {
     return undefined
   }
@@ -3132,6 +3143,8 @@ export type EcCommerceOverview = {
   last24h: number
   lastReceivedAt: string | null
   byType: Array<{ eventType: string; label: string; count: number }>
+  /** 定期便の契約数。タブの数字はここから取る(#731)。 */
+  subscriptions: number
 }
 
 export type EcCommerceEvent = {
@@ -3287,6 +3300,8 @@ export type EcSubscriptionList = {
     cancellationTopReason: string | null
     monthlyStats: Array<{ month: string; count: number; amount: number }>
   }
+  /** 形が違って読めなかったスナップショットの数。0 でも必ず返る(#731)。 */
+  skipped: { malformedSnapshots: number }
   risk: {
     source: 'payment_status'
     ruleVersion: string
@@ -3614,6 +3629,13 @@ export type PhotoReviewMetrics = {
   attentionCount: number
 }
 
+/** GET /api/accounts/health-summary の応答。ログ本文は含まない。 */
+export type AccountHealthSummary = {
+  items: Array<{ lineAccountId: string; riskLevel: string | null }>
+  warningCount: number
+  dangerCount: number
+}
+
 export type PhotoAssetRun = {
   id: string
   photoId: string
@@ -3656,6 +3678,20 @@ export type PhotoBulkDecision = {
   reasonNote: string | null
 }
 
+export type PhotoBulkReviewResult = {
+  updatedCount: number
+  items: Array<{
+    photoId: string
+    decision: 'approve' | 'return' | 'reject'
+    reviewVersion: number
+    decisionId: string
+    notificationStatus: 'sent' | 'failed'
+    notificationError?: string
+  }>
+  notificationFailures: Array<{ photoId: string; error: string }>
+  reconciled?: boolean
+}
+
 export type AdPlatform = {
   id: string
   /** meta / x / google / tiktok */
@@ -3664,6 +3700,7 @@ export type AdPlatform = {
   /** 鍵は先頭と末尾だけ残して伏せてある。 */
   config: Record<string, unknown>
   isActive: boolean
+  lineAccountId: string | null
   createdAt: string
   updatedAt: string
 }
@@ -3672,6 +3709,7 @@ export type AdConversionLog = {
   id: string
   adPlatformId: string
   friendId: string
+  lineAccountId: string | null
   eventName: string
   clickId: string | null
   clickIdType: string | null
@@ -3878,6 +3916,7 @@ export type FriendAddRuleDefinition = {
   timing: 'immediate' | 'scenario'
   actions: FriendAddRuleAction[]
   friendCondition: string
+  internalMemo?: string
   activeFrom: string | null
   activeUntil: string | null
   returningMode?: 'none' | 'same' | 'other'
@@ -4234,6 +4273,22 @@ export const api = {
       accountId: string,
       expectedVersion: number,
       data: SaveTagDefinition & { automationId?: string | null; automationDraftVersion?: string | null },
+    ) => fetchApi<ApiResponse<TagDefinition & { queued: number }>>(`/api/tags/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ lineAccountId: accountId, expectedVersion, ...data }),
+    }),
+    /**
+     * 保管済み(archived)タグの訂正専用（Issue #710）。名前と説明だけ送る。
+     * `updateDefinition` は `SaveTagDefinition` の必須項目（マイル・連動
+     * アクションなど）を要求するため、archived タグでは使えない。
+     * サーバ側（`updateTagDefinition`）も archived では名前と説明以外の
+     * 実質的な変更を拒否するので、ここで送らなくても保護は効く。
+     */
+    updateArchivedNameAndDescription: (
+      id: string,
+      accountId: string,
+      expectedVersion: number,
+      data: { name?: string; description?: string | null },
     ) => fetchApi<ApiResponse<TagDefinition & { queued: number }>>(`/api/tags/${id}`, {
       method: 'PATCH',
       body: JSON.stringify({ lineAccountId: accountId, expectedVersion, ...data }),
@@ -4739,6 +4794,10 @@ export const api = {
         errorCode: string | null
         result: AnalyticsCrossResult | null
         createdAt: string
+        queuePosition: number | null
+        pendingAhead: number
+        estimatedWaitMs: number | null
+        nextTickAt: string | null
       }>>(`/api/analytics/cross/results/${id}?account_id=${encodeURIComponent(accountId)}`),
     createResultAudience: (accountId: string, resultId: string, data: {
       sourceKind: 'cross' | 'funnel'
@@ -4918,6 +4977,14 @@ export const api = {
           ogTitle: string | null
           ogDescription: string | null
           ogImageUrl: string | null
+          /**
+           * 編集の版(#723)。保存でそのまま送り返す。
+           *
+           * サーバは前からこれを返していたのに、この型が落としていたので
+           * 画面が版を持てず、2人が同時に編集すると後勝ちで黙って上書き
+           * されていた。型に無いものは、来ていないことに誰も気づけない。
+           */
+          contentRevision: number
         }>
       >(`/api/forms/${id}?account_id=${encodeURIComponent(accountId)}`),
     create: (
@@ -4949,12 +5016,19 @@ export const api = {
         ogTitle?: string | null
         ogDescription?: string | null
         ogImageUrl?: string | null
+        /**
+         * 確認した編集の版(#723)。**必須。**
+         *
+         * 省けるようにすると、省いた呼び出しが楽観ロックを丸ごと迂回する。
+         * 受付停止のような1項目の更新も同じ口を通るので、例外を作らない。
+         */
+        expectedContentRevision: number
       },
     ) =>
-      fetchApi<ApiResponse<{ id: string }>>(`/api/forms/${id}?account_id=${encodeURIComponent(accountId)}`, {
-        method: 'PUT',
-        body: JSON.stringify(data),
-      }),
+      fetchApi<ApiResponse<{ id: string; contentRevision: number; updatedAt: string }>>(
+        `/api/forms/${id}?account_id=${encodeURIComponent(accountId)}`,
+        { method: 'PUT', body: JSON.stringify(data) },
+      ),
     deleteImpact: (id: string, accountId: string) =>
       fetchApi<ApiResponse<FormDeleteImpact>>(
         `/api/forms/${id}/delete-impact?account_id=${encodeURIComponent(accountId)}`,
@@ -5174,6 +5248,7 @@ export const api = {
       varKey: string
       type?: string
       value?: string
+      memo?: string
       folderId?: string | null
     }) =>
       fetchApi<ApiResponse<CommonVar>>('/api/common-vars', {
@@ -5240,8 +5315,14 @@ export const api = {
   },
   /** 汎用フォルダ。一覧13画面で共通に使う。 */
   folders: {
+    /**
+     * `unfiledCount` は「未分類」タブと同じ母集団で数えた件数（#631）。
+     * `kind` を渡さない、または件数の母集団が確立できていない種別
+     * （#730）では省かれる（`undefined`）。**`0` と紛れないよう、
+     * 呼び出し側は存在チェックしてから使うこと。**
+     */
     list: (kind?: string) =>
-      fetchApi<ApiResponse<Folder[]>>(`/api/folders${kind ? `?kind=${kind}` : ''}`),
+      fetchApi<ApiResponse<Folder[]> & { unfiledCount?: number }>(`/api/folders${kind ? `?kind=${kind}` : ''}`),
     /** 色（#RRGGBB）はフォルダに付く。中身の印にこの色が出る。 */
     create: (data: { kind: string; name: string; parentId?: string | null; color?: string | null }) =>
       fetchApi<ApiResponse<Folder>>('/api/folders', {
@@ -6224,6 +6305,30 @@ export const api = {
       `/api/conversions/definitions/${encodeURIComponent(id)}/replace`,
       { method: 'POST', body: JSON.stringify(data) },
     ),
+    /** 成果地点を、履歴を保ったまま編集して次の版にする（N-252）。 */
+    reviseDefinition: (id: string, data: {
+      expectedVersion: number
+      name: string
+      sourceType: string
+      sourceConfig?: Record<string, unknown>
+      deduplicationMode: 'every' | 'once_per_friend' | 'window'
+      deduplicationWindowDays?: number | null
+      valueMode: 'source' | 'fixed' | 'none'
+      fixedValue?: number | null
+      reversalPolicy: 'source_cancelled' | 'manual' | 'none'
+      attributionDays?: number | null
+      targetUrl?: string | null
+      reason?: string
+    }) => fetchApi<ApiResponse<{
+      id: string
+      version: number
+      revisionId: string
+      movedUsages: number
+      updatedAt: string
+    }>>(
+      `/api/conversions/definitions/${encodeURIComponent(id)}/revise`,
+      { method: 'POST', body: JSON.stringify(data) },
+    ),
     deleteDefinition: (id: string, data: { expectedVersion: number; reason?: string }) =>
       fetchApi<ApiResponse<{ id: string; deleted: true }>>(
         `/api/conversions/definitions/${encodeURIComponent(id)}`,
@@ -6265,7 +6370,7 @@ export const api = {
         method: 'POST',
         body: JSON.stringify(data),
       }),
-    /** 送った項目だけを書き換える。 */
+    /** 送った項目だけを書き換える。版の一致が必須(N-254)。 */
     updatePoint: (id: string, data: {
       name?: string
       eventType?: string
@@ -6275,14 +6380,17 @@ export const api = {
       countRepeat?: boolean
       attributionDays?: number | null
       lineAccountId?: string | null
+      /** 必須。ずれると409 */
+      expectedVersion: number
     }) =>
       fetchApi<ApiResponse<ConversionPoint>>(`/api/conversions/points/${id}`, {
         method: 'PUT',
         body: JSON.stringify(data),
       }),
-    deletePoint: (id: string) =>
-      fetchApi<ApiResponse<null>>(`/api/conversions/points/${id}`, { method: 'DELETE' }),
-    track: (data: { conversionPointId: string; friendId: string; userId?: string | null; affiliateCode?: string | null; metadata?: Record<string, unknown> | null }) =>
+    /** 停止する。版の一致が必須(N-254)。本文が落ちる通信経路でも届くようクエリで送る。 */
+    deletePoint: (id: string, expectedVersion: number) =>
+      fetchApi<ApiResponse<null>>(`/api/conversions/points/${id}?expectedVersion=${expectedVersion}`, { method: 'DELETE' }),
+    track: (data: { conversionPointId: string; friendId: string; userId?: string | null; affiliateCode?: string | null; metadata?: Record<string, unknown> | null; idempotencyKey?: string | null }) =>
       fetchApi<ApiResponse<unknown>>('/api/conversions/track', {
         method: 'POST',
         body: JSON.stringify(data),
@@ -6308,6 +6416,8 @@ export const api = {
       friendId?: string
       issueInitialLink?: boolean
       lineAccountId?: string
+      /** 安定した操作UUID（#686）。同じ値での再送は同じ登録を返す。 */
+      operationId?: string
     }) =>
       fetchApi<ApiResponse<Affiliate> & { link?: { refCode: string; url: string } | null }>(
         '/api/affiliates',
@@ -6523,6 +6633,14 @@ export const api = {
         /** Monthly and lifetime delivery totals. null when unavailable. */
         monthlySendCount: number | null;
         totalSendCount: number | null;
+        /** 347: 公開待ちの下書きがあるか。 */
+        hasDraft: boolean;
+        /** 347: 公開版の版番号。未公開は0。 */
+        publishedVersion: number;
+        /** 347: 最後に公開した日時。未公開はnull。 */
+        publishedAt: string | null;
+        /** 347: いまの下書き版。公開で0に戻る。 */
+        draftRevision: number;
         createdAt: string;
         updatedAt: string;
       }>>>(
@@ -6556,8 +6674,40 @@ export const api = {
         };
         createdAt: string;
         updatedAt: string;
+        /** 347: 公開待ちの下書きがあるか。 */
+        hasDraft: boolean;
+        /** 347: 公開版の版番号。未公開は0。 */
+        publishedVersion: number;
+        /** 347: 最後に公開した日時。未公開はnull。 */
+        publishedAt: string | null;
+        /** 347: いまの下書き版。公開で0に戻る。 */
+        draftRevision: number;
       }>>(
         `/api/templates/${id}`,
+      ),
+    /**
+     * 独立審査(指摘6): 下書きを公開版へ写す。確認キーは自動で振る。
+     * 詳細口が返す publishedVersion・draftRevision をそのまま渡す。
+     */
+    publish: (id: string, data: { expectedVersion: number; expectedDraftRevision: number }) =>
+      fetchApi<ApiResponse<{
+        id: string;
+        accountId: string | null;
+        messageType: string;
+        messageContent: string;
+        publishedVersion: number;
+        publishedAt: string | null;
+        published: boolean;
+        replayed: boolean;
+        hasDraft: boolean;
+        draftRevision: number;
+      }>>(
+        `/api/templates/${id}/publish`,
+        {
+          method: 'POST',
+          headers: { 'Idempotency-Key': crypto.randomUUID() },
+          body: JSON.stringify(data),
+        },
       ),
     create: (data: {
       accountId: string
@@ -7363,6 +7513,11 @@ export const api = {
       fetchApi<{ success: boolean }>(`/api/nen-campaigns/settings/${encodeURIComponent(campaignKey)}?lineAccountId=${encodeURIComponent(accountId)}`, {
         method: 'PUT', body: JSON.stringify(data),
       }),
+    /** 一覧の停止・再開だけを切り替える。本文の長さに関わらず必ず実行できる（#659）。 */
+    setEnabled: (accountId: string, campaignKey: string, isEnabled: boolean) =>
+      fetchApi<{ success: boolean }>(`/api/nen-campaigns/settings/${encodeURIComponent(campaignKey)}/enabled?lineAccountId=${encodeURIComponent(accountId)}`, {
+        method: 'PUT', body: JSON.stringify({ isEnabled }),
+      }),
     testSend: (data: { campaignKey: string; accountId: string; friendId: string }) =>
       fetchApi<{ success: boolean }>('/api/nen-campaigns/test-send', { method: 'POST', body: JSON.stringify(data) }),
     jobs: (accountId: string) => fetchApi<ApiResponse<Array<{
@@ -7452,7 +7607,7 @@ export const api = {
     bulkReviewPhotos: (
       data: { lineAccountId: string; decisions: PhotoBulkDecision[] },
       idempotencyKey: string,
-    ) => fetchApi<ApiResponse<{ updatedCount: number; awardedPoints: number; notificationFailures: number }>>(
+    ) => fetchApi<ApiResponse<PhotoBulkReviewResult>>(
       '/api/nen-members/photos/decisions/bulk',
       { method: 'POST', headers: { 'Idempotency-Key': idempotencyKey }, body: JSON.stringify(data) },
     ),
@@ -8171,6 +8326,9 @@ export const api = {
       fetchApi<ApiResponse<{ riskLevel: string; logs: AccountHealthLog[] }>>(
         `/api/accounts/${accountId}/health`,
       ),
+    /** サイドバーの警告数用。staff可視範囲の最新riskLevelだけを1回で取る。ログ本文なし。 */
+    summary: () =>
+      fetchApi<ApiResponse<AccountHealthSummary>>('/api/accounts/health-summary'),
     migrations: () =>
       fetchApi<ApiResponse<AccountMigration[]>>('/api/accounts/migrations'),
     migrate: (fromAccountId: string, data: { toAccountId: string }) =>
@@ -8372,6 +8530,27 @@ export const api = {
           headers: { 'Idempotency-Key': idempotencyKey },
           body: JSON.stringify(input),
         },
+      ),
+
+    listSchedules: (groupId: string) =>
+      fetchApi<ApiResponse<Array<{
+        id: string
+        mode: 'scheduled' | 'period'
+        startsAt: string
+        endsAt: string | null
+        restoreGroupId: string | null
+        restoreDefaultState: 'captured' | 'no_default' | null
+        status: string
+        attemptCount: number
+        nextRetryAt: string | null
+        lastErrorCode: string | null
+        createdAt: string
+      }>>>(`/api/rich-menu-groups/${groupId}/schedules`),
+
+    cancelSchedule: (groupId: string, scheduleId: string) =>
+      fetchApi<ApiResponse<{ id: string; status: string }>>(
+        `/api/rich-menu-groups/${groupId}/schedules/${scheduleId}/cancel`,
+        { method: 'POST' },
       ),
 
     create: (input: {
@@ -8690,6 +8869,8 @@ export const api = {
       lineAccountId?: string | null
       tagId?: string | null
       scenarioId?: string | null
+      /** 安定した操作UUID（#686）。同じ値での再送は同じ登録を返す。 */
+      operationId?: string
     }) =>
       fetchApi<{ success: boolean; data: AffiliateOffer }>('/api/affiliate-offers', {
         method: 'POST',
@@ -9110,6 +9291,39 @@ export interface BookingAvailabilityRule {
   is_active: number;
 }
 
+export interface BookingBreak {
+  id: string;
+  weekday: number;
+  start_time: string;
+  end_time: string;
+  time_zone: string;
+}
+
+export interface BookingDateBreak {
+  id: string;
+  work_date: string;
+  start_time: string;
+  end_time: string;
+  time_zone: string;
+  start_utc_offset: string;
+  end_utc_offset: string;
+}
+
+export interface BookingBreaksResponse {
+  breaks: BookingBreak[];
+  version: string;
+}
+
+export interface BookingDateBreaksResponse {
+  breaks: BookingDateBreak[];
+  version: string;
+}
+
+export interface BookingBreakConflict {
+  version: string;
+  breaks: Array<{ id: string; weekday?: number; work_date?: string; start_time: string; end_time: string }>;
+}
+
 export interface BookingGoogleCalendarConnection {
   id: string;
   calendar_id: string;
@@ -9123,6 +9337,12 @@ export interface BookingAvailabilitySlot {
   date: string;
   start: string;
   end: string;
+  /** 店舗タイムゾーン名。表示・送信はこの zone で読む。 */
+  timeZone: string;
+  /** 開始 instant（offset 付き ISO。fold 日の重複壁時刻も一意になる）。 */
+  startUtc: string;
+  /** 終了 instant（開始＋所要分。offset 付き ISO）。 */
+  endUtc: string;
   capacity: number;
   remaining: number;
   state: 'available' | 'limited' | 'full' | 'closed';
@@ -9471,6 +9691,34 @@ export const bookingApi = {
     fetchApi<{ ok: true; count: number }>(
       withAccount(`/api/booking/admin/staff/${staffId}/availability-rules`, accountId),
       { method: 'PUT', body: JSON.stringify({ rules }) },
+    ),
+  getBreaks: (accountId: string, staffId: string) =>
+    fetchApi<BookingBreaksResponse>(
+      withAccount(`/api/booking/admin/staff/${staffId}/breaks`, accountId),
+    ),
+  putBreaks: (
+    accountId: string,
+    staffId: string,
+    expectedVersion: string,
+    breaks: Array<{ id?: string; weekday: number; start_time: string; end_time: string }>,
+  ) =>
+    fetchApi<{ ok: true; count: number; version: string; breaks: BookingBreak[] }>(
+      withAccount(`/api/booking/admin/staff/${staffId}/breaks`, accountId),
+      { method: 'PUT', body: JSON.stringify({ expectedVersion, breaks }) },
+    ),
+  getBreakDates: (accountId: string, staffId: string) =>
+    fetchApi<BookingDateBreaksResponse>(
+      withAccount(`/api/booking/admin/staff/${staffId}/break-dates`, accountId),
+    ),
+  putBreakDates: (
+    accountId: string,
+    staffId: string,
+    expectedVersion: string,
+    breaks: Array<{ id?: string; work_date: string; start_time: string; end_time: string }>,
+  ) =>
+    fetchApi<{ ok: true; count: number; version: string; breaks: BookingDateBreak[] }>(
+      withAccount(`/api/booking/admin/staff/${staffId}/break-dates`, accountId),
+      { method: 'PUT', body: JSON.stringify({ expectedVersion, breaks }) },
     ),
   getGoogleCalendar: (accountId: string, staffId: string) =>
     fetchApi<{

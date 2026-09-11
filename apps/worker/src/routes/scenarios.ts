@@ -10,6 +10,8 @@ import {
   deleteScenarioStep,
   enrollFriendInScenario,
   getFriendById,
+  getScenarioPublishedVersion,
+  publishScenarioVersion,
   computeNextDeliveryAt,
 } from '@line-crm/db';
 import { reorderScenarios } from '@line-crm/db';
@@ -327,8 +329,15 @@ function serializeFriendScenario(row: DbFriendScenario) {
     status: row.status,
     startedAt: row.started_at,
     nextDeliveryAt: row.next_delivery_at,
+    // 開始時に固定した公開版。null は版より前の購読。
+    publishedVersionId: row.published_version_id ?? null,
     updatedAt: row.updated_at,
   };
+}
+
+/** 公開操作の確認キー。自動応答の公開口と同じ基準。 */
+function validScenarioPublishKey(value: string | undefined): value is string {
+  return Boolean(value && value.length >= 8 && value.length <= 200 && /^[A-Za-z0-9._:-]+$/.test(value));
 }
 
 /**
@@ -669,6 +678,10 @@ scenarios.delete('/api/scenarios/:id', requireRole('owner', 'admin'), async (c) 
     await deleteScenario(c.env.DB, id);
     return c.json({ success: true, data: null });
   } catch (err) {
+    const code = err instanceof Error ? err.message : '';
+    if (code === 'SCENARIO_HAS_DEPENDENTS' || /FOREIGN KEY/i.test(code)) {
+      return c.json({ success: false, error: '他の機能から使われているため削除できません。先に連携を外してください。' }, 409);
+    }
     console.error('DELETE /api/scenarios/:id error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
@@ -1126,9 +1139,9 @@ scenarios.get('/api/scenarios/:id/preview', scenarioPermission('view'), async (c
     }
     const scenarioId = c.req.param('id');
     const scenarioRow = await c.env.DB
-      .prepare(`SELECT delivery_mode FROM scenarios WHERE id = ?`)
+      .prepare(`SELECT delivery_mode, line_account_id FROM scenarios WHERE id = ?`)
       .bind(scenarioId)
-      .first<{ delivery_mode: DeliveryMode }>();
+      .first<{ delivery_mode: DeliveryMode; line_account_id: string | null }>();
     if (!scenarioRow) return c.json({ success: false, error: 'Scenario not found' }, 404);
 
     const stepsResult = await c.env.DB
@@ -1154,9 +1167,10 @@ scenarios.get('/api/scenarios/:id/preview', scenarioPermission('view'), async (c
 
     // 配信時と同じ resolveStepContent を呼んで、template_id があれば templates から
     // 最新内容を取って preview に返す。これで配信と preview の表示が一致する。
+    // シナリオの line_account_id を渡し、配信時と同じく公開版・同一アカウントだけを解決する。
     const resolvedSteps = await Promise.all(
       steps.map(async (step) => {
-        const resolved = await resolveStepContent(c.env.DB, step);
+        const resolved = await resolveStepContent(c.env.DB, step, scenarioRow.line_account_id);
         return { step, resolved };
       }),
     );
@@ -1348,6 +1362,17 @@ scenarios.post('/api/scenarios/:id/enroll/:friendId', requireRole('owner', 'admi
     if ((friend as { is_following?: number | null }).is_following !== 1) {
       return c.json({ success: false, error: 'ブロック中の友だちは登録できません。' }, 422);
     }
+    /*
+     * 未公開・停止中の契約はここで正直に返す。enrollFriendInScenario は
+     * webhook 経路の副作用でも使うので null に倒すだけだが、手動登録では
+     * 理由を 422 で返す（N-050 / #644）。
+     */
+    if (!scenario.is_active) {
+      return c.json({ success: false, error: '停止中のシナリオには登録できません。' }, 422);
+    }
+    if (!await getScenarioPublishedVersion(db, scenarioId)) {
+      return c.json({ success: false, error: 'まだ公開されていないため登録できません。先に公開してください。' }, 422);
+    }
 
     const enrollment = await enrollFriendInScenario(db, friendId, scenarioId);
     if (!enrollment) {
@@ -1357,6 +1382,46 @@ scenarios.post('/api/scenarios/:id/enroll/:friendId', requireRole('owner', 'admi
   } catch (err) {
     console.error('POST /api/scenarios/:id/enroll/:friendId error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+// POST /api/scenarios/:id/publish — いまの下書きを公開版として固定する。
+//
+// 下書きの編集は公開するまで配信へ混入しない。購読は開始時の版へ固定され、
+// 開始後の編集は次に公開した版の購読から使う（N-050 / #644）。
+// アカウント境界は /api/scenarios/:id 系の共通ミドルウェアで 404 にする。
+scenarios.post('/api/scenarios/:id/publish', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const requestKey = c.req.header('Idempotency-Key');
+    if (!validScenarioPublishKey(requestKey)) {
+      return c.json({ success: false, error: '公開操作の確認キーが必要です' }, 400);
+    }
+    const published = await publishScenarioVersion(c.env.DB, c.req.param('id'), {
+      staffId: c.get('staff')?.id ?? null,
+      idempotencyKey: requestKey,
+    });
+    return c.json({
+      success: true,
+      data: {
+        scenarioId: c.req.param('id'),
+        versionId: published.id,
+        versionNumber: Number(published.version_number),
+        publishedAt: published.published_at,
+      },
+    });
+  } catch (err) {
+    const code = err instanceof Error ? err.message : '';
+    if (code === 'SCENARIO_NOT_FOUND') {
+      return c.json({ success: false, error: 'シナリオが見つかりません' }, 404);
+    }
+    if (code === 'SCENARIO_PUBLISH_KEY_CONFLICT') {
+      return c.json({ success: false, error: '同じ確認キーが別の内容・別の公開操作で使われています' }, 409);
+    }
+    if (code === 'SCENARIO_PUBLISH_CONFLICT') {
+      return c.json({ success: false, error: '同時公開が競合しました。もう一度公開してください' }, 409);
+    }
+    console.error('POST /api/scenarios/:id/publish error:', err);
+    return c.json({ success: false, error: 'シナリオを公開できませんでした' }, 500);
   }
 });
 

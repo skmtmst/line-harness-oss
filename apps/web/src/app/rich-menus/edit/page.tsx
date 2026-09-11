@@ -15,6 +15,8 @@ import StickyBar from '@/components/shared/sticky-bar'
 import type { SegmentCondition } from '@/lib/segment-condition'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { RICH_MENU_DIMENSIONS } from '@line-crm/shared'
+import { datetimeLocalJstToUtcIso } from '@/lib/jst-datetime'
+import { useScheduleSubmit } from './schedule-submit'
 
 /**
  * 保存されている条件を読む。
@@ -214,6 +216,23 @@ function Editor({
   const [confirmError, setConfirmError] = useState('')
   /** 登録・取り下げの結果。`alert()` の代わりに画面へ残す。 */
   const [notice, setNotice] = useState('')
+  /*
+   * 公開予約の保存。1操作の Idempotency-Key を応答が確定するまで持ち続ける
+   * (押し直しで同じ予約が2件にならないようにする)。中身は schedule-submit.ts。
+   */
+  const scheduleSubmit = useScheduleSubmit({
+    groupId: group?.id ?? '',
+    persistDraft: () => persistDraft(),
+    onSaving: setSaving,
+    onSaved: (message) => {
+      setError(null)
+      setNotice(message)
+    },
+    onFailed: (message) => {
+      setNotice('')
+      setError(message)
+    },
+  })
   /**
    * 下見で押したときに「何が起きるか」。
    *
@@ -667,25 +686,7 @@ function Editor({
         publishing={publishing}
         onSave={() => void handleSave()}
         onPublishNow={() => void handlePublish()}
-        onSchedule={async (input) => {
-          setSaving(true)
-          setNotice('')
-          setError(null)
-          try {
-            await persistDraft()
-            const response = await api.richMenuGroups.schedule(
-              group.id,
-              input,
-              crypto.randomUUID(),
-            )
-            if (!response.success) throw new Error(response.error)
-            setNotice('公開予約を保存しました。予約時点の内容で公開します。')
-          } catch {
-            setError('公開予約を保存できませんでした。入力と通信状態を確認して、もう一度お試しください。')
-          } finally {
-            setSaving(false)
-          }
-        }}
+        onSchedule={scheduleSubmit}
       />
     )
   }
@@ -1415,6 +1416,68 @@ function PublishStep({
     })
   }, [group.accountId, group.id])
 
+  const [schedules, setSchedules] = useState<Array<{
+    id: string
+    mode: 'scheduled' | 'period'
+    startsAt: string
+    endsAt: string | null
+    restoreGroupId: string | null
+    restoreDefaultState: 'captured' | 'no_default' | null
+    status: string
+    attemptCount: number
+    nextRetryAt: string | null
+    lastErrorCode: string | null
+    createdAt: string
+  }>>([])
+  const [schedulesNotice, setSchedulesNotice] = useState('')
+  const [schedulesError, setSchedulesError] = useState('')
+  const [cancellingId, setCancellingId] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    void api.richMenuGroups.listSchedules(group.id).then((response) => {
+      if (cancelled) return
+      if (!response.success) {
+        setSchedulesError('予約一覧を取得できませんでした。時間をおいて開き直してください。')
+        return
+      }
+      setSchedulesError('')
+      setSchedules(response.data)
+    }).catch(() => {
+      if (!cancelled) setSchedulesError('予約一覧を取得できませんでした。時間をおいて開き直してください。')
+    })
+    return () => { cancelled = true }
+  }, [group.id])
+
+  const refreshSchedules = useCallback(() => {
+    void api.richMenuGroups.listSchedules(group.id).then((response) => {
+      if (!response.success) {
+        setSchedulesError('予約一覧を取得できませんでした。時間をおいて開き直してください。')
+        return
+      }
+      setSchedulesError('')
+      setSchedules(response.data)
+    }).catch(() => {
+      setSchedulesError('予約一覧を取得できませんでした。時間をおいて開き直してください。')
+    })
+  }, [group.id])
+
+  const cancelSchedule = useCallback(async (scheduleId: string) => {
+    setCancellingId(scheduleId)
+    setSchedulesNotice('')
+    try {
+      const response = await api.richMenuGroups.cancelSchedule(group.id, scheduleId)
+      if (!response.success) throw new Error(response.error)
+      setSchedulesNotice('予約を取り消しました。')
+      refreshSchedules()
+    } catch {
+      setSchedulesNotice('予約を取り消せませんでした。実行が始まっている可能性があります。')
+      refreshSchedules()
+    } finally {
+      setCancellingId(null)
+    }
+  }, [group.id, refreshSchedules])
+
   const unconfiguredAreas = pages.reduce((count, page) => count + page.areas.filter((area) => !area.label).length, 0)
   const imageReady = pages.length > 0 && pages.every((page) => page.imageR2Key)
   const submit = () => {
@@ -1425,10 +1488,10 @@ function PublishStep({
     if (!startsAt || (mode === 'period' && !endsAt)) return
     void onSchedule({
       mode,
-      startsAt: new Date(startsAt).toISOString(),
-      endsAt: mode === 'period' ? new Date(endsAt).toISOString() : null,
+      startsAt: datetimeLocalJstToUtcIso(startsAt),
+      endsAt: mode === 'period' ? datetimeLocalJstToUtcIso(endsAt) : null,
       restoreGroupId: mode === 'period' ? restoreGroupId || null : null,
-    })
+    }).then(() => refreshSchedules()).catch(() => refreshSchedules())
   }
 
   return (
@@ -1454,7 +1517,7 @@ function PublishStep({
             <div className="border-hairline mt-5 grid gap-4 border-t pt-5 sm:grid-cols-2">
               <label className="text-ink-secondary text-xs font-semibold">出しはじめ<input aria-label="出しはじめ" type="datetime-local" value={startsAt} onChange={(event) => setStartsAt(event.target.value)} className="border-hairline rounded-control text-ink mt-1 block w-full border px-3 py-2 text-sm" /></label>
               {mode === 'period' ? <label className="text-ink-secondary text-xs font-semibold">出しおわり<input aria-label="出しおわり" type="datetime-local" value={endsAt} onChange={(event) => setEndsAt(event.target.value)} className="border-hairline rounded-control text-ink mt-1 block w-full border px-3 py-2 text-sm" /></label> : null}
-              {mode === 'period' ? <label className="text-ink-secondary text-xs font-semibold sm:col-span-2">終わったらどうする<SelectField aria-label="終わったらどうする" value={restoreGroupId} onChange={(event) => setRestoreGroupId(event.target.value)} options={[{ value: '', label: '前のメニューに戻す' }, ...restoreMenus.map((item) => ({ value: item.id, label: item.name }))]} className="mt-1" /></label> : null}
+              {mode === 'period' ? <label className="text-ink-secondary text-xs font-semibold sm:col-span-2">終わったらどうする<SelectField aria-label="終わったらどうする" value={restoreGroupId} onChange={(event) => setRestoreGroupId(event.target.value)} options={[{ value: '', label: '前のメニューに戻す（実行開始時に確定）' }, ...restoreMenus.map((item) => ({ value: item.id, label: item.name }))]} className="mt-1" /><span className="text-ink-faint mt-1 block text-xs">{restoreGroupId ? '終了時に選んだメニューへ戻します。' : '「前のメニューに戻す」は実行開始の直前、そのときに表示中のメニューに確定します。表示中のメニューが無い場合は終了時に表示を外します。'}</span></label> : null}
             </div>
           ) : null}
 
@@ -1474,7 +1537,51 @@ function PublishStep({
           <section className="bg-status-info-soft text-status-info rounded-card p-5 text-xs leading-5"><h2 className="text-sm font-bold">公開すると何が変わるか</h2><p className="mt-2"><MetricValue metric={preview?.effective} /> のトーク画面のメニューが入れ替わります。</p><p className="mt-2">LINEへの反映は数分かかることがあります。</p></section>
         </aside>
       </div>
+      <section aria-label="公開予約の一覧" className="border-hairline bg-canvas rounded-card mt-5 border p-6">
+        <h2 className="text-ink text-sm font-bold">公開予約の一覧</h2>
+        {schedulesNotice ? <p role="status" className="text-ink mt-2 text-xs">{schedulesNotice}</p> : null}
+        {schedulesError ? <p role="alert" className="text-danger mt-2 text-xs">{schedulesError}</p> : null}
+        {!schedulesError ? (schedules.length === 0 ? (
+          <p className="text-ink-faint mt-2 text-xs">まだ公開予約はありません。日時を決めて予約するとここに出ます。</p>
+        ) : (
+          <ul className="mt-3 space-y-2">
+            {schedules.map((item) => (
+              <li key={item.id} className="border-hairline flex flex-wrap items-center justify-between gap-2 rounded border px-3 py-2 text-xs">
+                <span className="text-ink">
+                  {new Date(item.startsAt).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })} 開始
+                  {item.mode === 'period' && item.endsAt ? ` 〜 ${new Date(item.endsAt).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}` : ''}
+                  {' ・ '}
+                  {item.status === 'scheduled' ? '予約中'
+                    : item.status === 'publishing' ? '公開処理中'
+                    : item.status === 'published' ? '期間公開中'
+                    : item.status === 'restoring' ? '復元処理中'
+                    : item.status === 'completed' ? '完了'
+                    : item.status === 'cancelled' ? '取消済み'
+                    : item.status === 'failed' ? '失敗・要対応' : item.status}
+                  {item.status === 'failed' && item.lastErrorCode ? `（${item.lastErrorCode.slice(0, 40)}）` : ''}
+                  {item.nextRetryAt ? ` ・ 次回 ${new Date(item.nextRetryAt).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}` : ''}
+                  {item.mode === 'period' ? (item.restoreGroupId ? ` ・ 戻し先 ${restoreMenus.find((menu) => menu.id === item.restoreGroupId)?.name ?? item.restoreGroupId}` : item.restoreDefaultState === 'captured' ? ' ・ 戻し先確定済み（切替前の表示へ戻す）' : item.restoreDefaultState === 'no_default' ? ' ・ 戻し先なし（終了時に表示を外す）' : ' ・ 戻し先は実行開始時に確定') : ''}
+                </span>
+                {item.status === 'scheduled' ? (
+                  <Button
+                    onClick={() => void cancelSchedule(item.id)}
+                    disabled={cancellingId === item.id}
+                  >
+                    {cancellingId === item.id ? '取消中…' : '予約を取り消す'}
+                  </Button>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        )) : null}
+      </section>
       <StickyBar actions={<div className="flex w-full items-center justify-between gap-3"><Button href={`/rich-menus/edit?id=${group.id}&step=targeting`}>前へ：誰に出すか</Button><div className="flex gap-2"><Button onClick={onSave} disabled={saving || publishing}>下書きに保存</Button><Button variant="primary" onClick={submit} disabled={saving || publishing || (mode !== 'now' && !startsAt) || (mode === 'period' && !endsAt)}>{publishing ? '公開中…' : mode === 'now' ? 'この内容で公開する' : 'この内容で予約する'}</Button></div></div>} />
     </main>
   )
 }
+
+/**
+ * 試験からだけ使う出し口。公開手順の画面を、本物のReactで単体で動かして
+ * 「押したときに実際どうなるか」を確かめるために使う（#621）。
+ */
+RichMenuEditPage.__testing = { PublishStep }

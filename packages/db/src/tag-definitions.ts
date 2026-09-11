@@ -43,7 +43,12 @@ type AutomationRow = {
 
 export class TagDefinitionError extends Error {
   constructor(
-    public readonly code: 'not_found' | 'version_conflict' | 'automation_conflict' | 'folder_not_found',
+    public readonly code:
+      | 'not_found'
+      | 'version_conflict'
+      | 'automation_conflict'
+      | 'folder_not_found'
+      | 'archived_readonly',
     message: string,
   ) {
     super(message);
@@ -113,13 +118,20 @@ async function getAutomation(
   };
 }
 
+/**
+ * 対応マーク（`getSupportMarkById`）・回答フォーム（`getFormById`）と同じ
+ * 形で archived を除外する（Issue #710）。既定では見えない。編集画面
+ * ・削除影響確認など、archived でも読む必要がある呼び出し側は
+ * `includeArchived: true` を明示する。
+ */
 export async function getTagDefinition(
   db: D1Database,
   tagId: string,
   lineAccountId: string,
+  options: { includeArchived?: boolean } = {},
 ): Promise<TagDefinitionDetail | null> {
   const tag = await db.prepare(
-    `SELECT * FROM tags WHERE id = ? AND line_account_id = ?`,
+    `SELECT * FROM tags WHERE id = ? AND line_account_id = ?${options.includeArchived ? '' : " AND status = 'active'"}`,
   ).bind(tagId, lineAccountId).first<Tag>();
   if (!tag) return null;
   return { tag, automation: await getAutomation(db, tagId, lineAccountId) };
@@ -256,15 +268,62 @@ export type UpdateTagDefinitionInput = {
   actorId?: string | null;
 };
 
+/**
+ * 保管済み(archived)タグは、表示名の訂正（`name`・`description`）だけ許す。
+ * 挙動を決める設定（フォルダ・スター・手動付与可否・再付与方針・連動の
+ * 有効無効・マイル・連動アクションの中身）は変えられない。
+ *
+ * 根拠（Issue #710 司令塔裁定）: タグには archived を active へ戻す口が
+ * 無い（`git grep` で確認済み）。戻せないのに表示名まで凍結すると、
+ * 誤字が永久に残る。かといって挙動を決める設定まで自由に変えられると、
+ * 「保管したのに中身が変わる」に気づけない状態になる
+ * （対応マーク・回答フォームは archived を読む関数自体で除外しており、
+ * 編集自体ができない。タグだけ「気づかず開けて、気づかず保存できる」
+ * 状態だった）。
+ *
+ * この保護は `expectedVersion` 付きの更新（このファイルの
+ * `updateTagDefinition`）にしか効かない。`PATCH /api/tags/:id` が
+ * `expectedVersion` 無しで受けたときは、`tags.ts` の `updateTag`
+ * （version も status も見ないレガシー経路）を通ってしまう。塞げていない。
+ * 別票 #715 で扱う。
+ */
+function assertArchivedTagUpdateAllowed(current: Tag, input: UpdateTagDefinitionInput): void {
+  if (current.status !== 'archived') return;
+  const changedRestrictedField =
+    (input.groupId !== undefined && input.groupId !== (current.folder_id ?? null))
+    || (input.isStarred !== undefined && input.isStarred !== (current.is_starred === 1))
+    || (input.manualAssignmentAllowed !== undefined
+      && input.manualAssignmentAllowed !== (current.manual_assignment_allowed === 1))
+    || (input.reapplyPolicy !== undefined && input.reapplyPolicy !== current.reapply_policy)
+    || (input.linkedEnabled !== undefined && input.linkedEnabled !== (current.linked_enabled === 1))
+    || (input.mileage !== undefined && (
+      input.mileage.self !== Number(current.mileage_reward)
+      || input.mileage.referrer !== Number(current.referral_mileage_reward)
+      || input.mileage.multiplier !== (current.mileage_multiplier_bps === null ? null : Number(current.mileage_multiplier_bps))
+      || input.mileage.priority !== Number(current.mileage_multiplier_priority)
+    ))
+    || input.actions !== undefined
+    || input.automationId !== undefined
+    || input.automationDraftVersion !== undefined;
+  if (changedRestrictedField) {
+    throw new TagDefinitionError(
+      'archived_readonly',
+      '保管済みのタグは名前と説明だけ変更できます',
+    );
+  }
+}
+
 export async function updateTagDefinition(
   db: D1Database,
   input: UpdateTagDefinitionInput,
 ): Promise<TagDefinitionDetail> {
-  const current = await getTagDefinition(db, input.tagId, input.lineAccountId);
+  // archived タグも読めないと、名前・説明の訂正すら受け付けられない。
+  const current = await getTagDefinition(db, input.tagId, input.lineAccountId, { includeArchived: true });
   if (!current) throw new TagDefinitionError('not_found', 'タグが見つかりません');
   if (current.tag.version !== input.expectedVersion) {
     throw new TagDefinitionError('version_conflict', '別の人が先にタグを更新しました');
   }
+  assertArchivedTagUpdateAllowed(current.tag, input);
   if (input.groupId !== undefined) await requireTagFolder(db, input.groupId);
   if (input.automationId !== undefined
     && input.automationId !== current.automation?.id
@@ -446,7 +505,7 @@ export async function updateTagDefinition(
   if ((results[0]?.meta?.changes ?? 0) !== 1) {
     throw new TagDefinitionError('version_conflict', '別の人が先にタグを更新しました');
   }
-  return (await getTagDefinition(db, input.tagId, input.lineAccountId))!;
+  return (await getTagDefinition(db, input.tagId, input.lineAccountId, { includeArchived: true }))!;
 }
 
 const REFERENCE_META: Record<keyof TagDeleteImpactReferences, { kind: string; name: string; href: string }> = {
@@ -476,8 +535,9 @@ export async function getScopedTagDeleteImpact(
   db: D1Database,
   tagId: string,
   lineAccountId: string,
+  options: { includeArchived?: boolean } = {},
 ) {
-  const detail = await getTagDefinition(db, tagId, lineAccountId);
+  const detail = await getTagDefinition(db, tagId, lineAccountId, options);
   if (!detail) return null;
   const impact = await getTagDeleteImpact(db, tagId);
   if (!impact) return null;
@@ -554,7 +614,14 @@ export async function getScopedTagDeleteImpact(
 }
 
 export class TagArchiveError extends Error {
-  constructor(public readonly code: 'not_found' | 'version_conflict' | 'impact_changed' | 'replacement_not_found') {
+  constructor(
+    public readonly code:
+      | 'not_found'
+      | 'version_conflict'
+      | 'impact_changed'
+      | 'replacement_not_found'
+      | 'already_archived',
+  ) {
     super(code);
   }
 }
@@ -575,6 +642,19 @@ export async function archiveTag(
     `SELECT * FROM tags WHERE id = ? AND line_account_id = ?`,
   ).bind(input.tagId, input.lineAccountId).first<Tag>();
   if (!tag) throw new TagArchiveError('not_found');
+  /*
+   * すでに整理済みなら、ここで止める。**監査の書き込みより前で止めること。**
+   *
+   * 止めないと version が無意味に増え、operation_audit に「保管した」記録が
+   * 実際の回数より多く残る。監査ログは、あとから読む人が事実を確かめるための
+   * ものなので、そこに嘘が入るのは他と害の種類が違う（#708）。
+   *
+   * 呼び出し側はこの code を「失敗」ではなく「もう着いている」として見せる。
+   * 望んだ状態には着いているので、利用者から見れば成功と同じ（#708 の裁定）。
+   * なお、この API の Idempotency-Key は受け取って検査するだけで、保存も
+   * 照合もしていない（冪等ではない）。#709 で扱う。
+   */
+  if (tag.status !== 'active') throw new TagArchiveError('already_archived');
   if (Number(tag.version) !== input.expectedVersion) throw new TagArchiveError('version_conflict');
   const impact = await getScopedTagDeleteImpact(db, input.tagId, input.lineAccountId);
   if (!impact) throw new TagArchiveError('not_found');

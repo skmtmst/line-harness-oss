@@ -76,8 +76,9 @@ const folders = {
   updateFolder: vi.fn(),
   deleteFolder: vi.fn(),
   getWebinarFolderCounts: vi.fn(),
+  getFolderItemCounts: vi.fn().mockResolvedValue(undefined),
   isFolderKind: (v: unknown) =>
-    typeof v === 'string' && ['tag', 'template', 'media', 'webinar'].includes(v),
+    typeof v === 'string' && ['tag', 'template', 'media', 'webinar', 'reminder', 'scenario', 'auto_reply', 'broadcast'].includes(v),
 };
 vi.mock('@line-crm/db', () => ({ ...marks, ...searches, ...folders }));
 vi.mock('../services/account-access.js', () => accountAccess);

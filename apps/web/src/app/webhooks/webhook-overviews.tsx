@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { IncomingWebhook, WebhookInteractionSummary } from '@line-crm/shared'
 import { api, type IncomingWebhookDetail, type OutgoingWebhookOverview } from '@/lib/api'
 import Button from '@/components/shared/button'
@@ -149,6 +149,7 @@ export function OutgoingOverview({
   lineAccountId,
   onReload,
   onToggle,
+  togglingIds,
   onRotate,
   onDelete,
 }: {
@@ -161,6 +162,8 @@ export function OutgoingOverview({
   lineAccountId: string | null
   onReload: () => void
   onToggle: (id: string, active: boolean) => void
+  /** 開始・停止の応答を待っている行のID(#707)。 */
+  togglingIds: string[]
   onRotate: (item: OutgoingWebhookOverview) => void
   onDelete: (item: OutgoingWebhookOverview) => void
 }) {
@@ -169,6 +172,13 @@ export function OutgoingOverview({
   const [sort, setSort] = useState<OutgoingSort>('volume')
   const [page, setPage] = useState(1)
   const [settingsId, setSettingsId] = useState<string | null>(null)
+  /*
+    開いている行の「設定」ボタンと吹き出しを、まとめて包む入れ物(#705)。
+    外側を押したかどうかは、この入れ物の中かどうかで決める。ボタンまで
+    含めて包むのは、ボタンを押したときに「外側なので閉じる」と
+    「onClick で開き直す」が続けて起きて、閉じられなくなるのを避けるため。
+  */
+  const settingsRef = useRef<HTMLDivElement | null>(null)
   const [testingId, setTestingId] = useState<string | null>(null)
   /**
    * 「1回 試してみる」の結果(#506 中)。
@@ -226,6 +236,36 @@ export function OutgoingOverview({
   useEffect(() => {
     if (page > pageCount) setPage(pageCount)
   }, [page, pageCount])
+
+  /*
+    操作の吹き出しを、外側を押したときと Escape で閉じる(#705)。
+
+    ここは以前「設定」をもう一度押すまで閉じなかった。応答が返っても、
+    画面の他の場所を押しても、Escape でも閉じない。この家の他の一覧
+    (`reminders`・`tags-page-v4` が使う `components/shared/action-menu.tsx`、
+    自前の `components/shared/folder-panel.tsx`)はどれも閉じる仕掛けを
+    持っていて、**webhooks だけが持っていなかった。**同じ形に揃える。
+
+    「選んだら閉じる」は入れない。押した瞬間に「止める」が消えると
+    二重押しそのものが起こせなくなり、二重押し防止(page.tsx の
+    togglingIdsRef)を見張っている試験の当て先が消えるため。送信中の
+    見え方は #707 で別に扱う。
+  */
+  useEffect(() => {
+    if (settingsId === null) return
+    const onPointerDown = (event: PointerEvent) => {
+      if (!settingsRef.current?.contains(event.target as Node)) setSettingsId(null)
+    }
+    const onKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.key === 'Escape') setSettingsId(null)
+    }
+    document.addEventListener('pointerdown', onPointerDown)
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown)
+      document.removeEventListener('keydown', onKeyDown)
+    }
+  }, [settingsId])
 
   return (
     <section aria-label="こちらから送る一覧">
@@ -308,6 +348,7 @@ export function OutgoingOverview({
           </thead>
           <tbody>
             {visible.map((item) => {
+              const toggling = togglingIds.includes(item.id)
               const pending = item.deliverySummary.lastResult?.status === 'pending'
               const failed = !pending && (item.deliverySummary.lastResult?.status === 'failed'
                 || item.deliverySummary.failed > 0)
@@ -328,8 +369,15 @@ export function OutgoingOverview({
                     ) : null}
                   </Td>
                   <Td>
-                    <StatusBadge tone={failed ? 'danger' : pending ? 'neutral' : item.isActive ? 'success' : 'neutral'} size="compact">
-                      {failed ? '返事がありません' : pending ? '送信中' : item.isActive ? 'うまくいっています' : '止めています'}
+                    {/*
+                      応答待ちは一覧の帯にも出す(#707)。操作の吹き出しは外側を
+                      押すと閉じるので、ボタンの文言だけだと、閉じた瞬間にどの行が
+                      待ちなのか分からなくなる。
+                      言葉は `切り替え中`。すぐ左の `送信中` は配信の待ち件数で
+                      別の意味なので、同じ言葉を重ねない。
+                    */}
+                    <StatusBadge tone={toggling ? 'info' : failed ? 'danger' : pending ? 'neutral' : item.isActive ? 'success' : 'neutral'} size="compact">
+                      {toggling ? '切り替え中' : failed ? '返事がありません' : pending ? '送信中' : item.isActive ? 'うまくいっています' : '止めています'}
                     </StatusBadge>
                     {failed && item.deliverySummary.lastResult?.completedAt ? (
                       <span className="text-ink-faint mt-1 block text-xs">
@@ -347,7 +395,7 @@ export function OutgoingOverview({
                         disabled={!lineAccountId || testingId !== null || !item.isActive}
                         onClick={() => void runTest(item)}
                       >{testingId === item.id ? '試しています…' : '1回 試してみる'}</Button>
-                      <div className="relative">
+                      <div className="relative" ref={settingsId === item.id ? settingsRef : null}>
                         <Button
                           variant="secondary"
                           aria-expanded={settingsId === item.id}
@@ -356,14 +404,58 @@ export function OutgoingOverview({
                           設定
                         </Button>
                         {settingsId === item.id ? (
-                          <div className="bg-canvas border-hairline rounded-card absolute right-0 z-10 mt-2 flex min-w-max gap-2 border p-2 shadow-lg">
+                          /*
+                            吹き出しは**自分の行の帯の中**に出す(#705)。
+
+                            以前はボタンの下(`mt-2`)へ垂らしていたので、次の行の
+                            操作ボタンに 14〜25px かぶさっていた。かぶさった所を
+                            押すと、狙った行ではなく**この行の「削除」「合言葉」が
+                            動く。**1280px幅では中心が 4px だけ空いていて偶然
+                            押せていたが、1600px幅では中心も覆われて次の行の
+                            「設定」がまったく押せない。
+
+                            行の高さは58px以上、吹き出しは54px なので、上下中央に
+                            置けば他の行へはみ出さない。応答が返るまで開いたままでも、
+                            奪うのは自分の行の中だけになる。
+                          */
+                          <div className="bg-canvas border-hairline rounded-card absolute top-1/2 right-full z-10 mr-2 flex min-w-max -translate-y-1/2 gap-2 border p-2 shadow-lg">
+                          {/*
+                            送信中でも**押せる状態のまま**にする(#707)。
+
+                            `disabled` にすると二重押しがそもそも起こせなくなり、
+                            二重押し防止(page.tsx の togglingIdsRef)を見張っている
+                            試験2が、防止が壊れても緑のままになる。押せる状態を
+                            保ったまま、文言と `aria-busy` で送信中だと分かるようにする。
+
+                            幅を固定する理由(#707 で実測)。固定を外すと、押した
+                            瞬間にボタンが **幅 67px → 119px・左へ 52px** 伸びる
+                            (1280×720 と 1600×900 のどちらでも同じ)。試験の
+                            `dblclick` は2発とも同じ座標へ落ちるので、押下位置が
+                            動くのは危ない。
+
+                            **ただし今の並びでは2発目は当たる。**吹き出しが
+                            `right-full` で右端を固定しており、この `止める` が
+                            いちばん左なので、伸びても押した点は箱の中に残る。
+                            重ねがけの逆変異(幅の固定を外す + 二重押し防止を外す)で
+                            送信が2回になることを確かめた。**当たっているのは
+                            吹き出しの向きに助けられているだけ**で、向きや並び順を
+                            変えた瞬間に2発目が外れ、防止が壊れていても試験2が緑に
+                            なる。幅を固定して伸びをゼロにし、その不動を試験2が
+                            押下前後の座標で見張る。押した指の下でボタンの大きさが
+                            変わらなくなる利点も兼ねる。
+                          */}
                           <Button
                             variant="secondary"
+                            className="min-w-36"
                             onClick={() => onToggle(item.id, item.isActive)}
                             disabled={!item.isActive && !canActivate}
+                            aria-busy={toggling || undefined}
+                            data-webhook-toggle-pending={toggling ? `outgoing:${item.id}` : undefined}
                             title={!item.isActive && !canActivate ? 'URLと合言葉を確かめてください' : undefined}
                           >
-                            {item.isActive ? '止める' : '動かす'}
+                            {toggling
+                              ? (item.isActive ? '止めています…' : '動かしています…')
+                              : (item.isActive ? '止める' : '動かす')}
                           </Button>
                           <Button variant="secondary" onClick={() => onRotate(item)}>合言葉</Button>
                           <Button variant="secondary" onClick={() => onDelete(item)}>削除</Button>
@@ -397,6 +489,7 @@ export function IncomingOverview({
   endpointUrl,
   onReload,
   onToggle,
+  togglingIds,
   onRotate,
   onDelete,
 }: {
@@ -407,6 +500,14 @@ export function IncomingOverview({
   endpointUrl: (id: string) => string
   onReload: () => void
   onToggle: (id: string, active: boolean) => void
+  /**
+   * 開始・停止の応答を待っている行のID(#707)。
+   *
+   * 外向きとまったく同じ「黙って落とす」作りだったので、見え方も同じに揃える。
+   * ただし内向きの `止める` は詳細の窓の中にあり、`webhook-runtime.spec.ts` に
+   * 当て先が無い。**ここは見え方だけで、二重押し防止の見張りは付いていない。**
+   */
+  togglingIds: string[]
   onRotate: (item: IncomingWebhook) => void
   onDelete: (item: IncomingWebhook) => void
 }) {
@@ -520,8 +621,17 @@ export function IncomingOverview({
               </div>
             </dl>
             <div className="mt-2 flex flex-wrap gap-2">
-              <Button variant="secondary" onClick={() => onToggle(selected.id, selected.isActive)} disabled={!selected.hasSecret && !selected.isActive}>
-                {selected.isActive ? '止める' : '動かす'}
+              <Button
+                variant="secondary"
+                className="min-w-36"
+                onClick={() => onToggle(selected.id, selected.isActive)}
+                disabled={!selected.hasSecret && !selected.isActive}
+                aria-busy={togglingIds.includes(selected.id) || undefined}
+                data-webhook-toggle-pending={togglingIds.includes(selected.id) ? `incoming:${selected.id}` : undefined}
+              >
+                {togglingIds.includes(selected.id)
+                  ? (selected.isActive ? '止めています…' : '動かしています…')
+                  : (selected.isActive ? '止める' : '動かす')}
               </Button>
               <Button variant="secondary" onClick={() => onRotate(selected)}>合言葉を更新</Button>
               <Button variant="secondary" onClick={() => onDelete(selected)}>削除</Button>

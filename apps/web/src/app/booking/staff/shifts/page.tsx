@@ -1,8 +1,10 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import StaffDetail from './staff-detail'
 import {
   bookingApi,
   type BookingAvailabilitySlot,
@@ -42,6 +44,22 @@ function previewDates(): Array<{ date: string; day: number }> {
 }
 
 export default function StaffShiftsPage() {
+  return (
+    <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中...</div>}>
+      <StaffShiftsPageContent />
+    </Suspense>
+  )
+}
+
+// ?staff_id= があるときは担当者別の勤務・シフト画面、ないときは従来のお店全体の受付枠。
+function StaffShiftsPageContent() {
+  const staffId = useSearchParams().get('staff_id') ?? ''
+  usePageTitle('予約設定')
+  if (staffId) return <StaffDetail staffId={staffId} />
+  return <StoreShiftsView />
+}
+
+function StoreShiftsView() {
   usePageTitle('予約設定')
   const { selectedAccountId, selectedAccount } = useAccount()
   const [settings, setSettings] = useState<BookingSettings | null>(null)

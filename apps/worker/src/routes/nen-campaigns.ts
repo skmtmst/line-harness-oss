@@ -1,5 +1,11 @@
 import { Hono, type Context } from 'hono';
 import { getLineAccountById, jstNow } from '@line-crm/db';
+import {
+  checkNenCampaignBodyLength,
+  countNenCampaignBodyLength,
+  NEN_CAMPAIGN_BODY_MAX_LENGTH,
+  NEN_PET_NAME_MAX_LENGTH,
+} from '@line-crm/shared';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import {
@@ -200,7 +206,16 @@ nenCampaigns.put('/api/nen-campaigns/settings/:campaignKey', requireRole('owner'
       && (!Array.isArray(body.afterActions) || afterActions.length !== body.afterActions.length)) {
     return c.json({ success: false, error: 'Invalid campaign actions' }, 400);
   }
-  if (!body.title.trim() || body.title.trim().length > 120 || body.bodyText.length > 1500
+  // 本文の上限は画面と同じ採用上限（NEN_CAMPAIGN_BODY_MAX_LENGTH）。数え方も
+  // 画面の残数表示と同じ関数で測り、超過時は字数を添えて理由を返す。
+  const bodyCheck = checkNenCampaignBodyLength(body.bodyText);
+  if (!bodyCheck.fits) {
+    return c.json({
+      success: false,
+      error: `本文は${NEN_CAMPAIGN_BODY_MAX_LENGTH.toLocaleString('ja-JP')}字以内で入力してください（現在${bodyCheck.length.toLocaleString('ja-JP')}字）`,
+    }, 400);
+  }
+  if (!body.title.trim() || body.title.trim().length > 120
       || !Number.isInteger(delayDays) || delayDays < 0 || delayDays > 365
       || !/^([01]\d|2[0-3]):[0-5]\d$/.test(body.deliveryTime)
       || buttonLabel.length > 20 || !isUrl(buttonUrl) || !isUrl(imageUrl)) {
@@ -219,6 +234,30 @@ nenCampaigns.put('/api/nen-campaigns/settings/:campaignKey', requireRole('owner'
     button_url: buttonUrl || null,
     image_url: imageUrl || null,
     after_actions: afterActions,
+    updated_at: jstNow(),
+  });
+  return c.json({ success: true });
+});
+
+// 一覧の停止・再開（isEnabledだけの切り替え）専用の口。上のPUTと同じ口を
+// 使うと、本文・題名などを送り直すことになり、保存済み本文が上限を超えて
+// いる場合に停止すらできなくなる（#659差し戻し2点目）。停止は本文の長さに
+// 関わらず必ず実行できる必要があるため、is_enabled以外は今の値のまま
+// 変えず、本文の長さ検査も行わない。
+nenCampaigns.put('/api/nen-campaigns/settings/:campaignKey/enabled', requireRole('owner', 'admin'), async (c) => {
+  const accountId = await requireAccount(c);
+  if (typeof accountId !== 'string') return accountId;
+  const key = c.req.param('campaignKey');
+  if (!CAMPAIGN_KEYS.has(key)) return c.json({ success: false, error: 'Invalid campaign' }, 400);
+  const body = await c.req.json<{ isEnabled?: unknown }>().catch(() => null);
+  if (!body || typeof body.isEnabled !== 'boolean') {
+    return c.json({ success: false, error: 'isEnabled is required' }, 400);
+  }
+  const current = await getNenCampaign(c.env.DB, key, accountId);
+  if (!current) return c.json({ success: false, error: 'Campaign not found' }, 404);
+  await saveNenCampaignAccountSetting(c.env.DB, accountId, {
+    ...current,
+    is_enabled: body.isEnabled ? 1 : 0,
     updated_at: jstNow(),
   });
   return c.json({ success: true });
@@ -612,6 +651,15 @@ nenCampaigns.post('/api/nen-campaigns/pets', requireRole('owner', 'admin'), asyn
   if (!body || typeof body.friendId !== 'string' || typeof body.name !== 'string' || !body.name.trim()) {
     return c.json({ success: false, error: 'friendId and name are required' }, 400);
   }
+  // ペットの名前はNEN配信の本文へ差し込まれる（{{pet_name}}）。無制限だと
+  // 差し込み展開後の本文が際限なく膨らみ、保存時の上限判定の前提（#659）が
+  // 崩れるため、ここで有限の上限を持たせる。
+  if (countNenCampaignBodyLength(body.name.trim()) > NEN_PET_NAME_MAX_LENGTH) {
+    return c.json({
+      success: false,
+      error: `ペットのお名前は${NEN_PET_NAME_MAX_LENGTH}字以内で入力してください`,
+    }, 400);
+  }
   const animalType = ['dog', 'cat', 'other'].includes(String(body.animalType)) ? String(body.animalType) : 'dog';
   const gender = ['male', 'female', 'unknown'].includes(String(body.gender)) ? String(body.gender) : 'unknown';
   const birthday = typeof body.birthday === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(body.birthday) ? body.birthday : null;
@@ -635,6 +683,12 @@ nenCampaigns.put('/api/nen-campaigns/pets/:id', requireRole('owner', 'admin'), a
   if (typeof accountId !== 'string') return accountId;
   const body = await c.req.json<Record<string, unknown>>().catch(() => null);
   if (!body || typeof body.name !== 'string' || !body.name.trim()) return c.json({ success: false, error: 'name is required' }, 400);
+  if (countNenCampaignBodyLength(body.name.trim()) > NEN_PET_NAME_MAX_LENGTH) {
+    return c.json({
+      success: false,
+      error: `ペットのお名前は${NEN_PET_NAME_MAX_LENGTH}字以内で入力してください`,
+    }, 400);
+  }
   const animalType = ['dog', 'cat', 'other'].includes(String(body.animalType)) ? String(body.animalType) : 'dog';
   const gender = ['male', 'female', 'unknown'].includes(String(body.gender)) ? String(body.gender) : 'unknown';
   const birthday = typeof body.birthday === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(body.birthday) ? body.birthday : null;
@@ -718,6 +772,20 @@ nenCampaigns.post('/api/integrations/eccube/columns', async (c) => {
       || (body.image_url && (typeof body.image_url !== 'string' || !isUrl(body.image_url)))) {
     return c.json({ success: false, error: 'Invalid column' }, 400);
   }
+  // 120: 管理画面経路（validateNenColumnCreateBody）と同じ値に揃えた。送信元の
+  // EC-Cube側フォームも独立に120字で制約している（JournalController.php の
+  // titleフィールド、Assert\Length(max:120)）が、それはLHが保証されたもの
+  // ではない。#711 の司令塔裁定で、経路ごとに違う上限を持たないことを優先し、
+  // 管理画面と同じ120を採った。
+  if (body.title.length > 120) {
+    console.error(JSON.stringify({
+      event: 'nen_eccube_column_title_rejected',
+      slug: body.slug,
+      titleLength: body.title.length,
+      maxLength: 120,
+    }));
+    return c.json({ success: false, error: 'title_invalid' }, 400);
+  }
   const lineAccountId = typeof body.line_account_id === 'string' ? body.line_account_id : null;
   if (lineAccountId && !await getLineAccountById(c.env.DB, lineAccountId)) {
     return c.json({ success: false, error: 'LINE account not found' }, 404);
@@ -738,6 +806,11 @@ nenCampaigns.post('/api/integrations/eccube/columns', async (c) => {
     imageUrl: typeof body.image_url === 'string' ? body.image_url : null,
     publishedAt: typeof body.published_at === 'string' ? body.published_at : null,
   });
+  // intro_textはON CONFLICTのSET句に含めない（意図的）。EC-Cubeはintro_textを
+  // 送らないので、再同期のたびに既定文で上書きすると、LHの画面で人が直した
+  // 紹介文が消える。既定文のまま古くなるより、人が直した内容が消えるほうが
+  // 害が大きいという判断（未確認・推測）。#711 の司令塔裁定を参照。
+  // https://github.com/kentavndng/line-harness-board/issues/711
   await c.env.DB.prepare(
     `INSERT INTO nen_columns
       (id, external_id, slug, title, category, excerpt, intro_text, article_url, image_url, published_at, delivery_status, line_account_id, created_at, updated_at)

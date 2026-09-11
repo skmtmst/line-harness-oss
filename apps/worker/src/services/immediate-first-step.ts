@@ -1,8 +1,10 @@
 import {
   getScenarioById,
+  getScenarioPublishedVersion,
+  getStepsForDelivery,
+  scenarioStepExists,
   getFriendById,
   computeNextDeliveryAt,
-  resolveStepContent,
   advanceFriendScenario,
   completeFriendScenario,
   claimFriendScenarioForDelivery,
@@ -13,6 +15,7 @@ import {
   jstNow,
   toJstString,
 } from '@line-crm/db';
+import type { PinnedScenarioStep, ScenarioDeliverySource } from '@line-crm/db';
 import { LineClient, type Message } from '@line-crm/line-sdk';
 import {
   buildMessage,
@@ -36,6 +39,8 @@ export interface ImmediatePushContext {
 export interface EnrollmentRef {
   id: string;
   current_step_order: number;
+  /** 開始時に固定した公開版。無いときは購読行から読み直す。 */
+  published_version_id?: string | null;
 }
 
 export interface ImmediatePushOptions {
@@ -75,6 +80,50 @@ export interface ImmediatePushOptions {
    * fence every same-flow race there.
    */
   skipCooldown?: boolean;
+  /**
+   * 送信の結末を呼ぶ側へ伝える。戻り値の false は「送っていない」と
+   * 「送ったかどうか分からない」を区別できないため、台帳へ結末を残す
+   * 呼び出し（友だち追加時配信）だけがこれを渡す。
+   *
+   *   delivered … LINE が受け付けた
+   *   failed    … LINE が要求を断った（4xx）。届いていない
+   *   unknown   … 通信断・タイムアウト・429・5xx。届いたかもしれない
+   *
+   * 送信そのものを試みなかったとき（配信対象外・再送見送りなど）は呼ばない。
+   */
+  onSendOutcome?: (outcome: 'delivered' | 'failed' | 'unknown') => void;
+  /**
+   * 結末の分からない送信（通信断・タイムアウト・429・5xx）のあと、
+   * この登録をどう扱うか。
+   *
+   *   retry（既定） … claim を返し、cron が改めて1通目を送る。従来どおり。
+   *   stop          … 1通目を送り終えた扱いにして先へ進め、cron に
+   *                   送り直させない。届いていたときに2通目を出さない。
+   *
+   * 台帳へ「送達不明」を残して人が確かめる呼び出し（友だち追加時配信）は
+   * stop を渡す。自動で送り直すと、同じ人に同じ案内が2通届く。
+   */
+  unknownSendPolicy?: 'retry' | 'stop';
+  /**
+   * LINE へ渡す再試行キー（`X-Line-Retry-Key`）。同じキーの2回目は LINE 側が
+   * 受け付け済みとして 409 を返し、**二重に届かない**。予約と fence をすり抜けた
+   * 万一の同時送信に対する最後の砦として、友だち追加の経路だけが渡す。
+   * reply は token が1回きりなので不要。
+   */
+  retryKey?: string;
+}
+
+/**
+ * 送信の例外を「届いていない」と「届いたかもしれない」に分ける。
+ *
+ * LINE が 4xx で断ったときは要求が受け付けられていないので届いていない。
+ * 通信断・タイムアウト・429・5xx は、こちらが結果を知らないだけで
+ * 届いていることがある。自動で送り直すと二重に届く。
+ */
+function classifySendFailure(error: unknown): 'failed' | 'unknown' {
+  const status = (error as { status?: unknown } | null)?.status;
+  if (typeof status === 'number' && status >= 400 && status < 500 && status !== 429) return 'failed';
+  return 'unknown';
 }
 
 /**
@@ -133,35 +182,46 @@ export async function pushImmediateFirstStep(
     // this an entry route pointing at a deactivated campaign would still
     // instant-push its first step.
     if (!scenarioRow.is_active) return false;
-    const steps = scenarioRow.steps;
-    const firstStep = steps[0];
-    if (!firstStep) return false;
 
-    // Immediate only: delay-0 relative steps schedule at-or-before "now".
-    // elapsed/absolute_time modes have offset/clock-time semantics — cron
-    // owns those. Checked BEFORE claiming/enrolling so non-immediate
-    // enrollments are left untouched.
-    const enrolledAtJst = new Date(Date.now() + 9 * 60 * 60_000);
-    const firstScheduledAt = computeNextDeliveryAt(
-      { delivery_mode: scenarioRow.delivery_mode ?? 'relative' },
-      firstStep,
-      { enrolledAt: enrolledAtJst, previousDeliveredAt: enrolledAtJst, now: enrolledAtJst },
-    );
-    if (firstScheduledAt.getTime() > enrolledAtJst.getTime()) return false;
+    // 送る1通目は、購読開始時に固定した公開版だけから読む（351）。live の
+    // 下書き表は読まない。版が無い・欠損しているときは送らない。
+    const loadPinnedFirstStep = async (
+      pinnedVersionId: string | null | undefined,
+    ): Promise<{ source: ScenarioDeliverySource; firstStep: PinnedScenarioStep } | null> => {
+      const source = await getStepsForDelivery(db, scenarioId, pinnedVersionId ?? null);
+      if (!source) return null;
+      const liveSteps = source.steps.filter((s) => (s.is_draft ?? 0) === 0);
+      const firstStep = liveSteps[0];
+      if (!firstStep) return null;
+      return { source, firstStep };
+    };
+
+    const resolveEnrollmentVersionId = async (
+      enrollment: EnrollmentRef,
+    ): Promise<string | null> => {
+      if (enrollment.published_version_id) return enrollment.published_version_id;
+      const row = await db
+        .prepare(`SELECT published_version_id FROM friend_scenarios WHERE id = ?`)
+        .bind(enrollment.id)
+        .first<{ published_version_id: string | null }>();
+      return row?.published_version_id ?? null;
+    };
 
     // Cooldown probe: a racing sender the claim protocol can't see may have
     // just pushed this exact step (click campaign vs follow webhook, double
-    // LIFF load, …).
-    const isRecentDuplicate = async (): Promise<boolean> => {
+    // LIFF load, …). Identity is the version-owned step id — deleting and
+    // re-creating the draft step must not lose the dedup. The live-step leg
+    // covers sends logged before versions existed.
+    const isRecentDuplicate = async (firstStep: PinnedScenarioStep): Promise<boolean> => {
       const cutoff = toJstString(new Date(Date.now() - 60_000));
       const recent = await db
         .prepare(
           `SELECT 1 FROM messages_log
-           WHERE friend_id = ? AND scenario_step_id = ?
+           WHERE friend_id = ? AND (scenario_version_step_id = ? OR scenario_step_id = ?)
              AND direction = 'outgoing' AND created_at > ?
            LIMIT 1`,
         )
-        .bind(friendId, firstStep.id, cutoff)
+        .bind(friendId, firstStep.id, firstStep.live_step_id ?? firstStep.id, cutoff)
         .first();
       return recent !== null;
     };
@@ -169,18 +229,22 @@ export async function pushImmediateFirstStep(
     const lookupEnrollment = () =>
       db
         .prepare(
-          `SELECT id, current_step_order FROM friend_scenarios
+          `SELECT id, current_step_order, published_version_id FROM friend_scenarios
            WHERE friend_id = ? AND scenario_id = ? AND status != 'completed'
            ORDER BY updated_at DESC LIMIT 1`,
         )
         .bind(friendId, scenarioId)
         .first<EnrollmentRef>();
 
-    const advancePastFirstStep = async (enrollmentId: string) => {
-      const nextStep = steps[1];
+    const advancePastFirstStep = async (
+      enrollmentId: string,
+      source: ScenarioDeliverySource,
+      firstStep: PinnedScenarioStep,
+    ) => {
+      const nextStep = source.steps.filter((s) => (s.is_draft ?? 0) === 0)[1];
       if (nextStep) {
         const next = computeNextDeliveryAt(
-          { delivery_mode: scenarioRow.delivery_mode ?? 'relative' },
+          { delivery_mode: source.deliveryMode },
           nextStep,
           { enrolledAt: enrolledAtJst, previousDeliveredAt: enrolledAtJst, now: enrolledAtJst },
         );
@@ -199,7 +263,7 @@ export async function pushImmediateFirstStep(
       }
     };
 
-    const attachReachTag = async () => {
+    const attachReachTag = async (firstStep: PinnedScenarioStep) => {
       if (!firstStep.on_reach_tag_id) return;
       try {
         await addTagToFriend(db, friendId, firstStep.on_reach_tag_id);
@@ -208,13 +272,32 @@ export async function pushImmediateFirstStep(
       }
     };
 
+    // Immediate only: delay-0 relative steps schedule at-or-before "now".
+    // elapsed/absolute_time modes have offset/clock-time semantics — cron
+    // owns those. Checked BEFORE claiming/enrolling so non-immediate
+    // enrollments are left untouched.
+    const enrolledAtJst = new Date(Date.now() + 9 * 60 * 60_000);
+    const isImmediate = (source: ScenarioDeliverySource, firstStep: PinnedScenarioStep) => {
+      const firstScheduledAt = computeNextDeliveryAt(
+        { delivery_mode: source.deliveryMode },
+        firstStep,
+        { enrolledAt: enrolledAtJst, previousDeliveredAt: enrolledAtJst, now: enrolledAtJst },
+      );
+      return firstScheduledAt.getTime() <= enrolledAtJst.getTime();
+    };
+
     // Which row to advance after a successful send (null = pure re-click
     // re-delivery: the row is already past step 1, leave it alone).
     let advanceTargetId: string | null = null;
+    let pinned: { source: ScenarioDeliverySource; firstStep: PinnedScenarioStep } | null = null;
 
     if (mode === 'once') {
       const enrollmentRow = options?.enrollment ?? (await lookupEnrollment());
-      if (!enrollmentRow || enrollmentRow.current_step_order >= firstStep.step_order) return false;
+      if (!enrollmentRow) return false;
+      pinned = await loadPinnedFirstStep(await resolveEnrollmentVersionId(enrollmentRow));
+      if (!pinned) return false;
+      if (enrollmentRow.current_step_order >= pinned.firstStep.step_order) return false;
+      if (!isImmediate(pinned.source, pinned.firstStep)) return false;
 
       // Optimistic lock shared with the cron worker: whoever claims first
       // delivers step 1; the loser backs off. Closes the double-send window
@@ -231,10 +314,10 @@ export async function pushImmediateFirstStep(
       // Advance without pushing on a cooldown hit so the row is neither
       // stranded at step -1 nor re-delivered by the cron. The racer
       // delivered step 1, so the reach tag still applies.
-      if (!options?.skipCooldown && (await isRecentDuplicate())) {
-        await advancePastFirstStep(enrollmentRow.id);
+      if (!options?.skipCooldown && (await isRecentDuplicate(pinned.firstStep))) {
+        await advancePastFirstStep(enrollmentRow.id, pinned.source, pinned.firstStep);
         claimedEnrollmentId = null; // the advance released the claim
-        await attachReachTag();
+        await attachReachTag(pinned.firstStep);
         return false;
       }
     } else {
@@ -244,13 +327,21 @@ export async function pushImmediateFirstStep(
       // a fresh active step-0 row behind for the cron worker to pick up
       // (the partial UNIQUE on friend_scenarios is keyed
       // `WHERE status != 'completed'`, so completed runs don't block a new
-      // INSERT).
-      if (await isRecentDuplicate()) return false;
+      // INSERT). The probe identity comes from the current published version
+      // (read-only — no side effects yet).
+      const currentVersion = await getScenarioPublishedVersion(db, scenarioId);
+      const pre = currentVersion ? await loadPinnedFirstStep(currentVersion.id) : null;
+      if (!pre || !isImmediate(pre.source, pre.firstStep)) return false;
+      if (await isRecentDuplicate(pre.firstStep)) return false;
 
       // INSERT OR IGNORE — null on re-clicks (already enrolled), still push.
       const enrollment = await enrollFriendInScenario(db, friendId, scenarioId);
       const row = enrollment ?? (await lookupEnrollment());
-      if (row && row.current_step_order < firstStep.step_order) {
+      // Authoritative read: the enrollment's own pinned version (a concurrent
+      // publish may have moved the pointer between the probe and the enroll).
+      pinned = row ? await loadPinnedFirstStep(await resolveEnrollmentVersionId(row)) : null;
+      if (!pinned) return false;
+      if (row && row.current_step_order < pinned.firstStep.step_order) {
         // This click owes step 1 to the enrollment — join the claim protocol
         // so the cron (the fresh row's next_delivery_at is already due) and
         // the follow-webhook path can't send it concurrently. A failed claim
@@ -264,9 +355,10 @@ export async function pushImmediateFirstStep(
         // Pure re-click re-delivery. Re-probe the cooldown: the first probe
         // ran before the enroll round-trip, and a racing sender may have
         // logged its send in between.
-        if (await isRecentDuplicate()) return false;
+        if (await isRecentDuplicate(pinned.firstStep)) return false;
       }
     }
+    const { source, firstStep } = pinned;
 
     const releaseClaim = async () => {
       if (!claimedEnrollmentId) return;
@@ -287,9 +379,17 @@ export async function pushImmediateFirstStep(
     // reply-token send where latency eats into the token validity window.
     // ctxAccount is the caller-resolved channel (LIFF/OAuth flows), used for
     // both the push token and the tracked-link owner below.
-    const [resolvedMeta, resolved, ctxAccount] = await Promise.all([
+    //
+    // 文面・質問は固定版の写しをそのまま使う。配信時に templates 表を
+    // 読み直さない（公開後の template 編集を混入させない）。
+    const resolved = {
+      messageType: firstStep.message_type,
+      messageContent: firstStep.message_content,
+      templateIdAtSend: firstStep.template_id_at_send ?? null,
+      questionJson: firstStep.question_json ?? null,
+    };
+    const [resolvedMeta, ctxAccount] = await Promise.all([
       resolveMetadata(db, { user_id: friend.user_id, metadata: friend.metadata }),
-      resolveStepContent(db, firstStep),
       ctx.accountChannelId ? getLineAccountByChannelId(db, ctx.accountChannelId) : null,
     ]);
     const friendWithMeta = { ...friend, metadata: resolvedMeta } as Parameters<typeof expandVariables>[1];
@@ -306,6 +406,10 @@ export async function pushImmediateFirstStep(
     // caller-resolved channel — LIFF/OAuth entry points run BEFORE the follow
     // webhook wires friend.line_account_id, and an owner-less link would send
     // that account's friends through the global LIFF consent screen.
+    // live 側の通IDは履歴づけの控え。消されたあとは版所有の通IDに倒す。
+    const liveStepId = (await scenarioStepExists(db, firstStep.live_step_id ?? null))
+      ? firstStep.live_step_id!
+      : null;
     const question = parseQuestion(resolved.questionJson);
     let messages: Message[];
     if (question) {
@@ -317,7 +421,10 @@ export async function pushImmediateFirstStep(
             : question.intro,
           text: expandVariables(question.text, friendWithMeta, ctx.workerUrl, 'text', extra),
         },
-        firstStep.id,
+        // 押し口は必ず版所有の通ID。live の通IDを載せると、公開後に直した
+        // 返信・タグ・遷移が旧版の購読へ混入し、下書きの通を消した瞬間に
+        // ボタンが無反応になる（#644 再審査 1）。
+        { kind: 'version', stepId: firstStep.id },
       );
     } else {
       const decorated = await decorateForFriendPush(
@@ -349,43 +456,64 @@ export async function pushImmediateFirstStep(
           if (acct?.channel_access_token) accessToken = acct.channel_access_token;
         }
         const lineClient = new LineClient(accessToken);
-        await lineClient.pushMessage(pushTarget, messages);
+        await lineClient.pushMessage(pushTarget, messages, options?.retryKey);
       }
     } catch (err) {
-      // The message never left LINE's API — release so the cron retries on
-      // schedule.
+      // 4xx は LINE が断ったので届いていない。それ以外は結末が分からない。
+      const outcome = classifySendFailure(err);
+      options?.onSendOutcome?.(outcome);
+      if (outcome === 'unknown' && options?.unknownSendPolicy === 'stop' && advanceTargetId) {
+        /*
+         * 届いたかもしれないので cron に送り直させない。1通目を送り終えた
+         * 扱いにして先へ進める。到達タグは付けない（届いた確証がない）。
+         * 呼ぶ側は台帳へ送達不明を残し、人が確かめる。
+         */
+        console.error('[immediate-first-step] send outcome unknown, stopping retry:', err);
+        // 進める先は、この購読が固定している版の通で決める（351）。live の
+        // 下書きを見ると、公開後に順序を変えたぶんだけ飛ばし先がずれる。
+        await advancePastFirstStep(advanceTargetId, source, firstStep);
+        claimedEnrollmentId = null; // advance が claim を返している
+        return false;
+      }
+      // 届いていない（4xx）・従来どおりの呼び出しは claim を返して cron へ。
       console.error('[immediate-first-step] send failed, releasing claim:', err);
       await releaseClaim();
       return false;
     }
     sent = true;
+    options?.onSendOutcome?.('delivered');
     settleAfterSend = async () => {
       if (advanceTargetId) {
-        await advancePastFirstStep(advanceTargetId);
+        await advancePastFirstStep(advanceTargetId, source, firstStep);
         claimedEnrollmentId = null; // the advance released the claim
-        await attachReachTag();
+        await attachReachTag(firstStep);
       }
     };
 
     // Log what was actually delivered (post buildMessage normalization) so
     // the cooldown above sees it on subsequent calls and the dashboard chat
     // view mirrors LINE 1:1. delivery_type mirrors the send channel.
+    //
+    // 二重送信防止の正体は scenario_version_step_id（版所有の通ID）。
+    // scenario_step_id には live が残っているときだけ入れ、消されたあとは
+    // NULL（外部キーを壊さない）。
     for (const sentMessage of messages) {
       const logPayload = messageToLogPayload(sentMessage);
       await db
         .prepare(
-          `INSERT INTO messages_log (id, friend_id, direction, message_type, content, broadcast_id, scenario_step_id, delivery_type, source, template_id_at_send, created_at)
-           VALUES (?, ?, 'outgoing', ?, ?, NULL, ?, ?, 'scenario', ?, ?)`,
+          `INSERT INTO messages_log (id, friend_id, direction, message_type, content, broadcast_id, scenario_step_id, delivery_type, source, template_id_at_send, created_at, scenario_version_step_id)
+           VALUES (?, ?, 'outgoing', ?, ?, NULL, ?, ?, 'scenario', ?, ?, ?)`,
         )
         .bind(
           crypto.randomUUID(),
           friendId,
           logPayload.messageType,
           logPayload.content,
-          firstStep.id,
+          liveStepId,
           options?.reply ? 'reply' : null,
           resolved.templateIdAtSend,
           jstNow(),
+          firstStep.id,
         )
         .run();
     }

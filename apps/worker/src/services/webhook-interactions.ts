@@ -3,9 +3,11 @@ import {
   createWebhookInteraction,
   finishWebhookInteraction,
   getOutgoingWebhookById,
+  resolveWebhookSecret,
   restoreWebhookInteractionFailure,
   type WebhookInteractionFailureReason,
   type WebhookInteractionRow,
+  type WebhookKeyInput,
 } from '@line-crm/db';
 
 import { deliverWebhook, recordDeliveryOutcome } from './outgoing-webhook-delivery.js';
@@ -47,6 +49,7 @@ function failureReason(status: number | null): WebhookInteractionFailureReason {
 export async function retryWebhookInteraction(
   db: D1Database,
   original: WebhookInteractionRow,
+  keys?: WebhookKeyInput | string,
 ): Promise<WebhookInteractionRow> {
   if (original.direction !== 'outgoing' || original.status !== 'failed' || !original.webhook_id) {
     throw new Error('not_retryable');
@@ -55,6 +58,17 @@ export async function retryWebhookInteraction(
   if (!webhook) throw new Error('webhook_not_found');
   if (!webhook.is_active) throw new Error('webhook_inactive');
   if (!original.request_body_json) throw new Error('payload_unavailable');
+  // 署名は送信直前に復号した値で付ける。secretが設定済みで読めない
+  // (鍵不足・復号失敗)ときだけ送らずに止める(#650)。未設定の旧行は従来どおり送る。
+  let sendSecret: string | null = null;
+  if (webhook.secret_encrypted || webhook.secret) {
+    try {
+      sendSecret = await resolveWebhookSecret(webhook, keys);
+    } catch {
+      throw new Error('webhook_secret_unavailable');
+    }
+    if (!sendSecret) throw new Error('webhook_secret_unavailable');
+  }
 
   const claimed = await claimWebhookInteractionRetry(db, original.id, original.line_account_id);
   if (!claimed) throw new Error('already_retried');
@@ -73,8 +87,11 @@ export async function retryWebhookInteraction(
       idempotencyKey: original.idempotency_key,
       retryOfId: original.id,
     });
+    // 署名用の復号は deliverWebhook が行う。ここでの復号は、送り直しを
+    // 始める前に止めるための事前確認(#650 再審査)。
     const result = await deliverWebhook(webhook, original.request_body_json, {
       idempotencyKey: original.idempotency_key,
+      credentialKeys: keys,
     });
     await finishWebhookInteraction(db, retry.id, original.line_account_id, {
       status: result.ok ? 'succeeded' : 'failed',
