@@ -141,6 +141,7 @@ describe('migration 380: 統括ひな形の基盤', () => {
       templateId: preflight.templateId,
       templateVersionId: preflight.templateVersionId,
       targetAccountId: preflight.targetAccountId,
+      idempotencyFingerprint: preflight.idempotencyFingerprint,
       snapshotToken: preflight.snapshotToken,
       sourceId: 'source-overwrite',
       itemKind: 'tag',
@@ -154,6 +155,7 @@ describe('migration 380: 統括ひな形の基盤', () => {
       templateId: preflight.templateId,
       templateVersionId: preflight.templateVersionId,
       targetAccountId: preflight.targetAccountId,
+      idempotencyFingerprint: preflight.idempotencyFingerprint,
       snapshotToken: preflight.snapshotToken,
       sourceId: 'source-alias',
       itemKind: 'tag',
@@ -168,6 +170,7 @@ describe('migration 380: 統括ひな形の基盤', () => {
       templateId: preflight.templateId,
       templateVersionId: preflight.templateVersionId,
       targetAccountId: preflight.targetAccountId,
+      idempotencyFingerprint: preflight.idempotencyFingerprint,
       snapshotToken: 'foreign-snapshot',
       sourceId: 'source-new',
       itemKind: 'tag',
@@ -204,6 +207,12 @@ describe('migration 380: 統括ひな形の基盤', () => {
        idempotency_fingerprint, snapshot_token, status)
       VALUES ('run-a', 'tenant-a', 'template-a', 'version-a', 'account-a', 'preflight-1',
        'store-fingerprint-a', 'wrong-snapshot', 'pending')`).run())
+      .toThrow(/FOREIGN KEY constraint failed/);
+    expect(() => sqlite.prepare(`INSERT INTO hq_template_distribution_results
+      (run_id, tenant_id, template_id, template_version_id, target_account_id, preflight_id,
+       idempotency_fingerprint, snapshot_token, status)
+      VALUES ('run-a', 'tenant-a', 'template-a', 'version-a', 'account-a', 'preflight-1',
+       'wrong-fingerprint', 'snapshot-a', 'pending')`).run())
       .toThrow(/FOREIGN KEY constraint failed/);
   });
 

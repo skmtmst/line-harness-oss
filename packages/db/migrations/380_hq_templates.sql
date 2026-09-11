@@ -46,7 +46,10 @@ CREATE TABLE hq_template_preflights (
   expires_at TEXT,
   PRIMARY KEY (id, tenant_id),
   UNIQUE (tenant_id, target_account_id, idempotency_fingerprint),
-  UNIQUE (id, tenant_id, template_id, template_version_id, target_account_id, snapshot_token),
+  UNIQUE (
+    id, tenant_id, template_id, template_version_id, target_account_id,
+    idempotency_fingerprint, snapshot_token
+  ),
   FOREIGN KEY (template_id, tenant_id)
     REFERENCES hq_templates(id, tenant_id),
   FOREIGN KEY (template_version_id, template_id, tenant_id)
@@ -59,6 +62,7 @@ CREATE TABLE hq_template_preflight_resolutions (
   template_id TEXT NOT NULL,
   template_version_id TEXT NOT NULL,
   target_account_id TEXT NOT NULL,
+  idempotency_fingerprint TEXT NOT NULL,
   snapshot_token TEXT NOT NULL,
   source_id TEXT NOT NULL,
   item_kind TEXT NOT NULL,
@@ -71,9 +75,11 @@ CREATE TABLE hq_template_preflight_resolutions (
   CHECK (resolution_mode != 'overwrite' OR (target_id IS NOT NULL AND expected_revision IS NOT NULL)),
   CHECK (resolution_mode != 'alias' OR alias_name IS NOT NULL),
   FOREIGN KEY (
-    preflight_id, tenant_id, template_id, template_version_id, target_account_id, snapshot_token
+    preflight_id, tenant_id, template_id, template_version_id, target_account_id,
+    idempotency_fingerprint, snapshot_token
   ) REFERENCES hq_template_preflights(
-    id, tenant_id, template_id, template_version_id, target_account_id, snapshot_token
+    id, tenant_id, template_id, template_version_id, target_account_id,
+    idempotency_fingerprint, snapshot_token
   ) ON DELETE CASCADE
 );
 
@@ -117,9 +123,11 @@ CREATE TABLE hq_template_distribution_results (
     REFERENCES hq_template_distribution_runs(id, tenant_id, template_id, template_version_id)
     ON DELETE CASCADE,
   FOREIGN KEY (
-    preflight_id, tenant_id, template_id, template_version_id, target_account_id, snapshot_token
+    preflight_id, tenant_id, template_id, template_version_id, target_account_id,
+    idempotency_fingerprint, snapshot_token
   ) REFERENCES hq_template_preflights(
-    id, tenant_id, template_id, template_version_id, target_account_id, snapshot_token
+    id, tenant_id, template_id, template_version_id, target_account_id,
+    idempotency_fingerprint, snapshot_token
   )
 );
 

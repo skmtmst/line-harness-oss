@@ -61,6 +61,7 @@ export interface HqTemplatePreflightResolution {
   template_id: string;
   template_version_id: string;
   target_account_id: string;
+  idempotency_fingerprint: string;
   snapshot_token: string;
   source_id: string;
   item_kind: string;
@@ -380,6 +381,7 @@ export async function saveHqTemplatePreflightResolution(
     templateId: string;
     templateVersionId: string;
     targetAccountId: string;
+    idempotencyFingerprint: string;
     snapshotToken: string;
     sourceId: string;
     itemKind: string;
@@ -395,12 +397,14 @@ export async function saveHqTemplatePreflightResolution(
   const result = await db.prepare(
     `INSERT INTO hq_template_preflight_resolutions
        (preflight_id, tenant_id, template_id, template_version_id, target_account_id,
-        snapshot_token, source_id, item_kind, resolution_mode, target_id, alias_name, expected_revision)
+        idempotency_fingerprint, snapshot_token, source_id, item_kind, resolution_mode,
+        target_id, alias_name, expected_revision)
      SELECT id, tenant_id, template_id, template_version_id, target_account_id,
-            snapshot_token, ?, ?, ?, ?, ?, ?
+            idempotency_fingerprint, snapshot_token, ?, ?, ?, ?, ?, ?
      FROM hq_template_preflights
      WHERE id = ? AND tenant_id = ? AND template_id = ? AND template_version_id = ?
-       AND target_account_id = ? AND snapshot_token = ? AND status IN ('ready', 'blocked')
+       AND target_account_id = ? AND idempotency_fingerprint = ? AND snapshot_token = ?
+       AND status IN ('ready', 'blocked')
      ON CONFLICT(preflight_id, tenant_id, source_id) DO UPDATE SET
        item_kind = excluded.item_kind,
        resolution_mode = excluded.resolution_mode,
@@ -410,6 +414,7 @@ export async function saveHqTemplatePreflightResolution(
      WHERE hq_template_preflight_resolutions.template_id = excluded.template_id
        AND hq_template_preflight_resolutions.template_version_id = excluded.template_version_id
        AND hq_template_preflight_resolutions.target_account_id = excluded.target_account_id
+       AND hq_template_preflight_resolutions.idempotency_fingerprint = excluded.idempotency_fingerprint
        AND hq_template_preflight_resolutions.snapshot_token = excluded.snapshot_token`,
   ).bind(
     input.sourceId,
@@ -423,6 +428,7 @@ export async function saveHqTemplatePreflightResolution(
     input.templateId,
     input.templateVersionId,
     input.targetAccountId,
+    input.idempotencyFingerprint,
     input.snapshotToken,
   ).run();
   if ((result.meta.changes ?? 0) !== 1) return { kind: 'conflict_or_missing' };
