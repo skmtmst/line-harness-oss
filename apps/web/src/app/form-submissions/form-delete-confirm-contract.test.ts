@@ -37,7 +37,21 @@ describe('V6回答フォーム削除確認 gBp2J', () => {
 
   it('受付だけ止めるときは回答と一覧を残す', () => {
     expect(PAGE).toContain('受付だけ止める（おすすめ）')
-    expect(PAGE).toContain("api.forms.update(deleteTarget.id, selectedAccountId, { isActive: false })")
+    /*
+     * #723 で版を添えるようになり、1行では収まらなくなった。
+     *
+     * もとの1行の表明 `api.forms.update(deleteTarget.id, selectedAccountId, { isActive: false })`
+     * が捕まえていたのは3つ。置き換え後も全部捕まる。
+     *   (1) 削除・保管ではなく `api.forms.update` を呼ぶ  → 1つめの表明
+     *   (2) 対象と公式アカウントを渡す                    → 1つめの表明
+     *   (3) `isActive: false`（止める側）を送る            → 2つめの表明
+     * そのうえで、**版を送ること**と**影響の版ではなく編集の版を送ること**を足す。
+     * 実際に飛ぶ本文は実ブラウザ検査（form-submissions-browser-behavior.mjs の 8）
+     * が見ている。
+     */
+    expect(PAGE).toContain('api.forms.update(deleteTarget.id, selectedAccountId, {')
+    expect(PAGE).toContain('isActive: false,')
+    expect(PAGE).toContain('expectedContentRevision: deleteImpact.contentRevision,')
     expect(PAGE).toContain("form.id === deleteTarget.id ? { ...form, isActive: false } : form")
   })
 
