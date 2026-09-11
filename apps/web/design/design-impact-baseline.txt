@@ -128,6 +128,7 @@ shared-button-importer components/chats/template-folder-select.tsx
 shared-button-importer components/dashboard/dashboard-editor.tsx
 shared-button-importer components/dashboard/qr-dialog.tsx
 shared-button-importer components/feature-disabled-gate.tsx
+shared-button-importer components/friend-fields/edit-tag-page-v4.tsx
 shared-button-importer components/friend-fields/field-list.tsx
 shared-button-importer components/friend-fields/mark-list.tsx
 shared-button-importer components/friend-fields/saved-search-list.tsx

@@ -49,6 +49,8 @@ export interface ConversionEvent {
   point_name_snapshot: string | null;
   event_type_snapshot: string | null;
   value_snapshot: number | null;
+  /** 計測したときの成果地点の版（N-252）。移行377より前の行は NULL。 */
+  point_version_snapshot: number | null;
   idempotency_key: string | null;
 }
 
@@ -410,6 +412,21 @@ async function findBlockingEvent(
     .first<ConversionEvent>();
 }
 
+/**
+ * 計測したときの金額の控え（N-252）。**必ず数値を返す。NULL を返さない。**
+ *
+ * `point.value` をそのまま控えると、`value_mode` が `none` / `source` の地点では
+ * NULL が入る（`createConversionDefinition` は fixed 以外で value を NULL にする）。
+ * NULL の行は `affiliate-settlements.ts` の `value_snapshot ?? point_value` で
+ * **そのときの地点の値**へ落ちるため、承認前に地点を編集すると過去の成果の
+ * 報酬額が後から動く。控えに数値を必ず1つ置いて、後から変わる値を参照させない。
+ *
+ * 「いま NULL の行を見つけられなかった」ではなく、**NULL の行が生まれない形**にする。
+ */
+function measuredValue(point: { value: number | null }): number {
+  return Number(point.value ?? 0);
+}
+
 export async function trackConversion(
   db: D1Database,
   input: TrackConversionInput,
@@ -468,7 +485,8 @@ export async function trackConversion(
     approvalStatus,
     point.name,
     point.event_type,
-    point.value,
+    measuredValue(point),
+    point.version,
     input.idempotencyKey ?? null,
   ];
   try {
@@ -476,8 +494,8 @@ export async function trackConversion(
       await db.prepare(`INSERT INTO conversion_events
         (id, conversion_point_id, friend_id, user_id, affiliate_code, metadata, created_at,
          affiliate_id, attributed_ref_code, approval_status, point_name_snapshot,
-         event_type_snapshot, value_snapshot, idempotency_key)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+         event_type_snapshot, value_snapshot, point_version_snapshot, idempotency_key)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
         .bind(...eventValues)
         .run();
     } else {
@@ -528,8 +546,8 @@ export async function trackConversion(
       const insertIfClaimed = db.prepare(`INSERT INTO conversion_events
           (id, conversion_point_id, friend_id, user_id, affiliate_code, metadata, created_at,
            affiliate_id, attributed_ref_code, approval_status, point_name_snapshot,
-           event_type_snapshot, value_snapshot, idempotency_key)
-        SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+           event_type_snapshot, value_snapshot, point_version_snapshot, idempotency_key)
+        SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
          WHERE EXISTS (
            SELECT 1 FROM conversion_event_dedup_claims
             WHERE conversion_point_id = ? AND friend_id = ? AND last_event_id = ?

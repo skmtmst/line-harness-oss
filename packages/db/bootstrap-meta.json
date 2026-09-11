@@ -309,8 +309,10 @@
     "345_ad_platform_account_scope.sql",
     "346_ad_conversion_idempotency_and_backfill.sql",
     "347_template_published_version.sql",
+    "348_form_submission_idempotency.sql",
     "349_affiliate_settlement_snapshot.sql",
     "350_webhook_secret_encrypted.sql",
+    "351_scenario_published_versions.sql",
     "352_photo_notification_delivery.sql",
     "354_analytics_cross_lease_generation.sql",
     "355_rich_menu_schedule_lease.sql",
@@ -321,6 +323,7 @@
     "361_ec_v6_dispatches.sql",
     "362_entry_route_stop_suppression_dedup.sql",
     "363_ad_conversion_lease_and_provider_id.sql",
+    "364_scenario_version_ownership.sql",
     "365_rich_menu_schedule_default_pin.sql",
     "366_ad_conversion_outbox.sql",
     "367_conversion_once_dedup_guard.sql",
@@ -331,7 +334,8 @@
     "373_ai_loop_slack_reports.sql",
     "374_mileage_redemption_step_outbox.sql",
     "375_mileage_redemption_step_lease.sql",
-    "376_friend_tag_side_effect_runs.sql"
+    "376_friend_tag_side_effect_runs.sql",
+    "377_conversion_point_version_edit.sql"
   ],
-  "migrationCount": 332
+  "migrationCount": 336
 }

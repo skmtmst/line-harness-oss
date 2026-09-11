@@ -1458,6 +1458,20 @@ CREATE TABLE conversion_definition_operations (
   created_at          TEXT NOT NULL
 );
 
+CREATE TABLE conversion_definition_revisions (
+  id                  TEXT PRIMARY KEY,
+  conversion_point_id TEXT NOT NULL REFERENCES conversion_points(id) ON DELETE CASCADE,
+  from_version        INTEGER NOT NULL CHECK (from_version > 0),
+  to_version          INTEGER NOT NULL CHECK (to_version > from_version),
+  before_config_json  TEXT NOT NULL CHECK (json_valid(before_config_json)),
+  after_config_json   TEXT NOT NULL CHECK (json_valid(after_config_json)),
+  affected_usages     INTEGER NOT NULL DEFAULT 0 CHECK (affected_usages >= 0),
+  reason              TEXT,
+  performed_by        TEXT NOT NULL,
+  created_at          TEXT NOT NULL,
+  UNIQUE (conversion_point_id, to_version)
+);
+
 CREATE TABLE conversion_definition_usages (
   id                       TEXT PRIMARY KEY,
   conversion_point_id      TEXT NOT NULL REFERENCES conversion_points(id),
@@ -1503,7 +1517,7 @@ CREATE TABLE conversion_events (
   value_snapshot       REAL,
   idempotency_key      TEXT,
   created_at           TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-);
+, point_version_snapshot INTEGER);
 
 CREATE TABLE conversion_points (
   id         TEXT PRIMARY KEY,
@@ -2014,6 +2028,44 @@ CREATE TABLE form_submissions (
 , destination_write_status TEXT NOT NULL DEFAULT 'unknown'
   CHECK (destination_write_status IN ('pending', 'succeeded', 'partial', 'failed', 'not_requested', 'unknown')), destination_write_attempted INTEGER, destination_write_succeeded INTEGER, destination_write_failed INTEGER, destination_write_completed_at TEXT);
 
+CREATE TABLE form_submit_claims (
+  tenant_id TEXT NOT NULL DEFAULT '',
+  line_account_id TEXT NOT NULL,
+  form_id TEXT NOT NULL,
+  friend_id TEXT NOT NULL,
+  idempotency_key TEXT NOT NULL,
+  request_hash TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'in_progress'
+    CHECK (status IN ('in_progress', 'failed', 'completed')),
+  steps TEXT NOT NULL DEFAULT '[]',
+  webhook TEXT,
+  submission_id TEXT,
+  owner TEXT NOT NULL,
+  version INTEGER NOT NULL DEFAULT 1,
+  lease_generation INTEGER NOT NULL DEFAULT 1,
+  effect_stats TEXT NOT NULL DEFAULT '{}',
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  expires_at TEXT NOT NULL,
+  PRIMARY KEY (tenant_id, line_account_id, form_id, friend_id, idempotency_key)
+);
+
+CREATE TABLE form_submit_outbox (
+  tenant_id TEXT NOT NULL DEFAULT '',
+  line_account_id TEXT NOT NULL,
+  form_id TEXT NOT NULL,
+  friend_id TEXT NOT NULL,
+  idempotency_key TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  event_id TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending'
+    CHECK (status IN ('pending', 'delivered', 'failed')),
+  payload TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (tenant_id, line_account_id, form_id, friend_id, idempotency_key, kind)
+);
+
 CREATE TABLE forms (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
@@ -2374,7 +2426,7 @@ CREATE TABLE "friend_scenarios" (
   started_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   next_delivery_at   TEXT,
   updated_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-, previous_scenario_id TEXT);
+, previous_scenario_id TEXT, published_version_id TEXT REFERENCES scenario_versions (id));
 
 CREATE TABLE friend_scores (
   id              TEXT PRIMARY KEY,
@@ -2888,7 +2940,7 @@ CREATE TABLE messages_log (
   line_account_id  TEXT,
   sent_by_staff_id TEXT,
   created_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-, origin_kind TEXT, origin_id TEXT);
+, origin_kind TEXT, origin_id TEXT, scenario_version_step_id TEXT);
 
 CREATE TABLE mileage_adjustment_notifications (
   id                TEXT PRIMARY KEY,
@@ -4482,6 +4534,21 @@ CREATE TABLE scenario_drafts (
   updated_at         TEXT NOT NULL
 );
 
+CREATE TABLE scenario_pinned_action_fires (
+  action_key TEXT NOT NULL,
+  friend_id  TEXT NOT NULL REFERENCES friends (id) ON DELETE CASCADE,
+  fired_at   TEXT NOT NULL,
+  PRIMARY KEY (action_key, friend_id)
+);
+
+CREATE TABLE scenario_publish_keys (
+  publish_idempotency_key   TEXT PRIMARY KEY,
+  scenario_id               TEXT NOT NULL REFERENCES scenarios (id) ON DELETE CASCADE,
+  version_id                TEXT NOT NULL,
+  content_snapshot          TEXT NOT NULL,
+  created_at                TEXT NOT NULL
+);
+
 CREATE TABLE "scenario_steps" (
   id              TEXT PRIMARY KEY,
   scenario_id     TEXT NOT NULL REFERENCES scenarios (id) ON DELETE CASCADE,
@@ -4514,6 +4581,25 @@ CREATE TABLE "scenario_triggers" (
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
 
+CREATE TABLE scenario_versions (
+  id                        TEXT PRIMARY KEY,
+  scenario_id               TEXT NOT NULL REFERENCES scenarios (id) ON DELETE CASCADE,
+  version_number            INTEGER NOT NULL,
+  delivery_mode             TEXT NOT NULL DEFAULT 'relative',
+  audience_condition_json   TEXT,
+  on_complete_mode          TEXT NOT NULL DEFAULT 'pause',
+  on_complete_scenario_id   TEXT,
+  steps_snapshot            TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(steps_snapshot)),
+  actions_snapshot          TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(actions_snapshot)),
+  status                    TEXT NOT NULL DEFAULT 'published'
+    CHECK (status IN ('published', 'retired')),
+  published_at              TEXT NOT NULL,
+  published_by_staff_id     TEXT,
+  created_at                TEXT NOT NULL,
+  updated_at                TEXT NOT NULL,
+  UNIQUE (scenario_id, version_number)
+);
+
 CREATE TABLE scenarios (
   id              TEXT PRIMARY KEY,
   name            TEXT NOT NULL,
@@ -4524,7 +4610,7 @@ CREATE TABLE scenarios (
   delivery_mode   TEXT NOT NULL DEFAULT 'relative' CHECK (delivery_mode IN ('relative', 'elapsed', 'absolute_time')),
   created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-, line_account_id TEXT, folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL, display_order INTEGER NOT NULL DEFAULT 0, allow_concurrent INTEGER NOT NULL DEFAULT 0, audience_condition_json TEXT, on_complete_mode TEXT NOT NULL DEFAULT 'pause', on_complete_scenario_id TEXT REFERENCES scenarios (id) ON DELETE SET NULL, created_from_recipe_id TEXT REFERENCES recipes(id), recipe_clone_run_id TEXT REFERENCES recipe_clone_runs(id));
+, line_account_id TEXT, folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL, display_order INTEGER NOT NULL DEFAULT 0, allow_concurrent INTEGER NOT NULL DEFAULT 0, audience_condition_json TEXT, on_complete_mode TEXT NOT NULL DEFAULT 'pause', on_complete_scenario_id TEXT REFERENCES scenarios (id) ON DELETE SET NULL, created_from_recipe_id TEXT REFERENCES recipes(id), recipe_clone_run_id TEXT REFERENCES recipe_clone_runs(id), current_published_version_id TEXT);
 
 CREATE TABLE scoring_rules (
   id          TEXT PRIMARY KEY,
@@ -5645,6 +5731,9 @@ CREATE INDEX idx_common_vars_v338_account_name
 CREATE INDEX idx_conversion_definition_operations_point
   ON conversion_definition_operations(conversion_point_id, created_at DESC);
 
+CREATE INDEX idx_conversion_definition_revisions_point
+  ON conversion_definition_revisions(conversion_point_id, created_at DESC);
+
 CREATE INDEX idx_conversion_definition_usages_account
   ON conversion_definition_usages(line_account_id, ref_kind, ref_id);
 
@@ -5812,6 +5901,12 @@ CREATE INDEX idx_form_submissions_form_write_status
 
 CREATE INDEX idx_form_submissions_friend ON form_submissions (friend_id);
 
+CREATE INDEX idx_form_submit_claims_submission
+  ON form_submit_claims (submission_id);
+
+CREATE INDEX idx_form_submit_claims_updated
+  ON form_submit_claims (updated_at);
+
 CREATE INDEX idx_forms_status_updated
   ON forms(status, updated_at DESC);
 
@@ -5923,6 +6018,10 @@ WHERE status = 'active' AND next_delivery_at IS NOT NULL;
 CREATE INDEX idx_friend_scenarios_friend_id ON friend_scenarios (friend_id);
 
 CREATE INDEX idx_friend_scenarios_next_delivery_at ON friend_scenarios (next_delivery_at);
+
+CREATE INDEX idx_friend_scenarios_published_version
+  ON friend_scenarios (published_version_id)
+  WHERE published_version_id IS NOT NULL;
 
 CREATE INDEX idx_friend_scenarios_status ON friend_scenarios (status);
 
@@ -6097,6 +6196,10 @@ CREATE INDEX idx_messages_log_friend_source ON messages_log (friend_id, source);
 
 CREATE INDEX idx_messages_log_origin
   ON messages_log (origin_kind, created_at);
+
+CREATE INDEX idx_messages_log_version_step
+  ON messages_log (friend_id, scenario_version_step_id)
+  WHERE scenario_version_step_id IS NOT NULL;
 
 CREATE INDEX idx_mileage_adjustment_notifications_retry
   ON mileage_adjustment_notifications(status, updated_at)
@@ -6469,12 +6572,21 @@ CREATE INDEX idx_scenario_actions_lookup
 CREATE INDEX idx_scenario_drafts_account_updated
   ON scenario_drafts(line_account_id, updated_at DESC, scenario_id);
 
+CREATE INDEX idx_scenario_pinned_action_fires_friend
+  ON scenario_pinned_action_fires (friend_id);
+
+CREATE INDEX idx_scenario_publish_keys_scenario
+  ON scenario_publish_keys (scenario_id);
+
 CREATE INDEX idx_scenario_steps_scenario_lookup ON scenario_steps (scenario_id);
 
 CREATE INDEX idx_scenario_triggers_lookup ON scenario_triggers (kind, tag_id);
 
 CREATE UNIQUE INDEX idx_scenario_triggers_unique
   ON scenario_triggers (scenario_id, kind, COALESCE(tag_id, ''));
+
+CREATE INDEX idx_scenario_versions_scenario
+  ON scenario_versions (scenario_id, status, version_number DESC);
 
 CREATE INDEX idx_scenarios_order ON scenarios (display_order);
 
@@ -6971,6 +7083,24 @@ ON friend_add_rule_versions
 WHEN OLD.status IN ('published', 'retired')
 BEGIN SELECT RAISE(ABORT, 'published friend-add rule versions are immutable'); END;
 
+CREATE TRIGGER trg_friend_scenarios_version_ownership_insert
+BEFORE INSERT ON friend_scenarios
+WHEN NEW.published_version_id IS NOT NULL
+ AND NOT EXISTS (
+   SELECT 1 FROM scenario_versions
+   WHERE id = NEW.published_version_id AND scenario_id = NEW.scenario_id
+ )
+BEGIN SELECT RAISE(ABORT, 'published version belongs to another scenario'); END;
+
+CREATE TRIGGER trg_friend_scenarios_version_ownership_update
+BEFORE UPDATE OF published_version_id ON friend_scenarios
+WHEN NEW.published_version_id IS NOT NULL
+ AND NOT EXISTS (
+   SELECT 1 FROM scenario_versions
+   WHERE id = NEW.published_version_id AND scenario_id = NEW.scenario_id
+ )
+BEGIN SELECT RAISE(ABORT, 'published version belongs to another scenario'); END;
+
 CREATE TRIGGER trg_friend_scores_v6_snapshot
 AFTER INSERT ON friend_scores
 WHEN NEW.line_account_id IS NOT NULL
@@ -7104,6 +7234,35 @@ WHEN OLD.status IN ('published', 'superseded')
  AND NEW.status <> OLD.status
  AND NOT (OLD.status = 'published' AND NEW.status = 'superseded')
 BEGIN SELECT RAISE(ABORT, 'published reminder version status cannot move backwards'); END;
+
+CREATE TRIGGER trg_scenario_versions_immutable_delete
+BEFORE DELETE ON scenario_versions
+WHEN OLD.status IN ('published', 'retired')
+ AND EXISTS (SELECT 1 FROM scenarios WHERE id = OLD.scenario_id)
+BEGIN SELECT RAISE(ABORT, 'published scenario versions cannot be deleted'); END;
+
+CREATE TRIGGER trg_scenario_versions_immutable_update
+BEFORE UPDATE OF scenario_id, version_number, delivery_mode, audience_condition_json,
+  on_complete_mode, on_complete_scenario_id, steps_snapshot, actions_snapshot
+ON scenario_versions
+WHEN OLD.status IN ('published', 'retired')
+BEGIN SELECT RAISE(ABORT, 'published scenario versions are immutable'); END;
+
+CREATE TRIGGER trg_scenario_versions_status_transition
+BEFORE UPDATE OF status ON scenario_versions
+WHEN OLD.status IN ('published', 'retired')
+ AND NEW.status <> OLD.status
+ AND NOT (OLD.status = 'published' AND NEW.status = 'retired')
+BEGIN SELECT RAISE(ABORT, 'published scenario version status cannot move backwards'); END;
+
+CREATE TRIGGER trg_scenarios_pointer_ownership
+BEFORE UPDATE OF current_published_version_id ON scenarios
+WHEN NEW.current_published_version_id IS NOT NULL
+ AND NOT EXISTS (
+   SELECT 1 FROM scenario_versions
+   WHERE id = NEW.current_published_version_id AND scenario_id = NEW.id
+ )
+BEGIN SELECT RAISE(ABORT, 'published version belongs to another scenario'); END;
 
 -- Seed data required by tenant-aware inserts on a fresh database.
 INSERT OR IGNORE INTO tenants (id, name) VALUES

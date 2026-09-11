@@ -5,6 +5,7 @@ import Link from 'next/link'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
 import SummaryCard from '@/components/shared/summary-card'
+import Pagination from '@/components/shared/pagination'
 import { Tabs } from '@/components/shared/tabs'
 import { ActionCell, DataTable, Td, Th, TableHeadRow, Tr } from '@/components/shared/table'
 import { ApiError, api, type EcSubscription, type EcSubscriptionList } from '@/lib/api'
@@ -27,12 +28,23 @@ const STATUS_TONE: Record<EcSubscription['status'], string> = {
   cancelled: styles.statusMuted,
 }
 
+/** 1ページに出す件数。 */
+const PAGE_SIZE = 100
+
 export default function SubscriptionsPanel({ accountId }: { accountId: string | null }) {
   const [data, setData] = useState<EcSubscriptionList | null>(null)
   const [state, setState] = useState<'loading' | 'ready' | 'empty' | 'error' | 'forbidden'>('loading')
   const [filter, setFilter] = useState<Filter>('all')
   const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
+  /** 絞り込みに合う総数。サーバが数える(#731)。 */
+  const [total, setTotal] = useState(0)
 
+  /*
+   * 表示条件(ようす)は**サーバへ渡す**(#731)。手元で絞ると、ページごとに
+   * 絞ることになって「N件中M件」が合わなくなる。検索の言葉だけは、いまも
+   * ページの中だけで効く(サーバ側に検索が無いため。下の文言でそう伝える)。
+   */
   const load = useCallback(async () => {
     if (!accountId) {
       setData(null)
@@ -41,26 +53,31 @@ export default function SubscriptionsPanel({ accountId }: { accountId: string | 
     }
     setState('loading')
     try {
-      const response = await api.ecCommerce.subscriptions({ lineAccountId: accountId, limit: 100 })
+      const response = await api.ecCommerce.subscriptions({
+        lineAccountId: accountId,
+        status: filter === 'all' ? undefined : filter,
+        limit: PAGE_SIZE,
+        offset: (page - 1) * PAGE_SIZE,
+      })
       if (!response.success || !Array.isArray(response.data?.items)) throw new Error('invalid_subscription_response')
       setData(response.data)
+      setTotal(response.pagination?.total ?? response.data.items.length)
       setState(response.data.items.length ? 'ready' : 'empty')
     } catch (error) {
       setState(error instanceof ApiError && error.status === 403 ? 'forbidden' : 'error')
     }
-  }, [accountId])
+  }, [accountId, filter, page])
 
   useEffect(() => { void load() }, [load])
+  // 表示条件やアカウントを変えたら先頭のページへ戻す。
+  useEffect(() => { setPage(1) }, [accountId, filter])
 
   const shown = useMemo(() => {
     const needle = search.trim().toLowerCase()
-    return (data?.items ?? []).filter((item) => {
-      if (filter !== 'all' && item.status !== filter) return false
-      if (!needle) return true
-      return [item.ownerName, item.petName, item.contractNumber, item.items]
-        .some((value) => value?.toLowerCase().includes(needle))
-    })
-  }, [data, filter, search])
+    if (!needle) return data?.items ?? []
+    return (data?.items ?? []).filter((item) => [item.ownerName, item.petName, item.contractNumber, item.items]
+      .some((value) => value?.toLowerCase().includes(needle)))
+  }, [data, search])
 
   if (state !== 'ready') {
     return (
@@ -110,7 +127,27 @@ export default function SubscriptionsPanel({ accountId }: { accountId: string | 
           </tbody>
         </DataTable>
       )}
-      <p className={styles.footer}>定期便 {summary?.total.toLocaleString('ja-JP')}件中 {shown.length.toLocaleString('ja-JP')}件を表示</p>
+      {/*
+        「N件中M件」の N は**サーバが数えた総数**(#731)。以前は取ってきた行を
+        数えていたので、501人目以降の契約は N にも入らず、切れていることが
+        分からなかった。
+      */}
+      <p className={styles.footer}>
+        {search.trim()
+          ? `このページの ${shown.length.toLocaleString('ja-JP')}件を表示（検索はページの中だけに効きます）`
+          : `${filter === 'all' ? '定期便' : '表示条件に合う定期便'} ${total.toLocaleString('ja-JP')}件中 ${
+            total === 0 ? 0 : ((page - 1) * PAGE_SIZE + 1).toLocaleString('ja-JP')
+          }〜${((page - 1) * PAGE_SIZE + shown.length).toLocaleString('ja-JP')}件を表示`}
+        {data && data.skipped.malformedSnapshots > 0
+          ? `／ 形が読めなかったお客様のぶん ${data.skipped.malformedSnapshots.toLocaleString('ja-JP')}件は数えていません`
+          : ''}
+      </p>
+      <Pagination
+        page={page}
+        pageCount={Math.max(1, Math.ceil(total / PAGE_SIZE))}
+        onPageChange={setPage}
+        ariaLabel="定期便のページ送り"
+      />
     </>
   )
 }

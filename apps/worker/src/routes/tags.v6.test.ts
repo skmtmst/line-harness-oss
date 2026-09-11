@@ -246,6 +246,76 @@ describe('V6 タグ定義と共通アクション連動', () => {
     ).get(createdBody.data.tag.id)).toEqual({ action: 'archived' });
   });
 
+  /*
+   * #708: すでに整理済みのタグへ、画面が影響を読み直してからもう一度 archive を
+   * 投げても、版も監査記録も増やさない。ここで止めたい崩れ方は2つ。
+   *
+   *   1. 何度でも 200 で成功し、tags.version が 2→3→4 と増える。
+   *   2. operation_audit に「保管した」が実際の回数より多く残る。監査は、あとから
+   *      読む人が事実を確かめるためのものなので、ここに嘘が入るのは他と害が違う。
+   *
+   * 409 は version_conflict / impact_changed と同じ番号だが、code を分けて
+   * already_archived で返す。画面はこれを見て「失敗」ではなく「もう着いている」
+   * として見せる（#708 の裁定）。
+   */
+  it('整理済みのタグへの再 archive は 409 already_archived で止め、版も監査記録も増やさない', async () => {
+    const created = await app(testDb.db).request('/api/tags', json('POST', {
+      lineAccountId: 'account-1',
+      name: '二度保管しないタグ',
+      mileage: { self: 0, referrer: 0, multiplier: null, priority: 0 },
+    }));
+    const createdBody = await created.json() as { data: { tag: { id: string; version: number } } };
+    const tagId = createdBody.data.tag.id;
+
+    async function archive() {
+      const impactResponse = await app(testDb.db).request(
+        `/api/tags/${tagId}/dependencies?lineAccountId=account-1`,
+      );
+      const impactBody = await impactResponse.json() as {
+        data: { revision: string; canArchive: boolean };
+      };
+      return app(testDb.db).request(
+        `/api/tags/${tagId}/archive?lineAccountId=account-1`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Idempotency-Key': crypto.randomUUID() },
+          body: JSON.stringify({
+            expectedVersion: (testDb.raw.prepare('SELECT version FROM tags WHERE id = ?')
+              .get(tagId) as { version: number }).version,
+            impactRevision: impactBody.data.revision,
+          }),
+        },
+      );
+    }
+
+    const first = await archive();
+    expect(first.status).toBe(200);
+    expect(testDb.raw.prepare('SELECT status, version FROM tags WHERE id = ?').get(tagId))
+      .toEqual({ status: 'archived', version: 2 });
+
+    /* 影響を読み直してから、もう一度投げる。前はここが 200 で通り、版が 3 になった。 */
+    const second = await archive();
+    expect(second.status).toBe(409);
+    await expect(second.json()).resolves.toMatchObject({
+      success: false,
+      code: 'already_archived',
+    });
+    /* 版が動かないこと。 */
+    expect(testDb.raw.prepare('SELECT status, version FROM tags WHERE id = ?').get(tagId))
+      .toEqual({ status: 'archived', version: 2 });
+    /* 監査記録が増えないこと。409 が監査の書き込みより前に効いていること。 */
+    expect(testDb.raw.prepare(
+      "SELECT COUNT(*) AS n FROM operation_audit WHERE target_kind = 'tag' AND target_id = ? AND action = 'archived'",
+    ).get(tagId)).toEqual({ n: 1 });
+
+    /* 3回目も同じ。 */
+    const third = await archive();
+    expect(third.status).toBe(409);
+    expect(testDb.raw.prepare(
+      "SELECT COUNT(*) AS n FROM operation_audit WHERE target_kind = 'tag' AND target_id = ? AND action = 'archived'",
+    ).get(tagId)).toEqual({ n: 1 });
+  });
+
   it('閲覧担当者は作成・更新・依存確認を行えない', async () => {
     const staff: AuthenticatedStaff = { ...admin, id: 'staff-1', role: 'staff', name: '担当者' };
     const instance = app(testDb.db, staff);

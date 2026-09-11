@@ -58,6 +58,12 @@ interface FormState {
   xHarnessBaseUrl: string | null;
   profile: { userId: string; displayName: string; pictureUrl?: string } | null;
   friendId: string | null;
+  /**
+   * 論理送信単位の安定した冪等キー。画面を開いている間は同じ値を使い続け、
+   * 連打・通信再送を同じ回答としてまとめる。送り直しは同じキーで行い、
+   * 新しいキーへの付け替えは利用者の明示の送り直し操作のときだけ行う。
+   */
+  submitIdempotencyKey: string | null;
   submitting: boolean;
   verifiedXUsername: string;
   /**
@@ -74,6 +80,7 @@ const state: FormState = {
   xHarnessBaseUrl: null,
   profile: null,
   friendId: null,
+  submitIdempotencyKey: null,
   submitting: false,
   verifiedXUsername: '',
   refTrackedLinkId: null,
@@ -718,6 +725,82 @@ function validateForm(): string | null {
   return null;
 }
 
+interface FormSubmitPayload {
+  status: number;
+  json: {
+    success?: boolean;
+    error?: string;
+    code?: string;
+    data?: { webhookPassed?: boolean; complete?: boolean };
+    retryable?: boolean;
+    idempotencyKey?: string;
+  } | null;
+}
+
+/** 内容違い・期限切れの使い回し。新しいキーへの付け替えは利用者の明示の操作のときだけ行う。 */
+class FormSubmitConflictError extends Error {
+  constructor(readonly code: 'idempotency_content_mismatch' | 'idempotency_expired') {
+    super(code);
+  }
+}
+
+export async function postFormSubmit(
+  path: string,
+  body: Record<string, unknown>,
+  key: string,
+): Promise<FormSubmitPayload> {
+  const res = await apiCall(path, {
+    method: 'POST',
+    headers: { 'Idempotency-Key': key },
+    body: JSON.stringify(body),
+  });
+  const json = await res.clone().json().catch(() => null) as FormSubmitPayload['json'];
+  return { status: res.status, json };
+}
+
+/**
+ * 送信の実行。202(未完)は同じキーで送り直し、元のキーへの誘導は
+ * 付け替えて続ける。新しい回答を作る付け替えはここではしない。
+ */
+async function postFormSubmitWithResume(
+  path: string,
+  body: Record<string, unknown>,
+  key: string,
+): Promise<{ payload: FormSubmitPayload; key: string }> {
+  let currentKey = key;
+  let last: FormSubmitPayload = { status: 0, json: null };
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    last = await postFormSubmit(path, body, currentKey);
+    if (last.status === 202 && last.json?.retryable) {
+      await new Promise((r) => setTimeout(r, 1500));
+      continue;
+    }
+    const guided = last.json?.code === 'idempotency_recovery_pending'
+      ? last.json?.idempotencyKey
+      : undefined;
+    if (last.status === 409 && guided && guided !== currentKey) {
+      currentKey = guided;
+      state.submitIdempotencyKey = guided;
+      continue;
+    }
+    return { payload: last, key: currentKey };
+  }
+  return { payload: last, key: currentKey };
+}
+
+function throwOnFormSubmitError(payload: FormSubmitPayload, fallback: string): void {
+  const { status, json } = payload;
+  if (status === 200 || status === 201) return;
+  if (status === 202) {
+    throw new Error('送信を受け付けましたが、一部の処理が終わっていません。時間をおいて送り直してください。');
+  }
+  const code = json?.code;
+  if (status === 409 && (code === 'idempotency_content_mismatch' || code === 'idempotency_expired')) {
+    throw new FormSubmitConflictError(code);
+  }
+  throw new Error(`${status}: ${json?.error || fallback}`);
+}
+
 async function submitForm(): Promise<void> {
   if (state.submitting || !state.formDef) return;
 
@@ -740,6 +823,9 @@ async function submitForm(): Promise<void> {
     submitBtn.disabled = true;
     submitBtn.textContent = '送信中...';
   }
+  // 論理送信単位の安定したキー。連打・通信再送は同じキーで送る。
+  if (!state.submitIdempotencyKey) state.submitIdempotencyKey = crypto.randomUUID();
+  const idemKey = state.submitIdempotencyKey;
 
   try {
     const data = collectFormData();
@@ -783,19 +869,14 @@ async function submitForm(): Promise<void> {
       const webhookBody: Record<string, unknown> = { data: { ...data } };
       if (state.refTrackedLinkId) webhookBody.trackedLinkId = state.refTrackedLinkId;
 
-      const webhookSubmitRes = await apiCall(`/api/forms/${state.formDef.id}/submit`, {
-        method: 'POST',
-        body: JSON.stringify(webhookBody),
-      });
-      if (!webhookSubmitRes.ok) {
-        const errText = await webhookSubmitRes.text().catch(() => '');
-        let errMsg = '送信に失敗しました';
-        try { const errData = JSON.parse(errText); errMsg = errData.error || errMsg; } catch { errMsg = errText || errMsg; }
-        throw new Error(`${webhookSubmitRes.status}: ${errMsg}`);
-      }
+      const { payload: webhookPayload } = await postFormSubmitWithResume(
+        `/api/forms/${state.formDef.id}/submit`,
+        webhookBody,
+        idemKey,
+      );
+      throwOnFormSubmitError(webhookPayload, '送信に失敗しました');
       // Check server-side webhook recheck result
-      const submitResult = await webhookSubmitRes.clone().json().catch(() => null) as { data?: { webhookPassed?: boolean } } | null;
-      if (submitResult?.data?.webhookPassed === false) {
+      if (webhookPayload.json?.data?.webhookPassed === false) {
         throw new Error(state.formDef.onSubmitWebhookFailMessage || '条件を満たしていません');
       }
       renderWebhookSuccess(successMsg);
@@ -806,18 +887,13 @@ async function submitForm(): Promise<void> {
     if (state.refTrackedLinkId) body.trackedLinkId = state.refTrackedLinkId;
     console.log('Submitting to:', `/api/forms/${state.formDef.id}/submit`);
 
-    const res = await apiCall(`/api/forms/${state.formDef.id}/submit`, {
-      method: 'POST',
-      body: JSON.stringify(body),
-    });
-    console.log('Response status:', res.status);
-
-    if (!res.ok) {
-      const errText = await res.text().catch(() => '');
-      let errMsg = '送信に失敗しました';
-      try { const errData = JSON.parse(errText); errMsg = errData.error || errMsg; } catch { errMsg = errText || errMsg; }
-      throw new Error(`${res.status}: ${errMsg}`);
-    }
+    const { payload } = await postFormSubmitWithResume(
+      `/api/forms/${state.formDef.id}/submit`,
+      body,
+      idemKey,
+    );
+    console.log('Response status:', payload.status);
+    throwOnFormSubmitError(payload, '送信に失敗しました');
 
     renderSuccess();
   } catch (err) {
@@ -831,9 +907,28 @@ async function submitForm(): Promise<void> {
     const errEl = document.createElement('p');
     errEl.className = 'form-error-msg';
     errEl.style.cssText = 'color:#e53e3e;font-size:14px;margin:8px 0;text-align:center;';
-    errEl.textContent = err instanceof Error ? err.message : '送信に失敗しました';
+    if (err instanceof FormSubmitConflictError) {
+      // 自動では送り直さない。新しい回答として送るのは利用者の操作のときだけ。
+      errEl.textContent = err.code === 'idempotency_expired'
+        ? '送信の有効期限が切れました。もう一度送る場合は下のボタンから送り直してください。'
+        : '送信済みの内容と異なるため、そのままでは送れません。別の回答として送る場合は下のボタンから送り直してください。';
+    } else {
+      errEl.textContent = err instanceof Error ? err.message : '送信に失敗しました';
+    }
     const btn = document.getElementById('submitBtn');
     btn?.parentElement?.insertBefore(errEl, btn);
+    if (err instanceof FormSubmitConflictError) {
+      const resendBtn = document.createElement('button');
+      resendBtn.type = 'button';
+      resendBtn.textContent = '別の回答として送り直す';
+      resendBtn.style.cssText = 'display:block;margin:8px auto;padding:8px 16px;';
+      resendBtn.onclick = () => {
+        resendBtn.remove();
+        state.submitIdempotencyKey = crypto.randomUUID();
+        void submitForm();
+      };
+      errEl.after(resendBtn);
+    }
   }
 }
 

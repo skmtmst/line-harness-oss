@@ -705,6 +705,181 @@ export async function stopConversionDefinition(
   return { id: input.id, status: 'stopped' as const, version: input.expectedVersion + 1, stoppedAt: now };
 }
 
+/** 編集で差し替える設定。監査の前後比較にもこの形をそのまま使う。 */
+type DefinitionConfig = {
+  name: string;
+  sourceType: string;
+  sourceConfig: Record<string, unknown>;
+  measureMethod: 'url_reach' | 'webhook' | 'manual';
+  targetUrl: string | null;
+  deduplicationMode: ConversionDeduplicationMode;
+  deduplicationWindowDays: number | null;
+  valueMode: ConversionValueMode;
+  fixedValue: number | null;
+  reversalPolicy: ConversionReversalPolicy;
+  attributionDays: number | null;
+};
+
+type RevisionRow = {
+  id: string;
+  version: number;
+  status: ConversionDefinitionStatus;
+  line_account_id: string | null;
+  name: string;
+  event_type: string;
+  value: number | null;
+  measure_method: 'url_reach' | 'webhook' | 'manual';
+  target_url: string | null;
+  count_repeat: number;
+  attribution_days: number | null;
+  source_config_json: string;
+  deduplication_mode: ConversionDeduplicationMode;
+  deduplication_window_days: number | null;
+  value_mode: ConversionValueMode;
+  reversal_policy: ConversionReversalPolicy;
+};
+
+function configOf(row: RevisionRow): DefinitionConfig {
+  return {
+    name: row.name,
+    sourceType: row.event_type,
+    sourceConfig: JSON.parse(row.source_config_json || '{}') as Record<string, unknown>,
+    measureMethod: row.measure_method,
+    targetUrl: row.target_url,
+    deduplicationMode: row.deduplication_mode,
+    deduplicationWindowDays: row.deduplication_window_days,
+    valueMode: row.value_mode,
+    fixedValue: row.value,
+    reversalPolicy: row.reversal_policy,
+    attributionDays: row.attribution_days,
+  };
+}
+
+export type ReviseConversionDefinitionInput = {
+  id: string;
+  scope: ConversionDefinitionScope;
+  expectedVersion: number;
+  reason?: string | null;
+  staffId: string;
+} & Omit<DefinitionConfig, 'targetUrl' | 'deduplicationWindowDays' | 'fixedValue' | 'attributionDays'>
+  & Partial<Pick<DefinitionConfig, 'targetUrl' | 'deduplicationWindowDays' | 'fixedValue' | 'attributionDays'>>;
+
+/**
+ * 成果地点を、履歴を保ったまま編集して次の版にする（N-252）。
+ *
+ * **過去の成果は書き換えない。** 集計は `conversion_events.value_snapshot` を
+ * 見ており、計測時の版は `point_version_snapshot` に残る。だから編集しても
+ * 過去の集計額は動かない。
+ *
+ * **利用先は安定ID（`conversion_point_id`）のまま次の版へ付け替える。**
+ * 参照が切れないよう、地点の版を上げるのと同じ処理の中で `definition_version`
+ * を進める。
+ *
+ * **後勝ちにしない。** `stopConversionDefinition` と同じ形で、版のCASに勝った
+ * ときだけ監査と利用先が動く。負けた側は 409 で、副作用は0のまま終わる
+ * （D1 の batch は1文でも失敗すれば全体を rollback する。ここでは失敗ではなく
+ * 「0件更新」で表すので、後段の文も同じ条件で自分を止める）。
+ */
+export async function reviseConversionDefinition(
+  db: D1Database,
+  input: ReviseConversionDefinitionInput,
+) {
+  const account = accountWhere('cp.', input.scope, undefined);
+  const current = await db.prepare(`SELECT cp.id, cp.version, cp.status, cp.line_account_id,
+      cp.name, cp.event_type, cp.value, cp.measure_method, cp.target_url, cp.count_repeat,
+      cp.attribution_days, cp.source_config_json, cp.deduplication_mode,
+      cp.deduplication_window_days, cp.value_mode, cp.reversal_policy
+    FROM conversion_points cp WHERE cp.id = ? AND ${account.sql}`)
+    .bind(input.id, ...account.values)
+    .first<RevisionRow>();
+  requireExpectedDefinition(current, input.expectedVersion);
+  const row = current!;
+
+  const name = input.name.trim();
+  if (!name) throw new ConversionDefinitionError('required', '成果地点の名前を入れてください', 400);
+  // 同じ店の中で名前が重ならないこと。自分自身は除く（名前を変えない編集を弾かない）。
+  const duplicate = await db.prepare(`SELECT id FROM conversion_points
+    WHERE line_account_id IS ? AND lower(trim(name)) = lower(trim(?)) AND id != ? LIMIT 1`)
+    .bind(row.line_account_id, name, input.id)
+    .first<{ id: string }>();
+  if (duplicate) {
+    throw new ConversionDefinitionError('duplicate_name', '同じ名前の成果地点があります', 409);
+  }
+
+  const after: DefinitionConfig = {
+    name,
+    sourceType: input.sourceType,
+    sourceConfig: input.sourceConfig,
+    measureMethod: input.measureMethod,
+    targetUrl: input.measureMethod === 'url_reach' ? input.targetUrl ?? null : null,
+    deduplicationMode: input.deduplicationMode,
+    deduplicationWindowDays: input.deduplicationMode === 'window'
+      ? input.deduplicationWindowDays ?? null : null,
+    valueMode: input.valueMode,
+    fixedValue: input.valueMode === 'fixed' ? input.fixedValue ?? null : null,
+    reversalPolicy: input.reversalPolicy,
+    attributionDays: input.attributionDays ?? null,
+  };
+  const before = configOf(row);
+  const toVersion = input.expectedVersion + 1;
+  const now = jstNow();
+  const revisionId = crypto.randomUUID();
+  const usageRow = await db.prepare(`SELECT COUNT(*) AS total FROM conversion_definition_usages
+    WHERE conversion_point_id = ? AND definition_version = ?`)
+    .bind(input.id, input.expectedVersion).first<{ total: number }>();
+  const affectedUsages = Number(usageRow?.total ?? 0);
+
+  const results = await db.batch([
+    db.prepare(`UPDATE conversion_points
+        SET name = ?, event_type = ?, value = ?, measure_method = ?, target_url = ?,
+            count_repeat = ?, attribution_days = ?, source_config_json = ?,
+            deduplication_mode = ?, deduplication_window_days = ?, value_mode = ?,
+            reversal_policy = ?, updated_at = ?, version = version + 1
+      WHERE id = ? AND version = ? AND status = 'active'`)
+      .bind(
+        after.name, after.sourceType, after.fixedValue, after.measureMethod, after.targetUrl,
+        after.deduplicationMode === 'every' ? 1 : 0, after.attributionDays,
+        JSON.stringify(after.sourceConfig), after.deduplicationMode,
+        after.deduplicationWindowDays, after.valueMode, after.reversalPolicy,
+        now, input.id, input.expectedVersion,
+      ),
+    // CASに勝ったときだけ監査を残す。負けた batch は行を1つも作らない。
+    db.prepare(`INSERT INTO conversion_definition_revisions
+      (id, conversion_point_id, from_version, to_version, before_config_json,
+       after_config_json, affected_usages, reason, performed_by, created_at)
+      SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ? WHERE changes() = 1`)
+      .bind(
+        revisionId, input.id, input.expectedVersion, toVersion,
+        JSON.stringify(before), JSON.stringify(after), affectedUsages,
+        input.reason ?? null, input.staffId, now,
+      ),
+    /*
+     * 利用先を次の版へ付け替える。
+     *
+     * `changes()` は直前の文（監査のINSERT）を指すので、ここでは使えない。
+     * 監査行そのものの有無を条件にする。CASに負けた batch では監査行が
+     * 作られないため、この UPDATE も0件で終わり、利用先の版だけが
+     * 先に進んでしまうことがない。
+     */
+    db.prepare(`UPDATE conversion_definition_usages
+        SET definition_version = ?, updated_at = ?
+      WHERE conversion_point_id = ? AND definition_version = ?
+        AND EXISTS (SELECT 1 FROM conversion_definition_revisions
+                     WHERE conversion_point_id = ? AND to_version = ?)`)
+      .bind(toVersion, now, input.id, input.expectedVersion, input.id, toVersion),
+  ]);
+  if ((results[0]?.meta.changes ?? 0) !== 1 || (results[1]?.meta.changes ?? 0) !== 1) {
+    throw new ConversionDefinitionError('version_conflict', '成果地点が更新されています。読み直してください', 409);
+  }
+  return {
+    id: input.id,
+    version: toVersion,
+    revisionId,
+    movedUsages: Number(results[2]?.meta.changes ?? 0),
+    updatedAt: now,
+  };
+}
+
 export async function replaceConversionDefinitionUsages(
   db: D1Database,
   input: { id: string; replacementId: string; scope: ConversionDefinitionScope; expectedVersion: number; replacementExpectedVersion: number; reason?: string | null; staffId: string },

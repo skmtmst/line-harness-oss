@@ -3139,6 +3139,8 @@ export type EcCommerceOverview = {
   last24h: number
   lastReceivedAt: string | null
   byType: Array<{ eventType: string; label: string; count: number }>
+  /** 定期便の契約数。タブの数字はここから取る(#731)。 */
+  subscriptions: number
 }
 
 export type EcCommerceEvent = {
@@ -3294,6 +3296,8 @@ export type EcSubscriptionList = {
     cancellationTopReason: string | null
     monthlyStats: Array<{ month: string; count: number; amount: number }>
   }
+  /** 形が違って読めなかったスナップショットの数。0 でも必ず返る(#731)。 */
+  skipped: { malformedSnapshots: number }
   risk: {
     source: 'payment_status'
     ruleVersion: string
@@ -4265,6 +4269,22 @@ export const api = {
       accountId: string,
       expectedVersion: number,
       data: SaveTagDefinition & { automationId?: string | null; automationDraftVersion?: string | null },
+    ) => fetchApi<ApiResponse<TagDefinition & { queued: number }>>(`/api/tags/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ lineAccountId: accountId, expectedVersion, ...data }),
+    }),
+    /**
+     * 保管済み(archived)タグの訂正専用（Issue #710）。名前と説明だけ送る。
+     * `updateDefinition` は `SaveTagDefinition` の必須項目（マイル・連動
+     * アクションなど）を要求するため、archived タグでは使えない。
+     * サーバ側（`updateTagDefinition`）も archived では名前と説明以外の
+     * 実質的な変更を拒否するので、ここで送らなくても保護は効く。
+     */
+    updateArchivedNameAndDescription: (
+      id: string,
+      accountId: string,
+      expectedVersion: number,
+      data: { name?: string; description?: string | null },
     ) => fetchApi<ApiResponse<TagDefinition & { queued: number }>>(`/api/tags/${id}`, {
       method: 'PATCH',
       body: JSON.stringify({ lineAccountId: accountId, expectedVersion, ...data }),
@@ -6258,6 +6278,30 @@ export const api = {
       reason?: string
     }) => fetchApi<ApiResponse<{ id: string; replacementId: string; replacedUsageCount: number; status: 'stopped'; version: number }>>(
       `/api/conversions/definitions/${encodeURIComponent(id)}/replace`,
+      { method: 'POST', body: JSON.stringify(data) },
+    ),
+    /** 成果地点を、履歴を保ったまま編集して次の版にする（N-252）。 */
+    reviseDefinition: (id: string, data: {
+      expectedVersion: number
+      name: string
+      sourceType: string
+      sourceConfig?: Record<string, unknown>
+      deduplicationMode: 'every' | 'once_per_friend' | 'window'
+      deduplicationWindowDays?: number | null
+      valueMode: 'source' | 'fixed' | 'none'
+      fixedValue?: number | null
+      reversalPolicy: 'source_cancelled' | 'manual' | 'none'
+      attributionDays?: number | null
+      targetUrl?: string | null
+      reason?: string
+    }) => fetchApi<ApiResponse<{
+      id: string
+      version: number
+      revisionId: string
+      movedUsages: number
+      updatedAt: string
+    }>>(
+      `/api/conversions/definitions/${encodeURIComponent(id)}/revise`,
       { method: 'POST', body: JSON.stringify(data) },
     ),
     deleteDefinition: (id: string, data: { expectedVersion: number; reason?: string }) =>
