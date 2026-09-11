@@ -63,6 +63,7 @@ import { applyMileageRulesForEvent } from '@line-crm/db';
 import { createBroadcastRetryKey } from '../services/broadcast-retry-key.js';
 import { dispatchAutomationEventWithLogging } from '../services/automation-triggers.js';
 import { applyActionScoreEvent } from '../services/action-score-events.js';
+import { recordConversionSourceEvent } from '../services/conversion-event-sources.js';
 import {
   applyFormLayoutEffects,
   checkFormGates,
@@ -1764,6 +1765,24 @@ forms.post('/api/forms/:id/submit', async (c) => {
         const lost = await claimCheckpoint('mileage');
         if (lost) throw new ClaimOwnershipLost(lost);
       }
+    }
+
+    // 回答の保存を成果計測へ接続する(#648)。「フォームが送信された」を起点に
+    // 選んだ地点は、ここを通らないと 0 件のままになる。
+    //
+    // Webhook に弾かれた回答はここまで来ない(上で早期に返す)。冪等キーには
+    // 回答IDを使う。同じ Idempotency-Key の再送は同じ回答IDへ落ち着くので、
+    // 二度数えない。失敗しても回答の応答は返す(記録だけ残す)。
+    try {
+      await recordConversionSourceEvent(c.env.DB, {
+        sourceType: 'form_submitted',
+        lineAccountId: identity.lineAccountId,
+        friendId,
+        sourceEventId: submission.id,
+        metadata: { formId, submissionId: submission.id },
+      });
+    } catch (error) {
+      console.error('form conversion record failed:', error);
     }
 
     const executionCtx = optionalExecutionCtx(c);
