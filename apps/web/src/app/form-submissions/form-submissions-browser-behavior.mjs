@@ -452,6 +452,8 @@ try {
     assert.equal(state.putBodies[0].expectedContentRevision, 4, '読み込んだ版をそのまま送る')
     // 相手がいつ保存したかを添える。
     await page.getByText(/ほかの人が.*に先に保存しました/).waitFor()
+    // 二重に出さない（元の位置からは消してある）。
+    assert.equal(await page.getByText(/ほかの人が.*に先に保存しました/).count(), 1, '文言を二重に出さない')
     // **ここが要点。入力は残っている。**
     assert.equal(await nameInput.inputValue(), 'わたしが直した名前', '409 で入力を捨てない')
 
@@ -464,32 +466,54 @@ try {
   }
 
   /*
-   * 8. 受付停止も編集の版を送る（#723）。
+   * 7b. オプション設定タブで、409 の知らせが**覆いの下敷きにならない**
+   *     （#723 独立審査の差し戻し）。
    *
-   * 免除すると、止めたはずのフォームが編集画面の保存で公開中に戻り、回答が
-   * 入り続ける。**影響の版（`revision`=9）ではなく編集の版を送る**ことも見る。
+   * 以前は知らせが基本タブの枠の中にあったので、`OptionsDialog`
+   * （`aria-modal`・`z-50`）の下に隠れていた。**DOM にあるだけでは足りない。**
+   * ここでは実物のブラウザで、その場所が本当に掴めるか（`elementFromPoint`）で見る。
+   * 重なりは実ブラウザでしか確かめられないので、この検査はここに置く。
+   * 3タブとも DOM に出ることは実マウント側（edit/save-conflict-tabs.test.tsx）で見る。
    */
   {
     const detail = {
-      ...form(1, { id: 'form-1', name: '停止するフォーム' }),
+      ...form(1, { id: 'form-1', name: 'サーバ側の名前' }),
       contentRevision: 4,
     }
     const { context, page, state } = await openHarness(browser, {
       formsByAccount: { 'account-a': [detail] },
       detail,
+      putResults: ['conflict'],
     })
     await openList(page)
-    await page.getByRole('button', { name: '停止するフォームを削除' }).click()
-    const stop = page.getByRole('button', { name: '受付だけ止める' })
-    await stop.waitFor({ timeout: 15_000 })
-    await stop.click()
-    await page.waitForFunction(() => true)
-    await page.waitForTimeout(800)
+    await page.getByRole('link', { name: 'サーバ側の名前', exact: true }).click()
+    await page.locator('#fm-name').waitFor({ timeout: 15_000 })
+    await page.waitForFunction(
+      () => document.querySelector('#fm-name')?.value === 'サーバ側の名前',
+      undefined, { timeout: 15_000 },
+    )
+    await page.getByRole('link', { name: 'オプション設定' }).click()
+    const dialog = page.locator('[aria-modal="true"]')
+    await dialog.waitFor({ timeout: 15_000 })
 
-    assert.equal(state.putBodies.length, 1, '受付停止で保存を1回出す')
-    assert.equal(state.putBodies[0].isActive, false, '止める指示を送る')
-    assert.equal(state.putBodies[0].expectedContentRevision, 4,
-      '編集の版（contentRevision）を送る。影響の版 revision=9 を送らない')
+    await page.getByRole('button', { name: '保存する' }).click()
+
+    const message = page.getByText(/ほかの人が.*に先に保存しました/)
+    const reload = page.getByRole('button', { name: '最新の内容を読み込む（入力中の内容は消えます）' })
+    await message.waitFor({ timeout: 15_000 })
+    assert.equal(state.putBodies.length, 1, 'オプション: 保存を1回出す')
+    assert.equal(state.putBodies[0].expectedContentRevision, 4, 'オプション: 読み込んだ版を送る')
+    assert.equal(await message.count(), 1, 'オプション: 文言を二重に出さない')
+    assert.equal(await dialog.count(), 1, 'オプション: 覆いは出たまま（閉じていない）')
+    assert.equal(await reload.isVisible(), true, 'オプション: 読み直す出口が見えている')
+
+    // **覆いの下敷きになっていないこと。**その場所で実際に掴めるかで見る。
+    const reachable = await reload.evaluate((node) => {
+      const box = node.getBoundingClientRect()
+      const top = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2)
+      return node === top || node.contains(top)
+    })
+    assert.equal(reachable, true, 'オプション: 読み直す出口が覆いの下敷きになっていない')
     await context.close()
   }
 

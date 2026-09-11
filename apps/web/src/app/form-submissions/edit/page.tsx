@@ -38,6 +38,7 @@ import { validateLayoutForSave } from './form-validate'
 import OptionsDialog from '@/components/forms/options-dialog'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import StickyBar from '@/components/shared/sticky-bar'
+import SaveConflictBar from '@/components/shared/save-conflict-bar'
 import { conflictMessage } from './form-conflict-message'
 import { EMPTY_REFS, type FormRefs } from '@/components/forms/form-refs'
 import { usePageTitle } from '@/components/shell/page-chrome'
@@ -633,6 +634,20 @@ function FormEditInner() {
         </Button>
       </nav>
 
+      {/*
+        #723: 保存の失敗は3つのタブすべてで届かせる。
+        位置と重なりは共通部品が持つので、ここに `z-[60]` を手書きしない。
+        競合のときだけ「最新の内容を読み込む」を添える（押すまで読み直さない）。
+      */}
+      {error && (
+        <SaveConflictBar
+          message={error}
+          actionLabel={conflict ? '最新の内容を読み込む（入力中の内容は消えます）' : undefined}
+          onAction={conflict ? () => void reloadAfterConflict() : undefined}
+          actionQa="form-edit-conflict-reload"
+        />
+      )}
+
       {loading ? (
         <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm">
           読み込み中...
@@ -927,22 +942,13 @@ function FormEditInner() {
                   />
                 </Field>
 
-                {error && <p className="text-danger text-sm">{error}</p>}
-                {notice && <p className="text-success text-sm">{notice}</p>}
                 {/*
-                  #723: 競合したときの出口。**入力は消さない。**
-                  押すまで読み直さないので、必要なところを写してから押せる。
+                  #723: 失敗の知らせは、この中ではなくタブの外（`SaveConflictBar`）へ
+                  出す。ここに書くと、デザイン設定タブでは DOM にも出ず、
+                  オプション設定タブでは覆いの下敷きになる。二重に出さないため
+                  ここからは消してある。
                 */}
-                {conflict && (
-                  <button
-                    type="button"
-                    onClick={() => void reloadAfterConflict()}
-                    data-qa="form-edit-conflict-reload"
-                    className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken shrink-0 border px-3 py-1.5 text-sm font-medium"
-                  >
-                    最新の内容を読み込む（入力中の内容は消えます）
-                  </button>
-                )}
+                {notice && <p className="text-success text-sm">{notice}</p>}
               </div>
             </section>
             )}

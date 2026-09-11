@@ -785,6 +785,9 @@
   "components/shared/row-actions.tsx": {
     "unresolved-classname": 4
   },
+  "components/shared/save-conflict-bar.tsx": {
+    "unresolved-classname": 4
+  },
   "components/shared/select-field.tsx": {
     "unresolved-classname": 1
   },
