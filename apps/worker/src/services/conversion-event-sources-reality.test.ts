@@ -703,4 +703,21 @@ describe('起点6: 注文が確定した (ec_order_confirmed)', () => {
     await post('ec-event-1');
     expect(countEvents('ec_order_confirmed')).toBe(1);
   });
+
+  test('通知が停止されていても注文確定は数える', async () => {
+    addPoint('ec_order_confirmed');
+    // 取引通知だけを止めた状態。取り込みは 'skipped' の出口へ抜ける。
+    // 成果計測はその出口より前にあるので、数えられなければならない。
+    sqlite
+      .prepare(
+        `INSERT INTO ec_notification_settings (event_type, is_enabled, created_at, updated_at)
+         VALUES ('ec.order.confirmed', 0, 'x', 'x')`,
+      )
+      .run();
+
+    const res = await post('ec-event-2');
+    expect(res.status).toBe(202);
+    expect(await res.json()).toMatchObject({ status: 'skipped' });
+    expect(countEvents('ec_order_confirmed')).toBe(1);
+  });
 });
