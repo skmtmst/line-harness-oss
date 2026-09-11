@@ -1,11 +1,25 @@
 import type Database from 'better-sqlite3';
+import { encryptCredential } from '@line-crm/db';
 import type { Message } from '@line-crm/line-sdk';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite';
+import { publishScenarioVersion } from '@line-crm/db';
 import { createAutomationActionExecutors } from './automation-action-executors';
 import { processAutomationRun, startAutomationRun, type ActionDefinition } from './automation-engine';
 
 const NOW = '2026-08-26T05:00:00.000Z';
+const AUTO_KEY = Buffer.from(Array.from({ length: 32 }, (_, i) => (i * 7 + 1) % 256)).toString('base64url');
+
+async function hmacHex(secret: string, body: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    'raw', encoder.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'],
+  );
+  const signature = await crypto.subtle.sign('HMAC', key, encoder.encode(body));
+  return Array.from(new Uint8Array(signature))
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('');
+}
 
 function addAccount(raw: Database.Database, id: string): void {
   raw.prepare(`INSERT OR IGNORE INTO tenants (id, name) VALUES ('tenant-1', '本部')`).run();
@@ -247,6 +261,8 @@ describe('V6オートメーションの既存処理接続', () => {
          (id, scenario_id, step_order, delay_minutes, message_type, message_content)
        VALUES ('scenario-step-1', 'scenario-1', 1, 0, 'text', '案内です')`,
     ).run();
+    // 参加には明示公開が要る（351）。
+    await publishScenarioVersion(testDb.db, 'scenario-1', { staffId: null, idempotencyKey: 'exec-s1' });
     const result = await execute(testDb, {
       accountId: 'account-1', friendId: 'friend-1',
       action: {
@@ -361,7 +377,10 @@ describe('V6オートメーションの既存処理接続', () => {
       action: {
         id: 'webhook', type: 'send_webhook', params: { webhookId: 'webhook-1' }, onFailure: 'stop',
       },
-      executors: createAutomationActionExecutors({ fetch: fetchMock as typeof fetch }),
+      executors: createAutomationActionExecutors({
+        fetch: fetchMock as typeof fetch,
+        lookupHost: async () => ['93.184.216.34'],
+      }),
     });
 
     expect(result.status).toBe('waiting');
@@ -372,6 +391,48 @@ describe('V6オートメーションの既存処理接続', () => {
     expect(headers['Idempotency-Key']).toBe(step.id);
   });
 
+  it('暗号化された送り先は復号して署名し、鍵なしでは送らず止める(#650)', async () => {
+    const secret = 'e'.repeat(32);
+    const encrypted = await encryptCredential(secret, AUTO_KEY);
+    testDb.raw.prepare(
+      `INSERT INTO outgoing_webhooks
+         (id, name, url, event_types, secret, secret_encrypted, is_active, line_account_id)
+       VALUES ('enc-hook', '暗号', 'https://hooks.example.com/events', '[]', NULL, ?, 1, 'account-1')`,
+    ).run(encrypted);
+    const fetchMock = vi.fn(async (
+      _input: RequestInfo | URL,
+      _init?: RequestInit,
+    ) => new Response('', { status: 200 }));
+    const ok = await execute(testDb, {
+      accountId: 'account-1', friendId: 'friend-1',
+      action: { id: 'webhook', type: 'send_webhook', params: { webhookId: 'enc-hook' }, onFailure: 'stop' },
+      executors: createAutomationActionExecutors({
+        fetch: fetchMock as typeof fetch,
+        credentialEncryptionKey: AUTO_KEY,
+        lookupHost: async () => ['93.184.216.34'],
+      }),
+    });
+    expect(ok.status).toBe('success');
+    const sent = fetchMock.mock.calls[0]?.[1] as { headers: Record<string, string>; body: string };
+    expect(sent.headers['X-Webhook-Signature']).toBe(await hmacHex(secret, sent.body));
+
+    const fetchBlocked = vi.fn();
+    const ng = await execute(testDb, {
+      accountId: 'account-1', friendId: 'friend-1',
+      action: { id: 'webhook', type: 'send_webhook', params: { webhookId: 'enc-hook' }, onFailure: 'stop' },
+      // 送り先は安全。止まる理由をsecretが読めないことだけに絞る。
+      executors: createAutomationActionExecutors({
+        fetch: fetchBlocked as typeof fetch,
+        lookupHost: async () => ['93.184.216.34'],
+      }),
+    });
+    expect(ng.status).toBe('failed');
+    expect(fetchBlocked).not.toHaveBeenCalled();
+    expect(testDb.raw.prepare(
+      `SELECT error_code FROM automation_run_steps WHERE automation_run_id = ? AND step_key = 'webhook'`,
+    ).get(ng.runId)).toEqual({ error_code: 'webhook_secret_unavailable' });
+  });
+
   it('別アカウントのWebhookと安全でないURLを送らない', async () => {
     testDb.raw.prepare(
       `INSERT INTO outgoing_webhooks
@@ -380,20 +441,69 @@ describe('V6オートメーションの既存処理接続', () => {
               ('local-hook', '内部', 'https://[::1]/private', '[]', 1, 'account-1')`,
     ).run();
     const fetchMock = vi.fn();
+    const deps = {
+      fetch: fetchMock as typeof fetch,
+      lookupHost: async () => ['93.184.216.34'],
+    };
     const other = await execute(testDb, {
       accountId: 'account-1', friendId: 'friend-1',
       action: { id: 'other', type: 'send_webhook', params: { webhookId: 'other-hook' }, onFailure: 'stop' },
-      executors: createAutomationActionExecutors({ fetch: fetchMock as typeof fetch }),
+      executors: createAutomationActionExecutors(deps),
     });
     const local = await execute(testDb, {
       accountId: 'account-1', friendId: 'friend-1',
       action: { id: 'local', type: 'send_webhook', params: { webhookId: 'local-hook' }, onFailure: 'stop' },
-      executors: createAutomationActionExecutors({ fetch: fetchMock as typeof fetch }),
+      executors: createAutomationActionExecutors(deps),
     });
 
     expect(other.status).toBe('failed');
     expect(local.status).toBe('failed');
     expect(fetchMock).not.toHaveBeenCalled();
+    // 止めた送り先は秘密値を残さず失敗台帳だけに数える。
+    expect(testDb.raw.prepare(
+      `SELECT consecutive_failures FROM outgoing_webhooks WHERE id = 'local-hook'`,
+    ).get()).toEqual({ consecutive_failures: 1 });
+  });
+
+  it('DNS切替・転送先の内部向きも送らず失敗台帳へ残す', async () => {
+    testDb.raw.prepare(
+      `INSERT INTO outgoing_webhooks
+         (id, name, url, event_types, is_active, line_account_id)
+       VALUES ('rebind-hook', '差替', 'https://hooks.example.com/events', '[]', 1, 'account-1'),
+              ('redirect-hook', '転送', 'https://hooks.example.com/start', '[]', 1, 'account-1')`,
+    ).run();
+    const fetchMock = vi.fn(async (
+      input: RequestInfo | URL,
+    ) => {
+      if (String(input) === 'https://hooks.example.com/start') {
+        return new Response('', { status: 302, headers: { location: 'https://10.9.9.9/inside' } });
+      }
+      throw new Error(`送ってはいけない先: ${String(input)}`);
+    });
+    const rebind = await execute(testDb, {
+      accountId: 'account-1', friendId: 'friend-1',
+      action: { id: 'rebind', type: 'send_webhook', params: { webhookId: 'rebind-hook' }, onFailure: 'stop' },
+      executors: createAutomationActionExecutors({
+        fetch: fetchMock as typeof fetch,
+        lookupHost: async () => ['10.9.9.9'],
+      }),
+    });
+    const redirect = await execute(testDb, {
+      accountId: 'account-1', friendId: 'friend-1',
+      action: { id: 'redirect', type: 'send_webhook', params: { webhookId: 'redirect-hook' }, onFailure: 'stop' },
+      executors: createAutomationActionExecutors({
+        fetch: fetchMock as typeof fetch,
+        lookupHost: async () => ['93.184.216.34'],
+      }),
+    });
+
+    expect(rebind.status).toBe('failed');
+    expect(redirect.status).toBe('failed');
+    // 転送先へは送らないので転送元の1回だけ。
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(testDb.raw.prepare(
+      `SELECT consecutive_failures FROM outgoing_webhooks WHERE id IN ('rebind-hook', 'redirect-hook') ORDER BY id`,
+    ).all()).toEqual([{ consecutive_failures: 1 }, { consecutive_failures: 1 }]);
   });
 
   it('同じアカウントで公開済みのリッチメニューだけを切り替える', async () => {

@@ -779,6 +779,53 @@ export async function getMileageRedemption(
   return row ? mapRedemption(row) : null;
 }
 
+export type MileageRedemptionListStatus = MileageRedemptionStatus | 'all';
+
+export interface MileageRedemptionListItem extends MileageRewardRedemption {
+  rewardName: string;
+}
+
+/**
+ * 交換履歴の一覧。管理画面で「残高を減らしたのに特典が届かなかった交換」を
+ * 見つけるための口。失敗理由・試行回数・最終日時は行がそのまま持つ。
+ * アカウントの絞り込みは呼び出し側ではなくここで掛ける。
+ */
+export async function listMileageRedemptions(
+  db: D1Database,
+  input: {
+    lineAccountId: string;
+    status?: MileageRedemptionListStatus;
+    limit: number;
+    offset: number;
+  },
+): Promise<{
+  items: MileageRedemptionListItem[];
+  pagination: { total: number; limit: number; offset: number };
+}> {
+  const limit = Math.min(100, Math.max(1, Math.floor(input.limit)));
+  const offset = Math.max(0, Math.floor(input.offset));
+  const status = input.status ?? 'delivery_failed';
+  const statusClause = status === 'all' ? '' : 'AND r.status = ?';
+  const binds: unknown[] = [input.lineAccountId];
+  if (status !== 'all') binds.push(status);
+  const totalRow = await db.prepare(
+    `SELECT COUNT(*) AS count FROM mileage_redemptions r
+      WHERE r.line_account_id = ? ${statusClause}`,
+  ).bind(...binds).first<{ count: number }>();
+  const rows = await db.prepare(
+    `SELECT r.*, reward.name AS reward_name
+       FROM mileage_redemptions r
+       JOIN mileage_rewards reward ON reward.id = r.reward_id
+      WHERE r.line_account_id = ? ${statusClause}
+      ORDER BY r.updated_at DESC, r.id
+      LIMIT ? OFFSET ?`,
+  ).bind(...binds, limit, offset).all<RedemptionRow & { reward_name: string }>();
+  return {
+    items: rows.results.map((row) => ({ ...mapRedemption(row), rewardName: row.reward_name })),
+    pagination: { total: totalRow?.count ?? 0, limit, offset },
+  };
+}
+
 export async function reserveMileageRewardRedemption(
   db: D1Database,
   input: {
@@ -1106,6 +1153,202 @@ export async function refundMileageRewardRedemption(
       : []),
   ]);
   return (await getMileageRedemption(db, current.id))!;
+}
+
+export type MileageRedemptionStepStatus = 'started' | 'sent';
+
+export interface MileageRedemptionStepDelivery {
+  redemptionId: string;
+  stepKey: string;
+  idempotencyKey: string;
+  status: MileageRedemptionStepStatus;
+  attemptCount: number;
+  owner: string | null;
+  leaseExpiresAt: string | null;
+  generation: number;
+  fenceToken: string | null;
+  needsReconcile: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * 確定書き込みの失敗印。外部送信は終わっているかもしれないので、
+ * deliver 側はこれを delivery_failed に落とさず、回収に任せる。
+ */
+export class MileageRedemptionConfirmError extends Error {
+  constructor(message = '特典の送信後の確定に失敗しました') {
+    super(message);
+    this.name = 'MileageRedemptionConfirmError';
+  }
+}
+
+/**
+ * 手順の貸出予約。返すのは次の4つのどれか。
+ *
+ * - 'send' … 自分が貸出を持った。送ってよいのはこの走者だけ。
+ * - 'sent' … 送信済み。送らない(やり直しが再送しないための outbox の口)。
+ * - 'reconcile' … 照合待ち。「送るかもしれない」の証言が残っているが、
+ *   送ったか確かめられない。**送り直さないし、勝手に確定もしない。**
+ *   受信先が冪等でなくても二重に届かないのはこのため。
+ * - 'busy' … 別の走者が貸出を持っている。送らずに待つ。
+ *
+ * 証言は送る前に残す。送ったあとの確定書き込みが何度失敗しても、
+ * 証言は残るので回収は送り直さない。期限切れの引き継ぎでは世代を進め、
+ * 期限切れの旧持ち主が貸出を取り直しても 'reconcile' しか返らない
+ * (旧持ち主の再送は禁止)。古い走者の遅い確定は owner と fence が
+ * 合わずに拒否される(取り違え防止の fence)。
+ */
+export type RedemptionStepClaim = 'send' | 'sent' | 'reconcile' | 'busy';
+
+export interface RedemptionStepLease {
+  redemptionId: string;
+  stepKey: string;
+  idempotencyKey: string;
+  owner: string;
+  fenceToken: string;
+  leaseExpiresAt: string;
+  now: string;
+}
+
+interface RedemptionStepRow {
+  status: MileageRedemptionStepStatus;
+  owner: string | null;
+  leaseExpiresAt: string | null;
+  idempotencyKey: string;
+  needsReconcile: number;
+}
+
+async function selectRedemptionStep(
+  db: D1Database,
+  redemptionId: string,
+  stepKey: string,
+): Promise<RedemptionStepRow | null> {
+  return db.prepare(
+    `SELECT status, owner,
+            lease_expires_at AS leaseExpiresAt,
+            idempotency_key AS idempotencyKey,
+            needs_reconcile AS needsReconcile
+       FROM mileage_redemption_step_deliveries
+      WHERE redemption_id = ? AND step_key = ?`,
+  ).bind(redemptionId, stepKey).first<RedemptionStepRow>();
+}
+
+export async function claimRedemptionStep(
+  db: D1Database,
+  input: RedemptionStepLease,
+): Promise<RedemptionStepClaim> {
+  let existing = await selectRedemptionStep(db, input.redemptionId, input.stepKey);
+  if (!existing) {
+    try {
+      /*
+       * 証言つきの確保。「送るかもしれない」を送る前に残す。
+       * この書き込みに失敗したら送らない。送ったあとの確定が
+       * 何度失敗しても証言は残るので、回収は送り直さない。
+       */
+      await db.prepare(
+        `INSERT INTO mileage_redemption_step_deliveries
+           (redemption_id, step_key, idempotency_key, status,
+            owner, lease_expires_at, generation, fence_token, needs_reconcile,
+            created_at, updated_at)
+         VALUES (?, ?, ?, 'started', ?, ?, 1, ?, 1, ?, ?)`,
+      ).bind(
+        input.redemptionId, input.stepKey, input.idempotencyKey,
+        input.owner, input.leaseExpiresAt, input.fenceToken,
+        input.now, input.now,
+      ).run();
+      return 'send';
+    } catch {
+      // 同時確保の負け：相手の行を既存として扱う。行が無ければ投げ直す。
+      existing = await selectRedemptionStep(db, input.redemptionId, input.stepKey);
+      if (!existing) throw new MileageRedemptionConfirmError();
+    }
+  }
+  if (existing.status === 'sent') return 'sent';
+  // 証言がある行は、誰も送り直さないし勝手に確定もしない。照合待ち。
+  if (existing.needsReconcile === 1) return 'reconcile';
+  const leaseLive = existing.leaseExpiresAt !== null && existing.leaseExpiresAt > input.now;
+  // 別の走者が貸出を持っている間は、送らずに待つ。
+  if (leaseLive && existing.owner !== null && existing.owner !== input.owner) return 'busy';
+  if (existing.owner === input.owner && leaseLive) {
+    // 同じ走者の取り直し：貸出を延ばし、証言と fence を新しくする。
+    const refreshed = await db.prepare(
+      `UPDATE mileage_redemption_step_deliveries
+          SET lease_expires_at = ?, fence_token = ?, needs_reconcile = 1,
+              attempt_count = attempt_count + 1, updated_at = ?
+        WHERE redemption_id = ? AND step_key = ?
+          AND status = 'started' AND needs_reconcile = 0 AND owner = ?`,
+    ).bind(
+      input.leaseExpiresAt, input.fenceToken, input.now,
+      input.redemptionId, input.stepKey, input.owner,
+    ).run();
+    return (refreshed.meta?.changes ?? 0) === 1 ? 'send' : 'busy';
+  }
+  // 期限切れの引き継ぎ：世代を進め、証言つきで取り直す。
+  // 古い走者の遅い確定は通らない。
+  const taken = await db.prepare(
+    `UPDATE mileage_redemption_step_deliveries
+        SET owner = ?, lease_expires_at = ?, generation = generation + 1,
+            fence_token = ?, needs_reconcile = 1,
+            attempt_count = attempt_count + 1, updated_at = ?
+      WHERE redemption_id = ? AND step_key = ?
+        AND status = 'started' AND needs_reconcile = 0
+        AND (lease_expires_at IS NULL OR lease_expires_at <= ?)`,
+  ).bind(
+    input.owner, input.leaseExpiresAt, input.fenceToken, input.now,
+    input.redemptionId, input.stepKey, input.now,
+  ).run();
+  return (taken.meta?.changes ?? 0) === 1 ? 'send' : 'busy';
+}
+
+/**
+ * 外部送信が終わった手順を sent にする。証言つきの自分の貸出だけ通す。
+ * 証言を消した行(送らなかったことが決まった行)・古い走者の遅い確定・
+ * 確保していない行の確定は投げる。呼び出し側は確定失敗として扱い、
+ * 失敗には落とさない(証言が残るので回収は送り直さない)。
+ */
+export async function markRedemptionStepSent(
+  db: D1Database,
+  input: { redemptionId: string; stepKey: string; owner: string; fenceToken: string; now: string },
+): Promise<void> {
+  const result = await db.prepare(
+    `UPDATE mileage_redemption_step_deliveries
+        SET status = 'sent', needs_reconcile = 0, updated_at = ?
+      WHERE redemption_id = ? AND step_key = ?
+        AND status = 'started' AND needs_reconcile = 1
+        AND owner = ? AND fence_token = ?`,
+  ).bind(input.now, input.redemptionId, input.stepKey, input.owner, input.fenceToken).run();
+  if ((result.meta?.changes ?? 0) !== 1) {
+    throw new MileageRedemptionConfirmError();
+  }
+}
+
+/**
+ * 送らなかった手順の証言を消す。実行器が送る前に失敗したときだけ使う。
+ * 消せたら回収は送り直してよい(送っていないことが決まった)。
+ * 消せなければ照合待ちのまま残し、送り直さない。
+ *
+ * **貸出も一緒に返す。** 証言を消すだけで持ち主と期限を残すと、行は
+ * 「送っていないのに、まだ誰かが送信中」に見える。次の走者は貸出が
+ * 生きている間 `'busy'` しか受け取れず、失敗した直後のやり直しが
+ * 貸出の残り時間ぶん空振りする(#641 司令塔独立審査で実測: 失敗から
+ * 5分間、管理画面のやり直しが1回も送らない)。送らないことが決まった
+ * 行に貸出を握らせない。
+ */
+export async function clearRedemptionStepIntent(
+  db: D1Database,
+  input: { redemptionId: string; stepKey: string; owner: string; fenceToken: string; now: string },
+): Promise<void> {
+  const result = await db.prepare(
+    `UPDATE mileage_redemption_step_deliveries
+        SET needs_reconcile = 0, owner = NULL, lease_expires_at = NULL, updated_at = ?
+      WHERE redemption_id = ? AND step_key = ?
+        AND status = 'started' AND needs_reconcile = 1
+        AND owner = ? AND fence_token = ?`,
+  ).bind(input.now, input.redemptionId, input.stepKey, input.owner, input.fenceToken).run();
+  if ((result.meta?.changes ?? 0) !== 1) {
+    throw new MileageRedemptionConfirmError();
+  }
 }
 
 export async function getReservedMileageRewardCode(

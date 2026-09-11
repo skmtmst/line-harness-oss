@@ -270,6 +270,19 @@ export type BulkPhotoDecision = {
   reasonNote: string | null;
 };
 
+export type BulkPhotoDecisionItem = {
+  photoId: string;
+  decision: 'approve' | 'return' | 'reject';
+  reviewVersion: number;
+  /** 審査イベントのID。一括後のLINE通知の送達記録と再送に使う。 */
+  decisionId: string;
+};
+
+export type BulkPhotoDecisionResult = {
+  updatedCount: number;
+  items: BulkPhotoDecisionItem[];
+};
+
 export async function applyBulkPhotoDecisions(
   db: D1Database,
   input: {
@@ -308,13 +321,27 @@ export async function applyBulkPhotoDecisions(
       return { kind: 'risk_not_low', photoId: decision.photoId };
     }
   }
+  // 単票と同じく、友だちの所属アカウントも審査確定の前に照合する。
+  // 写真行だけ見ると、他アカウントへ移った友だちの写真を確定してしまう。
+  {
+    const friendIds = [...new Set(subjects.map((subject) => subject!.friendId))];
+    const placeholders = friendIds.map(() => '?').join(',');
+    const rows = await db.prepare(
+      `SELECT id FROM friends WHERE id IN (${placeholders}) AND line_account_id = ?`,
+    ).bind(...friendIds, input.lineAccountId).all<{ id: string }>();
+    const visible = new Set(rows.results.map((row) => row.id));
+    const mismatchIndex = subjects.findIndex((subject) => !visible.has(subject!.friendId));
+    if (mismatchIndex >= 0) return { kind: 'not_found', photoId: input.decisions[mismatchIndex].photoId };
+  }
   const now = input.now ?? new Date().toISOString();
-  const result = {
+  const eventIds = input.decisions.map(() => crypto.randomUUID());
+  const result: BulkPhotoDecisionResult = {
     updatedCount: input.decisions.length,
-    items: input.decisions.map((decision) => ({
+    items: input.decisions.map((decision, index) => ({
       photoId: decision.photoId,
       decision: decision.decision,
       reviewVersion: decision.expectedVersion + 1,
+      decisionId: eventIds[index],
     })),
   };
   const statements: D1PreparedStatement[] = [];
@@ -322,7 +349,7 @@ export async function applyBulkPhotoDecisions(
     const decision = input.decisions[index];
     const subject = subjects[index]!;
     const status = decision.decision === 'approve' ? 'adopted' : 'rejected';
-    const eventId = crypto.randomUUID();
+    const eventId = eventIds[index];
     statements.push(db.prepare(
       `INSERT INTO nen_photo_review_events
         (id, photo_id, line_account_id, from_status, to_status, reason_code, reason_note,
@@ -367,6 +394,245 @@ export async function applyBulkPhotoDecisions(
     throw error;
   }
   return { kind: 'created', result };
+}
+
+/**
+ * 一括審査の受付票へ通知後の結果を上書きする。
+ * 同じ再実行鍵の再送時はこの保存済み結果を返すだけで、LINEを再送しない。
+ */
+export type BulkNotifiedItem = BulkPhotoDecisionItem & {
+  notificationStatus: 'sent' | 'failed';
+  notificationError?: string;
+};
+
+export type BulkNotificationResult = {
+  updatedCount: number;
+  items: BulkNotifiedItem[];
+  notificationFailures: Array<{ photoId: string; error: string }>;
+  reconciled?: boolean;
+};
+
+export async function recordBulkDecisionNotificationResult(
+  db: D1Database,
+  input: {
+    receiptId: string;
+    lineAccountId: string;
+    actorId: string;
+    idempotencyKey: string;
+    result: BulkNotificationResult;
+    now?: string;
+    /**
+     * 通知前の受付票だけ上書きするCAS。送達台帳からの復旧用。
+     * 並行する確定側の新しい結果を、古い復旧結果で上書きしない。
+     */
+    onlyIfPending?: boolean;
+  },
+): Promise<boolean> {
+  const now = input.now ?? new Date().toISOString();
+  const updated = input.onlyIfPending
+    ? await db.prepare(
+      `UPDATE nen_photo_bulk_decision_receipts
+          SET result_json = ?, created_at = ?
+        WHERE id = ? AND line_account_id = ? AND requested_by = ? AND idempotency_key = ?
+          AND json_extract(result_json, '$.items[0].notificationStatus') IS NULL`,
+    ).bind(
+      JSON.stringify(input.result), now,
+      input.receiptId, input.lineAccountId, input.actorId, input.idempotencyKey,
+    ).run()
+    : await db.prepare(
+      `UPDATE nen_photo_bulk_decision_receipts
+          SET result_json = ?, created_at = ?
+        WHERE id = ? AND line_account_id = ? AND requested_by = ? AND idempotency_key = ?`,
+    ).bind(
+      JSON.stringify(input.result), now,
+      input.receiptId, input.lineAccountId, input.actorId, input.idempotencyKey,
+    ).run();
+  return Number(updated.meta?.changes ?? 0) === 1;
+}
+
+export type PhotoNotificationStatus = 'pending' | 'sending' | 'sent' | 'failed';
+
+export type PhotoNotificationState = {
+  decisionId: string;
+  status: PhotoNotificationStatus;
+  error: string | null;
+  generation: number;
+  leaseId: string | null;
+  leaseExpiresAt: string | null;
+  attemptCount: number;
+};
+
+type PhotoNotificationStateRow = {
+  id: string;
+  notification_status: PhotoNotificationStatus;
+  notification_error: string | null;
+  notification_generation: number;
+  notification_lease_id: string | null;
+  notification_lease_expires_at: string | null;
+  notification_attempt_count: number;
+};
+
+function mapNotificationState(row: PhotoNotificationStateRow): PhotoNotificationState {
+  return {
+    decisionId: row.id,
+    status: row.notification_status,
+    error: row.notification_error,
+    generation: Number(row.notification_generation),
+    leaseId: row.notification_lease_id,
+    leaseExpiresAt: row.notification_lease_expires_at,
+    attemptCount: Number(row.notification_attempt_count),
+  };
+}
+
+const NOTIFICATION_STATE_COLUMNS = `id, notification_status, notification_error,
+  notification_generation, notification_lease_id, notification_lease_expires_at,
+  notification_attempt_count`;
+
+export async function getBulkDecisionReceipt(
+  db: D1Database,
+  input: { lineAccountId: string; actorId: string; idempotencyKey: string },
+): Promise<{ receiptId: string; result: unknown } | null> {
+  const row = await db.prepare(
+    `SELECT id, result_json FROM nen_photo_bulk_decision_receipts
+      WHERE line_account_id = ? AND requested_by = ? AND idempotency_key = ?`,
+  ).bind(input.lineAccountId, input.actorId, input.idempotencyKey)
+    .first<{ id: string; result_json: string }>();
+  if (!row) return null;
+  try {
+    return { receiptId: row.id, result: JSON.parse(row.result_json) };
+  } catch {
+    return { receiptId: row.id, result: null };
+  }
+}
+
+export async function getPhotoNotificationState(
+  db: D1Database,
+  input: { decisionId: string; lineAccountId: string },
+): Promise<PhotoNotificationState | null> {
+  const row = await db.prepare(
+    `SELECT ${NOTIFICATION_STATE_COLUMNS} FROM nen_photo_review_events
+      WHERE id = ? AND line_account_id = ?`,
+  ).bind(input.decisionId, input.lineAccountId).first<PhotoNotificationStateRow>();
+  return row ? mapNotificationState(row) : null;
+}
+
+/*
+ * 通知の送信権を取る。未送信・失敗済み・lease切れの送信中だけ送り手になれる。
+ * 同じ行を同時に取り合っても、条件付き更新で勝者は1人になる。
+ */
+export async function claimPhotoNotificationDelivery(
+  db: D1Database,
+  input: {
+    decisionId: string;
+    lineAccountId: string;
+    leaseId: string;
+    leaseExpiresAt: string;
+    now?: string;
+  },
+): Promise<{ generation: number } | null> {
+  const now = input.now ?? new Date().toISOString();
+  const row = await db.prepare(
+    `UPDATE nen_photo_review_events
+        SET notification_status = 'sending',
+            notification_lease_id = ?, notification_lease_expires_at = ?,
+            notification_generation = notification_generation + 1,
+            notification_attempt_count = notification_attempt_count + 1,
+            updated_at = ?
+      WHERE id = ? AND line_account_id = ?
+        AND (notification_status IN ('pending', 'failed')
+          OR (notification_status = 'sending'
+            AND (notification_lease_expires_at IS NULL OR notification_lease_expires_at <= ?)))
+      RETURNING notification_generation`,
+  ).bind(
+    input.leaseId, input.leaseExpiresAt, now,
+    input.decisionId, input.lineAccountId, now,
+  ).first<{ notification_generation: number }>();
+  return row ? { generation: Number(row.notification_generation) } : null;
+}
+
+/*
+ * 送信結果を確定する。取った世代と一致し、まだ送信中のときだけ書く。
+ * 遅れて届いた失敗が、ほかの処理の成功を上書きしないための条件。
+ */
+export async function completePhotoNotificationDelivery(
+  db: D1Database,
+  input: {
+    decisionId: string;
+    lineAccountId: string;
+    generation: number;
+    status: 'sent' | 'failed';
+    error?: string | null;
+    now?: string;
+  },
+): Promise<boolean> {
+  const now = input.now ?? new Date().toISOString();
+  const updated = input.status === 'sent'
+    ? await db.prepare(
+      `UPDATE nen_photo_review_events
+          SET notification_status = 'sent', notification_error = NULL,
+              notification_lease_id = NULL, notification_lease_expires_at = NULL,
+              notification_sent_at = ?, updated_at = ?
+        WHERE id = ? AND line_account_id = ?
+          AND notification_status = 'sending' AND notification_generation = ?`,
+    ).bind(now, now, input.decisionId, input.lineAccountId, input.generation).run()
+    : await db.prepare(
+      `UPDATE nen_photo_review_events
+          SET notification_status = 'failed', notification_error = ?,
+              notification_lease_id = NULL, notification_lease_expires_at = NULL,
+              notification_first_failed_at = COALESCE(notification_first_failed_at, ?),
+              updated_at = ?
+        WHERE id = ? AND line_account_id = ?
+          AND notification_status = 'sending' AND notification_generation = ?`,
+    ).bind(
+      input.error ?? '審査結果をLINEで通知できませんでした', now, now,
+      input.decisionId, input.lineAccountId, input.generation,
+    ).run();
+  return Number(updated.meta?.changes ?? 0) === 1;
+}
+
+/*
+ * 受付票の結果を送達台帳から作り直す。通知後の記録に失敗して受付票が
+ * 古いままのとき、同じ再実行鍵の再送で結果を復旧するために使う。
+ */
+export async function reconcileBulkNotificationOutcomes(
+  db: D1Database,
+  input: {
+    lineAccountId: string;
+    items: BulkPhotoDecisionItem[];
+  },
+): Promise<Pick<BulkNotificationResult, 'items' | 'notificationFailures'>> {
+  const notified: BulkNotifiedItem[] = [];
+  const notificationFailures: Array<{ photoId: string; error: string }> = [];
+  for (const item of input.items) {
+    const state = await getPhotoNotificationState(db, {
+      decisionId: item.decisionId, lineAccountId: input.lineAccountId,
+    });
+    let notificationStatus: 'sent' | 'failed';
+    let notificationError: string | undefined;
+    if (!state) {
+      notificationStatus = 'failed';
+      notificationError = '送達の記録が見つかりません。再送してください。';
+    } else if (state.status === 'sent') {
+      notificationStatus = 'sent';
+    } else if (state.status === 'failed') {
+      notificationStatus = 'failed';
+      notificationError = state.error ?? '審査結果をLINEで通知できませんでした';
+    } else if (state.status === 'sending') {
+      notificationStatus = 'failed';
+      notificationError = '送達を確認中です。しばらくしてから再送してください。';
+    } else {
+      notificationStatus = 'failed';
+      notificationError = '通知はまだ送られていません。再送してください。';
+    }
+    notified.push({
+      ...item, notificationStatus,
+      ...(notificationError ? { notificationError } : {}),
+    });
+    if (notificationStatus === 'failed' && notificationError) {
+      notificationFailures.push({ photoId: item.photoId, error: notificationError });
+    }
+  }
+  return { items: notified, notificationFailures };
 }
 
 export async function issuePhotoOriginalDownload(

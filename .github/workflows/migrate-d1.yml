@@ -40,6 +40,11 @@ on:
         options:
           - dry-run
           - apply
+      migration:
+        description: 指定した1件だけを対象にする場合のファイル名（空欄は未適用すべて）
+        type: string
+        required: false
+        default: ''
 
 permissions:
   contents: read
@@ -107,9 +112,23 @@ jobs:
         id: pending
         env:
           DB_NAME: ${{ steps.db.outputs.name }}
+          TARGET_MIGRATION: ${{ inputs.migration }}
         run: |
-          pending_file="$RUNNER_TEMP/d1-pending-migrations.txt"
-          : > "$pending_file"
+          all_pending_file="$RUNNER_TEMP/d1-all-pending-migrations.txt"
+          apply_file="$RUNNER_TEMP/d1-pending-migrations.txt"
+          : > "$all_pending_file"
+          : > "$apply_file"
+
+          if [ -n "$TARGET_MIGRATION" ]; then
+            if ! printf '%s' "$TARGET_MIGRATION" | grep -Eq '^[0-9]{3,}_[A-Za-z0-9_-]+\.sql$'; then
+              echo "::error::migration にはマイグレーションのファイル名だけを指定してください"
+              exit 1
+            fi
+            if [ ! -f "packages/db/migrations/$TARGET_MIGRATION" ]; then
+              echo "::error::指定したマイグレーションが見つかりません: $TARGET_MIGRATION"
+              exit 1
+            fi
+          fi
 
           npx wrangler d1 execute "$DB_NAME" --remote --command \
             "CREATE TABLE IF NOT EXISTS _migrations (name TEXT PRIMARY KEY, applied_at TEXT NOT NULL)"
@@ -122,27 +141,44 @@ jobs:
               console.log(rows.map((r) => r.name).join('\n'));
             ")
 
-          count=0
+          pending_count=0
           for f in $(ls packages/db/migrations/*.sql | sort); do
             name=$(basename "$f")
             if ! printf '%s\n' "$applied" | grep -qxF "$name"; then
-              printf '%s\n' "$f" >> "$pending_file"
-              count=$((count + 1))
+              printf '%s\n' "$f" >> "$all_pending_file"
+              pending_count=$((pending_count + 1))
             fi
           done
 
-          echo "count=$count" >> "$GITHUB_OUTPUT"
+          if [ -n "$TARGET_MIGRATION" ]; then
+            target_path="packages/db/migrations/$TARGET_MIGRATION"
+            if grep -qxF "$target_path" "$all_pending_file"; then
+              printf '%s\n' "$target_path" > "$apply_file"
+            fi
+          else
+            cp "$all_pending_file" "$apply_file"
+          fi
+
+          apply_count=$(wc -l < "$apply_file" | tr -d ' ')
+          echo "count=$apply_count" >> "$GITHUB_OUTPUT"
           {
-            echo "## 未適用のマイグレーション: ${count} 件"
+            echo "## 未適用のマイグレーション: ${pending_count} 件"
             echo
             echo "対象: \`$DB_NAME\`"
             echo
-            if [ "$count" -gt 0 ]; then
+            if [ "$pending_count" -gt 0 ]; then
               echo '```'
-              sed 's#^packages/db/migrations/##' "$pending_file"
+              sed 's#^packages/db/migrations/##' "$all_pending_file"
               echo '```'
             else
               echo "すべて適用済みです。"
+            fi
+            echo
+            if [ -n "$TARGET_MIGRATION" ]; then
+              echo "今回の指定: \`$TARGET_MIGRATION\`"
+              echo "適用対象: ${apply_count} 件"
+            else
+              echo "今回の指定: 未適用すべて"
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 

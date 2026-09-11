@@ -8,6 +8,7 @@ const PAGE = readFileSync(join(HERE, 'page.tsx'), 'utf8')
 const EDIT_PAGE = readFileSync(join(HERE, 'edit', 'page.tsx'), 'utf8')
 const DESIGN_SETTINGS = readFileSync(join(HERE, 'edit', 'form-design-settings.tsx'), 'utf8')
 const RESPONSES_PAGE = readFileSync(join(HERE, 'responses', 'page.tsx'), 'utf8')
+const FORM_PREVIEW = readFileSync(join(HERE, '..', '..', 'components', 'forms', 'form-preview.tsx'), 'utf8')
 const API = readFileSync(join(HERE, '..', '..', 'lib', 'api.ts'), 'utf8')
 
 describe('V6回答フォーム一覧', () => {
@@ -21,9 +22,9 @@ describe('V6回答フォーム一覧', () => {
   it('初回空・検索0件・読込中・失敗を言い分ける', () => {
     expect(PAGE).toContain("kind=\"loading\"")
     expect(PAGE).toContain("kind=\"error\"")
-    expect(PAGE).toContain('フォームがまだ1つも無いときの見え方です。')
     expect(PAGE).toContain('まだフォームがありません')
     expect(PAGE).toContain('最初の1つを作ると、集まった回答もここから見られます。')
+    expect(PAGE).not.toContain('見え方です。')
     expect(PAGE).toContain('条件に合うフォームはありません')
     expect(PAGE).toContain('onRetry={() => void loadForms()}')
   })
@@ -77,6 +78,54 @@ describe('V6回答フォーム一覧', () => {
   })
 })
 
+describe('#676 一覧の並び・件数・回答導線（N-172/N-173/N-180/N-181）', () => {
+  it('並び順と表示件数を実際の一覧へ効かせ、URLへ残す', () => {
+    // 何で並べるか・何件出すかは試験で固定しない。
+    // 「選んだ値が一覧とURLへ届く」ことだけを見る。
+    expect(PAGE).toContain('aria-label="並び順"')
+    expect(PAGE).toContain('FORM_PAGE_SIZES')
+    expect(PAGE).toContain('router.replace(')
+    expect(PAGE).not.toContain('onChange={() => undefined}')
+    expect(PAGE).toContain('visibleForms.map((form)')
+  })
+
+  it('回答の導線はその行のフォームを指し、先頭固定の帯を置かない', () => {
+    expect(PAGE).not.toContain('forms[0]')
+    expect(PAGE).toContain('responses?id=${encodeURIComponent(form.id)}')
+    expect(PAGE).toContain('の集まった回答を見る`}')
+  })
+
+  it('更新列は作成日ではなく更新日時を出し、無い状態を区別する', () => {
+    expect(PAGE).toContain('displayUpdatedAt(form.updatedAt)')
+    expect(PAGE).toContain('更新日時を取得できません')
+    expect(PAGE).not.toContain('new Date(form.createdAt).toLocaleDateString')
+  })
+
+  it('staffへはフォルダ追加を出さず、owner/adminへは止めて置く（N-175 は #688）', () => {
+    // 役割の判定は自分で書き直さず、1か所に寄せてあるものを読む。
+    expect(PAGE).toContain("from '@/components/automations/use-can-manage'")
+    // staff（false）と読み取り前（null）は要素ごと出さない。
+    expect(PAGE).toContain('addFolderDisabled={canAddFolder === true}')
+    expect(PAGE).toContain('addFolderTitle=')
+    expect(PAGE).not.toContain('FolderAddDialog')
+    expect(PAGE).not.toContain('onAddFolder')
+    // 画面の中で数え方を作らない。フォルダの件数はAPIが返す値だけを出す。
+    expect(PAGE).not.toContain('folderCounts')
+    expect(PAGE).not.toContain("form.folderId || 'unfiled'")
+  })
+
+  it('実ブラウザ検査は通信が止まるのを待たず、画面が出す印で待つ', () => {
+    const BROWSER = readFileSync(join(HERE, 'form-submissions-browser-behavior.mjs'), 'utf8')
+    // 通信が止まる瞬間は管理画面では来ないことがある。待つ条件にしない。
+    expect(BROWSER).not.toMatch(/waitUntil:\s*'networkidle'/)
+    expect(BROWSER).toContain("waitUntil: 'domcontentloaded'")
+    expect(BROWSER).toContain('data-design-node="EMBIK"')
+    expect(BROWSER).toContain('data-list-state="loading"')
+    // 実在しない `folderId` を混ぜた模擬データへ戻らないようにする。
+    expect(BROWSER).not.toContain('folderId:')
+  })
+})
+
 describe('V6回答フォームの未実装3画面', () => {
   it('vCqUj は12種の追加口・顧客プレビュー・作成元を表示する', () => {
     expect(EDIT_PAGE).toContain('ブロックを追加（12種）')
@@ -102,13 +151,28 @@ describe('V6回答フォームの未実装3画面', () => {
     ]) expect(OPTIONS).toContain(label)
   })
 
-  it('ava2n は押せるデザイン設定で、5色・書体・角丸・背景とSNS表示を保存する', () => {
+  /*
+   * #725 で背景画像の操作面を消したため、旧・表明の '背景画像' を外した。
+   * 旧・表明が捕まえていた壊し方と、いまどこで捕まえるかの対応:
+   *
+   *   (a) デザイン設定から色・書体・角丸の操作面が消える
+   *       → 下の label ループがそのまま見張る（'背景画像' 以外は据え置き）
+   *   (b) 背景画像の値そのものが画面から失われる
+   *       → 消したのは操作面だけで、値は `form-preview.tsx` が描き続ける。
+   *         `theme.backgroundImageUrl` を preview が読むことを下で見張る
+   *   (c) OGP が保存経路から外れる
+   *       → EDIT_PAGE の3行の表明を据え置き、さらに **この窓から編集できる**
+   *         ことを実マウントの試験（form-design-settings.dead-ui.test.tsx）で見張る
+   */
+  it('ava2n は5色・書体・角丸を持ち、SNS表示を保存する', () => {
     expect(EDIT_PAGE).toContain("params.get('tab') === 'design'")
     expect(EDIT_PAGE).toContain('<FormDesignSettings')
     expect(EDIT_PAGE).not.toContain('title="準備中です"')
-    for (const label of ['メイン', 'サブ', 'アクセント', 'エラー', '文字', '文字の書体', '角の丸み', '背景画像']) {
+    for (const label of ['メイン', 'サブ', 'アクセント', 'エラー', '文字', '文字の書体', '角の丸み']) {
       expect(DESIGN_SETTINGS).toContain(label)
     }
+    // (b) 操作面は消したが、背景画像の値は捨てていない。
+    expect(FORM_PREVIEW).toContain('theme.backgroundImageUrl')
     expect(EDIT_PAGE).toContain('ogTitle: ogTitle.trim() || null')
     expect(EDIT_PAGE).toContain('ogDescription: ogDescription.trim() || null')
     expect(EDIT_PAGE).toContain('ogImageUrl: ogImageUrl.trim() || null')

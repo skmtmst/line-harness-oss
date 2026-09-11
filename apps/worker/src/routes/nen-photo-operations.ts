@@ -1,16 +1,30 @@
 import { Hono, type Context, type Next } from 'hono';
 import {
   applyBulkPhotoDecisions,
+  claimPhotoNotificationDelivery,
+  completePhotoNotificationDelivery,
   consumePhotoOriginalDownload,
   consumeStepUpGrant,
+  getBulkDecisionReceipt,
   getPhotoAssetStatus,
   getPhotoDerivatives,
   getPhotoReviewMetrics,
   issuePhotoOriginalDownload,
+  reconcileBulkNotificationOutcomes,
+  recordBulkDecisionNotificationResult,
   requestPhotoAssessment,
   requestPhotoAssetProcessing,
+  type BulkNotifiedItem,
+  type BulkNotificationResult,
   type BulkPhotoDecision,
+  type BulkPhotoDecisionItem,
+  type BulkPhotoDecisionResult,
 } from '@line-crm/db';
+import {
+  deliverPhotoReviewNotification,
+  loadPhotoReviewRecipient,
+  type PhotoReviewReasonCode,
+} from './nen-members.js';
 import type { Env } from '../index.js';
 import { auditLog } from '../lib/audit-log.js';
 import { sha256Hex } from '../middleware/auth.js';
@@ -231,12 +245,24 @@ nenPhotoOperations.post(
     auditLog(c, 'photo.review.bulk', { kind: 'nen-photo' });
     try {
       const requestFingerprint = await sha256Hex(JSON.stringify({ lineAccountId, decisions }));
+      const receiptId = crypto.randomUUID();
       const result = await applyBulkPhotoDecisions(c.env.DB, {
-        id: crypto.randomUUID(), lineAccountId, actorId: c.get('staff')!.id,
+        id: receiptId, lineAccountId, actorId: c.get('staff')!.id,
         actorName: c.get('staff')!.name, idempotencyKey: key, requestFingerprint, decisions,
       });
-      if (result.kind === 'created' || result.kind === 'duplicate') {
-        return c.json({ success: true, duplicate: result.kind === 'duplicate', data: result.result }, result.kind === 'created' ? 201 : 200);
+      if (result.kind === 'duplicate') {
+        // 保存済み結果を返すだけで、LINEは再送しない（重複通知防止）。
+        // 通知後の記録に失敗して受付票が古いままのときは、送達台帳から作り直す。
+        const healed = await healBulkDecisionReceipt(c, {
+          lineAccountId, idempotencyKey: key, stored: result.result,
+        });
+        return c.json({ success: true, duplicate: true, data: healed ?? result.result }, 200);
+      }
+      if (result.kind === 'created') {
+        const data = await notifyBulkPhotoDecisions(c, {
+          receiptId, lineAccountId, idempotencyKey: key, decisions, result: result.result,
+        });
+        return c.json({ success: true, duplicate: false, data }, 201);
       }
       if (result.kind === 'not_found') return c.json({ success: false, error: '写真が見つかりません', photoId: result.photoId }, 404);
       if (result.kind === 'risk_not_low') {
@@ -327,3 +353,168 @@ nenPhotoOperations.get(
     }
   },
 );
+
+function bulkNotificationItems(result: unknown): BulkPhotoDecisionItem[] {
+  if (!result || typeof result !== 'object') return [];
+  const items = (result as { items?: unknown }).items;
+  return Array.isArray(items) ? items as BulkPhotoDecisionItem[] : [];
+}
+
+function bulkStoredItemsHaveOutcomes(stored: unknown): stored is BulkPhotoDecisionResult {
+  if (!stored || typeof stored !== 'object') return false;
+  const items = (stored as { items?: unknown }).items;
+  return Array.isArray(items) && items.length > 0
+    && items.every((item) => item && typeof item === 'object'
+      && typeof (item as { decisionId?: unknown }).decisionId === 'string'
+      && typeof (item as { notificationStatus?: unknown }).notificationStatus === 'string');
+}
+
+/*
+ * 受付票が通知前の結果のままのとき、送達台帳から作り直して受付票へ戻す。
+ * 通知後の記録に失敗しても、次の同じ再実行鍵で結果が復旧する。
+ */
+async function healBulkDecisionReceipt(
+  c: Context<Env>,
+  input: { lineAccountId: string; idempotencyKey: string; stored: unknown },
+): Promise<BulkNotificationResult | null> {
+  if (bulkStoredItemsHaveOutcomes(input.stored)) return null;
+  if (!input.stored || typeof input.stored !== 'object') return null;
+  const storedItems = bulkNotificationItems(input.stored);
+  if (storedItems.length === 0 || storedItems.some((item) => !item.decisionId)) return null;
+  const healed = await reconcileBulkNotificationOutcomes(c.env.DB, {
+    lineAccountId: input.lineAccountId, items: storedItems,
+  });
+  const updatedCount = typeof (input.stored as { updatedCount?: unknown }).updatedCount === 'number'
+    ? (input.stored as { updatedCount: number }).updatedCount
+    : healed.items.length;
+  const data: BulkNotificationResult = {
+    updatedCount, items: healed.items, notificationFailures: healed.notificationFailures,
+    reconciled: true,
+  };
+  try {
+    const receipt = await getBulkDecisionReceipt(c.env.DB, {
+      lineAccountId: input.lineAccountId, actorId: c.get('staff')!.id, idempotencyKey: input.idempotencyKey,
+    });
+    const recorded = receipt
+      ? await recordBulkDecisionNotificationResult(c.env.DB, {
+        receiptId: receipt.receiptId, lineAccountId: input.lineAccountId,
+        actorId: c.get('staff')!.id, idempotencyKey: input.idempotencyKey, result: data,
+        // 復旧側は通知前の受付票だけ直す。確定側の新しい結果を古い復旧で上書きしない。
+        onlyIfPending: true,
+      })
+      : false;
+    if (!recorded) console.error('heal bulk decision receipt failed', input.idempotencyKey);
+  } catch (error) {
+    console.error('heal bulk decision receipt failed', input.idempotencyKey, error);
+  }
+  return data;
+}
+
+/*
+ * 一括の1対象ぶんの通知。ここで投げた例外は呼び出し側が対象単位で受け止め、
+ * 残りの対象の通知は続ける。
+ */
+async function notifyOneBulkDecision(
+  c: Context<Env>,
+  input: {
+    lineAccountId: string;
+    item: BulkPhotoDecisionItem;
+    decision: BulkPhotoDecision | undefined;
+  },
+): Promise<BulkNotifiedItem> {
+  const { item, decision } = input;
+  const recipient = await loadPhotoReviewRecipient(c.env.DB, {
+    photoId: item.photoId, lineAccountId: input.lineAccountId,
+  }).catch(() => null);
+  if (!recipient) {
+    const notificationError = '通知先が見つかりません';
+    // 送達台帳へ失敗として残す。ここで残せなくても再送口は pending を拾える。
+    try {
+      const claimed = await claimPhotoNotificationDelivery(c.env.DB, {
+        decisionId: item.decisionId, lineAccountId: input.lineAccountId,
+        leaseId: crypto.randomUUID(),
+        leaseExpiresAt: new Date(Date.now() + 5 * 60_000).toISOString(),
+      });
+      if (claimed) {
+        await completePhotoNotificationDelivery(c.env.DB, {
+          decisionId: item.decisionId, lineAccountId: input.lineAccountId,
+          generation: claimed.generation, status: 'failed', error: notificationError,
+        });
+      }
+    } catch (error) {
+      console.error('bulk photo decision recipient failure record failed', item.decisionId, error);
+    }
+    return { ...item, notificationStatus: 'failed', notificationError };
+  }
+  const delivery = await deliverPhotoReviewNotification(c.env.DB, c, recipient, {
+    lineAccountId: input.lineAccountId,
+    photoId: item.photoId,
+    status: decision?.decision === 'approve' ? 'adopted' : 'rejected',
+    reasonCode: decision?.decision === 'approve'
+      ? null
+      : (decision?.reasonCode ?? null) as PhotoReviewReasonCode | null,
+    reasonNote: decision?.reasonNote ?? null,
+    decisionId: item.decisionId,
+  });
+  return {
+    ...item,
+    notificationStatus: delivery.notificationStatus,
+    ...(delivery.notificationError ? { notificationError: delivery.notificationError } : {}),
+  };
+}
+
+/*
+ * 一括審査の各対象へ、単票と同じ送達状態機械でLINE通知を送る。
+ * 一部が失敗しても残りを続け、失敗分は既存の通知再送口で再試行できる。
+ * 通知フェーズの成否は審査自体の確定（201）を覆さない。
+ */
+async function notifyBulkPhotoDecisions(
+  c: Context<Env>,
+  input: {
+    receiptId: string;
+    lineAccountId: string;
+    idempotencyKey: string;
+    decisions: BulkPhotoDecision[];
+    result: unknown;
+  },
+): Promise<BulkNotificationResult> {
+  const byPhoto = new Map(input.decisions.map((decision) => [decision.photoId, decision]));
+  const items = bulkNotificationItems(input.result);
+  const notified: BulkNotifiedItem[] = [];
+  const notificationFailures: Array<{ photoId: string; error: string }> = [];
+  for (const item of items) {
+    let outcome: BulkNotifiedItem;
+    try {
+      outcome = await notifyOneBulkDecision(c, {
+        lineAccountId: input.lineAccountId, item, decision: byPhoto.get(item.photoId),
+      });
+    } catch (error) {
+      // 対象1件の想定外の失敗で、後続対象の通知まで止めない（対象単位の分離）。
+      // 送達台帳は pending か sending のまま残るが、どちらも再送口の拾い上げ対象。
+      console.error('bulk photo decision notify failed', item.decisionId, error);
+      outcome = {
+        ...item, notificationStatus: 'failed',
+        notificationError: '通知を実行できませんでした。再送してください。',
+      };
+    }
+    notified.push(outcome);
+    if (outcome.notificationStatus === 'failed' && outcome.notificationError) {
+      notificationFailures.push({ photoId: item.photoId, error: outcome.notificationError });
+    }
+  }
+  const updatedCount = typeof (input.result as { updatedCount?: unknown }).updatedCount === 'number'
+    ? (input.result as { updatedCount: number }).updatedCount
+    : notified.length;
+  const data: BulkNotificationResult = { updatedCount, items: notified, notificationFailures };
+  try {
+    const recorded = await recordBulkDecisionNotificationResult(c.env.DB, {
+      receiptId: input.receiptId, lineAccountId: input.lineAccountId,
+      actorId: c.get('staff')!.id, idempotencyKey: input.idempotencyKey, result: data,
+    });
+    // false も握りつぶさない。次の同じ再実行鍵で送達台帳から作り直す。
+    if (!recorded) console.error('POST bulk photo decisions notification record failed', input.idempotencyKey);
+  } catch (error) {
+    console.error('POST bulk photo decisions notification record error:', error);
+  }
+  return data;
+}

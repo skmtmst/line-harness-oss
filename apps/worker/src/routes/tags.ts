@@ -621,8 +621,9 @@ tags.get(
         const denied = await requireVisibleLineAccount(c, lineAccountId);
         if (denied) return denied;
       }
+      // 保管済み(archived)タグも削除影響は確認できる必要がある(#710)。
       const impact = lineAccountId
-        ? await getScopedTagDeleteImpact(c.env.DB, c.req.param('id'), lineAccountId)
+        ? await getScopedTagDeleteImpact(c.env.DB, c.req.param('id'), lineAccountId, { includeArchived: true })
         : await getTagDeleteImpact(c.env.DB, c.req.param('id'));
       if (!impact) return c.json({ success: false, error: 'Not found' }, 404);
       return c.json({ success: true, data: impact });
@@ -642,7 +643,8 @@ tags.get('/api/tags/:id/dependencies', requireRole('owner', 'admin'), async (c) 
     }
     const denied = await requireVisibleLineAccount(c, lineAccountId);
     if (denied) return denied;
-    const impact = await getScopedTagDeleteImpact(c.env.DB, c.req.param('id'), lineAccountId);
+    // 編集画面(archived タグでも開く。#710)がここを読むため、除外しない。
+    const impact = await getScopedTagDeleteImpact(c.env.DB, c.req.param('id'), lineAccountId, { includeArchived: true });
     if (!impact) return c.json({ success: false, error: 'Not found' }, 404);
     return c.json({
       success: true,
@@ -667,7 +669,8 @@ tags.get('/api/tags/:id', requireRole('owner', 'admin'), async (c) => {
     }
     const denied = await requireVisibleLineAccount(c, lineAccountId);
     if (denied) return denied;
-    const detail = await getTagDefinition(c.env.DB, c.req.param('id'), lineAccountId);
+    // 編集画面が保管済みタグでも開けるよう、除外しない(#710)。
+    const detail = await getTagDefinition(c.env.DB, c.req.param('id'), lineAccountId, { includeArchived: true });
     if (!detail) return c.json({ success: false, error: 'tag not found' }, 404);
     return c.json({
       success: true,
@@ -721,6 +724,10 @@ tags.patch('/api/tags/reorder', requireRole('owner', 'admin'), async (c) => {
 tags.patch('/api/tags/:id', requireRole('owner', 'admin'), async (c) => {
   try {
     const body = await c.req.json<Record<string, unknown>>();
+    // 保管済み(archived)タグの保護(#710)は、この分岐(expectedVersion 付き
+    // → updateTagDefinition)にしか効かない。expectedVersion 無しは下の
+    // else で updateTag（version も status も見ないレガシー経路）を通る。
+    // 塞げていない。別票 #715 で扱う。
     if (body.expectedVersion !== undefined) {
       const lineAccountId = requestedLineAccountId(c, body);
       if (!lineAccountId) {
@@ -1015,6 +1022,12 @@ tags.post('/api/tags/:id/archive', requireRole('owner', 'admin'), async (c) => {
     if (!idempotencyKey || idempotencyKey.length > 128) {
       return c.json({ success: false, error: 'Idempotency-Key is required' }, 400);
     }
+    /*
+     * この Idempotency-Key は、**受け取って検査しているが、保存も照合もしていない。**
+     * つまりこの口は冪等ではない。必須にしておきながら冪等でないのは、呼び出し側へ
+     * 「ここは冪等だ」と言っているのと同じで、無いものを有るように見せてしまう。
+     * #709 で扱う（別票）。
+     */
     const expectedVersion = Number(body.expectedVersion);
     const impactRevision = typeof body.impactRevision === 'string' ? body.impactRevision.trim() : '';
     if (!Number.isInteger(expectedVersion) || expectedVersion < 1 || !impactRevision) {
@@ -1032,7 +1045,19 @@ tags.post('/api/tags/:id/archive', requireRole('owner', 'admin'), async (c) => {
     return c.json({ success: true, data: result });
   } catch (err) {
     if (err instanceof TagArchiveError) {
-      return c.json({ success: false, code: err.code, error: err.message }, err.code === 'not_found' ? 404 : 409);
+      /*
+       * already_archived は「もう着いている」であって失敗ではない。画面は code で
+       * 分岐して、赤い失敗ではなく成功と同じ通知にする（#708 の裁定）。
+       * version_conflict / impact_changed と同じ 409 に混ぜると画面が「版が古い」と
+       * 誤解するので、code は分けたまま返す。
+       */
+      const error = err.code === 'already_archived'
+        ? 'このタグはすでに整理されています。'
+        : err.message;
+      return c.json(
+        { success: false, code: err.code, error },
+        err.code === 'not_found' ? 404 : 409,
+      );
     }
     console.error('POST /api/tags/:id/archive error:', err);
     return c.json({ success: false, error: 'タグをアーカイブできませんでした' }, 500);

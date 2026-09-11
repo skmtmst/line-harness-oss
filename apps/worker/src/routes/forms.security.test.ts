@@ -10,7 +10,24 @@ const mocks = vi.hoisted(() => ({
   archiveFormAtRevision: vi.fn(),
   deleteFormAtRevision: vi.fn(),
   getFriendByLineUserIdForAccount: vi.fn(),
-  createFormSubmission: vi.fn(),
+  insertFormSubmissionRecord: vi.fn(),
+  resyncFormSubmitCount: vi.fn(),
+  createFormSubmitClaim: vi.fn(),
+  getFormSubmitClaim: vi.fn(),
+  takeoverFormSubmitClaim: vi.fn(),
+  readFormSubmitClaimSteps: vi.fn(),
+  appendFormSubmitClaimStep: vi.fn(),
+  saveFormSubmitClaimWebhook: vi.fn(),
+  completeFormSubmitClaim: vi.fn(),
+  failFormSubmitClaim: vi.fn(),
+  ensureFormSubmitOutboxEvent: vi.fn(),
+  getFormSubmitOutbox: vi.fn(),
+  markFormSubmitOutboxDelivered: vi.fn(),
+  readFormSubmitOutboxPayload: vi.fn(),
+  readFormSubmitClaimEffectStats: vi.fn(),
+  saveFormSubmitClaimEffectStats: vi.fn(),
+  findUnfinishedFormSubmitClaimByHash: vi.fn(),
+  getFormSubmissionById: vi.fn(),
   createForm: vi.fn(),
   getFormSubmissions: vi.fn(),
   getFormSubmissionsPage: vi.fn(),
@@ -37,7 +54,24 @@ vi.mock('@line-crm/db', () => ({
   getFormSubmissions: mocks.getFormSubmissions,
   getFormSubmissionsPage: mocks.getFormSubmissionsPage,
   getFormSubmissionAnalytics: mocks.getFormSubmissionAnalytics,
-  createFormSubmission: mocks.createFormSubmission,
+  insertFormSubmissionRecord: mocks.insertFormSubmissionRecord,
+  resyncFormSubmitCount: mocks.resyncFormSubmitCount,
+  createFormSubmitClaim: mocks.createFormSubmitClaim,
+  getFormSubmitClaim: mocks.getFormSubmitClaim,
+  takeoverFormSubmitClaim: mocks.takeoverFormSubmitClaim,
+  readFormSubmitClaimSteps: mocks.readFormSubmitClaimSteps,
+  appendFormSubmitClaimStep: mocks.appendFormSubmitClaimStep,
+  saveFormSubmitClaimWebhook: mocks.saveFormSubmitClaimWebhook,
+  completeFormSubmitClaim: mocks.completeFormSubmitClaim,
+  failFormSubmitClaim: mocks.failFormSubmitClaim,
+  ensureFormSubmitOutboxEvent: mocks.ensureFormSubmitOutboxEvent,
+  getFormSubmitOutbox: mocks.getFormSubmitOutbox,
+  markFormSubmitOutboxDelivered: mocks.markFormSubmitOutboxDelivered,
+  readFormSubmitOutboxPayload: mocks.readFormSubmitOutboxPayload,
+  readFormSubmitClaimEffectStats: mocks.readFormSubmitClaimEffectStats,
+  saveFormSubmitClaimEffectStats: mocks.saveFormSubmitClaimEffectStats,
+  findUnfinishedFormSubmitClaimByHash: mocks.findUnfinishedFormSubmitClaimByHash,
+  getFormSubmissionById: mocks.getFormSubmissionById,
   updateFormSubmissionDestinationWriteResult: mocks.updateFormSubmissionDestinationWriteResult,
   getFriendByLineUserIdForAccount: mocks.getFriendByLineUserIdForAccount,
   getFriendById: vi.fn(),
@@ -47,6 +81,7 @@ vi.mock('@line-crm/db', () => ({
   enrollFriendInScenario: vi.fn(),
   applyMileageRulesForEvent: vi.fn(),
   jstNow: vi.fn(() => '2026-08-04T12:00:00+09:00'),
+  toJstString: vi.fn((date: Date) => date.toISOString()),
 }));
 
 vi.mock('../services/liff-auth.js', () => ({
@@ -166,13 +201,49 @@ beforeEach(() => {
     dateFields: [],
   });
   mocks.updateFormSubmissionDestinationWriteResult.mockResolvedValue('not_requested');
-  mocks.createFormSubmission.mockImplementation(async (_db, input) => ({
-    id: 'submission-1',
-    form_id: input.formId,
-    friend_id: input.friendId,
-    data: input.data,
-    created_at: '2026-08-04T12:00:00+09:00',
+  mocks.getFormSubmitClaim.mockResolvedValue(null);
+  mocks.createFormSubmitClaim.mockImplementation(async (_db, input) => ({
+    claimed: true,
+    claim: { ...input, status: 'in_progress', steps: '[]', owner: input.owner },
   }));
+  mocks.readFormSubmitClaimSteps.mockReturnValue([]);
+  mocks.appendFormSubmitClaimStep.mockResolvedValue(true);
+  mocks.saveFormSubmitClaimWebhook.mockResolvedValue(true);
+  mocks.completeFormSubmitClaim.mockResolvedValue(true);
+  mocks.failFormSubmitClaim.mockResolvedValue(true);
+  mocks.findUnfinishedFormSubmitClaimByHash.mockResolvedValue(null);
+  mocks.readFormSubmitClaimEffectStats.mockReturnValue({});
+  mocks.saveFormSubmitClaimEffectStats.mockResolvedValue(true);
+  mocks.ensureFormSubmitOutboxEvent.mockImplementation(async (_db, _scope, _kind, eventId) => ({
+    event_id: eventId,
+    status: 'pending',
+    payload: null,
+  }));
+  mocks.getFormSubmitOutbox.mockResolvedValue(null);
+  mocks.markFormSubmitOutboxDelivered.mockResolvedValue(true);
+  mocks.readFormSubmitOutboxPayload.mockReturnValue(null);
+  const answers = new Map<string, Record<string, unknown>>();
+  mocks.insertFormSubmissionRecord.mockImplementation(async (_db, input) => {
+    const row = {
+      id: input.id ?? 'submission-1',
+      form_id: input.formId,
+      friend_id: input.friendId ?? null,
+      data: input.data,
+      destination_write_status: 'pending',
+      destination_write_attempted: null,
+      destination_write_succeeded: null,
+      destination_write_failed: null,
+      destination_write_completed_at: null,
+      created_at: '2026-08-04T12:00:00+09:00',
+    };
+    answers.set(row.id, row);
+    return { ...row };
+  });
+  mocks.getFormSubmissionById.mockImplementation(async (_db, id) => {
+    const row = answers.get(id);
+    return row ? { ...row } : null;
+  });
+  mocks.resyncFormSubmitCount.mockResolvedValue(undefined);
   mocks.createForm.mockResolvedValue({
     ...baseForm,
     id: 'draft-form-1',
@@ -251,11 +322,14 @@ describe('LINE公式アカウントの範囲', () => {
     const { bindings } = env();
     const res = await app().request('/api/forms/form-1/submit', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer id-token' },
+      headers: {
+         'Content-Type': 'application/json', Authorization: 'Bearer id-token',
+        'Idempotency-Key': 'aaaaaaaa-1111-4333-8444-555555555555',
+      },
       body: JSON.stringify({ data: { x_username: 'other' } }),
     }, bindings);
     expect(res.status).toBe(404);
-    expect(mocks.createFormSubmission).not.toHaveBeenCalled();
+    expect(mocks.insertFormSubmissionRecord).not.toHaveBeenCalled();
   });
 });
 
@@ -270,21 +344,39 @@ describe('submission pagination compatibility', () => {
     );
     expect(res.status).toBe(200);
     expect(await res.json()).toMatchObject({ success: true, data: [] });
-    expect(mocks.getFormSubmissions).toHaveBeenCalledWith(bindings.DB, 'form-1');
+    // #722: 切る数は口が渡す。渡した数と名乗る数が同じであることが要点。
+    expect(mocks.getFormSubmissions).toHaveBeenCalledWith(bindings.DB, 'form-1', 200);
     expect(mocks.getFormSubmissionsPage).not.toHaveBeenCalled();
   });
 
-  test('caps the legacy non-paginated shape at 500 with a migration warning', async () => {
-    mocks.getFormSubmissions.mockResolvedValue(
-      Array.from({ length: 600 }, (_, index) => ({
-        id: `submission-${index}`,
-        form_id: 'form-1',
-        friend_id: null,
-        friend_name: null,
-        data: '{}',
-        created_at: '2026-08-04T12:00:00+09:00',
-      })),
-    );
+  /*
+   * #722 で書き換えた表明。
+   *
+   * **元は「DBヘルパが600件返しても口が500件へ切る」を見ていた。**その表明は
+   * 緑のまま通っていたが、実際の DB ヘルパは 200 で切っていたので、
+   * **口の `slice(0, 500)` には一度も仕事が無く、名乗りだけが 500 だった。**
+   * ヘルパを差し替えて 600 件返させたこの試験だけが、500 という数を
+   * 本物のように見せていた。
+   *
+   * 元の表明が捕まえていた壊し方と、いまどこで捕まえるか:
+   *
+   *   (a) ページ分けなしの応答が配列の形でなくなる
+   *       → すぐ上の試験が据え置きで見張る
+   *   (b) 応答が青天井になる（切らない）
+   *       → 切るのは SQL ひとつ。実 D1 の
+   *         `forms-limit-and-opens-guard.test.ts` が 300件仕込んで
+   *         200件で切れることを見張る
+   *   (c) 移行を促す `Warning` が消える
+   *       → 下で据え置き。さらに**名乗る数が実際と同じ**であることも見張る
+   *   (d) ページ分け口が巻き添えで呼ばれる
+   *       → 下で据え置き
+   *
+   * ここではヘルパを差し替えているので「何件で切れるか」は見られない
+   * （差し替えた戻り値をそのまま返すだけになる）。**この層で見るのは
+   * 「口が渡した数と名乗る数が一致していること」**に絞る。
+   */
+  test('asks the helper for exactly the number it names in the warning', async () => {
+    mocks.getFormSubmissions.mockResolvedValue([]);
     const { bindings } = env();
     const res = await app(true).request(
       '/api/forms/form-1/submissions?account_id=account-a',
@@ -292,9 +384,11 @@ describe('submission pagination compatibility', () => {
       bindings,
     );
     expect(res.status).toBe(200);
-    const body = await res.json() as { data: unknown[] };
-    expect(body.data).toHaveLength(500);
-    expect(res.headers.get('warning')).toContain('page/limit');
+    const requestedLimit = mocks.getFormSubmissions.mock.calls[0][2] as number;
+    const warning = res.headers.get('warning') ?? '';
+    expect(warning).toContain('page/limit');
+    expect(warning).toContain(String(requestedLimit));
+    expect(warning).not.toContain('500');
     expect(mocks.getFormSubmissionsPage).not.toHaveBeenCalled();
   });
 
@@ -702,16 +796,17 @@ describe('LIFF identity enforcement', () => {
       headers: {
         Authorization: 'Bearer valid-line-id-token',
         'Content-Type': 'application/json',
+        'Idempotency-Key': 'bbbbbbbb-2222-4333-8444-555555555555',
       },
       body: JSON.stringify({ data }),
     }, bindings);
 
     expect(res.status).toBe(201);
-    expect(mocks.createFormSubmission).toHaveBeenCalledWith(bindings.DB, {
+    expect(mocks.insertFormSubmissionRecord).toHaveBeenCalledWith(bindings.DB, expect.objectContaining({
       formId: 'form-1',
       friendId: 'friend-real',
       data: JSON.stringify(data),
-    });
+    }));
   });
 
   test('rejects partial metadata writes without a valid LINE ID token', async () => {
@@ -829,12 +924,15 @@ describe('LIFF identity enforcement', () => {
     const { bindings } = env();
     const res = await app().request('/api/forms/form-1/submit', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+         'Content-Type': 'application/json',
+        'Idempotency-Key': 'cccccccc-3333-4333-8444-555555555555',
+      },
       body: JSON.stringify({ friendId: 'victim-friend', data: { x_username: 'alice' } }),
     }, bindings);
 
     expect(res.status).toBe(401);
-    expect(mocks.createFormSubmission).not.toHaveBeenCalled();
+    expect(mocks.insertFormSubmissionRecord).not.toHaveBeenCalled();
   });
 
   test('ignores _skipWebhook and checks the webhook for the authenticated friend', async () => {
@@ -859,6 +957,7 @@ describe('LIFF identity enforcement', () => {
       headers: {
         Authorization: 'Bearer valid-line-id-token',
         'Content-Type': 'application/json',
+        'Idempotency-Key': 'dddddddd-4444-4333-8444-555555555555',
       },
       body: JSON.stringify({
         friendId: 'victim-friend',
@@ -880,11 +979,11 @@ describe('LIFF identity enforcement', () => {
         Authorization: 'Bearer secret',
       },
     });
-    expect(mocks.createFormSubmission).toHaveBeenCalledWith(bindings.DB, expect.objectContaining({
+    expect(mocks.insertFormSubmissionRecord).toHaveBeenCalledWith(bindings.DB, expect.objectContaining({
       formId: 'form-1',
       friendId: 'friend-real',
     }));
-    expect(mocks.createFormSubmission).not.toHaveBeenCalledWith(
+    expect(mocks.insertFormSubmissionRecord).not.toHaveBeenCalledWith(
       bindings.DB,
       expect.objectContaining({ friendId: 'victim-friend' }),
     );
@@ -920,6 +1019,7 @@ describe('LIFF identity enforcement', () => {
       headers: {
         Authorization: 'Bearer valid-line-id-token',
         'Content-Type': 'application/json',
+        'Idempotency-Key': 'eeeeeeee-5555-4333-8444-555555555555',
       },
       body: JSON.stringify({ data: { x_username: 'alice' } }),
     }, bindings);

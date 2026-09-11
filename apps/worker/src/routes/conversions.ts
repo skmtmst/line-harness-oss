@@ -2,7 +2,9 @@ import { Hono, type Context, type MiddlewareHandler } from 'hono';
 import {
   getConversionPoints,
   getConversionPointById,
+  canRecordConversion,
   createConversionPoint,
+  hasConversionPointActivity,
   updateConversionPoint,
   stopConversionPoint,
   trackConversion,
@@ -20,6 +22,7 @@ import {
   getConversionDefinitionDeleteImpact,
   stopConversionDefinition,
   replaceConversionDefinitionUsages,
+  reviseConversionDefinition,
   deleteUnusedConversionDefinition,
   getConversionDefinitionReport,
   listConversionDefinitionsForExport,
@@ -225,7 +228,15 @@ function plainObject(value: unknown): Record<string, unknown> | null {
     ? value as Record<string, unknown> : null;
 }
 
-function readDefinitionInput(body: Record<string, unknown>) {
+/**
+ * 成果地点の入力を1か所で検証する。
+ *
+ * 編集（新版化）は既にある地点を書き換えるので、店の指定は本文から取らない
+ * （地点に紐づく店が正本）。同じ検証を2つ書くと片方だけ直したときに食い違うので、
+ * 必須かどうかだけを切り替える。
+ */
+function readDefinitionInput(body: Record<string, unknown>, options: { requireAccount?: boolean } = {}) {
+  const requireAccount = options.requireAccount !== false;
   const name = typeof body.name === 'string' ? body.name.trim() : '';
   const sourceType = typeof body.sourceType === 'string' ? body.sourceType : '';
   const sourceConfig = plainObject(body.sourceConfig) ?? {};
@@ -237,7 +248,7 @@ function readDefinitionInput(body: Record<string, unknown>) {
   const fixedValue = body.fixedValue == null || body.fixedValue === '' ? null : Number(body.fixedValue);
   const attributionDays = body.attributionDays == null || body.attributionDays === '' ? null : Number(body.attributionDays);
   const targetUrl = typeof body.targetUrl === 'string' && body.targetUrl.trim() ? body.targetUrl.trim() : null;
-  if (!name || name.length > 120 || !lineAccountId || (targetUrl && targetUrl.length > 2000) || !DEFINITION_SOURCE_TYPES.has(sourceType)
+  if (!name || name.length > 120 || (requireAccount && !lineAccountId) || (targetUrl && targetUrl.length > 2000) || !DEFINITION_SOURCE_TYPES.has(sourceType)
     || !DEDUPLICATION_MODES.has(deduplicationMode) || !VALUE_MODES.has(valueMode)
     || !REVERSAL_POLICIES.has(reversalPolicy)
     || (deduplicationMode === 'window' && (!Number.isInteger(windowDays) || windowDays! < 1 || windowDays! > 365))
@@ -301,7 +312,23 @@ interface ConversionPointBody {
   countRepeat?: unknown;
   attributionDays?: unknown;
   lineAccountId?: unknown;
+  expectedVersion?: unknown;
 }
+
+/**
+ * 数え方を変える項目。稼働中または成果・利用先のある地点では
+ * 旧PUTで触らせず、新版作成か停止後の手順へ案内する(N-254)。
+ * 名前だけは表示用で数え方に影響しないため対象外。
+ */
+const CONVERSION_MEASURE_PATCH_KEYS = new Set([
+  'eventType',
+  'value',
+  'measureMethod',
+  'targetUrl',
+  'countRepeat',
+  'attributionDays',
+  'lineAccountId',
+]);
 
 /**
  * 計測に関する項目を検証して取り出す。
@@ -505,6 +532,52 @@ conversions.post('/api/conversions/definitions/:id/stop', conversionPermission('
       staffId: c.get('staff')!.id,
     });
     auditLog(c, 'conversion.definition.stop', { kind: 'conversion_definition', id: c.req.param('id') });
+    return c.json({ success: true, data });
+  } catch (error) {
+    return conversionContractError(c, error);
+  }
+});
+
+/*
+ * POST /api/conversions/definitions/:id/revise — 履歴を保ったまま編集して次の版にする（N-252）。
+ *
+ * 停止・差し替えと同じく、版は本文で受けて CAS に使う。負けたら 409 で、
+ * DBには何も残さない。過去の成果は書き換えない（集計は計測時の控えを見ている）。
+ */
+conversions.post('/api/conversions/definitions/:id/revise', conversionPermission('edit'), async (c) => {
+  try {
+    const body = await c.req.json<Record<string, unknown>>().catch(() => null);
+    const expectedVersion = positiveVersion(body?.expectedVersion);
+    if (!body || expectedVersion === null) {
+      return c.json({ success: false, error: 'expectedVersionを正しく指定してください' }, 400);
+    }
+    const parsedReason = readReason(body);
+    if (!parsedReason.ok) return c.json({ success: false, error: parsedReason.error }, 400);
+    const definition = readDefinitionInput(body, { requireAccount: false });
+    if (!definition) {
+      return c.json({ success: false, error: '成果地点の入力内容を正しく指定してください' }, 400);
+    }
+    const scope = await conversionDefinitionScope(c);
+    if (!scope.ok) return scope.response;
+    const data = await reviseConversionDefinition(c.env.DB, {
+      id: c.req.param('id'),
+      scope: scope.value,
+      expectedVersion,
+      name: definition.name,
+      sourceType: definition.sourceType,
+      sourceConfig: definition.sourceConfig,
+      measureMethod: definition.measureMethod,
+      targetUrl: definition.targetUrl,
+      deduplicationMode: definition.deduplicationMode,
+      deduplicationWindowDays: definition.deduplicationWindowDays,
+      valueMode: definition.valueMode,
+      fixedValue: definition.fixedValue,
+      reversalPolicy: definition.reversalPolicy,
+      attributionDays: definition.attributionDays,
+      reason: parsedReason.reason,
+      staffId: c.get('staff')!.id,
+    });
+    auditLog(c, 'conversion.definition.revise', { kind: 'conversion_definition', id: c.req.param('id') });
     return c.json({ success: true, data });
   } catch (error) {
     return conversionContractError(c, error);
@@ -724,6 +797,9 @@ conversions.post('/api/conversions/points', requireRole('owner', 'admin'), async
 
 // PUT /api/conversions/points/:id - update
 // 送られた項目だけを触る。画面が「計測方法だけ変える」ような部分更新をするため。
+// ただし旧口のまま版・利用先確認を通さず上書きすると、稼働中の数え方が
+// 後から変わる(N-254)。定義系と同じく版の一致を求め、稼働中または
+// 成果・利用先のある地点の数え方は新版作成か停止後の手順へ案内する。
 conversions.put('/api/conversions/points/:id', requireRole('owner', 'admin'), requireVisibleConversionPoint, async (c) => {
   try {
     const id = c.req.param('id');
@@ -731,6 +807,23 @@ conversions.put('/api/conversions/points/:id', requireRole('owner', 'admin'), re
     if (!current) return c.json({ success: false, error: 'Not found' }, 404);
 
     const body = await c.req.json<ConversionPointBody>();
+    /*
+     * 版は本文が正本。代理やプロキシで本文が落ちたときだけクエリを見る
+     * (#513 L11)。定義系の stop / replace / delete と同じ約束にする。
+     */
+    const expectedVersion = positiveVersion(body.expectedVersion)
+      ?? positiveVersion(c.req.query('expectedVersion'));
+    if (expectedVersion === null) {
+      return c.json({ success: false, error: 'expectedVersionを正しく指定してください。本文が落ちる通信経路ではクエリでも指定できます' }, 400);
+    }
+    if (current.version !== expectedVersion) {
+      return c.json({
+        success: false,
+        error: '成果地点が更新されています。読み直してください',
+        currentVersion: current.version,
+      }, 409);
+    }
+
     const options = readMeasureOptions(body, current);
     if (!options.ok) return c.json({ success: false, error: options.error }, 400);
     if ('lineAccountId' in options.value
@@ -750,7 +843,30 @@ conversions.put('/api/conversions/points/:id', requireRole('owner', 'admin'), re
       patch.value = body.value === null || body.value === '' ? null : Number(body.value);
     }
 
-    const point = await updateConversionPoint(c.env.DB, id, patch);
+    const touchesMeasure = Object.keys(patch).some((key) => CONVERSION_MEASURE_PATCH_KEYS.has(key));
+    if (touchesMeasure
+      && (current.status === 'active' || await hasConversionPointActivity(c.env.DB, id))) {
+      return c.json({
+        success: false,
+        error: '稼働中または成果・利用先のある地点の数え方は、この口では変えられません。新しい成果地点を作るか、停止してから変えてください',
+      }, 409);
+    }
+
+    let point;
+    try {
+      point = await updateConversionPoint(c.env.DB, id, patch, { expectedVersion });
+    } catch (error) {
+      // 読み取りから書込みの間に別操作が版を進めたときだけここに来る。
+      if (error instanceof Error && error.message === 'conversion_point_version_conflict') {
+        const latest = await getConversionPointById(c.env.DB, id);
+        return c.json({
+          success: false,
+          error: '成果地点が更新されています。読み直してください',
+          currentVersion: latest?.version ?? current.version,
+        }, 409);
+      }
+      throw error;
+    }
     if (!point) return c.json({ success: false, error: 'Not found' }, 404);
     return c.json({ success: true, data: serializeConversionPoint(point) });
   } catch (err) {
@@ -760,9 +876,37 @@ conversions.put('/api/conversions/points/:id', requireRole('owner', 'admin'), re
 });
 
 // DELETE /api/conversions/points/:id - stop tracking and preserve history
+//
+// 停止も版を進める操作のため、旧PUTと同じく版の一致を必須にする(N-254)。
+// 版は本文が正本。代理やプロキシで本文が落ちたときだけクエリを見る(#513 L11)。
 conversions.delete('/api/conversions/points/:id', requireRole('owner', 'admin'), requireVisibleConversionPoint, async (c) => {
   try {
-    await stopConversionPoint(c.env.DB, c.req.param('id'));
+    const id = c.req.param('id');
+    const body = await c.req.json<Record<string, unknown>>().catch(() => null);
+    const expectedVersion = positiveVersion(body?.expectedVersion)
+      ?? positiveVersion(c.req.query('expectedVersion'));
+    if (expectedVersion === null) {
+      return c.json({ success: false, error: 'expectedVersionを正しく指定してください。本文が落ちる通信経路ではクエリでも指定できます' }, 400);
+    }
+    try {
+      await stopConversionPoint(c.env.DB, id, expectedVersion);
+    } catch (error) {
+      if (error instanceof Error && error.message === 'conversion_point_not_found') {
+        return c.json({ success: false, error: 'Not found' }, 404);
+      }
+      if (error instanceof Error && error.message === 'conversion_point_already_stopped') {
+        return c.json({ success: false, error: 'この成果地点はすでに停止しています' }, 409);
+      }
+      if (error instanceof Error && error.message === 'conversion_point_version_conflict') {
+        const latest = await getConversionPointById(c.env.DB, id);
+        return c.json({
+          success: false,
+          error: '成果地点が更新されています。読み直してください',
+          currentVersion: latest?.version ?? expectedVersion,
+        }, 409);
+      }
+      throw error;
+    }
     return c.json({ success: true, data: null });
   } catch (err) {
     console.error('DELETE /api/conversions/points/:id error:', err);
@@ -804,6 +948,11 @@ conversions.post('/api/conversions/track', requireRole('owner', 'admin'), async 
     )) {
       return c.json({ success: false, error: 'このコンバージョンを記録する権限がありません' }, 403);
     }
+    // 地点と友だちのアカウントの組み合わせも見る。両方を見られる職員でも
+    // 交差記録はできない。地点が全アカウント対象(NULL)のときだけ交差を許可する。
+    if (!canRecordConversion(pointAccount.line_account_id, friendAccount.line_account_id)) {
+      return c.json({ success: false, error: '地点と友だちのアカウントが違うため記録できません' }, 403);
+    }
     if (pointAccount.status === 'stopped') {
       return c.json({ success: false, error: 'この成果地点は計測を停止しています' }, 409);
     }
@@ -838,6 +987,18 @@ conversions.post('/api/conversions/track', requireRole('owner', 'admin'), async 
       },
     }, 201);
   } catch (err) {
+    // 同じ冪等キーの別内容の使い回しは409。同じ再送は上で200/201相当を返している。
+    if (err instanceof Error && err.message === 'conversion_idempotency_key_conflict') {
+      return c.json({ success: false, error: 'このキーは別の内容で既に使われています' }, 409);
+    }
+    // helper内部の境界判定は公開 /t/:linkId を含む全callerで共通。
+    // 管理口では競合中にaccountが変わった場合も権限エラーとして返す。
+    if (err instanceof Error && err.message === 'conversion_account_mismatch') {
+      return c.json({ success: false, error: '地点と友だちのアカウントが違うため記録できません' }, 403);
+    }
+    if (err instanceof Error && err.message === 'conversion_friend_not_found') {
+      return c.json({ success: false, error: 'このコンバージョンを記録する権限がありません' }, 403);
+    }
     console.error('POST /api/conversions/track error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }

@@ -137,12 +137,59 @@ jobs:
           bash scripts/deploy/apply-d1-migrations.sh \
             "$D1_DATABASE_NAME" "$RUNNER_TEMP/d1-pending-migrations.txt"
 
+      # 生成物の置き場所は build が決める。workflow 側で決め打ちしない。
+      #
+      # 正本は apps/worker/wrangler.toml の name。
+      # @cloudflare/vite-plugin は worker 名の - を _ に直した名前の
+      # Vite 環境を作り、その環境名のフォルダへ wrangler.json を出す。
+      # 改名してもここだけ読めば追従する。
+      - name: Resolve worker build artifact path
+        run: |
+          worker_name=$(sed -n 's/^name[[:space:]]*=[[:space:]]*"\(.*\)"$/\1/p' apps/worker/wrangler.toml | head -n 1)
+          if [ -z "$worker_name" ]; then
+            echo "::error::apps/worker/wrangler.toml から worker 名を読めませんでした。"
+            exit 1
+          fi
+          worker_env=$(printf '%s' "$worker_name" | tr '-' '_')
+          if [ -z "$worker_env" ]; then
+            echo "::error::worker の出力名を導出できませんでした(name=$worker_name)。"
+            exit 1
+          fi
+          echo "WORKER_DEPLOY_CONFIG=dist/${worker_env}/wrangler.json" >> "$GITHUB_ENV"
+          echo "配備設定の生成物: dist/${worker_env}/wrangler.json (正本のname=$worker_name)"
+
       - name: Build Worker and LIFF assets
         run: pnpm --filter worker build
         env:
           VITE_LIFF_ID: ${{ vars.VITE_LIFF_ID }}
           VITE_BOT_BASIC_ID: ${{ vars.VITE_BOT_BASIC_ID }}
           VITE_CALENDAR_CONNECTION_ID: ${{ vars.VITE_CALENDAR_CONNECTION_ID }}
+
+      # build の直後に生成物の有無と中身を確かめる。
+      # 無いまま進むと patch や deploy が分かりにくい失敗になるので、
+      # ここで理由付きで止める。
+      - name: Verify worker build artifact
+        run: |
+          test -n "$WORKER_DEPLOY_CONFIG"
+          if [ ! -f "apps/worker/$WORKER_DEPLOY_CONFIG" ]; then
+            echo "::error::worker build の生成物がありません: apps/worker/$WORKER_DEPLOY_CONFIG"
+            echo "apps/worker/dist の中身:"
+            ls -R apps/worker/dist || true
+            exit 1
+          fi
+          node -e '
+            const fs = require("fs");
+            const target = `apps/worker/${process.env.WORKER_DEPLOY_CONFIG}`;
+            const config = JSON.parse(fs.readFileSync(target, "utf8"));
+            const flags = config.compatibility_flags ?? [];
+            const required = ["nodejs_compat", "global_fetch_strictly_public"];
+            const missing = required.filter((flag) => !flags.includes(flag));
+            if (missing.length > 0) {
+              console.error(`::error::${target} に ${missing.join(", ")} がありません: ${JSON.stringify(flags)}`);
+              process.exit(1);
+            }
+            console.log(`互換flag: ${JSON.stringify(flags)}`);
+          '
 
       - name: Patch wrangler config
         env:
@@ -160,12 +207,17 @@ jobs:
           WORKER_URL: ${{ vars.WORKER_URL }}
         run: |
           test -n "$D1_DATABASE_ID"
+          test -n "$WORKER_DEPLOY_CONFIG"
           cd apps/worker
+          if [ ! -f "$WORKER_DEPLOY_CONFIG" ]; then
+            echo "::error::配備設定の生成物がありません: apps/worker/$WORKER_DEPLOY_CONFIG"
+            exit 1
+          fi
           sed -i \
             -e "s|\"account_id\":\"[^\"]*\"|\"account_id\":\"${CLOUDFLARE_ACCOUNT_ID}\"|g" \
             -e "s|\"database_name\":\"[^\"]*\"|\"database_name\":\"${D1_DATABASE_NAME}\"|g" \
             -e "s|\"database_id\":\"[^\"]*\"|\"database_id\":\"${D1_DATABASE_ID}\"|g" \
-            dist/line_harness/wrangler.json
+            "$WORKER_DEPLOY_CONFIG"
           # Inject admin CORS vars into the deployed config when ADMIN_ORIGIN is
           # set. ADMIN_ALLOW_CROSS_SITE defaults to "true" (SameSite=None; Secure
           # cookies) since cross-origin admin/API is the case that needs it.
@@ -175,7 +227,7 @@ jobs:
               .vars.ADMIN_ORIGIN = $o
               | .vars.ADMIN_ALLOW_CROSS_SITE = (if $x == "" then "true" else $x end)
               | (if $w != "" then .vars.WORKER_URL = $w else . end)
-            ' dist/line_harness/wrangler.json > "$tmp" && mv "$tmp" dist/line_harness/wrangler.json
+            ' "$WORKER_DEPLOY_CONFIG" > "$tmp" && mv "$tmp" "$WORKER_DEPLOY_CONFIG"
             echo "Patched admin CORS vars: ADMIN_ORIGIN=$ADMIN_ORIGIN ADMIN_ALLOW_CROSS_SITE=${ADMIN_ALLOW_CROSS_SITE:-true}"
           fi
 
@@ -185,4 +237,4 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: apps/worker
-          command: deploy --config dist/line_harness/wrangler.json --name ${{ vars.WORKER_NAME || 'your-worker-name' }}
+          command: deploy --config ${{ env.WORKER_DEPLOY_CONFIG }} --name ${{ vars.WORKER_NAME || 'your-worker-name' }}

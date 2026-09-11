@@ -19,6 +19,7 @@ import {
   type AnalyticsReportSchedule,
 } from '@line-crm/db';
 import { sendXServerMail } from './xserver-mail.js';
+import { featureJobCanRun } from './feature-enforcement.js';
 
 type AnalyticsReportEnv = {
   DB: D1Database;
@@ -207,6 +208,10 @@ export async function processDueAnalyticsReports(env: AnalyticsReportEnv, now = 
   let processed = 0;
   let failed = 0;
   for (const schedule of due) {
+    // 機能オフ中は作らず予約のまま残す。再オンで再開する。
+    if (!await featureJobCanRun(env.DB, { accountId: schedule.lineAccountId, featureId: 'analytics', job: 'analytics scheduled reports' })) {
+      continue;
+    }
     const context = contextFor(schedule, now);
     const runId = await beginAnalyticsReportRun(env.DB, {
       scheduleId: schedule.id, lineAccountId: schedule.lineAccountId,

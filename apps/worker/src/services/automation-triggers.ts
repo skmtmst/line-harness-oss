@@ -7,6 +7,7 @@ import {
   type RunStatus,
 } from './automation-engine.js';
 import { createAutomationActionExecutors } from './automation-action-executors.js';
+import { featureJobCanRun } from './feature-enforcement.js';
 
 const EVENT_TRIGGER_TYPES = new Set([
   'friend_add',
@@ -15,7 +16,18 @@ const EVENT_TRIGGER_TYPES = new Set([
   'form_submitted',
   'link_clicked',
   'calendar_booked',
+  // EC受信の全11種。種別の可否は受信口の EC_EVENT_TYPES が正本。
   'ec.order.confirmed',
+  'ec.order.payment_received',
+  'ec.order.bank_transfer_reminder',
+  'ec.order.shipped',
+  'ec.order.cancelled',
+  'ec.order.refunded',
+  'ec.subscription.upcoming',
+  'ec.subscription.payment_failed',
+  'ec.subscription.card_updated',
+  'ec.subscription.cancelled',
+  'ec.customer.profile_updated',
   'score_threshold_crossed',
   'score_band_changed',
   'manual_reply_sent',
@@ -38,6 +50,16 @@ const EVENT_FILTER_KEYS: Record<string, ReadonlySet<string>> = {
   link_clicked: new Set(['trackedLinkId']),
   calendar_booked: new Set(['bookingType', 'menuId', 'eventId']),
   'ec.order.confirmed': new Set(),
+  'ec.order.payment_received': new Set(),
+  'ec.order.bank_transfer_reminder': new Set(),
+  'ec.order.shipped': new Set(),
+  'ec.order.cancelled': new Set(),
+  'ec.order.refunded': new Set(),
+  'ec.subscription.upcoming': new Set(),
+  'ec.subscription.payment_failed': new Set(),
+  'ec.subscription.card_updated': new Set(),
+  'ec.subscription.cancelled': new Set(),
+  'ec.customer.profile_updated': new Set(),
   score_threshold_crossed: new Set([
     'ruleId', 'ruleVersionId', 'scoreBefore', 'currentScore',
     'previousBand', 'currentBand', 'thresholdBand',
@@ -421,6 +443,10 @@ export async function processScheduledAutomationTriggers(
   let due = 0;
   for (const candidate of candidates.results ?? []) {
     if (!SCHEDULE_TRIGGER_TYPES.has(candidate.trigger_type)) continue;
+    // 機能オフ中は起動しない。定義は残るため再オンで再開する。
+    if (candidate.line_account_id && !await featureJobCanRun(db, { accountId: candidate.line_account_id, featureId: 'automations', job: 'automation triggers' })) {
+      continue;
+    }
     try {
       const config = parseScheduleConfig(candidate.trigger_config, candidate.trigger_type);
       const occurrence = dueOccurrence(candidate.trigger_type, config, now, candidate.timezone);
@@ -482,6 +508,10 @@ export async function processOverdueSupportMarkTriggers(
   }>();
   const results: AutomationDispatchItem[] = [];
   for (const row of rows.results ?? []) {
+    // 機能オフ中は期限切れ評価を起こさない。会話は残るため再オンで再開する。
+    if (!await featureJobCanRun(db, { accountId: row.line_account_id, featureId: 'support_marks', job: 'support mark triggers' })) {
+      continue;
+    }
     results.push(...await dispatchAutomationEvent(db, {
       lineAccountId: row.line_account_id,
       eventType: 'response_overdue',

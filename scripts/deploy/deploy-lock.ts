@@ -346,13 +346,30 @@ export function releaseLock(
   };
 }
 
-/** Resolve the GitHub login of the current operator via the gh CLI. */
-function currentHolder(): string {
-  try {
-    return execFileSync('gh', ['api', 'user', '--jq', '.login'], {
+/**
+ * Resolve the GitHub login of the current operator.
+ *
+ * A GitHub Actions token belongs to the workflow installation, so `gh api
+ * user` cannot resolve a personal login there. The signed event actor is the
+ * stable holder name for CI. Interactive runs still use the authenticated gh
+ * account.
+ */
+export function currentHolder(
+  runtimeEnv: NodeJS.ProcessEnv = processEnv,
+  resolveInteractive: () => string = () =>
+    execFileSync('gh', ['api', 'user', '--jq', '.login'], {
       encoding: 'utf8',
       stdio: ['pipe', 'pipe', 'pipe'],
-    }).trim();
+    }).trim(),
+): string {
+  const actionsActor =
+    runtimeEnv.GITHUB_ACTIONS === 'true' ? runtimeEnv.GITHUB_ACTOR?.trim() : undefined;
+  if (actionsActor) return actionsActor;
+
+  try {
+    const login = resolveInteractive();
+    if (!login) throw new Error('empty login');
+    return login;
   } catch {
     throw new Error(
       'GitHub ログインを取得できません。`gh auth login` を済ませてから実行してください。',

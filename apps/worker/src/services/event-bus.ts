@@ -25,7 +25,7 @@ import {
   finishWebhookInteraction,
   type WebhookInteractionFailureReason,
 } from '@line-crm/db';
-import { deliverWebhook, recordDeliveryOutcome } from './outgoing-webhook-delivery.js';
+import { deliverWebhook, postWebhookSafely, recordDeliveryOutcome } from './outgoing-webhook-delivery.js';
 import { LineClient } from '@line-crm/line-sdk';
 import type { Message } from '@line-crm/line-sdk';
 import { sendAdConversions } from './ad-conversion.js';
@@ -48,7 +48,48 @@ export interface EventPayload {
   eventData?: Record<string, unknown>;
   conversionEventName?: string;
   conversionValue?: number;
+  /** ISO通貨(例 USD)。無いときは円扱い。 */
+  conversionCurrency?: string;
+  /** 金額が補助単位(セント等)のとき true。通貨不明のときは換算しない。 */
+  conversionAmountInMinorUnit?: boolean;
   replyToken?: string;
+}
+
+function toAdConversionAmount(value: unknown): number | undefined {
+  const amount = typeof value === 'string' && value.trim() !== '' ? Number(value) : value;
+  return typeof amount === 'number' && Number.isFinite(amount) && amount > 0 ? amount : undefined;
+}
+
+/**
+ * 通常イベントから広告成果への対応表。購入に結びつく出来事だけ送る。
+ * どれを送るかはここで一元管理し、各呼び出し側では決めない。
+ */
+export function adConversionForEvent(
+  eventType: string,
+  payload: EventPayload,
+): { eventName: string; value?: number; currency?: string; amountInMinorUnit?: boolean } | null {
+  if (payload.conversionEventName) {
+    return {
+      eventName: payload.conversionEventName,
+      value: payload.conversionValue,
+      currency: payload.conversionCurrency,
+      amountInMinorUnit: payload.conversionAmountInMinorUnit,
+    };
+  }
+  if (eventType === 'cv_fire' && payload.eventData?.type === 'purchase') {
+    return { eventName: 'Purchase', value: toAdConversionAmount(payload.eventData?.amount) };
+  }
+  if (eventType === 'ec.order.confirmed' || eventType === 'ec.order.payment_received') {
+    // 金額の読みどころを統一: 正規形 orderTotal → 互換 order.total → 旧 total。
+    // (EC側の通貨・単位の正規化は#1472の結合時に渡す。今は値だけ通す)
+    const eventData = payload.eventData ?? {};
+    const order = eventData.order as Record<string, unknown> | undefined;
+    return {
+      eventName: 'Purchase',
+      value: toAdConversionAmount(eventData.orderTotal ?? order?.total ?? eventData.total),
+    };
+  }
+  return null;
 }
 
 /**
@@ -81,9 +122,20 @@ export async function fireEvent(
     fireOutgoingWebhooks(db, eventType, payload, outgoingWebhookLineAccountId),
     processScoring(db, eventType, payload, outgoingWebhookLineAccountId, lineAccessToken),
   ];
-  if (payload.friendId && payload.conversionEventName) {
+  const adConversion = payload.friendId ? adConversionForEvent(eventType, payload) : null;
+  if (payload.friendId && adConversion) {
     phase1.push(
-      sendAdConversions(db, payload.friendId, payload.conversionEventName, payload.conversionValue),
+      sendAdConversions(db, payload.friendId, adConversion.eventName, adConversion.value, {
+        // 発生元の安定IDを冪等キーにし、再配達の二重送信を止める。
+        idempotencyKey: payload.sourceEventId
+          ? `${payload.sourceKind ?? eventType}:${payload.sourceEventId}`
+          : undefined,
+        // イベント確定時の所属を渡す。友だち移動後の再送でも旧所属で送る。
+        lineAccountId: lineAccountId ?? outgoingWebhookLineAccountId ?? undefined,
+        // 通貨・単位が分かるときだけ渡す。無いときは円・主単位扱い。
+        currency: adConversion.currency,
+        amountInMinorUnit: adConversion.amountInMinorUnit,
+      }),
     );
   }
   await Promise.allSettled(phase1);
@@ -512,11 +564,14 @@ async function executeAction(
     case 'send_webhook': {
       const url = action.params.url;
       if (url) {
-        await fetch(url, {
-          method: 'POST',
+        // 旧式の直書きURLも共通の安全送信へ通す。検査を迂回する直 fetch は置かない。
+        const outcome = await postWebhookSafely(url, {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ friendId, ...payload.eventData }),
         });
+        if ('blocked' in outcome) {
+          throw new Error(`send_webhook_url_unsafe: ${outcome.blocked}`);
+        }
       }
       break;
     }

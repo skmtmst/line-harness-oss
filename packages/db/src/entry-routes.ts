@@ -77,6 +77,21 @@ export async function getEntryRouteByRefCode(
     .first<EntryRoute>();
 }
 
+/**
+ * N-244: ref 名前空間の所有確認用。is_active を問わず行を返す。
+ * 停止した経路を「存在しない」と区別し、公開URL受付を止めるために使う。
+ * 返す行の redirect_url / pool_id / tag_id 等を公開応答に含めてはならない。
+ */
+export async function getEntryRouteByRefCodeAny(
+  db: D1Database,
+  refCode: string,
+): Promise<EntryRoute | null> {
+  return db
+    .prepare(`SELECT * FROM entry_routes WHERE ref_code = ?`)
+    .bind(refCode)
+    .first<EntryRoute>();
+}
+
 export async function createEntryRoute(
   db: D1Database,
   input: CreateEntryRouteInput,

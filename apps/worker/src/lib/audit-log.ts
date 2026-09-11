@@ -52,6 +52,7 @@ export type AuditAction =
   | 'conversion.definition.create'
   | 'conversion.definition.stop'
   | 'conversion.definition.replace'
+  | 'conversion.definition.revise'
   | 'conversion.definition.delete'
   | 'conversion.definition.usage.create'
   | 'conversion.report.export'

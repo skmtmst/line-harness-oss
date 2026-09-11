@@ -687,19 +687,197 @@ export async function stopConversionDefinition(
   const now = jstNow();
   const usageRow = await db.prepare('SELECT COUNT(*) AS total FROM conversion_definition_usages WHERE conversion_point_id = ?')
     .bind(input.id).first<{ total: number }>();
-  const [result] = await db.batch([
+  const operationId = crypto.randomUUID();
+  // D1 batchは1文でも失敗すれば全体をrollbackする。CAS直後のchanges()が1の
+  // ときだけログを作るため、競合したbatchは副作用0のまま終わる。
+  const results = await db.batch([
     db.prepare(`UPDATE conversion_points SET status = 'stopped', stopped_at = ?,
       updated_at = ?, version = version + 1 WHERE id = ? AND version = ? AND status = 'active'`)
       .bind(now, now, input.id, input.expectedVersion),
     db.prepare(`INSERT INTO conversion_definition_operations
       (id, conversion_point_id, action, replacement_id, affected_usages, reason, performed_by, created_at)
-      VALUES (?, ?, 'stop', NULL, ?, ?, ?, ?)`)
-      .bind(crypto.randomUUID(), input.id, Number(usageRow?.total ?? 0), input.reason ?? null, input.staffId, now),
+      SELECT ?, ?, 'stop', NULL, ?, ?, ?, ? WHERE changes() = 1`)
+      .bind(operationId, input.id, Number(usageRow?.total ?? 0), input.reason ?? null, input.staffId, now),
   ]);
-  if ((result.meta.changes ?? 0) !== 1) {
+  if ((results[0]?.meta.changes ?? 0) !== 1 || (results[1]?.meta.changes ?? 0) !== 1) {
     throw new ConversionDefinitionError('version_conflict', '成果地点が更新されています。読み直してください', 409);
   }
   return { id: input.id, status: 'stopped' as const, version: input.expectedVersion + 1, stoppedAt: now };
+}
+
+/** 編集で差し替える設定。監査の前後比較にもこの形をそのまま使う。 */
+type DefinitionConfig = {
+  name: string;
+  sourceType: string;
+  sourceConfig: Record<string, unknown>;
+  measureMethod: 'url_reach' | 'webhook' | 'manual';
+  targetUrl: string | null;
+  deduplicationMode: ConversionDeduplicationMode;
+  deduplicationWindowDays: number | null;
+  valueMode: ConversionValueMode;
+  fixedValue: number | null;
+  reversalPolicy: ConversionReversalPolicy;
+  attributionDays: number | null;
+};
+
+type RevisionRow = {
+  id: string;
+  version: number;
+  status: ConversionDefinitionStatus;
+  line_account_id: string | null;
+  name: string;
+  event_type: string;
+  value: number | null;
+  measure_method: 'url_reach' | 'webhook' | 'manual';
+  target_url: string | null;
+  count_repeat: number;
+  attribution_days: number | null;
+  source_config_json: string;
+  deduplication_mode: ConversionDeduplicationMode;
+  deduplication_window_days: number | null;
+  value_mode: ConversionValueMode;
+  reversal_policy: ConversionReversalPolicy;
+};
+
+function configOf(row: RevisionRow): DefinitionConfig {
+  return {
+    name: row.name,
+    sourceType: row.event_type,
+    sourceConfig: JSON.parse(row.source_config_json || '{}') as Record<string, unknown>,
+    measureMethod: row.measure_method,
+    targetUrl: row.target_url,
+    deduplicationMode: row.deduplication_mode,
+    deduplicationWindowDays: row.deduplication_window_days,
+    valueMode: row.value_mode,
+    fixedValue: row.value,
+    reversalPolicy: row.reversal_policy,
+    attributionDays: row.attribution_days,
+  };
+}
+
+export type ReviseConversionDefinitionInput = {
+  id: string;
+  scope: ConversionDefinitionScope;
+  expectedVersion: number;
+  reason?: string | null;
+  staffId: string;
+} & Omit<DefinitionConfig, 'targetUrl' | 'deduplicationWindowDays' | 'fixedValue' | 'attributionDays'>
+  & Partial<Pick<DefinitionConfig, 'targetUrl' | 'deduplicationWindowDays' | 'fixedValue' | 'attributionDays'>>;
+
+/**
+ * 成果地点を、履歴を保ったまま編集して次の版にする（N-252）。
+ *
+ * **過去の成果は書き換えない。** 集計は `conversion_events.value_snapshot` を
+ * 見ており、計測時の版は `point_version_snapshot` に残る。だから編集しても
+ * 過去の集計額は動かない。
+ *
+ * **利用先は安定ID（`conversion_point_id`）のまま次の版へ付け替える。**
+ * 参照が切れないよう、地点の版を上げるのと同じ処理の中で `definition_version`
+ * を進める。
+ *
+ * **後勝ちにしない。** `stopConversionDefinition` と同じ形で、版のCASに勝った
+ * ときだけ監査と利用先が動く。負けた側は 409 で、副作用は0のまま終わる
+ * （D1 の batch は1文でも失敗すれば全体を rollback する。ここでは失敗ではなく
+ * 「0件更新」で表すので、後段の文も同じ条件で自分を止める）。
+ */
+export async function reviseConversionDefinition(
+  db: D1Database,
+  input: ReviseConversionDefinitionInput,
+) {
+  const account = accountWhere('cp.', input.scope, undefined);
+  const current = await db.prepare(`SELECT cp.id, cp.version, cp.status, cp.line_account_id,
+      cp.name, cp.event_type, cp.value, cp.measure_method, cp.target_url, cp.count_repeat,
+      cp.attribution_days, cp.source_config_json, cp.deduplication_mode,
+      cp.deduplication_window_days, cp.value_mode, cp.reversal_policy
+    FROM conversion_points cp WHERE cp.id = ? AND ${account.sql}`)
+    .bind(input.id, ...account.values)
+    .first<RevisionRow>();
+  requireExpectedDefinition(current, input.expectedVersion);
+  const row = current!;
+
+  const name = input.name.trim();
+  if (!name) throw new ConversionDefinitionError('required', '成果地点の名前を入れてください', 400);
+  // 同じ店の中で名前が重ならないこと。自分自身は除く（名前を変えない編集を弾かない）。
+  const duplicate = await db.prepare(`SELECT id FROM conversion_points
+    WHERE line_account_id IS ? AND lower(trim(name)) = lower(trim(?)) AND id != ? LIMIT 1`)
+    .bind(row.line_account_id, name, input.id)
+    .first<{ id: string }>();
+  if (duplicate) {
+    throw new ConversionDefinitionError('duplicate_name', '同じ名前の成果地点があります', 409);
+  }
+
+  const after: DefinitionConfig = {
+    name,
+    sourceType: input.sourceType,
+    sourceConfig: input.sourceConfig,
+    measureMethod: input.measureMethod,
+    targetUrl: input.measureMethod === 'url_reach' ? input.targetUrl ?? null : null,
+    deduplicationMode: input.deduplicationMode,
+    deduplicationWindowDays: input.deduplicationMode === 'window'
+      ? input.deduplicationWindowDays ?? null : null,
+    valueMode: input.valueMode,
+    fixedValue: input.valueMode === 'fixed' ? input.fixedValue ?? null : null,
+    reversalPolicy: input.reversalPolicy,
+    attributionDays: input.attributionDays ?? null,
+  };
+  const before = configOf(row);
+  const toVersion = input.expectedVersion + 1;
+  const now = jstNow();
+  const revisionId = crypto.randomUUID();
+  const usageRow = await db.prepare(`SELECT COUNT(*) AS total FROM conversion_definition_usages
+    WHERE conversion_point_id = ? AND definition_version = ?`)
+    .bind(input.id, input.expectedVersion).first<{ total: number }>();
+  const affectedUsages = Number(usageRow?.total ?? 0);
+
+  const results = await db.batch([
+    db.prepare(`UPDATE conversion_points
+        SET name = ?, event_type = ?, value = ?, measure_method = ?, target_url = ?,
+            count_repeat = ?, attribution_days = ?, source_config_json = ?,
+            deduplication_mode = ?, deduplication_window_days = ?, value_mode = ?,
+            reversal_policy = ?, updated_at = ?, version = version + 1
+      WHERE id = ? AND version = ? AND status = 'active'`)
+      .bind(
+        after.name, after.sourceType, after.fixedValue, after.measureMethod, after.targetUrl,
+        after.deduplicationMode === 'every' ? 1 : 0, after.attributionDays,
+        JSON.stringify(after.sourceConfig), after.deduplicationMode,
+        after.deduplicationWindowDays, after.valueMode, after.reversalPolicy,
+        now, input.id, input.expectedVersion,
+      ),
+    // CASに勝ったときだけ監査を残す。負けた batch は行を1つも作らない。
+    db.prepare(`INSERT INTO conversion_definition_revisions
+      (id, conversion_point_id, from_version, to_version, before_config_json,
+       after_config_json, affected_usages, reason, performed_by, created_at)
+      SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ? WHERE changes() = 1`)
+      .bind(
+        revisionId, input.id, input.expectedVersion, toVersion,
+        JSON.stringify(before), JSON.stringify(after), affectedUsages,
+        input.reason ?? null, input.staffId, now,
+      ),
+    /*
+     * 利用先を次の版へ付け替える。
+     *
+     * `changes()` は直前の文（監査のINSERT）を指すので、ここでは使えない。
+     * 監査行そのものの有無を条件にする。CASに負けた batch では監査行が
+     * 作られないため、この UPDATE も0件で終わり、利用先の版だけが
+     * 先に進んでしまうことがない。
+     */
+    db.prepare(`UPDATE conversion_definition_usages
+        SET definition_version = ?, updated_at = ?
+      WHERE conversion_point_id = ? AND definition_version = ?
+        AND EXISTS (SELECT 1 FROM conversion_definition_revisions
+                     WHERE conversion_point_id = ? AND to_version = ?)`)
+      .bind(toVersion, now, input.id, input.expectedVersion, input.id, toVersion),
+  ]);
+  if ((results[0]?.meta.changes ?? 0) !== 1 || (results[1]?.meta.changes ?? 0) !== 1) {
+    throw new ConversionDefinitionError('version_conflict', '成果地点が更新されています。読み直してください', 409);
+  }
+  return {
+    id: input.id,
+    version: toVersion,
+    revisionId,
+    movedUsages: Number(results[2]?.meta.changes ?? 0),
+    updatedAt: now,
+  };
 }
 
 export async function replaceConversionDefinitionUsages(
@@ -722,26 +900,50 @@ export async function replaceConversionDefinitionUsages(
     .bind(input.id).first<{ total: number }>();
   const affectedUsages = Number(usageRow?.total ?? 0);
   const now = jstNow();
+  const operationId = crypto.randomUUID();
+  // 事前確認は読んだ瞬間の姿でしかない。置換先を別の要求が停止・版更新・削除
+  // しても旧地点のCASだけなら通ってしまい、利用先が停止済みや旧版の置換先へ
+  // 移る。置換先のID・版・稼働中・同アカウントを旧地点のCAS文そのものへ
+  // EXISTSで入れ、同じtransaction内で1文として固定する。
   const results = await db.batch([
+    db.prepare(`UPDATE conversion_points AS source SET status = 'stopped', stopped_at = ?,
+      updated_at = ?, version = version + 1
+      WHERE source.id = ? AND source.version = ? AND source.status = 'active'
+        AND EXISTS (
+          SELECT 1 FROM conversion_points AS replacement
+          WHERE replacement.id = ? AND replacement.version = ?
+            AND replacement.status = 'active' AND replacement.id <> source.id
+            AND (replacement.line_account_id = source.line_account_id
+              OR (replacement.line_account_id IS NULL AND source.line_account_id IS NULL))
+        )`)
+      .bind(now, now, input.id, input.expectedVersion, input.replacementId, input.replacementExpectedVersion),
+    db.prepare(`INSERT INTO conversion_definition_operations
+      (id, conversion_point_id, action, replacement_id, affected_usages, reason, performed_by, created_at)
+      SELECT ?, ?, 'replace', ?, ?, ?, ?, ? WHERE changes() = 1`)
+      .bind(operationId, input.id, input.replacementId, affectedUsages, input.reason ?? null, input.staffId, now),
     db.prepare(`DELETE FROM conversion_definition_usages AS source
       WHERE source.conversion_point_id = ? AND EXISTS (
         SELECT 1 FROM conversion_definition_usages target
         WHERE target.conversion_point_id = ? AND target.line_account_id = source.line_account_id
           AND target.ref_kind = source.ref_kind AND target.ref_id = source.ref_id
           AND COALESCE(target.ref_version_id, '') = COALESCE(source.ref_version_id, '')
-      )`).bind(input.id, input.replacementId),
+      ) AND EXISTS (SELECT 1 FROM conversion_definition_operations WHERE id = ?)`)
+      .bind(input.id, input.replacementId, operationId),
     db.prepare(`UPDATE conversion_definition_usages SET conversion_point_id = ?,
-      definition_version = ?, updated_at = ? WHERE conversion_point_id = ?`)
-      .bind(input.replacementId, input.replacementExpectedVersion, now, input.id),
-    db.prepare(`UPDATE conversion_points SET status = 'stopped', stopped_at = ?,
-      updated_at = ?, version = version + 1 WHERE id = ? AND version = ? AND status = 'active'`)
-      .bind(now, now, input.id, input.expectedVersion),
-    db.prepare(`INSERT INTO conversion_definition_operations
-      (id, conversion_point_id, action, replacement_id, affected_usages, reason, performed_by, created_at)
-      VALUES (?, ?, 'replace', ?, ?, ?, ?, ?)`)
-      .bind(crypto.randomUUID(), input.id, input.replacementId, affectedUsages, input.reason ?? null, input.staffId, now),
+      definition_version = ?, updated_at = ? WHERE conversion_point_id = ?
+      AND EXISTS (SELECT 1 FROM conversion_definition_operations WHERE id = ?)`)
+      .bind(input.replacementId, input.replacementExpectedVersion, now, input.id, operationId),
   ]);
-  if ((results[2].meta.changes ?? 0) !== 1) {
+  if ((results[0]?.meta.changes ?? 0) !== 1 || (results[1]?.meta.changes ?? 0) !== 1) {
+    // 敗者には、旧地点と置換先のどちらを読み直すのかを分けて伝える。
+    const latestReplacement = await currentDefinitionForMutation(db, input.replacementId, input.scope);
+    if (!latestReplacement) {
+      throw new ConversionDefinitionError('replacement_not_found', '置換先の成果地点が見つかりません。読み直してください', 409);
+    }
+    if (Number(latestReplacement.version) !== input.replacementExpectedVersion
+      || latestReplacement.status !== 'active') {
+      throw new ConversionDefinitionError('replacement_conflict', '置換先の成果地点が更新されています。読み直してください', 409);
+    }
     throw new ConversionDefinitionError('version_conflict', '成果地点が更新されています。読み直してください', 409);
   }
   return {
@@ -764,18 +966,19 @@ export async function deleteUnusedConversionDefinition(
     throw new ConversionDefinitionError('definition_in_use', '成果または利用先があるため、削除せず停止してください', 409);
   }
   const now = jstNow();
+  const operationId = crypto.randomUUID();
   const results = await db.batch([
-    db.prepare(`INSERT INTO conversion_definition_operations
-      (id, conversion_point_id, action, replacement_id, affected_usages, reason, performed_by, created_at)
-      VALUES (?, ?, 'delete', NULL, 0, ?, ?, ?)`)
-      .bind(crypto.randomUUID(), input.id, input.reason ?? null, input.staffId, now),
     db.prepare(`DELETE FROM conversion_points
       WHERE id = ? AND version = ?
         AND NOT EXISTS (SELECT 1 FROM conversion_events WHERE conversion_point_id = ?)
         AND NOT EXISTS (SELECT 1 FROM conversion_definition_usages WHERE conversion_point_id = ?)`)
       .bind(input.id, input.expectedVersion, input.id, input.id),
+    db.prepare(`INSERT INTO conversion_definition_operations
+      (id, conversion_point_id, action, replacement_id, affected_usages, reason, performed_by, created_at)
+      SELECT ?, ?, 'delete', NULL, 0, ?, ?, ? WHERE changes() = 1`)
+      .bind(operationId, input.id, input.reason ?? null, input.staffId, now),
   ]);
-  if ((results[1].meta.changes ?? 0) !== 1) {
+  if ((results[0]?.meta.changes ?? 0) !== 1 || (results[1]?.meta.changes ?? 0) !== 1) {
     throw new ConversionDefinitionError('version_conflict', '成果地点が更新されています。読み直してください', 409);
   }
   return { id: input.id, deleted: true as const };

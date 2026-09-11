@@ -1,4 +1,5 @@
 import { jstNow } from './utils.js';
+import { ensureConversionRewardSnapshot, reverseSettledRewardOnRejection } from './affiliate-settlements.js';
 import { createAffiliateLink } from './affiliate-links.js';
 import type { AffiliateLink } from './affiliate-links.js';
 import { ensureDefaultMileageProgram } from './mileage.js';
@@ -37,38 +38,80 @@ export interface CreateAffiliateOfferInput {
   lineAccountId?: string | null;
   tagId?: string | null;
   scenarioId?: string | null;
+  /**
+   * Stable per-attempt UUID from the client (#686). When the create commits
+   * but the response is lost, the client retries with the SAME operationId;
+   * this lets the retry recover the original row instead of creating a
+   * duplicate offer.
+   */
+  operationId?: string | null;
+}
+
+/** Look up a prior create by its client-supplied operation UUID (idempotent replay, #686). */
+async function findAffiliateOfferByOperationId(
+  db: D1Database,
+  lineAccountId: string | null,
+  operationId: string,
+): Promise<AffiliateOffer | null> {
+  return db
+    .prepare(
+      `SELECT * FROM affiliate_offers WHERE line_account_id IS ? AND operation_id = ?`,
+    )
+    .bind(lineAccountId, operationId)
+    .first<AffiliateOffer>();
+}
+
+function isOperationIdConflict(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return /UNIQUE constraint failed/i.test(msg) && /affiliate_offers\.operation_id/i.test(msg);
 }
 
 export async function createAffiliateOffer(
   db: D1Database,
   input: CreateAffiliateOfferInput,
 ): Promise<AffiliateOffer> {
+  const lineAccountId = input.lineAccountId ?? null;
+  if (input.operationId) {
+    const existing = await findAffiliateOfferByOperationId(db, lineAccountId, input.operationId);
+    if (existing) return existing;
+  }
+
   const id = crypto.randomUUID();
   const now = jstNow();
   if (!input.mileageProgramId || input.mileageProgramId === 'default') {
     await ensureDefaultMileageProgram(db);
   }
 
-  await db
-    .prepare(
-      `INSERT INTO affiliate_offers
-         (id, name, description, reward_amount, reward_miles, mileage_program_id,
-          line_account_id, tag_id, scenario_id, is_active, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)`,
-    )
-    .bind(
-      id,
-      input.name,
-      input.description ?? null,
-      input.rewardAmount ?? 0,
-      input.rewardMiles ?? 0,
-      input.mileageProgramId ?? 'default',
-      input.lineAccountId ?? null,
-      input.tagId ?? null,
-      input.scenarioId ?? null,
-      now,
-    )
-    .run();
+  try {
+    await db
+      .prepare(
+        `INSERT INTO affiliate_offers
+           (id, name, description, reward_amount, reward_miles, mileage_program_id,
+            line_account_id, tag_id, scenario_id, is_active, created_at, operation_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
+      )
+      .bind(
+        id,
+        input.name,
+        input.description ?? null,
+        input.rewardAmount ?? 0,
+        input.rewardMiles ?? 0,
+        input.mileageProgramId ?? 'default',
+        lineAccountId,
+        input.tagId ?? null,
+        input.scenarioId ?? null,
+        now,
+        input.operationId ?? null,
+      )
+      .run();
+  } catch (err) {
+    // A concurrent retry of the same operationId won the race; recover its row.
+    if (input.operationId && isOperationIdConflict(err)) {
+      const winner = await findAffiliateOfferByOperationId(db, lineAccountId, input.operationId);
+      if (winner) return winner;
+    }
+    throw err;
+  }
 
   return (await getAffiliateOfferById(db, id))!;
 }
@@ -271,7 +314,17 @@ export async function setConversionApproval(
     )
     .bind(status, now, eventId, status)
     .run();
-  if ((result.meta?.changes ?? 0) > 0) return true;
+  if ((result.meta?.changes ?? 0) > 0) {
+    // 承認が通ったら計算根拠の版を作る。承認後・締め前の設定編集で
+    // 金額/条件/対象が変わらないようにする。曖昧な行は版を作らずnullで
+    // 終える(版が無い行は締め・支払い・レポートで0として扱う)。
+    // 版の書き込みが落ちた場合は再試行(already_set側)で修復する。
+    if (status === 'approved') await ensureConversionRewardSnapshot(db, eventId, now);
+    // 確定済みの成果を取り消したときは、確定を消さずに同額の反対仕訳を起こす。
+    // 締めの記録はそのまま残し、支払いの確定済みだけが相殺される。
+    if (status === 'rejected') await reverseSettledRewardOnRejection(db, eventId, now);
+    return true;
+  }
 
   // Distinguish no-op (same status already set) from truly missing/non-attributed.
   const existing = await db
@@ -280,7 +333,13 @@ export async function setConversionApproval(
     )
     .bind(eventId, status)
     .first<{ 1: number }>();
-  return existing ? 'already_set' : false;
+  if (!existing) return false;
+  // 二重押しの再試行は承認済みの修復にも使う: 承認だけ通って版が無い
+  // 行があればここで作る(締めは版優先のため、版が無いと後編集で金額が動く)。
+  if (status === 'approved') await ensureConversionRewardSnapshot(db, eventId, now);
+  // 取消の再試行も同じく修復に使う: 取消だけ通って反対仕訳が無い行を起票する。
+  if (status === 'rejected') await reverseSettledRewardOnRejection(db, eventId, now);
+  return 'already_set';
 }
 
 /** Resolved attribution detail for an affiliate-attributed conversion event. */

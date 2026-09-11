@@ -1,7 +1,7 @@
 'use client'
 
 import SelectField from '@/components/shared/select-field'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import Button from '@/components/shared/button'
 import Pagination from '@/components/shared/pagination'
@@ -11,7 +11,16 @@ import './webinars.css'
 import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
 import { webinarLoadFailure, type WebinarLoadFailure } from './webinar-load-failure'
 import { useAccount } from '@/contexts/account-context'
-import { ApiError, webinarApi, type Webinar, type WebinarFolder, type WebinarListItem, type WebinarOverview } from '@/lib/api'
+import {
+  ApiError,
+  webinarApi,
+  type Webinar,
+  type WebinarFolder,
+  type WebinarListItem,
+  type WebinarListParams,
+  type WebinarListResponse,
+  type WebinarOverview,
+} from '@/lib/api'
 import { overviewCards } from './overview-view'
 import { publicationStateLabel } from '@/components/webinars/publication-label'
 
@@ -124,7 +133,252 @@ function displayStatus(webinar: WebinarListItem): string {
   return STATUS_LABEL[webinar.status]
 }
 
-export default function WebinarsPage() {
+/** 検索入力を口へ渡すまでの待ち時間。1文字ごとの取り直しを束ねる。 */
+const WEBINAR_SEARCH_DEBOUNCE_MS = 300
+
+/** 最後の入力だけを検索へ渡す。呼び出し側は返した関数で前の予約を取り消す。 */
+function scheduleWebinarSearch(
+  query: string,
+  onReady: (query: string) => void,
+): () => void {
+  const timer = setTimeout(() => onReady(query), WEBINAR_SEARCH_DEBOUNCE_MS)
+  return () => clearTimeout(timer)
+}
+
+interface WebinarListSnapshot {
+  items: WebinarListItem[]
+  total: number
+  loadedAccountId: string | null
+}
+
+/*
+ * 取り直しの出し方を決める。
+ * 同じアカウントの検索直しは裏で取り、直前の一覧を消さない(N-124)。
+ * アカウントが変わったら全面読み込みにする（他アカウントの行を見せない）。
+ */
+function beginWebinarListRefresh(
+  snapshot: WebinarListSnapshot,
+  accountId: string,
+): 'initial' | 'background' {
+  return snapshot.loadedAccountId === accountId ? 'background' : 'initial'
+}
+
+/*
+ * 一覧の応答を当てはめる。古い応答なら null を返し、捨てる。
+ * 新しい検索結果を古い応答で上書きしない(N-124)。
+ */
+function commitWebinarListResponse(args: {
+  snapshot: WebinarListSnapshot
+  currentGeneration: number
+  generation: number
+  accountId: string
+  res: { data: { items: unknown; total: unknown } } | null | undefined
+}): WebinarListSnapshot | null {
+  if (args.currentGeneration !== args.generation) return null
+  const res = args.res
+  /*
+    **頁の器で来なかったら、そこで止める。**
+    器だけ違う返事が来ると `items.map is not a function` で
+    **一覧が白い画面になる**。読めなかったこととして扱えば、
+    理由と読み直しの口が出る。
+  */
+  if (!res || !res.data || !Array.isArray(res.data.items) || typeof res.data.total !== 'number') {
+    throw new ApiError(500, 'ウェビナーの一覧が読めない形で返りました')
+  }
+  return { items: res.data.items as WebinarListItem[], total: res.data.total, loadedAccountId: args.accountId }
+}
+
+/**
+ * 一覧APIを呼び、返った時点でも最新の要求だけを確定する。
+ * `list` を受け取る形にして、遅延・逆順応答を実APIと同じ非同期境界で試せるようにする。
+ */
+async function requestWebinarList(args: {
+  list: (accountId: string, params: WebinarListParams) => Promise<{ data: WebinarListResponse }>
+  snapshot: WebinarListSnapshot
+  generation: number
+  currentGeneration: () => number
+  accountId: string
+  params: WebinarListParams
+}): Promise<WebinarListSnapshot | null> {
+  const res = await args.list(args.accountId, args.params)
+  return commitWebinarListResponse({
+    snapshot: args.snapshot,
+    currentGeneration: args.currentGeneration(),
+    generation: args.generation,
+    accountId: args.accountId,
+    res,
+  })
+}
+
+/*
+ * アーカイブ確認の文面。
+ * 公開中は押す前に「先に停止」と次の操作を言う(N-129)。
+ * 止まっているものには出さない。
+ */
+function webinarArchiveDialogCopy(target: WebinarListItem): {
+  description: string
+  stopFirst: string | null
+} {
+  return {
+    description: `「${target.title}」は一覧から外れ、新しく使えなくなります。申込者・視聴履歴・CTA・分析結果は消えません。`,
+    stopFirst: target.status === 'active'
+      ? '公開中のウェビナーは、このままではアーカイブできません。先に公開を停止してから、もう一度アーカイブしてください。'
+      : null,
+  }
+}
+
+function WebinarArchiveConfirm({
+  target,
+  busy,
+  error,
+  onCancel,
+  onConfirm,
+}: {
+  target: WebinarListItem
+  busy: boolean
+  error: string | undefined
+  onCancel: () => void
+  onConfirm: () => void
+}) {
+  const copy = webinarArchiveDialogCopy(target)
+  return (
+    <ConfirmDialog
+      open
+      designNode="LKuAQ"
+      title="ウェビナーをアーカイブしますか？"
+      description={copy.description}
+      confirmLabel="アーカイブする"
+      destructive
+      busy={busy}
+      error={error}
+      onCancel={onCancel}
+      onConfirm={copy.stopFirst ? undefined : onConfirm}
+    >
+      {copy.stopFirst ? (
+        <div className="rounded-control border border-amber-200 bg-amber-50 p-3 text-xs text-ink">
+          <p>{copy.stopFirst}</p>
+          <div className="mt-3">
+            <Button href={`/webinars/edit?id=${target.id}`}>編集画面で公開を停止する</Button>
+          </div>
+        </div>
+      ) : undefined}
+    </ConfirmDialog>
+  )
+}
+
+function WebinarListTable({
+  items,
+  onArchive,
+}: {
+  items: WebinarListItem[]
+  onArchive: (target: WebinarListItem) => void
+}) {
+  return (
+    <>
+      <div className="bg-canvas-sunken text-ink-faint hidden grid-cols-12 gap-3 px-4 py-3 text-xs font-semibold md:grid">
+        <span className="col-span-4">ウェビナー名</span><span className="col-span-2">状態</span><span>申込</span><span>視聴</span><span className="col-span-2">公開期間</span><span className="col-span-2">操作</span>
+      </div>
+      <div className="divide-hairline divide-y">
+        {items.map((w) => (
+          <div key={w.id} className="grid gap-3 px-4 py-4 md:grid-cols-12 md:items-center">
+            <div className="min-w-0 md:col-span-4"><Link href={`/webinars/edit?id=${w.id}`} className="text-accent block truncate text-sm font-bold hover:underline" title={w.title}>{w.title}</Link><span className="text-ink-faint mt-1 block truncate font-mono text-[11px]" title={`/${w.slug}`}>/{w.slug}</span></div>
+            <div className="md:col-span-2"><span className={`rounded-pill inline-flex px-2.5 py-1 text-[11px] font-semibold ${STATUS_BADGE[w.status]}`}>{displayStatus(w)}</span></div>
+            <div className="text-ink-secondary text-sm tabular-nums" title={w.registrationCount == null ? '申込人数は一覧APIに未接続です。' : undefined}><span className="text-ink-faint md:hidden">申込 </span>{measuredCount(w.registrationCount)}</div>
+            <div className="text-ink-secondary text-sm tabular-nums" title={w.viewerCount == null ? '視聴人数は一覧APIに未接続です。' : undefined}><span className="text-ink-faint md:hidden">視聴 </span>{measuredCount(w.viewerCount)}</div>
+            <div className="text-ink-secondary truncate text-sm md:col-span-2" title={publicationSummary(w)}>{publicationSummary(w)}</div>
+            <div className="flex items-center gap-2 md:col-span-2"><Link href={`/webinars/edit?id=${w.id}`} className="text-accent text-xs font-semibold">編集</Link><button type="button" data-qa-open={w.id === 'webinar-5' ? 'LKuAQ' : undefined} onClick={() => onArchive(w)} className="text-danger text-xs font-semibold" aria-label={`${w.title}をアーカイブ`}>アーカイブ</button></div>
+          </div>
+        ))}
+      </div>
+    </>
+  )
+}
+
+function WebinarListErrorNotice({
+  failure,
+  onRetry,
+}: {
+  failure: WebinarLoadFailure
+  onRetry: () => void
+}) {
+  return (
+    <div role="alert" className="border-hairline border-b px-4 py-3">
+      <p className="text-ink text-sm font-bold">{failure.title}</p>
+      <p className="text-ink-secondary mt-1 text-xs">{failure.description}</p>
+      {failure.retryable ? (
+        <div className="mt-2"><Button onClick={onRetry}>もう一度読み込む</Button></div>
+      ) : null}
+    </div>
+  )
+}
+
+function WebinarListContent({
+  accountLoading,
+  loading,
+  selectedAccountId,
+  accountsCount,
+  loadFailure,
+  visibleItems,
+  panelGrand,
+  refreshing,
+  onRetry,
+  onArchive,
+}: {
+  accountLoading: boolean
+  loading: boolean
+  selectedAccountId: string | null
+  accountsCount: number
+  loadFailure: WebinarLoadFailure | null
+  visibleItems: WebinarListItem[]
+  panelGrand: number
+  refreshing: boolean
+  onRetry: () => void
+  onArchive: (target: WebinarListItem) => void
+}) {
+  if (accountLoading || loading) return <ListState kind="loading" />
+  if (!selectedAccountId) {
+    return (
+      <div className="p-12 text-center text-sm font-medium text-ink">
+        {accountsCount > 0 ? '上のバーでLINE公式アカウントを選んでください' : 'LINE公式アカウントが登録されていません'}
+      </div>
+    )
+  }
+  if (loadFailure) {
+    return visibleItems.length > 0 ? (
+      <>
+        <WebinarListErrorNotice failure={loadFailure} onRetry={onRetry} />
+        <WebinarListTable items={visibleItems} onArchive={onArchive} />
+      </>
+    ) : (
+      <ListState
+        kind={loadFailure.kind}
+        title={loadFailure.title}
+        description={loadFailure.description}
+        action={loadFailure.retryable ? <Button onClick={onRetry}>もう一度読み込む</Button> : undefined}
+      />
+    )
+  }
+  if (visibleItems.length === 0) {
+    return panelGrand === 0 ? (
+      <ListState
+        kind="empty"
+        title="まだウェビナーがありません"
+        description="動画セミナーの申込と視聴を、ここで管理します。"
+        action={<Button variant="primary" href="/webinars/new">ウェビナーを作る</Button>}
+      />
+    ) : (
+      <ListState kind="empty" title="条件に合うウェビナーはありません" description="検索文字か保存した条件を変えてください。" />
+    )
+  }
+  return (
+    <>
+      {refreshing ? <p role="status" className="text-ink-faint border-hairline border-b px-4 py-2 text-xs">検索中…</p> : null}
+      <WebinarListTable items={visibleItems} onArchive={onArchive} />
+    </>
+  )
+}
+
+function WebinarsPage() {
   const { selectedAccountId, accounts, loading: accountLoading } = useAccount()
   const requestGeneration = useRef(0)
   const overviewRequestGeneration = useRef(0)
@@ -138,12 +392,19 @@ export default function WebinarsPage() {
   const [loadedOverviewAccountId, setLoadedOverviewAccountId] = useState<string | null>(null)
   const [overviewFailure, setOverviewFailure] = useState<WebinarLoadFailure | null>(null)
   const [query, setQuery] = useState('')
+  const [debouncedQuery, setDebouncedQuery] = useState('')
   const [sortKey, setSortKey] = useState<SortKey>('updated')
   const [pageSize, setPageSize] = useState(20)
   const [page, setPage] = useState(1)
   const [savedFilter, setSavedFilter] = useState<SavedFilter>('')
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [loadFailure, setLoadFailure] = useState<WebinarLoadFailure | null>(null)
+  /*
+    取り直しの出し分けに使う直前の確定値。refで持つので、
+    `refresh` の依存に入れず、余計な取り直しを起こさない。
+  */
+  const listSnapshotRef = useRef<WebinarListSnapshot>({ items: [], total: 0, loadedAccountId: null })
   const [archiveTarget, setArchiveTarget] = useState<WebinarListItem | null>(null)
   const [archiving, setArchiving] = useState(false)
   const [archiveError, setArchiveError] = useState('')
@@ -167,45 +428,62 @@ export default function WebinarsPage() {
       setLoadedAccountId(null)
       setLoadFailure(null)
       setLoading(false)
+      setRefreshing(false)
       return
     }
     const accountId = selectedAccountId
-    setLoading(true)
-    setItems([])
-    setLoadedAccountId(null)
+    /*
+      N-124: 検索のたびに一覧を消さない。同じアカウントの取り直しは
+      裏で行い、直前の一覧を残す。全面の読込表示は初回だけ。
+    */
+    const mode = beginWebinarListRefresh(listSnapshotRef.current, accountId)
+    if (mode === 'initial') {
+      setLoading(true)
+      setItems([])
+      setLoadedAccountId(null)
+    } else {
+      setRefreshing(true)
+    }
     setLoadFailure(null)
     try {
       /*
         絞り・並び・頁はサーバーで行う(共通一覧契約の offset 方式)。
         取った1頁を画面で絞り直すと件数や頁数が変わるので、来たまま出す。
+        入力中の1文字ごとは `debouncedQuery` で束ねる。
       */
-      const res = await webinarApi.list(accountId, {
-        page,
-        limit: pageSize,
-        q: query.trim() || undefined,
-        folder: selectedFolder || undefined,
-        status: savedFilter || undefined,
-        sort: sortKey,
+      const next = await requestWebinarList({
+        list: webinarApi.list,
+        snapshot: listSnapshotRef.current,
+        generation,
+        currentGeneration: () => requestGeneration.current,
+        accountId,
+        params: {
+          page,
+          limit: pageSize,
+          q: debouncedQuery.trim() || undefined,
+          folder: selectedFolder || undefined,
+          status: savedFilter || undefined,
+          sort: sortKey,
+        },
       })
-      if (requestGeneration.current !== generation) return
-      /*
-        **頁の器で来なかったら、そこで止める。**
-        器だけ違う返事が来ると `items.map is not a function` で
-        **一覧が白い画面になる**。読めなかったこととして扱えば、
-        理由と読み直しの口が出る。
-      */
-      if (!res.data || !Array.isArray(res.data.items) || typeof res.data.total !== 'number') {
-        throw new ApiError(500, 'ウェビナーの一覧が読めない形で返りました')
-      }
-      setItems(res.data.items)
-      setTotal(res.data.total)
-      setLoadedAccountId(accountId)
+      /* 古い応答は捨てる。新しい検索結果を上書きしない。 */
+      if (next === null) return
+      setItems(next.items)
+      setTotal(next.total)
+      setLoadedAccountId(next.loadedAccountId)
     } catch (err) {
+      /*
+        N-124: 裏の取り直しが落ちても直前の一覧は残す。
+        初回で何も無いときだけ、全体の失敗表示にする。
+      */
       if (requestGeneration.current === generation) setLoadFailure(webinarLoadFailure(err))
     } finally {
-      if (requestGeneration.current === generation) setLoading(false)
+      if (requestGeneration.current === generation) {
+        if (mode === 'initial') setLoading(false)
+        else setRefreshing(false)
+      }
     }
-  }, [selectedAccountId, page, pageSize, query, selectedFolder, savedFilter, sortKey])
+  }, [selectedAccountId, page, pageSize, debouncedQuery, selectedFolder, savedFilter, sortKey])
 
   const refreshOverview = useCallback(async () => {
     const generation = ++overviewRequestGeneration.current
@@ -231,6 +509,21 @@ export default function WebinarsPage() {
   useEffect(() => {
     void refresh()
   }, [refresh])
+
+  useEffect(() => {
+    listSnapshotRef.current = { items, total, loadedAccountId }
+  }, [items, total, loadedAccountId])
+
+  /*
+    N-124: 入力のたびに口を叩かない。300ms黙ったら検索をかけ直す。
+    連打中は直前の一覧を残す。
+  */
+  useEffect(() => {
+    return scheduleWebinarSearch(query, (nextQuery) => {
+      setPage(1)
+      setDebouncedQuery(nextQuery)
+    })
+  }, [query])
 
   useEffect(() => {
     void refreshOverview()
@@ -350,7 +643,7 @@ export default function WebinarsPage() {
 
   useEffect(() => {
     setPage(1)
-  }, [query, selectedFolder, savedFilter, sortKey, pageSize, selectedAccountId])
+  }, [selectedFolder, savedFilter, sortKey, pageSize, selectedAccountId])
 
   const pageCount = Math.max(1, Math.ceil(visibleTotal / pageSize))
   const currentPage = Math.min(page, pageCount)
@@ -362,6 +655,11 @@ export default function WebinarsPage() {
   useEffect(() => {
     if (page > pageCount) setPage(pageCount)
   }, [page, pageCount])
+
+  const openArchive = useCallback((target: WebinarListItem) => {
+    setArchiveError('')
+    setArchiveTarget(target)
+  }, [])
 
   const archiveSelected = async () => {
     if (!archiveTarget || archiving) return
@@ -459,37 +757,18 @@ export default function WebinarsPage() {
             </div>
 
             <div className="border-hairline bg-canvas min-h-[360px] overflow-hidden rounded-card border">
-              {accountLoading || loading ? (
-                <ListState kind="loading" />
-              ) : !selectedAccountId ? (
-                <div className="p-12 text-center text-sm font-medium text-ink">{accounts.length > 0 ? '上のバーでLINE公式アカウントを選んでください' : 'LINE公式アカウントが登録されていません'}</div>
-              ) : loadFailure ? (
-                <ListState kind={loadFailure.kind} title={loadFailure.title} description={loadFailure.description} action={loadFailure.retryable ? <Button onClick={() => void refresh()}>もう一度読み込む</Button> : undefined} />
-              ) : visibleItems.length === 0 ? (
-                panelGrand === 0 ? (
-                  <ListState kind="empty" title="まだウェビナーがありません" description="動画セミナーの申込と視聴を、ここで管理します。" action={<Button variant="primary" href="/webinars/new">ウェビナーを作る</Button>} />
-                ) : (
-                  <ListState kind="empty" title="条件に合うウェビナーはありません" description="検索文字か保存した条件を変えてください。" />
-                )
-              ) : (
-                <>
-                  <div className="bg-canvas-sunken text-ink-faint hidden grid-cols-12 gap-3 px-4 py-3 text-xs font-semibold md:grid">
-                    <span className="col-span-4">ウェビナー名</span><span className="col-span-2">状態</span><span>申込</span><span>視聴</span><span className="col-span-2">公開期間</span><span className="col-span-2">操作</span>
-                  </div>
-                  <div className="divide-hairline divide-y">
-                    {visible.map((w) => (
-                      <div key={w.id} className="grid gap-3 px-4 py-4 md:grid-cols-12 md:items-center">
-                        <div className="min-w-0 md:col-span-4"><Link href={`/webinars/edit?id=${w.id}`} className="text-accent block truncate text-sm font-bold hover:underline" title={w.title}>{w.title}</Link><span className="text-ink-faint mt-1 block truncate font-mono text-[11px]" title={`/${w.slug}`}>/{w.slug}</span></div>
-                        <div className="md:col-span-2"><span className={`rounded-pill inline-flex px-2.5 py-1 text-[11px] font-semibold ${STATUS_BADGE[w.status]}`}>{displayStatus(w)}</span></div>
-                        <div className="text-ink-secondary text-sm tabular-nums" title={w.registrationCount == null ? '申込人数は一覧APIに未接続です。' : undefined}><span className="text-ink-faint md:hidden">申込 </span>{measuredCount(w.registrationCount)}</div>
-                        <div className="text-ink-secondary text-sm tabular-nums" title={w.viewerCount == null ? '視聴人数は一覧APIに未接続です。' : undefined}><span className="text-ink-faint md:hidden">視聴 </span>{measuredCount(w.viewerCount)}</div>
-                        <div className="text-ink-secondary truncate text-sm md:col-span-2" title={publicationSummary(w)}>{publicationSummary(w)}</div>
-                        <div className="flex items-center gap-2 md:col-span-2"><Link href={`/webinars/edit?id=${w.id}`} className="text-accent text-xs font-semibold">編集</Link><button type="button" data-qa-open={w.id === 'webinar-5' ? 'LKuAQ' : undefined} onClick={() => { setArchiveError(''); setArchiveTarget(w) }} className="text-danger text-xs font-semibold" aria-label={`${w.title}をアーカイブ`}>アーカイブ</button></div>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              )}
+              <WebinarListContent
+                accountLoading={accountLoading}
+                loading={loading}
+                selectedAccountId={selectedAccountId}
+                accountsCount={accounts.length}
+                loadFailure={loadFailure}
+                visibleItems={visibleItems}
+                panelGrand={panelGrand}
+                refreshing={refreshing}
+                onRetry={() => void refresh()}
+                onArchive={openArchive}
+              />
             </div>
 
             {hasListData && visibleTotal > 0 && (
@@ -499,20 +778,15 @@ export default function WebinarsPage() {
         </div>
       </div>
       {archiveTarget ? <ArchiveReviewBackdrop target={archiveTarget} /> : null}
-      <ConfirmDialog
-        open={archiveTarget !== null}
-        designNode="LKuAQ"
-        title="ウェビナーをアーカイブしますか？"
-        description={archiveTarget
-          ? `「${archiveTarget.title}」は一覧から外れ、新しく使えなくなります。申込者・視聴履歴・CTA・分析結果は消えません。`
-          : ''}
-        confirmLabel="アーカイブする"
-        destructive
-        busy={archiving}
-        error={archiveError || (archiveTarget ? '申込者・視聴履歴・分析結果は消えません。ウェビナーの一覧には出なくなります。' : undefined)}
-        onCancel={() => { if (!archiving) setArchiveTarget(null) }}
-        onConfirm={() => void archiveSelected()}
-      />
+      {archiveTarget ? (
+        <WebinarArchiveConfirm
+          target={archiveTarget}
+          busy={archiving}
+          error={archiveError || undefined}
+          onCancel={() => { if (!archiving) setArchiveTarget(null) }}
+          onConfirm={() => void archiveSelected()}
+        />
+      ) : null}
       {(folderDialogOpen || editingFolder) ? (
         <WebinarFolderDialog
           folder={editingFolder}
@@ -573,3 +847,16 @@ function ArchiveReviewBackdrop({ target }: { target: WebinarListItem }) {
     </div>
   )
 }
+
+const WebinarsPageWithTestSupport = Object.assign(WebinarsPage, {
+  __testing: {
+    WEBINAR_SEARCH_DEBOUNCE_MS,
+    WebinarArchiveConfirm,
+    WebinarListContent,
+    WebinarListErrorNotice,
+    requestWebinarList,
+    scheduleWebinarSearch,
+  },
+})
+
+export default WebinarsPageWithTestSupport

@@ -192,6 +192,8 @@ export default function ScenariosPage() {
   const [actionError, setActionError] = useState('')
   const [creating, setCreating] = useState(false)
   const [folders, setFolders] = useState<Folder[]>([])
+  /** 「未分類」の件数。`null` は数えていない（#631、#730）。 */
+  const [unfiledCount, setUnfiledCount] = useState<number | null>(null)
   const [folderFilter, setFolderFilter] = useState('')
   const [folderDialogOpen, setFolderDialogOpen] = useState(false)
   const [toggleTarget, setToggleTarget] = useState<ScenarioWithCount | null>(null)
@@ -201,6 +203,7 @@ export default function ScenariosPage() {
   const loadFolders = useCallback(async () => {
     const res = await api.folders.list('scenario')
     if (res.success) setFolders(res.data)
+    setUnfiledCount(res.success ? res.unfiledCount ?? null : null)
   }, [])
 
   useEffect(() => {
@@ -462,17 +465,19 @@ export default function ScenariosPage() {
           onSelect={setFolderFilter}
           onAddFolder={() => setFolderDialogOpen(true)}
           rows={[
-            { id: '', label: 'すべて', count: scenarios.length },
+            { id: '', label: 'すべて', count: scenarioList.total },
             ...folders.map((f) => ({
               id: f.id,
               label: f.name,
-              count: scenarios.filter((sc) => sc.folderId === f.id).length,
+              // #631: フォルダ件数はAPI(itemCount)をそのまま出す。現在ページの
+              // 行だけを数えるフォールバックは、ページングで実数と食い違うため廃止。
+              count: f.itemCount ?? null,
               color: f.color,
             })),
             {
               id: UNFILED,
               label: '未分類',
-              count: scenarios.filter((sc) => !sc.folderId).length,
+              count: unfiledCount,
             },
           ]}
         >
