@@ -2028,7 +2028,8 @@ CREATE TABLE forms (
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 , on_submit_message_type TEXT CHECK (on_submit_message_type IN ('text', 'flex')) DEFAULT NULL, on_submit_message_content TEXT DEFAULT NULL, on_submit_webhook_url TEXT, on_submit_webhook_headers TEXT, on_submit_webhook_fail_message TEXT, og_title TEXT, og_description TEXT, og_image_url TEXT, layout TEXT, status TEXT NOT NULL DEFAULT 'active'
   CHECK (status IN ('active', 'archived')), archived_at TEXT, revision INTEGER NOT NULL DEFAULT 1
-  CHECK (revision >= 1));
+  CHECK (revision >= 1), content_revision INTEGER NOT NULL DEFAULT 1
+  CHECK (content_revision >= 1));
 
 CREATE TABLE "friend_add_action_runs" (
   id                  TEXT PRIMARY KEY,

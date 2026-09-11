@@ -757,6 +757,8 @@ export type FormDeleteImpact = {
   referenceCount: number
   answerUrl: string | null
   revision: number
+  /** 編集の版(#723)。受付停止が updateForm を通るので、ここから渡す。 */
+  contentRevision: number
   checkedAt: string
   canDelete: boolean
   canArchive: boolean
@@ -4953,6 +4955,14 @@ export const api = {
           ogTitle: string | null
           ogDescription: string | null
           ogImageUrl: string | null
+          /**
+           * 編集の版(#723)。保存でそのまま送り返す。
+           *
+           * サーバは前からこれを返していたのに、この型が落としていたので
+           * 画面が版を持てず、2人が同時に編集すると後勝ちで黙って上書き
+           * されていた。型に無いものは、来ていないことに誰も気づけない。
+           */
+          contentRevision: number
         }>
       >(`/api/forms/${id}?account_id=${encodeURIComponent(accountId)}`),
     create: (
@@ -4984,12 +4994,19 @@ export const api = {
         ogTitle?: string | null
         ogDescription?: string | null
         ogImageUrl?: string | null
+        /**
+         * 確認した編集の版(#723)。**必須。**
+         *
+         * 省けるようにすると、省いた呼び出しが楽観ロックを丸ごと迂回する。
+         * 受付停止のような1項目の更新も同じ口を通るので、例外を作らない。
+         */
+        expectedContentRevision: number
       },
     ) =>
-      fetchApi<ApiResponse<{ id: string }>>(`/api/forms/${id}?account_id=${encodeURIComponent(accountId)}`, {
-        method: 'PUT',
-        body: JSON.stringify(data),
-      }),
+      fetchApi<ApiResponse<{ id: string; contentRevision: number; updatedAt: string }>>(
+        `/api/forms/${id}?account_id=${encodeURIComponent(accountId)}`,
+        { method: 'PUT', body: JSON.stringify(data) },
+      ),
     deleteImpact: (id: string, accountId: string) =>
       fetchApi<ApiResponse<FormDeleteImpact>>(
         `/api/forms/${id}/delete-impact?account_id=${encodeURIComponent(accountId)}`,

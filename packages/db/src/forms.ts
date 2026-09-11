@@ -22,6 +22,8 @@ export interface Form {
   status: 'active' | 'archived';
   archived_at: string | null;
   revision: number;
+  /** 編集の版(#723 / migration 379)。updateForm だけが増やす。 */
+  content_revision: number;
   submit_count: number;
   og_title: string | null;
   og_description: string | null;
@@ -232,6 +234,8 @@ export type FormDeleteImpact = {
   referenceCount: number;
   answerUrl: string | null;
   revision: number;
+  /** 編集の版(#723)。受付停止など updateForm を通る操作がこれを送る。 */
+  contentRevision: number;
   checkedAt: string;
   canDelete: boolean;
   canArchive: boolean;
@@ -239,7 +243,7 @@ export type FormDeleteImpact = {
   blockers: Array<'published' | 'has_submissions' | 'has_opens' | 'in_use' | 'already_archived'>;
 };
 
-type FormImpactRow = Pick<Form, 'id' | 'name' | 'is_active' | 'status' | 'revision'>;
+type FormImpactRow = Pick<Form, 'id' | 'name' | 'is_active' | 'status' | 'revision' | 'content_revision'>;
 type FormImpactReferenceRow = {
   kind: FormDeleteReference['kind'];
   name: string | null;
@@ -258,7 +262,7 @@ export async function getFormDeleteImpact(
 ): Promise<FormDeleteImpact | null> {
   const results = await db.batch([
     db.prepare(
-      `SELECT f.id, f.name, f.is_active, f.status, f.revision
+      `SELECT f.id, f.name, f.is_active, f.status, f.revision, f.content_revision
          FROM forms f
          JOIN form_accounts fa ON fa.form_id = f.id
         WHERE f.id = ? AND fa.line_account_id = ?`,
@@ -328,6 +332,7 @@ export async function getFormDeleteImpact(
       ? `https://liff.line.me/${liffId}/?page=form&id=${encodeURIComponent(row.id)}`
       : null,
     revision: row.revision,
+    contentRevision: row.content_revision,
     checkedAt,
     canDelete,
     canArchive,
@@ -462,17 +467,45 @@ export interface UpdateFormInput {
   ogImageUrl?: string | null;
 }
 
+/**
+ * 編集保存の結果。**競合と「見つからない」を分ける。**
+ *
+ * 呼び出し口が 409 と 404 を撃ち分けられないと、運用者に「ほかの人が先に
+ * 保存した」のか「フォームが消えた」のかが届かない。
+ */
+export type UpdateFormResult =
+  | { kind: 'updated'; form: Form }
+  | { kind: 'not_found' }
+  | { kind: 'conflict'; form: Form };
+
+/**
+ * フォームの編集保存(#723)。
+ *
+ * **確認した編集の版(`expectedContentRevision`)と一致するときだけ書く。**
+ * 一致しなければ1行も更新せず `conflict` を返す。以前はここが
+ * `WHERE id = ?` だけで、2人が同時に編集すると後から保存した人の内容で
+ * 黙って上書きされ、先の人の変更は何の断りもなく消えていた。
+ *
+ * 守るのは `content_revision` で、`revision` ではない。`revision` は
+ * migration 259 のトリガが来訪や回答で増やす「削除影響の確認版」なので、
+ * 編集の楽観ロックに使うと誰も編集していないのに 409 になる(migration 379)。
+ *
+ * 送られなかった項目は**いま DB にある値**で埋める。版を条件に入れたので、
+ * 読んだあと書くまでのあいだに誰かが書いていれば1行も更新されない。
+ * つまりこの読み直し＋書き戻しは、版の確認とセットで初めて安全になる。
+ */
 export async function updateForm(
   db: D1Database,
   id: string,
   input: UpdateFormInput,
-): Promise<Form | null> {
+  expectedContentRevision: number,
+): Promise<UpdateFormResult> {
   const existing = await getFormById(db, id);
-  if (!existing) return null;
+  if (!existing) return { kind: 'not_found' };
 
   const now = jstNow();
 
-  await db
+  const result = await db
     .prepare(
       `UPDATE forms
        SET name = ?,
@@ -492,8 +525,9 @@ export async function updateForm(
            og_description = ?,
            og_image_url = ?,
            updated_at = ?,
-           revision = revision + 1
-       WHERE id = ?`,
+           revision = revision + 1,
+           content_revision = content_revision + 1
+       WHERE id = ? AND content_revision = ?`,
     )
     .bind(
       input.name ?? existing.name,
@@ -528,10 +562,18 @@ export async function updateForm(
       'ogImageUrl' in input ? (input.ogImageUrl ?? null) : existing.og_image_url,
       now,
       id,
+      expectedContentRevision,
     )
     .run();
 
-  return getFormById(db, id);
+  if ((result.meta?.changes ?? 0) !== 1) {
+    const latest = await getFormById(db, id);
+    // 版が合わなかったのか、そのあいだに消えたのかを分ける。
+    return latest ? { kind: 'conflict', form: latest } : { kind: 'not_found' };
+  }
+
+  const updated = await getFormById(db, id);
+  return updated ? { kind: 'updated', form: updated } : { kind: 'not_found' };
 }
 
 // ── Submissions ───────────────────────────────────────────────────────────────
