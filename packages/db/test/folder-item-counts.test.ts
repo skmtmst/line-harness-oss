@@ -137,6 +137,50 @@ describe('getFolderItemCounts(#631)', () => {
     expect(counts!.byFolderId).toEqual({})
     expect(counts!.unfiled).toBe(0)
   })
+
+  /**
+   * 独立審査#631: 一覧（apps/worker/src/routes/reminders.ts:425）は
+   * `deleted_at IS NULL` で論理削除済みを除くが、件数側にその絞りが
+   * 無かった。一覧5件・フォルダ6件のような食い違いが、リマインダを
+   * 1件消すだけで起きる。
+   */
+  it('一覧が除く論理削除済み(deleted_at)のリマインダは、フォルダ件数に入らない', async () => {
+    sqlite.prepare(`INSERT INTO folders (id, kind, name, display_order, created_at, updated_at)
+      VALUES ('folder-3', 'reminder', 'フォルダ3', 0, '2026-01-01', '2026-01-01')`).run()
+    const insertReminder = sqlite.prepare(
+      `INSERT INTO reminders (id, name, trigger_type, folder_id, line_account_id, deleted_at, created_at, updated_at)
+       VALUES (?, ?, 'manual', ?, ?, ?, '2026-01-01', '2026-01-01')`,
+    )
+    // folder-3: 生きた1件 + 消した1件。一覧に出るのは1件だけ。
+    insertReminder.run('r-live', '生きている', 'folder-3', 'account-a', null)
+    insertReminder.run('r-deleted', '消した', 'folder-3', 'account-a', '2026-02-01')
+
+    const counts = await getFolderItemCounts(db, 'reminder', {
+      allowedAccountIds: ['account-a'],
+      canSeeUnassigned: false,
+    })
+    expect(counts!.byFolderId['folder-3']).toBe(1)
+    // 消した行を含めた2にはならない。
+    expect(counts!.byFolderId['folder-3']).not.toBe(2)
+  })
+
+  it('未分類の件数も、論理削除済みを除いた数になる', async () => {
+    const insertReminder = sqlite.prepare(
+      `INSERT INTO reminders (id, name, trigger_type, folder_id, line_account_id, deleted_at, created_at, updated_at)
+       VALUES (?, ?, 'manual', ?, ?, ?, '2026-01-01', '2026-01-01')`,
+    )
+    // beforeEach で account-a の未割当は r-a4 の1件。生きた1件を足して2、
+    // 消した1件は入らない。
+    insertReminder.run('r-live-unfiled', '生きている未分類', null, 'account-a', null)
+    insertReminder.run('r-deleted-unfiled', '消した未分類', null, 'account-a', '2026-02-01')
+
+    const counts = await getFolderItemCounts(db, 'reminder', {
+      allowedAccountIds: ['account-a'],
+      canSeeUnassigned: false,
+    })
+    expect(counts!.unfiled).toBe(2)
+    expect(counts!.unfiled).not.toBe(3)
+  })
 })
 
 describe('FOLDER_ITEM_COUNT_TABLES(#631)', () => {

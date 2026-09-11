@@ -205,8 +205,20 @@ export async function countFoldersByKind(db: D1Database): Promise<Record<string,
  * 既にアカウント境界込みで実装済みで、呼び出し側（`GET /api/folders`）が
  * 種別で分岐してそちらを使う。
  */
-export const FOLDER_ITEM_COUNT_TABLES: Partial<Record<FolderKind, { table: string; accountColumn: string }>> = {
-  reminder: { table: 'reminders', accountColumn: 'line_account_id' },
+export const FOLDER_ITEM_COUNT_TABLES: Partial<Record<FolderKind, {
+  table: string;
+  accountColumn: string;
+  /**
+   * 一覧が既定で掛けている絞り込み。件数も同じ母集団で数えるために要る。
+   * ここが無いと、一覧に出ない行がフォルダ件数にだけ残る（独立審査 #631）。
+   *
+   * 他の5種別には付けない。いま一覧側が何も絞っていないため、付けると
+   * 逆に母集団がずれる。一覧側の絞り込みが増えたら、そのときここへ足す。
+   */
+  listFilter?: string;
+}>> = {
+  // 一覧は deleted_at IS NULL で絞る(apps/worker/src/routes/reminders.ts:425)。
+  reminder: { table: 'reminders', accountColumn: 'line_account_id', listFilter: 'deleted_at IS NULL' },
   scenario: { table: 'scenarios', accountColumn: 'line_account_id' },
   tag: { table: 'tags', accountColumn: 'line_account_id' },
   template: { table: 'templates', accountColumn: 'line_account_id' },
@@ -240,7 +252,7 @@ export async function getFolderItemCounts(
 ): Promise<FolderItemCounts | undefined> {
   const target = FOLDER_ITEM_COUNT_TABLES[kind];
   if (!target) return undefined;
-  const { table, accountColumn } = target;
+  const { table, accountColumn, listFilter } = target;
   const accountSql = scope.allowedAccountIds.length > 0
     ? `${accountColumn} IN (${scope.allowedAccountIds.map(() => '?').join(',')})`
     : null;
@@ -259,15 +271,16 @@ export async function getFolderItemCounts(
   // folder_id ごとの内訳と未分類は別の集計（GROUP BY は NULL を1グループ
   // として返さないため、未分類だけ別クエリが要る）。Promise.all で
   // 並列に投げ、直列2往復にはしない。
+  const listSql = listFilter ? ` AND ${listFilter}` : '';
   const [byFolderResult, unfiledResult] = await Promise.all([
     db.prepare(
       `SELECT folder_id, COUNT(*) AS item_count FROM ${table}
-        WHERE folder_id IS NOT NULL AND ${scopeSql}
+        WHERE folder_id IS NOT NULL AND ${scopeSql}${listSql}
         GROUP BY folder_id`,
     ).bind(...bindings).all<{ folder_id: string; item_count: number }>(),
     db.prepare(
       `SELECT COUNT(*) AS unfiled_count FROM ${table}
-        WHERE folder_id IS NULL AND ${scopeSql}`,
+        WHERE folder_id IS NULL AND ${scopeSql}${listSql}`,
     ).bind(...bindings).first<{ unfiled_count: number }>(),
   ]);
   const byFolderId = Object.fromEntries(
