@@ -25,6 +25,36 @@ export const OPERATOR_DELIVERY_MAX_ATTEMPTS = EXTERNAL_DELIVERY_MAX_ATTEMPTS;
 /** 取り掛かり中の取りこぼしと見なすまでの猶予(分)。in-flightの二重送信を避ける。 */
 const STUCK_PENDING_LEASE_MINUTES = 5;
 
+/**
+ * cron の1回で回収する送達行の上限。
+ *
+ * **どのレーンに載せたか**: 既存の delivery レーン(5分ごと。式は
+ * `SCHEDULED_CRONS.delivery`)。新しい cron 式は増やしていない。
+ *
+ * **なぜ5分か**: 再試行の待ち時間は共通基盤 §6-2 の 1分・5分・30分
+ * (`EXTERNAL_DELIVERY_RETRY_DELAYS_MINUTES`)で決まる。回収がこれより細かく
+ * 回っても待ち時間は縮まないので、意味があるのは最短の1分までである。
+ * 1分レーンを新設すると 5分ごとに既存2レーンと重なる。frequentHeavy の式が
+ * delivery の式から1分ずらしてあるのは重なりを避けるためなので、それを
+ * 崩すことになる。得られるのは「最初の再試行が1〜6分後ではなく
+ * ちょうど1分後に出る」だけで、運用者が画面・LINE・メールで読むお知らせに
+ * その差は効かない。よって既存の delivery レーンに相乗りする。
+ * **代償は明記しておく: 1分の再試行段は最大5分遅れて出る。**
+ *
+ * **なぜ100件か**: 5分間隔なので毎時12回、12×100 = **毎時1200行**が処理能力。
+ * この口に溜まるのは「業務イベント側の同期送信で落ちた行」と「Worker が
+ * 途中で止まって pending のまま残った行」だけで、初回送信は cron を通らない。
+ * 1行あたりの再試行は最大 `EXTERNAL_DELIVERY_MAX_ATTEMPTS - 1` = 3回で、
+ * 1分・5分・30分に散る。100 はこの sweep 自身の上限(`Math.min(..., 100)`)
+ * と同じ値で、delivery レーンの他ジョブ(automation・reminder 等)が使っている
+ * `limit: 100` にもそろえてある。
+ *
+ * **溜まる速さが1200行/時を超えたらどうなるか**: 取りこぼしはしない。SELECT は
+ * `ORDER BY queued_at, d.id` の先入れ先出しなので、古い行から順に遅れて捌ける
+ * だけである。これ以上増やすには sweep 側の clamp も上げる必要がある。
+ */
+export const OPERATOR_NOTIFICATION_SWEEP_LIMIT = 100;
+
 export class OperatorEventError extends Error {
   readonly code: string;
   constructor(code: string, message: string) {
