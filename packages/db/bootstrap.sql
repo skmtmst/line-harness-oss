@@ -2014,6 +2014,44 @@ CREATE TABLE form_submissions (
 , destination_write_status TEXT NOT NULL DEFAULT 'unknown'
   CHECK (destination_write_status IN ('pending', 'succeeded', 'partial', 'failed', 'not_requested', 'unknown')), destination_write_attempted INTEGER, destination_write_succeeded INTEGER, destination_write_failed INTEGER, destination_write_completed_at TEXT);
 
+CREATE TABLE form_submit_claims (
+  tenant_id TEXT NOT NULL DEFAULT '',
+  line_account_id TEXT NOT NULL,
+  form_id TEXT NOT NULL,
+  friend_id TEXT NOT NULL,
+  idempotency_key TEXT NOT NULL,
+  request_hash TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'in_progress'
+    CHECK (status IN ('in_progress', 'failed', 'completed')),
+  steps TEXT NOT NULL DEFAULT '[]',
+  webhook TEXT,
+  submission_id TEXT,
+  owner TEXT NOT NULL,
+  version INTEGER NOT NULL DEFAULT 1,
+  lease_generation INTEGER NOT NULL DEFAULT 1,
+  effect_stats TEXT NOT NULL DEFAULT '{}',
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  expires_at TEXT NOT NULL,
+  PRIMARY KEY (tenant_id, line_account_id, form_id, friend_id, idempotency_key)
+);
+
+CREATE TABLE form_submit_outbox (
+  tenant_id TEXT NOT NULL DEFAULT '',
+  line_account_id TEXT NOT NULL,
+  form_id TEXT NOT NULL,
+  friend_id TEXT NOT NULL,
+  idempotency_key TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  event_id TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending'
+    CHECK (status IN ('pending', 'delivered', 'failed')),
+  payload TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (tenant_id, line_account_id, form_id, friend_id, idempotency_key, kind)
+);
+
 CREATE TABLE forms (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
@@ -5784,6 +5822,12 @@ CREATE INDEX idx_form_submissions_form_write_status
   ON form_submissions(form_id, destination_write_status, created_at DESC);
 
 CREATE INDEX idx_form_submissions_friend ON form_submissions (friend_id);
+
+CREATE INDEX idx_form_submit_claims_submission
+  ON form_submit_claims (submission_id);
+
+CREATE INDEX idx_form_submit_claims_updated
+  ON form_submit_claims (updated_at);
 
 CREATE INDEX idx_forms_status_updated
   ON forms(status, updated_at DESC);
