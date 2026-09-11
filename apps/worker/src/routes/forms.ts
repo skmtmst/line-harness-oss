@@ -1767,25 +1767,31 @@ forms.post('/api/forms/:id/submit', async (c) => {
       }
     }
 
+    const executionCtx = optionalExecutionCtx(c);
+
     // 回答の保存を成果計測へ接続する(#648)。「フォームが送信された」を起点に
     // 選んだ地点は、ここを通らないと 0 件のままになる。
     //
     // Webhook に弾かれた回答はここまで来ない(上で早期に返す)。冪等キーには
     // 回答IDを使う。同じ Idempotency-Key の再送は同じ回答IDへ落ち着くので、
     // 二度数えない。失敗しても回答の応答は返す(記録だけ残す)。
-    try {
-      await recordConversionSourceEvent(c.env.DB, {
-        sourceType: 'form_submitted',
-        lineAccountId: identity.lineAccountId,
-        friendId,
-        sourceEventId: submission.id,
-        metadata: { formId, submissionId: submission.id },
-      });
-    } catch (error) {
+    //
+    // 応答を返す手前でDBを2回引くと、並行の2要求が予約の窓の中で長く重なる。
+    // 隣の行動スコア・自動化と同じく、実行文脈があれば応答の後ろへ回す
+    // (無い呼ばれ方でも数えられるよう、その場合だけその場で待つ)。
+    const recordFormConversion = () => recordConversionSourceEvent(c.env.DB, {
+      sourceType: 'form_submitted',
+      lineAccountId: identity.lineAccountId,
+      friendId,
+      sourceEventId: submission.id,
+      metadata: { formId, submissionId: submission.id },
+    }).catch((error) => {
       console.error('form conversion record failed:', error);
-    }
+      return null;
+    });
+    if (executionCtx) executionCtx.waitUntil(recordFormConversion());
+    else await recordFormConversion();
 
-    const executionCtx = optionalExecutionCtx(c);
     if (executionCtx && identity.lineAccountId) executionCtx.waitUntil(
       Promise.allSettled([
         applyActionScoreEvent(c.env.DB, {
