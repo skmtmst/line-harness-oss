@@ -4269,6 +4269,22 @@ export const api = {
       method: 'PATCH',
       body: JSON.stringify({ lineAccountId: accountId, expectedVersion, ...data }),
     }),
+    /**
+     * 保管済み(archived)タグの訂正専用（Issue #710）。名前と説明だけ送る。
+     * `updateDefinition` は `SaveTagDefinition` の必須項目（マイル・連動
+     * アクションなど）を要求するため、archived タグでは使えない。
+     * サーバ側（`updateTagDefinition`）も archived では名前と説明以外の
+     * 実質的な変更を拒否するので、ここで送らなくても保護は効く。
+     */
+    updateArchivedNameAndDescription: (
+      id: string,
+      accountId: string,
+      expectedVersion: number,
+      data: { name?: string; description?: string | null },
+    ) => fetchApi<ApiResponse<TagDefinition & { queued: number }>>(`/api/tags/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ lineAccountId: accountId, expectedVersion, ...data }),
+    }),
     // 色は受け取らない。印の色はフォルダ（tagGroups）に付く。
     create: (data: { name: string; groupId?: string | null }) =>
       fetchApi<ApiResponse<Tag>>('/api/tags', {

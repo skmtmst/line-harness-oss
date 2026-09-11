@@ -309,6 +309,7 @@
     "345_ad_platform_account_scope.sql",
     "346_ad_conversion_idempotency_and_backfill.sql",
     "347_template_published_version.sql",
+    "348_form_submission_idempotency.sql",
     "349_affiliate_settlement_snapshot.sql",
     "350_webhook_secret_encrypted.sql",
     "352_photo_notification_delivery.sql",

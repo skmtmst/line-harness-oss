@@ -621,8 +621,9 @@ tags.get(
         const denied = await requireVisibleLineAccount(c, lineAccountId);
         if (denied) return denied;
       }
+      // 保管済み(archived)タグも削除影響は確認できる必要がある(#710)。
       const impact = lineAccountId
-        ? await getScopedTagDeleteImpact(c.env.DB, c.req.param('id'), lineAccountId)
+        ? await getScopedTagDeleteImpact(c.env.DB, c.req.param('id'), lineAccountId, { includeArchived: true })
         : await getTagDeleteImpact(c.env.DB, c.req.param('id'));
       if (!impact) return c.json({ success: false, error: 'Not found' }, 404);
       return c.json({ success: true, data: impact });
@@ -642,7 +643,8 @@ tags.get('/api/tags/:id/dependencies', requireRole('owner', 'admin'), async (c) 
     }
     const denied = await requireVisibleLineAccount(c, lineAccountId);
     if (denied) return denied;
-    const impact = await getScopedTagDeleteImpact(c.env.DB, c.req.param('id'), lineAccountId);
+    // 編集画面(archived タグでも開く。#710)がここを読むため、除外しない。
+    const impact = await getScopedTagDeleteImpact(c.env.DB, c.req.param('id'), lineAccountId, { includeArchived: true });
     if (!impact) return c.json({ success: false, error: 'Not found' }, 404);
     return c.json({
       success: true,
@@ -667,7 +669,8 @@ tags.get('/api/tags/:id', requireRole('owner', 'admin'), async (c) => {
     }
     const denied = await requireVisibleLineAccount(c, lineAccountId);
     if (denied) return denied;
-    const detail = await getTagDefinition(c.env.DB, c.req.param('id'), lineAccountId);
+    // 編集画面が保管済みタグでも開けるよう、除外しない(#710)。
+    const detail = await getTagDefinition(c.env.DB, c.req.param('id'), lineAccountId, { includeArchived: true });
     if (!detail) return c.json({ success: false, error: 'tag not found' }, 404);
     return c.json({
       success: true,
@@ -721,6 +724,10 @@ tags.patch('/api/tags/reorder', requireRole('owner', 'admin'), async (c) => {
 tags.patch('/api/tags/:id', requireRole('owner', 'admin'), async (c) => {
   try {
     const body = await c.req.json<Record<string, unknown>>();
+    // 保管済み(archived)タグの保護(#710)は、この分岐(expectedVersion 付き
+    // → updateTagDefinition)にしか効かない。expectedVersion 無しは下の
+    // else で updateTag（version も status も見ないレガシー経路）を通る。
+    // 塞げていない。別票 #715 で扱う。
     if (body.expectedVersion !== undefined) {
       const lineAccountId = requestedLineAccountId(c, body);
       if (!lineAccountId) {
