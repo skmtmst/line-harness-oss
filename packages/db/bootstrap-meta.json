@@ -337,7 +337,7 @@
     "376_friend_tag_side_effect_runs.sql",
     "377_conversion_point_version_edit.sql",
     "379_form_content_revision.sql",
-    "380_hq_templates.sql"
+    "381_hq_templates.sql"
   ],
   "migrationCount": 338
 }

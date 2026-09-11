@@ -22,7 +22,7 @@ import {
 import { asD1 } from './d1-test-helper.js';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const migration = readFileSync(join(root, 'migrations/380_hq_templates.sql'), 'utf8');
+const migration = readFileSync(join(root, 'migrations/381_hq_templates.sql'), 'utf8');
 
 function setup() {
   const sqlite = new Database(':memory:');
@@ -63,7 +63,7 @@ const storeBinding = {
   snapshotToken: 'snapshot-a',
 };
 
-describe('migration 380: 統括ひな形の基盤', () => {
+describe('migration 381: 統括ひな形の基盤', () => {
   test('既存テーブルを変更せず追加し、店舗単位の解決表も作る', () => {
     expect(migration).not.toMatch(/\bALTER\s+TABLE\b/i);
     expect(migration).not.toMatch(/\bDROP\s+TABLE\b/i);
