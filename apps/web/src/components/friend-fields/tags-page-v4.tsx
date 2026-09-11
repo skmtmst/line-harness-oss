@@ -896,6 +896,8 @@ export default function TagsPageV4({
                             <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: group?.color ?? '#8b938d' }} />
                             {/* 設計 `VQykB` は青文字。押すと編集へ行く（編集ボタンは置かない）。 */}
                             <Link href={`/tags/edit?id=${tag.id}`} className="truncate text-label font-semibold text-status-info hover:underline" title={tag.name}>{tag.name}</Link>
+                            {/* 保管済みは一覧に出続けるが、開くと名前と説明しか直せない(#710)。 */}
+                            {tag.status === 'archived' && <span className="shrink-0 rounded-pill bg-canvas-sunken px-2 py-0.5 text-micro font-bold text-ink-faint">保管済み</span>}
                           </div>
                         </td>
                         <td className="px-3 py-3">
