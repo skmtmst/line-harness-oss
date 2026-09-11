@@ -106,6 +106,8 @@ function BroadcastList() {
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [folders, setFolders] = useState<Folder[]>([])
+  /** 「未分類」の件数。`null` は数えていない（#631、#730）。 */
+  const [unfiledCount, setUnfiledCount] = useState<number | null>(null)
   /** 選んでいるフォルダ。空は「すべて」、UNFILED は「未分類」。 */
   const [folderFilter, setFolderFilter] = useState('')
   const [folderDialogOpen, setFolderDialogOpen] = useState(false)
@@ -202,8 +204,12 @@ function BroadcastList() {
     setFolderError('')
     try {
       const res = await api.folders.list('broadcast')
-      if (res.success) setFolders(res.data)
-      else setFolderError('フォルダを読み込めませんでした。')
+      if (res.success) {
+        setFolders(res.data)
+        setUnfiledCount(res.unfiledCount ?? null)
+      } else {
+        setFolderError('フォルダを読み込めませんでした。')
+      }
     } catch {
       setFolderError('フォルダを読み込めませんでした。')
     }
@@ -465,11 +471,14 @@ function BroadcastList() {
               onSelect={setFolderFilter}
               onAddFolder={() => setFolderDialogOpen(true)}
               rows={[
-                { id: '', label: 'すべて', count: broadcasts.length },
+                { id: '', label: 'すべて', count: listTotal ?? broadcasts.length },
                 ...folders.map((f, index) => ({
                   id: f.id,
                   label: f.name,
-                  count: broadcasts.filter((b) => b.folderId === f.id).length,
+                  // #631: フォルダ件数はAPI(itemCount)をそのまま出す。読み込み
+                  // 済み範囲だけを数えるフォールバックは、cursorページングで
+                  // まだ全部読めていないと実数と食い違うため廃止。
+                  count: f.itemCount ?? null,
                   color: f.color,
                   // 中央の行なら、上へ／下へを含む設計の5操作を全部撮れる。
                   qaOpen: index === 1 ? 'xkRDb' : undefined,
@@ -482,7 +491,7 @@ function BroadcastList() {
                 {
                   id: UNFILED,
                   label: '未分類',
-                  count: broadcasts.filter((b) => !b.folderId).length,
+                  count: unfiledCount,
                 },
               ]}
             >
