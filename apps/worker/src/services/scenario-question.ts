@@ -8,8 +8,10 @@
  * 選択肢が4つまでで、ラベルも短い。Flex なら数を増やせるうえ、押した跡を
  * 残す作りにもできる。
  *
- * 押されたことは postback で戻ってくる。data は `sq:<stepId>:<index>` の形。
- * LINE の postback data は300文字までなので、本文は入れずに参照だけ載せる。
+ * 押されたことは postback で戻ってくる。data は公開版に固定された通を指す
+ * `sq:2:<版ID>:<通番>:<index>` の形（旧形の `sq:<下書き通ID>:<index>` も
+ * 読める）。LINE の postback data は300文字までなので、本文は入れずに参照
+ * だけ載せる。
  */
 import type { Message } from '@line-crm/line-sdk'
 
@@ -85,20 +87,77 @@ export function parseQuestion(raw: string | null | undefined): ScenarioQuestion 
   }
 }
 
-export function buildQuestionPostbackData(stepId: string, choiceIndex: number): string {
-  return `${QUESTION_POSTBACK_PREFIX}:${stepId}:${choiceIndex}`
+/**
+ * 押されたボタンがどの通のものかを指す参照。
+ *
+ * - `version` … 公開版に固定された通（`<版ID>:<通番>`）。**新しく送る質問は
+ *   必ずこちら。** 押されたときに版の写しだけを読めるので、公開後の編集が
+ *   旧版の購読へ混入しない。下書きの通を消しても押し口が死なない。
+ * - `live` … 下書き（scenario_steps.id）。この変更より前に送った質問が
+ *   まだトークに残っているので、読めるようにしておく。
+ */
+export type QuestionStepRef =
+  | { kind: 'version'; stepId: string }
+  | { kind: 'live'; stepId: string }
+
+/** 版所有の通IDが混ざる前の形（`sq:<下書き通ID>:<番号>`）と区別する目印。 */
+const VERSION_POSTBACK_MARK = '2'
+
+export function toQuestionStepRef(ref: QuestionStepRef | string): QuestionStepRef {
+  return typeof ref === 'string' ? { kind: 'live', stepId: ref } : ref
+}
+
+/**
+ * postback の data を作る。
+ *
+ * 版所有の通IDは `<版ID>:<通番>` でコロンを含む。そのまま並べると
+ * `sq:<版ID>:<通番>:<番号>` になり、区切りの数が形によって変わる。
+ * 先頭に目印を1つ置き、読むときは**右端の1つだけ**を番号として切る。
+ * こうすると通IDの形が変わっても解釈が揺れない。
+ */
+export function buildQuestionPostbackData(
+  ref: QuestionStepRef | string,
+  choiceIndex: number,
+): string {
+  const target = toQuestionStepRef(ref)
+  if (target.kind === 'version') {
+    return `${QUESTION_POSTBACK_PREFIX}:${VERSION_POSTBACK_MARK}:${target.stepId}:${choiceIndex}`
+  }
+  return `${QUESTION_POSTBACK_PREFIX}:${target.stepId}:${choiceIndex}`
+}
+
+/** 同じ通の押下をまとめて数えるための前置き（末尾の番号を落とした形）。 */
+export function buildQuestionPostbackPrefix(ref: QuestionStepRef | string): string {
+  const target = toQuestionStepRef(ref)
+  if (target.kind === 'version') {
+    return `${QUESTION_POSTBACK_PREFIX}:${VERSION_POSTBACK_MARK}:${target.stepId}:`
+  }
+  return `${QUESTION_POSTBACK_PREFIX}:${target.stepId}:`
 }
 
 export function parseQuestionPostback(
   data: string,
-): { stepId: string; choiceIndex: number } | null {
-  if (!data.startsWith(`${QUESTION_POSTBACK_PREFIX}:`)) return null
-  const parts = data.split(':')
-  if (parts.length !== 3) return null
-  const choiceIndex = Number(parts[2])
+): { kind: 'version' | 'live'; stepId: string; choiceIndex: number } | null {
+  const head = `${QUESTION_POSTBACK_PREFIX}:`
+  if (!data.startsWith(head)) return null
+  const rest = data.slice(head.length)
+  const at = rest.lastIndexOf(':')
+  if (at <= 0 || at === rest.length - 1) return null
+  const choiceIndex = Number(rest.slice(at + 1))
   if (!Number.isInteger(choiceIndex) || choiceIndex < 0) return null
-  if (!parts[1]) return null
-  return { stepId: parts[1], choiceIndex }
+  const body = rest.slice(0, at)
+  if (!body) return null
+
+  const versionHead = `${VERSION_POSTBACK_MARK}:`
+  if (body.startsWith(versionHead)) {
+    const stepId = body.slice(versionHead.length)
+    // 版所有の通IDは `<版ID>:<通番>`。区切りが無い形は受け取らない。
+    if (!stepId || !stepId.includes(':')) return null
+    return { kind: 'version', stepId, choiceIndex }
+  }
+  // 旧形。下書きの通IDにコロンは入らない。
+  if (body.includes(':')) return null
+  return { kind: 'live', stepId: body, choiceIndex }
 }
 
 /**
@@ -115,7 +174,7 @@ export function parseQuestionPostback(
  */
 function buildChoiceAction(
   choice: ScenarioQuestionChoice,
-  stepId: string,
+  ref: QuestionStepRef,
   index: number,
 ): Record<string, unknown> {
   const label = (choice.label || `選択肢${index + 1}`).slice(0, 20)
@@ -143,7 +202,7 @@ function buildChoiceAction(
   const action: Record<string, unknown> = {
     type: 'postback',
     label,
-    data: buildQuestionPostbackData(stepId, index),
+    data: buildQuestionPostbackData(ref, index),
   }
   // 友だちの発言として出す文。空なら LINE 側が何も出さないので、
   // 押したことがトークに残らない。既定では選択肢の文字を出す。
@@ -161,8 +220,9 @@ function buildChoiceAction(
  */
 export function buildQuestionMessages(
   question: ScenarioQuestion,
-  stepId: string,
+  step: QuestionStepRef | string,
 ): Message[] {
+  const ref = toQuestionStepRef(step)
   const messages: Message[] = []
   if (question.intro && question.intro.trim() !== '') {
     messages.push({ type: 'text', text: question.intro })
@@ -173,7 +233,7 @@ export function buildQuestionMessages(
     style: index === 0 ? 'primary' : 'secondary',
     height: 'sm',
     margin: index === 0 ? 'none' : 'sm',
-    action: buildChoiceAction(choice, stepId, index),
+    action: buildChoiceAction(choice, ref, index),
   }))
 
   const bubble = {
@@ -208,21 +268,33 @@ export function buildQuestionMessages(
 export async function hasAnsweredBefore(
   db: D1Database,
   friendId: string,
-  stepId: string,
+  step: QuestionStepRef | string,
   choiceIndex: number | null,
+  /**
+   * 同じ通を指す別の形。版へ移す前に押されたぶん（`sq:<下書き通ID>:...`）を
+   * 2度目と数えるために渡す。渡さないと、公開版へ移した瞬間に全員の
+   * 「1度目」が戻ってしまう。
+   */
+  alsoMatch?: QuestionStepRef | string | null,
 ): Promise<boolean> {
-  const prefix =
-    choiceIndex === null
-      ? `${QUESTION_POSTBACK_PREFIX}:${stepId}:`
-      : buildQuestionPostbackData(stepId, choiceIndex)
-  const row = await db
-    .prepare(
-      `SELECT 1 AS ok FROM messages_log
-        WHERE friend_id = ? AND direction = 'incoming' AND source = 'postback'
-          AND content LIKE ?
-        LIMIT 1`,
-    )
-    .bind(friendId, choiceIndex === null ? `${prefix}%` : prefix)
-    .first<{ ok: number }>()
-  return !!row
+  const refs = [toQuestionStepRef(step)]
+  if (alsoMatch) refs.push(toQuestionStepRef(alsoMatch))
+
+  for (const ref of refs) {
+    const pattern =
+      choiceIndex === null
+        ? `${buildQuestionPostbackPrefix(ref)}%`
+        : buildQuestionPostbackData(ref, choiceIndex)
+    const row = await db
+      .prepare(
+        `SELECT 1 AS ok FROM messages_log
+          WHERE friend_id = ? AND direction = 'incoming' AND source = 'postback'
+            AND content LIKE ?
+          LIMIT 1`,
+      )
+      .bind(friendId, pattern)
+      .first<{ ok: number }>()
+    if (row) return true
+  }
+  return false
 }

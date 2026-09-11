@@ -24,10 +24,17 @@ describe('V6 EC integration screens', () => {
     expect(tabsView).toContain('Promise.allSettled')
     expect(tabsView).toContain('api.ecCommerce.overview(accountId)')
     expect(tabsView).toContain('api.ecCommerce.operationIdentityCandidates')
-    expect(tabsView).toContain('api.ecCommerce.subscriptions')
     expect(tabsView).toContain("overview.status === 'fulfilled' && overview.value.success")
     expect(tabsView).toContain("identities.status === 'fulfilled' && identities.value.success")
-    expect(tabsView).toContain("subscriptions.status === 'fulfilled' && subscriptions.value.success")
+    /*
+     * 定期便の件数は `overview` から取る(#731)。以前は `api.ecCommerce.subscriptions`
+     * を `limit:1` で叩いていたが、**`limit:1` でも 500 行ぶん働く**作りだった。
+     * 元の表明「どの数も API が数えたものだけを出し、失敗を 0 と偽らない」は
+     * ここで保つ——定期便も `overview` の成否判定の中に入るので、失敗時は
+     * `undefined`(タブに数字を出さない)のままになる。
+     */
+    expect(tabsView).toContain('overview.value.data.subscriptions')
+    expect(tabsView).not.toContain('api.ecCommerce.subscriptions')
   })
 
   it('shows the V6 decision information without inventing unavailable values', () => {

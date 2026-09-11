@@ -8,7 +8,7 @@ import {
 } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import SelectField from '@/components/shared/select-field'
-import { Field } from '@/components/shared/form-controls'
+import { Field, TextArea, TextInput } from '@/components/shared/form-controls'
 import { useRouter } from 'next/navigation'
 
 const COLOR_ROLES: Array<{
@@ -45,7 +45,6 @@ export default function FormDesignSettings({
   onOgImageUrlChange: (value: string) => void
 }) {
   const router = useRouter()
-  void [ogTitle, ogDescription, ogImageUrl, onOgTitleChange, onOgDescriptionChange, onOgImageUrlChange]
   const theme = value ?? FORM_THEME_DEFAULT
   const patch = <K extends keyof FormTheme>(key: K, next: FormTheme[K]) => {
     onChange({ ...theme, [key]: next })
@@ -64,18 +63,18 @@ export default function FormDesignSettings({
           <button type="button" onClick={close} className="text-ink-faint px-2 text-2xl leading-none" aria-label="閉じる">×</button>
         </header>
         <div className="p-6">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <div className="flex gap-7 border-b border-hairline text-sm font-medium">
-              <span className="border-b-2 border-accent px-1 pb-3 text-accent">色</span>
-              <span className="px-1 pb-3 text-ink-secondary">文字と背景</span>
-              <span className="px-1 pb-3 text-ink-secondary">CSSで細かく</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-5">
-          <div className="flex items-center justify-between gap-3">
+        {/*
+          #725: 「色／文字と背景／CSSで細かく」は <span> で押せなかった。
+          押せる形にはせず、タブをやめて区分を見出しで並べて出す。
+          - 「CSSで細かく」は中身がどこにも無い。押せるようにすると、
+            切り替えた先が空の面になり、いま消している死にUIが1つ増える
+          - 中身は1画面に収まる。押せなかった面を押せるようにする代わりに、
+            いま全部見えているものを隠すのは、利用者にとって損になる
+          CSS編集を実装するときは、そのときタブへ戻す。
+        */}
+        <div>
+          <h3 className="text-ink text-sm font-medium">色</h3>
+          <div className="mt-3 flex items-center justify-between gap-3">
             <p className="text-ink text-sm font-semibold">色は5つの役割にだけ割り当てます</p>
             <Button onClick={() => onChange({ ...FORM_THEME_DEFAULT })}>おまかせで組む</Button>
           </div>
@@ -109,7 +108,9 @@ export default function FormDesignSettings({
           </p>
         </div>
 
-        <div className="border-hairline mt-5 grid gap-4 border-t pt-5 sm:grid-cols-3">
+        <div className="border-hairline mt-5 border-t pt-5">
+          <h3 className="text-ink text-sm font-medium">文字と角の丸み</h3>
+          <div className="mt-3 grid gap-4 sm:grid-cols-3">
           <Field label="文字の書体" htmlFor="form-theme-font">
             <SelectField
               id="form-theme-font"
@@ -133,15 +134,59 @@ export default function FormDesignSettings({
               ]}
             />
           </Field>
+          </div>
         </div>
 
-          <Field label="背景画像" htmlFor="form-theme-background">
-            <SelectField id="form-theme-background" value={theme.backgroundImageUrl ?? ''} onChange={(event) => patch('backgroundImageUrl', event.target.value || null)} options={[{ value: '', label: 'なし' }]} />
-          </Field>
+        {/*
+          #725: 背景画像の選択肢は「なし」1つだけで、選ぶものが無かったので消した。
+          値そのものは生きている（`form-preview.tsx` が背景として描き、
+          `normalizeFormTheme` が https のURLだけ通す）。選べる画像の出どころ
+          （登録メディア一覧など）を繋いだら、ここへ選択欄を戻す。
+        */}
+
+        <div className="border-hairline mt-5 border-t pt-5">
+          <h3 className="text-ink text-sm font-medium">リンクの見え方</h3>
+          <p className="text-ink-faint mt-0.5 text-xs">LINEやSNSにこのフォームのURLを貼ったときに出るカードです。空のままなら自動で作ります。</p>
+          <div className="mt-3 space-y-4">
+            <Field label="カードの見出し" htmlFor="form-og-title">
+              <TextInput
+                id="form-og-title"
+                value={ogTitle}
+                maxLength={80}
+                onChange={(event) => onOgTitleChange(event.target.value)}
+              />
+            </Field>
+            <Field label="カードの説明" htmlFor="form-og-description">
+              <TextArea
+                id="form-og-description"
+                value={ogDescription}
+                maxLength={200}
+                rows={3}
+                onChange={(event) => onOgDescriptionChange(event.target.value)}
+              />
+            </Field>
+            <Field label="カードの画像URL" htmlFor="form-og-image-url" note="https で始まるURLだけ使えます。">
+              <TextInput
+                id="form-og-image-url"
+                type="url"
+                inputMode="url"
+                placeholder="https://"
+                value={ogImageUrl}
+                onChange={(event) => onOgImageUrlChange(event.target.value)}
+              />
+            </Field>
+          </div>
+        </div>
         </div>
         <footer className="border-hairline flex items-center justify-between border-t px-6 py-4">
           <button type="button" onClick={() => onChange({ ...FORM_THEME_DEFAULT })} className="text-accent text-sm font-medium">元に戻す</button>
-          <div className="flex gap-2"><Button onClick={close}>閉じる</Button><Button variant="primary">保存する</Button></div>
+          {/*
+            #725: ここにあった「保存する」は onClick を持たず、押しても何も
+            起きなかった。繋がずに消す。本物の保存は編集画面下部の追従帯
+            （`edit/page.tsx` の StickyBar）ひとつだけで、同じ意味のボタンを
+            2つ並べると、押した人はどちらが効いたのか分からなくなる。
+          */}
+          <Button onClick={close}>閉じる</Button>
         </footer>
       </section>
     </div>

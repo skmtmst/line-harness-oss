@@ -123,7 +123,7 @@ function formatKeys(keys: string[]): string {
  * 後続票で記載を増やしたら、実測に合わせて両方を同じ PR で更新する。
  */
 // 本流の87件(先行PR合流分)に、この票の secret-backfill 1口を足して88件。
-const DOCUMENTED_MIN = 88;
+const DOCUMENTED_MIN = 89;
 const ALLOWLIST_MAX = 777;
 
 /**
@@ -192,6 +192,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'POST /api/broadcasts',
   'POST /api/broadcasts/{id}/send',
   'POST /api/broadcasts/dedup-preview',
+  'POST /api/conversions/definitions/{id}/revise',
   'POST /api/conversions/points',
   'POST /api/conversions/track',
   'POST /api/friends/{id}/tags',
@@ -200,6 +201,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'POST /api/nen-campaigns/deliveries/{id}/retry',
   'POST /api/scenarios',
   'POST /api/scenarios/{id}/enroll/{friendId}',
+  'POST /api/scenarios/{id}/publish',
   'POST /api/scenarios/{id}/simulate',
   'POST /api/scenarios/{id}/steps',
   'POST /api/settings/features/impact',
@@ -1203,7 +1205,7 @@ describe('OpenAPIと公開APIの同期', () => {
     ).toEqual([]);
   });
 
-  test('記載済みoperation数は87以上（後退禁止）', async () => {
+  test('記載済みoperation数は88以上（後退禁止）', async () => {
     const spec = await loadSpec();
     const count = documentedKeys(spec).size;
     expect(
@@ -1221,7 +1223,7 @@ describe('OpenAPIと公開APIの同期', () => {
     ).toBe(true);
   });
 
-  test('基準の記載87件が残っている（allowlistへの移し替え検出）', async () => {
+  test('基準の記載88件が残っている（allowlistへの移し替え検出）', async () => {
     const spec = await loadSpec();
     const documented = documentedKeys(spec);
     const lost = [...BASELINE_DOCUMENTED].filter((key) => !documented.has(key)).sort();

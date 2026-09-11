@@ -111,7 +111,8 @@ function setupApp(d1: D1Database) {
   return { app, env };
 }
 
-function seedDb(raw: SqliteD1['raw']) {
+async function seedDb(dbs: SqliteD1) {
+  const raw = dbs.raw;
   raw.exec(`
     INSERT INTO line_accounts
       (id, channel_id, name, channel_access_token, channel_secret,
@@ -130,6 +131,12 @@ function seedDb(raw: SqliteD1['raw']) {
       (id, scenario_id, step_order, delay_minutes, message_type, message_content)
     VALUES ('st1', 'sc1', 0, 0, 'text', 'hello');
   `);
+  // 参加には明示公開が要る（351 / #644）。稼働中の状態にしてから試す。
+  const { publishScenarioVersion } = await import('@line-crm/db');
+  await publishScenarioVersion(dbs.db, 'sc1', {
+    staffId: null,
+    idempotencyKey: 'entry-route-stop-handover-seed',
+  });
 }
 
 function postCallback(app: Hono<Env>, env: Env['Bindings'], ref: string, extra: Record<string, string> = {}) {
@@ -193,7 +200,7 @@ async function postFollow(app: Hono<Env>, env: Env['Bindings'], userId: string, 
 describe('停止由来の引き継ぎ (N-244差戻・実DB)', () => {
   let dbs: SqliteD1;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
     installFetchMock();
     insertFaults.remaining = 0;
@@ -204,7 +211,7 @@ describe('停止由来の引き継ぎ (N-244差戻・実DB)', () => {
     lineClientMocks.pushMessage.mockResolvedValue(undefined);
     lineClientMocks.replyMessage.mockResolvedValue(undefined);
     dbs = createTestD1();
-    seedDb(dbs.raw);
+    await seedDb(dbs);
   });
 
   afterEach(() => {
