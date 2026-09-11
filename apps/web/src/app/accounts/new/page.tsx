@@ -530,7 +530,11 @@ export default function NewLineAccountPage() {
             </Button>
           ) : (
             <>
-              <Button href="/accounts" disabled={Boolean(busyAction)}>やめる</Button>
+              {busyAction ? (
+                <Button type="button" disabled>やめる</Button>
+              ) : (
+                <Button href="/accounts">やめる</Button>
+              )}
               {currentStep > 1 && (
                 <Button type="button" disabled={Boolean(busyAction)} onClick={moveBack}>
                   戻る
