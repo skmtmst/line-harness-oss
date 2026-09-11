@@ -1458,6 +1458,20 @@ CREATE TABLE conversion_definition_operations (
   created_at          TEXT NOT NULL
 );
 
+CREATE TABLE conversion_definition_revisions (
+  id                  TEXT PRIMARY KEY,
+  conversion_point_id TEXT NOT NULL REFERENCES conversion_points(id) ON DELETE CASCADE,
+  from_version        INTEGER NOT NULL CHECK (from_version > 0),
+  to_version          INTEGER NOT NULL CHECK (to_version > from_version),
+  before_config_json  TEXT NOT NULL CHECK (json_valid(before_config_json)),
+  after_config_json   TEXT NOT NULL CHECK (json_valid(after_config_json)),
+  affected_usages     INTEGER NOT NULL DEFAULT 0 CHECK (affected_usages >= 0),
+  reason              TEXT,
+  performed_by        TEXT NOT NULL,
+  created_at          TEXT NOT NULL,
+  UNIQUE (conversion_point_id, to_version)
+);
+
 CREATE TABLE conversion_definition_usages (
   id                       TEXT PRIMARY KEY,
   conversion_point_id      TEXT NOT NULL REFERENCES conversion_points(id),
@@ -1503,7 +1517,7 @@ CREATE TABLE conversion_events (
   value_snapshot       REAL,
   idempotency_key      TEXT,
   created_at           TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-);
+, point_version_snapshot INTEGER);
 
 CREATE TABLE conversion_points (
   id         TEXT PRIMARY KEY,
@@ -5616,6 +5630,9 @@ CREATE INDEX idx_common_vars_v338_account_name
 
 CREATE INDEX idx_conversion_definition_operations_point
   ON conversion_definition_operations(conversion_point_id, created_at DESC);
+
+CREATE INDEX idx_conversion_definition_revisions_point
+  ON conversion_definition_revisions(conversion_point_id, created_at DESC);
 
 CREATE INDEX idx_conversion_definition_usages_account
   ON conversion_definition_usages(line_account_id, ref_kind, ref_id);
