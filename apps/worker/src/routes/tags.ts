@@ -1015,6 +1015,12 @@ tags.post('/api/tags/:id/archive', requireRole('owner', 'admin'), async (c) => {
     if (!idempotencyKey || idempotencyKey.length > 128) {
       return c.json({ success: false, error: 'Idempotency-Key is required' }, 400);
     }
+    /*
+     * この Idempotency-Key は、**受け取って検査しているが、保存も照合もしていない。**
+     * つまりこの口は冪等ではない。必須にしておきながら冪等でないのは、呼び出し側へ
+     * 「ここは冪等だ」と言っているのと同じで、無いものを有るように見せてしまう。
+     * #709 で扱う（別票）。
+     */
     const expectedVersion = Number(body.expectedVersion);
     const impactRevision = typeof body.impactRevision === 'string' ? body.impactRevision.trim() : '';
     if (!Number.isInteger(expectedVersion) || expectedVersion < 1 || !impactRevision) {
@@ -1032,7 +1038,19 @@ tags.post('/api/tags/:id/archive', requireRole('owner', 'admin'), async (c) => {
     return c.json({ success: true, data: result });
   } catch (err) {
     if (err instanceof TagArchiveError) {
-      return c.json({ success: false, code: err.code, error: err.message }, err.code === 'not_found' ? 404 : 409);
+      /*
+       * already_archived は「もう着いている」であって失敗ではない。画面は code で
+       * 分岐して、赤い失敗ではなく成功と同じ通知にする（#708 の裁定）。
+       * version_conflict / impact_changed と同じ 409 に混ぜると画面が「版が古い」と
+       * 誤解するので、code は分けたまま返す。
+       */
+      const error = err.code === 'already_archived'
+        ? 'このタグはすでに整理されています。'
+        : err.message;
+      return c.json(
+        { success: false, code: err.code, error },
+        err.code === 'not_found' ? 404 : 409,
+      );
     }
     console.error('POST /api/tags/:id/archive error:', err);
     return c.json({ success: false, error: 'タグをアーカイブできませんでした' }, 500);

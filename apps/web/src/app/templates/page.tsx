@@ -663,12 +663,19 @@ export default function TemplatesPage() {
           className="border-hairline rounded-control focus:ring-accent min-w-0 flex-1 border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
         />
         <span className="bg-canvas-sunken rounded-control px-3 py-2 text-sm font-medium">保存した検索</span>
-        <SelectField
-          size="compact"
-          aria-label="表示件数"
-          value="20"
-          options={[{ value: '20', label: '20件表示' }]}
-        />
+        {/*
+          ここは「20件表示」の選び口だった(#615)。**選べない選び口だった。**
+          `value` だけ渡して `onChange` も読み取り専用指定も無いので、React が
+          controlled field の警告を console error に出していた。そのうえ
+          この一覧はページ送りを持たず、絞り込みに合うものを**全部**描くので、
+          「20件表示」という表示そのものが嘘だった。
+
+          **操作できない事実は、操作部品ではなく数で出す。**選び口へ戻すのは、
+          一覧にページ送りを入れるときに一緒にやる。
+        */}
+        {view === 'ready' ? (
+          <span className="text-ink-secondary px-1 text-sm tabular-nums">{filteredTemplates.length}件を表示</span>
+        ) : null}
       </div>
 
 
