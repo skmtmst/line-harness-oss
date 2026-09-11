@@ -8,6 +8,7 @@ const PAGE = readFileSync(join(HERE, 'page.tsx'), 'utf8')
 const EDIT_PAGE = readFileSync(join(HERE, 'edit', 'page.tsx'), 'utf8')
 const DESIGN_SETTINGS = readFileSync(join(HERE, 'edit', 'form-design-settings.tsx'), 'utf8')
 const RESPONSES_PAGE = readFileSync(join(HERE, 'responses', 'page.tsx'), 'utf8')
+const FORM_PREVIEW = readFileSync(join(HERE, '..', '..', 'components', 'forms', 'form-preview.tsx'), 'utf8')
 const API = readFileSync(join(HERE, '..', '..', 'lib', 'api.ts'), 'utf8')
 
 describe('V6回答フォーム一覧', () => {
@@ -150,13 +151,28 @@ describe('V6回答フォームの未実装3画面', () => {
     ]) expect(OPTIONS).toContain(label)
   })
 
-  it('ava2n は押せるデザイン設定で、5色・書体・角丸・背景とSNS表示を保存する', () => {
+  /*
+   * #725 で背景画像の操作面を消したため、旧・表明の '背景画像' を外した。
+   * 旧・表明が捕まえていた壊し方と、いまどこで捕まえるかの対応:
+   *
+   *   (a) デザイン設定から色・書体・角丸の操作面が消える
+   *       → 下の label ループがそのまま見張る（'背景画像' 以外は据え置き）
+   *   (b) 背景画像の値そのものが画面から失われる
+   *       → 消したのは操作面だけで、値は `form-preview.tsx` が描き続ける。
+   *         `theme.backgroundImageUrl` を preview が読むことを下で見張る
+   *   (c) OGP が保存経路から外れる
+   *       → EDIT_PAGE の3行の表明を据え置き、さらに **この窓から編集できる**
+   *         ことを実マウントの試験（form-design-settings.dead-ui.test.tsx）で見張る
+   */
+  it('ava2n は5色・書体・角丸を持ち、SNS表示を保存する', () => {
     expect(EDIT_PAGE).toContain("params.get('tab') === 'design'")
     expect(EDIT_PAGE).toContain('<FormDesignSettings')
     expect(EDIT_PAGE).not.toContain('title="準備中です"')
-    for (const label of ['メイン', 'サブ', 'アクセント', 'エラー', '文字', '文字の書体', '角の丸み', '背景画像']) {
+    for (const label of ['メイン', 'サブ', 'アクセント', 'エラー', '文字', '文字の書体', '角の丸み']) {
       expect(DESIGN_SETTINGS).toContain(label)
     }
+    // (b) 操作面は消したが、背景画像の値は捨てていない。
+    expect(FORM_PREVIEW).toContain('theme.backgroundImageUrl')
     expect(EDIT_PAGE).toContain('ogTitle: ogTitle.trim() || null')
     expect(EDIT_PAGE).toContain('ogDescription: ogDescription.trim() || null')
     expect(EDIT_PAGE).toContain('ogImageUrl: ogImageUrl.trim() || null')
