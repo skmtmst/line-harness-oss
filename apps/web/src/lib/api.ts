@@ -5298,8 +5298,14 @@ export const api = {
   },
   /** 汎用フォルダ。一覧13画面で共通に使う。 */
   folders: {
+    /**
+     * `unfiledCount` は「未分類」タブと同じ母集団で数えた件数（#631）。
+     * `kind` を渡さない、または件数の母集団が確立できていない種別
+     * （#730）では省かれる（`undefined`）。**`0` と紛れないよう、
+     * 呼び出し側は存在チェックしてから使うこと。**
+     */
     list: (kind?: string) =>
-      fetchApi<ApiResponse<Folder[]>>(`/api/folders${kind ? `?kind=${kind}` : ''}`),
+      fetchApi<ApiResponse<Folder[]> & { unfiledCount?: number }>(`/api/folders${kind ? `?kind=${kind}` : ''}`),
     /** 色（#RRGGBB）はフォルダに付く。中身の印にこの色が出る。 */
     create: (data: { kind: string; name: string; parentId?: string | null; color?: string | null }) =>
       fetchApi<ApiResponse<Folder>>('/api/folders', {
