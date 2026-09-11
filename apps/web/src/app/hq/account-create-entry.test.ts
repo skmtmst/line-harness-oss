@@ -1,4 +1,4 @@
-import { describe, it } from 'node:test'
+import { describe, it } from 'vitest'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -10,8 +10,8 @@ const hqOpenPage = readFileSync(join(here, 'open', 'page.tsx'), 'utf8')
 
 describe('HQ account create entry', () => {
   it('HQ page links to the general account flow', () => {
-    assert.match(hqPage, /href="\/accounts\/new"/)
-    assert.match(hqPage, /LINEアカウントを新規登録/)
+    assert.equal(hqPage.match(/href="\/accounts\/new"/g)?.length, 2)
+    assert.equal(hqPage.match(/LINEアカウントを新規登録/g)?.length, 2)
     assert.doesNotMatch(hqPage, /restaurant-test\/stores\/new/)
   })
 
