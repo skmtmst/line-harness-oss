@@ -3,6 +3,7 @@ import { encryptCredential } from '@line-crm/db';
 import type { Message } from '@line-crm/line-sdk';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite';
+import { publishScenarioVersion } from '@line-crm/db';
 import { createAutomationActionExecutors } from './automation-action-executors';
 import { processAutomationRun, startAutomationRun, type ActionDefinition } from './automation-engine';
 
@@ -260,6 +261,8 @@ describe('V6オートメーションの既存処理接続', () => {
          (id, scenario_id, step_order, delay_minutes, message_type, message_content)
        VALUES ('scenario-step-1', 'scenario-1', 1, 0, 'text', '案内です')`,
     ).run();
+    // 参加には明示公開が要る（351）。
+    await publishScenarioVersion(testDb.db, 'scenario-1', { staffId: null, idempotencyKey: 'exec-s1' });
     const result = await execute(testDb, {
       accountId: 'account-1', friendId: 'friend-1',
       action: {

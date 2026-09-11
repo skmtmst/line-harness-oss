@@ -122,13 +122,13 @@ function formatKeys(keys: string[]): string {
  * - ALLOWLIST_MAX: 未記載負債はここより増やせない
  * 後続票で記載を増やしたら、実測に合わせて両方を同じ PR で更新する。
  */
-// 本流の87件(先行PR合流分)に、この票の secret-backfill 1口を足して88件。
-const DOCUMENTED_MIN = 90;
+// 本流の93件に、この票の運用者通知2口(operator-event-types の GET・operator-outbox/sweep の POST)を足して95件。
+const DOCUMENTED_MIN = 95;
 const ALLOWLIST_MAX = 777;
 
 /**
- * PR #1456 時点の記載済み 83 件＋#630 の health-summary 1 件＋#1446 の予約3口の基準一覧。
- * さらに #663 の運用者通知2口を足した基準一覧。
+ * PR #1456 時点の記載済み 83 件＋本流で増えた 5 件＋#655 休憩 4 件
+ * ＋#663 の運用者通知 2 口の基準一覧。
  * 既存仕様を ALLOWLIST へ移して後退させる変更を落とすためのもの。
  * 件数が変わらなくても、ここにある1件が消えたら落ちる。
  * 後続票で記載を増やしたら、増えた分をここへ足す。
@@ -150,6 +150,8 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'GET /api/affiliates/{id}',
   'GET /api/affiliates/{id}/report',
   'GET /api/auto-replies',
+  'GET /api/booking/admin/staff/{id}/break-dates',
+  'GET /api/booking/admin/staff/{id}/breaks',
   'GET /api/broadcasts',
   'GET /api/broadcasts/{id}',
   'GET /api/common-actions/resources',
@@ -194,6 +196,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'POST /api/broadcasts',
   'POST /api/broadcasts/{id}/send',
   'POST /api/broadcasts/dedup-preview',
+  'POST /api/conversions/definitions/{id}/revise',
   'POST /api/conversions/points',
   'POST /api/conversions/track',
   'POST /api/friends/{id}/tags',
@@ -203,6 +206,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'POST /api/notifications/operator-outbox/sweep',
   'POST /api/scenarios',
   'POST /api/scenarios/{id}/enroll/{friendId}',
+  'POST /api/scenarios/{id}/publish',
   'POST /api/scenarios/{id}/simulate',
   'POST /api/scenarios/{id}/steps',
   'POST /api/settings/features/impact',
@@ -218,6 +222,8 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'POST /api/webhooks/maintenance/secret-backfill',
   'POST /webhook',
   'PUT /api/affiliates/{id}',
+  'PUT /api/booking/admin/staff/{id}/break-dates',
+  'PUT /api/booking/admin/staff/{id}/breaks',
   'PUT /api/broadcasts/{id}',
   'PUT /api/friends/{id}/fields',
   'PUT /api/line-accounts/{id}',
@@ -1206,7 +1212,7 @@ describe('OpenAPIと公開APIの同期', () => {
     ).toEqual([]);
   });
 
-  test('記載済みoperation数は87以上（後退禁止）', async () => {
+  test('記載済みoperation数は88以上（後退禁止）', async () => {
     const spec = await loadSpec();
     const count = documentedKeys(spec).size;
     expect(
@@ -1224,7 +1230,7 @@ describe('OpenAPIと公開APIの同期', () => {
     ).toBe(true);
   });
 
-  test('基準の記載87件が残っている（allowlistへの移し替え検出）', async () => {
+  test('基準の記載88件が残っている（allowlistへの移し替え検出）', async () => {
     const spec = await loadSpec();
     const documented = documentedKeys(spec);
     const lost = [...BASELINE_DOCUMENTED].filter((key) => !documented.has(key)).sort();

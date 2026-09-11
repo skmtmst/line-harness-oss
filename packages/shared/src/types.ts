@@ -274,6 +274,15 @@ export interface Folder {
   color: string | null;
   createdAt: string;
   updatedAt: string;
+  /**
+   * 選択中アカウントの可視範囲で数えた、このフォルダに属する件数（#631）。
+   *
+   * `kind` が件数の数え方（対応表・アカウント境界）を確立できていない種別
+   * （#730）や `kind` を指定しない呼び出しでは `undefined`。**`undefined`
+   * は「0件」ではなく「数えていない」を意味する。**画面はキャストで
+   * フォールバック計算をせず、そのまま「—」等を出すこと。
+   */
+  itemCount?: number;
 }
 
 /** 対応マーク */

@@ -447,7 +447,7 @@ function deleteImpactRows(
   return rows
 }
 
-function DeleteTagDialog({ tag, accountId, onCancel, onArchived }: { tag: Tag; accountId: string | null; onCancel: () => void; onArchived: () => void }) {
+function DeleteTagDialog({ tag, accountId, onCancel, onArchived }: { tag: Tag; accountId: string | null; onCancel: () => void; onArchived: (notice?: string) => void }) {
   const [text, setText] = useState('')
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
@@ -550,7 +550,17 @@ function DeleteTagDialog({ tag, accountId, onCancel, onArchived }: { tag: Tag; a
                   impactRevision: impact.revision,
                 }, crypto.randomUUID())
                 onArchived()
-              } catch {
+              } catch (reason) {
+                /*
+                 * 「もう整理済み」は失敗ではない。着きたかった状態にはもう着いている
+                 * ので、赤い失敗ではなく、成功と同じ通知で見せて一覧を読み直す。
+                 * 409 をそのまま失敗として出すと、利用者からは「押したのに何が
+                 * 起きたか分からない」に見える（#708 の裁定）。
+                 */
+                if (reason instanceof ApiError && reason.code === 'already_archived') {
+                  onArchived('このタグはすでに整理されています。')
+                  return
+                }
                 setSaveError('アーカイブできませんでした。影響を読み直して、もう一度お試しください。')
                 setSaving(false)
               }
@@ -594,6 +604,8 @@ export default function TagsPageV4({
   const [page, setPage] = useState(1)
   const [dragId, setDragId] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Tag | null>(null)
+  /** 「すでに整理済み」など、失敗ではない結果を出すための通知。 */
+  const [notice, setNotice] = useState('')
   const [csvOpen, setCsvOpen] = useState(false)
 
   const load = useCallback(async () => {
@@ -782,6 +794,7 @@ export default function TagsPageV4({
             <Button href="/tags/new" variant="primary">＋ タグを追加</Button>
           </div>
         )}
+        {notice && <Notice className="mb-4" tone="success" message={notice} onClose={() => setNotice('')} />}
         {error && <p className="mb-4 rounded-control border border-danger/20 bg-danger-bg p-3 text-sm text-danger">{error}</p>}
         {/* 設計 `HrwyW` は gap 14、フォルダは 240 固定（`DgeL8`）。 */}
         <div className="grid min-w-0 gap-[14px] xl:grid-cols-[240px_minmax(0,1fr)]">
@@ -883,6 +896,8 @@ export default function TagsPageV4({
                             <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: group?.color ?? '#8b938d' }} />
                             {/* 設計 `VQykB` は青文字。押すと編集へ行く（編集ボタンは置かない）。 */}
                             <Link href={`/tags/edit?id=${tag.id}`} className="truncate text-label font-semibold text-status-info hover:underline" title={tag.name}>{tag.name}</Link>
+                            {/* 保管済みは一覧に出続けるが、開くと名前と説明しか直せない(#710)。 */}
+                            {tag.status === 'archived' && <span className="shrink-0 rounded-pill bg-canvas-sunken px-2 py-0.5 text-micro font-bold text-ink-faint">保管済み</span>}
                           </div>
                         </td>
                         <td className="px-3 py-3">
@@ -944,7 +959,7 @@ export default function TagsPageV4({
         ) : null}
       </> : tab === 'fields' ? <FriendFieldList accountId={accountId} /> : tab === 'marks' ? <SupportMarkList accountId={accountId} /> : <SavedSearchList accountId={accountId} />}
       </div>
-      {deleteTarget && <DeleteTagDialog tag={deleteTarget} accountId={accountId} onCancel={() => setDeleteTarget(null)} onArchived={() => { setDeleteTarget(null); void load() }} />}
+      {deleteTarget && <DeleteTagDialog tag={deleteTarget} accountId={accountId} onCancel={() => setDeleteTarget(null)} onArchived={(result) => { setDeleteTarget(null); setNotice(result ?? ''); void load() }} />}
     </div>
   )
 }

@@ -149,3 +149,66 @@ describe('緊急停止の影響集計', () => {
       .resolves.toEqual({ count: null });
   });
 });
+
+/** `db.prepare` の呼び出し回数を数える。件数を仕込む前に作り直すこと。 */
+function countPrepareCalls(db: D1Database): { db: D1Database; count: () => number } {
+  let calls = 0;
+  const wrapped = {
+    prepare: (sql: string) => {
+      calls += 1;
+      return db.prepare(sql);
+    },
+    batch: (statements: D1PreparedStatement[]) => db.batch(statements),
+  } as unknown as D1Database;
+  return { db: wrapped, count: () => calls };
+}
+
+/** 一斉配信を大量に仕込む。監視対象はクエリ本数であって、内容は問わない。 */
+function seedScheduledBroadcasts(raw: (typeof testDb)['raw'], accountId: string, from: number, to: number): void {
+  const insert = raw.prepare(
+    `INSERT INTO broadcasts
+     (id, title, message_type, message_content, target_type, status, scheduled_at, line_account_id)
+     VALUES (?, ?, 'text', '本文', 'all', 'scheduled', ?, ?)`,
+  );
+  for (let i = from; i < to; i += 1) {
+    insert.run(`broadcast-bulk-${i}`, `一斉配信${i}`, `2026-09-05T11:${String(i % 60).padStart(2, '0')}:00.000Z`, accountId);
+  }
+}
+
+/*
+  緊急停止の直前確認は「急いでいるときほど遅くなる」と本末転倒になる。
+  停止対象が増えても、確認1回あたりのクエリ本数は増えてはいけない
+  （Issue #737）。所要時間そのものは環境で揺れるため試験化せず、
+  代わりに `db.prepare` の呼び出し回数という決定的な値で固定する。
+*/
+describe('緊急停止の直前確認: クエリ本数が件数に比例しない(Issue #737)', () => {
+  it('停止対象が60件でも600件でもクエリ本数は変わらない', async () => {
+    seedScheduledBroadcasts(testDb.raw, 'account-1', 0, 60);
+    const counted60 = countPrepareCalls(testDb.db);
+    await getOperationImpactPreview(counted60.db, 'account-1');
+    const queries60 = counted60.count();
+
+    seedScheduledBroadcasts(testDb.raw, 'account-1', 60, 600);
+    const counted600 = countPrepareCalls(testDb.db);
+    await getOperationImpactPreview(counted600.db, 'account-1');
+    const queries600 = counted600.count();
+
+    expect(queries60).toBeGreaterThan(0);
+    expect(queries600).toBe(queries60);
+  });
+
+  it('件数(itemCount)は上限を超えても実数のまま、対象者数(friendCount)は代表サンプルの下限値になる', async () => {
+    testDb.raw.prepare(
+      "INSERT INTO friends (id, line_user_id, display_name, line_account_id, is_following) VALUES ('friend-following-1', 'user-following-1', '四郎', 'account-1', 1)",
+    ).run();
+    seedScheduledBroadcasts(testDb.raw, 'account-1', 0, 600);
+
+    const impact = await getOperationImpactPreview(testDb.db, 'account-1');
+
+    expect(impact.broadcast_dispatch.itemCount).toBe(600);
+    expect(impact.broadcast_dispatch.friendCountIsPartial).toBe(true);
+    // サンプル上限(50件)ぶんの対象者数だけを数えた下限値。600件全部の対象者数(実際は
+    // もっと多い)を「0人」や「実数」と偽らないことが目的で、正確な値そのものは問わない。
+    expect(impact.broadcast_dispatch.friendCount).not.toBeNull();
+  });
+});

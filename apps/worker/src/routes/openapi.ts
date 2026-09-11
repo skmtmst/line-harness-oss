@@ -761,7 +761,35 @@ const spec = {
           { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
           { name: 'friendId', in: 'path', required: true, schema: { type: 'string' } },
         ],
-        responses: { '201': { description: 'Enrolled' } },
+        responses: {
+          '201': { description: 'Enrolled' },
+          '404': { description: 'シナリオ・友だちなし' },
+          '409': { description: '登録済み・削除不可の連携あり' },
+          '422': { description: '未公開・停止中・ブロック中など登録不可' },
+        },
+      },
+    },
+    '/api/scenarios/{id}/publish': {
+      post: {
+        tags: ['Scenarios'],
+        summary: '公開版の固定',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          {
+            name: 'Idempotency-Key',
+            in: 'header',
+            required: true,
+            schema: { type: 'string' },
+            description: '公開操作の確認キー（8〜200字の英数._:-）。同じキーの再実行は同じ版を返し、別内容での使い回しは409。',
+          },
+        ],
+        responses: {
+          '200': { description: 'Published' },
+          '400': { description: '確認キー不足・不正' },
+          '403': { description: '権限不足' },
+          '404': { description: 'シナリオなし・他アカウント' },
+          '409': { description: '確認キーの使い回し・同時公開の競合' },
+        },
       },
     },
     // ── Broadcasts ───────────────────────────────────────────────────────────
@@ -1044,6 +1072,45 @@ const spec = {
       },
     },
     // ── Conversions ─────────────────────────────────────────────────────────
+    '/api/conversions/definitions/{id}/revise': {
+      post: {
+        tags: ['Conversions'],
+        summary: '成果地点を履歴を保ったまま編集して次の版にする',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['expectedVersion', 'name', 'sourceType', 'deduplicationMode', 'valueMode', 'reversalPolicy'],
+                properties: {
+                  expectedVersion: { type: 'integer', minimum: 1 },
+                  name: { type: 'string', minLength: 1, maxLength: 120 },
+                  sourceType: { type: 'string' },
+                  sourceConfig: { type: 'object' },
+                  deduplicationMode: { type: 'string', enum: ['every', 'once_per_friend', 'window'] },
+                  deduplicationWindowDays: { type: ['integer', 'null'], minimum: 1, maximum: 365 },
+                  valueMode: { type: 'string', enum: ['source', 'fixed', 'none'] },
+                  fixedValue: { type: ['number', 'null'], minimum: 0 },
+                  reversalPolicy: { type: 'string', enum: ['source_cancelled', 'manual', 'none'] },
+                  attributionDays: { type: ['integer', 'null'], minimum: 1, maximum: 365 },
+                  targetUrl: { type: ['string', 'null'], maxLength: 2000 },
+                  reason: { type: 'string', maxLength: 200 },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': { description: '次の版になった。過去の成果と集計額は変わらない' },
+          '400': { description: '入力または expectedVersion が不正' },
+          '403': { description: '編集の権限が無い' },
+          '404': { description: '見えない・存在しない成果地点' },
+          '409': { description: '版が進んでいる・停止済み・同名がある（副作用は残さない）' },
+        },
+      },
+    },
     '/api/conversions/points': {
       get: { tags: ['Conversions'], summary: 'CV ポイント一覧', responses: { '200': { description: 'All conversion points' } } },
       post: {
@@ -1261,6 +1328,49 @@ const spec = {
         responses: { '200': { description: 'OK' } },
       },
     },
+    // ── Booking staff breaks (N-405 #655) ────────────────────────────────────
+    '/api/booking/admin/staff/{id}/breaks': {
+      get: {
+        tags: ['Booking'],
+        summary: '担当者の休憩一覧取得',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: { '200': { description: 'Breaks with version' }, '404': { description: 'Staff not in account' } },
+      },
+      put: {
+        tags: ['Booking'],
+        summary: '担当者の休憩を週全体で置き換え',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        requestBody: { content: { 'application/json': { schema: { type: 'object', properties: { expectedVersion: { type: 'string' }, breaks: { type: 'array', maxItems: 28, items: { type: 'object', properties: { id: { type: 'string' }, weekday: { type: 'integer', minimum: 0, maximum: 6 }, start_time: { type: 'string' }, end_time: { type: 'string' } }, required: ['weekday', 'start_time', 'end_time'] } } }, required: ['breaks', 'expectedVersion'] } } } },
+        responses: { '200': { description: 'Replaced with version' }, '400': { description: 'Invalid request' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Staff not in account' }, '409': { description: 'Version conflict' }, '422': { description: 'Invalid weekday, overlap, outside hours, or time range' } },
+      },
+    },
+    '/api/booking/admin/staff/{id}/break-dates': {
+      get: {
+        tags: ['Booking'],
+        summary: '担当者の日付指定の休憩一覧取得',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: { '200': { description: 'Date breaks with version' }, '404': { description: 'Staff not in account' } },
+      },
+      put: {
+        tags: ['Booking'],
+        summary: '担当者の日付指定の休憩を全体で置き換え',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        requestBody: { content: { 'application/json': { schema: { type: 'object', properties: { expectedVersion: { type: 'string' }, breaks: { type: 'array', maxItems: 366, items: { type: 'object', properties: { id: { type: 'string' }, work_date: { type: 'string' }, start_time: { type: 'string' }, end_time: { type: 'string' } }, required: ['work_date', 'start_time', 'end_time'] } } }, required: ['breaks', 'expectedVersion'] } } } },
+        responses: { '200': { description: 'Replaced with version' }, '400': { description: 'Invalid request' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Staff not in account' }, '409': { description: 'Version conflict' }, '422': { description: 'Invalid date, DST gap, overlap, outside hours, or time range' } },
+      },
+    },
     // ── Rich Menus (publish schedules) ────────────────────────────────────
     '/api/rich-menu-groups/{groupId}/schedule': {
       post: {
@@ -1301,6 +1411,7 @@ const spec = {
     { name: 'LINE Accounts', description: 'マルチLINEアカウント管理' },
     { name: 'Conversions', description: 'コンバージョン計測' },
     { name: 'Affiliates', description: 'アフィリエイト管理' },
+    { name: 'Booking', description: '予約設定' },
     { name: 'Templates', description: 'テンプレート公開版' },
     { name: 'Rich Menus', description: 'リッチメニュー公開予約' },
     { name: 'Settings', description: '機能設定' },

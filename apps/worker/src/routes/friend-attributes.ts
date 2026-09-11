@@ -30,6 +30,7 @@ import {
   type LoginAuditRow,
   type LoginAuditAction,
   getFolders,
+  getFolderItemCounts,
   getFolderById,
   createFolder,
   updateFolder,
@@ -321,7 +322,7 @@ function validateConditionsForFormat(
   return parsed;
 }
 
-function serializeFolder(row: Folder, count?: number) {
+function serializeFolder(row: Folder, count?: number, itemCount?: number) {
   return {
     id: row.id,
     kind: row.kind,
@@ -333,6 +334,9 @@ function serializeFolder(row: Folder, count?: number) {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     ...(count === undefined ? {} : { count }),
+    // #631: 一覧画面が読む正式なフィールド。undefinedなら「数えていない」
+    // という意味で、レスポンスからキーごと落とす（0件と区別するため）。
+    ...(itemCount === undefined ? {} : { itemCount }),
   };
 }
 
@@ -1334,27 +1338,58 @@ friendAttributes.get('/api/folders', async (c) => {
     if (raw && !isFolderKind(raw)) {
       return c.json({ success: false, error: '知らないフォルダの種類です' }, 400);
     }
-    if (raw !== 'webinar') {
-      const items = await getFolders(c.env.DB, raw && isFolderKind(raw) ? raw : undefined);
+    const kind = raw && isFolderKind(raw) ? raw : undefined;
+
+    if (kind === 'webinar') {
+      const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+      const requestedAccountId = c.req.query('account_id')?.trim();
+      if (!requestedAccountId) {
+        return c.json({ success: false, error: 'account_id_required' }, 400);
+      }
+      if (!scope.allowedAccountIds.includes(requestedAccountId)) {
+        return c.json({ success: false, error: 'Not found' }, 404);
+      }
+      const items = await getFolders(c.env.DB, 'webinar', requestedAccountId);
+      const counts = await getWebinarFolderCounts(c.env.DB, {
+        allowedAccountIds: scope.allowedAccountIds,
+        canSeeUnassigned: scope.canSeeUnassigned,
+        accountId: requestedAccountId,
+      });
+      return c.json({
+        success: true,
+        data: items.map((row) => serializeFolder(row, counts[row.id] ?? 0, counts[row.id] ?? 0)),
+      });
+    }
+
+    const items = await getFolders(c.env.DB, kind);
+
+    // kind を指定しない呼び出しは全種別をまとめて返す口で、往復回数も
+    // 数えるべき母集団も定まらないため件数を数えない。呼び出し元は
+    // すべて kind を指定している（2026-09-11時点で apps/web 側21箇所すべて、
+    // apps/web/src/lib/api.ts の folders.list 経由）。増えたら見直すこと。
+    if (!kind) {
       return c.json({ success: true, data: items.map((row) => serializeFolder(row)) });
     }
+
     const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
-    const requestedAccountId = c.req.query('account_id')?.trim();
-    if (!requestedAccountId) {
-      return c.json({ success: false, error: 'account_id_required' }, 400);
-    }
-    if (!scope.allowedAccountIds.includes(requestedAccountId)) {
-      return c.json({ success: false, error: 'Not found' }, 404);
-    }
-    const items = await getFolders(c.env.DB, 'webinar', requestedAccountId);
-    const counts = await getWebinarFolderCounts(c.env.DB, {
+    const itemCounts = await getFolderItemCounts(c.env.DB, kind, {
       allowedAccountIds: scope.allowedAccountIds,
       canSeeUnassigned: scope.canSeeUnassigned,
-      accountId: requestedAccountId,
     });
     return c.json({
       success: true,
-      data: items.map((row) => serializeFolder(row, counts[row.id] ?? 0)),
+      data: items.map((row) => {
+        // `itemCounts` が undefined の kind（#730、対応表に無い種別）は
+        // 「数えていない」。中身が0件のフォルダは GROUP BY の結果に
+        // 現れず `byFolderId[row.id]` も undefined になるため、
+        // ここで初めて `0` へ読み替える。「数えていない」と
+        // 「数えたら0件だった」を混同しない。
+        const itemCount = itemCounts === undefined ? undefined : (itemCounts.byFolderId[row.id] ?? 0);
+        return serializeFolder(row, undefined, itemCount);
+      }),
+      // 一覧の「未分類」タブと同じ母集団。itemCounts が無い kind（#730）は
+      // 未分類件数も数えていないので、キーごと省く。
+      ...(itemCounts === undefined ? {} : { unfiledCount: itemCounts.unfiled }),
     });
   } catch (err) {
     console.error('GET /api/folders error:', err);

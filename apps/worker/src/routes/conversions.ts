@@ -22,6 +22,7 @@ import {
   getConversionDefinitionDeleteImpact,
   stopConversionDefinition,
   replaceConversionDefinitionUsages,
+  reviseConversionDefinition,
   deleteUnusedConversionDefinition,
   getConversionDefinitionReport,
   listConversionDefinitionsForExport,
@@ -227,7 +228,15 @@ function plainObject(value: unknown): Record<string, unknown> | null {
     ? value as Record<string, unknown> : null;
 }
 
-function readDefinitionInput(body: Record<string, unknown>) {
+/**
+ * 成果地点の入力を1か所で検証する。
+ *
+ * 編集（新版化）は既にある地点を書き換えるので、店の指定は本文から取らない
+ * （地点に紐づく店が正本）。同じ検証を2つ書くと片方だけ直したときに食い違うので、
+ * 必須かどうかだけを切り替える。
+ */
+function readDefinitionInput(body: Record<string, unknown>, options: { requireAccount?: boolean } = {}) {
+  const requireAccount = options.requireAccount !== false;
   const name = typeof body.name === 'string' ? body.name.trim() : '';
   const sourceType = typeof body.sourceType === 'string' ? body.sourceType : '';
   const sourceConfig = plainObject(body.sourceConfig) ?? {};
@@ -239,7 +248,7 @@ function readDefinitionInput(body: Record<string, unknown>) {
   const fixedValue = body.fixedValue == null || body.fixedValue === '' ? null : Number(body.fixedValue);
   const attributionDays = body.attributionDays == null || body.attributionDays === '' ? null : Number(body.attributionDays);
   const targetUrl = typeof body.targetUrl === 'string' && body.targetUrl.trim() ? body.targetUrl.trim() : null;
-  if (!name || name.length > 120 || !lineAccountId || (targetUrl && targetUrl.length > 2000) || !DEFINITION_SOURCE_TYPES.has(sourceType)
+  if (!name || name.length > 120 || (requireAccount && !lineAccountId) || (targetUrl && targetUrl.length > 2000) || !DEFINITION_SOURCE_TYPES.has(sourceType)
     || !DEDUPLICATION_MODES.has(deduplicationMode) || !VALUE_MODES.has(valueMode)
     || !REVERSAL_POLICIES.has(reversalPolicy)
     || (deduplicationMode === 'window' && (!Number.isInteger(windowDays) || windowDays! < 1 || windowDays! > 365))
@@ -523,6 +532,52 @@ conversions.post('/api/conversions/definitions/:id/stop', conversionPermission('
       staffId: c.get('staff')!.id,
     });
     auditLog(c, 'conversion.definition.stop', { kind: 'conversion_definition', id: c.req.param('id') });
+    return c.json({ success: true, data });
+  } catch (error) {
+    return conversionContractError(c, error);
+  }
+});
+
+/*
+ * POST /api/conversions/definitions/:id/revise — 履歴を保ったまま編集して次の版にする（N-252）。
+ *
+ * 停止・差し替えと同じく、版は本文で受けて CAS に使う。負けたら 409 で、
+ * DBには何も残さない。過去の成果は書き換えない（集計は計測時の控えを見ている）。
+ */
+conversions.post('/api/conversions/definitions/:id/revise', conversionPermission('edit'), async (c) => {
+  try {
+    const body = await c.req.json<Record<string, unknown>>().catch(() => null);
+    const expectedVersion = positiveVersion(body?.expectedVersion);
+    if (!body || expectedVersion === null) {
+      return c.json({ success: false, error: 'expectedVersionを正しく指定してください' }, 400);
+    }
+    const parsedReason = readReason(body);
+    if (!parsedReason.ok) return c.json({ success: false, error: parsedReason.error }, 400);
+    const definition = readDefinitionInput(body, { requireAccount: false });
+    if (!definition) {
+      return c.json({ success: false, error: '成果地点の入力内容を正しく指定してください' }, 400);
+    }
+    const scope = await conversionDefinitionScope(c);
+    if (!scope.ok) return scope.response;
+    const data = await reviseConversionDefinition(c.env.DB, {
+      id: c.req.param('id'),
+      scope: scope.value,
+      expectedVersion,
+      name: definition.name,
+      sourceType: definition.sourceType,
+      sourceConfig: definition.sourceConfig,
+      measureMethod: definition.measureMethod,
+      targetUrl: definition.targetUrl,
+      deduplicationMode: definition.deduplicationMode,
+      deduplicationWindowDays: definition.deduplicationWindowDays,
+      valueMode: definition.valueMode,
+      fixedValue: definition.fixedValue,
+      reversalPolicy: definition.reversalPolicy,
+      attributionDays: definition.attributionDays,
+      reason: parsedReason.reason,
+      staffId: c.get('staff')!.id,
+    });
+    auditLog(c, 'conversion.definition.revise', { kind: 'conversion_definition', id: c.req.param('id') });
     return c.json({ success: true, data });
   } catch (error) {
     return conversionContractError(c, error);

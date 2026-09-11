@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { fetchApi } from '@/lib/api'
-import { api, type FormDeleteImpact } from '@/lib/api'
+import { api, ApiError, type FormDeleteImpact } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { useCanManage } from '@/components/automations/use-can-manage'
 import { displayFormName, sortFormsByLatestAnswer } from './form-list'
@@ -314,19 +314,32 @@ export default function FormSubmissionsPage() {
   }
 
   const stopAccepting = async () => {
-    if (!deleteTarget || stopping || deleting || !selectedAccountId) return
+    if (!deleteTarget || !deleteImpact || stopping || deleting || !selectedAccountId) return
     setStopping(true)
     setDeleteError('')
     try {
-      const result = await api.forms.update(deleteTarget.id, selectedAccountId, { isActive: false })
+      /*
+       * #723: 受付停止も編集保存と同じ口（`PUT /api/forms/:id`）を通る。
+       * だから版を免除しない。免除すると、止めたはずのフォームが編集画面の
+       * 保存で公開中に戻り、回答が入り続ける。
+       *
+       * 版は押す直前に読み直した `deleteImpact` から渡す。`revision`（影響の版）
+       * ではなく `contentRevision`（編集の版）を渡す。
+       */
+      const result = await api.forms.update(deleteTarget.id, selectedAccountId, {
+        isActive: false,
+        expectedContentRevision: deleteImpact.contentRevision,
+      })
       if (!result.success) throw new Error(result.error)
       setForms((current) => current.map((form) => (
         form.id === deleteTarget.id ? { ...form, isActive: false } : form
       )))
       setDeleteTarget(null)
       setDeleteImpact(null)
-    } catch {
-      setDeleteError('回答の受付を止められませんでした。状態を読み直してから、もう一度お試しください。')
+    } catch (error) {
+      setDeleteError(error instanceof ApiError && error.status === 409
+        ? 'ほかの人が先にこの回答フォームを保存しました。開き直して、もう一度お試しください。'
+        : '回答の受付を止められませんでした。状態を読み直してから、もう一度お試しください。')
     } finally {
       setStopping(false)
     }
