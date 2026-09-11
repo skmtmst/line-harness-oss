@@ -9,6 +9,7 @@ import {
   updateScenarioStep,
 } from '@line-crm/db';
 import { processStepDeliveries } from './step-delivery';
+import { parseQuestionPostback } from './scenario-question';
 
 // 文面パリティ装飾だけモック（中身の同一性は既存の decoration テストが
 // 保証）。LINE 送信は偽クライアントで受け、DB は本物を使う。
@@ -182,5 +183,92 @@ describe('processStepDeliveries の版固定（実D1）', () => {
     expect(accountSends).toHaveLength(1);
     expect(JSON.stringify(accountSends[0].messages)).toContain('公開時の文面');
     expect(JSON.stringify(accountSends[0].messages)).not.toContain('書き換えた文面');
+  });
+
+  /*
+   * 質問つきの通を1件だけ持つシナリオ。押し口の形だけを見たいので、
+   * 2通目は置かない。
+   */
+  async function seedPublishedQuestion() {
+    const scenario = await createScenario(testDb.db, { name: '質問', triggerType: 'manual' });
+    const step1 = await createScenarioStep(testDb.db, {
+      scenarioId: scenario.id,
+      stepOrder: 0,
+      messageType: 'text',
+      messageContent: '質問の控え',
+    });
+    testDb.raw
+      .prepare(`UPDATE scenario_steps SET question_json = ? WHERE id = ?`)
+      .run(
+        JSON.stringify({
+          text: 'どちらにしますか',
+          tapMode: 'single',
+          choices: [{ label: 'はい', behavior: 'none', reply: 'ありがとうございます' }],
+        }),
+        step1.id,
+      );
+    insertFriend(testDb.raw, 'friend-1', { line_user_id: 'U-friend-1' });
+    await publishScenarioVersion(testDb.db, scenario.id, { staffId: null, idempotencyKey: 'cron-q1' });
+    const enrollment = (await enrollFriendInScenario(testDb.db, 'friend-1', scenario.id))!;
+    return { scenario, step1, enrollment };
+  }
+
+  /** 送った質問メッセージから、ボタンが載せた postback の data を取り出す。 */
+  function postbackDataOf(messages: unknown[]): string[] {
+    const found: string[] = [];
+    JSON.stringify(messages, (_key, value) => {
+      if (
+        value &&
+        typeof value === 'object' &&
+        (value as { type?: unknown }).type === 'postback' &&
+        typeof (value as { data?: unknown }).data === 'string'
+      ) {
+        found.push((value as { data: string }).data);
+      }
+      return value as unknown;
+    });
+    return found;
+  }
+
+  /*
+   * 下書きを消したあとも、押し口は「押して反応する」形で届く（#644 独立審査）。
+   *
+   * 下書き削除後も固定版から配信を続けるのは、この票で新しく作った振る舞い。
+   * そこで初めて「版所有の通ID（コロンを含む）を押し口へ載せる」経路が生まれる。
+   * 旧形として載せると受信側が弾き、友だちが押しても無反応になる。
+   */
+  it('下書きの通を消しても、送る質問の押し口は受信側が読める形になっている', async () => {
+    const { step1, enrollment } = await seedPublishedQuestion();
+    testDb.raw.prepare(`DELETE FROM scenario_steps WHERE id = ?`).run(step1.id);
+
+    const { sent, client } = pushHarness();
+    await processStepDeliveries(testDb.db, client as never);
+
+    expect(sent).toHaveLength(1);
+    const datas = postbackDataOf(sent[0].messages);
+    expect(datas).toHaveLength(1);
+
+    // ここが要点。受信側（webhook）が使うのと同じ関数で読み戻せること。
+    const parsed = parseQuestionPostback(datas[0]);
+    expect(parsed).not.toBeNull();
+    expect(parsed).toEqual({
+      kind: 'version',
+      stepId: `${enrollment.published_version_id}:0`,
+      choiceIndex: 0,
+    });
+  });
+
+  it('下書きの通が残っているあいだは、押し口は従来どおり下書きの通IDを載せる', async () => {
+    const { step1 } = await seedPublishedQuestion();
+
+    const { sent, client } = pushHarness();
+    await processStepDeliveries(testDb.db, client as never);
+
+    const datas = postbackDataOf(sent[0].messages);
+    expect(parseQuestionPostback(datas[0])).toEqual({
+      kind: 'live',
+      stepId: step1.id,
+      choiceIndex: 0,
+    });
   });
 });

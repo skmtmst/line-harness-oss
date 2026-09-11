@@ -536,7 +536,17 @@ async function processSingleDelivery(
             : question.intro,
           text: expandVariables(question.text, friendWithMeta, workerUrl, 'text', extra),
         },
-        liveStepId ?? currentStep.id,
+        // 押し口は、どちらの通IDを載せたかが分かる形で渡す。
+        //
+        // 文字列で渡すと `toQuestionStepRef` が無条件に旧形（下書きの通ID）
+        // として扱う。下書きを消したあとは版所有の通ID（`<版ID>:<通番>`）が
+        // 入るので、旧形として送ると受信側の `parseQuestionPostback` が
+        // 「旧形にコロンは入らない」で弾き、押しても無反応になる。
+        // 下書き削除後も配信が続くのはこの票で新しく作った振る舞いなので、
+        // その経路の押し口もここで揃える（#644 独立審査）。
+        liveStepId
+          ? { kind: 'live' as const, stepId: liveStepId }
+          : { kind: 'version' as const, stepId: currentStep.id },
       )
     : [buildMessage(tracked.messageType, tracked.content)];
   // Resolve the correct LINE client for this friend's account
