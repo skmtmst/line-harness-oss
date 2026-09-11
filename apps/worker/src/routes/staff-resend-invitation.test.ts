@@ -3,6 +3,7 @@ import { Hono } from 'hono';
 import type { Env } from '../index.js';
 import { sha256Hex } from '../middleware/auth.js';
 import { createTestD1 } from '../test-utils/d1-sqlite.js';
+import { businessAuditMiddleware } from '../middleware/business-audit.js';
 
 /*
  * N-425/N-432(#668)。期限切れ招待の再送と7日期限の契約試験。
@@ -30,6 +31,21 @@ function app(role: 'owner' | 'admin' | 'staff' = 'admin') {
     });
     await next();
   });
+  instance.route('/', staff);
+  return instance;
+}
+
+/* 本番と同じ並びで監査ミドルウェアを挟んだ口。記録が残ることを実表で見る。 */
+function auditedApp(role: 'owner' | 'admin' | 'staff' = 'admin') {
+  const instance = new Hono<Env>();
+  instance.use('*', async (c, next) => {
+    c.set('staff', {
+      id: 'env-owner', name: '管理者', role, readOnly: false,
+      permissionKeys: [],
+    });
+    await next();
+  });
+  instance.use('/api/*', businessAuditMiddleware);
   instance.route('/', staff);
   return instance;
 }
@@ -151,6 +167,59 @@ describe('招待の再送 (N-425)', () => {
   it('存在しない人は404', async () => {
     const response = await resend('nobody');
     expect(response.status).toBe(404);
+  });
+
+  it('メール確認まで済んだ人(pending_line)にはLINE連携の案内を送り直す', async () => {
+    testDb.raw.prepare(`UPDATE staff_members SET invite_status = 'pending_line' WHERE id = 'invitee-1'`).run();
+    expect((await resend()).status).toBe(200);
+
+    /* 確認メールを送っても確認画面は pending_email のときしか進まない。届くべきは連携の案内。 */
+    expect(mail.sendStaffInviteEmail).not.toHaveBeenCalled();
+    expect(mail.sendStaffLineLinkEmail).toHaveBeenCalledOnce();
+    const lineUrl = mail.sendStaffLineLinkEmail.mock.calls[0][1].lineUrl as string;
+    const token = new URL(lineUrl).searchParams.get('invite') ?? '';
+    expect(token.length).toBeGreaterThan(10);
+    /* 送り直したトークンが、その行の生きている招待であること。 */
+    expect(inviteeRow('invitee-1').invite_token_hash).toBe(await sha256Hex(token));
+    expect(inviteeRow('invitee-1').invite_expires_at).toBe(new Date(Date.now() + SEVEN_DAYS_MS).toISOString());
+  });
+
+  it('メール未確認(pending_email)には確認メールを送り、連携の案内は送らない', async () => {
+    expect((await resend()).status).toBe(200);
+    expect(mail.sendStaffInviteEmail).toHaveBeenCalledOnce();
+    expect(mail.sendStaffLineLinkEmail).not.toHaveBeenCalled();
+  });
+
+  it('メールアドレスが無ければ400で断る', async () => {
+    testDb.raw.prepare(`UPDATE staff_members SET email = NULL WHERE id = 'invitee-1'`).run();
+    const response = await resend();
+    expect(response.status).toBe(400);
+    expect(await response.text()).toContain('メールアドレスがない');
+    expect(mail.sendStaffInviteEmail).not.toHaveBeenCalled();
+    /* 断ったのだから、生きている招待を壊してはいけない。 */
+    expect(inviteeRow('invitee-1').invite_token_hash).toBe(await sha256Hex(OLD_TOKEN));
+  });
+
+  it('再送は監査履歴に残る', async () => {
+    const response = await auditedApp().request('/api/staff/invitee-1/resend-invitation', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}),
+    }, bindings());
+    expect(response.status).toBe(200);
+
+    const events = testDb.raw.prepare(
+      'SELECT action, target_id, actor_principal_id, result FROM audit_events',
+    ).all() as Array<{ action: string; target_id: string; actor_principal_id: string; result: string }>;
+    expect(events).toEqual([{
+      action: 'api.post./api/staff/:id/resend-invitation',
+      target_id: 'invitee-1',
+      actor_principal_id: 'env-owner',
+      result: 'success',
+    }]);
+  });
+
+  it('owner も送り直せる', async () => {
+    expect((await resend('invitee-1', 'owner')).status).toBe(200);
+    expect(mail.sendStaffInviteEmail).toHaveBeenCalledOnce();
   });
 
   it('メール送信に失敗したら500で送り直しを案内する', async () => {

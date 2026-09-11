@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import QRCode from 'qrcode'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
@@ -288,6 +288,8 @@ function StaffPageHost() {
   /* ブラウザの `confirm()` をやめて、共通の確認窓へ移した（理由は EditModal と同じ）。 */
   const [disablingTarget, setDisablingTarget] = useState<StaffMember | null>(null), [disablingTwoFactor, setDisablingTwoFactor] = useState(false), [disableError, setDisableError] = useState('')
   const [resendingId, setResendingId] = useState<string | null>(null), [resendNotice, setResendNotice] = useState(''), [resendError, setResendError] = useState('')
+  /* 送信中の掛け金。state は次の描画まで古いままなので、素早い二度押しの2回目を止められない。 */
+  const resendingRef = useRef(false)
   const administrator = me?.role === 'admin' || me?.role === 'owner'
   usePageTitle(permissionTarget ? `${permissionTarget.name}さんに見せる範囲` : 'ログインユーザー')
   const load = useCallback(async () => {
@@ -373,11 +375,14 @@ function StaffPageHost() {
   /**
    * 招待を送り直す(N-425)。
    *
-   * 処理中は受け付けない（二度押しで2回叩くと、1回目のリンクが無効に見える）。
+   * 処理中は受け付けない。2回叩くと2本目のトークンで1本目が上書きされ、
+   * 先に届いたメールのリンクがその場で死ぬ。見た目を `disabled` にするだけでは
+   * 同じ描画の中へ2回届く二度押しを止められないので、掛け金(ref)で締める。
    * 結果と新しい期限・次の対応は表の上の帯に出す。失敗は握りつぶさず理由を出す。
    */
   const runResend = async (member: StaffMember) => {
-    if (resendingId) return
+    if (resendingRef.current) return
+    resendingRef.current = true
     setResendingId(member.id)
     setResendNotice('')
     setResendError('')
@@ -389,6 +394,7 @@ function StaffPageHost() {
     } catch (caught) {
       setResendError(`${messageOf(caught)}。状態を読み直してから、もう一度お試しください。`)
     } finally {
+      resendingRef.current = false
       setResendingId(null)
     }
   }

@@ -407,10 +407,23 @@ staff.post('/api/staff/:id/resend-invitation', requireRole('owner', 'admin'), as
     });
     if (!updated) return c.json({ success: false, error: 'Staff member not found' }, 404);
     try {
-      await sendStaffInviteEmail(c.env, {
-        name: updated.name, email: updated.email ?? target.email,
-        verifyUrl: invitationConfirmationUrl(c, token),
-      });
+      /*
+       * どこで止まっているかで送る便りを変える。メール確認まで済んでいる人
+       * (pending_line)へ確認メールを送り直しても、確認画面は pending_email
+       * のときしか先へ進めないので、LINE連携の案内が誰にも届かないまま
+       * 「送った」ことになる。止まっている一歩のほうを送り直す。
+       */
+      if (updated.invite_status === 'pending_line') {
+        await sendStaffLineLinkEmail(c.env, {
+          name: updated.name, email: updated.email ?? target.email,
+          lineUrl: `${new URL(c.req.url).origin}/api/auth/line?invite=${encodeURIComponent(token)}`,
+        });
+      } else {
+        await sendStaffInviteEmail(c.env, {
+          name: updated.name, email: updated.email ?? target.email,
+          verifyUrl: invitationConfirmationUrl(c, token),
+        });
+      }
     } catch (error) {
       console.error('POST /api/staff/:id/resend-invitation error:', error);
       return c.json({ success: false, error: '招待メールを送信できませんでした。時間をおいて、もう一度送り直してください。' }, 500);
