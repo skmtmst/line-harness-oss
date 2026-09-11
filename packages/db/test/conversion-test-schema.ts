@@ -45,6 +45,7 @@ export function applyConversionTestSchema(db: Database.Database): void {
       affiliate_id TEXT, attributed_ref_code TEXT,
       approval_status TEXT, approved_at TEXT,
       point_name_snapshot TEXT, event_type_snapshot TEXT, value_snapshot REAL,
+      point_version_snapshot INTEGER,
       idempotency_key TEXT, created_at TEXT NOT NULL
     );
     CREATE TABLE conversion_event_dedup_claims (
@@ -58,6 +59,14 @@ export function applyConversionTestSchema(db: Database.Database): void {
       definition_version INTEGER NOT NULL, line_account_id TEXT NOT NULL,
       ref_kind TEXT NOT NULL, ref_id TEXT NOT NULL, ref_version_id TEXT,
       created_by TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+    );
+    CREATE TABLE conversion_definition_revisions (
+      id TEXT PRIMARY KEY, conversion_point_id TEXT NOT NULL,
+      from_version INTEGER NOT NULL, to_version INTEGER NOT NULL,
+      before_config_json TEXT NOT NULL, after_config_json TEXT NOT NULL,
+      affected_usages INTEGER NOT NULL DEFAULT 0,
+      reason TEXT, performed_by TEXT NOT NULL, created_at TEXT NOT NULL,
+      UNIQUE (conversion_point_id, to_version)
     );
     CREATE TABLE conversion_definition_operations (
       id TEXT PRIMARY KEY, conversion_point_id TEXT NOT NULL, action TEXT NOT NULL,

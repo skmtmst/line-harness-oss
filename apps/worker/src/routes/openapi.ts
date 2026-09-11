@@ -1044,6 +1044,45 @@ const spec = {
       },
     },
     // ── Conversions ─────────────────────────────────────────────────────────
+    '/api/conversions/definitions/{id}/revise': {
+      post: {
+        tags: ['Conversions'],
+        summary: '成果地点を履歴を保ったまま編集して次の版にする',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['expectedVersion', 'name', 'sourceType', 'deduplicationMode', 'valueMode', 'reversalPolicy'],
+                properties: {
+                  expectedVersion: { type: 'integer', minimum: 1 },
+                  name: { type: 'string', minLength: 1, maxLength: 120 },
+                  sourceType: { type: 'string' },
+                  sourceConfig: { type: 'object' },
+                  deduplicationMode: { type: 'string', enum: ['every', 'once_per_friend', 'window'] },
+                  deduplicationWindowDays: { type: ['integer', 'null'], minimum: 1, maximum: 365 },
+                  valueMode: { type: 'string', enum: ['source', 'fixed', 'none'] },
+                  fixedValue: { type: ['number', 'null'], minimum: 0 },
+                  reversalPolicy: { type: 'string', enum: ['source_cancelled', 'manual', 'none'] },
+                  attributionDays: { type: ['integer', 'null'], minimum: 1, maximum: 365 },
+                  targetUrl: { type: ['string', 'null'], maxLength: 2000 },
+                  reason: { type: 'string', maxLength: 200 },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': { description: '次の版になった。過去の成果と集計額は変わらない' },
+          '400': { description: '入力または expectedVersion が不正' },
+          '403': { description: '編集の権限が無い' },
+          '404': { description: '見えない・存在しない成果地点' },
+          '409': { description: '版が進んでいる・停止済み・同名がある（副作用は残さない）' },
+        },
+      },
+    },
     '/api/conversions/points': {
       get: { tags: ['Conversions'], summary: 'CV ポイント一覧', responses: { '200': { description: 'All conversion points' } } },
       post: {

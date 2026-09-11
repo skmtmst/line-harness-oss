@@ -111,7 +111,7 @@ function form(index, overrides = {}) {
 }
 
 async function openHarness(browser, { role = 'admin', formsByAccount = {}, fail = false, listDelayMs = {} } = {}) {
-  const state = { listCalls: [], folderWrites: 0 }
+  const state = { listCalls: [], folderWrites: 0, formWrites: [] }
   const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } })
   await context.addInitScript(() => {
     localStorage.setItem('lh_selected_account', 'account-a')
@@ -160,6 +160,11 @@ async function openHarness(browser, { role = 'admin', formsByAccount = {}, fail 
       if (delay > 0) await new Promise((resolve) => setTimeout(resolve, delay))
       const items = formsByAccount[accountId] ?? []
       return json({ success: true, data: { items, total: items.length, page: 1, limit: items.length } })
+    }
+    // #725: デザイン設定の保存が何を送るかを見るために足した。
+    if (/^\/api\/forms\/[^/]+$/.test(path) && request.method() === 'PUT') {
+      state.formWrites.push(JSON.parse(request.postData() ?? '{}'))
+      return json({ success: true, data: { id: path.split('/').pop() } })
     }
     if (path === '/api/folders') {
       if (request.method() !== 'GET') {
@@ -366,6 +371,61 @@ try {
     await page.getByText('表示できませんでした', { exact: true }).waitFor()
     assert.equal(await page.getByRole('button', { name: '再読み込み' }).count(), 1)
     assert.equal(await page.getByText('まだフォームがありません', { exact: true }).count(), 0, '失敗を0件と言わない')
+    await context.close()
+  }
+
+  /*
+   * 7. #725 デザイン設定の死にUI。
+   *
+   *    OGPの入力は `void [...]` で捨てられていて、この窓から編集できなかった。
+   *    値は保存経路には乗っていたので「保存されているのに直す口が無い」形だった。
+   *    ここでは本物のブラウザで、**窓に打った文字が保存の中身まで届く**ことと、
+   *    押しても何も起きない操作面が残っていないことを見る。
+   *
+   *    「保存済みの値が欄に出る」ほうは、ここでは見ない。書き出した管理画面を
+   *    直接URLで開くと、`/form-submissions/edit?id=...` は `GET /api/forms/:id`
+   *    を一度も呼ばない（`useSearchParams` が最初の描画で空を返し、読み込みの
+   *    効果がそのまま素通りする）。**これは #725 の変更前からそうで、この票の
+   *    範囲外**。値が欄に出ることは、親から props を渡す実マウントの試験
+   *    `edit/form-design-settings.dead-ui.test.tsx` で見張っている。
+   */
+  {
+    const { context, page, state } = await openHarness(browser)
+    await page.goto(`${baseUrl}/form-submissions/edit?id=form-1&tab=design`, { waitUntil: 'domcontentloaded' })
+
+    const dialog = page.getByRole('dialog', { name: 'デザイン設定' })
+    await dialog.waitFor({ timeout: 15_000 })
+
+    // (1) OGPの3欄がこの窓にあり、打った文字が保存の中身へ乗る。
+    //     窓は `z-50` の覆いで下部追従帯（`z-index: 20`）を隠すので、
+    //     利用者と同じ順（打つ → 閉じる → 保存）でたどる。
+    await page.locator('#form-og-title').fill('ごはんの相談フォーム')
+    await page.locator('#form-og-description').fill('3分で終わります')
+    await page.locator('#form-og-image-url').fill('https://example.test/ogp.png')
+    // 「閉じる」は2つある（見出しの × と下段のボタン）。下段のほうを押す。
+    await dialog.getByRole('button', { name: '閉じる', exact: true }).last().click()
+    await dialog.waitFor({ state: 'detached', timeout: 10_000 })
+    // 直接URLで開くと1件取得が走らずフォーム名が空のままなので、保存の
+    // 前提条件だけ満たす（#725 の対象外。上の但し書きを参照）。
+    await page.locator('#fm-name').fill('ごはんの相談')
+    await page.getByRole('button', { name: 'フォームを保存' }).click()
+    for (let i = 0; i < 100 && state.formWrites.length === 0; i += 1) await page.waitForTimeout(50)
+    assert.equal(state.formWrites.length, 1, '保存が1回だけ飛ぶ')
+    assert.equal(state.formWrites[0].ogTitle, 'ごはんの相談フォーム', '打った見出しが保存へ乗る')
+    assert.equal(state.formWrites[0].ogDescription, '3分で終わります', '打った説明が保存へ乗る')
+    assert.equal(state.formWrites[0].ogImageUrl, 'https://example.test/ogp.png', '打った画像URLが保存へ乗る')
+
+    // (2) 窓の中に無反応な操作面が残っていない（窓を開き直して見る）
+    await page.goto(`${baseUrl}/form-submissions/edit?id=form-1&tab=design`, { waitUntil: 'domcontentloaded' })
+    await dialog.waitFor({ timeout: 15_000 })
+    assert.equal(await dialog.getByRole('button', { name: '保存する', exact: true }).count(), 0,
+      '窓の中に2つ目の保存を置かない')
+    assert.equal(await dialog.locator('#form-theme-background').count(), 0,
+      '選択肢が「なし」だけの背景画像欄を出さない')
+    assert.equal(await dialog.getByText('CSSで細かく', { exact: true }).count(), 0,
+      '中身の無い押せないタブを出さない')
+    assert.equal(await dialog.getByText('背景画像', { exact: true }).count(), 0,
+      '背景画像の見出しごと消えている')
     await context.close()
   }
 
