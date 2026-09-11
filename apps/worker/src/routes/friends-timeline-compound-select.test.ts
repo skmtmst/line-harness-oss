@@ -286,6 +286,39 @@ describe('割る前(8項)と割ったあと(4+4のCTE)の突き合わせ（票 #
     expect(after).toHaveLength(5);
   });
 
+  test('全列が同じ行が2つあっても、割る前と同じく2つ返る(UNION へ変えると1つに減る)', () => {
+    // identity_events と analytics_events だけが event_type / summary /
+    // source_kind / source_id を自由に置けるので、7列すべてが一致する行を
+    // 作れる（他の組は summary が固定文字列で違うため一致させられない）。
+    // 外側の UNION ALL を UNION に書き換える変異を当てると、この2行が
+    // 1行に減って落ちる（票 #717 差し戻し起因）。
+    sqlite.prepare(`INSERT INTO users (id, tenant_id) VALUES ('user-1', '00000000-0000-4000-8000-000000000001')`).run();
+    sqlite.prepare(`UPDATE friends SET user_id = 'user-1' WHERE id = 'friend-1'`).run();
+    sqlite
+      .prepare(
+        `INSERT INTO identity_events (id, tenant_id, user_id, event_type, summary, actor_name, occurred_at, correlation_id)
+         VALUES ('dup-1', '00000000-0000-4000-8000-000000000001', 'user-1', 'profile',
+                 '共通イベントを記録しました', 'sys', '2026-09-06T10:00:00.000', 'corr-1')`,
+      )
+      .run();
+    sqlite
+      .prepare(
+        `INSERT INTO analytics_events
+           (id, line_account_id, friend_id, event_type, source_kind, source_id, occurred_at, idempotency_key)
+         VALUES ('dup-1', 'acct-1', 'friend-1', 'profile', 'identity_event', 'dup-1',
+                 '2026-09-06T10:00:00.000', 'idem-dup')`,
+      )
+      .run();
+
+    const f = 'friend-1';
+    const bindArgs = [f, f, f, f, f, f, f, f, 51, 0];
+    const before = sqlite.prepare(BEFORE_QUERY).all(...bindArgs) as { id: string }[];
+    const after = sqlite.prepare(extractAfterQuery()).all(...bindArgs) as { id: string }[];
+
+    expect(after).toEqual(before);
+    expect(after.filter((r) => r.id === 'dup-1')).toHaveLength(2);
+  });
+
   test('limitを絞っても同じ行が返る(ページングの先読みも一致)', () => {
     const friendId = 'friend-1';
     const bindArgs = [friendId, friendId, friendId, friendId, friendId, friendId, friendId, friendId, 4, 0];
@@ -305,5 +338,44 @@ describe('割る前(8項)と割ったあと(4+4のCTE)の突き合わせ（票 #
 
     expect(after).toEqual(before);
     expect(after).toHaveLength(0);
+  });
+});
+
+describe('ORDER BYのtiebreak（仕様固定）', () => {
+  // occurred_at が同値のときの並びは SQLite の「不定」なので、割る前の
+  // クエリと突き合わせても同じ順で返るとは限らない（実測でも7ケース中2
+  // ケースで不一致になった）。確率で赤くなる試験は置けないため、ここだけは
+  // 「割る前と同じか」ではなく「timeline.id DESC で決定的に並ぶ」という
+  // いまの仕様そのものを固定の期待値で書く。
+  test('occurred_atが同値のときは、グループ(group_a/group_b)をまたいでもtimeline.id降順で確定的に並ぶ', async () => {
+    const sameOccurredAt = '2026-09-06T10:00:00.000';
+    // group_a由来(messages_log)とgroup_b由来(analytics_events)を混ぜる。
+    sqlite
+      .prepare(
+        `INSERT INTO messages_log (id, friend_id, direction, message_type, content, created_at)
+         VALUES ('tie-a', 'friend-1', 'incoming', 'text', '同着a', ?)`,
+      )
+      .run(sameOccurredAt);
+    sqlite
+      .prepare(
+        `INSERT INTO messages_log (id, friend_id, direction, message_type, content, created_at)
+         VALUES ('tie-c', 'friend-1', 'incoming', 'text', '同着c', ?)`,
+      )
+      .run(sameOccurredAt);
+    sqlite
+      .prepare(
+        `INSERT INTO analytics_events
+           (id, line_account_id, friend_id, event_type, source_kind, source_id, occurred_at, idempotency_key)
+         VALUES ('tie-b', 'acct-1', 'friend-1', 'custom_event', 'analytics', 'tie-b', ?, 'idem-tie-b')`,
+      )
+      .run(sameOccurredAt);
+
+    const app = createApp(asD1(sqlite));
+    const res = await app.request('/api/friends/friend-1/timeline');
+    const body = (await res.json()) as { data: { items: Array<{ id: string }> } };
+    const tieIds = body.data.items.map((i) => i.id).filter((id) => id.startsWith('tie-'));
+
+    // 文字列としての id 降順 = tie-c, tie-b, tie-a。
+    expect(tieIds).toEqual(['tie-c', 'tie-b', 'tie-a']);
   });
 });

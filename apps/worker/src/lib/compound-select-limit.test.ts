@@ -14,6 +14,12 @@
  * `packages/db/migrations/` に対して作る。対象がここと重ならない：
  * こちらは実行時SQL）。
  *
+ * `packages/db/src` も対象に含めている理由: 独立審査（PR #1585）が同じ
+ * 走査を当てたところ、`packages/db/src/templates.ts` に上限ちょうど
+ * （5項）の問い合わせが実在し、`apps/worker/src` だけの走査では
+ * 見張れていないと指摘された。いま違反はまだ無いが、あと1項足せば
+ * D1で落ちる（この票が直したのと同じ形の事故）ため、走査対象を広げた。
+ *
  * 括弧の深さごとに独立したカウンタを持たせている理由: 例えば
  *   WITH group_a AS ( SELECT ... UNION ALL SELECT ... UNION ALL SELECT ... )
  *   ...
@@ -32,7 +38,17 @@ import { describe, expect, test } from 'vitest';
 /** D1 の SQLITE_MAX_COMPOUND_SELECT。wrangler d1 execute --local で実測。 */
 const D1_MAX_COMPOUND_SELECT_TERMS = 5;
 
-const SRC_ROOT = join(process.cwd(), 'src');
+/**
+ * 走査対象のルート。`label` は違反報告の先頭に付け、どちらの配下かを
+ * すぐ分かるようにする。`packages/db/src` は所有パス外だったが、
+ * PR #1585 の審査で「上限ちょうどの問い合わせが実在し見張られていない」
+ * と指摘され、司令塔の裁定で走査対象に加えた（`packages/db/src` の
+ * 実装ファイルそのものは触っていない）。
+ */
+const SCAN_ROOTS = [
+  { label: 'apps/worker/src', dir: join(process.cwd(), 'src') },
+  { label: 'packages/db/src', dir: join(process.cwd(), '../../packages/db/src') },
+];
 
 function listSourceFiles(dir: string): string[] {
   const out: string[] = [];
@@ -51,20 +67,25 @@ function listSourceFiles(dir: string): string[] {
 }
 
 /**
- * ファイル内のテンプレートリテラル（`` ` `` 文字列）を、TypeScriptの
- * AST から正確に抜き出す。
+ * ファイル内の文字列リテラル（テンプレートリテラル `` ` `` と、単一引用符
+ * `'...'` の通常の文字列の両方）を、TypeScriptのASTから正確に抜き出す。
  *
  * 最初は `indexOf('\`')` を単純にペアリングする実装にしていたが、
  * コメント中のインラインコード表記（例: `` `%` `` `` `_` ``）が
  * バッククォートとして誤って対になり、本物のSQLテンプレートリテラルの
  * 境界がズレて中身が読めなくなった（逆変異を当てて確かめて見つけた）。
  * コメントはASTに現れないので、AST走査ならこの誤りが起きない。
+ *
+ * 単一引用符も拾う理由: `db.prepare('SELECT ...')` のように文字列を
+ * `'...'` で書くことも実際にある（例: `routes/tenants.ts`）。長い
+ * compound SELECT を1行の引用符で書く人はまず居らず穴は狭いが、走査が
+ * 「テンプレートリテラルだけ」だと素通りしてしまう分は塞いでおく。
  */
 function extractTemplateLiterals(source: string, fileName: string): string[] {
   const out: string[] = [];
   const sourceFile = ts.createSourceFile(fileName, source, ts.ScriptTarget.Latest, true);
   const visit = (node: ts.Node) => {
-    if (ts.isNoSubstitutionTemplateLiteral(node)) {
+    if (ts.isNoSubstitutionTemplateLiteral(node) || ts.isStringLiteral(node)) {
       out.push(node.text);
     } else if (ts.isTemplateExpression(node)) {
       // `head ${expr} middle ${expr} tail` 形。埋め込み式は構造を
@@ -139,21 +160,25 @@ function analyzeCompoundBlocks(text: string): CompoundBlockResult[] {
 }
 
 describe(`実行時SQLの compound SELECT が D1 の上限(${D1_MAX_COMPOUND_SELECT_TERMS}項)を超えない`, () => {
-  test('apps/worker/src 配下（試験を除く）を走査して、超えるものが無いことを確かめる', () => {
-    const files = listSourceFiles(SRC_ROOT);
-    expect(files.length).toBeGreaterThan(100); // 走査自体が空振りしていないことの確認。
-
+  test('apps/worker/src・packages/db/src 配下（試験を除く）を走査して、超えるものが無いことを確かめる', () => {
     const violations: string[] = [];
-    for (const file of files) {
-      const source = readFileSync(file, 'utf8');
-      for (const literal of extractTemplateLiterals(source, file)) {
-        // SQLらしくない（UNIONを含まない）文字列は、そもそも項数1で
-        // 問題にならない。analyzeCompoundBlocksへ全部通しても軽い。
-        for (const block of analyzeCompoundBlocks(literal)) {
-          if (block.terms > D1_MAX_COMPOUND_SELECT_TERMS) {
-            violations.push(
-              `${relative(SRC_ROOT, file)}: ${block.terms}項 — "${block.snippet}..."`,
-            );
+    for (const root of SCAN_ROOTS) {
+      const files = listSourceFiles(root.dir);
+      // 走査自体が空振りしていないことの確認。ルートごとに見る
+      // （合計で見ると、片方が0件でも足し合わせで超えてしまい気づけない）。
+      expect(files.length, `${root.label} の走査対象が少なすぎます`).toBeGreaterThan(50);
+
+      for (const file of files) {
+        const source = readFileSync(file, 'utf8');
+        for (const literal of extractTemplateLiterals(source, file)) {
+          // SQLらしくない（UNIONを含まない）文字列は、そもそも項数1で
+          // 問題にならない。analyzeCompoundBlocksへ全部通しても軽い。
+          for (const block of analyzeCompoundBlocks(literal)) {
+            if (block.terms > D1_MAX_COMPOUND_SELECT_TERMS) {
+              violations.push(
+                `${root.label}/${relative(root.dir, file)}: ${block.terms}項 — "${block.snippet}..."`,
+              );
+            }
           }
         }
       }
