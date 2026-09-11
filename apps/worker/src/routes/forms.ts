@@ -63,6 +63,7 @@ import { applyMileageRulesForEvent } from '@line-crm/db';
 import { createBroadcastRetryKey } from '../services/broadcast-retry-key.js';
 import { dispatchAutomationEventWithLogging } from '../services/automation-triggers.js';
 import { applyActionScoreEvent } from '../services/action-score-events.js';
+import { dispatchOperatorEvent } from '../services/operator-notification-dispatch.js';
 import {
   applyFormLayoutEffects,
   checkFormGates,
@@ -1784,6 +1785,17 @@ forms.post('/api/forms/:id/submit', async (c) => {
           sourceEventId: submission.id,
           friendId,
           eventData: { formId, submissionId: submission.id },
+        }),
+        // 回答が入ったことを運用者へ知らせる。他の副作用と同じ扱いで、
+        // 通知が落ちても回答は成立させる。発生元に回答IDを使うので、
+        // 同じキーでの再送・再開で通知が二重に作られることはない。
+        // 送り残しは回収口から拾う。
+        dispatchOperatorEvent(c.env.DB, c.env, {
+          lineAccountId: identity.lineAccountId,
+          eventType: 'form_submitted',
+          sourceEventId: submission.id,
+          message: `フォーム「${form.name}」に回答がありました`,
+          executionMode: 'automatic',
         }),
       ]).then((results) => {
         for (const result of results) {

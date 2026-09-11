@@ -47,7 +47,7 @@ export const OPERATOR_NOTIFICATION_EVENT_TYPES: OperatorEventTypeEntry[] = [
       file: 'apps/worker/src/routes/forms.ts',
       route: 'POST /api/forms/:id/submit',
     },
-    connected: false,
+    connected: true,
   },
   {
     eventType: 'ec_order_received',

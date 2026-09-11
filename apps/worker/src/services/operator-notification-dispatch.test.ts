@@ -81,16 +81,18 @@ describe('運用者通知の自動発火と登録簿', () => {
     seedBase(testDb);
   });
 
-  it('登録簿の4件が見え、接続済みと未接続を見分けられる', () => {
+  it('登録簿の4件が見え、いずれも実producerへ接続済みと分かる', () => {
     const items = listOperatorEventTypes();
     expect(items.map((item) => item.eventType).sort()).toEqual([
       'booking_created', 'broadcast_completed', 'ec_order_received', 'form_submitted',
     ]);
+    // 代表4件はすべて実producerへつないだ。未接続のまま connected=true に
+    // しても緑にならないよう、つなぎ目そのものは producer 側の実ルート試験
+    // (booking- / broadcasts- / forms- / ec-integrations-operator-notification)
+    // が見張っている。
     expect(items.filter((item) => item.connected).map((item) => item.eventType).sort())
-      .toEqual(['booking_created', 'broadcast_completed', 'ec_order_received']);
-    // フォームは PR #1469 が未統合で未接続。接続したらここも変える。
-    expect(items.filter((item) => !item.connected).map((item) => item.eventType).sort())
-      .toEqual(['form_submitted']);
+      .toEqual(['booking_created', 'broadcast_completed', 'ec_order_received', 'form_submitted']);
+    expect(items.filter((item) => !item.connected)).toEqual([]);
     expect(items.every((item) => item.producer.file.length > 0 && item.producer.route.length > 0)).toBe(true);
   });
 
