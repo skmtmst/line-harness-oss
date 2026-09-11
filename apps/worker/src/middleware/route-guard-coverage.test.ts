@@ -340,6 +340,7 @@ const STAFF_FAIL_CLOSED_SNAPSHOT: string[] = [
     'POST /api/settings/features/impact',
     'POST /api/site/link',
     'POST /api/staff',
+    'POST /api/staff/:id/resend-invitation',
     'POST /api/tenants',
     'POST /api/traffic-pools',
     'POST /api/traffic-pools/:id/accounts',
