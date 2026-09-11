@@ -5,6 +5,7 @@ import { api } from '@/lib/api'
 import type { LineAccount } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import PageHeader from '@/components/shared/page-header'
+import Select from '@/components/shared/select'
 import StickyBar from '@/components/shared/sticky-bar'
 import StatusBadge from '@/components/shared/status-badge'
 import { emptyAccountFormState, type AccountFormState } from '@/components/accounts/account-form-fields'
@@ -216,8 +217,8 @@ export default function NewLineAccountPage() {
         loginChannelSecret: form.loginChannelSecret,
         liffId: form.liffId.trim(),
         timezone,
-        country: country.trim() || null,
-        role: role.trim() || null,
+        country: country || null,
+        role: role || null,
         parentLineAccountId: parentLineAccountId || null,
       })
       if (!created.success) {
@@ -655,17 +656,15 @@ function SelectField({ id, label, value, onChange, options, required = false, er
       <span className="text-ink-secondary mb-1 block text-xs font-medium">
         {label}{required && <span className="text-danger ml-1">必須</span>}
       </span>
-      <select
+      <Select
         id={id}
+        aria-label={label}
         value={value}
-        onChange={(event) => onChange(event.target.value)}
-        required={required}
-        aria-invalid={error ? true : undefined}
-        aria-describedby={error ? errorId : undefined}
-        className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm"
-      >
-        {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-      </select>
+        onChange={onChange}
+        options={options}
+        size="full"
+        error={error}
+      />
       {error && <span id={errorId} className="text-danger mt-1 block text-xs">{error}</span>}
     </label>
   )
@@ -702,16 +701,16 @@ function ReviewGroup({ title, children }: { title: string; children: ReactNode }
   return (
     <section className="border-hairline rounded-control border p-4">
       <h3 className="text-ink text-sm font-bold">{title}</h3>
-      <dl className="mt-3 divide-y divide-[var(--color-border-hairline)]">{children}</dl>
+      <dl className="mt-3 divide-y divide-hairline">{children}</dl>
     </section>
   )
 }
 
 function ReviewRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="grid gap-1 py-2 sm:grid-cols-[12rem_minmax(0,1fr)]">
+    <div className="grid gap-1 py-2 sm:grid-cols-3">
       <dt className="text-ink-faint text-xs">{label}</dt>
-      <dd className="text-ink break-all text-sm">{value}</dd>
+      <dd className="text-ink break-all text-sm sm:col-span-2">{value}</dd>
     </div>
   )
 }

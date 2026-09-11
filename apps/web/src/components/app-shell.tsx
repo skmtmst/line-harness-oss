@@ -39,12 +39,14 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     )
   }
 
+  const guardedContent = <RootLandingGate><StoreSelectionGate><FeatureDisabledGate>{children}</FeatureDisabledGate></StoreSelectionGate></RootLandingGate>
+
   return (
     <AuthGuard>
       <AccountProvider>
         <PageChromeProvider>
           {isAccountCreate ? (
-            <AccountCreateWorkspace>{children}</AccountCreateWorkspace>
+            <AccountCreateWorkspace>{guardedContent}</AccountCreateWorkspace>
           ) : (
             <div className={styles.shell}>
               {/* Cookieが届いていないときの案内。全画面で同じものを1つだけ出す。 */}
@@ -56,7 +58,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               <div className={`${styles.workspace} ${isFriendAttributesV2 ? 'friend-attributes-v2-shell' : ''}`}>
                 <Sidebar friendAttributesV2Mode={isFriendAttributesV2} />
                 <Workspace>
-                  <GuardedContent>{children}</GuardedContent>
+                  {guardedContent}
                 </Workspace>
               </div>
             </div>
@@ -78,20 +80,10 @@ function AccountCreateWorkspace({ children }: { children: React.ReactNode }) {
           data-design-shell="account-create"
           className={`${styles.content} ${styles.contentFull}`}
         >
-          <GuardedContent>{children}</GuardedContent>
+          {children}
         </div>
       </main>
     </div>
-  )
-}
-
-function GuardedContent({ children }: { children: React.ReactNode }) {
-  return (
-    <RootLandingGate>
-      <StoreSelectionGate>
-        <FeatureDisabledGate>{children}</FeatureDisabledGate>
-      </StoreSelectionGate>
-    </RootLandingGate>
   )
 }
 
