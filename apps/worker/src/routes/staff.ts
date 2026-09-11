@@ -16,7 +16,8 @@ import { getVisibleLineAccountScope } from '../services/account-access.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 
 const staff = new Hono<Env>();
-const INVITE_TTL_MS = 48 * 60 * 60 * 1000;
+// 招待の有効期限は7日。要件 v6-30 §9-2・§17(既存の48時間招待はその期限のまま守り、新規・再送から7日)。
+const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const TWO_FACTOR_ATTEMPT_LIMIT_ERROR = '入力回数を超えました。しばらく待ってからやり直してください';
 
 function invitationConfirmationUrl(c: { env: Env['Bindings']; req: { url: string } }, token: string): string {
@@ -66,6 +67,7 @@ async function serializeStaff(
     permissionKeys: safeJson<string[]>(row.permission_keys, []),
     notificationPreferences: safeJson<Record<string, { email: boolean; line: boolean }>>(row.notification_preferences, {}),
     inviteStatus: row.invite_status || 'active',
+    inviteExpiresAt: row.invite_expires_at ?? null,
     policyVersion: Number(row.policy_version ?? 1),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -311,7 +313,14 @@ staff.post('/api/staff', requireRole('owner', 'admin'), async (c) => {
     if (accountScope.accountScope !== undefined && !await mayAssignAccountScopes(c.env.DB, current, accountScope.accountScope, accountScope.scopedLineAccountIds)) {
       return c.json({ success: false, error: '権限のないLINEアカウントは指定できません' }, 403);
     }
-    if ((await getStaffMembers(c.env.DB, currentTenantId(c))).some((item) => item.email?.toLowerCase() === email)) {
+    // 同じメールの行があるときは作り直さない。要件 v6-30 §9-2(既存メールは新規行を作らず、管理者へ安全な案内)。
+    // 招待中・期限切れなら再送へ案内し、利用開始済みなら従来どおり登録済みで断る(N-425)。
+    const duplicateInvite = (await getStaffMembers(c.env.DB, currentTenantId(c)))
+      .find((item) => item.email?.toLowerCase() === email);
+    if (duplicateInvite) {
+      if (duplicateInvite.invite_status === 'pending_email' || duplicateInvite.invite_status === 'pending_line' || duplicateInvite.invite_status === 'expired') {
+        return c.json({ success: false, error: 'このメールアドレスは招待中です。新しく作り直さず、ログインユーザー画面の「招待中」タブからもう一度送り直してください。' }, 409);
+      }
       return c.json({ success: false, error: 'このメールアドレスは登録済みです' }, 409);
     }
 
@@ -371,6 +380,46 @@ staff.post('/api/staff/invitations/confirm/verify', async (c) => {
     });
   }
   return c.json({ success: true, data: { status: 'pending_line' } });
+});
+
+/*
+ * 招待の再送(N-425)。未受諾・期限切れの招待だけ owner/admin が送り直せる。
+ * 同じ行を使い回す(新規行を作らず、作成日時などの履歴を残す)。旧トークンは
+ * 上書きで失効し、新トークンの期限は7日(N-432)。二重押し・同時再送は後勝ちで、
+ * 生き残るのは最後に発行した1つだけ。旧リンクの受諾は410で再発行を案内する。
+ * 自動再送はしない(要件 v6-30 §9-2)。管理者が対象を確かめて押す運用にする。
+ */
+staff.post('/api/staff/:id/resend-invitation', requireRole('owner', 'admin'), async (c) => {
+  const id = c.req.param('id');
+  const target = await getStaffById(c.env.DB, id);
+  if (!target || !isInCurrentTenant(c, target)) return c.json({ success: false, error: 'Staff member not found' }, 404);
+  if (target.invite_status === 'active') {
+    return c.json({ success: false, error: 'このユーザーはすでに利用を開始しています。招待の再送はできません。' }, 409);
+  }
+  if (!target.email) {
+    return c.json({ success: false, error: 'メールアドレスがないため招待を再送できません。' }, 400);
+  }
+  try {
+    const token = randomToken();
+    const updated = await updateStaffMember(c.env.DB, id, {
+      invite_token_hash: await sha256Hex(token),
+      invite_expires_at: new Date(Date.now() + INVITE_TTL_MS).toISOString(),
+    });
+    if (!updated) return c.json({ success: false, error: 'Staff member not found' }, 404);
+    try {
+      await sendStaffInviteEmail(c.env, {
+        name: updated.name, email: updated.email ?? target.email,
+        verifyUrl: invitationConfirmationUrl(c, token),
+      });
+    } catch (error) {
+      console.error('POST /api/staff/:id/resend-invitation error:', error);
+      return c.json({ success: false, error: '招待メールを送信できませんでした。時間をおいて、もう一度送り直してください。' }, 500);
+    }
+    return c.json({ success: true, data: await serializeStaff(c.env.DB, updated) });
+  } catch (error) {
+    console.error('POST /api/staff/:id/resend-invitation error:', error);
+    return c.json({ success: false, error: '招待を再送できませんでした' }, 500);
+  }
 });
 
 staff.patch('/api/staff/:id', async (c) => {
