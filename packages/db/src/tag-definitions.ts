@@ -614,7 +614,14 @@ export async function getScopedTagDeleteImpact(
 }
 
 export class TagArchiveError extends Error {
-  constructor(public readonly code: 'not_found' | 'version_conflict' | 'impact_changed' | 'replacement_not_found') {
+  constructor(
+    public readonly code:
+      | 'not_found'
+      | 'version_conflict'
+      | 'impact_changed'
+      | 'replacement_not_found'
+      | 'already_archived',
+  ) {
     super(code);
   }
 }
@@ -635,6 +642,19 @@ export async function archiveTag(
     `SELECT * FROM tags WHERE id = ? AND line_account_id = ?`,
   ).bind(input.tagId, input.lineAccountId).first<Tag>();
   if (!tag) throw new TagArchiveError('not_found');
+  /*
+   * すでに整理済みなら、ここで止める。**監査の書き込みより前で止めること。**
+   *
+   * 止めないと version が無意味に増え、operation_audit に「保管した」記録が
+   * 実際の回数より多く残る。監査ログは、あとから読む人が事実を確かめるための
+   * ものなので、そこに嘘が入るのは他と害の種類が違う（#708）。
+   *
+   * 呼び出し側はこの code を「失敗」ではなく「もう着いている」として見せる。
+   * 望んだ状態には着いているので、利用者から見れば成功と同じ（#708 の裁定）。
+   * なお、この API の Idempotency-Key は受け取って検査するだけで、保存も
+   * 照合もしていない（冪等ではない）。#709 で扱う。
+   */
+  if (tag.status !== 'active') throw new TagArchiveError('already_archived');
   if (Number(tag.version) !== input.expectedVersion) throw new TagArchiveError('version_conflict');
   const impact = await getScopedTagDeleteImpact(db, input.tagId, input.lineAccountId);
   if (!impact) throw new TagArchiveError('not_found');
