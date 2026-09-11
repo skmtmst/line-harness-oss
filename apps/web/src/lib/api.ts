@@ -3139,6 +3139,8 @@ export type EcCommerceOverview = {
   last24h: number
   lastReceivedAt: string | null
   byType: Array<{ eventType: string; label: string; count: number }>
+  /** 定期便の契約数。タブの数字はここから取る(#731)。 */
+  subscriptions: number
 }
 
 export type EcCommerceEvent = {
@@ -3294,6 +3296,8 @@ export type EcSubscriptionList = {
     cancellationTopReason: string | null
     monthlyStats: Array<{ month: string; count: number; amount: number }>
   }
+  /** 形が違って読めなかったスナップショットの数。0 でも必ず返る(#731)。 */
+  skipped: { malformedSnapshots: number }
   risk: {
     source: 'payment_status'
     ruleVersion: string

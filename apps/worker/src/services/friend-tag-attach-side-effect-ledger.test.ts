@@ -12,6 +12,7 @@ import {
   countStuckFriendTagSideEffectRuns,
   enrollFriendInScenario,
   listStuckFriendTagSideEffectRuns,
+  publishScenarioVersion,
   reopenFriendTagSideEffectRun,
 } from '@line-crm/db';
 import { createTestD1, insertFriend } from '../test-utils/d1-sqlite.js';
@@ -21,7 +22,7 @@ import {
 } from './friend-tag-attach.js';
 import { fireEvent } from './event-bus.js';
 
-function setup() {
+async function setup() {
   const { db, raw } = createTestD1();
   raw
     .prepare(
@@ -57,6 +58,11 @@ function setup() {
        VALUES ('rule-1', 'タグ変化', 'tag_change', 5)`,
     )
     .run();
+  // 参加には明示公開が要る（351 / #644）。稼働中の状態にしてから試す。
+  await publishScenarioVersion(db, 'scenario-1', {
+    staffId: null,
+    idempotencyKey: 'tag-attach-ledger-seed',
+  });
   return { db, raw };
 }
 
@@ -178,7 +184,7 @@ afterEach(() => {
 
 describe('#699 タグ付与後の副作用の工程別台帳', () => {
   test('付与だけ確定して工程が落ちた事実が台帳に残り、失敗理由も残る', async () => {
-    const { db, raw } = setup();
+    const { db, raw } = await setup();
     startEnrollOutage(raw);
 
     await expect(attachTagAndFireSideEffects(db, 'friend-1', 'tag-1')).rejects.toThrow(
@@ -206,7 +212,7 @@ describe('#699 タグ付与後の副作用の工程別台帳', () => {
   });
 
   test('次に同じ経路へ来たとき、落ちた工程だけが走り直る', async () => {
-    const { db, raw } = setup();
+    const { db, raw } = await setup();
     startEnrollOutage(raw);
     await expect(attachTagAndFireSideEffects(db, 'friend-1', 'tag-1')).rejects.toThrow();
     const afterFailure = counts(raw);
@@ -232,7 +238,7 @@ describe('#699 タグ付与後の副作用の工程別台帳', () => {
   });
 
   test('走り直しは付与時刻を台帳から取り直すので、マイルが二重に積まれない', async () => {
-    const { db, raw } = setup();
+    const { db, raw } = await setup();
     startEnrollOutage(raw);
     await expect(attachTagAndFireSideEffects(db, 'friend-1', 'tag-1')).rejects.toThrow();
     const assignedAt = ledger(raw)[0].assigned_at;
@@ -257,7 +263,7 @@ describe('#699 タグ付与後の副作用の工程別台帳', () => {
   });
 
   test('正常な経路を2回通しても、どの副作用も二重に走らない', async () => {
-    const { db, raw } = setup();
+    const { db, raw } = await setup();
     expect(await attachTagAndFireSideEffects(db, 'friend-1', 'tag-1')).toEqual({ added: true });
     expect(await attachTagAndFireSideEffects(db, 'friend-1', 'tag-1')).toEqual({ added: false });
     expect(counts(raw)).toEqual({
@@ -269,7 +275,7 @@ describe('#699 タグ付与後の副作用の工程別台帳', () => {
   });
 
   test('enrollFriendInScenario は2回走らせても増えないが、fireEvent は増える', async () => {
-    const { db, raw } = setup();
+    const { db, raw } = await setup();
     // enrollFriendInScenario: 存在確認と部分UNIQUE索引で二重登録を防ぐ。
     await enrollFriendInScenario(db, 'friend-1', 'scenario-1');
     await enrollFriendInScenario(db, 'friend-1', 'scenario-1');
@@ -291,7 +297,7 @@ describe('#699 タグ付与後の副作用の工程別台帳', () => {
   // 審査 REJECT 根拠2: failed の event_tag_change を走り直すと二重に出る
   // ============================================================
   test('加点が外へ出たあとに落ちた tag_change は、failed でも走り直さない', async () => {
-    const { db, raw } = setup();
+    const { db, raw } = await setup();
 
     // fireEvent は Phase 1 (送信 webhook + 加点) を allSettled で済ませたあと
     // getFriendScore を呼ぶ。そこを1回だけ落とすと「加点は外へ出たのに
@@ -330,7 +336,7 @@ describe('#699 タグ付与後の副作用の工程別台帳', () => {
   });
 
   test('人が確かめて reopen したときだけ、止まった tag_change が走り直る', async () => {
-    const { db, raw } = setup();
+    const { db, raw } = await setup();
     const flaky = withOneFailingStatement(db, /^SELECT score FROM friends WHERE id = \?$/);
     await expect(attachTagAndFireSideEffects(flaky, 'friend-1', 'tag-1')).rejects.toThrow();
     expect(await countStuckFriendTagSideEffectRuns(db)).toBe(1);
@@ -355,7 +361,7 @@ describe('#699 タグ付与後の副作用の工程別台帳', () => {
   // 審査 REJECT 根拠3: 予約が無いと同時2本で二重に走る
   // ============================================================
   test('未了の tag_change へ同時に2本来ても、予約で1回しか走らない', async () => {
-    const { db, raw } = setup();
+    const { db, raw } = await setup();
     // 台帳を開いた直後に処理ごと消えた、という状態を作る
     // (付与は確定、工程はすべて pending で一度も走っていない)。
     raw
@@ -392,7 +398,7 @@ describe('#699 タグ付与後の副作用の工程別台帳', () => {
   });
 
   test('新規付与が同時に2本来ても、副作用は1回しか走らない', async () => {
-    const { db, raw } = setup();
+    const { db, raw } = await setup();
     // tracked-links.ts の Promise.allSettled・webinars.ts の並行呼び出しと同じ形。
     const results = await Promise.allSettled([
       attachTagAndFireSideEffects(db, 'friend-1', 'tag-1'),
@@ -409,7 +415,7 @@ describe('#699 タグ付与後の副作用の工程別台帳', () => {
   });
 
   test('結末が分からない工程は、冪等なものだけ走り直す', async () => {
-    const { db, raw } = setup();
+    const { db, raw } = await setup();
     await attachTagAndFireSideEffects(db, 'friend-1', 'tag-1');
     // 処理ごと消えて running のまま残った、という状態を作る。
     raw
@@ -435,7 +441,7 @@ describe('#699 タグ付与後の副作用の工程別台帳', () => {
   });
 
   test('落ち続ける工程は上限で止まり、台帳に残って記録にも出る', async () => {
-    const { db, raw } = setup();
+    const { db, raw } = await setup();
     startEnrollOutage(raw);
     await expect(attachTagAndFireSideEffects(db, 'friend-1', 'tag-1')).rejects.toThrow();
 
@@ -458,7 +464,7 @@ describe('#699 タグ付与後の副作用の工程別台帳', () => {
   });
 
   test('タグを外して付け直すと、工程は新しい付与としてすべて開き直る', async () => {
-    const { db, raw } = setup();
+    const { db, raw } = await setup();
     startEnrollOutage(raw);
     // 1回目はシナリオ登録を落として、台帳に failed と last_error を残す。
     await expect(attachTagAndFireSideEffects(db, 'friend-1', 'tag-1')).rejects.toThrow();
@@ -495,7 +501,7 @@ describe('#699 タグ付与後の副作用の工程別台帳', () => {
   });
 
   test('台帳が無い古い付与は、勝手に走り直さない', async () => {
-    const { db, raw } = setup();
+    const { db, raw } = await setup();
     // 376 より前に付いたタグ = friend_tags はあるが台帳の行が無い。
     raw
       .prepare(
@@ -516,7 +522,7 @@ describe('#699 タグ付与後の副作用の工程別台帳', () => {
   });
 
   test('タグを手で外したあとの未了行は、止まっている行に数えない', async () => {
-    const { db, raw } = setup();
+    const { db, raw } = await setup();
     const flaky = withOneFailingStatement(db, /^SELECT score FROM friends WHERE id = \?$/);
     await expect(attachTagAndFireSideEffects(flaky, 'friend-1', 'tag-1')).rejects.toThrow();
     expect(await countStuckFriendTagSideEffectRuns(db)).toBe(1);
