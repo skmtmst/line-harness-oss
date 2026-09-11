@@ -1,4 +1,4 @@
-import { boundedListLimit, jstNow } from './utils.js';
+import { boundedListLimit, jstNow, MAX_LIST_LIMIT } from './utils.js';
 // =============================================================================
 // Forms — Survey / questionnaire system (L社 回答フォーム equivalent)
 // =============================================================================
@@ -578,9 +578,22 @@ export async function updateForm(
 
 // ── Submissions ───────────────────────────────────────────────────────────────
 
+/**
+ * ページ分けなしの回答一覧（互換用）。
+ *
+ * **切る数は呼び出し側が渡す。**#722 の前はここが 200 の直書きで、呼び出し側の
+ * 口は「500件まで」と名乗っていた。**数が2か所にあって食い違っていたので、
+ * 利用先は 201件目から黙って取り落としていた。**名乗る側が渡せば、名乗りと
+ * 実際は同じ数になる。
+ *
+ * `boundedListLimit` は残す。**渡し忘れ・渡しすぎのときの天井**で、
+ * この現場の一覧ヘルパは全部これで `MAX_LIST_LIMIT` に抑えてある
+ * （DB ヘルパを直接呼んでも一覧が無制限にならないようにするため）。
+ */
 export async function getFormSubmissions(
   db: D1Database,
   formId: string,
+  limit?: number,
 ): Promise<FormSubmission[]> {
   const result = await db
     .prepare(
@@ -588,7 +601,7 @@ export async function getFormSubmissions(
        LEFT JOIN friends f ON f.id = fs.friend_id
        WHERE fs.form_id = ? ORDER BY fs.created_at DESC LIMIT ?`,
     )
-    .bind(formId, 200)
+    .bind(formId, boundedListLimit(limit, MAX_LIST_LIMIT))
     .all<FormSubmission & { friend_name: string | null }>();
   return result.results;
 }

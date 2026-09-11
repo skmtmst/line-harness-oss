@@ -633,6 +633,8 @@ export type OperationImpactMetric = {
   friendCount: number | null
   pendingCount?: number
   nearestScheduledAt?: string | null
+  /** trueのとき、friendCountは代表サンプルだけの合計(下限値)。省略時は全件。 */
+  friendCountIsPartial?: boolean
 }
 
 export type OperationImpactPreview = Record<
