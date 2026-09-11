@@ -92,6 +92,36 @@ describe('migration 381: 統括ひな形の基盤', () => {
     expect(() => insert.run('bad', 'recipe', 'bad')).toThrow(/CHECK constraint failed/);
   });
 
+  test('templateとversionの識別bindingを変更できず、内容列は更新できる', () => {
+    const { sqlite } = setup();
+    seedTemplate(sqlite, 'tenant-a', 'template-a', 'version-a');
+
+    sqlite.prepare(`UPDATE hq_templates
+      SET name = '更新名', description = '更新説明', revision = revision + 1
+      WHERE id = 'template-a' AND tenant_id = 'tenant-a'`).run();
+    sqlite.prepare(`UPDATE hq_template_versions
+      SET definition_json = '{"updated":true}', content_hash = 'hash-updated'
+      WHERE id = 'version-a' AND tenant_id = 'tenant-a'`).run();
+    expect(sqlite.prepare(`SELECT name FROM hq_templates`).pluck().get()).toBe('更新名');
+    expect(sqlite.prepare(`SELECT content_hash FROM hq_template_versions`).pluck().get()).toBe('hash-updated');
+
+    for (const sql of [
+      `UPDATE hq_templates SET id = 'template-other' WHERE id = 'template-a'`,
+      `UPDATE hq_templates SET tenant_id = 'tenant-other' WHERE id = 'template-a'`,
+      `UPDATE hq_templates SET template_type = 'form' WHERE id = 'template-a'`,
+    ]) {
+      expect(() => sqlite.prepare(sql).run()).toThrow(/HQ_TEMPLATE_BINDING_IMMUTABLE/);
+    }
+    for (const sql of [
+      `UPDATE hq_template_versions SET id = 'version-other' WHERE id = 'version-a'`,
+      `UPDATE hq_template_versions SET template_id = 'template-other' WHERE id = 'version-a'`,
+      `UPDATE hq_template_versions SET tenant_id = 'tenant-other' WHERE id = 'version-a'`,
+      `UPDATE hq_template_versions SET version = 2 WHERE id = 'version-a'`,
+    ]) {
+      expect(() => sqlite.prepare(sql).run()).toThrow(/HQ_TEMPLATE_VERSION_BINDING_IMMUTABLE/);
+    }
+  });
+
   test('version作成planはarchivedでない同一tenant/templateだけをCAS更新する', () => {
     const plan = buildCreateHqTemplateVersionPlan({
       id: 'version-2',
@@ -252,6 +282,10 @@ describe('migration 381: 統括ひな形の基盤', () => {
     ).run()).toThrow(/HQ_TEMPLATE_RESULT_TERMINAL/);
     expect(sqlite.prepare(`SELECT status FROM hq_template_distribution_results`).pluck().get())
       .toBe('succeeded');
+    expect(() => sqlite.prepare(`DELETE FROM hq_template_distribution_results
+      WHERE run_id = 'run-a' AND tenant_id = 'tenant-a'`).run())
+      .toThrow(/HQ_TEMPLATE_RESULT_RECOVERY_LEDGER_IMMUTABLE/);
+    expect(sqlite.prepare(`SELECT COUNT(*) FROM hq_template_distribution_results`).pluck().get()).toBe(1);
     expect(() => sqlite.prepare(`DELETE FROM hq_template_distribution_runs WHERE id = 'run-a'`).run())
       .toThrow(/HQ_TEMPLATE_RUN_RECOVERY_LEDGER_IMMUTABLE/);
     expect(sqlite.prepare(`SELECT COUNT(*) FROM hq_template_distribution_results`).pluck().get()).toBe(1);
@@ -294,6 +328,11 @@ describe('migration 381: 統括ひな形の基盤', () => {
     const key = { runId: 'run-a', tenantId: 'tenant-a', targetAccountId: 'account-a', objectKey: 'tmp/key' };
     expect(await recordHqTemplateOwnedR2Key(db, { ...key, ownerToken: 'owner-a' })).toBe('recorded');
     expect(await recordHqTemplateOwnedR2Key(db, { ...key, ownerToken: 'owner-b' })).toBe('conflict_or_missing');
+    expect(() => sqlite.prepare(`DELETE FROM hq_template_owned_r2_keys
+      WHERE run_id = 'run-a' AND tenant_id = 'tenant-a' AND target_account_id = 'account-a'
+        AND object_key = 'tmp/key'`).run())
+      .toThrow(/HQ_TEMPLATE_R2_RECOVERY_LEDGER_IMMUTABLE/);
+    expect(sqlite.prepare(`SELECT COUNT(*) FROM hq_template_owned_r2_keys`).pluck().get()).toBe(1);
     expect(await setHqTemplateOwnedR2KeyState(db, {
       ...key, ownerToken: 'owner-a', expectedState: 'staged', state: 'cleanup_pending',
     })).toBe(true);

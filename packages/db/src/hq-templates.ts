@@ -506,7 +506,7 @@ export async function beginHqTemplateStoreResult(
   | { kind: 'created' | 'reused'; result: HqTemplateDistributionResult }
   | { kind: 'conflict_or_missing' }
 > {
-  // Migration 380's AFTER INSERT trigger consumes the exact preflight in the same
+  // Migration 381's AFTER INSERT trigger consumes the exact preflight in the same
   // SQLite statement. A failed consume raises and rolls this result INSERT back.
   const inserted = await db.prepare(
     `INSERT OR IGNORE INTO hq_template_distribution_results

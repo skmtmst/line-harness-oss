@@ -146,6 +146,21 @@ CREATE TABLE hq_template_owned_r2_keys (
     ON DELETE CASCADE
 );
 
+CREATE TRIGGER hq_template_binding_guard
+BEFORE UPDATE ON hq_templates
+WHEN NEW.id != OLD.id
+  OR NEW.tenant_id != OLD.tenant_id
+  OR NEW.template_type != OLD.template_type
+BEGIN SELECT RAISE(ABORT, 'HQ_TEMPLATE_BINDING_IMMUTABLE'); END;
+
+CREATE TRIGGER hq_template_version_binding_guard
+BEFORE UPDATE ON hq_template_versions
+WHEN NEW.id != OLD.id
+  OR NEW.template_id != OLD.template_id
+  OR NEW.tenant_id != OLD.tenant_id
+  OR NEW.version != OLD.version
+BEGIN SELECT RAISE(ABORT, 'HQ_TEMPLATE_VERSION_BINDING_IMMUTABLE'); END;
+
 CREATE TRIGGER hq_template_preflight_terminal_guard
 BEFORE UPDATE ON hq_template_preflights
 WHEN OLD.status IN ('expired', 'consumed') AND NEW.status != OLD.status
@@ -203,6 +218,10 @@ BEFORE UPDATE OF status ON hq_template_distribution_results
 WHEN OLD.status IN ('succeeded', 'version_conflict', 'unsupported') AND NEW.status != OLD.status
 BEGIN SELECT RAISE(ABORT, 'HQ_TEMPLATE_RESULT_TERMINAL'); END;
 
+CREATE TRIGGER hq_template_result_no_delete
+BEFORE DELETE ON hq_template_distribution_results
+BEGIN SELECT RAISE(ABORT, 'HQ_TEMPLATE_RESULT_RECOVERY_LEDGER_IMMUTABLE'); END;
+
 CREATE TRIGGER hq_template_r2_state_guard
 BEFORE UPDATE OF state ON hq_template_owned_r2_keys
 WHEN NOT (
@@ -221,6 +240,10 @@ WHEN NEW.run_id != OLD.run_id
   OR NEW.object_key != OLD.object_key
   OR NEW.owner_token != OLD.owner_token
 BEGIN SELECT RAISE(ABORT, 'HQ_TEMPLATE_R2_BINDING_IMMUTABLE'); END;
+
+CREATE TRIGGER hq_template_r2_no_delete
+BEFORE DELETE ON hq_template_owned_r2_keys
+BEGIN SELECT RAISE(ABORT, 'HQ_TEMPLATE_R2_RECOVERY_LEDGER_IMMUTABLE'); END;
 
 CREATE TRIGGER hq_template_logical_archive_only
 BEFORE DELETE ON hq_templates

@@ -7005,6 +7005,13 @@ WHEN EXISTS (
 )
 BEGIN SELECT RAISE(ABORT, 'conversion point with events or usages cannot be deleted'); END;
 
+CREATE TRIGGER hq_template_binding_guard
+BEFORE UPDATE ON hq_templates
+WHEN NEW.id != OLD.id
+  OR NEW.tenant_id != OLD.tenant_id
+  OR NEW.template_type != OLD.template_type
+BEGIN SELECT RAISE(ABORT, 'HQ_TEMPLATE_BINDING_IMMUTABLE'); END;
+
 CREATE TRIGGER hq_template_logical_archive_only
 BEFORE DELETE ON hq_templates
 BEGIN SELECT RAISE(ABORT, 'HQ_TEMPLATE_USE_LOGICAL_ARCHIVE'); END;
@@ -7034,6 +7041,10 @@ WHEN NEW.run_id != OLD.run_id
   OR NEW.owner_token != OLD.owner_token
 BEGIN SELECT RAISE(ABORT, 'HQ_TEMPLATE_R2_BINDING_IMMUTABLE'); END;
 
+CREATE TRIGGER hq_template_r2_no_delete
+BEFORE DELETE ON hq_template_owned_r2_keys
+BEGIN SELECT RAISE(ABORT, 'HQ_TEMPLATE_R2_RECOVERY_LEDGER_IMMUTABLE'); END;
+
 CREATE TRIGGER hq_template_r2_state_guard
 BEFORE UPDATE OF state ON hq_template_owned_r2_keys
 WHEN NOT (
@@ -7060,6 +7071,10 @@ CREATE TRIGGER hq_template_result_consume_preflight
 AFTER INSERT ON hq_template_distribution_results
 BEGIN UPDATE hq_template_preflights SET status = 'consumed' WHERE id = NEW.preflight_id AND tenant_id = NEW.tenant_id AND template_id = NEW.template_id AND template_version_id = NEW.template_version_id AND target_account_id = NEW.target_account_id AND idempotency_fingerprint = NEW.idempotency_fingerprint AND snapshot_token = NEW.snapshot_token AND status = 'ready'; SELECT CASE WHEN changes() != 1 THEN RAISE(ABORT, 'HQ_TEMPLATE_PREFLIGHT_NOT_CONSUMED') END; END;
 
+CREATE TRIGGER hq_template_result_no_delete
+BEFORE DELETE ON hq_template_distribution_results
+BEGIN SELECT RAISE(ABORT, 'HQ_TEMPLATE_RESULT_RECOVERY_LEDGER_IMMUTABLE'); END;
+
 CREATE TRIGGER hq_template_result_terminal_guard
 BEFORE UPDATE OF status ON hq_template_distribution_results
 WHEN OLD.status IN ('succeeded', 'version_conflict', 'unsupported') AND NEW.status != OLD.status
@@ -7082,6 +7097,14 @@ CREATE TRIGGER hq_template_run_terminal_guard
 BEFORE UPDATE OF status ON hq_template_distribution_runs
 WHEN OLD.status != 'running' AND NEW.status != OLD.status
 BEGIN SELECT RAISE(ABORT, 'HQ_TEMPLATE_RUN_TERMINAL'); END;
+
+CREATE TRIGGER hq_template_version_binding_guard
+BEFORE UPDATE ON hq_template_versions
+WHEN NEW.id != OLD.id
+  OR NEW.template_id != OLD.template_id
+  OR NEW.tenant_id != OLD.tenant_id
+  OR NEW.version != OLD.version
+BEGIN SELECT RAISE(ABORT, 'HQ_TEMPLATE_VERSION_BINDING_IMMUTABLE'); END;
 
 CREATE TRIGGER trg_action_score_published_version_immutable
 BEFORE UPDATE ON action_score_rule_versions
