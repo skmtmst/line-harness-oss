@@ -4689,6 +4689,34 @@ CREATE TABLE staff_availability_rules (
   FOREIGN KEY (staff_id) REFERENCES staff(id)
 );
 
+CREATE TABLE staff_break_dates (
+  id               TEXT PRIMARY KEY,
+  staff_id         TEXT NOT NULL,
+  work_date        TEXT NOT NULL, -- YYYY-MM-DD
+  start_time       TEXT NOT NULL, -- HH:MM
+  end_time         TEXT NOT NULL, -- HH:MM
+  time_zone        TEXT NOT NULL DEFAULT 'Asia/Tokyo',
+  start_utc_offset TEXT NOT NULL DEFAULT '+09:00',
+  end_utc_offset   TEXT NOT NULL DEFAULT '+09:00',
+  created_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  updated_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  UNIQUE (staff_id, work_date, start_time, end_time),
+  FOREIGN KEY (staff_id) REFERENCES staff(id)
+);
+
+CREATE TABLE staff_breaks (
+  id          TEXT PRIMARY KEY,
+  staff_id    TEXT NOT NULL,
+  weekday     INTEGER NOT NULL CHECK (weekday BETWEEN 0 AND 6), -- 0=Sun
+  start_time  TEXT NOT NULL,                                    -- HH:MM
+  end_time    TEXT NOT NULL,                                    -- HH:MM
+  time_zone   TEXT NOT NULL DEFAULT 'Asia/Tokyo',
+  created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  UNIQUE (staff_id, weekday, start_time, end_time),
+  FOREIGN KEY (staff_id) REFERENCES staff(id)
+);
+
 CREATE TABLE staff_members (
   id         TEXT PRIMARY KEY,
   name       TEXT NOT NULL,
@@ -6588,6 +6616,12 @@ CREATE INDEX idx_staff_account_sort ON staff (line_account_id, sort_order);
 
 CREATE INDEX idx_staff_availability_rules_staff
   ON staff_availability_rules (staff_id, weekday, is_active);
+
+CREATE INDEX idx_staff_break_dates_staff
+  ON staff_break_dates (staff_id, work_date);
+
+CREATE INDEX idx_staff_breaks_staff
+  ON staff_breaks (staff_id, weekday);
 
 CREATE UNIQUE INDEX idx_staff_members_api_key ON staff_members(api_key);
 

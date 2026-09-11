@@ -122,12 +122,12 @@ function formatKeys(keys: string[]): string {
  * - ALLOWLIST_MAX: 未記載負債はここより増やせない
  * 後続票で記載を増やしたら、実測に合わせて両方を同じ PR で更新する。
  */
-// 本流の87件(先行PR合流分)に、この票の secret-backfill 1口を足して88件。
-const DOCUMENTED_MIN = 89;
+// 本流の89件に、この票の休憩4口(breaks/break-dates の GET・PUT)を足して93件。
+const DOCUMENTED_MIN = 93;
 const ALLOWLIST_MAX = 777;
 
 /**
- * PR #1456 時点の記載済み 83 件＋#630 の health-summary 1 件＋#1446 の予約3口の基準一覧。
+ * PR #1456 時点の記載済み 83 件＋本流で増えた 5 件＋#655 休憩 4 件の基準一覧。
  * 既存仕様を ALLOWLIST へ移して後退させる変更を落とすためのもの。
  * 件数が変わらなくても、ここにある1件が消えたら落ちる。
  * 後続票で記載を増やしたら、増えた分をここへ足す。
@@ -149,6 +149,8 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'GET /api/affiliates/{id}',
   'GET /api/affiliates/{id}/report',
   'GET /api/auto-replies',
+  'GET /api/booking/admin/staff/{id}/break-dates',
+  'GET /api/booking/admin/staff/{id}/breaks',
   'GET /api/broadcasts',
   'GET /api/broadcasts/{id}',
   'GET /api/common-actions/resources',
@@ -217,6 +219,8 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'POST /api/webhooks/maintenance/secret-backfill',
   'POST /webhook',
   'PUT /api/affiliates/{id}',
+  'PUT /api/booking/admin/staff/{id}/break-dates',
+  'PUT /api/booking/admin/staff/{id}/breaks',
   'PUT /api/broadcasts/{id}',
   'PUT /api/friends/{id}/fields',
   'PUT /api/line-accounts/{id}',

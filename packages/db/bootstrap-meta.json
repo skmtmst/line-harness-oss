@@ -327,6 +327,8 @@
     "365_rich_menu_schedule_default_pin.sql",
     "366_ad_conversion_outbox.sql",
     "367_conversion_once_dedup_guard.sql",
+    "368_staff_breaks.sql",
+    "369_staff_break_dates.sql",
     "370_affiliate_registration_operation_idempotency.sql",
     "372_affiliate_initial_link_operation_idempotency.sql",
     "373_ai_loop_slack_reports.sql",
@@ -336,5 +338,5 @@
     "377_conversion_point_version_edit.sql",
     "379_form_content_revision.sql"
   ],
-  "migrationCount": 335
+  "migrationCount": 337
 }
