@@ -6276,6 +6276,30 @@ export const api = {
       `/api/conversions/definitions/${encodeURIComponent(id)}/replace`,
       { method: 'POST', body: JSON.stringify(data) },
     ),
+    /** 成果地点を、履歴を保ったまま編集して次の版にする（N-252）。 */
+    reviseDefinition: (id: string, data: {
+      expectedVersion: number
+      name: string
+      sourceType: string
+      sourceConfig?: Record<string, unknown>
+      deduplicationMode: 'every' | 'once_per_friend' | 'window'
+      deduplicationWindowDays?: number | null
+      valueMode: 'source' | 'fixed' | 'none'
+      fixedValue?: number | null
+      reversalPolicy: 'source_cancelled' | 'manual' | 'none'
+      attributionDays?: number | null
+      targetUrl?: string | null
+      reason?: string
+    }) => fetchApi<ApiResponse<{
+      id: string
+      version: number
+      revisionId: string
+      movedUsages: number
+      updatedAt: string
+    }>>(
+      `/api/conversions/definitions/${encodeURIComponent(id)}/revise`,
+      { method: 'POST', body: JSON.stringify(data) },
+    ),
     deleteDefinition: (id: string, data: { expectedVersion: number; reason?: string }) =>
       fetchApi<ApiResponse<{ id: string; deleted: true }>>(
         `/api/conversions/definitions/${encodeURIComponent(id)}`,
