@@ -27,6 +27,20 @@ describe('operationImpactText', () => {
     })).toBe('1件／対象延べ—人')
     expect(operationImpactText('broadcast_dispatch', null)).toBe('影響を確認できません')
   })
+
+  it('friendCountIsPartialのとき対象者数に「以上」を添えて下限であることを示す', () => {
+    expect(operationImpactText('broadcast_dispatch', {
+      ...impact,
+      broadcast_dispatch: { itemCount: 120, friendCount: 3000, nearestScheduledAt: null, friendCountIsPartial: true },
+    })).toBe('120件／対象延べ3,000人以上')
+  })
+
+  it('friendCountIsPartialが無い・falseのときは「以上」を付けない', () => {
+    expect(operationImpactText('broadcast_dispatch', {
+      ...impact,
+      broadcast_dispatch: { itemCount: 2, friendCount: 1284, nearestScheduledAt: null, friendCountIsPartial: false },
+    })).toBe('2件／対象延べ1,284人')
+  })
 })
 
 /*

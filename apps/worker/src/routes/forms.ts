@@ -93,8 +93,22 @@ const FORM_ARCHIVE_BODY_MAX_BYTES = 16 * 1024;
  * 短い答えの一時置き場のため十分な大きさ。
  */
 const PARTIAL_MERGED_MAX_BYTES = 32 * 1024;
-/** ページ分けなし回答取得の上限。互換用の古い形だけに適用する。 */
-const NON_PAGINATED_SUBMISSIONS_MAX = 500;
+/*
+ * ページ分けなしの回答一覧の天井。**この数がただ1つの出どころ。**
+ * SQL の `LIMIT` にもこれを渡し、`Warning` でもこれを名乗る。
+ *
+ * #722 の前はここが 500、DB 側が 200 の直書きで、**名乗りと実際が食い違って
+ * いた。**利用先は 201件目から黙って取り落としていて、応答は 200 OK、
+ * `Warning` は「500件まで」。取り落としに気づく手がかりが無かった。
+ *
+ * 200 なのは、この現場の一覧ヘルパが全部 `boundedListLimit` で
+ * `MAX_LIST_LIMIT`（200）に抑えられているから。ここだけ 500 にすると、
+ * ほかのどの一覧よりも 2.5 倍重い応答を1つだけ作ることになる
+ * （そもそも上限を置いた理由が「重い応答」だった）。
+ * この数と `MAX_LIST_LIMIT` が離れていないことは
+ * `forms-limit-and-opens-guard.test.ts` が見張っている。
+ */
+const NON_PAGINATED_SUBMISSIONS_MAX = 200;
 /**
  * 冪等キーは UUID。回答行の id そのものとして使い、同じキーの再送・同時
  * 送信を 1 行にまとめる(一斉配信の Idempotency-Key と同じ流儀)。
@@ -819,16 +833,21 @@ forms.get('/api/forms/:id/submissions', requireRole('owner', 'admin', 'staff'), 
     if (!hasPagination) {
       // SDKなど既存利用先との互換性を保つ。V6管理画面だけが明示的にページ分けを要求する。
       // 大きいフォームで重い応答になるため上限を置く。page/limit 付きへ移行すること。
-      const submissions = await getFormSubmissions(c.env.DB, id);
+      /*
+       * **切るのは `getFormSubmissions` の SQL ひとつだけ。**ここで重ねて
+       * `slice` すると、DB 側の天井を上げても口が黙って切り直してしまい、
+       * 「名乗りと実際がずれているのに気づけない」という #722 の形がそのまま
+       * 残る（実際、逆変異で確かめた: DB 側を 500 にしても slice があると
+       * 試験が緑のままだった）。数も切る場所も1か所にする。
+       */
+      const submissions = await getFormSubmissions(c.env.DB, id, NON_PAGINATED_SUBMISSIONS_MAX);
       // Header 値は ASCII のみ。日本語の案内は PR と票に残す。
+      // 数は直書きしない。名乗りと実際がずれると、取り落としに気づけない。
       c.header(
         'Warning',
-        '299 - "non-paginated submissions are limited to 500 rows; use page/limit"',
+        `299 - "non-paginated submissions are limited to ${NON_PAGINATED_SUBMISSIONS_MAX} rows; use page/limit"`,
       );
-      return c.json({
-        success: true,
-        data: submissions.slice(0, NON_PAGINATED_SUBMISSIONS_MAX).map(serializeSubmission),
-      });
+      return c.json({ success: true, data: submissions.map(serializeSubmission) });
     }
     const page = listPage(c.req.query('page'));
     const limit = listLimit(c.req.query('limit'), 20);
@@ -861,9 +880,28 @@ forms.get('/api/forms/:id/submissions', requireRole('owner', 'admin', 'staff'), 
 forms.post('/api/forms/:id/opened', async (c) => {
   try {
     const formId = c.req.param('id');
-    // 保管後のURLは開けない。回答だけでなく「開いた記録」も増やさない。
-    if (!await getFormById(c.env.DB, formId)) {
+    /*
+     * 受け付けていないフォームの「開いた記録」を増やさない。**塞ぐのは2つ。**
+     *
+     *   保管した（status='archived'） … `getFormById` が見つけない → 404
+     *   受付を止めた（is_active=0）   … 下で弾く → 記録せず 200
+     *
+     * #722 の前は保管の側しか塞いでおらず、注記も保管のことしか書いて
+     * いなかった。読むと全部塞がったように見えるのに、**受付を止めた
+     * フォームは開かれるたびに `form_opens` が増え続けていた。**削除影響の
+     * 画面に出る「開かれた回数」が水増しされ、止めたはずのフォームが
+     * 使われ続けているように見えた。
+     *
+     * 止めた側を 404 にしないのは、この口が計測用で、呼び出し元（LIFF）の
+     * 表示を邪魔しないため。**すぐ下の「関係のない公式アカウント」も同じ形**
+     * ——記録せずに 200 を返す。
+     */
+    const openedForm = await getFormById(c.env.DB, formId);
+    if (!openedForm) {
       return c.json({ success: false, error: 'Form not found' }, 404);
+    }
+    if (!openedForm.is_active) {
+      return c.json({ success: true });
     }
     // Open analytics may remain anonymous, but a caller can only attribute an
     // open to the LINE identity proven by its ID token. Body-supplied customer
@@ -926,6 +964,15 @@ forms.post('/api/forms/:id/partial', async (c) => {
     const form = await getFormById(c.env.DB, c.req.param('id'));
     if (!form) {
       return c.json({ success: false, error: 'Form not found' }, 404);
+    }
+    /*
+     * 受付を止めたフォームへ下書きを書かない（#722）。ここは友だちの
+     * `friends.metadata` を直に書き換えるので、止めたあとも書けると
+     * **受け付けていないはずの答えが業務データへ入り続ける。**
+     * 断り方は `/submit`（:1024）・`/files`（:891）と同じ 400 に揃える。
+     */
+    if (!form.is_active) {
+      return c.json({ success: false, error: 'This form is no longer accepting responses' }, 400);
     }
     // 回答定義に無い鍵は受け付けない。業務で使う鍵の上書きを防ぐ。
     const allowedNames = new Set(

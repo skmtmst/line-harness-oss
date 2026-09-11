@@ -38,8 +38,6 @@ interface Reminder {
   createdAt: string; updatedAt: string
 }
 
-type VisualFolder = Folder & { itemCount?: number; listTotal?: number }
-
 const UNFILED = '__unfiled__'
 const PER_PAGE = 20
 /** 行ごとに作ると件数分だけ重いため、外で1回作って使い回す (#489-19)。 */
@@ -57,6 +55,8 @@ export default function RemindersPage() {
   const router = useRouter()
   const { selectedAccountId } = useAccount()
   const [folders, setFolders] = useState<Folder[]>([])
+  /** 「未分類」の件数。`null` は数えていない（#631、#730）。 */
+  const [unfiledCount, setUnfiledCount] = useState<number | null>(null)
   const [nameQuery, setNameQuery] = useState('')
   const deferredNameQuery = useDeferredValue(nameQuery.trim())
   const [folderFilter, setFolderFilter] = useState('')
@@ -73,8 +73,12 @@ export default function RemindersPage() {
     setFoldersError(false)
     try {
       const res = await api.folders.list('reminder')
-      if (res.success) setFolders(res.data)
-      else setFoldersError(true)
+      if (res.success) {
+        setFolders(res.data)
+        setUnfiledCount(res.unfiledCount ?? null)
+      } else {
+        setFoldersError(true)
+      }
     } catch { setFoldersError(true) }
   }, [])
   const loadReminderPage = useCallback(async (
@@ -163,10 +167,12 @@ export default function RemindersPage() {
           ...folders.map((folder) => ({
             id: folder.id,
             label: folder.name,
-            count: (folder as VisualFolder).itemCount ?? reminders.filter((item) => item.folderId === folder.id).length,
+            // #631: フォルダ件数はAPI(itemCount)をそのまま出す。現在ページの
+            // 行だけを数えるフォールバックは、ページングで実数と食い違うため廃止。
+            count: folder.itemCount ?? null,
             color: folder.color,
           })),
-          { id: UNFILED, label: '未分類', count: reminders.filter((item) => !item.folderId).length },
+          { id: UNFILED, label: '未分類', count: unfiledCount },
         ]}
       />
       <div className="min-w-0">
