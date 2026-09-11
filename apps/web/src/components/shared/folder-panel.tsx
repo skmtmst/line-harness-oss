@@ -25,7 +25,13 @@ export const FOLDER_RAIL_STYLE = {
 export interface FolderPanelRow {
   id: string
   label: string
-  count: number
+  /**
+   * このフォルダに属する件数。`null` は「数えていない」（#631）。
+   *
+   * 母集団が確立できていない口では、`0` と嘘をつくより出さない方がよい。
+   * `null` のときは `—` を出す。
+   */
+  count: number | null
   /**
    * フォルダの色（#RRGGBB）。115 で folders.color を足した。
    * 未設定は null。色はフォルダに付き、属するタグに出る。
@@ -143,7 +149,7 @@ export default function FolderPanel({
                   </svg>
                 )}
                 <span className="min-w-0 flex-1 truncate">{row.label}</span>
-                <span className="text-ink-faint shrink-0 text-xs tabular-nums">{row.count}</span>
+                <span className="text-ink-faint shrink-0 text-xs tabular-nums">{row.count === null ? '—' : row.count}</span>
               </button>
               {/* 操作は設計どおり1つの「…」へまとめる。行に5個の小さな口を
                   並べると、選択との押し間違いが増え、短い名前も狭くなる。 */}

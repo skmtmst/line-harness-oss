@@ -326,7 +326,13 @@ function OperationalAlertsCard({ risk, healthIssues, oldestWaitMinutes, twoFacto
   return <Card padding="roomy" className="min-h-[128px]">
     <div className="flex items-start justify-between gap-3">
       <h2 className="text-ink text-base font-bold">運用アラート</h2>
-      <span className={count === null ? 'text-ink-faint text-sm font-bold' : count > 0 ? 'text-danger text-sm font-bold' : 'text-success text-sm font-bold'}>{count === null ? '—' : `${count}件`}</span>
+      {/*
+        #631: 件数の母集団は変えない（health issue だけを数える）。
+        「最も古い未対応」と別のものを数えていることが、件数の脇の文言
+        だけで分かるようにする。0件のときに「未対応が長引いている」の
+        隣で緑の「0件」が出ても、別の指標だと読めるようにするのが狙い。
+      */}
+      <span className={count === null ? 'text-ink-faint text-sm font-bold' : count > 0 ? 'text-danger text-sm font-bold' : 'text-success text-sm font-bold'}>{count === null ? '—' : `接続・自動処理 ${count}件`}</span>
     </div>
     {/*
       設計（`vUXKb`）は「最も古い未対応」と「二段階認証」の2行。
