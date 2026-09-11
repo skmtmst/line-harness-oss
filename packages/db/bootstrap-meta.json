@@ -336,7 +336,8 @@
     "375_mileage_redemption_step_lease.sql",
     "376_friend_tag_side_effect_runs.sql",
     "377_conversion_point_version_edit.sql",
-    "379_form_content_revision.sql"
+    "379_form_content_revision.sql",
+    "380_hq_templates.sql"
   ],
-  "migrationCount": 337
+  "migrationCount": 338
 }

@@ -105,6 +105,16 @@ export interface HqTemplateDuplicate {
   reason: string;
 }
 
+/** Persisted preflight decision for one source item. Secrets are never carried here. */
+export interface HqTemplateResolution {
+  sourceId: string;
+  itemKind: string;
+  mode: HqTemplateDistributionMode;
+  targetId?: string;
+  aliasName?: string;
+  expectedRevision?: string;
+}
+
 export type HqTemplateIdMap = Readonly<Record<string, string>>;
 
 export interface HqTemplateSqlStatement {
@@ -127,8 +137,11 @@ export interface HqTemplateOwnedR2Key {
 export interface HqTemplateStoreAtomicCommitPlan {
   tenantId: string;
   targetAccountId: string;
+  preflightId: string;
+  idempotencyFingerprint: string;
   snapshotToken: HqTemplateSnapshotToken;
   mode: HqTemplateDistributionMode;
+  resolutions: readonly HqTemplateResolution[];
   stage: readonly HqTemplateOwnedR2Object[];
   dbCommit: readonly HqTemplateSqlStatement[];
   compensateOnDbFailure: readonly HqTemplateOwnedR2Key[];
@@ -138,8 +151,11 @@ export interface HqTemplateStoreAtomicCommitPlan {
 export interface HqTemplateAdapterContext {
   tenantId: string;
   targetAccountId: string;
+  preflightId: string;
+  idempotencyFingerprint: string;
   mode: HqTemplateDistributionMode;
   snapshotToken: HqTemplateSnapshotToken;
+  resolutions: readonly HqTemplateResolution[];
 }
 
 export interface HqTemplateAdapterInput {

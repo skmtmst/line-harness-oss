@@ -5,6 +5,7 @@ import {
   createHqTemplateSnapshotToken,
   parseHqTemplateSnapshotToken,
   requireHqTemplateAuthority,
+  type HqTemplateAdapterContext,
 } from './contract.js';
 import { getHqTemplateAdapter, hqTemplateAdapterRegistry } from './registry.js';
 
@@ -62,6 +63,29 @@ describe('統括ひな形の共通contract', () => {
       'commit',
     ]);
     expect(VERSION_CONFLICT_MESSAGE).toBe('配布先で編集がありました。もう一度確認してください');
+  });
+
+  test('adapter入力は店舗preflight・fingerprint・item別解決へ固定される', () => {
+    const context: HqTemplateAdapterContext = {
+      tenantId: 'tenant-1',
+      targetAccountId: 'account-1',
+      preflightId: 'preflight-1',
+      idempotencyFingerprint: 'fingerprint-1',
+      mode: 'overwrite',
+      snapshotToken: 'hqts1.snapshot' as HqTemplateAdapterContext['snapshotToken'],
+      resolutions: [
+        {
+          sourceId: 'source-1',
+          itemKind: 'tag',
+          mode: 'overwrite',
+          targetId: 'target-1',
+          expectedRevision: 'revision-3',
+        },
+        { sourceId: 'source-2', itemKind: 'tag', mode: 'alias', aliasName: '別名' },
+      ],
+    };
+    expect(context.preflightId).toBe('preflight-1');
+    expect(context.resolutions.map((item) => item.mode)).toEqual(['overwrite', 'alias']);
   });
 
   test('4種類は別adapterとして登録され、明示的にUNSUPPORTEDを返す', async () => {
