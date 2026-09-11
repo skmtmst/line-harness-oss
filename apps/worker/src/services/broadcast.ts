@@ -9,6 +9,11 @@ import {
   jstNow,
   updateBroadcastLineRequestId,
   createBroadcastInsight,
+  getBlockedRecipientIds,
+  markBroadcastRecipientsDispatched,
+  buildBroadcastSettleStatements,
+  settleBroadcastRecipients,
+  isBroadcastStopped,
 } from '@line-crm/db';
 import type { Broadcast } from '@line-crm/db';
 import type { LineClient } from '@line-crm/line-sdk';
@@ -20,6 +25,7 @@ import {
 import { aggregationUnitFor, aggregationUnits } from './broadcast-aggregation.js';
 import { resolveInterpolationExtra } from './interpolation-context.js';
 import { createBroadcastRetryKey } from './broadcast-retry-key.js';
+import { classifyDeliveryFailure, deliveryErrorCode } from './broadcast-delivery-outcome.js';
 import { evaluateQuota, fetchQuota, shortfallMessage } from './broadcast-quota-guard.js';
 import { recordLineTokenDefaultFallback } from './line-token.js';
 import { featureJobCanRun } from './feature-enforcement.js';
@@ -304,10 +310,24 @@ export async function processBroadcastSend(
       const totalBatches = Math.ceil(followingFriends.length / MULTICAST_BATCH_SIZE);
       // 開封数を取らない配信では null。集計ユニットは月1,000の上限がある。
       const unit = aggregationUnitFor(broadcast);
+      /*
+       * 送達台帳（#662）。予約した tag 配信はこの関数の中で最後まで送るので、
+       * 束と束のあいだが唯一の止めどころになる。台帳がないと、失敗した束の
+       * 相手が誰だったのかが残らず——今までは `console.error` だけで消えていた
+       * ——「失敗した相手だけ送り直す」ができない。
+       */
+      const blocked = await getBlockedRecipientIds(db, broadcast.id);
+      const attemptNo = Number((broadcast as unknown as Record<string, unknown>).send_attempt_no ?? 1) || 1;
       for (let i = 0; i < followingFriends.length; i += MULTICAST_BATCH_SIZE) {
+        // 次の束へ進む前に停止を読み直す。送り終えた束は取り消せないので、
+        // **新しい束を始めないことで止める**。
+        if (await isBroadcastStopped(db, broadcastId)) break;
         const batchIndex = Math.floor(i / MULTICAST_BATCH_SIZE);
         const batch = followingFriends.slice(i, i + MULTICAST_BATCH_SIZE);
-        const lineUserIds = batch.map((f) => f.line_user_id);
+        const sendable = batch.filter((f) => !blocked.has(f.id));
+        if (sendable.length === 0) continue;
+        const sendableIds = sendable.map((f) => f.id);
+        const lineUserIds = sendable.map((f) => f.line_user_id);
 
         // Stealth: add staggered delay between batches
         if (batchIndex > 0) {
@@ -318,36 +338,65 @@ export async function processBroadcastSend(
         // Stealth: add slight variation to text messages
         const batchMessages = varyTextMessages(messages, batchIndex, totalBatches);
 
+        await markBroadcastRecipientsDispatched(db, {
+          broadcastId,
+          attemptNo,
+          lineAccountId: broadcastAccountId,
+          friendIds: sendableIds,
+        });
         try {
           const retryKey = await createBroadcastRetryKey(
             broadcast.id,
             'multicast',
-            ...batch.map((f) => f.id),
+            `attempt:${attemptNo}`,
+            ...sendableIds,
             JSON.stringify(batchMessages),
           );
           await lineClient.multicast(lineUserIds, batchMessages, aggregationUnits(unit), retryKey);
-          successCount += batch.length;
+          successCount += sendable.length;
 
           // Log only successfully sent messages (batch insert for performance)
           // line_account_id は broadcast 設定時のアカウントを記録 (送信時点の固定値)。
           // friends.line_account_id は webhook で書き換わる mutable なので使わない。
           const broadcastAccount = (broadcast as unknown as Record<string, unknown>).line_account_id as string | null;
-          const logStmts = batch.flatMap(friend => finalParts.map(part =>
+          const logStmts = sendable.flatMap(friend => finalParts.map(part =>
             db.prepare(
               `INSERT INTO messages_log (id, friend_id, direction, message_type, content, broadcast_id, scenario_step_id, source, line_account_id, created_at)
                VALUES (?, ?, 'outgoing', ?, ?, ?, NULL, 'broadcast', ?, ?)`,
             ).bind(crypto.randomUUID(), friend.id, part.messageType, part.messageContent, broadcastId, broadcastAccount, now),
           ));
-          await db.batch(logStmts);
+          await db.batch([
+            ...logStmts,
+            ...buildBroadcastSettleStatements(db, {
+              broadcastId,
+              friendIds: sendableIds,
+              state: 'sent',
+            }),
+          ]);
+          for (const id of sendableIds) blocked.add(id);
         } catch (err) {
           console.error(`Multicast batch ${i / MULTICAST_BATCH_SIZE} failed:`, err);
-          // Continue with next batch; failed batch is not logged
+          // Continue with next batch; failed batch is not logged.
+          // 誰が落ちたかは台帳に残す。断定できた失敗だけが再送の対象になる。
+          const outcome = classifyDeliveryFailure(err);
+          await settleBroadcastRecipients(db, {
+            broadcastId,
+            friendIds: sendableIds,
+            state: outcome,
+            errorCode: deliveryErrorCode(err),
+          });
+          if (outcome === 'unknown') for (const id of sendableIds) blocked.add(id);
         }
       }
       await updateBroadcastLineRequestId(db, broadcast.id, null, unit);
     }
     // multi-account-dedup はこの関数の冒頭で queue に委譲済み (ここには到達しない)。
 
+    // 停止で束の途中を抜けた配信を「送信済み」にしない（#662）。送り残した
+    // 相手がいるのに完了と書くと、再開も失敗分の再送もできなくなる。
+    if (await isBroadcastStopped(db, broadcastId)) {
+      return (await getBroadcastById(db, broadcastId))!;
+    }
     await createBroadcastInsight(db, broadcast.id);
     await updateBroadcastStatus(db, broadcastId, 'sent', { totalCount, successCount });
   } catch (err) {
@@ -592,11 +641,17 @@ async function processQueuedBroadcastBatches(
   // UTC 正規化されて見かけ 9 時間古くなり、recover 側 (julianday('now','+9 hours'))
   // と比較すると即座に「stale」扱いされて lock 取得直後に解除される。created_at
   // 列の DEFAULT と同じ式を使って naive JST に揃える。
+  //
+  // `stopped_at IS NULL` は #662 の停止。**運用者が停止を押した後は、
+  // 新しい送信権をここで取らせない。**停止を受け付ける UPDATE と、この
+  // ロック取得の UPDATE は同じ行の条件付き更新なので、どちらが先でも
+  // 「停止が勝てばロックは取れず、ロックが勝てば停止はループ内の確認で効く」
+  // のどちらかに決まる。両方が進む状態にはならない。
   const lockResult = await db.prepare(
-    `UPDATE broadcasts SET batch_offset = -1, batch_lock_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours') WHERE id = ? AND batch_offset = ?`,
+    `UPDATE broadcasts SET batch_offset = -1, batch_lock_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours') WHERE id = ? AND batch_offset = ? AND stopped_at IS NULL`,
   ).bind(broadcast.id, batchOffset).run();
   if (!lockResult.meta.changes || lockResult.meta.changes === 0) {
-    // 他のCron実行が既に処理中 → スキップ
+    // 他のCron実行が既に処理中、または停止済み → スキップ
     return;
   }
 
@@ -709,6 +764,20 @@ async function processQueuedBroadcastBatches(
   const now = jstNow();
   // 開封数を取らない配信では null。集計ユニットは月1,000の上限がある。
   const unit = aggregationUnitFor(broadcast);
+  /*
+   * 送達台帳（#662）。
+   *
+   * `blocked` は**もう送ってはいけない相手**——送達済み（sent）と
+   * 送達不明（unknown）。この tick の始めに1回だけ引く。相手の id を
+   * 並べて `IN (...)` で引くと D1 のバインド上限（100）に当たるので、
+   * 配信ぶんをまとめて引いてから手元で照合する。
+   *
+   * `attemptNo` は試行の番号。失敗分の再送で進む。provider へ渡す再送キーに
+   * 混ぜるので、同じ試行の中での送り直しは LINE 側で重複が潰れ、試行を
+   * またぐ再送は台帳側で成功・送達不明を飛ばす。
+   */
+  const blocked = await getBlockedRecipientIds(db, broadcast.id);
+  const attemptNo = Number(raw.send_attempt_no ?? 1) || 1;
   let currentOffset = batchOffset;
   const tickStartOffset = batchOffset;
   const personalized = hasRecipientVariablesInParts(finalParts);
@@ -737,12 +806,33 @@ async function processQueuedBroadcastBatches(
 
   // 1回のCron実行で、上限まで処理する（タイムアウトしない範囲で）
   while (currentOffset < stopAt) {
+    /*
+     * 停止（#662）はここで効く。**次の一束へ進む前に必ず読み直す。**
+     *
+     * ロックを取ったあとに運用者が停止を押した場合、この tick は自分が
+     * 掴んだ束を送り終えている。送り終えた分を取り消すことはできない
+     * （相手のトークに残る）ので、**新しい束を始めないことで止める**。
+     * 途中まで進んだ位置を書き戻してロックを外し、再開でその続きから送る。
+     */
+    if (await isBroadcastStopped(db, broadcast.id)) {
+      await db.prepare(
+        `UPDATE broadcasts SET batch_offset = ?, batch_lock_at = NULL
+          WHERE id = ? AND stopped_at IS NOT NULL`,
+      ).bind(currentOffset, broadcast.id).run();
+      return;
+    }
     const batch = friends.slice(currentOffset, currentOffset + deliveryBatchSize);
-    const lineUserIds = batch.map(f => f.line_user_id);
     const batchIndex = Math.floor(currentOffset / deliveryBatchSize);
 
     if (personalized) {
       for (const friend of batch) {
+        // 台帳が「送達済み」「送達不明」と覚えている相手は飛ばす（#662）。
+        // 送達不明を飛ばすのは at-most-once のため——外へ出たかもしれない
+        // 相手を送り直すと、相手のトークに2通残って取り消せない。
+        if (blocked.has(friend.id)) {
+          currentOffset++;
+          continue;
+        }
         const alreadyLogged = await db.prepare(
           `SELECT 1 FROM messages_log
             WHERE broadcast_id = ? AND friend_id = ? AND direction = 'outgoing'
@@ -767,27 +857,55 @@ async function processQueuedBroadcastBatches(
           const retryKey = await createBroadcastRetryKey(
             broadcast.id,
             'personalized-push',
+            `attempt:${attemptNo}`,
             friend.id,
             JSON.stringify(personalizedMessages),
           );
+          // 外へ出す**直前**に台帳へ「出す」と書く。書いてから送ると、
+          // 送信と記録のあいだで Worker が消えても送達不明として残る。
+          // 逆にすると「届いたのに台帳は空」になり、次の試行が再送する。
+          await markBroadcastRecipientsDispatched(db, {
+            broadcastId: broadcast.id,
+            attemptNo,
+            lineAccountId: accountId,
+            friendIds: [friend.id],
+          });
           await lineClient.pushMessage(friend.line_user_id, personalizedMessages, retryKey, aggregationUnits(unit));
 
-          await db.batch(renderedParts.map((part) => db.prepare(
-            `INSERT INTO messages_log
-              (id, friend_id, direction, message_type, content, broadcast_id, scenario_step_id, source, line_account_id, created_at)
-             VALUES (?, ?, 'outgoing', ?, ?, ?, NULL, 'broadcast', ?, ?)`,
-          ).bind(
-            crypto.randomUUID(),
-            friend.id,
-            part.messageType,
-            part.messageContent,
-            broadcast.id,
-            accountId,
-            now,
-          )));
+          await db.batch([
+            ...renderedParts.map((part) => db.prepare(
+              `INSERT INTO messages_log
+                (id, friend_id, direction, message_type, content, broadcast_id, scenario_step_id, source, line_account_id, created_at)
+               VALUES (?, ?, 'outgoing', ?, ?, ?, NULL, 'broadcast', ?, ?)`,
+            ).bind(
+              crypto.randomUUID(),
+              friend.id,
+              part.messageType,
+              part.messageContent,
+              broadcast.id,
+              accountId,
+              now,
+            )),
+            ...buildBroadcastSettleStatements(db, {
+              broadcastId: broadcast.id,
+              friendIds: [friend.id],
+              state: 'sent',
+            }),
+          ]);
+          blocked.add(friend.id);
           currentOffset++;
         } catch (err) {
           console.error(`Personalized broadcast recipient ${friend.id} failed:`, err);
+          // 届いていないと断定できたものだけ再送の対象にする。分からない
+          // ものは送達不明のまま置き、この tick の残りも飛ばす。
+          const outcome = classifyDeliveryFailure(err);
+          await settleBroadcastRecipients(db, {
+            broadcastId: broadcast.id,
+            friendIds: [friend.id],
+            state: outcome,
+            errorCode: deliveryErrorCode(err),
+          });
+          if (outcome === 'unknown') blocked.add(friend.id);
           await db.prepare(
             `UPDATE broadcasts
                 SET batch_offset = ?, batch_lock_at = NULL,
@@ -818,6 +936,23 @@ async function processQueuedBroadcastBatches(
       continue;
     }
 
+    /*
+     * 台帳が覚えている相手を束から抜く（#662）。
+     *
+     *   送達済み（sent）   … もう届いている
+     *   送達不明（unknown）… 外へ出たかもしれない。送り直さない
+     *
+     * 抜いた結果が空なら、外の口は**一度も叩かない**で位置だけ進める。
+     * 失敗分の再送は先頭から歩き直すので、ここで叩いてしまうと送り終えた
+     * 相手へ2通目が出る。
+     */
+    const sendable = batch.filter((friend) => !blocked.has(friend.id));
+    if (sendable.length === 0) {
+      currentOffset += batch.length;
+      continue;
+    }
+    const lineUserIds = sendable.map(f => f.line_user_id);
+
     // ステルス遅延（最初のバッチ以外）
     if (batchIndex > 0) {
       const delay = calculateStaggerDelay(friends.length, batchIndex, deliveryBatchSize);
@@ -827,16 +962,33 @@ async function processQueuedBroadcastBatches(
     // テキストメッセージのバリエーションは先頭のテキスト1通だけに付ける。
     const batchMessages = varyTextMessages(messages, batchIndex, totalBatches);
 
+    const sendableIds = sendable.map((f) => f.id);
+    // 外へ出す直前に台帳へ「出す」と書く。ここで書いた印が残ったまま決着が
+    // 付かなければ、その相手は送達不明として再送の対象から外れる。
+    await markBroadcastRecipientsDispatched(db, {
+      broadcastId: broadcast.id,
+      attemptNo,
+      lineAccountId: accountId,
+      friendIds: sendableIds,
+    });
     try {
       const retryKey = await createBroadcastRetryKey(
         broadcast.id,
         'queued-multicast',
-        ...batch.map((f) => f.id),
+        `attempt:${attemptNo}`,
+        ...sendableIds,
         JSON.stringify(batchMessages),
       );
       await lineClient.multicast(lineUserIds, batchMessages, aggregationUnits(unit), retryKey);
     } catch (err) {
       console.error(`Queued broadcast batch ${batchIndex} send failed:`, err);
+      const outcome = classifyDeliveryFailure(err);
+      await settleBroadcastRecipients(db, {
+        broadcastId: broadcast.id,
+        friendIds: sendableIds,
+        state: outcome,
+        errorCode: deliveryErrorCode(err),
+      });
       // 送信失敗: ロック解除 + offsetを保存して次のCronで再開
       await updateBroadcastBatchProgress(db, broadcast.id, currentOffset, 0);
       return; // batch_offset が currentOffset に戻り、次の cron で再開可能
@@ -846,23 +998,42 @@ async function processQueuedBroadcastBatches(
     // line_account_id は queue path lock 時の broadcast.line_account_id を使う
     // (friends.line_account_id ではなく送信元アカウントを固定で記録)。
     const queuedBroadcastAccount = (broadcast as unknown as Record<string, unknown>).line_account_id as string | null;
+    const settleSent = () => buildBroadcastSettleStatements(db, {
+      broadcastId: broadcast.id,
+      friendIds: sendableIds,
+      state: 'sent',
+    });
     try {
-      const stmts = batch.flatMap(friend => finalParts.map(part =>
-        db.prepare(
-          `INSERT INTO messages_log (id, friend_id, direction, message_type, content, broadcast_id, scenario_step_id, source, line_account_id, created_at)
-           VALUES (?, ?, 'outgoing', ?, ?, ?, NULL, 'broadcast', ?, ?)`,
-        ).bind(crypto.randomUUID(), friend.id, part.messageType, part.messageContent, broadcast.id, queuedBroadcastAccount, now),
-      ));
+      const stmts = [
+        ...sendable.flatMap(friend => finalParts.map(part =>
+          db.prepare(
+            `INSERT INTO messages_log (id, friend_id, direction, message_type, content, broadcast_id, scenario_step_id, source, line_account_id, created_at)
+             VALUES (?, ?, 'outgoing', ?, ?, ?, NULL, 'broadcast', ?, ?)`,
+          ).bind(crypto.randomUUID(), friend.id, part.messageType, part.messageContent, broadcast.id, queuedBroadcastAccount, now),
+        )),
+        // 送達の記録と台帳の決着を**同じ batch** に載せる。分けて流すと、
+        // 記録だけ残って台帳が押さえたままの窓ができ、その相手が
+        // 「届いたのに送達不明」になる。
+        ...settleSent(),
+      ];
       await db.batch(stmts);
     } catch (logErr) {
       console.error(`Queued broadcast batch ${batchIndex} log failed (messages already sent):`, logErr);
+      // 記録に失敗しても、外の口は受け取っている。台帳だけは必ず閉じる。
+      // 閉じ損ねると次の試行がこの相手を送り直して2通目が出る。
+      try {
+        await db.batch(settleSent());
+      } catch (settleErr) {
+        console.error(`Queued broadcast batch ${batchIndex} ledger settle failed:`, settleErr);
+      }
     }
+    for (const friend of sendable) blocked.add(friend.id);
 
     currentOffset += batch.length;
     // Update success_count but keep batch_offset=-1 (locked) during processing
     await db.prepare(
       `UPDATE broadcasts SET success_count = success_count + ? WHERE id = ?`,
-    ).bind(batch.length, broadcast.id).run();
+    ).bind(sendable.length, broadcast.id).run();
   }
 
   // まだ残っている（時間をかけて配る設定で途中まで送った）。

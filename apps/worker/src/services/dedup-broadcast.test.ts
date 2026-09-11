@@ -379,6 +379,10 @@ function makeSendDb(opts: {
             progressUpdates.push({ progress: params[0], successCount: params[1] });
           }
           return {
+            // batch() に載った文を後から見分けるための印。どの文が
+            // どの batch に入ったか（= 何と何が同時に確定するか）を
+            // 試験が読めるようにする。
+            __sql: sql,
             async first<T>(): Promise<T | null> { return null; },
             async all<T>(): Promise<{ results: T[] }> {
               if (isSelectedCount) return { results: (opts.selectedCounts ?? []) as unknown as T[] };
@@ -491,8 +495,18 @@ describe('processMultiAccountDedupBroadcast', () => {
     );
     expect(result).toMatchObject({ totalCount: 1, successCount: 1 });
     expect((clients[0].calls[0].args[1] as unknown[])).toHaveLength(2);
-    // 2通の送信記録 + 受信者単位の進捗更新。
-    expect(batches[0]).toHaveLength(3);
+    // 2通の送信記録 + 受信者単位の進捗更新 + 送達台帳の決着（#662）。
+    // **同じ batch に載っていること**が要点。分けて流すと、記録だけ残って
+    // 台帳が押さえたままの窓ができ、その相手が「届いたのに送達不明」になる。
+    const deliveryBatch = batches.find((stmts) =>
+      (stmts as Array<{ __sql?: string }>).some((st) => st.__sql?.includes('INSERT INTO messages_log')),
+    )!;
+    expect(deliveryBatch).toBeDefined();
+    const sqls = (deliveryBatch as Array<{ __sql?: string }>).map((st) => st.__sql ?? '');
+    expect(sqls.filter((sql) => sql.includes('INSERT INTO messages_log'))).toHaveLength(2);
+    expect(sqls.filter((sql) => sql.includes('UPDATE broadcasts SET dedup_progress'))).toHaveLength(1);
+    expect(sqls.filter((sql) => sql.includes('UPDATE broadcast_send_claims'))).toHaveLength(1);
+    expect(deliveryBatch).toHaveLength(4);
   });
 
   it('one account multicast throws: other succeeds, failedAccountIds = [thrower]', async () => {
