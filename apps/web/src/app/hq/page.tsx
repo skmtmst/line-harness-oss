@@ -61,7 +61,7 @@ export default function HqPage() {
           <p className="mt-1 text-sm text-ink-secondary">LINE公式アカウントごとに店舗の管理画面へ移動できます。</p>
         </div>
         <Button href="/accounts/new" variant="primary" className="shrink-0">
-          ＋店舗の新規アカウント登録
+          ＋LINEアカウントを新規登録
         </Button>
       </header>
 
@@ -78,7 +78,7 @@ export default function HqPage() {
           <h2 className="text-xl font-bold text-ink">まだ店舗がありません</h2>
           <p className="mt-2 text-sm text-ink-secondary">最初のLINE公式アカウントを登録すると、ここから店舗へログインできます。</p>
           <Button href="/accounts/new" variant="primary" className="mt-6">
-            ＋店舗の新規アカウント登録
+            ＋LINEアカウントを新規登録
           </Button>
         </section>
       ) : null}
