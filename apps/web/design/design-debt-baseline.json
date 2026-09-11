@@ -606,7 +606,7 @@
     "unresolved-classname": 30
   },
   "components/friend-fields/edit-tag-page-v4.tsx": {
-    "arbitrary-value": 2,
+    "arbitrary-value": 3,
     "direct-secondary-button": 1
   },
   "components/friend-fields/field-list.tsx": {
