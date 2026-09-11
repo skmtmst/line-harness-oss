@@ -154,8 +154,12 @@ function toText(value: unknown): string {
 // 送信後の処理
 // ---------------------------------------------------------------------------
 
-/** メッセージを送る手段。route 側から渡す。テストでは差し替える。 */
-export type PushText = (text: string) => Promise<void>;
+/**
+ * メッセージを送る手段。route 側から渡す。テストでは差し替える。
+ * stableSuffix は再開時の再送でも同じ値になる送信の識別子で、LINE の
+ * 再送キーに使い分ける(連番にすると再開時にずれて二重送信になる)。
+ */
+export type PushText = (text: string, stableSuffix: string) => Promise<void>;
 
 export interface FormEffectInput {
   db: D1Database;
@@ -166,6 +170,22 @@ export interface FormEffectInput {
   push?: { defaultAccessToken: string; workerUrl?: string };
   /** テキスト送信・テンプレート送信で使う。無ければその動作は飛ばす */
   pushText?: PushText;
+  /**
+   * 回答送信の再開時に二重登録を避ける接頭辞。例: `form-submit:<answerId>`。
+   * 付けるとリマインダ登録に安定した sourceEventId を付けて重複を避ける。
+   */
+  idempotencyPrefix?: string;
+  /**
+   * 効果の実行前–完了の掛け金。再開時は終わった効果を飛ばし、終わった
+   * 効果だけを記録する(部分失敗の補完)。返さない・投げない hook は
+   * 効果を未完のままにしないこと。hook が投げた失敗は握らず、そのまま
+   * 呼び出し元へ返す(予約の所有者を失った合図など)。
+   */
+  skipEffect?: (effectId: string) => boolean;
+  onEffectComplete?: (
+    effectId: string,
+    stats: { attempted: number; succeeded: number; failed: number },
+  ) => Promise<void>;
 }
 
 export interface FormDestinationWriteStats {
@@ -176,6 +196,11 @@ export interface FormDestinationWriteStats {
 
 export interface FormEffectResult {
   destinationWrites: FormDestinationWriteStats;
+  /**
+   * 失敗して欠落した工程の名前。空ならすべて完了。
+   * route は空でないとき工程完了にせず、同じ送信の再送で補完する。
+   */
+  failedEffects: string[];
 }
 
 /**
@@ -183,17 +208,18 @@ export interface FormEffectResult {
  *
  * 途中で失敗しても後ろを続ける。1つの動作の失敗が、他の動作を巻き込んで
  * 全部落とすのが一番困る（タグは付いたのにシナリオが動かない、が
- * 分からなくなる）。
+ * 分からなくなる）。失敗した工程の名前は failedEffects に残す。
  */
 export async function applyFormLayoutEffects(input: FormEffectInput): Promise<FormEffectResult> {
   const { db, layout, friendId, answers } = input;
   const destinationWrites: FormDestinationWriteStats = { attempted: 0, succeeded: 0, failed: 0 };
+  const failedEffects: string[] = [];
 
   for (const block of collectInputs(layout)) {
     const value = answers[block.name];
     if (value === undefined) continue;
 
-    await runSafely('destinations', () => writeDestinations(
+    await runEffectStep(input, failedEffects, destinationWrites, `destinations:${block.id}`, () => writeDestinations(
       db,
       block,
       value,
@@ -202,33 +228,102 @@ export async function applyFormLayoutEffects(input: FormEffectInput): Promise<Fo
     ));
 
     if (hasChoices(block)) {
-      await runSafely('choices', () => runChoiceEffects(input, block, value, destinationWrites));
+      await runEffectStep(input, failedEffects, destinationWrites, `choices:${block.id}`, () =>
+        runChoiceEffects(input, block, value, destinationWrites, failedEffects));
     }
 
     if (block.type === 'date' && block.reminder?.reminderId) {
-      await runSafely('reminder', () =>
-        enrollFriendInReminder(db, {
-          friendId,
-          reminderId: block.reminder!.reminderId,
-          targetDate: toText(value),
-        }).then(() => undefined),
-      );
+      await runEffectStep(input, failedEffects, destinationWrites, `reminder:${block.id}`, () =>
+        enrollFormReminderOnce(input, block.reminder!.reminderId, toText(value)));
     }
   }
 
-  for (const action of layout.options?.afterActions ?? []) {
-    await runSafely('afterAction', () => runFormAction(input, action, destinationWrites));
+  const afterActions = layout.options?.afterActions ?? [];
+  for (let index = 0; index < afterActions.length; index += 1) {
+    const action = afterActions[index];
+    await runEffectStep(input, failedEffects, destinationWrites, `afterAction:${index}`, () =>
+      runFormAction(input, action, destinationWrites, index, `afterAction:${index}`));
   }
 
-  return { destinationWrites };
+  return { destinationWrites, failedEffects };
 }
 
-async function runSafely(label: string, run: () => Promise<unknown>): Promise<void> {
+/**
+ * 効果を1件実行する。再開時は終わった効果を飛ばし、終わった効果の集計
+ * だけを hook へ渡す。内側で握られた失敗(選択肢ごとの動作など)も、この
+ * 効果の未完として扱い、再送で補完できるようにする。hook の失敗だけは
+ * 握らず呼び出し元へ返す。
+ */
+async function runEffectStep(
+  input: FormEffectInput,
+  failed: string[],
+  stats: FormDestinationWriteStats,
+  effectId: string,
+  run: () => Promise<unknown>,
+): Promise<void> {
+  if (input.skipEffect?.(effectId)) return;
+  const beforeFailed = stats.failed;
+  const beforeInnerFailed = failed.length;
+  const before = { attempted: stats.attempted, succeeded: stats.succeeded, failed: stats.failed };
   try {
     await run();
   } catch (err) {
+    failed.push(effectId);
+    console.error(`form effect (${effectId}) failed:`, err);
+    return;
+  }
+  if (failed.length > beforeInnerFailed || stats.failed > beforeFailed) {
+    // 内側の動作が欠けたまま終わった。再開時に補完するため未完に残す。
+    if (!failed.includes(effectId)) failed.push(effectId);
+    console.error(`form effect (${effectId}) partial failure`);
+    return;
+  }
+  await input.onEffectComplete?.(effectId, {
+    attempted: stats.attempted - before.attempted,
+    succeeded: stats.succeeded - before.succeeded,
+    failed: stats.failed - before.failed,
+  });
+}
+
+async function runTracked(failed: string[], label: string, run: () => Promise<unknown>): Promise<void> {
+  try {
+    await run();
+  } catch (err) {
+    failed.push(label);
     console.error(`form effect (${label}) failed:`, err);
   }
+}
+
+/**
+ * リマインダの登録。二重登録を避けるため、接頭辞があるときは安定した
+ * 登録元idを付けて既存を確認してから登録する(再開時の再実行に備える)。
+ */
+async function enrollFormReminderOnce(
+  input: FormEffectInput,
+  reminderId: string,
+  targetDate: string,
+  keySuffix?: string,
+): Promise<void> {
+  const { db, friendId } = input;
+  const sourceEventId = input.idempotencyPrefix
+    ? `${input.idempotencyPrefix}:${keySuffix ?? `reminder:${reminderId}`}`
+    : null;
+  if (sourceEventId) {
+    const existing = await db
+      .prepare(
+        `SELECT 1 AS found FROM friend_reminders
+         WHERE friend_id = ? AND reminder_id = ? AND source_event_id = ? LIMIT 1`,
+      )
+      .bind(friendId, reminderId, sourceEventId)
+      .first<{ found: number }>();
+    if (existing?.found) return;
+  }
+  await enrollFriendInReminder(db, {
+    friendId,
+    reminderId,
+    targetDate,
+    sourceEventId,
+  }).then(() => undefined);
 }
 
 /**
@@ -249,9 +344,11 @@ async function writeDestinations(
   const text = toText(value);
 
   for (const fieldId of dest.friendFieldIds ?? []) {
+    // 書けない相手(EC正・削除済み)は数えない。数えると「失敗」になり、
+    // 再送しても直らない工程が未完のまま残る。
+    const target = await getFriendFieldById(db, fieldId);
+    if (!target || target.ec_is_master === 1) continue;
     await trackDestinationWrite(stats, 1, async () => {
-      const target = await getFriendFieldById(db, fieldId);
-      if (!target || target.ec_is_master === 1) return false;
       await setFriendFieldValue(db, {
         friendId,
         fieldId,
@@ -308,6 +405,7 @@ async function runChoiceEffects(
   block: FormInputBlock,
   value: unknown,
   stats: FormDestinationWriteStats,
+  failed: string[],
 ): Promise<void> {
   const selected = toLabels(value);
   if (selected.length === 0) return;
@@ -321,11 +419,16 @@ async function runChoiceEffects(
       case 'friendField':
         await applyChoiceFriendField(input, block, choice, stats);
         break;
-      case 'action':
-        for (const action of choice.actions ?? []) {
-          await runSafely('choiceAction', () => runFormAction(input, action, stats));
+      case 'action': {
+        const actions = choice.actions ?? [];
+        for (let actionIndex = 0; actionIndex < actions.length; actionIndex += 1) {
+          const action = actions[actionIndex];
+          const actionLabel = `choiceAction:${block.id}:${choice.id}:${actionIndex}`;
+          await runTracked(failed, actionLabel, () =>
+            runFormAction(input, action, stats, undefined, actionLabel));
         }
         break;
+      }
       default:
         // 動作を決めていない選択肢は、回答として残すだけ
         break;
@@ -353,9 +456,10 @@ async function applyChoiceFriendField(
 ): Promise<void> {
   const fieldId = block.choiceFriendFieldId;
   if (!fieldId) return;
+  // 書けない相手は数えない(再送しても直らない未完にしない)。
+  const target = await getFriendFieldById(input.db, fieldId);
+  if (!target || target.ec_is_master === 1) return;
   await trackDestinationWrite(stats, 1, async () => {
-    const target = await getFriendFieldById(input.db, fieldId);
-    if (!target || target.ec_is_master === 1) return false;
     // 値を書いていない選択肢は、ラベルをそのまま入れる
     const value = choice.value && choice.value !== '' ? choice.value : choice.label;
     await setFriendFieldValue(input.db, {
@@ -368,17 +472,24 @@ async function applyChoiceFriendField(
   });
 }
 
-/** 1つの動作を実行する。 */
+/**
+ * 1つの動作を実行する。pushSuffix は送信の安定した識別子で、再開時の
+ * 再送でも同じ値になるものを呼ぶ側が渡す(省略時は動作の種類で代用する)。
+ */
 export async function runFormAction(
   input: FormEffectInput,
   action: FormAction,
   destinationWrites?: FormDestinationWriteStats,
+  actionIndex?: number,
+  pushSuffix?: string,
 ): Promise<void> {
   const { db, friendId } = input;
 
   switch (action.kind) {
     case 'send_text':
-      if (input.pushText && action.text) await input.pushText(action.text);
+      if (input.pushText && action.text) {
+        await input.pushText(action.text, pushSuffix ?? `send_text:${action.text}`);
+      }
       return;
 
     case 'send_template': {
@@ -391,7 +502,9 @@ export async function runFormAction(
         console.warn('form action: skipped non-text template', action.templateId);
         return;
       }
-      if (template.message_content) await input.pushText(template.message_content);
+      if (template.message_content) {
+        await input.pushText(template.message_content, pushSuffix ?? `send_template:${action.templateId}`);
+      }
       return;
     }
 
@@ -414,9 +527,10 @@ export async function runFormAction(
 
     case 'friend_field': {
       if (!action.fieldId) return;
+      // 書けない相手は数えない(再送しても直らない未完にしない)。
+      const target = await getFriendFieldById(db, action.fieldId);
+      if (!target || target.ec_is_master === 1) return;
       const write = async () => {
-        const target = await getFriendFieldById(db, action.fieldId!);
-        if (!target || target.ec_is_master === 1) return false;
         await setFriendFieldValue(db, {
           friendId,
           fieldId: action.fieldId!,
@@ -447,15 +561,20 @@ export async function runFormAction(
       await enrollFriendInScenario(db, friendId, action.scenarioId);
       return;
 
-    case 'reminder':
+    case 'reminder': {
       if (!action.reminderId) return;
-      await enrollFriendInReminder(db, {
-        friendId,
-        reminderId: action.reminderId,
-        // 起点の日付を持たない動作なので、今日から動かす
-        targetDate: jstNow().slice(0, 10),
-      });
+      const reminderLabel = actionIndex === undefined
+        ? `reminder:action:${action.reminderId}`
+        : `reminder:afterAction:${actionIndex}`;
+      // 起点の日付を持たない動作なので、今日から動かす
+      await enrollFormReminderOnce(
+        input,
+        action.reminderId,
+        jstNow().slice(0, 10),
+        reminderLabel,
+      );
       return;
+    }
 
     default:
       return;
