@@ -23,10 +23,11 @@ async function enterConnectionStep() {
   await waitFor(() => expect(calls.list).toHaveBeenCalledOnce())
   fill('account-name', '試験用アカウント')
   next()
+  expect(screen.getByText('2. LINE側の準備を確認')).toBeTruthy()
+  next()
   fill('channel-id', '123456')
   fill('channel-secret', 'synthetic-secret')
   fill('channel-access-token', 'synthetic-token')
-  next()
   fill('login-channel-id', '789012')
   fill('login-channel-secret', 'synthetic-login-secret')
   fill('liff-id', '789012-example')
@@ -34,8 +35,7 @@ async function enterConnectionStep() {
 }
 async function confirmConnection() {
   fireEvent.click(screen.getByRole('button', { name: '接続を確かめる' }))
-  await waitFor(() => expect(screen.getByText('すべての接続を確認できました。次へ進めます。')).toBeTruthy())
-  next()
+  await waitFor(() => expect(screen.getByText('すべての接続を確認できました。登録できます。')).toBeTruthy())
 }
 
 describe('アカウント作成ウィザード', () => {
@@ -52,13 +52,34 @@ describe('アカウント作成ウィザード', () => {
     expect(screen.getByRole('button', { name: 'タイムゾーン' })).toBeTruthy()
   })
 
+  it('準備の後に6認証項目をまとめて入力し、未入力なら接続段階へ進めない', async () => {
+    render(<NewLineAccountPage />)
+    fill('account-name', '試験用')
+    next()
+    expect(screen.getByText('2. LINE側の準備を確認')).toBeTruthy()
+    fireEvent.click(screen.getByRole('checkbox', { name: 'LINE公式アカウントを用意' }))
+    next()
+    for (const id of ['channel-id', 'channel-secret', 'channel-access-token', 'login-channel-id', 'login-channel-secret', 'liff-id']) {
+      expect((document.getElementById(id) as HTMLInputElement).required).toBe(true)
+    }
+    for (const id of ['channel-secret', 'channel-access-token', 'login-channel-secret']) {
+      expect((document.getElementById(id) as HTMLInputElement).type).toBe('password')
+    }
+    next()
+    expect(screen.getByText('チャネルIDを入力してください。')).toBeTruthy()
+    expect(screen.getByText('LIFF IDを入力してください。')).toBeTruthy()
+    expect(calls.verify).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: '戻る' }))
+    expect((screen.getByRole('checkbox', { name: 'LINE公式アカウントを用意' }) as HTMLInputElement).checked).toBe(true)
+  })
+
   it('接続失敗時は保存せず最終確認へ進めない', async () => {
     calls.verify.mockResolvedValue({ success: false, error: 'private provider error' })
     await enterConnectionStep()
     fireEvent.click(screen.getByRole('button', { name: '接続を確かめる' }))
     await screen.findByText('接続を確認できませんでした。入力内容とLINE Developersの設定を確認してください。')
-    next()
-    expect(screen.getByText('接続確認がすべて通ってから次へ進んでください。')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '接続を確かめて保存' }))
+    expect(screen.getByText('接続確認がすべて通ってから登録してください。')).toBeTruthy()
     expect(calls.create).not.toHaveBeenCalled()
     expect(document.body.textContent).not.toContain('private provider error')
   })
@@ -89,5 +110,7 @@ describe('アカウント作成ウィザード', () => {
     await screen.findByText('登録が完了しました', { selector: 'h2' })
     expect(screen.getByRole('link', { name: '登録したアカウントを見る' }).getAttribute('href')).toBe('/accounts/detail?id=new-account')
     expect(document.querySelector('input[type="password"]')).toBeNull()
+    expect(screen.getByRole('link', { name: 'アカウント一覧へ' }).getAttribute('href')).toBe('/accounts')
+    expect(document.querySelector('[aria-current="step"]')?.textContent).toContain('完了')
   })
 })
