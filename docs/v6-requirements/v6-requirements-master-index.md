@@ -59,6 +59,8 @@
 | 32 | 運用状態 | [詳細](./v6-32-operations-status-requirements-draft.md) | server監視、kill switch、復旧、追記履歴 |
 | 33 | アカウント設定 | [詳細](./v6-33-account-settings-requirements-draft.md) | LINE公式アカウントの登録・検証・切替、Webhook URL突合、Lステップからの乗り換え |
 | 34 | はじめの設定と案内 | [詳細](./v6-34-onboarding-guidance-requirements-draft.md) | 初回セットアップの順路、レシピ、マニュアル導線、エラー文面 |
+| 35 | バナー生成（統括） | [詳細](./v6-35-banner-generation-requirements-draft.md) | 統括でのAI画像生成、プロジェクト、画像ライブラリ、店舗へ渡す、月間上限（2026-09-12 追加） |
+| 36 | 統括アカウント・課金・お問い合わせ | [詳細](./v6-36-hq-account-billing-requirements-draft.md) | 統括の左下アカウントメニュー、メンバー管理、課金プラン（3種・仮）と無料トライアル、お問い合わせ、会員登録（2026-09-12 追加） |
 
 ## 3. 実装判断
 
