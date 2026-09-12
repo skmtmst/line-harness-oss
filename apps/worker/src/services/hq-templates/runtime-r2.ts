@@ -153,7 +153,7 @@ export type R2StoreOutcome = { status: HqTemplateDistributionResult['status']; r
 
 const MAX_IO_ATTEMPTS = 3;
 
-/** R2-backed store with bounded I/O retry; stale interrupted claims terminate safely. */
+/** R2-backed store with bounded I/O retry. Active R2 claims are never stolen by time alone. */
 export async function executeR2RuntimeStore(options: R2StoreOptions): Promise<R2StoreOutcome> {
   const { db, authority, templateId, runId } = options;
   if (requireHqTemplateAuthority(authority).kind !== 'AUTHORIZED' || options.context.tenantId !== authority.tenantId) fail('FORBIDDEN');
@@ -182,13 +182,6 @@ export async function executeR2RuntimeStore(options: R2StoreOptions): Promise<R2
   if (previous && (previous.template_id !== templateId || previous.template_version_id !== p!.template_version_id || previous.preflight_id !== p!.id || previous.snapshot_token !== p!.snapshot_token || previous.idempotency_fingerprint !== runId)) fail('INVALID_PREFLIGHT');
   if (previous) {
     await checkReceipt();
-    if (previous.status === 'staged' && Date.parse(previous.started_at) <= Date.now() - 2 * 60_000) {
-      await db.prepare(`UPDATE hq_template_distribution_results SET status='failed',error_code='INTERRUPTED',finished_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE run_id=? AND tenant_id=? AND target_account_id=? AND status='staged' AND started_at=?`).bind(runId, authority.tenantId, context.targetAccountId, previous.started_at).run();
-      const recovered = await read();
-      if (!recovered) fail('RESULT_UNAVAILABLE');
-      const cleanupPending = !(await reconcileFailedOwnedImages({ ...options, templateVersionId: p!.template_version_id }, runId, context.targetAccountId));
-      return { status: recovered!.status, reused: true, ...(cleanupPending ? { cleanupPending: true } : {}) };
-    }
     if (previous.status !== 'pending') {
       const cleanupPending = previous.status === 'failed' ? !(await reconcileFailedOwnedImages({ ...options, templateVersionId: p!.template_version_id }, runId, context.targetAccountId)) : false;
       return { status: previous.status, reused: true, ...(cleanupPending ? { cleanupPending: true } : {}) };
