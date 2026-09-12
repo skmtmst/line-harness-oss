@@ -10209,6 +10209,14 @@ export type WebinarNotificationSettingsInput = Omit<
   'webinarId' | 'version' | 'updatedAt'
 >
 
+export type WebinarSkipReasonCount = {
+  /** 記録された理由の符号。古い行では null のことがある。 */
+  code: string | null
+  /** 画面に出す日本語。 */
+  label: string
+  count: number
+}
+
 export type WebinarNotificationOverview = {
   total: number
   pending: number
@@ -10216,6 +10224,13 @@ export type WebinarNotificationOverview = {
   failed: number
   skipped: number
   cancelled: number
+  /**
+   * 見送りの内訳（#745）。
+   *
+   * 「見送り 5件」だけでは、**視聴済みだから送らなかった**（正常）のか、
+   * **対象回が終了済みで落ちた**（もう取り戻せない）のかが分かりません。
+   */
+  skippedReasons: WebinarSkipReasonCount[]
   audience: {
     people: number
     bookings: number
