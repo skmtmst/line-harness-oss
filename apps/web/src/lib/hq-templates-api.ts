@@ -1,4 +1,5 @@
 import { ApiError, fetchApi } from './api'
+import type { FormLayout } from '@line-crm/shared'
 
 export const TEMPLATE_TYPES = ['tag', 'template', 'rich_menu', 'form'] as const
 export type TemplateType = typeof TEMPLATE_TYPES[number]
@@ -9,11 +10,61 @@ export interface HqTemplate {
 }
 export interface TagDefinition {
   schemaVersion: 1
-  tag: { name: string; color?: string; description?: string; folderId?: string }
-  folders: { id: string; name: string; parentId?: string; color?: string }[]
+  tag: { name: string; color?: string; description?: string | null; folderId?: string | null }
+  folders: { id: string; name: string; parentId?: string | null; color?: string | null }[]
 }
-export interface TemplateInput { type: 'tag'; name: string; description?: string; definition: TagDefinition }
-export interface TemplateDetail { template: HqTemplate; definition: TagDefinition }
+export interface MessageTemplateDefinition {
+  schemaVersion: 1
+  template: {
+    id: string; name: string; category: string
+    messageType: 'text' | 'image' | 'flex' | 'carousel'
+    messageContent: string; carouselActionsJson: string | null
+    carouselTapLimitMode: 'none' | 'once'; carouselTapLimitText: string | null
+    questionJson: string | null; questionStatus: 'draft' | 'published'
+  }
+  media: Array<{
+    id: string; kind: 'image' | 'video' | 'audio' | 'file'; filename: string; mimeType: string
+    sizeBytes: number; width: number | null; height: number | null; durationMs: number | null
+    r2Key: string; publicUrl: string | null; versionId: string; versionNo: number; contentHash: string
+  }>
+}
+export interface RichMenuDefinition {
+  schemaVersion: 1
+  richMenu: {
+    id: string; name: string; chatBarText: string; size: 'large' | 'compact'; defaultPageId: string
+    pages: Array<{
+      id: string; name: string; imageR2Key: string
+      areas: Array<{
+        id: string; bounds: { x: number; y: number; width: number; height: number }
+        actionType: 'uri' | 'message' | 'postback' | 'richmenuswitch'; actionData: Record<string, string>
+        intent?: 'url' | 'text' | 'form' | 'template' | 'switch'; label?: string
+        tagIds?: string[]; formId?: string; templateId?: string; scenarioId?: string
+      }>
+    }>
+  }
+}
+export type FormFieldType = 'text' | 'textarea' | 'radio' | 'checkbox' | 'select' | 'file' | 'date' | 'prefecture'
+export interface FormDefinition {
+  schemaVersion: 1
+  form: {
+    name: string; description: string | null
+    fields: Array<{ name: string; label: string; type: FormFieldType; required?: boolean; options?: string[]; placeholder?: string | null; description?: string | null }>
+    layout: FormLayout | null; on_submit_tag_id: string | null; on_submit_scenario_id: string | null; save_to_metadata: boolean
+  }
+}
+export interface TemplateDefinitionByType {
+  tag: TagDefinition
+  template: MessageTemplateDefinition
+  rich_menu: RichMenuDefinition
+  form: FormDefinition
+}
+export type TemplateDefinition = TemplateDefinitionByType[TemplateType]
+export type TemplateInput = {
+  [K in TemplateType]: { type: K; name: string; description?: string; definition: TemplateDefinitionByType[K] }
+}[TemplateType]
+export type TemplateDetail = {
+  [K in TemplateType]: { template: HqTemplate & { template_type: K }; definition: TemplateDefinitionByType[K] }
+}[TemplateType]
 export interface HqAccount { id: string; name: string }
 export interface PreflightItem {
   sourceId: string; itemKind: string; name: string; targetId?: string | null
