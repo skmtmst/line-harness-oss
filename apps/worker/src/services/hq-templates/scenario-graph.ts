@@ -55,7 +55,7 @@ export function collectJsonReferences(value: unknown): ScenarioGraphReference[] 
       for (const id of item as unknown[]) add('tag', id);
       return;
     }
-    if (key && /^(?:folderId|friendFieldId|friendFieldIds|fieldId|markId|reminderId|eventId|mediaId|formId|trackedLinkId|richMenuId|accountId|lineAccountId)$/.test(key)) {
+    if (key && /^(?:folderId|friendFieldId|friendFieldIds|fieldId|markId|reminderId|eventId|mediaId|mediaUrl|imageUrl|backgroundImageUrl|backgroundUrl|originalContentUrl|previewImageUrl|videoUrl|audioUrl|formId|trackedLinkId|richMenuId|accountId|lineAccountId)$/.test(key)) {
       if (item != null && item !== '' && !(Array.isArray(item) && item.length === 0)) unsupported();
       return;
     }
@@ -64,7 +64,11 @@ export function collectJsonReferences(value: unknown): ScenarioGraphReference[] 
       return;
     }
     if (Array.isArray(item)) { for (const child of item) visit(child); return; }
-    if (item && typeof item === 'object') for (const [childKey, child] of Object.entries(item)) visit(child, childKey);
+    if (item && typeof item === 'object') {
+      const record = item as Record<string, unknown>;
+      if (['image', 'video', 'audio'].includes(String(record.type)) && typeof record.url === 'string' && record.url) unsupported();
+      for (const [childKey, child] of Object.entries(record)) visit(child, childKey);
+    }
   };
   visit(value);
   return [...refs.values()];
@@ -144,6 +148,7 @@ export async function loadScenarioReferenceGraph(db: D1Database, tenantId: strin
     if (!row) unavailable();
     ensureSameAccount(row!);
     if (row!.folder_id || row!.created_from_recipe_id || row!.recipe_clone_run_id) unsupported();
+    if (['image', 'video', 'audio'].includes(String(row!.message_type)) || ['image', 'video', 'audio'].includes(String(row!.draft_message_type))) unsupported();
     const refs: ScenarioGraphReference[] = [];
     for (const field of ['message_content', 'carousel_actions_json', 'question_json', 'draft_message_content', 'draft_carousel_actions_json', 'draft_question_json']) {
       const raw = row![field];
@@ -185,6 +190,7 @@ export async function loadScenarioReferenceGraph(db: D1Database, tenantId: strin
       if (step.template_id) localAdd('template', step.template_id);
       if (step.on_reach_tag_id) localAdd('tag', step.on_reach_tag_id);
       if (step.condition_type || step.condition_value) unsupported();
+      if (['image', 'video', 'audio'].includes(String(step.message_type))) unsupported();
       if (hasPortableScenarioReference(step.message_content)) unsupported();
       if (/^\s*[\[{]/.test(String(step.message_content))) for (const ref of collectJsonReferences(parseJson(step.message_content))) localAdd(ref.kind, ref.sourceId);
       for (const field of ['message_bubbles_json', 'target_condition_json', 'question_json']) {

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import { createTestD1, type SqliteD1 } from '../../test-utils/d1-sqlite.js';
 import { inspectFormTemplate, inspectFormTemplateReferences } from './form.js';
-import { buildFormRuntimePlan, executeFormStore, executeHqAtomicStore } from './runtime.js';
+import { buildFormRuntimePlan, createFormReferenceResolver, executeFormStore, executeHqAtomicStore } from './runtime.js';
 import type { HqTemplateAdapterContext, HqTemplateAuthority } from './contract.js';
 let fixture: SqliteD1;
 const authority: HqTemplateAuthority = { tenantId: 'tenant', actorId: 'owner', role: 'owner', readOnly: false, accountScoped: false };
@@ -138,6 +138,37 @@ describe('form runtime and atomic store execution', () => {
     fixture.raw.exec("INSERT INTO templates(id,name,message_type,message_content,line_account_id) VALUES ('source-template','案内','text','本文','source'),('target-template-a','案内','text','A','a'),('target-template-b','案内','text','B','a'); INSERT INTO scenarios(id,name,trigger_type,line_account_id) VALUES ('source-scenario','案内シナリオ','manual','source'); INSERT INTO scenario_steps(id,scenario_id,step_order,message_type,message_content,template_id) VALUES ('source-step','source-scenario',1,'text','控え','source-template')");
     fixture.raw.prepare("UPDATE hq_template_versions SET definition_json=? WHERE id='version'").run(JSON.stringify({...definition,form:{...definition.form,on_submit_scenario_id:'source-scenario'}}));
     await expect(preflight('a')).rejects.toMatchObject({code:'SELECTION_REQUIRED'}); expect(count('forms')).toBe(0);
+  });
+  test('a direct tag already planned before its scenario graph is not inserted twice',async()=>{
+    fixture.raw.exec("INSERT INTO scenarios(id,name,trigger_type,trigger_tag_id,line_account_id) VALUES ('source-scenario','タグ開始','tag_added','source-tag','source'); INSERT INTO scenario_triggers(id,scenario_id,kind,tag_id) VALUES ('source-trigger','source-scenario','tag_added','source-tag')");
+    fixture.raw.prepare("UPDATE hq_template_versions SET definition_json=? WHERE id='version'").run(JSON.stringify({...definition,form:{...definition.form,on_submit_scenario_id:'source-scenario'}}));
+    const context=await preflight('a'), resolve=createFormReferenceResolver({db:fixture.db,authority});
+    const tag=await resolve({kind:'tag',sourceId:'source-tag'},context);
+    const scenario=await resolve({kind:'scenario',sourceId:'source-scenario'},context);
+    expect(tag.dbCommit?.filter(statement=>statement.sql.startsWith('INSERT INTO tags'))).toHaveLength(1);
+    expect(scenario.dbCommit?.filter(statement=>statement.sql.startsWith('INSERT INTO tags'))).toHaveLength(0);
+  });
+  test('a scenario reachable only through template JSON is included in the atomic clone',async()=>{
+    fixture.raw.exec(`
+      INSERT INTO templates(id,name,message_type,message_content,carousel_actions_json,line_account_id) VALUES ('source-template','分岐テンプレート','carousel','{}','{"0":{"0":[{"scenarioId":"source-child"}]}}','source');
+      INSERT INTO scenarios(id,name,trigger_type,line_account_id) VALUES ('source-root','入口','manual','source'),('source-child','分岐先','manual','source');
+      INSERT INTO scenario_steps(id,scenario_id,step_order,message_type,message_content,template_id) VALUES ('source-root-step','source-root',1,'text','控え','source-template'),('source-child-step','source-child',1,'text','到着',NULL);
+    `);
+    fixture.raw.prepare("UPDATE hq_template_versions SET definition_json=? WHERE id='version'").run(JSON.stringify({...definition,form:{...definition.form,on_submit_scenario_id:'source-root'}}));
+    const context=await preflight('a');
+    expect(context.resolutions.map(row=>row.sourceId)).toContain('scenario:source-child');
+    expect((await executeFormStore(options(context))).status).toBe('succeeded');
+    expect(fixture.raw.prepare("SELECT count(*) n FROM scenarios WHERE line_account_id='a'").get()).toEqual({n:2});
+    const template=fixture.raw.prepare("SELECT carousel_actions_json FROM templates WHERE line_account_id='a'").get() as {carousel_actions_json:string};
+    expect(template.carousel_actions_json).not.toContain('source-child');
+    expect(fixture.raw.pragma('foreign_key_check')).toEqual([]);
+  });
+  test.each(['step-image','template-flex-image'])('non-portable media in scenario graph (%s) fails closed during preflight',async kind=>{
+    fixture.raw.exec("INSERT INTO scenarios(id,name,trigger_type,line_account_id) VALUES ('source-scenario','画像案内','manual','source')");
+    if(kind==='step-image') fixture.raw.exec("INSERT INTO scenario_steps(id,scenario_id,step_order,message_type,message_content) VALUES ('source-step','source-scenario',1,'image','https://cdn.example.invalid/source-only.jpg')");
+    else fixture.raw.exec("INSERT INTO templates(id,name,message_type,message_content,line_account_id) VALUES ('source-template','画像カード','flex','{\"type\":\"bubble\",\"hero\":{\"type\":\"image\",\"url\":\"https://cdn.example.invalid/source-only.jpg\"}}','source'); INSERT INTO scenario_steps(id,scenario_id,step_order,message_type,message_content,template_id) VALUES ('source-step','source-scenario',1,'text','控え','source-template')");
+    fixture.raw.prepare("UPDATE hq_template_versions SET definition_json=? WHERE id='version'").run(JSON.stringify({...definition,form:{...definition.form,on_submit_scenario_id:'source-scenario'}}));
+    await expect(preflight('a')).rejects.toMatchObject({code:'UNSUPPORTED_REFERENCE'}); expect(count('forms')).toBe(0);
   });
   test('concurrent replay observes staged and never starts another business plan',async()=>{
     const c=await preflight('a');let release!:()=>void,entered!:()=>void,builds=0;

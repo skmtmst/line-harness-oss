@@ -100,18 +100,21 @@ export function createFormReferenceResolver({ db, authority }: { db: D1Database;
     let graph;
     try { graph = await loadScenarioReferenceGraph(db, authority.tenantId, [reference.sourceId]); }
     catch (error) { if (error instanceof ScenarioGraphError) fail(error.code); throw error; }
-    const statements: HqTemplateStatement[] = [], ids = new Map<string, string>(), names = new Map<string, string>(), modes = new Map<string, string>();
+    const statements: HqTemplateStatement[] = [], ids = new Map<string, string>(), names = new Map<string, string>(), modes = new Map<string, string>(), preResolved = new Set<string>();
     for (const ref of graph.references) {
+      const resourceKey = formReferenceKey(ref.kind, ref.sourceId), existing = resolved.get(resourceKey);
       const source = ref.kind === 'tag' ? graph.tags.get(ref.sourceId) : ref.kind === 'template' ? graph.templates.get(ref.sourceId) : graph.scenarios.get(ref.sourceId)?.row;
       if (!source) fail('REFERENCE_UNAVAILABLE');
       const safeSource = source as DbRow;
       const { rows, match } = await destination(ref, String(safeSource.name), context);
       const selection = validateSelection(ref, context, match);
-      const name = match && selection.mode === 'alias' ? nextAliasName(String(safeSource.name), rows.map(row => row.name)) : String(safeSource.name);
-      const targetId = match && selection.mode === 'overwrite' ? match.id : crypto.randomUUID();
-      ids.set(ref.sourceId, targetId); names.set(formReferenceKey(ref.kind, ref.sourceId), name); modes.set(formReferenceKey(ref.kind, ref.sourceId), selection.mode);
-      resolved.set(formReferenceKey(ref.kind, ref.sourceId), { targetId, aliasName: selection.mode === 'alias' ? name : undefined });
-      if (match && selection.mode === 'overwrite') {
+      const name = existing?.aliasName ?? (match && selection.mode === 'alias' ? nextAliasName(String(safeSource.name), rows.map(row => row.name)) : String(safeSource.name));
+      const targetId = existing?.targetId ?? (match && selection.mode === 'overwrite' ? match.id : crypto.randomUUID());
+      if (match && selection.mode === 'overwrite' && targetId !== match.id) fail('SELECTION_REQUIRED');
+      ids.set(ref.sourceId, targetId); names.set(resourceKey, name); modes.set(resourceKey, selection.mode);
+      if (existing) preResolved.add(resourceKey);
+      else resolved.set(resourceKey, { targetId, aliasName: selection.mode === 'alias' ? name : undefined });
+      if (!existing && match && selection.mode === 'overwrite') {
         const targetGuard = ref.kind === 'tag'
           ? guard(`EXISTS(SELECT 1 FROM tags WHERE id=? AND line_account_id=? AND version=? AND updated_at IS ? AND status='active')`, [match.id, context.targetAccountId, match.version!, match.updated_at])
           : ref.kind === 'template'
@@ -123,11 +126,13 @@ export function createFormReferenceResolver({ db, authority }: { db: D1Database;
     statements.push(...scenarioGraphSourceGuardStatements(graph));
     for (const row of graph.tags.values()) {
       const key = formReferenceKey('tag', String(row.id)), mode = modes.get(key)!, targetId = ids.get(String(row.id))!, name = names.get(key)!;
+      if (preResolved.has(key)) continue;
       if (mode === 'overwrite') statements.push({ sql: `UPDATE tags SET name=?,normalized_name=?,color=?,description=?,version=version+1,updated_by=?,updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=? AND line_account_id=?`, bindings: [name, normalizeScopedTagName(name), row.color, row.description, authority.actorId, targetId, context.targetAccountId] });
       else statements.push({ sql: `INSERT INTO tags(id,name,normalized_name,color,description,line_account_id,created_by,updated_by,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,strftime('%Y-%m-%dT%H:%M:%fZ','now'),strftime('%Y-%m-%dT%H:%M:%fZ','now'))`, bindings: [targetId, name, normalizeScopedTagName(name), row.color, row.description, context.targetAccountId, authority.actorId, authority.actorId] });
     }
     for (const row of graph.templates.values()) {
       const key = formReferenceKey('template', String(row.id)), mode = modes.get(key)!, targetId = ids.get(String(row.id))!;
+      if (preResolved.has(key)) continue;
       const clone: DbRow = { ...row, id: targetId, name: names.get(key)!, line_account_id: context.targetAccountId, folder_id: null, created_from_recipe_id: null, recipe_clone_run_id: null, published_version: 0, published_at: null, publish_idempotency_key: null };
       for (const field of ['message_content','carousel_actions_json','question_json','draft_message_content','draft_carousel_actions_json','draft_question_json']) if (clone[field] != null) clone[field] = remapScenarioJson(clone[field], ids);
       delete clone.created_at; delete clone.updated_at;
@@ -139,8 +144,10 @@ export function createFormReferenceResolver({ db, authority }: { db: D1Database;
     const ordered: string[] = [], seen = new Set<string>();
     const order = (id: string) => { if (seen.has(id)) return; seen.add(id); const node = graph.scenarios.get(id)!; for (const ref of node.references) if (ref.kind === 'scenario') order(ref.sourceId); ordered.push(id); };
     order(reference.sourceId);
+    for (const sourceId of graph.scenarios.keys()) order(sourceId);
     for (const sourceId of ordered) {
       const node = graph.scenarios.get(sourceId)!, key = formReferenceKey('scenario', sourceId), mode = modes.get(key)!, targetId = ids.get(sourceId)!;
+      if (preResolved.has(key)) continue;
       const clone: DbRow = { ...node.row, id: targetId, name: names.get(key)!, line_account_id: context.targetAccountId, is_active: 0, trigger_tag_id: node.row.trigger_tag_id ? ids.get(String(node.row.trigger_tag_id)) ?? fail('REFERENCE_UNAVAILABLE') : null, on_complete_scenario_id: node.row.on_complete_scenario_id ? ids.get(String(node.row.on_complete_scenario_id)) ?? fail('REFERENCE_UNAVAILABLE') : null, folder_id: null, created_from_recipe_id: null, recipe_clone_run_id: null, current_published_version_id: null };
       delete clone.created_at; delete clone.updated_at;
       if (mode === 'overwrite') {
