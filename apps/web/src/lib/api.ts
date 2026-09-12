@@ -4227,8 +4227,13 @@ export const api = {
   },
   tags: {
     /** withCounts で friendCount 付き (JOIN 集計 — タグ管理ページ用)。 */
-    list: (params?: { withCounts?: boolean }) =>
-      fetchApi<ApiResponse<Tag[]>>(`/api/tags${params?.withCounts ? '?withCounts=1' : ''}`),
+    list: (params?: { withCounts?: boolean; accountId?: string | null }) => {
+      const query = new URLSearchParams()
+      if (params?.withCounts) query.set('withCounts', '1')
+      if (params?.accountId) query.set('lineAccountId', params.accountId)
+      const suffix = query.size > 0 ? `?${query.toString()}` : ''
+      return fetchApi<ApiResponse<Tag[]>>(`/api/tags${suffix}`)
+    },
     /** CSVを保存せずに検査し、行ごとの扱いを返す。 */
     importPreview: (rows: TagCsvImportInputRow[]) =>
       fetchApi<ApiResponse<TagCsvImportPreview>>('/api/tags/import/preview', {
@@ -5339,21 +5344,26 @@ export const api = {
       fetchApi<ApiResponse<null>>(`/api/folders/${id}`, { method: 'DELETE' }),
   },
   tagGroups: {
-    list: () => fetchApi<ApiResponse<TagGroup[]>>('/api/tag-groups'),
+    list: (accountId?: string | null) => fetchApi<ApiResponse<TagGroup[]>>(
+      `/api/tag-groups${accountId ? `?lineAccountId=${encodeURIComponent(accountId)}` : ''}`,
+    ),
     /** 色（#RRGGBB）はこのフォルダに付く。属するタグの印に出る。 */
-    create: (data: { name: string; sortOrder?: number; color?: string | null }) =>
+    create: (data: { name: string; sortOrder?: number; color?: string | null; accountId?: string | null }) =>
       fetchApi<ApiResponse<TagGroup>>('/api/tag-groups', {
         method: 'POST',
         body: JSON.stringify(data),
       }),
-    update: (id: string, data: { name?: string; sortOrder?: number; color?: string | null }) =>
+    update: (id: string, data: { name?: string; sortOrder?: number; color?: string | null; accountId?: string | null }) =>
       fetchApi<ApiResponse<TagGroup>>(`/api/tag-groups/${id}`, {
         method: 'PATCH',
         body: JSON.stringify(data),
       }),
     /** 消しても属していたタグは残り、未分類に戻る。 */
-    delete: (id: string) =>
-      fetchApi<ApiResponse<null>>(`/api/tag-groups/${id}`, { method: 'DELETE' }),
+    delete: (id: string, accountId?: string | null) =>
+      fetchApi<ApiResponse<null>>(
+        `/api/tag-groups/${id}${accountId ? `?lineAccountId=${encodeURIComponent(accountId)}` : ''}`,
+        { method: 'DELETE' },
+      ),
   },
   scenarios: {
     listPage: (params?: {
