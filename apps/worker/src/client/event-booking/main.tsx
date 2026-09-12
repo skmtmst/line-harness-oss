@@ -5,6 +5,13 @@
 import { StrictMode, useEffect, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import './styles.css';
+import {
+  bookingOutcome,
+  doneScreenCopy,
+  isSlotDisabled,
+  slotSeatLabel,
+  type BookingOutcome,
+} from './waitlist-view.js';
 
 let _root: Root | null = null;
 
@@ -25,6 +32,8 @@ interface EventDetail {
   max_bookings_per_friend: number | null;
   requires_approval: number;
   cancel_deadline_hours_before: number | null;
+  /** 満席のあとキャンセル待ちを受けるか。GET /api/liff/events/:id が返す。 */
+  waitlist_enabled?: number;
   // 既予約検出 (multi-account 含む): 同一人物が別アカで既に予約済の場合に
   // Worker が GET 時点で詰めて返す。null は未予約。
   my_existing_booking?: {
@@ -237,6 +246,7 @@ function EventDetailScreen({
   }
 
   const overLimit = max != null && myActive.length >= max;
+  const waitlistOpen = event.waitlist_enabled === 1;
 
   return (
     <div className="pb-24 eb-fade-in">
@@ -294,7 +304,13 @@ function EventDetailScreen({
             <ul className="space-y-2">
               {slots.map((s) => {
                 const full = s.remaining != null && s.remaining <= 0;
-                const disabled = full || overLimit;
+                /*
+                 * 満席でも、この枠がキャンセル待ちを受けるなら押せる (#747)。
+                 * サーバは前から満席の申込を待ち行列へ入れて 200 を返すのに、
+                 * 画面が押させないので、その口へ辿り着けなかった。
+                 * 予約上限に達している人は、待ちにも入れないので押せない。
+                 */
+                const disabled = isSlotDisabled({ full, waitlistOpen, overLimit });
                 return (
                   <li key={s.id}>
                     <button
@@ -307,7 +323,11 @@ function EventDetailScreen({
                         <span className="text-base">{formatJpTimeOnly(s.starts_at)} 〜 {formatJpTimeOnly(s.ends_at)}</span>
                       </span>
                       <span className="text-xs font-medium">
-                        {full ? '満員' : s.capacity == null ? '定員なし' : `残 ${s.remaining}`}
+                        {slotSeatLabel({
+                          capacity: s.capacity,
+                          remaining: s.remaining,
+                          waitlistOpen,
+                        })}
                       </span>
                     </button>
                   </li>
@@ -343,12 +363,18 @@ function ConfirmScreen({
   event: EventDetail;
   slot: EventSlot;
   onBack: () => void;
-  onDone: (status: string) => void;
+  onDone: (outcome: BookingOutcome) => void;
 }) {
   const [note, setNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [idemKey] = useState(uid);
+  /*
+   * 満席の枠を選んで来た = キャンセル待ちの申込 (#747)。押せるようにした
+   * 以上、「予約をリクエスト」と書いたままだと何を頼んだのか分からない。
+   * 実際に待ちへ入るかはサーバが決めるので、ここは見せ方だけを変える。
+   */
+  const slotIsFull = slot.remaining != null && slot.remaining <= 0;
 
   async function submit() {
     if (note.length > 5000) {
@@ -358,13 +384,19 @@ function ConfirmScreen({
     setSubmitting(true);
     setError(null);
     try {
-      const res = await apiPost<{ id: string; status: string }>(
+      const res = await apiPost<{ id?: string; status?: string; waitlisted?: boolean }>(
         `/api/liff/events/${event.id}/bookings`,
         { slot_id: slot.id, customer_note: note || null },
         ctx,
         { 'Idempotency-Key': idemKey },
       );
-      onDone(res.status);
+      /*
+       * キャンセル待ちに入ったときの応答は 200 で `{ waitlisted: true }` (#747)。
+       * 200 なので apiPost は投げない。ここで見分けないと res.status が
+       * undefined のまま渡り、完了画面が「予約が確定しました」と出す。
+       * 満席の枠を押せるようにした以上、この道は日常的に通る。
+       */
+      onDone(bookingOutcome(res));
     } catch (err) {
       const e = err as { status?: number; body?: { error?: string } };
       const code = e.body?.error;
@@ -401,7 +433,9 @@ function ConfirmScreen({
       </button>
 
       <div>
-        <h1 className="text-base font-bold text-gray-900">予約内容のご確認</h1>
+        <h1 className="text-base font-bold text-gray-900">
+          {slotIsFull ? 'キャンセル待ちのご確認' : '予約内容のご確認'}
+        </h1>
         <p className="text-xs text-gray-500 mt-1">最後にご確認ください</p>
       </div>
 
@@ -413,11 +447,16 @@ function ConfirmScreen({
         </dl>
       </div>
 
-      {event.requires_approval === 1 && (
+      {slotIsFull ? (
+        <div className="bg-blue-50 border border-blue-200 text-blue-900 text-xs rounded-xl p-3">
+          この回は満席です。キャンセル待ちにお入れします。空きが出たら LINE でご案内します。
+          この時点では予約は取れていません。
+        </div>
+      ) : event.requires_approval === 1 ? (
         <div className="bg-amber-50 border border-amber-200 text-amber-900 text-xs rounded-xl p-3">
           このイベントは承認制です。受付後、運営が承認するまでお待ちください。
         </div>
-      )}
+      ) : null}
 
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1.5">
@@ -441,7 +480,7 @@ function ConfirmScreen({
       )}
 
       <button onClick={submit} disabled={submitting} className="eb-primary-btn">
-        {submitting ? '送信中...' : '予約をリクエスト'}
+        {submitting ? '送信中...' : slotIsFull ? 'キャンセル待ちに入る' : '予約をリクエスト'}
       </button>
       <button onClick={onBack} disabled={submitting} className="eb-secondary-btn">
         戻る
@@ -459,20 +498,25 @@ function Row({ label, value, valueClassName }: { label: string; value: string; v
   );
 }
 
+/**
+ * 申込のあとの完了画面。
+ *
+ * `status` は3通り (#747)。
+ *  - `waitlisted`: 席が埋まっていてキャンセル待ちに入った。**予約は取れていない**
+ *  - `requested` : 申込を受け付けた。運営の承認待ち
+ *  - それ以外     : 予約が確定した
+ *
+ * 以前は `requested` かどうかの二択で、待ちに入っただけの人にも
+ * 「予約が確定しました」と出していた。
+ */
 function DoneScreen({ status, onGoHistory }: { status: string; onGoHistory: () => void }) {
-  const isPending = status === 'requested';
+  const copy = doneScreenCopy(status as BookingOutcome);
   return (
     <div className="px-4 py-10 text-center eb-slide-up">
       <div className="eb-card">
-        <div className="text-5xl mb-3">{isPending ? '⏳' : '✅'}</div>
-        <h1 className="text-lg font-bold mb-2 text-gray-900">
-          {isPending ? '受付しました' : '予約が確定しました'}
-        </h1>
-        <p className="text-sm text-gray-600 mb-6 leading-relaxed">
-          {isPending
-            ? '運営の承認をお待ちください。承認されると LINE でお知らせします。'
-            : '予約が確定しました。LINE で詳細をお送りしました。'}
-        </p>
+        <div className="text-5xl mb-3">{copy.icon}</div>
+        <h1 className="text-lg font-bold mb-2 text-gray-900">{copy.title}</h1>
+        <p className="text-sm text-gray-600 mb-6 leading-relaxed">{copy.body}</p>
         <button onClick={onGoHistory} className="eb-primary-btn">
           予約履歴を見る
         </button>
@@ -785,7 +829,7 @@ function App({ ctx, initial }: { ctx: EventBookingContext; initial: Screen }) {
             event={screen.event}
             slot={screen.slot}
             onBack={() => setScreen({ kind: 'detail', eventId: screen.event.id })}
-            onDone={(status) => setScreen({ kind: 'done', status })}
+            onDone={(outcome) => setScreen({ kind: 'done', status: outcome })}
           />
         )}
         {screen.kind === 'done' && (
