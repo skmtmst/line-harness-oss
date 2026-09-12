@@ -51,19 +51,36 @@ function validateTextPostback(area: Area, targetAreaId: string): void {
     && buildTapPostbackData(targetAreaId, area.actionData.text).length > 300) fail('INVALID_ACTION');
 }
 function assertPublicUri(value: unknown): void {
-  let url: URL, path: string, hash: string;
+  const decode = (raw: string): string => {
+    let current = raw;
+    for (let i = 0; i < 3; i++) {
+      if (!/%[0-9a-f]{2}/i.test(current)) return current;
+      try {
+        const next = decodeURIComponent(current);
+        if (next === current) return current;
+        current = next;
+      } catch { fail('INVALID_ACTION'); }
+    }
+    // Encoded account references must not survive the bounded inspection.
+    if (/%[0-9a-f]{2}/i.test(current)) fail('OPAQUE_REFERENCE_UNSUPPORTED');
+    return current;
+  };
+  let url: URL;
   try {
     url = new URL(String(value));
-    path = decodeURIComponent(url.pathname);
-    hash = decodeURIComponent(url.hash);
   } catch { fail('INVALID_ACTION'); }
   if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) fail('INVALID_ACTION');
+  const path = decode(url.pathname);
+  const query = decode(url.search);
+  const hash = decode(url.hash);
+  const queryKeys = [...url.searchParams.keys()].map(decode);
   const referenceParameter = /^(?:form|template|scenario|tag|(?:line)?account)(?:s|ids?)?$/;
   const referencePath = /(?:^|\/)(?:forms?|templates?|scenarios?|tags?|accounts?)\//i;
-  const referenceFragment = /(?:^|[?&#/])(?:forms?|templates?|scenarios?|tags?|accounts?)(?:_?id)?[=\/]/i;
+  const referenceFragment = /(?:^|[?&#\/=])(?:forms?|templates?|scenarios?|tags?|accounts?)(?:[_-]?ids?)?[=\/]/i;
+  const liff = /(?:^|\/\/)(?:liff|miniapp)\.line\.me(?:[./:?#]|$)/i;
   if (['liff.line.me', 'miniapp.line.me'].includes(url.hostname.replace(/\.$/, ''))
-    || [...url.searchParams.keys()].some(k => referenceParameter.test(k.replace(/[_-]/g, '').toLowerCase()))
-    || referencePath.test(path) || referenceFragment.test(hash)) fail('OPAQUE_REFERENCE_UNSUPPORTED');
+    || queryKeys.some(k => referenceParameter.test(k.replace(/[_-]/g, '').toLowerCase()) || k.toLowerCase() === 'liff.state')
+    || [path, query, hash].some(part => referencePath.test(part) || referenceFragment.test(part) || liff.test(part))) fail('OPAQUE_REFERENCE_UNSUPPORTED');
 }
 export function parseRichMenuTemplateDefinition(input: HqTemplateAdapterInput, tenantId: string): RichMenuHqDefinition {
   if (input.definitionJson.length > 128_000) fail('DEFINITION_TOO_LARGE');

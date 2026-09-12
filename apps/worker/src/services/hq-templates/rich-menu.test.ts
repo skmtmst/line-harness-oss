@@ -76,6 +76,10 @@ describe('rich-menu HQ store atomic adapter', () => {
     'https://example.invalid/#/forms/source-form',
     'https://example.invalid/#?form=source-form',
     'https://liff.line.me/source-liff',
+    'https://example.invalid/?next=https%3A%2F%2Fliff.line.me%2Fsource',
+    'https://example.invalid/?next=%2Fforms%2Fsource',
+    'https://example.invalid/%2566orms/source',
+    'https://example.invalid/?next=https%253A%252F%252Fliff.line.me%252Fsource',
   ])('rejects opaque source references before DB/R2 work: %s', uri => {
     const f = fixture();
     const area = f.definition.richMenu.pages[0].areas[0];
