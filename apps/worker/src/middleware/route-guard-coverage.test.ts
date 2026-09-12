@@ -308,6 +308,7 @@ const STAFF_FAIL_CLOSED_SNAPSHOT: string[] = [
     'POST /api/hq/templates',
     'POST /api/hq/templates/:id/distribute',
     'POST /api/hq/templates/:id/preflight',
+    'POST /api/hq/templates/media',
     'POST /api/identity-candidates/:id/decide',
     'POST /api/identity-candidates/:id/undo',
     'POST /api/identity-candidates/detect',
