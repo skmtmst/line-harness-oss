@@ -201,10 +201,10 @@ describe('HQひな形の配布フロー', () => {
   })
   it('全段階で5段階の進捗を示し、モバイル表の見出しをdata-labelへ保持する', async () => {
     await list()
-    expect(screen.getByRole('navigation', { name: '配布の進捗' }).querySelectorAll('li')).toHaveLength(5)
-    expect(screen.getByText('1 一覧').getAttribute('aria-current')).toBe('step')
+    expect(screen.queryByRole('navigation', { name: '配布の進捗' })).toBeNull()
     expect(screen.getByText('来店済み', { selector: 'td span' }).closest('td')?.getAttribute('data-label')).toBe('名前')
     fireEvent.click(screen.getByRole('button', { name: '来店済みを編集' })); await screen.findByLabelText('名前')
+    expect(screen.getByRole('navigation', { name: '配布の進捗' }).querySelectorAll('li')).toHaveLength(5)
     expect(screen.getByText('2 ひな形').getAttribute('aria-current')).toBe('step')
     fireEvent.click(screen.getByRole('button', { name: '保存して配布先を選ぶ' })); await screen.findByRole('checkbox', { name: '銀座本店' })
     expect(screen.getByText('3 店舗').getAttribute('aria-current')).toBe('step')
