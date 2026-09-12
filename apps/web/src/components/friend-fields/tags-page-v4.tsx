@@ -253,10 +253,10 @@ const QUICK_FILTERS: Array<[string, string]> = [
 const cardShadow = '[box-shadow:1px_1px_1px_rgba(15,23,42,0.14)]'
 
 export const FRIEND_ATTRIBUTES_QA_GROUPS: TagGroup[] = [
-  { id: 'qa-vip', name: 'VIP', sortOrder: 0, color: '#F59E0B', createdAt: '', updatedAt: '' },
-  { id: 'qa-pet', name: 'ペット', sortOrder: 1, color: '#EC4899', createdAt: '', updatedAt: '' },
-  { id: 'qa-member', name: '会員', sortOrder: 2, color: '#10B981', createdAt: '', updatedAt: '' },
-  { id: 'qa-purchase', name: '購入', sortOrder: 3, color: '#3B82F6', createdAt: '', updatedAt: '' },
+  { id: 'qa-vip', accountId: null, name: 'VIP', sortOrder: 0, color: '#F59E0B', createdAt: '', updatedAt: '' },
+  { id: 'qa-pet', accountId: null, name: 'ペット', sortOrder: 1, color: '#EC4899', createdAt: '', updatedAt: '' },
+  { id: 'qa-member', accountId: null, name: '会員', sortOrder: 2, color: '#10B981', createdAt: '', updatedAt: '' },
+  { id: 'qa-purchase', accountId: null, name: '購入', sortOrder: 3, color: '#3B82F6', createdAt: '', updatedAt: '' },
 ]
 
 export const FRIEND_ATTRIBUTES_QA_TAGS: Tag[] = [
@@ -281,7 +281,7 @@ export const FRIEND_ATTRIBUTES_QA_TAGS: Tag[] = [
   createdAt: '2026-01-13T00:00:00.000Z',
 }))
 
-function FolderList({ groups, items, countsKnown, active, onSelect, onChanged }: { groups: TagGroup[]; items: Tag[]; countsKnown: boolean; active: string; onSelect: (id: string) => void; onChanged: () => void }) {
+function FolderList({ groups, items, countsKnown, active, accountId, onSelect, onChanged }: { groups: TagGroup[]; items: Tag[]; countsKnown: boolean; active: string; accountId: string | null; onSelect: (id: string) => void; onChanged: () => void }) {
   const [menuId, setMenuId] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [menuError, setMenuError] = useState('')
@@ -298,8 +298,8 @@ function FolderList({ groups, items, countsKnown, active, onSelect, onChanged }:
     setBusy(true); setMenuError('')
     try {
       const [currentResult, otherResult] = await Promise.all([
-        api.tagGroups.update(group.id, { sortOrder: index + direction }),
-        api.tagGroups.update(other.id, { sortOrder: index }),
+        api.tagGroups.update(group.id, { sortOrder: index + direction, accountId }),
+        api.tagGroups.update(other.id, { sortOrder: index, accountId }),
       ])
       if (!currentResult.success) throw new Error(currentResult.error)
       if (!otherResult.success) throw new Error(otherResult.error)
@@ -314,7 +314,7 @@ function FolderList({ groups, items, countsKnown, active, onSelect, onChanged }:
     if (busy) return
     setBusy(true); setMenuError('')
     try {
-      const result = await api.tagGroups.delete(group.id)
+      const result = await api.tagGroups.delete(group.id, accountId)
       if (!result.success) throw new Error(result.error)
       if (active === group.id) onSelect('')
       setDeleteGroup(null)
@@ -613,7 +613,7 @@ export default function TagsPageV4({
     setStatus('loading')
     setError('')
     try {
-      const [tags, folders] = await Promise.all([api.tags.list({ withCounts: true }), api.tagGroups.list()])
+      const [tags, folders] = await Promise.all([api.tags.list({ withCounts: true }), api.tagGroups.list(accountId)])
       // `success: false` を黙って捨てない。捨てると空の表を「0件」として見せる。
       if (!tags.success) throw new Error(tags.error)
       setItems(tags.data)
@@ -622,7 +622,7 @@ export default function TagsPageV4({
     } catch (reason) {
       setStatus(reason instanceof ApiError && reason.status === 403 ? 'forbidden' : 'error')
     }
-  }, [fixture])
+  }, [fixture, accountId])
   useEffect(() => { void load() }, [load])
 
   const filtered = useMemo(() => items.filter((tag) => {
@@ -798,7 +798,7 @@ export default function TagsPageV4({
         {error && <p className="mb-4 rounded-control border border-danger/20 bg-danger-bg p-3 text-sm text-danger">{error}</p>}
         {/* 設計 `HrwyW` は gap 14、フォルダは 240 固定（`DgeL8`）。 */}
         <div className="grid min-w-0 gap-[14px] xl:grid-cols-[240px_minmax(0,1fr)]">
-          <FolderList groups={groups} items={items} countsKnown={ready} active={folder} onSelect={setFolder} onChanged={() => void load()} />
+          <FolderList groups={groups} items={items} countsKnown={ready} active={folder} accountId={accountId} onSelect={setFolder} onChanged={() => void load()} />
           <main className="min-w-0">
             {/*
               検索・選択は最長の表示内容と矢印余白を確保し、残る幅は検索欄へ渡す。

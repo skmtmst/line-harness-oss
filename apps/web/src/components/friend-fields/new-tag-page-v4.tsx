@@ -25,7 +25,7 @@ export default function NewTagPageV4() {
     let cancelled = false
     setLoading(Boolean(copyId))
     void Promise.all([
-      api.tagGroups.list(),
+      api.tagGroups.list(selectedAccountId),
       copyId && selectedAccountId ? api.tags.definition(copyId, selectedAccountId) : Promise.resolve(null),
     ]).then(([folders, definition]) => {
       if (cancelled) return

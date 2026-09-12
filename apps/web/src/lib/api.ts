@@ -5339,21 +5339,26 @@ export const api = {
       fetchApi<ApiResponse<null>>(`/api/folders/${id}`, { method: 'DELETE' }),
   },
   tagGroups: {
-    list: () => fetchApi<ApiResponse<TagGroup[]>>('/api/tag-groups'),
+    list: (accountId?: string | null) => fetchApi<ApiResponse<TagGroup[]>>(
+      `/api/tag-groups${accountId ? `?lineAccountId=${encodeURIComponent(accountId)}` : ''}`,
+    ),
     /** 色（#RRGGBB）はこのフォルダに付く。属するタグの印に出る。 */
-    create: (data: { name: string; sortOrder?: number; color?: string | null }) =>
+    create: (data: { name: string; sortOrder?: number; color?: string | null; accountId?: string | null }) =>
       fetchApi<ApiResponse<TagGroup>>('/api/tag-groups', {
         method: 'POST',
         body: JSON.stringify(data),
       }),
-    update: (id: string, data: { name?: string; sortOrder?: number; color?: string | null }) =>
+    update: (id: string, data: { name?: string; sortOrder?: number; color?: string | null; accountId?: string | null }) =>
       fetchApi<ApiResponse<TagGroup>>(`/api/tag-groups/${id}`, {
         method: 'PATCH',
         body: JSON.stringify(data),
       }),
     /** 消しても属していたタグは残り、未分類に戻る。 */
-    delete: (id: string) =>
-      fetchApi<ApiResponse<null>>(`/api/tag-groups/${id}`, { method: 'DELETE' }),
+    delete: (id: string, accountId?: string | null) =>
+      fetchApi<ApiResponse<null>>(
+        `/api/tag-groups/${id}${accountId ? `?lineAccountId=${encodeURIComponent(accountId)}` : ''}`,
+        { method: 'DELETE' },
+      ),
   },
   scenarios: {
     listPage: (params?: {

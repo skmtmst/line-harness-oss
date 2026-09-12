@@ -1482,7 +1482,7 @@ friendAttributes.patch('/api/folders/:id', requireRole('owner', 'admin'), async 
     if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
 
     const body = await c.req.json<Record<string, unknown>>();
-    const access = await folderBoundary(c, existing, typeof body.accountId === 'string' ? body.accountId.trim() : c.req.query('account_id'));
+    const access = await folderBoundary(c, existing, typeof body.accountId === 'string' ? body.accountId.trim() : c.req.query('account_id')?.trim());
     if (access) return access;
     let webinarAccountId = '';
     if (existing.kind === 'webinar') {
@@ -1553,7 +1553,7 @@ friendAttributes.delete('/api/folders/:id', requireRole('owner', 'admin'), async
         return c.json({ success: false, error: 'Not found' }, 404);
       }
     }
-    const denied = await folderBoundary(c, existing, c.req.query('account_id'));
+    const denied = await folderBoundary(c, existing, c.req.query('account_id')?.trim());
     if (denied) return denied;
     if (!(await deleteFolder(c.env.DB, id))) {
       return c.json({ success: false, error: 'フォルダの店舗境界を確認してください' }, 409);

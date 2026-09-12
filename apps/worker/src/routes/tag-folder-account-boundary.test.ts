@@ -91,7 +91,8 @@ describe('existing tag/folder endpoints enforce account ownership', () => {
     ] as const) {
       const response = await req(url, 'POST', body);
       expect(response.status).toBe(201);
-      const value = await response.json() as { data: { id: string } };
+      const value = await response.json() as { data: { id: string; accountId: string | null } };
+      expect(value.data.accountId).toBe('a');
       expect(fixture.raw.prepare('SELECT account_id FROM folders WHERE id=?').get(value.data.id)).toEqual({ account_id: 'a' });
     }
     expect((await req('/api/folders/folder-a', 'DELETE')).status).toBe(200);

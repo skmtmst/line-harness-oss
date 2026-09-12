@@ -156,7 +156,7 @@ export default function EditTagPageV4() {
       const [detail, dependenciesResult, folders] = await Promise.all([
         api.tags.definition(tagId, selectedAccountId),
         api.tags.dependencies(tagId, selectedAccountId),
-        api.tagGroups.list(),
+        api.tagGroups.list(selectedAccountId),
       ])
       if (folders.success) setGroups(folders.data)
       if (dependenciesResult.success) {

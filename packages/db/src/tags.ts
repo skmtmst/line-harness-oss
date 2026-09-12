@@ -51,6 +51,8 @@ export interface Tag {
  */
 export interface TagGroup {
   id: string;
+  /** この分類を所有するLINE公式アカウント。旧データだけ null。 */
+  account_id: string | null;
   name: string;
   sort_order: number;
   /** #RRGGBB。未設定は null。115 で folders.color を足した。 */
@@ -934,7 +936,7 @@ export async function getTagGroups(db: D1Database, scope?: { allowedAccountIds: 
   const condition = `(${own} OR ${scope?.canSeeUnassigned !== false ? "account_id IS NULL" : "0"})`;
   const result = await db
     .prepare(
-      `SELECT id, name, display_order AS sort_order, color, created_at, updated_at
+      `SELECT id, account_id, name, display_order AS sort_order, color, created_at, updated_at
          FROM folders WHERE kind = 'tag' AND ${condition}
         ORDER BY display_order ASC, name ASC`,
     )
@@ -958,7 +960,7 @@ export async function createTagGroup(
     .run();
   return (await db
     .prepare(
-      `SELECT id, name, display_order AS sort_order, color, created_at, updated_at
+      `SELECT id, account_id, name, display_order AS sort_order, color, created_at, updated_at
          FROM folders WHERE id = ?`,
     )
     .bind(id)
@@ -995,7 +997,7 @@ export async function updateTagGroup(
   return (
     (await db
       .prepare(
-        `SELECT id, name, display_order AS sort_order, color, created_at, updated_at
+        `SELECT id, account_id, name, display_order AS sort_order, color, created_at, updated_at
            FROM folders WHERE id = ? AND kind = 'tag'`,
       )
       .bind(id)

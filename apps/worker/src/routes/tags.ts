@@ -238,6 +238,7 @@ function tagDefinitionResponse(detail: Awaited<ReturnType<typeof getTagDefinitio
 function serializeTagGroup(row: DbTagGroup) {
   return {
     id: row.id,
+    accountId: row.account_id ?? null,
     name: row.name,
     sortOrder: Number(row.sort_order ?? 0),
     // 色はフォルダに付く。属するタグの印にこの色を出す。

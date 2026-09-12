@@ -685,6 +685,8 @@ export interface SavedSearchUsage {
 export interface TagGroup {
   /** 主キー (UUIDv4) */
   id: string;
+  /** 所有するLINE公式アカウント。移行前の共通分類だけ null。 */
+  accountId: string | null;
   /** 分類名 */
   name: string;
   /** 一覧での並び順。小さいほど上 */
