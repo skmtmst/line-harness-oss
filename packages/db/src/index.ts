@@ -15,6 +15,7 @@ export * from './scenario-delivery-timestamps';
 export * from './scenario-triggers';
 export * from './scenario-resolve';
 export * from './broadcasts';
+export * from './broadcast-send-claims';
 export * from './broadcast-message-assets';
 export * from './users';
 export * from './line-accounts';
