@@ -39,7 +39,7 @@ function nextAliasName(name: string, existing: readonly string[]): string {
 
 /** Store-scoped planner: never writes; all reference creation joins the form batch. */
 export function createFormReferenceResolver({ db, authority }: { db: D1Database; authority: HqTemplateAuthority }): FormTemplateDependencies['resolveReference'] {
-  const resolved = new Map<string, { targetId: string; aliasName?: string }>();
+  const resolved = new Map<string, { targetId: string; aliasName?: string; planned?: boolean }>();
   const emitted = new Set<string>();
   const emitOnce = (keys: readonly string[], statements: HqTemplateStatement[]) => {
     const fresh = keys.filter(key => !emitted.has(key));
@@ -125,7 +125,7 @@ export function createFormReferenceResolver({ db, authority }: { db: D1Database;
       ids.set(ref.sourceId, targetId); names.set(resourceKey, name); modes.set(resourceKey, selection.mode);
       const exactSourceReuse = selection.mode === 'overwrite' && match?.id === ref.sourceId && safeSource.line_account_id === context.targetAccountId;
       if (existing || exactSourceReuse) preResolved.add(resourceKey);
-      if (!existing) resolved.set(resourceKey, { targetId, aliasName: selection.mode === 'alias' ? name : undefined });
+      if (!existing) resolved.set(resourceKey, { targetId, aliasName: selection.mode === 'alias' ? name : undefined, planned: !exactSourceReuse });
       if (!existing && !exactSourceReuse && match && selection.mode === 'overwrite') {
         const targetGuard = ref.kind === 'tag'
           ? guard(`EXISTS(SELECT 1 FROM tags WHERE id=? AND line_account_id=? AND version=? AND updated_at IS ? AND status='active')`, [match.id, context.targetAccountId, match.version!, match.updated_at])

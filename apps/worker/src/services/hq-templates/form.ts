@@ -25,6 +25,8 @@ export type FormReference = HqTemplateReference & {
 export type FormReferenceResolution = {
     targetId: string;
     aliasName?: string;
+    /** The target is created or updated by an earlier statement in this same atomic plan. */
+    planned?: boolean;
     /** A trusted reference adapter's plan; it must not write before this batch. */
     dbCommit?: readonly HqTemplateStatement[];
 };
@@ -348,7 +350,7 @@ export function createFormHqTemplateAdapter(deps: FormTemplateDependencies): HqT
                 const mapped = await deps.resolveReference(ref, context);
                 text(mapped?.targetId, 160);
                 resolved.set(referenceKey(ref.kind, ref.sourceId), mapped);
-                if (!mapped.dbCommit?.length) {
+                if (!mapped.dbCommit?.length && !mapped.planned) {
                     const table = ref.kind === 'tag' ? 'tags' : 'scenarios';
                     if (!await deps.db.prepare(`SELECT id FROM ${table} WHERE id=? AND line_account_id=?${ref.kind === 'tag' ? " AND status='active'" : ''}`).bind(mapped.targetId, context.targetAccountId).first())
                         throw new FormTemplateError('REFERENCE_UNAVAILABLE');

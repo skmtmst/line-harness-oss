@@ -172,10 +172,11 @@ describe('form runtime and atomic store execution', () => {
     expect(fixture.raw.prepare("SELECT * FROM scenario_steps WHERE id='source-step'").get()).toEqual(stepBefore);
     expect((await executeFormStore(options(await preflight('a')))).status).toBe('succeeded');
   });
-  test('overlapping direct parent and child roots validate their own packed graph revisions',async()=>{
-    fixture.raw.exec("INSERT INTO scenarios(id,name,trigger_type,on_complete_mode,on_complete_scenario_id,line_account_id) VALUES ('source-parent','親','manual','move','source-child','source'),('source-child','子','manual','stop',NULL,'source'); INSERT INTO scenario_steps(id,scenario_id,step_order,message_type,message_content) VALUES ('parent-step','source-parent',1,'text','親本文'),('child-step','source-child',1,'text','子本文')");
-    const layout={version:2,header:[],sections:[{id:'page',name:'質問',blocks:[{id:'field',kind:'input',name:'answer',label:'質問',type:'text'}]}],options:{afterActions:[{kind:'scenario',op:'start',scenarioId:'source-child'}]}};
-    fixture.raw.prepare("UPDATE hq_template_versions SET definition_json=? WHERE id='version'").run(JSON.stringify({...definition,form:{...definition.form,layout,on_submit_scenario_id:'source-parent'}}));
+  test.each([['a-root','b-child'],['z-root','a-child']])('overlapping direct parent %s and child %s roots share one planned target without duplicate inserts',async(parentId,childId)=>{
+    fixture.raw.prepare("INSERT INTO scenarios(id,name,trigger_type,on_complete_mode,on_complete_scenario_id,line_account_id) VALUES (?,'親','manual','move',?,'source'),(?,'子','manual','stop',NULL,'source')").run(parentId,childId,childId);
+    fixture.raw.prepare("INSERT INTO scenario_steps(id,scenario_id,step_order,message_type,message_content) VALUES ('parent-step',?,1,'text','親本文'),('child-step',?,1,'text','子本文')").run(parentId,childId);
+    const layout={version:2,header:[],sections:[{id:'page',name:'質問',blocks:[{id:'field',kind:'input',name:'answer',label:'質問',type:'text'}]}],options:{afterActions:[{kind:'scenario',op:'start',scenarioId:childId}]}};
+    fixture.raw.prepare("UPDATE hq_template_versions SET definition_json=? WHERE id='version'").run(JSON.stringify({...definition,form:{...definition.form,layout,on_submit_scenario_id:parentId}}));
     const context=await preflight('a');
     expect(context.resolutions.filter(row=>row.itemKind==='scenario').every(row=>row.expectedRevision?.includes('hqsg1.'))).toBe(true);
     expect((await executeFormStore(options(context))).status).toBe('succeeded');
