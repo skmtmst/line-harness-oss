@@ -20,6 +20,7 @@ const db = {
   recordCloneItem: vi.fn(),
   listCloneItems: vi.fn(),
   finishCloneRun: vi.fn(),
+  findTagByNormalizedName: vi.fn(),
   getVersionedAccountSetting: vi.fn(),
   parseFeatures: (row: { required_features: string }) => JSON.parse(row.required_features),
   parseItems: (row: { items_json: string | null }) =>
@@ -28,6 +29,8 @@ const db = {
     required.filter((k) => features[k] === false),
   prefixedName: (prefix: string | null | undefined, name: string) =>
     (prefix ?? '').trim() ? `${(prefix ?? '').trim()} ${name}` : name,
+  normalizeTagNameForCleanup: (name: string) =>
+    name.normalize('NFKC').trim().replace(/\s+/gu, ' ').toLocaleLowerCase('ja-JP'),
 };
 vi.mock('@line-crm/db', () => db);
 
@@ -97,6 +100,7 @@ beforeEach(() => {
   db.listRecipes.mockResolvedValue([RECIPE]);
   db.cloneCounts.mockResolvedValue({ 'rcp-1': 12 });
   db.findRunByKey.mockResolvedValue(null);
+  db.findTagByNormalizedName.mockResolvedValue(null);
   db.startCloneRun.mockResolvedValue({ id: 'run-1' });
   db.listCloneItems.mockResolvedValue([]);
   db.getVersionedAccountSetting.mockResolvedValue({ data: { features: {} } });
@@ -190,6 +194,16 @@ describe('複製', () => {
     await makeApp().fetch(clone({ accountId: 'acc-1', namePrefix: '2026春' }), env);
     const names = bind.mock.calls.flat().filter((v) => typeof v === 'string');
     expect(names.some((n) => String(n).startsWith('2026春 '))).toBe(true);
+  });
+
+  it('タグの同名確認を店舗単位で行い、別店舗には同名を作れる', async () => {
+    await makeApp().fetch(clone({ accountId: 'store-a' }, 'store-a-key'), env);
+    await makeApp().fetch(clone({ accountId: 'store-b' }, 'store-b-key'), env);
+    expect(db.findTagByNormalizedName).toHaveBeenCalledWith(env.DB, '新規', 'store-a');
+    expect(db.findTagByNormalizedName).toHaveBeenCalledWith(env.DB, '新規', 'store-b');
+    const tagSql = prepare.mock.calls.map((call) => String(call[0]))
+      .find((sql) => /INSERT INTO tags/.test(sql));
+    expect(tagSql).toContain('normalized_name');
   });
 
   /*

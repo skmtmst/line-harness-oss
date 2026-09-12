@@ -145,7 +145,7 @@ function stripLineComments(sql: string): string {
 const REBUILD_MARKER = /--\s*migration-policy:\s*table-rebuild\b/i;
 
 /** 印のあるファイルが、ほんとうに表の作り直しになっているか。 */
-function isCoherentRebuild(stripped: string): boolean {
+function isCoherentRebuild(stripped: string, fileName?: string): boolean {
   const created = [...stripped.matchAll(/\bCREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?["\[`]?(\w+)["\]`]?/gi)]
     .map((m) => m[1]);
   const dropped = [...stripped.matchAll(/\bDROP\s+TABLE\s+(?:IF\s+EXISTS\s+)?["\[`]?(\w+)["\]`]?/gi)]
@@ -155,6 +155,22 @@ function isCoherentRebuild(stripped: string): boolean {
 
   // 落とすだけ・改名するだけは通さない。作り直しは必ず両方そろう。
   for (const table of dropped) {
+    // D1 disallows TEMP tables. Migration 382 uses these three transaction-local
+    // sidecars to detach FK references before replacing tags, then restores and
+    // checks them before cleanup. Never permit arbitrary backup-table drops.
+    const sidecars = new Set([
+      'migration_382_tag_refs_backup',
+      'migration_382_friend_tags_backup',
+      'migration_382_friend_tag_side_effect_runs_backup',
+    ]);
+    if (fileName === '382_tags_account_name_scope.sql' && sidecars.has(table)) {
+      const create = new RegExp(`\\bCREATE\\s+TABLE\\s+${table}\\s*(?:\\(|AS\\s+SELECT\\b)`, 'i').exec(stripped);
+      const drop = new RegExp(`\\bDROP\\s+TABLE\\s+${table}\\s*;`, 'i').exec(stripped);
+      if (created.filter(name => name === table).length === 1
+        && dropped.filter(name => name === table).length === 1
+        && create && drop && create.index < drop.index) continue;
+      return false;
+    }
     const back = renamed.find((r) => r.to === table);
     if (!back) return false;
     // 改名の元は、作り直し用と分かる `<表名>_new` / `<表名>_next` に限る。
@@ -197,7 +213,7 @@ export function checkMigration(sql: string, fileName?: string): CheckResult {
   if (fileName && GRANDFATHERED_REBUILDS.has(fileName)) return { ok: true };
 
   const rebuild = REBUILD_MARKER.test(sql);
-  if (rebuild && !isCoherentRebuild(stripped)) {
+  if (rebuild && !isCoherentRebuild(stripped, fileName)) {
     return {
       ok: false,
       violation:

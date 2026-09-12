@@ -1,0 +1,239 @@
+import { beforeEach, afterEach, describe, expect, test } from 'vitest';
+import { updateForm } from '@line-crm/db';
+import { createTestD1, type SqliteD1 } from '../../test-utils/d1-sqlite.js';
+import { createFormHqTemplateAdapter, inspectFormTemplate, formTemplatePublicUrl, formTemplateSnapshot, formTemplateSnapshotToken, parseFormTemplateDefinition, type FormTemplateDependencies } from './form.js';
+import type { HqTemplateAdapterInput, HqTemplateAdapterContext, HqTemplateAdapterResult, HqTemplateAuthority, HqTemplateStoreAtomicCommitPlan } from './contract.js';
+let fixture: SqliteD1;
+const authority: HqTemplateAuthority = { tenantId: 'tenant-a', actorId: 'owner', role: 'owner', readOnly: false, accountScoped: false };
+const definition = { schemaVersion: 1, form: { name: 'アンケート', description: 'ご意見', fields: [{ name: 'answer', label: 'ご感想', type: 'text', required: true }], on_submit_tag_id: 'hq-tag', on_submit_scenario_id: 'hq-scenario' } };
+const input: HqTemplateAdapterInput = { templateVersionId: 'version-1', definitionJson: JSON.stringify(definition) };
+const ok = <T>(result: HqTemplateAdapterResult<T>): T => { expect(result.kind).toBe('OK'); if (result.kind !== 'OK')
+    throw new Error('Unsupported'); return result.value; };
+function resolver(): FormTemplateDependencies['resolveReference'] {
+    return async (ref, context) => ({ targetId: `${context.targetAccountId}-${ref.kind}` });
+}
+async function preflight(accountId: string, mode: 'create' | 'overwrite' | 'alias' = 'create', source = input) {
+    const info = await inspectFormTemplate(fixture.db, authority, accountId, source);
+    const context: HqTemplateAdapterContext = { tenantId: authority.tenantId, targetAccountId: accountId, preflightId: `preflight-${accountId}`, idempotencyFingerprint: 'run', mode, snapshotToken: info.snapshotToken, resolutions: [{ sourceId: 'form', itemKind: 'form', mode, targetId: info.targetId ?? undefined, expectedRevision: info.expectedRevision ?? undefined }] };
+    return { context, info };
+}
+async function plan(context: HqTemplateAdapterContext, source = input, resolveReference = resolver()) {
+    const adapter = createFormHqTemplateAdapter({ db: fixture.db, authority, resolveReference });
+    const refs = ok(await adapter.extractReferences(source)), verified = ok(await adapter.verifyReferences(context, refs));
+    const duplicates = ok(await adapter.detectDuplicates(context, verified)), ids = ok(await adapter.buildIdMap(context, verified, duplicates));
+    return ok(await adapter.buildCommitPlan(context, source, ids));
+}
+async function commit(p: HqTemplateStoreAtomicCommitPlan) { await fixture.db.batch(p.dbCommit.map(s => fixture.db.prepare(s.sql).bind(...s.bindings))); return p.resolutions.find(r => r.sourceId === 'form')!.targetId!; }
+function rows() { return fixture.raw.prepare('SELECT * FROM forms ORDER BY id').all() as Array<Record<string, unknown>>; }
+beforeEach(() => {
+    fixture = createTestD1({ foreignKeys: true });
+    fixture.raw.exec("INSERT INTO tenants(id,name) VALUES ('tenant-a','統括A'),('tenant-b','統括B')");
+    for (const id of ['a1', 'a2', 'a3', 'b1']) {
+        fixture.raw.prepare("INSERT INTO line_accounts(id,name,channel_id,channel_access_token,channel_secret,tenant_id,liff_id) VALUES (?,?,?,'fixture','fixture',?,?)").run(id, id, `fixture-${id}`, id === 'b1' ? 'tenant-b' : 'tenant-a', `liff-${id}`);
+        fixture.raw.prepare('INSERT INTO tags(id,name,line_account_id) VALUES (?,?,?)').run(`${id}-tag`, `配布先${id}`, id);
+        fixture.raw.prepare("INSERT INTO scenarios(id,name,trigger_type,line_account_id) VALUES (?,?,'manual',?)").run(`${id}-scenario`, `配布先${id}`, id);
+    }
+});
+afterEach(() => fixture.raw.close());
+describe('HQ form atomic plans', () => {
+    test('three destination drafts have new stable URLs and local tag/scenario references', async () => {
+        const urls = [];
+        for (const account of ['a1', 'a2', 'a3']) {
+            const { context } = await preflight(account), p = await plan(context), id = await commit(p);
+            urls.push(await formTemplatePublicUrl(fixture.db, authority, account, id));
+            expect(fixture.raw.prepare('SELECT is_active,on_submit_tag_id,on_submit_scenario_id,content_revision FROM forms WHERE id=?').get(id)).toEqual({ is_active: 0, on_submit_tag_id: `${account}-tag`, on_submit_scenario_id: `${account}-scenario`, content_revision: 1 });
+            expect(await formTemplatePublicUrl(fixture.db, authority, 'b1', id)).toBeNull();
+        }
+        expect(rows()).toHaveLength(3);
+        expect(new Set(urls).size).toBe(3);
+        expect(urls.every(url => url?.startsWith('https://liff.line.me/liff-a'))).toBe(true);
+        expect(fixture.raw.pragma('foreign_key_check')).toEqual([]);
+    });
+    test('overwrite preserves form ID, answers, URL and old editor conflict semantics', async () => {
+        const id = await commit(await plan((await preflight('a1')).context));
+        fixture.raw.prepare("INSERT INTO form_submissions(id,form_id,data) VALUES ('answer',?,'{\"answer\":\"synthetic\"}')").run(id);
+        fixture.raw.prepare('UPDATE forms SET is_active=1,submit_count=7 WHERE id=?').run(id);
+        const answer = fixture.raw.prepare('SELECT * FROM form_submissions').get(), url = await formTemplatePublicUrl(fixture.db, authority, 'a1', id);
+        const { context } = await preflight('a1', 'overwrite');
+        await commit(await plan(context));
+        expect(rows()).toHaveLength(1);
+        expect(rows()[0]).toMatchObject({ id, content_revision: 2, is_active: 0, submit_count: 7 });
+        expect(fixture.raw.prepare('SELECT * FROM form_submissions').get()).toEqual(answer);
+        expect(await formTemplatePublicUrl(fixture.db, authority, 'a1', id)).toBe(url);
+        expect((await updateForm(fixture.db, id, { description: '古い編集' }, 1)).kind).toBe('conflict');
+        expect((await updateForm(fixture.db, id, { description: '新しい編集' }, 2)).kind).toBe('updated');
+    });
+    test('new answers after preflight are retained and do not cause content conflicts', async () => {
+        const id = await commit(await plan((await preflight('a1')).context)), { context } = await preflight('a1', 'overwrite');
+        fixture.raw.prepare("INSERT INTO form_submissions(id,form_id,data) VALUES ('new-answer',?,'{}')").run(id);
+        fixture.raw.prepare("INSERT INTO form_opens(id,form_id) VALUES ('opened',?)").run(id);
+        await commit(await plan(context));
+        expect(rows()[0].content_revision).toBe(2);
+        expect(fixture.raw.prepare('SELECT count(*) n FROM form_submissions').get()).toEqual({ n: 1 });
+    });
+    test('one edited store fails version check, other store plans commit', async () => {
+        for (const account of ['a1', 'a2', 'a3'])
+            await commit(await plan((await preflight(account)).context));
+        const checks = await Promise.all(['a1', 'a2', 'a3'].map(account => preflight(account, 'overwrite')));
+        const id = (await inspectFormTemplate(fixture.db, authority, 'a2', input)).targetId!;
+        await updateForm(fixture.db, id, { description: '店舗の編集' }, 1);
+        const statuses = [];
+        for (const check of checks) {
+            try {
+                await commit(await plan(check.context));
+                statuses.push('succeeded');
+            }
+            catch (error) {
+                statuses.push((error as {
+                    code: string;
+                }).code);
+            }
+        }
+        expect(statuses).toEqual(['succeeded', 'VERSION_CONFLICT', 'succeeded']);
+        expect(fixture.raw.prepare('SELECT description FROM forms WHERE id=?').get(id)).toEqual({ description: '店舗の編集' });
+    });
+    test('edit between plan and batch is rejected atomically', async () => {
+        const id = await commit(await plan((await preflight('a1')).context)), p = await plan((await preflight('a1', 'overwrite')).context);
+        await updateForm(fixture.db, id, { description: '直前の編集' }, 1);
+        await expect(commit(p)).rejects.toThrow();
+        expect(rows()[0]).toMatchObject({ description: '直前の編集', content_revision: 2 });
+    });
+    const modes = ['create', 'overwrite', 'alias'] as const;
+    test.each(modes.flatMap(selectionMode => modes.map(contextMode => ({ selectionMode, contextMode }))))('plan mode $contextMode must match selected operation $selectionMode', async ({ selectionMode, contextMode }) => {
+        // Make the selected operation valid independently of the envelope mode.
+        const existingId = selectionMode === 'create' ? null : await commit(await plan((await preflight('a1')).context));
+        const { context } = await preflight('a1', selectionMode);
+        const before = rows();
+        context.mode = contextMode;
+        if (contextMode !== selectionMode) {
+            await expect(plan(context)).rejects.toMatchObject({ code: 'SELECTION_REQUIRED' });
+            expect(rows()).toEqual(before);
+            return;
+        }
+        const p = await plan(context);
+        expect(p.mode).toBe(selectionMode);
+        expect(p.resolutions.find(r => r.sourceId === 'form')!.mode).toBe(selectionMode);
+        const id = await commit(p);
+        if (selectionMode === 'overwrite') {
+            expect(id).toBe(existingId);
+            expect(rows()).toHaveLength(1);
+            expect(rows()[0].content_revision).toBe(2);
+        } else {
+            expect(id).not.toBe(existingId);
+            expect(rows()).toHaveLength(selectionMode === 'alias' ? 2 : 1);
+            expect(rows().some(r => r.id === id && r.name === (selectionMode === 'alias' ? 'アンケート (2)' : 'アンケート'))).toBe(true);
+        }
+    });
+    test('same-name aliases are (2), (3); duplicates require explicit choices', async () => {
+        await commit(await plan((await preflight('a1')).context));
+        await expect(plan((await preflight('a1')).context)).rejects.toMatchObject({ code: 'SELECTION_REQUIRED' });
+        await commit(await plan((await preflight('a1', 'alias')).context));
+        await commit(await plan((await preflight('a1', 'alias')).context));
+        expect(rows().map(r => r.name).sort()).toEqual(['アンケート', 'アンケート (2)', 'アンケート (3)']);
+    });
+    test('reference plans create before form inside one batch; any failure rolls everything back', async () => {
+        const staged: FormTemplateDependencies['resolveReference'] = async (ref, c) => ({ targetId: `new-${c.targetAccountId}-${ref.kind}`, dbCommit: [ref.kind === 'tag' ? { sql: 'INSERT INTO tags(id,name,line_account_id) VALUES (?,?,?)', bindings: [`new-${c.targetAccountId}-tag`, `新タグ${c.targetAccountId}`, c.targetAccountId] } : { sql: "INSERT INTO scenarios(id,name,trigger_type,line_account_id) VALUES (?,?,'manual',?)", bindings: [`new-${c.targetAccountId}-scenario`, '新シナリオ', c.targetAccountId] }] });
+        fixture.raw.exec("CREATE TRIGGER reject_form BEFORE INSERT ON forms BEGIN SELECT RAISE(ABORT,'synthetic'); END");
+        const p = await plan((await preflight('a1')).context, input, staged);
+        await expect(commit(p)).rejects.toThrow();
+        expect(rows()).toHaveLength(0);
+        expect(fixture.raw.prepare("SELECT id FROM tags WHERE id LIKE 'new-%'").all()).toEqual([]);
+        fixture.raw.exec('DROP TRIGGER reject_form');
+        await commit(p);
+        expect(rows()[0]).toMatchObject({ on_submit_tag_id: 'new-a1-tag', on_submit_scenario_id: 'new-a1-scenario' });
+    });
+    test('foreign tenant, wrong-store resolver and missing references fail closed', async () => {
+        await expect(preflight('b1')).rejects.toMatchObject({ code: 'FORBIDDEN' });
+        const { context } = await preflight('a1');
+        await expect(plan(context, input, async (ref) => ({ targetId: `b1-${ref.kind}` }))).rejects.toMatchObject({ code: 'REFERENCE_UNAVAILABLE' });
+        await expect(plan(context, input, async () => ({ targetId: 'missing' }))).rejects.toMatchObject({ code: 'REFERENCE_UNAVAILABLE' });
+        expect(rows()).toHaveLength(0);
+    });
+    test('a staged resolver cannot smuggle foreign ownership into the atomic commit', async () => {
+        const p = await plan((await preflight('a1')).context, input, async (ref) => ({ targetId: `b1-${ref.kind}`, dbCommit: [{ sql: 'SELECT 1', bindings: [] }] }));
+        await expect(commit(p)).rejects.toThrow();
+        expect(rows()).toHaveLength(0);
+    });
+    test('forms shared by multiple stores cannot be overwritten indirectly', async () => {
+        const id = await commit(await plan((await preflight('a1')).context));
+        fixture.raw.prepare('INSERT INTO form_accounts(form_id,line_account_id) VALUES (?,?)').run(id, 'a2');
+        const p = await preflight('a1', 'overwrite');
+        expect(p.info.allowedModes).toEqual(['alias']);
+        await expect(plan(p.context)).rejects.toMatchObject({ code: 'SHARED_FORM' });
+        const alias = await plan((await preflight('a1', 'alias')).context);
+        await commit(alias);
+        expect(rows()).toHaveLength(2);
+    });
+    test('unsupported secrets and nested references are never copied silently', () => {
+        for (const addition of [{ on_submit_webhook_headers: 'not-portable' }, { is_active: 1 }, { submit_count: 10 }])
+            expect(() => parseFormTemplateDefinition({ ...input, definitionJson: JSON.stringify({ ...definition, form: { ...definition.form, ...addition } }) })).toThrow();
+        expect(() => parseFormTemplateDefinition({ ...input, definitionJson: JSON.stringify({ ...definition, form: { ...definition.form, fields: [{ name: 'x', label: 'x', type: 'text', friendFieldId: 'source-field' }] } }) })).toThrow();
+    });
+    const urlDefinition = (url: unknown, location: 'button' | 'thanks' | 'image' = 'button'): HqTemplateAdapterInput => ({
+        ...input,
+        definitionJson: JSON.stringify({ ...definition, form: { ...definition.form, layout: {
+            version: 2, header: [], sections: [{ id: 'section', name: '確認', blocks: location === 'button'
+                ? [{ id: 'button', kind: 'button', label: '次へ', url }]
+                : location === 'image' ? [{ id: 'image', kind: 'image', mediaUrl: '', linkUrl: url }] : [],
+            }], options: location === 'thanks' ? { thanksUrl: url } : {},
+        } } }),
+    });
+    test.each(['button', 'thanks', 'image'] as const)('%s URL rejects unsafe schemes and relative URLs before references or writes', async location => {
+        for (const url of ['javascript:void(0)', 'JaVaScRiPt:void(0)', 'java\nscript:void(0)', 'data:text/html,synthetic', 'ftp://example.test/file', '//example.test/thanks', '/thanks', '../thanks', 'https://user:pass@example.test/', 'https://example.test/forms%5csource', 'https://example.test/%00', 'https:\\example.test/thanks', 123]) {
+            const resolveReference = async () => { throw new Error('resolver must not be called'); };
+            const adapter = createFormHqTemplateAdapter({ db: fixture.db, authority, resolveReference });
+            await expect(adapter.extractReferences(urlDefinition(url, location))).rejects.toMatchObject({ code: 'INVALID_DEFINITION' });
+        }
+        expect(rows()).toHaveLength(0);
+    });
+    test.each([
+        'https://liff.line.me/source-liff/forms/source', 'https://LIFF.LINE.ME./source', 'https://miniapp.line.me/source',
+        'https://example.test/forms/source', 'https://example.test/%66orms/source', 'https://example.test/%2566orms/source',
+        'https://example.test/?form=source', 'https://example.test/?FORM_ID=source', 'https://example.test/?line-account-id=source',
+        'https://example.test/?%2566orm=source', 'https://example.test/?liff.state=%2Fforms%2Fsource',
+        'https://example.test/#/forms/source', 'https://example.test/#form_id=source',
+        'https://example.test/?next=https%3A%2F%2Fliff.line.me%2Fsource', 'https://example.test/?next=%2Fforms%2Fsource',
+    ])('opaque account URL is unsupported: %s', url => {
+        for (const location of ['button', 'thanks', 'image'] as const)
+            expect(() => parseFormTemplateDefinition(urlDefinition(url, location))).toThrowError(expect.objectContaining({ code: 'UNSUPPORTED_REFERENCE' }));
+    });
+    test('safe external links remain intact in drafts and overwrite while account URLs are rejected before changes', async () => {
+        const safe = 'https://example.test/guide?topic=care#section';
+        const source = urlDefinition(safe, 'thanks');
+        const id = await commit(await plan((await preflight('a1', 'create', source)).context, source));
+        expect(JSON.parse(rows()[0].layout as string).options.thanksUrl).toBe(safe);
+        const publicUrl = await formTemplatePublicUrl(fixture.db, authority, 'a1', id);
+        const changed = urlDefinition('http://example.test/help', 'button');
+        await commit(await plan((await preflight('a1', 'overwrite', changed)).context, changed));
+        const stored = JSON.parse(rows()[0].layout as string);
+        expect(stored.sections[0].blocks[0].url).toBe('http://example.test/help');
+        expect(rows()[0]).toMatchObject({ id, is_active: 0, content_revision: 2 });
+        expect(await formTemplatePublicUrl(fixture.db, authority, 'a1', id)).toBe(publicUrl);
+        const before = rows();
+        await expect(preflight('a1', 'overwrite', urlDefinition('https://liff.line.me/source'))).rejects.toMatchObject({ code: 'UNSUPPORTED_REFERENCE' });
+        expect(rows()).toEqual(before);
+        for (const url of ['', null, 'https://example.test/thanks', 'https://example.test/offer?discount=20%25'])
+            expect(() => parseFormTemplateDefinition(urlDefinition(url, 'thanks'))).not.toThrow();
+    });
+    test('LIFF missing is explicit; default adapter remains unbound', async () => {
+        fixture.raw.exec("UPDATE line_accounts SET liff_id=NULL WHERE id='a1'");
+        await expect(plan((await preflight('a1')).context)).rejects.toMatchObject({ code: 'LIFF_UNAVAILABLE' });
+        expect(rows()).toHaveLength(0);
+    });
+    test('nested tag/scenario layout references are remapped without changing answer names', async () => {
+        const layout = { version: 2, header: [], sections: [{ id: 'page', name: '質問', blocks: [{ id: 'field', kind: 'input', name: 'answer', label: '質問', type: 'radio', choiceMode: 'tag', choices: [{ id: 'option', label: '選択', tagId: 'hq-tag' }] }] }], options: { afterActions: [{ kind: 'scenario', op: 'start', scenarioId: 'hq-scenario' }] } };
+        const source = { ...input, definitionJson: JSON.stringify({ ...definition, form: { ...definition.form, layout } }) };
+        await commit(await plan((await preflight('a1', 'create', source)).context, source));
+        const stored = JSON.parse(rows()[0].layout as string);
+        expect(stored.sections[0].blocks[0].choices[0].tagId).toBe('a1-tag');
+        expect(stored.options.afterActions[0].scenarioId).toBe('a1-scenario');
+        expect(JSON.parse(rows()[0].fields as string)[0].name).toBe('answer');
+    });
+    test('snapshot token changes for content edits but not answer accounting', async () => {
+        const id = await commit(await plan((await preflight('a1')).context)), before = await formTemplateSnapshotToken(await formTemplateSnapshot(fixture.db, 'a1'));
+        fixture.raw.prepare('UPDATE forms SET revision=revision+1,submit_count=submit_count+1 WHERE id=?').run(id);
+        expect(await formTemplateSnapshotToken(await formTemplateSnapshot(fixture.db, 'a1'))).toBe(before);
+        await updateForm(fixture.db, id, { name: '変更' }, 1);
+        expect(await formTemplateSnapshotToken(await formTemplateSnapshot(fixture.db, 'a1'))).not.toBe(before);
+    });
+});

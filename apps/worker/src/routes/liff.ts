@@ -26,6 +26,7 @@ import {
   jstNow,
   getFriendAddScenarioIds,
   resolveLineCredential,
+  findOrCreateGlobalTag,
 } from '@line-crm/db';
 import {
   isStoppedEntryRouteRef,
@@ -1953,19 +1954,7 @@ async function applyXHarnessActions(
   // Add tag if specified
   if (result.tag) {
     try {
-      // Find or create the tag by name
-      let tagRow = await db
-        .prepare('SELECT id FROM tags WHERE name = ?')
-        .bind(result.tag)
-        .first<{ id: string }>();
-      if (!tagRow) {
-        const tagId = crypto.randomUUID();
-        const { jstNow } = await import('@line-crm/db');
-        tagRow = await db
-          .prepare('INSERT INTO tags (id, name, created_at) VALUES (?, ?, ?) RETURNING id')
-          .bind(tagId, result.tag, jstNow())
-          .first<{ id: string }>();
-      }
+      const tagRow = await findOrCreateGlobalTag(db, { name: result.tag });
       if (tagRow) {
         const { addTagToFriend } = await import('@line-crm/db');
         await addTagToFriend(db, friendId, tagRow.id);
