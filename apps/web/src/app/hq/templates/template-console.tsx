@@ -278,7 +278,20 @@ export default function TemplateConsole({ type }: { type: TemplateType }) {
         <label className={styles.field}><span>種類</span><input className={styles.input} value={LABELS[type]} readOnly /></label>
         <label className={styles.field}><span>名前</span><input className={styles.input} value={name} maxLength={200} disabled={busy || createUncertain} onChange={e => setName(e.target.value)} /></label>
         <label className={styles.field}><span>説明</span><textarea className={styles.input} value={description} maxLength={2000} rows={2} disabled={busy || createUncertain} onChange={e => setDescription(e.target.value)} /></label>
-        <TemplateDefinitionEditor type={type} value={definition} disabled={busy || createUncertain} tenantId={creationScope.current?.tenantId} onChange={setDefinition} onBusyChange={setUploadBusy} />
+        <TemplateDefinitionEditor
+          type={type}
+          value={definition}
+          disabled={busy || createUncertain}
+          tenantId={creationScope.current?.tenantId}
+          onChange={setDefinition}
+          onBusyChange={setUploadBusy}
+          onRichMenuNameChange={setName}
+          richMenuReferences={{
+            tags: templates.filter(item => item.template_type === 'tag').map(item => ({ id: item.id, name: item.name })),
+            templates: templates.filter(item => item.template_type === 'template').map(item => ({ id: item.id, name: item.name })),
+            forms: templates.filter(item => item.template_type === 'form').map(item => ({ id: item.id, name: item.name })),
+          }}
+        />
       </section></div><aside className={styles.stack}><section className={styles.panel}><h2>保存状態</h2><p>{detail ? name !== detail.template.name || description !== (detail.template.description ?? '') || JSON.stringify(definition) !== JSON.stringify(detail.definition) ? '未保存の変更あり' : '保存済み' : '下書き'}</p>{detail && <p className={styles.muted}>{formatDate(detail.template.updated_at)}</p>}</section><section className={styles.panel}><h2>店舗での見え方</h2><span className={`${styles.badge} ${styles.success}`}>{name || `${LABELS[type]}名`}</span><p className={styles.muted}>参照先 {referenceCount(type, definition)}件を含めて配布します。</p></section></aside></div>
       {createUncertain && <Notice tone="validation" message="前回の保存結果がまだ確定していません。重複を防ぐため入力を固定しています。同じ依頼を再確認し、保存済みならその結果を読み込みます。" />}
       <footer className={styles.footer}><Button disabled={busy || createUncertain} onClick={toList}>キャンセル</Button>{createUncertain ? <Button variant="primary" disabled={busy} onClick={() => save(false)}>前回の保存を再確認</Button> : <><Button disabled={busy || Boolean(validation)} onClick={() => save(false)}>下書き保存</Button><Button variant="primary" disabled={busy || Boolean(validation)} onClick={() => save(true)}>保存して配布先を選ぶ</Button></>}</footer>

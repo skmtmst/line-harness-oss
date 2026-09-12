@@ -9,12 +9,14 @@ vi.mock('@/lib/hq-templates-api', () => ({ TEMPLATE_TYPES: ['tag','template','ri
 vi.mock('next/navigation', () => ({ usePathname: () => '/hq/templates', useRouter: () => ({ push: vi.fn() }) }))
 const template = { id: 't1', name: '来店済み', description: '説明', template_type: 'tag', revision: 3, updated_at: '2026-09-12T00:00:00Z' }
 const detail = { template, definition: { schemaVersion: 1, tag: { name: '来店済み', folderId: 'f1' }, folders: [{ id: 'f1', name: '来店管理' }] } }
+const richMenuMedia = { id:'image',kind:'image',filename:'menu.png',mimeType:'image/png',sizeBytes:32,width:2500,height:1686,durationMs:null,r2Key:'hq-templates/tenant-a/menu.png',publicUrl:null,versionId:'image',versionNo:1,contentHash:'a'.repeat(64) }
 const accounts = [{ id: 'a', name: '銀座本店' }, { id: 'b', name: '横浜店' }]
 const checked = (): Preflight => ({ preflightId: 'p1', expiresAt: new Date(Date.now() + 60_000).toISOString(), stores: accounts.map(a => ({ accountId: a.id, accountName: a.name, items: [{ sourceId: 'tag1', itemKind: 'tag', name: '来店済み', expectedRevision: 'v3', duplicate: true, allowedModes: a.id === 'a' ? ['overwrite','alias'] : ['alias'] }] })) })
 const completed = { runId: 'p1', status: 'partial', stores: [{ accountId: 'a', status: 'succeeded', counts: { created: 1, overwritten: 2, aliased: 1 } }, { accountId: 'b', status: 'version_conflict', reason: '配布先で編集がありました。もう一度確認してください', counts: { created: 0, overwritten: 0, aliased: 0 } }] }
 beforeEach(() => {
   vi.resetAllMocks(); window.sessionStorage.clear(); window.history.replaceState(null, '', '/hq/templates?type=tag')
   calls.context.mockResolvedValue({ tenantId: 'tenant-a', actorId: 'owner' })
+  calls.uploadImage.mockResolvedValue(richMenuMedia)
   calls.list.mockResolvedValue([template]); calls.accounts.mockResolvedValue(accounts); calls.get.mockResolvedValue(structuredClone(detail))
   calls.create.mockResolvedValue(structuredClone(detail)); calls.update.mockResolvedValue(structuredClone(detail))
   calls.preflight.mockImplementation(async () => checked()); calls.distribute.mockResolvedValue(completed); calls.result.mockResolvedValue(completed)
@@ -173,7 +175,7 @@ describe('HQひな形の配布フロー', () => {
   })
   it.each([
     ['template', { schemaVersion: 1, template: { id: 'hq-authored-message', name: '来店お礼', category: 'general', messageType: 'text', messageContent: 'ありがとうございます', carouselActionsJson: null, carouselTapLimitMode: 'none', carouselTapLimitText: null, questionJson: null, questionStatus: 'draft' }, media: [] }, '配信する本文', 'ありがとうございます'],
-    ['rich_menu', { schemaVersion: 1, richMenu: { id: 'rich-menu-main', name: '店舗メニュー', chatBarText: 'メニュー', size: 'large', defaultPageId: 'page-1', pages: [{ id: 'page-1', name: 'メイン', imageR2Key: 'hq-templates/tenant-a/menu.png', areas: [] }] } }, 'リッチメニュー画像の保存先', 'hq-templates/tenant-a/menu.png'],
+    ['rich_menu', { schemaVersion: 1, richMenu: { id: 'rich-menu-main', name: '店舗メニュー', chatBarText: 'メニュー', size: 'large', defaultPageId: 'page-1', pages: [{ id: 'page-1', name: 'メイン', imageR2Key: 'hq-templates/tenant-a/menu.png', areas: [] }] } }, null, null],
     ['form', { schemaVersion: 1, form: { name: 'ご来店アンケート', description: null, fields: [{ name: 'question_1', label: '質問1', type: 'text', required: false }], layout: null, on_submit_tag_id: null, on_submit_scenario_id: null, save_to_metadata: true } }, null, null],
   ] as const)('%s を専用入力欄から作成できる', async (type, definition, fieldLabel, fieldValue) => {
     const name = type === 'template' ? '来店お礼' : type === 'rich_menu' ? '店舗メニュー' : 'ご来店アンケート'
@@ -183,6 +185,10 @@ describe('HQひな形の配布フロー', () => {
     fireEvent.click(await screen.findByRole('button', { name: '＋ひな形を作成' }))
     fireEvent.change(screen.getByLabelText('名前'), { target: { value: name } })
     if (fieldLabel && fieldValue) fireEvent.change(screen.getByLabelText(fieldLabel), { target: { value: fieldValue } })
+    if (type === 'rich_menu') {
+      fireEvent.change(screen.getByLabelText('リッチメニュー画像を選ぶ'), { target: { files: [new File(['fixture'], 'menu.png', { type: 'image/png' })] } })
+      await waitFor(() => expect(calls.uploadImage).toHaveBeenCalledOnce())
+    }
     fireEvent.click(screen.getByRole('button', { name: '下書き保存' }))
     await screen.findByText('ひな形を保存しました。')
     expect(calls.list).toHaveBeenCalledWith(type)
