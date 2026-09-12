@@ -5019,9 +5019,9 @@ CREATE TABLE tag_groups (
   updated_at TEXT NOT NULL
 );
 
-CREATE TABLE tags (
+CREATE TABLE "tags" (
   id                          TEXT PRIMARY KEY,
-  name                        TEXT UNIQUE NOT NULL,
+  name                        TEXT NOT NULL,
   color                       TEXT NOT NULL DEFAULT '#3B82F6',
   mileage_reward              INTEGER NOT NULL DEFAULT 0 CHECK (mileage_reward >= 0),
   referral_mileage_reward     INTEGER NOT NULL DEFAULT 0 CHECK (referral_mileage_reward >= 0),

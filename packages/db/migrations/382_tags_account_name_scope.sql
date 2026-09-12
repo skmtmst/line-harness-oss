@@ -1,0 +1,196 @@
+-- migration-policy: table-rebuild
+
+-- Remove only the legacy database-wide tags.name UNIQUE constraint.
+
+-- D1 applies this file transactionally. Do not execute statements individually on a live database.
+
+-- Foreign keys stay enabled: defer_foreign_keys alone does NOT prevent DELETE actions.
+
+-- Disconnect every nullable reference; preserve the two leaf CASCADE tables before replacing tags.
+
+PRAGMA defer_foreign_keys = ON;
+
+WITH expected(table_name, column_name, delete_action) AS (VALUES
+  ('affiliate_offers','tag_id','NO ACTION'),
+  ('broadcasts','target_tag_id','SET NULL'),
+  ('entry_routes','tag_id','SET NULL'),
+  ('forms','on_submit_tag_id','SET NULL'),
+  ('friend_tag_side_effect_runs','tag_id','CASCADE'),
+  ('friend_tags','tag_id','CASCADE'),
+  ('menus','auto_tag_id','SET NULL'),
+  ('nen_columns','completion_tag_id','SET NULL'),
+  ('nen_columns','target_tag_id','SET NULL'),
+  ('reminders','target_tag_id','SET NULL'),
+  ('scenario_steps','on_reach_tag_id','SET NULL'),
+  ('scenario_triggers','tag_id','CASCADE'),
+  ('scenarios','trigger_tag_id','SET NULL'),
+  ('tracked_links','tag_id','SET NULL')),
+actual AS (
+ SELECT m.name AS table_name, f."from" AS column_name, f.on_delete AS delete_action
+ FROM sqlite_schema m JOIN pragma_foreign_key_list(m.name) f
+ WHERE m.type = 'table' AND m.name != '_cf_METADATA' AND f."table" = 'tags'
+), missing AS (SELECT * FROM expected EXCEPT SELECT * FROM actual),
+extra AS (SELECT * FROM actual EXCEPT SELECT * FROM expected)
+SELECT json(CASE WHEN NOT EXISTS(SELECT 1 FROM missing) AND NOT EXISTS(SELECT 1 FROM extra)
+ THEN '{}' ELSE 'unexpected tags foreign keys: stop migration 382' END);
+
+CREATE TABLE migration_382_tag_refs_backup (table_name TEXT NOT NULL, row_id INTEGER NOT NULL, column_name TEXT NOT NULL, tag_id TEXT);
+
+INSERT INTO migration_382_tag_refs_backup SELECT 'affiliate_offers', rowid, 'tag_id', tag_id FROM affiliate_offers;
+
+INSERT INTO migration_382_tag_refs_backup SELECT 'broadcasts', rowid, 'target_tag_id', target_tag_id FROM broadcasts;
+
+INSERT INTO migration_382_tag_refs_backup SELECT 'entry_routes', rowid, 'tag_id', tag_id FROM entry_routes;
+
+INSERT INTO migration_382_tag_refs_backup SELECT 'forms', rowid, 'on_submit_tag_id', on_submit_tag_id FROM forms;
+
+INSERT INTO migration_382_tag_refs_backup SELECT 'menus', rowid, 'auto_tag_id', auto_tag_id FROM menus;
+
+INSERT INTO migration_382_tag_refs_backup SELECT 'nen_columns', rowid, 'completion_tag_id', completion_tag_id FROM nen_columns;
+
+INSERT INTO migration_382_tag_refs_backup SELECT 'nen_columns', rowid, 'target_tag_id', target_tag_id FROM nen_columns;
+
+INSERT INTO migration_382_tag_refs_backup SELECT 'reminders', rowid, 'target_tag_id', target_tag_id FROM reminders;
+
+INSERT INTO migration_382_tag_refs_backup SELECT 'scenario_steps', rowid, 'on_reach_tag_id', on_reach_tag_id FROM scenario_steps;
+
+INSERT INTO migration_382_tag_refs_backup SELECT 'scenario_triggers', rowid, 'tag_id', tag_id FROM scenario_triggers;
+
+INSERT INTO migration_382_tag_refs_backup SELECT 'scenarios', rowid, 'trigger_tag_id', trigger_tag_id FROM scenarios;
+
+INSERT INTO migration_382_tag_refs_backup SELECT 'tracked_links', rowid, 'tag_id', tag_id FROM tracked_links;
+
+CREATE TABLE migration_382_friend_tag_side_effect_runs_backup AS SELECT * FROM friend_tag_side_effect_runs;
+
+CREATE TABLE migration_382_friend_tags_backup AS SELECT * FROM friend_tags;
+
+UPDATE affiliate_offers SET tag_id = NULL WHERE tag_id IS NOT NULL;
+
+UPDATE broadcasts SET target_tag_id = NULL WHERE target_tag_id IS NOT NULL;
+
+UPDATE entry_routes SET tag_id = NULL WHERE tag_id IS NOT NULL;
+
+UPDATE forms SET on_submit_tag_id = NULL WHERE on_submit_tag_id IS NOT NULL;
+
+UPDATE menus SET auto_tag_id = NULL WHERE auto_tag_id IS NOT NULL;
+
+UPDATE nen_columns SET completion_tag_id = NULL WHERE completion_tag_id IS NOT NULL;
+
+UPDATE nen_columns SET target_tag_id = NULL WHERE target_tag_id IS NOT NULL;
+
+UPDATE reminders SET target_tag_id = NULL WHERE target_tag_id IS NOT NULL;
+
+UPDATE scenario_steps SET on_reach_tag_id = NULL WHERE on_reach_tag_id IS NOT NULL;
+
+UPDATE scenario_triggers SET tag_id = NULL WHERE tag_id IS NOT NULL;
+
+UPDATE scenarios SET trigger_tag_id = NULL WHERE trigger_tag_id IS NOT NULL;
+
+UPDATE tracked_links SET tag_id = NULL WHERE tag_id IS NOT NULL;
+
+DELETE FROM friend_tag_side_effect_runs;
+
+DELETE FROM friend_tags;
+
+CREATE TABLE tags_new (
+  id                          TEXT PRIMARY KEY,
+  name                        TEXT NOT NULL,
+  color                       TEXT NOT NULL DEFAULT '#3B82F6',
+  mileage_reward              INTEGER NOT NULL DEFAULT 0 CHECK (mileage_reward >= 0),
+  referral_mileage_reward     INTEGER NOT NULL DEFAULT 0 CHECK (referral_mileage_reward >= 0),
+  mileage_multiplier_bps      INTEGER CHECK (mileage_multiplier_bps IS NULL OR mileage_multiplier_bps BETWEEN 1000 AND 100000),
+  mileage_multiplier_priority INTEGER NOT NULL DEFAULT 0,
+  created_at                  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+, group_id TEXT REFERENCES tag_groups(id) ON DELETE SET NULL, folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL, is_starred INTEGER NOT NULL DEFAULT 0, display_order INTEGER NOT NULL DEFAULT 0, line_account_id TEXT REFERENCES line_accounts(id), description TEXT, normalized_name TEXT, manual_assignment_allowed INTEGER NOT NULL DEFAULT 1
+  CHECK (manual_assignment_allowed IN (0, 1)), reapply_policy TEXT NOT NULL DEFAULT 'first_only'
+  CHECK (reapply_policy IN ('first_only', 'every_time')), linked_enabled INTEGER NOT NULL DEFAULT 0
+  CHECK (linked_enabled IN (0, 1)), status TEXT NOT NULL DEFAULT 'active'
+  CHECK (status IN ('active', 'archived')), version INTEGER NOT NULL DEFAULT 1 CHECK (version > 0), created_by TEXT, updated_by TEXT, updated_at TEXT, created_from_recipe_id TEXT REFERENCES recipes(id), recipe_clone_run_id TEXT REFERENCES recipe_clone_runs(id));
+
+INSERT INTO tags_new SELECT * FROM tags;
+
+DROP TABLE tags;
+
+ALTER TABLE tags_new RENAME TO tags;
+
+CREATE UNIQUE INDEX idx_tags_account_normalized_name
+  ON tags(line_account_id, normalized_name)
+  WHERE line_account_id IS NOT NULL AND normalized_name IS NOT NULL;
+
+CREATE INDEX idx_tags_account_status_name
+  ON tags(line_account_id, status, name, id);
+
+CREATE INDEX idx_tags_group ON tags(group_id, name);
+
+CREATE INDEX idx_tags_line_account
+  ON tags(line_account_id, display_order, id);
+
+CREATE INDEX idx_tags_order ON tags (folder_id, display_order);
+
+UPDATE affiliate_offers SET tag_id = (SELECT tag_id FROM migration_382_tag_refs_backup b WHERE b.table_name = 'affiliate_offers' AND b.column_name = 'tag_id' AND b.row_id = affiliate_offers.rowid);
+
+UPDATE broadcasts SET target_tag_id = (SELECT tag_id FROM migration_382_tag_refs_backup b WHERE b.table_name = 'broadcasts' AND b.column_name = 'target_tag_id' AND b.row_id = broadcasts.rowid);
+
+UPDATE entry_routes SET tag_id = (SELECT tag_id FROM migration_382_tag_refs_backup b WHERE b.table_name = 'entry_routes' AND b.column_name = 'tag_id' AND b.row_id = entry_routes.rowid);
+
+UPDATE forms SET on_submit_tag_id = (SELECT tag_id FROM migration_382_tag_refs_backup b WHERE b.table_name = 'forms' AND b.column_name = 'on_submit_tag_id' AND b.row_id = forms.rowid);
+
+UPDATE menus SET auto_tag_id = (SELECT tag_id FROM migration_382_tag_refs_backup b WHERE b.table_name = 'menus' AND b.column_name = 'auto_tag_id' AND b.row_id = menus.rowid);
+
+UPDATE nen_columns SET completion_tag_id = (SELECT tag_id FROM migration_382_tag_refs_backup b WHERE b.table_name = 'nen_columns' AND b.column_name = 'completion_tag_id' AND b.row_id = nen_columns.rowid);
+
+UPDATE nen_columns SET target_tag_id = (SELECT tag_id FROM migration_382_tag_refs_backup b WHERE b.table_name = 'nen_columns' AND b.column_name = 'target_tag_id' AND b.row_id = nen_columns.rowid);
+
+UPDATE reminders SET target_tag_id = (SELECT tag_id FROM migration_382_tag_refs_backup b WHERE b.table_name = 'reminders' AND b.column_name = 'target_tag_id' AND b.row_id = reminders.rowid);
+
+UPDATE scenario_steps SET on_reach_tag_id = (SELECT tag_id FROM migration_382_tag_refs_backup b WHERE b.table_name = 'scenario_steps' AND b.column_name = 'on_reach_tag_id' AND b.row_id = scenario_steps.rowid);
+
+UPDATE scenario_triggers SET tag_id = (SELECT tag_id FROM migration_382_tag_refs_backup b WHERE b.table_name = 'scenario_triggers' AND b.column_name = 'tag_id' AND b.row_id = scenario_triggers.rowid);
+
+UPDATE scenarios SET trigger_tag_id = (SELECT tag_id FROM migration_382_tag_refs_backup b WHERE b.table_name = 'scenarios' AND b.column_name = 'trigger_tag_id' AND b.row_id = scenarios.rowid);
+
+UPDATE tracked_links SET tag_id = (SELECT tag_id FROM migration_382_tag_refs_backup b WHERE b.table_name = 'tracked_links' AND b.column_name = 'tag_id' AND b.row_id = tracked_links.rowid);
+
+INSERT INTO friend_tag_side_effect_runs SELECT * FROM migration_382_friend_tag_side_effect_runs_backup;
+
+INSERT INTO friend_tags SELECT * FROM migration_382_friend_tags_backup;
+
+SELECT json(CASE WHEN NOT EXISTS(SELECT 1 FROM migration_382_tag_refs_backup b LEFT JOIN affiliate_offers t ON t.rowid = b.row_id WHERE b.table_name = 'affiliate_offers' AND b.column_name = 'tag_id' AND (t.rowid IS NOT b.row_id OR t.tag_id IS NOT b.tag_id)) THEN '{}' ELSE 'tag reference restoration failed' END);
+
+SELECT json(CASE WHEN NOT EXISTS(SELECT 1 FROM migration_382_tag_refs_backup b LEFT JOIN broadcasts t ON t.rowid = b.row_id WHERE b.table_name = 'broadcasts' AND b.column_name = 'target_tag_id' AND (t.rowid IS NOT b.row_id OR t.target_tag_id IS NOT b.tag_id)) THEN '{}' ELSE 'tag reference restoration failed' END);
+
+SELECT json(CASE WHEN NOT EXISTS(SELECT 1 FROM migration_382_tag_refs_backup b LEFT JOIN entry_routes t ON t.rowid = b.row_id WHERE b.table_name = 'entry_routes' AND b.column_name = 'tag_id' AND (t.rowid IS NOT b.row_id OR t.tag_id IS NOT b.tag_id)) THEN '{}' ELSE 'tag reference restoration failed' END);
+
+SELECT json(CASE WHEN NOT EXISTS(SELECT 1 FROM migration_382_tag_refs_backup b LEFT JOIN forms t ON t.rowid = b.row_id WHERE b.table_name = 'forms' AND b.column_name = 'on_submit_tag_id' AND (t.rowid IS NOT b.row_id OR t.on_submit_tag_id IS NOT b.tag_id)) THEN '{}' ELSE 'tag reference restoration failed' END);
+
+SELECT json(CASE WHEN NOT EXISTS(SELECT 1 FROM migration_382_tag_refs_backup b LEFT JOIN menus t ON t.rowid = b.row_id WHERE b.table_name = 'menus' AND b.column_name = 'auto_tag_id' AND (t.rowid IS NOT b.row_id OR t.auto_tag_id IS NOT b.tag_id)) THEN '{}' ELSE 'tag reference restoration failed' END);
+
+SELECT json(CASE WHEN NOT EXISTS(SELECT 1 FROM migration_382_tag_refs_backup b LEFT JOIN nen_columns t ON t.rowid = b.row_id WHERE b.table_name = 'nen_columns' AND b.column_name = 'completion_tag_id' AND (t.rowid IS NOT b.row_id OR t.completion_tag_id IS NOT b.tag_id)) THEN '{}' ELSE 'tag reference restoration failed' END);
+
+SELECT json(CASE WHEN NOT EXISTS(SELECT 1 FROM migration_382_tag_refs_backup b LEFT JOIN nen_columns t ON t.rowid = b.row_id WHERE b.table_name = 'nen_columns' AND b.column_name = 'target_tag_id' AND (t.rowid IS NOT b.row_id OR t.target_tag_id IS NOT b.tag_id)) THEN '{}' ELSE 'tag reference restoration failed' END);
+
+SELECT json(CASE WHEN NOT EXISTS(SELECT 1 FROM migration_382_tag_refs_backup b LEFT JOIN reminders t ON t.rowid = b.row_id WHERE b.table_name = 'reminders' AND b.column_name = 'target_tag_id' AND (t.rowid IS NOT b.row_id OR t.target_tag_id IS NOT b.tag_id)) THEN '{}' ELSE 'tag reference restoration failed' END);
+
+SELECT json(CASE WHEN NOT EXISTS(SELECT 1 FROM migration_382_tag_refs_backup b LEFT JOIN scenario_steps t ON t.rowid = b.row_id WHERE b.table_name = 'scenario_steps' AND b.column_name = 'on_reach_tag_id' AND (t.rowid IS NOT b.row_id OR t.on_reach_tag_id IS NOT b.tag_id)) THEN '{}' ELSE 'tag reference restoration failed' END);
+
+SELECT json(CASE WHEN NOT EXISTS(SELECT 1 FROM migration_382_tag_refs_backup b LEFT JOIN scenario_triggers t ON t.rowid = b.row_id WHERE b.table_name = 'scenario_triggers' AND b.column_name = 'tag_id' AND (t.rowid IS NOT b.row_id OR t.tag_id IS NOT b.tag_id)) THEN '{}' ELSE 'tag reference restoration failed' END);
+
+SELECT json(CASE WHEN NOT EXISTS(SELECT 1 FROM migration_382_tag_refs_backup b LEFT JOIN scenarios t ON t.rowid = b.row_id WHERE b.table_name = 'scenarios' AND b.column_name = 'trigger_tag_id' AND (t.rowid IS NOT b.row_id OR t.trigger_tag_id IS NOT b.tag_id)) THEN '{}' ELSE 'tag reference restoration failed' END);
+
+SELECT json(CASE WHEN NOT EXISTS(SELECT 1 FROM migration_382_tag_refs_backup b LEFT JOIN tracked_links t ON t.rowid = b.row_id WHERE b.table_name = 'tracked_links' AND b.column_name = 'tag_id' AND (t.rowid IS NOT b.row_id OR t.tag_id IS NOT b.tag_id)) THEN '{}' ELSE 'tag reference restoration failed' END);
+
+SELECT json(CASE WHEN NOT EXISTS(SELECT * FROM friend_tag_side_effect_runs EXCEPT SELECT * FROM migration_382_friend_tag_side_effect_runs_backup) AND NOT EXISTS(SELECT * FROM migration_382_friend_tag_side_effect_runs_backup EXCEPT SELECT * FROM friend_tag_side_effect_runs) THEN '{}' ELSE 'tag cascade restoration failed' END);
+
+SELECT json(CASE WHEN NOT EXISTS(SELECT * FROM friend_tags EXCEPT SELECT * FROM migration_382_friend_tags_backup) AND NOT EXISTS(SELECT * FROM migration_382_friend_tags_backup EXCEPT SELECT * FROM friend_tags) THEN '{}' ELSE 'tag cascade restoration failed' END);
+
+SELECT json(CASE WHEN NOT EXISTS(SELECT 1 FROM pragma_foreign_key_check) THEN '{}' ELSE 'foreign key check failed after tag rebuild' END);
+
+DROP TABLE migration_382_tag_refs_backup;
+
+DROP TABLE migration_382_friend_tag_side_effect_runs_backup;
+
+DROP TABLE migration_382_friend_tags_backup;
+
+PRAGMA foreign_key_check;
+
+PRAGMA defer_foreign_keys = OFF;
