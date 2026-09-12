@@ -2,11 +2,12 @@ import {
   HQ_TEMPLATE_DISTRIBUTION_MODES,
   HQ_TEMPLATE_TYPES,
   type HqTemplateDistributionMode,
+  type HqTemplateStatement,
   type HqTemplateType,
 } from '@line-crm/db';
 
 export { HQ_TEMPLATE_DISTRIBUTION_MODES, HQ_TEMPLATE_TYPES };
-export type { HqTemplateDistributionMode, HqTemplateType };
+export type { HqTemplateDistributionMode, HqTemplateStatement, HqTemplateType };
 
 export const VERSION_CONFLICT_MESSAGE = '配布先で編集がありました。もう一度確認してください';
 
@@ -121,11 +122,6 @@ export interface HqTemplateResolution {
 
 export type HqTemplateIdMap = Readonly<Record<string, string>>;
 
-export interface HqTemplateSqlStatement {
-  sql: string;
-  bindings: readonly (string | number | null)[];
-}
-
 export interface HqTemplateOwnedR2Object {
   key: string;
   ownerToken: string;
@@ -147,7 +143,7 @@ export interface HqTemplateStoreAtomicCommitPlan {
   mode: HqTemplateDistributionMode;
   resolutions: readonly HqTemplateResolution[];
   stage: readonly HqTemplateOwnedR2Object[];
-  dbCommit: readonly HqTemplateSqlStatement[];
+  dbCommit: readonly HqTemplateStatement[];
   compensateOnDbFailure: readonly HqTemplateOwnedR2Key[];
   reconcile: readonly HqTemplateOwnedR2Key[];
 }

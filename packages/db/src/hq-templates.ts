@@ -334,6 +334,8 @@ export async function saveHqTemplatePreflight(
   | { kind: 'saved'; preflight: HqTemplatePreflight }
   | { kind: 'conflict_or_missing' }
 > {
+  // SQLite 3.35+ final catch-all ON CONFLICT: id/fingerprintのどちらの競合も、
+  // bindingを満たさない場合はWHEREでno-opとなりchanges=0を返す。
   const result = await db.prepare(
     `INSERT INTO hq_template_preflights
        (id, tenant_id, template_id, template_version_id, target_account_id,
@@ -506,7 +508,7 @@ export async function beginHqTemplateStoreResult(
   | { kind: 'created' | 'reused'; result: HqTemplateDistributionResult }
   | { kind: 'conflict_or_missing' }
 > {
-  // Migration 380's AFTER INSERT trigger consumes the exact preflight in the same
+  // Migration 381's AFTER INSERT trigger consumes the exact preflight in the same
   // SQLite statement. A failed consume raises and rolls this result INSERT back.
   const inserted = await db.prepare(
     `INSERT OR IGNORE INTO hq_template_distribution_results
