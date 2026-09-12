@@ -53,12 +53,33 @@ function patch(body: unknown) {
   }), { DB } as Env['Bindings']);
 }
 
+function me() {
+  return app().fetch(new Request('https://example.com/api/staff/me'), { DB } as Env['Bindings']);
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   dbMocks.getStaffById.mockResolvedValue(null);
 });
 
 describe('staff permission and notification validation', () => {
+  it('returns the authenticated tenant scope for browser receipt isolation', async () => {
+    dbMocks.getStaffById.mockResolvedValue({
+      id: 'owner-1', tenant_id: 'tenant-1', name: '管理者', email: null,
+      role: 'owner', access_level: 'full', api_key: 'masked', line_user_id: null,
+      is_active: 1, permission_keys: '[]', notification_preferences: '{}',
+      invite_status: 'active', invite_token_hash: null, invite_expires_at: null,
+      email_verified_at: null, line_linked_at: null, totp_secret_enc: null,
+      totp_pending_secret_enc: null, totp_enabled_at: null, totp_last_used_step: null,
+      assigned_line_account_id: null, can_access_descendant_accounts: 1,
+      account_scope: 'all', policy_version: 1,
+      created_at: '2026-09-12T00:00:00.000Z', updated_at: '2026-09-12T00:00:00.000Z',
+    });
+    const response = await me();
+    expect(response.status).toBe(200);
+    expect((await response.json() as { data: { tenantId: string } }).data.tenantId).toBe('tenant-1');
+  });
+
   it('rejects permission keys with unusable characters before touching the DB', async () => {
     const response = await post({ permissionKeys: ['/chats', '<script>alert(1)</script>'] });
     expect(response.status).toBe(400);

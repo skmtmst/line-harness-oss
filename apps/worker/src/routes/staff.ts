@@ -57,6 +57,9 @@ async function serializeStaff(
   const accountScope = row.account_scope ?? 'all';
   return {
     id: row.id,
+    // The browser uses this authenticated scope to namespace recoverable
+    // idempotency receipts. It is an identifier, never a credential.
+    tenantId: row.tenant_id ?? DEFAULT_TENANT_ID,
     name: row.name,
     email: exposeEmail ? row.email : maskEmail(row.email),
     role: displayRole(row),
@@ -215,7 +218,7 @@ staff.get('/api/staff/me', async (c) => {
   try {
     const current = c.get('staff');
     if (current.id === 'env-owner') {
-      return c.json({ success: true, data: { id: current.id, name: '管理者', role: 'admin', email: null, permissionKeys: [], assignedLineAccountId: null, canAccessDescendantAccounts: true, accountScope: 'all', scopedLineAccountIds: [] } });
+      return c.json({ success: true, data: { id: current.id, tenantId: current.tenantId ?? DEFAULT_TENANT_ID, name: '管理者', role: 'admin', email: null, permissionKeys: [], assignedLineAccountId: null, canAccessDescendantAccounts: true, accountScope: 'all', scopedLineAccountIds: [] } });
     }
     const member = await getStaffById(c.env.DB, current.id);
     if (!member) return c.json({ success: false, error: 'Staff member not found' }, 404);

@@ -1695,6 +1695,8 @@ export interface AutomationLog {
 // -----------------------------------------------------------------------------
 export interface StaffMember {
   id: string;
+  /** 認証済み本人APIが返すテナント識別子。古いAPI応答との互換のため任意。 */
+  tenantId?: string;
   name: string;
   email: string | null;
   role: 'owner' | 'admin' | 'staff' | 'viewer';
