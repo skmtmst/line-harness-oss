@@ -57,8 +57,9 @@ export const HQ_MENU_SECTIONS: MenuSection[] = [
       { href: hqOpenHref('rich-menus'), label: 'リッチメニュー管理', icon: 'M4 4h6v6H4V4zm0 10h6v6H4v-6zm10-10h6v6h-6V4zm0 10h6v6h-6v-6z', id: 'hq-rich-menus', note: '店舗を選んでリッチメニュー管理を開きます', required: true },
       { href: hqOpenHref('form-submissions'), label: '回答フォーム管理', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2', id: 'hq-forms', note: '店舗を選んで回答フォーム管理を開きます', required: true },
       // ★V6 35-1 `aH6NX/EMiz0` の並び。統括で画像を作り、店舗へ渡す。
+      // 「設定」は 2026-09-12 に外した。統括名・権限者は左下のアカウントメニュー →
+      // メンバー管理（/hq/members）から入る（★V6 36-1・36-5）。
       { href: '/hq/banners', label: 'バナー生成', icon: 'M4 5a2 2 0 012-2h12a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm4 5a1.5 1.5 0 100-3 1.5 1.5 0 000 3zm12 5l-5-5L5 21', id: 'hq-banners', note: '配信やリッチメニューに使う画像をAIで作り、店舗へ渡します', required: true },
-      { href: '/hq/settings', label: '設定', icon: 'M4 6h16M4 12h16M4 18h7', id: 'hq-settings', note: '統括の設定を管理します', required: true },
     ],
   },
 ]

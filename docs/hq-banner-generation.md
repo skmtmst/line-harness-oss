@@ -79,6 +79,8 @@ OpenAI の公式価格はトークン単位（gpt-image-2: 出力 $15/1M トー�
 | `BANNER_MONTHLY_IMAGES` | var（任意） | 統括ごとの月間上限（枚）。未設定は 150 |
 | `BANNER_IMAGE_QUALITY` | var（任意） | 生成の品質（low／medium／high）。未設定は medium |
 
+（統括の「お問い合わせ」の宛先は `SUPPORT_NOTIFY_EMAIL`。未設定なら `CONTACT_EMAIL` へ届く。値は Git に書かない）
+
 検証環境へ入れるときは `--config apps/worker/wrangler.staging.toml` を付けて `wrangler secret put OPENAI_API_KEY` を実行する。値は Git にもチャットにも書かない。
 
 ## データ

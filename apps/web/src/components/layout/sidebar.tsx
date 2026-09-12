@@ -9,6 +9,7 @@ import { useBrand } from '@/lib/use-brand'
 import { restaurantTestUiEnabled } from '@/lib/environment-features'
 import { HQ_MENU_SECTIONS, orderedMenuSections, type MenuItem } from '@/lib/menu'
 import SidebarIdentity from './sidebar-identity'
+import HqAccountMenu from '@/components/hq/account-menu'
 import {
   FEATURE_SETTINGS_UPDATED_EVENT,
   SIDEBAR_FEATURE_BY_HREF,
@@ -273,6 +274,12 @@ export default function Sidebar({
     for (const section of sections) {
       for (const item of section.items) {
         if (item.href === '/') continue
+        // 統括の「店舗管理」(/hq) も完全一致にする。/hq/banners や /hq/members を
+        // 開いたときに店舗管理が光ってしまうため。
+        if (item.href === '/hq') {
+          if (activePathname === '/hq') best = '/hq'
+          continue
+        }
         const path = item.href.split('?')[0]
         if (activePathname !== path && !activePathname.startsWith(path + '/')) continue
         if (best === null || path.length > best.length) best = path
@@ -408,8 +415,12 @@ export default function Sidebar({
         名前・権限・ログアウトは、2026-08-26 に共通トップバーへ移した。
         ここに残すと二重に出る（`docs/v6-common-rules.md` §1）。
         枠だけ残すのは、下端の余白がメニューの最後の項目に食い込まないため。
+
+        統括（/hq）だけは例外（2026-09-12、§1-2）。下端にログイン中のアカウントを置き、
+        押すとメンバー管理・お問い合わせ・ログアウトのメニューが上に開く。
+        正本は ★V6 36-1 `qAvlC`。中身は `components/hq/account-menu.tsx` が持つ。
       */}
-      <div className={styles.footer} />
+      {isHq ? <HqAccountMenu /> : <div className={styles.footer} />}
     </>
   )
 

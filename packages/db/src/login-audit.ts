@@ -118,3 +118,27 @@ export async function countLoginAudit(
     .first<{ count: number }>();
   return row?.count ?? 0;
 }
+
+/**
+ * 権限者ごとの最終ログイン日時（action='login' の最新。失敗は 'fail' で別に記録される）。
+ * 統括のメンバー管理の「最終ログイン」列に使う。記録が無い人は入らない。
+ */
+export async function getLastLoginByStaff(
+  db: D1Database,
+  staffIds: string[],
+): Promise<Record<string, string>> {
+  if (staffIds.length === 0) return {};
+  const placeholders = staffIds.map(() => '?').join(', ');
+  const { results } = await db
+    .prepare(
+      `SELECT admin_user_id, MAX(created_at) AS last_at
+         FROM login_audit
+        WHERE action = 'login' AND admin_user_id IN (${placeholders})
+        GROUP BY admin_user_id`,
+    )
+    .bind(...staffIds)
+    .all<{ admin_user_id: string; last_at: string }>();
+  const out: Record<string, string> = {};
+  for (const row of results ?? []) out[row.admin_user_id] = row.last_at;
+  return out;
+}
