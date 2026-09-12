@@ -186,7 +186,7 @@ export async function deleteFolder(db: D1Database, id: string): Promise<boolean>
     SELECT 1 FROM tags t WHERE (t.folder_id = folders.id OR t.folder_id IN (SELECT id FROM children))
       AND t.line_account_id IS NOT folders.account_id
   ))`).bind(id, id).run();
-  return Number(result.meta?.changes ?? 0) === 1;
+  return Number(result.meta?.changes ?? 0) > 0;
 }
 
 /** kind ごとの件数。画面のタブに数字を出すため。 */

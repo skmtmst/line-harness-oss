@@ -103,6 +103,13 @@ describe('existing tag/folder endpoints enforce account ownership', () => {
     expect((await req('/api/folders', 'POST', { kind: 'tag', name: 'bad' })).status).toBe(400);
     expect((await req('/api/tags/import/preview', 'POST', { rows: [] })).status).toBe(400);
   });
+  it('deletes same-account descendants while preserving their tags as unfiled', async () => {
+    folder('own-child', 'a', 'tag', 'folder-a');
+    fixture.raw.prepare('UPDATE tags SET folder_id=? WHERE id=?').run('own-child', 'tag-a');
+    expect((await req('/api/folders/folder-a', 'DELETE')).status).toBe(200);
+    expect(fixture.raw.prepare('SELECT id FROM folders WHERE id=?').get('own-child')).toBeUndefined();
+    expect(fixture.raw.prepare('SELECT folder_id FROM tags WHERE id=?').get('tag-a')).toEqual({ folder_id: null });
+  });
   it('rejects a corrupted cross-account descendant without cascading', async () => {
     folder('bad-child', 'b', 'tag', 'folder-a');
     expect((await req('/api/folders/folder-a', 'DELETE')).status).toBe(409);
