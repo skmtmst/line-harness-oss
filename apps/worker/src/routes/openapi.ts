@@ -315,10 +315,10 @@ const spec = {
       post: {
         tags: ['HQ Templates'],
         summary: '統括ひな形を作成',
-        parameters: [{ name: 'Idempotency-Key', in: 'header', schema: { type: 'string' }, description: '再送時も同じ値を使用する作成依頼ID' }],
+        parameters: [{ name: 'Idempotency-Key', in: 'header', schema: { type: 'string' }, description: '再送時も同じ値を使用する作成依頼ID。省略時はbody.requestIdが必須' }],
         requestBody: {
           required: true,
-          content: { 'application/json': { schema: { type: 'object', required: ['requestId', 'type', 'name', 'definition'], properties: {
+          content: { 'application/json': { schema: { type: 'object', required: ['type', 'name', 'definition'], properties: {
             requestId: { type: 'string' }, type: { type: 'string', enum: ['tag', 'rich_menu', 'template', 'form'] },
             name: { type: 'string', minLength: 1 }, description: { type: 'string' }, definition: { type: 'object' },
           } } } },
@@ -335,7 +335,7 @@ const spec = {
       patch: {
         tags: ['HQ Templates'], summary: '統括ひな形を改訂',
         parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
-        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['expectedRevision'], properties: {
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['expectedRevision', 'name', 'definition'], properties: {
           expectedRevision: { type: 'integer', minimum: 1 }, name: { type: 'string', minLength: 1 }, description: { type: 'string' }, definition: { type: 'object' },
         } } } } },
         responses: { '200': { description: 'Updated' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Not found' }, '409': { description: 'Revision conflict' } },
