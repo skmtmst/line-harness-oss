@@ -43,10 +43,6 @@ function json(body: unknown) {
 }
 
 function seed(db: SqliteD1) {
-  const columns = db.raw.prepare(`PRAGMA table_info(notification_rules)`).all() as Array<{ name: string }>;
-  if (!columns.some((column) => column.name === 'version')) {
-    db.raw.prepare(`ALTER TABLE notification_rules ADD COLUMN version INTEGER NOT NULL DEFAULT 1 CHECK (version > 0)`).run();
-  }
   db.raw.prepare(`INSERT INTO tenants (id, name) VALUES ('tenant-1', '統括1')`).run();
   db.raw.prepare(`
     INSERT INTO line_accounts
@@ -74,6 +70,16 @@ function seed(db: SqliteD1) {
     importance: 'important', recipientIds: ['owner-1'], recipientLabel: 'オーナー',
     message: '新しい予約が入りました', dedupeMinutes: 10,
   }));
+  // 登録簿に無いきっかけのルール。画面の選択肢を直しても、API を直接叩けば
+  // この形は作れる。公開の口で断れるかを見るために置く。
+  db.raw.prepare(`
+    INSERT INTO notification_rules
+      (id, name, event_type, conditions, channels, line_account_id, is_active)
+    VALUES ('rule-unconnected', '受信箱に届いたら', 'message_received', ?, '["dashboard","line"]', 'account-1', 0)
+  `).run(JSON.stringify({
+    importance: 'normal', recipientIds: ['owner-1'], recipientLabel: 'オーナー',
+    message: '受信箱に届きました', dedupeMinutes: 0,
+  }));
 }
 
 describe('運用者へのお知らせの送信と実行記録', () => {
@@ -99,6 +105,40 @@ describe('運用者へのお知らせの送信と実行記録', () => {
     await expect(response.json()).resolves.toMatchObject({
       data: { summary: { staff: 2, canReceive: 1, line: 1, email: 0, dashboard: 0, unavailable: 1 } },
     });
+  });
+
+  /*
+   * 審査(2026-09-12)が見つけた形。画面が保存していた message_received は
+   * 公開が 200 で通り is_active=1 になるのに、dispatch は unknown_event_type
+   * で断るので通知は0件だった。**公開できて届かない**のが一番悪い。
+   * 公開の時点で断ることで、静かな失敗を見える失敗にする。
+   */
+  it('登録簿に無いきっかけは公開できず、停止のまま残る', async () => {
+    const response = await app(testDb.db).request(
+      '/api/notifications/operator-rules/rule-unconnected/publish',
+      json({ lineAccountId: 'account-1' }),
+    );
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toMatchObject({
+      success: false, code: 'event_type_not_connected',
+    });
+    // 断ったのに公開されていたら意味がない。台帳側も見る。
+    const row = testDb.raw.prepare(
+      `SELECT is_active FROM notification_rules WHERE id = 'rule-unconnected'`,
+    ).get() as { is_active: number };
+    expect(row.is_active).toBe(0);
+  });
+
+  it('登録簿にあるきっかけは、今までどおり公開できる（締めすぎていない）', async () => {
+    const response = await app(testDb.db).request(
+      '/api/notifications/operator-rules/rule-1/publish',
+      json({ lineAccountId: 'account-1' }),
+    );
+    expect(response.status).toBe(200);
+    const row = testDb.raw.prepare(
+      `SELECT is_active FROM notification_rules WHERE id = 'rule-1'`,
+    ).get() as { is_active: number };
+    expect(row.is_active).toBe(1);
   });
 
   it('宛先を確認して公開し、同じ発生元をLINEと管理画面へ二重送信しない', async () => {
