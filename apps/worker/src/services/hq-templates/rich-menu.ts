@@ -1,3 +1,5 @@
+import { RICH_MENU_ACTION_TYPE_BY_INTENT } from '@line-crm/shared';
+import { resolveSwitcherActions, validateRichMenuGroupForPublish, type AreaInput } from '../../lib/rich-menu-publisher.js';
 import {
   unsupportedHqTemplateAdapter, requireHqTemplateAuthority, createHqTemplateSnapshotToken,
   type HqTemplateAdapter, type HqTemplateAdapterInput, type HqTemplateAdapterContext,
@@ -12,7 +14,7 @@ type RefKind = 'tag' | 'form' | 'scenario' | 'template';
 interface Area {
   id: string; bounds: { x: number; y: number; width: number; height: number };
   actionType: 'uri' | 'message' | 'postback' | 'richmenuswitch';
-  actionData: Record<string, string>; intent?: string; label?: string;
+  actionData: Record<string, string>; intent?: 'url' | 'text' | 'form' | 'template' | 'switch'; label?: string;
   tagIds?: string[]; formId?: string; templateId?: string; scenarioId?: string;
 }
 interface Page { id: string; name: string; imageR2Key: string; areas: Area[] }
@@ -41,6 +43,21 @@ async function digest(value: string | Uint8Array): Promise<string> {
   return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))).map(v => v.toString(16).padStart(2, '0')).join('');
 }
 const referenceKey = (r: HqTemplateReference) => `${r.kind}:${r.sourceId}`;
+function assertPublicUri(value: unknown): void {
+  let url: URL, path: string, hash: string;
+  try {
+    url = new URL(String(value));
+    path = decodeURIComponent(url.pathname);
+    hash = decodeURIComponent(url.hash);
+  } catch { fail('INVALID_ACTION'); }
+  if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) fail('INVALID_ACTION');
+  const referenceParameter = /^(?:form|template|scenario|tag|(?:line)?account)(?:s|ids?)?$/;
+  const referencePath = /(?:^|\/)(?:forms?|templates?|scenarios?|tags?|accounts?)\//i;
+  const referenceFragment = /(?:^|[?&#/])(?:forms?|templates?|scenarios?|tags?|accounts?)(?:_?id)?[=\/]/i;
+  if (['liff.line.me', 'miniapp.line.me'].includes(url.hostname.replace(/\.$/, ''))
+    || [...url.searchParams.keys()].some(k => referenceParameter.test(k.replace(/[_-]/g, '').toLowerCase()))
+    || referencePath.test(path) || referenceFragment.test(hash)) fail('OPAQUE_REFERENCE_UNSUPPORTED');
+}
 function parse(input: HqTemplateAdapterInput, tenantId: string): RichMenuHqDefinition {
   if (input.definitionJson.length > 128_000) fail('DEFINITION_TOO_LARGE');
   const d: unknown = JSON.parse(input.definitionJson);
@@ -65,32 +82,45 @@ function parse(input: HqTemplateAdapterInput, tenantId: string): RichMenuHqDefin
       for (const v of Object.values(b)) if (!Number.isInteger(v) || (v as number) < 0) fail('INVALID_BOUNDS');
       if (!(Number(b.width) > 0 && Number(b.height) > 0 && Number(b.x) + Number(b.width) <= 2500 && Number(b.y) + Number(b.height) <= (g.size === 'large' ? 1686 : 843))) fail('INVALID_BOUNDS');
       if (!['uri', 'message', 'postback', 'richmenuswitch'].includes(String(a.actionType))) fail('INVALID_ACTION');
+      // The existing publisher/tap handler has no executable scenario action.
+      // Never report a successful distribution that silently drops that behavior.
+      if (a.scenarioId !== undefined) fail('UNSUPPORTED_SCENARIO_REFERENCE');
+      if (a.intent !== undefined) {
+        if (!['url', 'text', 'form', 'template', 'switch'].includes(String(a.intent))) fail('INVALID_ACTION');
+        const expected = RICH_MENU_ACTION_TYPE_BY_INTENT[a.intent as keyof typeof RICH_MENU_ACTION_TYPE_BY_INTENT];
+        if (a.actionType !== expected) fail('INVALID_ACTION');
+      }
       // Opaque postback payloads may hide source account IDs. Only structured references are accepted.
-      const allowed = a.actionType === 'richmenuswitch' ? ['targetPageId'] : a.actionType === 'uri' ? ['uri'] : a.actionType === 'message' ? ['text'] : [];
+      const allowed = a.intent === 'form' ? [] : a.actionType === 'richmenuswitch' ? ['targetPageId'] : a.actionType === 'uri' ? ['uri'] : a.actionType === 'message' ? ['text'] : [];
       keys(a.actionData, allowed);
       for (const v of Object.values(a.actionData)) text(v, 2000);
-      if (a.actionType === 'uri') {
-        const url = new URL(String(a.actionData.uri));
-        if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) fail('INVALID_ACTION');
-        if (['liff.line.me', 'miniapp.line.me'].includes(url.hostname) || [...url.searchParams.keys()].some(k => /^(form|template|scenario|tag|account)_?id$/i.test(k))) fail('OPAQUE_REFERENCE_UNSUPPORTED');
-      }
+      if (a.actionType === 'uri' && a.intent !== 'form') assertPublicUri(a.actionData.uri);
       if (a.actionType === 'message' && !a.actionData.text) fail('INVALID_ACTION');
       if (a.actionType === 'richmenuswitch') ident(a.actionData.targetPageId);
-      if (a.intent !== undefined && !['url', 'text', 'form', 'template', 'switch'].includes(String(a.intent))) fail('INVALID_ACTION');
-      if (a.actionType === 'postback' && !['form', 'template'].includes(String(a.intent))) fail('OPAQUE_REFERENCE_UNSUPPORTED');
+      if (a.actionType === 'postback' && a.intent !== 'template') fail('OPAQUE_REFERENCE_UNSUPPORTED');
       if (a.label !== undefined) text(a.label);
-      for (const key of ['formId', 'templateId', 'scenarioId']) if (a[key] !== undefined) ident(a[key]);
+      for (const key of ['formId', 'templateId']) if (a[key] !== undefined) ident(a[key]);
       if (a.intent === 'form' && !a.formId || a.intent === 'template' && !a.templateId) fail('MISSING_REFERENCE');
+      if (a.formId !== undefined && a.intent !== 'form' || a.templateId !== undefined && a.intent !== 'template') fail('INVALID_REFERENCE');
       if (a.tagIds !== undefined && (!Array.isArray(a.tagIds) || a.tagIds.length > 30)) fail('INVALID_REFERENCE');
       for (const tag of (a.tagIds ?? []) as unknown[]) ident(tag);
+      // Only these intents emit an area postback consumed by handleRichMenuTap.
+      if ((a.tagIds as unknown[] | undefined)?.length && !['text', 'template'].includes(String(a.intent))) fail('UNSUPPORTED_TAG_ACTION');
     }
   }
   const definition = d as unknown as RichMenuHqDefinition;
   const pageIds = new Set(definition.richMenu.pages.map(p => p.id));
   if (!pageIds.has(definition.richMenu.defaultPageId)) fail('INVALID_DEFAULT_PAGE');
   for (const p of definition.richMenu.pages) for (const a of p.areas) if (a.actionType === 'richmenuswitch' && !pageIds.has(a.actionData.targetPageId)) fail('INVALID_SWITCH_TARGET');
+  // Reuse the same action validator as publication (no LINE/R2 calls). The target
+  // account's actual LIFF URL remains a prerequisite of the later publish flow.
+  const pages = definition.richMenu.pages.map((p, orderIndex) => ({ ...p, orderIndex, imageContentType: null, lineRichMenuId: null, areas: p.areas as AreaInput[] }));
+  try {
+    validateRichMenuGroupForPublish({ id: definition.richMenu.id, size: definition.richMenu.size, chatBarText: definition.richMenu.chatBarText, isDefaultForAll: false, formBaseUrl: 'https://example.invalid/', pages: resolveSwitcherActions(pages, definition.richMenu.id) });
+  } catch { fail('INVALID_ACTION'); }
   return definition;
 }
+
 function references(d: RichMenuHqDefinition): HqTemplateReference[] {
   const result = new Map<string, HqTemplateReference>();
   for (const page of d.richMenu.pages) for (const a of page.areas) {
@@ -114,6 +144,9 @@ export function createRichMenuHqTemplateAdapter(options: RichMenuAdapterOptions)
   if (requireHqTemplateAuthority(authority).kind !== 'AUTHORIZED') fail('FORBIDDEN');
   ident(authority.tenantId); ident(input.templateVersionId);
   const d = parse(input, authority.tenantId); const g = d.richMenu; const refs = references(d);
+  // D1 allows 100 bound parameters per statement. The atomic snapshot guard
+  // needs the seven root bindings, reference bindings, and one expected snapshot.
+  if (8 + refs.reduce((count, ref) => count + (ref.kind === 'form' ? 3 : 2), 0) > 100) fail('UNSUPPORTED_REFERENCE_LIMIT');
   const assertContext = (c: Pick<HqTemplateAdapterContext, 'tenantId' | 'targetAccountId'>) => {
     if (c.tenantId !== authority.tenantId) fail('FORBIDDEN'); ident(c.targetAccountId);
   };

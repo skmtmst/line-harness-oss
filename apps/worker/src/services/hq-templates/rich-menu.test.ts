@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createTestD1 } from '../../test-utils/d1-sqlite.js';
 import { createRichMenuHqTemplateAdapter, executeRichMenuHqPlan, type RichMenuHqDefinition } from './rich-menu.js';
+import { createRichMenuShells, type GroupInput, type LineRichMenuClient } from '../../lib/rich-menu-publisher.js';
 import type { HqTemplateAdapterContext, HqTemplateStatement, HqTemplateStoreAtomicCommitPlan } from './contract.js';
 
 const resources: ReturnType<typeof createTestD1>[] = [];
@@ -11,12 +12,13 @@ function fixture() {
   for (const account of ['a', 'b', 'c', 'outside']) {
     sql.raw.prepare('INSERT INTO line_accounts(id,channel_id,name,channel_access_token,channel_secret,tenant_id) VALUES (?,?,?,?,?,?)').run(account, account, account, 'test-only', 'test-only', account === 'outside' ? 'other' : 'tenant');
     sql.raw.prepare('INSERT INTO tags(id,name,line_account_id) VALUES (?,?,?)').run(`tag-${account}`, `Tag-${account}`, account);
+    sql.raw.prepare("INSERT INTO templates(id,name,message_type,message_content,line_account_id) VALUES (?,?,'text','fixture',?)").run(`template-${account}`, 'Template', account);
     sql.raw.prepare('INSERT INTO forms(id,name) VALUES (?,?)').run(`form-${account}`, 'Form');
     sql.raw.prepare('INSERT INTO form_accounts VALUES (?,?,?)').run(`form-${account}`, account, 'now');
     sql.raw.prepare("INSERT INTO scenarios(id,name,trigger_type,line_account_id) VALUES (?,?,'manual',?)").run(`scenario-${account}`, 'Scenario', account);
   }
   const definition: RichMenuHqDefinition = { schemaVersion: 1, richMenu: { id: 'menu', name: 'Menu', chatBarText: '開く', size: 'large', defaultPageId: 'p1', pages: [
-    { id: 'p1', name: 'One', imageR2Key: 'hq-templates/tenant/image1', areas: [{ id: 'ar1', bounds: { x: 0, y: 0, width: 100, height: 100 }, actionType: 'postback', actionData: {}, intent: 'form', formId: 'source-form', scenarioId: 'source-scenario', tagIds: ['source-tag'] }] },
+    { id: 'p1', name: 'One', imageR2Key: 'hq-templates/tenant/image1', areas: [{ id: 'ar1', bounds: { x: 0, y: 0, width: 100, height: 100 }, actionType: 'uri', actionData: {}, intent: 'form', formId: 'source-form' }, { id: 'ar3', bounds: { x: 100, y: 0, width: 100, height: 100 }, actionType: 'message', actionData: { text: 'ご案内' }, intent: 'text', tagIds: ['source-tag'] }, { id: 'ar4', bounds: { x: 200, y: 0, width: 100, height: 100 }, actionType: 'postback', actionData: {}, intent: 'template', templateId: 'source-template' }] },
     { id: 'p2', name: 'Two', imageR2Key: 'hq-templates/tenant/image2', areas: [{ id: 'ar2', bounds: { x: 0, y: 0, width: 100, height: 100 }, actionType: 'richmenuswitch', actionData: { targetPageId: 'p1' }, intent: 'switch' }] },
   ] } };
   const input = { templateVersionId: 'version', definitionJson: JSON.stringify(definition) };
@@ -56,11 +58,87 @@ describe('rich-menu HQ store atomic adapter', () => {
       expect(pages).toHaveLength(2);
       for (const [i, page] of pages.entries()) { expect(page.line_richmenu_id).toBeNull(); expect(page.image_r2_key.startsWith(`rich-menus/${account}/`)).toBe(true); expect(f.objects.get(page.image_r2_key)?.bytes).toEqual(new Uint8Array([i + 1, 2, 3])); }
       const area = f.raw.prepare('SELECT * FROM rich_menu_areas WHERE page_id=?').get(pages[0].id) as any;
-      expect(area.form_id).toBe(`form-${account}`); expect(JSON.parse(area.tag_ids)).toEqual([`tag-${account}`]); expect(JSON.parse(area.action_data)).toEqual({ scenarioId: `scenario-${account}` });
+      expect(area.form_id).toBe(`form-${account}`); expect(JSON.parse(area.action_data)).toEqual({});
+      expect((f.raw.prepare("SELECT tag_ids FROM rich_menu_areas WHERE page_id=? AND intent='text'").get(pages[0].id) as any).tag_ids).toBe(JSON.stringify([`tag-${account}`]));
+      expect((f.raw.prepare("SELECT template_id FROM rich_menu_areas WHERE page_id=? AND intent='template'").get(pages[0].id) as any).template_id).toBe(`template-${account}`);
       const switchArea = f.raw.prepare('SELECT * FROM rich_menu_areas WHERE page_id=?').get(pages[1].id) as any;
       expect(JSON.parse(switchArea.action_data).targetPageId).toBe(pages[0].id);
     }
     expect(f.objects.size).toBe(8);
+  });
+  it.each([
+    'https://example.invalid/liff?form=source-form',
+    'https://example.invalid/?template_id=source-template',
+    'https://example.invalid/?scenarioId=source-scenario',
+    'https://example.invalid/?tag=source-tag',
+    'https://example.invalid/?line_account_id=source-account',
+    'https://example.invalid/forms/source-form',
+    'https://example.invalid/#/forms/source-form',
+    'https://example.invalid/#?form=source-form',
+    'https://liff.line.me/source-liff',
+  ])('rejects opaque source references before DB/R2 work: %s', uri => {
+    const f = fixture();
+    const area = f.definition.richMenu.pages[0].areas[0];
+    Object.assign(area, { actionType: 'uri', actionData: { uri }, intent: 'url' }); delete area.formId;
+    expect(() => createRichMenuHqTemplateAdapter({ ...f.options, input: { ...f.input, definitionJson: JSON.stringify(f.definition) } })).toThrow('OPAQUE_REFERENCE_UNSUPPORTED');
+    expect(f.bucket.head).not.toHaveBeenCalled(); expect(f.bucket.put).not.toHaveBeenCalled();
+  });
+  it('explicitly rejects unexecutable scenario references instead of marking them copied', () => {
+    const f = fixture(); f.definition.richMenu.pages[0].areas[0].scenarioId = 'source-scenario';
+    expect(() => createRichMenuHqTemplateAdapter({ ...f.options, input: { ...f.input, definitionJson: JSON.stringify(f.definition) } })).toThrow('UNSUPPORTED_SCENARIO_REFERENCE');
+    expect(f.bucket.head).not.toHaveBeenCalled(); expect(f.raw.prepare('SELECT * FROM rich_menu_groups').all()).toEqual([]);
+  });
+  it.each([
+    { actionType: 'message', actionData: { text: 'switch' }, intent: 'switch' },
+    { actionType: 'postback', actionData: {}, intent: 'form', formId: 'source-form' },
+    { actionType: 'uri', actionData: { uri: 'https://example.invalid/' }, intent: 'text' },
+    { actionType: 'message', actionData: { text: 'x'.repeat(301) }, intent: 'text' },
+    { actionType: 'uri', actionData: { uri: `https://example.invalid/${'x'.repeat(1000)}` }, intent: 'url' },
+  ])('rejects an action the existing publisher cannot publish: %j', replacement => {
+    const f = fixture();
+    f.definition.richMenu.pages[0].areas[0] = { id: 'ar1', bounds: { x: 0, y: 0, width: 100, height: 100 }, ...replacement } as any;
+    expect(() => createRichMenuHqTemplateAdapter({ ...f.options, input: { ...f.input, definitionJson: JSON.stringify(f.definition) } })).toThrow('INVALID_ACTION');
+    expect(f.bucket.head).not.toHaveBeenCalled();
+  });
+  it.each(['form', 'url', undefined])('rejects tag side effects for an intent that never emits a tap: %s', intent => {
+    const f = fixture();
+    const area = f.definition.richMenu.pages[0].areas[0];
+    area.tagIds = ['source-tag'];
+    if (intent !== 'form') { delete area.formId; Object.assign(area, { intent, actionType: 'uri', actionData: { uri: 'https://example.invalid/' } }); }
+    expect(() => createRichMenuHqTemplateAdapter({ ...f.options, input: { ...f.input, definitionJson: JSON.stringify(f.definition) } })).toThrow('UNSUPPORTED_TAG_ACTION');
+  });
+  it('publishes the persisted draft through the existing payload builder using only fake LINE/R2 clients', async () => {
+    const f = fixture(); await f.execute(await f.plan('a'));
+    const row = f.raw.prepare('SELECT * FROM rich_menu_groups').get() as any;
+    const pages = (f.raw.prepare('SELECT * FROM rich_menu_pages WHERE group_id=? ORDER BY order_index').all(row.id) as any[]).map(p => ({
+      id: p.id, orderIndex: p.order_index, name: p.name, imageR2Key: p.image_r2_key, imageContentType: p.image_content_type, lineRichMenuId: p.line_richmenu_id,
+      areas: (f.raw.prepare('SELECT * FROM rich_menu_areas WHERE page_id=? ORDER BY rowid').all(p.id) as any[]).map(a => ({ id: a.id, bounds: { x: a.bounds_x, y: a.bounds_y, width: a.bounds_width, height: a.bounds_height }, actionType: a.action_type, actionData: JSON.parse(a.action_data), intent: a.intent, formId: a.form_id, templateId: a.template_id, tagIds: JSON.parse(a.tag_ids) })),
+    }));
+    const group: GroupInput = { id: row.id, size: row.size, chatBarText: row.chat_bar_text, isDefaultForAll: false, formBaseUrl: 'https://liff.line.me/fixture-a', pages };
+    const createRichMenu = vi.fn(async (_payload: unknown) => ({ richMenuId: `fake-${crypto.randomUUID()}` }));
+    const line = { createRichMenu, uploadRichMenuImage: vi.fn(), deleteRichMenu: vi.fn() } as unknown as LineRichMenuClient;
+    await createRichMenuShells(group, line, { get: async key => ({ body: f.objects.get(key)!.bytes }) });
+    const payloads = createRichMenu.mock.calls.map(c => c[0] as any);
+    expect(payloads[0].areas[0].action).toEqual({ type: 'uri', uri: 'https://liff.line.me/fixture-a?form=form-a' });
+    expect(payloads[0].areas[1].action).toMatchObject({ type: 'postback', displayText: 'ご案内' });
+    expect(payloads[0].areas[1].action.data).toContain(pages[0].areas[1].id);
+    expect(payloads[0].areas[2].action).toMatchObject({ type: 'postback' });
+    expect(payloads[0].areas[2].action.data).toContain(pages[0].areas[2].id);
+    expect(payloads[1].areas[0].action).toMatchObject({ type: 'richmenuswitch', richMenuAliasId: `lhx-${row.id.slice(0, 8)}-0` });
+    expect(JSON.stringify(payloads)).not.toMatch(/source-(form|template|tag|scenario)/);
+    // Publishing was simulated, so the distribution still has no actual LINE ID.
+    expect(f.raw.prepare('SELECT line_richmenu_id FROM rich_menu_pages').all()).toEqual([{ line_richmenu_id: null }, { line_richmenu_id: null }]);
+  });
+  it('rejects more than 100 snapshot guard bindings before resolving refs or querying DB', () => {
+    const f = fixture(), resolveReference = vi.fn();
+    const definitionWithTags = (count: number) => ({ ...f.definition, richMenu: { ...f.definition.richMenu, pages: [{ ...f.definition.richMenu.pages[0], areas: [
+      { id: 'many-1', bounds: { x: 0, y: 0, width: 100, height: 100 }, actionType: 'message', actionData: { text: '案内' }, intent: 'text', tagIds: Array.from({ length: Math.min(count, 30) }, (_, i) => `source-${i}`) },
+      { id: 'many-2', bounds: { x: 100, y: 0, width: 100, height: 100 }, actionType: 'message', actionData: { text: '案内' }, intent: 'text', tagIds: Array.from({ length: Math.max(0, count - 30) }, (_, i) => `source-${i + 30}`) },
+    ] }] } });
+    const build = (count: number) => createRichMenuHqTemplateAdapter({ ...f.options, resolveReference, input: { ...f.input, definitionJson: JSON.stringify(definitionWithTags(count)) } });
+    expect(() => build(46)).not.toThrow(); // 7 root + 92 refs + 1 expected = 100.
+    expect(() => build(47)).toThrow('UNSUPPORTED_REFERENCE_LIMIT');
+    expect(resolveReference).not.toHaveBeenCalled(); expect(f.bucket.head).not.toHaveBeenCalled();
   });
   it('rejects another tenant and cross-account references', async () => {
     const f = fixture(); await expect(f.plan('outside')).rejects.toThrow('SCOPE_MISMATCH');
