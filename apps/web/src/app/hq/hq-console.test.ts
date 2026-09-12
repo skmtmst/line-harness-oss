@@ -8,6 +8,7 @@ const openPage = readFileSync(new URL('./open/page.tsx', import.meta.url), 'utf8
 const shell = readFileSync(new URL('../../components/app-shell.tsx', import.meta.url), 'utf8')
 const sidebar = readFileSync(new URL('../../components/layout/sidebar.tsx', import.meta.url), 'utf8')
 const topBar = readFileSync(new URL('../../components/shell/app-top-bar.tsx', import.meta.url), 'utf8')
+const templatePage = readFileSync(new URL('./templates/page.tsx', import.meta.url), 'utf8')
 
 describe('統括コンソール', () => {
   it('既存のLINEアカウント一覧APIだけで店舗一覧を作る', () => {
@@ -54,12 +55,14 @@ describe('統括コンソール', () => {
     expect(HQ_MENU_SECTIONS.flatMap((section) => section.items).some((item) => item.label === '採用フロー管理')).toBe(false)
     expect(HQ_MENU_SECTIONS.flatMap((section) => section.items).map((item) => item.href)).toEqual([
       '/hq',
-      '/hq/templates?type=tag',
-      '/hq/templates?type=template',
-      '/hq/templates?type=rich_menu',
-      '/hq/templates?type=form',
+      '/hq/open?target=tags',
+      '/hq/open?target=templates',
+      '/hq/open?target=rich-menus',
+      '/hq/open?target=form-submissions',
       '/hq/settings',
     ])
+    expect(templatePage).toContain('HQ_TEMPLATE_DISTRIBUTION_ENABLED')
+    expect(templatePage).toContain("hqOpenHref('tags')")
   })
 
   it('店舗を開く既存導線は残り、選択後に識別子なしで遷移する', () => {

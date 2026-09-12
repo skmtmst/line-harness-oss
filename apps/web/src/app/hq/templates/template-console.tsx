@@ -6,13 +6,24 @@ import Button from '@/components/shared/button'
 import { Th } from '@/components/shared/table'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { usePageTitle } from '@/components/shell/page-chrome'
-import { hqTemplatesApi, TEMPLATE_TYPES, type TemplateType, type TemplateDetail, type TagDefinition, type HqTemplate, type HqAccount, type Preflight, type Resolution, type DistributionMode, type DistributionResult } from '@/lib/hq-templates-api'
+import { hqTemplatesApi, TEMPLATE_TYPES, type TemplateType, type TemplateDetail, type TemplateInput, type TagDefinition, type HqTemplate, type HqAccount, type Preflight, type Resolution, type DistributionMode, type DistributionResult } from '@/lib/hq-templates-api'
+import { hqOpenHref, type HqOpenTargetKey } from '@/lib/hq-navigation'
 import styles from './template-console.module.css'
 
 const LABELS: Record<TemplateType, string> = { tag: 'タグ', template: 'テンプレート', rich_menu: 'リッチメニュー', form: '回答フォーム' }
 const MODES: Record<DistributionMode, string> = { create: '新規作成', overwrite: '上書き', alias: '別名で作成' }
 const NODES = { list: 'rsyjI', edit: 'ZsLly', accounts: 'E0CmCp', duplicates: 'Uhd35', result: 'FxHyL' }
 type Stage = keyof typeof NODES
+const STEPS: readonly { stage: Stage; label: string }[] = [
+  { stage: 'list', label: '一覧' },
+  { stage: 'edit', label: 'ひな形' },
+  { stage: 'accounts', label: '店舗' },
+  { stage: 'duplicates', label: '重複確認' },
+  { stage: 'result', label: '結果' },
+]
+const LEGACY_TARGETS: Record<Exclude<TemplateType, 'tag'>, HqOpenTargetKey> = {
+  template: 'templates', rich_menu: 'rich-menus', form: 'form-submissions',
+}
 const freshDefinition = (): TagDefinition => ({ schemaVersion: 1, tag: { name: '' }, folders: [] })
 const choiceKey = (account: string, source: string) => JSON.stringify([account, source])
 const failedStores = (result: DistributionResult) => result.stores.filter(store => ['failed', 'version_conflict', 'unsupported'].includes(store.status))
@@ -47,10 +58,12 @@ export default function TemplateConsole({ type }: { type: TemplateType }) {
   const [busy, setBusy] = useState(false)
   const [ready, setReady] = useState(false)
   const [error, setError] = useState('')
+  const [conflict, setConflict] = useState(false)
   const [message, setMessage] = useState('')
   const [remove, setRemove] = useState<HqTemplate | null>(null)
   const [now, setNow] = useState(Date.now())
   const lock = useRef(false)
+  const createAttempt = useRef<{ requestId: string; input: TemplateInput } | null>(null)
   const alive = useRef(true)
   const supported = type === 'tag'
   usePageTitle(stage === 'list' ? '統括のひな形' : stage === 'edit' ? 'ひな形の作成・編集' : stage === 'accounts' ? '配布先店舗を選択' : stage === 'duplicates' ? '重複確認と配布方法' : '配布結果')
@@ -76,11 +89,16 @@ export default function TemplateConsole({ type }: { type: TemplateType }) {
 
   const perform = async (action: () => Promise<void>) => {
     if (lock.current || !ready) return
-    lock.current = true; setBusy(true); setError(''); setMessage('')
-    try { await action() } catch (e) { if (alive.current) setError(errorText(e)) }
+    lock.current = true; setBusy(true); setError(''); setConflict(false); setMessage('')
+    try { await action() } catch (e) {
+      if (alive.current) {
+        setError(errorText(e))
+        setConflict(Boolean(e && typeof e === 'object' && 'status' in e && e.status === 409))
+      }
+    }
     finally { lock.current = false; if (alive.current) setBusy(false) }
   }
-  const toList = () => { setStage('list'); setSearch(''); setPreflight(null); setChoices({}); setPendingRun(null); setResult(null); setError(''); window.history.replaceState(null, '', window.location.pathname + window.location.search) }
+  const toList = () => { createAttempt.current = null; setStage('list'); setSearch(''); setPreflight(null); setChoices({}); setPendingRun(null); setResult(null); setError(''); setConflict(false); window.history.replaceState(null, '', window.location.pathname + window.location.search) }
   const loadDetailIntoForm = (loaded: TemplateDetail) => {
     if (loaded.template.template_type !== 'tag' || loaded.definition.schemaVersion !== 1) throw new Error('この種類のひな形は未対応です（UNSUPPORTED）。')
     setDetail(loaded); setName(loaded.template.name); setDescription(loaded.template.description ?? ''); setDefinition(loaded.definition)
@@ -93,8 +111,29 @@ export default function TemplateConsole({ type }: { type: TemplateType }) {
   const save = (distribute: boolean) => void perform(async () => {
     if (!name.trim() || !definition.tag.name.trim() || definition.folders.some(folder => !folder.name.trim())) throw new Error('名前と参照先の名前を入力してください。')
     const input = { type: 'tag' as const, name: name.trim(), description: description.trim(), definition: { ...definition, tag: { ...definition.tag, description: description.trim() } } }
-    const saved = detail ? await hqTemplatesApi.update(detail.template.id, { ...input, expectedRevision: detail.template.revision }) : await hqTemplatesApi.create(input)
+    let saved: TemplateDetail
+    if (detail) {
+      saved = await hqTemplatesApi.update(detail.template.id, { ...input, expectedRevision: detail.template.revision })
+    } else {
+      const attempt = createAttempt.current ?? { requestId: crypto.randomUUID(), input }
+      createAttempt.current = attempt
+      try {
+        // If the response is lost, retry the exact request id and payload so the server can replay its 201.
+        saved = await hqTemplatesApi.create(attempt.input, attempt.requestId)
+      } catch (cause) {
+        if (cause && typeof cause === 'object' && 'responseReceived' in cause && cause.responseReceived === true) {
+          createAttempt.current = null
+        } else {
+          // Keep the visible form aligned with the immutable retry payload.
+          setName(attempt.input.name)
+          setDescription(attempt.input.description ?? '')
+          setDefinition(attempt.input.definition)
+        }
+        throw cause
+      }
+    }
     if (!alive.current) return
+    createAttempt.current = null
     loadDetailIntoForm(saved)
     setTemplates(current => [saved.template, ...current.filter(row => row.id !== saved.template.id)])
     setMessage('ひな形を保存しました。')
@@ -174,18 +213,18 @@ export default function TemplateConsole({ type }: { type: TemplateType }) {
   const title = stage === 'list' ? 'ひな形一覧' : stage === 'edit' ? `タグのひな形を${detail ? '編集' : '作成'}` : stage === 'accounts' ? '配布先店舗を選択' : stage === 'duplicates' ? `重複する項目が${duplicates.length}件あります` : done ? '配布が完了しました' : '配布結果を確認しています'
 
   return <div className={styles.console} data-design-node={NODES[stage]} aria-busy={busy}>
-    {(stage === 'accounts' || stage === 'duplicates') && <nav aria-label="配布の進捗"><ol className={styles.steps}>{['ひな形', '店舗', '重複確認', '結果'].map((label, i) => <li key={label} aria-current={['edit', 'accounts', 'duplicates', 'result'][i] === stage ? 'step' : undefined}>{i + 1} {label}</li>)}</ol></nav>}
+    <nav aria-label="配布の進捗"><ol className={styles.steps}>{STEPS.map((step, i) => <li key={step.stage} aria-current={step.stage === stage ? 'step' : undefined}>{i + 1} {step.label}</li>)}</ol></nav>
     {stage === 'edit' && <p className={styles.breadcrumb}><button type="button" disabled={busy} onClick={toList}>ひな形一覧</button> / {detail ? '編集' : '新規作成'}</p>}
     <header className={styles.header}><div><h1>{title}</h1><p className={styles.muted}>{stage === 'list' ? 'タグ・テンプレート・リッチメニュー・回答フォームを一元管理' : stage === 'accounts' ? '同じ組織内の店舗を複数選択できます' : stage === 'duplicates' ? '一括設定のあと、必要な項目だけ個別に変更できます' : stage === 'edit' ? '店舗へ配布するタグと参照設定をまとめます' : detail?.template.name}</p></div>
-      {stage === 'list' && supported && <Button variant="primary" disabled={!ready || busy} onClick={() => { setDetail(null); setName(''); setDescription(''); setDefinition(freshDefinition()); setStage('edit'); setError('') }}>＋ひな形を作成</Button>}
+      {stage === 'list' && supported && <Button variant="primary" disabled={!ready || busy} onClick={() => { createAttempt.current = null; setDetail(null); setName(''); setDescription(''); setDefinition(freshDefinition()); setStage('edit'); setError(''); setConflict(false) }}>＋ひな形を作成</Button>}
     </header>
-    {error && <p role="alert" className={`${styles.notice} ${styles.error}`}>{error}</p>}
+    {error && <div role="alert" className={`${styles.notice} ${styles.error}`}><p>{error}</p>{conflict && detail && <Button disabled={busy} onClick={() => open(detail.template.id, 'edit')}>最新の内容を読み込む</Button>}</div>}
     {message && <p role="status" className={`${styles.notice} ${styles.success}`}>{message}</p>}
     {stage === 'list' && <>
-      <nav aria-label="ひな形の種類" className={styles.tabs}>{TEMPLATE_TYPES.map(key => <Link key={key} href={`/hq/templates?type=${key}`} aria-current={key === type ? 'page' : undefined}>{LABELS[key]}</Link>)}</nav>
-      {!supported ? <section className={`${styles.panel} ${styles.empty}`}><h2>{LABELS[type]}のひな形は未対応です</h2><p>この種類はまだ作成・配布できません（UNSUPPORTED）。</p></section> : !ready ? <section className={`${styles.panel} ${styles.empty}`}><p role="status">{busy ? 'ひな形を読み込み中…' : '読み込めませんでした。権限や接続を確認し、ページを再読み込みしてください。'}</p></section> : <>
+      <nav aria-label="ひな形の種類" className={styles.tabs}>{TEMPLATE_TYPES.map(key => <Link key={key} href={key === 'tag' ? '/hq/templates?type=tag' : hqOpenHref(LEGACY_TARGETS[key])} aria-current={key === type ? 'page' : undefined}>{LABELS[key]}</Link>)}</nav>
+      {!supported ? <section className={`${styles.panel} ${styles.empty}`}><h2>{LABELS[type]}のひな形は未対応です</h2><p>この種類はまだ作成・配布できません（UNSUPPORTED）。</p><Link href={hqOpenHref(LEGACY_TARGETS[type])}>店舗を選んで既存の{LABELS[type]}を開く</Link></section> : !ready ? <section className={`${styles.panel} ${styles.empty}`}><p role="status">{busy ? 'ひな形を読み込み中…' : '読み込めませんでした。権限や接続を確認し、ページを再読み込みしてください。'}</p></section> : <>
         <div className={styles.toolbar}><input aria-label="ひな形を検索" className={`${styles.input} ${styles.search}`} placeholder="名前で検索" value={search} onChange={e => setSearch(e.target.value)} /><span>{templates.length}件</span></div>
-        <div className={styles.panel}><table className={styles.table}><thead><tr><Th style={{ width: '28%' }}>名前</Th><Th className={styles.optional}>参照先</Th><Th className={styles.optional}>更新日時</Th><Th>配布先</Th><Th style={{ width: '12%' }}>操作</Th></tr></thead><tbody>{templates.filter(row => row.name.toLocaleLowerCase().includes(search.toLocaleLowerCase())).map(row => <tr key={row.id}><td><span className={styles.name} title={row.name}>{row.name}</span><small className={styles.muted}>{LABELS[row.template_type]}</small></td><td className={styles.optional}><span className={styles.name} title={row.reference_summary}>{row.reference_summary ?? '—'}</span></td><td className={styles.optional}>{formatDate(row.updated_at)}</td><td>{row.distributed_account_count === undefined ? '—' : row.distributed_account_count ? `${row.distributed_account_count}店舗` : '未配布'}</td><td><details className={styles.menu}><summary aria-label={`${row.name}の操作`}>…</summary><div className={styles.menuItems}><Button disabled={busy} onClick={() => open(row.id, 'edit')} aria-label={`${row.name}を編集`}>編集</Button><Button disabled={busy} onClick={() => open(row.id, 'accounts')} aria-label={`${row.name}を配布`}>配布</Button><Button disabled={busy} onClick={() => setRemove(row)} aria-label={`${row.name}を削除`}>削除</Button></div></details></td></tr>)}</tbody></table>{!templates.some(row => row.name.toLocaleLowerCase().includes(search.toLocaleLowerCase())) && <p className={styles.empty}>{templates.length ? '検索に一致するひな形はありません。' : 'まだひな形がありません。最初のひな形を作成してください。'}</p>}</div>
+        <div className={styles.panel}><table className={styles.table}><thead><tr><Th style={{ width: '28%' }}>名前</Th><Th className={styles.optional}>参照先</Th><Th className={styles.optional}>更新日時</Th><Th>配布先</Th><Th style={{ width: '12%' }}>操作</Th></tr></thead><tbody>{templates.filter(row => row.name.toLocaleLowerCase().includes(search.toLocaleLowerCase())).map(row => <tr key={row.id}><td data-label="名前"><span className={styles.name} title={row.name}>{row.name}</span><small className={styles.muted}>{LABELS[row.template_type]}</small></td><td data-label="参照先" className={styles.optional}><span className={styles.name} title={row.reference_summary}>{row.reference_summary ?? '—'}</span></td><td data-label="更新日時" className={styles.optional}>{formatDate(row.updated_at)}</td><td data-label="配布先">{row.distributed_account_count === undefined ? '—' : row.distributed_account_count ? `${row.distributed_account_count}店舗` : '未配布'}</td><td data-label="操作"><details className={styles.menu}><summary aria-label={`${row.name}の操作`}>…</summary><div className={styles.menuItems}><Button disabled={busy} onClick={() => open(row.id, 'edit')} aria-label={`${row.name}を編集`}>編集</Button><Button disabled={busy} onClick={() => open(row.id, 'accounts')} aria-label={`${row.name}を配布`}>配布</Button><Button disabled={busy} onClick={() => setRemove(row)} aria-label={`${row.name}を削除`}>削除</Button></div></details></td></tr>)}</tbody></table>{!templates.some(row => row.name.toLocaleLowerCase().includes(search.toLocaleLowerCase())) && <p className={styles.empty}>{templates.length ? '検索に一致するひな形はありません。' : 'まだひな形がありません。最初のひな形を作成してください。'}</p>}</div>
       </>}
     </>}
     {stage === 'edit' && <>
@@ -209,7 +248,7 @@ export default function TemplateConsole({ type }: { type: TemplateType }) {
     {stage === 'duplicates' && preflight && <>
       <p className={styles.notice}>参照先の重複も含みます。上書きできない項目は「別名で作成」を選んでください。</p>
       <div className={styles.toolbar}><div><strong>一括設定</strong><p className={styles.muted}>個別設定で変更できます</p></div><div className={styles.actions}><Button disabled={busy} onClick={() => bulk('overwrite')}>すべて上書き</Button><Button disabled={busy} variant="primary" onClick={() => bulk('alias')}>すべて別名で作成</Button></div></div>
-      <section className={styles.panel}><table className={styles.table}><thead><tr><Th>店舗</Th><Th>項目</Th><Th className={styles.optional}>配布先の版</Th><Th>配布方法</Th></tr></thead><tbody>{preflight.stores.flatMap(store => store.items.map(item => <tr key={choiceKey(store.accountId, item.sourceId)}><td><span className={styles.name} title={store.accountName}>{store.accountName}</span></td><td><span className={styles.name} title={item.name}>{item.name}</span><span className={styles.muted}>{item.itemKind === 'folder' ? 'タググループ' : 'タグ'}</span></td><td className={styles.optional}>{item.expectedRevision ?? '新規'}</td><td>{item.duplicate ? <div role="group" aria-label={`${store.accountName} ${item.name}の配布方法`} className={styles.actions}>{(['overwrite', 'alias'] as const).map(mode => <Button key={mode} disabled={busy || !item.allowedModes.includes(mode)} variant={choices[choiceKey(store.accountId, item.sourceId)] === mode ? 'primary' : 'secondary'} aria-pressed={choices[choiceKey(store.accountId, item.sourceId)] === mode} onClick={() => setChoices(current => ({ ...current, [choiceKey(store.accountId, item.sourceId)]: mode }))}>{MODES[mode]}</Button>)}</div> : '新規作成'}</td></tr>))}</tbody></table></section>
+      <section className={styles.panel}><table className={styles.table}><thead><tr><Th>店舗</Th><Th>項目</Th><Th className={styles.optional}>配布先の版</Th><Th>配布方法</Th></tr></thead><tbody>{preflight.stores.flatMap(store => store.items.map(item => <tr key={choiceKey(store.accountId, item.sourceId)}><td data-label="店舗"><span className={styles.name} title={store.accountName}>{store.accountName}</span></td><td data-label="項目"><span className={styles.name} title={item.name}>{item.name}</span><span className={styles.muted}>{item.itemKind === 'folder' ? 'タググループ' : 'タグ'}</span></td><td data-label="配布先の版" className={styles.optional}>{item.expectedRevision ?? '新規'}</td><td data-label="配布方法">{item.duplicate ? <div role="group" aria-label={`${store.accountName} ${item.name}の配布方法`} className={styles.actions}>{(['overwrite', 'alias'] as const).map(mode => <Button key={mode} disabled={busy || !item.allowedModes.includes(mode)} variant={choices[choiceKey(store.accountId, item.sourceId)] === mode ? 'primary' : 'secondary'} aria-pressed={choices[choiceKey(store.accountId, item.sourceId)] === mode} onClick={() => setChoices(current => ({ ...current, [choiceKey(store.accountId, item.sourceId)]: mode }))}>{MODES[mode]}</Button>)}</div> : '新規作成'}</td></tr>))}</tbody></table></section>
       <p className={`${styles.notice} ${styles.error}`}>配布直前に版を再確認します。配布先で編集があれば、その店舗の変更を取り消します。</p>
       {expired && <p role="alert">確認の有効期限が切れました。店舗の現在版をもう一度確認してください。</p>}
       <p className={styles.muted}>成功済み店舗は保持され、失敗分だけ再確認できます。別名は店舗内で重複しない名前になります。</p>
