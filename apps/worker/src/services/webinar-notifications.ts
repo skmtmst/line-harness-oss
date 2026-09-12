@@ -511,7 +511,7 @@ export async function sendWebinarNotificationTest(
 export async function processWebinarNotificationJobs(
   db: D1Database,
   options: WebinarNotificationDeliveryOptions,
-): Promise<{ sent: number; failed: number; skipped: number }> {
+): Promise<{ sent: number; failed: number; skipped: number; heldByStop: number }> {
   const now = options.now ?? new Date();
   const nowEpoch = Math.floor(now.getTime() / 1000);
   const due = await db.prepare(
@@ -548,6 +548,20 @@ export async function processWebinarNotificationJobs(
   let sent = 0;
   let failed = 0;
   let skipped = 0;
+  let heldByStop = 0;
+  /*
+   * 緊急停止の判定を 1 tick 内で使い回す。1回の取り出しは最大100行あり、
+   * 同じアカウントの判定を100回引き直す意味がない。機能オフ側の
+   * createFeatureJobGate と同じ考え方。**tick をまたいで持たないこと。**
+   */
+  const stopCache = new Map<string, boolean>();
+  const stoppedForAccount = async (accountId: string): Promise<boolean> => {
+    const cached = stopCache.get(accountId);
+    if (cached !== undefined) return cached;
+    const stopped = await isOperationCapabilityStopped(db, accountId, 'reminder_dispatch');
+    stopCache.set(accountId, stopped);
+    return stopped;
+  };
   for (const row of due.results ?? []) {
     if (!row.account_id || !await featureJobCanRun(db, {
       accountId: row.account_id,
@@ -556,6 +570,28 @@ export async function processWebinarNotificationJobs(
       occurredAt: now.toISOString(),
     })) {
       skipped++;
+      continue;
+    }
+    /*
+     * 緊急停止中は**行に触らない**（#745）。
+     *
+     * 以前はここで claim してから `status='skipped'` で確定させていた。
+     * `skipped` を `queued` へ戻す経路はどこにも無く、積み直しも
+     * `UNIQUE (registration_id, settings_version, kind)` に当たるので、
+     * **復旧しても永久に届かなかった**。「止める」と書いてあるボタンが
+     * 実際には「捨てる」になっていた。
+     *
+     * 緊急停止は一時的な操作なので、`queued` のまま残して次の tick に
+     * 拾い直させる。**claim もしない**——claim すると `attempt_count` が
+     * 毎 tick 増え、取り出しの上限に当たった時点で、やはり黙って
+     * 届かなくなる。
+     *
+     * 送る意味が無くなったジョブ（対象回が終了済みなど）は、この先の
+     * `notification_expired` が落とす。**停止を理由に落とさない。**
+     * 落とす理由は「期限を過ぎた」であって「止まっていた」ではない。
+     */
+    if (await stoppedForAccount(row.account_id)) {
+      heldByStop++;
       continue;
     }
     const claimed = await db.prepare(
@@ -571,11 +607,6 @@ export async function processWebinarNotificationJobs(
       const isMissedButViewed = row.kind === 'missed' && Boolean(row.viewed);
       const isLateReminder = ['day_before', 'hour_before', 'session_start'].includes(row.kind)
         && nowEpoch >= row.session_start_at + row.duration_seconds;
-      const operationStopped = await isOperationCapabilityStopped(
-        db,
-        row.account_id,
-        'reminder_dispatch',
-      );
       const skip = isMissedButViewed
         ? { code: 'already_viewed', message: 'すでに視聴済みのため送信しませんでした。' }
         : isLateReminder
@@ -586,9 +617,7 @@ export async function processWebinarNotificationJobs(
               ? { code: 'line_account_mismatch', message: '送信先とウェビナーのLINEアカウントが一致しないため送信しませんでした。' }
               : !row.line_account_active
                 ? { code: 'line_account_inactive', message: 'LINEアカウントが停止中のため送信しませんでした。' }
-                : operationStopped
-                    ? { code: 'operation_stopped', message: '緊急停止中のため送信しませんでした。' }
-                    : null;
+                : null;
       if (
         skip
       ) {
@@ -659,7 +688,39 @@ export async function processWebinarNotificationJobs(
       failed++;
     }
   }
-  return { sent, failed, skipped };
+  return { sent, failed, skipped, heldByStop };
+}
+
+/**
+ * 見送った理由の表示名（#745）。
+ *
+ * 「見送り 5件」とだけ出しても、運用者は**何が起きたのか分かりません。**
+ * 「視聴済みだから送らなかった」（正常）と「対象回が終了済みで落ちた」
+ * （取り戻せない）は、取るべき行動がまったく違います。理由ごとに分けて
+ * 出すために、この対応表を正本として持ちます。
+ *
+ * `operation_stopped` は #745 以降**新しく付きません**（緊急停止は行を
+ * 確定させず `queued` のまま残すため）。ただし過去に付いた行が残って
+ * いる可能性があるので、読む側からは外しません。
+ */
+const SKIP_REASON_LABELS: Record<string, string> = {
+  already_viewed: 'すでに視聴済み',
+  notification_expired: '対象回が終了済み',
+  friend_not_following: 'ブロック・友だち解除',
+  line_account_mismatch: 'LINEアカウントの不一致',
+  line_account_inactive: 'LINEアカウントが停止中',
+  operation_stopped: '緊急停止中（#745 より前の記録）',
+};
+
+export function webinarSkipReasonLabel(code: string | null): string {
+  if (!code) return '理由の記録なし';
+  return SKIP_REASON_LABELS[code] ?? code;
+}
+
+export interface WebinarSkipReasonCount {
+  code: string | null;
+  label: string;
+  count: number;
 }
 
 export async function getWebinarNotificationOverview(
@@ -672,9 +733,10 @@ export async function getWebinarNotificationOverview(
   failed: number;
   skipped: number;
   cancelled: number;
+  skippedReasons: WebinarSkipReasonCount[];
   audience: { people: number; bookings: number; definition: 'active_registrations' };
 }> {
-  const [row, audience] = await Promise.all([
+  const [row, audience, reasons] = await Promise.all([
     db.prepare(
       `SELECT COUNT(*) AS total,
             SUM(CASE WHEN status IN ('queued','claimed','retry_wait') THEN 1 ELSE 0 END) AS pending,
@@ -689,6 +751,14 @@ export async function getWebinarNotificationOverview(
          FROM webinar_registrations
         WHERE webinar_id=? AND status='active'`,
     ).bind(webinarId).first<{ people: number | null; bookings: number | null }>(),
+    // 見送りの内訳。多い順に出して、いちばん件数の多い理由から目に入るようにする。
+    db.prepare(
+      `SELECT last_error_code AS code, COUNT(*) AS count
+         FROM webinar_notification_jobs
+        WHERE webinar_id=? AND status='skipped'
+        GROUP BY last_error_code
+        ORDER BY count DESC, code ASC`,
+    ).bind(webinarId).all<{ code: string | null; count: number }>(),
   ]);
   return {
     total: row?.total ?? 0,
@@ -697,6 +767,11 @@ export async function getWebinarNotificationOverview(
     failed: row?.failed ?? 0,
     skipped: row?.skipped ?? 0,
     cancelled: row?.cancelled ?? 0,
+    skippedReasons: (reasons.results ?? []).map((entry) => ({
+      code: entry.code,
+      label: webinarSkipReasonLabel(entry.code),
+      count: Number(entry.count),
+    })),
     audience: {
       people: audience?.people ?? 0,
       bookings: audience?.bookings ?? 0,

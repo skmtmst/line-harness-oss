@@ -158,7 +158,7 @@ describe('webinar notification jobs', () => {
       defaultAccessToken: 'fallback',
       defaultLiffId: null,
       proxyDispatch: dispatch,
-    })).toEqual({ sent: 1, failed: 0, skipped: 0 });
+    })).toEqual({ sent: 1, failed: 0, skipped: 0, heldByStop: 0 });
     expect(dispatch).toHaveBeenCalledTimes(1);
     const request = dispatch.mock.calls[0]?.[0];
     expect(request.headers.get('X-Line-Retry-Key')).toBe(job.line_retry_key);
@@ -190,7 +190,7 @@ describe('webinar notification jobs', () => {
       defaultAccessToken: 'fallback',
       defaultLiffId: null,
       proxyDispatch: dispatch,
-    })).toEqual({ sent: 0, failed: 0, skipped: 1 });
+    })).toEqual({ sent: 0, failed: 0, skipped: 1, heldByStop: 0 });
     expect(dispatch).not.toHaveBeenCalled();
     expect(raw.prepare(
       `SELECT status, attempt_count FROM webinar_notification_jobs WHERE id=?`,
@@ -224,7 +224,7 @@ describe('webinar notification jobs', () => {
       defaultAccessToken: 'fallback',
       defaultLiffId: null,
       proxyDispatch: dispatch,
-    })).toEqual({ sent: 0, failed: 0, skipped: 1 });
+    })).toEqual({ sent: 0, failed: 0, skipped: 1, heldByStop: 0 });
     expect(dispatch).not.toHaveBeenCalled();
     expect(raw.prepare(`SELECT status FROM webinar_notification_jobs WHERE id=?`).get(missed.id))
       .toEqual({ status: 'skipped' });
@@ -267,7 +267,81 @@ describe('webinar notification jobs', () => {
     });
   });
 
-  test('緊急停止中は送信直前に止め、停止理由を履歴へ残す', async () => {
+  /*
+   * #745 の裁定で契約が変わりました。**緊急停止は「捨てる」から「止める」へ。**
+   *
+   * 元の表明（`status='skipped'`, `last_error_code='operation_stopped'` に
+   * なること）が捕まえていた壊し方は2つです。
+   *
+   *   1. 緊急停止中なのに外部へ送ってしまう
+   *      → 下の `expect(dispatch).not.toHaveBeenCalled()` が引き続き捕まえます
+   *   2. 緊急停止が判定されず、何事も無かったことにされる
+   *      → 元は「skipped が1件」で見ていました。いまは `heldByStop: 1` で見ます
+   *
+   * そして元の表明は、**復旧しても永久に届かない**という壊れ方を
+   * 通していました（`skipped` を戻す経路が無いため）。新しい表明は
+   * 「行が触られていないこと」と「復旧したら実際に届くこと」まで見るので、
+   * 元より強くなっています。
+   */
+  test('緊急停止中は行を確定させず、復旧したら実際に届く', async () => {
+    const { db, raw } = createTestD1();
+    seedBase(raw);
+    await saveWebinarNotificationSettings(db, 'webinar-1', SETTINGS, NOW);
+    await registerWebinarSession(db, 'webinar-1', 'friend-1', SESSION, NOW);
+    const job = raw.prepare(
+      `SELECT id FROM webinar_notification_jobs WHERE kind='day_before'`,
+    ).get() as { id: string };
+    raw.prepare(
+      `UPDATE webinar_notification_jobs SET scheduled_at=?, next_retry_at=? WHERE id=?`,
+    ).run(Math.floor(NOW.getTime() / 1000), Math.floor(NOW.getTime() / 1000), job.id);
+    raw.prepare(
+      `INSERT INTO operation_control_sets
+         (scope_key, line_account_id, version, states_json, active_incident_id, updated_at)
+       VALUES ('account-1', 'account-1', 1, ?, 'incident-1', ?)`,
+    ).run(JSON.stringify({ reminder_dispatch: 'stopped' }), NOW.toISOString());
+    const dispatch = vi.fn(async () => new Response('{}', { status: 200 }));
+    const options = {
+      now: NOW,
+      proxyBaseUrl: 'https://worker.example.com',
+      defaultAccessToken: 'fallback',
+      defaultLiffId: null,
+      proxyDispatch: dispatch,
+    };
+
+    expect(await processWebinarNotificationJobs(db, options))
+      .toEqual({ sent: 0, failed: 0, skipped: 0, heldByStop: 1 });
+    expect(dispatch).not.toHaveBeenCalled();
+    // **行に触らない。**claim もしない（attempt_count が毎tick増えると、
+    // 取り出しの上限に当たった時点でやはり黙って届かなくなる）。
+    expect(raw.prepare(
+      `SELECT status, attempt_count, last_error_code, lease_expires_at
+         FROM webinar_notification_jobs WHERE id=?`,
+    ).get(job.id)).toEqual({
+      status: 'queued', attempt_count: 0, last_error_code: null, lease_expires_at: null,
+    });
+
+    // 止めている間、何tick回しても増えない。
+    await processWebinarNotificationJobs(db, options);
+    await processWebinarNotificationJobs(db, options);
+    expect(raw.prepare(`SELECT attempt_count FROM webinar_notification_jobs WHERE id=?`).get(job.id))
+      .toEqual({ attempt_count: 0 });
+
+    // 復旧したら届く。ここが元の表明では通っていた壊れ方（永久に届かない）。
+    raw.prepare(`UPDATE operation_control_sets SET states_json=?, active_incident_id=NULL WHERE scope_key='account-1'`)
+      .run(JSON.stringify({ reminder_dispatch: 'running' }));
+    expect(await processWebinarNotificationJobs(db, options))
+      .toEqual({ sent: 1, failed: 0, skipped: 0, heldByStop: 0 });
+    expect(dispatch).toHaveBeenCalledTimes(1);
+    expect(raw.prepare(`SELECT status FROM webinar_notification_jobs WHERE id=?`).get(job.id))
+      .toEqual({ status: 'succeeded' });
+  });
+
+  /*
+   * 落とす理由は「期限を過ぎた」であって「止まっていた」ではない（#745）。
+   * 停止中は判断そのものを先送りし、復旧したときに、そのジョブ自身の
+   * 予定時刻で改めて判断する。
+   */
+  test('停止をまたいで期限が切れたら、停止ではなく期限を理由に落ちる', async () => {
     const { db, raw } = createTestD1();
     seedBase(raw);
     await saveWebinarNotificationSettings(db, 'webinar-1', SETTINGS, NOW);
@@ -285,17 +359,60 @@ describe('webinar notification jobs', () => {
     ).run(JSON.stringify({ reminder_dispatch: 'stopped' }), NOW.toISOString());
     const dispatch = vi.fn(async () => new Response('{}', { status: 200 }));
 
+    // 停止中は落とさない。行は queued のまま。
     expect(await processWebinarNotificationJobs(db, {
-      now: NOW,
-      proxyBaseUrl: 'https://worker.example.com',
-      defaultAccessToken: 'fallback',
-      defaultLiffId: null,
-      proxyDispatch: dispatch,
-    })).toEqual({ sent: 0, failed: 0, skipped: 1 });
+      now: NOW, proxyBaseUrl: 'https://worker.example.com',
+      defaultAccessToken: 'fallback', defaultLiffId: null, proxyDispatch: dispatch,
+    })).toEqual({ sent: 0, failed: 0, skipped: 0, heldByStop: 1 });
+    expect(raw.prepare(`SELECT status FROM webinar_notification_jobs WHERE id=?`).get(job.id))
+      .toEqual({ status: 'queued' });
+
+    // 復旧したときには、対象回が終わっている。
+    raw.prepare(`UPDATE operation_control_sets SET states_json=?, active_incident_id=NULL WHERE scope_key='account-1'`)
+      .run(JSON.stringify({ reminder_dispatch: 'running' }));
+    const afterSession = new Date((SESSION + 3600 + 60) * 1000);
+    // 前日・開始前・開始時の3件がまとめて期限切れになる（対象回が終わったため）。
+    // 見逃し案内(missed)はまだ予定時刻に達していないので対象外。
+    expect(await processWebinarNotificationJobs(db, {
+      now: afterSession, proxyBaseUrl: 'https://worker.example.com',
+      defaultAccessToken: 'fallback', defaultLiffId: null, proxyDispatch: dispatch,
+    })).toEqual({ sent: 0, failed: 0, skipped: 3, heldByStop: 0 });
     expect(dispatch).not.toHaveBeenCalled();
+    // 理由は notification_expired。operation_stopped ではない。
     expect(raw.prepare(
       `SELECT status, last_error_code FROM webinar_notification_jobs WHERE id=?`,
-    ).get(job.id)).toEqual({ status: 'skipped', last_error_code: 'operation_stopped' });
+    ).get(job.id)).toEqual({ status: 'skipped', last_error_code: 'notification_expired' });
+  });
+
+  /*
+   * 「見送り 5件」だけでは、取るべき行動が決まらない（#745）。
+   * 視聴済み（正常）と対象回の終了（届かないまま終わった）を分けて出す。
+   */
+  test('見送りの内訳を理由ごとに数えて返す', async () => {
+    const { db, raw } = createTestD1();
+    seedBase(raw);
+    const insert = raw.prepare(
+      `INSERT INTO webinar_notification_jobs
+         (id, webinar_id, registration_id, friend_id, session_start_at, settings_version, kind,
+          scheduled_at, status, attempt_count, line_retry_key, last_error_code, created_at, updated_at)
+       VALUES (?, 'webinar-1', ?, 'friend-1', ?, 1, ?, ?, 'skipped', 1, ?, ?, ?, ?)`,
+    );
+    raw.prepare(
+      `INSERT INTO webinar_registrations (id, webinar_id, friend_id, session_start_at, status, created_at)
+       VALUES ('registration-1','webinar-1','friend-1',?, 'active', ?)`,
+    ).run(SESSION, NOW.toISOString());
+    insert.run('j1', 'registration-1', SESSION, 'day_before', SESSION - 86400, 'rk1', 'notification_expired', NOW.toISOString(), NOW.toISOString());
+    insert.run('j2', 'registration-1', SESSION, 'hour_before', SESSION - 3600, 'rk2', 'notification_expired', NOW.toISOString(), NOW.toISOString());
+    insert.run('j3', 'registration-1', SESSION, 'missed', SESSION + 86400, 'rk3', 'already_viewed', NOW.toISOString(), NOW.toISOString());
+    insert.run('j4', 'registration-1', SESSION, 'session_start', SESSION, 'rk4', null, NOW.toISOString(), NOW.toISOString());
+
+    const overview = await getWebinarNotificationOverview(db, 'webinar-1');
+    expect(overview.skipped).toBe(4);
+    expect(overview.skippedReasons).toEqual([
+      { code: 'notification_expired', label: '対象回が終了済み', count: 2 },
+      { code: null, label: '理由の記録なし', count: 1 },
+      { code: 'already_viewed', label: 'すでに視聴済み', count: 1 },
+    ]);
   });
 
   test('テスト送信先だけへ自動送信として通知イメージを送る', async () => {
