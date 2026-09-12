@@ -33,49 +33,109 @@ async function messageSnapshot(b:R2RuntimeBinding,account:string):Promise<Messag
   return {tenantId:b.authority.tenantId,targetAccountId:account,templates,media,snapshotToken:`hqts1.${await digest(JSON.stringify([templates,media]))}` as HqTemplateSnapshotToken};
 }
 type RichReference = ReturnType<typeof richMenuReferences>[number];
-type RichReferenceMatch = RichReference & { name:string;targetId:string;expectedRevision:string };
+type DbRow = Record<string,string|number|null>;
+type RichReferenceMatch = RichReference & { name:string;targetId:string;expectedRevision:string;operation:'reuse'|'create';dbCommit:HqTemplateStatement[] };
 const richReferenceKey = (ref:RichReference) => `${ref.kind}:${ref.sourceId}`;
+const insertRow = (table:string,row:DbRow):HqTemplateStatement => { const columns=Object.keys(row);return {sql:`INSERT INTO ${table}(${columns.join(',')}) VALUES (${columns.map(()=>'?').join(',')})`,bindings:columns.map(column=>row[column])}; };
+const exactRowGuard = (table:string,row:DbRow):HqTemplateStatement => { const columns=Object.keys(row);return guard(`EXISTS(SELECT 1 FROM ${table} WHERE ${columns.map(column=>`${column} IS ?`).join(' AND ')})`,columns.map(column=>row[column])); };
+const targetListGuard = (sql:string,bindings:HqTemplateStatement['bindings'],snapshot:string):HqTemplateStatement => guard(`(${sql}) IS ?`,[...bindings,snapshot]);
+const portableText = (value:unknown) => {
+  let current=String(value??'');
+  for(let attempt=0;attempt<4;attempt++) {
+    if(/(?:liff\.line\.me|[?&#](?:form|template|scenario|tag|account|line[_-]?account)(?:s|[_-]?ids?)?=|\/(?:forms?|scenarios?|templates?|tags?|accounts?)\/)/i.test(current))return false;
+    if(!/%[0-9a-f]{2}/i.test(current))return true;
+    try { const decoded=decodeURIComponent(current);if(decoded===current)return true;current=decoded; }
+    catch { return false; }
+  }
+  return !/%[0-9a-f]{2}/i.test(current);
+};
+function formValueHasDependency(value:unknown):boolean {
+  if(Array.isArray(value))return value.some(formValueHasDependency);
+  if(!value||typeof value!=='object')return false;
+  return Object.entries(value).some(([key,item])=>
+    (['tagId','tagIds','scenarioId','templateId','friendFieldId','friendFieldIds','choiceFriendFieldId','fieldId','reminderId','mediaUrl','backgroundImageUrl'].includes(key)&&item!=null&&item!==''&&!(Array.isArray(item)&&!item.length))
+    ||(['url','linkUrl','thanksUrl'].includes(key)&&!portableText(item))
+    ||formValueHasDependency(item));
+}
 
-/** Resolve only an already-existing destination resource and bind its exact mutable revision. */
-async function matchRichReference(b:R2RuntimeBinding,ref:RichReference,account:string,sourceGuards:HqTemplateStatement[]):Promise<RichReferenceMatch> {
+function parsePortableLayout(value:unknown):unknown {
+  if(value==null||value==='')return null;
+  try { return JSON.parse(String(value)); }
+  catch { fail('UNSUPPORTED_REFERENCE'); }
+}
+
+const activeAccountGuard = (account:string,tenant:string) => guard(`EXISTS(SELECT 1 FROM line_accounts WHERE id=? AND tenant_id=? AND is_active=1 AND archived_at IS NULL)`,[account,tenant]);
+
+async function plannedTargetId(b:R2RuntimeBinding,account:string,ref:RichReference) {
+  return (await digest(JSON.stringify([b.authority.tenantId,b.templateVersionId,account,ref.kind,ref.sourceId]))).slice(0,32);
+}
+
+/** Reuse an exact destination match or plan one private/local clone in the parent atomic batch. */
+async function matchRichReference(b:R2RuntimeBinding,ref:RichReference,account:string,execution=false):Promise<RichReferenceMatch> {
   if (!['tag','form','scenario','template'].includes(ref.kind)) fail('UNSUPPORTED_REFERENCE');
   await targetAccount(b,account);
-  let source:{name:string}|null;
-  let targets:{id:string;name:string;expectedRevision:string}[];
-  if(ref.kind==='form') {
-    const sql=`SELECT f.name FROM forms f WHERE f.id=? AND f.status<>'archived' AND EXISTS(SELECT 1 FROM form_accounts fa JOIN line_accounts a ON a.id=fa.line_account_id WHERE fa.form_id=f.id AND a.tenant_id=? AND a.is_active=1 AND a.archived_at IS NULL) AND NOT EXISTS(SELECT 1 FROM form_accounts fa LEFT JOIN line_accounts a ON a.id=fa.line_account_id WHERE fa.form_id=f.id AND (a.tenant_id IS NULL OR a.tenant_id<>?))`;
-    source=await b.db.prepare(sql).bind(ref.sourceId,b.authority.tenantId,b.authority.tenantId).first();
-    targets=(await b.db.prepare(`SELECT f.id,f.name,json_array(f.content_revision,f.updated_at) AS expectedRevision FROM forms f WHERE f.status<>'archived' AND EXISTS(SELECT 1 FROM form_accounts fa WHERE fa.form_id=f.id AND fa.line_account_id=?) AND NOT EXISTS(SELECT 1 FROM form_accounts fa WHERE fa.form_id=f.id AND fa.line_account_id<>?) ORDER BY f.id`).bind(account,account).all<{id:string;name:string;expectedRevision:string}>()).results;
-    if(source)sourceGuards.push(guard(`EXISTS(SELECT 1 FROM (${sql}) WHERE name=?)`,[ref.sourceId,b.authority.tenantId,b.authority.tenantId,source.name]));
-  } else {
-    const table=ref.kind==='tag'?'tags':ref.kind==='scenario'?'scenarios':'templates';
-    const active=ref.kind==='tag'?" AND t.status='active'":ref.kind==='scenario'?" AND t.is_active=1":'';
-    const targetActive=ref.kind==='tag'?" AND status='active'":ref.kind==='scenario'?" AND is_active=1":'';
-    const revision=ref.kind==='tag'?'json_array(version,updated_at)':ref.kind==='scenario'?'json_array(updated_at,current_published_version_id)':'json_array(draft_revision,updated_at)';
-    const sql=`SELECT t.name FROM ${table} t JOIN line_accounts a ON a.id=t.line_account_id WHERE t.id=? AND a.tenant_id=? AND a.is_active=1 AND a.archived_at IS NULL${active}`;
-    source=await b.db.prepare(sql).bind(ref.sourceId,b.authority.tenantId).first();
-    targets=(await b.db.prepare(`SELECT id,name,${revision} AS expectedRevision FROM ${table} WHERE line_account_id=?${targetActive} ORDER BY id`).bind(account).all<{id:string;name:string;expectedRevision:string}>()).results;
-    if(source)sourceGuards.push(guard(`EXISTS(SELECT 1 FROM (${sql}) WHERE name=?)`,[ref.sourceId,b.authority.tenantId,source.name]));
+  const unavailable=()=>fail(execution?'VERSION_CONFLICT':'REFERENCE_UNAVAILABLE');
+  if(ref.kind==='tag') {
+    const source=await b.db.prepare(`SELECT t.id,t.name,t.normalized_name,t.color,t.description,t.status,t.version,t.line_account_id,t.created_by,t.updated_by,t.created_at,t.updated_at FROM tags t JOIN line_accounts a ON a.id=t.line_account_id WHERE t.id=? AND t.status='active' AND a.tenant_id=? AND a.is_active=1 AND a.archived_at IS NULL`).bind(ref.sourceId,b.authority.tenantId).first<DbRow>();if(!source)unavailable();
+    const listSql=`SELECT json_group_array(json_array(id,name,status,version,updated_at)) FROM (SELECT id,name,status,version,updated_at FROM tags WHERE line_account_id=? ORDER BY id)`,list=(await b.db.prepare(`SELECT (${listSql}) AS snapshot`).bind(account).first<{snapshot:string}>())!.snapshot;
+    const rows=(JSON.parse(list) as [string,string,string,number,string|null][]).map(([id,name,status,version,updated_at])=>({id,name,status,version,updated_at}));
+    const matches=rows.filter(row=>normalizeScopedTagName(row.name)===normalizeScopedTagName(String(source!.name)));if(matches.length>1||matches.some(row=>row.status!=='active'))unavailable();
+    const match=matches[0],sourceHash=await digest(JSON.stringify(source)),dbCommit=[exactRowGuard('tags',source!),activeAccountGuard(String(source!.line_account_id),b.authority.tenantId),targetListGuard(listSql,[account],list)];
+    if(match)return {...ref,name:String(source!.name),targetId:match.id,expectedRevision:JSON.stringify([sourceHash,match.version,match.updated_at]),operation:'reuse',dbCommit};
+    const targetId=await plannedTargetId(b,account,ref),row:DbRow={...source!,id:targetId,normalized_name:normalizeScopedTagName(String(source!.name)),line_account_id:account,created_by:b.authority.actorId,updated_by:b.authority.actorId};delete row.created_at;delete row.updated_at;row.version=1;
+    return {...ref,name:String(source!.name),targetId,expectedRevision:JSON.stringify([sourceHash,null]),operation:'create',dbCommit:[...dbCommit,guard(`NOT EXISTS(SELECT 1 FROM tags WHERE id=?)`,[targetId]),insertRow('tags',row)]};
   }
-  if(!source)fail('REFERENCE_UNAVAILABLE');
-  const matches=targets.filter(t=>normalizeScopedTagName(t.name)===normalizeScopedTagName(source!.name));
-  if(matches.length!==1)fail('REFERENCE_UNAVAILABLE');
-  return {...ref,name:source!.name,targetId:matches[0].id,expectedRevision:matches[0].expectedRevision};
+  if(ref.kind==='scenario') {
+    const source=await b.db.prepare(`SELECT s.* FROM scenarios s JOIN line_accounts a ON a.id=s.line_account_id WHERE s.id=? AND s.is_active=1 AND a.tenant_id=? AND a.is_active=1 AND a.archived_at IS NULL`).bind(ref.sourceId,b.authority.tenantId).first<DbRow>();if(!source)unavailable();
+    if(source!.trigger_type!=='manual'||source!.on_complete_mode!=='pause'||source!.trigger_tag_id||source!.on_complete_scenario_id||source!.folder_id||source!.audience_condition_json)fail('UNSUPPORTED_REFERENCE');
+    const steps=(await b.db.prepare(`SELECT * FROM scenario_steps WHERE scenario_id=? ORDER BY step_order,id`).bind(ref.sourceId).all<DbRow>()).results;
+    if(await b.db.prepare(`SELECT 1 FROM scenario_actions WHERE scenario_id=? LIMIT 1`).bind(ref.sourceId).first()||await b.db.prepare(`SELECT 1 FROM scenario_triggers WHERE scenario_id=? LIMIT 1`).bind(ref.sourceId).first()||steps.some(step=>step.template_id||step.on_reach_tag_id||step.message_bubbles_json||step.target_condition_json||step.question_json||step.condition_type||step.condition_value||step.message_type!=='text'||!portableText(step.message_content)))fail('UNSUPPORTED_REFERENCE');
+    const listSql=`SELECT json_group_array(json_array(id,name,is_active,updated_at,current_published_version_id)) FROM (SELECT id,name,is_active,updated_at,current_published_version_id FROM scenarios WHERE line_account_id=? ORDER BY id)`,list=(await b.db.prepare(`SELECT (${listSql}) AS snapshot`).bind(account).first<{snapshot:string}>())!.snapshot;
+    const rows=(JSON.parse(list) as [string,string,number,string|null,string|null][]).map(([id,name,is_active,updated_at,current])=>({id,name,is_active,updated_at,current})),matches=rows.filter(row=>normalizeScopedTagName(row.name)===normalizeScopedTagName(String(source!.name)));if(matches.length>1||matches.some(row=>row.is_active!==1))unavailable();
+    const sourceHash=await digest(JSON.stringify([source,steps])),dbCommit=[exactRowGuard('scenarios',source!),activeAccountGuard(String(source!.line_account_id),b.authority.tenantId),guard(`(SELECT COUNT(*) FROM scenario_steps WHERE scenario_id=?)=?`,[ref.sourceId,steps.length]),...steps.map(row=>exactRowGuard('scenario_steps',row)),guard(`NOT EXISTS(SELECT 1 FROM scenario_actions WHERE scenario_id=?) AND NOT EXISTS(SELECT 1 FROM scenario_triggers WHERE scenario_id=?)`,[ref.sourceId,ref.sourceId]),targetListGuard(listSql,[account],list)],match=matches[0];
+    if(match)return {...ref,name:String(source!.name),targetId:match.id,expectedRevision:JSON.stringify([sourceHash,match.updated_at,match.current]),operation:'reuse',dbCommit};
+    const targetId=await plannedTargetId(b,account,ref),scenario:DbRow={...source!,id:targetId,line_account_id:account,is_active:0,folder_id:null,created_from_recipe_id:null,recipe_clone_run_id:null,current_published_version_id:null};delete scenario.created_at;delete scenario.updated_at;
+    const clones=steps.map((step,index)=>{const row:DbRow={...step,id:`${targetId.slice(0,24)}s${String(index).padStart(3,'0')}`,scenario_id:targetId,is_draft:1};delete row.created_at;return insertRow('scenario_steps',row)});
+    return {...ref,name:String(source!.name),targetId,expectedRevision:JSON.stringify([sourceHash,null]),operation:'create',dbCommit:[...dbCommit,guard(`NOT EXISTS(SELECT 1 FROM scenarios WHERE id=?)`,[targetId]),insertRow('scenarios',scenario),...clones]};
+  }
+  if(ref.kind==='form') {
+    const source=await b.db.prepare(`SELECT f.* FROM forms f WHERE f.id=? AND f.status<>'archived' AND EXISTS(SELECT 1 FROM form_accounts fa JOIN line_accounts a ON a.id=fa.line_account_id WHERE fa.form_id=f.id AND a.tenant_id=? AND a.is_active=1 AND a.archived_at IS NULL) AND NOT EXISTS(SELECT 1 FROM form_accounts fa LEFT JOIN line_accounts a ON a.id=fa.line_account_id WHERE fa.form_id=f.id AND (a.tenant_id IS NULL OR a.tenant_id<>?))`).bind(ref.sourceId,b.authority.tenantId,b.authority.tenantId).first<DbRow>();if(!source)unavailable();
+    if(source!.on_submit_tag_id||source!.on_submit_scenario_id||source!.on_submit_webhook_url||source!.on_submit_webhook_headers||source!.og_image_url||!portableText(source!.on_submit_message_content)||formValueHasDependency(parsePortableLayout(source!.fields))||formValueHasDependency(parsePortableLayout(source!.layout)))fail('UNSUPPORTED_REFERENCE');
+    const listSql=`SELECT json_group_array(json_array(f.id,f.name,f.status,f.content_revision,f.updated_at,(SELECT json_group_array(line_account_id) FROM (SELECT line_account_id FROM form_accounts WHERE form_id=f.id ORDER BY line_account_id)))) FROM (SELECT f.* FROM forms f WHERE EXISTS(SELECT 1 FROM form_accounts WHERE form_id=f.id AND line_account_id=?) ORDER BY f.id) f`,list=(await b.db.prepare(`SELECT (${listSql}) AS snapshot`).bind(account).first<{snapshot:string}>())!.snapshot;
+    const rows=(JSON.parse(list) as [string,string,string,number,string|null,string][]).map(([id,name,status,content_revision,updated_at,owners])=>({id,name,status,content_revision,updated_at,owners:typeof owners==='string'?JSON.parse(owners) as string[]:owners as unknown as string[]})),matches=rows.filter(row=>normalizeScopedTagName(row.name)===normalizeScopedTagName(String(source!.name)));if(matches.length>1||matches.some(row=>row.status==='archived'||row.owners.length!==1||row.owners[0]!==account))unavailable();
+    const ownerSql=`SELECT json_group_array(line_account_id) FROM (SELECT line_account_id FROM form_accounts WHERE form_id=? ORDER BY line_account_id)`,sourceOwners=(await b.db.prepare(`SELECT (${ownerSql}) AS snapshot`).bind(ref.sourceId).first<{snapshot:string}>())!.snapshot;
+    const sourceHash=await digest(JSON.stringify([source,sourceOwners])),dbCommit=[exactRowGuard('forms',source!),targetListGuard(ownerSql,[ref.sourceId],sourceOwners),guard(`EXISTS(SELECT 1 FROM form_accounts fa JOIN line_accounts a ON a.id=fa.line_account_id WHERE fa.form_id=? AND a.tenant_id=? AND a.is_active=1 AND a.archived_at IS NULL) AND NOT EXISTS(SELECT 1 FROM form_accounts fa LEFT JOIN line_accounts a ON a.id=fa.line_account_id WHERE fa.form_id=? AND (a.tenant_id IS NULL OR a.tenant_id<>? OR a.is_active<>1 OR a.archived_at IS NOT NULL))`,[ref.sourceId,b.authority.tenantId,ref.sourceId,b.authority.tenantId]),targetListGuard(listSql,[account],list)],match=matches[0];
+    if(match)return {...ref,name:String(source!.name),targetId:match.id,expectedRevision:JSON.stringify([sourceHash,match.content_revision,match.updated_at]),operation:'reuse',dbCommit};
+    const targetId=await plannedTargetId(b,account,ref),form:DbRow={...source!,id:targetId,is_active:0,status:'active',archived_at:null,revision:1,content_revision:1,submit_count:0};delete form.created_at;delete form.updated_at;
+    return {...ref,name:String(source!.name),targetId,expectedRevision:JSON.stringify([sourceHash,null]),operation:'create',dbCommit:[...dbCommit,guard(`NOT EXISTS(SELECT 1 FROM forms WHERE id=?)`,[targetId]),insertRow('forms',form),{sql:`INSERT INTO form_accounts(form_id,line_account_id,created_at) VALUES (?,?,strftime('%Y-%m-%dT%H:%M:%fZ','now'))`,bindings:[targetId,account]}]};
+  }
+  const source=await b.db.prepare(`SELECT t.* FROM templates t JOIN line_accounts a ON a.id=t.line_account_id WHERE t.id=? AND a.tenant_id=? AND a.is_active=1 AND a.archived_at IS NULL`).bind(ref.sourceId,b.authority.tenantId).first<DbRow>();if(!source)unavailable();
+  if(source!.message_type!=='text'||source!.carousel_actions_json||source!.question_json||source!.folder_id||source!.created_from_recipe_id||source!.recipe_clone_run_id||!portableText(source!.message_content)||source!.draft_message_type&&source!.draft_message_type!=='text'||source!.draft_carousel_actions_json||source!.draft_question_json||source!.draft_message_content&&!portableText(source!.draft_message_content))fail('UNSUPPORTED_REFERENCE');
+  const listSql=`SELECT json_group_array(json_array(id,name,draft_revision,updated_at)) FROM (SELECT id,name,draft_revision,updated_at FROM templates WHERE line_account_id=? ORDER BY id)`,list=(await b.db.prepare(`SELECT (${listSql}) AS snapshot`).bind(account).first<{snapshot:string}>())!.snapshot;
+  const rows=(JSON.parse(list) as [string,string,number,string|null][]).map(([id,name,draft_revision,updated_at])=>({id,name,draft_revision,updated_at})),matches=rows.filter(row=>normalizeScopedTagName(row.name)===normalizeScopedTagName(String(source!.name)));if(matches.length>1)unavailable();
+  const sourceHash=await digest(JSON.stringify(source)),dbCommit=[exactRowGuard('templates',source!),activeAccountGuard(String(source!.line_account_id),b.authority.tenantId),targetListGuard(listSql,[account],list)],match=matches[0];
+  if(match)return {...ref,name:String(source!.name),targetId:match.id,expectedRevision:JSON.stringify([sourceHash,match.draft_revision,match.updated_at]),operation:'reuse',dbCommit};
+  const targetId=await plannedTargetId(b,account,ref),template:DbRow={...source!,id:targetId,line_account_id:account,folder_id:null,created_from_recipe_id:null,recipe_clone_run_id:null,published_at:null,publish_idempotency_key:null};delete template.created_at;delete template.updated_at;
+  return {...ref,name:String(source!.name),targetId,expectedRevision:JSON.stringify([sourceHash,null]),operation:'create',dbCommit:[...dbCommit,guard(`NOT EXISTS(SELECT 1 FROM templates WHERE id=?)`,[targetId]),insertRow('templates',template)]};
 }
 async function inspectRichReferences(b:R2RuntimeBinding,definition:RichMenuHqDefinition,account:string) {
-  return Promise.all(richMenuReferences(definition).map(ref=>matchRichReference(b,ref,account,[])));
+  return Promise.all(richMenuReferences(definition).map(ref=>matchRichReference(b,ref,account)));
 }
 /** The execution resolver accepts only the exact preflight-selected target and revision. */
 function richResolver(b:R2RuntimeBinding,sourceGuards:HqTemplateStatement[],context?:HqTemplateAdapterContext) {
-  return async (ref:RichReference,account:string):Promise<string|null> => {
-    const match=await matchRichReference(b,ref,account,sourceGuards);
+  const added=new Set<string>();
+  return async (ref:RichReference,account:string) => {
+    const match=await matchRichReference(b,ref,account,!!context);
     if(context) {
       if(context.targetAccountId!==account)fail('SELECTION_REQUIRED');
       const selected=context.resolutions.filter(r=>r.sourceId===richReferenceKey(ref)&&r.itemKind===ref.kind);
-      if(selected.length!==1||selected[0].mode!=='overwrite'||selected[0].targetId!==match.targetId)fail('SELECTION_REQUIRED');
+      const mode=match.operation==='reuse'?'overwrite':'create';
+      if(selected.length!==1)fail('SELECTION_REQUIRED');
+      if(selected[0].mode!==mode||selected[0].targetId!==match.targetId)fail('VERSION_CONFLICT');
       if(selected[0].expectedRevision!==match.expectedRevision)fail('VERSION_CONFLICT');
+      if(!added.has(richReferenceKey(ref))){sourceGuards.push(...match.dbCommit);added.add(richReferenceKey(ref));}
     }
-    return match.targetId;
+    return {targetId:match.targetId,operation:match.operation,expectedRevision:match.expectedRevision};
   };
 }
 /** Prevent the rich-menu adapter's arrayBuffer call from consuming an unbounded stream. */
@@ -147,7 +207,7 @@ export async function inspectR2RuntimeStore(b:R2RuntimeBinding,targetAccountId:s
   const references=await inspectRichReferences(b,definition,targetAccountId);
   return {type:v.template_type,snapshotToken:await adapter.snapshot(targetAccountId),items:[
     {sourceId:definition.richMenu.id,itemKind:'rich_menu',name:definition.richMenu.name,targetId:target?.id??null,expectedRevision:target?.updated_at??null,duplicate:!!target,allowedModes:!target?['create']:target.status==='draft'?['overwrite','alias']:['alias']},
-    ...references.map(ref=>({sourceId:richReferenceKey(ref),itemKind:ref.kind,name:ref.name,targetId:ref.targetId,expectedRevision:ref.expectedRevision,duplicate:true,operation:'reuse' as const,allowedModes:['overwrite']})),
+    ...references.map(ref=>({sourceId:richReferenceKey(ref),itemKind:ref.kind,name:ref.name,targetId:ref.targetId,expectedRevision:ref.expectedRevision,duplicate:ref.operation==='reuse',operation:ref.operation,allowedModes:ref.operation==='reuse'?['overwrite'] as const:['create'] as const})),
   ]};
 }
 async function buildR2Plan(b:R2RuntimeBinding,context:HqTemplateAdapterContext,input:HqTemplateAdapterInput,type:'template'|'rich_menu') {
@@ -165,7 +225,12 @@ async function buildR2Plan(b:R2RuntimeBinding,context:HqTemplateAdapterContext,i
   }
   const refs=ok(await adapter.extractReferences(input)),verified=ok(await adapter.verifyReferences(context,refs));
   const duplicates=ok(await adapter.detectDuplicates(context,verified)),ids=ok(await adapter.buildIdMap(context,verified,duplicates));
-  const plan=ok(await adapter.buildCommitPlan(context,input,ids));return {...plan,dbCommit:[...sourceGuards,...plan.dbCommit]};
+  const plan=ok(await adapter.buildCommitPlan(context,input,ids));
+  // The adapter's first statement verifies the exact preflight snapshot. Run it
+  // before reference clones, then create dependencies before rich-menu rows.
+  return type==='rich_menu'
+    ? {...plan,dbCommit:[plan.dbCommit[0],...sourceGuards,...plan.dbCommit.slice(1)]}
+    : {...plan,dbCommit:[...sourceGuards,...plan.dbCommit]};
 }
 
 export interface R2StoreOptions {

@@ -160,7 +160,10 @@ export async function preflightDistribution(db: D1Database, authority: HqTemplat
       : r2!.items;
     const storeId = crypto.randomUUID(), token = tagDefinition ? `hqts1.${await digest(snapshot!)}` : form?.snapshotToken ?? r2!.snapshotToken;
     statements.push({ sql: `INSERT INTO hq_template_preflights(id,tenant_id,template_id,template_version_id,target_account_id,distribution_mode,idempotency_fingerprint,snapshot_token,status,created_by,expires_at) VALUES (?,?,?,?,?,'create',?,?,'ready',?,?)`, bindings: [storeId, authority.tenantId, id, template.current_version_id!, account.id, preflightId, token, authority.actorId, expiresAt] });
-    for (const item of items) statements.push({ sql: `INSERT INTO hq_template_preflight_resolutions(preflight_id,tenant_id,template_id,template_version_id,target_account_id,idempotency_fingerprint,snapshot_token,source_id,item_kind,resolution_mode,target_id,expected_revision) VALUES (?,?,?,?,?,?,?,?,?,'create',?,?)`, bindings: [storeId, authority.tenantId, id, template.current_version_id!, account.id, preflightId, token, item.sourceId, item.itemKind, item.targetId, item.expectedRevision] });
+    for (const item of items) {
+      const fixedRichReferenceMode = template.template_type === 'rich_menu' && item.itemKind !== 'rich_menu' ? item.allowedModes[0] : 'create';
+      statements.push({ sql: `INSERT INTO hq_template_preflight_resolutions(preflight_id,tenant_id,template_id,template_version_id,target_account_id,idempotency_fingerprint,snapshot_token,source_id,item_kind,resolution_mode,target_id,expected_revision) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`, bindings: [storeId, authority.tenantId, id, template.current_version_id!, account.id, preflightId, token, item.sourceId, item.itemKind, fixedRichReferenceMode, item.targetId, item.expectedRevision] });
+    }
     stores.push({ accountId: account.id, accountName: account.name, items });
   }
   for (const account of accounts) statements.unshift(guard(`EXISTS(SELECT 1 FROM line_accounts WHERE id=? AND tenant_id=? AND is_active=1 AND archived_at IS NULL)`, [account.id, authority.tenantId]));
@@ -193,7 +196,11 @@ export async function distributionResult(db: D1Database, authority: HqTemplateAu
     const resolutions = (await db.prepare(`SELECT r.resolution_mode,r.item_kind,t.template_type FROM hq_template_preflight_resolutions r JOIN hq_templates t ON t.id=r.template_id AND t.tenant_id=r.tenant_id WHERE r.preflight_id=? AND r.tenant_id=?`).bind(row.preflight_id, authority.tenantId).all<{ resolution_mode: string; item_kind: string; template_type: string }>()).results;
     const counts: { created: number; overwritten: number; aliased: number; reused?: number } = { created: 0, overwritten: 0, aliased: 0 };
     if (row.status === 'succeeded') for (const r of resolutions) {
-      if (r.template_type === 'rich_menu' && r.item_kind !== 'rich_menu') { counts.reused = (counts.reused ?? 0) + 1; continue; }
+      if (r.template_type === 'rich_menu' && r.item_kind !== 'rich_menu') {
+        if (r.resolution_mode === 'create') counts.created++;
+        else counts.reused = (counts.reused ?? 0) + 1;
+        continue;
+      }
       if (r.resolution_mode === 'create') counts.created++; else if (r.resolution_mode === 'overwrite') counts.overwritten++; else counts.aliased++;
     }
     stores.push({ accountId: row.target_account_id, status: row.status, reason: resultReason(row.status), cleanupPending: Number(cleanup?.count ?? 0) > 0, counts });
@@ -219,7 +226,9 @@ export async function distributeTemplate(db: D1Database, authority: HqTemplateAu
     if (!row || !['create', 'overwrite', 'alias'].includes(selected.mode)) throw new HqTemplateError('SELECTION_REQUIRED', 409);
     const p = preflights.find(p => p.id === row.preflight_id)!;
     if (p.status === 'consumed') { if (template.template_type === 'tag' && row.resolution_mode !== selected.mode) throw new HqTemplateError('SELECTION_CHANGED', 409); }
-    else if (row.target_id ? selected.mode === 'create' : selected.mode !== 'create') throw new HqTemplateError('SELECTION_REQUIRED', 409);
+    else if (template.template_type === 'rich_menu' && row.item_kind !== 'rich_menu') {
+      if (row.resolution_mode !== selected.mode) throw new HqTemplateError('SELECTION_CHANGED', 409);
+    } else if (row.target_id ? selected.mode === 'create' : selected.mode !== 'create') throw new HqTemplateError('SELECTION_REQUIRED', 409);
   }
   if (template.template_type !== 'tag') {
     if ((template.template_type === 'template' || template.template_type === 'rich_menu') && !bucket) throw new HqTemplateError('UNSUPPORTED', 422);

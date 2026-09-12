@@ -24,7 +24,7 @@ export interface RichMenuHqDefinition {
   richMenu: { id: string; name: string; chatBarText: string; size: 'large' | 'compact'; defaultPageId: string; pages: Page[] };
 }
 export interface RichMenuReferenceResolver {
-  (reference: HqTemplateReference, targetAccountId: string): Promise<string | null>;
+  (reference: HqTemplateReference, targetAccountId: string): Promise<string | null | { targetId: string; operation: 'reuse' | 'create'; expectedRevision?: string }>;
 }
 export interface RichMenuAdapterOptions {
   db: D1Database; bucket: Pick<R2Bucket, 'head' | 'get' | 'put' | 'delete'>;
@@ -33,6 +33,7 @@ export interface RichMenuAdapterOptions {
   input: HqTemplateAdapterInput;
   resolveReference: RichMenuReferenceResolver;
 }
+type RichMenuBoundReference = HqTemplateMatchedReference & { operation: 'reuse' | 'create'; expectedRevision?: string };
 function fail(code: string): never { throw new Error(code); }
 const ident = (value: unknown): string => typeof value === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(value) ? value : fail('INVALID_ID');
 const text = (value: unknown, max = 200): string => typeof value === 'string' && value.trim() && value.length <= max ? value : fail('INVALID_DEFINITION');
@@ -174,11 +175,13 @@ export function createRichMenuHqTemplateAdapter(options: RichMenuAdapterOptions)
   const assertContext = (c: Pick<HqTemplateAdapterContext, 'tenantId' | 'targetAccountId'>) => {
     if (c.tenantId !== authority.tenantId) fail('FORBIDDEN'); ident(c.targetAccountId);
   };
-  async function targetRefs(accountId: string): Promise<HqTemplateMatchedReference[]> {
+  async function targetRefs(accountId: string): Promise<RichMenuBoundReference[]> {
     return Promise.all(refs.map(async r => {
-      const targetId = await resolveReference(r, accountId);
-      if (!targetId) fail('REFERENCE_UNRESOLVED');
-      return { ...r, targetId: ident(targetId) };
+      const resolved = await resolveReference(r, accountId);
+      if (!resolved) fail('REFERENCE_UNRESOLVED');
+      return typeof resolved === 'string'
+        ? { ...r, targetId: ident(resolved), operation: 'reuse' as const }
+        : { ...r, targetId: ident(resolved.targetId), operation: resolved.operation, expectedRevision: resolved.expectedRevision };
     }));
   }
   async function capture(accountId: string) {
@@ -207,7 +210,7 @@ export function createRichMenuHqTemplateAdapter(options: RichMenuAdapterOptions)
     if (!row) fail('VERSION_CONFLICT');
     const values = JSON.parse(row.snapshot) as unknown[][][];
     if (values[0].length !== 1 || values[1].length !== 1 || values[1][0][1] !== input.definitionJson) fail('SOURCE_OR_TARGET_SCOPE_MISMATCH');
-    if (values.slice(5).some(v => v.length !== 1)) fail('REFERENCE_SCOPE_MISMATCH');
+    if (values.slice(5).some((v, index) => v.length !== (matched[index].operation === 'reuse' ? 1 : 0))) fail('REFERENCE_SCOPE_MISMATCH');
     const media = await Promise.all(g.pages.map(async p => {
       const obj = await bucket.head(p.imageR2Key);
       if (!obj || obj.size < 1 || obj.size > 1024 * 1024 || !['image/png', 'image/jpeg'].includes(obj.httpMetadata?.contentType ?? '')) fail('INVALID_IMAGE');
@@ -253,7 +256,8 @@ export function createRichMenuHqTemplateAdapter(options: RichMenuAdapterOptions)
       if (decisions.length !== 1 || c.resolutions.length !== refs.length + 1 || decisions[0].mode !== c.mode) fail('RESOLUTION_REQUIRED');
       for (const matched of s.matched) {
         const selected = c.resolutions.filter(r => r.sourceId === referenceKey(matched) && r.itemKind === matched.kind);
-        if (selected.length !== 1 || selected[0].mode !== 'overwrite' || selected[0].targetId !== matched.targetId) fail('RESOLUTION_REQUIRED');
+        const mode = matched.operation === 'reuse' ? 'overwrite' : 'create';
+        if (selected.length !== 1 || selected[0].mode !== mode || selected[0].targetId !== matched.targetId || (matched.expectedRevision !== undefined && selected[0].expectedRevision !== matched.expectedRevision)) fail('RESOLUTION_REQUIRED');
       }
       const choice = decisions[0];
       const groupId = c.mode === 'overwrite' ? ident(choice.targetId) : resolve(g.id);

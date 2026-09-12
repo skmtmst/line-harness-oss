@@ -31,7 +31,7 @@ async function fixture(type:'template'|'rich_menu'='rich_menu') {
   async function preflight(account='a',mode:'create'|'overwrite'|'alias'='create'){
     const info=await inspectR2RuntimeStore(binding,account),id=`preflight-${account}`;
     sql.raw.prepare("INSERT INTO hq_template_preflights(id,tenant_id,template_id,template_version_id,target_account_id,distribution_mode,idempotency_fingerprint,snapshot_token,status,created_by,expires_at) VALUES (?,'tenant','hq','v',?,?,'run',?,'ready','owner','2099-01-01T00:00:00Z')").run(id,account,mode,info.snapshotToken);
-    const resolutions=info.items.map(item=>({sourceId:item.sourceId,itemKind:item.itemKind,mode:(info.type==='rich_menu'&&item.itemKind!=='rich_menu'?'overwrite':item.duplicate?mode:'create') as 'create'|'overwrite'|'alias',targetId:item.targetId??undefined,expectedRevision:item.expectedRevision??undefined}));
+    const resolutions=info.items.map(item=>({sourceId:item.sourceId,itemKind:item.itemKind,mode:(info.type==='rich_menu'&&item.itemKind!=='rich_menu'?item.allowedModes[0]:item.duplicate?mode:'create') as 'create'|'overwrite'|'alias',targetId:item.targetId??undefined,expectedRevision:item.expectedRevision??undefined}));
     for(const item of resolutions)sql.raw.prepare("INSERT INTO hq_template_preflight_resolutions(preflight_id,tenant_id,template_id,template_version_id,target_account_id,idempotency_fingerprint,snapshot_token,source_id,item_kind,resolution_mode,target_id,expected_revision) VALUES (?,'tenant','hq','v',?,'run',?,?,?,?,?,?)").run(id,account,info.snapshotToken,item.sourceId,item.itemKind,item.mode,item.targetId??null,item.expectedRevision??null);
     const context:HqTemplateAdapterContext={tenantId:'tenant',targetAccountId:account,preflightId:id,idempotencyFingerprint:'run',snapshotToken:info.snapshotToken,mode,resolutions};return context;
   }
@@ -170,10 +170,120 @@ describe('DB-bound R2 store executor',()=>{
     const action=f.raw.prepare("SELECT action_data FROM rich_menu_areas WHERE action_data LIKE '%scenarioId%'").get() as {action_data:string};
     expect(JSON.parse(action.action_data)).toMatchObject({scenarioId:'local-scenario'});
   });
-  test('missing destination scenario fails before network or image writes',async()=>{
+  test('missing destination scenario is cloned inactive in the same batch',async()=>{
     const f=await fixture();f.raw.exec("INSERT INTO scenarios(id,name,trigger_type,line_account_id,is_active) VALUES ('source-scenario','ご案内','manual','source',1)");(f.rich.richMenu.pages[0].areas[0] as unknown as Record<string,unknown>).scenarioId='source-scenario';
     const json=JSON.stringify(f.rich);f.raw.prepare("UPDATE hq_template_versions SET definition_json=?,content_hash=? WHERE id='v'").run(json,await digest(json));
-    await expect(f.preflight()).rejects.toThrow('REFERENCE_UNAVAILABLE');expect(f.bucket.put).not.toHaveBeenCalled();
+    const context=await f.preflight();
+    const reference=context.resolutions.find(item=>item.sourceId==='scenario:source-scenario')!;
+    expect(reference).toMatchObject({mode:'create',itemKind:'scenario'});
+    expect(reference.targetId).toMatch(/^[a-f0-9]{32}$/);
+    expect((await f.execute(context)).status).toBe('succeeded');
+    expect(f.raw.prepare('SELECT name,line_account_id,is_active FROM scenarios WHERE id=?').get(reference.targetId)).toEqual({name:'ご案内',line_account_id:'a',is_active:0});
+    const action=f.raw.prepare("SELECT action_data FROM rich_menu_areas WHERE action_data LIKE '%scenarioId%'").get() as {action_data:string};
+    expect(JSON.parse(action.action_data)).toMatchObject({scenarioId:reference.targetId});
+  });
+
+  test('missing portable tag, form, scenario and text template are cloned and bound atomically',async()=>{
+    const f=await fixture();
+    f.raw.exec(`
+      INSERT INTO tags(id,name,line_account_id) VALUES ('source-tag','会員','source');
+      INSERT INTO forms(id,name,description,fields,layout) VALUES ('source-form','申込','説明','[]','[]');
+      INSERT INTO form_accounts(form_id,line_account_id) VALUES ('source-form','source');
+      INSERT INTO scenarios(id,name,trigger_type,line_account_id,is_active) VALUES ('source-scenario','案内','manual','source',1);
+      INSERT INTO scenario_steps(id,scenario_id,step_order,delay_minutes,message_type,message_content,is_draft) VALUES ('source-step','source-scenario',1,0,'text','安全な本文',0);
+    `);
+    const areas=f.rich.richMenu.pages[0].areas as Array<Record<string,unknown>>;
+    Object.assign(areas[0],{tagIds:['source-tag'],scenarioId:'source-scenario'});
+    areas.push({id:'form-area',bounds:{x:100,y:0,width:100,height:100},actionType:'uri',actionData:{},intent:'form',formId:'source-form'});
+    areas.push({id:'template-area',bounds:{x:200,y:0,width:100,height:100},actionType:'postback',actionData:{},intent:'template',templateId:'source-template'});
+    const json=JSON.stringify(f.rich);f.raw.prepare("UPDATE hq_template_versions SET definition_json=?,content_hash=? WHERE id='v'").run(json,await digest(json));
+    const info=await inspectR2RuntimeStore(f.binding,'a'),references=info.items.filter(item=>item.itemKind!=='rich_menu');
+    expect(references.map(item=>[item.itemKind,'operation' in item?item.operation:undefined,item.allowedModes,item.duplicate])).toEqual([
+      ['form','create',['create'],false],['scenario','create',['create'],false],['tag','create',['create'],false],['template','create',['create'],false],
+    ]);
+    const context=await f.preflight();
+    expect((await f.execute(context)).status).toBe('succeeded');
+    const byKind=Object.fromEntries(context.resolutions.filter(item=>item.itemKind!=='rich_menu').map(item=>[item.itemKind,item.targetId]));
+    expect(f.raw.prepare('SELECT line_account_id,status FROM tags WHERE id=?').get(byKind.tag)).toEqual({line_account_id:'a',status:'active'});
+    expect(f.raw.prepare('SELECT is_active,status FROM forms WHERE id=?').get(byKind.form)).toEqual({is_active:0,status:'active'});
+    expect(f.raw.prepare('SELECT line_account_id FROM form_accounts WHERE form_id=?').get(byKind.form)).toEqual({line_account_id:'a'});
+    expect(f.raw.prepare('SELECT line_account_id,is_active FROM scenarios WHERE id=?').get(byKind.scenario)).toEqual({line_account_id:'a',is_active:0});
+    expect(f.raw.prepare('SELECT message_content,is_draft FROM scenario_steps WHERE scenario_id=?').get(byKind.scenario)).toEqual({message_content:'安全な本文',is_draft:1});
+    expect(f.raw.prepare('SELECT line_account_id,message_type,message_content FROM templates WHERE id=?').get(byKind.template)).toEqual({line_account_id:'a',message_type:'text',message_content:'fixture'});
+    const areaRows=f.raw.prepare('SELECT action_data,tag_ids,form_id,template_id FROM rich_menu_areas ORDER BY id').all() as Array<Record<string,string|null>>;
+    expect(areaRows.some(row=>row.form_id===byKind.form)).toBe(true);
+    expect(areaRows.some(row=>row.template_id===byKind.template)).toBe(true);
+    expect(areaRows.some(row=>row.tag_ids===JSON.stringify([byKind.tag]))).toBe(true);
+    expect(areaRows.some(row=>row.action_data?.includes(String(byKind.scenario)))).toBe(true);
+    expect(f.raw.pragma('foreign_key_check')).toEqual([]);
+  });
+
+  test('a source revision or newly-created same-name target invalidates create before R2 writes',async()=>{
+    const changed=await fixture();
+    changed.raw.exec("INSERT INTO tags(id,name,line_account_id) VALUES ('source-tag','会員','source')");
+    (changed.rich.richMenu.pages[0].areas[0] as unknown as Record<string,unknown>).tagIds=['source-tag'];
+    let json=JSON.stringify(changed.rich);changed.raw.prepare("UPDATE hq_template_versions SET definition_json=?,content_hash=? WHERE id='v'").run(json,await digest(json));
+    const sourceContext=await changed.preflight();
+    changed.raw.exec("UPDATE tags SET description='変更後',version=version+1 WHERE id='source-tag'");
+    expect(await changed.execute(sourceContext)).toMatchObject({status:'version_conflict'});
+    expect(changed.bucket.put).not.toHaveBeenCalled();
+
+    const raced=await fixture();
+    raced.raw.exec("INSERT INTO tags(id,name,line_account_id) VALUES ('source-tag','会員','source')");
+    (raced.rich.richMenu.pages[0].areas[0] as unknown as Record<string,unknown>).tagIds=['source-tag'];
+    json=JSON.stringify(raced.rich);raced.raw.prepare("UPDATE hq_template_versions SET definition_json=?,content_hash=? WHERE id='v'").run(json,await digest(json));
+    const targetContext=await raced.preflight();
+    raced.raw.exec("INSERT INTO tags(id,name,line_account_id) VALUES ('concurrent-tag','会員','a')");
+    expect(await raced.execute(targetContext)).toMatchObject({status:'version_conflict'});
+    expect(raced.bucket.put).not.toHaveBeenCalled();
+
+    const movedOwner=await fixture();
+    movedOwner.raw.exec("INSERT INTO forms(id,name,fields,layout) VALUES ('source-form','申込','[]','[]'); INSERT INTO form_accounts(form_id,line_account_id) VALUES ('source-form','source')");
+    Object.assign(movedOwner.rich.richMenu.pages[0].areas[0] as unknown as Record<string,unknown>,{actionType:'uri',actionData:{},intent:'form',formId:'source-form'});
+    json=JSON.stringify(movedOwner.rich);movedOwner.raw.prepare("UPDATE hq_template_versions SET definition_json=?,content_hash=? WHERE id='v'").run(json,await digest(json));
+    const ownerContext=await movedOwner.preflight();
+    movedOwner.raw.exec("UPDATE line_accounts SET tenant_id='other' WHERE id='source'");
+    expect(await movedOwner.execute(ownerContext)).toMatchObject({status:'version_conflict'});
+    expect(movedOwner.bucket.put).not.toHaveBeenCalled();
+  });
+
+  test('ambiguous destination references and non-portable source dependencies fail closed',async()=>{
+    const ambiguous=await fixture();
+    ambiguous.raw.exec("INSERT INTO forms(id,name) VALUES ('source-form','申込'),('target-form-1','申込'),('target-form-2','申込'); INSERT INTO form_accounts(form_id,line_account_id) VALUES ('source-form','source'),('target-form-1','a'),('target-form-2','a')");
+    Object.assign(ambiguous.rich.richMenu.pages[0].areas[0] as unknown as Record<string,unknown>,{actionType:'uri',actionData:{},intent:'form',formId:'source-form'});
+    let json=JSON.stringify(ambiguous.rich);ambiguous.raw.prepare("UPDATE hq_template_versions SET definition_json=?,content_hash=? WHERE id='v'").run(json,await digest(json));
+    await expect(ambiguous.preflight()).rejects.toThrow('REFERENCE_UNAVAILABLE');
+    expect(ambiguous.bucket.put).not.toHaveBeenCalled();
+
+    const unsupported=await fixture();
+    unsupported.raw.exec("UPDATE templates SET message_type='image',message_content='media/source/image' WHERE id='source-template'");
+    Object.assign(unsupported.rich.richMenu.pages[0].areas[0] as unknown as Record<string,unknown>,{actionType:'postback',actionData:{},intent:'template',templateId:'source-template'});
+    json=JSON.stringify(unsupported.rich);unsupported.raw.prepare("UPDATE hq_template_versions SET definition_json=?,content_hash=? WHERE id='v'").run(json,await digest(json));
+    await expect(unsupported.preflight()).rejects.toThrow('UNSUPPORTED_REFERENCE');
+    expect(unsupported.bucket.put).not.toHaveBeenCalled();
+
+    const formDependency=await fixture();
+    formDependency.raw.exec(`INSERT INTO forms(id,name,fields,layout) VALUES ('source-form','申込','[{"name":"email","friendFieldId":"source-field"}]','[]'); INSERT INTO form_accounts(form_id,line_account_id) VALUES ('source-form','source')`);
+    Object.assign(formDependency.rich.richMenu.pages[0].areas[0] as unknown as Record<string,unknown>,{actionType:'uri',actionData:{},intent:'form',formId:'source-form'});
+    json=JSON.stringify(formDependency.rich);formDependency.raw.prepare("UPDATE hq_template_versions SET definition_json=?,content_hash=? WHERE id='v'").run(json,await digest(json));
+    await expect(formDependency.preflight()).rejects.toThrow('UNSUPPORTED_REFERENCE');
+    expect(formDependency.bucket.put).not.toHaveBeenCalled();
+  });
+
+  test('a dependency clone failure rolls back every DB row in the rich-menu batch',async()=>{
+    const f=await fixture();
+    f.raw.exec("INSERT INTO tags(id,name,line_account_id) VALUES ('source-tag','会員','source'); INSERT INTO forms(id,name,fields,layout) VALUES ('source-form','申込','[]','[]'); INSERT INTO form_accounts(form_id,line_account_id) VALUES ('source-form','source')");
+    const areas=f.rich.richMenu.pages[0].areas as Array<Record<string,unknown>>;
+    Object.assign(areas[0],{tagIds:['source-tag']});
+    areas.push({id:'form-area',bounds:{x:100,y:0,width:100,height:100},actionType:'uri',actionData:{},intent:'form',formId:'source-form'});
+    const json=JSON.stringify(f.rich);f.raw.prepare("UPDATE hq_template_versions SET definition_json=?,content_hash=? WHERE id='v'").run(json,await digest(json));
+    const context=await f.preflight();
+    f.raw.exec("CREATE TRIGGER reject_cloned_form_owner BEFORE INSERT ON form_accounts WHEN NEW.line_account_id='a' BEGIN SELECT RAISE(ABORT,'fixture'); END");
+    expect(await f.execute(context)).toMatchObject({status:'failed'});
+    expect(f.raw.prepare("SELECT COUNT(*) n FROM tags WHERE line_account_id='a'").get()).toEqual({n:0});
+    expect(f.raw.prepare("SELECT COUNT(*) n FROM form_accounts WHERE line_account_id='a'").get()).toEqual({n:0});
+    expect(f.raw.prepare("SELECT COUNT(*) n FROM rich_menu_groups WHERE account_id='a'").get()).toEqual({n:0});
+    expect(f.raw.pragma('foreign_key_check')).toEqual([]);
   });
 
 });

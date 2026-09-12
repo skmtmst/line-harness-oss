@@ -94,6 +94,29 @@ describe('HQ authoring Web payload to HTTP/SQLite/R2 distribution',()=>{
     expect(result.body.data.stores[1].reason).toBe('配布先で編集がありました。もう一度確認してください');
     expect(sql.raw.prepare("SELECT account_id FROM rich_menu_groups ORDER BY account_id").all()).toEqual([{account_id:'a'},{account_id:'c'}]);
   });
+  test('rich menu preflight fixes missing reference creation and reports created dependencies',async()=>{
+    const uploaded=await upload('rich_menu');expect(uploaded.status).toBe(201);
+    sql.raw.exec("INSERT INTO tags(id,name,line_account_id) VALUES ('source-tag','会員','a')");
+    const value=freshDefinition('rich_menu') as any;value.richMenu.name='参照複製メニュー';value.richMenu.pages[0].imageR2Key=uploaded.body.data.r2Key;
+    value.richMenu.pages[0].areas.push({id:'tag-area',bounds:{x:0,y:0,width:100,height:100},actionType:'message',actionData:{text:'会員'},intent:'text',tagIds:['source-tag']});
+    const id=await save('rich_menu',value),p=await request(`/${id}/preflight`,'POST',{accountIds:['a','b','c']});expect(p.status,JSON.stringify(p.body)).toBe(200);
+    for(const store of p.body.data.stores) {
+      const item=store.items.find((candidate:any)=>candidate.sourceId==='tag:source-tag');
+      expect(item).toMatchObject(store.accountId==='a'
+        ? {itemKind:'tag',duplicate:true,operation:'reuse',allowedModes:['overwrite'],targetId:'source-tag'}
+        : {itemKind:'tag',duplicate:false,operation:'create',allowedModes:['create']});
+      const persisted=sql.raw.prepare('SELECT resolution_mode,target_id,expected_revision FROM hq_template_preflight_resolutions WHERE target_account_id=? AND source_id=?').get(store.accountId,'tag:source-tag') as any;
+      expect(persisted).toEqual({resolution_mode:store.accountId==='a'?'overwrite':'create',target_id:item.targetId,expected_revision:item.expectedRevision});
+    }
+    const body={preflightId:p.body.data.preflightId,resolutions:p.body.data.stores.flatMap((store:any)=>store.items.map((item:any)=>({accountId:store.accountId,sourceId:item.sourceId,mode:item.duplicate?'overwrite':'create'})))};
+    const result=await request(`/${id}/distribute`,'POST',body);expect(result.status,JSON.stringify(result.body)).toBe(200);
+    expect(result.body.data.stores.map((store:any)=>store.counts)).toEqual([
+      {created:1,overwritten:0,aliased:0,reused:1},
+      {created:2,overwritten:0,aliased:0},
+      {created:2,overwritten:0,aliased:0},
+    ]);
+    expect(sql.raw.prepare("SELECT line_account_id,name FROM tags ORDER BY line_account_id").all()).toEqual(['a','b','c'].map(line_account_id=>({line_account_id,name:'会員'})));
+  });
   test('lost upload response retries exact immutable receipt and never overwrites',async()=>{
     const put=bucket.put.getMockImplementation();bucket.put.mockImplementationOnce(async(...args:any[])=>{await put(...args);throw new Error('lost response')});
     const first=await upload(),second=await upload();expect(first.status).toBe(201);expect(second).toEqual(first);expect(bucket.put).toHaveBeenCalledOnce();expect(objects.size).toBe(1);
