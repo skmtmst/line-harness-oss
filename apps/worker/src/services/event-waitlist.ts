@@ -104,7 +104,7 @@ export type EventWaitlistPromotionResult =
   | { kind: 'conflict'; currentVersion: number }
   | {
       kind: 'noop';
-      reason: 'no_waiting' | 'no_capacity' | 'offer_pending' | 'occurrence_started' | 'party_too_large';
+      reason: 'no_waiting' | 'no_capacity' | 'offer_pending' | 'occurrence_started' | 'party_too_large' | 'applicant_ineligible';
       occurrenceVersion: number;
       promoted: null;
     }
@@ -423,11 +423,38 @@ export async function promoteEventWaitlist(
       `UPDATE event_waitlist
           SET status = 'offered', offered_at = ?, offer_expires_at = ?,
               offer_token_hash = ?, version = version + 1, updated_at = ?
-        WHERE id = ? AND status = 'waiting' AND version = ?`,
+        WHERE id = ? AND status = 'waiting' AND version = ?
+          AND NOT EXISTS (
+            SELECT 1 FROM event_bookings b
+             WHERE b.event_id = event_waitlist.event_id
+               AND b.slot_id = event_waitlist.slot_id
+               AND b.identity_key = event_waitlist.identity_key
+               AND b.status IN ('requested','confirmed')
+          )
+          AND EXISTS (
+            SELECT 1 FROM events e WHERE e.id = event_waitlist.event_id
+              AND (e.max_bookings_per_friend IS NULL OR (
+                (SELECT COUNT(*) FROM event_bookings b
+                  WHERE b.event_id = e.id AND b.identity_key = event_waitlist.identity_key
+                    AND b.status IN ('requested','confirmed'))
+                + (SELECT COUNT(*) FROM event_waitlist held
+                    WHERE held.event_id = e.id AND held.identity_key = event_waitlist.identity_key
+                      AND held.id != event_waitlist.id AND held.status IN ('offered','accepted'))
+              ) < e.max_bookings_per_friend)
+          )`,
     )
     .bind(nowIso, expiresAt, tokenHash, nowIso, waiting.id, waiting.version)
     .run();
   if ((claimed.meta?.changes ?? 0) === 0) {
+    // 別の開催回の予約や保留が先に成立した人には、席も通知も確保しない。
+    // 待ち順と申込内容は残し、予約が取り消されたあとの再検査に使う。
+    const unchanged = await db
+      .prepare(`SELECT id FROM event_waitlist WHERE id = ? AND status = 'waiting' AND version = ?`)
+      .bind(waiting.id, waiting.version)
+      .first<{ id: string }>();
+    if (unchanged) {
+      return { kind: 'noop', reason: 'applicant_ineligible', occurrenceVersion, promoted: null };
+    }
     const latest = await loadOccurrence(db, occurrence.id, params.lineAccountId);
     return { kind: 'conflict', currentVersion: latest?.version ?? occurrence.version };
   }

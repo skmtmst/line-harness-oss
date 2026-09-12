@@ -1577,22 +1577,47 @@ events.post('/api/liff/events/:id/bookings', async (c) => {
   const status = event.requires_approval === 1 ? 'requested' : 'confirmed';
   const id = crypto.randomUUID();
   const nowIso = firstParticipationCheckedAt;
-  await c.env.DB
+  const bookingInserted = await c.env.DB
     .prepare(
       `INSERT INTO event_bookings
          (id, line_account_id, event_id, slot_id, friend_id, status, customer_note,
           requested_at, identity_key, party_size, answer_snapshot_json,
           first_participation, first_participation_attended_count,
           first_participation_checked_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+        WHERE NOT EXISTS (
+          SELECT 1 FROM event_waitlist
+           WHERE event_id = ? AND slot_id = ? AND identity_key = ?
+             AND status IN ('waiting','offered','accepted')
+        )
+          AND (? IS NULL OR (
+            (SELECT COUNT(*) FROM event_bookings
+              WHERE event_id = ? AND identity_key = ? AND status IN ('requested','confirmed'))
+            + (SELECT COUNT(*) FROM event_waitlist
+                WHERE event_id = ? AND identity_key = ? AND status IN ('offered','accepted'))
+          ) < ?)`,
     )
     .bind(
       id, account_id, event.id, slot.id, friend.id, status,
       body.customer_note ?? null, nowIso, identityKey, partySize,
       answerSnapshot.json, firstParticipationIsFirst, priorAttendedCount,
       firstParticipationCheckedAt,
+      event.id, slot.id, identityKey,
+      event.max_bookings_per_friend, event.id, identityKey,
+      event.id, identityKey, event.max_bookings_per_friend,
     )
     .run();
+  if ((bookingInserted.meta?.changes ?? 0) === 0) {
+    // 同じ回の待ちが先に成立した場合は、その順番・人数・回答を維持する。
+    // 別の回のwaitingは予約上限を消費せず、席を保留したoffered/acceptedだけ数える。
+    const waiting = await c.env.DB
+      .prepare(`SELECT id FROM event_waitlist WHERE event_id = ? AND slot_id = ?
+                 AND identity_key = ? AND status IN ('waiting','offered','accepted') LIMIT 1`)
+      .bind(event.id, slot.id, identityKey)
+      .first<{ id: string }>();
+    if (waiting) return finalize(409, { error: 'duplicate_friend_booking' });
+    return finalize(409, { error: event.max_bookings_per_friend === 1 ? 'duplicate_friend_booking' : 'over_friend_limit' });
+  }
 
   // Verify capacity again. If there is a race winner ahead of us — i.e. an
   // earlier (smaller requested_at, then smaller id) row — we are the loser
