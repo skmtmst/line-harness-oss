@@ -190,9 +190,10 @@ export async function distributionResult(db: D1Database, authority: HqTemplateAu
       await reconcileFailedOwnedImages({ db, bucket, authority, templateId, templateVersionId: row.template_version_id }, runId, row.target_account_id);
     }
     const cleanup = await db.prepare(`SELECT COUNT(*) AS count FROM hq_template_owned_r2_keys WHERE run_id=? AND tenant_id=? AND target_account_id=? AND state IN ('staged','cleanup_pending')`).bind(runId, authority.tenantId, row.target_account_id).first<{ count: number }>();
-    const resolutions = (await db.prepare(`SELECT resolution_mode FROM hq_template_preflight_resolutions WHERE preflight_id=? AND tenant_id=?`).bind(row.preflight_id, authority.tenantId).all<{ resolution_mode: string }>()).results;
-    const counts = { created: 0, overwritten: 0, aliased: 0 };
+    const resolutions = (await db.prepare(`SELECT r.resolution_mode,r.item_kind,t.template_type FROM hq_template_preflight_resolutions r JOIN hq_templates t ON t.id=r.template_id AND t.tenant_id=r.tenant_id WHERE r.preflight_id=? AND r.tenant_id=?`).bind(row.preflight_id, authority.tenantId).all<{ resolution_mode: string; item_kind: string; template_type: string }>()).results;
+    const counts: { created: number; overwritten: number; aliased: number; reused?: number } = { created: 0, overwritten: 0, aliased: 0 };
     if (row.status === 'succeeded') for (const r of resolutions) {
+      if (r.template_type === 'rich_menu' && r.item_kind !== 'rich_menu') { counts.reused = (counts.reused ?? 0) + 1; continue; }
       if (r.resolution_mode === 'create') counts.created++; else if (r.resolution_mode === 'overwrite') counts.overwritten++; else counts.aliased++;
     }
     stores.push({ accountId: row.target_account_id, status: row.status, reason: resultReason(row.status), cleanupPending: Number(cleanup?.count ?? 0) > 0, counts });

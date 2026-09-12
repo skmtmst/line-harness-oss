@@ -89,6 +89,10 @@ export function createFormReferenceResolver({ db, authority }: { db: D1Database;
         const scenario: DbRow = { ...safeSource, id: match.id, line_account_id: context.targetAccountId, is_active: 0, folder_id: null, created_from_recipe_id: null, recipe_clone_run_id: null, current_published_version_id: null };
         const statements: HqTemplateStatement[] = [...sourceGuards,
           guard(`EXISTS(SELECT 1 FROM scenarios WHERE id=? AND line_account_id=? AND updated_at IS ?)`, [match.id, context.targetAccountId, match.updated_at]),
+          // Scenario-level hooks/triggers survive a step deletion. Replace them
+          // with the source's (validated empty) dependency set in this same batch.
+          { sql: `DELETE FROM scenario_actions WHERE scenario_id=?`, bindings: [match.id] },
+          { sql: `DELETE FROM scenario_triggers WHERE scenario_id=?`, bindings: [match.id] },
           { sql: `DELETE FROM scenario_steps WHERE scenario_id=?`, bindings: [match.id] },
           updateScenarioRow(scenario, match.id, context.targetAccountId),
         ];

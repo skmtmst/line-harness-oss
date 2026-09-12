@@ -147,7 +147,7 @@ export async function inspectR2RuntimeStore(b:R2RuntimeBinding,targetAccountId:s
   const references=await inspectRichReferences(b,definition,targetAccountId);
   return {type:v.template_type,snapshotToken:await adapter.snapshot(targetAccountId),items:[
     {sourceId:definition.richMenu.id,itemKind:'rich_menu',name:definition.richMenu.name,targetId:target?.id??null,expectedRevision:target?.updated_at??null,duplicate:!!target,allowedModes:!target?['create']:target.status==='draft'?['overwrite','alias']:['alias']},
-    ...references.map(ref=>({sourceId:richReferenceKey(ref),itemKind:ref.kind,name:ref.name,targetId:ref.targetId,expectedRevision:ref.expectedRevision,duplicate:true,allowedModes:['overwrite']})),
+    ...references.map(ref=>({sourceId:richReferenceKey(ref),itemKind:ref.kind,name:ref.name,targetId:ref.targetId,expectedRevision:ref.expectedRevision,duplicate:true,operation:'reuse' as const,allowedModes:['overwrite']})),
   ]};
 }
 async function buildR2Plan(b:R2RuntimeBinding,context:HqTemplateAdapterContext,input:HqTemplateAdapterInput,type:'template'|'rich_menu') {

@@ -29,6 +29,22 @@ async function chooseStores() {
 async function distribute() { await chooseStores(); fireEvent.click(screen.getByRole('button', { name: 'すべて別名で作成' })); fireEvent.click(screen.getByRole('button', { name: 'この内容で2店舗へ配布' })); await screen.findByText('配布が完了しました') }
 
 describe('HQひな形の配布フロー', () => {
+  it('参照再利用は上書きと区別し、既存を使用する選択と結果内訳を表示する', async () => {
+    const p = checked()
+    for (const store of p.stores) store.items = store.items.map(item => ({ ...item, operation: 'reuse', allowedModes: ['overwrite'] }))
+    calls.preflight.mockResolvedValue(p)
+    calls.distribute.mockResolvedValue({ runId: 'p1', status: 'completed', stores: accounts.map(a => ({ accountId: a.id, status: 'succeeded', counts: { created: 1, overwritten: 0, aliased: 0, reused: 1 } })) })
+    await chooseStores()
+    expect(screen.getAllByRole('button', { name: '既存を使用' })).toHaveLength(2)
+    expect(screen.queryByRole('button', { name: '上書き', exact: true })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'すべて別名で作成' }))
+    expect((screen.getByRole('button', { name: 'この内容で2店舗へ配布' }) as HTMLButtonElement).disabled).toBe(true)
+    fireEvent.click(screen.getByRole('button', { name: '上書き・再利用を一括指定' }))
+    fireEvent.click(screen.getByRole('button', { name: 'この内容で2店舗へ配布' }))
+    await screen.findByText('配布が完了しました')
+    expect(screen.getAllByText(/既存参照 1件を再利用/)).toHaveLength(2)
+    expect(calls.distribute).toHaveBeenCalledWith('t1', 'p1', accounts.map(a => ({ accountId: a.id, sourceId: 'tag1', mode: 'overwrite' })))
+  })
   it('画像登録中は保存を止め、確定した内容だけ保存できる', async () => {
     let finish!: (value: unknown) => void
     calls.uploadImage.mockImplementation(() => new Promise(resolve => { finish = resolve }))
@@ -118,7 +134,7 @@ describe('HQひな形の配布フロー', () => {
   })
   it('選択なしと重複未選択を止め、一括設定は許可された項目だけに適用する', async () => {
     await chooseStores(); const execute = screen.getByRole('button', { name: 'この内容で2店舗へ配布' }) as HTMLButtonElement
-    expect(execute.disabled).toBe(true); fireEvent.click(screen.getByRole('button', { name: 'すべて上書き' })); expect(execute.disabled).toBe(true)
+    expect(execute.disabled).toBe(true); fireEvent.click(screen.getByRole('button', { name: '上書き・再利用を一括指定' })); expect(execute.disabled).toBe(true)
     const group = within(screen.getByRole('group', { name: '横浜店 来店済みの配布方法' }))
     expect((group.getByRole('button', { name: '上書き' }) as HTMLButtonElement).disabled).toBe(true)
     fireEvent.click(group.getByRole('button', { name: '別名で作成' })); expect(execute.disabled).toBe(false)

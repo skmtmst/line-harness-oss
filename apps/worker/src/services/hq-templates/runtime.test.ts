@@ -68,6 +68,16 @@ describe('form runtime and atomic store execution', () => {
     expect((await executeFormStore(options(await preflight('a')))).status).toBe('succeeded');expect(count('forms')).toBe(1);expect(count('scenarios')).toBe(2);
     expect(fixture.raw.prepare("SELECT message_content FROM scenario_steps WHERE scenario_id='target-scenario'").get()).toEqual({message_content:'元の内容'});
   });
+  test.each([false, true])('scenario overwrite removes old actions/triggers atomically (rollback=%s)',async rollback=>{
+    fixture.raw.exec("INSERT INTO scenarios(id,name,trigger_type,line_account_id,is_active) VALUES ('source-scenario','ご案内','manual','source',1),('target-scenario','ご案内','manual','a',1); INSERT INTO scenario_steps(id,scenario_id,step_order,message_type,message_content) VALUES ('source-step','source-scenario',1,'text','元の内容'),('target-step','target-scenario',1,'text','別の内容'); INSERT INTO scenario_actions(id,scenario_id,hook,action_type,config_json) VALUES ('old-action','target-scenario','scenario_completed','send_message','{}'); INSERT INTO scenario_triggers(id,scenario_id,kind) VALUES ('old-trigger','target-scenario','friend_add')");
+    fixture.raw.prepare("UPDATE hq_template_versions SET definition_json=? WHERE id='version'").run(JSON.stringify({...definition,form:{...definition.form,on_submit_scenario_id:'source-scenario'}}));
+    if(rollback)fixture.raw.exec("CREATE TRIGGER reject_form BEFORE INSERT ON forms BEGIN SELECT RAISE(ABORT,'fixture'); END");
+    expect((await executeFormStore(options(await preflight('a')))).status).toBe(rollback?'failed':'succeeded');
+    expect(fixture.raw.prepare("SELECT count(*) n FROM scenario_actions WHERE scenario_id='target-scenario'").get()).toEqual({n:rollback?1:0});
+    expect(fixture.raw.prepare("SELECT count(*) n FROM scenario_triggers WHERE scenario_id='target-scenario'").get()).toEqual({n:rollback?1:0});
+    expect(fixture.raw.prepare("SELECT message_content FROM scenario_steps WHERE scenario_id='target-scenario'").get()).toEqual({message_content:rollback?'別の内容':'元の内容'});
+    expect(fixture.raw.pragma('foreign_key_check')).toEqual([]);
+  });
   test('scenario alias choice creates a separately named reference and preserves the selected duplicate',async()=>{
     fixture.raw.exec("INSERT INTO scenarios(id,name,trigger_type,line_account_id,is_active) VALUES ('source-scenario','ご案内','manual','source',1),('target-scenario','ご案内','manual','a',1); INSERT INTO scenario_steps(id,scenario_id,step_order,message_type,message_content) VALUES ('source-step','source-scenario',1,'text','元の内容'),('target-step','target-scenario',1,'text','既存の内容')");
     fixture.raw.prepare("UPDATE hq_template_versions SET definition_json=? WHERE id='version'").run(JSON.stringify({...definition,form:{...definition.form,on_submit_scenario_id:'source-scenario'}}));

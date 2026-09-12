@@ -67,7 +67,7 @@ export type TemplateDetail = {
 }[TemplateType]
 export interface HqAccount { id: string; name: string }
 export interface PreflightItem {
-  sourceId: string; itemKind: string; name: string; targetId?: string | null
+  sourceId: string; itemKind: string; name: string; targetId?: string | null; operation?: 'reuse'
   expectedRevision?: string | number | null; duplicate: boolean; allowedModes: DistributionMode[]
 }
 export interface Preflight {
@@ -80,7 +80,7 @@ export interface DistributionResult {
   stores: {
     accountId: string; accountName?: string
     status: 'pending' | 'staged' | 'succeeded' | 'failed' | 'version_conflict' | 'unsupported'
-    reason?: string | null; cleanupPending?: boolean; counts: { created: number; overwritten: number; aliased: number }
+    reason?: string | null; cleanupPending?: boolean; counts: { created: number; overwritten: number; aliased: number; reused?: number }
   }[]
 }
 export class HqTemplatesApiError extends Error {
