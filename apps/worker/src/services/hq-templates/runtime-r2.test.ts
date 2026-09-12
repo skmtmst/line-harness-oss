@@ -131,10 +131,17 @@ describe('DB-bound R2 store executor',()=>{
     expect((await f.execute(await f.preflight())).status).toBe('succeeded');
     expect(f.raw.prepare("SELECT tag_ids FROM rich_menu_areas WHERE tag_ids<>'[]' AND tag_ids IS NOT NULL").get()).toEqual({tag_ids:'["local-tag"]'});
   });
-  test('scenario reference remains unsupported and makes no network or image writes',async()=>{
-    const f=await fixture();(f.rich.richMenu.pages[0].areas[0] as unknown as Record<string,unknown>).scenarioId='source-scenario';
+  test('rich-menu scenario side effects point to the destination account scenario',async()=>{
+    const f=await fixture();f.raw.exec("INSERT INTO scenarios(id,name,trigger_type,line_account_id,is_active) VALUES ('source-scenario','ご案内','manual','source',1),('local-scenario','ご案内','manual','a',1)");(f.rich.richMenu.pages[0].areas[0] as unknown as Record<string,unknown>).scenarioId='source-scenario';
     const json=JSON.stringify(f.rich);f.raw.prepare("UPDATE hq_template_versions SET definition_json=?,content_hash=? WHERE id='v'").run(json,await digest(json));
-    await expect(f.preflight()).rejects.toThrow();expect(f.bucket.put).not.toHaveBeenCalled();
+    expect((await f.execute(await f.preflight())).status).toBe('succeeded');
+    const action=f.raw.prepare("SELECT action_data FROM rich_menu_areas WHERE action_data LIKE '%scenarioId%'").get() as {action_data:string};
+    expect(JSON.parse(action.action_data)).toMatchObject({scenarioId:'local-scenario'});
+  });
+  test('missing destination scenario fails before network or image writes',async()=>{
+    const f=await fixture();f.raw.exec("INSERT INTO scenarios(id,name,trigger_type,line_account_id,is_active) VALUES ('source-scenario','ご案内','manual','source',1)");(f.rich.richMenu.pages[0].areas[0] as unknown as Record<string,unknown>).scenarioId='source-scenario';
+    const json=JSON.stringify(f.rich);f.raw.prepare("UPDATE hq_template_versions SET definition_json=?,content_hash=? WHERE id='v'").run(json,await digest(json));
+    await expect(f.preflight()).rejects.toThrow('REFERENCE_UNAVAILABLE');expect(f.bucket.put).not.toHaveBeenCalled();
   });
 
 });

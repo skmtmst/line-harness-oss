@@ -1101,6 +1101,7 @@ export interface RichMenuAreaTapTarget {
   scoreChange: number | null;
   templateId: string | null;
   formId: string | null;
+  scenarioId: string | null;
 }
 
 export async function getRichMenuAreaTapTarget(
@@ -1117,6 +1118,7 @@ export async function getRichMenuAreaTapTarget(
               a.score_change  AS score_change,
               a.template_id   AS template_id,
               a.form_id       AS form_id,
+              a.action_data   AS action_data,
               p.group_id      AS group_id,
               g.account_id    AS account_id
          FROM rich_menu_areas a
@@ -1134,10 +1136,16 @@ export async function getRichMenuAreaTapTarget(
       score_change: number | null;
       template_id: string | null;
       form_id: string | null;
+      action_data: string;
       group_id: string;
       account_id: string;
     }>();
   if (!row) return null;
+  let scenarioId: string | null = null;
+  try {
+    const data = JSON.parse(row.action_data) as Record<string, unknown>;
+    if (typeof data.scenarioId === 'string' && data.scenarioId) scenarioId = data.scenarioId;
+  } catch { /* Invalid legacy action data has no executable scenario. */ }
   return {
     areaId: row.area_id,
     pageId: row.page_id,
@@ -1149,6 +1157,7 @@ export async function getRichMenuAreaTapTarget(
     scoreChange: row.score_change,
     templateId: row.template_id,
     formId: row.form_id,
+    scenarioId,
   };
 }
 

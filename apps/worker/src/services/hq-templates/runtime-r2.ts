@@ -34,7 +34,7 @@ async function messageSnapshot(b:R2RuntimeBinding,account:string):Promise<Messag
 /** Only already-existing, exclusively scoped references. No hidden reference writes. */
 function richResolver(b:R2RuntimeBinding,sourceGuards:HqTemplateStatement[]) {
   return async (ref:{kind:string;sourceId:string},account:string):Promise<string|null> => {
-    if (!['tag','form','template'].includes(ref.kind)) fail('UNSUPPORTED_REFERENCE');
+    if (!['tag','form','scenario','template'].includes(ref.kind)) fail('UNSUPPORTED_REFERENCE');
     await targetAccount(b,account);
     let source:{name:string}|null;
     let targets:{id:string;name:string}[];
@@ -44,7 +44,7 @@ function richResolver(b:R2RuntimeBinding,sourceGuards:HqTemplateStatement[]) {
       targets=(await b.db.prepare(`SELECT f.id,f.name FROM forms f WHERE f.status<>'archived' AND EXISTS(SELECT 1 FROM form_accounts fa WHERE fa.form_id=f.id AND fa.line_account_id=?) AND NOT EXISTS(SELECT 1 FROM form_accounts fa WHERE fa.form_id=f.id AND fa.line_account_id<>?) ORDER BY f.id`).bind(account,account).all<{id:string;name:string}>()).results;
       if(source)sourceGuards.push(guard(`EXISTS(SELECT 1 FROM (${sql}) WHERE name=?)`,[ref.sourceId,b.authority.tenantId,b.authority.tenantId,source.name]));
     } else {
-      const table=ref.kind==='tag'?'tags':'templates', active=ref.kind==='tag'?" AND t.status='active'":'';
+      const table=ref.kind==='tag'?'tags':ref.kind==='scenario'?'scenarios':'templates', active=ref.kind==='tag'?" AND t.status='active'":ref.kind==='scenario'?" AND t.is_active=1":'';
       const sql=`SELECT t.name FROM ${table} t JOIN line_accounts a ON a.id=t.line_account_id WHERE t.id=? AND a.tenant_id=? AND a.is_active=1 AND a.archived_at IS NULL${active}`;
       source=await b.db.prepare(sql).bind(ref.sourceId,b.authority.tenantId).first();
       targets=(await b.db.prepare(`SELECT id,name FROM ${table} WHERE line_account_id=?${ref.kind==='tag'?" AND status='active'":''} ORDER BY id`).bind(account).all<{id:string;name:string}>()).results;

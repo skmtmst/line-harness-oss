@@ -87,10 +87,19 @@ describe('rich-menu HQ store atomic adapter', () => {
     expect(() => createRichMenuHqTemplateAdapter({ ...f.options, input: { ...f.input, definitionJson: JSON.stringify(f.definition) } })).toThrow('OPAQUE_REFERENCE_UNSUPPORTED');
     expect(f.bucket.head).not.toHaveBeenCalled(); expect(f.bucket.put).not.toHaveBeenCalled();
   });
-  it('explicitly rejects unexecutable scenario references instead of marking them copied', () => {
-    const f = fixture(); f.definition.richMenu.pages[0].areas[0].scenarioId = 'source-scenario';
-    expect(() => createRichMenuHqTemplateAdapter({ ...f.options, input: { ...f.input, definitionJson: JSON.stringify(f.definition) } })).toThrow('UNSUPPORTED_SCENARIO_REFERENCE');
-    expect(f.bucket.head).not.toHaveBeenCalled(); expect(f.raw.prepare('SELECT * FROM rich_menu_groups').all()).toEqual([]);
+  it('maps an executable scenario side effect to the destination scenario', async () => {
+    const f = fixture(); f.definition.richMenu.pages[0].areas[1].scenarioId = 'source-scenario';
+    const input = { ...f.input, definitionJson: JSON.stringify(f.definition) };
+    f.raw.prepare("UPDATE hq_template_versions SET definition_json=? WHERE id='version'").run(input.definitionJson);
+    const adapter = createRichMenuHqTemplateAdapter({ ...f.options, input });
+    const context: HqTemplateAdapterContext = { tenantId: 'tenant', targetAccountId: 'a', preflightId: 'preflight-a', idempotencyFingerprint: 'fingerprint', mode: 'create', snapshotToken: await adapter.snapshot('a'), resolutions: [{ sourceId: 'menu', itemKind: 'rich_menu', mode: 'create' }] };
+    const refs = await adapter.extractReferences(input); if (refs.kind !== 'OK') throw new Error();
+    const verified = await adapter.verifyReferences(context, refs.value); if (verified.kind !== 'OK') throw new Error();
+    const map = await adapter.buildIdMap(context, verified.value, []); if (map.kind !== 'OK') throw new Error();
+    const plan = await adapter.buildCommitPlan(context, input, map.value); if (plan.kind !== 'OK') throw new Error();
+    await f.batch(plan.value.dbCommit);
+    const row = f.raw.prepare("SELECT action_data FROM rich_menu_areas WHERE intent='text'").get() as {action_data:string};
+    expect(JSON.parse(row.action_data)).toMatchObject({scenarioId:'scenario-a'});
   });
   it.each([
     { actionType: 'message', actionData: { text: 'switch' }, intent: 'switch' },

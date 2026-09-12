@@ -296,6 +296,7 @@ export function validateRichMenuGroupForPublish(group: GroupInput): void {
 /** 押されたときに、こちら側で何かする設定が入っているか。 */
 export function hasTapSideEffects(area: AreaInput): boolean {
   if ((area.tagIds?.length ?? 0) > 0) return true;
+  if (typeof area.actionData?.scenarioId === 'string' && area.actionData.scenarioId.length > 0) return true;
   return typeof area.scoreChange === 'number' && area.scoreChange !== 0;
 }
 
