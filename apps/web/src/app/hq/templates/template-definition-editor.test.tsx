@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { emptyLayout } from '@line-crm/shared'
 import type { FormDefinition, RichMenuDefinition } from '@/lib/hq-templates-api'
-import TemplateDefinitionEditor, { definitionError } from './template-definition-editor'
+import TemplateDefinitionEditor, { definitionError, referenceCount } from './template-definition-editor'
 
 vi.mock('@/lib/hq-templates-api', () => ({ hqTemplatesApi: { uploadImage: vi.fn() } }))
 
@@ -42,6 +42,41 @@ describe('TemplateDefinitionEditor', () => {
       ...value,
       richMenu: { ...value.richMenu, pages: [{ ...value.richMenu.pages[0], name: '変更後' }, value.richMenu.pages[1]] },
     })
+  })
+
+  it.each(['text', 'template'] as const)('%sのタップに追加で開始するシナリオを設定する', actionKind => {
+    const action = actionKind === 'text'
+      ? { id: 'area-1', bounds: { x: 0, y: 0, width: 2500, height: 1686 }, actionType: 'message' as const, actionData: { text: '案内を見る' }, intent: 'text' as const }
+      : { id: 'area-1', bounds: { x: 0, y: 0, width: 2500, height: 1686 }, actionType: 'postback' as const, actionData: {}, intent: 'template' as const, templateId: 'source-template' }
+    const value: RichMenuDefinition = {
+      schemaVersion: 1,
+      richMenu: {
+        id: 'menu', name: 'メニュー', chatBarText: 'メニュー', size: 'large', defaultPageId: 'page-1',
+        pages: [{ id: 'page-1', name: 'メイン', imageR2Key: 'hq-templates/tenant-a/main.png', areas: [action] }],
+      },
+    }
+    const onChange = vi.fn()
+    render(<TemplateDefinitionEditor type="rich_menu" value={value} disabled={false} tenantId="tenant-a" onChange={onChange} />)
+    fireEvent.change(screen.getByLabelText('追加で開始するシナリオの元ID'), { target: { value: 'source-scenario' } })
+    expect(onChange).toHaveBeenCalledWith({
+      ...value,
+      richMenu: { ...value.richMenu, pages: [{ ...value.richMenu.pages[0], areas: [{ ...action, scenarioId: 'source-scenario' }] }] },
+    })
+  })
+
+  it('シナリオ参照を検証し、参照件数へ含める', () => {
+    const value: RichMenuDefinition = {
+      schemaVersion: 1,
+      richMenu: {
+        id: 'menu', name: 'メニュー', chatBarText: 'メニュー', size: 'large', defaultPageId: 'page-1',
+        pages: [{ id: 'page-1', name: 'メイン', imageR2Key: 'hq-templates/tenant-a/main.png', areas: [{
+          id: 'area-1', bounds: { x: 0, y: 0, width: 2500, height: 1686 }, actionType: 'message', actionData: { text: '案内を見る' }, intent: 'text', scenarioId: 'source-scenario',
+        }] }],
+      },
+    }
+    expect(definitionError('rich_menu', value, 'tenant-a')).toBeNull()
+    expect(referenceCount('rich_menu', value)).toBe(1)
+    expect(definitionError('rich_menu', { ...value, richMenu: { ...value.richMenu, pages: [{ ...value.richMenu.pages[0], areas: [{ ...value.richMenu.pages[0].areas[0], scenarioId: 'invalid id' }] }] } }, 'tenant-a')).toBe('追加で開始するシナリオの元IDを正しく入力してください。')
   })
 
   it('高度な回答フォームは未表示のlayoutを守るため質問編集を止める', () => {

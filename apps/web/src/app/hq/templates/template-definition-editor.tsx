@@ -54,6 +54,8 @@ export function definitionError(type: TemplateType, definition: TemplateDefiniti
       if (area.intent === 'text' && !area.actionData.text?.trim()) return 'タップ時のメッセージを入力してください。'
       if (area.intent === 'form' && !area.formId?.trim()) return 'タップ先の回答フォームを入力してください。'
       if (area.intent === 'template' && !area.templateId?.trim()) return 'タップ先のテンプレートを入力してください。'
+      if (area.scenarioId !== undefined && !/^[A-Za-z0-9_-]{1,128}$/.test(area.scenarioId)) return '追加で開始するシナリオの元IDを正しく入力してください。'
+      if (area.scenarioId && !['text', 'template'].includes(String(area.intent))) return 'シナリオ開始は、メッセージまたはテンプレートを送るタップ動作に設定してください。'
     }
     return null
   }
@@ -68,7 +70,7 @@ export function definitionError(type: TemplateType, definition: TemplateDefiniti
 export function referenceCount(type: TemplateType, definition: TemplateDefinition): number {
   if (type === 'tag' && 'tag' in definition) return definition.folders.length
   if (type === 'template' && 'template' in definition) return definition.media.length
-  if (type === 'rich_menu' && 'richMenu' in definition) return definition.richMenu.pages.reduce((sum, page) => sum + page.areas.reduce((count, area) => count + (area.formId ? 1 : 0) + (area.templateId ? 1 : 0) + (area.tagIds?.length ?? 0), 0), 0)
+  if (type === 'rich_menu' && 'richMenu' in definition) return definition.richMenu.pages.reduce((sum, page) => sum + page.areas.reduce((count, area) => count + (area.formId ? 1 : 0) + (area.templateId ? 1 : 0) + (area.scenarioId ? 1 : 0) + (area.tagIds?.length ?? 0), 0), 0)
   if (type === 'form' && 'form' in definition) return Number(Boolean(definition.form.on_submit_tag_id)) + Number(Boolean(definition.form.on_submit_scenario_id))
   return 0
 }
@@ -139,6 +141,7 @@ function RichMenuEditor({ value, disabled, tenantId, onChange, onBusyChange }: {
       {actionKind === 'text' && action && <label className={styles.field}><span>送るメッセージ</span><input aria-label="タップ時のメッセージ" className={styles.input} value={action.actionData.text ?? ''} maxLength={2000} disabled={disabled || multipleAreas} onChange={event => setAction({ ...action, actionData: { text: event.target.value } })} /></label>}
       {actionKind === 'form' && action && <label className={styles.field}><span>回答フォームの元ID</span><input aria-label="タップ先の回答フォーム" className={styles.input} value={action.formId ?? ''} maxLength={128} disabled={disabled || multipleAreas} onChange={event => setAction({ ...action, formId: event.target.value })} /><small className={styles.muted}>配布時に各店舗の回答フォームへ置き換えます。</small></label>}
       {actionKind === 'template' && action && <label className={styles.field}><span>テンプレートの元ID</span><input aria-label="タップ先のテンプレート" className={styles.input} value={action.templateId ?? ''} maxLength={128} disabled={disabled || multipleAreas} onChange={event => setAction({ ...action, templateId: event.target.value })} /><small className={styles.muted}>配布時に各店舗のテンプレートへ置き換えます。</small></label>}
+      {(actionKind === 'text' || actionKind === 'template') && action && <label className={styles.field}><span>追加で開始するシナリオ（任意）</span><input aria-label="追加で開始するシナリオの元ID" className={styles.input} value={action.scenarioId ?? ''} maxLength={128} disabled={disabled || multipleAreas} placeholder="シナリオの元ID" onChange={event => { const scenarioId = event.target.value; setAction({ ...action, ...(scenarioId ? { scenarioId } : { scenarioId: undefined }) }) }} /><small className={styles.muted}>タップ時にメッセージまたはテンプレートを送り、同時にシナリオを開始します。配布時に各店舗の同名シナリオへ置き換えます。</small></label>}
     </section>
   </>
 }

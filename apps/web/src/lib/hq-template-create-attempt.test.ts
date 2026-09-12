@@ -36,6 +36,22 @@ describe('HQ creation receipt storage', () => {
     expect(loadCreationAttempt(s, scope, type)).toEqual(item)
     expect(loadCreationAttempt(s, scope, type === 'form' ? 'template' : 'form')).toBeNull()
   })
+  it.each(['text', 'template'] as const)('%sタップのシナリオ参照を未確定依頼へ保存する', intent => {
+    const s = storage()
+    const area = intent === 'text'
+      ? { id: 'area-1', bounds: { x: 0, y: 0, width: 2500, height: 1686 }, actionType: 'message' as const, actionData: { text: '案内を見る' }, intent, scenarioId: 'source-scenario' }
+      : { id: 'area-1', bounds: { x: 0, y: 0, width: 2500, height: 1686 }, actionType: 'postback' as const, actionData: {}, intent, templateId: 'source-template', scenarioId: 'source-scenario' }
+    const item = { requestId: `request-${intent}`, distribute: false, input: { type: 'rich_menu' as const, name: 'メニュー', definition: { schemaVersion: 1 as const, richMenu: { id: 'rich-menu-main', name: 'メニュー', chatBarText: 'メニュー', size: 'large' as const, defaultPageId: 'page-1', pages: [{ id: 'page-1', name: 'メイン', imageR2Key: 'hq-templates/tenant-a/menu.png', areas: [area] }] } } } }
+    persistCreationAttempt(s, scope, 'rich_menu', item)
+    expect(loadCreationAttempt(s, scope, 'rich_menu')).toEqual(item)
+  })
+  it('URLタップや不正なIDのシナリオ参照は未確定依頼へ保存しない', () => {
+    const s = storage()
+    const definition = { schemaVersion: 1 as const, richMenu: { id: 'rich-menu-main', name: 'メニュー', chatBarText: 'メニュー', size: 'large' as const, defaultPageId: 'page-1', pages: [{ id: 'page-1', name: 'メイン', imageR2Key: 'hq-templates/tenant-a/menu.png', areas: [{ id: 'area-1', bounds: { x: 0, y: 0, width: 2500, height: 1686 }, actionType: 'uri' as const, actionData: { uri: 'https://example.com' }, intent: 'url' as const, scenarioId: 'source-scenario' }] }] } }
+    expect(() => persistCreationAttempt(s, scope, 'rich_menu', { requestId: 'request-url', distribute: false, input: { type: 'rich_menu', name: 'メニュー', definition } })).toThrow()
+    const textDefinition = { ...definition, richMenu: { ...definition.richMenu, pages: [{ ...definition.richMenu.pages[0], areas: [{ ...definition.richMenu.pages[0].areas[0], intent: 'text' as const, actionType: 'message' as const, actionData: { text: '案内' }, scenarioId: 'invalid id' }] }] } }
+    expect(() => persistCreationAttempt(s, scope, 'rich_menu', { requestId: 'request-invalid-id', distribute: false, input: { type: 'rich_menu', name: 'メニュー', definition: textDefinition } })).toThrow()
+  })
   it('別scopeのコピー・破損・過大データを破棄して新規作成せず停止する', () => {
     const s = storage(); persistCreationAttempt(s, scope, 'tag', attempt)
     const key = creationStorageKey(scope, 'tag'), other = creationStorageKey({ ...scope, tenantId: 'tenant-b' }, 'tag')

@@ -50,7 +50,8 @@ function validAttempt(value: unknown): value is CreationAttempt {
     return menu.pages.every(page => object(page, ['id', 'name', 'imageR2Key', 'areas']) && identifier(page.id) && text(page.name, 200) && text(page.imageR2Key, 1024) && Array.isArray(page.areas) && page.areas.length <= 20 && page.areas.every(area => {
       if (!object(area, ['id', 'bounds', 'actionType', 'actionData', 'intent', 'label', 'tagIds', 'formId', 'templateId', 'scenarioId']) || !identifier(area.id) || !object(area.bounds, ['x', 'y', 'width', 'height']) || !Object.values(area.bounds).every(Number.isSafeInteger) || !object(area.actionData, ['uri', 'text', 'targetPageId']) || !Object.values(area.actionData).every(entry => text(entry, 2000))) return false
       return ['uri', 'message', 'postback', 'richmenuswitch'].includes(String(area.actionType)) && (area.intent === undefined || ['url', 'text', 'form', 'template', 'switch'].includes(String(area.intent))) && optionalText(area.label, 200)
-        && (area.tagIds === undefined || Array.isArray(area.tagIds) && area.tagIds.length <= 30 && area.tagIds.every(identifier)) && (area.formId === undefined || identifier(area.formId)) && (area.templateId === undefined || identifier(area.templateId)) && area.scenarioId === undefined
+        && (area.tagIds === undefined || Array.isArray(area.tagIds) && area.tagIds.length <= 30 && area.tagIds.every(identifier)) && (area.formId === undefined || identifier(area.formId)) && (area.templateId === undefined || identifier(area.templateId))
+        && (area.scenarioId === undefined || identifier(area.scenarioId) && ['text', 'template'].includes(String(area.intent)))
     }))
   }
   if (!object(definition, ['schemaVersion', 'form']) || definition.schemaVersion !== 1) return false
