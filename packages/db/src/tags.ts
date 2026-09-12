@@ -214,6 +214,43 @@ export function normalizeTagNameForCleanup(name: string): string {
     .toLocaleLowerCase('ja-JP');
 }
 
+/** Find an equal comparison name, including rows created before normalized_name. */
+export async function findTagByNormalizedName(
+  db: D1Database,
+  name: string,
+  lineAccountId: string | null,
+  excludeId?: string,
+): Promise<Tag | null> {
+  const normalizedName = normalizeTagNameForCleanup(name);
+  const rows = await db.prepare(
+    `SELECT * FROM tags
+      WHERE line_account_id IS ?
+        AND (normalized_name = ? OR normalized_name IS NULL)
+      ORDER BY id`,
+  ).bind(lineAccountId, normalizedName).all<Tag>();
+  return (rows.results ?? []).find((row) =>
+    row.id !== excludeId
+    && (row.normalized_name === normalizedName
+      || (row.normalized_name === null
+        && normalizeTagNameForCleanup(row.name) === normalizedName))) ?? null;
+}
+
+function tagNameConflict(): Error {
+  // Existing route contracts map SQLite UNIQUE errors to HTTP 409.
+  return new Error('UNIQUE constraint failed: tags normalized name');
+}
+
+export async function assertTagNameAvailable(
+  db: D1Database,
+  name: string,
+  lineAccountId: string | null,
+  excludeId?: string,
+): Promise<void> {
+  if (await findTagByNormalizedName(db, name, lineAccountId, excludeId)) {
+    throw tagNameConflict();
+  }
+}
+
 export async function getTagsWithCounts(
   db: D1Database,
 ): Promise<TagWithCount[]> {
@@ -730,9 +767,9 @@ export interface CreateTagsBulkResult {
   tagId?: string;
 }
 
-// D1 は1文につき100個までしか値を束縛できない。このINSERTは1行4個なので、
-// 25行でちょうど100個。500行でも20文に収まり、無料枠の1実行50クエリを超えない。
-const TAGS_PER_BULK_INSERT = 25;
+// D1 は1文100バインドまで。正規化名を含む1行5個×20行、500行25文で
+// 無料枠の1実行50クエリ内に収める。旧APIの作成先は未所属(global)のまま。
+const TAGS_PER_BULK_INSERT = 20;
 
 export async function createTag(
   db: D1Database,
@@ -742,13 +779,15 @@ export async function createTag(
   const now = jstNow();
   const color = input.color ?? '#3B82F6';
 
+  await assertTagNameAvailable(db, input.name, null);
+
   await db
     .prepare(
       // group_id は書かない。folders が正で、group_id は移送前の名残。
-      `INSERT INTO tags (id, name, color, folder_id, created_at)
-       VALUES (?, ?, ?, ?, ?)`,
+      `INSERT INTO tags (id, name, color, folder_id, created_at, line_account_id, normalized_name)
+       VALUES (?, ?, ?, ?, ?, NULL, ?)`,
     )
-    .bind(id, input.name, color, input.groupId ?? null, now)
+    .bind(id, input.name, color, input.groupId ?? null, now, normalizeTagNameForCleanup(input.name))
     .run();
 
   return (await db
@@ -757,13 +796,30 @@ export async function createTag(
     .first<Tag>())!;
 }
 
+export async function findOrCreateGlobalTag(
+  db: D1Database,
+  input: CreateTagInput,
+): Promise<Tag> {
+  const existing = await findTagByNormalizedName(db, input.name, null);
+  if (existing) return existing;
+  try {
+    return await createTag(db, input);
+  } catch (error) {
+    // The normalized unique index serializes concurrent writers. Recover the
+    // winner so webhook retries attach the already-created tag.
+    const concurrent = await findTagByNormalizedName(db, input.name, null);
+    if (concurrent) return concurrent;
+    throw error;
+  }
+}
+
 /**
  * CSVからのタグ登録を、D1の1実行あたりのクエリ上限内でまとめて書く。
  *
  * - idを先に作り、RETURNINGで実際に入った行だけを判別する。
  * - 同名が先に作られた行はINSERT OR IGNOREで見送りにする。
  * - 確認後にフォルダが消えた場合は、外部キー違反にせず未分類で登録する。
- * - 1文が失敗しても、ほかの25行単位の文は続ける。
+ * - 1文が失敗しても、ほかの20行単位の文は続ける。
  */
 export async function createTagsBulk(
   db: D1Database,
@@ -774,6 +830,13 @@ export async function createTagsBulk(
     () => ({ status: 'failed' }),
   );
   const now = jstNow();
+  const legacyNullNames = new Set(
+    ((await db.prepare(
+      `SELECT name FROM tags
+        WHERE line_account_id IS NULL AND normalized_name IS NULL`,
+    ).all<{ name: string }>()).results ?? [])
+      .map((row) => normalizeTagNameForCleanup(row.name)),
+  );
 
   for (let offset = 0; offset < inputs.length; offset += TAGS_PER_BULK_INSERT) {
     const chunk = inputs.slice(offset, offset + TAGS_PER_BULK_INSERT);
@@ -781,16 +844,25 @@ export async function createTagsBulk(
       id: crypto.randomUUID(),
       name: input.name,
       groupId: input.groupId ?? null,
+      normalizedName: normalizeTagNameForCleanup(input.name),
     }));
-    const values = prepared
-      .map(() => "(?, ?, '#3B82F6', (SELECT id FROM folders WHERE kind = 'tag' AND id = ?), ?)")
+    const insertable = prepared.filter((row, index) => {
+      if (legacyNullNames.has(row.normalizedName)) {
+        results[offset + index] = { status: 'skipped' };
+        return false;
+      }
+      return true;
+    });
+    if (insertable.length === 0) continue;
+    const values = insertable
+      .map(() => "(?, ?, '#3B82F6', (SELECT id FROM folders WHERE kind = 'tag' AND id = ?), ?, NULL, ?)")
       .join(', ');
-    const binds = prepared.flatMap((row) => [row.id, row.name, row.groupId, now]);
+    const binds = insertable.flatMap((row) => [row.id, row.name, row.groupId, now, row.normalizedName]);
 
     try {
       const inserted = await db
         .prepare(
-          `INSERT OR IGNORE INTO tags (id, name, color, folder_id, created_at)
+          `INSERT OR IGNORE INTO tags (id, name, color, folder_id, created_at, line_account_id, normalized_name)
            VALUES ${values}
            RETURNING id`,
         )
@@ -798,13 +870,15 @@ export async function createTagsBulk(
         .run<{ id: string }>();
       const insertedIds = new Set((inserted.results ?? []).map((row) => row.id));
       prepared.forEach((row, index) => {
+        if (legacyNullNames.has(row.normalizedName)) return;
         results[offset + index] = insertedIds.has(row.id)
           ? { status: 'created', tagId: row.id }
           : { status: 'skipped' };
       });
     } catch (error) {
       console.error(`createTagsBulk rows ${offset + 1}-${offset + chunk.length} error:`, error);
-      prepared.forEach((_row, index) => {
+      prepared.forEach((row, index) => {
+        if (legacyNullNames.has(row.normalizedName)) return;
         results[offset + index] = { status: 'failed' };
       });
     }
@@ -852,11 +926,14 @@ export async function updateTag(
   id: string,
   input: { name?: string; color?: string; isStarred?: boolean },
 ): Promise<Tag | null> {
+  const current = await db.prepare(`SELECT * FROM tags WHERE id = ?`).bind(id).first<Tag>();
+  if (!current) return null;
   const sets: string[] = [];
   const binds: unknown[] = [];
   if (input.name !== undefined) {
-    sets.push('name = ?');
-    binds.push(input.name);
+    await assertTagNameAvailable(db, input.name, current.line_account_id ?? null, id);
+    sets.push('name = ?', 'normalized_name = ?');
+    binds.push(input.name, normalizeTagNameForCleanup(input.name));
   }
   if (input.color !== undefined) {
     sets.push('color = ?');
@@ -867,6 +944,8 @@ export async function updateTag(
     binds.push(input.isStarred ? 1 : 0);
   }
   if (sets.length > 0) {
+    sets.push('version = version + 1', 'updated_at = ?');
+    binds.push(jstNow());
     await db
       .prepare(`UPDATE tags SET ${sets.join(', ')} WHERE id = ?`)
       .bind(...binds, id)
