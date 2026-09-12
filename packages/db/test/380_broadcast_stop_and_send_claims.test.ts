@@ -129,6 +129,66 @@ describe('380 一斉配信の停止と送達台帳', () => {
       const recovered = raw.prepare(`SELECT batch_offset FROM broadcasts WHERE id = 'b1'`).get() as { batch_offset: number };
       expect(recovered.batch_offset).toBe(0);
     });
+
+    /*
+     * 停滞ロックの復旧は**3本ある**（未着手 / dedup の途中 / 差し込みありの絞り込み）。
+     * 上の試験が見張っているのは1本目だけで、2本目と3本目の `stopped_at IS NULL` は
+     * 外しても誰も気づかなかった（PR #1612 の独立審査で指摘）。
+     *
+     * 実害は今のところ出ない——ロックは解けるが `getQueuedBroadcasts` 側の
+     * 絞り込みが独立に止めるので送信までは進まない。**それでも見張る。**
+     * 停止の効き目が実質1か所にぶら下がっている状態で、そこが将来動いたときに
+     * 気づけなくなるため。
+     *
+     * どちらの試験も「止めていなければ復旧する」ところまで測る。測らないと、
+     * そもそもどの UPDATE にも当たらない行を置いて緑になっていても分からない。
+     */
+    it('停止した dedup 途中の配信は、停滞ロックの復旧で生き返らない', async () => {
+      // success_count > 0 かつ dedup_progress あり = 復旧の2本目が拾う形。
+      // success_count = 0 ではないので1本目には当たらない。
+      raw.prepare(
+        `INSERT INTO broadcasts
+           (id, title, message_type, message_content, target_type, status, line_account_id,
+            batch_offset, batch_lock_at, success_count, dedup_progress, account_ids,
+            stopped_at, created_at)
+         VALUES ('bc-dedup', 'お知らせ', 'text', 'こんにちは', 'multi-account-dedup', 'sending', 'account-1',
+                 -1, '2020-01-01T00:00:00.000', 5, '{"sentIdentKeys":[]}', '["account-1"]',
+                 '2026-09-11T10:00:00.000', '2026-09-11T09:00:00.000')`,
+      ).run();
+
+      await recoverStalledBroadcasts(db);
+      const stopped = raw.prepare(`SELECT batch_offset FROM broadcasts WHERE id = 'bc-dedup'`).get() as { batch_offset: number };
+      expect(stopped.batch_offset, '停止中なので復旧の対象にならない').toBe(-1);
+
+      // 止めていなければ復旧する（この行がそもそも2本目に当たることの確認）。
+      raw.prepare(`UPDATE broadcasts SET stopped_at = NULL WHERE id = 'bc-dedup'`).run();
+      await recoverStalledBroadcasts(db);
+      const resumed = raw.prepare(`SELECT batch_offset FROM broadcasts WHERE id = 'bc-dedup'`).get() as { batch_offset: number };
+      expect(resumed.batch_offset, '止めていなければ復旧の対象になる').toBe(0);
+    });
+
+    it('停止した差し込みあり配信は、停滞ロックの復旧で生き返らない', async () => {
+      // 差し込み（{{name}}）ありの絞り込み = 復旧の3本目が拾う形。
+      // dedup ではないので2本目、success_count > 0 なので1本目には当たらない。
+      raw.prepare(
+        `INSERT INTO broadcasts
+           (id, title, message_type, message_content, target_type, status, line_account_id,
+            batch_offset, batch_lock_at, success_count, segment_conditions,
+            stopped_at, created_at)
+         VALUES ('bc-pers', 'お知らせ', 'text', '{{name}} さんへ', 'tag', 'sending', 'account-1',
+                 -1, '2020-01-01T00:00:00.000', 5, '{"operator":"AND","rules":[]}',
+                 '2026-09-11T10:00:00.000', '2026-09-11T09:00:00.000')`,
+      ).run();
+
+      await recoverStalledBroadcasts(db);
+      const stopped = raw.prepare(`SELECT batch_offset FROM broadcasts WHERE id = 'bc-pers'`).get() as { batch_offset: number };
+      expect(stopped.batch_offset, '停止中なので復旧の対象にならない').toBe(-1);
+
+      raw.prepare(`UPDATE broadcasts SET stopped_at = NULL WHERE id = 'bc-pers'`).run();
+      await recoverStalledBroadcasts(db);
+      const resumed = raw.prepare(`SELECT batch_offset FROM broadcasts WHERE id = 'bc-pers'`).get() as { batch_offset: number };
+      expect(resumed.batch_offset, '止めていなければ復旧の対象になる').toBe(0);
+    });
   });
 
   describe('送達台帳', () => {
