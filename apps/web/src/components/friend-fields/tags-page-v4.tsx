@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ArrowDown, ArrowUp, MoreHorizontal, Palette, Pencil, Trash2 } from 'lucide-react'
@@ -19,6 +19,7 @@ import FriendFieldList from './field-list'
 import SupportMarkList from './mark-list'
 import SavedSearchList from './saved-search-list'
 import TagCsvImportDialog from './tag-csv-import-dialog'
+import { isCurrentTagListRequest, type TagListRequestKey } from './tag-list-state'
 
 const TABS = [
   ['tags', 'タグ'],
@@ -102,7 +103,9 @@ function FolderSelect({ tag, groups, onItemsChange, onError }: { tag: Tag; group
         className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
       >
         <option value="">未分類</option>
-        {groups.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+        {groups
+          .filter((item) => item.accountId === tag.lineAccountId)
+          .map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
       </select>
     </span>
   )
@@ -253,10 +256,10 @@ const QUICK_FILTERS: Array<[string, string]> = [
 const cardShadow = '[box-shadow:1px_1px_1px_rgba(15,23,42,0.14)]'
 
 export const FRIEND_ATTRIBUTES_QA_GROUPS: TagGroup[] = [
-  { id: 'qa-vip', name: 'VIP', sortOrder: 0, color: '#F59E0B', createdAt: '', updatedAt: '' },
-  { id: 'qa-pet', name: 'ペット', sortOrder: 1, color: '#EC4899', createdAt: '', updatedAt: '' },
-  { id: 'qa-member', name: '会員', sortOrder: 2, color: '#10B981', createdAt: '', updatedAt: '' },
-  { id: 'qa-purchase', name: '購入', sortOrder: 3, color: '#3B82F6', createdAt: '', updatedAt: '' },
+  { id: 'qa-vip', accountId: null, name: 'VIP', sortOrder: 0, color: '#F59E0B', createdAt: '', updatedAt: '' },
+  { id: 'qa-pet', accountId: null, name: 'ペット', sortOrder: 1, color: '#EC4899', createdAt: '', updatedAt: '' },
+  { id: 'qa-member', accountId: null, name: '会員', sortOrder: 2, color: '#10B981', createdAt: '', updatedAt: '' },
+  { id: 'qa-purchase', accountId: null, name: '購入', sortOrder: 3, color: '#3B82F6', createdAt: '', updatedAt: '' },
 ]
 
 export const FRIEND_ATTRIBUTES_QA_TAGS: Tag[] = [
@@ -298,8 +301,8 @@ function FolderList({ groups, items, countsKnown, active, onSelect, onChanged }:
     setBusy(true); setMenuError('')
     try {
       const [currentResult, otherResult] = await Promise.all([
-        api.tagGroups.update(group.id, { sortOrder: index + direction }),
-        api.tagGroups.update(other.id, { sortOrder: index }),
+        api.tagGroups.update(group.id, { sortOrder: index + direction, accountId: group.accountId }),
+        api.tagGroups.update(other.id, { sortOrder: index, accountId: other.accountId }),
       ])
       if (!currentResult.success) throw new Error(currentResult.error)
       if (!otherResult.success) throw new Error(otherResult.error)
@@ -314,7 +317,7 @@ function FolderList({ groups, items, countsKnown, active, onSelect, onChanged }:
     if (busy) return
     setBusy(true); setMenuError('')
     try {
-      const result = await api.tagGroups.delete(group.id)
+      const result = await api.tagGroups.delete(group.id, group.accountId)
       if (!result.success) throw new Error(result.error)
       if (active === group.id) onSelect('')
       setDeleteGroup(null)
@@ -607,22 +610,30 @@ export default function TagsPageV4({
   /** 「すでに整理済み」など、失敗ではない結果を出すための通知。 */
   const [notice, setNotice] = useState('')
   const [csvOpen, setCsvOpen] = useState(false)
+  const loadRequestRef = useRef<TagListRequestKey>({ accountId, generation: 0 })
 
   const load = useCallback(async () => {
     if (fixture) return
+    const request = { accountId, generation: loadRequestRef.current.generation + 1 }
+    loadRequestRef.current = request
     setStatus('loading')
     setError('')
     try {
-      const [tags, folders] = await Promise.all([api.tags.list({ withCounts: true }), api.tagGroups.list()])
+      const [tags, folders] = await Promise.all([
+        api.tags.list({ withCounts: true, accountId }),
+        api.tagGroups.list(accountId),
+      ])
+      if (!isCurrentTagListRequest(loadRequestRef.current, request)) return
       // `success: false` を黙って捨てない。捨てると空の表を「0件」として見せる。
       if (!tags.success) throw new Error(tags.error)
       setItems(tags.data)
       if (folders.success) setGroups(folders.data)
       setStatus('ready')
     } catch (reason) {
+      if (!isCurrentTagListRequest(loadRequestRef.current, request)) return
       setStatus(reason instanceof ApiError && reason.status === 403 ? 'forbidden' : 'error')
     }
-  }, [fixture])
+  }, [fixture, accountId])
   useEffect(() => { void load() }, [load])
 
   const filtered = useMemo(() => items.filter((tag) => {

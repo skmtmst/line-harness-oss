@@ -63,7 +63,7 @@ import { applyMileageRulesForEvent } from '@line-crm/db';
 import { createBroadcastRetryKey } from '../services/broadcast-retry-key.js';
 import { dispatchAutomationEventWithLogging } from '../services/automation-triggers.js';
 import { applyActionScoreEvent } from '../services/action-score-events.js';
-import { recordConversionSourceEvent } from '../services/conversion-event-sources.js';
+import { recordConversionSourceEvent } from '@line-crm/db';
 import {
   applyFormLayoutEffects,
   checkFormGates,

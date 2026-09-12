@@ -61,7 +61,7 @@ import {
 import { awardActivityMileage } from '../services/activity-mileage.js';
 import { dispatchAutomationEventWithLogging } from '../services/automation-triggers.js';
 import { applyActionScoreEvent } from '../services/action-score-events.js';
-import { recordConversionSourceEvent } from '../services/conversion-event-sources.js';
+import { recordConversionSourceEvent } from '@line-crm/db';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import {
   finishBookingOperation,

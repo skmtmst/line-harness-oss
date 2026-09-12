@@ -84,7 +84,7 @@ async function fireEcV6Event(
   });
 }
 import { enqueuePostShippingFollowUps } from '../services/nen-engagement.js';
-import { recordConversionSourceEvent } from '../services/conversion-event-sources.js';
+import { recordConversionSourceEvent } from '@line-crm/db';
 import { ecFlexMessage } from '../services/ec-notification-message.js';
 import { syncNenEcTags, syncNenPetTags } from '../services/nen-tag-sync.js';
 

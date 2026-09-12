@@ -86,7 +86,9 @@ const { webinarRoutes } = await import('../routes/webinars.js');
 const { trackedLinks } = await import('../routes/tracked-links.js');
 const { ecIntegrations } = await import('../routes/ec-integrations.js');
 const { attachTagAndFireSideEffects } = await import('./friend-tag-attach.js');
-const { recordConversionSourceEvent } = await import('./conversion-event-sources.js');
+const { recordConversionSourceEvent } = await import('@line-crm/db');
+const { friends: friendsRoutes } = await import('../routes/friends.js');
+const { createAutomationActionExecutors } = await import('./automation-action-executors.js');
 
 // ---- 実 SQLite を D1 の形にかぶせる ----------------------------------------
 
@@ -267,6 +269,103 @@ describe('起点2: タグが付いた (tag_added)', () => {
     expect(countEvents('tag_added')).toBe(1);
 
     await attachTagAndFireSideEffects(db, 'friend-1', 'tag-1');
+    expect(countEvents('tag_added')).toBe(1);
+  });
+});
+
+// ---- 起点2の別の入口(#648 差し戻し) ---------------------------------------
+
+/*
+ * 「タグが付いた」は、`attachTagAndFireSideEffects` を通る経路でしか数えて
+ * いなかった。友だち詳細画面の手動タグ付けも、オートメーションの
+ * 「タグを付ける」アクションも、db の `addTagToFriend` を直に呼ぶため
+ * 0 件のままだった(独立審査 2026-09-12)。
+ *
+ * 画面の起点一覧は「タグが付いた」としか書いておらず、誰が付けたかで
+ * 数えたり数えなかったりする境界は運用者に説明できない。ここでは
+ * **本物の口を叩いて**、実際に1件数えられることを見る。
+ */
+describe('起点2の別の入口: 手動タグ付け・オートメーションのタグ付け', () => {
+  beforeEach(() => {
+    sqlite.exec(`
+      INSERT INTO tags (id, name, line_account_id) VALUES ('tag-1', 'VIP', 'account-a');
+    `);
+  });
+
+  test('友だち詳細画面の「タグを付ける」で成果が1件数えられる', async () => {
+    addPoint('tag_added');
+
+    const app = new Hono<Env>();
+    app.use('*', async (c, next) => {
+      c.set('staff', { id: 'staff-1', name: '担当', role: 'owner', readOnly: false } as never);
+      return next();
+    });
+    app.route('/', friendsRoutes);
+
+    const exec = makeExecCtx();
+    const res = await app.fetch(
+      new Request('https://worker.example.test/api/friends/friend-1/tags', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tagId: 'tag-1' }),
+      }),
+      env(),
+      exec.ctx,
+    );
+    await exec.drain();
+
+    expect(res.status).toBe(201);
+    expect(countEvents('tag_added')).toBe(1);
+  });
+
+  test('オートメーションの「タグを付ける」アクションで成果が1件数えられる', async () => {
+    addPoint('tag_added');
+
+    const executors = createAutomationActionExecutors();
+    await executors.add_tag({
+      db,
+      runId: 'run-1',
+      lineAccountId: 'account-a',
+      automationId: 'auto-1',
+      automationVersionId: 'auto-v1',
+      friendId: 'friend-1',
+      sourceEventId: 'evt-1',
+      inputEvent: {},
+      action: { type: 'add_tag', params: { tagId: 'tag-1' } },
+      stepExecutionId: 'step-1',
+      idempotencyKey: 'idem-1',
+      attemptNumber: 1,
+      commonActionVersionId: null,
+      isTest: false,
+    } as never);
+
+    expect(countEvents('tag_added')).toBe(1);
+  });
+
+  test('同じタグを二度付けても増えない(2度目は付与そのものが起きない)', async () => {
+    addPoint('tag_added');
+
+    const executors = createAutomationActionExecutors();
+    const context = {
+      db,
+      runId: 'run-1',
+      lineAccountId: 'account-a',
+      automationId: 'auto-1',
+      automationVersionId: 'auto-v1',
+      friendId: 'friend-1',
+      sourceEventId: 'evt-1',
+      inputEvent: {},
+      action: { type: 'add_tag', params: { tagId: 'tag-1' } },
+      stepExecutionId: 'step-1',
+      idempotencyKey: 'idem-1',
+      attemptNumber: 1,
+      commonActionVersionId: null,
+      isTest: false,
+    } as never;
+
+    await executors.add_tag(context);
+    await executors.add_tag(context);
+
     expect(countEvents('tag_added')).toBe(1);
   });
 });

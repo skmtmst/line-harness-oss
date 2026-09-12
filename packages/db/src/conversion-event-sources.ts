@@ -1,4 +1,4 @@
-import { trackConversion } from '@line-crm/db';
+import { trackConversion } from './conversions.js';
 
 /**
  * コンバージョン起点 → 実イベントの接続口。
@@ -10,6 +10,16 @@ import { trackConversion } from '@line-crm/db';
  *
  * 失敗しても呼び出し元の業務処理は巻き添えにしない。呼び出し側は
  * executionCtx.waitUntil(it) で best-effort 実行すること。
+ *
+ * **なぜ apps/worker ではなく packages/db に置くか(#648 の差し戻し)。**
+ * 「タグが付いた」を数える口を worker のサービスに置いたところ、
+ * `attachTagAndFireSideEffects` を通る経路でしか数えられず、友だち詳細画面の
+ * 手動タグ付けやオートメーションのタグ付けアクション(いずれも db の
+ * `addTagToFriend` を直に呼ぶ)では 0 件のままだった。マイル加算が経路を
+ * 問わず効いているのは、`addTagToFriend` の中(= db の層)で積んでいるため。
+ * 成果計測も同じ層へ下ろすことで、呼び出し元を1つも触らずに全経路へ届く。
+ * この関数が外から使うのは同じ package の trackConversion だけで、
+ * worker のものは1つも使わない。
  */
 
 /** 画面で選べる6起点。conversions.ts の DEFINITION_SOURCE_TYPES と一致させる。 */
@@ -49,8 +59,15 @@ export interface ConversionSourceResult {
   skipped: 'unknown_source' | 'invalid_input' | 'friend_not_found' | 'account_mismatch' | null;
 }
 
-interface ConversionPointRow {
-  id: string;
+/**
+ * 友だち1行と、その友だちで数えられる地点を1文で引いた結果。
+ *
+ * 地点が無いときも友だちの行は返る(LEFT JOIN)。そのとき point_id は NULL に
+ * なるので、「友だちが居ない」と「地点が無い」を1回の往復で見分けられる。
+ */
+interface FriendPointRow {
+  friend_account_id: string | null;
+  point_id: string | null;
 }
 
 function idempotencyKey(sourceType: string, sourceEventId: string): string {
@@ -84,36 +101,54 @@ export async function recordConversionSourceEvent(
     return { ...empty, skipped: 'invalid_input' };
   }
 
-  // 友だちの所属でアカウント境界を確かめる。申告アカウントと違う友だちは数えない。
-  const friend = await db
-    .prepare('SELECT line_account_id FROM friends WHERE id = ?')
-    .bind(event.friendId)
-    .first<{ line_account_id: string | null }>();
-  if (!friend) return { ...empty, skipped: 'friend_not_found' };
-  const accountId = event.lineAccountId?.trim() || friend.line_account_id;
-  if (!accountId || friend.line_account_id !== accountId) {
+  /*
+   * 友だちの所属と、数えられる地点を **1回の往復で** 引く(#648 の差し戻し)。
+   *
+   * この関数はタグが1本新しく付くたびに走る。友だちを引いてから地点を引く
+   * 2回の形だと、一括タグ付けで N 件付けたときに 2N 回の往復になる。
+   * LEFT JOIN 1本にすると N 回で済む。
+   *
+   * 地点の絞り込み(停止中を外す・起点の一致・アカウントの一致)は
+   * **この SQL が正本**。アカウントは友だちの所属で突き合わせる。
+   * 申告アカウントとの食い違いは、行を受け取ったあとで弾く(下)。
+   *
+   * compound SELECT(UNION 系)は使っていないので、D1 の上限5項には触れない。
+   */
+  const rows = await db
+    .prepare(
+      `SELECT f.line_account_id AS friend_account_id,
+              cp.id             AS point_id
+         FROM friends f
+         LEFT JOIN conversion_points cp
+                ON cp.event_type = ?
+               AND cp.status = 'active'
+               AND (cp.line_account_id IS NULL OR cp.line_account_id = f.line_account_id)
+        WHERE f.id = ?`,
+    )
+    .bind(event.sourceType, event.friendId)
+    .all<FriendPointRow>();
+
+  const found = rows.results;
+  if (found.length === 0) return { ...empty, skipped: 'friend_not_found' };
+
+  // 申告アカウントと違う友だちは数えない。申告が無いときは友だちの所属を使う。
+  const friendAccountId = found[0].friend_account_id;
+  const accountId = event.lineAccountId?.trim() || friendAccountId;
+  if (!accountId || friendAccountId !== accountId) {
     return { ...empty, skipped: 'account_mismatch' };
   }
 
-  // 計測中の地点だけ拾う。停止中は除外し、アカウント未指定の地点は全店共通として拾う。
-  const points = await db
-    .prepare(
-      `SELECT id FROM conversion_points
-        WHERE event_type = ?
-          AND status = 'active'
-          AND (line_account_id IS NULL OR line_account_id = ?)`,
-    )
-    .bind(event.sourceType, accountId)
-    .all<ConversionPointRow>();
+  const points = found.filter((row): row is FriendPointRow & { point_id: string } =>
+    row.point_id !== null);
 
   const key = idempotencyKey(event.sourceType, event.sourceEventId);
   const metadata = JSON.stringify({ sourceType: event.sourceType, ...(event.metadata ?? {}) });
   let recorded = 0;
   let failed = 0;
-  for (const point of points.results) {
+  for (const point of points) {
     try {
       await trackConversion(db, {
-        conversionPointId: point.id,
+        conversionPointId: point.point_id,
         friendId: event.friendId,
         metadata,
         idempotencyKey: key,
@@ -123,10 +158,10 @@ export async function recordConversionSourceEvent(
       failed += 1;
       console.error('conversion source record failed:', {
         sourceType: event.sourceType,
-        conversionPointId: point.id,
+        conversionPointId: point.point_id,
         reason: error instanceof Error ? error.message : 'unknown',
       });
     }
   }
-  return { matched: points.results.length, recorded, failed, skipped: null };
+  return { matched: points.length, recorded, failed, skipped: null };
 }

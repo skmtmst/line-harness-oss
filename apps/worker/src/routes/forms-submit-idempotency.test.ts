@@ -101,6 +101,9 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('@line-crm/db', () => ({
+  // #648: 成果計測は packages/db へ移した。この差し替えに書き出しが無いと、
+  // 呼び出し口が 500 になる。数えること自体は実DBの試験で見ている。
+  recordConversionSourceEvent: vi.fn(async () => ({ matched: 0, recorded: 0, failed: 0, skipped: null })),
   getForms: vi.fn(),
   getFormsWithStats: vi.fn(),
   getFormById: mocks.getFormById,

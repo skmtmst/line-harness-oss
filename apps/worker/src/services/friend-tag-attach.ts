@@ -17,7 +17,7 @@ import {
 } from '@line-crm/db';
 import { fireEvent } from './event-bus.js';
 import { pushImmediateFirstStep, type ImmediatePushContext } from './immediate-first-step.js';
-import { recordConversionSourceEvent } from './conversion-event-sources.js';
+import { recordConversionSourceEvent } from '@line-crm/db';
 
 // friend に tag を attach し、`POST /api/friends/:id/tags` と同じ side effects を発火する。
 // side effects: tag_added シナリオ enrollment + tag_change イベント (automation/webhook/scoring 用)。
