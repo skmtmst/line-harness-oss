@@ -52,7 +52,7 @@ const NOT_YET: Record<string, number> = {}
 
 describe('素の <select> を画面に書かない', () => {
   it('全ページを読めている', () => {
-    expect(PAGES.length).toBe(148)  // 2026-09-13: 統括のメンバー管理・お問い合わせ・課金プラン（/hq/members、/hq/support、/hq/billing）を足した実測値。
+    expect(PAGES.length).toBe(153)  // 2026-09-13: 統括のメンバー管理・お問い合わせ・課金プラン（/hq/members、/hq/support、/hq/billing）を足した実測値。  // 2026-09-13: 会員登録（/register、/register/sent、/register/complete）とパスワード再設定（/password/forgot、/password/reset）を足して 153。
   })
 
   it('表に無い画面は素の <select> を持たない', () => {

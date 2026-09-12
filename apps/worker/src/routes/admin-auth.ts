@@ -11,17 +11,14 @@ import {
   csrfCookie,
   csrfTokenFromCookie,
   expiredCookie,
-  SESSION_MAX_AGE,
   sha256Hex,
 } from '../middleware/auth.js';
+import { clientIp, issueSession, randomToken, startTwoFactorChallenge, twoFactorLoginUrl, twoFactorRequired } from '../services/admin-session.js';
 import { resolveAdminAuthConfig } from '../middleware/admin-auth-config.js';
 import { recordLoginAudit } from '@line-crm/db';
 import {
-  createAdminSession,
-  createTwoFactorChallenge,
   claimStaffTotpStep,
   deleteAdminSession,
-  deleteExpiredTwoFactorChallenges,
   deleteTwoFactorChallenge,
   getStaffById,
   getStaffByInviteTokenHash,
@@ -40,16 +37,7 @@ const OAUTH_NONCE_COOKIE = 'lh_line_nonce';
 const OAUTH_VERIFIER_COOKIE = 'lh_line_verifier';
 const OAUTH_INVITE_COOKIE = 'lh_line_invite';
 const OAUTH_MAX_AGE = 600;
-const TWO_FACTOR_CHALLENGE_MAX_AGE = 5 * 60 * 1000;
 const TWO_FACTOR_MAX_ATTEMPTS = 5;
-
-function randomToken(bytes = 32): string {
-  const value = new Uint8Array(bytes);
-  crypto.getRandomValues(value);
-  let binary = '';
-  for (const byte of value) binary += String.fromCharCode(byte);
-  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
-}
 
 function oauthCookie(name: string, value: string, maxAge = OAUTH_MAX_AGE): string {
   return `${name}=${encodeURIComponent(value)}; Path=/api/auth/line; HttpOnly; Secure; SameSite=Lax; Max-Age=${maxAge}`;
@@ -74,24 +62,6 @@ function adminLoginUrl(c: Context<Env>, error?: string): string {
   const base = c.env.ADMIN_PUBLIC_URL?.replace(/\/+$/, '');
   if (!base) throw new Error('ADMIN_PUBLIC_URL is not configured');
   return `${base}/login${error ? `?error=${encodeURIComponent(error)}` : ''}`;
-}
-
-function twoFactorLoginUrl(c: Context<Env>, challengeToken: string): string {
-  const base = c.env.ADMIN_PUBLIC_URL?.replace(/\/+$/, '');
-  if (!base) throw new Error('ADMIN_PUBLIC_URL is not configured');
-  const url = new URL(`${base}/login/two-factor`);
-  url.hash = new URLSearchParams({ lh_2fa: challengeToken }).toString();
-  return url.toString();
-}
-
-async function issueSession(c: Context<Env>, staffId: string, sameSite: 'Strict' | 'Lax' | 'None') {
-  const sessionToken = randomToken();
-  const expiresAt = new Date(Date.now() + SESSION_MAX_AGE * 1000).toISOString();
-  await createAdminSession(c.env.DB, await sha256Hex(sessionToken), staffId, expiresAt);
-  const csrfToken = randomToken();
-  c.header('Set-Cookie', adminSessionCookie(sessionToken, sameSite), { append: true });
-  c.header('Set-Cookie', csrfCookie(csrfToken, sameSite), { append: true });
-  return { csrfToken, sessionToken };
 }
 
 adminAuth.get('/api/auth/line', async (c) => {
@@ -204,16 +174,9 @@ adminAuth.get('/api/auth/line/callback', async (c) => {
 
     const config = resolveAdminAuthConfig(c.env, { requestOrigin: new URL(c.req.url).origin });
     if (config.misconfigured) return c.redirect(adminLoginUrl(c, 'configuration_error'));
-    if (staff.totp_enabled_at && staff.totp_secret_enc) {
+    if (twoFactorRequired(staff)) {
       if (!c.env.TOTP_ENCRYPTION_KEY) return c.redirect(adminLoginUrl(c, 'configuration_error'));
-      const challengeToken = randomToken();
-      await deleteExpiredTwoFactorChallenges(c.env.DB, new Date().toISOString());
-      await createTwoFactorChallenge(
-        c.env.DB,
-        await sha256Hex(challengeToken),
-        staff.id,
-        new Date(Date.now() + TWO_FACTOR_CHALLENGE_MAX_AGE).toISOString(),
-      );
+      const challengeToken = await startTwoFactorChallenge(c, staff.id);
       return c.redirect(twoFactorLoginUrl(c, challengeToken));
     }
     const session = await issueSession(c, staff.id, config.sameSite);
@@ -311,21 +274,6 @@ adminAuth.post('/api/auth/two-factor/verify', async (c) => {
  * turning the silent "login breaks after deploy" failure into an actionable
  * configuration error.
  */
-/**
- * 接続元のIP。
- *
- * Cloudflare が付けるヘッダを優先する。前段のプロキシが入る構成でも
- * 何かしら残るよう、順に見て最初に見つかったものを使う。
- */
-function clientIp(c: { req: { header: (name: string) => string | undefined } }): string | null {
-  return (
-    c.req.header('cf-connecting-ip') ||
-    c.req.header('x-forwarded-for')?.split(',')[0]?.trim() ||
-    c.req.header('x-real-ip') ||
-    null
-  );
-}
-
 adminAuth.post('/api/auth/login', async (c) => {
   const config = resolveAdminAuthConfig(c.env, { requestOrigin: new URL(c.req.url).origin });
   if (config.misconfigured) {

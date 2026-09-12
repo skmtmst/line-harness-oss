@@ -21,6 +21,8 @@ export interface StaffMember {
   totp_pending_secret_enc: string | null;
   totp_enabled_at: string | null;
   totp_last_used_step: number | null;
+  password_hash?: string | null;
+  password_updated_at?: string | null;
   assigned_line_account_id?: string | null;
   can_access_descendant_accounts?: number;
   account_scope?: 'all' | 'accounts';
@@ -65,6 +67,8 @@ export interface UpdateStaffInput {
   totp_pending_secret_enc?: string | null;
   totp_enabled_at?: string | null;
   totp_last_used_step?: number | null;
+  password_hash?: string | null;
+  password_updated_at?: string | null;
   assigned_line_account_id?: string | null;
   can_access_descendant_accounts?: boolean;
   account_scope?: 'all' | 'accounts';
@@ -193,6 +197,8 @@ export async function updateStaffMember(
   if (input.totp_pending_secret_enc !== undefined) { sets.push('totp_pending_secret_enc = ?'); values.push(input.totp_pending_secret_enc); }
   if (input.totp_enabled_at !== undefined) { sets.push('totp_enabled_at = ?'); values.push(input.totp_enabled_at); }
   if (input.totp_last_used_step !== undefined) { sets.push('totp_last_used_step = ?'); values.push(input.totp_last_used_step); }
+  if (input.password_hash !== undefined) { sets.push('password_hash = ?'); values.push(input.password_hash); }
+  if (input.password_updated_at !== undefined) { sets.push('password_updated_at = ?'); values.push(input.password_updated_at); }
   if (input.assigned_line_account_id !== undefined) { sets.push('assigned_line_account_id = ?'); values.push(input.assigned_line_account_id); }
   if (input.can_access_descendant_accounts !== undefined) { sets.push('can_access_descendant_accounts = ?'); values.push(input.can_access_descendant_accounts ? 1 : 0); }
   if (input.account_scope !== undefined) { sets.push('account_scope = ?'); values.push(input.account_scope); }

@@ -10,13 +10,14 @@ import StoreSelectionGate from './store-selection-gate'
 import AppTopBar from './shell/app-top-bar'
 import { PageChromeProvider, usePageChrome } from './shell/page-chrome'
 import styles from './app-shell.module.css'
+import { isPublicAuthPath } from '@/lib/auth-email'
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const isFriendAttributesV2 = pathname === '/tags-v2' || pathname === '/visual-qa/friend-attributes-v2'
   const isFriendAttributesV3 = pathname === '/tags-v3' || pathname === '/visual-qa/friend-attributes-v3'
 
-  if (pathname === '/login' || pathname === '/login/two-factor') {
+  if (isPublicAuthPath(pathname)) {
     return <>{children}</>
   }
 

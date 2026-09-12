@@ -130,6 +130,7 @@ import { tenants } from './routes/tenants.js';
 import { hqBanners } from './routes/hq-banners.js';
 import { hqSupport } from './routes/hq-support.js';
 import { hqBilling } from './routes/hq-billing.js';
+import { authEmail } from './routes/auth-email.js';
 import { codexSlackEvents } from './routes/codex-slack-events.js';
 import { clientErrors } from './routes/client-errors.js';
 import { lineWebhookEvents } from './routes/line-webhook-events.js';
@@ -207,6 +208,8 @@ export type Env = {
     STRIPE_PRICE_LIGHT?: string;
     STRIPE_PRICE_STANDARD?: string;
     STRIPE_PRICE_PRO?: string;
+    /** 会員登録・パスワード再設定のロボット対策（Cloudflare Turnstile）の秘密の鍵。未設定なら登録を受け付けない。 */
+    TURNSTILE_SECRET_KEY?: string;
     TOTP_ENCRYPTION_KEY?: string;
     // AES-GCM key for credentials stored in line_accounts. Optional so a
     // missing secret does not stop unrelated Worker routes from starting.
@@ -422,6 +425,7 @@ app.route('/', tenants);
 app.route('/', hqBanners);
 app.route('/', hqSupport);
 app.route('/', hqBilling);
+app.route('/', authEmail);
 app.route('/', codexSlackEvents);
 app.route('/', clientErrors);
 app.route('/', lineWebhookEvents);

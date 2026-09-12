@@ -13,14 +13,16 @@ Pencil: `V6正本.pen` ★V6 36 系 5 画面。行は Y=224179（35 系の右）
 
 `docs/v6-common-rules.md` §1-2 の「メニュー下端に何も置かない」は、統括の画面だけ例外とした（同日改訂）。
 
-## 0-1. 実装の状態（2026-09-13、PR「codex/masato-hq-account-menu」「codex/masato-billing」）
+## 0-1. 実装の状態（2026-09-13、PR「codex/masato-hq-account-menu」「codex/masato-billing」「codex/masato-registration」）
 
 | 画面 | ルート | 状態 |
 |---|---|---|
 | 36-1 アカウントメニュー | 統括の全画面（`components/hq/account-menu.tsx`） | 実装。プランの札（無料トライアル／プラン名／支払いを確認中／トライアル終了／契約終了）と残り日数は `GET /api/hq/billing/summary` から。課金対象外（既存の統括）は役割の札。**「プロフィールを編集」はまだ置かない**（出す＝使える）。課金プランの項目は担当者には出さない |
 | 36-2 課金プラン | `/hq/billing` | 実装（PR4）。契約状況の帯 → プラン 3 枚 → 注記 → 支払い履歴。申込は `POST /api/hq/billing/checkout`（オーナーのみ）→ Stripe Checkout、支払い方法・解約は `POST /api/hq/billing/portal`（オーナー・管理者）→ Stripe ポータル。Webhook は `POST /api/hq/billing/webhook`（`STRIPE_BILLING_WEBHOOK_SECRET` で検証、`billing_events` で二重処理を防ぐ）。**既存の統括は `plan_status='exempt'` のままで何も変わらない**。金額は Stripe の価格が取れればそれ、取れなければ仮（税込表示）。プロは「相談する」（お問い合わせへ） |
 | 36-3 お問い合わせ | `/hq/support` | 実装。送ると `hq_support_requests` に残り、運営（`SUPPORT_NOTIFY_EMAIL`、無ければ `CONTACT_EMAIL`）へメール、送信者へ控え。**店舗の受信箱（support-inbox）には入れない**（相手も向きも違うため別の表にした）。閲覧のみの権限は更新ができない決まりなので送れない（権限表の「閲覧のみ: 可」はここで直す） |
-| 36-4 会員登録 | — | 未実装（PR5）。登録時に `plan_status='trialing'`・`trial_ends_at=登録+30日` を入れる |
+| 36-4 会員登録 | `/register` → `/register/sent` → `/register/complete?token=` | 実装（PR5）。**メールだけ入れる → 本登録 URL をメールで送る → URL の先で会社名・名前・パスワード → 統括（`plan_status='trialing'`、`trial_ends_at=+30日`）とオーナー権限者を作ってそのまま `/hq` へ**（決定 2026-09-13）。誰でも登録できる。守り: Cloudflare Turnstile、同じブラウザの 2 回目は断る（印を localStorage と Cookie に置く）、同じ接続元 5 件/日・同じメール 3 件/日、登録済みメールでも返事は同じ（本人にだけ案内メール）。詳細は `docs/hq-signup-and-password-login.md` |
+| 0-1 ログイン | `/login` | 改修（PR5）。メール＋パスワードが主、LINE ログインが副。二段階認証の人は既存の 6 桁コードの画面へ。既存の権限者は今までどおり LINE で入れる |
+| 36-6 パスワード再設定 | `/password/forgot` → `/password/reset?token=` | 実装（PR5）。Turnstile 付きで依頼、URL は 1 時間・1 回限り。設定するとその人のセッションはすべて失効。LINE だけの権限者もここからパスワードを持てる |
 | 36-5 メンバー管理 | `/hq/members`（`?tab=tenant` で統括の情報） | 実装。旧 `/hq/settings` は転送。招待の有効期限は API どおり **48時間**（設計の「7日」は Pencil も直した）。最終ログインは `GET /api/staff/last-logins`、再送は `POST /api/staff/:id/resend-invite` |
 
 統括メニューから「設定」を外した。
@@ -32,7 +34,12 @@ Pencil: `V6正本.pen` ★V6 36 系 5 画面。行は Y=224179（35 系の右）
 | 1 | 36-1 アカウントメニューを開く | `qAvlC` | ログイン中のアカウント `X6G9j6`、アカウントメニュー `bfhe6` |
 | 2 | 36-2 課金プラン | `q7FP5k` | メイン `rTvC9`、契約状況の帯 `G8n7TD`、プラン一覧 `na3K3`、支払い履歴 |
 | 3 | 36-3 お問い合わせ | `X6LZP` | メイン `bg0zu`、問い合わせフォーム `hAh52`、右側（送信者・これまでの問い合わせ）、下部追従バー `kgFxH` |
-| 4 | 36-4 会員登録 | `KYwCv` | 登録カード `u1UePl` |
+| 4 | 36-4 会員登録（メール入力） | `JBd7P` | 登録カード `NIOtl`（旧 `KYwCv`／`u1UePl` は 2026-09-13 に作り直した） |
+| 4-A | 36-4-A 確認メールを送りました | `q32Ao` | 登録カード `r7JPOa` |
+| 4-B | 36-4-B 本登録 | `jk88n` | 登録カード `oVX3x` |
+| 0 | 0-1 ログイン（★V6） | `UufG8` | ログインカード `m3tWJ` |
+| 6-A | 36-6-A パスワードを忘れた | `fmDeV` | 再設定依頼カード `dVI5v` |
+| 6-B | 36-6-B パスワードの再設定 | `KN3y1` | 再設定カード `fWkBE` |
 | 5 | 36-5 メンバー管理 | `CRL4w` | メイン `d6qWV`、数値カード帯 `kCaRU`、権限者の表 `nLVwc` |
 
 ## 2. 達成すること
@@ -67,11 +74,13 @@ Pencil: `V6正本.pen` ★V6 36 系 5 画面。行は Y=224179（35 系の右）
 - 下部追従バー: 左に控えの案内、中央に「内容をクリア」「送信する」
 - 送信すると `support-inbox` の既存の受信箱へ入り、運営に通知される。送信者には控えメール
 
-### 36-4 会員登録（`KYwCv`）
+### 36-4 会員登録（`JBd7P` → `q32Ao` → `jk88n`）
 
-- 中央カード 520px: ロゴ、「無料で始める」、会社名・統括名、あなたの名前、メール、パスワード（8文字以上・英数）、確認、同意、主ボタン「無料で始める」、ログインへの導線、フッター（規約・プライバシー・特商法・お問い合わせ）
-- 不一致・未入力はその項目の下に赤字。送信後は「確認メールを送りました」画面（別途）
-- 登録で作られるもの: 統括（tenants）、オーナー権限者（staff_members）、トライアル期限（登録日＋30日）
+- 1 歩目（`/register`）: 中央カード 520px: ロゴ、「無料で始める」、メールアドレス、ロボット対策（Turnstile）、同意、主ボタン「確認メールを送る」、ログインへの導線、フッター（規約・プライバシー・特商法・お問い合わせ。ページができるまで文字だけ）
+- 送信後（`/register/sent`）: 「確認メールを送りました」。入れたメールを出す（URL には載せず、同じタブの中だけで持ち回す）。届かないときの案内と「別のメールアドレスで送り直す」
+- 本登録（`/register/complete?token=`）: メール（確認済み・変えられない）、会社名・統括名、あなたの名前、パスワード（8文字以上・英字と数字）、確認、主ボタン「無料で始める」。不一致・未入力はその項目の下に赤字。URL が切れている・使用済みのときは理由と「もう一度メールアドレスを入力する」
+- 登録で作られるもの: 統括（tenants、トライアル期限＝登録日＋30日）、オーナー権限者（staff_members、`password_hash`、`email_verified_at`）。そのままログイン状態で `/hq` へ
+- 「1 ブラウザ 1 回」の印: 本登録の返事にある印を localStorage に残し、Worker も Cookie に置く。次の登録依頼でどちらかが一致したら「このブラウザではすでに別のメールアドレスで登録されています」。データを消す・別のブラウザでは抜けられる（Masato 了解済み）
 
 ### 36-5 メンバー管理（`CRL4w`）
 
@@ -82,7 +91,9 @@ Pencil: `V6正本.pen` ★V6 36 系 5 画面。行は Y=224179（35 系の右）
 
 ## 4. データと外部連携
 
-- 認証: 既存の API キー＋Cookie セッションに、メール＋パスワード（ハッシュ）を併存させる。既存の権限者とログイン方法は変えない
+- 認証: 既存の API キー＋Cookie セッションに、メール＋パスワード（PBKDF2-SHA256 のハッシュ、`staff_members.password_hash`、migration 292）を併存させた。既存の権限者とログイン方法は変えない。パスワードを持つ権限者のメールは重複させない（部分ユニーク索引）。メールで送る URL は `auth_email_tokens`（ハッシュだけ・1 回限り）、回数制限は `auth_throttles`（D1、再起動で消えない）
+- ロボット対策: Cloudflare Turnstile。秘密の鍵 `TURNSTILE_SECRET_KEY`（Worker secret）とサイト用の鍵 `NEXT_PUBLIC_TURNSTILE_SITE_KEY`（Web のビルド変数）。鍵が無い環境は登録と再設定を受け付けない（安全側）
+- メールの件名の呼び名は「musubo」（招待メールも含めて変更、決定 2026-09-13）
 - 統括: `tenants` に `trial_ends_at`、`plan_key`、`plan_status`、`stripe_customer_id`、`stripe_subscription_id`、`current_period_ends_at`、`plan_updated_at` を追加（追加のみ、migration 291）。`plan_status` の既定は `exempt`（課金対象外）。受け取った Webhook は `billing_events` に残す
 - 権利（いま何ができるか）: `apps/worker/src/services/billing-plans.ts` の `resolveEntitlements`。トライアル期限切れと解約は**配信（一斉配信・シナリオ・リマインダ・自動応答）とバナー生成を止め、閲覧はできる**。`past_due`（支払い失敗で Stripe が再試行中）は止めず案内だけ。判定に失敗したときは止めない（fail-open）
 - 課金: Stripe Checkout（subscription）、Customer Portal、Webhook（`checkout.session.completed` / `customer.subscription.created|updated|deleted` / `invoice.paid` / `invoice.payment_failed`）。署名検証は既存の Stripe Webhook ルートと同じ `services/stripe-signature.ts`。EC と同じ Stripe アカウントを使い、Webhook の署名シークレットだけ別（決定 2026-09-13）
@@ -113,5 +124,7 @@ Pencil: `V6正本.pen` ★V6 36 系 5 画面。行は Y=224179（35 系の右）
 
 - プランの価格と内容（仮置きのまま進める。決定 2026-09-13。正式な金額は Stripe の価格に入れる）
 - トライアル終了後の扱いは「配信と生成を止め、閲覧はできる。データは90日保持」で決定（2026-09-13）。90日後の実際の削除はまだ作っていない
-- 会員登録の公開範囲（誰でも登録できるか、招待制か）
+- 会員登録は誰でもできる（決定 2026-09-13）。招待制にするなら招待コードを足す
+- 同意欄の利用規約・プライバシーポリシー・特定商取引法のページがまだ無い。できたら `NEXT_PUBLIC_TERMS_URL` `NEXT_PUBLIC_PRIVACY_URL` `NEXT_PUBLIC_COMMERCE_LAW_URL` に入れる（それまでは文字だけ）
+- メール登録した権限者の LINE 連携（PR6、左下メニューの「プロフィールを編集」から）
 - 適格請求書の発行者と表記（Stripe の請求書設定）
