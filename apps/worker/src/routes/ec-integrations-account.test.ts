@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 
 const mocks = vi.hoisted(() => ({
+  dispatchOperatorEvent: vi.fn(),
   getAccount: vi.fn(),
   getFriend: vi.fn(),
   lineClient: vi.fn(),
@@ -19,6 +20,9 @@ vi.mock('@line-crm/db', () => ({
 }));
 vi.mock('@line-crm/line-sdk', () => ({ LineClient: mocks.lineClient }));
 vi.mock('../services/event-bus.js', () => ({ fireEvent: vi.fn(), logOutgoingMessage: vi.fn() }));
+vi.mock('../services/operator-notification-dispatch.js', () => ({
+  dispatchOperatorEvent: mocks.dispatchOperatorEvent,
+}));
 vi.mock('../services/nen-tag-sync.js', () => ({ syncNenEcTags: vi.fn(), syncNenPetTags: vi.fn() }));
 vi.mock('../services/nen-engagement.js', () => ({ enqueuePostShippingFollowUps: vi.fn() }));
 

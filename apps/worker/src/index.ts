@@ -148,6 +148,10 @@ import { lineWebhookEvents } from './routes/line-webhook-events.js';
 import { operations } from './routes/operations.js';
 import { runScheduledOperationHealthChecks } from './services/operations-health.js';
 import { processOperationNotificationOutbox } from './services/operation-notifications.js';
+import {
+  OPERATOR_NOTIFICATION_SWEEP_LIMIT,
+  sweepOperatorNotifications,
+} from './services/operator-notification-dispatch.js';
 import { reportHarnessErrorToSlack } from './services/codex-slack-relay.js';
 import { routeInboundEmail } from './services/inbound-email-router.js';
 import { deleteExpiredRestaurantRawEmails } from './services/restaurant-email-intake.js';
@@ -1519,6 +1523,35 @@ async function scheduled(
     await processOperationNotificationOutbox(env);
   } catch (error) {
     console.error('operation notification outbox error:', error);
+  }
+
+  // N-327 (#663): 公開済み運用者通知ルールの送り残しを回収する。
+  //
+  // 初回の送信は業務イベントの側で同期に行う。ここが拾うのは、そこで
+  // 落ちて retry_wait に入った行と、Worker が途中で止まって pending の
+  // まま残った行だけ。回収しないと「公開したのに届かない」が、繋がって
+  // いないからではなく溜まったままで起きる。
+  //
+  // 間隔をこの delivery レーン(5分)に載せた理由と件数の根拠は
+  // services/operator-notification-dispatch.ts の SWEEP 定数の説明にある。
+  // 1件の失敗で他のアカウントの回収を止めないよう、例外はここで止める。
+  try {
+    const result = await sweepOperatorNotifications(env.DB, env, {
+      limit: OPERATOR_NOTIFICATION_SWEEP_LIMIT,
+      now: new Date(event.scheduledTime),
+    });
+    if (result.swept > 0) {
+      console.log(JSON.stringify({
+        event: 'operator_notification_sweep',
+        swept: result.swept,
+        accepted: result.accepted,
+        excluded: result.excluded,
+        failed: result.failed,
+        pending: result.pending,
+      }));
+    }
+  } catch (error) {
+    console.error('operator notification sweep error:', error);
   }
 
   const defaultLineClient = new LineClient(env.LINE_CHANNEL_ACCESS_TOKEN);

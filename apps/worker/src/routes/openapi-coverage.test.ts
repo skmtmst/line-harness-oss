@@ -122,12 +122,13 @@ function formatKeys(keys: string[]): string {
  * - ALLOWLIST_MAX: 未記載負債はここより増やせない
  * 後続票で記載を増やしたら、実測に合わせて両方を同じ PR で更新する。
  */
-// 本流の89件に、この票の休憩4口(breaks/break-dates の GET・PUT)を足して93件。
-const DOCUMENTED_MIN = 93;
+// 本流の93件に、この票の運用者通知2口(operator-event-types の GET・operator-outbox/sweep の POST)を足して95件。
+const DOCUMENTED_MIN = 95;
 const ALLOWLIST_MAX = 777;
 
 /**
- * PR #1456 時点の記載済み 83 件＋本流で増えた 5 件＋#655 休憩 4 件の基準一覧。
+ * PR #1456 時点の記載済み 83 件＋本流で増えた 5 件＋#655 休憩 4 件
+ * ＋#663 の運用者通知 2 口の基準一覧。
  * 既存仕様を ALLOWLIST へ移して後退させる変更を落とすためのもの。
  * 件数が変わらなくても、ここにある1件が消えたら落ちる。
  * 後続票で記載を増やしたら、増えた分をここへ足す。
@@ -171,6 +172,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'GET /api/nen-campaigns/metrics/columns',
   'GET /api/nen-campaigns/metrics/flows',
   'GET /api/nen-campaigns/metrics/pets',
+  'GET /api/notifications/operator-event-types',
   'GET /api/reminders',
   'GET /api/scenarios',
   'GET /api/scenarios/{id}',
@@ -201,6 +203,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'POST /api/line-accounts',
   'POST /api/mileage/rules',
   'POST /api/nen-campaigns/deliveries/{id}/retry',
+  'POST /api/notifications/operator-outbox/sweep',
   'POST /api/scenarios',
   'POST /api/scenarios/{id}/enroll/{friendId}',
   'POST /api/scenarios/{id}/publish',

@@ -3868,7 +3868,7 @@ CREATE TABLE notification_rules (
   is_active    INTEGER NOT NULL DEFAULT 1,
   created_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-);
+, version INTEGER NOT NULL DEFAULT 1 CHECK (version > 0));
 
 CREATE TABLE notifications (
   id              TEXT PRIMARY KEY,
@@ -6600,6 +6600,15 @@ CREATE INDEX idx_operation_incidents_status_created
 
 CREATE INDEX idx_operation_notification_outbox_due
   ON operation_notification_outbox(status, next_attempt_at);
+
+CREATE UNIQUE INDEX idx_operator_notification_instance_source
+  ON notification_instances(
+    line_account_id,
+    definition_id,
+    source_event_type,
+    source_event_id
+  )
+  WHERE audience_type = 'operator';
 
 CREATE INDEX idx_outbound_send_requests_created
   ON outbound_send_requests(created_at);
