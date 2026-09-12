@@ -5019,9 +5019,9 @@ CREATE TABLE tag_groups (
   updated_at TEXT NOT NULL
 );
 
-CREATE TABLE tags (
+CREATE TABLE "tags" (
   id                          TEXT PRIMARY KEY,
-  name                        TEXT UNIQUE NOT NULL,
+  name                        TEXT NOT NULL,
   color                       TEXT NOT NULL DEFAULT '#3B82F6',
   mileage_reward              INTEGER NOT NULL DEFAULT 0 CHECK (mileage_reward >= 0),
   referral_mileage_reward     INTEGER NOT NULL DEFAULT 0 CHECK (referral_mileage_reward >= 0),
@@ -6844,6 +6844,9 @@ CREATE INDEX idx_support_marks_active
 
 CREATE INDEX idx_tag_groups_sort ON tag_groups(sort_order, id);
 
+CREATE UNIQUE INDEX idx_tags_account_exact_name
+  ON tags(line_account_id, name) WHERE line_account_id IS NOT NULL;
+
 CREATE UNIQUE INDEX idx_tags_account_normalized_name
   ON tags(line_account_id, normalized_name)
   WHERE line_account_id IS NOT NULL AND normalized_name IS NOT NULL;
@@ -6852,6 +6855,12 @@ CREATE INDEX idx_tags_account_status_name
   ON tags(line_account_id, status, name, id);
 
 CREATE INDEX idx_tags_group ON tags(group_id, name);
+
+CREATE UNIQUE INDEX idx_tags_legacy_name ON tags(name) WHERE line_account_id IS NULL;
+
+CREATE UNIQUE INDEX idx_tags_legacy_normalized_name
+  ON tags(normalized_name)
+  WHERE line_account_id IS NULL AND normalized_name IS NOT NULL;
 
 CREATE INDEX idx_tags_line_account
   ON tags(line_account_id, display_order, id);
