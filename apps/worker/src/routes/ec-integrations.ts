@@ -85,6 +85,7 @@ async function fireEcV6Event(
   });
 }
 import { enqueuePostShippingFollowUps } from '../services/nen-engagement.js';
+import { recordConversionSourceEvent } from '@line-crm/db';
 import { ecFlexMessage } from '../services/ec-notification-message.js';
 import { syncNenEcTags, syncNenPetTags } from '../services/nen-tag-sync.js';
 
@@ -521,6 +522,27 @@ ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
 
     await syncMemberSnapshot(c.env.DB, friend.id, event, now);
     await syncNenEcTags(c.env.DB, friend.id);
+
+    // 注文の確定を成果計測へ接続する(#648)。「注文が確定した」を起点に選んだ
+    // 地点は、ここを通らないと 0 件のままになる。
+    //
+    // この位置は、この後のどの出口(通知停止で skipped / 通常の processed)を
+    // 通っても必ず通る。冪等キーは EC 側の event_id なので、同じ注文の再送
+    // (台帳 claim をすり抜けた再試行を含む)でも二度数えない。
+    // 記録に失敗しても注文処理は続ける(通知を落とさない)。
+    if (event.event_type === 'ec.order.confirmed') {
+      try {
+        await recordConversionSourceEvent(c.env.DB, {
+          sourceType: 'ec_order_confirmed',
+          lineAccountId,
+          friendId: friend.id,
+          sourceEventId: event.event_id,
+          metadata: { ecEventId: event.event_id, orderNumber: event.order?.number ?? null },
+        });
+      } catch (error) {
+        console.error(`[ec-event] conversion record failed event=${event.event_id}`, error);
+      }
+    }
 
     if (event.event_type === 'ec.customer.profile_updated') {
       const { syncNenPetProfiles } = await import('../services/nen-engagement.js');

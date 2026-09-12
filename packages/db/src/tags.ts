@@ -1,5 +1,6 @@
 import { jstNow } from './utils.js';
 import { enqueueMileageEvent } from './mileage.js';
+import { recordConversionSourceEvent } from './conversion-event-sources.js';
 export interface Tag {
   id: string;
   name: string;
@@ -1095,6 +1096,25 @@ export async function deleteTagGroup(db: D1Database, id: string): Promise<void> 
   await db.prepare(`DELETE FROM folders WHERE id = ? AND kind = 'tag'`).bind(id).run();
 }
 
+/**
+ * 友だちにタグを1本付ける。新しく付いたときだけ副作用を起こす。
+ *
+ * **この関数を通らない付け方が2つある(#648)。**どちらも `friend_tags` へ直に
+ * INSERT していて、マイルも成果計測も通らない。
+ *
+ *  - `packages/db/src/tag-definitions.ts` のタグ廃止時の置き換え
+ *  - `apps/worker/src/services/nen-column-operations.ts` のコラム読了タグ
+ *
+ * **タグ廃止の置き換えは、通してはいけない。**あれは「そのタグが付いている
+ * 全員へ、置き換え先のタグを一斉に付ける」処理で、成果として数えると
+ * **運用者がタグを1本片づけただけで成果が何百件も一気に増える。**業務の
+ * 出来事ではなく、台帳の引っ越しだからである。将来この箇所をここ経由へ
+ * 書き換えるときは、成果計測を迂回する道を先に用意すること。
+ *
+ * コラム読了タグの方は「本来数えるべき」に見えるが、ここ経由にすると
+ * 成果計測と同時にマイル加算も始まり、利用者の残高が変わる。その扱いは
+ * この票の外なので別票で決める(司令塔裁定 2026-09-12)。
+ */
 export async function addTagToFriend(
   db: D1Database,
   friendId: string,
@@ -1122,6 +1142,28 @@ export async function addTagToFriend(
       });
     } catch (error) {
       console.error('tag mileage enqueue failed:', error);
+    }
+    // 「タグが付いた」を成果として数える(#648)。
+    //
+    // マイルの隣に置くのは、**呼び出し元を1つも触らずに全経路へ届かせる**ため。
+    // 以前はこの計測を worker の attachTagAndFireSideEffects の中だけに置いて
+    // いたので、友だち詳細画面の手動タグ付け・オートメーションのタグ付け
+    // アクション(どちらもこの関数を直に呼ぶ)では 0 件のままだった。
+    // 画面の起点一覧は「タグが付いた」としか書いておらず、誰が付けたかで
+    // 数えたり数えなかったりする境界は運用者に説明できない。
+    //
+    // 冪等キーは付与時刻を含む。同じ(友だち,タグ)の2回目は上の
+    // INSERT OR IGNORE が 0 行になり added=false なので、ここへ来ない。
+    // 失敗しても握って進む。タグ付与そのものを巻き添えにしない。
+    try {
+      await recordConversionSourceEvent(db, {
+        sourceType: 'tag_added',
+        friendId,
+        sourceEventId: `${friendId}:${tagId}:${now}`,
+        metadata: { tagId },
+      });
+    } catch (error) {
+      console.error('tag conversion record failed:', error);
     }
   }
   return added;

@@ -56,6 +56,12 @@ export interface Broadcast {
   message_options_json?: string | null;
   after_action_version_id?: string | null;
   lock_version?: number;
+  /** 停止を受け付けた時刻（JST）。NULL なら止まっていない。#662 */
+  stopped_at?: string | null;
+  /** 停止を押した担当者。監査で「誰が止めたか」を読むために残す。 */
+  stopped_by?: string | null;
+  /** 送信の試行番号。失敗分の再送で1つ進む。provider へ渡す再送キーの一部。 */
+  send_attempt_no?: number;
 }
 
 export async function getBroadcasts(
@@ -520,7 +526,10 @@ export async function getQueuedBroadcasts(db: D1Database): Promise<Broadcast[]> 
   // sent_at IS NULL: 完了済みは除外
   const result = await db
     .prepare(
-      `SELECT * FROM broadcasts WHERE status = 'sending' AND batch_offset >= 0 AND sent_at IS NULL AND (segment_conditions IS NOT NULL OR account_ids IS NOT NULL) ORDER BY created_at ASC`,
+      // stopped_at IS NOT NULL は停止を受け付けた配信。**新しい送信権を取らせない**
+      // ので、ここで拾わない（#662）。止めたあと再開すると stopped_at が NULL に
+      // 戻り、次の tick から続きを送る。
+      `SELECT * FROM broadcasts WHERE status = 'sending' AND batch_offset >= 0 AND sent_at IS NULL AND stopped_at IS NULL AND (segment_conditions IS NOT NULL OR account_ids IS NOT NULL) ORDER BY created_at ASC`,
     )
     .all<Broadcast>();
   return result.results;
@@ -542,6 +551,11 @@ export async function getQueuedBroadcasts(db: D1Database): Promise<Broadcast[]> 
  *    してよい。success_count > 0 だが dedup_progress=NULL の row (resume 機能 deploy 前の
  *    停滞 / 030 migration 直後の在庫) は ID 集合が無く安全に再開できないため両系統とも
  *    対象外にし、手動対応 (D1 で sent に書き換え等) に委ねる。
+ *
+ * 3 系統とも `stopped_at IS NULL` で絞る。停止中の配信はロックを持ったまま
+ * Worker が消えていても**戻さない**。戻すと次の cron が拾って送信を続け、
+ * 運用者が押した停止が黙って無効になる (#662)。停止中のロックは再開
+ * (resumeBroadcastSending) が外す。
  */
 export async function recoverStalledBroadcasts(db: D1Database): Promise<void> {
   // 進捗ゼロ (success_count=0) の lock 用。idempotency 保護が無いので長め。0.021日 ≈ 30分。
@@ -557,7 +571,7 @@ export async function recoverStalledBroadcasts(db: D1Database): Promise<void> {
     .prepare(
       `UPDATE broadcasts SET batch_offset = 0, batch_lock_at = NULL
        WHERE status = 'sending' AND batch_offset = -1
-       AND sent_at IS NULL AND success_count = 0
+       AND sent_at IS NULL AND stopped_at IS NULL AND success_count = 0
        AND (segment_conditions IS NOT NULL OR account_ids IS NOT NULL)
        AND batch_lock_at IS NOT NULL
        AND julianday('now', '+9 hours') - julianday(batch_lock_at) > ${STALL_LOCK_REVOKE_DAYS_NO_PROGRESS}`,
@@ -577,7 +591,7 @@ export async function recoverStalledBroadcasts(db: D1Database): Promise<void> {
     .prepare(
       `UPDATE broadcasts SET batch_offset = 0, batch_lock_at = NULL
        WHERE status = 'sending' AND batch_offset = -1
-       AND sent_at IS NULL
+       AND sent_at IS NULL AND stopped_at IS NULL
        AND target_type = 'multi-account-dedup'
        AND success_count > 0 AND dedup_progress IS NOT NULL
        AND batch_lock_at IS NOT NULL
@@ -594,7 +608,7 @@ export async function recoverStalledBroadcasts(db: D1Database): Promise<void> {
     .prepare(
       `UPDATE broadcasts SET batch_offset = 0, batch_lock_at = NULL
        WHERE status = 'sending' AND batch_offset = -1
-       AND sent_at IS NULL
+       AND sent_at IS NULL AND stopped_at IS NULL
        AND target_type != 'multi-account-dedup'
        AND segment_conditions IS NOT NULL
        AND instr(replace(message_content, ' ', ''), '{{name}}') > 0
@@ -674,4 +688,138 @@ export async function updateBroadcastFailedAccountIds(
   await db.prepare(`UPDATE broadcasts SET failed_account_ids = ? WHERE id = ?`)
     .bind(JSON.stringify(failedAccountIds), broadcastId)
     .run();
+}
+
+/*
+ * 送信中の一斉配信を止める／再開する／失敗した相手だけ送り直す（#662 / N-059）。
+ *
+ * どれも**版（lock_version）付きの条件付き UPDATE 1本**で決める。
+ * 読んでから書くと、2人が同時に押したときに両方が「自分が勝った」と読む。
+ * 変わった行数（changes）を見て、1 だった者だけが先へ進む。
+ *
+ * 停止は status を動かさない。status の意味（下書き→予約→送信中→送信済み）は
+ * そのままにして、「新しい送信権をもう取らない」という別の軸を stopped_at で
+ * 持つ。status を増やすと 30 列の表を作り直すことになり、既存の
+ * `status = 'sending'` の判定すべての意味が変わる。代わりに、送信中の行を
+ * **拾う口すべて**に `stopped_at IS NULL` を足してある
+ * （getQueuedBroadcasts / recoverStalledBroadcasts / バッチ取得の CAS）。
+ */
+
+export interface BroadcastStopInput {
+  id: string;
+  expectedVersion: number;
+  actorId?: string | null;
+  at?: string;
+}
+
+/** 停止を受け付ける。送信中で、まだ止まっていなくて、版が一致したときだけ 1 を返す。 */
+export async function requestBroadcastStop(
+  db: D1Database,
+  input: BroadcastStopInput,
+): Promise<number> {
+  const result = await db
+    .prepare(
+      `UPDATE broadcasts
+          SET stopped_at = ?, stopped_by = ?, lock_version = lock_version + 1
+        WHERE id = ? AND status = 'sending' AND stopped_at IS NULL AND lock_version = ?`,
+    )
+    .bind(input.at ?? jstNow(), input.actorId ?? null, input.id, input.expectedVersion)
+    .run();
+  return result.meta.changes ?? 0;
+}
+
+/**
+ * 再開する。止まっているときだけ。
+ *
+ * `batch_offset` が -1（ロック中）のまま止まった場合は 0 に戻す。台帳が
+ * 送達済み・送達不明を覚えているので、先頭から歩き直しても二重に送らない。
+ */
+export async function resumeBroadcastSending(
+  db: D1Database,
+  input: { id: string; expectedVersion: number; segmentConditions?: string | null },
+): Promise<number> {
+  const fields = [
+    'stopped_at = NULL',
+    'stopped_by = NULL',
+    'batch_lock_at = NULL',
+    'batch_offset = CASE WHEN batch_offset < 0 THEN 0 ELSE batch_offset END',
+    'lock_version = lock_version + 1',
+  ];
+  const values: unknown[] = [];
+  if (input.segmentConditions) {
+    fields.push('segment_conditions = ?');
+    values.push(input.segmentConditions);
+  }
+  values.push(input.id, input.expectedVersion);
+  const result = await db
+    .prepare(
+      `UPDATE broadcasts SET ${fields.join(', ')}
+        WHERE id = ? AND status = 'sending' AND stopped_at IS NOT NULL AND lock_version = ?`,
+    )
+    .bind(...values)
+    .run();
+  return result.meta.changes ?? 0;
+}
+
+export interface BroadcastRetryAttemptInput {
+  id: string;
+  expectedVersion: number;
+  /**
+   * キューに載せるための絞り込み条件。tag 配信をキュー経路へ移すときだけ渡す。
+   * 500人以下の tag 配信はその場で送り切る作りで、キューを通らないため、
+   * 再送では条件の印を書いてキュー側へ寄せる。
+   */
+  segmentConditions?: string | null;
+}
+
+/**
+ * 失敗した相手だけの再送を始める。試行番号を1つ進めて、キューへ戻す。
+ *
+ * 止まっている配信と、送り終わった配信のどちらからでも始められる。
+ * **誰に送るかはここでは決めない。**台帳側（reopenFailedClaims）が
+ * failed の行だけを開け直し、送信側が sent / unknown を飛ばす。
+ */
+export async function beginBroadcastRetryAttempt(
+  db: D1Database,
+  input: BroadcastRetryAttemptInput,
+): Promise<{ changes: number; attemptNo: number | null }> {
+  const fields = [
+    'send_attempt_no = send_attempt_no + 1',
+    "status = 'sending'",
+    'sent_at = NULL',
+    'stopped_at = NULL',
+    'stopped_by = NULL',
+    'batch_offset = 0',
+    'batch_lock_at = NULL',
+    'lock_version = lock_version + 1',
+  ];
+  const values: unknown[] = [];
+  if (input.segmentConditions) {
+    fields.push('segment_conditions = ?');
+    values.push(input.segmentConditions);
+  }
+  values.push(input.id, input.expectedVersion);
+  const result = await db
+    .prepare(
+      `UPDATE broadcasts SET ${fields.join(', ')}
+        WHERE id = ? AND lock_version = ?
+          AND (status = 'sent' OR (status = 'sending' AND stopped_at IS NOT NULL))`,
+    )
+    .bind(...values)
+    .run();
+  if ((result.meta.changes ?? 0) !== 1) return { changes: 0, attemptNo: null };
+  const row = await db
+    .prepare(`SELECT send_attempt_no FROM broadcasts WHERE id = ?`)
+    .bind(input.id)
+    .first<{ send_attempt_no: number }>();
+  return { changes: 1, attemptNo: Number(row?.send_attempt_no ?? 1) };
+}
+
+/** 停止の印を読む。送信の途中で「もう止まっているか」を確かめるのに使う。 */
+export async function isBroadcastStopped(db: D1Database, id: string): Promise<boolean> {
+  const row = await db
+    .prepare(`SELECT stopped_at FROM broadcasts WHERE id = ?`)
+    .bind(id)
+    .first<{ stopped_at: string | null }>();
+  return !!row?.stopped_at;
 }

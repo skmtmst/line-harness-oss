@@ -62,6 +62,7 @@ import {
 import { awardActivityMileage } from '../services/activity-mileage.js';
 import { dispatchAutomationEventWithLogging } from '../services/automation-triggers.js';
 import { applyActionScoreEvent } from '../services/action-score-events.js';
+import { recordConversionSourceEvent } from '@line-crm/db';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import {
   finishBookingOperation,
@@ -2001,6 +2002,23 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
     return c.json(response, 409);
   }
 
+  // 予約の確定を成果計測へ接続する(#648)。ここは代理登録で、入った時点で
+  // 確定(confirmed)なので、この1か所が「確定した」の起点になる。
+  // 友だちが紐づかない電話予約は数えない(成果は友だちに結びつける)。
+  if (friendId) {
+    try {
+      await recordConversionSourceEvent(c.env.DB, {
+        sourceType: 'reservation_confirmed',
+        lineAccountId: accountId,
+        friendId,
+        sourceEventId: bookingId,
+        metadata: { bookingId, bookingType: 'salon', via: 'proxy_create' },
+      });
+    } catch (error) {
+      console.error('booking conversion record failed (proxy-create):', error);
+    }
+  }
+
   let confirmationOperationId: string | null = null;
   if (sendLineConfirmation && friendId) {
     await insertConfirmationReminders(c.env.DB, {
@@ -3181,6 +3199,21 @@ booking.patch('/api/booking/admin/requests/:id', requireRole('owner', 'admin', '
       startsAt: new Date(row.starts_at),
       now: new Date(),
     });
+    // 承認による確定も同じ起点として数える(#648)。冪等キーは予約IDなので、
+    // 代理登録側と同じ予約を二重に数えることはない。
+    if (row.friend_id) {
+      try {
+        await recordConversionSourceEvent(c.env.DB, {
+          sourceType: 'reservation_confirmed',
+          lineAccountId: accountId,
+          friendId: row.friend_id,
+          sourceEventId: id,
+          metadata: { bookingId: id, bookingType: 'salon', via: 'approve' },
+        });
+      } catch (error) {
+        console.error('booking conversion record failed (approve):', error);
+      }
+    }
     try {
       await syncConfirmedBookingToGoogle(c.env.DB, googleCredentials(c.env), id);
     } catch (error) {
