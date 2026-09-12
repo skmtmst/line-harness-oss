@@ -1,13 +1,14 @@
 'use client'
 
 import { Suspense, useCallback, useEffect, useState } from 'react'
-import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import type { Tag } from '@line-crm/shared'
 import { api } from '@/lib/api'
-import Header from '@/components/layout/header'
 import BroadcastForm from '@/components/broadcasts/broadcast-form'
 import type { SegmentCondition } from '@/lib/segment-condition'
+import type { BroadcastStepKey } from '@/components/broadcasts/broadcast-steps'
+
+const BROADCAST_STEPS = new Set<BroadcastStepKey>(['basic', 'audience', 'message', 'schedule', 'confirm'])
 
 function scoreRangeCondition(params: URLSearchParams): SegmentCondition | null {
   const parse = (key: 'scoreMin' | 'scoreMax') => {
@@ -35,6 +36,19 @@ function NewBroadcastPageContent() {
   const [tags, setTags] = useState<Tag[]>([])
   const [loading, setLoading] = useState(true)
   const initialCondition = scoreRangeCondition(new URLSearchParams(searchParams.toString()))
+  const requestedStep = searchParams.get('step') as BroadcastStepKey | null
+  const currentStep: BroadcastStepKey = requestedStep && BROADCAST_STEPS.has(requestedStep) ? requestedStep : 'basic'
+  const scheduledDateParam = searchParams.get('scheduledDate') ?? ''
+  const scheduledTimeParam = searchParams.get('scheduledTime') ?? '10:00'
+  const initialScheduledDate = /^\d{4}-\d{2}-\d{2}$/.test(scheduledDateParam) ? scheduledDateParam : ''
+  const initialScheduledTime = /^\d{2}:\d{2}$/.test(scheduledTimeParam) ? scheduledTimeParam : '10:00'
+
+  const changeStep = (step: BroadcastStepKey) => {
+    const next = new URLSearchParams(searchParams.toString())
+    if (step === 'basic') next.delete('step')
+    else next.set('step', step)
+    router.replace(`/broadcasts/new${next.size ? `?${next.toString()}` : ''}`, { scroll: false })
+  }
 
   const load = useCallback(async () => {
     try {
@@ -51,16 +65,6 @@ function NewBroadcastPageContent() {
 
   return (
     <div>
-      <Header title="配信を作成" description="友だちへまとめて送るメッセージを作ります。" />
-
-      <nav className="text-ink-faint mb-4 text-xs">
-        <Link href="/broadcasts" className="hover:underline">
-          一斉配信
-        </Link>
-        <span className="mx-1.5">›</span>
-        <span>作成</span>
-      </nav>
-
       {loading ? (
         <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm">
           読み込み中...
@@ -78,6 +82,11 @@ function NewBroadcastPageContent() {
           initialTemplateId={searchParams.get('templateId')}
           initialContentTemplateId={searchParams.get('contentTemplateId')}
           initialCondition={initialCondition}
+          initialScheduledDate={initialScheduledDate}
+          initialScheduledTime={initialScheduledTime}
+          currentStep={currentStep}
+          onStepChange={changeStep}
+          visualQaAugustCampaign={searchParams.get('visualQa') === 'august-campaign'}
         />
       )}
     </div>

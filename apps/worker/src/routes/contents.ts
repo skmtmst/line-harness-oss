@@ -1,22 +1,42 @@
 import { Hono, type Context } from 'hono';
 import {
   getMedia,
+  countMedia,
   getMediaById,
-  createMedia,
+  getFolderById,
   updateMedia,
   deleteMedia,
   getMediaUsages,
   getMediaDeleteImpact,
   getMediaReplacementPlan,
   applyMediaReplacementPlan,
+  getMediaStorageQuota,
+  createMediaUploadSession,
+  getMediaUploadSession,
+  failMediaUploadSession,
+  verifyMediaUploadSession,
+  completeNewMediaUpload,
+  createMediaVersionFromUpload,
+  getCurrentMediaVersionNo,
+  MediaVersionConflictError,
   jstNow,
   getCommonVars,
-  getCommonVarUsageCounts,
+  countCommonVars,
+  COMMON_VARS_LIST_LIMIT,
+  getCommonVarUsageSummaries,
   getCommonVarById,
+  getCommonVarByIdIncludingArchived,
   createCommonVar,
   updateCommonVar,
+  CommonVarFolderError,
+  CommonVarKeyConflictError,
   deleteCommonVar,
   getCommonVarUsageImpact,
+  getCommonVarVersions,
+  getCommonVarReplacementCandidates,
+  getCommonVarReplacementPlan,
+  applyCommonVarReplacementPlan,
+  CommonVarVersionConflictError,
   getCommonVarSchedules,
   createCommonVarSchedule,
   deleteCommonVarSchedule,
@@ -29,12 +49,15 @@ import {
   type CommonVarType,
   type CommonVarUsageImpact,
   type CommonVarUsageItem,
+  type CommonVarReplacementPlan,
 } from '@line-crm/db';
 import type { CommonVarDeleteImpact, CommonVarUsageKind } from '@line-crm/shared';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
+import { auditLog } from '../lib/audit-log.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import { scanSingleMediaUsage } from '../services/media-usage-scan.js';
+import { createR2PresignedPutUrl } from '../services/r2-presigned-upload.js';
 import type { MediaReplacementImpact } from '@line-crm/shared';
 
 /**
@@ -141,6 +164,13 @@ const ALLOWED: Record<string, { kind: MediaKind; ext: string[]; maxBytes: number
   'application/pdf': { kind: 'file', ext: ['pdf'], maxBytes: 20 * 1024 * 1024 },
 };
 
+const DIRECT_ALLOWED: Record<string, { kind: MediaKind; ext: string[]; maxBytes: number }> = {
+  ...ALLOWED,
+  'video/mp4': { kind: 'video', ext: ['mp4'], maxBytes: 200 * 1024 * 1024 },
+  'audio/mpeg': { kind: 'audio', ext: ['mp3'], maxBytes: 200 * 1024 * 1024 },
+  'audio/mp4': { kind: 'audio', ext: ['m4a'], maxBytes: 200 * 1024 * 1024 },
+};
+
 /**
  * 動画の上限を 90MB にしている理由。
  *
@@ -185,6 +215,12 @@ function hasMediaSignature(bytes: Uint8Array, mimeType: string): boolean {
   }
 }
 
+/**
+ * `url` は配信用の公開URLとして返す。配信本文に文字列として埋まり、
+ * LINEのサーバーが認証なしで取りに行くため、公開のままにしている。
+ * 管理画面の表示・ダウンロードには使わず、認証付きの
+ * `/api/media/:id/content`・`/api/media/:id/download` を使う。
+ */
 function serializeMedia(row: Media, workerUrl: string) {
   return {
     id: row.id,
@@ -204,6 +240,407 @@ function serializeMedia(row: Media, workerUrl: string) {
   };
 }
 
+function directUploadConfig(env: Env['Bindings']) {
+  const accountId = env.CF_ACCOUNT_ID?.trim();
+  const accessKeyId = env.MEDIA_R2_ACCESS_KEY_ID?.trim();
+  const secretAccessKey = env.MEDIA_R2_SECRET_ACCESS_KEY?.trim();
+  const bucketName = env.MEDIA_R2_BUCKET_NAME?.trim();
+  if (!accountId || !accessKeyId || !secretAccessKey || !bucketName) return null;
+  return { accountId, accessKeyId, secretAccessKey, bucketName };
+}
+
+function normalizedEtag(value: string): string {
+  return value.trim().replace(/^"|"$/g, '');
+}
+
+async function mediaVersionPreview(
+  c: Context<Env>,
+  mediaId: string,
+  uploadSessionId: string,
+  accountId: string,
+) {
+  const [media, session, currentVersionNo] = await Promise.all([
+    getMediaById(c.env.DB, mediaId, accountId),
+    getMediaUploadSession(c.env.DB, uploadSessionId, accountId),
+    getCurrentMediaVersionNo(c.env.DB, mediaId, accountId),
+  ]);
+  if (!media || !session || currentVersionNo === null || session.target_media_id !== mediaId) {
+    return null;
+  }
+  const blockers = session.status === 'verified'
+    ? (session.kind === media.kind ? [] : ['different_kind'])
+    : ['upload_not_verified'];
+  const raw = [
+    media.id, media.r2_key, String(currentVersionNo), session.id, session.r2_key,
+    session.etag ?? '', session.kind, session.expected_mime, String(session.expected_size),
+    ...blockers,
+  ].join('\n');
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(raw));
+  const previewToken = [...new Uint8Array(digest)]
+    .map((byte) => byte.toString(16).padStart(2, '0')).join('');
+  return {
+    media,
+    session,
+    currentVersionNo,
+    previewToken,
+    blockers,
+    canReplace: blockers.length === 0,
+  };
+}
+
+// 容量は現行ファイルだけでなく旧版と期限内アップロード予約も含める。
+contents.get('/api/media/quota', async (c) => {
+  try {
+    const accountId = c.req.query('accountId')?.trim();
+    if (!accountId) return c.json({ success: false, error: 'accountId query param required' }, 400);
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
+    return c.json({ success: true, data: await getMediaStorageQuota(c.env.DB, accountId) });
+  } catch (err) {
+    console.error('GET /api/media/quota error:', err);
+    return c.json({ success: false, error: '容量を確認できませんでした' }, 503);
+  }
+});
+
+contents.post(
+  '/api/media/upload-sessions',
+  requireRole('owner', 'admin', 'staff'),
+  async (c) => {
+    try {
+      const body = await c.req.json<{
+        accountId?: unknown;
+        files?: Array<{
+          filename?: unknown;
+          mimeType?: unknown;
+          sizeBytes?: unknown;
+          folderId?: unknown;
+          targetMediaId?: unknown;
+        }>;
+      }>().catch(() => null);
+      const accountId = typeof body?.accountId === 'string' ? body.accountId.trim() : '';
+      if (!accountId || !Array.isArray(body?.files) || body.files.length < 1 || body.files.length > 20) {
+        return c.json({ success: false, error: 'accountId と1〜20件のfilesが必要です' }, 400);
+      }
+      if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+        return c.json({ success: false, error: 'Not found' }, 404);
+      }
+      const config = directUploadConfig(c.env);
+      if (!config) {
+        return c.json({
+          success: false,
+          code: 'media_direct_upload_unavailable',
+          error: '直接アップロードの設定が完了していません',
+        }, 503);
+      }
+      const validated: Array<{
+        filename: string;
+        mimeType: string;
+        sizeBytes: number;
+        folderId: string | null;
+        targetMediaId: string | null;
+        spec: { kind: MediaKind; ext: string[]; maxBytes: number };
+      }> = [];
+      for (const file of body.files) {
+        const filename = typeof file?.filename === 'string' ? file.filename.trim() : '';
+        const mimeType = typeof file?.mimeType === 'string' ? file.mimeType.trim().toLowerCase() : '';
+        const sizeBytes = Number(file?.sizeBytes);
+        const folderId = typeof file?.folderId === 'string' && file.folderId.trim()
+          ? file.folderId.trim()
+          : null;
+        const targetMediaId = typeof file?.targetMediaId === 'string' && file.targetMediaId.trim()
+          ? file.targetMediaId.trim()
+          : null;
+        const spec = DIRECT_ALLOWED[mimeType];
+        const ext = extensionOf(filename);
+        if (!filename || filename.length > 255 || /[\u0000-\u001f]/.test(filename)
+          || !spec || !spec.ext.includes(ext)
+          || !Number.isSafeInteger(sizeBytes) || sizeBytes < 1 || sizeBytes > spec.maxBytes) {
+          return c.json({
+            success: false,
+            code: 'media_file_invalid',
+            error: `${filename || 'ファイル'}の形式、拡張子、容量を確認してください`,
+          }, 400);
+        }
+        if (targetMediaId && !await getMediaById(c.env.DB, targetMediaId, accountId)) {
+          return c.json({ success: false, error: 'Not found' }, 404);
+        }
+        validated.push({ filename, mimeType, sizeBytes, folderId, targetMediaId, spec });
+      }
+      const quota = await getMediaStorageQuota(c.env.DB, accountId);
+      const requestedBytes = validated.reduce((total, file) => total + file.sizeBytes, 0);
+      if (requestedBytes > quota.remainingBytes) {
+        return c.json({
+          success: false,
+          code: 'media_quota_exceeded',
+          error: '保存容量が不足しています',
+          data: quota,
+        }, 409);
+      }
+      const now = new Date();
+      const expiresAt = new Date(now.getTime() + 15 * 60 * 1000).toISOString();
+      const sessions = [];
+      for (const file of validated) {
+        const id = crypto.randomUUID();
+        const r2Key = `media/${accountId}/${crypto.randomUUID()}.${extensionOf(file.filename)}`;
+        await createMediaUploadSession(c.env.DB, {
+          id,
+          lineAccountId: accountId,
+          targetMediaId: file.targetMediaId,
+          folderId: file.folderId,
+          filename: file.filename,
+          kind: file.spec.kind,
+          mimeType: file.mimeType,
+          sizeBytes: file.sizeBytes,
+          r2Key,
+          expiresAt,
+          createdBy: c.get('staff')?.id ?? null,
+        });
+        const signed = await createR2PresignedPutUrl(config, {
+          key: r2Key,
+          contentType: file.mimeType,
+          lineAccountId: accountId,
+          uploadSessionId: id,
+          expiresInSeconds: 900,
+          now,
+        });
+        sessions.push({
+          id,
+          filename: file.filename,
+          sizeBytes: file.sizeBytes,
+          targetMediaId: file.targetMediaId,
+          method: 'PUT',
+          uploadUrl: signed.url,
+          requiredHeaders: signed.headers,
+          expiresAt: signed.expiresAt,
+        });
+      }
+      return c.json({ success: true, data: { sessions } }, 201);
+    } catch (err) {
+      console.error('POST /api/media/upload-sessions error:', err);
+      return c.json({ success: false, error: 'アップロードを準備できませんでした' }, 500);
+    }
+  },
+);
+
+contents.post(
+  '/api/media/upload-sessions/:id/complete',
+  requireRole('owner', 'admin', 'staff'),
+  async (c) => {
+    const accountIdFromBody = async () => c.req.json<{ accountId?: unknown; etag?: unknown }>()
+      .catch(() => null);
+    let accountId = '';
+    try {
+      const body = await accountIdFromBody();
+      accountId = typeof body?.accountId === 'string' ? body.accountId.trim() : '';
+      const suppliedEtag = typeof body?.etag === 'string' ? normalizedEtag(body.etag) : '';
+      if (!accountId || !suppliedEtag) {
+        return c.json({ success: false, error: 'accountId と etag が必要です' }, 400);
+      }
+      if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+        return c.json({ success: false, error: 'Not found' }, 404);
+      }
+      let session = await getMediaUploadSession(c.env.DB, c.req.param('id'), accountId);
+      if (!session) return c.json({ success: false, error: 'Not found' }, 404);
+      if (session.status === 'completed') {
+        return c.json({
+          success: true,
+          data: { uploadSessionId: session.id, status: 'completed', mediaId: session.result_media_id },
+        });
+      }
+      if (session.status === 'verified') {
+        return c.json({
+          success: true,
+          data: { uploadSessionId: session.id, status: 'verified', targetMediaId: session.target_media_id },
+        });
+      }
+      if (session.status !== 'pending') {
+        return c.json({ success: false, code: 'media_upload_not_pending', error: 'このアップロードは確定できません' }, 409);
+      }
+      if (Date.parse(session.expires_at) <= Date.now()) {
+        await failMediaUploadSession(c.env.DB, session.id, accountId, 'expired');
+        return c.json({ success: false, code: 'media_upload_expired', error: 'アップロード期限が切れました' }, 409);
+      }
+      const object = await c.env.IMAGES.head(session.r2_key);
+      const objectEtag = object?.etag ? normalizedEtag(object.etag) : '';
+      const contentType = object?.httpMetadata?.contentType ?? '';
+      const metadata = object?.customMetadata ?? {};
+      const metadataAccountId = metadata['line-account-id'] ?? metadata.lineAccountId;
+      const metadataSessionId = metadata['upload-session-id'] ?? metadata.uploadSessionId;
+      if (!object || Number(object.size) !== Number(session.expected_size)
+        || contentType !== session.expected_mime || objectEtag !== suppliedEtag
+        || metadataAccountId !== accountId || metadataSessionId !== session.id) {
+        await failMediaUploadSession(c.env.DB, session.id, accountId, 'object_mismatch');
+        await c.env.IMAGES.delete(session.r2_key);
+        return c.json({
+          success: false,
+          code: 'media_upload_mismatch',
+          error: 'アップロードしたファイルを確認できませんでした',
+        }, 409);
+      }
+      const bodyObject = await c.env.IMAGES.get(session.r2_key, { range: { offset: 0, length: 16 } });
+      const signatureBytes = bodyObject
+        ? new Uint8Array(await bodyObject.arrayBuffer())
+        : new Uint8Array();
+      if (!hasMediaSignature(signatureBytes, session.expected_mime)) {
+        await failMediaUploadSession(c.env.DB, session.id, accountId, 'signature_mismatch');
+        await c.env.IMAGES.delete(session.r2_key);
+        return c.json({
+          success: false,
+          code: 'media_signature_mismatch',
+          error: 'ファイルの実際の形式が申告と一致しません',
+        }, 409);
+      }
+      session = await verifyMediaUploadSession(c.env.DB, session.id, accountId, objectEtag);
+      if (!session) throw new Error('verified upload session is unavailable');
+      if (session.target_media_id) {
+        return c.json({
+          success: true,
+          data: { uploadSessionId: session.id, status: 'verified', targetMediaId: session.target_media_id },
+        });
+      }
+      const media = await completeNewMediaUpload(c.env.DB, session);
+      return c.json({
+        success: true,
+        data: { uploadSessionId: session.id, status: 'completed', mediaId: media.id },
+      }, 201);
+    } catch (err) {
+      console.error('POST /api/media/upload-sessions/:id/complete error:', err);
+      return c.json({ success: false, error: 'アップロードを確定できませんでした' }, 500);
+    }
+  },
+);
+
+contents.post('/api/media/:id/versions', requireRole('owner', 'admin', 'staff'), async (c) => {
+  try {
+    const body = await c.req.json<{
+      accountId?: unknown;
+      uploadSessionId?: unknown;
+      previewToken?: unknown;
+      changeReason?: unknown;
+    }>().catch(() => null);
+    const accountId = typeof body?.accountId === 'string' ? body.accountId.trim() : '';
+    const uploadSessionId = typeof body?.uploadSessionId === 'string'
+      ? body.uploadSessionId.trim()
+      : '';
+    const previewToken = typeof body?.previewToken === 'string' ? body.previewToken.trim() : '';
+    const changeReason = typeof body?.changeReason === 'string' ? body.changeReason.trim() : '';
+    if (!accountId || !uploadSessionId || !previewToken
+      || !changeReason || changeReason.length > 500) {
+      return c.json({
+        success: false,
+        error: 'accountId、確認済みuploadSessionId、previewToken、変更理由が必要です',
+      }, 400);
+    }
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
+    const preview = await mediaVersionPreview(
+      c, c.req.param('id'), uploadSessionId, accountId,
+    );
+    if (!preview) return c.json({ success: false, error: 'Not found' }, 404);
+    if (preview.previewToken !== previewToken) {
+      return c.json({
+        success: false,
+        code: 'media_replacement_changed',
+        error: 'ファイルまたは現在版が変わりました。差し替え内容を確認し直してください。',
+        data: {
+          previewToken: preview.previewToken,
+          currentVersionNo: preview.currentVersionNo,
+          blockers: preview.blockers,
+          canReplace: preview.canReplace,
+        },
+      }, 409);
+    }
+    if (!preview.canReplace) {
+      return c.json({
+        success: false,
+        code: 'media_replacement_blocked',
+        error: 'このファイルは現在のメディアと互換性がありません',
+        data: { blockers: preview.blockers },
+      }, 409);
+    }
+    const version = await createMediaVersionFromUpload(c.env.DB, {
+      mediaId: c.req.param('id'),
+      lineAccountId: accountId,
+      uploadSessionId,
+      expectedVersionNo: preview.currentVersionNo,
+      changeReason,
+      uploadedBy: c.get('staff')?.id ?? null,
+    });
+    return c.json({
+      success: true,
+      data: {
+        id: version.id,
+        mediaId: version.media_id,
+        versionNo: version.version_no,
+        mimeType: version.mime_type,
+        sizeBytes: version.size_bytes,
+        changeReason: version.change_reason,
+        createdAt: version.created_at,
+      },
+    }, 201);
+  } catch (err) {
+    if (err instanceof MediaVersionConflictError) {
+      return c.json({
+        success: false,
+        code: 'media_version_conflict',
+        error: '新しい版が追加されています。最新状態を読み直してください。',
+        currentVersionNo: err.currentVersionNo,
+      }, 409);
+    }
+    if (err instanceof Error && err.message === 'media_not_found') {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
+    if (err instanceof Error && err.message === 'media_upload_session_not_verified') {
+      return c.json({
+        success: false,
+        code: 'media_upload_not_verified',
+        error: '差し替え用ファイルの確認が完了していません',
+      }, 409);
+    }
+    console.error('POST /api/media/:id/versions error:', err);
+    return c.json({ success: false, error: '新しい版を追加できませんでした' }, 500);
+  }
+});
+
+contents.post(
+  '/api/media/:id/replacement-preview',
+  requireRole('owner', 'admin', 'staff'),
+  async (c) => {
+    try {
+      const body = await c.req.json<{ accountId?: unknown; uploadSessionId?: unknown }>()
+        .catch(() => null);
+      const accountId = typeof body?.accountId === 'string' ? body.accountId.trim() : '';
+      const uploadSessionId = typeof body?.uploadSessionId === 'string'
+        ? body.uploadSessionId.trim()
+        : '';
+      if (!accountId || !uploadSessionId) {
+        return c.json({ success: false, error: 'accountId と uploadSessionId が必要です' }, 400);
+      }
+      if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+        return c.json({ success: false, error: 'Not found' }, 404);
+      }
+      const preview = await mediaVersionPreview(c, c.req.param('id'), uploadSessionId, accountId);
+      if (!preview) return c.json({ success: false, error: 'Not found' }, 404);
+      return c.json({
+        success: true,
+        data: {
+          mediaId: preview.media.id,
+          uploadSessionId: preview.session.id,
+          currentVersionNo: preview.currentVersionNo,
+          previewToken: preview.previewToken,
+          blockers: preview.blockers,
+          canReplace: preview.canReplace,
+        },
+      });
+    } catch (err) {
+      console.error('POST /api/media/:id/replacement-preview error:', err);
+      return c.json({ success: false, error: '差し替え内容を確認できませんでした' }, 503);
+    }
+  },
+);
+
 contents.get('/api/media', async (c) => {
   try {
     const accountId = c.req.query('accountId')?.trim();
@@ -215,127 +652,105 @@ contents.get('/api/media', async (c) => {
     const kind = kindRaw && ['image', 'video', 'audio', 'file'].includes(kindRaw)
       ? (kindRaw as MediaKind)
       : undefined;
-    const items = await getMedia(c.env.DB, {
+    const limit = Math.min(100, Math.max(1, Number.parseInt(c.req.query('limit') || '20', 10) || 20));
+    const offset = Math.max(0, Number.parseInt(c.req.query('offset') || '0', 10) || 0);
+    const sortRaw = c.req.query('sort');
+    const sort = sortRaw && ['newest', 'oldest', 'name', 'size', 'usage'].includes(sortRaw)
+      ? sortRaw as 'newest' | 'oldest' | 'name' | 'size' | 'usage'
+      : 'newest';
+    const filters = {
       lineAccountId: accountId,
       kind,
       folderId: c.req.query('folderId') || undefined,
-    });
+      excludeId: c.req.query('excludeId') || undefined,
+      query: c.req.query('query')?.trim() || undefined,
+      unusedOnly: c.req.query('unusedOnly') === '1',
+      nearLimitOnly: c.req.query('nearLimitOnly') === '1',
+    };
+    const [items, total] = await Promise.all([
+      getMedia(c.env.DB, { ...filters, sort, limit, offset }),
+      countMedia(c.env.DB, filters),
+    ]);
     const workerUrl = c.env.WORKER_URL || new URL(c.req.url).origin;
-    return c.json({ success: true, data: items.map((m) => serializeMedia(m, workerUrl)) });
+    return c.json({
+      success: true,
+      data: { items: items.map((m) => serializeMedia(m, workerUrl)), total, limit, offset },
+    });
   } catch (err) {
     console.error('GET /api/media error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
 
-contents.post('/api/media', requireRole('owner', 'admin', 'staff'), async (c) => {
+/**
+ * 管理画面がメディアの中身を読むための共通処理。
+ *
+ * 一覧が返す `url` は配信用の公開URL（配信本文に文字列として埋まり、
+ * LINEが取りに行くため公開のまま）で、管理画面の表示には使わない。
+ * こちらは担当者の役割とLINEアカウントの可視範囲を毎回確認する。
+ * 監査行は download の成功・拒否だけに絞り、一覧の縮小表示のような
+ * 閲覧のたびには残さない。
+ */
+async function serveMediaFile(
+  c: Context<Env>,
+  opts: { auditDownload: boolean; disposition: 'attachment' | 'inline' },
+) {
+  const id = c.req.param('id');
+  const accountId = c.req.query('accountId')?.trim();
+  if (!id) return c.json({ success: false, error: 'Not found' }, 404);
+  if (!accountId) return c.json({ success: false, error: 'accountId query param required' }, 400);
+  if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+    if (opts.auditDownload) {
+      auditLog(c, 'media.download', { kind: 'media', id }, { result: 'denied', lineAccountId: accountId });
+    }
+    return c.json({ success: false, error: 'Not found' }, 404);
+  }
+  const media = await getMediaById(c.env.DB, id, accountId);
+  if (!media) {
+    if (opts.auditDownload) {
+      auditLog(c, 'media.download', { kind: 'media', id }, { result: 'denied', lineAccountId: accountId });
+    }
+    return c.json({ success: false, error: 'Not found' }, 404);
+  }
+  const object = await c.env.IMAGES.get(media.r2_key);
+  if (!object) return c.json({ success: false, error: 'Not found' }, 404);
+  if (opts.auditDownload) {
+    auditLog(c, 'media.download', { kind: 'media', id }, { result: 'success', lineAccountId: accountId });
+  }
+  const disposition = opts.disposition === 'attachment'
+    ? `attachment; filename="download"; filename*=UTF-8''${encodeURIComponent(media.filename)}`
+    : `inline; filename="view"; filename*=UTF-8''${encodeURIComponent(media.filename)}`;
+  return new Response(object.body, {
+    headers: {
+      'Content-Type': media.mime_type,
+      'Content-Disposition': disposition,
+      'Cache-Control': 'private, no-store',
+    },
+  });
+}
+
+/**
+ * 登録メディアのダウンロード。添付ファイルとして受け渡し、
+ * 成功・拒否のどちらもURLや秘密値なしで監査へ残す。
+ */
+contents.get('/api/media/:id/download', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
-    const staff = c.get('staff');
-    const body = await c.req.json<{
-      accountId?: string;
-      data?: string;
-      filename?: string;
-      mimeType?: string;
-      folderId?: string | null;
-      width?: number;
-      height?: number;
-      durationMs?: number;
-    }>();
-
-    const accountId = body.accountId?.trim() ?? '';
-    if (!accountId) return c.json({ success: false, error: 'accountId is required' }, 400);
-    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
-      return c.json({ success: false, error: 'Not found' }, 404);
-    }
-
-    const filename = (body.filename ?? '').trim();
-    if (!filename) return c.json({ success: false, error: 'ファイル名がありません' }, 400);
-    if (!body.data) return c.json({ success: false, error: 'ファイルの中身がありません' }, 400);
-
-    // data: URL 形式で来た場合は、そこに書かれた種別を優先する。
-    let base64 = body.data;
-    let mimeType = body.mimeType ?? '';
-    const dataUrl = /^data:([^;]+);base64,(.+)$/.exec(base64);
-    if (dataUrl) {
-      mimeType = dataUrl[1];
-      base64 = dataUrl[2];
-    }
-
-    const spec = ALLOWED[mimeType];
-    if (!spec) {
-      return c.json(
-        {
-          success: false,
-          error: `この形式は受け付けていません（${mimeType || '不明'}）。対応: ${Object.keys(ALLOWED).join(', ')}`,
-        },
-        400,
-      );
-    }
-    const ext = extensionOf(filename);
-    if (!spec.ext.includes(ext)) {
-      // 中身と名前が食い違っている。どちらかが間違っているので保存しない。
-      return c.json(
-        {
-          success: false,
-          error: `ファイル名の拡張子（.${ext || 'なし'}）が中身の形式（${mimeType}）と合いません`,
-        },
-        400,
-      );
-    }
-
-    let bytes: Uint8Array;
-    try {
-      bytes = Uint8Array.from(atob(base64), (ch) => ch.charCodeAt(0));
-    } catch {
-      return c.json({ success: false, error: 'ファイルの中身を読み取れませんでした' }, 400);
-    }
-    if (bytes.byteLength > spec.maxBytes) {
-      return c.json(
-        {
-          success: false,
-          error: `ファイルが大きすぎます（上限 ${Math.round(spec.maxBytes / 1024 / 1024)}MB）`,
-        },
-        413,
-      );
-    }
-    if (!hasMediaSignature(bytes, mimeType)) {
-      return c.json(
-        { success: false, error: 'ファイルの実際の形式が、選択された形式と一致しません' },
-        400,
-      );
-    }
-
-    const r2Key = `media/${crypto.randomUUID()}.${ext}`;
-    await c.env.IMAGES.put(r2Key, bytes, {
-      httpMetadata: { contentType: mimeType },
-      customMetadata: { originalFilename: filename },
-    });
-
-    let media: Media;
-    try {
-      media = await createMedia(c.env.DB, {
-        lineAccountId: accountId,
-        kind: spec.kind,
-        filename,
-        mimeType,
-        sizeBytes: bytes.byteLength,
-        r2Key,
-        folderId: body.folderId ?? null,
-        width: body.width ?? null,
-        height: body.height ?? null,
-        durationMs: body.durationMs ?? null,
-        uploadedBy: staff?.id ?? null,
-      });
-    } catch (error) {
-      // DBに行が無い実体は画面から消せない。登録失敗時に同じ場で片付ける。
-      await c.env.IMAGES.delete(r2Key).catch((cleanupError) =>
-        console.error('media orphan cleanup failed:', cleanupError));
-      throw error;
-    }
-    const workerUrl = c.env.WORKER_URL || new URL(c.req.url).origin;
-    return c.json({ success: true, data: serializeMedia(media, workerUrl) }, 201);
+    return await serveMediaFile(c, { auditDownload: true, disposition: 'attachment' });
   } catch (err) {
-    console.error('POST /api/media error:', err);
+    console.error('GET /api/media/:id/download error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+/**
+ * 登録メディアの表示用中身。縮小表示・試し見・ファイル開きが使う。
+ * 認可は download と同じだが、閲覧のたびに監査行は残さない。
+ */
+contents.get('/api/media/:id/content', requireRole('owner', 'admin', 'staff'), async (c) => {
+  try {
+    return await serveMediaFile(c, { auditDownload: false, disposition: 'inline' });
+  } catch (err) {
+    console.error('GET /api/media/:id/content error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -351,34 +766,36 @@ contents.patch('/api/media/:id', requireRole('owner', 'admin'), async (c) => {
     const existing = await getMediaById(c.env.DB, id, accountId);
     if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
     const body = await c.req.json<{ filename?: string; folderId?: string | null }>();
+    // 名前は空・長すぎ・制御文字を受け付けない（直接アップロードの申告時と同じ決まり）。
+    const filename = body.filename === undefined ? undefined : String(body.filename).trim();
+    if (filename !== undefined) {
+      if (!filename) return c.json({ success: false, error: 'ファイル名を入力してください' }, 400);
+      if (filename.length > 255) {
+        return c.json({ success: false, error: 'ファイル名は255文字までで入力してください' }, 400);
+      }
+      if (/[\u0000-\u001f]/.test(filename)) {
+        return c.json({ success: false, error: 'ファイル名に使えない文字が含まれています' }, 400);
+      }
+    }
+    // 存在しない・別種のフォルダを指すと、一覧の絞り込みから消える。
+    let folderId: string | null | undefined;
+    if ('folderId' in body) {
+      folderId = body.folderId ? String(body.folderId) : null;
+      if (folderId) {
+        const folder = await getFolderById(c.env.DB, folderId);
+        if (!folder || folder.kind !== 'media') {
+          return c.json({ success: false, error: '指定のフォルダが見つかりません。フォルダを選び直してください' }, 400);
+        }
+      }
+    }
     const media = await updateMedia(c.env.DB, id, accountId, {
-      filename: body.filename === undefined ? undefined : String(body.filename).trim(),
-      ...(('folderId' in body) ? { folderId: body.folderId ?? null } : {}),
+      ...(filename !== undefined ? { filename } : {}),
+      ...(folderId !== undefined ? { folderId } : {}),
     });
     const workerUrl = c.env.WORKER_URL || new URL(c.req.url).origin;
     return c.json({ success: true, data: serializeMedia(media!, workerUrl) });
   } catch (err) {
     console.error('PATCH /api/media/:id error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
-  }
-});
-
-contents.get('/api/media/:id/usages', async (c) => {
-  try {
-    const accountId = c.req.query('accountId')?.trim();
-    if (!accountId) return c.json({ success: false, error: 'accountId query param required' }, 400);
-    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
-      return c.json({ success: false, error: 'Not found' }, 404);
-    }
-    const existing = await getMediaById(c.env.DB, c.req.param('id'), accountId);
-    if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
-    const usages = await getMediaUsages(c.env.DB, c.req.param('id'));
-    return c.json({
-      success: true,
-      data: usages.map((u) => ({ refKind: u.ref_kind, refId: u.ref_id, scannedAt: u.scanned_at })),
-    });
-  } catch (err) {
-    console.error('GET /api/media/:id/usages error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -423,7 +840,10 @@ contents.get('/api/media/:id/replacement-impact', requireRole('owner', 'admin'),
     }
     const current = await replacementImpact(c, c.req.param('id'), replacementId, accountId);
     if (!current) return c.json({ success: false, error: 'Not found' }, 404);
-    return c.json({ success: true, data: current.impact });
+    return c.json({
+      success: true,
+      data: { ...current.impact, previewToken: current.impact.revision },
+    });
   } catch (err) {
     console.error('GET /api/media/:id/replacement-impact error:', err);
     return c.json({ success: false, error: '差し替えたときの影響を確認できませんでした' }, 503);
@@ -442,9 +862,9 @@ contents.post('/api/media/:id/replace-usages', requireRole('owner', 'admin'), as
     const replacementId = typeof body.replacementMediaId === 'string'
       ? body.replacementMediaId.trim()
       : '';
-    const expectedRevision = typeof body.expectedRevision === 'string'
-      ? body.expectedRevision.trim()
-      : '';
+    const expectedRevision = typeof body.previewToken === 'string'
+      ? body.previewToken.trim()
+      : (typeof body.expectedRevision === 'string' ? body.expectedRevision.trim() : '');
     if (!replacementId || !expectedRevision) {
       return c.json({ success: false, error: '差し替え先と、確認した版が必要です' }, 400);
     }
@@ -577,6 +997,9 @@ function serializeVar(row: CommonVar) {
     varKey: row.var_key,
     type: row.type,
     value: row.value,
+    memo: row.memo ?? '',
+    version: Number(row.version ?? 1),
+    archivedAt: row.archived_at ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     nextSchedule: row.next_effective_from
@@ -584,6 +1007,7 @@ function serializeVar(row: CommonVar) {
       : null,
     pendingScheduleCount: Number(row.pending_schedule_count ?? 0),
     usageCount: Number(row.usage_count ?? 0),
+    usageByKind: row.usage_by_kind ?? null,
   };
 }
 
@@ -608,6 +1032,19 @@ const COMMON_VAR_USAGE_KIND_LABELS: Record<CommonVarUsageKind, string> = {
   friend_add: '友だち追加時の配信',
   common_action: '共通アクション',
 };
+
+function emptyCommonVarUsageImpact(): CommonVarUsageImpact {
+  return {
+    total: 0,
+    blockingTotal: 0,
+    historicalTotal: 0,
+    unscopedFormTotal: 0,
+    byKind: Object.fromEntries(
+      Object.keys(COMMON_VAR_USAGE_KIND_LABELS).map((kind) => [kind, 0]),
+    ) as Record<CommonVarUsageKind, number>,
+    items: [],
+  };
+}
 
 function collectReadableStrings(value: unknown, token: string, out: string[]): void {
   if (typeof value === 'string') {
@@ -654,6 +1091,8 @@ function commonVarUsageHref(item: CommonVarUsageItem): string {
     case 'automation': return '/automations';
     case 'friend_add': return '/friend-add-settings';
     case 'common_action': return `/common-actions/versions?id=${id}`;
+    // 新しい種別が増えても画面のLinkを壊さない。一覧へ戻す。
+    default: return '/contents/vars';
   }
 }
 
@@ -719,9 +1158,11 @@ function serializeCommonVarChangeImpact(
   const items = impact.items.map((item, index) => {
     const safeSource = readableCommonVarUsage(item.source_content, token);
     const previewAvailable = safeSource.includes(token);
+    // base.items は impact.items と同じ順で作る。同じ位置の要素を使う前提を
+    // 型で守れないので、無いときは安全な文へ倒す（非null断言を使わない）。
     const currentPreview = previewAvailable
       ? safeSource.replaceAll(token, variable.value)
-      : base.items[index]!.currentPreview;
+      : (base.items.at(index)?.currentPreview ?? safeSource);
     const changesOnSave = item.is_historical !== 1;
     const nextPreview = !changesOnSave
       ? currentPreview
@@ -777,6 +1218,57 @@ function serializeCommonVarChangeImpact(
   };
 }
 
+async function commonVarUsageRevision(
+  variable: CommonVar,
+  impact: CommonVarUsageImpact,
+): Promise<string> {
+  const raw = [
+    `${variable.id}:${variable.version}`,
+    ...impact.items.map((item) => [
+      item.kind, item.source_id, item.source_parent_id ?? '', item.source_status ?? '', item.source_content,
+    ].join(':')).sort(),
+    `unscoped:${impact.unscopedFormTotal}`,
+  ].join('\n');
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(raw));
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+async function commonVarReplacementRevision(plan: CommonVarReplacementPlan): Promise<string> {
+  const raw = [
+    `${plan.source.id}:${plan.source.version}:${plan.replacement.id}:${plan.replacement.version}`,
+    ...plan.targets.map((target) =>
+      `${target.table}:${target.id}:${target.fingerprint}`).sort(),
+    `blocked:${plan.blockedTotal}`,
+  ].join('\n');
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(raw));
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+function serializeCommonVarReplacementPlan(plan: CommonVarReplacementPlan, revision: string) {
+  const byKind = Object.fromEntries(Object.keys(COMMON_VAR_USAGE_KIND_LABELS).map((kind) => [
+    kind,
+    plan.targets.filter((target) => target.kind === kind).length,
+  ]));
+  return {
+    source: { id: plan.source.id, name: plan.source.name, type: plan.source.type, version: plan.source.version },
+    replacement: {
+      id: plan.replacement.id,
+      name: plan.replacement.name,
+      type: plan.replacement.type,
+      version: plan.replacement.version,
+    },
+    usageTotal: plan.usageTotal,
+    replaceableTotal: plan.replaceableTotal,
+    blockedTotal: plan.blockedTotal,
+    historicalTotal: plan.historicalTotal,
+    unscopedFormTotal: plan.unscopedFormTotal,
+    byKind,
+    canReplace: plan.blockedTotal === 0,
+    revision,
+    checkedAt: jstNow(),
+  };
+}
+
 contents.get('/api/common-vars', async (c) => {
   try {
     const accountId = c.req.query('accountId')?.trim();
@@ -784,20 +1276,83 @@ contents.get('/api/common-vars', async (c) => {
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
       return c.json({ success: false, error: 'Not found' }, 404);
     }
-    const items = await getCommonVars(c.env.DB, {
-      lineAccountId: accountId,
-      folderId: c.req.query('folderId') || undefined,
-    });
-    const usageCounts = await getCommonVarUsageCounts(
+    const rawLimit = Number(c.req.query('limit'));
+    const limit = Number.isFinite(rawLimit)
+      ? Math.max(1, Math.min(Math.floor(rawLimit), COMMON_VARS_LIST_LIMIT))
+      : COMMON_VARS_LIST_LIMIT;
+    const folderId = c.req.query('folderId') || undefined;
+    const [items, total] = await Promise.all([
+      getCommonVars(c.env.DB, { lineAccountId: accountId, folderId, limit }),
+      countCommonVars(c.env.DB, { lineAccountId: accountId, folderId }),
+    ]);
+    const usageSummaries = await getCommonVarUsageSummaries(
       c.env.DB,
       items.map((item) => item.var_key),
       accountId,
     );
-    for (const item of items) item.usage_count = usageCounts.get(item.var_key) ?? 0;
-    return c.json({ success: true, data: items.map(serializeVar) });
+    for (const item of items) {
+      const summary = usageSummaries.get(item.var_key);
+      item.usage_count = summary?.total ?? 0;
+      item.usage_by_kind = summary?.byKind ?? Object.fromEntries(
+        Object.keys(COMMON_VAR_USAGE_KIND_LABELS).map((kind) => [kind, 0]),
+      ) as CommonVar['usage_by_kind'];
+    }
+    return c.json({
+      success: true,
+      data: items.map(serializeVar),
+      meta: { total, limited: total > items.length, limit },
+    });
   } catch (err) {
     console.error('GET /api/common-vars error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+contents.get('/api/common-vars/:id', async (c) => {
+  try {
+    const accountId = c.req.query('accountId')?.trim();
+    if (!accountId) return c.json({ success: false, error: 'accountId query param required' }, 400);
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
+    const variable = await getCommonVarByIdIncludingArchived(c.env.DB, c.req.param('id'), accountId);
+    if (!variable) return c.json({ success: false, error: 'Not found' }, 404);
+    const [impact, versions] = await Promise.all([
+      variable.archived_at
+        ? Promise.resolve(emptyCommonVarUsageImpact())
+        : getCommonVarUsageImpact(c.env.DB, variable.var_key, accountId),
+      getCommonVarVersions(c.env.DB, variable.id, accountId, 20),
+    ]);
+    const serializedImpact = serializeCommonVarDeleteImpact(variable, impact);
+    variable.usage_count = impact.total;
+    variable.usage_by_kind = impact.byKind;
+    return c.json({
+      success: true,
+      data: {
+        ...serializeVar(variable),
+        usages: serializedImpact.items.slice(0, 15),
+        usagePage: {
+          total: impact.total,
+          shown: Math.min(serializedImpact.items.length, 15),
+          hasMore: impact.total > 15,
+          unavailableCount: impact.unscopedFormTotal,
+        },
+        history: versions.map((version) => ({
+          id: version.id,
+          version: Number(version.version_no),
+          name: version.name,
+          value: version.value,
+          memo: version.memo,
+          changeReason: version.change_reason,
+          actorId: version.actor_id,
+          actorName: version.actor_name,
+          createdAt: version.created_at,
+        })),
+      },
+    });
+  } catch (err) {
+    console.error('GET /api/common-vars/:id error:', err);
+    return c.json({ success: false, error: '共通情報の詳細を確認できませんでした' }, 503);
   }
 });
 
@@ -817,21 +1372,43 @@ contents.post('/api/common-vars', requireRole('owner', 'admin'), async (c) => {
     const keyCheck = validateFieldKey(body.varKey);
     if (!keyCheck.ok) return c.json({ success: false, error: keyCheck.error }, 422);
 
-    const type = (COMMON_VAR_TYPES as readonly string[]).includes(String(body.type))
-      ? (String(body.type) as CommonVarType)
-      : 'text';
+    // 不正な種別は黙って標準にしない。誤った種別での登録に気づけなくなる。
+    const typeRaw = body.type === undefined ? 'text' : String(body.type);
+    if (!(COMMON_VAR_TYPES as readonly string[]).includes(typeRaw)) {
+      return c.json({ success: false, error: '種別が正しくありません。選び直してください' }, 400);
+    }
+    const type = typeRaw as CommonVarType;
+
+    // 編集画面の入力欄と同じ上限を口でも守る。超えた値は送信時に落ち、
+    // 原因がこの操作と結びつかなくなる。
+    const value = body.value == null ? '' : String(body.value);
+    const memo = body.memo == null ? '' : String(body.memo);
+    if (name.length > 200) {
+      return c.json({ success: false, error: '名前は200文字までで入力してください' }, 400);
+    }
+    if (value.length > 200) {
+      return c.json({ success: false, error: '差し込まれる文字は200文字までで入力してください' }, 400);
+    }
+    if (memo.length > 1000) {
+      return c.json({ success: false, error: 'メモは1000文字までで入力してください' }, 400);
+    }
 
     const created = await createCommonVar(c.env.DB, {
       lineAccountId: accountId,
       name,
       varKey: String(body.varKey),
       type,
-      value: body.value == null ? '' : String(body.value),
+      value,
+      memo,
+      actorId: c.get('staff').id,
       folderId: body.folderId ? String(body.folderId) : null,
     });
     return c.json({ success: true, data: serializeVar(created) }, 201);
   } catch (err) {
-    if (err instanceof Error && err.message.includes('UNIQUE constraint')) {
+    if (err instanceof CommonVarFolderError) {
+      return c.json({ success: false, error: '指定のフォルダが見つかりません。フォルダを選び直してください' }, 400);
+    }
+    if (err instanceof CommonVarKeyConflictError) {
       return c.json({ success: false, error: 'その差し込み名は既に使われています' }, 409);
     }
     console.error('POST /api/common-vars error:', err);
@@ -851,6 +1428,12 @@ contents.patch('/api/common-vars/:id', requireRole('owner', 'admin'), async (c) 
     if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
 
     const body = await c.req.json<Record<string, unknown>>();
+    const expectedVersion = body.expectedVersion === undefined
+      ? undefined
+      : Number(body.expectedVersion);
+    if (expectedVersion !== undefined && (!Number.isInteger(expectedVersion) || expectedVersion < 1)) {
+      return c.json({ success: false, error: 'expectedVersion must be a positive integer' }, 400);
+    }
     // 差し込み名は変えられない。変えるとテンプレートの差し込みが黙って空になる。
     if (body.varKey !== undefined && body.varKey !== existing.var_key) {
       return c.json(
@@ -862,13 +1445,45 @@ contents.patch('/api/common-vars/:id', requireRole('owner', 'admin'), async (c) 
         422,
       );
     }
+    // 空の名前は作れない(登録時と同じ)。版番号なしの上書きは許すが、
+    // その旨は契約テストに明記する(同時編集の衝突検出は版番号つきのみ)。
+    const patchName = body.name === undefined ? undefined : String(body.name).trim();
+    if (patchName !== undefined && !patchName) {
+      return c.json({ success: false, error: '名前を入力してください' }, 400);
+    }
+    if (patchName !== undefined && patchName.length > 200) {
+      return c.json({ success: false, error: '名前は200文字までで入力してください' }, 400);
+    }
+    const patchValue = body.value === undefined ? undefined : String(body.value);
+    if (patchValue !== undefined && patchValue.length > 200) {
+      return c.json({ success: false, error: '差し込まれる文字は200文字までで入力してください' }, 400);
+    }
+    const patchMemo = body.memo === undefined ? undefined : String(body.memo);
+    if (patchMemo !== undefined && patchMemo.length > 1000) {
+      return c.json({ success: false, error: 'メモは1000文字までで入力してください' }, 400);
+    }
     const updated = await updateCommonVar(c.env.DB, id, accountId, {
-      name: body.name === undefined ? undefined : String(body.name).trim(),
-      value: body.value === undefined ? undefined : String(body.value),
+      name: patchName,
+      value: patchValue,
+      memo: patchMemo,
+      expectedVersion,
+      actorId: c.get('staff').id,
+      changeReason: typeof body.changeReason === 'string' ? body.changeReason : undefined,
       ...(('folderId' in body) ? { folderId: body.folderId ? String(body.folderId) : null } : {}),
     });
     return c.json({ success: true, data: serializeVar(updated!) });
   } catch (err) {
+    if (err instanceof CommonVarFolderError) {
+      return c.json({ success: false, error: '指定のフォルダが見つかりません。フォルダを選び直してください' }, 400);
+    }
+    if (err instanceof CommonVarVersionConflictError) {
+      return c.json({
+        success: false,
+        error: '別の担当者が先に更新しました。最新内容を読み直してください。',
+        code: 'common_var_version_conflict',
+        currentVersion: err.currentVersion,
+      }, 409);
+    }
     console.error('PATCH /api/common-vars/:id error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
@@ -907,10 +1522,33 @@ contents.post('/api/common-vars/:id/impact-preview', requireRole('owner', 'admin
     }
     const existing = await getCommonVarById(c.env.DB, c.req.param('id'), accountId);
     if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
+    if (body.expectedVersion !== undefined) {
+      const expectedVersion = Number(body.expectedVersion);
+      if (!Number.isInteger(expectedVersion) || expectedVersion < 1) {
+        return c.json({ success: false, error: 'expectedVersion must be a positive integer' }, 400);
+      }
+      if (expectedVersion !== existing.version) {
+        return c.json({
+          success: false,
+          error: '別の担当者が先に更新しました。最新内容を読み直してください。',
+          code: 'common_var_version_conflict',
+          currentVersion: existing.version,
+        }, 409);
+      }
+    }
     const impact = await getCommonVarUsageImpact(c.env.DB, existing.var_key, accountId);
+    const serialized = serializeCommonVarChangeImpact(existing, impact, body.nextValue);
     return c.json({
       success: true,
-      data: serializeCommonVarChangeImpact(existing, impact, body.nextValue),
+      data: {
+        ...serialized,
+        version: existing.version,
+        usageByKind: impact.byKind,
+        scheduledUsageCount: impact.items.filter((item) => item.source_status === 'scheduled').length,
+        publishedUsageCount: impact.items.filter((item) =>
+          item.source_status === 'active' || item.source_status === 'sending').length,
+        usageRevision: await commonVarUsageRevision(existing, impact),
+      },
     });
   } catch (err) {
     if (err instanceof RequestBodyError) {
@@ -921,6 +1559,110 @@ contents.post('/api/common-vars/:id/impact-preview', requireRole('owner', 'admin
       { success: false, error: '影響する場所を確認できませんでした' },
       503,
     );
+  }
+});
+
+contents.post('/api/common-vars/:id/replace', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const body = await readBoundedJson(c.req.raw);
+    const accountId = typeof body.accountId === 'string' ? body.accountId.trim() : '';
+    if (!accountId) return c.json({ success: false, error: 'accountId is required' }, 400);
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
+    const source = await getCommonVarById(c.env.DB, c.req.param('id'), accountId);
+    if (!source) return c.json({ success: false, error: 'Not found' }, 404);
+    const replacementId = typeof body.replacementId === 'string' ? body.replacementId.trim() : '';
+    if (!replacementId) {
+      const candidates = await getCommonVarReplacementCandidates(c.env.DB, source);
+      return c.json({
+        success: true,
+        data: {
+          source: { id: source.id, name: source.name, type: source.type, version: source.version },
+          candidates: candidates.map((candidate) => ({
+            id: candidate.id,
+            name: candidate.name,
+            varKey: candidate.var_key,
+            type: candidate.type,
+            value: candidate.value,
+            version: candidate.version,
+          })),
+        },
+      });
+    }
+    const replacement = await getCommonVarById(c.env.DB, replacementId, accountId);
+    if (!replacement) return c.json({ success: false, error: 'Not found' }, 404);
+    if (source.id === replacement.id || source.type !== replacement.type) {
+      return c.json({ success: false, error: '同じ種類の別の共通情報を選んでください' }, 422);
+    }
+    const plan = await getCommonVarReplacementPlan(c.env.DB, source, replacement);
+    const revision = await commonVarReplacementRevision(plan);
+    const preview = serializeCommonVarReplacementPlan(plan, revision);
+    if (body.apply !== true) return c.json({ success: true, data: preview });
+
+    const expectedVersion = Number(body.expectedVersion);
+    if (!Number.isInteger(expectedVersion) || expectedVersion < 1) {
+      return c.json({ success: false, error: 'expectedVersion is required' }, 400);
+    }
+    if (expectedVersion !== source.version) {
+      return c.json({
+        success: false,
+        error: '別の担当者が先に更新しました。最新内容を読み直してください。',
+        code: 'common_var_version_conflict',
+        currentVersion: source.version,
+      }, 409);
+    }
+    if (typeof body.expectedRevision !== 'string' || body.expectedRevision !== revision) {
+      return c.json({
+        success: false,
+        error: '使用先が変わりました。影響をもう一度確認してください。',
+        code: 'common_var_usage_changed',
+        data: preview,
+      }, 409);
+    }
+    if (!preview.canReplace) {
+      return c.json({
+        success: false,
+        error: '差し替えられない使用先があります。先に個別に確認してください。',
+        code: 'common_var_replacement_blocked',
+        data: preview,
+      }, 409);
+    }
+    const result = await applyCommonVarReplacementPlan(c.env.DB, plan, c.get('staff').id);
+    let remainingUsageCount: number | null = null;
+    try {
+      const remaining = await getCommonVarUsageImpact(c.env.DB, source.var_key, accountId);
+      remainingUsageCount = remaining.blockingTotal;
+    } catch {
+      // 差し替え自体は完了している。再走査不能を0件と偽らずnullで返す。
+    }
+    return c.json({
+      success: true,
+      data: {
+        ...result,
+        sourceId: source.id,
+        replacementId: replacement.id,
+        remainingUsageCount,
+        verification: remainingUsageCount === null
+          ? 'unavailable'
+          : remainingUsageCount === 0 ? 'verified' : 'partial',
+        completedAt: jstNow(),
+      },
+    });
+  } catch (err) {
+    if (err instanceof RequestBodyError) {
+      return c.json({ success: false, error: err.message }, err.status);
+    }
+    if (err instanceof CommonVarVersionConflictError) {
+      return c.json({
+        success: false,
+        error: '別の担当者が先に更新しました。最新内容を読み直してください。',
+        code: 'common_var_version_conflict',
+        currentVersion: err.currentVersion,
+      }, 409);
+    }
+    console.error('POST /api/common-vars/:id/replace error:', err);
+    return c.json({ success: false, error: '差し替えの影響を確認できませんでした' }, 503);
   }
 });
 
@@ -946,7 +1688,7 @@ contents.delete('/api/common-vars/:id', requireRole('owner', 'admin'), async (c)
         409,
       );
     }
-    await deleteCommonVar(c.env.DB, existing.id, accountId);
+    await deleteCommonVar(c.env.DB, existing.id, accountId, c.get('staff').id);
     return c.json({ success: true, data: null });
   } catch (err) {
     console.error('DELETE /api/common-vars/:id error:', err);
@@ -985,9 +1727,11 @@ contents.post('/api/common-vars/:id/schedules', requireRole('owner', 'admin'), a
     const existing = await getCommonVarById(c.env.DB, varId, accountId);
     if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
 
-    const body = await c.req.json<{ effectiveFrom?: unknown; value?: unknown }>();
-    const effectiveFrom = String(body.effectiveFrom ?? '');
-    if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(effectiveFrom)) {
+    // 同じ画面の impact-preview・replace と同じ16KB制限にする。
+    const body = await readBoundedJson(c.req.raw);
+    const effectiveFrom = typeof body.effectiveFrom === 'string' ? body.effectiveFrom : '';
+    if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(effectiveFrom)
+      || !isValidScheduleDateTime(effectiveFrom)) {
       return c.json(
         { success: false, error: '切り替える日時は 2026-09-01T10:00 の形で指定してください' },
         400,
@@ -1003,14 +1747,34 @@ contents.post('/api/common-vars/:id/schedules', requireRole('owner', 'admin'), a
     const created = await createCommonVarSchedule(c.env.DB, {
       varId,
       effectiveFrom,
-      value: String(body.value ?? ''),
+      value: typeof body.value === 'string' ? body.value : '',
     });
     return c.json({ success: true, data: serializeSchedule(created) }, 201);
   } catch (err) {
+    if (err instanceof RequestBodyError) {
+      return c.json({ success: false, error: err.message }, err.status);
+    }
     console.error('POST /api/common-vars/:id/schedules error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
+
+/**
+ * 切替日時の実在検査。正規表現だけでは月13・99日が通る。
+ * JSTの壁時計として組み立て直し、月日時刻の範囲を確かめる。
+ */
+export function isValidScheduleDateTime(value: string): boolean {
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(value);
+  if (!match) return false;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const hour = Number(match[4]);
+  const minute = Number(match[5]);
+  if (month < 1 || month > 12 || hour > 23 || minute > 59) return false;
+  const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  return day >= 1 && day <= lastDay;
+}
 
 contents.delete(
   '/api/common-vars/:id/schedules/:scheduleId',

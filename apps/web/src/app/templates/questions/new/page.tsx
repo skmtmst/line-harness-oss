@@ -11,7 +11,9 @@ import QuestionEditor, {
 import Button from '@/components/shared/button'
 import StickyBar from '@/components/shared/sticky-bar'
 import ListState from '@/components/shared/list-state'
+import SelectField from '@/components/shared/select-field'
 import { TextField } from '@/components/shared/text-field'
+import type { Folder } from '@line-crm/shared'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
 
@@ -20,6 +22,23 @@ function displayText(value: string): string {
     .replaceAll('{{name}}', '山田 太郎')
     .replace(/\{\{field\.[^}]+\}\}/g, '登録済みの情報')
     .replace(/\{\{var\.[^}]+\}\}/g, '共通情報')
+}
+
+/*
+ * 口から来た質問が編集器の形かを確かめる（#497 軽7）。
+ * `as` で通すと、項目が増えたときのずれに気づけない。
+ * 形が違うものは読み込まず、読込エラーにする。
+ */
+function isEditableQuestion(value: unknown): value is ScenarioQuestion {
+  if (!value || typeof value !== 'object') return false
+  const question = value as Record<string, unknown>
+  if (typeof question.text !== 'string') return false
+  if (question.tapMode !== 'single' && question.tapMode !== 'multiple') return false
+  if (!Array.isArray(question.choices)) return false
+  return question.choices.every((choice) =>
+    !!choice
+    && typeof choice === 'object'
+    && typeof (choice as Record<string, unknown>).label === 'string')
 }
 
 function questionSummary(question: ScenarioQuestion): string[] {
@@ -41,6 +60,8 @@ function QuestionTemplatePageInner() {
   const id = params.get('id')
   const [name, setName] = useState('')
   const [category, setCategory] = useState('未分類')
+  const [folderId, setFolderId] = useState<string | null>(null)
+  const [folders, setFolders] = useState<Folder[]>([])
   const [question, setQuestion] = useState<ScenarioQuestion>(() => emptyQuestion())
   const [categories, setCategories] = useState<string[]>([])
   const [usageCount, setUsageCount] = useState(0)
@@ -48,15 +69,17 @@ function QuestionTemplatePageInner() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
+  // 分類名の候補は置き場の一覧から取る。テンプレ全件を引くと件数が増えるほど重くなる。
   useEffect(() => {
     if (!selectedAccountId) {
       setCategories([])
       return
     }
     let cancelled = false
-    void api.templates.list(undefined, selectedAccountId).then((res) => {
+    void api.folders.list('template').then((res) => {
       if (cancelled || !res.success) return
-      setCategories([...new Set(res.data.map((item) => item.category).filter(Boolean))])
+      setFolders(res.data)
+      setCategories([...new Set(res.data.map((item) => item.name).filter(Boolean))])
     })
     return () => { cancelled = true }
   }, [selectedAccountId])
@@ -75,7 +98,12 @@ function QuestionTemplatePageInner() {
         }
         setName(template.data.name)
         setCategory(template.data.category || '未分類')
-        setQuestion(template.data.question as ScenarioQuestion)
+        setFolderId(template.data.folderId ?? null)
+        if (!isEditableQuestion(template.data.question)) {
+          setError('質問テンプレートを読み込めませんでした。')
+          return
+        }
+        setQuestion(template.data.question)
         setUsageCount(Object.values(template.data.usedBy).reduce((total, items) => total + items.length, 0))
       })
       .catch(() => {
@@ -116,6 +144,7 @@ function QuestionTemplatePageInner() {
       messageContent: question.intro?.trim() || question.text,
       question,
       questionStatus,
+      folderId,
     }
     try {
       const result = id
@@ -177,6 +206,16 @@ function QuestionTemplatePageInner() {
               <datalist id="question-template-folders">
                 {categories.map((item) => <option key={item} value={item} />)}
               </datalist>
+            </label>
+            <label className="text-label font-semibold text-ink-secondary">
+              置き場
+              <SelectField
+                aria-label="置き場"
+                value={folderId ?? ''}
+                onChange={(event) => setFolderId(event.target.value || null)}
+                options={[{ value: '', label: '未分類' }, ...folders.map((folder) => ({ value: folder.id, label: folder.name }))]}
+                className="mt-2"
+              />
             </label>
           </section>
 

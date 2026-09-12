@@ -7,7 +7,9 @@
  */
 import { describe, it, expect, beforeEach } from 'vitest'
 import type Database from 'better-sqlite3'
+import { applyDueCommonVarSchedules, updateCommonVar } from '@line-crm/db'
 import { createTestD1, insertFriend } from '../test-utils/d1-sqlite.js'
+import { publishScenarioVersion } from '@line-crm/db'
 import { runScenarioActions, runScenarioOp } from './scenario-actions.js'
 
 let db: D1Database
@@ -55,7 +57,7 @@ function fieldValue(friendId: string, fieldId: string): string | null {
   return row?.value ?? null
 }
 
-beforeEach(() => {
+beforeEach(async () => {
   const created = createTestD1()
   db = created.db
   raw = created.raw
@@ -75,6 +77,9 @@ beforeEach(() => {
               ('st2','s2',1,0,'text','移動先の1通目')`,
     )
     .run()
+  // 参加には明示公開が要る（351）。
+  await publishScenarioVersion(db, 's1', { staffId: null, idempotencyKey: 'actions-s1' })
+  await publishScenarioVersion(db, 's2', { staffId: null, idempotencyKey: 'actions-s2' })
   raw
     .prepare(
       `INSERT INTO tags (id, name, color, group_id) VALUES ('t1','犬','#000',NULL), ('t2','猫','#000','g1'), ('t3','鳥','#000','g1')`,
@@ -318,10 +323,291 @@ describe('共通情報', () => {
   it('加算・減算がアカウント単位の値に効く', async () => {
     addAction('a1', 'common_var', { varKey: 'stock', op: 'sub', value: '3' })
     await runScenarioActions(db, { scenarioId: SCENARIO, hook: 'step_sent', friendId: 'f1', stepId: STEP })
-    const row = raw.prepare(`SELECT value FROM common_vars WHERE var_key = 'stock'`).get() as { value: string }
-    expect(row.value).toBe('7')
+    expect(commonVarValue('account-1', 'stock')).toBe('7')
+  })
+
+  it('同じ共通情報への並行した2更新は両方反映される', async () => {
+    addAction('a1', 'common_var', { varKey: 'stock', op: 'sub', value: '3' })
+    const sdb = serializedDb()
+    const input = { scenarioId: SCENARIO, hook: 'step_sent' as const, friendId: 'f1', stepId: STEP }
+    const [first, second] = await Promise.all([
+      runScenarioActions(sdb, input),
+      runScenarioActions(sdb, input),
+    ])
+    expect(first.failed).toBe(0)
+    expect(second.failed).toBe(0)
+    // 10 - 3 - 3。片方が消えると '7' になる。
+    expect(commonVarValue('account-1', 'stock')).toBe('4')
+  })
+
+  it('他のアカウントの同名キーには触れない', async () => {
+    raw
+      .prepare(
+        `INSERT INTO common_vars (id, line_account_id, name, var_key, type, value)
+         VALUES ('v2','account-2','在庫','stock','number','100')`,
+      )
+      .run()
+    addAction('a1', 'common_var', { varKey: 'stock', op: 'sub', value: '3' })
+    await runScenarioActions(db, { scenarioId: SCENARIO, hook: 'step_sent', friendId: 'f2', stepId: STEP })
+    expect(commonVarValue('account-2', 'stock')).toBe('97')
+    expect(commonVarValue('account-1', 'stock')).toBe('10')
+  })
+
+  it('自分のアカウントに無いキーは失敗し、他のアカウントの値は変わらない', async () => {
+    raw
+      .prepare(
+        `INSERT INTO common_vars (id, line_account_id, name, var_key, type, value)
+         VALUES ('v2','account-2','予約枠','seats','number','5')`,
+      )
+      .run()
+    addAction('a1', 'common_var', { varKey: 'seats', op: 'sub', value: '1' })
+    const result = await runScenarioActions(db, {
+      scenarioId: SCENARIO,
+      hook: 'step_sent',
+      friendId: 'f1',
+      stepId: STEP,
+    })
+    expect(result.failed).toBe(1)
+    expect(commonVarValue('account-2', 'seats')).toBe('5')
+  })
+
+  it('数でない値に加算しても落ちない（0とみなす）', async () => {
+    raw.prepare(`UPDATE common_vars SET value = 'あいう' WHERE var_key = 'stock'`).run()
+    addAction('a1', 'common_var', { varKey: 'stock', op: 'add', value: '3' })
+    const result = await runScenarioActions(db, {
+      scenarioId: SCENARIO,
+      hook: 'step_sent',
+      friendId: 'f1',
+      stepId: STEP,
+    })
+    expect(result.failed).toBe(0)
+    expect(commonVarValue('account-1', 'stock')).toBe('3')
+  })
+
+  it('加算・減算で版番号と履歴が進む', async () => {
+    seedV1History()
+    addAction('a1', 'common_var', { varKey: 'stock', op: 'sub', value: '3' })
+    await runScenarioActions(db, { scenarioId: SCENARIO, hook: 'step_sent', friendId: 'f1', stepId: STEP })
+    expect(commonVarValue('account-1', 'stock')).toBe('7')
+    expect(commonVarVersion('v1')).toBe(2)
+
+    raw.prepare(`DELETE FROM scenario_actions`).run()
+    addAction('a2', 'common_var', { varKey: 'stock', op: 'add', value: '2' })
+    await runScenarioActions(db, { scenarioId: SCENARIO, hook: 'step_sent', friendId: 'f1', stepId: STEP })
+    expect(commonVarValue('account-1', 'stock')).toBe('9')
+    expect(commonVarVersion('v1')).toBe(3)
+    expect(versionHistory('v1')).toEqual([
+      { version_no: 1, value: '10', change_reason: '作成' },
+      { version_no: 2, value: '7', change_reason: 'シナリオ減算' },
+      { version_no: 3, value: '9', change_reason: 'シナリオ加算' },
+    ])
+  })
+
+  it('引ききれなくても負の数で残る（下限で止めない）', async () => {
+    raw.prepare(`UPDATE common_vars SET value = '2' WHERE id = 'v1'`).run()
+    addAction('a1', 'common_var', { varKey: 'stock', op: 'sub', value: '5' })
+    const result = await runScenarioActions(db, {
+      scenarioId: SCENARIO,
+      hook: 'step_sent',
+      friendId: 'f1',
+      stepId: STEP,
+    })
+    expect(result.failed).toBe(0)
+    expect(commonVarValue('account-1', 'stock')).toBe('-3')
+  })
+
+  it('加算と減算の並行でも両方反映され、版と履歴が連番になる', async () => {
+    seedV1History()
+    addAction('a1', 'common_var', { varKey: 'stock', op: 'add', value: '5' })
+    raw
+      .prepare(
+        `INSERT INTO scenario_actions
+           (id, scenario_id, hook, step_id, choice_index, sort_order, action_type, config_json, condition_json, repeat_on_refire)
+         VALUES ('b1', 's2', 'step_sent', NULL, NULL, 0, 'common_var', ?, NULL, 1)`,
+      )
+      .run(JSON.stringify({ varKey: 'stock', op: 'sub', value: '3' }))
+    const sdb = serializedDb()
+    const [first, second] = await Promise.all([
+      runScenarioActions(sdb, { scenarioId: 's1', hook: 'step_sent', friendId: 'f1', stepId: STEP }),
+      runScenarioActions(sdb, { scenarioId: 's2', hook: 'step_sent', friendId: 'f1' }),
+    ])
+    expect(first.failed).toBe(0)
+    expect(second.failed).toBe(0)
+    // 10 + 5 - 3。順番がどちらでも '12'。
+    expect(commonVarValue('account-1', 'stock')).toBe('12')
+    expect(commonVarVersion('v1')).toBe(3)
+    const history = versionHistory('v1')
+    expect(history.map((h) => h.version_no)).toEqual([1, 2, 3])
+    expect(history[2]?.value).toBe('12')
+  })
+
+  it('10件の連続した並行更新がすべて最終値・版・履歴に残る', async () => {
+    seedV1History()
+    addAction('a1', 'common_var', { varKey: 'stock', op: 'add', value: '1' })
+    const sdb = serializedDb()
+    const input = { scenarioId: SCENARIO, hook: 'step_sent' as const, friendId: 'f1', stepId: STEP }
+    // 再試行も上限もない。競合は起きず、10件すべてが順に当たる。
+    const results = await Promise.all(
+      Array.from({ length: 10 }, () => runScenarioActions(sdb, input)),
+    )
+    for (const result of results) {
+      expect(result.failed).toBe(0)
+      expect(result.executed).toBe(1)
+    }
+    expect(commonVarValue('account-1', 'stock')).toBe('20')
+    expect(commonVarVersion('v1')).toBe(11)
+    assertVersionHistoryConsistent('v1')
+  })
+
+  it('先頭に数字がある文字列は先頭の数として読む（SQL数値化）', async () => {
+    // 計算を SQL の中で行うため、数の読み方は SQLite に従う。
+    // '12abc' は従来の Number 扱いだと0だが、ここでは12として足す。
+    raw.prepare(`UPDATE common_vars SET value = '12abc' WHERE id = 'v1'`).run()
+    addAction('a1', 'common_var', { varKey: 'stock', op: 'add', value: '3' })
+    const result = await runScenarioActions(db, {
+      scenarioId: SCENARIO,
+      hook: 'step_sent',
+      friendId: 'f1',
+      stepId: STEP,
+    })
+    expect(result.failed).toBe(0)
+    expect(commonVarValue('account-1', 'stock')).toBe('15')
+  })
+
+  it('画面編集と並行しても版契約が壊れない', async () => {
+    seedV1History()
+    addAction('a1', 'common_var', { varKey: 'stock', op: 'add', value: '5' })
+    const sdb = serializedDb()
+    const screen = updateCommonVar(sdb, 'v1', 'account-1', { value: '100' }).then(
+      () => ({ ok: true as const }),
+      () => ({ ok: false as const }),
+    )
+    const [scenarioResult, screenResult] = await Promise.all([
+      runScenarioActions(sdb, { scenarioId: SCENARIO, hook: 'step_sent', friendId: 'f1', stepId: STEP }),
+      screen,
+    ])
+    expect(scenarioResult.failed).toBe(0)
+    assertVersionHistoryConsistent('v1')
+    if (screenResult.ok) {
+      // 画面が先なら105、後なら100。どちらも版どおり。
+      expect(['100', '105']).toContain(commonVarValue('account-1', 'stock'))
+    } else {
+      // 画面が古い版で負けた。シナリオの加算だけが残る。
+      expect(commonVarValue('account-1', 'stock')).toBe('15')
+    }
+  })
+
+  it('予約適用と並行しても版契約が壊れない', async () => {
+    seedV1History()
+    raw
+      .prepare(
+        `INSERT INTO common_var_schedules (id, var_id, effective_from, value, applied_at)
+         VALUES ('sch1', 'v1', '2026-01-01T00:00:00.000', '50', NULL)`,
+      )
+      .run()
+    addAction('a1', 'common_var', { varKey: 'stock', op: 'sub', value: '3' })
+    const sdb = serializedDb()
+    const schedule = applyDueCommonVarSchedules(sdb, '2026-06-01T00:00:00.000').then(
+      () => ({ ok: true as const }),
+      () => ({ ok: false as const }),
+    )
+    const [scenarioResult] = await Promise.all([
+      runScenarioActions(sdb, { scenarioId: SCENARIO, hook: 'step_sent', friendId: 'f1', stepId: STEP }),
+      schedule,
+    ])
+    expect(scenarioResult.failed).toBe(0)
+    assertVersionHistoryConsistent('v1')
+    const applied = (
+      raw.prepare(`SELECT applied_at FROM common_var_schedules WHERE id = 'sch1'`).get() as {
+        applied_at: string | null
+      }
+    ).applied_at
+    if (applied) {
+      // 予約が当たった。先なら47、シナリオの後なら絶対値50のまま。
+      expect(['47', '50']).toContain(commonVarValue('account-1', 'stock'))
+    } else {
+      // 予約は版で負けて次回送り。シナリオの減算だけが残る。
+      expect(commonVarValue('account-1', 'stock')).toBe('7')
+    }
   })
 })
+
+function commonVarValue(lineAccountId: string, varKey: string): string | null {
+  const row = raw
+    .prepare(`SELECT value FROM common_vars WHERE line_account_id = ? AND var_key = ?`)
+    .get(lineAccountId, varKey) as { value: string } | undefined
+  return row?.value ?? null
+}
+
+function commonVarVersion(id: string): number {
+  const row = raw.prepare(`SELECT version FROM common_vars WHERE id = ?`).get(id) as {
+    version: number
+  }
+  return row.version
+}
+
+interface VersionHistoryRow {
+  version_no: number
+  value: string
+  change_reason: string
+}
+
+function versionHistory(varId: string): VersionHistoryRow[] {
+  return raw
+    .prepare(
+      `SELECT version_no, value, change_reason FROM common_var_versions
+        WHERE common_var_id = ? ORDER BY version_no ASC`,
+    )
+    .all(varId) as VersionHistoryRow[]
+}
+
+/** 備品の v1 行には履歴が無いので、版1の行を足す。 */
+function seedV1History(): void {
+  raw
+    .prepare(
+      `INSERT INTO common_var_versions
+         (id, common_var_id, version_no, name, value, memo, change_reason, actor_id, created_at)
+       VALUES ('hv1', 'v1', 1, '在庫', '10', '', '作成', NULL, '2026-01-01T00:00:00.000')`,
+    )
+    .run()
+}
+
+/** 版番号と履歴が食い違っていないこと。最後の履歴が今の値を指す。 */
+function assertVersionHistoryConsistent(varId: string): void {
+  const version = commonVarVersion(varId)
+  const history = versionHistory(varId)
+  expect(history.map((h) => h.version_no)).toEqual(
+    Array.from({ length: version }, (_, i) => i + 1),
+  )
+  const row = raw.prepare(`SELECT value FROM common_vars WHERE id = ?`).get(varId) as {
+    value: string
+  }
+  expect(history[history.length - 1]?.value).toBe(row.value)
+}
+
+/**
+ * batch だけを直列にする D1。
+ *
+ * テスト用の D1 は接続が1つなので、2つの batch が重なると BEGIN が
+ * 入れ子になって落ちる。本物の D1 では batch は原子単位で直列に確定
+ * されるので、その動きをここで再現する。
+ */
+function serializedDb(): D1Database {
+  let tail: Promise<unknown> = Promise.resolve()
+  const batch = async (statements: D1PreparedStatement[]) => {
+    const run = tail.then(() =>
+      (db as unknown as { batch: (s: D1PreparedStatement[]) => Promise<unknown> }).batch(statements),
+    )
+    tail = run.catch(() => undefined)
+    return run
+  }
+  return {
+    prepare: db.prepare.bind(db),
+    batch: batch as unknown as D1Database['batch'],
+  } as unknown as D1Database
+}
+
+
 
 describe('シナリオ操作', () => {
   it('購読を始める', async () => {

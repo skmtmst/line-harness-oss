@@ -14,6 +14,8 @@ vi.mock('@line-crm/db', async () => ({
   ...mocks,
 }));
 
+vi.mock('./feature-enforcement.js', () => ({ featureJobCanRun: async () => true }));
+
 const { refreshRecentAnalyticsProjections, selectNextAnalyticsProjectionAccount } =
   await import('./analytics-projection.js');
 

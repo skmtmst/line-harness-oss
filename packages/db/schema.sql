@@ -214,6 +214,8 @@ CREATE TABLE IF NOT EXISTS messages_log (
 );
 
 CREATE INDEX IF NOT EXISTS idx_messages_log_broadcast_id ON messages_log(broadcast_id);
+CREATE INDEX IF NOT EXISTS idx_messages_log_broadcast_friend_direction
+  ON messages_log (broadcast_id, friend_id, direction);
 
 CREATE INDEX IF NOT EXISTS idx_messages_log_friend_id ON messages_log (friend_id);
 CREATE INDEX IF NOT EXISTS idx_messages_log_created_at ON messages_log (created_at);
@@ -356,6 +358,7 @@ CREATE TABLE IF NOT EXISTS line_accounts (
   og_site_name           TEXT,
   og_default_image_url   TEXT,
   og_default_description TEXT,
+  official_profile_url   TEXT,
   created_at             TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at             TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
@@ -405,6 +408,20 @@ CREATE INDEX IF NOT EXISTS idx_conversion_events_affiliate ON conversion_events 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_conversion_events_point_idempotency
   ON conversion_events(conversion_point_id, idempotency_key)
   WHERE idempotency_key IS NOT NULL;
+CREATE TABLE IF NOT EXISTS conversion_event_dedup_claims (
+  conversion_point_id TEXT NOT NULL REFERENCES conversion_points(id) ON DELETE CASCADE,
+  friend_id           TEXT NOT NULL REFERENCES friends(id) ON DELETE CASCADE,
+  mode                TEXT NOT NULL CHECK (mode IN ('lifetime', 'window')),
+  window_days         INTEGER CHECK (window_days IS NULL OR window_days BETWEEN 1 AND 365),
+  last_event_id       TEXT NOT NULL,
+  last_at             TEXT NOT NULL,
+  updated_at          TEXT NOT NULL,
+  PRIMARY KEY (conversion_point_id, friend_id),
+  CHECK ((mode = 'lifetime' AND window_days IS NULL)
+      OR (mode = 'window' AND window_days IS NOT NULL))
+);
+CREATE INDEX IF NOT EXISTS idx_conversion_event_dedup_claims_event
+  ON conversion_event_dedup_claims(last_event_id);
 CREATE INDEX IF NOT EXISTS idx_conversion_points_status ON conversion_points(status, created_at DESC);
 
 CREATE TRIGGER IF NOT EXISTS conversion_points_prevent_delete
@@ -520,6 +537,7 @@ CREATE TABLE IF NOT EXISTS mileage_rules (
   initial_status TEXT NOT NULL DEFAULT 'available'
                  CHECK (initial_status IN ('pending','available')),
   conditions     TEXT CHECK (conditions IS NULL OR json_valid(conditions)),
+  line_account_id TEXT REFERENCES line_accounts(id),
   is_active      INTEGER NOT NULL DEFAULT 1,
   valid_from     TEXT,
   valid_until    TEXT,

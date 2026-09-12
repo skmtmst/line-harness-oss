@@ -6,8 +6,10 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import type { DeliveryMode, Folder, Scenario } from '@line-crm/shared'
 import { ApiError, api } from '@/lib/api'
-import Header from '@/components/layout/header'
 import SelectField from '@/components/shared/select-field'
+import { usePageTitle } from '@/components/shell/page-chrome'
+import { scenarioReferenceData } from '@/components/scenarios/scenario-reference-data'
+import './scenario-mode.css'
 
 /**
  * 配信方式の選択（設計）。
@@ -28,6 +30,7 @@ export default function ScenarioModePage() {
 }
 
 function ScenarioModeContent() {
+  usePageTitle('シナリオを作成')
   const router = useRouter()
   const params = useSearchParams()
   const id = params.get('id') ?? ''
@@ -63,6 +66,7 @@ function ScenarioModeContent() {
           return false
         }
         setScenario(res.data)
+        scenarioReferenceData.invalidateScenario(id)
         setName(res.data.name)
         setFolderId(res.data.folderId ?? '')
         return true
@@ -85,7 +89,7 @@ function ScenarioModeContent() {
     if (!id) return
     let active = true
     setScenarioState('loading')
-    void api.scenarios.get(id)
+    void scenarioReferenceData.scenario(id)
       .then((res) => {
         if (!active) return
         if (res.success) {
@@ -147,6 +151,7 @@ function ScenarioModeContent() {
         setSaving(null)
         return
       }
+      scenarioReferenceData.invalidateScenario(id)
       // 3段目へ。設計の帯が3段なので、2段で編集画面へ放り出さない。
       router.push(`/scenarios/first-step?id=${encodeURIComponent(id)}`)
     } catch (cause) {
@@ -182,51 +187,20 @@ function ScenarioModeContent() {
 
   return (
     <div data-design-node="cCB7r" data-list-state={scenarioState} aria-busy={scenarioState === 'loading'}>
-      <nav data-design="Crumb" className="text-ink-faint mb-2 text-xs">
-        <Link href="/scenarios" className="hover:underline">
-          シナリオ配信
+      <div data-design="Head" className="mb-7 flex items-center justify-between">
+        <nav data-design="Crumb" className="text-ink-faint text-xs">
+          <Link href="/scenarios" className="hover:underline">
+            シナリオ配信
+          </Link>
+          <span className="mx-1.5">/</span>
+          <span>新規作成</span>
+        </nav>
+        <Link
+          href="/scenarios"
+          className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control inline-flex items-center border px-3 py-2 text-sm font-medium"
+        >
+          ✕ キャンセル
         </Link>
-        <span className="mx-1.5">/</span>
-        <span>配信方式の選択</span>
-      </nav>
-
-      <div data-design="Head">
-        <Header
-          title="配信方式の選択"
-          description="このシナリオでステップを並べる基準を選びます。あとから変更できますが、設定済みのステップは作り直しになります。"
-          action={
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                disabled
-                title="マニュアルは準備中です"
-                className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm font-medium opacity-50"
-              >
-                マニュアル
-              </button>
-              <Link
-                href="/scenarios"
-                className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control inline-flex items-center border px-3 py-2 text-sm font-medium"
-              >
-                ✕ キャンセル
-              </Link>
-            </div>
-          }
-        />
-      </div>
-
-      <div data-design="Notice" className="space-y-2">
-        {scenarioState === 'loading' && (
-          <p className="bg-info-bg text-info rounded-card px-4 py-3 text-sm">
-            シナリオを読み込んでいます。
-          </p>
-        )}
-        {scenarioState === 'ready' && scenario && (
-          <p className="bg-success-bg text-success rounded-card px-4 py-3 text-sm">
-            シナリオ「{scenario.name}」を作成しました。続けて配信方式を選んでください。
-            <span className="text-ink-faint ml-3 text-xs">フォルダ：{selectedFolderName}</span>
-          </p>
-        )}
-        {error && <p className="bg-danger-bg text-danger rounded-card px-4 py-3 text-sm">{error}</p>}
       </div>
 
       <StepTrail
@@ -238,8 +212,23 @@ function ScenarioModeContent() {
         ]}
       />
 
+      <div data-design="Notice" className="mt-4 space-y-2">
+        {scenarioState === 'loading' && (
+          <p className="bg-info-bg text-info rounded-card px-4 py-3 text-sm">
+            シナリオを読み込んでいます。
+          </p>
+        )}
+        {scenarioState === 'ready' && scenario && (
+          <p className="bg-success-bg text-success rounded-card px-4 py-3 text-sm">
+            「{scenario.name}」の下書きを作成しました。続けて配信方式を選んでください。
+          </p>
+        )}
+        {error && <p className="bg-danger-bg text-danger rounded-card px-4 py-3 text-sm">{error}</p>}
+      </div>
+
       <div data-design="Name" className="bg-canvas rounded-card border-hairline mt-4 mb-4 border p-4">
-        <div className="grid max-w-3xl gap-4 md:grid-cols-2">
+        <h2 className="text-ink text-sm font-bold">シナリオ情報</h2>
+        <div className="mt-2 grid max-w-4xl gap-4 md:grid-cols-2">
           <label className="block">
             <span className="text-ink-secondary mb-1 block text-xs font-medium">
               シナリオ名 <span className="text-danger">*</span>
@@ -253,15 +242,13 @@ function ScenarioModeContent() {
               placeholder="例: 友だち追加ウェルカム"
               className="border-hairline rounded-control bg-canvas text-ink focus:ring-accent w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
             />
-            <span className="text-ink-faint mt-1 block text-xs">
-              一覧に出る名前です。あとから変えられます。
-            </span>
           </label>
 
           <label className="block">
-            <span className="text-ink-secondary mb-1 block text-xs font-medium">フォルダ</span>
+            <span className="text-ink-secondary mb-1 block text-xs font-medium">フォルダ：</span>
             <SelectField
               value={folderId}
+              title={selectedFolderName}
               disabled={!scenario || folderState !== 'ready' || detailsSaving || saving !== null}
               onChange={(event) => {
                 const nextFolderId = event.target.value
@@ -276,15 +263,15 @@ function ScenarioModeContent() {
                 ...folders.map((folder) => ({ value: folder.id, label: folder.name })),
               ]}
             />
-            <span className="text-ink-faint mt-1 block text-xs">
-              {folderState === 'loading'
-                ? 'フォルダを読み込んでいます。'
-                : folderState === 'error'
-                  ? 'フォルダを確認できないため、いまは変更できません。'
-                  : detailsSaving
-                    ? 'フォルダを保存しています。'
-                    : '一覧で探しやすい分類を選べます。'}
-            </span>
+            {folderState !== 'ready' || detailsSaving ? (
+              <span className="text-ink-faint mt-1 block text-xs">
+                {folderState === 'loading'
+                  ? 'フォルダを読み込んでいます。'
+                  : folderState === 'error'
+                    ? 'フォルダを確認できないため、いまは変更できません。'
+                    : 'フォルダを保存しています。'}
+              </span>
+            ) : null}
           </label>
         </div>
       </div>
@@ -293,7 +280,6 @@ function ScenarioModeContent() {
         <ModeCard
           mode="absolute_time"
           title="時刻で指定"
-          recommended
           lead="配信時刻がそろうため、開封されやすい時間帯に寄せられます。"
           body="配信のタイミングを「購読開始から〇日後の〇時」と指定できます。メルマガのような決まった時間の定期配信ができます。"
           uses={['メルマガ配信', '定期リマインド', '朝夜の固定配信']}
@@ -398,8 +384,8 @@ function ModeCard({
   onChoose: (mode: DeliveryMode) => void
 }) {
   return (
-    // h-full と mt-auto の組み合わせで、2枚のカードの高さと下のボタンの位置が
-    // そろう。中身の長さが違うと、ボタンだけ上下にずれる。
+    // カードの高さはそろえるが、操作は説明の直後に置く。Pencilでは内容の短い
+    // 「時刻で指定」の操作を下端まで押し下げず、読んだ流れで選べる。
     <section className="bg-canvas rounded-card border-hairline flex h-full flex-col border p-5">
       <div className="flex items-start gap-3">
         {/* 絵文字は使わない。端末やフォントで見た目が変わるうえ、
@@ -427,9 +413,9 @@ function ModeCard({
         </div>
       </div>
 
-      <p className="text-ink mt-4 text-sm leading-relaxed">{body}</p>
+      <p className="text-ink mt-3 text-sm leading-relaxed">{body}</p>
 
-      <div className="mt-3 flex flex-wrap gap-2">
+      <div className="mt-2 flex flex-wrap gap-2">
         {uses.map(u => (
           <span key={u} className="bg-canvas-sunken text-ink-secondary rounded-control px-2 py-1 text-xs">
             {u}
@@ -441,10 +427,10 @@ function ModeCard({
         具体例。どちらを選ぶと何が変わるかは、言葉より並べた時刻のほうが早い。
         同じ日の違う時刻に始めた2人で、届く時刻がそろうか・ズレるかを見せる。
       */}
-      <div className="border-hairline rounded-card mt-4 border p-4">
+      <div className={`border-hairline rounded-card border p-4 ${mode === 'absolute_time' ? 'mt-0' : 'mt-2'}`}>
         <p className="text-ink-secondary text-xs">具体例：同じ日の違う時刻に購読開始した2人</p>
         {heads && (
-          <div className="mt-3 flex gap-2 pl-[9.5rem]">
+          <div className={`${mode === 'absolute_time' ? 'mt-0' : 'mt-2'} flex gap-2 pl-[9.5rem]`}>
             {heads.map(h => (
               <span
                 key={h}
@@ -455,7 +441,7 @@ function ModeCard({
             ))}
           </div>
         )}
-        <div className="mt-2 space-y-2">
+        <div className={mode === 'absolute_time' ? 'mt-0 space-y-0' : 'mt-1 space-y-1'}>
           {rows.map(r => (
             <div key={r.who} className="flex items-center gap-2">
               <div className="w-36 shrink-0">
@@ -467,17 +453,17 @@ function ModeCard({
             </div>
           ))}
         </div>
-        <p className="border-hairline text-ink-secondary rounded-control mt-3 border px-3 py-2 text-xs leading-relaxed">
+        <p className={`border-hairline text-ink-secondary rounded-control border px-3 py-2 text-xs leading-relaxed ${mode === 'absolute_time' ? 'mt-0' : 'mt-2'}`}>
           {result}
         </p>
-        <p className="text-ink-faint mt-2 text-[11px] leading-relaxed">※ {note}</p>
+        <p className={`text-ink-faint text-[11px] leading-relaxed ${mode === 'absolute_time' ? 'mt-0' : 'mt-1'}`}>※ {note}</p>
       </div>
 
       <button
         type="button"
         onClick={() => onChoose(mode)}
         disabled={disabled || saving !== null}
-        className="bg-accent-deep hover:brightness-92 text-on-accent rounded-control mt-auto w-full px-4 py-3 text-sm font-bold transition-colors disabled:opacity-50"
+        className="bg-accent-deep hover:brightness-92 text-on-accent rounded-control mt-0 w-full px-4 py-3 text-sm font-bold transition-colors disabled:opacity-50"
       >
         {saving === mode ? '作成中…' : `${cta} →`}
       </button>

@@ -1,4 +1,5 @@
 import type { MileageRewardFailurePolicy, MileageRewardKind } from '@/lib/api'
+import type { SegmentCondition } from '@/lib/segment-condition'
 
 /**
  * 使い道の入力の中身（設計 `p9CcEB` 17-1-G）。
@@ -18,6 +19,7 @@ export type FormState = {
   endsAt: string
   benefitExpiresDays: string
   commonActionVersionId: string
+  targetConditions: SegmentCondition | null
   failurePolicy: MileageRewardFailurePolicy
   customerMessage: string
 }

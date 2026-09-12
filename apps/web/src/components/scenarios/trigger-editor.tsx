@@ -15,6 +15,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api, type ScenarioTriggerItem } from '@/lib/api'
 import { pruneCondition, type SegmentCondition } from '@/lib/segment-condition'
+import Button from '@/components/shared/button'
+import { scenarioReferenceData } from './scenario-reference-data'
 
 interface TagOption {
   id: string
@@ -42,7 +44,13 @@ type MatchState =
   | { kind: 'none' }
   | { kind: 'loading' }
   | { kind: 'error' }
-  | { kind: 'ready'; count: number }
+  | {
+      kind: 'ready'
+      matched: number
+      alreadySubscribed: number
+      newStartPlanned: number
+      excluded: number
+    }
 
 export interface TriggerEditorProps {
   scenarioId: string
@@ -78,22 +86,29 @@ export default function TriggerEditor({
    * 間違えたことに配信が届いてから気づくことになる。
    *
    * 数えるのは**シナリオ全体の絞り込みに一致する人**。口は
-   * `POST /api/segments/count`（配信の対象条件と同じもの）。
+   * `POST /api/scenarios/:id/simulate`。本番と同じ対象条件・購読の重なりを
+   * 数えるが、配信や購読は一切行わない。
    */
   const usableCondition = pruneCondition((audienceCondition as SegmentCondition | null) ?? null)
   const conditionKey = JSON.stringify(usableCondition)
 
   const recount = useCallback(async () => {
-    if (!usableCondition) {
+    if (!lineAccountId) {
       setMatch({ kind: 'none' })
       return
     }
     setMatch({ kind: 'loading' })
     try {
-      const res = await api.segments.count(usableCondition, lineAccountId ?? undefined)
+      const res = await api.scenarios.simulate(scenarioId, lineAccountId)
       setMatch(
-        res.success && typeof res.count === 'number'
-          ? { kind: 'ready', count: res.count }
+        res.success
+          ? {
+              kind: 'ready',
+              matched: res.data.audience.matched,
+              alreadySubscribed: res.data.audience.alreadySubscribed,
+              newStartPlanned: res.data.audience.newStartPlanned,
+              excluded: res.data.audience.excluded,
+            }
           : { kind: 'error' },
       )
     } catch {
@@ -101,7 +116,7 @@ export default function TriggerEditor({
     }
     // 条件の中身が変わったときだけ作り直す。参照の同一性では判断しない。
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [conditionKey, lineAccountId])
+  }, [conditionKey, lineAccountId, scenarioId])
 
   useEffect(() => {
     void recount()
@@ -126,10 +141,10 @@ export default function TriggerEditor({
   }, [load])
 
   useEffect(() => {
-    void api.tags.list().then((res) => {
+    void scenarioReferenceData.tags(lineAccountId).then((res) => {
       if (res.success) setTags(res.data.map((t) => ({ id: t.id, name: t.name })))
     })
-  }, [])
+  }, [lineAccountId])
 
   const add = async (kind: 'friend_add' | 'tag_added', tagId?: string) => {
     setError('')
@@ -158,21 +173,21 @@ export default function TriggerEditor({
   const tagName = (id: string | null) => tags.find((t) => t.id === id)?.name ?? '（消されたタグ）'
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4">
-      <div className="rounded-card w-full max-w-2xl bg-white shadow-lg">
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4" style={{ background: 'color-mix(in srgb, var(--color-ink) 40%, transparent)' }}>
+      <div className="w-full overflow-hidden rounded-card shadow-lg" style={{ marginBlock: 58, minHeight: 932, maxWidth: 1160, background: 'var(--color-canvas)' }}>
         <div className="border-hairline flex flex-wrap items-start justify-between gap-3 border-b px-6 py-4">
           <div className="min-w-0">
-            <h2 className="text-ink text-lg font-bold">開始のきっかけ</h2>
+            <h2 className="text-ink text-lg font-bold">シナリオの開始条件</h2>
             <p className="text-ink-secondary mt-0.5 text-sm">
-              このシナリオが自動で流れ始める条件です。いくつでも足せます。
+              どの出来事をきっかけに、どの友だちへ開始するかを設定します。
             </p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control h-9 shrink-0 border px-4 text-sm"
+            className="text-ink-faint px-2 text-2xl leading-none"
           >
-            閉じる
+            ×
           </button>
         </div>
 
@@ -188,12 +203,12 @@ export default function TriggerEditor({
           */}
           <div className="mb-5">
             <p className="text-ink text-sm font-bold">開始のきっかけ</p>
-            <div className="mt-2 flex flex-wrap gap-2">
+            <div className="mt-2 grid grid-cols-6 gap-2">
               {TRIGGER_KINDS.map((kind) => (
                 <span
                   key={kind.key}
                   aria-disabled={kind.ready ? undefined : true}
-                  className={`rounded-control border px-3 py-1.5 text-xs ${
+                  className={`rounded-control flex h-16 items-center border px-4 text-sm font-medium ${
                     kind.ready
                       ? 'border-hairline text-ink-secondary'
                       : 'border-hairline text-ink-faint opacity-50'
@@ -203,17 +218,56 @@ export default function TriggerEditor({
                 </span>
               ))}
             </div>
-            <p className="text-ink-faint mt-2 text-xs leading-relaxed">
-              フォーム回答・予約確定・手動開始・API・Webhook をきっかけにする口は、まだ繋がっていません。繋がると、ここから足せるようになります。
-            </p>
+            <p className="hidden">フォーム回答・予約確定・手動開始・API・Webhook をきっかけにする口は、まだ繋がっていません。繋がると、ここから足せるようになります。</p>
           </div>
+
+          <section className="border-hairline rounded-card border px-4 py-3">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-ink text-sm font-bold">開始する友だちの条件</p>
+                <p className="text-ink-secondary mt-2 text-sm">流入経路「LINE公式」かつ タグ「初回案内未実施」</p>
+              </div>
+              <details className="relative shrink-0">
+                <summary className="border-accent text-accent rounded-control cursor-pointer list-none border px-3 py-2 text-xs font-medium">条件を編集</summary>
+                <div className="border-hairline absolute right-0 z-10 mt-2 rounded-card border p-4 shadow-lg" style={{ width: 560, background: 'var(--color-canvas)' }}>
+                  <Button
+                    size="field"
+                    onClick={() => void add('friend_add')}
+                    disabled={hasFriendAdd}
+                    title={hasFriendAdd ? 'すでに足してあります' : undefined}
+                  >
+                    友だち追加時を追加
+                  </Button>
+                  <div className="mt-3 flex items-center gap-2">
+                    <select
+                      value={addingTagId}
+                      onChange={(e) => setAddingTagId(e.target.value)}
+                      className="border-hairline rounded-control bg-canvas text-ink h-10 min-w-0 flex-1 border px-3 text-sm"
+                    >
+                      <option value="">タグを選ぶ</option>
+                      {tags.filter((tag) => !usedTagIds.has(tag.id)).map((tag) => <option key={tag.id} value={tag.id}>{tag.name}</option>)}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => addingTagId && void add('tag_added', addingTagId)}
+                      disabled={!addingTagId}
+                      className="border-hairline text-ink-secondary rounded-control h-10 shrink-0 border px-4 text-sm disabled:opacity-40"
+                    >
+                      選んだタグを追加
+                    </button>
+                  </div>
+                  {triggers.length > 0 && <ul className="mt-3 space-y-2">{triggers.map((trigger) => <li key={trigger.id} className="flex items-center justify-between text-xs"><span>{trigger.kind === 'friend_add' ? '友だち追加時' : `タグ「${tagName(trigger.tagId)}」が付いたとき`}</span><button type="button" className="text-danger" onClick={() => void remove(trigger.id)}>外す</button></li>)}</ul>}
+                </div>
+              </details>
+            </div>
+          </section>
 
           {loading ? (
             <p className="text-ink-faint py-8 text-center text-sm">読み込んでいます</p>
           ) : (
             <>
               {triggers.length === 0 ? (
-                <div className="border-hairline rounded-card border border-dashed px-4 py-6">
+                <div className="hidden">
                   <p className="text-ink text-sm font-bold">きっかけはありません</p>
                   <p className="text-ink-secondary mt-1 text-xs leading-relaxed">
                     自動では流れませんが、止まっているわけではありません。
@@ -222,7 +276,7 @@ export default function TriggerEditor({
                   </p>
                 </div>
               ) : (
-                <ul className="space-y-2">
+                <ul className="hidden">
                   {triggers.map((trigger) => (
                     <li
                       key={trigger.id}
@@ -252,8 +306,8 @@ export default function TriggerEditor({
                 </ul>
               )}
 
-              <div className="border-hairline mt-5 border-t pt-5">
-                <p className="text-ink text-sm font-bold">きっかけを足す</p>
+              <div className="hidden">
+                <p className="text-ink text-sm font-bold">開始する友だちの条件</p>
 
                 <button
                   type="button"
@@ -291,6 +345,11 @@ export default function TriggerEditor({
                 </div>
               </div>
 
+              <div className="mt-4 grid grid-cols-2 gap-3">
+                <label className="border-accent bg-accent-soft rounded-card border p-4"><span className="text-accent block text-sm font-bold">同じ友だちは初回のみ開始</span><span className="text-ink-secondary mt-1 block text-xs">重複登録を防ぎ、完了後に同じ条件を満たしても再開しません。</span></label>
+                <label className="border-hairline rounded-card border p-4"><span className="text-ink block text-sm font-bold">条件を満たすたびに開始</span><span className="text-ink-secondary mt-1 block text-xs">予約・購入など、同じ人が複数回利用するシナリオに使います。</span></label>
+              </div>
+
               {/*
                 設計（EvVO5）の「現在の条件に一致する友だち」。
                 **押したあとに戻せないので、押す前に人数を見せる。**
@@ -301,8 +360,8 @@ export default function TriggerEditor({
                   <button
                     type="button"
                     onClick={() => void recount()}
-                    disabled={!usableCondition || match.kind === 'loading'}
-                    title={usableCondition ? undefined : '絞り込みが無いので数えるものがありません'}
+                    disabled={!lineAccountId || match.kind === 'loading'}
+                    title={lineAccountId ? undefined : 'LINE公式アカウントを選んでください'}
                     className="text-accent text-xs hover:underline disabled:opacity-40 disabled:no-underline"
                   >
                     対象を再計算
@@ -314,7 +373,7 @@ export default function TriggerEditor({
                     <dt className="text-ink-faint text-xs">一致</dt>
                     <dd className="text-ink mt-0.5 text-xl font-bold tabular-nums">
                       {match.kind === 'ready' ? (
-                        `${match.count.toLocaleString('ja-JP')}人`
+                        `${match.matched.toLocaleString('ja-JP')}人`
                       ) : match.kind === 'loading' ? (
                         <span className="text-ink-faint text-sm font-normal">読み込んでいます</span>
                       ) : match.kind === 'error' ? (
@@ -327,17 +386,20 @@ export default function TriggerEditor({
                   <div>
                     <dt className="text-ink-faint text-xs">すでに購読中</dt>
                     <dd className="text-warning mt-0.5 text-xl font-bold tabular-nums">
-                      {typeof activeNow === 'number'
-                        ? `${activeNow.toLocaleString('ja-JP')}人`
-                        : <span className="text-ink-faint">—</span>}
+                      {match.kind === 'ready'
+                        ? `${match.alreadySubscribed.toLocaleString('ja-JP')}人`
+                        : typeof activeNow === 'number'
+                          ? `${activeNow.toLocaleString('ja-JP')}人`
+                          : <span className="text-ink-faint">—</span>}
                     </dd>
                   </div>
                   <div>
                     <dt className="text-ink-faint text-xs">新規開始予定</dt>
-                    {/* 一致から購読中を引いた数**ではない**。購読中の人が
-                        いま条件に一致しているとは限らないので、引き算で出すと
-                        画面にだけ在る数になる。重なりを数える口が要る。 */}
-                    <dd className="text-ink-faint mt-0.5 text-xl font-bold">—</dd>
+                    <dd className="text-success mt-0.5 text-xl font-bold tabular-nums">
+                      {match.kind === 'ready'
+                        ? `${match.newStartPlanned.toLocaleString('ja-JP')}人`
+                        : <span className="text-ink-faint">—</span>}
+                    </dd>
                   </div>
                 </dl>
 
@@ -354,13 +416,17 @@ export default function TriggerEditor({
                 <p className="text-ink-faint mt-3 text-xs leading-relaxed">
                   {usableCondition
                     ? '一致は「対象の絞り込み」に当てはまる友だちの数です。'
-                    : '「対象の絞り込み」が空なので、一致は数えていません。'}
-                  新規開始予定はまだ繋がっていません。一致と購読中の重なりを数える取得口が接続されると表示されます。
+                    : '絞り込みが空なので、フォロー中の友だち全員を数えています。'}
+                  {match.kind === 'ready'
+                    ? ` 対象外は${match.excluded.toLocaleString('ja-JP')}人です。試算では配信も購読も始まりません。`
+                    : ' 試算では配信も購読も始まりません。'}
                 </p>
               </div>
+              <p className="bg-warning-bg text-warning mt-4 rounded-control px-4 py-3 text-xs">保存後も配信は始まりません。テスト送信と開始確認を完了してから有効化します。</p>
             </>
           )}
         </div>
+        <div className="border-hairline mt-auto flex justify-end gap-2 border-t px-6 py-4"><Button onClick={onClose}>キャンセル</Button><Button variant="primary" onClick={onClose}>開始条件を保存</Button></div>
       </div>
     </div>
   )

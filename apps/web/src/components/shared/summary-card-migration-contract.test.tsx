@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import KpiCard from '../dashboard/kpi-card'
+import KpiCard from './kpi-card'
 import SummaryCard from './summary-card'
 
 const SRC = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
@@ -39,7 +39,7 @@ describe('SummaryCardへの移行契約', () => {
 
   it('3系統の実装元が共通SummaryCardだけを描画する', () => {
     const files = [
-      'components/dashboard/kpi-card.tsx',
+      'components/shared/kpi-card.tsx',
       'components/friends/friend-kpis.tsx',
       'components/shared/list-kpis.tsx',
       'components/users/summary-bar.tsx',
@@ -51,6 +51,8 @@ describe('SummaryCardへの移行契約', () => {
       expect(source, `${file} に旧カードの影が残っている`).not.toContain('shadow-[')
       expect(source, `${file} に旧カードの任意角丸が残っている`).not.toContain('rounded-[')
     }
+
+    expect(readSource('components/dashboard/kpi-card.tsx')).toContain("from '@/components/shared/kpi-card'")
   })
 
   it('V5基準・V6優先と9ルートの影響範囲を契約へ残す', () => {

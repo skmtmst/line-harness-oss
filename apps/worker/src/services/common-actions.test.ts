@@ -1,6 +1,7 @@
 import type Database from 'better-sqlite3';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite';
+import { createTemplate, publishTemplate } from '@line-crm/db';
 import {
   CommonActionValidationError,
   createCommonAction,
@@ -103,12 +104,116 @@ describe('V6共通アクション', () => {
     ).get(created.draftVersionId)).toEqual({ status: 'draft' });
   });
 
+  it('未公開・別アカウントのテンプレートは結びつけられない(再審査2・3)', async () => {
+    const messageAction = (templateId: string) => [{
+      id: 'msg-step',
+      type: 'send_message',
+      params: { templateId },
+      onFailure: 'stop',
+    }];
+    const tryPublish = async (name: string, templateId: string) => {
+      const created = await createCommonAction(testDb.db, {
+        lineAccountId: 'account-1', name, actions: messageAction(templateId),
+      });
+      return publishCommonActionDraft(testDb.db, {
+        id: created.id, lineAccountId: 'account-1', draftVersionId: created.draftVersionId,
+      });
+    };
+    const unpublished = await createTemplate(testDb.db, {
+      name: '未公開', messageType: 'text', messageContent: '未公開の本文', lineAccountId: 'account-1',
+    });
+    await expect(tryPublish('未公開を使う', unpublished.id)).rejects.toMatchObject(
+      { code: 'resource_not_found', field: 'actions.0.params.templateId' },
+    );
+
+    const other = await createTemplate(testDb.db, {
+      name: '別持ち主', messageType: 'text', messageContent: '別の本文', lineAccountId: 'account-2',
+    });
+    await publishTemplate(testDb.db, other.id, { idempotencyKey: 'common-other-publish' });
+    await expect(tryPublish('別持ち主を使う', other.id)).rejects.toMatchObject(
+      { code: 'resource_not_found', field: 'actions.0.params.templateId' },
+    );
+
+    const mine = await createTemplate(testDb.db, {
+      name: '公開済み', messageType: 'text', messageContent: '公開版の本文', lineAccountId: 'account-1',
+    });
+    await publishTemplate(testDb.db, mine.id, { idempotencyKey: 'common-mine-publish' });
+    const published = await tryPublish('公開済みを使う', mine.id);
+    expect(published.versionNumber).toBe(1);
+  });
+
+  it('テンプレート候補は同一アカウントの公開版だけを返す', async () => {
+    const unpublished = await createTemplate(testDb.db, {
+      name: '編集中', messageType: 'text', messageContent: '下書き', lineAccountId: 'account-1',
+    });
+    const published = await createTemplate(testDb.db, {
+      name: '公開中', messageType: 'text', messageContent: '公開版', lineAccountId: 'account-1',
+    });
+    const other = await createTemplate(testDb.db, {
+      name: '別アカウント', messageType: 'text', messageContent: '公開版', lineAccountId: 'account-2',
+    });
+    await publishTemplate(testDb.db, published.id, {
+      expectedVersion: 0,
+      expectedDraftRevision: 1,
+      idempotencyKey: 'common-resource-publish-1',
+    });
+    await publishTemplate(testDb.db, other.id, {
+      expectedVersion: 0,
+      expectedDraftRevision: 1,
+      idempotencyKey: 'common-resource-publish-2',
+    });
+
+    const resources = await listCommonActionResources(testDb.db, { lineAccountId: 'account-1' });
+    expect(resources.templates).toEqual([{ id: published.id, name: '公開中' }]);
+    expect(resources.templates).not.toContainEqual({ id: unpublished.id, name: '編集中' });
+    expect(resources.templates).not.toContainEqual({ id: other.id, name: '別アカウント' });
+  });
+
   it('未知の処理を保存も公開もしない', async () => {
     await expect(createCommonAction(testDb.db, {
       lineAccountId: 'account-1',
       name: '未接続処理',
       actions: [{ id: 'future', type: 'future_action', params: {}, onFailure: 'stop' }],
     })).rejects.toMatchObject({ code: 'action_type_unsupported' });
+  });
+
+  it('タグ条件の分岐を検査し、両方の公開版を固定する', async () => {
+    const yes = await createCommonAction(testDb.db, {
+      lineAccountId: 'account-1', name: 'VIP向け', actions: tagAction('tag-1'),
+    });
+    await publishCommonActionDraft(testDb.db, {
+      id: yes.id, lineAccountId: 'account-1', draftVersionId: yes.draftVersionId,
+    });
+    const no = await createCommonAction(testDb.db, {
+      lineAccountId: 'account-1', name: '通常向け', actions: tagAction('tag-1'),
+    });
+    await publishCommonActionDraft(testDb.db, {
+      id: no.id, lineAccountId: 'account-1', draftVersionId: no.draftVersionId,
+    });
+    const branched = await createCommonAction(testDb.db, {
+      lineAccountId: 'account-1',
+      name: 'VIPで分ける',
+      actions: [{
+        id: 'branch-1', type: 'branch', onFailure: 'stop',
+        params: {
+          condition: { operator: 'AND', rules: [{ type: 'tag_exists', value: 'tag-1' }] },
+          then: [{ id: 'yes', type: 'common_action', params: { commonActionId: yes.id }, onFailure: 'stop' }],
+          else: [{ id: 'no', type: 'common_action', params: { commonActionId: no.id }, onFailure: 'stop' }],
+        },
+      }],
+    });
+    await publishCommonActionDraft(testDb.db, {
+      id: branched.id, lineAccountId: 'account-1', draftVersionId: branched.draftVersionId,
+    });
+    const detail = await getCommonActionDetail(testDb.db, {
+      id: branched.id, lineAccountId: 'account-1',
+    });
+    const branch = detail.versions[0].actions[0];
+    expect(branch.type).toBe('branch');
+    expect((branch.params.then as Array<{ params: Record<string, unknown> }>)[0].params)
+      .toMatchObject({ commonActionId: yes.id, commonActionVersionId: yes.draftVersionId });
+    expect((branch.params.else as Array<{ params: Record<string, unknown> }>)[0].params)
+      .toMatchObject({ commonActionId: no.id, commonActionVersionId: no.draftVersionId });
   });
 
   it('複製は元とつながらない独立した下書きを作る', async () => {
@@ -194,11 +299,32 @@ describe('V6共通アクション', () => {
       bindingId: 'binding-1',
       lineAccountId: 'account-1',
       versionId: draft2.draftVersionId,
+      expectedVersionId: created.draftVersionId,
+      actorId: 'staff-1',
     });
     detail = await getCommonActionDetail(testDb.db, {
       id: created.id, lineAccountId: 'account-1',
     });
     expect(detail.bindings[0]).toMatchObject({ versionNumber: 2, hasNewerVersion: false });
+    expect(testDb.raw.prepare(
+      `SELECT from_action_version_id, to_action_version_id, actor_id
+         FROM common_action_binding_migration_events`,
+    ).get()).toEqual({
+      from_action_version_id: created.draftVersionId,
+      to_action_version_id: draft2.draftVersionId,
+      actor_id: 'staff-1',
+    });
+    await expect(updateCommonActionBindingVersion(testDb.db, {
+      id: created.id,
+      bindingId: 'binding-1',
+      lineAccountId: 'account-1',
+      versionId: created.draftVersionId,
+      expectedVersionId: created.draftVersionId,
+      actorId: 'staff-2',
+    })).rejects.toMatchObject({ code: 'version_conflict' });
+    expect(testDb.raw.prepare(
+      `SELECT COUNT(*) AS count FROM common_action_binding_migration_events`,
+    ).get()).toEqual({ count: 1 });
   });
 
   it('共通アクション同士の循環を公開できない', async () => {
@@ -269,14 +395,78 @@ describe('V6共通アクション', () => {
     const unusedRows = await listCommonActions(testDb.db, {
       lineAccountId: 'account-1', status: 'unused',
     });
-    expect(unusedRows.map((row) => row.id)).toEqual([unused.id]);
+    expect(unusedRows.items.map((row) => row.id)).toEqual([unused.id]);
+    expect(unusedRows.total).toBe(1);
+  });
+
+  it('一覧の今月集計は実行台帳を読み、1人テストを混ぜない', async () => {
+    const created = await createCommonAction(testDb.db, {
+      lineAccountId: 'account-1', name: '集計対象', actions: tagAction('tag-1'),
+    });
+    await publishCommonActionDraft(testDb.db, {
+      id: created.id, lineAccountId: 'account-1', draftVersionId: created.draftVersionId,
+    });
+    testDb.raw.prepare(
+      `INSERT INTO automation_definitions
+         (id, line_account_id, name, status, current_published_version_id)
+       VALUES ('automation-metrics', 'account-1', '集計ルール', 'active', 'automation-metrics-v1')`,
+    ).run();
+    testDb.raw.prepare(
+      `INSERT INTO automation_versions
+         (id, automation_id, version_number, status, trigger_type, action_config)
+       VALUES ('automation-metrics-v1', 'automation-metrics', 1, 'published', 'message_received', '[]')`,
+    ).run();
+    for (const [id, status, isTest] of [
+      ['run-success', 'success', 0],
+      ['run-failed', 'failed', 0],
+      ['run-test', 'failed', 1],
+    ] as const) {
+      testDb.raw.prepare(
+        `INSERT INTO automation_runs
+           (id, line_account_id, automation_id, automation_version_id, source_event_id,
+            idempotency_key, status, is_test, created_at)
+         VALUES (?, 'account-1', 'automation-metrics', 'automation-metrics-v1', ?, ?, ?, ?, datetime('now'))`,
+      ).run(id, `event-${id}`, `key-${id}`, status, isTest);
+      testDb.raw.prepare(
+        `INSERT INTO automation_run_steps
+           (id, automation_run_id, step_key, action_type, common_action_version_id,
+            idempotency_key, status)
+         VALUES (?, ?, 'common', 'common_action_marker', ?, ?, 'success')`,
+      ).run(`step-${id}`, id, created.draftVersionId, `step-${id}`);
+      testDb.raw.prepare(
+        `INSERT INTO automation_run_steps
+           (id, automation_run_id, step_key, action_type, idempotency_key, status)
+         VALUES (?, ?, 'common/tag', 'add_tag', ?, ?)`,
+      ).run(`child-${id}`, id, `child-${id}`, status === 'failed' ? 'failed' : 'success');
+    }
+
+    const result = await listCommonActions(testDb.db, { lineAccountId: 'account-1' });
+    expect(result.items[0]).toMatchObject({
+      executionCountThisMonth: 2,
+      failureCountThisMonth: 1,
+    });
+    expect(result.items[0].lastRunAt).not.toBeNull();
   });
 
   it('編集画面の選択肢をLINE公式アカウント内に限定する', async () => {
+    const published = await createCommonAction(testDb.db, {
+      lineAccountId: 'account-1', name: '公開済み', actions: tagAction('tag-1'),
+    });
+    await publishCommonActionDraft(testDb.db, {
+      id: published.id,
+      lineAccountId: 'account-1',
+      draftVersionId: published.draftVersionId,
+    });
     const resources = await listCommonActionResources(testDb.db, {
       lineAccountId: 'account-1',
     });
     expect(resources.tags).toEqual([{ id: 'tag-1', name: 'tag-1' }]);
     expect(resources.tags).not.toContainEqual(expect.objectContaining({ id: 'tag-2' }));
+    expect(resources.commonActions).toContainEqual({
+      id: published.id,
+      name: '公開済み',
+      version: 1,
+      currentPublishedVersionId: published.draftVersionId,
+    });
   });
 });

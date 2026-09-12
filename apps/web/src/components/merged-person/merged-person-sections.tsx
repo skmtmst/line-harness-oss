@@ -6,7 +6,9 @@ import type {
   MergedPersonLinkedFriend,
   MergedPersonProfileValue,
 } from '@line-crm/shared'
+import type { FriendProfileCandidate, FriendTagCandidate } from '@/lib/api'
 import Card from '@/components/shared/card'
+import Button from '@/components/shared/button'
 import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import {
   confidenceText,
@@ -34,7 +36,7 @@ import styles from './merged-person-detail.module.css'
  * メール・電話は `valuePreview` をそのまま出し、生値は組み立てない。
  */
 
-export function MergedProfileCard({ person }: { person: MergedPersonDetail }) {
+export function MergedProfileCard({ person, tags = [] }: { person: MergedPersonDetail; tags?: FriendTagCandidate[] }) {
   const email = person.profileValues.find((value) => value.fieldKey === 'email')
   const phone = person.profileValues.find((value) => value.fieldKey === 'phone')
   return (
@@ -47,6 +49,11 @@ export function MergedProfileCard({ person }: { person: MergedPersonDetail }) {
         <Row label="状態" value={statusText(person.status)} />
         <Row label="結び付いている友だち" value={`${person.linkedFriends.length}件`} />
       </div>
+      {tags.length > 0 ? (
+        <div className={styles.actions}>
+          {tags.map((tag) => <span key={tag.id} className={`${styles.tag} ${styles.tagOn}`}>{tag.name}</span>)}
+        </div>
+      ) : null}
     </Card>
   )
 }
@@ -127,7 +134,7 @@ export function MergedAdminCard({ person }: { person: MergedPersonDetail }) {
 }
 
 /** 紐付く友だち。`friendId` は開く操作にだけ使い、本文へは出さない。 */
-export function MergedFriendsTable({ friends }: { friends: MergedPersonLinkedFriend[] }) {
+export function MergedFriendsTable({ friends, onUnlink }: { friends: MergedPersonLinkedFriend[]; onUnlink?: (friend: MergedPersonLinkedFriend) => void }) {
   return (
     <Card layout="vertical" className={styles.section} data-merged-part="friends">
       <p className={styles.sectionTitle}>結び付いている友だち {friends.length}件</p>
@@ -169,6 +176,16 @@ export function MergedFriendsTable({ friends }: { friends: MergedPersonLinkedFri
                     >
                       友だちを開く
                     </a>
+                    {onUnlink ? (
+                      <button
+                        type="button"
+                        className={styles.dangerLink}
+                        data-qa-open="w8W4Eh-unlink"
+                        onClick={() => onUnlink(friend)}
+                      >
+                        統合を解除
+                      </button>
+                    ) : null}
                   </ActionCell>
                 </Tr>
               ))}
@@ -181,7 +198,15 @@ export function MergedFriendsTable({ friends }: { friends: MergedPersonLinkedFri
 }
 
 /** 統合された属性。項目ごとに「どこから採ったか」を記録する。 */
-export function MergedProfileValues({ values }: { values: MergedPersonProfileValue[] }) {
+export function MergedProfileValues({
+  values,
+  candidates = [],
+  onEdit,
+}: {
+  values: MergedPersonProfileValue[]
+  candidates?: FriendProfileCandidate[]
+  onEdit?: () => void
+}) {
   return (
     <Card layout="vertical" className={styles.section} data-merged-part="values">
       <p className={styles.sectionTitle}>統合された属性 {values.length}件</p>
@@ -206,8 +231,15 @@ export function MergedProfileValues({ values }: { values: MergedPersonProfileVal
         </div>
       )}
       <p className={styles.sectionNote}>
-        採用する値の変更は、変更元の項目が揃ってから開けます。
+        {candidates.length > 0
+          ? `変更候補を${candidates.length}項目確認できます。マスク済みの値から採用元を選べます。`
+          : '採用する値の変更候補はまだありません。'}
       </p>
+      {onEdit ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <Button type="button" onClick={onEdit}>統合プロフィールを編集</Button>
+        </div>
+      ) : null}
     </Card>
   )
 }

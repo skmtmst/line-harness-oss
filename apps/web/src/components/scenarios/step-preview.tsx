@@ -117,6 +117,13 @@ function rolledToNextDay(
   return at.getDate() !== expected.getDate() || at.getMonth() !== expected.getMonth()
 }
 
+/** 実際の友だち情報を作らず、LINEプレビューだけ安全な例へ置き換える。 */
+export function renderPreviewBody(body: string): string {
+  return body
+    .replaceAll('{{name}}', 'Kenta')
+    .replaceAll('{{お名前}}', 'Kenta')
+}
+
 export default function StepPreview({
   deliveryMode,
   offsetDays,
@@ -140,6 +147,28 @@ export default function StepPreview({
       aria-label="1通目の下見"
       className={`${styles.preview} border-hairline bg-canvas border p-4`}
     >
+      <section className="bg-line-preview -mx-4 -mt-4 mb-4 min-h-75 rounded-t-card p-4">
+        <h3 className="text-on-accent text-center text-sm font-bold">LINEプレビュー</h3>
+        <p className="mt-3 flex justify-center">
+          <span className="bg-line-preview-label text-on-accent rounded-pill inline-flex items-center gap-1 px-2.5 py-1 text-micro font-semibold">
+            <Clock aria-hidden size={13} strokeWidth={1.75} />
+            {words}に届きます（1通目）
+          </span>
+        </p>
+        <div className="mt-4">
+          {templateName ? (
+            <Bubble>
+              <span className="text-ink-faint text-micro">テンプレート</span>
+              <span className="text-ink mt-0.5 block text-label font-bold">{templateName}</span>
+            </Bubble>
+          ) : body.trim() ? (
+            <Bubble>{renderPreviewBody(body)}</Bubble>
+          ) : (
+            <Placeholder>本文を書くと、ここに出ます</Placeholder>
+          )}
+        </div>
+      </section>
+
       <h3 className="text-ink text-sm font-bold">配信の流れ</h3>
       <p className="text-ink-faint mt-0.5 text-micro leading-relaxed">
         いま購読が始まったとして計算しています（購読開始 {formatJst(start)}）。
@@ -271,7 +300,7 @@ export default function StepPreview({
             <Placeholder>音声のURLを入れると、ここに出ます</Placeholder>
           )
         ) : body.trim() ? (
-          <Bubble>{body}</Bubble>
+          <Bubble>{renderPreviewBody(body)}</Bubble>
         ) : (
           <Placeholder>本文を書くと、ここに出ます</Placeholder>
         )}
@@ -290,22 +319,42 @@ export default function StepPreview({
 
       {/*
         差し込みの注意書き。
-        日付は届く日時が決まっているのでここで実物にできるが、名前や
-        友だち情報は相手ごとに変わるので置き換えられない。混ぜて出すと
-        「置き換わるもの／置き換わらないもの」が分からなくなるため、
-        どちらも書いたまま出して、そのことを書く。
+        実際の友だち情報は使わず、名前だけプレビュー用の例へ置き換える。
+        本番送信では友だちごとの実値へ置き換わることを、その場に書く。
       */}
       {/\{\{[a-z_.+:0-9-]+\}\}/.test(body) && (
         <p className="text-ink-faint mt-2 text-micro leading-relaxed">
-          差し込み（{'{{name}}'} や {'{{date}}'} など）は、送るときに実際の値へ置き換わります。
-          ここでは書いたまま出しています。
+          名前はプレビュー用の「Kenta」に置き換えています。送るときは友だちごとの実際の値になります。
+          そのほかの差し込みは書いたまま表示します。
         </p>
       )}
 
       <p className="text-ink-faint border-hairline mt-3 border-t pt-3 text-micro leading-relaxed">
         2通目からは、このあとの編集画面で足せます。足すと、ここと同じ形で届く日時が並びます。
       </p>
+
+      <section className="border-hairline mt-3 border-t pt-3">
+        <h3 className="text-ink text-sm font-bold">設定サマリー</h3>
+        <dl className="mt-2 divide-y divide-hairline text-xs">
+          <SummaryRow label="配信対象" value={audienceLabel} />
+          <SummaryRow label="配信日時" value={`${words}・${formatJst(at)}`} />
+          <SummaryRow
+            label="送信数"
+            value={templateName ? 'テンプレート 1通' : `${kind === 'text' ? 'テキスト' : 'メッセージ'} 1通`}
+          />
+          <SummaryRow label="配信後" value="次のステップへ進む" />
+        </dl>
+      </section>
     </aside>
+  )
+}
+
+function SummaryRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-start justify-between gap-4 py-3 first:pt-0 last:pb-0">
+      <dt className="text-ink-faint shrink-0">{label}</dt>
+      <dd className="text-ink text-right font-semibold">{value}</dd>
+    </div>
   )
 }
 

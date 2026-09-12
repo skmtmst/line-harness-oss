@@ -7,6 +7,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const dbMocks = {
   // eager module-load deps (mirror other route tests)
   getLineAccounts: vi.fn().mockResolvedValue([]),
+  getLineAccountScopeEntries: vi.fn(async (...args: unknown[]) => dbMocks.getLineAccounts(...args)),
+  getAccountSetting: vi.fn().mockResolvedValue(null),
+  getVersionedAccountSetting: vi.fn().mockResolvedValue({
+    version: 1,
+    data: { features: { affiliates: true } },
+  }),
   getStaffByApiKey: vi.fn(),
   recoverStalledBroadcasts: vi.fn(),
   recoverStuckDeliveries: vi.fn(),
@@ -29,10 +35,12 @@ const env = {
 } as unknown as import('../index.js').Env['Bindings'];
 
 function req(method: string, path: string, body?: unknown) {
+  const separator = path.includes('?') ? '&' : '?';
+  const scopedPath = `${path}${separator}accountId=account-1`;
   const headers = new Headers({ Authorization: `Bearer ${API_KEY}` });
   if (body !== undefined) headers.set('Content-Type', 'application/json');
   return worker.fetch(
-    new Request(`https://worker.example.com${path}`, {
+    new Request(`https://worker.example.com${scopedPath}`, {
       method,
       headers,
       body: body !== undefined ? JSON.stringify(body) : undefined,
@@ -117,6 +125,20 @@ describe('POST /api/affiliate-offers', () => {
     expect(res.status).toBe(400);
     expect(dbMocks.createAffiliateOffer).not.toHaveBeenCalled();
   });
+
+  // #505 重大1: 選べる先が複数あるのに空欄で押すと 400。文言はそのまま
+  // 画面へ出すので、運用者の言葉で返す。
+  it('rejects a missing lineAccountId with 400 when several accounts are visible', async () => {
+    dbMocks.getLineAccounts.mockResolvedValue([
+      { id: 'account-1', tenant_id: '00000000-0000-4000-8000-000000000001' },
+      { id: 'account-2', tenant_id: '00000000-0000-4000-8000-000000000001' },
+    ]);
+    const res = await req('POST', '/api/affiliate-offers', { name: 'x' });
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { success: boolean; error: string };
+    expect(body.error).toContain('LINEアカウントを選んでください');
+    expect(dbMocks.createAffiliateOffer).not.toHaveBeenCalled();
+  });
 });
 
 describe('GET /api/affiliate-offers', () => {
@@ -196,5 +218,78 @@ describe('PUT /api/affiliate-offers/:id', () => {
       'off-1',
       expect.objectContaining({ reward_miles: 750 }),
     );
+  });
+});
+
+describe('タグ・シナリオの所属検査（#554 点検#505中3）', () => {
+  // タグ・シナリオの存在確認だけ本物の振る舞いにし、他は既存モックを使う。
+  const visibleTags = new Map([['tag-1', 'account-1']]);
+  const visibleScenarios = new Map([['sc-1', 'account-1']]);
+  const fakeDb = {
+    prepare: (sql: string) => ({
+      bind: (...args: unknown[]) => ({
+        first: async () => {
+          const [id, lineAccountId] = args as [string, string];
+          const table = sql.includes('FROM tags') ? visibleTags : visibleScenarios;
+          return table.get(id) === lineAccountId ? { id } : null;
+        },
+      }),
+    }),
+  } as unknown as D1Database;
+
+  function reqWithDb(method: string, path: string, body?: unknown) {
+    const separator = path.includes('?') ? '&' : '?';
+    const headers = new Headers({ Authorization: `Bearer ${API_KEY}` });
+    if (body !== undefined) headers.set('Content-Type', 'application/json');
+    return worker.fetch(
+      new Request(`https://worker.example.com${path}${separator}accountId=account-1`, {
+        method,
+        headers,
+        body: body !== undefined ? JSON.stringify(body) : undefined,
+      }),
+      { ...env, DB: fakeDb },
+      { waitUntil() {}, passThroughOnException() {} } as unknown as ExecutionContext,
+    );
+  }
+
+  it('同じアカウントのタグ・シナリオ付き作成は通す', async () => {
+    dbMocks.createAffiliateOffer.mockResolvedValue(OFFER_ROW);
+    const res = await reqWithDb('POST', '/api/affiliate-offers', {
+      name: 'キャンペーンA', tagId: 'tag-1', scenarioId: 'sc-1',
+    });
+    expect(res.status).toBe(201);
+    expect(dbMocks.createAffiliateOffer).toHaveBeenCalled();
+  });
+
+  it('他アカウントのタグ付き作成を400で弾き、保存しない', async () => {
+    const res = await reqWithDb('POST', '/api/affiliate-offers', {
+      name: 'キャンペーンA', tagId: 'tag-2',
+    });
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toContain('タグ');
+    expect(dbMocks.createAffiliateOffer).not.toHaveBeenCalled();
+  });
+
+  it('存在しないシナリオ付き作成を400で弾く', async () => {
+    const res = await reqWithDb('POST', '/api/affiliate-offers', {
+      name: 'キャンペーンA', scenarioId: 'sc-9',
+    });
+    expect(res.status).toBe(400);
+    expect(dbMocks.createAffiliateOffer).not.toHaveBeenCalled();
+  });
+
+  it('更新で他アカウントのタグを400で弾く', async () => {
+    dbMocks.getAffiliateOfferById.mockResolvedValue({ ...OFFER_ROW, line_account_id: 'account-1' });
+    const res = await reqWithDb('PUT', '/api/affiliate-offers/off-1', { tagId: 'tag-2' });
+    expect(res.status).toBe(400);
+    expect(dbMocks.updateAffiliateOffer).not.toHaveBeenCalled();
+  });
+
+  it('更新で同じアカウントのシナリオは通す', async () => {
+    dbMocks.getAffiliateOfferById.mockResolvedValue({ ...OFFER_ROW, line_account_id: 'account-1' });
+    dbMocks.updateAffiliateOffer.mockResolvedValue({ ...OFFER_ROW, scenario_id: 'sc-1' });
+    const res = await reqWithDb('PUT', '/api/affiliate-offers/off-1', { scenarioId: 'sc-1' });
+    expect(res.status).toBe(200);
   });
 });

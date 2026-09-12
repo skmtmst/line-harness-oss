@@ -11,6 +11,7 @@ import {
   recommendedActionText,
   referenceKindText,
   sameDeleteImpactRequest,
+  UNKNOWN_BLOCKER_TEXT,
 } from './delete-impact'
 
 describe('表示中の人数', () => {
@@ -30,7 +31,13 @@ describe('表示中の人数', () => {
   })
 
   it('実値はそのまま出す', () => {
-    expect(audienceText({ value: 1842, reason: 'assignment_ledger_unavailable' })).toBe('1,842人')
+    const audience = {
+      value: 1842,
+      state: 'partial' as const,
+      reason: 'preexisting_assignments_not_backfilled' as const,
+    }
+    expect(audienceText(audience)).toBe('1,842人')
+    expect(audienceReason(audience)).toContain('記録開始後')
   })
 })
 
@@ -66,6 +73,15 @@ describe('消せない理由', () => {
     expect(recommendedActionText('unpublish')).toContain('取り下げ')
     expect(recommendedActionText('review_references')).toContain('外して')
     expect(recommendedActionText('delete')).toBe('消せます。')
+  })
+
+  it('知らない種が増えても文言を空白にしない(#502中)', () => {
+    // サーバが新しいブロック種を増やすと、旧画面の文言が undefined になる。
+    const texts = blockerTexts(['published', 'future_new_kind' as never])
+    expect(texts[0]).toContain('先に取り下げてください')
+    expect(texts[1]).toBe(UNKNOWN_BLOCKER_TEXT)
+    expect(texts[1]).not.toMatch(/undefined/)
+    expect(texts[1].length).toBeGreaterThan(0)
   })
 
   it('参照元の種類を日本語で言う', () => {

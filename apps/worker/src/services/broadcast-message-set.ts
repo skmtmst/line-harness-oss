@@ -172,10 +172,14 @@ export async function autoTrackMessageParts(
   workerUrl: string | undefined,
   lineAccountId: string | null,
   trackLinks: boolean,
+  broadcastId?: string | null,
 ): Promise<BroadcastMessagePart[]> {
   if (!workerUrl || !trackLinks) return parts;
   return Promise.all(parts.map(async (part) => {
-    const tracked = await autoTrackContent(db, part.messageType, part.messageContent, workerUrl, { lineAccountId });
+    const tracked = await autoTrackContent(db, part.messageType, part.messageContent, workerUrl, {
+      lineAccountId,
+      broadcastId,
+    });
     return { ...part, messageType: tracked.messageType, messageContent: tracked.content };
   }));
 }

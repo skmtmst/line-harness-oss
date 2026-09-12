@@ -57,6 +57,25 @@ export interface CreateAffiliateLinkInput {
   lineAccountId?: string | null;
   /** Offer to scope this link to (ASP Phase 2). Omit for a 汎用リンク. */
   offerId?: string | null;
+  /**
+   * Stable per-attempt UUID from the client (#686). The registration screen
+   * passes the SAME id on a response-loss retry, so the initial link is issued
+   * at most once even when two attempts run concurrently. Omit for links that
+   * are issued by hand — those stay NULL and may be created freely.
+   */
+  operationId?: string | null;
+}
+
+/** Look up a prior link issued under the same operation UUID (#686). */
+async function findLinkByOperationId(
+  db: D1Database,
+  affiliateId: string,
+  operationId: string,
+): Promise<AffiliateLink | null> {
+  return db
+    .prepare(`SELECT * FROM affiliate_links WHERE affiliate_id = ? AND operation_id = ?`)
+    .bind(affiliateId, operationId)
+    .first<AffiliateLink>();
 }
 
 /**
@@ -95,6 +114,13 @@ export async function createAffiliateLink(
     }
   }
 
+  // 同じ操作UUIDで既に発行済みなら、それを返す（#686）。応答だけ失われた
+  // 再送でリンクを増やさない。
+  if (input.operationId) {
+    const existing = await findLinkByOperationId(db, input.affiliateId, input.operationId);
+    if (existing) return existing;
+  }
+
   let attempt = 0;
   while (true) {
     attempt++;
@@ -105,8 +131,8 @@ export async function createAffiliateLink(
       await db
         .prepare(
           `INSERT INTO affiliate_links
-             (id, affiliate_id, ref_code, label, line_account_id, offer_id, is_active, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, 1, ?)`,
+             (id, affiliate_id, ref_code, label, line_account_id, offer_id, is_active, created_at, operation_id)
+           VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)`,
         )
         .bind(
           id,
@@ -116,6 +142,7 @@ export async function createAffiliateLink(
           lineAccountId,
           input.offerId ?? null,
           now,
+          input.operationId ?? null,
         )
         .run();
 
@@ -126,6 +153,18 @@ export async function createAffiliateLink(
         .first<AffiliateLink>())!;
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
+      // 操作UUIDの衝突は「同時に走ったもう一方が先に発行した」ということ。
+      // 別のslugで作り直すと2本になるので、相手の行を回収して返す。
+      // ref_code の衝突とここを混ぜると、無限に retry して発行し続ける。
+      if (
+        input.operationId &&
+        /UNIQUE constraint failed/i.test(msg) &&
+        /affiliate_links\.operation_id/i.test(msg)
+      ) {
+        const winner = await findLinkByOperationId(db, input.affiliateId, input.operationId);
+        if (winner) return winner;
+        throw err;
+      }
       if (/UNIQUE constraint failed/i.test(msg)) {
         // Collision — retry with a new slug
         continue;

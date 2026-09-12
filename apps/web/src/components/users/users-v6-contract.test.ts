@@ -60,7 +60,7 @@ describe('統合ユーザーV6の画面契約', () => {
 
   it('KPI名を統合ユーザーの業務用語へそろえる', () => {
     /* 面は共通SummaryCardへ移したので、名前は title= で渡す。 */
-    for (const label of ['統合ユーザー', '紐付く友だち', '重複している行', '重複率']) {
+    for (const label of ['統合ユーザー', '紐付く友だち', 'UID連携済み', '重複配信の削減']) {
       expect(SUMMARY).toContain(`title="${label}"`)
     }
     expect(SUMMARY).not.toContain('余分な行数')

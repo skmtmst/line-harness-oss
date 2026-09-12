@@ -84,6 +84,22 @@ describe('NEN account settings', () => {
     expect((await getNenBirthdayCouponSetting(db, 'account-b'))?.benefit_label).toBe('共通クーポン');
   });
 
+  it('keeps the form and mileage actions when the account copy is read again', async () => {
+    const { db } = database();
+    const base = await getNenCampaign(db, 'review_request', 'account-a');
+    await saveNenCampaignAccountSetting(db, 'account-a', {
+      ...base!,
+      after_actions: [
+        { kind: 'open_form', formId: 'form-review', formName: '口コミ', buttonLabel: '感想を書く' },
+        { kind: 'award_mileage', amount: 200, trigger: 'form_submitted' },
+      ],
+    });
+    expect((await getNenCampaign(db, 'review_request', 'account-a'))?.after_actions).toEqual([
+      { kind: 'open_form', formId: 'form-review', formName: '口コミ', buttonLabel: '感想を書く' },
+      { kind: 'award_mileage', amount: 200, trigger: 'form_submitted' },
+    ]);
+  });
+
   it('fixes the selected account copy into queued follow-up jobs', async () => {
     const { db, jobs } = database();
     const base = await getNenCampaign(db, 'arrival_check', 'account-a');

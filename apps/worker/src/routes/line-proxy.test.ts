@@ -7,6 +7,7 @@ const lineClientMocks = vi.hoisted(() => ({
 
 vi.mock('@line-crm/db', () => ({
   getLineAccounts: vi.fn(),
+  getLineAccountScopeEntries: vi.fn(),
   getFriendByLineUserIdForAccount: vi.fn(),
   upsertFriend: vi.fn(),
   getChatByFriendId: vi.fn(),
@@ -40,6 +41,7 @@ vi.mock('../services/step-delivery.js', () => ({
 
 import {
   getLineAccounts,
+  getLineAccountScopeEntries,
   getFriendByLineUserIdForAccount,
   upsertFriend,
   getChatByFriendId,
@@ -168,6 +170,9 @@ beforeEach(() => {
   fetchMock = vi.fn(async () => upstreamResponse());
   vi.stubGlobal('fetch', fetchMock);
   vi.mocked(getLineAccounts).mockResolvedValue([ACCOUNT] as never);
+  vi.mocked(getLineAccountScopeEntries).mockImplementation(
+    async (db: D1Database) => vi.mocked(getLineAccounts)(db) as never,
+  );
   vi.mocked(getFriendByLineUserIdForAccount).mockResolvedValue(FRIEND as never);
   vi.mocked(getChatByFriendId).mockResolvedValue({ id: 'chat-1', status: 'unread' } as never);
   vi.mocked(updateChat).mockResolvedValue(undefined as never);

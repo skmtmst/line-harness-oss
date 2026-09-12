@@ -15,6 +15,9 @@ import {
 import { addJitter, sleep } from './stealth.js';
 import { pushViaHarnessProxy } from './line-proxy-send.js';
 import type { HarnessProxyDispatch } from './line-proxy-send.js';
+import {
+  featureJobCanRun,
+} from './feature-enforcement.js';
 
 const LEAD_SECONDS = 300;
 
@@ -78,6 +81,13 @@ export async function processWebinarReminders(
   for (let i = 0; i < due.length; i++) {
     const reg = due[i];
     try {
+      if (!reg.account_id || !await featureJobCanRun(db, {
+        accountId: reg.account_id,
+        featureId: 'webinars',
+        job: 'webinar-reminders',
+      })) {
+        continue;
+      }
       if (i > 0) await sleep(addJitter(50, 200));
       const friend = await getFriendById(db, reg.friend_id);
       if (!friend || !friend.is_following) {

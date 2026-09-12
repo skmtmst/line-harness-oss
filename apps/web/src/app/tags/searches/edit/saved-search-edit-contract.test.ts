@@ -28,4 +28,9 @@ describe('保存した検索の条件編集', () => {
     expect(PAGE).toContain('condition.kind === \'scenario\'')
     expect(PAGE).toContain('optionsWithCurrent(')
   })
+
+  it('複製の失敗を黙らせず理由を出して画面に残す', () => {
+    expect(PAGE).toContain('if (!res.success) { setError(res.error); return }')
+    expect(PAGE).toContain('router.push(`/tags/searches/edit?id=${encodeURIComponent(res.data.id)}`)')
+  })
 })

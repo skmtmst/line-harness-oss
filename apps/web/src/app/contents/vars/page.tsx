@@ -4,8 +4,13 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'rea
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import type { CommonVar, CommonVarDeleteImpact, Folder } from '@line-crm/shared'
-import { api, ApiError } from '@/lib/api'
-import FolderPanel from '@/components/shared/folder-panel'
+import {
+  api,
+  ApiError,
+  type CommonVarReplacementCandidate,
+  type CommonVarReplacementImpact,
+} from '@/lib/api'
+import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
 import { formatStamp } from '@/lib/common-vars'
 import Pagination from '@/components/shared/pagination'
 import Button from '@/components/shared/button'
@@ -24,6 +29,13 @@ import {
 } from './delete-impact'
 import ListState from '@/components/shared/list-state'
 import { useAccount } from '@/contexts/account-context'
+import SelectField from '@/components/shared/select-field'
+import {
+  commonVarsCsv,
+  filterAndSortCommonVars,
+  type CommonVarFilter,
+  type CommonVarOrder,
+} from './list-model'
 
 /**
  * 共通情報の一覧。
@@ -37,10 +49,18 @@ import { useAccount } from '@/contexts/account-context'
 /** 「未分類」を表す絞り込みの値。空文字だと「すべて」と区別できない。 */
 const UNGROUPED = '__ungrouped__'
 
-/** 1ページに出す件数。Lステップと同じく、下にページ番号を並べる。 */
-const PER_PAGE = 20
+/*
+ * 一括削除の上限。1件ごとに使用先9種の走査が走るため、
+ * 件数に比例してWorker・D1が重くなる。上限を超えたら確認口を打たず、
+ * 絞り込みで分けるよう案内する。
+ */
+const MAX_BATCH_DELETE_COUNT = 20
 
-/** 一覧の更新日は、次回変更と同じセルに収まる短い形で出す。 */
+/*
+ * 一覧の更新日は、次回変更と同じセルに収まる短い形で出す。
+ * `formatStamp`（`@/lib/common-vars`）とは別物。あちらは履歴・予定の
+ * 「いつ」を読ませる長い形。用途が違うので統一せず、名前で使い分ける。
+ */
 function formatListDate(value: string): string {
   const match = /^\d{4}-(\d{2})-(\d{2})/.exec(value)
   return match ? `${match[1]}/${match[2]}` : value
@@ -57,9 +77,14 @@ function VarsPageInner() {
   const [folders, setFolders] = useState<Folder[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  /** 一覧が件数上限で切られたときに絞り込み誘導を出す。 */
+  const [listLimited, setListLimited] = useState(false)
 
   const [query, setQuery] = useState('')
   const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(20)
+  const [stateFilter, setStateFilter] = useState<CommonVarFilter>('all')
+  const [order, setOrder] = useState<CommonVarOrder>('usage_desc')
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [deleteTargets, setDeleteTargets] = useState<CommonVar[]>([])
   /** 1件ずつの削除確認（設計 `yPkWe`）。 */
@@ -68,6 +93,10 @@ function VarsPageInner() {
   const [singlePhase, setSinglePhase] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
   const [singleBusy, setSingleBusy] = useState(false)
   const [singleError, setSingleError] = useState('')
+  const [replacementCandidates, setReplacementCandidates] = useState<CommonVarReplacementCandidate[]>([])
+  const [replacementId, setReplacementId] = useState('')
+  const [replacementImpact, setReplacementImpact] = useState<CommonVarReplacementImpact | null>(null)
+  const [replacementPhase, setReplacementPhase] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
   /** 確認のために打ってもらう差し込みキー。 */
   const [typedKey, setTypedKey] = useState('')
   /** いま影響を読んでいるアカウント・対象・世代。遅れて返った別の結果を捨てるために持つ。 */
@@ -102,10 +131,19 @@ function VarsPageInner() {
         api.folders.list('common_var'),
       ])
       if (accountAtRequest !== latestAccountRef.current) return
-      if (vars.success) setItems(vars.data)
+      if (vars.success) {
+        setItems(vars.data)
+        setListLimited(vars.meta?.limited ?? false)
+      }
       if (folderList.success) setFolders(folderList.data)
-    } catch {
-      if (accountAtRequest === latestAccountRef.current) setError('読み込みに失敗しました')
+    } catch (e) {
+      // 権限なしと通信障害で文言を分ける。同じ文言だと運用者が接続を
+      // 確かめ続け、権限申請に気づけない。
+      if (accountAtRequest === latestAccountRef.current) {
+        setError(e instanceof ApiError && e.status === 403
+          ? 'この一覧を見る権限がありません。管理者に権限を申請してください。'
+          : '読み込みに失敗しました。接続を確かめて、もう一度お試しください。')
+      }
     } finally {
       if (accountAtRequest === latestAccountRef.current) setLoading(false)
     }
@@ -128,6 +166,10 @@ function VarsPageInner() {
     setSingleBusy(false)
     setSingleError('')
     setTypedKey('')
+    setReplacementCandidates([])
+    setReplacementId('')
+    setReplacementImpact(null)
+    setReplacementPhase('idle')
     deleteRequestRef.current = {
       accountId: selectedAccountId,
       generation: deleteRequestRef.current.generation + 1,
@@ -136,31 +178,46 @@ function VarsPageInner() {
     setDeleteTargets([])
     setDeleting(false)
     setDeleteError('')
+    setListLimited(false)
   }, [selectedAccountId])
 
-  const filtered = useMemo(() => {
-    const needle = query.trim().toLowerCase()
-    return items.filter((item) => {
-      if (folderFilter === UNGROUPED && item.folderId !== null) return false
-      if (folderFilter && folderFilter !== UNGROUPED && item.folderId !== folderFilter) return false
-      if (!needle) return true
-      return (
-        item.name.toLowerCase().includes(needle) ||
-        item.varKey.toLowerCase().includes(needle) ||
-        item.value.toLowerCase().includes(needle)
-      )
-    })
-  }, [items, folderFilter, query])
+  const filtered = useMemo(
+    () => filterAndSortCommonVars(items, {
+      query,
+      folderId: folderFilter,
+      ungroupedValue: UNGROUPED,
+      filter: stateFilter,
+      order,
+    }),
+    [folderFilter, items, order, query, stateFilter],
+  )
 
-  const pageCount = Math.max(1, Math.ceil(filtered.length / PER_PAGE))
+  const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize))
   const current = useMemo(
-    () => filtered.slice((page - 1) * PER_PAGE, page * PER_PAGE),
-    [filtered, page],
+    () => filtered.slice((page - 1) * pageSize, page * pageSize),
+    [filtered, page, pageSize],
+  )
+
+  const emptyInUseCount = useMemo(
+    () => items.filter((item) => item.value === '' && typeof item.usageCount === 'number' && item.usageCount > 0).length,
+    [items],
   )
 
   useEffect(() => {
     if (page > pageCount) setPage(pageCount)
   }, [page, pageCount])
+
+  const exportVisibleCsv = () => {
+    if (filtered.length === 0) return
+    const url = URL.createObjectURL(
+      new Blob([`\uFEFF${commonVarsCsv(filtered)}`], { type: 'text/csv;charset=utf-8' }),
+    )
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = 'common-information.csv'
+    anchor.click()
+    URL.revokeObjectURL(url)
+  }
 
   const addFolder = async () => {
     const name = folderName.trim()
@@ -193,6 +250,10 @@ function VarsPageInner() {
     setSingleError('')
     setSingleImpact(null)
     setSinglePhase('loading')
+    setReplacementCandidates([])
+    setReplacementId('')
+    setReplacementImpact(null)
+    setReplacementPhase('loading')
     if (!selectedAccountId) {
       setSinglePhase('error')
       return
@@ -212,19 +273,110 @@ function VarsPageInner() {
       singleRequestRef.current.accountId === request.accountId &&
       singleRequestRef.current.itemId === request.itemId &&
       singleRequestRef.current.generation === request.generation
+    const [impactResult, candidatesResult] = await Promise.allSettled([
+      api.commonVars.deleteImpact(request.itemId, request.accountId),
+      api.commonVars.replacementCandidates(request.itemId, request.accountId),
+    ])
+    if (!isCurrentRequest()) return
+    if (impactResult.status === 'rejected' || !impactResult.value.success) {
+      setSinglePhase('error')
+      setReplacementPhase('error')
+      return
+    }
+    setSingleImpact(impactResult.value.data)
+    setSinglePhase('ready')
+    if (candidatesResult.status === 'rejected' || !candidatesResult.value.success) {
+      setReplacementPhase('error')
+      return
+    }
+    setReplacementCandidates(candidatesResult.value.data.candidates)
+    const first = candidatesResult.value.data.candidates[0]
+    if (!first) {
+      setReplacementPhase('ready')
+      return
+    }
+    setReplacementId(first.id)
     try {
-      const res = await api.commonVars.deleteImpact(request.itemId, request.accountId)
+      const preview = await api.commonVars.replacementImpact(request.itemId, request.accountId, first.id)
       if (!isCurrentRequest()) return
-      if (!res.success) throw new Error('impact_failed')
-      setSingleImpact(res.data)
-      setSinglePhase('ready')
+      if (!preview.success) throw new Error('replacement_impact_failed')
+      setReplacementImpact(preview.data)
+      setReplacementPhase('ready')
     } catch {
       if (!isCurrentRequest()) return
-      /*
-        使用先が読めないときは**消させない**。「参照0件」と読み違えて
-        消すと、差し込んでいた文が空欄のまま送られ続ける。
-      */
-      setSinglePhase('error')
+      setReplacementPhase('error')
+    }
+  }
+
+  const selectReplacement = async (nextId: string) => {
+    if (!singleTarget || !selectedAccountId) return
+    setReplacementId(nextId)
+    setReplacementImpact(null)
+    if (!nextId) {
+      setReplacementPhase('ready')
+      return
+    }
+    const request = {
+      accountId: selectedAccountId,
+      itemId: singleTarget.id,
+      generation: singleRequestRef.current.generation + 1,
+    }
+    singleRequestRef.current = request
+    setReplacementPhase('loading')
+    try {
+      const res = await api.commonVars.replacementImpact(request.itemId, request.accountId, nextId)
+      if (singleRequestRef.current.generation !== request.generation) return
+      if (!res.success) throw new Error('replacement_impact_failed')
+      setReplacementImpact(res.data)
+      setReplacementPhase('ready')
+    } catch {
+      if (singleRequestRef.current.generation === request.generation) setReplacementPhase('error')
+    }
+  }
+
+  const confirmReplacement = async () => {
+    if (!singleTarget || !selectedAccountId || !replacementImpact?.canReplace || singleBusy) return
+    const request = {
+      accountId: selectedAccountId,
+      itemId: singleTarget.id,
+      generation: singleRequestRef.current.generation + 1,
+    }
+    singleRequestRef.current = request
+    setSingleBusy(true)
+    setSingleError('')
+    try {
+      const res = await api.commonVars.replace(request.itemId, request.accountId, {
+        replacementId: replacementImpact.replacement.id,
+        expectedVersion: replacementImpact.source.version,
+        expectedRevision: replacementImpact.revision,
+      })
+      if (singleRequestRef.current.generation !== request.generation) return
+      if (!res.success) throw new Error('replace_failed')
+      singleRequestRef.current = {
+        accountId: selectedAccountId,
+        itemId: null,
+        generation: request.generation + 1,
+      }
+      setSingleTarget(null)
+      setSingleImpact(null)
+      setSinglePhase('idle')
+      setSingleBusy(false)
+      setReplacementCandidates([])
+      setReplacementId('')
+      setReplacementImpact(null)
+      setReplacementPhase('idle')
+      await load()
+    } catch (error) {
+      if (singleRequestRef.current.generation !== request.generation) return
+      if (error instanceof ApiError && error.status === 409) {
+        setSingleError('使用先が変わりました。影響をもう一度確認してください。')
+        setSingleBusy(false)
+        await selectReplacement(replacementImpact.replacement.id)
+      } else {
+        setSingleError('差し替えを完了できませんでした。状態を読み直して、もう一度お試しください。')
+      }
+    } finally {
+      if (singleRequestRef.current.generation === request.generation) setSingleBusy(false)
     }
   }
 
@@ -285,10 +437,18 @@ function VarsPageInner() {
     setSinglePhase('idle')
     setSingleError('')
     setTypedKey('')
+    setReplacementCandidates([])
+    setReplacementId('')
+    setReplacementImpact(null)
+    setReplacementPhase('idle')
   }
 
   const prepareRemoveSelected = async () => {
     if (selected.size === 0 || !selectedAccountId) return
+    if (selected.size > MAX_BATCH_DELETE_COUNT) {
+      setError(`一度に削除できるのは${MAX_BATCH_DELETE_COUNT}件までです。フォルダや検索で絞り込んで分けて削除してください。`)
+      return
+    }
     const request = {
       accountId: selectedAccountId,
       generation: deleteRequestRef.current.generation + 1,
@@ -396,19 +556,34 @@ function VarsPageInner() {
         </div>
       )}
 
-      <div className="grid gap-4 lg:grid-cols-[16rem_minmax(0,1fr)]">
-        <div className="space-y-3">
-          <button
-            onClick={() => setAddingFolder(true)}
-            className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control w-full border px-3 py-2 text-sm font-medium"
-          >
-            ＋ 新しいフォルダ
-          </button>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <Button href="/contents/vars/new" variant="primary">＋ 共通情報を作る</Button>
+        </div>
+        <Button type="button" onClick={exportVisibleCsv} disabled={filtered.length === 0}>
+          CSVで書き出す
+        </Button>
+      </div>
 
+      {emptyInUseCount > 0 ? (
+        <div className="bg-status-warning-soft text-status-warning mb-4 rounded-control px-4 py-3 text-sm font-semibold" role="status">
+          中身が空のまま使われているものが {emptyInUseCount.toLocaleString('ja-JP')}件あります。差し込んだところが空欄のまま送られます。
+        </div>
+      ) : null}
+
+      {listLimited ? (
+        <div className="bg-status-warning-soft text-status-warning mb-4 rounded-control px-4 py-3 text-sm font-semibold" role="status">
+          表示は最初の200件までです。フォルダや検索で絞り込んでください。
+        </div>
+      ) : null}
+
+      <div style={FOLDER_RAIL_STYLE} className="grid gap-4 lg:grid-cols-[var(--folder-rail-width)_minmax(0,1fr)]">
+        <div className="space-y-3">
           <FolderPanel
             total={`${items.length} 件`}
             activeId={folderFilter}
             onSelect={setFolderFilter}
+            onAddFolder={() => setAddingFolder(true)}
             rows={[
               { id: '', label: 'すべて', count: items.length },
               {
@@ -467,21 +642,62 @@ function VarsPageInner() {
         </div>
 
         <div>
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <Button href="/contents/vars/new" variant="primary">共通情報を作る</Button>
-            <div className="flex flex-wrap items-center gap-2">
-              <input
-                type="search"
-                value={query}
-                onChange={(e) => {
-                  setQuery(e.target.value)
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <input
+              type="search"
+              value={query}
+              onChange={(e) => {
+                setQuery(e.target.value)
+                setPage(1)
+              }}
+              placeholder="名前・差し込みキー・中身で検索"
+              aria-label="共通情報を検索"
+              className="border-hairline rounded-control focus:ring-accent min-w-64 flex-1 border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
+            />
+            <SelectField
+              size="compact"
+              value={String(pageSize)}
+              onChange={(event) => {
+                setPageSize(Number(event.target.value))
+                setPage(1)
+              }}
+              aria-label="表示件数"
+              options={[20, 50, 100].map((value) => ({ value: String(value), label: `${value}件表示` }))}
+            />
+          </div>
+
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            {([
+              ['all', 'すべて'],
+              ['empty', '空のまま'],
+              ['scheduled', '期限つき'],
+              ['unused', '使われていない'],
+            ] as const).map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                aria-pressed={stateFilter === value}
+                onClick={() => {
+                  setStateFilter(value)
                   setPage(1)
                 }}
-                placeholder="検索"
-                aria-label="共通情報を検索"
-                className="border-hairline rounded-control focus:ring-accent w-48 border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
-              />
-            </div>
+                className={stateFilter === value
+                  ? 'border-accent bg-accent-soft text-accent rounded-pill border px-3 py-1.5 text-xs font-semibold'
+                  : 'border-hairline bg-canvas text-ink-secondary rounded-pill border px-3 py-1.5 text-xs font-semibold'}
+              >
+                {label}
+              </button>
+            ))}
+            <SelectField
+              value={order}
+              onChange={(event) => setOrder(event.target.value as CommonVarOrder)}
+              aria-label="並び順"
+              options={[
+                { value: 'usage_desc', label: '使われている数が多い順' },
+                { value: 'updated_desc', label: '更新が新しい順' },
+                { value: 'name_asc', label: '名前順' },
+              ]}
+            />
           </div>
 
           <div className="bg-canvas rounded-card border-hairline overflow-hidden border">
@@ -574,17 +790,19 @@ function VarsPageInner() {
                             {/* 差し込みの書き方を独立した列に出す。名前と混ぜず、
                                 テンプレートを書くときに横へ追って確認できる。 */}
                             <code
-                              title={`{{var.${item.varKey}}}`}
+                              title={placeholderText(item.name)}
                               className="text-ink-faint block truncate whitespace-nowrap text-xs"
-                            >{`{{var.${item.varKey}}}`}</code>
+                            >{placeholderText(item.name)}</code>
                           </td>
                           <td title={item.value || '（空）'} className="text-ink truncate px-4 py-3 text-sm">
                             {item.value || <span className="text-ink-faint">（空）</span>}
                           </td>
                           <td className="text-ink-secondary whitespace-nowrap px-4 py-3 text-xs">
-                            {item.usageCount === 0
-                              ? '使われていません'
-                              : `${(item.usageCount ?? 0).toLocaleString('ja-JP')}か所`}
+                            {item.usageCount === undefined
+                              ? '—（未取得）'
+                              : item.usageCount === 0
+                                ? '使われていません'
+                                : `${item.usageCount.toLocaleString('ja-JP')}か所`}
                           </td>
                           <td className="text-ink-secondary px-4 py-3 text-xs">
                             <span className="whitespace-nowrap">{formatListDate(item.updatedAt)}</span>
@@ -648,6 +866,7 @@ function VarsPageInner() {
       */}
       <Dialog
         open={singleTarget !== null}
+        designNode="yPkWe"
         tone="destructive"
         title={singleTarget ? `共通情報「${singleTarget.name}」を削除しますか？` : ''}
         description="この共通情報と、登録値・次回予約を削除します。テンプレート・配信・フォルダ・友だちは削除しません。"
@@ -665,6 +884,25 @@ function VarsPageInner() {
               >
                 キャンセル
               </Button>
+              {singleImpact && !singleImpact.canDelete && replacementImpact?.canReplace ? (
+                <Button
+                  type="button"
+                  variant="primary"
+                  onClick={() => void confirmReplacement()}
+                  disabled={singleBusy || replacementPhase !== 'ready'}
+                >
+                  {singleBusy ? '差し替え中…' : '差し替えて削除'}
+                </Button>
+              ) : null}
+              {singleImpact && !singleImpact.canDelete ? (
+                <Button
+                  type="button"
+                  disabled
+                  title="使用中の共通情報は削除できません"
+                >
+                  このまま削除
+                </Button>
+              ) : null}
               {/* 消せないときは押し口ごと出さない。押せるように見えて何も起きない形にしない。 */}
               {canDeleteVar({ impact: singleImpact, typedKey, busy: singleBusy }) ? (
                 <Button type="button" variant="primary" onClick={() => void confirmSingleDelete()}>
@@ -690,6 +928,54 @@ function VarsPageInner() {
               {consequenceText(singleImpact) ? (
                 <p className="text-ink-secondary text-xs leading-5">{consequenceText(singleImpact)}</p>
               ) : null}
+
+              <div>
+                <h3 className="text-ink text-sm font-bold">どうしますか</h3>
+                <div className="mt-2 space-y-2">
+                  <div className="border-accent bg-accent-soft rounded-control border p-3">
+                    <p className="text-accent text-sm font-bold">別の共通情報に差し替えてから削除する（おすすめ）</p>
+                    <p className="text-ink-secondary mt-1 text-xs leading-5">
+                      {singleImpact.blockingTotal.toLocaleString('ja-JP')}か所の差し込みを、選んだ別のキーへ置き換えます。置き換え後は元の共通情報を履歴が残る形で保管します。
+                    </p>
+                    <label className="text-ink-secondary mt-2 block text-xs font-semibold">
+                      差し替え先
+                      <SelectField
+                        value={replacementId}
+                        disabled={singleBusy || replacementCandidates.length === 0}
+                        onChange={(event) => void selectReplacement(event.target.value)}
+                        aria-label="差し替え先"
+                        className="mt-1 w-full"
+                        style={{ width: '100%' }}
+                        options={replacementCandidates.length > 0
+                          ? replacementCandidates.map((candidate) => ({
+                              value: candidate.id,
+                              label: `${placeholderText(candidate.name)} — ${candidate.value || '（空）'}`,
+                            }))
+                          : [{ value: '', label: replacementPhase === 'loading' ? '候補を読み込んでいます' : '差し替えられる候補がありません' }]}
+                      />
+                    </label>
+                    {replacementPhase === 'loading' ? (
+                      <p className="text-ink-faint mt-2 text-xs">差し替え後の影響を確認しています…</p>
+                    ) : replacementPhase === 'error' ? (
+                      <p className="text-danger mt-2 text-xs font-semibold">差し替え後の影響を確認できませんでした。</p>
+                    ) : replacementImpact ? (
+                      <p className={replacementImpact.canReplace ? 'text-success mt-2 text-xs font-semibold' : 'text-danger mt-2 text-xs font-semibold'}>
+                        {replacementImpact.canReplace
+                          ? `${replacementImpact.replaceableTotal.toLocaleString('ja-JP')}か所を差し替え、元の共通情報を保管できます。`
+                          : `${replacementImpact.blockedTotal.toLocaleString('ja-JP')}か所は自動で差し替えられません。先に個別に確認してください。`}
+                      </p>
+                    ) : null}
+                  </div>
+                  <div className="border-hairline rounded-control border p-3" aria-disabled={!singleImpact.canDelete}>
+                    <p className="text-ink text-sm font-bold">このまま削除する</p>
+                    <p className="text-ink-secondary mt-1 text-xs leading-5">
+                      {singleImpact.canDelete
+                        ? '使われている場所が無いことを確認してから削除します。'
+                        : `${singleImpact.blockingTotal.toLocaleString('ja-JP')}か所が空欄になるため、先に使用先を直してください。`}
+                    </p>
+                  </div>
+                </div>
+              </div>
 
               {splitItems(singleImpact.items).blocking.length > 0 ? (
                 <div>
@@ -735,7 +1021,7 @@ function VarsPageInner() {
                   <input
                     value={typedKey}
                     onChange={(e) => setTypedKey(e.target.value)}
-                    placeholder={placeholderText(singleImpact.variable.varKey)}
+                    placeholder={placeholderText(singleImpact.variable.name)}
                     className="border-hairline rounded-control bg-canvas text-ink mt-1 w-full border px-3 py-2 text-sm"
                   />
                 </label>
@@ -746,8 +1032,8 @@ function VarsPageInner() {
               ) : null}
 
               <p className="text-ink-faint text-micro leading-5">
-                {checkedAtText(singleImpact.checkedAt)} 時点で、テンプレート・一斉配信・シナリオ・リマインダ・自動応答・回答フォーム・オートメーション・友だち追加時の8種類を確認しました。
-                まとめて差し替える操作は、まだ用意していません。
+                {checkedAtText(singleImpact.checkedAt)} 時点で、テンプレート・一斉配信・シナリオ・リマインダ・自動応答・回答フォーム・オートメーション・友だち追加時・共通アクションの9種類を確認しました。
+                差し替え前にも使用先の世代を再確認します。
               </p>
             </div>
           ) : null}

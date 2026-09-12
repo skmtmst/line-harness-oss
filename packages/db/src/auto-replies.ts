@@ -391,3 +391,26 @@ export async function getAutoReplyHitCounts(
     total: r.total,
   }));
 }
+
+/**
+ * 公開前確認に出す、1ルールの期間内一致数。
+ *
+ * 0件と集計失敗を混ぜないため、この関数は取得できた数だけを返し、
+ * 呼び出し側が失敗を null として扱う。
+ */
+export async function getAutoReplyHitCountSince(
+  db: D1Database,
+  autoReplyId: string,
+  since: string,
+): Promise<number> {
+  const row = await db
+    .prepare(
+      `SELECT COUNT(*) AS count
+         FROM auto_reply_hits
+        WHERE auto_reply_id = ?
+          AND datetime(hit_at) >= datetime(?)`,
+    )
+    .bind(autoReplyId, since)
+    .first<{ count: number }>();
+  return Number(row?.count ?? 0);
+}

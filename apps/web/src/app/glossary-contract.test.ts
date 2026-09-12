@@ -76,10 +76,12 @@ describe('用語表（V6 §7 48番の表記ゆれ潰し）', () => {
     for (const rel of FIXED_STATE) {
       const f = FILES.find((x) => x.p === rel)
       expect(f, `${rel} が見つからない`).toBeDefined()
-      // side-cards は「自動変更する対応マークがあるか」を読むので、その一語だけ許す。
+      // side-cards は一覧名、詳細検索は自由分類の support mark 軸なので、その箇所だけ許す。
       const body = rel === 'components/dashboard/side-cards.tsx'
         ? f!.s.replace(/対応マーク一覧/g, '')
-        : f!.s
+        : rel === 'components/friends/advanced-search-dialog.tsx'
+          ? f!.s.replace("{ label: '対応マーク',", '')
+          : f!.s
       expect(body.includes('対応マーク'), `${rel}: 固定4状態は「対応状況」と呼ぶ`).toBe(false)
     }
   })

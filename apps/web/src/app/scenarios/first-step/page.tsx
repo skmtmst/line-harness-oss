@@ -7,11 +7,12 @@ import {
   countTemplateTextCharacters,
   type DeliveryMode,
   type Scenario,
+  type ScenarioStep,
   type Tag,
   type Template,
 } from '@line-crm/shared'
 import { api } from '@/lib/api'
-import Header from '@/components/layout/header'
+import { scenarioReferenceData } from '@/components/scenarios/scenario-reference-data'
 import ImageUploader, { type ImageUploaderValue } from '@/components/shared/image-uploader'
 import MessageTypeTabs, { type StepMessageKind } from '@/components/scenarios/message-type-tabs'
 import MessageKindFields, {
@@ -32,6 +33,7 @@ import CharCounter, { LINE_TEXT_LIMIT, isOverCharLimit } from '@/components/scen
 import styles from './first-step.module.css'
 import type { SegmentCondition } from '@/components/shared/condition-builder'
 import SelectField from '@/components/shared/select-field'
+import { usePageTitle } from '@/components/shell/page-chrome'
 
 /**
  * ステップの作成（設計の3段目）。
@@ -61,11 +63,13 @@ const modeLabel: Record<DeliveryMode, string> = {
 }
 
 function FirstStepContent() {
+  usePageTitle('1通目を設定')
   const router = useRouter()
   const params = useSearchParams()
   const id = params.get('id') ?? ''
 
-  const [scenario, setScenario] = useState<Scenario | null>(null)
+  const [scenario, setScenario] = useState<(Scenario & { steps: ScenarioStep[] }) | null>(null)
+  const [existingStepId, setExistingStepId] = useState<string | null>(null)
   const [tags, setTags] = useState<Tag[]>([])
   const [body, setBody] = useState('')
   /** 差し込みをカーソルの位置に入れるために、入力欄そのものを持つ。 */
@@ -107,17 +111,46 @@ function FirstStepContent() {
 
   useEffect(() => {
     if (!id) return
-    void api.scenarios.get(id).then(res => {
+    void scenarioReferenceData.scenario(id).then(res => {
       if (!res.success) {
         setError(res.error)
         return
       }
       setScenario(res.data)
+      const first = [...res.data.steps].sort((a, b) => a.stepOrder - b.stepOrder)[0]
+      if (first) {
+        // 作成フローを途中で閉じて戻った場合は、既存の1通目を再表示する。
+        // 空のフォームへ戻すと、保存時に同じ「1通目」が増えてしまう。
+        setExistingStepId(first.id)
+        setOffsetDays(first.offsetDays ?? Math.floor(first.delayMinutes / 1440))
+        setOffsetHours(
+          res.data.deliveryMode === 'relative'
+            ? Math.floor((first.delayMinutes % 1440) / 60)
+            : Math.floor((first.offsetMinutes ?? 0) / 60),
+        )
+        setDeliveryTime(first.deliveryTime ?? '10:00')
+        setTargetCondition((first.targetCondition as SegmentCondition | null) ?? null)
+        setTargetMode(first.targetCondition ? 'advanced' : 'all')
+        setQuestion((first.question as ScenarioQuestion | null) ?? emptyQuestion())
+
+        if (first.templateId) {
+          setContentMode('template')
+          setTemplateId(first.templateId)
+        } else {
+          setContentMode('compose')
+          if (first.question) {
+            setKind('question')
+          } else {
+            setKind(first.messageType as StepMessageKind)
+            if (first.messageType === 'text') setBody(first.messageContent)
+          }
+        }
+      }
     })
-    void api.tags.list().then(res => {
+    void scenarioReferenceData.tags().then(res => {
       if (res.success) setTags(res.data)
     })
-    void api.templates.list().then(res => {
+    void scenarioReferenceData.templates().then(res => {
       if (res.success) setTemplates(res.data as unknown as Template[])
     })
   }, [id])
@@ -220,19 +253,33 @@ function FirstStepContent() {
                     messageContent: serializeMessageKind(kind as MessageKind, kindState) ?? '',
                   }
 
-      const res = await api.scenarios.addStep(id, {
+      const stepPayload = {
         stepOrder: 1,
         ...payload,
         ...schedule,
         targetCondition: stepTargetCondition(),
         question: contentMode === 'compose' && kind === 'question' ? question : null,
-      })
+      }
+      const res = existingStepId
+        ? await api.scenarios.updateStep(id, existingStepId, stepPayload)
+        : await api.scenarios.addStep(id, stepPayload)
       if (!res.success) {
         setError(res.error)
         setSaving(false)
         return
       }
+    } else {
+      /*
+       * 空のまま保存を押しても何も言わず編集へ進むと、書いたつもりが
+       * 保存されていないのか区別できない（点検 #495 中7）。
+       * 書かずに進む道は「1通目はあとで書く」ボタンに寄せ、保存ボタンは
+       * 空なら理由を出して止める。
+       */
+      setError('内容を入力してください。あとで書く場合は「1通目はあとで書く」を押してください。')
+      setSaving(false)
+      return
     }
+    scenarioReferenceData.invalidateScenario(id)
     goDetail()
   }
 
@@ -254,41 +301,36 @@ function FirstStepContent() {
 
   return (
     <div data-design-node="kk8dz">
-      <nav data-design="Crumb" className="text-ink-faint mb-2 text-xs">
-        <Link href="/scenarios" className="hover:underline">
-          シナリオ配信
+      <div data-design="Head" className="mb-7 flex items-center justify-between">
+        <nav data-design="Crumb" className="text-ink-faint text-xs">
+          <Link href="/scenarios" className="hover:underline">
+            シナリオ配信
+          </Link>
+          <span className="mx-1.5">/</span>
+          <span>1通目を設定</span>
+        </nav>
+        <Link
+          href="/scenarios"
+          className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control inline-flex items-center border px-3 py-2 text-sm font-medium"
+        >
+          ✕ キャンセル
         </Link>
-        <span className="mx-1.5">/</span>
-        <span>ステップの作成</span>
-      </nav>
-
-      <div data-design="Head">
-        <Header
-          title="ステップの作成"
-          description="シナリオの名前と、いつ流すかを決めます。1通目はここで書いても、あとで書いてもかまいません。"
-          action={
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                disabled
-                title="マニュアルは準備中です"
-                className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm font-medium opacity-50"
-              >
-                マニュアル
-              </button>
-              <Link
-                href="/scenarios"
-                className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control inline-flex items-center border px-3 py-2 text-sm font-medium"
-              >
-                ✕ キャンセル
-              </Link>
-            </div>
-          }
-        />
       </div>
+
+      <ol
+        aria-label="シナリオ作成の進み方"
+        className="bg-canvas border-hairline mb-4 flex flex-wrap items-center gap-3 rounded-card border px-4 py-3 text-xs"
+      >
+        <StepMark n={1} label="シナリオ情報" state="done" />
+        <StepLine />
+        <StepMark n={2} label="配信方式" state="done" />
+        <StepLine />
+        <StepMark n={3} label="1通目を設定" state="current" />
+      </ol>
 
       <div data-design="Notice" className="space-y-2">
         <p className="bg-success-bg text-success rounded-card px-4 py-3 text-sm">
-          配信方式を「{modeLabel[mode]}」にしました。続けて名前と1通目を決めてください。
+          配信方式：{modeLabel[mode]}　・　シナリオ：{scenario?.name ?? '読み込み中'}
         </p>
         {error && <p className="bg-danger-bg text-danger rounded-card px-4 py-3 text-sm">{error}</p>}
       </div>
@@ -544,9 +586,11 @@ function FirstStepContent() {
               targetMode === 'all'
                 ? 'シナリオ購読中の全員'
                 : targetMode === 'tag'
-                  ? (tags.find(t => t.id === targetTagId)?.name
-                      ? `タグ「${tags.find(t => t.id === targetTagId)!.name}」がある人`
-                      : 'タグで絞り込む（未選択）')
+                  ? (() => {
+                      // 2回探すと間に変わる余地がある。1回探して使い回す（#495 軽17）。
+                      const tagName = tags.find(t => t.id === targetTagId)?.name
+                      return tagName ? `タグ「${tagName}」がある人` : 'タグで絞り込む（未選択）'
+                    })()
                   : targetCondition
                     ? describeCondition(targetCondition)
                     : '詳細条件で絞り込む（未設定）'

@@ -39,8 +39,8 @@ export function impactMatchesRequest(
 /**
  * いま表示している人数。
  *
- * `value` が `null` のときは**0人ではない**。誰に出ているかの記録
- * （割り当て台帳）がまだ無いだけなので、理由を添えて未取得と書く。
+ * `value` が `null` のときは**0人ではない**。値があっても `partial` なら、
+ * 割り当て台帳の記録開始前を含まないことを理由として添える。
  */
 export function audienceText(audience: RichMenuDeleteImpact['currentAudience']): string {
   if (audience.value === null) return NOT_AVAILABLE
@@ -48,6 +48,9 @@ export function audienceText(audience: RichMenuDeleteImpact['currentAudience']):
 }
 
 export function audienceReason(audience: RichMenuDeleteImpact['currentAudience']): string | null {
+  if (audience.value !== null && audience.state === 'partial') {
+    return '記録開始後に確認できた人数です。開始前の割り当ては含みません。'
+  }
   if (audience.value !== null) return null
   return '誰に出ているかの記録がまだ無いため、人数は数えられません。'
 }
@@ -85,14 +88,18 @@ const BLOCKER_TEXT = {
   operational_references: '自動処理から使われています。参照を外してください。',
 } as const
 
+/** サーバが新しい種を増やしたときに文言を空白にしないための予備。 */
+export const UNKNOWN_BLOCKER_TEXT = '確認が必要な項目があります。最新の状態を読み直してください。'
+
 /**
  * 消せない理由。
  *
  * **内部の記号をそのまま出さない。** `blockers` は `published` のような
  * 英語の合図なので、何をすればよいかの日本語へ置き換える。
+ * 知らない種が来たら予備の文言にする (#502中)。
  */
 export function blockerTexts(blockers: RichMenuDeleteImpact['blockers']): string[] {
-  return blockers.map((key) => BLOCKER_TEXT[key])
+  return blockers.map((key) => BLOCKER_TEXT[key as keyof typeof BLOCKER_TEXT] ?? UNKNOWN_BLOCKER_TEXT)
 }
 
 const ACTION_TEXT = {

@@ -2,7 +2,9 @@
 
 import React from 'react'
 import Button from '@/components/shared/button'
-import PageHeader from '@/components/shared/page-header'
+import Breadcrumb from '@/components/shared/breadcrumb'
+import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
+import { usePageTitle } from '@/components/shell/page-chrome'
 import IdentityDecisionDialog from '@/components/identity/identity-decision-dialog'
 import {
   IdentityAssurance,
@@ -15,6 +17,7 @@ import {
 import { IdentityStateBlock } from '@/components/identity/identity-state'
 import { useIdentityReview } from '@/components/identity/identity-review'
 import styles from '@/components/identity/identity-review.module.css'
+import './issue481-height.css'
 
 /**
  * 設計 `InCDe` 3-2-A「重複候補の確認」。
@@ -26,6 +29,7 @@ import styles from '@/components/identity/identity-review.module.css'
  * 判断に使う部品は `components/identity` に1組だけ置いてある。
  */
 export default function FriendIdentityCandidatesPage() {
+  usePageTitle('重複候補の確認')
   const review = useIdentityReview('friend_duplicate')
   const first = review.items[0] ?? null
 
@@ -36,20 +40,15 @@ export default function FriendIdentityCandidatesPage() {
   }, [review.state, first?.id])
 
   const detail = review.detail
+  const profileCandidates = detail && 'profileCandidates' in detail ? detail.profileCandidates : []
+  const tagCandidates = detail && 'tagCandidates' in detail ? detail.tagCandidates : []
 
   return (
-    <div className={styles.screen}>
-      <PageHeader
-        breadcrumb={[
-          { label: '友だち', href: '/friends' },
-          { label: '重複候補の確認' },
-        ]}
-        title="重複候補の確認"
-        description="同じ人が2件に分かれていないかを、根拠を見て決めます。"
-        actions={
-          <Button href="/friends?tab=duplicates">重複検出へ</Button>
-        }
-      />
+    <div className={styles.screen} data-issue481-identity style={{ gap: 14 }}>
+      <div className="flex min-h-10 items-center justify-between gap-3">
+        <Breadcrumb items={[{ label: '重複検出', href: '/friends?tab=duplicates' }, { label: detail ? `候補 #${String(detail.id).slice(0, 8)}` : '候補' }]} />
+        <Button href="/friends?tab=duplicates">重複検出へ</Button>
+      </div>
 
       <IdentityStateBlock
         state={review.state}
@@ -73,6 +72,40 @@ export default function FriendIdentityCandidatesPage() {
             <IdentitySubjectCard side="候補A" subject={detail.left} />
             <IdentitySubjectCard side="候補B" subject={detail.right} />
           </div>
+
+          {profileCandidates.length > 0 ? (
+            <section className="rounded-card border border-hairline bg-canvas p-4 shadow-card">
+              <h2 className="text-sm font-bold text-ink">統合プロフィールに採用する値</h2>
+              <div className="mt-2 overflow-hidden rounded-control border border-hairline">
+                <DataTable className="table-fixed text-xs">
+                  <thead className="bg-canvas-sunken text-ink-secondary">
+                    <TableHeadRow><Th>項目</Th><Th>候補A</Th><Th>候補B</Th><Th>採用する値</Th></TableHeadRow>
+                  </thead>
+                  <tbody className="divide-y divide-hairline">
+                    {profileCandidates.map((field) => {
+                      const left = field.options.find((option) => option.sourceFriendId === detail.left.id)
+                      const right = field.options.find((option) => option.sourceFriendId === detail.right.id)
+                      return (
+                        <Tr key={field.fieldKey}>
+                          <Td><span className="font-semibold text-ink">{field.fieldLabel}</span></Td>
+                          <Td>{left?.valuePreview ?? '—'}</Td>
+                          <Td>{right?.valuePreview ?? '—'}</Td>
+                          <Td>判定時に選択</Td>
+                        </Tr>
+                      )
+                    })}
+                    {tagCandidates.length > 0 ? (
+                      <Tr>
+                        <Td><span className="font-semibold text-ink">タグ</span></Td>
+                        <Td colSpan={2}>{tagCandidates.map((tag) => tag.name).join('・')}</Td>
+                        <Td>元の友だちに保持</Td>
+                      </Tr>
+                    ) : null}
+                  </tbody>
+                </DataTable>
+              </div>
+            </section>
+          ) : null}
 
           <IdentityHistoryList history={detail.history} />
 

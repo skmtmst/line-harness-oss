@@ -1,14 +1,15 @@
 import { MANUAL_LINKS } from '@/lib/manual-links'
+import type { ManualLink } from '@/lib/api'
 
 /**
  * 設計 ★V6 34-4「マニュアルの正本表」（`f9oUm`）。
  *
  * トップバーの「マニュアル」がどこを開くかを、運営だけが決める表。
  *
- * **表の正本はサーバにある。** 画面 ID ごとの URL・最後に確かめた日・
- * リンクの状態を持つ口（`GET /api/manual-links`）がまだ無いので（台帳 #134）、
- * いま出せるのは手元にある 4 つの作業 ID だけ。
- * 出せない 262 件を 0 件として描かず、何が足りないかを言う。
+ * **表の正本はサーバにある。** 一覧は `GET /api/manual-links` を読む
+ * （`page.tsx` が `api.manualLinks.list()` で取得）。
+ * 下の 4 つの作業 ID は、サーバにまだ無い分の手元の行。
+ * 出せない分を 0 件として描かず、何が足りないかを言う。
  */
 
 /** リンクの状態。設計の 3 つ。 */
@@ -69,6 +70,17 @@ export function localRows(): ManualLinkRow[] {
   })
 }
 
+export function manualLinkRow(link: ManualLink): ManualLinkRow {
+  return {
+    screenId: link.keyKind === 'screen' ? link.key : '—',
+    taskId: link.keyKind === 'task' ? link.key : null,
+    name: link.name,
+    url: link.url ?? '',
+    checkedAt: link.lastCheckedAt,
+    status: link.status,
+  }
+}
+
 /** URL の見せ方。空のときは URL に見せない。 */
 export function urlLabel(url: string): string {
   return url.trim() === '' ? '（まだ決めていません）' : url
@@ -76,7 +88,18 @@ export function urlLabel(url: string): string {
 
 /** 最後に確かめた日。確かめていなければ `—`。 */
 export function checkedLabel(checkedAt: string | null): string {
-  return checkedAt ?? '—'
+  if (!checkedAt) return '—'
+  if (/^\d{1,2}\/\d{1,2}\s+\d{2}:\d{2}$/.test(checkedAt)) return checkedAt
+  const date = new Date(checkedAt)
+  if (Number.isNaN(date.getTime())) return checkedAt
+  return new Intl.DateTimeFormat('ja-JP', {
+    timeZone: 'Asia/Tokyo',
+    month: 'numeric',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(date)
 }
 
 /** 絞り込みの区分。設計の「状態：すべて」。 */
@@ -126,7 +149,22 @@ export const VERIFY_UNAVAILABLE_NOTE =
 export const VERIFY_SCHEDULE_NOTE =
   '確かめるのは毎日 04:00 と、この画面の「いま全部を確かめる」を押したときです。'
 
-/** この表を触れる人。設計「この表を直せるのは運営だけです」。 */
-export function canEditTable(role: string | null): boolean {
-  return role === 'owner'
+/**
+ * この表を触れる人。サーバー（`manual-links.ts` の `canOperate`）を広めに写す。
+ *
+ * 運営の代表（`env-owner`）か、マニュアルの編集権限
+ * （`manual.link.edit`）を持つ人は必ず出す。代表者（owner）も出す。
+ * 以前は代表者だけを見ていたため、権限を持つ人でも表が出なかった。
+ * 最終の可否はサーバーが決める。権限が足りない操作は 403 として
+ * 理由と依頼先を画面に出す。
+ */
+export function canEditTable(staff: {
+  id?: string | null
+  role?: string | null
+  permissionKeys?: string[] | null
+} | null): boolean {
+  if (!staff) return false
+  if (staff.id === 'env-owner') return true
+  if ((staff.permissionKeys ?? []).includes('manual.link.edit')) return true
+  return staff.role === 'owner'
 }

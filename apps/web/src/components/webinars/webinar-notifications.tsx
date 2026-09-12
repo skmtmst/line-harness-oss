@@ -10,6 +10,7 @@ import {
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import Select from '@/components/shared/select'
+import { audienceText } from '@/app/webinars/overview-view'
 
 /**
  * ウェビナーの通知・リマインド（設計 `Ho8z4` 10-1-D）。
@@ -34,7 +35,14 @@ const HOUR_OPTIONS = [15, 30, 60, 120].map((m) => ({
   label: m < 60 ? `${m}分前` : `${m / 60}時間前`,
 }))
 
-export default function WebinarNotifications({ webinarId }: { webinarId: string }) {
+export default function WebinarNotifications({ webinarId, onLoaded }: {
+  webinarId: string
+  /*
+    親の概要段と子の編集タブで同じ口を2回叩かない。取得はここに一本化し、
+    親は報告を受けて概要だけ描く。保存後の取り直しもここが行い、親へ流す。
+  */
+  onLoaded?: (data: { settings: WebinarNotificationSettings | null; overview: WebinarNotificationOverview | null } | null) => void
+}) {
   const [settings, setSettings] = useState<WebinarNotificationSettings | null>(null)
   const [overview, setOverview] = useState<WebinarNotificationOverview | null>(null)
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading')
@@ -55,10 +63,12 @@ export default function WebinarNotifications({ webinarId }: { webinarId: string 
       setSettings(res.data.settings)
       setOverview(res.data.overview ?? null)
       setState('ready')
+      onLoaded?.({ settings: res.data.settings, overview: res.data.overview ?? null })
     } catch {
       setState('error')
+      onLoaded?.(null)
     }
-  }, [webinarId])
+  }, [webinarId, onLoaded])
 
   useEffect(() => { void load() }, [load])
 
@@ -192,6 +202,7 @@ export default function WebinarNotifications({ webinarId }: { webinarId: string 
   ]
 
   const available = overview !== null
+  const audience = audienceText(overview?.audience)
 
   return (
     <section className="space-y-4" data-design-node="Ho8z4">
@@ -225,9 +236,36 @@ export default function WebinarNotifications({ webinarId }: { webinarId: string 
           </div>
         ))}
       </dl>
+      {/*
+        見送りの内訳（#745）。**数だけ出しても、取るべき行動が決まらない。**
+        「すでに視聴済み」は正常だが、「対象回が終了済み」は届かないまま
+        終わったということで、運用者が気づく必要がある。
+        0 件のときは出さない——常に空の枠があると、誰も見なくなる。
+      */}
+      {available && (overview?.skippedReasons?.length ?? 0) > 0 && (
+        <div className="border-hairline rounded-xl border p-4" data-testid="webinar-skip-reasons">
+          <p className="text-ink text-xs font-bold">見送りの内訳</p>
+          <ul className="mt-2 space-y-1">
+            {overview!.skippedReasons.map((reason) => (
+              <li key={reason.code ?? 'unknown'} className="text-ink-secondary flex justify-between gap-4 text-xs">
+                <span>{reason.label}</span>
+                <span className="text-ink font-bold tabular-nums">{reason.count.toLocaleString('ja-JP')}件</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       {!available && (
         <p className="text-ink-faint text-xs">送った結果はまだ読めていません。—（未取得）</p>
       )}
+
+      <div className="bg-canvas rounded-card border-hairline border px-4 py-3">
+        <div className="flex items-baseline justify-between gap-4">
+          <p className="text-ink-faint text-xs">通知の対象</p>
+          <p className="text-ink text-lg font-bold tabular-nums">{audience.people}</p>
+        </div>
+        <p className="text-ink-faint mt-1 text-xs">{audience.note}</p>
+      </div>
 
       <ul className="border-hairline divide-hairline divide-y overflow-hidden rounded-xl border">
         {rows.map((row) => (

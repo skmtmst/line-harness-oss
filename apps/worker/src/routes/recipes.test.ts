@@ -20,7 +20,7 @@ const db = {
   recordCloneItem: vi.fn(),
   listCloneItems: vi.fn(),
   finishCloneRun: vi.fn(),
-  rollbackCloneRun: vi.fn(),
+  findTagByNormalizedName: vi.fn(),
   getVersionedAccountSetting: vi.fn(),
   parseFeatures: (row: { required_features: string }) => JSON.parse(row.required_features),
   parseItems: (row: { items_json: string | null }) =>
@@ -29,6 +29,8 @@ const db = {
     required.filter((k) => features[k] === false),
   prefixedName: (prefix: string | null | undefined, name: string) =>
     (prefix ?? '').trim() ? `${(prefix ?? '').trim()} ${name}` : name,
+  normalizeTagNameForCleanup: (name: string) =>
+    name.normalize('NFKC').trim().replace(/\s+/gu, ' ').toLocaleLowerCase('ja-JP'),
 };
 vi.mock('@line-crm/db', () => db);
 
@@ -46,12 +48,16 @@ const bind = vi.fn((..._values: unknown[]) => ({
 // 引数の型を書いておく。書かないと `prepare.mock.calls[n][0]` が
 // 長さ0のタプル扱いになり、CI の型検査だけが落ちる。
 const prepare = vi.fn((_sql: string) => ({ bind }));
-const env = { DB: { prepare } as unknown as D1Database };
+const batch = vi.fn(async () => []);
+const env = { DB: { prepare, batch } as unknown as D1Database };
 
-function makeApp() {
+function makeApp(
+  role: 'owner' | 'admin' | 'staff' = 'owner',
+  permissionKeys: string[] = [],
+) {
   const app = new Hono<Env>();
   app.use('*', async (c, next) => {
-    c.set('staff', { id: 'u-1', name: 'テスト', role: 'owner', readOnly: false });
+    c.set('staff', { id: 'u-1', name: 'テスト', role, readOnly: false, permissionKeys });
     return next();
   });
   app.route('/', recipes);
@@ -70,7 +76,7 @@ const RECIPE = {
     { kind: 'タグ', name: '新規', note: '友だち追加時のルールから付きます' },
     { kind: 'テンプレート', name: '1通目 はじめまして', note: '本文は見本です' },
   ]),
-  item_count: 16,
+  item_count: 2,
   display_order: 0,
   created_at: '2026-09-04T00:00:00+09:00',
   updated_at: '2026-09-04T00:00:00+09:00',
@@ -83,7 +89,7 @@ function clone(body: unknown, key: string | null = 'idem-1') {
       'content-type': 'application/json',
       ...(key ? { 'Idempotency-Key': key } : {}),
     },
-    body: JSON.stringify(body),
+    body: JSON.stringify({ expectedVersion: 1, ...(body as Record<string, unknown>) }),
   });
 }
 
@@ -94,10 +100,12 @@ beforeEach(() => {
   db.listRecipes.mockResolvedValue([RECIPE]);
   db.cloneCounts.mockResolvedValue({ 'rcp-1': 12 });
   db.findRunByKey.mockResolvedValue(null);
+  db.findTagByNormalizedName.mockResolvedValue(null);
   db.startCloneRun.mockResolvedValue({ id: 'run-1' });
   db.listCloneItems.mockResolvedValue([]);
   db.getVersionedAccountSetting.mockResolvedValue({ data: { features: {} } });
   run.mockResolvedValue(undefined);
+  batch.mockResolvedValue([]);
 });
 
 describe('一覧', () => {
@@ -135,7 +143,7 @@ describe('一覧', () => {
     const body = await res.json() as { data: Array<{ items: unknown; itemCount: number }> };
     expect(body.data[0].items).toBeNull();
     // 件数だけは設計の1行から分かるので、そちらは出してよい。
-    expect(body.data[0].itemCount).toBe(16);
+    expect(body.data[0].itemCount).toBe(2);
   });
 });
 
@@ -148,7 +156,15 @@ describe('複製', () => {
 
   /* **同じキーで2回作らない。** 押し直しや再送で下書きが二重にできる。 */
   it('同じキーで来たら前の結果を返し、作り直さない', async () => {
-    db.findRunByKey.mockResolvedValue({ id: 'run-前', status: 'succeeded', created_count: 2 });
+    const requestFingerprint = await hash(JSON.stringify({
+      recipeId: RECIPE.id,
+      recipeVersion: RECIPE.version,
+      accountId: 'acc-1',
+      namePrefix: null,
+    }));
+    db.findRunByKey.mockResolvedValue({
+      id: 'run-前', status: 'succeeded', created_count: 2, request_fingerprint: requestFingerprint,
+    });
     const res = await makeApp().fetch(clone({ accountId: 'acc-1' }), env);
     expect(res.status).toBe(200);
     expect(await res.json()).toMatchObject({ data: { runId: 'run-前', createdCount: 2 } });
@@ -180,20 +196,29 @@ describe('複製', () => {
     expect(names.some((n) => String(n).startsWith('2026春 '))).toBe(true);
   });
 
+  it('タグの同名確認を店舗単位で行い、別店舗には同名を作れる', async () => {
+    await makeApp().fetch(clone({ accountId: 'store-a' }, 'store-a-key'), env);
+    await makeApp().fetch(clone({ accountId: 'store-b' }, 'store-b-key'), env);
+    expect(db.findTagByNormalizedName).toHaveBeenCalledWith(env.DB, '新規', 'store-a');
+    expect(db.findTagByNormalizedName).toHaveBeenCalledWith(env.DB, '新規', 'store-b');
+    const tagSql = prepare.mock.calls.map((call) => String(call[0]))
+      .find((sql) => /INSERT INTO tags/.test(sql));
+    expect(tagSql).toContain('normalized_name');
+  });
+
   /*
     **部分的に作らない**（要件 §7-3）。半分だけできた状態は、
     運用者が何を消せばよいか分からない。
   */
   it('途中で失敗したら作ったものを全部戻す', async () => {
-    run.mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error('D1 error'));
+    batch.mockRejectedValueOnce(new Error('D1 error'));
     const res = await makeApp().fetch(clone({ accountId: 'acc-1' }), env);
     expect(res.status).toBe(500);
     expect(await res.json()).toMatchObject({ error: '作れませんでした。何も作られていません' });
-    expect(db.rollbackCloneRun).toHaveBeenCalledWith(expect.anything(), 'run-1');
     expect(db.finishCloneRun).toHaveBeenCalledWith(expect.anything(), 'run-1', {
-      status: 'failed',
+      status: 'rolled_back',
       createdCount: 0,
-      failureReason: 'D1 error',
+      failureReason: 'CLONE_TRANSACTION_FAILED',
     });
   });
 
@@ -207,12 +232,13 @@ describe('複製', () => {
   it('シナリオを止まった状態で作る', async () => {
     db.getRecipeById.mockResolvedValue({
       ...RECIPE,
+      item_count: 1,
       items_json: JSON.stringify([{ kind: 'シナリオ', name: '7日間', note: '7通' }]),
     });
     await makeApp().fetch(clone({ accountId: 'acc-1' }), env);
     const sql = prepare.mock.calls.map((call) => String(call[0])).find((s) => /INSERT INTO scenarios/.test(s));
     expect(sql).toBeDefined();
-    expect(sql).toContain('0, datetime');
+    expect(sql).toContain('is_active');
   });
 
   it('見えないアカウントには作らない', async () => {
@@ -221,4 +247,40 @@ describe('複製', () => {
     expect(res.status).toBe(404);
     expect(db.startCloneRun).not.toHaveBeenCalled();
   });
+
+  it('複製権限のないスタッフは作らない', async () => {
+    const res = await makeApp('staff').fetch(clone({ accountId: 'acc-1' }), env);
+    expect(res.status).toBe(403);
+    expect(await res.json()).toMatchObject({
+      code: 'FORBIDDEN', missingPermissions: ['recipe.definition.clone'],
+    });
+    expect(db.startCloneRun).not.toHaveBeenCalled();
+  });
+
+  it('複製と対象の編集権限があるスタッフは作れる', async () => {
+    const res = await makeApp('staff', [
+      'recipe.definition.clone', 'tag.definition.edit', 'template.definition.edit',
+    ]).fetch(clone({ accountId: 'acc-1' }), env);
+    expect(res.status).toBe(202);
+  });
+
+  it('古いレシピ版は409にする', async () => {
+    const res = await makeApp().fetch(clone({ accountId: 'acc-1', expectedVersion: 0 }), env);
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ code: 'VERSION_CONFLICT' });
+  });
+
+  it('同じ冪等キーを別入力に使ったら409にする', async () => {
+    db.findRunByKey.mockResolvedValue({
+      id: 'run-前', status: 'succeeded', created_count: 2, request_fingerprint: 'different',
+    });
+    const res = await makeApp().fetch(clone({ accountId: 'acc-1' }), env);
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ code: 'IDEMPOTENCY_CONFLICT' });
+  });
 });
+
+async function hash(value: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
+}

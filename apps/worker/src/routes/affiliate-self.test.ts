@@ -31,6 +31,11 @@ const dbMocks = {
   listMileageRewards: vi.fn(),
   getMileageRewardRedemptionCounts: vi.fn(),
   reserveMileageRewardRedemption: vi.fn(),
+  encryptCredential: vi.fn(),
+  getAffiliateBankProfile: vi.fn(),
+  saveAffiliateBankProfile: vi.fn(),
+  listAffiliateStatementsForSelf: vi.fn(),
+  getAffiliateStatementDownload: vi.fn(),
   MileageRewardError: class MileageRewardError extends Error {
     constructor(public code: string, message: string, public status = 400) { super(message); }
   },
@@ -53,12 +58,15 @@ const DB = {} as D1Database;
 // account login channels), so tokens minted by any other channel are rejected.
 const LOGIN_CHANNEL_ID = '2000000000';
 
+const imagesGet = vi.fn();
 const env = {
   DB,
   LIFF_URL: 'https://liff.line.me/1000000000-DefaultAA',
   WORKER_URL: 'https://worker.example.com',
   LINE_LOGIN_CHANNEL_ID: LOGIN_CHANNEL_ID,
   LINE_CHANNEL_SECRET: 'wallet-link-secret',
+  LINE_CREDENTIAL_ENCRYPTION_KEY: 'test-encryption-key',
+  IMAGES: { get: imagesGet },
 } as unknown as import('../index.js').Env['Bindings'];
 
 function call(path: string, init?: RequestInit) {
@@ -194,6 +202,7 @@ function installStore() {
 beforeEach(() => {
   vi.clearAllMocks();
   vi.unstubAllGlobals();
+  imagesGet.mockReset();
   dbMocks.getLineAccounts.mockResolvedValue([
     { id: 'account-main', login_channel_id: LOGIN_CHANNEL_ID },
   ]);
@@ -238,6 +247,19 @@ beforeEach(() => {
     kind: 'created',
     redemption: { id: 'redemption-1' },
   });
+  dbMocks.encryptCredential.mockResolvedValue('encrypted-account-number');
+  dbMocks.getAffiliateBankProfile.mockResolvedValue(null);
+  dbMocks.saveAffiliateBankProfile.mockResolvedValue({
+    kind: 'created',
+    profile: {
+      affiliateId: 'aff-friend-alice', lineAccountId: 'account-main',
+      bankCode: '0001', bankName: 'テスト銀行', branchCode: '001', branchName: '本店',
+      accountType: 'ordinary', accountLast4: '4567', accountHolderName: 'ALICE',
+      version: 1, updatedAt: '2026-09-07T00:00:00.000Z',
+    },
+  });
+  dbMocks.listAffiliateStatementsForSelf.mockResolvedValue([]);
+  dbMocks.getAffiliateStatementDownload.mockResolvedValue(null);
   deliveryMocks.deliverMileageReward.mockResolvedValue({
     status: 'succeeded',
     message: '交換しました',
@@ -601,5 +623,77 @@ describe('POST /api/liff/affiliate/register — concurrent double-register', () 
     expect(body.affiliate.id).toBe('aff-winner');
     // The loser must NOT auto-issue a second first-link.
     expect(dbMocks.createAffiliateLink).not.toHaveBeenCalled();
+  });
+});
+
+describe('LIFF affiliate bank and statements', () => {
+  async function registerAlice() {
+    const response = await call('/api/liff/affiliate/register', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ lineAccessToken: 'tok-alice' }),
+    });
+    expect(response.status).toBe(200);
+  }
+
+  it('LINEで再照合した本人だけが振込先を保存し、口座番号を返さない', async () => {
+    await registerAlice();
+    const response = await call('/api/liff/affiliate/bank', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json', 'Idempotency-Key': '018f6c6e-7b37-4a2f-8a71-1e1224dbba01' },
+      body: JSON.stringify({
+        lineAccessToken: 'tok-alice', bankCode: '0001', bankName: 'テスト銀行',
+        branchCode: '001', branchName: '本店', accountType: 'ordinary',
+        accountNumber: '1234567', accountHolderName: 'ALICE', expectedVersion: 0,
+      }),
+    });
+    expect(response.status).toBe(201);
+    expect(dbMocks.encryptCredential).toHaveBeenCalledWith('1234567', 'test-encryption-key');
+    expect(dbMocks.saveAffiliateBankProfile).toHaveBeenCalledWith(DB, expect.objectContaining({
+      affiliateId: expect.stringContaining('friend-alice'), lineAccountId: 'account-main',
+      accountLast4: '4567', encryptedAccountNumber: 'encrypted-account-number',
+    }));
+    const json = JSON.stringify(await response.json());
+    expect(json).not.toContain('1234567');
+    expect(json).not.toContain('encrypted-account-number');
+    expect(json).toContain('4567');
+  });
+
+  it('振込先の版競合を409にし、別の紹介者IDを入力で指定させない', async () => {
+    await registerAlice();
+    dbMocks.saveAffiliateBankProfile.mockResolvedValueOnce({ kind: 'changed' });
+    const response = await call('/api/liff/affiliate/bank', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json', 'Idempotency-Key': '018f6c6e-7b37-4a2f-8a71-1e1224dbba02' },
+      body: JSON.stringify({
+        lineAccessToken: 'tok-alice', affiliateId: 'affiliate-bob',
+        bankCode: '0001', bankName: 'テスト銀行', branchCode: '001', branchName: '本店',
+        accountType: 'ordinary', accountNumber: '1234567', accountHolderName: 'ALICE', expectedVersion: 1,
+      }),
+    });
+    expect(response.status).toBe(409);
+    expect(dbMocks.saveAffiliateBankProfile).toHaveBeenCalledWith(DB, expect.objectContaining({
+      affiliateId: expect.stringContaining('friend-alice'),
+    }));
+  });
+
+  it('自分の明細だけを一覧・downloadする', async () => {
+    await registerAlice();
+    dbMocks.listAffiliateStatementsForSelf.mockResolvedValueOnce([{ id: 'statement-1', totalAmount: 5000 }]);
+    const list = await call('/api/liff/affiliate/statements?lineAccessToken=tok-alice');
+    expect(list.status).toBe(200);
+    expect(dbMocks.listAffiliateStatementsForSelf).toHaveBeenCalledWith(DB, expect.objectContaining({
+      lineAccountId: 'account-main', affiliateId: expect.stringContaining('friend-alice'),
+    }));
+
+    dbMocks.getAffiliateStatementDownload.mockResolvedValueOnce({
+      statement: { id: 'statement-1' }, objectKey: 'affiliate-statements/statement-1.pdf', checksum: 'sum',
+    });
+    imagesGet.mockResolvedValueOnce({ body: 'pdf-body' });
+    const download = await call('/api/liff/affiliate/statements/statement-1/download?lineAccessToken=tok-alice');
+    expect(download.status).toBe(200);
+    expect(download.headers.get('content-type')).toBe('application/pdf');
+    expect(dbMocks.getAffiliateStatementDownload).toHaveBeenCalledWith(DB, expect.objectContaining({
+      affiliateId: expect.stringContaining('friend-alice'), statementId: 'statement-1',
+    }));
   });
 });

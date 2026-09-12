@@ -9,6 +9,7 @@ export interface NotificationRuleRow {
   channels: string;    // JSON配列
   line_account_id: string | null;
   is_active: number;
+  version: number; // 内容の版。更新のたびに+1し、発火時に台帳へ写す(N-327)
   created_at: string;
   updated_at: string;
 }
@@ -75,8 +76,8 @@ export async function createNotificationRule(
   // The legacy table defaults to active, which made a newly-saved definition
   // look live even though no recipient resolution or delivery was performed.
   await db.prepare(`INSERT INTO notification_rules
-    (id, name, event_type, conditions, channels, line_account_id, is_active, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?)`)
+    (id, name, event_type, conditions, channels, line_account_id, is_active, version, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, 0, 1, ?, ?)`)
     .bind(
       id,
       input.name,
@@ -98,12 +99,17 @@ export async function updateNotificationRule(
 ): Promise<void> {
   const sets: string[] = [];
   const values: unknown[] = [];
+  // 内容の版: 名前・きっかけ・条件・通知方法が変わったら+1する。
+  // 公開/停止だけの切り替えは版を変えない(発火済みの版表示がぶれないため)。
+  const bumpsVersion = updates.name !== undefined || updates.eventType !== undefined
+    || updates.conditions !== undefined || updates.channels !== undefined;
   if (updates.name !== undefined) { sets.push('name = ?'); values.push(updates.name); }
   if (updates.eventType !== undefined) { sets.push('event_type = ?'); values.push(updates.eventType); }
   if (updates.conditions !== undefined) { sets.push('conditions = ?'); values.push(JSON.stringify(updates.conditions)); }
   if (updates.channels !== undefined) { sets.push('channels = ?'); values.push(JSON.stringify(updates.channels)); }
   if (updates.isActive !== undefined) { sets.push('is_active = ?'); values.push(updates.isActive ? 1 : 0); }
   if (sets.length === 0) return;
+  if (bumpsVersion) sets.push('version = version + 1');
   sets.push('updated_at = ?');
   values.push(jstNow());
   values.push(id);

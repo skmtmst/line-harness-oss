@@ -27,25 +27,49 @@ function orSection(): string {
   return CODE.slice(at, end)
 }
 
-/** OR節が並べようとしている軸の名前。 */
-const OR_LABELS = ['対応状況', 'シナリオ', 'イベント予約', '回答フォーム', '最終反応日']
+/** Pencil の OR 節に並ぶ11軸。 */
+const OR_LABELS = [
+  '対応マーク',
+  'シナリオ',
+  'イベント予約',
+  'カレンダー予約',
+  '回答フォーム',
+  '最終反応日',
+  'リマインダ',
+  '個別メモ',
+  'ステータスメッセージ',
+  '友だち登録日',
+  'その他',
+]
 
 describe('詳細条件のORの軸は、黙って消えない', () => {
-  it('並べようとしている軸が、すべて NOT_YET にある', () => {
+  it('新契約へ接続する全軸が OR_AXES にある', () => {
     for (const label of OR_LABELS) {
-      expect(DIALOG, `${label} を並べる側に書いているのに NOT_YET に項目が無い`)
+      expect(DIALOG, `${label} が OR_AXES に無い`)
         .toContain(`{ label: '${label}',`)
     }
+    expect(DIALOG).toContain('setAny((current) => [...current, condition])')
   })
 
-  it('対応状況の理由が書いてある', () => {
-    expect(DIALOG).toContain("{ label: '対応状況', why: '対応状況で絞る口がありません' }")
+  it('固定4状態と自由分類の対応マークを別の軸にする', () => {
+    expect(DIALOG).toContain("chat_status: '対応状況'")
+    expect(DIALOG).toContain("{ label: '対応マーク', make:")
   })
 
-  it('押せない理由が title ではなく画面に出ている', () => {
+  it('選択肢待ちの軸だけ無効にし、理由を画面に出す', () => {
     const section = orSection()
     expect(section, 'OR節が見つからない').not.toBe('')
-    expect(section, '理由を title に隠している').not.toContain('title={item.why}')
-    expect(section, '理由を本文に出していない').toContain('{item.why}')
+    expect(section).toContain('disabled={!condition}')
+    expect(section).toContain('選択肢を読み込むと使えます')
+    expect(section).not.toContain('title=')
+  })
+
+  it('表示する友だちと保存済み条件の入口を省かない', () => {
+    expect(DIALOG).toContain('表示する友だち')
+    expect(DIALOG).toContain('表示中')
+    expect(DIALOG).toContain('非表示')
+    expect(DIALOG).toContain('ブロックした人')
+    expect(DIALOG).toContain('友だちの状態')
+    expect(DIALOG).toContain('保存した検索から読み込む')
   })
 })

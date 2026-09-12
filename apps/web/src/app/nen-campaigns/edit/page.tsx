@@ -3,19 +3,18 @@
 import { Suspense, useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { api } from '@/lib/api'
-import Header from '@/components/layout/header'
+import { api, type NenColumn } from '@/lib/api'
 import StickyBar from '@/components/shared/sticky-bar'
 import CampaignEditor from './campaign-editor'
 import { useAccount } from '@/contexts/account-context'
 
-interface Column {
-  id: string
-  slug: string
-  title: string
-  intro_text: string | null
-  published_at: string | null
-}
+/*
+ * 一覧は `api.nenCampaigns.columns`（`NenColumn`・ラクダ語）を読む。
+ * 実API（`routes/nen-campaigns.ts` の columns 口）もモックもラクダ語で返す。
+ * 以前はここだけヘビ語の別型で読んでいたため、下書きが常に空になり
+ * 保存ボタンがずっと押せないままだった（#512 重大1）。
+ */
+type Column = Pick<NenColumn, 'id' | 'slug' | 'title' | 'introText' | 'publishedAt'>
 
 /**
  * NENコラムに添える紹介文の編集。
@@ -49,11 +48,11 @@ function NenColumnEditInner() {
       return
     }
     try {
-      const res = await api.nenColumns.list(selectedAccountId)
+      const res = await api.nenCampaigns.columns(selectedAccountId)
       if (res.success) {
         setColumns(res.data)
         const next: Record<string, string> = {}
-        for (const c of res.data) next[c.id] = c.intro_text ?? ''
+        for (const c of res.data) next[c.id] = c.introText ?? ''
         setDrafts(next)
       }
     } catch {
@@ -73,9 +72,9 @@ function NenColumnEditInner() {
     setError('')
     setNotice('')
     try {
-      const res = await api.nenColumns.updateMessage(selectedAccountId, column.id, drafts[column.id] ?? '')
+      const res = await api.nenCampaigns.updateColumnMessage(selectedAccountId, column.id, drafts[column.id] ?? '')
       if (!res.success) {
-        setError(res.error)
+        setError('保存に失敗しました')
         return
       }
       setNotice(`「${column.title}」の紹介文を保存しました`)
@@ -91,11 +90,6 @@ function NenColumnEditInner() {
 
   return (
     <div>
-      <Header
-        title="NENコラムを編集する"
-        description="LINEで配るときに前に付ける一言を決めます。"
-      />
-
       <nav className="text-ink-faint mb-4 text-xs">
         <Link href="/nen-campaigns" className="hover:underline">
           フォロー配信
@@ -130,8 +124,8 @@ function NenColumnEditInner() {
               <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
                 <p className="text-ink text-sm font-medium">{column.title}</p>
                 <p className="text-ink-faint text-xs">
-                  {column.published_at
-                    ? new Date(column.published_at).toLocaleDateString('ja-JP')
+                  {column.publishedAt
+                    ? new Date(column.publishedAt).toLocaleDateString('ja-JP')
                     : '未公開'}
                 </p>
               </div>
@@ -141,6 +135,7 @@ function NenColumnEditInner() {
                 onChange={(e) => setDrafts((prev) => ({ ...prev, [column.id]: e.target.value }))}
                 placeholder="例: 今週のコラムです。よろしければご覧ください。"
                 aria-label={`${column.title}の紹介文`}
+                maxLength={1500}
                 className="border-hairline rounded-control w-full resize-y border px-3 py-2 text-sm"
               />
               <StickyBar
@@ -148,7 +143,7 @@ function NenColumnEditInner() {
                 actions={(
                 <button
                   onClick={() => save(column)}
-                  disabled={savingId === column.id || (drafts[column.id] ?? '') === (column.intro_text ?? '')}
+                  disabled={savingId === column.id || (drafts[column.id] ?? '') === (column.introText ?? '')}
                   className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken border px-3 py-1.5 text-sm font-medium disabled:opacity-40"
                 >
                   {savingId === column.id ? '保存中...' : '保存'}

@@ -4,6 +4,9 @@ import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const PAGE = fs.readFileSync(path.join(__dirname, 'page.tsx'), 'utf8')
+const EDIT = fs.readFileSync(path.join(__dirname, 'edit/page.tsx'), 'utf8')
+const PUBLISHED = fs.readFileSync(path.join(__dirname, 'published/page.tsx'), 'utf8')
+const API = fs.readFileSync(path.join(__dirname, '../../lib/api.ts'), 'utf8')
 const FORM = fs.readFileSync(path.join(__dirname, '../../components/webinars/webinar-form.tsx'), 'utf8')
 /** 読み込めなかった理由の文言は、試験しやすいよう別ファイルへ出した。 */
 const FAILURE = fs.readFileSync(path.join(__dirname, 'webinar-load-failure.ts'), 'utf8')
@@ -20,31 +23,53 @@ describe('V6 ウェビナー一覧の契約', () => {
     expect(PAGE).not.toContain('表示件数の切り替えは準備中です')
   })
 
-  it('公開中と下書きの条件を実際に絞り込む', () => {
-    expect(PAGE).toContain("searched.filter((w) => w.status === savedFilter)")
+  it('公開中と下書きの条件をサーバーで絞り込む', () => {
+    /* 取った1頁を画面で絞り直すと件数や頁数が変わる。絞りは口へ渡す。 */
+    expect(PAGE).toContain('status: savedFilter || undefined')
     expect(PAGE).toContain("{ key: 'active', label: '公開中のみ' }")
     expect(PAGE).toContain("{ key: 'draft', label: '下書きのみ' }")
     expect(PAGE).not.toContain('保存した条件は準備中です')
+    expect(PAGE).not.toContain('foldered.filter')
   })
 
-  it('保存できないフォルダ操作を出さない', () => {
-    expect(PAGE).not.toContain('フォルダは準備中です')
-    expect(PAGE).not.toContain('フォルダを追加')
+  it('選択アカウントのフォルダ件数を表示し、追加・改名・並び替え・削除を保存する', () => {
+    expect(PAGE).toContain('lg:grid-cols-[var(--folder-rail-width)_minmax(0,1fr)]')
+    expect(PAGE).toContain('style={FOLDER_RAIL_STYLE}')
+    expect(PAGE).toContain("onAddFolder={() => { setFolderError(''); setFolderDialogOpen(true) }}")
+    expect(PAGE).toContain("webinarApi.createFolder(selectedAccountId, { name })")
+    expect(PAGE).toContain('webinarApi.updateFolder(selectedAccountId, editingFolder.id, { name })')
+    expect(PAGE).toContain('webinarApi.deleteFolder(selectedAccountId, deletingFolder.id)')
+    expect(PAGE).toContain('webinarApi.folders(selectedAccountId)')
+    expect(PAGE).toContain('count: folder.count')
+    /* 未分類の絞りはサーバーへ渡す(絞り値は UNFILED 行の id)。 */
+    expect(PAGE).toContain("{ id: UNFILED, label: '未分類', count: unfiledCount }")
+    expect(PAGE).not.toContain('const WEBINAR_FOLDERS')
+    expect(PAGE).not.toContain('min-h-[640px]')
+    expect(PAGE).not.toContain('フォルダ名と件数は一覧APIへの接続後に表示します。')
+    expect(PAGE).toContain('measuredCount(w.registrationCount)')
+    expect(PAGE).toContain('measuredCount(w.viewerCount)')
+    expect(PAGE).toContain('publicationSummary(w)')
   })
 
   it('選択中のLINEアカウントだけを読み、新規作成にも所属を保存する', () => {
-    expect(PAGE).toContain('webinarApi.list(accountId)')
-    expect(PAGE).toContain('requestGeneration.current !== generation')
+    expect(PAGE).toContain('webinarApi.list(accountId, {')
+    expect(PAGE).toContain('currentGeneration: () => requestGeneration.current')
     expect(PAGE).toContain('loadedAccountId === selectedAccountId ? items : []')
+    expect(PAGE).toContain('folderRequestGeneration.current === generation')
     expect(PAGE).toContain('上のバーでLINE公式アカウントを選んでください')
     expect(FORM).toContain("...(!initial ? { accountId: selectedAccountId } : {})")
   })
 
-  it('表示件数を超えたウェビナーも共通ページ送りで確認できる', () => {
+  it('一覧は頁ごとに取り、取った頁を絞り直さない', () => {
     expect(PAGE).toContain("import Pagination from '@/components/shared/pagination'")
-    expect(PAGE).toContain('const visibleStart = (currentPage - 1) * pageSize')
+    expect(PAGE).toContain('limit: pageSize')
+    expect(PAGE).toContain('q: debouncedQuery.trim() || undefined')
+    expect(PAGE).toContain('folder: selectedFolder || undefined')
+    expect(PAGE).toContain('sort: sortKey')
+    expect(PAGE).toContain('!Array.isArray(res.data.items) || typeof res.data.total !==')
     expect(PAGE).toContain('pageCount={pageCount}')
     expect(PAGE).not.toContain('ほかに {hiddenCount} 件あります')
+    expect(PAGE).not.toContain('.slice(visibleStart, visibleStart + pageSize)')
   })
 
   it('取得失敗を空の一覧と混ぜず、同じ画面で再取得できる', () => {
@@ -55,10 +80,56 @@ describe('V6 ウェビナー一覧の契約', () => {
     expect(FAILURE).toContain('ウェビナーを表示できませんでした')
     expect(FAILURE).toContain('通信状態を確認して、もう一度読み込んでください。')
     expect(PAGE).not.toContain('e instanceof Error ? e.message')
-    expect(PAGE).toContain('onClick={() => void refresh()}')
+    expect(PAGE).toContain('onRetry={() => void refresh()}')
     expect(PAGE).toContain('もう一度読み込む')
     /* 失敗の1枚と、空の1枚が別であること。 */
-    expect(PAGE).toContain(') : loadFailure ? (')
-    expect(PAGE).toContain(') : visibleItems.length === 0 ? (')
+    expect(PAGE).toContain('if (loadFailure)')
+    expect(PAGE).toContain('if (visibleItems.length === 0)')
+  })
+
+  it('物理削除ではなく履歴を残すアーカイブ確認を使う', () => {
+    expect(PAGE).toContain('ウェビナーをアーカイブしますか？')
+    expect(PAGE).toContain('申込者・視聴履歴・CTA・分析結果は消えません')
+    expect(PAGE).toContain('webinarApi.archive(archiveTarget.id)')
+    expect(API).toContain("method: 'POST'")
+    expect(API).not.toContain('webinarApi.remove')
+  })
+
+  it('視聴後アクション・参加者・分析・公開プレビューを別の面で開ける', () => {
+    for (const label of ['視聴後アクション', '公開プレビュー', '参加者', '分析']) {
+      expect(EDIT).toContain(`'${label}'`)
+    }
+    expect(EDIT).toContain('webinarApi.saveActions(webinarId, actions)')
+    expect(EDIT).toContain('webinarApi.participantsCsvUrl(webinarId)')
+    expect(EDIT).toContain('data-design-node="Xjk8q"')
+    expect(EDIT).toContain('data-design-node="Q8sHa"')
+    expect(EDIT).toContain('data-design-node="yxyzQ"')
+  })
+
+  it('残り12画面を実ノードと直接開ける面に分ける', () => {
+    for (const node of ['PV1Vh', 'd3rFGD', 'Ho8z4', 'Xjk8q', 'GB0NR', 'D6yO7e', 'Q8sHa', 'yxyzQ']) {
+      expect(EDIT).toContain(`data-design-node="${node}"`)
+    }
+    expect(PAGE).toContain('data-design-node="ZC13r"')
+    expect(PAGE).toContain('data-design-node="LKuAQ"')
+    for (const pane of ['video', 'cta', 'notifications', 'actions', 'preview', 'review', 'participants', 'analytics']) {
+      expect(EDIT).toContain(`pane === '${pane}'`)
+    }
+  })
+
+  it('編集・公開前検査・運用・参加者・分析を実APIへ接続する', () => {
+    for (const call of [
+      'webinarApi.editor(id)',
+      'webinarApi.publishValidation(webinar.id)',
+      'webinarApi.participants(webinarId, undefined, 8)',
+      'webinarApi.testPublicPage(webinar.id, editor.version)',
+    ]) expect(EDIT).toContain(call)
+    for (const call of [
+      'webinarApi.pause(id, editor.version)',
+      'webinarApi.testNotifications(id)',
+      'webinarApi.duplicate(id, editor.version)',
+    ]) expect(PUBLISHED).toContain(call)
+    expect(EDIT).toContain('analytics.viewSegments')
+    expect(PUBLISHED).toContain('editor.monitoring.notificationFailures')
   })
 })

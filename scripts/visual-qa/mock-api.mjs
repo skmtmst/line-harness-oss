@@ -26,37 +26,79 @@ import { fileURLToPath } from 'node:url'
 const FINGERPRINT = createHash('sha256').update(readFileSync(fileURLToPath(import.meta.url))).digest('hex').slice(0, 16)
 import { readArrayGetPaths } from './api-shapes.mjs'
 import {
+  mileageWriteResponse,
   MILEAGE_REWARDS,
   FORM_DELETE_IMPACT_FIXTURES,
   COMMON_VARS,
+  COMMON_VAR_FOLDERS,
+  COMMON_VAR_DETAIL,
   COMMON_VAR_DELETE_IMPACT,
+  COMMON_VAR_SCHEDULES,
+  commonVarChangeImpact,
   COMMON_VAR_DELETE_IMPACT_EMPTY,
+  COMMON_VAR_REPLACEMENT_CANDIDATES,
+  COMMON_VAR_REPLACEMENT_PREVIEW,
+  COMMON_VAR_REPLACEMENT_RESULT,
   MEDIA_DELETE_IMPACT,
   MEDIA_DELETE_IMPACT_EMPTY,
   MEDIA_REPLACEMENT_IMPACT,
   MEDIA_REPLACEMENT_IMPACT_BLOCKED,
   MEDIA_REPLACEMENT_IMPACT_EMPTY,
+  MEDIA_FOLDERS,
   MEDIA_ITEMS,
-  FRIEND_ADD_LIFECYCLE_DRAFT,
-  FRIEND_ADD_LIFECYCLE_PUBLISHED,
-  FRIEND_ADD_LIFECYCLE_TEST_RESULT,
-  FRIEND_ADD_LIFECYCLE_VALIDATION,
-  AUTO_REPLIES, AUTO_REPLY_FOLDERS,
-  BROADCASTS, CHATS, FRIEND_FIELDS, INBOX_STATS, INBOX_SAVED_VIEWS, FRIEND_MESSAGES, FRIEND_MILEAGE, FRIEND_DETAILS,
-  TEMPLATES, TEMPLATE_FOLDERS,
+  MEDIA_QUOTA,
+  FRIEND_ADD_RUNS,
+  AUTO_REPLIES, AUTO_REPLY_FOLDERS, AUTO_REPLY_RUNS, AUTO_REPLY_CONFLICT_SUMMARY,
+  AUTO_REPLY_PUBLISH_CONFLICTS, AUTO_REPLY_PUBLISH_DRAFT,
+  AUTO_REPLY_PUBLISH_RESULT, AUTO_REPLY_PUBLISH_TEST, AUTO_REPLY_PUBLISH_VALIDATION,
+  BROADCASTS, BROADCAST_FOLDERS, BROADCAST_INSIGHTS, BROADCAST_LIST_META,
+  BROADCAST_NOTIFICATION_SETTINGS,
+  BROADCAST_PREFLIGHT, BROADCAST_SAVED_VIEWS, CHATS, FRIEND_FIELDS, FRIEND_ATTRIBUTE_FIELDS, FRIEND_FIELD_FOLDERS,
+  FRIEND_ATTRIBUTE_SAVED_SEARCH_DETAIL, FRIEND_ATTRIBUTE_SAVED_SEARCH_RESPONSE, FRIEND_FIELD_MIGRATION_PREVIEW,
+  INBOX_STATS, INBOX_SAVED_VIEWS, FRIEND_MESSAGES, FRIEND_MILEAGE, FRIEND_DETAILS,
+  TEMPLATES, TEMPLATE_FOLDERS, TEMPLATE_TEST_RECIPIENTS,
   DUPLICATE_STATS, FRIENDS, FRIEND_BULK_RUN, FRIEND_SCENARIOS, FRIEND_STATS,
   IDENTITY_CANDIDATE_DETECTION, IDENTITY_CANDIDATE_EC, IDENTITY_CANDIDATE_ERROR, IDENTITY_CANDIDATE_FRIEND,
   IDENTITY_CANDIDATE_LISTS,
-  MERGED_PERSON_DETAIL, MERGED_PERSON_EMPTY, MERGED_PERSON_ERROR,
-  LIST_STATS, NEN_COLUMN_CREATE, OPERATORS, REMINDERS, REMINDER_FOLDERS, SCENARIO_STATS, SCENARIO_STEPS, USERS_GROUPED,
+  FRIEND_SAVED_VIEWS, MERGED_PERSON_DETAIL, MERGED_PERSON_EMPTY, MERGED_PERSON_ERROR,
+  LIST_STATS, NEN_BIRTHDAY_COUPON, NEN_CAMPAIGN_SETTINGS, NEN_COLUMN_CREATE, NEN_COLUMN_OPERATIONS, NEN_COLUMNS, NEN_JOBS, NEN_PETS,
+  NEN_FLOW_METRICS, NEN_COLUMN_METRICS, NEN_PET_METRICS, NEN_DELIVERIES, NEN_DELIVERY_DETAILS,
+  OPERATORS, REMINDERS, REMINDER_DRAFT, REMINDER_FOLDERS, REMINDER_VALIDATE, REMINDER_PREVIEW, REMINDER_TEST_SEND, REMINDER_PUBLISH, SCENARIO_ACTIONS, SCENARIO_DRAFT, SCENARIO_FOLDERS, SCENARIO_STATS, SCENARIO_STEPS, SCENARIO_SIMULATION, SCENARIO_RUNS, USERS_GROUPED,
   RICH_MENU_DELETE_IMPACT, RICH_MENU_DELETE_IMPACT_EMPTY,
-  TAGS, TAG_GROUPS,
+  RICH_MENU_GROUPS, RICH_MENU_GROUP_DETAILS, RICH_MENU_EXTERNAL, RICH_MENU_TAP_STATS,
+  TAGS, TAG_GROUPS, TAG_DEFINITION_NEN_SUBSCRIPTION, TAG_DEPENDENCIES_NEN_SUBSCRIPTION,
+  TAG_ARCHIVE_RESULT,
+  TAG_IMPORT_SAMPLE_ROWS, tagImportPreview, tagImportResult, REMINDER_RUNS,
   ACTION_SCORE_RULES,
-  SUPPORT_MARKS, SUPPORT_MARK_AUTOMATION_RULES,
-  OUTGOING_WEBHOOKS, INCOMING_WEBHOOKS, ENTRY_ROUTES, STAFF_MEMBERS, LOGIN_AUDIT,
-  AFFILIATES, AFFILIATE_OFFERS, AFFILIATE_REPORT, AFFILIATE_REPORT_DETAIL, AFFILIATE_LINKS, MILEAGE_OVERVIEW,
-  COMMON_ACTIONS, BOOKING_MENUS, BOOKING_STAFF, BOOKING_MENU_STAFF, BOOKING_AVAILABILITY, BOOKING_REQUESTS,
-  EC_NOTIFICATION_SETTINGS, ADMIN_EVENTS, EVENT_BOOKINGS, NEN_PHOTOS, EC_EVENTS, EC_OVERVIEW, MILEAGE_RULES, CONVERSION_POINTS,
+  SUPPORT_MARKS, SUPPORT_MARK_ARCHIVE_IMPACT, SUPPORT_MARK_AUTOMATION_RULES,
+  OUTGOING_WEBHOOKS, OUTGOING_WEBHOOK_TEST_RESULT, INCOMING_WEBHOOKS, INCOMING_WEBHOOK_DETAILS, ENTRY_ROUTES, INFLOW_SUMMARY,
+  SITE_TRACKING_SUMMARY, SITE_TRACKING_PAGES, AD_PLATFORMS, AD_CONVERSION_LOGS, TRACKED_LINKS,
+  STAFF_MEMBERS, LOGIN_AUDIT,
+  AFFILIATES, AFFILIATE_OFFERS, AFFILIATE_REPORT, AFFILIATE_REPORT_DETAIL, AFFILIATE_LINKS,
+  AFFILIATE_SETTLEMENT_PREVIEW, AFFILIATE_SETTLEMENT_CREATED, AFFILIATE_PAYOUT_BATCH, AFFILIATE_STATEMENT,
+  MILEAGE_EARNING_RULES, MILEAGE_FRIENDS, MILEAGE_HISTORY, MILEAGE_OVERVIEW,
+  COMMON_ACTIONS, COMMON_ACTION_DETAIL, AUTOMATIONS, AUTOMATION_RUNS, AUTOMATION_TEMPLATES,
+  BOOKING_MENUS, BOOKING_SETTINGS, BOOKING_STAFF, BOOKING_STAFF_MENUS, BOOKING_MENU_STAFF, BOOKING_AVAILABILITY, BOOKING_RESOURCES,
+  BOOKING_AVAILABILITY_RULES, BOOKING_BREAKS, BOOKING_BREAK_DATES, BOOKING_STAFF_SHIFTS, BOOKING_GOOGLE_CALENDAR,
+  BOOKING_PROXY_CREATE, BOOKING_REQUESTS,
+  BOOKING_ADMIN_DETAIL, BOOKING_CUSTOMER_CONTEXT, BOOKING_REMINDER_PREVIEW, BOOKING_CONFLICT_ALTERNATIVES,
+  EC_NOTIFICATION_SETTINGS, EC_NOTIFICATION_RUNS, LINE_NOTIFICATION_DEFINITIONS, LINE_NOTIFICATION_METRICS, LINE_NOTIFICATION_DELIVERIES,
+  OPERATOR_NOTIFICATION_RECIPIENTS, OPERATOR_NOTIFICATION_RULES, ADMIN_EVENTS, EVENT_DETAIL, EVENT_SLOTS, EVENT_WAITLIST, EVENT_BOOKINGS, NEN_PHOTOS, NEN_PHOTO_DETAIL,
+  NEN_PHOTO_REVIEW_METRICS, NEN_PHOTO_ASSET_STATUS, NEN_PHOTO_DERIVATIVES,
+  NEN_PHOTO_ASSET_PROCESS_RESULT, NEN_PHOTO_BULK_DECISION_RESULT,
+  NEN_PHOTO_PUBLICATIONS, EC_EVENTS, EC_OVERVIEW, EC_ORDERS, EC_ACTION_EXECUTIONS, EC_IDENTITY_CANDIDATES, MILEAGE_RULES,
+  FORM_FOLDERS, FORMS, FORM_LIST, FORM_DETAIL, FORM_SUBMISSIONS,
+  LINE_ACCOUNTS, LINE_ACCOUNT_DETAIL, LINE_ACCOUNT_VERIFY_CONNECTION, ACCOUNT_HANDOVER, ACCOUNT_HANDOVER_DECISIONS,
+  ACCOUNT_HEALTH_LOGS,
+  CONVERSION_POINTS, CONVERSION_REPORT_CURRENT, CONVERSION_REPORT_PREVIOUS,
+  CONVERSION_DEFINITIONS, CONVERSION_DEFINITION_REPORT, CONVERSION_EXPORT_CSV,
+  CONVERSION_DEFINITION_PREVIEW, CONVERSION_DEFINITION_DELETE_IMPACT,
+  OPERATION_CONTROL_PREVIEW, OPERATION_HEALTH, OPERATION_HISTORY,
+  WEBINARS, WEBINAR_FOLDERS, WEBINAR_OVERVIEW, WEBINAR_NOTIFICATIONS, WEBINAR_CTAS, WEBINAR_ACTIONS, WEBINAR_COMMENTS, WEBINAR_ANALYTICS,
+  WEBINAR_EDITOR, WEBINAR_PUBLISH_VALIDATION, WEBINAR_PARTICIPANTS,
+  FRIEND_ADD_RULE_PUBLISH, FRIEND_ADD_RULE_VALIDATE,
+  ACCESS_USERS, ACCESS_ROLES, ACCESS_AUDIT_EVENTS,
+  GETTING_STARTED, RECIPES, MANUAL_LINKS,
 } from './fixtures.mjs'
 
 if (process.env.NODE_ENV === 'production') {
@@ -67,10 +109,17 @@ if (process.env.NODE_ENV === 'production') {
 const PORT = Number(process.env.PORT ?? 8788)
 const HOST = '127.0.0.1'
 
+// 機能10専用。フォルダ操作後の再取得でも、同じプロセス内では保存結果を返す。
+let webinarFolders = WEBINAR_FOLDERS.map((folder) => ({ ...folder }))
+
+// 機能15専用。版追加の撮影では、差し替え用セッションの確定が本番口と同じ
+// `verified` を返す必要がある。申告時に受けた targetMediaId を覚えておく。
+const mediaUploadSessionTargets = new Map()
+
 /** 画面を見るだけなので、いちばん権限のある人で固定する。実在しない名前。 */
 const STAFF = {
   id: 'visual-qa-owner',
-  name: '画面確認',
+  name: 'Kenta Kawano',
   role: 'owner',
   readOnly: false,
   permissionKeys: [],
@@ -113,6 +162,85 @@ const ACCOUNT = {
  */
 const EMPTY_PAGE = { items: [], total: 0, page: 1, limit: 20 }
 
+/** 機能9。設計の一覧・5段編集・削除確認を同じ1組の設定で撮る。 */
+const FRIEND_ADD_RULE = {
+  id: 'rule-referral',
+  accountId: 'visual-qa-account',
+  friendKind: 'first_time',
+  name: '紹介キャンペーンの初回案内',
+  folderName: '紹介',
+  priority: 3,
+  isFallback: false,
+  status: 'published',
+  versionId: 'rule-referral-v1',
+  versionNumber: 1,
+  versionStatus: 'published',
+  version: 1,
+  lastTestStatus: 'succeeded',
+  lastTestedAt: '2026-01-13T10:00:00+09:00',
+  publishedAt: '2026-01-13T10:01:00+09:00',
+  matchedLast7Days: 9,
+  definition: {
+    routeIds: ['route-referral'],
+    scenarioId: 'scenario-welcome',
+    messageType: 'text',
+    messageText: 'ご登録ありがとうございます。ご希望の内容をお選びください。',
+    timing: 'immediate',
+    actions: [
+      { type: 'add_tag', label: 'タグ「新規友だち」を付ける', targetId: 'tag-new' },
+      { type: 'start_scenario', label: 'シナリオ「新規登録7日間フォロー」を開始する', targetId: 'scenario-welcome' },
+    ],
+    friendCondition: '紹介キャンペーンから来た人へ特典を案内する。',
+    activeFrom: null,
+    activeUntil: null,
+    weekdays: [1, 2, 3, 4, 5, 6, 0],
+    timeWindows: [{ start: '08:00', end: '21:00' }],
+    resendSuppressionHours: 24,
+    deliveryChoices: { sendWelcomeMessage: true, startScenario: true, runActions: true },
+    unknownRouteAction: { sendCommonGuidance: true, notifyStaff: true },
+  },
+  routeNames: ['紹介キャンペーン'],
+  scenarioName: '新規登録7日間フォロー',
+}
+
+const FRIEND_ADD_RULE_OPTIONS = {
+  routes: [
+    { id: 'route-shop', name: '店頭QRコード', kind: 'QR' },
+    { id: 'route-instagram', name: 'Instagramプロフィール', kind: '広告' },
+    { id: 'route-referral', name: '紹介キャンペーン', kind: '紹介' },
+  ],
+  scenarios: [
+    { id: 'scenario-welcome', name: '新規登録7日間フォロー' },
+    { id: 'scenario-common', name: '共通のあいさつ' },
+  ],
+  tags: [{ id: 'tag-new', name: '新規友だち' }, { id: 'tag-delivered', name: '配信済み' }],
+  folders: [
+    { id: 'friend-add-folder-store', name: '店頭' },
+    { id: 'friend-add-folder-ads', name: '広告' },
+    { id: 'friend-add-folder-referral', name: '紹介' },
+  ],
+}
+
+const FRIEND_ADD_RULES = {
+  items: [
+    { ...FRIEND_ADD_RULE, id: 'rule-shop', name: '店頭QRの初回案内', folderName: '店頭', priority: 1, matchedLast7Days: 41, routeNames: ['店頭QRコード'], definition: { ...FRIEND_ADD_RULE.definition, routeIds: ['route-shop'], messageText: '来店クーポンをご案内します。' } },
+    { ...FRIEND_ADD_RULE, id: 'rule-instagram', name: '広告からの初回案内', folderName: '広告', priority: 2, matchedLast7Days: 24, routeNames: ['Instagramプロフィール'], definition: { ...FRIEND_ADD_RULE.definition, routeIds: ['route-instagram'], messageText: '資料をダウンロードできます。' } },
+    FRIEND_ADD_RULE,
+    { ...FRIEND_ADD_RULE, id: 'rule-fallback', name: '経路が分からなかった人', folderName: null, priority: 999999, isFallback: true, matchedLast7Days: 12, routeNames: [], scenarioName: '共通のあいさつ', definition: { ...FRIEND_ADD_RULE.definition, routeIds: [], scenarioId: 'scenario-common', messageText: '友だち追加ありがとうございます。' } },
+  ],
+  summary: { rules: 4, active: 3, recentAdds: 86, captured: 74, unknownRoute: 12, delivered: 84, failed: 2 },
+  options: FRIEND_ADD_RULE_OPTIONS,
+  total: 4,
+  nextCursor: null,
+}
+
+const FRIEND_ADD_RULE_MATCHES = new Map([
+  ['rule-shop', 241],
+  ['rule-instagram', 382],
+  ['rule-referral', 214],
+  ['rule-fallback', 12],
+])
+
 /** 期間の端。**時計を読まない**（読むと画像が毎回変わる）。 */
 const FIXED_FROM = '2026-01-01'
 const FIXED_TO = '2026-01-13'
@@ -149,6 +277,22 @@ const DASHBOARD_TREND = [
   ['2026-08-17', 0, 0, 4, []],
   ['2026-08-18', 0, 0, 4, []],
   ['2026-08-19', 0, 0, 4, []],
+].map(([date, added, blocked, active, sources]) => ({
+  date, added, blocked, active, estimated: false, sources,
+}))
+
+/**
+ * 指標カード用の7日推移。設計 `vUXKb` は全日とも有効友だち398人で、
+ * 8/13だけ登録1人・流入元「検索」1人。旧グラフ用の active=4 は流用しない。
+ */
+const DASHBOARD_METRIC_TREND = [
+  ['2026-08-13', 1, 0, 398, [{ name: '検索', count: 1 }]],
+  ['2026-08-14', 0, 0, 398, []],
+  ['2026-08-15', 0, 0, 398, []],
+  ['2026-08-16', 0, 0, 398, []],
+  ['2026-08-17', 0, 0, 398, []],
+  ['2026-08-18', 0, 0, 398, []],
+  ['2026-08-19', 0, 0, 398, []],
 ].map(([date, added, blocked, active, sources]) => ({
   date, added, blocked, active, estimated: false, sources,
 }))
@@ -201,6 +345,53 @@ const DASHBOARD_OVERVIEW = {
     funnelAlerts: 0,
     automationFailures: 0,
   },
+  // PR #1016 の未取得判別契約。値だけでなく、基準時刻と期間も本番APIとそろえる。
+  metrics: {
+    activeFriends: {
+      value: 398,
+      state: 'available',
+      reason: null,
+      asOf: `${FIXED_TO}T00:00:00.000Z`,
+      period: 'latest',
+    },
+    monthlyQuota: {
+      value: { used: 3, limit: 200, remaining: 197 },
+      state: 'available',
+      reason: null,
+      asOf: `${FIXED_TO}T00:00:00.000Z`,
+      period: 'this-month',
+    },
+    friendTrend: {
+      value: DASHBOARD_METRIC_TREND,
+      state: 'estimated',
+      reason: null,
+      asOf: `${FIXED_TO}T00:00:00.000Z`,
+      period: 'last7-fixed',
+    },
+    officialProfileUrl: {
+      value: 'https://lin.ee/nen-official',
+      state: 'available',
+      reason: null,
+      asOf: `${FIXED_TO}T00:00:00.000Z`,
+      period: 'latest',
+    },
+  },
+  // 機能1 `JN6mQ`。撮影時だけPencilの見本QRと固定URLへ合わせる。
+  // 実環境のQR生成とURL解決にはこの値を返さない。
+  visualQa: {
+    referenceQr: true,
+    friendAddUrl: 'https://nen-line-stg.skmtmst.workers.dev/auth/line?account=2011090867',
+    officialProfileUrl: 'https://lin.ee/nen-official',
+    pendingPhotos: 1,
+    hideBookings: true,
+    healthRisk: 'normal',
+    operationalAlerts: 2,
+    twoFactor: { enabled: 0, total: 6 },
+    notificationUnreadCount: 3,
+    shipmentStatus: '未処理なし',
+    // 設計の運用アラート見本は未対応360件。本番相当の inbox.unanswered=5 とは別物の見本値。
+    supportInbox: { unanswered: 360, resolved: 38 },
+  },
 }
 
 /**
@@ -239,12 +430,12 @@ const SUPPORT_EMAIL_ITEMS = [
     customerIdentifier: 'sakamoto@example.com',
     subject: '発送について',
     preview: 'ご注文ありがとうございます。発送状況をご案内します。',
-    status: 'unread',
+    status: 'resolved',
     revision: 1,
     assignedStaffId: null,
     assignedStaffName: null,
     lastIncomingAt: '2026-08-16T02:10:00.000Z',
-    isUnread: true,
+    isUnread: false,
   },
   {
     id: 'email:mail-2',
@@ -253,12 +444,12 @@ const SUPPORT_EMAIL_ITEMS = [
     customerIdentifier: 'taro@example.com',
     subject: 'ご注文について',
     preview: 'ご注文ありがとうございます。内容を確認して対応します。',
-    status: 'unread',
+    status: 'resolved',
     revision: 1,
     assignedStaffId: null,
     assignedStaffName: null,
     lastIncomingAt: '2026-08-16T01:30:00.000Z',
-    isUnread: true,
+    isUnread: false,
   },
 ]
 
@@ -295,15 +486,48 @@ const ARRAY_PREFIXES = [
   '/api/users/',
 ]
 
-/** 機能のオン／オフ。全部オンにして、どの画面も出るようにする。 */
-const FEATURE_KEYS = [
-  'scenarios', 'broadcasts', 'templates', 'reminders', 'auto_replies',
-  'rich_menus', 'webinars', 'inflow_tracking', 'forms', 'mileage',
-  'affiliates', 'analytics', 'media', 'events', 'booking', 'automations',
-  'external_integrations', 'friend_add_routing', 'nen_campaigns',
-  'photo_review', 'ec_commerce', 'line_notifications', 'restaurant_test',
-]
-const FEATURES = Object.fromEntries(FEATURE_KEYS.map((k) => [k, true]))
+/** 機能31の固定応答。本物と同じ全ID・既定値・版を返す。 */
+const FEATURES = {
+  scenarios: true, broadcasts: true, templates: true, reminders: true,
+  auto_replies: true, rich_menus: true, inflow_tracking: true, forms: true,
+  photo_review: true, automations: true, external_integrations: true,
+  friend_add_routing: true, multi_store_hierarchy: false,
+  multi_store_bulk_updates: false, reservation_ledger: false,
+  external_reservations: false, google_business_profile: false,
+  friend_fields: true, support_marks: true, saved_searches: true,
+  media: true, common_vars: true, analytics: true, site_tracking: true,
+  webinars: false, events: true, booking: true, affiliates: false, mileage: true,
+  ec_commerce: true, line_notifications: true, nen_campaigns: true,
+  restaurant_test: true,
+}
+
+/** 設計 `bfB50` / `oHAN4` を確認するための固定ECデータ。秘密値そのものは置かない。 */
+const EC_SUBSCRIPTIONS = {
+  items: [
+    { id: 'sub-1', friendId: 'friend-1', ownerName: '高橋 直人', petName: 'ももちゃん', contractNumber: 'SUB-12492', status: 'active', statusLabel: 'よく続いています', riskReason: null, nextShippingAt: '2026-09-08', cycle: 'フード定期便（毎月）', items: '鹿肉フード × 2', amount: 12800, continuedCount: 10, startedAt: '2025-11-01', cancelledAt: null, cancellationReason: null, syncedAt: '2026-09-06T09:58:00+09:00' },
+    { id: 'sub-2', friendId: 'friend-2', ownerName: '前田 さくら', petName: 'そらくん', contractNumber: 'SUB-12503', status: 'active', statusLabel: 'よく続いています', riskReason: null, nextShippingAt: '2026-09-09', cycle: 'おやつ定期便（毎月）', items: '鹿肉ジャーキー × 1', amount: 4200, continuedCount: 8, startedAt: '2026-01-01', cancelledAt: null, cancellationReason: null, syncedAt: '2026-09-06T09:58:00+09:00' },
+    { id: 'sub-3', friendId: 'friend-3', ownerName: '木村 亮', petName: 'こむぎちゃん', contractNumber: 'SUB-12511', status: 'at_risk', statusLabel: '決済の確認が必要です', riskReason: '定期便のお支払いを確認できませんでした', nextShippingAt: '2026-09-12', cycle: 'フード定期便（2か月に1回）', items: '鹿肉フード × 1', amount: 8600, continuedCount: 7, startedAt: '2025-08-01', cancelledAt: null, cancellationReason: null, syncedAt: '2026-09-06T09:58:00+09:00' },
+    { id: 'sub-4', friendId: 'friend-4', ownerName: '中村 彩', petName: 'ぷりんちゃん', contractNumber: 'SUB-12528', status: 'paused', statusLabel: '休止中です', riskReason: null, nextShippingAt: null, cycle: 'おやつ定期便（毎月）', items: '鹿肉クッキー × 2', amount: 3600, continuedCount: 4, startedAt: '2026-05-01', cancelledAt: null, cancellationReason: null, syncedAt: '2026-09-06T09:58:00+09:00' },
+    { id: 'sub-5', friendId: 'friend-5', ownerName: '大西 健一', petName: 'レオくん', contractNumber: 'SUB-12532', status: 'cancelled', statusLabel: '止まりました', riskReason: null, nextShippingAt: null, cycle: 'フード定期便（毎月）', items: '鹿肉フード × 1', amount: 9800, continuedCount: 3, startedAt: '2026-05-01', cancelledAt: '2026-09-01', cancellationReason: '使いきれない', syncedAt: '2026-09-06T09:58:00+09:00' },
+  ],
+  summary: { total: 186, active: 172, paused: 5, atRisk: 14, cancelled: 8, monthlyAmount: 1482000, startedThisMonth: 12, cancelledThisMonth: 3, cancellationTopReason: '使いきれない', monthlyStats: [
+    { month: '2026-06', count: 158, amount: 1248000 }, { month: '2026-07', count: 169, amount: 1324000 }, { month: '2026-08', count: 172, amount: 1482000 },
+  ] },
+  risk: { source: 'payment_status', ruleVersion: 'subscription-payment-status-v1', calculatedAt: '2026-09-06T09:58:00+09:00', predictiveScoreAvailable: false },
+}
+
+const EC_CONNECTOR = {
+  configured: true,
+  connector: {
+    id: 'connector-visual', provider: 'shopify', shopDomain: 'nen-store.myshopify.com', status: 'connected',
+    secretConfigured: true, secretLastFour: '8f3a', secretUpdatedAt: '2026-02-14T10:00:00+09:00',
+    eventTypes: ['ec.order.confirmed', 'ec.order.payment_received', 'ec.order.shipped', 'ec.order.cancelled', 'ec.order.refunded', 'ec.customer.profile_updated'],
+    identityRules: ['verified_email', 'verified_phone', 'manual_name_postal'], version: 3, updatedAt: '2026-09-06T09:58:00+09:00',
+  },
+  health: { today: 148, last30Days: 2486, failed: 2, lastReceivedAt: '2026-09-06T09:58:00+09:00', lastSucceededAt: '2026-09-06T09:58:00+09:00' },
+  impact: { ...EC_OVERVIEW.impact },
+  retryPolicy: '3回まで・10分あけて',
+}
 
 /**
  * パスごとの形。ここに無いものは `EMPTY_PAGE` になる。
@@ -314,8 +538,151 @@ const FEATURES = Object.fromEntries(FEATURE_KEYS.map((k) => [k, true]))
 /** 分析の指標1つ。`state` と `reason` を持つのが契約。 */
 const METRIC = (value, state = 'available', reason = null) => ({ value, state, reason })
 
+/*
+  分析の後半3画面。空の器だけでは、行列・時系列ファネル・保存履歴を
+  設計画像と比較できない。固定時刻と架空の集計結果だけを返し、保存や
+  再集計そのものは行わない。
+*/
+const ANALYTICS_CROSS_RESULT = {
+  lineAccountId: 'visual-qa-account',
+  timeZone: 'Asia/Tokyo',
+  rowValues: [
+    { key: 'instagram', label: 'Instagram' },
+    { key: 'store-qr', label: '店頭のQR' },
+    { key: 'referral', label: '紹介リンク' },
+    { key: 'meta', label: '広告（Meta）' },
+    { key: 'unknown', label: '分からない' },
+  ],
+  columnValues: [
+    { key: 'tagged', label: '付いている' },
+    { key: 'untagged', label: '付いていない' },
+  ],
+  cells: [
+    ['instagram', 'Instagram', 'tagged', '付いている', 86, 79],
+    ['instagram', 'Instagram', 'untagged', '付いていない', 318, 306],
+    ['store-qr', '店頭のQR', 'tagged', '付いている', 142, 104],
+    ['store-qr', '店頭のQR', 'untagged', '付いていない', 96, 91],
+    ['referral', '紹介リンク', 'tagged', '付いている', 54, 49],
+    ['referral', '紹介リンク', 'untagged', '付いていない', 171, 168],
+    ['meta', '広告（Meta）', 'tagged', '付いている', 31, 26],
+    ['meta', '広告（Meta）', 'untagged', '付いていない', 208, 201],
+    ['unknown', '分からない', 'tagged', '付いている', 12, 9],
+    ['unknown', '分からない', 'untagged', '付いていない', 286, 277],
+  ].map(([rowKey, rowLabel, columnKey, columnLabel, value, previousValue]) => ({
+    rowKey, rowLabel, columnKey, columnLabel, value, uniqueFriends: value,
+    totalRatio: value / 1404, previousValue, difference: value - previousValue,
+  })),
+  totalValue: 1404,
+  totalFriends: 1404,
+  previousTotalValue: 1310,
+  periodFrom: '2026-06-06T00:00:00.000Z',
+  periodTo: '2026-09-03T00:00:00.000Z',
+  previousPeriodFrom: '2026-03-08T00:00:00.000Z',
+  previousPeriodTo: '2026-06-05T23:59:59.999Z',
+  dataCutoffAt: '2026-09-03T02:40:00.000Z',
+  state: 'available',
+  stateReason: null,
+}
+
+const ANALYTICS_FUNNEL_RUN = {
+  runId: 'visual-funnel-run-1',
+  funnelId: 'visual-funnel-1',
+  versionId: 'visual-funnel-version-1',
+  versionNumber: 3,
+  lineAccountId: 'visual-qa-account',
+  cohortFrom: '2026-06-06T00:00:00.000Z',
+  cohortTo: '2026-09-03T00:00:00.000Z',
+  timeZone: 'Asia/Tokyo',
+  dataCutoffAt: '2026-09-03T02:40:00.000Z',
+  state: 'available',
+  stateReason: null,
+  groups: [{
+    key: 'all', label: 'すべての経路', entrants: 1404, completed: 96,
+    steps: [
+      { stepOrder: 1, label: '友だちになった', reached: 1404, conversionFromPrevious: null, droppedAfter: 0, inProgressAfter: 0, averageSecondsFromPrevious: null, medianSecondsFromPrevious: null },
+      { stepOrder: 2, label: '1回でも反応した', reached: 886, conversionFromPrevious: 0.631, droppedAfter: 518, inProgressAfter: 0, averageSecondsFromPrevious: 86400, medianSecondsFromPrevious: 72000 },
+      { stepOrder: 3, label: 'フォームに答えた', reached: 412, conversionFromPrevious: 0.465, droppedAfter: 474, inProgressAfter: 0, averageSecondsFromPrevious: 172800, medianSecondsFromPrevious: 151200 },
+      { stepOrder: 4, label: '予約か購入をした', reached: 238, conversionFromPrevious: 0.578, droppedAfter: 174, inProgressAfter: 0, averageSecondsFromPrevious: 259200, medianSecondsFromPrevious: 216000 },
+      { stepOrder: 5, label: 'くり返し買った', reached: 96, conversionFromPrevious: 0.403, droppedAfter: 142, inProgressAfter: 0, averageSecondsFromPrevious: 604800, medianSecondsFromPrevious: 518400 },
+    ],
+  }],
+}
+
+const ANALYTICS_SAVED = [
+  ['saved-1', '経路 × 体験申込', 'cross', '佐々木', 12, '2026-08-25T11:20:00+09:00'],
+  ['saved-2', '友だちになってからの5段', 'funnel', '佐々木', 9, '2026-08-25T09:40:00+09:00'],
+  ['saved-3', '広告ごとの費用対効果', 'cross', '田中', 6, '2026-08-24T18:05:00+09:00'],
+  ['saved-4', 'コラムの読まれ方', 'cross', '山口', 4, '2026-08-23T14:30:00+09:00'],
+  ['saved-5', 'タグ × 予約', 'cross', '田中', 21, '2026-08-12T10:15:00+09:00'],
+  ['saved-6', '旧・流入の内訳', 'cross', '佐々木', 3, '2026-07-28T16:40:00+09:00'],
+].map(([id, name, kind, createdByName, snapshotCount, updatedAt], index) => ({
+  id, name, kind, status: 'active', currentVersionNumber: index === 5 ? 1 : 2,
+  createdBy: `visual-owner-${index + 1}`, createdByName,
+  createdAt: '2026-06-01T09:00:00+09:00', updatedAt, snapshotCount,
+  latestSnapshot: {
+    id: `${id}-snapshot-latest`, state: index === 5 ? 'unavailable' : 'available',
+    periodFrom: '2026-08-05T00:00:00+09:00', periodTo: '2026-09-03T00:00:00+09:00',
+    dataCutoffAt: '2026-09-03T02:40:00.000Z', createdAt: updatedAt,
+  },
+}))
+
+const PENDING_APPROVALS = [
+  ['木村 亮', '合同会社ノース', 'ao-2', '定期便のお申し込み', 'ECの定期が確定したとき', 5000, true],
+  ['大西 健一', '合同会社ノース', 'ao-4', '資料請求', '資料請求', 1500, true],
+  ['岡本 遥', '旧パートナーA（停止中）', 'ao-1', '体験の申し込み', '体験の申し込み', 3000, true],
+  ['高橋 直人', '田中 明', 'ao-2', '定期便のお申し込み', 'ECの定期が確定したとき', 5000, false],
+  ['藤井 理沙', '中村 彩', 'ao-1', '体験の申し込み', '体験の申し込み', 3000, false],
+  ['前田 さくら', '木村 亮', 'ao-1', '体験の申し込み', '体験の申し込み', 3000, false],
+  ['松本 圭', '山口 商店', 'ao-3', '友だち追加', '友だち追加', 100, false],
+  ['石田 未来', '田中 明', 'ao-4', '資料請求', '資料請求', 6000, false],
+].map(([friendName, affiliateName, offerId, offerName, conversionPointName, value, duplicateFlag], index) => ({
+  eventId: `cv-p-${index + 1}`,
+  createdAt: `2026-09-0${Math.min(index + 1, 6)}T${String(8 + index).padStart(2, '0')}:12:00+09:00`,
+  friendId: `friend-${index + 1}`,
+  friendName,
+  affiliateId: `af-${(index % 6) + 1}`,
+  affiliateName,
+  offerId,
+  offerName,
+  offerRewardMiles: 0,
+  conversionPointName,
+  value,
+  approvalStatus: 'pending',
+  duplicateFlag,
+}))
+
+const APPROVED_APPROVALS = Array.from({ length: 34 }, (_, index) => {
+  const offerIndex = index < 18 ? 1 : index < 26 ? 2 : index < 31 ? 3 : 4
+  const rewards = [0, 3000, 5000, 100, 1500]
+  const names = ['', '体験の申し込み', '定期便のお申し込み', '友だち追加', '資料請求']
+  return {
+    eventId: `cv-a-${index + 1}`,
+    createdAt: `2026-09-0${(index % 6) + 1}T10:00:00+09:00`,
+    friendId: `approved-friend-${index + 1}`,
+    friendName: `承認済みの友だち ${index + 1}`,
+    affiliateId: `af-${(index % 6) + 1}`,
+    affiliateName: AFFILIATES[index % AFFILIATES.length].name,
+    offerId: `ao-${offerIndex}`,
+    offerName: names[offerIndex],
+    offerRewardMiles: 0,
+    conversionPointName: names[offerIndex],
+    value: rewards[offerIndex],
+    approvalStatus: 'approved',
+    duplicateFlag: false,
+  }
+})
+
+const REJECTED_APPROVALS = Array.from({ length: 8 }, (_, index) => ({
+  ...PENDING_APPROVALS[index],
+  eventId: `cv-r-${index + 1}`,
+  approvalStatus: 'rejected',
+  duplicateFlag: false,
+}))
+
+const CONVERSION_APPROVALS = [...PENDING_APPROVALS, ...APPROVED_APPROVALS, ...REJECTED_APPROVALS]
+
 const SHAPES = {
-  '/api/public/brand': { name: '画面確認アカウント', iconUrl: null },
+  '/api/public/brand': { name: '株式会社 然', iconUrl: null },
   /*
     マイルの履歴。**既定の器（`{items,total,page,limit}`）では形が違う。**
 
@@ -338,31 +705,13 @@ const SHAPES = {
     行が無いと「表に無い種別が内部の記号のまま出ていないか」も見られないので、
     承認待ち・承認済み・重複ありの3行を置く。
   */
-  '/api/conversions/approvals': [
-    {
-      eventId: 'cv-1', createdAt: '2026-08-24T20:53:00+09:00',
-      friendId: 'friend-1', friendName: 'さかもとまさと',
-      affiliateId: 'af-1', affiliateName: 'Masato.S',
-      offerId: 'of-1', offerName: '夏の紹介キャンペーン', offerRewardMiles: 50,
-      conversionPointName: '購入完了', value: 12000,
-      approvalStatus: 'pending', duplicateFlag: false,
-    },
-    {
-      eventId: 'cv-2', createdAt: '2026-08-19T09:12:00+09:00',
-      friendId: 'friend-2', friendName: 'Kyohei Yamamoto',
-      affiliateId: 'af-1', affiliateName: 'Masato.S',
-      offerId: null, offerName: null, offerRewardMiles: null,
-      conversionPointName: '資料請求', value: null,
-      approvalStatus: 'approved', duplicateFlag: false,
-    },
-    {
-      eventId: 'cv-3', createdAt: '2026-08-13T20:52:00+09:00',
-      friendId: 'friend-3', friendName: null,
-      affiliateId: 'af-2', affiliateName: null,
-      offerId: 'of-1', offerName: '夏の紹介キャンペーン', offerRewardMiles: 50,
-      conversionPointName: '購入完了', value: 8000,
-      approvalStatus: 'pending', duplicateFlag: true,
-    },
+  '/api/conversions/approvals': CONVERSION_APPROVALS,
+  '/api/affiliate-payments': [
+    { affiliateId: 'af-1', affiliateName: '田中 明', code: 'tanaka01', holdDays: 30, payoutCycle: '8/31締め・9/30払い', approvedConversions: 9, approvedReward: 84000, heldConversions: 2, heldReward: 18000, holdStatusUnknown: 0, unsettledConversions: 9, unsettledReward: 84000, settledConversions: 0, settledReward: 0 },
+    { affiliateId: 'af-2', affiliateName: '合同会社ノース', code: 'north', holdDays: 30, payoutCycle: '8/31締め・9/30払い', approvedConversions: 8, approvedReward: 72000, heldConversions: 1, heldReward: 12000, holdStatusUnknown: 0, unsettledConversions: 8, unsettledReward: 72000, settledConversions: 0, settledReward: 0 },
+    { affiliateId: 'af-3', affiliateName: '木村 亮', code: 'miyuki', holdDays: 30, payoutCycle: '8/31締め・9/30払い', approvedConversions: 7, approvedReward: 64000, heldConversions: 2, heldReward: 18000, holdStatusUnknown: 0, unsettledConversions: 7, unsettledReward: 64000, settledConversions: 0, settledReward: 0 },
+    { affiliateId: 'af-4', affiliateName: '中村 彩', code: 'aya-n', holdDays: 30, payoutCycle: '8/31締め・9/30払い', approvedConversions: 5, approvedReward: 42000, heldConversions: 1, heldReward: 9000, holdStatusUnknown: 0, unsettledConversions: 5, unsettledReward: 42000, settledConversions: 0, settledReward: 0 },
+    { affiliateId: 'af-5', affiliateName: '山口 商店', code: 'yamaguchi', holdDays: 60, payoutCycle: '8/31締め・9/30払い', approvedConversions: 5, approvedReward: 50000, heldConversions: 2, heldReward: 15000, holdStatusUnknown: 0, unsettledConversions: 5, unsettledReward: 50000, settledConversions: 0, settledReward: 0 },
   ],
   '/api/action-scores/rules': ACTION_SCORE_RULES,
   '/api/action-scores/friends': {
@@ -373,11 +722,13 @@ const SHAPES = {
       highMin: 70, normalMin: 30,
     },
     items: [
-      { friendId: 'friend-1', displayName: 'さかもとまさと', score: 82, band: 'high', change30d: 4, lastActionAt: '2026-08-24T20:53:00+09:00' },
-      { friendId: 'friend-2', displayName: 'Kyohei Yamamoto', score: 55, band: 'normal', change30d: 0, lastActionAt: '2026-08-19T09:12:00+09:00' },
-      { friendId: 'friend-3', displayName: '菅野 亮', score: 31, band: 'low', change30d: -6, lastActionAt: '2026-08-13T20:52:00+09:00' },
+      { friendId: 'friend-1', displayName: 'さかもとまさと', currentScore: 82, band: 'high', change30d: 4, lastReason: '配信URLクリック → 夏のご案内', lastChangedAt: '2026-08-24T20:53:00+09:00' },
+      { friendId: 'friend-2', displayName: 'Kyohei Yamamoto', currentScore: 55, band: 'normal', change30d: 0, lastReason: '回答フォーム回答 → 食生活アンケート', lastChangedAt: '2026-08-19T09:12:00+09:00' },
+      { friendId: 'friend-3', displayName: '菅野 亮', currentScore: 31, band: 'normal', change30d: -6, lastReason: 'ブロック', lastChangedAt: '2026-08-13T20:52:00+09:00' },
+      { friendId: 'friend-4', displayName: '前田 さくら', currentScore: 47, band: 'normal', change30d: 3, lastReason: 'メッセージ返信 → 配送日のご相談', lastChangedAt: '2026-08-12T18:15:00+09:00' },
+      { friendId: 'friend-5', displayName: '大西 健一', currentScore: 22, band: 'low', change30d: 0, lastReason: '30日間反応なし', lastChangedAt: '2026-08-10T09:00:00+09:00' },
     ],
-    pagination: { total: 3, limit: 20, offset: 0 },
+    pagination: { total: 5, limit: 20, offset: 0 },
   },
   /*
     分析・友だちの増減。**既定の器では `data.data` が無く、画面ごと落ちる**
@@ -513,42 +864,50 @@ const SHAPES = {
         unusedItems: METRIC(79), automaticRuns: METRIC(214), manualSends: METRIC(12), estimatedHoursSaved: METRIC(1),
       },
       categories: [
-        { key: 'tags', label: 'タグ', href: '/tags', created: METRIC(101), inUse: METRIC(22), unused: METRIC(79), brokenReferences: METRIC(0), lastUsedAt: METRIC('2026-08-24') },
         { key: 'templates', label: 'テンプレート', href: '/templates', created: METRIC(0), inUse: METRIC(0), unused: METRIC(0), brokenReferences: METRIC(0), lastUsedAt: METRIC(null, 'unavailable', 'まだ使われていません') },
         { key: 'scenarios', label: 'シナリオ', href: '/scenarios', created: METRIC(11), inUse: METRIC(11), unused: METRIC(0), brokenReferences: METRIC(0), lastUsedAt: METRIC('2026-08-26') },
+        { key: 'forms', label: '回答フォーム', href: '/form-submissions', created: METRIC(8, 'partial', '回答実績から確認できるフォームのみです'), inUse: METRIC(5, 'partial', '回答実績から確認できるフォームのみです'), unused: METRIC(3, 'partial', '回答実績から確認できるフォームのみです'), brokenReferences: METRIC(null, 'partial', '利用関係台帳で追加します'), lastUsedAt: METRIC('2026-08-29', 'partial', '回答実績から確認できるフォームのみです') },
+        { key: 'rich_menus', label: 'リッチメニュー', href: '/rich-menus', created: METRIC(4), inUse: METRIC(2), unused: METRIC(2), brokenReferences: METRIC(null, 'partial', '利用関係台帳で追加します'), lastUsedAt: METRIC('2026-08-30') },
+        { key: 'friend_attributes', label: 'タグ・友だち情報', href: '/tags', created: METRIC(101, 'partial', '旧共通項目を含みます'), inUse: METRIC(22, 'partial', '旧共通項目を含みます'), unused: METRIC(79, 'partial', '旧共通項目を含みます'), brokenReferences: METRIC(null, 'partial', '利用関係台帳で追加します'), lastUsedAt: METRIC('2026-08-24', 'partial', '旧共通項目を含みます') },
+        { key: 'inflow_conversion', label: '流入リンク・成果地点', href: '/inflow-links', created: METRIC(16), inUse: METRIC(9), unused: METRIC(7), brokenReferences: METRIC(null, 'partial', '利用関係台帳で追加します'), lastUsedAt: METRIC('2026-08-31') },
+        { key: 'automations', label: 'オートメーション・共通アクション', href: '/automations', created: METRIC(7), inUse: METRIC(3), unused: METRIC(4), brokenReferences: METRIC(null, 'partial', '利用関係台帳で追加します'), lastUsedAt: METRIC('2026-09-01') },
+        { key: 'media_vars', label: '登録メディア・共通情報', href: '/contents', created: METRIC(null, 'unavailable', '旧データにLINEアカウント所属がありません'), inUse: METRIC(null, 'unavailable', '旧データにLINEアカウント所属がありません'), unused: METRIC(null, 'unavailable', '旧データにLINEアカウント所属がありません'), brokenReferences: METRIC(null, 'partial', '利用関係台帳で追加します'), lastUsedAt: METRIC(null, 'unavailable', '旧データにLINEアカウント所属がありません') },
+      ],
+    },
+  },
+  /*
+    分析・定期レポート作成。予約が0件でも、選択肢は本物と同じ器で返す。
+    これが無いと保存済み分析と受信者を選べず、設計 `URqOA` を撮れない。
+  */
+  '/api/analytics/report-schedules': {
+    items: [],
+    options: {
+      timeZone: 'Asia/Tokyo',
+      savedAnalyses: [
+        { id: 'saved-route', name: '経路別の成果', kind: 'cross' },
+      ],
+      recipients: [
+        {
+          id: 'staff-owner', name: '佐々木 亮太', role: 'admin',
+          email: 'sasaki@example.com', lineLinked: true,
+        },
+        {
+          id: 'staff-operator', name: '山本 京子', role: 'staff',
+          email: 'yamamoto@example.com', lineLinked: true,
+        },
       ],
     },
   },
   '/api/mileage/rewards': MILEAGE_REWARDS,
-  '/api/mileage/history': {
-    items: [
-      {
-        id: 'ml-1', friendId: 'friend-1', friendName: 'さかもとまさと',
-        entryType: 'earn', status: 'confirmed', mode: 'automatic',
-        amount: 5, balanceAfter: 5, reason: '写真の投稿が通りました',
-        occurredAt: '2026-08-24T20:53:00+09:00', createdAt: '2026-08-24T20:53:00+09:00',
-      },
-      {
-        id: 'ml-2', friendId: 'friend-2', friendName: 'Kyohei Yamamoto',
-        entryType: 'earn', status: 'confirmed', mode: 'automatic',
-        amount: 3, balanceAfter: 3, reason: '友だち追加',
-        occurredAt: '2026-08-19T09:12:00+09:00', createdAt: '2026-08-19T09:12:00+09:00',
-      },
-      {
-        id: 'ml-3', friendId: 'friend-3', friendName: '菅野 亮',
-        entryType: 'spend', status: 'confirmed', mode: 'manual',
-        amount: -2, balanceAfter: 1, reason: '手で減らしました',
-        occurredAt: '2026-08-13T20:52:00+09:00', createdAt: '2026-08-13T20:52:00+09:00',
-      },
-    ],
-    pagination: { total: 3, limit: 20, offset: 0 },
-  },
+  '/api/mileage/history': MILEAGE_HISTORY,
   '/api/settings/features': {
     features: FEATURES,
     sidebarOrder: null,
     sidebarItemOrder: null,
     parentChildMode: false,
-    specializedFeatureKeys: [],
+    specializedFeatureKeys: ['nen_campaigns', 'photo_review', 'ec_commerce', 'line_notifications'],
+    // 本物は版を返す。無いと画面の expectedVersion 付き保存の欠落に気づけない。
+    version: 1,
   },
   '/api/inbox/unanswered/count': { total: 0, byAccount: [], oldestWaitMinutes: null },
   // 設計 `vUXKb` の「写真審査 1件 確認待ち」。0で返すとカードが空のまま撮れる。
@@ -566,16 +925,15 @@ const SHAPES = {
     failed: 0,
     openRate: 69.4,
   },
+  '/api/broadcasts/notification-settings': BROADCAST_NOTIFICATION_SETTINGS,
   '/api/friends/stats': FRIEND_STATS,
   '/api/friends': { items: FRIENDS, total: 231, page: 1, limit: 20 },
   '/api/users-grouped': USERS_GROUPED,
   '/api/duplicates/stats': DUPLICATE_STATS,
   '/api/operators': OPERATORS,
   '/api/scenarios': FRIEND_SCENARIOS,
-  '/api/media': MEDIA_ITEMS,
-
-  /* 予約。`api.ts` を通らない口なので、読む側（`app/page.tsx`）に合わせる。 */
-  '/api/booking/admin/requests': { requests: [] },
+  '/api/media': { items: MEDIA_ITEMS, total: MEDIA_ITEMS.length, limit: 20, offset: 0 },
+  '/api/media/quota': MEDIA_QUOTA,
 
   /* EC の出荷予定（`EcShipmentList`）。`soon`/`later` は配列で要る。 */
   '/api/ec-commerce/shipments': {
@@ -598,12 +956,8 @@ const SHAPES = {
   '/api/dashboard/organization-overview': DASHBOARD_OVERVIEW,
 
   /* リッチメニュー。LINE側にある実物の一覧と、押された回数。 */
-  '/api/rich-menu-groups/external': { currentDefault: null, lineMenus: [] },
-  '/api/rich-menu-groups/tap-stats': { from: FIXED_FROM, to: FIXED_TO, byArea: [], byGroup: [], total: 0 },
-
-  /* 友だち追加時配信の公開前確認（PR #597）。契約と同じ形を返す。 */
-  '/api/friend-add-routing/draft': FRIEND_ADD_LIFECYCLE_DRAFT,
-  '/api/friend-add-routing/conflicts': { conflicts: [] },
+  '/api/rich-menu-groups/external': RICH_MENU_EXTERNAL,
+  '/api/rich-menu-groups/tap-stats': RICH_MENU_TAP_STATS,
 
 }
 
@@ -612,14 +966,153 @@ const SHAPES = {
  * 本番データは変更せず、毎回同じ結果を返す。ほかの更新は従来どおり405。
  */
 function visualQaWriteBody(method, pathname) {
-  if (method === 'POST' && pathname === '/api/friend-add-routing/validate') {
-    return FRIEND_ADD_LIFECYCLE_VALIDATION
+  if (method === 'POST' && pathname === '/api/notifications/operator-rules/recipients-preview') {
+    return OPERATOR_NOTIFICATION_RECIPIENTS
   }
-  if (method === 'POST' && pathname === '/api/friend-add-routing/draft/test') {
-    return FRIEND_ADD_LIFECYCLE_TEST_RESULT
+  if (method === 'POST' && /^\/api\/notifications\/operator-rules\/[^/]+\/(publish|test)$/.test(pathname)) {
+    return { accepted: 2, excluded: 0, failed: 0, duplicate: 0 }
   }
-  if (method === 'POST' && pathname === '/api/friend-add-routing/publish') {
-    return FRIEND_ADD_LIFECYCLE_PUBLISHED
+  const scenarioSimulation = /^\/api\/scenarios\/([^/]+)\/simulate$/.exec(pathname)
+  if (method === 'POST' && scenarioSimulation) {
+    return { ...SCENARIO_SIMULATION, scenarioId: scenarioSimulation[1] }
+  }
+  if (method === 'PUT' && /^\/api\/scenarios\/[^/]+\/draft$/.test(pathname)) return SCENARIO_DRAFT
+  /*
+   * リマインダの公開フロー（下書き保存・検査・予定・試し送り・公開）。
+   * 読みの `/draft` と `/runs` は従来のGET側にある。ここは書き込み側で、
+   * 本番と同じ器（`{success:true,data}`）で固定の返事を返す。
+   */
+  if (method === 'PUT' && /^\/api\/reminders\/[^/]+\/draft$/.test(pathname)) return REMINDER_DRAFT
+  if (method === 'POST' && /^\/api\/reminders\/[^/]+\/validate$/.test(pathname)) return REMINDER_VALIDATE
+  if (method === 'POST' && /^\/api\/reminders\/[^/]+\/preview$/.test(pathname)) return REMINDER_PREVIEW
+  if (method === 'POST' && /^\/api\/reminders\/[^/]+\/test-send$/.test(pathname)) return REMINDER_TEST_SEND
+  if (method === 'POST' && /^\/api\/reminders\/[^/]+\/publish$/.test(pathname)) return REMINDER_PUBLISH
+  if (method === 'POST' && /^\/api\/scenarios\/[^/]+\/test-send$/.test(pathname)) return { sent: 1 }
+  if (method === 'POST' && /^\/api\/scenarios\/[^/]+\/steps\/[^/]+\/test-send$/.test(pathname)) return { sent: 1 }
+  if (method === 'POST' && pathname === '/api/ec-commerce/test-send') return { sent: 1 }
+  if (method === 'PUT' && /^\/api\/manual-links\/[^/]+$/.test(pathname)) {
+    const key = decodeURIComponent(pathname.split('/').pop() ?? '')
+    return MANUAL_LINKS.items.find((item) => item.key === key) ?? null
+  }
+  if (method === 'POST' && /^\/api\/recipes\/[^/]+\/clone$/.test(pathname)) {
+    return { runId: 'visual-recipe-clone-run', status: 'succeeded', createdCount: 16, items: [] }
+  }
+  if (method === 'POST' && pathname === '/api/manual-links/check') {
+    return { checked: 265, ok: 263, broken: 2, unset: 1 }
+  }
+  if (method === 'POST' && pathname === '/api/line-accounts/verify-connection') {
+    return LINE_ACCOUNT_VERIFY_CONNECTION
+  }
+  if (method === 'POST' && /^\/api\/friend-add-rules\/[^/]+\/validate$/.test(pathname)) {
+    // 失敗系は visualState=error で切り替える。固定成功だけだと公開不可の
+    // 状態を確かめられない (#501-軽)。器は本物の失敗応答と同じ形。
+    if (query.get('visualState') === 'error') {
+      return {
+        success: false,
+        data: {
+          stateChanged: false, ruleId: FRIEND_ADD_RULE.id, matched: false,
+          reasons: ['送るシナリオが見つかりません。'],
+          scenarioId: FRIEND_ADD_RULE.definition.scenarioId,
+          message: FRIEND_ADD_RULE.definition.messageText,
+          actions: FRIEND_ADD_RULE.definition.actions,
+        },
+        error: 'テスト条件を確認してください',
+      }
+    }
+    return FRIEND_ADD_RULE_VALIDATE
+  }
+  if (method === 'POST' && /^\/api\/friend-add-rules\/[^/]+\/publish$/.test(pathname)) {
+    if (query.get('visualState') === 'error') {
+      return { success: false, error: '公開前にテストを成功させてください' }
+    }
+    return FRIEND_ADD_RULE_PUBLISH
+  }
+  if (method === 'POST' && /^\/api\/friend-fields\/[^/]+\/migration-preview$/.test(pathname)) {
+    return FRIEND_FIELD_MIGRATION_PREVIEW
+  }
+  if (method === 'POST' && pathname === '/api/inbox/saved-views') {
+    return {
+      id: 'inbox-view-preview',
+      name: '未割り当て・期限超過',
+      createdBy: 'Kenta',
+      isShared: false,
+      matchCount: 1,
+    }
+  }
+  if (method === 'POST' && pathname === '/api/broadcasts/saved-views') {
+    return BROADCAST_SAVED_VIEWS[0]
+  }
+  if (method === 'POST' && pathname === '/api/analytics/cross/query') {
+    return { id: 'visual-cross-result-1', state: 'pending' }
+  }
+  /*
+   * 本番の口は `{success,data}` で包む。素値のままだと `api.ts` の
+   * 応答期待と形が違い、目視環境でテスト成功の絵を再現できない（#494 軽14）。
+   */
+  if (method === 'POST' && /^\/api\/auto-replies\/[^/]+\/test$/.test(pathname)) {
+    return { success: true, data: AUTO_REPLY_PUBLISH_TEST }
+  }
+  if (method === 'POST' && /^\/api\/auto-replies\/[^/]+\/validate$/.test(pathname)) {
+    return { success: true, data: AUTO_REPLY_PUBLISH_VALIDATION }
+  }
+  if (method === 'POST' && /^\/api\/auto-replies\/[^/]+\/publish$/.test(pathname)) {
+    return { success: true, data: AUTO_REPLY_PUBLISH_RESULT }
+  }
+  if (method === 'POST' && /^\/api\/rich-menu-groups\/[^/]+\/preview-targets$/.test(pathname)) {
+    return {
+      matched: { value: 1020, state: 'available', reason: null },
+      overlap: { value: 180, state: 'available', reason: null },
+      effective: { value: 840, state: 'available', reason: null },
+      higherMenus: ['夏キャンペーン'],
+      priority: 2,
+    }
+  }
+  if (method === 'POST' && pathname === '/api/friend-add-rules/test') {
+    return {
+      stateChanged: false, ruleId: FRIEND_ADD_RULE.id, matched: true,
+      reasons: ['この設定が優先順位どおりに選ばれます。'],
+      scenarioId: FRIEND_ADD_RULE.definition.scenarioId,
+      message: FRIEND_ADD_RULE.definition.messageText,
+      actions: FRIEND_ADD_RULE.definition.actions,
+    }
+  }
+  if (method === 'POST' && pathname === '/api/broadcasts/preflight') {
+    return BROADCAST_PREFLIGHT
+  }
+  if (method === 'PUT' && pathname === '/api/broadcasts/notification-settings') {
+    return BROADCAST_NOTIFICATION_SETTINGS
+  }
+  if (method === 'POST' && /^\/api\/tags\/[^/]+\/archive$/.test(pathname)) {
+    return TAG_ARCHIVE_RESULT
+  }
+  if (method === 'POST' && /^\/api\/webhooks\/outgoing\/[^/]+\/test$/.test(pathname)) {
+    return OUTGOING_WEBHOOK_TEST_RESULT
+  }
+  if (method === 'POST' && pathname === '/api/saved-searches/preview') {
+    return FRIEND_ATTRIBUTE_SAVED_SEARCH_DETAIL
+  }
+  /* 機能29の操作系。承認・拒否・取消・枠の増減を目視できるよう固定の返事を返す(点検#520の中7)。 */
+  if (method === 'POST' && /^\/api\/events\/admin\/events\/[^/]+\/bookings\/[^/]+\/decide$/.test(pathname)) {
+    const bookingId = pathname.split('/').pop()
+    const found = EVENT_BOOKINGS.find((booking) => booking.id === bookingId) ?? EVENT_BOOKINGS[0]
+    return { ...found, status: 'confirmed', decided_at: '2026-09-08T00:00:00.000Z' }
+  }
+  if (method === 'POST' && /^\/api\/events\/admin\/events\/[^/]+\/bookings\/[^/]+\/cancel$/.test(pathname)) {
+    return { ok: true }
+  }
+  if (method === 'PUT' && /^\/api\/events\/admin\/events\/[^/]+\/bookings\/[^/]+$/.test(pathname)) {
+    const bookingId = pathname.split('/').pop()
+    const found = EVENT_BOOKINGS.find((booking) => booking.id === bookingId) ?? EVENT_BOOKINGS[0]
+    return { ...found, status: 'confirmed' }
+  }
+  if (method === 'POST' && /^\/api\/events\/admin\/events\/[^/]+\/slots$/.test(pathname)) {
+    return { items: EVENT_SLOTS }
+  }
+  if (method === 'PUT' && /^\/api\/events\/admin\/events\/[^/]+\/slots\/[^/]+$/.test(pathname)) {
+    return EVENT_SLOTS[0]
+  }
+  if (method === 'DELETE' && /^\/api\/events\/admin\/events\/[^/]+\/slots\/[^/]+$/.test(pathname)) {
+    return {}
   }
   return null
 }
@@ -628,7 +1121,7 @@ function visualQaWriteBody(method, pathname) {
 const RAW = {
   // `0.0.0-dev` のときはバナー自体を出さない。manifest も見に行かない。
   //（update-banner.tsx の DEV_VERSION と同じ値でないと効かない）
-  '/admin/version': { version: '0.0.0-dev', worker_hash: '', admin_hash: '', liff_hash: '' },
+  '/admin/version': { version: '2.6.4', worker_hash: '', admin_hash: '', liff_hash: '' },
   '/admin/manifest': { releases: [], versions: [] },
 
   /*
@@ -646,11 +1139,30 @@ const RAW = {
   */
   /* 空いている時間。包むと `res.by_staff` が undefined になり、選ぶ口が0件になる。 */
   '/api/booking/admin/availability': BOOKING_AVAILABILITY,
+  '/api/booking/admin/resources': { success: true, data: { resources: BOOKING_RESOURCES } },
   '/api/booking/admin/menus': { menus: BOOKING_MENUS },
   '/api/booking/admin/staff': { staff: BOOKING_STAFF },
+  '/api/booking/admin/customer-context': { customer: BOOKING_CUSTOMER_CONTEXT },
+  '/api/booking/admin/reminder-preview': BOOKING_REMINDER_PREVIEW,
+  '/api/booking/admin/alternatives': BOOKING_CONFLICT_ALTERNATIVES,
   '/api/events/admin/events': { items: ADMIN_EVENTS },
   // 予約メニューの帯は `requests` から件数を出す。包むと `.filter` で落ちる。
-  '/api/booking/admin/requests': { requests: BOOKING_REQUESTS },
+  // 撮影用は BOOKING_REQUESTS(実APIと同じ器。動的な絞り込みは下の分岐が受ける)。
+  '/api/booking/admin/requests': { requests: BOOKING_REQUESTS, total: BOOKING_REQUESTS.length, limit: 50, offset: 0 },
+  '/api/booking/admin/requests-summary': {
+    total: BOOKING_REQUESTS.length,
+    requested: BOOKING_REQUESTS.filter((item) => item.status === 'requested').length,
+    monthTotal: BOOKING_REQUESTS.length,
+    monthConfirmed: BOOKING_REQUESTS.filter((item) => item.status === 'confirmed').length,
+    monthCancelled: BOOKING_REQUESTS.filter((item) => ['cancelled', 'rejected', 'no_show'].includes(item.status)).length,
+    lastMonthTotal: 0,
+    todayTotal: BOOKING_REQUESTS.length,
+    weekTotal: BOOKING_REQUESTS.length,
+    byMenu: BOOKING_MENUS.map((menu) => ({
+      name: menu.name,
+      total: BOOKING_REQUESTS.filter((item) => item.menu_name === menu.name).length,
+    })),
+  },
 }
 
 /**
@@ -663,9 +1175,27 @@ const RAW = {
  * `29-1-B 申込者の一覧` が `.filter` で「画面を表示できませんでした」になっていた。
  */
 const RAW_PATTERNS = [
-  [/^\/api\/events\/admin\/events\/[^/]+\/bookings$/, { items: EVENT_BOOKINGS }],
+  [/^\/api\/booking\/admin\/bookings\/[^/]+$/, BOOKING_ADMIN_DETAIL],
+  [/^\/api\/booking\/admin\/staff\/[^/]+\/menus$/, (url) => ({
+    matrix: BOOKING_STAFF_MENUS[url.pathname.split('/')[5]] ?? [],
+  })],
+  [/^\/api\/events\/admin\/events\/[^/]+$/, EVENT_DETAIL],
+  [/^\/api\/events\/admin\/events\/[^/]+\/slots$/, { items: EVENT_SLOTS }],
+  [/^\/api\/events\/admin\/events\/[^/]+\/waitlist$/, { waitlist: EVENT_WAITLIST }],
+  [/^\/api\/events\/admin\/events\/notifications\/pending$/, { count: 2 }],
+  [/^\/api\/events\/admin\/events\/[^/]+\/bookings$/, (url) => ({
+    items: url.searchParams.get('status')
+      ? EVENT_BOOKINGS.filter((booking) => booking.status === url.searchParams.get('status'))
+      : EVENT_BOOKINGS,
+  })],
   /* メニューに就ける担当。器は `{staff}`。包むと選ぶ口が0件になる。 */
   [/^\/api\/booking\/admin\/menus\/[^/]+\/staff$/, { staff: BOOKING_MENU_STAFF }],
+  /* `tksPc` の通常・読込中・失敗を分けるため、通常だけ本番と同じ器で返す。 */
+  [/^\/api\/booking\/admin\/staff\/[^/]+\/shifts$/, { shifts: BOOKING_STAFF_SHIFTS }],
+  [/^\/api\/booking\/admin\/staff\/[^/]+\/availability-rules$/, { rules: BOOKING_AVAILABILITY_RULES }],
+  [/^\/api\/booking\/admin\/staff\/[^/]+\/breaks$/, BOOKING_BREAKS],
+  [/^\/api\/booking\/admin\/staff\/[^/]+\/break-dates$/, BOOKING_BREAK_DATES],
+  [/^\/api\/booking\/admin\/staff\/[^/]+\/google-calendar$/, BOOKING_GOOGLE_CALENDAR],
 ]
 
 /** 参照が1つも無ければ消せる（`packages/db` の `canDelete` と同じ数え方）。 */
@@ -720,9 +1250,268 @@ function reminderStepsOf(reminder) {
   }))
 }
 
-function bodyFor(pathname, query = new URLSearchParams()) {
+const NEN_RANGE_END = Date.parse('2026-08-25T15:00:00.000Z')
+
+function nenRangeFor(query) {
+  const from = query.get('from')
+  const to = query.get('to')
+  if (from && to && Number.isFinite(Date.parse(from)) && Number.isFinite(Date.parse(to))) {
+    return {
+      days: Math.max(1, Math.ceil((Date.parse(to) - Date.parse(from)) / 86_400_000)),
+      from: new Date(from).toISOString(),
+      to: new Date(to).toISOString(),
+    }
+  }
+  const requested = Number.parseInt(query.get('days') ?? '30', 10)
+  const days = Number.isSafeInteger(requested) && requested >= 1 && requested <= 365 ? requested : 30
+  return {
+    days,
+    from: new Date(NEN_RANGE_END - days * 86_400_000).toISOString(),
+    to: new Date(NEN_RANGE_END).toISOString(),
+  }
+}
+
+function nenMetricsBody(data, query) {
+  return { ...data, range: nenRangeFor(query) }
+}
+
+function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (pathname === '/api/auth/session') {
     return { success: true, data: STAFF, csrfToken: 'visual-qa-csrf' }
+  }
+  if (pathname === '/api/inbox/unanswered') {
+    return {
+      success: true,
+      data: {
+        total: 2,
+        page: 1,
+        pageSize: 2000,
+        rows: [
+          {
+            friendId: 'friend-inbox-1',
+            displayName: '佐藤 美咲',
+            pictureUrl: null,
+            accountId: 'visual-qa-account',
+            accountName: '画面確認アカウント',
+            lastIncomingAt: '2026-09-07T04:30:00.000Z',
+            lastManualAt: null,
+            lastMachineAt: '2026-09-07T04:31:00.000Z',
+            lastIncomingType: 'text',
+            lastIncomingContent: '予約について確認したいです',
+          },
+          {
+            friendId: 'friend-inbox-2',
+            displayName: '鈴木 健太',
+            pictureUrl: null,
+            accountId: 'visual-qa-account',
+            accountName: '画面確認アカウント',
+            lastIncomingAt: '2026-09-07T03:15:00.000Z',
+            lastManualAt: null,
+            lastMachineAt: null,
+            lastIncomingType: 'text',
+            lastIncomingContent: '商品の発送日はいつですか？',
+          },
+        ],
+      },
+    }
+  }
+  if (pathname === '/api/affiliate-settlements/preview') {
+    return { success: true, data: AFFILIATE_SETTLEMENT_PREVIEW }
+  }
+  if (pathname === '/api/ec-commerce/orders') {
+    const requestedLimit = Number.parseInt(query.get('limit') ?? '', 10)
+    const requestedOffset = Number.parseInt(query.get('offset') ?? '', 10)
+    const limit = Number.isInteger(requestedLimit) && requestedLimit > 0 ? Math.min(requestedLimit, 100) : 20
+    const offset = Number.isInteger(requestedOffset) && requestedOffset >= 0 ? requestedOffset : 0
+    const status = query.get('status')
+    const search = (query.get('query') ?? '').trim().toLocaleLowerCase('ja')
+    const filtered = EC_ORDERS.items.filter((order) => {
+      if (status && order.status !== status) return false
+      if (!search) return true
+      return order.orderNumber.toLocaleLowerCase('ja').includes(search)
+        || (order.customerName ?? '').toLocaleLowerCase('ja').includes(search)
+    })
+    const total = status || search ? filtered.length : EC_ORDERS.total
+    return {
+      success: true,
+      data: { ...EC_ORDERS, items: filtered.slice(offset, offset + limit), total },
+      pagination: { total, limit, offset },
+    }
+  }
+  if (pathname === '/api/ec-commerce/action-executions') {
+    const requestedLimit = Number.parseInt(query.get('limit') ?? '', 10)
+    const requestedOffset = Number.parseInt(query.get('offset') ?? '', 10)
+    const limit = Number.isInteger(requestedLimit) && requestedLimit > 0 ? Math.min(requestedLimit, 100) : 20
+    const offset = Number.isInteger(requestedOffset) && requestedOffset >= 0 ? requestedOffset : 0
+    const status = query.get('status')
+    const eventId = query.get('eventId')
+    const statusGroup = query.get('statusGroup')
+    const groupStatuses = { processing: ['pending', 'processing'], failed: ['retryable_failed', 'permanent_failed'] }
+    const grouped = statusGroup ? (groupStatuses[statusGroup] ?? null) : null
+    const filtered = EC_ACTION_EXECUTIONS.items.filter((execution) => (
+      (!status || execution.status === status)
+      && (!grouped || grouped.includes(execution.status))
+      && (!eventId || execution.eventId === eventId)
+    ))
+    const total = status || grouped || eventId ? filtered.length : EC_ACTION_EXECUTIONS.total
+    return {
+      success: true,
+      data: { ...EC_ACTION_EXECUTIONS, items: filtered.slice(offset, offset + limit), total },
+      pagination: { total, limit, offset },
+    }
+  }
+  if (pathname === '/api/ec-commerce/identity-candidates') {
+    const requestedLimit = Number.parseInt(query.get('limit') ?? '', 10)
+    const requestedOffset = Number.parseInt(query.get('offset') ?? '', 10)
+    const limit = Number.isInteger(requestedLimit) && requestedLimit > 0 ? Math.min(requestedLimit, 100) : 20
+    const offset = Number.isInteger(requestedOffset) && requestedOffset >= 0 ? requestedOffset : 0
+    const status = query.get('status') ?? 'pending'
+    const filtered = EC_IDENTITY_CANDIDATES.items.filter((candidate) => candidate.status === status)
+    const total = status === 'pending' ? EC_IDENTITY_CANDIDATES.total : filtered.length
+    return {
+      success: true,
+      data: { ...EC_IDENTITY_CANDIDATES, items: filtered.slice(offset, offset + limit), total },
+      pagination: { total, limit, offset },
+    }
+  }
+  if (pathname === '/api/access/users') {
+    const requestedLimit = Number.parseInt(query.get('limit') ?? '', 10)
+    const requestedOffset = Number.parseInt(query.get('offset') ?? '', 10)
+    const limit = Number.isInteger(requestedLimit) && requestedLimit > 0 ? Math.min(requestedLimit, 200) : 50
+    const offset = Number.isInteger(requestedOffset) && requestedOffset >= 0 ? requestedOffset : 0
+    const status = query.get('status')
+    const roleBundle = query.get('roleBundle')
+    const search = (query.get('query') ?? '').trim().toLocaleLowerCase('ja')
+    const filtered = ACCESS_USERS.items.filter((user) => {
+      if (status && user.status !== status) return false
+      if (roleBundle && user.roleBundle !== roleBundle) return false
+      if (!search) return true
+      return user.name.toLocaleLowerCase('ja').includes(search)
+        || (user.email ?? '').toLocaleLowerCase('ja').includes(search)
+    })
+    return {
+      success: true,
+      data: {
+        ...ACCESS_USERS,
+        items: filtered.slice(offset, offset + limit),
+        pagination: { total: filtered.length, limit, offset },
+      },
+    }
+  }
+  if (pathname === '/api/access/roles') return { success: true, data: ACCESS_ROLES }
+  if (pathname === '/api/audit/events') {
+    const requestedLimit = Number.parseInt(query.get('limit') ?? '', 10)
+    const requestedOffset = Number.parseInt(query.get('offset') ?? '', 10)
+    const limit = Number.isInteger(requestedLimit) && requestedLimit > 0 ? Math.min(requestedLimit, 200) : 20
+    const offset = Number.isInteger(requestedOffset) && requestedOffset >= 0 ? requestedOffset : 0
+    const category = query.get('category')
+    const result = query.get('result')
+    const actorId = query.get('actorId')
+    const action = query.get('action')
+    const search = (query.get('query') ?? '').trim().toLocaleLowerCase('ja')
+    const from = query.get('from') ? Date.parse(query.get('from')) : null
+    const to = query.get('to') ? Date.parse(query.get('to')) : null
+    const filtered = ACCESS_AUDIT_EVENTS.items.filter((event) => {
+      if (category && event.category !== category) return false
+      if (result && event.result !== result) return false
+      if (actorId && event.actor.id !== actorId) return false
+      if (action && event.action !== action) return false
+      const createdAt = Date.parse(event.createdAt)
+      if (Number.isFinite(from) && createdAt < from) return false
+      if (Number.isFinite(to) && createdAt > to) return false
+      if (!search) return true
+      return [event.actor.name, event.action, event.target?.kind, event.target?.id, event.reason]
+        .some((value) => String(value ?? '').toLocaleLowerCase('ja').includes(search))
+    })
+    const hasFilter = Boolean(category || result || actorId || action || search || Number.isFinite(from) || Number.isFinite(to))
+    const total = hasFilter ? filtered.length : ACCESS_AUDIT_EVENTS.pagination.total
+    return {
+      success: true,
+      data: {
+        ...ACCESS_AUDIT_EVENTS,
+        items: filtered.slice(offset, offset + limit),
+        pagination: { total, limit, offset },
+      },
+    }
+  }
+  if (pathname === '/api/getting-started') return { success: true, data: GETTING_STARTED }
+  if (pathname === '/api/recipes') return { success: true, data: RECIPES }
+  const recipeDetail = /^\/api\/recipes\/([^/]+)$/.exec(pathname)
+  if (recipeDetail) {
+    return { success: true, data: RECIPES.find((recipe) => recipe.id === recipeDetail[1]) ?? null }
+  }
+  if (pathname === '/api/manual-links') return { success: true, data: MANUAL_LINKS }
+  if (pathname === '/api/operations/control/preview') {
+    return { success: true, data: OPERATION_CONTROL_PREVIEW }
+  }
+  if (pathname === '/api/operations/health') {
+    return { success: true, data: OPERATION_HEALTH }
+  }
+  if (pathname === '/api/operations/history') {
+    const requestedLimit = Number.parseInt(query.get('limit') ?? '', 10)
+    const limit = Number.isFinite(requestedLimit) && requestedLimit >= 0
+      ? requestedLimit
+      : OPERATION_HISTORY.length
+    return { success: true, data: OPERATION_HISTORY.slice(0, limit) }
+  }
+  if (pathname === '/api/analytics/cross/results/visual-cross-result-1') {
+    return {
+      success: true,
+      data: {
+        id: 'visual-cross-result-1', state: 'available', errorCode: null,
+        result: ANALYTICS_CROSS_RESULT, createdAt: '2026-09-03T02:40:00.000Z',
+      },
+    }
+  }
+  if (pathname === '/api/analytics/funnels') {
+    return {
+      success: true,
+      data: [{
+        id: 'visual-funnel-1', name: '友だちになってからの5段', windowDays: 30,
+        createdAt: '2026-06-01T09:00:00+09:00',
+        currentVersion: { id: 'visual-funnel-version-1', versionNumber: 3, createdAt: '2026-08-20T09:00:00+09:00' },
+        migrationState: 'ready',
+      }],
+    }
+  }
+  if (pathname === '/api/analytics/funnels/visual-funnel-1/runs/latest') {
+    return { success: true, data: ANALYTICS_FUNNEL_RUN }
+  }
+  if (pathname === '/api/analytics/saved') {
+    return { success: true, data: ANALYTICS_SAVED }
+  }
+  const savedSnapshots = /^\/api\/analytics\/saved\/([^/]+)\/snapshots$/.exec(pathname)
+  if (savedSnapshots) {
+    const saved = ANALYTICS_SAVED.find((item) => item.id === savedSnapshots[1])
+    return {
+      success: true,
+      data: saved ? [0, 1, 2].map((offset) => ({
+        id: `${saved.id}-snapshot-${offset + 1}`, savedAnalysisId: saved.id,
+        analysisVersionId: `${saved.id}-version-${saved.currentVersionNumber}`,
+        sourceKind: saved.kind, sourceResultId: `visual-result-${offset + 1}`,
+        periodFrom: `2026-0${Math.max(6, 8 - offset)}-05T00:00:00+09:00`,
+        periodTo: `2026-0${Math.max(7, 9 - offset)}-03T00:00:00+09:00`,
+        timeZone: 'Asia/Tokyo', dataCutoffAt: '2026-09-03T02:40:00.000Z',
+        state: offset === 2 ? 'partial' : 'available', result: {},
+        createdBy: saved.createdBy, createdAt: saved.updatedAt,
+      })) : [],
+    }
+  }
+  if (pathname === '/api/conversions/approvals') {
+    const status = query.get('status')
+    return {
+      success: true,
+      data: status ? CONVERSION_APPROVALS.filter((item) => item.approvalStatus === status) : CONVERSION_APPROVALS,
+    }
+  }
+  if (pathname === `/api/line-accounts/${ACCOUNT.id}/handovers`) {
+    return { success: true, data: [ACCOUNT_HANDOVER] }
+  }
+  if (pathname === `/api/account-handovers/${ACCOUNT_HANDOVER.id}`) {
+    return {
+      success: true,
+      data: { ...ACCOUNT_HANDOVER, decisions: ACCOUNT_HANDOVER_DECISIONS, unresolvedReviews: 20 },
+    }
   }
   if (pathname.startsWith('/api/line-accounts/') && pathname.split('/').length === 4) {
     /*
@@ -734,15 +1523,8 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     return {
       success: true,
       data: {
-        ...ACCOUNT,
-        webhook: { status: 'matched', expectedUrl: `${'https://api.example'}/webhook`, actualUrl: `${'https://api.example'}/webhook`, active: true, checkedAt: `${FIXED_TO}T00:00:00.000Z` },
-        channelAccessTokenConfigured: true,
-        channelSecretConfigured: true,
-        loginChannelSecretConfigured: true,
-        friendCapacity: 50000,
-        capacityWarnAt: 45000,
-        country: '日本',
-        role: '検証用。本番の配信には使わない',
+        ...(LINE_ACCOUNTS.find((account) => account.id === pathname.split('/')[3]) ?? LINE_ACCOUNT_DETAIL),
+        ...(pathname.split('/')[3] === LINE_ACCOUNT_DETAIL.id ? LINE_ACCOUNT_DETAIL : {}),
       },
     }
   }
@@ -751,7 +1533,93 @@ function bodyFor(pathname, query = new URLSearchParams()) {
       `webhook` を付ける。無いと接続状態カードが「確認中」のままで、
       設計の「正常」と並べたときに実装の差に見えてしまう。
     */
-    return { success: true, data: [{ ...ACCOUNT, webhook: { status: 'matched', checkedAt: `${FIXED_TO}T00:00:00.000Z` } }] }
+    return { success: true, data: LINE_ACCOUNTS }
+  }
+  if (pathname === '/api/friends/migrations') {
+    return { success: true, data: [{
+      id: 'visual-uid-run', fromAccountId: ACCOUNT.id, toAccountId: 'visual-qa-account-new',
+      purpose: '友だち情報・タグ・配信停止状態を新アカウントへ引き継ぐ', sourceKind: 'csv',
+      sourceFilename: 'uid-map-2026-09-06.csv', status: 'review', dryRunRevision: 1,
+      counts: { total: 5214, auto: 4982, review: 34, unmatched: 195, conflict: 3, applied: 0, failed: 0 },
+      createdBy: STAFF.id, approvedBy: null, createdAt: '2026-09-06T05:20:00.000Z',
+      reviewedAt: null, executedAt: null, completedAt: null, rolledBackAt: null, failureReason: null,
+    }] }
+  }
+  if (pathname === '/api/friends/migrations/visual-uid-run') {
+    return { success: true, data: {
+      id: 'visual-uid-run', fromAccountId: ACCOUNT.id, toAccountId: 'visual-qa-account-new',
+      purpose: '友だち情報・タグ・配信停止状態を新アカウントへ引き継ぐ', sourceKind: 'csv',
+      sourceFilename: 'uid-map-2026-09-06.csv', status: 'review', dryRunRevision: 1,
+      counts: { total: 5214, auto: 4982, review: 34, unmatched: 195, conflict: 3, applied: 0, failed: 0 },
+      createdBy: STAFF.id, approvedBy: null, createdAt: '2026-09-06T05:20:00.000Z',
+      reviewedAt: null, executedAt: null, completedAt: null, rolledBackAt: null, failureReason: null,
+      items: [
+        { id: 'uid-item-1', oldUid: 'old_uid_00291', newUid: 'new_uid_00291', candidateName: 'Kyohei Yamamoto', evidenceType: 'operator_csv', classification: 'review', conflictReason: '2アカウントに候補があります', decision: 'pending', result: 'pending', errorMessage: null },
+        { id: 'uid-item-2', oldUid: 'old_uid_00412', newUid: 'new_uid_00412', candidateName: '山田 太郎', evidenceType: 'operator_csv', classification: 'conflict', conflictReason: '新旧UIDが別の統合ユーザーに結び付いています', decision: 'pending', result: 'pending', errorMessage: null },
+        { id: 'uid-item-3', oldUid: 'old_uid_01180', newUid: null, candidateName: null, evidenceType: 'operator_csv', classification: 'unmatched', conflictReason: '移行先に一致する友だちがいません', decision: 'pending', result: 'pending', errorMessage: null },
+      ],
+    } }
+  }
+  if (pathname === '/api/friends/migration-jobs') {
+    return { success: true, data: [
+      { id: 'import-1', kind: 'import', line_account_id: ACCOUNT.id, total_count: 231, update_count: 34, conflict_count: 3, status: 'completed', created_by_name: '河野 健太', created_at: '2026-09-03T05:20:00.000Z' },
+      { id: 'import-2', kind: 'import', line_account_id: ACCOUNT.id, total_count: 231, update_count: 34, conflict_count: 3, status: 'previewed', created_by_name: '河野 健太', created_at: '2026-09-03T02:05:00.000Z' },
+      { id: 'export-1', kind: 'export', line_account_id: ACCOUNT.id, row_count: 231, status: 'expired', created_by_name: '坂本 真人', created_at: '2026-09-02T10:40:00.000Z', expires_at: '2026-09-09T10:40:00.000Z' },
+    ] }
+  }
+  if (pathname === '/api/friend-add-rules') {
+    // 検索とフォルダ絞りはサーバ側で全件に効かせる (本物と同じ契約)。
+    const q = (query.get('q') ?? '').trim().toLocaleLowerCase('ja-JP')
+    const folder = query.get('folder') ?? ''
+    const items = FRIEND_ADD_RULES.items
+      .filter((item) => !q || item.name.toLocaleLowerCase('ja-JP').includes(q))
+      .filter((item) => !folder
+        || (folder === '__uncategorized' ? item.folderName == null : item.folderName === folder))
+    const counts = new Map()
+    for (const item of FRIEND_ADD_RULES.items) {
+      counts.set(item.folderName ?? null, (counts.get(item.folderName ?? null) ?? 0) + 1)
+    }
+    return {
+      success: true,
+      data: {
+        ...FRIEND_ADD_RULES,
+        items,
+        total: items.length,
+        folderCounts: Array.from(counts.entries()).map(([name, count]) => ({ name, count })),
+      },
+    }
+  }
+  if (pathname === '/api/friend-add-rules/conflicts') {
+    return {
+      success: true,
+      data: {
+        conflicts: [],
+        rules: FRIEND_ADD_RULES.items.map((rule) => ({
+          id: rule.id,
+          name: rule.name,
+          priority: rule.priority,
+          weekdays: rule.definition.weekdays ?? [],
+          timeWindows: rule.definition.timeWindows ?? [],
+          friendCondition: rule.definition.friendCondition || null,
+          matchedLast28Days: FRIEND_ADD_RULE_MATCHES.get(rule.id) ?? 0,
+        })),
+      },
+    }
+  }
+  if (/^\/api\/friend-add-rules\/[^/]+$/.test(pathname)) {
+    // 未知IDは本物と同じく404にする。何を渡しても同一設定を返すと、
+    // 存在しない設定の画面が空にならず実機差異に気づけない (#501-軽)。
+    const ruleId = pathname.split('/').pop()
+    const found = FRIEND_ADD_RULES.items.find((item) => item.id === ruleId)
+    if (!found) return { success: false, error: 'Not found' }
+    return {
+      success: true,
+      data: {
+        rule: found,
+        options: FRIEND_ADD_RULE_OPTIONS,
+        staffNotification: { status: 'connected', reason: null },
+      },
+    }
   }
   if (pathname === '/api/identity-candidates/detect') {
     return {
@@ -776,6 +1644,11 @@ function bodyFor(pathname, query = new URLSearchParams()) {
       ? IDENTITY_CANDIDATE_EC
       : IDENTITY_CANDIDATE_FRIEND
     return { success: true, data: candidate }
+  }
+  const friendDuplicate = /^\/api\/friends\/duplicates\/([^/]+)$/.exec(pathname)
+  if (friendDuplicate) {
+    if (query.get('visualState') === 'error') return IDENTITY_CANDIDATE_ERROR
+    return { success: true, data: IDENTITY_CANDIDATE_FRIEND }
   }
   const mergedPerson = /^\/api\/friends\/people\/([^/]+)$/.exec(pathname)
   if (mergedPerson) {
@@ -818,6 +1691,19 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   const detail = pathname.match(/^\/api\/friends\/([^/]+)$/)
   if (detail && FRIEND_DETAILS[detail[1]]) return { success: true, data: FRIEND_DETAILS[detail[1]] }
   if (/^\/api\/friends\/[^/]+\/mileage$/.test(pathname)) return { success: true, data: FRIEND_MILEAGE }
+  if (pathname === '/api/friends/friend-1/fields') {
+    const values = ['1988-04-12', '2026-12-31', '2026-09-15', 'プレミアム']
+    return {
+      success: true,
+      data: {
+        items: FRIEND_FIELDS.map((field, index) => ({ ...field, value: values[index] })),
+        hiddenPersonalCount: 0,
+      },
+    }
+  }
+  if (pathname === '/api/friends/friend-1/rich-menu') {
+    return { success: true, data: { id: 'rich-menu-main', name: '通常メニュー・予約', isDefault: false } }
+  }
   const messages = pathname.match(/^\/api\/friends\/([^/]+)\/messages$/)
   if (messages) {
     // 設計 `xGLVe` のトーク欄。載っていない友だちは空で返す（実際に空の人もいる）。
@@ -825,23 +1711,180 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   }
   // テンプレート選択（設計 `NfgOs` / `NWbuF`）。空だと選ぶものが1つも出ない。
   if (pathname === '/api/templates') return { success: true, data: TEMPLATES }
+  const templateDetail = /^\/api\/templates\/(template-\d+)$/.exec(pathname)
+  if (templateDetail) {
+    const template = TEMPLATES.find((item) => item.id === templateDetail[1])
+    if (template) {
+      const usedBy = template.id === 'template-9' ? {
+        scenarioSteps: [{ scenarioId: 'scenario-welcome', scenarioName: '新規登録7日間フォロー', stepId: 'step-1', stepOrder: 1 }],
+        autoReplies: [{ id: 'auto-reply-document', keyword: '資料請求', matchType: 'exact', lineAccountId: 'visual-qa-account' }],
+        automations: [{ id: 'automation-inbox-favorite', name: '受信箱の「よく使う」（担当3人が登録）', eventType: 'inbox_favorite' }],
+        reminderSteps: [], richMenuAreas: [], trackedLinks: [],
+      } : {
+        autoReplies: [], automations: [], scenarioSteps: [], reminderSteps: [], richMenuAreas: [], trackedLinks: [],
+      }
+      return { success: true, data: { ...template, accountId: 'visual-qa-account', question: null, questionStatus: 'draft', usedBy } }
+    }
+  }
+  if (pathname === '/api/account-settings/test-recipients') {
+    return { success: true, data: TEMPLATE_TEST_RECIPIENTS }
+  }
+  // 管理画面の保存・保管・削除の流れ（#503 L5）。絵の検証用に成功だけ返す。
+  if (method === 'POST' && pathname === '/api/forms/drafts') {
+    return { success: true, data: { id: 'form-draft-qa', isActive: false } }
+  }
+  if (method === 'PUT' && pathname === `/api/forms/${FORM_DETAIL.id}`) {
+    return { success: true, data: { id: FORM_DETAIL.id } }
+  }
+  if (method === 'POST' && pathname === `/api/forms/${FORM_DETAIL.id}/archive`) {
+    return {
+      success: true,
+      data: {
+        status: 'archived',
+        archivedAt: '2026-08-26T00:00:00.000Z',
+        retainedSubmissionCount: 0,
+        retainedOpenCount: 0,
+        retainedReferenceCount: 0,
+        answerUrlUnavailable: true,
+      },
+    }
+  }
+  if (method === 'DELETE' && pathname === `/api/forms/${FORM_DETAIL.id}`) {
+    return { success: true, data: null }
+  }
+  if (pathname === '/api/forms') {
+    return { success: true, data: query.get('with_list_summary') === '1' ? FORM_LIST : FORMS }
+  }
+  if (pathname === `/api/forms/${FORM_DETAIL.id}`) return { success: true, data: FORM_DETAIL }
+  const formSubmissions = new RegExp(`^/api/forms/${FORM_DETAIL.id}/submissions$`).test(pathname)
+  if (formSubmissions) {
+    /*
+     * 互換用の古い形（ページ分けなし）は配列だけを返す。**実口と同じく上限200件**
+     * （`MAX_LIST_LIMIT`）。#722 の前はここが 500 で、実口は 200 で切っていた。
+     * モックで確かめた人が「500件来る」と誤解する形だった。
+     */
+    if (query.get('page') === null && query.get('limit') === null) {
+      return { success: true, data: FORM_SUBMISSIONS.items.slice(0, 200) }
+    }
+    const page = Number.parseInt(query.get('page') ?? '1', 10)
+    const limit = Number.parseInt(query.get('limit') ?? '20', 10)
+    const safePage = Number.isInteger(page) && page > 0 ? page : 1
+    const safeLimit = Number.isInteger(limit) && limit > 0 ? Math.min(limit, 50) : 20
+    const start = (safePage - 1) * safeLimit
+    return { success: true, data: { ...FORM_SUBMISSIONS, items: FORM_SUBMISSIONS.items.slice(start, start + safeLimit), page: safePage, limit: safeLimit } }
+  }
+  if (pathname === '/api/folders' && query.get('kind') === 'form') {
+    return { success: true, data: FORM_FOLDERS }
+  }
   if (pathname === '/api/folders' && query.get('kind') === 'template') {
     return { success: true, data: TEMPLATE_FOLDERS }
+  }
+  if (pathname === '/api/folders' && query.get('kind') === 'broadcast') {
+    return { success: true, data: BROADCAST_FOLDERS }
+  }
+  if (pathname === '/api/folders' && query.get('kind') === 'scenario') {
+    return { success: true, data: SCENARIO_FOLDERS }
   }
   if (pathname === '/api/folders' && query.get('kind') === 'reminder') {
     return { success: true, data: REMINDER_FOLDERS }
   }
-  if (pathname === '/api/friend-fields') return { success: true, data: FRIEND_FIELDS }
+  if (pathname === '/api/folders' && query.get('kind') === 'friend_field') {
+    return { success: true, data: FRIEND_FIELD_FOLDERS }
+  }
+  if (pathname === '/api/friend-fields') {
+    // 機能4は利用人数つきの一覧を要求する。他機能の選択肢は従来データを保つ。
+    return { success: true, data: query.get('withUsage') === '1' ? FRIEND_ATTRIBUTE_FIELDS : FRIEND_FIELDS }
+  }
   if (pathname === '/api/folders' && query.get('kind') === 'auto_reply') {
     return { success: true, data: AUTO_REPLY_FOLDERS }
   }
+  if (pathname === '/api/folders' && query.get('kind') === 'common_var') {
+    return { success: true, data: COMMON_VAR_FOLDERS }
+  }
+  if (pathname === '/api/folders' && query.get('kind') === 'media') {
+    return { success: true, data: MEDIA_FOLDERS }
+  }
+  if (pathname === '/api/folders' && query.get('kind') === 'webinar') {
+    const accountId = query.get('account_id')
+    return {
+      success: true,
+      data: webinarFolders.filter((folder) => !accountId || folder.accountId === accountId),
+    }
+  }
+  if (pathname === '/api/booking/admin/settings') {
+    return { success: true, data: BOOKING_SETTINGS }
+  }
   if (pathname === '/api/auto-replies') return { success: true, data: AUTO_REPLIES }
+  if (pathname === '/api/auto-replies/conflicts') {
+    return { success: true, data: AUTO_REPLY_CONFLICT_SUMMARY }
+  }
+  if (pathname === '/api/auto-reply-runs') {
+    const requestedLimit = Number.parseInt(query.get('limit') ?? '', 10)
+    const requestedOffset = Number.parseInt(query.get('offset') ?? '', 10)
+    const limit = Number.isInteger(requestedLimit) && requestedLimit > 0 ? Math.min(requestedLimit, 100) : 20
+    const offset = Number.isInteger(requestedOffset) && requestedOffset >= 0 ? requestedOffset : 0
+    return {
+      success: true,
+      data: {
+        ...AUTO_REPLY_RUNS,
+        items: AUTO_REPLY_RUNS.items.slice(offset, offset + limit),
+        pagination: { total: AUTO_REPLY_RUNS.items.length, limit, offset },
+      },
+    }
+  }
+  if (/^\/api\/auto-replies\/[^/]+\/draft$/.test(pathname)) {
+    return { success: true, data: AUTO_REPLY_PUBLISH_DRAFT }
+  }
+  if (/^\/api\/auto-replies\/[^/]+\/conflicts$/.test(pathname)) {
+    return { success: true, data: { conflicts: AUTO_REPLY_PUBLISH_CONFLICTS } }
+  }
   const autoReplyOne = /^\/api\/auto-replies\/([^/]+)$/.exec(pathname)
   if (autoReplyOne) {
     const found = AUTO_REPLIES.find((item) => item.id === autoReplyOne[1])
     return found ? { success: true, data: found } : { success: false, error: 'Not found' }
   }
-  if (pathname === '/api/reminders') return { success: true, data: REMINDERS }
+  if (pathname === '/api/reminders') {
+    const usesListContract = ['page', 'limit', 'q', 'folderId', 'status'].some((key) => query.has(key))
+    if (!usesListContract) return { success: true, data: REMINDERS }
+    const requestedPage = Number.parseInt(query.get('page') ?? '', 10)
+    const requestedLimit = Number.parseInt(query.get('limit') ?? '', 10)
+    const page = Number.isInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1
+    const limit = Number.isInteger(requestedLimit) && requestedLimit > 0 ? Math.min(requestedLimit, 200) : 20
+    const q = (query.get('q') ?? '').trim().toLocaleLowerCase('ja-JP')
+    const folderId = query.get('folderId') ?? ''
+    const status = query.get('status') ?? ''
+    const filtered = REMINDERS.filter((reminder) => {
+      if (q && !`${reminder.name} ${reminder.description ?? ''}`.toLocaleLowerCase('ja-JP').includes(q)) return false
+      if (folderId === '__unfiled__' && reminder.folderId) return false
+      if (folderId && folderId !== '__unfiled__' && reminder.folderId !== folderId) return false
+      if (status === 'failed' && !reminder.hasFailure) return false
+      if (status === 'draft' && reminder.lifecycleStatus !== 'draft') return false
+      if (status === 'active' && (reminder.lifecycleStatus === 'draft' || reminder.lifecycleStatus === 'stopped' || !reminder.isActive)) return false
+      if (status === 'stopped' && reminder.lifecycleStatus !== 'stopped' && reminder.isActive) return false
+      return true
+    }).sort((left, right) => (
+      (left.displayOrder ?? 0) - (right.displayOrder ?? 0)
+      || right.createdAt.localeCompare(left.createdAt)
+      || left.id.localeCompare(right.id)
+    ))
+    const offset = (page - 1) * limit
+    return {
+      success: true,
+      data: {
+        items: filtered.slice(offset, offset + limit),
+        total: filtered.length,
+        limit,
+        sort: [
+          { field: 'displayOrder', direction: 'asc' },
+          { field: 'createdAt', direction: 'desc' },
+          { field: 'id', direction: 'asc' },
+        ],
+      },
+    }
+  }
+  if (/^\/api\/reminders\/[^/]+\/draft$/.test(pathname)) {
+    return { success: true, data: REMINDER_DRAFT }
+  }
   const reminderOne = /^\/api\/reminders\/([^/]+)$/.exec(pathname)
   if (reminderOne) {
     const found = REMINDERS.find((item) => item.id === reminderOne[1])
@@ -863,15 +1906,100 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     const reminder = REMINDERS.find((item) => item.id === reminderSteps[1])
     return { success: true, data: reminder ? reminderStepsOf(reminder) : [] }
   }
+  if (pathname === '/api/friend-add-runs') {
+    const status = query.get('status')
+    const ruleId = query.get('rule_id')
+    const kind = query.get('kind')
+    const attribution = query.get('attribution')
+    const requestedLimit = Number.parseInt(query.get('limit') ?? '', 10)
+    const limit = Number.isInteger(requestedLimit) && requestedLimit > 0
+      ? Math.min(requestedLimit, 100)
+      : 20
+    const items = FRIEND_ADD_RUNS.items
+      .filter((item) => !status || item.status === status)
+      .filter((item) => !ruleId || item.rule?.id === ruleId)
+      .filter((item) => !kind || item.friendKind === kind)
+      .filter((item) => !attribution || item.attribution?.status === attribution)
+      .slice(0, limit)
+    return { success: true, data: { ...FRIEND_ADD_RUNS, items } }
+  }
+  if (pathname === '/api/scenarios') {
+    const requestedPage = Number.parseInt(query.get('page') ?? '', 10)
+    const requestedLimit = Number.parseInt(query.get('limit') ?? '', 10)
+    const page = Number.isInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1
+    const limit = Number.isInteger(requestedLimit) && requestedLimit > 0 ? Math.min(requestedLimit, 200) : 50
+    const offset = (page - 1) * limit
+    const nameQuery = (query.get('query') ?? '').trim().toLocaleLowerCase('ja-JP')
+    const active = query.get('active')
+    const createdFrom = query.get('createdFrom')
+    const folderId = query.get('folderId')
+    const filtered = FRIEND_SCENARIOS
+      .filter((item) => !nameQuery || item.name.toLocaleLowerCase('ja-JP').includes(nameQuery))
+      .filter((item) => active !== '0' || !item.isActive)
+      .filter((item) => !createdFrom || item.createdAt >= createdFrom)
+      .filter((item) => !folderId
+        || (folderId === '__unfiled__' ? !item.folderId : item.folderId === folderId))
+    return {
+      success: true,
+      data: {
+        items: filtered.slice(offset, offset + limit),
+        total: filtered.length,
+        limit,
+        sort: [
+          { field: 'createdAt', direction: 'desc' },
+          { field: 'id', direction: 'desc' },
+        ],
+      },
+    }
+  }
   if (/^\/api\/scenarios\/[^/]+\/stats$/.test(pathname)) return { success: true, data: SCENARIO_STATS }
+  if (/^\/api\/scenarios\/[^/]+\/simulate$/.test(pathname)) return { success: true, data: SCENARIO_SIMULATION }
+  if (/^\/api\/scenarios\/[^/]+\/runs$/.test(pathname)) return { success: true, data: SCENARIO_RUNS }
+  if (/^\/api\/scenarios\/[^/]+\/draft$/.test(pathname)) return { success: true, data: SCENARIO_DRAFT }
+  const scenarioActions = pathname.match(/^\/api\/scenarios\/([^/]+)\/actions$/)
+  if (scenarioActions) {
+    return {
+      success: true,
+      data: SCENARIO_ACTIONS
+        .filter((action) => action.scenarioId === scenarioActions[1])
+        .sort((left, right) => left.sortOrder - right.sortOrder),
+    }
+  }
   const scenario = pathname.match(/^\/api\/scenarios\/([^/]+)$/)
   if (scenario) {
     // 通を配列で返す。`{items,total}` のままだと `scenario.steps` で落ちる。
     const row = FRIEND_SCENARIOS.find((r) => r.id === scenario[1]) ?? FRIEND_SCENARIOS[0]
     return { success: true, data: { ...row, steps: SCENARIO_STEPS.map((step) => ({ ...step, scenarioId: row.id })) } }
   }
-  if (pathname === '/api/broadcasts') return { success: true, data: BROADCASTS }
+  if (pathname === '/api/broadcasts/saved-views') {
+    return { success: true, data: BROADCAST_SAVED_VIEWS }
+  }
+  if (pathname === '/api/broadcasts/notification-settings') {
+    return { success: true, data: BROADCAST_NOTIFICATION_SETTINGS }
+  }
+  const broadcastInsight = pathname.match(/^\/api\/broadcasts\/([^/]+)\/insight$/)
+  if (broadcastInsight) {
+    return { success: true, data: BROADCAST_INSIGHTS[broadcastInsight[1]] ?? null }
+  }
+  const broadcastOne = pathname.match(/^\/api\/broadcasts\/([^/]+)$/)
+  if (broadcastOne) {
+    const found = BROADCASTS.find((item) => item.id === broadcastOne[1])
+    return found ? { success: true, data: found } : { success: false, error: 'Not found' }
+  }
+  if (pathname === '/api/broadcasts') {
+    return { success: true, data: BROADCASTS, ...BROADCAST_LIST_META }
+  }
   if (pathname === '/api/inbox/saved-views') return { success: true, data: INBOX_SAVED_VIEWS }
+  if (pathname === '/api/friends/saved-views') {
+    const id = query.get('id')
+    if (id) {
+      const item = FRIEND_SAVED_VIEWS.items.find((view) => view.id === id)
+      return item
+        ? { success: true, data: item }
+        : { success: false, error: '保存した検索が見つかりません' }
+    }
+    return { success: true, data: FRIEND_SAVED_VIEWS }
+  }
   if (pathname === '/api/chats') return { success: true, data: CHATS }
   if (pathname === '/api/chats/stats') return { success: true, data: INBOX_STATS }
   if (pathname === '/api/support/inbox') {
@@ -901,65 +2029,55 @@ function bodyFor(pathname, query = new URLSearchParams()) {
       },
     }
   }
+  /* リマインダの実行結果（設計 `GC4St` 7-1-H）。絞り込みと検索もここで効かせる。 */
+  if (/^\/api\/reminders\/[^/]+\/runs$/.test(pathname)) {
+    const status = query.get('status')
+    const search = (query.get('search') ?? '').trim()
+    let items = REMINDER_RUNS.items
+    if (status) items = items.filter((run) => run.domainStatus === status)
+    if (search) items = items.filter((run) => (run.friendName ?? '').includes(search))
+    return {
+      success: true,
+      data: { ...REMINDER_RUNS, items, pagination: { ...REMINDER_RUNS.pagination, total: items.length } },
+    }
+  }
   if (pathname === '/api/tags') return { success: true, data: TAGS }
+  const tagDependencies = /^\/api\/tags\/([^/]+)\/dependencies$/.exec(pathname)
+  if (tagDependencies) {
+    return {
+      success: true,
+      data: {
+        ...TAG_DEPENDENCIES_NEN_SUBSCRIPTION,
+        tag: { ...TAG_DEPENDENCIES_NEN_SUBSCRIPTION.tag, id: tagDependencies[1] },
+      },
+    }
+  }
+  const tagDefinition = /^\/api\/tags\/([^/]+)$/.exec(pathname)
+  if (tagDefinition) {
+    const tag = { ...TAG_DEFINITION_NEN_SUBSCRIPTION.tag, id: tagDefinition[1] }
+    return query.get('withActions') === '1'
+      ? { success: true, data: { ...TAG_DEFINITION_NEN_SUBSCRIPTION, ...tag, tag } }
+      : { success: true, data: tag }
+  }
   if (pathname === '/api/support-marks') return { success: true, data: SUPPORT_MARKS }
+  if (/^\/api\/support-marks\/[^/]+\/archive-impact$/.test(pathname)) {
+    return { success: true, data: SUPPORT_MARK_ARCHIVE_IMPACT }
+  }
+  if (pathname === '/api/saved-searches' && query.get('format') !== 'segment_v1') {
+    return FRIEND_ATTRIBUTE_SAVED_SEARCH_RESPONSE
+  }
+  const savedSearchDetail = /^\/api\/saved-searches\/([^/]+)$/.exec(pathname)
+  if (savedSearchDetail) {
+    return {
+      success: true,
+      data: { ...FRIEND_ATTRIBUTE_SAVED_SEARCH_DETAIL, id: savedSearchDetail[1] },
+    }
+  }
   /* 自動変更ルール（設計 `GMvBd` 4-3-A）。マークごとに返す。 */
   if (/^\/api\/support-marks\/[^/]+\/automation-rules$/.test(pathname)) {
     return { success: true, data: SUPPORT_MARK_AUTOMATION_RULES }
   }
-  /*
-    いま入っている人。34-1「はじめの設定」の最終確認が役割で言い分けるので、
-    一覧の形（items/total）ではなく 1 人ぶんを返す。
-  */
-  /*
-    友だち追加時の振り分け。34-1 の段3・段4 がこれを読む。
-    下書きはあるが公開していない——設計 `RAW35` が「止まっています」で
-    描いている状態を、そのまま固定データにする。
-  */
-  if (pathname === '/api/friend-add-routing')
-    return {
-      success: true,
-      data: {
-        configured: true,
-        routing: {
-          firstTime: { scenarioId: 'visual-qa-scenario', actions: [], timing: 'immediate' },
-          returning: { scenarioId: null, actions: [], mode: 'none', startPosition: 'start' },
-          criteria: { firstTime: 'never_added' },
-        },
-        scenarios: [{ id: 'visual-qa-scenario', name: '新規登録 7日間フォロー' }],
-        tags: [],
-      },
-    }
-  if (pathname === '/api/friend-add-routing/draft')
-    return {
-      success: true,
-      data: {
-        accountId: 'visual-qa-account',
-        versionId: 'visual-qa-draft',
-        versionNumber: 1,
-        status: 'draft',
-        routing: {
-          firstTime: { scenarioId: 'visual-qa-scenario', actions: [], timing: 'immediate' },
-          returning: { scenarioId: null, actions: [], mode: 'none', startPosition: 'start' },
-          criteria: { firstTime: 'never_added' },
-        },
-        lastTestStatus: null,
-        lastTestedAt: null,
-        publishedAt: null,
-      },
-    }
-  if (pathname === '/api/staff/me')
-    return {
-      success: true,
-      data: {
-        id: 'visual-qa-staff',
-        name: 'Kenta Kawano',
-        email: null,
-        role: 'owner',
-        permissionKeys: [],
-        isActive: true,
-      },
-    }
+  /* `/api/staff/me` は下の1か所だけ(STAFFの固定データ)。ここに書くと下が死にコードになる。 */
   const formDeleteImpact = /^\/api\/forms\/([^/]+)\/delete-impact$/.exec(pathname)
   if (formDeleteImpact) {
     const data = formDeleteImpact[1] === 'form-empty'
@@ -996,8 +2114,113 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     return { success: true, data: { id: STAFF.id, name: STAFF.name, role: STAFF.role, email: null } }
   }
   if (pathname === '/api/webhooks/outgoing') return { success: true, data: OUTGOING_WEBHOOKS }
+  const incomingWebhookDetail = /^\/api\/webhooks\/incoming\/([^/]+)$/.exec(pathname)
+  if (incomingWebhookDetail) {
+    const detail = INCOMING_WEBHOOK_DETAILS[incomingWebhookDetail[1]]
+    return detail
+      ? { success: true, data: detail }
+      : { success: false, error: 'Not found' }
+  }
   if (pathname === '/api/webhooks/incoming') return { success: true, data: INCOMING_WEBHOOKS }
   if (pathname === '/api/entry-routes') return { success: true, data: ENTRY_ROUTES }
+  if (pathname === '/api/entry-route-genres') {
+    return { success: true, data: ['SNS', '紹介', '店頭', '広告', 'メール', '紙'].map((name, index) => ({ id: `erg-${index + 1}`, name, createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-08-25T00:00:00.000Z' })) }
+  }
+  if (pathname === '/api/site/summary') return { success: true, data: SITE_TRACKING_SUMMARY }
+  if (pathname === '/api/site/pages') return { success: true, data: SITE_TRACKING_PAGES }
+  if (pathname === '/api/site/tracking-key') {
+    // アカウントごとに違う鍵を返す。乱数は使わない(毎回同じ絵にする)。
+    const accountId = query.get('accountId') ?? 'visual-qa-account'
+    const trackingKey = `hk_${createHash('sha256').update(`site-tracking:${accountId}`).digest('hex').slice(0, 32)}`
+    return { success: true, data: { accountId, trackingKey } }
+  }
+  if (pathname === '/api/ad-platforms') return { success: true, data: AD_PLATFORMS }
+  if (pathname === '/api/ad-platforms/logs') {
+    const page = Math.max(1, Number(query.get('page')) || 1)
+    const limit = Math.min(200, Math.max(1, Number(query.get('limit')) || 20))
+    const status = query.get('status')
+    const search = (query.get('query') ?? '').trim().toLocaleLowerCase('ja')
+    const filtered = AD_CONVERSION_LOGS.filter((log) => {
+      const statusMatches = !status || status === 'all'
+        || (status === 'sent' ? ['sent', 'success'].includes(log.status) : log.status === status)
+      const queryMatches = !search
+        || [log.eventName, log.clickIdType ?? ''].some((value) => value.toLocaleLowerCase('ja').includes(search))
+      return statusMatches && queryMatches
+    })
+    return {
+      success: true,
+      data: {
+        items: filtered.slice((page - 1) * limit, page * limit),
+        total: filtered.length,
+        page,
+        limit,
+        sort: [{ field: 'createdAt', direction: 'desc' }, { field: 'id', direction: 'desc' }],
+      },
+    }
+  }
+  const adPlatformLogs = /^\/api\/ad-platforms\/([^/]+)\/logs$/.exec(pathname)
+  if (adPlatformLogs) {
+    return { success: true, data: AD_CONVERSION_LOGS.filter((log) => log.adPlatformId === adPlatformLogs[1]) }
+  }
+  /*
+    流入元の詳細。可変部分を配列の既定値へ落とすと、1件取得まで `[]` になり、
+    `route.createdAt.slice(...)` で詳細画面全体が落ちる。画面確認用の同じ1件から
+    詳細・段階・参照元を組み立て、一覧と右側で別のリンクを見せない。
+  */
+  const entryRouteFunnel = /^\/api\/entry-routes\/([^/]+)\/funnel$/.exec(pathname)
+  if (entryRouteFunnel) {
+    return {
+      success: true,
+      data: { click_count: 1240, friend_add_count: 86, form_submission_count: 36, cv_count: 12 },
+    }
+  }
+  const entryRouteSources = /^\/api\/entry-routes\/([^/]+)\/sources$/.exec(pathname)
+  if (entryRouteSources) {
+    return {
+      success: true,
+      data: [
+        { label: 'instagram.com', count: 312 },
+        { label: 'lin.ee', count: 96 },
+        { label: '直接アクセス', count: 78 },
+      ],
+    }
+  }
+  const entryRouteDetail = /^\/api\/entry-routes\/([^/]+)$/.exec(pathname)
+  if (entryRouteDetail) {
+    const entryRoute = ENTRY_ROUTES.find((item) => item.id === entryRouteDetail[1])
+    return entryRoute
+      ? { success: true, data: entryRoute }
+      : { success: false, error: 'Not found' }
+  }
+  if (pathname === '/api/analytics/ref-summary') {
+    return { success: true, data: INFLOW_SUMMARY }
+  }
+  // #514-9: 計測リンクの一覧。本番の GET /api/tracked-links と同じ形で返す。
+  if (pathname === '/api/tracked-links') {
+    return { success: true, data: TRACKED_LINKS }
+  }
+  if (/^\/api\/analytics\/ref\/[^/]+$/.test(pathname)) {
+    /*
+      #514-8・9: 本番の GET /api/analytics/ref/:refCode と同じ形
+      (refCode・name・friends[id・displayName・trackedAt・currentStatus])で返す。
+      firstPage・conversion・miles の豊富な形は本番に無いので持たせない。
+    */
+    const refCode = decodeURIComponent(pathname.split('/').pop())
+    return {
+      success: true,
+      data: {
+        refCode,
+        name: (ENTRY_ROUTES.find((item) => item.refCode === refCode) ?? {}).name ?? null,
+        friends: [
+          { id: 'friend-inflow-1', displayName: '石田 未来', trackedAt: '2026-08-25T09:12:00.000Z', currentStatus: '友だち中' },
+          { id: 'friend-inflow-2', displayName: '新田 遥', trackedAt: '2026-08-24T21:40:00.000Z', currentStatus: '友だち中' },
+          { id: 'friend-inflow-3', displayName: '松本 圭', trackedAt: '2026-08-22T12:05:00.000Z', currentStatus: '友だち中' },
+          { id: 'friend-inflow-4', displayName: '林 里佳', trackedAt: '2026-08-20T18:22:00.000Z', currentStatus: 'ブロック済み' },
+          { id: 'friend-inflow-5', displayName: '大村 真', trackedAt: '2026-08-18T10:44:00.000Z', currentStatus: '友だち中' },
+        ],
+      },
+    }
+  }
   if (pathname === '/api/staff') return { success: true, data: STAFF_MEMBERS }
   if (pathname === '/api/login-audit') return { success: true, data: LOGIN_AUDIT }
 
@@ -1010,28 +2233,232 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   */
   if (pathname === '/api/affiliates') return { success: true, data: AFFILIATES }
   if (pathname === '/api/affiliate-offers') return { success: true, data: AFFILIATE_OFFERS }
-  if (pathname === '/api/common-actions') return { success: true, data: COMMON_ACTIONS }
+  if (pathname === '/api/common-actions') {
+    const status = query.get('status')
+    const search = (query.get('query') ?? '').trim().toLocaleLowerCase('ja')
+    const filtered = COMMON_ACTIONS
+      .filter((item) => status === 'old_version'
+        ? item.oldVersionBindingCount > 0
+        : status === 'unused'
+          ? item.status === 'published' && item.bindingCount === 0
+          : status ? item.status === status : true)
+      .filter((item) => !search || `${item.name} ${item.description ?? ''}`.toLocaleLowerCase('ja').includes(search))
+    const requestedLimit = Number.parseInt(query.get('limit') ?? '', 10)
+    const requestedOffset = Number.parseInt(query.get('offset') ?? '', 10)
+    const limit = Number.isInteger(requestedLimit) && requestedLimit > 0 ? Math.min(requestedLimit, 500) : null
+    const offset = Number.isInteger(requestedOffset) && requestedOffset >= 0 ? requestedOffset : 0
+    return {
+      success: true,
+      data: limit === null ? filtered : filtered.slice(offset, offset + limit),
+      pagination: { total: filtered.length, limit, offset },
+      freshness: 'available',
+    }
+  }
+  if (pathname === '/api/automations') return {
+    success: true,
+    data: AUTOMATIONS,
+    summary: {
+      active: AUTOMATIONS.filter((item) => item.status === 'active').length,
+      stopped: AUTOMATIONS.filter((item) => item.status === 'stopped').length,
+      executionCount30d: AUTOMATIONS.reduce((sum, item) => sum + item.executionCount30d, 0),
+      failureCount30d: AUTOMATIONS.reduce((sum, item) => sum + item.failureCount30d, 0),
+    },
+    freshness: 'available',
+  }
+  if (pathname === '/api/automation-draft-resources') return {
+    success: true,
+    data: {
+      tags: [{ id: 'tag-trial', name: '体験申込' }, { id: 'tag-member', name: '会員' }],
+      scenarios: [{ id: 'scenario-trial', name: '体験前フォロー' }],
+    },
+  }
+  if (pathname === '/api/automation-runs') {
+    // #519 軽: 本番口と同じく search・status・limit で絞る（固定7件を返さない）。
+    const runStatus = query.get('status')
+    const runSearch = (query.get('search') ?? '').trim().toLocaleLowerCase('ja')
+    const runLimit = Math.max(1, Number.parseInt(query.get('limit') ?? '', 10) || 20)
+    const statusDomains = runStatus === 'executed'
+      ? ['success', 'partial', 'failed']
+      : runStatus === 'problems'
+        ? ['partial', 'failed']
+        : runStatus === 'skipped'
+          ? ['skipped_condition']
+          : null
+    const runItems = AUTOMATION_RUNS.items.filter((item) => {
+      if (statusDomains && !statusDomains.includes(item.domainStatus)) return false
+      if (!runSearch) return true
+      return [item.subject, item.automationName].some((value) =>
+        String(value ?? '').toLocaleLowerCase('ja').includes(runSearch))
+    })
+    return {
+      success: true,
+      data: {
+        ...AUTOMATION_RUNS,
+        items: runItems.slice(0, runLimit),
+        pagination: { total: runItems.length, limit: runLimit, offset: 0 },
+      },
+    }
+  }
+  if (pathname === '/api/automation-templates') return { success: true, data: AUTOMATION_TEMPLATES }
   if (pathname === '/api/ec-commerce/settings') return { success: true, data: EC_NOTIFICATION_SETTINGS }
+  if (pathname === '/api/line-notifications/customer-definitions') {
+    return { success: true, data: LINE_NOTIFICATION_DEFINITIONS }
+  }
+  if (pathname === '/api/line-notifications/metrics') {
+    return { success: true, data: LINE_NOTIFICATION_METRICS }
+  }
+  if (pathname === '/api/line-notifications/deliveries') {
+    const requestedLimit = Number.parseInt(query.get('limit') ?? '', 10)
+    const requestedOffset = Number.parseInt(query.get('offset') ?? '', 10)
+    const limit = Number.isInteger(requestedLimit) && requestedLimit > 0 ? Math.min(requestedLimit, 100) : 20
+    const offset = Number.isInteger(requestedOffset) && requestedOffset >= 0 ? requestedOffset : 0
+    // 本番の view=failures は excluded / retry_wait / failed の3状態。failed だけにすると件数が合わない。
+    // 本番口は retry_wait を failed に寄せて返す（publicDeliveryStatus）ので、見本も同じ寄せ方をする。
+    const toPublic = (item) => item.status === 'retry_wait' ? { ...item, status: 'failed' } : item
+    const items = (query.get('view') === 'failures'
+      ? LINE_NOTIFICATION_DELIVERIES.items.filter((item) => item.status === 'failed' || item.status === 'excluded' || item.status === 'retry_wait')
+      : LINE_NOTIFICATION_DELIVERIES.items
+    ).map(toPublic)
+    return { success: true, data: { ...LINE_NOTIFICATION_DELIVERIES, items: items.slice(offset, offset + limit) }, pagination: { total: items.length, limit, offset } }
+  }
+  if (pathname === '/api/notifications/operator-rules') {
+    return { success: true, data: { items: OPERATOR_NOTIFICATION_RULES, summary: { total: 11, published: 9, stopped: 2, missingRecipients: 1, recipients: 6, acceptedToday: 42, excludedToday: 1 } } }
+  }
+  if (pathname === '/api/ec-commerce/notification-runs') {
+    const requestedLimit = Number.parseInt(query.get('limit') ?? '', 10)
+    const requestedOffset = Number.parseInt(query.get('offset') ?? '', 10)
+    const limit = Number.isInteger(requestedLimit) && requestedLimit > 0 ? Math.min(requestedLimit, 100) : 20
+    const offset = Number.isInteger(requestedOffset) && requestedOffset >= 0 ? requestedOffset : 0
+    return {
+      success: true,
+      data: {
+        ...EC_NOTIFICATION_RUNS,
+        items: EC_NOTIFICATION_RUNS.items.slice(offset, offset + limit),
+      },
+      pagination: { total: EC_NOTIFICATION_RUNS.items.length, limit, offset },
+    }
+  }
   if (pathname === '/api/nen-members/photos') return { success: true, data: NEN_PHOTOS }
+  if (pathname === '/api/nen-members/photos/review-metrics') {
+    return { success: true, data: NEN_PHOTO_REVIEW_METRICS }
+  }
+  if (pathname === '/api/nen-members/photos/publications') return { success: true, data: NEN_PHOTO_PUBLICATIONS }
+  const photoAssetStatus = /^\/api\/nen-members\/photos\/([^/]+)\/assets\/status$/.exec(pathname)
+  if (photoAssetStatus) {
+    return {
+      success: true,
+      data: {
+        ...NEN_PHOTO_ASSET_STATUS,
+        jobs: NEN_PHOTO_ASSET_STATUS.jobs.map((job) => ({ ...job, photoId: photoAssetStatus[1] })),
+      },
+    }
+  }
+  if (/^\/api\/nen-members\/photos\/[^/]+\/assets\/derivatives$/.test(pathname)) {
+    return { success: true, data: NEN_PHOTO_DERIVATIVES }
+  }
+  if (/^\/api\/nen-members\/photos\/[^/]+$/.test(pathname)) return { success: true, data: NEN_PHOTO_DETAIL }
   if (pathname === '/api/ec-commerce/overview') return { success: true, data: EC_OVERVIEW }
   /* 取り込みの記録。ページ送りの数を器の外に持つ口。 */
   if (pathname === '/api/ec-commerce/events') {
     return { success: true, data: EC_EVENTS, pagination: { total: EC_EVENTS.length, limit: 20, offset: 0 } }
   }
+  if (pathname === '/api/ec-commerce/subscriptions') {
+    return { success: true, data: EC_SUBSCRIPTIONS, pagination: { total: EC_SUBSCRIPTIONS.summary.total, limit: 100, offset: 0 } }
+  }
+  if (pathname === '/api/ec-commerce/connector') return { success: true, data: EC_CONNECTOR }
   if (pathname === '/api/affiliates-report') return { success: true, data: AFFILIATE_REPORT }
+  const affiliateArchiveImpact = /^\/api\/affiliates\/([^/]+)\/archive-impact$/.exec(pathname)
+  if (affiliateArchiveImpact) {
+    const affiliate = AFFILIATES.find((item) => item.id === affiliateArchiveImpact[1]) ?? AFFILIATES[0]
+    return {
+      success: true,
+      data: {
+        affiliateId: affiliate.id,
+        affiliateName: affiliate.name,
+        lifecycle: affiliate.isActive ? 'active' : 'paused',
+        activeLinks: 3,
+        unsettledConversions: 9,
+        unsettledReward: 24000,
+        pendingConversions: 2,
+        checkedAt: '2026-09-06T00:00:00.000Z',
+      },
+    }
+  }
+  const affiliatePaymentPreview = /^\/api\/affiliate-payments\/([^/]+)\/preview$/.exec(pathname)
+  if (affiliatePaymentPreview) {
+    const affiliate = AFFILIATES.find((item) => item.id === affiliatePaymentPreview[1]) ?? AFFILIATES[1]
+    return {
+      success: true,
+      data: {
+        affiliateId: affiliate.id,
+        affiliateName: affiliate.name,
+        code: affiliate.code,
+        amount: 72000,
+        conversionCount: 18,
+        periodFrom: '2026-08-01T00:00:00+09:00',
+        periodTo: '2026-08-31T23:59:59+09:00',
+        closeDate: null,
+        paymentDate: '2026-09-30T00:00:00+09:00',
+        bankDestination: null,
+        breakdown: [
+          { offerName: '定期便のはじめて購入', conversions: 8, unitReward: 5000, subtotal: 40000 },
+          { offerName: '無料体験の申込', conversions: 9, unitReward: 3000, subtotal: 27000 },
+          { offerName: '友だち追加だけ', conversions: 50, unitReward: 100, subtotal: 5000 },
+        ],
+      },
+    }
+  }
   /* 紹介者ひとりぶん。`/api/affiliates/:id/report` と `/links`。器の形が要る。 */
   if (/^\/api\/affiliates\/[^/]+\/report$/.test(pathname)) return { success: true, data: AFFILIATE_REPORT_DETAIL }
   if (/^\/api\/affiliates\/[^/]+\/links$/.test(pathname)) return { success: true, data: AFFILIATE_LINKS }
   if (pathname === '/api/mileage/overview') return { success: true, data: MILEAGE_OVERVIEW }
+  if (pathname === '/api/mileage/friends') return { success: true, data: MILEAGE_FRIENDS }
+  if (pathname === '/api/mileage/earning-rules') return { success: true, data: MILEAGE_EARNING_RULES }
   if (pathname === '/api/mileage/rules') return { success: true, data: MILEAGE_RULES }
+  if (pathname === '/api/mileage/adjustment-policy') {
+    return { success: true, data: { configured: true, approvalThreshold: 10_000 } }
+  }
+  if (/^\/api\/mileage\/rewards\/[^/]+$/.test(pathname)) {
+    const rewardId = pathname.split('/').pop()
+    const reward = MILEAGE_REWARDS.rewards.find((item) => item.id === rewardId)
+    return reward
+      ? { success: true, data: reward }
+      : { success: false, error: '使い道が見つかりません' }
+  }
+  if (pathname === '/api/conversions/definitions') return { success: true, data: CONVERSION_DEFINITIONS }
+  if (/^\/api\/conversions\/definitions\/[^/]+\/delete-impact$/.test(pathname)) {
+    return { success: true, data: CONVERSION_DEFINITION_DELETE_IMPACT }
+  }
   if (pathname === '/api/conversions/points') return { success: true, data: CONVERSION_POINTS }
+  if (pathname === '/api/conversions/report') {
+    if (query.has('from') || query.has('to')) {
+      return { success: true, data: CONVERSION_DEFINITION_REPORT }
+    }
+    const startDate = query.get('startDate') ?? ''
+    const data = startDate >= '2026-08-01'
+      ? CONVERSION_REPORT_CURRENT
+      : CONVERSION_REPORT_PREVIOUS
+    return { success: true, data }
+  }
   if (pathname === '/api/common-vars') return { success: true, data: COMMON_VARS }
+  if (pathname === `/api/common-vars/${COMMON_VAR_DETAIL.id}`) return { success: true, data: COMMON_VAR_DETAIL }
   const commonVarDeleteImpact = /^\/api\/common-vars\/([^/]+)\/delete-impact$/.exec(pathname)
   if (commonVarDeleteImpact) {
     const impact = commonVarDeleteImpact[1] === COMMON_VAR_DELETE_IMPACT_EMPTY.variable.id
       ? COMMON_VAR_DELETE_IMPACT_EMPTY
       : COMMON_VAR_DELETE_IMPACT
     return { success: true, data: impact }
+  }
+  /*
+    共通情報の切り替え予約の一覧。予約表が常に空だと、予約ありの
+    見た目・契約が検証されない。固定の予約を1件だけ返す。
+  */
+  const commonVarSchedules = /^\/api\/common-vars\/([^/]+)\/schedules$/.exec(pathname)
+  if (commonVarSchedules) {
+    return {
+      success: true,
+      data: commonVarSchedules[1] === COMMON_VAR_DETAIL.id ? COMMON_VAR_SCHEDULES : [],
+    }
   }
   const mediaDeleteImpact = /^\/api\/media\/([^/]+)\/delete-impact$/.exec(pathname)
   if (mediaDeleteImpact) {
@@ -1057,6 +2484,81 @@ function bodyFor(pathname, query = new URLSearchParams()) {
       : RICH_MENU_DELETE_IMPACT
     return { success: true, data: impact }
   }
+  if (pathname === '/api/rich-menu-groups') {
+    if (query.has('page') || query.has('limit')) {
+      const page = Math.max(1, Number(query.get('page')) || 1)
+      const limit = Math.max(1, Math.min(200, Number(query.get('limit')) || 50))
+      const search = (query.get('query') ?? '').trim().toLocaleLowerCase('ja')
+      const folderId = query.get('folderId')
+      const filter = query.get('filter')
+      const sort = query.get('sort') ?? 'priority'
+      const narrowed = RICH_MENU_GROUPS.filter((group) => {
+        if (search && !group.name.toLocaleLowerCase('ja').includes(search)) return false
+        if (folderId === '__unfiled__' && group.folderId !== null) return false
+        if (folderId && folderId !== '__unfiled__' && group.folderId !== folderId) return false
+        if (filter === 'published' && group.status !== 'published') return false
+        if (filter === 'scheduled' && !group.publishingAt) return false
+        if (filter === 'draft' && group.status !== 'draft') return false
+        if (filter === 'targeting' && !group.targetingEnabled) return false
+        return true
+      }).sort((a, b) => {
+        if (sort === 'name') return a.name.localeCompare(b.name, 'ja') || a.id.localeCompare(b.id)
+        if (sort === 'updated') return b.updatedAt.localeCompare(a.updatedAt) || a.id.localeCompare(b.id)
+        if (sort === 'taps') {
+          return (b.monthlyStats?.taps ?? -1) - (a.monthlyStats?.taps ?? -1) || a.id.localeCompare(b.id)
+        }
+        return a.targetingPriority - b.targetingPriority || a.id.localeCompare(b.id)
+      })
+      const total = narrowed.length
+      const offset = (page - 1) * limit
+      const appliedSort = sort === 'taps'
+        ? [{ field: 'monthlyStats.taps', direction: 'desc' }, { field: 'id', direction: 'asc' }]
+        : sort === 'updated'
+          ? [{ field: 'updatedAt', direction: 'desc' }, { field: 'id', direction: 'asc' }]
+          : sort === 'name'
+            ? [{ field: 'name', direction: 'asc' }, { field: 'id', direction: 'asc' }]
+            : [
+                { field: 'targetingPriority', direction: 'asc' },
+                { field: 'createdAt', direction: 'asc' },
+                { field: 'id', direction: 'asc' },
+              ]
+      return {
+        success: true,
+        data: {
+          items: narrowed.slice(offset, offset + limit),
+          total,
+          limit,
+          sort: appliedSort,
+          facets: {
+            total: RICH_MENU_GROUPS.length,
+            published: RICH_MENU_GROUPS.filter((group) => group.status === 'published').length,
+            targeting: RICH_MENU_GROUPS.filter((group) => group.targetingEnabled).length,
+            folderCounts: Object.fromEntries(
+              RICH_MENU_GROUPS.reduce((counts, group) => {
+                const key = group.folderId ?? '__unfiled__'
+                counts.set(key, (counts.get(key) ?? 0) + 1)
+                return counts
+              }, new Map()),
+            ),
+          },
+        },
+      }
+    }
+    return { success: true, data: RICH_MENU_GROUPS }
+  }
+  if (pathname === '/api/rich-menu-groups/external') {
+    return { success: true, data: RICH_MENU_EXTERNAL }
+  }
+  if (pathname === '/api/rich-menu-groups/tap-stats') {
+    return { success: true, data: RICH_MENU_TAP_STATS }
+  }
+  const richMenuGroup = /^\/api\/rich-menu-groups\/([^/]+)$/.exec(pathname)
+  if (richMenuGroup) {
+    const group = RICH_MENU_GROUP_DETAILS[richMenuGroup[1]]
+    return group
+      ? { success: true, data: group }
+      : { success: false, error: 'リッチメニューが見つかりません' }
+  }
   if (pathname === '/api/tag-groups') return { success: true, data: TAG_GROUPS }
   if (pathname === '/api/list-stats') return { success: true, data: LIST_STATS }
   if (/^\/api\/accounts\/[^/]+\/health$/.test(pathname)) {
@@ -1068,38 +2570,9 @@ function bodyFor(pathname, query = new URLSearchParams()) {
       当たらないと「状態確認中」のままになり、設計の「正常稼働」と
       並べたときに**実装の差に見えてしまう**（実際はこちらの返事が違うだけ）。
     */
-    return { success: true, data: { riskLevel: 'normal', logs: [] } }
-  }
-  if (pathname === '/api/support-marks') {
-    /*
-      対応マーク。**「保留」と「対応中」が要る。**
-      設計 `GMvBd`（追加・編集）と `zGZMA`（削除の確認）は、この2つの行を
-      押してから開く。行が無いと押しどころが無く、6+1 状態が撮れなかった。
-
-      `usedIn` も持たせる。**参照数が無いと「削除できるか確認できません」**
-      になり、削除の確認窓（`zGZMA`）まで進めない。「対応中」は使用先を
-      持たせて**消せない側**、「保留」は 0 で**消せる側**にして、
-      両方の見た目を撮れるようにする。
-    */
-    const mark = (id, name, color, order, extra = {}) => ({
-      id, name, color, isDefault: order === 0, autoOnInbound: order === 0,
-      displayOrder: order, createdAt: `${FIXED_TO}T00:00:00.000Z`,
-      friendCount: 0,
-      usedIn: { broadcasts: 0, scenarios: 0, autoReplies: 0, savedSearches: 0, automations: 0 },
-      ...extra,
-    })
-    return {
-      success: true,
-      data: [
-        mark('sm-1', '未対応', '#e5484d', 0, { friendCount: 23 }),
-        mark('sm-2', '対応中', '#f5c56b', 1, {
-          friendCount: 8,
-          usedIn: { broadcasts: 1, scenarios: 0, autoReplies: 2, savedSearches: 0, automations: 0 },
-        }),
-        mark('sm-3', '保留', '#8b8f94', 2, { friendCount: 4 }),
-        mark('sm-4', '対応済み', '#05913e', 3, { friendCount: 186 }),
-      ],
-    }
+    const accountId = pathname.split('/')[3]
+    const logs = ACCOUNT_HEALTH_LOGS[accountId] ?? []
+    return { success: true, data: { riskLevel: logs[0]?.riskLevel ?? 'normal', logs } }
   }
   if (pathname === '/api/notifications/center') {
     /*
@@ -1155,11 +2628,16 @@ function bodyFor(pathname, query = new URLSearchParams()) {
           state: 'available',
           stateReason: null,
           clickRateDefinition: 'クリック率は「実人数 ÷ 届いた人数」で出しています。',
+          // 点検#508軽5: 初回・最終日時とタグ由来がないと、その表示を壊しても撮影で気づけない。
+          hasMore: true,
           links: [
             {
               trackedLinkId: 'tl-1', name: '定期便の案内', originalUrl: 'https://example.com/subscription',
               isActive: true, clicks: METRIC(482), knownClickPeople: METRIC(311),
               deliveredPeople: METRIC(1_842), clickRate: METRIC(16.9),
+              firstClickedAt: METRIC('2026-08-06T10:00:00+09:00'),
+              lastClickedAt: METRIC('2026-09-02T18:30:00+09:00'),
+              actions: { tagName: '来店タグ', scenarioName: '9月の定期便' },
               usageLocations: ['一斉配信「9月の定期便」', 'リッチメニュー「メインA」'],
             },
             {
@@ -1173,9 +2651,56 @@ function bodyFor(pathname, query = new URLSearchParams()) {
       },
     }
   }
+  if (pathname === '/api/nen-campaigns/settings') return { success: true, data: NEN_CAMPAIGN_SETTINGS }
+  if (pathname === '/api/nen-campaigns/columns') return { success: true, data: NEN_COLUMNS }
+  if (pathname === '/api/nen-campaigns/columns-preview') {
+    const targetMode = query.get('targetMode') === 'tag' ? 'tag' : 'all'
+    return {
+      success: true,
+      data: targetMode === 'tag'
+        ? NEN_COLUMN_OPERATIONS.audience
+        : { count: 1_284, targetMode: 'all', targetTagId: null },
+    }
+  }
+  if (pathname === '/api/nen-campaigns/pets') return { success: true, data: NEN_PETS }
+  if (pathname === '/api/nen-campaigns/jobs') return { success: true, data: NEN_JOBS }
+  if (pathname === '/api/nen-campaigns/metrics/flows') return { success: true, data: nenMetricsBody(NEN_FLOW_METRICS, query) }
+  if (pathname === '/api/nen-campaigns/metrics/columns') return { success: true, data: nenMetricsBody(NEN_COLUMN_METRICS, query) }
+  if (pathname === '/api/nen-campaigns/metrics/pets') return { success: true, data: nenMetricsBody(NEN_PET_METRICS, query) }
+  if (pathname === '/api/nen-campaigns/deliveries') {
+    const status = query.get('status')
+    const cursor = Math.max(0, Number.parseInt(query.get('cursor') ?? '0', 10) || 0)
+    const limit = Math.min(100, Math.max(1, Number.parseInt(query.get('limit') ?? '20', 10) || 20))
+    const filtered = status
+      ? NEN_DELIVERIES.deliveries.filter((delivery) => delivery.status === status)
+      : NEN_DELIVERIES.deliveries
+    return {
+      success: true,
+      data: {
+        ...nenMetricsBody(NEN_DELIVERIES, query),
+        deliveries: filtered.slice(cursor, cursor + limit),
+        pagination: {
+          total: status ? filtered.length : NEN_DELIVERIES.pagination.total,
+          limit,
+          cursor: String(cursor),
+          nextCursor: cursor + limit < (status ? filtered.length : NEN_DELIVERIES.pagination.total)
+            ? String(cursor + limit)
+            : null,
+        },
+      },
+    }
+  }
+  const nenDeliveryDetail = /^\/api\/nen-campaigns\/deliveries\/([^/]+)$/.exec(pathname)
+  if (nenDeliveryDetail) {
+    const detail = NEN_DELIVERY_DETAILS[decodeURIComponent(nenDeliveryDetail[1])]
+    return detail
+      ? { success: true, data: detail }
+      : { status: 404, body: { success: false, error: '配信記録が見つかりません' } }
+  }
+  if (pathname === '/api/nen-campaigns/birthday-coupon') return { success: true, data: NEN_BIRTHDAY_COUPON }
   if (pathname === '/api/nen-campaigns/overview') {
     // `jobs` が入っていないと `overview.jobs.pending` で落ちる。
-    return { success: true, data: { activeCampaigns: 2, jobs: { total: 18, pending: 3, sent: 14, failed: 1 }, columns: 6, pets: 4, coupons: 2 } }
+    return { success: true, data: { activeCampaigns: 6, jobs: { total: 2640, pending: 148, sent: 2486, failed: 6 }, columns: 24, pets: 864, coupons: 28 } }
   }
   if (pathname === '/api/webhooks/interactions') {
     /*
@@ -1194,24 +2719,52 @@ function bodyFor(pathname, query = new URLSearchParams()) {
         items: [
           {
             id: 'wi-1', direction: 'outgoing', webhookName: 'Slack ／ #注文チャンネル',
-            eventType: '注文が確定したとき', triggerSummary: '注文 #12492・¥12,800・石田 未来',
+            eventType: 'order.created', triggerSummary: '注文 #12492・¥12,800・石田 未来',
             status: 'succeeded', responseLabel: '200 OK', responseStatus: 200,
             attemptCount: 1, durationMs: 300, failureReason: null, canRetry: false,
             startedAt: '2026-08-25T02:42:00.000Z', completedAt: '2026-08-25T02:42:00.300Z', retryOfId: null,
           },
           {
             id: 'wi-2', direction: 'outgoing', webhookName: 'Slack ／ #アラート',
-            eventType: '在庫が少なくなったとき', triggerSummary: '定期便パンフ 残り 3',
+            eventType: 'inventory.low', triggerSummary: '定期便パンフ 残り 3',
             status: 'failed', responseLabel: '503 Service Unavailable', responseStatus: 503,
             attemptCount: 3, durationMs: 10_000, failureReason: '相手が応答しませんでした', canRetry: true,
             startedAt: '2026-08-24T05:10:00.000Z', completedAt: '2026-08-24T05:10:10.000Z', retryOfId: null,
           },
           {
             id: 'wi-3', direction: 'incoming', webhookName: '予約サービス',
-            eventType: '予約が入ったとき', triggerSummary: '8/26 14:00 トリミング（小型犬）',
+            eventType: 'incoming_webhook.reservation', triggerSummary: '8/26 14:00 トリミング（小型犬）',
             status: 'succeeded', responseLabel: '200 OK', responseStatus: 200,
             attemptCount: 1, durationMs: 180, failureReason: null, canRetry: false,
             startedAt: '2026-08-24T01:05:00.000Z', completedAt: '2026-08-24T01:05:00.180Z', retryOfId: null,
+          },
+          {
+            id: 'wi-4', direction: 'outgoing', webhookName: 'Google スプレッドシート ／ 注文一覧',
+            eventType: 'order.created', triggerSummary: '注文 #12491・¥8,400・佐藤 陽子',
+            status: 'succeeded', responseLabel: '200 OK', responseStatus: 200,
+            attemptCount: 1, durationMs: 520, failureReason: null, canRetry: false,
+            startedAt: '2026-08-23T09:30:00.000Z', completedAt: '2026-08-23T09:30:00.520Z', retryOfId: null,
+          },
+          {
+            id: 'wi-5', direction: 'outgoing', webhookName: 'kintone ／ 顧客管理',
+            eventType: 'friend.added', triggerSummary: '友だち U9a81…・流入 QRコード',
+            status: 'succeeded', responseLabel: '200 OK', responseStatus: 200,
+            attemptCount: 1, durationMs: 260, failureReason: null, canRetry: false,
+            startedAt: '2026-08-22T07:15:00.000Z', completedAt: '2026-08-22T07:15:00.260Z', retryOfId: null,
+          },
+          {
+            id: 'wi-6', direction: 'incoming', webhookName: 'アンケートツール',
+            eventType: 'incoming_webhook.survey', triggerSummary: '回答 #A-1842・満足度 5',
+            status: 'succeeded', responseLabel: '200 OK', responseStatus: 200,
+            attemptCount: 1, durationMs: 140, failureReason: null, canRetry: false,
+            startedAt: '2026-08-21T03:20:00.000Z', completedAt: '2026-08-21T03:20:00.140Z', retryOfId: null,
+          },
+          {
+            id: 'wi-7', direction: 'outgoing', webhookName: 'Chatwork ／ 発送連絡',
+            eventType: 'shipment.completed', triggerSummary: '注文 #12480・追跡 1234…',
+            status: 'succeeded', responseLabel: '200 OK', responseStatus: 200,
+            attemptCount: 1, durationMs: 390, failureReason: null, canRetry: false,
+            startedAt: '2026-08-20T11:05:00.000Z', completedAt: '2026-08-20T11:05:00.390Z', retryOfId: null,
           },
         ],
       },
@@ -1239,13 +2792,36 @@ function bodyFor(pathname, query = new URLSearchParams()) {
         templates: [{ id: 'template-usage-1', name: '来店後のご案内' }],
         webhooks: [{ id: 'wh-1', name: '予約サービスへ知らせる' }],
         richMenus: [{ id: 'rmg-1', name: '通常メニュー' }],
-        commonActions: [{ id: 'ca-1', name: '来店後のご案内', version: 3 }],
+        commonActions: [
+          // 機能6。XQfMD/FpgxHの設計状態「配信済みタグを追加」。
+          { id: 'ca-broadcast-delivered-tag', name: 'タグ「8月キャンペーン配信済み」を追加', version: 1 },
+          { id: 'ca-1', name: '来店後のご案内', version: 3 },
+          { id: 'ca-subscription-guide', name: '定期便スタートガイド', version: 1 },
+        ],
+      },
+    }
+  }
+  if (pathname === '/api/common-actions/ca-broadcast-delivered-tag') {
+    return {
+      success: true,
+      data: {
+        ...COMMON_ACTION_DETAIL,
+        id: 'ca-broadcast-delivered-tag',
+        name: 'タグ「8月キャンペーン配信済み」を追加',
+        currentDraftVersionId: null,
+        currentPublishedVersionId: 'cav-broadcast-delivered-tag-1',
+        versions: [{
+          id: 'cav-broadcast-delivered-tag-1', versionNumber: 1, status: 'published',
+          actions: [{ id: 'broadcast-delivered-tag-step', type: 'add_tag', params: { tagId: 'tag-broadcast-delivered' }, onFailure: 'stop' }],
+          createdBy: 'Kenta Kawano', createdAt: '2026-08-20T00:00:00.000Z', publishedAt: '2026-08-20T00:00:00.000Z',
+        }],
+        bindings: [],
       },
     }
   }
   if (pathname.startsWith('/api/common-actions/') && !pathname.includes('/resources')) {
     // `versions` `bindings` が入っていないと `.find` で落ちる。
-    return { success: true, data: { id: pathname.split('/').pop(), name: '来店後のご案内', versions: [], bindings: [], currentPublishedVersionId: null, currentDraftVersionId: null } }
+    return { success: true, data: COMMON_ACTION_DETAIL }
   }
   if (pathname === '/api/saved-searches' && query.get('format') === 'segment_v1') {
     /*
@@ -1253,20 +2829,19 @@ function bodyFor(pathname, query = new URLSearchParams()) {
       空だと「この条件を使う」の行が描かれず、設計 `sqFXf`（対象条件を編集）が
       撮れなかった。設計と同じ2件を返す。
     */
-    const rule = (field, op, value) => ({ field, operator: op, value })
     return {
       success: true,
       data: [
         {
           id: 'sp-1', name: 'VIPかつ未契約', scope: 'friends', conditionFormat: 'segment_v1',
-          conditions: { version: 1, condition: { operator: 'AND', rules: [rule('tag', 'includes', 'VIP'), rule('tag', 'excludes', '契約中')] } },
+          conditions: { version: 1, condition: { operator: 'AND', rules: [{ type: 'tag_exists', value: 'tag-vip' }, { type: 'tag_not_exists', value: 'tag-trial' }], groups: [] } },
           createdBy: '河野 健太', lineAccountId: 'visual-qa-account', isShared: true,
           displayOrder: 1, createdAt: '2026-08-10T00:00:00.000Z',
           usedIn: [{ kind: 'broadcast', count: 2 }, { kind: 'automation', count: 1 }],
         },
         {
           id: 'sp-2', name: '誕生日30日前', scope: 'friends', conditionFormat: 'segment_v1',
-          conditions: { version: 1, condition: { operator: 'AND', rules: [rule('field', 'within_days', 30)] } },
+          conditions: { version: 1, condition: { operator: 'AND', rules: [{ type: 'registered_at', value: { from: '2026-07-25', to: '' } }], groups: [] } },
           createdBy: '河野 健太', lineAccountId: 'visual-qa-account', isShared: false,
           displayOrder: 2, createdAt: '2026-08-18T00:00:00.000Z',
           usedIn: [{ kind: 'other', count: 1 }],
@@ -1274,6 +2849,57 @@ function bodyFor(pathname, query = new URLSearchParams()) {
       ],
     }
   }
+  if (pathname === '/api/webinars') {
+    /*
+      本物と同じ offset 方式(page/limit・total・sort)。全件配列を返すと、
+      頁ごと取得の新コードが撮影で壊れる。絞り無しの既定は従来どおり
+      全件が1頁に入る(5件・total 5)で、既定の撮影は変わらない。
+    */
+    const rawPage = Number(query.get('page') ?? '')
+    const rawLimit = Number(query.get('limit') ?? '')
+    const page = Number.isInteger(rawPage) && rawPage > 0 ? rawPage : 1
+    const limit = Number.isInteger(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, 200) : 50
+    const sort = query.get('sort') === 'created' ? 'created' : query.get('sort') === 'name' ? 'name' : 'updated'
+    const status = query.get('status') === 'active' || query.get('status') === 'draft' ? query.get('status') : ''
+    const folder = query.get('folder') ?? ''
+    const needle = (query.get('q') ?? '').trim().toLowerCase()
+    let rows = WEBINARS.filter((webinar) => webinar.status !== 'archived')
+    if (status) rows = rows.filter((webinar) => webinar.status === status)
+    if (folder === '__unfiled__') rows = rows.filter((webinar) => !webinar.folderId)
+    else if (folder) rows = rows.filter((webinar) => webinar.folderId === folder)
+    if (needle) {
+      rows = rows.filter((webinar) => webinar.title.toLowerCase().includes(needle) || webinar.slug.toLowerCase().includes(needle))
+    }
+    rows = [...rows].sort((left, right) => {
+      if (sort === 'name') return left.title < right.title ? -1 : left.title > right.title ? 1 : 0
+      const key = sort === 'created' ? 'createdAt' : 'updatedAt'
+      return left[key] > right[key] ? -1 : left[key] < right[key] ? 1 : 0
+    })
+    const sorts = {
+      updated: { field: 'updatedAt', direction: 'desc' },
+      created: { field: 'createdAt', direction: 'desc' },
+      name: { field: 'title', direction: 'asc' },
+    }
+    return {
+      success: true,
+      data: {
+        items: rows.slice((page - 1) * limit, page * limit),
+        total: rows.length,
+        limit,
+        sort: [sorts[sort]],
+      },
+    }
+  }
+  if (pathname === '/api/webinars/overview') return { success: true, data: WEBINAR_OVERVIEW }
+  if (/^\/api\/webinars\/[^/]+\/editor$/.test(pathname)) return { success: true, data: WEBINAR_EDITOR }
+  if (/^\/api\/webinars\/[^/]+\/publish-validation$/.test(pathname)) return { success: true, data: WEBINAR_PUBLISH_VALIDATION }
+  if (/^\/api\/webinars\/[^/]+\/participants$/.test(pathname)) return { success: true, data: WEBINAR_PARTICIPANTS }
+  if (/^\/api\/webinars\/[^/]+\/notifications$/.test(pathname)) return { success: true, data: WEBINAR_NOTIFICATIONS }
+  if (/^\/api\/webinars\/[^/]+\/ctas$/.test(pathname)) return { success: true, data: WEBINAR_CTAS }
+  if (/^\/api\/webinars\/[^/]+\/actions$/.test(pathname)) return { success: true, data: WEBINAR_ACTIONS }
+  if (/^\/api\/webinars\/[^/]+\/comments$/.test(pathname)) return { success: true, data: WEBINAR_COMMENTS }
+  if (/^\/api\/webinars\/[^/]+\/user-comments$/.test(pathname)) return { success: true, data: [] }
+  if (/^\/api\/webinars\/[^/]+\/analytics$/.test(pathname)) return { success: true, data: WEBINAR_ANALYTICS }
   if (/^\/api\/webinars\/[^/]+$/.test(pathname)) {
     /*
       ウェビナー1件。**器を通さない**（`fetchApi<{ data: Webinar }>`）。
@@ -1282,28 +2908,7 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     */
     return {
       data: {
-        id: pathname.split('/').pop(), accountId: 'visual-qa-account',
-        title: '定期便のはじめ方', slug: 'subscription-start', status: 'active',
-        videoPrefix: 'nen/subscription-start', durationSeconds: 2_580,
-        schedule: [], cta: { label: '詳しく見る', url: 'https://example.com/subscription', showAtSeconds: 900 },
-        tagOnAttend: null, tagOnCtaClick: null,
-        createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-25T02:00:00.000Z',
-      },
-    }
-  }
-  if (/^\/api\/webinars\/[^/]+\/analytics$/.test(pathname)) {
-    // 一覧の器だと `participants` `daily` `formFunnel` が無く、画面が落ちる。
-    return {
-      data: {
-        summary: {
-          reservations: 128, viewers: 96, registeredAndJoined: 74, watched5m: 88,
-          watched15m: 61, completed: 34, avgWatchedSeconds: 1_140, ctaClicks: 41, formSubmissions: 18,
-        },
-        daily: [], participants: [], sessions: [], dropoff: [],
-        formFunnel: {
-          ctaImpressions: 96, ctaClicks: 41, formOpens: 33, formStarts: 27,
-          submitAttempts: 21, submitSuccesses: 18, submitErrors: 3, fieldCompletions: [],
-        },
+        ...WEBINARS[0], id: pathname.split('/').pop(),
       },
     }
   }
@@ -1314,7 +2919,33 @@ function bodyFor(pathname, query = new URLSearchParams()) {
       設計 `HBTk0` と文字を並べて初めて分かった。
       画面側も `undefined` を出さないよう直したが、正しい返事もここに置く。
     */
-    return { success: true, data: { total: 12, inUse: 9, registeredFriends: 1_284, formLinks: 3, updatedThisMonth: 4 } }
+    return { success: true, data: { total: 12, inUse: 9, registeredFriends: 187, formLinks: 6, updatedThisMonth: 3 } }
+  }
+  if (pathname === '/api/friends') {
+    /*
+     * 点検 #496-23：絞り・検索・ページ送りを無視した固定231件だと、
+     * 画面確認で絞りが効いて見えて実機差異に気づけない。
+     * クエリに連動させる。絞り無しの既定は従来どおり（全件・total 231）で、
+     * 既定の撮影が変わらないようにする。
+     */
+    const search = (query.get('search') ?? '').trim().toLocaleLowerCase('ja')
+    const tagId = query.get('tagId') ?? ''
+    const requestedLimit = Number.parseInt(query.get('limit') ?? '', 10)
+    const requestedOffset = Number.parseInt(query.get('offset') ?? '', 10)
+    const limit = Number.isInteger(requestedLimit) && requestedLimit > 0 ? requestedLimit : FRIENDS.length
+    const offset = Number.isInteger(requestedOffset) && requestedOffset >= 0 ? requestedOffset : 0
+    let items = FRIENDS
+    if (search) {
+      items = items.filter((friend) => (friend.displayName ?? '').toLocaleLowerCase('ja').includes(search))
+    }
+    if (tagId) {
+      items = items.filter((friend) => (friend.tags ?? []).some((tag) => tag.id === tagId))
+    }
+    const narrowed = search !== '' || tagId !== ''
+    return {
+      success: true,
+      data: { items: items.slice(offset, offset + limit), total: narrowed ? items.length : 231, page: 1, limit },
+    }
   }
   if (pathname in SHAPES) {
     return { success: true, data: SHAPES[pathname] }
@@ -1339,7 +2970,8 @@ const server = createServer((req, res) => {
     'Access-Control-Allow-Headers',
     'Content-Type, X-CSRF-Token, X-Admin-Session, Idempotency-Key, X-Confirm-Irreversible',
   )
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS')
+  res.setHeader('Access-Control-Expose-Headers', 'ETag')
 
   if (method === 'OPTIONS') {
     res.writeHead(204).end()
@@ -1363,6 +2995,82 @@ const server = createServer((req, res) => {
     return
   }
 
+  if (method === 'GET' && url.pathname === '/api/media') {
+    const limit = Math.min(100, Math.max(1, Number(url.searchParams.get('limit') || 20)))
+    const offset = Math.max(0, Number(url.searchParams.get('offset') || 0))
+    const kind = url.searchParams.get('kind')
+    const query = (url.searchParams.get('query') || '').toLowerCase()
+    const folderId = url.searchParams.get('folderId')
+    const excludeId = url.searchParams.get('excludeId')
+    const sort = url.searchParams.get('sort') || 'newest'
+    const filtered = MEDIA_ITEMS.filter((item) =>
+      (!kind || item.kind === kind)
+      && (!excludeId || item.id !== excludeId)
+      && (!query || item.filename.toLowerCase().includes(query))
+      && (!folderId || (folderId === '__ungrouped__' ? item.folderId == null : item.folderId === folderId))
+      && (url.searchParams.get('unusedOnly') !== '1' || item.usageCount === 0)
+      && (url.searchParams.get('nearLimitOnly') !== '1' || item.sizeBytes >= (item.kind === 'image' ? 8 : item.kind === 'file' ? 16 : 160) * 1024 * 1024),
+    ).toSorted((left, right) => {
+      if (sort === 'oldest') return left.createdAt.localeCompare(right.createdAt)
+      if (sort === 'name') return left.filename.localeCompare(right.filename, 'ja')
+      if (sort === 'size') return right.sizeBytes - left.sizeBytes
+      if (sort === 'usage') return (right.usageCount ?? -1) - (left.usageCount ?? -1)
+      return right.createdAt.localeCompare(left.createdAt)
+    })
+    res.writeHead(200).end(JSON.stringify({
+      success: true,
+      data: { items: filtered.slice(offset, offset + limit), total: filtered.length, limit, offset },
+    }))
+    return
+  }
+
+  if (method === 'GET' && url.pathname === '/api/booking/admin/requests') {
+    const limit = Math.min(100, Math.max(1, Number(url.searchParams.get('limit') || 50)))
+    const offset = Math.max(0, Number(url.searchParams.get('offset') || 0))
+    const status = url.searchParams.get('status') || 'requested'
+    const query = url.searchParams.get('query') || ''
+    const menuName = url.searchParams.get('menu_name')
+    const from = url.searchParams.get('from')
+    const to = url.searchParams.get('to')
+    const filtered = BOOKING_REQUESTS.filter((item) =>
+      (status === 'all' || item.status === status)
+      && (!query || (item.friend_name || '').includes(query))
+      && (!menuName || item.menu_name === menuName)
+      && (!from || item.starts_at >= from)
+      && (!to || item.starts_at < to),
+    )
+    res.writeHead(200).end(JSON.stringify({
+      requests: filtered.slice(offset, offset + limit), total: filtered.length, limit, offset,
+    }))
+    return
+  }
+
+  if (method === 'GET' && url.pathname === '/api/conversions/export') {
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8')
+    res.setHeader('Content-Disposition', 'attachment; filename="conversion-definitions-2026-08-25.csv"')
+    res.setHeader('Cache-Control', 'no-store')
+    res.writeHead(200).end(CONVERSION_EXPORT_CSV)
+    return
+  }
+
+  if (method === 'GET' && url.pathname === '/api/nen-members/photos/original-download/visual-qa-once') {
+    const jpeg = Buffer.from('/9j/4AAQSkZJRgABAQAAAQABAAD/2Q==', 'base64')
+    res.setHeader('Content-Type', 'image/jpeg')
+    res.setHeader('Cache-Control', 'no-store')
+    res.writeHead(200).end(jpeg)
+    return
+  }
+
+  if (method === 'GET' && url.pathname.startsWith('/api/rich-menu-images/')) {
+    // 6面が見分けられる撮影専用画像。1px画像ではキャンバスが黒く見え、
+    // 画像本体を取得できたか判定できないため、実際の比率に近いPNGを返す。
+    const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAlgAAAGQCAYAAAByNR6YAAAKXklEQVR42u3WMRGAMBAAwYhAASJQgQYkMPjABJLoqejSkaGgDQbyCrLFarhLwzpXoG3cFyAwHRsQSCIKBgsMFhgsMFhgsMBggcECgwUGCzBYYLDAYIHBAoMFBgsMFhgsMFhgsACDBQYLDBYYLDBYYLDAYIHBAoMFBgswWGCwwGCBwQKDBQYLDBYYLDBYYLAAgwUGCwwWGCwwWGCwwGCBwQKDBQYLMFhgsMBggcECgwUGCwwWGCwwWIDBAoMFBgsMFhgsMFhgsMBggcECgwUYLDBYYLDAYIHBAoMFBgsMFhgsMFiAwQKDBQYLDBYYLDBYYLDAYIHBAoMFGCwwWGCwwGCBwQKDBQYLDBYYLDBYgMECgwUGCwwWGCwwWGCwwGCBwQJEFAwWGCwwWGCwwGCBwQKDBQYLDBZgsMBggcECgwUGCwwWGCwwWGCwwGABBgsMFhgsMFhgsMBggcECgwUGCwwWYLDAYIHBAoMFBgsMFhgsMFhgsMBgAQYLDBYYLDBYYLDAYIHBAoMFBgsQUTBYYLDAYIHBAoMFBgsMFhgsMFiAwQKDBQYLDBYYLDBYYLDAYIHBAoMFGCwwWGCwwGCBwQKDBQYLDBYYLDBYgMECgwUGCwwWGCwwWGCwwGCBwQKDBRgsMFhgsMBggcECgwUGCwwWGCzAYIHBAoMFBgsMFhgsMFhgsMBggcECDBYYLDBYYLDAYIHBAoMFBgsMFhgswGCBwQKDBQYLDBYYLDBYYLDAYIHBAgwWGCwwWGCwwGCBwQKDBQYLDBYYLCEFgwUGCwwWGCwwWGCwwGCBwQKDBRgsMFhgsMBggcECgwUGCwwWGCwwWIDBAoMFBgsMFhgsMFhgsMBggcECgwUYLDBYYLDAYIHBAoMFBgsMFhgsMFiAwQKDBQYLDBYYLDBYYLDAYIHBAoMFGCwwWGCwwGCBwQKDBQYLDBYYLMBggcECgwUGCwwWGCwwWGCwwGCBwQIMFhgsMFhgsMBggcECgwUGCwwWGCzAYIHBAoMFBgsMFhgsMFhgsMBggcECDBYYLDBYYLDAYIHBAoMFBgsMFhgswGCBwQKDBQYLDBYYLDBYYLDAYAEGCwwWGCwwWGCwwGCBwQKDBQYLDBZgsMBggcECgwUGCwwWGCwwWGCwwGABBgsMFhgsMFhgsMBggcECgwUGCwwWYLDAYIHBAoMFBgsMFhgsMFhgsMBgiSgYLDBYYLDAYIHBAoMFBgsMFhgswGCBwQKDBQYLDBYYLDBYYLDAYIHBAgwWGCwwWGCwwGCBwQKDBQYLDBYYLMBggcECgwUGCwwWGCwwGCBwQIMFhgsMFhgsMBggcECgwUGCwwWGCwRBYMFBgsMFhgsMFhgsMBggcECgwUYLDBYYLDAYIHBAoMFBgsMFhgsMFiAwQKDBQYLDBYYLDBYYLDAYIHBAoMFGCwwWGCwwGCBwQKDBQYLDBYYLDBYgMECgwUGCwwWGCwwWGCwwGCBwQKDJaJgsMBggcECgwUGCwwWGCwwWGCwAIMFBgsMFhgsMFhgsMBggcECgwXdDdbzvRVou0sGAme+gIDBAoMFBgsMFhgsMFhgsMBggcECgwUYLDBYYLDAYIHBAoMFBgsMFhgsMFiAwQKDBQYLDBYYLDBYYLDAYIHBAoMFGCwwWGCwwGCBwQKDBQYLDBYYLDBYgMECgwUGCwwWGCwwWGCwwGCBwQJEFAwWGCwwWGCwwGCBwQKDBQYLDBZgsMBggcECgwUGCwwWGCwwWGCwwGABBgsMFhgsMFhgsMBggcECgwUGCwwWYLDAYIHBAoMFBgsMFhgsMFhgsMBgAQYLDBYYLDBYYLDAYIHBAoMFBgsQUTBYYLDAYIHBAoMFBgsMFhgsMFiAwQKDBQYLDBYYLDBYYLDAYIHBAoMFGCwwWGCwwGCBwQKDBQYLDBYYLDBYgMECgwUGCwwWGCwwWGCwwGCBwQKDBRgsMFhgsMBggcECgwUGCwwWGCzAYIHBAoMFBgsMFhgsMFhgsMBggcECDBYYLDBYYLDAYIHBAoMFBgsMFhgswGCBwQKDBQYLDBYYLDBYYLDAYIHBAgwWGCwwWGCwwGCBwQKDBQYLDBYYLCEFgwUGCwwWGCwwWGCwwGCBwQKDBRgsMFhgsMBggcECgwUGCwwWGCwwWIDBAoMFBgsMFhgsMFhgsMBggcECgwUYLDBYYLDAYIHBAoMFBgsMFhgsMFiAwQKDBQYLDBYYLDBYYLDAYIHBAoMFGCwwWGCwwGCBwQKDBQYLDBYYLMBggcECgwUGCwwWGCwwWGCwwGCBwQIMFhgsMFhgsMBggcECgwUGCwwWGCzAYIHBAoMFBgsMFhgsMFhgsMBggcECDBYYLDBYYLDAYIHBAoMFBgsMFhgswGCBwQKDBQYLDBYYLDBYYLDAYAEGCwwWGCwwWGCwwGCBwQKDBQYLDBZgsMBggcECgwUGCwwWGCwwWGCwwGABBgsMFhgsMFhgsMBggcECgwUGCwwWYLDAYIHBAoMFBgsMFhgsMFhgsMBgiSgYLDBYYLDAYIHBAoMFBgsMFhgswGCBwQKDBQYLDBYYLDBYYLDAYIHBAgwWGCwwWGCwwGCBwQKDBQYLDBYYLMBggcECgwUGCwwWGCwwGCBwQIMFhgsMFhgsMBggcECgwUGCwwWGCwRBYMFBgsMFhgsMFhgsMBggcECgwUYLDBYYLDAYIHBAoMFBgsMFhgsMFiAwQKDBQYLDBYYLDBYYLDAYIHBAoMFGCwwWGCwwGCBwQKDBQYLDBYYLDBYgMECgwUGCwwWGCwwWGCwwGCBwQKDJaJgsMBggcECgwUGCwwWGCwwWGCwAIMFBgsMFhgsMFhgsMBggcECgwUGCzBYYLDAYIHBAoMFBgsMFhgsMFhgsACDBQYLDBYYLDBYYLDAYIHBAoMFBgswWGCwwGCBwQKDBQYLDBYYLDBYYLBEFAwWGCwwWGCwwGCBwQKDBQYLDBZgsMBggcECgwUGCwwWGCwwWGCwwGABBgsMFhgsMFhgsMBggcECgwUGCwwWYLDAYIHBAoMFBgsMFhgsMFhgsMBgAQYLDBYYLDBYYLDAYIHBAoMFBgsMloiCwQKDBQYLDBYYLDBYYLDAYIHBAgwWGCwwWGCwwGCBwQKDBQYLDBYYLMBggcECgwUGCwwWGCwwWGCwwGCBwQIMFhgsMFhgsMBggcECgwUGCwwWGCzAYIHBAoMFBgsMFhgsMFhgsMBggcESUTBYYLDAYIHBAoMFBgsMFhgsMFiAwQKDBQYLDBYYLDBYYLDAYIHBgu780r18zIsQvWAAAAAASUVORK5CYII=', 'base64')
+    res.setHeader('Content-Type', 'image/png')
+    res.setHeader('Cache-Control', 'no-store')
+    res.writeHead(200).end(png)
+    return
+  }
+
   res.setHeader('Content-Type', 'application/json; charset=utf-8')
 
   // 更新は原則通さない。固定結果を返す3口も保存・配信は一切行わない。
@@ -1372,6 +3080,250 @@ const server = createServer((req, res) => {
   // ただし画面側のエラー報告だけは 204 で受ける。405 を返すと、
   // 報告が失敗したこと自体が新しいエラーになって際限なく増える。
   if (method !== 'GET') {
+    const formWriteRequest = (
+      (method === 'POST' && (url.pathname === '/api/forms/drafts'
+        || url.pathname === `/api/forms/${FORM_DETAIL.id}/archive`))
+      || (method === 'PUT' && url.pathname === `/api/forms/${FORM_DETAIL.id}`)
+      || (method === 'DELETE' && url.pathname === `/api/forms/${FORM_DETAIL.id}`)
+    )
+    if (formWriteRequest) {
+      res.writeHead(200).end(JSON.stringify(bodyFor(method, url.pathname, url.searchParams)))
+      return
+    }
+    if (/^\/api\/(mileage\/(rules|rewards|adjustments)|action-scores\/rules)/.test(url.pathname)) {
+      let raw = ''
+      req.on('data', (chunk) => { raw += chunk })
+      req.on('end', () => {
+        let requestBody = {}
+        try { requestBody = JSON.parse(raw || '{}') } catch { requestBody = {} }
+        const fixed = mileageWriteResponse(method, url.pathname, requestBody, req.headers)
+        if (fixed) {
+          res.writeHead(fixed.status).end(JSON.stringify(fixed.body))
+          return
+        }
+        res.writeHead(405).end(JSON.stringify({ success: false, error: '画面確認用のため、更新はできません' }))
+      })
+      return
+    }
+    if (method === 'POST' && url.pathname === '/api/folders') {
+      let raw = ''
+      req.on('data', (chunk) => { raw += chunk })
+      req.on('end', () => {
+        let body = {}
+        try { body = JSON.parse(raw || '{}') } catch { body = {} }
+        if (body.kind !== 'webinar') {
+          res.writeHead(405).end(JSON.stringify({ success: false, error: '画面確認用のため、更新はできません' }))
+          return
+        }
+        if (body.accountId !== 'visual-qa-account' || !String(body.name ?? '').trim()) {
+          res.writeHead(400).end(JSON.stringify({ success: false, error: 'フォルダの内容を確認してください' }))
+          return
+        }
+        const folder = {
+          id: `webinar-folder-${webinarFolders.length + 1}`,
+          kind: 'webinar',
+          accountId: body.accountId,
+          name: String(body.name).trim(),
+          parentId: null,
+          displayOrder: webinarFolders.length,
+          count: 0,
+          color: body.color ?? null,
+          createdAt: '2026-09-07T15:00:00.000Z',
+          updatedAt: '2026-09-07T15:00:00.000Z',
+        }
+        webinarFolders = [...webinarFolders, folder]
+        res.writeHead(201).end(JSON.stringify({ success: true, data: folder }))
+      })
+      return
+    }
+    const webinarFolderPath = /^\/api\/folders\/([^/]+)$/.exec(url.pathname)
+    if (method === 'PATCH' && webinarFolderPath) {
+      let raw = ''
+      req.on('data', (chunk) => { raw += chunk })
+      req.on('end', () => {
+        let body = {}
+        try { body = JSON.parse(raw || '{}') } catch { body = {} }
+        const id = decodeURIComponent(webinarFolderPath[1])
+        const index = webinarFolders.findIndex((folder) => folder.id === id && folder.accountId === body.accountId)
+        if (index < 0) {
+          res.writeHead(404).end(JSON.stringify({ success: false, error: 'Not found' }))
+          return
+        }
+        const folder = {
+          ...webinarFolders[index],
+          ...(typeof body.name === 'string' ? { name: body.name.trim() } : {}),
+          ...(Number.isFinite(body.displayOrder) ? { displayOrder: body.displayOrder } : {}),
+          updatedAt: '2026-09-07T15:01:00.000Z',
+        }
+        webinarFolders = webinarFolders.map((item, itemIndex) => itemIndex === index ? folder : item)
+        webinarFolders.sort((a, b) => a.displayOrder - b.displayOrder || a.name.localeCompare(b.name, 'ja'))
+        res.writeHead(200).end(JSON.stringify({ success: true, data: folder }))
+      })
+      return
+    }
+    if (method === 'DELETE' && webinarFolderPath) {
+      const id = decodeURIComponent(webinarFolderPath[1])
+      const accountId = url.searchParams.get('account_id')
+      const folder = webinarFolders.find((item) => item.id === id && item.accountId === accountId)
+      if (!folder) {
+        res.writeHead(404).end(JSON.stringify({ success: false, error: 'Not found' }))
+        return
+      }
+      webinarFolders = webinarFolders.filter((item) => item.id !== id)
+      res.writeHead(200).end(JSON.stringify({ success: true, data: null }))
+      return
+    }
+    if (method === 'POST' && url.pathname === '/api/conversions/definitions/preview') {
+      res.writeHead(200).end(JSON.stringify({ success: true, data: CONVERSION_DEFINITION_PREVIEW }))
+      return
+    }
+    if (method === 'POST' && url.pathname === '/api/conversions/definitions') {
+      res.writeHead(201).end(JSON.stringify({ success: true, data: CONVERSION_DEFINITION_DELETE_IMPACT.definition }))
+      return
+    }
+    if (method === 'POST' && /^\/api\/conversions\/definitions\/[^/]+\/stop$/.test(url.pathname)) {
+      res.writeHead(200).end(JSON.stringify({ success: true, data: { id: 'cp-2', status: 'stopped', version: 2, stoppedAt: '2026-09-07T14:00:00+09:00' } }))
+      return
+    }
+    if (method === 'POST' && /^\/api\/conversions\/definitions\/[^/]+\/replace$/.test(url.pathname)) {
+      res.writeHead(200).end(JSON.stringify({ success: true, data: { id: 'cp-2', replacementId: 'cp-1', replacedUsageCount: 3, status: 'stopped', version: 2 } }))
+      return
+    }
+    if (method === 'DELETE' && /^\/api\/conversions\/definitions\/[^/]+$/.test(url.pathname)) {
+      res.writeHead(200).end(JSON.stringify({ success: true, data: { id: 'cp-6', deleted: true } }))
+      return
+    }
+    if (method === 'POST' && /^\/api\/webinars\/[^/]+\/public-page\/test$/.test(url.pathname)) {
+      res.writeHead(200).end(JSON.stringify({ success: true, data: WEBINAR_EDITOR }))
+      return
+    }
+    /*
+      本物の公開応答は `{ webinar, validation }`（`apps/worker/src/routes/webinars.ts`
+      の publish）。単体を返すと、公開結果を読む新コードがモックで動いて
+      本番で壊れる契約の穴になる。停止・複製は単体のまま。
+    */
+    if (method === 'POST' && /^\/api\/webinars\/[^/]+\/publish$/.test(url.pathname)) {
+      res.writeHead(200).end(JSON.stringify({ success: true, data: { webinar: WEBINARS[0], validation: WEBINAR_PUBLISH_VALIDATION } }))
+      return
+    }
+    if (method === 'POST' && /^\/api\/webinars\/[^/]+\/(pause|duplicate)$/.test(url.pathname)) {
+      res.writeHead(200).end(JSON.stringify({ success: true, data: WEBINARS[0] }))
+      return
+    }
+    if (method === 'POST' && /^\/api\/webinars\/[^/]+\/notifications\/test$/.test(url.pathname)) {
+      res.writeHead(200).end(JSON.stringify({ success: true, data: { sent: 1, failed: 0 } }))
+      return
+    }
+    if (method === 'POST' && /^\/api\/automation-runs\/[^/]+\/retry$/.test(url.pathname)) {
+      res.writeHead(202).end(JSON.stringify({
+        success: true,
+        data: { runId: url.pathname.split('/')[3], retryStepCount: 1, status: 'succeeded' },
+      }))
+      return
+    }
+    if (method === 'POST' && /^\/api\/automation-templates\/[^/]+\/drafts$/.test(url.pathname)) {
+      res.writeHead(201).end(JSON.stringify({
+        success: true,
+        data: { id: 'automation-visual-draft', draftVersionId: 'automation-visual-version' },
+      }))
+      return
+    }
+    if (method === 'PUT' && url.pathname === '/api/automation-drafts/automation-visual-draft') {
+      res.writeHead(200).end(JSON.stringify({ success: true, data: { updated: true } }))
+      return
+    }
+    if (method === 'POST' && url.pathname === '/api/automations/automation-visual-draft/audience-preview') {
+      res.writeHead(200).end(JSON.stringify({
+        success: true,
+        data: {
+          automationId: 'automation-visual-draft',
+          versionId: 'automation-visual-version',
+          matched: 286,
+          total: 842,
+          freshness: 'available',
+          calculatedAt: '2026-09-07T03:00:00.000Z',
+        },
+      }))
+      return
+    }
+    if (method === 'POST' && url.pathname === '/api/automations/automation-visual-draft/test') {
+      res.writeHead(200).end(JSON.stringify({
+        success: true,
+        data: { runId: 'automation-visual-test', versionId: 'automation-visual-version', status: 'succeeded' },
+      }))
+      return
+    }
+    if (method === 'POST' && url.pathname === '/api/automation-drafts/automation-visual-draft/publish') {
+      res.writeHead(200).end(JSON.stringify({
+        success: true,
+        data: { id: 'automation-visual-draft', versionId: 'automation-visual-version', versionNumber: 1, status: 'active' },
+      }))
+      return
+    }
+    if (method === 'PATCH' && /^\/api\/mileage\/earning-rules\/[^/]+\/draft$/.test(url.pathname)) {
+      let raw = ''
+      req.on('data', (chunk) => { raw += chunk })
+      req.on('end', () => {
+        let body = {}
+        try { body = JSON.parse(raw || '{}') } catch { body = {} }
+        const ruleId = url.pathname.split('/')[4]
+        const version = Number.isInteger(body.expectedVersion) ? body.expectedVersion + 1 : 1
+        res.writeHead(200).end(JSON.stringify({
+          success: true,
+          data: {
+            ruleId,
+            lineAccountId: body.accountId ?? 'visual-qa-account',
+            version,
+            draft: body.draft ?? {},
+            updatedAt: '2026-09-07T03:31:00.000Z',
+          },
+        }))
+      })
+      return
+    }
+    if (method === 'POST' && url.pathname === '/api/media/upload-sessions') {
+      let raw = ''
+      req.on('data', (chunk) => { raw += chunk })
+      req.on('end', () => {
+        let body = {}
+        try { body = JSON.parse(raw || '{}') } catch { body = {} }
+        const files = Array.isArray(body.files) ? body.files : []
+        const sessions = files.map((file, index) => ({
+          id: `visual-upload-${index + 1}`,
+          filename: String(file.filename ?? `upload-${index + 1}`),
+          sizeBytes: Number(file.sizeBytes ?? 1),
+          targetMediaId: file.targetMediaId ?? null,
+          method: 'PUT',
+          uploadUrl: `http://${HOST}:${PORT}/api/media/upload-sessions/visual-upload-${index + 1}/blob`,
+          requiredHeaders: { 'Content-Type': String(file.mimeType ?? 'application/octet-stream') },
+          expiresAt: '2026-09-07T15:15:00.000Z',
+        }))
+        for (const session of sessions) {
+          // IDは申告順の連番で再利用されるため、最新の申告で上書きする。
+          if (session.targetMediaId) mediaUploadSessionTargets.set(session.id, session.targetMediaId)
+          else mediaUploadSessionTargets.delete(session.id)
+        }
+        res.writeHead(201).end(JSON.stringify({ success: true, data: { sessions } }))
+      })
+      return
+    }
+    if (method === 'PUT' && /^\/api\/media\/upload-sessions\/[^/]+\/blob$/.test(url.pathname)) {
+      res.setHeader('ETag', '"visual-qa-etag"')
+      res.writeHead(200).end()
+      return
+    }
+    if (method === 'POST' && /^\/api\/media\/upload-sessions\/[^/]+\/complete$/.test(url.pathname)) {
+      const uploadSessionId = url.pathname.split('/')[4]
+      const targetMediaId = mediaUploadSessionTargets.get(uploadSessionId) ?? null
+      // 差し替え用（版追加）の確定は、本番口と同じ `verified` を返す。
+      // 新規登録形のまま `completed` を返すと、詳細の版追加フローが検証不能になる。
+      if (targetMediaId) {
+        res.writeHead(200).end(JSON.stringify({ success: true, data: { uploadSessionId, status: 'verified', targetMediaId } }))
+        return
+      }
+      res.writeHead(200).end(JSON.stringify({ success: true, data: { uploadSessionId, status: 'completed', mediaId: 'media-uploaded-1', targetMediaId: null } }))
+      return
+    }
     if (url.pathname === '/api/client-errors') {
       res.writeHead(204).end()
       return
@@ -1380,6 +3332,342 @@ const server = createServer((req, res) => {
     // DB更新はせず、ほかのPOSTは従来どおり405にする。
     if (method === 'POST' && url.pathname === '/api/nen-campaigns/columns') {
       res.writeHead(NEN_COLUMN_CREATE.success.status).end(JSON.stringify(NEN_COLUMN_CREATE.success.body))
+      return
+    }
+    const nenDuplicate = /^\/api\/nen-campaigns\/columns\/[^/]+\/duplicate$/.test(url.pathname)
+    if (method === 'POST' && nenDuplicate) {
+      res.writeHead(201).end(JSON.stringify({ success: true, data: NEN_COLUMN_OPERATIONS.duplicate }))
+      return
+    }
+    const nenTestSend = /^\/api\/nen-campaigns\/columns\/[^/]+\/test-send$/.test(url.pathname)
+    if (method === 'POST' && nenTestSend) {
+      res.writeHead(200).end(JSON.stringify({ success: true }))
+      return
+    }
+    const nenReadEvent = /^\/api\/nen-campaigns\/columns\/[^/]+\/read-events$/.test(url.pathname)
+    if (method === 'POST' && nenReadEvent) {
+      res.writeHead(200).end(JSON.stringify({ success: true, data: NEN_COLUMN_OPERATIONS.readEvent }))
+      return
+    }
+    if (method === 'POST' && url.pathname === '/api/nen-campaigns/deliveries/pending-now') {
+      res.writeHead(200).end(JSON.stringify({ success: true, data: NEN_COLUMN_OPERATIONS.pendingNow }))
+      return
+    }
+    /*
+      タグCSVの下見と結果。保存はせず、受け取った行を固定規則で判定する。
+      空欄・長すぎる名前・制御文字・既存名・不明フォルダを同じ入力なら
+      毎回同じ結果にし、成功と一部失敗の両方を撮れるようにする。
+    */
+    if (method === 'POST' && (url.pathname === '/api/tags/import/preview' || url.pathname === '/api/tags/import')) {
+      let raw = ''
+      req.on('data', (chunk) => { raw += chunk })
+      req.on('end', () => {
+        let rows = TAG_IMPORT_SAMPLE_ROWS
+        try {
+          const parsed = JSON.parse(raw || '{}')
+          if (Array.isArray(parsed.rows) && parsed.rows.length > 0) rows = parsed.rows
+        } catch {
+          rows = TAG_IMPORT_SAMPLE_ROWS
+        }
+        const data = url.pathname.endsWith('/preview') ? tagImportPreview(rows) : tagImportResult(rows)
+        res.writeHead(200).end(JSON.stringify({ success: true, data }))
+      })
+      return
+    }
+    /*
+      共通情報を**変える前**の確認（`uNBlA`）。**POST だが保存はしない。**
+      長い本文を投げるために `POST` なので、ここで 405 を返すと
+      「口はあるのに画面が壊れている」ように見える絵が撮れてしまう。
+    */
+    if (method === 'POST' && /^\/api\/common-vars\/[^/]+\/impact-preview$/.test(url.pathname)) {
+      let raw = ''
+      req.on('data', (chunk) => { raw += chunk })
+      req.on('end', () => {
+        let nextValue = ''
+        try { nextValue = JSON.parse(raw || '{}').nextValue ?? '' } catch { nextValue = '' }
+        res.writeHead(200).end(JSON.stringify({
+          success: true,
+          data: commonVarChangeImpact(typeof nextValue === 'string' ? nextValue : ''),
+        }))
+      })
+      return
+    }
+    /*
+      共通情報の切り替え予約の登録と削除。モックは保存せず、
+      受け取った値をそのまま返して成功の絵が撮れるようにする。
+    */
+    if (method === 'POST' && /^\/api\/common-vars\/[^/]+\/schedules$/.test(url.pathname)) {
+      let raw = ''
+      req.on('data', (chunk) => { raw += chunk })
+      req.on('end', () => {
+        let body = {}
+        try { body = JSON.parse(raw || '{}') } catch { body = {} }
+        const varId = decodeURIComponent(url.pathname.split('/')[3] ?? '')
+        res.writeHead(201).end(JSON.stringify({
+          success: true,
+          data: {
+            id: 'common-var-schedule-new',
+            varId,
+            effectiveFrom: typeof body.effectiveFrom === 'string' ? body.effectiveFrom : '2026-10-01T10:00',
+            value: typeof body.value === 'string' ? body.value : '',
+            appliedAt: null,
+          },
+        }))
+      })
+      return
+    }
+    if (method === 'DELETE' && /^\/api\/common-vars\/[^/]+\/schedules\/[^/]+$/.test(url.pathname)) {
+      res.writeHead(200).end(JSON.stringify({ success: true, data: null }))
+      return
+    }
+    /*
+      共通情報の差し替え（PR #1131）。候補取得・影響確認・実行完了を
+      同じPOSTの入力で分けるが、モックは保存せず固定結果だけ返す。
+    */
+    if (method === 'POST' && url.pathname === `/api/common-vars/${COMMON_VAR_DETAIL.id}/replace`) {
+      let raw = ''
+      req.on('data', (chunk) => { raw += chunk })
+      req.on('end', () => {
+        let body = {}
+        try { body = JSON.parse(raw || '{}') } catch { body = {} }
+        const data = !body.replacementId
+          ? COMMON_VAR_REPLACEMENT_CANDIDATES
+          : body.apply === true
+            ? COMMON_VAR_REPLACEMENT_RESULT
+            : COMMON_VAR_REPLACEMENT_PREVIEW
+        res.writeHead(200).end(JSON.stringify({ success: true, data }))
+      })
+      return
+    }
+    /*
+      代理予約の登録完了と予約枠競合。**POSTだが保存も通知も起こさない。**
+      撮影手順の10:00だけ成功、14:00だけ競合にし、ほかの時刻を誤って
+      登録済みに見せない。本番と同じく成功は201、競合は409で返す。
+    */
+    if (method === 'POST' && url.pathname === '/api/booking/admin/bookings') {
+      let raw = ''
+      req.on('data', (chunk) => { raw += chunk })
+      req.on('end', () => {
+        let startsAt = ''
+        try {
+          const parsed = JSON.parse(raw || '{}')
+          startsAt = typeof parsed.starts_at === 'string' ? parsed.starts_at : ''
+        } catch {
+          startsAt = ''
+        }
+        const fixed = startsAt === '2026-09-03T01:00:00.000Z'
+          ? BOOKING_PROXY_CREATE.success
+          : startsAt === '2026-09-03T05:00:00.000Z'
+            ? BOOKING_PROXY_CREATE.conflict
+            : BOOKING_PROXY_CREATE.unavailable
+        res.writeHead(fixed.status).end(JSON.stringify(fixed.body))
+      })
+      return
+    }
+    /*
+      成果の締め・振込データ・明細（機能16）。本番と同じHTTP状態と器を返すが、
+      DB更新、ファイル生成、紹介者への通知は一切行わない。
+    */
+    if (method === 'POST' && url.pathname === '/api/affiliate-settlements') {
+      res.writeHead(201).end(JSON.stringify({ success: true, data: AFFILIATE_SETTLEMENT_CREATED }))
+      return
+    }
+    if (method === 'POST' && url.pathname === '/api/affiliate-payout-batches') {
+      res.writeHead(201).end(JSON.stringify({ success: true, data: AFFILIATE_PAYOUT_BATCH }))
+      return
+    }
+    if (method === 'POST' && url.pathname === '/api/affiliate-statements') {
+      res.writeHead(201).end(JSON.stringify({
+        success: true, data: AFFILIATE_STATEMENT, notificationAttempted: true,
+      }))
+      return
+    }
+    /*
+      写真審査の一括判断と派生画像処理。撮影用に本番と同じ受付結果を返すだけで、
+      審査・ポイント付与・画像生成・通知は一切実行しない。
+    */
+    if (method === 'POST' && url.pathname === '/api/nen-members/photos/decisions/bulk') {
+      res.writeHead(201).end(JSON.stringify({
+        success: true, duplicate: false, data: NEN_PHOTO_BULK_DECISION_RESULT,
+      }))
+      return
+    }
+    /*
+      機能22の原本保存。実物や秘密値は返さず、再認証と一回限りURLの
+      画面遷移だけを固定応答で確認する。000000 は失敗確認専用。
+    */
+    if (method === 'POST' && url.pathname === '/api/auth/step-up') {
+      let raw = ''
+      req.on('data', (chunk) => { raw += chunk })
+      req.on('end', () => {
+        let body = {}
+        try { body = JSON.parse(raw || '{}') } catch { body = {} }
+        if (body.purpose !== 'photo.original.download' || body.code === '000000') {
+          res.writeHead(400).end(JSON.stringify({ success: false, error: '再認証コードを確認してください。' }))
+          return
+        }
+        res.writeHead(201).end(JSON.stringify({
+          success: true,
+          data: {
+            token: 'visual-qa-photo-original-step-up',
+            purpose: 'photo.original.download',
+            expiresAt: '2026-09-07T03:10:00.000Z',
+          },
+        }))
+      })
+      return
+    }
+    const photoOriginalIssue = /^\/api\/nen-members\/photos\/([^/]+)\/original-download$/.exec(url.pathname)
+    if (method === 'POST' && photoOriginalIssue) {
+      if (req.headers['x-step-up-token'] !== 'visual-qa-photo-original-step-up') {
+        res.writeHead(428).end(JSON.stringify({ success: false, error: '原本の保存には再認証が必要です。' }))
+        return
+      }
+      res.writeHead(201).end(JSON.stringify({
+        success: true,
+        data: {
+          downloadUrl: '/api/nen-members/photos/original-download/visual-qa-once',
+          expiresAt: '2026-09-07T03:05:00.000Z',
+          oneTime: true,
+        },
+      }))
+      return
+    }
+    const photoAssetProcess = /^\/api\/nen-members\/photos\/([^/]+)\/assets\/process$/.exec(url.pathname)
+    if (method === 'POST' && photoAssetProcess) {
+      res.writeHead(202).end(JSON.stringify({
+        success: true,
+        duplicate: false,
+        data: { ...NEN_PHOTO_ASSET_PROCESS_RESULT, photoId: photoAssetProcess[1] },
+      }))
+      return
+    }
+    // 機能3の保存した検索。DBへは書かず、本番契約と同じ201と保存済みの器を返す。
+    if (method === 'POST' && url.pathname === '/api/friends/saved-views') {
+      res.writeHead(201).end(JSON.stringify({ success: true, data: FRIEND_SAVED_VIEWS.items[0] }))
+      return
+    }
+    // #518 中5: 目視 QA で確認窓・復旧フローが検証できるよう、停止・復旧・
+    // 手動チェックの POST に本物と同じ形の成功応答を返す(DBへは書かない)。
+    if (method === 'POST' && url.pathname === '/api/operations/health/runs') {
+      res.writeHead(200).end(JSON.stringify({ success: true, duplicate: false, data: OPERATION_HEALTH }))
+      return
+    }
+    if (method === 'POST' && url.pathname === '/api/operations/incidents') {
+      const incident = {
+        ...OPERATION_HISTORY[0],
+        id: 'operation-incident-manual',
+        status: 'resolved',
+        stoppedAt: '2026-08-25T12:00:00+09:00',
+        resolvedAt: null,
+        createdAt: '2026-08-25T12:00:00+09:00',
+        updatedAt: '2026-08-25T12:00:00+09:00',
+      }
+      res.writeHead(200).end(JSON.stringify({
+        success: true,
+        data: {
+          status: 'changed',
+          control: {
+            ...OPERATION_CONTROL_PREVIEW.control,
+            version: OPERATION_CONTROL_PREVIEW.control.version + 1,
+            activeIncidentId: incident.id,
+            reason: '障害対応',
+            actorId: '目視確認',
+            stoppedAt: incident.stoppedAt,
+            updatedAt: incident.stoppedAt,
+          },
+          incident,
+        },
+      }))
+      return
+    }
+    const operationRestore = /^\/api\/operations\/incidents\/([^/]+)\/restore$/.exec(url.pathname)
+    if (method === 'POST' && operationRestore) {
+      res.writeHead(200).end(JSON.stringify({
+        success: true,
+        data: {
+          status: 'changed',
+          control: OPERATION_CONTROL_PREVIEW.control,
+          incident: {
+            ...OPERATION_HISTORY[0],
+            id: operationRestore[1],
+            status: 'resolved',
+            resolvedAt: '2026-08-25T12:30:00+09:00',
+          },
+        },
+      }))
+      return
+    }
+    /*
+      リッチメニューの書き込み系 (#502中)。DBへは書かず、本番契約と同じ
+      HTTP状態と器を返す。編集・公開・予約・適用・削除の画面検証用。
+      409/400 の代表例つき (削除ブロック・冪等キーなし・順序の形違い)。
+    */
+    if (method === 'POST' && url.pathname === '/api/rich-menu-groups') {
+      res.writeHead(201).end(JSON.stringify({
+        success: true, data: { id: 'rmg-new', pages: [{ id: 'rmg-new-top' }] },
+      }))
+      return
+    }
+    if (method === 'POST' && url.pathname === '/api/rich-menu-groups/reorder-priorities') {
+      let raw = ''
+      req.on('data', (chunk) => { raw += chunk })
+      req.on('end', () => {
+        let body = {}
+        try { body = JSON.parse(raw || '{}') } catch { body = {} }
+        if (!Array.isArray(body.orderedIds)) {
+          res.writeHead(400).end(JSON.stringify({ success: false, error: 'orderedIds must be string array' }))
+          return
+        }
+        res.writeHead(200).end(JSON.stringify({ success: true, data: { updated: body.orderedIds.length } }))
+      })
+      return
+    }
+    const richMenuWriteGroup = /^\/api\/rich-menu-groups\/([^/]+)$/.exec(url.pathname)
+    if (method === 'PATCH' && richMenuWriteGroup) {
+      if (!RICH_MENU_GROUP_DETAILS[richMenuWriteGroup[1]]) {
+        res.writeHead(404).end(JSON.stringify({ success: false, error: 'not found' }))
+        return
+      }
+      res.writeHead(200).end(JSON.stringify({ success: true, data: { id: richMenuWriteGroup[1] } }))
+      return
+    }
+    if (method === 'DELETE' && richMenuWriteGroup) {
+      if (!RICH_MENU_GROUP_DETAILS[richMenuWriteGroup[1]]
+        && richMenuWriteGroup[1] !== 'rich-menu-target') {
+        res.writeHead(404).end(JSON.stringify({ success: false, error: 'not found' }))
+        return
+      }
+      if (richMenuWriteGroup[1] === 'rich-menu-target') {
+        res.writeHead(409).end(JSON.stringify({
+          success: false,
+          code: 'rich_menu_delete_blocked',
+          error: '削除する前に、公開状態と使われている場所を確認してください',
+          data: RICH_MENU_DELETE_IMPACT,
+        }))
+        return
+      }
+      res.writeHead(200).end(JSON.stringify({ success: true }))
+      return
+    }
+    const richMenuWriteAction = /^\/api\/rich-menu-groups\/([^/]+)\/(publish|unpublish|schedule|apply-to-tag)$/.exec(url.pathname)
+    if (method === 'POST' && richMenuWriteAction) {
+      const action = richMenuWriteAction[2]
+      if (action === 'schedule' || action === 'apply-to-tag') {
+        if (!req.headers['idempotency-key']) {
+          res.writeHead(400).end(JSON.stringify({ success: false, error: 'Idempotency-Key header required' }))
+          return
+        }
+      }
+      const payloads = {
+        publish: { pages: [] },
+        unpublish: { pages: [], warnings: [] },
+        schedule: { id: 'rms-visual-qa', status: 'scheduled' },
+        'apply-to-tag': { chunks: 1, total: 2, runId: 'visual-qa-run' },
+      }
+      res.writeHead(action === 'schedule' ? 201 : 200).end(
+        JSON.stringify({ success: true, data: payloads[action] }),
+      )
       return
     }
     const fixedResult = visualQaWriteBody(method, url.pathname)
@@ -1405,10 +3693,11 @@ const server = createServer((req, res) => {
   }
   const rawPattern = RAW_PATTERNS.find(([re]) => re.test(url.pathname))
   if (rawPattern) {
-    res.writeHead(200).end(JSON.stringify(rawPattern[1]))
+    const fixed = typeof rawPattern[1] === 'function' ? rawPattern[1](url) : rawPattern[1]
+    res.writeHead(200).end(JSON.stringify(fixed))
     return
   }
-  res.writeHead(200).end(JSON.stringify(bodyFor(url.pathname, url.searchParams)))
+  res.writeHead(200).end(JSON.stringify(bodyFor(method, url.pathname, url.searchParams)))
 })
 
 /*

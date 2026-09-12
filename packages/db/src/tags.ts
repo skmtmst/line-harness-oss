@@ -1,9 +1,21 @@
 import { jstNow } from './utils.js';
 import { enqueueMileageEvent } from './mileage.js';
+import { recordConversionSourceEvent } from './conversion-event-sources.js';
 export interface Tag {
   id: string;
   name: string;
   color: string;
+  line_account_id: string | null;
+  description: string | null;
+  normalized_name: string | null;
+  manual_assignment_allowed: number;
+  reapply_policy: 'first_only' | 'every_time';
+  linked_enabled: number;
+  status: 'active' | 'archived';
+  version: number;
+  created_by: string | null;
+  updated_by: string | null;
+  updated_at: string | null;
   /**
    * @deprecated 099 で folders へ移送済み。folder_id を見ること。
    * 追加のみポリシーで列を落とせないため残っているだけで、読み書きしない。
@@ -40,6 +52,8 @@ export interface Tag {
  */
 export interface TagGroup {
   id: string;
+  /** この分類を所有するLINE公式アカウント。旧データだけ null。 */
+  account_id: string | null;
   name: string;
   sort_order: number;
   /** #RRGGBB。未設定は null。115 で folders.color を足した。 */
@@ -199,6 +213,43 @@ export function normalizeTagNameForCleanup(name: string): string {
     .trim()
     .replace(/\s+/gu, ' ')
     .toLocaleLowerCase('ja-JP');
+}
+
+/** Find an equal comparison name, including rows created before normalized_name. */
+export async function findTagByNormalizedName(
+  db: D1Database,
+  name: string,
+  lineAccountId: string | null,
+  excludeId?: string,
+): Promise<Tag | null> {
+  const normalizedName = normalizeTagNameForCleanup(name);
+  const rows = await db.prepare(
+    `SELECT * FROM tags
+      WHERE line_account_id IS ?
+        AND (normalized_name = ? OR normalized_name IS NULL)
+      ORDER BY id`,
+  ).bind(lineAccountId, normalizedName).all<Tag>();
+  return (rows.results ?? []).find((row) =>
+    row.id !== excludeId
+    && (row.normalized_name === normalizedName
+      || (row.normalized_name === null
+        && normalizeTagNameForCleanup(row.name) === normalizedName))) ?? null;
+}
+
+function tagNameConflict(): Error {
+  // Existing route contracts map SQLite UNIQUE errors to HTTP 409.
+  return new Error('UNIQUE constraint failed: tags normalized name');
+}
+
+export async function assertTagNameAvailable(
+  db: D1Database,
+  name: string,
+  lineAccountId: string | null,
+  excludeId?: string,
+): Promise<void> {
+  if (await findTagByNormalizedName(db, name, lineAccountId, excludeId)) {
+    throw tagNameConflict();
+  }
 }
 
 export async function getTagsWithCounts(
@@ -717,9 +768,9 @@ export interface CreateTagsBulkResult {
   tagId?: string;
 }
 
-// D1 は1文につき100個までしか値を束縛できない。このINSERTは1行4個なので、
-// 25行でちょうど100個。500行でも20文に収まり、無料枠の1実行50クエリを超えない。
-const TAGS_PER_BULK_INSERT = 25;
+// D1 は1文100バインドまで。正規化名を含む1行5個×20行、500行25文で
+// 無料枠の1実行50クエリ内に収める。旧APIの作成先は未所属(global)のまま。
+const TAGS_PER_BULK_INSERT = 20;
 
 export async function createTag(
   db: D1Database,
@@ -729,13 +780,15 @@ export async function createTag(
   const now = jstNow();
   const color = input.color ?? '#3B82F6';
 
+  await assertTagNameAvailable(db, input.name, null);
+
   await db
     .prepare(
       // group_id は書かない。folders が正で、group_id は移送前の名残。
-      `INSERT INTO tags (id, name, color, folder_id, created_at)
-       VALUES (?, ?, ?, ?, ?)`,
+      `INSERT INTO tags (id, name, color, folder_id, created_at, line_account_id, normalized_name)
+       VALUES (?, ?, ?, ?, ?, NULL, ?)`,
     )
-    .bind(id, input.name, color, input.groupId ?? null, now)
+    .bind(id, input.name, color, input.groupId ?? null, now, normalizeTagNameForCleanup(input.name))
     .run();
 
   return (await db
@@ -744,13 +797,30 @@ export async function createTag(
     .first<Tag>())!;
 }
 
+export async function findOrCreateGlobalTag(
+  db: D1Database,
+  input: CreateTagInput,
+): Promise<Tag> {
+  const existing = await findTagByNormalizedName(db, input.name, null);
+  if (existing) return existing;
+  try {
+    return await createTag(db, input);
+  } catch (error) {
+    // The normalized unique index serializes concurrent writers. Recover the
+    // winner so webhook retries attach the already-created tag.
+    const concurrent = await findTagByNormalizedName(db, input.name, null);
+    if (concurrent) return concurrent;
+    throw error;
+  }
+}
+
 /**
  * CSVからのタグ登録を、D1の1実行あたりのクエリ上限内でまとめて書く。
  *
  * - idを先に作り、RETURNINGで実際に入った行だけを判別する。
  * - 同名が先に作られた行はINSERT OR IGNOREで見送りにする。
  * - 確認後にフォルダが消えた場合は、外部キー違反にせず未分類で登録する。
- * - 1文が失敗しても、ほかの25行単位の文は続ける。
+ * - 1文が失敗しても、ほかの20行単位の文は続ける。
  */
 export async function createTagsBulk(
   db: D1Database,
@@ -761,6 +831,13 @@ export async function createTagsBulk(
     () => ({ status: 'failed' }),
   );
   const now = jstNow();
+  const legacyNullNames = new Set(
+    ((await db.prepare(
+      `SELECT name FROM tags
+        WHERE line_account_id IS NULL AND normalized_name IS NULL`,
+    ).all<{ name: string }>()).results ?? [])
+      .map((row) => normalizeTagNameForCleanup(row.name)),
+  );
 
   for (let offset = 0; offset < inputs.length; offset += TAGS_PER_BULK_INSERT) {
     const chunk = inputs.slice(offset, offset + TAGS_PER_BULK_INSERT);
@@ -768,16 +845,25 @@ export async function createTagsBulk(
       id: crypto.randomUUID(),
       name: input.name,
       groupId: input.groupId ?? null,
+      normalizedName: normalizeTagNameForCleanup(input.name),
     }));
-    const values = prepared
-      .map(() => "(?, ?, '#3B82F6', (SELECT id FROM folders WHERE kind = 'tag' AND id = ?), ?)")
+    const insertable = prepared.filter((row, index) => {
+      if (legacyNullNames.has(row.normalizedName)) {
+        results[offset + index] = { status: 'skipped' };
+        return false;
+      }
+      return true;
+    });
+    if (insertable.length === 0) continue;
+    const values = insertable
+      .map(() => "(?, ?, '#3B82F6', (SELECT id FROM folders WHERE kind = 'tag' AND id = ?), ?, NULL, ?)")
       .join(', ');
-    const binds = prepared.flatMap((row) => [row.id, row.name, row.groupId, now]);
+    const binds = insertable.flatMap((row) => [row.id, row.name, row.groupId, now, row.normalizedName]);
 
     try {
       const inserted = await db
         .prepare(
-          `INSERT OR IGNORE INTO tags (id, name, color, folder_id, created_at)
+          `INSERT OR IGNORE INTO tags (id, name, color, folder_id, created_at, line_account_id, normalized_name)
            VALUES ${values}
            RETURNING id`,
         )
@@ -785,13 +871,15 @@ export async function createTagsBulk(
         .run<{ id: string }>();
       const insertedIds = new Set((inserted.results ?? []).map((row) => row.id));
       prepared.forEach((row, index) => {
+        if (legacyNullNames.has(row.normalizedName)) return;
         results[offset + index] = insertedIds.has(row.id)
           ? { status: 'created', tagId: row.id }
           : { status: 'skipped' };
       });
     } catch (error) {
       console.error(`createTagsBulk rows ${offset + 1}-${offset + chunk.length} error:`, error);
-      prepared.forEach((_row, index) => {
+      prepared.forEach((row, index) => {
+        if (legacyNullNames.has(row.normalizedName)) return;
         results[offset + index] = { status: 'failed' };
       });
     }
@@ -811,10 +899,12 @@ export async function assignTagToGroup(
   id: string,
   groupId: string | null,
 ): Promise<Tag | null> {
-  await db
-    .prepare(`UPDATE tags SET folder_id = ? WHERE id = ?`)
-    .bind(groupId, id)
+  const result = await db
+    .prepare(`UPDATE tags SET folder_id = ?, updated_at = ?, version = version + 1 WHERE id = ?
+      AND (? IS NULL OR EXISTS (SELECT 1 FROM folders f WHERE f.id = ? AND f.kind = 'tag' AND f.account_id IS tags.line_account_id))`)
+    .bind(groupId, jstNow(), id, groupId, groupId)
     .run();
+  if (Number(result.meta?.changes ?? 0) !== 1) return null;
   return (
     (await db.prepare(`SELECT * FROM tags WHERE id = ?`).bind(id).first<Tag>()) ??
     null
@@ -837,11 +927,14 @@ export async function updateTag(
   id: string,
   input: { name?: string; color?: string; isStarred?: boolean },
 ): Promise<Tag | null> {
+  const current = await db.prepare(`SELECT * FROM tags WHERE id = ?`).bind(id).first<Tag>();
+  if (!current) return null;
   const sets: string[] = [];
   const binds: unknown[] = [];
   if (input.name !== undefined) {
-    sets.push('name = ?');
-    binds.push(input.name);
+    await assertTagNameAvailable(db, input.name, current.line_account_id ?? null, id);
+    sets.push('name = ?', 'normalized_name = ?');
+    binds.push(input.name, normalizeTagNameForCleanup(input.name));
   }
   if (input.color !== undefined) {
     sets.push('color = ?');
@@ -852,6 +945,8 @@ export async function updateTag(
     binds.push(input.isStarred ? 1 : 0);
   }
   if (sets.length > 0) {
+    sets.push('version = version + 1', 'updated_at = ?');
+    binds.push(jstNow());
     await db
       .prepare(`UPDATE tags SET ${sets.join(', ')} WHERE id = ?`)
       .bind(...binds, id)
@@ -872,17 +967,21 @@ export async function updateTag(
  * 現在占めている位置だけを入れ替え、指定されていないタグはその場に残す。
  * 最後に全体へ一意の順番を振るので、部分的な並び替えでも順番が重複しない。
  */
-export async function reorderTags(db: D1Database, ids: string[]): Promise<void> {
+export async function reorderTags(db: D1Database, ids: string[], scope?: { allowedAccountIds: string[]; canSeeUnassigned: boolean }): Promise<void> {
   if (ids.length < 2) return;
 
+  const allowed = scope?.allowedAccountIds ?? [];
+  const where = scope ? `WHERE (${allowed.length ? `t.line_account_id IN (${allowed.map(() => '?').join(',')})` : '0'} OR ${scope.canSeeUnassigned ? 't.line_account_id IS NULL' : '0'})` : '';
   const current = await db
     .prepare(
       `SELECT t.id
          FROM tags t
          LEFT JOIN friend_tags ft ON ft.tag_id = t.id
+        ${where}
         GROUP BY t.id
         ORDER BY t.display_order ASC, COUNT(ft.friend_id) DESC, t.name ASC`,
     )
+    .bind(...allowed)
     .all<{ id: string }>();
 
   const existing = new Set(current.results.map((tag) => tag.id));
@@ -911,33 +1010,37 @@ export async function deleteTag(db: D1Database, id: string): Promise<void> {
 // 「お悩み」「ペット」のような分類でタグをまとめる。分類は入れ子にしない。
 // 二段で足りることが分かっているし、階層を許すと画面もクエリも一気に複雑になる。
 
-export async function getTagGroups(db: D1Database): Promise<TagGroup[]> {
+export async function getTagGroups(db: D1Database, scope?: { allowedAccountIds: string[]; canSeeUnassigned: boolean }): Promise<TagGroup[]> {
+  const ids = scope?.allowedAccountIds ?? [];
+  const own = ids.length ? `account_id IN (${ids.map(() => "?").join(",")})` : "0";
+  const condition = `(${own} OR ${scope?.canSeeUnassigned !== false ? "account_id IS NULL" : "0"})`;
   const result = await db
     .prepare(
-      `SELECT id, name, display_order AS sort_order, color, created_at, updated_at
-         FROM folders WHERE kind = 'tag'
+      `SELECT id, account_id, name, display_order AS sort_order, color, created_at, updated_at
+         FROM folders WHERE kind = 'tag' AND ${condition}
         ORDER BY display_order ASC, name ASC`,
     )
+    .bind(...ids)
     .all<TagGroup>();
   return result.results;
 }
 
 export async function createTagGroup(
   db: D1Database,
-  input: { name: string; sortOrder?: number; color?: string | null },
+  input: { name: string; sortOrder?: number; color?: string | null; accountId?: string | null },
 ): Promise<TagGroup> {
   const id = crypto.randomUUID();
   const now = jstNow();
   await db
     .prepare(
-      `INSERT INTO folders (id, kind, name, display_order, color, created_at, updated_at)
-       VALUES (?, 'tag', ?, ?, ?, ?, ?)`,
+      `INSERT INTO folders (id, kind, name, display_order, color, account_id, created_at, updated_at)
+       VALUES (?, 'tag', ?, ?, ?, ?, ?, ?)`,
     )
-    .bind(id, input.name, input.sortOrder ?? 0, input.color ?? null, now, now)
+    .bind(id, input.name, input.sortOrder ?? 0, input.color ?? null, input.accountId ?? null, now, now)
     .run();
   return (await db
     .prepare(
-      `SELECT id, name, display_order AS sort_order, color, created_at, updated_at
+      `SELECT id, account_id, name, display_order AS sort_order, color, created_at, updated_at
          FROM folders WHERE id = ?`,
     )
     .bind(id)
@@ -974,7 +1077,7 @@ export async function updateTagGroup(
   return (
     (await db
       .prepare(
-        `SELECT id, name, display_order AS sort_order, color, created_at, updated_at
+        `SELECT id, account_id, name, display_order AS sort_order, color, created_at, updated_at
            FROM folders WHERE id = ? AND kind = 'tag'`,
       )
       .bind(id)
@@ -993,6 +1096,25 @@ export async function deleteTagGroup(db: D1Database, id: string): Promise<void> 
   await db.prepare(`DELETE FROM folders WHERE id = ? AND kind = 'tag'`).bind(id).run();
 }
 
+/**
+ * 友だちにタグを1本付ける。新しく付いたときだけ副作用を起こす。
+ *
+ * **この関数を通らない付け方が2つある(#648)。**どちらも `friend_tags` へ直に
+ * INSERT していて、マイルも成果計測も通らない。
+ *
+ *  - `packages/db/src/tag-definitions.ts` のタグ廃止時の置き換え
+ *  - `apps/worker/src/services/nen-column-operations.ts` のコラム読了タグ
+ *
+ * **タグ廃止の置き換えは、通してはいけない。**あれは「そのタグが付いている
+ * 全員へ、置き換え先のタグを一斉に付ける」処理で、成果として数えると
+ * **運用者がタグを1本片づけただけで成果が何百件も一気に増える。**業務の
+ * 出来事ではなく、台帳の引っ越しだからである。将来この箇所をここ経由へ
+ * 書き換えるときは、成果計測を迂回する道を先に用意すること。
+ *
+ * コラム読了タグの方は「本来数えるべき」に見えるが、ここ経由にすると
+ * 成果計測と同時にマイル加算も始まり、利用者の残高が変わる。その扱いは
+ * この票の外なので別票で決める(司令塔裁定 2026-09-12)。
+ */
 export async function addTagToFriend(
   db: D1Database,
   friendId: string,
@@ -1020,6 +1142,28 @@ export async function addTagToFriend(
       });
     } catch (error) {
       console.error('tag mileage enqueue failed:', error);
+    }
+    // 「タグが付いた」を成果として数える(#648)。
+    //
+    // マイルの隣に置くのは、**呼び出し元を1つも触らずに全経路へ届かせる**ため。
+    // 以前はこの計測を worker の attachTagAndFireSideEffects の中だけに置いて
+    // いたので、友だち詳細画面の手動タグ付け・オートメーションのタグ付け
+    // アクション(どちらもこの関数を直に呼ぶ)では 0 件のままだった。
+    // 画面の起点一覧は「タグが付いた」としか書いておらず、誰が付けたかで
+    // 数えたり数えなかったりする境界は運用者に説明できない。
+    //
+    // 冪等キーは付与時刻を含む。同じ(友だち,タグ)の2回目は上の
+    // INSERT OR IGNORE が 0 行になり added=false なので、ここへ来ない。
+    // 失敗しても握って進む。タグ付与そのものを巻き添えにしない。
+    try {
+      await recordConversionSourceEvent(db, {
+        sourceType: 'tag_added',
+        friendId,
+        sourceEventId: `${friendId}:${tagId}:${now}`,
+        metadata: { tagId },
+      });
+    } catch (error) {
+      console.error('tag conversion record failed:', error);
     }
   }
   return added;

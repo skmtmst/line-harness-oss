@@ -24,6 +24,18 @@ interface AccountHealthLog {
   createdAt: string
 }
 
+type AccountHealthState = AccountHealthLog['riskLevel'] | 'unknown' | 'error'
+
+interface AccountHealthSnapshot {
+  state: AccountHealthState
+  logs: AccountHealthLog[]
+}
+
+interface AccountHealthResponse {
+  success: boolean
+  data?: unknown
+}
+
 interface AccountMigration {
   id: string
   fromAccountId: string
@@ -35,10 +47,49 @@ interface AccountMigration {
   completedAt: string | null
 }
 
+type MigrationLoadState = 'loading' | 'ready' | 'error'
+
 const riskConfig = {
   normal: { label: '正常', color: 'bg-green-500', textColor: 'text-green-700', bgColor: 'bg-green-100' },
   warning: { label: '警告', color: 'bg-yellow-500', textColor: 'text-yellow-700', bgColor: 'bg-yellow-100' },
   danger: { label: '危険', color: 'bg-red-500', textColor: 'text-red-700', bgColor: 'bg-red-100' },
+  unknown: { label: '未確認', color: 'bg-ink-faint', textColor: 'text-ink-faint', bgColor: 'bg-canvas-sunken' },
+  error: { label: '取得失敗', color: 'bg-danger', textColor: 'text-danger', bgColor: 'bg-danger-bg' },
+} satisfies Record<AccountHealthState, { label: string; color: string; textColor: string; bgColor: string }>
+
+function isRiskLevel(value: unknown): value is AccountHealthLog['riskLevel'] {
+  return value === 'normal' || value === 'warning' || value === 'danger'
+}
+
+function resolveAccountHealth(response: AccountHealthResponse): AccountHealthSnapshot {
+  if (!response.success) return { state: 'error', logs: [] }
+
+  const payload = response.data && typeof response.data === 'object'
+    ? response.data as { riskLevel?: unknown; logs?: unknown }
+    : {}
+  const logs = Array.isArray(payload.logs) ? payload.logs as AccountHealthLog[] : []
+  const state = isRiskLevel(payload.riskLevel)
+    ? payload.riskLevel
+    : isRiskLevel(logs[0]?.riskLevel)
+      ? logs[0].riskLevel
+      : 'unknown'
+
+  return { state, logs }
+}
+
+async function loadAccountHealthStates(
+  accountIds: string[],
+  getHealth: (accountId: string) => Promise<AccountHealthResponse>,
+): Promise<Record<string, AccountHealthSnapshot>> {
+  const entries = await Promise.all(accountIds.map(async (accountId) => {
+    try {
+      return [accountId, resolveAccountHealth(await getHealth(accountId))] as const
+    } catch {
+      return [accountId, { state: 'error', logs: [] }] as const
+    }
+  }))
+
+  return Object.fromEntries(entries)
 }
 
 const statusConfig: Record<AccountMigration['status'], { label: string; textColor: string; bgColor: string }> = {
@@ -52,14 +103,16 @@ export default function HealthPage() {
   usePageTitle('BAN検知ダッシュボード')
   const [accounts, setAccounts] = useState<LineAccount[]>([])
   const [healthLogs, setHealthLogs] = useState<Record<string, AccountHealthLog[]>>({})
-  const [latestRisk, setLatestRisk] = useState<Record<string, AccountHealthLog['riskLevel']>>({})
+  const [latestRisk, setLatestRisk] = useState<Record<string, AccountHealthState>>({})
   const [migrations, setMigrations] = useState<AccountMigration[]>([])
+  const [migrationLoadState, setMigrationLoadState] = useState<MigrationLoadState>('loading')
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [migrateFrom, setMigrateFrom] = useState<string | null>(null)
   const [migrateToId, setMigrateToId] = useState('')
   const [migrating, setMigrating] = useState(false)
+  const [retryingHealthIds, setRetryingHealthIds] = useState<Set<string>>(new Set())
 
   const loadAccounts = useCallback(async () => {
     setLoading(true)
@@ -69,28 +122,16 @@ export default function HealthPage() {
       if (res.success) {
         const data = res.data as unknown as LineAccount[]
         setAccounts(data)
-        // Load health for each account
-        const risks: Record<string, AccountHealthLog['riskLevel']> = {}
-        for (const account of data) {
-          try {
-            const healthRes = await api.health.getHealth(account.id)
-            if (healthRes.success) {
-              const payload = healthRes.data as unknown as { lineAccountId: string; riskLevel: string; logs: AccountHealthLog[] }
-              const logs = payload.logs ?? []
-              setHealthLogs((prev) => ({ ...prev, [account.id]: logs }))
-              if (payload.riskLevel) {
-                risks[account.id] = payload.riskLevel as AccountHealthLog['riskLevel']
-              } else if (logs.length > 0) {
-                risks[account.id] = logs[0].riskLevel
-              } else {
-                risks[account.id] = 'normal'
-              }
-            }
-          } catch {
-            risks[account.id] = 'normal'
-          }
-        }
-        setLatestRisk(risks)
+        const snapshots = await loadAccountHealthStates(
+          data.map((account) => account.id),
+          (accountId) => api.health.getHealth(accountId),
+        )
+        setHealthLogs(Object.fromEntries(
+          Object.entries(snapshots).map(([accountId, snapshot]) => [accountId, snapshot.logs]),
+        ))
+        setLatestRisk(Object.fromEntries(
+          Object.entries(snapshots).map(([accountId, snapshot]) => [accountId, snapshot.state]),
+        ))
       } else {
         setError('アカウント情報の取得に失敗しました')
       }
@@ -101,14 +142,34 @@ export default function HealthPage() {
     }
   }, [])
 
+  const retryAccountHealth = useCallback(async (accountId: string) => {
+    setRetryingHealthIds((current) => new Set(current).add(accountId))
+    const snapshots = await loadAccountHealthStates(
+      [accountId],
+      (id) => api.health.getHealth(id),
+    )
+    const snapshot = snapshots[accountId]
+    setHealthLogs((current) => ({ ...current, [accountId]: snapshot.logs }))
+    setLatestRisk((current) => ({ ...current, [accountId]: snapshot.state }))
+    setRetryingHealthIds((current) => {
+      const next = new Set(current)
+      next.delete(accountId)
+      return next
+    })
+  }, [])
+
   const loadMigrations = useCallback(async () => {
+    setMigrationLoadState('loading')
     try {
       const res = await api.health.migrations()
-      if (res.success) {
-        setMigrations(res.data as unknown as AccountMigration[])
+      if (res.success && Array.isArray(res.data)) {
+        setMigrations(res.data as AccountMigration[])
+        setMigrationLoadState('ready')
+      } else {
+        setMigrationLoadState('error')
       }
     } catch {
-      // Non-blocking
+      setMigrationLoadState('error')
     }
   }, [])
 
@@ -167,10 +228,11 @@ export default function HealthPage() {
           {/* Account Health Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
             {accounts.map((account) => {
-              const risk = latestRisk[account.id] || 'normal'
+              const risk = latestRisk[account.id] ?? 'unknown'
               const config = riskConfig[risk]
               const isExpanded = expandedId === account.id
               const logs = healthLogs[account.id] || []
+              const healthUnavailable = risk === 'unknown' || risk === 'error'
 
               return (
                 <div key={account.id} className="bg-white rounded-lg border border-gray-200 overflow-hidden">
@@ -192,7 +254,7 @@ export default function HealthPage() {
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full ${config.bgColor} ${config.textColor}`}>
+                        <span className={`inline-flex items-center gap-1.5 whitespace-nowrap text-xs font-medium px-2.5 py-1 rounded-full ${config.bgColor} ${config.textColor}`}>
                           <span className={`w-2 h-2 rounded-full ${config.color} ${risk === 'danger' ? 'animate-pulse' : ''}`} />
                           {config.label}
                         </span>
@@ -211,6 +273,24 @@ export default function HealthPage() {
                   {/* Expanded: Health Logs */}
                   {isExpanded && (
                     <div className="border-t border-gray-200 p-4">
+                      {healthUnavailable && (
+                        <div className="border-hairline bg-canvas-sunken text-ink-secondary mb-3 rounded-lg border p-3 text-sm">
+                          <p>
+                            {risk === 'error'
+                              ? 'ヘルス情報を取得できませんでした。'
+                              : 'まだ確認結果がありません。'}
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => void retryAccountHealth(account.id)}
+                            disabled={retryingHealthIds.has(account.id)}
+                            className="text-action mt-2 text-sm font-medium underline underline-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            {retryingHealthIds.has(account.id) ? '再取得中...' : '再試行'}
+                          </button>
+                        </div>
+                      )}
+
                       {risk === 'danger' && (
                         <div className="mb-3">
                           <button
@@ -225,18 +305,16 @@ export default function HealthPage() {
                         </div>
                       )}
 
-                      {logs.length === 0 ? (
-                        <p className="text-sm text-gray-400 text-center py-4">ヘルスログがありません</p>
-                      ) : (
+                      {logs.length > 0 ? (
                         <div className="overflow-x-auto">
                           <table className="w-full text-sm">
                             <thead>
                               <tr className="text-left text-xs text-gray-500 border-b border-gray-100">
-                                <th className="pb-2 pr-3 font-medium">エラーコード</th>
-                                <th className="pb-2 pr-3 font-medium">エラー数</th>
-                                <th className="pb-2 pr-3 font-medium">チェック期間</th>
-                                <th className="pb-2 pr-3 font-medium">リスク</th>
-                                <th className="pb-2 font-medium">日時</th>
+                                <th className="px-4 py-3 font-medium">エラーコード</th>
+                                <th className="px-4 py-3 font-medium">エラー数</th>
+                                <th className="px-4 py-3 font-medium">チェック期間</th>
+                                <th className="px-4 py-3 font-medium">リスク</th>
+                                <th className="px-4 py-3 font-medium">日時</th>
                               </tr>
                             </thead>
                             <tbody>
@@ -264,7 +342,9 @@ export default function HealthPage() {
                             </tbody>
                           </table>
                         </div>
-                      )}
+                      ) : !healthUnavailable ? (
+                        <p className="text-sm text-gray-400 text-center py-4">ヘルスログがありません</p>
+                      ) : null}
                     </div>
                   )}
                 </div>
@@ -325,7 +405,22 @@ export default function HealthPage() {
           {/* Migrations Table */}
           <div>
             <h2 className="text-lg font-bold text-gray-900 mb-4">移行履歴</h2>
-            {migrations.length === 0 ? (
+            {migrationLoadState === 'loading' ? (
+              <div className="border-hairline bg-canvas text-ink-faint rounded-lg border p-8 text-center">
+                移行履歴を読み込んでいます...
+              </div>
+            ) : migrationLoadState === 'error' ? (
+              <div className="border-danger bg-danger-bg text-danger rounded-lg border p-8 text-center">
+                <p>移行履歴を取得できませんでした。</p>
+                <button
+                  type="button"
+                  onClick={() => void loadMigrations()}
+                  className="text-action mt-3 text-sm font-medium underline underline-offset-2"
+                >
+                  再読み込み
+                </button>
+              </div>
+            ) : migrations.length === 0 ? (
               <div className="bg-white rounded-lg border border-gray-200 p-8 text-center text-gray-400">
                 移行履歴はありません
               </div>

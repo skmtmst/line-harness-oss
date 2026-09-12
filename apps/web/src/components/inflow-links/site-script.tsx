@@ -2,321 +2,244 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { api } from '@/lib/api'
-import KpiCard from '@/components/dashboard/kpi-card'
+import { useAccount } from '@/contexts/account-context'
+import Button from '@/components/shared/button'
+import ListState from '@/components/shared/list-state'
+import { TableHeadRow, Th } from '@/components/shared/table'
 
-/**
- * サイトスクリプトの案内と、直近の閲覧数。
- *
- * 貼るコードをそのまま出す。手順を文章で説明するより、
- * コピーできる1行がある方が確実に伝わる。
- */
+type PageRow = { host: string | null; path: string; views: number; visitors: number }
+type TrackingSummary = {
+  todayEvents: number
+  todayPageViews: number
+  linkedEvents: number
+  unlinkedEvents: number
+  pathCount: number
+  eventTypeCount: number
+  lastEventAt: string | null
+}
+
 export default function SiteScript() {
-  const [pages, setPages] = useState<Array<{ path: string; views: number; visitors: number }>>([])
+  const { selectedAccountId } = useAccount()
+  const [pages, setPages] = useState<PageRow[]>([])
+  const [summary, setSummary] = useState<TrackingSummary | null>(null)
   const [loading, setLoading] = useState(true)
+  const [failed, setFailed] = useState(false)
   const [copied, setCopied] = useState(false)
-
-  // NEXT_PUBLIC_API_URL はビルド時に埋まる。Worker のURLがそのまま入る。
+  const [copyFailed, setCopyFailed] = useState(false)
+  // アカウント別の計測鍵。取れるまで・取れないときはコードを出さない
+  // (固定の鍵を出すと他アカウントの計測が混ざる)。
+  const [trackingKey, setTrackingKey] = useState<string | null>(null)
+  const [keyLoading, setKeyLoading] = useState(true)
+  const [keyAttempt, setKeyAttempt] = useState(0)
   const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? ''
-  const snippet = `<script src="${apiUrl}/api/site/script.js" async></script>`
-
-  const [summary, setSummary] = useState<{
-    todayEvents: number
-    todayPageViews: number
-    linkedEvents: number
-    unlinkedEvents: number
-    pathCount: number
-    eventTypeCount: number
-    lastEventAt: string | null
-  } | null>(null)
+  const snippet = trackingKey
+    ? `<script async src="${apiUrl}/api/site/script.js" data-key="${trackingKey}"></script>`
+    : null
 
   const load = useCallback(async () => {
     setLoading(true)
-    try {
-      const [pagesRes, sumRes] = await Promise.allSettled([
-        api.siteTracking.pages(),
-        api.siteTracking.summary(),
-      ])
-      if (pagesRes.status === 'fulfilled' && pagesRes.value.success) setPages(pagesRes.value.data)
-      if (sumRes.status === 'fulfilled' && sumRes.value.success) setSummary(sumRes.value.data)
-    } catch {
-      // 記録がまだ無い場合もある。表の空欄で伝わる。
-    } finally {
-      setLoading(false)
+    setFailed(false)
+    const [pagesResult, summaryResult] = await Promise.allSettled([
+      api.siteTracking.pages({ accountId: selectedAccountId ?? undefined }),
+      api.siteTracking.summary(selectedAccountId ?? undefined),
+    ])
+    if (pagesResult.status === 'fulfilled' && pagesResult.value.success) {
+      setPages(pagesResult.value.data)
     }
-  }, [])
+    if (summaryResult.status === 'fulfilled' && summaryResult.value.success) {
+      setSummary(summaryResult.value.data)
+    }
+    if (pagesResult.status === 'rejected' && summaryResult.status === 'rejected') {
+      setFailed(true)
+    }
+    setLoading(false)
+  }, [selectedAccountId])
 
   useEffect(() => {
     void load()
   }, [load])
 
+  // 選択中アカウントの計測鍵を取る。未選択のときは口に省いて送り、
+  // 可視アカウントが1つだけなら向こうで補う。複数ある・失敗のときは
+  // コードを出さず案内にする。
+  useEffect(() => {
+    let cancelled = false
+    setKeyLoading(true)
+    void api.siteTracking
+      .trackingKey(selectedAccountId ?? undefined)
+      .then((res) => {
+        if (cancelled) return
+        setTrackingKey(res.success && res.data.trackingKey ? res.data.trackingKey : null)
+      })
+      .catch(() => {
+        if (cancelled) return
+        setTrackingKey(null)
+      })
+      .finally(() => {
+        if (!cancelled) setKeyLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [selectedAccountId, keyAttempt])
+
   const copy = async () => {
+    if (!snippet) return
     try {
       await navigator.clipboard.writeText(snippet)
       setCopied(true)
+      setCopyFailed(false)
       setTimeout(() => setCopied(false), 2000)
     } catch {
-      // クリップボードが使えない環境もある。コードは画面に出ている。
+      setCopyFailed(true)
     }
   }
 
-  const linkedRate =
-    summary && summary.linkedEvents + summary.unlinkedEvents > 0
-      ? Math.round(
-          (summary.linkedEvents / (summary.linkedEvents + summary.unlinkedEvents)) * 1000,
-        ) / 10
-      : null
-
-  // 「設置できているか」は設定を見ても分からない。最後にいつ受け取ったかで判断する。
   const receiving = summary?.lastEventAt != null
   const lastSeen = summary?.lastEventAt
-    ? `${summary.lastEventAt.slice(0, 10)} ${summary.lastEventAt.slice(11, 16)}`
+    ? summary.lastEventAt.slice(0, 16).replace('T', ' ').replaceAll('-', '/')
     : null
 
   return (
-    <div>
-      <p className="text-ink-faint mb-4 text-xs leading-relaxed">
-        自社サイトにコードを埋め込むと、サイト上の行動をLINEの友だちに結びつけて記録できます。「商品ページを見たが買わなかった人」への配信ができるようになります。
+    <div className="space-y-4" data-design-node="IhSBB">
+      <p className="rounded-card bg-info-bg px-4 py-3 text-xs leading-relaxed text-ink-secondary">
+        見ているページを数えるためのコードです。サイトに貼ると、どのページを見た人が友だちになったかが分かります。入力フォームの中身など、個人が特定できる情報は送りません。
       </p>
 
-      <div
-        className={`rounded-card mb-4 flex flex-wrap items-center justify-between gap-2 border p-4 ${
-          receiving ? 'bg-success-bg border-success-bg' : 'border-hairline bg-canvas'
-        }`}
-      >
-        <div className="min-w-0">
-          <p className={`text-sm font-semibold ${receiving ? 'text-success' : 'text-ink-faint'}`}>
-            {receiving ? '計測できています' : 'まだ記録が届いていません'}
-          </p>
-          <p className="text-ink-faint mt-0.5 text-xs">
-            {receiving
-              ? `最終受信 ${lastSeen} ・ 今日 ${summary?.todayEvents.toLocaleString('ja-JP')} 件`
-              : 'コードを貼ってから数分で届きはじめます。'}
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <button
-            onClick={() => void load()}
-            className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken border px-3 py-1.5 text-xs font-medium"
-          >
-            設置を確認
-          </button>
-          {/* 1件ずつの記録を見る画面が無い。友だち詳細には出るが、
-              サイト全体のログを並べる場所を持っていない。 */}
-          <button
-            disabled
-            title="計測ログの一覧は準備中です"
-            className="border-hairline text-ink-faint rounded-control border px-3 py-1.5 text-xs opacity-50"
-          >
-            計測ログを見る
-          </button>
-          {/* 貼るコードは下に出ている。サイトごとに発行する仕組みは無い。 */}
-          <button
-            disabled
-            title="サイトごとのコード発行は準備中です。貼るコードは下にあります"
-            className="border-hairline text-ink-faint rounded-control border px-3 py-1.5 text-xs opacity-50"
-          >
-            コードを発行
-          </button>
-        </div>
-      </div>
-
-      <div className="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        <KpiCard
-          title="今日の計測"
-          value={summary?.todayEvents ?? null}
-          unit="件"
-          detail={`ページ閲覧 ${summary?.todayPageViews ?? 0}`}
-          loading={loading}
-        />
-        <KpiCard
-          title="友だちと結びついた"
-          value={summary?.linkedEvents ?? null}
-          unit="件"
-          detail={linkedRate != null ? `${linkedRate}%` : '—'}
-          loading={loading}
-        />
-        <KpiCard
-          title="結びつかなかった"
-          value={summary?.unlinkedEvents ?? null}
-          unit="件"
-          detail="LINE経由でない訪問"
-          loading={loading}
-        />
-        <KpiCard
-          title="設置ページ"
-          value={summary?.pathCount ?? null}
-          unit="種類"
-          detail={`計測イベント ${summary?.eventTypeCount ?? 0}`}
-          loading={loading}
-        />
-        {/* 「カートに入れた」「購入した」を、URLの条件で決める仕組みが無い。
-            どのイベントがカートなのかを機械が知らないので差を出せない。 */}
-        <KpiCard title="カート放棄" value={null} unit="人" detail="過去7日" />
-      </div>
-
-      <div className="bg-canvas rounded-card border-hairline mb-5 border p-5">
-        <h2 className="text-ink mb-2 text-sm font-semibold">サイトに貼るコード</h2>
-        <p className="text-ink-secondary mb-3 text-sm">
-          すべてのページの{' '}
-          <code className="bg-canvas-sunken rounded px-1">&lt;/head&gt;</code>{' '}
-          の直前に貼ってください。どのページが見られたかを記録します。
-          LIFFやフォームを経由した人は、友だちと結びついて個人の行動として見られるようになります。
-        </p>
-        <div className="flex flex-wrap items-center gap-2">
-          <code className="bg-canvas-sunken text-ink-secondary min-w-0 flex-1 overflow-x-auto rounded px-3 py-2 text-xs">
-            {snippet}
-          </code>
-          <button
-            onClick={copy}
-            className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken border px-3 py-2 text-sm font-medium"
-          >
-            {copied ? 'コピーしました' : 'コードをコピー'}
-          </button>
-        </div>
-
-        <details className="mt-4">
-          <summary className="text-ink-secondary cursor-pointer text-sm font-medium">
-            ボタンのクリックや購入も記録したいとき
-          </summary>
-          <div className="text-ink-secondary mt-2 space-y-2 text-sm">
-            <p>
-              押されたことを記録したい要素に{' '}
-              <code className="bg-canvas-sunken rounded px-1">
-                data-lh-event=&quot;名前&quot;
-              </code>{' '}
-              を付けます。
+      <section className={`rounded-card border p-4 ${receiving ? 'border-success-bg bg-success-bg' : 'border-hairline bg-canvas'}`}>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className={`text-sm font-semibold ${receiving ? 'text-success' : 'text-ink'}`}>
+              {receiving ? `動いています。最後にデータが届いたのは ${lastSeen} です。` : 'まだデータが届いていません。'}
             </p>
-            <code className="bg-canvas-sunken block overflow-x-auto rounded px-3 py-2 text-xs">
-              &lt;button data-lh-event=&quot;資料請求&quot;&gt;資料を請求する&lt;/button&gt;
-            </code>
-            <p>
-              購入完了のように、こちらから知らせたいときは{' '}
-              <code className="bg-canvas-sunken rounded px-1">
-                lhTrack(&apos;購入&apos;, 5000)
-              </code>{' '}
-              を呼びます。
+            <p className="mt-1 text-xs text-ink-faint">
+              {receiving
+                ? `今日は ${summary?.todayEvents.toLocaleString('ja-JP')}件、${summary?.pathCount.toLocaleString('ja-JP')}種類のページから届いています。`
+                : 'コードを貼ったあと、サイトを1ページ開いてから確かめてください。'}
             </p>
           </div>
-        </details>
+          <Button onClick={() => void load()}>いま届いているか確かめる</Button>
+        </div>
+      </section>
 
-        <p className="text-ink-faint mt-4 text-xs leading-relaxed">
-          URLのクエリ文字列（<code>?</code> より後ろ）は記録しません。
-          メールアドレスなどがURLに入っている場合に、それごと保存してしまわないためです。
-        </p>
+      {failed && (
+        <ListState
+          kind="error"
+          title="サイトの計測状況を表示できませんでした"
+          description="計測データは消えていません。通信状態を確認して、もう一度お試しください。"
+          action={<Button onClick={() => void load()}>もう一度読み込む</Button>}
+        />
+      )}
+
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="space-y-4">
+          <section className="rounded-card border border-hairline bg-canvas p-5">
+            <h2 className="text-base font-bold text-ink">サイトに貼るコード</h2>
+            <p className="mt-1 text-xs leading-relaxed text-ink-faint">ホームページの &lt;/head&gt; の直前に、この1行をそのまま貼ってください。ページごとに書き換える必要はありません。</p>
+            {keyLoading ? (
+              <p className="mt-3 text-xs text-ink-faint">あなたのアカウントのコードを取得しています…</p>
+            ) : snippet ? (
+              <>
+                <div className="mt-3 rounded-control bg-ink p-4 text-on-accent">
+                  <p className="text-xs text-on-accent">あなたのアカウントで使うコード</p>
+                  <div className="mt-2 flex items-center gap-3">
+                    <code className="min-w-0 flex-1 overflow-x-auto text-xs">{snippet}</code>
+                    <Button onClick={copy}>{copied ? 'コピーしました' : 'コピー'}</Button>
+                  </div>
+                </div>
+                {copyFailed && <p className="mt-2 text-xs text-status-danger">コピーできませんでした。上のコードを選んでコピーしてください。</p>}
+              </>
+            ) : (
+              <div className="mt-3 rounded-control bg-canvas-sunken p-4">
+                <p className="text-xs leading-relaxed text-ink-secondary">
+                  計測コードを取得できませんでした。アカウントごとの鍵が無いと他の計測と混ざるため、以前の共通の鍵は表示しません。通信状態を確かめて、もう一度お試しください。
+                </p>
+                <div className="mt-2">
+                  <Button onClick={() => setKeyAttempt((n) => n + 1)}>コードをもう一度取得する</Button>
+                </div>
+              </div>
+            )}
+          </section>
+
+          <section className="rounded-card border border-hairline bg-canvas p-5">
+            <h2 className="text-base font-bold text-ink">貼るとできるようになること</h2>
+            <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-3">
+              <Capability title="どのページを見て来たか" description="友だち追加の直前に見ていたページが、その人の記録に残ります。" />
+              <Capability title="どれくらい迷ったか" description="はじめて来てから友だちになるまでの日数が分かります。" />
+              <Capability title="成果を数える" description="カートに入れた・買った・申し込んだを成果地点として数えられます。" />
+            </div>
+          </section>
+
+          <section className="overflow-hidden rounded-card border border-hairline bg-canvas">
+            <div className="border-b border-hairline px-4 py-3">
+              <h2 className="text-base font-bold text-ink">いま届いているページ</h2>
+              <p className="mt-1 text-xs text-ink-faint">コードを貼ったページの届き具合です。</p>
+            </div>
+            {loading ? <ListState kind="loading" title="サイトの計測状況を読み込んでいます" /> : pages.length === 0 ? (
+              <ListState kind="empty" title="まだ記録がありません" description="コードを貼ったあと、サイトを開くと数分で表示されます。" />
+            ) : (
+              <table className="w-full table-fixed text-xs">
+                <thead className="border-b border-hairline bg-canvas-sunken text-ink-faint"><TableHeadRow><Th>サイト</Th><Th>ページ</Th><Th align="right">この30日のページ表示</Th><Th align="right">友だち追加</Th></TableHeadRow></thead>
+                <tbody className="divide-y divide-hairline">
+                  {pages.map((page) => {
+                    return <tr key={`${page.host ?? ''}:${page.path}`}>
+                      <td className="truncate px-4 py-3 text-ink-secondary" title={page.host ?? '以前の記録'}>{page.host ?? '以前の記録'}</td>
+                      <td className="truncate px-4 py-3 font-semibold text-ink" title={page.path}>{page.path}</td>
+                      <td className="px-4 py-3 text-right tabular-nums text-ink-secondary">{page.views.toLocaleString('ja-JP')}</td>
+                      <td className="px-4 py-3 text-right tabular-nums text-ink-secondary">{page.visitors.toLocaleString('ja-JP')}人</td>
+                    </tr>
+                  })}
+                </tbody>
+              </table>
+            )}
+          </section>
+        </div>
+
+        <aside className="space-y-4">
+          <section className="rounded-card border border-hairline bg-canvas p-5">
+            <h2 className="text-sm font-bold text-ink">貼りかたが分からないときは</h2>
+            <dl className="mt-3 space-y-4">
+              <Help title="WordPress をお使いなら" description="テーマの header.php か、コードを貼るプラグインに入れます" />
+              <Help title="Shopify をお使いなら" description="テーマの theme.liquid の </head> の前に入れます" />
+              <Help title="制作会社にお願いするなら" description="このコードをそのまま送れば伝わります。書き換えは不要です" />
+            </dl>
+          </section>
+          <section className="rounded-card border border-hairline bg-canvas p-5">
+            <h2 className="text-sm font-bold text-ink">つながる先</h2>
+            <ul className="mt-3 space-y-3 text-xs"><li className="text-action">→ 流入と計測</li><li className="text-action">→ コンバージョン</li><li className="text-action">→ 友だち</li><li className="text-action">→ 分析</li></ul>
+          </section>
+          <section className="rounded-card border border-hairline bg-canvas p-5">
+            <h2 className="text-sm font-bold text-ink">どうやって友だちと結びつくか</h2>
+            <ol className="mt-3 space-y-2 text-xs text-ink-secondary">
+              <li><strong>1. LINEから開いた場合</strong> その場で経路を記録します。</li>
+              <li><strong>2. あとからLINEを追加した場合</strong> 同じブラウザの記録と結びつけます。</li>
+              <li><strong>3. 結びつかない場合</strong> 個人を推測せず経路不明として数えます。</li>
+            </ol>
+          </section>
+          <section className="rounded-card border border-status-warn bg-status-warn-soft p-5">
+            <h2 className="text-sm font-bold text-status-warn-deep">気をつけること</h2>
+            <ul className="mt-3 space-y-3 text-xs leading-relaxed text-status-warn-deep"><li>個人が特定できる情報は送りません</li></ul>
+          </section>
+        </aside>
       </div>
+    </div>
+  )
+}
 
-      <div className="bg-canvas rounded-card border-hairline overflow-hidden border">
-        <div className="border-hairline border-b px-4 py-3">
-          <p className="text-ink text-sm font-semibold">よく見られているページ（この30日）</p>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[600px]">
-            <thead>
-              <tr className="bg-canvas-sunken border-hairline border-b">
-                <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold uppercase">
-                  ページ
-                </th>
-                <th className="text-ink-faint px-4 py-3 text-right text-xs font-semibold uppercase">
-                  閲覧
-                </th>
-                <th className="text-ink-faint px-4 py-3 text-right text-xs font-semibold uppercase">
-                  人数
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {loading ? (
-                <tr>
-                  <td colSpan={3} className="text-ink-faint px-4 py-8 text-center text-sm">
-                    読み込み中...
-                  </td>
-                </tr>
-              ) : pages.length === 0 ? (
-                <tr>
-                  <td colSpan={3} className="text-ink-faint px-4 py-8 text-center text-sm">
-                    まだ記録がありません。コードを貼ってから数分で出はじめます。
-                  </td>
-                </tr>
-              ) : (
-                pages.map((p) => (
-                  <tr key={p.path} className="hover:bg-canvas-sunken">
-                    <td className="text-ink px-4 py-3 text-sm">{p.path}</td>
-                    <td className="text-ink-secondary px-4 py-3 text-right text-sm tabular-nums">
-                      {p.views.toLocaleString('ja-JP')}
-                    </td>
-                    <td className="text-ink-secondary px-4 py-3 text-right text-sm tabular-nums">
-                      {p.visitors.toLocaleString('ja-JP')}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+function Capability({ title, description }: { title: string; description: string }) {
+  return (
+    <div className="rounded-control bg-canvas-sunken p-4">
+      <h3 className="text-sm font-semibold text-ink">{title}</h3>
+      <p className="mt-1 text-xs leading-relaxed text-ink-faint">{description}</p>
+    </div>
+  )
+}
 
-      <section className="bg-canvas rounded-card border-hairline mt-5 border p-5">
-        <div className="flex flex-wrap items-start justify-between gap-2">
-          <div className="min-w-0">
-            <h2 className="text-ink text-sm font-semibold">計測するできごと</h2>
-            <p className="text-ink-faint mt-0.5 text-xs">
-              URLの条件に当てはまったときに記録します
-            </p>
-          </div>
-          <button
-            disabled
-            title="できごとの定義は準備中です"
-            className="border-hairline text-ink-faint rounded-control border px-3 py-1.5 text-xs opacity-50"
-          >
-            できごとを追加
-          </button>
-        </div>
-        {/* できごとの定義（対象URL → 起きたときの動作）を保存する場所が無い。
-            いまはスクリプトが送ってきたイベントをそのまま記録している。 */}
-        <div className="border-hairline mt-3 rounded-lg border border-dashed p-6 text-center">
-          <p className="text-ink-faint text-xs leading-relaxed">
-            できごとの名前・対象URL・起きたときの動作を決める仕組みは準備中です。
-            いまはサイトから送られたできごとを、そのまま記録しています。
-          </p>
-        </div>
-        <p className="text-ink-faint mt-2 text-xs leading-relaxed">
-          「カートに入れたが購入していない人」は、この2つのできごとの差から自動で抽出されます。配信の絞り込み条件として使えます。（準備中）
-        </p>
-      </section>
-
-      <section className="bg-canvas rounded-card border-hairline mt-3 border p-5">
-        <h2 className="text-ink text-sm font-semibold">どうやって友だちと結びつくか</h2>
-        <dl className="mt-3 space-y-3 text-xs leading-relaxed">
-          <div>
-            <dt className="text-ink-secondary font-medium">1. LINEから開いた場合</dt>
-            <dd className="text-ink-faint">
-              配信のリンクを踏んでサイトに来た人は、その時点で友だちが特定できます。
-            </dd>
-          </div>
-          <div>
-            <dt className="text-ink-secondary font-medium">2. あとからLINEを追加した場合</dt>
-            <dd className="text-ink-faint">
-              同じブラウザで友だち追加すると、それまでの行動もさかのぼって結びつきます。
-            </dd>
-          </div>
-          <div>
-            <dt className="text-ink-secondary font-medium">3. 結びつかない場合</dt>
-            <dd className="text-ink-faint">
-              検索などから直接来た人は「不明」として記録され、人数の集計にだけ使われます。
-            </dd>
-          </div>
-        </dl>
-      </section>
-
-      <section className="bg-canvas rounded-card border-hairline mt-3 border p-5">
-        <h2 className="text-ink text-sm font-semibold">個人情報の扱い</h2>
-        <ul className="text-ink-faint mt-2 space-y-1.5 text-xs leading-relaxed">
-          <li>・サイト側でCookieの同意を取ってから設置してください</li>
-          <li>・入力フォームの中身は送信していません。URLとイベント名だけを記録します</li>
-          <li>・友だちが結びついた行動は、その人の履歴として友だち詳細に表示されます</li>
-          <li>・利用目的をプライバシーポリシーに記載してください</li>
-        </ul>
-      </section>
+function Help({ title, description }: { title: string; description: string }) {
+  return (
+    <div>
+      <dt className="text-xs font-semibold text-ink-secondary">{title}</dt>
+      <dd className="mt-1 text-xs leading-relaxed text-ink-faint">{description}</dd>
     </div>
   )
 }

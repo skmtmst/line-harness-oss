@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import type { Scenario, ScenarioTriggerType, DeliveryMode } from '@line-crm/shared'
-import { api } from '@/lib/api'
+import type { Scenario } from '@line-crm/shared'
+import { api, type ScenarioRuns, type ScenarioSimulation } from '@/lib/api'
+import { useOffsetServerList } from '@/lib/use-server-list'
 import { useAccount } from '@/contexts/account-context'
 
 function scenarioCompletionDetail(active: number, completed: number): string {
@@ -13,95 +14,237 @@ function scenarioCompletionDetail(active: number, completed: number): string {
   return `登録合計 ${enrolled.toLocaleString('ja-JP')}人のうち ${rate}%`
 }
 import type { Folder } from '@line-crm/shared'
-import Header from '@/components/layout/header'
 import ListKpis from '@/components/shared/list-kpis'
 import ListToolbar from '@/components/shared/list-toolbar'
-import FolderPanel from '@/components/shared/folder-panel'
+import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
 import ScenarioList from '@/components/scenarios/scenario-list'
-import { shouldShowStartChecklist, startChecklist } from './start-checklist'
+import { startChecklist } from './start-checklist'
 
 type ScenarioWithCount = Scenario & {
   stepCount?: number
   subscriberCount?: number
   completedCount?: number
 }
-type LoadStatus = 'loading' | 'ready' | 'error'
 
 /** 未分類を表す印。空文字は「すべて」なので別の値にする。 */
 const UNFILED = '__unfiled__'
 
-/** 作成日時が、運用画面の基準である日本時間の今月か。 */
-function isCreatedThisMonth(createdAt: string, now = new Date()): boolean {
+function StartScenarioDialog({
+  scenario,
+  busy,
+  error,
+  onConfirm,
+  onCancel,
+}: {
+  scenario: ScenarioWithCount
+  busy: boolean
+  error: string
+  onConfirm: () => void
+  onCancel: () => void
+}) {
+  const { selectedAccountId } = useAccount()
+  const lineAccountId = scenario.lineAccountId ?? selectedAccountId
+  const [simulation, setSimulation] = useState<ScenarioSimulation | null>(null)
+  const [runs, setRuns] = useState<ScenarioRuns | null>(null)
+  const [preflightLoading, setPreflightLoading] = useState(true)
+  /*
+   * 開始は戻せない操作なので、確認のチェックが入るまで開始ボタンを
+   * 押せない。defaultChecked の非制御にすると、見ていないまま
+   * 始められて確認が形だけになる（点検 #495 中4）。
+   */
+  const [confirmed, setConfirmed] = useState(false)
+
+  useEffect(() => {
+    if (!lineAccountId) {
+      setPreflightLoading(false)
+      return
+    }
+    let cancelled = false
+    setPreflightLoading(true)
+    void Promise.all([
+      api.scenarios.simulate(scenario.id, lineAccountId).catch(() => null),
+      api.scenarios.runs(scenario.id, lineAccountId, { limit: 1 }).catch(() => null),
+    ]).then(([simulationResponse, runsResponse]) => {
+      if (cancelled) return
+      setSimulation(simulationResponse?.success ? simulationResponse.data : null)
+      setRuns(runsResponse?.success ? runsResponse.data : null)
+      setPreflightLoading(false)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [lineAccountId, scenario.id])
+
+  const checks = startChecklist(scenario).map((item, index) => {
+    if (index === 1 && simulation) {
+      const complete = simulation.steps.length > 0
+      return {
+        ...item,
+        state: complete ? 'ok' as const : 'warn' as const,
+        detail: complete
+          ? `${simulation.steps.length}通すべての配信日時を試算しました`
+          : '配信日時を試算できない通があります',
+      }
+    }
+    if (index === 2 && runs) {
+      return {
+        ...item,
+        state: runs.testSends.length > 0 ? 'ok' as const : 'warn' as const,
+        detail: runs.testSends.length > 0
+          ? `最新のテスト送信は${runs.testSends[0].messageCount}通です`
+          : 'テスト送信の記録がありません',
+      }
+    }
+    if (index === 3 && runs) {
+      const enough = runs.quota.remaining === null
+        ? runs.quota.state === 'unlimited'
+        : runs.quota.remaining >= (simulation?.audience.newStartPlanned ?? 0)
+      return {
+        ...item,
+        state: enough ? 'ok' as const : 'warn' as const,
+        detail: runs.quota.state === 'unlimited'
+          ? '送信数の上限はありません'
+          : runs.quota.remaining === null
+            ? runs.quota.reason ?? '送信枠を取得できませんでした'
+            : `残り${runs.quota.remaining.toLocaleString('ja-JP')}通です`,
+      }
+    }
+    return item
+  })
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-6" style={{ background: 'color-mix(in srgb, var(--color-ink) 35%, transparent)' }} role="dialog" aria-modal="true" aria-labelledby="start-scenario-title">
+      <div className="border-hairline flex w-full flex-col overflow-y-auto rounded-card border shadow-xl" style={{ height: 860, maxWidth: 1040, background: 'var(--color-canvas)' }}>
+        <div className="border-hairline flex items-start justify-between gap-4 border-b px-6 py-5">
+          <div>
+            <h2 id="start-scenario-title" className="text-ink text-xl font-bold">
+              配信を開始しますか？
+            </h2>
+            <p className="text-ink-secondary mt-1 text-sm">開始前の最終確認です。開始後は条件に一致した友だちから順に配信されます。</p>
+          </div>
+          <button type="button" onClick={onCancel} disabled={busy} aria-label="閉じる" className="text-ink-faint hover:text-ink text-xl">×</button>
+        </div>
+
+        <div className="grid gap-6 px-6 pb-4 lg:grid-cols-2">
+          <section className="border-hairline rounded-card border p-5" style={{ minHeight: 510 }}>
+            <p className="text-ink mb-4 text-sm font-bold">開始するシナリオ</p>
+            <dl className="space-y-3 text-sm">
+              <div className="flex justify-between gap-4"><dt className="text-ink-faint">開始対象</dt><dd className="text-ink text-right font-medium">{simulation ? `新規開始予定 ${simulation.audience.newStartPlanned.toLocaleString('ja-JP')}人` : preflightLoading ? '—（試算中）' : '—（取得できません）'}</dd></div>
+              <div className="border-hairline flex justify-between gap-4 border-t pt-3"><dt className="text-ink-faint">開始タイミング</dt><dd className="text-ink text-right font-medium">保存後すぐ</dd></div>
+              <div className="border-hairline flex justify-between gap-4 border-t pt-3"><dt className="text-ink-faint">配信ステップ</dt><dd className="text-ink text-right font-medium">{simulation ? `${simulation.steps.length}通` : scenario.stepCount === undefined ? '—通' : `${scenario.stepCount}通`}</dd></div>
+              <div className="border-hairline flex justify-between gap-4 border-t pt-3"><dt className="text-ink-faint">終了後</dt><dd className="text-ink text-right font-medium">完了タグ＋担当者通知</dd></div>
+            </dl>
+          </section>
+
+          <section className="border-hairline rounded-card border p-5" style={{ minHeight: 510 }}>
+            <p className="text-ink mb-3 text-sm font-bold">配信前チェック</p>
+            <ul className="space-y-3 text-sm">
+              {preflightLoading ? <li className="text-ink-faint text-xs">開始前の実データを確認しています…</li> : null}
+              {checks.map((item) => (
+                <li key={item.label} className="flex items-start gap-3">
+                  <span aria-hidden className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs font-bold ${item.state === 'ok' ? 'bg-success-bg text-success' : item.state === 'warn' ? 'bg-warning-bg text-warning' : 'bg-canvas-sunken text-ink-faint'}`}>
+                    {item.state === 'ok' ? '✓' : item.state === 'warn' ? '!' : '—'}
+                  </span>
+                  <span><span className="text-ink block font-medium">{item.label}</span><span className="text-ink-faint block text-xs">{item.detail}</span></span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        </div>
+
+        <div className="bg-warning-bg mx-6 mb-5 rounded-card px-5 py-4">
+          <p className="text-warning text-sm font-bold">開始後に起きること</p>
+          <ul className="text-ink-secondary mt-2 space-y-1 text-xs"><li>・条件に一致した{simulation?.audience.newStartPlanned.toLocaleString('ja-JP') ?? '—'}人が購読を開始します</li><li>・配信中の友だちは停止するまで次のステップへ進みます</li><li>・開始・停止・編集は監査履歴とSlackのPRスレッドへ記録します</li></ul>
+        </div>
+        <label className="mx-6 mb-4 flex items-center gap-2 text-sm font-medium"><input type="checkbox" checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} />対象人数・内容・送信枠を確認しました</label>
+        {error ? <p className="bg-danger-bg text-danger mx-6 mb-4 rounded-card px-4 py-3 text-sm">{error}</p> : null}
+        <div className="border-hairline mt-auto flex justify-end gap-3 border-t px-6 py-4">
+          <span className="text-ink-faint mr-auto self-center text-xs">開始後も緊急停止できます。停止理由は履歴に残ります。</span><Button onClick={onCancel} disabled={busy}>戻って確認</Button>
+          <Button variant="primary" onClick={onConfirm} disabled={busy || !confirmed}>{busy ? '開始中…' : '配信を開始'}</Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/** 運用画面の基準である日本時間の今月初日。 */
+function currentMonthStart(now = new Date()): string {
   const month = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Asia/Tokyo',
     year: 'numeric',
     month: '2-digit',
   })
-  return month.format(new Date(createdAt)) === month.format(now)
+  return `${month.format(now)}-01T00:00:00+09:00`
 }
 
 export default function ScenariosPage() {
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const router = useRouter()
-  const [scenarios, setScenarios] = useState<ScenarioWithCount[]>([])
   // 名前の絞り込み（設計 `Body` の検索）。手元で絞る。
   const [nameQuery, setNameQuery] = useState('')
+  const [serverQuery, setServerQuery] = useState('')
   /** よく使う絞り込み。いま数えられるのは「停止中のみ」だけ。 */
   const [stoppedOnly, setStoppedOnly] = useState(false)
   const [createdThisMonthOnly, setCreatedThisMonthOnly] = useState(false)
-  const [loadStatus, setLoadStatus] = useState<LoadStatus>('loading')
   const [actionError, setActionError] = useState('')
   const [creating, setCreating] = useState(false)
   const [folders, setFolders] = useState<Folder[]>([])
+  /** 「未分類」の件数。`null` は数えていない（#631、#730）。 */
+  const [unfiledCount, setUnfiledCount] = useState<number | null>(null)
   const [folderFilter, setFolderFilter] = useState('')
   const [folderDialogOpen, setFolderDialogOpen] = useState(false)
   const [toggleTarget, setToggleTarget] = useState<ScenarioWithCount | null>(null)
   const [toggleBusy, setToggleBusy] = useState(false)
   const [toggleError, setToggleError] = useState('')
-  const loadRequestRef = useRef(0)
 
   const loadFolders = useCallback(async () => {
     const res = await api.folders.list('scenario')
     if (res.success) setFolders(res.data)
+    setUnfiledCount(res.success ? res.unfiledCount ?? null : null)
   }, [])
 
   useEffect(() => {
     void loadFolders()
   }, [loadFolders])
 
-  const loadScenarios = useCallback(async () => {
-    const requestId = ++loadRequestRef.current
-    setLoadStatus('loading')
-    setActionError('')
-    setScenarios([])
-    try {
-      const res = await api.scenarios.list({ accountId: selectedAccountId || undefined })
-      if (requestId !== loadRequestRef.current) return
-      if (res.success) {
-        setScenarios(res.data)
-        setLoadStatus('ready')
-      } else {
-        setScenarios([])
-        setLoadStatus('error')
-      }
-    } catch {
-      if (requestId !== loadRequestRef.current) return
-      setScenarios([])
-      setLoadStatus('error')
-    }
-  }, [selectedAccountId])
-
   useEffect(() => {
-    if (accountLoading) return
-    void loadScenarios()
-    return () => {
-      loadRequestRef.current += 1
-    }
-  }, [accountLoading, loadScenarios])
+    const timer = setTimeout(() => setServerQuery(nameQuery.trim()), 300)
+    return () => clearTimeout(timer)
+  }, [nameQuery])
+
+  const loadScenarioPage = useCallback(async (
+    request: { page: number; limit: number },
+    signal: AbortSignal,
+  ) => {
+    if (accountLoading) return { items: [], total: 0, limit: request.limit, sort: [] }
+    const res = await api.scenarios.listPage({
+      accountId: selectedAccountId || undefined,
+      page: request.page,
+      limit: request.limit,
+      query: serverQuery || undefined,
+      active: stoppedOnly ? 0 : undefined,
+      createdFrom: createdThisMonthOnly ? currentMonthStart() : undefined,
+      folderId: folderFilter || undefined,
+    }, signal)
+    if (!res.success) throw new Error(res.error)
+    return res.data
+  }, [accountLoading, createdThisMonthOnly, folderFilter, selectedAccountId, serverQuery, stoppedOnly])
+  const scenarioList = useOffsetServerList<ScenarioWithCount>({
+    requestKey: JSON.stringify({
+      ready: !accountLoading,
+      accountId: selectedAccountId ?? '',
+      query: serverQuery,
+      stoppedOnly,
+      createdThisMonthOnly,
+      folderFilter,
+    }),
+    load: loadScenarioPage,
+  })
+  const scenarios = scenarioList.items
+  const loadScenarios = scenarioList.retry
 
   /**
    * シナリオを作って、配信方式の選択へ送る。
@@ -145,13 +288,10 @@ export default function ScenariosPage() {
    */
   const handleReorder = async (ids: string[]) => {
     setActionError('')
-    const rank = new Map(ids.map((id, i) => [id, i]))
-    setScenarios((prev) =>
-      [...prev].sort((a, b) => (rank.get(a.id) ?? 1e9) - (rank.get(b.id) ?? 1e9)),
-    )
     try {
       const res = await api.scenarios.reorder(ids)
       if (!res.success) throw new Error(res.error)
+      void loadScenarios()
     } catch {
       setActionError('並び順を保存できませんでした。最新の並び順を読み直しました。')
       void loadScenarios()
@@ -207,7 +347,13 @@ export default function ScenariosPage() {
 
   const handleDelete = async (id: string) => {
     try {
-      await api.scenarios.delete(id)
+      /*
+       * fetchApi は口の失敗を例外でなく {success:false} で返す。
+       * 成功を見ないと、消えていないのに再読込だけされて気づけない
+       * （点検 #495 中6）。同じ画面の並べ替え・移動・切替は見ている。
+       */
+      const res = await api.scenarios.delete(id)
+      if (!res.success) throw new Error(res.error)
       void loadScenarios()
     } catch {
       setActionError('シナリオを削除できませんでした。状態を読み直してから、もう一度お試しください。')
@@ -216,29 +362,11 @@ export default function ScenariosPage() {
 
   return (
     <div>
-      <div data-design="Head">
-      <Header
-        title="シナリオ配信"
-        description="配信のタイミングを指定して複数のメッセージを順に送ります。友だちの反応に応じて分岐もできます。作成しただけでは配信されません。"
-        action={
-          <div className="flex flex-wrap items-center gap-2">
-            <span
-              className="border-hairline bg-canvas-sunken text-ink-secondary rounded-control border px-3 py-2 text-sm font-medium"
-              title="表の左端の ⠿ を掴むと並べ替えられます"
-            >
-              ⇅ 並び替えは ⠿ を掴む
-            </span>
-            <button
-              disabled
-              title="マニュアルは準備中です"
-              className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm font-medium opacity-50"
-            >
-              マニュアル
-            </button>
-          </div>
-        }
-      />
-      </div>
+      <section data-design="Head" className="bg-success-bg text-success mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-card px-4 py-3 text-sm">
+        <span aria-hidden>ⓘ</span>
+        <strong>作成しただけでは配信されません。開始条件を設定すると配信が始まります。</strong>
+        <span className="font-semibold underline underline-offset-2">配信を始める方法</span>
+      </section>
 
       {/* 設計の KPI 4枚。数は /api/list-stats から4画面ぶんまとめて来る。 */}
       <div data-design="KPIs">
@@ -277,21 +405,18 @@ export default function ScenariosPage() {
 
       {toggleTarget ? (
         <div data-design-node="RUxNf">
+          {toggleTarget.isActive ? (
           <ConfirmDialog
             open
-            title={`「${toggleTarget.name}」を${toggleTarget.isActive ? '停止' : '開始'}しますか？`}
+            title={`「${toggleTarget.name}」を停止しますか？`}
             description={[
               toggleTarget.lineAccountId === null ? '全LINEアカウントに適用されるシナリオです。' : '',
               `現在の購読中は${toggleTarget.subscriberCount === undefined ? '—人（人数を確認できませんでした）' : `${toggleTarget.subscriberCount}人`}です。`,
               `配信内容は${toggleTarget.stepCount === undefined ? '—通（通数を確認できませんでした）' : `${toggleTarget.stepCount}通`}です。`,
-              toggleTarget.isActive
-                ? '停止すると新しい配信を止めます。これまでの配信履歴は残ります。'
-                : toggleTarget.subscriberCount === 0
-                  ? '現在届く人はいません。開始後に登録された友だちから配信対象になります。'
-                  : '開始すると、登録条件に合う友だちへの配信が動き始めます。',
+              '停止すると新しい配信を止めます。これまでの配信履歴は残ります。',
             ].filter(Boolean).join(' ')}
-            confirmLabel={toggleTarget.isActive ? 'シナリオを停止' : 'シナリオを開始'}
-            destructive={toggleTarget.isActive}
+            confirmLabel="シナリオを停止"
+            destructive
             busy={toggleBusy}
             error={toggleError || undefined}
             onConfirm={() => void confirmToggleActive()}
@@ -300,52 +425,26 @@ export default function ScenariosPage() {
               setToggleTarget(null)
               setToggleError('')
             }}
-          >
-            {shouldShowStartChecklist(toggleTarget.isActive) ? (
-              <div className="space-y-2">
-                <p className="text-ink-secondary text-xs font-medium">配信前チェック</p>
-                <ul className="space-y-1.5 text-sm">
-                  {startChecklist(toggleTarget).map((item) => (
-                    <li key={item.label} className="flex items-start gap-2">
-                      <span
-                        aria-hidden="true"
-                        className={
-                          item.state === 'ok'
-                            ? 'text-success'
-                            : item.state === 'warn'
-                              ? 'text-warning'
-                              : 'text-ink-faint'
-                        }
-                      >
-                        {item.state === 'ok' ? '✓' : item.state === 'warn' ? '!' : '—'}
-                      </span>
-                      <span>
-                        <span className="text-ink block">{item.label}</span>
-                        <span className="text-ink-faint block text-xs">{item.detail}</span>
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-                <p className="text-ink-faint text-xs">
-                  「—」は、この画面から確かめられない項目です。確認済みとしては扱いません。
-                </p>
-              </div>
-            ) : null}
-          </ConfirmDialog>
+          />
+          ) : (
+            <StartScenarioDialog
+              scenario={toggleTarget}
+              busy={toggleBusy}
+              error={toggleError}
+              onConfirm={() => void confirmToggleActive()}
+              onCancel={() => {
+                if (toggleBusy) return
+                setToggleTarget(null)
+                setToggleError('')
+              }}
+            />
+          )}
         </div>
       ) : null}
 
       {/* 一覧本体（設計 `Body`）。 */}
       <div data-design="Body">
-      {/*
-        「フォルダを追加」と「＋ シナリオを作成」は、設計では KPI の下・
-        フォルダ欄と表の上に置く。見出しの操作欄に入れていたので、
-        絵と位置が違っていた。
-      */}
       <div className="mb-4 flex flex-wrap items-center gap-2">
-        <Button onClick={() => setFolderDialogOpen(true)}>
-          フォルダを追加
-        </Button>
         <button
           onClick={() => void handleCreate()}
           disabled={creating}
@@ -359,23 +458,26 @@ export default function ScenariosPage() {
         いないので（列が無い）、いまは「すべて」だけ。分類できるように
         なったらここに並ぶ。
       */}
-      <div className="grid gap-4 lg:grid-cols-[16rem_minmax(0,1fr)]">
+      <div style={FOLDER_RAIL_STYLE} className="grid gap-4 lg:grid-cols-[var(--folder-rail-width)_minmax(0,1fr)]">
         <FolderPanel
-          total={`${scenarios.length} 件`}
+          total={`${scenarioList.total} 件`}
           activeId={folderFilter}
           onSelect={setFolderFilter}
+          onAddFolder={() => setFolderDialogOpen(true)}
           rows={[
-            { id: '', label: 'すべて', count: scenarios.length },
+            { id: '', label: 'すべて', count: scenarioList.total },
             ...folders.map((f) => ({
               id: f.id,
               label: f.name,
-              count: scenarios.filter((sc) => sc.folderId === f.id).length,
+              // #631: フォルダ件数はAPI(itemCount)をそのまま出す。現在ページの
+              // 行だけを数えるフォールバックは、ページングで実数と食い違うため廃止。
+              count: f.itemCount ?? null,
               color: f.color,
             })),
             {
               id: UNFILED,
               label: '未分類',
-              count: scenarios.filter((sc) => !sc.folderId).length,
+              count: unfiledCount,
             },
           ]}
         >
@@ -450,39 +552,37 @@ export default function ScenariosPage() {
         </div>
       )}
 
-      {loadStatus === 'loading' ? (
-        <ListState kind="loading" title="シナリオを読み込んでいます" />
-      ) : loadStatus === 'error' ? (
+      {scenarioList.loading && scenarios.length === 0 ? (
+        <ListState kind="loading" title="読み込んでいます" />
+      ) : scenarioList.error ? (
         <ListState
           kind="error"
-          title="シナリオを表示できませんでした"
-          description="登録したシナリオは消えていません。再読み込みしても直らない場合は、エラー報告へ連絡してください。"
+          title="表示できませんでした"
+          description="登録したシナリオは消えていません。再読み込みしても直らないときは、エラー報告へお知らせください。"
           onRetry={() => void loadScenarios()}
         />
       ) : (
         <ScenarioList
-          scenarios={scenarios
-            .filter((sc) =>
-              nameQuery.trim() === ''
-                ? true
-                : sc.name.toLowerCase().includes(nameQuery.trim().toLowerCase()),
-            )
-            .filter((sc) => (stoppedOnly ? !sc.isActive : true))
-            .filter((sc) => (createdThisMonthOnly ? isCreatedThisMonth(sc.createdAt) : true))
-            .filter((sc) =>
-              folderFilter === ''
-                ? true
-                : folderFilter === UNFILED
-                  ? !sc.folderId
-                  : sc.folderId === folderFilter,
-            )}
+          scenarios={scenarios}
           onReorder={handleReorder}
           folders={folders}
           onMoveFolder={handleMoveFolder}
           onToggleActive={(id) => requestToggleActive(id)}
           onDelete={handleDelete}
+          onCreate={() => void handleCreate()}
         />
       )}
+      {scenarioList.pageCount > 1 ? (
+        <div className="mt-4 flex items-center justify-end gap-3 text-sm">
+          <Button disabled={scenarioList.page <= 1 || scenarioList.loading} onClick={() => scenarioList.setPage(scenarioList.page - 1)}>
+            前へ
+          </Button>
+          <span className="text-ink-secondary">{scenarioList.page} / {scenarioList.pageCount}ページ</span>
+          <Button disabled={scenarioList.page >= scenarioList.pageCount || scenarioList.loading} onClick={() => scenarioList.setPage(scenarioList.page + 1)}>
+            次へ
+          </Button>
+        </div>
+      ) : null}
         </div>
       </div>
       </div>

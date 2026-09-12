@@ -9,6 +9,7 @@ import { webinarLoadFailure } from './webinar-load-failure'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const PAGE = readFileSync(join(HERE, 'page.tsx'), 'utf8')
+const OVERVIEW = readFileSync(join(HERE, 'overview-view.ts'), 'utf8')
 
 /**
  * ウェビナー一覧（設計 `ZC13r` 10-1 ／ `zCQXe` 10-1-L）の、
@@ -54,21 +55,28 @@ describe('読み込めなかった理由の見分け', () => {
 })
 
 describe('一覧の状態（設計 10-1-L `zCQXe`）', () => {
-  it('読めていないときに 0 件と書かない', () => {
+  it('集計が読めていないときに 0 件と書かない', () => {
     /*
      * 「1つも無い」と「読めなかった」は別のこと。0 と出すと消えたように見える。
      */
-    expect(PAGE).toContain("{hasListData ? visibleItems.length : '—'}")
-    expect(PAGE).toContain("公開中 {hasListData ? visibleItems.filter((w) => w.status === 'active').length : '—（未取得）'}")
+    expect(PAGE).toContain('overviewCards(visibleOverview)')
+    expect(OVERVIEW).toContain("metric.state !== 'available' || metric.value === null")
+    expect(OVERVIEW).toContain('metric?.reason ??')
   })
 
-  it('数が無いときは単位も出さない', () => {
-    /* `—件` は数に見える。 */
-    expect(PAGE).toContain('{hasListData && <span className="text-ink-faint ml-0.5 text-xs font-normal">件</span>}')
+  it('集計失敗を空表示にせず、その場で再読み込みできる', () => {
+    expect(PAGE).toContain('visibleOverviewFailure ? (')
+    expect(PAGE).toContain('集計を読み直す')
+    expect(PAGE).toContain('visibleOverviewFailure.retryable')
+  })
+
+  it('アカウント切替時に前の集計を表示しない', () => {
+    expect(PAGE).toContain('loadedOverviewAccountId === selectedAccountId ? overview : null')
+    expect(PAGE).toContain('overviewRequestGeneration.current !== generation')
   })
 
   it('読めていないときはページ送りを出さない', () => {
-    expect(PAGE).toContain('{hasListData && filtered.length > 0 && (')
+    expect(PAGE).toContain('{hasListData && visibleTotal > 0 && (')
   })
 
   it('読込・失敗・権限不足を共通部品で描く', () => {
@@ -80,11 +88,11 @@ describe('一覧の状態（設計 10-1-L `zCQXe`）', () => {
     expect(PAGE).not.toContain('ウェビナーを読み込めませんでした')
   })
 
-  it('配列で来なかった返事を、そのまま一覧へ流さない', () => {
+  it('頁の器で来なかった返事を、そのまま一覧へ流さない', () => {
     /*
-     * 口の契約は配列だが、器だけ違う返事が来ると `[...narrowed]` が
-     * `narrowed is not iterable` になり、**一覧が白い画面になる**。
+     * 口の契約は頁形式(`{items,total}`)だが、器だけ違う返事が来ると
+     * `items.map is not a function` で**一覧が白い画面になる**。
      */
-    expect(PAGE).toContain('if (!Array.isArray(res.data)) throw new ApiError(500,')
+    expect(PAGE).toContain('if (!res || !res.data || !Array.isArray(res.data.items) || typeof res.data.total !==')
   })
 })

@@ -4,10 +4,14 @@ import type { Env } from '../index.js';
 
 const mocks = {
   getTemplatesWithUsageCount: vi.fn(),
+  getTemplateSendCounts: vi.fn(),
   getTemplateById: vi.fn(),
   getTemplateUsage: vi.fn(),
   createTemplate: vi.fn(),
   updateTemplate: vi.fn(),
+  saveTemplateDraft: vi.fn(),
+  publishTemplate: vi.fn(),
+  hasTemplateDraft: vi.fn().mockReturnValue(false),
   deleteTemplate: vi.fn(),
   getCarouselTapTotals: vi.fn(),
   getFolderById: vi.fn(),
@@ -46,6 +50,7 @@ const EMPTY_USAGE = {
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.getTemplateUsage.mockResolvedValue(EMPTY_USAGE);
+  mocks.getTemplateSendCounts.mockResolvedValue(new Map());
   mocks.getTemplateById.mockResolvedValue({ id: 'tpl-1', line_account_id: 'account-1' });
   accountAccess.canAccessAllLineAccounts.mockResolvedValue(true);
   accountAccess.getVisibleLineAccountScope.mockResolvedValue({
@@ -115,7 +120,7 @@ describe('テンプレートのLINEアカウント境界', () => {
   });
 
   it('一覧は選択中LINEアカウントだけをDB層へ渡す', async () => {
-    mocks.getTemplatesWithUsageCount.mockResolvedValue([]);
+    mocks.getTemplatesWithUsageCount.mockResolvedValue({ items: [], total: 0 });
     mocks.getCarouselTapTotals.mockResolvedValue(new Map());
     const response = await makeApp().fetch(
       new Request('https://example.com/api/templates?account_id=account-1'),
@@ -126,6 +131,149 @@ describe('テンプレートのLINEアカウント境界', () => {
     expect(mocks.getTemplatesWithUsageCount).toHaveBeenCalledWith(env.DB, undefined, {
       accountIds: ['account-1'],
       includeUnassigned: false,
+    }, undefined);
+  });
+
+  it('一覧は当月・累計の実送信数を返す', async () => {
+    mocks.getTemplatesWithUsageCount.mockResolvedValue({ items: [{
+      id: 'tpl-1', line_account_id: 'account-1', name: '案内', category: 'general',
+      message_type: 'text', message_content: '本文', question_json: null,
+      question_status: 'published', folder_id: null, usage_count: 1,
+      created_at: '2026-09-01', updated_at: '2026-09-01',
+    }], total: 1 });
+    mocks.getCarouselTapTotals.mockResolvedValue(new Map());
+    mocks.getTemplateSendCounts.mockResolvedValue(new Map([[
+      'tpl-1', { thisMonth: 12, total: 48 },
+    ]]));
+
+    const response = await makeApp().fetch(
+      new Request('https://example.com/api/templates?account_id=account-1'),
+      env,
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      data: [{ id: 'tpl-1', monthlySendCount: 12, totalSendCount: 48 }],
+    });
+    expect(mocks.getTemplateSendCounts).toHaveBeenCalledWith(env.DB, ['tpl-1']);
+  });
+
+  it('中1: page/limit付きは共通一覧契約の形で返し、DBへ切り出しを渡す', async () => {
+    mocks.getTemplatesWithUsageCount.mockResolvedValue({ items: [], total: 3 });
+    mocks.getCarouselTapTotals.mockResolvedValue(new Map());
+    const response = await makeApp().fetch(
+      new Request('https://example.com/api/templates?account_id=account-1&page=2&limit=1'),
+      env,
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      data: {
+        items: [],
+        total: 3,
+        limit: 1,
+        sort: [
+          { field: 'created_at', direction: 'desc' },
+          { field: 'id', direction: 'asc' },
+        ],
+      },
+    });
+    expect(mocks.getTemplatesWithUsageCount).toHaveBeenCalledWith(env.DB, undefined, {
+      accountIds: ['account-1'],
+      includeUnassigned: false,
+    }, { limit: 1, offset: 1 });
+  });
+
+  it('中4: カード型・カルーセルの巨大な本文は422で断る', async () => {
+    const hugeCarousel = JSON.stringify(Array.from({ length: 10 }, (_, index) => ({
+      thumbnailImageUrl: `https://example.co.jp/${'a'.repeat(6000)}`,
+      title: `パネル${index + 1}`,
+      text: 'あ'.repeat(50),
+      actions: [{ type: 'uri', label: '詳しく見る', uri: 'https://example.co.jp/' }],
+    })));
+    for (const messageContent of ['あ'.repeat(50001), hugeCarousel]) {
+      const response = await makeApp().fetch(
+        new Request('https://example.com/api/templates', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            accountId: 'account-1',
+            name: '巨大',
+            category: 'general',
+            messageType: messageContent === hugeCarousel ? 'carousel' : 'flex',
+            messageContent,
+          }),
+        }),
+        env,
+      );
+      expect(response.status).toBe(422);
+      expect(await response.json()).toMatchObject({ error: expect.stringContaining('大きすぎます') });
+    }
+    expect(mocks.createTemplate).not.toHaveBeenCalled();
+  });
+});
+
+describe('テンプレートの作成・更新の返し', () => {
+  const row = {
+    id: 'tpl-1',
+    name: '案内',
+    category: 'general',
+    message_type: 'text',
+    message_content: 'こんにちは',
+    question_json: null,
+    question_status: 'published',
+    folder_id: null,
+    line_account_id: 'account-1',
+    carousel_actions_json: null,
+    carousel_tap_limit_mode: 'none',
+    carousel_tap_limit_text: null,
+    created_at: '2026-01-13T00:00:00.000Z',
+    updated_at: '2026-01-13T00:00:00.000Z',
+  };
+
+  it('軽11: 作成(201)の返しは更新と同じ形（本文・更新日時を含む）', async () => {
+    mocks.createTemplate.mockResolvedValue(row);
+    const response = await makeApp().fetch(
+      new Request('https://example.com/api/templates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          accountId: 'account-1',
+          name: '案内',
+          category: 'general',
+          messageType: 'text',
+          messageContent: 'こんにちは',
+        }),
+      }),
+      env,
+    );
+    expect(response.status).toBe(201);
+    const body = (await response.json()) as { data: Record<string, unknown> };
+    expect(body.data).toMatchObject({
+      id: 'tpl-1',
+      messageContent: 'こんにちは',
+      createdAt: '2026-01-13T00:00:00.000Z',
+      updatedAt: '2026-01-13T00:00:00.000Z',
+    });
+  });
+
+  it('軽11: 更新の返しに作成日時・更新日時を含む', async () => {
+    mocks.getTemplateById.mockResolvedValue(row);
+    const response = await makeApp().fetch(
+      new Request('https://example.com/api/templates/tpl-1', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: '案内（改）' }),
+      }),
+      env,
+    );
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as { data: Record<string, unknown> };
+    expect(body.data).toMatchObject({
+      id: 'tpl-1',
+      messageContent: 'こんにちは',
+      createdAt: '2026-01-13T00:00:00.000Z',
+      updatedAt: '2026-01-13T00:00:00.000Z',
     });
   });
 });

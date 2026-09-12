@@ -15,6 +15,8 @@ export interface BroadcastTemplateOption {
   category: string
   messageType: string
   messageContent: string
+  usageCount?: number
+  updatedAt?: string
 }
 
 function bubbleId(): string {

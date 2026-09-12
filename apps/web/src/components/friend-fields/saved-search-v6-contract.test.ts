@@ -14,14 +14,15 @@ describe('V6 保存した検索の画面契約', () => {
     expect(editPage).toContain('api.savedSearches.update')
     expect(editPage).toContain('api.savedSearches.create')
     expect(editPage).toContain('api.savedSearches.delete')
-    expect(editPage).toContain('api.friends.list')
+    expect(editPage).toContain('api.savedSearches.preview')
+    expect(editPage).toContain('api.savedSearches.detail')
     expect(editPage).toContain('すべて満たす')
     expect(editPage).toContain('いずれか1つ以上満たす')
   })
 
   it('保存と呼び出しをブラウザ1台だけのlocalStorageへ戻さない', () => {
-    expect(advanced).toContain('api.savedSearches.create')
-    expect(friendsPage).toContain('api.savedSearches.list')
+    expect(advanced).toContain('api.friendSavedViews.create')
+    expect(friendsPage).toContain('api.friendSavedViews.list')
     expect(advanced + friendsPage).not.toContain("localStorage.setItem('friends.savedSearch'")
     expect(advanced + friendsPage).not.toContain("localStorage.getItem('friends.savedSearch'")
   })

@@ -1,4 +1,4 @@
-import { Hono, type Context } from 'hono';
+import { Hono, type Context, type MiddlewareHandler } from 'hono';
 import {
   getAffiliates,
   getAffiliateById,
@@ -15,6 +15,10 @@ import {
   getAffiliateByFriendId,
   getAffiliateJourneys,
   getAffiliatePaymentSummaries,
+  getAffiliateArchiveImpact,
+  updateAffiliateLifecycle,
+  previewAffiliateSettlement,
+  confirmAffiliateSettlement,
   listAffiliateLinks,
   listAffiliateOffers,
   type AffiliateScope,
@@ -46,6 +50,36 @@ function accountVisible(
   return lineAccountId == null
     ? visible.canSeeUnassigned
     : visible.allowedAccountIds.includes(lineAccountId);
+}
+
+/**
+ * 紹介者の成績・動線の参照に付ける権限検査（#554 点検#505中9）。
+ *
+ * 成果地点側の `conversionPermission('view')` と同じ考えで、見るだけの人にも
+ * 鍵（`affiliate.report.view`、精算口と共通）で開ける。owner・admin は素通し。
+ */
+function affiliateReportPermission(): MiddlewareHandler<Env> {
+  return async (c, next) => {
+    const staff = c.get('staff');
+    if (!staff || (staff.role === 'staff' && !staff.permissionKeys?.includes('affiliate.report.view'))) {
+      return c.json({ success: false, error: 'この操作を行う権限がありません' }, 403);
+    }
+    await next();
+  };
+}
+
+/**
+ * 報酬率の範囲検査（#554 点検#505中2）。
+ *
+ * 100超をそのまま保存すると報酬計算（revenue*rate/100）が膨らむ。
+ * 省略時はDB既定（0）を使うので undefined は通す。
+ */
+function commissionRateError(value: unknown): string | null {
+  if (value === undefined) return null;
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 100) {
+    return '報酬率は0から100の間で入力してください';
+  }
+  return null;
 }
 
 function serializeAffiliate(row: {
@@ -154,12 +188,14 @@ affiliates.get('/api/affiliate-payments', requireRole('owner', 'admin'), async (
     if (!scope.allowedAccountIds.includes(lineAccountId)) {
       return c.json({ success: false, error: '支払い履歴が見つかりません' }, 404);
     }
-    const items = await getAffiliatePaymentSummaries(c.env.DB, lineAccountId);
+    const tenantId = c.get('staff')?.tenantId ?? DEFAULT_TENANT_ID;
+    const items = await getAffiliatePaymentSummaries(c.env.DB, lineAccountId, tenantId);
     return c.json({
       success: true,
       data: items,
       limitations: {
         payoutHistory: false,
+        settlementHistory: true,
         bankDestination: false,
         settlementSchedule: false,
       },
@@ -167,6 +203,154 @@ affiliates.get('/api/affiliate-payments', requireRole('owner', 'admin'), async (
   } catch (err) {
     console.error('GET /api/affiliate-payments error:', err);
     return c.json({ success: false, error: '支払い情報を取得できませんでした' }, 500);
+  }
+});
+
+// GET /api/affiliates/:id/archive-impact - 停止・アーカイブ前の影響確認
+affiliates.get('/api/affiliates/:id/archive-impact', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const { scope } = await getAffiliateScope(c);
+    const affiliate = await getAffiliateById(c.env.DB, c.req.param('id'), scope);
+    if (!affiliate?.line_account_id) {
+      return c.json({ success: false, error: '紹介者が見つかりません' }, 404);
+    }
+    const impact = await getAffiliateArchiveImpact(c.env.DB, {
+      tenantId: scope.tenantId,
+      affiliateId: affiliate.id,
+      lineAccountId: affiliate.line_account_id,
+    });
+    if (!impact) return c.json({ success: false, error: '紹介者が見つかりません' }, 404);
+    return c.json({ success: true, data: impact });
+  } catch (err) {
+    console.error('GET /api/affiliates/:id/archive-impact error:', err);
+    return c.json({ success: false, error: '影響を確認できませんでした' }, 500);
+  }
+});
+
+// POST /api/affiliates/:id/archive - 記録を残したまま紹介を止める
+affiliates.post('/api/affiliates/:id/archive', requireRole('owner', 'admin'), async (c) => {
+  auditLog(c, 'affiliate.archive', { kind: 'affiliate', id: c.req.param('id') });
+  try {
+    const { scope } = await getAffiliateScope(c);
+    const affiliate = await getAffiliateById(c.env.DB, c.req.param('id'), scope);
+    if (!affiliate?.line_account_id) {
+      return c.json({ success: false, error: '紹介者が見つかりません' }, 404);
+    }
+    const body = await c.req.json<{
+      mode?: unknown;
+      confirmationName?: unknown;
+    }>();
+    if (body.mode !== 'pause' && body.mode !== 'archive') {
+      return c.json({ success: false, error: '停止方法を選んでください' }, 400);
+    }
+    if (body.mode === 'archive' && body.confirmationName !== affiliate.name) {
+      return c.json({ success: false, error: '確認用の名前が一致しません' }, 400);
+    }
+    const updated = await updateAffiliateLifecycle(c.env.DB, {
+      tenantId: scope.tenantId,
+      affiliateId: affiliate.id,
+      lineAccountId: affiliate.line_account_id,
+      lifecycle: body.mode === 'pause' ? 'paused' : 'archived',
+    });
+    if (!updated) return c.json({ success: false, error: '紹介者が見つかりません' }, 404);
+    return c.json({
+      success: true,
+      data: {
+        affiliateId: affiliate.id,
+        lifecycle: body.mode === 'pause' ? 'paused' : 'archived',
+        recordsPreserved: true,
+      },
+    });
+  } catch (err) {
+    console.error('POST /api/affiliates/:id/archive error:', err);
+    return c.json({ success: false, error: '紹介を止められませんでした' }, 500);
+  }
+});
+
+// GET /api/affiliate-payments/:id/preview - 支払い確定前の固定内容
+affiliates.get('/api/affiliate-payments/:id/preview', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const lineAccountId = c.req.query('lineAccountId');
+    if (!lineAccountId) {
+      return c.json({ success: false, error: 'LINE公式アカウントを選んでください' }, 400);
+    }
+    const { visible, scope } = await getAffiliateScope(c);
+    if (!visible.allowedAccountIds.includes(lineAccountId)) {
+      return c.json({ success: false, error: '支払い情報が見つかりません' }, 404);
+    }
+    const affiliate = await getAffiliateById(c.env.DB, c.req.param('id'), scope);
+    if (!affiliate || affiliate.line_account_id !== lineAccountId) {
+      return c.json({ success: false, error: '支払い情報が見つかりません' }, 404);
+    }
+    const preview = await previewAffiliateSettlement(c.env.DB, {
+      tenantId: scope.tenantId,
+      affiliateId: affiliate.id,
+      lineAccountId,
+    });
+    if (!preview) return c.json({ success: false, error: '支払い情報が見つかりません' }, 404);
+    const { entries: _entries, ...data } = preview;
+    return c.json({ success: true, data });
+  } catch (err) {
+    console.error('GET /api/affiliate-payments/:id/preview error:', err);
+    return c.json({ success: false, error: '確定内容を確認できませんでした' }, 500);
+  }
+});
+
+// POST /api/affiliate-payments/:id/confirm - 承認済み報酬を追記台帳へ固定する
+affiliates.post('/api/affiliate-payments/:id/confirm', requireRole('owner', 'admin'), async (c) => {
+  auditLog(c, 'affiliate.settlement.close', { kind: 'affiliate', id: c.req.param('id') });
+  try {
+    const body = await c.req.json<{
+      lineAccountId?: unknown;
+      expectedAmount?: unknown;
+      idempotencyKey?: unknown;
+    }>();
+    if (typeof body.lineAccountId !== 'string' || !body.lineAccountId) {
+      return c.json({ success: false, error: 'LINE公式アカウントを選んでください' }, 400);
+    }
+    if (!Number.isInteger(body.expectedAmount) || Number(body.expectedAmount) < 0) {
+      return c.json({ success: false, error: '確定額が正しくありません' }, 400);
+    }
+    if (typeof body.idempotencyKey !== 'string' || body.idempotencyKey.length < 8 || body.idempotencyKey.length > 200) {
+      return c.json({ success: false, error: 'もう一度、確定内容を開き直してください' }, 400);
+    }
+    const { visible, scope } = await getAffiliateScope(c);
+    if (!visible.allowedAccountIds.includes(body.lineAccountId)) {
+      return c.json({ success: false, error: '支払い情報が見つかりません' }, 404);
+    }
+    const affiliate = await getAffiliateById(c.env.DB, c.req.param('id'), scope);
+    if (!affiliate || affiliate.line_account_id !== body.lineAccountId) {
+      return c.json({ success: false, error: '支払い情報が見つかりません' }, 404);
+    }
+
+    const result = await confirmAffiliateSettlement(c.env.DB, {
+      tenantId: scope.tenantId,
+      lineAccountId: body.lineAccountId,
+      affiliateId: affiliate.id,
+      actorId: c.get('staff').id,
+      idempotencyKey: body.idempotencyKey,
+      expectedAmount: Number(body.expectedAmount),
+    });
+    if (result.kind === 'not_found') {
+      return c.json({ success: false, error: '支払い情報が見つかりません' }, 404);
+    }
+    if (result.kind === 'empty') {
+      return c.json({ success: false, code: 'NOTHING_TO_SETTLE', error: '確定できる報酬はありません' }, 409);
+    }
+    if (result.kind === 'changed') {
+      return c.json({ success: false, code: 'SETTLEMENT_CHANGED', error: '金額が変わりました。内容を読み直してください' }, 409);
+    }
+    if (result.kind === 'idempotency_conflict') {
+      return c.json({ success: false, code: 'IDEMPOTENCY_CONFLICT', error: '同じ再実行キーが別の入力に使われています' }, 409);
+    }
+    return c.json({ success: true, data: result }, result.kind === 'created' ? 201 : 200);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (/UNIQUE constraint failed/i.test(message)) {
+      return c.json({ success: false, code: 'SETTLEMENT_CHANGED', error: '別の操作で確定済みです。内容を読み直してください' }, 409);
+    }
+    console.error('POST /api/affiliate-payments/:id/confirm error:', err);
+    return c.json({ success: false, error: '支払いを確定できませんでした' }, 500);
   }
 });
 
@@ -208,6 +392,7 @@ affiliates.post('/api/affiliates', requireRole('owner', 'admin'), async (c) => {
       friendId?: string;
       issueInitialLink?: boolean;
       lineAccountId?: string;
+      operationId?: string;
     }>();
 
     const name = typeof body.name === 'string' ? body.name.trim() : '';
@@ -216,6 +401,12 @@ affiliates.post('/api/affiliates', requireRole('owner', 'admin'), async (c) => {
     const requestedLineAccountId = typeof body.lineAccountId === 'string'
       ? body.lineAccountId.trim()
       : '';
+    // 安定した操作UUID（#686）。commit後に応答だけ失われて再送されても、
+    // packages/db 側が同じIDで既存行を回収するため二重登録にならない。
+    const operationId = typeof body.operationId === 'string' ? body.operationId.trim() : '';
+    if (operationId && (operationId.length < 8 || operationId.length > 200)) {
+      return c.json({ success: false, error: 'もう一度、最初からやり直してください' }, 400);
+    }
     const { visible, scope } = await getAffiliateScope(c);
 
     // Require at least one of name / code / friendId to identify the affiliate.
@@ -252,6 +443,10 @@ affiliates.post('/api/affiliates', requireRole('owner', 'admin'), async (c) => {
     if (!visible.allowedAccountIds.includes(lineAccountId)) {
       return c.json({ success: false, error: 'Affiliate not found' }, 404);
     }
+    const rateError = commissionRateError(body.commissionRate);
+    if (rateError) {
+      return c.json({ success: false, error: rateError }, 400);
+    }
 
     // ── Legacy explicit-code path (OSS back-compat) ─────────────────────────
     // Only taken when a code was supplied AND no friend binding is requested.
@@ -275,6 +470,7 @@ affiliates.post('/api/affiliates', requireRole('owner', 'admin'), async (c) => {
           name: resolvedName,
           code,
           commissionRate: body.commissionRate,
+          operationId: operationId || undefined,
         });
         return c.json({ success: true, data: serializeAffiliate(item) }, 201);
       } catch (err) {
@@ -302,6 +498,7 @@ affiliates.post('/api/affiliates', requireRole('owner', 'admin'), async (c) => {
         name: resolvedName,
         commissionRate: body.commissionRate,
         friendId: friendId || null,
+        operationId: operationId || undefined,
       });
     } catch (err) {
       // The friend_id partial UNIQUE index throws when the friend already has an
@@ -325,11 +522,16 @@ affiliates.post('/api/affiliates', requireRole('owner', 'admin'), async (c) => {
         ? body.issueInitialLink
         : Boolean(friendId);
 
+    // 応答だけ失われた再送は、上の operationId で同じ `item` を回収する。
+    // リンク発行も同じ操作UUIDを渡し、DB側の部分UNIQUEで1本に収める（#686）。
+    // ここを「一覧を読んで無ければ作る」で書くと、同時2実行で両方が
+    // 「まだ無い」と読んでそれぞれ発行し、リンクが2本できる。
     let link: { refCode: string; url: string } | undefined;
     if (shouldIssueLink) {
       const created = await createAffiliateLink(c.env.DB, {
         affiliateId: item.id,
         lineAccountId,
+        operationId: operationId || undefined,
       });
       const baseUrl = await resolveLinkBaseUrl(c.env.DB, c.env);
       link = { refCode: created.ref_code, url: `${baseUrl}/${created.ref_code}` };
@@ -359,6 +561,8 @@ affiliates.put('/api/affiliates/:id', requireRole('owner', 'admin'), async (c) =
 
     const settlement = readAffiliateSettlement(body);
     if (!settlement.ok) return c.json({ success: false, error: settlement.error }, 400);
+    const rateError = commissionRateError(body.commissionRate);
+    if (rateError) return c.json({ success: false, error: rateError }, 400);
 
     const updated = await updateAffiliate(c.env.DB, id, {
       name: body.name,
@@ -396,7 +600,7 @@ affiliates.delete('/api/affiliates/:id', requireRole('owner', 'admin'), async (c
 // GET /api/affiliates/:id/report - affiliate performance report (v2)
 // Extends the legacy report with ref_tracking-based clicks, add-time friendAdds,
 // conversionsByPoint, estimatedCommission and identity-key duplicateFlags.
-affiliates.get('/api/affiliates/:id/report', async (c) => {
+affiliates.get('/api/affiliates/:id/report', affiliateReportPermission(), async (c) => {
   try {
     const { scope } = await getAffiliateScope(c);
     const affiliate = await getAffiliateById(c.env.DB, c.req.param('id'), scope);
@@ -422,7 +626,7 @@ affiliates.get('/api/affiliates/:id/report', async (c) => {
 
 // GET /api/affiliates/:id/journeys - attributed-friend journey summaries
 // Cursor-paginated on (addedAt, friendId), same scheme as GET /api/chats.
-affiliates.get('/api/affiliates/:id/journeys', async (c) => {
+affiliates.get('/api/affiliates/:id/journeys', affiliateReportPermission(), async (c) => {
   try {
     const { scope } = await getAffiliateScope(c);
     const affiliate = await getAffiliateById(c.env.DB, c.req.param('id'), scope);
@@ -443,7 +647,7 @@ affiliates.get('/api/affiliates/:id/journeys', async (c) => {
 });
 
 // GET /api/affiliates/:id/links - list all ref_code links for an affiliate
-affiliates.get('/api/affiliates/:id/links', async (c) => {
+affiliates.get('/api/affiliates/:id/links', affiliateReportPermission(), async (c) => {
   try {
     const { scope } = await getAffiliateScope(c);
     const affiliate = await getAffiliateById(c.env.DB, c.req.param('id'), scope);

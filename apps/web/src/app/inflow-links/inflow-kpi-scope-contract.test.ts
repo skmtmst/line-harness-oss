@@ -35,7 +35,7 @@ describe('流入と計測の帯は、選択中のフォルダだけを数えな�
   })
 
   it('稼働中も同じ数え方にそろえる', () => {
-    expect(PAGE).toContain('const accountRouteCount = accountFilteredRows.length')
+    expect(PAGE).toContain('const accountRouteCount = summary?.routeTotal ?? accountFilteredRows.length')
     expect(PAGE).toContain(
       "const activeRouteCount = accountFilteredRows.filter((r) => r.source !== 'orphan').length",
     )

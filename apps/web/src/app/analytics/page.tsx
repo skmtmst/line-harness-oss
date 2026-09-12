@@ -1,7 +1,7 @@
 'use client'
 
 import SelectField from '@/components/shared/select-field'
-import { Suspense, useEffect, useMemo, useState } from 'react'
+import { Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import type { FriendField } from '@line-crm/shared'
 import {
@@ -18,14 +18,23 @@ import {
   type SavedAnalyticsSnapshot,
   type SavedAnalyticsSummary,
 } from '@/lib/api'
-import KpiCard from '@/components/dashboard/kpi-card'
+import KpiCard from '@/components/shared/kpi-card'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import Button from '@/components/shared/button'
+import Breadcrumb from '@/components/shared/breadcrumb'
 import Chip, { type ChipTone } from '@/components/shared/chip'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import { useAccount } from '@/contexts/account-context'
+import { csvCell } from '@/lib/presentation'
 import { formatAnalyticsDateTime } from './analytics-time'
 import { canTidyUsage, summarizeMenuFeatures, usageObservation } from './analytics-usage'
+
+// 実行間隔ガード(点検#508の中4)の符号を、運用の言葉に言い換える。
+function explainStartError(code: string, fallback: string): string {
+  if (code === 'analytics_cross_busy') return '他の集計が動いています。終わってからもう一度押してください'
+  if (code === 'analytics_funnel_too_soon') return 'さきほど集計したばかりです。少し待ってから押してください'
+  return fallback
+}
 
 const TABS = [
   { key: 'friends', label: '友だちの増減' },
@@ -38,12 +47,62 @@ const TABS = [
   { key: 'saved', label: '保存した分析' },
 ]
 
-/** 期間の選択肢。日数で持つ。 */
-const RANGES = [
-  { days: 7, label: '7日' },
-  { days: 28, label: '28日' },
-  { days: 90, label: '90日' },
-]
+function downloadCsv(filename: string, rows: Array<Array<string | number | null | undefined>>) {
+  const csv = rows.map((row) => row.map(csvCell).join(',')).join('\n')
+  const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' }))
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = filename
+  anchor.click()
+  URL.revokeObjectURL(url)
+}
+
+function AnalyticsNotice({ children }: { children: ReactNode }) {
+  return (
+    <div className="bg-info-bg border-info rounded-card border px-4 py-3 text-sm leading-relaxed text-ink-secondary">
+      {children}
+    </div>
+  )
+}
+
+function AnalyticsExportButton({ onClick, disabled }: { onClick: () => void; disabled: boolean }) {
+  return (
+    <Button onClick={onClick} disabled={disabled} variant="secondary">
+      CSVで書き出す
+    </Button>
+  )
+}
+
+function metricSum(metrics: Array<AnalyticsMetric<number>>): number | null {
+  const values = metrics.map(shownValue)
+  return values.some((value) => value === null)
+    ? null
+    : values.reduce<number>((sum, value) => sum + (value ?? 0), 0)
+}
+
+const RANGES = [7, 30, 90]
+const WEEKDAY_JP = ['日', '月', '火', '水', '木', '金', '土']
+
+function RangePicker({ days, onChange }: { days: number; onChange: (days: number) => void }) {
+  return (
+    <div className="flex gap-1" aria-label="集計期間">
+      {RANGES.map((range) => (
+        <button
+          type="button"
+          key={range}
+          onClick={() => onChange(range)}
+          className={`rounded-control px-3 py-2 text-xs font-medium ${days === range ? 'bg-accent-deep text-on-accent' : 'bg-canvas-sunken text-ink-secondary'}`}
+        >
+          {range}日
+        </button>
+      ))}
+    </div>
+  )
+}
+
+function weekdayOf(date: string): string {
+  return WEEKDAY_JP[new Date(`${date}T00:00:00+09:00`).getDay()] ?? ''
+}
 
 function rangeFor(days: number): { from: string; to: string } {
   const jstNow = new Date(Date.now() + 9 * 3600_000)
@@ -51,26 +110,6 @@ function rangeFor(days: number): { from: string; to: string } {
     from: new Date(jstNow.getTime() - days * 24 * 3600_000).toISOString().slice(0, 10),
     to: jstNow.toISOString().slice(0, 10),
   }
-}
-
-function RangePicker({ days, onChange }: { days: number; onChange: (d: number) => void }) {
-  return (
-    <div className="mb-4 flex gap-1">
-      {RANGES.map((r) => (
-        <button
-          key={r.days}
-          onClick={() => onChange(r.days)}
-          className={`rounded-pill px-3 py-1 text-sm transition-colors ${
-            days === r.days
-              ? 'bg-accent-deep text-on-accent'
-              : 'bg-canvas-sunken text-ink-secondary hover:bg-hairline'
-          }`}
-        >
-          {r.label}
-        </button>
-      ))}
-    </div>
-  )
 }
 
 function SaveAnalysisAction({
@@ -159,49 +198,54 @@ function SaveAnalysisAction({
   )
 }
 
-/**
- * 棒グラフ。
- *
- * ライブラリを入れず、divの高さで描く。目盛りが要るほど細かく見るなら
- * 数字の表を見た方が速い、という判断。書き出したページも軽く済む。
- */
-function Bars({ items }: { items: Array<{ label: string; value: number }> }) {
-  const max = Math.max(1, ...items.map((i) => i.value))
-  return (
-    <div className="flex h-40 items-end gap-1 overflow-x-auto">
-      {items.map((item) => (
-        <div key={item.label} className="flex min-w-[1.5rem] flex-1 flex-col items-center gap-1">
-          <div
-            className="bg-accent w-full rounded-t"
-            style={{ height: `${Math.round((item.value / max) * 100)}%` }}
-            title={`${item.label}: ${item.value}`}
-          />
-          <span className="text-ink-faint text-[10px] whitespace-nowrap">
-            {item.label.slice(5)}
-          </span>
-        </div>
-      ))}
-    </div>
-  )
+type CrossQueueStatus = {
+  state: string
+  queuePosition: number | null
+  pendingAhead: number
+  estimatedWaitMs: number | null
+  nextTickAt: string | null
 }
 
-const WEEKDAY_JP = ['日', '月', '火', '水', '木', '金', '土']
-
-/** 「2026-08-12」→「水」。JST の日付文字列をそのまま曜日にする。 */
-function weekdayOf(date: string): string {
-  const [y, m, d] = date.split('-').map(Number)
-  return WEEKDAY_JP[new Date(Date.UTC(y, m - 1, d)).getUTCDay()]
+function formatCrossNextTick(nextTickAt: string): string {
+  const parsed = new Date(nextTickAt)
+  if (Number.isNaN(parsed.getTime())) return ''
+  return new Intl.DateTimeFormat('ja-JP', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+    timeZone: 'Asia/Tokyo',
+  }).format(parsed)
 }
+
+function formatCrossWaitMinutes(estimatedWaitMs: number): string {
+  return String(Math.max(1, Math.round(estimatedWaitMs / 60_000)))
+}
+
+// 自動確認は5分cronの最初の処理機会をまたいで続ける。打ち切りは「観測した
+// 最短目安+3分」と「開始から15分」の早い方(点検#508の中2: 打ち切りと間隔延長
+// があり、無限に叩かない)。run IDは保持し、打ち切り後は「結果をもう一度確認」
+// で同じrunへ再接続する。
+const CROSS_AUTO_POLL_MIN_MS = 6 * 60_000
+const CROSS_AUTO_POLL_MARGIN_MS = 3 * 60_000
+const CROSS_AUTO_POLL_MAX_MS = 15 * 60_000
+// 一時的な確認失敗の後の待ち時間。run IDを消さず間隔を空けて続け、実行中の集計へ再接続できるようにする。
+const CROSS_POLL_ERROR_BACKOFF_MS = 10_000
 
 function CrossTab({ accountId, canManage }: { accountId: string; canManage: boolean }) {
   const [fields, setFields] = useState<FriendField[]>([])
+  // 友だち情報欄が取れないのに空表示のままにすると、項目を作り直す事故になる。
+  const [fieldsError, setFieldsError] = useState('')
   const [fieldId, setFieldId] = useState('')
   const [rowKind, setRowKind] = useState<'tag' | 'route' | 'score_band' | 'conversion_point' | 'booking_status' | 'purchase_status'>('tag')
   const [crossResult, setCrossResult] = useState<AnalyticsCrossResult | null>(null)
   const [crossRunId, setCrossRunId] = useState('')
   const [crossResultId, setCrossResultId] = useState('')
+  const [crossQueue, setCrossQueue] = useState<CrossQueueStatus | null>(null)
+  const [crossAutoStopped, setCrossAutoStopped] = useState(false)
+  const [crossRecheck, setCrossRecheck] = useState(0)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [crossDays, setCrossDays] = useState(30)
   const [audience, setAudience] = useState<{ id: string; memberCount: number; expiresAt: string } | null>(null)
   const [picked, setPicked] = useState<{
     row: string
@@ -210,66 +254,161 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
     columnKey: string
     count: number
   } | null>(null)
+  // いま表示してよい応答の世代。アカウント切替・画面破棄で進む。
+  const viewGeneration = useRef(0)
 
   useEffect(() => {
+    let active = true
+    setFieldsError('')
     void api.friendFields.list(accountId).then((res) => {
+      if (!active) return
       if (res.success) {
         setFields(res.data)
         if (res.data.length > 0) setFieldId(res.data[0].id)
+      } else {
+        setFieldsError(res.error || '友だち情報欄を読み込めませんでした')
       }
+    }).catch(() => {
+      if (active) setFieldsError('友だち情報欄を読み込めませんでした')
     })
+    return () => {
+      active = false
+    }
   }, [accountId])
 
   useEffect(() => {
     setCrossResult(null)
     setCrossRunId('')
     setCrossResultId('')
+    setCrossQueue(null)
+    setCrossAutoStopped(false)
     setPicked(null)
     setAudience(null)
     setError('')
   }, [accountId])
 
+  // アカウントを切り替える、または画面を離れると世代が1つ進む。切替の前に投げた
+  // 通信が後から返っても、世代が合わないので表示へ入れない(前のアカウントの
+  // run ID・結果・対象者が新しいアカウントの画面に出るのを防ぐ)。
+  useEffect(() => {
+    const generation = viewGeneration.current
+    return () => { viewGeneration.current = generation + 1 }
+  }, [accountId])
+
+  // 結果待ちの読み直し。終わらない集計があると無限に叩き続け、端末の電池と
+  // 回線、D1の読み取り枠を消費するため、打ち切り時刻を過ぎたら自動確認は止める。
+  // 打ち切りは最低6分(5分cronの最初の処理機会をまたぐ)で、観測した最短目安+3分
+  // まで延ばす(上限15分)。集計自体は5分cronで続く。run IDは保持し、
+  // 「結果をもう一度確認」で同じrunへ再接続する。一時的な確認失敗でもrun IDを
+  // 消さず、順番表示を残したまま間隔を空けて確認を続ける。
   useEffect(() => {
     if (!crossRunId) return
     let active = true
+    let timer: number | undefined
+    let attempts = 0
+    let pollErrors = 0
+    const pollStart = Date.now()
+    let deadline = pollStart + CROSS_AUTO_POLL_MIN_MS
+    // 自動確認の打ち切り。成功でも失敗でも、次の確認を積む前にここを通す。
+    // 確認が失敗し続けるときに打ち切りを見ないと、上限15分を過ぎても
+    // 端末が叩き続ける。集計自体は5分cronで続くので、run IDと順番表示は
+    // 残したまま手動の再確認へ渡す。
+    const stopIfDeadlinePassed = (): boolean => {
+      if (Date.now() < deadline) return false
+      setCrossAutoStopped(true)
+      setLoading(false)
+      return true
+    }
     const check = async () => {
+      // 確認を投げる前にも打ち切りを見る。前の確認が長引いて上限を越えた場合に、
+      // もう1本増やしてから止める、という動きにしない。
+      if (stopIfDeadlinePassed()) return
+      attempts += 1
       try {
         const response = await api.analytics.crossResult(accountId, crossRunId)
         if (!active) return
         if (!response.success) throw new Error(response.error)
+        pollErrors = 0
+        setError('')
+        setCrossQueue({
+          state: response.data.state,
+          queuePosition: response.data.queuePosition ?? null,
+          pendingAhead: response.data.pendingAhead ?? 0,
+          estimatedWaitMs: response.data.estimatedWaitMs ?? null,
+          nextTickAt: response.data.nextTickAt ?? null,
+        })
+        const waitMs = response.data.estimatedWaitMs
+        if (waitMs != null) {
+          deadline = Math.min(
+            pollStart + CROSS_AUTO_POLL_MAX_MS,
+            Math.max(deadline, Date.now() + waitMs + CROSS_AUTO_POLL_MARGIN_MS),
+          )
+        }
         if (response.data.result) {
           setCrossResult(response.data.result)
           setCrossRunId('')
+          setCrossQueue(null)
           setLoading(false)
-        } else if (response.data.state === 'failed') {
-          setError(response.data.errorCode || 'クロス分析に失敗しました')
-          setCrossRunId('')
-          setLoading(false)
+          return
         }
-      } catch (caught) {
+        if (response.data.state === 'failed') {
+          setError(response.data.errorCode || 'クロス分析に失敗しました。条件を変えずにもう一度集計できます')
+          setCrossRunId('')
+          setCrossQueue(null)
+          setLoading(false)
+          return
+        }
+      } catch {
         if (!active) return
-        setError(caught instanceof Error ? caught.message : 'クロス分析を確認できませんでした')
-        setCrossRunId('')
-        setLoading(false)
+        // 一時的な確認失敗でrun IDを消すと、実行中の集計へ再接続できなくなる。
+        // 順番表示は残し、間隔を空けて確認を続ける。ただし打ち切り時刻を過ぎて
+        // いたら、間隔を空ける前にここで止める(失敗が続くほど間隔が延びるため、
+        // 打ち切りを後回しにすると上限を大きく越える)。
+        pollErrors += 1
+        setError('クロス分析を確認できませんでした。確認を続けています')
+        if (stopIfDeadlinePassed()) return
+        // 失敗が続くほど間隔を空ける(10秒→20秒→30秒まで)。打ち切り時刻はそのまま。
+        timer = window.setTimeout(
+          () => void check(),
+          CROSS_POLL_ERROR_BACKOFF_MS * Math.min(pollErrors, 3),
+        )
+        return
       }
+      if (!active) return
+      // 自動確認の打ち切り。5分cronの集計自体は続いている。run IDと順番表示は
+      // 保持し、手動の再確認で同じrunへ戻る。新規の送り直しは促さない(送り直すと
+      // 元の集計がpendingの間は429になるため)。
+      if (stopIfDeadlinePassed()) return
+      timer = window.setTimeout(() => void check(), attempts < 10 ? 3000 : 10000)
     }
     void check()
-    const timer = window.setInterval(() => void check(), 1500)
     return () => {
       active = false
-      window.clearInterval(timer)
+      if (timer !== undefined) window.clearTimeout(timer)
     }
-  }, [accountId, crossRunId])
+  }, [accountId, crossRunId, crossRecheck])
+
+  // 時間切れ後もrun IDを保持しているため、同じ集計へ再接続できる。
+  const recheckCross = () => {
+    if (!crossRunId) return
+    setCrossAutoStopped(false)
+    setError('')
+    setLoading(true)
+    setCrossRecheck((n) => n + 1)
+  }
 
   const runCross = async () => {
     if (!fieldId) return
+    const generation = viewGeneration.current
     setLoading(true)
     setError('')
     setPicked(null)
     setAudience(null)
     setCrossResult(null)
+    setCrossQueue(null)
+    setCrossAutoStopped(false)
     const now = new Date()
-    const from = new Date(now.getTime() - 30 * 24 * 3600_000)
+    const from = new Date(now.getTime() - crossDays * 24 * 3600_000)
     const rowAxis: AnalyticsCrossAxis = { kind: rowKind }
     try {
       const response = await api.analytics.runCross(accountId, {
@@ -281,16 +420,22 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
         periodTo: now.toISOString(),
       })
       if (!response.success) throw new Error(response.error)
+      // 切替の前に投げた集計の受付が後から返っても、前のアカウントのrun IDで
+      // 待機表示やポーリングを始めない。
+      if (viewGeneration.current !== generation) return
       setCrossResultId(response.data.id)
       setCrossRunId(response.data.id)
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'クロス分析を開始できませんでした')
+      if (viewGeneration.current !== generation) return
+      const code = caught instanceof Error ? caught.message : ''
+      setError(explainStartError(code, code || 'クロス分析を開始できませんでした'))
       setLoading(false)
     }
   }
 
   const prepareCrossAudience = async () => {
     if (!picked || !crossResultId) return
+    const generation = viewGeneration.current
     setError('')
     try {
       const response = await api.analytics.createResultAudience(accountId, crossResultId, {
@@ -299,8 +444,11 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
         columnKey: picked.columnKey,
       })
       if (!response.success) throw new Error(response.error)
+      // 前のアカウントで作った対象者を、切替後の画面へ出さない。
+      if (viewGeneration.current !== generation) return
       setAudience(response.data)
     } catch (caught) {
+      if (viewGeneration.current !== generation) return
       setError(caught instanceof Error ? caught.message : '対象者を準備できませんでした')
     }
   }
@@ -390,6 +538,27 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
     return out
   }, [summary, cells.length, rowTotals, rows, lookup])
 
+  const exportCross = () => {
+    if (!crossResult) return
+    downloadCsv('analytics-cross.csv', [
+      [`${rowLabel} ＼ ${fieldName}`, ...cols.map((column) => column.label), '合計'],
+      ...rows.map((row) => [
+        row.label,
+        ...cols.map((column) => lookup.get(`${row.key}\u0000${column.key}`) ?? 0),
+        rowTotals.get(row.key) ?? 0,
+      ]),
+      ['合計', ...cols.map((column) => colTotals.get(column.key) ?? 0), grandTotal],
+    ])
+  }
+
+  if (fieldsError) {
+    return (
+      <p className="text-danger bg-danger-bg border-danger rounded-card border p-8 text-center text-sm" role="alert">
+        友だち情報欄を読み込めませんでした。開き直してください。
+      </p>
+    )
+  }
+
   if (fields.length === 0) {
     return (
       <p className="text-ink-faint bg-canvas rounded-card border-hairline border p-8 text-center text-sm">
@@ -402,12 +571,12 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
   }
 
   return (
-    <div data-design-node="f5HsX">
-      <p className="text-ink-faint mb-4 text-xs leading-relaxed">
-        タグや友だち情報を掛け合わせて、友だちが何人いるかを表にします。数字を押すとその人たちを抽出でき、そのまま配信できます。
-      </p>
+    <div data-design-node="f5HsX" className="space-y-4">
+      <div className="flex justify-end"><AnalyticsExportButton onClick={exportCross} disabled={!crossResult} /></div>
+      <AnalyticsNotice>数えているのは、こちらで観測できたことだけです。LINEで開かれたかどうかは取れないため、この画面には出しません。</AnalyticsNotice>
+      <p className="text-sm text-ink-secondary">タグや友だち情報を掛け合わせて、友だちが何人いるかを表にします。数字を押すとその人たちを抽出でき、そのまま配信できます。</p>
 
-      <section className="bg-canvas rounded-card border-hairline mb-4 border p-4">
+      <section className="bg-canvas rounded-card border-hairline border p-4">
         <h3 className="text-ink mb-3 text-sm font-semibold">何を掛け合わせるか</h3>
         <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end">
           <div>
@@ -431,12 +600,17 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
             />
           </div>
           <Button onClick={() => void runCross()} disabled={loading || !fieldId} variant="primary">
-            {loading ? '集計中' : 'この30日を集計'}
+            {loading ? '集計中' : `この${crossDays}日を集計`}
           </Button>
         </div>
+        <dl className="mt-3 grid gap-3 border-t border-hairline pt-3 sm:grid-cols-2">
+          <div><dt className="text-xs font-medium text-ink-secondary">数えるもの</dt><dd className="mt-1 text-sm text-ink">友だちの人数（重複なし）</dd></div>
+          <div><dt className="mb-1 text-xs font-medium text-ink-secondary">期間</dt><dd><RangePicker days={crossDays} onChange={setCrossDays} /></dd></div>
+        </dl>
         <p className="text-ink-faint mt-2 text-xs">
           集計結果はその時点のデータで固定します。期間や軸を変えた場合は、新しい結果として集計します。
         </p>
+        <p className="mt-1 text-xs text-ink-faint">追加条件を最大15個指定するには、クロス分析APIの追加条件の接続が必要です。</p>
         {error && <p className="text-danger mt-2 text-xs">{error}</p>}
         {crossResult?.stateReason && <p className="text-warning mt-2 text-xs">{crossResult.stateReason}</p>}
       </section>
@@ -463,23 +637,58 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
       </div>
 
       {loading ? (
-        <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm">
-          集計を受け付けました。終わるまでこの画面で確認しています。
+        <div className="bg-canvas rounded-card border-hairline border p-8 text-center text-sm" role="status">
+          <p className="text-ink font-medium">集計を受け付けました。終わるまでこの画面で確認しています。</p>
+          <p className="text-ink-secondary mt-2">
+            現在の状態: {crossQueue?.state === 'running' ? '処理中です' : 'このLINEアカウント内で待ち順に並んでいます'}
+          </p>
+          {crossQueue?.queuePosition != null && (
+            <p className="text-ink-secondary mt-1">
+              このLINEアカウント内の順番は{crossQueue.queuePosition}番目です
+              {crossQueue.pendingAhead === 0 ? '（このアカウントであなたの前にはありません）' : `（このアカウントであなたの前に${crossQueue.pendingAhead}件あります）`}
+            </p>
+          )}
+          {crossQueue?.estimatedWaitMs != null && crossQueue.estimatedWaitMs > 0 && (
+            <p className="text-ink-secondary mt-1">
+              最短で約{formatCrossWaitMinutes(crossQueue.estimatedWaitMs)}分です。他の処理状況により延びることがあります
+              {crossQueue.nextTickAt && formatCrossNextTick(crossQueue.nextTickAt)
+                ? `（次回処理は${formatCrossNextTick(crossQueue.nextTickAt)}ごろ）`
+                : ''}
+            </p>
+          )}
+          <p className="text-ink-faint mt-2 text-xs">同じ分析をもう一度押す必要はありません。このままお待ちください。</p>
+          <p className="text-ink-faint mt-1 text-xs">結果が出た後はこの画面で確認でき、失敗・時間切れのときも集計し直せます。</p>
+        </div>
+      ) : !crossResult && crossAutoStopped && crossRunId ? (
+        <div className="bg-canvas rounded-card border-hairline border p-8 text-center text-sm" role="status">
+          <p className="text-ink font-medium">自動の確認を止めました。集計はこのまま続いています。</p>
+          {crossQueue?.queuePosition != null && (
+            <p className="text-ink-secondary mt-1">
+              このLINEアカウント内の順番は{crossQueue.queuePosition}番目です
+            </p>
+          )}
+          <p className="text-ink-secondary mt-1">
+            「結果をもう一度確認」を押すと同じ集計の続きを確認できます。もう一度集計を送り直す必要はありません。
+          </p>
+          <div className="mt-3 flex justify-center">
+            <Button onClick={() => recheckCross()} variant="primary">結果をもう一度確認</Button>
+          </div>
+          <p className="text-ink-faint mt-2 text-xs">結果が出た後はこの画面で確認でき、失敗のときも集計し直せます。</p>
         </div>
       ) : !crossResult ? (
         <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm">
-          たて・よこの軸を選び、「この30日を集計」を押してください。
+          たて・よこの軸を選び、「この{crossDays}日を集計」を押してください。
         </div>
       ) : cells.length === 0 ? (
         <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm">
           {crossResult.state === 'unavailable'
-            ? crossResult.stateReason || 'この分析に必要なデータを取得できません。'
+            ? crossResult.stateReason || '未取得'
             : 'この条件に該当する人はいません。'}
         </div>
       ) : (
         <>
-          <div data-design="Table" className="bg-canvas rounded-card border-hairline overflow-x-auto border">
-            <table className="w-full min-w-[600px]">
+          <div data-design="Table" className="bg-canvas rounded-card border-hairline overflow-hidden border">
+            <table className="w-full table-fixed">
               <thead>
                 <tr className="bg-canvas-sunken border-hairline border-b">
                   <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold">
@@ -635,6 +844,11 @@ function FunnelTab({ accountId, canManage }: { accountId: string; canManage: boo
   const [loading, setLoading] = useState(true)
   const [running, setRunning] = useState(false)
   const [runError, setRunError] = useState('')
+  // まだ1度も集計していない状態。壊れているのか未集計なのか分ける(点検#508軽13)。
+  const [noRun, setNoRun] = useState(false)
+  // 一覧の取得失敗は空表示と分ける。失敗したまま「まだありません」と出すと、
+  // あるものを無いと勘違いして作り直す(点検#508の中3)。
+  const [listError, setListError] = useState('')
   const [creating, setCreating] = useState(false)
   const [picked, setPicked] = useState<number | null>(null)
   const [funnelAudience, setFunnelAudience] = useState<{ id: string; memberCount: number; expiresAt: string } | null>(null)
@@ -642,6 +856,7 @@ function FunnelTab({ accountId, canManage }: { accountId: string; canManage: boo
   useEffect(() => {
     let active = true
     setLoading(true)
+    setListError('')
     setFunnels([])
     setSelected('')
     setRun(null)
@@ -651,10 +866,16 @@ function FunnelTab({ accountId, canManage }: { accountId: string; canManage: boo
     void api.analytics.v6Funnels
       .list(accountId)
       .then((res) => {
-        if (active && res.success) {
+        if (!active) return
+        if (res.success) {
           setFunnels(res.data)
           if (res.data.length > 0) setSelected(res.data[0].id)
+        } else {
+          setListError(res.error || 'ファネルを読み込めませんでした')
         }
+      })
+      .catch(() => {
+        if (active) setListError('ファネルを読み込めませんでした')
       })
       .finally(() => {
         if (active) setLoading(false)
@@ -671,13 +892,15 @@ function FunnelTab({ accountId, canManage }: { accountId: string; canManage: boo
     setFunnelAudience(null)
     setRun(null)
     setRunError('')
+    setNoRun(false)
     void api.analytics.v6Funnels.latestRun(accountId, selected).then((res) => {
       if (!active) return
       if (res.success) {
         setRun(res.data)
         setGroupKey(res.data.groups[0]?.key ?? 'all')
       }
-      else if (res.error !== 'Not found') setRunError(res.error)
+      else if (res.error === 'Not found') setNoRun(true)
+      else setRunError(res.error)
     })
     return () => {
       active = false
@@ -699,7 +922,8 @@ function FunnelTab({ accountId, canManage }: { accountId: string; canManage: boo
       setRun(response.data)
       setGroupKey(response.data.groups[0]?.key ?? 'all')
     } catch (error) {
-      setRunError(error instanceof Error ? error.message : '再集計できませんでした')
+      const code = error instanceof Error ? error.message : ''
+      setRunError(explainStartError(code, code || '再集計できませんでした'))
     } finally {
       setRunning(false)
     }
@@ -775,12 +999,25 @@ function FunnelTab({ accountId, canManage }: { accountId: string; canManage: boo
 
   const top = result?.[0]?.reached ?? 0
   const selectedFunnel = funnels.find((f) => f.id === selected) ?? null
+  const exportFunnel = () => {
+    if (!result) return
+    downloadCsv('analytics-funnel.csv', [
+      ['段', '到達した人', '前の段からの通過率', 'ここで止まった人', 'まだ途中の人'],
+      ...result.map((step) => [
+        step.label,
+        step.reached,
+        step.conversionFromPrevious === null ? null : `${Math.round(step.conversionFromPrevious * 1000) / 10}%`,
+        step.droppedAfter,
+        step.inProgressAfter,
+      ]),
+    ])
+  }
 
   return (
-    <div data-design-node="C2I7ry">
-      <p className="text-ink-faint mb-4 text-xs leading-relaxed">
-        友だちがどこまで進んで、どこで離れたかを段階ごとに見ます。段を自由に組み替えられるので、配信の流れでも購入の流れでも作れます。
-      </p>
+    <div data-design-node="C2I7ry" className="space-y-4">
+      <div className="flex justify-end"><AnalyticsExportButton onClick={exportFunnel} disabled={!result} /></div>
+      <AnalyticsNotice>段は上から順に見ます。同じ人が同じ段を2回通っても1回として数えます。判定できる期間は、最初の段から設定した日数です。まだ途中の人は完了した人に含めません。</AnalyticsNotice>
+      <p className="text-sm text-ink-secondary">友だちがどこまで進んで、どこで離れたかを段階ごとに見ます。段を自由に組み替えられるので、配信の流れでも購入の流れでも作れます。</p>
 
       {creating ? (
         <FunnelForm
@@ -794,6 +1031,10 @@ function FunnelTab({ accountId, canManage }: { accountId: string; canManage: boo
             setSelected(id)
           }}
         />
+      ) : listError ? (
+        <p className="text-danger bg-danger-bg rounded-card border-danger border p-8 text-center text-sm" role="alert">
+          ファネルを読み込めませんでした。開き直してください。
+        </p>
       ) : funnels.length === 0 ? (
         <p className="text-ink-faint bg-canvas rounded-card border-hairline border p-8 text-center text-sm">
           ファネルがまだありません。段を2つ以上つないで、どこで離れているかを見られます。
@@ -810,7 +1051,7 @@ function FunnelTab({ accountId, canManage }: { accountId: string; canManage: boo
         </p>
       ) : (
         <>
-          <section className="bg-canvas rounded-card border-hairline mb-4 border p-4">
+          <section className="bg-canvas rounded-card border-hairline border p-4">
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div className="min-w-0">
                 <h3 className="text-ink text-sm font-semibold">段の並び</h3>
@@ -875,6 +1116,7 @@ function FunnelTab({ accountId, canManage }: { accountId: string; canManage: boo
               ／データ締切 {formatAnalyticsDateTime(run.dataCutoffAt)}
             </p>}
             {runError && <p className="text-danger mt-2 text-xs">{runError}</p>}
+            {noRun && !run && <p className="text-ink-faint mt-2 text-xs">まだ集計がありません。「この30日を再集計」を押してください</p>}
             {run?.stateReason && <p className="text-warning mt-2 text-xs">{run.stateReason}</p>}
             {run && run.groups.length > 1 && (
               <div className="mt-3 max-w-xs">
@@ -1063,6 +1305,8 @@ function FunnelForm({
   ]
 
   const [name, setName] = useState('')
+  // 何日以内の通過で数えるか(点検#508軽11)。裏は1〜365日を受け付ける。
+  const [windowDays, setWindowDays] = useState('30')
   const [steps, setSteps] = useState([
     { label: '', kind: 'tag', value: '' },
     { label: '', kind: 'conversion', value: '' },
@@ -1104,7 +1348,7 @@ function FunnelForm({
     try {
       const res = await api.analytics.v6Funnels.create(accountId, {
         name: name.trim(),
-        windowDays: 30,
+        windowDays: Number(windowDays),
         steps: steps.map((s) => ({
           label: s.label.trim(),
           kind: s.kind,
@@ -1136,6 +1380,23 @@ function FunnelForm({
           onChange={(e) => setName(e.target.value)}
           placeholder="例: 友だち追加から購入まで"
           className="border-hairline rounded-control w-full max-w-md border px-3 py-2 text-sm"
+        />
+      </div>
+
+      <div>
+        <label htmlFor="fn-window" className="text-ink-secondary mb-1 block text-sm font-medium">
+          何日以内の通過で数えるか
+        </label>
+        <SelectField
+          id="fn-window"
+          value={windowDays}
+          onChange={(e) => setWindowDays(e.target.value)}
+          options={[
+            { value: '7', label: '7日以内' },
+            { value: '30', label: '30日以内' },
+            { value: '90', label: '90日以内' },
+          ]}
+          className="max-w-md"
         />
       </div>
 
@@ -1258,6 +1519,7 @@ function useOverview<T>(load: () => Promise<OverviewResult<T>>, key: string) {
         if (active) setLoading(false)
       })
     return () => { active = false }
+    // 契約: loaderはkeyに含まれる値だけに依存すること。キーに含まれない値をloaderが読んだらキーを足す。
     // loaderはkeyが表すアカウント・期間が変わった時だけ実行する。
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key])
@@ -1317,8 +1579,21 @@ function OverviewState({ loading, error }: { loading: boolean; error: string }) 
   return null
 }
 
+// 経路の内訳だけを後から読む(点検#508軽10)。概要と同時に2つの重い集計を走らせない。
+// 概要が出てから描かれるので、この関数の読み込みは概要の後に始まる。
+// 取得中は表の場所だけ読み込み表示にする。
+function RouteBreakdown({ accountId, from, to }: { accountId: string; from: string; to: string }) {
+  const routeState = useOverview<AnalyticsRoutesOverview>(
+    () => api.analytics.routesOverview(accountId, { from, to }),
+    `${accountId}:${from}:${to}:friends-routes`,
+  )
+  if (!routeState.data) return <OverviewState loading={routeState.loading} error={routeState.error} />
+  return <table className="w-full table-fixed"><thead><TableHeadRow><Th>経路</Th><Th align="right">増えた友だち</Th><Th align="right">現在つながっている</Th><Th align="right">1人追加あたり費用</Th></TableHeadRow></thead><tbody className="divide-y divide-hairline">{routeState.data.data.routes.map((route) => <tr key={route.id} className="text-sm"><td className="px-4 py-3"><p className="truncate font-medium" title={route.name}>{route.name}</p><p className="mt-1 truncate text-xs text-ink-faint">{route.refCode ? `ref=${route.refCode}` : '参照コードなし'}</p></td><td className="px-4 py-3 text-right"><MetricCell metric={route.friendAdds} /></td><td className="px-4 py-3 text-right"><MetricCell metric={route.currentFriends} /></td><td className="px-4 py-3 text-right"><MetricCell metric={route.costPerFriend} currency /></td></tr>)}</tbody></table>
+}
+
 function FriendsOverviewTab({ accountId }: { accountId: string }) {
   const range = useMemo(() => rangeFor(29), [])
+  const [selectedDate, setSelectedDate] = useState('')
   const state = useOverview<AnalyticsFriendsOverview>(
     () => api.analytics.friendsOverview(accountId, range),
     `${accountId}:${range.from}:${range.to}:friends`,
@@ -1330,29 +1605,50 @@ function FriendsOverviewTab({ accountId }: { accountId: string }) {
   // 差し引きは増加と減少から導いた値。元の2つが出せないなら、差し引きも出せない。
   // ここを道連れにしないと「増えた —／減った —／差し引き 0人」という読めない並びになる。
   const netValue = addedValue === null || removedValue === null ? null : shownValue(overview.metrics.net)
+  const remainingRate = addedValue && removedValue !== null
+    ? Math.max(0, ((addedValue - removedValue) / addedValue) * 100)
+    : null
   const pendingReason = overview.stateReason ?? '日ごとの集計がまだありません'
   // 日ごとの表は行ごとの状態を持たない。全体の状態が「実測できた」でないときは、
   // 0 が並んだ30行を出さずに理由を1行で出す。
   const daysShown = overview.state === 'available' || overview.state === 'partial'
+  const selectedDay = overview.days.find((day) => day.date === selectedDate) ?? overview.days.at(-1) ?? null
+  const selectedCampaigns = overview.campaigns.filter((item) => item.date === selectedDay?.date)
   return <div data-design-node="Zxezb" className="space-y-4">
     {overview.state !== 'available' && overview.stateReason && <div className="bg-warning-bg border-warning rounded-card border px-4 py-3 text-sm">{overview.stateReason}</div>}
     <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
-      <KpiCard title="増えた友だち" value={addedValue} unit="人" detail={overview.metrics.added.reason ?? (addedValue === null ? pendingReason : `初回 ${metricText(overview.metrics.firstTime)}人`)} />
-      <KpiCard title="減った友だち" value={removedValue} unit="人" detail={overview.metrics.removed.reason ?? (removedValue === null ? pendingReason : 'ブロック・解除')} />
-      <KpiCard title="差し引き" value={netValue} unit="人" detail={overview.metrics.net.reason ?? (netValue === null ? pendingReason : '増加 − 減少')} />
-      <KpiCard title="現在つながっている" value={shownValue(overview.metrics.currentFriends)} unit="人" detail={overview.metrics.currentFriends.reason ?? `再追加 ${metricText(overview.metrics.returning)}人`} />
+      <KpiCard title="現在つながっている" value={shownValue(overview.metrics.currentFriends)} unit="人" detail={overview.metrics.currentFriends.reason ?? (netValue === null ? pendingReason : `この30日の差し引き ${netValue > 0 ? '+' : ''}${netValue}人`)} />
+      <KpiCard title="増えた友だち" value={addedValue} unit="人" detail={overview.metrics.added.reason ?? (addedValue === null ? pendingReason : `この30日。初回 ${metricText(overview.metrics.firstTime)}人`)} />
+      <KpiCard title="減った友だち" value={removedValue} unit="人" detail={overview.metrics.removed.reason ?? (removedValue === null ? pendingReason : 'この30日。ブロック・友だち解除')} />
+      <KpiCard title="差し引き" value={netValue} unit="人" detail={remainingRate === null ? pendingReason : `増加 − 減少。残っている割合 ${remainingRate.toFixed(1)}%`} />
     </div>
-    <div className="bg-canvas rounded-card border-hairline overflow-hidden border">
-      <div className="border-hairline flex items-center justify-between border-b px-4 py-3"><h2 className="text-sm font-semibold">日ごとの増減</h2><span className="text-ink-faint text-xs">{state.data.period.from}〜{state.data.period.to}</span></div>
-      <table className="w-full table-fixed">
-        <thead><TableHeadRow><Th>日付</Th><Th align="right">増加</Th><Th align="right">減少</Th><Th align="right">差し引き</Th><Th>同日の施策</Th></TableHeadRow></thead>
-        <tbody className="divide-hairline divide-y">{!daysShown ? <tr><td colSpan={5} className="text-ink-faint p-8 text-center text-sm">{pendingReason}</td></tr> : [...overview.days].reverse().map((day) => {
-          const campaigns = overview.campaigns.filter((item) => item.date === day.date)
-          const names = campaigns.map((item) => item.name).join('、')
-          return <tr key={day.date} className="text-sm"><td className="px-4 py-2 tabular-nums">{day.date}</td><td className="px-4 py-2 text-right tabular-nums">{day.added}</td><td className="px-4 py-2 text-right tabular-nums">{day.removed}</td><td className="px-4 py-2 text-right font-medium tabular-nums">{day.net > 0 ? '+' : ''}{day.net}</td><td className="text-ink-secondary truncate px-4 py-2" title={names || undefined}>{names || '—'}</td></tr>
-        })}</tbody>
-      </table>
-    </div>
+    <AnalyticsNotice>増えた人と減った人を日ごとに並べています。減りが増えた日に何を配信したかも、同じ日付で確かめられます。</AnalyticsNotice>
+    <section className="bg-canvas rounded-card border-hairline border p-4">
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-2">
+        <div><h2 className="font-semibold text-ink">日ごとの増減（この30日）</h2><p className="mt-1 text-xs text-ink-faint">上が増えた人、下が減った人です。</p></div>
+        <span className="text-xs tabular-nums text-ink-faint">{state.data.period.from}〜{state.data.period.to}</span>
+      </div>
+      {!daysShown ? <p className="p-8 text-center text-sm text-ink-faint">{pendingReason}</p> : (
+        <div className="grid h-44 grid-cols-[repeat(30,minmax(0,1fr))] items-center gap-1 border-y border-hairline py-3">
+          {overview.days.map((day, index) => {
+            const max = Math.max(1, ...overview.days.flatMap((item) => [item.added, item.removed]))
+            const campaigns = overview.campaigns.filter((item) => item.date === day.date)
+            return <button type="button" key={day.date} onClick={() => setSelectedDate(day.date)} className={`relative flex h-full flex-col justify-center ${selectedDate === day.date ? 'ring-2 ring-accent ring-offset-1' : ''}`} title={`${day.date} 増加${day.added}・減少${day.removed}${campaigns.length ? `・${campaigns.map((item) => item.name).join('、')}` : ''}`}>
+              <div className="flex h-1/2 items-end"><span className="block w-full rounded-t bg-accent" style={{ height: `${Math.max(3, day.added / max * 100)}%` }} /></div>
+              <div className="border-t border-hairline" />
+              <div className="flex h-1/2 items-start"><span className="block w-full rounded-b bg-danger" style={{ height: `${Math.max(3, day.removed / max * 100)}%` }} /></div>
+              {(index === 0 || index === overview.days.length - 1 || campaigns.length > 0) && <span className="absolute -bottom-6 left-1/2 -translate-x-1/2 whitespace-nowrap text-[10px] text-ink-faint">{day.date.slice(5).replace('-', '/')}</span>}
+            </button>
+          })}
+        </div>
+      )}
+      <div className="mt-8 flex flex-wrap gap-4 text-xs text-ink-secondary"><span>● 増えた人</span><span className="text-danger">● 減った人</span>{overview.campaigns.map((item) => <span key={item.id}>{item.date.slice(5).replace('-', '/')} {item.name}</span>)}</div>
+      {selectedDay && <div className="mt-3 rounded-control bg-canvas-sunken px-3 py-2 text-xs text-ink-secondary"><strong className="text-ink">{selectedDay.date}（{weekdayOf(selectedDay.date)}）</strong>　増加 {selectedDay.added}人・減少 {selectedDay.removed}人・差し引き {selectedDay.net > 0 ? '+' : ''}{selectedDay.net}人　施策 {selectedCampaigns.length ? selectedCampaigns.map((item) => item.name).join('、') : 'なし'}</div>}
+    </section>
+    <section className="overflow-hidden rounded-card border border-hairline bg-canvas">
+      <div className="border-b border-hairline px-4 py-3"><h2 className="font-semibold text-ink">どこから増えたか</h2><p className="mt-1 text-xs text-ink-faint">「経路と成果」に接続された経路ごとの、この30日の実測です。</p></div>
+      <RouteBreakdown accountId={accountId} from={range.from} to={range.to} />
+    </section>
   </div>
 }
 
@@ -1364,13 +1660,28 @@ function ReactionsOverviewTab({ accountId }: { accountId: string }) {
   )
   if (!state.data) return <OverviewState loading={state.loading} error={state.error} />
   const overview = state.data.data
+  const delivered = shownValue(overview.metrics.delivered)
+  const clicked = shownValue(overview.metrics.lineClicked)
+  const clickRate = delivered && clicked !== null ? clicked / delivered * 100 : null
+  const maxHourly = Math.max(1, ...overview.trackedClickHours.map((item) => item.clicks))
   return <div data-design-node="J6Inc" className="space-y-4">
     <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
-      <KpiCard title="送信対象" value={overview.metrics.sent.value} unit="人" detail={overview.metrics.sent.reason ?? '配信ごとの対象'} />
-      <KpiCard title="到達" value={overview.metrics.delivered.value} unit="人" detail={overview.metrics.delivered.reason ?? 'LINE取得値'} />
-      <KpiCard title="開封" value={overview.metrics.opened.value} unit="人" detail={overview.metrics.opened.reason ?? '20人未満は取得対象外'} />
-      <KpiCard title="自社URLクリック" value={overview.metrics.trackedClicks.value} unit="回" detail={overview.clickDefinition} />
+      <KpiCard title="この30日に送った" value={overview.campaigns.length} unit="回" detail="一覧に取得できた配信" />
+      <KpiCard title="届いた人" value={delivered} unit="人" detail={overview.metrics.delivered.reason ?? '配信ごとの到達数の合計'} />
+      <KpiCard title="押された割合" value={clickRate} unit="%" detail="LINEクリック ÷ 届いた人" />
+      <KpiCard title="取得できない配信" value={shownValue(overview.metrics.unavailableCampaigns)} unit="件" detail={overview.metrics.unavailableCampaigns.reason ?? '開封などを取得できない配信'} />
     </div>
+    <AnalyticsNotice>配信ごとの開かれ方・押され方です。20人未満など取得できない数は、0ではなく「—」と理由で示します。</AnalyticsNotice>
+    <section className="bg-canvas rounded-card border-hairline border p-4">
+      <h2 className="font-semibold text-ink">送った時間ごとの「押された回数」</h2>
+      <p className="mt-1 text-xs text-ink-faint">こちらで作った中継URLのクリックを、時間帯ごとに並べています。</p>
+      <div className="mt-4 flex h-28 items-end gap-2">
+        {Array.from({ length: 24 }, (_, hour) => {
+          const clicks = overview.trackedClickHours.find((item) => item.hour === hour)?.clicks ?? 0
+          return <div key={hour} className="flex min-w-0 flex-1 flex-col items-center gap-1" title={`${hour}時台 ${clicks}回`}><span className="w-full rounded-t bg-accent" style={{ height: `${Math.max(2, clicks / maxHourly * 96)}px` }} />{hour % 3 === 0 && <span className="whitespace-nowrap text-[10px] text-ink-faint">{hour}時</span>}</div>
+        })}
+      </div>
+    </section>
     <div className="bg-canvas rounded-card border-hairline overflow-hidden border"><table className="w-full table-fixed">
       <thead><TableHeadRow><Th>配信</Th><Th>種類・日時</Th><Th align="right">対象</Th><Th align="right">到達</Th><Th align="right">開封</Th><Th align="right">LINEクリック</Th><Th align="right">成果</Th></TableHeadRow></thead>
       <tbody className="divide-hairline divide-y">{overview.campaigns.length === 0 ? <tr><td colSpan={7} className="text-ink-faint p-8 text-center text-sm">この期間の配信はありません</td></tr> : overview.campaigns.map((item) => <tr key={`${item.kind}:${item.id}`} className="text-sm"><td className="truncate px-4 py-3 font-medium" title={item.name}>{item.name}</td><td className="text-ink-secondary px-3 py-3">{item.kind === 'broadcast' ? '一斉配信' : 'シナリオ'}<br /><span className="text-xs tabular-nums">{item.sentAt.slice(0, 16).replace('T', ' ')}</span></td><td className="px-3 py-3 text-right"><MetricCell metric={item.targetPeople} /></td><td className="px-3 py-3 text-right"><MetricCell metric={item.delivered} /></td><td className="px-3 py-3 text-right"><MetricCell metric={item.opened} /></td><td className="px-3 py-3 text-right"><MetricCell metric={item.lineClicked} /></td><td className="px-3 py-3 text-right"><MetricCell metric={item.outcomes} /></td></tr>)}</tbody>
@@ -1386,11 +1697,35 @@ function RoutesOverviewTab({ accountId }: { accountId: string }) {
   )
   if (!state.data) return <OverviewState loading={state.loading} error={state.error} />
   const overview = state.data.data
+  const clicks = metricSum(overview.routes.map((item) => item.clicks))
+  const friends = metricSum(overview.routes.map((item) => item.friendAdds))
+  const reactions = metricSum(overview.routes.map((item) => item.reactionPeople))
+  const conversions = metricSum(overview.routes.map((item) => item.conversions.approved))
+  const revenue = metricSum(overview.routes.map((item) => item.conversions.revenue))
+  const adCost = metricSum(overview.routes.map((item) => item.adCost))
+  const profit = metricSum(overview.routes.map((item) => item.profitAfterAdCost))
+  const stages = [
+    { label: 'リンクを見た', value: clicks },
+    { label: '友だちになった', value: friends },
+    { label: '1回でも反応した', value: reactions },
+    { label: '成果になった', value: conversions },
+  ]
   return <div data-design-node="YBGtm" className="space-y-4">
-    <div className="bg-info-bg border-info rounded-card flex items-center justify-between border px-4 py-3 text-sm"><span>帰属方式: {overview.attributionLabel}</span><Link href={overview.searchConsoleHref} className="text-accent font-medium hover:underline">Search Consoleを見る</Link></div>
+    <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+      <KpiCard title="この30日の成果" value={conversions} unit="件" detail={revenue === null ? '売上は未取得です' : `売上 ${revenue.toLocaleString('ja-JP')}円`} />
+      <KpiCard title="かかった広告費" value={adCost} unit="円" detail="接続済みの経路を合計" />
+      <KpiCard title="差し引き" value={profit} unit="円" detail="売上から広告費を引いた残り" />
+      <KpiCard title="費用を取得できない経路" value={overview.routes.filter((item) => shownValue(item.adCost) === null).length} unit="件" detail="0円として計算しません" />
+    </div>
+    <AnalyticsNotice><span>経路ごとに、かかった費用と出た成果を差し引きまで出します。帰属方式は「{overview.attributionLabel}」です。</span> <Link href={overview.searchConsoleHref} className="font-medium text-accent hover:underline">Search Consoleを見る</Link></AnalyticsNotice>
+    <div className="grid grid-cols-4 overflow-hidden rounded-card border border-hairline bg-canvas">{stages.map((stage, index) => {
+      const previous = index > 0 ? stages[index - 1].value : null
+      const rate = previous && stage.value !== null ? stage.value / previous * 100 : null
+      return <div key={stage.label} className="border-r border-hairline px-4 py-3 last:border-r-0"><p className="text-xs text-ink-faint">{stage.label}</p><p className="mt-1 text-lg font-bold text-ink">{stage.value === null ? '—' : stage.value.toLocaleString('ja-JP')}<span className="ml-1 text-xs font-normal">{index === 0 ? '回' : index === 3 ? '件' : '人'}</span></p>{index > 0 && <p className="text-xs text-ink-secondary">前段の {rate === null ? '—' : `${rate.toFixed(1)}%`}</p>}</div>
+    })}</div>
     <div className="bg-canvas rounded-card border-hairline overflow-hidden border"><table className="w-full table-fixed">
-      <thead><TableHeadRow><Th>経路</Th><Th align="right">クリック</Th><Th align="right">友だち追加</Th><Th align="right">現在</Th><Th align="right">反応</Th><Th align="right">承認成果</Th><Th align="right">成果金額</Th><Th align="right">広告費</Th><Th align="right">差し引き</Th></TableHeadRow></thead>
-      <tbody className="divide-hairline divide-y">{overview.routes.length === 0 ? <tr><td colSpan={9} className="text-ink-faint p-8 text-center text-sm">この期間に集計できる経路はありません</td></tr> : overview.routes.map((item) => <tr key={item.id} className="text-sm"><td className="truncate px-3 py-3 font-medium" title={item.name}>{item.name}</td><td className="px-2 py-3 text-right"><MetricCell metric={item.clicks} /></td><td className="px-2 py-3 text-right"><MetricCell metric={item.friendAdds} /></td><td className="px-2 py-3 text-right"><MetricCell metric={item.currentFriends} /></td><td className="px-2 py-3 text-right"><MetricCell metric={item.reactionPeople} /></td><td className="px-2 py-3 text-right"><MetricCell metric={item.conversions.approved} /></td><td className="px-2 py-3 text-right"><MetricCell metric={item.conversions.revenue} currency /></td><td className="px-2 py-3 text-right"><MetricCell metric={item.adCost} currency /></td><td className="px-2 py-3 text-right"><MetricCell metric={item.profitAfterAdCost} currency /></td></tr>)}</tbody>
+      <thead><TableHeadRow><Th>経路</Th><Th align="right">友だち</Th><Th align="right">反応</Th><Th align="right">成果</Th><Th align="right">売上</Th><Th align="right">かかった費用</Th><Th align="right">差し引き</Th></TableHeadRow></thead>
+      <tbody className="divide-hairline divide-y">{overview.routes.length === 0 ? <tr><td colSpan={7} className="text-ink-faint p-8 text-center text-sm">この期間に集計できる経路はありません</td></tr> : overview.routes.map((item) => <tr key={item.id} className="text-sm"><td className="px-3 py-3 font-medium"><p className="truncate" title={item.name}>{item.name}</p><p className="mt-1 truncate text-xs font-normal text-ink-faint">{item.refCode ? `流入と計測 ／ ref=${item.refCode}` : '参照コードなし'} ／ クリック <MetricCell metric={item.clicks} /></p></td><td className="px-2 py-3 text-right"><MetricCell metric={item.friendAdds} /><p className="mt-1 text-xs text-ink-faint">現在 <MetricCell metric={item.currentFriends} /></p></td><td className="px-2 py-3 text-right"><MetricCell metric={item.reactionPeople} /></td><td className="px-2 py-3 text-right"><MetricCell metric={item.conversions.approved} /><p className="mt-1 text-xs text-ink-faint">保留 <MetricCell metric={item.conversions.pending} />・却下 <MetricCell metric={item.conversions.rejected} /></p></td><td className="px-2 py-3 text-right"><MetricCell metric={item.conversions.revenue} currency /></td><td className="px-2 py-3 text-right"><MetricCell metric={item.adCost} currency /><p className="mt-1 text-xs text-ink-faint">友だち1人 <MetricCell metric={item.costPerFriend} currency />・成果1件 <MetricCell metric={item.costPerConversion} currency /></p></td><td className="px-2 py-3 text-right"><MetricCell metric={item.profitAfterAdCost} currency /></td></tr>)}</tbody>
     </table></div>
   </div>
 }
@@ -1421,6 +1756,10 @@ function UsageOverviewTab({ accountId }: { accountId: string }) {
   }, [accountId])
   if (!state.data) return <OverviewState loading={state.loading} error={state.error} />
   const overview = state.data.data
+  const estimatedHoursSavedValue = overview.summary.estimatedHoursSaved.state === 'available'
+    || overview.summary.estimatedHoursSaved.state === 'partial'
+    ? overview.summary.estimatedHoursSaved.value
+    : null
   return <div data-design-node="QQ1SR" className="space-y-4">
     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
       <KpiCard
@@ -1431,25 +1770,25 @@ function UsageOverviewTab({ accountId }: { accountId: string }) {
       />
       <KpiCard
         title="作ったのに使っていない"
-        value={overview.summary.unusedItems.value}
+        value={shownValue(overview.summary.unusedItems)}
         unit="個"
         detail={overview.summary.unusedItems.reason ?? '8分類の利用状況から集計'}
-        action={{ label: '片づける', href: '#usage-items' }}
+        action={(shownValue(overview.summary.unusedItems) ?? 0) > 0 ? { label: '片づける', href: '#usage-items' } : undefined}
       />
       <KpiCard
         title="自動で動いた回数"
-        value={overview.summary.automaticRuns.value}
+        value={shownValue(overview.summary.automaticRuns)}
         unit="回"
         detail={`この30日。${overview.summary.automaticRuns.reason ?? '実行記録から集計'}。手で送ったのは${overview.summary.manualSends.value?.toLocaleString('ja-JP') ?? '—'}回`}
       />
       <KpiCard
         title="手作業が減った時間"
-        value={overview.summary.estimatedHoursSaved.value}
+        value={estimatedHoursSavedValue}
         unit="時間"
         detail={overview.summary.estimatedHoursSaved.reason ?? '1件30秒として試算'}
       />
     </div>
-    {overview.stateReason && <div className="bg-warning-bg border-warning rounded-card border px-4 py-3 text-sm">{overview.stateReason}</div>}
+    {overview.stateReason ? <div className="bg-warning-bg border-warning rounded-card border px-4 py-3 text-sm">{overview.stateReason}</div> : <AnalyticsNotice>項目が多いほど良い、ではありません。使っていないものは使用先を確かめてから、下の「片づける」で整理できます。</AnalyticsNotice>}
     <div id="usage-items" className="bg-canvas rounded-card border-hairline overflow-hidden border"><table className="w-full table-fixed">
       <thead><TableHeadRow><Th>機能</Th><Th align="right">作成</Th><Th align="right">利用中</Th><Th align="right">未使用</Th><Th>気づいたこと</Th><Th align="right">操作</Th></TableHeadRow></thead>
       <tbody className="divide-hairline divide-y">{overview.categories.map((item) => {
@@ -1466,17 +1805,40 @@ function UsageOverviewTab({ accountId }: { accountId: string }) {
 
 function UrlClicksOverviewTab({ accountId }: { accountId: string }) {
   const range = useMemo(() => rangeFor(29), [])
+  const [query, setQuery] = useState('')
   const state = useOverview<AnalyticsUrlClicksOverview>(
     () => api.analytics.urlClicksOverview(accountId, { ...range, limit: 200 }),
     `${accountId}:${range.from}:${range.to}:url-clicks`,
   )
   if (!state.data) return <OverviewState loading={state.loading} error={state.error} />
   const overview = state.data.data
+  const visibleLinks = overview.links.filter((item) => `${item.name} ${item.originalUrl} ${item.usageLocations.join(' ')}`.toLowerCase().includes(query.trim().toLowerCase()))
+  const clicks = metricSum(overview.links.map((item) => item.clicks))
+  const people = metricSum(overview.links.map((item) => item.knownClickPeople))
+  const zeroLinks = overview.links.filter((item) => shownValue(item.clicks) === 0).length
+  const exportRows = () => downloadCsv('analytics-url-clicks.csv', [
+    ['リンク名', 'URL', '押された回数', '押した人', '使われた場所'],
+    ...visibleLinks.map((item) => [item.name, item.originalUrl, shownValue(item.clicks), shownValue(item.knownClickPeople), item.usageLocations.join('、')]),
+  ])
   return <div data-design-node="Fh2Qj" className="space-y-4">
+    <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+      <KpiCard title="押された回数" value={clicks} unit="回" detail="この30日の中継URL" />
+      <KpiCard title="押した人（URLごとの合計）" value={people} unit="人" detail="URLをまたぐ重複は除けません" />
+      <KpiCard title="計測中のURL" value={overview.links.filter((item) => item.isActive).length} unit="件" detail="この画面に取得できたもの" />
+      <KpiCard title="押されていないURL" value={zeroLinks} unit="件" detail="実測できたURLのうち" />
+    </div>
+    <AnalyticsNotice>数えているのは、こちらで作った中継URLだけです。直接貼ったURLは数えられません。同じURLを同じ人が何度押しても「押した人」は1人と数えます。</AnalyticsNotice>
     {overview.stateReason && <div className="bg-warning-bg border-warning rounded-card border px-4 py-3 text-sm">{overview.stateReason}</div>}
+    {overview.hasMore && <AnalyticsNotice>200件まで表示しています。探す言葉を足して絞ってください。CSVの書き出しも、表示している範囲だけが入ります。</AnalyticsNotice>}
+    <div className="flex flex-wrap items-center gap-2">
+      <label htmlFor="url-click-search" className="sr-only">URL・配信名・リンク名で探す</label>
+      <input id="url-click-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="URL・配信名・リンク名で探す" className="h-10 min-w-64 flex-1 rounded-control border border-hairline bg-canvas px-3 text-sm" />
+      <span className="text-xs text-ink-faint">{state.data.period.from}〜{state.data.period.to}</span>
+      <AnalyticsExportButton onClick={exportRows} disabled={visibleLinks.length === 0} />
+    </div>
     <div className="bg-canvas rounded-card border-hairline overflow-hidden border"><table className="w-full table-fixed">
-      <thead><TableHeadRow><Th>URL名</Th><Th>リンク先</Th><Th align="right">クリック</Th><Th align="right">実人数</Th><Th align="right">届いた人数</Th><Th align="right">クリック率</Th><Th>使われた場所</Th></TableHeadRow></thead>
-      <tbody className="divide-hairline divide-y">{overview.links.length === 0 ? <tr><td colSpan={7} className="text-ink-faint p-8 text-center text-sm">この期間に集計できるURLはありません</td></tr> : overview.links.map((item) => <tr key={item.trackedLinkId} className="text-sm"><td className="truncate px-3 py-3 font-medium" title={item.name}>{item.name}{!item.isActive && <span className="text-ink-faint ml-1 text-xs">停止</span>}</td><td className="text-ink-secondary truncate px-3 py-3" title={item.originalUrl}>{item.originalUrl}</td><td className="px-2 py-3 text-right"><MetricCell metric={item.clicks} /></td><td className="px-2 py-3 text-right"><MetricCell metric={item.knownClickPeople} /></td><td className="px-2 py-3 text-right"><MetricCell metric={item.deliveredPeople} /></td><td className="px-2 py-3 text-right"><MetricCell metric={item.clickRate} percent /></td><td className="text-ink-secondary truncate px-3 py-3" title={item.usageLocations.join('、')}>{item.usageLocations.length ? item.usageLocations.join('、') : '—'}</td></tr>)}</tbody>
+      <thead><TableHeadRow><Th>リンク名・リンク先URL</Th><Th>どこから</Th><Th align="right">押された回数</Th><Th align="right">押した人</Th><Th align="right">クリック率</Th><Th>状態</Th></TableHeadRow></thead>
+      <tbody className="divide-hairline divide-y">{visibleLinks.length === 0 ? <tr><td colSpan={6} className="text-ink-faint p-8 text-center text-sm">条件に合うURLはありません</td></tr> : visibleLinks.map((item) => <tr key={item.trackedLinkId} className="text-sm"><td className="px-3 py-3"><p className="truncate font-medium" title={item.name}>{item.name}</p><p className="mt-1 truncate text-xs text-ink-faint" title={item.originalUrl}>{item.originalUrl}</p><p className="mt-1 truncate text-[11px] text-ink-faint">最初 {item.firstClickedAt ? <DateTimeMetricCell metric={item.firstClickedAt} /> : '—'} ／ 最後 {item.lastClickedAt ? <DateTimeMetricCell metric={item.lastClickedAt} /> : '—'}</p></td><td className="text-ink-secondary truncate px-3 py-3" title={item.usageLocations.join('、')}>{item.usageLocations.length ? item.usageLocations.join('、') : '—'}</td><td className="px-2 py-3 text-right"><MetricCell metric={item.clicks} /></td><td className="px-2 py-3 text-right"><MetricCell metric={item.knownClickPeople} /><p className="mt-1 text-xs text-ink-faint">届いた人数 <MetricCell metric={item.deliveredPeople} /></p></td><td className="px-2 py-3 text-right">{shownValue(item.clickRate) === null ? <span className="text-ink-faint" title={item.clickRate.reason ?? undefined}>—</span> : <span>{shownValue(item.clickRate)}%</span>}</td><td className="px-3 py-3"><Chip tone={item.isActive ? 'ok' : 'neutral'}>{item.isActive ? '計測中' : '停止中'}</Chip>{(item.actions?.tagName || item.actions?.scenarioName) && <p className="mt-1 truncate text-xs text-ink-faint" title={[item.actions.tagName, item.actions.scenarioName].filter(Boolean).join('、')}>{[item.actions.tagName, item.actions.scenarioName].filter(Boolean).join('・')}</p>}</td></tr>)}</tbody>
     </table></div>
     <p className="text-ink-faint text-xs">{overview.clickRateDefinition}</p>
   </div>
@@ -1485,7 +1847,7 @@ function UrlClicksOverviewTab({ accountId }: { accountId: string }) {
 const SAVED_STATE_LABELS: Record<SavedAnalyticsSnapshot['state'], string> = {
   available: '利用可能',
   partial: '一部集計',
-  unavailable: '取得不可',
+  unavailable: '未取得',
   failed: '失敗',
 }
 
@@ -1496,8 +1858,9 @@ const SAVED_STATE_TONES: Record<SavedAnalyticsSnapshot['state'], ChipTone> = {
   failed: 'danger',
 }
 
-function SavedAnalyticsTab({ accountId }: { accountId: string }) {
+function SavedAnalyticsTab({ accountId, onCountChange }: { accountId: string; onCountChange?: (count: number | null) => void }) {
   const [items, setItems] = useState<SavedAnalyticsSummary[]>([])
+  const [query, setQuery] = useState('')
   const [selectedId, setSelectedId] = useState('')
   const [snapshots, setSnapshots] = useState<SavedAnalyticsSnapshot[]>([])
   const [loading, setLoading] = useState(true)
@@ -1518,9 +1881,13 @@ function SavedAnalyticsTab({ accountId }: { accountId: string }) {
         if (!response.success) throw new Error(response.error)
         setItems(response.data)
         setSelectedId(response.data[0]?.id ?? '')
+        // 件数表示はこの取得結果を使い回す(点検#508軽9)。タブ名のためだけにもう1回叩かない。
+        onCountChange?.(response.data.length)
       })
       .catch((caught: unknown) => {
-        if (active) setError(caught instanceof Error ? caught.message : '保存した分析を確認できませんでした')
+        if (!active) return
+        setError(caught instanceof Error ? caught.message : '保存した分析を確認できませんでした')
+        onCountChange?.(null)
       })
       .finally(() => {
         if (active) setLoading(false)
@@ -1557,14 +1924,40 @@ function SavedAnalyticsTab({ accountId }: { accountId: string }) {
   }, [accountId, selectedId])
 
   const selected = items.find((item) => item.id === selectedId) ?? null
+  const visibleItems = items.filter((item) => `${item.name} ${item.createdByName}`.toLowerCase().includes(query.trim().toLowerCase()))
+  const staleCount = items.filter((item) => item.latestSnapshot && ['unavailable', 'failed'].includes(item.latestSnapshot.state)).length
+  const exportSaved = () => downloadCsv('analytics-saved.csv', [
+    ['分析名', '種類', '作った人', '定義版', '更新日時', '集計状態', '保存結果数'],
+    ...visibleItems.map((item) => [
+      item.name,
+      item.kind === 'cross' ? 'クロス分析' : 'ファネル',
+      item.createdByName,
+      item.currentVersionNumber,
+      item.updatedAt,
+      item.latestSnapshot ? SAVED_STATE_LABELS[item.latestSnapshot.state] : null,
+      item.snapshotCount,
+    ]),
+  ])
 
   return (
     <div data-design-node="dfwD4" className="space-y-4">
+      <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+        <KpiCard title="保存した分析" value={items.length} unit="件" detail="クロス分析とファネル" loading={loading} />
+        <KpiCard title="保存した結果" value={items.reduce((sum, item) => sum + item.snapshotCount, 0)} unit="件" detail="時点ごとに固定した結果" loading={loading} />
+        <KpiCard title="定義が古いもの" value={staleCount} unit="件" detail="未取得・失敗の最新結果" loading={loading} />
+        <KpiCard title="選んだ分析の履歴" value={selected ? selected.snapshotCount : null} unit="件" detail={selected?.name ?? '分析を選んでください'} loading={loading} />
+      </div>
       <div className="bg-info-bg border-info rounded-card border px-4 py-3 text-sm">
         <p className="text-ink font-medium">条件の定義と集計結果を分けて保存しています</p>
         <p className="text-ink-secondary mt-1 text-xs">
           あとから条件が変わっても、保存時点の結果は書き換わりません。定期レポートは現在「なし」です。
         </p>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <label htmlFor="saved-analysis-search" className="sr-only">分析名・作った人で探す</label>
+        <input id="saved-analysis-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="分析名・作った人で探す" className="h-10 min-w-64 flex-1 rounded-control border border-hairline bg-canvas px-3 text-sm" />
+        <AnalyticsExportButton onClick={exportSaved} disabled={visibleItems.length === 0} />
       </div>
 
       {loading ? (
@@ -1585,8 +1978,8 @@ function SavedAnalyticsTab({ accountId }: { accountId: string }) {
               <h2 className="text-sm font-semibold">保存した分析</h2>
               <span className="text-ink-faint text-xs">{items.length}件</span>
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[760px] table-fixed">
+            <div className="overflow-hidden">
+              <table className="w-full table-fixed">
                 <thead>
                   <TableHeadRow>
                     <Th>分析名</Th>
@@ -1599,7 +1992,7 @@ function SavedAnalyticsTab({ accountId }: { accountId: string }) {
                   </TableHeadRow>
                 </thead>
                 <tbody className="divide-hairline divide-y">
-                  {items.map((item) => {
+                  {visibleItems.map((item) => {
                     const active = selectedId === item.id
                     return (
                       <tr key={item.id} className={active ? 'bg-accent-soft' : 'hover:bg-canvas-sunken'}>
@@ -1681,6 +2074,7 @@ function AnalyticsInner() {
   const tab = useMergedTab(TABS)
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const [canManage, setCanManage] = useState(false)
+  const [savedCount, setSavedCount] = useState<number | null>(null)
 
   useEffect(() => {
     let active = true
@@ -1692,23 +2086,44 @@ function AnalyticsInner() {
       active = false
     }
   }, [])
+  // 保存件数は保存タブの取得結果を使い回す(点検#508軽9)。開く前は件数を出さない。
+  useEffect(() => {
+    setSavedCount(null)
+  }, [selectedAccountId])
   if (accountLoading) {
     return <div className="text-ink-faint p-8 text-center text-sm">分析を読み込んでいます</div>
   }
   if (!selectedAccountId) {
     return <div className="text-ink-faint p-8 text-center text-sm">LINE公式アカウントを選んでください</div>
   }
+  const currentLabel = TABS.find((item) => item.key === tab)?.label ?? '分析'
+  const displayTabs = TABS.map((item) => item.key === 'saved' && savedCount !== null
+    ? { ...item, label: `${item.label} ${savedCount}` }
+    : item)
   return (
     <div data-analytics-design="v6">
-      <MergedTabs basePath="/analytics" tabs={TABS} active={tab} />
+      <Breadcrumb
+        items={tab === 'friends'
+          ? [{ label: '成果と分析' }, { label: '分析' }]
+          : [{ label: '分析', href: '/analytics?tab=friends' }, { label: currentLabel }]}
+        className="mb-3"
+      />
+      <MergedTabs basePath="/analytics" tabs={displayTabs} active={tab} />
       {tab === 'friends' && <FriendsOverviewTab accountId={selectedAccountId} />}
       {tab === 'reactions' && <ReactionsOverviewTab accountId={selectedAccountId} />}
       {tab === 'routes' && <RoutesOverviewTab accountId={selectedAccountId} />}
       {tab === 'usage' && <UsageOverviewTab accountId={selectedAccountId} />}
-      {tab === 'cross' && <CrossTab accountId={selectedAccountId} canManage={canManage} />}
+      {/*
+        アカウントを切り替えたらクロス分析は作り直す(key)。前のアカウントへ投げた
+        通信が後から返っても、その応答を受け取る画面はもう無い。中の世代fenceと
+        合わせて、前のアカウントの結果・待ち順・対象者が新しい画面へ入らない。
+      */}
+      {tab === 'cross' && (
+        <CrossTab key={selectedAccountId} accountId={selectedAccountId} canManage={canManage} />
+      )}
       {tab === 'funnel' && <FunnelTab accountId={selectedAccountId} canManage={canManage} />}
       {tab === 'url-clicks' && <UrlClicksOverviewTab accountId={selectedAccountId} />}
-      {tab === 'saved' && <SavedAnalyticsTab accountId={selectedAccountId} />}
+      {tab === 'saved' && <SavedAnalyticsTab accountId={selectedAccountId} onCountChange={setSavedCount} />}
     </div>
   )
 }

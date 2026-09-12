@@ -60,7 +60,7 @@ describe('一括削除の一部失敗', () => {
     expect(
       failBranch.slice(0, earlyReturn),
       '失敗の枝で一覧を読み直していない',
-    ).toContain('await loadReminders()')
+    ).toContain('reminderList.retry()')
   })
 
   it('口の返事をそのまま画面へ出さない', () => {

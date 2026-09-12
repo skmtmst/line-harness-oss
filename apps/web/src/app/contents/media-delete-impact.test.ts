@@ -7,8 +7,10 @@ import {
   NOT_AVAILABLE,
   referenceKindText,
   referenceNameText,
+  summarizeBulkDeleteResult,
   usageText,
 } from './media-delete-impact'
+import { mediaUsageKindText } from './media-usage-display'
 
 const impact = (over: Record<string, unknown> = {}) =>
   ({
@@ -49,6 +51,18 @@ describe('使用先', () => {
     expect(referenceKindText('rich_menu')).toBe('リッチメニュー')
   })
 
+  it('#550 M4 「シナリオの通」ではなく「シナリオのステップ」と書く', () => {
+    // 削除の窓と詳細画面で同じ使用先が違う名前に見えていた。
+    expect(referenceKindText('scenario_step')).toBe('シナリオのステップ')
+  })
+
+  it('#550 M4 種別の言い方は使用箇所の1つの表と同じにする', () => {
+    // 表を2か所に置くと、片方だけ直して食い違いが再発する。
+    for (const kind of ['template', 'broadcast', 'rich_menu', 'scenario_step', 'nen_column', 'event', 'webinar'] as const) {
+      expect(referenceKindText(kind)).toBe(mediaUsageKindText(kind))
+    }
+  })
+
   it('名前が無い理由を書き分ける', () => {
     /*
      * 空欄にすると「名前の無い使用先」に見える。
@@ -80,6 +94,27 @@ describe('確かめた時刻', () => {
 
   it('読めなければ「—（未取得）」', () => {
     expect(checkedAtText('こわれた日付')).toBe(NOT_AVAILABLE)
+  })
+})
+
+describe('#550 M3 まとめて削除の結果文', () => {
+  it('全部消せたら成功の文にする', () => {
+    expect(summarizeBulkDeleteResult(3, [])).toEqual({ tone: 'success', message: '削除しました（3件）' })
+  })
+
+  it('一部失敗したら成功数と失敗した名前を残す', () => {
+    // 件ごとに上書きすると最後の1件しか残らない。
+    expect(summarizeBulkDeleteResult(1, ['a.png', 'b.png'])).toEqual({
+      tone: 'error',
+      message: '削除しました1件、失敗2件（a.png、b.png）',
+    })
+  })
+
+  it('全部失敗したら失敗した名前を残す', () => {
+    expect(summarizeBulkDeleteResult(0, ['a.png'])).toEqual({
+      tone: 'error',
+      message: '削除できませんでした（a.png）',
+    })
   })
 })
 

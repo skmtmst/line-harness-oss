@@ -7,6 +7,7 @@
 - ゴールから外れる提案をしないでください。
 - ゴールに進む提案を必ずしてください。
 - クラウド作業の開始前に `bash scripts/codex/doctor.sh` を実行し、最終行が「要確認」なら作業を始めず理由を報告してください。
+  - 手元の PC(NodeTerm の `~/lh-work` の作業ツリー)では `DOCTOR_LOCAL=1 bash scripts/codex/doctor.sh` で実行する。Cloudflare の遮断検査は Codex のクラウド砂場向けで、手元では必ず「要確認」になるため。`CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` は lane の作業に不要で、未設定が正しい。最終行が「合格」なら着手してよい(2026-09-06、司令塔の判断。台帳 #216)。
 - 回答には必ず「次のタスクはこれ」「今の進捗を全体像から整理するとこれ」を含めてください。
 - 私が大学生だと思って、言語化してください。
 - LINE Harness Proxy から担当者として1対1返信する場合は、`X-Line-Harness-Source: manual` を必ず付けてください。予約通知などの自動送信には付けないでください。

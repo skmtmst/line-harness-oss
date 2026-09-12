@@ -8,6 +8,8 @@ const openPage = readFileSync(new URL('./open/page.tsx', import.meta.url), 'utf8
 const shell = readFileSync(new URL('../../components/app-shell.tsx', import.meta.url), 'utf8')
 const sidebar = readFileSync(new URL('../../components/layout/sidebar.tsx', import.meta.url), 'utf8')
 const topBar = readFileSync(new URL('../../components/shell/app-top-bar.tsx', import.meta.url), 'utf8')
+const templatePage = readFileSync(new URL('./templates/page.tsx', import.meta.url), 'utf8')
+const sharedTemplatePage = readFileSync(new URL('./hq-template-page.tsx', import.meta.url), 'utf8')
 
 describe('統括コンソール', () => {
   it('既存のLINEアカウント一覧APIだけで店舗一覧を作る', () => {
@@ -43,26 +45,29 @@ describe('統括コンソール', () => {
     expect(shell).not.toContain('<HqReturnButton />')
     expect(topBar).toContain("router.push('/hq')")
     expect(topBar).toContain('clearSelectedAccountId')
-    expect(shell).toContain('<RootLandingGate><StoreSelectionGate>{children}</StoreSelectionGate></RootLandingGate>')
+    expect(shell).toContain('<RootLandingGate><StoreSelectionGate><FeatureDisabledGate>{children}</FeatureDisabledGate></StoreSelectionGate></RootLandingGate>')
   })
 
   it('統括と店舗のサイドバーを分け、採用フローを作らない', () => {
     expect(sidebar).toContain('HQ_MENU_SECTIONS')
     expect(HQ_MENU_SECTIONS.flatMap((section) => section.items).map((item) => item.label)).toEqual([
-      '店舗管理', 'タグ', 'テンプレート管理', 'リッチメニュー管理', '回答フォーム管理', '設定',
+      '店舗管理', '友だち属性', 'テンプレート', 'リッチメニュー', '回答フォーム', '設定',
     ])
     expect(HQ_MENU_SECTIONS.flatMap((section) => section.items).some((item) => item.label === '採用フロー管理')).toBe(false)
     expect(HQ_MENU_SECTIONS.flatMap((section) => section.items).map((item) => item.href)).toEqual([
       '/hq',
-      '/hq/open?target=tags',
-      '/hq/open?target=templates',
-      '/hq/open?target=rich-menus',
-      '/hq/open?target=form-submissions',
+      '/hq/friend-attributes',
+      '/hq/templates',
+      '/hq/rich-menus',
+      '/hq/form-submissions',
       '/hq/settings',
     ])
+    expect(templatePage).toContain('HqTemplatePage')
+    expect(sharedTemplatePage).toContain('HQ_TEMPLATE_DISTRIBUTION_ENABLED')
+    expect(sharedTemplatePage).toContain('hqOpenHref(target)')
   })
 
-  it('統括の4項目は同じ店舗一覧を流用し、選択後に識別子なしで遷移する', () => {
+  it('店舗を開く既存導線は残り、選択後に識別子なしで遷移する', () => {
     expect(openPage).toContain('<HqAccountList')
     expect(openPage).toContain('setSelectedAccountId(accountId)')
     expect(openPage).toContain('router.push(target.destination)')

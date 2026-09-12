@@ -11,6 +11,9 @@ const dbMocks = {
   recoverStuckDeliveries: vi.fn(),
   // /r/:ref resolution helpers
   getEntryRouteByRefCode: vi.fn(),
+  // N-244: stopped-route check. Default null keeps every existing case on
+  // the legacy path (active hit / neither-table miss).
+  getEntryRouteByRefCodeAny: vi.fn().mockResolvedValue(null),
   getTrafficPoolBySlug: vi.fn(),
   getTrafficPoolById: vi.fn(),
   getRandomPoolAccount: vi.fn(),
@@ -162,6 +165,37 @@ describe('/r/:ref — affiliate_links fallback', () => {
     // Affiliate fallback must be entirely bypassed for a known entry_route.
     expect(dbMocks.getAffiliateLinkByRefCode).not.toHaveBeenCalled();
     expect(dbMocks.incrementAffiliateLinkClick).not.toHaveBeenCalled();
+  });
+
+  // #514 重大4: 転送先が設定された経路はそちらへ 302 で送る。
+  // 保存はするのに読まないままだった。
+  it('(d) route with redirect_url → 302 to that URL', async () => {
+    dbMocks.getEntryRouteByRefCode.mockResolvedValue({
+      id: 'route-1',
+      ref_code: 'old',
+      redirect_url: 'https://example.com/lp',
+      pool_id: null,
+      is_active: 1,
+    });
+    const res = await get('/r/old');
+    expect(res.status).toBe(302);
+    expect(res.headers.get('location')).toBe('https://example.com/lp');
+  });
+
+  it('(e) dangerous redirect_url → falls through to the landing page', async () => {
+    dbMocks.getEntryRouteByRefCode.mockResolvedValue({
+      id: 'route-1',
+      ref_code: 'old',
+      redirect_url: 'javascript:alert(1)',
+      pool_id: null,
+      is_active: 1,
+    });
+    dbMocks.getAffiliateLinkByRefCode.mockResolvedValue(null);
+    dbMocks.getTrafficPoolBySlug.mockResolvedValue(null);
+    const res = await get('/r/old');
+    expect(res.status).toBe(200);
+    const html = await res.text();
+    expect(html).toContain('LINEで開く');
   });
 
   it('(c) ref in neither table → legacy default behavior unchanged', async () => {

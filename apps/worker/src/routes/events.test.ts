@@ -35,6 +35,16 @@ const notifierMocks = {
 };
 vi.mock('../services/event-booking-notifier.js', () => notifierMocks);
 
+const waitlistMocks = {
+  createEventWaitlistOfferSender: vi.fn(() => vi.fn()),
+  enqueueEventWaitlistPromotion: vi.fn(async () => true),
+  getEventOccurrenceApplicants: vi.fn(),
+  getEventOccurrenceUsedSeats: vi.fn(),
+  promoteEventWaitlist: vi.fn(),
+  processEventWaitlistPromotionJobs: vi.fn(),
+};
+vi.mock('../services/event-waitlist.js', () => waitlistMocks);
+
 const { default: events } = await import('./events.js');
 
 type TestEnv = {
@@ -125,6 +135,34 @@ function makeEventDb(state: {
   state.friendTags ??= [];
   state.tags ??= [];
   state.waitlist ??= [];
+  const eventMatchesAccount = (event: EventRow, account: string): boolean => {
+    if (event.target_type === 'multi-account-dedup') {
+      try {
+        return (JSON.parse(event.account_ids ?? '[]') as string[]).includes(account);
+      } catch {
+        return false;
+      }
+    }
+    return event.line_account_id === account;
+  };
+  const filterAdminEvents = (sql: string, bound: unknown[]): EventRow[] => {
+    const account = bound[0] as string;
+    const query = sql.includes('e.name LIKE ?') ? String(bound[2] ?? '').replace(/^%|%$/g, '').replace(/\\([\\%_])/g, '$1') : '';
+    return state.events.filter((event) => {
+      if (event.deleted_at != null || !eventMatchesAccount(event, account)) return false;
+      if (query && !event.name.includes(query)) return false;
+      if (sql.includes('e.is_published = 1') && event.is_published !== 1) return false;
+      if (sql.includes('pending.event_id = e.id') && !(state.bookings ?? []).some((booking) => booking.event_id === event.id && booking.status === 'requested')) return false;
+      if (sql.includes('NOT EXISTS (SELECT 1 FROM event_slots cap')) {
+        const slots = (state.slots ?? []).filter((slot) => slot.event_id === event.id && slot.deleted_at == null && slot.is_active === 1);
+        if (slots.length === 0 || slots.some((slot) => slot.capacity == null)) return false;
+        const capacity = slots.reduce((sum, slot) => sum + (slot.capacity ?? 0), 0);
+        const active = (state.bookings ?? []).filter((booking) => booking.event_id === event.id && ['requested', 'confirmed'].includes(booking.status)).length;
+        if (active < capacity) return false;
+      }
+      return true;
+    });
+  };
   const db = {
     prepare(sql: string) {
       let bound: unknown[] = [];
@@ -289,7 +327,7 @@ function makeEventDb(state: {
             } : null) as T | null;
           }
           // notifications/pending count: SELECT COUNT(*) AS c FROM event_bookings WHERE line_account_id = ? AND status = 'requested'
-          if (sql.includes('FROM event_bookings') && sql.includes("status = 'requested'")) {
+          if (sql.includes('COUNT(*) AS c') && sql.includes('FROM event_bookings') && sql.includes("status = 'requested'")) {
             const [account_id] = bound as [string];
             const c = (state.bookings ?? []).filter(
               (b) =>
@@ -393,6 +431,9 @@ function makeEventDb(state: {
             return {
               id: b.id,
               status: b.status,
+              line_account_id: (b as Record<string, unknown>).line_account_id,
+              event_id: b.event_id,
+              slot_id: (b as Record<string, unknown>).slot_id,
               cancel_deadline_hours_before: e.cancel_deadline_hours_before,
               slot_starts_at: s.starts_at,
             } as T;
@@ -419,26 +460,82 @@ function makeEventDb(state: {
             const s = (state.slots ?? []).find((x) => x.id === id);
             return (s ?? null) as T | null;
           }
-          // SELECT COUNT(*) AS c FROM event_bookings WHERE slot_id = ? AND status IN ('requested','confirmed')
-          if (sql.includes('FROM event_bookings') && sql.includes('COUNT(*) AS c')) {
-            const [slot_id] = bound as [string];
+          if (
+            sql.includes('SELECT COUNT(*) AS c FROM event_bookings')
+            && sql.includes("status = 'attended'")
+          ) {
+            const [friend_id, checked_at] = bound as [string, string];
+            const c = (state.bookings ?? []).filter((booking) => {
+              const row = booking as Record<string, unknown>;
+              return row.friend_id === friend_id
+                && booking.status === 'attended'
+                && String(row.requested_at ?? '') < checked_at;
+            }).length;
+            return { c } as T;
+          }
+          if (sql.includes('AS requested_count') && sql.includes('FROM event_bookings WHERE event_id = ?')) {
+            const [event_id] = bound as [string];
+            const rows = (state.bookings ?? []).filter((booking) => booking.event_id === event_id);
+            const count = (status: string) => rows.filter((booking) => booking.status === status).length;
+            return {
+              total: rows.length,
+              requested_count: count('requested'),
+              confirmed_count: count('confirmed'),
+              rejected_count: count('rejected'),
+              cancelled_count: count('cancelled'),
+              expired_count: count('expired'),
+              attended_count: count('attended'),
+              no_show_count: count('no_show'),
+            } as T;
+          }
+          if (sql.startsWith('SELECT COUNT(*) AS c FROM event_waitlist WHERE event_id = ?')) {
+            const [event_id] = bound as [string];
+            const active = new Set(['waiting', 'offered', 'accepted']);
+            return {
+              c: (state.waitlist ?? []).filter((row) => row.event_id === event_id && active.has(String(row.status))).length,
+            } as T;
+          }
+          if (sql.includes('AS slot_count') && sql.includes('FROM event_slots WHERE event_id = ?')) {
+            const [event_id] = bound as [string];
+            const slots = (state.slots ?? []).filter(
+              (slot) => slot.event_id === event_id && slot.deleted_at == null && slot.is_active === 1,
+            );
+            return {
+              slot_count: slots.length,
+              uncapped_count: slots.filter((slot) => slot.capacity == null).length,
+              total_capacity: slots.reduce((sum, slot) => sum + (slot.capacity ?? 0), 0),
+            } as T;
+          }
+          // 申込一覧の総数(点検#520の中8)。使用席数の枝より前に置く。
+          // 絞りがあるときは bound が [event_id, status?, slot_id?] の順に積まれる。
+          if (sql.startsWith('SELECT COUNT(*) AS c FROM event_bookings b')) {
+            const [event_id, second, third] = bound as [string, string?, string?];
+            const filterStatus = sql.includes('b.status = ?') ? second : null;
+            const filterSlot = sql.includes('b.slot_id = ?') ? (filterStatus ? third : second) : null;
             const c = (state.bookings ?? []).filter(
-              (b) => (b as BookingRow & { slot_id?: string }).slot_id === slot_id && (b.status === 'requested' || b.status === 'confirmed'),
+              (b) => b.event_id === event_id
+                && (filterStatus ? b.status === filterStatus : true)
+                && (filterSlot ? (b as Record<string, unknown>).slot_id === filterSlot : true),
             ).length;
+            return { c } as T;
+          }
+          // 開催回の使用席数。複数人申込は party_size の合計で数える。
+          if (
+            sql.includes('FROM event_bookings')
+            && (sql.includes('COUNT(*) AS c') || sql.includes('SUM(party_size)'))
+            && sql.includes('slot_id = ?')
+          ) {
+            const [slot_id] = bound as [string];
+            const c = (state.bookings ?? [])
+              .filter(
+                (b) => (b as BookingRow & { slot_id?: string }).slot_id === slot_id && (b.status === 'requested' || b.status === 'confirmed'),
+              )
+              .reduce((sum, booking) => sum + Number((booking as Record<string, unknown>).party_size ?? 1), 0);
             return { c } as T;
           }
           // Multi-account 対応の events lookup helper:
           // single モード → line_account_id 一致、multi-account-dedup モード
           // → account_ids JSON 配列に含まれる、のどちらか。
-          const eventMatchesAccount = (e: EventRow, account: string): boolean => {
-            if (e.target_type === 'multi-account-dedup') {
-              const ids = e.account_ids
-                ? (() => { try { return JSON.parse(e.account_ids as string) as string[]; } catch { return [] } })()
-                : [];
-              return ids.includes(account);
-            }
-            return e.line_account_id === account;
-          };
           // LIFF SELECT id FROM events ... AND is_published = 1
           if (sql.includes('SELECT id FROM events') && sql.includes('is_published')) {
             const [id, account, account2] = bound as [string, string, string?];
@@ -481,27 +578,39 @@ function makeEventDb(state: {
             const e = state.events.find((x) => x.id === id);
             return (e ?? null) as T | null;
           }
+          // イベント一覧の総数(点検#520の中8)。
+          if (sql.startsWith('SELECT COUNT(*) AS c FROM events e')) {
+            const c = filterAdminEvents(sql, bound).length;
+            return { c } as T;
+          }
           return null;
         },
         async all<T>() {
+          if (
+            sql.includes('SELECT id, tenant_id, parent_line_account_id') &&
+            sql.includes('WHERE COALESCE(tenant_id, ?) = ?')
+          ) {
+            const [defaultTenantId, tenantId] = bound as [string, string];
+            const results = (state.accounts ?? [])
+              .filter((account) => (account.tenant_id ?? defaultTenantId) === tenantId)
+              .map((account) => ({
+                id: account.id,
+                tenant_id: account.tenant_id ?? null,
+                parent_line_account_id: null,
+                is_active: account.is_active,
+                archived_at: null,
+                login_channel_id: null,
+                liff_id: account.liff_id,
+              }));
+            return { results } as { results: T[] };
+          }
           if (sql.startsWith('SELECT * FROM line_accounts')) {
             return { results: state.accounts ?? [] } as { results: T[] };
           }
           // admin events list (must come before event_slots branch since
           // its sub-queries also reference event_slots s)
           if (sql.startsWith('SELECT\n         e.*') || (sql.includes('FROM events e') && (sql.includes('e.line_account_id') || sql.includes('e.target_type')))) {
-            const [account] = bound as [string];
-            const items = state.events
-              .filter((e) => {
-                if (e.deleted_at != null) return false;
-                if (e.target_type === 'multi-account-dedup') {
-                  const ids = e.account_ids
-                    ? (() => { try { return JSON.parse(e.account_ids as string) as string[]; } catch { return [] } })()
-                    : [];
-                  return ids.includes(account);
-                }
-                return e.line_account_id === account;
-              })
+            const items = filterAdminEvents(sql, bound)
               .map((e) => {
                 const slots = (state.slots ?? []).filter(
                   (s) => s.event_id === e.id && s.deleted_at == null && s.is_active === 1,
@@ -515,10 +624,12 @@ function makeEventDb(state: {
                         .map((s) => s.starts_at)
                         .sort()[0]
                     : null;
-                const cap = slots.reduce<number | null>((acc, s) => {
-                  if (s.capacity == null) return acc;
-                  return (acc ?? 0) + s.capacity;
-                }, null);
+                // 本番と同じ決め方(点検#520の中6): 定員なしの枠が混ざれば合計なし。
+                const cap = slots.some((s) => s.capacity == null)
+                  ? null
+                  : slots.length > 0
+                    ? slots.reduce((acc, s) => acc + (s.capacity ?? 0), 0)
+                    : null;
                 const total_active = (state.bookings ?? []).filter(
                   (b) => b.event_id === e.id && (b.status === 'requested' || b.status === 'confirmed'),
                 ).length;
@@ -538,12 +649,13 @@ function makeEventDb(state: {
                   visible_tag_name,
                 };
               })
-              .sort((a, b) =>
-                a.sort_order !== b.sort_order
-                  ? a.sort_order - b.sort_order
-                  : b.created_at.localeCompare(a.created_at),
-              );
-            return { results: items as unknown as T[] };
+              .sort((a, b) => sql.includes('e.name COLLATE NOCASE')
+                ? a.name.localeCompare(b.name) || a.id.localeCompare(b.id)
+                : (a.next_slot_starts_at == null ? 1 : b.next_slot_starts_at == null ? -1 : a.next_slot_starts_at.localeCompare(b.next_slot_starts_at)) || a.id.localeCompare(b.id));
+            // 本番は LIMIT/OFFSET を付ける(点検#520の中8)。bound の末尾2つ。
+            const limit = typeof bound[bound.length - 2] === 'number' ? (bound[bound.length - 2] as number) : items.length;
+            const offset = typeof bound[bound.length - 1] === 'number' ? (bound[bound.length - 1] as number) : 0;
+            return { results: items.slice(offset, offset + limit) as unknown as T[] };
           }
           // admin bookings list: SELECT b.*, s.starts_at, ..., friends.display_name FROM event_bookings b JOIN event_slots s ...
           if (sql.includes('FROM event_bookings b') && sql.includes('friend_display_name')) {
@@ -567,7 +679,10 @@ function makeEventDb(state: {
                   friend_line_user_id: f?.line_user_id ?? null,
                 };
               });
-            return { results: items as unknown as T[] };
+            // 本番は LIMIT/OFFSET を付ける(点検#520の中8)。bound の末尾2つ。
+            const limit = typeof bound[bound.length - 2] === 'number' ? (bound[bound.length - 2] as number) : items.length;
+            const offset = typeof bound[bound.length - 1] === 'number' ? (bound[bound.length - 1] as number) : 0;
+            return { results: items.slice(offset, offset + limit) as unknown as T[] };
           }
           // LIFF history JOIN: FROM event_bookings b JOIN events e JOIN event_slots s
           if (sql.includes('FROM event_bookings b') && sql.includes('event_name')) {
@@ -639,19 +754,31 @@ function makeEventDb(state: {
         },
         async run() {
           if (sql.includes('INSERT OR IGNORE INTO event_waitlist')) {
-            const [id, event_id, slot_id, friend_id, identity_key, created_at] = bound as string[];
+            const [
+              id, line_account_id, event_id, slot_id, friend_id, identity_key,
+              party_size, answer_snapshot_json, first_participation,
+              first_participation_attended_count, first_participation_checked_at,
+              created_at, updated_at,
+            ] = bound as string[];
             const dup = (state.waitlist ?? []).some(
               (w) => w.slot_id === slot_id && w.identity_key === identity_key,
             );
             if (dup) return { success: true, meta: { changes: 0 } };
             (state.waitlist ??= []).push({
               id,
+              line_account_id,
               event_id,
               slot_id,
               friend_id,
               identity_key,
               status: 'waiting',
+              party_size,
+              answer_snapshot_json,
+              first_participation,
+              first_participation_attended_count,
+              first_participation_checked_at,
               created_at,
+              updated_at,
             });
             return { success: true, meta: { changes: 1 } };
           }
@@ -710,14 +837,26 @@ function makeEventDb(state: {
           }
           if (sql.startsWith('INSERT INTO event_bookings')) {
             const [
-              id, line_account_id, event_id, slot_id, friend_id, status, customer_note, _requested_at, identity_key,
-            ] = bound as [string, string, string, string, string, string, string | null, string, string | undefined];
+              id, line_account_id, event_id, slot_id, friend_id, status, customer_note,
+              requested_at, identity_key, party_size, answer_snapshot_json,
+              first_participation, first_participation_attended_count,
+              first_participation_checked_at,
+            ] = bound as [
+              string, string, string, string, string, string, string | null,
+              string, string | undefined, number, string | null, number, number, string,
+            ];
             (state.bookings ?? []).push({
               id, event_id, status,
               slot_id, friend_id,
               line_account_id,
               customer_note,
               identity_key,
+              requested_at,
+              party_size,
+              answer_snapshot_json,
+              first_participation,
+              first_participation_attended_count,
+              first_participation_checked_at,
             } as BookingRow & Record<string, unknown>);
             return { success: true, meta: { changes: 1 } };
           }
@@ -847,7 +986,10 @@ function makeEventDb(state: {
   return db;
 }
 
-function setupApp(state: Parameters<typeof makeEventDb>[0]) {
+function setupApp(
+  state: Parameters<typeof makeEventDb>[0],
+  staffRole: 'owner' | 'admin' | 'staff' = 'owner',
+) {
   state.accounts ??= [];
   for (const account of state.accounts) {
     account.tenant_id ??= 'tenant-a';
@@ -862,8 +1004,19 @@ function setupApp(state: Parameters<typeof makeEventDb>[0]) {
   }
   const app = new Hono<TestEnv>();
   const db = makeEventDb(state);
+  waitlistMocks.getEventOccurrenceUsedSeats.mockImplementation(
+    async (_db: D1Database, slotId: string) => {
+      const bookingSeats = (state.bookings ?? [])
+        .filter((booking) => booking.slot_id === slotId && (booking.status === 'requested' || booking.status === 'confirmed'))
+        .reduce((sum, booking) => sum + Number((booking as Record<string, unknown>).party_size ?? 1), 0);
+      const heldSeats = (state.waitlist ?? [])
+        .filter((entry) => entry.slot_id === slotId && (entry.status === 'offered' || entry.status === 'accepted'))
+        .reduce((sum, entry) => sum + Number(entry.party_size ?? 1), 0);
+      return bookingSeats + heldSeats;
+    },
+  );
   app.use('*', async (c, next) => {
-    c.set('staff', { id: 'staff-1', role: 'owner', tenantId: 'tenant-a' } as never);
+    c.set('staff', { id: 'staff-1', role: staffRole, tenantId: 'tenant-a' } as never);
     c.env = { DB: db } as TestEnv['Bindings'];
     await next();
   });
@@ -878,7 +1031,49 @@ beforeEach(() => {
   for (const fn of Object.values(idempotencyMocks)) fn.mockReset();
   for (const fn of Object.values(reminderMocks)) fn.mockReset();
   for (const fn of Object.values(notifierMocks)) fn.mockReset();
+  for (const fn of Object.values(waitlistMocks)) fn.mockReset();
   reminderMocks.computeRemindersForBooking.mockReturnValue([]);
+  waitlistMocks.createEventWaitlistOfferSender.mockReturnValue(vi.fn());
+  waitlistMocks.enqueueEventWaitlistPromotion.mockResolvedValue(true);
+});
+
+describe('admin role guards (N-065 #623)', () => {
+  const guardState = () => ({
+    events: [baseEvent({ id: 'e1', line_account_id: 'la1' })],
+    slots: [{ id: 's1', event_id: 'e1', starts_at: '2099-06-01T10:00:00Z', ends_at: '2099-06-01T12:00:00Z', capacity: null, is_active: 1, sort_order: 0, deleted_at: null }],
+    bookings: [
+      { id: 'b1', event_id: 'e1', slot_id: 's1', friend_id: 'f1', line_account_id: 'la1', status: 'requested' } as BookingRow & Record<string, unknown>,
+    ],
+    friends: [{ id: 'f1', line_account_id: 'la1', line_user_id: 'U1' }],
+  });
+
+  test('slot time change is owner/admin only (staff cannot reach it)', async () => {
+    const body = { starts_at: '2099-06-03T10:00:00Z', ends_at: '2099-06-03T12:00:00Z' };
+    const init = { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } as RequestInit;
+    const denied = await setupApp(guardState(), 'staff')
+      .request('/api/events/admin/events/e1/slots/s1?account_id=la1', init);
+    expect(denied.status).toBe(403);
+    expect(await denied.json()).toMatchObject({ success: false });
+    const allowed = await setupApp(guardState(), 'owner')
+      .request('/api/events/admin/events/e1/slots/s1?account_id=la1', init);
+    expect(allowed.status).not.toBe(403);
+  });
+
+  test('booking decide/cancel/update allow staff (permission layer gates)', async () => {
+    const staffApp = () => setupApp(guardState(), 'staff');
+    const decide = await staffApp().request('/api/events/admin/events/e1/bookings/b1/decide?account_id=la1', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'confirm' }),
+    });
+    expect(decide.status).not.toBe(403);
+    const cancel = await staffApp().request('/api/events/admin/events/e1/bookings/b1/cancel?account_id=la1', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}),
+    });
+    expect(cancel.status).not.toBe(403);
+    const update = await staffApp().request('/api/events/admin/events/e1/bookings/b1?account_id=la1', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ internal_note: 'x' }),
+    });
+    expect(update.status).not.toBe(403);
+  });
 });
 
 describe('admin account scope', () => {
@@ -971,6 +1166,35 @@ describe('POST /api/events/admin/events', () => {
     expect(res.status).toBe(422);
     const body = (await res.json()) as { error: string };
     expect(body.error).toBe('invalid_name');
+  });
+
+  test('422 for blank name, waitlist_enabled=2, negative sort_order (点検#520軽14)', async () => {
+    // 空白だけの名前は画面とDBの読みがずれる。waitlist_enabledは画面が `=== 1` で読む。
+    for (const payload of [
+      { name: '   ' },
+      { name: 'X', waitlist_enabled: 2 },
+      { name: 'X', sort_order: -1 },
+    ]) {
+      const app = setupApp({ events: [] });
+      const res = await app.request('/api/events/admin/events?account_id=la1', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      expect(res.status).toBe(422);
+    }
+  });
+
+  test('422 when venue_url is not http(s) (点検#520の中5)', async () => {
+    const app = setupApp({ events: [] });
+    const res = await app.request('/api/events/admin/events?account_id=la1', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: 'X', venue_url: 'javascript:alert(1)' }),
+    });
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toBe('invalid_venue_url');
   });
 
   test('422 when name >255', async () => {
@@ -1192,6 +1416,71 @@ describe('GET /api/events/admin/events', () => {
     expect(e.total_capacity).toBe(8);
     expect(e.total_active).toBe(2);
     expect(e.pending_count).toBe(1);
+  });
+
+  test('total_capacity is null when an uncapped slot is mixed in (点検#520の中6)', async () => {
+    const state = {
+      events: [baseEvent({ id: 'e1', line_account_id: 'la1' })],
+      slots: [
+        { id: 's1', event_id: 'e1', starts_at: '2099-06-01T10:00:00Z', ends_at: '2099-06-01T12:00:00Z', capacity: 5, is_active: 1, sort_order: 0, deleted_at: null },
+        { id: 's2', event_id: 'e1', starts_at: '2099-06-02T10:00:00Z', ends_at: '2099-06-02T12:00:00Z', capacity: null, is_active: 1, sort_order: 1, deleted_at: null },
+      ],
+      bookings: [],
+    };
+    const app = setupApp(state);
+    const res = await app.request('/api/events/admin/events?account_id=la1');
+    const body = (await res.json()) as { items: Array<{ total_capacity: number | null }> };
+    expect(body.items[0].total_capacity).toBeNull();
+  });
+
+  test('clamps limit and returns total (点検#520の中8)', async () => {
+    const state = {
+      events: [
+        baseEvent({ id: 'e1', line_account_id: 'la1', name: 'A' }),
+        baseEvent({ id: 'e2', line_account_id: 'la1', name: 'B' }),
+        baseEvent({ id: 'e3', line_account_id: 'la1', name: 'C' }),
+      ],
+      slots: [],
+      bookings: [],
+    };
+    const app = setupApp(state);
+    const one = (await (await app.request('/api/events/admin/events?account_id=la1&limit=1')).json()) as {
+      items: unknown[]; total: number; limit: number;
+    };
+    expect(one.items).toHaveLength(1);
+    expect(one.total).toBe(3);
+    const clamped = (await (await app.request('/api/events/admin/events?account_id=la1&limit=999')).json()) as {
+      items: unknown[]; total: number; limit: number;
+    };
+    expect(clamped.limit).toBe(200);
+    expect(clamped.items).toHaveLength(3);
+    expect(clamped.total).toBe(3);
+  });
+
+  test('applies search, filter, sort, and page before returning the list', async () => {
+    const state = {
+      events: [
+        baseEvent({ id: 'e1', line_account_id: 'la1', name: 'Bravo meeting', is_published: 1 }),
+        baseEvent({ id: 'e2', line_account_id: 'la1', name: 'Hidden meeting', is_published: 0 }),
+        baseEvent({ id: 'e3', line_account_id: 'la1', name: 'Alpha meeting', is_published: 1 }),
+      ],
+      slots: [],
+      bookings: [],
+    };
+    const app = setupApp(state);
+    const res = await app.request('/api/events/admin/events?account_id=la1&q=meeting&filter=open&sort=name&page=2&limit=1');
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { items: EventRow[]; total: number; limit: number; sort: Array<{ field: string }> };
+    expect(body.items.map((event) => event.id)).toEqual(['e1']);
+    expect(body.total).toBe(2);
+    expect(body.limit).toBe(1);
+    expect(body.sort.map((item) => item.field)).toEqual(['name', 'id']);
+  });
+
+  test('rejects unsupported list filters', async () => {
+    const app = setupApp({ events: [] });
+    expect((await app.request('/api/events/admin/events?account_id=la1&filter=unknown')).status).toBe(400);
+    expect((await app.request('/api/events/admin/events?account_id=la1&sort=unknown')).status).toBe(400);
   });
 });
 
@@ -1439,6 +1728,45 @@ describe('event_slots admin', () => {
       body: JSON.stringify({ ends_at: '2099-06-01T09:00:00Z' }),
     });
     expect(res.status).toBe(422);
+  });
+
+  test('PUT 409 when shrinking capacity below used seats (点検#520の中4)', async () => {
+    const state = {
+      events: [baseEvent({ id: 'e1', line_account_id: 'la1' })],
+      slots: [{ id: 's1', event_id: 'e1', starts_at: '2099-06-01T10:00:00Z', ends_at: '2099-06-01T12:00:00Z', capacity: 5, is_active: 1, sort_order: 0, deleted_at: null }],
+      bookings: [
+        { id: 'b1', event_id: 'e1', slot_id: 's1', status: 'confirmed', party_size: 2 },
+        { id: 'b2', event_id: 'e1', slot_id: 's1', status: 'requested', party_size: 1 },
+      ],
+    };
+    const app = setupApp(state);
+    const res = await app.request('/api/events/admin/events/e1/slots/s1?account_id=la1', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ capacity: 2 }),
+    });
+    expect(res.status).toBe(409);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toBe('slot_capacity_below_bookings');
+    expect(state.slots[0].capacity).toBe(5);
+  });
+
+  test('PUT allows shrinking capacity to exactly used seats (点検#520の中4)', async () => {
+    const state = {
+      events: [baseEvent({ id: 'e1', line_account_id: 'la1' })],
+      slots: [{ id: 's1', event_id: 'e1', starts_at: '2099-06-01T10:00:00Z', ends_at: '2099-06-01T12:00:00Z', capacity: 5, is_active: 1, sort_order: 0, deleted_at: null }],
+      bookings: [
+        { id: 'b1', event_id: 'e1', slot_id: 's1', status: 'confirmed', party_size: 2 },
+      ],
+    };
+    const app = setupApp(state);
+    const res = await app.request('/api/events/admin/events/e1/slots/s1?account_id=la1', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ capacity: 2 }),
+    });
+    expect(res.status).toBe(200);
+    expect(state.slots[0].capacity).toBe(2);
   });
 
   test('DELETE soft-deletes when no active bookings', async () => {
@@ -2027,6 +2355,13 @@ describe('LIFF POST /api/liff/events/me/:bookingId/cancel', () => {
     expect(res.status).toBe(200);
     expect(state.bookings[0].status).toBe('cancelled');
     expect(reminderMocks.cancelPendingRemindersFor).toHaveBeenCalledWith(expect.anything(), 'b1');
+    expect(waitlistMocks.enqueueEventWaitlistPromotion).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        lineAccountId: 'la1', eventId: 'e1', occurrenceId: 's1',
+        sourceKey: 'booking:b1:cancelled',
+      }),
+    );
   });
 
   test('403 cancel_not_allowed when cancel_deadline_hours_before is null', async () => {
@@ -2065,7 +2400,7 @@ describe('LIFF POST /api/liff/events/me/:bookingId/cancel', () => {
     expect(res.status).toBe(409);
   });
 
-  test('409 invalid_state for already-cancelled booking', async () => {
+  test('200 retry for already-cancelled booking repairs V6 instead of 409 (N-065)', async () => {
     const futureMs = Date.now() + 7 * 24 * 3600_000;
     const state = {
       events: [baseEvent({ id: 'e1', line_account_id: 'la1', is_published: 1, cancel_deadline_hours_before: 24 })],
@@ -2080,7 +2415,8 @@ describe('LIFF POST /api/liff/events/me/:bookingId/cancel', () => {
       method: 'POST',
       headers: { 'Authorization': 'Bearer t' },
     });
-    expect(res.status).toBe(409);
+    // N-065: V6 取消が投げた直後の再送は、業務が済みでも V6 だけ直して 200 を返す。
+    expect(res.status).toBe(200);
   });
 
   test('404 cross-friend cancel', async () => {
@@ -2155,6 +2491,81 @@ describe('admin bookings management', () => {
     expect(body.items.map((x) => x.id)).toEqual(['b1']);
   });
 
+  test('GET /:id/bookings returns total and honors limit (点検#520の中8)', async () => {
+    const state = {
+      events: [baseEvent({ id: 'e1', line_account_id: 'la1' })],
+      slots: [{ id: 's1', event_id: 'e1', starts_at: '2099-06-01T10:00:00Z', ends_at: '2099-06-01T12:00:00Z', capacity: null, is_active: 1, sort_order: 0, deleted_at: null }],
+      bookings: [
+        { id: 'b1', event_id: 'e1', slot_id: 's1', friend_id: 'f1', line_account_id: 'la1', status: 'requested' } as BookingRow & Record<string, unknown>,
+        { id: 'b2', event_id: 'e1', slot_id: 's1', friend_id: 'f2', line_account_id: 'la1', status: 'confirmed' } as BookingRow & Record<string, unknown>,
+      ],
+      friends: [
+        { id: 'f1', line_account_id: 'la1', line_user_id: 'U1' },
+        { id: 'f2', line_account_id: 'la1', line_user_id: 'U2' },
+      ],
+    };
+    const app = setupApp(state);
+    const res = await app.request('/api/events/admin/events/e1/bookings?account_id=la1&limit=1');
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { items: Array<{ id: string }>; total: number; limit: number };
+    expect(body.items).toHaveLength(1);
+    expect(body.total).toBe(2);
+    expect(body.limit).toBe(1);
+  });
+
+  test('GET /:id/bookings returns the requested page', async () => {
+    const state = {
+      events: [baseEvent({ id: 'e1', line_account_id: 'la1' })],
+      slots: [{ id: 's1', event_id: 'e1', starts_at: '2099-06-01T10:00:00Z', ends_at: '2099-06-01T12:00:00Z', capacity: 2, is_active: 1, sort_order: 0, deleted_at: null }],
+      bookings: [
+        { id: 'b1', event_id: 'e1', slot_id: 's1', friend_id: 'f1', line_account_id: 'la1', status: 'requested' } as BookingRow & Record<string, unknown>,
+        { id: 'b2', event_id: 'e1', slot_id: 's1', friend_id: 'f2', line_account_id: 'la1', status: 'requested' } as BookingRow & Record<string, unknown>,
+      ],
+      friends: [],
+    };
+    const body = (await (await setupApp(state).request('/api/events/admin/events/e1/bookings?account_id=la1&page=2&limit=1')).json()) as { items: Array<{ id: string }>; total: number };
+    expect(body.items).toHaveLength(1);
+    expect(body.total).toBe(2);
+  });
+
+  test('GET /:id/bookings/summary returns all-status counts and capacity without list rows', async () => {
+    const state = {
+      events: [baseEvent({ id: 'e1', line_account_id: 'la1' })],
+      slots: [
+        { id: 's1', event_id: 'e1', starts_at: '2099-06-01T10:00:00Z', ends_at: '2099-06-01T12:00:00Z', capacity: 3, is_active: 1, sort_order: 0, deleted_at: null },
+        { id: 's2', event_id: 'e1', starts_at: '2099-06-02T10:00:00Z', ends_at: '2099-06-02T12:00:00Z', capacity: 2, is_active: 1, sort_order: 1, deleted_at: null },
+      ],
+      bookings: [
+        { id: 'b1', event_id: 'e1', status: 'requested' },
+        { id: 'b2', event_id: 'e1', status: 'confirmed' },
+        { id: 'b3', event_id: 'e1', status: 'cancelled' },
+      ],
+      waitlist: [
+        { id: 'w1', event_id: 'e1', status: 'waiting' },
+        { id: 'w2', event_id: 'e1', status: 'cancelled' },
+      ],
+    };
+    const res = await setupApp(state).request('/api/events/admin/events/e1/bookings/summary?account_id=la1');
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      total: 3,
+      requested: 1,
+      confirmed: 1,
+      cancelled: 1,
+      waitlist: 1,
+      totalCapacity: 5,
+    });
+  });
+
+  test('GET /:id/bookings/summary returns zeros for no applications and hides another account event', async () => {
+    const state = { events: [baseEvent({ id: 'e1', line_account_id: 'la1' })], slots: [], bookings: [] };
+    const app = setupApp(state);
+    const empty = await app.request('/api/events/admin/events/e1/bookings/summary?account_id=la1');
+    expect(await empty.json()).toMatchObject({ total: 0, requested: 0, confirmed: 0, waitlist: 0, totalCapacity: null });
+    const hidden = await app.request('/api/events/admin/events/e1/bookings/summary?account_id=la2');
+    expect(hidden.status).toBe(403);
+  });
+
   test('POST decide confirm transitions to confirmed and creates reminders', async () => {
     const state = {
       events: [baseEvent({ id: 'e1', line_account_id: 'la1', reminder_day_before_enabled: 1, reminder_hours_before: 2 })],
@@ -2197,6 +2608,10 @@ describe('admin bookings management', () => {
     expect(notifierMocks.sendEventBookingNotification).toHaveBeenCalledWith(
       expect.objectContaining({ kind: 'rejected' }),
     );
+    expect(waitlistMocks.enqueueEventWaitlistPromotion).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ sourceKey: 'booking:b1:rejected', occurrenceId: 's1' }),
+    );
   });
 
   test('POST decide returns 409 already_decided', async () => {
@@ -2218,6 +2633,50 @@ describe('admin bookings management', () => {
     expect(body.error).toBe('already_decided');
   });
 
+  test('POST decide confirm refuses when the slot is already full (点検#520の中3)', async () => {
+    const state = {
+      events: [baseEvent({ id: 'e1', line_account_id: 'la1' })],
+      slots: [{ id: 's1', event_id: 'e1', starts_at: '2099-06-01T10:00:00Z', ends_at: '2099-06-01T12:00:00Z', capacity: 2, is_active: 1, sort_order: 0, deleted_at: null }],
+      bookings: [
+        { id: 'b1', event_id: 'e1', slot_id: 's1', friend_id: 'f1', line_account_id: 'la1', status: 'requested', party_size: 1 } as BookingRow & Record<string, unknown>,
+        { id: 'b2', event_id: 'e1', slot_id: 's1', friend_id: 'f2', line_account_id: 'la1', status: 'confirmed', party_size: 2 } as BookingRow & Record<string, unknown>,
+      ],
+      accounts: [{ id: 'la1', liff_id: 'L1', is_active: 1 }],
+      friends: [],
+    };
+    const app = setupApp(state);
+    const res = await app.request('/api/events/admin/events/e1/bookings/b1/decide?account_id=la1', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ action: 'confirm' }),
+    });
+    expect(res.status).toBe(409);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toBe('slot_full');
+    expect(state.bookings[0].status).toBe('requested');
+  });
+
+  test('POST decide confirm passes when seats remain (点検#520の中3)', async () => {
+    const state = {
+      events: [baseEvent({ id: 'e1', line_account_id: 'la1' })],
+      slots: [{ id: 's1', event_id: 'e1', starts_at: '2099-06-01T10:00:00Z', ends_at: '2099-06-01T12:00:00Z', capacity: 2, is_active: 1, sort_order: 0, deleted_at: null }],
+      bookings: [
+        { id: 'b1', event_id: 'e1', slot_id: 's1', friend_id: 'f1', line_account_id: 'la1', status: 'requested', party_size: 1 } as BookingRow & Record<string, unknown>,
+        { id: 'b2', event_id: 'e1', slot_id: 's1', friend_id: 'f2', line_account_id: 'la1', status: 'confirmed', party_size: 1 } as BookingRow & Record<string, unknown>,
+      ],
+      accounts: [{ id: 'la1', liff_id: 'L1', is_active: 1, channel_access_token: 'tok' }],
+      friends: [{ id: 'f1', line_account_id: 'la1', line_user_id: 'U1' }],
+    };
+    const app = setupApp(state);
+    const res = await app.request('/api/events/admin/events/e1/bookings/b1/decide?account_id=la1', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ action: 'confirm' }),
+    });
+    expect(res.status).toBe(200);
+    expect(state.bookings[0].status).toBe('confirmed');
+  });
+
   test('POST admin cancel transitions to cancelled by admin', async () => {
     const state = {
       events: [baseEvent({ id: 'e1', line_account_id: 'la1' })],
@@ -2234,6 +2693,10 @@ describe('admin bookings management', () => {
     expect(state.bookings[0].status).toBe('cancelled');
     expect((state.bookings[0] as Record<string, unknown>).cancelled_by).toBe('admin');
     expect(reminderMocks.cancelPendingRemindersFor).toHaveBeenCalled();
+    expect(waitlistMocks.enqueueEventWaitlistPromotion).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ sourceKey: 'booking:b1:cancelled', occurrenceId: 's1' }),
+    );
     expect(notifierMocks.sendEventBookingNotification).toHaveBeenCalledWith(
       expect.objectContaining({ kind: 'cancelled_by_admin' }),
     );
@@ -2308,6 +2771,78 @@ describe('admin bookings management', () => {
   });
 });
 
+describe('V6 occurrence applicants / waitlist promotion routes', () => {
+  const state = {
+    events: [baseEvent({ id: 'e1', line_account_id: 'la1' })],
+    accounts: [{ id: 'la1', liff_id: 'L1', is_active: 1 }],
+  };
+
+  test('normal / empty: 申込者データを包んで返し、空配列を成功として保つ', async () => {
+    waitlistMocks.getEventOccurrenceApplicants.mockResolvedValueOnce({
+      occurrence: { id: 's1', eventId: 'e1', startsAt: '2099-01-01', endsAt: '2099-01-02', capacity: 2, activeSeats: 1, version: 1 },
+      summary: { bookingCount: 1, waitingCount: 0, activeSeats: 1 },
+      applicants: [{ source: 'booking', id: 'b1', friendId: 'f1' }],
+    });
+    const app = setupApp(structuredClone(state));
+    const normal = await app.request('/api/events/admin/occurrences/s1/applicants?account_id=la1');
+    expect(normal.status).toBe(200);
+    await expect(normal.json()).resolves.toMatchObject({
+      success: true,
+      data: { occurrence: { id: 's1', version: 1 }, applicants: [{ id: 'b1' }] },
+    });
+    expect(waitlistMocks.getEventOccurrenceApplicants).toHaveBeenCalledWith(
+      expect.anything(),
+      { occurrenceId: 's1', lineAccountId: 'la1' },
+    );
+
+    waitlistMocks.getEventOccurrenceApplicants.mockResolvedValueOnce({
+      occurrence: { id: 's2', eventId: 'e1', startsAt: '2099-01-01', endsAt: '2099-01-02', capacity: 2, activeSeats: 0, version: 1 },
+      summary: { bookingCount: 0, waitingCount: 0, activeSeats: 0 },
+      applicants: [],
+    });
+    const empty = await app.request('/api/events/admin/occurrences/s2/applicants?account_id=la1');
+    expect(empty.status).toBe(200);
+    await expect(empty.json()).resolves.toMatchObject({ success: true, data: { applicants: [] } });
+  });
+
+  test('not found / forbidden: 所属外を404、認証なしを403にする', async () => {
+    waitlistMocks.getEventOccurrenceApplicants.mockResolvedValueOnce(null);
+    const app = setupApp(structuredClone(state));
+    const missing = await app.request('/api/events/admin/occurrences/other/applicants?account_id=la1');
+    expect(missing.status).toBe(404);
+
+    const unauthenticated = new Hono<TestEnv>();
+    unauthenticated.route('/', events);
+    const forbidden = await unauthenticated.request(
+      '/api/events/admin/occurrences/s1/applicants',
+      {},
+      { DB: makeEventDb({ events: [] }) },
+    );
+    expect(forbidden.status).toBe(403);
+  });
+
+  test('conflict: expectedVersionを必須にし、版違いを409で返す', async () => {
+    const app = setupApp(structuredClone(state));
+    const missingVersion = await app.request(
+      '/api/events/admin/occurrences/s1/waitlist/promote?account_id=la1',
+      { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' },
+    );
+    expect(missingVersion.status).toBe(422);
+
+    waitlistMocks.promoteEventWaitlist.mockResolvedValueOnce({ kind: 'conflict', currentVersion: 3 });
+    const conflict = await app.request(
+      '/api/events/admin/occurrences/s1/waitlist/promote?account_id=la1',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ expectedVersion: 2 }),
+      },
+    );
+    expect(conflict.status).toBe(409);
+    await expect(conflict.json()).resolves.toEqual({ error: 'version_conflict', currentVersion: 3 });
+  });
+});
+
 function baseEvent(over: Partial<EventRow>): EventRow {
   const now = new Date().toISOString();
   return {
@@ -2355,7 +2890,10 @@ describe('094 公開対象・申込締切・キャンセル待ち', () => {
     deleted_at: null,
   };
 
-  function book(app: ReturnType<typeof setupApp>) {
+  function book(
+    app: ReturnType<typeof setupApp>,
+    body: Record<string, unknown> = { slot_id: 's1' },
+  ) {
     return app.request('/api/liff/events/e1/bookings?liffId=L1', {
       method: 'POST',
       headers: {
@@ -2363,7 +2901,7 @@ describe('094 公開対象・申込締切・キャンセル待ち', () => {
         'Idempotency-Key': 'k1',
         Authorization: 'Bearer t',
       },
-      body: JSON.stringify({ slot_id: 's1' }),
+      body: JSON.stringify(body),
     });
   }
 
@@ -2468,5 +3006,46 @@ describe('094 公開対象・申込締切・キャンセル待ち', () => {
     expect(state.waitlist).toHaveLength(1);
     // 待ちは予約に入れない。定員の数え方に手を入れずに済ませるため。
     expect(state.bookings).toHaveLength(1);
+  });
+
+  test('複数人申込は人数分の席を使い、回答と初回判定を申込時点で固定する', async () => {
+    const state = {
+      events: [baseEvent({ id: 'e1', is_published: 1 })],
+      slots: [{ ...futureSlot, capacity: 3 }],
+      bookings: [{
+        id: 'past', event_id: 'e1', slot_id: 'past-slot', friend_id: 'f1',
+        status: 'attended', requested_at: '2025-01-01T00:00:00.000Z', party_size: 1,
+      } as BookingRow & Record<string, unknown>],
+      accounts: [account],
+      friends: [friend],
+    };
+    liffAuthMocks.verifyCallerLineUserId.mockResolvedValue('U1');
+    idempotencyMocks.reserveEventIdempotency.mockResolvedValue({ kind: 'inserted' });
+    const res = await book(setupApp(state), {
+      slot_id: 's1', party_size: 2, answers: { companion: '母', pet: 'ポチ' },
+    });
+    expect(res.status).toBe(201);
+    expect(state.bookings[1]).toMatchObject({
+      party_size: 2,
+      answer_snapshot_json: JSON.stringify({ companion: '母', pet: 'ポチ' }),
+      first_participation: 0,
+      first_participation_attended_count: 1,
+    });
+  });
+
+  test('期限付き案内で保留した席には新しい申込を割り込ませない', async () => {
+    const state = {
+      events: [baseEvent({ id: 'e1', is_published: 1, waitlist_enabled: 0 })],
+      slots: [{ ...futureSlot, capacity: 2 }],
+      bookings: [],
+      waitlist: [{ slot_id: 's1', status: 'offered', party_size: 2 }],
+      accounts: [account],
+      friends: [friend],
+    };
+    liffAuthMocks.verifyCallerLineUserId.mockResolvedValue('U1');
+    idempotencyMocks.reserveEventIdempotency.mockResolvedValue({ kind: 'inserted' });
+    const res = await book(setupApp(state));
+    expect(res.status).toBe(409);
+    await expect(res.json()).resolves.toEqual({ error: 'slot_full' });
   });
 });

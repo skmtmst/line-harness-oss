@@ -9,7 +9,7 @@
  * ここは**読む側の入り口**。古い列は残してあるが、判断には使わない。
  * 2か所を見比べる作りにすると、片方だけ直したときに黙ってずれる。
  */
-export type ScenarioTriggerKind = 'friend_add' | 'tag_added';
+export type ScenarioTriggerKind = 'friend_add' | 'tag_added' | 'form_answer' | 'booking_confirmed';
 
 export interface ScenarioTrigger {
   id: string;

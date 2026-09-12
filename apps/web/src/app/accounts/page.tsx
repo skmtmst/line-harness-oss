@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { LineAccount } from '@line-crm/shared'
 import { api } from '@/lib/api'
@@ -9,8 +10,8 @@ import ListState from '@/components/shared/list-state'
 import SummaryCard from '@/components/shared/summary-card'
 import StatusBadge from '@/components/shared/status-badge'
 import SearchField from '@/components/shared/search-field'
-import SelectField from '@/components/shared/select-field'
-import PageHeader from '@/components/shared/page-header'
+import Breadcrumb from '@/components/shared/breadcrumb'
+import AccountOrdering from '@/components/accounts/account-ordering'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import {
   ACCOUNT_FILTERS,
@@ -22,6 +23,12 @@ import {
   webhookLabel,
   type AccountFilter,
 } from './account-list-view'
+import AccountMigration from './migration'
+
+type AccountWithStats = LineAccount & {
+  stats?: { friendCount: number; activeScenarios: number; messagesThisMonth: number }
+  timezone?: string
+}
 
 /**
  * LINEアカウントの一覧。設計 ★V6 33-1（`QT91v`）。
@@ -30,10 +37,12 @@ import {
  * LINE公式アカウントの設定は別のもの（要件 §5-3）。転送をやめて画面にする。
  */
 export default function AccountsPage() {
-  const [accounts, setAccounts] = useState<LineAccount[]>([])
+  const searchParams = useSearchParams()
+  const [accounts, setAccounts] = useState<AccountWithStats[]>([])
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<AccountFilter>('all')
+  const [orderingOpen, setOrderingOpen] = useState(false)
 
   const load = useCallback(async () => {
     setStatus('loading')
@@ -54,55 +63,75 @@ export default function AccountsPage() {
     [accounts, filter, query],
   )
 
-  /*
-    帯の数。**取れないものは `—`。** 友だち数を返す口がこの一覧に無いので、
-    人数は数を作らず未取得として出す（`docs/v6-common-rules.md`
-    「取れない数字を 0 にしない」）。
-  */
-  const activeCount = accounts.filter((a) => a.isActive).length
-  const inactiveCount = accounts.filter((a) => !a.isActive).length
+  // アーカイブは停止と重ねて数えず、4枚の帯を互いに読み違えないようにする。
+  const activeCount = accounts.filter((a) => a.isActive && !a.archivedAt).length
+  const inactiveCount = accounts.filter((a) => !a.isActive && !a.archivedAt).length
+  const archivedCount = accounts.filter((a) => Boolean(a.archivedAt)).length
   const problemCount = accounts.filter(hasConnectionProblem).length
+  const activeFriendCounts = accounts
+    .filter((account) => account.isActive && !account.archivedAt)
+    .map((account) => account.stats?.friendCount)
+  const activeFriendDetail = activeFriendCounts.every((count): count is number => typeof count === 'number')
+    ? `友だち ${activeFriendCounts.join('・')}人`
+    : '友だち数は未取得'
+
+  if (searchParams.get('tab') === 'migration') return <AccountMigration />
 
   return (
     <div data-design-node="QT91v">
-      <PageHeader
-        breadcrumb={[{ label: '設定' }, { label: 'LINEアカウント' }]}
-        title="LINEアカウント"
-        description="送受信に使うLINE公式アカウントを登録し、接続の状態を確かめます。"
-        actions={<Button href="/accounts/new" variant="primary">＋ LINEアカウントを登録</Button>}
-      />
+      <div data-design="Head" className="mb-4 flex min-h-10 flex-wrap items-center justify-between gap-3">
+        <div>
+          <Breadcrumb items={[{ label: 'LINEアカウント' }]} />
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" onClick={() => setOrderingOpen((open) => !open)}>
+            {orderingOpen ? '並び順と親子を閉じる' : '並び順と親子を変える'}
+          </Button>
+          <Button href="/accounts/new" variant="primary">＋ LINEアカウントを登録</Button>
+        </div>
+      </div>
+
+      {orderingOpen && <AccountOrdering />}
 
       <div data-design="KPIs" className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">
-        <SummaryCard title="稼働中" value={activeCount} unit="件" variant="v6"
-          detail="送受信できます" />
-        <SummaryCard title="停止中" value={inactiveCount} unit="件" variant="v6"
+        <SummaryCard title="稼働中" value={activeCount} unit="" variant="v6"
+          badge="100%" detail={activeFriendDetail} />
+        <SummaryCard title="停止中" value={inactiveCount} unit="" variant="v6"
           detail="送受信を止めています" />
-        {/*
-          アーカイブは `archived_at` がまだ無い（台帳 #128 で Codex へ）。
-          **0 と書くと「1件も無い」と読まれる**ので、未取得として `—` を出す。
-        */}
-        <SummaryCard title="アーカイブ" value={null} unit="件" variant="v6"
-          detail="まだ繋がっていません" />
-        <SummaryCard title="接続に問題" value={problemCount} unit="件" variant="v6"
+        <SummaryCard title="アーカイブ" value={archivedCount} unit="" variant="v6"
+          detail="記録は残っています" />
+        <SummaryCard title="接続に問題" value={problemCount} unit="" variant="v6"
           badge={problemCount > 0 ? '要対応' : undefined} badgeTone="danger"
           detail="Webhookが合っていません" />
       </div>
 
-      <div className="bg-canvas rounded-card border-hairline mb-3 flex flex-wrap items-center gap-2 border p-3">
-        <SearchField
-          placeholder="アカウント名・チャネルIDで検索"
-          aria-label="アカウント名・チャネルIDで検索"
-          value={query}
-          onChange={setQuery}
-          onClear={() => setQuery('')}
-          className="min-w-0 flex-1"
-        />
-        <SelectField
-          aria-label="表示する状態"
-          value={filter}
-          onChange={(e) => setFilter(e.target.value as AccountFilter)}
-          options={ACCOUNT_FILTERS.map((f) => ({ value: f.value, label: f.label }))}
-        />
+      <div className="bg-canvas rounded-card border-hairline mb-3 border p-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <SearchField
+            placeholder="アカウント名・チャネルIDで検索"
+            aria-label="アカウント名・チャネルIDで検索"
+            value={query}
+            onChange={setQuery}
+            onClear={() => setQuery('')}
+            className="min-w-64 flex-1"
+          />
+          <span className="border-hairline rounded-control border px-3 py-2 text-sm text-ink-secondary">
+            20件表示
+          </span>
+        </div>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          {ACCOUNT_FILTERS.map((item) => (
+            <Button
+              key={item.value}
+              type="button"
+              variant={filter === item.value ? 'primary' : 'secondary'}
+              onClick={() => setFilter(item.value)}
+            >
+              {item.label}
+            </Button>
+          ))}
+          <span className="text-ink-faint ml-auto text-xs">{shown.length}件を表示</span>
+        </div>
       </div>
 
       {status === 'loading' ? (
@@ -149,7 +178,7 @@ export default function AccountsPage() {
                       <p className="text-ink text-sm font-medium">{account.name}</p>
                       <p className="text-ink-faint mt-0.5 text-xs">
                         チャネル {account.channelId}
-                        {account.country ? ` ・ ${account.country}` : ''}
+                        {` ・ ${account.timezone ?? 'Asia/Tokyo'}`}
                       </p>
                     </td>
                     <td className="px-4 py-3">
@@ -158,19 +187,22 @@ export default function AccountsPage() {
                     <td className="px-4 py-3">
                       <StatusBadge tone={webhook.tone}>{webhook.label}</StatusBadge>
                     </td>
-                    {/*
-                      友だち数を返す口がこの一覧に無い。**0 と書かない。**
-                      数えて 0 だったことと、数えていないことは別。
-                    */}
-                    <td className="text-ink-faint px-4 py-3 text-sm">—</td>
-                    <td className="text-ink-faint px-4 py-3 text-sm">—</td>
+                    <td className="text-ink-secondary px-4 py-3 text-sm tabular-nums">
+                      {account.stats ? `${account.stats.friendCount.toLocaleString('ja-JP')}人` : '—'}
+                    </td>
+                    <td className="px-4 py-3 text-sm">
+                      {account.isDefault
+                        ? <StatusBadge tone="success">既定</StatusBadge>
+                        : <span className="text-ink-faint">—</span>}
+                    </td>
                     <td className="text-ink-secondary px-4 py-3 text-sm">
                       {parentName(account, accounts)}
                     </td>
                     <td className="px-4 py-3">
-                      <Link href={`/accounts/${account.id}`} className="text-action text-sm hover:underline">
+                      <Link href={`/accounts/detail?id=${account.id}`} className="text-action text-sm hover:underline">
                         詳細
                       </Link>
+                      <span className="text-ink-faint ml-4" aria-hidden>•••</span>
                     </td>
                   </tr>
                 )
@@ -187,15 +219,7 @@ export default function AccountsPage() {
         <p className="text-ink text-sm font-bold">ここで見えること</p>
         <p className="text-ink-secondary mt-1 text-xs leading-relaxed">
           接続状態は、送受信ができる状態かどうか。Webhook は、LINE側に登録した受け口がこのシステムと合っているかどうかです。
-          合っていないと、友だちからのメッセージが届きません。
-        </p>
-        {/*
-          **出す＝使える。** 既定・アーカイブ・並び順と親子は、まだ口が無い。
-          押し口を置かず、理由を本文で言う（`v6-common-rules.md` §7-10）。
-        */}
-        <p className="text-ink-faint mt-2 text-xs leading-relaxed">
-          既定アカウントの指定、アーカイブ、並び順と親子の変更は、まだ繋がっていません。
-          保存する口が接続されると使えます。
+          合っていないと、友だちからのメッセージが届きません。アーカイブしたアカウントは記録が残り、送受信だけを止めます。
         </p>
       </div>
     </div>

@@ -3,9 +3,9 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { Bookmark, Circle, SlidersHorizontal, Star } from 'lucide-react'
-import type { SavedSearch, Scenario, Tag } from '@line-crm/shared'
-import { api, type FriendListItem } from '@/lib/api'
+import { Bookmark, Check, Circle, SlidersHorizontal, Star } from 'lucide-react'
+import type { Scenario, Tag } from '@line-crm/shared'
+import { api, type FriendListItem, type FriendSavedView, type SupportMarkListItem } from '@/lib/api'
 import FriendKpis from '@/components/friends/friend-kpis'
 import FriendListTable from '@/components/friends/friend-list-table'
 import AdvancedSearchDialog, { type AdvancedSearchResult } from '@/components/friends/advanced-search-dialog'
@@ -17,10 +17,10 @@ import MergedUsersPage from '@/app/users/page'
 import { EmbeddedPageProvider } from '@/components/layout/embedded-page-context'
 import Button from '@/components/shared/button'
 import Chip from '@/components/shared/chip'
-import ListState from '@/components/shared/list-state'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
 import { emptyMessageOf } from './friend-list-empty'
+import { csvExportLine } from './csv-export'
 import BulkRunDialog from '@/components/friends/bulk-run-dialog'
 import { canRunBulk } from '@/components/friends/bulk-run-view'
 import { savedSearchParams, savedSearchSummary } from '@/components/friends/saved-search-utils'
@@ -71,6 +71,7 @@ function FriendsPageInner({
   const [allTags, setAllTags] = useState<Tag[]>([])
   const [operators, setOperators] = useState<Array<{ id: string; name: string }>>([])
   const [scenarios, setScenarios] = useState<Scenario[]>([])
+  const [marks, setMarks] = useState<SupportMarkListItem[]>([])
   const [advancedOpen, setAdvancedOpen] = useState(false)
   const [savedOpen, setSavedOpen] = useState(false)
   const [advanced, setAdvanced] = useState<AdvancedSearchResult | null>(null)
@@ -86,6 +87,7 @@ function FriendsPageInner({
   const [scenarioId, setScenarioId] = useState('')
   const [attentionOnly, setAttentionOnly] = useState(false)
   const [loadStatus, setLoadStatus] = useState<LoadStatus>('loading')
+  const [optionsFailed, setOptionsFailed] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const selectedFriendIds = useMemo(() => [...selectedIds], [selectedIds])
   const loadRequestRef = useRef(0)
@@ -120,16 +122,21 @@ function FriendsPageInner({
 
   const loadOptions = useCallback(async () => {
     try {
-      const [tagResponse, operatorResponse, scenarioResponse] = await Promise.all([
+      const [tagResponse, operatorResponse, scenarioResponse, markResponse] = await Promise.all([
         api.tags.list(),
         api.operators.list(),
         api.scenarios.list(selectedAccountId ? { accountId: selectedAccountId } : undefined),
+        selectedAccountId ? api.supportMarks.list(selectedAccountId) : Promise.resolve({ success: true as const, data: [] }),
       ])
       if (tagResponse.success) setAllTags(tagResponse.data)
       if (operatorResponse.success) setOperators(operatorResponse.data)
       if (scenarioResponse.success) setScenarios(scenarioResponse.data)
+      if (markResponse.success) setMarks(markResponse.data)
+      setOptionsFailed(false)
     } catch {
       // 選択肢の取得に失敗しても、友だち一覧と検索は使える。
+      // ただし「タグがない」と「取れなかった」の区別が付くよう一言出す(#496-19)。
+      setOptionsFailed(true)
     }
   }, [selectedAccountId])
 
@@ -217,9 +224,8 @@ function FriendsPageInner({
       friend.latestIncomingMessage?.content ?? '',
       friend.createdAt.slice(0, 10),
     ])
-    const csv = [header, ...rows]
-      .map((row) => row.map((value) => `"${String(value).replaceAll('"', '""')}"`).join(','))
-      .join('\n')
+    // 先頭 =+-@ の数式インジェクション対策つき(#496-4)。出るのは表示中のページ分だけ(#496-21)。
+    const csv = [header, ...rows].map((row) => csvExportLine(row)).join('\n')
     const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' }))
     const anchor = document.createElement('a')
     anchor.href = url
@@ -375,14 +381,26 @@ function FriendsPageInner({
               options={[{ value: '', label: 'すべて' }, ...scenarios.map((scenario) => ({ value: scenario.id, label: scenario.name }))]}
             />
           </div>
-          <button type="button" aria-pressed={responseFilter === 'unhandled'} onClick={() => resetPageWith(() => setResponseFilter(responseFilter === 'unhandled' ? 'all' : 'unhandled'))} className={`inline-flex h-10.5 shrink-0 items-center gap-2 rounded-full px-4 text-xs font-bold text-danger ${responseFilter === 'unhandled' ? 'bg-status-danger-selected ring-2 ring-status-danger/30' : 'bg-status-danger-soft'}`}>
-            <Circle aria-hidden="true" className="h-2.5 w-2.5 fill-current" />未対応
+          <button type="button" data-filter-chip="unhandled" aria-pressed={responseFilter === 'unhandled'} onClick={() => resetPageWith(() => setResponseFilter(responseFilter === 'unhandled' ? 'all' : 'unhandled'))} className={`inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border px-3 text-xs font-bold transition-colors ${responseFilter === 'unhandled' ? 'border-status-danger-border bg-status-danger-selected text-danger shadow-sm' : 'border-transparent bg-status-danger-soft text-danger hover:bg-status-danger-selected'}`}>
+            {responseFilter === 'unhandled'
+              ? <Check aria-hidden="true" className="h-3.5 w-3.5" />
+              : <Circle aria-hidden="true" className="h-2.5 w-2.5 fill-current" />}
+            未対応
           </button>
-          <button type="button" aria-pressed={attentionOnly} onClick={() => resetPageWith(() => setAttentionOnly(!attentionOnly))} className={`inline-flex h-10.5 shrink-0 items-center gap-2 rounded-full bg-status-warn-soft px-4 text-xs font-bold ${attentionOnly ? 'ring-2 ring-status-warn-deep/30' : ''} text-status-warn-deep`}>
-            <Star aria-hidden="true" className="h-3.5 w-3.5" />注目のみ
+          <button type="button" data-filter-chip="attention" aria-pressed={attentionOnly} onClick={() => resetPageWith(() => setAttentionOnly(!attentionOnly))} className={`inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border bg-status-warn-soft px-3 text-xs font-bold text-status-warn-deep transition-colors ${attentionOnly ? 'border-status-warn-deep shadow-sm' : 'border-transparent hover:brightness-95'}`}>
+            {attentionOnly
+              ? <Check aria-hidden="true" className="h-3.5 w-3.5" />
+              : <Star aria-hidden="true" className="h-3.5 w-3.5" />}
+            注目のみ
           </button>
           <span className="shrink-0 whitespace-nowrap text-xs text-ink-faint">{loadStatus === 'ready' ? `${total.toLocaleString('ja-JP')}件` : '—'}</span>
         </div>
+        {optionsFailed ? (
+          <p className="mt-2 text-xs text-ink-secondary">
+            絞り込みの選択肢を読み込めませんでした。タグが空なのは、取れなかっただけかもしれません。
+            <button type="button" onClick={() => void loadOptions()} className="font-semibold text-action hover:underline">再読み込み</button>
+          </p>
+        ) : null}
       </section>
 
       {selectedIds.size > 0 ? (
@@ -416,32 +434,19 @@ function FriendsPageInner({
       <BulkRunDialog
         open={bulkOpen}
         friendIds={selectedFriendIds}
+        selectedFriends={friends.filter((friend) => selectedIds.has(friend.id))}
         tags={allTags}
         accountId={selectedAccountId}
         onClose={() => setBulkOpen(false)}
         onDone={() => void loadFriends()}
       />
 
-      {loadStatus === 'loading' ? (
-        <ListState kind="loading" title="友だちを読み込んでいます" />
-      ) : loadStatus === 'error' ? (
-        <ListState
-          kind="error"
-          title="友だちを表示できませんでした"
-          description="登録した友だちは消えていません。再読み込みしても直らない場合は、エラー報告へ連絡してください。"
-          onRetry={() => void loadFriends()}
-        />
-      ) : friends.length === 0 ? (
-        /*
-          **絞り込んで0件と、そもそも1人もいないのは別のこと。**
-          以前はどちらも「検索条件を外すか」と言っていたので、まだ誰も
-          友だちになっていないアカウントで、外すべき条件が無いのに
-          条件を外せと言われた。共通部品を通して、状態を名前で言えるようにする。
-        */
-        <ListState kind="empty" title={emptyMessage.title} description={emptyMessage.description} />
-      ) : (
-        <FriendListTable
+      <FriendListTable
           friends={friends}
+          status={loadStatus}
+          emptyTitle={emptyMessage.title}
+          emptyDescription={emptyMessage.description}
+          onRetry={() => void loadFriends()}
           total={total}
           selectedIds={selectedIds}
           onToggleSelect={toggleSelect}
@@ -453,10 +458,34 @@ function FriendsPageInner({
           onPageChange={setPage}
           onPageSizeChange={(size) => resetPageWith(() => setPageSize(size as (typeof PAGE_SIZE_OPTIONS)[number]))}
           onToggleAttention={toggleAttention}
-        />
-      )}
+      />
 
-      <AdvancedSearchDialog open={advancedOpen} accountId={selectedAccountId} tags={allTags} fieldNames={[]} onClose={() => setAdvancedOpen(false)} onApply={(result) => { setAdvanced(result); setAdvancedOpen(false); setPage(1) }} />
+      {advancedOpen ? (
+        <style>{`
+          [data-friends-advanced-search] > div {
+            background-color: rgb(16 24 40 / 33%) !important;
+          }
+          [data-friends-advanced-search] > div > div {
+            max-height: min(944px, calc(100vh - 32px)) !important;
+          }
+        `}</style>
+      ) : null}
+      <div data-friends-advanced-search>
+        <AdvancedSearchDialog
+          open={advancedOpen}
+          accountId={selectedAccountId}
+          tags={allTags}
+          fieldNames={[]}
+          marks={marks}
+          scenarios={scenarios}
+          onClose={() => setAdvancedOpen(false)}
+          onLoadSaved={() => {
+            setAdvancedOpen(false)
+            setSavedOpen(true)
+          }}
+          onApply={(result) => { setAdvanced(result); setAdvancedOpen(false); setPage(1) }}
+        />
+      </div>
       {savedOpen ? (
         <SavedSearchDialog
           accountId={selectedAccountId}
@@ -510,7 +539,7 @@ function SavedSearchDialog({
   onApply: (result: AdvancedSearchResult) => void
   onOpenAdvanced: () => void
 }) {
-  const [saved, setSaved] = useState<SavedSearch[]>([])
+  const [saved, setSaved] = useState<FriendSavedView[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -523,8 +552,8 @@ function SavedSearchDialog({
       setLoading(false)
       return
     }
-    void api.savedSearches.list(accountId).then((res) => {
-      if (!cancelled && res.success) setSaved(res.data)
+    void api.friendSavedViews.list(accountId).then((res) => {
+      if (!cancelled && res.success) setSaved(res.data.items)
     }).catch(() => {
       if (!cancelled) setError('保存した検索を読み込めませんでした')
     }).finally(() => {
@@ -555,6 +584,9 @@ function SavedSearchDialog({
                     <span className="rounded-pill bg-canvas px-2 py-0.5 text-xs font-medium text-ink-faint">{search.isShared ? '全員' : '自分だけ'}</span>
                   </span>
                   <span className="mt-2 block text-xs leading-5 text-ink-secondary">{summary.slice(0, 3).join(' ／ ') || '条件を確認してください'}</span>
+                  <span className="mt-1 block text-xs font-semibold text-accent">
+                    {search.match.total === null ? search.match.error ?? '人数を確認できません' : `${search.match.total.toLocaleString('ja-JP')}人`}
+                  </span>
                 </button>
               )
             })}
@@ -600,7 +632,7 @@ function FriendsPageHost() {
           active={tab}
           actions={(
             <div className="flex flex-wrap items-center justify-end gap-2">
-              {tab === 'list' ? <button type="button" onClick={() => exportCurrentPage?.()} disabled={!exportCurrentPage} className="h-9.5 rounded-control border border-hairline bg-canvas px-4 text-sm font-semibold text-ink-secondary hover:bg-canvas-sunken disabled:text-ink-disabled">CSVで書き出す</button> : null}
+              {tab === 'list' ? <button type="button" onClick={() => exportCurrentPage?.()} disabled={!exportCurrentPage} className="h-9.5 rounded-control border border-hairline bg-canvas px-4 text-sm font-semibold text-ink-secondary hover:bg-canvas-sunken disabled:text-ink-disabled">表示中をCSVで書き出す</button> : null}
               <Link href="/accounts?tab=migration" className="flex h-9.5 items-center rounded-control border border-hairline bg-canvas px-4 text-sm font-semibold text-action hover:bg-action-soft">UID移行</Link>
             </div>
           )}
