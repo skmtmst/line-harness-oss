@@ -4227,8 +4227,13 @@ export const api = {
   },
   tags: {
     /** withCounts で friendCount 付き (JOIN 集計 — タグ管理ページ用)。 */
-    list: (params?: { withCounts?: boolean }) =>
-      fetchApi<ApiResponse<Tag[]>>(`/api/tags${params?.withCounts ? '?withCounts=1' : ''}`),
+    list: (params?: { withCounts?: boolean; accountId?: string | null }) => {
+      const query = new URLSearchParams()
+      if (params?.withCounts) query.set('withCounts', '1')
+      if (params?.accountId) query.set('lineAccountId', params.accountId)
+      const suffix = query.size > 0 ? `?${query.toString()}` : ''
+      return fetchApi<ApiResponse<Tag[]>>(`/api/tags${suffix}`)
+    },
     /** CSVを保存せずに検査し、行ごとの扱いを返す。 */
     importPreview: (rows: TagCsvImportInputRow[]) =>
       fetchApi<ApiResponse<TagCsvImportPreview>>('/api/tags/import/preview', {

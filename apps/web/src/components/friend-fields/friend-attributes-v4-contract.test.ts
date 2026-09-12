@@ -190,7 +190,7 @@ describe('友だち属性 V4 contract', () => {
     // ここで「手動」と埋めると、断定できなかったものを断定したことになる。
     expect(source).toContain("tag.assignSource ? SOURCE_LABELS[tag.assignSource] : '—'")
     // 使用先。`withCounts=1` で読んでいるので、無いのは0件＝「未使用」。
-    expect(source).toContain("api.tags.list({ withCounts: true })")
+    expect(source).toContain("api.tags.list({ withCounts: true, accountId })")
     expect(source).toContain("if (!tag.usedIn) return 'なし'")
     /*
       「未使用」は **友だち0人かつ全参照0件**（kenta 確定 2026-08-26）。

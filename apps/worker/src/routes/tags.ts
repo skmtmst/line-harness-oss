@@ -434,7 +434,13 @@ tags.get('/api/tag-groups', async (c) => {
     const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
     const requested = requestedLineAccountId(c);
     if (requested && !scope.allowedAccountIds.includes(requested)) return c.json({ success: false, error: 'Not found' }, 404);
-    const items = await getTagGroups(c.env.DB, { ...scope, allowedAccountIds: requested ? [requested] : scope.allowedAccountIds });
+    const items = await getTagGroups(c.env.DB, {
+      ...scope,
+      allowedAccountIds: requested ? [requested] : scope.allowedAccountIds,
+      // An explicitly selected account is an editing boundary. Legacy unassigned
+      // folders cannot be assigned to that account's tags, so do not offer them.
+      canSeeUnassigned: requested ? false : scope.canSeeUnassigned,
+    });
     return c.json({ success: true, data: items.map(serializeTagGroup) });
   } catch (err) {
     console.error('GET /api/tag-groups error:', err);
@@ -580,7 +586,7 @@ tags.get('/api/tags', async (c) => {
       : await getTags(c.env.DB);
     const allowedIds = requestedAccountId ? [requestedAccountId] : scope.allowedAccountIds;
     const visibleItems = items.filter((item) => item.line_account_id == null
-      ? scope.canSeeUnassigned
+      ? !requestedAccountId && scope.canSeeUnassigned
       : allowedIds.includes(item.line_account_id));
     return c.json({ success: true, data: visibleItems.map(serializeTag) });
   } catch (err) {

@@ -53,10 +53,26 @@ describe('existing tag/folder endpoints enforce account ownership', () => {
     for (const url of ['/api/folders?kind=tag&account_id=a', '/api/tag-groups?account_id=a']) {
       const response = await req(url);
       const body = await response.json() as { data: { id: string }[] };
-      expect(body.data.map((row) => row.id).sort()).toEqual(['folder-a', 'legacy']);
+      expect(body.data.map((row) => row.id).sort()).toEqual(
+        url.startsWith('/api/tag-groups') ? ['folder-a'] : ['folder-a', 'legacy'],
+      );
     }
     const response = await req('/api/folders?kind=tag');
     expect(JSON.stringify(await response.json())).not.toContain('folder-c');
+  });
+  it('uses the selected account as the exact tag and tag-folder editing boundary', async () => {
+    actor.id = 'env-owner'; actor.role = 'owner';
+    fixture.raw.prepare(`INSERT INTO tags(id,name,normalized_name,line_account_id,folder_id,created_at,updated_at)
+      VALUES('tag-legacy','tag-legacy','tag-legacy',NULL,'legacy','2026-01-01','2026-01-01')`).run();
+
+    const groups = await (await req('/api/tag-groups?lineAccountId=a')).json() as { data: { id: string }[] };
+    expect(groups.data.map((row) => row.id)).toEqual(['folder-a']);
+
+    const scopedTags = await (await req('/api/tags?lineAccountId=a&withCounts=1')).json() as { data: { id: string }[] };
+    expect(scopedTags.data.map((row) => row.id)).toEqual(['tag-a']);
+
+    const allTags = await (await req('/api/tags')).json() as { data: { id: string }[] };
+    expect(allTags.data.map((row) => row.id).sort()).toEqual(['tag-a', 'tag-b', 'tag-legacy']);
   });
   it.each(['b', 'c'])('cannot list/edit/delete another account %s via either folder API', async (id) => {
     expect((await req(`/api/folders?kind=tag&account_id=${id}`)).status).toBe(404);

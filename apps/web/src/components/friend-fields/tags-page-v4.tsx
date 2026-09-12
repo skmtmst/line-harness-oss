@@ -613,7 +613,10 @@ export default function TagsPageV4({
     setStatus('loading')
     setError('')
     try {
-      const [tags, folders] = await Promise.all([api.tags.list({ withCounts: true }), api.tagGroups.list(accountId)])
+      const [tags, folders] = await Promise.all([
+        api.tags.list({ withCounts: true, accountId }),
+        api.tagGroups.list(accountId),
+      ])
       // `success: false` を黙って捨てない。捨てると空の表を「0件」として見せる。
       if (!tags.success) throw new Error(tags.error)
       setItems(tags.data)
