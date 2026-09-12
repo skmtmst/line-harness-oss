@@ -183,6 +183,72 @@ describe('DB-bound R2 store executor',()=>{
     expect(JSON.parse(action.action_data)).toMatchObject({scenarioId:reference.targetId});
   });
 
+  test('rich menu clones a dependent scenario graph and remaps every reference in one batch',async()=>{
+    const f=await fixture();
+    f.raw.exec(`
+      INSERT INTO tags(id,name,line_account_id) VALUES ('source-trigger-tag','開始タグ','source'),('source-action-tag','完了タグ','source');
+      INSERT INTO templates(id,name,message_type,message_content,line_account_id,published_version) VALUES ('source-graph-template','案内テンプレート','text','テンプレート本文','source',1);
+      INSERT INTO scenarios(id,name,trigger_type,trigger_tag_id,on_complete_mode,on_complete_scenario_id,line_account_id,is_active) VALUES
+        ('source-child','次の案内','manual',NULL,'pause',NULL,'source',1),
+        ('source-root','複雑な案内','tag_added','source-trigger-tag','move','source-child','source',1);
+      INSERT INTO scenario_steps(id,scenario_id,step_order,message_type,message_content,template_id,on_reach_tag_id) VALUES
+        ('source-child-step','source-child',1,'text','次です',NULL,NULL),
+        ('source-root-step','source-root',1,'text','控え','source-graph-template','source-action-tag');
+      INSERT INTO scenario_actions(id,scenario_id,hook,step_id,sort_order,action_type,config_json) VALUES
+        ('source-tag-action','source-root','step_sent','source-root-step',0,'tag','{"op":"add","tagIds":["source-action-tag"]}'),
+        ('source-next-action','source-root','scenario_completed',NULL,1,'scenario','{"op":"start","scenarioId":"source-child"}'),
+        ('source-template-action','source-root','scenario_completed',NULL,2,'send_template','{"templateId":"source-graph-template"}');
+      INSERT INTO scenario_triggers(id,scenario_id,kind,tag_id) VALUES
+        ('source-friend-trigger','source-root','friend_add',NULL),
+        ('source-tag-trigger','source-root','tag_added','source-trigger-tag');
+    `);
+    (f.rich.richMenu.pages[0].areas[0] as unknown as Record<string,unknown>).scenarioId='source-root';
+    const json=JSON.stringify(f.rich);f.raw.prepare("UPDATE hq_template_versions SET definition_json=?,content_hash=? WHERE id='v'").run(json,await digest(json));
+    const context=await f.preflight();
+    expect(context.resolutions.filter(row=>row.itemKind!=='rich_menu').map(row=>row.sourceId)).toEqual([
+      'scenario:source-child','scenario:source-root','tag:source-action-tag','tag:source-trigger-tag','template:source-graph-template',
+    ]);
+    expect((await f.execute(context)).status).toBe('succeeded');
+    const scenarios=f.raw.prepare("SELECT id,name,is_active,on_complete_scenario_id,trigger_tag_id FROM scenarios WHERE line_account_id='a' ORDER BY name").all() as Array<Record<string,unknown>>;
+    expect(scenarios).toHaveLength(2);expect(scenarios.every(row=>row.is_active===0)).toBe(true);
+    const root=scenarios.find(row=>row.name==='複雑な案内')!,child=scenarios.find(row=>row.name==='次の案内')!;
+    expect(root.on_complete_scenario_id).toBe(child.id);expect(root.trigger_tag_id).not.toBe('source-trigger-tag');
+    const step=f.raw.prepare('SELECT id,template_id,on_reach_tag_id,is_draft FROM scenario_steps WHERE scenario_id=?').get(root.id) as Record<string,unknown>;
+    expect(step).toMatchObject({is_draft:1});expect(step.template_id).not.toBe('source-graph-template');expect(step.on_reach_tag_id).not.toBe('source-action-tag');
+    const configs=(f.raw.prepare('SELECT config_json FROM scenario_actions WHERE scenario_id=? ORDER BY sort_order').all(root.id) as Array<{config_json:string}>).map(row=>JSON.parse(row.config_json));
+    expect(JSON.stringify(configs)).not.toContain('source-');
+    expect(f.raw.prepare('SELECT COUNT(*) n FROM scenario_triggers WHERE scenario_id=?').get(root.id)).toEqual({n:2});
+    expect(f.raw.prepare("SELECT COUNT(*) n FROM rich_menu_groups WHERE account_id='a'").get()).toEqual({n:1});
+    expect(f.raw.pragma('foreign_key_check')).toEqual([]);
+  });
+
+  test('scenario graph reuses an exact destination name and binds the cloned parent to it',async()=>{
+    const f=await fixture();
+    f.raw.exec("INSERT INTO scenarios(id,name,trigger_type,on_complete_mode,line_account_id,is_active) VALUES ('source-child','次の案内','manual','pause','source',1),('source-root','親案内','manual','move','source',1),('local-child','次の案内','manual','pause','a',1); UPDATE scenarios SET on_complete_scenario_id='source-child' WHERE id='source-root'");
+    (f.rich.richMenu.pages[0].areas[0] as unknown as Record<string,unknown>).scenarioId='source-root';
+    const json=JSON.stringify(f.rich);f.raw.prepare("UPDATE hq_template_versions SET definition_json=?,content_hash=? WHERE id='v'").run(json,await digest(json));
+    const context=await f.preflight(),child=context.resolutions.find(row=>row.sourceId==='scenario:source-child')!;
+    expect(child).toMatchObject({mode:'overwrite',targetId:'local-child'});
+    expect((await f.execute(context)).status).toBe('succeeded');
+    expect(f.raw.prepare("SELECT on_complete_scenario_id FROM scenarios WHERE line_account_id='a' AND name='親案内'").get()).toEqual({on_complete_scenario_id:'local-child'});
+    expect(f.raw.prepare("SELECT COUNT(*) n FROM scenarios WHERE line_account_id='a' AND name='次の案内'").get()).toEqual({n:1});
+  });
+
+  test('scenario graph revision conflict and cycle fail before rich-menu R2 writes',async()=>{
+    const changed=await fixture();
+    changed.raw.exec("INSERT INTO scenarios(id,name,trigger_type,on_complete_mode,line_account_id,is_active) VALUES ('source-root','案内','manual','pause','source',1); INSERT INTO scenario_actions(id,scenario_id,hook,action_type,config_json) VALUES ('source-action','source-root','scenario_completed','send_message','{\"content\":\"完了\"}')");
+    (changed.rich.richMenu.pages[0].areas[0] as unknown as Record<string,unknown>).scenarioId='source-root';
+    let json=JSON.stringify(changed.rich);changed.raw.prepare("UPDATE hq_template_versions SET definition_json=?,content_hash=? WHERE id='v'").run(json,await digest(json));
+    const context=await changed.preflight();changed.raw.exec("UPDATE scenario_actions SET config_json='{\"content\":\"変更\"}' WHERE id='source-action'");
+    expect(await changed.execute(context)).toMatchObject({status:'version_conflict'});expect(changed.bucket.put).not.toHaveBeenCalled();
+
+    const cyclic=await fixture();
+    cyclic.raw.exec("INSERT INTO scenarios(id,name,trigger_type,on_complete_mode,on_complete_scenario_id,line_account_id,is_active) VALUES ('source-a','A','manual','move','source-b','source',1),('source-b','B','manual','move','source-a','source',1)");
+    (cyclic.rich.richMenu.pages[0].areas[0] as unknown as Record<string,unknown>).scenarioId='source-a';
+    json=JSON.stringify(cyclic.rich);cyclic.raw.prepare("UPDATE hq_template_versions SET definition_json=?,content_hash=? WHERE id='v'").run(json,await digest(json));
+    await expect(cyclic.preflight()).rejects.toMatchObject({code:'UNSUPPORTED_REFERENCE'});expect(cyclic.bucket.put).not.toHaveBeenCalled();
+  });
+
   test('missing portable tag, form, scenario and text template are cloned and bound atomically',async()=>{
     const f=await fixture();
     f.raw.exec(`

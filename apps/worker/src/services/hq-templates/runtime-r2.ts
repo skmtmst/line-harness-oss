@@ -3,6 +3,7 @@ import { beginHqTemplateDistributionRun, beginHqTemplateStoreResult, recordHqTem
 import { requireHqTemplateAuthority, type HqTemplateAdapter, type HqTemplateAdapterContext, type HqTemplateAdapterInput, type HqTemplateAdapterResult, type HqTemplateAuthority, type HqTemplateSnapshotToken, type HqTemplateStoreAtomicCommitPlan } from './contract.js';
 import { createTemplateHqTemplateAdapter, parseMessageTemplateDefinition, inspectMessageTemplateDefinition, readMessageTemplateSourceBytes, type MessageTemplateTargetSnapshot, type MessageTemplateSourceMediaBinding, type MessageTemplateAdapterDependencies } from './template.js';
 import { createRichMenuHqTemplateAdapter, parseRichMenuTemplateDefinition, richMenuReferences, type RichMenuHqDefinition } from './rich-menu.js';
+import { loadScenarioReferenceGraph, remapScenarioJson, scenarioGraphSourceGuardStatements, ScenarioGraphError, type ScenarioGraphReference, type ScenarioReferenceGraph } from './scenario-graph.js';
 
 export class HqR2RuntimeError extends Error { constructor(public readonly code: string) { super(code); } }
 const fail = (code: string): never => { throw new HqR2RuntimeError(code); };
@@ -86,17 +87,7 @@ async function matchRichReference(b:R2RuntimeBinding,ref:RichReference,account:s
     return {...ref,name:String(source!.name),targetId,expectedRevision:JSON.stringify([sourceHash,null]),operation:'create',dbCommit:[...dbCommit,guard(`NOT EXISTS(SELECT 1 FROM tags WHERE id=?)`,[targetId]),insertRow('tags',row)]};
   }
   if(ref.kind==='scenario') {
-    const source=await b.db.prepare(`SELECT s.* FROM scenarios s JOIN line_accounts a ON a.id=s.line_account_id WHERE s.id=? AND s.is_active=1 AND a.tenant_id=? AND a.is_active=1 AND a.archived_at IS NULL`).bind(ref.sourceId,b.authority.tenantId).first<DbRow>();if(!source)unavailable();
-    if(source!.trigger_type!=='manual'||source!.on_complete_mode!=='pause'||source!.trigger_tag_id||source!.on_complete_scenario_id||source!.folder_id||source!.audience_condition_json)fail('UNSUPPORTED_REFERENCE');
-    const steps=(await b.db.prepare(`SELECT * FROM scenario_steps WHERE scenario_id=? ORDER BY step_order,id`).bind(ref.sourceId).all<DbRow>()).results;
-    if(await b.db.prepare(`SELECT 1 FROM scenario_actions WHERE scenario_id=? LIMIT 1`).bind(ref.sourceId).first()||await b.db.prepare(`SELECT 1 FROM scenario_triggers WHERE scenario_id=? LIMIT 1`).bind(ref.sourceId).first()||steps.some(step=>step.template_id||step.on_reach_tag_id||step.message_bubbles_json||step.target_condition_json||step.question_json||step.condition_type||step.condition_value||step.message_type!=='text'||!portableText(step.message_content)))fail('UNSUPPORTED_REFERENCE');
-    const listSql=`SELECT json_group_array(json_array(id,name,is_active,updated_at,current_published_version_id)) FROM (SELECT id,name,is_active,updated_at,current_published_version_id FROM scenarios WHERE line_account_id=? ORDER BY id)`,list=(await b.db.prepare(`SELECT (${listSql}) AS snapshot`).bind(account).first<{snapshot:string}>())!.snapshot;
-    const rows=(JSON.parse(list) as [string,string,number,string|null,string|null][]).map(([id,name,is_active,updated_at,current])=>({id,name,is_active,updated_at,current})),matches=rows.filter(row=>normalizeScopedTagName(row.name)===normalizeScopedTagName(String(source!.name)));if(matches.length>1||matches.some(row=>row.is_active!==1))unavailable();
-    const sourceHash=await digest(JSON.stringify([source,steps])),dbCommit=[exactRowGuard('scenarios',source!),activeAccountGuard(String(source!.line_account_id),b.authority.tenantId),guard(`(SELECT COUNT(*) FROM scenario_steps WHERE scenario_id=?)=?`,[ref.sourceId,steps.length]),...steps.map(row=>exactRowGuard('scenario_steps',row)),guard(`NOT EXISTS(SELECT 1 FROM scenario_actions WHERE scenario_id=?) AND NOT EXISTS(SELECT 1 FROM scenario_triggers WHERE scenario_id=?)`,[ref.sourceId,ref.sourceId]),targetListGuard(listSql,[account],list)],match=matches[0];
-    if(match)return {...ref,name:String(source!.name),targetId:match.id,expectedRevision:JSON.stringify([sourceHash,match.updated_at,match.current]),operation:'reuse',dbCommit};
-    const targetId=await plannedTargetId(b,account,ref),scenario:DbRow={...source!,id:targetId,line_account_id:account,is_active:0,folder_id:null,created_from_recipe_id:null,recipe_clone_run_id:null,current_published_version_id:null};delete scenario.created_at;delete scenario.updated_at;
-    const clones=steps.map((step,index)=>{const row:DbRow={...step,id:`${targetId.slice(0,24)}s${String(index).padStart(3,'0')}`,scenario_id:targetId,is_draft:1};delete row.created_at;return insertRow('scenario_steps',row)});
-    return {...ref,name:String(source!.name),targetId,expectedRevision:JSON.stringify([sourceHash,null]),operation:'create',dbCommit:[...dbCommit,guard(`NOT EXISTS(SELECT 1 FROM scenarios WHERE id=?)`,[targetId]),insertRow('scenarios',scenario),...clones]};
+    fail('SCENARIO_GRAPH_REQUIRED');
   }
   if(ref.kind==='form') {
     const source=await b.db.prepare(`SELECT f.* FROM forms f WHERE f.id=? AND f.status<>'archived' AND EXISTS(SELECT 1 FROM form_accounts fa JOIN line_accounts a ON a.id=fa.line_account_id WHERE fa.form_id=f.id AND a.tenant_id=? AND a.is_active=1 AND a.archived_at IS NULL) AND NOT EXISTS(SELECT 1 FROM form_accounts fa LEFT JOIN line_accounts a ON a.id=fa.line_account_id WHERE fa.form_id=f.id AND (a.tenant_id IS NULL OR a.tenant_id<>?))`).bind(ref.sourceId,b.authority.tenantId,b.authority.tenantId).first<DbRow>();if(!source)unavailable();
@@ -118,22 +109,106 @@ async function matchRichReference(b:R2RuntimeBinding,ref:RichReference,account:s
   const targetId=await plannedTargetId(b,account,ref),template:DbRow={...source!,id:targetId,line_account_id:account,folder_id:null,created_from_recipe_id:null,recipe_clone_run_id:null,published_at:null,publish_idempotency_key:null};delete template.created_at;delete template.updated_at;
   return {...ref,name:String(source!.name),targetId,expectedRevision:JSON.stringify([sourceHash,null]),operation:'create',dbCommit:[...dbCommit,guard(`NOT EXISTS(SELECT 1 FROM templates WHERE id=?)`,[targetId]),insertRow('templates',template)]};
 }
-async function inspectRichReferences(b:R2RuntimeBinding,definition:RichMenuHqDefinition,account:string) {
-  return Promise.all(richMenuReferences(definition).map(ref=>matchRichReference(b,ref,account)));
+type RichReferencePlan = { matches:RichReferenceMatch[];dbCommit:HqTemplateStatement[] };
+
+async function scenarioGraphPlan(b:R2RuntimeBinding,graph:ScenarioReferenceGraph,account:string,execution:boolean):Promise<RichReferencePlan> {
+  const unavailable=()=>fail(execution?'VERSION_CONFLICT':'REFERENCE_UNAVAILABLE');
+  const graphHash=await digest(graph.snapshot),matches:RichReferenceMatch[]=[],dbCommit:HqTemplateStatement[]=[activeAccountGuard(graph.sourceAccountId,b.authority.tenantId),...scenarioGraphSourceGuardStatements(graph)];
+  const ids=new Map<string,string>(),modes=new Map<string,'reuse'|'create'>();
+  for(const reference of graph.references) {
+    const ref=reference as RichReference;
+    const source=reference.kind==='tag'?graph.tags.get(reference.sourceId):reference.kind==='template'?graph.templates.get(reference.sourceId):graph.scenarios.get(reference.sourceId)?.row;
+    if(!source)unavailable();
+    if(reference.kind==='template'&&(source!.message_type!=='text'||source!.draft_message_type&&source!.draft_message_type!=='text'))unavailable();
+    const config=reference.kind==='tag'
+      ? {table:'tags',columns:'id,name,status,version,updated_at',revision:(row:DbRow)=>[row.version,row.updated_at],valid:(row:DbRow)=>row.status==='active'}
+      : reference.kind==='template'
+        ? {table:'templates',columns:'id,name,draft_revision,published_version,updated_at',revision:(row:DbRow)=>[row.draft_revision,row.published_version,row.updated_at],valid:(_row:DbRow)=>true}
+        : {table:'scenarios',columns:'id,name,is_active,updated_at,current_published_version_id',revision:(row:DbRow)=>[row.updated_at,row.current_published_version_id],valid:(row:DbRow)=>row.is_active===1};
+    const listSql=`SELECT json_group_array(json_array(${config.columns})) FROM (SELECT ${config.columns} FROM ${config.table} WHERE line_account_id=? ORDER BY id)`,list=(await b.db.prepare(`SELECT (${listSql}) AS snapshot`).bind(account).first<{snapshot:string}>())!.snapshot;
+    const columns=config.columns.split(','),rows=(JSON.parse(list) as unknown[][]).map(values=>Object.fromEntries(columns.map((column,index)=>[column,values[index]])) as DbRow);
+    const same=rows.filter(row=>normalizeScopedTagName(String(row.name))===normalizeScopedTagName(String(source!.name)));
+    if(same.length>1||same.some(row=>!config.valid(row)))unavailable();
+    const match=same[0],targetId=match?String(match.id):await plannedTargetId(b,account,ref),operation=match?'reuse' as const:'create' as const;
+    ids.set(reference.sourceId,targetId);modes.set(richReferenceKey(ref),operation);
+    dbCommit.push(targetListGuard(listSql,[account],list));
+    matches.push({...ref,name:String(source!.name),targetId,operation,expectedRevision:JSON.stringify([graphHash,match?config.revision(match):null]),dbCommit:[]});
+  }
+  for(const match of matches)if(match.operation==='create')dbCommit.push(guard(`NOT EXISTS(SELECT 1 FROM ${{tag:'tags',template:'templates',scenario:'scenarios'}[match.kind as 'tag'|'template'|'scenario']} WHERE id=?)`,[match.targetId]));
+  for(const row of graph.tags.values()) {
+    const key=richReferenceKey({kind:'tag',sourceId:String(row.id)}),targetId=ids.get(String(row.id))!;
+    if(modes.get(key)==='reuse')continue;
+    const clone:DbRow={...row,id:targetId,normalized_name:normalizeScopedTagName(String(row.name)),line_account_id:account,created_by:b.authority.actorId,updated_by:b.authority.actorId,version:1};delete clone.created_at;delete clone.updated_at;
+    dbCommit.push(insertRow('tags',clone));
+  }
+  for(const row of graph.templates.values()) {
+    const key=richReferenceKey({kind:'template',sourceId:String(row.id)}),targetId=ids.get(String(row.id))!;
+    if(modes.get(key)==='reuse')continue;
+    const clone:DbRow={...row,id:targetId,line_account_id:account,folder_id:null,created_from_recipe_id:null,recipe_clone_run_id:null,published_version:0,published_at:null,publish_idempotency_key:null};
+    for(const field of ['message_content','carousel_actions_json','question_json','draft_message_content','draft_carousel_actions_json','draft_question_json'])if(clone[field]!=null)clone[field]=remapScenarioJson(clone[field],ids);
+    delete clone.created_at;delete clone.updated_at;dbCommit.push(insertRow('templates',clone));
+  }
+  const ordered:string[]=[],seen=new Set<string>();
+  const order=(id:string)=>{if(seen.has(id))return;seen.add(id);const node=graph.scenarios.get(id)??unavailable();for(const ref of node.references)if(ref.kind==='scenario')order(ref.sourceId);ordered.push(id)};
+  for(const id of graph.scenarios.keys())order(id);
+  for(const sourceId of ordered) {
+    const node=graph.scenarios.get(sourceId)!,key=richReferenceKey({kind:'scenario',sourceId}),targetId=ids.get(sourceId)!;
+    if(modes.get(key)==='reuse')continue;
+    const clone:DbRow={...node.row,id:targetId,line_account_id:account,is_active:0,trigger_tag_id:node.row.trigger_tag_id?ids.get(String(node.row.trigger_tag_id))??unavailable():null,on_complete_scenario_id:node.row.on_complete_scenario_id?ids.get(String(node.row.on_complete_scenario_id))??unavailable():null,folder_id:null,created_from_recipe_id:null,recipe_clone_run_id:null,current_published_version_id:null};
+    delete clone.created_at;delete clone.updated_at;dbCommit.push(insertRow('scenarios',clone));
+    const stepIds=new Map<string,string>();
+    for(const step of node.steps)stepIds.set(String(step.id),(await digest(JSON.stringify([b.authority.tenantId,b.templateVersionId,account,'scenario_step',step.id]))).slice(0,32));
+    const remapIds=new Map([...ids,...stepIds]);
+    for(const step of node.steps) {
+      const copy:DbRow={...step,id:stepIds.get(String(step.id))!,scenario_id:targetId,template_id:step.template_id?ids.get(String(step.template_id))??unavailable():null,on_reach_tag_id:step.on_reach_tag_id?ids.get(String(step.on_reach_tag_id))??unavailable():null,is_draft:1};
+      if(/^\s*[\[{]/.test(String(copy.message_content)))copy.message_content=remapScenarioJson(copy.message_content,remapIds);
+      for(const field of ['message_bubbles_json','target_condition_json','question_json'])if(copy[field]!=null)copy[field]=remapScenarioJson(copy[field],remapIds);
+      delete copy.created_at;dbCommit.push(insertRow('scenario_steps',copy));
+    }
+    for(const action of node.actions) {
+      const copy:DbRow={...action,id:(await digest(JSON.stringify([b.authority.tenantId,b.templateVersionId,account,'scenario_action',action.id]))).slice(0,32),scenario_id:targetId,step_id:action.step_id?stepIds.get(String(action.step_id))??unavailable():null,config_json:remapScenarioJson(action.config_json,remapIds),condition_json:remapScenarioJson(action.condition_json,remapIds)};
+      delete copy.created_at;dbCommit.push(insertRow('scenario_actions',copy));
+    }
+    for(const trigger of node.triggers) {
+      const copy:DbRow={...trigger,id:(await digest(JSON.stringify([b.authority.tenantId,b.templateVersionId,account,'scenario_trigger',trigger.id]))).slice(0,32),scenario_id:targetId,tag_id:trigger.tag_id?ids.get(String(trigger.tag_id))??unavailable():null};
+      delete copy.created_at;dbCommit.push(insertRow('scenario_triggers',copy));
+    }
+  }
+  return {matches,dbCommit};
 }
-/** The execution resolver accepts only the exact preflight-selected target and revision. */
-function richResolver(b:R2RuntimeBinding,sourceGuards:HqTemplateStatement[],context?:HqTemplateAdapterContext) {
-  const added=new Set<string>();
+
+async function planRichReferences(b:R2RuntimeBinding,definition:RichMenuHqDefinition,account:string,execution=false):Promise<RichReferencePlan> {
+  const direct=richMenuReferences(definition),scenarioIds=direct.filter(ref=>ref.kind==='scenario').map(ref=>ref.sourceId),matches=new Map<string,RichReferenceMatch>(),dbCommit:HqTemplateStatement[]=[];
+  if(scenarioIds.length) {
+    try {
+      const graph=await loadScenarioReferenceGraph(b.db,b.authority.tenantId,scenarioIds),plan=await scenarioGraphPlan(b,graph,account,execution);
+      for(const match of plan.matches)matches.set(richReferenceKey(match),match);dbCommit.push(...plan.dbCommit);
+    } catch(error) {
+      if(error instanceof ScenarioGraphError)fail(execution?'VERSION_CONFLICT':error.code);
+      throw error;
+    }
+  }
+  for(const ref of direct)if(!matches.has(richReferenceKey(ref))) {
+    const match=await matchRichReference(b,ref,account,execution);matches.set(richReferenceKey(ref),match);dbCommit.push(...match.dbCommit);
+  }
+  return {matches:[...matches.values()].sort((a,b)=>richReferenceKey(a).localeCompare(richReferenceKey(b))),dbCommit};
+}
+
+/** The execution resolver accepts only the exact preflight-selected graph and revision. */
+function richResolver(plan:RichReferencePlan,sourceGuards:HqTemplateStatement[],context?:HqTemplateAdapterContext) {
+  const byKey=new Map(plan.matches.map(match=>[richReferenceKey(match),match]));let bound=false;
   return async (ref:RichReference,account:string) => {
-    const match=await matchRichReference(b,ref,account,!!context);
-    if(context) {
+    const match=byKey.get(richReferenceKey(ref))??fail('REFERENCE_UNAVAILABLE');
+    if(context&&!bound) {
       if(context.targetAccountId!==account)fail('SELECTION_REQUIRED');
-      const selected=context.resolutions.filter(r=>r.sourceId===richReferenceKey(ref)&&r.itemKind===ref.kind);
-      const mode=match.operation==='reuse'?'overwrite':'create';
-      if(selected.length!==1)fail('SELECTION_REQUIRED');
-      if(selected[0].mode!==mode||selected[0].targetId!==match.targetId)fail('VERSION_CONFLICT');
-      if(selected[0].expectedRevision!==match.expectedRevision)fail('VERSION_CONFLICT');
-      if(!added.has(richReferenceKey(ref))){sourceGuards.push(...match.dbCommit);added.add(richReferenceKey(ref));}
+      const selected=context.resolutions.filter(r=>r.itemKind!=='rich_menu');
+      if(selected.length!==plan.matches.length)fail('SELECTION_REQUIRED');
+      for(const planned of plan.matches) {
+        const rows=selected.filter(r=>r.sourceId===richReferenceKey(planned)&&r.itemKind===planned.kind),mode=planned.operation==='reuse'?'overwrite':'create';
+        if(rows.length!==1)fail('SELECTION_REQUIRED');
+        if(rows[0].mode!==mode||rows[0].targetId!==planned.targetId||rows[0].expectedRevision!==planned.expectedRevision)fail('VERSION_CONFLICT');
+      }
+      sourceGuards.push(...plan.dbCommit);bound=true;
     }
     return {targetId:match.targetId,operation:match.operation,expectedRevision:match.expectedRevision};
   };
@@ -201,10 +276,11 @@ export async function inspectR2RuntimeStore(b:R2RuntimeBinding,targetAccountId:s
     return {type:v.template_type,snapshotToken:snapshot.snapshotToken,items:inspectMessageTemplateDefinition(parseMessageTemplateDefinition(JSON.parse(v.definition_json)),snapshot)};
   }
   const definition=parseRichMenuTemplateDefinition(input,b.authority.tenantId);
-  const adapter=createRichMenuHqTemplateAdapter({db:b.db,bucket:boundedRichBucket(b),authority:b.authority,input,resolveReference:richResolver(b,[])});
+  const referencePlan=await planRichReferences(b,definition,targetAccountId);
+  const adapter=createRichMenuHqTemplateAdapter({db:b.db,bucket:boundedRichBucket(b),authority:b.authority,input,resolveReference:richResolver(referencePlan,[])});
   const rows=(await b.db.prepare(`SELECT id,name,status,updated_at FROM rich_menu_groups WHERE account_id=? ORDER BY id`).bind(targetAccountId).all<{id:string;name:string;status:string;updated_at:string}>()).results.filter(r=>r.name===definition.richMenu.name);
   if(rows.length>1)fail('AMBIGUOUS_TARGET');const target=rows[0];
-  const references=await inspectRichReferences(b,definition,targetAccountId);
+  const references=referencePlan.matches;
   return {type:v.template_type,snapshotToken:await adapter.snapshot(targetAccountId),items:[
     {sourceId:definition.richMenu.id,itemKind:'rich_menu',name:definition.richMenu.name,targetId:target?.id??null,expectedRevision:target?.updated_at??null,duplicate:!!target,allowedModes:!target?['create']:target.status==='draft'?['overwrite','alias']:['alias']},
     ...references.map(ref=>({sourceId:richReferenceKey(ref),itemKind:ref.kind,name:ref.name,targetId:ref.targetId,expectedRevision:ref.expectedRevision,duplicate:ref.operation==='reuse',operation:ref.operation,allowedModes:ref.operation==='reuse'?['overwrite'] as const:['create'] as const})),
@@ -212,7 +288,7 @@ export async function inspectR2RuntimeStore(b:R2RuntimeBinding,targetAccountId:s
 }
 async function buildR2Plan(b:R2RuntimeBinding,context:HqTemplateAdapterContext,input:HqTemplateAdapterInput,type:'template'|'rich_menu') {
   const sourceGuards:HqTemplateStatement[]=[];
-  let adapter:HqTemplateAdapter;
+  let adapter:HqTemplateAdapter,richContext:HqTemplateAdapterContext|undefined;
   if(type==='template')adapter=await messageAdapter(b,context,input,sourceGuards);
   else {
     const definition=parseRichMenuTemplateDefinition(input,b.authority.tenantId);
@@ -221,7 +297,11 @@ async function buildR2Plan(b:R2RuntimeBinding,context:HqTemplateAdapterContext,i
       let name='';for(let n=2;n<10000;n++){const candidate=`${definition.richMenu.name} (${n})`;if(!names.includes(candidate)){name=candidate;break;}}if(!name)fail('ALIAS_EXHAUSTED');
       context={...context,resolutions:context.resolutions.map(r=>({...r,aliasName:name}))};
     }
-    adapter=createRichMenuHqTemplateAdapter({db:b.db,bucket:boundedRichBucket(b),authority:b.authority,input,resolveReference:richResolver(b,sourceGuards,context)});
+    const referencePlan=await planRichReferences(b,definition,context.targetAccountId,true);
+    const directKeys=new Set(richMenuReferences(definition).map(richReferenceKey));
+    const adapterContext={...context,resolutions:context.resolutions.filter(r=>r.itemKind==='rich_menu'||directKeys.has(r.sourceId))};
+    adapter=createRichMenuHqTemplateAdapter({db:b.db,bucket:boundedRichBucket(b),authority:b.authority,input,resolveReference:richResolver(referencePlan,sourceGuards,context)});
+    richContext=context;context=adapterContext;
   }
   const refs=ok(await adapter.extractReferences(input)),verified=ok(await adapter.verifyReferences(context,refs));
   const duplicates=ok(await adapter.detectDuplicates(context,verified)),ids=ok(await adapter.buildIdMap(context,verified,duplicates));
@@ -229,7 +309,7 @@ async function buildR2Plan(b:R2RuntimeBinding,context:HqTemplateAdapterContext,i
   // The adapter's first statement verifies the exact preflight snapshot. Run it
   // before reference clones, then create dependencies before rich-menu rows.
   return type==='rich_menu'
-    ? {...plan,dbCommit:[plan.dbCommit[0],...sourceGuards,...plan.dbCommit.slice(1)]}
+    ? {...plan,resolutions:richContext!.resolutions,dbCommit:[plan.dbCommit[0],...sourceGuards,...plan.dbCommit.slice(1)]}
     : {...plan,dbCommit:[...sourceGuards,...plan.dbCommit]};
 }
 
