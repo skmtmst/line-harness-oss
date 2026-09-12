@@ -23,6 +23,7 @@ export type FormReference = HqTemplateReference & {
 };
 export type FormReferenceResolution = {
     targetId: string;
+    aliasName?: string;
     /** A trusted reference adapter's plan; it must not write before this batch. */
     dbCommit?: readonly HqTemplateStatement[];
 };
@@ -197,6 +198,18 @@ type FormSnapshot = {
         content_revision: number;
         owners: string[];
     }[];
+    tags: {
+        id: string;
+        name: string;
+        version: number;
+        updated_at: string | null;
+        status: string;
+    }[];
+    scenarios: {
+        id: string;
+        name: string;
+        updated_at: string | null;
+    }[];
 };
 export async function formTemplateSnapshot(db: D1Database, accountId: string): Promise<string> {
     const result = await db.prepare(SNAPSHOT_SQL).bind(accountId, accountId, accountId, accountId).first<{
@@ -228,7 +241,41 @@ export async function inspectFormTemplate(db: D1Database, authority: HqTemplateA
     authorize(authority, { tenantId: authority.tenantId, targetAccountId: accountId }, state);
     const found = target(state, def.form.name);
     const allowedModes = !found ? ['create'] as const : found.status === 'archived' || found.owners.length !== 1 ? ['alias'] as const : ['overwrite', 'alias'] as const;
-    return { snapshotToken: await formTemplateSnapshotToken(snapshot), sourceId: 'form', itemKind: 'form', name: def.form.name, targetId: found?.id ?? null, expectedRevision: found ? String(found.content_revision) : null, duplicate: Boolean(found), allowedModes, references: references(def) };
+    return { snapshot, snapshotToken: await formTemplateSnapshotToken(snapshot), sourceId: 'form', itemKind: 'form', name: def.form.name, targetId: found?.id ?? null, expectedRevision: found ? String(found.content_revision) : null, duplicate: Boolean(found), allowedModes, references: references(def) };
+}
+/** Preflight rows make every form reference an explicit, immutable operator decision. */
+export async function inspectFormTemplateReferences(db: D1Database, authority: HqTemplateAuthority, accountId: string, input: HqTemplateAdapterInput, inspectedSnapshot?: string) {
+    const def = parseFormTemplateDefinition(input), snapshot = inspectedSnapshot ?? await formTemplateSnapshot(db, accountId), state = JSON.parse(snapshot) as FormSnapshot;
+    authorize(authority, { tenantId: authority.tenantId, targetAccountId: accountId }, state);
+    const referenceItems = [];
+    for (const reference of references(def)) {
+        const source = reference.kind === 'tag'
+            ? await db.prepare(`SELECT t.name FROM tags t JOIN line_accounts a ON a.id=t.line_account_id WHERE t.id=? AND t.status='active' AND a.tenant_id=? AND a.is_active=1 AND a.archived_at IS NULL`).bind(reference.sourceId, authority.tenantId).first<{ name: string }>()
+            : await db.prepare(`SELECT s.name FROM scenarios s JOIN line_accounts a ON a.id=s.line_account_id WHERE s.id=? AND a.tenant_id=? AND a.is_active=1 AND a.archived_at IS NULL`).bind(reference.sourceId, authority.tenantId).first<{ name: string }>();
+        if (!source)
+            throw new FormTemplateError('REFERENCE_UNAVAILABLE');
+        const matches = reference.kind === 'tag'
+            ? state.tags.filter(row => normalizeScopedTagName(row.name) === normalizeScopedTagName(source.name))
+            : state.scenarios.filter(row => normalizeScopedTagName(row.name) === normalizeScopedTagName(source.name));
+        if (matches.length > 1 || (reference.kind === 'tag' && state.tags.filter(row => normalizeScopedTagName(row.name) === normalizeScopedTagName(source.name)).some(row => row.status !== 'active')))
+            throw new FormTemplateError('SELECTION_REQUIRED');
+        const match = matches[0] ?? null;
+        const expectedRevision = match
+            ? reference.kind === 'tag'
+                ? JSON.stringify([(match as FormSnapshot['tags'][number]).version, match.updated_at])
+                : JSON.stringify([match.updated_at])
+            : null;
+        referenceItems.push({
+            sourceId: referenceKey(reference.kind, reference.sourceId),
+            itemKind: reference.kind,
+            name: source.name,
+            targetId: match?.id ?? null,
+            expectedRevision,
+            duplicate: Boolean(match),
+            allowedModes: match ? ['overwrite', 'alias'] as const : ['create'] as const,
+        });
+    }
+    return referenceItems;
 }
 /** The URL is derived from the destination LIFF and stable form ID, never copied. */
 export async function formTemplatePublicUrl(db: D1Database, authority: HqTemplateAuthority, accountId: string, formId: string): Promise<string | null> {
@@ -318,7 +365,12 @@ export function createFormHqTemplateAdapter(deps: FormTemplateDependencies): HqT
                 statements.push({ sql: `UPDATE forms SET name=?,description=?,fields=?,layout=?,on_submit_tag_id=?,on_submit_scenario_id=?,save_to_metadata=?,is_active=0,updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now'),revision=revision+1,content_revision=content_revision+1 WHERE id=? AND content_revision=?`, bindings: [...values, id, found!.content_revision] });
             else
                 statements.push({ sql: `INSERT INTO forms(id,name,description,fields,layout,on_submit_tag_id,on_submit_scenario_id,save_to_metadata,is_active) VALUES (?,?,?,?,?,?,?,?,0)`, bindings: [id, ...values] }, { sql: `INSERT INTO form_accounts(form_id,line_account_id) VALUES (?,?)`, bindings: [id, context.targetAccountId] });
-            planned = { tenantId: context.tenantId, targetAccountId: context.targetAccountId, preflightId: context.preflightId, idempotencyFingerprint: context.idempotencyFingerprint, snapshotToken: context.snapshotToken, mode: context.mode, resolutions: context.resolutions.map(r => r === selection ? { ...r, targetId: id, aliasName: selection.mode === 'alias' ? name : undefined } : r), stage: [], dbCommit: statements, compensateOnDbFailure: [], reconcile: [] };
+            planned = { tenantId: context.tenantId, targetAccountId: context.targetAccountId, preflightId: context.preflightId, idempotencyFingerprint: context.idempotencyFingerprint, snapshotToken: context.snapshotToken, mode: context.mode, resolutions: context.resolutions.map(r => {
+                if (r === selection)
+                    return { ...r, targetId: id, aliasName: selection.mode === 'alias' ? name : undefined };
+                const mapped = resolved.get(r.sourceId);
+                return mapped ? { ...r, targetId: mapped.targetId, aliasName: mapped.aliasName } : r;
+            }), stage: [], dbCommit: statements, compensateOnDbFailure: [], reconcile: [] };
             return { kind: 'OK', value: ids };
         },
         async buildCommitPlan(context, input, idMap) {

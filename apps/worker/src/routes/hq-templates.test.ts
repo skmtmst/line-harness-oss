@@ -277,9 +277,9 @@ describe('HQ tag HTTP and real SQLite boundaries', () => {
       { line_account_id: 'a1', name: 'お知らせ' }, { line_account_id: 'a2', name: 'お知らせ' }, { line_account_id: 'a3', name: 'お知らせ' },
     ]);
   });
-  test('form templates distribute privately to three stores, remap tags, replay once and isolate conflicts', async () => {
-    sql.exec("INSERT INTO tags(id,name,line_account_id) VALUES ('source-tag','ご購入済み','a1')");
-    const formDefinition = { schemaVersion: 1, form: { name: 'ご利用アンケート', description: '確認用', fields: [{ name: 'answer', label: '回答', type: 'text', required: true }], layout: null, on_submit_tag_id: 'source-tag', on_submit_scenario_id: null, save_to_metadata: true } };
+  test('form templates distribute privately, bind reference choices on redistribution and isolate conflicts', async () => {
+    sql.exec("INSERT INTO tags(id,name,line_account_id) VALUES ('source-tag','ご購入済み','a1'); INSERT INTO scenarios(id,name,trigger_type,line_account_id,is_active) VALUES ('source-scenario','ご購入後のご案内','manual','a1',1); INSERT INTO scenario_steps(id,scenario_id,step_order,message_type,message_content) VALUES ('source-step','source-scenario',1,'text','ありがとうございます')");
+    const formDefinition = { schemaVersion: 1, form: { name: 'ご利用アンケート', description: '確認用', fields: [{ name: 'answer', label: '回答', type: 'text', required: true }], layout: null, on_submit_tag_id: 'source-tag', on_submit_scenario_id: 'source-scenario', save_to_metadata: true } };
     const created = await request('', 'POST', { type: 'form', name: '回答フォーム', definition: formDefinition, requestId: crypto.randomUUID() });
     expect(created.status, JSON.stringify(created.body)).toBe(201);
     const first = await preflight(created.body.data.template.id);
@@ -287,12 +287,14 @@ describe('HQ tag HTTP and real SQLite boundaries', () => {
     expect(distributed.status, JSON.stringify(distributed.body)).toBe(200);
     expect(distributed.body.data.status).toBe('completed');
     expect(count('forms')).toBe(3);
-    const mapped = sql.prepare(`SELECT fa.line_account_id AS account_id,f.is_active,t.line_account_id AS tag_account FROM forms f JOIN form_accounts fa ON fa.form_id=f.id JOIN tags t ON t.id=f.on_submit_tag_id ORDER BY fa.line_account_id`).all() as Array<{ account_id: string; is_active: number; tag_account: string }>;
-    expect(mapped).toEqual(['a1','a2','a3'].map(account_id => ({ account_id, is_active: 0, tag_account: account_id })));
+    const mapped = sql.prepare(`SELECT fa.line_account_id AS account_id,f.is_active,t.line_account_id AS tag_account,s.line_account_id AS scenario_account FROM forms f JOIN form_accounts fa ON fa.form_id=f.id JOIN tags t ON t.id=f.on_submit_tag_id JOIN scenarios s ON s.id=f.on_submit_scenario_id ORDER BY fa.line_account_id`).all() as Array<{ account_id: string; is_active: number; tag_account: string; scenario_account: string }>;
+    expect(mapped).toEqual(['a1','a2','a3'].map(account_id => ({ account_id, is_active: 0, tag_account: account_id, scenario_account: account_id })));
     expect((await execute(created.body.data.template.id, first)).body.data).toEqual(distributed.body.data);
     expect(count('forms')).toBe(3);
+    const scenarioIds = sql.prepare("SELECT line_account_id,id FROM scenarios ORDER BY line_account_id").all();
 
     const second = await preflight(created.body.data.template.id);
+    expect(second.stores.every((store: any) => store.items.some((item: any) => item.sourceId === 'scenario:source-scenario' && item.itemKind === 'scenario' && item.duplicate && item.allowedModes.includes('overwrite')))).toBe(true);
     const a2 = sql.prepare(`SELECT f.id FROM forms f JOIN form_accounts fa ON fa.form_id=f.id WHERE fa.line_account_id='a2'`).get() as { id: string };
     sql.prepare(`UPDATE forms SET content_revision=content_revision+1 WHERE id=?`).run(a2.id);
     const retried = await execute(created.body.data.template.id, second);
@@ -300,6 +302,7 @@ describe('HQ tag HTTP and real SQLite boundaries', () => {
     expect(retried.body.data.status).toBe('partial');
     expect(retried.body.data.stores.map((store: any) => store.status)).toEqual(['succeeded','version_conflict','succeeded']);
     expect(count('forms')).toBe(3);
+    expect(sql.prepare("SELECT line_account_id,id FROM scenarios ORDER BY line_account_id").all()).toEqual(scenarioIds);
     expect(sql.pragma('foreign_key_check')).toEqual([]);
   });
   test('a consumed form preflight keeps its immutable overwrite decision after bounded failure', async () => {

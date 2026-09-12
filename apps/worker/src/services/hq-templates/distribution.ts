@@ -7,7 +7,7 @@ import { type HqTemplateAuthority, type HqTemplateResolution, type HqTemplateAda
 import { getHqTemplateAdapter } from './registry.js';
 import { boundedText, HqTemplateError, inspectTags, parseTagDefinition, planTags, tagSnapshot } from './tag.js';
 import { parseMessageTemplateDefinition } from './template.js';
-import { inspectFormTemplate, parseFormTemplateDefinition } from './form.js';
+import { FormTemplateError, inspectFormTemplate, inspectFormTemplateReferences, parseFormTemplateDefinition } from './form.js';
 import { parseRichMenuTemplateDefinition } from './rich-menu.js';
 import { executeFormStore, HqRuntimeError } from './runtime.js';
 import { executeR2RuntimeStore, HqR2RuntimeError, inspectR2RuntimeStore, reconcileFailedOwnedImages } from './runtime-r2.js';
@@ -135,7 +135,20 @@ export async function preflightDistribution(db: D1Database, authority: HqTemplat
   const statements: HqTemplateStatement[] = [], stores = [];
   for (const account of accounts) {
     const snapshot = tagDefinition ? await tagSnapshot(db, account.id) : null;
-    const form = template.template_type === 'form' ? await inspectFormTemplate(db, authority, account.id, input) : null;
+    let form: Awaited<ReturnType<typeof inspectFormTemplate>> | null = null;
+    let formReferences: Awaited<ReturnType<typeof inspectFormTemplateReferences>> = [];
+    if (template.template_type === 'form') {
+      try {
+        form = await inspectFormTemplate(db, authority, account.id, input);
+        formReferences = await inspectFormTemplateReferences(db, authority, account.id, input, form.snapshot);
+      } catch (error) {
+        if (!(error instanceof FormTemplateError)) throw error;
+        if (error.code === 'FORBIDDEN') throw new HqTemplateError('FORBIDDEN', 403);
+        if (error.code === 'SELECTION_REQUIRED' || error.code === 'VERSION_CONFLICT' || error.code === 'REFERENCE_UNAVAILABLE') throw new HqTemplateError(error.code === 'SELECTION_REQUIRED' ? 'SELECTION_REQUIRED' : 'VERSION_CONFLICT', 409);
+        if (error.code === 'UNSUPPORTED_REFERENCE') throw new HqTemplateError('UNSUPPORTED', 422);
+        throw new HqTemplateError('INVALID_DEFINITION');
+      }
+    }
     let r2: Awaited<ReturnType<typeof inspectR2RuntimeStore>> | null = null;
     if (template.template_type === 'template' || template.template_type === 'rich_menu') {
       if (!bucket) throw new HqTemplateError('UNSUPPORTED', 422);
@@ -143,7 +156,7 @@ export async function preflightDistribution(db: D1Database, authority: HqTemplat
       catch (error) { rethrowR2(error); }
     }
     const items = tagDefinition ? inspectTags(tagDefinition, snapshot!) : form
-      ? [{ sourceId: form.sourceId, itemKind: form.itemKind, name: form.name, targetId: form.targetId, expectedRevision: form.expectedRevision, duplicate: form.duplicate, allowedModes: [...form.allowedModes] }]
+      ? [{ sourceId: form.sourceId, itemKind: form.itemKind, name: form.name, targetId: form.targetId, expectedRevision: form.expectedRevision, duplicate: form.duplicate, allowedModes: [...form.allowedModes] }, ...formReferences.map(item => ({ ...item, allowedModes: [...item.allowedModes] }))]
       : r2!.items;
     const storeId = crypto.randomUUID(), token = tagDefinition ? `hqts1.${await digest(snapshot!)}` : form?.snapshotToken ?? r2!.snapshotToken;
     statements.push({ sql: `INSERT INTO hq_template_preflights(id,tenant_id,template_id,template_version_id,target_account_id,distribution_mode,idempotency_fingerprint,snapshot_token,status,created_by,expires_at) VALUES (?,?,?,?,?,'create',?,?,'ready',?,?)`, bindings: [storeId, authority.tenantId, id, template.current_version_id!, account.id, preflightId, token, authority.actorId, expiresAt] });
@@ -212,7 +225,8 @@ export async function distributeTemplate(db: D1Database, authority: HqTemplateAu
     for (const p of preflights) {
       const selected = selections.filter(selection => selection.accountId === p.target_account_id).map(selection => {
         const row = stored.find(resolution => resolution.preflight_id === p.id && resolution.source_id === selection.sourceId)!;
-        return { sourceId: selection.sourceId, itemKind: row.item_kind, mode: selection.mode };
+        const base = { sourceId: selection.sourceId, itemKind: row.item_kind, mode: selection.mode };
+        return template.template_type === 'form' ? { ...base, targetId: row.target_id ?? undefined, expectedRevision: row.expected_revision ?? undefined } : base;
       });
       const root = selected.find(resolution => resolution.itemKind === template.template_type);
       if (!root) throw new HqTemplateError('SELECTION_REQUIRED', 409);

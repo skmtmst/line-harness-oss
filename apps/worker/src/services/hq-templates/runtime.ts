@@ -19,6 +19,25 @@ function exactRowGuard(table: 'scenarios' | 'scenario_steps', row: DbRow): HqTem
   const columns = Object.keys(row);
   return guard(`EXISTS(SELECT 1 FROM ${table} WHERE ${columns.map(column => `${column} IS ?`).join(' AND ')})`, columns.map(column => row[column]));
 }
+function updateScenarioRow(row: DbRow, id: string, accountId: string): HqTemplateStatement {
+  const columns = Object.keys(row).filter(column => !['id', 'line_account_id', 'created_at', 'updated_at'].includes(column));
+  return { sql: `UPDATE scenarios SET ${columns.map(column => `${column}=?`).join(',')},updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=? AND line_account_id=?`, bindings: [...columns.map(column => row[column]), id, accountId] };
+}
+const formReferenceKey = (kind: string, sourceId: string) => `${kind}:${sourceId}`;
+function formReferenceSelection(reference: { kind: string; sourceId: string }, context: HqTemplateAdapterContext) {
+  const sourceId = formReferenceKey(reference.kind, reference.sourceId);
+  const matches = context.resolutions.filter(row => row.sourceId === sourceId && row.itemKind === reference.kind);
+  if (matches.length !== 1) fail('SELECTION_REQUIRED');
+  return matches[0];
+}
+function nextAliasName(name: string, existing: readonly string[]): string {
+  const normalized = new Set(existing.map(normalizeScopedTagName));
+  for (let suffix = 2; suffix < 10000; suffix++) {
+    const candidate = `${name} (${suffix})`;
+    if (!normalized.has(normalizeScopedTagName(candidate))) return candidate;
+  }
+  return fail('SELECTION_REQUIRED');
+}
 function hasPortableTextReference(value: unknown): boolean {
   let current = String(value ?? '');
   for (let attempt = 0; attempt < 4; attempt++) {
@@ -39,6 +58,7 @@ export function createFormReferenceResolver({ db, authority }: { db: D1Database;
   const plannedScenarios = new Map<string, { targetId: string; statements: HqTemplateStatement[] }>();
   return async (reference, context) => {
     if (requireHqTemplateAuthority(authority).kind !== 'AUTHORIZED' || context.tenantId !== authority.tenantId) fail('FORBIDDEN');
+    const selection = formReferenceSelection(reference, context);
     if (reference.kind === 'scenario') {
       const source = await db.prepare(`SELECT s.* FROM scenarios s JOIN line_accounts a ON a.id=s.line_account_id WHERE s.id=? AND a.tenant_id=? AND a.is_active=1 AND a.archived_at IS NULL`).bind(reference.sourceId, authority.tenantId).first<DbRow>();
       if (!source) fail('REFERENCE_UNAVAILABLE');
@@ -50,23 +70,42 @@ export function createFormReferenceResolver({ db, authority }: { db: D1Database;
       const hasActions = await db.prepare(`SELECT 1 AS present FROM scenario_actions WHERE scenario_id=? LIMIT 1`).bind(reference.sourceId).first();
       const hasTriggers = await db.prepare(`SELECT 1 AS present FROM scenario_triggers WHERE scenario_id=? LIMIT 1`).bind(reference.sourceId).first();
       if (hasActions || hasTriggers || steps.some(step => step.template_id || step.on_reach_tag_id || step.message_bubbles_json || step.target_condition_json || step.question_json || step.condition_type || step.condition_value || step.message_type !== 'text' || hasPortableTextReference(step.message_content))) fail('UNSUPPORTED_REFERENCE');
-      const matches = (await db.prepare(`SELECT id,name FROM scenarios WHERE line_account_id=? ORDER BY id`).bind(context.targetAccountId).all<{ id: string; name: string }>()).results.filter(row => normalizeScopedTagName(row.name) === normalizeScopedTagName(String(safeSource.name)));
+      const destinationRows = (await db.prepare(`SELECT id,name,updated_at FROM scenarios WHERE line_account_id=? ORDER BY id`).bind(context.targetAccountId).all<{ id: string; name: string; updated_at: string | null }>()).results;
+      const matches = destinationRows.filter(row => normalizeScopedTagName(row.name) === normalizeScopedTagName(String(safeSource.name)));
       if (matches.length > 1) fail('REFERENCE_UNAVAILABLE');
-      if (matches.length === 1) {
-        if (String(safeSource.line_account_id) !== context.targetAccountId || matches[0].id !== reference.sourceId) fail('REFERENCE_UNAVAILABLE');
-        return { targetId: matches[0].id, dbCommit: [exactRowGuard('scenarios', safeSource), guard(`(SELECT COUNT(*) FROM scenario_steps WHERE scenario_id=?)=?`, [reference.sourceId, steps.length]), ...steps.map(step => exactRowGuard('scenario_steps', step)), guard(`NOT EXISTS(SELECT 1 FROM scenario_actions WHERE scenario_id=?) AND NOT EXISTS(SELECT 1 FROM scenario_triggers WHERE scenario_id=?)`, [reference.sourceId, reference.sourceId])] };
+      const match = matches[0] ?? null;
+      const expectedRevision = match ? JSON.stringify([match.updated_at]) : undefined;
+      if (!match ? selection.mode !== 'create' || selection.targetId || selection.expectedRevision : selection.mode === 'create' || selection.targetId !== match.id || selection.expectedRevision !== expectedRevision) fail('SELECTION_REQUIRED');
+      const sourceGuards: HqTemplateStatement[] = [
+        exactRowGuard('scenarios', safeSource),
+        guard(`(SELECT COUNT(*) FROM scenario_steps WHERE scenario_id=?)=?`, [reference.sourceId, steps.length]),
+        ...steps.map(step => exactRowGuard('scenario_steps', step)),
+        guard(`NOT EXISTS(SELECT 1 FROM scenario_actions WHERE scenario_id=?) AND NOT EXISTS(SELECT 1 FROM scenario_triggers WHERE scenario_id=?)`, [reference.sourceId, reference.sourceId]),
+      ];
+      if (match && String(safeSource.line_account_id) === context.targetAccountId && match.id === reference.sourceId && selection.mode === 'overwrite') {
+        return { targetId: match.id, dbCommit: sourceGuards };
       }
-      const cacheKey = JSON.stringify([context.targetAccountId, normalizeScopedTagName(String(safeSource.name))]);
+      if (match && selection.mode === 'overwrite') {
+        const scenario: DbRow = { ...safeSource, id: match.id, line_account_id: context.targetAccountId, is_active: 0, folder_id: null, created_from_recipe_id: null, recipe_clone_run_id: null, current_published_version_id: null };
+        const statements: HqTemplateStatement[] = [...sourceGuards,
+          guard(`EXISTS(SELECT 1 FROM scenarios WHERE id=? AND line_account_id=? AND updated_at IS ?)`, [match.id, context.targetAccountId, match.updated_at]),
+          { sql: `DELETE FROM scenario_steps WHERE scenario_id=?`, bindings: [match.id] },
+          updateScenarioRow(scenario, match.id, context.targetAccountId),
+        ];
+        for (const step of steps) {
+          const cloned: DbRow = { ...step, id: crypto.randomUUID(), scenario_id: match.id, is_draft: 1 };
+          delete cloned.created_at;
+          statements.push(insertRow('scenario_steps', cloned));
+        }
+        return { targetId: match.id, dbCommit: statements };
+      }
+      const scenarioName = match ? nextAliasName(String(safeSource.name), destinationRows.map(row => row.name)) : String(safeSource.name);
+      const cacheKey = JSON.stringify([context.targetAccountId, normalizeScopedTagName(scenarioName)]);
       let created = plannedScenarios.get(cacheKey);
       if (!created) {
         const targetId = crypto.randomUUID();
-        const statements: HqTemplateStatement[] = [
-          exactRowGuard('scenarios', safeSource),
-          guard(`(SELECT COUNT(*) FROM scenario_steps WHERE scenario_id=?)=?`, [reference.sourceId, steps.length]),
-          guard(`NOT EXISTS(SELECT 1 FROM scenario_actions WHERE scenario_id=?) AND NOT EXISTS(SELECT 1 FROM scenario_triggers WHERE scenario_id=?)`, [reference.sourceId, reference.sourceId]),
-        ];
-        for (const step of steps) statements.push(exactRowGuard('scenario_steps', step));
-        const scenario: DbRow = { ...safeSource, id: targetId, line_account_id: context.targetAccountId, is_active: 0, folder_id: null, created_from_recipe_id: null, recipe_clone_run_id: null, current_published_version_id: null };
+        const statements: HqTemplateStatement[] = [...sourceGuards];
+        const scenario: DbRow = { ...safeSource, id: targetId, name: scenarioName, line_account_id: context.targetAccountId, is_active: 0, folder_id: null, created_from_recipe_id: null, recipe_clone_run_id: null, current_published_version_id: null };
         delete scenario.created_at; delete scenario.updated_at;
         statements.push(insertRow('scenarios', scenario));
         for (const step of steps) {
@@ -77,27 +116,34 @@ export function createFormReferenceResolver({ db, authority }: { db: D1Database;
         created = { targetId, statements };
         plannedScenarios.set(cacheKey, created);
       }
-      return { targetId: created.targetId, dbCommit: created.statements };
+      return { targetId: created.targetId, aliasName: match ? scenarioName : undefined, dbCommit: created.statements };
     }
     if (reference.kind !== 'tag') fail('UNSUPPORTED_REFERENCE');
     const source = await db.prepare(`SELECT t.id,t.name,t.color,t.description,t.version,t.updated_at,t.line_account_id FROM tags t JOIN line_accounts a ON a.id=t.line_account_id WHERE t.id=? AND t.status='active' AND a.tenant_id=? AND a.is_active=1 AND a.archived_at IS NULL`).bind(reference.sourceId, authority.tenantId).first<{ id: string; name: string; color: string; description: string | null; version: number; updated_at: string | null; line_account_id: string }>();
     if (!source) fail('REFERENCE_UNAVAILABLE');
+    const safeSource = source!;
     const target = await db.prepare(`SELECT id FROM line_accounts WHERE id=? AND tenant_id=? AND is_active=1 AND archived_at IS NULL`).bind(context.targetAccountId, authority.tenantId).first();
     if (!target) fail('FORBIDDEN');
-    const sourceGuard = guard(`EXISTS(SELECT 1 FROM tags t JOIN line_accounts a ON a.id=t.line_account_id WHERE t.id=? AND t.line_account_id=? AND t.name=? AND t.color IS ? AND t.description IS ? AND t.version=? AND t.updated_at IS ? AND t.status='active' AND a.tenant_id=? AND a.is_active=1 AND a.archived_at IS NULL)`, [source!.id, source!.line_account_id, source!.name, source!.color, source!.description, source!.version, source!.updated_at, authority.tenantId]);
-    const name = normalizeScopedTagName(source!.name);
-    const rows = (await db.prepare(`SELECT id,name,status FROM tags WHERE line_account_id=? ORDER BY id`).bind(context.targetAccountId).all<{ id: string; name: string; status: string }>()).results;
+    const sourceGuard = guard(`EXISTS(SELECT 1 FROM tags t JOIN line_accounts a ON a.id=t.line_account_id WHERE t.id=? AND t.line_account_id=? AND t.name=? AND t.color IS ? AND t.description IS ? AND t.version=? AND t.updated_at IS ? AND t.status='active' AND a.tenant_id=? AND a.is_active=1 AND a.archived_at IS NULL)`, [safeSource.id, safeSource.line_account_id, safeSource.name, safeSource.color, safeSource.description, safeSource.version, safeSource.updated_at, authority.tenantId]);
+    const name = normalizeScopedTagName(safeSource.name);
+    const rows = (await db.prepare(`SELECT id,name,status,version,updated_at FROM tags WHERE line_account_id=? ORDER BY id`).bind(context.targetAccountId).all<{ id: string; name: string; status: string; version: number; updated_at: string | null }>()).results;
     const matches = rows.filter(row => normalizeScopedTagName(row.name) === name);
     if (matches.length > 1 || matches.some(row => row.status !== 'active')) fail('REFERENCE_UNAVAILABLE');
-    if (matches.length === 1) return { targetId: matches[0].id, dbCommit: [sourceGuard] };
-    const cacheKey = JSON.stringify([context.targetAccountId, name]);
+    const match = matches[0] ?? null;
+    const expectedRevision = match ? JSON.stringify([match.version, match.updated_at]) : undefined;
+    if (!match ? selection.mode !== 'create' || selection.targetId || selection.expectedRevision : selection.mode === 'create' || selection.targetId !== match.id || selection.expectedRevision !== expectedRevision) fail('SELECTION_REQUIRED');
+    if (match && safeSource.line_account_id === context.targetAccountId && match.id === reference.sourceId && selection.mode === 'overwrite') return { targetId: match.id, dbCommit: [sourceGuard] };
+    if (match && selection.mode === 'overwrite') return { targetId: match.id, dbCommit: [sourceGuard, guard(`EXISTS(SELECT 1 FROM tags WHERE id=? AND line_account_id=? AND version=? AND updated_at IS ? AND status='active')`, [match.id, context.targetAccountId, match.version, match.updated_at]), { sql: `UPDATE tags SET name=?,normalized_name=?,color=?,description=?,version=version+1,updated_by=?,updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=? AND line_account_id=?`, bindings: [safeSource.name, name, safeSource.color, safeSource.description, authority.actorId, match.id, context.targetAccountId] }] };
+    const tagName = match ? nextAliasName(safeSource.name, rows.map(row => row.name)) : safeSource.name;
+    const normalizedTagName = normalizeScopedTagName(tagName);
+    const cacheKey = JSON.stringify([context.targetAccountId, normalizedTagName]);
     let created = planned.get(cacheKey);
     if (!created) {
       const targetId = crypto.randomUUID();
-      created = { targetId, statement: { sql: `INSERT INTO tags(id,name,normalized_name,color,description,line_account_id,created_by,updated_by,created_at,updated_at) SELECT ?,?,?,?,?,?,?,?,strftime('%Y-%m-%dT%H:%M:%fZ','now'),strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE NOT EXISTS(SELECT 1 FROM tags WHERE id=?)`, bindings: [targetId, source!.name, name, source!.color, source!.description, context.targetAccountId, authority.actorId, authority.actorId, targetId] } };
+      created = { targetId, statement: { sql: `INSERT INTO tags(id,name,normalized_name,color,description,line_account_id,created_by,updated_by,created_at,updated_at) SELECT ?,?,?,?,?,?,?,?,strftime('%Y-%m-%dT%H:%M:%fZ','now'),strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE NOT EXISTS(SELECT 1 FROM tags WHERE id=?)`, bindings: [targetId, tagName, normalizedTagName, safeSource.color, safeSource.description, context.targetAccountId, authority.actorId, authority.actorId, targetId] } };
       planned.set(cacheKey, created);
     }
-    return { targetId: created.targetId, dbCommit: [sourceGuard, created.statement] };
+    return { targetId: created.targetId, aliasName: match ? tagName : undefined, dbCommit: [sourceGuard, created.statement] };
   };
 }
 export const createFormTagReferenceResolver = createFormReferenceResolver;

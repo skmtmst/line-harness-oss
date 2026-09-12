@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import { createTestD1, type SqliteD1 } from '../../test-utils/d1-sqlite.js';
-import { inspectFormTemplate } from './form.js';
+import { inspectFormTemplate, inspectFormTemplateReferences } from './form.js';
 import { buildFormRuntimePlan, executeFormStore, executeHqAtomicStore } from './runtime.js';
 import type { HqTemplateAdapterContext, HqTemplateAuthority } from './contract.js';
 let fixture: SqliteD1;
@@ -10,10 +10,13 @@ const input = { templateVersionId: 'version', definitionJson: JSON.stringify(def
 const options = (context: HqTemplateAdapterContext, db = fixture.db) => ({ db, authority, templateId: 'template', runId: 'run', context });
 const count = (table: string) => (fixture.raw.prepare(`SELECT COUNT(*) n FROM ${table}`).get() as { n: number }).n;
 async function preflight(account: string): Promise<HqTemplateAdapterContext> {
-  const info = await inspectFormTemplate(fixture.db, authority, account, input), id = `preflight-${account}`;
+  const version = fixture.raw.prepare("SELECT definition_json FROM hq_template_versions WHERE id='version'").get() as { definition_json: string };
+  const currentInput = { ...input, definitionJson: version.definition_json };
+  const info = await inspectFormTemplate(fixture.db, authority, account, currentInput), references = await inspectFormTemplateReferences(fixture.db, authority, account, currentInput, info.snapshot), id = `preflight-${account}`;
   fixture.raw.prepare(`INSERT INTO hq_template_preflights(id,tenant_id,template_id,template_version_id,target_account_id,distribution_mode,idempotency_fingerprint,snapshot_token,status,created_by,expires_at) VALUES (?,'tenant','template','version',?,'create','run',?,'ready','owner','2099-01-01T00:00:00.000Z')`).run(id,account,info.snapshotToken);
   fixture.raw.prepare(`INSERT INTO hq_template_preflight_resolutions(preflight_id,tenant_id,template_id,template_version_id,target_account_id,idempotency_fingerprint,snapshot_token,source_id,item_kind,resolution_mode,target_id,expected_revision) VALUES (?,'tenant','template','version',?,'run',?,'form','form','create',?,?)`).run(id,account,info.snapshotToken,info.targetId,info.expectedRevision);
-  return { tenantId:'tenant',targetAccountId:account,preflightId:id,idempotencyFingerprint:'run',snapshotToken:info.snapshotToken,mode:'create',resolutions:[{sourceId:'form',itemKind:'form',mode:'create'}] };
+  for (const reference of references) fixture.raw.prepare(`INSERT INTO hq_template_preflight_resolutions(preflight_id,tenant_id,template_id,template_version_id,target_account_id,idempotency_fingerprint,snapshot_token,source_id,item_kind,resolution_mode,target_id,expected_revision) VALUES (?,'tenant','template','version',?,'run',?,?,?,?,?,?)`).run(id,account,info.snapshotToken,reference.sourceId,reference.itemKind,reference.duplicate?'overwrite':'create',reference.targetId,reference.expectedRevision);
+  return { tenantId:'tenant',targetAccountId:account,preflightId:id,idempotencyFingerprint:'run',snapshotToken:info.snapshotToken,mode:'create',resolutions:[{sourceId:'form',itemKind:'form',mode:'create'},...references.map(reference=>({sourceId:reference.sourceId,itemKind:reference.itemKind,mode:reference.duplicate?'overwrite' as const:'create' as const,targetId:reference.targetId??undefined,expectedRevision:reference.expectedRevision??undefined}))] };
 }
 beforeEach(() => {
   fixture = createTestD1({foreignKeys:true});
@@ -32,11 +35,11 @@ describe('form runtime and atomic store execution', () => {
     expect(rows.every(r=>r.is_active===0&&r.line_account_id===r.target)).toBe(true);
     expect(fixture.raw.prepare("SELECT COUNT(*) n FROM audit_events WHERE action='hq_template.distributed'").get()).toEqual({n:3}); expect(fixture.raw.pragma('foreign_key_check')).toEqual([]);
   });
-  test('same-name active legacy tag reused in exact account without editing its metadata',async()=>{
+  test('same-name active tag is overwritten only after its preflight choice is bound',async()=>{
     fixture.raw.exec("INSERT INTO tags(id,name,line_account_id,description) VALUES ('existing','vip','a','keep'),('foreign-tag','vip','foreign','other')");
     await executeFormStore(options(await preflight('a')));
     expect(fixture.raw.prepare('SELECT on_submit_tag_id FROM forms').get()).toEqual({on_submit_tag_id:'existing'});
-    expect(fixture.raw.prepare("SELECT description FROM tags WHERE id='existing'").get()).toEqual({description:'keep'}); expect(count('tags')).toBe(3);
+    expect(fixture.raw.prepare("SELECT description FROM tags WHERE id='existing'").get()).toEqual({description:null}); expect(count('tags')).toBe(3);
   });
   test.each(['foreign','missing','archived'])('%s source tag is rejected without destination writes',async kind=>{
     const c=await preflight('a');
@@ -59,10 +62,21 @@ describe('form runtime and atomic store execution', () => {
     fixture.raw.prepare("UPDATE hq_template_versions SET definition_json=? WHERE id='version'").run(JSON.stringify({...definition,form:{...definition.form,on_submit_scenario_id:'source-scenario'}}));
     expect((await executeFormStore(options(await preflight('a')))).status).toBe('unsupported');expect(count('forms')).toBe(0);expect(count('scenarios')).toBe(1);expect(count('tags')).toBe(1);
   });
-  test('same-name destination scenarios are not silently reused',async()=>{
+  test('same-name destination scenario is explicitly overwritten from its bound preflight row',async()=>{
     fixture.raw.exec("INSERT INTO scenarios(id,name,trigger_type,line_account_id,is_active) VALUES ('source-scenario','ご案内','manual','source',1),('target-scenario','ご案内','manual','a',1); INSERT INTO scenario_steps(id,scenario_id,step_order,message_type,message_content) VALUES ('source-step','source-scenario',1,'text','元の内容'),('target-step','target-scenario',1,'text','別の内容')");
     fixture.raw.prepare("UPDATE hq_template_versions SET definition_json=? WHERE id='version'").run(JSON.stringify({...definition,form:{...definition.form,on_submit_scenario_id:'source-scenario'}}));
-    expect((await executeFormStore(options(await preflight('a')))).status).toBe('failed');expect(count('forms')).toBe(0);expect(count('scenarios')).toBe(2);
+    expect((await executeFormStore(options(await preflight('a')))).status).toBe('succeeded');expect(count('forms')).toBe(1);expect(count('scenarios')).toBe(2);
+    expect(fixture.raw.prepare("SELECT message_content FROM scenario_steps WHERE scenario_id='target-scenario'").get()).toEqual({message_content:'元の内容'});
+  });
+  test('scenario alias choice creates a separately named reference and preserves the selected duplicate',async()=>{
+    fixture.raw.exec("INSERT INTO scenarios(id,name,trigger_type,line_account_id,is_active) VALUES ('source-scenario','ご案内','manual','source',1),('target-scenario','ご案内','manual','a',1); INSERT INTO scenario_steps(id,scenario_id,step_order,message_type,message_content) VALUES ('source-step','source-scenario',1,'text','元の内容'),('target-step','target-scenario',1,'text','既存の内容')");
+    fixture.raw.prepare("UPDATE hq_template_versions SET definition_json=? WHERE id='version'").run(JSON.stringify({...definition,form:{...definition.form,on_submit_scenario_id:'source-scenario'}}));
+    const context=await preflight('a');
+    context.resolutions=context.resolutions.map(row=>row.itemKind==='scenario'?{...row,mode:'alias'}:row);
+    expect((await executeFormStore(options(context))).status).toBe('succeeded');
+    const form=fixture.raw.prepare('SELECT on_submit_scenario_id FROM forms').get() as {on_submit_scenario_id:string};
+    expect(fixture.raw.prepare('SELECT name FROM scenarios WHERE id=?').get(form.on_submit_scenario_id)).toEqual({name:'ご案内 (2)'});
+    expect(fixture.raw.prepare("SELECT message_content FROM scenario_steps WHERE scenario_id='target-scenario'").get()).toEqual({message_content:'既存の内容'});
   });
   test.each(['trigger','completion','encoded-reference','underscore-reference'])('non-portable scenario %s is rejected before destination writes',async kind=>{
     fixture.raw.exec("INSERT INTO scenarios(id,name,trigger_type,on_complete_mode,line_account_id,is_active) VALUES ('source-scenario','ご案内','manual','pause','source',1); INSERT INTO scenario_steps(id,scenario_id,step_order,message_type,message_content) VALUES ('source-step','source-scenario',1,'text','ありがとうございます')");
@@ -107,7 +121,7 @@ describe('form runtime and atomic store execution', () => {
   });
   test('changed replay choices and foreign authority cannot reuse the result',async()=>{
     const c=await preflight('a');await executeFormStore(options(c));
-    await expect(executeFormStore(options({...c,mode:'alias',resolutions:[{sourceId:'form',itemKind:'form',mode:'alias'}]}))).rejects.toMatchObject({code:'SELECTION_CHANGED'});
+    await expect(executeFormStore(options({...c,mode:'alias',resolutions:c.resolutions.map(r=>r.sourceId==='form'?{...r,mode:'alias'}:r)}))).rejects.toMatchObject({code:'SELECTION_CHANGED'});
     await expect(executeFormStore({...options(c),authority:{...authority,tenantId:'other'}})).rejects.toMatchObject({code:'FORBIDDEN'});expect(count('forms')).toBe(1);
   });
   test('simultaneous first submissions execute the plan once',async()=>{
@@ -122,9 +136,9 @@ describe('form runtime and atomic store execution', () => {
     expect(fixture.raw.prepare('SELECT status FROM hq_template_distribution_results').get()).toEqual({status:'pending'});
     expect((await executeFormStore(options(c))).status).toBe('succeeded');expect(count('forms')).toBe(1);
   });
-  test('ambiguous or archived destination name fails without creating another tag',async()=>{
+  test('ambiguous or archived destination name fails during preflight without creating another tag',async()=>{
     fixture.raw.exec("INSERT INTO tags(id,name,line_account_id) VALUES ('duplicate1','vip','a'),('duplicate2','ＶＩＰ','a')");
-    expect((await executeFormStore(options(await preflight('a')))).status).toBe('failed');expect(count('forms')).toBe(0);
+    await expect(preflight('a')).rejects.toMatchObject({code:'SELECTION_REQUIRED'});expect(count('forms')).toBe(0);
   });
   test('expired preflight cannot be claimed',async()=>{
     const c=await preflight('a');fixture.raw.exec("UPDATE hq_template_preflights SET expires_at='2000-01-01T00:00:00Z'");
