@@ -28,6 +28,7 @@ import {
 } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { sha256Hex } from '../middleware/auth.js';
+import { reserveIncomingWebhook, type IncomingWebhookExecution } from '../services/incoming-webhook-receipts.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import {
@@ -1041,6 +1042,7 @@ webhooks.post('/api/webhooks/maintenance/secret-backfill', requireRole('owner'),
 // ========== 受信Webhookエンドポイント (外部システムからの受信) ==========
 
 webhooks.post('/api/webhooks/incoming/:id/receive', async (c) => {
+  let execution: IncomingWebhookExecution | undefined;
   try {
     const id = c.req.param('id');
     const wh = await getIncomingWebhookById(c.env.DB, id);
@@ -1081,10 +1083,9 @@ webhooks.post('/api/webhooks/incoming/:id/receive', async (c) => {
      * N-365 (#746): 同じ署名の使い回しを弾く。
      *
      * 署名は本文だけで作られているので、盗った署名をそのまま送り直すと
-     * 何度でも通っていた。署名検証を通った受信を1件ずつ予約し、
-     * changes=1 を得た呼び出しだけが下流(受信行動・イベント発火)へ進む。
-     * 2回目は副作用を起こさず 200 を返すので、送り手が通信の切断で
-     * 同じ本文を送り直したときも二重に処理しない。
+     * 何度でも通っていた。期限付き所有権を得た1件だけが下流へ進む。
+     * 完了済みなら200、処理中なら再送可能な503、失敗・期限切れなら再開する。
+     * 再開時は成功済みの処理を飛ばし、同じイベントIDで下流の重複を防ぐ。
      *
      * 予約は本文を読めたあとに置く。形の壊れた本文で予約を使い切ると、
      * 送り直しが 400 ではなく「重複」になってしまう。
@@ -1092,14 +1093,12 @@ webhooks.post('/api/webhooks/incoming/:id/receive', async (c) => {
      * 入れるのは署名そのものではなく SHA-256(台帳に使い回せる値を残さない)。
      */
     const signatureHash = await sha256Hex(expected);
-    const reserved = await c.env.DB
-      .prepare(
-        `INSERT OR IGNORE INTO incoming_webhook_receipts (webhook_id, signature_hash)
-         VALUES (?, ?)`,
-      )
-      .bind(wh.id, signatureHash)
-      .run();
-    if ((reserved.meta?.changes ?? 0) !== 1) {
+    const reserved = await reserveIncomingWebhook(c.env.DB, wh.id, signatureHash);
+    if (reserved.kind === 'busy') {
+      c.header('Retry-After', '5');
+      return c.json({ success: false, error: 'Webhook processing in progress' }, 503);
+    }
+    if (reserved.kind === 'completed') {
       console.log(JSON.stringify({
         event: 'incoming_webhook_duplicate_signature',
         webhookId: wh.id,
@@ -1109,6 +1108,7 @@ webhooks.post('/api/webhooks/incoming/:id/receive', async (c) => {
         data: { received: true, duplicate: true, source: wh.source_type },
       });
     }
+    execution = reserved.execution;
 
     if (wh.line_account_id) {
       try {
@@ -1129,11 +1129,11 @@ webhooks.post('/api/webhooks/incoming/:id/receive', async (c) => {
     const { fireEvent } = await import('../services/event-bus.js');
     const eventType = `incoming_webhook.${wh.source_type}`;
     const started = Date.now();
-    let interaction: WebhookInteractionRow | null = null;
+    let interaction: Pick<WebhookInteractionRow, 'id'> | null = null;
     if (wh.line_account_id) {
       try {
-        interaction = await createWebhookInteraction(c.env.DB, {
-          lineAccountId: wh.line_account_id,
+        interaction = await execution.step('interaction', async () => ({ id: (await createWebhookInteraction(c.env.DB, {
+          lineAccountId: wh.line_account_id!,
           direction: 'incoming',
           webhookId: wh.id,
           webhookName: wh.name,
@@ -1141,7 +1141,7 @@ webhooks.post('/api/webhooks/incoming/:id/receive', async (c) => {
           triggerSummary: `${wh.name}から受け取った`,
           // 受信は送り直さないため本文を保管しない。顧客情報を台帳へ複製しない。
           requestBodyJson: null,
-        });
+        })).id }));
       } catch (logError) {
         // 台帳の一時障害で、署名確認済みの受信処理まで止めない。
         console.error('受信Webhookの記録開始に失敗:', logError);
@@ -1153,20 +1153,28 @@ webhooks.post('/api/webhooks/incoming/:id/receive', async (c) => {
       });
       const configuredActions = safeJson<IncomingWebhookActionRef[]>(wh.action_refs_json, []);
       const actionResult = wh.line_account_id
-        ? await executeIncomingWebhookActions(c.env.DB, {
-          lineAccountId: wh.line_account_id,
+        ? await execution.step('actions', async () => {
+          const result = await executeIncomingWebhookActions(c.env.DB, {
+          lineAccountId: wh.line_account_id!,
           webhookId: wh.id,
-          sourceEventId: interaction?.id ?? crypto.randomUUID(),
+          sourceEventId: execution!.sourceEventId,
           payload,
           identityMatching,
           actions: configuredActions,
           dependencies: { credentialEncryptionKey: c.env.LINE_CREDENTIAL_ENCRYPTION_KEY },
+          execution,
+          });
+          if (result.failed > 0) throw new Error('incoming_actions_failed');
+          return result;
         })
         : { matchedFriendId: null, executed: 0, failed: 0 };
-      await fireEvent(c.env.DB, eventType, {
+      await execution.step('event', () => fireEvent(c.env.DB, eventType, {
+        sourceEventId: execution!.sourceEventId,
+        sourceKind: 'incoming_webhook_receipt',
+        occurredAt: execution!.occurredAt,
         friendId: actionResult.matchedFriendId ?? undefined,
         eventData: { webhookId: wh.id, source: wh.source_type, payload, actionResult },
-      }, undefined, wh.line_account_id ?? null);
+      }, undefined, wh.line_account_id ?? null, execution));
       if (actionResult.failed > 0) throw new Error('受信Webhookの処理に失敗しました');
     } catch (eventError) {
       if (interaction && wh.line_account_id) {
@@ -1198,8 +1206,12 @@ webhooks.post('/api/webhooks/incoming/:id/receive', async (c) => {
       }
     }
 
+    await execution.complete();
     return c.json({ success: true, data: { received: true, source: wh.source_type } });
   } catch (err) {
+    if (execution) {
+      try { await execution.fail(); } catch { /* The lease lets a later retry recover even during a DB outage. */ }
+    }
     console.error('POST /api/webhooks/incoming/:id/receive error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }

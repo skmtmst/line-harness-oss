@@ -2807,8 +2807,23 @@ CREATE TABLE inbox_staff_reads (
 CREATE TABLE incoming_webhook_receipts (
   webhook_id     TEXT NOT NULL REFERENCES incoming_webhooks(id) ON DELETE CASCADE,
   signature_hash TEXT NOT NULL,
+  source_event_id TEXT NOT NULL UNIQUE,
+  status TEXT NOT NULL DEFAULT 'accepted' CHECK (status IN ('accepted','processing','completed','retryable_failed')),
+  lease_owner TEXT,
+  lease_expires_at INTEGER,
+  attempt_count INTEGER NOT NULL DEFAULT 0,
+  completed_at TEXT,
+  last_error_code TEXT,
   received_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   PRIMARY KEY (webhook_id, signature_hash)
+);
+
+CREATE TABLE incoming_webhook_steps (
+  source_event_id TEXT NOT NULL REFERENCES incoming_webhook_receipts(source_event_id) ON DELETE CASCADE,
+  step_key TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('processing','completed')),
+  result_json TEXT,
+  PRIMARY KEY (source_event_id, step_key)
 );
 
 CREATE TABLE incoming_webhooks (

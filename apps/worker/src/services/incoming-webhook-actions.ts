@@ -3,6 +3,7 @@ import type {
   IncomingWebhookIdentityMatch,
 } from '@line-crm/db';
 import type { ActionDefinition, AutomationActionContext } from './automation-engine.js';
+import { stableWebhookStepId, type IncomingWebhookExecution } from './incoming-webhook-receipts.js';
 import {
   createAutomationActionExecutors,
   type AutomationActionExecutorDependencies,
@@ -105,38 +106,40 @@ export async function executeIncomingWebhookActions(
     identityMatching: IncomingWebhookIdentityMatch;
     actions: IncomingWebhookActionRef[];
     dependencies?: AutomationActionExecutorDependencies;
+    execution?: IncomingWebhookExecution;
   },
 ): Promise<ActionRunResult> {
   if (input.actions.length === 0) return { matchedFriendId: null, executed: 0, failed: 0 };
-  const friendId = await resolveFriendId(
-    db, input.lineAccountId, input.payload, input.identityMatching,
-  );
+  const resolve = () => resolveFriendId(db, input.lineAccountId, input.payload, input.identityMatching);
+  const friendId = input.execution ? await input.execution.step('matched-friend', resolve) : await resolve();
   if (!friendId) return { matchedFriendId: null, executed: 0, failed: 0 };
 
   const executors = createAutomationActionExecutors(input.dependencies);
   let executed = 0;
   let failed = 0;
   let sequence = 0;
-  for (const ref of input.actions) {
+  for (const [refIndex, ref] of input.actions.entries()) {
     let plan: ActionDefinition[];
     try {
-      plan = ref.refKind === 'common_action'
+      const makePlan = async () => ref.refKind === 'common_action'
         ? await commonActionPlan(db, input.lineAccountId, ref)
         : [directAction(ref, sequence)].filter((item): item is ActionDefinition => item !== null);
+      plan = input.execution ? await input.execution.step(`plan:${refIndex}`, makePlan) : await makePlan();
       if (plan.length === 0) throw new Error(`未対応の受信Webhook処理です: ${ref.refKind}`);
     } catch (error) {
       console.error('[incoming-webhook-actions] plan failed', error);
       failed++;
       continue;
     }
-    for (const action of plan) {
+    for (const [actionIndex, action] of plan.entries()) {
       sequence++;
       const executor = executors[action.type];
       if (!executor) {
         failed++;
         continue;
       }
-      const stepExecutionId = `${input.sourceEventId}:${sequence}`;
+      const stepKey = `action:${refIndex}:${actionIndex}`;
+      const stepExecutionId = await stableWebhookStepId(input.sourceEventId, stepKey);
       const context: AutomationActionContext = {
         db,
         runId: input.sourceEventId,
@@ -154,7 +157,11 @@ export async function executeIncomingWebhookActions(
         isTest: false,
       };
       try {
-        await executor(context);
+        if (input.execution) {
+          await input.execution.step(stepKey, () => executor(context));
+        } else {
+          await executor(context);
+        }
         executed++;
       } catch (error) {
         console.error(`[incoming-webhook-actions] action=${action.id} failed`, error);

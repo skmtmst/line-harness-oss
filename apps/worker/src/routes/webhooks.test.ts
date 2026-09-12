@@ -141,9 +141,15 @@ function setupApp(
  * webhook-incoming-replay.test.ts が見ている。
  */
 const reserveRun = vi.fn(async () => ({ meta: { changes: 1 } }));
+const receiptPrepare = (sql: string) => ({ bind: () => ({
+  run: reserveRun,
+  first: async () => sql.includes('SELECT source_event_id,status,received_at')
+    ? { source_event_id: 'receipt-event-1', status: 'processing', received_at: '2026-09-12T00:00:00.000Z' }
+    : null,
+}) });
 const baseEnv = {
   DB: {
-    prepare: () => ({ bind: () => ({ run: reserveRun }) }),
+    prepare: receiptPrepare,
   } as unknown as D1Database,
 } as Record<string, unknown>;
 
@@ -1028,6 +1034,7 @@ describe('POST /api/webhooks/incoming/:id/receive — signature', () => {
       expect.anything(),
       undefined,
       'account-a',
+      expect.objectContaining({ sourceEventId: 'receipt-event-1', step: expect.any(Function) }),
     );
     expect(createWebhookInteraction).toHaveBeenCalledWith(baseEnv.DB, expect.objectContaining({
       lineAccountId: 'account-a',
@@ -1086,6 +1093,7 @@ describe('POST /api/webhooks/incoming/:id/receive — signature', () => {
       expect.objectContaining({ friendId: 'friend-a' }),
       undefined,
       ACCOUNT_ID,
+      expect.objectContaining({ sourceEventId: 'receipt-event-1', step: expect.any(Function) }),
     );
   });
 
@@ -1433,7 +1441,7 @@ describe('#650 POST /api/webhooks/maintenance/secret-backfill', () => {
 const TEST_KEY = 'test-key-for-webhook-secret-encryption-01';
 // baseEnv と同じ理由で、受信口の予約 INSERT を受ける代役を置く(#746)。
 const keyedEnv = {
-  DB: { prepare: () => ({ bind: () => ({ run: reserveRun }) }) } as unknown as D1Database,
+  DB: { prepare: receiptPrepare } as unknown as D1Database,
   LINE_CREDENTIAL_ENCRYPTION_KEY: TEST_KEY,
 } as Record<string, unknown>;
 const ENCRYPTED_ROW = {

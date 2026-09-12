@@ -316,10 +316,24 @@ export async function getActiveRulesByEvent(db: D1Database, eventType: string): 
 }
 
 /** イベント発生時にスコアリングルールを適用 */
-export async function applyScoring(db: D1Database, friendId: string, eventType: string): Promise<number> {
+export async function applyScoring(db: D1Database, friendId: string, eventType: string, sourceEventId?: string): Promise<number> {
   const rules = await getActiveRulesByEvent(db, eventType);
   let totalChange = 0;
   for (const rule of rules) {
+    if (sourceEventId) {
+      const id = JSON.stringify(['incoming-score', sourceEventId, friendId, rule.id]);
+      const now = jstNow();
+      // D1 batch is atomic: a crash cannot leave the journal and cached total apart.
+      await db.batch([
+        db.prepare(`UPDATE friends SET score=score+?,updated_at=? WHERE id=?
+          AND NOT EXISTS (SELECT 1 FROM friend_scores WHERE id=?)`).bind(rule.score_value, now, friendId, id),
+        db.prepare(`INSERT OR IGNORE INTO friend_scores
+          (id,friend_id,scoring_rule_id,score_change,reason,created_at) VALUES (?,?,?,?,?,?)`)
+          .bind(id, friendId, rule.id, rule.score_value, `${eventType} → ${rule.name}`, now),
+      ]);
+      totalChange += rule.score_value;
+      continue;
+    }
     await addScore(db, {
       friendId,
       scoringRuleId: rule.id,

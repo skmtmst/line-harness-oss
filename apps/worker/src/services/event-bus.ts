@@ -1,4 +1,9 @@
 import { extractFlexAltText } from '../utils/flex-alt-text.js';
+import { stableWebhookStepId, type IncomingWebhookExecution } from './incoming-webhook-receipts.js';
+
+function replayStep<T>(execution: IncomingWebhookExecution | undefined, key: string, work: () => Promise<T>): Promise<T> {
+  return execution ? execution.step(key, work) : work();
+}
 
 /**
  * イベントバス — システム内イベントの発火と処理
@@ -107,6 +112,7 @@ export async function fireEvent(
   payload: EventPayload,
   lineAccessToken?: string,
   lineAccountId?: string | null,
+  execution?: IncomingWebhookExecution,
 ): Promise<void> {
   let outgoingWebhookLineAccountId = lineAccountId;
   if (outgoingWebhookLineAccountId === undefined && payload.friendId) {
@@ -119,8 +125,8 @@ export async function fireEvent(
 
   // Phase 1: fire webhooks, apply scoring rules, and ad conversion postback concurrently.
   const phase1: Promise<unknown>[] = [
-    fireOutgoingWebhooks(db, eventType, payload, outgoingWebhookLineAccountId),
-    processScoring(db, eventType, payload, outgoingWebhookLineAccountId, lineAccessToken),
+    fireOutgoingWebhooks(db, eventType, payload, outgoingWebhookLineAccountId, execution),
+    replayStep(execution, 'event:scoring', () => processScoring(db, eventType, payload, outgoingWebhookLineAccountId, lineAccessToken, execution)),
   ];
   const adConversion = payload.friendId ? adConversionForEvent(eventType, payload) : null;
   if (payload.friendId && adConversion) {
@@ -138,7 +144,10 @@ export async function fireEvent(
       }),
     );
   }
-  await Promise.allSettled(phase1);
+  const phase1Results = await Promise.allSettled(phase1);
+  if (execution && phase1Results.some((result) => result.status === 'rejected')) {
+    throw new Error('incoming_event_phase_failed');
+  }
 
   // Build an enriched payload with the freshly-updated score.
   const enrichedPayload: EventPayload = payload.friendId
@@ -181,20 +190,20 @@ export async function fireEvent(
   }
 
   // Phase 2: evaluate automations.
-  await processAutomations(db, eventType, enrichedPayload, lineAccessToken, lineAccountId);
+  await replayStep(execution, 'event:legacy-automations', () => processAutomations(db, eventType, enrichedPayload, lineAccessToken, lineAccountId, execution));
 
   // V6は発生元の不変IDとアカウントが分かるイベントだけを受け付ける。
   // 旧イベントの時刻などからIDを推測すると再配達で二重実行になるため、
   // 接続元が明示していないイベントは移行PRで接続するまで実行しない。
   if (lineAccountId && enrichedPayload.sourceEventId) {
-    await dispatchAutomationEventWithLogging(db, {
+    await replayStep(execution, 'event:automations', () => dispatchAutomationEventWithLogging(db, {
       lineAccountId,
       eventType,
-      sourceEventId: enrichedPayload.sourceEventId,
+      sourceEventId: enrichedPayload.sourceEventId!,
       friendId: enrichedPayload.friendId,
       eventData: enrichedPayload.eventData,
       lineAccessToken,
-    });
+    }));
   }
 
   // Phase 3: リッチメニューの出し分けを見直す。
@@ -233,6 +242,7 @@ async function fireOutgoingWebhooks(
   eventType: string,
   payload: EventPayload,
   lineAccountId?: string | null,
+  execution?: IncomingWebhookExecution,
 ): Promise<void> {
   try {
     if (lineAccountId == null) {
@@ -244,12 +254,13 @@ async function fireOutgoingWebhooks(
     }
     const webhooks = await getActiveOutgoingWebhooksByEvent(db, eventType, lineAccountId);
     for (const wh of webhooks) {
+      await replayStep(execution, `event:outgoing:${wh.id}`, async () => {
       let interactionId: string | null = null;
       const started = Date.now();
       try {
         const body = JSON.stringify({
           event: eventType,
-          timestamp: jstNow(),
+          timestamp: execution?.occurredAt ?? jstNow(),
           data: payload,
         });
         const idempotencyKey = payload.sourceEventId
@@ -302,6 +313,7 @@ async function fireOutgoingWebhooks(
           // 連続失敗数の更新は補助情報。配送結果そのものを巻き戻さない。
           console.error(`送信Webhook ${wh.id} の連続失敗数を更新できませんでした:`, outcomeError);
         }
+        if (execution && !result.ok) throw new Error('incoming_outgoing_delivery_failed');
       } catch (err) {
         if (interactionId && lineAccountId) {
           try {
@@ -317,10 +329,13 @@ async function fireOutgoingWebhooks(
           }
         }
         console.error(`送信Webhook ${wh.id} への通知失敗:`, err);
+        if (execution) throw err;
       }
+      });
     }
   } catch (err) {
     console.error('fireOutgoingWebhooks error:', err);
+    if (execution) throw err;
   }
 }
 
@@ -339,6 +354,7 @@ async function processScoring(
   payload: EventPayload,
   lineAccountId?: string | null,
   lineAccessToken?: string,
+  execution?: IncomingWebhookExecution,
 ): Promise<void> {
   if (!payload.friendId) return;
   try {
@@ -358,9 +374,11 @@ async function processScoring(
       // 公開後または明示停止後は旧ルールへ戻さず、二重加点を防ぐ。
       if (v6.configured) return;
     }
-    await applyScoring(db, payload.friendId, eventType);
+    if (execution) await applyScoring(db, payload.friendId, eventType, execution.sourceEventId);
+    else await applyScoring(db, payload.friendId, eventType);
   } catch (err) {
     console.error('processScoring error:', err);
+    if (execution) throw err;
   }
 }
 
@@ -371,6 +389,7 @@ async function processAutomations(
   payload: EventPayload,
   lineAccessToken?: string,
   lineAccountId?: string | null,
+  execution?: IncomingWebhookExecution,
 ): Promise<void> {
   try {
     const allAutomations = await getActiveAutomationsByEvent(db, eventType);
@@ -388,13 +407,18 @@ async function processAutomations(
 
       const results: Array<{ action: string; success: boolean; error?: string }> = [];
 
-      for (const action of actions) {
+      for (const [index, action] of actions.entries()) {
         try {
-          await executeAction(db, action, payload, lineAccessToken, lineAccountId);
+          await replayStep(execution, `event:legacy:${automation.id}:${index}`, async () => {
+            const idempotencyKey = execution
+              ? await stableWebhookStepId(execution.sourceEventId, `legacy:${automation.id}:${index}`) : undefined;
+            await executeAction(db, action, payload, lineAccessToken, lineAccountId, idempotencyKey);
+          });
           results.push({ action: action.type, success: true });
         } catch (err) {
           const errorMsg = err instanceof Error ? err.message : String(err);
           results.push({ action: action.type, success: false, error: errorMsg });
+          if (execution) throw err;
         }
       }
 
@@ -411,6 +435,7 @@ async function processAutomations(
     }
   } catch (err) {
     console.error('processAutomations error:', err);
+    if (execution) throw err;
   }
 }
 
@@ -460,6 +485,7 @@ async function executeAction(
   payload: EventPayload,
   lineAccessToken?: string,
   lineAccountId?: string | null,
+  idempotencyKey?: string,
 ): Promise<void> {
   const friendId = payload.friendId;
   if (!friendId && action.type !== 'send_webhook') {
@@ -476,7 +502,8 @@ async function executeAction(
       break;
 
     case 'start_scenario':
-      await enrollFriendInScenario(db, friendId!, action.params.scenarioId);
+      if (idempotencyKey) await enrollFriendInScenario(db, friendId!, action.params.scenarioId, idempotencyKey);
+      else await enrollFriendInScenario(db, friendId!, action.params.scenarioId);
       break;
 
     case 'send_message': {
@@ -542,7 +569,7 @@ async function executeAction(
           }
         }
       } else {
-        await lineClient.pushMessage(friend.line_user_id, [msg]);
+        await lineClient.pushMessage(friend.line_user_id, [msg], idempotencyKey);
         deliveryType = 'push';
       }
 
@@ -566,12 +593,13 @@ async function executeAction(
       if (url) {
         // 旧式の直書きURLも共通の安全送信へ通す。検査を迂回する直 fetch は置かない。
         const outcome = await postWebhookSafely(url, {
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...(idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {}) },
           body: JSON.stringify({ friendId, ...payload.eventData }),
         });
         if ('blocked' in outcome) {
           throw new Error(`send_webhook_url_unsafe: ${outcome.blocked}`);
         }
+        if (idempotencyKey && !outcome.response.ok) throw new Error(`incoming_legacy_webhook_rejected:${outcome.response.status}`);
       }
       break;
     }
