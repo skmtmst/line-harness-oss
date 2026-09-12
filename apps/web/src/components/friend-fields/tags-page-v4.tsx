@@ -103,7 +103,9 @@ function FolderSelect({ tag, groups, onItemsChange, onError }: { tag: Tag; group
         className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
       >
         <option value="">未分類</option>
-        {groups.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+        {groups
+          .filter((item) => item.accountId === tag.lineAccountId)
+          .map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
       </select>
     </span>
   )
