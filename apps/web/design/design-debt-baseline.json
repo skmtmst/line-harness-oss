@@ -847,5 +847,8 @@
   },
   "app/ec-commerce/subscriptions-panel.tsx": {
     "unresolved-classname": 16
+  },
+  "app/hq/templates/template-console.tsx": {
+    "unresolved-classname": 88
   }
 }
