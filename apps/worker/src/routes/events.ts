@@ -1425,6 +1425,53 @@ events.post('/api/liff/events/:id/bookings', async (c) => {
     if (Date.now() >= cutoffAt) return finalize(410, { error: 'entry_closed' });
   }
 
+  /*
+   * 満席のときキャンセル待ちへ入れる。**申込前の空き確認と、INSERT 後の
+   * 再検査で負けたときの両方から呼ぶ** (#747 / N-416)。
+   *
+   * 以前はここが申込前の分岐の中だけにあったので、**同時申込で負けた側は
+   * 待ちが有効でも `slot_full` で終わっていた**。空き確認を通った時点では
+   * 席があったのに、後から来た再検査で弾かれるという、利用者からは
+   * 区別のつかない負け方をする。待ちが有効なら、どちらの負け方でも
+   * 同じ行き先にする。
+   *
+   * キャンセル待ちは event_bookings に入れない。定員を数えている箇所が
+   * 多く、そこへ「待ちは数えない」条件を足して回ると必ずどこかで漏れる。
+   * 同じ(枠, 同一人物)の重複は部分UNIQUE索引が弾くので INSERT OR IGNORE。
+   */
+  // 巻き上げられる function 宣言にすると、外側の const に効いている絞り込みが
+  // 消える (このファイルの runBookingFlow と同じ理由)。const の arrow にする。
+  const enterWaitlist = async (): Promise<Response> => {
+    await c.env.DB
+      .prepare(
+        `INSERT OR IGNORE INTO event_waitlist
+           (id, line_account_id, event_id, slot_id, friend_id, identity_key, status,
+            party_size, answer_snapshot_json, first_participation,
+            first_participation_attended_count, first_participation_checked_at,
+            created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, 'waiting', ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .bind(
+        crypto.randomUUID(),
+        account_id,
+        event.id,
+        slot.id,
+        friend.id,
+        computeIdentityKey(friend),
+        partySize,
+        answerSnapshot.json,
+        firstParticipationIsFirst,
+        priorAttendedCount,
+        firstParticipationCheckedAt,
+        firstParticipationCheckedAt,
+        firstParticipationCheckedAt,
+      )
+      .run();
+    // 200 で返す。409 だと画面側は失敗として扱い、「待ちに入りました」を
+    // 出せない。画面は waitlisted を見て確定と区別する。
+    return finalize(200, { waitlisted: true, slot_id: slot.id });
+  };
+
   // Pre-flight friend-limit check は identity_key ベースに統合済 (後段の
   // sameIdentityActive ブロック参照)。friend_id ベースの単一アカウント
   // 内カウントは cross-account 同一人物を捉えられないので使わない。
@@ -1437,37 +1484,7 @@ events.post('/api/liff/events/:id/bookings', async (c) => {
     const usedSeats = await getEventOccurrenceUsedSeats(c.env.DB, slot.id);
     if (usedSeats + partySize > slotRow.capacity) {
       if (event.waitlist_enabled !== 1) return finalize(409, { error: 'slot_full' });
-      // キャンセル待ちは event_bookings に入れない。定員を数えている箇所が
-      // 多く、そこへ「待ちは数えない」条件を足して回ると必ずどこかで漏れる。
-      const identityKeyForWait = computeIdentityKey(friend);
-      await c.env.DB
-        .prepare(
-          `INSERT OR IGNORE INTO event_waitlist
-             (id, line_account_id, event_id, slot_id, friend_id, identity_key, status,
-              party_size, answer_snapshot_json, first_participation,
-              first_participation_attended_count, first_participation_checked_at,
-              created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, 'waiting', ?, ?, ?, ?, ?, ?, ?)`,
-        )
-        .bind(
-          crypto.randomUUID(),
-          account_id,
-          event.id,
-          slot.id,
-          friend.id,
-          identityKeyForWait,
-          partySize,
-          answerSnapshot.json,
-          firstParticipationIsFirst,
-          priorAttendedCount,
-          firstParticipationCheckedAt,
-          firstParticipationCheckedAt,
-          firstParticipationCheckedAt,
-        )
-        .run();
-      // 200 で返す。409 だと画面側は失敗として扱い、「待ちに入りました」を
-      // 出せない。
-      return finalize(200, { waitlisted: true, slot_id: slot.id });
+      return enterWaitlist();
     }
   }
 
@@ -1561,6 +1578,9 @@ events.post('/api/liff/events/:id/bookings', async (c) => {
           .prepare(`DELETE FROM event_bookings WHERE id = ?`)
           .bind(id)
           .run();
+        // 席を戻してから待ちへ入れる。順序が逆だと、自分の予約行が残った
+        // まま待ちの行が増え、一瞬だけ定員を二重に押さえる。
+        if (event.waitlist_enabled === 1) return enterWaitlist();
         return finalize(409, { error: 'slot_full' });
       }
     }
