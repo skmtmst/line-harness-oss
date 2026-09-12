@@ -3,6 +3,9 @@ import { createTestD1 } from '../../test-utils/d1-sqlite.js';
 import type { HqTemplateAdapterContext, HqTemplateResolution, HqTemplateSnapshotToken } from './contract.js';
 import {
   createTemplateHqTemplateAdapter,
+  readMessageTemplateSourceBytes,
+  MESSAGE_TEMPLATE_MEDIA_MAX_BYTES,
+  MESSAGE_TEMPLATE_TOTAL_MEDIA_MAX_BYTES,
   inspectMessageTemplateDefinition,
   nextMessageTemplateAlias,
   parseMessageTemplateDefinition,
@@ -160,6 +163,7 @@ describe('message template HQ adapter', () => {
       authority: sourceAuthority,
       templateVersionId: 'version-1',
       binding: { mediaVersionId: 'source-media-v1', versionNo: 1, etag: 'etag-source-v1' },
+      maxBytes: 4,
     });
   });
 
@@ -276,6 +280,38 @@ describe('message template HQ adapter', () => {
       .toEqual({ r2_key: existingMedia.r2Key });
     expect(objects.get(existingMedia.r2Key)).toEqual(new Uint8Array([9, 9, 9, 9]));
     expect(objects.has(plan.stage[0]!.key)).toBe(false);
+  });
+
+  it.each(['renamed-target', 'renamed-other', 'unchanged', 'other-account'] as const)('overwrite checks the complete media name inventory atomically: %s', async change => {
+    const store = createTestD1();
+    try {
+      store.raw.prepare("INSERT INTO templates(id,name,message_type,message_content,line_account_id,updated_at) VALUES ('existing','来店お礼','text','old','store-a','rev-1')").run();
+      for (const [id, account, filename] of [['existing-media','store-a','thanks.png'], ['other','store-a','other.png'], ['remote','store-b','remote.png']]) {
+        store.raw.prepare("INSERT INTO media(id,line_account_id,kind,filename,mime_type,size_bytes,r2_key,created_at) VALUES (?,?,'image',?,'image/png',4,?,'created')").run(id, account, filename, `media/${account}/${id}.png`);
+        store.raw.prepare("INSERT INTO media_versions(id,media_id,version_no,r2_key,mime_type,size_bytes,content_hash,created_at) VALUES (?,?,1,?,'image/png',4,?,'created')").run(`${id}-v1`,id,`media/${account}/${id}.png`,contentHash);
+      }
+      const key = 'media/store-a/existing-media.png';
+      const current = { id: 'existing-media', filename: 'thanks.png', mimeType: 'image/png', sizeBytes: 4, r2Key: key, publicUrl: null, contentHash, revision: `created:${contentHash}:${key}`, versionNo: 1 };
+      const other = { ...current, id: 'other', filename: 'other.png', r2Key: 'media/store-a/other.png', contentHash: 'b'.repeat(64) };
+      const selections: HqTemplateResolution[] = [
+        { sourceId: 'template:source-template', itemKind: 'template', mode: 'overwrite', targetId: 'existing', expectedRevision: 'rev-1' },
+        { sourceId: 'media:source-media', itemKind: 'media', mode: 'overwrite', targetId: current.id, expectedRevision: current.revision },
+      ];
+      const plan = await planMessageTemplateDistribution({ context: context('store-a', selections), source: authorizedSource(), snapshot: snapshot({ templates: [{id:'existing',name:'来店お礼',updatedAt:'rev-1'}], media: [current,other] }), idMap: {'template:source-template':'existing','media:source-media':'existing-media'}, dependencies: dependencies() });
+      if (change === 'renamed-target') store.raw.prepare("UPDATE media SET filename='saved-by-other-editor.png' WHERE id='existing-media'").run();
+      if (change === 'renamed-other') store.raw.prepare("UPDATE media SET filename='ＴＨＡＮＫＳ．ＰＮＧ' WHERE id='other'").run();
+      if (change === 'other-account') store.raw.prepare("UPDATE media SET filename='thanks.png' WHERE id='remote'").run();
+      const before = ['templates','media','media_versions','media_usages'].map(table => store.raw.prepare(`SELECT * FROM ${table} ORDER BY rowid`).all());
+      const apply = () => store.db.batch(plan.dbCommit.map(statement => store.db.prepare(statement.sql).bind(...statement.bindings)));
+      if (change.startsWith('renamed')) {
+        await expect(apply()).rejects.toThrow();
+        expect(['templates','media','media_versions','media_usages'].map(table => store.raw.prepare(`SELECT * FROM ${table} ORDER BY rowid`).all())).toEqual(before);
+      } else {
+        await apply();
+        expect(store.raw.prepare("SELECT filename,r2_key FROM media WHERE id='existing-media'").get()).toEqual({filename:'thanks.png',r2_key:plan.stage[0]!.key});
+      }
+      expect(plan.compensateOnDbFailure).not.toContainEqual(expect.objectContaining({key}));
+    } finally { store.raw.close(); }
   });
 
   it.each(['insert', 'rename', 'unchanged', 'other-account'] as const)('checks the complete name inventory before committing an NFKC name: %s', async (change) => {
@@ -396,6 +432,47 @@ describe('message template HQ adapter', () => {
     }));
     await expect(selfConsistentForeignPrefix.extractReferences({ templateVersionId: 'version-1', definitionJson: '{}' }))
       .rejects.toMatchObject({ code: 'SOURCE_MEDIA_AUTHORITY_MISMATCH' });
+  });
+
+  const definitionWithSizes = (sizes: readonly number[]) => ({
+    ...definition,
+    template: { ...definition.template, messageContent: JSON.stringify(sizes.map((_,index)=>`sized-${index}`)) },
+    media: sizes.map((sizeBytes, index) => ({...definition.media[0]!, id: `sized-${index}`, r2Key: `hq-templates/tenant-1/sized-${index}`, versionId: `sized-v${index}`, publicUrl: null, sizeBytes })),
+  });
+  it.each(['definition-single','definition-total','binding-single','binding-total'] as const)('rejects %s capacity before any R2 read', async kind => {
+    let readCalled = false;
+    const tooLarge = kind.endsWith('single') ? [MESSAGE_TEMPLATE_MEDIA_MAX_BYTES + 1] : [MESSAGE_TEMPLATE_MEDIA_MAX_BYTES, MESSAGE_TEMPLATE_MEDIA_MAX_BYTES, 1];
+    let version = sourceVersion();
+    if (kind.startsWith('definition')) version = sourceVersion({definitionJson: JSON.stringify(definitionWithSizes(tooLarge))});
+    else version = sourceVersion({media: tooLarge.map((sizeBytes,index) => ({...version.media[0]!,mediaId:`sized-${index}`,sizeBytes}))});
+    const adapter = createTemplateHqTemplateAdapter(sourceAuthority, dependencies({resolveSourceVersion:async()=>version, readSourceObjectIfUnchanged:async()=>{readCalled=true;return null;}}));
+    await expect(adapter.extractReferences({templateVersionId:'version-1',definitionJson:'{}'})).rejects.toMatchObject({code:'MEDIA_SIZE_LIMIT',status:422});
+    expect(readCalled).toBe(false);
+  });
+  it('allows declared boundary sizes without allocating file buffers', () => {
+    const parsed = parseMessageTemplateDefinition(definitionWithSizes([MESSAGE_TEMPLATE_MEDIA_MAX_BYTES, MESSAGE_TEMPLATE_MEDIA_MAX_BYTES]));
+    expect(parsed.media.reduce((sum,media)=>sum+media.sizeBytes,0)).toBe(MESSAGE_TEMPLATE_TOTAL_MEDIA_MAX_BYTES);
+  });
+  it('rechecks bytes returned by an incorrectly implemented runtime reader', async () => {
+    let readLimit: number | undefined;
+    await expect(planMessageTemplateDistribution({context:context('store-a',createResolutions()),source:authorizedSource(),snapshot:snapshot(),idMap:{'template:source-template':'new-template','media:source-media':'new-media'},dependencies:dependencies({readSourceObjectIfUnchanged:async input=>{readLimit=input.maxBytes;return {bytes:new Uint8Array(5),etag:'etag-source-v1'};}})})).rejects.toMatchObject({code:'MEDIA_SIZE_LIMIT'});
+    expect(readLimit).toBe(4);
+  });
+  it('reads stream chunks up to the exact actual byte limit', async () => {
+    const body = new ReadableStream<Uint8Array>({start(c){c.enqueue(new Uint8Array([1,2]));c.enqueue(new Uint8Array([3,4]));c.close();}});
+    expect(await readMessageTemplateSourceBytes(body,4)).toEqual(new Uint8Array([1,2,3,4]));
+    expect(body.locked).toBe(false);
+  });
+  it('cancels an oversized stream before accepting all source bytes', async () => {
+    let cancelled = false;
+    const body = new ReadableStream<Uint8Array>({start(c){c.enqueue(new Uint8Array([1,2,3]));c.enqueue(new Uint8Array([4,5]));},cancel(){cancelled=true;}});
+    await expect(readMessageTemplateSourceBytes(body,4)).rejects.toMatchObject({code:'MEDIA_SIZE_LIMIT'});
+    expect(cancelled).toBe(true); expect(body.locked).toBe(false);
+  });
+  it('rejects unbounded runtime read limits without consuming the stream', async () => {
+    const body = new ReadableStream<Uint8Array>();
+    await expect(readMessageTemplateSourceBytes(body,MESSAGE_TEMPLATE_MEDIA_MAX_BYTES+1)).rejects.toMatchObject({code:'MEDIA_SIZE_LIMIT'});
+    expect(body.locked).toBe(false);
   });
 
   it('rejects same-size source bytes when their SHA-256 does not match the immutable version', async () => {

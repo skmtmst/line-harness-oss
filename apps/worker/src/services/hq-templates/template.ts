@@ -11,6 +11,11 @@ import {
   type HqTemplateStoreAtomicCommitPlan,
 } from './contract.js';
 
+// The current commit plan retains copied bytes in memory. Keep enough headroom
+// for the Worker, SHA-256 buffers and one bounded streaming read.
+export const MESSAGE_TEMPLATE_MEDIA_MAX_BYTES = 8 * 1024 * 1024;
+export const MESSAGE_TEMPLATE_TOTAL_MEDIA_MAX_BYTES = 16 * 1024 * 1024;
+
 export class TemplateHqTemplateError extends Error {
   constructor(public readonly code: string, public readonly status: 400 | 409 | 422 | 500 = 400) {
     super(code);
@@ -130,12 +135,15 @@ export interface MessageTemplateAdapterDependencies {
   /**
    * Must perform a conditional R2 read when binding.etag is present. Returning null means that
    * the object no longer matches the version recorded by resolveSourceVersion.
+   * Check the R2 reported size and consume body with readMessageTemplateSourceBytes
+   * (or an equivalent bounded reader). Do not call unbounded arrayBuffer() first.
    */
   readSourceObjectIfUnchanged(input: Readonly<{
     authority: MessageTemplateSourceAuthority;
     templateVersionId: string;
     media: MessageTemplateMediaDefinition;
     binding: MessageTemplateSourceMediaBinding;
+    maxBytes: number;
   }>): Promise<Readonly<{ bytes: Uint8Array; etag: string | null }> | null>;
   createId(
     kind: 'template' | 'media' | 'media_version',
@@ -204,6 +212,47 @@ function jsonText(value: unknown, max: number): string | null {
   return text;
 }
 
+function assertMediaBudget(media: readonly { sizeBytes: number }[]): void {
+  let total = 0;
+  if (media.length > 50) throw new TemplateHqTemplateError('MEDIA_SIZE_LIMIT', 422);
+  for (const item of media) {
+    if (!Number.isSafeInteger(item.sizeBytes) || item.sizeBytes < 0
+      || item.sizeBytes > MESSAGE_TEMPLATE_MEDIA_MAX_BYTES) {
+      throw new TemplateHqTemplateError('MEDIA_SIZE_LIMIT', 422);
+    }
+    total += item.sizeBytes;
+    if (total > MESSAGE_TEMPLATE_TOTAL_MEDIA_MAX_BYTES) {
+      throw new TemplateHqTemplateError('MEDIA_SIZE_LIMIT', 422);
+    }
+  }
+}
+
+/** Bounded R2 body reader for the runtime dependency; cancels on actual oversize. */
+export async function readMessageTemplateSourceBytes(
+  body: ReadableStream<Uint8Array>,
+  maxBytes: number,
+): Promise<Uint8Array> {
+  if (!Number.isSafeInteger(maxBytes) || maxBytes < 0 || maxBytes > MESSAGE_TEMPLATE_MEDIA_MAX_BYTES)
+    throw new TemplateHqTemplateError('MEDIA_SIZE_LIMIT', 422);
+  const reader = body.getReader();
+  const bytes = new Uint8Array(maxBytes);
+  let total = 0;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (!(value instanceof Uint8Array) || value.byteLength > maxBytes - total)
+        throw new TemplateHqTemplateError('MEDIA_SIZE_LIMIT', 422);
+      bytes.set(value, total);
+      total += value.byteLength;
+    }
+    return total === maxBytes ? bytes : bytes.slice(0, total);
+  } catch (error) {
+    try { await reader.cancel(); } catch { /* Retain the original read/limit failure. */ }
+    throw error;
+  } finally { reader.releaseLock(); }
+}
+
 /** The version payload stored in hq_template_versions.definition_json. */
 export function parseMessageTemplateDefinition(value: unknown): MessageTemplateDefinition {
   const root = object(value);
@@ -250,6 +299,7 @@ export function parseMessageTemplateDefinition(value: unknown): MessageTemplateD
       contentHash: requiredText(item.contentHash, 255),
     };
   });
+  assertMediaBudget(media);
   if (new Set(media.map((item) => item.id)).size !== media.length
     || new Set(media.map((item) => item.r2Key)).size !== media.length) {
     throw new TemplateHqTemplateError('INVALID_DEFINITION', 422);
@@ -315,6 +365,8 @@ function assertAuthorizedSource(
 ): void {
   const { authority, version, definition, media: bindings } = source;
   const expectedSourcePrefix = sourceR2Prefix(authority.tenantId);
+  assertMediaBudget(definition.media);
+  assertMediaBudget([...bindings.values()]);
   if (authority.tenantId !== expectedTenantId
     || version.tenantId !== authority.tenantId
     || version.sourceAccountId !== authority.sourceAccountId
@@ -597,13 +649,15 @@ export async function planMessageTemplateDistribution(input: {
         throw new TemplateHqTemplateError('DUPLICATE_NAME', 409);
       }
       occupied.push(name);
-      if (!guardedInventories.has(item.itemKind)) {
-        const names: [string, string][] = item.itemKind === 'template'
-          ? snapshot.templates.map(row => [row.id, row.name])
-          : snapshot.media.map(row => [row.id, row.filename]);
-        dbCommit.push(nameInventoryGuard(item.itemKind, context.targetAccountId, names));
-        guardedInventories.add(item.itemKind);
-      }
+    }
+    // Renaming media does not create a media_version. Overwrite needs this guard
+    // too, otherwise a concurrent rename is silently undone by the UPDATE.
+    if (!guardedInventories.has(item.itemKind)) {
+      const names: [string, string][] = item.itemKind === 'template'
+        ? snapshot.templates.map(row => [row.id, row.name])
+        : snapshot.media.map(row => [row.id, row.filename]);
+      dbCommit.push(nameInventoryGuard(item.itemKind, context.targetAccountId, names));
+      guardedInventories.add(item.itemKind);
     }
     resolved.push({
       ...resolution,
@@ -613,6 +667,7 @@ export async function planMessageTemplateDistribution(input: {
     });
   }
 
+  let stagedBytes = 0;
   for (const media of referencedMedia(definition)) {
     const sourceId = `media:${media.id}`;
     const item = items.find((entry) => entry.sourceId === sourceId)!;
@@ -636,12 +691,16 @@ export async function planMessageTemplateDistribution(input: {
     plannedTargetR2Keys.add(targetR2Key);
     const binding = source.media.get(media.id);
     if (!binding) throw new TemplateHqTemplateError('SOURCE_MEDIA_AUTHORITY_MISMATCH', 422);
+    const maxBytes = Math.min(media.sizeBytes, MESSAGE_TEMPLATE_MEDIA_MAX_BYTES, MESSAGE_TEMPLATE_TOTAL_MEDIA_MAX_BYTES - stagedBytes);
     const sourceObject = await dependencies.readSourceObjectIfUnchanged({
       authority: source.authority,
       templateVersionId: source.version.templateVersionId,
       media,
       binding,
+      maxBytes,
     });
+    if (sourceObject && sourceObject.bytes.byteLength > maxBytes)
+      throw new TemplateHqTemplateError('MEDIA_SIZE_LIMIT', 422);
     const declaredHash = normalizeSha256(media.contentHash);
     if (!sourceObject
       || (binding.etag !== null && sourceObject.etag !== binding.etag)
@@ -651,6 +710,7 @@ export async function planMessageTemplateDistribution(input: {
       || (media.publicUrl !== null && targetPublicUrl === null)) {
       throw new TemplateHqTemplateError('MEDIA_COPY_INVALID', 422);
     }
+    stagedBytes += sourceObject.bytes.byteLength;
     stage.push({ key: targetR2Key, ownerToken, bytes: sourceObject.bytes, contentType: media.mimeType });
     compensateOnDbFailure.push({ key: targetR2Key, ownerToken });
     reconcile.push({ key: targetR2Key, ownerToken });
