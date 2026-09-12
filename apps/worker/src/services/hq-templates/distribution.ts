@@ -10,7 +10,7 @@ import { parseMessageTemplateDefinition } from './template.js';
 import { inspectFormTemplate, parseFormTemplateDefinition } from './form.js';
 import { parseRichMenuTemplateDefinition } from './rich-menu.js';
 import { executeFormStore, HqRuntimeError } from './runtime.js';
-import { executeR2RuntimeStore, HqR2RuntimeError, inspectR2RuntimeStore } from './runtime-r2.js';
+import { executeR2RuntimeStore, HqR2RuntimeError, inspectR2RuntimeStore, reconcileFailedOwnedImages } from './runtime-r2.js';
 
 export { HqTemplateError } from './tag.js';
 export type DistributionSelection = { accountId: string; sourceId: string; mode: 'create' | 'overwrite' | 'alias' };
@@ -167,18 +167,22 @@ function rethrowR2(error: unknown): never {
   if (error.code.includes('UNSUPPORTED')) throw new HqTemplateError('UNSUPPORTED', 422);
   throw new HqTemplateError('INVALID_DEFINITION');
 }
-export async function distributionResult(db: D1Database, authority: HqTemplateAuthority, templateId: string, runId: string) {
+export async function distributionResult(db: D1Database, authority: HqTemplateAuthority, templateId: string, runId: string, bucket?: R2Bucket) {
   const run = await db.prepare(`SELECT id,status FROM hq_template_distribution_runs WHERE id=? AND tenant_id=? AND template_id=?`).bind(runId, authority.tenantId, templateId).first<{ id: string; status: string }>();
   if (!run) throw new HqTemplateError('NOT_FOUND', 404);
   const rows = (await db.prepare(`SELECT * FROM hq_template_distribution_results WHERE run_id=? AND tenant_id=? ORDER BY target_account_id`).bind(runId, authority.tenantId).all<HqTemplateDistributionResult>()).results;
   const stores = [];
   for (const row of rows) {
+    if (bucket && row.status === 'failed') {
+      await reconcileFailedOwnedImages({ db, bucket, authority, templateId, templateVersionId: row.template_version_id }, runId, row.target_account_id);
+    }
+    const cleanup = await db.prepare(`SELECT COUNT(*) AS count FROM hq_template_owned_r2_keys WHERE run_id=? AND tenant_id=? AND target_account_id=? AND state IN ('staged','cleanup_pending')`).bind(runId, authority.tenantId, row.target_account_id).first<{ count: number }>();
     const resolutions = (await db.prepare(`SELECT resolution_mode FROM hq_template_preflight_resolutions WHERE preflight_id=? AND tenant_id=?`).bind(row.preflight_id, authority.tenantId).all<{ resolution_mode: string }>()).results;
     const counts = { created: 0, overwritten: 0, aliased: 0 };
     if (row.status === 'succeeded') for (const r of resolutions) {
       if (r.resolution_mode === 'create') counts.created++; else if (r.resolution_mode === 'overwrite') counts.overwritten++; else counts.aliased++;
     }
-    stores.push({ accountId: row.target_account_id, status: row.status, reason: resultReason(row.status), counts });
+    stores.push({ accountId: row.target_account_id, status: row.status, reason: resultReason(row.status), cleanupPending: Number(cleanup?.count ?? 0) > 0, counts });
   }
   const targets = (await db.prepare(`SELECT target_account_id FROM hq_template_preflights WHERE tenant_id=? AND template_id=? AND idempotency_fingerprint=? ORDER BY target_account_id`).bind(authority.tenantId, templateId, runId).all<{ target_account_id: string }>()).results;
   for (const p of targets) if (!stores.some(s => s.accountId === p.target_account_id)) stores.push({ accountId: p.target_account_id, status: 'pending', reason: null, counts: { created: 0, overwritten: 0, aliased: 0 } });
@@ -232,12 +236,12 @@ export async function distributeTemplate(db: D1Database, authority: HqTemplateAu
         throw new HqTemplateError('RESULT_UNAVAILABLE', 500);
       }
     }
-    const result = await distributionResult(db, authority, templateId, runId);
+    const result = await distributionResult(db, authority, templateId, runId, bucket);
     if (result.stores.some(store => store.status === 'pending' || store.status === 'staged')) return result;
     const succeeded = result.stores.filter(store => store.status === 'succeeded').length;
     const status = succeeded === preflights.length ? 'completed' : succeeded ? 'partial' : 'failed';
     await db.prepare(`UPDATE hq_template_distribution_runs SET status=?,finished_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=? AND tenant_id=? AND status='running'`).bind(status, runId, authority.tenantId).run();
-    return distributionResult(db, authority, templateId, runId);
+    return distributionResult(db, authority, templateId, runId, bucket);
   }
   const definition = parseTagDefinition(JSON.parse(version.definition_json));
   await beginHqTemplateDistributionRun(db, { id: runId, tenantId: authority.tenantId, templateId, templateVersionId: preflights[0].template_version_id, idempotencyFingerprint: runId, createdBy: authority.actorId });

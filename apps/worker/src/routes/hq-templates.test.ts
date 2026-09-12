@@ -302,7 +302,7 @@ describe('HQ tag HTTP and real SQLite boundaries', () => {
     expect(count('forms')).toBe(3);
     expect(sql.pragma('foreign_key_check')).toEqual([]);
   });
-  test('a consumed form preflight reuses its immutable overwrite decision while staged', async () => {
+  test('a consumed form preflight keeps its immutable overwrite decision after bounded failure', async () => {
     const formDefinition = { schemaVersion: 1, form: { name: '再実行フォーム', description: null, fields: [{ name: 'answer', label: '回答', type: 'text', required: true }], layout: null, on_submit_tag_id: null, on_submit_scenario_id: null, save_to_metadata: true } };
     const created = await request('', 'POST', { type: 'form', name: '再実行フォーム', definition: formDefinition, requestId: crypto.randomUUID() });
     const first = await preflight(created.body.data.template.id, ['a1']);
@@ -310,9 +310,9 @@ describe('HQ tag HTTP and real SQLite boundaries', () => {
     const retry = await preflight(created.body.data.template.id, ['a1']);
     sql.exec("CREATE TRIGGER reject_form_update BEFORE UPDATE ON forms BEGIN SELECT RAISE(ABORT,'fixture'); END");
     const interrupted = await execute(created.body.data.template.id, retry, selections(retry, 'overwrite'));
-    expect(interrupted.status).toBe(200);expect(interrupted.body.data.status).toBe('running');
+    expect(interrupted.status).toBe(200);expect(interrupted.body.data.status).toBe('failed');
     const replay = await execute(created.body.data.template.id, retry, selections(retry, 'overwrite'));
-    expect(replay.status).toBe(200);expect(replay.body.data.status).toBe('running');
+    expect(replay.status).toBe(200);expect(replay.body.data.status).toBe('failed');
     sql.exec('DROP TRIGGER reject_form_update');
   });
   test('invalid definitions, cyclic or unrelated folders are rejected', async () => {

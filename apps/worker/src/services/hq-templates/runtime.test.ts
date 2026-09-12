@@ -64,11 +64,12 @@ describe('form runtime and atomic store execution', () => {
     fixture.raw.prepare("UPDATE hq_template_versions SET definition_json=? WHERE id='version'").run(JSON.stringify({...definition,form:{...definition.form,on_submit_scenario_id:'source-scenario'}}));
     expect((await executeFormStore(options(await preflight('a')))).status).toBe('failed');expect(count('forms')).toBe(0);expect(count('scenarios')).toBe(2);
   });
-  test.each(['trigger','completion','encoded-reference'])('non-portable scenario %s is rejected before destination writes',async kind=>{
+  test.each(['trigger','completion','encoded-reference','underscore-reference'])('non-portable scenario %s is rejected before destination writes',async kind=>{
     fixture.raw.exec("INSERT INTO scenarios(id,name,trigger_type,on_complete_mode,line_account_id,is_active) VALUES ('source-scenario','ご案内','manual','pause','source',1); INSERT INTO scenario_steps(id,scenario_id,step_order,message_type,message_content) VALUES ('source-step','source-scenario',1,'text','ありがとうございます')");
     if(kind==='trigger')fixture.raw.exec("UPDATE scenarios SET trigger_type='friend_add' WHERE id='source-scenario'");
     if(kind==='completion')fixture.raw.exec("UPDATE scenarios SET on_complete_mode='restart' WHERE id='source-scenario'");
     if(kind==='encoded-reference')fixture.raw.exec("UPDATE scenario_steps SET message_content='https%253A%252F%252Fliff.line.me%252Ffixture' WHERE id='source-step'");
+    if(kind==='underscore-reference')fixture.raw.exec("UPDATE scenario_steps SET message_content='https://example.invalid/path?line_account_id=source&scenario_id=source-scenario' WHERE id='source-step'");
     fixture.raw.prepare("UPDATE hq_template_versions SET definition_json=? WHERE id='version'").run(JSON.stringify({...definition,form:{...definition.form,on_submit_scenario_id:'source-scenario'}}));
     expect((await executeFormStore(options(await preflight('a')))).status).toBe('unsupported');expect(count('forms')).toBe(0);expect(count('scenarios')).toBe(1);
   });
@@ -84,25 +85,25 @@ describe('form runtime and atomic store execution', () => {
     expect((await executeFormStore(options(c,db))).status).toBe('succeeded');await executeFormStore(options(c));expect(count('forms')).toBe(1);
     expect(fixture.raw.prepare("SELECT COUNT(*) n FROM audit_events WHERE action='hq_template.distributed'").get()).toEqual({n:1});
   });
-  test('business failure rolls back tag, form, resolutions and success audit; unknown remains staged',async()=>{
+  test('business failure retries safely, rolls back partial writes, then becomes terminal',async()=>{
     const c=await preflight('a');fixture.raw.exec("CREATE TRIGGER fail_form BEFORE INSERT ON forms BEGIN SELECT RAISE(ABORT,'fixture'); END");
-    expect((await executeFormStore(options(c))).status).toBe('staged');expect(count('forms')).toBe(0);expect(count('tags')).toBe(1);
+    expect((await executeFormStore(options(c))).status).toBe('failed');expect(count('forms')).toBe(0);expect(count('tags')).toBe(1);
     expect(fixture.raw.prepare('SELECT target_id FROM hq_template_preflight_resolutions').get()).toEqual({target_id:null});expect(fixture.raw.prepare("SELECT COUNT(*) n FROM audit_events WHERE action='hq_template.distributed'").get()).toEqual({n:0});
-    fixture.raw.exec('DROP TRIGGER fail_form');expect(await executeFormStore(options(c))).toEqual({status:'staged',reused:true});expect(count('forms')).toBe(0);
+    fixture.raw.exec('DROP TRIGGER fail_form');expect(await executeFormStore(options(c))).toEqual({status:'failed',reused:true});expect(count('forms')).toBe(0);
   });
   test('one destination edit conflicts without blocking another store',async()=>{
     const a=await preflight('a'),b=await preflight('b');fixture.raw.exec("INSERT INTO tags(id,name,line_account_id) VALUES ('changed','edited','a')");
     expect((await executeFormStore(options(a))).status).toBe('version_conflict');expect((await executeFormStore(options(b))).status).toBe('succeeded');expect(count('forms')).toBe(1);
   });
   test('source edit between plan and batch rolls back all destination writes',async()=>{
-    const c=await preflight('a');expect((await executeHqAtomicStore({...options(c),buildPlan:async(context,input)=>{const p=await buildFormRuntimePlan({db:fixture.db,authority,context,input});fixture.raw.exec("UPDATE tags SET name='changed' WHERE id='source-tag'");return p}})).status).toBe('staged');expect(count('forms')).toBe(0);expect(count('tags')).toBe(1);
+    const c=await preflight('a');expect((await executeHqAtomicStore({...options(c),buildPlan:async(context,input)=>{const p=await buildFormRuntimePlan({db:fixture.db,authority,context,input});fixture.raw.exec("UPDATE tags SET name='changed' WHERE id='source-tag'");return p}})).status).toBe('failed');expect(count('forms')).toBe(0);expect(count('tags')).toBe(1);
   });
   test('scenario step insertion between plan and batch is detected atomically',async()=>{
     fixture.raw.exec("INSERT INTO scenarios(id,name,trigger_type,line_account_id,is_active) VALUES ('source-scenario','ご案内','manual','source',1); INSERT INTO scenario_steps(id,scenario_id,step_order,message_type,message_content) VALUES ('source-step','source-scenario',1,'text','最初の内容')");
     fixture.raw.prepare("UPDATE hq_template_versions SET definition_json=? WHERE id='version'").run(JSON.stringify({...definition,form:{...definition.form,on_submit_scenario_id:'source-scenario'}}));
     const c=await preflight('a');
     const result=await executeHqAtomicStore({...options(c),buildPlan:async(context,input)=>{const plan=await buildFormRuntimePlan({db:fixture.db,authority,context,input});fixture.raw.exec("INSERT INTO scenario_steps(id,scenario_id,step_order,message_type,message_content) VALUES ('late-step','source-scenario',2,'text','後から追加')");return plan}});
-    expect(result.status).toBe('staged');expect(count('forms')).toBe(0);expect(fixture.raw.prepare("SELECT COUNT(*) n FROM scenarios WHERE line_account_id='a'").get()).toEqual({n:0});
+    expect(result.status).toBe('failed');expect(count('forms')).toBe(0);expect(fixture.raw.prepare("SELECT COUNT(*) n FROM scenarios WHERE line_account_id='a'").get()).toEqual({n:0});
   });
   test('changed replay choices and foreign authority cannot reuse the result',async()=>{
     const c=await preflight('a');await executeFormStore(options(c));

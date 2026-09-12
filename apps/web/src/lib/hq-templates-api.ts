@@ -80,7 +80,7 @@ export interface DistributionResult {
   stores: {
     accountId: string; accountName?: string
     status: 'pending' | 'staged' | 'succeeded' | 'failed' | 'version_conflict' | 'unsupported'
-    reason?: string | null; counts: { created: number; overwritten: number; aliased: number }
+    reason?: string | null; cleanupPending?: boolean; counts: { created: number; overwritten: number; aliased: number }
   }[]
 }
 export class HqTemplatesApiError extends Error {

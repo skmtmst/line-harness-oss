@@ -22,7 +22,7 @@ function exactRowGuard(table: 'scenarios' | 'scenario_steps', row: DbRow): HqTem
 function hasPortableTextReference(value: unknown): boolean {
   let current = String(value ?? '');
   for (let attempt = 0; attempt < 4; attempt++) {
-    if (/(?:liff\.line\.me|[?&#](?:form|template|scenario|tag|(?:line)?account)(?:s|ids?)?=|\/(?:forms?|scenarios?|templates?|tags?|accounts?)\/)/i.test(current)) return true;
+    if (/(?:liff\.line\.me|[?&#](?:form|template|scenario|tag|account|line[_-]?account)(?:s|[_-]?ids?)?=|\/(?:forms?|scenarios?|templates?|tags?|accounts?)\/)/i.test(current)) return true;
     if (!/%[0-9a-f]{2}/i.test(current)) return false;
     try {
       const next = decodeURIComponent(current);
@@ -122,7 +122,9 @@ export interface AtomicStoreOptions {
 }
 export type AtomicStoreOutcome = { status: HqTemplateDistributionResult['status']; reused: boolean };
 
-/** No R2, takeover, or automatic retry. An interrupted staged claim needs reconciliation. */
+const MAX_DB_COMMIT_ATTEMPTS = 3;
+
+/** Atomic DB store with bounded retry; stale interrupted claims terminate safely. */
 export async function executeHqAtomicStore(options: AtomicStoreOptions): Promise<AtomicStoreOutcome> {
   const { db, authority, templateId, runId } = options;
   if (requireHqTemplateAuthority(authority).kind !== 'AUTHORIZED' || options.context.tenantId !== authority.tenantId) fail('FORBIDDEN');
@@ -149,7 +151,16 @@ export async function executeHqAtomicStore(options: AtomicStoreOptions): Promise
   };
   const previous = await read();
   if (previous && (previous.template_id !== templateId || previous.template_version_id !== p!.template_version_id || previous.preflight_id !== p!.id || previous.snapshot_token !== p!.snapshot_token || previous.idempotency_fingerprint !== runId)) fail('INVALID_PREFLIGHT');
-  if (previous) { await checkReceipt(); if (previous.status !== 'pending') return { status: previous.status, reused: true }; }
+  if (previous) {
+    await checkReceipt();
+    if (previous.status === 'staged' && Date.parse(previous.started_at) <= Date.now() - 2 * 60_000) {
+      await db.prepare(`UPDATE hq_template_distribution_results SET status='failed',error_code='INTERRUPTED',finished_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE run_id=? AND tenant_id=? AND target_account_id=? AND status='staged' AND started_at=?`).bind(runId, authority.tenantId, context.targetAccountId, previous.started_at).run();
+      const recovered = await read();
+      if (!recovered) fail('RESULT_UNAVAILABLE');
+      return { status: recovered!.status, reused: true };
+    }
+    if (previous.status !== 'pending') return { status: previous.status, reused: true };
+  }
   if (!p!.expires_at || !Number.isFinite(Date.parse(p!.expires_at)) || Date.parse(p!.expires_at) <= Date.now()) fail('VERSION_CONFLICT');
   const run = await beginHqTemplateDistributionRun(db, { id: runId, tenantId: authority.tenantId, templateId, templateVersionId: p!.template_version_id, idempotencyFingerprint: runId, createdBy: authority.actorId });
   if (run.run.status !== 'running' || run.run.created_by !== authority.actorId) fail('INVALID_RUN');
@@ -158,14 +169,13 @@ export async function executeHqAtomicStore(options: AtomicStoreOptions): Promise
   await checkReceipt();
   const begun = await beginHqTemplateStoreResult(db, { runId, tenantId: authority.tenantId, templateId, templateVersionId: p!.template_version_id, targetAccountId: context.targetAccountId, preflightId: p!.id, idempotencyFingerprint: runId, snapshotToken: p!.snapshot_token });
   if (begun.kind === 'conflict_or_missing') fail('INVALID_PREFLIGHT');
-  const claimed = await db.prepare(`UPDATE hq_template_distribution_results SET status='staged',attempt_count=attempt_count+1 WHERE run_id=? AND tenant_id=? AND target_account_id=? AND status='pending'`).bind(runId, authority.tenantId, context.targetAccountId).run();
+  const claimed = await db.prepare(`UPDATE hq_template_distribution_results SET status='staged',attempt_count=attempt_count+1,started_at=strftime('%Y-%m-%dT%H:%M:%fZ','now'),finished_at=NULL,error_code=NULL WHERE run_id=? AND tenant_id=? AND target_account_id=? AND status='pending'`).bind(runId, authority.tenantId, context.targetAccountId).run();
   if (claimed.meta.changes !== 1) { const row = await read(); if (!row) fail('RESULT_UNAVAILABLE'); return { status: row!.status, reused: true }; }
   const claimedRow = await read();
   if (!claimedRow || claimedRow.status !== 'staged') fail('RESULT_UNAVAILABLE');
   const attempt = claimedRow!.attempt_count;
   const claimCondition = `EXISTS(SELECT 1 FROM hq_template_distribution_results WHERE run_id=? AND tenant_id=? AND target_account_id=? AND status='staged' AND attempt_count=?)`;
   const claimBindings = [runId, authority.tenantId, context.targetAccountId, attempt];
-  let batchStarted = false;
   try {
     const plan = await options.buildPlan(context, input);
     if (plan.stage.length || plan.compensateOnDbFailure.length || plan.reconcile.length) fail('UNSUPPORTED_R2');
@@ -173,19 +183,26 @@ export async function executeHqAtomicStore(options: AtomicStoreOptions): Promise
     const statements: HqTemplateStatement[] = [guard(claimCondition, claimBindings), guard(`EXISTS(SELECT 1 FROM hq_template_preflights WHERE id=? AND tenant_id=? AND status='consumed' AND expires_at>strftime('%Y-%m-%dT%H:%M:%fZ','now'))`, [p!.id, authority.tenantId]), guard(`EXISTS(SELECT 1 FROM line_accounts WHERE id=? AND tenant_id=? AND is_active=1 AND archived_at IS NULL)`, [context.targetAccountId, authority.tenantId]), guard(`EXISTS(SELECT 1 FROM hq_template_versions v JOIN hq_templates t ON t.id=v.template_id AND t.tenant_id=v.tenant_id WHERE v.id=? AND v.tenant_id=? AND v.template_id=? AND v.definition_json=? AND t.archived_at IS NULL)`, [input.templateVersionId, authority.tenantId, templateId, input.definitionJson]), guard(`EXISTS(SELECT 1 FROM hq_template_distribution_runs WHERE id=? AND tenant_id=? AND status='running' AND created_by=?)`, [runId, authority.tenantId, authority.actorId]), ...plan.dbCommit];
     for (const r of plan.resolutions) statements.push({ sql: `UPDATE hq_template_preflight_resolutions SET resolution_mode=?,target_id=?,expected_revision=?,alias_name=? WHERE preflight_id=? AND tenant_id=? AND source_id=?`, bindings: [r.mode, r.targetId ?? null, r.expectedRevision ?? null, r.aliasName ?? null, p!.id, authority.tenantId, r.sourceId] });
     statements.push({ sql: `UPDATE hq_template_distribution_results SET status='succeeded',finished_at=strftime('%Y-%m-%dT%H:%M:%fZ','now'),error_code=NULL WHERE run_id=? AND tenant_id=? AND target_account_id=? AND status='staged' AND attempt_count=?`, bindings: claimBindings }, { sql: `INSERT INTO audit_events(id,tenant_id,line_account_id,category,actor_principal_id,actor_role,action,target_kind,target_id,result,after_json) VALUES (?,?,?,'business',?,?,'hq_template.distributed','hq_template',?,'success',?)`, bindings: [crypto.randomUUID(), authority.tenantId, context.targetAccountId, authority.actorId, authority.role, templateId, JSON.stringify({ runId })] });
-    batchStarted = true;
-    await db.batch(statements.map(s => db.prepare(s.sql).bind(...s.bindings)));
-    return { status: 'succeeded', reused: false };
+    for (let commitAttempt = 1; commitAttempt <= MAX_DB_COMMIT_ATTEMPTS; commitAttempt++) {
+      try {
+        await db.batch(statements.map(s => db.prepare(s.sql).bind(...s.bindings)));
+        return { status: 'succeeded', reused: false };
+      } catch (error) {
+        const row = await read().catch(() => null);
+        if (!row) fail('RESULT_UNAVAILABLE');
+        if (row!.status !== 'staged' || row!.attempt_count !== attempt) return { status: row!.status, reused: true };
+        if (commitAttempt === MAX_DB_COMMIT_ATTEMPTS) throw error;
+      }
+    }
+    return fail('STORE_COMMIT_FAILED');
   } catch (error) {
     // A successful batch may lose its response. Never replay the business writes.
     const row = await read().catch(() => null);
     if (!row) fail('RESULT_UNAVAILABLE');
     if (row!.status !== 'staged' || row!.attempt_count !== attempt) return { status: row!.status, reused: true };
     const code = error instanceof Error && 'code' in error ? String(error.code) : '';
-    // A thrown batch is not proof of rollback. Keep unknown database outcomes staged.
-    if (batchStarted || !code) return { status: 'staged', reused: false };
     const status = code.includes('UNSUPPORTED') ? 'unsupported' : code === 'VERSION_CONFLICT' ? 'version_conflict' : 'failed';
-    await db.prepare(`UPDATE hq_template_distribution_results SET status=?,error_code=?,finished_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE run_id=? AND tenant_id=? AND target_account_id=? AND status='staged' AND attempt_count=?`).bind(status, status === 'unsupported' ? 'UNSUPPORTED_REFERENCE' : status === 'version_conflict' ? 'VERSION_CONFLICT' : 'STORE_PLAN_FAILED', ...claimBindings).run();
+    await db.prepare(`UPDATE hq_template_distribution_results SET status=?,error_code=?,finished_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE run_id=? AND tenant_id=? AND target_account_id=? AND status='staged' AND attempt_count=?`).bind(status, status === 'unsupported' ? 'UNSUPPORTED_REFERENCE' : status === 'version_conflict' ? 'VERSION_CONFLICT' : code ? 'STORE_PLAN_FAILED' : 'STORE_COMMIT_FAILED', ...claimBindings).run();
     return { status, reused: false };
   }
 }

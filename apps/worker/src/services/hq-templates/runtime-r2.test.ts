@@ -57,14 +57,14 @@ describe('DB-bound R2 store executor',()=>{
     const f=await fixture(),c=await f.preflight();const db={prepare:f.db.prepare.bind(f.db),batch:async(s:D1PreparedStatement[])=>{await f.db.batch(s);throw new Error('lost response')}}as unknown as D1Database;
     expect((await f.execute(c,db)).status).toBe('succeeded');expect(f.bucket.delete).not.toHaveBeenCalled();expect(f.raw.prepare("SELECT COUNT(*) n FROM hq_template_owned_r2_keys WHERE state='committed'").get()).toEqual({n:2});
   });
-  test('unknown DB failure retains staged images and cannot replay batch',async()=>{
+  test('unknown DB failure retries, becomes terminal, and cleans owned images',async()=>{
     const f=await fixture(),c=await f.preflight();f.raw.exec("CREATE TRIGGER reject_menu BEFORE INSERT ON rich_menu_groups BEGIN SELECT RAISE(ABORT,'fixture'); END");
-    expect(await f.execute(c)).toMatchObject({status:'staged',cleanupPending:true});expect(f.bucket.delete).not.toHaveBeenCalled();expect(f.raw.prepare('SELECT COUNT(*) n FROM rich_menu_groups').get()).toEqual({n:0});expect(f.raw.prepare("SELECT COUNT(*) n FROM hq_template_owned_r2_keys WHERE state='staged'").get()).toEqual({n:2});
-    f.raw.exec('DROP TRIGGER reject_menu');expect((await f.execute(c)).status).toBe('staged');expect(f.bucket.put).toHaveBeenCalledTimes(2);
+    expect(await f.execute(c)).toMatchObject({status:'failed'});expect(f.bucket.delete).toHaveBeenCalledTimes(2);expect(f.raw.prepare('SELECT COUNT(*) n FROM rich_menu_groups').get()).toEqual({n:0});expect(f.raw.prepare("SELECT COUNT(*) n FROM hq_template_owned_r2_keys WHERE state='cleaned'").get()).toEqual({n:2});
+    f.raw.exec('DROP TRIGGER reject_menu');expect((await f.execute(c)).status).toBe('failed');expect(f.bucket.put).toHaveBeenCalledTimes(2);
   });
-  test('unknown PUT keeps ownership record and never deletes pending data',async()=>{
+  test('lost PUT response is reconciled from the deterministic object and completes',async()=>{
     const f=await fixture(),c=await f.preflight(),put=f.bucket.put.getMockImplementation()!;f.bucket.put.mockImplementationOnce(async(...args)=>{await put(...args);throw new Error('lost PUT response')});
-    expect(await f.execute(c)).toMatchObject({status:'staged',cleanupPending:true});expect(f.bucket.delete).not.toHaveBeenCalled();expect(f.raw.prepare("SELECT COUNT(*) n FROM hq_template_owned_r2_keys WHERE state='staged'").get()).toEqual({n:1});
+    expect(await f.execute(c)).toMatchObject({status:'succeeded'});expect(f.bucket.delete).not.toHaveBeenCalled();expect(f.raw.prepare("SELECT COUNT(*) n FROM hq_template_owned_r2_keys WHERE state='committed'").get()).toEqual({n:2});
   });
   test('definite owner conflict cleans only this attempt earlier objects',async()=>{
     const f=await fixture(),c=await f.preflight(),put=f.bucket.put.getMockImplementation()!;let calls=0,foreignKey='';

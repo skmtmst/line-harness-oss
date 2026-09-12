@@ -88,4 +88,4 @@ hqTemplates.post('/api/hq/templates/:id/distribute', async c => {
   const data = await distributeTemplate(dbFor(c.env), await authority(c), c.req.param('id'), input.preflightId, input.resolutions as DistributionSelection[], c.env.IMAGES, c.env.WORKER_URL);
   c.set('auditRecorded', true); return c.json({ success: true, data });
 });
-hqTemplates.get('/api/hq/templates/:id/distributions/:runId', async c => c.json({ success: true, data: await distributionResult(dbFor(c.env), await authority(c), c.req.param('id'), c.req.param('runId')) }));
+hqTemplates.get('/api/hq/templates/:id/distributions/:runId', async c => c.json({ success: true, data: await distributionResult(dbFor(c.env), await authority(c), c.req.param('id'), c.req.param('runId'), c.env.IMAGES) }));
