@@ -184,3 +184,5 @@ table-header-migration-target app/webhooks/webhook-interactions.tsx
 
 # 詳細内テーブルのため、直書きthを残す既知の例外。
 native-table-header-exception app/affiliates/tabs.tsx
+
+shared-button-importer app/hq/templates/template-console.tsx

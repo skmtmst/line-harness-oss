@@ -54,15 +54,15 @@ describe('統括コンソール', () => {
     expect(HQ_MENU_SECTIONS.flatMap((section) => section.items).some((item) => item.label === '採用フロー管理')).toBe(false)
     expect(HQ_MENU_SECTIONS.flatMap((section) => section.items).map((item) => item.href)).toEqual([
       '/hq',
-      '/hq/open?target=tags',
-      '/hq/open?target=templates',
-      '/hq/open?target=rich-menus',
-      '/hq/open?target=form-submissions',
+      '/hq/templates?type=tag',
+      '/hq/templates?type=template',
+      '/hq/templates?type=rich_menu',
+      '/hq/templates?type=form',
       '/hq/settings',
     ])
   })
 
-  it('統括の4項目は同じ店舗一覧を流用し、選択後に識別子なしで遷移する', () => {
+  it('店舗を開く既存導線は残り、選択後に識別子なしで遷移する', () => {
     expect(openPage).toContain('<HqAccountList')
     expect(openPage).toContain('setSelectedAccountId(accountId)')
     expect(openPage).toContain('router.push(target.destination)')
