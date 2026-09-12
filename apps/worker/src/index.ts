@@ -193,8 +193,10 @@ export type Env = {
     OPENAI_API_KEY?: string;
     /** 画像生成モデル名。未設定時は gpt-image-1。 */
     OPENAI_IMAGE_MODEL?: string;
-    /** 統括ごとの月間生成上限（単位）。未設定時は300。 */
-    BANNER_MONTHLY_UNITS?: string;
+    /** 統括ごとの月間生成上限（枚）。未設定時は150。料金プラン導入後はプランの値を使う。 */
+    BANNER_MONTHLY_IMAGES?: string;
+    /** 生成の品質（low|medium|high）。運用者には選ばせず、未設定時は medium。 */
+    BANNER_IMAGE_QUALITY?: string;
     TOTP_ENCRYPTION_KEY?: string;
     // AES-GCM key for credentials stored in line_accounts. Optional so a
     // missing secret does not stop unrelated Worker routes from starting.

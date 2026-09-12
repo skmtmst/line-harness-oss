@@ -93,8 +93,7 @@ async function createProject(name = '春のキャンペーン') {
 }
 
 const GENERATE_BODY = {
-  presetKey: 'line_square',
-  quality: 'medium',
+  presetKey: 'line_rich_message',
   count: 2,
   textLines: ['春の感謝祭', '今すぐチェック'],
   mainColor: '#FF6600',
@@ -192,9 +191,10 @@ describe('生成', () => {
     const project = await createProject();
     let res = await call('POST', `/api/hq/banners/projects/${project.id}/generations`, GENERATE_BODY);
     expect(res.status).toBe(201);
-    const generation = (await res.json<{ data: { id: string; status: string; finalPrompt: string; unitsPerImage: number; requestedCount: number } }>()).data;
+    const generation = (await res.json<{ data: { id: string; status: string; finalPrompt: string; unitsPerImage: number; requestedCount: number; quality: string } }>()).data;
     expect(generation.status).toBe('queued');
-    expect(generation.unitsPerImage).toBe(3);
+    expect(generation.unitsPerImage).toBe(1);
+    expect(generation.quality).toBe('medium');
     expect(generation.requestedCount).toBe(2);
     expect(generation.finalPrompt).toContain('「春の感謝祭」');
 
@@ -232,9 +232,12 @@ describe('生成', () => {
     expect(media.every((m) => m.line_account_id === null && m.kind === 'image' && m.r2_key.startsWith('banner/'))).toBe(true);
     expect(r2.store.size).toBe(2);
 
-    // 利用量は 3単位 × 2枚
+    // 利用量は 2枚（品質は数えない）
     res = await call('GET', '/api/hq/banners/usage');
-    expect((await res.json<{ data: { used: number } }>()).data.used).toBe(6);
+    const usage = (await res.json<{ data: { month: { used: number; limit: number }; today: { used: number; limit: number }; paused: boolean } }>()).data;
+    expect(usage.month).toMatchObject({ used: 2, limit: 150 });
+    expect(usage.today).toMatchObject({ used: 2, limit: 30 });
+    expect(usage.paused).toBe(false);
 
     // プロジェクト詳細に画像と生成条件が並ぶ
     res = await call('GET', `/api/hq/banners/projects/${project.id}`);
@@ -258,7 +261,7 @@ describe('生成', () => {
     expect(body.data.generation.errorMessage).toContain('安全基準');
 
     res = await call('GET', '/api/hq/banners/usage');
-    expect((await res.json<{ data: { used: number } }>()).data.used).toBe(0);
+    expect((await res.json<{ data: { month: { used: number } } }>()).data.month.used).toBe(0);
     expect(r2.store.size).toBe(0);
   });
 
@@ -280,11 +283,56 @@ describe('生成', () => {
 
   it('月の上限を超える生成は受け付けない', async () => {
     const project = await createProject();
-    const res = await call('POST', `/api/hq/banners/projects/${project.id}/generations`, { ...GENERATE_BODY, quality: 'high', count: 2 }, {
-      env: { BANNER_MONTHLY_UNITS: '10' },
+    const res = await call('POST', `/api/hq/banners/projects/${project.id}/generations`, { ...GENERATE_BODY, count: 4 }, {
+      env: { BANNER_MONTHLY_IMAGES: '3' },
     });
     expect(res.status).toBe(409);
-    expect((await res.json<{ error: string }>()).error).toContain('上限');
+    expect((await res.json<{ error: string }>()).error).toContain('今月の生成上限');
+  });
+
+  it('1日の上限（月の1/5）も見る', async () => {
+    const project = await createProject();
+    // 月 10枚 → 1日 2枚。3枚は断る
+    const res = await call('POST', `/api/hq/banners/projects/${project.id}/generations`, { ...GENERATE_BODY, count: 3 }, {
+      env: { BANNER_MONTHLY_IMAGES: '10' },
+    });
+    expect(res.status).toBe(409);
+    expect((await res.json<{ error: string }>()).error).toContain('今日の生成上限');
+  });
+
+  it('短時間に失敗が3回続いたら自動で一時停止する', async () => {
+    const project = await createProject();
+    openai.generate.mockRejectedValue(new OpenAIImageError('server', 'boom', 500));
+    for (let i = 0; i < 3; i += 1) {
+      const res = await call('POST', `/api/hq/banners/projects/${project.id}/generations`, { ...GENERATE_BODY, count: 1 });
+      const g = (await res.json<{ data: { id: string } }>()).data;
+      await call('POST', `/api/hq/banners/generations/${g.id}/run`);
+    }
+    const res = await call('POST', `/api/hq/banners/projects/${project.id}/generations`, { ...GENERATE_BODY, count: 1 });
+    expect(res.status).toBe(409);
+    expect((await res.json<{ error: string }>()).error).toContain('失敗が続いた');
+    const usage = await call('GET', '/api/hq/banners/usage');
+    expect((await usage.json<{ data: { paused: boolean } }>()).data.paused).toBe(true);
+  });
+
+  it('品質を指定しても無視して固定値で作る', async () => {
+    const project = await createProject();
+    const res = await call('POST', `/api/hq/banners/projects/${project.id}/generations`, { ...GENERATE_BODY, quality: 'high' }, {
+      env: { BANNER_IMAGE_QUALITY: 'low' },
+    });
+    expect(res.status).toBe(201);
+    expect((await res.json<{ data: { quality: string } }>()).data.quality).toBe('low');
+  });
+
+  it('用途は LINE と SNS の規格を網羅している', async () => {
+    const res = await call('GET', '/api/hq/banners/presets');
+    const data = (await res.json<{ data: { presets: Array<{ key: string; group: string; targetWidth: number; targetHeight: number }>; maxCount: number; usage: { month: { limit: number }; today: { limit: number } } } }>()).data;
+    const keys = data.presets.map((p) => p.key);
+    expect(keys).toEqual(expect.arrayContaining(['line_rich_message', 'line_rich_menu_large', 'line_rich_menu_small', 'line_card', 'sns_instagram_feed', 'sns_story', 'sns_ogp', 'sns_youtube_thumbnail']));
+    expect(data.presets.find((p) => p.key === 'line_rich_menu_large')).toMatchObject({ group: 'line', targetWidth: 2500, targetHeight: 1686 });
+    expect(data.maxCount).toBe(4);
+    expect(data.usage.month.limit).toBe(150);
+    expect(data.usage.today.limit).toBe(30);
   });
 
   it('アーカイブ済みのプロジェクトでは生成できない', async () => {
@@ -340,7 +388,7 @@ describe('画像ライブラリと店舗への受け渡し', () => {
     res = await call('GET', '/api/hq/banners/images?q=%E6%84%9F%E8%AC%9D%E7%A5%AD');
     expect((await res.json<{ data: Array<{ id: string }> }>()).data.map((i) => i.id)).toEqual([image.id]);
 
-    res = await call('GET', '/api/hq/banners/images?preset=rich_menu_large');
+    res = await call('GET', '/api/hq/banners/images?preset=line_rich_menu_large');
     expect((await res.json<{ data: unknown[] }>()).data).toHaveLength(0);
   });
 

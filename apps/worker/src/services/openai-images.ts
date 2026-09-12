@@ -59,7 +59,8 @@ export class OpenAIImageError extends Error {
   }
 }
 
-export const DEFAULT_OPENAI_IMAGE_MODEL = 'gpt-image-1';
+/** 既定モデル。gpt-image-1 は 2026-10 に廃止予定なので、Banas と同じ gpt-image-2 を使う。 */
+export const DEFAULT_OPENAI_IMAGE_MODEL = 'gpt-image-2';
 const OPENAI_IMAGES_URL = 'https://api.openai.com/v1/images/generations';
 const DEFAULT_TIMEOUT_MS = 120_000;
 
