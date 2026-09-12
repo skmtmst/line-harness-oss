@@ -1425,6 +1425,8 @@ events.post('/api/liff/events/:id/bookings', async (c) => {
     if (Date.now() >= cutoffAt) return finalize(410, { error: 'entry_closed' });
   }
 
+  const identityKey = computeIdentityKey(friend);
+
   /*
    * 満席のときキャンセル待ちへ入れる。**申込前の空き確認と、INSERT 後の
    * 再検査で負けたときの両方から呼ぶ** (#747 / N-416)。
@@ -1442,14 +1444,26 @@ events.post('/api/liff/events/:id/bookings', async (c) => {
   // 巻き上げられる function 宣言にすると、外側の const に効いている絞り込みが
   // 消える (このファイルの runBookingFlow と同じ理由)。const の arrow にする。
   const enterWaitlist = async (): Promise<Response> => {
-    await c.env.DB
+    // 別キーの同時申込で、この本人の予約が先に成立した可能性がある。
+    // 確認と待ち登録を同じ文にして、その間に予約が割り込む隙間も閉じる。
+    const entered = await c.env.DB
       .prepare(
         `INSERT OR IGNORE INTO event_waitlist
            (id, line_account_id, event_id, slot_id, friend_id, identity_key, status,
             party_size, answer_snapshot_json, first_participation,
             first_participation_attended_count, first_participation_checked_at,
             created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, 'waiting', ?, ?, ?, ?, ?, ?, ?)`,
+         SELECT ?, ?, ?, ?, ?, ?, 'waiting', ?, ?, ?, ?, ?, ?, ?
+          WHERE NOT EXISTS (
+            SELECT 1 FROM event_bookings
+             WHERE event_id = ? AND slot_id = ? AND identity_key = ?
+               AND status IN ('requested','confirmed')
+          )
+            AND (? IS NULL OR (
+              SELECT COUNT(*) FROM event_bookings
+               WHERE event_id = ? AND identity_key = ?
+                 AND status IN ('requested','confirmed')
+            ) < ?)`,
       )
       .bind(
         crypto.randomUUID(),
@@ -1457,7 +1471,7 @@ events.post('/api/liff/events/:id/bookings', async (c) => {
         event.id,
         slot.id,
         friend.id,
-        computeIdentityKey(friend),
+        identityKey,
         partySize,
         answerSnapshot.json,
         firstParticipationIsFirst,
@@ -1465,8 +1479,41 @@ events.post('/api/liff/events/:id/bookings', async (c) => {
         firstParticipationCheckedAt,
         firstParticipationCheckedAt,
         firstParticipationCheckedAt,
+        event.id, slot.id, identityKey,
+        event.max_bookings_per_friend, event.id, identityKey, event.max_bookings_per_friend,
       )
       .run();
+    if ((entered.meta.changes ?? 0) === 0) {
+      const existing = await c.env.DB
+        .prepare(
+          `SELECT b.id, b.status, b.slot_id, s.starts_at AS slot_starts_at, COUNT(*) OVER () AS total
+             FROM event_bookings b
+             JOIN event_slots s ON s.id = b.slot_id
+            WHERE b.event_id = ? AND b.identity_key = ?
+              AND b.status IN ('requested','confirmed')
+            ORDER BY (b.slot_id = ?) DESC, b.requested_at ASC, b.id ASC
+            LIMIT 1`,
+        )
+        .bind(event.id, identityKey, slot.id)
+        .first<{ id: string; status: string; slot_id: string; slot_starts_at: string; total: number }>();
+      if (existing && (existing.slot_id === slot.id
+        || (event.max_bookings_per_friend != null && existing.total >= event.max_bookings_per_friend))) {
+        if (existing.slot_id === slot.id || event.max_bookings_per_friend === 1) {
+          return finalize(409, {
+            error: 'duplicate_friend_booking',
+            existing: { id: existing.id, status: existing.status, slot_starts_at: existing.slot_starts_at },
+          });
+        }
+        return finalize(409, { error: 'over_friend_limit' });
+      }
+      // 判定後に予約が取り消された場合も、未登録を「待ち」と返さない。
+      const waiting = await c.env.DB
+        .prepare(`SELECT id FROM event_waitlist WHERE event_id = ? AND slot_id = ?
+                   AND identity_key = ? AND status IN ('waiting','offered') LIMIT 1`)
+        .bind(event.id, slot.id, identityKey)
+        .first<{ id: string }>();
+      if (!waiting) return finalize(409, { error: 'slot_full' });
+    }
     // 200 で返す。409 だと画面側は失敗として扱い、「待ちに入りました」を
     // 出せない。画面は waitlisted を見て確定と区別する。
     return finalize(200, { waitlisted: true, slot_id: slot.id });
@@ -1487,11 +1534,6 @@ events.post('/api/liff/events/:id/bookings', async (c) => {
       return enterWaitlist();
     }
   }
-
-  // identity_key 算出: broadcasts dedup と同じ式 (url_token > uid > solo)。
-  // computeIdentityKey は friends.picture_url の url_token を最優先、なければ
-  // user_id (UUID)、ともになければ自分自身のみ ('solo:'+id) にフォールバック。
-  const identityKey = computeIdentityKey(friend);
 
   // 同一人物 (cross-account) の active 予約数を identity_key ベースでカウント。
   // 重複制限ロジック:

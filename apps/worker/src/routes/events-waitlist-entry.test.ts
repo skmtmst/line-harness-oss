@@ -81,15 +81,15 @@ function makeApp(db: D1Database) {
   };
 }
 
-async function book(app: Hono<Env>, env: unknown, key: string) {
+async function book(app: Hono<Env>, env: unknown, key: string, liffId = 'L1') {
   const res = await app.request(
-    '/api/liff/events/ev-1/bookings?liffId=L1',
+    `/api/liff/events/ev-1/bookings?liffId=${liffId}`,
     {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
         'Idempotency-Key': key,
-        Authorization: 'Bearer t',
+        Authorization: `Bearer ${liffId}`,
       },
       body: JSON.stringify({ slot_id: 'slot-1' }),
     },
@@ -124,6 +124,16 @@ beforeEach(() => {
 });
 
 describe('前から満席だった申込', () => {
+  it('待ち登録済みの本人が別キーで再送しても同じ待ち1件を返す', async () => {
+    const { db, raw } = createTestD1();
+    seed(raw, { capacity: 0, waitlist: 1 });
+    const { app, env } = makeApp(db);
+    expect(await book(app, env, 'waiting-first')).toMatchObject({ status: 200, body: { waitlisted: true } });
+    expect(await book(app, env, 'waiting-repeat')).toMatchObject({ status: 200, body: { waitlisted: true } });
+    expect(waitlistRows(raw)).toEqual([{ friend_id: 'friend-1', status: 'waiting' }]);
+    raw.close();
+  });
+
   it('待ちが有効なら待ち行列へ入り、200 で待ちと分かる形を返す', async () => {
     const { db, raw } = createTestD1();
     seed(raw, { capacity: 1, waitlist: 1 });
@@ -164,6 +174,110 @@ describe('前から満席だった申込', () => {
 });
 
 describe('同時申込で負けた申込', () => {
+  it.each([1, 3, null])('同じ本人が別キーで同時申込しても、予約と待ちに二重所属しない（本人上限 %s）', async (max) => {
+    const { db, raw } = createTestD1();
+    seed(raw, { capacity: 1, waitlist: 1 });
+    raw.prepare('UPDATE events SET max_bookings_per_friend = ?').run(max);
+    const { app, env } = makeApp(db);
+    const results = await Promise.all([book(app, env, 'same-a'), book(app, env, 'same-b')]);
+    expect(results.map(result => result.status).sort()).toEqual([201, 409]);
+    expect(results.find(result => result.status === 409)?.body).toMatchObject({ error: 'duplicate_friend_booking' });
+    expect(bookingRows(raw)).toEqual([{ friend_id: 'friend-1', status: 'confirmed' }]);
+    expect(waitlistRows(raw)).toEqual([]);
+    raw.close();
+  });
+
+  it('満席の回を別キーで送り直しても、成立済みの本人を待ちへ入れない', async () => {
+    const { db, raw } = createTestD1();
+    seed(raw, { capacity: 1, waitlist: 1 });
+    const { app, env } = makeApp(db);
+    expect((await book(app, env, 'first')).status).toBe(201);
+    const repeat = await book(app, env, 'second');
+    expect(repeat.status).toBe(409);
+    expect(repeat.body).toMatchObject({ error: 'duplicate_friend_booking' });
+    expect(bookingRows(raw)).toHaveLength(1);
+    expect(waitlistRows(raw)).toEqual([]);
+    raw.close();
+  });
+
+  it('別の回ですでに本人上限に達している場合も待ちへ入れない', async () => {
+    const { db, raw } = createTestD1();
+    seed(raw, { capacity: 0, waitlist: 1 });
+    raw.prepare('UPDATE events SET max_bookings_per_friend = 2').run();
+    raw.prepare(`INSERT INTO event_slots (id, event_id, starts_at, ends_at, capacity, is_active)
+                 VALUES ('slot-other', 'ev-1', ?, ?, 5, 1)`).run(FUTURE, FUTURE);
+    for (const id of ['existing-a', 'existing-b']) {
+      raw.prepare(`INSERT INTO event_bookings
+        (id, line_account_id, event_id, slot_id, friend_id, identity_key, status, requested_at)
+        VALUES (?, 'account-1', 'ev-1', 'slot-other', 'friend-1', 'solo:friend-1', 'confirmed', ?)`).run(id, FUTURE);
+    }
+    const { app, env } = makeApp(db);
+    const result = await book(app, env, 'over-limit');
+    expect(result).toMatchObject({ status: 409, body: { error: 'over_friend_limit' } });
+    expect(waitlistRows(raw)).toEqual([]);
+    raw.close();
+  });
+
+  it('共有イベントなら別アカウントの同一identityの同時申込も二重所属しない', async () => {
+    const { db, raw } = createTestD1();
+    seed(raw, { capacity: 1, waitlist: 1 });
+    raw.prepare(`INSERT INTO line_accounts (id, channel_id, name, channel_access_token, channel_secret, liff_id)
+      VALUES ('account-2', 'channel-2', '支店', 'token', 'secret', 'L2')`).run();
+    raw.prepare(`UPDATE friends SET user_id = 'shared-user' WHERE id = 'friend-1'`).run();
+    raw.prepare(`INSERT INTO friends (id, line_user_id, line_account_id, is_following, user_id)
+      VALUES ('friend-shared', 'U-shared', 'account-2', 1, 'shared-user')`).run();
+    liffAuthMocks.verifyCallerLineUserId.mockImplementation(async (auth?: string | null) =>
+      auth === 'Bearer L2' ? 'U-shared' : 'U-friend-1');
+    raw.prepare(`UPDATE events SET target_type = 'multi-account-dedup', account_ids = '["account-1","account-2"]'`).run();
+    const { app, env } = makeApp(db);
+    const results = await Promise.all([book(app, env, 'account-a'), book(app, env, 'account-b', 'L2')]);
+    expect(results.map(result => result.status).sort()).toEqual([201, 409]);
+    expect(results.find(result => result.status === 409)?.body).toMatchObject({ error: 'duplicate_friend_booking' });
+    expect(bookingRows(raw)).toHaveLength(1);
+    expect(waitlistRows(raw)).toEqual([]);
+    raw.close();
+  });
+
+  it('公開対象外のアカウントから満席イベントの待ちに入れない', async () => {
+    const { db, raw } = createTestD1();
+    seed(raw, { capacity: 0, waitlist: 1 });
+    raw.prepare(`INSERT INTO line_accounts (id, channel_id, name, channel_access_token, channel_secret, liff_id)
+      VALUES ('account-2', 'channel-2', '支店', 'token', 'secret', 'L2')`).run();
+    raw.prepare(`INSERT INTO friends (id, line_user_id, line_account_id, is_following)
+      VALUES ('friend-other', 'U-other', 'account-2', 1)`).run();
+    liffAuthMocks.verifyCallerLineUserId.mockResolvedValue('U-other');
+    const { app, env } = makeApp(db);
+    expect(await book(app, env, 'foreign-account', 'L2')).toMatchObject({
+      status: 409, body: { error: 'event_unpublished' },
+    });
+    expect(waitlistRows(raw)).toEqual([]);
+    expect(bookingRows(raw)).toEqual([]);
+    raw.close();
+  });
+
+  it('別アカウントの別イベントの予約は本人上限へ混ぜない', async () => {
+    const { db, raw } = createTestD1();
+    seed(raw, { capacity: 0, waitlist: 1 });
+    raw.prepare(`UPDATE events SET max_bookings_per_friend = 1`).run();
+    raw.prepare(`UPDATE friends SET user_id = 'shared-user' WHERE id = 'friend-1'`).run();
+    raw.prepare(`INSERT INTO line_accounts (id, channel_id, name, channel_access_token, channel_secret)
+      VALUES ('account-2', 'channel-2', '支店', 'token', 'secret')`).run();
+    raw.prepare(`INSERT INTO friends (id, line_user_id, line_account_id, is_following, user_id)
+      VALUES ('friend-other', 'U-other', 'account-2', 1, 'shared-user')`).run();
+    raw.prepare(`INSERT INTO events (id, line_account_id, name, target_type, is_published)
+      VALUES ('ev-other', 'account-2', '別の催し', 'single', 1)`).run();
+    raw.prepare(`INSERT INTO event_slots (id, event_id, starts_at, ends_at, capacity, is_active)
+      VALUES ('slot-other', 'ev-other', ?, ?, 1, 1)`).run(FUTURE, FUTURE);
+    raw.prepare(`INSERT INTO event_bookings
+      (id, line_account_id, event_id, slot_id, friend_id, identity_key, status, requested_at)
+      VALUES ('other-booking', 'account-2', 'ev-other', 'slot-other', 'friend-other',
+              'uid:shared-user', 'confirmed', ?)`).run(FUTURE);
+    const { app, env } = makeApp(db);
+    expect(await book(app, env, 'separate-event')).toMatchObject({ status: 200, body: { waitlisted: true } });
+    expect(waitlistRows(raw)).toEqual([{ friend_id: 'friend-1', status: 'waiting' }]);
+    raw.close();
+  });
+
   it('待ちが有効なら、負けた側も待ち行列へ入る', async () => {
     const { db, raw } = createTestD1();
     seed(raw, { capacity: 1, waitlist: 1 });
