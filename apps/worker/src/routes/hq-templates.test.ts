@@ -26,6 +26,12 @@ async function preflight(id: string, accounts = ['a1','a2','a3']) {
 function selections(p: any, duplicateMode = 'overwrite') {
   return p.stores.flatMap((s: any) => s.items.map((i: any) => ({ accountId: s.accountId, sourceId: i.sourceId, mode: i.duplicate ? duplicateMode : 'create' })));
 }
+async function distributionRequestHash(selected: ReturnType<typeof selections>) {
+  const canonical = [...selected]
+    .sort((a,b) => JSON.stringify([a.accountId,a.sourceId]).localeCompare(JSON.stringify([b.accountId,b.sourceId])))
+    .map(s => [s.accountId,s.sourceId,s.mode]);
+  return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify(canonical)))),n=>n.toString(16).padStart(2,'0')).join('');
+}
 async function execute(id: string, p: any, selected = selections(p)) {
   return request(`/${id}/distribute`, 'POST', { preflightId: p.preflightId, resolutions: selected });
 }
@@ -210,12 +216,24 @@ describe('HQ tag HTTP and real SQLite boundaries', () => {
     expect(responses.map(r => r.status)).toEqual([200,200]); expect(responses[0].body.data).toEqual(responses[1].body.data);
     expect(count('tags')).toBe(1); expect(count('hq_template_distribution_results')).toBe(1);
   });
-  test('concurrent different decisions are bound before the first store writes', async () => {
-    const t = await create(); await execute(t.id,await preflight(t.id,['a1']));
-    const p = await preflight(t.id,['a1']);
-    const responses = await Promise.all([execute(t.id,p,selections(p,'overwrite')),execute(t.id,p,selections(p,'alias'))]);
-    expect(responses.map(r => r.status).sort()).toEqual([200,409]);
-    expect(count('tags')).toBe(1); expect(count('hq_template_distribution_results')).toBe(2);
+  test('concurrent different decisions bind exactly the winning claim before the first store writes', async () => {
+    // Alternate launch order and repeat against one SQLite database. Promise scheduling may
+    // legitimately let either decision claim the run, so validate the persisted winner rather
+    // than assuming the overwrite request always wins.
+    for (let iteration=0;iteration<8;iteration++) {
+      const t = await create(); await execute(t.id,await preflight(t.id,['a1']));
+      const p = await preflight(t.id,['a1']),before=count('tags');
+      const byMode={overwrite:selections(p,'overwrite'),alias:selections(p,'alias')};
+      const order = iteration%2===0 ? ['overwrite','alias'] as const : ['alias','overwrite'] as const;
+      const responses = await Promise.all(order.map(mode=>execute(t.id,p,byMode[mode])));
+      expect(responses.map(r => r.status).sort()).toEqual([200,409]);
+      const winner=order[responses.findIndex(response=>response.status===200)];
+      const claim=sql.prepare("SELECT after_json FROM audit_events WHERE source_kind='hq_template_distribution_request' AND source_id=?").get(JSON.stringify(['tenant-a',p.preflightId])) as {after_json:string};
+      expect(JSON.parse(claim.after_json).requestHash).toBe(await distributionRequestHash(byMode[winner]));
+      expect(sql.prepare('SELECT DISTINCT resolution_mode FROM hq_template_preflight_resolutions WHERE idempotency_fingerprint=?').all(p.preflightId)).toEqual([{resolution_mode:winner}]);
+      expect(sql.prepare('SELECT COUNT(*) AS n FROM hq_template_distribution_results WHERE run_id=?').get(p.preflightId)).toEqual({n:1});
+      expect(count('tags')).toBe(before+(winner==='alias'?1:0));
+    }
   });
   test('interrupted run retains its decision claim and resumes only the same request', async () => {
     const t = await create(); await execute(t.id,await preflight(t.id,['a1']));
