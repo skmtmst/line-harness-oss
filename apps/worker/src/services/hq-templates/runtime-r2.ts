@@ -120,16 +120,17 @@ async function scenarioGraphPlan(b:R2RuntimeBinding,graph:ScenarioReferenceGraph
     const source=reference.kind==='tag'?graph.tags.get(reference.sourceId):reference.kind==='template'?graph.templates.get(reference.sourceId):graph.scenarios.get(reference.sourceId)?.row;
     if(!source)unavailable();
     if(reference.kind==='template'&&(source!.message_type!=='text'||source!.draft_message_type&&source!.draft_message_type!=='text'))unavailable();
+    const generatedTargetId=await plannedTargetId(b,account,ref);
     const config=reference.kind==='tag'
       ? {table:'tags',columns:'id,name,status,version,updated_at',revision:(row:DbRow)=>[row.version,row.updated_at],valid:(row:DbRow)=>row.status==='active'}
       : reference.kind==='template'
         ? {table:'templates',columns:'id,name,draft_revision,published_version,updated_at',revision:(row:DbRow)=>[row.draft_revision,row.published_version,row.updated_at],valid:(_row:DbRow)=>true}
-        : {table:'scenarios',columns:'id,name,is_active,updated_at,current_published_version_id',revision:(row:DbRow)=>[row.updated_at,row.current_published_version_id],valid:(row:DbRow)=>row.is_active===1};
+        : {table:'scenarios',columns:'id,name,is_active,updated_at,current_published_version_id',revision:(row:DbRow)=>[row.updated_at,row.current_published_version_id],valid:(row:DbRow)=>row.is_active===1||(row.id===generatedTargetId&&row.is_active===0&&row.current_published_version_id==null)};
     const listSql=`SELECT json_group_array(json_array(${config.columns})) FROM (SELECT ${config.columns} FROM ${config.table} WHERE line_account_id=? ORDER BY id)`,list=(await b.db.prepare(`SELECT (${listSql}) AS snapshot`).bind(account).first<{snapshot:string}>())!.snapshot;
     const columns=config.columns.split(','),rows=(JSON.parse(list) as unknown[][]).map(values=>Object.fromEntries(columns.map((column,index)=>[column,values[index]])) as DbRow);
     const same=rows.filter(row=>normalizeScopedTagName(String(row.name))===normalizeScopedTagName(String(source!.name)));
     if(same.length>1||same.some(row=>!config.valid(row)))unavailable();
-    const match=same[0],targetId=match?String(match.id):await plannedTargetId(b,account,ref),operation=match?'reuse' as const:'create' as const;
+    const match=same[0],targetId=match?String(match.id):generatedTargetId,operation=match?'reuse' as const:'create' as const;
     ids.set(reference.sourceId,targetId);modes.set(richReferenceKey(ref),operation);
     dbCommit.push(targetListGuard(listSql,[account],list));
     matches.push({...ref,name:String(source!.name),targetId,operation,expectedRevision:JSON.stringify([graphHash,match?config.revision(match):null]),dbCommit:[]});

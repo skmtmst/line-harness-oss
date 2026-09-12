@@ -28,14 +28,14 @@ async function fixture(type:'template'|'rich_menu'='rich_menu') {
   sql.raw.prepare('INSERT INTO hq_templates(id,tenant_id,template_type,name) VALUES (?,?,?,?)').run('hq','tenant',type,'HQ');
   sql.raw.prepare("INSERT INTO hq_template_versions(id,tenant_id,template_id,version,definition_json,content_hash) VALUES ('v','tenant','hq',1,?,?)").run(json,await digest(json));
   const binding:R2RuntimeBinding={db:sql.db,bucket:bucket as unknown as R2Bucket,authority,templateId:'hq',templateVersionId:'v',publicBaseUrl:'https://example.invalid'};
-  async function preflight(account='a',mode:'create'|'overwrite'|'alias'='create'){
-    const info=await inspectR2RuntimeStore(binding,account),id=`preflight-${account}`;
-    sql.raw.prepare("INSERT INTO hq_template_preflights(id,tenant_id,template_id,template_version_id,target_account_id,distribution_mode,idempotency_fingerprint,snapshot_token,status,created_by,expires_at) VALUES (?,'tenant','hq','v',?,?,'run',?,'ready','owner','2099-01-01T00:00:00Z')").run(id,account,mode,info.snapshotToken);
+  async function preflight(account='a',mode:'create'|'overwrite'|'alias'='create',runId='run'){
+    const info=await inspectR2RuntimeStore(binding,account),id=runId==='run'?`preflight-${account}`:`preflight-${account}-${runId}`;
+    sql.raw.prepare("INSERT INTO hq_template_preflights(id,tenant_id,template_id,template_version_id,target_account_id,distribution_mode,idempotency_fingerprint,snapshot_token,status,created_by,expires_at) VALUES (?,'tenant','hq','v',?,?,?,?,'ready','owner','2099-01-01T00:00:00Z')").run(id,account,mode,runId,info.snapshotToken);
     const resolutions=info.items.map(item=>({sourceId:item.sourceId,itemKind:item.itemKind,mode:(info.type==='rich_menu'&&item.itemKind!=='rich_menu'?item.allowedModes[0]:item.duplicate?mode:'create') as 'create'|'overwrite'|'alias',targetId:item.targetId??undefined,expectedRevision:item.expectedRevision??undefined}));
-    for(const item of resolutions)sql.raw.prepare("INSERT INTO hq_template_preflight_resolutions(preflight_id,tenant_id,template_id,template_version_id,target_account_id,idempotency_fingerprint,snapshot_token,source_id,item_kind,resolution_mode,target_id,expected_revision) VALUES (?,'tenant','hq','v',?,'run',?,?,?,?,?,?)").run(id,account,info.snapshotToken,item.sourceId,item.itemKind,item.mode,item.targetId??null,item.expectedRevision??null);
-    const context:HqTemplateAdapterContext={tenantId:'tenant',targetAccountId:account,preflightId:id,idempotencyFingerprint:'run',snapshotToken:info.snapshotToken,mode,resolutions};return context;
+    for(const item of resolutions)sql.raw.prepare("INSERT INTO hq_template_preflight_resolutions(preflight_id,tenant_id,template_id,template_version_id,target_account_id,idempotency_fingerprint,snapshot_token,source_id,item_kind,resolution_mode,target_id,expected_revision) VALUES (?,'tenant','hq','v',?,?,?,?,?,?,?,?)").run(id,account,runId,info.snapshotToken,item.sourceId,item.itemKind,item.mode,item.targetId??null,item.expectedRevision??null);
+    const context:HqTemplateAdapterContext={tenantId:'tenant',targetAccountId:account,preflightId:id,idempotencyFingerprint:runId,snapshotToken:info.snapshotToken,mode,resolutions};return context;
   }
-  const execute=(context:HqTemplateAdapterContext,db=sql.db)=>executeR2RuntimeStore({...binding,db,runId:'run',context});
+  const execute=(context:HqTemplateAdapterContext,db=sql.db)=>executeR2RuntimeStore({...binding,db,runId:context.idempotencyFingerprint,context});
   return {...sql,binding,bucket,objects,preflight,execute,rich,message};
 }
 describe('DB-bound R2 store executor',()=>{
@@ -232,6 +232,41 @@ describe('DB-bound R2 store executor',()=>{
     expect((await f.execute(context)).status).toBe('succeeded');
     expect(f.raw.prepare("SELECT on_complete_scenario_id FROM scenarios WHERE line_account_id='a' AND name='親案内'").get()).toEqual({on_complete_scenario_id:'local-child'});
     expect(f.raw.prepare("SELECT COUNT(*) n FROM scenarios WHERE line_account_id='a' AND name='次の案内'").get()).toEqual({n:1});
+  });
+
+  test('a later distribution reuses the exact inactive unpublished scenario drafts created by this template version',async()=>{
+    const f=await fixture();
+    f.raw.exec("INSERT INTO scenarios(id,name,trigger_type,on_complete_mode,line_account_id,is_active) VALUES ('source-child','次の案内','manual','pause','source',1),('source-root','親案内','manual','move','source',1); UPDATE scenarios SET on_complete_scenario_id='source-child' WHERE id='source-root'");
+    (f.rich.richMenu.pages[0].areas[0] as unknown as Record<string,unknown>).scenarioId='source-root';
+    const json=JSON.stringify(f.rich);f.raw.prepare("UPDATE hq_template_versions SET definition_json=?,content_hash=? WHERE id='v'").run(json,await digest(json));
+    const first=await f.preflight();
+    expect((await f.execute(first)).status).toBe('succeeded');
+    const created=first.resolutions.filter(row=>row.itemKind==='scenario').map(row=>row.targetId).sort();
+    expect(f.raw.prepare("SELECT COUNT(*) n FROM scenarios WHERE line_account_id='a' AND is_active=0 AND current_published_version_id IS NULL").get()).toEqual({n:2});
+
+    const second=await f.preflight('a','overwrite','run-2'),reused=second.resolutions.filter(row=>row.itemKind==='scenario');
+    expect(reused.every(row=>row.mode==='overwrite')).toBe(true);
+    expect(reused.map(row=>row.targetId).sort()).toEqual(created);
+    expect((await f.execute(second)).status).toBe('succeeded');
+    expect(f.raw.prepare("SELECT COUNT(*) n FROM scenarios WHERE line_account_id='a'").get()).toEqual({n:2});
+    expect(f.raw.prepare("SELECT COUNT(*) n FROM rich_menu_groups WHERE account_id='a'").get()).toEqual({n:1});
+    expect(f.raw.pragma('foreign_key_check')).toEqual([]);
+  });
+
+  test('inactive scenario drafts not generated by this distribution remain unavailable and ambiguous',async()=>{
+    const invalid=await fixture();
+    invalid.raw.exec("INSERT INTO scenarios(id,name,trigger_type,on_complete_mode,line_account_id,is_active) VALUES ('source-root','親案内','manual','pause','source',1),('unrelated-draft','親案内','manual','pause','a',0)");
+    (invalid.rich.richMenu.pages[0].areas[0] as unknown as Record<string,unknown>).scenarioId='source-root';
+    let json=JSON.stringify(invalid.rich);invalid.raw.prepare("UPDATE hq_template_versions SET definition_json=?,content_hash=? WHERE id='v'").run(json,await digest(json));
+    await expect(invalid.preflight()).rejects.toMatchObject({code:'REFERENCE_UNAVAILABLE'});
+    expect(invalid.bucket.put).not.toHaveBeenCalled();
+
+    const ambiguous=await fixture();
+    ambiguous.raw.exec("INSERT INTO scenarios(id,name,trigger_type,on_complete_mode,line_account_id,is_active) VALUES ('source-root','親案内','manual','pause','source',1),('local-active','親案内','manual','pause','a',1),('local-inactive','親案内','manual','pause','a',0)");
+    (ambiguous.rich.richMenu.pages[0].areas[0] as unknown as Record<string,unknown>).scenarioId='source-root';
+    json=JSON.stringify(ambiguous.rich);ambiguous.raw.prepare("UPDATE hq_template_versions SET definition_json=?,content_hash=? WHERE id='v'").run(json,await digest(json));
+    await expect(ambiguous.preflight()).rejects.toMatchObject({code:'REFERENCE_UNAVAILABLE'});
+    expect(ambiguous.bucket.put).not.toHaveBeenCalled();
   });
 
   test('scenario graph revision conflict and cycle fail before rich-menu R2 writes',async()=>{
