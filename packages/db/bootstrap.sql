@@ -6844,6 +6844,9 @@ CREATE INDEX idx_support_marks_active
 
 CREATE INDEX idx_tag_groups_sort ON tag_groups(sort_order, id);
 
+CREATE UNIQUE INDEX idx_tags_account_exact_name
+  ON tags(line_account_id, name) WHERE line_account_id IS NOT NULL;
+
 CREATE UNIQUE INDEX idx_tags_account_normalized_name
   ON tags(line_account_id, normalized_name)
   WHERE line_account_id IS NOT NULL AND normalized_name IS NOT NULL;

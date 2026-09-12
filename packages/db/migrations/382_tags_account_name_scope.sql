@@ -133,6 +133,11 @@ CREATE UNIQUE INDEX idx_tags_account_normalized_name
 -- Scoped tags keep the account + normalized_name index above.
 CREATE UNIQUE INDEX idx_tags_legacy_name ON tags(name) WHERE line_account_id IS NULL;
 
+-- Older account-owned rows can still have NULL normalized_name. Include both old
+-- and normalized rows so an exact-name duplicate cannot cross between the two.
+CREATE UNIQUE INDEX idx_tags_account_exact_name
+  ON tags(line_account_id, name) WHERE line_account_id IS NOT NULL;
+
 CREATE INDEX idx_tags_account_status_name
   ON tags(line_account_id, status, name, id);
 

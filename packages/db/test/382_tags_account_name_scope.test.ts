@@ -10,7 +10,8 @@ const bootstrap = readFileSync(`${root}bootstrap.sql`, 'utf8');
 // its old UNIQUE(name) constraint to exercise a populated pre-migration database.
 const legacy = bootstrap.replace(/CREATE TABLE (?:"tags"|tags) \([\s\S]*?\);/, table =>
   table.replace(/name\s+TEXT(?: UNIQUE)? NOT NULL/, 'name TEXT UNIQUE NOT NULL'))
-  .replace(/CREATE UNIQUE INDEX idx_tags_legacy_name[^;]+;/, '');
+  .replace(/CREATE UNIQUE INDEX idx_tags_legacy_name[^;]+;/, '')
+  .replace(/CREATE UNIQUE INDEX idx_tags_account_exact_name[^;]+;/, '');
 const referenceColumns = [
   ['affiliate_offers', 'tag_id', 'NO ACTION'],
   ['broadcasts', 'target_tag_id', 'SET NULL'],
@@ -115,7 +116,7 @@ describe('382: タグ名の一意性を店舗単位へ移す', () => {
       expect(db.prepare('SELECT rowid,* FROM scenario_triggers ORDER BY rowid').all()).toEqual(triggerRows);
       expect(contents(db)).toEqual(before);
       expect(db.pragma('table_info(tags)')).toEqual(columns);
-      expect(db.prepare("SELECT name,sql FROM sqlite_master WHERE type='index' AND tbl_name='tags' AND sql IS NOT NULL AND name != 'idx_tags_legacy_name' ORDER BY name").all()).toEqual(indexes);
+      expect(db.prepare("SELECT name,sql FROM sqlite_master WHERE type='index' AND tbl_name='tags' AND sql IS NOT NULL AND name NOT IN ('idx_tags_legacy_name','idx_tags_account_exact_name') ORDER BY name").all()).toEqual(indexes);
       expect(db.pragma('foreign_keys', { simple: true })).toBe(1);
       expect(db.pragma('foreign_key_check')).toEqual([]);
     } finally { db.close(); }
@@ -152,6 +153,20 @@ describe('382: タグ名の一意性を店舗単位へ移す', () => {
       expect(db.prepare("SELECT count(*) n FROM tags WHERE name='同名タグ'").get()).toEqual({ n: 3 });
       expect(() => insert(db, 'tags', { id: 'conflict', name: ' 同名タグ ', normalized_name: '同名タグ', line_account_id: 'account-1' })).toThrow(/UNIQUE/);
       expect(() => insert(db, 'tags', { id: 'legacy-duplicate', name: '整理済み' })).toThrow(/UNIQUE/);
+      expect(db.pragma('foreign_key_check')).toEqual([]);
+    } finally { db.close(); }
+  });
+
+  test('旧店舗タグのNULL正規化名を保持しつつ同店舗の完全同名だけを拒否する', () => {
+    const db = setup();
+    try {
+      insert(db, 'tags', { id: 'old-scoped-null', name: '旧店舗タグ', line_account_id: 'account-1', normalized_name: null });
+      migrate(db);
+      expect(db.prepare("SELECT normalized_name FROM tags WHERE id='old-scoped-null'").get()).toEqual({ normalized_name: null });
+      for (const normalized of [null, '旧店舗タグ']) {
+        expect(() => insert(db, 'tags', { id: `duplicate-${normalized ?? 'null'}`, name: '旧店舗タグ', line_account_id: 'account-1', normalized_name: normalized })).toThrow(/UNIQUE/);
+      }
+      insert(db, 'tags', { id: 'other-account-name', name: '旧店舗タグ', line_account_id: 'account-2', normalized_name: '旧店舗タグ' });
       expect(db.pragma('foreign_key_check')).toEqual([]);
     } finally { db.close(); }
   });
