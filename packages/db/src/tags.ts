@@ -822,10 +822,12 @@ export async function assignTagToGroup(
   id: string,
   groupId: string | null,
 ): Promise<Tag | null> {
-  await db
-    .prepare(`UPDATE tags SET folder_id = ? WHERE id = ?`)
-    .bind(groupId, id)
+  const result = await db
+    .prepare(`UPDATE tags SET folder_id = ?, updated_at = ?, version = version + 1 WHERE id = ?
+      AND (? IS NULL OR EXISTS (SELECT 1 FROM folders f WHERE f.id = ? AND f.kind = 'tag' AND f.account_id IS tags.line_account_id))`)
+    .bind(groupId, jstNow(), id, groupId, groupId)
     .run();
+  if (Number(result.meta?.changes ?? 0) !== 1) return null;
   return (
     (await db.prepare(`SELECT * FROM tags WHERE id = ?`).bind(id).first<Tag>()) ??
     null
@@ -883,17 +885,21 @@ export async function updateTag(
  * 現在占めている位置だけを入れ替え、指定されていないタグはその場に残す。
  * 最後に全体へ一意の順番を振るので、部分的な並び替えでも順番が重複しない。
  */
-export async function reorderTags(db: D1Database, ids: string[]): Promise<void> {
+export async function reorderTags(db: D1Database, ids: string[], scope?: { allowedAccountIds: string[]; canSeeUnassigned: boolean }): Promise<void> {
   if (ids.length < 2) return;
 
+  const allowed = scope?.allowedAccountIds ?? [];
+  const where = scope ? `WHERE (${allowed.length ? `t.line_account_id IN (${allowed.map(() => '?').join(',')})` : '0'} OR ${scope.canSeeUnassigned ? 't.line_account_id IS NULL' : '0'})` : '';
   const current = await db
     .prepare(
       `SELECT t.id
          FROM tags t
          LEFT JOIN friend_tags ft ON ft.tag_id = t.id
+        ${where}
         GROUP BY t.id
         ORDER BY t.display_order ASC, COUNT(ft.friend_id) DESC, t.name ASC`,
     )
+    .bind(...allowed)
     .all<{ id: string }>();
 
   const existing = new Set(current.results.map((tag) => tag.id));
@@ -922,29 +928,33 @@ export async function deleteTag(db: D1Database, id: string): Promise<void> {
 // 「お悩み」「ペット」のような分類でタグをまとめる。分類は入れ子にしない。
 // 二段で足りることが分かっているし、階層を許すと画面もクエリも一気に複雑になる。
 
-export async function getTagGroups(db: D1Database): Promise<TagGroup[]> {
+export async function getTagGroups(db: D1Database, scope?: { allowedAccountIds: string[]; canSeeUnassigned: boolean }): Promise<TagGroup[]> {
+  const ids = scope?.allowedAccountIds ?? [];
+  const own = ids.length ? `account_id IN (${ids.map(() => "?").join(",")})` : "0";
+  const condition = `(${own} OR ${scope?.canSeeUnassigned !== false ? "account_id IS NULL" : "0"})`;
   const result = await db
     .prepare(
       `SELECT id, name, display_order AS sort_order, color, created_at, updated_at
-         FROM folders WHERE kind = 'tag'
+         FROM folders WHERE kind = 'tag' AND ${condition}
         ORDER BY display_order ASC, name ASC`,
     )
+    .bind(...ids)
     .all<TagGroup>();
   return result.results;
 }
 
 export async function createTagGroup(
   db: D1Database,
-  input: { name: string; sortOrder?: number; color?: string | null },
+  input: { name: string; sortOrder?: number; color?: string | null; accountId?: string | null },
 ): Promise<TagGroup> {
   const id = crypto.randomUUID();
   const now = jstNow();
   await db
     .prepare(
-      `INSERT INTO folders (id, kind, name, display_order, color, created_at, updated_at)
-       VALUES (?, 'tag', ?, ?, ?, ?, ?)`,
+      `INSERT INTO folders (id, kind, name, display_order, color, account_id, created_at, updated_at)
+       VALUES (?, 'tag', ?, ?, ?, ?, ?, ?)`,
     )
-    .bind(id, input.name, input.sortOrder ?? 0, input.color ?? null, now, now)
+    .bind(id, input.name, input.sortOrder ?? 0, input.color ?? null, input.accountId ?? null, now, now)
     .run();
   return (await db
     .prepare(

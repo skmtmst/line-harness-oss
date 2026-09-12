@@ -156,11 +156,11 @@ export type CreateTagDefinitionInput = {
   actorId?: string | null;
 };
 
-async function requireTagFolder(db: D1Database, groupId: string | null | undefined): Promise<void> {
+async function requireTagFolder(db: D1Database, groupId: string | null | undefined, lineAccountId: string): Promise<void> {
   if (!groupId) return;
   const folder = await db.prepare(
-    `SELECT id FROM folders WHERE id = ? AND kind = 'tag'`,
-  ).bind(groupId).first<{ id: string }>();
+    `SELECT id FROM folders WHERE id = ? AND kind = 'tag' AND account_id = ?`,
+  ).bind(groupId, lineAccountId).first<{ id: string }>();
   if (!folder) throw new TagDefinitionError('folder_not_found', 'タグのフォルダが見つかりません');
 }
 
@@ -168,7 +168,7 @@ export async function createTagDefinition(
   db: D1Database,
   input: CreateTagDefinitionInput,
 ): Promise<TagDefinitionDetail> {
-  await requireTagFolder(db, input.groupId);
+  await requireTagFolder(db, input.groupId, input.lineAccountId);
   const tagId = crypto.randomUUID();
   const now = jstNow();
   const actions = input.actions ?? [];
@@ -324,7 +324,7 @@ export async function updateTagDefinition(
     throw new TagDefinitionError('version_conflict', '別の人が先にタグを更新しました');
   }
   assertArchivedTagUpdateAllowed(current.tag, input);
-  if (input.groupId !== undefined) await requireTagFolder(db, input.groupId);
+  if (input.groupId !== undefined) await requireTagFolder(db, input.groupId, input.lineAccountId);
   if (input.automationId !== undefined
     && input.automationId !== current.automation?.id
     && !(input.automationId === null && current.automation === null)) {
