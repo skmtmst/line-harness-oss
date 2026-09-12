@@ -118,6 +118,17 @@ export function bindScenarioGraphRevision(targetRevision: string | null, sourceG
   return JSON.stringify({ targetRevision, sourceGraphToken });
 }
 
+export function readScenarioGraphRevision(value: string | undefined): { targetRevision: string | null; sourceGraphToken: string } | null {
+  if (!value) return null;
+  try {
+    const parsed = JSON.parse(value) as Record<string, unknown>;
+    if (!parsed || typeof parsed !== 'object' || !Object.prototype.hasOwnProperty.call(parsed, 'targetRevision')) return null;
+    if (parsed.targetRevision !== null && typeof parsed.targetRevision !== 'string') return null;
+    if (typeof parsed.sourceGraphToken !== 'string' || !parsed.sourceGraphToken.startsWith('hqsg1.')) return null;
+    return { targetRevision: parsed.targetRevision as string | null, sourceGraphToken: parsed.sourceGraphToken };
+  } catch { return null; }
+}
+
 const graphGuard = (condition: string, bindings: ScenarioGraphStatement['bindings']): ScenarioGraphStatement => ({ sql: `SELECT json(CASE WHEN (${condition}) THEN '{}' ELSE 'HQ_SCENARIO_GRAPH_CONFLICT' END)`, bindings });
 const exactGraphRowGuard = (table: string, row: ScenarioGraphRow): ScenarioGraphStatement => {
   const columns = Object.keys(row);

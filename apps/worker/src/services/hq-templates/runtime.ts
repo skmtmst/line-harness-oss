@@ -1,7 +1,7 @@
 import { beginHqTemplateDistributionRun, beginHqTemplateStoreResult, normalizeScopedTagName, type HqTemplateDistributionResult, type HqTemplatePreflight, type HqTemplatePreflightResolution, type HqTemplateStatement } from '@line-crm/db';
 import { requireHqTemplateAuthority, type HqTemplateAdapterContext, type HqTemplateAdapterInput, type HqTemplateAdapterResult, type HqTemplateAuthority, type HqTemplateStoreAtomicCommitPlan } from './contract.js';
 import { createFormHqTemplateAdapter, type FormReference, type FormTemplateDependencies } from './form.js';
-import { bindScenarioGraphRevision, loadScenarioReferenceGraph, remapScenarioJson, scenarioGraphSnapshotToken, scenarioGraphSourceGuardStatements, ScenarioGraphError, type ScenarioGraphReference, type ScenarioGraphRow } from './scenario-graph.js';
+import { bindScenarioGraphRevision, loadScenarioReferenceGraph, readScenarioGraphRevision, remapScenarioJson, scenarioGraphSnapshotToken, scenarioGraphSourceGuardStatements, ScenarioGraphError, type ScenarioGraphReference, type ScenarioGraphRow } from './scenario-graph.js';
 
 export class HqRuntimeError extends Error {
   constructor(public readonly code: string) { super(code); }
@@ -60,9 +60,11 @@ export function createFormReferenceResolver({ db, authority }: { db: D1Database;
         : JSON.stringify([match.updated_at]);
     const expectedRevision = sourceGraphToken ? bindScenarioGraphRevision(targetRevision, sourceGraphToken) : targetRevision ?? undefined;
     if (sourceGraphToken && selection.expectedRevision !== expectedRevision) fail('VERSION_CONFLICT');
+    const boundGraphRevision = reference.kind === 'scenario' ? readScenarioGraphRevision(selection.expectedRevision) : null;
+    const selectedTargetRevision = boundGraphRevision ? boundGraphRevision.targetRevision ?? undefined : selection.expectedRevision;
     if (!match
-      ? selection.mode !== 'create' || selection.targetId || selection.expectedRevision !== expectedRevision
-      : selection.mode === 'create' || selection.targetId !== match.id || selection.expectedRevision !== expectedRevision) fail('SELECTION_REQUIRED');
+      ? selection.mode !== 'create' || selection.targetId || selectedTargetRevision !== (targetRevision ?? undefined)
+      : selection.mode === 'create' || selection.targetId !== match.id || selectedTargetRevision !== targetRevision) fail('SELECTION_REQUIRED');
     return selection;
   };
   const destination = async (reference: ScenarioGraphReference, name: string, context: HqTemplateAdapterContext) => {
@@ -97,12 +99,18 @@ export function createFormReferenceResolver({ db, authority }: { db: D1Database;
   };
   const resolveScenarioGraph = async (reference: FormReference, context: HqTemplateAdapterContext) => {
     const rootKey = formReferenceKey(reference.kind, reference.sourceId), cached = resolved.get(rootKey);
-    if (cached) return { ...cached, dbCommit: [] };
     await targetAccount(context);
     let graph;
     try { graph = await loadScenarioReferenceGraph(db, authority.tenantId, [reference.sourceId]); }
     catch (error) { if (error instanceof ScenarioGraphError) fail(error.code); throw error; }
     const sourceGraphToken = await scenarioGraphSnapshotToken(graph.snapshot);
+    if (cached) {
+      const root = graph.scenarios.get(reference.sourceId)?.row;
+      if (!root) fail('REFERENCE_UNAVAILABLE');
+      const { match } = await destination(reference, String(root!.name), context);
+      validateSelection(reference, context, match, sourceGraphToken);
+      return { ...cached, dbCommit: [] };
+    }
     const statements: HqTemplateStatement[] = [], ids = new Map<string, string>(), names = new Map<string, string>(), modes = new Map<string, string>(), preResolved = new Set<string>();
     for (const ref of graph.references) {
       const resourceKey = formReferenceKey(ref.kind, ref.sourceId), existing = resolved.get(resourceKey);
@@ -115,9 +123,10 @@ export function createFormReferenceResolver({ db, authority }: { db: D1Database;
       const targetId = existing?.targetId ?? (match && selection.mode === 'overwrite' ? match.id : crypto.randomUUID());
       if (match && selection.mode === 'overwrite' && targetId !== match.id) fail('SELECTION_REQUIRED');
       ids.set(ref.sourceId, targetId); names.set(resourceKey, name); modes.set(resourceKey, selection.mode);
-      if (existing) preResolved.add(resourceKey);
-      else resolved.set(resourceKey, { targetId, aliasName: selection.mode === 'alias' ? name : undefined });
-      if (!existing && match && selection.mode === 'overwrite') {
+      const exactSourceReuse = selection.mode === 'overwrite' && match?.id === ref.sourceId && safeSource.line_account_id === context.targetAccountId;
+      if (existing || exactSourceReuse) preResolved.add(resourceKey);
+      if (!existing) resolved.set(resourceKey, { targetId, aliasName: selection.mode === 'alias' ? name : undefined });
+      if (!existing && !exactSourceReuse && match && selection.mode === 'overwrite') {
         const targetGuard = ref.kind === 'tag'
           ? guard(`EXISTS(SELECT 1 FROM tags WHERE id=? AND line_account_id=? AND version=? AND updated_at IS ? AND status='active')`, [match.id, context.targetAccountId, match.version!, match.updated_at])
           : ref.kind === 'template'
