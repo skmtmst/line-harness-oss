@@ -46,9 +46,18 @@ describe('form runtime and atomic store execution', () => {
     expect((await executeFormStore(options(c))).status).toBe('failed');expect(count('forms')).toBe(0);
     expect(fixture.raw.prepare("SELECT id FROM tags WHERE line_account_id='a'").all()).toEqual([]);
   });
-  test('unsupported scenario never becomes an empty scenario or partially created tag',async()=>{
-    fixture.raw.prepare("UPDATE hq_template_versions SET definition_json=? WHERE id='version'").run(JSON.stringify({...definition,form:{...definition.form,on_submit_scenario_id:'scenario'}}));
-    expect((await executeFormStore(options(await preflight('a')))).status).toBe('unsupported');expect(count('forms')).toBe(0);expect(count('scenarios')).toBe(0);expect(count('tags')).toBe(1);
+  test('a simple referenced scenario is copied as an inactive draft with its steps',async()=>{
+    fixture.raw.exec("INSERT INTO scenarios(id,name,trigger_type,line_account_id,is_active) VALUES ('source-scenario','ご案内','manual','source',1); INSERT INTO scenario_steps(id,scenario_id,step_order,message_type,message_content) VALUES ('source-step','source-scenario',1,'text','ありがとうございます')");
+    fixture.raw.prepare("UPDATE hq_template_versions SET definition_json=? WHERE id='version'").run(JSON.stringify({...definition,form:{...definition.form,on_submit_scenario_id:'source-scenario'}}));
+    expect((await executeFormStore(options(await preflight('a')))).status).toBe('succeeded');
+    const form=fixture.raw.prepare('SELECT on_submit_scenario_id FROM forms').get() as {on_submit_scenario_id:string};
+    expect(fixture.raw.prepare('SELECT line_account_id,is_active,current_published_version_id FROM scenarios WHERE id=?').get(form.on_submit_scenario_id)).toEqual({line_account_id:'a',is_active:0,current_published_version_id:null});
+    expect(fixture.raw.prepare('SELECT scenario_id,message_content,is_draft FROM scenario_steps WHERE scenario_id=?').get(form.on_submit_scenario_id)).toEqual({scenario_id:form.on_submit_scenario_id,message_content:'ありがとうございます',is_draft:1});
+  });
+  test('unsupported scenario dependencies never leave an empty scenario or a partial form',async()=>{
+    fixture.raw.exec("INSERT INTO scenarios(id,name,trigger_type,line_account_id) VALUES ('source-scenario','複雑な案内','manual','source'); INSERT INTO scenario_actions(id,scenario_id,hook,action_type,config_json) VALUES ('source-action','source-scenario','scenario_completed','scenario','{}')");
+    fixture.raw.prepare("UPDATE hq_template_versions SET definition_json=? WHERE id='version'").run(JSON.stringify({...definition,form:{...definition.form,on_submit_scenario_id:'source-scenario'}}));
+    expect((await executeFormStore(options(await preflight('a')))).status).toBe('unsupported');expect(count('forms')).toBe(0);expect(count('scenarios')).toBe(1);expect(count('tags')).toBe(1);
   });
   test('concurrent replay observes staged and never starts another business plan',async()=>{
     const c=await preflight('a');let release!:()=>void,entered!:()=>void,builds=0;
