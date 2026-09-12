@@ -125,6 +125,7 @@ jobs:
         run: pnpm --filter web build
         env:
           NEXT_PUBLIC_API_URL: ${{ env.STAGING_API_URL }}
+          NEXT_PUBLIC_HQ_TEMPLATE_DISTRIBUTION_ENABLED: '1'
           NEXT_PUBLIC_RESTAURANT_TEST_ENABLED: 'true'
 
       - name: Deploy Admin Panel to staging
