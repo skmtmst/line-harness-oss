@@ -728,9 +728,9 @@ export interface CreateTagsBulkResult {
   tagId?: string;
 }
 
-// D1 は1文につき100個までしか値を束縛できない。このINSERTは1行4個なので、
-// 25行でちょうど100個。500行でも20文に収まり、無料枠の1実行50クエリを超えない。
-const TAGS_PER_BULK_INSERT = 25;
+// D1 は1文100バインドまで。正規化名を含む1行5個×20行、500行25文で
+// 無料枠の1実行50クエリ内に収める。旧APIの作成先は未所属(global)のまま。
+const TAGS_PER_BULK_INSERT = 20;
 
 export async function createTag(
   db: D1Database,
@@ -743,10 +743,10 @@ export async function createTag(
   await db
     .prepare(
       // group_id は書かない。folders が正で、group_id は移送前の名残。
-      `INSERT INTO tags (id, name, color, folder_id, created_at)
-       VALUES (?, ?, ?, ?, ?)`,
+      `INSERT INTO tags (id, name, color, folder_id, created_at, line_account_id, normalized_name)
+       VALUES (?, ?, ?, ?, ?, NULL, ?)`,
     )
-    .bind(id, input.name, color, input.groupId ?? null, now)
+    .bind(id, input.name, color, input.groupId ?? null, now, normalizeTagNameForCleanup(input.name))
     .run();
 
   return (await db
@@ -761,7 +761,7 @@ export async function createTag(
  * - idを先に作り、RETURNINGで実際に入った行だけを判別する。
  * - 同名が先に作られた行はINSERT OR IGNOREで見送りにする。
  * - 確認後にフォルダが消えた場合は、外部キー違反にせず未分類で登録する。
- * - 1文が失敗しても、ほかの25行単位の文は続ける。
+ * - 1文が失敗しても、ほかの20行単位の文は続ける。
  */
 export async function createTagsBulk(
   db: D1Database,
@@ -781,14 +781,14 @@ export async function createTagsBulk(
       groupId: input.groupId ?? null,
     }));
     const values = prepared
-      .map(() => "(?, ?, '#3B82F6', (SELECT id FROM folders WHERE kind = 'tag' AND id = ?), ?)")
+      .map(() => "(?, ?, '#3B82F6', (SELECT id FROM folders WHERE kind = 'tag' AND id = ?), ?, NULL, ?)")
       .join(', ');
-    const binds = prepared.flatMap((row) => [row.id, row.name, row.groupId, now]);
+    const binds = prepared.flatMap((row) => [row.id, row.name, row.groupId, now, normalizeTagNameForCleanup(row.name)]);
 
     try {
       const inserted = await db
         .prepare(
-          `INSERT OR IGNORE INTO tags (id, name, color, folder_id, created_at)
+          `INSERT OR IGNORE INTO tags (id, name, color, folder_id, created_at, line_account_id, normalized_name)
            VALUES ${values}
            RETURNING id`,
         )
@@ -851,8 +851,8 @@ export async function updateTag(
   const sets: string[] = [];
   const binds: unknown[] = [];
   if (input.name !== undefined) {
-    sets.push('name = ?');
-    binds.push(input.name);
+    sets.push('name = ?', 'normalized_name = ?');
+    binds.push(input.name, normalizeTagNameForCleanup(input.name));
   }
   if (input.color !== undefined) {
     sets.push('color = ?');
@@ -863,6 +863,8 @@ export async function updateTag(
     binds.push(input.isStarred ? 1 : 0);
   }
   if (sets.length > 0) {
+    sets.push('version = version + 1', 'updated_at = ?');
+    binds.push(jstNow());
     await db
       .prepare(`UPDATE tags SET ${sets.join(', ')} WHERE id = ?`)
       .bind(...binds, id)

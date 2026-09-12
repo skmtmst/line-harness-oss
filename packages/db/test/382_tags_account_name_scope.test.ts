@@ -9,7 +9,8 @@ const bootstrap = readFileSync(`${root}bootstrap.sql`, 'utf8');
 // The generated bootstrap already contains 382 after regeneration. Reintroduce only
 // its old UNIQUE(name) constraint to exercise a populated pre-migration database.
 const legacy = bootstrap.replace(/CREATE TABLE (?:"tags"|tags) \([\s\S]*?\);/, table =>
-  table.replace(/name\s+TEXT(?: UNIQUE)? NOT NULL/, 'name TEXT UNIQUE NOT NULL'));
+  table.replace(/name\s+TEXT(?: UNIQUE)? NOT NULL/, 'name TEXT UNIQUE NOT NULL'))
+  .replace(/CREATE UNIQUE INDEX idx_tags_legacy_name[^;]+;/, '');
 const referenceColumns = [
   ['affiliate_offers', 'tag_id', 'NO ACTION'],
   ['broadcasts', 'target_tag_id', 'SET NULL'],
@@ -67,6 +68,8 @@ function setup() {
   insert(db, 'reminders', { id: 'reminder-1', name: '試験', target_tag_id: 'tag-1' });
   insert(db, 'scenario_steps', { id: 'step-1', scenario_id: 'scenario-1', step_order: 1, message_type: 'text', message_content: 'synthetic', on_reach_tag_id: 'tag-1' });
   insert(db, 'scenario_triggers', { id: 'trigger-1', scenario_id: 'scenario-1', kind: 'tag_added', tag_id: 'tag-1' });
+  insert(db, 'scenario_triggers', { id: 'trigger-2', scenario_id: 'scenario-1', kind: 'tag_added', tag_id: 'tag-2', created_at: 'preserved-trigger-time' });
+  insert(db, 'scenario_triggers', { id: 'trigger-tag-null', scenario_id: 'scenario-1', kind: 'tag_added', tag_id: null });
   insert(db, 'scenario_triggers', { id: 'trigger-null', scenario_id: 'scenario-1', kind: 'friend_add', tag_id: null });
   insert(db, 'tracked_links', { id: 'link-1', name: '試験', original_url: 'https://example.invalid/', tag_id: 'tag-1' });
   insert(db, 'tracked_links', { id: null, name: 'NULL id 1', original_url: 'https://example.invalid/1', tag_id: 'tag-1' });
@@ -93,7 +96,7 @@ describe('382: タグ名の一意性を店舗単位へ移す', () => {
       for (const { name } of db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all() as { name: string }[]) {
         for (const fk of db.pragma(`foreign_key_list("${name}")`) as { table: string; from: string; on_delete: string }[]) {
           if (fk.table === 'tags') actual.push([name, fk.from, fk.on_delete]);
-          expect(['friend_tags', 'friend_tag_side_effect_runs']).not.toContain(fk.table);
+          expect(['friend_tags', 'friend_tag_side_effect_runs', 'scenario_triggers']).not.toContain(fk.table);
         }
       }
       expect(actual.sort()).toEqual([...referenceColumns].sort());
@@ -107,12 +110,36 @@ describe('382: タグ名の一意性を店舗単位へ移す', () => {
       const columns = db.pragma('table_info(tags)');
       const indexes = db.prepare("SELECT name,sql FROM sqlite_master WHERE type='index' AND tbl_name='tags' AND sql IS NOT NULL ORDER BY name").all();
       expect(db.pragma('foreign_key_check')).toEqual([]);
+      const triggerRows = db.prepare('SELECT rowid,* FROM scenario_triggers ORDER BY rowid').all();
       migrate(db);
+      expect(db.prepare('SELECT rowid,* FROM scenario_triggers ORDER BY rowid').all()).toEqual(triggerRows);
       expect(contents(db)).toEqual(before);
       expect(db.pragma('table_info(tags)')).toEqual(columns);
-      expect(db.prepare("SELECT name,sql FROM sqlite_master WHERE type='index' AND tbl_name='tags' AND sql IS NOT NULL ORDER BY name").all()).toEqual(indexes);
+      expect(db.prepare("SELECT name,sql FROM sqlite_master WHERE type='index' AND tbl_name='tags' AND sql IS NOT NULL AND name != 'idx_tags_legacy_name' ORDER BY name").all()).toEqual(indexes);
       expect(db.pragma('foreign_keys', { simple: true })).toBe(1);
       expect(db.pragma('foreign_key_check')).toEqual([]);
+    } finally { db.close(); }
+  });
+
+  test('同一scenarioの複数tag_added条件をNULLに集約せず全行・行IDを保持する', () => {
+    const db = setup();
+    try {
+      const before = db.prepare('SELECT rowid,* FROM scenario_triggers ORDER BY rowid').all();
+      expect(() => db.exec('UPDATE scenario_triggers SET tag_id=NULL WHERE tag_id IS NOT NULL')).toThrow(/UNIQUE/);
+      expect(db.prepare('SELECT rowid,* FROM scenario_triggers ORDER BY rowid').all()).toEqual(before);
+      migrate(db);
+      expect(db.prepare('SELECT rowid,* FROM scenario_triggers ORDER BY rowid').all()).toEqual(before);
+      expect(db.pragma('foreign_key_check')).toEqual([]);
+    } finally { db.close(); }
+  });
+
+  test('CASCADE退避対象に未知の子テーブルがあれば削除前に止める', () => {
+    const db = setup();
+    try {
+      db.exec("CREATE TABLE future_trigger_child(id TEXT, trigger_id TEXT REFERENCES scenario_triggers(id) ON DELETE CASCADE); INSERT INTO future_trigger_child VALUES ('child','trigger-1')");
+      const before = contents(db);
+      expect(() => migrate(db)).toThrow();
+      expect(contents(db)).toEqual(before);
     } finally { db.close(); }
   });
 
@@ -124,6 +151,7 @@ describe('382: タグ名の一意性を店舗単位へ移す', () => {
       for (let i = 1; i <= 3; i++) insert(db, 'tags', { id: `new-${i}`, name: '同名タグ', normalized_name: '同名タグ', line_account_id: `account-${i}` });
       expect(db.prepare("SELECT count(*) n FROM tags WHERE name='同名タグ'").get()).toEqual({ n: 3 });
       expect(() => insert(db, 'tags', { id: 'conflict', name: ' 同名タグ ', normalized_name: '同名タグ', line_account_id: 'account-1' })).toThrow(/UNIQUE/);
+      expect(() => insert(db, 'tags', { id: 'legacy-duplicate', name: '整理済み' })).toThrow(/UNIQUE/);
       expect(db.pragma('foreign_key_check')).toEqual([]);
     } finally { db.close(); }
   });

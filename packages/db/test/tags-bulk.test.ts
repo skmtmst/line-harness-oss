@@ -22,9 +22,9 @@ function mockD1(options: { failStatement?: number; skipRow?: number } = {}) {
               if (currentStatement === options.failStatement) {
                 throw new Error('D1 unavailable');
               }
-              const ids = binds.filter((_value, index) => index % 4 === 0) as string[];
+              const ids = binds.filter((_value, index) => index % 5 === 0) as string[];
               const results = ids
-                .filter((_id, index) => currentStatement * 25 + index !== options.skipRow)
+                .filter((_id, index) => currentStatement * 20 + index !== options.skipRow)
                 .map((id) => ({ id }));
               return { success: true, results, meta: {} };
             },
@@ -37,7 +37,7 @@ function mockD1(options: { failStatement?: number; skipRow?: number } = {}) {
 }
 
 describe('createTagsBulk', () => {
-  it('500件を20クエリ・各100バインド以内で登録する', async () => {
+  it('500件を25クエリ・各100バインド以内で登録する', async () => {
     const { db, calls } = mockD1();
     const inputs = Array.from({ length: 500 }, (_, index) => ({
       name: `タグ${index}`,
@@ -46,7 +46,7 @@ describe('createTagsBulk', () => {
 
     const result = await createTagsBulk(db, inputs);
 
-    expect(calls).toHaveLength(20);
+    expect(calls).toHaveLength(25);
     expect(calls.every((call) => call.binds.length === 100)).toBe(true);
     expect(calls.every((call) => call.sql.includes('INSERT OR IGNORE'))).toBe(true);
     expect(calls.every((call) => call.sql.includes('RETURNING id'))).toBe(true);
@@ -65,16 +65,16 @@ describe('createTagsBulk', () => {
     expect(result.map((row) => row.status)).toEqual(['created', 'skipped', 'created']);
   });
 
-  it('1文が失敗しても次の25件は続ける', async () => {
+  it('1文が失敗しても次の20件は続ける', async () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const { db } = mockD1({ failStatement: 0 });
     const result = await createTagsBulk(
       db,
-      Array.from({ length: 26 }, (_, index) => ({ name: `タグ${index}` })),
+      Array.from({ length: 21 }, (_, index) => ({ name: `タグ${index}` })),
     );
 
-    expect(result.slice(0, 25).every((row) => row.status === 'failed')).toBe(true);
-    expect(result[25].status).toBe('created');
+    expect(result.slice(0, 20).every((row) => row.status === 'failed')).toBe(true);
+    expect(result[20].status).toBe('created');
     consoleError.mockRestore();
   });
 });

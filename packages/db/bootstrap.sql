@@ -6853,6 +6853,8 @@ CREATE INDEX idx_tags_account_status_name
 
 CREATE INDEX idx_tags_group ON tags(group_id, name);
 
+CREATE UNIQUE INDEX idx_tags_legacy_name ON tags(name) WHERE line_account_id IS NULL;
+
 CREATE INDEX idx_tags_line_account
   ON tags(line_account_id, display_order, id);
 
