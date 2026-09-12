@@ -27,6 +27,7 @@ import {
   type IncomingWebhookActionRef,
 } from '@line-crm/db';
 import type { Env } from '../index.js';
+import { sha256Hex } from '../middleware/auth.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import {
@@ -1074,6 +1075,39 @@ webhooks.post('/api/webhooks/incoming/:id/receive', async (c) => {
       payload = JSON.parse(rawBody);
     } catch {
       return c.json({ success: false, error: 'Invalid JSON body' }, 400);
+    }
+
+    /*
+     * N-365 (#746): 同じ署名の使い回しを弾く。
+     *
+     * 署名は本文だけで作られているので、盗った署名をそのまま送り直すと
+     * 何度でも通っていた。署名検証を通った受信を1件ずつ予約し、
+     * changes=1 を得た呼び出しだけが下流(受信行動・イベント発火)へ進む。
+     * 2回目は副作用を起こさず 200 を返すので、送り手が通信の切断で
+     * 同じ本文を送り直したときも二重に処理しない。
+     *
+     * 予約は本文を読めたあとに置く。形の壊れた本文で予約を使い切ると、
+     * 送り直しが 400 ではなく「重複」になってしまう。
+     * 鍵に webhook_id を含めるのは、別の受信口の署名と混ざらないようにするため。
+     * 入れるのは署名そのものではなく SHA-256(台帳に使い回せる値を残さない)。
+     */
+    const signatureHash = await sha256Hex(expected);
+    const reserved = await c.env.DB
+      .prepare(
+        `INSERT OR IGNORE INTO incoming_webhook_receipts (webhook_id, signature_hash)
+         VALUES (?, ?)`,
+      )
+      .bind(wh.id, signatureHash)
+      .run();
+    if ((reserved.meta?.changes ?? 0) !== 1) {
+      console.log(JSON.stringify({
+        event: 'incoming_webhook_duplicate_signature',
+        webhookId: wh.id,
+      }));
+      return c.json({
+        success: true,
+        data: { received: true, duplicate: true, source: wh.source_type },
+      });
     }
 
     if (wh.line_account_id) {

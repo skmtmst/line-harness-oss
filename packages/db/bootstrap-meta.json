@@ -340,7 +340,8 @@
     "379_form_content_revision.sql",
     "380_broadcast_stop_and_send_claims.sql",
     "381_hq_templates.sql",
-    "382_tags_account_name_scope.sql"
+    "382_tags_account_name_scope.sql",
+    "384_incoming_webhook_receipts.sql"
   ],
-  "migrationCount": 341
+  "migrationCount": 342
 }

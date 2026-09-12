@@ -2804,6 +2804,13 @@ CREATE TABLE inbox_staff_reads (
   PRIMARY KEY (staff_id, channel, conversation_id)
 );
 
+CREATE TABLE incoming_webhook_receipts (
+  webhook_id     TEXT NOT NULL REFERENCES incoming_webhooks(id) ON DELETE CASCADE,
+  signature_hash TEXT NOT NULL,
+  received_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  PRIMARY KEY (webhook_id, signature_hash)
+);
+
 CREATE TABLE incoming_webhooks (
   id          TEXT PRIMARY KEY,
   name        TEXT NOT NULL,
@@ -6295,6 +6302,9 @@ CREATE INDEX idx_inbox_reply_leases_expiry ON inbox_reply_leases (expires_at);
 
 CREATE INDEX idx_inbox_staff_reads_conversation
   ON inbox_staff_reads (channel, conversation_id, staff_id);
+
+CREATE INDEX idx_incoming_webhook_receipts_received
+  ON incoming_webhook_receipts (received_at);
 
 CREATE INDEX idx_incoming_webhooks_line_account ON incoming_webhooks (line_account_id);
 
