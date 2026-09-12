@@ -11,6 +11,8 @@ import {
   parseFeatures,
   parseItems,
   prefixedName,
+  findTagByNormalizedName,
+  normalizeTagNameForCleanup,
   startCloneRun,
   type RecipeRow,
   type RecipeItem,
@@ -108,10 +110,10 @@ function cloneStatements(
     if (item.kind === 'tag') {
       statements.push(db.prepare(
         `INSERT INTO tags
-           (id, name, description, line_account_id, status, created_from_recipe_id,
+           (id, name, normalized_name, description, line_account_id, status, created_from_recipe_id,
             recipe_clone_run_id, created_at, updated_at)
-         VALUES (?, ?, ?, ?, 'active', ?, ?, ?, ?)`,
-      ).bind(item.id, item.name, item.note, accountId, recipe.id, runId, now, now));
+         VALUES (?, ?, ?, ?, ?, 'active', ?, ?, ?, ?)`,
+      ).bind(item.id, item.name, normalizeTagNameForCleanup(item.name), item.note, accountId, recipe.id, runId, now, now));
     } else if (item.kind === 'template') {
       statements.push(db.prepare(
         `INSERT INTO templates
@@ -207,7 +209,7 @@ async function findNameConflicts(
   const seen = new Set<string>();
   const conflicts: Array<{ kind: CloneKind; name: string }> = [];
   const tables: Record<CloneKind, { table: string; scoped: boolean }> = {
-    tag: { table: 'tags', scoped: false },
+    tag: { table: 'tags', scoped: true },
     template: { table: 'templates', scoped: true },
     scenario: { table: 'scenarios', scoped: true },
     reminder: { table: 'reminders', scoped: true },
@@ -215,14 +217,19 @@ async function findNameConflicts(
     friend_add_rule: { table: 'friend_add_rules', scoped: true },
   };
   for (const item of items) {
-    const duplicateKey = `${item.kind}:${item.name}`;
+    const comparisonName = item.kind === 'tag'
+      ? normalizeTagNameForCleanup(item.name)
+      : item.name;
+    const duplicateKey = `${item.kind}:${comparisonName}`;
     if (seen.has(duplicateKey)) {
       conflicts.push({ kind: item.kind, name: item.name });
       continue;
     }
     seen.add(duplicateKey);
     const target = tables[item.kind];
-    const row = target.scoped
+    const row = item.kind === 'tag'
+      ? await findTagByNormalizedName(db, item.name, accountId)
+      : target.scoped
       ? await db.prepare(`SELECT 1 AS hit FROM ${target.table} WHERE line_account_id = ? AND name = ? LIMIT 1`)
         .bind(accountId, item.name).first<{ hit: number }>()
       : await db.prepare(`SELECT 1 AS hit FROM ${target.table} WHERE name = ? LIMIT 1`)

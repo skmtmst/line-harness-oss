@@ -877,7 +877,7 @@ tags.patch('/api/tags/:id', requireRole('owner', 'admin'), async (c) => {
   } catch (err) {
     const handled = tagDefinitionError(c, err);
     if (handled) return handled;
-    // tags.name は UNIQUE。重複は 500 ではなく 409 で返す。
+    // 未所属のname・店舗別のnormalized_name一意制約違反は409で返す。
     if (err instanceof Error && err.message.includes('UNIQUE constraint')) {
       return c.json({ success: false, error: 'tag name already exists' }, 409);
     }
@@ -1027,7 +1027,7 @@ tags.post('/api/tags', requireRole('owner', 'admin'), async (c) => {
   } catch (err) {
     const handled = tagDefinitionError(c, err);
     if (handled) return handled;
-    // tags.name has a UNIQUE constraint — surface duplicates as 409, not 500
+    // Legacy name / scoped normalized-name uniqueness conflicts return 409.
     if (err instanceof Error && err.message.includes('UNIQUE constraint')) {
       return c.json({ success: false, error: 'tag name already exists' }, 409);
     }
