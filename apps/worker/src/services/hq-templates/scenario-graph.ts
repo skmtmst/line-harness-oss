@@ -108,6 +108,16 @@ export type ScenarioReferenceGraph = {
   snapshot: string;
 };
 
+/** Opaque revision persisted by preflight so execution cannot follow a newer source graph. */
+export async function scenarioGraphSnapshotToken(snapshot: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(snapshot));
+  return `hqsg1.${Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('')}`;
+}
+
+export function bindScenarioGraphRevision(targetRevision: string | null, sourceGraphToken: string): string {
+  return JSON.stringify({ targetRevision, sourceGraphToken });
+}
+
 const graphGuard = (condition: string, bindings: ScenarioGraphStatement['bindings']): ScenarioGraphStatement => ({ sql: `SELECT json(CASE WHEN (${condition}) THEN '{}' ELSE 'HQ_SCENARIO_GRAPH_CONFLICT' END)`, bindings });
 const exactGraphRowGuard = (table: string, row: ScenarioGraphRow): ScenarioGraphStatement => {
   const columns = Object.keys(row);

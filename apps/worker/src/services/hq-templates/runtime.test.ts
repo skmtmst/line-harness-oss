@@ -195,6 +195,15 @@ describe('form runtime and atomic store execution', () => {
   test('source edit between plan and batch rolls back all destination writes',async()=>{
     const c=await preflight('a');expect((await executeHqAtomicStore({...options(c),buildPlan:async(context,input)=>{const p=await buildFormRuntimePlan({db:fixture.db,authority,context,input});fixture.raw.exec("UPDATE tags SET name='changed' WHERE id='source-tag'");return p}})).status).toBe('failed');expect(count('forms')).toBe(0);expect(count('tags')).toBe(1);
   });
+  test('source scenario graph edited after preflight is rejected as a version conflict',async()=>{
+    fixture.raw.exec("INSERT INTO scenarios(id,name,trigger_type,line_account_id,is_active) VALUES ('source-scenario','ご案内','manual','source',1); INSERT INTO scenario_steps(id,scenario_id,step_order,message_type,message_content) VALUES ('source-step','source-scenario',1,'text','最初の内容')");
+    fixture.raw.prepare("UPDATE hq_template_versions SET definition_json=? WHERE id='version'").run(JSON.stringify({...definition,form:{...definition.form,on_submit_scenario_id:'source-scenario'}}));
+    const context=await preflight('a'), revision=context.resolutions.find(row=>row.sourceId==='scenario:source-scenario')?.expectedRevision;
+    expect(revision).toContain('hqsg1.');
+    fixture.raw.exec("UPDATE scenario_steps SET message_content='事前確認後の変更' WHERE id='source-step'");
+    expect((await executeFormStore(options(context))).status).toBe('version_conflict');
+    expect(count('forms')).toBe(0);expect(fixture.raw.prepare("SELECT COUNT(*) n FROM scenarios WHERE line_account_id='a'").get()).toEqual({n:0});
+  });
   test('scenario step insertion between plan and batch is detected atomically',async()=>{
     fixture.raw.exec("INSERT INTO scenarios(id,name,trigger_type,line_account_id,is_active) VALUES ('source-scenario','ご案内','manual','source',1); INSERT INTO scenario_steps(id,scenario_id,step_order,message_type,message_content) VALUES ('source-step','source-scenario',1,'text','最初の内容')");
     fixture.raw.prepare("UPDATE hq_template_versions SET definition_json=? WHERE id='version'").run(JSON.stringify({...definition,form:{...definition.form,on_submit_scenario_id:'source-scenario'}}));

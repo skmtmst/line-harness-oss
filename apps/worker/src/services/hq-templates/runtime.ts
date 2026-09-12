@@ -1,7 +1,7 @@
 import { beginHqTemplateDistributionRun, beginHqTemplateStoreResult, normalizeScopedTagName, type HqTemplateDistributionResult, type HqTemplatePreflight, type HqTemplatePreflightResolution, type HqTemplateStatement } from '@line-crm/db';
 import { requireHqTemplateAuthority, type HqTemplateAdapterContext, type HqTemplateAdapterInput, type HqTemplateAdapterResult, type HqTemplateAuthority, type HqTemplateStoreAtomicCommitPlan } from './contract.js';
 import { createFormHqTemplateAdapter, type FormReference, type FormTemplateDependencies } from './form.js';
-import { loadScenarioReferenceGraph, remapScenarioJson, scenarioGraphSourceGuardStatements, ScenarioGraphError, type ScenarioGraphReference, type ScenarioGraphRow } from './scenario-graph.js';
+import { bindScenarioGraphRevision, loadScenarioReferenceGraph, remapScenarioJson, scenarioGraphSnapshotToken, scenarioGraphSourceGuardStatements, ScenarioGraphError, type ScenarioGraphReference, type ScenarioGraphRow } from './scenario-graph.js';
 
 export class HqRuntimeError extends Error {
   constructor(public readonly code: string) { super(code); }
@@ -51,15 +51,17 @@ export function createFormReferenceResolver({ db, authority }: { db: D1Database;
     const target = await db.prepare(`SELECT id FROM line_accounts WHERE id=? AND tenant_id=? AND is_active=1 AND archived_at IS NULL`).bind(context.targetAccountId, authority.tenantId).first();
     if (!target) fail('FORBIDDEN');
   };
-  const validateSelection = (reference: ScenarioGraphReference, context: HqTemplateAdapterContext, match: { id: string; updated_at: string | null; version?: number; draft_revision?: number; published_version?: number } | null) => {
+  const validateSelection = (reference: ScenarioGraphReference, context: HqTemplateAdapterContext, match: { id: string; updated_at: string | null; version?: number; draft_revision?: number; published_version?: number } | null, sourceGraphToken?: string) => {
     const selection = formReferenceSelection(reference, context);
-    const expectedRevision = !match ? undefined : reference.kind === 'tag'
+    const targetRevision = !match ? null : reference.kind === 'tag'
       ? JSON.stringify([match.version, match.updated_at])
       : reference.kind === 'template'
         ? JSON.stringify([match.draft_revision, match.published_version, match.updated_at])
         : JSON.stringify([match.updated_at]);
+    const expectedRevision = sourceGraphToken ? bindScenarioGraphRevision(targetRevision, sourceGraphToken) : targetRevision ?? undefined;
+    if (sourceGraphToken && selection.expectedRevision !== expectedRevision) fail('VERSION_CONFLICT');
     if (!match
-      ? selection.mode !== 'create' || selection.targetId || selection.expectedRevision
+      ? selection.mode !== 'create' || selection.targetId || selection.expectedRevision !== expectedRevision
       : selection.mode === 'create' || selection.targetId !== match.id || selection.expectedRevision !== expectedRevision) fail('SELECTION_REQUIRED');
     return selection;
   };
@@ -100,6 +102,7 @@ export function createFormReferenceResolver({ db, authority }: { db: D1Database;
     let graph;
     try { graph = await loadScenarioReferenceGraph(db, authority.tenantId, [reference.sourceId]); }
     catch (error) { if (error instanceof ScenarioGraphError) fail(error.code); throw error; }
+    const sourceGraphToken = await scenarioGraphSnapshotToken(graph.snapshot);
     const statements: HqTemplateStatement[] = [], ids = new Map<string, string>(), names = new Map<string, string>(), modes = new Map<string, string>(), preResolved = new Set<string>();
     for (const ref of graph.references) {
       const resourceKey = formReferenceKey(ref.kind, ref.sourceId), existing = resolved.get(resourceKey);
@@ -107,7 +110,7 @@ export function createFormReferenceResolver({ db, authority }: { db: D1Database;
       if (!source) fail('REFERENCE_UNAVAILABLE');
       const safeSource = source as DbRow;
       const { rows, match } = await destination(ref, String(safeSource.name), context);
-      const selection = validateSelection(ref, context, match);
+      const selection = validateSelection(ref, context, match, ref.kind === 'scenario' && ref.sourceId === reference.sourceId ? sourceGraphToken : undefined);
       const name = existing?.aliasName ?? (match && selection.mode === 'alias' ? nextAliasName(String(safeSource.name), rows.map(row => row.name)) : String(safeSource.name));
       const targetId = existing?.targetId ?? (match && selection.mode === 'overwrite' ? match.id : crypto.randomUUID());
       if (match && selection.mode === 'overwrite' && targetId !== match.id) fail('SELECTION_REQUIRED');
