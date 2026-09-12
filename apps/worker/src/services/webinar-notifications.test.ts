@@ -405,6 +405,16 @@ describe('webinar notification jobs', () => {
     insert.run('j2', 'registration-1', SESSION, 'hour_before', SESSION - 3600, 'rk2', 'notification_expired', NOW.toISOString(), NOW.toISOString());
     insert.run('j3', 'registration-1', SESSION, 'missed', SESSION + 86400, 'rk3', 'already_viewed', NOW.toISOString(), NOW.toISOString());
     insert.run('j4', 'registration-1', SESSION, 'session_start', SESSION, 'rk4', null, NOW.toISOString(), NOW.toISOString());
+    // 見送り以外の行にも理由の符号は付く。**内訳に混ぜない。**
+    // 混ぜると「対象回が終了済み 2件」の隣に、送信の再試行が尽きた失敗が
+    // 並び、運用者は見送りの件数を読み違える。
+    raw.prepare(
+      `INSERT INTO webinar_notification_jobs
+         (id, webinar_id, registration_id, friend_id, session_start_at, settings_version, kind,
+          scheduled_at, status, attempt_count, line_retry_key, last_error_code, created_at, updated_at)
+       VALUES ('j5','webinar-1','registration-1','friend-1',?,1,'completed',?, 'permanent_failed', 3, 'rk5',
+               'retry_exhausted', ?, ?)`,
+    ).run(SESSION, SESSION + 7200, NOW.toISOString(), NOW.toISOString());
 
     const overview = await getWebinarNotificationOverview(db, 'webinar-1');
     expect(overview.skipped).toBe(4);
