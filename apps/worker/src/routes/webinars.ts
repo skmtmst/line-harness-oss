@@ -68,7 +68,7 @@ import {
 } from '@line-crm/db';
 import { verifyCallerLineUserId } from '../services/liff-auth.js';
 import { attachTagAndFireSideEffects } from '../services/friend-tag-attach.js';
-import { recordConversionSourceEvent } from '../services/conversion-event-sources.js';
+import { recordConversionSourceEvent } from '@line-crm/db';
 import { resolveSession, parseScheduleRules, upcomingSessions } from '../services/webinar-schedule.js';
 import { sendWebinarRegistrationConfirmation } from '../services/webinar-reminders.js';
 import {
