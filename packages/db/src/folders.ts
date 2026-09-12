@@ -37,7 +37,7 @@ export type FolderKind = (typeof FOLDER_KINDS)[number];
 export interface Folder {
   id: string;
   kind: string;
-  /** ウェビナー用フォルダの所有LINE公式アカウント。ほかの種類は null。 */
+  /** 所有LINE公式アカウント。null は移行前の共有フォルダ。 */
   account_id: string | null;
   name: string;
   parent_id: string | null;
@@ -56,7 +56,18 @@ export async function getFolders(
   db: D1Database,
   kind?: FolderKind,
   accountId?: string,
+  scope?: FolderItemCountScope,
 ): Promise<Folder[]> {
+  if (scope) {
+    // Account-owned rows are never public. Only tag/webinar legacy rows have
+    // the unassigned policy; other existing folder kinds keep their old list.
+    const ids = accountId ? scope.allowedAccountIds.filter((id) => id === accountId) : scope.allowedAccountIds;
+    const own = ids.length ? `account_id IN (${ids.map(() => "?").join(",")})` : "0";
+    const legacy = scope.canSeeUnassigned ? "account_id IS NULL" : "(account_id IS NULL AND kind NOT IN ('tag', 'webinar'))";
+    const result = await db.prepare(`SELECT * FROM folders WHERE (${own} OR ${legacy})${kind ? " AND kind = ?" : ""}
+      ORDER BY kind ASC, display_order ASC, name ASC`).bind(...ids, ...(kind ? [kind] : [])).all<Folder>();
+    return result.results;
+  }
   if (kind === 'webinar' && accountId) {
     const result = await db
       .prepare(
@@ -164,8 +175,18 @@ export async function updateFolder(
  * 子フォルダだけは ON DELETE CASCADE で一緒に消える。空の入れ物が
  * 親を失って一覧の最上位に湧いてくる方が分かりにくいため。
  */
-export async function deleteFolder(db: D1Database, id: string): Promise<void> {
-  await db.prepare(`DELETE FROM folders WHERE id = ?`).bind(id).run();
+export async function deleteFolder(db: D1Database, id: string): Promise<boolean> {
+  // Older data may have a foreign-account descendant. Never cascade across it.
+  const result = await db.prepare(`WITH RECURSIVE children(id, account_id, kind) AS (
+    SELECT id, account_id, kind FROM folders WHERE parent_id = ?
+    UNION SELECT f.id, f.account_id, f.kind FROM folders f JOIN children c ON f.parent_id = c.id
+  ) DELETE FROM folders WHERE id = ? AND NOT EXISTS (
+    SELECT 1 FROM children c WHERE c.account_id IS NOT folders.account_id OR c.kind <> folders.kind
+  ) AND (kind <> 'tag' OR NOT EXISTS (
+    SELECT 1 FROM tags t WHERE (t.folder_id = folders.id OR t.folder_id IN (SELECT id FROM children))
+      AND t.line_account_id IS NOT folders.account_id
+  ))`).bind(id, id).run();
+  return Number(result.meta?.changes ?? 0) > 0;
 }
 
 /** kind ごとの件数。画面のタブに数字を出すため。 */

@@ -8,6 +8,7 @@ const openPage = readFileSync(new URL('./open/page.tsx', import.meta.url), 'utf8
 const shell = readFileSync(new URL('../../components/app-shell.tsx', import.meta.url), 'utf8')
 const sidebar = readFileSync(new URL('../../components/layout/sidebar.tsx', import.meta.url), 'utf8')
 const topBar = readFileSync(new URL('../../components/shell/app-top-bar.tsx', import.meta.url), 'utf8')
+const templatePage = readFileSync(new URL('./templates/page.tsx', import.meta.url), 'utf8')
 
 describe('統括コンソール', () => {
   it('既存のLINEアカウント一覧APIだけで店舗一覧を作る', () => {
@@ -60,9 +61,11 @@ describe('統括コンソール', () => {
       '/hq/open?target=form-submissions',
       '/hq/settings',
     ])
+    expect(templatePage).toContain('HQ_TEMPLATE_DISTRIBUTION_ENABLED')
+    expect(templatePage).toContain("hqOpenHref('tags')")
   })
 
-  it('統括の4項目は同じ店舗一覧を流用し、選択後に識別子なしで遷移する', () => {
+  it('店舗を開く既存導線は残り、選択後に識別子なしで遷移する', () => {
     expect(openPage).toContain('<HqAccountList')
     expect(openPage).toContain('setSelectedAccountId(accountId)')
     expect(openPage).toContain('router.push(target.destination)')
