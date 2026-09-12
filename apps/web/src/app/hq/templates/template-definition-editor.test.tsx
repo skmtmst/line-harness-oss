@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { emptyLayout } from '@line-crm/shared'
 import type { FormDefinition, MessageTemplateDefinition, RichMenuDefinition } from '@/lib/hq-templates-api'
 import TemplateDefinitionEditor, { definitionError, freshDefinition, referenceCount } from './template-definition-editor'
@@ -96,7 +96,7 @@ describe('TemplateDefinitionEditor', () => {
     expect(definitionError('rich_menu', { ...value, richMenu: { ...value.richMenu, pages: [{ ...value.richMenu.pages[0], areas: [{ ...value.richMenu.pages[0].areas[0], scenarioId: 'invalid id' }] }] } }, 'tenant-a')).toBe('追加で開始するシナリオの元IDを正しく入力してください。')
   })
 
-  it('高度な回答フォームは未表示のlayoutを守るため質問編集を止める', () => {
+  it('高度な回答フォームを店舗と同じブロック編集面で開き、layoutを保って保存する', async () => {
     const value: FormDefinition = {
       schemaVersion: 1,
       form: {
@@ -106,9 +106,12 @@ describe('TemplateDefinitionEditor', () => {
         on_submit_tag_id: null, on_submit_scenario_id: null, save_to_metadata: true,
       },
     }
-    render(<TemplateDefinitionEditor type="form" value={value} disabled={false} onChange={vi.fn()} />)
-    expect(screen.getByText(/高度な構成/)).toBeTruthy()
-    expect((screen.getByLabelText('質問1の表示名') as HTMLInputElement).disabled).toBe(true)
-    expect((screen.getByRole('button', { name: '＋質問' }) as HTMLButtonElement).disabled).toBe(true)
+    const onCanonicalSave = vi.fn()
+    render(<TemplateDefinitionEditor type="form" value={value} disabled={false} onChange={vi.fn()} onCanonicalSave={onCanonicalSave} />)
+    expect((screen.getByLabelText(/フォーム名/) as HTMLInputElement).value).toBe('分岐フォーム')
+    expect(screen.getByRole('button', { name: '＋ ブロックを追加（12種）' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'フォームを保存' }))
+    await waitFor(() => expect(onCanonicalSave).toHaveBeenCalledOnce())
+    expect(onCanonicalSave.mock.calls[0][0].form.layout).toEqual(value.form.layout)
   })
 })

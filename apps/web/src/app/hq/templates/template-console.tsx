@@ -46,7 +46,7 @@ export function resolvedItems(preflight: Preflight, choices: Record<string, Dist
   return result
 }
 
-export default function TemplateConsole({ type }: { type: TemplateType }) {
+export default function TemplateConsole({ type, useCanonicalEditors = true }: { type: TemplateType; useCanonicalEditors?: boolean }) {
   const [stage, setStage] = useState<Stage>('list')
   const [templates, setTemplates] = useState<HqTemplate[]>([])
   const [accounts, setAccounts] = useState<HqAccount[]>([])
@@ -124,11 +124,11 @@ export default function TemplateConsole({ type }: { type: TemplateType }) {
     if (!alive.current) return
     loadDetailIntoForm(loaded); setSelected([]); setSearch(''); setPreflight(null); setChoices({}); setStage(next)
   })
-  const save = (distribute: boolean) => void perform(async () => {
-    const preparedDefinition = definitionForName(type, definition, name.trim(), description.trim())
-    const validation = !name.trim() ? 'ひな形の名前を入力してください。' : definitionError(type, preparedDefinition, creationScope.current?.tenantId)
+  const save = (distribute: boolean, sourceDefinition = definition, sourceName = name, sourceDescription = description) => perform(async () => {
+    const preparedDefinition = definitionForName(type, sourceDefinition, sourceName.trim(), sourceDescription.trim())
+    const validation = !sourceName.trim() ? 'ひな形の名前を入力してください。' : definitionError(type, preparedDefinition, creationScope.current?.tenantId)
     if (validation) throw new Error(validation)
-    const input = { type, name: name.trim(), description: description.trim(), definition: preparedDefinition } as TemplateInput
+    const input = { type, name: sourceName.trim(), description: sourceDescription.trim(), definition: preparedDefinition } as TemplateInput
     let saved: TemplateDetail
     let continueToAccounts = distribute
     if (detail) {
@@ -258,6 +258,13 @@ export default function TemplateConsole({ type }: { type: TemplateType }) {
   const accountName = (id: string) => accounts.find(account => account.id === id)?.name ?? id
   const title = stage === 'list' ? PAGE_TITLES[type] : stage === 'edit' ? `${LABELS[type]}のひな形を${detail ? '編集' : '作成'}` : stage === 'accounts' ? '配布先店舗を選択' : stage === 'duplicates' ? `重複する項目が${duplicates.length}件あります` : done ? '配布が完了しました' : '配布結果を確認しています'
   const validation = definitionError(type, definitionForName(type, definition, name.trim(), description.trim()), creationScope.current?.tenantId)
+  const canonicalEditorOwnsSave = useCanonicalEditors && (type === 'tag' || type === 'form')
+  const saveCanonicalDefinition = async (next: TemplateDefinition) => {
+    const nextName = definitionName(type, next)
+    const nextDescription = 'tag' in next ? next.tag.description ?? '' : 'form' in next ? next.form.description ?? '' : description
+    setDefinition(next); setName(nextName); setDescription(nextDescription)
+    await save(false, next, nextName, nextDescription)
+  }
 
   return <div className={styles.console} data-design-node={NODES[stage]} aria-busy={busy}>
     {stage !== 'list' && <nav aria-label="配布の進捗"><ol className={styles.steps}>{STEPS.map((step, i) => <li key={step.stage} aria-current={step.stage === stage ? 'step' : undefined}>{i + 1} {step.label}</li>)}</ol></nav>}
@@ -275,26 +282,38 @@ export default function TemplateConsole({ type }: { type: TemplateType }) {
     </>}
     {stage === 'edit' && <>
       <div className={styles.grid}><div className={styles.stack}><section className={styles.panel}>
-        <label className={styles.field}><span>種類</span><input className={styles.input} value={LABELS[type]} readOnly /></label>
-        <label className={styles.field}><span>名前</span><input className={styles.input} value={name} maxLength={200} disabled={busy || createUncertain} onChange={e => setName(e.target.value)} /></label>
-        <label className={styles.field}><span>説明</span><textarea className={styles.input} value={description} maxLength={2000} rows={2} disabled={busy || createUncertain} onChange={e => setDescription(e.target.value)} /></label>
-        <TemplateDefinitionEditor
+        {!canonicalEditorOwnsSave && (!useCanonicalEditors || type !== 'rich_menu') && <>
+          <label className={styles.field}><span>種類</span><input className={styles.input} value={LABELS[type]} readOnly /></label>
+          <label className={styles.field}><span>名前</span><input className={styles.input} value={name} maxLength={200} disabled={busy || createUncertain} onChange={e => setName(e.target.value)} /></label>
+          <label className={styles.field}><span>説明</span><textarea className={styles.input} value={description} maxLength={2000} rows={2} disabled={busy || createUncertain} onChange={e => setDescription(e.target.value)} /></label>
+        </>}
+        {canonicalEditorOwnsSave && createUncertain ? <>
+          <Notice tone="validation" message="前回の保存結果がまだ確定していません。重複を防ぐため入力を固定しています。同じ依頼を再確認し、保存済みならその結果を読み込みます。" />
+          <div className={styles.footer}><Button variant="primary" disabled={busy} onClick={() => save(false)}>前回の保存を再確認</Button></div>
+        </> : <TemplateDefinitionEditor
           type={type}
           value={definition}
           disabled={busy || createUncertain}
+          editing={Boolean(detail)}
           tenantId={creationScope.current?.tenantId}
           onChange={setDefinition}
           onBusyChange={setUploadBusy}
+          onCanonicalCancel={useCanonicalEditors ? toList : undefined}
+          onCanonicalSave={useCanonicalEditors ? saveCanonicalDefinition : undefined}
           onRichMenuNameChange={setName}
           richMenuReferences={{
             tags: templates.filter(item => item.template_type === 'tag').map(item => ({ id: item.id, name: item.name })),
             templates: templates.filter(item => item.template_type === 'template').map(item => ({ id: item.id, name: item.name })),
             forms: templates.filter(item => item.template_type === 'form').map(item => ({ id: item.id, name: item.name })),
           }}
-        />
-      </section></div><aside className={styles.stack}><section className={styles.panel}><h2>保存状態</h2><p>{detail ? name !== detail.template.name || description !== (detail.template.description ?? '') || JSON.stringify(definition) !== JSON.stringify(detail.definition) ? '未保存の変更あり' : '保存済み' : '下書き'}</p>{detail && <p className={styles.muted}>{formatDate(detail.template.updated_at)}</p>}</section><section className={styles.panel}><h2>店舗での見え方</h2><span className={`${styles.badge} ${styles.success}`}>{name || `${LABELS[type]}名`}</span><p className={styles.muted}>参照先 {referenceCount(type, definition)}件を含めて配布します。</p></section></aside></div>
-      {createUncertain && <Notice tone="validation" message="前回の保存結果がまだ確定していません。重複を防ぐため入力を固定しています。同じ依頼を再確認し、保存済みならその結果を読み込みます。" />}
-      <footer className={styles.footer}><Button disabled={busy || createUncertain} onClick={toList}>キャンセル</Button>{createUncertain ? <Button variant="primary" disabled={busy} onClick={() => save(false)}>前回の保存を再確認</Button> : <><Button disabled={busy || Boolean(validation)} onClick={() => save(false)}>下書き保存</Button><Button variant="primary" disabled={busy || Boolean(validation)} onClick={() => save(true)}>保存して配布先を選ぶ</Button></>}</footer>
+          formReferences={{
+            tags: templates.filter(item => item.template_type === 'tag').map(item => ({ id: item.id, name: item.name })),
+            friendFields: [], scenarios: [], reminders: [], templates: [],
+          }}
+        />}
+      </section></div>{!canonicalEditorOwnsSave && <aside className={styles.stack}><section className={styles.panel}><h2>保存状態</h2><p>{detail ? name !== detail.template.name || description !== (detail.template.description ?? '') || JSON.stringify(definition) !== JSON.stringify(detail.definition) ? '未保存の変更あり' : '保存済み' : '下書き'}</p>{detail && <p className={styles.muted}>{formatDate(detail.template.updated_at)}</p>}</section><section className={styles.panel}><h2>店舗での見え方</h2><span className={`${styles.badge} ${styles.success}`}>{name || `${LABELS[type]}名`}</span><p className={styles.muted}>参照先 {referenceCount(type, definition)}件を含めて配布します。</p></section></aside>}</div>
+      {createUncertain && !canonicalEditorOwnsSave && <Notice tone="validation" message="前回の保存結果がまだ確定していません。重複を防ぐため入力を固定しています。同じ依頼を再確認し、保存済みならその結果を読み込みます。" />}
+      {!canonicalEditorOwnsSave && <footer className={styles.footer}><Button disabled={busy || createUncertain} onClick={toList}>キャンセル</Button>{createUncertain ? <Button variant="primary" disabled={busy} onClick={() => save(false)}>前回の保存を再確認</Button> : <><Button disabled={busy || Boolean(validation)} onClick={() => save(false)}>下書き保存</Button><Button variant="primary" disabled={busy || Boolean(validation)} onClick={() => save(true)}>保存して配布先を選ぶ</Button></>}</footer>}
     </>}
     {stage === 'accounts' && <>
       <div className={styles.grid}><section className={styles.panel}><div className={styles.toolbar}><input aria-label="店舗を検索" className={`${styles.input} ${styles.search}`} placeholder="店舗名で検索" value={search} onChange={e => setSearch(e.target.value)} /><label><input type="checkbox" disabled={busy || !shownAccounts.length} checked={!!shownAccounts.length && shownAccounts.every(a => selected.includes(a.id))} onChange={e => setSelected(current => e.target.checked ? [...new Set([...current, ...shownAccounts.map(a => a.id)])] : current.filter(id => !shownAccounts.some(a => a.id === id)))} /> 表示中をすべて選択</label></div>

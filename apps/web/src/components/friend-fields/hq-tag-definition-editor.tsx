@@ -51,8 +51,9 @@ export function hqTagEditorToDefinition(definition: TagDefinition, values: TagEd
   }
 }
 
-export default function HqTagDefinitionEditor({ definition, saving, error, notice, onCancel, onSave }: {
+export default function HqTagDefinitionEditor({ definition, mode = 'create', saving, error, notice, onCancel, onSave }: {
   definition: TagDefinition
+  mode?: 'create' | 'edit'
   saving: boolean
   error?: string
   notice?: string
@@ -71,7 +72,7 @@ export default function HqTagDefinitionEditor({ definition, saving, error, notic
   }))
   const initialValues = hqTagDefinitionToEditor(definition)
   return <TagEditorV4
-    mode="create"
+    mode={mode}
     embedded
     groups={groups}
     initialLinked={initialValues.linked}
