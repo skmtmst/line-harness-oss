@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { emptyLayout } from '@line-crm/shared'
 import { clearCreationAttempt, creationStorageKey, loadCreationAttempt, persistCreationAttempt } from './hq-template-create-attempt'
 
 const scope = { tenantId: 'tenant-a', actorId: 'owner' }
@@ -24,6 +25,26 @@ describe('HQ creation receipt storage', () => {
     expect(() => persistCreationAttempt(s, scope, 'tag', { ...attempt, token: 'fixture-not-a-secret' } as typeof attempt)).toThrow()
     expect(() => persistCreationAttempt(s, scope, 'tag', { ...attempt, input: { ...attempt.input, authorization: 'fixture' } } as typeof attempt)).toThrow()
     expect(loadCreationAttempt(s, scope, 'tag')).toBeNull()
+  })
+  it('店舗画面と同じタグ連動設定を含む作成依頼を保存する', () => {
+    const s = storage()
+    const item = { requestId: 'request-canonical-tag', distribute: false, input: { type: 'tag' as const, name: '来店', definition: { schemaVersion: 1 as const, tag: {
+      name: '来店', color: '#3B82F6', description: null, folderId: null, isStarred: false, manualAssignmentAllowed: true,
+      reapplyPolicy: 'first_only' as const, linkedEnabled: true, mileage: { self: 10, referrer: 0, multiplier: null, priority: 0 },
+      actions: [{ id: 'message_1', type: 'send_message', params: { delayMinutes: 0, cancelIfTagRemoved: true, content: 'ご来店ありがとうございます' }, onFailure: 'stop' as const }],
+    }, folders: [] } } }
+    persistCreationAttempt(s, scope, 'tag', item)
+    expect(loadCreationAttempt(s, scope, 'tag')).toEqual(item)
+  })
+  it('店舗画面と同じ回答フォームのレイアウトを含む作成依頼を保存する', () => {
+    const s = storage(), layout = emptyLayout()
+    layout.sections[0].blocks.push({ id: 'answer_1', kind: 'input', type: 'text', name: 'answer', label: '回答', required: true })
+    const item = { requestId: 'request-canonical-form', distribute: false, input: { type: 'form' as const, name: 'アンケート', definition: { schemaVersion: 1 as const, form: {
+      name: 'アンケート', description: null, fields: [{ name: 'answer', label: '回答', type: 'text' as const, required: true }], layout,
+      on_submit_tag_id: null, on_submit_scenario_id: null, save_to_metadata: true,
+    } } } }
+    persistCreationAttempt(s, scope, 'form', item)
+    expect(loadCreationAttempt(s, scope, 'form')).toEqual(item)
   })
   it.each([
     ['template', { schemaVersion: 1, template: { id: 'template-main', name: 'お礼', category: 'general', messageType: 'text', messageContent: 'ありがとう', carouselActionsJson: null, carouselTapLimitMode: 'none', carouselTapLimitText: null, questionJson: null, questionStatus: 'draft' }, media: [] }],
