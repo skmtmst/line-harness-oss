@@ -141,8 +141,22 @@ describe('HQひな形の配布フロー', () => {
     window.history.replaceState(null, '', '/hq/templates?type=tag#template=t1&run=p1'); render(<TemplateConsole type="tag" />)
     await screen.findByText('配布が完了しました'); expect(calls.result).toHaveBeenCalledWith('t1', 'p1'); expect(calls.distribute).not.toHaveBeenCalled()
   })
-  it.each(['template','rich_menu','form'] as const)('未対応 %s には操作もAPI呼び出しも無い', async type => {
-    render(<TemplateConsole type={type} />); expect(screen.getByText(/UNSUPPORTED/)).toBeTruthy(); expect(screen.queryByRole('button', { name: '＋ひな形を作成' })).toBeNull(); expect(calls.list).not.toHaveBeenCalled()
+  it.each([
+    ['template', { schemaVersion: 1, template: { id: 'template-main', name: '来店お礼', category: 'general', messageType: 'text', messageContent: 'ありがとうございます', carouselActionsJson: null, carouselTapLimitMode: 'none', carouselTapLimitText: null, questionJson: null, questionStatus: 'draft' }, media: [] }, '配信する本文', 'ありがとうございます'],
+    ['rich_menu', { schemaVersion: 1, richMenu: { id: 'rich-menu-main', name: '店舗メニュー', chatBarText: 'メニュー', size: 'large', defaultPageId: 'page-1', pages: [{ id: 'page-1', name: 'メイン', imageR2Key: 'hq-templates/tenant-a/menu.png', areas: [] }] } }, 'リッチメニュー画像の保存先', 'hq-templates/tenant-a/menu.png'],
+    ['form', { schemaVersion: 1, form: { name: 'ご来店アンケート', description: null, fields: [{ name: 'question_1', label: '質問1', type: 'text', required: false }], layout: null, on_submit_tag_id: null, on_submit_scenario_id: null, save_to_metadata: true } }, null, null],
+  ] as const)('%s を専用入力欄から作成できる', async (type, definition, fieldLabel, fieldValue) => {
+    const name = type === 'template' ? '来店お礼' : type === 'rich_menu' ? '店舗メニュー' : 'ご来店アンケート'
+    calls.list.mockResolvedValue([])
+    calls.create.mockResolvedValue({ template: { ...template, id: `${type}-1`, name, template_type: type }, definition })
+    render(<TemplateConsole type={type} />)
+    fireEvent.click(await screen.findByRole('button', { name: '＋ひな形を作成' }))
+    fireEvent.change(screen.getByLabelText('名前'), { target: { value: name } })
+    if (fieldLabel && fieldValue) fireEvent.change(screen.getByLabelText(fieldLabel), { target: { value: fieldValue } })
+    fireEvent.click(screen.getByRole('button', { name: '下書き保存' }))
+    await screen.findByText('ひな形を保存しました。')
+    expect(calls.list).toHaveBeenCalledWith(type)
+    expect(calls.create).toHaveBeenCalledWith(expect.objectContaining({ type, name, definition }), expect.any(String))
   })
   it('権限不足のAPI応答後に作成・配布を許可しない', async () => {
     calls.accounts.mockRejectedValue(new Error('操作する権限がありません。')); render(<TemplateConsole type="tag" />); await screen.findByRole('alert')

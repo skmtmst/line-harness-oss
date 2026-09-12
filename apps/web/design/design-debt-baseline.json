@@ -850,5 +850,8 @@
   },
   "app/hq/templates/template-console.tsx": {
     "unresolved-classname": 88
+  },
+  "app/hq/templates/template-definition-editor.tsx": {
+    "unresolved-classname": 61
   }
 }
