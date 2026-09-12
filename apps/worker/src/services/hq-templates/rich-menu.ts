@@ -24,7 +24,7 @@ export interface RichMenuHqDefinition {
   richMenu: { id: string; name: string; chatBarText: string; size: 'large' | 'compact'; defaultPageId: string; pages: Page[] };
 }
 export interface RichMenuReferenceResolver {
-  (reference: HqTemplateReference, targetAccountId: string): Promise<string | null>;
+  (reference: HqTemplateReference, targetAccountId: string): Promise<string | null | { targetId: string; operation: 'reuse' | 'create'; expectedRevision?: string }>;
 }
 export interface RichMenuAdapterOptions {
   db: D1Database; bucket: Pick<R2Bucket, 'head' | 'get' | 'put' | 'delete'>;
@@ -33,6 +33,7 @@ export interface RichMenuAdapterOptions {
   input: HqTemplateAdapterInput;
   resolveReference: RichMenuReferenceResolver;
 }
+type RichMenuBoundReference = HqTemplateMatchedReference & { operation: 'reuse' | 'create'; expectedRevision?: string };
 function fail(code: string): never { throw new Error(code); }
 const ident = (value: unknown): string => typeof value === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(value) ? value : fail('INVALID_ID');
 const text = (value: unknown, max = 200): string => typeof value === 'string' && value.trim() && value.length <= max ? value : fail('INVALID_DEFINITION');
@@ -82,7 +83,7 @@ function assertPublicUri(value: unknown): void {
     || queryKeys.some(k => referenceParameter.test(k.replace(/[_-]/g, '').toLowerCase()) || k.toLowerCase() === 'liff.state')
     || [path, query, hash].some(part => referencePath.test(part) || referenceFragment.test(part) || liff.test(part))) fail('OPAQUE_REFERENCE_UNSUPPORTED');
 }
-function parse(input: HqTemplateAdapterInput, tenantId: string): RichMenuHqDefinition {
+export function parseRichMenuTemplateDefinition(input: HqTemplateAdapterInput, tenantId: string): RichMenuHqDefinition {
   if (input.definitionJson.length > 128_000) fail('DEFINITION_TOO_LARGE');
   const d: unknown = JSON.parse(input.definitionJson);
   keys(d, ['schemaVersion', 'richMenu']);
@@ -106,9 +107,6 @@ function parse(input: HqTemplateAdapterInput, tenantId: string): RichMenuHqDefin
       for (const v of Object.values(b)) if (!Number.isInteger(v) || (v as number) < 0) fail('INVALID_BOUNDS');
       if (!(Number(b.width) > 0 && Number(b.height) > 0 && Number(b.x) + Number(b.width) <= 2500 && Number(b.y) + Number(b.height) <= (g.size === 'large' ? 1686 : 843))) fail('INVALID_BOUNDS');
       if (!['uri', 'message', 'postback', 'richmenuswitch'].includes(String(a.actionType))) fail('INVALID_ACTION');
-      // The existing publisher/tap handler has no executable scenario action.
-      // Never report a successful distribution that silently drops that behavior.
-      if (a.scenarioId !== undefined) fail('UNSUPPORTED_SCENARIO_REFERENCE');
       if (a.intent !== undefined) {
         if (!['url', 'text', 'form', 'template', 'switch'].includes(String(a.intent))) fail('INVALID_ACTION');
         const expected = RICH_MENU_ACTION_TYPE_BY_INTENT[a.intent as keyof typeof RICH_MENU_ACTION_TYPE_BY_INTENT];
@@ -123,13 +121,14 @@ function parse(input: HqTemplateAdapterInput, tenantId: string): RichMenuHqDefin
       if (a.actionType === 'richmenuswitch') ident(a.actionData.targetPageId);
       if (a.actionType === 'postback' && a.intent !== 'template') fail('OPAQUE_REFERENCE_UNSUPPORTED');
       if (a.label !== undefined) text(a.label);
-      for (const key of ['formId', 'templateId']) if (a[key] !== undefined) ident(a[key]);
+      for (const key of ['formId', 'templateId', 'scenarioId']) if (a[key] !== undefined) ident(a[key]);
       if (a.intent === 'form' && !a.formId || a.intent === 'template' && !a.templateId) fail('MISSING_REFERENCE');
       if (a.formId !== undefined && a.intent !== 'form' || a.templateId !== undefined && a.intent !== 'template') fail('INVALID_REFERENCE');
       if (a.tagIds !== undefined && (!Array.isArray(a.tagIds) || a.tagIds.length > 30)) fail('INVALID_REFERENCE');
       for (const tag of (a.tagIds ?? []) as unknown[]) ident(tag);
       // Only these intents emit an area postback consumed by handleRichMenuTap.
       if ((a.tagIds as unknown[] | undefined)?.length && !['text', 'template'].includes(String(a.intent))) fail('UNSUPPORTED_TAG_ACTION');
+      if (a.scenarioId !== undefined && !['text', 'template'].includes(String(a.intent))) fail('UNSUPPORTED_SCENARIO_ACTION');
     }
   }
   const definition = d as unknown as RichMenuHqDefinition;
@@ -147,7 +146,7 @@ function parse(input: HqTemplateAdapterInput, tenantId: string): RichMenuHqDefin
   return definition;
 }
 
-function references(d: RichMenuHqDefinition): HqTemplateReference[] {
+export function richMenuReferences(d: RichMenuHqDefinition): HqTemplateReference[] {
   const result = new Map<string, HqTemplateReference>();
   for (const page of d.richMenu.pages) for (const a of page.areas) {
     const refs: [RefKind, string | undefined][] = [['form', a.formId], ['template', a.templateId], ['scenario', a.scenarioId], ...(a.tagIds ?? []).map(id => ['tag', id] as [RefKind, string])];
@@ -169,18 +168,20 @@ export function createRichMenuHqTemplateAdapter(options: RichMenuAdapterOptions)
   const input = { ...options.input };
   if (requireHqTemplateAuthority(authority).kind !== 'AUTHORIZED') fail('FORBIDDEN');
   ident(authority.tenantId); ident(input.templateVersionId);
-  const d = parse(input, authority.tenantId); const g = d.richMenu; const refs = references(d);
+  const d = parseRichMenuTemplateDefinition(input, authority.tenantId); const g = d.richMenu; const refs = richMenuReferences(d);
   // D1 allows 100 bound parameters per statement. The atomic snapshot guard
   // needs the seven root bindings, reference bindings, and one expected snapshot.
   if (8 + refs.reduce((count, ref) => count + (ref.kind === 'form' ? 3 : 2), 0) > 100) fail('UNSUPPORTED_REFERENCE_LIMIT');
   const assertContext = (c: Pick<HqTemplateAdapterContext, 'tenantId' | 'targetAccountId'>) => {
     if (c.tenantId !== authority.tenantId) fail('FORBIDDEN'); ident(c.targetAccountId);
   };
-  async function targetRefs(accountId: string): Promise<HqTemplateMatchedReference[]> {
+  async function targetRefs(accountId: string): Promise<RichMenuBoundReference[]> {
     return Promise.all(refs.map(async r => {
-      const targetId = await resolveReference(r, accountId);
-      if (!targetId) fail('REFERENCE_UNRESOLVED');
-      return { ...r, targetId: ident(targetId) };
+      const resolved = await resolveReference(r, accountId);
+      if (!resolved) fail('REFERENCE_UNRESOLVED');
+      return typeof resolved === 'string'
+        ? { ...r, targetId: ident(resolved), operation: 'reuse' as const }
+        : { ...r, targetId: ident(resolved.targetId), operation: resolved.operation, expectedRevision: resolved.expectedRevision };
     }));
   }
   async function capture(accountId: string) {
@@ -209,7 +210,7 @@ export function createRichMenuHqTemplateAdapter(options: RichMenuAdapterOptions)
     if (!row) fail('VERSION_CONFLICT');
     const values = JSON.parse(row.snapshot) as unknown[][][];
     if (values[0].length !== 1 || values[1].length !== 1 || values[1][0][1] !== input.definitionJson) fail('SOURCE_OR_TARGET_SCOPE_MISMATCH');
-    if (values.slice(5).some(v => v.length !== 1)) fail('REFERENCE_SCOPE_MISMATCH');
+    if (values.slice(5).some((v, index) => v.length !== (matched[index].operation === 'reuse' ? 1 : 0))) fail('REFERENCE_SCOPE_MISMATCH');
     const media = await Promise.all(g.pages.map(async p => {
       const obj = await bucket.head(p.imageR2Key);
       if (!obj || obj.size < 1 || obj.size > 1024 * 1024 || !['image/png', 'image/jpeg'].includes(obj.httpMetadata?.contentType ?? '')) fail('INVALID_IMAGE');
@@ -252,7 +253,12 @@ export function createRichMenuHqTemplateAdapter(options: RichMenuAdapterOptions)
       const resolve = (id: string) => ident(idMap[id]);
       for (const p of g.pages) for (const a of p.areas) validateTextPostback(a, resolve(a.id));
       const decisions = c.resolutions.filter(r => r.sourceId === g.id && r.itemKind === 'rich_menu');
-      if (decisions.length !== 1 || c.resolutions.length !== 1 || decisions[0].mode !== c.mode) fail('RESOLUTION_REQUIRED');
+      if (decisions.length !== 1 || c.resolutions.length !== refs.length + 1 || decisions[0].mode !== c.mode) fail('RESOLUTION_REQUIRED');
+      for (const matched of s.matched) {
+        const selected = c.resolutions.filter(r => r.sourceId === referenceKey(matched) && r.itemKind === matched.kind);
+        const mode = matched.operation === 'reuse' ? 'overwrite' : 'create';
+        if (selected.length !== 1 || selected[0].mode !== mode || selected[0].targetId !== matched.targetId || (matched.expectedRevision !== undefined && selected[0].expectedRevision !== matched.expectedRevision)) fail('RESOLUTION_REQUIRED');
+      }
       const choice = decisions[0];
       const groupId = c.mode === 'overwrite' ? ident(choice.targetId) : resolve(g.id);
       const target = await db.prepare('SELECT * FROM rich_menu_groups WHERE id=? AND account_id=?').bind(groupId, c.targetAccountId).first<Record<string, unknown>>();
@@ -263,7 +269,7 @@ export function createRichMenuHqTemplateAdapter(options: RichMenuAdapterOptions)
       if (c.mode === 'alias' && (!name.startsWith(`${g.name} (`) || !/^[2-9][0-9]*\)$|^1[0-9]+\)$/.test(name.slice(g.name.length + 2)))) fail('ALIAS_REQUIRED');
       const nameMatch = await db.prepare('SELECT id FROM rich_menu_groups WHERE account_id=? AND name=? AND id<>?').bind(c.targetAccountId, name, groupId).first();
       if (nameMatch) fail('DUPLICATE_NAME');
-      const ownerToken = await digest(JSON.stringify([c.tenantId, c.targetAccountId, c.preflightId, c.idempotencyFingerprint]));
+      const ownerToken = await digest(JSON.stringify([c.tenantId, c.targetAccountId, c.preflightId, c.idempotencyFingerprint, c.executionAttempt ?? 0]));
       const stage = await Promise.all(g.pages.map(async (p, i) => {
         const obj = await bucket.get(p.imageR2Key, { onlyIf: { etagMatches: s.media[i].etag } });
         if (!obj || !('body' in obj)) fail('IMAGE_CHANGED');

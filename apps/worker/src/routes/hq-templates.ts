@@ -1,3 +1,5 @@
+import { uploadHqImage } from '../services/hq-templates/authoring-media.js';
+import { TemplateHqTemplateError } from '../services/hq-templates/template.js';
 import { Hono, type Context } from 'hono';
 import { HQ_TEMPLATE_TYPES, getStaffById, type HqTemplateType } from '@line-crm/db';
 import { dbFor } from '../services/db-router.js';
@@ -34,7 +36,7 @@ const reasons: Record<string, string> = {
 };
 async function body(c: { req: { text(): Promise<string> } }): Promise<Record<string, unknown>> {
   const text = await c.req.text();
-  if (text.length > 64_000) throw new HqTemplateError('REQUEST_TOO_LARGE');
+  if (text.length > 2_000_000) throw new HqTemplateError('REQUEST_TOO_LARGE');
   let value: unknown;
   try { value = JSON.parse(text); } catch { throw new HqTemplateError('INVALID_REQUEST'); }
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new HqTemplateError('INVALID_REQUEST');
@@ -51,6 +53,16 @@ hqTemplates.use('/api/hq/templates/*', requireRole('owner', 'admin'), async (c, 
     const typed = error instanceof HqTemplateError;
     const code = typed ? error.code : 'UNAVAILABLE';
     return c.json({ success: false, error: reasons[code] ?? (typed && error.status < 500 ? '入力内容を確認してください' : '処理結果を確認できません。しばらくしてから再確認してください'), code }, typed ? error.status : 500);
+  }
+});
+hqTemplates.post('/api/hq/templates/media', async c => {
+  const auth = await authority(c);
+  try {
+    const data = await uploadHqImage(c.env.IMAGES, auth, c.req.raw, c.env.WORKER_URL || new URL(c.req.url).origin);
+    return c.json({ success: true, data }, 201);
+  } catch (error) {
+    if (error instanceof TemplateHqTemplateError) throw new HqTemplateError(error.code, 422);
+    throw error;
   }
 });
 hqTemplates.get('/api/hq/templates/accounts', async c => c.json({ success: true, data: await listTemplateAccounts(dbFor(c.env), await authority(c)) }));
@@ -80,12 +92,12 @@ hqTemplates.delete('/api/hq/templates/:id', async c => {
 hqTemplates.post('/api/hq/templates/:id/preflight', async c => {
   const input = await body(c);
   if (!Array.isArray(input.accountIds) || input.accountIds.some(v => typeof v !== 'string')) throw new HqTemplateError('INVALID_ACCOUNTS');
-  return c.json({ success: true, data: await preflightDistribution(dbFor(c.env), await authority(c), c.req.param('id'), input.accountIds as string[]) });
+  return c.json({ success: true, data: await preflightDistribution(dbFor(c.env), await authority(c), c.req.param('id'), input.accountIds as string[], c.env.IMAGES) });
 });
 hqTemplates.post('/api/hq/templates/:id/distribute', async c => {
   const input = await body(c);
   if (typeof input.preflightId !== 'string' || !Array.isArray(input.resolutions) || input.resolutions.length > 270 || input.resolutions.some(v => !v || typeof v !== 'object' || typeof v.accountId !== 'string' || typeof v.sourceId !== 'string' || !['create', 'overwrite', 'alias'].includes(v.mode))) throw new HqTemplateError('INVALID_SELECTION');
-  const data = await distributeTemplate(dbFor(c.env), await authority(c), c.req.param('id'), input.preflightId, input.resolutions as DistributionSelection[]);
+  const data = await distributeTemplate(dbFor(c.env), await authority(c), c.req.param('id'), input.preflightId, input.resolutions as DistributionSelection[], c.env.IMAGES, c.env.WORKER_URL || new URL(c.req.url).origin);
   c.set('auditRecorded', true); return c.json({ success: true, data });
 });
-hqTemplates.get('/api/hq/templates/:id/distributions/:runId', async c => c.json({ success: true, data: await distributionResult(dbFor(c.env), await authority(c), c.req.param('id'), c.req.param('runId')) }));
+hqTemplates.get('/api/hq/templates/:id/distributions/:runId', async c => c.json({ success: true, data: await distributionResult(dbFor(c.env), await authority(c), c.req.param('id'), c.req.param('runId'), c.env.IMAGES) }));

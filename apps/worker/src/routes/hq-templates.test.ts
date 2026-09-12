@@ -8,10 +8,10 @@ import { hqTemplates } from './hq-templates.js';
 import { routeClassification } from '../middleware/feature-enforcement.js';
 
 const definition = { schemaVersion: 1, tag: { name: '常連', color: '#123456', description: 'ご案内', folderId: 'child' }, folders: [{ id: 'child', name: 'ご利用', parentId: 'root' }, { id: 'root', name: 'お客様' }] };
-let sql: Database.Database, db: D1Database, app: Hono<Env>, staff: AuthenticatedStaff;
+let sql: Database.Database, db: D1Database, app: Hono<Env>, staff: AuthenticatedStaff, images: R2Bucket;
 function count(table: string) { return (sql.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get() as { n: number }).n; }
 async function request(path: string, method = 'GET', body?: unknown, extraHeaders: Record<string,string> = {}) {
-  const response = await app.request(`/api/hq/templates${path}`, { method, headers: { 'Content-Type': 'application/json', ...extraHeaders }, body: body === undefined ? undefined : JSON.stringify(body) }, { DB: db });
+  const response = await app.request(`/api/hq/templates${path}`, { method, headers: { 'Content-Type': 'application/json', ...extraHeaders }, body: body === undefined ? undefined : JSON.stringify(body) }, { DB: db, IMAGES: images, WORKER_URL: 'https://worker.test' } as Env['Bindings']);
   return { status: response.status, body: await response.json() as any };
 }
 async function create() {
@@ -26,15 +26,22 @@ async function preflight(id: string, accounts = ['a1','a2','a3']) {
 function selections(p: any, duplicateMode = 'overwrite') {
   return p.stores.flatMap((s: any) => s.items.map((i: any) => ({ accountId: s.accountId, sourceId: i.sourceId, mode: i.duplicate ? duplicateMode : 'create' })));
 }
+async function distributionRequestHash(selected: ReturnType<typeof selections>) {
+  const canonical = [...selected]
+    .sort((a,b) => JSON.stringify([a.accountId,a.sourceId]).localeCompare(JSON.stringify([b.accountId,b.sourceId])))
+    .map(s => [s.accountId,s.sourceId,s.mode]);
+  return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify(canonical)))),n=>n.toString(16).padStart(2,'0')).join('');
+}
 async function execute(id: string, p: any, selected = selections(p)) {
   return request(`/${id}/distribute`, 'POST', { preflightId: p.preflightId, resolutions: selected });
 }
 beforeEach(() => {
   const fixture = createTestD1({ foreignKeys: true }); sql = fixture.raw; db = fixture.db;
   sql.exec("INSERT INTO tenants(id,name) VALUES ('tenant-a','統括A'),('tenant-b','統括B')");
-  for (const id of ['a1','a2','a3','b1']) sql.prepare(`INSERT INTO line_accounts(id,name,channel_id,channel_access_token,channel_secret,tenant_id) VALUES (?,?,?,'fixture','fixture',?)`).run(id, id, `fixture-${id}`, id === 'b1' ? 'tenant-b' : 'tenant-a');
+  for (const id of ['a1','a2','a3','b1']) sql.prepare(`INSERT INTO line_accounts(id,name,channel_id,channel_access_token,channel_secret,tenant_id,liff_id) VALUES (?,?,?,'fixture','fixture',?,?)`).run(id, id, `fixture-${id}`, id === 'b1' ? 'tenant-b' : 'tenant-a', `liff-${id}`);
   sql.exec("INSERT INTO staff_members(id,name,role,api_key,tenant_id) VALUES ('owner','管理者','owner','fixture-owner','tenant-a')");
   staff = { id: 'owner', name: '管理者', role: 'owner', readOnly: false, tenantId: 'tenant-a' };
+  images = { head: async () => null, get: async () => null, put: async () => null, delete: async () => undefined } as unknown as R2Bucket;
   app = new Hono<Env>();
   app.use('*', async (c,next) => { c.set('staff', staff); await next(); }); app.route('/', hqTemplates);
 });
@@ -209,12 +216,24 @@ describe('HQ tag HTTP and real SQLite boundaries', () => {
     expect(responses.map(r => r.status)).toEqual([200,200]); expect(responses[0].body.data).toEqual(responses[1].body.data);
     expect(count('tags')).toBe(1); expect(count('hq_template_distribution_results')).toBe(1);
   });
-  test('concurrent different decisions are bound before the first store writes', async () => {
-    const t = await create(); await execute(t.id,await preflight(t.id,['a1']));
-    const p = await preflight(t.id,['a1']);
-    const responses = await Promise.all([execute(t.id,p,selections(p,'overwrite')),execute(t.id,p,selections(p,'alias'))]);
-    expect(responses.map(r => r.status).sort()).toEqual([200,409]);
-    expect(count('tags')).toBe(1); expect(count('hq_template_distribution_results')).toBe(2);
+  test('concurrent different decisions bind exactly the winning claim before the first store writes', async () => {
+    // Alternate launch order and repeat against one SQLite database. Promise scheduling may
+    // legitimately let either decision claim the run, so validate the persisted winner rather
+    // than assuming the overwrite request always wins.
+    for (let iteration=0;iteration<8;iteration++) {
+      const t = await create(); await execute(t.id,await preflight(t.id,['a1']));
+      const p = await preflight(t.id,['a1']),before=count('tags');
+      const byMode={overwrite:selections(p,'overwrite'),alias:selections(p,'alias')};
+      const order = iteration%2===0 ? ['overwrite','alias'] as const : ['alias','overwrite'] as const;
+      const responses = await Promise.all(order.map(mode=>execute(t.id,p,byMode[mode])));
+      expect(responses.map(r => r.status).sort()).toEqual([200,409]);
+      const winner=order[responses.findIndex(response=>response.status===200)];
+      const claim=sql.prepare("SELECT after_json FROM audit_events WHERE source_kind='hq_template_distribution_request' AND source_id=?").get(JSON.stringify(['tenant-a',p.preflightId])) as {after_json:string};
+      expect(JSON.parse(claim.after_json).requestHash).toBe(await distributionRequestHash(byMode[winner]));
+      expect(sql.prepare('SELECT DISTINCT resolution_mode FROM hq_template_preflight_resolutions WHERE idempotency_fingerprint=?').all(p.preflightId)).toEqual([{resolution_mode:winner}]);
+      expect(sql.prepare('SELECT COUNT(*) AS n FROM hq_template_distribution_results WHERE run_id=?').get(p.preflightId)).toEqual({n:1});
+      expect(count('tags')).toBe(before+(winner==='alias'?1:0));
+    }
   });
   test('interrupted run retains its decision claim and resumes only the same request', async () => {
     const t = await create(); await execute(t.id,await preflight(t.id,['a1']));
@@ -234,8 +253,91 @@ describe('HQ tag HTTP and real SQLite boundaries', () => {
     expect(response.status).toBe(500); expect(count('hq_template_preflights')).toBe(0);
     expect(response.body.data).toBeUndefined();
   });
-  test('unimplemented types, cyclic or unrelated folders are rejected', async () => {
-    expect((await request('','POST',{type:'form',name:'未実装',definition,requestId:crypto.randomUUID()})).status).toBe(422);
+  test('all four portable template types can be saved, replayed, filtered and edited', async () => {
+    const definitions = {
+      tag: definition,
+      template: { schemaVersion: 1, template: { id: 'notice', name: 'お知らせ', messageType: 'text', messageContent: 'ご案内' }, media: [] },
+      rich_menu: { schemaVersion: 1, richMenu: { id: 'menu', name: 'ご案内', chatBarText: 'メニュー', size: 'large', defaultPageId: 'page', pages: [{ id: 'page', name: 'メイン', imageR2Key: 'hq-templates/tenant-a/menu.png', areas: [{ id: 'area', bounds: { x: 0, y: 0, width: 100, height: 100 }, actionType: 'message', actionData: { text: 'ご案内' }, intent: 'text' }] }] } },
+      form: { schemaVersion: 1, form: { name: 'アンケート', description: null, fields: [{ name: 'answer', label: '回答', type: 'text', required: true }], layout: null, on_submit_tag_id: null, on_submit_scenario_id: null, save_to_metadata: true } },
+    } as const;
+    for (const type of ['tag', 'template', 'rich_menu', 'form'] as const) {
+      const input = { type, name: `${type}ひな形`, definition: definitions[type], requestId: crypto.randomUUID() };
+      const created = await request('', 'POST', input);
+      expect(created.status, JSON.stringify(created.body)).toBe(201);
+      expect(created.body.data.template.template_type).toBe(type);
+      expect(await request('', 'POST', input)).toEqual(created);
+      const filtered = await request(`?type=${type}`);
+      expect(filtered.body.data.map((item: any) => item.id)).toEqual([created.body.data.template.id]);
+      if (type === 'form') {
+        const checked = await request(`/${created.body.data.template.id}/preflight`, 'POST', { accountIds: ['a1', 'a2', 'a3'] });
+        expect(checked.status, JSON.stringify(checked.body)).toBe(200);
+        expect(checked.body.data.stores).toHaveLength(3);
+        expect(checked.body.data.stores.every((store: any) => store.items[0].itemKind === 'form' && store.items[0].allowedModes[0] === 'create')).toBe(true);
+      }
+      const edited = await request(`/${created.body.data.template.id}`, 'PATCH', { name: `${type}改訂`, definition: definitions[type], expectedRevision: created.body.data.template.revision });
+      expect(edited.status, JSON.stringify(edited.body)).toBe(200);
+      expect(edited.body.data.template.template_type).toBe(type);
+    }
+    expect(count('hq_templates')).toBe(4);
+    expect(count('hq_template_versions')).toBe(8);
+  });
+  test('message templates preflight and distribute through the HTTP route without external sends', async () => {
+    sql.exec("INSERT INTO templates(id,name,message_type,message_content,line_account_id) VALUES ('source-template','お知らせ','text','ご案内','a1')");
+    const messageDefinition = { schemaVersion: 1, template: { id: 'source-template', name: 'お知らせ', category: 'general', messageType: 'text', messageContent: 'ご案内', carouselActionsJson: null, carouselTapLimitMode: 'none', carouselTapLimitText: null, questionJson: null, questionStatus: 'draft' }, media: [] };
+    const created = await request('', 'POST', { type: 'template', name: 'お知らせ', definition: messageDefinition, requestId: crypto.randomUUID() });
+    expect(created.status, JSON.stringify(created.body)).toBe(201);
+    const checked = await preflight(created.body.data.template.id, ['a2', 'a3']);
+    expect(checked.stores.every((store: any) => store.items.length === 1 && store.items[0].itemKind === 'template')).toBe(true);
+    const distributed = await execute(created.body.data.template.id, checked);
+    expect(distributed.status, JSON.stringify(distributed.body)).toBe(200);
+    expect(distributed.body.data.status).toBe('completed');
+    expect(sql.prepare("SELECT line_account_id,name FROM templates ORDER BY line_account_id").all()).toEqual([
+      { line_account_id: 'a1', name: 'お知らせ' }, { line_account_id: 'a2', name: 'お知らせ' }, { line_account_id: 'a3', name: 'お知らせ' },
+    ]);
+  });
+  test('form templates distribute privately, bind reference choices on redistribution and isolate conflicts', async () => {
+    sql.exec("INSERT INTO tags(id,name,line_account_id) VALUES ('source-tag','ご購入済み','a1'); INSERT INTO scenarios(id,name,trigger_type,line_account_id,is_active) VALUES ('source-scenario','ご購入後のご案内','manual','a1',1); INSERT INTO scenario_steps(id,scenario_id,step_order,message_type,message_content) VALUES ('source-step','source-scenario',1,'text','ありがとうございます')");
+    const formDefinition = { schemaVersion: 1, form: { name: 'ご利用アンケート', description: '確認用', fields: [{ name: 'answer', label: '回答', type: 'text', required: true }], layout: null, on_submit_tag_id: 'source-tag', on_submit_scenario_id: 'source-scenario', save_to_metadata: true } };
+    const created = await request('', 'POST', { type: 'form', name: '回答フォーム', definition: formDefinition, requestId: crypto.randomUUID() });
+    expect(created.status, JSON.stringify(created.body)).toBe(201);
+    const first = await preflight(created.body.data.template.id);
+    const distributed = await execute(created.body.data.template.id, first);
+    expect(distributed.status, JSON.stringify(distributed.body)).toBe(200);
+    expect(distributed.body.data.status).toBe('completed');
+    expect(count('forms')).toBe(3);
+    const mapped = sql.prepare(`SELECT fa.line_account_id AS account_id,f.is_active,t.line_account_id AS tag_account,s.line_account_id AS scenario_account FROM forms f JOIN form_accounts fa ON fa.form_id=f.id JOIN tags t ON t.id=f.on_submit_tag_id JOIN scenarios s ON s.id=f.on_submit_scenario_id ORDER BY fa.line_account_id`).all() as Array<{ account_id: string; is_active: number; tag_account: string; scenario_account: string }>;
+    expect(mapped).toEqual(['a1','a2','a3'].map(account_id => ({ account_id, is_active: 0, tag_account: account_id, scenario_account: account_id })));
+    expect((await execute(created.body.data.template.id, first)).body.data).toEqual(distributed.body.data);
+    expect(count('forms')).toBe(3);
+    const scenarioIds = sql.prepare("SELECT line_account_id,id FROM scenarios ORDER BY line_account_id").all();
+
+    const second = await preflight(created.body.data.template.id);
+    expect(second.stores.every((store: any) => store.items.some((item: any) => item.sourceId === 'scenario:source-scenario' && item.itemKind === 'scenario' && item.duplicate && item.allowedModes.includes('overwrite')))).toBe(true);
+    const a2 = sql.prepare(`SELECT f.id FROM forms f JOIN form_accounts fa ON fa.form_id=f.id WHERE fa.line_account_id='a2'`).get() as { id: string };
+    sql.prepare(`UPDATE forms SET content_revision=content_revision+1 WHERE id=?`).run(a2.id);
+    const retried = await execute(created.body.data.template.id, second);
+    expect(retried.status, JSON.stringify(retried.body)).toBe(200);
+    expect(retried.body.data.status).toBe('partial');
+    expect(retried.body.data.stores.map((store: any) => store.status)).toEqual(['succeeded','version_conflict','succeeded']);
+    expect(count('forms')).toBe(3);
+    expect(sql.prepare("SELECT line_account_id,id FROM scenarios ORDER BY line_account_id").all()).toEqual(scenarioIds);
+    expect(sql.pragma('foreign_key_check')).toEqual([]);
+  });
+  test('a consumed form preflight keeps its immutable overwrite decision after bounded failure', async () => {
+    const formDefinition = { schemaVersion: 1, form: { name: '再実行フォーム', description: null, fields: [{ name: 'answer', label: '回答', type: 'text', required: true }], layout: null, on_submit_tag_id: null, on_submit_scenario_id: null, save_to_metadata: true } };
+    const created = await request('', 'POST', { type: 'form', name: '再実行フォーム', definition: formDefinition, requestId: crypto.randomUUID() });
+    const first = await preflight(created.body.data.template.id, ['a1']);
+    expect((await execute(created.body.data.template.id, first)).body.data.status).toBe('completed');
+    const retry = await preflight(created.body.data.template.id, ['a1']);
+    sql.exec("CREATE TRIGGER reject_form_update BEFORE UPDATE ON forms BEGIN SELECT RAISE(ABORT,'fixture'); END");
+    const interrupted = await execute(created.body.data.template.id, retry, selections(retry, 'overwrite'));
+    expect(interrupted.status).toBe(200);expect(interrupted.body.data.status).toBe('failed');
+    const replay = await execute(created.body.data.template.id, retry, selections(retry, 'overwrite'));
+    expect(replay.status).toBe(200);expect(replay.body.data.status).toBe('failed');
+    sql.exec('DROP TRIGGER reject_form_update');
+  });
+  test('invalid definitions, cyclic or unrelated folders are rejected', async () => {
+    expect((await request('','POST',{type:'form',name:'不正',definition,requestId:crypto.randomUUID()})).status).toBe(400);
     for (const folders of [[{id:'child',name:'循環',parentId:'child'}],[...definition.folders,{id:'unrelated',name:'不要'}]]) {
       expect((await request('','POST',{type:'tag',name:'不正',definition:{...definition,folders},requestId:crypto.randomUUID()})).status).toBe(400);
     }

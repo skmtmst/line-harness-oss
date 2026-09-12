@@ -13,6 +13,15 @@ import { hqTemplatesApi, HqTemplatesApiError } from './hq-templates-api'
 const request = transport.request
 beforeEach(() => { request.mockReset(); request.mockResolvedValue({ success: true, data: { value: 'ok' } }) })
 describe('HQ template API transport', () => {
+  it('画像をJSON化せず認証・CSRF共通transportで送信する', async () => {
+    const file = new File(['fixture'], '画像.png', { type: 'image/png' })
+    await hqTemplatesApi.uploadImage(file, 'message')
+    expect(request).toHaveBeenCalledWith('/api/hq/templates/media?purpose=message&filename=%E7%94%BB%E5%83%8F.png', { method: 'POST', headers: { 'Content-Type': 'image/png' }, body: file })
+    request.mockClear()
+    await expect(hqTemplatesApi.uploadImage(new File(['<svg/>'], 'image.svg', { type: 'image/svg+xml' }), 'message')).rejects.toThrow('PNG・JPEG')
+    expect(request).not.toHaveBeenCalled()
+  })
+
   it('保存領域の所属先と利用者は認証済みAPIから取得する', async () => {
     request.mockResolvedValue({ success: true, data: { id: 'owner', tenantId: 'tenant-a', ignored: 'not-retained' } })
     expect(await hqTemplatesApi.context()).toEqual({ tenantId: 'tenant-a', actorId: 'owner' })

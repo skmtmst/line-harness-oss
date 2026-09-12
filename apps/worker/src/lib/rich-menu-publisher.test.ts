@@ -905,6 +905,17 @@ describe('intent から LINE の action への変換', () => {
     });
   });
 
+  it('テキストを送る（シナリオ開始付きの場合）→ タップを受け取る postback へ寄せる', async () => {
+    const [action] = await publishAndReadActions(
+      groupWithAreas([{ id: 'a1', bounds: BOUNDS, actionType: 'message', actionData: { text: '案内を見る', scenarioId: 'scenario-a' }, intent: 'text' }]),
+    );
+    expect(action).toEqual({
+      type: 'postback',
+      data: 'rma=a1&d=%E6%A1%88%E5%86%85%E3%82%92%E8%A6%8B%E3%82%8B',
+      displayText: '案内を見る',
+    });
+  });
+
   it('スコアだけ設定した場合も postback へ寄せる', async () => {
     const [action] = await publishAndReadActions(
       groupWithAreas([

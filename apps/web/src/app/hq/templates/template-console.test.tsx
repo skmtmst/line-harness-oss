@@ -4,7 +4,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import TemplateConsole, { resolvedItems } from './template-console'
 import type { Preflight } from '@/lib/hq-templates-api'
 
-const calls = vi.hoisted(() => Object.fromEntries(['context','list','accounts','get','create','update','remove','preflight','distribute','result'].map(key => [key, vi.fn()])))
+const calls = vi.hoisted(() => Object.fromEntries(['uploadImage','context','list','accounts','get','create','update','remove','preflight','distribute','result'].map(key => [key, vi.fn()])))
 vi.mock('@/lib/hq-templates-api', () => ({ TEMPLATE_TYPES: ['tag','template','rich_menu','form'], hqTemplatesApi: calls }))
 vi.mock('next/navigation', () => ({ usePathname: () => '/hq/templates', useRouter: () => ({ push: vi.fn() }) }))
 const template = { id: 't1', name: '来店済み', description: '説明', template_type: 'tag', revision: 3, updated_at: '2026-09-12T00:00:00Z' }
@@ -29,6 +29,36 @@ async function chooseStores() {
 async function distribute() { await chooseStores(); fireEvent.click(screen.getByRole('button', { name: 'すべて別名で作成' })); fireEvent.click(screen.getByRole('button', { name: 'この内容で2店舗へ配布' })); await screen.findByText('配布が完了しました') }
 
 describe('HQひな形の配布フロー', () => {
+  it('参照再利用は上書きと区別し、既存を使用する選択と結果内訳を表示する', async () => {
+    const p = checked()
+    for (const store of p.stores) store.items = store.items.map(item => ({ ...item, operation: 'reuse', allowedModes: ['overwrite'] }))
+    calls.preflight.mockResolvedValue(p)
+    calls.distribute.mockResolvedValue({ runId: 'p1', status: 'completed', stores: accounts.map(a => ({ accountId: a.id, status: 'succeeded', counts: { created: 1, overwritten: 0, aliased: 0, reused: 1 } })) })
+    await chooseStores()
+    expect(screen.getAllByRole('button', { name: '既存を使用' })).toHaveLength(2)
+    expect(screen.queryByRole('button', { name: '上書き', exact: true })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'すべて別名で作成' }))
+    expect((screen.getByRole('button', { name: 'この内容で2店舗へ配布' }) as HTMLButtonElement).disabled).toBe(true)
+    fireEvent.click(screen.getByRole('button', { name: '上書き・再利用を一括指定' }))
+    fireEvent.click(screen.getByRole('button', { name: 'この内容で2店舗へ配布' }))
+    await screen.findByText('配布が完了しました')
+    expect(screen.getAllByText(/既存参照 1件を再利用/)).toHaveLength(2)
+    expect(calls.distribute).toHaveBeenCalledWith('t1', 'p1', accounts.map(a => ({ accountId: a.id, sourceId: 'tag1', mode: 'overwrite' })))
+  })
+  it('画像登録中は保存を止め、確定した内容だけ保存できる', async () => {
+    let finish!: (value: unknown) => void
+    calls.uploadImage.mockImplementation(() => new Promise(resolve => { finish = resolve }))
+    render(<TemplateConsole type="template" />); await screen.findByText('ひな形一覧')
+    fireEvent.click(screen.getByRole('button', { name: '＋ひな形を作成' }))
+    fireEvent.change(screen.getByLabelText('名前'), { target: { value: '画像付き案内' } })
+    fireEvent.change(screen.getByLabelText('配信する本文'), { target: { value: '本文' } })
+    fireEvent.change(screen.getByLabelText('メッセージ画像を選ぶ'), { target: { files: [new File(['fixture'], 'a.png', { type: 'image/png' })] } })
+    expect((screen.getByRole('button', { name: '下書き保存' }) as HTMLButtonElement).disabled).toBe(true)
+    fireEvent.click(screen.getByRole('button', { name: '下書き保存' })); expect(calls.create).not.toHaveBeenCalled()
+    finish({ id:'image',kind:'image',filename:'a.png',mimeType:'image/png',sizeBytes:32,width:2500,height:1686,durationMs:null,r2Key:'hq-templates/tenant-a/uploads/a.png',publicUrl:null,versionId:'image',versionNo:1,contentHash:'a'.repeat(64) })
+    await waitFor(() => expect((screen.getByRole('button', { name: '下書き保存' }) as HTMLButtonElement).disabled).toBe(false))
+  })
+
   it('作成・編集で期待版と参照先を保ち、保存結果から次へ進む', async () => {
     await list(); fireEvent.click(screen.getByRole('button', { name: '来店済みを編集' })); await screen.findByLabelText('名前')
     fireEvent.change(screen.getByLabelText('名前'), { target: { value: '保存名' } }); fireEvent.click(screen.getByRole('button', { name: '保存して配布先を選ぶ' }))
@@ -104,7 +134,7 @@ describe('HQひな形の配布フロー', () => {
   })
   it('選択なしと重複未選択を止め、一括設定は許可された項目だけに適用する', async () => {
     await chooseStores(); const execute = screen.getByRole('button', { name: 'この内容で2店舗へ配布' }) as HTMLButtonElement
-    expect(execute.disabled).toBe(true); fireEvent.click(screen.getByRole('button', { name: 'すべて上書き' })); expect(execute.disabled).toBe(true)
+    expect(execute.disabled).toBe(true); fireEvent.click(screen.getByRole('button', { name: '上書き・再利用を一括指定' })); expect(execute.disabled).toBe(true)
     const group = within(screen.getByRole('group', { name: '横浜店 来店済みの配布方法' }))
     expect((group.getByRole('button', { name: '上書き' }) as HTMLButtonElement).disabled).toBe(true)
     fireEvent.click(group.getByRole('button', { name: '別名で作成' })); expect(execute.disabled).toBe(false)
@@ -141,8 +171,22 @@ describe('HQひな形の配布フロー', () => {
     window.history.replaceState(null, '', '/hq/templates?type=tag#template=t1&run=p1'); render(<TemplateConsole type="tag" />)
     await screen.findByText('配布が完了しました'); expect(calls.result).toHaveBeenCalledWith('t1', 'p1'); expect(calls.distribute).not.toHaveBeenCalled()
   })
-  it.each(['template','rich_menu','form'] as const)('未対応 %s には操作もAPI呼び出しも無い', async type => {
-    render(<TemplateConsole type={type} />); expect(screen.getByText(/UNSUPPORTED/)).toBeTruthy(); expect(screen.queryByRole('button', { name: '＋ひな形を作成' })).toBeNull(); expect(calls.list).not.toHaveBeenCalled()
+  it.each([
+    ['template', { schemaVersion: 1, template: { id: 'hq-authored-message', name: '来店お礼', category: 'general', messageType: 'text', messageContent: 'ありがとうございます', carouselActionsJson: null, carouselTapLimitMode: 'none', carouselTapLimitText: null, questionJson: null, questionStatus: 'draft' }, media: [] }, '配信する本文', 'ありがとうございます'],
+    ['rich_menu', { schemaVersion: 1, richMenu: { id: 'rich-menu-main', name: '店舗メニュー', chatBarText: 'メニュー', size: 'large', defaultPageId: 'page-1', pages: [{ id: 'page-1', name: 'メイン', imageR2Key: 'hq-templates/tenant-a/menu.png', areas: [] }] } }, 'リッチメニュー画像の保存先', 'hq-templates/tenant-a/menu.png'],
+    ['form', { schemaVersion: 1, form: { name: 'ご来店アンケート', description: null, fields: [{ name: 'question_1', label: '質問1', type: 'text', required: false }], layout: null, on_submit_tag_id: null, on_submit_scenario_id: null, save_to_metadata: true } }, null, null],
+  ] as const)('%s を専用入力欄から作成できる', async (type, definition, fieldLabel, fieldValue) => {
+    const name = type === 'template' ? '来店お礼' : type === 'rich_menu' ? '店舗メニュー' : 'ご来店アンケート'
+    calls.list.mockResolvedValue([])
+    calls.create.mockResolvedValue({ template: { ...template, id: `${type}-1`, name, template_type: type }, definition })
+    render(<TemplateConsole type={type} />)
+    fireEvent.click(await screen.findByRole('button', { name: '＋ひな形を作成' }))
+    fireEvent.change(screen.getByLabelText('名前'), { target: { value: name } })
+    if (fieldLabel && fieldValue) fireEvent.change(screen.getByLabelText(fieldLabel), { target: { value: fieldValue } })
+    fireEvent.click(screen.getByRole('button', { name: '下書き保存' }))
+    await screen.findByText('ひな形を保存しました。')
+    expect(calls.list).toHaveBeenCalledWith(type)
+    expect(calls.create).toHaveBeenCalledWith(expect.objectContaining({ type, name, definition }), expect.any(String))
   })
   it('権限不足のAPI応答後に作成・配布を許可しない', async () => {
     calls.accounts.mockRejectedValue(new Error('操作する権限がありません。')); render(<TemplateConsole type="tag" />); await screen.findByRole('alert')
