@@ -1007,6 +1007,23 @@ const spec = {
         },
       },
     },
+    // ── Staff invitation ────────────────────────────────────────────────────
+    '/api/staff/{id}/resend-invitation': {
+      post: {
+        tags: ['Staff'],
+        summary: '未受諾・期限切れのスタッフ招待を再送',
+        description: '同じ行を使い回して新しい招待トークンを発行する。旧トークンは即時に失効し、新しい期限は7日。',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: {
+          '200': { description: 'Invitation resent with a new token and expiry' },
+          '400': { description: 'No email address on the staff member' },
+          '403': { description: 'Owner or admin role required' },
+          '404': { description: 'Not found in current tenant' },
+          '409': { description: 'Already active; nothing to resend' },
+          '500': { description: 'Invitation mail could not be sent' },
+        },
+      },
+    },
     // ── Users (UUID Cross-Account) ──────────────────────────────────────────
     '/api/users': {
       get: { tags: ['Users'], summary: '内部ユーザー一覧取得', responses: { '200': { description: 'All users' } } },
