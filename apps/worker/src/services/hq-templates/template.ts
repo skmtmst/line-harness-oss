@@ -123,6 +123,9 @@ export interface MessageTemplateAdapterDependencies {
     authority: MessageTemplateSourceAuthority;
     templateVersionId: string;
   }>): Promise<MessageTemplateSourceVersion | null>;
+  /** Complete, tenant-checked account inventory; never return a filtered/paginated name list.
+   * Its token must be recomputed from current authoritative state, not copied from context.
+   */
   loadTargetSnapshot(context: HqTemplateAdapterContext): Promise<MessageTemplateTargetSnapshot>;
   /**
    * Must perform a conditional R2 read when binding.etag is present. Returning null means that
@@ -415,7 +418,8 @@ export function inspectMessageTemplateDefinition(
   }];
   for (const media of referencedMedia(definition)) {
     const targetMedia = uniqueMatch(
-      snapshot.media.filter((item) => item.contentHash === media.contentHash),
+      snapshot.media.filter((item) => normalizeSha256(media.contentHash) !== null
+        && normalizeSha256(item.contentHash) === normalizeSha256(media.contentHash)),
       'AMBIGUOUS_MEDIA',
     );
     result.push({
@@ -473,6 +477,22 @@ function conflictGuard(sql: string, bindings: readonly HqTemplateBinding[]): HqT
   };
 }
 
+function nameInventoryGuard(kind: 'template' | 'media', accountId: string, names: readonly (readonly [string, string])[]): HqTemplateStatement {
+  const table = kind === 'template' ? 'templates' : 'media';
+  const column = kind === 'template' ? 'name' : 'filename';
+  const expected = JSON.stringify(names);
+  // SQLite lower() cannot reproduce JavaScript NFKC/case folding. Prove the entire
+  // account name inventory is unchanged instead, then use the JS decision above.
+  // Compare sets, not JSON row ordering; Unicode ids and query ordering are immaterial.
+  return conflictGuard(`SELECT 1 WHERE
+    (SELECT COUNT(*) FROM ${table} WHERE line_account_id=?) = json_array_length(?)
+    AND NOT EXISTS(SELECT 1 FROM ${table} t WHERE t.line_account_id=? AND NOT EXISTS(
+      SELECT 1 FROM json_each(?) expected
+      WHERE json_extract(expected.value,'$[0]') IS t.id
+        AND json_extract(expected.value,'$[1]') IS t.${column}))`,
+  [accountId, expected, accountId, expected]);
+}
+
 export async function planMessageTemplateDistribution(input: {
   context: HqTemplateAdapterContext;
   source: AuthorizedMessageTemplateSource;
@@ -502,11 +522,15 @@ export async function planMessageTemplateDistribution(input: {
   const resolved: HqTemplateResolution[] = [];
   const occupiedTemplateNames = [...snapshot.templates.map((entry) => entry.name)];
   const occupiedMediaNames = [...snapshot.media.map((entry) => entry.filename)];
+  const guardedInventories = new Set<'template' | 'media'>();
 
   for (const item of items) {
     const resolution = requireResolution(item, context.resolutions);
     const targetId = idMap[item.sourceId];
     if (!targetId || /\s/.test(targetId)) throw new TemplateHqTemplateError('INVALID_ID_MAP', 409);
+    if (resolution.mode === 'overwrite' && (targetId !== item.targetId || targetId !== resolution.targetId)) {
+      throw new TemplateHqTemplateError('INVALID_ID_MAP', 409);
+    }
     let name = item.name;
     if (resolution.mode === 'alias') {
       const occupied = item.itemKind === 'template' ? occupiedTemplateNames : occupiedMediaNames;
@@ -515,16 +539,20 @@ export async function planMessageTemplateDistribution(input: {
         throw new TemplateHqTemplateError('ALIAS_SELECTION_CONFLICT', 409);
       }
       name = generated;
-      occupied.push(name);
     }
     if (resolution.mode !== 'overwrite') {
-      const table = item.itemKind === 'template' ? 'templates' : 'media';
-      const column = item.itemKind === 'template' ? 'name' : 'filename';
-      dbCommit.push({
-        // A concurrent same-name insert makes the INSERT below fail this guard in the same batch.
-        sql: `SELECT CASE WHEN NOT EXISTS(SELECT 1 FROM ${table} WHERE line_account_id = ? AND lower(trim(${column})) = lower(trim(?))) THEN 1 ELSE json_extract('DUPLICATE_NAME', '$') END`,
-        bindings: [context.targetAccountId, name],
-      });
+      const occupied = item.itemKind === 'template' ? occupiedTemplateNames : occupiedMediaNames;
+      if (occupied.some(existing => normalizeName(existing) === normalizeName(name))) {
+        throw new TemplateHqTemplateError('DUPLICATE_NAME', 409);
+      }
+      occupied.push(name);
+      if (!guardedInventories.has(item.itemKind)) {
+        const names: [string, string][] = item.itemKind === 'template'
+          ? snapshot.templates.map(row => [row.id, row.name])
+          : snapshot.media.map(row => [row.id, row.filename]);
+        dbCommit.push(nameInventoryGuard(item.itemKind, context.targetAccountId, names));
+        guardedInventories.add(item.itemKind);
+      }
     }
     resolved.push({
       ...resolution,

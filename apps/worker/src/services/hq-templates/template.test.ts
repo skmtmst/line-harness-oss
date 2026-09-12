@@ -256,6 +256,55 @@ describe('message template HQ adapter', () => {
       .toEqual({ count: 0 });
   });
 
+  it.each(['insert', 'rename', 'unchanged', 'other-account'] as const)('checks the complete name inventory before committing an NFKC name: %s', async (change) => {
+    const store = createTestD1({ foreignKeys: true });
+    try {
+      for (const id of ['store-a', 'store-b']) store.raw.prepare("INSERT INTO line_accounts(id,name,channel_id,channel_access_token,channel_secret) VALUES (?,?,?,'fixture','fixture')").run(id,id,id);
+      const templates = change === 'rename' ? [{ id: 'existing', name: 'Unrelated', updatedAt: 'rev-1' }] : [];
+      if (templates.length) store.raw.prepare("INSERT INTO templates(id,name,message_type,message_content,line_account_id,updated_at) VALUES ('existing','Unrelated','text','old','store-a','rev-1')").run();
+      const source = authorizedSource(sourceVersion({
+        definitionJson: JSON.stringify({ ...definition, template: { ...definition.template, name: 'ＶＩＰ', messageType: 'text', messageContent: 'Synthetic' }, media: [] }),
+        media: [],
+      }));
+      const plan = await planMessageTemplateDistribution({
+        context: context('store-a', [{ sourceId: 'template:source-template', itemKind: 'template', mode: 'create' }]),
+        source, snapshot: snapshot({ templates }), idMap: { 'template:source-template': 'planned' }, dependencies: dependencies(),
+      });
+      if (change === 'rename') store.raw.prepare("UPDATE templates SET name='VIP' WHERE id='existing'").run();
+      if (change === 'insert' || change === 'other-account') store.raw.prepare("INSERT INTO templates(id,name,message_type,message_content,line_account_id) VALUES ('concurrent','VIP','text','old',?)").run(change === 'insert' ? 'store-a' : 'store-b');
+      const apply = () => store.db.batch(plan.dbCommit.map(statement => store.db.prepare(statement.sql).bind(...statement.bindings)));
+      if (change === 'insert' || change === 'rename') {
+        await expect(apply()).rejects.toThrow();
+        expect(store.raw.prepare("SELECT id FROM templates WHERE id='planned'").get()).toBeUndefined();
+      } else {
+        await apply();
+        expect(store.raw.prepare("SELECT name FROM templates WHERE id='planned'").get()).toEqual({ name: 'ＶＩＰ' });
+      }
+      expect(store.raw.pragma('foreign_key_check')).toEqual([]);
+    } finally { store.raw.close(); }
+  });
+
+  it.each(['template', 'media'] as const)('rejects an overwrite id map that points to another %s', async (kind) => {
+    const existingMedia = { id: 'existing-media', filename: 'existing.png', mimeType: 'image/png', sizeBytes: 4, r2Key: 'target/existing.png', publicUrl: null, contentHash, revision: 'rev-1', versionNo: 1 };
+    const templates = kind === 'template' ? [{ id: 'existing-template', name: definition.template.name, updatedAt: 'rev-1' }, { id: 'other-template', name: 'Other', updatedAt: 'rev-1' }] : [];
+    const media = kind === 'media' ? [existingMedia] : [];
+    const selections = createResolutions().map(row => row.itemKind === kind ? { ...row, mode: 'overwrite' as const, targetId: `existing-${kind}`, expectedRevision: 'rev-1' } : row);
+    let readCalled = false;
+    await expect(planMessageTemplateDistribution({
+      context: context('store-a', selections), source: authorizedSource(), snapshot: snapshot({ templates, media }),
+      idMap: { 'template:source-template': kind === 'template' ? 'other-template' : 'new-template', 'media:source-media': kind === 'media' ? 'other-media' : 'new-media' },
+      dependencies: dependencies({ readSourceObjectIfUnchanged: async () => { readCalled = true; return null; } }),
+    })).rejects.toMatchObject({ code: 'INVALID_ID_MAP', status: 409 });
+    expect(readCalled).toBe(false);
+  });
+
+  it.each([`sha256:${contentHash}`, `sha256=${contentHash}`, contentHash.toUpperCase()])('recognizes equivalent media digest representation %s', (hash) => {
+    const existing = { id: 'existing-media', filename: 'existing.png', mimeType: 'image/png', sizeBytes: 4, r2Key: 'target/existing.png', publicUrl: null, contentHash: hash, revision: 'rev-1', versionNo: 1 };
+    expect(inspectMessageTemplateDefinition(definition, snapshot({ media: [existing] }))[1]).toMatchObject({ duplicate: true, targetId: 'existing-media', allowedModes: ['overwrite', 'alias'] });
+    const source = { ...definition, media: [{ ...definition.media[0]!, contentHash: hash }] };
+    expect(inspectMessageTemplateDefinition(source, snapshot({ media: [{ ...existing, contentHash }] }))[1]).toMatchObject({ duplicate: true, targetId: 'existing-media' });
+  });
+
   it('allocates the first free deterministic alias, including (2) and (3)', () => {
     expect(nextMessageTemplateAlias('来店お礼', ['来店お礼'])).toBe('来店お礼 (2)');
     expect(nextMessageTemplateAlias('来店お礼', ['来店お礼', '来店お礼 (2)'])).toBe('来店お礼 (3)');
