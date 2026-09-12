@@ -8,10 +8,10 @@ import { hqTemplates } from './hq-templates.js';
 import { routeClassification } from '../middleware/feature-enforcement.js';
 
 const definition = { schemaVersion: 1, tag: { name: '常連', color: '#123456', description: 'ご案内', folderId: 'child' }, folders: [{ id: 'child', name: 'ご利用', parentId: 'root' }, { id: 'root', name: 'お客様' }] };
-let sql: Database.Database, db: D1Database, app: Hono<Env>, staff: AuthenticatedStaff;
+let sql: Database.Database, db: D1Database, app: Hono<Env>, staff: AuthenticatedStaff, images: R2Bucket;
 function count(table: string) { return (sql.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get() as { n: number }).n; }
 async function request(path: string, method = 'GET', body?: unknown, extraHeaders: Record<string,string> = {}) {
-  const response = await app.request(`/api/hq/templates${path}`, { method, headers: { 'Content-Type': 'application/json', ...extraHeaders }, body: body === undefined ? undefined : JSON.stringify(body) }, { DB: db });
+  const response = await app.request(`/api/hq/templates${path}`, { method, headers: { 'Content-Type': 'application/json', ...extraHeaders }, body: body === undefined ? undefined : JSON.stringify(body) }, { DB: db, IMAGES: images, WORKER_URL: 'https://worker.test' } as Env['Bindings']);
   return { status: response.status, body: await response.json() as any };
 }
 async function create() {
@@ -35,6 +35,7 @@ beforeEach(() => {
   for (const id of ['a1','a2','a3','b1']) sql.prepare(`INSERT INTO line_accounts(id,name,channel_id,channel_access_token,channel_secret,tenant_id,liff_id) VALUES (?,?,?,'fixture','fixture',?,?)`).run(id, id, `fixture-${id}`, id === 'b1' ? 'tenant-b' : 'tenant-a', `liff-${id}`);
   sql.exec("INSERT INTO staff_members(id,name,role,api_key,tenant_id) VALUES ('owner','管理者','owner','fixture-owner','tenant-a')");
   staff = { id: 'owner', name: '管理者', role: 'owner', readOnly: false, tenantId: 'tenant-a' };
+  images = { head: async () => null, get: async () => null, put: async () => null, delete: async () => undefined } as unknown as R2Bucket;
   app = new Hono<Env>();
   app.use('*', async (c,next) => { c.set('staff', staff); await next(); }); app.route('/', hqTemplates);
 });
@@ -262,6 +263,20 @@ describe('HQ tag HTTP and real SQLite boundaries', () => {
     expect(count('hq_templates')).toBe(4);
     expect(count('hq_template_versions')).toBe(8);
   });
+  test('message templates preflight and distribute through the HTTP route without external sends', async () => {
+    sql.exec("INSERT INTO templates(id,name,message_type,message_content,line_account_id) VALUES ('source-template','お知らせ','text','ご案内','a1')");
+    const messageDefinition = { schemaVersion: 1, template: { id: 'source-template', name: 'お知らせ', category: 'general', messageType: 'text', messageContent: 'ご案内', carouselActionsJson: null, carouselTapLimitMode: 'none', carouselTapLimitText: null, questionJson: null, questionStatus: 'draft' }, media: [] };
+    const created = await request('', 'POST', { type: 'template', name: 'お知らせ', definition: messageDefinition, requestId: crypto.randomUUID() });
+    expect(created.status, JSON.stringify(created.body)).toBe(201);
+    const checked = await preflight(created.body.data.template.id, ['a2', 'a3']);
+    expect(checked.stores.every((store: any) => store.items.length === 1 && store.items[0].itemKind === 'template')).toBe(true);
+    const distributed = await execute(created.body.data.template.id, checked);
+    expect(distributed.status, JSON.stringify(distributed.body)).toBe(200);
+    expect(distributed.body.data.status).toBe('completed');
+    expect(sql.prepare("SELECT line_account_id,name FROM templates ORDER BY line_account_id").all()).toEqual([
+      { line_account_id: 'a1', name: 'お知らせ' }, { line_account_id: 'a2', name: 'お知らせ' }, { line_account_id: 'a3', name: 'お知らせ' },
+    ]);
+  });
   test('form templates distribute privately to three stores, remap tags, replay once and isolate conflicts', async () => {
     sql.exec("INSERT INTO tags(id,name,line_account_id) VALUES ('source-tag','ご購入済み','a1')");
     const formDefinition = { schemaVersion: 1, form: { name: 'ご利用アンケート', description: '確認用', fields: [{ name: 'answer', label: '回答', type: 'text', required: true }], layout: null, on_submit_tag_id: 'source-tag', on_submit_scenario_id: null, save_to_metadata: true } };
@@ -286,6 +301,19 @@ describe('HQ tag HTTP and real SQLite boundaries', () => {
     expect(retried.body.data.stores.map((store: any) => store.status)).toEqual(['succeeded','version_conflict','succeeded']);
     expect(count('forms')).toBe(3);
     expect(sql.pragma('foreign_key_check')).toEqual([]);
+  });
+  test('a consumed form preflight reuses its immutable overwrite decision while staged', async () => {
+    const formDefinition = { schemaVersion: 1, form: { name: '再実行フォーム', description: null, fields: [{ name: 'answer', label: '回答', type: 'text', required: true }], layout: null, on_submit_tag_id: null, on_submit_scenario_id: null, save_to_metadata: true } };
+    const created = await request('', 'POST', { type: 'form', name: '再実行フォーム', definition: formDefinition, requestId: crypto.randomUUID() });
+    const first = await preflight(created.body.data.template.id, ['a1']);
+    expect((await execute(created.body.data.template.id, first)).body.data.status).toBe('completed');
+    const retry = await preflight(created.body.data.template.id, ['a1']);
+    sql.exec("CREATE TRIGGER reject_form_update BEFORE UPDATE ON forms BEGIN SELECT RAISE(ABORT,'fixture'); END");
+    const interrupted = await execute(created.body.data.template.id, retry, selections(retry, 'overwrite'));
+    expect(interrupted.status).toBe(200);expect(interrupted.body.data.status).toBe('running');
+    const replay = await execute(created.body.data.template.id, retry, selections(retry, 'overwrite'));
+    expect(replay.status).toBe(200);expect(replay.body.data.status).toBe('running');
+    sql.exec('DROP TRIGGER reject_form_update');
   });
   test('invalid definitions, cyclic or unrelated folders are rejected', async () => {
     expect((await request('','POST',{type:'form',name:'不正',definition,requestId:crypto.randomUUID()})).status).toBe(400);

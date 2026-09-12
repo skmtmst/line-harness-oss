@@ -10,6 +10,7 @@ import { parseMessageTemplateDefinition } from './template.js';
 import { inspectFormTemplate, parseFormTemplateDefinition } from './form.js';
 import { parseRichMenuTemplateDefinition } from './rich-menu.js';
 import { executeFormStore, HqRuntimeError } from './runtime.js';
+import { executeR2RuntimeStore, HqR2RuntimeError, inspectR2RuntimeStore } from './runtime-r2.js';
 
 export { HqTemplateError } from './tag.js';
 export type DistributionSelection = { accountId: string; sourceId: string; mode: 'create' | 'overwrite' | 'alias' };
@@ -125,19 +126,26 @@ export async function deleteTemplate(db: D1Database, authority: HqTemplateAuthor
 export async function listTemplates(db: D1Database, authority: HqTemplateAuthority, type?: HqTemplateType): Promise<HqTemplate[]> {
   return listHqTemplates(db, authority.tenantId, type);
 }
-export async function preflightDistribution(db: D1Database, authority: HqTemplateAuthority, id: string, accountIds: string[]) {
+export async function preflightDistribution(db: D1Database, authority: HqTemplateAuthority, id: string, accountIds: string[], bucket?: R2Bucket) {
   const accounts = await requireTargetAccounts(db, authority, accountIds);
   const { template, definition } = await templateDetail(db, authority, id);
-  if (template.template_type !== 'tag' && template.template_type !== 'form') throw new HqTemplateError('UNSUPPORTED', 422);
   const input = { templateVersionId: template.current_version_id!, definitionJson: JSON.stringify(definition) };
   const tagDefinition = template.template_type === 'tag' ? parseTagDefinition(definition) : null;
   const preflightId = crypto.randomUUID(), expiresAt = new Date(Date.now() + 15 * 60_000).toISOString();
   const statements: HqTemplateStatement[] = [], stores = [];
   for (const account of accounts) {
     const snapshot = tagDefinition ? await tagSnapshot(db, account.id) : null;
-    const form = tagDefinition ? null : await inspectFormTemplate(db, authority, account.id, input);
-    const items = tagDefinition ? inspectTags(tagDefinition, snapshot!) : [{ sourceId: form!.sourceId, itemKind: form!.itemKind, name: form!.name, targetId: form!.targetId, expectedRevision: form!.expectedRevision, duplicate: form!.duplicate, allowedModes: [...form!.allowedModes] }];
-    const storeId = crypto.randomUUID(), token = tagDefinition ? `hqts1.${await digest(snapshot!)}` : form!.snapshotToken;
+    const form = template.template_type === 'form' ? await inspectFormTemplate(db, authority, account.id, input) : null;
+    let r2: Awaited<ReturnType<typeof inspectR2RuntimeStore>> | null = null;
+    if (template.template_type === 'template' || template.template_type === 'rich_menu') {
+      if (!bucket) throw new HqTemplateError('UNSUPPORTED', 422);
+      try { r2 = await inspectR2RuntimeStore({ db, bucket, authority, templateId: id, templateVersionId: template.current_version_id! }, account.id); }
+      catch (error) { rethrowR2(error); }
+    }
+    const items = tagDefinition ? inspectTags(tagDefinition, snapshot!) : form
+      ? [{ sourceId: form.sourceId, itemKind: form.itemKind, name: form.name, targetId: form.targetId, expectedRevision: form.expectedRevision, duplicate: form.duplicate, allowedModes: [...form.allowedModes] }]
+      : r2!.items;
+    const storeId = crypto.randomUUID(), token = tagDefinition ? `hqts1.${await digest(snapshot!)}` : form?.snapshotToken ?? r2!.snapshotToken;
     statements.push({ sql: `INSERT INTO hq_template_preflights(id,tenant_id,template_id,template_version_id,target_account_id,distribution_mode,idempotency_fingerprint,snapshot_token,status,created_by,expires_at) VALUES (?,?,?,?,?,'create',?,?,'ready',?,?)`, bindings: [storeId, authority.tenantId, id, template.current_version_id!, account.id, preflightId, token, authority.actorId, expiresAt] });
     for (const item of items) statements.push({ sql: `INSERT INTO hq_template_preflight_resolutions(preflight_id,tenant_id,template_id,template_version_id,target_account_id,idempotency_fingerprint,snapshot_token,source_id,item_kind,resolution_mode,target_id,expected_revision) VALUES (?,?,?,?,?,?,?,?,?,'create',?,?)`, bindings: [storeId, authority.tenantId, id, template.current_version_id!, account.id, preflightId, token, item.sourceId, item.itemKind, item.targetId, item.expectedRevision] });
     stores.push({ accountId: account.id, accountName: account.name, items });
@@ -151,6 +159,13 @@ function resultReason(status: string): string | null {
   if (status === 'failed') return 'この店舗には配布できませんでした。もう一度確認してください';
   if (status === 'unsupported') return 'この種類の配布はまだ利用できません';
   return null;
+}
+function rethrowR2(error: unknown): never {
+  if (!(error instanceof HqR2RuntimeError)) throw error;
+  if (error.code === 'FORBIDDEN') throw new HqTemplateError('FORBIDDEN', 403);
+  if (error.code === 'VERSION_CONFLICT' || error.code.includes('UNAVAILABLE') || error.code.startsWith('AMBIGUOUS_')) throw new HqTemplateError('VERSION_CONFLICT', 409);
+  if (error.code.includes('UNSUPPORTED')) throw new HqTemplateError('UNSUPPORTED', 422);
+  throw new HqTemplateError('INVALID_DEFINITION');
 }
 export async function distributionResult(db: D1Database, authority: HqTemplateAuthority, templateId: string, runId: string) {
   const run = await db.prepare(`SELECT id,status FROM hq_template_distribution_runs WHERE id=? AND tenant_id=? AND template_id=?`).bind(runId, authority.tenantId, templateId).first<{ id: string; status: string }>();
@@ -171,12 +186,11 @@ export async function distributionResult(db: D1Database, authority: HqTemplateAu
   return { runId, status: run.status, stores };
 }
 
-export async function distributeTemplate(db: D1Database, authority: HqTemplateAuthority, templateId: string, runId: string, selections: DistributionSelection[]) {
+export async function distributeTemplate(db: D1Database, authority: HqTemplateAuthority, templateId: string, runId: string, selections: DistributionSelection[], bucket?: R2Bucket, publicBaseUrl?: string) {
   const preflights = (await db.prepare(`SELECT * FROM hq_template_preflights WHERE tenant_id=? AND template_id=? AND idempotency_fingerprint=? ORDER BY target_account_id`).bind(authority.tenantId, templateId, runId).all<HqTemplatePreflight>()).results;
   if (!preflights.length || preflights.some(p => p.created_by !== authority.actorId)) throw new HqTemplateError('NOT_FOUND', 404);
   await requireTargetAccounts(db, authority, preflights.map(p => p.target_account_id));
   const { template } = await templateDetail(db, authority, templateId);
-  if (template.template_type !== 'tag' && template.template_type !== 'form') throw new HqTemplateError('UNSUPPORTED', 422);
   if (preflights.some(p => p.template_version_id !== preflights[0].template_version_id)) throw new HqTemplateError('INVALID_PREFLIGHT', 409);
   const version = await db.prepare(`SELECT definition_json FROM hq_template_versions WHERE id=? AND tenant_id=? AND template_id=?`).bind(preflights[0].template_version_id, authority.tenantId, templateId).first<{ definition_json: string }>();
   if (!version) throw new HqTemplateError('NOT_FOUND', 404);
@@ -186,19 +200,20 @@ export async function distributeTemplate(db: D1Database, authority: HqTemplateAu
     const row = stored.find(r => r.target_account_id === selected.accountId && r.source_id === selected.sourceId);
     if (!row || !['create', 'overwrite', 'alias'].includes(selected.mode)) throw new HqTemplateError('SELECTION_REQUIRED', 409);
     const p = preflights.find(p => p.id === row.preflight_id)!;
-    if (p.status === 'consumed') { if (row.resolution_mode !== selected.mode) throw new HqTemplateError('SELECTION_CHANGED', 409); }
+    if (p.status === 'consumed') { if (template.template_type === 'tag' && row.resolution_mode !== selected.mode) throw new HqTemplateError('SELECTION_CHANGED', 409); }
     else if (row.target_id ? selected.mode === 'create' : selected.mode !== 'create') throw new HqTemplateError('SELECTION_REQUIRED', 409);
   }
-  if (template.template_type === 'form') {
+  if (template.template_type !== 'tag') {
+    if ((template.template_type === 'template' || template.template_type === 'rich_menu') && !bucket) throw new HqTemplateError('UNSUPPORTED', 422);
     for (const p of preflights) {
       const selected = selections.filter(selection => selection.accountId === p.target_account_id).map(selection => {
         const row = stored.find(resolution => resolution.preflight_id === p.id && resolution.source_id === selection.sourceId)!;
         return { sourceId: selection.sourceId, itemKind: row.item_kind, mode: selection.mode };
       });
-      const root = selected.find(resolution => resolution.sourceId === 'form' && resolution.itemKind === 'form');
+      const root = selected.find(resolution => resolution.itemKind === template.template_type);
       if (!root) throw new HqTemplateError('SELECTION_REQUIRED', 409);
       try {
-        await executeFormStore({ db, authority, templateId, runId, context: {
+        const context = {
           tenantId: authority.tenantId,
           targetAccountId: p.target_account_id,
           preflightId: p.id,
@@ -206,9 +221,11 @@ export async function distributeTemplate(db: D1Database, authority: HqTemplateAu
           snapshotToken: p.snapshot_token as HqTemplateSnapshotToken,
           mode: root.mode,
           resolutions: selected,
-        } });
+        } as const;
+        if (template.template_type === 'form') await executeFormStore({ db, authority, templateId, runId, context });
+        else await executeR2RuntimeStore({ db, bucket: bucket!, authority, templateId, runId, context, publicBaseUrl });
       } catch (error) {
-        if (!(error instanceof HqRuntimeError)) throw error;
+        if (!(error instanceof HqRuntimeError) && !(error instanceof HqR2RuntimeError)) throw error;
         if (error.code === 'FORBIDDEN') throw new HqTemplateError('FORBIDDEN', 403);
         if (error.code === 'SELECTION_REQUIRED' || error.code === 'SELECTION_CHANGED') throw new HqTemplateError(error.code, 409);
         if (error.code === 'INVALID_PREFLIGHT' || error.code === 'VERSION_CONFLICT') throw new HqTemplateError('VERSION_CONFLICT', 409);

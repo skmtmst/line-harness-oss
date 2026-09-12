@@ -19,6 +19,19 @@ function exactRowGuard(table: 'scenarios' | 'scenario_steps', row: DbRow): HqTem
   const columns = Object.keys(row);
   return guard(`EXISTS(SELECT 1 FROM ${table} WHERE ${columns.map(column => `${column} IS ?`).join(' AND ')})`, columns.map(column => row[column]));
 }
+function hasPortableTextReference(value: unknown): boolean {
+  let current = String(value ?? '');
+  for (let attempt = 0; attempt < 4; attempt++) {
+    if (/(?:liff\.line\.me|[?&#](?:form|template|scenario|tag|(?:line)?account)(?:s|ids?)?=|\/(?:forms?|scenarios?|templates?|tags?|accounts?)\/)/i.test(current)) return true;
+    if (!/%[0-9a-f]{2}/i.test(current)) return false;
+    try {
+      const next = decodeURIComponent(current);
+      if (next === current) return false;
+      current = next;
+    } catch { return true; }
+  }
+  return /%[0-9a-f]{2}/i.test(current);
+}
 
 /** Store-scoped planner: never writes; all reference creation joins the form batch. */
 export function createFormReferenceResolver({ db, authority }: { db: D1Database; authority: HqTemplateAuthority }): FormTemplateDependencies['resolveReference'] {
@@ -30,22 +43,26 @@ export function createFormReferenceResolver({ db, authority }: { db: D1Database;
       const source = await db.prepare(`SELECT s.* FROM scenarios s JOIN line_accounts a ON a.id=s.line_account_id WHERE s.id=? AND a.tenant_id=? AND a.is_active=1 AND a.archived_at IS NULL`).bind(reference.sourceId, authority.tenantId).first<DbRow>();
       if (!source) fail('REFERENCE_UNAVAILABLE');
       const safeSource = source!;
-      if (safeSource.trigger_tag_id || safeSource.on_complete_scenario_id || safeSource.folder_id || safeSource.audience_condition_json) fail('UNSUPPORTED_REFERENCE');
+      if (safeSource.trigger_type !== 'manual' || safeSource.on_complete_mode !== 'pause' || safeSource.trigger_tag_id || safeSource.on_complete_scenario_id || safeSource.folder_id || safeSource.audience_condition_json) fail('UNSUPPORTED_REFERENCE');
       const target = await db.prepare(`SELECT id FROM line_accounts WHERE id=? AND tenant_id=? AND is_active=1 AND archived_at IS NULL`).bind(context.targetAccountId, authority.tenantId).first();
       if (!target) fail('FORBIDDEN');
+      const steps = (await db.prepare(`SELECT * FROM scenario_steps WHERE scenario_id=? ORDER BY step_order,id`).bind(reference.sourceId).all<DbRow>()).results;
+      const hasActions = await db.prepare(`SELECT 1 AS present FROM scenario_actions WHERE scenario_id=? LIMIT 1`).bind(reference.sourceId).first();
+      const hasTriggers = await db.prepare(`SELECT 1 AS present FROM scenario_triggers WHERE scenario_id=? LIMIT 1`).bind(reference.sourceId).first();
+      if (hasActions || hasTriggers || steps.some(step => step.template_id || step.on_reach_tag_id || step.message_bubbles_json || step.target_condition_json || step.question_json || step.condition_type || step.condition_value || step.message_type !== 'text' || hasPortableTextReference(step.message_content))) fail('UNSUPPORTED_REFERENCE');
       const matches = (await db.prepare(`SELECT id,name FROM scenarios WHERE line_account_id=? ORDER BY id`).bind(context.targetAccountId).all<{ id: string; name: string }>()).results.filter(row => normalizeScopedTagName(row.name) === normalizeScopedTagName(String(safeSource.name)));
       if (matches.length > 1) fail('REFERENCE_UNAVAILABLE');
-      if (matches.length === 1) return { targetId: matches[0].id, dbCommit: [exactRowGuard('scenarios', safeSource)] };
+      if (matches.length === 1) {
+        if (String(safeSource.line_account_id) !== context.targetAccountId || matches[0].id !== reference.sourceId) fail('REFERENCE_UNAVAILABLE');
+        return { targetId: matches[0].id, dbCommit: [exactRowGuard('scenarios', safeSource), guard(`(SELECT COUNT(*) FROM scenario_steps WHERE scenario_id=?)=?`, [reference.sourceId, steps.length]), ...steps.map(step => exactRowGuard('scenario_steps', step)), guard(`NOT EXISTS(SELECT 1 FROM scenario_actions WHERE scenario_id=?) AND NOT EXISTS(SELECT 1 FROM scenario_triggers WHERE scenario_id=?)`, [reference.sourceId, reference.sourceId])] };
+      }
       const cacheKey = JSON.stringify([context.targetAccountId, normalizeScopedTagName(String(safeSource.name))]);
       let created = plannedScenarios.get(cacheKey);
       if (!created) {
-        const steps = (await db.prepare(`SELECT * FROM scenario_steps WHERE scenario_id=? ORDER BY step_order,id`).bind(reference.sourceId).all<DbRow>()).results;
-        const hasActions = await db.prepare(`SELECT 1 AS present FROM scenario_actions WHERE scenario_id=? LIMIT 1`).bind(reference.sourceId).first();
-        const hasTriggers = await db.prepare(`SELECT 1 AS present FROM scenario_triggers WHERE scenario_id=? LIMIT 1`).bind(reference.sourceId).first();
-        if (hasActions || hasTriggers || steps.some(step => step.template_id || step.on_reach_tag_id || step.message_bubbles_json || step.target_condition_json || step.question_json || step.condition_type || step.condition_value || step.message_type !== 'text' || /(?:liff\.line\.me|\/forms?\/|\/scenarios?\/|\/templates?\/|\/tags?\/)/i.test(String(step.message_content)))) fail('UNSUPPORTED_REFERENCE');
         const targetId = crypto.randomUUID();
         const statements: HqTemplateStatement[] = [
           exactRowGuard('scenarios', safeSource),
+          guard(`(SELECT COUNT(*) FROM scenario_steps WHERE scenario_id=?)=?`, [reference.sourceId, steps.length]),
           guard(`NOT EXISTS(SELECT 1 FROM scenario_actions WHERE scenario_id=?) AND NOT EXISTS(SELECT 1 FROM scenario_triggers WHERE scenario_id=?)`, [reference.sourceId, reference.sourceId]),
         ];
         for (const step of steps) statements.push(exactRowGuard('scenario_steps', step));

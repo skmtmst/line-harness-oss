@@ -59,6 +59,19 @@ describe('form runtime and atomic store execution', () => {
     fixture.raw.prepare("UPDATE hq_template_versions SET definition_json=? WHERE id='version'").run(JSON.stringify({...definition,form:{...definition.form,on_submit_scenario_id:'source-scenario'}}));
     expect((await executeFormStore(options(await preflight('a')))).status).toBe('unsupported');expect(count('forms')).toBe(0);expect(count('scenarios')).toBe(1);expect(count('tags')).toBe(1);
   });
+  test('same-name destination scenarios are not silently reused',async()=>{
+    fixture.raw.exec("INSERT INTO scenarios(id,name,trigger_type,line_account_id,is_active) VALUES ('source-scenario','ご案内','manual','source',1),('target-scenario','ご案内','manual','a',1); INSERT INTO scenario_steps(id,scenario_id,step_order,message_type,message_content) VALUES ('source-step','source-scenario',1,'text','元の内容'),('target-step','target-scenario',1,'text','別の内容')");
+    fixture.raw.prepare("UPDATE hq_template_versions SET definition_json=? WHERE id='version'").run(JSON.stringify({...definition,form:{...definition.form,on_submit_scenario_id:'source-scenario'}}));
+    expect((await executeFormStore(options(await preflight('a')))).status).toBe('failed');expect(count('forms')).toBe(0);expect(count('scenarios')).toBe(2);
+  });
+  test.each(['trigger','completion','encoded-reference'])('non-portable scenario %s is rejected before destination writes',async kind=>{
+    fixture.raw.exec("INSERT INTO scenarios(id,name,trigger_type,on_complete_mode,line_account_id,is_active) VALUES ('source-scenario','ご案内','manual','pause','source',1); INSERT INTO scenario_steps(id,scenario_id,step_order,message_type,message_content) VALUES ('source-step','source-scenario',1,'text','ありがとうございます')");
+    if(kind==='trigger')fixture.raw.exec("UPDATE scenarios SET trigger_type='friend_add' WHERE id='source-scenario'");
+    if(kind==='completion')fixture.raw.exec("UPDATE scenarios SET on_complete_mode='restart' WHERE id='source-scenario'");
+    if(kind==='encoded-reference')fixture.raw.exec("UPDATE scenario_steps SET message_content='https%253A%252F%252Fliff.line.me%252Ffixture' WHERE id='source-step'");
+    fixture.raw.prepare("UPDATE hq_template_versions SET definition_json=? WHERE id='version'").run(JSON.stringify({...definition,form:{...definition.form,on_submit_scenario_id:'source-scenario'}}));
+    expect((await executeFormStore(options(await preflight('a')))).status).toBe('unsupported');expect(count('forms')).toBe(0);expect(count('scenarios')).toBe(1);
+  });
   test('concurrent replay observes staged and never starts another business plan',async()=>{
     const c=await preflight('a');let release!:()=>void,entered!:()=>void,builds=0;
     const gate=new Promise<void>(r=>{release=r}),ready=new Promise<void>(r=>{entered=r});
@@ -83,6 +96,13 @@ describe('form runtime and atomic store execution', () => {
   });
   test('source edit between plan and batch rolls back all destination writes',async()=>{
     const c=await preflight('a');expect((await executeHqAtomicStore({...options(c),buildPlan:async(context,input)=>{const p=await buildFormRuntimePlan({db:fixture.db,authority,context,input});fixture.raw.exec("UPDATE tags SET name='changed' WHERE id='source-tag'");return p}})).status).toBe('staged');expect(count('forms')).toBe(0);expect(count('tags')).toBe(1);
+  });
+  test('scenario step insertion between plan and batch is detected atomically',async()=>{
+    fixture.raw.exec("INSERT INTO scenarios(id,name,trigger_type,line_account_id,is_active) VALUES ('source-scenario','ご案内','manual','source',1); INSERT INTO scenario_steps(id,scenario_id,step_order,message_type,message_content) VALUES ('source-step','source-scenario',1,'text','最初の内容')");
+    fixture.raw.prepare("UPDATE hq_template_versions SET definition_json=? WHERE id='version'").run(JSON.stringify({...definition,form:{...definition.form,on_submit_scenario_id:'source-scenario'}}));
+    const c=await preflight('a');
+    const result=await executeHqAtomicStore({...options(c),buildPlan:async(context,input)=>{const plan=await buildFormRuntimePlan({db:fixture.db,authority,context,input});fixture.raw.exec("INSERT INTO scenario_steps(id,scenario_id,step_order,message_type,message_content) VALUES ('late-step','source-scenario',2,'text','後から追加')");return plan}});
+    expect(result.status).toBe('staged');expect(count('forms')).toBe(0);expect(fixture.raw.prepare("SELECT COUNT(*) n FROM scenarios WHERE line_account_id='a'").get()).toEqual({n:0});
   });
   test('changed replay choices and foreign authority cannot reuse the result',async()=>{
     const c=await preflight('a');await executeFormStore(options(c));
