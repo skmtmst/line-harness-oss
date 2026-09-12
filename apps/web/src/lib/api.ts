@@ -13,6 +13,7 @@ import type {
   BannerUsage,
 } from './hq-banners'
 import type { HqSupportKind, HqSupportRequest } from './hq-support'
+import type { BillingInvoice, BillingSummary, PlanKey } from './hq-billing'
 import type {
   ReminderDraftSettings,
   ReminderDraftVersion,
@@ -3361,6 +3362,16 @@ export const api = {
         method: 'PATCH',
         body: JSON.stringify({ name }),
       }),
+  },
+  /** 統括の課金（★V6 36-2）。形は `apps/worker/src/routes/hq-billing.ts`。 */
+  hqBilling: {
+    summary: () => fetchApi<ApiResponse<BillingSummary>>('/api/hq/billing/summary'),
+    /** Stripe の申込画面の URL。オーナーだけ。 */
+    checkout: (planKey: PlanKey) =>
+      fetchApi<ApiResponse<{ url: string }>>('/api/hq/billing/checkout', { method: 'POST', body: JSON.stringify({ planKey }) }),
+    /** 支払い方法・解約（Stripe のカスタマーポータル）の URL。 */
+    portal: () => fetchApi<ApiResponse<{ url: string }>>('/api/hq/billing/portal', { method: 'POST', body: JSON.stringify({}) }),
+    invoices: () => fetchApi<ApiResponse<BillingInvoice[]>>('/api/hq/billing/invoices'),
   },
   /** 統括から運営へのお問い合わせ（★V6 36-3）。形は `apps/worker/src/routes/hq-support.ts`。 */
   hqSupport: {

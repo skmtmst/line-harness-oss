@@ -335,6 +335,8 @@ export async function authMiddleware(c: Context<Env>, next: Next): Promise<Respo
     path.startsWith('/auth/') ||
     path === '/setup' ||
     path === '/api/integrations/stripe/webhook' ||
+    // 課金（サブスクリプション）の Stripe Webhook。署名で守る（routes/hq-billing.ts）。
+    path === '/api/hq/billing/webhook' ||
     path === '/api/integrations/eccube/events' ||
     path === '/api/integrations/eccube/columns' ||
     // Codex clients sign the exact body with a dedicated shared secret.

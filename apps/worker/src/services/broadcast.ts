@@ -21,6 +21,7 @@ import { aggregationUnitFor, aggregationUnits } from './broadcast-aggregation.js
 import { resolveInterpolationExtra } from './interpolation-context.js';
 import { createBroadcastRetryKey } from './broadcast-retry-key.js';
 import { evaluateQuota, fetchQuota, shortfallMessage } from './broadcast-quota-guard.js';
+import { getSendPermissionForAccount, type SendPermissionCache } from './send-entitlements.js';
 import { recordLineTokenDefaultFallback } from './line-token.js';
 import {
   assertMessagePartsResolved,
@@ -435,6 +436,7 @@ export async function processScheduledBroadcasts(
   lineClient: LineClient,
   workerUrl?: string,
 ): Promise<void> {
+  const sendPermissions: SendPermissionCache = new Map();
   const allBroadcasts = await getBroadcasts(db);
 
   const nowMs = Date.now();
@@ -478,6 +480,17 @@ export async function processScheduledBroadcasts(
         **取れないときは止めない。** LINE の口が落ちているだけで予約を潰すと、
         送れるはずの配信が届かなくなる。
       */
+      // 課金の状態（トライアル終了・解約）で配信が止まっている統括は送らない。
+      // 下書きへ戻し、予約は消す。プランを選べば送り直せる。
+      const permission = await getSendPermissionForAccount(db, accountId, sendPermissions);
+      if (!permission.allowed) {
+        console.warn(`[broadcast] scheduled broadcast ${broadcast.id} held: ${permission.reason}`);
+        await db.prepare(
+          `UPDATE broadcasts SET status = 'draft', scheduled_at = NULL WHERE id = ? AND status = 'sending'`,
+        ).bind(broadcast.id).run();
+        continue;
+      }
+
       const guard = await guardScheduledBroadcastQuota(db, broadcast, accountId);
       if (guard.blocked) {
         // 下書きへ戻す。**内容は消さない**ので、相手を減らして予約し直せる。
@@ -534,9 +547,16 @@ export async function processQueuedBroadcasts(
   workerUrl?: string,
 ): Promise<void> {
   const queued = await getQueuedBroadcasts(db);
+  const sendPermissions: SendPermissionCache = new Map();
   for (const broadcast of queued) {
     // アカウント別のlineClientを解決
     const accountId = (broadcast as unknown as Record<string, unknown>).line_account_id as string | null;
+    // 送っている途中でトライアルが終わった統括は、残りを送らずに待つ（プランを選べば続きから送れる）。
+    const permission = await getSendPermissionForAccount(db, accountId, sendPermissions);
+    if (!permission.allowed) {
+      console.warn(`[broadcast] queued broadcast ${broadcast.id} held: ${permission.reason}`);
+      continue;
+    }
     let client = lineClient;
     if (accountId) {
       const { getLineAccountById } = await import('@line-crm/db');

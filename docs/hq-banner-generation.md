@@ -34,7 +34,8 @@
 
 - 品質は `medium`（スタンダード）に固定。日本語の文字が崩れにくく、原価とのバランスがよい。変えるときは `BANNER_IMAGE_QUALITY`
 - 成功した枚数だけ台帳に記録する。失敗分は数えない
-- 月の上限は当面 `BANNER_MONTHLY_IMAGES`（既定 150）。料金プラン導入後はプランの値に置き換える
+- 月の上限は料金プランの値（`apps/worker/src/services/billing-plans.ts`）。課金対象外の統括（既存、`plan_status='exempt'`）だけ `BANNER_MONTHLY_IMAGES`（既定 150）
+- トライアル終了・解約の統括は生成を止める（`usage.blocked`）。画面は 35-4 の帯で「課金プランを見る」へ案内する
 
 ### 原価の目安（OpenAI gpt-image-2、2026-09 時点の公開情報・1ドル150円で換算）
 
@@ -76,7 +77,10 @@ OpenAI の公式価格はトークン単位（gpt-image-2: 出力 $15/1M トー�
 |---|---|---|
 | `OPENAI_API_KEY` | **secret**（`wrangler secret put`） | 未設定のときは生成だけ 503 で断る。ほかの機能は動く |
 | `OPENAI_IMAGE_MODEL` | var（任意） | 画像生成モデル名。未設定は `gpt-image-2` |
-| `BANNER_MONTHLY_IMAGES` | var（任意） | 統括ごとの月間上限（枚）。未設定は 150 |
+| `BANNER_MONTHLY_IMAGES` | var（任意） | 課金対象外の統括の月間上限（枚）。未設定は 150。課金中・トライアル中はプランの値が優先 |
+| `STRIPE_SECRET_KEY` | **secret** | 課金プラン（36-2）の申込・ポータル・請求の取得に使う。未設定は申込ボタンが押せないだけ |
+| `STRIPE_BILLING_WEBHOOK_SECRET` | **secret** | `POST /api/hq/billing/webhook` の署名検証。EC 側の Webhook とは別の値 |
+| `STRIPE_PRICE_LIGHT`／`STRIPE_PRICE_STANDARD`／`STRIPE_PRICE_PRO` | var | Stripe の価格 ID。無いプランは申し込めない |
 | `BANNER_IMAGE_QUALITY` | var（任意） | 生成の品質（low／medium／high）。未設定は medium |
 
 （統括の「お問い合わせ」の宛先は `SUPPORT_NOTIFY_EMAIL`。未設定なら `CONTACT_EMAIL` へ届く。値は Git に書かない）
@@ -135,4 +139,4 @@ OpenAI の公式価格はトークン単位（gpt-image-2: 出力 $15/1M トー�
 
 - LINE 規格サイズへの正確なリサイズ、リッチメッセージ（1040×1040 の固定サイズ）への変換
 - 参照画像つき生成、指示文による編集、背景除去、高画質化
-- 料金プランと連動した上限
+- トライアル終了・解約から 90 日後のデータ削除

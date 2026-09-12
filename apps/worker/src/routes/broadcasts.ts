@@ -8,6 +8,7 @@ import {
 } from '@line-crm/db';
 import type { Broadcast as DbBroadcast, BroadcastMessageType, BroadcastTargetType } from '@line-crm/db';
 import { LineClient } from '@line-crm/line-sdk';
+import { getSendPermissionForAccount } from '../services/send-entitlements.js';
 import { processBroadcastSend, buildMessage, processQueuedBroadcasts } from '../services/broadcast.js';
 import {
   MAX_BROADCAST_MESSAGES,
@@ -1163,6 +1164,11 @@ broadcasts.post('/api/broadcasts/:id/send', requireRole('owner', 'admin'), requi
     // 即時送信パスには recoverStalledBroadcasts がない)
     let accountToken: string | null = null;
     const broadcastAccountId = (existing as unknown as Record<string, unknown>).line_account_id;
+    // 課金の状態（トライアル終了・解約）で配信が止まっている統括は送らない（★V6 36-2）。
+    const sendPermission = await getSendPermissionForAccount(c.env.DB, (broadcastAccountId as string | null) ?? null);
+    if (!sendPermission.allowed) {
+      return c.json({ success: false, error: sendPermission.reason ?? '配信が止まっています' }, 409);
+    }
     if (broadcastAccountId) {
       const { getLineAccountById } = await import('@line-crm/db');
       const account = await getLineAccountById(c.env.DB, broadcastAccountId as string);

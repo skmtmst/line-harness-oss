@@ -18,11 +18,12 @@ describe('統括の左下アカウントメニュー', () => {
     expect(sidebar).toContain("{isHq ? <HqAccountMenu /> : <div className={styles.footer} />}")
   })
 
-  it('メニューにはメンバー管理・お問い合わせ・ログアウトを置き、まだ無い画面（課金プラン・プロフィール）は出さない', () => {
+  it('メニューにはメンバー管理・課金プラン・お問い合わせ・ログアウトを置き、まだ無い画面（プロフィール）は出さない', () => {
     expect(menu).toContain('href="/hq/members"')
+    expect(menu).toContain('href="/hq/billing"')
     expect(menu).toContain('href="/hq/support"')
     expect(menu).toContain('logoutAndGoToLogin')
-    expect(menu).not.toMatch(/href="\/hq\/(billing|profile)"/)
+    expect(menu).not.toMatch(/href="\/hq\/profile"/)
     expect(menu).not.toContain('準備中')
   })
 

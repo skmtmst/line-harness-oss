@@ -13,14 +13,14 @@ Pencil: `V6正本.pen` ★V6 36 系 5 画面。行は Y=224179（35 系の右）
 
 `docs/v6-common-rules.md` §1-2 の「メニュー下端に何も置かない」は、統括の画面だけ例外とした（同日改訂）。
 
-## 0-1. 実装の状態（2026-09-13、PR「codex/masato-hq-account-menu」）
+## 0-1. 実装の状態（2026-09-13、PR「codex/masato-hq-account-menu」「codex/masato-billing」）
 
 | 画面 | ルート | 状態 |
 |---|---|---|
-| 36-1 アカウントメニュー | 統括の全画面（`components/hq/account-menu.tsx`） | 実装。**プランの札と残り日数は 36-2 ができるまで出さず、役割の札を出す。「プロフィールを編集」「課金プラン」もまだ置かない**（出す＝使える） |
-| 36-2 課金プラン | — | 未実装（PR4） |
+| 36-1 アカウントメニュー | 統括の全画面（`components/hq/account-menu.tsx`） | 実装。プランの札（無料トライアル／プラン名／支払いを確認中／トライアル終了／契約終了）と残り日数は `GET /api/hq/billing/summary` から。課金対象外（既存の統括）は役割の札。**「プロフィールを編集」はまだ置かない**（出す＝使える）。課金プランの項目は担当者には出さない |
+| 36-2 課金プラン | `/hq/billing` | 実装（PR4）。契約状況の帯 → プラン 3 枚 → 注記 → 支払い履歴。申込は `POST /api/hq/billing/checkout`（オーナーのみ）→ Stripe Checkout、支払い方法・解約は `POST /api/hq/billing/portal`（オーナー・管理者）→ Stripe ポータル。Webhook は `POST /api/hq/billing/webhook`（`STRIPE_BILLING_WEBHOOK_SECRET` で検証、`billing_events` で二重処理を防ぐ）。**既存の統括は `plan_status='exempt'` のままで何も変わらない**。金額は Stripe の価格が取れればそれ、取れなければ仮（税込表示）。プロは「相談する」（お問い合わせへ） |
 | 36-3 お問い合わせ | `/hq/support` | 実装。送ると `hq_support_requests` に残り、運営（`SUPPORT_NOTIFY_EMAIL`、無ければ `CONTACT_EMAIL`）へメール、送信者へ控え。**店舗の受信箱（support-inbox）には入れない**（相手も向きも違うため別の表にした）。閲覧のみの権限は更新ができない決まりなので送れない（権限表の「閲覧のみ: 可」はここで直す） |
-| 36-4 会員登録 | — | 未実装（PR5） |
+| 36-4 会員登録 | — | 未実装（PR5）。登録時に `plan_status='trialing'`・`trial_ends_at=登録+30日` を入れる |
 | 36-5 メンバー管理 | `/hq/members`（`?tab=tenant` で統括の情報） | 実装。旧 `/hq/settings` は転送。招待の有効期限は API どおり **48時間**（設計の「7日」は Pencil も直した）。最終ログインは `GET /api/staff/last-logins`、再送は `POST /api/staff/:id/resend-invite` |
 
 統括メニューから「設定」を外した。
@@ -83,10 +83,11 @@ Pencil: `V6正本.pen` ★V6 36 系 5 画面。行は Y=224179（35 系の右）
 ## 4. データと外部連携
 
 - 認証: 既存の API キー＋Cookie セッションに、メール＋パスワード（ハッシュ）を併存させる。既存の権限者とログイン方法は変えない
-- 統括: `tenants` に `trial_ends_at`、`plan_key`、`plan_status`、`stripe_customer_id`、`stripe_subscription_id` を追加（追加のみ）
-- 課金: Stripe Checkout（subscription）、Customer Portal、Webhook（`checkout.session.completed` / `customer.subscription.updated` / `customer.subscription.deleted` / `invoice.paid`）。署名検証は既存の Stripe Webhook ルートの方式に合わせる
+- 統括: `tenants` に `trial_ends_at`、`plan_key`、`plan_status`、`stripe_customer_id`、`stripe_subscription_id`、`current_period_ends_at`、`plan_updated_at` を追加（追加のみ、migration 291）。`plan_status` の既定は `exempt`（課金対象外）。受け取った Webhook は `billing_events` に残す
+- 権利（いま何ができるか）: `apps/worker/src/services/billing-plans.ts` の `resolveEntitlements`。トライアル期限切れと解約は**配信（一斉配信・シナリオ・リマインダ・自動応答）とバナー生成を止め、閲覧はできる**。`past_due`（支払い失敗で Stripe が再試行中）は止めず案内だけ。判定に失敗したときは止めない（fail-open）
+- 課金: Stripe Checkout（subscription）、Customer Portal、Webhook（`checkout.session.completed` / `customer.subscription.created|updated|deleted` / `invoice.paid` / `invoice.payment_failed`）。署名検証は既存の Stripe Webhook ルートと同じ `services/stripe-signature.ts`。EC と同じ Stripe アカウントを使い、Webhook の署名シークレットだけ別（決定 2026-09-13）
 - お問い合わせ: 既存の support-inbox に「統括からの問い合わせ」として保存。メール送信は既存の送信経路
-- 設定（秘密）: `STRIPE_SECRET_KEY`、`STRIPE_BILLING_WEBHOOK_SECRET`、価格 ID 3 つ（環境変数）
+- 設定（秘密）: `STRIPE_SECRET_KEY`、`STRIPE_BILLING_WEBHOOK_SECRET`（secret）、価格 ID `STRIPE_PRICE_LIGHT`／`STRIPE_PRICE_STANDARD`／`STRIPE_PRICE_PRO`（var）。値は Git にもチャットにも書かない。鍵が無いときは画面に「接続設定がまだ」と出し、申込ボタンは押せない。Stripe 側に Webhook の送り先 `https://<Worker>/api/hq/billing/webhook` を登録する
 
 ## 5. 権限
 
@@ -95,7 +96,9 @@ Pencil: `V6正本.pen` ★V6 36 系 5 画面。行は Y=224179（35 系の右）
 | オーナー | 可 | 可 | 可 | 可 |
 | 管理者 | 可 | 可（役割の昇格は不可） | 閲覧のみ | 可 |
 | 担当者 | 可（プロフィールとお問い合わせのみ） | 不可 | 不可 | 可 |
-| 閲覧のみ | 可（閲覧） | 閲覧 | 閲覧 | 不可（更新ができない決まりのため） |
+| 閲覧のみ | 可（閲覧） | 閲覧 | 閲覧（役割が担当者なら不可） | 不可（更新ができない決まりのため） |
+
+「閲覧のみ」は役割とは別の印（`readOnly`）。課金プランは役割で判定し、担当者には出さない。申込はオーナーだけ、支払い方法の管理はオーナーと管理者。
 
 ## 6. 合格条件
 
@@ -108,7 +111,7 @@ Pencil: `V6正本.pen` ★V6 36 系 5 画面。行は Y=224179（35 系の右）
 
 ## 7. 未決・要確認
 
-- プランの価格と内容（仮置き）。Masato が決める
-- トライアル終了後に配信を止めるか、閲覧のみにするか（設計は「配信と生成が止まり、データは90日保持」で仮置き）
+- プランの価格と内容（仮置きのまま進める。決定 2026-09-13。正式な金額は Stripe の価格に入れる）
+- トライアル終了後の扱いは「配信と生成を止め、閲覧はできる。データは90日保持」で決定（2026-09-13）。90日後の実際の削除はまだ作っていない
 - 会員登録の公開範囲（誰でも登録できるか、招待制か）
 - 適格請求書の発行者と表記（Stripe の請求書設定）

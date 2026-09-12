@@ -23,6 +23,7 @@ import {
 import type { LineClient } from '@line-crm/line-sdk';
 import type { Message } from '@line-crm/line-sdk';
 import { jitterDeliveryTime, addJitter, sleep } from './stealth.js';
+import { getSendPermissionForAccount, type SendPermissionCache } from './send-entitlements.js';
 import { matchesCondition, parseCondition } from './segment-query.js';
 import { runScenarioActions, resumePreviousScenario, runScenarioOp } from './scenario-actions.js';
 import { parseQuestion, buildQuestionMessages } from './scenario-question.js';
@@ -192,6 +193,7 @@ export async function processStepDeliveries(
   }
 
   const now = jstNow();
+  const sendPermissions: SendPermissionCache = new Map();
   const dueFriendScenarios = await getFriendScenariosDueForDelivery(
     db,
     now,
@@ -209,7 +211,7 @@ export async function processStepDeliveries(
       if (i > 0) {
         await sleep(addJitter(50, 200));
       }
-      const sent = await processSingleDelivery(db, lineClient, fs, workerUrl);
+      const sent = await processSingleDelivery(db, lineClient, fs, workerUrl, sendPermissions);
       if (sent) sendCount++;
     } catch (err) {
       console.error(`Error processing friend_scenario ${fs.id}:`, err);
@@ -278,7 +280,17 @@ async function processSingleDelivery(
     started_at: string;
   },
   workerUrl?: string,
+  sendPermissions?: SendPermissionCache,
 ): Promise<boolean> {
+  // 課金の状態（トライアル終了・解約）で配信が止まっている統括は送らない。
+  // 予約は触らず（claim もしない）、次の cron でまた確かめる。プランを選べば続きから届く。
+  const scenarioAccount = await db
+    .prepare('SELECT line_account_id FROM scenarios WHERE id = ?')
+    .bind(fs.scenario_id)
+    .first<{ line_account_id: string | null }>();
+  const permission = await getSendPermissionForAccount(db, scenarioAccount?.line_account_id ?? null, sendPermissions);
+  if (!permission.allowed) return false;
+
   // Optimistic lock: claim this delivery (prevents duplicate sends from parallel workers)
   const claimed = await claimFriendScenarioForDelivery(db, fs.id, fs.current_step_order);
   if (!claimed) return false;

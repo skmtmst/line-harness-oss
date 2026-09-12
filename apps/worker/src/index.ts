@@ -129,6 +129,7 @@ import { restaurantTest } from './routes/restaurant-test.js';
 import { tenants } from './routes/tenants.js';
 import { hqBanners } from './routes/hq-banners.js';
 import { hqSupport } from './routes/hq-support.js';
+import { hqBilling } from './routes/hq-billing.js';
 import { codexSlackEvents } from './routes/codex-slack-events.js';
 import { clientErrors } from './routes/client-errors.js';
 import { lineWebhookEvents } from './routes/line-webhook-events.js';
@@ -200,6 +201,12 @@ export type Env = {
     BANNER_IMAGE_QUALITY?: string;
     /** 統括からのお問い合わせを知らせる運営の宛先。未設定なら CONTACT_EMAIL。 */
     SUPPORT_NOTIFY_EMAIL?: string;
+    /** 統括の課金（Stripe サブスクリプション）。値は secret／var で持ち、ここには書かない。 */
+    STRIPE_SECRET_KEY?: string;
+    STRIPE_BILLING_WEBHOOK_SECRET?: string;
+    STRIPE_PRICE_LIGHT?: string;
+    STRIPE_PRICE_STANDARD?: string;
+    STRIPE_PRICE_PRO?: string;
     TOTP_ENCRYPTION_KEY?: string;
     // AES-GCM key for credentials stored in line_accounts. Optional so a
     // missing secret does not stop unrelated Worker routes from starting.
@@ -414,6 +421,7 @@ app.route('/', restaurantTest);
 app.route('/', tenants);
 app.route('/', hqBanners);
 app.route('/', hqSupport);
+app.route('/', hqBilling);
 app.route('/', codexSlackEvents);
 app.route('/', clientErrors);
 app.route('/', lineWebhookEvents);
