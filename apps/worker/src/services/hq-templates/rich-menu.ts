@@ -65,7 +65,7 @@ function assertPublicUri(value: unknown): void {
     || [...url.searchParams.keys()].some(k => referenceParameter.test(k.replace(/[_-]/g, '').toLowerCase()))
     || referencePath.test(path) || referenceFragment.test(hash)) fail('OPAQUE_REFERENCE_UNSUPPORTED');
 }
-function parse(input: HqTemplateAdapterInput, tenantId: string): RichMenuHqDefinition {
+export function parseRichMenuTemplateDefinition(input: HqTemplateAdapterInput, tenantId: string): RichMenuHqDefinition {
   if (input.definitionJson.length > 128_000) fail('DEFINITION_TOO_LARGE');
   const d: unknown = JSON.parse(input.definitionJson);
   keys(d, ['schemaVersion', 'richMenu']);
@@ -152,7 +152,7 @@ export function createRichMenuHqTemplateAdapter(options: RichMenuAdapterOptions)
   const input = { ...options.input };
   if (requireHqTemplateAuthority(authority).kind !== 'AUTHORIZED') fail('FORBIDDEN');
   ident(authority.tenantId); ident(input.templateVersionId);
-  const d = parse(input, authority.tenantId); const g = d.richMenu; const refs = references(d);
+  const d = parseRichMenuTemplateDefinition(input, authority.tenantId); const g = d.richMenu; const refs = references(d);
   // D1 allows 100 bound parameters per statement. The atomic snapshot guard
   // needs the seven root bindings, reference bindings, and one expected snapshot.
   if (8 + refs.reduce((count, ref) => count + (ref.kind === 'form' ? 3 : 2), 0) > 100) fail('UNSUPPORTED_REFERENCE_LIMIT');

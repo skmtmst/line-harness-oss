@@ -234,8 +234,30 @@ describe('HQ tag HTTP and real SQLite boundaries', () => {
     expect(response.status).toBe(500); expect(count('hq_template_preflights')).toBe(0);
     expect(response.body.data).toBeUndefined();
   });
-  test('unimplemented types, cyclic or unrelated folders are rejected', async () => {
-    expect((await request('','POST',{type:'form',name:'未実装',definition,requestId:crypto.randomUUID()})).status).toBe(422);
+  test('all four portable template types can be saved, replayed, filtered and edited', async () => {
+    const definitions = {
+      tag: definition,
+      template: { schemaVersion: 1, template: { id: 'notice', name: 'お知らせ', messageType: 'text', messageContent: 'ご案内' }, media: [] },
+      rich_menu: { schemaVersion: 1, richMenu: { id: 'menu', name: 'ご案内', chatBarText: 'メニュー', size: 'large', defaultPageId: 'page', pages: [{ id: 'page', name: 'メイン', imageR2Key: 'hq-templates/tenant-a/menu.png', areas: [{ id: 'area', bounds: { x: 0, y: 0, width: 100, height: 100 }, actionType: 'message', actionData: { text: 'ご案内' }, intent: 'text' }] }] } },
+      form: { schemaVersion: 1, form: { name: 'アンケート', description: null, fields: [{ name: 'answer', label: '回答', type: 'text', required: true }], layout: null, on_submit_tag_id: null, on_submit_scenario_id: null, save_to_metadata: true } },
+    } as const;
+    for (const type of ['tag', 'template', 'rich_menu', 'form'] as const) {
+      const input = { type, name: `${type}ひな形`, definition: definitions[type], requestId: crypto.randomUUID() };
+      const created = await request('', 'POST', input);
+      expect(created.status, JSON.stringify(created.body)).toBe(201);
+      expect(created.body.data.template.template_type).toBe(type);
+      expect(await request('', 'POST', input)).toEqual(created);
+      const filtered = await request(`?type=${type}`);
+      expect(filtered.body.data.map((item: any) => item.id)).toEqual([created.body.data.template.id]);
+      const edited = await request(`/${created.body.data.template.id}`, 'PATCH', { name: `${type}改訂`, definition: definitions[type], expectedRevision: created.body.data.template.revision });
+      expect(edited.status, JSON.stringify(edited.body)).toBe(200);
+      expect(edited.body.data.template.template_type).toBe(type);
+    }
+    expect(count('hq_templates')).toBe(4);
+    expect(count('hq_template_versions')).toBe(8);
+  });
+  test('invalid definitions, cyclic or unrelated folders are rejected', async () => {
+    expect((await request('','POST',{type:'form',name:'不正',definition,requestId:crypto.randomUUID()})).status).toBe(400);
     for (const folders of [[{id:'child',name:'循環',parentId:'child'}],[...definition.folders,{id:'unrelated',name:'不要'}]]) {
       expect((await request('','POST',{type:'tag',name:'不正',definition:{...definition,folders},requestId:crypto.randomUUID()})).status).toBe(400);
     }
