@@ -68,6 +68,7 @@ import {
 } from '@line-crm/db';
 import { verifyCallerLineUserId } from '../services/liff-auth.js';
 import { attachTagAndFireSideEffects } from '../services/friend-tag-attach.js';
+import { recordConversionSourceEvent } from '@line-crm/db';
 import { resolveSession, parseScheduleRules, upcomingSessions } from '../services/webinar-schedule.js';
 import { sendWebinarRegistrationConfirmation } from '../services/webinar-reminders.js';
 import {
@@ -393,6 +394,14 @@ webinarRoutes.post('/api/liff/webinars/:slug/heartbeat', async (c) => {
         auth.friendId,
         sessionStartAt,
       ));
+      // 視聴完了を成果計測へ接続する(#648)。同じ視聴の再送は冪等キーで1件にまとまる。
+      c.executionCtx.waitUntil(recordConversionSourceEvent(c.env.DB, {
+        sourceType: 'webinar_completed',
+        lineAccountId: loaded.webinar.account_id,
+        friendId: auth.friendId,
+        sourceEventId: `${loaded.webinar.id}:${auth.friendId}:complete`,
+        metadata: { webinarId: loaded.webinar.id, sessionStartAt },
+      }).catch((err) => console.error('webinar conversion record failed:', err)));
     }
     return c.json({ ok: true });
   } catch (err) {
