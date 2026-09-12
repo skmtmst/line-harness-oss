@@ -9,6 +9,7 @@ import NoteBar from '@/components/shared/note-bar'
 import SummaryCard from '@/components/shared/summary-card'
 import { DataTable, NameCell, Td, Th, Tr } from '@/components/shared/table'
 import { ApiError, api, type OperatorNotificationRule } from '@/lib/api'
+import { operatorEventLabel } from './operator-event-options'
 
 type LoadState = 'loading' | 'ready' | 'error' | 'forbidden'
 type DraftConditions = { recipientLabel?: string; scheduleLabel?: string }
@@ -22,12 +23,6 @@ type OperatorNotificationSummary = {
   excludedToday: number
 }
 
-const EVENT_LABELS: Record<string, string> = {
-  message_received: '受信箱に届いたとき',
-  friend_add: '友だちが追加されたとき',
-  cv_fire: '成果が記録されたとき',
-  'incoming_webhook.custom': '外部連携のイベントを受け取ったとき',
-}
 
 function conditionsOf(rule: OperatorNotificationRule): DraftConditions {
   return rule.conditions as DraftConditions
@@ -74,7 +69,7 @@ export default function OperatorNotificationRules({ lineAccountId }: { lineAccou
       if (filter === 'published' && rule.status !== 'published') return false
       if (filter === 'draft' && rule.status !== 'draft') return false
       if (filter === 'missing' && rule.recipientCount > 0) return false
-      return !normalized || [rule.name, EVENT_LABELS[rule.eventType] ?? rule.eventType, conditionsOf(rule).recipientLabel]
+      return !normalized || [rule.name, operatorEventLabel(rule.eventType), conditionsOf(rule).recipientLabel]
         .some((value) => value?.toLocaleLowerCase('ja-JP').includes(normalized))
     })
   }, [filter, query, rules])
@@ -167,7 +162,7 @@ export default function OperatorNotificationRules({ lineAccountId }: { lineAccou
       : visible.length === 0 ? <ListState kind="empty" title="条件に合うお知らせはありません" description="検索語か絞り込みを変えてください。" />
       : <DataTable><thead><tr><Th>お知らせ</Th><Th>きっかけ</Th><Th>受け取る人</Th><Th>送る時間</Th><Th>今日</Th><Th>操作</Th></tr></thead><tbody>{visible.map((rule) => <Tr key={rule.id}>
         <NameCell name={<span title={rule.name}>{rule.name}</span>} sub={channelLabel(rule.channels)} />
-        <Td>{EVENT_LABELS[rule.eventType] ?? '接続先を確認してください'}</Td>
+        <Td>{operatorEventLabel(rule.eventType)}</Td>
         <Td><span className={rule.recipientCount > 0 ? 'text-ink-secondary' : 'font-semibold text-warning'}>{rule.recipientCount > 0 ? `${rule.recipientCount}人` : '受け取れる人なし'}</span></Td>
         <Td>{conditionsOf(rule).scheduleLabel ?? 'いつでも'}</Td>
         <Td>{rule.occurredToday > 0 ? `${rule.occurredToday}件` : '—'}</Td>

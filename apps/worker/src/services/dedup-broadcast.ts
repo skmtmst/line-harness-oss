@@ -191,9 +191,20 @@ export async function computeDedupBroadcastPreview(
 }
 
 import { LineClient } from '@line-crm/line-sdk';
-import { getCommonVarMap, getLineAccountById, jstNow, updateBroadcastLineRequestId } from '@line-crm/db';
+import {
+  getCommonVarMap,
+  getLineAccountById,
+  jstNow,
+  updateBroadcastLineRequestId,
+  getBlockedRecipientIds,
+  markBroadcastRecipientsDispatched,
+  buildBroadcastSettleStatements,
+  settleBroadcastRecipients,
+  isBroadcastStopped,
+} from '@line-crm/db';
 import { calculateStaggerDelay, sleep } from './stealth.js';
 import { createBroadcastRetryKey } from './broadcast-retry-key.js';
+import { classifyDeliveryFailure, deliveryErrorCode } from './broadcast-delivery-outcome.js';
 import {
   assertMessagePartsResolved,
   buildMessages,
@@ -221,6 +232,9 @@ export interface ProcessMultiAccountDedupResult {
   // caller は status='sent' にせず batch_offset=0 に戻して次の cron tick に継続させる。
   // true = 全 account を送り切った (= 完了)。caller が status='sent' にする。
   complete: boolean;
+  // 運用者が停止を押したので束の切れ目で降りた (#662)。complete=false と同じく
+  // caller は status='sent' にしない。再開するまで queue は拾わない。
+  stopped: boolean;
 }
 
 // 1 回の cron 実行でこの時間 (ms) を超えたら、残りは次の tick に回して yield する。
@@ -307,6 +321,8 @@ export async function processMultiAccountDedupBroadcast(
     alt_text?: string | null;
     dedup_progress?: string | null;
     aggregation_unit?: string | null;
+    /** 送信の試行番号。失敗分の再送で進む。台帳と provider の再送キーに使う。 */
+    send_attempt_no?: number | null;
   },
   lineClientFactory: (token: string) => LineClient = (t) => new LineClient(t),
   opts: { maxRunMs?: number; now?: () => number } = {},
@@ -321,6 +337,8 @@ export async function processMultiAccountDedupBroadcast(
   // (毎 tick 必ず success_count が伸びる → 永久に同じ所で足踏みしない)。
   let sentAnyBatch = false;
   let timeExceeded = false;
+  // 運用者が停止を押した (#662)。束の切れ目で降りる。
+  let stopRequested = false;
 
   const accountIds = (broadcast.account_ids ? JSON.parse(broadcast.account_ids) : []) as string[];
   const dedupPriority = (broadcast.dedup_priority ? JSON.parse(broadcast.dedup_priority) : []) as string[];
@@ -336,6 +354,16 @@ export async function processMultiAccountDedupBroadcast(
   // identKey ベースで既送ぶんを除外して残差だけ送る。
   const progress = parseProgress(broadcast.dedup_progress);
   const sentSet = new Set(progress.sentIdentKeys);
+
+  /*
+   * 送達台帳（#662）。dedup は identKey で「送った人」を覚えているが、
+   * **送れなかった人・外へ出たか分からない人**は覚えていない。台帳の
+   * blocked は送達済み(sent)と送達不明(unknown)の friend_id で、停止をまたいだ
+   * 再送で送達不明の相手へ2通目が出るのを防ぐ。identKey の集合と役割が
+   * 違うので、両方を見る。
+   */
+  const blocked = await getBlockedRecipientIds(db, broadcast.id);
+  const attemptNo = Number(broadcast.send_attempt_no ?? 1) || 1;
 
   // totalCount は「この broadcast の意図した audience 全体」= 既送 identKey ∪
   // active アカウントの preview 当選者 identKey。母集団変動 (unfollow / tag 喪失) で
@@ -361,6 +389,7 @@ export async function processMultiAccountDedupBroadcast(
 
   for (const accountResult of preview.perAccount) {
     if (timeExceeded) break; // 時間バジェット超過 — 残アカウントは次の cron tick で処理
+    if (stopRequested) break; // 停止済み — 新しいアカウントの送信を始めない
     const account = await getLineAccountById(db, accountResult.accountId);
     if (!account || !account.is_active) {
       console.log(`[multi-account-dedup] skipping inactive/missing account ${accountResult.accountId}`);
@@ -375,7 +404,11 @@ export async function processMultiAccountDedupBroadcast(
     // 既に送信済の identKey を持つ recipient を除外して残差だけ送る。
     // identKey は dedup の意味論的 ID なので、母集団変動や cross-account 遷移が
     // あっても論理重複を完全に防げる。
-    const remaining = recipients.filter((r) => !sentSet.has(r.identKey));
+    // 台帳が送達済み・送達不明と覚えている相手も外す。identKey の集合だけだと
+    // 「外へ出たかもしれない」相手が未送扱いで残り、再送で2通目が出る。
+    const remaining = recipients.filter(
+      (r) => !sentSet.has(r.identKey) && !blocked.has(r.friendId),
+    );
     if (remaining.length === 0) continue; // このアカに残作業なし
 
     const sourceParts = broadcast.messageParts ?? parseBroadcastMessageParts({
@@ -443,6 +476,13 @@ export async function processMultiAccountDedupBroadcast(
           break;
         }
 
+        // 次の束へ進む前に停止を読み直す（#662）。送り終えた束は取り消せない
+        // ので、新しい束を始めないことで止める。
+        if (await isBroadcastStopped(db, broadcast.id)) {
+          stopRequested = true;
+          break;
+        }
+
         if (batchIdx > 0) {
           await sleep(calculateStaggerDelay(remaining.length, batchIdx, deliveryBatchSize));
         }
@@ -453,6 +493,10 @@ export async function processMultiAccountDedupBroadcast(
           content: string;
         }>;
         let batchDeliveryError: unknown = null;
+        // 外へ出たかもしれない相手の集合。決着が付かなかったぶんは停止の
+        // 受付時に送達不明へ倒れ、再送の対象から外れる。
+        const dispatchedIds: string[] = [];
+        let failedRecipientIds: string[] = [];
         if (personalized) {
           for (const recipient of batch) {
             try {
@@ -464,15 +508,26 @@ export async function processMultiAccountDedupBroadcast(
               const retryKey = await createBroadcastRetryKey(
                 broadcast.id,
                 'dedup-personalized-push',
+                `attempt:${attemptNo}`,
                 recipient.friendId,
                 JSON.stringify(recipientMessages),
               );
+              // 外へ出す直前に台帳へ書く。1人ずつ押さえるので、束の途中で
+              // 落ちたときに**まだ試していない相手**を送達不明にしない。
+              await markBroadcastRecipientsDispatched(db, {
+                broadcastId: broadcast.id,
+                attemptNo,
+                lineAccountId: account.id,
+                friendIds: [recipient.friendId],
+              });
+              dispatchedIds.push(recipient.friendId);
               await client.pushMessage(recipient.lineUserId, recipientMessages, retryKey, [unit]);
               for (const part of renderedParts) {
                 delivered.push({ recipient, messageType: part.messageType, content: part.messageContent });
               }
             } catch (err) {
               batchDeliveryError = err;
+              failedRecipientIds = [recipient.friendId];
               break;
             }
           }
@@ -481,11 +536,33 @@ export async function processMultiAccountDedupBroadcast(
           const retryKey = await createBroadcastRetryKey(
             broadcast.id,
             'dedup-multicast',
+            `attempt:${attemptNo}`,
             account.id,
             ...batch.map((r) => r.identKey),
             JSON.stringify(batchMessages),
           );
-          await client.multicast(batch.map((r) => r.lineUserId), batchMessages, [unit], retryKey);
+          await markBroadcastRecipientsDispatched(db, {
+            broadcastId: broadcast.id,
+            attemptNo,
+            lineAccountId: account.id,
+            friendIds: batch.map((r) => r.friendId),
+          });
+          dispatchedIds.push(...batch.map((r) => r.friendId));
+          try {
+            await client.multicast(batch.map((r) => r.lineUserId), batchMessages, [unit], retryKey);
+          } catch (err) {
+            // 誰が落ちたかを台帳へ残してから、従来どおりアカウント単位の
+            // 失敗として投げ直す。残さないと再送の対象が作れない。
+            const outcome = classifyDeliveryFailure(err);
+            await settleBroadcastRecipients(db, {
+              broadcastId: broadcast.id,
+              friendIds: dispatchedIds,
+              state: outcome,
+              errorCode: deliveryErrorCode(err),
+            });
+            if (outcome === 'unknown') for (const id of dispatchedIds) blocked.add(id);
+            throw err;
+          }
           for (const recipient of batch) {
             for (const part of accountParts) {
               delivered.push({ recipient, messageType: part.messageType, content: part.messageContent });
@@ -501,6 +578,7 @@ export async function processMultiAccountDedupBroadcast(
         }
 
         const now = jstNow();
+        const deliveredIds = [...new Set(delivered.map(({ recipient }) => recipient.friendId))];
         // messages_log INSERT と progress UPDATE を 1 batch にまとめてアトミックに
         // 永続化する。Worker が multicast 後・batch 完了前に死ぬと「LINE 配信済 +
         // DB 進捗未更新」になって resume 時に同 batch を再送 → 重複配信事故が起きる。
@@ -517,10 +595,31 @@ export async function processMultiAccountDedupBroadcast(
           db.prepare(
             `UPDATE broadcasts SET dedup_progress = ?, success_count = ? WHERE id = ?`,
           ).bind(JSON.stringify(progress), progress.sentIdentKeys.length, broadcast.id),
+          // 台帳の決着を**同じ batch** に載せる。分けて流すと、送達の記録だけ
+          // 残って台帳が押さえたままの窓ができ、その相手が「届いたのに
+          // 送達不明」になる。
+          ...buildBroadcastSettleStatements(db, {
+            broadcastId: broadcast.id,
+            friendIds: deliveredIds,
+            state: 'sent',
+          }),
         ];
         await db.batch(stmts);
+        for (const id of deliveredIds) blocked.add(id);
         sentAnyBatch = true; // 1 batch 以上 durable に記録した → 前進保証 & yield 可
-        if (batchDeliveryError) throw batchDeliveryError;
+        if (batchDeliveryError) {
+          // 1人ずつ送る経路で落ちた相手。届いていないと断定できたものだけを
+          // 再送の対象にし、分からないものは送達不明のまま置く。
+          const outcome = classifyDeliveryFailure(batchDeliveryError);
+          await settleBroadcastRecipients(db, {
+            broadcastId: broadcast.id,
+            friendIds: failedRecipientIds,
+            state: outcome,
+            errorCode: deliveryErrorCode(batchDeliveryError),
+          });
+          if (outcome === 'unknown') for (const id of failedRecipientIds) blocked.add(id);
+          throw batchDeliveryError;
+        }
       }
     } catch (err) {
       console.error(`[multi-account-dedup] account ${account.id} failed:`, err);
@@ -553,5 +652,5 @@ export async function processMultiAccountDedupBroadcast(
   //
   // complete=false (timeExceeded) のときは caller が status='sent' にせず batch_offset=0 に
   // 戻し、次の cron tick が getQueuedBroadcasts で拾って残りを送る (= 分割送信)。
-  return { totalCount, successCount, failedAccountIds, complete: !timeExceeded };
+  return { totalCount, successCount, failedAccountIds, complete: !timeExceeded && !stopRequested, stopped: stopRequested };
 }

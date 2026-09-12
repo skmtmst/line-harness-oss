@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { ApiError, api, type ApiBroadcast, type BroadcastInsight } from '@/lib/api'
+import { ApiError, api, type ApiBroadcast, type BroadcastInsight, type BroadcastLedger } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import Header from '@/components/layout/header'
 import FlexPreviewComponent from '@/components/flex-preview'
@@ -10,6 +10,7 @@ import TestSendSection from '@/components/broadcasts/test-send-section'
 import ProgressBar from '@/components/broadcasts/progress-bar'
 import SendConfirmDialog from '@/components/broadcasts/send-confirm-dialog'
 import SegmentBuilder from '@/components/broadcasts/segment-builder'
+import BroadcastStopControls from '@/components/broadcasts/broadcast-stop-controls'
 import Button from '@/components/shared/button'
 import { startVisiblePoll } from '@/lib/visible-polling'
 import { broadcastCsvFilename } from './broadcast-csv-filename'
@@ -50,6 +51,14 @@ export default function BroadcastDetail({ broadcastId }: BroadcastDetailProps) {
     uniqueClick: number | null;
   }> | null>(null)
   const [showSegmentBuilder, setShowSegmentBuilder] = useState(false)
+  /*
+   * 送達台帳の内訳（#662）。届いた・届かなかった・送達不明・送信中。
+   *
+   * 「送信成功 N人」だけを出すと、運用者は「残りは失敗したのだから
+   * 送り直せる」と読む。**送達不明は送り直せない。**外へ出たかもしれない
+   * 相手へもう一度送ると、相手のトークに2通残って取り消せないため。
+   */
+  const [ledger, setLedger] = useState<BroadcastLedger | null>(null)
 
   const load = useCallback(async () => {
     // 別 broadcast へ移動後の遅い応答は捨てる(順序逆転防止、#630)。
@@ -62,6 +71,7 @@ export default function BroadcastDetail({ broadcastId }: BroadcastDetailProps) {
     setPerAccountStats(null)
     setInsight(null)
     setTargetCount(null)
+    setLedger(null)
     try {
       const res = await api.broadcasts.get(id)
       if (requestId !== latestIdRef.current) return
@@ -76,6 +86,17 @@ export default function BroadcastDetail({ broadcastId }: BroadcastDetailProps) {
             ? prev
             : fresh,
         )
+        /*
+         * 送達台帳を読む（#662）。送信中でも送信完了でも要る。
+         * 送信完了の画面には進捗の巡回が回らないので、ここで1回だけ引かないと
+         * 「失敗した相手へ送り直す」に出す人数が無い。
+         */
+        if (fresh.status === 'sending' || fresh.status === 'sent') {
+          api.broadcasts.getProgress(id).then((r) => {
+            if (requestId !== latestIdRef.current) return
+            if (r.success && r.data?.ledger) setLedger(r.data.ledger)
+          }).catch(() => {/* ignore — 台帳が読めなくても本文は出す */})
+        }
         if (res.data.totalCount > 0) {
           setTargetCount(res.data.totalCount)
         } else if (res.data.status === 'draft' || res.data.status === 'scheduled') {
@@ -129,7 +150,13 @@ export default function BroadcastDetail({ broadcastId }: BroadcastDetailProps) {
           status: data.status as ApiBroadcast['status'],
           totalCount: data.totalCount,
           successCount: data.successCount,
+          // 停止の状態と版を、進捗と同じ応答で最新にする。版が古いままだと
+          // 停止ボタンが必ず 409 になる。
+          stopped: data.stopped ?? prev.stopped,
+          stoppedAt: data.stoppedAt ?? prev.stoppedAt,
+          sendAttemptNo: data.sendAttemptNo ?? prev.sendAttemptNo,
         } : prev)
+        if (data.ledger) setLedger(data.ledger)
         setPerAccountStats(data.perAccountStats)
         if (data.status === 'sent') {
           finished = true
@@ -264,6 +291,16 @@ export default function BroadcastDetail({ broadcastId }: BroadcastDetailProps) {
           ))}
         </nav>
 
+        <BroadcastStopControls
+          broadcastId={id}
+          status={broadcast.status}
+          stopped={!!broadcast.stopped}
+          version={broadcast.version ?? 1}
+          ledger={ledger}
+          targetType={broadcast.targetType}
+          onChanged={load}
+        />
+
         <section className="mb-4">
           <h2 className="text-ink text-lg font-bold">配信結果</h2>
           <p className="text-ink-secondary mt-1 text-sm">送信・開封・クリック・ブロックを確認します。</p>
@@ -392,13 +429,20 @@ export default function BroadcastDetail({ broadcastId }: BroadcastDetailProps) {
             <div className="flex justify-between">
               <dt className="text-ink-faint">ステータス</dt>
               <dd>
-                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                <span data-testid="broadcast-status-badge" className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
                   broadcast.status === 'draft' ? 'bg-canvas-sunken text-ink-secondary' :
                   broadcast.status === 'scheduled' ? 'bg-info-bg text-info' :
                   broadcast.status === 'sending' ? 'bg-warning-bg text-warning' :
                   'bg-success-bg text-success'
                 }`}>
-                  {broadcast.status === 'draft' ? '下書き' : broadcast.status === 'scheduled' ? '予約済み' : broadcast.status === 'sending' ? '送信中' : '送信完了'}
+                  {/*
+                    停止中を「送信中」と出さない（#662）。運用者が停止を押した
+                    のに送信中のままだと、効いていないと読んでもう一度押す。
+                  */}
+                  {broadcast.status === 'draft' ? '下書き'
+                    : broadcast.status === 'scheduled' ? '予約済み'
+                    : broadcast.status === 'sending' ? (broadcast.stopped ? '停止中' : '送信中')
+                    : '送信完了'}
                 </span>
               </dd>
             </div>
@@ -467,6 +511,18 @@ export default function BroadcastDetail({ broadcastId }: BroadcastDetailProps) {
       )}
 
       {/* Send Progress */}
+      {broadcast.status === 'sending' && (
+        <BroadcastStopControls
+          broadcastId={id}
+          status={broadcast.status}
+          stopped={!!broadcast.stopped}
+          version={broadcast.version ?? 1}
+          ledger={ledger}
+          targetType={broadcast.targetType}
+          onChanged={load}
+        />
+      )}
+
       {broadcast.status === 'sending' && (
         <div className="mb-4">
           <ProgressBar totalCount={broadcast.totalCount} successCount={broadcast.successCount} />

@@ -1330,6 +1330,16 @@ friendAttributes.get('/api/login-audit', requireRole('owner', 'admin'), async (c
   }
 });
 
+async function folderBoundary(c: Context<Env>, folder: { account_id: string | null; kind: string }, requested?: string): Promise<Response | null> {
+  const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+  const owner = folder.account_id ?? null;
+  if (owner ? !scope.allowedAccountIds.includes(owner) || Boolean(requested && requested !== owner)
+    : folder.kind === 'tag' && !scope.canSeeUnassigned) {
+    return c.json({ success: false, error: 'Not found' }, 404);
+  }
+  return null;
+}
+
 // ── 汎用フォルダ ────────────────────────────────────────────
 
 friendAttributes.get('/api/folders', async (c) => {
@@ -1361,7 +1371,12 @@ friendAttributes.get('/api/folders', async (c) => {
       });
     }
 
-    const items = await getFolders(c.env.DB, kind);
+    const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+    const requestedAccountId = c.req.query('account_id')?.trim();
+    if (requestedAccountId && !scope.allowedAccountIds.includes(requestedAccountId)) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
+    const items = await getFolders(c.env.DB, kind, requestedAccountId, scope);
 
     // kind を指定しない呼び出しは全種別をまとめて返す口で、往復回数も
     // 数えるべき母集団も定まらないため件数を数えない。呼び出し元は
@@ -1371,9 +1386,8 @@ friendAttributes.get('/api/folders', async (c) => {
       return c.json({ success: true, data: items.map((row) => serializeFolder(row)) });
     }
 
-    const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
     const itemCounts = await getFolderItemCounts(c.env.DB, kind, {
-      allowedAccountIds: scope.allowedAccountIds,
+      allowedAccountIds: requestedAccountId ? [requestedAccountId] : scope.allowedAccountIds,
       canSeeUnassigned: scope.canSeeUnassigned,
     });
     return c.json({
@@ -1406,10 +1420,14 @@ friendAttributes.post('/api/folders', requireRole('owner', 'admin'), async (c) =
     const name = typeof body.name === 'string' ? body.name.trim() : '';
     if (!name) return c.json({ success: false, error: 'フォルダ名を入力してください' }, 400);
 
-    const accountId = body.kind === 'webinar'
+    const accountId = body.kind === 'webinar' || body.kind === 'tag'
       ? (typeof body.accountId === 'string' ? body.accountId.trim() : '')
       : '';
-    if (body.kind === 'webinar') {
+    if (body.kind === 'tag' && !accountId) {
+      const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+      if (!scope.canSeeUnassigned) return c.json({ success: false, error: 'account_id_required' }, 400);
+    }
+    if (body.kind === 'webinar' || accountId) {
       if (!accountId) return c.json({ success: false, error: 'account_id_required' }, 400);
       const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
       if (!scope.allowedAccountIds.includes(accountId)) {
@@ -1427,7 +1445,7 @@ friendAttributes.post('/api/folders', requireRole('owner', 'admin'), async (c) =
       if (parent.kind !== body.kind) {
         return c.json({ success: false, error: '別の種類のフォルダには入れられません' }, 422);
       }
-      if (body.kind === 'webinar' && parent.account_id !== accountId) {
+      if ((parent.account_id ?? null) !== (accountId || null)) {
         return c.json({ success: false, error: '親フォルダが見つかりません' }, 400);
       }
     }
@@ -1464,6 +1482,8 @@ friendAttributes.patch('/api/folders/:id', requireRole('owner', 'admin'), async 
     if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
 
     const body = await c.req.json<Record<string, unknown>>();
+    const access = await folderBoundary(c, existing, typeof body.accountId === 'string' ? body.accountId.trim() : c.req.query('account_id')?.trim());
+    if (access) return access;
     let webinarAccountId = '';
     if (existing.kind === 'webinar') {
       webinarAccountId = typeof body.accountId === 'string' ? body.accountId.trim() : '';
@@ -1489,7 +1509,7 @@ friendAttributes.patch('/api/folders/:id', requireRole('owner', 'admin'), async 
       if (parentId) {
         const parent = await getFolderById(c.env.DB, parentId);
         if (!parent || parent.kind !== existing.kind
-          || (existing.kind === 'webinar' && parent.account_id !== webinarAccountId)) {
+          || (parent.account_id ?? null) !== (existing.account_id ?? null)) {
           return c.json({ success: false, error: '親フォルダが見つかりません' }, 400);
         }
         if (parent.parent_id) {
@@ -1533,7 +1553,11 @@ friendAttributes.delete('/api/folders/:id', requireRole('owner', 'admin'), async
         return c.json({ success: false, error: 'Not found' }, 404);
       }
     }
-    await deleteFolder(c.env.DB, id);
+    const denied = await folderBoundary(c, existing, c.req.query('account_id')?.trim());
+    if (denied) return denied;
+    if (!(await deleteFolder(c.env.DB, id))) {
+      return c.json({ success: false, error: 'フォルダの店舗境界を確認してください' }, 409);
+    }
     return c.json({ success: true, data: null });
   } catch (err) {
     console.error('DELETE /api/folders/:id error:', err);

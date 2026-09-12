@@ -297,6 +297,86 @@ const spec = {
     },
   },
   paths: {
+    // ── HQ Templates ───────────────────────────────────────────────────────
+    '/api/hq/templates/accounts': {
+      get: {
+        tags: ['HQ Templates'],
+        summary: '配布先として選べるLINE公式アカウントを取得',
+        responses: { '200': { description: 'Tenant-scoped account list' }, '403': { description: 'Owner or admin role required' } },
+      },
+    },
+    '/api/hq/templates': {
+      get: {
+        tags: ['HQ Templates'],
+        summary: '統括ひな形一覧を取得',
+        parameters: [{ name: 'type', in: 'query', schema: { type: 'string', enum: ['tag', 'rich_menu', 'template', 'form'] } }],
+        responses: { '200': { description: 'Tenant-scoped template list' }, '400': { description: 'Invalid template type' }, '403': { description: 'Owner or admin role required' } },
+      },
+      post: {
+        tags: ['HQ Templates'],
+        summary: '統括ひな形を作成',
+        parameters: [{ name: 'Idempotency-Key', in: 'header', schema: { type: 'string' }, description: '再送時も同じ値を使用する作成依頼ID。省略時はbody.requestIdが必須' }],
+        requestBody: {
+          required: true,
+          content: { 'application/json': { schema: { type: 'object', required: ['type', 'name', 'definition'], properties: {
+            requestId: { type: 'string' }, type: { type: 'string', enum: ['tag', 'rich_menu', 'template', 'form'] },
+            name: { type: 'string', minLength: 1 }, description: { type: 'string' }, definition: { type: 'object' },
+          } } } },
+        },
+        responses: { '201': { description: 'Created, or the same idempotent result' }, '400': { description: 'Invalid request' }, '403': { description: 'Owner or admin role required' }, '409': { description: 'Idempotency conflict' } },
+      },
+    },
+    '/api/hq/templates/{id}': {
+      get: {
+        tags: ['HQ Templates'], summary: '統括ひな形の詳細を取得',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'Template detail' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Not found' } },
+      },
+      patch: {
+        tags: ['HQ Templates'], summary: '統括ひな形を改訂',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['expectedRevision', 'name', 'definition'], properties: {
+          expectedRevision: { type: 'integer', minimum: 1 }, name: { type: 'string', minLength: 1 }, description: { type: 'string' }, definition: { type: 'object' },
+        } } } } },
+        responses: { '200': { description: 'Updated' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Not found' }, '409': { description: 'Revision conflict' } },
+      },
+      delete: {
+        tags: ['HQ Templates'], summary: '統括ひな形を削除',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['expectedRevision'], properties: { expectedRevision: { type: 'integer', minimum: 1 } } } } } },
+        responses: { '200': { description: 'Deleted' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Not found' }, '409': { description: 'Revision conflict' } },
+      },
+    },
+    '/api/hq/templates/{id}/preflight': {
+      post: {
+        tags: ['HQ Templates'], summary: '配布先の競合を事前検査',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['accountIds'], properties: { accountIds: { type: 'array', items: { type: 'string' } } } } } } },
+        responses: { '200': { description: 'Preflight result with per-account conflicts' }, '400': { description: 'Invalid account selection' }, '403': { description: 'Owner or admin role required' } },
+      },
+    },
+    '/api/hq/templates/{id}/distribute': {
+      post: {
+        tags: ['HQ Templates'], summary: '事前検査済みの選択内容で店舗へ配布',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['preflightId', 'resolutions'], properties: {
+          preflightId: { type: 'string' }, resolutions: { type: 'array', maxItems: 270, items: { type: 'object', required: ['accountId', 'sourceId', 'mode'], properties: {
+            accountId: { type: 'string' }, sourceId: { type: 'string' }, mode: { type: 'string', enum: ['create', 'overwrite', 'alias'] }, targetId: { type: 'string' },
+          } } },
+        } } } } },
+        responses: { '200': { description: 'Distribution run result' }, '400': { description: 'Invalid or changed selection' }, '403': { description: 'Owner or admin role required' }, '409': { description: 'Template or target version conflict' } },
+      },
+    },
+    '/api/hq/templates/{id}/distributions/{runId}': {
+      get: {
+        tags: ['HQ Templates'], summary: '配布実行の結果を取得',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'runId', in: 'path', required: true, schema: { type: 'string' } },
+        ],
+        responses: { '200': { description: 'Distribution result' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Not found' } },
+      },
+    },
     // ── Friends ─────────────────────────────────────────────────────────────
     '/api/friends': {
       get: {
@@ -820,6 +900,60 @@ const spec = {
         responses: { '200': { description: 'Sent' } },
       },
     },
+    /*
+     * 送り始めた配信を止める・続きを送る・失敗した相手だけ送り直す（#662）。
+     * どれも `expectedVersion`（画面が読み込んだ版）が要る。版が食い違えば
+     * 409 で断り、二重の適用を止める。
+     */
+    '/api/broadcasts/{id}/stop': {
+      post: {
+        tags: ['Broadcasts'],
+        summary: '送信中の配信を停止',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: {
+          required: true,
+          content: { 'application/json': { schema: { type: 'object', properties: { expectedVersion: { type: 'integer' } }, required: ['expectedVersion'] } } },
+        },
+        responses: {
+          '200': { description: '停止した（すでに停止済みの再要求も 200）' },
+          '400': { description: 'expectedVersion が無い' },
+          '409': { description: '送信中でない／全員配信で止められない／版が食い違う' },
+        },
+      },
+    },
+    '/api/broadcasts/{id}/resume': {
+      post: {
+        tags: ['Broadcasts'],
+        summary: '停止した配信の続きを送る',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: {
+          required: true,
+          content: { 'application/json': { schema: { type: 'object', properties: { expectedVersion: { type: 'integer' } }, required: ['expectedVersion'] } } },
+        },
+        responses: {
+          '200': { description: '再開した' },
+          '400': { description: 'expectedVersion が無い' },
+          '409': { description: '停止中でない／版が食い違う' },
+        },
+      },
+    },
+    '/api/broadcasts/{id}/retry-failed': {
+      post: {
+        tags: ['Broadcasts'],
+        summary: '失敗した相手だけ再送（送達不明は含まない）',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: {
+          required: true,
+          content: { 'application/json': { schema: { type: 'object', properties: { expectedVersion: { type: 'integer' } }, required: ['expectedVersion'] } } },
+        },
+        responses: {
+          '202': { description: '再送を受け付けた' },
+          '400': { description: 'expectedVersion が無い' },
+          '409': { description: '再送できる相手がいない／送信済みでも停止中でもない／版が食い違う' },
+          '428': { description: '取り消せない操作の確認を経ていない' },
+        },
+      },
+    },
     '/api/broadcasts/dedup-preview': {
       post: {
         tags: ['Broadcasts'],
@@ -924,6 +1058,23 @@ const spec = {
           '403': { description: 'Owner or admin role required' },
           '404': { description: 'Not found in account scope' },
           '409': { description: 'Retry unavailable or version conflict' },
+        },
+      },
+    },
+    // ── Staff invitation ────────────────────────────────────────────────────
+    '/api/staff/{id}/resend-invitation': {
+      post: {
+        tags: ['Staff'],
+        summary: '未受諾・期限切れのスタッフ招待を再送',
+        description: '同じ行を使い回して新しい招待トークンを発行する。旧トークンは即時に失効し、新しい期限は7日。',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: {
+          '200': { description: 'Invitation resent with a new token and expiry' },
+          '400': { description: 'No email address on the staff member' },
+          '403': { description: 'Owner or admin role required' },
+          '404': { description: 'Not found in current tenant' },
+          '409': { description: 'Already active; nothing to resend' },
+          '500': { description: 'Invitation mail could not be sent' },
         },
       },
     },
@@ -1403,6 +1554,7 @@ const spec = {
   },
   tags: [
     { name: 'Friends', description: '友だち管理' },
+    { name: 'HQ Templates', description: '統括ひな形の作成・事前検査・店舗配布' },
     { name: 'Tags', description: 'タグ管理' },
     { name: 'Scenarios', description: 'ステップ配信シナリオ' },
     { name: 'Broadcasts', description: '一斉配信' },

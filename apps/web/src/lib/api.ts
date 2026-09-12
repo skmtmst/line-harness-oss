@@ -1222,6 +1222,36 @@ export type ApiBroadcast = Omit<Broadcast, 'targetType'> & {
   afterActionVersionId?: string | null;
   /** 楽観ロックに使う版。 */
   version?: number;
+  /**
+   * 停止中か（#662 / N-059）。
+   *
+   * `status` は動かしていない。停止は送信の段階とは別の軸——「送信中だが、
+   * 新しい送信権をもう取らない」——なので、画面はこの2つを合わせて読む。
+   * `status === 'sending' && stopped` が「停止中」。
+   */
+  stopped?: boolean;
+  stoppedAt?: string | null;
+  /** 送信の試行番号。失敗分の再送で進む。 */
+  sendAttemptNo?: number;
+};
+
+/**
+ * 送達台帳の内訳（#662 / N-059）。
+ *
+ * `successCount` だけだと「残りは失敗」と読めてしまい、送達不明の相手を
+ * 送り直してよいものと誤解させる。届いた・届かなかった・分からない を分ける。
+ */
+export type BroadcastLedger = {
+  /** 届いた人。 */
+  sent: number
+  /** 届かなかったと断定できた人。**再送の対象**。 */
+  failed: number
+  /** 外へ出たかもしれないが確かめられない人。**再送しない**。 */
+  unknown: number
+  /** いま送っている途中の人。 */
+  inFlight: number
+  /** 再送の対象人数（= failed）。 */
+  retryableCount: number
 };
 
 export type BroadcastMessageButton = {
@@ -4227,8 +4257,13 @@ export const api = {
   },
   tags: {
     /** withCounts で friendCount 付き (JOIN 集計 — タグ管理ページ用)。 */
-    list: (params?: { withCounts?: boolean }) =>
-      fetchApi<ApiResponse<Tag[]>>(`/api/tags${params?.withCounts ? '?withCounts=1' : ''}`),
+    list: (params?: { withCounts?: boolean; accountId?: string | null }) => {
+      const query = new URLSearchParams()
+      if (params?.withCounts) query.set('withCounts', '1')
+      if (params?.accountId) query.set('lineAccountId', params.accountId)
+      const suffix = query.size > 0 ? `?${query.toString()}` : ''
+      return fetchApi<ApiResponse<Tag[]>>(`/api/tags${suffix}`)
+    },
     /** CSVを保存せずに検査し、行ごとの扱いを返す。 */
     importPreview: (rows: TagCsvImportInputRow[]) =>
       fetchApi<ApiResponse<TagCsvImportPreview>>('/api/tags/import/preview', {
@@ -5339,21 +5374,26 @@ export const api = {
       fetchApi<ApiResponse<null>>(`/api/folders/${id}`, { method: 'DELETE' }),
   },
   tagGroups: {
-    list: () => fetchApi<ApiResponse<TagGroup[]>>('/api/tag-groups'),
+    list: (accountId?: string | null) => fetchApi<ApiResponse<TagGroup[]>>(
+      `/api/tag-groups${accountId ? `?lineAccountId=${encodeURIComponent(accountId)}` : ''}`,
+    ),
     /** 色（#RRGGBB）はこのフォルダに付く。属するタグの印に出る。 */
-    create: (data: { name: string; sortOrder?: number; color?: string | null }) =>
+    create: (data: { name: string; sortOrder?: number; color?: string | null; accountId?: string | null }) =>
       fetchApi<ApiResponse<TagGroup>>('/api/tag-groups', {
         method: 'POST',
         body: JSON.stringify(data),
       }),
-    update: (id: string, data: { name?: string; sortOrder?: number; color?: string | null }) =>
+    update: (id: string, data: { name?: string; sortOrder?: number; color?: string | null; accountId?: string | null }) =>
       fetchApi<ApiResponse<TagGroup>>(`/api/tag-groups/${id}`, {
         method: 'PATCH',
         body: JSON.stringify(data),
       }),
     /** 消しても属していたタグは残り、未分類に戻る。 */
-    delete: (id: string) =>
-      fetchApi<ApiResponse<null>>(`/api/tag-groups/${id}`, { method: 'DELETE' }),
+    delete: (id: string, accountId?: string | null) =>
+      fetchApi<ApiResponse<null>>(
+        `/api/tag-groups/${id}${accountId ? `?lineAccountId=${encodeURIComponent(accountId)}` : ''}`,
+        { method: 'DELETE' },
+      ),
   },
   scenarios: {
     listPage: (params?: {
@@ -5758,9 +5798,44 @@ export const api = {
       fetchApi<ApiResponse<BroadcastInsight>>(`/api/broadcasts/${id}/fetch-insight`, { method: 'POST' }),
     testSend: (id: string) =>
       fetchApi<{ success: boolean; sent?: number; failed?: number; error?: string }>(`/api/broadcasts/${id}/test-send`, { method: 'POST' }),
+    /**
+     * 送信中の配信を止める（#662）。
+     *
+     * `expectedVersion` は画面が読み込んだ版。2人が同時に押したとき、
+     * 勝つのは1人だけ（負けた側は 409）。**押している間ボタンを無効にする
+     * のは見た目の手当てで、本当の守りはこの版**。
+     */
+    stop: (id: string, expectedVersion: number) =>
+      fetchApi<ApiResponse<ApiBroadcast & { ledger: BroadcastLedger }> & { alreadyStopped?: boolean; stoppedUnknownCount?: number }>(
+        `/api/broadcasts/${id}/stop`,
+        { method: 'POST', body: JSON.stringify({ expectedVersion }) },
+      ),
+    /** 止めた配信の続きを送る。送達済み・送達不明の相手は飛ばす。 */
+    resume: (id: string, expectedVersion: number) =>
+      fetchApi<ApiResponse<ApiBroadcast & { ledger: BroadcastLedger }>>(
+        `/api/broadcasts/${id}/resume`,
+        { method: 'POST', body: JSON.stringify({ expectedVersion }) },
+      ),
+    /**
+     * 失敗した相手だけ送り直す。**送達不明の相手は含まれない**（二重に
+     * 届くのを避けるため）。相手へ実際に届くので、送信と同じ確認を要求する。
+     */
+    retryFailed: (id: string, expectedVersion: number) =>
+      fetchApi<ApiResponse<ApiBroadcast & { ledger: BroadcastLedger }> & { attemptNo?: number; retryTargets?: number }>(
+        `/api/broadcasts/${id}/retry-failed`,
+        {
+          method: 'POST',
+          headers: IRREVERSIBLE_BROADCAST_HEADERS,
+          body: JSON.stringify({ expectedVersion }),
+        },
+      ),
     getProgress: (id: string) =>
       fetchApi<{ success: boolean; data?: {
         status: string
+        stopped?: boolean
+        stoppedAt?: string | null
+        sendAttemptNo?: number
+        ledger?: BroadcastLedger
         totalCount: number
         successCount: number
         batchOffset: number

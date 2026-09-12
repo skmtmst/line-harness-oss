@@ -21,7 +21,10 @@ import {
   ruleConditions,
   sweepOperatorNotifications,
 } from '../services/operator-notification-dispatch.js';
-import { listOperatorEventTypes } from '../services/operator-notification-registry.js';
+import {
+  isKnownOperatorEventType,
+  listOperatorEventTypes,
+} from '../services/operator-notification-registry.js';
 
 const notifications = new Hono<Env>();
 
@@ -183,6 +186,21 @@ notifications.post('/api/notifications/operator-rules/:id/publish', requireRole(
     }
     const rule = await getNotificationRuleById(c.env.DB, c.req.param('id'), lineAccountId);
     if (!rule) return c.json({ success: false, error: 'お知らせが見つかりません' }, 404);
+    /*
+     * 登録簿に無いきっかけは、公開できても自動発火しない(dispatch が
+     * unknown_event_type で断る)。公開の時点で断らないと「公開したのに
+     * 届かない」を静かに作る。N-327 の芯はそこなので、ここで閉じる。
+     *
+     * 画面の選択肢も登録簿に合わせてあるが、この口は API を直接叩いても
+     * 通るので、入口の数だけ塞いでおく。
+     */
+    if (!isKnownOperatorEventType(rule.event_type)) {
+      return c.json({
+        success: false,
+        code: 'event_type_not_connected',
+        error: 'このきっかけでは自動でお知らせできません。きっかけを選び直してください。',
+      }, 409);
+    }
     const conditions = ruleConditions(rule);
     if (!conditions.recipientIds?.length) {
       return c.json({ success: false, code: 'recipient_required', error: '受け取るスタッフを1人以上選んでください' }, 409);

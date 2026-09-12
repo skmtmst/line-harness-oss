@@ -121,6 +121,7 @@ shared-button-importer components/automations/common-action-editor.tsx
 shared-button-importer components/broadcasts/broadcast-asset-manager.tsx
 shared-button-importer components/broadcasts/broadcast-detail.tsx
 shared-button-importer components/broadcasts/broadcast-form.tsx
+shared-button-importer components/broadcasts/broadcast-stop-controls.tsx
 shared-button-importer components/broadcasts/segment-builder.tsx
 shared-button-importer components/broadcasts/segment-preset-controls.tsx
 shared-button-importer components/chats/friend-info-sidebar.tsx
@@ -184,3 +185,5 @@ table-header-migration-target app/webhooks/webhook-interactions.tsx
 
 # 詳細内テーブルのため、直書きthを残す既知の例外。
 native-table-header-exception app/affiliates/tabs.tsx
+
+shared-button-importer app/hq/templates/template-console.tsx

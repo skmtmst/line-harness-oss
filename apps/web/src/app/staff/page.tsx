@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import QRCode from 'qrcode'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
@@ -17,6 +17,7 @@ import { useAccount } from '@/contexts/account-context'
 import {
   ApiError,
   api,
+  fetchApi,
   type AccessRoleBundle,
   type AccessRoleItem,
   type AccessUserItem,
@@ -80,6 +81,15 @@ function auditActionLabel(action: string): string {
   return '操作記録'
 }
 function formatStaffDate(value: string | undefined): string { if (!value) return 'まだ入っていません'; const date = new Date(value); return Number.isNaN(date.getTime()) ? '日時を取得できませんでした' : date.toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) }
+/* 一覧の StaffMember には招待期限が載っていない。再送口の返事を読むための形。 */
+type StaffMemberWithInvite = StaffMember & { inviteExpiresAt?: string | null }
+function formatInviteExpiry(value: string | null | undefined): string {
+  if (!value) return '期限を取得できませんでした'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '期限を取得できませんでした'
+  const text = date.toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+  return date.getTime() < Date.now() ? `期限切れ（${text}まででした）` : `${text}まで`
+}
 function permissionSummary(member: StaffMember): string { if (member.role === 'owner' || member.role === 'admin') return 'すべての画面'; if (member.permissionKeys.length === 0) return member.role === 'viewer' ? '閲覧できる画面は未設定' : '表示する機能は未設定'; const labels = member.permissionKeys.map((key) => permissionLabel(key)).filter(Boolean); return labels.length > 0 ? labels.join('・') : `${member.permissionKeys.length}機能` }
 function downloadAuditCsv(rows: AuditEventItem[]): void {
   const body = [
@@ -277,6 +287,9 @@ function StaffPageHost() {
   const USER_PAGE_SIZE = 6
   /* ブラウザの `confirm()` をやめて、共通の確認窓へ移した（理由は EditModal と同じ）。 */
   const [disablingTarget, setDisablingTarget] = useState<StaffMember | null>(null), [disablingTwoFactor, setDisablingTwoFactor] = useState(false), [disableError, setDisableError] = useState('')
+  const [resendingId, setResendingId] = useState<string | null>(null), [resendNotice, setResendNotice] = useState(''), [resendError, setResendError] = useState('')
+  /* 送信中の掛け金。state は次の描画まで古いままなので、素早い二度押しの2回目を止められない。 */
+  const resendingRef = useRef(false)
   const administrator = me?.role === 'admin' || me?.role === 'owner'
   usePageTitle(permissionTarget ? `${permissionTarget.name}さんに見せる範囲` : 'ログインユーザー')
   const load = useCallback(async () => {
@@ -359,6 +372,32 @@ function StaffPageHost() {
    * 処理中は受け付けない。失敗は握りつぶさず、窓の中に運用者の言葉で出す。
    */
   const runDisableTwoFactor = async () => { if (!disablingTarget || disablingTwoFactor) return; setDisablingTwoFactor(true); setDisableError(''); try { const res = await api.staff.disableTwoFactor(disablingTarget.id); if (!res.success) throw new Error(res.error); setDisablingTarget(null); await load() } catch { setDisableError('二段階認証を解除できませんでした。状態を読み直してから、もう一度お試しください。') } finally { setDisablingTwoFactor(false) } }
+  /**
+   * 招待を送り直す(N-425)。
+   *
+   * 処理中は受け付けない。2回叩くと2本目のトークンで1本目が上書きされ、
+   * 先に届いたメールのリンクがその場で死ぬ。見た目を `disabled` にするだけでは
+   * 同じ描画の中へ2回届く二度押しを止められないので、掛け金(ref)で締める。
+   * 結果と新しい期限・次の対応は表の上の帯に出す。失敗は握りつぶさず理由を出す。
+   */
+  const runResend = async (member: StaffMember) => {
+    if (resendingRef.current) return
+    resendingRef.current = true
+    setResendingId(member.id)
+    setResendNotice('')
+    setResendError('')
+    try {
+      const result = await fetchApi<{ success: boolean; data: StaffMemberWithInvite }>(`/api/staff/${member.id}/resend-invitation`, { method: 'POST' })
+      const expiry = formatInviteExpiry(result.data.inviteExpiresAt)
+      setResendNotice(`招待メールを送り直しました。新しい期限は${expiry}です。相手にメールを確認してもらってください。期限内に受諾がなければ、もう一度送り直せます。`)
+      await load()
+    } catch (caught) {
+      setResendError(`${messageOf(caught)}。状態を読み直してから、もう一度お試しください。`)
+    } finally {
+      resendingRef.current = false
+      setResendingId(null)
+    }
+  }
    const tabAction = administrator && tab === 'audit'
      ? <Button onClick={() => downloadAuditCsv(audits)} disabled={audits.length === 0}>CSVで書き出す</Button>
     : administrator && tab !== 'audit' ? <Link href="/staff/new" className="cursor-pointer rounded-control bg-accent-deep px-4 py-2 text-sm font-medium text-on-accent">人を追加する</Link> : null
@@ -369,10 +408,12 @@ function StaffPageHost() {
     <div data-design="KPIs" className="mb-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4"><Kpi label="いまいる人" value={`${accessSummary.active}`} unit="人" note={`管理者 ${accessSummary.roleCounts.administrator}・運用 ${accessSummary.roleCounts.operations}・見るだけ ${accessSummary.roleCounts.view_only}`} /><Kpi label="招待して返事がない" value={`${accessSummary.invited}`} unit="人" note={`期限切れ ${accessSummary.expiredInvitations}人`} /><Kpi label="90日 入っていない" value={`${accessSummary.unused90Days}`} unit="人" note="最終ログインから90日以上" /><Kpi label="2段階の確認" value={`${accessSummary.mfaEnabled} / ${accessSummary.active}`} unit="人" note={`管理者は必ず入れてください${accessSummary.mfaRate === null ? '' : `（${accessSummary.mfaRate}%）`}`} /></div>
     <div className="mb-4 flex items-center justify-between gap-3 rounded-control bg-info-bg px-4 py-3 text-sm font-medium text-accent"><span>「見せる範囲」は、画面ごとに決められます。電話番号や住所など、必要な情報だけを見せると事故が減ります。</span></div>
     {error && <div className="mb-4 flex items-center justify-between gap-4 rounded-control bg-danger-bg p-3 text-sm text-danger"><p>{error}</p><Button variant="secondary" onClick={() => void load()}>もう一度読み込む</Button></div>}
+    {resendNotice && <div className="mb-4 rounded-control bg-info-bg px-4 py-3 text-sm font-medium text-accent" role="status"><p>{resendNotice}</p></div>}
+    {resendError && <div className="mb-4 rounded-control bg-danger-bg p-3 text-sm text-danger" role="alert"><p>{resendError}</p></div>}
     {tab === 'roles' && <div className="mb-4 grid gap-3 md:grid-cols-2 xl:grid-cols-5">{accessRoles.map((role) => <div key={role.id} className="rounded-card border border-hairline bg-canvas p-4"><div className="flex items-start justify-between gap-2"><p className="font-semibold text-ink">{role.name}</p><span className="rounded-full bg-accent-soft px-2 py-1 text-[11px] font-semibold text-accent">{role.assignedUserCount}人</span></div><p className="mt-2 text-xs leading-5 text-ink-secondary">{role.description}</p><p className="mt-3 text-xs text-ink-faint">{role.requiresMfa ? '2段階の確認が必要' : role.featureAccess === 'view' ? '閲覧のみ' : role.featureAccess === 'custom' ? '機能ごとに設定' : '編集できる'}</p></div>)}</div>}
     <div className="mb-3 flex flex-wrap items-center gap-3"><SearchField value={query} onChange={setQuery} onClear={() => setQuery('')} placeholder="人の名前・メールで検索" className="min-w-64 flex-1" /><Select aria-label="並び順" value={sort} onChange={setSort} options={LIST_SORT_OPTIONS} /></div>
     <div className="mb-3"><Tabs items={[{ label: 'すべて', count: tabUsers.length, current: roleFilter === 'all', onClick: () => setRoleFilter('all') }, ...(['administrator', 'operations', 'reception', 'view_only', 'custom'] as const).map((role) => ({ label: ACCESS_ROLE_LABEL[role], count: tabUsers.filter((user) => user.roleBundle === role).length, current: roleFilter === role, onClick: () => setRoleFilter(role) }))]} /></div>
-    <div id="staff-list" className="overflow-hidden rounded-card border border-hairline bg-canvas"><table className="w-full table-fixed text-sm"><thead><TableHeadRow><Th className="w-1/4">人</Th><Th>役わり</Th><Th>職位</Th><Th className="w-1/5">見せる範囲</Th><Th>最後に入った</Th><Th>2段階の確認</Th><Th align="right">操作</Th></TableHeadRow></thead><tbody className="divide-y divide-hairline">{loading ? <tr><td colSpan={7} className="p-10 text-center text-ink-faint">ログインユーザーを読み込んでいます…</td></tr> : shown.length === 0 ? <tr><td colSpan={7} className="p-10 text-center text-ink-faint">条件に合うログインユーザーはいません。条件を変えてお試しください。</td></tr> : shown.map((user) => { const member = memberById.get(user.id); const editable = member ? canEdit(member) : false; const scope = accessScopeLabel(user, accountNames); const twoFactorLabel = user.mfaEnabled ? '入れています' : user.status === 'active' ? '入れていません' : '—'; const warning = !user.mfaEnabled || user.status === 'expired' || user.status === 'suspended'; return <tr key={user.id} className="hover:bg-canvas-sunken"><td className="min-w-0 px-3 py-3"><p className="truncate font-semibold" title={user.name}>{user.name}</p><p className="truncate text-xs text-ink-faint" title={user.email ?? ''}>{user.email ?? 'メール未登録'}</p>{warning && <span className="mt-1 inline-block rounded-full bg-warning-bg px-2 py-0.5 text-xs font-semibold text-warning">確認が必要</span>}</td><td className="px-3 py-3"><span className={`whitespace-nowrap font-semibold ${user.roleBundle === 'administrator' ? 'text-success' : 'text-ink-secondary'}`}>{ACCESS_ROLE_LABEL[user.roleBundle]}</span></td><td className="truncate px-3 py-3 text-xs text-ink-secondary" title={user.jobTitle ?? ''}>{user.jobTitle ?? '—'}</td><td className="px-3 py-3"><p className="truncate text-xs font-medium" title={`${accessFeatureLabel(user)}：${scope}`}>{accessFeatureLabel(user)}</p><p className="mt-1 truncate text-xs text-ink-faint" title={scope}>{scope}</p></td><td className="px-3 py-3"><p className="whitespace-nowrap text-ink-secondary">{formatStaffDate(user.lastLoginAt ?? undefined)}</p><p className="mt-1 truncate text-xs text-ink-faint" title={user.lastActionAt ? '操作記録あり' : '操作記録なし'}>{user.lastActionAt ? `最後の操作：${formatStaffDate(user.lastActionAt)}` : '操作記録なし'}</p></td><td className="px-3 py-3">{editable && member ? <Button onClick={() => openTwoFactor(member)}>{twoFactorLabel}</Button> : <span className="whitespace-nowrap text-xs text-ink-faint">{twoFactorLabel}</span>}</td><td className="px-3 py-3"><div className="flex flex-wrap justify-end gap-1">{editable && member ? <><RowActionButton label="中身を見る" onClick={() => openPermissions(user)} /><RowActionButton label="この人を外す" onClick={() => setEditing(member)} /></> : member || !administrator ? <span className="text-xs text-ink-faint">操作できません</span> : <span className="text-xs font-semibold text-warning" title="スタッフ情報と結び付いていないため操作できません。名前とメールを確認してください。">要確認</span>}</div></td></tr> })}</tbody></table><p className="border-t border-hairline bg-info-bg px-4 py-3 text-xs text-ink-secondary">権限・担当範囲・職位・最終ログイン・2段階認証はアクセス API の最新状態です。確認が必要な人には注意札を表示します。</p></div>
+    <div id="staff-list" className="overflow-hidden rounded-card border border-hairline bg-canvas"><table className="w-full table-fixed text-sm"><thead><TableHeadRow><Th className="w-1/4">人</Th><Th>役わり</Th><Th>職位</Th><Th className="w-1/5">見せる範囲</Th><Th>最後に入った</Th><Th>2段階の確認</Th><Th align="right">操作</Th></TableHeadRow></thead><tbody className="divide-y divide-hairline">{loading ? <tr><td colSpan={7} className="p-10 text-center text-ink-faint">ログインユーザーを読み込んでいます…</td></tr> : shown.length === 0 ? <tr><td colSpan={7} className="p-10 text-center text-ink-faint">条件に合うログインユーザーはいません。条件を変えてお試しください。</td></tr> : shown.map((user) => { const member = memberById.get(user.id); const editable = member ? canEdit(member) : false; const scope = accessScopeLabel(user, accountNames); const twoFactorLabel = user.mfaEnabled ? '入れています' : user.status === 'active' ? '入れていません' : '—'; const warning = !user.mfaEnabled || user.status === 'expired' || user.status === 'suspended'; return <tr key={user.id} className="hover:bg-canvas-sunken"><td className="min-w-0 px-3 py-3"><p className="truncate font-semibold" title={user.name}>{user.name}</p><p className="truncate text-xs text-ink-faint" title={user.email ?? ''}>{user.email ?? 'メール未登録'}</p>{tab === 'invited' && member && member.inviteStatus !== 'active' && <p className="mt-1 truncate text-xs text-ink-faint">招待の期限：{formatInviteExpiry((member as StaffMemberWithInvite).inviteExpiresAt)}</p>}{warning && <span className="mt-1 inline-block rounded-full bg-warning-bg px-2 py-0.5 text-xs font-semibold text-warning">確認が必要</span>}</td><td className="px-3 py-3"><span className={`whitespace-nowrap font-semibold ${user.roleBundle === 'administrator' ? 'text-success' : 'text-ink-secondary'}`}>{ACCESS_ROLE_LABEL[user.roleBundle]}</span></td><td className="truncate px-3 py-3 text-xs text-ink-secondary" title={user.jobTitle ?? ''}>{user.jobTitle ?? '—'}</td><td className="px-3 py-3"><p className="truncate text-xs font-medium" title={`${accessFeatureLabel(user)}：${scope}`}>{accessFeatureLabel(user)}</p><p className="mt-1 truncate text-xs text-ink-faint" title={scope}>{scope}</p></td><td className="px-3 py-3"><p className="whitespace-nowrap text-ink-secondary">{formatStaffDate(user.lastLoginAt ?? undefined)}</p><p className="mt-1 truncate text-xs text-ink-faint" title={user.lastActionAt ? '操作記録あり' : '操作記録なし'}>{user.lastActionAt ? `最後の操作：${formatStaffDate(user.lastActionAt)}` : '操作記録なし'}</p></td><td className="px-3 py-3">{editable && member ? <Button onClick={() => openTwoFactor(member)}>{twoFactorLabel}</Button> : <span className="whitespace-nowrap text-xs text-ink-faint">{twoFactorLabel}</span>}</td><td className="px-3 py-3"><div className="flex flex-wrap justify-end gap-1">{editable && member ? <><RowActionButton label="中身を見る" onClick={() => openPermissions(user)} /><RowActionButton label="この人を外す" onClick={() => setEditing(member)} /></> : member || !administrator ? <span className="text-xs text-ink-faint">操作できません</span> : <span className="text-xs font-semibold text-warning" title="スタッフ情報と結び付いていないため操作できません。名前とメールを確認してください。">要確認</span>}{tab === 'invited' && administrator && member && member.inviteStatus !== 'active' && <Button disabled={resendingId !== null} onClick={() => void runResend(member)}>{resendingId === member.id ? '送信中…' : 'もう一度送る'}</Button>}</div></td></tr> })}</tbody></table><p className="border-t border-hairline bg-info-bg px-4 py-3 text-xs text-ink-secondary">権限・担当範囲・職位・最終ログイン・2段階認証はアクセス API の最新状態です。確認が必要な人には注意札を表示します。</p></div>
     {!loading && !error && <div className="mt-3 flex items-center justify-between text-xs text-ink-faint"><p>ログインユーザー {filteredUsers.length}人中 {shown.length}人を表示{usersTotal > accessUsers.length ? `（全${usersTotal}人中${accessUsers.length}人まで読み込み）` : ''}</p>{pageCount > 1 && <div className="flex items-center gap-2"><Button disabled={userPage === 1} onClick={() => setUserPage(userPage - 1)}>前へ</Button><span>{userPage} / {pageCount}</span><Button disabled={userPage === pageCount} onClick={() => setUserPage(userPage + 1)}>次へ</Button></div>}</div>}
     {editing && <EditModal member={editing} administrator={Boolean(administrator)} currentUserId={me?.id ?? null} activeAdministratorCount={activeAdministratorCount} onClose={() => setEditing(null)} onSaved={load} />}{settingTwoFactor && <TwoFactorModal member={settingTwoFactor} onClose={() => setSettingTwoFactor(null)} onSaved={load} />}</>}
     {/* 設定し直せる操作なので赤にしない。赤は本当に戻せない操作のために空けておく。 */}
