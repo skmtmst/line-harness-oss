@@ -33,7 +33,8 @@ import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { cancelByTrigger, enrollByTrigger } from '../services/reminder-trigger.js';
 import { canTransition, nextStatus, type BookingAction } from '../services/booking-state.js';
-import { getAccountTimeZone, getAvailability, tzDateStr, tzHHMM } from '../services/availability.js';
+import { getAccountTimeZone, getAvailability, getStoreCapacityWindows, tzDateStr, tzHHMM } from '../services/availability.js';
+import { STORE_CAPACITY_GUARD_SQL } from '../services/booking-store-capacity.js';
 import {
   enqueueCalendarDeleteOperation,
   removeBookingFromGoogle,
@@ -559,7 +560,9 @@ booking.post('/api/liff/booking/requests', async (c) => {
     staff_id: string;
     starts_at: string; // UTC ISO8601
     customer_note?: string;
+    party_size?: unknown;
   }>();
+  if (body.party_size !== undefined && body.party_size !== 1) return c.json({ error: 'unsupported_party_size' }, 422);
   if (!body.menu_id || !body.staff_id || !body.starts_at) {
     return c.json({ error: 'missing_params' }, 400);
   }
@@ -631,6 +634,7 @@ booking.post('/api/liff/booking/requests', async (c) => {
 
   const bookingId = crypto.randomUUID();
   const nowIso = new Date().toISOString();
+  const storeWindows = await getStoreCapacityWindows(c.env.DB, accountId, startsAt, blockEndsAt);
   // 競合チェックと INSERT を 1 ステートメントで原子化する。
   // INSERT ... SELECT WHERE NOT EXISTS パターンで、同一スタッフの overlap 行がある場合は
   // 0 行 INSERT に落とす。changes=0 を 409 として扱う。
@@ -659,7 +663,8 @@ booking.post('/api/liff/booking/requests', async (c) => {
              AND starts_at < ?
              AND block_ends_at > ?
              AND menu_id = ?
-        ) < ?`,
+        ) < ?
+        ${STORE_CAPACITY_GUARD_SQL}`,
     )
     .bind(
       bookingId,
@@ -685,6 +690,7 @@ booking.post('/api/liff/booking/requests', async (c) => {
       startsAt.toISOString(),
       body.menu_id,
       Math.max(1, menuRow.concurrent_capacity ?? 1),
+      JSON.stringify(storeWindows), accountId, accountId,
     )
     .run();
   if ((insertResult.meta?.changes ?? 0) === 0) {
@@ -1748,7 +1754,9 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
     starts_at: string; // UTC ISO8601
     customer_note?: string;
     send_line_confirmation?: boolean;
+    party_size?: unknown;
   }>();
+  if (body.party_size !== undefined && body.party_size !== 1) return c.json({ error: 'unsupported_party_size' }, 422);
   const friendInput = body.friend_id?.trim() || null;
   const customerInput = body.booking_customer_id?.trim() || null;
   if (
@@ -1924,6 +1932,7 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
     day_before: sendLineConfirmation,
     hours_before: sendLineConfirmation,
   });
+  const storeWindows = await getStoreCapacityWindows(c.env.DB, accountId, startsAt, blockEndsAt);
   const insertResult = await c.env.DB
     .prepare(
       `INSERT INTO bookings
@@ -1950,7 +1959,8 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
              AND starts_at < ?
              AND block_ends_at > ?
              AND menu_id = ?
-        ) < ?`,
+        ) < ?
+        ${STORE_CAPACITY_GUARD_SQL}`,
     )
     .bind(
       bookingId,
@@ -1981,6 +1991,7 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
       startsAt.toISOString(),
       body.menu_id,
       Math.max(1, menuRow.concurrent_capacity ?? 1),
+      JSON.stringify(storeWindows), accountId, accountId,
     )
     .run();
   if ((insertResult.meta?.changes ?? 0) === 0) {
