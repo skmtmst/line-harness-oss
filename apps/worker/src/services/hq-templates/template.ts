@@ -291,6 +291,14 @@ function belongsToR2Prefix(key: string, prefix: string): boolean {
   return normalized !== '' && key.startsWith(`${normalized}/`);
 }
 
+function sourceR2Prefix(tenantId: string): string {
+  return `hq-templates/${tenantId}`;
+}
+
+function targetR2Prefix(accountId: string): string {
+  return `media/${accountId}`;
+}
+
 function parseSourceDefinition(source: MessageTemplateSourceVersion): MessageTemplateDefinition {
   try {
     return parseMessageTemplateDefinition(JSON.parse(source.definitionJson));
@@ -306,6 +314,7 @@ function assertAuthorizedSource(
   expectedTemplateVersionId: string,
 ): void {
   const { authority, version, definition, media: bindings } = source;
+  const expectedSourcePrefix = sourceR2Prefix(authority.tenantId);
   if (authority.tenantId !== expectedTenantId
     || version.tenantId !== authority.tenantId
     || version.sourceAccountId !== authority.sourceAccountId
@@ -322,7 +331,8 @@ function assertAuthorizedSource(
       || binding.mediaVersionId !== media.versionId
       || binding.versionNo !== media.versionNo
       || binding.r2Key !== media.r2Key
-      || !belongsToR2Prefix(binding.r2Key, binding.r2KeyPrefix)
+      || binding.r2KeyPrefix.replace(/\/+$/, '') !== expectedSourcePrefix
+      || !belongsToR2Prefix(binding.r2Key, expectedSourcePrefix)
       || binding.sizeBytes !== media.sizeBytes
       || normalizeSha256(binding.contentHash) === null
       || normalizeSha256(binding.contentHash) !== normalizeSha256(media.contentHash)) {
@@ -363,21 +373,37 @@ function normalizeName(value: string): string {
   return value.normalize('NFKC').trim().toLocaleLowerCase('ja-JP');
 }
 
-function allTemplateText(definition: MessageTemplateDefinition): string {
+function templateTextFields(definition: MessageTemplateDefinition): readonly string[] {
   const template = definition.template;
   return [
     template.messageContent,
     template.carouselActionsJson,
     template.carouselTapLimitText,
     template.questionJson,
-  ].filter((value): value is string => value !== null).join('\n');
+  ].filter((value): value is string => value !== null);
+}
+
+function exactStringValues(value: string): readonly string[] {
+  try {
+    const root: unknown = JSON.parse(value);
+    const result: string[] = [];
+    const visit = (entry: unknown): void => {
+      if (typeof entry === 'string') result.push(entry);
+      else if (Array.isArray(entry)) entry.forEach(visit);
+      else if (entry && typeof entry === 'object') Object.values(entry).forEach(visit);
+    };
+    visit(root);
+    return result;
+  } catch {
+    return [value];
+  }
 }
 
 /** Only media actually referenced by the template body is distributed. */
 export function referencedMedia(definition: MessageTemplateDefinition): readonly MessageTemplateMediaDefinition[] {
-  const body = allTemplateText(definition);
+  const exactValues = new Set(templateTextFields(definition).flatMap(exactStringValues));
   const references = definition.media.filter((media) =>
-    [media.id, media.r2Key, media.publicUrl].some((locator) => locator !== null && body.includes(locator)),
+    [media.id, media.r2Key, media.publicUrl].some((locator) => locator !== null && exactValues.has(locator)),
   );
   const declaredLocators = new Map<string, string>();
   for (const media of references) {
@@ -417,11 +443,19 @@ export function inspectMessageTemplateDefinition(
     allowedModes: targetTemplate ? ['overwrite', 'alias'] : ['create'],
   }];
   for (const media of referencedMedia(definition)) {
-    const targetMedia = uniqueMatch(
+    const contentMatch = uniqueMatch(
       snapshot.media.filter((item) => normalizeSha256(media.contentHash) !== null
         && normalizeSha256(item.contentHash) === normalizeSha256(media.contentHash)),
       'AMBIGUOUS_MEDIA',
     );
+    const nameMatch = uniqueMatch(
+      snapshot.media.filter((item) => normalizeName(item.filename) === normalizeName(media.filename)),
+      'AMBIGUOUS_MEDIA_NAME',
+    );
+    if (contentMatch && nameMatch && contentMatch.id !== nameMatch.id) {
+      throw new TemplateHqTemplateError('AMBIGUOUS_MEDIA', 409);
+    }
+    const targetMedia = contentMatch ?? nameMatch;
     result.push({
       sourceId: `media:${media.id}`,
       itemKind: 'media',
@@ -444,13 +478,27 @@ export function nextMessageTemplateAlias(name: string, occupiedNames: readonly s
   throw new TemplateHqTemplateError('ALIAS_EXHAUSTED', 409);
 }
 
-function replaceAll(value: string | null, replacements: ReadonlyMap<string, string>): string | null {
+function replaceExactLocators(value: string | null, replacements: ReadonlyMap<string, string>): string | null {
   if (value === null) return null;
-  const sources = [...replacements.keys()].sort((left, right) => right.length - left.length);
-  if (sources.length === 0) return value;
-  const pattern = new RegExp(sources.map((source) => source.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|'), 'g');
-  // String.replace scans the original input once; generated ids/URLs are never treated as source locators.
-  return value.replace(pattern, (source) => replacements.get(source)!);
+  let changed = false;
+  const replace = (entry: unknown): unknown => {
+    if (typeof entry === 'string') {
+      const replacement = replacements.get(entry);
+      if (replacement !== undefined) changed = true;
+      return replacement ?? entry;
+    }
+    if (Array.isArray(entry)) return entry.map(replace);
+    if (entry && typeof entry === 'object') {
+      return Object.fromEntries(Object.entries(entry).map(([key, child]) => [key, replace(child)]));
+    }
+    return entry;
+  };
+  try {
+    const rewritten = replace(JSON.parse(value));
+    return changed ? JSON.stringify(rewritten) : value;
+  } catch {
+    return replacements.get(value) ?? value;
+  }
 }
 
 function requireResolution(
@@ -523,6 +571,9 @@ export async function planMessageTemplateDistribution(input: {
   const occupiedTemplateNames = [...snapshot.templates.map((entry) => entry.name)];
   const occupiedMediaNames = [...snapshot.media.map((entry) => entry.filename)];
   const guardedInventories = new Set<'template' | 'media'>();
+  const sourceR2Keys = new Set(definition.media.map((entry) => entry.r2Key));
+  const existingTargetR2Keys = new Set(snapshot.media.map((entry) => entry.r2Key));
+  const plannedTargetR2Keys = new Set<string>();
 
   for (const item of items) {
     const resolution = requireResolution(item, context.resolutions);
@@ -573,9 +624,16 @@ export async function planMessageTemplateDistribution(input: {
     const targetR2Key = dependencies.createTargetR2Key(media, targetId, context);
     const targetPublicUrl = dependencies.createTargetPublicUrl(targetR2Key, media, context);
     const ownerToken = dependencies.createOwnerToken(targetR2Key, context);
-    if (!targetR2Key || !ownerToken || /\s/.test(ownerToken)) {
+    if (!targetR2Key
+      || !belongsToR2Prefix(targetR2Key, targetR2Prefix(context.targetAccountId))
+      || sourceR2Keys.has(targetR2Key)
+      || existingTargetR2Keys.has(targetR2Key)
+      || plannedTargetR2Keys.has(targetR2Key)
+      || !ownerToken
+      || /\s/.test(ownerToken)) {
       throw new TemplateHqTemplateError('MEDIA_COPY_INVALID', 422);
     }
+    plannedTargetR2Keys.add(targetR2Key);
     const binding = source.media.get(media.id);
     if (!binding) throw new TemplateHqTemplateError('SOURCE_MEDIA_AUTHORITY_MISMATCH', 422);
     const sourceObject = await dependencies.readSourceObjectIfUnchanged({
@@ -639,10 +697,10 @@ export async function planMessageTemplateDistribution(input: {
   const targetTemplateId = idMap[rootItem.sourceId]!;
   const rootName = resolved[0]?.aliasName ?? definition.template.name;
   const template = definition.template;
-  const messageContent = replaceAll(template.messageContent, replacements)!;
-  const carouselActionsJson = replaceAll(template.carouselActionsJson, replacements);
-  const carouselTapLimitText = replaceAll(template.carouselTapLimitText, replacements);
-  const questionJson = replaceAll(template.questionJson, replacements);
+  const messageContent = replaceExactLocators(template.messageContent, replacements)!;
+  const carouselActionsJson = replaceExactLocators(template.carouselActionsJson, replacements);
+  const carouselTapLimitText = replaceExactLocators(template.carouselTapLimitText, replacements);
+  const questionJson = replaceExactLocators(template.questionJson, replacements);
   if (rootResolution.mode === 'overwrite') {
     dbCommit.push(conflictGuard(
       'SELECT 1 FROM templates WHERE id = ? AND line_account_id = ? AND updated_at = ?',

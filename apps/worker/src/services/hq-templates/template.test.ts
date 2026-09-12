@@ -29,7 +29,7 @@ const definition = parseMessageTemplateDefinition({
   },
   media: [{
     id: 'source-media', kind: 'image', filename: 'thanks.png', mimeType: 'image/png', sizeBytes: 4,
-    width: 100, height: 50, durationMs: null, r2Key: 'source/media.png',
+    width: 100, height: 50, durationMs: null, r2Key: 'hq-templates/tenant-1/media.png',
     publicUrl: 'https://source/media.png', versionId: 'source-media-v1', versionNo: 1,
     contentHash,
   }],
@@ -48,8 +48,8 @@ function sourceVersion(overrides: Partial<MessageTemplateSourceVersion> = {}): M
       mediaId: 'source-media',
       mediaVersionId: 'source-media-v1',
       versionNo: 1,
-      r2Key: 'source/media.png',
-      r2KeyPrefix: 'source',
+      r2Key: 'hq-templates/tenant-1/media.png',
+      r2KeyPrefix: 'hq-templates/tenant-1',
       sizeBytes: 4,
       contentHash,
       etag: 'etag-source-v1',
@@ -90,7 +90,8 @@ function dependencies(overrides: Partial<MessageTemplateAdapterDependencies> = {
       etag: 'etag-source-v1',
     }),
     createId: (kind, sourceId, ctx) => `${kind}-${ctx.targetAccountId}-${sourceId}`,
-    createTargetR2Key: (_media, targetId, ctx) => `accounts/${ctx.targetAccountId}/${targetId}.png`,
+    createTargetR2Key: (media, targetId, ctx) =>
+      `media/${ctx.targetAccountId}/${targetId}/${media.versionId}.png`,
     createTargetPublicUrl: (key) => `https://target/${key}`,
     createOwnerToken: (key, ctx) => `${ctx.preflightId}:${key}`,
     now: () => '2026-09-12T12:00:00.000Z',
@@ -151,7 +152,7 @@ describe('message template HQ adapter', () => {
     expect(JSON.parse(String(insert?.bindings?.[4]))).toEqual({
       hero: {
         mediaId: 'media-store-a-media:source-media',
-        url: 'https://target/accounts/store-a/media-store-a-media:source-media.png',
+        url: 'https://target/media/store-a/media-store-a-media:source-media/source-media-v1.png',
       },
     });
     expect(resolverInput).toEqual({ authority: sourceAuthority, templateVersionId: 'version-1' });
@@ -175,12 +176,12 @@ describe('message template HQ adapter', () => {
       });
       expect(plan.targetAccountId).toBe(accountId);
       expect(plan.stage).toHaveLength(1);
-      expect(plan.stage[0]?.key).toContain(`accounts/${accountId}/media-${accountId}`);
+      expect(plan.stage[0]?.key).toContain(`media/${accountId}/media-${accountId}`);
       expect(plan.compensateOnDbFailure).toEqual(plan.reconcile);
       const insert = plan.dbCommit.find((statement) => statement.sql.includes('INSERT INTO templates'));
       const storedBody = String(insert?.bindings?.[4]);
       expect(storedBody).toContain(`media-${accountId}`);
-      expect(storedBody).toContain(`https://target/accounts/${accountId}/media-${accountId}.png`);
+      expect(storedBody).toContain(`https://target/media/${accountId}/media-${accountId}/source-media-v1.png`);
     }
   });
 
@@ -224,18 +225,36 @@ describe('message template HQ adapter', () => {
       `INSERT INTO templates(id,name,message_type,message_content,line_account_id,updated_at)
        VALUES ('existing','来店お礼','text','old','store-a','rev-1')`,
     ).run();
+    store.raw.prepare(
+      `INSERT INTO media(id,line_account_id,kind,filename,mime_type,size_bytes,r2_key,created_at)
+       VALUES ('existing-media','store-a','image','thanks.png','image/png',4,'media/store-a/current.png','media-created')`,
+    ).run();
+    store.raw.prepare(
+      `INSERT INTO media_versions(id,media_id,version_no,r2_key,mime_type,size_bytes,content_hash,created_at)
+       VALUES ('existing-media-v1','existing-media',1,'media/store-a/current.png','image/png',4,?,'media-created')`,
+    ).run(contentHash);
+    const existingMedia = {
+      id: 'existing-media', filename: 'thanks.png', mimeType: 'image/png', sizeBytes: 4,
+      r2Key: 'media/store-a/current.png', publicUrl: null, contentHash,
+      revision: `media-created:${contentHash}:media/store-a/current.png`, versionNo: 1,
+    };
     const resolutions: HqTemplateResolution[] = [
       { sourceId: 'template:source-template', itemKind: 'template', mode: 'overwrite', targetId: 'existing', expectedRevision: 'rev-1' },
-      { sourceId: 'media:source-media', itemKind: 'media', mode: 'create' },
+      { sourceId: 'media:source-media', itemKind: 'media', mode: 'overwrite', targetId: existingMedia.id, expectedRevision: existingMedia.revision },
     ];
     const plan = await planMessageTemplateDistribution({
       context: context('store-a', resolutions), source: authorizedSource(),
-      snapshot: snapshot({ templates: [{ id: 'existing', name: '来店お礼', updatedAt: 'rev-1' }] }),
-      idMap: { 'template:source-template': 'existing', 'media:source-media': 'new-media' },
+      snapshot: snapshot({
+        templates: [{ id: 'existing', name: '来店お礼', updatedAt: 'rev-1' }],
+        media: [existingMedia],
+      }),
+      idMap: { 'template:source-template': 'existing', 'media:source-media': existingMedia.id },
       dependencies: dependencies(),
     });
+    const objects = new Map<string, Uint8Array>([[existingMedia.r2Key, new Uint8Array([9, 9, 9, 9])]]);
+    for (const staged of plan.stage) objects.set(staged.key, staged.bytes);
     store.raw.prepare("UPDATE templates SET updated_at='rev-2' WHERE id='existing'").run();
-    const apply = () => {
+    const apply = async () => {
       store.raw.exec('BEGIN IMMEDIATE');
       try {
         for (const statement of plan.dbCommit) {
@@ -246,14 +265,17 @@ describe('message template HQ adapter', () => {
         store.raw.exec('COMMIT');
       } catch (error) {
         store.raw.exec('ROLLBACK');
+        for (const owned of plan.compensateOnDbFailure) objects.delete(owned.key);
         throw error;
       }
     };
-    expect(apply).toThrow();
+    await expect(apply()).rejects.toThrow();
     expect(store.raw.prepare("SELECT message_content,updated_at FROM templates WHERE id='existing'").get())
       .toEqual({ message_content: 'old', updated_at: 'rev-2' });
-    expect(store.raw.prepare("SELECT COUNT(*) AS count FROM media WHERE line_account_id='store-a'").get())
-      .toEqual({ count: 0 });
+    expect(store.raw.prepare("SELECT r2_key FROM media WHERE id='existing-media'").get())
+      .toEqual({ r2_key: existingMedia.r2Key });
+    expect(objects.get(existingMedia.r2Key)).toEqual(new Uint8Array([9, 9, 9, 9]));
+    expect(objects.has(plan.stage[0]!.key)).toBe(false);
   });
 
   it.each(['insert', 'rename', 'unchanged', 'other-account'] as const)('checks the complete name inventory before committing an NFKC name: %s', async (change) => {
@@ -354,6 +376,26 @@ describe('message template HQ adapter', () => {
     }));
     await expect(wrongPrefix.extractReferences({ templateVersionId: 'version-1', definitionJson: '{}' }))
       .rejects.toMatchObject({ code: 'SOURCE_MEDIA_AUTHORITY_MISMATCH' });
+
+    const foreignDefinition = {
+      ...definition,
+      media: [{
+        ...definition.media[0]!,
+        r2Key: 'hq-templates/tenant-2/media.png',
+      }],
+    };
+    const selfConsistentForeignPrefix = createTemplateHqTemplateAdapter(sourceAuthority, dependencies({
+      resolveSourceVersion: async () => sourceVersion({
+        definitionJson: JSON.stringify(foreignDefinition),
+        media: [{
+          ...version.media[0]!,
+          r2Key: 'hq-templates/tenant-2/media.png',
+          r2KeyPrefix: 'hq-templates/tenant-2',
+        }],
+      }),
+    }));
+    await expect(selfConsistentForeignPrefix.extractReferences({ templateVersionId: 'version-1', definitionJson: '{}' }))
+      .rejects.toMatchObject({ code: 'SOURCE_MEDIA_AUTHORITY_MISMATCH' });
   });
 
   it('rejects same-size source bytes when their SHA-256 does not match the immutable version', async () => {
@@ -384,5 +426,148 @@ describe('message template HQ adapter', () => {
         }),
       }),
     })).rejects.toMatchObject({ code: 'MEDIA_COPY_INVALID', status: 422 });
+  });
+
+  it.each([
+    ['another account', 'media/store-b/new.png'],
+    ['the current object', 'media/store-a/current.png'],
+  ])('rejects a target R2 key owned by %s', async (_case, targetR2Key) => {
+    const existing = {
+      id: 'existing-media', filename: 'thanks.png', mimeType: 'image/png', sizeBytes: 4,
+      r2Key: 'media/store-a/current.png', publicUrl: 'https://target/current.png', contentHash,
+      revision: 'rev-1', versionNo: 1,
+    };
+    const resolutions: HqTemplateResolution[] = [
+      { sourceId: 'template:source-template', itemKind: 'template', mode: 'create' },
+      { sourceId: 'media:source-media', itemKind: 'media', mode: 'overwrite', targetId: existing.id, expectedRevision: existing.revision },
+    ];
+    await expect(planMessageTemplateDistribution({
+      context: context('store-a', resolutions), source: authorizedSource(),
+      snapshot: snapshot({ media: [existing] }),
+      idMap: { 'template:source-template': 'new-template', 'media:source-media': existing.id },
+      dependencies: dependencies({ createTargetR2Key: () => targetR2Key }),
+    })).rejects.toMatchObject({ code: 'MEDIA_COPY_INVALID', status: 422 });
+  });
+
+  it('rejects two copied media objects that resolve to the same target R2 key', async () => {
+    const media = [
+      { ...definition.media[0]!, id: 'media-a', filename: 'a.png', r2Key: 'hq-templates/tenant-1/a.png', publicUrl: null, versionId: 'media-a-v1' },
+      { ...definition.media[0]!, id: 'media-b', filename: 'b.png', r2Key: 'hq-templates/tenant-1/b.png', publicUrl: null, versionId: 'media-b-v1' },
+    ];
+    const twoMedia = parseMessageTemplateDefinition({
+      ...definition,
+      template: { ...definition.template, messageContent: JSON.stringify(['media-a', 'media-b']) },
+      media,
+    });
+    const version = sourceVersion({
+      definitionJson: JSON.stringify(twoMedia),
+      media: media.map((item) => ({
+        tenantId: 'tenant-1', sourceAccountId: 'source-store', templateVersionId: 'version-1',
+        mediaId: item.id, mediaVersionId: item.versionId, versionNo: item.versionNo,
+        r2Key: item.r2Key, r2KeyPrefix: 'hq-templates/tenant-1', sizeBytes: item.sizeBytes,
+        contentHash: item.contentHash, etag: 'etag-source-v1',
+      })),
+    });
+    await expect(planMessageTemplateDistribution({
+      context: context('store-a', [
+        { sourceId: 'template:source-template', itemKind: 'template', mode: 'create' },
+        { sourceId: 'media:media-a', itemKind: 'media', mode: 'create' },
+        { sourceId: 'media:media-b', itemKind: 'media', mode: 'create' },
+      ]),
+      source: authorizedSource(version), snapshot: snapshot(),
+      idMap: {
+        'template:source-template': 'new-template',
+        'media:media-a': 'target-a',
+        'media:media-b': 'target-b',
+      },
+      dependencies: dependencies({ createTargetR2Key: () => 'media/store-a/shared.png' }),
+    })).rejects.toMatchObject({ code: 'MEDIA_COPY_INVALID', status: 422 });
+  });
+
+  it('rewrites exact structured locators without changing matching substrings in human text', async () => {
+    const media = [{
+      ...definition.media[0]!, id: 'cat', r2Key: 'hq-templates/tenant-1/cat.png',
+      publicUrl: null, versionId: 'cat-v1',
+    }];
+    const exactDefinition = parseMessageTemplateDefinition({
+      ...definition,
+      template: {
+        ...definition.template,
+        messageContent: JSON.stringify({ text: 'catalog and cat pictures', mediaId: 'cat' }),
+      },
+      media,
+    });
+    const version = sourceVersion({
+      definitionJson: JSON.stringify(exactDefinition),
+      media: [{
+        ...sourceVersion().media[0]!, mediaId: 'cat', mediaVersionId: 'cat-v1',
+        r2Key: 'hq-templates/tenant-1/cat.png',
+      }],
+    });
+    const plan = await planMessageTemplateDistribution({
+      context: context('store-a', [
+        { sourceId: 'template:source-template', itemKind: 'template', mode: 'create' },
+        { sourceId: 'media:cat', itemKind: 'media', mode: 'create' },
+      ]),
+      source: authorizedSource(version), snapshot: snapshot(),
+      idMap: { 'template:source-template': 'new-template', 'media:cat': 'target-cat' },
+      dependencies: dependencies(),
+    });
+    const insert = plan.dbCommit.find((statement) => statement.sql.includes('INSERT INTO templates'))!;
+    expect(JSON.parse(String(insert.bindings?.[4]))).toEqual({
+      text: 'catalog and cat pictures',
+      mediaId: 'target-cat',
+    });
+  });
+
+  it('offers overwrite and alias for an NFKC-equivalent media filename with different content', async () => {
+    const existing = {
+      id: 'existing-media', filename: 'ＴＨＡＮＫＳ．ＰＮＧ', mimeType: 'image/png', sizeBytes: 8,
+      r2Key: 'media/store-a/existing.png', publicUrl: null, contentHash: 'a'.repeat(64),
+      revision: 'rev-existing', versionNo: 3,
+    };
+    const items = inspectMessageTemplateDefinition(definition, snapshot({ media: [existing] }));
+    expect(items[1]).toMatchObject({
+      duplicate: true, targetId: existing.id, expectedRevision: existing.revision,
+      allowedModes: ['overwrite', 'alias'],
+    });
+
+    const overwrite = await planMessageTemplateDistribution({
+      context: context('store-a', [
+        { sourceId: 'template:source-template', itemKind: 'template', mode: 'create' },
+        { sourceId: 'media:source-media', itemKind: 'media', mode: 'overwrite', targetId: existing.id, expectedRevision: existing.revision },
+      ]),
+      source: authorizedSource(), snapshot: snapshot({ media: [existing] }),
+      idMap: { 'template:source-template': 'new-template', 'media:source-media': existing.id },
+      dependencies: dependencies(),
+    });
+    expect(overwrite.dbCommit.some((statement) => statement.sql.includes('UPDATE media SET'))).toBe(true);
+    expect(overwrite.stage[0]?.key).not.toBe(existing.r2Key);
+    expect(overwrite.compensateOnDbFailure).not.toContainEqual(expect.objectContaining({ key: existing.r2Key }));
+
+    const alias = await planMessageTemplateDistribution({
+      context: context('store-a', [
+        { sourceId: 'template:source-template', itemKind: 'template', mode: 'create' },
+        { sourceId: 'media:source-media', itemKind: 'media', mode: 'alias', targetId: existing.id },
+      ]),
+      source: authorizedSource(), snapshot: snapshot({ media: [existing] }),
+      idMap: { 'template:source-template': 'alias-template', 'media:source-media': 'alias-media' },
+      dependencies: dependencies(),
+    });
+    const mediaInsert = alias.dbCommit.find((statement) => statement.sql.includes('INSERT INTO media\n'))!;
+    expect(mediaInsert.bindings?.[3]).toBe('thanks.png (2)');
+  });
+
+  it('fails closed when media content and normalized filename match different targets', () => {
+    expect(() => inspectMessageTemplateDefinition(definition, snapshot({ media: [
+      {
+        id: 'content-match', filename: 'other.png', mimeType: 'image/png', sizeBytes: 4,
+        r2Key: 'media/store-a/content.png', publicUrl: null, contentHash, revision: 'r1', versionNo: 1,
+      },
+      {
+        id: 'name-match', filename: 'ＴＨＡＮＫＳ．ＰＮＧ', mimeType: 'image/png', sizeBytes: 4,
+        r2Key: 'media/store-a/name.png', publicUrl: null, contentHash: 'b'.repeat(64), revision: 'r2', versionNo: 1,
+      },
+    ] }))).toThrowError(expect.objectContaining({ code: 'AMBIGUOUS_MEDIA', status: 409 }));
   });
 });
