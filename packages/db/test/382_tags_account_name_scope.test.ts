@@ -11,6 +11,7 @@ const bootstrap = readFileSync(`${root}bootstrap.sql`, 'utf8');
 const legacy = bootstrap.replace(/CREATE TABLE (?:"tags"|tags) \([\s\S]*?\);/, table =>
   table.replace(/name\s+TEXT(?: UNIQUE)? NOT NULL/, 'name TEXT UNIQUE NOT NULL'))
   .replace(/CREATE UNIQUE INDEX idx_tags_legacy_name[^;]+;/, '')
+  .replace(/CREATE UNIQUE INDEX idx_tags_legacy_normalized_name[^;]+;/, '')
   .replace(/CREATE UNIQUE INDEX idx_tags_account_exact_name[^;]+;/, '');
 const referenceColumns = [
   ['affiliate_offers', 'tag_id', 'NO ACTION'],
@@ -116,7 +117,7 @@ describe('382: タグ名の一意性を店舗単位へ移す', () => {
       expect(db.prepare('SELECT rowid,* FROM scenario_triggers ORDER BY rowid').all()).toEqual(triggerRows);
       expect(contents(db)).toEqual(before);
       expect(db.pragma('table_info(tags)')).toEqual(columns);
-      expect(db.prepare("SELECT name,sql FROM sqlite_master WHERE type='index' AND tbl_name='tags' AND sql IS NOT NULL AND name NOT IN ('idx_tags_legacy_name','idx_tags_account_exact_name') ORDER BY name").all()).toEqual(indexes);
+      expect(db.prepare("SELECT name,sql FROM sqlite_master WHERE type='index' AND tbl_name='tags' AND sql IS NOT NULL AND name NOT IN ('idx_tags_legacy_name','idx_tags_legacy_normalized_name','idx_tags_account_exact_name') ORDER BY name").all()).toEqual(indexes);
       expect(db.pragma('foreign_keys', { simple: true })).toBe(1);
       expect(db.pragma('foreign_key_check')).toEqual([]);
     } finally { db.close(); }
@@ -168,6 +169,15 @@ describe('382: タグ名の一意性を店舗単位へ移す', () => {
       }
       insert(db, 'tags', { id: 'other-account-name', name: '旧店舗タグ', line_account_id: 'account-2', normalized_name: '旧店舗タグ' });
       expect(db.pragma('foreign_key_check')).toEqual([]);
+    } finally { db.close(); }
+  });
+
+  test('新しい未所属タグは正規化名の同時競合をDBでも拒否する', () => {
+    const db = setup();
+    try {
+      migrate(db);
+      insert(db, 'tags', { id: 'global-a', name: 'ＶＩＰ　会員', line_account_id: null, normalized_name: 'vip 会員' });
+      expect(() => insert(db, 'tags', { id: 'global-b', name: 'vip 会員', line_account_id: null, normalized_name: 'vip 会員' })).toThrow(/UNIQUE/);
     } finally { db.close(); }
   });
 

@@ -6,11 +6,14 @@ type PreparedCall = {
   binds: unknown[];
 };
 
-function mockD1(options: { failStatement?: number; skipRow?: number } = {}) {
+function mockD1(options: { failStatement?: number; skipRow?: number; legacyNames?: string[] } = {}) {
   const calls: PreparedCall[] = [];
   let statementIndex = 0;
   const db = {
     prepare: vi.fn((sql: string) => {
+      if (/SELECT name FROM tags/.test(sql)) {
+        return { all: async () => ({ results: (options.legacyNames ?? []).map((name) => ({ name })) }) };
+      }
       const call: PreparedCall = { sql, binds: [] };
       calls.push(call);
       return {
@@ -63,6 +66,12 @@ describe('createTagsBulk', () => {
     ]);
 
     expect(result.map((row) => row.status)).toEqual(['created', 'skipped', 'created']);
+  });
+
+  it('旧NULL正規化名とNFKCで同じCSV行を見送る', async () => {
+    const { db } = mockD1({ legacyNames: ['ＶＩＰ　会員'] });
+    const result = await createTagsBulk(db, [{ name: 'vip 会員' }, { name: '別タグ' }]);
+    expect(result.map((row) => row.status)).toEqual(['skipped', 'created']);
   });
 
   it('1文が失敗しても次の20件は続ける', async () => {

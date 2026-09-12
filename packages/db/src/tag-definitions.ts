@@ -1,4 +1,9 @@
-import { getTagDeleteImpact, type Tag, type TagDeleteImpactReferences } from './tags.js';
+import {
+  assertTagNameAvailable,
+  getTagDeleteImpact,
+  type Tag,
+  type TagDeleteImpactReferences,
+} from './tags.js';
 import { jstNow } from './utils.js';
 
 export type TagLinkedAction = {
@@ -169,6 +174,7 @@ export async function createTagDefinition(
   input: CreateTagDefinitionInput,
 ): Promise<TagDefinitionDetail> {
   await requireTagFolder(db, input.groupId, input.lineAccountId);
+  await assertTagNameAvailable(db, input.name, input.lineAccountId);
   const tagId = crypto.randomUUID();
   const now = jstNow();
   const actions = input.actions ?? [];
@@ -324,6 +330,9 @@ export async function updateTagDefinition(
     throw new TagDefinitionError('version_conflict', '別の人が先にタグを更新しました');
   }
   assertArchivedTagUpdateAllowed(current.tag, input);
+  if (input.name !== undefined) {
+    await assertTagNameAvailable(db, input.name, input.lineAccountId, input.tagId);
+  }
   if (input.groupId !== undefined) await requireTagFolder(db, input.groupId, input.lineAccountId);
   if (input.automationId !== undefined
     && input.automationId !== current.automation?.id

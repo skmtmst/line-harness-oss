@@ -133,6 +133,12 @@ CREATE UNIQUE INDEX idx_tags_account_normalized_name
 -- Scoped tags keep the account + normalized_name index above.
 CREATE UNIQUE INDEX idx_tags_legacy_name ON tags(name) WHERE line_account_id IS NULL;
 
+-- New global writers persist the NFKC comparison key. This closes concurrent
+-- create races; application writers also normalize old NULL rows before writes.
+CREATE UNIQUE INDEX idx_tags_legacy_normalized_name
+  ON tags(normalized_name)
+  WHERE line_account_id IS NULL AND normalized_name IS NOT NULL;
+
 -- Older account-owned rows can still have NULL normalized_name. Include both old
 -- and normalized rows so an exact-name duplicate cannot cross between the two.
 CREATE UNIQUE INDEX idx_tags_account_exact_name

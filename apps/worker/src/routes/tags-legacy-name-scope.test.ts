@@ -43,12 +43,12 @@ async function request(path: string, method: string, body: unknown) {
 
 describe('legacy tags after migration 382: real SQLite and HTTP', () => {
   test('same-name POST returns 409, including pre-existing NULL normalized_name', async () => {
-    sql.exec("INSERT INTO tags(id,name) VALUES ('old','従来タグ')");
-    expect((await request('/api/tags', 'POST', { name: '従来タグ' })).status).toBe(409);
-    const first = await request('/api/tags', 'POST', { name: 'ＶＩＰ　会員' });
+    sql.exec("INSERT INTO tags(id,name) VALUES ('old','ＶＩＰ　会員')");
+    expect((await request('/api/tags', 'POST', { name: 'vip 会員' })).status).toBe(409);
+    const first = await request('/api/tags', 'POST', { name: 'ＧＯＬＤ　会員' });
     expect(first.status).toBe(201);
-    expect(sql.prepare('SELECT line_account_id,normalized_name FROM tags WHERE id=?').get(first.body.data.id)).toEqual({ line_account_id: null, normalized_name: 'vip 会員' });
-    expect((await request('/api/tags', 'POST', { name: 'ＶＩＰ　会員' })).status).toBe(409);
+    expect(sql.prepare('SELECT line_account_id,normalized_name FROM tags WHERE id=?').get(first.body.data.id)).toEqual({ line_account_id: null, normalized_name: 'gold 会員' });
+    expect((await request('/api/tags', 'POST', { name: 'gold 会員' })).status).toBe(409);
     expect(sql.prepare('SELECT count(*) n FROM tags').get()).toEqual({ n: 2 });
   });
 
@@ -88,14 +88,14 @@ describe('legacy tags after migration 382: real SQLite and HTTP', () => {
   test('old scoped NULL-normalized names reject duplicate POST and both PATCH contracts', async () => {
     for (const id of ['a1', 'a2']) sql.prepare("INSERT INTO line_accounts(id,name,channel_id,channel_access_token,channel_secret) VALUES (?,?,?,'fixture','fixture')").run(id,id,`fixture-${id}`);
     sql.exec("INSERT INTO tags(id,name,normalized_name,line_account_id) VALUES ('old-scoped','VIP',NULL,'a1'),('renamed','Other','other','a1')");
-    expect((await request('/api/tags', 'POST', { name: 'VIP', lineAccountId: 'a1' })).status).toBe(409);
-    expect((await request('/api/tags/renamed', 'PATCH', { name: 'VIP' })).status).toBe(409);
-    expect((await request('/api/tags/renamed', 'PATCH', { name: 'VIP', lineAccountId: 'a1', expectedVersion: 1 })).status).toBe(409);
+    expect((await request('/api/tags', 'POST', { name: 'ＶＩＰ', lineAccountId: 'a1' })).status).toBe(409);
+    expect((await request('/api/tags/renamed', 'PATCH', { name: 'ＶＩＰ' })).status).toBe(409);
+    expect((await request('/api/tags/renamed', 'PATCH', { name: 'ＶＩＰ', lineAccountId: 'a1', expectedVersion: 1 })).status).toBe(409);
     expect(sql.prepare("SELECT id,name,normalized_name,version FROM tags WHERE line_account_id='a1' ORDER BY id").all()).toEqual([
       { id: 'old-scoped', name: 'VIP', normalized_name: null, version: 1 },
       { id: 'renamed', name: 'Other', normalized_name: 'other', version: 1 },
     ]);
-    expect((await request('/api/tags', 'POST', { name: 'VIP', lineAccountId: 'a2' })).status).toBe(201);
+    expect((await request('/api/tags', 'POST', { name: 'ＶＩＰ', lineAccountId: 'a2' })).status).toBe(201);
     expect(sql.pragma('foreign_key_check')).toEqual([]);
   });
 
