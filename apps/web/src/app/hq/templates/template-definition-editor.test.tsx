@@ -2,14 +2,36 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { emptyLayout } from '@line-crm/shared'
-import type { FormDefinition, RichMenuDefinition } from '@/lib/hq-templates-api'
-import TemplateDefinitionEditor, { definitionError, referenceCount } from './template-definition-editor'
+import type { FormDefinition, MessageTemplateDefinition, RichMenuDefinition } from '@/lib/hq-templates-api'
+import TemplateDefinitionEditor, { definitionError, freshDefinition, referenceCount } from './template-definition-editor'
 
 vi.mock('@/lib/hq-templates-api', () => ({ hqTemplatesApi: { uploadImage: vi.fn() } }))
 
 afterEach(cleanup)
 
 describe('TemplateDefinitionEditor', () => {
+  it('統括メッセージでも店舗と同じ編集面を使い、非表示の保存項目を保持する', () => {
+    const value = freshDefinition('template') as MessageTemplateDefinition
+    value.template.messageContent = 'ご案内：'
+    value.template.carouselActionsJson = '{"keep":true}'
+    value.template.questionJson = '{"question":"keep"}'
+    const onChange = vi.fn()
+
+    render(<TemplateDefinitionEditor type="template" value={value} disabled={false} onChange={onChange} />)
+
+    expect(screen.getByText('LINEプレビュー')).toBeTruthy()
+    expect(screen.getByText('本文に入れたURLの扱い')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '名前' }))
+
+    expect(onChange).toHaveBeenCalledWith({
+      ...value,
+      template: {
+        ...value.template,
+        messageContent: 'ご案内：{{name}}',
+      },
+    })
+  })
+
   it('統括R2領域外のリッチメニュー画像を保存前に止める', () => {
     const value: RichMenuDefinition = {
       schemaVersion: 1,

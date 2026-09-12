@@ -162,6 +162,7 @@ shared-button-importer components/shared/folder-panel.tsx
 shared-button-importer components/shared/list-state.tsx
 shared-button-importer components/shared/not-connected.tsx
 shared-button-importer components/store-selection-gate.tsx
+shared-button-importer components/templates/message-template-editor.tsx
 shared-button-importer components/users/user-row.tsx
 shared-button-importer components/webinars/webinar-notifications.tsx
 

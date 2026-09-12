@@ -6,6 +6,10 @@ import { freshDefinition, withUploadedImage } from '@/lib/hq-template-authoring'
 export { freshDefinition } from '@/lib/hq-template-authoring'
 import Button from '@/components/shared/button'
 import Select from '@/components/shared/select'
+import {
+  EMPTY_TEMPLATE_REFERENCES,
+  MessageTemplateEditor,
+} from '@/components/templates/message-template-editor'
 import type {
   FormDefinition,
   FormFieldType,
@@ -101,12 +105,46 @@ function ImageUpload({ purpose, disabled, onUploaded, onBusyChange }: { purpose:
 
 function MessageEditor({ value, disabled, onChange, onBusyChange }: { value: MessageTemplateDefinition; disabled: boolean; onChange: (next: MessageTemplateDefinition) => void; onBusyChange?: (busy: boolean) => void }) {
   const current = value.template
-  return <>
-    <div className={styles.twoColumns}><div className={styles.field}><span>メッセージ形式</span><Select aria-label="メッセージ形式" size="full" value={current.messageType} disabled={disabled} options={[{ value: 'text', label: 'テキスト' }, { value: 'flex', label: 'Flexメッセージ' }, { value: 'carousel', label: 'カルーセル' }, { value: 'image', label: '画像' }]} onChange={messageType => onChange({ ...value, template: { ...current, messageType: messageType as MessageTemplateDefinition['template']['messageType'] } })} /></div><label className={styles.field}><span>分類</span><input aria-label="テンプレートの分類" className={styles.input} value={current.category} maxLength={100} disabled={disabled} onChange={event => onChange({ ...value, template: { ...current, category: event.target.value } })} /></label></div>
-    {current.id === 'hq-authored-message' && <ImageUpload purpose="message" disabled={disabled} onBusyChange={onBusyChange} onUploaded={media => onChange(withUploadedImage(value, media))} />}
-    {value.media.map(media => <p key={media.id} className={styles.muted}>{media.filename}（{Math.ceil(media.sizeBytes / 1024)} KB）<br /><span className={styles.name}>{media.publicUrl ?? media.r2Key}</span></p>)}
-    <label className={styles.field}><span>{current.messageType === 'text' ? '本文' : 'メッセージ内容'}</span><textarea aria-label="配信する本文" className={styles.input} value={current.messageContent} rows={9} disabled={disabled} placeholder={current.messageType === 'text' ? '店舗から配信する文章を入力' : '形式に対応する内容を入力'} onChange={event => onChange({ ...value, template: { ...current, messageContent: event.target.value } })} /><small className={styles.muted}>{current.messageType === 'text' ? '店舗ごとに同じ文章を配布します。' : '画像・Flex・カルーセルは登録メディアの参照も配布対象になります。'}</small></label>
-  </>
+  const [targetDate, setTargetDate] = useState('')
+  const messageTypeOptions = [
+    { value: 'text', label: 'テキスト' },
+    { value: 'flex', label: 'カード型' },
+    { value: 'image', label: '画像' },
+    // 既存データを開いて保存しても形式を落とさない。店舗側の専用編集画面へ
+    // 移されるまで、HQで作成済みのカルーセルも選択肢として保持する。
+    { value: 'carousel', label: 'カルーセル' },
+  ]
+  return (
+    <MessageTemplateEditor
+      value={{ messageType: current.messageType, messageContent: current.messageContent }}
+      onChange={(next) => onChange({
+        ...value,
+        template: {
+          ...current,
+          messageType: next.messageType as MessageTemplateDefinition['template']['messageType'],
+          messageContent: next.messageContent,
+        },
+      })}
+      targetDate={targetDate}
+      onTargetDateChange={setTargetDate}
+      references={EMPTY_TEMPLATE_REFERENCES}
+      referenceAccountId={null}
+      referenceUnavailableHint="友だち情報と共通情報は店舗ごとに異なるため、配布先のLINEアカウントで設定してください。"
+      disabled={disabled}
+      typeOptions={messageTypeOptions}
+      bodyAriaLabel="配信する本文"
+      beforeType={(
+        <>
+          <label className={styles.field}>
+            <span>分類</span>
+            <input aria-label="テンプレートの分類" className={styles.input} value={current.category} maxLength={100} disabled={disabled} onChange={event => onChange({ ...value, template: { ...current, category: event.target.value } })} />
+          </label>
+          {current.id === 'hq-authored-message' && <ImageUpload purpose="message" disabled={disabled} onBusyChange={onBusyChange} onUploaded={media => onChange(withUploadedImage(value, media))} />}
+          {value.media.map(media => <p key={media.id} className={styles.muted}>{media.filename}（{Math.ceil(media.sizeBytes / 1024)} KB）<br /><span className={styles.name}>{media.publicUrl ?? media.r2Key}</span></p>)}
+        </>
+      )}
+    />
+  )
 }
 
 function RichMenuEditor({ value, disabled, tenantId, onChange, onBusyChange }: { value: RichMenuDefinition; disabled: boolean; tenantId?: string; onChange: (next: RichMenuDefinition) => void; onBusyChange?: (busy: boolean) => void }) {
