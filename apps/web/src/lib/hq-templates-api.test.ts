@@ -48,6 +48,20 @@ describe('HQ template API transport', () => {
     expect(conflict).toMatchObject({ status: 409, responseReceived: true })
     expect(conflict.message).toBe('最新版を読み込んでください。')
   })
+  it.each([408, 429, 500, 502, 504])('HTTP %sを受信しても作成の未実行確定とは扱わない', async status => {
+    request.mockRejectedValue(new transport.ApiError(status, 'gateway error'))
+    const error = await hqTemplatesApi.create({ type: 'tag', name: '再確認', definition: { schemaVersion: 1, tag: { name: '再確認' }, folders: [] } }, 'same-request').catch(cause => cause)
+    expect(error).toMatchObject({ status, responseReceived: true, requestNotApplied: false })
+  })
+  it.each([400, 401, 403, 409, 422, 428])('HTTP %sの明確な拒否を結果不明と区別する', async status => {
+    request.mockRejectedValue(new transport.ApiError(status))
+    const error = await hqTemplatesApi.get('t1').catch(cause => cause)
+    expect(error).toMatchObject({ status, responseReceived: true, requestNotApplied: true })
+  })
+  it('HTTP応答自体が不明なら未実行とは断定しない', async () => {
+    request.mockRejectedValue(new TypeError('Failed to fetch'))
+    expect(await hqTemplatesApi.get('t1').catch(cause => cause)).toMatchObject({ responseReceived: false, requestNotApplied: false })
+  })
   it('内部エラー本文は画面用エラーへ渡さない', async () => {
     request.mockRejectedValue(new transport.ApiError(500, 'D1_ERROR: SELECT secret FROM tenant'))
     const error = await hqTemplatesApi.get('t1').catch(cause => cause)

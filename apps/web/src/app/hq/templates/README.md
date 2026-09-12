@@ -5,7 +5,7 @@
 
 - Pencil: `nen-order-inventory-fulfillment.pen` の rsyjI / ZsLly / E0CmCp / Uhd35 / FxHyL。
 - 保存・削除は期待revision付き。共通fetchApiによるセッション・CSRF保護を利用する。
-- 新規保存は8〜128文字のrequestId（UUID推奨）をbodyと`Idempotency-Key`へ同じ値で渡す。応答不明時は同じrequestIdと同じpayloadを再送し、サーバーの201再現を受ける。サーバー応答を受信済みなら次の操作は新しいrequestIdにする。同じrequestIdで異なるpayloadを送った409 `IDEMPOTENCY_CONFLICT` は最新版を再読込して解消する。
+- 新規保存は8〜128文字のrequestId（UUID推奨）をbodyと`Idempotency-Key`へ同じ値で渡す。応答不明時は同じrequestIdと同じpayloadを再送し、サーバーの201再現を受ける。HTTP応答があっても408・5xxなど結果不明は同じrequestId・payloadを保持し、入力を固定して「前回の保存を再確認」を表示する。後続の拒否応答だけでは以前の結果不明を解除せず、成功結果を復元するまで同じ依頼を保持する。最初の試行が明確な入力・権限エラーで拒否された場合だけ、新しい依頼として修正できる。同じrequestIdで異なるpayloadを送った409 `IDEMPOTENCY_CONFLICT` は最新版を再読込して解消する。
 - 配布前確認は選択店舗との一致と有効期限を検査する。重複は未選択から開始し、allowedModes内だけ選べる。一括設定後も個別変更できる。
 - preflightIdがrunIdになるAPI契約。POST応答不達はGETで復元し、自動再POSTしない。URLのhashにひな形IDと配布番号だけを残し、再読込でもGETで復元する。
 - 完了が確定した失敗店舗だけ、新しい事前確認へ戻す。成功件数はsucceeded店舗の内訳から計算し、通信失敗や処理中を成功・失敗として数えない。

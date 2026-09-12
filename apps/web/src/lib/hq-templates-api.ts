@@ -33,7 +33,7 @@ export interface DistributionResult {
   }[]
 }
 export class HqTemplatesApiError extends Error {
-  constructor(message: string, public readonly status?: number, public readonly responseReceived = false) {
+  constructor(message: string, public readonly status?: number, public readonly responseReceived = false, public readonly requestNotApplied = false) {
     super(message)
     this.name = 'HqTemplatesApiError'
   }
@@ -69,7 +69,11 @@ async function request<T>(path: string, method = 'GET', body?: unknown, headers?
       : safeBodyMessage || (detail.status === 409 || detail.code === 'VERSION_CONFLICT'
         ? '内容が更新されました。もう一度確認してください。'
         : '処理できませんでした。接続と入力内容を確認し、もう一度お試しください。')
-    throw new HqTemplatesApiError(message, detail.status, error instanceof ApiError)
+    // A gateway/timeout response can arrive after the Worker committed. Receiving
+    // HTTP is not proof that creation failed. Only known rejection statuses prove
+    // this request did not apply; a previous ambiguous attempt remains ambiguous.
+    const requestNotApplied = error instanceof ApiError && [400, 401, 403, 404, 405, 409, 422, 428].includes(error.status)
+    throw new HqTemplatesApiError(message, detail.status, error instanceof ApiError, requestNotApplied)
   }
 }
 const idPath = (id: string) => `/${encodeURIComponent(id)}`

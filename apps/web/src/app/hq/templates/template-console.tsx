@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import Button from '@/components/shared/button'
+import Notice from '@/components/shared/notice'
 import { Th } from '@/components/shared/table'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { usePageTitle } from '@/components/shell/page-chrome'
@@ -63,7 +64,8 @@ export default function TemplateConsole({ type }: { type: TemplateType }) {
   const [remove, setRemove] = useState<HqTemplate | null>(null)
   const [now, setNow] = useState(Date.now())
   const lock = useRef(false)
-  const createAttempt = useRef<{ requestId: string; input: TemplateInput } | null>(null)
+  const createAttempt = useRef<{ requestId: string; input: TemplateInput; distribute: boolean } | null>(null)
+  const [createUncertain, setCreateUncertain] = useState(false)
   const alive = useRef(true)
   const supported = type === 'tag'
   usePageTitle(stage === 'list' ? '統括のひな形' : stage === 'edit' ? 'ひな形の作成・編集' : stage === 'accounts' ? '配布先店舗を選択' : stage === 'duplicates' ? '重複確認と配布方法' : '配布結果')
@@ -98,7 +100,7 @@ export default function TemplateConsole({ type }: { type: TemplateType }) {
     }
     finally { lock.current = false; if (alive.current) setBusy(false) }
   }
-  const toList = () => { createAttempt.current = null; setStage('list'); setSearch(''); setPreflight(null); setChoices({}); setPendingRun(null); setResult(null); setError(''); setConflict(false); window.history.replaceState(null, '', window.location.pathname + window.location.search) }
+  const toList = () => { if (createUncertain) return; createAttempt.current = null; setStage('list'); setSearch(''); setPreflight(null); setChoices({}); setPendingRun(null); setResult(null); setError(''); setConflict(false); window.history.replaceState(null, '', window.location.pathname + window.location.search) }
   const loadDetailIntoForm = (loaded: TemplateDetail) => {
     if (loaded.template.template_type !== 'tag' || loaded.definition.schemaVersion !== 1) throw new Error('この種類のひな形は未対応です（UNSUPPORTED）。')
     setDetail(loaded); setName(loaded.template.name); setDescription(loaded.template.description ?? ''); setDefinition(loaded.definition)
@@ -112,18 +114,22 @@ export default function TemplateConsole({ type }: { type: TemplateType }) {
     if (!name.trim() || !definition.tag.name.trim() || definition.folders.some(folder => !folder.name.trim())) throw new Error('名前と参照先の名前を入力してください。')
     const input = { type: 'tag' as const, name: name.trim(), description: description.trim(), definition: { ...definition, tag: { ...definition.tag, description: description.trim() } } }
     let saved: TemplateDetail
+    let continueToAccounts = distribute
     if (detail) {
       saved = await hqTemplatesApi.update(detail.template.id, { ...input, expectedRevision: detail.template.revision })
     } else {
-      const attempt = createAttempt.current ?? { requestId: crypto.randomUUID(), input }
+      const attempt = createAttempt.current ?? { requestId: crypto.randomUUID(), input, distribute }
       createAttempt.current = attempt
+      continueToAccounts = attempt.distribute
       try {
         // If the response is lost, retry the exact request id and payload so the server can replay its 201.
         saved = await hqTemplatesApi.create(attempt.input, attempt.requestId)
       } catch (cause) {
-        if (cause && typeof cause === 'object' && 'responseReceived' in cause && cause.responseReceived === true) {
+        if (!createUncertain && cause && typeof cause === 'object' && 'requestNotApplied' in cause && cause.requestNotApplied === true) {
           createAttempt.current = null
         } else {
+          // A later rejection cannot disprove an earlier committed-but-unacknowledged attempt.
+          setCreateUncertain(true)
           // Keep the visible form aligned with the immutable retry payload.
           setName(attempt.input.name)
           setDescription(attempt.input.description ?? '')
@@ -133,11 +139,12 @@ export default function TemplateConsole({ type }: { type: TemplateType }) {
       }
     }
     if (!alive.current) return
-    createAttempt.current = null
     loadDetailIntoForm(saved)
+    createAttempt.current = null
+    setCreateUncertain(false)
     setTemplates(current => [saved.template, ...current.filter(row => row.id !== saved.template.id)])
     setMessage('ひな形を保存しました。')
-    if (distribute) { setSelected([]); setSearch(''); setStage('accounts') }
+    if (continueToAccounts) { setSelected([]); setSearch(''); setStage('accounts') }
     else setStage('list')
   })
   const checkStores = (ids: string[]) => void perform(async () => {
@@ -214,7 +221,7 @@ export default function TemplateConsole({ type }: { type: TemplateType }) {
 
   return <div className={styles.console} data-design-node={NODES[stage]} aria-busy={busy}>
     <nav aria-label="配布の進捗"><ol className={styles.steps}>{STEPS.map((step, i) => <li key={step.stage} aria-current={step.stage === stage ? 'step' : undefined}>{i + 1} {step.label}</li>)}</ol></nav>
-    {stage === 'edit' && <p className={styles.breadcrumb}><button type="button" disabled={busy} onClick={toList}>ひな形一覧</button> / {detail ? '編集' : '新規作成'}</p>}
+    {stage === 'edit' && <p className={styles.breadcrumb}><button type="button" disabled={busy || createUncertain} onClick={toList}>ひな形一覧</button> / {detail ? '編集' : '新規作成'}</p>}
     <header className={styles.header}><div><h1>{title}</h1><p className={styles.muted}>{stage === 'list' ? 'タグ・テンプレート・リッチメニュー・回答フォームを一元管理' : stage === 'accounts' ? '同じ組織内の店舗を複数選択できます' : stage === 'duplicates' ? '一括設定のあと、必要な項目だけ個別に変更できます' : stage === 'edit' ? '店舗へ配布するタグと参照設定をまとめます' : detail?.template.name}</p></div>
       {stage === 'list' && supported && <Button variant="primary" disabled={!ready || busy} onClick={() => { createAttempt.current = null; setDetail(null); setName(''); setDescription(''); setDefinition(freshDefinition()); setStage('edit'); setError(''); setConflict(false) }}>＋ひな形を作成</Button>}
     </header>
@@ -230,14 +237,15 @@ export default function TemplateConsole({ type }: { type: TemplateType }) {
     {stage === 'edit' && <>
       <div className={styles.grid}><div className={styles.stack}><section className={styles.panel}>
         <label className={styles.field}><span>種類</span><input className={styles.input} value="タグ" readOnly /></label>
-        <label className={styles.field}><span>名前</span><input className={styles.input} value={name} maxLength={200} disabled={busy} onChange={e => { setName(e.target.value); setDefinition(current => ({ ...current, tag: { ...current.tag, name: e.target.value } })) }} /></label>
-        <label className={styles.field}><span>説明</span><textarea className={styles.input} value={description} maxLength={2000} rows={2} disabled={busy} onChange={e => setDescription(e.target.value)} /></label>
+        <label className={styles.field}><span>名前</span><input className={styles.input} value={name} maxLength={200} disabled={busy || createUncertain} onChange={e => { setName(e.target.value); setDefinition(current => ({ ...current, tag: { ...current.tag, name: e.target.value } })) }} /></label>
+        <label className={styles.field}><span>説明</span><textarea className={styles.input} value={description} maxLength={2000} rows={2} disabled={busy || createUncertain} onChange={e => setDescription(e.target.value)} /></label>
 
       </section><section className={styles.panel}><h2>一緒に配布する参照先</h2><p className={styles.muted}>タグが利用するグループも重複の確認対象になります。</p>
-        {definition.folders.map(folder => <label key={folder.id} className={styles.reference}><span>タググループ</span><input aria-label={`タググループ ${folder.id}`} className={styles.input} value={folder.name} disabled={busy} onChange={e => setDefinition(current => ({ ...current, folders: current.folders.map(f => f.id === folder.id ? { ...f, name: e.target.value } : f) }))} /><span className={styles.badge}>配布対象に含む</span></label>)}
-        {!definition.folders.length && <Button disabled={busy} onClick={() => setDefinition(current => ({ ...current, tag: { ...current.tag, folderId: 'tag-group' }, folders: [{ id: 'tag-group', name: '' }] }))}>タググループを追加</Button>}
+        {definition.folders.map(folder => <label key={folder.id} className={styles.reference}><span>タググループ</span><input aria-label={`タググループ ${folder.id}`} className={styles.input} value={folder.name} disabled={busy || createUncertain} onChange={e => setDefinition(current => ({ ...current, folders: current.folders.map(f => f.id === folder.id ? { ...f, name: e.target.value } : f) }))} /><span className={styles.badge}>配布対象に含む</span></label>)}
+        {!definition.folders.length && <Button disabled={busy || createUncertain} onClick={() => setDefinition(current => ({ ...current, tag: { ...current.tag, folderId: 'tag-group' }, folders: [{ id: 'tag-group', name: '' }] }))}>タググループを追加</Button>}
       </section></div><aside className={styles.stack}><section className={styles.panel}><h2>保存状態</h2><p>{detail ? name !== detail.template.name || description !== (detail.template.description ?? '') || JSON.stringify(definition) !== JSON.stringify(detail.definition) ? '未保存の変更あり' : '保存済み' : '下書き'}</p>{detail && <p className={styles.muted}>{formatDate(detail.template.updated_at)}</p>}</section><section className={styles.panel}><h2>店舗での見え方</h2><span className={`${styles.badge} ${styles.success}`}>{definition.tag.name || 'タグ名'}</span><p className={styles.muted}>保存後に配布先店舗を選択します。</p></section></aside></div>
-      <footer className={styles.footer}><Button disabled={busy} onClick={toList}>キャンセル</Button><Button disabled={busy || !name.trim() || !definition.tag.name.trim()} onClick={() => save(false)}>下書き保存</Button><Button variant="primary" disabled={busy || !name.trim() || !definition.tag.name.trim()} onClick={() => save(true)}>保存して配布先を選ぶ</Button></footer>
+      {createUncertain && <Notice tone="validation" message="前回の保存結果がまだ確定していません。重複を防ぐため入力を固定しています。同じ依頼を再確認し、保存済みならその結果を読み込みます。" />}
+      <footer className={styles.footer}><Button disabled={busy || createUncertain} onClick={toList}>キャンセル</Button>{createUncertain ? <Button variant="primary" disabled={busy} onClick={() => save(false)}>前回の保存を再確認</Button> : <><Button disabled={busy || !name.trim() || !definition.tag.name.trim()} onClick={() => save(false)}>下書き保存</Button><Button variant="primary" disabled={busy || !name.trim() || !definition.tag.name.trim()} onClick={() => save(true)}>保存して配布先を選ぶ</Button></>}</footer>
     </>}
     {stage === 'accounts' && <>
       <div className={styles.grid}><section className={styles.panel}><div className={styles.toolbar}><input aria-label="店舗を検索" className={`${styles.input} ${styles.search}`} placeholder="店舗名で検索" value={search} onChange={e => setSearch(e.target.value)} /><label><input type="checkbox" disabled={busy || !shownAccounts.length} checked={!!shownAccounts.length && shownAccounts.every(a => selected.includes(a.id))} onChange={e => setSelected(current => e.target.checked ? [...new Set([...current, ...shownAccounts.map(a => a.id)])] : current.filter(id => !shownAccounts.some(a => a.id === id)))} /> 表示中をすべて選択</label></div>
