@@ -220,6 +220,45 @@ describe('V6 event waitlist and applicants', () => {
     ).get()).toEqual({ status: 'waiting', offered_at: null, offer_expires_at: null, offer_token_hash: null });
   });
 
+  test.each(['accepted', 'offered'])('空席確認後に増えた%sの保留人数も確保のSQLで数える', async status => {
+    seedWaitlist();
+    sqlite.exec(`UPDATE event_waitlist SET party_size = 2`);
+    const before = sqlite.prepare(`SELECT * FROM event_waitlist WHERE id = 'wait-a'`).get();
+    // offeredは期限切れでも、失効処理前の保留行として席数へ含める。
+    db = asD1(sqlite, async query => {
+      if (!/SET status = 'offered'/.test(query)) return;
+      sqlite.prepare(`INSERT INTO event_waitlist
+        (id, line_account_id, event_id, slot_id, friend_id, identity_key, status,
+         party_size, offered_at, offer_expires_at, created_at, updated_at)
+        VALUES ('held', 'account-a', 'event-a', 'slot-a', 'friend-c', 'friend-c', ?,
+          2, '2026-09-01', '2026-09-02', '2026-09-01', '2026-09-01')`).run(status);
+    });
+    const sender = vi.fn<EventWaitlistOfferSender>().mockResolvedValue(undefined);
+    expect(await promoteEventWaitlist(db, {
+      occurrenceId: 'slot-a', lineAccountId: 'account-a', sender,
+      now: new Date('2026-09-07T00:00:00.000Z'),
+    })).toMatchObject({ kind: 'noop', reason: 'party_too_large' });
+    expect(sender).not.toHaveBeenCalled();
+    expect(sqlite.prepare(`SELECT * FROM event_waitlist WHERE id = 'wait-a'`).get()).toEqual(before);
+  });
+
+  test.each([1, null])('空席確認後に定員が%sへ変わったら古い容量で案内しない', async capacity => {
+    seedWaitlist();
+    sqlite.exec(`UPDATE event_waitlist SET party_size = 2`);
+    const before = sqlite.prepare(`SELECT * FROM event_waitlist`).all();
+    db = asD1(sqlite, async query => {
+      if (/SET status = 'offered'/.test(query)) {
+        sqlite.prepare(`UPDATE event_slots SET capacity = ? WHERE id = 'slot-a'`).run(capacity);
+      }
+    });
+    const sender = vi.fn<EventWaitlistOfferSender>().mockResolvedValue(undefined);
+    expect(await promoteEventWaitlist(db, {
+      occurrenceId: 'slot-a', lineAccountId: 'account-a', sender,
+    })).toMatchObject({ kind: 'noop', reason: capacity == null ? 'no_capacity' : 'party_too_large' });
+    expect(sender).not.toHaveBeenCalled();
+    expect(sqlite.prepare(`SELECT * FROM event_waitlist`).all()).toEqual(before);
+  });
+
   test('暗号化済みトークンだけのアカウントを送信先なしと誤判定しない', async () => {
     sqlite.prepare(
       `UPDATE line_accounts

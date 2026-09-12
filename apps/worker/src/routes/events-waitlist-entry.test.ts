@@ -120,7 +120,7 @@ function racingCallers(): void {
 }
 
 /** SQLの結果は変えず、指定した書き込み直前で要求の順番だけを固定する。 */
-function pauseBefore(db: D1Database, matches: (sql: string) => boolean) {
+function pauseBefore(db: D1Database, matches: (sql: string) => boolean, method: 'run' | 'first' = 'run') {
   let reached!: () => void;
   let resume!: () => void;
   const ready = new Promise<void>(resolve => { reached = resolve; });
@@ -139,13 +139,13 @@ function pauseBefore(db: D1Database, matches: (sql: string) => boolean) {
           const bound = bind(...args);
           return {
             ...bound,
-            async run() {
+            async [method]() {
               if (!intercepted) {
                 intercepted = true;
                 reached();
                 await released;
               }
-              return bound.run();
+              return bound[method]();
             },
           };
         },
@@ -245,6 +245,98 @@ describe('待ち登録が先に確定する競合', () => {
     expect(bookingRows(raw)).toEqual([{ friend_id: 'friend-2', status: 'cancelled' }]);
     expect(raw.prepare('SELECT * FROM event_waitlist').all()).toEqual(before);
     expect(notifierMocks.sendEventBookingNotification).not.toHaveBeenCalled();
+    raw.close();
+  });
+});
+
+describe('繰上げと即時予約の席確保は原子的', () => {
+  it.each([
+    { capacity: 1, waitingParty: 1, bookingParty: 1, approval: 0, promoted: false },
+    { capacity: 3, waitingParty: 2, bookingParty: 2, approval: 0, promoted: false },
+    { capacity: 3, waitingParty: 2, bookingParty: 2, approval: 1, promoted: false },
+    { capacity: 3, waitingParty: 2, bookingParty: 1, approval: 0, promoted: true },
+  ])('空席SELECT後に別人が予約しても人数で定員を守る: %j', async ({ capacity, waitingParty, bookingParty, approval, promoted }) => {
+    const { db, raw } = createTestD1();
+    seed(raw, { capacity: 0, waitlist: 1 });
+    raw.prepare('UPDATE events SET requires_approval = ?').run(approval);
+    const { app, env } = makeApp(db);
+    expect((await book(app, env, 'wait-first', 'L1', 'slot-1', waitingParty)).status).toBe(200);
+    const before = raw.prepare('SELECT * FROM event_waitlist').all();
+    raw.prepare("UPDATE event_slots SET capacity = ? WHERE id = 'slot-1'").run(capacity);
+    const gate = pauseBefore(db, sql => /SET status = 'offered'/.test(sql));
+    const { promoteEventWaitlist, getEventOccurrenceUsedSeats } = await import('../services/event-waitlist.js');
+    const sender = vi.fn(async () => {});
+    const promotion = promoteEventWaitlist(gate.db, { occurrenceId: 'slot-1', lineAccountId: 'account-1', sender });
+    await gate.ready;
+    liffAuthMocks.verifyCallerLineUserId.mockResolvedValue('U-friend-2');
+    expect((await book(app, env, 'other-person', 'L1', 'slot-1', bookingParty)).status).toBe(201);
+    gate.resume();
+    expect((await promotion).kind).toBe(promoted ? 'promoted' : 'noop');
+    expect(await getEventOccurrenceUsedSeats(db, 'slot-1')).toBe(bookingParty + (promoted ? waitingParty : 0));
+    expect(await getEventOccurrenceUsedSeats(db, 'slot-1')).toBeLessThanOrEqual(capacity);
+    expect(sender).toHaveBeenCalledTimes(promoted ? 1 : 0);
+    if (!promoted) {
+      // 競合負けでは版、順番、回答、通知情報を含めて何も書き換えない。
+      expect(raw.prepare('SELECT * FROM event_waitlist').all()).toEqual(before);
+      raw.prepare("UPDATE event_bookings SET status = 'cancelled'").run();
+      expect((await promoteEventWaitlist(db, { occurrenceId: 'slot-1', lineAccountId: 'account-1', sender })).kind).toBe('promoted');
+      expect(sender).toHaveBeenCalledTimes(1);
+      expect(await getEventOccurrenceUsedSeats(db, 'slot-1')).toBe(waitingParty);
+    }
+    const offer = raw.prepare('SELECT offered_at, offer_expires_at FROM event_waitlist').get() as { offered_at: string; offer_expires_at: string };
+    expect(Date.parse(offer.offer_expires_at) - Date.parse(offer.offered_at)).toBe(24 * 3600_000);
+    raw.close();
+  });
+
+  it('繰上げが先に席を保留したら、後発予約は席を返して待ちの最後へ入る', async () => {
+    const { db, raw } = createTestD1();
+    seed(raw, { capacity: 0, waitlist: 1 });
+    const normal = makeApp(db);
+    expect((await book(normal.app, normal.env, 'first-wait')).status).toBe(200);
+    raw.prepare("UPDATE event_slots SET capacity = 2 WHERE id = 'slot-1'").run();
+    raw.prepare("UPDATE event_waitlist SET created_at = '2026-01-01T00:00:00.000Z', party_size = 2").run();
+    const gate = pauseBefore(db, sql => /INSERT INTO event_bookings/.test(sql));
+    const { app, env } = makeApp(gate.db);
+    liffAuthMocks.verifyCallerLineUserId.mockResolvedValue('U-friend-2');
+    const booking = book(app, env, 'later-booking');
+    await gate.ready;
+    const { promoteEventWaitlist, getEventOccurrenceUsedSeats } = await import('../services/event-waitlist.js');
+    const sender = vi.fn(async () => {});
+    expect((await promoteEventWaitlist(db, { occurrenceId: 'slot-1', lineAccountId: 'account-1', sender })).kind).toBe('promoted');
+    gate.resume();
+    expect(await booking).toMatchObject({ status: 200, body: { waitlisted: true } });
+    expect(bookingRows(raw)).toEqual([]);
+    expect(waitlistRows(raw)).toEqual([{ friend_id: 'friend-1', status: 'offered' }, { friend_id: 'friend-2', status: 'waiting' }]);
+    expect(await getEventOccurrenceUsedSeats(db, 'slot-1')).toBe(2);
+    expect(sender).toHaveBeenCalledTimes(1);
+    expect(notifierMocks.sendEventBookingNotification).not.toHaveBeenCalled();
+    raw.close();
+  });
+
+  it('同時繰上げが古い案内なし判定を持っていても、先着を飛ばさず1組だけ案内する', async () => {
+    const { db, raw } = createTestD1();
+    seed(raw, { capacity: 0, waitlist: 1 });
+    const { app, env } = makeApp(db);
+    expect((await book(app, env, 'first')).status).toBe(200);
+    liffAuthMocks.verifyCallerLineUserId.mockResolvedValue('U-friend-2');
+    expect((await book(app, env, 'second')).status).toBe(200);
+    raw.prepare("UPDATE event_waitlist SET created_at = CASE friend_id WHEN 'friend-1' THEN '2026-01-01' ELSE '2026-01-02' END").run();
+    raw.prepare("UPDATE event_slots SET capacity = 2 WHERE id = 'slot-1'").run();
+    const secondBefore = raw.prepare("SELECT * FROM event_waitlist WHERE friend_id = 'friend-2'").get();
+    const candidateGate = pauseBefore(db, sql => /SELECT id, line_account_id, friend_id, party_size, version, created_at/.test(sql), 'first');
+    const versionGate = pauseBefore(db, sql => /UPDATE event_slots/.test(sql));
+    const { promoteEventWaitlist } = await import('../services/event-waitlist.js');
+    const sender = vi.fn(async () => {});
+    const staleReader = promoteEventWaitlist(candidateGate.db, { occurrenceId: 'slot-1', lineAccountId: 'account-1', sender });
+    await candidateGate.ready;
+    const first = promoteEventWaitlist(versionGate.db, { occurrenceId: 'slot-1', lineAccountId: 'account-1', sender });
+    await versionGate.ready;
+    candidateGate.resume();
+    expect(await staleReader).toMatchObject({ kind: 'noop', reason: 'offer_pending' });
+    versionGate.resume();
+    expect(await first).toMatchObject({ kind: 'promoted', promoted: { friendId: 'friend-1' } });
+    expect(sender).toHaveBeenCalledTimes(1);
+    expect(raw.prepare("SELECT * FROM event_waitlist WHERE friend_id = 'friend-2'").get()).toEqual(secondBefore);
     raw.close();
   });
 });
