@@ -7,7 +7,7 @@ import { type HqTemplateAuthority, type HqTemplateResolution, type HqTemplateAda
 import { getHqTemplateAdapter } from './registry.js';
 import { boundedText, HqTemplateError, inspectTags, parseTagDefinition, planTags, tagSnapshot } from './tag.js';
 import { parseMessageTemplateDefinition } from './template.js';
-import { parseFormTemplateDefinition } from './form.js';
+import { inspectFormTemplate, parseFormTemplateDefinition } from './form.js';
 import { parseRichMenuTemplateDefinition } from './rich-menu.js';
 
 export { HqTemplateError } from './tag.js';
@@ -127,11 +127,16 @@ export async function listTemplates(db: D1Database, authority: HqTemplateAuthori
 export async function preflightDistribution(db: D1Database, authority: HqTemplateAuthority, id: string, accountIds: string[]) {
   const accounts = await requireTargetAccounts(db, authority, accountIds);
   const { template, definition } = await templateDetail(db, authority, id);
-  if (template.template_type !== 'tag') throw new HqTemplateError('UNSUPPORTED', 422);
-  const def = parseTagDefinition(definition), preflightId = crypto.randomUUID(), expiresAt = new Date(Date.now() + 15 * 60_000).toISOString();
+  if (template.template_type !== 'tag' && template.template_type !== 'form') throw new HqTemplateError('UNSUPPORTED', 422);
+  const input = { templateVersionId: template.current_version_id!, definitionJson: JSON.stringify(definition) };
+  const tagDefinition = template.template_type === 'tag' ? parseTagDefinition(definition) : null;
+  const preflightId = crypto.randomUUID(), expiresAt = new Date(Date.now() + 15 * 60_000).toISOString();
   const statements: HqTemplateStatement[] = [], stores = [];
   for (const account of accounts) {
-    const snapshot = await tagSnapshot(db, account.id), items = inspectTags(def, snapshot), storeId = crypto.randomUUID(), token = `hqts1.${await digest(snapshot)}`;
+    const snapshot = tagDefinition ? await tagSnapshot(db, account.id) : null;
+    const form = tagDefinition ? null : await inspectFormTemplate(db, authority, account.id, input);
+    const items = tagDefinition ? inspectTags(tagDefinition, snapshot!) : [{ sourceId: form!.sourceId, itemKind: form!.itemKind, name: form!.name, targetId: form!.targetId, expectedRevision: form!.expectedRevision, duplicate: form!.duplicate, allowedModes: [...form!.allowedModes] }];
+    const storeId = crypto.randomUUID(), token = tagDefinition ? `hqts1.${await digest(snapshot!)}` : form!.snapshotToken;
     statements.push({ sql: `INSERT INTO hq_template_preflights(id,tenant_id,template_id,template_version_id,target_account_id,distribution_mode,idempotency_fingerprint,snapshot_token,status,created_by,expires_at) VALUES (?,?,?,?,?,'create',?,?,'ready',?,?)`, bindings: [storeId, authority.tenantId, id, template.current_version_id!, account.id, preflightId, token, authority.actorId, expiresAt] });
     for (const item of items) statements.push({ sql: `INSERT INTO hq_template_preflight_resolutions(preflight_id,tenant_id,template_id,template_version_id,target_account_id,idempotency_fingerprint,snapshot_token,source_id,item_kind,resolution_mode,target_id,expected_revision) VALUES (?,?,?,?,?,?,?,?,?,'create',?,?)`, bindings: [storeId, authority.tenantId, id, template.current_version_id!, account.id, preflightId, token, item.sourceId, item.itemKind, item.targetId, item.expectedRevision] });
     stores.push({ accountId: account.id, accountName: account.name, items });

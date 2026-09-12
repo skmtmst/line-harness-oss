@@ -249,6 +249,12 @@ describe('HQ tag HTTP and real SQLite boundaries', () => {
       expect(await request('', 'POST', input)).toEqual(created);
       const filtered = await request(`?type=${type}`);
       expect(filtered.body.data.map((item: any) => item.id)).toEqual([created.body.data.template.id]);
+      if (type === 'form') {
+        const checked = await request(`/${created.body.data.template.id}/preflight`, 'POST', { accountIds: ['a1', 'a2', 'a3'] });
+        expect(checked.status, JSON.stringify(checked.body)).toBe(200);
+        expect(checked.body.data.stores).toHaveLength(3);
+        expect(checked.body.data.stores.every((store: any) => store.items[0].itemKind === 'form' && store.items[0].allowedModes[0] === 'create')).toBe(true);
+      }
       const edited = await request(`/${created.body.data.template.id}`, 'PATCH', { name: `${type}改訂`, definition: definitions[type], expectedRevision: created.body.data.template.revision });
       expect(edited.status, JSON.stringify(edited.body)).toBe(200);
       expect(edited.body.data.template.template_type).toBe(type);
