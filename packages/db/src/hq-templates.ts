@@ -334,6 +334,8 @@ export async function saveHqTemplatePreflight(
   | { kind: 'saved'; preflight: HqTemplatePreflight }
   | { kind: 'conflict_or_missing' }
 > {
+  // SQLite 3.35+ final catch-all ON CONFLICT: id/fingerprintのどちらの競合も、
+  // bindingを満たさない場合はWHEREでno-opとなりchanges=0を返す。
   const result = await db.prepare(
     `INSERT INTO hq_template_preflights
        (id, tenant_id, template_id, template_version_id, target_account_id,
