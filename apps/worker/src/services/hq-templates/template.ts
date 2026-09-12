@@ -4,7 +4,6 @@ import {
   unsupportedHqTemplateAdapter,
   type HqTemplateAdapter,
   type HqTemplateAdapterContext,
-  type HqTemplateAdapterInput,
   type HqTemplateMatchedReference,
   type HqTemplateReference,
   type HqTemplateResolution,
@@ -69,6 +68,45 @@ export type MessageTemplateTargetSnapshot = Readonly<{
   }>[];
 }>;
 
+/**
+ * The factory is bound to this authority before it receives an adapter input.
+ * A route must derive it from the authenticated tenant and source account.
+ */
+export type MessageTemplateSourceAuthority = Readonly<{
+  tenantId: string;
+  sourceAccountId: string;
+}>;
+
+export type MessageTemplateSourceMediaBinding = Readonly<{
+  tenantId: string;
+  templateVersionId: string;
+  sourceAccountId: string;
+  mediaId: string;
+  mediaVersionId: string;
+  versionNo: number;
+  r2Key: string;
+  r2KeyPrefix: string;
+  sizeBytes: number;
+  contentHash: string;
+  etag: string | null;
+}>;
+
+/** Result of a tenant-scoped DB lookup by immutable template version id. */
+export type MessageTemplateSourceVersion = Readonly<{
+  tenantId: string;
+  templateVersionId: string;
+  sourceAccountId: string;
+  definitionJson: string;
+  media: readonly MessageTemplateSourceMediaBinding[];
+}>;
+
+export type AuthorizedMessageTemplateSource = Readonly<{
+  authority: MessageTemplateSourceAuthority;
+  version: MessageTemplateSourceVersion;
+  definition: MessageTemplateDefinition;
+  media: ReadonlyMap<string, MessageTemplateSourceMediaBinding>;
+}>;
+
 export type MessageTemplatePreflightItem = Readonly<{
   sourceId: string;
   itemKind: 'template' | 'media';
@@ -80,8 +118,22 @@ export type MessageTemplatePreflightItem = Readonly<{
 }>;
 
 export interface MessageTemplateAdapterDependencies {
+  /** Must resolve by tenant + source account + immutable version id in one authoritative DB lookup. */
+  resolveSourceVersion(input: Readonly<{
+    authority: MessageTemplateSourceAuthority;
+    templateVersionId: string;
+  }>): Promise<MessageTemplateSourceVersion | null>;
   loadTargetSnapshot(context: HqTemplateAdapterContext): Promise<MessageTemplateTargetSnapshot>;
-  readSourceObject(media: MessageTemplateMediaDefinition): Promise<Uint8Array>;
+  /**
+   * Must perform a conditional R2 read when binding.etag is present. Returning null means that
+   * the object no longer matches the version recorded by resolveSourceVersion.
+   */
+  readSourceObjectIfUnchanged(input: Readonly<{
+    authority: MessageTemplateSourceAuthority;
+    templateVersionId: string;
+    media: MessageTemplateMediaDefinition;
+    binding: MessageTemplateSourceMediaBinding;
+  }>): Promise<Readonly<{ bytes: Uint8Array; etag: string | null }> | null>;
   createId(
     kind: 'template' | 'media' | 'media_version',
     sourceId: string,
@@ -104,6 +156,10 @@ export interface MessageTemplateAdapterDependencies {
 type VerifiedReference = HqTemplateMatchedReference & Readonly<{
   duplicate: boolean;
   expectedRevision: string | null;
+}>;
+
+type MessageTemplateReferenceMetadata = HqTemplateReference & Readonly<{
+  source: AuthorizedMessageTemplateSource;
 }>;
 
 function object(value: unknown): Record<string, unknown> {
@@ -215,6 +271,91 @@ export function parseMessageTemplateDefinition(value: unknown): MessageTemplateD
   return parsed;
 }
 
+function normalizeSha256(value: string): string | null {
+  const match = /^(?:sha256[:=])?([a-f0-9]{64})$/i.exec(value.trim());
+  return match?.[1]?.toLowerCase() ?? null;
+}
+
+async function sha256Hex(bytes: Uint8Array): Promise<string> {
+  const source = new Uint8Array(bytes.byteLength);
+  source.set(bytes);
+  const digest = await crypto.subtle.digest('SHA-256', source);
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+function belongsToR2Prefix(key: string, prefix: string): boolean {
+  const normalized = prefix.replace(/\/+$/, '');
+  return normalized !== '' && key.startsWith(`${normalized}/`);
+}
+
+function parseSourceDefinition(source: MessageTemplateSourceVersion): MessageTemplateDefinition {
+  try {
+    return parseMessageTemplateDefinition(JSON.parse(source.definitionJson));
+  } catch (error) {
+    if (error instanceof TemplateHqTemplateError) throw error;
+    throw new TemplateHqTemplateError('SOURCE_VERSION_INVALID', 422);
+  }
+}
+
+function assertAuthorizedSource(
+  source: AuthorizedMessageTemplateSource,
+  expectedTenantId: string,
+  expectedTemplateVersionId: string,
+): void {
+  const { authority, version, definition, media: bindings } = source;
+  if (authority.tenantId !== expectedTenantId
+    || version.tenantId !== authority.tenantId
+    || version.sourceAccountId !== authority.sourceAccountId
+    || version.templateVersionId !== expectedTemplateVersionId
+    || bindings.size !== definition.media.length) {
+    throw new TemplateHqTemplateError('SOURCE_AUTHORITY_MISMATCH', 422);
+  }
+  for (const media of definition.media) {
+    const binding = bindings.get(media.id);
+    if (!binding
+      || binding.tenantId !== authority.tenantId
+      || binding.sourceAccountId !== authority.sourceAccountId
+      || binding.templateVersionId !== expectedTemplateVersionId
+      || binding.mediaVersionId !== media.versionId
+      || binding.versionNo !== media.versionNo
+      || binding.r2Key !== media.r2Key
+      || !belongsToR2Prefix(binding.r2Key, binding.r2KeyPrefix)
+      || binding.sizeBytes !== media.sizeBytes
+      || normalizeSha256(binding.contentHash) === null
+      || normalizeSha256(binding.contentHash) !== normalizeSha256(media.contentHash)) {
+      throw new TemplateHqTemplateError('SOURCE_MEDIA_AUTHORITY_MISMATCH', 422);
+    }
+  }
+}
+
+async function loadAuthorizedSource(
+  authority: MessageTemplateSourceAuthority,
+  templateVersionId: string,
+  dependencies: MessageTemplateAdapterDependencies,
+): Promise<AuthorizedMessageTemplateSource> {
+  if (!authority.tenantId || !authority.sourceAccountId || !templateVersionId || /\s/.test(templateVersionId)) {
+    throw new TemplateHqTemplateError('SOURCE_AUTHORITY_INVALID', 422);
+  }
+  const version = await dependencies.resolveSourceVersion({ authority, templateVersionId });
+  if (!version
+    || version.tenantId !== authority.tenantId
+    || version.sourceAccountId !== authority.sourceAccountId
+    || version.templateVersionId !== templateVersionId) {
+    throw new TemplateHqTemplateError('SOURCE_AUTHORITY_MISMATCH', 422);
+  }
+  const definition = parseSourceDefinition(version);
+  const bindings = new Map<string, MessageTemplateSourceMediaBinding>();
+  for (const binding of version.media) {
+    if (bindings.has(binding.mediaId)) {
+      throw new TemplateHqTemplateError('SOURCE_MEDIA_AUTHORITY_MISMATCH', 422);
+    }
+    bindings.set(binding.mediaId, binding);
+  }
+  const source = { authority, version, definition, media: bindings };
+  assertAuthorizedSource(source, authority.tenantId, templateVersionId);
+  return source;
+}
+
 function normalizeName(value: string): string {
   return value.normalize('NFKC').trim().toLocaleLowerCase('ja-JP');
 }
@@ -301,10 +442,11 @@ export function nextMessageTemplateAlias(name: string, occupiedNames: readonly s
 
 function replaceAll(value: string | null, replacements: ReadonlyMap<string, string>): string | null {
   if (value === null) return null;
-  let next = value;
-  const ordered = [...replacements.entries()].sort(([left], [right]) => right.length - left.length);
-  for (const [source, target] of ordered) next = next.split(source).join(target);
-  return next;
+  const sources = [...replacements.keys()].sort((left, right) => right.length - left.length);
+  if (sources.length === 0) return value;
+  const pattern = new RegExp(sources.map((source) => source.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|'), 'g');
+  // String.replace scans the original input once; generated ids/URLs are never treated as source locators.
+  return value.replace(pattern, (source) => replacements.get(source)!);
 }
 
 function requireResolution(
@@ -333,12 +475,14 @@ function conflictGuard(sql: string, bindings: readonly HqTemplateBinding[]): HqT
 
 export async function planMessageTemplateDistribution(input: {
   context: HqTemplateAdapterContext;
-  definition: MessageTemplateDefinition;
+  source: AuthorizedMessageTemplateSource;
   snapshot: MessageTemplateTargetSnapshot;
   idMap: Readonly<Record<string, string>>;
   dependencies: MessageTemplateAdapterDependencies;
 }): Promise<HqTemplateStoreAtomicCommitPlan> {
-  const { context, definition, snapshot, idMap, dependencies } = input;
+  const { context, source, snapshot, idMap, dependencies } = input;
+  const { definition } = source;
+  assertAuthorizedSource(source, context.tenantId, source.version.templateVersionId);
   if (snapshot.tenantId !== context.tenantId
     || snapshot.targetAccountId !== context.targetAccountId
     || snapshot.snapshotToken !== context.snapshotToken) {
@@ -404,11 +548,24 @@ export async function planMessageTemplateDistribution(input: {
     if (!targetR2Key || !ownerToken || /\s/.test(ownerToken)) {
       throw new TemplateHqTemplateError('MEDIA_COPY_INVALID', 422);
     }
-    const bytes = await dependencies.readSourceObject(media);
-    if (bytes.byteLength !== media.sizeBytes || (media.publicUrl !== null && targetPublicUrl === null)) {
+    const binding = source.media.get(media.id);
+    if (!binding) throw new TemplateHqTemplateError('SOURCE_MEDIA_AUTHORITY_MISMATCH', 422);
+    const sourceObject = await dependencies.readSourceObjectIfUnchanged({
+      authority: source.authority,
+      templateVersionId: source.version.templateVersionId,
+      media,
+      binding,
+    });
+    const declaredHash = normalizeSha256(media.contentHash);
+    if (!sourceObject
+      || (binding.etag !== null && sourceObject.etag !== binding.etag)
+      || sourceObject.bytes.byteLength !== media.sizeBytes
+      || declaredHash === null
+      || await sha256Hex(sourceObject.bytes) !== declaredHash
+      || (media.publicUrl !== null && targetPublicUrl === null)) {
       throw new TemplateHqTemplateError('MEDIA_COPY_INVALID', 422);
     }
-    stage.push({ key: targetR2Key, ownerToken, bytes, contentType: media.mimeType });
+    stage.push({ key: targetR2Key, ownerToken, bytes: sourceObject.bytes, contentType: media.mimeType });
     compensateOnDbFailure.push({ key: targetR2Key, ownerToken });
     reconcile.push({ key: targetR2Key, ownerToken });
     replacements.set(media.id, targetId);
@@ -509,48 +666,51 @@ export async function planMessageTemplateDistribution(input: {
   };
 }
 
-function definitionFromInput(input: HqTemplateAdapterInput): MessageTemplateDefinition {
-  try {
-    return parseMessageTemplateDefinition(JSON.parse(input.definitionJson));
-  } catch (error) {
-    if (error instanceof TemplateHqTemplateError) throw error;
-    throw new TemplateHqTemplateError('INVALID_DEFINITION', 422);
-  }
+function referenceSource(reference: HqTemplateReference): AuthorizedMessageTemplateSource {
+  const metadata = reference as Partial<MessageTemplateReferenceMetadata>;
+  if (!metadata.source) throw new TemplateHqTemplateError('INVALID_REFERENCE', 422);
+  return metadata.source;
 }
 
-function referenceDefinition(reference: HqTemplateReference): MessageTemplateDefinition {
-  const metadata = reference as HqTemplateReference & { definition?: MessageTemplateDefinition };
-  if (!metadata.definition) throw new TemplateHqTemplateError('INVALID_REFERENCE', 422);
-  return metadata.definition;
-}
-
-/** Runtime wiring can supply D1/R2 operations without expanding the shared adapter contract. */
+/**
+ * Runtime wiring binds an authenticated source authority and supplies tenant-scoped D1/R2
+ * operations without expanding the shared adapter contract. input.definitionJson is deliberately
+ * ignored: the immutable version selected by input.templateVersionId is the only source of truth.
+ */
 export function createTemplateHqTemplateAdapter(
+  authority: MessageTemplateSourceAuthority,
   dependencies: MessageTemplateAdapterDependencies,
 ): HqTemplateAdapter {
   return {
     type: 'template',
     async extractReferences(input) {
-      const definition = definitionFromInput(input);
-      const references: Array<HqTemplateReference & { definition: MessageTemplateDefinition }> = [{
+      const source = await loadAuthorizedSource(authority, input.templateVersionId, dependencies);
+      const references: MessageTemplateReferenceMetadata[] = [{
         kind: 'template',
-        sourceId: `template:${definition.template.id}`,
-        definition,
+        sourceId: `template:${source.definition.template.id}`,
+        source,
       }];
-      for (const media of referencedMedia(definition)) {
-        references.push({ kind: 'media', sourceId: `media:${media.id}`, definition });
+      for (const media of referencedMedia(source.definition)) {
+        references.push({ kind: 'media', sourceId: `media:${media.id}`, source });
       }
       return { kind: 'OK', value: references };
     },
     async verifyReferences(context, references) {
+      if (context.tenantId !== authority.tenantId) {
+        throw new TemplateHqTemplateError('SOURCE_AUTHORITY_MISMATCH', 422);
+      }
       const snapshot = await dependencies.loadTargetSnapshot(context);
       if (snapshot.tenantId !== context.tenantId
         || snapshot.targetAccountId !== context.targetAccountId
         || snapshot.snapshotToken !== context.snapshotToken) {
         throw new TemplateHqTemplateError(VERSION_CONFLICT_MESSAGE, 409);
       }
-      const definition = referenceDefinition(references[0]!);
-      const items = inspectMessageTemplateDefinition(definition, snapshot);
+      const source = referenceSource(references[0]!);
+      if (source.authority.tenantId !== authority.tenantId
+        || source.authority.sourceAccountId !== authority.sourceAccountId) {
+        throw new TemplateHqTemplateError('SOURCE_AUTHORITY_MISMATCH', 422);
+      }
+      const items = inspectMessageTemplateDefinition(source.definition, snapshot);
       const verified: VerifiedReference[] = references.map((reference) => {
         const item = items.find((candidate) => candidate.sourceId === reference.sourceId);
         if (!item || item.itemKind !== reference.kind) {
@@ -602,11 +762,14 @@ export function createTemplateHqTemplateAdapter(
       return { kind: 'OK', value: map };
     },
     async buildCommitPlan(context, input, idMap) {
-      const definition = definitionFromInput(input);
+      if (context.tenantId !== authority.tenantId) {
+        throw new TemplateHqTemplateError('SOURCE_AUTHORITY_MISMATCH', 422);
+      }
+      const source = await loadAuthorizedSource(authority, input.templateVersionId, dependencies);
       const snapshot = await dependencies.loadTargetSnapshot(context);
       return {
         kind: 'OK',
-        value: await planMessageTemplateDistribution({ context, definition, snapshot, idMap, dependencies }),
+        value: await planMessageTemplateDistribution({ context, source, snapshot, idMap, dependencies }),
       };
     },
   };
