@@ -91,6 +91,12 @@ function contents(db: Database.Database) {
 function migrate(db: Database.Database) { db.transaction(() => db.exec(migration))(); }
 
 describe('382: タグ名の一意性を店舗単位へ移す', () => {
+  test('D1が拒否する動的PRAGMA走査を使わず、固定テーブルごとに検査する', () => {
+    const executableSql = migration.replace(/--.*$/gm, '');
+    expect(executableSql).not.toMatch(/pragma_foreign_key_list\s*\(\s*[a-z]+\.name\s*\)/i);
+    expect(executableSql).not.toMatch(/pragma_foreign_key_list[\s\S]{0,300}UNION\s+ALL/i);
+  });
+
   test('実schemaの全14参照を列挙し、CASCADE対象にさらに子参照がないことを確認', () => {
     const db = setup();
     try {
