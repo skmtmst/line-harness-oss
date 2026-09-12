@@ -418,6 +418,14 @@ describe('画像ライブラリと店舗への受け渡し', () => {
     body = (await res.json<{ data: typeof body }>()).data;
     expect(body.deliveries[0].alreadyDelivered).toBe(true);
     expect(r2.store.size).toBe(3);
+
+    // 数値カード帯の数。画像1枚を2店舗へ渡したので、画像1・店舗2。
+    const stats = await call('GET', '/api/hq/banners/stats');
+    expect((await stats.json<{ data: unknown }>()).data).toEqual({
+      projects: { active: 1, archived: 0 },
+      deliveredImages: 1,
+      deliveredAccounts: 2,
+    });
   });
 
   it('別の統括の店舗へは渡せない', async () => {

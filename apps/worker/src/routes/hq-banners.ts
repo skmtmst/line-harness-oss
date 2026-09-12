@@ -10,6 +10,7 @@ import {
   getBannerImageDelivery,
   getBannerImageWithDetail,
   getBannerProject,
+  getBannerStats,
   getBannerUsageThisMonth,
   getBannerUsageToday,
   countRecentFailedBannerGenerations,
@@ -265,6 +266,16 @@ hqBanners.get('/api/hq/banners/presets', async (c) => {
 hqBanners.get('/api/hq/banners/usage', async (c) => {
   const usage = await usageSnapshot(c, tenantOf(c));
   return c.json({ success: true, data: usage });
+});
+
+hqBanners.get('/api/hq/banners/stats', async (c) => {
+  try {
+    const stats = await getBannerStats(c.env.DB, tenantOf(c));
+    return c.json({ success: true, data: stats });
+  } catch (err) {
+    console.error('GET /api/hq/banners/stats error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
 });
 
 // =============================================================== projects

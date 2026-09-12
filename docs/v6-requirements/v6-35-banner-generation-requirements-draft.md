@@ -16,7 +16,7 @@ Pencil: `V6正本.pen`（Kenta の `pencil-new.pen` と同一系統）の ★V6 
 |---|---:|---:|
 | V6 UI・UX | — | 設計済み（6画面） |
 | Lステップ・Liny競争力 | 0（機能なし） | 高い（両者に無い機能） |
-| 現行実装 | API・DB は PR「codex/masato-banner-generation-api」で完了 | 画面を追加 |
+| 現行実装 | API・DB は PR #19、画面は PR「codex/masato-banner-generation-ui」で実装 | 規格サイズへの整形・課金連動が残る |
 | データ安全性 | — | 統括単位で分離、店舗へは複製して渡す |
 
 ## 1. 画面と実 Node
@@ -31,6 +31,17 @@ Pencil: `V6正本.pen`（Kenta の `pencil-new.pen` と同一系統）の ★V6 
 | 6 | 35-4 一覧の状態 | `xY2wj` | L 一覧 | 状態の一覧 `m3YDxb`（空／読込中／エラー／上限） |
 
 統括メニューは 6 画面すべてで同じ構造（`V6s 統括メニュー（バナー生成）`）。実装は 1 つの部品にし、開いている画面だけを強調する。
+
+実装のルート（2026-09-12）: 35-1 `/hq/banners`、35-3 `/hq/banners?tab=library`（タブは `?tab=`、Link にしない）、35-2 `/hq/banners/project?id=`。動的セグメントは作らない（静的書き出しのため）。
+コード: `apps/web/src/app/hq/banners/`、部品は `apps/web/src/components/hq/banners/`、型と計算は `apps/web/src/lib/hq-banners.ts`。
+
+実装で設計から変えたこと（Pencil も同日に直した）:
+
+- 絞り込みの札は共通部品 `FilterChip`（丸・高さ32）に合わせた
+- 画像タイルのキャプションは「日時・用途」。品質は出さない（決定どおり）
+- 画像ライブラリの並び順は「作成が新しい順」だけなので、選べないプルダウンを置かず文章で出す（§2-2）
+- 数値カード帯の「店舗へ渡した画像」は `GET /api/hq/banners/stats` を足して実数を出す
+- 35-4 の「課金プランを見る」は 36-2 ができるまで置かない（出す＝使える）
 
 ## 2. 達成すること
 

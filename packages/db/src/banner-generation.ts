@@ -553,6 +553,47 @@ export async function getBannerImageDelivery(
     .first<BannerImageDelivery>();
 }
 
+// -------------------------------------------------------------------- stats
+
+export interface BannerStats {
+  projects: { active: number; archived: number };
+  /** 店舗へ渡した画像の数（同じ画像を複数店舗へ渡しても1と数える）。 */
+  deliveredImages: number;
+  /** 渡した先の店舗の数（重複なし）。 */
+  deliveredAccounts: number;
+}
+
+/** 数値カード帯に出す数。プロジェクト数と、店舗へ渡した画像・店舗の数。 */
+export async function getBannerStats(db: D1Database, tenantId: string): Promise<BannerStats> {
+  const [projects, deliveries] = await Promise.all([
+    db
+      .prepare(
+        `SELECT
+           SUM(CASE WHEN archived_at IS NULL THEN 1 ELSE 0 END) AS active,
+           SUM(CASE WHEN archived_at IS NOT NULL THEN 1 ELSE 0 END) AS archived
+         FROM banner_projects WHERE tenant_id = ?`,
+      )
+      .bind(tenantId)
+      .first<{ active: number | null; archived: number | null }>(),
+    db
+      .prepare(
+        `SELECT
+           COUNT(DISTINCT d.banner_image_id) AS images,
+           COUNT(DISTINCT d.line_account_id) AS accounts
+         FROM banner_image_deliveries d
+         JOIN banner_images i ON i.id = d.banner_image_id
+        WHERE i.tenant_id = ?`,
+      )
+      .bind(tenantId)
+      .first<{ images: number | null; accounts: number | null }>(),
+  ]);
+  return {
+    projects: { active: Number(projects?.active ?? 0), archived: Number(projects?.archived ?? 0) },
+    deliveredImages: Number(deliveries?.images ?? 0),
+    deliveredAccounts: Number(deliveries?.accounts ?? 0),
+  };
+}
+
 // -------------------------------------------------------------------- usage
 
 /** 当日（日本時間）の生成枚数。1日の上限判定に使う。 */
