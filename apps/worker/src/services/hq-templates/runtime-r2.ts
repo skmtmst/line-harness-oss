@@ -2,7 +2,7 @@ import { HQ_AUTHORED_MESSAGE_ID, isRegisteredHqMedia } from './authoring-media.j
 import { beginHqTemplateDistributionRun, beginHqTemplateStoreResult, recordHqTemplateOwnedR2Key, setHqTemplateOwnedR2KeyState, normalizeScopedTagName, type HqTemplateDistributionResult, type HqTemplatePreflight, type HqTemplatePreflightResolution, type HqTemplateStatement } from '@line-crm/db';
 import { requireHqTemplateAuthority, type HqTemplateAdapter, type HqTemplateAdapterContext, type HqTemplateAdapterInput, type HqTemplateAdapterResult, type HqTemplateAuthority, type HqTemplateSnapshotToken, type HqTemplateStoreAtomicCommitPlan } from './contract.js';
 import { createTemplateHqTemplateAdapter, parseMessageTemplateDefinition, inspectMessageTemplateDefinition, readMessageTemplateSourceBytes, type MessageTemplateTargetSnapshot, type MessageTemplateSourceMediaBinding, type MessageTemplateAdapterDependencies } from './template.js';
-import { createRichMenuHqTemplateAdapter, parseRichMenuTemplateDefinition } from './rich-menu.js';
+import { createRichMenuHqTemplateAdapter, parseRichMenuTemplateDefinition, richMenuReferences, type RichMenuHqDefinition } from './rich-menu.js';
 
 export class HqR2RuntimeError extends Error { constructor(public readonly code: string) { super(code); } }
 const fail = (code: string): never => { throw new HqR2RuntimeError(code); };
@@ -32,29 +32,50 @@ async function messageSnapshot(b:R2RuntimeBinding,account:string):Promise<Messag
   const media=(await b.db.prepare(`SELECT m.id,m.filename,m.mime_type AS mimeType,m.size_bytes AS sizeBytes,m.r2_key AS r2Key,m.public_url AS publicUrl,COALESCE(v.content_hash,'') AS contentHash,COALESCE(v.created_at || ':' || COALESCE(v.content_hash,'') || ':' || v.r2_key,'') AS revision,COALESCE(v.version_no,0) AS versionNo FROM media m LEFT JOIN media_versions v ON v.media_id=m.id AND v.version_no=(SELECT MAX(v2.version_no) FROM media_versions v2 WHERE v2.media_id=m.id) WHERE m.line_account_id=? ORDER BY m.id`).bind(account).all<MessageTemplateTargetSnapshot['media'][number]>()).results;
   return {tenantId:b.authority.tenantId,targetAccountId:account,templates,media,snapshotToken:`hqts1.${await digest(JSON.stringify([templates,media]))}` as HqTemplateSnapshotToken};
 }
-/** Only already-existing, exclusively scoped references. No hidden reference writes. */
-function richResolver(b:R2RuntimeBinding,sourceGuards:HqTemplateStatement[]) {
-  return async (ref:{kind:string;sourceId:string},account:string):Promise<string|null> => {
-    if (!['tag','form','scenario','template'].includes(ref.kind)) fail('UNSUPPORTED_REFERENCE');
-    await targetAccount(b,account);
-    let source:{name:string}|null;
-    let targets:{id:string;name:string}[];
-    if(ref.kind==='form') {
-      const sql=`SELECT f.name FROM forms f WHERE f.id=? AND EXISTS(SELECT 1 FROM form_accounts fa JOIN line_accounts a ON a.id=fa.line_account_id WHERE fa.form_id=f.id AND a.tenant_id=?) AND NOT EXISTS(SELECT 1 FROM form_accounts fa LEFT JOIN line_accounts a ON a.id=fa.line_account_id WHERE fa.form_id=f.id AND (a.tenant_id IS NULL OR a.tenant_id<>?))`;
-      source=await b.db.prepare(sql).bind(ref.sourceId,b.authority.tenantId,b.authority.tenantId).first();
-      targets=(await b.db.prepare(`SELECT f.id,f.name FROM forms f WHERE f.status<>'archived' AND EXISTS(SELECT 1 FROM form_accounts fa WHERE fa.form_id=f.id AND fa.line_account_id=?) AND NOT EXISTS(SELECT 1 FROM form_accounts fa WHERE fa.form_id=f.id AND fa.line_account_id<>?) ORDER BY f.id`).bind(account,account).all<{id:string;name:string}>()).results;
-      if(source)sourceGuards.push(guard(`EXISTS(SELECT 1 FROM (${sql}) WHERE name=?)`,[ref.sourceId,b.authority.tenantId,b.authority.tenantId,source.name]));
-    } else {
-      const table=ref.kind==='tag'?'tags':ref.kind==='scenario'?'scenarios':'templates', active=ref.kind==='tag'?" AND t.status='active'":ref.kind==='scenario'?" AND t.is_active=1":'';
-      const sql=`SELECT t.name FROM ${table} t JOIN line_accounts a ON a.id=t.line_account_id WHERE t.id=? AND a.tenant_id=? AND a.is_active=1 AND a.archived_at IS NULL${active}`;
-      source=await b.db.prepare(sql).bind(ref.sourceId,b.authority.tenantId).first();
-      targets=(await b.db.prepare(`SELECT id,name FROM ${table} WHERE line_account_id=?${ref.kind==='tag'?" AND status='active'":''} ORDER BY id`).bind(account).all<{id:string;name:string}>()).results;
-      if(source)sourceGuards.push(guard(`EXISTS(SELECT 1 FROM (${sql}) WHERE name=?)`,[ref.sourceId,b.authority.tenantId,source.name]));
+type RichReference = ReturnType<typeof richMenuReferences>[number];
+type RichReferenceMatch = RichReference & { name:string;targetId:string;expectedRevision:string };
+const richReferenceKey = (ref:RichReference) => `${ref.kind}:${ref.sourceId}`;
+
+/** Resolve only an already-existing destination resource and bind its exact mutable revision. */
+async function matchRichReference(b:R2RuntimeBinding,ref:RichReference,account:string,sourceGuards:HqTemplateStatement[]):Promise<RichReferenceMatch> {
+  if (!['tag','form','scenario','template'].includes(ref.kind)) fail('UNSUPPORTED_REFERENCE');
+  await targetAccount(b,account);
+  let source:{name:string}|null;
+  let targets:{id:string;name:string;expectedRevision:string}[];
+  if(ref.kind==='form') {
+    const sql=`SELECT f.name FROM forms f WHERE f.id=? AND f.status<>'archived' AND EXISTS(SELECT 1 FROM form_accounts fa JOIN line_accounts a ON a.id=fa.line_account_id WHERE fa.form_id=f.id AND a.tenant_id=? AND a.is_active=1 AND a.archived_at IS NULL) AND NOT EXISTS(SELECT 1 FROM form_accounts fa LEFT JOIN line_accounts a ON a.id=fa.line_account_id WHERE fa.form_id=f.id AND (a.tenant_id IS NULL OR a.tenant_id<>?))`;
+    source=await b.db.prepare(sql).bind(ref.sourceId,b.authority.tenantId,b.authority.tenantId).first();
+    targets=(await b.db.prepare(`SELECT f.id,f.name,json_array(f.content_revision,f.updated_at) AS expectedRevision FROM forms f WHERE f.status<>'archived' AND EXISTS(SELECT 1 FROM form_accounts fa WHERE fa.form_id=f.id AND fa.line_account_id=?) AND NOT EXISTS(SELECT 1 FROM form_accounts fa WHERE fa.form_id=f.id AND fa.line_account_id<>?) ORDER BY f.id`).bind(account,account).all<{id:string;name:string;expectedRevision:string}>()).results;
+    if(source)sourceGuards.push(guard(`EXISTS(SELECT 1 FROM (${sql}) WHERE name=?)`,[ref.sourceId,b.authority.tenantId,b.authority.tenantId,source.name]));
+  } else {
+    const table=ref.kind==='tag'?'tags':ref.kind==='scenario'?'scenarios':'templates';
+    const active=ref.kind==='tag'?" AND t.status='active'":ref.kind==='scenario'?" AND t.is_active=1":'';
+    const targetActive=ref.kind==='tag'?" AND status='active'":ref.kind==='scenario'?" AND is_active=1":'';
+    const revision=ref.kind==='tag'?'json_array(version,updated_at)':ref.kind==='scenario'?'json_array(updated_at,current_published_version_id)':'json_array(draft_revision,updated_at)';
+    const sql=`SELECT t.name FROM ${table} t JOIN line_accounts a ON a.id=t.line_account_id WHERE t.id=? AND a.tenant_id=? AND a.is_active=1 AND a.archived_at IS NULL${active}`;
+    source=await b.db.prepare(sql).bind(ref.sourceId,b.authority.tenantId).first();
+    targets=(await b.db.prepare(`SELECT id,name,${revision} AS expectedRevision FROM ${table} WHERE line_account_id=?${targetActive} ORDER BY id`).bind(account).all<{id:string;name:string;expectedRevision:string}>()).results;
+    if(source)sourceGuards.push(guard(`EXISTS(SELECT 1 FROM (${sql}) WHERE name=?)`,[ref.sourceId,b.authority.tenantId,source.name]));
+  }
+  if(!source)fail('REFERENCE_UNAVAILABLE');
+  const matches=targets.filter(t=>normalizeScopedTagName(t.name)===normalizeScopedTagName(source!.name));
+  if(matches.length!==1)fail('REFERENCE_UNAVAILABLE');
+  return {...ref,name:source!.name,targetId:matches[0].id,expectedRevision:matches[0].expectedRevision};
+}
+async function inspectRichReferences(b:R2RuntimeBinding,definition:RichMenuHqDefinition,account:string) {
+  return Promise.all(richMenuReferences(definition).map(ref=>matchRichReference(b,ref,account,[])));
+}
+/** The execution resolver accepts only the exact preflight-selected target and revision. */
+function richResolver(b:R2RuntimeBinding,sourceGuards:HqTemplateStatement[],context?:HqTemplateAdapterContext) {
+  return async (ref:RichReference,account:string):Promise<string|null> => {
+    const match=await matchRichReference(b,ref,account,sourceGuards);
+    if(context) {
+      if(context.targetAccountId!==account)fail('SELECTION_REQUIRED');
+      const selected=context.resolutions.filter(r=>r.sourceId===richReferenceKey(ref)&&r.itemKind===ref.kind);
+      if(selected.length!==1||selected[0].mode!=='overwrite'||selected[0].targetId!==match.targetId)fail('SELECTION_REQUIRED');
+      if(selected[0].expectedRevision!==match.expectedRevision)fail('VERSION_CONFLICT');
     }
-    if(!source)fail('REFERENCE_UNAVAILABLE');
-    const matches=targets.filter(t=>normalizeScopedTagName(t.name)===normalizeScopedTagName(source!.name));
-    if(matches.length!==1)fail('REFERENCE_UNAVAILABLE');
-    return matches[0].id;
+    return match.targetId;
   };
 }
 /** Prevent the rich-menu adapter's arrayBuffer call from consuming an unbounded stream. */
@@ -123,7 +144,11 @@ export async function inspectR2RuntimeStore(b:R2RuntimeBinding,targetAccountId:s
   const adapter=createRichMenuHqTemplateAdapter({db:b.db,bucket:boundedRichBucket(b),authority:b.authority,input,resolveReference:richResolver(b,[])});
   const rows=(await b.db.prepare(`SELECT id,name,status,updated_at FROM rich_menu_groups WHERE account_id=? ORDER BY id`).bind(targetAccountId).all<{id:string;name:string;status:string;updated_at:string}>()).results.filter(r=>r.name===definition.richMenu.name);
   if(rows.length>1)fail('AMBIGUOUS_TARGET');const target=rows[0];
-  return {type:v.template_type,snapshotToken:await adapter.snapshot(targetAccountId),items:[{sourceId:definition.richMenu.id,itemKind:'rich_menu',name:definition.richMenu.name,targetId:target?.id??null,expectedRevision:target?.updated_at??null,duplicate:!!target,allowedModes:!target?['create']:target.status==='draft'?['overwrite','alias']:['alias']}]};
+  const references=await inspectRichReferences(b,definition,targetAccountId);
+  return {type:v.template_type,snapshotToken:await adapter.snapshot(targetAccountId),items:[
+    {sourceId:definition.richMenu.id,itemKind:'rich_menu',name:definition.richMenu.name,targetId:target?.id??null,expectedRevision:target?.updated_at??null,duplicate:!!target,allowedModes:!target?['create']:target.status==='draft'?['overwrite','alias']:['alias']},
+    ...references.map(ref=>({sourceId:richReferenceKey(ref),itemKind:ref.kind,name:ref.name,targetId:ref.targetId,expectedRevision:ref.expectedRevision,duplicate:true,allowedModes:['overwrite']})),
+  ]};
 }
 async function buildR2Plan(b:R2RuntimeBinding,context:HqTemplateAdapterContext,input:HqTemplateAdapterInput,type:'template'|'rich_menu') {
   const sourceGuards:HqTemplateStatement[]=[];
@@ -136,7 +161,7 @@ async function buildR2Plan(b:R2RuntimeBinding,context:HqTemplateAdapterContext,i
       let name='';for(let n=2;n<10000;n++){const candidate=`${definition.richMenu.name} (${n})`;if(!names.includes(candidate)){name=candidate;break;}}if(!name)fail('ALIAS_EXHAUSTED');
       context={...context,resolutions:context.resolutions.map(r=>({...r,aliasName:name}))};
     }
-    adapter=createRichMenuHqTemplateAdapter({db:b.db,bucket:boundedRichBucket(b),authority:b.authority,input,resolveReference:richResolver(b,sourceGuards)});
+    adapter=createRichMenuHqTemplateAdapter({db:b.db,bucket:boundedRichBucket(b),authority:b.authority,input,resolveReference:richResolver(b,sourceGuards,context)});
   }
   const refs=ok(await adapter.extractReferences(input)),verified=ok(await adapter.verifyReferences(context,refs));
   const duplicates=ok(await adapter.detectDuplicates(context,verified)),ids=ok(await adapter.buildIdMap(context,verified,duplicates));

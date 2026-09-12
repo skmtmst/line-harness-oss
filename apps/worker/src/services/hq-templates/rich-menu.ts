@@ -145,7 +145,7 @@ export function parseRichMenuTemplateDefinition(input: HqTemplateAdapterInput, t
   return definition;
 }
 
-function references(d: RichMenuHqDefinition): HqTemplateReference[] {
+export function richMenuReferences(d: RichMenuHqDefinition): HqTemplateReference[] {
   const result = new Map<string, HqTemplateReference>();
   for (const page of d.richMenu.pages) for (const a of page.areas) {
     const refs: [RefKind, string | undefined][] = [['form', a.formId], ['template', a.templateId], ['scenario', a.scenarioId], ...(a.tagIds ?? []).map(id => ['tag', id] as [RefKind, string])];
@@ -167,7 +167,7 @@ export function createRichMenuHqTemplateAdapter(options: RichMenuAdapterOptions)
   const input = { ...options.input };
   if (requireHqTemplateAuthority(authority).kind !== 'AUTHORIZED') fail('FORBIDDEN');
   ident(authority.tenantId); ident(input.templateVersionId);
-  const d = parseRichMenuTemplateDefinition(input, authority.tenantId); const g = d.richMenu; const refs = references(d);
+  const d = parseRichMenuTemplateDefinition(input, authority.tenantId); const g = d.richMenu; const refs = richMenuReferences(d);
   // D1 allows 100 bound parameters per statement. The atomic snapshot guard
   // needs the seven root bindings, reference bindings, and one expected snapshot.
   if (8 + refs.reduce((count, ref) => count + (ref.kind === 'form' ? 3 : 2), 0) > 100) fail('UNSUPPORTED_REFERENCE_LIMIT');
@@ -250,7 +250,11 @@ export function createRichMenuHqTemplateAdapter(options: RichMenuAdapterOptions)
       const resolve = (id: string) => ident(idMap[id]);
       for (const p of g.pages) for (const a of p.areas) validateTextPostback(a, resolve(a.id));
       const decisions = c.resolutions.filter(r => r.sourceId === g.id && r.itemKind === 'rich_menu');
-      if (decisions.length !== 1 || c.resolutions.length !== 1 || decisions[0].mode !== c.mode) fail('RESOLUTION_REQUIRED');
+      if (decisions.length !== 1 || c.resolutions.length !== refs.length + 1 || decisions[0].mode !== c.mode) fail('RESOLUTION_REQUIRED');
+      for (const matched of s.matched) {
+        const selected = c.resolutions.filter(r => r.sourceId === referenceKey(matched) && r.itemKind === matched.kind);
+        if (selected.length !== 1 || selected[0].mode !== 'overwrite' || selected[0].targetId !== matched.targetId) fail('RESOLUTION_REQUIRED');
+      }
       const choice = decisions[0];
       const groupId = c.mode === 'overwrite' ? ident(choice.targetId) : resolve(g.id);
       const target = await db.prepare('SELECT * FROM rich_menu_groups WHERE id=? AND account_id=?').bind(groupId, c.targetAccountId).first<Record<string, unknown>>();

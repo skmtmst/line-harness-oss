@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createTestD1 } from '../../test-utils/d1-sqlite.js';
-import { createRichMenuHqTemplateAdapter, executeRichMenuHqPlan, type RichMenuHqDefinition } from './rich-menu.js';
+import { createRichMenuHqTemplateAdapter, executeRichMenuHqPlan, richMenuReferences, type RichMenuHqDefinition } from './rich-menu.js';
 import { createRichMenuShells, type GroupInput, type LineRichMenuClient } from '../../lib/rich-menu-publisher.js';
 import type { HqTemplateAdapterContext, HqTemplateStatement, HqTemplateStoreAtomicCommitPlan } from './contract.js';
 
@@ -35,8 +35,12 @@ function fixture(messageText = 'ご案内') {
   const options = { db: sql.db, bucket: bucket as unknown as R2Bucket, authority: { tenantId: 'tenant', actorId: 'staff', role: 'owner', readOnly: false, accountScoped: false } as const, input, resolveReference: async (r: { kind: string }, account: string) => `${r.kind}-${account}` };
   const adapter = createRichMenuHqTemplateAdapter(options);
   const batch = async (statements: readonly HqTemplateStatement[]) => { await sql.db.batch(statements.map(s => sql.db.prepare(s.sql).bind(...s.bindings))); };
+  const boundReferences = (d = definition, account = 'a') => richMenuReferences(d).map(r => ({ sourceId: `${r.kind}:${r.sourceId}`, itemKind: r.kind, mode: 'overwrite' as const, targetId: `${r.kind}-${account}`, expectedRevision: 'fixture' }));
   async function plan(account = 'a', override: Partial<HqTemplateAdapterContext> = {}) {
-    const c: HqTemplateAdapterContext = { tenantId: 'tenant', targetAccountId: account, preflightId: `preflight-${account}`, idempotencyFingerprint: 'fingerprint', mode: 'create', snapshotToken: await adapter.snapshot(account), resolutions: [{ sourceId: 'menu', itemKind: 'rich_menu', mode: 'create' }], ...override };
+    const selected = override.resolutions;
+    const root = [{ sourceId: 'menu', itemKind: 'rich_menu', mode: (override.mode ?? 'create') as 'create'|'overwrite'|'alias' }];
+    const resolutions = selected === undefined ? [...root, ...boundReferences(definition, account)] : selected.length === 0 ? [] : [...selected, ...boundReferences(definition, account).filter(ref => !selected.some(item => item.sourceId === ref.sourceId))];
+    const c: HqTemplateAdapterContext = { tenantId: 'tenant', targetAccountId: account, preflightId: `preflight-${account}`, idempotencyFingerprint: 'fingerprint', mode: 'create', snapshotToken: await adapter.snapshot(account), ...override, resolutions };
     const extracted = await adapter.extractReferences(input); if (extracted.kind !== 'OK') throw new Error();
     const refs = await adapter.verifyReferences(c, extracted.value); if (refs.kind !== 'OK') throw new Error();
     const map = await adapter.buildIdMap(c, refs.value, []); if (map.kind !== 'OK') throw new Error();
@@ -44,7 +48,7 @@ function fixture(messageText = 'ご案内') {
     return result.value;
   }
   const execute = (p: HqTemplateStoreAtomicCommitPlan, commit = batch, reconcile = async () => 'not_committed' as const) => executeRichMenuHqPlan(p, { bucket: options.bucket, commit, reconcile });
-  return { ...sql, objects, bucket, options, adapter, definition, input, plan, batch, execute };
+  return { ...sql, objects, bucket, options, adapter, definition, input, plan, batch, execute, boundReferences };
 }
 
 describe('rich-menu HQ store atomic adapter', () => {
@@ -92,7 +96,7 @@ describe('rich-menu HQ store atomic adapter', () => {
     const input = { ...f.input, definitionJson: JSON.stringify(f.definition) };
     f.raw.prepare("UPDATE hq_template_versions SET definition_json=? WHERE id='version'").run(input.definitionJson);
     const adapter = createRichMenuHqTemplateAdapter({ ...f.options, input });
-    const context: HqTemplateAdapterContext = { tenantId: 'tenant', targetAccountId: 'a', preflightId: 'preflight-a', idempotencyFingerprint: 'fingerprint', mode: 'create', snapshotToken: await adapter.snapshot('a'), resolutions: [{ sourceId: 'menu', itemKind: 'rich_menu', mode: 'create' }] };
+    const context: HqTemplateAdapterContext = { tenantId: 'tenant', targetAccountId: 'a', preflightId: 'preflight-a', idempotencyFingerprint: 'fingerprint', mode: 'create', snapshotToken: await adapter.snapshot('a'), resolutions: [{ sourceId: 'menu', itemKind: 'rich_menu', mode: 'create' }, ...f.boundReferences(f.definition, 'a')] };
     const refs = await adapter.extractReferences(input); if (refs.kind !== 'OK') throw new Error();
     const verified = await adapter.verifyReferences(context, refs.value); if (verified.kind !== 'OK') throw new Error();
     const map = await adapter.buildIdMap(context, verified.value, []); if (map.kind !== 'OK') throw new Error();
@@ -162,7 +166,7 @@ describe('rich-menu HQ store atomic adapter', () => {
   });
   it('rechecks the final mapped area ID before reading or staging image bytes', async () => {
     const f = fixture('あ'.repeat(29));
-    const c: HqTemplateAdapterContext = { tenantId: 'tenant', targetAccountId: 'a', preflightId: 'preflight-a', idempotencyFingerprint: 'fingerprint', mode: 'create', snapshotToken: await f.adapter.snapshot('a'), resolutions: [{ sourceId: 'menu', itemKind: 'rich_menu', mode: 'create' }] };
+    const c: HqTemplateAdapterContext = { tenantId: 'tenant', targetAccountId: 'a', preflightId: 'preflight-a', idempotencyFingerprint: 'fingerprint', mode: 'create', snapshotToken: await f.adapter.snapshot('a'), resolutions: [{ sourceId: 'menu', itemKind: 'rich_menu', mode: 'create' }, ...f.boundReferences(f.definition, 'a')] };
     const extracted = await f.adapter.extractReferences(f.input); if (extracted.kind !== 'OK') throw new Error();
     const refs = await f.adapter.verifyReferences(c, extracted.value); if (refs.kind !== 'OK') throw new Error();
     const map = await f.adapter.buildIdMap(c, refs.value, []); if (map.kind !== 'OK') throw new Error();

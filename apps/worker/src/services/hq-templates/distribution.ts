@@ -226,7 +226,7 @@ export async function distributeTemplate(db: D1Database, authority: HqTemplateAu
       const selected = selections.filter(selection => selection.accountId === p.target_account_id).map(selection => {
         const row = stored.find(resolution => resolution.preflight_id === p.id && resolution.source_id === selection.sourceId)!;
         const base = { sourceId: selection.sourceId, itemKind: row.item_kind, mode: selection.mode };
-        return template.template_type === 'form' ? { ...base, targetId: row.target_id ?? undefined, expectedRevision: row.expected_revision ?? undefined } : base;
+        return template.template_type === 'form' || template.template_type === 'rich_menu' ? { ...base, targetId: row.target_id ?? undefined, expectedRevision: row.expected_revision ?? undefined } : base;
       });
       const root = selected.find(resolution => resolution.itemKind === template.template_type);
       if (!root) throw new HqTemplateError('SELECTION_REQUIRED', 409);

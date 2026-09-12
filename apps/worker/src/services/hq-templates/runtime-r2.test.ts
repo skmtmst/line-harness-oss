@@ -31,8 +31,9 @@ async function fixture(type:'template'|'rich_menu'='rich_menu') {
   async function preflight(account='a',mode:'create'|'overwrite'|'alias'='create'){
     const info=await inspectR2RuntimeStore(binding,account),id=`preflight-${account}`;
     sql.raw.prepare("INSERT INTO hq_template_preflights(id,tenant_id,template_id,template_version_id,target_account_id,distribution_mode,idempotency_fingerprint,snapshot_token,status,created_by,expires_at) VALUES (?,'tenant','hq','v',?,?,'run',?,'ready','owner','2099-01-01T00:00:00Z')").run(id,account,mode,info.snapshotToken);
-    for(const item of info.items)sql.raw.prepare("INSERT INTO hq_template_preflight_resolutions(preflight_id,tenant_id,template_id,template_version_id,target_account_id,idempotency_fingerprint,snapshot_token,source_id,item_kind,resolution_mode,target_id,expected_revision) VALUES (?,'tenant','hq','v',?,'run',?,?,?,'create',?,?)").run(id,account,info.snapshotToken,item.sourceId,item.itemKind,item.targetId,item.expectedRevision);
-    const context:HqTemplateAdapterContext={tenantId:'tenant',targetAccountId:account,preflightId:id,idempotencyFingerprint:'run',snapshotToken:info.snapshotToken,mode,resolutions:info.items.map(item=>({sourceId:item.sourceId,itemKind:item.itemKind,mode:item.duplicate?mode:'create'}))};return context;
+    const resolutions=info.items.map(item=>({sourceId:item.sourceId,itemKind:item.itemKind,mode:(info.type==='rich_menu'&&item.itemKind!=='rich_menu'?'overwrite':item.duplicate?mode:'create') as 'create'|'overwrite'|'alias',targetId:item.targetId??undefined,expectedRevision:item.expectedRevision??undefined}));
+    for(const item of resolutions)sql.raw.prepare("INSERT INTO hq_template_preflight_resolutions(preflight_id,tenant_id,template_id,template_version_id,target_account_id,idempotency_fingerprint,snapshot_token,source_id,item_kind,resolution_mode,target_id,expected_revision) VALUES (?,'tenant','hq','v',?,'run',?,?,?,?,?,?)").run(id,account,info.snapshotToken,item.sourceId,item.itemKind,item.mode,item.targetId??null,item.expectedRevision??null);
+    const context:HqTemplateAdapterContext={tenantId:'tenant',targetAccountId:account,preflightId:id,idempotencyFingerprint:'run',snapshotToken:info.snapshotToken,mode,resolutions};return context;
   }
   const execute=(context:HqTemplateAdapterContext,db=sql.db)=>executeR2RuntimeStore({...binding,db,runId:'run',context});
   return {...sql,binding,bucket,objects,preflight,execute,rich,message};
@@ -130,6 +131,37 @@ describe('DB-bound R2 store executor',()=>{
     const json=JSON.stringify(f.rich);f.raw.prepare("UPDATE hq_template_versions SET definition_json=?,content_hash=? WHERE id='v'").run(json,await digest(json));
     expect((await f.execute(await f.preflight())).status).toBe('succeeded');
     expect(f.raw.prepare("SELECT tag_ids FROM rich_menu_areas WHERE tag_ids<>'[]' AND tag_ids IS NOT NULL").get()).toEqual({tag_ids:'["local-tag"]'});
+  });
+  test('rich-menu preflight exposes and execution binds every destination reference id and revision',async()=>{
+    const f=await fixture();
+    f.raw.exec(`
+      INSERT INTO tags(id,name,line_account_id) VALUES ('source-tag','Tag','source'),('local-tag','Tag','a');
+      INSERT INTO forms(id,name) VALUES ('source-form','Form'),('local-form','Form');
+      INSERT INTO form_accounts(form_id,line_account_id,created_at) VALUES ('source-form','source','now'),('local-form','a','now');
+      INSERT INTO scenarios(id,name,trigger_type,line_account_id,is_active) VALUES ('source-scenario','Scenario','manual','source',1),('local-scenario','Scenario','manual','a',1);
+      INSERT INTO templates(id,name,message_type,message_content,line_account_id) VALUES ('local-template','Source','text','fixture','a');
+    `);
+    const areas=f.rich.richMenu.pages[0].areas as Array<Record<string,unknown>>;
+    Object.assign(areas[0],{tagIds:['source-tag'],scenarioId:'source-scenario'});
+    areas.push({id:'form-area',bounds:{x:100,y:0,width:100,height:100},actionType:'uri',actionData:{},intent:'form',formId:'source-form'});
+    areas.push({id:'template-area',bounds:{x:200,y:0,width:100,height:100},actionType:'postback',actionData:{},intent:'template',templateId:'source-template'});
+    const json=JSON.stringify(f.rich);f.raw.prepare("UPDATE hq_template_versions SET definition_json=?,content_hash=? WHERE id='v'").run(json,await digest(json));
+    const info=await inspectR2RuntimeStore(f.binding,'a');
+    const refs=info.items.filter(item=>item.itemKind!=='rich_menu');
+    expect(refs.map(item=>[item.sourceId,item.targetId,item.allowedModes])).toEqual([
+      ['form:source-form','local-form',['overwrite']],
+      ['scenario:source-scenario','local-scenario',['overwrite']],
+      ['tag:source-tag','local-tag',['overwrite']],
+      ['template:source-template','local-template',['overwrite']],
+    ]);
+    expect(refs.every(item=>typeof item.expectedRevision==='string'&&item.expectedRevision.startsWith('['))).toBe(true);
+    const context=await f.preflight();
+    const selected=context.resolutions.find(item=>item.sourceId==='tag:source-tag')!;
+    await expect(f.execute({...context,resolutions:context.resolutions.map(item=>item===selected?{...item,targetId:'foreign-tag'}:item)})).rejects.toMatchObject({code:'SELECTION_REQUIRED'});
+    expect(f.bucket.put).not.toHaveBeenCalled();
+    f.raw.prepare("UPDATE tags SET version=version+1 WHERE id='local-tag'").run();
+    expect(await f.execute(context)).toMatchObject({status:'version_conflict'});
+    expect(f.bucket.put).not.toHaveBeenCalled();
   });
   test('rich-menu scenario side effects point to the destination account scenario',async()=>{
     const f=await fixture();f.raw.exec("INSERT INTO scenarios(id,name,trigger_type,line_account_id,is_active) VALUES ('source-scenario','ご案内','manual','source',1),('local-scenario','ご案内','manual','a',1)");(f.rich.richMenu.pages[0].areas[0] as unknown as Record<string,unknown>).scenarioId='source-scenario';
