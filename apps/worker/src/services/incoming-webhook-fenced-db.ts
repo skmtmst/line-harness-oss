@@ -1,3 +1,58 @@
+/** Conservatively classify exactly one supported SQLite statement, never a SQL prefix. */
+function classifySingleStatement(sql: string): { readOnly: boolean; sql: string } {
+  const unsupported = () => { throw new Error('incoming_receipt_unsupported_sql'); };
+  if (sql.includes('\0')) unsupported();
+  let keyword = '';
+  let terminated = false;
+  let statementEnd = sql.length;
+  for (let i = 0; i < sql.length;) {
+    const char = sql[i];
+    if (/\s/.test(char)) { i++; continue; }
+    if (sql.startsWith('--', i)) {
+      i += 2;
+      while (i < sql.length && sql[i] !== '\n' && sql[i] !== '\r') i++;
+      continue;
+    }
+    if (sql.startsWith('/*', i)) {
+      const end = sql.indexOf('*/', i + 2);
+      if (end < 0) unsupported();
+      i = end + 2;
+      continue;
+    }
+    // D1's all() can execute a SELECT followed by a mutation. No token (including
+    // another semicolon) may follow the one optional terminal semicolon.
+    if (terminated) unsupported();
+    if (!keyword) {
+      const word = /^[A-Za-z_][A-Za-z_0-9$]*/.exec(sql.slice(i))?.[0];
+      if (!word || !/^(SELECT|INSERT|UPDATE|DELETE|REPLACE)$/i.test(word)) unsupported();
+      keyword = word!.toUpperCase();
+      i += word!.length;
+      continue;
+    }
+    if (char === ';') { terminated = true; statementEnd = i; i++; continue; }
+    if (char === "'" || char === '"' || char === '`' || char === '[') {
+      const close = char === '[' ? ']' : char;
+      i++;
+      let closed = false;
+      while (i < sql.length) {
+        if (sql[i++] !== close) continue;
+        if (char !== '[' && sql[i] === close) { i++; continue; }
+        closed = true;
+        break;
+      }
+      if (!closed) unsupported();
+      continue;
+    }
+    i++;
+  }
+  if (!keyword) unsupported();
+  // WITH/PRAGMA/EXPLAIN and other unclassified SQL are deliberately unsupported,
+  // even when a particular instance could be read-only.
+  // D1 treats a comment after a terminal semicolon as an empty second statement.
+  // Only strip that terminator/tail after the entire input has passed validation.
+  return { readOnly: keyword === 'SELECT', sql: sql.slice(0, statementEnd) };
+}
+
 /** All receipt-owned writes share an atomic D1 transaction with their lease fence. */
 export function incomingWebhookFencedDb(
   db: D1Database,
@@ -40,10 +95,8 @@ export function incomingWebhookFencedDb(
     get(target, property) {
       if (typeof property === 'symbol') return undefined;
       if (property === 'prepare') return (sql: string) => {
-        if (!/^\s*(SELECT|INSERT|UPDATE|DELETE|REPLACE)\b/i.test(sql)) {
-          throw new Error('incoming_receipt_unsupported_sql');
-        }
-        return wrap(target.prepare(sql), /^\s*SELECT\b/i.test(sql));
+        const single = classifySingleStatement(sql);
+        return wrap(target.prepare(single.sql), single.readOnly);
       };
       if (property === 'batch') return (items: D1PreparedStatement[]) => atomic(items.map(item => {
         const original = statements.get(item);
