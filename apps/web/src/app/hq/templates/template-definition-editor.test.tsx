@@ -43,7 +43,7 @@ describe('TemplateDefinitionEditor', () => {
     expect(definitionError('rich_menu', value, 'tenant-a')).toBe('画像の保存先は hq-templates/tenant-a/ から始めてください。')
   })
 
-  it('複数ページの既存リッチメニューは先頭ページだけを変え、残りを保持する', () => {
+  it('複数ページを保持したまま共通作成UIで名前を変える', () => {
     const area = (id: string, x: number) => ({ id, bounds: { x, y: 0, width: 1250, height: 1686 }, actionType: 'uri' as const, actionData: { uri: `https://example.com/${id}` }, intent: 'url' as const })
     const value: RichMenuDefinition = {
       schemaVersion: 1,
@@ -57,19 +57,16 @@ describe('TemplateDefinitionEditor', () => {
     }
     const onChange = vi.fn()
     render(<TemplateDefinitionEditor type="rich_menu" value={value} disabled={false} tenantId="tenant-a" onChange={onChange} />)
-    expect((screen.getByRole('button', { name: 'リッチメニューのサイズ' }) as HTMLButtonElement).disabled).toBe(true)
-    expect((screen.getByRole('button', { name: 'リッチメニューのタップ動作' }) as HTMLButtonElement).disabled).toBe(true)
-    fireEvent.change(screen.getByLabelText('リッチメニューのページ名'), { target: { value: '変更後' } })
+    expect(screen.getByRole('list', { name: 'リッチメニュー作成の進み方' })).toBeTruthy()
+    fireEvent.change(screen.getByLabelText('メニュー名'), { target: { value: '変更後' } })
     expect(onChange).toHaveBeenCalledWith({
       ...value,
-      richMenu: { ...value.richMenu, pages: [{ ...value.richMenu.pages[0], name: '変更後' }, value.richMenu.pages[1]] },
+      richMenu: { ...value.richMenu, name: '変更後' },
     })
   })
 
-  it.each(['text', 'template'] as const)('%sのタップに追加で開始するシナリオを設定する', actionKind => {
-    const action = actionKind === 'text'
-      ? { id: 'area-1', bounds: { x: 0, y: 0, width: 2500, height: 1686 }, actionType: 'message' as const, actionData: { text: '案内を見る' }, intent: 'text' as const }
-      : { id: 'area-1', bounds: { x: 0, y: 0, width: 2500, height: 1686 }, actionType: 'postback' as const, actionData: {}, intent: 'template' as const, templateId: 'source-template' }
+  it('未対応のシナリオ参照は値を落とさず編集を安全停止する', () => {
+    const action = { id: 'area-1', bounds: { x: 0, y: 0, width: 2500, height: 1686 }, actionType: 'message' as const, actionData: { text: '案内を見る' }, intent: 'text' as const, scenarioId: 'source-scenario' }
     const value: RichMenuDefinition = {
       schemaVersion: 1,
       richMenu: {
@@ -79,11 +76,9 @@ describe('TemplateDefinitionEditor', () => {
     }
     const onChange = vi.fn()
     render(<TemplateDefinitionEditor type="rich_menu" value={value} disabled={false} tenantId="tenant-a" onChange={onChange} />)
-    fireEvent.change(screen.getByLabelText('追加で開始するシナリオの元ID'), { target: { value: 'source-scenario' } })
-    expect(onChange).toHaveBeenCalledWith({
-      ...value,
-      richMenu: { ...value.richMenu, pages: [{ ...value.richMenu.pages[0], areas: [{ ...action, scenarioId: 'source-scenario' }] }] },
-    })
+    expect(screen.getByRole('alert').textContent).toContain('シナリオ参照')
+    expect((screen.getByLabelText('メニュー名') as HTMLInputElement).disabled).toBe(true)
+    expect(onChange).not.toHaveBeenCalled()
   })
 
   it('シナリオ参照を検証し、参照件数へ含める', () => {

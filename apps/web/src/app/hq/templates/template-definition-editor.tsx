@@ -3,6 +3,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { hqTemplatesApi } from '@/lib/hq-templates-api'
 import { freshDefinition, withUploadedImage } from '@/lib/hq-template-authoring'
+import RichMenuCreateForm, { freshRichMenuCreateValue, type RichMenuOption } from '@/components/rich-menus/rich-menu-create-form'
+import {
+  HqRichMenuCompatibilityError,
+  hqDefinitionToRichMenuCreateValue,
+  richMenuCreateValueToHqDefinition,
+} from '@/lib/hq-rich-menu-create'
 export { freshDefinition } from '@/lib/hq-template-authoring'
 import Button from '@/components/shared/button'
 import Select from '@/components/shared/select'
@@ -147,41 +153,38 @@ function MessageEditor({ value, disabled, onChange, onBusyChange }: { value: Mes
   )
 }
 
-function RichMenuEditor({ value, disabled, tenantId, onChange, onBusyChange }: { value: RichMenuDefinition; disabled: boolean; tenantId?: string; onChange: (next: RichMenuDefinition) => void; onBusyChange?: (busy: boolean) => void }) {
-  const menu = value.richMenu
-  const page = menu.pages[0]
-  if (!page) return null
-  const setMenu = (patch: Partial<RichMenuDefinition['richMenu']>) => onChange({ ...value, richMenu: { ...menu, ...patch } })
-  const setFirstPage = (next: typeof page) => setMenu({ pages: [next, ...menu.pages.slice(1)] })
-  const action = page.areas[0]
-  const multipleAreas = page.areas.length > 1
-  const actionKind = !action ? 'none' : action.intent === 'form' ? 'form' : action.intent === 'template' ? 'template' : action.intent === 'text' ? 'text' : 'url'
-  const setActionKind = (kind: string) => {
-    if (kind === 'none') { setFirstPage({ ...page, areas: [] }); return }
-    const bounds = { x: 0, y: 0, width: 2500, height: menu.size === 'large' ? 1686 : 843 }
-    const next: RichMenuDefinition['richMenu']['pages'][number]['areas'][number] = kind === 'form'
-      ? { id: 'area-1', bounds, actionType: 'uri' as const, actionData: {}, intent: 'form' as const, formId: '' }
-      : kind === 'template'
-        ? { id: 'area-1', bounds, actionType: 'postback' as const, actionData: {}, intent: 'template' as const, templateId: '' }
-        : kind === 'text'
-          ? { id: 'area-1', bounds, actionType: 'message' as const, actionData: { text: '' }, intent: 'text' as const }
-          : { id: 'area-1', bounds, actionType: 'uri' as const, actionData: { uri: 'https://' }, intent: 'url' as const }
-    setFirstPage({ ...page, areas: [next] })
-  }
-  const setAction = (next: RichMenuDefinition['richMenu']['pages'][number]['areas'][number]) => setFirstPage({ ...page, areas: [next] })
-  return <>
-    <div className={styles.twoColumns}><label className={styles.field}><span>トーク画面の表示</span><input aria-label="トーク画面の表示" className={styles.input} value={menu.chatBarText} maxLength={14} disabled={disabled} onChange={event => setMenu({ chatBarText: event.target.value })} /></label><div className={styles.field}><span>サイズ</span><Select aria-label="リッチメニューのサイズ" size="full" value={menu.size} disabled={disabled || menu.pages.length > 1 || page.areas.length > 1} options={[{ value: 'large', label: '大（2500 × 1686）' }, { value: 'compact', label: '小（2500 × 843）' }]} onChange={size => { const nextSize = size as 'large' | 'compact'; const oldHeight = menu.size === 'large' ? 1686 : 843; const nextHeight = nextSize === 'large' ? 1686 : 843; setMenu({ size: nextSize, pages: [{ ...page, areas: page.areas.map(area => area.bounds.x === 0 && area.bounds.y === 0 && area.bounds.width === 2500 && area.bounds.height === oldHeight ? { ...area, bounds: { ...area.bounds, height: nextHeight } } : area) }, ...menu.pages.slice(1)] }) }} /><small className={styles.muted}>{menu.pages.length > 1 || page.areas.length > 1 ? '複数ページ・複数領域の既存設定を守るため、サイズ変更は元の編集画面で行ってください。' : '画像全体を1つの領域として設定します。'}</small></div></div>
-    <ImageUpload purpose="rich_menu" disabled={disabled} onBusyChange={onBusyChange} onUploaded={media => { if (media.width !== 2500 || media.height !== (menu.size === 'large' ? 1686 : 843)) throw new Error('選択中のサイズに合う画像を指定してください。'); setFirstPage({ ...page, imageR2Key: media.r2Key }) }} />
-    <section className={styles.subpanel}><h2>メインページ</h2>{menu.pages.length > 1 && <p className={styles.notice}>この画面では先頭ページを編集します。残り{menu.pages.length - 1}ページは変更せず保存します。</p>}<label className={styles.field}><span>ページ名</span><input aria-label="リッチメニューのページ名" className={styles.input} value={page.name} maxLength={200} disabled={disabled} onChange={event => setFirstPage({ ...page, name: event.target.value })} /></label><label className={styles.field}><span>登録済み画像の保存先</span><input aria-label="リッチメニュー画像の保存先" className={styles.input} value={page.imageR2Key} maxLength={1024} disabled={disabled} placeholder={`hq-templates/${tenantId ?? '組織ID'}/menu.png`} onChange={event => setFirstPage({ ...page, imageR2Key: event.target.value })} /><small className={styles.muted}>統括用に登録した画像を指定します。配布時に各店舗へ複製され、下書きとして保存されます。</small></label>
-      {multipleAreas && <p className={styles.notice}>このページには複数のタップ領域があります。既存の領域を守るため、タップ動作は元の編集画面で変更してください。</p>}
-      <div className={styles.field}><span>画像全体を押したとき</span><Select aria-label="リッチメニューのタップ動作" size="full" value={actionKind} disabled={disabled || multipleAreas} options={[{ value: 'none', label: '動作なし' }, { value: 'url', label: 'Webページを開く' }, { value: 'text', label: 'メッセージを送る' }, { value: 'form', label: '回答フォームを開く' }, { value: 'template', label: 'テンプレートを送る' }]} onChange={setActionKind} /></div>
-      {actionKind === 'url' && action && <label className={styles.field}><span>URL</span><input aria-label="タップ先URL" className={styles.input} value={action.actionData.uri ?? ''} maxLength={2000} disabled={disabled || multipleAreas} onChange={event => setAction({ ...action, actionData: { uri: event.target.value } })} /></label>}
-      {actionKind === 'text' && action && <label className={styles.field}><span>送るメッセージ</span><input aria-label="タップ時のメッセージ" className={styles.input} value={action.actionData.text ?? ''} maxLength={2000} disabled={disabled || multipleAreas} onChange={event => setAction({ ...action, actionData: { text: event.target.value } })} /></label>}
-      {actionKind === 'form' && action && <label className={styles.field}><span>回答フォームの元ID</span><input aria-label="タップ先の回答フォーム" className={styles.input} value={action.formId ?? ''} maxLength={128} disabled={disabled || multipleAreas} onChange={event => setAction({ ...action, formId: event.target.value })} /><small className={styles.muted}>配布時に各店舗の回答フォームへ置き換えます。</small></label>}
-      {actionKind === 'template' && action && <label className={styles.field}><span>テンプレートの元ID</span><input aria-label="タップ先のテンプレート" className={styles.input} value={action.templateId ?? ''} maxLength={128} disabled={disabled || multipleAreas} onChange={event => setAction({ ...action, templateId: event.target.value })} /><small className={styles.muted}>配布時に各店舗のテンプレートへ置き換えます。</small></label>}
-      {(actionKind === 'text' || actionKind === 'template') && action && <label className={styles.field}><span>追加で開始するシナリオ（任意）</span><input aria-label="追加で開始するシナリオの元ID" className={styles.input} value={action.scenarioId ?? ''} maxLength={128} disabled={disabled || multipleAreas} placeholder="シナリオの元ID" onChange={event => { const scenarioId = event.target.value; setAction({ ...action, ...(scenarioId ? { scenarioId } : { scenarioId: undefined }) }) }} /><small className={styles.muted}>タップ時にメッセージまたはテンプレートを送り、同時にシナリオを開始します。配布時に各店舗の同名シナリオへ置き換えます。</small></label>}
-    </section>
-  </>
+export type RichMenuEditorReferences = {
+  tags?: RichMenuOption[]
+  templates?: RichMenuOption[]
+  forms?: RichMenuOption[]
+  trackedLinks?: RichMenuOption[]
+}
+
+function RichMenuEditor({ value, disabled, onChange, onBusyChange, onNameChange, references = {} }: { value: RichMenuDefinition; disabled: boolean; tenantId?: string; onChange: (next: RichMenuDefinition) => void; onBusyChange?: (busy: boolean) => void; onNameChange?: (name: string) => void; references?: RichMenuEditorReferences }) {
+  const [changeError, setChangeError] = useState<string | null>(null)
+  let compatibilityError: string | null = null
+  let draft = freshRichMenuCreateValue()
+  try { draft = hqDefinitionToRichMenuCreateValue(value) }
+  catch (error) { compatibilityError = error instanceof Error ? error.message : '内容を安全に読み込めないため停止しました。' }
+  const page = value.richMenu.pages[0]
+  return <RichMenuCreateForm
+    value={draft}
+    disabled={disabled}
+    compatibilityError={compatibilityError}
+    validationError={changeError}
+    tags={references.tags}
+    templates={references.templates}
+    forms={references.forms}
+    trackedLinks={references.trackedLinks}
+    onChange={next => {
+      try { const converted = richMenuCreateValueToHqDefinition(next, value); onChange(converted); if (next.name !== value.richMenu.name) onNameChange?.(next.name); setChangeError(null) }
+      catch (error) { setChangeError(error instanceof HqRichMenuCompatibilityError ? error.message : '変更を安全に保存できないため停止しました。') }
+    }}
+    imageAction={page ? <ImageUpload purpose="rich_menu" disabled={disabled || Boolean(compatibilityError)} onBusyChange={onBusyChange} onUploaded={media => {
+      if (media.width !== 2500 || media.height !== (value.richMenu.size === 'large' ? 1686 : 843)) throw new Error('選択中のサイズに合う画像を指定してください。')
+      onChange({ ...value, richMenu: { ...value.richMenu, pages: [{ ...page, imageR2Key: media.r2Key }, ...value.richMenu.pages.slice(1)] } })
+    }} /> : null}
+  />
 }
 
 function FormEditor({ value, disabled, onChange }: { value: FormDefinition; disabled: boolean; onChange: (next: FormDefinition) => void }) {
@@ -196,10 +199,10 @@ function FormEditor({ value, disabled, onChange }: { value: FormDefinition; disa
   </>
 }
 
-export default function TemplateDefinitionEditor({ type, value, disabled, tenantId, onChange, onBusyChange }: { type: TemplateType; value: TemplateDefinition; disabled: boolean; tenantId?: string; onChange: (next: TemplateDefinition) => void; onBusyChange?: (busy: boolean) => void }) {
+export default function TemplateDefinitionEditor({ type, value, disabled, tenantId, onChange, onBusyChange, richMenuReferences, onRichMenuNameChange }: { type: TemplateType; value: TemplateDefinition; disabled: boolean; tenantId?: string; onChange: (next: TemplateDefinition) => void; onBusyChange?: (busy: boolean) => void; richMenuReferences?: RichMenuEditorReferences; onRichMenuNameChange?: (name: string) => void }) {
   if (type === 'tag' && 'tag' in value) return <TagEditor value={value} disabled={disabled} onChange={onChange} />
   if (type === 'template' && 'template' in value) return <MessageEditor value={value} disabled={disabled} onChange={onChange} onBusyChange={onBusyChange} />
-  if (type === 'rich_menu' && 'richMenu' in value) return <RichMenuEditor value={value} disabled={disabled} tenantId={tenantId} onChange={onChange} onBusyChange={onBusyChange} />
+  if (type === 'rich_menu' && 'richMenu' in value) return <RichMenuEditor value={value} disabled={disabled} tenantId={tenantId} onChange={onChange} onBusyChange={onBusyChange} onNameChange={onRichMenuNameChange} references={richMenuReferences} />
   if (type === 'form' && 'form' in value) return <FormEditor value={value} disabled={disabled} onChange={onChange} />
   return <p role="alert">ひな形の種類と保存内容が一致しません。</p>
 }
