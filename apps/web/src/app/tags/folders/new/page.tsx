@@ -45,6 +45,7 @@ function FolderEditor() {
   const [name, setName] = useState('')
   const [color, setColor] = useState(COLORS[0].value)
   const [scope, setScope] = useState<'tag' | 'friend_field'>('tag')
+  const [folderAccountId, setFolderAccountId] = useState<string | null>(selectedAccountId)
   const [saving, setSaving] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [error, setError] = useState('')
@@ -78,6 +79,7 @@ function FolderEditor() {
       setName('')
       setColor(COLORS[0].value)
       setScope('tag')
+      setFolderAccountId(selectedAccountId)
       setLoadState('ready')
       return
     }
@@ -101,6 +103,7 @@ function FolderEditor() {
         }
         setName(group.name)
         setColor(group.color ?? COLORS[0].value)
+        setFolderAccountId(group.accountId)
         setLoadState('ready')
       })
       .catch((reason: unknown) => {
@@ -119,7 +122,7 @@ function FolderEditor() {
     try {
       if (scope === 'tag') {
         const result = editId
-          ? await api.tagGroups.update(editId, { name: name.trim(), color, accountId: selectedAccountId })
+          ? await api.tagGroups.update(editId, { name: name.trim(), color, accountId: folderAccountId })
           : await api.tagGroups.create({ name: name.trim(), color, accountId: selectedAccountId })
         if (!result.success) throw new Error('save_failed')
       } else {
@@ -142,7 +145,7 @@ function FolderEditor() {
     setSaving(true)
     setError('')
     try {
-      const result = await api.tagGroups.delete(editId, selectedAccountId)
+      const result = await api.tagGroups.delete(editId, folderAccountId)
       if (!result.success) throw new Error('delete_failed')
       if (!isCurrentFolderRequest(activeRequestRef.current, request)) return
       router.push('/tags')

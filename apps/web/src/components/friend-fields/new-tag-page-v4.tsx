@@ -29,7 +29,7 @@ export default function NewTagPageV4() {
       copyId && selectedAccountId ? api.tags.definition(copyId, selectedAccountId) : Promise.resolve(null),
     ]).then(([folders, definition]) => {
       if (cancelled) return
-      if (folders.success) setGroups(folders.data)
+      if (folders.success) setGroups(folders.data.filter((group) => group.accountId === selectedAccountId))
       if (definition?.success) setCopySource(definition.data)
     }).catch(() => {
       if (!cancelled) setError('複製元のタグを読み込めませんでした')

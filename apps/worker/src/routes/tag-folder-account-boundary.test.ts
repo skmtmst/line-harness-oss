@@ -53,9 +53,7 @@ describe('existing tag/folder endpoints enforce account ownership', () => {
     for (const url of ['/api/folders?kind=tag&account_id=a', '/api/tag-groups?account_id=a']) {
       const response = await req(url);
       const body = await response.json() as { data: { id: string }[] };
-      expect(body.data.map((row) => row.id).sort()).toEqual(
-        url.startsWith('/api/tag-groups') ? ['folder-a'] : ['folder-a', 'legacy'],
-      );
+      expect(body.data.map((row) => row.id).sort()).toEqual(['folder-a', 'legacy']);
     }
     const response = await req('/api/folders?kind=tag');
     expect(JSON.stringify(await response.json())).not.toContain('folder-c');
@@ -66,7 +64,7 @@ describe('existing tag/folder endpoints enforce account ownership', () => {
       VALUES('tag-legacy','tag-legacy','tag-legacy',NULL,'legacy','2026-01-01','2026-01-01')`).run();
 
     const groups = await (await req('/api/tag-groups?lineAccountId=a')).json() as { data: { id: string }[] };
-    expect(groups.data.map((row) => row.id)).toEqual(['folder-a']);
+    expect(groups.data.map((row) => row.id).sort()).toEqual(['folder-a', 'legacy']);
 
     const scopedTags = await (await req('/api/tags?lineAccountId=a&withCounts=1')).json() as { data: { id: string }[] };
     expect(scopedTags.data.map((row) => row.id)).toEqual(['tag-a']);

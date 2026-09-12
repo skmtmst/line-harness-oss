@@ -437,9 +437,6 @@ tags.get('/api/tag-groups', async (c) => {
     const items = await getTagGroups(c.env.DB, {
       ...scope,
       allowedAccountIds: requested ? [requested] : scope.allowedAccountIds,
-      // An explicitly selected account is an editing boundary. Legacy unassigned
-      // folders cannot be assigned to that account's tags, so do not offer them.
-      canSeeUnassigned: requested ? false : scope.canSeeUnassigned,
     });
     return c.json({ success: true, data: items.map(serializeTagGroup) });
   } catch (err) {

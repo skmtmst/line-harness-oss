@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ArrowDown, ArrowUp, MoreHorizontal, Palette, Pencil, Trash2 } from 'lucide-react'
@@ -19,6 +19,7 @@ import FriendFieldList from './field-list'
 import SupportMarkList from './mark-list'
 import SavedSearchList from './saved-search-list'
 import TagCsvImportDialog from './tag-csv-import-dialog'
+import { isCurrentTagListRequest, type TagListRequestKey } from './tag-list-state'
 
 const TABS = [
   ['tags', 'タグ'],
@@ -281,7 +282,7 @@ export const FRIEND_ATTRIBUTES_QA_TAGS: Tag[] = [
   createdAt: '2026-01-13T00:00:00.000Z',
 }))
 
-function FolderList({ groups, items, countsKnown, active, accountId, onSelect, onChanged }: { groups: TagGroup[]; items: Tag[]; countsKnown: boolean; active: string; accountId: string | null; onSelect: (id: string) => void; onChanged: () => void }) {
+function FolderList({ groups, items, countsKnown, active, onSelect, onChanged }: { groups: TagGroup[]; items: Tag[]; countsKnown: boolean; active: string; onSelect: (id: string) => void; onChanged: () => void }) {
   const [menuId, setMenuId] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [menuError, setMenuError] = useState('')
@@ -298,8 +299,8 @@ function FolderList({ groups, items, countsKnown, active, accountId, onSelect, o
     setBusy(true); setMenuError('')
     try {
       const [currentResult, otherResult] = await Promise.all([
-        api.tagGroups.update(group.id, { sortOrder: index + direction, accountId }),
-        api.tagGroups.update(other.id, { sortOrder: index, accountId }),
+        api.tagGroups.update(group.id, { sortOrder: index + direction, accountId: group.accountId }),
+        api.tagGroups.update(other.id, { sortOrder: index, accountId: other.accountId }),
       ])
       if (!currentResult.success) throw new Error(currentResult.error)
       if (!otherResult.success) throw new Error(otherResult.error)
@@ -314,7 +315,7 @@ function FolderList({ groups, items, countsKnown, active, accountId, onSelect, o
     if (busy) return
     setBusy(true); setMenuError('')
     try {
-      const result = await api.tagGroups.delete(group.id, accountId)
+      const result = await api.tagGroups.delete(group.id, group.accountId)
       if (!result.success) throw new Error(result.error)
       if (active === group.id) onSelect('')
       setDeleteGroup(null)
@@ -607,9 +608,12 @@ export default function TagsPageV4({
   /** 「すでに整理済み」など、失敗ではない結果を出すための通知。 */
   const [notice, setNotice] = useState('')
   const [csvOpen, setCsvOpen] = useState(false)
+  const loadRequestRef = useRef<TagListRequestKey>({ accountId, generation: 0 })
 
   const load = useCallback(async () => {
     if (fixture) return
+    const request = { accountId, generation: loadRequestRef.current.generation + 1 }
+    loadRequestRef.current = request
     setStatus('loading')
     setError('')
     try {
@@ -617,12 +621,14 @@ export default function TagsPageV4({
         api.tags.list({ withCounts: true, accountId }),
         api.tagGroups.list(accountId),
       ])
+      if (!isCurrentTagListRequest(loadRequestRef.current, request)) return
       // `success: false` を黙って捨てない。捨てると空の表を「0件」として見せる。
       if (!tags.success) throw new Error(tags.error)
       setItems(tags.data)
       if (folders.success) setGroups(folders.data)
       setStatus('ready')
     } catch (reason) {
+      if (!isCurrentTagListRequest(loadRequestRef.current, request)) return
       setStatus(reason instanceof ApiError && reason.status === 403 ? 'forbidden' : 'error')
     }
   }, [fixture, accountId])
@@ -801,7 +807,7 @@ export default function TagsPageV4({
         {error && <p className="mb-4 rounded-control border border-danger/20 bg-danger-bg p-3 text-sm text-danger">{error}</p>}
         {/* 設計 `HrwyW` は gap 14、フォルダは 240 固定（`DgeL8`）。 */}
         <div className="grid min-w-0 gap-[14px] xl:grid-cols-[240px_minmax(0,1fr)]">
-          <FolderList groups={groups} items={items} countsKnown={ready} active={folder} accountId={accountId} onSelect={setFolder} onChanged={() => void load()} />
+          <FolderList groups={groups} items={items} countsKnown={ready} active={folder} onSelect={setFolder} onChanged={() => void load()} />
           <main className="min-w-0">
             {/*
               検索・選択は最長の表示内容と矢印余白を確保し、残る幅は検索欄へ渡す。

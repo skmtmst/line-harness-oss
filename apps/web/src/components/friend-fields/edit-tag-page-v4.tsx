@@ -158,7 +158,7 @@ export default function EditTagPageV4() {
         api.tags.dependencies(tagId, selectedAccountId),
         api.tagGroups.list(selectedAccountId),
       ])
-      if (folders.success) setGroups(folders.data)
+      if (folders.success) setGroups(folders.data.filter((group) => group.accountId === selectedAccountId))
       if (dependenciesResult.success) {
         setDependencies(dependenciesResult.data)
         setDependenciesStatus('ready')

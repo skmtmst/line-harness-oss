@@ -89,7 +89,7 @@ describe('フォルダの作成・編集（設計 byqIW）', () => {
 
   it('編集時はフォルダだけを削除し、中のタグを残すことを確認する', () => {
     const source = read(FOLDER_EDITOR)
-    expect(source).toContain('api.tagGroups.delete(editId, selectedAccountId)')
+    expect(source).toContain('api.tagGroups.delete(editId, folderAccountId)')
     expect(source).toContain('このフォルダを削除')
     expect(source).toContain('中にあるタグは削除されず、未分類へ戻ります。')
     expect(source).toContain('フォルダを保存')
@@ -99,6 +99,7 @@ describe('フォルダの作成・編集（設計 byqIW）', () => {
     const source = read(FOLDER_EDITOR)
     expect(source).toContain('.list(selectedAccountId)')
     expect(source).toContain('accountId: selectedAccountId')
+    expect(source).toContain('setFolderAccountId(group.accountId)')
   })
 })
 
