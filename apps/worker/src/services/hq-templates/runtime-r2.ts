@@ -193,7 +193,19 @@ export async function executeR2RuntimeStore(options: R2StoreOptions): Promise<R2
       return { status: previous.status, reused: true, ...(cleanupPending ? { cleanupPending: true } : {}) };
     }
   }
-  if (!p!.expires_at || !Number.isFinite(Date.parse(p!.expires_at)) || Date.parse(p!.expires_at) <= Date.now()) fail('VERSION_CONFLICT');
+  if (!p!.expires_at || !Number.isFinite(Date.parse(p!.expires_at)) || Date.parse(p!.expires_at) <= Date.now()) {
+    const pending = await read();
+    if (pending?.status === 'pending') {
+      await db.prepare(`UPDATE hq_template_distribution_results SET status='version_conflict',error_code='PREFLIGHT_EXPIRED',finished_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE run_id=? AND tenant_id=? AND target_account_id=? AND status='pending'`).bind(runId, authority.tenantId, context.targetAccountId).run();
+      const terminal = await read();
+      if (terminal?.status === 'version_conflict') {
+        const clean = await reconcileFailedOwnedImages({ ...options, templateVersionId: p!.template_version_id }, runId, context.targetAccountId);
+        return { status: 'version_conflict', reused: true, ...(!clean ? {cleanupPending:true} : {}) };
+      }
+      if (terminal) return { status: terminal.status, reused: true };
+    }
+    fail('VERSION_CONFLICT');
+  }
   const run = await beginHqTemplateDistributionRun(db, { id: runId, tenantId: authority.tenantId, templateId, templateVersionId: p!.template_version_id, idempotencyFingerprint: runId, createdBy: authority.actorId });
   if (run.run.status !== 'running' || run.run.created_by !== authority.actorId) fail('INVALID_RUN');
   // Write receipt before the first claim, so even a crash in pending binds the decision.

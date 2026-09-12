@@ -87,6 +87,22 @@ describe('DB-bound R2 store executor',()=>{
     const committed=f.raw.prepare("SELECT object_key FROM hq_template_owned_r2_keys WHERE state='committed'").all() as {object_key:string}[];
     expect(committed.every(row=>f.objects.has(row.object_key))).toBe(true);
   });
+  test('an expired stale claim becomes terminal and cleans its staged object',async()=>{
+    const f=await fixture(),c=await f.preflight(),put=f.bucket.put.getMockImplementation()!;
+    let release!:()=>void,entered!:()=>void,oldKey='';
+    const gate=new Promise<void>(resolve=>{release=resolve}),started=new Promise<void>(resolve=>{entered=resolve});
+    f.bucket.put.mockImplementationOnce(async(...args)=>{oldKey=args[0];const result=await put(...args);entered();await gate;return result});
+    const first=f.execute(c);
+    await started;
+    f.raw.prepare("UPDATE hq_template_distribution_results SET started_at='2000-01-01T00:00:00.000Z' WHERE run_id='run' AND target_account_id='a'").run();
+    f.raw.prepare("UPDATE hq_template_preflights SET expires_at='2000-01-01T00:00:00.000Z' WHERE id='preflight-a'").run();
+    expect(await f.execute(c)).toMatchObject({status:'version_conflict'});
+    expect(f.objects.has(oldKey)).toBe(false);
+    expect(f.raw.prepare("SELECT status,error_code FROM hq_template_distribution_results WHERE run_id='run' AND target_account_id='a'").get()).toEqual({status:'version_conflict',error_code:'PREFLIGHT_EXPIRED'});
+    release();
+    expect((await first).status).toBe('version_conflict');
+    expect(f.raw.prepare("SELECT COUNT(*) n FROM hq_template_owned_r2_keys WHERE state='cleaned'").get()).toEqual({n:1});
+  });
   test('definite owner conflict cleans only this attempt earlier objects',async()=>{
     const f=await fixture(),c=await f.preflight(),put=f.bucket.put.getMockImplementation()!;let calls=0,foreignKey='';
     f.bucket.put.mockImplementation(async(key,data,opts)=>{if(++calls===2){foreignKey=key;f.objects.set(key,{bytes:data,etag:'other',size:data.length,httpMetadata:{contentType:'image/png'},customMetadata:{ownerToken:'other',contentHash:'other'}});return null}return put(key,data,opts)});
