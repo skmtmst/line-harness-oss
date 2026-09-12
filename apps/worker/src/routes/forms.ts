@@ -20,6 +20,8 @@ import {
   getFormSubmissionById,
   insertFormSubmissionRecord,
   resyncFormSubmitCount,
+  claimFormCapacitySlot,
+  releaseFormCapacityClaims,
   createFormSubmitClaim,
   getFormSubmitClaim,
   takeoverFormSubmitClaim,
@@ -68,6 +70,7 @@ import { recordConversionSourceEvent } from '@line-crm/db';
 import {
   applyFormLayoutEffects,
   checkFormGates,
+  collectCapacitySlots,
 } from '../services/form-layout-effects.js';
 import {
   collectInputs,
@@ -1565,6 +1568,42 @@ forms.post('/api/forms/:id/submit', async (c) => {
       if (lost) throw new ClaimOwnershipLost(lost);
     };
 
+    // 全体上限・選択肢定員を原子的に確保する(N-167 / #751)。
+    //
+    // 上の checkFormGates は「数えてから比べる」だけの安い先読みで、
+    // 比べたあと保存するまでの間に別の回答が割り込む隙間がある。ここが
+    // 最終的な砦(正本)。枠ごとに条件付き INSERT 1本で決め、changes を
+    // 見て勝った者だけを通す(claimFormCapacitySlot)。同時に複数の枠が
+    // 要る回答(定員つきの選択肢を選びつつ全体上限もある等)は、1つでも
+    // 取れなければ確保済みの分ごと取り消す。
+    //
+    // Webhook より前に置くのは、どうせ断る回答のために外部へ問い合わせを
+    // 投げないため。工程(capacity)は一度きり: 再開時に二重に消費しない。
+    const ensureCapacity = async (): Promise<string | null> => {
+      if (!claimCtx || claimDone('capacity') || !layout) return null;
+      const slots = collectCapacitySlots(layout, submissionData);
+      if (slots.length === 0) {
+        const lost = await claimCheckpoint('capacity');
+        if (lost) throw new ClaimOwnershipLost(lost);
+        return null;
+      }
+      let rejectedMessage: string | null = null;
+      for (const slot of slots) {
+        const ok = await claimFormCapacitySlot(c.env.DB, formId, slot.key, claimCtx.submissionId, slot.limit);
+        if (!ok) {
+          rejectedMessage = slot.message;
+          break;
+        }
+      }
+      if (rejectedMessage !== null) {
+        await releaseFormCapacityClaims(c.env.DB, formId, claimCtx.submissionId);
+        return rejectedMessage;
+      }
+      const lost = await claimCheckpoint('capacity');
+      if (lost) throw new ClaimOwnershipLost(lost);
+      return null;
+    };
+
     let submission: DbFormSubmission;
     let webhookData: Record<string, unknown> | null = null;
     // 配分結果の記録。キーありの再開時に記録済みなら上書きせず、集計値を残す。
@@ -1589,6 +1628,15 @@ forms.post('/api/forms/:id/submit', async (c) => {
         if (lost) throw new ClaimOwnershipLost(lost);
       }
     };
+
+    const capacityRejected = await ensureCapacity();
+    if (capacityRejected) {
+      if (claimCtx) {
+        await failFormSubmitClaim(c.env.DB, claimCtx.scope, claimCtx.owner, claimCtx.version).catch(() => {});
+      }
+      return c.json({ success: false, error: capacityRejected }, 400);
+    }
+
     try {
       if (form.on_submit_webhook_url) {
         let webhookPassed: boolean;

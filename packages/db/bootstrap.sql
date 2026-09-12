@@ -2025,6 +2025,14 @@ CREATE TABLE form_accounts (
   PRIMARY KEY (form_id, line_account_id)
 );
 
+CREATE TABLE form_capacity_claims (
+  form_id       TEXT NOT NULL REFERENCES forms(id) ON DELETE CASCADE,
+  slot_key      TEXT NOT NULL,
+  submission_id TEXT NOT NULL,
+  created_at    TEXT NOT NULL,
+  PRIMARY KEY (form_id, slot_key, submission_id)
+);
+
 CREATE TABLE form_opens (
   id TEXT PRIMARY KEY,
   form_id TEXT NOT NULL,
@@ -6057,6 +6065,12 @@ CREATE INDEX idx_folders_webinar_account_order_333
 
 CREATE INDEX idx_form_accounts_account
   ON form_accounts(line_account_id, form_id);
+
+CREATE INDEX idx_form_capacity_claims_slot
+  ON form_capacity_claims (form_id, slot_key);
+
+CREATE INDEX idx_form_capacity_claims_submission
+  ON form_capacity_claims (form_id, submission_id);
 
 CREATE INDEX idx_form_opens_form ON form_opens (form_id, opened_at);
 
