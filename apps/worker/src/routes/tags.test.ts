@@ -39,7 +39,7 @@ function app(role: 'owner' | 'admin' | 'staff' = 'owner') {
   const a = new Hono<TestEnv>();
   a.use('*', async (c, next) => {
     c.set('staff', { id: 'staff-1', role });
-    c.env = { DB: {} as D1Database };
+    c.env = { DB: { prepare: () => ({ bind: (id: string) => ({ first: async () => /missing|nope|not-found/.test(id) ? null : { ...TAG_ROW, id, line_account_id: null } }) }) } as unknown as D1Database };
     await next();
   });
   a.route('/', tags);
@@ -500,7 +500,7 @@ describe('PATCH /api/tags/reorder', () => {
   test('渡された並びをそのまま保存する', async () => {
     const res = await patch('/api/tags/reorder', { ids: ['c', 'a', 'b'] });
     expect(res.status).toBe(200);
-    expect(dbMocks.reorderTags).toHaveBeenCalledWith(expect.anything(), ['c', 'a', 'b']);
+    expect(dbMocks.reorderTags).toHaveBeenCalledWith(expect.anything(), ['c', 'a', 'b'], expect.objectContaining({ canSeeUnassigned: true }));
   });
 
   test(':id に食われない', async () => {

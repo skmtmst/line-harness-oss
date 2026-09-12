@@ -3,6 +3,8 @@ import { Hono } from 'hono';
 import type { Env } from '../index.js';
 
 const mocks = {
+  getFolderById: vi.fn(),
+  deleteFolder: vi.fn(),
   getTags: vi.fn(),
   getTagsWithUsage: vi.fn(),
   createTag: vi.fn(),
@@ -29,7 +31,7 @@ app.use('*', async (c, next) => {
   return next();
 });
 app.route('/', tags);
-const env = { DB: {} as D1Database };
+const env = { DB: { prepare: () => ({ bind: (id: string) => ({ first: async () => id === 't-1' ? TAG : null }) }) } as unknown as D1Database };
 
 function req(path: string, method: string, body?: unknown) {
   return app.fetch(
@@ -66,6 +68,8 @@ const TAG = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.getFolderById.mockImplementation(async (_db, id) => id === 'g-1' ? { ...GROUP, kind: 'tag', account_id: null } : null);
+  mocks.deleteFolder.mockResolvedValue(true);
   accountAccessMocks.getVisibleLineAccountScope.mockResolvedValue({
     allowedAccountIds: ['account-1'],
     ids: ['account-1'],
@@ -167,13 +171,13 @@ describe('タグの所属', () => {
     expect(mocks.assignTagToGroup).toHaveBeenCalledWith(env.DB, 't-1', null);
   });
 
-  it('無い分類を指定すると400で理由が返る', async () => {
+  it('無い分類を指定すると404で理由が返る', async () => {
     // 500 だと画面側は「サーバーが壊れた」としか出せない。
     mocks.assignTagToGroup.mockRejectedValue(new Error('FOREIGN KEY constraint failed'));
     const res = await req('/api/tags/t-1/group', 'PATCH', { groupId: 'ghost' });
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(404);
     const body = (await res.json()) as { error: string };
-    expect(body.error).toBe('group not found');
+    expect(body.error).toBe('Not found');
   });
 
   it('タグの作成時に分類を指定できる', async () => {
