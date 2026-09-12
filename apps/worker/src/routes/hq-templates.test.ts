@@ -10,12 +10,12 @@ import { routeClassification } from '../middleware/feature-enforcement.js';
 const definition = { schemaVersion: 1, tag: { name: '常連', color: '#123456', description: 'ご案内', folderId: 'child' }, folders: [{ id: 'child', name: 'ご利用', parentId: 'root' }, { id: 'root', name: 'お客様' }] };
 let sql: Database.Database, db: D1Database, app: Hono<Env>, staff: AuthenticatedStaff;
 function count(table: string) { return (sql.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get() as { n: number }).n; }
-async function request(path: string, method = 'GET', body?: unknown) {
-  const response = await app.request(`/api/hq/templates${path}`, { method, headers: { 'Content-Type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) }, { DB: db });
+async function request(path: string, method = 'GET', body?: unknown, extraHeaders: Record<string,string> = {}) {
+  const response = await app.request(`/api/hq/templates${path}`, { method, headers: { 'Content-Type': 'application/json', ...extraHeaders }, body: body === undefined ? undefined : JSON.stringify(body) }, { DB: db });
   return { status: response.status, body: await response.json() as any };
 }
 async function create() {
-  const result = await request('', 'POST', { type: 'tag', name: 'ご利用タグ', definition });
+  const result = await request('', 'POST', { type: 'tag', name: 'ご利用タグ', definition, requestId: crypto.randomUUID() });
   expect(result.status, JSON.stringify(result.body)).toBe(201);
   return result.body.data.template;
 }
@@ -52,6 +52,56 @@ describe('HQ tag HTTP and real SQLite boundaries', () => {
     expect((await request(`/${t.id}`, 'DELETE', { expectedRevision: update.body.data.template.revision })).status).toBe(200);
     expect((await request(`/${t.id}`)).status).toBe(404); expect(count('hq_templates')).toBe(1); expect(count('audit_events')).toBe(3);
     expect(routeClassification('/api/hq/templates/x/distribute','POST')?.kind).toBe('core');
+  });
+  test('creation response loss retries the same ID, version and audit once', async () => {
+    const body = {requestId:crypto.randomUUID(),type:'tag',name:'再送検査',definition}, original=db.batch.bind(db); let lost=false;
+    db.batch = (async statements => { const result=await original(statements); if(!lost){lost=true;throw new Error('response lost');}return result; }) as D1Database['batch'];
+    const first=await request('','POST',body), replay=await request('','POST',body);
+    expect(first.status).toBe(201); expect(replay).toEqual(first);
+    expect(count('hq_templates')).toBe(1);expect(count('hq_template_versions')).toBe(1);expect(count('operation_request_receipts')).toBe(1);expect(count('audit_events')).toBe(1);
+  });
+  test('creation keys bind the entire payload but JSON member order is immaterial', async () => {
+    const body={requestId:crypto.randomUUID(),type:'tag',name:'元の名前',definition};
+    const first=await request('','POST',body);expect(first.status).toBe(201);
+    expect(await request('','POST',{definition,name:body.name,type:body.type,requestId:body.requestId})).toEqual(first);
+    for(const change of [{name:'別の名前'},{type:'form'},{definition:null},{description:'新しい説明'},{ignoredExtra:'different'}]){
+      const r=await request('','POST',{...body,...change});expect(r.status).toBe(409);expect(r.body.code).toBe('IDEMPOTENCY_CONFLICT');
+    }
+    expect(count('hq_templates')).toBe(1);expect(count('hq_template_versions')).toBe(1);
+  });
+  test('same key replays across authorized actors in one tenant but is independent across tenants', async () => {
+    const body={requestId:crypto.randomUUID(),type:'tag',name:'統括単位',definition},first=await request('','POST',body);
+    sql.exec("INSERT INTO staff_members(id,name,role,api_key,tenant_id) VALUES ('admin2','別管理者','admin','fixture-admin2','tenant-a'),('owner-b','別統括','owner','fixture-owner-b','tenant-b')");
+    staff={id:'admin2',name:'別管理者',role:'admin',readOnly:false,tenantId:'tenant-a'};expect(await request('','POST',body)).toEqual(first);
+    staff={id:'owner-b',name:'別統括',role:'owner',readOnly:false,tenantId:'tenant-b'};const second=await request('','POST',body);
+    expect(second.status).toBe(201);expect(second.body.data.template.id).not.toBe(first.body.data.template.id);expect(count('hq_templates')).toBe(2);
+    staff.readOnly=true;expect((await request('','POST',body)).status).toBe(403);
+    staff.readOnly=false;staff.tenantId='tenant-a';expect((await request('','POST',body)).status).toBe(403);
+  });
+  test('edits and archive do not change or recreate the original creation result', async () => {
+    const body={requestId:crypto.randomUUID(),type:'tag',name:'元のひな形',definition},first=await request('','POST',body),t=first.body.data.template;
+    const changed=await request(`/${t.id}`,'PATCH',{name:'編集済み',definition,expectedRevision:t.revision});
+    expect(changed.status).toBe(200);expect(await request('','POST',body)).toEqual(first);
+    await request(`/${t.id}`,'DELETE',{expectedRevision:changed.body.data.template.revision});
+    expect(await request('','POST',body)).toEqual(first);expect(count('hq_templates')).toBe(1);
+    expect((await request(`/${t.id}`)).status).toBe(404);
+  });
+  test('simultaneous create requests converge and failed transactions keep the key reusable', async () => {
+    const body={requestId:crypto.randomUUID(),type:'tag',name:'同時作成',definition},original=db.batch.bind(db);let tail:Promise<unknown>=Promise.resolve();
+    db.batch=((statements:D1PreparedStatement[])=>{const next=tail.then(()=>original(statements));tail=next.catch(()=>{});return next;}) as D1Database['batch'];
+    const replies=await Promise.all([request('','POST',body),request('','POST',body)]);expect(replies[0].status).toBe(201);expect(replies[1]).toEqual(replies[0]);expect(count('hq_templates')).toBe(1);
+    sql.exec("CREATE TRIGGER reject_create BEFORE INSERT ON hq_template_versions BEGIN SELECT RAISE(ABORT,'synthetic'); END");
+    const retryBody={...body,requestId:crypto.randomUUID()};expect((await request('','POST',retryBody)).status).toBe(500);expect(count('operation_request_receipts')).toBe(1);
+    sql.exec('DROP TRIGGER reject_create');expect((await request('','POST',retryBody)).status).toBe(201);expect(count('hq_templates')).toBe(2);
+  });
+  test('header keys work, missing/conflicting keys fail, and receipt loss cannot duplicate resources', async () => {
+    const key=crypto.randomUUID(),body={type:'tag',name:'ヘッダー',definition};
+    expect((await request('','POST',body)).status).toBe(400);
+    expect((await request('','POST',{...body,requestId:'another-key'},{'Idempotency-Key':key})).status).toBe(400);
+    const first=await request('','POST',body,{'Idempotency-Key':key});expect(first.status).toBe(201);
+    expect(await request('','POST',{...body,requestId:key})).toEqual(first);
+    sql.exec("DELETE FROM operation_request_receipts WHERE action='hq_template.create'");
+    const lost=await request('','POST',body,{'Idempotency-Key':key});expect(lost.status).toBe(409);expect(lost.body.code).toBe('CREATE_RECEIPT_UNAVAILABLE');expect(count('hq_templates')).toBe(1);
   });
   test('three stores receive same name and mapped folders; retry is exactly once', async () => {
     const t = await create(), p = await preflight(t.id), result = await execute(t.id,p);
@@ -185,9 +235,9 @@ describe('HQ tag HTTP and real SQLite boundaries', () => {
     expect(response.body.data).toBeUndefined();
   });
   test('unimplemented types, cyclic or unrelated folders are rejected', async () => {
-    expect((await request('','POST',{type:'form',name:'未実装',definition})).status).toBe(422);
+    expect((await request('','POST',{type:'form',name:'未実装',definition,requestId:crypto.randomUUID()})).status).toBe(422);
     for (const folders of [[{id:'child',name:'循環',parentId:'child'}],[...definition.folders,{id:'unrelated',name:'不要'}]]) {
-      expect((await request('','POST',{type:'tag',name:'不正',definition:{...definition,folders}})).status).toBe(400);
+      expect((await request('','POST',{type:'tag',name:'不正',definition:{...definition,folders},requestId:crypto.randomUUID()})).status).toBe(400);
     }
     expect(count('hq_templates')).toBe(0);
   });

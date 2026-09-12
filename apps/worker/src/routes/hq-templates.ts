@@ -4,7 +4,7 @@ import { dbFor } from '../services/db-router.js';
 import type { Env } from '../index.js';
 import { requireHqTemplateAuthority, type HqTemplateAuthority } from '../services/hq-templates/contract.js';
 import {
-  HqTemplateError, listTemplates, listTemplateAccounts, templateDetail, saveTemplate, deleteTemplate,
+  HqTemplateError, templateCreationRequestId, listTemplates, listTemplateAccounts, templateDetail, saveTemplate, deleteTemplate,
   preflightDistribution, distributeTemplate, distributionResult, type DistributionSelection,
 } from '../services/hq-templates/distribution.js';
 
@@ -21,6 +21,9 @@ async function authority(c: Context<Env>): Promise<HqTemplateAuthority> {
   return auth.authority;
 }
 const reasons: Record<string, string> = {
+  INVALID_REQUEST_ID: '作成依頼の識別情報を確認してください',
+  IDEMPOTENCY_CONFLICT: '同じ作成依頼の内容が変わっています。元の内容で再確認してください',
+  CREATE_RECEIPT_UNAVAILABLE: '作成済みの記録を確認できません。一覧から状態を確認してください',
   FORBIDDEN: '統括の編集権限が必要です', NOT_FOUND: '対象が見つかりません',
   UNSUPPORTED: 'この種類のひな形はまだ利用できません',
   VERSION_CONFLICT: '編集がありました。もう一度確認してください',
@@ -57,7 +60,10 @@ hqTemplates.get('/api/hq/templates', async c => {
 });
 hqTemplates.get('/api/hq/templates/:id', async c => c.json({ success: true, data: await templateDetail(dbFor(c.env), await authority(c), c.req.param('id')) }));
 hqTemplates.post('/api/hq/templates', async c => {
-  const data = await saveTemplate(dbFor(c.env), await authority(c), await body(c));
+  const auth = await authority(c), input = await body(c), headerKey = c.req.header('Idempotency-Key');
+  if (headerKey !== undefined && input.requestId !== undefined && headerKey !== input.requestId) throw new HqTemplateError('INVALID_REQUEST_ID');
+  input.requestId = templateCreationRequestId(headerKey ?? input.requestId);
+  const data = await saveTemplate(dbFor(c.env), auth, input);
   c.set('auditRecorded', true);
   return c.json({ success: true, data }, 201);
 });

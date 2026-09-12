@@ -39,21 +39,63 @@ export async function templateDetail(db: D1Database, authority: HqTemplateAuthor
   if (!version) throw new HqTemplateError('VERSION_UNAVAILABLE', 409);
   return { template, definition: JSON.parse(version.definition_json) as unknown };
 }
+/** Client creation keys are tenant-scoped; the receipt namespace never overlaps health operations. */
+export function templateCreationRequestId(value: unknown): string {
+  if (typeof value !== 'string' || !/^[A-Za-z0-9._:-]{8,128}$/.test(value)) throw new HqTemplateError('INVALID_REQUEST_ID');
+  return value;
+}
+function canonicalCreationBody(body: Record<string, unknown>): string {
+  const stable = (value: unknown): unknown => Array.isArray(value) ? value.map(stable) : value && typeof value === 'object' ? Object.fromEntries(Object.entries(value).sort(([a],[b]) => a < b ? -1 : a > b ? 1 : 0).map(([key,v]) => [key,stable(v)])) : value;
+  return JSON.stringify(stable(Object.fromEntries(Object.entries(body).filter(([key]) => key !== 'requestId'))));
+}
+async function replayTemplateCreation(db: D1Database, authority: HqTemplateAuthority, key: string, requestHash: string, templateId: string, name: string, description: string | null) {
+  const receipt = await db.prepare(`SELECT request_hash,resource_id FROM operation_request_receipts WHERE action='hq_template.create' AND actor_id=? AND idempotency_key=?`).bind(`tenant:${authority.tenantId}`, key).first<{ request_hash: string; resource_id: string }>();
+  if (!receipt) return null;
+  if (receipt.request_hash !== requestHash) throw new HqTemplateError('IDEMPOTENCY_CONFLICT', 409);
+  if (receipt.resource_id !== templateId) throw new HqTemplateError('CREATE_RECEIPT_UNAVAILABLE', 409);
+  const initial = await db.prepare(`SELECT t.created_at AS template_created_at,v.id,v.created_at,v.created_by,v.definition_json FROM hq_templates t JOIN hq_template_versions v ON v.tenant_id=t.tenant_id AND v.template_id=t.id AND v.version=1 WHERE t.id=? AND t.tenant_id=?`).bind(templateId, authority.tenantId).first<{ template_created_at:string; id:string; created_at:string; created_by:string|null; definition_json:string }>();
+  if (!initial) throw new HqTemplateError('CREATE_RECEIPT_UNAVAILABLE', 409);
+  // Return the original creation response, even if the live record was later edited/archived.
+  return { template: { id: templateId, tenant_id: authority.tenantId, template_type: 'tag' as const, name, description, current_version_id: initial.id, revision: 2, created_by: initial.created_by, created_at: initial.template_created_at, updated_at: initial.created_at, archived_at: null }, definition: JSON.parse(initial.definition_json) as unknown };
+}
 export async function saveTemplate(db: D1Database, authority: HqTemplateAuthority, body: Record<string, unknown>, id?: string) {
+  const requestId = id ? null : templateCreationRequestId(body.requestId);
+  const requestHash = await digest(canonicalCreationBody(body));
+  if (requestId) {
+    const receipt = await db.prepare(`SELECT request_hash FROM operation_request_receipts WHERE action='hq_template.create' AND actor_id=? AND idempotency_key=?`).bind(`tenant:${authority.tenantId}`,requestId).first<{ request_hash:string }>();
+    if (receipt && receipt.request_hash !== requestHash) throw new HqTemplateError('IDEMPOTENCY_CONFLICT',409);
+  }
   const current = id ? await templateDetail(db, authority, id) : null;
   const type = current?.template.template_type ?? body.type;
   if (type !== 'tag' || (body.type !== undefined && body.type !== type)) throw new HqTemplateError('UNSUPPORTED', 422);
   const definition = parseTagDefinition(body.definition), json = JSON.stringify(definition);
   const name = boundedText(body.name), description = body.description == null || body.description === '' ? null : boundedText(body.description, 2000);
-  const templateId = id ?? crypto.randomUUID(), versionId = crypto.randomUUID(), revision = current?.template.revision ?? 0;
+  const templateId = id ?? `hqt_${await digest(JSON.stringify([authority.tenantId, requestId]))}`;
+  const versionId = crypto.randomUUID(), revision = current?.template.revision ?? 0, createdAt = new Date().toISOString();
+  if (requestId) {
+    const replay = await replayTemplateCreation(db, authority, requestId, requestHash, templateId, name, description);
+    if (replay) return replay;
+  }
   if (id && (!Number.isSafeInteger(body.expectedRevision) || body.expectedRevision !== revision)) throw new HqTemplateError('VERSION_CONFLICT', 409);
   const statements: HqTemplateStatement[] = [];
   if (current) statements.push(guard(`EXISTS(SELECT 1 FROM hq_templates WHERE id=? AND tenant_id=? AND revision=? AND archived_at IS NULL)`, [id!, authority.tenantId, revision]));
-  else statements.push({ sql: `INSERT INTO hq_templates(id,tenant_id,template_type,name,description,created_by) VALUES (?,?,'tag',?,?,?)`, bindings: [templateId, authority.tenantId, name, description, authority.actorId] });
-  statements.push({ sql: `INSERT INTO hq_template_versions(id,tenant_id,template_id,version,definition_json,content_hash,created_by) VALUES (?,?,?,(SELECT COALESCE(MAX(version),0)+1 FROM hq_template_versions WHERE tenant_id=? AND template_id=?),?,?,?)`, bindings: [versionId, authority.tenantId, templateId, authority.tenantId, templateId, json, await digest(json), authority.actorId] });
-  statements.push({ sql: `UPDATE hq_templates SET name=?,description=?,current_version_id=?,revision=revision+1,updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=? AND tenant_id=?`, bindings: [name, description, versionId, templateId, authority.tenantId] }, audit(authority, current ? 'edited' : 'created', templateId));
-  try { await batch(db, statements); } catch { throw new HqTemplateError('VERSION_CONFLICT', 409); }
-  return templateDetail(db, authority, templateId);
+  else statements.push(
+    { sql: `INSERT INTO operation_request_receipts(action,actor_id,idempotency_key,request_hash,resource_id,created_at) VALUES ('hq_template.create',?,?,?,?,?)`, bindings: [`tenant:${authority.tenantId}`, requestId!, requestHash, templateId, createdAt] },
+    { sql: `INSERT INTO hq_templates(id,tenant_id,template_type,name,description,created_by,created_at,updated_at) VALUES (?,?,'tag',?,?,?,?,?)`, bindings: [templateId, authority.tenantId, name, description, authority.actorId, createdAt, createdAt] });
+  statements.push({ sql: `INSERT INTO hq_template_versions(id,tenant_id,template_id,version,definition_json,content_hash,created_by,created_at) VALUES (?,?,?,(SELECT COALESCE(MAX(version),0)+1 FROM hq_template_versions WHERE tenant_id=? AND template_id=?),?,?,?,?)`, bindings: [versionId, authority.tenantId, templateId, authority.tenantId, templateId, json, await digest(json), authority.actorId, createdAt] });
+  statements.push({ sql: `UPDATE hq_templates SET name=?,description=?,current_version_id=?,revision=revision+1,updated_at=? WHERE id=? AND tenant_id=?`, bindings: [name, description, versionId, createdAt, templateId, authority.tenantId] }, audit(authority, current ? 'edited' : 'created', templateId));
+  try { await batch(db, statements); }
+  catch {
+    if (requestId) {
+      const replay = await replayTemplateCreation(db, authority, requestId, requestHash, templateId, name, description);
+      if (replay) return replay;
+      // Even an operator-deleted receipt cannot make the same key create a second resource.
+      if (await getHqTemplate(db, authority.tenantId, templateId)) throw new HqTemplateError('CREATE_RECEIPT_UNAVAILABLE', 409);
+      throw new HqTemplateError('CREATE_UNAVAILABLE', 500);
+    }
+    throw new HqTemplateError('VERSION_CONFLICT', 409);
+  }
+  return requestId ? (await replayTemplateCreation(db, authority, requestId, requestHash, templateId, name, description))! : templateDetail(db, authority, templateId);
 }
 export async function deleteTemplate(db: D1Database, authority: HqTemplateAuthority, id: string, revision: unknown) {
   if (!Number.isSafeInteger(revision)) throw new HqTemplateError('INVALID_REVISION');
