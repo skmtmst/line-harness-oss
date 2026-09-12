@@ -127,6 +127,7 @@ import { dashboard } from './routes/dashboard.js';
 import { siteTracking } from './routes/site-tracking.js';
 import { restaurantTest } from './routes/restaurant-test.js';
 import { tenants } from './routes/tenants.js';
+import { hqBanners } from './routes/hq-banners.js';
 import { codexSlackEvents } from './routes/codex-slack-events.js';
 import { clientErrors } from './routes/client-errors.js';
 import { lineWebhookEvents } from './routes/line-webhook-events.js';
@@ -188,6 +189,12 @@ export type Env = {
     LINE_LOGIN_CHANNEL_SECRET: string;
     /** Stripe Webhook署名キー。未設定時はStripe受信ルートだけ503で拒否する。 */
     STRIPE_WEBHOOK_SECRET?: string;
+    /** 統括のバナー生成（OpenAI 画像生成）。未設定時は生成だけ503で断る。 */
+    OPENAI_API_KEY?: string;
+    /** 画像生成モデル名。未設定時は gpt-image-1。 */
+    OPENAI_IMAGE_MODEL?: string;
+    /** 統括ごとの月間生成上限（単位）。未設定時は300。 */
+    BANNER_MONTHLY_UNITS?: string;
     TOTP_ENCRYPTION_KEY?: string;
     // AES-GCM key for credentials stored in line_accounts. Optional so a
     // missing secret does not stop unrelated Worker routes from starting.
@@ -400,6 +407,7 @@ app.route('/', siteTracking);
 // 飲食店向けの検証専用領域。既存NEN機能とはAPI/DB名前空間を分離する。
 app.route('/', restaurantTest);
 app.route('/', tenants);
+app.route('/', hqBanners);
 app.route('/', codexSlackEvents);
 app.route('/', clientErrors);
 app.route('/', lineWebhookEvents);

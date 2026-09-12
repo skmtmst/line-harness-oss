@@ -108,7 +108,8 @@ export async function createMedia(
   db: D1Database,
   input: {
     kind: MediaKind;
-    lineAccountId: string;
+    /** null は統括所有（バナー生成など、店舗に属さないメディア）。 */
+    lineAccountId: string | null;
     filename: string;
     mimeType: string;
     sizeBytes: number;
@@ -146,7 +147,8 @@ export async function createMedia(
       jstNow(),
     )
     .run();
-  return (await getMediaById(db, id, input.lineAccountId))!;
+  // 統括所有（line_account_id が NULL）の行も返せるよう、ID だけで引く。
+  return (await db.prepare('SELECT * FROM media WHERE id = ?').bind(id).first<Media>())!;
 }
 
 export async function updateMedia(
