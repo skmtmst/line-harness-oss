@@ -3,6 +3,7 @@ import { HQ_TEMPLATE_TYPES, getStaffById, type HqTemplateType } from '@line-crm/
 import { dbFor } from '../services/db-router.js';
 import type { Env } from '../index.js';
 import { requireHqTemplateAuthority, type HqTemplateAuthority } from '../services/hq-templates/contract.js';
+import { requireRole } from '../middleware/role-guard.js';
 import {
   HqTemplateError, templateCreationRequestId, listTemplates, listTemplateAccounts, templateDetail, saveTemplate, deleteTemplate,
   preflightDistribution, distributeTemplate, distributionResult, type DistributionSelection,
@@ -44,7 +45,7 @@ hqTemplates.onError((error, c) => {
   return c.json({ success: false, code, error: reasons[code] ?? (typed && error.status < 500 ? '入力内容を確認してください' : '処理結果を確認できません。再確認してください') }, typed ? error.status : 500);
 });
 // The route-local boundary also protects direct route mounting in tests/other apps.
-hqTemplates.use('/api/hq/templates/*', async (c, next) => {
+hqTemplates.use('/api/hq/templates/*', requireRole('owner', 'admin'), async (c, next) => {
   try { await authority(c); await next(); }
   catch (error) {
     const typed = error instanceof HqTemplateError;
