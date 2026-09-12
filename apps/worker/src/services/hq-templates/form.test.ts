@@ -169,6 +169,52 @@ describe('HQ form atomic plans', () => {
             expect(() => parseFormTemplateDefinition({ ...input, definitionJson: JSON.stringify({ ...definition, form: { ...definition.form, ...addition } }) })).toThrow();
         expect(() => parseFormTemplateDefinition({ ...input, definitionJson: JSON.stringify({ ...definition, form: { ...definition.form, fields: [{ name: 'x', label: 'x', type: 'text', friendFieldId: 'source-field' }] } }) })).toThrow();
     });
+    const urlDefinition = (url: unknown, location: 'button' | 'thanks' | 'image' = 'button'): HqTemplateAdapterInput => ({
+        ...input,
+        definitionJson: JSON.stringify({ ...definition, form: { ...definition.form, layout: {
+            version: 2, header: [], sections: [{ id: 'section', name: '確認', blocks: location === 'button'
+                ? [{ id: 'button', kind: 'button', label: '次へ', url }]
+                : location === 'image' ? [{ id: 'image', kind: 'image', mediaUrl: '', linkUrl: url }] : [],
+            }], options: location === 'thanks' ? { thanksUrl: url } : {},
+        } } }),
+    });
+    test.each(['button', 'thanks', 'image'] as const)('%s URL rejects unsafe schemes and relative URLs before references or writes', async location => {
+        for (const url of ['javascript:void(0)', 'JaVaScRiPt:void(0)', 'java\nscript:void(0)', 'data:text/html,synthetic', 'ftp://example.test/file', '//example.test/thanks', '/thanks', '../thanks', 'https://user:pass@example.test/', 'https://example.test/forms%5csource', 'https://example.test/%00', 'https:\\example.test/thanks', 123]) {
+            const resolveReference = async () => { throw new Error('resolver must not be called'); };
+            const adapter = createFormHqTemplateAdapter({ db: fixture.db, authority, resolveReference });
+            await expect(adapter.extractReferences(urlDefinition(url, location))).rejects.toMatchObject({ code: 'INVALID_DEFINITION' });
+        }
+        expect(rows()).toHaveLength(0);
+    });
+    test.each([
+        'https://liff.line.me/source-liff/forms/source', 'https://LIFF.LINE.ME./source', 'https://miniapp.line.me/source',
+        'https://example.test/forms/source', 'https://example.test/%66orms/source', 'https://example.test/%2566orms/source',
+        'https://example.test/?form=source', 'https://example.test/?FORM_ID=source', 'https://example.test/?line-account-id=source',
+        'https://example.test/?%2566orm=source', 'https://example.test/?liff.state=%2Fforms%2Fsource',
+        'https://example.test/#/forms/source', 'https://example.test/#form_id=source',
+        'https://example.test/?next=https%3A%2F%2Fliff.line.me%2Fsource', 'https://example.test/?next=%2Fforms%2Fsource',
+    ])('opaque account URL is unsupported: %s', url => {
+        for (const location of ['button', 'thanks', 'image'] as const)
+            expect(() => parseFormTemplateDefinition(urlDefinition(url, location))).toThrowError(expect.objectContaining({ code: 'UNSUPPORTED_REFERENCE' }));
+    });
+    test('safe external links remain intact in drafts and overwrite while account URLs are rejected before changes', async () => {
+        const safe = 'https://example.test/guide?topic=care#section';
+        const source = urlDefinition(safe, 'thanks');
+        const id = await commit(await plan((await preflight('a1', 'create', source)).context, source));
+        expect(JSON.parse(rows()[0].layout as string).options.thanksUrl).toBe(safe);
+        const publicUrl = await formTemplatePublicUrl(fixture.db, authority, 'a1', id);
+        const changed = urlDefinition('http://example.test/help', 'button');
+        await commit(await plan((await preflight('a1', 'overwrite', changed)).context, changed));
+        const stored = JSON.parse(rows()[0].layout as string);
+        expect(stored.sections[0].blocks[0].url).toBe('http://example.test/help');
+        expect(rows()[0]).toMatchObject({ id, is_active: 0, content_revision: 2 });
+        expect(await formTemplatePublicUrl(fixture.db, authority, 'a1', id)).toBe(publicUrl);
+        const before = rows();
+        await expect(preflight('a1', 'overwrite', urlDefinition('https://liff.line.me/source'))).rejects.toMatchObject({ code: 'UNSUPPORTED_REFERENCE' });
+        expect(rows()).toEqual(before);
+        for (const url of ['', null, 'https://example.test/thanks', 'https://example.test/offer?discount=20%25'])
+            expect(() => parseFormTemplateDefinition(urlDefinition(url, 'thanks'))).not.toThrow();
+    });
     test('LIFF missing is explicit; default adapter remains unbound', async () => {
         fixture.raw.exec("UPDATE line_accounts SET liff_id=NULL WHERE id='a1'");
         await expect(plan((await preflight('a1')).context)).rejects.toMatchObject({ code: 'LIFF_UNAVAILABLE' });

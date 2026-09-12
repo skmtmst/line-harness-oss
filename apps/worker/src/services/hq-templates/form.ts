@@ -43,6 +43,47 @@ function text(value: unknown, max = 200): string {
 }
 function optionalText(value: unknown, max = 2000): string | null { return value == null || value === '' ? null : text(value, max); }
 const referenceKey = (kind: string, id: string) => `${kind}:${id}`;
+/** Match the form editor's absolute HTTP(S) contract; account links need an explicit resolver. */
+function validatePortableUrl(value: unknown): void {
+    if (value == null || value === '') return;
+    if (typeof value !== 'string' || value.length > 2048 || /[\u0000-\u001f\u007f\\]/.test(value))
+        throw new FormTemplateError('INVALID_DEFINITION');
+    if (!value.trim()) return;
+    let url: URL;
+    const decode = (raw: string): string => {
+        let current = raw;
+        for (let i = 0; i < 3; i++) {
+            if (!/%[0-9a-f]{2}/i.test(current)) return current;
+            const next = decodeURIComponent(current);
+            if (next === current) return current;
+            current = next;
+        }
+        // Do not silently accept indefinitely encoded account references.
+        if (/%[0-9a-f]{2}/i.test(current)) throw new FormTemplateError('UNSUPPORTED_REFERENCE');
+        return current;
+    };
+    let path: string, query: string, hash: string, keys: string[];
+    try {
+        url = new URL(value.trim());
+        path = decode(url.pathname); query = decode(url.search); hash = decode(url.hash);
+        keys = [...url.searchParams.keys()].map(decode);
+        if ([path, query, hash, ...keys].some(part => /[\u0000-\u001f\u007f\\]/.test(part)))
+            throw new FormTemplateError('INVALID_DEFINITION');
+    } catch (error) {
+        if (error instanceof FormTemplateError) throw error;
+        throw new FormTemplateError('INVALID_DEFINITION');
+    }
+    if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password)
+        throw new FormTemplateError('INVALID_DEFINITION');
+    const referenceParameter = /^(?:form|template|scenario|tag|(?:line)?account)(?:s|ids?)?$/;
+    const referencePath = /(?:^|\/)(?:forms?|templates?|scenarios?|tags?|accounts?)\//i;
+    const referenceFragment = /(?:^|[?&#/])(?:forms?|templates?|scenarios?|tags?|accounts?)(?:[_-]?ids?)?[=\/]/i;
+    const liff = /(?:^|\/\/)(?:liff|miniapp)\.line\.me(?:[./:?#]|$)/i;
+    if (['liff.line.me', 'miniapp.line.me'].includes(url.hostname.replace(/\.$/, ''))
+        || keys.some(key => referenceParameter.test(key.replace(/[_-]/g, '').toLowerCase()) || key.toLowerCase() === 'liff.state')
+        || [path, query, hash].some(part => referencePath.test(part) || referenceFragment.test(part) || liff.test(part)))
+        throw new FormTemplateError('UNSUPPORTED_REFERENCE');
+}
 /** The visitor remaps supported references and rejects unknown cross-account dependencies. */
 function visitLayout(value: unknown, resolve: (kind: 'tag' | 'scenario', id: string) => string): unknown {
     if (Array.isArray(value))
@@ -51,6 +92,7 @@ function visitLayout(value: unknown, resolve: (kind: 'tag' | 'scenario', id: str
         return value;
     const result: Record<string, unknown> = {};
     for (const [key, item] of Object.entries(value)) {
+        if (['url', 'linkUrl', 'thanksUrl'].includes(key)) validatePortableUrl(item);
         if (['friendFieldId', 'friendFieldIds', 'choiceFriendFieldId', 'fieldId', 'templateId', 'reminderId', 'mediaUrl', 'backgroundImageUrl'].includes(key) && item != null && item !== '' && !(Array.isArray(item) && !item.length))
             throw new FormTemplateError('UNSUPPORTED_REFERENCE');
         if ((key === 'tagId' || key === 'scenarioId') && item != null && item !== '')
