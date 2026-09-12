@@ -1,6 +1,6 @@
 import { describe, expect, test, vi } from 'vitest';
 
-import { createTestD1, insertFriend } from '../test-utils/d1-sqlite.js';
+import { createTestD1, insertFriend, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import {
   calculateWebinarNotificationSchedule,
   enqueueWebinarCompletedNotification,
@@ -44,6 +44,204 @@ function seedBase(raw: import('better-sqlite3').Database) {
   ).run(NOW.toISOString(), NOW.toISOString());
   insertFriend(raw, 'friend-1', { line_account_id: 'account-1', line_user_id: 'U001' });
 }
+
+describe('緊急停止と通知取得・送信の競合 (#745)', () => {
+  const epoch = Math.floor(NOW.getTime() / 1000);
+  const deliveryOptions = {
+    now: NOW, proxyBaseUrl: 'https://worker.example.com',
+    defaultAccessToken: 'fallback', defaultLiffId: null,
+  };
+
+  async function fixture(count = 1) {
+    const store = createTestD1();
+    seedBase(store.raw);
+    await saveWebinarNotificationSettings(store.db, 'webinar-1', SETTINGS, NOW);
+    for (let index = 1; index <= count; index++) {
+      if (index > 1) insertFriend(store.raw, `friend-${index}`, {
+        line_account_id: 'account-1', line_user_id: `U${index}`,
+      });
+      await registerWebinarSession(store.db, 'webinar-1', `friend-${index}`, SESSION, NOW);
+    }
+    store.raw.prepare(`UPDATE webinar_notification_jobs SET scheduled_at=?, next_retry_at=? WHERE kind='day_before'`)
+      .run(epoch, epoch);
+    store.raw.prepare(`INSERT INTO operation_control_sets
+      (scope_key, line_account_id, version, states_json, updated_at)
+      VALUES ('account-1', 'account-1', 1, '{"reminder_dispatch":"running"}', ?)`)
+      .run(NOW.toISOString());
+    return store;
+  }
+
+  function stop(store: SqliteD1, stopped = true) {
+    store.raw.prepare(`UPDATE operation_control_sets SET states_json=? WHERE scope_key='account-1'`)
+      .run(JSON.stringify({ reminder_dispatch: stopped ? 'stopped' : 'running' }));
+  }
+
+  function state(store: SqliteD1) {
+    return store.raw.prepare(`SELECT status, attempt_count, lease_expires_at, next_retry_at, last_error_code
+      FROM webinar_notification_jobs WHERE kind='day_before'`).get();
+  }
+
+  // 故障点だけを差し込む。SELECT/UPDATE/changesはすべて実SQLiteの結果を使う。
+  function intercept(
+    db: D1Database,
+    hook: (sql: string, method: string, run: () => Promise<unknown>) => Promise<unknown>,
+  ): D1Database {
+    const wrap = (sql: string, statement: D1PreparedStatement): D1PreparedStatement => new Proxy(statement, {
+      get(target, key) {
+        if (key === 'bind') return (...args: unknown[]) => wrap(sql, target.bind(...args));
+        if (key === 'run' || key === 'all' || key === 'first') {
+          return () => hook(sql, key, () => target[key]());
+        }
+        return Reflect.get(target, key);
+      },
+    });
+    return new Proxy(db, {
+      get(target, key) {
+        if (key === 'prepare') return (sql: string) => wrap(sql, target.prepare(sql));
+        return Reflect.get(target, key);
+      },
+    });
+  }
+
+  test('100件の1件目送信中に停止すると残り99件は未取得で残り、解除後一度ずつ届く', async () => {
+    const store = await fixture(100);
+    let claims = 0;
+    const countedDb = intercept(store.db, async (sql, method, run) => {
+      if (method === 'run' && sql.includes("SET status='claimed', attempt_count")) claims++;
+      return run();
+    });
+    const dispatch = vi.fn(async (_request: Request) => {
+      stop(store);
+      return new Response('{}', { status: 200 });
+    });
+    expect(await processWebinarNotificationJobs(countedDb, { ...deliveryOptions, proxyDispatch: dispatch }))
+      .toEqual({ sent: 1, failed: 0, skipped: 0, heldByStop: 99 });
+    expect(dispatch).toHaveBeenCalledTimes(1);
+    expect(claims, '停止後の99件にはclaim自体を行わない').toBe(1);
+    expect(store.raw.prepare(`SELECT COUNT(*) AS count FROM webinar_notification_jobs
+      WHERE kind='day_before' AND status='queued' AND attempt_count=0 AND lease_expires_at IS NULL`).get())
+      .toEqual({ count: 99 });
+    stop(store, false);
+    dispatch.mockImplementation(async () => new Response('{}', { status: 200 }));
+    expect(await processWebinarNotificationJobs(store.db, { ...deliveryOptions, proxyDispatch: dispatch }))
+      .toEqual({ sent: 99, failed: 0, skipped: 0, heldByStop: 0 });
+    await processWebinarNotificationJobs(store.db, { ...deliveryOptions, proxyDispatch: dispatch });
+    expect(dispatch).toHaveBeenCalledTimes(100);
+    expect(new Set(dispatch.mock.calls.map(([request]) => request.headers.get('X-Line-Retry-Key'))).size).toBe(100);
+    store.raw.close();
+  });
+
+  test.each(['queued', 'retry_wait', 'claimed'] as const)(
+    '未停止判定後・claim直前に停止した%sは試行回数とleaseを消費せず、解除後一度だけ届く',
+    async (initialStatus) => {
+      const store = await fixture();
+      const attempts = initialStatus === 'queued' ? 0 : 2;
+      store.raw.prepare(`UPDATE webinar_notification_jobs SET status=?, attempt_count=?,
+        lease_expires_at=?, last_error_code=? WHERE kind='day_before'`)
+        .run(initialStatus, attempts, initialStatus === 'claimed' ? epoch - 1 : null,
+          initialStatus === 'retry_wait' ? 'line_temporary_failure' : null);
+      let raced = false;
+      const racedDb = intercept(store.db, async (sql, method, run) => {
+        if (!raced && method === 'run' && sql.includes("SET status='claimed', attempt_count")) {
+          raced = true;
+          stop(store);
+        }
+        return run();
+      });
+      const dispatch = vi.fn(async () => new Response('{}', { status: 200 }));
+      expect(await processWebinarNotificationJobs(racedDb, { ...deliveryOptions, proxyDispatch: dispatch }))
+        .toEqual({ sent: 0, failed: 0, skipped: 0, heldByStop: 1 });
+      expect(raced).toBe(true);
+      expect(dispatch).not.toHaveBeenCalled();
+      expect(state(store)).toEqual({
+        status: initialStatus === 'retry_wait' ? 'retry_wait' : 'queued',
+        attempt_count: attempts, lease_expires_at: null, next_retry_at: epoch,
+        last_error_code: initialStatus === 'retry_wait' ? 'line_temporary_failure' : null,
+      });
+      stop(store, false);
+      await processWebinarNotificationJobs(store.db, { ...deliveryOptions, proxyDispatch: dispatch });
+      await processWebinarNotificationJobs(store.db, { ...deliveryOptions, proxyDispatch: dispatch });
+      expect(dispatch).toHaveBeenCalledTimes(1);
+      expect(state(store)).toMatchObject({ status: 'succeeded', attempt_count: attempts + 1, lease_expires_at: null });
+      store.raw.close();
+    },
+  );
+
+  test('claim直前に停止した期限切れ通知を、停止中にskippedへ確定しない', async () => {
+    const store = await fixture();
+    store.raw.prepare(`UPDATE webinar_notification_jobs SET session_start_at=? WHERE kind='day_before'`)
+      .run(epoch - 3601);
+    const racedDb = intercept(store.db, async (sql, method, run) => {
+      if (method === 'run' && sql.includes("SET status='claimed', attempt_count")) stop(store);
+      return run();
+    });
+    const dispatch = vi.fn(async () => new Response('{}', { status: 200 }));
+    expect(await processWebinarNotificationJobs(racedDb, { ...deliveryOptions, proxyDispatch: dispatch }))
+      .toEqual({ sent: 0, failed: 0, skipped: 0, heldByStop: 1 });
+    expect(state(store)).toMatchObject({ status: 'queued', attempt_count: 0, lease_expires_at: null });
+    expect(dispatch).not.toHaveBeenCalled();
+    store.raw.close();
+  });
+
+  test('claim後の設定取得中に停止しても外部送信直前に止まり、解除後一度だけ届く', async () => {
+    const store = await fixture();
+    const racedDb = intercept(store.db, async (sql, method, run) => {
+      const result = await run();
+      if (method === 'first' && sql === 'SELECT liff_id FROM line_accounts WHERE id=?') stop(store);
+      return result;
+    });
+    const dispatch = vi.fn(async () => new Response('{}', { status: 200 }));
+    expect(await processWebinarNotificationJobs(racedDb, { ...deliveryOptions, proxyDispatch: dispatch }))
+      .toEqual({ sent: 0, failed: 0, skipped: 0, heldByStop: 1 });
+    expect(dispatch).not.toHaveBeenCalled();
+    expect(state(store)).toMatchObject({ status: 'queued', attempt_count: 0, lease_expires_at: null });
+    stop(store, false);
+    await processWebinarNotificationJobs(store.db, { ...deliveryOptions, proxyDispatch: dispatch });
+    await processWebinarNotificationJobs(store.db, { ...deliveryOptions, proxyDispatch: dispatch });
+    expect(dispatch).toHaveBeenCalledTimes(1);
+    store.raw.close();
+  });
+
+  test.each(['attempt', 'lease', 'cancelled'] as const)('停止で返す直前に%sが変わった他の処理の行は上書きしない', async (changed) => {
+    const store = await fixture();
+    const racedDb = intercept(store.db, async (sql, method, run) => {
+      if (method === 'run' && sql.includes("SET status='claimed', attempt_count")) stop(store);
+      if (method === 'run' && sql.includes('attempt_count=attempt_count-1')) {
+        store.raw.prepare(`UPDATE webinar_notification_jobs SET status=?, attempt_count=?, lease_expires_at=?
+          WHERE kind='day_before'`).run(
+          changed === 'cancelled' ? 'cancelled' : 'claimed',
+          changed === 'attempt' ? 2 : 1,
+          changed === 'lease' ? epoch + 601 : epoch + 300,
+        );
+      }
+      return run();
+    });
+    const dispatch = vi.fn(async () => new Response('{}', { status: 200 }));
+    await processWebinarNotificationJobs(racedDb, { ...deliveryOptions, proxyDispatch: dispatch });
+    expect(state(store)).toMatchObject({
+      status: changed === 'cancelled' ? 'cancelled' : 'claimed',
+      attempt_count: changed === 'attempt' ? 2 : 1,
+      lease_expires_at: changed === 'lease' ? epoch + 601 : epoch + 300,
+    });
+    expect(dispatch).not.toHaveBeenCalled();
+    store.raw.close();
+  });
+
+  test('取得一覧の後に試行世代が変わった行を古い情報でclaimしない', async () => {
+    const store = await fixture();
+    const racedDb = intercept(store.db, async (sql, method, run) => {
+      if (method === 'run' && sql.includes("SET status='claimed', attempt_count")) {
+        store.raw.prepare(`UPDATE webinar_notification_jobs SET attempt_count=1 WHERE kind='day_before'`).run();
+      }
+      return run();
+    });
+    const dispatch = vi.fn(async () => new Response('{}', { status: 200 }));
+    await processWebinarNotificationJobs(racedDb, { ...deliveryOptions, proxyDispatch: dispatch });
+    expect(dispatch).not.toHaveBeenCalled();
+    expect(state(store)).toMatchObject({ status: 'queued', attempt_count: 1, lease_expires_at: null });
+    store.raw.close();
+  });
+});
 
 describe('calculateWebinarNotificationSchedule', () => {
   test('JSTの前日・開始前・開始時・翌日の時刻を固定する', () => {

@@ -77,6 +77,7 @@ type DueJobRow = {
   friend_id: string;
   session_start_at: number;
   kind: WebinarNotificationKind;
+  status: 'queued' | 'retry_wait' | 'claimed';
   attempt_count: number;
   line_retry_key: string;
   title: string;
@@ -516,7 +517,7 @@ export async function processWebinarNotificationJobs(
   const nowEpoch = Math.floor(now.getTime() / 1000);
   const due = await db.prepare(
     `SELECT j.id, j.webinar_id, j.registration_id, j.friend_id,
-            j.session_start_at, j.kind, j.attempt_count, j.line_retry_key,
+            j.session_start_at, j.kind, j.status, j.attempt_count, j.line_retry_key,
             w.title, w.slug, w.duration_seconds, w.account_id,
             f.line_user_id, f.is_following, f.line_account_id,
             la.channel_access_token, la.channel_access_token_encrypted,
@@ -549,19 +550,6 @@ export async function processWebinarNotificationJobs(
   let failed = 0;
   let skipped = 0;
   let heldByStop = 0;
-  /*
-   * 緊急停止の判定を 1 tick 内で使い回す。1回の取り出しは最大100行あり、
-   * 同じアカウントの判定を100回引き直す意味がない。機能オフ側の
-   * createFeatureJobGate と同じ考え方。**tick をまたいで持たないこと。**
-   */
-  const stopCache = new Map<string, boolean>();
-  const stoppedForAccount = async (accountId: string): Promise<boolean> => {
-    const cached = stopCache.get(accountId);
-    if (cached !== undefined) return cached;
-    const stopped = await isOperationCapabilityStopped(db, accountId, 'reminder_dispatch');
-    stopCache.set(accountId, stopped);
-    return stopped;
-  };
   for (const row of due.results ?? []) {
     if (!row.account_id || !await featureJobCanRun(db, {
       accountId: row.account_id,
@@ -590,20 +578,39 @@ export async function processWebinarNotificationJobs(
      * `notification_expired` が落とす。**停止を理由に落とさない。**
      * 落とす理由は「期限を過ぎた」であって「止まっていた」ではない。
      */
-    if (await stoppedForAccount(row.account_id)) {
+    // 未停止の結果は使い回さない。1件の送信中にも緊急停止は切り替わる。
+    if (await isOperationCapabilityStopped(db, row.account_id, 'reminder_dispatch')) {
       heldByStop++;
       continue;
     }
+    const claimLeaseExpiresAt = nowEpoch + 300;
     const claimed = await db.prepare(
       `UPDATE webinar_notification_jobs
           SET status='claimed', attempt_count=attempt_count+1, lease_expires_at=?, updated_at=?
-        WHERE id=? AND (
+        WHERE id=? AND attempt_count=? AND (
           status IN ('queued','retry_wait')
           OR (status='claimed' AND COALESCE(lease_expires_at, 0) <= ?)
         )`,
-    ).bind(nowEpoch + 300, now.toISOString(), row.id, nowEpoch).run();
+    ).bind(claimLeaseExpiresAt, now.toISOString(), row.id, row.attempt_count, nowEpoch).run();
     if ((claimed.meta.changes ?? 0) === 0) continue;
+    const holdClaimIfStopped = async (): Promise<boolean> => {
+      if (!await isOperationCapabilityStopped(db, row.account_id, 'reminder_dispatch')) return false;
+      // 自分が取得した世代とleaseだけを戻す。別workerによる再取得・取消は上書きしない。
+      // retry_waitの再試行日時・理由を残し、期限切れclaimはqueuedへ戻して再取得可能にする。
+      await db.prepare(
+        `UPDATE webinar_notification_jobs
+            SET status=?, attempt_count=attempt_count-1, lease_expires_at=NULL, updated_at=?
+          WHERE id=? AND status='claimed' AND attempt_count=? AND lease_expires_at=?`,
+      ).bind(
+        row.status === 'retry_wait' ? 'retry_wait' : 'queued',
+        now.toISOString(), row.id, row.attempt_count + 1, claimLeaseExpiresAt,
+      ).run();
+      heldByStop++;
+      return true;
+    };
     try {
+      // 停止確認とclaimの間に切り替わった場合も、期限切れなどの確定処理へ進めない。
+      if (await holdClaimIfStopped()) continue;
       const isMissedButViewed = row.kind === 'missed' && Boolean(row.viewed);
       const isLateReminder = ['day_before', 'hour_before', 'session_start'].includes(row.kind)
         && nowEpoch >= row.session_start_at + row.duration_seconds;
@@ -642,6 +649,8 @@ export async function processWebinarNotificationJobs(
         row.channel_access_token ?? options.defaultAccessToken,
         { lineAccountId, field: 'channel_access_token' },
       );
+      // 設定取得・復号を待っている間の停止も、外部送信の直前に読み直す。
+      if (await holdClaimIfStopped()) continue;
       const response = await pushViaHarnessProxy(
         options.proxyBaseUrl,
         accessToken,
