@@ -103,6 +103,103 @@ describe('緊急停止と通知取得・送信の競合 (#745)', () => {
     });
   }
 
+  // 本物のProxy認証・友だち検索・初回チャット作成・履歴保存も同じDBへ通す。
+  // 外部LINEだけ代役にし、waitUntilの記録まで待って全SQL文を数える。
+  async function proxyFixture(count: number) {
+    const store = await fixture(count);
+    for (let index = 1; index <= count; index++) {
+      store.raw.prepare('UPDATE friends SET line_user_id=? WHERE id=?')
+        .run(`U${index.toString(16).padStart(32, '0')}`, `friend-${index}`);
+    }
+    const { lineProxy } = await import('../routes/line-proxy.js');
+    let queries = 0;
+    const countedDb = intercept(store.db, async (_sql, _method, run) => {
+      queries++;
+      if (queries > 1000) throw new Error('D1 1000 queries per invocation exceeded');
+      return run();
+    });
+    return {
+      store,
+      async tick() {
+        queries = 0;
+        // この通知専用の1000枠ではない。他cron用に500文を先に消費して検証する。
+        for (let i = 0; i < 500; i++) await countedDb.prepare('SELECT 1').first();
+        const pending: Promise<unknown>[] = [];
+        const result = await processWebinarNotificationJobs(countedDb, {
+          ...deliveryOptions,
+          proxyDispatch: (request) => Promise.resolve(lineProxy.fetch(request, {
+            DB: countedDb, LINE_CHANNEL_ACCESS_TOKEN: 'fallback',
+          }, {
+            waitUntil(promise: Promise<unknown>) { pending.push(promise); },
+            passThroughOnException() {},
+            props: {},
+          })),
+        });
+        await Promise.all(pending);
+        expect(queries).toBeLessThanOrEqual(1000);
+        // 実経路が増えても、500文の共通枠を削って黙って通さない。
+        expect(queries - 500).toBeLessThanOrEqual(400);
+        return { result, queries: queries - 500 };
+      },
+    };
+  }
+
+  test('実Proxy込み100件をD1上限内の複数tickに分け、送信と履歴を各1回にする', async () => {
+    const real = await proxyFixture(100);
+    const upstream = vi.fn(async (_url: RequestInfo | URL, _init?: RequestInit) => new Response('{}', { status: 200 }));
+    vi.stubGlobal('fetch', upstream);
+    try {
+      const counts: number[] = [];
+      const queries: number[] = [];
+      for (let tick = 0; tick < 5; tick++) {
+        const result = await real.tick();
+        counts.push(result.result.sent);
+        queries.push(result.queries);
+        expect(result.result).toMatchObject({ failed: 0, skipped: 0, heldByStop: 0 });
+      }
+      expect(counts).toEqual([20, 20, 20, 20, 20]);
+      expect(queries).toEqual([301, 301, 301, 301, 301]);
+      expect((await real.tick()).result.sent).toBe(0);
+      expect(upstream).toHaveBeenCalledTimes(100);
+      expect(new Set(upstream.mock.calls.map(([, init]) => new Headers(init?.headers).get('X-Line-Retry-Key'))).size).toBe(100);
+      expect(real.store.raw.prepare(`SELECT COUNT(*) AS n FROM webinar_notification_jobs
+        WHERE kind='day_before' AND status='succeeded' AND attempt_count=1 AND lease_expires_at IS NULL`).get()).toEqual({ n: 100 });
+      expect(real.store.raw.prepare('SELECT COUNT(*) AS n FROM messages_log').get()).toEqual({ n: 100 });
+      expect(real.store.raw.prepare('SELECT COUNT(*) AS n FROM chats').get()).toEqual({ n: 100 });
+    } finally {
+      vi.unstubAllGlobals();
+      real.store.raw.close();
+    }
+  });
+
+  test('実Proxy送信中の停止を次tickへ持ち越し、解除後は残りだけ1回ずつ送る', async () => {
+    const real = await proxyFixture(100);
+    const upstream = vi.fn(async (_url: RequestInfo | URL, _init?: RequestInit) => {
+      stop(real.store);
+      return new Response('{}', { status: 200 });
+    });
+    vi.stubGlobal('fetch', upstream);
+    try {
+      expect((await real.tick()).result).toEqual({ sent: 1, failed: 0, skipped: 0, heldByStop: 19 });
+      expect((await real.tick()).result).toEqual({ sent: 0, failed: 0, skipped: 0, heldByStop: 20 });
+      expect(upstream).toHaveBeenCalledTimes(1);
+      expect(real.store.raw.prepare(`SELECT COUNT(*) AS n FROM webinar_notification_jobs
+        WHERE kind='day_before' AND status='queued' AND attempt_count=0 AND lease_expires_at IS NULL`).get()).toEqual({ n: 99 });
+      stop(real.store, false);
+      upstream.mockImplementation(async () => new Response('{}', { status: 200 }));
+      const resumed = [];
+      for (let tick = 0; tick < 5; tick++) resumed.push((await real.tick()).result.sent);
+      expect(resumed).toEqual([20, 20, 20, 20, 19]);
+      expect((await real.tick()).result.sent).toBe(0);
+      expect(upstream).toHaveBeenCalledTimes(100);
+      expect(new Set(upstream.mock.calls.map(([, init]) => new Headers(init?.headers).get('X-Line-Retry-Key'))).size).toBe(100);
+      expect(real.store.raw.prepare('SELECT COUNT(*) AS n FROM messages_log').get()).toEqual({ n: 100 });
+    } finally {
+      vi.unstubAllGlobals();
+      real.store.raw.close();
+    }
+  });
+
   test('100件の1件目送信中に停止すると残り99件は未取得で残り、解除後一度ずつ届く', async () => {
     const store = await fixture(100);
     let claims = 0;
@@ -115,7 +212,7 @@ describe('緊急停止と通知取得・送信の競合 (#745)', () => {
       return new Response('{}', { status: 200 });
     });
     expect(await processWebinarNotificationJobs(countedDb, { ...deliveryOptions, proxyDispatch: dispatch }))
-      .toEqual({ sent: 1, failed: 0, skipped: 0, heldByStop: 99 });
+      .toEqual({ sent: 1, failed: 0, skipped: 0, heldByStop: 19 });
     expect(dispatch).toHaveBeenCalledTimes(1);
     expect(claims, '停止後の99件にはclaim自体を行わない').toBe(1);
     expect(store.raw.prepare(`SELECT COUNT(*) AS count FROM webinar_notification_jobs
@@ -123,8 +220,12 @@ describe('緊急停止と通知取得・送信の競合 (#745)', () => {
       .toEqual({ count: 99 });
     stop(store, false);
     dispatch.mockImplementation(async () => new Response('{}', { status: 200 }));
-    expect(await processWebinarNotificationJobs(store.db, { ...deliveryOptions, proxyDispatch: dispatch }))
-      .toEqual({ sent: 99, failed: 0, skipped: 0, heldByStop: 0 });
+    const resumed = [];
+    for (let tick = 0; tick < 5; tick++) {
+      resumed.push(await processWebinarNotificationJobs(store.db, { ...deliveryOptions, proxyDispatch: dispatch }));
+    }
+    expect(resumed.map((result) => result.sent)).toEqual([20, 20, 20, 20, 19]);
+    expect(resumed.every((result) => result.failed + result.skipped + result.heldByStop === 0)).toBe(true);
     await processWebinarNotificationJobs(store.db, { ...deliveryOptions, proxyDispatch: dispatch });
     expect(dispatch).toHaveBeenCalledTimes(100);
     expect(new Set(dispatch.mock.calls.map(([request]) => request.headers.get('X-Line-Retry-Key'))).size).toBe(100);

@@ -17,6 +17,12 @@ import {
 
 const JST_SECONDS = 9 * 60 * 60;
 
+// cron内のlineProxyも同じD1呼び出し予算を使う。実Proxy（初回チャット作成・
+// waitUntilの送信履歴を含む）では20件で301 queries。上限1000を使い切らず、
+// 他のcron処理・失敗記録の余地を残す。残りは次tickで拾い、停止は毎件読み直す。
+// https://developers.cloudflare.com/d1/platform/limits/
+const WEBINAR_NOTIFICATION_TICK_LIMIT = 20;
+
 export type WebinarNotificationKind =
   | 'day_before'
   | 'hour_before'
@@ -544,7 +550,7 @@ export async function processWebinarNotificationJobs(
         AND r.status='active'
         AND w.status='active'
       ORDER BY j.scheduled_at ASC
-      LIMIT 100`,
+      LIMIT ${WEBINAR_NOTIFICATION_TICK_LIMIT}`,
   ).bind(nowEpoch, EXTERNAL_DELIVERY_MAX_ATTEMPTS, nowEpoch, nowEpoch).all<DueJobRow>();
   let sent = 0;
   let failed = 0;
