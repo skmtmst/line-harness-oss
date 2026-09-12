@@ -1,6 +1,7 @@
 import { beginHqTemplateDistributionRun, beginHqTemplateStoreResult, normalizeScopedTagName, type HqTemplateDistributionResult, type HqTemplatePreflight, type HqTemplatePreflightResolution, type HqTemplateStatement } from '@line-crm/db';
 import { requireHqTemplateAuthority, type HqTemplateAdapterContext, type HqTemplateAdapterInput, type HqTemplateAdapterResult, type HqTemplateAuthority, type HqTemplateStoreAtomicCommitPlan } from './contract.js';
-import { createFormHqTemplateAdapter, type FormTemplateDependencies } from './form.js';
+import { createFormHqTemplateAdapter, type FormReference, type FormTemplateDependencies } from './form.js';
+import { loadScenarioReferenceGraph, remapScenarioJson, scenarioGraphSourceGuardStatements, ScenarioGraphError, type ScenarioGraphReference, type ScenarioGraphRow } from './scenario-graph.js';
 
 export class HqRuntimeError extends Error {
   constructor(public readonly code: string) { super(code); }
@@ -10,14 +11,11 @@ const guard = (condition: string, bindings: HqTemplateStatement['bindings']): Hq
 const hash = async (value: string) => Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value))), n => n.toString(16).padStart(2, '0')).join('');
 const ok = <T>(r: HqTemplateAdapterResult<T>): T => r.kind === 'OK' ? r.value : fail('UNSUPPORTED');
 
-type DbRow = Record<string, string | number | null>;
-function insertRow(table: 'scenarios' | 'scenario_steps', row: DbRow): HqTemplateStatement {
+type DbRow = ScenarioGraphRow;
+type PortableTable = 'scenarios' | 'scenario_steps' | 'scenario_actions' | 'scenario_triggers' | 'templates';
+function insertRow(table: PortableTable, row: DbRow): HqTemplateStatement {
   const columns = Object.keys(row);
   return { sql: `INSERT INTO ${table}(${columns.join(',')}) VALUES (${columns.map(() => '?').join(',')})`, bindings: columns.map(column => row[column]) };
-}
-function exactRowGuard(table: 'scenarios' | 'scenario_steps', row: DbRow): HqTemplateStatement {
-  const columns = Object.keys(row);
-  return guard(`EXISTS(SELECT 1 FROM ${table} WHERE ${columns.map(column => `${column} IS ?`).join(' AND ')})`, columns.map(column => row[column]));
 }
 function updateScenarioRow(row: DbRow, id: string, accountId: string): HqTemplateStatement {
   const columns = Object.keys(row).filter(column => !['id', 'line_account_id', 'created_at', 'updated_at'].includes(column));
@@ -38,116 +36,143 @@ function nextAliasName(name: string, existing: readonly string[]): string {
   }
   return fail('SELECTION_REQUIRED');
 }
-function hasPortableTextReference(value: unknown): boolean {
-  let current = String(value ?? '');
-  for (let attempt = 0; attempt < 4; attempt++) {
-    if (/(?:liff\.line\.me|[?&#](?:form|template|scenario|tag|account|line[_-]?account)(?:s|[_-]?ids?)?=|\/(?:forms?|scenarios?|templates?|tags?|accounts?)\/)/i.test(current)) return true;
-    if (!/%[0-9a-f]{2}/i.test(current)) return false;
-    try {
-      const next = decodeURIComponent(current);
-      if (next === current) return false;
-      current = next;
-    } catch { return true; }
-  }
-  return /%[0-9a-f]{2}/i.test(current);
-}
 
 /** Store-scoped planner: never writes; all reference creation joins the form batch. */
 export function createFormReferenceResolver({ db, authority }: { db: D1Database; authority: HqTemplateAuthority }): FormTemplateDependencies['resolveReference'] {
-  const planned = new Map<string, { targetId: string; statement: HqTemplateStatement }>();
-  const plannedScenarios = new Map<string, { targetId: string; statements: HqTemplateStatement[] }>();
-  return async (reference, context) => {
-    if (requireHqTemplateAuthority(authority).kind !== 'AUTHORIZED' || context.tenantId !== authority.tenantId) fail('FORBIDDEN');
-    const selection = formReferenceSelection(reference, context);
-    if (reference.kind === 'scenario') {
-      const source = await db.prepare(`SELECT s.* FROM scenarios s JOIN line_accounts a ON a.id=s.line_account_id WHERE s.id=? AND a.tenant_id=? AND a.is_active=1 AND a.archived_at IS NULL`).bind(reference.sourceId, authority.tenantId).first<DbRow>();
-      if (!source) fail('REFERENCE_UNAVAILABLE');
-      const safeSource = source!;
-      if (safeSource.trigger_type !== 'manual' || safeSource.on_complete_mode !== 'pause' || safeSource.trigger_tag_id || safeSource.on_complete_scenario_id || safeSource.folder_id || safeSource.audience_condition_json) fail('UNSUPPORTED_REFERENCE');
-      const target = await db.prepare(`SELECT id FROM line_accounts WHERE id=? AND tenant_id=? AND is_active=1 AND archived_at IS NULL`).bind(context.targetAccountId, authority.tenantId).first();
-      if (!target) fail('FORBIDDEN');
-      const steps = (await db.prepare(`SELECT * FROM scenario_steps WHERE scenario_id=? ORDER BY step_order,id`).bind(reference.sourceId).all<DbRow>()).results;
-      const hasActions = await db.prepare(`SELECT 1 AS present FROM scenario_actions WHERE scenario_id=? LIMIT 1`).bind(reference.sourceId).first();
-      const hasTriggers = await db.prepare(`SELECT 1 AS present FROM scenario_triggers WHERE scenario_id=? LIMIT 1`).bind(reference.sourceId).first();
-      if (hasActions || hasTriggers || steps.some(step => step.template_id || step.on_reach_tag_id || step.message_bubbles_json || step.target_condition_json || step.question_json || step.condition_type || step.condition_value || step.message_type !== 'text' || hasPortableTextReference(step.message_content))) fail('UNSUPPORTED_REFERENCE');
-      const destinationRows = (await db.prepare(`SELECT id,name,updated_at FROM scenarios WHERE line_account_id=? ORDER BY id`).bind(context.targetAccountId).all<{ id: string; name: string; updated_at: string | null }>()).results;
-      const matches = destinationRows.filter(row => normalizeScopedTagName(row.name) === normalizeScopedTagName(String(safeSource.name)));
-      if (matches.length > 1) fail('REFERENCE_UNAVAILABLE');
-      const match = matches[0] ?? null;
-      const expectedRevision = match ? JSON.stringify([match.updated_at]) : undefined;
-      if (!match ? selection.mode !== 'create' || selection.targetId || selection.expectedRevision : selection.mode === 'create' || selection.targetId !== match.id || selection.expectedRevision !== expectedRevision) fail('SELECTION_REQUIRED');
-      const sourceGuards: HqTemplateStatement[] = [
-        exactRowGuard('scenarios', safeSource),
-        guard(`(SELECT COUNT(*) FROM scenario_steps WHERE scenario_id=?)=?`, [reference.sourceId, steps.length]),
-        ...steps.map(step => exactRowGuard('scenario_steps', step)),
-        guard(`NOT EXISTS(SELECT 1 FROM scenario_actions WHERE scenario_id=?) AND NOT EXISTS(SELECT 1 FROM scenario_triggers WHERE scenario_id=?)`, [reference.sourceId, reference.sourceId]),
-      ];
-      if (match && String(safeSource.line_account_id) === context.targetAccountId && match.id === reference.sourceId && selection.mode === 'overwrite') {
-        return { targetId: match.id, dbCommit: sourceGuards };
-      }
-      if (match && selection.mode === 'overwrite') {
-        const scenario: DbRow = { ...safeSource, id: match.id, line_account_id: context.targetAccountId, is_active: 0, folder_id: null, created_from_recipe_id: null, recipe_clone_run_id: null, current_published_version_id: null };
-        const statements: HqTemplateStatement[] = [...sourceGuards,
-          guard(`EXISTS(SELECT 1 FROM scenarios WHERE id=? AND line_account_id=? AND updated_at IS ?)`, [match.id, context.targetAccountId, match.updated_at]),
-          // Scenario-level hooks/triggers survive a step deletion. Replace them
-          // with the source's (validated empty) dependency set in this same batch.
-          { sql: `DELETE FROM scenario_actions WHERE scenario_id=?`, bindings: [match.id] },
-          { sql: `DELETE FROM scenario_triggers WHERE scenario_id=?`, bindings: [match.id] },
-          { sql: `DELETE FROM scenario_steps WHERE scenario_id=?`, bindings: [match.id] },
-          updateScenarioRow(scenario, match.id, context.targetAccountId),
-        ];
-        for (const step of steps) {
-          const cloned: DbRow = { ...step, id: crypto.randomUUID(), scenario_id: match.id, is_draft: 1 };
-          delete cloned.created_at;
-          statements.push(insertRow('scenario_steps', cloned));
-        }
-        return { targetId: match.id, dbCommit: statements };
-      }
-      const scenarioName = match ? nextAliasName(String(safeSource.name), destinationRows.map(row => row.name)) : String(safeSource.name);
-      const cacheKey = JSON.stringify([context.targetAccountId, normalizeScopedTagName(scenarioName)]);
-      let created = plannedScenarios.get(cacheKey);
-      if (!created) {
-        const targetId = crypto.randomUUID();
-        const statements: HqTemplateStatement[] = [...sourceGuards];
-        const scenario: DbRow = { ...safeSource, id: targetId, name: scenarioName, line_account_id: context.targetAccountId, is_active: 0, folder_id: null, created_from_recipe_id: null, recipe_clone_run_id: null, current_published_version_id: null };
-        delete scenario.created_at; delete scenario.updated_at;
-        statements.push(insertRow('scenarios', scenario));
-        for (const step of steps) {
-          const cloned: DbRow = { ...step, id: crypto.randomUUID(), scenario_id: targetId, is_draft: 1 };
-          delete cloned.created_at;
-          statements.push(insertRow('scenario_steps', cloned));
-        }
-        created = { targetId, statements };
-        plannedScenarios.set(cacheKey, created);
-      }
-      return { targetId: created.targetId, aliasName: match ? scenarioName : undefined, dbCommit: created.statements };
-    }
-    if (reference.kind !== 'tag') fail('UNSUPPORTED_REFERENCE');
-    const source = await db.prepare(`SELECT t.id,t.name,t.color,t.description,t.version,t.updated_at,t.line_account_id FROM tags t JOIN line_accounts a ON a.id=t.line_account_id WHERE t.id=? AND t.status='active' AND a.tenant_id=? AND a.is_active=1 AND a.archived_at IS NULL`).bind(reference.sourceId, authority.tenantId).first<{ id: string; name: string; color: string; description: string | null; version: number; updated_at: string | null; line_account_id: string }>();
-    if (!source) fail('REFERENCE_UNAVAILABLE');
-    const safeSource = source!;
+  const resolved = new Map<string, { targetId: string; aliasName?: string }>();
+  const emitted = new Set<string>();
+  const emitOnce = (keys: readonly string[], statements: HqTemplateStatement[]) => {
+    const fresh = keys.filter(key => !emitted.has(key));
+    if (!fresh.length) return [];
+    fresh.forEach(key => emitted.add(key));
+    return statements;
+  };
+  const targetAccount = async (context: HqTemplateAdapterContext) => {
     const target = await db.prepare(`SELECT id FROM line_accounts WHERE id=? AND tenant_id=? AND is_active=1 AND archived_at IS NULL`).bind(context.targetAccountId, authority.tenantId).first();
     if (!target) fail('FORBIDDEN');
-    const sourceGuard = guard(`EXISTS(SELECT 1 FROM tags t JOIN line_accounts a ON a.id=t.line_account_id WHERE t.id=? AND t.line_account_id=? AND t.name=? AND t.color IS ? AND t.description IS ? AND t.version=? AND t.updated_at IS ? AND t.status='active' AND a.tenant_id=? AND a.is_active=1 AND a.archived_at IS NULL)`, [safeSource.id, safeSource.line_account_id, safeSource.name, safeSource.color, safeSource.description, safeSource.version, safeSource.updated_at, authority.tenantId]);
-    const name = normalizeScopedTagName(safeSource.name);
-    const rows = (await db.prepare(`SELECT id,name,status,version,updated_at FROM tags WHERE line_account_id=? ORDER BY id`).bind(context.targetAccountId).all<{ id: string; name: string; status: string; version: number; updated_at: string | null }>()).results;
-    const matches = rows.filter(row => normalizeScopedTagName(row.name) === name);
-    if (matches.length > 1 || matches.some(row => row.status !== 'active')) fail('REFERENCE_UNAVAILABLE');
-    const match = matches[0] ?? null;
-    const expectedRevision = match ? JSON.stringify([match.version, match.updated_at]) : undefined;
-    if (!match ? selection.mode !== 'create' || selection.targetId || selection.expectedRevision : selection.mode === 'create' || selection.targetId !== match.id || selection.expectedRevision !== expectedRevision) fail('SELECTION_REQUIRED');
-    if (match && safeSource.line_account_id === context.targetAccountId && match.id === reference.sourceId && selection.mode === 'overwrite') return { targetId: match.id, dbCommit: [sourceGuard] };
-    if (match && selection.mode === 'overwrite') return { targetId: match.id, dbCommit: [sourceGuard, guard(`EXISTS(SELECT 1 FROM tags WHERE id=? AND line_account_id=? AND version=? AND updated_at IS ? AND status='active')`, [match.id, context.targetAccountId, match.version, match.updated_at]), { sql: `UPDATE tags SET name=?,normalized_name=?,color=?,description=?,version=version+1,updated_by=?,updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=? AND line_account_id=?`, bindings: [safeSource.name, name, safeSource.color, safeSource.description, authority.actorId, match.id, context.targetAccountId] }] };
-    const tagName = match ? nextAliasName(safeSource.name, rows.map(row => row.name)) : safeSource.name;
-    const normalizedTagName = normalizeScopedTagName(tagName);
-    const cacheKey = JSON.stringify([context.targetAccountId, normalizedTagName]);
-    let created = planned.get(cacheKey);
-    if (!created) {
-      const targetId = crypto.randomUUID();
-      created = { targetId, statement: { sql: `INSERT INTO tags(id,name,normalized_name,color,description,line_account_id,created_by,updated_by,created_at,updated_at) SELECT ?,?,?,?,?,?,?,?,strftime('%Y-%m-%dT%H:%M:%fZ','now'),strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE NOT EXISTS(SELECT 1 FROM tags WHERE id=?)`, bindings: [targetId, tagName, normalizedTagName, safeSource.color, safeSource.description, context.targetAccountId, authority.actorId, authority.actorId, targetId] } };
-      planned.set(cacheKey, created);
+  };
+  const validateSelection = (reference: ScenarioGraphReference, context: HqTemplateAdapterContext, match: { id: string; updated_at: string | null; version?: number; draft_revision?: number; published_version?: number } | null) => {
+    const selection = formReferenceSelection(reference, context);
+    const expectedRevision = !match ? undefined : reference.kind === 'tag'
+      ? JSON.stringify([match.version, match.updated_at])
+      : reference.kind === 'template'
+        ? JSON.stringify([match.draft_revision, match.published_version, match.updated_at])
+        : JSON.stringify([match.updated_at]);
+    if (!match
+      ? selection.mode !== 'create' || selection.targetId || selection.expectedRevision
+      : selection.mode === 'create' || selection.targetId !== match.id || selection.expectedRevision !== expectedRevision) fail('SELECTION_REQUIRED');
+    return selection;
+  };
+  const destination = async (reference: ScenarioGraphReference, name: string, context: HqTemplateAdapterContext) => {
+    const table = reference.kind === 'tag' ? 'tags' : reference.kind === 'template' ? 'templates' : 'scenarios';
+    const columns = reference.kind === 'tag' ? 'id,name,updated_at,version,status' : reference.kind === 'template' ? 'id,name,updated_at,draft_revision,published_version' : 'id,name,updated_at';
+    const rows = (await db.prepare(`SELECT ${columns} FROM ${table} WHERE line_account_id=? ORDER BY id`).bind(context.targetAccountId).all<{ id: string; name: string; updated_at: string | null; version?: number; status?: string; draft_revision?: number; published_version?: number }>()).results;
+    const matches = rows.filter(row => normalizeScopedTagName(row.name) === normalizeScopedTagName(name));
+    if (matches.length > 1 || (reference.kind === 'tag' && matches.some(row => row.status !== 'active'))) fail('REFERENCE_UNAVAILABLE');
+    return { rows, match: matches[0] ?? null };
+  };
+  const resolveTag = async (reference: FormReference, context: HqTemplateAdapterContext) => {
+    const key = formReferenceKey(reference.kind, reference.sourceId), cached = resolved.get(key);
+    if (cached) return { ...cached, dbCommit: [] };
+    const source = await db.prepare(`SELECT t.id,t.name,t.color,t.description,t.version,t.updated_at,t.line_account_id FROM tags t JOIN line_accounts a ON a.id=t.line_account_id WHERE t.id=? AND t.status='active' AND a.tenant_id=? AND a.is_active=1 AND a.archived_at IS NULL`).bind(reference.sourceId, authority.tenantId).first<{ id: string; name: string; color: string; description: string | null; version: number; updated_at: string | null; line_account_id: string }>();
+    if (!source) fail('REFERENCE_UNAVAILABLE');
+    await targetAccount(context);
+    const { rows, match } = await destination(reference, source!.name, context);
+    const selection = validateSelection(reference, context, match);
+    const sourceGuard = guard(`EXISTS(SELECT 1 FROM tags t JOIN line_accounts a ON a.id=t.line_account_id WHERE t.id=? AND t.line_account_id=? AND t.name=? AND t.color IS ? AND t.description IS ? AND t.version=? AND t.updated_at IS ? AND t.status='active' AND a.tenant_id=? AND a.is_active=1 AND a.archived_at IS NULL)`, [source!.id, source!.line_account_id, source!.name, source!.color, source!.description, source!.version, source!.updated_at, authority.tenantId]);
+    if (match && source!.line_account_id === context.targetAccountId && match.id === reference.sourceId && selection.mode === 'overwrite') {
+      resolved.set(key, { targetId: match.id });
+      return { targetId: match.id, dbCommit: emitOnce([key], [sourceGuard]) };
     }
-    return { targetId: created.targetId, aliasName: match ? tagName : undefined, dbCommit: [sourceGuard, created.statement] };
+    if (match && selection.mode === 'overwrite') {
+      resolved.set(key, { targetId: match.id });
+      return { targetId: match.id, dbCommit: emitOnce([key], [sourceGuard, guard(`EXISTS(SELECT 1 FROM tags WHERE id=? AND line_account_id=? AND version=? AND updated_at IS ? AND status='active')`, [match.id, context.targetAccountId, match.version!, match.updated_at]), { sql: `UPDATE tags SET name=?,normalized_name=?,color=?,description=?,version=version+1,updated_by=?,updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=? AND line_account_id=?`, bindings: [source!.name, normalizeScopedTagName(source!.name), source!.color, source!.description, authority.actorId, match.id, context.targetAccountId] }]) };
+    }
+    const name = match ? nextAliasName(source!.name, rows.map(row => row.name)) : source!.name;
+    const targetId = crypto.randomUUID();
+    resolved.set(key, { targetId, aliasName: match ? name : undefined });
+    return { targetId, aliasName: match ? name : undefined, dbCommit: emitOnce([key], [sourceGuard, { sql: `INSERT INTO tags(id,name,normalized_name,color,description,line_account_id,created_by,updated_by,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,strftime('%Y-%m-%dT%H:%M:%fZ','now'),strftime('%Y-%m-%dT%H:%M:%fZ','now'))`, bindings: [targetId, name, normalizeScopedTagName(name), source!.color, source!.description, context.targetAccountId, authority.actorId, authority.actorId] }]) };
+  };
+  const resolveScenarioGraph = async (reference: FormReference, context: HqTemplateAdapterContext) => {
+    const rootKey = formReferenceKey(reference.kind, reference.sourceId), cached = resolved.get(rootKey);
+    if (cached) return { ...cached, dbCommit: [] };
+    await targetAccount(context);
+    let graph;
+    try { graph = await loadScenarioReferenceGraph(db, authority.tenantId, [reference.sourceId]); }
+    catch (error) { if (error instanceof ScenarioGraphError) fail(error.code); throw error; }
+    const statements: HqTemplateStatement[] = [], ids = new Map<string, string>(), names = new Map<string, string>(), modes = new Map<string, string>();
+    for (const ref of graph.references) {
+      const source = ref.kind === 'tag' ? graph.tags.get(ref.sourceId) : ref.kind === 'template' ? graph.templates.get(ref.sourceId) : graph.scenarios.get(ref.sourceId)?.row;
+      if (!source) fail('REFERENCE_UNAVAILABLE');
+      const safeSource = source as DbRow;
+      const { rows, match } = await destination(ref, String(safeSource.name), context);
+      const selection = validateSelection(ref, context, match);
+      const name = match && selection.mode === 'alias' ? nextAliasName(String(safeSource.name), rows.map(row => row.name)) : String(safeSource.name);
+      const targetId = match && selection.mode === 'overwrite' ? match.id : crypto.randomUUID();
+      ids.set(ref.sourceId, targetId); names.set(formReferenceKey(ref.kind, ref.sourceId), name); modes.set(formReferenceKey(ref.kind, ref.sourceId), selection.mode);
+      resolved.set(formReferenceKey(ref.kind, ref.sourceId), { targetId, aliasName: selection.mode === 'alias' ? name : undefined });
+      if (match && selection.mode === 'overwrite') {
+        const targetGuard = ref.kind === 'tag'
+          ? guard(`EXISTS(SELECT 1 FROM tags WHERE id=? AND line_account_id=? AND version=? AND updated_at IS ? AND status='active')`, [match.id, context.targetAccountId, match.version!, match.updated_at])
+          : ref.kind === 'template'
+            ? guard(`EXISTS(SELECT 1 FROM templates WHERE id=? AND line_account_id=? AND draft_revision=? AND published_version=? AND updated_at IS ?)`, [match.id, context.targetAccountId, match.draft_revision!, match.published_version!, match.updated_at])
+            : guard(`EXISTS(SELECT 1 FROM scenarios WHERE id=? AND line_account_id=? AND updated_at IS ?)`, [match.id, context.targetAccountId, match.updated_at]);
+        statements.push(targetGuard);
+      }
+    }
+    statements.push(...scenarioGraphSourceGuardStatements(graph));
+    for (const row of graph.tags.values()) {
+      const key = formReferenceKey('tag', String(row.id)), mode = modes.get(key)!, targetId = ids.get(String(row.id))!, name = names.get(key)!;
+      if (mode === 'overwrite') statements.push({ sql: `UPDATE tags SET name=?,normalized_name=?,color=?,description=?,version=version+1,updated_by=?,updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=? AND line_account_id=?`, bindings: [name, normalizeScopedTagName(name), row.color, row.description, authority.actorId, targetId, context.targetAccountId] });
+      else statements.push({ sql: `INSERT INTO tags(id,name,normalized_name,color,description,line_account_id,created_by,updated_by,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,strftime('%Y-%m-%dT%H:%M:%fZ','now'),strftime('%Y-%m-%dT%H:%M:%fZ','now'))`, bindings: [targetId, name, normalizeScopedTagName(name), row.color, row.description, context.targetAccountId, authority.actorId, authority.actorId] });
+    }
+    for (const row of graph.templates.values()) {
+      const key = formReferenceKey('template', String(row.id)), mode = modes.get(key)!, targetId = ids.get(String(row.id))!;
+      const clone: DbRow = { ...row, id: targetId, name: names.get(key)!, line_account_id: context.targetAccountId, folder_id: null, created_from_recipe_id: null, recipe_clone_run_id: null, published_version: 0, published_at: null, publish_idempotency_key: null };
+      for (const field of ['message_content','carousel_actions_json','question_json','draft_message_content','draft_carousel_actions_json','draft_question_json']) if (clone[field] != null) clone[field] = remapScenarioJson(clone[field], ids);
+      delete clone.created_at; delete clone.updated_at;
+      if (mode === 'overwrite') {
+        const columns = Object.keys(clone).filter(column => !['id','line_account_id'].includes(column));
+        statements.push({ sql: `UPDATE templates SET ${columns.map(column => `${column}=?`).join(',')},updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=? AND line_account_id=?`, bindings: [...columns.map(column => clone[column]), targetId, context.targetAccountId] });
+      } else statements.push(insertRow('templates', clone));
+    }
+    const ordered: string[] = [], seen = new Set<string>();
+    const order = (id: string) => { if (seen.has(id)) return; seen.add(id); const node = graph.scenarios.get(id)!; for (const ref of node.references) if (ref.kind === 'scenario') order(ref.sourceId); ordered.push(id); };
+    order(reference.sourceId);
+    for (const sourceId of ordered) {
+      const node = graph.scenarios.get(sourceId)!, key = formReferenceKey('scenario', sourceId), mode = modes.get(key)!, targetId = ids.get(sourceId)!;
+      const clone: DbRow = { ...node.row, id: targetId, name: names.get(key)!, line_account_id: context.targetAccountId, is_active: 0, trigger_tag_id: node.row.trigger_tag_id ? ids.get(String(node.row.trigger_tag_id)) ?? fail('REFERENCE_UNAVAILABLE') : null, on_complete_scenario_id: node.row.on_complete_scenario_id ? ids.get(String(node.row.on_complete_scenario_id)) ?? fail('REFERENCE_UNAVAILABLE') : null, folder_id: null, created_from_recipe_id: null, recipe_clone_run_id: null, current_published_version_id: null };
+      delete clone.created_at; delete clone.updated_at;
+      if (mode === 'overwrite') {
+        statements.push({ sql: `DELETE FROM scenario_actions WHERE scenario_id=?`, bindings: [targetId] }, { sql: `DELETE FROM scenario_triggers WHERE scenario_id=?`, bindings: [targetId] }, { sql: `DELETE FROM scenario_steps WHERE scenario_id=?`, bindings: [targetId] }, updateScenarioRow(clone, targetId, context.targetAccountId));
+      } else statements.push(insertRow('scenarios', clone));
+      const stepIds = new Map<string,string>();
+      for (const step of node.steps) stepIds.set(String(step.id), crypto.randomUUID());
+      const remapIds = new Map([...ids, ...stepIds]);
+      for (const step of node.steps) {
+        const copy: DbRow = { ...step, id: stepIds.get(String(step.id))!, scenario_id: targetId, template_id: step.template_id ? ids.get(String(step.template_id)) ?? fail('REFERENCE_UNAVAILABLE') : null, on_reach_tag_id: step.on_reach_tag_id ? ids.get(String(step.on_reach_tag_id)) ?? fail('REFERENCE_UNAVAILABLE') : null, is_draft: 1 };
+        if (/^\s*[\[{]/.test(String(copy.message_content))) copy.message_content = remapScenarioJson(copy.message_content, remapIds);
+        for (const field of ['message_bubbles_json','target_condition_json','question_json']) if (copy[field] != null) copy[field] = remapScenarioJson(copy[field], remapIds);
+        delete copy.created_at; statements.push(insertRow('scenario_steps', copy));
+      }
+      for (const action of node.actions) {
+        const copy: DbRow = { ...action, id: crypto.randomUUID(), scenario_id: targetId, step_id: action.step_id ? stepIds.get(String(action.step_id)) ?? fail('REFERENCE_UNAVAILABLE') : null, config_json: remapScenarioJson(action.config_json, remapIds), condition_json: remapScenarioJson(action.condition_json, remapIds) };
+        delete copy.created_at; statements.push(insertRow('scenario_actions', copy));
+      }
+      for (const trigger of node.triggers) {
+        const copy: DbRow = { ...trigger, id: crypto.randomUUID(), scenario_id: targetId, tag_id: trigger.tag_id ? ids.get(String(trigger.tag_id)) ?? fail('REFERENCE_UNAVAILABLE') : null };
+        delete copy.created_at; statements.push(insertRow('scenario_triggers', copy));
+      }
+    }
+    const allKeys = graph.references.map(ref => formReferenceKey(ref.kind, ref.sourceId));
+    const result = resolved.get(rootKey)!;
+    return { ...result, dbCommit: emitOnce(allKeys, statements) };
+  };
+  return async (reference, context) => {
+    if (requireHqTemplateAuthority(authority).kind !== 'AUTHORIZED' || context.tenantId !== authority.tenantId) fail('FORBIDDEN');
+    if (reference.kind === 'tag') return resolveTag(reference, context);
+    if (reference.kind === 'scenario') return resolveScenarioGraph(reference, context);
+    return fail('UNSUPPORTED_REFERENCE');
   };
 }
 export const createFormTagReferenceResolver = createFormReferenceResolver;

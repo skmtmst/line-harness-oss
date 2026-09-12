@@ -1,6 +1,7 @@
 import { normalizeScopedTagName } from '@line-crm/db';
 import { layoutToFields, normalizeLayout, type FormLayout } from '@line-crm/shared';
 import { unsupportedHqTemplateAdapter, requireHqTemplateAuthority, type HqTemplateAdapter, type HqTemplateAdapterContext, type HqTemplateAdapterInput, type HqTemplateAuthority, type HqTemplateReference, type HqTemplateStatement, type HqTemplateSnapshotToken, type HqTemplateStoreAtomicCommitPlan, } from './contract.js';
+import { loadScenarioReferenceGraph, ScenarioGraphError } from './scenario-graph.js';
 /** Unbound callers remain closed until the common executor provides dependencies. */
 export const formHqTemplateAdapter = unsupportedHqTemplateAdapter('form');
 export class FormTemplateError extends Error {
@@ -19,7 +20,7 @@ export type FormTemplateDefinition = {
     };
 };
 export type FormReference = HqTemplateReference & {
-    kind: 'tag' | 'scenario';
+    kind: 'tag' | 'scenario' | 'template';
 };
 export type FormReferenceResolution = {
     targetId: string;
@@ -181,7 +182,8 @@ const SNAPSHOT_SQL = `SELECT json_object(
  'account',json((SELECT json_object('id',id,'tenant',tenant_id,'active',is_active,'archived',archived_at,'liff',liff_id) FROM line_accounts WHERE id=?)),
  'forms',json((SELECT json_group_array(json_object('id',id,'name',name,'description',description,'fields',fields,'layout',layout,'tag',on_submit_tag_id,'scenario',on_submit_scenario_id,'active',is_active,'status',status,'content_revision',content_revision,'owners',json((SELECT json_group_array(line_account_id) FROM (SELECT line_account_id FROM form_accounts WHERE form_id=f.id ORDER BY line_account_id))))) FROM (SELECT f.* FROM forms f WHERE EXISTS(SELECT 1 FROM form_accounts WHERE form_id=f.id AND line_account_id=?) ORDER BY f.id) f)),
  'tags',json((SELECT json_group_array(json_object('id',id,'name',name,'version',version,'updated_at',updated_at,'status',status)) FROM (SELECT * FROM tags WHERE line_account_id=? ORDER BY id))),
- 'scenarios',json((SELECT json_group_array(json_object('id',id,'name',name,'updated_at',updated_at,'active',is_active,'published',current_published_version_id)) FROM (SELECT * FROM scenarios WHERE line_account_id=? ORDER BY id)))
+ 'scenarios',json((SELECT json_group_array(json_object('id',id,'name',name,'updated_at',updated_at,'active',is_active,'published',current_published_version_id)) FROM (SELECT * FROM scenarios WHERE line_account_id=? ORDER BY id))),
+ 'templates',json((SELECT json_group_array(json_object('id',id,'name',name,'updated_at',updated_at,'draft_revision',draft_revision,'published_version',published_version)) FROM (SELECT * FROM templates WHERE line_account_id=? ORDER BY id)))
 ) AS snapshot`;
 type FormSnapshot = {
     account: {
@@ -210,9 +212,16 @@ type FormSnapshot = {
         name: string;
         updated_at: string | null;
     }[];
+    templates: {
+        id: string;
+        name: string;
+        updated_at: string | null;
+        draft_revision: number;
+        published_version: number;
+    }[];
 };
 export async function formTemplateSnapshot(db: D1Database, accountId: string): Promise<string> {
-    const result = await db.prepare(SNAPSHOT_SQL).bind(accountId, accountId, accountId, accountId).first<{
+    const result = await db.prepare(SNAPSHOT_SQL).bind(accountId, accountId, accountId, accountId, accountId).first<{
         snapshot: string;
     }>();
     if (!result)
@@ -247,23 +256,42 @@ export async function inspectFormTemplate(db: D1Database, authority: HqTemplateA
 export async function inspectFormTemplateReferences(db: D1Database, authority: HqTemplateAuthority, accountId: string, input: HqTemplateAdapterInput, inspectedSnapshot?: string) {
     const def = parseFormTemplateDefinition(input), snapshot = inspectedSnapshot ?? await formTemplateSnapshot(db, accountId), state = JSON.parse(snapshot) as FormSnapshot;
     authorize(authority, { tenantId: authority.tenantId, targetAccountId: accountId }, state);
+    const expanded = new Map(references(def).map(reference => [referenceKey(reference.kind, reference.sourceId), reference]));
+    const scenarioIds = [...expanded.values()].filter(reference => reference.kind === 'scenario').map(reference => reference.sourceId);
+    if (scenarioIds.length) {
+        try {
+            const graph = await loadScenarioReferenceGraph(db, authority.tenantId, scenarioIds);
+            for (const reference of graph.references)
+                expanded.set(referenceKey(reference.kind, reference.sourceId), reference);
+        } catch (error) {
+            if (error instanceof ScenarioGraphError)
+                throw new FormTemplateError(error.code);
+            throw error;
+        }
+    }
     const referenceItems = [];
-    for (const reference of references(def)) {
+    for (const reference of [...expanded.values()].sort((a, b) => referenceKey(a.kind, a.sourceId).localeCompare(referenceKey(b.kind, b.sourceId)))) {
         const source = reference.kind === 'tag'
             ? await db.prepare(`SELECT t.name FROM tags t JOIN line_accounts a ON a.id=t.line_account_id WHERE t.id=? AND t.status='active' AND a.tenant_id=? AND a.is_active=1 AND a.archived_at IS NULL`).bind(reference.sourceId, authority.tenantId).first<{ name: string }>()
-            : await db.prepare(`SELECT s.name FROM scenarios s JOIN line_accounts a ON a.id=s.line_account_id WHERE s.id=? AND a.tenant_id=? AND a.is_active=1 AND a.archived_at IS NULL`).bind(reference.sourceId, authority.tenantId).first<{ name: string }>();
+            : reference.kind === 'scenario'
+                ? await db.prepare(`SELECT s.name FROM scenarios s JOIN line_accounts a ON a.id=s.line_account_id WHERE s.id=? AND a.tenant_id=? AND a.is_active=1 AND a.archived_at IS NULL`).bind(reference.sourceId, authority.tenantId).first<{ name: string }>()
+                : await db.prepare(`SELECT t.name FROM templates t JOIN line_accounts a ON a.id=t.line_account_id WHERE t.id=? AND a.tenant_id=? AND a.is_active=1 AND a.archived_at IS NULL`).bind(reference.sourceId, authority.tenantId).first<{ name: string }>();
         if (!source)
             throw new FormTemplateError('REFERENCE_UNAVAILABLE');
         const matches = reference.kind === 'tag'
             ? state.tags.filter(row => normalizeScopedTagName(row.name) === normalizeScopedTagName(source.name))
-            : state.scenarios.filter(row => normalizeScopedTagName(row.name) === normalizeScopedTagName(source.name));
+            : reference.kind === 'scenario'
+                ? state.scenarios.filter(row => normalizeScopedTagName(row.name) === normalizeScopedTagName(source.name))
+                : state.templates.filter(row => normalizeScopedTagName(row.name) === normalizeScopedTagName(source.name));
         if (matches.length > 1 || (reference.kind === 'tag' && state.tags.filter(row => normalizeScopedTagName(row.name) === normalizeScopedTagName(source.name)).some(row => row.status !== 'active')))
             throw new FormTemplateError('SELECTION_REQUIRED');
         const match = matches[0] ?? null;
         const expectedRevision = match
             ? reference.kind === 'tag'
                 ? JSON.stringify([(match as FormSnapshot['tags'][number]).version, match.updated_at])
-                : JSON.stringify([match.updated_at])
+                : reference.kind === 'scenario'
+                    ? JSON.stringify([match.updated_at])
+                    : JSON.stringify([(match as FormSnapshot['templates'][number]).draft_revision, (match as FormSnapshot['templates'][number]).published_version, match.updated_at])
             : null;
         referenceItems.push({
             sourceId: referenceKey(reference.kind, reference.sourceId),
@@ -352,7 +380,7 @@ export function createFormHqTemplateAdapter(deps: FormTemplateDependencies): HqT
             const fields = layout ? layoutToFields(layout) : def!.form.fields;
             const tagId = def!.form.on_submit_tag_id ? map('tag', def!.form.on_submit_tag_id) : null;
             const scenarioId = def!.form.on_submit_scenario_id ? map('scenario', def!.form.on_submit_scenario_id) : null;
-            const statements: HqTemplateStatement[] = [guard(`(${SNAPSHOT_SQL})=?`, [context.targetAccountId, context.targetAccountId, context.targetAccountId, context.targetAccountId, snapshot!])];
+            const statements: HqTemplateStatement[] = [guard(`(${SNAPSHOT_SQL})=?`, [context.targetAccountId, context.targetAccountId, context.targetAccountId, context.targetAccountId, context.targetAccountId, snapshot!])];
             statements.push(guard(`EXISTS(SELECT 1 FROM line_accounts WHERE id=? AND tenant_id=? AND is_active=1 AND archived_at IS NULL)`, [context.targetAccountId, deps.authority.tenantId]));
             for (const value of resolved.values())
                 statements.push(...value.dbCommit ?? []);
