@@ -9,6 +9,7 @@ import { boundedText, HqTemplateError, inspectTags, parseTagDefinition, planTags
 import { parseMessageTemplateDefinition } from './template.js';
 import { inspectFormTemplate, parseFormTemplateDefinition } from './form.js';
 import { parseRichMenuTemplateDefinition } from './rich-menu.js';
+import { executeFormStore, HqRuntimeError } from './runtime.js';
 
 export { HqTemplateError } from './tag.js';
 export type DistributionSelection = { accountId: string; sourceId: string; mode: 'create' | 'overwrite' | 'alias' };
@@ -175,11 +176,10 @@ export async function distributeTemplate(db: D1Database, authority: HqTemplateAu
   if (!preflights.length || preflights.some(p => p.created_by !== authority.actorId)) throw new HqTemplateError('NOT_FOUND', 404);
   await requireTargetAccounts(db, authority, preflights.map(p => p.target_account_id));
   const { template } = await templateDetail(db, authority, templateId);
-  if (template.template_type !== 'tag') throw new HqTemplateError('UNSUPPORTED', 422);
+  if (template.template_type !== 'tag' && template.template_type !== 'form') throw new HqTemplateError('UNSUPPORTED', 422);
   if (preflights.some(p => p.template_version_id !== preflights[0].template_version_id)) throw new HqTemplateError('INVALID_PREFLIGHT', 409);
   const version = await db.prepare(`SELECT definition_json FROM hq_template_versions WHERE id=? AND tenant_id=? AND template_id=?`).bind(preflights[0].template_version_id, authority.tenantId, templateId).first<{ definition_json: string }>();
   if (!version) throw new HqTemplateError('NOT_FOUND', 404);
-  const definition = parseTagDefinition(JSON.parse(version.definition_json));
   const stored = (await db.prepare(`SELECT * FROM hq_template_preflight_resolutions WHERE tenant_id=? AND template_id=? AND idempotency_fingerprint=? ORDER BY target_account_id,source_id`).bind(authority.tenantId, templateId, runId).all<HqTemplatePreflightResolution>()).results;
   if (selections.length !== stored.length || new Set(selections.map(s => JSON.stringify([s.accountId, s.sourceId]))).size !== stored.length) throw new HqTemplateError('SELECTION_REQUIRED', 409);
   for (const selected of selections) {
@@ -189,6 +189,40 @@ export async function distributeTemplate(db: D1Database, authority: HqTemplateAu
     if (p.status === 'consumed') { if (row.resolution_mode !== selected.mode) throw new HqTemplateError('SELECTION_CHANGED', 409); }
     else if (row.target_id ? selected.mode === 'create' : selected.mode !== 'create') throw new HqTemplateError('SELECTION_REQUIRED', 409);
   }
+  if (template.template_type === 'form') {
+    for (const p of preflights) {
+      const selected = selections.filter(selection => selection.accountId === p.target_account_id).map(selection => {
+        const row = stored.find(resolution => resolution.preflight_id === p.id && resolution.source_id === selection.sourceId)!;
+        return { sourceId: selection.sourceId, itemKind: row.item_kind, mode: selection.mode };
+      });
+      const root = selected.find(resolution => resolution.sourceId === 'form' && resolution.itemKind === 'form');
+      if (!root) throw new HqTemplateError('SELECTION_REQUIRED', 409);
+      try {
+        await executeFormStore({ db, authority, templateId, runId, context: {
+          tenantId: authority.tenantId,
+          targetAccountId: p.target_account_id,
+          preflightId: p.id,
+          idempotencyFingerprint: runId,
+          snapshotToken: p.snapshot_token as HqTemplateSnapshotToken,
+          mode: root.mode,
+          resolutions: selected,
+        } });
+      } catch (error) {
+        if (!(error instanceof HqRuntimeError)) throw error;
+        if (error.code === 'FORBIDDEN') throw new HqTemplateError('FORBIDDEN', 403);
+        if (error.code === 'SELECTION_REQUIRED' || error.code === 'SELECTION_CHANGED') throw new HqTemplateError(error.code, 409);
+        if (error.code === 'INVALID_PREFLIGHT' || error.code === 'VERSION_CONFLICT') throw new HqTemplateError('VERSION_CONFLICT', 409);
+        throw new HqTemplateError('RESULT_UNAVAILABLE', 500);
+      }
+    }
+    const result = await distributionResult(db, authority, templateId, runId);
+    if (result.stores.some(store => store.status === 'pending' || store.status === 'staged')) return result;
+    const succeeded = result.stores.filter(store => store.status === 'succeeded').length;
+    const status = succeeded === preflights.length ? 'completed' : succeeded ? 'partial' : 'failed';
+    await db.prepare(`UPDATE hq_template_distribution_runs SET status=?,finished_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=? AND tenant_id=? AND status='running'`).bind(status, runId, authority.tenantId).run();
+    return distributionResult(db, authority, templateId, runId);
+  }
+  const definition = parseTagDefinition(JSON.parse(version.definition_json));
   await beginHqTemplateDistributionRun(db, { id: runId, tenantId: authority.tenantId, templateId, templateVersionId: preflights[0].template_version_id, idempotencyFingerprint: runId, createdBy: authority.actorId });
   // Claim the complete decision set before any store mutation. This also binds
   // concurrent requests and interrupted runs whose first store has not completed.

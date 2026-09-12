@@ -32,7 +32,7 @@ async function execute(id: string, p: any, selected = selections(p)) {
 beforeEach(() => {
   const fixture = createTestD1({ foreignKeys: true }); sql = fixture.raw; db = fixture.db;
   sql.exec("INSERT INTO tenants(id,name) VALUES ('tenant-a','統括A'),('tenant-b','統括B')");
-  for (const id of ['a1','a2','a3','b1']) sql.prepare(`INSERT INTO line_accounts(id,name,channel_id,channel_access_token,channel_secret,tenant_id) VALUES (?,?,?,'fixture','fixture',?)`).run(id, id, `fixture-${id}`, id === 'b1' ? 'tenant-b' : 'tenant-a');
+  for (const id of ['a1','a2','a3','b1']) sql.prepare(`INSERT INTO line_accounts(id,name,channel_id,channel_access_token,channel_secret,tenant_id,liff_id) VALUES (?,?,?,'fixture','fixture',?,?)`).run(id, id, `fixture-${id}`, id === 'b1' ? 'tenant-b' : 'tenant-a', `liff-${id}`);
   sql.exec("INSERT INTO staff_members(id,name,role,api_key,tenant_id) VALUES ('owner','管理者','owner','fixture-owner','tenant-a')");
   staff = { id: 'owner', name: '管理者', role: 'owner', readOnly: false, tenantId: 'tenant-a' };
   app = new Hono<Env>();
@@ -261,6 +261,31 @@ describe('HQ tag HTTP and real SQLite boundaries', () => {
     }
     expect(count('hq_templates')).toBe(4);
     expect(count('hq_template_versions')).toBe(8);
+  });
+  test('form templates distribute privately to three stores, remap tags, replay once and isolate conflicts', async () => {
+    sql.exec("INSERT INTO tags(id,name,line_account_id) VALUES ('source-tag','ご購入済み','a1')");
+    const formDefinition = { schemaVersion: 1, form: { name: 'ご利用アンケート', description: '確認用', fields: [{ name: 'answer', label: '回答', type: 'text', required: true }], layout: null, on_submit_tag_id: 'source-tag', on_submit_scenario_id: null, save_to_metadata: true } };
+    const created = await request('', 'POST', { type: 'form', name: '回答フォーム', definition: formDefinition, requestId: crypto.randomUUID() });
+    expect(created.status, JSON.stringify(created.body)).toBe(201);
+    const first = await preflight(created.body.data.template.id);
+    const distributed = await execute(created.body.data.template.id, first);
+    expect(distributed.status, JSON.stringify(distributed.body)).toBe(200);
+    expect(distributed.body.data.status).toBe('completed');
+    expect(count('forms')).toBe(3);
+    const mapped = sql.prepare(`SELECT fa.line_account_id AS account_id,f.is_active,t.line_account_id AS tag_account FROM forms f JOIN form_accounts fa ON fa.form_id=f.id JOIN tags t ON t.id=f.on_submit_tag_id ORDER BY fa.line_account_id`).all() as Array<{ account_id: string; is_active: number; tag_account: string }>;
+    expect(mapped).toEqual(['a1','a2','a3'].map(account_id => ({ account_id, is_active: 0, tag_account: account_id })));
+    expect((await execute(created.body.data.template.id, first)).body.data).toEqual(distributed.body.data);
+    expect(count('forms')).toBe(3);
+
+    const second = await preflight(created.body.data.template.id);
+    const a2 = sql.prepare(`SELECT f.id FROM forms f JOIN form_accounts fa ON fa.form_id=f.id WHERE fa.line_account_id='a2'`).get() as { id: string };
+    sql.prepare(`UPDATE forms SET content_revision=content_revision+1 WHERE id=?`).run(a2.id);
+    const retried = await execute(created.body.data.template.id, second);
+    expect(retried.status, JSON.stringify(retried.body)).toBe(200);
+    expect(retried.body.data.status).toBe('partial');
+    expect(retried.body.data.stores.map((store: any) => store.status)).toEqual(['succeeded','version_conflict','succeeded']);
+    expect(count('forms')).toBe(3);
+    expect(sql.pragma('foreign_key_check')).toEqual([]);
   });
   test('invalid definitions, cyclic or unrelated folders are rejected', async () => {
     expect((await request('','POST',{type:'form',name:'不正',definition,requestId:crypto.randomUUID()})).status).toBe(400);
