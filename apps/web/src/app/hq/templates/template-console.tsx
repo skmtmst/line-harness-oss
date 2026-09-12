@@ -10,6 +10,7 @@ import { usePageTitle } from '@/components/shell/page-chrome'
 import { hqTemplatesApi, TEMPLATE_TYPES, type TemplateType, type TemplateDetail, type TemplateInput, type TagDefinition, type HqTemplate, type HqAccount, type Preflight, type Resolution, type DistributionMode, type DistributionResult } from '@/lib/hq-templates-api'
 import { hqOpenHref, type HqOpenTargetKey } from '@/lib/hq-navigation'
 import styles from './template-console.module.css'
+import { clearCreationAttempt, loadCreationAttempt, persistCreationAttempt, sameCreationScope, type CreationAttempt, type CreationScope } from '@/lib/hq-template-create-attempt'
 
 const LABELS: Record<TemplateType, string> = { tag: 'タグ', template: 'テンプレート', rich_menu: 'リッチメニュー', form: '回答フォーム' }
 const MODES: Record<DistributionMode, string> = { create: '新規作成', overwrite: '上書き', alias: '別名で作成' }
@@ -64,7 +65,8 @@ export default function TemplateConsole({ type }: { type: TemplateType }) {
   const [remove, setRemove] = useState<HqTemplate | null>(null)
   const [now, setNow] = useState(Date.now())
   const lock = useRef(false)
-  const createAttempt = useRef<{ requestId: string; input: TemplateInput; distribute: boolean } | null>(null)
+  const createAttempt = useRef<CreationAttempt | null>(null)
+  const creationScope = useRef<CreationScope | null>(null)
   const [createUncertain, setCreateUncertain] = useState(false)
   const alive = useRef(true)
   const supported = type === 'tag'
@@ -78,8 +80,16 @@ export default function TemplateConsole({ type }: { type: TemplateType }) {
     if (!supported) return
     let current = true
     setBusy(true)
-    void Promise.all([hqTemplatesApi.list(type), hqTemplatesApi.accounts()]).then(([rows, stores]) => {
-      if (current) { setTemplates(rows); setAccounts(stores); setReady(true) }
+    void Promise.all([hqTemplatesApi.list(type), hqTemplatesApi.accounts(), hqTemplatesApi.context()]).then(([rows, stores, scope]) => {
+      if (current) {
+        const attempt = loadCreationAttempt(window.sessionStorage, scope, type)
+        creationScope.current = scope
+        if (attempt) {
+          createAttempt.current = attempt; setCreateUncertain(true); setDetail(null)
+          setName(attempt.input.name); setDescription(attempt.input.description ?? ''); setDefinition(attempt.input.definition); setStage('edit')
+        }
+        setTemplates(rows); setAccounts(stores); setReady(true)
+      }
     }).catch(e => { if (current) setError(errorText(e)) }).finally(() => { if (current) setBusy(false) })
     return () => { current = false }
   }, [type, supported])
@@ -118,7 +128,11 @@ export default function TemplateConsole({ type }: { type: TemplateType }) {
     if (detail) {
       saved = await hqTemplatesApi.update(detail.template.id, { ...input, expectedRevision: detail.template.revision })
     } else {
+      const scope = await hqTemplatesApi.context()
+      if (!creationScope.current || !sameCreationScope(creationScope.current, scope)) throw new Error('ログイン中の所属先または利用者が変わりました。元のアカウントで再ログインしてから再読み込みしてください。')
       const attempt = createAttempt.current ?? { requestId: crypto.randomUUID(), input, distribute }
+      // Persist before POST: reload/login navigation is an ambiguous outcome too.
+      persistCreationAttempt(window.sessionStorage, scope, type, attempt)
       createAttempt.current = attempt
       continueToAccounts = attempt.distribute
       try {
@@ -126,6 +140,7 @@ export default function TemplateConsole({ type }: { type: TemplateType }) {
         saved = await hqTemplatesApi.create(attempt.input, attempt.requestId)
       } catch (cause) {
         if (!createUncertain && cause && typeof cause === 'object' && 'requestNotApplied' in cause && cause.requestNotApplied === true) {
+          clearCreationAttempt(window.sessionStorage, scope, type, attempt.requestId)
           createAttempt.current = null
         } else {
           // A later rejection cannot disprove an earlier committed-but-unacknowledged attempt.
@@ -137,6 +152,7 @@ export default function TemplateConsole({ type }: { type: TemplateType }) {
         }
         throw cause
       }
+      clearCreationAttempt(window.sessionStorage, scope, type, attempt.requestId)
     }
     if (!alive.current) return
     loadDetailIntoForm(saved)
@@ -192,7 +208,7 @@ export default function TemplateConsole({ type }: { type: TemplateType }) {
     if (alive.current) setResult(loaded)
   })
   useEffect(() => {
-    if (!ready) return
+    if (!ready || createAttempt.current) return
     const params = new URLSearchParams(window.location.hash.slice(1))
     const id = params.get('template'), runId = params.get('run')
     if (!id || !runId) return

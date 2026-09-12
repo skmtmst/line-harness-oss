@@ -13,6 +13,15 @@ import { hqTemplatesApi, HqTemplatesApiError } from './hq-templates-api'
 const request = transport.request
 beforeEach(() => { request.mockReset(); request.mockResolvedValue({ success: true, data: { value: 'ok' } }) })
 describe('HQ template API transport', () => {
+  it('保存領域の所属先と利用者は認証済みAPIから取得する', async () => {
+    request.mockResolvedValue({ success: true, data: { id: 'owner', tenantId: 'tenant-a', ignored: 'not-retained' } })
+    expect(await hqTemplatesApi.context()).toEqual({ tenantId: 'tenant-a', actorId: 'owner' })
+    expect(request).toHaveBeenCalledWith('/api/staff/me')
+  })
+  it.each([{ id: 'owner' }, { tenantId: 'tenant-a' }, { id: 'owner', tenantId: null }])('tenantまたは本人のIDが無いAPI応答は拒否する: %j', data => {
+    request.mockResolvedValue({ success: true, data })
+    return expect(hqTemplatesApi.context()).rejects.toThrow('所属先を確認できません')
+  })
   it('認証とCSRFがある共通transportを利用し、成功envelopeを取り出す', async () => {
     expect(await hqTemplatesApi.list('tag')).toEqual({ value: 'ok' })
     expect(request).toHaveBeenCalledWith('/api/hq/templates?type=tag', { method: 'GET' })

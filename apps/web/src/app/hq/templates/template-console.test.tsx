@@ -1,10 +1,10 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import TemplateConsole, { resolvedItems } from './template-console'
 import type { Preflight } from '@/lib/hq-templates-api'
 
-const calls = vi.hoisted(() => Object.fromEntries(['list','accounts','get','create','update','remove','preflight','distribute','result'].map(key => [key, vi.fn()])))
+const calls = vi.hoisted(() => Object.fromEntries(['context','list','accounts','get','create','update','remove','preflight','distribute','result'].map(key => [key, vi.fn()])))
 vi.mock('@/lib/hq-templates-api', () => ({ TEMPLATE_TYPES: ['tag','template','rich_menu','form'], hqTemplatesApi: calls }))
 vi.mock('next/navigation', () => ({ usePathname: () => '/hq/templates', useRouter: () => ({ push: vi.fn() }) }))
 const template = { id: 't1', name: '来店済み', description: '説明', template_type: 'tag', revision: 3, updated_at: '2026-09-12T00:00:00Z' }
@@ -13,7 +13,8 @@ const accounts = [{ id: 'a', name: '銀座本店' }, { id: 'b', name: '横浜店
 const checked = (): Preflight => ({ preflightId: 'p1', expiresAt: new Date(Date.now() + 60_000).toISOString(), stores: accounts.map(a => ({ accountId: a.id, accountName: a.name, items: [{ sourceId: 'tag1', itemKind: 'tag', name: '来店済み', expectedRevision: 'v3', duplicate: true, allowedModes: a.id === 'a' ? ['overwrite','alias'] : ['alias'] }] })) })
 const completed = { runId: 'p1', status: 'partial', stores: [{ accountId: 'a', status: 'succeeded', counts: { created: 1, overwritten: 2, aliased: 1 } }, { accountId: 'b', status: 'version_conflict', reason: '配布先で編集がありました。もう一度確認してください', counts: { created: 0, overwritten: 0, aliased: 0 } }] }
 beforeEach(() => {
-  vi.resetAllMocks(); window.history.replaceState(null, '', '/hq/templates?type=tag')
+  vi.resetAllMocks(); window.sessionStorage.clear(); window.history.replaceState(null, '', '/hq/templates?type=tag')
+  calls.context.mockResolvedValue({ tenantId: 'tenant-a', actorId: 'owner' })
   calls.list.mockResolvedValue([template]); calls.accounts.mockResolvedValue(accounts); calls.get.mockResolvedValue(structuredClone(detail))
   calls.create.mockResolvedValue(structuredClone(detail)); calls.update.mockResolvedValue(structuredClone(detail))
   calls.preflight.mockImplementation(async () => checked()); calls.distribute.mockResolvedValue(completed); calls.result.mockResolvedValue(completed)
@@ -98,7 +99,7 @@ describe('HQひな形の配布フロー', () => {
     await list(); fireEvent.click(screen.getByRole('button', { name: '＋ひな形を作成' }))
     fireEvent.change(screen.getByLabelText('名前'), { target: { value: '一回だけ' } })
     const save = screen.getByRole('button', { name: '下書き保存' }); fireEvent.click(save); fireEvent.click(save)
-    expect(calls.create).toHaveBeenCalledOnce()
+    await waitFor(() => expect(calls.create).toHaveBeenCalledOnce())
     finish(structuredClone(detail)); await screen.findByText('ひな形を保存しました。')
   })
   it('選択なしと重複未選択を止め、一括設定は許可された項目だけに適用する', async () => {
@@ -172,5 +173,55 @@ describe('HQひな形の配布フロー', () => {
   it('空の確認や許可されない新規作成を実行対象にしない', () => {
     expect(resolvedItems({ ...checked(), stores: [] }, {})).toBeNull()
     const p = checked(); p.stores[0].items[0].duplicate = false; p.stores[0].items[0].allowedModes = ['alias']; expect(resolvedItems(p, {})).toBeNull()
+  })
+  it('通信不明の新規依頼は再読込と認証画面往復後も固定payloadと同じキーで回収する', async () => {
+    calls.create.mockRejectedValueOnce(new Error('network'))
+    await list(); fireEvent.click(screen.getByRole('button', { name: '＋ひな形を作成' }))
+    fireEvent.change(screen.getByLabelText('名前'), { target: { value: '再読込する依頼' } })
+    fireEvent.click(screen.getByRole('button', { name: '保存して配布先を選ぶ' }))
+    await screen.findByRole('button', { name: '前回の保存を再確認' })
+    const original = calls.create.mock.calls[0]
+    cleanup(); window.history.replaceState(null, '', '/login'); window.history.replaceState(null, '', '/hq/templates?type=tag')
+    render(<TemplateConsole type="tag" />)
+    await screen.findByRole('button', { name: '前回の保存を再確認' })
+    expect((screen.getByLabelText('名前') as HTMLInputElement).value).toBe('再読込する依頼')
+    expect((screen.getByLabelText('名前') as HTMLInputElement).disabled).toBe(true)
+    expect(calls.create).toHaveBeenCalledTimes(1)
+    calls.create.mockRejectedValueOnce(Object.assign(new Error('権限確認'), { requestNotApplied: true, status: 403 }))
+    fireEvent.click(screen.getByRole('button', { name: '前回の保存を再確認' })); await screen.findByText('権限確認')
+    expect(window.sessionStorage.length).toBe(1)
+    fireEvent.click(screen.getByRole('button', { name: '前回の保存を再確認' }))
+    await screen.findByRole('checkbox', { name: '銀座本店' })
+    expect(calls.create.mock.calls[1]).toEqual(original); expect(calls.create.mock.calls[2]).toEqual(original)
+    expect(window.sessionStorage.length).toBe(0)
+  })
+  it('POSTの応答待ちにページを離れても依頼が残り、別tenantや利用者では復元しない', async () => {
+    calls.create.mockReturnValue(new Promise(() => {}))
+    await list(); fireEvent.click(screen.getByRole('button', { name: '＋ひな形を作成' }))
+    fireEvent.change(screen.getByLabelText('名前'), { target: { value: '元の組織' } }); fireEvent.click(screen.getByRole('button', { name: '下書き保存' }))
+    await waitFor(() => expect(calls.create).toHaveBeenCalledOnce())
+    cleanup(); calls.context.mockResolvedValue({ tenantId: 'tenant-b', actorId: 'owner' })
+    render(<TemplateConsole type="tag" />); await screen.findByLabelText('来店済みの操作')
+    expect(screen.queryByRole('button', { name: '前回の保存を再確認' })).toBeNull()
+    cleanup(); calls.context.mockResolvedValue({ tenantId: 'tenant-a', actorId: 'another-owner' })
+    render(<TemplateConsole type="tag" />); await screen.findByLabelText('来店済みの操作')
+    expect(screen.queryByRole('button', { name: '前回の保存を再確認' })).toBeNull()
+    cleanup(); calls.context.mockResolvedValue({ tenantId: 'tenant-a', actorId: 'owner' })
+    render(<TemplateConsole type="tag" />); await screen.findByRole('button', { name: '前回の保存を再確認' })
+    expect(calls.create).toHaveBeenCalledOnce()
+  })
+  it('表示後に所属先が変われば新規POSTを停止する', async () => {
+    await list(); fireEvent.click(screen.getByRole('button', { name: '＋ひな形を作成' }))
+    fireEvent.change(screen.getByLabelText('名前'), { target: { value: '保存しない' } })
+    calls.context.mockResolvedValue({ tenantId: 'tenant-b', actorId: 'owner' })
+    fireEvent.click(screen.getByRole('button', { name: '下書き保存' })); await screen.findByRole('alert')
+    expect(calls.create).not.toHaveBeenCalled()
+  })
+  it('保存場所が使えなければ新規POSTを開始しない', async () => {
+    await list(); fireEvent.click(screen.getByRole('button', { name: '＋ひな形を作成' }))
+    fireEvent.change(screen.getByLabelText('名前'), { target: { value: '保存しない' } })
+    const write = vi.spyOn(window.sessionStorage, 'setItem').mockImplementation(() => { throw new Error('quota') })
+    fireEvent.click(screen.getByRole('button', { name: '下書き保存' })); await screen.findByRole('alert')
+    expect(calls.create).not.toHaveBeenCalled(); write.mockRestore()
   })
 })

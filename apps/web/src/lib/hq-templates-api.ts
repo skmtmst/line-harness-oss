@@ -78,6 +78,14 @@ async function request<T>(path: string, method = 'GET', body?: unknown, headers?
 }
 const idPath = (id: string) => `/${encodeURIComponent(id)}`
 export const hqTemplatesApi = {
+  context: async (): Promise<{ tenantId: string; actorId: string }> => {
+    const response = await fetchApi<{ success: boolean; data?: { id?: string; tenantId?: string } }>('/api/staff/me')
+    const { id, tenantId } = response.data ?? {}
+    if (!response.success || typeof id !== 'string' || typeof tenantId !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(id) || !/^[A-Za-z0-9_-]{1,128}$/.test(tenantId)) {
+      throw new HqTemplatesApiError('所属先を確認できません。ログイン状態を確認してから再読み込みしてください。')
+    }
+    return { tenantId, actorId: id }
+  },
   list: (type: TemplateType) => request<HqTemplate[]>(`?type=${type}`),
   accounts: () => request<HqAccount[]>('/accounts'),
   get: (id: string) => request<TemplateDetail>(idPath(id)),
