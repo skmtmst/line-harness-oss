@@ -610,7 +610,33 @@ export async function getAvailability(
         : base
           ? [{ start: base.start_time, end: base.end_time }]
           : [];
-      let workingList = mergeIntervals([...coreWorking, ...staffOpenHours]);
+      /*
+       * 店舗の営業時間（週次）で、通常の勤務を切り詰める（#748 / N-403）。
+       *
+       * これまで `booking_business_hours` は定員の計算にしか使われておらず、
+       * 枠の開閉には効いていなかった。営業 10:00-17:00・勤務 09:00-18:00 の
+       * 店で 09:00 の枠が出て、17:00-18:00 まではみ出していた。
+       *
+       * **その曜日の行が1件も無ければ、制限しない。**閉じる側へ倒すと、
+       * 営業時間を1件も持たない既存の店（いま営業時間を作る口が無い＝N-406）
+       * の枠が全部消える。行が入っている店だけを縛る。
+       *
+       * 同じ曜日に複数行あるときは区間として束ねる（10:00-13:00 と
+       * 14:00-18:00 なら昼休みは閉じる）。
+       *
+       * 臨時営業（例外日の `open`）はこのあと足す。**営業時間では切らない。**
+       * 日付を指定して「この日は開ける」と入れたものなので、週次の並びより
+       * そちらを採る。`closed` と `custom_hours` の扱いはこれまでどおり。
+       */
+      const dayHours = (businessHours.results ?? [])
+        .filter((hour) => hour.weekday === weekdayForDate(date));
+      const businessIntervals = mergeIntervals(
+        dayHours.map((hour) => ({ start: hour.start_time, end: hour.end_time })),
+      );
+      const coreWithinBusiness = businessIntervals.length > 0
+        ? intersectIntervals(coreWorking, businessIntervals)
+        : coreWorking;
+      let workingList = mergeIntervals([...coreWithinBusiness, ...staffOpenHours]);
       if (!storeClosed) {
         workingList = mergeIntervals([...workingList, ...storeOpenHours]);
       } else {
@@ -639,11 +665,20 @@ export async function getAvailability(
       const googleBusy = googleBusyByStaff.get(s.id);
       // 外の予定は定員に関係なく塞ぐ（sameMenu を付けない）。
       if (googleBusy) dayBookings.push(...googleBusyForDate(googleBusy, date, timeZone));
-      const dayHours = (businessHours.results ?? [])
-        .filter((hour) => hour.weekday === weekdayForDate(date));
+      /*
+       * 営業時間の定員は、**重なっている行**から取る（#748）。
+       *
+       * これまでは「勤務区間を完全に含む行」だけを見ていた。含む行が1件も
+       * 無いと内側の reduce が初期値をそのまま返し、`storeCapacity` が
+       * Infinity のまま——**店舗の定員が丸ごと効かなくなっていた。**
+       * 営業 10:00-17:00（定員1）・勤務 09:00-18:00 の店で、メニュー側の
+       * 同時受付数がそのまま通っていた。
+       *
+       * 重なりで見れば、その区間に掛かる制限のうちいちばん厳しいものを採る。
+       */
       const storeCapacity = workingList.reduce(
         (min, working) => dayHours
-          .filter((hour) => hour.start_time <= working.start && hour.end_time >= working.end)
+          .filter((hour) => hour.start_time < working.end && hour.end_time > working.start)
           .reduce((inner, hour) => Math.min(inner, Number(hour.capacity ?? 1)), min),
         Number.POSITIVE_INFINITY,
       );
