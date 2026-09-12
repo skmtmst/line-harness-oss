@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { Eye, FlaskConical, Gift, Plus, X } from 'lucide-react'
-import { api, type NenCampaignAfterAction, type NenCampaignSetting } from '@/lib/api'
+import { ApiError, api, type NenCampaignAfterAction, type NenCampaignSetting } from '@/lib/api'
+import { checkNenCampaignBodyLength, NEN_CAMPAIGN_BODY_MAX_LENGTH } from '@line-crm/shared'
 import { useAccount } from '@/contexts/account-context'
 import { Field, inputClass } from '@/components/shared/form-controls'
 import Button from '@/components/shared/button'
@@ -167,10 +168,17 @@ export default function CampaignEditor({ campaignKey }: { campaignKey: string })
     }
   }
 
+  const bodyCheck = checkNenCampaignBodyLength(merged.bodyText ?? '')
+  const bodyLimitLabel = NEN_CAMPAIGN_BODY_MAX_LENGTH.toLocaleString('ja-JP')
+
   const save = async () => {
     if (!setting || !selectedAccountId) return
     if (!merged.bodyText?.trim()) {
       setError('本文を入力してください')
+      return
+    }
+    if (!bodyCheck.fits) {
+      setError(`本文が長すぎます（現在${bodyCheck.length.toLocaleString('ja-JP')}字・上限${bodyLimitLabel}字）。短くしてから保存してください。入力内容はそのまま残っています。`)
       return
     }
     setSaving(true)
@@ -194,8 +202,9 @@ export default function CampaignEditor({ campaignKey }: { campaignKey: string })
       }
       setSetting(merged)
       setNotice('配信内容を保存しました')
-    } catch {
-      setError('保存できませんでした。通信状態を確認して、もう一度お試しください。')
+    } catch (error) {
+      const reason = error instanceof ApiError && error.message ? error.message : ''
+      setError(reason || '保存できませんでした。通信状態を確認して、もう一度お試しください。')
     } finally {
       setSaving(false)
     }
@@ -250,8 +259,15 @@ export default function CampaignEditor({ campaignKey }: { campaignKey: string })
               <div className="mb-3 flex items-center justify-between gap-3"><p className="text-ink-secondary text-xs font-bold">1つめ ／ リッチメッセージ</p><div className="flex gap-2"><Button>差し替える</Button><Button>消す</Button></div></div>
               <div className="bg-canvas rounded-card border-hairline border p-3">
                 <InsertToolbar targetRef={bodyRef} value={merged.bodyText} onChange={(bodyText) => setDraft((previous) => ({ ...previous, bodyText }))} />
-                <p className="text-ink-faint mt-2 text-right text-xs tabular-nums">{merged.bodyText.length.toLocaleString('ja-JP')} / 4,500</p>
-                <textarea ref={bodyRef} rows={5} maxLength={4500} value={merged.bodyText} onChange={(event) => setDraft((previous) => ({ ...previous, bodyText: event.target.value }))} aria-label="配信本文" className={`${inputClass} mt-2 resize-y leading-relaxed`} />
+                {bodyCheck.fits ? (
+                  <p className="text-ink-faint mt-2 text-right text-xs tabular-nums">あと{(NEN_CAMPAIGN_BODY_MAX_LENGTH - bodyCheck.length).toLocaleString('ja-JP')}字（上限{bodyLimitLabel}字。長すぎるとLINEで送れません）</p>
+                ) : (
+                  <p role="alert" className="text-danger mt-2 text-right text-xs font-bold tabular-nums">{bodyLimitLabel}字を超えています（現在{bodyCheck.length.toLocaleString('ja-JP')}字）。短くしてください。</p>
+                )}
+                {bodyCheck.fits && !bodyCheck.expandedFits && (
+                  <p className="text-ink-faint mt-1 text-right text-xs">差し込む名前が長いと、送るときに長すぎる場合があります。</p>
+                )}
+                <textarea ref={bodyRef} rows={5} value={merged.bodyText} onChange={(event) => setDraft((previous) => ({ ...previous, bodyText: event.target.value }))} aria-label="配信本文" className={`${inputClass} mt-2 resize-y leading-relaxed`} />
               </div>
             </div>
             <Button className="mt-3 h-11 w-full"><Plus aria-hidden size={16} />吹き出しを追加する（あと2つまで）</Button>
@@ -278,7 +294,7 @@ export default function CampaignEditor({ campaignKey }: { campaignKey: string })
         </aside>
       </div>
 
-      <StickyBar status={merged.isEnabled ? '動いています。保存すると、これから届く42通に新しい中身が使われます。' : '停止中です。保存しても新しい配信は始まりません。'} actions={<><Button href="/nen-campaigns">キャンセル</Button><Button onClick={() => setTestSearchOpen(true)}><FlaskConical aria-hidden size={16} />自分にテスト送信</Button><Button variant="primary" onClick={() => void save()} disabled={saving}>{saving ? '保存中…' : '配信内容を保存'}</Button></>} />
+      <StickyBar status={merged.isEnabled ? '動いています。保存すると、これから届く42通に新しい中身が使われます。' : '停止中です。保存しても新しい配信は始まりません。'} actions={<><Button href="/nen-campaigns">キャンセル</Button><Button onClick={() => setTestSearchOpen(true)}><FlaskConical aria-hidden size={16} />自分にテスト送信</Button><Button variant="primary" onClick={() => void save()} disabled={saving || !bodyCheck.fits}>{saving ? '保存中…' : '配信内容を保存'}</Button></>} />
     </div>
   )
 }

@@ -6,6 +6,7 @@ const page = readFileSync(new URL('../../app/line-notifications/page.tsx', impor
 const create = readFileSync(new URL('../../app/line-notifications/operator/new/page.tsx', import.meta.url), 'utf8')
 const db = readFileSync(new URL('../../../../../packages/db/src/notifications.ts', import.meta.url), 'utf8')
 const route = readFileSync(new URL('../../../../worker/src/routes/notifications.ts', import.meta.url), 'utf8')
+const dispatch = readFileSync(new URL('../../../../worker/src/services/operator-notification-dispatch.ts', import.meta.url), 'utf8')
 
 describe('V6 運用者へのお知らせ — 宛先・送信・実行記録の接続', () => {
   it('4タブの2番目に運用者向けを置き、顧客向けと混ぜない', () => {
@@ -41,15 +42,15 @@ describe('V6 運用者へのお知らせ — 宛先・送信・実行記録の�
   })
 
   it('新しいルールはDBで明示的に停止状態へ置く', () => {
-    expect(db).toContain('line_account_id, is_active, created_at')
-    expect(db).toContain('VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?)')
+    expect(db).toContain('line_account_id, is_active, version, created_at')
+    expect(db).toContain('VALUES (?, ?, ?, ?, ?, ?, 0, 1, ?, ?)')
   })
 
   it('公開は専用APIだけで宛先を再検証し、実行記録を重複させない', () => {
     expect(route).toContain("notifications.post('/api/notifications/operator-rules/:id/publish'")
     expect(route).toContain("code: 'recipient_required'")
-    expect(route).toContain('claimOperatorDelivery')
-    expect(route).toContain('idempotency_key')
+    expect(dispatch).toContain('claimOperatorDelivery')
+    expect(dispatch).toContain('idempotency_key')
   })
 
   it('本文側に大きな画面タイトルを重ねない', () => {

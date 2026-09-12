@@ -30,6 +30,7 @@ import {
   type LoginAuditRow,
   type LoginAuditAction,
   getFolders,
+  getFolderItemCounts,
   getFolderById,
   createFolder,
   updateFolder,
@@ -321,7 +322,7 @@ function validateConditionsForFormat(
   return parsed;
 }
 
-function serializeFolder(row: Folder, count?: number) {
+function serializeFolder(row: Folder, count?: number, itemCount?: number) {
   return {
     id: row.id,
     kind: row.kind,
@@ -333,6 +334,9 @@ function serializeFolder(row: Folder, count?: number) {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     ...(count === undefined ? {} : { count }),
+    // #631: 一覧画面が読む正式なフィールド。undefinedなら「数えていない」
+    // という意味で、レスポンスからキーごと落とす（0件と区別するため）。
+    ...(itemCount === undefined ? {} : { itemCount }),
   };
 }
 
@@ -1326,6 +1330,16 @@ friendAttributes.get('/api/login-audit', requireRole('owner', 'admin'), async (c
   }
 });
 
+async function folderBoundary(c: Context<Env>, folder: { account_id: string | null; kind: string }, requested?: string): Promise<Response | null> {
+  const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+  const owner = folder.account_id ?? null;
+  if (owner ? !scope.allowedAccountIds.includes(owner) || Boolean(requested && requested !== owner)
+    : folder.kind === 'tag' && !scope.canSeeUnassigned) {
+    return c.json({ success: false, error: 'Not found' }, 404);
+  }
+  return null;
+}
+
 // ── 汎用フォルダ ────────────────────────────────────────────
 
 friendAttributes.get('/api/folders', async (c) => {
@@ -1334,27 +1348,62 @@ friendAttributes.get('/api/folders', async (c) => {
     if (raw && !isFolderKind(raw)) {
       return c.json({ success: false, error: '知らないフォルダの種類です' }, 400);
     }
-    if (raw !== 'webinar') {
-      const items = await getFolders(c.env.DB, raw && isFolderKind(raw) ? raw : undefined);
-      return c.json({ success: true, data: items.map((row) => serializeFolder(row)) });
+    const kind = raw && isFolderKind(raw) ? raw : undefined;
+
+    if (kind === 'webinar') {
+      const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+      const requestedAccountId = c.req.query('account_id')?.trim();
+      if (!requestedAccountId) {
+        return c.json({ success: false, error: 'account_id_required' }, 400);
+      }
+      if (!scope.allowedAccountIds.includes(requestedAccountId)) {
+        return c.json({ success: false, error: 'Not found' }, 404);
+      }
+      const items = await getFolders(c.env.DB, 'webinar', requestedAccountId);
+      const counts = await getWebinarFolderCounts(c.env.DB, {
+        allowedAccountIds: scope.allowedAccountIds,
+        canSeeUnassigned: scope.canSeeUnassigned,
+        accountId: requestedAccountId,
+      });
+      return c.json({
+        success: true,
+        data: items.map((row) => serializeFolder(row, counts[row.id] ?? 0, counts[row.id] ?? 0)),
+      });
     }
+
     const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
     const requestedAccountId = c.req.query('account_id')?.trim();
-    if (!requestedAccountId) {
-      return c.json({ success: false, error: 'account_id_required' }, 400);
-    }
-    if (!scope.allowedAccountIds.includes(requestedAccountId)) {
+    if (requestedAccountId && !scope.allowedAccountIds.includes(requestedAccountId)) {
       return c.json({ success: false, error: 'Not found' }, 404);
     }
-    const items = await getFolders(c.env.DB, 'webinar', requestedAccountId);
-    const counts = await getWebinarFolderCounts(c.env.DB, {
-      allowedAccountIds: scope.allowedAccountIds,
+    const items = await getFolders(c.env.DB, kind, requestedAccountId, scope);
+
+    // kind を指定しない呼び出しは全種別をまとめて返す口で、往復回数も
+    // 数えるべき母集団も定まらないため件数を数えない。呼び出し元は
+    // すべて kind を指定している（2026-09-11時点で apps/web 側21箇所すべて、
+    // apps/web/src/lib/api.ts の folders.list 経由）。増えたら見直すこと。
+    if (!kind) {
+      return c.json({ success: true, data: items.map((row) => serializeFolder(row)) });
+    }
+
+    const itemCounts = await getFolderItemCounts(c.env.DB, kind, {
+      allowedAccountIds: requestedAccountId ? [requestedAccountId] : scope.allowedAccountIds,
       canSeeUnassigned: scope.canSeeUnassigned,
-      accountId: requestedAccountId,
     });
     return c.json({
       success: true,
-      data: items.map((row) => serializeFolder(row, counts[row.id] ?? 0)),
+      data: items.map((row) => {
+        // `itemCounts` が undefined の kind（#730、対応表に無い種別）は
+        // 「数えていない」。中身が0件のフォルダは GROUP BY の結果に
+        // 現れず `byFolderId[row.id]` も undefined になるため、
+        // ここで初めて `0` へ読み替える。「数えていない」と
+        // 「数えたら0件だった」を混同しない。
+        const itemCount = itemCounts === undefined ? undefined : (itemCounts.byFolderId[row.id] ?? 0);
+        return serializeFolder(row, undefined, itemCount);
+      }),
+      // 一覧の「未分類」タブと同じ母集団。itemCounts が無い kind（#730）は
+      // 未分類件数も数えていないので、キーごと省く。
+      ...(itemCounts === undefined ? {} : { unfiledCount: itemCounts.unfiled }),
     });
   } catch (err) {
     console.error('GET /api/folders error:', err);
@@ -1371,10 +1420,14 @@ friendAttributes.post('/api/folders', requireRole('owner', 'admin'), async (c) =
     const name = typeof body.name === 'string' ? body.name.trim() : '';
     if (!name) return c.json({ success: false, error: 'フォルダ名を入力してください' }, 400);
 
-    const accountId = body.kind === 'webinar'
+    const accountId = body.kind === 'webinar' || body.kind === 'tag'
       ? (typeof body.accountId === 'string' ? body.accountId.trim() : '')
       : '';
-    if (body.kind === 'webinar') {
+    if (body.kind === 'tag' && !accountId) {
+      const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+      if (!scope.canSeeUnassigned) return c.json({ success: false, error: 'account_id_required' }, 400);
+    }
+    if (body.kind === 'webinar' || accountId) {
       if (!accountId) return c.json({ success: false, error: 'account_id_required' }, 400);
       const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
       if (!scope.allowedAccountIds.includes(accountId)) {
@@ -1392,7 +1445,7 @@ friendAttributes.post('/api/folders', requireRole('owner', 'admin'), async (c) =
       if (parent.kind !== body.kind) {
         return c.json({ success: false, error: '別の種類のフォルダには入れられません' }, 422);
       }
-      if (body.kind === 'webinar' && parent.account_id !== accountId) {
+      if ((parent.account_id ?? null) !== (accountId || null)) {
         return c.json({ success: false, error: '親フォルダが見つかりません' }, 400);
       }
     }
@@ -1429,6 +1482,8 @@ friendAttributes.patch('/api/folders/:id', requireRole('owner', 'admin'), async 
     if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
 
     const body = await c.req.json<Record<string, unknown>>();
+    const access = await folderBoundary(c, existing, typeof body.accountId === 'string' ? body.accountId.trim() : c.req.query('account_id')?.trim());
+    if (access) return access;
     let webinarAccountId = '';
     if (existing.kind === 'webinar') {
       webinarAccountId = typeof body.accountId === 'string' ? body.accountId.trim() : '';
@@ -1454,7 +1509,7 @@ friendAttributes.patch('/api/folders/:id', requireRole('owner', 'admin'), async 
       if (parentId) {
         const parent = await getFolderById(c.env.DB, parentId);
         if (!parent || parent.kind !== existing.kind
-          || (existing.kind === 'webinar' && parent.account_id !== webinarAccountId)) {
+          || (parent.account_id ?? null) !== (existing.account_id ?? null)) {
           return c.json({ success: false, error: '親フォルダが見つかりません' }, 400);
         }
         if (parent.parent_id) {
@@ -1498,7 +1553,11 @@ friendAttributes.delete('/api/folders/:id', requireRole('owner', 'admin'), async
         return c.json({ success: false, error: 'Not found' }, 404);
       }
     }
-    await deleteFolder(c.env.DB, id);
+    const denied = await folderBoundary(c, existing, c.req.query('account_id')?.trim());
+    if (denied) return denied;
+    if (!(await deleteFolder(c.env.DB, id))) {
+      return c.json({ success: false, error: 'フォルダの店舗境界を確認してください' }, 409);
+    }
     return c.json({ success: true, data: null });
   } catch (err) {
     console.error('DELETE /api/folders/:id error:', err);

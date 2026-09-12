@@ -1,11 +1,21 @@
+import { CredentialEncryptionKeyError, decryptCredential, encryptCredential } from './credential-crypto.js';
 import { jstNow, toJstString } from './utils.js';
 // Webhook IN/OUT クエリヘルパー
+
+/**
+ * 受信・送信Webhookの secret の最低文字数。API の入力検査と旧平文の表示判定は
+ * この値だけを見る。apps/worker/src/routes/webhooks.ts はこれを読み替えて使う。
+ */
+export const WEBHOOK_SECRET_MIN_LENGTH = 32;
 
 export interface IncomingWebhookRow {
   id: string;
   name: string;
   source_type: string;
+  /** 旧平文。#650 以降の新規・更新では NULL になる。読み取りの後方互換だけに使う。 */
   secret: string | null;
+  /** AES-GCM 暗号文。#650 以降の正本。旧スキーマの行には無いことがある。 */
+  secret_encrypted?: string | null;
   is_active: number;
   line_account_id: string | null;
   version: number;
@@ -35,7 +45,10 @@ export interface OutgoingWebhookRow {
   name: string;
   url: string;
   event_types: string; // JSON配列
+  /** 旧平文。#650 以降の新規・更新では NULL になる。読み取りの後方互換だけに使う。 */
   secret: string | null;
+  /** AES-GCM 暗号文。#650 以降の正本。旧スキーマの行には無いことがある。 */
+  secret_encrypted?: string | null;
   is_active: number;
   /** 失敗したとき何回まで送り直すか。0 なら送り直さない */
   max_retries: number;
@@ -331,6 +344,373 @@ export async function getOutgoingWebhookDeliverySummaries(
   return result.results ?? [];
 }
 
+/**
+ * Webhook secret の暗号化の約束(#650)。
+ *
+ * 保存形式: secret_encrypted 列に `k<鍵ID>.v1.<iv>.<暗号文>` を入れる。
+ * 鍵ID は鍵素材の SHA-256 先頭12桁で、鍵そのものは含まない。
+ * secret 列の旧平文は後方互換の読み取りだけに使い、新規・更新では NULL にする。
+ * 平文で返すのは作成直後の1回だけ(API層)。GET・ログ・エラーには出さない。
+ * 送信・照合の直前だけ復号する。鍵不足・復号失敗は例外にして止める。
+ * 平文列の廃止は、暗号化の行き渡り確認後に別の票で行う。
+ *
+ * 鍵ローテーション手順(新旧併用):
+ * 1. 新鍵を現行にし、旧鍵を LINE_CREDENTIAL_PREVIOUS_KEYS に残す(両方で読める期間)。
+ * 2. backfillWebhookSecrets で全行を新鍵に寄せ直す(dry-run→batch→照合)。
+ * 3. getWebhookSecretKeyStats で旧鍵IDの参照が 0 件になったら旧鍵を捨てる。
+ */
+export type WebhookSecretColumns = {
+  id?: string;
+  secret: string | null;
+  secret_encrypted?: string | null;
+};
+
+/** 呼び出し側が渡す鍵。文字列1件は現行鍵だけの指定とみなす。 */
+export interface WebhookKeyInput {
+  current?: string | undefined;
+  previous?: string | string[] | undefined;
+}
+
+interface WebhookKeySet {
+  current: { id: string; material: string };
+  previous: { id: string; material: string }[];
+}
+
+const keyIdCache = new Map<string, string>();
+
+/** 鍵素材から鍵ID(SHA-256 先頭12桁)を作る。鍵素材そのものは含まない。 */
+export async function webhookKeyId(material: string): Promise<string> {
+  const normalized = material.trim();
+  const cached = keyIdCache.get(normalized);
+  if (cached) return cached;
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(normalized));
+  const id = Array.from(new Uint8Array(digest))
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('')
+    .slice(0, 12);
+  keyIdCache.set(normalized, id);
+  return id;
+}
+
+async function readWorkerEnvKey(name: string): Promise<string | undefined> {
+  try {
+    // Worker は bindings から読む。Node の単体テストには bindings がないため、
+    // その場合は呼び出し側が渡した鍵だけを使う(暗号化の書き込みは鍵必須)。
+    const runtime = await import('cloudflare:workers');
+    const bindings = runtime.env as unknown as Record<string, string | undefined>;
+    return bindings[name]?.trim() || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function normalizeKeyInput(keys?: WebhookKeyInput | string): WebhookKeyInput {
+  if (typeof keys === 'string') return { current: keys };
+  return keys ?? {};
+}
+
+async function readWebhookKeySet(keys?: WebhookKeyInput | string): Promise<WebhookKeySet | undefined> {
+  const input = normalizeKeyInput(keys);
+  const current = input.current?.trim() || await readWorkerEnvKey('LINE_CREDENTIAL_ENCRYPTION_KEY');
+  if (!current) return undefined;
+  const rawPrevious = input.previous ?? await readWorkerEnvKey('LINE_CREDENTIAL_PREVIOUS_KEYS');
+  const materials = (Array.isArray(rawPrevious) ? rawPrevious : String(rawPrevious ?? '').split(','))
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0 && entry !== current);
+  const previous: WebhookKeySet['previous'] = [];
+  for (const material of materials) {
+    previous.push({ id: await webhookKeyId(material), material });
+  }
+  return { current: { id: await webhookKeyId(current), material: current }, previous };
+}
+
+const STORED_SECRET_PATTERN = /^k([0-9a-f]{12})\.(v1\..+)$/;
+
+/** 保存値を鍵IDと暗号本体に分ける。旧平文・不明形式は null。 */
+function parseStoredSecret(stored: string): { keyId: string | null; payload: string } | null {
+  const versioned = STORED_SECRET_PATTERN.exec(stored);
+  if (versioned) return { keyId: versioned[1], payload: versioned[2] };
+  if (stored.startsWith('v1.')) return { keyId: null, payload: stored };
+  return null;
+}
+
+/** 平文を1件、現行鍵で暗号化する。現行鍵がなければ書かずに例外にする。 */
+export async function encryptWebhookSecret(
+  value: string,
+  keys?: WebhookKeyInput | string,
+): Promise<string> {
+  const set = await readWebhookKeySet(keys);
+  if (!set) throw new CredentialEncryptionKeyError();
+  const payload = await encryptCredential(value, set.current.material);
+  return `k${set.current.id}.${payload}`;
+}
+
+/**
+ * 送信・照合の直前だけ呼ぶ。暗号文があれば現行→旧鍵の順で復号し、
+ * 旧平文だけの行はそのまま返す。鍵不足・復号失敗は例外にする。
+ * 戻り値 null は未設定。例外とログに秘密値・鍵は含めない。
+ */
+export async function resolveWebhookSecret(
+  row: WebhookSecretColumns,
+  keys?: WebhookKeyInput | string,
+): Promise<string | null> {
+  if (row.secret_encrypted) {
+    const parsed = parseStoredSecret(row.secret_encrypted);
+    if (!parsed) {
+      console.error(JSON.stringify({
+        event: 'webhook_secret_unknown_format',
+        webhookId: row.id ?? null,
+      }));
+      throw new Error('Unable to decrypt webhook secret');
+    }
+    const set = await readWebhookKeySet(keys);
+    const candidates = set
+      ? (parsed.keyId
+        ? [set.current, ...set.previous].filter((key) => key.id === parsed.keyId)
+        : [set.current, ...set.previous])
+      : [];
+    if (candidates.length === 0) {
+      console.error(JSON.stringify({
+        event: 'webhook_secret_key_unavailable',
+        webhookId: row.id ?? null,
+        keyId: parsed.keyId,
+      }));
+      throw new Error('Unable to decrypt webhook secret');
+    }
+    for (const candidate of candidates) {
+      try {
+        return await decryptCredential(parsed.payload, candidate.material);
+      } catch {
+        // 鍵IDが付いた行は対応鍵だけ試す。付いていない旧形式だけ全鍵を試す。
+        if (parsed.keyId) break;
+      }
+    }
+    console.error(JSON.stringify({
+      event: 'webhook_secret_decrypt_failed',
+      webhookId: row.id ?? null,
+      keyId: parsed.keyId,
+    }));
+    throw new Error('Unable to decrypt webhook secret');
+  }
+  return row.secret;
+}
+
+/** 一覧・詳細の hasSecret 判定。秘密値そのものは返さない。 */
+export function hasWebhookSecret(row: WebhookSecretColumns): boolean {
+  if (row.secret_encrypted) return true;
+  return !!row.secret && row.secret.length >= WEBHOOK_SECRET_MIN_LENGTH;
+}
+
+export type WebhookSecretTable = 'incoming_webhooks' | 'outgoing_webhooks';
+
+export interface WebhookSecretBackfillOptions {
+  lineAccountId?: string;
+  tables?: WebhookSecretTable[];
+  batchSize?: number;
+  dryRun?: boolean;
+  keys?: WebhookKeyInput | string;
+}
+
+export interface WebhookSecretBackfillReport {
+  dryRun: boolean;
+  batchSize: number;
+  legacyTotal: number;
+  rekeyTotal: number;
+  processed: number;
+  migrated: number;
+  failed: Array<{
+    table: WebhookSecretTable;
+    id: string;
+    reason: 'unreadable' | 'encrypt_failed' | 'verify_failed' | 'write_failed';
+  }>;
+  remainingLegacy: number;
+  remainingRekey: number;
+  done: boolean;
+}
+
+async function countLegacyWebhookSecrets(
+  db: D1Database,
+  table: WebhookSecretTable,
+  lineAccountId?: string,
+): Promise<number> {
+  // 「平文が残っているか」だけを見る。暗号文が既に入っていても平文が残る行は
+  // 未完了として数える。両方ある行を移行済みと数えると、done が嘘になる。
+  const where = lineAccountId === undefined
+    ? `secret IS NOT NULL`
+    : `line_account_id = ? AND secret IS NOT NULL`;
+  const binds = lineAccountId === undefined ? [] : [lineAccountId];
+  const row = await db.prepare(
+    `SELECT COUNT(*) AS count FROM ${table} WHERE ${where}`,
+  ).bind(...binds).first<{ count: number }>();
+  return row?.count ?? 0;
+}
+
+async function countRekeyWebhookSecrets(
+  db: D1Database,
+  table: WebhookSecretTable,
+  currentKeyId: string,
+  lineAccountId?: string,
+): Promise<number> {
+  const where = lineAccountId === undefined
+    ? `secret_encrypted IS NOT NULL AND secret_encrypted NOT LIKE ?`
+    : `line_account_id = ? AND secret_encrypted IS NOT NULL AND secret_encrypted NOT LIKE ?`;
+  const binds = lineAccountId === undefined ? [`k${currentKeyId}.%`] : [lineAccountId, `k${currentKeyId}.%`];
+  const row = await db.prepare(
+    `SELECT COUNT(*) AS count FROM ${table} WHERE ${where}`,
+  ).bind(...binds).first<{ count: number }>();
+  return row?.count ?? 0;
+}
+
+/**
+ * 既存の平文・旧鍵暗号文を現行鍵へ寄せる(dry-run→batch→照合→再開)。
+ *
+ * - dryRun=true は件数だけ数えて書かない(移行前の見積もり用)。
+ * - 1行ごとに「読む→現行鍵で暗号化→復号で照合→1文で平文NULL化」し、
+ *   どこかで失敗した行は平文を残したまま failed に積んで次へ進む。
+ * - べき等なので中断したら同じ条件で呼び直せば残りが進む(失敗再開)。
+ * - 現行鍵がなければ何も書かず例外にする。
+ */
+export async function backfillWebhookSecrets(
+  db: D1Database,
+  options: WebhookSecretBackfillOptions = {},
+): Promise<WebhookSecretBackfillReport> {
+  const tables = options.tables ?? ['incoming_webhooks', 'outgoing_webhooks'];
+  const batchSize = Math.min(500, Math.max(1, Math.floor(options.batchSize ?? 50)));
+  const dryRun = options.dryRun ?? true;
+  const set = await readWebhookKeySet(options.keys);
+  if (!set) throw new CredentialEncryptionKeyError();
+  const likeCurrent = `k${set.current.id}.%`;
+
+  const report: WebhookSecretBackfillReport = {
+    dryRun,
+    batchSize,
+    legacyTotal: 0,
+    rekeyTotal: 0,
+    processed: 0,
+    migrated: 0,
+    failed: [],
+    remainingLegacy: 0,
+    remainingRekey: 0,
+    done: false,
+  };
+  for (const table of tables) {
+    report.legacyTotal += await countLegacyWebhookSecrets(db, table, options.lineAccountId);
+    report.rekeyTotal += await countRekeyWebhookSecrets(db, table, set.current.id, options.lineAccountId);
+  }
+  if (dryRun) {
+    report.remainingLegacy = report.legacyTotal;
+    report.remainingRekey = report.rekeyTotal;
+    report.done = report.legacyTotal === 0 && report.rekeyTotal === 0;
+    return report;
+  }
+
+  for (const table of tables) {
+    // 平文が残っている行と、旧鍵のままの行を拾う。暗号文を入れた後に平文だけ
+    // 消し損ねた行も `secret IS NOT NULL` で拾い直せる(数えるだけで終わらせない)。
+    const where = options.lineAccountId === undefined
+      ? `secret IS NOT NULL OR (secret_encrypted IS NOT NULL AND secret_encrypted NOT LIKE ?)`
+      : `line_account_id = ? AND (secret IS NOT NULL OR (secret_encrypted IS NOT NULL AND secret_encrypted NOT LIKE ?))`;
+    const binds = options.lineAccountId === undefined ? [likeCurrent] : [options.lineAccountId, likeCurrent];
+    const targets = await db.prepare(
+      `SELECT id, secret, secret_encrypted FROM ${table} WHERE ${where} ORDER BY id ASC LIMIT ?`,
+    ).bind(...binds, batchSize).all<{ id: string; secret: string | null; secret_encrypted: string | null }>();
+    for (const target of targets.results ?? []) {
+      report.processed += 1;
+      let plaintext: string | null;
+      try {
+        plaintext = await resolveWebhookSecret(
+          { id: target.id, secret: target.secret, secret_encrypted: target.secret_encrypted },
+          { current: set.current.material, previous: set.previous.map((key) => key.material) },
+        );
+      } catch {
+        report.failed.push({ table, id: target.id, reason: 'unreadable' });
+        continue;
+      }
+      if (!plaintext) {
+        report.failed.push({ table, id: target.id, reason: 'unreadable' });
+        continue;
+      }
+      let stored: string;
+      try {
+        stored = await encryptWebhookSecret(plaintext, { current: set.current.material });
+      } catch {
+        report.failed.push({ table, id: target.id, reason: 'encrypt_failed' });
+        continue;
+      }
+      const parsed = parseStoredSecret(stored);
+      let verified = false;
+      if (parsed) {
+        try {
+          verified = (await decryptCredential(parsed.payload, set.current.material)) === plaintext;
+        } catch {
+          verified = false;
+        }
+      }
+      if (!verified) {
+        report.failed.push({ table, id: target.id, reason: 'verify_failed' });
+        continue;
+      }
+      try {
+        const updateWhere = options.lineAccountId === undefined ? `id = ?` : `id = ? AND line_account_id = ?`;
+        const updateBinds = options.lineAccountId === undefined
+          ? [stored, jstNow(), target.id]
+          : [stored, jstNow(), target.id, options.lineAccountId];
+        await db.prepare(
+          `UPDATE ${table} SET secret_encrypted = ?, secret = NULL, updated_at = ? WHERE ${updateWhere}`,
+        ).bind(...updateBinds).run();
+        report.migrated += 1;
+      } catch {
+        report.failed.push({ table, id: target.id, reason: 'write_failed' });
+      }
+    }
+  }
+
+  for (const table of tables) {
+    report.remainingLegacy += await countLegacyWebhookSecrets(db, table, options.lineAccountId);
+    report.remainingRekey += await countRekeyWebhookSecrets(db, table, set.current.id, options.lineAccountId);
+  }
+  report.done = report.remainingLegacy === 0 && report.remainingRekey === 0;
+  return report;
+}
+
+export interface WebhookSecretKeyStats {
+  legacy: number;
+  encrypted: number;
+  unknownFormat: number;
+  byKeyId: Record<string, number>;
+}
+
+/**
+ * 鍵IDごとの暗号文の分布。旧鍵の参照が 0 件になったら旧鍵を捨てられる(廃止照合)。
+ * 未指定時は全アカウント、指定時はそのアカウントだけ数える。
+ */
+export async function getWebhookSecretKeyStats(
+  db: D1Database,
+  lineAccountId?: string,
+): Promise<WebhookSecretKeyStats> {
+  const stats: WebhookSecretKeyStats = { legacy: 0, encrypted: 0, unknownFormat: 0, byKeyId: {} };
+  const tables: WebhookSecretTable[] = ['incoming_webhooks', 'outgoing_webhooks'];
+  for (const table of tables) {
+    const where = lineAccountId === undefined ? '' : 'WHERE line_account_id = ?';
+    const binds = lineAccountId === undefined ? [] : [lineAccountId];
+    const rows = await db.prepare(
+      `SELECT secret, secret_encrypted FROM ${table} ${where}`,
+    ).bind(...binds).all<{ secret: string | null; secret_encrypted: string | null }>();
+    for (const row of rows.results ?? []) {
+      if (row.secret) stats.legacy += 1;
+      if (!row.secret_encrypted) continue;
+      const parsed = parseStoredSecret(row.secret_encrypted);
+      if (!parsed?.keyId) {
+        stats.unknownFormat += 1;
+        continue;
+      }
+      stats.encrypted += 1;
+      stats.byKeyId[parsed.keyId] = (stats.byKeyId[parsed.keyId] ?? 0) + 1;
+    }
+  }
+  return stats;
+}
+
 // --- 受信Webhook ---
 
 export async function getIncomingWebhooks(
@@ -427,12 +807,17 @@ export async function updateIncomingWebhookMaskedSample(
 export async function createIncomingWebhook(
   db: D1Database,
   input: { name: string; sourceType?: string; secret?: string; lineAccountId: string },
+  keys?: WebhookKeyInput | string,
 ): Promise<IncomingWebhookRow> {
   const id = crypto.randomUUID();
   const now = jstNow();
+  // secret があるときは暗号化して保存し、平文は残さない。鍵がなければ例外にする。
+  const encrypted = input.secret === undefined
+    ? null
+    : await encryptWebhookSecret(input.secret, keys);
   await db
-    .prepare(`INSERT INTO incoming_webhooks (id, name, source_type, secret, line_account_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)`)
-    .bind(id, input.name, input.sourceType ?? 'custom', input.secret ?? null, input.lineAccountId, now, now)
+    .prepare(`INSERT INTO incoming_webhooks (id, name, source_type, secret, secret_encrypted, line_account_id, created_at, updated_at) VALUES (?, ?, ?, NULL, ?, ?, ?, ?)`)
+    .bind(id, input.name, input.sourceType ?? 'custom', encrypted, input.lineAccountId, now, now)
     .run();
   return (await getIncomingWebhookById(db, id, input.lineAccountId))!;
 }
@@ -442,12 +827,18 @@ export async function updateIncomingWebhook(
   id: string,
   lineAccountId: string,
   updates: Partial<{ name: string; sourceType: string; secret: string; isActive: boolean }>,
+  keys?: WebhookKeyInput | string,
 ): Promise<void> {
   const sets: string[] = [];
   const values: unknown[] = [];
   if (updates.name !== undefined) { sets.push('name = ?'); values.push(updates.name); }
   if (updates.sourceType !== undefined) { sets.push('source_type = ?'); values.push(updates.sourceType); }
-  if (updates.secret !== undefined) { sets.push('secret = ?'); values.push(updates.secret); }
+  if (updates.secret !== undefined) {
+    // 入れ直しは暗号化して保存し、旧平文を消す。鍵がなければ例外にする。
+    sets.push('secret_encrypted = ?');
+    values.push(await encryptWebhookSecret(updates.secret, keys));
+    sets.push('secret = NULL');
+  }
   if (updates.isActive !== undefined) { sets.push('is_active = ?'); values.push(updates.isActive ? 1 : 0); }
   if (sets.length === 0) return;
   sets.push('updated_at = ?');
@@ -493,12 +884,17 @@ export async function getOutgoingWebhookById(
 export async function createOutgoingWebhook(
   db: D1Database,
   input: { name: string; url: string; eventTypes: string[]; secret?: string; maxRetries?: number; lineAccountId: string },
+  keys?: WebhookKeyInput | string,
 ): Promise<OutgoingWebhookRow> {
   const id = crypto.randomUUID();
   const now = jstNow();
+  // secret があるときは暗号化して保存し、平文は残さない。鍵がなければ例外にする。
+  const encrypted = input.secret === undefined
+    ? null
+    : await encryptWebhookSecret(input.secret, keys);
   await db
-    .prepare(`INSERT INTO outgoing_webhooks (id, name, url, event_types, secret, max_retries, line_account_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-    .bind(id, input.name, input.url, JSON.stringify(input.eventTypes), input.secret ?? null, input.maxRetries ?? 0, input.lineAccountId, now, now)
+    .prepare(`INSERT INTO outgoing_webhooks (id, name, url, event_types, secret, secret_encrypted, max_retries, line_account_id, created_at, updated_at) VALUES (?, ?, ?, ?, NULL, ?, ?, ?, ?, ?)`)
+    .bind(id, input.name, input.url, JSON.stringify(input.eventTypes), encrypted, input.maxRetries ?? 0, input.lineAccountId, now, now)
     .run();
   return (await getOutgoingWebhookById(db, id, input.lineAccountId))!;
 }
@@ -515,13 +911,19 @@ export async function updateOutgoingWebhook(
     isActive: boolean;
     maxRetries: number;
   }>,
+  keys?: WebhookKeyInput | string,
 ): Promise<void> {
   const sets: string[] = [];
   const values: unknown[] = [];
   if (updates.name !== undefined) { sets.push('name = ?'); values.push(updates.name); }
   if (updates.url !== undefined) { sets.push('url = ?'); values.push(updates.url); }
   if (updates.eventTypes !== undefined) { sets.push('event_types = ?'); values.push(JSON.stringify(updates.eventTypes)); }
-  if (updates.secret !== undefined) { sets.push('secret = ?'); values.push(updates.secret); }
+  if (updates.secret !== undefined) {
+    // 入れ直しは暗号化して保存し、旧平文を消す。鍵がなければ例外にする。
+    sets.push('secret_encrypted = ?');
+    values.push(await encryptWebhookSecret(updates.secret, keys));
+    sets.push('secret = NULL');
+  }
   if (updates.isActive !== undefined) { sets.push('is_active = ?'); values.push(updates.isActive ? 1 : 0); }
   if (updates.maxRetries !== undefined) { sets.push('max_retries = ?'); values.push(updates.maxRetries); }
   if (sets.length === 0) return;

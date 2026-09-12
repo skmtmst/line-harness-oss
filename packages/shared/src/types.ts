@@ -274,6 +274,15 @@ export interface Folder {
   color: string | null;
   createdAt: string;
   updatedAt: string;
+  /**
+   * 選択中アカウントの可視範囲で数えた、このフォルダに属する件数（#631）。
+   *
+   * `kind` が件数の数え方（対応表・アカウント境界）を確立できていない種別
+   * （#730）や `kind` を指定しない呼び出しでは `undefined`。**`undefined`
+   * は「0件」ではなく「数えていない」を意味する。**画面はキャストで
+   * フォールバック計算をせず、そのまま「—」等を出すこと。
+   */
+  itemCount?: number;
 }
 
 /** 対応マーク */
@@ -676,6 +685,8 @@ export interface SavedSearchUsage {
 export interface TagGroup {
   /** 主キー (UUIDv4) */
   id: string;
+  /** 所有するLINE公式アカウント。移行前の共通分類だけ null。 */
+  accountId: string | null;
   /** 分類名 */
   name: string;
   /** 一覧での並び順。小さいほど上 */
@@ -1684,6 +1695,8 @@ export interface AutomationLog {
 // -----------------------------------------------------------------------------
 export interface StaffMember {
   id: string;
+  /** 認証済み本人APIが返すテナント識別子。古いAPI応答との互換のため任意。 */
+  tenantId?: string;
   name: string;
   email: string | null;
   role: 'owner' | 'admin' | 'staff' | 'viewer';
@@ -1915,7 +1928,7 @@ export const FRIEND_ADD_ROUTING_DEFAULT: FriendAddRouting = {
 /** V6の友だち追加履歴。Pencil共通デザインはこの契約だけを見て描画する。 */
 export type FriendAddEventKind = "first_time" | "returning";
 export type FriendAddEventAttributionStatus = "captured" | "unavailable";
-export type FriendAddEventRoutingStatus = "pending" | "completed" | "failed" | "suppressed";
+export type FriendAddEventRoutingStatus = "pending" | "completed" | "failed" | "suppressed" | "partial_failed";
 
 export interface FriendAddEventItem {
   id: string;

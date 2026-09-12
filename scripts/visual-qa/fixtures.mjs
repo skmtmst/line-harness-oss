@@ -5050,6 +5050,28 @@ export const BOOKING_AVAILABILITY_RULES = [
   { id: 'bar-6', weekday: 0, start_time: '10:00', end_time: '17:00' },
 ]
 
+/*
+  担当者の休憩(N-405 #655)。本番の GET breaks と同じ器で返す。
+  枠への差し引きは #1471 合流まで効かないので、画面は保存のみを約束する。
+*/
+export const BOOKING_BREAKS = {
+  breaks: [
+    { id: 'bb-1', weekday: 1, start_time: '12:00', end_time: '13:00', time_zone: 'Asia/Tokyo' },
+    { id: 'bb-2', weekday: 5, start_time: '12:00', end_time: '13:00', time_zone: 'Asia/Tokyo' },
+  ],
+  version: 'mock-breaks-v1',
+}
+
+export const BOOKING_BREAK_DATES = {
+  breaks: [
+    {
+      id: 'bbd-1', work_date: '2026-09-23', start_time: '12:00', end_time: '13:00',
+      time_zone: 'Asia/Tokyo', start_utc_offset: '+09:00', end_utc_offset: '+09:00',
+    },
+  ],
+  version: 'mock-break-dates-v1',
+}
+
 export const BOOKING_STAFF_SHIFTS = [
   { id: 'bss-1', work_date: '2026-09-23', start_time: '10:00', end_time: '17:00' },
   { id: 'bss-2', work_date: '2026-12-29', start_time: '10:00', end_time: '15:00' },

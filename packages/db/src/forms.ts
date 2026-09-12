@@ -1,4 +1,4 @@
-import { boundedListLimit, jstNow } from './utils.js';
+import { boundedListLimit, jstNow, MAX_LIST_LIMIT } from './utils.js';
 // =============================================================================
 // Forms — Survey / questionnaire system (L社 回答フォーム equivalent)
 // =============================================================================
@@ -22,6 +22,8 @@ export interface Form {
   status: 'active' | 'archived';
   archived_at: string | null;
   revision: number;
+  /** 編集の版(#723 / migration 379)。updateForm だけが増やす。 */
+  content_revision: number;
   submit_count: number;
   og_title: string | null;
   og_description: string | null;
@@ -232,6 +234,8 @@ export type FormDeleteImpact = {
   referenceCount: number;
   answerUrl: string | null;
   revision: number;
+  /** 編集の版(#723)。受付停止など updateForm を通る操作がこれを送る。 */
+  contentRevision: number;
   checkedAt: string;
   canDelete: boolean;
   canArchive: boolean;
@@ -239,7 +243,7 @@ export type FormDeleteImpact = {
   blockers: Array<'published' | 'has_submissions' | 'has_opens' | 'in_use' | 'already_archived'>;
 };
 
-type FormImpactRow = Pick<Form, 'id' | 'name' | 'is_active' | 'status' | 'revision'>;
+type FormImpactRow = Pick<Form, 'id' | 'name' | 'is_active' | 'status' | 'revision' | 'content_revision'>;
 type FormImpactReferenceRow = {
   kind: FormDeleteReference['kind'];
   name: string | null;
@@ -258,7 +262,7 @@ export async function getFormDeleteImpact(
 ): Promise<FormDeleteImpact | null> {
   const results = await db.batch([
     db.prepare(
-      `SELECT f.id, f.name, f.is_active, f.status, f.revision
+      `SELECT f.id, f.name, f.is_active, f.status, f.revision, f.content_revision
          FROM forms f
          JOIN form_accounts fa ON fa.form_id = f.id
         WHERE f.id = ? AND fa.line_account_id = ?`,
@@ -328,6 +332,7 @@ export async function getFormDeleteImpact(
       ? `https://liff.line.me/${liffId}/?page=form&id=${encodeURIComponent(row.id)}`
       : null,
     revision: row.revision,
+    contentRevision: row.content_revision,
     checkedAt,
     canDelete,
     canArchive,
@@ -462,17 +467,45 @@ export interface UpdateFormInput {
   ogImageUrl?: string | null;
 }
 
+/**
+ * 編集保存の結果。**競合と「見つからない」を分ける。**
+ *
+ * 呼び出し口が 409 と 404 を撃ち分けられないと、運用者に「ほかの人が先に
+ * 保存した」のか「フォームが消えた」のかが届かない。
+ */
+export type UpdateFormResult =
+  | { kind: 'updated'; form: Form }
+  | { kind: 'not_found' }
+  | { kind: 'conflict'; form: Form };
+
+/**
+ * フォームの編集保存(#723)。
+ *
+ * **確認した編集の版(`expectedContentRevision`)と一致するときだけ書く。**
+ * 一致しなければ1行も更新せず `conflict` を返す。以前はここが
+ * `WHERE id = ?` だけで、2人が同時に編集すると後から保存した人の内容で
+ * 黙って上書きされ、先の人の変更は何の断りもなく消えていた。
+ *
+ * 守るのは `content_revision` で、`revision` ではない。`revision` は
+ * migration 259 のトリガが来訪や回答で増やす「削除影響の確認版」なので、
+ * 編集の楽観ロックに使うと誰も編集していないのに 409 になる(migration 379)。
+ *
+ * 送られなかった項目は**いま DB にある値**で埋める。版を条件に入れたので、
+ * 読んだあと書くまでのあいだに誰かが書いていれば1行も更新されない。
+ * つまりこの読み直し＋書き戻しは、版の確認とセットで初めて安全になる。
+ */
 export async function updateForm(
   db: D1Database,
   id: string,
   input: UpdateFormInput,
-): Promise<Form | null> {
+  expectedContentRevision: number,
+): Promise<UpdateFormResult> {
   const existing = await getFormById(db, id);
-  if (!existing) return null;
+  if (!existing) return { kind: 'not_found' };
 
   const now = jstNow();
 
-  await db
+  const result = await db
     .prepare(
       `UPDATE forms
        SET name = ?,
@@ -492,8 +525,9 @@ export async function updateForm(
            og_description = ?,
            og_image_url = ?,
            updated_at = ?,
-           revision = revision + 1
-       WHERE id = ?`,
+           revision = revision + 1,
+           content_revision = content_revision + 1
+       WHERE id = ? AND content_revision = ?`,
     )
     .bind(
       input.name ?? existing.name,
@@ -528,17 +562,38 @@ export async function updateForm(
       'ogImageUrl' in input ? (input.ogImageUrl ?? null) : existing.og_image_url,
       now,
       id,
+      expectedContentRevision,
     )
     .run();
 
-  return getFormById(db, id);
+  if ((result.meta?.changes ?? 0) !== 1) {
+    const latest = await getFormById(db, id);
+    // 版が合わなかったのか、そのあいだに消えたのかを分ける。
+    return latest ? { kind: 'conflict', form: latest } : { kind: 'not_found' };
+  }
+
+  const updated = await getFormById(db, id);
+  return updated ? { kind: 'updated', form: updated } : { kind: 'not_found' };
 }
 
 // ── Submissions ───────────────────────────────────────────────────────────────
 
+/**
+ * ページ分けなしの回答一覧（互換用）。
+ *
+ * **切る数は呼び出し側が渡す。**#722 の前はここが 200 の直書きで、呼び出し側の
+ * 口は「500件まで」と名乗っていた。**数が2か所にあって食い違っていたので、
+ * 利用先は 201件目から黙って取り落としていた。**名乗る側が渡せば、名乗りと
+ * 実際は同じ数になる。
+ *
+ * `boundedListLimit` は残す。**渡し忘れ・渡しすぎのときの天井**で、
+ * この現場の一覧ヘルパは全部これで `MAX_LIST_LIMIT` に抑えてある
+ * （DB ヘルパを直接呼んでも一覧が無制限にならないようにするため）。
+ */
 export async function getFormSubmissions(
   db: D1Database,
   formId: string,
+  limit?: number,
 ): Promise<FormSubmission[]> {
   const result = await db
     .prepare(
@@ -546,7 +601,7 @@ export async function getFormSubmissions(
        LEFT JOIN friends f ON f.id = fs.friend_id
        WHERE fs.form_id = ? ORDER BY fs.created_at DESC LIMIT ?`,
     )
-    .bind(formId, 200)
+    .bind(formId, boundedListLimit(limit, MAX_LIST_LIMIT))
     .all<FormSubmission & { friend_name: string | null }>();
   return result.results;
 }
@@ -621,11 +676,17 @@ export interface CreateFormSubmissionInput {
   data: string; // JSON string
 }
 
-export async function createFormSubmission(
+/**
+ * 回答行の INSERT だけを行う。件数更新は別工程にする。
+ *
+ * 冪等化した送信では、INSERT 後に件数更新が失敗しても同じキーで再開
+ * できるよう、工程ごとに記録する。id を渡すとその値で保存する。
+ */
+export async function insertFormSubmissionRecord(
   db: D1Database,
-  input: CreateFormSubmissionInput,
+  input: CreateFormSubmissionInput & { id?: string },
 ): Promise<FormSubmission> {
-  const id = crypto.randomUUID();
+  const id = input.id ?? crypto.randomUUID();
   const now = jstNow();
 
   await db
@@ -637,16 +698,49 @@ export async function createFormSubmission(
     .bind(id, input.formId, input.friendId ?? null, input.data, now)
     .run();
 
-  // Increment submit_count
-  await db
-    .prepare(`UPDATE forms SET submit_count = submit_count + 1, updated_at = ? WHERE id = ?`)
-    .bind(now, input.formId)
-    .run();
-
   return (await db
     .prepare(`SELECT * FROM form_submissions WHERE id = ?`)
     .bind(id)
     .first<FormSubmission>())!;
+}
+
+/** 回答の受付数を 1 増やす。キーなし送信の従来の組み立て用。 */
+export async function incrementFormSubmitCount(
+  db: D1Database,
+  formId: string,
+): Promise<void> {
+  await db
+    .prepare(`UPDATE forms SET submit_count = submit_count + 1, updated_at = ? WHERE id = ?`)
+    .bind(jstNow(), formId)
+    .run();
+}
+
+/**
+ * 受付数を回答行の実数に合わせる。何度実行しても同じ値になるので、
+ * 冪等化した送信の再開時に重ねて実行しても数は狂わない。
+ */
+export async function resyncFormSubmitCount(
+  db: D1Database,
+  formId: string,
+): Promise<void> {
+  await db
+    .prepare(
+      `UPDATE forms
+          SET submit_count = (SELECT COUNT(*) FROM form_submissions WHERE form_id = ?),
+              updated_at = ?
+        WHERE id = ?`,
+    )
+    .bind(formId, jstNow(), formId)
+    .run();
+}
+
+export async function createFormSubmission(
+  db: D1Database,
+  input: CreateFormSubmissionInput,
+): Promise<FormSubmission> {
+  const record = await insertFormSubmissionRecord(db, input);
+  await incrementFormSubmitCount(db, input.formId);
+  return record;
 }
 
 export interface FormDestinationWriteResult {
@@ -825,6 +919,442 @@ export async function countFormSubmissionsByFriend(
     .bind(formId, friendId)
     .first<{ n: number }>();
   return row?.n ?? 0;
+}
+
+/**
+ * 冪等キーの再送照合用に、回答を id で直接読む。
+ * キーは回答行の id そのものなので、同時送信の負けた側もここで勝ち行を読む。
+ */
+export async function getFormSubmissionById(
+  db: D1Database,
+  id: string,
+): Promise<FormSubmission | null> {
+  return db
+    .prepare(`SELECT * FROM form_submissions WHERE id = ?`)
+    .bind(id)
+    .first<FormSubmission>();
+}
+
+// ── 送信の冪等予約 ─────────────────────────────────────────────────────────
+// Webhook・LINE通知などの外部副作用より前に予約行を確保し、同時送信の
+// 片方だけが処理を進める。scope は(テナント・LINEアカウント・フォーム・
+// 友だち・キー)。途中失敗は failed に残し、同じキーで再開する。
+
+export type FormSubmitClaimStatus = 'in_progress' | 'failed' | 'completed';
+
+export interface FormSubmitClaim {
+  tenant_id: string;
+  line_account_id: string;
+  form_id: string;
+  friend_id: string;
+  idempotency_key: string;
+  request_hash: string;
+  status: FormSubmitClaimStatus;
+  /** 終わった工程の名前の JSON 配列 */
+  steps: string;
+  /** Webhook の結果の JSON。未実行は NULL */
+  webhook: string | null;
+  /** 確保済みの回答行の id。回答の保存前は NULL */
+  submission_id: string | null;
+  /** 処理中の所有者(試行ごとの UUID)。横取りの判定に使う */
+  owner: string;
+  /**
+   * 楽観ロックの版。横取りのたびに +1 し、読み取った版と一致するとき
+   * だけ所有者の書き換え・工程の記録を受け付ける(CAS)。
+   */
+  version: number;
+  /**
+   * 借りの世代番号。横取りのたびに +1 し、古い世代の試行が残した
+   * 副作用を重ねない柵にする。
+   */
+  lease_generation: number;
+  /** layout の効果ごとの集計({効果id: {attempted, succeeded, failed}})の JSON */
+  effect_stats: string;
+  created_at: string;
+  updated_at: string;
+  expires_at: string;
+}
+
+export interface FormSubmitClaimScope {
+  tenantId: string;
+  lineAccountId: string;
+  formId: string;
+  friendId: string;
+  key: string;
+}
+
+function claimBindings(scope: FormSubmitClaimScope): string[] {
+  return [scope.tenantId, scope.lineAccountId, scope.formId, scope.friendId, scope.key];
+}
+
+const CLAIM_SCOPE_WHERE =
+  `tenant_id = ? AND line_account_id = ? AND form_id = ? AND friend_id = ? AND idempotency_key = ?`;
+
+/** 予約行を読む。なければ NULL。 */
+export async function getFormSubmitClaim(
+  db: D1Database,
+  scope: FormSubmitClaimScope,
+): Promise<FormSubmitClaim | null> {
+  return db
+    .prepare(`SELECT * FROM form_submit_claims WHERE ${CLAIM_SCOPE_WHERE}`)
+    .bind(...claimBindings(scope))
+    .first<FormSubmitClaim>();
+}
+
+export interface CreateFormSubmitClaimInput extends FormSubmitClaimScope {
+  requestHash: string;
+  /**
+   * 確保する回答行の id。予約時に採番して予約行へ書き込み、回答の保存と
+   * 再開時の読み返しを同じ id で行う(二重保存を防ぐ)。
+   */
+  submissionId: string;
+  owner: string;
+  expiresAt: string;
+}
+
+/**
+ * 予約行を原子的に確保する。同時送信の片方だけが true で返る。
+ *
+ * すでに同じ scope・キーの行があるときは作らず、残っている行を返す。
+ * (主キーが同時実行を 1 行にまとめる)
+ */
+export async function createFormSubmitClaim(
+  db: D1Database,
+  input: CreateFormSubmitClaimInput,
+): Promise<{ claimed: boolean; claim: FormSubmitClaim }> {
+  const now = jstNow();
+  try {
+    await db
+      .prepare(
+        `INSERT INTO form_submit_claims
+           (tenant_id, line_account_id, form_id, friend_id, idempotency_key,
+            request_hash, status, steps, webhook, submission_id,
+            owner, version, lease_generation, effect_stats,
+            created_at, updated_at, expires_at)
+         VALUES (?, ?, ?, ?, ?, ?, 'in_progress', '[]', NULL, ?, ?, 1, 1, '{}', ?, ?, ?)`,
+      )
+      .bind(
+        input.tenantId,
+        input.lineAccountId,
+        input.formId,
+        input.friendId,
+        input.key,
+        input.requestHash,
+        input.submissionId,
+        input.owner,
+        now,
+        now,
+        input.expiresAt,
+      )
+      .run();
+  } catch {
+    const existing = await getFormSubmitClaim(db, input);
+    if (!existing) throw new Error('form_submit_claim_conflict_without_row');
+    return { claimed: false, claim: existing };
+  }
+  return {
+    claimed: true,
+    claim: (await getFormSubmitClaim(db, input))!,
+  };
+}
+
+/**
+ * 止まった予約の横取り。failed は即時、in_progress は古いものだけ所有者を
+ * 書き換える。読み取った所有者と版(CAS)が一致するときだけ書き換え、
+ * 版と借りの世代を +1 する。書き換えた試行だけ taken が true で返り、
+ * 世代番号 generation で再開する。古い版の試行の書き込みは、工程の記録
+ * 側の版ガードで捨てられる(横取りされた試行は副作用を重ねない)。
+ * (friend_scenarios の楽観ロックと同じ流儀)
+ */
+export async function takeoverFormSubmitClaim(
+  db: D1Database,
+  scope: FormSubmitClaimScope,
+  owner: string,
+  staleBefore: string,
+  observed: Pick<FormSubmitClaim, 'owner' | 'version'>,
+): Promise<{ taken: boolean; generation: number }> {
+  const result = await db
+    .prepare(
+      `UPDATE form_submit_claims
+          SET owner = ?, status = 'in_progress',
+              version = version + 1, lease_generation = lease_generation + 1,
+              updated_at = ?
+        WHERE ${CLAIM_SCOPE_WHERE}
+          AND owner = ? AND version = ?
+          AND (status = 'failed' OR (status = 'in_progress' AND updated_at < ?))`,
+    )
+    .bind(owner, jstNow(), ...claimBindings(scope), observed.owner, observed.version, staleBefore)
+    .run();
+  if ((result.meta.changes ?? 0) === 0) return { taken: false, generation: 0 };
+  const taken = await getFormSubmitClaim(db, scope);
+  return { taken: true, generation: taken?.lease_generation ?? 0 };
+}
+
+/** 工程の記録を読む。壊れていれば空として扱う。 */
+export function readFormSubmitClaimSteps(claim: Pick<FormSubmitClaim, 'steps'>): string[] {
+  try {
+    const parsed: unknown = JSON.parse(claim.steps || '[]');
+    return Array.isArray(parsed) ? parsed.map(String) : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * 終わった工程を 1 件足す。所有者か版が変わっていたら足さず false を返す。
+ * (横取りされた試行は副作用を重ねない。版の柵)
+ */
+export async function appendFormSubmitClaimStep(
+  db: D1Database,
+  scope: FormSubmitClaimScope,
+  owner: string,
+  step: string,
+  version: number,
+): Promise<boolean> {
+  const claim = await getFormSubmitClaim(db, scope);
+  if (!claim || claim.owner !== owner || claim.version !== version) return false;
+  const steps = readFormSubmitClaimSteps(claim);
+  if (!steps.includes(step)) steps.push(step);
+  const result = await db
+    .prepare(
+      `UPDATE form_submit_claims
+          SET steps = ?, updated_at = ?
+        WHERE ${CLAIM_SCOPE_WHERE} AND owner = ? AND version = ?`,
+    )
+    .bind(JSON.stringify(steps), jstNow(), ...claimBindings(scope), owner, version)
+    .run();
+  return (result.meta.changes ?? 0) > 0;
+}
+
+/** Webhook の結果を残し、工程にも記録する。版の柵つき。 */
+export async function saveFormSubmitClaimWebhook(
+  db: D1Database,
+  scope: FormSubmitClaimScope,
+  owner: string,
+  webhook: unknown,
+  version: number,
+): Promise<boolean> {
+  const result = await db
+    .prepare(
+      `UPDATE form_submit_claims
+          SET webhook = ?, updated_at = ?
+        WHERE ${CLAIM_SCOPE_WHERE} AND owner = ? AND version = ?`,
+    )
+    .bind(JSON.stringify(webhook), jstNow(), ...claimBindings(scope), owner, version)
+    .run();
+  if ((result.meta.changes ?? 0) === 0) return false;
+  return appendFormSubmitClaimStep(db, scope, owner, 'webhook', version);
+}
+
+/** 予約を完了にする。保存済みの回答を返すようになる。版の柵つき。 */
+export async function completeFormSubmitClaim(
+  db: D1Database,
+  scope: FormSubmitClaimScope,
+  owner: string,
+  version: number,
+): Promise<boolean> {
+  const result = await db
+    .prepare(
+      `UPDATE form_submit_claims
+          SET status = 'completed', updated_at = ?
+        WHERE ${CLAIM_SCOPE_WHERE} AND owner = ? AND version = ?`,
+    )
+    .bind(jstNow(), ...claimBindings(scope), owner, version)
+    .run();
+  return (result.meta.changes ?? 0) > 0;
+}
+
+/**
+ * 予約を失敗に残す。回答は消さず、同じキーでの再送が未完の工程を補完する。
+ * (所有者以外の試行が状態を変えないよう owner と版を見る)
+ */
+export async function failFormSubmitClaim(
+  db: D1Database,
+  scope: FormSubmitClaimScope,
+  owner: string,
+  version: number,
+): Promise<boolean> {
+  const result = await db
+    .prepare(
+      `UPDATE form_submit_claims
+          SET status = 'failed', updated_at = ?
+        WHERE ${CLAIM_SCOPE_WHERE} AND owner = ? AND version = ?`,
+    )
+    .bind(jstNow(), ...claimBindings(scope), owner, version)
+    .run();
+  return (result.meta.changes ?? 0) > 0;
+}
+
+/** layout の効果ごとの集計を読む。壊れていれば空として扱う。 */
+export function readFormSubmitClaimEffectStats(
+  claim: Pick<FormSubmitClaim, 'effect_stats'>,
+): Record<string, { attempted: number; succeeded: number; failed: number }> {
+  try {
+    const parsed: unknown = JSON.parse(claim.effect_stats || '{}');
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+    const out: Record<string, { attempted: number; succeeded: number; failed: number }> = {};
+    for (const [key, value] of Object.entries(parsed as Record<string, unknown>)) {
+      const entry = value as { attempted?: unknown; succeeded?: unknown; failed?: unknown };
+      out[String(key)] = {
+        attempted: Math.max(0, Math.floor(Number(entry?.attempted) || 0)),
+        succeeded: Math.max(0, Math.floor(Number(entry?.succeeded) || 0)),
+        failed: Math.max(0, Math.floor(Number(entry?.failed) || 0)),
+      };
+    }
+    return out;
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * layout の効果1件の集計を残す。同じ効果の実行は上書きし、再開時の合計が
+ * 重ならないようにする。所有者か版が違うときは残さず false を返す。
+ */
+export async function saveFormSubmitClaimEffectStats(
+  db: D1Database,
+  scope: FormSubmitClaimScope,
+  owner: string,
+  version: number,
+  effectId: string,
+  stats: { attempted: number; succeeded: number; failed: number },
+): Promise<boolean> {
+  const claim = await getFormSubmitClaim(db, scope);
+  if (!claim || claim.owner !== owner || claim.version !== version) return false;
+  const merged = readFormSubmitClaimEffectStats(claim);
+  merged[effectId] = {
+    attempted: Math.max(0, Math.floor(stats.attempted)),
+    succeeded: Math.max(0, Math.floor(stats.succeeded)),
+    failed: Math.max(0, Math.floor(stats.failed)),
+  };
+  const result = await db
+    .prepare(
+      `UPDATE form_submit_claims
+          SET effect_stats = ?, updated_at = ?
+        WHERE ${CLAIM_SCOPE_WHERE} AND owner = ? AND version = ?`,
+    )
+    .bind(JSON.stringify(merged), jstNow(), ...claimBindings(scope), owner, version)
+    .run();
+  return (result.meta.changes ?? 0) > 0;
+}
+
+// ── Webhook 配達の durable outbox ────────────────────────────────────────
+// 外部 Webhook は呼んでから結果を残すまでに落ちると再開時に呼び直しに
+// なる。呼ぶ前に安定した event_id で意図行を作り、配達の結果ごと残す。
+// 呼び直しも同じ event_id を送るので、受け側は重複を除ける。
+
+export type FormSubmitOutboxStatus = 'pending' | 'delivered' | 'failed';
+
+export interface FormSubmitOutboxEvent {
+  tenant_id: string;
+  line_account_id: string;
+  form_id: string;
+  friend_id: string;
+  idempotency_key: string;
+  kind: string;
+  event_id: string;
+  status: FormSubmitOutboxStatus;
+  payload: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** 配達の意図行を読む。なければ NULL。 */
+export async function getFormSubmitOutbox(
+  db: D1Database,
+  scope: FormSubmitClaimScope,
+  kind: string,
+): Promise<FormSubmitOutboxEvent | null> {
+  return db
+    .prepare(
+      `SELECT * FROM form_submit_outbox
+       WHERE tenant_id = ? AND line_account_id = ? AND form_id = ?
+         AND friend_id = ? AND idempotency_key = ? AND kind = ?`,
+    )
+    .bind(...claimBindings(scope), kind)
+    .first<FormSubmitOutboxEvent>();
+}
+
+/**
+ * 配達の意図行を確保する。安定した event_id で呼ぶ前に作り、すでにあれば
+ * 作り直さない(呼び直しも同じ event_id を使う)。
+ */
+export async function ensureFormSubmitOutboxEvent(
+  db: D1Database,
+  scope: FormSubmitClaimScope,
+  kind: string,
+  eventId: string,
+): Promise<FormSubmitOutboxEvent> {
+  const now = jstNow();
+  await db
+    .prepare(
+      `INSERT OR IGNORE INTO form_submit_outbox
+         (tenant_id, line_account_id, form_id, friend_id, idempotency_key,
+          kind, event_id, status, payload, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', NULL, ?, ?)`,
+    )
+    .bind(...claimBindings(scope), kind, eventId, now, now)
+    .run();
+  const row = await getFormSubmitOutbox(db, scope, kind);
+  if (!row) throw new Error('form_submit_outbox_missing_row');
+  return row;
+}
+
+/**
+ * 配達の結果を残す。pending のときだけ delivered にし、最初の結果を保つ。
+ * (呼び直しの重ね書きをしない)
+ */
+export async function markFormSubmitOutboxDelivered(
+  db: D1Database,
+  scope: FormSubmitClaimScope,
+  kind: string,
+  eventId: string,
+  payload: unknown,
+): Promise<boolean> {
+  const result = await db
+    .prepare(
+      `UPDATE form_submit_outbox
+          SET status = 'delivered', payload = ?, updated_at = ?
+        WHERE tenant_id = ? AND line_account_id = ? AND form_id = ?
+          AND friend_id = ? AND idempotency_key = ? AND kind = ?
+          AND event_id = ? AND status = 'pending'`,
+    )
+    .bind(JSON.stringify(payload), jstNow(), ...claimBindings(scope), kind, eventId)
+    .run();
+  return (result.meta.changes ?? 0) > 0;
+}
+
+/** 配達の結果を読む。壊れていれば NULL。 */
+export function readFormSubmitOutboxPayload(payload: string | null): { passed: boolean; data: unknown } | null {
+  if (!payload) return null;
+  try {
+    const parsed = JSON.parse(payload) as { passed?: unknown; data?: unknown };
+    if (!parsed || typeof parsed.passed !== 'boolean') return null;
+    return { passed: parsed.passed, data: parsed.data };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 同じ内容の未完の予約を探す。画面を開き直してキーが変わった再送でも、
+ * 未完の予約があれば新しい回答を作らず、元のキーでの再開へ誘導する
+ * (二重回答にしない)。期限切れ・完了済みは対象外。
+ */
+export async function findUnfinishedFormSubmitClaimByHash(
+  db: D1Database,
+  scope: Omit<FormSubmitClaimScope, 'key'>,
+  requestHash: string,
+): Promise<FormSubmitClaim | null> {
+  return db
+    .prepare(
+      `SELECT * FROM form_submit_claims
+       WHERE tenant_id = ? AND line_account_id = ? AND form_id = ?
+         AND friend_id = ? AND request_hash = ? AND status != 'completed'
+       ORDER BY updated_at DESC LIMIT 1`,
+    )
+    .bind(scope.tenantId, scope.lineAccountId, scope.formId, scope.friendId, requestHash)
+    .first<FormSubmitClaim>();
 }
 
 /** 前回の回答。オプションの「前回の回答を復元する」で使う。 */

@@ -65,30 +65,16 @@ beforeEach(() => {
 })
 
 describe('EC subscriptions and connector', () => {
-  it('returns real subscription facts and keeps unavailable aggregates null', async () => {
-    const subscription = JSON.stringify({ contracts: [{
-      contract_number: 'SUB-100', status: 'payment_failed', amount: 4280,
-      next_shipping_date: '2026-09-20', continued_count: 4,
-      items: [{ name: '鹿肉フード', quantity: 2 }],
-    }] })
-    const { app } = harness({ subscriptions: [{
-      friend_id: 'friend-a', owner_name: '高橋 直人', pet_name: 'もも',
-      subscription_json: subscription, synced_at: '2026-09-06T10:00:00+09:00',
-    }] })
-    const response = await app.request('/api/ec-commerce/subscriptions?lineAccountId=account-a')
-    expect(response.status).toBe(200)
-    const body = await response.json() as any
-    expect(body.data.items[0]).toMatchObject({
-      contractNumber: 'SUB-100', status: 'at_risk', amount: 4280,
-      items: '鹿肉フード × 2', riskReason: '定期便のお支払いを確認できませんでした',
-    })
-    expect(body.data.summary).toMatchObject({ total: 1, atRisk: 1, monthlyAmount: 4280 })
-    expect(body.data.summary.startedThisMonth).toBe(0)
-    expect(body.data.summary.cancelledThisMonth).toBe(0)
-    expect(body.data.summary.monthlyStats).toEqual([])
-    expect(body.data.risk.predictiveScoreAvailable).toBe(false)
-  })
-
+  /*
+   * 「定期便の中身と集計を返す」の表明は、#731 で
+   * `ec-commerce-subscriptions-pagination.test.ts` へ移した。
+   *
+   * ここの DB は `all()` が常に同じ行を返す作りで、契約を SQL で展開・集計する
+   * ようになった実装には答えられない。移した先は**本物の bootstrap.sql を流した
+   * SQLite に本物のルータを通す**ので、同じ表明(契約番号・状態・金額・商品名・
+   * 危険の理由・集計・monthlyStats・risk)をそのまま、しかも SQL ごと見張れる。
+   * 表明は1つも減らしていない(所有者・ペット名・継続回数を足した)。
+   */
   it('scopes subscription and connector reads to the selected account', async () => {
     mocks.canAccess.mockResolvedValue(false)
     const { app, calls } = harness()

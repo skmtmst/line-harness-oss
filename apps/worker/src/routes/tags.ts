@@ -9,9 +9,10 @@ import {
   updateTagMileageSettings,
   enqueueHistoricTagMileage,
   getTagGroups,
+  getFolderById,
+  deleteFolder,
   createTagGroup,
   updateTagGroup,
-  deleteTagGroup,
   assignTagToGroup,
   updateTag,
   reorderTags,
@@ -131,6 +132,28 @@ async function requireVisibleLineAccount(c: Context<Env>, id: string): Promise<R
   return null;
 }
 
+async function visibleTag(c: Context<Env>, id: string): Promise<DbTag | Response> {
+  const tag = await c.env.DB.prepare('SELECT * FROM tags WHERE id = ?').bind(id).first<DbTag>();
+  const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+  const requested = requestedLineAccountId(c);
+  if (!tag || (tag.line_account_id == null ? !scope.canSeeUnassigned
+    : !scope.allowedAccountIds.includes(tag.line_account_id) || Boolean(requested && tag.line_account_id !== requested))) {
+    return c.json({ success: false, error: 'Not found' }, 404);
+  }
+  return tag;
+}
+
+async function visibleTagFolder(c: Context<Env>, id: string, accountId?: string | null): Promise<Response | null> {
+  const folder = await getFolderById(c.env.DB, id);
+  const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+  if (!folder || folder.kind !== 'tag' || (folder.account_id == null ? !scope.canSeeUnassigned
+    : !scope.allowedAccountIds.includes(folder.account_id))
+    || (accountId !== undefined && (folder.account_id ?? null) !== accountId)) {
+    return c.json({ success: false, error: 'Not found' }, 404);
+  }
+  return null;
+}
+
 function tagDefinitionError(c: Context<Env>, error: unknown): Response | null {
   if (error instanceof TagDefinitionError) {
     const status = error.code === 'not_found' || error.code === 'folder_not_found' ? 404 : 409;
@@ -215,6 +238,7 @@ function tagDefinitionResponse(detail: Awaited<ReturnType<typeof getTagDefinitio
 function serializeTagGroup(row: DbTagGroup) {
   return {
     id: row.id,
+    accountId: row.account_id ?? null,
     name: row.name,
     sortOrder: Number(row.sort_order ?? 0),
     // 色はフォルダに付く。属するタグの印にこの色を出す。
@@ -377,7 +401,8 @@ async function loadTagImportPlan(
   db: D1Database,
   inputRows: TagCsvImportInputRow[],
 ): Promise<PlannedTagImportRow[]> {
-  const [existingTags, groups] = await Promise.all([getTags(db), getTagGroups(db)]);
+  const [allTags, groups] = await Promise.all([getTags(db), getTagGroups(db)]);
+  const existingTags = allTags.filter((tag) => tag.line_account_id == null);
   return planTagImport(inputRows, existingTags, groups);
 }
 
@@ -406,7 +431,13 @@ async function readImportRows(c: Context<Env>): Promise<
 // GET /api/tag-groups
 tags.get('/api/tag-groups', async (c) => {
   try {
-    const items = await getTagGroups(c.env.DB);
+    const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+    const requested = requestedLineAccountId(c);
+    if (requested && !scope.allowedAccountIds.includes(requested)) return c.json({ success: false, error: 'Not found' }, 404);
+    const items = await getTagGroups(c.env.DB, {
+      ...scope,
+      allowedAccountIds: requested ? [requested] : scope.allowedAccountIds,
+    });
     return c.json({ success: true, data: items.map(serializeTagGroup) });
   } catch (err) {
     console.error('GET /api/tag-groups error:', err);
@@ -438,7 +469,12 @@ tags.post('/api/tag-groups', requireRole('owner', 'admin'), async (c) => {
         400,
       );
     }
-    const group = await createTagGroup(c.env.DB, { name, sortOrder, color });
+    const accountId = requestedLineAccountId(c, body as Record<string, unknown>);
+    const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+    if (accountId ? !scope.allowedAccountIds.includes(accountId) : !scope.canSeeUnassigned) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
+    const group = await createTagGroup(c.env.DB, { name, sortOrder, color, ...(accountId ? { accountId } : {}) });
     return c.json({ success: true, data: serializeTagGroup(group) }, 201);
   } catch (err) {
     console.error('POST /api/tag-groups error:', err);
@@ -481,6 +517,8 @@ tags.patch('/api/tag-groups/:id', requireRole('owner', 'admin'), async (c) => {
       }
       patch.sortOrder = sortOrder;
     }
+    const denied = await visibleTagFolder(c, c.req.param('id'), requestedLineAccountId(c, body as Record<string, unknown>) ?? undefined);
+    if (denied) return denied;
     const group = await updateTagGroup(c.env.DB, c.req.param('id'), patch);
     if (!group) return c.json({ success: false, error: 'Not found' }, 404);
     return c.json({ success: true, data: serializeTagGroup(group) });
@@ -494,7 +532,9 @@ tags.patch('/api/tag-groups/:id', requireRole('owner', 'admin'), async (c) => {
 // 属していたタグは消えず「未分類」に戻る（tags.folder_id は ON DELETE SET NULL）。
 tags.delete('/api/tag-groups/:id', requireRole('owner', 'admin'), async (c) => {
   try {
-    await deleteTagGroup(c.env.DB, c.req.param('id'));
+    const denied = await visibleTagFolder(c, c.req.param('id'), requestedLineAccountId(c) ?? undefined);
+    if (denied) return denied;
+    if (!(await deleteFolder(c.env.DB, c.req.param('id')))) return c.json({ success: false, error: 'folder_scope_conflict' }, 409);
     return c.json({ success: true, data: null });
   } catch (err) {
     console.error('DELETE /api/tag-groups/:id error:', err);
@@ -508,6 +548,12 @@ tags.patch('/api/tags/:id/group', requireRole('owner', 'admin'), async (c) => {
     const body = await c.req.json<{ groupId?: unknown }>();
     const raw = body.groupId;
     const groupId = raw === null || raw === '' || raw === undefined ? null : String(raw);
+    const current = await visibleTag(c, c.req.param('id'));
+    if (current instanceof Response) return current;
+    if (groupId) {
+      const denied = await visibleTagFolder(c, groupId, current.line_account_id ?? null);
+      if (denied) return denied;
+    }
     const tag = await assignTagToGroup(c.env.DB, c.req.param('id'), groupId);
     if (!tag) return c.json({ success: false, error: 'Not found' }, 404);
     return c.json({ success: true, data: serializeTag(tag) });
@@ -537,7 +583,7 @@ tags.get('/api/tags', async (c) => {
       : await getTags(c.env.DB);
     const allowedIds = requestedAccountId ? [requestedAccountId] : scope.allowedAccountIds;
     const visibleItems = items.filter((item) => item.line_account_id == null
-      ? scope.canSeeUnassigned
+      ? !requestedAccountId && scope.canSeeUnassigned
       : allowedIds.includes(item.line_account_id));
     return c.json({ success: true, data: visibleItems.map(serializeTag) });
   } catch (err) {
@@ -549,6 +595,8 @@ tags.get('/api/tags', async (c) => {
 // POST /api/tags/import/preview - CSVから読み取った行を保存せずに検査する
 tags.post('/api/tags/import/preview', requireRole('owner', 'admin'), async (c) => {
   try {
+    const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+    if (!scope.canSeeUnassigned) return c.json({ success: false, error: 'lineAccountId is required' }, 400);
     const input = await readImportRows(c);
     if (!input.ok) {
       return c.json({ success: false, error: input.error }, input.status);
@@ -566,6 +614,8 @@ tags.post('/api/tags/import/preview', requireRole('owner', 'admin'), async (c) =
 // POST /api/tags/import - 検査をやり直し、登録可能な行だけを登録する
 tags.post('/api/tags/import', requireRole('owner', 'admin'), async (c) => {
   try {
+    const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+    if (!scope.canSeeUnassigned) return c.json({ success: false, error: 'lineAccountId is required' }, 400);
     const input = await readImportRows(c);
     if (!input.ok) {
       return c.json({ success: false, error: input.error }, input.status);
@@ -616,13 +666,16 @@ tags.get(
   requireRole('owner', 'admin'),
   async (c) => {
     try {
+      const current = await visibleTag(c, c.req.param('id'));
+      if (current instanceof Response) return current;
       const lineAccountId = requestedLineAccountId(c);
       if (lineAccountId) {
         const denied = await requireVisibleLineAccount(c, lineAccountId);
         if (denied) return denied;
       }
+      // 保管済み(archived)タグも削除影響は確認できる必要がある(#710)。
       const impact = lineAccountId
-        ? await getScopedTagDeleteImpact(c.env.DB, c.req.param('id'), lineAccountId)
+        ? await getScopedTagDeleteImpact(c.env.DB, c.req.param('id'), lineAccountId, { includeArchived: true })
         : await getTagDeleteImpact(c.env.DB, c.req.param('id'));
       if (!impact) return c.json({ success: false, error: 'Not found' }, 404);
       return c.json({ success: true, data: impact });
@@ -642,7 +695,8 @@ tags.get('/api/tags/:id/dependencies', requireRole('owner', 'admin'), async (c) 
     }
     const denied = await requireVisibleLineAccount(c, lineAccountId);
     if (denied) return denied;
-    const impact = await getScopedTagDeleteImpact(c.env.DB, c.req.param('id'), lineAccountId);
+    // 編集画面(archived タグでも開く。#710)がここを読むため、除外しない。
+    const impact = await getScopedTagDeleteImpact(c.env.DB, c.req.param('id'), lineAccountId, { includeArchived: true });
     if (!impact) return c.json({ success: false, error: 'Not found' }, 404);
     return c.json({
       success: true,
@@ -667,7 +721,8 @@ tags.get('/api/tags/:id', requireRole('owner', 'admin'), async (c) => {
     }
     const denied = await requireVisibleLineAccount(c, lineAccountId);
     if (denied) return denied;
-    const detail = await getTagDefinition(c.env.DB, c.req.param('id'), lineAccountId);
+    // 編集画面が保管済みタグでも開けるよう、除外しない(#710)。
+    const detail = await getTagDefinition(c.env.DB, c.req.param('id'), lineAccountId, { includeArchived: true });
     if (!detail) return c.json({ success: false, error: 'tag not found' }, 404);
     return c.json({
       success: true,
@@ -700,7 +755,11 @@ tags.patch('/api/tags/reorder', requireRole('owner', 'admin'), async (c) => {
     if (new Set(body.ids).size !== body.ids.length) {
       return c.json({ success: false, error: 'ids must not contain duplicates' }, 400);
     }
-    await reorderTags(c.env.DB, body.ids as string[]);
+    for (const id of body.ids as string[]) {
+      const current = await visibleTag(c, id);
+      if (current instanceof Response) return current;
+    }
+    await reorderTags(c.env.DB, body.ids as string[], await getVisibleLineAccountScope(c.env.DB, c.get('staff')));
     return c.json({ success: true, data: { updated: body.ids.length } });
   } catch (err) {
     console.error('PATCH /api/tags/reorder error:', err);
@@ -721,6 +780,10 @@ tags.patch('/api/tags/reorder', requireRole('owner', 'admin'), async (c) => {
 tags.patch('/api/tags/:id', requireRole('owner', 'admin'), async (c) => {
   try {
     const body = await c.req.json<Record<string, unknown>>();
+    // 保管済み(archived)タグの保護(#710)は、この分岐(expectedVersion 付き
+    // → updateTagDefinition)にしか効かない。expectedVersion 無しは下の
+    // else で updateTag（version も status も見ないレガシー経路）を通る。
+    // 塞げていない。別票 #715 で扱う。
     if (body.expectedVersion !== undefined) {
       const lineAccountId = requestedLineAccountId(c, body);
       if (!lineAccountId) {
@@ -806,13 +869,15 @@ tags.patch('/api/tags/:id', requireRole('owner', 'admin'), async (c) => {
       return c.json({ success: false, error: 'name or isStarred is required' }, 400);
     }
 
+    const current = await visibleTag(c, c.req.param('id'));
+    if (current instanceof Response) return current;
     const tag = await updateTag(c.env.DB, c.req.param('id'), patch);
     if (!tag) return c.json({ success: false, error: 'tag not found' }, 404);
     return c.json({ success: true, data: serializeTag(tag) });
   } catch (err) {
     const handled = tagDefinitionError(c, err);
     if (handled) return handled;
-    // tags.name は UNIQUE。重複は 500 ではなく 409 で返す。
+    // 未所属のname・店舗別のnormalized_name一意制約違反は409で返す。
     if (err instanceof Error && err.message.includes('UNIQUE constraint')) {
       return c.json({ success: false, error: 'tag name already exists' }, 409);
     }
@@ -853,6 +918,8 @@ tags.patch('/api/tags/:id/mileage', requireRole('owner', 'admin'), async (c) => 
       return c.json({ success: false, error: 'multiplierPriority must be an integer between 0 and 1000' }, 400);
     }
 
+    const current = await visibleTag(c, c.req.param('id'));
+    if (current instanceof Response) return current;
     const tag = await updateTagMileageSettings(c.env.DB, c.req.param('id'), {
       rewardMiles,
       referralRewardMiles,
@@ -942,6 +1009,12 @@ tags.post('/api/tags', requireRole('owner', 'admin'), async (c) => {
       return c.json({ success: false, error: 'tag color is not supported; set the folder color instead' }, 400);
     }
 
+    const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+    if (!scope.canSeeUnassigned) return c.json({ success: false, error: 'lineAccountId is required' }, 400);
+    if (body.groupId) {
+      const denied = await visibleTagFolder(c, String(body.groupId), null);
+      if (denied) return denied;
+    }
     const tag = await createTag(c.env.DB, {
       name,
       groupId:
@@ -954,7 +1027,7 @@ tags.post('/api/tags', requireRole('owner', 'admin'), async (c) => {
   } catch (err) {
     const handled = tagDefinitionError(c, err);
     if (handled) return handled;
-    // tags.name has a UNIQUE constraint — surface duplicates as 409, not 500
+    // Legacy name / scoped normalized-name uniqueness conflicts return 409.
     if (err instanceof Error && err.message.includes('UNIQUE constraint')) {
       return c.json({ success: false, error: 'tag name already exists' }, 409);
     }
@@ -975,6 +1048,8 @@ tags.post('/api/tags', requireRole('owner', 'admin'), async (c) => {
 tags.delete('/api/tags/:id', requireRole('owner', 'admin'), async (c) => {
   try {
     const id = c.req.param('id');
+    const current = await visibleTag(c, id);
+    if (current instanceof Response) return current;
     const impact = await getTagDeleteImpact(c.env.DB, id);
     if (!impact) {
       return c.json({ success: false, error: 'tag not found' }, 404);
@@ -1015,6 +1090,12 @@ tags.post('/api/tags/:id/archive', requireRole('owner', 'admin'), async (c) => {
     if (!idempotencyKey || idempotencyKey.length > 128) {
       return c.json({ success: false, error: 'Idempotency-Key is required' }, 400);
     }
+    /*
+     * この Idempotency-Key は、**受け取って検査しているが、保存も照合もしていない。**
+     * つまりこの口は冪等ではない。必須にしておきながら冪等でないのは、呼び出し側へ
+     * 「ここは冪等だ」と言っているのと同じで、無いものを有るように見せてしまう。
+     * #709 で扱う（別票）。
+     */
     const expectedVersion = Number(body.expectedVersion);
     const impactRevision = typeof body.impactRevision === 'string' ? body.impactRevision.trim() : '';
     if (!Number.isInteger(expectedVersion) || expectedVersion < 1 || !impactRevision) {
@@ -1032,7 +1113,19 @@ tags.post('/api/tags/:id/archive', requireRole('owner', 'admin'), async (c) => {
     return c.json({ success: true, data: result });
   } catch (err) {
     if (err instanceof TagArchiveError) {
-      return c.json({ success: false, code: err.code, error: err.message }, err.code === 'not_found' ? 404 : 409);
+      /*
+       * already_archived は「もう着いている」であって失敗ではない。画面は code で
+       * 分岐して、赤い失敗ではなく成功と同じ通知にする（#708 の裁定）。
+       * version_conflict / impact_changed と同じ 409 に混ぜると画面が「版が古い」と
+       * 誤解するので、code は分けたまま返す。
+       */
+      const error = err.code === 'already_archived'
+        ? 'このタグはすでに整理されています。'
+        : err.message;
+      return c.json(
+        { success: false, code: err.code, error },
+        err.code === 'not_found' ? 404 : 409,
+      );
     }
     console.error('POST /api/tags/:id/archive error:', err);
     return c.json({ success: false, error: 'タグをアーカイブできませんでした' }, 500);

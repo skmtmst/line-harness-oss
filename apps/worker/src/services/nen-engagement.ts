@@ -1,4 +1,5 @@
 import { accountFeatureOffExclusionSql, getFriendById, getLineAccountById, jstNow } from '@line-crm/db';
+import { NEN_CAMPAIGN_BODY_MAX_LENGTH } from '@line-crm/shared';
 import type { Message } from '@line-crm/line-sdk';
 import type { EcEvent } from '../routes/ec-integrations.js';
 import { logOutgoingMessage } from './event-bus.js';
@@ -152,6 +153,27 @@ function renderCampaignCopy(value: string, payload: Record<string, unknown>): st
     .replaceAll('{{coupon_expiry}}', String(coupon?.expires_at || '').slice(0, 10));
 }
 
+/**
+ * 送信直前の多重防御としての切り詰め。保存時の上限判定（#659）が効いて
+ * いれば、ここで実際に切ることは起きないはず。**発動したのなら、保存時の
+ * 検査をすり抜けたか、既存データが旧仕様のまま残っているなど、どこかに
+ * 不具合があるということ。** 黙って切ると、利用者が保存できた本文が
+ * 送信時に無言で短くなり、誰も気づけない。`nen_delivery_failed` と同じ
+ * 構造化ログの形で必ず記録する（`.catch` で握り潰さない）。
+ */
+function truncateForSend(value: string, maxLength: number, context: { campaignKey: string; field: string }): string {
+  if (value.length <= maxLength) return value;
+  console.error(JSON.stringify({
+    event: 'nen_body_truncated_at_send',
+    campaignKey: context.campaignKey,
+    field: context.field,
+    beforeLength: value.length,
+    afterLength: maxLength,
+    droppedLength: value.length - maxLength,
+  }));
+  return value.slice(0, maxLength);
+}
+
 function campaignSnapshot(campaign: CampaignRow): string {
   return JSON.stringify(campaign);
 }
@@ -196,16 +218,43 @@ export function readNenCampaignSnapshot(value: string | null, campaignKey: strin
   }
 }
 
+/*
+ * 1500: `c7069559b`（2026-08-13）で導入。根拠の記録は無い。動かす前提が
+ * 出てきたら、この数値そのものを見直すこと（#711 の司令塔裁定で確認済み）。
+ */
+const NEN_COLUMN_INTRO_MAX_LENGTH = 1500;
+
+/**
+ * 保存時の多重防御としての切り詰め。入口（EC-Cube Webhookのtitle ≤120字、
+ * 管理画面のtitle ≤120字・excerpt ≤500字）が効いていれば、固定文言を足しても
+ * ここで実際に切ることは起きないはず。**発動したのなら、入口の検査をすり
+ * 抜けたか、固定文言が伸びたなど、どこかに不具合があるということ。** 黙って
+ * 切ると、紹介文の結びが途中で消えたことに誰も気づけない。`truncateForSend`
+ * （#659）と同じ考え方で、切ったときだけ記録する。
+ */
+function truncateColumnIntro(value: string, maxLength: number, context: { title: string }): string {
+  if (value.length <= maxLength) return value;
+  console.error(JSON.stringify({
+    event: 'nen_column_intro_truncated',
+    title: context.title.slice(0, 120),
+    beforeLength: value.length,
+    afterLength: maxLength,
+    droppedLength: value.length - maxLength,
+  }));
+  return value.slice(0, maxLength);
+}
+
 export function buildDefaultColumnIntro(title: string, excerpt: string): string {
   const summary = excerpt.trim();
-  return [
+  const text = [
     'こんにちは、然-NEN-です🌿',
     '',
     `今回のNENコラムでは「${title.trim()}」についてご紹介します。`,
     summary,
     '',
     '愛犬・愛猫との毎日に役立つ内容です。ぜひご覧ください。',
-  ].filter((line, index, lines) => line || (index > 0 && lines[index - 1])).join('\n').slice(0, 1500);
+  ].filter((line, index, lines) => line || (index > 0 && lines[index - 1])).join('\n');
+  return truncateColumnIntro(text, NEN_COLUMN_INTRO_MAX_LENGTH, { title });
 }
 
 function flexMessage(campaign: CampaignRow, payload: Record<string, unknown>): Message {
@@ -217,7 +266,16 @@ function flexMessage(campaign: CampaignRow, payload: Record<string, unknown>): M
     || (event?.event_type === 'ec.order.shipped' ? event.shipping?.tracking_url : event?.order?.detail_url)
     || campaign.button_url || '');
   const title = renderCampaignCopy(String(article?.title || campaign.title), payload);
-  const body = renderCampaignCopy(String(article?.excerpt || campaign.body_text), payload);
+  // 保存時は差し込み前の本文だけを見ており（#659差し戻し1点目）、差し込み
+  // 値（ペットの名前など）でここまで膨らみうる。保存時の検査だけに頼らず、
+  // 実際にLINEへ送る直前でも同じ採用上限で切る（多重防御）。UTF-16 code
+  // unit単位で、保存時の数え方と揃っている。発動したら記録する
+  // （`truncateForSend` を参照）。
+  const body = truncateForSend(
+    renderCampaignCopy(String(article?.excerpt || campaign.body_text), payload),
+    NEN_CAMPAIGN_BODY_MAX_LENGTH,
+    { campaignKey: campaign.campaign_key, field: 'body' },
+  );
   const details: Array<{ type: 'text'; text: string; size: 'sm'; color: string; wrap: true }> = [];
   if (event?.order?.number) details.push({ type: 'text', text: `注文番号：${event.order.number}`, size: 'sm', color: '#64748B', wrap: true });
   const items = event ? orderSummary(event) : '';

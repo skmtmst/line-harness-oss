@@ -110,8 +110,11 @@ function form(index, overrides = {}) {
   }
 }
 
-async function openHarness(browser, { role = 'admin', formsByAccount = {}, fail = false, listDelayMs = {} } = {}) {
-  const state = { listCalls: [], folderWrites: 0 }
+async function openHarness(browser, {
+  role = 'admin', formsByAccount = {}, fail = false, listDelayMs = {},
+  detail = null, putResults = [],
+} = {}) {
+  const state = { listCalls: [], folderWrites: 0, formWrites: [], putBodies: [] }
   const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } })
   await context.addInitScript(() => {
     localStorage.setItem('lh_selected_account', 'account-a')
@@ -152,6 +155,38 @@ async function openHarness(browser, { role = 'admin', formsByAccount = {}, fail 
         data: { features: {}, sidebarOrder: null, sidebarItemOrder: null, parentChildMode: false, specializedFeatureKeys: [], version: 1 },
       })
     }
+    /*
+     * #723: 編集画面の版競合を見るための口。
+     *
+     * 詳細は `contentRevision` を返し、保存（PUT）は `putResults` の順に
+     * 結果を返す。409 は実物と同じ形（`error` / `message` / `data`）で返す。
+     */
+    if (detail && path === `/api/forms/${detail.id}/delete-impact`) {
+      return json({ success: true, data: {
+        form: { id: detail.id, name: detail.name, isActive: true, status: 'active' },
+        submissionCount: 3, openCount: 5, references: [], referenceCount: 0,
+        answerUrl: null, revision: 9, contentRevision: detail.contentRevision,
+        checkedAt: '2026-09-11T10:00:00.000+09:00',
+        canDelete: false, canArchive: true, recommendedAction: 'archive',
+        blockers: ['has_submissions'],
+      } })
+    }
+    if (detail && path === `/api/forms/${detail.id}`) {
+      if (request.method() === 'PUT') {
+        state.putBodies.push(JSON.parse(request.postData() ?? '{}'))
+        const next = putResults.shift() ?? 'ok'
+        if (next === 'conflict') {
+          return json({
+            success: false,
+            error: 'form_content_changed',
+            message: 'ほかの人が先に保存しました。最新の内容を読み込んでから、もう一度お試しください。',
+            data: { contentRevision: detail.contentRevision + 1, updatedAt: '2026-09-11T14:32:00.000+09:00' },
+          }, 409)
+        }
+        return json({ success: true, data: { ...detail, contentRevision: detail.contentRevision + 1 } })
+      }
+      return json({ success: true, data: detail })
+    }
     if (path === '/api/forms') {
       if (fail) return json({ success: false, error: 'failed' }, 500)
       const accountId = url.searchParams.get('account_id')
@@ -159,7 +194,20 @@ async function openHarness(browser, { role = 'admin', formsByAccount = {}, fail 
       const delay = listDelayMs[accountId ?? ''] ?? 0
       if (delay > 0) await new Promise((resolve) => setTimeout(resolve, delay))
       const items = formsByAccount[accountId] ?? []
-      return json({ success: true, data: { items, total: items.length, page: 1, limit: items.length } })
+      return json({ success: true, data: { items, total: items.length, page: 1, limit: Math.max(items.length, 1) } })
+    }
+    /*
+     * 編集画面は差し込み先の一覧も読む。`/api/scenarios` は
+     * `{ items, total, limit, sort }` の封筒で返る口なので、素の配列で返すと
+     * 画面側の読み替え（`data.items.map`）が落ちて読み込みごと失敗する。
+     */
+    if (path === '/api/scenarios') {
+      return json({ success: true, data: { items: [], total: 0, limit: 0, sort: [] } })
+    }
+    // #725: デザイン設定の保存が何を送るかを見るために足した。
+    if (/^\/api\/forms\/[^/]+$/.test(path) && request.method() === 'PUT') {
+      state.formWrites.push(JSON.parse(request.postData() ?? '{}'))
+      return json({ success: true, data: { id: path.split('/').pop() } })
     }
     if (path === '/api/folders') {
       if (request.method() !== 'GET') {
@@ -366,6 +414,196 @@ try {
     await page.getByText('表示できませんでした', { exact: true }).waitFor()
     assert.equal(await page.getByRole('button', { name: '再読み込み' }).count(), 1)
     assert.equal(await page.getByText('まだフォームがありません', { exact: true }).count(), 0, '失敗を0件と言わない')
+    await context.close()
+  }
+
+  /*
+   * 7. 編集保存の版競合（#723）。
+   *
+   * ほかの人が先に保存していたとき（409）、**入力を捨てないこと**。
+   * 読み直すかどうかは運用者が決める——押すまで読み直さない。
+   */
+  {
+    const detail = {
+      ...form(1, { id: 'form-1', name: 'サーバ側の名前' }),
+      contentRevision: 4,
+    }
+    const { context, page, state } = await openHarness(browser, {
+      formsByAccount: { 'account-a': [detail] },
+      detail,
+      putResults: ['conflict'],
+    })
+    /*
+     * 編集画面へは**一覧の名前を押して**入る。直接 URL を開くと、静的書き出し
+     * された頁では `useSearchParams` が `?id=` を拾えず、読み込みが始まらない。
+     * 運用者の通り道と同じ経路で確かめる。
+     */
+    await openList(page)
+    await page.getByRole('link', { name: 'サーバ側の名前', exact: true }).click()
+    const nameInput = page.locator('#fm-name')
+    await nameInput.waitFor({ timeout: 15_000 })
+    await page.waitForFunction(
+      () => document.querySelector('#fm-name')?.value === 'サーバ側の名前',
+      undefined, { timeout: 15_000 },
+    )
+
+    await nameInput.fill('わたしが直した名前')
+    await page.getByRole('button', { name: 'フォームを保存' }).click()
+
+    const conflictButton = page.getByRole('button', { name: '最新の内容を読み込む（入力中の内容は消えます）' })
+    await conflictButton.waitFor({ timeout: 15_000 })
+    // 確認した版を送っている（送らなければサーバが 400 にする）。
+    assert.equal(state.putBodies.length, 1, '保存を1回だけ出す')
+    assert.equal(state.putBodies[0].expectedContentRevision, 4, '読み込んだ版をそのまま送る')
+    // 相手がいつ保存したかを添える。
+    await page.getByText(/ほかの人が.*に先に保存しました/).waitFor()
+    // 二重に出さない（元の位置からは消してある）。
+    assert.equal(await page.getByText(/ほかの人が.*に先に保存しました/).count(), 1, '文言を二重に出さない')
+    // **ここが要点。入力は残っている。**
+    assert.equal(await nameInput.inputValue(), 'わたしが直した名前', '409 で入力を捨てない')
+
+    // 押すまで読み直さない。押したら相手の内容に入れ替わる。
+    await conflictButton.click()
+    await page.waitForFunction(() => document.querySelector('#fm-name')?.value === 'サーバ側の名前', undefined, { timeout: 15_000 })
+    assert.equal(await page.getByRole('button', { name: '最新の内容を読み込む（入力中の内容は消えます）' }).count(), 0,
+      '読み直したら競合の出口は消える')
+    await context.close()
+  }
+
+  /*
+   * 7b. オプション設定タブで、409 の知らせが**覆いの下敷きにならない**
+   *     （#723 独立審査の差し戻し）。
+   *
+   * 以前は知らせが基本タブの枠の中にあったので、`OptionsDialog`
+   * （`aria-modal`・`z-50`）の下に隠れていた。**DOM にあるだけでは足りない。**
+   * ここでは実物のブラウザで、その場所が本当に掴めるか（`elementFromPoint`）で見る。
+   * 重なりは実ブラウザでしか確かめられないので、この検査はここに置く。
+   * 3タブとも DOM に出ることは実マウント側（edit/save-conflict-tabs.test.tsx）で見る。
+   */
+  {
+    const detail = {
+      ...form(1, { id: 'form-1', name: 'サーバ側の名前' }),
+      contentRevision: 4,
+    }
+    const { context, page, state } = await openHarness(browser, {
+      formsByAccount: { 'account-a': [detail] },
+      detail,
+      putResults: ['conflict'],
+    })
+    await openList(page)
+    await page.getByRole('link', { name: 'サーバ側の名前', exact: true }).click()
+    await page.locator('#fm-name').waitFor({ timeout: 15_000 })
+    await page.waitForFunction(
+      () => document.querySelector('#fm-name')?.value === 'サーバ側の名前',
+      undefined, { timeout: 15_000 },
+    )
+    await page.getByRole('link', { name: 'オプション設定' }).click()
+    const dialog = page.locator('[aria-modal="true"]')
+    await dialog.waitFor({ timeout: 15_000 })
+
+    await page.getByRole('button', { name: '保存する' }).click()
+
+    const message = page.getByText(/ほかの人が.*に先に保存しました/)
+    const reload = page.getByRole('button', { name: '最新の内容を読み込む（入力中の内容は消えます）' })
+    await message.waitFor({ timeout: 15_000 })
+    assert.equal(state.putBodies.length, 1, 'オプション: 保存を1回出す')
+    assert.equal(state.putBodies[0].expectedContentRevision, 4, 'オプション: 読み込んだ版を送る')
+    assert.equal(await message.count(), 1, 'オプション: 文言を二重に出さない')
+    assert.equal(await dialog.count(), 1, 'オプション: 覆いは出たまま（閉じていない）')
+    assert.equal(await reload.isVisible(), true, 'オプション: 読み直す出口が見えている')
+
+    // **覆いの下敷きになっていないこと。**その場所で実際に掴めるかで見る。
+    const reachable = await reload.evaluate((node) => {
+      const box = node.getBoundingClientRect()
+      const top = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2)
+      return node === top || node.contains(top)
+    })
+    assert.equal(reachable, true, 'オプション: 読み直す出口が覆いの下敷きになっていない')
+    await context.close()
+  }
+
+  /*
+   * 8. 受付停止も編集の版を送る（#723）。
+   *
+   * 免除すると、止めたはずのフォームが編集画面の保存で公開中に戻り、回答が
+   * 入り続ける。**影響の版（`revision`=9）ではなく編集の版を送る**ことも見る。
+   */
+  {
+    const detail = {
+      ...form(1, { id: 'form-1', name: '停止するフォーム' }),
+      contentRevision: 4,
+    }
+    const { context, page, state } = await openHarness(browser, {
+      formsByAccount: { 'account-a': [detail] },
+      detail,
+    })
+    await openList(page)
+    await page.getByRole('button', { name: '停止するフォームを削除' }).click()
+    const stop = page.getByRole('button', { name: '受付だけ止める' })
+    await stop.waitFor({ timeout: 15_000 })
+    await stop.click()
+    await page.waitForFunction(() => true)
+    await page.waitForTimeout(800)
+
+    assert.equal(state.putBodies.length, 1, '受付停止で保存を1回出す')
+    assert.equal(state.putBodies[0].isActive, false, '止める指示を送る')
+    assert.equal(state.putBodies[0].expectedContentRevision, 4,
+      '編集の版（contentRevision）を送る。影響の版 revision=9 を送らない')
+    await context.close()
+  }
+
+  /*
+   * 9. #725 デザイン設定の死にUI。
+   *
+   *    OGPの入力は `void [...]` で捨てられていて、この窓から編集できなかった。
+   *    値は保存経路には乗っていたので「保存されているのに直す口が無い」形だった。
+   *    ここでは本物のブラウザで、**窓に打った文字が保存の中身まで届く**ことと、
+   *    押しても何も起きない操作面が残っていないことを見る。
+   *
+   *    「保存済みの値が欄に出る」ほうは、ここでは見ない。書き出した管理画面を
+   *    直接URLで開くと、`/form-submissions/edit?id=...` は `GET /api/forms/:id`
+   *    を一度も呼ばない（`useSearchParams` が最初の描画で空を返し、読み込みの
+   *    効果がそのまま素通りする）。**これは #725 の変更前からそうで、この票の
+   *    範囲外**。値が欄に出ることは、親から props を渡す実マウントの試験
+   *    `edit/form-design-settings.dead-ui.test.tsx` で見張っている。
+   */
+  {
+    const { context, page, state } = await openHarness(browser)
+    await page.goto(`${baseUrl}/form-submissions/edit?id=form-1&tab=design`, { waitUntil: 'domcontentloaded' })
+
+    const dialog = page.getByRole('dialog', { name: 'デザイン設定' })
+    await dialog.waitFor({ timeout: 15_000 })
+
+    // (1) OGPの3欄がこの窓にあり、打った文字が保存の中身へ乗る。
+    //     窓は `z-50` の覆いで下部追従帯（`z-index: 20`）を隠すので、
+    //     利用者と同じ順（打つ → 閉じる → 保存）でたどる。
+    await page.locator('#form-og-title').fill('ごはんの相談フォーム')
+    await page.locator('#form-og-description').fill('3分で終わります')
+    await page.locator('#form-og-image-url').fill('https://example.test/ogp.png')
+    // 「閉じる」は2つある（見出しの × と下段のボタン）。下段のほうを押す。
+    await dialog.getByRole('button', { name: '閉じる', exact: true }).last().click()
+    await dialog.waitFor({ state: 'detached', timeout: 10_000 })
+    // 直接URLで開くと1件取得が走らずフォーム名が空のままなので、保存の
+    // 前提条件だけ満たす（#725 の対象外。上の但し書きを参照）。
+    await page.locator('#fm-name').fill('ごはんの相談')
+    await page.getByRole('button', { name: 'フォームを保存' }).click()
+    for (let i = 0; i < 100 && state.formWrites.length === 0; i += 1) await page.waitForTimeout(50)
+    assert.equal(state.formWrites.length, 1, '保存が1回だけ飛ぶ')
+    assert.equal(state.formWrites[0].ogTitle, 'ごはんの相談フォーム', '打った見出しが保存へ乗る')
+    assert.equal(state.formWrites[0].ogDescription, '3分で終わります', '打った説明が保存へ乗る')
+    assert.equal(state.formWrites[0].ogImageUrl, 'https://example.test/ogp.png', '打った画像URLが保存へ乗る')
+
+    // (2) 窓の中に無反応な操作面が残っていない（窓を開き直して見る）
+    await page.goto(`${baseUrl}/form-submissions/edit?id=form-1&tab=design`, { waitUntil: 'domcontentloaded' })
+    await dialog.waitFor({ timeout: 15_000 })
+    assert.equal(await dialog.getByRole('button', { name: '保存する', exact: true }).count(), 0,
+      '窓の中に2つ目の保存を置かない')
+    assert.equal(await dialog.locator('#form-theme-background').count(), 0,
+      '選択肢が「なし」だけの背景画像欄を出さない')
+    assert.equal(await dialog.getByText('CSSで細かく', { exact: true }).count(), 0,
+      '中身の無い押せないタブを出さない')
+    assert.equal(await dialog.getByText('背景画像', { exact: true }).count(), 0,
+      '背景画像の見出しごと消えている')
     await context.close()
   }
 

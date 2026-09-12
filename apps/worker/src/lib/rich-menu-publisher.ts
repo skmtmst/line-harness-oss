@@ -69,6 +69,24 @@ export type GroupInput = {
   formBaseUrl?: string | null;
 };
 
+/**
+ * 長いLINE処理の途中で「まだ自分が担当か」を確かめる合図。
+ *
+ * 1回のpublishは、ページ数ぶんの作成・画像upload・alias切替・旧削除で
+ * 何分もかかる。その間ずっとleaseを延ばさないと、本人が動いている最中に
+ * 期限切れで別の実行に回収される。外部呼び出しの直前ごとにこれを呼び、
+ * 失権していたら投げてもらう。
+ */
+export type PublishHeartbeat = () => Promise<void>;
+
+/** leaseを失ったので、この実行は続けてはいけない。 */
+export class PublishLeaseLostError extends Error {
+  constructor(message = 'publish lease lost') {
+    super(message);
+    this.name = 'PublishLeaseLostError';
+  }
+}
+
 export class RichMenuValidationError extends Error {
   constructor(message: string) {
     super(message);
@@ -278,6 +296,7 @@ export function validateRichMenuGroupForPublish(group: GroupInput): void {
 /** 押されたときに、こちら側で何かする設定が入っているか。 */
 export function hasTapSideEffects(area: AreaInput): boolean {
   if ((area.tagIds?.length ?? 0) > 0) return true;
+  if (typeof area.actionData?.scenarioId === 'string' && area.actionData.scenarioId.length > 0) return true;
   return typeof area.scoreChange === 'number' && area.scoreChange !== 0;
 }
 
@@ -380,17 +399,44 @@ async function readR2Object(r2: R2Like, key: string): Promise<Uint8Array> {
   return new Uint8Array(await new Response(obj.body).arrayBuffer());
 }
 
-export async function publishRichMenuGroup(
+// =============================================================================
+// 段階公開(E-08 #621 司令塔裁定・案A)。publish を create/upload → DB journal確定 →
+// alias/default切替 → 旧メニュー削除へ分ける。journal確定前の失敗は、まだliveで
+// ない新メニューを消すだけで既存alias/defaultを変えない。切替途中の失敗は、
+// 保存した切替前LINE状態へ補償で戻す。予約実行が journal を挟むために使う。
+// 手動公開は従来どおり publishRichMenuGroup 一括版を使う。
+// =============================================================================
+
+/** 作ったばかりでまだliveでない新メニュー。 */
+export type RichMenuShell = {
+  pageId: string;
+  orderIndex: number;
+  newRichMenuId: string;
+};
+
+/** 切替前のLINE状態。切替失敗の補償でここへ戻す。 */
+export type PreSwitchLiveState = {
+  oldIds: Array<{ pageId: string; orderIndex: number; lineRichMenuId: string | null }>;
+  /** 切替前に読んだ実default。読めなかった場合は null。 */
+  previousDefaultId: string | null;
+};
+
+/**
+ * 第一段: 全ページを作成し、全画像を upload する。
+ * ここが完走するまで alias は触らない。失敗時は作った分を消して投げる。
+ */
+export async function createRichMenuShells(
   group: GroupInput,
   line: LineRichMenuClient,
   r2: R2Like,
-): Promise<PublishResult> {
+  heartbeat?: PublishHeartbeat,
+): Promise<{ shells: RichMenuShell[]; pages: PageInput[] }> {
   const resolvedPages = resolveSwitcherActions(group.pages, group.id);
   resolvedPages.sort((a, b) => a.orderIndex - b.orderIndex);
   validateRichMenuGroupForPublish({ ...group, pages: resolvedPages });
 
   const dimensions = RICH_MENU_DIMENSIONS[group.size];
-  const results: { pageId: string; newRichMenuId: string }[] = [];
+  const shells: RichMenuShell[] = [];
 
   // LINE 側へ変更を加える前に、全ページの画像が読めることを確認する。
   // 2ページ目の画像不備で1ページ目だけ公開される事故を防ぐ。
@@ -402,22 +448,9 @@ export async function publishRichMenuGroup(
     imageBytes.set(page.id, await readR2Object(r2, page.imageR2Key));
   }
 
-  const cleanupNewMenus = async (keepPageIds = new Set<string>()) => {
-    for (const result of results) {
-      // alias の復旧を確認できなかったページは、新メニューを消さない。
-      // LINE上の alias が新IDを指していた場合にリンク切れになるほうが危険なため。
-      if (keepPageIds.has(result.pageId)) continue;
-      try {
-        await line.deleteRichMenu(result.newRichMenuId);
-      } catch {
-        // 元の公開状態を守る処理なので、新規メニューの後片付け失敗は元のエラーを隠さない。
-      }
-    }
-  };
-
-  // 1. 全ページを作成し、全画像を upload する。ここが完走するまで alias は触らない。
   try {
     for (const page of resolvedPages) {
+      await heartbeat?.();
       const created = await line.createRichMenu({
         size: dimensions,
         selected: false,
@@ -428,7 +461,8 @@ export async function publishRichMenuGroup(
           action: toLineAction(a, group),
         })),
       });
-      results.push({ pageId: page.id, newRichMenuId: created.richMenuId });
+      shells.push({ pageId: page.id, orderIndex: page.orderIndex, newRichMenuId: created.richMenuId });
+      await heartbeat?.();
       await line.uploadRichMenuImage(
         created.richMenuId,
         imageBytes.get(page.id)!,
@@ -436,62 +470,48 @@ export async function publishRichMenuGroup(
       );
     }
   } catch (error) {
-    await cleanupNewMenus();
+    await deleteRichMenuShells(
+      line,
+      shells.map((shell) => shell.newRichMenuId),
+    );
     throw error;
   }
+  return { shells, pages: resolvedPages };
+}
 
-  // 2. alias を更新する。DELETE→CREATE の空白時間を作らない。
-  // 途中失敗時は切替済み alias を旧IDへ戻し、新規メニューを片付ける。
-  const switchedPages: PageInput[] = [];
-  const rollbackPublish = async () => {
-    const keepNewMenuFor = new Set<string>();
-    for (const page of [...switchedPages].reverse()) {
-      const aliasId = buildAliasId(group.id, page.orderIndex);
-      try {
-        if (page.lineRichMenuId) {
-          await line.upsertRichMenuAlias(aliasId, page.lineRichMenuId);
-        } else {
-          await line.deleteRichMenuAlias(aliasId);
-        }
-      } catch {
-        // alias が新IDを指している可能性があるため、このページの新メニューは消さない。
-        keepNewMenuFor.add(page.id);
-      }
-    }
-    await cleanupNewMenus(keepNewMenuFor);
-  };
-
-  try {
-    for (let index = 0; index < resolvedPages.length; index++) {
-      const page = resolvedPages[index];
-      const result = results[index];
-      // 通信結果が不明な失敗でも旧IDへ戻せるよう、試行前にロールバック対象へ入れる。
-      switchedPages.push(page);
-      await line.upsertRichMenuAlias(
-        buildAliasId(group.id, page.orderIndex),
-        result.newRichMenuId,
-      );
-    }
-
-    // 3. default 設定。失敗時は alias も元へ戻す。
-    if (group.isDefaultForAll && results.length > 0) {
-      await line.setDefaultRichMenu(results[0].newRichMenuId);
-    }
-  } catch (error) {
-    await rollbackPublish();
-    throw error;
+/**
+ * 第二段: alias を新メニューへ切替え、default を設定/解除する。
+ * 失敗時は投げるだけで補償しない。呼び出し側が journal を消してから
+ * restorePreSwitchLive で戻し、deleteRichMenuShells で片付ける順番を守る。
+ * (journalを残したまま新メニューを消すと、再試行が消えたIDへ切替えて壊す)
+ */
+export async function switchRichMenuLive(
+  line: LineRichMenuClient,
+  group: GroupInput,
+  shells: RichMenuShell[],
+  heartbeat?: PublishHeartbeat,
+): Promise<void> {
+  const ordered = [...shells].sort((a, b) => a.orderIndex - b.orderIndex);
+  for (const shell of ordered) {
+    await heartbeat?.();
+    await line.upsertRichMenuAlias(
+      buildAliasId(group.id, shell.orderIndex),
+      shell.newRichMenuId,
+    );
   }
 
-  // 4. default 解除
-  // 有効化時は order_index=0 ページの richMenuId を default に設定。
-  // 無効化 (false) 時は **この group の richMenu が現在 LINE の default に設定されている
-  // 場合のみ** 解除する。同一 account に別の isDefaultForAll=true group がある状態で
-  // 無条件に DELETE すると、その別 group の default まで壊してしまうため。
+  if (group.isDefaultForAll && shells.length > 0) {
+    // orderIndex順に並べた先頭を default にする。
+    const first = [...shells].sort((a, b) => a.orderIndex - b.orderIndex)[0];
+    await heartbeat?.();
+    await line.setDefaultRichMenu(first.newRichMenuId);
+    return;
+  }
+
   if (!group.isDefaultForAll) {
-    // ベストエフォート: ここまで来た時点で新 richmenu はすでに live。LINE 側 default
-    // 判定や解除に失敗しても publish 全体を失敗させない (D1 の status 更新が呼出側で
-    // 走らず状態不整合になるため)。default 解除がスキップされた場合は次回 publish で
-    // 再試行されるか、運用側で明示的に解除されることを期待する。
+    await heartbeat?.();
+    // ベストエフォート: この group の richmenu が現在 LINE の default なら外す。
+    // 別 group の default まで壊さないよう、自分のIDに当たるときだけ解除する。
     try {
       const currentDefault = await line.getCurrentDefaultRichMenuId();
       if (currentDefault) {
@@ -499,25 +519,175 @@ export async function publishRichMenuGroup(
         for (const p of group.pages) {
           if (p.lineRichMenuId) ownIds.add(p.lineRichMenuId);
         }
-        for (const r of results) ownIds.add(r.newRichMenuId);
+        for (const shell of shells) ownIds.add(shell.newRichMenuId);
         if (ownIds.has(currentDefault)) {
           await line.clearDefaultRichMenu();
         }
       }
     } catch (e) {
-      console.warn(`[publishRichMenuGroup] default lookup/clear failed (non-fatal):`, e);
+      console.warn(`[switchRichMenuLive] default lookup/clear failed (non-fatal):`, e);
     }
+  }
+}
+
+/**
+ * 切替失敗の補償: alias を旧IDへ戻す。default は restorePreSwitchDefault で別に戻す。
+ * 決して投げない(元の失敗を隠さない)。戻せなかった pageId の集合を返す。
+ * 戻せなかったページの新メニューは消してはいけない
+ * (alias が新IDを指したままリンク切れになるほうが危険なため)。
+ */
+export async function restorePreSwitchLive(
+  line: LineRichMenuClient,
+  groupId: string,
+  prev: PreSwitchLiveState,
+): Promise<Set<string>> {
+  const unrestored = new Set<string>();
+  for (const old of [...prev.oldIds].reverse()) {
+    const aliasId = buildAliasId(groupId, old.orderIndex);
+    try {
+      if (old.lineRichMenuId) {
+        await line.upsertRichMenuAlias(aliasId, old.lineRichMenuId);
+      } else {
+        await line.deleteRichMenuAlias(aliasId);
+      }
+    } catch (e) {
+      console.warn(`[restorePreSwitchLive] alias restore failed (non-fatal):`, e);
+      unrestored.add(old.pageId);
+    }
+  }
+  return unrestored;
+}
+
+/**
+ * default 復元の結果。呼び出し側は「戻し切れていない新メニューを消さない」
+ * ためにこれを見る。復元できたかどうかを飲み込むと、default が新メニューを
+ * 指したまま後片付けでその新メニューを消し、公開中の表示が消える。
+ */
+export type DefaultRestoreOutcome =
+  /** 現 default は今回の新メニューではない。こちらは何も触っていない。 */
+  | { state: 'untouched' }
+  /** 切替前の値へ戻した(または解除した)。 */
+  | { state: 'restored' }
+  /**
+   * 戻せなかった。retainedId は default が指したままの新メニューID。
+   * default を読めなかった場合は null で、どれが指されているか分からない。
+   */
+  | { state: 'failed'; retainedId: string | null };
+
+/**
+ * 切替前の default へ戻す。現在の default が今回作った新メニューのときだけ
+ * 戻す/外す(その間に外から変わっていたら触らない)。
+ * 決して投げない。戻せたかどうかは戻り値で伝える(飲み込まない)。
+ */
+export async function restorePreSwitchDefault(
+  line: LineRichMenuClient,
+  prev: PreSwitchLiveState,
+  newIds: string[],
+): Promise<DefaultRestoreOutcome> {
+  let current: string | null;
+  try {
+    current = await line.getCurrentDefaultRichMenuId();
+  } catch (e) {
+    // 読めない = 新メニューを指したままかもしれない。どれかも分からないので、
+    // 新メニューは1つも消さない(消すと default がリンク切れになる)。
+    console.warn(`[restorePreSwitchDefault] default lookup failed (non-fatal):`, e);
+    return { state: 'failed', retainedId: null };
+  }
+  if (!current || !newIds.includes(current)) return { state: 'untouched' };
+  try {
+    if (prev.previousDefaultId) {
+      await line.setDefaultRichMenu(prev.previousDefaultId);
+    } else {
+      await line.clearDefaultRichMenu();
+    }
+    return { state: 'restored' };
+  } catch (e) {
+    console.warn(`[restorePreSwitchDefault] default restore failed (non-fatal):`, e);
+    return { state: 'failed', retainedId: current };
+  }
+}
+
+/**
+ * 補償のあとで消してよい新メニューID。
+ * - alias を旧へ戻せなかったページの新メニューは消さない(alias がリンク切れになる)
+ * - default 復元が終わっていない新メニューも消さない(全友だちの表示が消える)
+ * - default をそもそも読めなかったときは、どれが指されているか分からないので1つも消さない
+ */
+export function deletableAfterCompensation(
+  shells: Array<{ pageId: string; newRichMenuId: string }>,
+  unrestoredPageIds: Set<string>,
+  defaultOutcome: DefaultRestoreOutcome,
+): string[] {
+  if (defaultOutcome.state === 'failed' && !defaultOutcome.retainedId) return [];
+  const retained =
+    defaultOutcome.state === 'failed' && defaultOutcome.retainedId
+      ? new Set([defaultOutcome.retainedId])
+      : new Set<string>();
+  return shells
+    .filter((shell) => !unrestoredPageIds.has(shell.pageId) && !retained.has(shell.newRichMenuId))
+    .map((shell) => shell.newRichMenuId);
+}
+
+/** 新メニュー/旧メニューの削除。404は許容し、失敗は飲み込む(後片付け用)。 */
+export async function deleteRichMenuShells(
+  line: LineRichMenuClient,
+  richMenuIds: string[],
+): Promise<void> {
+  for (const id of richMenuIds) {
+    if (!id) continue;
+    try {
+      await line.deleteRichMenu(id);
+    } catch {
+      // 後片付けの失敗は元のエラーを隠さない。残留は次回の清掃対象。
+    }
+  }
+}
+
+export async function publishRichMenuGroup(
+  group: GroupInput,
+  line: LineRichMenuClient,
+  r2: R2Like,
+  heartbeat?: PublishHeartbeat,
+): Promise<PublishResult> {
+  // 一括版(手動公開用)。段階関数と同じ実装を使い、journalは挟まない。
+  // 予約実行は段階関数を直接呼び、createと切替の間にjournalを確定する。
+  const { shells, pages: resolvedPages } = await createRichMenuShells(group, line, r2, heartbeat);
+  const results = shells.map((shell) => ({ pageId: shell.pageId, newRichMenuId: shell.newRichMenuId }));
+  const prev: PreSwitchLiveState = {
+    oldIds: resolvedPages.map((page) => ({
+      pageId: page.id,
+      orderIndex: page.orderIndex,
+      lineRichMenuId: page.lineRichMenuId,
+    })),
+    previousDefaultId: null,
+  };
+  try {
+    prev.previousDefaultId = await line.getCurrentDefaultRichMenuId();
+  } catch {
+    // 読めなくても切替は続ける。補償のdefault復元だけ弱くなる。
+    prev.previousDefaultId = null;
   }
 
-  // 5. 公開切替がすべて終わってから旧メニューを削除する。
-  for (const page of resolvedPages) {
-    if (!page.lineRichMenuId) continue;
-    try {
-      await line.deleteRichMenu(page.lineRichMenuId);
-    } catch {
-      // alias は新メニューへ切替済み。旧メニューの削除失敗は次回の清掃対象とする。
-    }
+  try {
+    await switchRichMenuLive(line, group, shells, heartbeat);
+  } catch (error) {
+    const unrestored = await restorePreSwitchLive(line, group.id, prev);
+    const defaultOutcome = await restorePreSwitchDefault(
+      line,
+      prev,
+      shells.map((shell) => shell.newRichMenuId),
+    );
+    // default を戻し切れていない新メニューは消さない(消すと全友だちの表示が消える)。
+    await deleteRichMenuShells(line, deletableAfterCompensation(shells, unrestored, defaultOutcome));
+    throw error;
   }
+
+  // 公開切替がすべて終わってから旧メニューを削除する。
+  await heartbeat?.();
+  await deleteRichMenuShells(
+    line,
+    prev.oldIds.filter((old) => old.lineRichMenuId).map((old) => old.lineRichMenuId as string),
+  );
 
   return { pages: results };
 }
@@ -565,11 +735,15 @@ export type UnpublishResult = {
 export async function unpublishRichMenuGroup(
   group: GroupInput,
   line: LineRichMenuClient,
+  heartbeat?: PublishHeartbeat,
 ): Promise<UnpublishResult> {
   const warnings: string[] = [];
   const pages: UnpublishResult['pages'] = [];
 
   for (const page of group.pages) {
+    // 外部呼び出しの前に担当を確かめる。失権していたら投げて止める
+    // (warnings へ落とすと、失権に気づかないまま成功応答してしまう)。
+    await heartbeat?.();
     // alias 削除
     const aliasId = buildAliasId(group.id, page.orderIndex);
     try {
@@ -590,6 +764,7 @@ export async function unpublishRichMenuGroup(
     pages.push({ pageId: page.id, clearedRichMenuId: page.lineRichMenuId });
   }
 
+  await heartbeat?.();
   // default が own group のものなら unlink。ベストエフォート (失敗しても unpublish 全体は成功扱い)。
   try {
     const currentDefault = await line.getCurrentDefaultRichMenuId();

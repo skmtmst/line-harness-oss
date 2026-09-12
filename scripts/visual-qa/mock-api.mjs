@@ -79,7 +79,7 @@ import {
   MILEAGE_EARNING_RULES, MILEAGE_FRIENDS, MILEAGE_HISTORY, MILEAGE_OVERVIEW,
   COMMON_ACTIONS, COMMON_ACTION_DETAIL, AUTOMATIONS, AUTOMATION_RUNS, AUTOMATION_TEMPLATES,
   BOOKING_MENUS, BOOKING_SETTINGS, BOOKING_STAFF, BOOKING_STAFF_MENUS, BOOKING_MENU_STAFF, BOOKING_AVAILABILITY, BOOKING_RESOURCES,
-  BOOKING_AVAILABILITY_RULES, BOOKING_STAFF_SHIFTS, BOOKING_GOOGLE_CALENDAR,
+  BOOKING_AVAILABILITY_RULES, BOOKING_BREAKS, BOOKING_BREAK_DATES, BOOKING_STAFF_SHIFTS, BOOKING_GOOGLE_CALENDAR,
   BOOKING_PROXY_CREATE, BOOKING_REQUESTS,
   BOOKING_ADMIN_DETAIL, BOOKING_CUSTOMER_CONTEXT, BOOKING_REMINDER_PREVIEW, BOOKING_CONFLICT_ALTERNATIVES,
   EC_NOTIFICATION_SETTINGS, EC_NOTIFICATION_RUNS, LINE_NOTIFICATION_DEFINITIONS, LINE_NOTIFICATION_METRICS, LINE_NOTIFICATION_DELIVERIES,
@@ -1193,6 +1193,8 @@ const RAW_PATTERNS = [
   /* `tksPc` の通常・読込中・失敗を分けるため、通常だけ本番と同じ器で返す。 */
   [/^\/api\/booking\/admin\/staff\/[^/]+\/shifts$/, { shifts: BOOKING_STAFF_SHIFTS }],
   [/^\/api\/booking\/admin\/staff\/[^/]+\/availability-rules$/, { rules: BOOKING_AVAILABILITY_RULES }],
+  [/^\/api\/booking\/admin\/staff\/[^/]+\/breaks$/, BOOKING_BREAKS],
+  [/^\/api\/booking\/admin\/staff\/[^/]+\/break-dates$/, BOOKING_BREAK_DATES],
   [/^\/api\/booking\/admin\/staff\/[^/]+\/google-calendar$/, BOOKING_GOOGLE_CALENDAR],
 ]
 
@@ -1756,9 +1758,13 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (pathname === `/api/forms/${FORM_DETAIL.id}`) return { success: true, data: FORM_DETAIL }
   const formSubmissions = new RegExp(`^/api/forms/${FORM_DETAIL.id}/submissions$`).test(pathname)
   if (formSubmissions) {
-    // 互換用の古い形（ページ分けなし）は配列だけを返す。実口と同じく上限500件。
+    /*
+     * 互換用の古い形（ページ分けなし）は配列だけを返す。**実口と同じく上限200件**
+     * （`MAX_LIST_LIMIT`）。#722 の前はここが 500 で、実口は 200 で切っていた。
+     * モックで確かめた人が「500件来る」と誤解する形だった。
+     */
     if (query.get('page') === null && query.get('limit') === null) {
-      return { success: true, data: FORM_SUBMISSIONS.items.slice(0, 500) }
+      return { success: true, data: FORM_SUBMISSIONS.items.slice(0, 200) }
     }
     const page = Number.parseInt(query.get('page') ?? '1', 10)
     const limit = Number.parseInt(query.get('limit') ?? '20', 10)

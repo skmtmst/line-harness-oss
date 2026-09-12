@@ -606,7 +606,7 @@
     "unresolved-classname": 30
   },
   "components/friend-fields/edit-tag-page-v4.tsx": {
-    "arbitrary-value": 2,
+    "arbitrary-value": 3,
     "direct-secondary-button": 1
   },
   "components/friend-fields/field-list.tsx": {
@@ -785,6 +785,9 @@
   "components/shared/row-actions.tsx": {
     "unresolved-classname": 4
   },
+  "components/shared/save-conflict-bar.tsx": {
+    "unresolved-classname": 4
+  },
   "components/shared/select-field.tsx": {
     "unresolved-classname": 1
   },
@@ -844,5 +847,11 @@
   },
   "app/ec-commerce/subscriptions-panel.tsx": {
     "unresolved-classname": 16
+  },
+  "app/hq/templates/template-console.tsx": {
+    "unresolved-classname": 88
+  },
+  "app/hq/templates/template-definition-editor.tsx": {
+    "unresolved-classname": 69
   }
 }

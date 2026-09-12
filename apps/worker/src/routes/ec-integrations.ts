@@ -13,6 +13,7 @@ import { EC_EVENT_TYPES } from '@line-crm/shared';
 import type { Env } from '../index.js';
 import { fireEvent, logOutgoingMessage } from '../services/event-bus.js';
 import { buildEcV6Event, ecDispatchIdempotencyKey, ecNotificationRetryKey } from '../services/ec-event-publish.js';
+import { dispatchOperatorEvent } from '../services/operator-notification-dispatch.js';
 
 export type EcDispatchSubscriber = 'notification' | 'v6';
 
@@ -84,6 +85,7 @@ async function fireEcV6Event(
   });
 }
 import { enqueuePostShippingFollowUps } from '../services/nen-engagement.js';
+import { recordConversionSourceEvent } from '@line-crm/db';
 import { ecFlexMessage } from '../services/ec-notification-message.js';
 import { syncNenEcTags, syncNenPetTags } from '../services/nen-tag-sync.js';
 
@@ -454,6 +456,25 @@ ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
     return c.json({ success: true, duplicate: true, status: row.status });
   }
 
+  // 受注は運用者へ知らせる。LINEの友だちが見つからなくても受注自体は起きて
+  // いるので、この先の照合結果を待たずにここで出す。台帳の行IDを発生元に
+  // 使うため、EC側の再送でも通知は1件しか作られない。
+  if (event.event_type === 'ec.order.confirmed') {
+    try {
+      const orderNumber = event.order?.number?.trim();
+      await dispatchOperatorEvent(c.env.DB, c.env, {
+        lineAccountId,
+        eventType: 'ec_order_received',
+        sourceEventId: row.id,
+        message: orderNumber ? `ECで注文${orderNumber}を受け付けました` : 'ECで新しい注文を受け付けました',
+        executionMode: 'automatic',
+      });
+    } catch (notificationError) {
+      // 受注の取り込みは通知の失敗で止めない。送り残しは回収口から拾う。
+      console.error(`[ec-event] operator notification failed event=${event.event_id}`, notificationError);
+    }
+  }
+
   if (!event.line_user_id) {
     await c.env.DB.prepare(
       `UPDATE ec_events
@@ -501,6 +522,27 @@ ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
 
     await syncMemberSnapshot(c.env.DB, friend.id, event, now);
     await syncNenEcTags(c.env.DB, friend.id);
+
+    // 注文の確定を成果計測へ接続する(#648)。「注文が確定した」を起点に選んだ
+    // 地点は、ここを通らないと 0 件のままになる。
+    //
+    // この位置は、この後のどの出口(通知停止で skipped / 通常の processed)を
+    // 通っても必ず通る。冪等キーは EC 側の event_id なので、同じ注文の再送
+    // (台帳 claim をすり抜けた再試行を含む)でも二度数えない。
+    // 記録に失敗しても注文処理は続ける(通知を落とさない)。
+    if (event.event_type === 'ec.order.confirmed') {
+      try {
+        await recordConversionSourceEvent(c.env.DB, {
+          sourceType: 'ec_order_confirmed',
+          lineAccountId,
+          friendId: friend.id,
+          sourceEventId: event.event_id,
+          metadata: { ecEventId: event.event_id, orderNumber: event.order?.number ?? null },
+        });
+      } catch (error) {
+        console.error(`[ec-event] conversion record failed event=${event.event_id}`, error);
+      }
+    }
 
     if (event.event_type === 'ec.customer.profile_updated') {
       const { syncNenPetProfiles } = await import('../services/nen-engagement.js');

@@ -18,6 +18,7 @@ function setup() {
       id TEXT PRIMARY KEY, name TEXT NOT NULL, event_type TEXT NOT NULL,
       conditions TEXT NOT NULL DEFAULT '{}', channels TEXT NOT NULL DEFAULT '["dashboard"]',
       line_account_id TEXT, is_active INTEGER NOT NULL DEFAULT 1,
+      version INTEGER NOT NULL DEFAULT 1 CHECK (version > 0),
       created_at TEXT NOT NULL, updated_at TEXT NOT NULL
     );
     CREATE TABLE notifications (

@@ -6,6 +6,7 @@ import type { Tag, TagGroup } from '@line-crm/shared'
 import { api, type TagDefinition, type TagDependencies, type TagDeleteImpactReferences } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import Button from '@/components/shared/button'
 import TagEditorV4, { definitionsForSave, linkedActionFromDefinition, type TagEditorValues } from './tag-editor-v4'
 
 /**
@@ -65,6 +66,66 @@ export function DeleteDialog({ tag, dependencies, dependenciesStatus, onCancel, 
   )
 }
 
+/**
+ * 保管済み(archived)タグの専用画面（Issue #710）。
+ *
+ * `TagEditorV4`（フォルダ・スター・マイル・連動アクションまで持つ通常の
+ * 編集フォーム）は使わない。archived タグはサーバ側
+ * （`updateTagDefinition`）が名前・説明以外の変更を拒否するため、それ以外
+ * の項目を編集できるように見せても保存できず、利用者が混乱する。
+ *
+ * タグには archived を active に戻す口が無い（司令塔裁定・Issue #710）。
+ * 戻せないので、名前・説明の訂正だけは常に許す。
+ */
+function ArchivedTagEditor({ tag, accountId, onCancel, onSaved }: {
+  tag: Tag
+  accountId: string
+  onCancel: () => void
+  onSaved: (updated: Tag) => void
+}) {
+  const [name, setName] = useState(tag.name)
+  const [description, setDescription] = useState(tag.description ?? '')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
+
+  const save = async () => {
+    if (saving) return
+    setSaving(true)
+    setError('')
+    setNotice('')
+    try {
+      const result = await api.tags.updateArchivedNameAndDescription(tag.id, accountId, tag.version ?? 1, {
+        name, description: description || null,
+      })
+      if (!result.success) throw new Error(result.error)
+      setNotice('保存しました。')
+      onSaved(result.data.tag)
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : '保存に失敗しました')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="mx-auto max-w-[680px] space-y-4 p-6">
+      <div role="status" className="rounded-card border border-warning/40 bg-warning-bg p-4 text-sm text-warning">
+        <p className="font-bold">このタグは保管済みです</p>
+        <p className="mt-1 text-xs leading-5">保管済みのタグは、あとから元に戻す機能がありません。誤字などの表示名の訂正だけできます。フォルダ・付与のしかた・マイル・連動アクションなどの設定は変更できません。</p>
+      </div>
+      {error && <p role="alert" className="rounded-control border border-danger/25 bg-danger-bg p-3 text-sm text-danger">{error}</p>}
+      {notice && <p className="rounded-control border border-accent/25 bg-accent-soft p-3 text-sm text-accent">{notice}</p>}
+      <label className="block"><span className="mb-1.5 block text-xs font-semibold text-ink-secondary">タグ名</span><input value={name} onChange={(event) => setName(event.target.value)} maxLength={80} className="w-full rounded-control border border-hairline px-3 py-2.5 text-sm outline-none focus:border-accent" /></label>
+      <label className="block"><span className="mb-1.5 block text-xs font-semibold text-ink-secondary">説明</span><textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={3} className="w-full rounded-control border border-hairline px-3 py-2.5 text-sm outline-none focus:border-accent" /></label>
+      <div className="flex justify-end gap-2">
+        <Button onClick={onCancel}>キャンセル</Button>
+        <Button variant="primary" onClick={() => void save()} disabled={saving || !name.trim()}>{saving ? '保存中…' : '保存'}</Button>
+      </div>
+    </div>
+  )
+}
+
 export default function EditTagPageV4() {
   usePageTitle('タグを編集')
   const router = useRouter()
@@ -95,9 +156,9 @@ export default function EditTagPageV4() {
       const [detail, dependenciesResult, folders] = await Promise.all([
         api.tags.definition(tagId, selectedAccountId),
         api.tags.dependencies(tagId, selectedAccountId),
-        api.tagGroups.list(),
+        api.tagGroups.list(selectedAccountId),
       ])
-      if (folders.success) setGroups(folders.data)
+      if (folders.success) setGroups(folders.data.filter((group) => group.accountId === selectedAccountId))
       if (dependenciesResult.success) {
         setDependencies(dependenciesResult.data)
         setDependenciesStatus('ready')
@@ -167,6 +228,22 @@ export default function EditTagPageV4() {
   if (loading) return <p className="p-6 text-sm text-ink-faint">読み込み中…</p>
   if (!selectedAccountId) return <div role="alert" className="rounded-card border border-warning/30 bg-warning-bg p-6 text-sm text-warning">LINE公式アカウントを選んでください。</div>
   if (!tag || !definition) return <div className="rounded-card border border-hairline bg-canvas p-8 text-center text-sm text-ink-faint">タグが見つかりません。<button type="button" onClick={() => router.push('/tags')} className="ml-2 text-action">一覧へ戻る</button></div>
+
+  // 保管済み(archived)タグは、通常の編集フォームを出さない(#710)。
+  if (tag.status === 'archived') {
+    return (
+      <ArchivedTagEditor
+        tag={tag}
+        accountId={selectedAccountId}
+        onCancel={() => router.push('/tags')}
+        // load() は setLoading(true) を伴い、読み込み中画面がこのまま
+        // 一度アンマウントされて「保存しました。」が一瞬で消える
+        // （画面が全部作り直されるため）。保存直後は PATCH の戻り値で
+        // その場を更新するだけにする。
+        onSaved={(updated) => setTag((current) => (current ? { ...current, ...updated } : current))}
+      />
+    )
+  }
 
   return (
     <>

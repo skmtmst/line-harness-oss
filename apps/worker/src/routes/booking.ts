@@ -48,6 +48,7 @@ import {
   saveIdempotencyResponse,
 } from '../services/booking-idempotency.js';
 import { sendBookingNotification } from '../services/booking-notifier.js';
+import { dispatchOperatorEvent } from '../services/operator-notification-dispatch.js';
 import {
   buildConfirmationReminderSchedule,
   insertConfirmationReminders,
@@ -61,6 +62,7 @@ import {
 import { awardActivityMileage } from '../services/activity-mileage.js';
 import { dispatchAutomationEventWithLogging } from '../services/automation-triggers.js';
 import { applyActionScoreEvent } from '../services/action-score-events.js';
+import { recordConversionSourceEvent } from '@line-crm/db';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import {
   finishBookingOperation,
@@ -742,19 +744,47 @@ booking.post('/api/liff/booking/requests', async (c) => {
     ),
   );
 
+  // 予約が入ったことを運用者へ知らせる。これも他の副作用と同じ扱いで、
+  // 通知が落ちても予約は成立させる。発生元に予約IDを使うので、同じ予約から
+  // 通知が二重に作られることはない。送り残しは回収口から拾う。
+  c.executionCtx.waitUntil(
+    dispatchOperatorEvent(c.env.DB, c.env, {
+      lineAccountId: accountId,
+      eventType: 'booking_created',
+      sourceEventId: bookingId,
+      message: '新しい予約が入りました',
+      executionMode: 'automatic',
+    }).catch((err) => console.error('booking operator notification failed:', err)),
+  );
+
   // notifyForBooking と同じく fire-and-forget。タグ付与失敗は予約成功扱い。
   // attachTagAndFireSideEffects は POST /api/friends/:id/tags と同じ side effects
   // (tag_added シナリオ enrollment + tag_change イベント) を発火する。
   // INSERT OR IGNORE で重複を吸収し、新規付与のときだけ side effects を打つ。
+  //
+  // 設定した時点で active でも、予約が入る時点では整理済み(archived)になっている
+  // ことがある。メニューに残っている auto_tag_id をそのまま信じず、付与の直前に
+  // アカウントと status='active' を引き直す。外れていれば付与も後続副作用も打たない
+  // (整理済みのタグが友だちに付き、シナリオ・イベントまで動いてしまうのを止める)。
   if (menuRow.auto_tag_id) {
     const tagId = menuRow.auto_tag_id;
     c.executionCtx.waitUntil(
-      attachTagAndFireSideEffects(c.env.DB, friendId, tagId, {
-        defaultAccessToken: c.env.LINE_CHANNEL_ACCESS_TOKEN,
-        workerUrl: c.env.WORKER_URL,
-      })
-        .then(() => undefined)
-        .catch((err) => console.error('booking auto-tag failed:', err)),
+      (async () => {
+        if (!(await isAssignableAutoTag(c.env.DB, tagId, accountId))) {
+          console.warn(JSON.stringify({
+            event: 'booking_auto_tag_skipped',
+            reason: 'tag_not_active_in_account',
+            tag_id: tagId,
+            line_account_id: accountId,
+            booking_id: bookingId,
+          }));
+          return;
+        }
+        await attachTagAndFireSideEffects(c.env.DB, friendId, tagId, {
+          defaultAccessToken: c.env.LINE_CHANNEL_ACCESS_TOKEN,
+          workerUrl: c.env.WORKER_URL,
+        });
+      })().catch((err) => console.error('booking auto-tag failed:', err)),
     );
   }
 
@@ -1301,6 +1331,49 @@ function toMenuActiveFlag(value: unknown): number {
   return value === false || value === 0 ? 0 : 1;
 }
 
+type AutoTagIdRead =
+  | { ok: true; present: boolean; value: string | null }
+  | { ok: false; error: 'invalid_auto_tag_id' };
+
+/**
+ * auto_tag_id は「文字列」か「null / 未送信」だけを受け付ける。
+ * 数値・真偽値・配列・オブジェクトをそのまま `.trim()` へ流すと TypeError になり、
+ * 入力の不備が 500(サーバ障害)として返ってしまう。呼び手が直せる誤りなので
+ * ここで型を見て 400 に倒す。
+ *
+ * PUT は「送られた項目だけ更新する」ため、未送信(`present: false`)と
+ * 明示的な null(`present: true, value: null`)を呼び出し側で区別できるようにする。
+ */
+function readAutoTagId(body: Record<string, unknown>): AutoTagIdRead {
+  if (!Object.prototype.hasOwnProperty.call(body, 'auto_tag_id')) {
+    return { ok: true, present: false, value: null };
+  }
+  const raw = body.auto_tag_id;
+  if (raw === null || raw === undefined) return { ok: true, present: true, value: null };
+  if (typeof raw !== 'string') return { ok: false, error: 'invalid_auto_tag_id' };
+  const trimmed = raw.trim();
+  return { ok: true, present: true, value: trimmed === '' ? null : trimmed };
+}
+
+/**
+ * 自動タグとして結び付けてよいタグかを、対象アカウント内かつ status='active' で確かめる。
+ *
+ * 整理済み(archived)のタグを受け付けると、二度と使わないタグへメニューが繋がったままになり、
+ * 予約のたびに「付いたはずのタグで絞り込めない」状態を作る。保存時(POST/PUT)と
+ * 実行時(予約成立時)の両方でここを通し、設定した後に整理されたタグも止める。
+ */
+async function isAssignableAutoTag(
+  db: D1Database,
+  tagId: string,
+  accountId: string,
+): Promise<boolean> {
+  const row = await db
+    .prepare(`SELECT 1 FROM tags WHERE id = ? AND line_account_id = ? AND status = 'active'`)
+    .bind(tagId, accountId)
+    .first<{ 1: number }>();
+  return row != null;
+}
+
 booking.post('/api/booking/admin/menus', requireRole('owner', 'admin'), async (c) => {
   const accountId = await resolveAccountIdAdmin(c);
   if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
@@ -1325,13 +1398,11 @@ booking.post('/api/booking/admin/menus', requireRole('owner', 'admin'), async (c
     price_mode: 'fixed', base_price: b.base_price,
   });
   if (!price.ok) return c.json({ error: price.error }, 400);
-  const autoTagId = (b.auto_tag_id ?? '').trim() === '' ? null : (b.auto_tag_id as string);
-  if (autoTagId) {
-    const tagExists = await c.env.DB
-      .prepare(`SELECT 1 FROM tags WHERE id = ? AND line_account_id = ?`)
-      .bind(autoTagId, accountId)
-      .first<{ 1: number }>();
-    if (!tagExists) return c.json({ error: 'tag_not_found' }, 400);
+  const autoTag = readAutoTagId(b as unknown as Record<string, unknown>);
+  if (!autoTag.ok) return c.json({ error: autoTag.error }, 400);
+  const autoTagId = autoTag.value;
+  if (autoTagId && !(await isAssignableAutoTag(c.env.DB, autoTagId, accountId))) {
+    return c.json({ error: 'tag_not_found' }, 400);
   }
   const id = crypto.randomUUID();
   const ruleColumns = Object.keys(rules.value);
@@ -1396,16 +1467,12 @@ booking.put('/api/booking/admin/menus/:id', requireRole('owner', 'admin'), async
   // 古いクライアントは新しい項目を送らない。`undefined` を null として
   // 書き込むと既存設定を消してしまうので、明示的に送られたものだけ更新する。
   // auto_tag_id が以前からこの扱いで、受付条件も同じにそろえた。
-  const hasAutoTagId = Object.prototype.hasOwnProperty.call(b, 'auto_tag_id');
-  const autoTagId = hasAutoTagId
-    ? ((b.auto_tag_id ?? '').trim() === '' ? null : (b.auto_tag_id as string))
-    : null;
-  if (hasAutoTagId && autoTagId) {
-    const tagExists = await c.env.DB
-      .prepare(`SELECT 1 FROM tags WHERE id = ? AND line_account_id = ?`)
-      .bind(autoTagId, accountId)
-      .first<{ 1: number }>();
-    if (!tagExists) return c.json({ error: 'tag_not_found' }, 400);
+  const autoTag = readAutoTagId(b as unknown as Record<string, unknown>);
+  if (!autoTag.ok) return c.json({ error: autoTag.error }, 400);
+  const hasAutoTagId = autoTag.present;
+  const autoTagId = autoTag.value;
+  if (hasAutoTagId && autoTagId && !(await isAssignableAutoTag(c.env.DB, autoTagId, accountId))) {
+    return c.json({ error: 'tag_not_found' }, 400);
   }
 
   // 常に書き込む項目（PUT なので、送られなければ既定値で上書きする）
@@ -1935,6 +2002,23 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
     return c.json(response, 409);
   }
 
+  // 予約の確定を成果計測へ接続する(#648)。ここは代理登録で、入った時点で
+  // 確定(confirmed)なので、この1か所が「確定した」の起点になる。
+  // 友だちが紐づかない電話予約は数えない(成果は友だちに結びつける)。
+  if (friendId) {
+    try {
+      await recordConversionSourceEvent(c.env.DB, {
+        sourceType: 'reservation_confirmed',
+        lineAccountId: accountId,
+        friendId,
+        sourceEventId: bookingId,
+        metadata: { bookingId, bookingType: 'salon', via: 'proxy_create' },
+      });
+    } catch (error) {
+      console.error('booking conversion record failed (proxy-create):', error);
+    }
+  }
+
   let confirmationOperationId: string | null = null;
   if (sendLineConfirmation && friendId) {
     await insertConfirmationReminders(c.env.DB, {
@@ -2309,6 +2393,403 @@ booking.put('/api/booking/admin/staff/:id/availability-rules', requireRole('owne
   ];
   await c.env.DB.batch(statements);
   return c.json({ ok: true, count: body.rules.length });
+});
+
+// ---- staff breaks (N-405 #655; 枠への差し引きは #1471 合流後に availability 側で有効化) ----
+
+const BREAK_WEEKLY_LIMIT = 28; // 1日4件×7日
+const BREAK_DATE_LIMIT = 366; // 日付指定はシフトと同じ上限
+
+type BreakRow = {
+  id: string;
+  weekday: number | null;
+  work_date: string | null;
+  start_time: string;
+  end_time: string;
+};
+
+/** 同時更新の検出用。行の中身から決まる不透明な版。保存のたびに変わる。 */
+function breaksFingerprint(rows: BreakRow[]): string {
+  const canonical = rows
+    .map((row) => `${row.id}|${row.weekday ?? ''}|${row.work_date ?? ''}|${row.start_time}|${row.end_time}`)
+    .sort()
+    .join('\n');
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < canonical.length; i++) {
+    hash ^= canonical.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return `${rows.length}:${(hash >>> 0).toString(16)}`;
+}
+
+function tzOffsetMinutes(timeZone: string, utcMs: number): number {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    hourCycle: 'h23',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  }).formatToParts(new Date(utcMs));
+  const get = (type: string) => Number(parts.find((part) => part.type === type)?.value ?? 0);
+  const asUTC = Date.UTC(get('year'), get('month') - 1, get('day'), get('hour'), get('minute'), get('second'));
+  return Math.round((asUTC - utcMs) / 60000);
+}
+
+/**
+ * 店舗時間での「日付 時刻」をUTCへ解く。存在しない時刻(DSTのgap)は null。
+ * あいまいな時刻(fold)は早い側(=夏時間側)の発生に決めてオフセットを返す。
+ */
+function resolveWallTime(
+  date: string,
+  time: string,
+  timeZone: string,
+): { offsetMinutes: number } | null {
+  const wallAsUTC = Date.parse(`${date}T${time}:00Z`);
+  if (Number.isNaN(wallAsUTC)) return null;
+  let utc = wallAsUTC;
+  for (let i = 0; i < 4; i++) {
+    utc = wallAsUTC - tzOffsetMinutes(timeZone, utc) * 60000;
+  }
+  const check = new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    hourCycle: 'h23',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).formatToParts(new Date(utc));
+  const get = (type: string) => check.find((part) => part.type === type)?.value ?? '';
+  const same =
+    `${get('year')}-${get('month')}-${get('day')}` === date &&
+    `${get('hour')}:${get('minute')}` === time;
+  if (!same) return null;
+  return { offsetMinutes: tzOffsetMinutes(timeZone, utc) };
+}
+
+function formatUtcOffset(offsetMinutes: number): string {
+  const sign = offsetMinutes < 0 ? '-' : '+';
+  const abs = Math.abs(offsetMinutes);
+  const hours = String(Math.floor(abs / 60)).padStart(2, '0');
+  const minutes = String(abs % 60).padStart(2, '0');
+  return `${sign}${hours}:${minutes}`;
+}
+
+async function staffStoreTimeZone(db: D1Database, accountId: string): Promise<string> {
+  const row = await db
+    .prepare(`SELECT timezone FROM booking_settings WHERE line_account_id = ? LIMIT 1`)
+    .bind(accountId)
+    .first<{ timezone: string | null }>()
+    .catch(() => null);
+  return row?.timezone?.trim() || 'Asia/Tokyo';
+}
+
+/** 同じ曜日・同じ日の範囲が重なっていたら 422 の理由を返す。境界の一致は重なりと見ない。 */
+function findBreakOverlap(
+  items: Array<{ key: string; start_time: string; end_time: string }>,
+): string | null {
+  const sorted = [...items].sort((a, b) => (
+    a.start_time < b.start_time ? -1 : a.start_time > b.start_time ? 1 : 0
+  ));
+  for (let i = 1; i < sorted.length; i++) {
+    if (sorted[i].start_time < sorted[i - 1].end_time) return 'break_overlap';
+  }
+  return null;
+}
+
+booking.get('/api/booking/admin/staff/:id/breaks', async (c) => {
+  const accountId = await resolveAccountIdAdmin(c);
+  if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
+  const staffId = c.req.param('id');
+  if (!(await assertStaffInAccount(c.env.DB, staffId, accountId))) {
+    return c.json({ error: 'staff_not_found_in_account' }, 404);
+  }
+  const rows = await c.env.DB
+    .prepare(
+      `SELECT id, weekday, start_time, end_time, time_zone
+         FROM staff_breaks
+        WHERE staff_id = ?
+        ORDER BY weekday ASC, start_time ASC`,
+    )
+    .bind(staffId)
+    .all<BreakRow & { time_zone: string }>();
+  const breaks = rows.results.map((row) => ({
+    id: row.id,
+    weekday: row.weekday,
+    start_time: row.start_time,
+    end_time: row.end_time,
+    time_zone: row.time_zone,
+  }));
+  return c.json({
+    breaks,
+    version: breaksFingerprint(rows.results),
+  });
+});
+
+booking.put('/api/booking/admin/staff/:id/breaks', requireRole('owner', 'admin'), async (c) => {
+  const accountId = await resolveAccountIdAdmin(c);
+  if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
+  const staffId = c.req.param('id');
+  if (!(await assertStaffInAccount(c.env.DB, staffId, accountId))) {
+    return c.json({ error: 'staff_not_found_in_account' }, 404);
+  }
+  const body = await c.req.json<{
+    breaks?: Array<{ id?: string; weekday: number; start_time: string; end_time: string }>;
+    expectedVersion?: unknown;
+  }>().catch(() => null);
+  if (!body || !Array.isArray(body.breaks)) return c.json({ error: 'invalid_breaks' }, 400);
+  if (body.breaks.length > BREAK_WEEKLY_LIMIT) return c.json({ error: 'too_many_breaks' }, 400);
+  if (typeof body.expectedVersion !== 'string' || body.expectedVersion.length === 0) {
+    return c.json({ error: 'invalid_version' }, 400);
+  }
+  for (const item of body.breaks) {
+    if (!Number.isInteger(item.weekday) || item.weekday < 0 || item.weekday > 6) {
+      return c.json({ error: 'invalid_weekday' }, 422);
+    }
+    if (!isValidTimeRange(item.start_time, item.end_time)) {
+      return c.json({ error: 'invalid_time_range' }, 422);
+    }
+  }
+  const current = await c.env.DB
+    .prepare(
+      `SELECT id, weekday, start_time, end_time
+         FROM staff_breaks
+        WHERE staff_id = ?`,
+    )
+    .bind(staffId)
+    .all<BreakRow>();
+  const currentRows = current.results;
+  const currentVersion = breaksFingerprint(currentRows);
+  const knownIds = new Set(currentRows.map((row) => row.id));
+  const unknown = body.breaks.find((item) => item.id != null && !knownIds.has(item.id));
+  if (currentVersion !== body.expectedVersion || unknown) {
+    return c.json({
+      error: 'version_conflict',
+      data: { version: currentVersion, breaks: currentRows },
+    }, 409);
+  }
+  const byWeekday = new Map<number, Array<{ key: string; start_time: string; end_time: string }>>();
+  body.breaks.forEach((item, index) => {
+    const list = byWeekday.get(item.weekday) ?? [];
+    list.push({ key: item.id ?? `new-${index}`, start_time: item.start_time, end_time: item.end_time });
+    byWeekday.set(item.weekday, list);
+  });
+  for (const list of byWeekday.values()) {
+    if (findBreakOverlap(list)) return c.json({ error: 'break_overlap' }, 422);
+  }
+  const rules = await c.env.DB
+    .prepare(`SELECT weekday, start_time, end_time FROM staff_availability_rules WHERE staff_id = ? AND is_active = 1`)
+    .bind(staffId)
+    .all<{ weekday: number; start_time: string; end_time: string }>();
+  for (const item of body.breaks) {
+    const rule = rules.results.find((entry) => entry.weekday === item.weekday);
+    if (!rule || rule.start_time > item.start_time || item.end_time > rule.end_time) {
+      return c.json({ error: 'break_outside_working_hours' }, 422);
+    }
+  }
+  const timeZone = await staffStoreTimeZone(c.env.DB, accountId);
+  const now = new Date().toISOString();
+  const payloadIds = new Set(body.breaks.map((item) => item.id).filter((id): id is string => id != null));
+  const statements: D1PreparedStatement[] = [
+    ...currentRows
+      .filter((row) => !payloadIds.has(row.id))
+      .map((row) => c.env.DB.prepare(`DELETE FROM staff_breaks WHERE id = ?`).bind(row.id)),
+    ...body.breaks.map((item) => {
+      if (item.id != null) {
+        return c.env.DB
+          .prepare(
+            `UPDATE staff_breaks
+                SET weekday = ?, start_time = ?, end_time = ?, time_zone = ?, updated_at = ?
+              WHERE id = ? AND staff_id = ?`,
+          )
+          .bind(item.weekday, item.start_time, item.end_time, timeZone, now, item.id, staffId);
+      }
+      return c.env.DB
+        .prepare(
+          `INSERT INTO staff_breaks
+            (id, staff_id, weekday, start_time, end_time, time_zone)
+           VALUES (?, ?, ?, ?, ?, ?)`,
+        )
+        .bind(crypto.randomUUID(), staffId, item.weekday, item.start_time, item.end_time, timeZone);
+    }),
+  ];
+  if (statements.length > 0) await c.env.DB.batch(statements);
+  const fresh = await c.env.DB
+    .prepare(
+      `SELECT id, weekday, start_time, end_time, time_zone
+         FROM staff_breaks
+        WHERE staff_id = ?
+        ORDER BY weekday ASC, start_time ASC`,
+    )
+    .bind(staffId)
+    .all<BreakRow & { time_zone: string }>();
+  const freshRows = fresh.results.map((row) => ({
+    id: row.id,
+    weekday: row.weekday,
+    work_date: null,
+    start_time: row.start_time,
+    end_time: row.end_time,
+    time_zone: row.time_zone,
+  }));
+  return c.json({ ok: true, count: freshRows.length, version: breaksFingerprint(freshRows), breaks: freshRows });
+});
+
+// ---- staff break dates (N-405 #655; 日付指定の休憩) ----
+
+booking.get('/api/booking/admin/staff/:id/break-dates', async (c) => {
+  const accountId = await resolveAccountIdAdmin(c);
+  if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
+  const staffId = c.req.param('id');
+  if (!(await assertStaffInAccount(c.env.DB, staffId, accountId))) {
+    return c.json({ error: 'staff_not_found_in_account' }, 404);
+  }
+  const rows = await c.env.DB
+    .prepare(
+      `SELECT id, work_date, start_time, end_time, time_zone, start_utc_offset, end_utc_offset
+         FROM staff_break_dates
+        WHERE staff_id = ?
+        ORDER BY work_date ASC, start_time ASC`,
+    )
+    .bind(staffId)
+    .all();
+  return c.json({
+    breaks: rows.results,
+    version: breaksFingerprint(rows.results as unknown as BreakRow[]),
+  });
+});
+
+booking.put('/api/booking/admin/staff/:id/break-dates', requireRole('owner', 'admin'), async (c) => {
+  const accountId = await resolveAccountIdAdmin(c);
+  if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
+  const staffId = c.req.param('id');
+  if (!(await assertStaffInAccount(c.env.DB, staffId, accountId))) {
+    return c.json({ error: 'staff_not_found_in_account' }, 404);
+  }
+  const body = await c.req.json<{
+    breaks?: Array<{ id?: string; work_date: string; start_time: string; end_time: string }>;
+    expectedVersion?: unknown;
+  }>().catch(() => null);
+  if (!body || !Array.isArray(body.breaks)) return c.json({ error: 'invalid_breaks' }, 400);
+  if (body.breaks.length > BREAK_DATE_LIMIT) return c.json({ error: 'too_many_break_dates' }, 400);
+  if (typeof body.expectedVersion !== 'string' || body.expectedVersion.length === 0) {
+    return c.json({ error: 'invalid_version' }, 400);
+  }
+  for (const item of body.breaks) {
+    if (!isValidShiftDate(item.work_date)) {
+      return c.json({ error: 'invalid_date' }, 422);
+    }
+    if (!isValidTimeRange(item.start_time, item.end_time)) {
+      return c.json({ error: 'invalid_time_range' }, 422);
+    }
+  }
+  const current = await c.env.DB
+    .prepare(
+      `SELECT id, work_date, start_time, end_time
+         FROM staff_break_dates
+        WHERE staff_id = ?`,
+    )
+    .bind(staffId)
+    .all<BreakRow>();
+  const currentRows = current.results;
+  const currentVersion = breaksFingerprint(currentRows);
+  const knownIds = new Set(currentRows.map((row) => row.id));
+  const unknown = body.breaks.find((item) => item.id != null && !knownIds.has(item.id));
+  if (currentVersion !== body.expectedVersion || unknown) {
+    return c.json({
+      error: 'version_conflict',
+      data: { version: currentVersion, breaks: currentRows },
+    }, 409);
+  }
+  const byDate = new Map<string, Array<{ key: string; start_time: string; end_time: string }>>();
+  body.breaks.forEach((item, index) => {
+    const list = byDate.get(item.work_date) ?? [];
+    list.push({ key: item.id ?? `new-${index}`, start_time: item.start_time, end_time: item.end_time });
+    byDate.set(item.work_date, list);
+  });
+  for (const list of byDate.values()) {
+    if (findBreakOverlap(list)) return c.json({ error: 'break_overlap' }, 422);
+  }
+  const timeZone = await staffStoreTimeZone(c.env.DB, accountId);
+  const resolved = new Map<string, { startOffset: string; endOffset: string }>();
+  for (const item of body.breaks) {
+    const start = resolveWallTime(item.work_date, item.start_time, timeZone);
+    const end = resolveWallTime(item.work_date, item.end_time, timeZone);
+    if (!start || !end) return c.json({ error: 'dst_gap' }, 422);
+    resolved.set(`${item.work_date}|${item.start_time}|${item.end_time}`, {
+      startOffset: formatUtcOffset(start.offsetMinutes),
+      endOffset: formatUtcOffset(end.offsetMinutes),
+    });
+  }
+  const dates = [...new Set(body.breaks.map((item) => item.work_date))];
+  const rules = await c.env.DB
+    .prepare(`SELECT weekday, start_time, end_time FROM staff_availability_rules WHERE staff_id = ? AND is_active = 1`)
+    .bind(staffId)
+    .all<{ weekday: number; start_time: string; end_time: string }>();
+  const shifts = dates.length === 0 ? { results: [] as Array<{ work_date: string; start_time: string; end_time: string }> } : await c.env.DB
+    .prepare(`SELECT work_date, start_time, end_time FROM staff_shifts WHERE staff_id = ? AND work_date IN (${dates.map(() => '?').join(',')})`)
+    .bind(staffId, ...dates)
+    .all<{ work_date: string; start_time: string; end_time: string }>();
+  for (const item of body.breaks) {
+    const shift = shifts.results.find((entry) => entry.work_date === item.work_date);
+    const working = shift ?? rules.results.find(
+      (entry) => entry.weekday === new Date(`${item.work_date}T00:00:00Z`).getUTCDay(),
+    );
+    if (!working || working.start_time > item.start_time || item.end_time > working.end_time) {
+      return c.json({ error: 'break_outside_working_hours' }, 422);
+    }
+  }
+  const now = new Date().toISOString();
+  const payloadIds = new Set(body.breaks.map((item) => item.id).filter((id): id is string => id != null));
+  const statements: D1PreparedStatement[] = [
+    ...currentRows
+      .filter((row) => !payloadIds.has(row.id))
+      .map((row) => c.env.DB.prepare(`DELETE FROM staff_break_dates WHERE id = ?`).bind(row.id)),
+    ...body.breaks.map((item) => {
+      const offsets = resolved.get(`${item.work_date}|${item.start_time}|${item.end_time}`) ?? {
+        startOffset: '+09:00',
+        endOffset: '+09:00',
+      };
+      if (item.id != null) {
+        return c.env.DB
+          .prepare(
+            `UPDATE staff_break_dates
+                SET work_date = ?, start_time = ?, end_time = ?, time_zone = ?,
+                    start_utc_offset = ?, end_utc_offset = ?, updated_at = ?
+              WHERE id = ? AND staff_id = ?`,
+          )
+          .bind(item.work_date, item.start_time, item.end_time, timeZone,
+            offsets.startOffset, offsets.endOffset, now, item.id, staffId);
+      }
+      return c.env.DB
+        .prepare(
+          `INSERT INTO staff_break_dates
+            (id, staff_id, work_date, start_time, end_time, time_zone,
+             start_utc_offset, end_utc_offset)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .bind(crypto.randomUUID(), staffId, item.work_date, item.start_time, item.end_time,
+          timeZone, offsets.startOffset, offsets.endOffset);
+    }),
+  ];
+  if (statements.length > 0) await c.env.DB.batch(statements);
+  const fresh = await c.env.DB
+    .prepare(
+      `SELECT id, work_date, start_time, end_time, time_zone, start_utc_offset, end_utc_offset
+         FROM staff_break_dates
+        WHERE staff_id = ?
+        ORDER BY work_date ASC, start_time ASC`,
+    )
+    .bind(staffId)
+    .all();
+  return c.json({
+    ok: true,
+    count: (fresh.results as unknown[]).length,
+    version: breaksFingerprint(fresh.results as unknown as BreakRow[]),
+    breaks: fresh.results,
+  });
 });
 
 booking.get('/api/booking/admin/staff/:id/google-calendar', async (c) => {
@@ -2718,6 +3199,21 @@ booking.patch('/api/booking/admin/requests/:id', requireRole('owner', 'admin', '
       startsAt: new Date(row.starts_at),
       now: new Date(),
     });
+    // 承認による確定も同じ起点として数える(#648)。冪等キーは予約IDなので、
+    // 代理登録側と同じ予約を二重に数えることはない。
+    if (row.friend_id) {
+      try {
+        await recordConversionSourceEvent(c.env.DB, {
+          sourceType: 'reservation_confirmed',
+          lineAccountId: accountId,
+          friendId: row.friend_id,
+          sourceEventId: id,
+          metadata: { bookingId: id, bookingType: 'salon', via: 'approve' },
+        });
+      } catch (error) {
+        console.error('booking conversion record failed (approve):', error);
+      }
+    }
     try {
       await syncConfirmedBookingToGoogle(c.env.DB, googleCredentials(c.env), id);
     } catch (error) {

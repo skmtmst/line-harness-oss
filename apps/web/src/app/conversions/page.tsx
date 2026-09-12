@@ -18,6 +18,54 @@ import KpiCard from '@/components/shared/kpi-card'
  * そのまま書いている。「URL到達」だと、誰がどのURLに来たときの話なのかが
  * 読み取れない。
  */
+/**
+ * 編集の入力（N-252）。
+ *
+ * 数値は入力途中で空になるので文字列で持ち、送るときだけ数へ直す。
+ * 途中を数値に強制すると「消して打ち直す」ができない。
+ */
+type EditForm = {
+  name: string
+  sourceType: string
+  deduplicationMode: 'every' | 'once_per_friend' | 'window'
+  deduplicationWindowDays: string
+  valueMode: 'source' | 'fixed' | 'none'
+  fixedValue: string
+  reversalPolicy: 'source_cancelled' | 'manual' | 'none'
+  attributionDays: string
+  targetUrl: string
+}
+
+function toEditForm(item: ConversionDefinitionListItem): EditForm {
+  return {
+    name: item.name,
+    sourceType: item.sourceType,
+    deduplicationMode: item.deduplicationMode,
+    deduplicationWindowDays: item.deduplicationWindowDays == null ? '' : String(item.deduplicationWindowDays),
+    valueMode: item.valueMode,
+    fixedValue: item.value == null ? '' : String(item.value),
+    reversalPolicy: item.reversalPolicy,
+    attributionDays: item.attributionDays == null ? '' : String(item.attributionDays),
+    targetUrl: item.targetUrl ?? '',
+  }
+}
+
+const VALUE_MODE_OPTIONS = [
+  { value: 'fixed', label: '1件あたりの金額を決める' },
+  { value: 'source', label: '連携元の金額を使う' },
+  { value: 'none', label: '金額を数えない' },
+]
+const DEDUP_OPTIONS = [
+  { value: 'every', label: '毎回数える' },
+  { value: 'once_per_friend', label: '1人1回だけ数える' },
+  { value: 'window', label: '決めた日数のあいだは1回だけ数える' },
+]
+const REVERSAL_OPTIONS = [
+  { value: 'manual', label: '人が取り消す' },
+  { value: 'source_cancelled', label: '連携元の取消に合わせる' },
+  { value: 'none', label: '取り消さない' },
+]
+
 function measureLabel(method: ConversionPoint['measureMethod']): string {
   if (method === 'url_reach') return '指定ページへの到達'
   if (method === 'webhook') return 'EC連携からの通知'
@@ -64,6 +112,7 @@ import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
+import { TextField } from '@/components/shared/text-field'
 
 const DAY_MS = 24 * 60 * 60 * 1000
 
@@ -218,6 +267,14 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
   const [detailTarget, setDetailTarget] = useState<ConversionDefinitionListItem | null>(null)
   const [stopping, setStopping] = useState(false)
   const [stopError, setStopError] = useState('')
+  /*
+   * 編集（新版化）。開いたときの版を控えて、送るときにそのまま渡す（N-252）。
+   * 別の人が先に直していたら口が409を返すので、勝手に上書きしない。
+   */
+  const [editTarget, setEditTarget] = useState<ConversionDefinitionListItem | null>(null)
+  const [editForm, setEditForm] = useState<EditForm | null>(null)
+  const [editSaving, setEditSaving] = useState(false)
+  const [editError, setEditError] = useState('')
 
   /**
    * 一覧は検索・並びを口へ渡し、続く頁をすべて読む(#513 M2・M3)。
@@ -289,6 +346,68 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
    * 「消せませんでした」と出る。消えているのに失敗に見える）。
    * 失敗は握りつぶさず、窓の中に運用者の言葉で出す。
    */
+  const openEdit = (target: ConversionDefinitionListItem) => {
+    setDetailTarget(null)
+    setEditTarget(target)
+    setEditForm(toEditForm(target))
+    setEditError('')
+  }
+
+  /**
+   * 編集を送る（N-252）。
+   *
+   * **開いたときの版をそのまま渡す。** 送る直前に読み直して版を取り直すと、
+   * 「別の人が直したこと」を自分で消してしまう。口が409を返したら、
+   * 上書きせずに読み直しを促す。
+   */
+  const submitEdit = async () => {
+    if (!editTarget || !editForm || editSaving) return
+    const name = editForm.name.trim()
+    if (!name) {
+      setEditError('名前を入れてください')
+      return
+    }
+    if (editForm.valueMode === 'fixed' && !editForm.fixedValue.trim()) {
+      setEditError('1件あたりの金額を入れてください')
+      return
+    }
+    if (editForm.deduplicationMode === 'window' && !editForm.deduplicationWindowDays.trim()) {
+      setEditError('数えない日数を入れてください')
+      return
+    }
+    setEditSaving(true)
+    setEditError('')
+    try {
+      const res = await api.conversions.reviseDefinition(editTarget.id, {
+        // 版は編集対象の控えが正本。入力の側にも持つと、片方だけ直したときに食い違う。
+        expectedVersion: editTarget.version,
+        name,
+        sourceType: editForm.sourceType,
+        sourceConfig: editTarget.sourceConfig,
+        deduplicationMode: editForm.deduplicationMode,
+        deduplicationWindowDays: editForm.deduplicationMode === 'window'
+          ? Number(editForm.deduplicationWindowDays) : null,
+        valueMode: editForm.valueMode,
+        fixedValue: editForm.valueMode === 'fixed' ? Number(editForm.fixedValue) : null,
+        reversalPolicy: editForm.reversalPolicy,
+        attributionDays: editForm.attributionDays.trim() ? Number(editForm.attributionDays) : null,
+        targetUrl: editForm.targetUrl.trim() ? editForm.targetUrl.trim() : null,
+        reason: '管理画面で成果地点を編集',
+      })
+      if (!res.success) throw new Error(res.error)
+      setEditTarget(null)
+      setEditForm(null)
+      await load()
+    } catch (error) {
+      const message = error instanceof Error ? error.message : ''
+      setEditError(message.includes('更新されています')
+        ? 'ほかの人がこの成果地点を先に直しました。上書きしていません。画面を閉じて読み直してから、もう一度お試しください。'
+        : message || '編集できませんでした。入力を確かめて、もう一度お試しください。')
+    } finally {
+      setEditSaving(false)
+    }
+  }
+
   const openStop = async (target: ConversionDefinitionListItem) => {
     setDetailTarget(null)
     setStopTarget(target)
@@ -614,6 +733,11 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
           <div className="flex justify-end gap-2">
             <Button onClick={() => setDetailTarget(null)}>閉じる</Button>
             {detailTarget.status === 'active' ? (
+              <Button onClick={() => openEdit(detailTarget)}>
+                編集
+              </Button>
+            ) : null}
+            {detailTarget.status === 'active' ? (
               <Button onClick={() => void openStop(detailTarget)}>
                 停止・削除
               </Button>
@@ -629,6 +753,89 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
             <div><dt className="text-ink-faint">利用先</dt><dd className="text-ink mt-1 font-semibold">{usageLabel(detailTarget)}</dd></div>
             <div><dt className="text-ink-faint">取消内訳</dt><dd className="text-ink mt-1 font-semibold">{detailTarget.metrics.cancellationCount == null ? '取消台帳は未接続' : `${detailTarget.metrics.cancellationCount}件・¥${(detailTarget.metrics.cancellationValue ?? 0).toLocaleString('ja-JP')}`}</dd></div>
           </dl>
+        ) : null}
+      </Dialog>
+
+      <Dialog
+        open={editTarget !== null && editForm !== null}
+        title={editTarget ? `「${editTarget.name}」を編集` : ''}
+        description="直すと次の版になります。過去に数えた成果と金額は、そのまま残ります。"
+        onCancel={() => { setEditTarget(null); setEditForm(null) }}
+        footer={(
+          <div className="flex justify-end gap-2">
+            <Button onClick={() => { setEditTarget(null); setEditForm(null) }}>やめる</Button>
+            <Button variant="primary" disabled={editSaving} onClick={() => void submitEdit()}>
+              {editSaving ? '保存中...' : 'この内容にする'}
+            </Button>
+          </div>
+        )}
+      >
+        {editForm ? (
+          <div className="space-y-3 text-sm">
+            <label className="block">
+              <span className="text-ink-faint text-xs">名前</span>
+              <TextField
+                aria-label="成果地点の名前"
+                value={editForm.name}
+                maxLength={120}
+                onChange={(event) => setEditForm({ ...editForm, name: event.target.value })}
+              />
+            </label>
+            <label className="block">
+              <span className="text-ink-faint text-xs">金額の決め方</span>
+              <Select
+                aria-label="金額の決め方"
+                value={editForm.valueMode}
+                options={VALUE_MODE_OPTIONS}
+                onChange={(value) => setEditForm({ ...editForm, valueMode: value as EditForm['valueMode'] })}
+              />
+            </label>
+            {editForm.valueMode === 'fixed' ? (
+              <label className="block">
+                <span className="text-ink-faint text-xs">1件あたりの金額</span>
+                <TextField
+                  aria-label="1件あたりの金額"
+                  inputMode="numeric"
+                  value={editForm.fixedValue}
+                  onChange={(event) => setEditForm({ ...editForm, fixedValue: event.target.value })}
+                />
+              </label>
+            ) : null}
+            <label className="block">
+              <span className="text-ink-faint text-xs">同じ人を何回数えるか</span>
+              <Select
+                aria-label="同じ人を何回数えるか"
+                value={editForm.deduplicationMode}
+                options={DEDUP_OPTIONS}
+                onChange={(value) => setEditForm({ ...editForm, deduplicationMode: value as EditForm['deduplicationMode'] })}
+              />
+            </label>
+            {editForm.deduplicationMode === 'window' ? (
+              <label className="block">
+                <span className="text-ink-faint text-xs">数えない日数（1〜365）</span>
+                <TextField
+                  aria-label="数えない日数"
+                  inputMode="numeric"
+                  value={editForm.deduplicationWindowDays}
+                  onChange={(event) => setEditForm({ ...editForm, deduplicationWindowDays: event.target.value })}
+                />
+              </label>
+            ) : null}
+            <label className="block">
+              <span className="text-ink-faint text-xs">取り消しの扱い</span>
+              <Select
+                aria-label="取り消しの扱い"
+                value={editForm.reversalPolicy}
+                options={REVERSAL_OPTIONS}
+                onChange={(value) => setEditForm({ ...editForm, reversalPolicy: value as EditForm['reversalPolicy'] })}
+              />
+            </label>
+            <p className="text-ink-faint text-xs leading-5">
+              いま使っている場所（{usageLabel(editTarget!)}）は、この成果地点のまま次の版へ引き継がれます。
+              過去の成果は数えたときの金額のままなので、集計額は変わりません。
+            </p>
+            {editError ? <p className="text-xs font-semibold text-ink">{editError}</p> : null}
+          </div>
         ) : null}
       </Dialog>
 

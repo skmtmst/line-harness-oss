@@ -4,7 +4,7 @@ export type FriendAddKind = 'first_time' | 'returning';
 export type FriendAddAttributionStatus = 'captured' | 'unavailable';
 export type FriendAddCandidateSource = 'line_login' | 'liff' | 'short_link';
 export type FriendAddCandidateStatus = 'pending' | 'consumed' | 'expired' | 'late';
-export type FriendAddRoutingStatus = 'pending' | 'completed' | 'failed' | 'suppressed';
+export type FriendAddRoutingStatus = 'pending' | 'completed' | 'failed' | 'suppressed' | 'partial_failed';
 
 export interface FriendAddAttributionCandidate {
   id: string;
@@ -203,6 +203,201 @@ export async function captureFriendAddEventAttribution(
   return { refCode: candidate.ref_code, entryRouteId: candidate.entry_route_id };
 }
 
+/**
+ * 送信権の予約の有効期間（分）。処理が終われば予約を消すので、残るのは
+ * 処理中に落ちたときだけ。その予約は古くなれば奪い直せる。
+ * 通常の処理は数秒で終わるため、2分でも余裕がある。
+ */
+export const FRIEND_ADD_SEND_CLAIM_TTL_MINUTES = 2;
+
+/**
+ * 「送り始めた」印（dispatched_at）が効く時間（分）。
+ *
+ * この印は「並行して走っている別の実行が、いま送っている最中かもしれない」
+ * ことを表す。守りたいのはその**同時実行の窓**だけで、Workers の実行時間の
+ * 上限を考えれば数分で足りる。ここを無期限にすると、通信が1回切れただけで
+ * その友だちへ**二度と**友だち追加配信が届かなくなる（印を消す経路が
+ * 予約の解放しか無く、送達不明では解放しないため）。混雑時の 429 でも
+ * 起きるので、例外的な事故ではない。
+ *
+ * 期限を過ぎたあとの「送ったかもしれない相手へ送り直さない」は、台帳側の
+ * 再送制限が受け持つ（`delivery_unknown` の行を届いた形跡として数える）。
+ * そちらは運用者が時間を決められる。二重の防ぎ方を、短い同時実行の窓と
+ * 運用者が決める再送の窓に分けている。
+ *
+ * 予約の TTL（2分）より十分に長くとる。長い送信が続いていても、
+ * 関門を通るたびに claimed_at が延びるので予約自体は奪われない。
+ */
+export const FRIEND_ADD_DISPATCH_MARK_TTL_MINUTES = 30;
+
+/**
+ * 別webhook IDで並行に届いたfollowの二重送信を防ぐ送信権の予約。
+ * (line_account_id, friend_id) に1行だけ置き、先に置いた実行だけが送る。
+ */
+export interface FriendAddSendClaim {
+  /** 送ってよいか。 */
+  held: boolean;
+  /**
+   * 奪い直したとき、**前の持ち主が外部送信を始めた印が残っていた**か。
+   * true なら送ったかもしれないので、奪った側は送らない（送達不明）。
+   * 送り直すと同じ人へ2通届く。
+   */
+  previousDispatchUnknown: boolean;
+  /**
+   * 予約の世代。回収（奪い直し）のたびに1つ進む。外部送信・アクション・
+   * 台帳の確定はすべて (event_id, generation) の組で持ち主を確かめてから
+   * 行う。回収された古い持ち主はここで弾かれる（fencing）。
+   * 取れなかったときは 0。
+   */
+  generation: number;
+}
+
+/**
+ * 送信権の予約を**1文の CAS（compare-and-set）**で取る。
+ *
+ * 空いていれば置く。誰かの予約があっても、古い（TTL超過）ときだけ
+ * 自分の event_id へ書き換えて世代を1つ進める。**取れた行そのものを
+ * RETURNING で受け取る**ので、「置いた」あとに別の実行が奪って、
+ * その世代を自分のものと読み違える隙が無い。
+ *
+ * 予約表が読めないときは投げる。呼ぶ側は送らない（fail-closed）。
+ * ここで「送ってよい」に倒すと、fencing の無い実行が二重送信する。
+ */
+export async function claimFriendAddSendRight(
+  db: D1Database,
+  input: { lineAccountId: string; friendId: string; eventId: string; now?: string },
+): Promise<FriendAddSendClaim> {
+  const now = input.now ?? jstNow();
+  const cutoff = addMinutes(now, -FRIEND_ADD_SEND_CLAIM_TTL_MINUTES);
+  const dispatchCutoff = addMinutes(now, -FRIEND_ADD_DISPATCH_MARK_TTL_MINUTES);
+  const won = await db.prepare(
+    `INSERT INTO friend_add_send_claims
+       (line_account_id, friend_id, event_id, generation, claimed_at, dispatched_at)
+     VALUES (?, ?, ?, 1, ?, NULL)
+     ON CONFLICT (line_account_id, friend_id) DO UPDATE
+        SET event_id = excluded.event_id,
+            generation = friend_add_send_claims.generation + 1,
+            claimed_at = excluded.claimed_at,
+            -- 期限を過ぎた「送り始めた」印は、奪い直すこの1文で落とす。
+            -- 残したままにすると、通信が1回切れただけでその友だちへ
+            -- 二度と届かなくなる。まだ新しい印はそのまま残す。
+            dispatched_at = CASE
+              WHEN friend_add_send_claims.dispatched_at IS NULL THEN NULL
+              WHEN friend_add_send_claims.dispatched_at < ? THEN NULL
+              ELSE friend_add_send_claims.dispatched_at
+            END
+      WHERE friend_add_send_claims.claimed_at < ?
+     RETURNING event_id, generation, dispatched_at`,
+  ).bind(
+    input.lineAccountId, input.friendId, input.eventId, now, dispatchCutoff, cutoff,
+  ).first<{ event_id: string; generation: number; dispatched_at: string | null }>();
+  // 他人の予約が生きている（DO UPDATE の WHERE が偽）ときは行が返らない。
+  if (!won || won.event_id !== input.eventId) {
+    return { held: false, generation: 0, previousDispatchUnknown: false };
+  }
+  /*
+   * 奪い直したときに、**まだ期限内の**「送り始めた」印が残っていたら、
+   * その実行は送っている最中かもしれない。予約は持てても送らない。
+   * RETURNING は書き換えたあとの値を返すので、期限切れの印はここで
+   * すでに NULL になっている。
+   */
+  return {
+    held: true,
+    generation: won.generation,
+    previousDispatchUnknown: won.dispatched_at != null,
+  };
+}
+
+/**
+ * まだ予約の持ち主かを確かめ、**同じ1文で貸出期限を延ばす**（heartbeat）。
+ *
+ * 外部送信の直前に必ず通す。確認と延長を別の文に分けると、確認して
+ * から送っている最中に期限切れとみなされ、別の実行に奪われる。奪った側も
+ * 送るため、同じ人に2通届く。TTL より長くかかる送信でも、この1文を
+ * くぐるたびに期限が延びるので奪われない。
+ *
+ * 戻り値 false は「もう持ち主ではない」。呼ぶ側は外部効果を行わない。
+ */
+export async function touchFriendAddSendClaim(
+  db: D1Database,
+  input: {
+    lineAccountId: string; friendId: string; eventId: string;
+    generation: number; now?: string;
+    /**
+     * これから外部へ送る場合は true。予約に「送り始めた」印を立てる。
+     * 途中で消えても、奪った側がこの印を見て送らないようにするため。
+     * DBだけを触る効果（登録・アクション）では立てない。
+     */
+    markDispatching?: boolean;
+  },
+): Promise<boolean> {
+  if (!Number.isInteger(input.generation) || input.generation < 1) return false;
+  const now = input.now ?? jstNow();
+  const result = await db.prepare(
+    `UPDATE friend_add_send_claims
+        SET claimed_at = ?,
+            dispatched_at = CASE WHEN ? = 1 THEN COALESCE(dispatched_at, ?) ELSE dispatched_at END
+      WHERE line_account_id = ? AND friend_id = ? AND event_id = ? AND generation = ?`,
+  ).bind(
+    now, input.markDispatching ? 1 : 0, now,
+    input.lineAccountId, input.friendId, input.eventId, input.generation,
+  ).run();
+  return (result.meta?.changes ?? 0) === 1;
+}
+
+/**
+ * 使い終わった予約を消す。**自分の event_id と世代の行だけ**消す。
+ * 回収で世代が進んでいたら（別の持ち主の行になっていたら）消さない。
+ */
+export async function releaseFriendAddSendRight(
+  db: D1Database,
+  input: { lineAccountId: string; friendId: string; eventId: string; generation: number },
+): Promise<void> {
+  if (!Number.isInteger(input.generation) || input.generation < 1) return;
+  await db.prepare(
+    `DELETE FROM friend_add_send_claims
+      WHERE line_account_id = ? AND friend_id = ? AND event_id = ? AND generation = ?`,
+  ).bind(input.lineAccountId, input.friendId, input.eventId, input.generation).run();
+}
+
+/**
+ * **送れたという事実だけを、確定とは別の1文で先に残す。**
+ *
+ * 台帳の確定（`markFriendAddEventRouting`）は、状態・理由・規則・購読まで
+ * まとめて書く大きな1文で、そこが落ちると行は `pending` のまま残る。
+ * `pending` は再送制限が数える材料（`completed` / `delivery_count > 0` /
+ * `first_delivery_sent_at` / `delivery_unknown`）のどれにも当たらないので、
+ * 「送り始めた印」の期限が切れたあと、次の追加が**もう1通送ってしまう**。
+ *
+ * そこで、送れたと分かったその場で、送信の事実だけを小さな1文で残す。
+ * 確定が落ちても、この行が再送制限の材料になって2通目を止める。
+ *
+ * 世代で締めない（fence を取らない）のは、これが**自分のイベント行**への
+ * 「自分が送った」という記録だから。回収されていても、送った事実は事実で、
+ * 残すほうが安全側になる。
+ */
+export async function recordFriendAddDelivery(
+  db: D1Database,
+  input: { eventId: string; lineAccountId: string; sentAt?: string },
+): Promise<void> {
+  const sentAt = input.sentAt ?? jstNow();
+  await db.prepare(
+    `UPDATE friend_add_events
+        SET delivery_count = delivery_count + 1,
+            first_delivery_sent_at = COALESCE(first_delivery_sent_at, ?)
+      WHERE id = ? AND line_account_id = ?`,
+  ).bind(sentAt, input.eventId, input.lineAccountId).run();
+}
+
+/**
+ * 台帳の確定。
+ *
+ * `fence` を渡すと、**同じ1文の中で**送信権の予約（event_id と世代）を
+ * 突き合わせ、持ち主でなければ1行も書かない。確かめてから書く2文にすると
+ * その隙に回収されることがあり、回収後の古い持ち主が結果を上書きできる。
+ *
+ * 戻り値は書けたかどうか。false は「持ち主でなくなっていた」を表す。
+ */
 export async function markFriendAddEventRouting(
   db: D1Database,
   input: {
@@ -214,19 +409,16 @@ export async function markFriendAddEventRouting(
     errorCode?: string | null;
     scenarioEnrollmentId?: string | null;
     deliveryCount?: number;
+    fence?: { friendId: string; generation: number };
   },
-): Promise<void> {
-  await db.prepare(
-    `UPDATE friend_add_events
-        SET routing_status = ?, routing_rule_id = ?, winning_rule_version_id = ?,
-            error_code = ?, scenario_enrollment_id = ?, delivery_count = ?,
-            first_delivery_sent_at = CASE
-              WHEN ? > 0 THEN COALESCE(first_delivery_sent_at, ?)
-              ELSE first_delivery_sent_at
-            END,
-            processed_at = ?
-      WHERE id = ? AND line_account_id = ?`,
-  ).bind(
+): Promise<boolean> {
+  const fence = input.fence;
+  const fenceSql = fence
+    ? ` AND EXISTS (SELECT 1 FROM friend_add_send_claims c
+                     WHERE c.line_account_id = ? AND c.friend_id = ?
+                       AND c.event_id = ? AND c.generation = ?)`
+    : '';
+  const bindings: unknown[] = [
     input.status,
     input.routingRuleId ?? null,
     input.winningRuleVersionId ?? null,
@@ -238,7 +430,22 @@ export async function markFriendAddEventRouting(
     jstNow(),
     input.eventId,
     input.lineAccountId,
-  ).run();
+  ];
+  if (fence) {
+    bindings.push(input.lineAccountId, fence.friendId, input.eventId, fence.generation);
+  }
+  const result = await db.prepare(
+    `UPDATE friend_add_events
+        SET routing_status = ?, routing_rule_id = ?, winning_rule_version_id = ?,
+            error_code = ?, scenario_enrollment_id = ?, delivery_count = ?,
+            first_delivery_sent_at = CASE
+              WHEN ? > 0 THEN COALESCE(first_delivery_sent_at, ?)
+              ELSE first_delivery_sent_at
+            END,
+            processed_at = ?
+      WHERE id = ? AND line_account_id = ?${fenceSql}`,
+  ).bind(...bindings).run();
+  if ((result.meta?.changes ?? 0) !== 1) return false;
   // 取得待ちを閉じた直後に届いた候補を、次回の再追加へ持ち越さない。
   await db.prepare(
     `UPDATE friend_add_attribution_candidates
@@ -250,6 +457,7 @@ export async function markFriendAddEventRouting(
     input.lineAccountId, input.eventId, input.lineAccountId,
     input.eventId, input.lineAccountId,
   ).run();
+  return true;
 }
 
 export async function listFriendAddEvents(

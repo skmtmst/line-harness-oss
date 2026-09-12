@@ -147,6 +147,7 @@ export const FEATURE_ROUTE_MANIFEST: readonly FeatureRouteMetadata[] = [
   exempt('/api/tenants', 'core', '統括管理'),
   exempt('/api/setup', 'core', '初期設定'),
   exempt('/api/getting-started', 'core', '初期設定'),
+  exempt('/api/hq/templates', 'core', '統括ひな形。ルート内でtenantと統括編集権限を検証'),
   exempt('/api/recipes', 'core', '設定テンプレート'),
   exempt('/api/manual-links', 'core', 'ヘルプ導線設定'),
   exempt('/api/account-handovers', 'core', 'アカウント引継ぎ'),
@@ -194,6 +195,12 @@ export const FEATURE_ROUTE_MANIFEST: readonly FeatureRouteMetadata[] = [
 
 /** 同じ prefix 内で公開経路と管理経路が分かれる例外。 */
 export const FEATURE_ROUTE_PATTERN_MANIFEST: readonly FeatureRoutePatternMetadata[] = [
+  {
+    pattern: /^\/api\/integrations\/ai-loop\/reports$/,
+    methods: ['POST'],
+    accountResolver: 'none',
+    classification: { kind: 'public', reason: 'HMAC署名で検証するAI開発状況の一方向報告' },
+  },
   {
     pattern: /^\/api\/affiliates\/click$/,
     methods: ['POST'],

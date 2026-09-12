@@ -308,7 +308,8 @@ automations.put(
     };
     const body = await c.req.json<DraftBody>().catch((): DraftBody => ({}));
     return draftEndpoint(c, async () => {
-      await updateAutomationDraft(c.env.DB, {
+      // 中身が変わると札も変わる。画面が次の突き合わせに使えるよう返す。
+      const saved = await updateAutomationDraft(c.env.DB, {
         id: c.req.param('id'),
         lineAccountId: accountId,
         expectedDraftVersionId: body.expectedDraftVersionId,
@@ -318,7 +319,7 @@ automations.put(
         conditions: body.conditions,
         actions: body.actions,
       });
-      return { updated: true };
+      return { updated: true, draftVersionId: saved.draftVersionId };
     });
   },
 );

@@ -11,7 +11,7 @@ import {
 } from './event-waitlist.js';
 import type { EventWaitlistOfferSender } from './event-waitlist.js';
 
-function asD1(sqlite: Database.Database): D1Database {
+function asD1(sqlite: Database.Database, beforeRun?: (query: string) => Promise<void>): D1Database {
   function prepare(query: string): D1PreparedStatement {
     const statement = sqlite.prepare(query);
     const make = (params: unknown[]): D1PreparedStatement => ({
@@ -23,6 +23,7 @@ function asD1(sqlite: Database.Database): D1Database {
         return (statement.get(...params) as T | undefined) ?? null;
       },
       async run<T>() {
+        if (beforeRun) await beforeRun(query);
         const info = statement.run(...params);
         return { success: true, meta: { changes: info.changes }, results: [] } as T;
       },
@@ -150,6 +151,62 @@ describe('V6 event waitlist and applicants', () => {
     })).resolves.toEqual({ kind: 'conflict', currentVersion: 2 });
   });
 
+  test('同じ枠に成立済み予約があれば、本人上限なしでも再度繰り上げない', async () => {
+    seedBooking();
+    seedWaitlist();
+    sqlite.exec(`UPDATE events SET max_bookings_per_friend = NULL;
+                UPDATE event_bookings SET identity_key = 'friend-b' WHERE id = 'booking-a';`);
+    const before = sqlite.prepare(`SELECT * FROM event_waitlist`).all();
+    const sender = vi.fn<EventWaitlistOfferSender>().mockResolvedValue(undefined);
+    expect(await promoteEventWaitlist(db, {
+      occurrenceId: 'slot-a', lineAccountId: 'account-a', sender,
+    })).toMatchObject({ kind: 'noop', reason: 'applicant_ineligible' });
+    expect(sender).not.toHaveBeenCalled();
+    expect(sqlite.prepare(`SELECT * FROM event_waitlist`).all()).toEqual(before);
+  });
+
+  test('繰上げ候補の読み取り後に別枠の予約が成立しても、案内確保の文で本人上限を守る', async () => {
+    seedWaitlist();
+    sqlite.exec(`UPDATE events SET max_bookings_per_friend = 1`);
+    let reached!: () => void;
+    let resume!: () => void;
+    const ready = new Promise<void>(resolve => { reached = resolve; });
+    const released = new Promise<void>(resolve => { resume = resolve; });
+    db = asD1(sqlite, async query => {
+      if (/SET status = 'offered'/.test(query)) { reached(); await released; }
+    });
+    const before = sqlite.prepare(`SELECT * FROM event_waitlist`).all();
+    const sender = vi.fn<EventWaitlistOfferSender>().mockResolvedValue(undefined);
+    const promotion = promoteEventWaitlist(db, {
+      occurrenceId: 'slot-a', lineAccountId: 'account-a', sender,
+    });
+    await ready;
+    sqlite.exec(`INSERT INTO event_bookings
+      (id, line_account_id, event_id, slot_id, friend_id, identity_key, status, requested_at)
+      VALUES ('other-booking', 'account-a', 'event-a', 'slot-empty', 'friend-b',
+              'friend-b', 'confirmed', '2026-09-01T00:00:00.000Z')`);
+    resume();
+    expect(await promotion).toMatchObject({ kind: 'noop', reason: 'applicant_ineligible' });
+    expect(sender).not.toHaveBeenCalled();
+    expect(sqlite.prepare(`SELECT * FROM event_waitlist`).all()).toEqual(before);
+  });
+
+  test('別枠で同一人物に保留中の席がある場合も、本人上限を超えて案内しない', async () => {
+    seedWaitlist();
+    sqlite.exec(`UPDATE events SET max_bookings_per_friend = 1;
+      INSERT INTO event_waitlist (id, line_account_id, event_id, slot_id, friend_id, identity_key,
+        status, offered_at, offer_expires_at, created_at, updated_at)
+      VALUES ('other-offer', 'account-a', 'event-a', 'slot-empty', 'friend-b', 'friend-b',
+        'offered', '2026-09-01', '2099-05-01', '2026-09-01', '2026-09-01')`);
+    const sender = vi.fn<EventWaitlistOfferSender>().mockResolvedValue(undefined);
+    expect(await promoteEventWaitlist(db, {
+      occurrenceId: 'slot-a', lineAccountId: 'account-a', sender,
+    })).toMatchObject({ kind: 'noop', reason: 'applicant_ineligible' });
+    expect(sender).not.toHaveBeenCalled();
+    expect(sqlite.prepare(`SELECT status FROM event_waitlist WHERE id = 'wait-a'`).get())
+      .toEqual({ status: 'waiting' });
+  });
+
   test('通知失敗は成立扱いにせず待機へ戻す', async () => {
     seedBooking();
     seedWaitlist();
@@ -161,6 +218,45 @@ describe('V6 event waitlist and applicants', () => {
     expect(sqlite.prepare(
       `SELECT status, offered_at, offer_expires_at, offer_token_hash FROM event_waitlist WHERE id = 'wait-a'`,
     ).get()).toEqual({ status: 'waiting', offered_at: null, offer_expires_at: null, offer_token_hash: null });
+  });
+
+  test.each(['accepted', 'offered'])('空席確認後に増えた%sの保留人数も確保のSQLで数える', async status => {
+    seedWaitlist();
+    sqlite.exec(`UPDATE event_waitlist SET party_size = 2`);
+    const before = sqlite.prepare(`SELECT * FROM event_waitlist WHERE id = 'wait-a'`).get();
+    // offeredは期限切れでも、失効処理前の保留行として席数へ含める。
+    db = asD1(sqlite, async query => {
+      if (!/SET status = 'offered'/.test(query)) return;
+      sqlite.prepare(`INSERT INTO event_waitlist
+        (id, line_account_id, event_id, slot_id, friend_id, identity_key, status,
+         party_size, offered_at, offer_expires_at, created_at, updated_at)
+        VALUES ('held', 'account-a', 'event-a', 'slot-a', 'friend-c', 'friend-c', ?,
+          2, '2026-09-01', '2026-09-02', '2026-09-01', '2026-09-01')`).run(status);
+    });
+    const sender = vi.fn<EventWaitlistOfferSender>().mockResolvedValue(undefined);
+    expect(await promoteEventWaitlist(db, {
+      occurrenceId: 'slot-a', lineAccountId: 'account-a', sender,
+      now: new Date('2026-09-07T00:00:00.000Z'),
+    })).toMatchObject({ kind: 'noop', reason: 'party_too_large' });
+    expect(sender).not.toHaveBeenCalled();
+    expect(sqlite.prepare(`SELECT * FROM event_waitlist WHERE id = 'wait-a'`).get()).toEqual(before);
+  });
+
+  test.each([1, null])('空席確認後に定員が%sへ変わったら古い容量で案内しない', async capacity => {
+    seedWaitlist();
+    sqlite.exec(`UPDATE event_waitlist SET party_size = 2`);
+    const before = sqlite.prepare(`SELECT * FROM event_waitlist`).all();
+    db = asD1(sqlite, async query => {
+      if (/SET status = 'offered'/.test(query)) {
+        sqlite.prepare(`UPDATE event_slots SET capacity = ? WHERE id = 'slot-a'`).run(capacity);
+      }
+    });
+    const sender = vi.fn<EventWaitlistOfferSender>().mockResolvedValue(undefined);
+    expect(await promoteEventWaitlist(db, {
+      occurrenceId: 'slot-a', lineAccountId: 'account-a', sender,
+    })).toMatchObject({ kind: 'noop', reason: capacity == null ? 'no_capacity' : 'party_too_large' });
+    expect(sender).not.toHaveBeenCalled();
+    expect(sqlite.prepare(`SELECT * FROM event_waitlist`).all()).toEqual(before);
   });
 
   test('暗号化済みトークンだけのアカウントを送信先なしと誤判定しない', async () => {

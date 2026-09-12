@@ -6,13 +6,14 @@ import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 
 const pushMessageWithRequestId = vi.hoisted(() => vi.fn());
 const sendOperationEmail = vi.hoisted(() => vi.fn());
+const canAccessAllLineAccounts = vi.hoisted(() => vi.fn(async () => true));
 vi.mock('@line-crm/line-sdk', () => ({
   LineClient: class {
     pushMessageWithRequestId = pushMessageWithRequestId;
   },
 }));
 vi.mock('../services/account-access.js', () => ({
-  canAccessAllLineAccounts: vi.fn(async () => true),
+  canAccessAllLineAccounts,
 }));
 vi.mock('../services/operation-notifications.js', () => ({ sendOperationEmail }));
 
@@ -69,6 +70,16 @@ function seed(db: SqliteD1) {
     importance: 'important', recipientIds: ['owner-1'], recipientLabel: 'オーナー',
     message: '新しい予約が入りました', dedupeMinutes: 10,
   }));
+  // 登録簿に無いきっかけのルール。画面の選択肢を直しても、API を直接叩けば
+  // この形は作れる。公開の口で断れるかを見るために置く。
+  db.raw.prepare(`
+    INSERT INTO notification_rules
+      (id, name, event_type, conditions, channels, line_account_id, is_active)
+    VALUES ('rule-unconnected', '受信箱に届いたら', 'message_received', ?, '["dashboard","line"]', 'account-1', 0)
+  `).run(JSON.stringify({
+    importance: 'normal', recipientIds: ['owner-1'], recipientLabel: 'オーナー',
+    message: '受信箱に届きました', dedupeMinutes: 0,
+  }));
 }
 
 describe('運用者へのお知らせの送信と実行記録', () => {
@@ -79,6 +90,8 @@ describe('運用者へのお知らせの送信と実行記録', () => {
     pushMessageWithRequestId.mockResolvedValue({ data: {}, requestId: 'line-request-1' });
     sendOperationEmail.mockReset();
     sendOperationEmail.mockResolvedValue(undefined);
+    canAccessAllLineAccounts.mockReset();
+    canAccessAllLineAccounts.mockResolvedValue(true);
     testDb = createTestD1();
     seed(testDb);
   });
@@ -92,6 +105,40 @@ describe('運用者へのお知らせの送信と実行記録', () => {
     await expect(response.json()).resolves.toMatchObject({
       data: { summary: { staff: 2, canReceive: 1, line: 1, email: 0, dashboard: 0, unavailable: 1 } },
     });
+  });
+
+  /*
+   * 審査(2026-09-12)が見つけた形。画面が保存していた message_received は
+   * 公開が 200 で通り is_active=1 になるのに、dispatch は unknown_event_type
+   * で断るので通知は0件だった。**公開できて届かない**のが一番悪い。
+   * 公開の時点で断ることで、静かな失敗を見える失敗にする。
+   */
+  it('登録簿に無いきっかけは公開できず、停止のまま残る', async () => {
+    const response = await app(testDb.db).request(
+      '/api/notifications/operator-rules/rule-unconnected/publish',
+      json({ lineAccountId: 'account-1' }),
+    );
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toMatchObject({
+      success: false, code: 'event_type_not_connected',
+    });
+    // 断ったのに公開されていたら意味がない。台帳側も見る。
+    const row = testDb.raw.prepare(
+      `SELECT is_active FROM notification_rules WHERE id = 'rule-unconnected'`,
+    ).get() as { is_active: number };
+    expect(row.is_active).toBe(0);
+  });
+
+  it('登録簿にあるきっかけは、今までどおり公開できる（締めすぎていない）', async () => {
+    const response = await app(testDb.db).request(
+      '/api/notifications/operator-rules/rule-1/publish',
+      json({ lineAccountId: 'account-1' }),
+    );
+    expect(response.status).toBe(200);
+    const row = testDb.raw.prepare(
+      `SELECT is_active FROM notification_rules WHERE id = 'rule-1'`,
+    ).get() as { is_active: number };
+    expect(row.is_active).toBe(1);
   });
 
   it('宛先を確認して公開し、同じ発生元をLINEと管理画面へ二重送信しない', async () => {
@@ -170,6 +217,98 @@ describe('運用者へのお知らせの送信と実行記録', () => {
     `).get() as { action: string; detail_json: string };
     expect(audit.action).toBe('exported');
     expect(JSON.parse(audit.detail_json)).toMatchObject({ reason: '月次確認' });
+  });
+
+  it('他アカウントの自動発火は403で止める', async () => {
+    canAccessAllLineAccounts.mockResolvedValueOnce(false);
+    const response = await app(testDb.db).request(
+      '/api/notifications/operator-events',
+      json({ lineAccountId: 'account-9', eventType: 'booking_created', sourceEventId: 'x-1' }),
+    );
+    expect(response.status).toBe(403);
+    expect(pushMessageWithRequestId).not.toHaveBeenCalled();
+    expect(testDb.raw.prepare(`SELECT COUNT(*) AS count FROM notification_instances`).get())
+      .toEqual({ count: 0 });
+  });
+
+  it('未登録のきっかけは400で止める', async () => {
+    const response = await app(testDb.db).request(
+      '/api/notifications/operator-events',
+      json({ lineAccountId: 'account-1', eventType: 'ghost_event', sourceEventId: 'x-1' }),
+    );
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({
+      success: false, code: 'unknown_event_type',
+    });
+  });
+
+  it('登録簿の口から代表4件がすべて接続済みと分かる', async () => {
+    const response = await app(testDb.db).request(
+      '/api/notifications/operator-event-types?lineAccountId=account-1',
+    );
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      data: {
+        summary: { total: 4, connected: 4, unconnected: 0 },
+      },
+    });
+    const body = await (await app(testDb.db).request(
+      '/api/notifications/operator-event-types?lineAccountId=account-1',
+    )).json() as { data: { items: Array<{ eventType: string; connected: boolean }> } };
+    expect(body.data.items.map((item) => item.eventType).sort()).toEqual([
+      'booking_created', 'broadcast_completed', 'ec_order_received', 'form_submitted',
+    ]);
+    const connected = body.data.items.filter((item) => item.connected).map((item) => item.eventType).sort();
+    expect(connected).toEqual([
+      'booking_created', 'broadcast_completed', 'ec_order_received', 'form_submitted',
+    ]);
+    const unconnected = body.data.items.filter((item) => !item.connected).map((item) => item.eventType).sort();
+    expect(unconnected).toEqual([]);
+  });
+
+  it('2回目の保存が残り、内容変更で版が上がる', async () => {
+    const first = await app(testDb.db).request(
+      '/api/notifications/rules/rule-1?lineAccountId=account-1',
+    );
+    await expect(first.json()).resolves.toMatchObject({ data: { version: 1 } });
+    const updated = await app(testDb.db).request(
+      '/api/notifications/rules/rule-1',
+      {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lineAccountId: 'account-1', name: '新しい予約(改)' }),
+      },
+    );
+    expect(updated.status).toBe(200);
+    const reread = await app(testDb.db).request(
+      '/api/notifications/rules/rule-1?lineAccountId=account-1',
+    );
+    await expect(reread.json()).resolves.toMatchObject({
+      data: { name: '新しい予約(改)', version: 2 },
+    });
+  });
+
+  it('自動とテスト送信をCSVの実行区分で区別できる', async () => {
+    await app(testDb.db).request(
+      '/api/notifications/operator-rules/rule-1/publish',
+      json({ lineAccountId: 'account-1' }),
+    );
+    await app(testDb.db).request(
+      '/api/notifications/operator-events',
+      json({ lineAccountId: 'account-1', eventType: 'booking_created', sourceEventId: 'booking-csv' }),
+    );
+    await app(testDb.db).request(
+      '/api/notifications/operator-rules/rule-1/test',
+      json({ lineAccountId: 'account-1' }),
+    );
+    const csv = await app(testDb.db).request(
+      '/api/notifications/operator-deliveries.csv?lineAccountId=account-1&reason=区別確認',
+    );
+    expect(csv.status).toBe(200);
+    const text = await csv.text();
+    expect(text.split('\r\n')[0]).toContain('実行区分');
+    expect(text).toContain('自動');
+    expect(text).toContain('テスト');
   });
 
   it('確認済みメールを代替経路として送り、実行記録へ残す', async () => {
