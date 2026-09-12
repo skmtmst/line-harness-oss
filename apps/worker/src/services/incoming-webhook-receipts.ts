@@ -1,7 +1,10 @@
+import { incomingWebhookFencedDb } from './incoming-webhook-fenced-db.js';
+
 /** A receipt survives request failures; only completed work is acknowledged as a duplicate. */
 const LEASE_MS = 300_000;
 
 export interface IncomingWebhookExecution {
+  db: D1Database;
   sourceEventId: string;
   occurredAt: string;
   step<T>(key: string, work: () => Promise<T>): Promise<T>;
@@ -32,9 +35,9 @@ export async function reserveIncomingWebhook(
     WHERE webhook_id=? AND signature_hash=? AND (status IN ('accepted','retryable_failed')
       OR (status='processing' AND COALESCE(lease_expires_at,0)<=?))`)
     .bind(owner, now + LEASE_MS, webhookId, signatureHash, now).run();
-  const row = await db.prepare(`SELECT source_event_id,status,received_at FROM incoming_webhook_receipts
+  const row = await db.prepare(`SELECT source_event_id,status,received_at,attempt_count FROM incoming_webhook_receipts
     WHERE webhook_id=? AND signature_hash=?`).bind(webhookId, signatureHash)
-    .first<{ source_event_id: string; status: string; received_at: string }>();
+    .first<{ source_event_id: string; status: string; received_at: string; attempt_count: number }>();
   if (!row) throw new Error('incoming_receipt_unavailable');
   if ((claimed.meta?.changes ?? 0) !== 1) return { kind: row.status === 'completed' ? 'completed' : 'busy' };
 
@@ -46,6 +49,7 @@ export async function reserveIncomingWebhook(
     if ((result.meta?.changes ?? 0) !== 1) throw new Error('incoming_receipt_lease_lost');
   };
   return { kind: 'acquired', execution: {
+    db: incomingWebhookFencedDb(db, { sourceEventId: row.source_event_id, owner, generation: row.attempt_count }),
     sourceEventId: row.source_event_id,
     occurredAt: row.received_at,
     async step<T>(key: string, work: () => Promise<T>): Promise<T> {

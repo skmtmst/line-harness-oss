@@ -100,6 +100,189 @@ describe('N-365 #746 受信Webhookの再送を弾く', () => {
     );
   }
 
+  function configureOrderedMetadata(splitRefs = false, firstType = 'set_metadata', lastType = 'set_metadata') {
+    configureTags();
+    const actions = ['first', 'last'].map((stage, index) => {
+      const type = index === 0 ? firstType : lastType;
+      return { id: stage, type, onFailure: 'continue', params: type === 'set_metadata'
+        ? { values: { stage } } : { richMenuPageId: 'menu-page' } };
+    });
+    const plans = splitRefs ? actions.map(action => [action]) : [actions];
+    const refs = plans.map((plan, index) => {
+      const id = `common-${index}`;
+      const version = `version-${index}`;
+      db.raw.prepare(`INSERT INTO common_actions (id,line_account_id,name,status,current_published_version_id)
+        VALUES (?,'account-1',?,'published',?)`).run(id, id, version);
+      db.raw.prepare(`INSERT INTO common_action_versions (id,common_action_id,version_number,status,action_config)
+        VALUES (?,?,1,'published',?)`).run(version, id, JSON.stringify(plan));
+      return { refKind: 'common_action', refId: id, refVersionId: version };
+    });
+    db.raw.prepare(`UPDATE incoming_webhooks SET action_refs_json=? WHERE id='iwh-1'`).run(JSON.stringify(refs));
+  }
+
+  const metadata = () => JSON.parse((db.raw.prepare("SELECT metadata FROM friends WHERE id='friend-1'")
+    .get() as { metadata: string }).metadata || '{}');
+
+  function seedRichMenu() {
+    db.raw.exec(`INSERT INTO rich_menu_groups (id,account_id,name,chat_bar_text,size,status)
+      VALUES ('menu-group','account-1','menu','menu','large','published');
+      INSERT INTO rich_menu_pages (id,group_id,order_index,name,alias_id,line_richmenu_id)
+      VALUES ('menu-page','menu-group',0,'menu','alias','line-menu');`);
+  }
+
+  it.each([false, true])('同じ受信の複数rich-menu最終状態操作は実行前に拒否する（参照分割=%s）', async split => {
+    configureOrderedMetadata(split, 'switch_rich_menu', 'remove_rich_menu');
+    seedRichMenu();
+    const fetch = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{"richMenuId":"other"}', { status: 200 }));
+    const body = JSON.stringify({ friendId: 'friend-1', order: 'ambiguous-menu' });
+    expect((await receive(body)).status).toBe(500);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(db.raw.prepare(`SELECT step_key FROM incoming_webhook_steps WHERE step_key LIKE 'action:%'`).all()).toEqual([]);
+    expect(fireEvent).not.toHaveBeenCalled();
+  });
+
+  it.each(['switch_rich_menu', 'remove_rich_menu'])('%sがすでに目的状態なら確認だけで成功し再変更しない', async type => {
+    configureOrderedMetadata(false, type);
+    seedRichMenu();
+    const fetch = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url, init) => {
+      expect(String(url)).toBe('https://api.line.me/v2/bot/user/U1/richmenu');
+      expect(init?.method).toBe('GET');
+      return type === 'switch_rich_menu'
+        ? new Response('{"richMenuId":"line-menu"}', { status: 200, headers: { 'Content-Type': 'application/json' } })
+        : new Response('not found', { status: 404 });
+    });
+    const body = JSON.stringify({ friendId: 'friend-1', order: 'already-menu' });
+    expect((await receive(body)).status).toBe(200);
+    expect(metadata()).toEqual({ stage: 'last' });
+    expect((await receive(body)).status).toBe(200);
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ['action:0:0', false, { stage: 'first' }],
+    ['plan:0', true, {}],
+  ] as const)('%sのcheckpoint失敗では後工程を止め、再送後の最終値を巻き戻さない', async (key, splitRefs, afterFailure) => {
+    configureOrderedMetadata(splitRefs);
+    const prepare = db.db.prepare.bind(db.db);
+    let fail = true;
+    vi.spyOn(db.db, 'prepare').mockImplementation((sql) => {
+      const statement = prepare(sql);
+      if (!sql.includes("UPDATE incoming_webhook_steps SET status='completed'")) return statement;
+      return { ...statement, bind(...args: unknown[]) {
+        const bound = statement.bind(...args);
+        if (!fail || args[2] !== key) return bound;
+        return new Proxy(bound, { get(target, property) {
+          if (property === 'run') return async () => { fail = false; throw new Error('checkpoint unavailable'); };
+          const value = Reflect.get(target, property);
+          return typeof value === 'function' ? value.bind(target) : value;
+        } });
+      } } as D1PreparedStatement;
+    });
+    const body = JSON.stringify({ friendId: 'friend-1', order: 'ordered-steps' });
+    expect((await receive(body)).status).toBe(500);
+    expect(metadata()).toEqual(afterFailure);
+    expect(fireEvent).not.toHaveBeenCalled();
+    expect(db.raw.prepare('SELECT status,attempt_count FROM incoming_webhook_receipts').get())
+      .toEqual({ status: 'retryable_failed', attempt_count: 1 });
+    expect(db.raw.prepare(`SELECT step_key FROM incoming_webhook_steps WHERE step_key IN ('action:0:1','action:1:0','plan:1')`).all())
+      .toEqual([]);
+    expect((await receive(body)).status).toBe(200);
+    expect(metadata()).toEqual({ stage: 'last' });
+    expect(db.raw.prepare(`SELECT status FROM incoming_webhook_steps WHERE step_key LIKE 'action:%'`).all())
+      .toEqual([{ status: 'completed' }, { status: 'completed' }]);
+    expect(db.raw.prepare('SELECT status,attempt_count FROM incoming_webhook_receipts').get())
+      .toEqual({ status: 'completed', attempt_count: 2 });
+    expect((await receive(body)).status).toBe(200);
+    expect(metadata()).toEqual({ stage: 'last' });
+    expect(fireEvent).toHaveBeenCalledTimes(1);
+  });
+
+  it('leaseを失った旧workerの遅い書き込みで再送完了後の最終値を戻さない', async () => {
+    configureOrderedMetadata();
+    const prepare = db.db.prepare.bind(db.db);
+    let enter!: () => void;
+    let release!: () => void;
+    const entered = new Promise<void>(resolve => { enter = resolve; });
+    const blocked = new Promise<void>(resolve => { release = resolve; });
+    let intercepted = false;
+    const metadataStatements = new WeakSet<D1PreparedStatement>();
+    const batch = db.db.batch.bind(db.db);
+    vi.spyOn(db.db, 'batch').mockImplementation(async statements => {
+      if (!intercepted && statements.some(statement => metadataStatements.has(statement))) {
+        intercepted = true; enter(); await blocked;
+      }
+      return batch(statements);
+    });
+    vi.spyOn(db.db, 'prepare').mockImplementation((sql) => {
+      const statement = prepare(sql);
+      if (!sql.includes('UPDATE friends SET metadata')) return statement;
+      return { ...statement, bind(...args: unknown[]) {
+        const bound = statement.bind(...args);
+        const delayed = { ...bound, async run() {
+          if (!intercepted) { intercepted = true; enter(); await blocked; }
+          return bound.run();
+        } } as D1PreparedStatement;
+        metadataStatements.add(delayed);
+        return delayed;
+      } } as D1PreparedStatement;
+    });
+    const body = JSON.stringify({ friendId: 'friend-1', order: 'stale-action-write' });
+    const stale = receive(body);
+    await entered;
+    expect((await receive(body)).status).toBe(503);
+    db.raw.prepare('UPDATE incoming_webhook_receipts SET lease_expires_at=0').run();
+    expect((await receive(body)).status).toBe(200);
+    expect(metadata()).toEqual({ stage: 'last' });
+    release();
+    expect((await stale).status).toBe(500);
+    expect(metadata()).toEqual({ stage: 'last' });
+  });
+
+  it('行動自体の失敗でも後工程を先に実行せず、復旧後は元の順に実行する', async () => {
+    configureOrderedMetadata();
+    const prepare = db.db.prepare.bind(db.db);
+    let fail = true;
+    vi.spyOn(db.db, 'prepare').mockImplementation((sql) => {
+      if (fail && sql.includes('UPDATE friends SET metadata')) {
+        fail = false;
+        throw new Error('metadata write unavailable');
+      }
+      return prepare(sql);
+    });
+    const body = JSON.stringify({ friendId: 'friend-1', order: 'action-failure' });
+    expect((await receive(body)).status).toBe(500);
+    expect(metadata()).toEqual({});
+    expect(fireEvent).not.toHaveBeenCalled();
+    expect((await receive(body)).status).toBe(200);
+    expect(metadata()).toEqual({ stage: 'last' });
+  });
+
+  it('未対応の行動を飛ばして後工程の結果だけ確定しない', async () => {
+    configureOrderedMetadata(false, 'future_action');
+    const body = JSON.stringify({ friendId: 'friend-1', order: 'unknown-action' });
+    expect((await receive(body)).status).toBe(500);
+    expect((await receive(body)).status).toBe(500);
+    expect(metadata()).toEqual({});
+    expect(fireEvent).not.toHaveBeenCalled();
+    expect(db.raw.prepare(`SELECT step_key FROM incoming_webhook_steps WHERE step_key LIKE 'action:%'`).all()).toEqual([]);
+  });
+
+  it('別tenantの友だち・タグには受信actionが触れない', async () => {
+    configureTags();
+    db.raw.prepare("INSERT INTO tenants (id,name) VALUES ('tenant-2','別組織')").run();
+    db.raw.prepare(`INSERT INTO line_accounts (id,channel_id,name,channel_access_token,channel_secret,is_active,tenant_id)
+      VALUES ('account-2','ch-2','別店舗','token-2','secret-2',1,'tenant-2')`).run();
+    db.raw.prepare(`INSERT INTO friends (id,line_user_id,line_account_id,is_following) VALUES ('friend-2','U2','account-2',1)`).run();
+    db.raw.prepare(`INSERT INTO tags (id,name,line_account_id) VALUES ('tag-2','別組織のタグ','account-2')`).run();
+    expect((await receive(JSON.stringify({ friendId: 'friend-2' }))).status).toBe(200);
+    expect(db.raw.prepare('SELECT COUNT(*) AS n FROM friend_tags').get()).toEqual({ n: 0 });
+    db.raw.prepare(`UPDATE incoming_webhooks SET action_refs_json=? WHERE id='iwh-1'`).run(JSON.stringify([
+      { refKind: 'tag', refId: 'tag-2', refVersionId: null },
+    ]));
+    expect((await receive(JSON.stringify({ friendId: 'friend-1' }))).status).toBe(500);
+    expect(db.raw.prepare('SELECT COUNT(*) AS n FROM friend_tags').get()).toEqual({ n: 0 });
+  });
+
   it('処理開始前のDB例外を失敗として残し、正規再送で回復する', async () => {
     configureTags();
     const prepare = db.db.prepare.bind(db.db);

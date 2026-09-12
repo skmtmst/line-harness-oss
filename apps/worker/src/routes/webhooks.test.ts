@@ -1028,27 +1028,29 @@ describe('POST /api/webhooks/incoming/:id/receive — signature', () => {
       baseEnv,
     );
     expect(res.status).toBe(200);
+    const fencedDb = vi.mocked(fireEvent).mock.calls[0]![5]!.db;
+    expect(fencedDb).not.toBe(baseEnv.DB);
     expect(fireEvent).toHaveBeenCalledWith(
-      baseEnv.DB,
+      fencedDb,
       'incoming_webhook.custom',
       expect.anything(),
       undefined,
       'account-a',
       expect.objectContaining({ sourceEventId: 'receipt-event-1', step: expect.any(Function) }),
     );
-    expect(createWebhookInteraction).toHaveBeenCalledWith(baseEnv.DB, expect.objectContaining({
+    expect(createWebhookInteraction).toHaveBeenCalledWith(fencedDb, expect.objectContaining({
       lineAccountId: 'account-a',
       direction: 'incoming',
       requestBodyJson: null,
     }));
     expect(finishWebhookInteraction).toHaveBeenCalledWith(
-      baseEnv.DB,
+      fencedDb,
       'interaction-1',
       'account-a',
       expect.objectContaining({ status: 'succeeded', responseStatus: 200 }),
     );
     expect(updateIncomingWebhookMaskedSample).toHaveBeenCalledWith(
-      baseEnv.DB,
+      fencedDb,
       'iwh-1',
       ACCOUNT_ID,
       {
@@ -1081,14 +1083,16 @@ describe('POST /api/webhooks/incoming/:id/receive — signature', () => {
       baseEnv,
     );
     expect(res.status).toBe(200);
-    expect(executeIncomingWebhookActions).toHaveBeenCalledWith(baseEnv.DB, expect.objectContaining({
+    const fencedDb = vi.mocked(fireEvent).mock.calls[0]![5]!.db;
+    expect(fencedDb).not.toBe(baseEnv.DB);
+    expect(executeIncomingWebhookActions).toHaveBeenCalledWith(fencedDb, expect.objectContaining({
       lineAccountId: ACCOUNT_ID,
       webhookId: 'iwh-1',
       payload: { friendId: 'friend-a' },
       actions: [{ refKind: 'tag', refId: 'tag-a', refVersionId: null }],
     }));
     expect(fireEvent).toHaveBeenCalledWith(
-      baseEnv.DB,
+      fencedDb,
       'incoming_webhook.custom',
       expect.objectContaining({ friendId: 'friend-a' }),
       undefined,

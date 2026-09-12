@@ -1113,7 +1113,7 @@ webhooks.post('/api/webhooks/incoming/:id/receive', async (c) => {
     if (wh.line_account_id) {
       try {
         await updateIncomingWebhookMaskedSample(
-          c.env.DB,
+          execution.db,
           wh.id,
           wh.line_account_id,
           maskedPayloadShape(payload),
@@ -1132,7 +1132,7 @@ webhooks.post('/api/webhooks/incoming/:id/receive', async (c) => {
     let interaction: Pick<WebhookInteractionRow, 'id'> | null = null;
     if (wh.line_account_id) {
       try {
-        interaction = await execution.step('interaction', async () => ({ id: (await createWebhookInteraction(c.env.DB, {
+        interaction = await execution.step('interaction', async () => ({ id: (await createWebhookInteraction(execution!.db, {
           lineAccountId: wh.line_account_id!,
           direction: 'incoming',
           webhookId: wh.id,
@@ -1154,7 +1154,7 @@ webhooks.post('/api/webhooks/incoming/:id/receive', async (c) => {
       const configuredActions = safeJson<IncomingWebhookActionRef[]>(wh.action_refs_json, []);
       const actionResult = wh.line_account_id
         ? await execution.step('actions', async () => {
-          const result = await executeIncomingWebhookActions(c.env.DB, {
+          const result = await executeIncomingWebhookActions(execution!.db, {
           lineAccountId: wh.line_account_id!,
           webhookId: wh.id,
           sourceEventId: execution!.sourceEventId,
@@ -1168,7 +1168,7 @@ webhooks.post('/api/webhooks/incoming/:id/receive', async (c) => {
           return result;
         })
         : { matchedFriendId: null, executed: 0, failed: 0 };
-      await execution.step('event', () => fireEvent(c.env.DB, eventType, {
+      await execution.step('event', () => fireEvent(execution!.db, eventType, {
         sourceEventId: execution!.sourceEventId,
         sourceKind: 'incoming_webhook_receipt',
         occurredAt: execution!.occurredAt,
@@ -1179,7 +1179,7 @@ webhooks.post('/api/webhooks/incoming/:id/receive', async (c) => {
     } catch (eventError) {
       if (interaction && wh.line_account_id) {
         try {
-          await finishWebhookInteraction(c.env.DB, interaction.id, wh.line_account_id, {
+          await finishWebhookInteraction(execution.db, interaction.id, wh.line_account_id, {
             status: 'failed',
             responseStatus: 500,
             attemptCount: 1,
@@ -1194,7 +1194,7 @@ webhooks.post('/api/webhooks/incoming/:id/receive', async (c) => {
     }
     if (interaction && wh.line_account_id) {
       try {
-        await finishWebhookInteraction(c.env.DB, interaction.id, wh.line_account_id, {
+        await finishWebhookInteraction(execution.db, interaction.id, wh.line_account_id, {
           status: 'succeeded',
           responseStatus: 200,
           attemptCount: 1,

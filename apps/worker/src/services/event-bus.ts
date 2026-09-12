@@ -114,6 +114,7 @@ export async function fireEvent(
   lineAccountId?: string | null,
   execution?: IncomingWebhookExecution,
 ): Promise<void> {
+  db = execution?.db ?? db;
   let outgoingWebhookLineAccountId = lineAccountId;
   if (outgoingWebhookLineAccountId === undefined && payload.friendId) {
     const friend = await db

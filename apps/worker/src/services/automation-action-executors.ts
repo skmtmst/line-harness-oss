@@ -31,6 +31,7 @@ interface AutomationLineClient {
   pushMessage(to: string, messages: Message[], retryKey?: string): Promise<unknown>;
   linkRichMenuToUser(userId: string, richMenuId: string): Promise<unknown>;
   unlinkRichMenuFromUser(userId: string): Promise<unknown>;
+  getRichMenuIdOfUser?(userId: string): Promise<{ richMenuId: string }>;
 }
 
 export interface AutomationActionExecutorDependencies {
@@ -408,9 +409,22 @@ async function richMenuExecutor(
   try {
     const token = await resolveAccessToken(context, dependencies);
     const client = (dependencies.createLineClient ?? ((value) => new LineClient(value)))(token);
-    if (operation === 'link') {
+    let alreadyApplied = false;
+    if (context.automationId.startsWith('incoming-webhook:') && client.getRichMenuIdOfUser) {
+      try {
+        const current = await client.getRichMenuIdOfUser(friend.line_user_id);
+        alreadyApplied = operation === 'link' && current.richMenuId === richMenuId;
+      } catch (error) {
+        if (/LINE API error:\s*404\b/.test(error instanceof Error ? error.message : String(error))) {
+          alreadyApplied = operation === 'unlink';
+        } else {
+          throw error;
+        }
+      }
+    }
+    if (!alreadyApplied && operation === 'link') {
       await client.linkRichMenuToUser(friend.line_user_id, richMenuId!);
-    } else {
+    } else if (!alreadyApplied) {
       await client.unlinkRichMenuFromUser(friend.line_user_id);
     }
     await recordRichMenuAssignment(context.db, {
