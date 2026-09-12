@@ -7,6 +7,7 @@ import {
   getPhotoNotificationState,
   jstNow,
   resolveLineCredential,
+  findOrCreateGlobalTag,
 } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
@@ -698,9 +699,7 @@ function aiText(result: unknown): string {
 async function assignConsultationTags(c: Context<Env>, friendId: string, animalType: 'dog' | 'cat', detected: string[]) {
   const names = [`AI相談：${animalType === 'dog' ? 'わんちゃん' : 'ねこちゃん'}`, ...detected.map((tag) => `AI相談：${tag}`)];
   for (const name of names) {
-    await c.env.DB.prepare(`INSERT OR IGNORE INTO tags (id, name, color, created_at) VALUES (?, ?, '#16815B', ?)`)
-      .bind(crypto.randomUUID(), name, jstNow()).run();
-    const tag = await c.env.DB.prepare(`SELECT id FROM tags WHERE name = ?`).bind(name).first<{ id: string }>();
+    const tag = await findOrCreateGlobalTag(c.env.DB, { name, color: '#16815B' });
     if (tag) await attachTagAndFireSideEffects(c.env.DB, friendId, tag.id);
   }
   return names;

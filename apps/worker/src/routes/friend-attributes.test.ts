@@ -1106,7 +1106,7 @@ describe('フォルダ', () => {
 
   it('種類で絞れる', async () => {
     await req('/api/folders?kind=template', 'GET');
-    expect(folders.getFolders).toHaveBeenCalledWith(env.DB, 'template');
+    expect(folders.getFolders).toHaveBeenCalledWith(env.DB, 'template', undefined, expect.objectContaining({ allowedAccountIds: ['account-1'] }));
   });
 
   it('ウェビナーフォルダは閲覧可能なアカウント内の件数を返す', async () => {
@@ -1142,6 +1142,7 @@ describe('フォルダ', () => {
     const renamed = await req('/api/folders/fo-webinar', 'PATCH', {
       accountId: 'account-1', name: '商品説明',
     });
+    folders.deleteFolder.mockResolvedValue(true);
     const deleted = await req('/api/folders/fo-webinar?account_id=account-1', 'DELETE');
 
     expect(created.status).toBe(201);
@@ -1161,6 +1162,7 @@ describe('フォルダ', () => {
     const renamed = await req('/api/folders/fo-webinar', 'PATCH', {
       accountId: 'account-1', name: '変更',
     });
+    folders.deleteFolder.mockResolvedValue(true);
     const deleted = await req('/api/folders/fo-webinar?account_id=account-1', 'DELETE');
 
     expect(renamed.status).toBe(404);
