@@ -129,6 +129,7 @@ shared-button-importer components/chats/template-folder-select.tsx
 shared-button-importer components/dashboard/dashboard-editor.tsx
 shared-button-importer components/dashboard/qr-dialog.tsx
 shared-button-importer components/feature-disabled-gate.tsx
+shared-button-importer components/forms/hq-form-definition-editor.tsx
 shared-button-importer components/friend-fields/edit-tag-page-v4.tsx
 shared-button-importer components/friend-fields/field-list.tsx
 shared-button-importer components/friend-fields/mark-list.tsx
@@ -152,6 +153,7 @@ shared-button-importer components/merged-person/merged-person-sections.tsx
 shared-button-importer components/merged-person/merged-profile-dialog.tsx
 shared-button-importer components/reminders/reminder-publish-flow.tsx
 shared-button-importer components/reminders/reminder-v6-ui.tsx
+shared-button-importer components/rich-menus/rich-menu-create-form.tsx
 shared-button-importer components/scenarios/action-editor.tsx
 shared-button-importer components/scenarios/scenario-dialogs.tsx
 shared-button-importer components/scenarios/scenario-list.tsx
@@ -188,4 +190,3 @@ table-header-migration-target app/webhooks/webhook-interactions.tsx
 native-table-header-exception app/affiliates/tabs.tsx
 
 shared-button-importer app/hq/templates/template-console.tsx
-shared-button-importer app/hq/templates/template-definition-editor.tsx

@@ -92,9 +92,9 @@ export default function NewRichMenuPage() {
           templates={templates}
           forms={forms}
           trackedLinks={trackedLinks}
-          footer={<StickyBar actions={<><Button href="/rich-menus">キャンセル</Button><Button type="submit" variant="primary" disabled={submitting || !selectedAccount}>{submitting ? '作成中...' : '下書きに保存して次へ'}</Button></>} />}
+          footer={<StickyBar actions={<><Button href="/rich-menus">キャンセル</Button><Button type="submit" variant="primary" disabled={submitting || !selectedAccount}>{submitting ? '作成中...' : '作成して編集へ'}</Button></>} />}
         />
-        {error ? <div role="alert" className="bg-danger-bg text-danger mt-3 rounded-control border border-red-200 p-3 text-sm">{error}</div> : null}
+        {error ? <div role="alert" className="border-danger bg-danger-bg text-danger mt-3 rounded-control border p-3 text-sm">{error}</div> : null}
       </form>
     </main>
   )

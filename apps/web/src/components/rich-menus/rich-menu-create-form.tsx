@@ -45,8 +45,8 @@ export function freshRichMenuCreateValue(): RichMenuCreateValue {
 }
 
 const SIZE_TABS: { value: 'large' | 'compact'; label: string; dims: string; hint: string }[] = [
-  { value: 'large', label: '大', dims: `${SIZE_DIMENSIONS.large.width} × ${SIZE_DIMENSIONS.large.height}px`, hint: '画面をしっかり使う。ボタンを6つまで置ける' },
-  { value: 'compact', label: '小', dims: `${SIZE_DIMENSIONS.compact.width} × ${SIZE_DIMENSIONS.compact.height}px`, hint: 'トークが隠れにくい。横に並べる形' },
+  { value: 'large', label: '大きい', dims: `${SIZE_DIMENSIONS.large.width} × ${SIZE_DIMENSIONS.large.height}px`, hint: '画面をしっかり使う。ボタンを6つまで置ける' },
+  { value: 'compact', label: '小さい', dims: `${SIZE_DIMENSIONS.compact.width} × ${SIZE_DIMENSIONS.compact.height}px`, hint: 'トークが隠れにくい。横に並べる形' },
 ]
 
 const LARGE_TEMPLATE_ORDER = [
@@ -168,12 +168,12 @@ export default function RichMenuCreateForm({
         <p>名前と土台のレイアウトを決めます。画像とタップ領域は、作成後の編集画面で設定します。</p>
       </section>
       <StepTrail label="リッチメニュー作成の進み方" items={[{ label: '形とボタン', state: 'current' }, { label: '誰に出すか', state: 'todo' }, { label: '公開のしかた', state: 'todo' }]} />
-      {compatibilityError || validationError ? <div role="alert" className="bg-danger-bg text-danger mt-4 rounded-control border border-red-200 p-3 text-sm">{compatibilityError ?? validationError}</div> : null}
+      {compatibilityError || validationError ? <div role="alert" className="border-danger bg-danger-bg text-danger mt-4 rounded-control border p-3 text-sm">{compatibilityError ?? validationError}</div> : null}
       <div className="mt-4 grid items-start gap-4 lg:grid-cols-4">
         <div className="border-hairline bg-canvas rounded-card min-w-0 space-y-4 border p-4 shadow-sm lg:col-span-3">
           <div className="grid gap-3 lg:grid-cols-6">
             <div className="lg:col-span-3">
-              <label className="text-ink-secondary mb-1 block text-sm font-medium">メニュー名 <span className="bg-danger-bg text-danger rounded-pill ml-1 px-1.5 py-0.5 text-[10px]">必須</span></label>
+              <label className="text-ink-secondary mb-1 block text-sm font-medium">メニュー名 <span className="bg-danger-bg text-danger rounded-pill text-micro ml-1 px-1.5 py-0.5">必須</span></label>
               <input value={value.name} aria-label="メニュー名" onChange={(event) => patch({ name: event.target.value })} required disabled={locked} className="border-hairline rounded-control focus:ring-accent block w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none" placeholder="例：メインメニュー" />
               <p className="text-ink-faint mt-1 text-xs">管理画面での識別用です。友だちには表示されません。</p>
             </div>
@@ -182,23 +182,23 @@ export default function RichMenuCreateForm({
               <SelectField id="rich-menu-folder" aria-label="フォルダ" value={value.folderId} disabled={locked || folders.length === 0} onChange={(event) => patch({ folderId: event.target.value })} options={[{ value: '', label: '未分類' }, ...folders.map((folder) => ({ value: folder.id, label: folder.name }))]} />
             </div>
             <div className="lg:col-span-2">
-              <label className="text-ink-secondary mb-1 block text-sm font-medium">メニューを開くボタンの文字</label>
+              <label className="text-ink-secondary mb-1 block text-sm font-medium">トーク画面下の文言</label>
               <input value={value.chatBarText} aria-label="メニューを開くボタンの文字" onChange={(event) => patch({ chatBarText: event.target.value })} maxLength={14} required disabled={locked} className="border-hairline rounded-control focus:ring-accent block w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none" />
-              <p className="text-ink-faint mt-1 text-xs">トークの下に出る文字。14字まで</p>
+              <p className="text-ink-faint mt-1 text-xs">14文字以内。メニューを開く前にトーク画面下に表示されます。</p>
             </div>
           </div>
 
           <div>
-            <span className="text-ink-secondary mb-2 block text-sm font-medium">メニューの形</span>
+            <span className="text-ink-secondary mb-2 block text-sm font-medium">画像の大きさ</span>
             <div className="flex flex-wrap gap-2">
-              {SIZE_TABS.map((item) => <button key={item.value} type="button" disabled={locked} onClick={() => changeSize(item.value)} aria-pressed={value.size === item.value} className={`rounded-control border px-4 py-2 text-left text-sm transition-colors ${value.size === item.value ? 'border-accent bg-accent-soft text-ink' : 'border-hairline text-ink-secondary hover:bg-canvas-sunken'}`}><span className="font-medium whitespace-nowrap">{item.label}</span><span className="text-ink-faint ml-2 text-xs whitespace-nowrap">{item.dims}</span><span className="text-ink-faint mt-0.5 block text-[11px]">{item.hint}</span></button>)}
+              {SIZE_TABS.map((item) => <button key={item.value} type="button" disabled={locked} onClick={() => changeSize(item.value)} aria-pressed={value.size === item.value} className={`rounded-control border px-4 py-2 text-left text-sm transition-colors ${value.size === item.value ? 'border-accent bg-accent-soft text-ink' : 'border-transparent text-ink-secondary hover:bg-canvas-sunken'}`}><span className="font-medium whitespace-nowrap">{item.label}</span><span className="text-ink-faint ml-2 text-xs whitespace-nowrap">{item.dims}</span><span className="text-ink-faint text-micro mt-0.5 block">{item.hint}</span></button>)}
             </div>
           </div>
 
           <div>
             <span className="text-ink-secondary mb-1 block text-sm font-medium">切替タブの数</span>
             <p className="text-ink-faint mb-2 text-xs">タブでほかのメニューへ移れます。切り替えが要らないときは「なし」。</p>
-            <div className="flex flex-wrap gap-2">{[0, 1, 2, 3].map((count) => <button key={count} type="button" disabled={locked} aria-pressed={value.tabCount === count} onClick={() => patch({ tabCount: count })} className={`rounded-control border px-4 py-2 text-xs font-semibold ${value.tabCount === count ? 'border-accent bg-accent-soft text-accent' : 'border-hairline bg-canvas text-ink-secondary'}`}>{count === 0 ? 'なし' : `${count}つ`}</button>)}</div>
+            <div className="flex flex-wrap gap-2">{[0, 1, 2, 3].map((count) => <button key={count} type="button" disabled={locked} aria-pressed={value.tabCount === count} onClick={() => patch({ tabCount: count })} className={`rounded-control border px-4 py-2 text-xs font-semibold ${value.tabCount === count ? 'border-accent bg-accent-soft text-accent' : 'border-transparent bg-canvas text-ink-secondary'}`}>{count === 0 ? 'なし' : `${count}つ`}</button>)}</div>
           </div>
 
           <div>
