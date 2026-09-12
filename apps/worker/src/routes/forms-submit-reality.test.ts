@@ -2,9 +2,10 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import Database from 'better-sqlite3';
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test as vitestTest, vi } from 'vitest';
 import { Hono } from 'hono';
 import type { Env } from '../index.js';
+import { AsyncTestScope } from '../test-utils/async-test-scope.js';
 
 /**
  * フォーム回答の冪等化の実DBテスト(N-165)。
@@ -95,6 +96,13 @@ import { forms } from './forms.js';
 
 let sqlite: Database.Database;
 let injected: { current: Inject };
+let scope: AsyncTestScope;
+
+// A timeout rejects Vitest's wrapper, not this body. Keep owning the body until
+// its requests, assertions and finally blocks have settled in afterEach.
+function test(name: string, body: () => Promise<void>) {
+  vitestTest(name, () => scope.run(body));
+}
 
 function setupDb() {
   sqlite = new Database(':memory:');
@@ -131,7 +139,9 @@ function env() {
 function app() {
   const a = new Hono<Env>();
   a.route('/', forms);
-  return a;
+  return {
+    fetch: (...args: Parameters<typeof a.fetch>) => scope.track(Promise.resolve(a.fetch(...args))),
+  };
 }
 
 function submitRequest(formId: string, data: Record<string, unknown>, key: string, bearer: string) {
@@ -164,22 +174,68 @@ function answerIdOf(key: string, friendId: string): string {
   return row.submission_id;
 }
 
-const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+function delay(ms: number) {
+  const gate = scope.gate(() => undefined);
+  const timer = setTimeout(() => gate.resolve(undefined), ms);
+  return scope.track(gate.promise.finally(() => clearTimeout(timer)));
+}
 
 beforeEach(() => {
+  scope = new AsyncTestScope();
   vi.clearAllMocks();
   pushCalls.length = 0;
   setupDb();
 });
 
-afterEach(() => {
+afterEach(async () => {
+  // Release fake I/O first, then join work, then restore globals/close the DB.
+  // Never clear the next test's counters while an old request can still send.
+  await scope.dispose();
+  sqlite.close();
   vi.unstubAllGlobals();
 });
 
 describe('フォーム回答の冪等化(実DB)', () => {
+  // Deliberately do not wrap these two probes with scope.run: the test itself
+  // stands in for afterEach after Vitest has stopped awaiting the original body.
+  vitestTest('#757 cleanup waits for the real request and its body continuation', async () => {
+    const gate = scope.gate(() => new Response(JSON.stringify({ eligible: true }), {
+      status: 200, headers: { 'Content-Type': 'application/json' },
+    }));
+    vi.stubGlobal('fetch', vi.fn(async () => gate.promise));
+    let bodyFinished = false;
+    const body = scope.run(async () => {
+      const response = await app().fetch(submitRequest('form-webhook', { full_name: '山田' }, KEY, 'user-1'), env());
+      expect(response.status).toBe(201);
+      await response.json();
+      bodyFinished = true;
+    });
+    await scope.dispose();
+    expect(bodyFinished).toBe(true);
+    expect(pushCalls).toHaveLength(1);
+    expect(claimStatus(KEY, 'friend-1')).toBe('completed');
+    await body;
+  });
+
+  vitestTest('#757 cleanup also owns an HTTP request abandoned by a failed assertion', async () => {
+    const gate = scope.gate(() => new Response(JSON.stringify({ eligible: true }), {
+      status: 200, headers: { 'Content-Type': 'application/json' },
+    }));
+    vi.stubGlobal('fetch', vi.fn(async () => gate.promise));
+    const request = app().fetch(submitRequest('form-webhook', { full_name: '山田' }, KEY, 'user-1'), env());
+    // No body awaits this request: this models an assertion failing before join.
+    await scope.dispose();
+    expect(pushCalls).toHaveLength(1);
+    expect(claimStatus(KEY, 'friend-1')).toBe('completed');
+    expect((await request).status).toBe(201);
+  });
+
   test('真の並行2要求でも回答・Webhook・通知・マイルは1回だけ', async () => {
-    let release!: (response: Response) => void;
-    const gate = new Promise<Response>((resolve) => { release = resolve; });
+    const held = scope.gate(() => new Response(JSON.stringify({ eligible: true }), {
+      status: 200, headers: { 'Content-Type': 'application/json' },
+    }));
+    const gate = held.promise;
+    const release = held.resolve;
     const fetchMock = vi.fn(async () => gate);
     vi.stubGlobal('fetch', fetchMock);
 
