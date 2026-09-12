@@ -43,43 +43,15 @@ import { conflictMessage } from './form-conflict-message'
 import { EMPTY_REFS, type FormRefs } from '@/components/forms/form-refs'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
+import {
+  formJumpsInto as jumpsInto,
+  makeFormBlock as makeBlock,
+  takenFormAnswerNames as takenAnswerNames,
+  uniqueFormCopyName as uniqueCopyName,
+} from '@/components/forms/form-definition-operations'
 
 /** 共通ヘッダを指す番号。セクションの添字と混ぜないために -1 を使う。 */
 const HEADER_TAB = -1
-
-function makeBlock(kind: string, type?: FormInputType, count = 0): FormBlock {
-  const id = newBlockId()
-  switch (kind) {
-    case 'heading':
-      return { id, kind: 'heading', text: '見出し', level: 2 }
-    case 'text':
-      return { id, kind: 'text', text: '' }
-    case 'image':
-      return { id, kind: 'image', mediaUrl: '', size: 'normal' }
-    case 'button':
-      return { id, kind: 'button', label: 'ボタン', url: '', style: 'default' }
-    default:
-      return {
-        id,
-        kind: 'input',
-        type: type ?? 'text',
-        // 回答データの見出しは英数字で作る。日本語のままだと、受け渡しの
-        // 途中で化けることがある。
-        name: `q${count + 1}_${id.slice(2)}`,
-        label: '',
-        required: false,
-        ...(type === 'radio' || type === 'checkbox' || type === 'select'
-          ? {
-              choiceMode: 'tag' as const,
-              choices: [
-                { id: newBlockId('c'), label: '選択肢1' },
-                { id: newBlockId('c'), label: '選択肢2' },
-              ],
-            }
-          : {}),
-      }
-  }
-}
 
 /**
  * そのページへ飛ばしている選択肢の数。
@@ -89,40 +61,12 @@ function makeBlock(kind: string, type?: FormInputType, count = 0): FormBlock {
  * 全ページの入力ブロックを見る**（自分自身のページも数える。消えるまでは
  * 分岐として生きているため）。
  */
-function jumpsInto(layout: FormLayout, sectionId: string): number {
-  let count = 0
-  for (const section of layout.sections) {
-    for (const block of section.blocks) {
-      if (block.kind !== 'input' || !block.choices) continue
-      count += block.choices.filter((c) => c.jumpToSectionId === sectionId).length
-    }
-  }
-  return count
-}
-
 /**
  * 複製の回答キーを一意にする。
  *
  * 回答は `name` を鍵に保存される。`${base}_copy` が既にあれば
  * `_copy2`、`_copy3` と番号を足して、重ならない名前を作る。
  */
-function uniqueCopyName(base: string, taken: Set<string>): string {
-  const first = `${base}_copy`
-  if (!taken.has(first)) return first
-  let n = 2
-  while (taken.has(`${base}_copy${n}`)) n += 1
-  return `${base}_copy${n}`
-}
-
-/** 編集全体の入力欄が使う回答キーの一覧。 */
-function takenAnswerNames(layout: FormLayout): Set<string> {
-  return new Set(
-    layout.header
-      .concat(layout.sections.flatMap((s) => s.blocks))
-      .flatMap((b) => (b.kind === 'input' ? [b.name] : [])),
-  )
-}
-
 function FormEditInner() {
   const params = useSearchParams()
   const router = useRouter()

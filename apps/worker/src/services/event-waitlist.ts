@@ -104,7 +104,7 @@ export type EventWaitlistPromotionResult =
   | { kind: 'conflict'; currentVersion: number }
   | {
       kind: 'noop';
-      reason: 'no_waiting' | 'no_capacity' | 'offer_pending' | 'occurrence_started' | 'party_too_large';
+      reason: 'no_waiting' | 'no_capacity' | 'offer_pending' | 'occurrence_started' | 'party_too_large' | 'applicant_ineligible';
       occurrenceVersion: number;
       promoted: null;
     }
@@ -418,16 +418,73 @@ export async function promoteEventWaitlist(
   const expiresAt = new Date(
     now.getTime() + (params.offerHours ?? DEFAULT_OFFER_HOURS) * 3600_000,
   ).toISOString();
+  // 事前SELECTの空席は他の予約・繰上げで変わる。人数分の容量確認と
+  // offered（期限付き席保留）への遷移を、同じSQLの中で確定する。
+  // 案内なし判定も再検査し、古い読取結果で次の待ちを追い越さない。
   const claimed = await db
     .prepare(
       `UPDATE event_waitlist
           SET status = 'offered', offered_at = ?, offer_expires_at = ?,
               offer_token_hash = ?, version = version + 1, updated_at = ?
-        WHERE id = ? AND status = 'waiting' AND version = ?`,
+        WHERE id = ? AND status = 'waiting' AND version = ?
+          AND EXISTS (
+            SELECT 1 FROM event_slots slot
+             WHERE slot.id = event_waitlist.slot_id AND slot.capacity IS NOT NULL
+               AND COALESCE((SELECT SUM(b.party_size) FROM event_bookings b
+                     WHERE b.slot_id = slot.id AND b.status IN ('requested','confirmed')), 0)
+                 + COALESCE((SELECT SUM(held.party_size) FROM event_waitlist held
+                     WHERE held.slot_id = slot.id AND held.status IN ('offered','accepted')), 0)
+                 + event_waitlist.party_size <= slot.capacity
+          )
+          AND NOT EXISTS (
+            SELECT 1 FROM event_waitlist pending
+             WHERE pending.slot_id = event_waitlist.slot_id
+               AND pending.status = 'offered' AND pending.offer_expires_at > ?
+          )
+          AND NOT EXISTS (
+            SELECT 1 FROM event_bookings b
+             WHERE b.event_id = event_waitlist.event_id
+               AND b.slot_id = event_waitlist.slot_id
+               AND b.identity_key = event_waitlist.identity_key
+               AND b.status IN ('requested','confirmed')
+          )
+          AND EXISTS (
+            SELECT 1 FROM events e WHERE e.id = event_waitlist.event_id
+              AND (e.max_bookings_per_friend IS NULL OR (
+                (SELECT COUNT(*) FROM event_bookings b
+                  WHERE b.event_id = e.id AND b.identity_key = event_waitlist.identity_key
+                    AND b.status IN ('requested','confirmed'))
+                + (SELECT COUNT(*) FROM event_waitlist held
+                    WHERE held.event_id = e.id AND held.identity_key = event_waitlist.identity_key
+                      AND held.id != event_waitlist.id AND held.status IN ('offered','accepted'))
+              ) < e.max_bookings_per_friend)
+          )`,
     )
-    .bind(nowIso, expiresAt, tokenHash, nowIso, waiting.id, waiting.version)
+    .bind(nowIso, expiresAt, tokenHash, nowIso, waiting.id, waiting.version, nowIso)
     .run();
   if ((claimed.meta?.changes ?? 0) === 0) {
+    // 競合負けでは席も通知も確保しない。待ち順・版・申込内容を残す。
+    // 以下の再読取は表示理由だけに使い、席の確保判断には使わない。
+    const unchanged = await db
+      .prepare(`SELECT id FROM event_waitlist WHERE id = ? AND status = 'waiting' AND version = ?`)
+      .bind(waiting.id, waiting.version)
+      .first<{ id: string }>();
+    if (unchanged) {
+      const pending = await db
+        .prepare(`SELECT id FROM event_waitlist WHERE slot_id = ?
+                    AND status = 'offered' AND offer_expires_at > ? LIMIT 1`)
+        .bind(occurrence.id, nowIso)
+        .first<{ id: string }>();
+      if (pending) return { kind: 'noop', reason: 'offer_pending', occurrenceVersion, promoted: null };
+      const latest = await loadOccurrence(db, occurrence.id, params.lineAccountId);
+      if (latest?.capacity == null) {
+        return { kind: 'noop', reason: 'no_capacity', occurrenceVersion, promoted: null };
+      }
+      if (waiting.party_size > latest.capacity - await getEventOccurrenceUsedSeats(db, occurrence.id)) {
+        return { kind: 'noop', reason: 'party_too_large', occurrenceVersion, promoted: null };
+      }
+      return { kind: 'noop', reason: 'applicant_ineligible', occurrenceVersion, promoted: null };
+    }
     const latest = await loadOccurrence(db, occurrence.id, params.lineAccountId);
     return { kind: 'conflict', currentVersion: latest?.version ?? occurrence.version };
   }
