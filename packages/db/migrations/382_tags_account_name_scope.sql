@@ -10,34 +10,52 @@
 
 PRAGMA defer_foreign_keys = ON;
 
-WITH expected(table_name, column_name, delete_action) AS (VALUES
-  ('affiliate_offers','tag_id','NO ACTION'),
-  ('broadcasts','target_tag_id','SET NULL'),
-  ('entry_routes','tag_id','SET NULL'),
-  ('forms','on_submit_tag_id','SET NULL'),
-  ('friend_tag_side_effect_runs','tag_id','CASCADE'),
-  ('friend_tags','tag_id','CASCADE'),
-  ('menus','auto_tag_id','SET NULL'),
-  ('nen_columns','completion_tag_id','SET NULL'),
-  ('nen_columns','target_tag_id','SET NULL'),
-  ('reminders','target_tag_id','SET NULL'),
-  ('scenario_steps','on_reach_tag_id','SET NULL'),
-  ('scenario_triggers','tag_id','CASCADE'),
-  ('scenarios','trigger_tag_id','SET NULL'),
-  ('tracked_links','tag_id','SET NULL')),
-actual AS (
- SELECT m.name AS table_name, f."from" AS column_name, f.on_delete AS delete_action
- FROM sqlite_schema m JOIN pragma_foreign_key_list(m.name) f
- WHERE m.type = 'table' AND m.name != '_cf_METADATA' AND f."table" = 'tags'
-), missing AS (SELECT * FROM expected EXCEPT SELECT * FROM actual),
-extra AS (SELECT * FROM actual EXCEPT SELECT * FROM expected)
-SELECT json(CASE WHEN NOT EXISTS(SELECT 1 FROM missing) AND NOT EXISTS(SELECT 1 FROM extra)
- THEN '{}' ELSE 'unexpected tags foreign keys: stop migration 382' END);
+-- D1 rejects a dynamic pragma_foreign_key_list(m.name) join with SQLITE_AUTH,
+-- and expanding every PRAGMA into one UNION can exceed D1's compound SELECT
+-- limit. Keep every assertion as a small fixed-table query instead.
+SELECT json(CASE WHEN (SELECT count(*) FROM pragma_foreign_key_list('affiliate_offers') WHERE "table" = 'tags') = 1 AND EXISTS(SELECT 1 FROM pragma_foreign_key_list('affiliate_offers') WHERE "table" = 'tags' AND "from" = 'tag_id' AND on_delete = 'NO ACTION') THEN '{}' ELSE 'unexpected tags foreign key: affiliate_offers.tag_id' END);
+SELECT json(CASE WHEN (SELECT count(*) FROM pragma_foreign_key_list('broadcasts') WHERE "table" = 'tags') = 1 AND EXISTS(SELECT 1 FROM pragma_foreign_key_list('broadcasts') WHERE "table" = 'tags' AND "from" = 'target_tag_id' AND on_delete = 'SET NULL') THEN '{}' ELSE 'unexpected tags foreign key: broadcasts.target_tag_id' END);
+SELECT json(CASE WHEN (SELECT count(*) FROM pragma_foreign_key_list('entry_routes') WHERE "table" = 'tags') = 1 AND EXISTS(SELECT 1 FROM pragma_foreign_key_list('entry_routes') WHERE "table" = 'tags' AND "from" = 'tag_id' AND on_delete = 'SET NULL') THEN '{}' ELSE 'unexpected tags foreign key: entry_routes.tag_id' END);
+SELECT json(CASE WHEN (SELECT count(*) FROM pragma_foreign_key_list('forms') WHERE "table" = 'tags') = 1 AND EXISTS(SELECT 1 FROM pragma_foreign_key_list('forms') WHERE "table" = 'tags' AND "from" = 'on_submit_tag_id' AND on_delete = 'SET NULL') THEN '{}' ELSE 'unexpected tags foreign key: forms.on_submit_tag_id' END);
+SELECT json(CASE WHEN (SELECT count(*) FROM pragma_foreign_key_list('friend_tag_side_effect_runs') WHERE "table" = 'tags') = 1 AND EXISTS(SELECT 1 FROM pragma_foreign_key_list('friend_tag_side_effect_runs') WHERE "table" = 'tags' AND "from" = 'tag_id' AND on_delete = 'CASCADE') THEN '{}' ELSE 'unexpected tags foreign key: friend_tag_side_effect_runs.tag_id' END);
+SELECT json(CASE WHEN (SELECT count(*) FROM pragma_foreign_key_list('friend_tags') WHERE "table" = 'tags') = 1 AND EXISTS(SELECT 1 FROM pragma_foreign_key_list('friend_tags') WHERE "table" = 'tags' AND "from" = 'tag_id' AND on_delete = 'CASCADE') THEN '{}' ELSE 'unexpected tags foreign key: friend_tags.tag_id' END);
+SELECT json(CASE WHEN (SELECT count(*) FROM pragma_foreign_key_list('menus') WHERE "table" = 'tags') = 1 AND EXISTS(SELECT 1 FROM pragma_foreign_key_list('menus') WHERE "table" = 'tags' AND "from" = 'auto_tag_id' AND on_delete = 'SET NULL') THEN '{}' ELSE 'unexpected tags foreign key: menus.auto_tag_id' END);
+SELECT json(CASE WHEN (SELECT count(*) FROM pragma_foreign_key_list('nen_columns') WHERE "table" = 'tags') = 2 AND EXISTS(SELECT 1 FROM pragma_foreign_key_list('nen_columns') WHERE "table" = 'tags' AND "from" = 'completion_tag_id' AND on_delete = 'SET NULL') AND EXISTS(SELECT 1 FROM pragma_foreign_key_list('nen_columns') WHERE "table" = 'tags' AND "from" = 'target_tag_id' AND on_delete = 'SET NULL') THEN '{}' ELSE 'unexpected tags foreign keys: nen_columns' END);
+SELECT json(CASE WHEN (SELECT count(*) FROM pragma_foreign_key_list('reminders') WHERE "table" = 'tags') = 1 AND EXISTS(SELECT 1 FROM pragma_foreign_key_list('reminders') WHERE "table" = 'tags' AND "from" = 'target_tag_id' AND on_delete = 'SET NULL') THEN '{}' ELSE 'unexpected tags foreign key: reminders.target_tag_id' END);
+SELECT json(CASE WHEN (SELECT count(*) FROM pragma_foreign_key_list('scenario_steps') WHERE "table" = 'tags') = 1 AND EXISTS(SELECT 1 FROM pragma_foreign_key_list('scenario_steps') WHERE "table" = 'tags' AND "from" = 'on_reach_tag_id' AND on_delete = 'SET NULL') THEN '{}' ELSE 'unexpected tags foreign key: scenario_steps.on_reach_tag_id' END);
+SELECT json(CASE WHEN (SELECT count(*) FROM pragma_foreign_key_list('scenario_triggers') WHERE "table" = 'tags') = 1 AND EXISTS(SELECT 1 FROM pragma_foreign_key_list('scenario_triggers') WHERE "table" = 'tags' AND "from" = 'tag_id' AND on_delete = 'CASCADE') THEN '{}' ELSE 'unexpected tags foreign key: scenario_triggers.tag_id' END);
+SELECT json(CASE WHEN (SELECT count(*) FROM pragma_foreign_key_list('scenarios') WHERE "table" = 'tags') = 1 AND EXISTS(SELECT 1 FROM pragma_foreign_key_list('scenarios') WHERE "table" = 'tags' AND "from" = 'trigger_tag_id' AND on_delete = 'SET NULL') THEN '{}' ELSE 'unexpected tags foreign key: scenarios.trigger_tag_id' END);
+SELECT json(CASE WHEN (SELECT count(*) FROM pragma_foreign_key_list('tracked_links') WHERE "table" = 'tags') = 1 AND EXISTS(SELECT 1 FROM pragma_foreign_key_list('tracked_links') WHERE "table" = 'tags' AND "from" = 'tag_id' AND on_delete = 'SET NULL') THEN '{}' ELSE 'unexpected tags foreign key: tracked_links.tag_id' END);
 
 SELECT json(CASE WHEN NOT EXISTS(
- SELECT 1 FROM sqlite_schema m JOIN pragma_foreign_key_list(m.name) f
- WHERE m.type = 'table' AND m.name != '_cf_METADATA'
- AND f."table" IN ('scenario_triggers', 'friend_tags', 'friend_tag_side_effect_runs')
+ SELECT 1 FROM sqlite_schema
+ WHERE type = 'table' AND name != '_cf_METADATA'
+ AND name NOT IN ('affiliate_offers', 'broadcasts', 'entry_routes', 'forms', 'friend_tag_side_effect_runs', 'friend_tags', 'menus', 'nen_columns', 'reminders', 'scenario_steps', 'scenario_triggers', 'scenarios', 'tracked_links')
+ AND (
+   lower(sql) LIKE '%references tags%'
+   OR lower(sql) LIKE '%references "tags"%'
+   OR lower(sql) LIKE '%references [tags]%'
+   OR lower(sql) LIKE '%references `tags`%'
+ )
+) THEN '{}' ELSE 'unexpected table references tags: stop migration 382' END);
+
+SELECT json(CASE WHEN NOT EXISTS(
+ SELECT 1 FROM sqlite_schema
+ WHERE type = 'table' AND name != '_cf_METADATA'
+ AND (
+   lower(sql) LIKE '%references scenario_triggers%'
+   OR lower(sql) LIKE '%references "scenario_triggers"%'
+   OR lower(sql) LIKE '%references [scenario_triggers]%'
+   OR lower(sql) LIKE '%references `scenario_triggers`%'
+   OR lower(sql) LIKE '%references friend_tags%'
+   OR lower(sql) LIKE '%references "friend_tags"%'
+   OR lower(sql) LIKE '%references [friend_tags]%'
+   OR lower(sql) LIKE '%references `friend_tags`%'
+   OR lower(sql) LIKE '%references friend_tag_side_effect_runs%'
+   OR lower(sql) LIKE '%references "friend_tag_side_effect_runs"%'
+   OR lower(sql) LIKE '%references [friend_tag_side_effect_runs]%'
+   OR lower(sql) LIKE '%references `friend_tag_side_effect_runs`%'
+ )
 ) AND (SELECT count(*) FROM pragma_table_info('scenario_triggers')) = 5
  THEN '{}' ELSE 'unexpected cascade leaf schema: stop migration 382' END);
 
