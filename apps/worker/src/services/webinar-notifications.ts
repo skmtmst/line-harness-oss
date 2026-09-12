@@ -549,7 +549,21 @@ export async function processWebinarNotificationJobs(
         AND COALESCE(j.next_retry_at, j.scheduled_at) <= ?
         AND r.status='active'
         AND w.status='active'
-      ORDER BY j.scheduled_at ASC
+      -- 停止中の先頭20件で他アカウントを塞がない。未停止を先に選び、
+      -- その中では予定時刻順を維持する。停止行は書き換えず解除後に拾う。
+      -- この判定は優先順位専用。送信許可には使わず、下の3点で読み直す。
+      ORDER BY EXISTS (
+        SELECT 1 FROM operation_control_sets control
+         WHERE control.scope_key IN ('*', w.account_id)
+           AND CASE
+             WHEN control.states_json IS NULL OR control.states_json = '' THEN 0
+             WHEN NOT json_valid(control.states_json)
+               THEN COALESCE(control.active_incident_id, '') != ''
+             WHEN json_type(control.states_json) = 'null'
+               THEN COALESCE(control.active_incident_id, '') != ''
+             ELSE json_extract(control.states_json, '$.reminder_dispatch') = 'stopped'
+           END
+      ) ASC, j.scheduled_at ASC, j.id ASC
       LIMIT ${WEBINAR_NOTIFICATION_TICK_LIMIT}`,
   ).bind(nowEpoch, EXTERNAL_DELIVERY_MAX_ATTEMPTS, nowEpoch, nowEpoch).all<DueJobRow>();
   let sent = 0;

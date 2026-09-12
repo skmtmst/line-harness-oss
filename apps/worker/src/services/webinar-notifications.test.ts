@@ -120,13 +120,14 @@ describe('緊急停止と通知取得・送信の競合 (#745)', () => {
     });
     return {
       store,
-      async tick() {
+      async tick(now = NOW) {
         queries = 0;
         // この通知専用の1000枠ではない。他cron用に500文を先に消費して検証する。
         for (let i = 0; i < 500; i++) await countedDb.prepare('SELECT 1').first();
         const pending: Promise<unknown>[] = [];
         const result = await processWebinarNotificationJobs(countedDb, {
           ...deliveryOptions,
+          now,
           proxyDispatch: (request) => Promise.resolve(lineProxy.fetch(request, {
             DB: countedDb, LINE_CHANNEL_ACCESS_TOKEN: 'fallback',
           }, {
@@ -166,6 +167,115 @@ describe('緊急停止と通知取得・送信の競合 (#745)', () => {
         WHERE kind='day_before' AND status='succeeded' AND attempt_count=1 AND lease_expires_at IS NULL`).get()).toEqual({ n: 100 });
       expect(real.store.raw.prepare('SELECT COUNT(*) AS n FROM messages_log').get()).toEqual({ n: 100 });
       expect(real.store.raw.prepare('SELECT COUNT(*) AS n FROM chats').get()).toEqual({ n: 100 });
+    } finally {
+      vi.unstubAllGlobals();
+      real.store.raw.close();
+    }
+  });
+
+  async function addAccount(store: SqliteD1, account: number, firstFriend: number, count: number) {
+    store.raw.prepare(`INSERT INTO line_accounts
+      (id, channel_id, name, channel_access_token, channel_secret, is_active, liff_id)
+      VALUES (?, ?, '別店舗', ?, 'secret', 1, ?)`)
+      .run(`account-${account}`, `channel-${account}`, `token-${account}`, `liff-${account}`);
+    store.raw.prepare(`INSERT INTO account_settings (id, line_account_id, key, value)
+      VALUES (?, ?, 'feature.webinars', '{"enabled":true}')`)
+      .run(`feature-${account}`, `account-${account}`);
+    store.raw.prepare(`INSERT INTO webinars
+      (id, account_id, title, slug, status, duration_seconds, schedule_json, created_at, updated_at)
+      VALUES (?, ?, '別店舗説明会', ?, 'active', 3600, '[]', ?, ?)`)
+      .run(`webinar-${account}`, `account-${account}`, `live-${account}`, NOW.toISOString(), NOW.toISOString());
+    await saveWebinarNotificationSettings(store.db, `webinar-${account}`, SETTINGS, NOW);
+    for (let index = firstFriend; index < firstFriend + count; index++) {
+      insertFriend(store.raw, `friend-${index}`, {
+        line_account_id: `account-${account}`, line_user_id: `U${index.toString(16).padStart(32, '0')}`,
+      });
+      await registerWebinarSession(store.db, `webinar-${account}`, `friend-${index}`, SESSION, NOW);
+      store.raw.prepare(`UPDATE webinar_notification_jobs SET scheduled_at=?, next_retry_at=?
+        WHERE friend_id=? AND kind='day_before'`).run(epoch + 1 + index % 7, epoch + 1, `friend-${index}`);
+    }
+  }
+
+  test('停止20件があっても別2アカウントへ進み、100件を予算内で予定順に各1回送る', async () => {
+    const real = await proxyFixture(20);
+    await addAccount(real.store, 2, 21, 40);
+    await addAccount(real.store, 3, 61, 40);
+    stop(real.store);
+    const before = real.store.raw.prepare(`SELECT * FROM webinar_notification_jobs WHERE webinar_id='webinar-1' ORDER BY id`).all();
+    const expectedOrder = (accountSql: string) => (real.store.raw.prepare(`
+      SELECT f.line_user_id FROM webinar_notification_jobs j JOIN friends f ON f.id=j.friend_id
+      WHERE j.kind='day_before' AND ${accountSql} ORDER BY j.scheduled_at, j.id`).all() as Array<{ line_user_id: string }>).map(row => row.line_user_id);
+    const activeOrder = expectedOrder("j.webinar_id != 'webinar-1'");
+    const heldOrder = expectedOrder("j.webinar_id = 'webinar-1'");
+    const upstream = vi.fn(async (_url: RequestInfo | URL, _init?: RequestInit) => new Response('{}', { status: 200 }));
+    vi.stubGlobal('fetch', upstream);
+    try {
+      for (let tick = 1; tick <= 4; tick++) {
+        // 実cron同様、tickの時刻も5分ずつ進める。
+        expect((await real.tick(new Date(NOW.getTime() + tick * 300_000))).result)
+          .toEqual({ sent: 20, failed: 0, skipped: 0, heldByStop: 0 });
+      }
+      expect(real.store.raw.prepare(`SELECT * FROM webinar_notification_jobs WHERE webinar_id='webinar-1' ORDER BY id`).all()).toEqual(before);
+      expect(upstream.mock.calls.map(([, init]) => JSON.parse(String(init?.body)).to)).toEqual(activeOrder);
+      expect((await real.tick(new Date(NOW.getTime() + 5 * 300_000))).result)
+        .toEqual({ sent: 0, failed: 0, skipped: 0, heldByStop: 20 });
+      stop(real.store, false);
+      expect((await real.tick(new Date(NOW.getTime() + 6 * 300_000))).result.sent).toBe(20);
+      expect((await real.tick(new Date(NOW.getTime() + 7 * 300_000))).result.sent).toBe(0);
+      expect(upstream.mock.calls.map(([, init]) => JSON.parse(String(init?.body)).to)).toEqual([...activeOrder, ...heldOrder]);
+      expect(new Set(upstream.mock.calls.map(([, init]) => new Headers(init?.headers).get('X-Line-Retry-Key'))).size).toBe(100);
+      expect(real.store.raw.prepare(`SELECT COUNT(*) AS n FROM webinar_notification_jobs
+        WHERE kind='day_before' AND status='succeeded' AND attempt_count=1 AND lease_expires_at IS NULL`).get()).toEqual({ n: 100 });
+      expect(real.store.raw.prepare('SELECT COUNT(*) AS n FROM messages_log').get()).toEqual({ n: 100 });
+    } finally {
+      vi.unstubAllGlobals();
+      real.store.raw.close();
+    }
+  });
+
+  test('全体停止は全アカウントの行を保持し、全体解除後も個別停止は維持する', async () => {
+    const real = await proxyFixture(20);
+    await addAccount(real.store, 2, 21, 1);
+    stop(real.store);
+    real.store.raw.prepare(`INSERT INTO operation_control_sets
+      (scope_key, line_account_id, version, states_json, updated_at)
+      VALUES ('*', NULL, 1, '{"reminder_dispatch":"stopped"}', ?)`).run(NOW.toISOString());
+    const before = real.store.raw.prepare('SELECT * FROM webinar_notification_jobs ORDER BY id').all();
+    const upstream = vi.fn(async () => new Response('{}', { status: 200 }));
+    vi.stubGlobal('fetch', upstream);
+    try {
+      const now = new Date(NOW.getTime() + 300_000);
+      for (let tick = 0; tick < 2; tick++) {
+        expect((await real.tick(now)).result).toEqual({ sent: 0, failed: 0, skipped: 0, heldByStop: 20 });
+      }
+      expect(upstream).not.toHaveBeenCalled();
+      expect(real.store.raw.prepare('SELECT * FROM webinar_notification_jobs ORDER BY id').all()).toEqual(before);
+      real.store.raw.prepare(`DELETE FROM operation_control_sets WHERE scope_key='*'`).run();
+      expect((await real.tick(now)).result).toEqual({ sent: 1, failed: 0, skipped: 0, heldByStop: 19 });
+      expect(upstream).toHaveBeenCalledTimes(1);
+      expect(real.store.raw.prepare(`SELECT status, attempt_count FROM webinar_notification_jobs
+        WHERE friend_id='friend-21' AND kind='day_before'`).get()).toEqual({ status: 'succeeded', attempt_count: 1 });
+      expect(real.store.raw.prepare(`SELECT COUNT(*) AS n FROM webinar_notification_jobs
+        WHERE webinar_id='webinar-1' AND kind='day_before' AND status='queued' AND attempt_count=0`).get()).toEqual({ n: 20 });
+    } finally {
+      vi.unstubAllGlobals();
+      real.store.raw.close();
+    }
+  });
+
+  test('停止中の正本がJSON nullでも正常アカウントを塞がず、安全側で保留する', async () => {
+    const real = await proxyFixture(20);
+    await addAccount(real.store, 2, 21, 1);
+    real.store.raw.prepare(`UPDATE operation_control_sets
+      SET states_json=' null ', active_incident_id='incident-1' WHERE scope_key='account-1'`).run();
+    const before = real.store.raw.prepare(`SELECT * FROM webinar_notification_jobs WHERE webinar_id='webinar-1' ORDER BY id`).all();
+    const upstream = vi.fn(async () => new Response('{}', { status: 200 }));
+    vi.stubGlobal('fetch', upstream);
+    try {
+      expect((await real.tick(new Date(NOW.getTime() + 300_000))).result)
+        .toEqual({ sent: 1, failed: 0, skipped: 0, heldByStop: 19 });
+      expect(upstream).toHaveBeenCalledTimes(1);
+      expect(real.store.raw.prepare(`SELECT * FROM webinar_notification_jobs WHERE webinar_id='webinar-1' ORDER BY id`).all()).toEqual(before);
     } finally {
       vi.unstubAllGlobals();
       real.store.raw.close();
