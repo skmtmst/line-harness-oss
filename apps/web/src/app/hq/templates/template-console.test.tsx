@@ -48,7 +48,7 @@ describe('HQひな形の配布フロー', () => {
   it('画像登録中は保存を止め、確定した内容だけ保存できる', async () => {
     let finish!: (value: unknown) => void
     calls.uploadImage.mockImplementation(() => new Promise(resolve => { finish = resolve }))
-    render(<TemplateConsole type="template" />); await screen.findByText('ひな形一覧')
+    render(<TemplateConsole type="template" />); await screen.findByText('テンプレート')
     fireEvent.click(screen.getByRole('button', { name: '＋ひな形を作成' }))
     fireEvent.change(screen.getByLabelText('名前'), { target: { value: '画像付き案内' } })
     fireEvent.change(screen.getByLabelText('配信する本文'), { target: { value: '本文' } })
