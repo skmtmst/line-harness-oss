@@ -112,3 +112,4 @@ export * from './operations-health';
 export * from './nen-photo-operations';
 export * from './friend-bulk-runs';
 export * from './friend-tag-side-effects';
+export * from './hq-templates';
