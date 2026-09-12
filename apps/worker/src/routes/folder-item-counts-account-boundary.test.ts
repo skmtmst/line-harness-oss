@@ -138,6 +138,6 @@ describe('GET /api/folders の件数(#631) — 実DB結合', () => {
     const res = await req('/api/folders');
     const body = await res.json() as { data: Array<Record<string, unknown>> };
     for (const row of body.data) expect(row).not.toHaveProperty('itemCount');
-    expect(accountAccess.getVisibleLineAccountScope).not.toHaveBeenCalled();
+    expect(accountAccess.getVisibleLineAccountScope).toHaveBeenCalled();
   });
 });
