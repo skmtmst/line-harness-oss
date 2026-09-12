@@ -74,6 +74,9 @@ describe('Cron Trigger設定', () => {
       'processScheduledBroadcasts',
       'processReminderDeliveries',
       'processQueuedBroadcasts',
+      // N-327 (#663): 運用者通知の送り残しの回収。cron から外すと
+      // retry_wait の行を誰も汲まなくなるので、ここで見張る。
+      'sweepOperatorNotifications',
     ];
 
     for (const call of frequentHeavyCalls) expect(frequentHeavy).toContain(call);

@@ -11,13 +11,10 @@ import StickyBar from '@/components/shared/sticky-bar'
 import { useAccount } from '@/contexts/account-context'
 import { ApiError, api, type OperatorRecipientPreview } from '@/lib/api'
 import { usePageTitle } from '@/components/shell/page-chrome'
-
-const EVENT_OPTIONS = [
-  { value: 'message_received', label: '予約が入ったとき' },
-  { value: 'friend_add', label: '友だちが追加されたとき' },
-  { value: 'cv_fire', label: '成果が記録されたとき' },
-  { value: 'incoming_webhook.custom', label: '外部連携のイベントを受け取ったとき' },
-]
+import {
+  DEFAULT_OPERATOR_EVENT_TYPE,
+  OPERATOR_EVENT_OPTIONS,
+} from '../../operator-event-options'
 
 const THRESHOLD_OPTIONS = [
   { value: 'one', label: '1件でも' },
@@ -48,7 +45,7 @@ export default function NewOperatorNotificationPage() {
   usePageTitle('運用者へのお知らせをつくる')
   const router = useRouter()
   const { selectedAccountId } = useAccount()
-  const [eventType, setEventType] = useState('message_received')
+  const [eventType, setEventType] = useState(DEFAULT_OPERATOR_EVENT_TYPE)
   const [threshold, setThreshold] = useState('one')
   const [importance, setImportance] = useState('normal')
   const [name, setName] = useState('新しい予約が入りました')
@@ -186,7 +183,7 @@ export default function NewOperatorNotificationPage() {
             <h2 className="mb-4 text-sm font-semibold text-ink">どんなときに知らせるか</h2>
             <div className="grid gap-4 lg:grid-cols-3">
               <Field label="きっかけ" htmlFor="operator-event" required>
-                <SelectField id="operator-event" className="w-full" value={eventType} onChange={(event) => setEventType(event.target.value)} options={EVENT_OPTIONS} />
+                <SelectField id="operator-event" className="w-full" value={eventType} onChange={(event) => setEventType(event.target.value)} options={[...OPERATOR_EVENT_OPTIONS]} />
               </Field>
               <Field label="どれくらいたまったら" htmlFor="operator-threshold">
                 <SelectField id="operator-threshold" className="w-full" value={threshold} onChange={(event) => setThreshold(event.target.value)} options={THRESHOLD_OPTIONS} />
