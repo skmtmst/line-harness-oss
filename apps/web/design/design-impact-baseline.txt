@@ -186,3 +186,4 @@ table-header-migration-target app/webhooks/webhook-interactions.tsx
 native-table-header-exception app/affiliates/tabs.tsx
 
 shared-button-importer app/hq/templates/template-console.tsx
+shared-button-importer app/hq/templates/template-definition-editor.tsx
