@@ -1,5 +1,6 @@
 import { RICH_MENU_ACTION_TYPE_BY_INTENT } from '@line-crm/shared';
 import { resolveSwitcherActions, validateRichMenuGroupForPublish, type AreaInput } from '../../lib/rich-menu-publisher.js';
+import { buildTapPostbackData } from '../../lib/rich-menu-tap.js';
 import {
   unsupportedHqTemplateAdapter, requireHqTemplateAuthority, createHqTemplateSnapshotToken,
   type HqTemplateAdapter, type HqTemplateAdapterInput, type HqTemplateAdapterContext,
@@ -43,6 +44,12 @@ async function digest(value: string | Uint8Array): Promise<string> {
   return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))).map(v => v.toString(16).padStart(2, '0')).join('');
 }
 const referenceKey = (r: HqTemplateReference) => `${r.kind}:${r.sourceId}`;
+function validateTextPostback(area: Area, targetAreaId: string): void {
+  // Tag actions wrap the text in a URL-encoded postback. Its final data, not
+  // just the visible text, must fit LINE's 300-character limit.
+  if (area.intent === 'text' && area.tagIds?.length
+    && buildTapPostbackData(targetAreaId, area.actionData.text).length > 300) fail('INVALID_ACTION');
+}
 function assertPublicUri(value: unknown): void {
   let url: URL, path: string, hash: string;
   try {
@@ -109,6 +116,8 @@ function parse(input: HqTemplateAdapterInput, tenantId: string): RichMenuHqDefin
     }
   }
   const definition = d as unknown as RichMenuHqDefinition;
+  // buildIdMap generates 32-character IDs. Recheck the actual mapping at commit.
+  for (const p of definition.richMenu.pages) for (const a of p.areas) validateTextPostback(a, '0'.repeat(32));
   const pageIds = new Set(definition.richMenu.pages.map(p => p.id));
   if (!pageIds.has(definition.richMenu.defaultPageId)) fail('INVALID_DEFAULT_PAGE');
   for (const p of definition.richMenu.pages) for (const a of p.areas) if (a.actionType === 'richmenuswitch' && !pageIds.has(a.actionData.targetPageId)) fail('INVALID_SWITCH_TARGET');
@@ -224,6 +233,7 @@ export function createRichMenuHqTemplateAdapter(options: RichMenuAdapterOptions)
       const s = await capture(c.targetAccountId); if (s.token !== c.snapshotToken) fail('VERSION_CONFLICT');
       for (const r of s.matched) if (idMap[referenceKey(r)] !== r.targetId) fail('REFERENCE_MISMATCH');
       const resolve = (id: string) => ident(idMap[id]);
+      for (const p of g.pages) for (const a of p.areas) validateTextPostback(a, resolve(a.id));
       const decisions = c.resolutions.filter(r => r.sourceId === g.id && r.itemKind === 'rich_menu');
       if (decisions.length !== 1 || c.resolutions.length !== 1 || decisions[0].mode !== c.mode) fail('RESOLUTION_REQUIRED');
       const choice = decisions[0];

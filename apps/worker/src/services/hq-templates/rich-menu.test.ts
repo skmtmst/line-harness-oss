@@ -6,7 +6,7 @@ import type { HqTemplateAdapterContext, HqTemplateStatement, HqTemplateStoreAtom
 
 const resources: ReturnType<typeof createTestD1>[] = [];
 afterEach(() => { for (const r of resources.splice(0)) r.raw.close(); });
-function fixture() {
+function fixture(messageText = 'ご案内') {
   const sql = createTestD1({ foreignKeys: true }); resources.push(sql);
   sql.raw.exec(`INSERT INTO tenants(id,name) VALUES ('tenant','HQ'),('other','Other');`);
   for (const account of ['a', 'b', 'c', 'outside']) {
@@ -18,7 +18,7 @@ function fixture() {
     sql.raw.prepare("INSERT INTO scenarios(id,name,trigger_type,line_account_id) VALUES (?,?,'manual',?)").run(`scenario-${account}`, 'Scenario', account);
   }
   const definition: RichMenuHqDefinition = { schemaVersion: 1, richMenu: { id: 'menu', name: 'Menu', chatBarText: '開く', size: 'large', defaultPageId: 'p1', pages: [
-    { id: 'p1', name: 'One', imageR2Key: 'hq-templates/tenant/image1', areas: [{ id: 'ar1', bounds: { x: 0, y: 0, width: 100, height: 100 }, actionType: 'uri', actionData: {}, intent: 'form', formId: 'source-form' }, { id: 'ar3', bounds: { x: 100, y: 0, width: 100, height: 100 }, actionType: 'message', actionData: { text: 'ご案内' }, intent: 'text', tagIds: ['source-tag'] }, { id: 'ar4', bounds: { x: 200, y: 0, width: 100, height: 100 }, actionType: 'postback', actionData: {}, intent: 'template', templateId: 'source-template' }] },
+    { id: 'p1', name: 'One', imageR2Key: 'hq-templates/tenant/image1', areas: [{ id: 'ar1', bounds: { x: 0, y: 0, width: 100, height: 100 }, actionType: 'uri', actionData: {}, intent: 'form', formId: 'source-form' }, { id: 'ar3', bounds: { x: 100, y: 0, width: 100, height: 100 }, actionType: 'message', actionData: { text: messageText }, intent: 'text', tagIds: ['source-tag'] }, { id: 'ar4', bounds: { x: 200, y: 0, width: 100, height: 100 }, actionType: 'postback', actionData: {}, intent: 'template', templateId: 'source-template' }] },
     { id: 'p2', name: 'Two', imageR2Key: 'hq-templates/tenant/image2', areas: [{ id: 'ar2', bounds: { x: 0, y: 0, width: 100, height: 100 }, actionType: 'richmenuswitch', actionData: { targetPageId: 'p1' }, intent: 'switch' }] },
   ] } };
   const input = { templateVersionId: 'version', definitionJson: JSON.stringify(definition) };
@@ -107,8 +107,12 @@ describe('rich-menu HQ store atomic adapter', () => {
     if (intent !== 'form') { delete area.formId; Object.assign(area, { intent, actionType: 'uri', actionData: { uri: 'https://example.invalid/' } }); }
     expect(() => createRichMenuHqTemplateAdapter({ ...f.options, input: { ...f.input, definitionJson: JSON.stringify(f.definition) } })).toThrow('UNSUPPORTED_TAG_ACTION');
   });
-  it('publishes the persisted draft through the existing payload builder using only fake LINE/R2 clients', async () => {
-    const f = fixture(); await f.execute(await f.plan('a'));
+  it.each([
+    { name: 'normal', messageText: 'ご案内', postbackLength: 66 },
+    { name: 'Japanese boundary', messageText: 'あ'.repeat(29), postbackLength: 300 },
+    { name: 'ASCII boundary', messageText: 'x'.repeat(261), postbackLength: 300 },
+  ])('publishes persisted $name actions through only fake LINE/R2 clients', async ({ messageText, postbackLength }) => {
+    const f = fixture(messageText); await f.execute(await f.plan('a'));
     const row = f.raw.prepare('SELECT * FROM rich_menu_groups').get() as any;
     const pages = (f.raw.prepare('SELECT * FROM rich_menu_pages WHERE group_id=? ORDER BY order_index').all(row.id) as any[]).map(p => ({
       id: p.id, orderIndex: p.order_index, name: p.name, imageR2Key: p.image_r2_key, imageContentType: p.image_content_type, lineRichMenuId: p.line_richmenu_id,
@@ -120,7 +124,8 @@ describe('rich-menu HQ store atomic adapter', () => {
     await createRichMenuShells(group, line, { get: async key => ({ body: f.objects.get(key)!.bytes }) });
     const payloads = createRichMenu.mock.calls.map(c => c[0] as any);
     expect(payloads[0].areas[0].action).toEqual({ type: 'uri', uri: 'https://liff.line.me/fixture-a?form=form-a' });
-    expect(payloads[0].areas[1].action).toMatchObject({ type: 'postback', displayText: 'ご案内' });
+    expect(payloads[0].areas[1].action).toMatchObject({ type: 'postback', displayText: messageText });
+    expect(payloads[0].areas[1].action.data.length).toBe(postbackLength);
     expect(payloads[0].areas[1].action.data).toContain(pages[0].areas[1].id);
     expect(payloads[0].areas[2].action).toMatchObject({ type: 'postback' });
     expect(payloads[0].areas[2].action.data).toContain(pages[0].areas[2].id);
@@ -128,6 +133,29 @@ describe('rich-menu HQ store atomic adapter', () => {
     expect(JSON.stringify(payloads)).not.toMatch(/source-(form|template|tag|scenario)/);
     // Publishing was simulated, so the distribution still has no actual LINE ID.
     expect(f.raw.prepare('SELECT line_richmenu_id FROM rich_menu_pages').all()).toEqual([{ line_richmenu_id: null }, { line_richmenu_id: null }]);
+  });
+  it.each(['あ'.repeat(30), 'x'.repeat(262), '😀'.repeat(22)])('rejects encoded text postbacks over 300 characters before R2 access: %s', messageText => {
+    const f = fixture();
+    f.definition.richMenu.pages[0].areas[1].actionData.text = messageText;
+    expect(() => createRichMenuHqTemplateAdapter({ ...f.options, input: { ...f.input, definitionJson: JSON.stringify(f.definition) } })).toThrow('INVALID_ACTION');
+    expect(f.bucket.head).not.toHaveBeenCalled(); expect(f.bucket.get).not.toHaveBeenCalled(); expect(f.bucket.put).not.toHaveBeenCalled();
+    expect(f.raw.prepare('SELECT * FROM rich_menu_groups').all()).toEqual([]);
+  });
+  it('keeps the full 300-character message limit when no tag postback is emitted', () => {
+    const f = fixture();
+    const area = f.definition.richMenu.pages[0].areas[1];
+    area.actionData.text = 'あ'.repeat(300); area.tagIds = [];
+    expect(() => createRichMenuHqTemplateAdapter({ ...f.options, input: { ...f.input, definitionJson: JSON.stringify(f.definition) } })).not.toThrow();
+  });
+  it('rechecks the final mapped area ID before reading or staging image bytes', async () => {
+    const f = fixture('あ'.repeat(29));
+    const c: HqTemplateAdapterContext = { tenantId: 'tenant', targetAccountId: 'a', preflightId: 'preflight-a', idempotencyFingerprint: 'fingerprint', mode: 'create', snapshotToken: await f.adapter.snapshot('a'), resolutions: [{ sourceId: 'menu', itemKind: 'rich_menu', mode: 'create' }] };
+    const extracted = await f.adapter.extractReferences(f.input); if (extracted.kind !== 'OK') throw new Error();
+    const refs = await f.adapter.verifyReferences(c, extracted.value); if (refs.kind !== 'OK') throw new Error();
+    const map = await f.adapter.buildIdMap(c, refs.value, []); if (map.kind !== 'OK') throw new Error();
+    await expect(f.adapter.buildCommitPlan(c, f.input, { ...map.value, ar3: 'a'.repeat(128) })).rejects.toThrow('INVALID_ACTION');
+    expect(f.bucket.get).not.toHaveBeenCalled(); expect(f.bucket.put).not.toHaveBeenCalled();
+    expect(f.raw.prepare('SELECT * FROM rich_menu_groups').all()).toEqual([]);
   });
   it('rejects more than 100 snapshot guard bindings before resolving refs or querying DB', () => {
     const f = fixture(), resolveReference = vi.fn();
