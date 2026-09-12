@@ -173,7 +173,7 @@ export async function distributionResult(db: D1Database, authority: HqTemplateAu
   const rows = (await db.prepare(`SELECT * FROM hq_template_distribution_results WHERE run_id=? AND tenant_id=? ORDER BY target_account_id`).bind(runId, authority.tenantId).all<HqTemplateDistributionResult>()).results;
   const stores = [];
   for (const row of rows) {
-    if (bucket && row.status === 'failed') {
+    if (bucket && row.status !== 'pending' && row.status !== 'staged') {
       await reconcileFailedOwnedImages({ db, bucket, authority, templateId, templateVersionId: row.template_version_id }, runId, row.target_account_id);
     }
     const cleanup = await db.prepare(`SELECT COUNT(*) AS count FROM hq_template_owned_r2_keys WHERE run_id=? AND tenant_id=? AND target_account_id=? AND state IN ('staged','cleanup_pending')`).bind(runId, authority.tenantId, row.target_account_id).first<{ count: number }>();

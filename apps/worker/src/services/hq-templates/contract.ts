@@ -156,6 +156,8 @@ export interface HqTemplateAdapterContext {
   mode: HqTemplateDistributionMode;
   snapshotToken: HqTemplateSnapshotToken;
   resolutions: readonly HqTemplateResolution[];
+  /** Internal store-attempt fence. Never accepted from HTTP request bodies. */
+  executionAttempt?: number;
 }
 
 export interface HqTemplateAdapterInput {

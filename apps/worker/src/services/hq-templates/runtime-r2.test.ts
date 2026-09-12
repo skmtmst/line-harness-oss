@@ -60,11 +60,32 @@ describe('DB-bound R2 store executor',()=>{
   test('unknown DB failure retries, becomes terminal, and cleans owned images',async()=>{
     const f=await fixture(),c=await f.preflight();f.raw.exec("CREATE TRIGGER reject_menu BEFORE INSERT ON rich_menu_groups BEGIN SELECT RAISE(ABORT,'fixture'); END");
     expect(await f.execute(c)).toMatchObject({status:'failed'});expect(f.bucket.delete).toHaveBeenCalledTimes(2);expect(f.raw.prepare('SELECT COUNT(*) n FROM rich_menu_groups').get()).toEqual({n:0});expect(f.raw.prepare("SELECT COUNT(*) n FROM hq_template_owned_r2_keys WHERE state='cleaned'").get()).toEqual({n:2});
-    f.raw.exec('DROP TRIGGER reject_menu');expect((await f.execute(c)).status).toBe('failed');expect(f.bucket.put).toHaveBeenCalledTimes(2);
+    const cleaned=f.raw.prepare("SELECT object_key,owner_token FROM hq_template_owned_r2_keys WHERE state='cleaned' LIMIT 1").get() as {object_key:string;owner_token:string};
+    f.objects.set(cleaned.object_key,{bytes:new Uint8Array([1,2,3]),etag:'late',size:3,httpMetadata:{contentType:'image/png'},customMetadata:{ownerToken:cleaned.owner_token,contentHash:'late'}});
+    f.raw.exec('DROP TRIGGER reject_menu');expect((await f.execute(c)).status).toBe('failed');expect(f.objects.has(cleaned.object_key)).toBe(false);expect(f.bucket.put).toHaveBeenCalledTimes(2);
   });
   test('lost PUT response is reconciled from the deterministic object and completes',async()=>{
     const f=await fixture(),c=await f.preflight(),put=f.bucket.put.getMockImplementation()!;f.bucket.put.mockImplementationOnce(async(...args)=>{await put(...args);throw new Error('lost PUT response')});
     expect(await f.execute(c)).toMatchObject({status:'succeeded'});expect(f.bucket.delete).not.toHaveBeenCalled();expect(f.raw.prepare("SELECT COUNT(*) n FROM hq_template_owned_r2_keys WHERE state='committed'").get()).toEqual({n:2});
+  });
+  test('a stale staged attempt is fenced, replaced, and cannot commit or retain its objects',async()=>{
+    const f=await fixture(),c=await f.preflight(),put=f.bucket.put.getMockImplementation()!;
+    let release!:()=>void,entered!:()=>void,oldKey='';
+    const gate=new Promise<void>(resolve=>{release=resolve}),started=new Promise<void>(resolve=>{entered=resolve});
+    f.bucket.put.mockImplementationOnce(async(...args)=>{oldKey=args[0];entered();await gate;return put(...args)});
+    const first=f.execute(c);
+    await started;
+    f.raw.prepare("UPDATE hq_template_distribution_results SET started_at='2000-01-01T00:00:00.000Z' WHERE run_id='run' AND target_account_id='a'").run();
+    const replacement=await f.execute(c);
+    expect(replacement.status).toBe('succeeded');
+    release();
+    expect((await first).status).toBe('succeeded');
+    expect(f.raw.prepare("SELECT attempt_count,status FROM hq_template_distribution_results WHERE run_id='run' AND target_account_id='a'").get()).toEqual({attempt_count:3,status:'succeeded'});
+    expect(f.raw.prepare("SELECT COUNT(*) n FROM hq_template_owned_r2_keys WHERE state='committed'").get()).toEqual({n:2});
+    expect(f.raw.prepare("SELECT COUNT(*) n FROM hq_template_owned_r2_keys WHERE state='cleaned'").get()).toEqual({n:1});
+    expect(f.objects.has(oldKey)).toBe(false);
+    const committed=f.raw.prepare("SELECT object_key FROM hq_template_owned_r2_keys WHERE state='committed'").all() as {object_key:string}[];
+    expect(committed.every(row=>f.objects.has(row.object_key))).toBe(true);
   });
   test('definite owner conflict cleans only this attempt earlier objects',async()=>{
     const f=await fixture(),c=await f.preflight(),put=f.bucket.put.getMockImplementation()!;let calls=0,foreignKey='';

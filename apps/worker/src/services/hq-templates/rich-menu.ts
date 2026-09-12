@@ -263,7 +263,7 @@ export function createRichMenuHqTemplateAdapter(options: RichMenuAdapterOptions)
       if (c.mode === 'alias' && (!name.startsWith(`${g.name} (`) || !/^[2-9][0-9]*\)$|^1[0-9]+\)$/.test(name.slice(g.name.length + 2)))) fail('ALIAS_REQUIRED');
       const nameMatch = await db.prepare('SELECT id FROM rich_menu_groups WHERE account_id=? AND name=? AND id<>?').bind(c.targetAccountId, name, groupId).first();
       if (nameMatch) fail('DUPLICATE_NAME');
-      const ownerToken = await digest(JSON.stringify([c.tenantId, c.targetAccountId, c.preflightId, c.idempotencyFingerprint]));
+      const ownerToken = await digest(JSON.stringify([c.tenantId, c.targetAccountId, c.preflightId, c.idempotencyFingerprint, c.executionAttempt ?? 0]));
       const stage = await Promise.all(g.pages.map(async (p, i) => {
         const obj = await bucket.get(p.imageR2Key, { onlyIf: { etagMatches: s.media[i].etag } });
         if (!obj || !('body' in obj)) fail('IMAGE_CHANGED');
