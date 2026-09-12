@@ -212,4 +212,3 @@ export default function HqFormDefinitionEditor({
     {showOptions && <OptionsDialog value={layout.options} refs={portableRefs} onChange={(options: FormOptions) => setLayout(previous => ({ ...previous, options }))} onClose={() => setShowOptions(false)} onSave={async () => { await save(); setShowOptions(false) }} />}
   </div>
 }
-

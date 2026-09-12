@@ -55,4 +55,3 @@ export function uniqueFormCopyName(base: string, taken: Set<string>): string {
   while (taken.has(`${base}_copy${number}`)) number += 1
   return `${base}_copy${number}`
 }
-

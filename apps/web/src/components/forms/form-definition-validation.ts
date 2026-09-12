@@ -32,4 +32,3 @@ export function validateFormLayoutForSave(layout: FormLayout): string | null {
   }
   return null
 }
-

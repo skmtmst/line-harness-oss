@@ -60,4 +60,3 @@ describe('HQ portable tag definition', () => {
     ]) expect(() => parseTagDefinition({ schemaVersion: 1, folders: [], tag: { name: 'unsafe', actions: [action] } })).toThrowError(expect.objectContaining({ code: 'UNSUPPORTED_REFERENCE' }))
   })
 })
-

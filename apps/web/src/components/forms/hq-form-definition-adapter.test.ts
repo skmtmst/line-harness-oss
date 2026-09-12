@@ -21,4 +21,3 @@ describe('HQ form editor adapter', () => {
     expect(hqFormPortableReferenceError(editor)).toContain('店舗固有')
   })
 })
-
