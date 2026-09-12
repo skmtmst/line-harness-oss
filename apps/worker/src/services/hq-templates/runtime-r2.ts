@@ -1,3 +1,4 @@
+import { HQ_AUTHORED_MESSAGE_ID, isRegisteredHqMedia } from './authoring-media.js';
 import { beginHqTemplateDistributionRun, beginHqTemplateStoreResult, recordHqTemplateOwnedR2Key, setHqTemplateOwnedR2KeyState, normalizeScopedTagName, type HqTemplateDistributionResult, type HqTemplatePreflight, type HqTemplatePreflightResolution, type HqTemplateStatement } from '@line-crm/db';
 import { requireHqTemplateAuthority, type HqTemplateAdapter, type HqTemplateAdapterContext, type HqTemplateAdapterInput, type HqTemplateAdapterResult, type HqTemplateAuthority, type HqTemplateSnapshotToken, type HqTemplateStoreAtomicCommitPlan } from './contract.js';
 import { createTemplateHqTemplateAdapter, parseMessageTemplateDefinition, inspectMessageTemplateDefinition, readMessageTemplateSourceBytes, type MessageTemplateTargetSnapshot, type MessageTemplateSourceMediaBinding, type MessageTemplateAdapterDependencies } from './template.js';
@@ -71,18 +72,20 @@ function boundedRichBucket(b:R2RuntimeBinding):Bucket {
 }
 async function messageAdapter(b:R2RuntimeBinding,context:HqTemplateAdapterContext,input:HqTemplateAdapterInput,sourceGuards:HqTemplateStatement[]) {
   const definition=parseMessageTemplateDefinition(JSON.parse(input.definitionJson));
-  const source=await b.db.prepare(`SELECT t.line_account_id FROM templates t JOIN line_accounts a ON a.id=t.line_account_id WHERE t.id=? AND a.tenant_id=? AND a.is_active=1 AND a.archived_at IS NULL`).bind(definition.template.id,b.authority.tenantId).first<{line_account_id:string}>();
-  if(!source)fail('SOURCE_ACCOUNT_UNAVAILABLE');
-  const sourceAccountId=source!.line_account_id;
-  sourceGuards.push(guard(`EXISTS(SELECT 1 FROM templates t JOIN line_accounts a ON a.id=t.line_account_id WHERE t.id=? AND t.line_account_id=? AND a.tenant_id=? AND a.is_active=1 AND a.archived_at IS NULL)`,[definition.template.id,sourceAccountId,b.authority.tenantId]));
+  const hqAuthored=definition.template.id===HQ_AUTHORED_MESSAGE_ID;
+  const source=hqAuthored?null:await b.db.prepare(`SELECT t.line_account_id FROM templates t JOIN line_accounts a ON a.id=t.line_account_id WHERE t.id=? AND a.tenant_id=? AND a.is_active=1 AND a.archived_at IS NULL`).bind(definition.template.id,b.authority.tenantId).first<{line_account_id:string}>();
+  if(!hqAuthored&&!source)fail('SOURCE_ACCOUNT_UNAVAILABLE');
+  // HQ provenance is the tenant/version DB record checked by sourceVersion, not a client account id.
+  const sourceAccountId=hqAuthored?`hq:${b.authority.tenantId}`:source!.line_account_id;
+  if(!hqAuthored)sourceGuards.push(guard(`EXISTS(SELECT 1 FROM templates t JOIN line_accounts a ON a.id=t.line_account_id WHERE t.id=? AND t.line_account_id=? AND a.tenant_id=? AND a.is_active=1 AND a.archived_at IS NULL)`,[definition.template.id,sourceAccountId,b.authority.tenantId]));
   const bindings:MessageTemplateSourceMediaBinding[]=[];
   for(const media of definition.media) {
-    const row=await b.db.prepare(`SELECT v.content_hash,v.etag FROM media_versions v JOIN media m ON m.id=v.media_id JOIN line_accounts a ON a.id=m.line_account_id WHERE v.id=? AND v.media_id=? AND v.version_no=? AND v.size_bytes=? AND m.line_account_id=? AND a.tenant_id=? AND a.is_active=1 AND a.archived_at IS NULL`).bind(media.versionId,media.id,media.versionNo,media.sizeBytes,sourceAccountId,b.authority.tenantId).first<{content_hash:string;etag:string|null}>();
-    if(!row||normalizeSha256(row.content_hash)!==normalizeSha256(media.contentHash)||!normalizeSha256(media.contentHash))fail('SOURCE_MEDIA_UNAVAILABLE');
+    const row=hqAuthored?null:await b.db.prepare(`SELECT v.content_hash,v.etag FROM media_versions v JOIN media m ON m.id=v.media_id JOIN line_accounts a ON a.id=m.line_account_id WHERE v.id=? AND v.media_id=? AND v.version_no=? AND v.size_bytes=? AND m.line_account_id=? AND a.tenant_id=? AND a.is_active=1 AND a.archived_at IS NULL`).bind(media.versionId,media.id,media.versionNo,media.sizeBytes,sourceAccountId,b.authority.tenantId).first<{content_hash:string;etag:string|null}>();
+    if(!normalizeSha256(media.contentHash)||(!hqAuthored&&(!row||normalizeSha256(row.content_hash)!==normalizeSha256(media.contentHash))))fail('SOURCE_MEDIA_UNAVAILABLE');
     const key=sourceKey(media.r2Key,b.authority.tenantId),object=await b.bucket.head(key);
-    if(!object||object.size!==media.sizeBytes)fail('SOURCE_MEDIA_UNAVAILABLE');
+    if(!object||object.size!==media.sizeBytes||(hqAuthored&&!isRegisteredHqMedia(object,media,b.authority.tenantId)))fail('SOURCE_MEDIA_UNAVAILABLE');
     bindings.push({tenantId:b.authority.tenantId,templateVersionId:b.templateVersionId,sourceAccountId,mediaId:media.id,mediaVersionId:media.versionId,versionNo:media.versionNo,r2Key:key,r2KeyPrefix:`hq-templates/${b.authority.tenantId}`,sizeBytes:media.sizeBytes,contentHash:media.contentHash,etag:object!.etag});
-    sourceGuards.push(guard(`EXISTS(SELECT 1 FROM media_versions v JOIN media m ON m.id=v.media_id JOIN line_accounts a ON a.id=m.line_account_id WHERE v.id=? AND v.media_id=? AND v.version_no=? AND v.size_bytes=? AND v.content_hash=? AND m.line_account_id=? AND a.tenant_id=? AND a.is_active=1 AND a.archived_at IS NULL)`,[media.versionId,media.id,media.versionNo,media.sizeBytes,row!.content_hash,sourceAccountId,b.authority.tenantId]));
+    if(!hqAuthored)sourceGuards.push(guard(`EXISTS(SELECT 1 FROM media_versions v JOIN media m ON m.id=v.media_id JOIN line_accounts a ON a.id=m.line_account_id WHERE v.id=? AND v.media_id=? AND v.version_no=? AND v.size_bytes=? AND v.content_hash=? AND m.line_account_id=? AND a.tenant_id=? AND a.is_active=1 AND a.archived_at IS NULL)`,[media.versionId,media.id,media.versionNo,media.sizeBytes,row!.content_hash,sourceAccountId,b.authority.tenantId]));
   }
   const owner=await digest(JSON.stringify([context.tenantId,context.targetAccountId,context.preflightId,context.idempotencyFingerprint,context.executionAttempt??0]));
   const ids=new Map<string,string>();

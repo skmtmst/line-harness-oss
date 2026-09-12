@@ -1,3 +1,5 @@
+import { uploadHqImage } from '../services/hq-templates/authoring-media.js';
+import { TemplateHqTemplateError } from '../services/hq-templates/template.js';
 import { Hono, type Context } from 'hono';
 import { HQ_TEMPLATE_TYPES, getStaffById, type HqTemplateType } from '@line-crm/db';
 import { dbFor } from '../services/db-router.js';
@@ -53,6 +55,16 @@ hqTemplates.use('/api/hq/templates/*', requireRole('owner', 'admin'), async (c, 
     return c.json({ success: false, error: reasons[code] ?? (typed && error.status < 500 ? '入力内容を確認してください' : '処理結果を確認できません。しばらくしてから再確認してください'), code }, typed ? error.status : 500);
   }
 });
+hqTemplates.post('/api/hq/templates/media', async c => {
+  const auth = await authority(c);
+  try {
+    const data = await uploadHqImage(c.env.IMAGES, auth, c.req.raw, c.env.WORKER_URL || new URL(c.req.url).origin);
+    return c.json({ success: true, data }, 201);
+  } catch (error) {
+    if (error instanceof TemplateHqTemplateError) throw new HqTemplateError(error.code, 422);
+    throw error;
+  }
+});
 hqTemplates.get('/api/hq/templates/accounts', async c => c.json({ success: true, data: await listTemplateAccounts(dbFor(c.env), await authority(c)) }));
 hqTemplates.get('/api/hq/templates', async c => {
   const type = c.req.query('type');
@@ -85,7 +97,7 @@ hqTemplates.post('/api/hq/templates/:id/preflight', async c => {
 hqTemplates.post('/api/hq/templates/:id/distribute', async c => {
   const input = await body(c);
   if (typeof input.preflightId !== 'string' || !Array.isArray(input.resolutions) || input.resolutions.length > 270 || input.resolutions.some(v => !v || typeof v !== 'object' || typeof v.accountId !== 'string' || typeof v.sourceId !== 'string' || !['create', 'overwrite', 'alias'].includes(v.mode))) throw new HqTemplateError('INVALID_SELECTION');
-  const data = await distributeTemplate(dbFor(c.env), await authority(c), c.req.param('id'), input.preflightId, input.resolutions as DistributionSelection[], c.env.IMAGES, c.env.WORKER_URL);
+  const data = await distributeTemplate(dbFor(c.env), await authority(c), c.req.param('id'), input.preflightId, input.resolutions as DistributionSelection[], c.env.IMAGES, c.env.WORKER_URL || new URL(c.req.url).origin);
   c.set('auditRecorded', true); return c.json({ success: true, data });
 });
 hqTemplates.get('/api/hq/templates/:id/distributions/:runId', async c => c.json({ success: true, data: await distributionResult(dbFor(c.env), await authority(c), c.req.param('id'), c.req.param('runId'), c.env.IMAGES) }));

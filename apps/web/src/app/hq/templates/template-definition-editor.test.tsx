@@ -5,6 +5,8 @@ import { emptyLayout } from '@line-crm/shared'
 import type { FormDefinition, RichMenuDefinition } from '@/lib/hq-templates-api'
 import TemplateDefinitionEditor, { definitionError } from './template-definition-editor'
 
+vi.mock('@/lib/hq-templates-api', () => ({ hqTemplatesApi: { uploadImage: vi.fn() } }))
+
 afterEach(cleanup)
 
 describe('TemplateDefinitionEditor', () => {

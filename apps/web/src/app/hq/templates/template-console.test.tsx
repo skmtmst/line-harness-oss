@@ -4,7 +4,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import TemplateConsole, { resolvedItems } from './template-console'
 import type { Preflight } from '@/lib/hq-templates-api'
 
-const calls = vi.hoisted(() => Object.fromEntries(['context','list','accounts','get','create','update','remove','preflight','distribute','result'].map(key => [key, vi.fn()])))
+const calls = vi.hoisted(() => Object.fromEntries(['uploadImage','context','list','accounts','get','create','update','remove','preflight','distribute','result'].map(key => [key, vi.fn()])))
 vi.mock('@/lib/hq-templates-api', () => ({ TEMPLATE_TYPES: ['tag','template','rich_menu','form'], hqTemplatesApi: calls }))
 vi.mock('next/navigation', () => ({ usePathname: () => '/hq/templates', useRouter: () => ({ push: vi.fn() }) }))
 const template = { id: 't1', name: '来店済み', description: '説明', template_type: 'tag', revision: 3, updated_at: '2026-09-12T00:00:00Z' }
@@ -29,6 +29,20 @@ async function chooseStores() {
 async function distribute() { await chooseStores(); fireEvent.click(screen.getByRole('button', { name: 'すべて別名で作成' })); fireEvent.click(screen.getByRole('button', { name: 'この内容で2店舗へ配布' })); await screen.findByText('配布が完了しました') }
 
 describe('HQひな形の配布フロー', () => {
+  it('画像登録中は保存を止め、確定した内容だけ保存できる', async () => {
+    let finish!: (value: unknown) => void
+    calls.uploadImage.mockImplementation(() => new Promise(resolve => { finish = resolve }))
+    render(<TemplateConsole type="template" />); await screen.findByText('ひな形一覧')
+    fireEvent.click(screen.getByRole('button', { name: '＋ひな形を作成' }))
+    fireEvent.change(screen.getByLabelText('名前'), { target: { value: '画像付き案内' } })
+    fireEvent.change(screen.getByLabelText('配信する本文'), { target: { value: '本文' } })
+    fireEvent.change(screen.getByLabelText('メッセージ画像を選ぶ'), { target: { files: [new File(['fixture'], 'a.png', { type: 'image/png' })] } })
+    expect((screen.getByRole('button', { name: '下書き保存' }) as HTMLButtonElement).disabled).toBe(true)
+    fireEvent.click(screen.getByRole('button', { name: '下書き保存' })); expect(calls.create).not.toHaveBeenCalled()
+    finish({ id:'image',kind:'image',filename:'a.png',mimeType:'image/png',sizeBytes:32,width:2500,height:1686,durationMs:null,r2Key:'hq-templates/tenant-a/uploads/a.png',publicUrl:null,versionId:'image',versionNo:1,contentHash:'a'.repeat(64) })
+    await waitFor(() => expect((screen.getByRole('button', { name: '下書き保存' }) as HTMLButtonElement).disabled).toBe(false))
+  })
+
   it('作成・編集で期待版と参照先を保ち、保存結果から次へ進む', async () => {
     await list(); fireEvent.click(screen.getByRole('button', { name: '来店済みを編集' })); await screen.findByLabelText('名前')
     fireEvent.change(screen.getByLabelText('名前'), { target: { value: '保存名' } }); fireEvent.click(screen.getByRole('button', { name: '保存して配布先を選ぶ' }))
@@ -142,7 +156,7 @@ describe('HQひな形の配布フロー', () => {
     await screen.findByText('配布が完了しました'); expect(calls.result).toHaveBeenCalledWith('t1', 'p1'); expect(calls.distribute).not.toHaveBeenCalled()
   })
   it.each([
-    ['template', { schemaVersion: 1, template: { id: 'template-main', name: '来店お礼', category: 'general', messageType: 'text', messageContent: 'ありがとうございます', carouselActionsJson: null, carouselTapLimitMode: 'none', carouselTapLimitText: null, questionJson: null, questionStatus: 'draft' }, media: [] }, '配信する本文', 'ありがとうございます'],
+    ['template', { schemaVersion: 1, template: { id: 'hq-authored-message', name: '来店お礼', category: 'general', messageType: 'text', messageContent: 'ありがとうございます', carouselActionsJson: null, carouselTapLimitMode: 'none', carouselTapLimitText: null, questionJson: null, questionStatus: 'draft' }, media: [] }, '配信する本文', 'ありがとうございます'],
     ['rich_menu', { schemaVersion: 1, richMenu: { id: 'rich-menu-main', name: '店舗メニュー', chatBarText: 'メニュー', size: 'large', defaultPageId: 'page-1', pages: [{ id: 'page-1', name: 'メイン', imageR2Key: 'hq-templates/tenant-a/menu.png', areas: [] }] } }, 'リッチメニュー画像の保存先', 'hq-templates/tenant-a/menu.png'],
     ['form', { schemaVersion: 1, form: { name: 'ご来店アンケート', description: null, fields: [{ name: 'question_1', label: '質問1', type: 'text', required: false }], layout: null, on_submit_tag_id: null, on_submit_scenario_id: null, save_to_metadata: true } }, null, null],
   ] as const)('%s を専用入力欄から作成できる', async (type, definition, fieldLabel, fieldValue) => {

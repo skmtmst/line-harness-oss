@@ -129,6 +129,13 @@ async function request<T>(path: string, method = 'GET', body?: unknown, headers?
 }
 const idPath = (id: string) => `/${encodeURIComponent(id)}`
 export const hqTemplatesApi = {
+  uploadImage: async (file: File, purpose: 'message' | 'rich_menu'): Promise<MessageTemplateDefinition['media'][number]> => {
+    const max = purpose === 'rich_menu' ? 1024 * 1024 : 8 * 1024 * 1024
+    if (!['image/png', 'image/jpeg'].includes(file.type) || file.size < 1 || file.size > max) throw new Error('PNG・JPEGの画像を、表示されたサイズ上限内で選んでください。')
+    const result = await fetchApi<{ success: boolean; data?: MessageTemplateDefinition['media'][number] }>(`/api/hq/templates/media?purpose=${purpose}&filename=${encodeURIComponent(file.name)}`, { method: 'POST', headers: { 'Content-Type': file.type }, body: file })
+    if (!result.success || !result.data) throw new Error('画像を登録できませんでした。もう一度選択してください。')
+    return result.data
+  },
   context: async (): Promise<{ tenantId: string; actorId: string }> => {
     const response = await fetchApi<{ success: boolean; data?: { id?: string; tenantId?: string } }>('/api/staff/me')
     const { id, tenantId } = response.data ?? {}

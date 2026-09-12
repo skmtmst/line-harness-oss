@@ -1,5 +1,9 @@
 'use client'
 
+import { useEffect, useRef, useState } from 'react'
+import { hqTemplatesApi } from '@/lib/hq-templates-api'
+import { freshDefinition, withUploadedImage } from '@/lib/hq-template-authoring'
+export { freshDefinition } from '@/lib/hq-template-authoring'
 import Button from '@/components/shared/button'
 import Select from '@/components/shared/select'
 import type {
@@ -20,12 +24,6 @@ const fieldTypes: Array<{ value: FormFieldType; label: string }> = [
   { value: 'prefecture', label: '都道府県' }, { value: 'file', label: 'ファイル' },
 ]
 
-export function freshDefinition(type: TemplateType): TemplateDefinition {
-  if (type === 'tag') return { schemaVersion: 1, tag: { name: '', color: '#3B82F6', description: null, folderId: null }, folders: [] }
-  if (type === 'template') return { schemaVersion: 1, template: { id: 'template-main', name: '', category: 'general', messageType: 'text', messageContent: '', carouselActionsJson: null, carouselTapLimitMode: 'none', carouselTapLimitText: null, questionJson: null, questionStatus: 'draft' }, media: [] }
-  if (type === 'rich_menu') return { schemaVersion: 1, richMenu: { id: 'rich-menu-main', name: '', chatBarText: 'メニュー', size: 'large', defaultPageId: 'page-1', pages: [{ id: 'page-1', name: 'メイン', imageR2Key: '', areas: [] }] } }
-  return { schemaVersion: 1, form: { name: '', description: null, fields: [{ name: 'question_1', label: '質問1', type: 'text', required: false }], layout: null, on_submit_tag_id: null, on_submit_scenario_id: null, save_to_metadata: true } }
-}
 
 export function definitionName(type: TemplateType, definition: TemplateDefinition): string {
   if (type === 'tag' && 'tag' in definition) return definition.tag.name
@@ -85,15 +83,31 @@ function TagEditor({ value, disabled, onChange }: { value: TagDefinition; disabl
   </>
 }
 
-function MessageEditor({ value, disabled, onChange }: { value: MessageTemplateDefinition; disabled: boolean; onChange: (next: MessageTemplateDefinition) => void }) {
+function ImageUpload({ purpose, disabled, onUploaded, onBusyChange }: { purpose: 'message' | 'rich_menu'; disabled: boolean; onUploaded: (media: MessageTemplateDefinition['media'][number]) => void; onBusyChange?: (busy: boolean) => void }) {
+  const [error, setError] = useState(''), [uploading, setUploading] = useState(false)
+  const alive = useRef(true), locked = useRef(false)
+  useEffect(() => { alive.current = true; return () => { alive.current = false; onBusyChange?.(false) } }, [onBusyChange])
+  const upload = async (file?: File) => {
+    if (!file || disabled || locked.current) return
+    locked.current = true; setUploading(true); onBusyChange?.(true); setError('')
+    try { const media = await hqTemplatesApi.uploadImage(file, purpose); if (alive.current) onUploaded(media) }
+    catch (e) { if (alive.current) setError(e instanceof Error ? e.message : '画像を登録できませんでした。') }
+    finally { locked.current = false; if (alive.current) { setUploading(false); onBusyChange?.(false) } }
+  }
+  return <div className={styles.field}><span>画像を登録</span><input aria-label={purpose === 'message' ? 'メッセージ画像を選ぶ' : 'リッチメニュー画像を選ぶ'} type="file" accept="image/png,image/jpeg" disabled={disabled || uploading} onChange={event => { const file = event.target.files?.[0]; event.target.value = ''; void upload(file) }} /><small className={styles.muted}>{purpose === 'message' ? 'PNG・JPEG、1件8 MiB以下。画像形式では本文に自動設定します。' : 'PNG・JPEG、1 MiB以下。幅2500px、高さ1686pxまたは843px。'}</small>{uploading && <p role="status">画像を登録しています…</p>}{error && <p role="alert">{error}</p>}</div>
+}
+
+function MessageEditor({ value, disabled, onChange, onBusyChange }: { value: MessageTemplateDefinition; disabled: boolean; onChange: (next: MessageTemplateDefinition) => void; onBusyChange?: (busy: boolean) => void }) {
   const current = value.template
   return <>
     <div className={styles.twoColumns}><div className={styles.field}><span>メッセージ形式</span><Select aria-label="メッセージ形式" size="full" value={current.messageType} disabled={disabled} options={[{ value: 'text', label: 'テキスト' }, { value: 'flex', label: 'Flexメッセージ' }, { value: 'carousel', label: 'カルーセル' }, { value: 'image', label: '画像' }]} onChange={messageType => onChange({ ...value, template: { ...current, messageType: messageType as MessageTemplateDefinition['template']['messageType'] } })} /></div><label className={styles.field}><span>分類</span><input aria-label="テンプレートの分類" className={styles.input} value={current.category} maxLength={100} disabled={disabled} onChange={event => onChange({ ...value, template: { ...current, category: event.target.value } })} /></label></div>
+    {current.id === 'hq-authored-message' && <ImageUpload purpose="message" disabled={disabled} onBusyChange={onBusyChange} onUploaded={media => onChange(withUploadedImage(value, media))} />}
+    {value.media.map(media => <p key={media.id} className={styles.muted}>{media.filename}（{Math.ceil(media.sizeBytes / 1024)} KB）<br /><span className={styles.name}>{media.publicUrl ?? media.r2Key}</span></p>)}
     <label className={styles.field}><span>{current.messageType === 'text' ? '本文' : 'メッセージ内容'}</span><textarea aria-label="配信する本文" className={styles.input} value={current.messageContent} rows={9} disabled={disabled} placeholder={current.messageType === 'text' ? '店舗から配信する文章を入力' : '形式に対応する内容を入力'} onChange={event => onChange({ ...value, template: { ...current, messageContent: event.target.value } })} /><small className={styles.muted}>{current.messageType === 'text' ? '店舗ごとに同じ文章を配布します。' : '画像・Flex・カルーセルは登録メディアの参照も配布対象になります。'}</small></label>
   </>
 }
 
-function RichMenuEditor({ value, disabled, tenantId, onChange }: { value: RichMenuDefinition; disabled: boolean; tenantId?: string; onChange: (next: RichMenuDefinition) => void }) {
+function RichMenuEditor({ value, disabled, tenantId, onChange, onBusyChange }: { value: RichMenuDefinition; disabled: boolean; tenantId?: string; onChange: (next: RichMenuDefinition) => void; onBusyChange?: (busy: boolean) => void }) {
   const menu = value.richMenu
   const page = menu.pages[0]
   if (!page) return null
@@ -117,6 +131,7 @@ function RichMenuEditor({ value, disabled, tenantId, onChange }: { value: RichMe
   const setAction = (next: RichMenuDefinition['richMenu']['pages'][number]['areas'][number]) => setFirstPage({ ...page, areas: [next] })
   return <>
     <div className={styles.twoColumns}><label className={styles.field}><span>トーク画面の表示</span><input aria-label="トーク画面の表示" className={styles.input} value={menu.chatBarText} maxLength={14} disabled={disabled} onChange={event => setMenu({ chatBarText: event.target.value })} /></label><div className={styles.field}><span>サイズ</span><Select aria-label="リッチメニューのサイズ" size="full" value={menu.size} disabled={disabled || menu.pages.length > 1 || page.areas.length > 1} options={[{ value: 'large', label: '大（2500 × 1686）' }, { value: 'compact', label: '小（2500 × 843）' }]} onChange={size => { const nextSize = size as 'large' | 'compact'; const oldHeight = menu.size === 'large' ? 1686 : 843; const nextHeight = nextSize === 'large' ? 1686 : 843; setMenu({ size: nextSize, pages: [{ ...page, areas: page.areas.map(area => area.bounds.x === 0 && area.bounds.y === 0 && area.bounds.width === 2500 && area.bounds.height === oldHeight ? { ...area, bounds: { ...area.bounds, height: nextHeight } } : area) }, ...menu.pages.slice(1)] }) }} /><small className={styles.muted}>{menu.pages.length > 1 || page.areas.length > 1 ? '複数ページ・複数領域の既存設定を守るため、サイズ変更は元の編集画面で行ってください。' : '画像全体を1つの領域として設定します。'}</small></div></div>
+    <ImageUpload purpose="rich_menu" disabled={disabled} onBusyChange={onBusyChange} onUploaded={media => { if (media.width !== 2500 || media.height !== (menu.size === 'large' ? 1686 : 843)) throw new Error('選択中のサイズに合う画像を指定してください。'); setFirstPage({ ...page, imageR2Key: media.r2Key }) }} />
     <section className={styles.subpanel}><h2>メインページ</h2>{menu.pages.length > 1 && <p className={styles.notice}>この画面では先頭ページを編集します。残り{menu.pages.length - 1}ページは変更せず保存します。</p>}<label className={styles.field}><span>ページ名</span><input aria-label="リッチメニューのページ名" className={styles.input} value={page.name} maxLength={200} disabled={disabled} onChange={event => setFirstPage({ ...page, name: event.target.value })} /></label><label className={styles.field}><span>登録済み画像の保存先</span><input aria-label="リッチメニュー画像の保存先" className={styles.input} value={page.imageR2Key} maxLength={1024} disabled={disabled} placeholder={`hq-templates/${tenantId ?? '組織ID'}/menu.png`} onChange={event => setFirstPage({ ...page, imageR2Key: event.target.value })} /><small className={styles.muted}>統括用に登録した画像を指定します。配布時に各店舗へ複製され、下書きとして保存されます。</small></label>
       {multipleAreas && <p className={styles.notice}>このページには複数のタップ領域があります。既存の領域を守るため、タップ動作は元の編集画面で変更してください。</p>}
       <div className={styles.field}><span>画像全体を押したとき</span><Select aria-label="リッチメニューのタップ動作" size="full" value={actionKind} disabled={disabled || multipleAreas} options={[{ value: 'none', label: '動作なし' }, { value: 'url', label: 'Webページを開く' }, { value: 'text', label: 'メッセージを送る' }, { value: 'form', label: '回答フォームを開く' }, { value: 'template', label: 'テンプレートを送る' }]} onChange={setActionKind} /></div>
@@ -140,10 +155,10 @@ function FormEditor({ value, disabled, onChange }: { value: FormDefinition; disa
   </>
 }
 
-export default function TemplateDefinitionEditor({ type, value, disabled, tenantId, onChange }: { type: TemplateType; value: TemplateDefinition; disabled: boolean; tenantId?: string; onChange: (next: TemplateDefinition) => void }) {
+export default function TemplateDefinitionEditor({ type, value, disabled, tenantId, onChange, onBusyChange }: { type: TemplateType; value: TemplateDefinition; disabled: boolean; tenantId?: string; onChange: (next: TemplateDefinition) => void; onBusyChange?: (busy: boolean) => void }) {
   if (type === 'tag' && 'tag' in value) return <TagEditor value={value} disabled={disabled} onChange={onChange} />
-  if (type === 'template' && 'template' in value) return <MessageEditor value={value} disabled={disabled} onChange={onChange} />
-  if (type === 'rich_menu' && 'richMenu' in value) return <RichMenuEditor value={value} disabled={disabled} tenantId={tenantId} onChange={onChange} />
+  if (type === 'template' && 'template' in value) return <MessageEditor value={value} disabled={disabled} onChange={onChange} onBusyChange={onBusyChange} />
+  if (type === 'rich_menu' && 'richMenu' in value) return <RichMenuEditor value={value} disabled={disabled} tenantId={tenantId} onChange={onChange} onBusyChange={onBusyChange} />
   if (type === 'form' && 'form' in value) return <FormEditor value={value} disabled={disabled} onChange={onChange} />
   return <p role="alert">ひな形の種類と保存内容が一致しません。</p>
 }
