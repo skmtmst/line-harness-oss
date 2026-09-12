@@ -236,6 +236,25 @@ export default function WebinarNotifications({ webinarId, onLoaded }: {
           </div>
         ))}
       </dl>
+      {/*
+        見送りの内訳（#745）。**数だけ出しても、取るべき行動が決まらない。**
+        「すでに視聴済み」は正常だが、「対象回が終了済み」は届かないまま
+        終わったということで、運用者が気づく必要がある。
+        0 件のときは出さない——常に空の枠があると、誰も見なくなる。
+      */}
+      {available && (overview?.skippedReasons?.length ?? 0) > 0 && (
+        <div className="border-hairline rounded-xl border p-4" data-testid="webinar-skip-reasons">
+          <p className="text-ink text-xs font-bold">見送りの内訳</p>
+          <ul className="mt-2 space-y-1">
+            {overview!.skippedReasons.map((reason) => (
+              <li key={reason.code ?? 'unknown'} className="text-ink-secondary flex justify-between gap-4 text-xs">
+                <span>{reason.label}</span>
+                <span className="text-ink font-bold tabular-nums">{reason.count.toLocaleString('ja-JP')}件</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       {!available && (
         <p className="text-ink-faint text-xs">送った結果はまだ読めていません。—（未取得）</p>
       )}

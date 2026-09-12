@@ -17,6 +17,12 @@ import {
 
 const JST_SECONDS = 9 * 60 * 60;
 
+// cron内のlineProxyも同じD1呼び出し予算を使う。実Proxy（初回チャット作成・
+// waitUntilの送信履歴を含む）では20件で301 queries。上限1000を使い切らず、
+// 他のcron処理・失敗記録の余地を残す。残りは次tickで拾い、停止は毎件読み直す。
+// https://developers.cloudflare.com/d1/platform/limits/
+const WEBINAR_NOTIFICATION_TICK_LIMIT = 20;
+
 export type WebinarNotificationKind =
   | 'day_before'
   | 'hour_before'
@@ -77,6 +83,7 @@ type DueJobRow = {
   friend_id: string;
   session_start_at: number;
   kind: WebinarNotificationKind;
+  status: 'queued' | 'retry_wait' | 'claimed';
   attempt_count: number;
   line_retry_key: string;
   title: string;
@@ -511,12 +518,12 @@ export async function sendWebinarNotificationTest(
 export async function processWebinarNotificationJobs(
   db: D1Database,
   options: WebinarNotificationDeliveryOptions,
-): Promise<{ sent: number; failed: number; skipped: number }> {
+): Promise<{ sent: number; failed: number; skipped: number; heldByStop: number }> {
   const now = options.now ?? new Date();
   const nowEpoch = Math.floor(now.getTime() / 1000);
   const due = await db.prepare(
     `SELECT j.id, j.webinar_id, j.registration_id, j.friend_id,
-            j.session_start_at, j.kind, j.attempt_count, j.line_retry_key,
+            j.session_start_at, j.kind, j.status, j.attempt_count, j.line_retry_key,
             w.title, w.slug, w.duration_seconds, w.account_id,
             f.line_user_id, f.is_following, f.line_account_id,
             la.channel_access_token, la.channel_access_token_encrypted,
@@ -542,12 +549,27 @@ export async function processWebinarNotificationJobs(
         AND COALESCE(j.next_retry_at, j.scheduled_at) <= ?
         AND r.status='active'
         AND w.status='active'
-      ORDER BY j.scheduled_at ASC
-      LIMIT 100`,
+      -- 停止中の先頭20件で他アカウントを塞がない。未停止を先に選び、
+      -- その中では予定時刻順を維持する。停止行は書き換えず解除後に拾う。
+      -- この判定は優先順位専用。送信許可には使わず、下の3点で読み直す。
+      ORDER BY EXISTS (
+        SELECT 1 FROM operation_control_sets control
+         WHERE control.scope_key IN ('*', w.account_id)
+           AND CASE
+             WHEN control.states_json IS NULL OR control.states_json = '' THEN 0
+             WHEN NOT json_valid(control.states_json)
+               THEN COALESCE(control.active_incident_id, '') != ''
+             WHEN json_type(control.states_json) = 'null'
+               THEN COALESCE(control.active_incident_id, '') != ''
+             ELSE json_extract(control.states_json, '$.reminder_dispatch') = 'stopped'
+           END
+      ) ASC, j.scheduled_at ASC, j.id ASC
+      LIMIT ${WEBINAR_NOTIFICATION_TICK_LIMIT}`,
   ).bind(nowEpoch, EXTERNAL_DELIVERY_MAX_ATTEMPTS, nowEpoch, nowEpoch).all<DueJobRow>();
   let sent = 0;
   let failed = 0;
   let skipped = 0;
+  let heldByStop = 0;
   for (const row of due.results ?? []) {
     if (!row.account_id || !await featureJobCanRun(db, {
       accountId: row.account_id,
@@ -558,24 +580,60 @@ export async function processWebinarNotificationJobs(
       skipped++;
       continue;
     }
+    /*
+     * 緊急停止中は**行に触らない**（#745）。
+     *
+     * 以前はここで claim してから `status='skipped'` で確定させていた。
+     * `skipped` を `queued` へ戻す経路はどこにも無く、積み直しも
+     * `UNIQUE (registration_id, settings_version, kind)` に当たるので、
+     * **復旧しても永久に届かなかった**。「止める」と書いてあるボタンが
+     * 実際には「捨てる」になっていた。
+     *
+     * 緊急停止は一時的な操作なので、`queued` のまま残して次の tick に
+     * 拾い直させる。**claim もしない**——claim すると `attempt_count` が
+     * 毎 tick 増え、取り出しの上限に当たった時点で、やはり黙って
+     * 届かなくなる。
+     *
+     * 送る意味が無くなったジョブ（対象回が終了済みなど）は、この先の
+     * `notification_expired` が落とす。**停止を理由に落とさない。**
+     * 落とす理由は「期限を過ぎた」であって「止まっていた」ではない。
+     */
+    // 未停止の結果は使い回さない。1件の送信中にも緊急停止は切り替わる。
+    if (await isOperationCapabilityStopped(db, row.account_id, 'reminder_dispatch')) {
+      heldByStop++;
+      continue;
+    }
+    const claimLeaseExpiresAt = nowEpoch + 300;
     const claimed = await db.prepare(
       `UPDATE webinar_notification_jobs
           SET status='claimed', attempt_count=attempt_count+1, lease_expires_at=?, updated_at=?
-        WHERE id=? AND (
+        WHERE id=? AND attempt_count=? AND (
           status IN ('queued','retry_wait')
           OR (status='claimed' AND COALESCE(lease_expires_at, 0) <= ?)
         )`,
-    ).bind(nowEpoch + 300, now.toISOString(), row.id, nowEpoch).run();
+    ).bind(claimLeaseExpiresAt, now.toISOString(), row.id, row.attempt_count, nowEpoch).run();
     if ((claimed.meta.changes ?? 0) === 0) continue;
+    const holdClaimIfStopped = async (): Promise<boolean> => {
+      if (!await isOperationCapabilityStopped(db, row.account_id, 'reminder_dispatch')) return false;
+      // 自分が取得した世代とleaseだけを戻す。別workerによる再取得・取消は上書きしない。
+      // retry_waitの再試行日時・理由を残し、期限切れclaimはqueuedへ戻して再取得可能にする。
+      await db.prepare(
+        `UPDATE webinar_notification_jobs
+            SET status=?, attempt_count=attempt_count-1, lease_expires_at=NULL, updated_at=?
+          WHERE id=? AND status='claimed' AND attempt_count=? AND lease_expires_at=?`,
+      ).bind(
+        row.status === 'retry_wait' ? 'retry_wait' : 'queued',
+        now.toISOString(), row.id, row.attempt_count + 1, claimLeaseExpiresAt,
+      ).run();
+      heldByStop++;
+      return true;
+    };
     try {
+      // 停止確認とclaimの間に切り替わった場合も、期限切れなどの確定処理へ進めない。
+      if (await holdClaimIfStopped()) continue;
       const isMissedButViewed = row.kind === 'missed' && Boolean(row.viewed);
       const isLateReminder = ['day_before', 'hour_before', 'session_start'].includes(row.kind)
         && nowEpoch >= row.session_start_at + row.duration_seconds;
-      const operationStopped = await isOperationCapabilityStopped(
-        db,
-        row.account_id,
-        'reminder_dispatch',
-      );
       const skip = isMissedButViewed
         ? { code: 'already_viewed', message: 'すでに視聴済みのため送信しませんでした。' }
         : isLateReminder
@@ -586,9 +644,7 @@ export async function processWebinarNotificationJobs(
               ? { code: 'line_account_mismatch', message: '送信先とウェビナーのLINEアカウントが一致しないため送信しませんでした。' }
               : !row.line_account_active
                 ? { code: 'line_account_inactive', message: 'LINEアカウントが停止中のため送信しませんでした。' }
-                : operationStopped
-                    ? { code: 'operation_stopped', message: '緊急停止中のため送信しませんでした。' }
-                    : null;
+                : null;
       if (
         skip
       ) {
@@ -613,6 +669,8 @@ export async function processWebinarNotificationJobs(
         row.channel_access_token ?? options.defaultAccessToken,
         { lineAccountId, field: 'channel_access_token' },
       );
+      // 設定取得・復号を待っている間の停止も、外部送信の直前に読み直す。
+      if (await holdClaimIfStopped()) continue;
       const response = await pushViaHarnessProxy(
         options.proxyBaseUrl,
         accessToken,
@@ -659,7 +717,39 @@ export async function processWebinarNotificationJobs(
       failed++;
     }
   }
-  return { sent, failed, skipped };
+  return { sent, failed, skipped, heldByStop };
+}
+
+/**
+ * 見送った理由の表示名（#745）。
+ *
+ * 「見送り 5件」とだけ出しても、運用者は**何が起きたのか分かりません。**
+ * 「視聴済みだから送らなかった」（正常）と「対象回が終了済みで落ちた」
+ * （取り戻せない）は、取るべき行動がまったく違います。理由ごとに分けて
+ * 出すために、この対応表を正本として持ちます。
+ *
+ * `operation_stopped` は #745 以降**新しく付きません**（緊急停止は行を
+ * 確定させず `queued` のまま残すため）。ただし過去に付いた行が残って
+ * いる可能性があるので、読む側からは外しません。
+ */
+const SKIP_REASON_LABELS: Record<string, string> = {
+  already_viewed: 'すでに視聴済み',
+  notification_expired: '対象回が終了済み',
+  friend_not_following: 'ブロック・友だち解除',
+  line_account_mismatch: 'LINEアカウントの不一致',
+  line_account_inactive: 'LINEアカウントが停止中',
+  operation_stopped: '緊急停止中（#745 より前の記録）',
+};
+
+export function webinarSkipReasonLabel(code: string | null): string {
+  if (!code) return '理由の記録なし';
+  return SKIP_REASON_LABELS[code] ?? code;
+}
+
+export interface WebinarSkipReasonCount {
+  code: string | null;
+  label: string;
+  count: number;
 }
 
 export async function getWebinarNotificationOverview(
@@ -672,9 +762,10 @@ export async function getWebinarNotificationOverview(
   failed: number;
   skipped: number;
   cancelled: number;
+  skippedReasons: WebinarSkipReasonCount[];
   audience: { people: number; bookings: number; definition: 'active_registrations' };
 }> {
-  const [row, audience] = await Promise.all([
+  const [row, audience, reasons] = await Promise.all([
     db.prepare(
       `SELECT COUNT(*) AS total,
             SUM(CASE WHEN status IN ('queued','claimed','retry_wait') THEN 1 ELSE 0 END) AS pending,
@@ -689,6 +780,14 @@ export async function getWebinarNotificationOverview(
          FROM webinar_registrations
         WHERE webinar_id=? AND status='active'`,
     ).bind(webinarId).first<{ people: number | null; bookings: number | null }>(),
+    // 見送りの内訳。多い順に出して、いちばん件数の多い理由から目に入るようにする。
+    db.prepare(
+      `SELECT last_error_code AS code, COUNT(*) AS count
+         FROM webinar_notification_jobs
+        WHERE webinar_id=? AND status='skipped'
+        GROUP BY last_error_code
+        ORDER BY count DESC, code ASC`,
+    ).bind(webinarId).all<{ code: string | null; count: number }>(),
   ]);
   return {
     total: row?.total ?? 0,
@@ -697,6 +796,11 @@ export async function getWebinarNotificationOverview(
     failed: row?.failed ?? 0,
     skipped: row?.skipped ?? 0,
     cancelled: row?.cancelled ?? 0,
+    skippedReasons: (reasons.results ?? []).map((entry) => ({
+      code: entry.code,
+      label: webinarSkipReasonLabel(entry.code),
+      count: Number(entry.count),
+    })),
     audience: {
       people: audience?.people ?? 0,
       bookings: audience?.bookings ?? 0,
