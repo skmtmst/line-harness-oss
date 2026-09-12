@@ -10,7 +10,9 @@ function classifySingleStatement(sql: string): { readOnly: boolean; sql: string 
     if (/\s/.test(char)) { i++; continue; }
     if (sql.startsWith('--', i)) {
       i += 2;
-      while (i < sql.length && sql[i] !== '\n' && sql[i] !== '\r') i++;
+      // SQLite ends -- comments at LF or EOF, not CR. Interpreting CR as a
+      // boundary would parse ignored quotes/semicolons as executable SQL.
+      while (i < sql.length && sql[i] !== '\n') i++;
       continue;
     }
     if (sql.startsWith('/*', i)) {
