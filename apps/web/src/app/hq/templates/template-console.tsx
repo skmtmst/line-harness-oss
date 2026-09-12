@@ -67,6 +67,7 @@ export default function TemplateConsole({ type }: { type: TemplateType }) {
   const lock = useRef(false)
   const createAttempt = useRef<CreationAttempt | null>(null)
   const creationScope = useRef<CreationScope | null>(null)
+  const createSettlement = useRef<{ kind: 'saved'; detail: TemplateDetail } | { kind: 'rejected' } | null>(null)
   const [createUncertain, setCreateUncertain] = useState(false)
   const alive = useRef(true)
   const supported = type === 'tag'
@@ -135,24 +136,41 @@ export default function TemplateConsole({ type }: { type: TemplateType }) {
       persistCreationAttempt(window.sessionStorage, scope, type, attempt)
       createAttempt.current = attempt
       continueToAccounts = attempt.distribute
-      try {
-        // If the response is lost, retry the exact request id and payload so the server can replay its 201.
-        saved = await hqTemplatesApi.create(attempt.input, attempt.requestId)
-      } catch (cause) {
-        if (!createUncertain && cause && typeof cause === 'object' && 'requestNotApplied' in cause && cause.requestNotApplied === true) {
-          clearCreationAttempt(window.sessionStorage, scope, type, attempt.requestId)
-          createAttempt.current = null
-        } else {
-          // A later rejection cannot disprove an earlier committed-but-unacknowledged attempt.
-          setCreateUncertain(true)
-          // Keep the visible form aligned with the immutable retry payload.
-          setName(attempt.input.name)
-          setDescription(attempt.input.description ?? '')
-          setDefinition(attempt.input.definition)
-        }
-        throw cause
+      const retainAttempt = () => {
+        setCreateUncertain(true)
+        setName(attempt.input.name); setDescription(attempt.input.description ?? ''); setDefinition(attempt.input.definition)
       }
-      clearCreationAttempt(window.sessionStorage, scope, type, attempt.requestId)
+      const clearReceipt = () => {
+        try { clearCreationAttempt(window.sessionStorage, scope, type, attempt.requestId) }
+        catch (cause) { retainAttempt(); throw cause }
+      }
+      if (createSettlement.current?.kind === 'rejected') {
+        clearReceipt()
+        createSettlement.current = null; createAttempt.current = null; setCreateUncertain(false)
+        setMessage('前回の保存は受け付けられていません。内容を確認して保存し直してください。')
+        return
+      }
+      if (createSettlement.current?.kind === 'saved') saved = createSettlement.current.detail
+      else {
+        try {
+          // If the response is lost, replay the exact key and payload. A known
+          // result with failed local cleanup needs only another cleanup attempt.
+          saved = await hqTemplatesApi.create(attempt.input, attempt.requestId)
+        } catch (cause) {
+          if (!createUncertain && cause && typeof cause === 'object' && 'requestNotApplied' in cause && cause.requestNotApplied === true) {
+            createSettlement.current = { kind: 'rejected' }
+            clearReceipt()
+            createSettlement.current = null; createAttempt.current = null
+          } else {
+            // A later rejection cannot disprove an earlier ambiguous attempt.
+            retainAttempt()
+          }
+          throw cause
+        }
+        createSettlement.current = { kind: 'saved', detail: saved }
+      }
+      clearReceipt()
+      createSettlement.current = null
     }
     if (!alive.current) return
     loadDetailIntoForm(saved)
