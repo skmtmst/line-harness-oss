@@ -911,6 +911,60 @@ const spec = {
         responses: { '200': { description: 'Sent' } },
       },
     },
+    /*
+     * 送り始めた配信を止める・続きを送る・失敗した相手だけ送り直す（#662）。
+     * どれも `expectedVersion`（画面が読み込んだ版）が要る。版が食い違えば
+     * 409 で断り、二重の適用を止める。
+     */
+    '/api/broadcasts/{id}/stop': {
+      post: {
+        tags: ['Broadcasts'],
+        summary: '送信中の配信を停止',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: {
+          required: true,
+          content: { 'application/json': { schema: { type: 'object', properties: { expectedVersion: { type: 'integer' } }, required: ['expectedVersion'] } } },
+        },
+        responses: {
+          '200': { description: '停止した（すでに停止済みの再要求も 200）' },
+          '400': { description: 'expectedVersion が無い' },
+          '409': { description: '送信中でない／全員配信で止められない／版が食い違う' },
+        },
+      },
+    },
+    '/api/broadcasts/{id}/resume': {
+      post: {
+        tags: ['Broadcasts'],
+        summary: '停止した配信の続きを送る',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: {
+          required: true,
+          content: { 'application/json': { schema: { type: 'object', properties: { expectedVersion: { type: 'integer' } }, required: ['expectedVersion'] } } },
+        },
+        responses: {
+          '200': { description: '再開した' },
+          '400': { description: 'expectedVersion が無い' },
+          '409': { description: '停止中でない／版が食い違う' },
+        },
+      },
+    },
+    '/api/broadcasts/{id}/retry-failed': {
+      post: {
+        tags: ['Broadcasts'],
+        summary: '失敗した相手だけ再送（送達不明は含まない）',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: {
+          required: true,
+          content: { 'application/json': { schema: { type: 'object', properties: { expectedVersion: { type: 'integer' } }, required: ['expectedVersion'] } } },
+        },
+        responses: {
+          '202': { description: '再送を受け付けた' },
+          '400': { description: 'expectedVersion が無い' },
+          '409': { description: '再送できる相手がいない／送信済みでも停止中でもない／版が食い違う' },
+          '428': { description: '取り消せない操作の確認を経ていない' },
+        },
+      },
+    },
     '/api/broadcasts/dedup-preview': {
       post: {
         tags: ['Broadcasts'],

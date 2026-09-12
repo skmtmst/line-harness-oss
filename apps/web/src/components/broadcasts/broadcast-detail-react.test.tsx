@@ -178,4 +178,39 @@ describe('一斉配信詳細の実React動作(#630)', () => {
     expect(host.textContent).toContain('配信 B')
     expect(host.textContent).toContain('進捗 700/900')
   })
+
+  /*
+   * #662 / N-059 — 停止中を「送信中」と出さない。
+   *
+   * 運用者が停止を押したのに送信中のままだと、効いていないと読んで
+   * もう一度押す。止まったことは画面の状態でしか分からない。
+   */
+  it('停止を受け付けた配信は「停止中」と出し、「送信中」とは出さない', async () => {
+    const row = broadcast({ id: 'S', status: 'sending', totalCount: 600, successCount: 500, targetType: 'segment' })
+    net.get = () => Promise.resolve({ success: true, data: { ...row, stopped: true, version: 4 } })
+    net.progress = () =>
+      Promise.resolve({
+        success: true,
+        data: {
+          status: 'sending',
+          stopped: true,
+          sendAttemptNo: 1,
+          ledger: { sent: 500, failed: 80, unknown: 20, inFlight: 0, retryableCount: 80 },
+          totalCount: 600,
+          successCount: 500,
+          batchOffset: 500,
+          perAccountStats: [],
+        },
+      })
+
+    await show('S')
+    await wait(5000)
+    // 状態の札そのものを見る。画面のどこかに「停止中」の字があるだけでは、
+    // 札が「送信中」のままでも通ってしまう。
+    expect(host.querySelector('[data-testid="broadcast-status-badge"]')?.textContent).toBe('停止中')
+    // 送達不明を「送り直せる数」に混ぜない。混ぜると運用者が押して、
+    // 相手のトークに2通目が出る。
+    expect(host.textContent).toContain('失敗した80人へ送り直す')
+    expect(host.textContent).toContain('送り直しません')
+  })
 })

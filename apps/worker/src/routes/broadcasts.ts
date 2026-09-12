@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import type { Context } from 'hono';
 import {
   getBroadcasts,
   getBroadcastById,
@@ -7,6 +8,16 @@ import {
   deleteBroadcast,
   getVersionedAccountSetting,
   saveVersionedAccountSetting,
+  requestBroadcastStop,
+  resumeBroadcastSending,
+  beginBroadcastRetryAttempt,
+  closeClaimsForStop,
+  reopenFailedClaims,
+  getRetryableRecipientIds,
+  countBroadcastLedger,
+  recordAuditEvent,
+  maskAuditIp,
+  auditDeviceFamily,
 } from '@line-crm/db';
 import type { Broadcast as DbBroadcast, BroadcastMessageType, BroadcastTargetType } from '@line-crm/db';
 import { LineClient } from '@line-crm/line-sdk';
@@ -280,6 +291,17 @@ function serializeBroadcast(row: DbBroadcast) {
     messageOptions: parseJsonObject(r.message_options_json),
     afterActionVersionId: (r.after_action_version_id as string | null | undefined) ?? null,
     version: Number(r.lock_version ?? 1),
+    /*
+     * 停止の状態（#662 / N-059）。
+     *
+     * status は動かしていない。停止は送信の段階（下書き→予約→送信中→
+     * 送信済み）とは別の軸——「送信中だが、新しい送信権をもう取らない」
+     * ——なので、画面はこの2つを合わせて読む。`status === 'sending' &&
+     * stopped === true` が「停止中」。
+     */
+    stopped: !!r.stopped_at,
+    stoppedAt: (r.stopped_at as string | null | undefined) ?? null,
+    sendAttemptNo: Number(r.send_attempt_no ?? 1),
     createdAt: row.created_at,
   };
 }
@@ -1255,6 +1277,358 @@ broadcasts.post('/api/broadcasts/:id/cancel', requireRole('owner', 'admin'), asy
   }
 });
 
+
+/**
+ * cron（5分間隔）を待たずに、その場でキュー処理を始める。
+ *
+ * 使えない環境（単体試験など）では黙って cron に任せる。**起動に失敗しても
+ * 送れなくなるわけではない**ので、応答は成功のまま返す。
+ */
+function kickQueueProcessing(c: Context<Env>, label: string): void {
+  try {
+    const ctx = c.executionCtx as ExecutionContext;
+    const defaultClient = new LineClient(c.env.LINE_CHANNEL_ACCESS_TOKEN);
+    ctx.waitUntil(
+      processQueuedBroadcasts(c.env.DB, defaultClient, c.env.WORKER_URL).catch((err) => {
+        console.error(`[${label}] background queue processing failed:`, err);
+      }),
+    );
+  } catch (kickErr) {
+    console.warn(`[${label}] waitUntil unavailable, falling back to cron:`, kickErr);
+  }
+}
+
+/*
+ * ───────── 送信中の一斉配信を止める／再開する／失敗した相手だけ送り直す ─────────
+ *
+ * #662 / N-059。これまで `sending` に入った配信を止める正式な経路が無かった。
+ *
+ * 3つの口はどれも**版付きの条件付き UPDATE 1本**で決める。読んでから書くと、
+ * 2人が同時に押したときに両方が「自分が勝った」と読む。変わった行数を見て、
+ * 1 だった者だけが先へ進む。画面側の連打防止（押している間ボタンを無効に
+ * する）は見た目の手当てで、**本当の守りはここ**。
+ */
+
+/** 停止・再送でキューへ載せ直すための絞り込みの印。 */
+function queueMarkerFor(broadcast: DbBroadcast): string | null {
+  const raw = broadcast as unknown as Record<string, unknown>;
+  // 既に条件が入っていればそれを使う（segment 配信・500人超の tag 配信）。
+  if (raw.segment_conditions) return null;
+  // 500人以下の tag 配信はその場で送り切る作りでキューを通らない。再開・再送では
+  // 500人超の経路と同じ印を書いて、キュー側（processQueuedBroadcastBatches）へ寄せる。
+  if (broadcast.target_type === 'tag' && broadcast.target_tag_id) {
+    return JSON.stringify({
+      operator: 'AND',
+      rules: [{ type: 'tag_exists', value: broadcast.target_tag_id }],
+    });
+  }
+  return null;
+}
+
+function parseExpectedVersion(value: unknown): number | null {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 1) return null;
+  return parsed;
+}
+
+/**
+ * 監査へ1件だけ残す。
+ *
+ * `auditRecorded` を立てて、共通の記録（api.post./api/…）と二重にしない。
+ * `await` するのは、止めた・再開した・送り直したという判断そのものが
+ * 後から追えないと困るため。取りこぼしを待たない口（waitUntil）には載せない。
+ */
+async function recordBroadcastControlAudit(
+  c: Context<Env>,
+  action: 'broadcast.stop' | 'broadcast.resume' | 'broadcast.retry_failed',
+  broadcast: DbBroadcast,
+  after: Record<string, unknown>,
+): Promise<void> {
+  const staff = c.get('staff');
+  c.set('auditRecorded', true);
+  const raw = broadcast as unknown as Record<string, unknown>;
+  try {
+    await recordAuditEvent(c.env.DB, {
+      tenantId: staff?.tenantId,
+      lineAccountId: (raw.line_account_id as string | null | undefined) ?? null,
+      category: 'business',
+      actorPrincipalId: staff?.id,
+      actorRole: staff?.role,
+      action,
+      targetKind: 'broadcast',
+      targetId: broadcast.id,
+      result: 'success',
+      after,
+      requestTraceId: c.req.header('cf-ray') ?? c.req.header('x-request-id') ?? null,
+      ipPrefix: maskAuditIp(c.req.header('cf-connecting-ip')),
+      deviceFamily: auditDeviceFamily(c.req.header('user-agent')),
+    });
+  } catch (err) {
+    console.error(`${action} audit insert failed:`, err);
+  }
+}
+
+/** 台帳の数え上げと再送対象数。画面と応答で同じ数を使う。 */
+async function broadcastLedgerSummary(db: D1Database, id: string) {
+  const counts = await countBroadcastLedger(db, id);
+  return {
+    sent: counts.sent,
+    failed: counts.failed,
+    unknown: counts.unknown,
+    inFlight: counts.claimed,
+    retryableCount: counts.failed,
+  };
+}
+
+// POST /api/broadcasts/:id/stop — 送信中の配信を止める
+broadcasts.post('/api/broadcasts/:id/stop', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const id = c.req.param('id');
+    const existing = await getBroadcastById(c.env.DB, id);
+    if (!existing || !await canAccessBroadcast(c.env.DB, c.get('staff'), existing)) {
+      return c.json({ success: false, error: 'Broadcast not found' }, 404);
+    }
+
+    /*
+     * 全員配信（target_type='all'）は止められない。
+     *
+     * LINE の broadcast の口は「全員へ配って」と1回頼むだけで、こちらに
+     * 宛先の一覧が無い。頼んだあとに止める手段が LINE 側に無いので、
+     * **できないことをできるように見せない**。
+     */
+    if (existing.target_type === 'all') {
+      return c.json({
+        success: false,
+        error: '全員への配信は、送り始めると途中で止められません（LINE側に停止の口がありません）。',
+        code: 'BROADCAST_NOT_STOPPABLE',
+      }, 409);
+    }
+    if (existing.status !== 'sending') {
+      return c.json({
+        success: false,
+        error: '送信中の配信だけ停止できます。',
+        code: 'BROADCAST_NOT_SENDING',
+      }, 409);
+    }
+
+    // 冪等: もう止まっているなら、同じ結果をそのまま返す。連打や再送信で
+    // 失敗に見せない（運用者は「止まったのか、止まっていないのか」だけを
+    // 知りたい）。
+    const rawExisting = existing as unknown as Record<string, unknown>;
+    if (rawExisting.stopped_at) {
+      return c.json({
+        success: true,
+        data: {
+          ...serializeBroadcast(existing),
+          ledger: await broadcastLedgerSummary(c.env.DB, id),
+        },
+        alreadyStopped: true,
+      });
+    }
+
+    const body = await c.req.json().catch(() => ({} as Record<string, unknown>));
+    const expectedVersion = parseExpectedVersion((body as Record<string, unknown>).expectedVersion);
+    if (expectedVersion === null) {
+      return c.json({
+        success: false,
+        error: 'expectedVersion（画面が読み込んだ版）が必要です。',
+        code: 'EXPECTED_VERSION_REQUIRED',
+      }, 400);
+    }
+
+    const changes = await requestBroadcastStop(c.env.DB, {
+      id,
+      expectedVersion,
+      actorId: c.get('staff')?.id ?? null,
+    });
+    if (changes !== 1) {
+      // 負けた側。相手が止めていたなら冪等に成功で返す。そうでなければ
+      // 版が食い違っている（別の操作が先に入った）。
+      const current = await getBroadcastById(c.env.DB, id);
+      const currentRaw = current as unknown as Record<string, unknown> | null;
+      if (current && currentRaw?.stopped_at) {
+        return c.json({
+          success: true,
+          data: {
+            ...serializeBroadcast(current),
+            ledger: await broadcastLedgerSummary(c.env.DB, id),
+          },
+          alreadyStopped: true,
+        });
+      }
+      return c.json({
+        success: false,
+        error: '別の操作が先に入りました。画面を読み直してからやり直してください。',
+        code: 'VERSION_MISMATCH',
+      }, 409);
+    }
+
+    /*
+     * 台帳を締める。
+     *
+     *   外へ出したあと決着していない相手 → **送達不明**。成功とも失敗とも
+     *     断定しない。再送の対象にしない（at-most-once）
+     *   押さえただけで外へ出していない相手 → **失敗**。まだ誰にも届いて
+     *     いないので送り直してよい
+     */
+    const closed = await closeClaimsForStop(c.env.DB, id);
+    const updated = await getBroadcastById(c.env.DB, id);
+    const ledger = await broadcastLedgerSummary(c.env.DB, id);
+    await recordBroadcastControlAudit(c, 'broadcast.stop', existing, {
+      undeliveredUnknown: closed.unknown,
+      releasedForRetry: closed.failed,
+      sent: ledger.sent,
+    });
+    return c.json({
+      success: true,
+      data: { ...serializeBroadcast(updated ?? existing), ledger },
+      stoppedUnknownCount: closed.unknown,
+    });
+  } catch (err) {
+    console.error('POST /api/broadcasts/:id/stop error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+// POST /api/broadcasts/:id/resume — 止めた配信の続きを送る
+broadcasts.post('/api/broadcasts/:id/resume', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const id = c.req.param('id');
+    const existing = await getBroadcastById(c.env.DB, id);
+    if (!existing || !await canAccessBroadcast(c.env.DB, c.get('staff'), existing)) {
+      return c.json({ success: false, error: 'Broadcast not found' }, 404);
+    }
+    const rawExisting = existing as unknown as Record<string, unknown>;
+    if (existing.status !== 'sending' || !rawExisting.stopped_at) {
+      return c.json({
+        success: false,
+        error: '停止中の配信だけ再開できます。',
+        code: 'BROADCAST_NOT_STOPPED',
+      }, 409);
+    }
+
+    const body = await c.req.json().catch(() => ({} as Record<string, unknown>));
+    const expectedVersion = parseExpectedVersion((body as Record<string, unknown>).expectedVersion);
+    if (expectedVersion === null) {
+      return c.json({
+        success: false,
+        error: 'expectedVersion（画面が読み込んだ版）が必要です。',
+        code: 'EXPECTED_VERSION_REQUIRED',
+      }, 400);
+    }
+
+    const changes = await resumeBroadcastSending(c.env.DB, {
+      id,
+      expectedVersion,
+      segmentConditions: queueMarkerFor(existing),
+    });
+    if (changes !== 1) {
+      return c.json({
+        success: false,
+        error: '別の操作が先に入りました。画面を読み直してからやり直してください。',
+        code: 'VERSION_MISMATCH',
+      }, 409);
+    }
+
+    const updated = await getBroadcastById(c.env.DB, id);
+    const ledger = await broadcastLedgerSummary(c.env.DB, id);
+    await recordBroadcastControlAudit(c, 'broadcast.resume', existing, { sent: ledger.sent });
+    kickQueueProcessing(c, 'resume');
+    return c.json({ success: true, data: { ...serializeBroadcast(updated ?? existing), ledger } });
+  } catch (err) {
+    console.error('POST /api/broadcasts/:id/resume error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+// POST /api/broadcasts/:id/retry-failed — 失敗した相手だけ送り直す
+//
+// 相手へ実際に届き、取り消せない。権限に加えて明示的な確認を要求する
+// （送信の口と同じ扱い）。
+broadcasts.post(
+  '/api/broadcasts/:id/retry-failed',
+  requireRole('owner', 'admin'),
+  requireIrreversibleConfirmation('broadcast-send'),
+  async (c) => {
+    try {
+      const id = c.req.param('id');
+      const existing = await getBroadcastById(c.env.DB, id);
+      if (!existing || !await canAccessBroadcast(c.env.DB, c.get('staff'), existing)) {
+        return c.json({ success: false, error: 'Broadcast not found' }, 404);
+      }
+      if (existing.target_type === 'all') {
+        return c.json({
+          success: false,
+          error: '全員への配信は宛先の一覧を持たないため、失敗した相手だけの再送ができません。',
+          code: 'BROADCAST_NOT_RETRYABLE',
+        }, 409);
+      }
+      const rawExisting = existing as unknown as Record<string, unknown>;
+      const stopped = !!rawExisting.stopped_at;
+      if (!(existing.status === 'sent' || (existing.status === 'sending' && stopped))) {
+        return c.json({
+          success: false,
+          error: '送信済み、または停止中の配信だけ再送できます。',
+          code: 'BROADCAST_NOT_RETRYABLE',
+        }, 409);
+      }
+
+      const retryable = await getRetryableRecipientIds(c.env.DB, id);
+      if (retryable.length === 0) {
+        return c.json({
+          success: false,
+          error: '再送できる相手がいません。送達不明の相手は、二重に届くのを避けるため再送しません。',
+          code: 'NO_RETRY_TARGET',
+        }, 409);
+      }
+
+      const body = await c.req.json().catch(() => ({} as Record<string, unknown>));
+      const expectedVersion = parseExpectedVersion((body as Record<string, unknown>).expectedVersion);
+      if (expectedVersion === null) {
+        return c.json({
+          success: false,
+          error: 'expectedVersion（画面が読み込んだ版）が必要です。',
+          code: 'EXPECTED_VERSION_REQUIRED',
+        }, 400);
+      }
+
+      const attempt = await beginBroadcastRetryAttempt(c.env.DB, {
+        id,
+        expectedVersion,
+        segmentConditions: queueMarkerFor(existing),
+      });
+      if (attempt.changes !== 1 || attempt.attemptNo === null) {
+        return c.json({
+          success: false,
+          error: '別の操作が先に入りました。画面を読み直してからやり直してください。',
+          code: 'VERSION_MISMATCH',
+        }, 409);
+      }
+
+      // 失敗した相手だけを新しい試行番号で開け直す。送達済み・送達不明の行は
+      // 触らない（`state = 'failed'` で絞る）。
+      const reopened = await reopenFailedClaims(c.env.DB, id, attempt.attemptNo);
+      const updated = await getBroadcastById(c.env.DB, id);
+      const ledger = await broadcastLedgerSummary(c.env.DB, id);
+      await recordBroadcastControlAudit(c, 'broadcast.retry_failed', existing, {
+        attemptNo: attempt.attemptNo,
+        retryTargets: reopened,
+        skippedUnknown: ledger.unknown,
+      });
+      kickQueueProcessing(c, 'retry-failed');
+      return c.json({
+        success: true,
+        data: { ...serializeBroadcast(updated ?? existing), ledger },
+        attemptNo: attempt.attemptNo,
+        retryTargets: reopened,
+      }, 202);
+    } catch (err) {
+      console.error('POST /api/broadcasts/:id/retry-failed error:', err);
+      return c.json({ success: false, error: 'Internal server error' }, 500);
+    }
+  },
+);
+
 // DELETE /api/broadcasts/:id - delete
 broadcasts.delete('/api/broadcasts/:id', requireRole('owner', 'admin'), async (c) => {
   try {
@@ -2154,13 +2528,35 @@ broadcasts.get('/api/broadcasts/:id/progress', async (c) => {
       uniqueClick: null,
     }));
   }
+  /*
+   * 送達台帳の内訳（#662）。画面はこの4つを別々に出す。
+   *
+   *   sent          … 届いた
+   *   failed        … 届かなかった。**再送の対象**
+   *   unknown       … 外へ出たかもしれないが確かめられない。再送しない
+   *   inFlight      … いま送っている途中
+   *
+   * `successCount` だけだと「残りは失敗」と読めてしまい、送達不明の相手を
+   * 再送してよいものと誤解させる。
+   */
+  const ledger = await countBroadcastLedger(c.env.DB, id);
   return c.json({
     success: true,
     data: {
       status: broadcast.status,
+      stopped: !!raw.stopped_at,
+      stoppedAt: (raw.stopped_at as string | null | undefined) ?? null,
+      sendAttemptNo: Number(raw.send_attempt_no ?? 1),
       totalCount: broadcast.total_count,
       successCount: broadcast.success_count,
       batchOffset: raw.batch_offset as number,
+      ledger: {
+        sent: ledger.sent,
+        failed: ledger.failed,
+        unknown: ledger.unknown,
+        inFlight: ledger.claimed,
+        retryableCount: ledger.failed,
+      },
       perAccountStats,
     },
   });

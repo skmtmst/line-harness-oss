@@ -17,6 +17,7 @@ import {
 } from '@line-crm/db';
 import { fireEvent } from './event-bus.js';
 import { pushImmediateFirstStep, type ImmediatePushContext } from './immediate-first-step.js';
+import { recordConversionSourceEvent } from '@line-crm/db';
 
 // friend に tag を attach し、`POST /api/friends/:id/tags` と同じ side effects を発火する。
 // side effects: tag_added シナリオ enrollment + tag_change イベント (automation/webhook/scoring 用)。
@@ -339,6 +340,25 @@ export async function attachTagAndFireSideEffects(
       propagated = error;
     }
   }
+  // 新規付与を成果計測へ接続する(#648)。地点がなければ何もしない。
+  // 友だちの所属アカウントはサービス側で台帳から解決する。
+  //
+  // 工程台帳(friend_tag_side_effect_runs)の工程としては開かない。工程の一覧は
+  // packages/db 側の FRIEND_TAG_SIDE_EFFECT_STEPS と migration 376 が正本で、
+  // この票の所有パスの外にある。計上の重複排除は trackConversion の冪等キーが
+  // 受け持つので、走り直しの台帳が無くても二重計上にはならない。
+  // 落ちた場合は記録だけ残して先へ進む(付与の本題を巻き添えにしない)。
+  try {
+    await recordConversionSourceEvent(db, {
+      sourceType: 'tag_added',
+      friendId,
+      sourceEventId: `${friendId}:${tagId}:${assignedAt}`,
+      metadata: { tagId },
+    });
+  } catch (error) {
+    console.error('tag conversion record failed:', error);
+  }
+
   // 従来どおり、シナリオ登録と tag_change の失敗は呼び出し口へ知らせる。
   if (propagated !== null) throw propagated;
 

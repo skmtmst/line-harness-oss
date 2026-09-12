@@ -1226,6 +1226,20 @@ CREATE TABLE broadcast_saved_views (
   UNIQUE (line_account_id, name)
 );
 
+CREATE TABLE broadcast_send_claims (
+  broadcast_id    TEXT NOT NULL REFERENCES broadcasts(id) ON DELETE CASCADE,
+  friend_id       TEXT NOT NULL REFERENCES friends(id) ON DELETE CASCADE,
+  line_account_id TEXT,
+  attempt_no      INTEGER NOT NULL DEFAULT 1 CHECK (attempt_no >= 1),
+  state           TEXT NOT NULL CHECK (state IN ('claimed', 'sent', 'failed', 'unknown')),
+  dispatched_at   TEXT,
+  settled_at      TEXT,
+  error_code      TEXT,
+  created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  PRIMARY KEY (broadcast_id, friend_id)
+);
+
 CREATE TABLE broadcast_tracked_links (
   broadcast_id     TEXT NOT NULL REFERENCES broadcasts(id) ON DELETE CASCADE,
   tracked_link_id  TEXT NOT NULL REFERENCES tracked_links(id) ON DELETE RESTRICT,
@@ -1266,7 +1280,7 @@ CREATE TABLE "broadcasts" (
   CHECK (draft_payload_json IS NULL OR json_valid(draft_payload_json)), message_options_json TEXT
   CHECK (message_options_json IS NULL OR json_valid(message_options_json)), after_action_version_id TEXT
   REFERENCES common_action_versions(id) ON DELETE RESTRICT, lock_version INTEGER NOT NULL DEFAULT 1
-  CHECK (lock_version > 0));
+  CHECK (lock_version > 0), stopped_at TEXT, stopped_by TEXT, send_attempt_no INTEGER NOT NULL DEFAULT 1);
 
 CREATE TABLE calendar_bookings (
   id             TEXT PRIMARY KEY,
@@ -5816,10 +5830,16 @@ CREATE INDEX idx_broadcast_message_assets_account_kind
 CREATE INDEX idx_broadcast_saved_views_account_updated
   ON broadcast_saved_views(line_account_id, updated_at DESC, id);
 
+CREATE INDEX idx_broadcast_send_claims_state
+  ON broadcast_send_claims (broadcast_id, state);
+
 CREATE INDEX idx_broadcast_tracked_links_link
   ON broadcast_tracked_links(tracked_link_id, broadcast_id);
 
 CREATE INDEX idx_broadcasts_status_lookup ON broadcasts (status);
+
+CREATE INDEX idx_broadcasts_stopped
+  ON broadcasts (status, stopped_at);
 
 CREATE INDEX idx_calendar_bookings_friend ON calendar_bookings (friend_id);
 
