@@ -75,6 +75,7 @@ const ACTION_TYPES = [
   ['担当者通知', '通知'],
   ['マイル付与', 'マイル'],
 ] as const
+export type TagEditorActionLabel = (typeof ACTION_TYPES)[number][0]
 
 const ACTION_DEFINITIONS: Record<(typeof ACTION_TYPES)[number][0], { actionType: string; resource?: keyof CommonActionResources; paramKey?: string }> = {
   'テキスト送信': { actionType: 'send_message' },
@@ -139,30 +140,31 @@ function StepTitle({ number, title, note }: { number: number; title: string; not
   )
 }
 
-function ActionDrawer({ accountId, onClose, onAdd, referenceState = false }: { accountId: string | null; onClose: () => void; onAdd: (action: LinkedAction) => void; referenceState?: boolean }) {
+function ActionDrawer({ accountId, suppliedResources, allowedActionTypes, onClose, onAdd, referenceState = false }: { accountId: string | null; suppliedResources?: CommonActionResources | null; allowedActionTypes?: readonly TagEditorActionLabel[]; onClose: () => void; onAdd: (action: LinkedAction) => void; referenceState?: boolean }) {
   const [selected, setSelected] = useState<(typeof ACTION_TYPES)[number]>(referenceState ? ACTION_TYPES[1] : ACTION_TYPES[0])
   const [timing, setTiming] = useState<'immediate' | 'delay'>('immediate')
   const [delay, setDelay] = useState(referenceState ? '24' : '1')
   const [delayUnit, setDelayUnit] = useState<'minutes' | 'hours' | 'days'>(referenceState ? 'hours' : 'minutes')
   const [message, setMessage] = useState('ご登録ありがとうございます。')
   const [amount, setAmount] = useState('100')
-  const [resources, setResources] = useState<CommonActionResources | null>(null)
+  const [resources, setResources] = useState<CommonActionResources | null>(suppliedResources ?? null)
   const [resourceId, setResourceId] = useState('')
   const definition = ACTION_DEFINITIONS[selected[0]]
   const choices = definition.resource
     ? (resources?.[definition.resource] as Array<{ id: string; name: string }> | undefined) ?? []
     : []
-  const unavailable = selected[0] === '友だち情報更新'
+  const unavailable = selected[0] === '友だち情報更新' || (allowedActionTypes ? !allowedActionTypes.includes(selected[0]) : false)
   const needsResource = Boolean(definition.resource)
 
   useEffect(() => {
+    if (suppliedResources !== undefined) { setResources(suppliedResources); return }
     if (!accountId) return
     let active = true
     void api.commonActions.resources(accountId, undefined, 'tag.added').then((res) => {
       if (active && res.success) setResources(res.data)
     })
     return () => { active = false }
-  }, [accountId])
+  }, [accountId, suppliedResources])
 
   useEffect(() => { setResourceId('') }, [selected])
 
@@ -207,8 +209,9 @@ function ActionDrawer({ accountId, onClose, onAdd, referenceState = false }: { a
                 <button
                   key={action[0]}
                   type="button"
+                  disabled={Boolean(allowedActionTypes && !allowedActionTypes.includes(action[0]))}
                   onClick={() => setSelected(action)}
-                  className={`rounded-control border px-3 py-3 text-left text-sm font-medium ${selected[0] === action[0] ? 'border-accent bg-accent-soft text-accent' : 'border-hairline text-ink-secondary hover:bg-canvas-sunken'}`}
+                  className={`rounded-control border px-3 py-3 text-left text-sm font-medium ${allowedActionTypes && !allowedActionTypes.includes(action[0]) ? 'cursor-not-allowed border-hairline text-ink-faint opacity-55' : selected[0] === action[0] ? 'border-accent bg-accent-soft text-accent' : 'border-hairline text-ink-secondary hover:bg-canvas-sunken'}`}
                 >
                   {action[0]}
                 </button>
@@ -242,7 +245,7 @@ function ActionDrawer({ accountId, onClose, onAdd, referenceState = false }: { a
             ) : selected[0] === 'マイル付与' ? (
               <input type="number" min={1} value={amount} onChange={(event) => setAmount(event.target.value)} className={inputClass} aria-label="付与マイル" />
             ) : (
-              <><select value={resourceId} onChange={(event) => setResourceId(event.target.value)} disabled={unavailable || !resources} className="w-full rounded-control border border-hairline bg-canvas px-3 py-2.5 text-sm text-ink outline-none focus:border-accent focus:ring-2 focus:ring-accent/15"><option value="">{unavailable ? 'この種類はまだ選べません' : resources ? `${selected[1]}を選択` : '選択肢を読み込み中…'}</option>{choices.map((choice) => <option key={choice.id} value={choice.id}>{choice.name}</option>)}</select>{referenceState && selected[0] === 'テンプレート送信' && <div className="mt-3 rounded-control bg-canvas-sunken p-3 text-xs leading-5 text-ink-secondary"><span className="font-semibold">プレビュー</span><br />選んだテンプレートの公開版を送ります。</div>}</>
+              <><select value={resourceId} onChange={(event) => setResourceId(event.target.value)} disabled={unavailable || !resources} className="w-full rounded-control border border-hairline bg-canvas px-3 py-2.5 text-sm text-ink outline-none focus:border-accent focus:ring-2 focus:ring-accent/15"><option value="">{unavailable ? 'この種類は配布先で設定してください' : resources ? `${selected[1]}を選択` : '選択肢を読み込み中…'}</option>{choices.map((choice) => <option key={choice.id} value={choice.id}>{choice.name}</option>)}</select>{referenceState && selected[0] === 'テンプレート送信' && <div className="mt-3 rounded-control bg-canvas-sunken p-3 text-xs leading-5 text-ink-secondary"><span className="font-semibold">プレビュー</span><br />選んだテンプレートの公開版を送ります。</div>}</>
             )}
             <div className="mt-3 rounded-control border border-hairline bg-canvas-sunken p-3 text-xs leading-5 text-ink-secondary">
               <span className="font-semibold">実行内容の確認：</span> {selected[0]}を{timing === 'immediate' ? 'すぐに' : `${delay}${delayUnit === 'minutes' ? '分' : delayUnit === 'hours' ? '時間' : '日'}後に`}実行します。
@@ -312,6 +315,9 @@ export default function TagEditorV4({
   onCancel,
   onSave,
   onDelete,
+  embedded = false,
+  resources,
+  allowedActionTypes,
 }: {
   mode: 'create' | 'edit'
   groups: TagGroup[]
@@ -330,6 +336,11 @@ export default function TagEditorV4({
   onCancel: () => void
   onSave: (values: TagEditorValues, andAnother: boolean, applyRetroactive: boolean) => Promise<void>
   onDelete?: () => void
+  /** Hide store breadcrumbs/actions when the canonical editor is embedded in HQ. */
+  embedded?: boolean
+  /** HQ may supply a deliberately portable resource catalogue. */
+  resources?: CommonActionResources | null
+  allowedActionTypes?: readonly TagEditorActionLabel[]
 }) {
   usePageTitle(mode === 'create' ? 'タグを作る' : 'タグを編集')
   const [name, setName] = useState(initialValues?.name ?? tag?.name ?? '')
@@ -382,9 +393,9 @@ export default function TagEditorV4({
 
   return (
     <div>
-      <div className="mb-5">
+      {!embedded && <div className="mb-5">
         <Breadcrumb items={[{ label: '友だち属性', href: '/tags' }, { label: mode === 'create' ? 'タグを作る' : 'タグを編集' }]} />
-      </div>
+      </div>}
 
       {error && <Notice className="mb-4" tone="error" message={error} />}
       {notice && <Notice className="mb-4" tone="success" message={notice} />}
@@ -496,14 +507,14 @@ export default function TagEditorV4({
         actions={(
           <>
             <Button onClick={onCancel}>キャンセル</Button>
-            {mode === 'edit' ? <Button href={`/tags/new?copy=${tag?.id ?? ''}`}>複製して新規作成</Button> : null}
+            {mode === 'edit' && !embedded ? <Button href={`/tags/new?copy=${tag?.id ?? ''}`}>複製して新規作成</Button> : null}
             {mode === 'create' ? <Button disabled={saving} onClick={() => requestSave(true)}>保存して続けて作る</Button> : null}
             <Button variant="primary" disabled={saving} onClick={() => requestSave(false)}>{saving ? '保存中…' : mode === 'create' ? 'タグを作る' : 'タグを保存'}</Button>
           </>
         )}
       />
 
-      {drawerOpen && <ActionDrawer accountId={accountId} referenceState={referenceDrawerState} onClose={() => setDrawerOpen(false)} onAdd={(action) => { setActions((current) => [...current, action]); setDrawerOpen(false) }} />}
+      {drawerOpen && <ActionDrawer accountId={accountId} suppliedResources={resources} allowedActionTypes={allowedActionTypes} referenceState={referenceDrawerState} onClose={() => setDrawerOpen(false)} onAdd={(action) => { setActions((current) => [...current, action]); setDrawerOpen(false) }} />}
       {retroactiveOpen && <RetroactiveDialog referenceState={referenceRetroactiveState} values={values} count={tag?.friendCount ?? 0} onCancel={() => { setRetroactiveOpen(false); void onSave({ ...values, applyToExisting: false }, false, false) }} onSave={() => { setRetroactiveOpen(false); void onSave(values, false, true) }} />}
     </div>
   )
