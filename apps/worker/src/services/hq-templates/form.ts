@@ -237,7 +237,7 @@ export function createFormHqTemplateAdapter(deps: FormTemplateDependencies): HqT
             check(context);
             const state = JSON.parse(snapshot!) as FormSnapshot, found = target(state, def!.form.name);
             const selection = context.resolutions.find(r => r.sourceId === 'form' && r.itemKind === 'form');
-            if (!selection || context.resolutions.filter(r => r.sourceId === 'form').length !== 1 || !['create', 'overwrite', 'alias'].includes(selection.mode) || (!found ? selection.mode !== 'create' : selection.mode === 'create'))
+            if (!selection || selection.mode !== context.mode || context.resolutions.filter(r => r.sourceId === 'form').length !== 1 || !['create', 'overwrite', 'alias'].includes(selection.mode) || (!found ? selection.mode !== 'create' : selection.mode === 'create'))
                 throw new FormTemplateError('SELECTION_REQUIRED');
             if (selection.mode === 'overwrite' && (found!.status === 'archived' || found!.owners.length !== 1 || found!.owners[0] !== context.targetAccountId))
                 throw new FormTemplateError('SHARED_FORM');

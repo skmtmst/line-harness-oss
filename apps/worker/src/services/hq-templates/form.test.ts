@@ -98,6 +98,32 @@ describe('HQ form atomic plans', () => {
         await expect(commit(p)).rejects.toThrow();
         expect(rows()[0]).toMatchObject({ description: '直前の編集', content_revision: 2 });
     });
+    const modes = ['create', 'overwrite', 'alias'] as const;
+    test.each(modes.flatMap(selectionMode => modes.map(contextMode => ({ selectionMode, contextMode }))))('plan mode $contextMode must match selected operation $selectionMode', async ({ selectionMode, contextMode }) => {
+        // Make the selected operation valid independently of the envelope mode.
+        const existingId = selectionMode === 'create' ? null : await commit(await plan((await preflight('a1')).context));
+        const { context } = await preflight('a1', selectionMode);
+        const before = rows();
+        context.mode = contextMode;
+        if (contextMode !== selectionMode) {
+            await expect(plan(context)).rejects.toMatchObject({ code: 'SELECTION_REQUIRED' });
+            expect(rows()).toEqual(before);
+            return;
+        }
+        const p = await plan(context);
+        expect(p.mode).toBe(selectionMode);
+        expect(p.resolutions.find(r => r.sourceId === 'form')!.mode).toBe(selectionMode);
+        const id = await commit(p);
+        if (selectionMode === 'overwrite') {
+            expect(id).toBe(existingId);
+            expect(rows()).toHaveLength(1);
+            expect(rows()[0].content_revision).toBe(2);
+        } else {
+            expect(id).not.toBe(existingId);
+            expect(rows()).toHaveLength(selectionMode === 'alias' ? 2 : 1);
+            expect(rows().some(r => r.id === id && r.name === (selectionMode === 'alias' ? 'アンケート (2)' : 'アンケート'))).toBe(true);
+        }
+    });
     test('same-name aliases are (2), (3); duplicates require explicit choices', async () => {
         await commit(await plan((await preflight('a1')).context));
         await expect(plan((await preflight('a1')).context)).rejects.toMatchObject({ code: 'SELECTION_REQUIRED' });
