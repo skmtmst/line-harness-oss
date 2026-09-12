@@ -146,6 +146,40 @@ describe('営業時間が枠の開閉に効く（#748 / N-403）', () => {
 });
 
 describe('営業時間の定員が効く（#748）', () => {
+  test('午前3・午後1は候補ごとに判定し、午後の定員で午前を消さない', async () => {
+    businessHour('morning', '10:00', '13:00', 3);
+    businessHour('afternoon', '13:00', '18:00', 1);
+    booking('am', '2026-09-14T11:00:00+09:00', '2026-09-14T12:00:00+09:00');
+    booking('pm', '2026-09-14T14:00:00+09:00', '2026-09-14T15:00:00+09:00');
+    const result = await getAvailability(db, { lineAccountId: 'acc-1', menuId: 'menu-1',
+      from: MONDAY, to: MONDAY, now: NOW, minLeadTimeMinutes: 0 });
+    expect(result.by_staff[0].slots.find(s => s.start === '11:00')).toMatchObject({ capacity: 3, remaining: 2 });
+    expect(result.by_staff[0].slots.some(s => s.start === '14:00')).toBe(false);
+  });
+
+  test('担当指定でも店舗定員は別担当・別メニューの予約を合算する', async () => {
+    businessHour('store', '10:00', '17:00', 1);
+    sqlite.exec(`INSERT INTO staff (id,line_account_id,name,display_name) VALUES ('st-2','acc-1','別担当','別担当');
+      INSERT INTO menus (id,line_account_id,name,duration_minutes,base_price) VALUES ('menu-2','acc-1','別メニュー',60,1000);`);
+    booking('other', '2026-09-14T11:00:00+09:00', '2026-09-14T12:00:00+09:00');
+    sqlite.exec(`UPDATE bookings SET staff_id='st-2',menu_id='menu-2' WHERE id='other'`);
+    const result = await getAvailability(db, { lineAccountId: 'acc-1', menuId: 'menu-1', staffId: 'st-1',
+      from: MONDAY, to: MONDAY, now: NOW, minLeadTimeMinutes: 0 });
+    expect(result.by_staff[0].slots.some(s => s.start === '11:00')).toBe(false);
+    expect(result.by_staff[0].slots.some(s => s.start === '12:00')).toBe(true);
+  });
+
+  test('後片付けだけ午後の定員1に触れる候補も、午後の既存予約を避ける', async () => {
+    businessHour('morning', '10:00', '13:00', 3);
+    businessHour('afternoon', '13:00', '18:00', 1);
+    sqlite.exec(`UPDATE menus SET buffer_after_minutes=30;
+      INSERT INTO staff (id,line_account_id,name,display_name) VALUES ('st-2','acc-1','別担当','別担当');`);
+    booking('other', '2026-09-14T13:00:00+09:00', '2026-09-14T14:00:00+09:00');
+    sqlite.exec(`UPDATE bookings SET staff_id='st-2' WHERE id='other'`);
+    expect((await slots()).some(s => s.start === '12:00')).toBe(false);
+    expect((await slots()).some(s => s.start === '11:30')).toBe(true);
+  });
+
   test('勤務が営業時間からはみ出していても、店舗の定員が効く', async () => {
     // 店舗の定員1、メニューの同時受付は5。勤務 09:00-18:00 は営業 10:00-17:00 をはみ出す。
     businessHour('bh-1', '10:00', '17:00', 1);

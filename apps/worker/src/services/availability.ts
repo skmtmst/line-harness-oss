@@ -7,6 +7,7 @@ import type { AvailabilityByStaff } from './booking-types.js';
 import { SLOT_GRANULARITY_MINUTES } from './booking-types.js';
 import { getStaffGoogleBusy } from './booking-calendar-sync.js';
 import type { GoogleServiceAccountCredentials } from './google-service-account.js';
+import { storeSeatsForSlot, type StoreCapacityWindow } from './booking-store-capacity.js';
 
 export interface Interval {
   start: string; // HH:MM
@@ -263,6 +264,34 @@ function weekdayForDate(date: string): number {
   return new Date(`${date}T00:00:00Z`).getUTCDay();
 }
 
+interface BusinessHour {
+  weekday: number;
+  start_time: string;
+  end_time: string;
+  capacity: number;
+}
+
+function storeCapacityWindows(hours: BusinessHour[], timeZone: string, startMs: number, endMs: number): StoreCapacityWindow[] {
+  const windows: StoreCapacityWindow[] = [];
+  for (const date of eachDate(tzDateStr(timeZone, new Date(startMs)), tzDateStr(timeZone, new Date(endMs - 1)))) {
+    for (const hour of hours.filter(h => h.weekday === weekdayForDate(date))) {
+      const start = Math.max(startMs, zonedTimeToUtcMs(timeZone, date, hour.start_time));
+      const end = Math.min(endMs, zonedTimeToUtcMs(timeZone, date, hour.end_time));
+      if (start < end) windows.push({ start: new Date(start).toISOString(), end: new Date(end).toISOString(), capacity: Number(hour.capacity) });
+    }
+  }
+  return windows;
+}
+
+/** Capacity applies only to business-hour intervals touched by this occupancy. */
+export async function getStoreCapacityWindows(db: D1Database, accountId: string, start: Date, end: Date): Promise<StoreCapacityWindow[]> {
+  const timeZone = await getAccountTimeZone(db, accountId);
+  const hours = await db.prepare(`SELECT bh.weekday, bh.start_time, bh.end_time, bh.capacity
+    FROM booking_business_hours bh JOIN booking_settings bs ON bs.id = bh.booking_settings_id
+    WHERE bs.line_account_id = ?`).bind(accountId).all<BusinessHour>();
+  return storeCapacityWindows(hours.results ?? [], timeZone, start.getTime(), end.getTime());
+}
+
 function googleBusyForDate(
   intervals: Array<{ start: string; end: string }>,
   date: string,
@@ -456,12 +485,12 @@ export async function getAvailability(
     .prepare(
       `SELECT staff_id, menu_id, starts_at, block_ends_at
          FROM bookings
-        WHERE staff_id IN (${placeholders})
+        WHERE line_account_id = ?
           AND status IN ('requested','confirmed')
-          AND starts_at < ?
-          AND block_ends_at > ?`,
+          AND julianday(starts_at) < julianday(?)
+          AND julianday(block_ends_at) > julianday(?)`,
     )
-    .bind(...staffIds, rangeEnd.toISOString(), rangeStart.toISOString())
+    .bind(params.lineAccountId, rangeEnd.toISOString(), rangeStart.toISOString())
     .all<{ staff_id: string; menu_id: string; starts_at: string; block_ends_at: string }>();
 
   const menuForCalc = {
@@ -508,14 +537,17 @@ export async function getAvailability(
   // 既存予約の instant 一覧（担当ごと）。壁日付ではなく instant の重なりで
   // 当日分を拾う。fold を跨ぐ予約が壁日付では別日に落ちるため。
   const bookingMsByStaff = new Map<string, Array<{ startMs: number; endMs: number; sameMenu: boolean }>>();
+  const storeBookings: Array<{ startMs: number; endMs: number }> = [];
   for (const b of bookings.results ?? []) {
     const startMs = new Date(b.starts_at).getTime();
     const endMs = new Date(b.block_ends_at).getTime();
     if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || startMs >= endMs) continue;
+    storeBookings.push({ startMs, endMs });
     const list = bookingMsByStaff.get(b.staff_id) ?? [];
     list.push({ startMs, endMs, sameMenu: b.menu_id === params.menuId });
     bookingMsByStaff.set(b.staff_id, list);
   }
+  const storeWindows = storeCapacityWindows(businessHours.results ?? [], timeZone, rangeStart.getTime(), rangeEnd.getTime());
 
   const by_staff: AvailabilityByStaff[] = [];
   for (const s of staffRows.results) {
@@ -665,34 +697,14 @@ export async function getAvailability(
       const googleBusy = googleBusyByStaff.get(s.id);
       // 外の予定は定員に関係なく塞ぐ（sameMenu を付けない）。
       if (googleBusy) dayBookings.push(...googleBusyForDate(googleBusy, date, timeZone));
-      /*
-       * 営業時間の定員は、**重なっている行**から取る（#748）。
-       *
-       * これまでは「勤務区間を完全に含む行」だけを見ていた。含む行が1件も
-       * 無いと内側の reduce が初期値をそのまま返し、`storeCapacity` が
-       * Infinity のまま——**店舗の定員が丸ごと効かなくなっていた。**
-       * 営業 10:00-17:00（定員1）・勤務 09:00-18:00 の店で、メニュー側の
-       * 同時受付数がそのまま通っていた。
-       *
-       * 重なりで見れば、その区間に掛かる制限のうちいちばん厳しいものを採る。
-       */
-      const storeCapacity = workingList.reduce(
-        (min, working) => dayHours
-          .filter((hour) => hour.start_time < working.end && hour.end_time > working.start)
-          .reduce((inner, hour) => Math.min(inner, Number(hour.capacity ?? 1)), min),
-        Number.POSITIVE_INFINITY,
-      );
-      const effectiveCapacity = Math.max(1, Math.min(
-        Number(menu.concurrent_capacity ?? 1),
-        Number.isFinite(storeCapacity) ? storeCapacity : Number.POSITIVE_INFINITY,
-        resourceCapacity,
-      ));
+      // Staff/menu concurrency is distinct from the store-wide seat budget.
+      const staffCapacity = Math.max(1, Math.min(Number(menu.concurrent_capacity ?? 1), resourceCapacity));
       const daySlots = computeSlots({
         working: workingList,
         busy: dayBookings,
         menu: menuForCalc,
         granularityMinutes: SLOT_GRANULARITY_MINUTES,
-        capacity: effectiveCapacity,
+        capacity: staffCapacity,
       });
       // instant 側の busy。当日の範囲と重なるものを instant のまま集める。
       // fold を跨ぐ予約・予定は壁時刻へ潰すと消える（01:30→01:30）ため、
@@ -750,7 +762,10 @@ export async function getAvailability(
         }
         if (instantBlocked) continue;
         const sameMenuCount = Math.max(wallSameCount, instantSameCount);
-        const remaining = Math.max(0, effectiveCapacity - sameMenuCount);
+        const storeSeats = storeSeatsForSlot(storeWindows, storeBookings, slotStartMs, slotEndMs);
+        if (storeSeats.remaining === 0) continue;
+        const effectiveCapacity = Math.min(staffCapacity, storeSeats.capacity);
+        const remaining = Math.max(0, Math.min(staffCapacity - sameMenuCount, storeSeats.remaining));
         slots.push({
           date,
           start: slot.start,
