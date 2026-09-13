@@ -13,6 +13,7 @@ import { describe, expect, it } from 'vitest'
 const HERE = dirname(fileURLToPath(import.meta.url))
 const PAGE = readFileSync(join(HERE, '..', '..', 'app', 'chats', 'page.tsx'), 'utf8')
 const SIDEBAR = readFileSync(join(HERE, 'friend-info-sidebar.tsx'), 'utf8')
+const INBOX_DROPDOWN = readFileSync(join(HERE, 'inbox-dropdown.tsx'), 'utf8')
 
 /**
  * `start` から `end` までを切り出す。**印が無ければ落とす。**
@@ -67,21 +68,12 @@ describe('xGLVe 一覧の行（日付・待ち時間・担当）', () => {
   })
 })
 
-describe('f0zn6 自分の未読', () => {
-  const toggle = region(PAGE, 'data-inbox-v6="mine-unread-toggle"', '</button>')
+describe('f0zn6 一覧の未読表示', () => {
   const row = region(PAGE, 'const waitingLabel = needsAttention', '<div className="flex items-start gap-3">')
 
-  it('押した状態が読み上げに伝わる形で切り替える', () => {
-    expect(toggle).toContain('onClick={() => setMineUnreadOnly((current) => !current)}')
-    expect(toggle).toContain('aria-pressed={mineUnreadOnly}')
-    expect(toggle).toContain('{mineUnreadCount}')
-    expect(toggle).toContain('自分の未読')
-  })
-
-  it('札の数は一覧に持っている行から数える（作り物の数を出さない）', () => {
-    const count = region(PAGE, 'const mineUnreadCount =', 'const activeFriendId')
-    expect(count).toContain('visibleMailItems.filter((item) => item.isUnread).length')
-    expect(count).toContain('visibleLineItems.filter((chat) => chat.isUnread).length')
+  it('設計に無い右端の「自分の未読」操作を置かない', () => {
+    expect(PAGE).not.toContain('data-inbox-v6="mine-unread-toggle"')
+    expect(PAGE).not.toContain('mineUnreadOnly')
   })
 
   it('自分あての未読の行は地の色を変える', () => {
@@ -91,7 +83,7 @@ describe('f0zn6 自分の未読', () => {
 })
 
 describe('H3lAOB / xGLVe トーク見出しの操作', () => {
-  const header = region(PAGE, '<div className="ml-auto flex flex-wrap items-center justify-end gap-2">', '{/* Messages')
+  const header = region(PAGE, '<div className="ml-auto flex flex-nowrap items-center justify-end gap-2">', '{/* Messages')
 
   it('設計の並び（★ → 担当 → 対応マーク → 顧客情報）で置く', () => {
     const star = header.indexOf('aria-pressed={chatDetail.isAttention}')
@@ -110,6 +102,33 @@ describe('H3lAOB / xGLVe トーク見出しの操作', () => {
     expect(header).toContain("showFriendInfo ? '顧客情報を閉じる' : '顧客情報を表示'")
     // 「閉じているときだけ出す」形へ戻さない。
     expect(header).not.toContain('{!showFriendInfo && (')
+  })
+
+  it('顧客情報を開いても操作列を1行・高さ40pxで保つ', () => {
+    expect(header).toContain('flex flex-nowrap')
+    expect(header).toContain('className="inline-flex h-10 shrink-0')
+    expect(PAGE).toContain("showFriendInfo ? 'xl:min-w-xl")
+    expect(header).toContain('compact={showFriendInfo}')
+    expect(INBOX_DROPDOWN).toContain('whitespace-nowrap border px-2.5 text-xs')
+  })
+})
+
+describe('#455 受信箱の上端と入力欄', () => {
+  it('集計帯を外し、対応ルールだけを絞り込み行へ残す', () => {
+    expect(PAGE).not.toContain('data-inbox-v4="summary"')
+    expect(PAGE).not.toContain('<InboxKpis')
+    expect(PAGE).toContain('href="/tags?tab=marks"')
+    expect(PAGE).toContain('対応ルール')
+  })
+
+  it('チャネルと並び順は折り返さず、左列を先に縮める', () => {
+    expect(PAGE).toContain('mt-2 flex min-w-0 flex-nowrap items-center gap-1 overflow-hidden')
+    expect(PAGE).toContain("showFriendInfo ? 'lg:w-72 2xl:w-[420px]'")
+  })
+
+  it('改行案内を入力欄の下へ置く', () => {
+    const composer = region(PAGE, 'data-inbox-v4="composer"', '<TemplatePicker')
+    expect(composer.indexOf('aria-label="メッセージを入力"')).toBeLessThan(composer.indexOf("'Shift + Enter で改行'"))
   })
 })
 
@@ -150,9 +169,11 @@ describe('Xi4x9 右パネルの表示項目', () => {
     expect(panel).toContain('右パネルの表示項目')
   })
 
-  it('掴んで動かす形は無いので「ドラッグ」と書かない', () => {
-    expect(panel).not.toContain('ドラッグ')
-    expect(panel).toContain('上へ／下へ')
+  it('設計どおり掴んで順番を変えられる', () => {
+    expect(panel).toContain('ドラッグで順番変更')
+    expect(panel).toContain('draggable')
+    expect(panel).toContain('onDragStart')
+    expect(panel).toContain('moveGroupBefore')
   })
 
   it('出し入れは素のチェックを土台にした入／切で読み上げにも伝わる', () => {
@@ -167,7 +188,7 @@ describe('Xi4x9 右パネルの表示項目', () => {
 
   it('全部隠しても戻せる道と、閉じる道を置く', () => {
     expect(panel).toContain('初期状態に戻す')
-    expect(panel).toContain('setSectionOrder(DETAIL_SECTIONS.map((item) => item.key))')
+    expect(panel).toContain('setSectionOrder(DEFAULT_SECTION_ORDER)')
     expect(panel).toContain('setHiddenSections([])')
     expect(panel).toContain('完了')
   })

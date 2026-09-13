@@ -1,3 +1,9 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
 /*
  * 顧客へのお知らせ（Pencil ★V6 `festr` / `Q55bb`）の、この画面だけの寸法。
  *
@@ -100,7 +106,7 @@
 }
 
 /* 行の中の小さな操作。設計 h32 r6。 */
-.rowAction {
+.root :global(.line-notification-v6-row-action) {
   display: inline-flex;
   height: 32px;
   align-items: center;
@@ -114,6 +120,39 @@
   cursor: pointer;
 }
 
-.rowAction:hover {
+.root :global(.line-notification-v6-row-action):hover {
   background: var(--color-canvas-sunken);
+}
+
+/* 一覧の6列。Tailwindの個別寸法を増やさず、この画面の設計と同じ幅に固定する。 */
+.root :global(.line-notification-v6-header) {
+  display: none;
+  gap: 12px;
+  border-bottom: 1px solid var(--color-hairline);
+  padding: 12px 16px;
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-faint);
+  font-size: var(--text-caption);
+  font-weight: 600;
+}
+
+.root :global(.line-notification-v6-row) {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+}
+
+@media (min-width: 1024px) {
+  .root :global(.line-notification-v6-header),
+  .root :global(.line-notification-v6-row) {
+    grid-template-columns: minmax(240px, 2fr) minmax(160px, 1.2fr) 90px 90px 110px 240px;
+  }
+
+  .root :global(.line-notification-v6-header) {
+    display: grid;
+  }
+
+  .root :global(.line-notification-v6-row) {
+    align-items: center;
+  }
 }

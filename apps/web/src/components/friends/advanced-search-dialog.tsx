@@ -1,9 +1,9 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import type { Tag } from '@line-crm/shared'
+import type { SavedSearchCondition, Scenario, Tag } from '@line-crm/shared'
 import { api, type FriendListParams } from '@/lib/api'
-import { friendParamsToSavedConditions } from './saved-search-utils'
+import { friendParamsToSavedConditions, savedSearchSummary } from './saved-search-utils'
 import { TextInput } from '@/components/shared/form-controls'
 import Button from '@/components/shared/button'
 
@@ -36,22 +36,31 @@ const BLOCK_LABEL: Record<Block['kind'], string> = {
   chat_status: '対応状況',
 }
 
-/**
- * まだ組み立てられない条件。**押せない札として並べる。**
- * 理由は札に出す（同じ質問が繰り返されるのを避けるため）。
- */
-const NOT_YET: Array<{ label: string; why: string }> = [
-  { label: '個別メモ', why: 'メモを検索する口がありません' },
-  // 下のOR節は `'対応状況'` を並べる側に書いているのに、この一覧に項目が無かった。
-  // そのため **設計にあるORの軸が1つ、黙って描かれないまま**だった。
-  { label: '対応状況', why: '対応状況で絞る口がありません' },
-  { label: 'シナリオ', why: '購読中のシナリオで絞る口がありません' },
-  { label: 'イベント予約', why: '予約から友だちを引く口がありません' },
-  { label: 'カレンダー予約', why: '同上' },
-  { label: 'リマインダ', why: 'この友だちのぶんを引く口がありません' },
-  { label: '回答フォーム', why: '回答から友だちを引く口がありません' },
-  { label: '最終反応日', why: '最終反応の日付を持っていません' },
-  { label: 'その他', why: '何を入れるか決まっていません' },
+const BLOCK_HELP: Record<Block['kind'], string> = {
+  name: 'LINE登録名・本名・システム表示名',
+  tag: '含む／含まない',
+  field: '項目と値',
+  status_message: 'ひとことに含む文字',
+  created_at: '期間を指定',
+  chat_status: '固定の4状態',
+}
+
+/** 新契約が受け取る OR 条件。選択肢が必要な軸だけ、取得前は無効にする。 */
+const OR_AXES: Array<{
+  label: string
+  make: (options: { markId?: string; scenarioId?: string }) => SavedSearchCondition | null
+}> = [
+  { label: '対応マーク', make: ({ markId }) => markId ? { kind: 'mark', op: 'eq', value: markId } : null },
+  { label: 'シナリオ', make: ({ scenarioId }) => scenarioId ? { kind: 'scenario', op: 'eq', value: scenarioId } : null },
+  { label: 'イベント予約', make: () => ({ kind: 'event_booking', op: 'exists' }) },
+  { label: 'カレンダー予約', make: () => ({ kind: 'calendar_booking', op: 'exists' }) },
+  { label: '回答フォーム', make: () => ({ kind: 'form', op: 'exists' }) },
+  { label: '最終反応日', make: () => ({ kind: 'last_activity', op: 'after', value: '2026-01-01' }) },
+  { label: 'リマインダ', make: () => ({ kind: 'reminder', op: 'exists' }) },
+  { label: '個別メモ', make: () => ({ kind: 'memo', op: 'exists' }) },
+  { label: 'ステータスメッセージ', make: () => ({ kind: 'status_message', op: 'contains', value: '登録' }) },
+  { label: '友だち登録日', make: () => ({ kind: 'created_at', op: 'after', value: '2026-01-01' }) },
+  { label: 'その他', make: () => ({ kind: 'common_event', op: 'exists', value: 'conversion' }) },
 ]
 
 export interface AdvancedSearchResult {
@@ -70,6 +79,7 @@ export interface AdvancedSearchResult {
     | 'sort'
     | 'limit'
     | 'savedSearchId'
+    | 'conditions'
   >
   /** 画面に「絞り込み中」を出すための、人が読める形 */
   summary: string[]
@@ -80,7 +90,10 @@ export default function AdvancedSearchDialog({
   accountId,
   tags,
   fieldNames,
+  marks,
+  scenarios,
   onClose,
+  onLoadSaved,
   onApply,
 }: {
   open: boolean
@@ -88,7 +101,10 @@ export default function AdvancedSearchDialog({
   tags: Tag[]
   /** 友だち情報の項目名。取れないときは空でよい（自由入力にする）。 */
   fieldNames: string[]
+  marks: Array<{ id: string; name: string }>
+  scenarios: Scenario[]
   onClose: () => void
+  onLoadSaved?: () => void
   onApply: (result: AdvancedSearchResult) => void
 }) {
   const [blocks, setBlocks] = useState<Block[]>([
@@ -97,6 +113,7 @@ export default function AdvancedSearchDialog({
     { kind: 'field', key: '', op: 'eq', value: '' },
   ])
   const [visibility, setVisibility] = useState<'' | 'following' | 'blocked'>('following')
+  const [any, setAny] = useState<SavedSearchCondition[]>([])
   const [sort, setSort] = useState<'recent' | 'oldest'>('recent')
   const [count, setCount] = useState<number | null>(null)
   const [counting, setCounting] = useState(false)
@@ -126,8 +143,13 @@ export default function AdvancedSearchDialog({
       }
       if (b.kind === 'chat_status') p.chatStatus = b.value
     }
+    p.conditions = {
+      ...friendParamsToSavedConditions(p),
+      any,
+      visibility: visibility === 'following' ? 'visible_only' : visibility === '' ? 'hidden_only' : 'all',
+    }
     return p
-  }, [blocks, visibility, sort])
+  }, [any, blocks, visibility, sort])
 
   const summary = useMemo(() => {
     const out: string[] = []
@@ -152,6 +174,7 @@ export default function AdvancedSearchDialog({
       )
     }
     if (params.visibility === 'blocked') out.push('ブロックした人')
+    out.push(...savedSearchSummary(params.conditions ?? {}, tags).filter((item) => item.startsWith('OR: ')))
     return out
   }, [params, tags])
 
@@ -203,11 +226,8 @@ export default function AdvancedSearchDialog({
     setSaving(true)
     setSaveError('')
     try {
-      const res = await api.savedSearches.create({
-        name: saveName.trim(),
-        accountId,
-        conditions: friendParamsToSavedConditions(params),
-        isShared: false,
+      const res = await api.friendSavedViews.create(accountId, {
+        name: saveName.trim(), conditions: friendParamsToSavedConditions(params), isShared: false,
       })
       if (!res.success) {
         setSaveError(res.error)
@@ -262,7 +282,7 @@ export default function AdvancedSearchDialog({
             </div>
           </section>
 
-          <section className="rounded-[12px] border border-[#DADDE2] bg-canvas p-3">
+          <section className="rounded-card border border-hairline bg-canvas p-3">
           <div className="flex items-center gap-2 px-1 pb-2">
             <span className="bg-accent-deep text-on-accent rounded-pill px-2 py-0.5 text-xs font-bold">
               AND
@@ -271,115 +291,115 @@ export default function AdvancedSearchDialog({
           </div>
 
           {blocks.map((b, i) => (
-            <section key={`${b.kind}-${i}`} className="mb-2 rounded-[9px] bg-[#F6F6F8] p-3 last:mb-0">
-              <div className="mb-2 flex items-center justify-between">
+            <section
+              key={`${b.kind}-${i}`}
+              className="mb-2 grid items-center gap-3 rounded-[9px] bg-[#F6F6F8] p-3 last:mb-0 sm:grid-cols-12"
+            >
+              <div className="sm:col-span-3">
                 <h3 className="text-ink text-sm font-bold">{BLOCK_LABEL[b.kind]}</h3>
-                <button
-                  type="button"
-                  onClick={() => drop(i)}
-                  aria-label={`${BLOCK_LABEL[b.kind]}の条件を外す`}
-                  className="text-danger text-xs hover:underline"
-                >
-                  外す
-                </button>
+                <p className="text-ink-faint mt-0.5 text-nano">{BLOCK_HELP[b.kind]}</p>
               </div>
 
-              {b.kind === 'name' && (
-                <>
+              <div className="min-w-0 sm:col-span-8">
+                {b.kind === 'name' && (
                   <input
                     value={b.keyword}
                     onChange={(e) => patch(i, { ...b, keyword: e.target.value })}
                     placeholder="キーワードを入力"
                     className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm"
                   />
-                  {/* 設計は LINE登録名 / 本名 / システム表示名 を選べる。
-                      いま持っているのは display_name だけ。 */}
-                  <p className="text-ink-faint mt-1 text-xs">
-                    LINE登録名から探します。本名とシステム表示名は、まだ検索の対象にできません。
-                  </p>
-                </>
-              )}
+                )}
 
-              {b.kind === 'tag' && (
-                <TagPicker
-                  tags={tags}
-                  include={b.include}
-                  exclude={b.exclude}
-                  onChange={(include, exclude) => patch(i, { ...b, include, exclude })}
-                />
-              )}
-
-              {b.kind === 'field' && (
-                <div className="flex flex-wrap items-center gap-2">
-                  <input
-                    list="friend-field-names"
-                    value={b.key}
-                    onChange={(e) => patch(i, { ...b, key: e.target.value })}
-                    placeholder="友だち情報欄名を入力"
-                    className="border-hairline rounded-control bg-canvas text-ink min-w-0 flex-1 border px-3 py-2 text-sm"
+                {b.kind === 'tag' && (
+                  <TagPicker
+                    tags={tags}
+                    include={b.include}
+                    exclude={b.exclude}
+                    onChange={(include, exclude) => patch(i, { ...b, include, exclude })}
                   />
-                  <datalist id="friend-field-names">
-                    {fieldNames.map((n) => (
-                      <option key={n} value={n} />
-                    ))}
-                  </datalist>
+                )}
+
+                {b.kind === 'field' && (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <input
+                      list="friend-field-names"
+                      value={b.key}
+                      onChange={(e) => patch(i, { ...b, key: e.target.value })}
+                      placeholder="友だち情報欄名を入力"
+                      className="border-hairline rounded-control bg-canvas text-ink min-w-0 flex-1 border px-3 py-2 text-sm"
+                    />
+                    <datalist id="friend-field-names">
+                      {fieldNames.map((n) => (
+                        <option key={n} value={n} />
+                      ))}
+                    </datalist>
+                    <select
+                      value={b.op}
+                      onChange={(e) => patch(i, { ...b, op: e.target.value as 'eq' | 'ne' })}
+                      className="border-hairline rounded-control bg-canvas text-ink border px-3 py-2 text-sm"
+                    >
+                      <option value="eq">等しい</option>
+                      <option value="ne">等しくない</option>
+                    </select>
+                    <input
+                      value={b.value}
+                      onChange={(e) => patch(i, { ...b, value: e.target.value })}
+                      placeholder="値を入力"
+                      className="border-hairline rounded-control bg-canvas text-ink min-w-0 flex-1 border px-3 py-2 text-sm"
+                    />
+                  </div>
+                )}
+
+                {b.kind === 'status_message' && (
+                  <input
+                    value={b.keyword}
+                    onChange={(e) => patch(i, { ...b, keyword: e.target.value })}
+                    placeholder="ひとことに含む文字"
+                    className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm"
+                  />
+                )}
+
+                {b.kind === 'created_at' && (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <input
+                      type="date"
+                      value={b.from}
+                      onChange={(e) => patch(i, { ...b, from: e.target.value })}
+                      className="border-hairline rounded-control bg-canvas text-ink border px-3 py-2 text-sm"
+                    />
+                    <span className="text-ink-secondary text-sm">〜</span>
+                    <input
+                      type="date"
+                      value={b.to}
+                      onChange={(e) => patch(i, { ...b, to: e.target.value })}
+                      className="border-hairline rounded-control bg-canvas text-ink border px-3 py-2 text-sm"
+                    />
+                  </div>
+                )}
+
+                {b.kind === 'chat_status' && (
                   <select
-                    value={b.op}
-                    onChange={(e) => patch(i, { ...b, op: e.target.value as 'eq' | 'ne' })}
+                    value={b.value}
+                    onChange={(e) =>
+                      patch(i, { ...b, value: e.target.value as 'unread' | 'in_progress' | 'resolved' })
+                    }
                     className="border-hairline rounded-control bg-canvas text-ink border px-3 py-2 text-sm"
                   >
-                    <option value="eq">等しい</option>
-                    <option value="ne">等しくない</option>
+                    <option value="unread">未対応</option>
+                    <option value="in_progress">対応中</option>
+                    <option value="resolved">対応済み</option>
                   </select>
-                  <input
-                    value={b.value}
-                    onChange={(e) => patch(i, { ...b, value: e.target.value })}
-                    placeholder="値を入力"
-                    className="border-hairline rounded-control bg-canvas text-ink min-w-0 flex-1 border px-3 py-2 text-sm"
-                  />
-                </div>
-              )}
+                )}
+              </div>
 
-              {b.kind === 'status_message' && (
-                <input
-                  value={b.keyword}
-                  onChange={(e) => patch(i, { ...b, keyword: e.target.value })}
-                  placeholder="ひとことに含む文字"
-                  className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm"
-                />
-              )}
-
-              {b.kind === 'created_at' && (
-                <div className="flex flex-wrap items-center gap-2">
-                  <input
-                    type="date"
-                    value={b.from}
-                    onChange={(e) => patch(i, { ...b, from: e.target.value })}
-                    className="border-hairline rounded-control bg-canvas text-ink border px-3 py-2 text-sm"
-                  />
-                  <span className="text-ink-secondary text-sm">〜</span>
-                  <input
-                    type="date"
-                    value={b.to}
-                    onChange={(e) => patch(i, { ...b, to: e.target.value })}
-                    className="border-hairline rounded-control bg-canvas text-ink border px-3 py-2 text-sm"
-                  />
-                </div>
-              )}
-
-              {b.kind === 'chat_status' && (
-                <select
-                  value={b.value}
-                  onChange={(e) =>
-                    patch(i, { ...b, value: e.target.value as 'unread' | 'in_progress' | 'resolved' })
-                  }
-                  className="border-hairline rounded-control bg-canvas text-ink border px-3 py-2 text-sm"
-                >
-                  <option value="unread">未対応</option>
-                  <option value="in_progress">対応中</option>
-                  <option value="resolved">対応済み</option>
-                </select>
-              )}
+              <button
+                type="button"
+                onClick={() => drop(i)}
+                aria-label={`${BLOCK_LABEL[b.kind]}の条件を外す`}
+                className="text-danger text-xs hover:underline"
+              >
+                外す
+              </button>
             </section>
           ))}
 
@@ -402,32 +422,72 @@ export default function AdvancedSearchDialog({
               <span className="rounded-full bg-[#0067D9] px-2 py-0.5 text-xs font-bold text-on-action">OR</span>
               <span className="text-sm font-bold text-[#1D1D1F]">いずれか1つ以上満たす条件</span>
             </div>
-            {/*
-              **押せない理由を `title` に隠さない。**
-
-              以前は `title={item.why}` だけで、マウスを乗せた人にしか読めなかった。
-              押せない札が理由なしに5つ並ぶと、壊れているのか、まだ無いのか分からない。
-              `NOT_YET` は理由の文をもう持っているので、札の下に出す。
-            */}
             <div className="mt-3 flex flex-wrap gap-3">
-              {NOT_YET.filter((item) => ['対応状況', 'シナリオ', 'イベント予約', '回答フォーム', '最終反応日'].includes(item.label)).map((item) => (
+              {OR_AXES.map((item) => {
+                const condition = item.make({ markId: marks[0]?.id, scenarioId: scenarios[0]?.id })
+                return (
                 <div key={item.label} className="flex max-w-xs flex-col gap-1">
-                  <button type="button" disabled className="w-fit rounded-full border border-[#DADDE2] bg-[#F6F8FB] px-3 py-1.5 text-xs text-[#667085] opacity-70">
-                    ＋ {item.label === 'イベント予約' ? '予約' : item.label}
+                  <button
+                    type="button"
+                    disabled={!condition}
+                    onClick={() => condition && setAny((current) => [...current, condition])}
+                    className="w-fit rounded-full border border-[#DADDE2] bg-[#F6F8FB] px-3 py-1.5 text-xs text-[#667085] disabled:opacity-50"
+                  >
+                    ＋ {item.label}
                   </button>
-                  {/* 任意値の class を足さない。10px は `--text-nano`、色は `--color-ink-faint`
-                      （#8b938d）が同じ値を既に持っている。design-debt を増やさずに済む。 */}
-                  <span className="text-ink-faint text-nano leading-tight">{item.why}</span>
+                  {!condition ? <span className="text-ink-faint text-nano leading-tight">選択肢を読み込むと使えます</span> : null}
                 </div>
+                )
+              })}
+            </div>
+            {any.length > 0 ? (
+              <div className="mt-3 space-y-2">
+                {savedSearchSummary({ any }, tags).map((label, index) => (
+                  <div key={`${label}-${index}`} className="flex items-center justify-between rounded-control bg-action-soft px-3 py-2 text-xs text-action">
+                    <span>{label.replace(/^OR: /, '')}</span>
+                    <button type="button" onClick={() => setAny((current) => current.filter((_, itemIndex) => itemIndex !== index))}>外す</button>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+          </section>
+
+          <section className="rounded-[12px] border border-[#DADDE2] bg-canvas p-3">
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="text-sm font-bold text-ink">表示する友だち</span>
+              <span className="text-nano text-ink-faint">既定は「表示中」のみ</span>
+            </div>
+            <div className="mt-2 flex flex-wrap gap-4 text-xs font-semibold text-ink-secondary">
+              {[
+                { value: 'following', label: '表示中' },
+                { value: '', label: '非表示' },
+                { value: 'blocked', label: 'ブロックした人' },
+              ].map((item) => (
+                <label key={item.label} className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={visibility === item.value}
+                    onChange={() => setVisibility(item.value as '' | 'following' | 'blocked')}
+                    className="h-4 w-4 accent-accent"
+                  />
+                  {item.label}
+                </label>
               ))}
             </div>
+            <label className="mt-3 flex flex-wrap items-center gap-3 text-xs font-semibold text-ink-secondary">
+              友だちの状態
+              <select disabled className="min-w-64 rounded-control border border-hairline bg-canvas-sunken px-3 py-2 text-xs text-ink-faint">
+                <option>このアカウントをブロックしていない</option>
+              </select>
+              <span className="text-nano font-normal text-ink-faint">相手側のブロック状態を絞る口の接続後に選べます</span>
+            </label>
           </section>
 
           <div className="grid gap-2 sm:grid-cols-3">
             <label className="rounded-[9px] border border-[#DADDE2] bg-canvas px-3 py-2">
               <span className="text-[10px] text-[#8B938D]">対象</span>
               <select value={visibility} onChange={(event) => setVisibility(event.target.value as '' | 'following' | 'blocked')} className="mt-0.5 w-full border-0 bg-transparent p-0 text-xs font-semibold text-[#565F59] outline-none">
-                <option value="following">友だち中</option>
+                <option value="following">すべての友だち</option>
                 <option value="blocked">ブロックした人</option>
                 <option value="">すべて</option>
               </select>
@@ -453,15 +513,21 @@ export default function AdvancedSearchDialog({
         </div>
 
         <div className="flex flex-wrap items-center gap-3 border-t border-[#EAEBED] px-6 py-4">
+          {onLoadSaved ? (
+            <Button type="button" onClick={onLoadSaved}>
+              保存した検索から読み込む
+            </Button>
+          ) : null}
           <button
             type="button"
             onClick={() => {
               setBlocks([])
+              setAny([])
               setVisibility('')
             }}
             className="text-xs font-medium text-[#8B938D] hover:text-[#565F59]"
           >
-            条件をすべてクリア
+            条件をリセット
           </button>
           <button
             type="button"
@@ -521,6 +587,7 @@ function TagPicker({
     <div>
       <div className="flex flex-wrap items-center gap-2">
         <select
+          aria-label="タグ名を選ぶ"
           value={pick}
           onChange={(e) => {
             const id = e.target.value

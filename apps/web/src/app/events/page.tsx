@@ -2,12 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import Header from '@/components/layout/header'
 import { eventsApi, type EventListItem } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
+import { usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
+import SelectField from '@/components/shared/select-field'
 import { daysUntilEvent, summarizeEventAttention } from './event-attention'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
@@ -51,11 +52,14 @@ function formatShortJpDate(iso: string | null): string {
 }
 
 export default function EventsListPage() {
+  usePageTitle('イベント予約')
   const { selectedAccountId } = useAccount()
   const [items, setItems] = useState<EventListItem[]>([])
+  const [listTotal, setListTotal] = useState(0)
   const [loadStatus, setLoadStatus] = useState<LoadStatus>('loading')
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<'all' | 'open' | 'pending' | 'full'>('all')
+  const [sort, setSort] = useState<'soon' | 'name'>('soon')
   const [page, setPage] = useState(1)
   const loadRequestRef = useRef(0)
 
@@ -68,17 +72,26 @@ export default function EventsListPage() {
     }
     setLoadStatus('loading')
     setItems([])
+    setListTotal(0)
     try {
-      const res = await eventsApi.listEvents(selectedAccountId)
+      const res = await eventsApi.listEvents(selectedAccountId, {
+        page,
+        limit: PAGE_SIZE,
+        q: query.trim() || undefined,
+        filter,
+        sort,
+      })
       if (requestId !== loadRequestRef.current) return
       setItems(res.items)
+      setListTotal(res.total ?? res.items.length)
       setLoadStatus('ready')
     } catch {
       if (requestId !== loadRequestRef.current) return
       setItems([])
+      setListTotal(0)
       setLoadStatus('error')
     }
-  }, [selectedAccountId])
+  }, [selectedAccountId, page, query, filter, sort])
 
   useEffect(() => {
     void refresh()
@@ -89,7 +102,7 @@ export default function EventsListPage() {
 
   useEffect(() => {
     setPage(1)
-  }, [query, filter])
+  }, [query, filter, sort])
 
   function isFull(e: EventListItem): boolean {
     return e.total_capacity != null && e.total_active >= e.total_capacity
@@ -98,21 +111,12 @@ export default function EventsListPage() {
   const attention = useMemo(() => summarizeEventAttention(items), [items])
   const nearest = attention.upcoming[0]
   const nearestLow = attention.lowApplications[0]
+  const unpublishedCount = items.filter((event) => event.is_published !== 1).length
+  // 「終わった回」は端末時計で数えると、時計のずれで件数が合わない(点検#520軽16)。
+  // サーバー時刻の口が無いので、件数は出さず「—」にする。
 
-  const filtered = useMemo(() => {
-    const q = query.trim()
-    return items.filter((e) => {
-      if (q && !e.name.includes(q)) return false
-      if (filter === 'open' && e.is_published !== 1) return false
-      if (filter === 'pending' && e.pending_count === 0) return false
-      if (filter === 'full' && !isFull(e)) return false
-      return true
-    })
-  }, [items, query, filter])
-
-  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const pageCount = Math.max(1, Math.ceil(listTotal / PAGE_SIZE))
   const current = Math.min(page, pageCount)
-  const shown = filtered.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE)
   /*
     **アカウントを選んでいないときも「取れた」にしない。** 選ぶ前は
     そもそも数える対象が無い。`ready` だけを見ると 0件と出る。
@@ -122,40 +126,35 @@ export default function EventsListPage() {
   return (
     <div>
       <div data-design="Head">
-        <Header
-          title="イベント予約"
-          description="開催するイベントの申込を管理します。定員と承認制の設定ができます。"
-        />
-        <div className="mb-4 flex flex-wrap items-center gap-2">
-          <button
-            disabled
-            title="操作マニュアルは準備中です"
-            className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm opacity-50"
-          >
-            マニュアル
-          </button>
-          <button
-            disabled
-            title="並び替えは準備中です"
-            className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm opacity-50"
-          >
-            並び替え
-          </button>
-          <button
-            disabled
-            title="フォルダ分けは準備中です"
-            className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm opacity-50"
-          >
-            フォルダを追加
-          </button>
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <nav className="text-ink-faint text-xs">
+            <span className="text-accent font-medium">予約</span>
+            <span className="mx-1.5">/</span>
+            <span>イベント予約</span>
+          </nav>
           <Link
             href="/events/new"
             className="bg-accent-deep text-on-accent rounded-control px-4 py-2 text-sm font-medium"
           >
-            イベントを作成
+            イベントをつくる
           </Link>
         </div>
+        <p className="text-ink-faint mb-4 text-sm">
+          開催するイベントの申込を管理します。定員と承認制の設定ができます。
+          マニュアル・フォルダを追加・保存した条件は、接続後にここから使えます。
+        </p>
       </div>
+
+      <section
+        data-event-count-summary
+        aria-label="一覧の集計（表示のみ）"
+        className="bg-canvas-sunken text-ink-secondary mb-4 flex flex-wrap items-center gap-x-6 gap-y-2 rounded-control px-4 py-3 text-sm"
+      >
+        <span className="text-ink-faint text-xs font-medium">一覧の集計（表示のみ）</span>
+        <span>これからの回 <strong className="text-ink">{dataReady ? attention.upcoming.length : '—'}</strong></span>
+        <span>受付前 <strong className="text-ink">{dataReady ? unpublishedCount : '—'}</strong></span>
+        <span>終わった回 <strong className="text-ink">—</strong></span>
+      </section>
 
       <div data-design="KPIs" className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">
         <Kpi
@@ -204,6 +203,10 @@ export default function EventsListPage() {
         />
       </div>
 
+      <div className="border-info bg-info-bg text-info mb-4 rounded-control border px-4 py-3 text-sm">
+        定員に達すると、お客様の画面では自動で「満席」になります。キャンセルが出たら、キャンセル待ちの人に自動で順番が回ります。
+      </div>
+
       <div
         data-design="Bar"
         className="bg-canvas rounded-card border-hairline mb-3 flex flex-wrap items-center gap-2 border p-3"
@@ -216,25 +219,28 @@ export default function EventsListPage() {
           aria-label="イベント名で検索"
           className="border-hairline rounded-control focus:ring-accent min-w-0 flex-1 border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
         />
-        <span className="text-ink-faint text-xs whitespace-nowrap">並び順</span>
+        <label className="text-ink-faint flex items-center gap-2 text-xs whitespace-nowrap">
+          並び順
+          <SelectField
+            value={sort}
+            onChange={(event) => setSort(event.target.value as 'soon' | 'name')}
+            aria-label="イベントの並び順"
+            options={[
+              { value: 'soon', label: '日付が近い順' },
+              { value: 'name', label: 'イベント名順' },
+            ]}
+          />
+        </label>
         {/*
           **押しても何も起きない選び口を出さない**（`v6-common-rules` §5-5
           「動くまで描かない」）。押せない形で位置だけ見せても、いつ使える
           ようになるのか読む人には分からない。
         */}
-        <span className="text-ink-faint text-xs whitespace-nowrap">表示</span>
         {/*
           **押しても何も起きない選び口を出さない**（`v6-common-rules` §5-5
           「動くまで描かない」）。押せない形で位置だけ見せても、いつ使える
           ようになるのか読む人には分からない。
         */}
-        <button
-          disabled
-          title="保存した条件は準備中です"
-          className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm opacity-50"
-        >
-          保存した条件
-        </button>
       </div>
 
       <div data-design="Saved" className="mb-3 flex flex-wrap items-center gap-2">
@@ -266,7 +272,7 @@ export default function EventsListPage() {
         <ListState kind="loading" />
       ) : loadStatus === 'error' ? (
         <ListState kind="error" description="登録したイベントは消えていません。再読み込みしても直らない場合はエラー報告へ。" action={<Button onClick={() => void refresh()}>イベントを再読み込み</Button>} />
-      ) : items.length === 0 ? (
+      ) : items.length === 0 && !query.trim() && filter === 'all' ? (
         <div className="bg-canvas rounded-card border-hairline border p-12 text-center">
           <p className="text-ink mb-2 font-medium">イベントがまだありません</p>
           <p className="text-ink-faint mb-4 text-sm">
@@ -279,7 +285,7 @@ export default function EventsListPage() {
             最初のイベントを作成
           </Link>
         </div>
-      ) : shown.length === 0 ? (
+      ) : items.length === 0 ? (
         <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-12 text-center text-sm">
           条件に合うイベントはありません
         </div>
@@ -298,10 +304,11 @@ export default function EventsListPage() {
                   <Th className="text-right">承認待ち</Th>
                   <Th>申込条件</Th>
                   <Th>状態</Th>
+                  <Th className="text-right">操作</Th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
-                {shown.map((e) => (
+              <tbody className="divide-hairline divide-y">
+                {items.map((e) => (
                   <tr key={e.id} className="hover:bg-canvas-sunken">
                     <td className="px-4 py-3 text-sm">
                       <Link
@@ -365,6 +372,20 @@ export default function EventsListPage() {
                         </span>
                       )}
                     </td>
+                    <td className="px-4 py-3 text-right text-sm whitespace-nowrap">
+                      <Link
+                        href={'/events/edit?id=' + e.id}
+                        className="border-hairline text-ink-secondary rounded-control mr-2 border px-3 py-1.5 text-xs font-medium"
+                      >
+                        中身を見る
+                      </Link>
+                      <Link
+                        href={'/events/bookings?id=' + e.id}
+                        className="border-accent text-accent rounded-control border px-3 py-1.5 text-xs font-medium"
+                      >
+                        申込者を見る
+                      </Link>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -383,9 +404,9 @@ export default function EventsListPage() {
             ? '—'
             : loadStatus === 'loading'
               ? '読み込み中'
-              : filtered.length === 0
+              : listTotal === 0
                 ? '0件'
-                : `${(current - 1) * PAGE_SIZE + 1}〜${Math.min(current * PAGE_SIZE, filtered.length)}件 / 全${filtered.length}件`}
+                : `${(current - 1) * PAGE_SIZE + 1}〜${Math.min(current * PAGE_SIZE, listTotal)}件 / 全${listTotal}件`}
         </span>
         {/*
           **送る先が無いページ送りを出さない。** 取れていないときに

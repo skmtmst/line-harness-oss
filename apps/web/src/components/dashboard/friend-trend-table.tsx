@@ -27,6 +27,9 @@ export default function FriendTrendTable({
 
   // 新しい日から見せる。設計も 8月15日 が先頭。
   const rows = [...trend].reverse()
+  if (rows.length === 0) {
+    return <p className="text-ink-faint px-5 py-6 text-center text-sm">この期間の推移はまだありません</p>
+  }
   return (
     <div>
       <div className="overflow-x-auto">
@@ -107,8 +110,10 @@ export function formatTrendSources(
 }
 
 /** 8月15日(土) の形にする。設計の表記に合わせている。 */
-function formatDate(iso: string): string {
+export function formatDate(iso: string): string {
   const [year, month, day] = iso.split('-').map(Number)
+  // 壊れた日付は元の文字列をそのまま出す。「NaN月NaN日」にはしない。
+  if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) return iso
   const weekday = ['日', '月', '火', '水', '木', '金', '土'][new Date(Date.UTC(year, month - 1, day)).getUTCDay()]
   return `${month}月${day}日(${weekday})`
 }

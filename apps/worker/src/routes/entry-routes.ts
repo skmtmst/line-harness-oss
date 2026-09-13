@@ -183,8 +183,8 @@ entryRoutes.patch('/api/entry-routes/:id', requireRole('owner', 'admin'), async 
         isActive: boolean;
       }>
     >();
-    if (body.refCode !== undefined && !/^[A-Za-z0-9_-]{1,64}$/.test(body.refCode.trim())) {
-      return c.json({ success: false, error: 'ref_code は64文字以内の半角英数字・_・-で入力してください' }, 400);
+    if (body.refCode !== undefined && body.refCode.trim() !== existing.ref_code) {
+      return c.json({ success: false, error: 'ref_code は作成後に変更できません' }, 400);
     }
     if (body.genre !== undefined && body.genre !== null && (!body.genre.trim() || body.genre.trim().length > 80)) {
       return c.json({ success: false, error: 'ジャンルは1〜80文字で入力してください' }, 400);
@@ -192,7 +192,7 @@ entryRoutes.patch('/api/entry-routes/:id', requireRole('owner', 'admin'), async 
     if (body.name !== undefined && (!body.name.trim() || body.name.trim().length > 120)) {
       return c.json({ success: false, error: '名前は1〜120文字で入力してください' }, 400);
     }
-    if (body.refCode !== undefined) body.refCode = body.refCode.trim();
+    delete body.refCode;
     if (typeof body.genre === 'string') body.genre = body.genre.trim();
     if (body.name !== undefined) body.name = body.name.trim();
     const row = await updateEntryRoute(c.env.DB, id, body);

@@ -106,6 +106,16 @@ describe('V6 案件一覧（GH8VL）の見せ方', () => {
     expect(csvCell(0)).toBe('0')
   })
 
+  it('CSVは数式として実行されない。=+-@始まりに引用符を付ける', () => {
+    expect(csvCell('=1+1')).toBe("'=1+1")
+    expect(csvCell('+cmd')).toBe("'+cmd")
+    expect(csvCell('-2')).toBe("'-2")
+    expect(csvCell('@sum')).toBe("'@sum")
+    expect(csvCell('田中')).toBe('田中')
+    // 引用符が必要な文字と組み合わさっても守る
+    expect(csvCell('=あ,い')).toBe("\"'=あ,い\"")
+  })
+
   it('CSVは画面に出ている行だけを、設計の見出しで書き出す', () => {
     const shown = selectOffers(OFFERS, { filters: ['draft'], query: '', sort: 'newest' })
     const csv = offersCsv(shown, {
@@ -141,7 +151,11 @@ describe('V6 案件一覧（GH8VL）の画面', () => {
 
   it('案内バーを1本置く', () => {
     expect(TABS).toContain("import NoteBar from '@/components/shared/note-bar'")
-    expect(TABS.match(/<NoteBar/g) ?? []).toHaveLength(1)
+    const offersTab = TABS.slice(
+      TABS.indexOf('export function OffersTab() {'),
+      TABS.indexOf('\nfunction SettlementEditor'),
+    )
+    expect(offersTab.match(/<NoteBar/g) ?? []).toHaveLength(1)
   })
 
   it('検索・表示件数・並び順・ページ送りを共通部品でつなぐ', () => {
@@ -172,7 +186,7 @@ describe('V6 案件一覧（GH8VL）の画面', () => {
     expect(TABS).not.toContain('?? offer.lineAccountId')
     expect(TABS).not.toContain('?? offer.tagId')
     expect(TABS).not.toContain('?? offer.scenarioId')
-    expect(TABS).toContain("'—（名前を確認できません）'")
+    expect(TABS).toContain("'名前を確認できません'")
   })
 })
 
@@ -203,9 +217,12 @@ describe('V6 アフィリエイターを追加する（xqT1Z）', () => {
 
   it('口の無い項目は押せない入力欄ではなく、—と理由で出す', () => {
     expect(NEW_PAGE).toContain('function Unavailable(')
-    for (const label of ['友だちから選ぶ', '1件あたりの上限', '振込先の登録', '成果時の動き']) {
+    for (const label of ['1件あたりの上限', '振込先の登録', '成果時の動き']) {
       expect(NEW_PAGE).toContain(`label="${label}"`)
     }
+    expect(NEW_PAGE).toContain('api.friends.list(friendSearchParams(friendSearch, friendPage, selectedAccountId))')
+    expect(NEW_PAGE).toContain('aria-label="友だち候補のページ"')
+    expect(NEW_PAGE).toContain('friendId: friendId || undefined')
     // 押せない入力欄を残していない。
     expect(NEW_PAGE).not.toMatch(/<TextInput\s+disabled/)
     expect(NEW_PAGE).not.toContain('<select id="af-account" disabled')
@@ -213,7 +230,7 @@ describe('V6 アフィリエイターを追加する（xqT1Z）', () => {
 
   it('未接続の言い方をそろえる', () => {
     const notWired = NEW_PAGE.match(/まだ繋がっていません。[^"]*が接続されると表示されます。/g) ?? []
-    expect(notWired).toHaveLength(4)
+    expect(notWired).toHaveLength(3)
   })
 
   it('URLのコピーは、コードが決まっているときだけ押せる', () => {
@@ -230,7 +247,22 @@ describe('V6 アフィリエイターを追加する（xqT1Z）', () => {
   })
 
   it('割合と保留期間をWorkerが受ける範囲で止める', () => {
-    expect(NEW_PAGE).toContain('rate <= 0 || rate > 100')
+    expect(NEW_PAGE).toContain('rate < 0 || rate > 100')
+    expect(NEW_PAGE).not.toContain('rate <= 0')
     expect(NEW_PAGE).toContain('!Number.isInteger(days) || days < 0 || days > 365')
+  })
+
+  it('KPIの元の承認は打ち切らず全件取る (#505 重大2)', () => {
+    // `limit: 200` で止めると数が小さく出て支払い判断を誤る。
+    // offset で送って短い頁まで取り、安全弁のときだけ注記を出す。
+    expect(TABS).toContain('listAllConversionApprovals')
+    expect(TABS).toContain('offset: page * APPROVAL_PAGE_SIZE')
+    expect(TABS).toContain('直近5000件まで')
+    // KPI 用の読み出し（紹介者タブの pending/approved、案件タブの3状態）は
+    // 全件取りに替えた。成果承認の作業列は表示用のため対象外で、
+    // 「直近最大200件」の注記を残す。
+    expect(TABS).not.toContain("api.conversionApprovals.list({ status: 'pending', limit: 200 })")
+    expect(TABS).not.toContain('api.conversionApprovals.list({ status, limit: 200 })')
+    expect(TABS).not.toContain('合計 ${formatYen(pendingYen)}（直近最大200件）')
   })
 })

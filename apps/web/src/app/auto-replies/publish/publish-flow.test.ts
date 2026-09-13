@@ -26,8 +26,8 @@ describe('publishGates', () => {
       dryRun(),
       new Set(),
     )
-    expect(gates[0].state).toBe('blocked')
-    expect(gates[0].detail).toContain('1件が未確認')
+    expect(gates[3].state).toBe('blocked')
+    expect(gates[3].detail).toContain('1件が未確認')
   })
 
   test('全部確認すれば通る', () => {
@@ -36,7 +36,7 @@ describe('publishGates', () => {
       dryRun(),
       new Set(['ar-1']),
     )
-    expect(gates[0].state).toBe('ok')
+    expect(gates[3].state).toBe('ok')
   })
 
   test('試験で下書きが負けたら止め、勝った相手を名前で出す', () => {
@@ -45,14 +45,14 @@ describe('publishGates', () => {
       dryRun({ draftWon: false, winner: { autoReplyId: 'ar-1', name: '一律返信', responseType: 'text', responseContent: '' } }),
       new Set(),
     )
-    expect(gates[1].state).toBe('blocked')
-    expect(gates[1].detail).toContain('一律返信')
+    expect(gates[2].state).toBe('blocked')
+    expect(gates[2].detail).toContain('一律返信')
   })
 
   test('入力の不足はそのまま出す', () => {
     const gates = publishGates(validation({ errors: ['キーワードがありません'] }), dryRun(), new Set())
-    expect(gates[2].state).toBe('blocked')
-    expect(gates[2].detail).toContain('キーワードがありません')
+    expect(gates[0].state).toBe('blocked')
+    expect(gates[0].detail).toContain('キーワードがありません')
   })
 })
 

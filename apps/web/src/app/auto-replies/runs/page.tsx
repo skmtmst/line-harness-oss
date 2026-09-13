@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { ArrowLeft, Download, Eye, Pause, Pencil, TriangleAlert } from 'lucide-react'
@@ -25,6 +25,17 @@ const STATUS: Record<ExecutionRunStatus, { label: string; tone: StatusBadgeTone 
   skipped: { label: '何もしませんでした', tone: 'neutral' },
   pending: { label: '確認待ち', tone: 'warning' },
   cancelled: { label: '取り消しました', tone: 'neutral' },
+  claimed: { label: '処理中', tone: 'warning' },
+  permanent_failed: { label: '失敗', tone: 'danger' },
+}
+
+/*
+ * 口が将来の状態を返しても白い画面にしない。
+ * 表に無い状態が来たら「確認中」で出す。理由は detail に残る。
+ */
+function statusView(status: string): { label: string; tone: StatusBadgeTone } {
+  return (STATUS as Record<string, { label: string; tone: StatusBadgeTone }>)[status]
+    ?? { label: '確認中', tone: 'neutral' }
 }
 
 function formatTime(value: string | null): string {
@@ -76,7 +87,7 @@ function csvFor(items: AutoReplyRun[]): string {
       item.accountLabel ?? '—',
       item.inputPreview ?? '—',
       item.triggerLabel,
-      STATUS[item.status].label,
+      statusView(item.status).label,
       actionLabel(item),
       item.durationMs === null ? '—' : `${item.durationMs}ms`,
     ]),
@@ -94,6 +105,7 @@ export default function AutoReplyRunsPage() {
   const [actionMessage, setActionMessage] = useState('')
   const [pausing, setPausing] = useState(false)
   const [exporting, setExporting] = useState(false)
+  const exportCancelledRef = useRef(false)
 
   usePageTitle(data ? `${data.rule.name}・実行結果` : '自動応答・実行結果')
 
@@ -144,18 +156,31 @@ export default function AutoReplyRunsPage() {
     }
   }
 
+  // 一度に書き出す上限。履歴が多いと固まる・落ちるため、超えたら範囲指定を促す。
+  const MAX_CSV_ROWS = 5000
   const exportCsv = async () => {
     if (!data?.rule.id || exporting) return
     setExporting(true)
+    exportCancelledRef.current = false
     setActionMessage('')
     try {
       const items: AutoReplyRun[] = []
       let offset = 0
+      let capped = false
       for (;;) {
+        if (exportCancelledRef.current) throw new Error('csv_cancelled')
         const response = await api.autoReplies.runs({ ruleId: data.rule.id, limit: 100, offset })
         if (!response.success) throw new Error(response.error)
-        items.push(...response.data.items)
+        const room = MAX_CSV_ROWS - items.length
+        items.push(...response.data.items.slice(0, room))
         offset += response.data.items.length
+        if (items.length % 1000 === 0 && items.length > 0) {
+          setActionMessage(`${items.length.toLocaleString('ja-JP')}件読み込み中…`)
+        }
+        if (items.length >= MAX_CSV_ROWS) {
+          capped = offset < response.data.pagination.total || response.data.items.length > room
+          break
+        }
         if (offset >= response.data.pagination.total || response.data.items.length === 0) break
       }
       const url = URL.createObjectURL(new Blob([csvFor(items)], { type: 'text/csv;charset=utf-8' }))
@@ -164,8 +189,17 @@ export default function AutoReplyRunsPage() {
       anchor.download = `auto-reply-runs-${data.rule.id}.csv`
       anchor.click()
       URL.revokeObjectURL(url)
-    } catch {
-      setActionMessage('CSVを書き出せませんでした。もう一度お試しください。')
+      setActionMessage(
+        capped
+          ? `直近${MAX_CSV_ROWS.toLocaleString('ja-JP')}件まで書き出しました。全部要るときは期間を絞って分けてください。`
+          : `${items.length.toLocaleString('ja-JP')}件を書き出しました。`,
+      )
+    } catch (e) {
+      if (e instanceof Error && e.message === 'csv_cancelled') {
+        setActionMessage('書き出しを止めました。')
+      } else {
+        setActionMessage('CSVを書き出せませんでした。もう一度お試しください。')
+      }
     } finally {
       setExporting(false)
     }
@@ -181,6 +215,11 @@ export default function AutoReplyRunsPage() {
         <Button onClick={() => void exportCsv()} disabled={!data?.rule.id || exporting}>
           <Download size={16} />{exporting ? '書き出しています' : '実行結果をCSVで書き出す'}
         </Button>
+        {exporting ? (
+          <Button variant="secondary" onClick={() => { exportCancelledRef.current = true }}>
+            書き出しを止める
+          </Button>
+        ) : null}
       </div>
 
       <div className={styles.columns}>
@@ -203,7 +242,7 @@ export default function AutoReplyRunsPage() {
               <>
                 <div className={styles.runList}>
                   {items.map((item, index) => {
-                    const view = STATUS[item.status]
+                    const view = statusView(item.status)
                     return (
                       <article key={item.id} className={`${styles.runRow} ${index === 0 ? styles.highlight : ''}`}>
                         <span className={styles.avatar} aria-hidden="true">{(item.friendName ?? '?').slice(0, 1)}</span>

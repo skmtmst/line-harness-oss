@@ -1,19 +1,22 @@
 'use client'
 
 import SelectField from '@/components/shared/select-field'
+import Button from '@/components/shared/button'
 import { useEffect, useState, useCallback, useRef, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import Header from '@/components/layout/header'
-import { api } from '@/lib/api'
+import { api, ApiError } from '@/lib/api'
 import { CanvasEditor, type Area } from '@/components/rich-menus/canvas-editor'
 import { AreaProperties, intentOf } from '@/components/rich-menus/area-properties'
-import type { RichMenuAreaTapCount } from '@/lib/api'
+import type { RichMenuAreaTapCount, RichMenuTargetPreview, RichMenuScheduleInput } from '@/lib/api'
 import ConditionBuilder from '@/components/shared/condition-builder'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import StickyBar from '@/components/shared/sticky-bar'
 import type { SegmentCondition } from '@/lib/segment-condition'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import { RICH_MENU_DIMENSIONS } from '@line-crm/shared'
+import { datetimeLocalJstToUtcIso } from '@/lib/jst-datetime'
+import { useScheduleSubmit } from './schedule-submit'
 
 /**
  * 保存されている条件を読む。
@@ -64,12 +67,60 @@ type Group = {
 type PickerOption = { id: string; name: string }
 
 const SIZE_LABEL: Record<Group['size'], string> = {
-  large: '2500×1686',
-  compact: '2500×843',
+  large: `${RICH_MENU_DIMENSIONS.large.width}×${RICH_MENU_DIMENSIONS.large.height}`,
+  compact: `${RICH_MENU_DIMENSIONS.compact.width}×${RICH_MENU_DIMENSIONS.compact.height}`,
+}
+
+/**
+ * 画像エラーのサーバ原文（英語）を日本語に写す。利用者が次の一手を
+ * 分かるように、形式・寸法・容量不足だけを定型文にする。
+ */
+function imageUploadErrorText(err: unknown): string {
+  const fallback = '画像を読み込めませんでした。もう一度お試しください。'
+  if (!(err instanceof ApiError)) return fallback
+  const message = err.status === 400 && err.message && !/^API error: /.test(err.message)
+    ? err.message
+    : ''
+  if (!message) return fallback
+  if (message.includes('content-type must be image/png or image/jpeg')
+    || message.includes('unrecognized image format')) {
+    return '画像の形式はPNGかJPEGにしてください。'
+  }
+  if (message.includes('exceeds 1MB limit')) {
+    return '画像が大きすぎます。1MB以下の画像を選んでください。'
+  }
+  if (message.includes('dimensions ')) {
+    return `画像の大きさが合いません。${SIZE_LABEL.large}（大）か${SIZE_LABEL.compact}（小）の画像を選んでください。`
+  }
+  if (message.includes('does not match group size')) {
+    return 'このページの大きさと画像の大きさが合いません。ページの大きさに合わせた画像を選んでください。'
+  }
+  return message
+}
+
+/**
+ * 取り下げの部分的失敗文（英語の原文）を日本語の定型文に写す。
+ * IDなどの内部語は出さず、種類ごとに1行へまとめる。
+ */
+function unpublishWarningText(warning: string): string {
+  if (warning.startsWith('delete alias ')) return '切り替え設定の一部を取り下げきれていません'
+  if (warning.startsWith('delete richmenu ')) return 'メニュー本体の一部を取り下げきれていません'
+  if (warning.startsWith('default lookup/clear')) return '標準表示の解除を確認できませんでした'
+  return '一部を取り下げきれていません'
+}
+
+/**
+ * 取得結果の形を確かめる。形違いの応答をそのまま `Group` に断定すると、
+ * 後の `pages.map` などで落ちる。
+ */
+function isGroupResponse(value: unknown): value is Group {
+  if (!value || typeof value !== 'object') return false
+  return 'id' in value && typeof value.id === 'string'
+    && 'name' in value && typeof value.name === 'string'
+    && 'pages' in value && Array.isArray(value.pages)
 }
 
 export default function RichMenuEditPage() {
-  usePageTitle('リッチメニュー編集')
   return (
     <Suspense
       fallback={
@@ -87,6 +138,8 @@ function RichMenuEditPageInner() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const groupId = searchParams.get('id') ?? ''
+  const editorStep = searchParams.get('step')
+  usePageTitle(editorStep === 'targeting' ? '誰に出すか' : editorStep === 'publish' ? '公開のしかた' : 'メニューを作る')
 
   if (!groupId) {
     return (
@@ -98,14 +151,16 @@ function RichMenuEditPageInner() {
       </main>
     )
   }
-  return <Editor groupId={groupId} router={router} />
+  return <Editor groupId={groupId} editorStep={editorStep} router={router} />
 }
 
 function Editor({
   groupId,
+  editorStep,
   router,
 }: {
   groupId: string
+  editorStep: string | null
   router: ReturnType<typeof useRouter>
 }) {
   const [group, setGroup] = useState<Group | null>(null)
@@ -161,6 +216,23 @@ function Editor({
   const [confirmError, setConfirmError] = useState('')
   /** 登録・取り下げの結果。`alert()` の代わりに画面へ残す。 */
   const [notice, setNotice] = useState('')
+  /*
+   * 公開予約の保存。1操作の Idempotency-Key を応答が確定するまで持ち続ける
+   * (押し直しで同じ予約が2件にならないようにする)。中身は schedule-submit.ts。
+   */
+  const scheduleSubmit = useScheduleSubmit({
+    groupId: group?.id ?? '',
+    persistDraft: () => persistDraft(),
+    onSaving: setSaving,
+    onSaved: (message) => {
+      setError(null)
+      setNotice(message)
+    },
+    onFailed: (message) => {
+      setNotice('')
+      setError(message)
+    },
+  })
   /**
    * 下見で押したときに「何が起きるか」。
    *
@@ -168,6 +240,9 @@ function Editor({
    * 画面に残せば、区画を押しながら設定と見比べられる。
    */
   const [previewMessage, setPreviewMessage] = useState('')
+  const [targetPreview, setTargetPreview] = useState<RichMenuTargetPreview | null>(null)
+  const [targetPreviewLoading, setTargetPreviewLoading] = useState(false)
+  const [targetPreviewError, setTargetPreviewError] = useState('')
 
   const closeConfirm = () => {
     if (publishing || unpublishing) return
@@ -184,7 +259,8 @@ function Editor({
     try {
       const res = await api.richMenuGroups.get(groupId)
       if (!res.success) throw new Error(res.error ?? '取得失敗')
-      const g = res.data as Group
+      if (!isGroupResponse(res.data)) throw new Error('取得失敗')
+      const g = res.data
       setGroup(g)
       setName(g.name)
       setChatBarText(g.chatBarText)
@@ -218,6 +294,31 @@ function Editor({
   useEffect(() => {
     reload()
   }, [reload])
+
+  const reloadTargetPreview = useCallback(async () => {
+    if (!group) return
+    setTargetPreviewLoading(true)
+    setTargetPreviewError('')
+    try {
+      const response = await api.richMenuGroups.previewTargets(
+        group.id,
+        targetingEnabled ? targetingCondition : null,
+      )
+      if (!response.success) throw new Error(response.error)
+      setTargetPreview(response.data)
+    } catch {
+      setTargetPreview(null)
+      setTargetPreviewError('対象人数を確認できませんでした。条件は保存できます。')
+    } finally {
+      setTargetPreviewLoading(false)
+    }
+  }, [group, targetingCondition, targetingEnabled])
+
+  useEffect(() => {
+    if (editorStep !== 'targeting' && editorStep !== 'publish') return
+    const timer = window.setTimeout(() => void reloadTargetPreview(), 250)
+    return () => window.clearTimeout(timer)
+  }, [editorStep, reloadTargetPreview])
 
   // 選択肢は片方が落ちても残りを出す。1つ取れなくても編集自体は続けられる。
   useEffect(() => {
@@ -415,8 +516,12 @@ function Editor({
     setError(null)
     setConfirmError('')
     setNotice('')
+    // #502中: 下書き保存の成否で文言を分ける。保存済みなのに
+    // 「保存されていません」と出すと、利用者が再入力してしまう。
+    let draftSaved = false
     try {
       await persistDraft()
+      draftSaved = true
       const res = await api.richMenuGroups.publish(groupId)
       // 失敗を握りつぶさない。返事を見ずに閉じると、登録できていないのに
       // 終わったように見える。
@@ -426,7 +531,11 @@ function Editor({
       await reload()
     } catch {
       // 生のAPIエラーは出さない。運用者が次にすることだけを窓に書く。
-      setConfirmError('LINEへ登録できませんでした。下書きは保存されていません。しばらくおいてから、もう一度お試しください。')
+      setConfirmError(
+        draftSaved
+          ? 'LINEへ登録できませんでした。下書きは保存済みです。LINEへの登録だけもう一度お試しください。'
+          : 'LINEへ登録できませんでした。下書きは保存されていません。しばらくおいてから、もう一度お試しください。',
+      )
     } finally {
       setPublishing(false)
     }
@@ -443,9 +552,11 @@ function Editor({
       if (!res.success) throw new Error(res.error ?? 'unpublish failed')
       const warnings = res.data?.warnings ?? []
       setConfirmKind(null)
+      // 原文（英語・IDつき）をそのまま出さず、日本語の定型文へ写して重複をまとめる。
+      const warningTexts = [...new Set(warnings.map(unpublishWarningText))]
       setNotice(
-        warnings.length > 0
-          ? `LINE上のメニュー登録を取り下げました。ただし、一部は取り下げきれていません: ${warnings.join(' / ')}`
+        warningTexts.length > 0
+          ? `LINE上のメニュー登録を取り下げました。ただし、${warningTexts.join(' / ')}。`
           : 'LINE上のメニュー登録を取り下げました。もう一度「LINEに登録」すれば元に戻せます。',
       )
       await reload()
@@ -509,7 +620,7 @@ function Editor({
       })
       setImageVersion((v) => v + 1)
     } catch (e) {
-      setError(e instanceof Error ? e.message : '画像を読み込めませんでした。もう一度お試しください。')
+      setError(imageUploadErrorText(e))
     } finally {
       setBusy(false)
     }
@@ -544,6 +655,42 @@ function Editor({
     ? `${api.richMenuGroups.imageUrl(activePage.imageR2Key)}?v=${imageVersion}`
     : null
 
+  if (editorStep === 'targeting') {
+    return (
+      <TargetingStep
+        group={group}
+        targetingEnabled={targetingEnabled}
+        targetingPriority={targetingPriority}
+        targetingCondition={targetingCondition}
+        tags={tags}
+        preview={targetPreview}
+        previewLoading={targetPreviewLoading}
+        previewError={targetPreviewError}
+        saving={saving}
+        onTargetingEnabled={setTargetingEnabled}
+        onTargetingPriority={setTargetingPriority}
+        onTargetingCondition={setTargetingCondition}
+        onRefresh={() => void reloadTargetPreview()}
+        onSave={() => void handleSave()}
+      />
+    )
+  }
+
+  if (editorStep === 'publish') {
+    return (
+      <PublishStep
+        group={group}
+        pages={pages}
+        preview={targetPreview}
+        saving={saving}
+        publishing={publishing}
+        onSave={() => void handleSave()}
+        onPublishNow={() => void handlePublish()}
+        onSchedule={scheduleSubmit}
+      />
+    )
+  }
+
   return (
     <main className="p-6 max-w-7xl mx-auto">
       <nav data-design="Crumb" className="text-ink-faint mb-2 text-xs">
@@ -554,52 +701,7 @@ function Editor({
         <span>{name || '(無名)'}</span>
       </nav>
 
-      <Header
-        description="トーク画面の下に出るメニューを作ります。エリアを選んで、押したときの動きを設定してください。"
-        action={
-          <StickyBar actions={(
-            <div className="flex items-center gap-2">
-            <label className="flex items-center gap-1.5 text-sm text-gray-600 mr-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={preview}
-                onChange={(e) => setPreview(e.target.checked)}
-              />
-              プレビュー
-            </label>
-            <button
-              onClick={handleSave}
-              disabled={saving || publishing || unpublishing || busy}
-              className="px-4 py-2 text-sm font-medium border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors"
-            >
-              {saving ? '保存中...' : '下書き保存'}
-            </button>
-            <button
-              onClick={() => {
-                setConfirmError('')
-                setConfirmKind('publish')
-              }}
-              disabled={saving || publishing || unpublishing || busy}
-              className="px-4 py-2 text-sm font-medium text-white rounded-lg disabled:opacity-50 transition-opacity hover:opacity-90"
-              style={{ backgroundColor: 'var(--color-accent)' }}
-            >
-              {publishing
-                ? 'LINE 登録中...'
-                : group.status === 'published'
-                  ? 'LINE に再登録'
-                  : 'LINE に登録'}
-            </button>
-            </div>
-          )} />
-        }
-      />
-
-      <Link
-        href="/rich-menus"
-        className="text-sm text-gray-500 hover:underline mb-4 inline-block"
-      >
-        ← 一覧に戻る
-      </Link>
+      <StepHeader active={1} groupId={group.id} />
 
       {/* 登録・取り下げの結果。`alert()` と違い、押したあとも読み返せる。 */}
       {notice && (
@@ -633,6 +735,7 @@ function Editor({
               style={active ? { backgroundColor: 'var(--color-accent)' } : undefined}
             >
               {p.name}
+              {active && <span className="ml-1 text-xs opacity-80">編集中</span>}
               {p.id.startsWith('tmp-') && (
                 <span className="ml-1 text-xs opacity-70">(未保存)</span>
               )}
@@ -1113,6 +1216,372 @@ function Editor({
           <li>・戻せます: もう一度「LINEに登録」すれば、また出せます。</li>
         </ul>
       </ConfirmDialog>
+
+      <StickyBar actions={(
+        <div className="flex items-center gap-2">
+          <label className="mr-2 flex cursor-pointer items-center gap-1.5 text-sm text-gray-600">
+            <input
+              type="checkbox"
+              checked={preview}
+              onChange={(e) => setPreview(e.target.checked)}
+            />
+            プレビュー
+          </label>
+          <button
+            onClick={handleSave}
+            disabled={saving || publishing || unpublishing || busy}
+            className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium transition-colors hover:bg-gray-50 disabled:opacity-50"
+          >
+            {saving ? '保存中...' : '下書きに保存'}
+          </button>
+          <button
+            onClick={() => {
+              setConfirmError('')
+              setConfirmKind('publish')
+            }}
+            disabled={saving || publishing || unpublishing || busy}
+            className="rounded-lg px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+            style={{ backgroundColor: 'var(--color-accent)' }}
+          >
+            {publishing
+              ? 'LINE 登録中...'
+              : group.status === 'published'
+                ? 'LINE に再登録'
+                : 'LINE に登録'}
+          </button>
+        </div>
+      )} />
     </main>
   )
 }
+
+function StepHeader({ active, groupId }: { active: 1 | 2 | 3; groupId: string }) {
+  const steps = [
+    { number: 1, label: '形とボタン', href: `/rich-menus/edit?id=${groupId}` },
+    { number: 2, label: '誰に出すか', href: `/rich-menus/edit?id=${groupId}&step=targeting` },
+    { number: 3, label: '公開のしかた', href: `/rich-menus/edit?id=${groupId}&step=publish` },
+  ]
+  return (
+    <div className="border-hairline bg-canvas mb-6 grid grid-cols-3 overflow-hidden rounded-card border">
+      {steps.map((step) => (
+        <Link
+          key={step.number}
+          href={step.href}
+          className={`flex min-w-0 items-center justify-center gap-3 border-r px-4 py-4 last:border-r-0 ${
+            step.number === active ? 'bg-accent/5 text-accent' : 'text-ink-secondary'
+          }`}
+        >
+          <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+            step.number === active ? 'bg-accent-deep text-on-accent' : 'bg-canvas-sunken text-ink-faint'
+          }`}>{step.number}</span>
+          <span className="min-w-0">
+            <span className="block text-xs font-bold tracking-wider">STEP {step.number}</span>
+            <span className="block truncate text-sm font-semibold">{step.label}</span>
+          </span>
+        </Link>
+      ))}
+    </div>
+  )
+}
+
+function MetricValue({ metric }: { metric: RichMenuTargetPreview['matched'] | undefined }) {
+  if (!metric || metric.state === 'unavailable' || metric.value === null) {
+    return <span title={metric?.reason ?? '未取得'}>— <small className="text-ink-faint text-xs">（未取得）</small></span>
+  }
+  return <>{metric.value.toLocaleString('ja-JP')}人</>
+}
+
+function TargetingStep({
+  group,
+  targetingEnabled,
+  targetingPriority,
+  targetingCondition,
+  tags,
+  preview,
+  previewLoading,
+  previewError,
+  saving,
+  onTargetingEnabled,
+  onTargetingPriority,
+  onTargetingCondition,
+  onRefresh,
+  onSave,
+}: {
+  group: Group
+  targetingEnabled: boolean
+  targetingPriority: number
+  targetingCondition: SegmentCondition | null
+  tags: PickerOption[]
+  preview: RichMenuTargetPreview | null
+  previewLoading: boolean
+  previewError: string
+  saving: boolean
+  onTargetingEnabled: (value: boolean) => void
+  onTargetingPriority: (value: number) => void
+  onTargetingCondition: (value: SegmentCondition | null) => void
+  onRefresh: () => void
+  onSave: () => void
+}) {
+  const [conditionEditorOpen, setConditionEditorOpen] = useState(false)
+  const firstRule = targetingCondition?.rules[0]
+  const selectedTagName = firstRule?.type.startsWith('tag_')
+    ? tags.find((tag) => tag.id === firstRule.value)?.name
+    : null
+  return (
+    <main data-design-node="kQ1bs" className="mx-auto max-w-7xl p-6 pb-24">
+      <nav className="text-ink-faint mb-2 text-xs"><Link href="/rich-menus">リッチメニュー</Link><span className="mx-1.5">/</span>{group.name}</nav>
+      <StepHeader active={2} groupId={group.id} />
+
+      <div className="grid gap-5 xl:grid-cols-3">
+        <section className="border-hairline bg-canvas rounded-card border p-6 shadow-sm xl:col-span-2">
+          <h2 className="text-ink text-base font-bold">このメニューを出す相手</h2>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <label className={`rounded-card cursor-pointer border p-4 ${!targetingEnabled ? 'border-accent bg-accent/5' : 'border-hairline'}`}>
+              <span className="flex items-center gap-2 text-sm font-semibold"><input type="radio" name="audience" checked={!targetingEnabled} onChange={() => onTargetingEnabled(false)} />すべての友だち</span>
+              <span className="text-ink-faint mt-2 block text-xs leading-5">ほかのメニューに当てはまらなかった人に出る、いちばん下の受け皿になります</span>
+            </label>
+            <label className={`rounded-card cursor-pointer border p-4 ${targetingEnabled ? 'border-accent bg-accent/5' : 'border-hairline'}`}>
+              <span className="flex items-center gap-2 text-sm font-semibold"><input type="radio" name="audience" checked={targetingEnabled} onChange={() => onTargetingEnabled(true)} />条件に当てはまる友だちだけ</span>
+              <span className="text-ink-faint mt-2 block text-xs leading-5">当てはまらない人には、これより下のメニューが出ます</span>
+            </label>
+          </div>
+
+          {targetingEnabled ? (
+            <div className="border-hairline mt-5 rounded-card border p-4">
+              <div className="flex items-center justify-between gap-3"><div><p className="text-ink text-sm font-bold">条件</p><p className="text-ink-secondary mt-1 text-xs">{selectedTagName ? `タグ「${selectedTagName}」を含む` : targetingCondition ? `保存済み条件 ${targetingCondition.rules.length}件` : '条件がまだありません'}</p></div><Button type="button" onClick={() => setConditionEditorOpen((open) => !open)}>{conditionEditorOpen ? '編集を閉じる' : '条件を編集'}</Button></div>
+              {conditionEditorOpen ? <div className="mt-4"><ConditionBuilder value={targetingCondition} onChange={onTargetingCondition} label="条件" /></div> : null}
+            </div>
+          ) : null}
+
+          <div className="border-hairline mt-5 grid gap-4 border-t pt-5 sm:grid-cols-3">
+            <div><p className="text-ink-faint text-xs">いま当てはまる人</p><p className="text-ink mt-1 text-2xl font-bold">{previewLoading ? '確認中…' : <MetricValue metric={preview?.matched} />}</p></div>
+            <div>
+              <label className="text-ink-faint text-xs" htmlFor="targeting-priority">出す順番</label>
+              <div className="mt-1 flex items-center gap-2"><input id="targeting-priority" aria-label="出す順番" type="number" min={1} value={targetingPriority + 1} onChange={(event) => onTargetingPriority(Math.max(0, Number(event.target.value) - 1))} className="border-hairline rounded-control w-20 border px-3 py-2 text-lg font-bold" /><span className="text-ink-secondary text-sm">番目</span></div>
+            </div>
+            <div><p className="text-ink-faint text-xs">実際にこのメニューが出る人</p><p className="text-accent mt-1 text-2xl font-bold"><MetricValue metric={preview?.effective} /></p></div>
+          </div>
+          {preview?.overlap.value ? <p className="bg-warning-bg text-warning mt-4 rounded-control px-3 py-2 text-xs">このうち {preview.overlap.value.toLocaleString('ja-JP')}人 は上の「{preview.higherMenus[0] ?? '優先メニュー'}」にも当てはまるため、そちらが出ます。</p> : null}
+          {previewError ? <p className="text-danger mt-3 text-xs" role="alert">{previewError}</p> : null}
+          <Button type="button" onClick={onRefresh} className="mt-3">人数をもう一度確認</Button>
+        </section>
+
+        <aside className="space-y-4">
+          <section className="border-hairline bg-canvas rounded-card border p-5">
+            <h2 className="text-ink text-sm font-bold">利用できる条件軸</h2>
+            <p className="text-ink-faint mt-1 text-xs">友だち一覧の詳細検索と同じ条件を使います</p>
+            <p className="text-ink-secondary mt-4 text-xs font-bold">標準互換（15軸）</p>
+            <div className="text-ink-secondary mt-2 flex flex-wrap gap-1.5 text-xs">{['名前','個別メモ','ステータスメッセージ','友だち登録日','タグ','友だち情報','シナリオ','イベント予約','カレンダー予約','共通情報','リマインダ','回答フォーム','最終反応日','その他','対応マーク'].map((label) => <span key={label} className="bg-canvas-sunken rounded px-2 py-1">{label}</span>)}</div>
+            <p className="text-ink-secondary mt-4 text-xs font-bold">この画面だけの軸（6軸）</p>
+            <div className="text-ink-secondary mt-2 flex flex-wrap gap-1.5 text-xs">{['担当者','流入経路','配信状況','予約状況','購入履歴','ブロック状態'].map((label) => <span key={label} className="bg-canvas-sunken rounded px-2 py-1">{label}</span>)}</div>
+          </section>
+          <section className="bg-status-info-soft text-status-info rounded-card p-4 text-xs leading-5"><strong className="block">条件はここだけの話ではありません</strong>一度作った条件は保存した検索として、配信や自動応答でも呼び出せます。</section>
+        </aside>
+      </div>
+
+      <StickyBar actions={<div className="flex w-full items-center justify-between gap-3"><span className="text-ink-faint text-xs">{group.status === 'published' ? 'LINE登録済み' : '下書き（まだ誰にも出ていません）'}</span><div className="flex gap-2"><Button href={`/rich-menus/edit?id=${group.id}`}>前へ：形とボタン</Button><Button onClick={onSave} disabled={saving}>{saving ? '保存中…' : '下書きに保存'}</Button><Button variant="primary" href={`/rich-menus/edit?id=${group.id}&step=publish`}>次へ：公開のしかた</Button></div></div>} />
+    </main>
+  )
+}
+
+function PublishStep({
+  group,
+  pages,
+  preview,
+  saving,
+  publishing,
+  onSave,
+  onPublishNow,
+  onSchedule,
+}: {
+  group: Group
+  pages: Page[]
+  preview: RichMenuTargetPreview | null
+  saving: boolean
+  publishing: boolean
+  onSave: () => void
+  onPublishNow: () => void
+  onSchedule: (input: RichMenuScheduleInput) => Promise<void>
+}) {
+  const [mode, setMode] = useState<'now' | 'scheduled' | 'period'>('now')
+  const [startsAt, setStartsAt] = useState('')
+  const [endsAt, setEndsAt] = useState('')
+  const [restoreGroupId, setRestoreGroupId] = useState('')
+  const [restoreMenus, setRestoreMenus] = useState<Array<{ id: string; name: string }>>([])
+
+  useEffect(() => {
+    void api.richMenuGroups.list(group.accountId).then((response) => {
+      if (!response.success) return
+      setRestoreMenus(response.data.filter((item) => item.id !== group.id && item.status === 'published').map((item) => ({ id: item.id, name: item.name })))
+    })
+  }, [group.accountId, group.id])
+
+  const [schedules, setSchedules] = useState<Array<{
+    id: string
+    mode: 'scheduled' | 'period'
+    startsAt: string
+    endsAt: string | null
+    restoreGroupId: string | null
+    restoreDefaultState: 'captured' | 'no_default' | null
+    status: string
+    attemptCount: number
+    nextRetryAt: string | null
+    lastErrorCode: string | null
+    createdAt: string
+  }>>([])
+  const [schedulesNotice, setSchedulesNotice] = useState('')
+  const [schedulesError, setSchedulesError] = useState('')
+  const [cancellingId, setCancellingId] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    void api.richMenuGroups.listSchedules(group.id).then((response) => {
+      if (cancelled) return
+      if (!response.success) {
+        setSchedulesError('予約一覧を取得できませんでした。時間をおいて開き直してください。')
+        return
+      }
+      setSchedulesError('')
+      setSchedules(response.data)
+    }).catch(() => {
+      if (!cancelled) setSchedulesError('予約一覧を取得できませんでした。時間をおいて開き直してください。')
+    })
+    return () => { cancelled = true }
+  }, [group.id])
+
+  const refreshSchedules = useCallback(() => {
+    void api.richMenuGroups.listSchedules(group.id).then((response) => {
+      if (!response.success) {
+        setSchedulesError('予約一覧を取得できませんでした。時間をおいて開き直してください。')
+        return
+      }
+      setSchedulesError('')
+      setSchedules(response.data)
+    }).catch(() => {
+      setSchedulesError('予約一覧を取得できませんでした。時間をおいて開き直してください。')
+    })
+  }, [group.id])
+
+  const cancelSchedule = useCallback(async (scheduleId: string) => {
+    setCancellingId(scheduleId)
+    setSchedulesNotice('')
+    try {
+      const response = await api.richMenuGroups.cancelSchedule(group.id, scheduleId)
+      if (!response.success) throw new Error(response.error)
+      setSchedulesNotice('予約を取り消しました。')
+      refreshSchedules()
+    } catch {
+      setSchedulesNotice('予約を取り消せませんでした。実行が始まっている可能性があります。')
+      refreshSchedules()
+    } finally {
+      setCancellingId(null)
+    }
+  }, [group.id, refreshSchedules])
+
+  const unconfiguredAreas = pages.reduce((count, page) => count + page.areas.filter((area) => !area.label).length, 0)
+  const imageReady = pages.length > 0 && pages.every((page) => page.imageR2Key)
+  const submit = () => {
+    if (mode === 'now') {
+      onPublishNow()
+      return
+    }
+    if (!startsAt || (mode === 'period' && !endsAt)) return
+    void onSchedule({
+      mode,
+      startsAt: datetimeLocalJstToUtcIso(startsAt),
+      endsAt: mode === 'period' ? datetimeLocalJstToUtcIso(endsAt) : null,
+      restoreGroupId: mode === 'period' ? restoreGroupId || null : null,
+    }).then(() => refreshSchedules()).catch(() => refreshSchedules())
+  }
+
+  return (
+    <main data-design-node="UMiJ9" className="mx-auto max-w-7xl p-6 pb-24">
+      <nav className="text-ink-faint mb-2 text-xs"><Link href="/rich-menus">リッチメニュー</Link><span className="mx-1.5">/</span>{group.name}</nav>
+      <StepHeader active={3} groupId={group.id} />
+      <div className="grid gap-5 xl:grid-cols-3">
+        <section className="border-hairline bg-canvas rounded-card border p-6 shadow-sm xl:col-span-2">
+          <h2 className="text-ink text-base font-bold">いつ出すか</h2>
+          <div className="mt-4 space-y-3">
+            {[
+              ['now', 'いますぐ出す', '保存したらすぐ、条件に当てはまる人のトーク画面に出ます'],
+              ['scheduled', '日時を決めて出す', 'その時刻になったら自動で出ます。それまでは今のメニューのままです'],
+              ['period', '期間を決める', '終わったら自動で元に戻します。キャンペーンはこれが安全です'],
+            ].map(([value, label, note]) => (
+              <label key={value} className={`rounded-card flex cursor-pointer gap-3 border p-4 ${mode === value ? 'border-accent bg-accent/5' : 'border-hairline'}`}>
+                <input type="radio" name="publish-mode" checked={mode === value} onChange={() => setMode(value as typeof mode)} />
+                <span><strong className="text-ink block text-sm">{label}</strong><span className="text-ink-faint mt-1 block text-xs">{note}</span></span>
+              </label>
+            ))}
+          </div>
+          {mode !== 'now' ? (
+            <div className="border-hairline mt-5 grid gap-4 border-t pt-5 sm:grid-cols-2">
+              <label className="text-ink-secondary text-xs font-semibold">出しはじめ<input aria-label="出しはじめ" type="datetime-local" value={startsAt} onChange={(event) => setStartsAt(event.target.value)} className="border-hairline rounded-control text-ink mt-1 block w-full border px-3 py-2 text-sm" /></label>
+              {mode === 'period' ? <label className="text-ink-secondary text-xs font-semibold">出しおわり<input aria-label="出しおわり" type="datetime-local" value={endsAt} onChange={(event) => setEndsAt(event.target.value)} className="border-hairline rounded-control text-ink mt-1 block w-full border px-3 py-2 text-sm" /></label> : null}
+              {mode === 'period' ? <label className="text-ink-secondary text-xs font-semibold sm:col-span-2">終わったらどうする<SelectField aria-label="終わったらどうする" value={restoreGroupId} onChange={(event) => setRestoreGroupId(event.target.value)} options={[{ value: '', label: '前のメニューに戻す（実行開始時に確定）' }, ...restoreMenus.map((item) => ({ value: item.id, label: item.name }))]} className="mt-1" /><span className="text-ink-faint mt-1 block text-xs">{restoreGroupId ? '終了時に選んだメニューへ戻します。' : '「前のメニューに戻す」は実行開始の直前、そのときに表示中のメニューに確定します。表示中のメニューが無い場合は終了時に表示を外します。'}</span></label> : null}
+            </div>
+          ) : null}
+
+          <div className="border-hairline mt-6 border-t pt-5">
+            <h2 className="text-ink text-sm font-bold">公開前チェック</h2>
+            <ul className="mt-3 space-y-2 text-sm">
+              <li className="text-success">✓ 誰に出すかが決まっています（<MetricValue metric={preview?.matched} />）</li>
+              <li className={imageReady ? 'text-success' : 'text-danger'}>{imageReady ? '✓' : '⚠'} 画像が登録されています{imageReady ? '' : '（未設定のページがあります）'}</li>
+              <li className={unconfiguredAreas === 0 ? 'text-success' : 'text-danger'}>{unconfiguredAreas === 0 ? '✓ すべてのボタン名が設定されています' : `⚠ ボタン名が未設定の場所が ${unconfiguredAreas}件 あります`}</li>
+              {preview?.overlap.value ? <li className="text-warning">⚠ 上の「{preview.higherMenus[0] ?? '優先メニュー'}」と {preview.overlap.value.toLocaleString('ja-JP')}人 が重なっています</li> : null}
+            </ul>
+          </div>
+        </section>
+
+        <aside className="space-y-4">
+          <section className="border-hairline bg-canvas rounded-card border p-5"><h2 className="text-ink text-sm font-bold">このメニューの設定</h2><dl className="mt-4 space-y-3 text-xs"><div><dt className="text-ink-faint">誰に出るか</dt><dd className="text-ink mt-1 font-semibold"><MetricValue metric={preview?.effective} /></dd></div><div><dt className="text-ink-faint">形</dt><dd className="text-ink mt-1 font-semibold">{group.size === 'large' ? '大' : '小'}・切替あり {pages.length}枚</dd></div><div><dt className="text-ink-faint">終わったら</dt><dd className="text-ink mt-1 font-semibold">{mode === 'period' ? restoreMenus.find((item) => item.id === restoreGroupId)?.name ?? '前のメニューに戻す' : '指定なし'}</dd></div></dl></section>
+          <section className="bg-status-info-soft text-status-info rounded-card p-5 text-xs leading-5"><h2 className="text-sm font-bold">公開すると何が変わるか</h2><p className="mt-2"><MetricValue metric={preview?.effective} /> のトーク画面のメニューが入れ替わります。</p><p className="mt-2">LINEへの反映は数分かかることがあります。</p></section>
+        </aside>
+      </div>
+      <section aria-label="公開予約の一覧" className="border-hairline bg-canvas rounded-card mt-5 border p-6">
+        <h2 className="text-ink text-sm font-bold">公開予約の一覧</h2>
+        {schedulesNotice ? <p role="status" className="text-ink mt-2 text-xs">{schedulesNotice}</p> : null}
+        {schedulesError ? <p role="alert" className="text-danger mt-2 text-xs">{schedulesError}</p> : null}
+        {!schedulesError ? (schedules.length === 0 ? (
+          <p className="text-ink-faint mt-2 text-xs">まだ公開予約はありません。日時を決めて予約するとここに出ます。</p>
+        ) : (
+          <ul className="mt-3 space-y-2">
+            {schedules.map((item) => (
+              <li key={item.id} className="border-hairline flex flex-wrap items-center justify-between gap-2 rounded border px-3 py-2 text-xs">
+                <span className="text-ink">
+                  {new Date(item.startsAt).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })} 開始
+                  {item.mode === 'period' && item.endsAt ? ` 〜 ${new Date(item.endsAt).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}` : ''}
+                  {' ・ '}
+                  {item.status === 'scheduled' ? '予約中'
+                    : item.status === 'publishing' ? '公開処理中'
+                    : item.status === 'published' ? '期間公開中'
+                    : item.status === 'restoring' ? '復元処理中'
+                    : item.status === 'completed' ? '完了'
+                    : item.status === 'cancelled' ? '取消済み'
+                    : item.status === 'failed' ? '失敗・要対応' : item.status}
+                  {item.status === 'failed' && item.lastErrorCode ? `（${item.lastErrorCode.slice(0, 40)}）` : ''}
+                  {item.nextRetryAt ? ` ・ 次回 ${new Date(item.nextRetryAt).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}` : ''}
+                  {item.mode === 'period' ? (item.restoreGroupId ? ` ・ 戻し先 ${restoreMenus.find((menu) => menu.id === item.restoreGroupId)?.name ?? item.restoreGroupId}` : item.restoreDefaultState === 'captured' ? ' ・ 戻し先確定済み（切替前の表示へ戻す）' : item.restoreDefaultState === 'no_default' ? ' ・ 戻し先なし（終了時に表示を外す）' : ' ・ 戻し先は実行開始時に確定') : ''}
+                </span>
+                {item.status === 'scheduled' ? (
+                  <Button
+                    onClick={() => void cancelSchedule(item.id)}
+                    disabled={cancellingId === item.id}
+                  >
+                    {cancellingId === item.id ? '取消中…' : '予約を取り消す'}
+                  </Button>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        )) : null}
+      </section>
+      <StickyBar actions={<div className="flex w-full items-center justify-between gap-3"><Button href={`/rich-menus/edit?id=${group.id}&step=targeting`}>前へ：誰に出すか</Button><div className="flex gap-2"><Button onClick={onSave} disabled={saving || publishing}>下書きに保存</Button><Button variant="primary" onClick={submit} disabled={saving || publishing || (mode !== 'now' && !startsAt) || (mode === 'period' && !endsAt)}>{publishing ? '公開中…' : mode === 'now' ? 'この内容で公開する' : 'この内容で予約する'}</Button></div></div>} />
+    </main>
+  )
+}
+
+/**
+ * 試験からだけ使う出し口。公開手順の画面を、本物のReactで単体で動かして
+ * 「押したときに実際どうなるか」を確かめるために使う（#621）。
+ */
+RichMenuEditPage.__testing = { PublishStep }

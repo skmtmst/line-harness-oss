@@ -4,10 +4,18 @@ import type { Env } from '../index.js';
 
 const marks = {
   getSupportMarksWithUsage: vi.fn(),
+  getSupportMarkArchiveImpact: vi.fn(),
   getSupportMarkById: vi.fn(),
   createSupportMark: vi.fn(),
+  createSupportMarkWithAutomationRules: vi.fn(),
   updateSupportMark: vi.fn(),
   replaceAndArchiveSupportMark: vi.fn(),
+  archiveSupportMarkWithReplacement: vi.fn(),
+  SupportMarkArchiveError: class SupportMarkArchiveError extends Error {
+    constructor(public readonly code: string, message: string) {
+      super(message);
+    }
+  },
   getDefaultSupportMark: vi.fn(),
   setFriendSupportMark: vi.fn(),
   setFriendSupportMarkBulk: vi.fn(),
@@ -17,9 +25,12 @@ const searches = {
   getSavedSearchById: vi.fn(),
   createSavedSearch: vi.fn(),
   updateSavedSearch: vi.fn(),
+  updateSavedSearchWithRevision: vi.fn(),
   deleteSavedSearch: vi.fn(),
   countSavedSearches: vi.fn(),
   getSavedSearchReferences: vi.fn(),
+  getSavedSearchUsageCounts: vi.fn(),
+  getSavedSearchReferenceUsageCounts: vi.fn(),
   SAVED_SEARCH_LIMIT: 50,
   SAVED_SEARCH_SCOPES: ['friends', 'chats', 'bookings'],
   validateSearchConditions: (raw: unknown) => {
@@ -42,15 +53,18 @@ const accountAccess = {
 };
 const savedSearchInsights = {
   getSavedSearchMatchInsights: vi.fn(),
+  getSavedSearchMatchPreview: vi.fn(),
 };
 const supportMarkAutomation = {
   SUPPORT_MARK_RULE_EVENTS: [
     'message_received', 'manual_reply_sent', 'staff_assigned', 'response_overdue', 'condition_matched',
   ],
   listSupportMarkAutomationRules: vi.fn(),
+  listSupportMarkAutomationRulesForAccount: vi.fn(),
   createSupportMarkAutomationRule: vi.fn(),
   updateSupportMarkAutomationRule: vi.fn(),
   archiveSupportMarkAutomationRule: vi.fn(),
+  validateSupportMarkAutomationRuleInput: vi.fn(),
 };
 const segmentQuery = {
   buildSegmentWhere: vi.fn(),
@@ -61,8 +75,10 @@ const folders = {
   createFolder: vi.fn(),
   updateFolder: vi.fn(),
   deleteFolder: vi.fn(),
+  getWebinarFolderCounts: vi.fn(),
+  getFolderItemCounts: vi.fn().mockResolvedValue(undefined),
   isFolderKind: (v: unknown) =>
-    typeof v === 'string' && ['tag', 'template', 'media'].includes(v),
+    typeof v === 'string' && ['tag', 'template', 'media', 'webinar', 'reminder', 'scenario', 'auto_reply', 'broadcast'].includes(v),
 };
 vi.mock('@line-crm/db', () => ({ ...marks, ...searches, ...folders }));
 vi.mock('../services/account-access.js', () => accountAccess);
@@ -83,11 +99,17 @@ function makeApp(role: 'owner' | 'admin' | 'staff' = 'owner') {
 }
 const env = { DB: {} as D1Database };
 
-function req(path: string, method: string, body?: unknown, role?: 'owner' | 'admin' | 'staff') {
+function req(
+  path: string,
+  method: string,
+  body?: unknown,
+  role?: 'owner' | 'admin' | 'staff',
+  headers: Record<string, string> = {},
+) {
   return makeApp(role).fetch(
     new Request(`https://example.com${path}`, {
       method,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...headers },
       body: body === undefined ? undefined : JSON.stringify(body),
     }),
     env,
@@ -102,7 +124,12 @@ const MARK = {
   auto_on_inbound: 1,
   display_order: 0,
   created_at: '2026-08-16',
+  revision: 1,
+  updated_by: 'u-1',
+  updated_at: '2026-08-16',
   archived_at: null,
+  version: 1,
+  created_by: 'u-1',
   tenant_id: 'tenant-1',
   line_account_id: 'account-1',
   is_inherited: 0,
@@ -123,6 +150,7 @@ const SEARCH = {
 const FOLDER = {
   id: 'fo-1',
   kind: 'template',
+  account_id: null,
   name: 'よく使う',
   parent_id: null,
   display_order: 0,
@@ -141,14 +169,39 @@ beforeEach(() => {
     saved_searches: 3,
     automations: 1,
   }]);
+  marks.getSupportMarkArchiveImpact.mockResolvedValue({
+    mark: {
+      ...MARK,
+      id: 'm-2',
+      is_default: 0,
+      friend_count: 5,
+      broadcasts: 0,
+      scenarios: 0,
+      auto_replies: 0,
+      saved_searches: 0,
+      automations: 0,
+    },
+    revision: 'm-2:1:5:0:0:0:0:0',
+    canArchive: true,
+    checkedAt: '2026-09-07T03:00:00+09:00',
+  });
   marks.getSupportMarkById.mockResolvedValue(MARK);
   marks.createSupportMark.mockResolvedValue(MARK);
+  marks.createSupportMarkWithAutomationRules.mockResolvedValue(MARK);
   marks.updateSupportMark.mockResolvedValue(MARK);
   marks.getDefaultSupportMark.mockResolvedValue(MARK);
   marks.replaceAndArchiveSupportMark.mockResolvedValue(0);
+  marks.archiveSupportMarkWithReplacement.mockResolvedValue({
+    archived: true,
+    markId: 'm-2',
+    replacementMarkId: 'm-1',
+    replacedFriendCount: 5,
+    version: 2,
+  });
   marks.setFriendSupportMark.mockResolvedValue(true);
   marks.setFriendSupportMarkBulk.mockResolvedValue(2);
   supportMarkAutomation.listSupportMarkAutomationRules.mockResolvedValue([]);
+  supportMarkAutomation.listSupportMarkAutomationRulesForAccount.mockResolvedValue([]);
   supportMarkAutomation.createSupportMarkAutomationRule.mockResolvedValue({
     id: 'rule-1', name: '担当者が決まったら対応中へ', markId: 'm-1', event: 'staff_assigned',
     condition: null, priority: 100, manualProtectionMinutes: 60, isActive: true,
@@ -162,12 +215,21 @@ beforeEach(() => {
   searches.getSavedSearchById.mockResolvedValue(SEARCH);
   searches.createSavedSearch.mockResolvedValue(SEARCH);
   searches.updateSavedSearch.mockResolvedValue(SEARCH);
+  searches.updateSavedSearchWithRevision.mockResolvedValue({ status: 'updated', search: SEARCH });
   searches.deleteSavedSearch.mockResolvedValue(true);
   searches.countSavedSearches.mockResolvedValue(0);
   searches.getSavedSearchReferences.mockResolvedValue([]);
+  searches.getSavedSearchUsageCounts.mockResolvedValue(new Map([['s-1', 4]]));
+  searches.getSavedSearchReferenceUsageCounts.mockResolvedValue(new Map());
   savedSearchInsights.getSavedSearchMatchInsights.mockResolvedValue(new Map([
     ['s-1', { matchCount: 7, matchCountError: null }],
   ]));
+  savedSearchInsights.getSavedSearchMatchPreview.mockResolvedValue({
+    total: 7,
+    byChannel: { line: 6, mail: 1 },
+    calculatedAt: '2026-09-07T04:00:00.000+09:00',
+    error: null,
+  });
   segmentQuery.buildSegmentWhere.mockReturnValue({ sql: '1 = 1', bindings: [] });
   accountAccess.getVisibleLineAccountScope.mockResolvedValue({
     accounts: [{ id: 'account-1' }],
@@ -179,6 +241,7 @@ beforeEach(() => {
   folders.getFolderById.mockResolvedValue(FOLDER);
   folders.createFolder.mockResolvedValue(FOLDER);
   folders.updateFolder.mockResolvedValue(FOLDER);
+  folders.getWebinarFolderCounts.mockResolvedValue({ 'fo-webinar': 2 });
 });
 
 describe('対応マーク', () => {
@@ -225,6 +288,92 @@ describe('対応マーク', () => {
       tenantId: 'tenant-1',
       lineAccountId: 'account-1',
     });
+  });
+
+  it('一覧に自動変更・表示先・版を実データから返す', async () => {
+    supportMarkAutomation.listSupportMarkAutomationRulesForAccount.mockResolvedValue([{
+      id: 'rule-1', name: '担当割当', markId: 'm-1', event: 'staff_assigned',
+      condition: null, priority: 100, manualProtectionMinutes: 60, isActive: true,
+      version: 1, updatedAt: '2026-09-07',
+    }]);
+    const res = await req('/api/support-marks?lineAccountId=account-1', 'GET');
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      data: [{
+        id: 'm-1', version: 1,
+        displayTargets: ['inbox', 'friend_list', 'friend_detail'],
+        automationRules: [{ id: 'rule-1', event: 'staff_assigned' }],
+      }],
+    });
+  });
+
+  it('マークと自動変更ルールを一度の複合作成へ渡す', async () => {
+    const automationRules = [{
+      name: '期限超過で要確認', event: 'response_overdue', condition: null,
+      priority: 100, manualProtectionMinutes: 60, isActive: true,
+    }];
+    const res = await req('/api/support-marks?lineAccountId=account-1', 'POST', {
+      name: '要確認', color: '#EF4B55', displayOrder: 2, automationRules,
+    });
+    expect(res.status).toBe(201);
+    expect(marks.createSupportMarkWithAutomationRules).toHaveBeenCalledWith(
+      env.DB,
+      { tenantId: 'tenant-1', lineAccountId: 'account-1' },
+      expect.objectContaining({ name: '要確認', color: '#EF4B55', displayOrder: 2 }),
+      'u-1',
+      automationRules,
+    );
+  });
+
+  it('スタッフは複合作成できない', async () => {
+    const res = await req(
+      '/api/support-marks?lineAccountId=account-1',
+      'POST',
+      { name: '要確認' },
+      'staff',
+    );
+    expect(res.status).toBe(403);
+    expect(marks.createSupportMarkWithAutomationRules).not.toHaveBeenCalled();
+  });
+
+  it('保管前に置換人数・使用先・確認版を返す', async () => {
+    const res = await req('/api/support-marks/m-2/archive-impact?lineAccountId=account-1', 'GET');
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      data: {
+        friendCount: 5,
+        canArchive: true,
+        impactRevision: 'm-2:1:5:0:0:0:0:0',
+        expectedVersion: 1,
+      },
+    });
+  });
+
+  it('確認版と冪等キーを指定して置換・保管する', async () => {
+    const res = await req(
+      '/api/support-marks/m-2/archive?lineAccountId=account-1',
+      'POST',
+      { replacementMarkId: 'm-1', expectedVersion: 1, impactRevision: 'impact-1' },
+      'owner',
+      { 'Idempotency-Key': 'archive-request-1' },
+    );
+    expect(res.status).toBe(200);
+    expect(marks.archiveSupportMarkWithReplacement).toHaveBeenCalledWith(
+      env.DB,
+      { tenantId: 'tenant-1', lineAccountId: 'account-1' },
+      {
+        markId: 'm-2', replacementMarkId: 'm-1', expectedVersion: 1,
+        impactRevision: 'impact-1', idempotencyKey: 'archive-request-1', actorId: 'u-1',
+      },
+    );
+  });
+
+  it('冪等キーなしの保管は実行しない', async () => {
+    const res = await req('/api/support-marks/m-2/archive?lineAccountId=account-1', 'POST', {
+      replacementMarkId: 'm-1', expectedVersion: 1, impactRevision: 'impact-1',
+    });
+    expect(res.status).toBe(400);
+    expect(marks.archiveSupportMarkWithReplacement).not.toHaveBeenCalled();
   });
 
   it('色の形が違えば弾く', async () => {
@@ -614,7 +763,7 @@ describe('保存した検索', () => {
       name: '別の名前',
     });
     expect(res.status).toBe(404);
-    expect(searches.updateSavedSearch).not.toHaveBeenCalled();
+    expect(searches.updateSavedSearchWithRevision).not.toHaveBeenCalled();
   });
 
   it('別機能の scope は汎用APIで扱わない', async () => {
@@ -638,7 +787,185 @@ describe('保存した検索', () => {
       }>;
     };
     expect(body.data[0].conditions.all).toHaveLength(1);
-    expect(body.data[0]).toMatchObject({ matchCount: 7, usedIn: [], canDelete: true });
+    expect(body.data[0]).toMatchObject({
+      matchCount: 7,
+      usedIn: [],
+      canDelete: true,
+      revision: 1,
+      callCountThisMonth: 4,
+    });
+  });
+
+  it('一覧に集計・ページ位置・同じitemsを追加し、既存data配列も維持する', async () => {
+    const res = await req(
+      '/api/saved-searches?lineAccountId=account-1&owner=me&limit=10&cursor=0',
+      'GET',
+    );
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      success: true,
+      data: [{ id: 's-1', callCountThisMonth: 4 }],
+      items: [{ id: 's-1', revision: 1 }],
+      summary: {
+        total: 1,
+        usedInBroadcasts: 0,
+        zeroMatches: 0,
+        callsThisMonth: 4,
+      },
+      pagination: { total: 1, limit: 10, cursor: '0', nextCursor: null },
+    });
+  });
+
+  it('owner=me の集計へ他人の共有検索を混ぜない', async () => {
+    searches.getSavedSearches.mockResolvedValueOnce([
+      SEARCH,
+      { ...SEARCH, id: 's-2', created_by: 'u-2', is_shared: 1 },
+    ]);
+    savedSearchInsights.getSavedSearchMatchInsights.mockResolvedValueOnce(new Map([
+      ['s-1', { matchCount: 7, matchCountError: null }],
+      ['s-2', { matchCount: 0, matchCountError: null }],
+    ]));
+    searches.getSavedSearchUsageCounts.mockResolvedValueOnce(new Map([
+      ['s-1', 4],
+      ['s-2', 9],
+    ]));
+    const res = await req(
+      '/api/saved-searches?lineAccountId=account-1&owner=me',
+      'GET',
+    );
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      data: [{ id: 's-1' }],
+      summary: { total: 1, zeroMatches: 0, callsThisMonth: 4 },
+      pagination: { total: 1 },
+    });
+  });
+
+  it('保存した検索が無い状態を0件の集計と空配列で返す', async () => {
+    searches.getSavedSearches.mockResolvedValueOnce([]);
+    savedSearchInsights.getSavedSearchMatchInsights.mockResolvedValueOnce(new Map());
+    const res = await req('/api/saved-searches?lineAccountId=account-1', 'GET');
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      data: [],
+      items: [],
+      summary: { total: 0, usedInBroadcasts: 0, zeroMatches: 0, callsThisMonth: 0 },
+      pagination: { total: 0, nextCursor: null },
+    });
+  });
+
+  it('一覧の取得失敗を成功の空配列へ潰さない', async () => {
+    searches.getSavedSearches.mockRejectedValueOnce(new Error('D1 unavailable'));
+    const res = await req('/api/saved-searches?lineAccountId=account-1', 'GET');
+    expect(res.status).toBe(500);
+    expect(await res.json()).toMatchObject({ success: false });
+  });
+
+  it('詳細に条件・所有者・版・人数内訳・使用先を返す', async () => {
+    searches.getSavedSearchReferences.mockResolvedValueOnce([{
+      saved_search_id: 's-1',
+      line_account_id: 'account-1',
+      reference_kind: 'broadcast',
+      reference_id: 'broadcast-1',
+      reference_name: 'VIP未契約案内',
+      reference_mode: 'live',
+      revision: 1,
+      last_used_at: '2026-09-07T01:00:00.000+09:00',
+      created_at: '2026-09-01T01:00:00.000+09:00',
+    }]);
+    searches.getSavedSearchReferenceUsageCounts.mockResolvedValueOnce(new Map([
+      ['s-1:broadcast:broadcast-1', 3],
+    ]));
+    const res = await req('/api/saved-searches/s-1?lineAccountId=account-1', 'GET');
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      data: {
+        id: 's-1',
+        revision: 1,
+        owner: { id: 'u-1', isCurrentUser: true },
+        accountScope: { type: 'line_account', id: 'account-1' },
+        match: {
+          total: 7,
+          byChannel: { line: 6, mail: 1 },
+          error: null,
+        },
+        usedIn: [{
+          kind: 'broadcast',
+          name: 'VIP未契約案内',
+          mode: 'live',
+          revision: 1,
+          callCountThisMonth: 3,
+        }],
+      },
+    });
+  });
+
+  it('スタッフへ他人の個人検索の詳細を漏らさない', async () => {
+    searches.getSavedSearchById.mockResolvedValueOnce({
+      ...SEARCH,
+      created_by: 'u-2',
+      is_shared: 0,
+    });
+    const res = await req(
+      '/api/saved-searches/s-1?lineAccountId=account-1',
+      'GET',
+      undefined,
+      'staff',
+    );
+    expect(res.status).toBe(404);
+    expect(savedSearchInsights.getSavedSearchMatchPreview).not.toHaveBeenCalled();
+  });
+
+  it('未保存の条件も同じ評価器で事前確認する', async () => {
+    const conditions = { all: [{ kind: 'tag', op: 'has', value: 'tag-vip' }] };
+    const res = await req('/api/saved-searches/preview', 'POST', {
+      lineAccountId: 'account-1',
+      conditions,
+    });
+    expect(res.status).toBe(200);
+    expect(savedSearchInsights.getSavedSearchMatchPreview).toHaveBeenCalledWith(
+      env.DB,
+      conditions,
+      'account-1',
+    );
+    expect(await res.json()).toMatchObject({
+      data: {
+        savedSearchId: null,
+        revision: 0,
+        match: { total: 7, byChannel: { line: 6, mail: 1 } },
+        usedIn: [],
+      },
+    });
+  });
+
+  it('古い版で詳細を事前確認したら409と現在版を返す', async () => {
+    searches.getSavedSearchById.mockResolvedValueOnce({ ...SEARCH, revision: 3 });
+    const res = await req('/api/saved-searches/preview', 'POST', {
+      lineAccountId: 'account-1',
+      savedSearchId: 's-1',
+      revision: 2,
+    });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({
+      code: 'SAVED_SEARCH_REVISION_CONFLICT',
+      data: { currentRevision: 3 },
+    });
+  });
+
+  it('別担当が先に更新した場合は後勝ちにせず409にする', async () => {
+    searches.updateSavedSearchWithRevision.mockResolvedValueOnce({
+      status: 'conflict',
+      current: { ...SEARCH, revision: 2 },
+    });
+    const res = await req('/api/saved-searches/s-1?lineAccountId=account-1', 'PATCH', {
+      name: '古い画面からの変更',
+      expectedRevision: 1,
+    });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({
+      code: 'SAVED_SEARCH_REVISION_CONFLICT',
+      data: { currentRevision: 2, usedIn: [] },
+    });
   });
 
   it('使用先と該当人数を同じ一覧APIで返す', async () => {
@@ -690,7 +1017,7 @@ describe('保存した検索', () => {
     const deleteRes = await req('/api/saved-searches/s-1?lineAccountId=account-1', 'DELETE', undefined, 'staff');
     expect(patchRes.status).toBe(404);
     expect(deleteRes.status).toBe(404);
-    expect(searches.updateSavedSearch).not.toHaveBeenCalled();
+    expect(searches.updateSavedSearchWithRevision).not.toHaveBeenCalled();
     expect(searches.deleteSavedSearch).not.toHaveBeenCalled();
   });
 
@@ -698,10 +1025,11 @@ describe('保存した検索', () => {
     searches.getSavedSearchById.mockResolvedValue({ ...SEARCH, created_by: 'u-2', is_shared: 0 });
     const res = await req('/api/saved-searches/s-1?lineAccountId=account-1', 'PATCH', { name: '管理名' }, 'admin');
     expect(res.status).toBe(200);
-    expect(searches.updateSavedSearch).toHaveBeenCalledWith(
+    expect(searches.updateSavedSearchWithRevision).toHaveBeenCalledWith(
       env.DB,
       's-1',
       expect.objectContaining({ lineAccountId: 'account-1', canManageAll: true }),
+      1,
       expect.objectContaining({ name: '管理名' }),
     );
   });
@@ -719,7 +1047,7 @@ describe('保存した検索', () => {
     const wrongAccount = await req('/api/saved-searches/s-1?lineAccountId=account-1', 'DELETE', undefined, 'admin');
     expect(wrongScope.status).toBe(404);
     expect(wrongAccount.status).toBe(404);
-    expect(searches.updateSavedSearch).not.toHaveBeenCalled();
+    expect(searches.updateSavedSearchWithRevision).not.toHaveBeenCalled();
     expect(searches.deleteSavedSearch).not.toHaveBeenCalled();
   });
 
@@ -778,7 +1106,75 @@ describe('フォルダ', () => {
 
   it('種類で絞れる', async () => {
     await req('/api/folders?kind=template', 'GET');
-    expect(folders.getFolders).toHaveBeenCalledWith(env.DB, 'template');
+    expect(folders.getFolders).toHaveBeenCalledWith(env.DB, 'template', undefined, expect.objectContaining({ allowedAccountIds: ['account-1'] }));
+  });
+
+  it('ウェビナーフォルダは閲覧可能なアカウント内の件数を返す', async () => {
+    folders.getFolders.mockResolvedValue([{
+      ...FOLDER, id: 'fo-webinar', kind: 'webinar', account_id: 'account-1',
+    }]);
+
+    const res = await req('/api/folders?kind=webinar&account_id=account-1', 'GET');
+
+    expect(res.status).toBe(200);
+    expect(folders.getFolders).toHaveBeenCalledWith(env.DB, 'webinar', 'account-1');
+    expect(folders.getWebinarFolderCounts).toHaveBeenCalledWith(env.DB, {
+      allowedAccountIds: ['account-1'],
+      canSeeUnassigned: false,
+      accountId: 'account-1',
+    });
+    expect(await res.json()).toMatchObject({
+      data: [{ id: 'fo-webinar', accountId: 'account-1', count: 2 }],
+    });
+  });
+
+  it('ウェビナーフォルダの作成・改名・削除を選択中アカウントへ固定する', async () => {
+    const webinarFolder = {
+      ...FOLDER, id: 'fo-webinar', kind: 'webinar', account_id: 'account-1', name: 'セミナー',
+    };
+    folders.createFolder.mockResolvedValue(webinarFolder);
+    folders.getFolderById.mockResolvedValue(webinarFolder);
+    folders.updateFolder.mockResolvedValue({ ...webinarFolder, name: '商品説明' });
+
+    const created = await req('/api/folders', 'POST', {
+      kind: 'webinar', accountId: 'account-1', name: 'セミナー',
+    });
+    const renamed = await req('/api/folders/fo-webinar', 'PATCH', {
+      accountId: 'account-1', name: '商品説明',
+    });
+    folders.deleteFolder.mockResolvedValue(true);
+    const deleted = await req('/api/folders/fo-webinar?account_id=account-1', 'DELETE');
+
+    expect(created.status).toBe(201);
+    expect(renamed.status).toBe(200);
+    expect(deleted.status).toBe(200);
+    expect(folders.createFolder).toHaveBeenCalledWith(env.DB, expect.objectContaining({
+      kind: 'webinar', accountId: 'account-1', name: 'セミナー',
+    }));
+    expect(folders.updateFolder).toHaveBeenCalledWith(env.DB, 'fo-webinar', { name: '商品説明' });
+    expect(folders.deleteFolder).toHaveBeenCalledWith(env.DB, 'fo-webinar');
+  });
+
+  it('別アカウントのウェビナーフォルダを更新・削除できない', async () => {
+    folders.getFolderById.mockResolvedValue({
+      ...FOLDER, id: 'fo-webinar', kind: 'webinar', account_id: 'account-other',
+    });
+    const renamed = await req('/api/folders/fo-webinar', 'PATCH', {
+      accountId: 'account-1', name: '変更',
+    });
+    folders.deleteFolder.mockResolvedValue(true);
+    const deleted = await req('/api/folders/fo-webinar?account_id=account-1', 'DELETE');
+
+    expect(renamed.status).toBe(404);
+    expect(deleted.status).toBe(404);
+    expect(folders.updateFolder).not.toHaveBeenCalled();
+    expect(folders.deleteFolder).not.toHaveBeenCalled();
+  });
+
+  it('ウェビナーフォルダ件数は見えないアカウントを404にする', async () => {
+    const res = await req('/api/folders?kind=webinar&account_id=account-other', 'GET');
+    expect(res.status).toBe(404);
+    expect(folders.getWebinarFolderCounts).not.toHaveBeenCalled();
   });
 
   it('知らない種類での絞り込みは弾く', async () => {

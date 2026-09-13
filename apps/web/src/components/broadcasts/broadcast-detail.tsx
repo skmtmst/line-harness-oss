@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { ApiError, api, type ApiBroadcast, type BroadcastInsight } from '@/lib/api'
+import { ApiError, api, type ApiBroadcast, type BroadcastInsight, type BroadcastLedger } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import Header from '@/components/layout/header'
 import FlexPreviewComponent from '@/components/flex-preview'
@@ -10,10 +10,19 @@ import TestSendSection from '@/components/broadcasts/test-send-section'
 import ProgressBar from '@/components/broadcasts/progress-bar'
 import SendConfirmDialog from '@/components/broadcasts/send-confirm-dialog'
 import SegmentBuilder from '@/components/broadcasts/segment-builder'
-import type { Tag } from '@line-crm/shared'
+import BroadcastStopControls from '@/components/broadcasts/broadcast-stop-controls'
+import Button from '@/components/shared/button'
+import { startVisiblePoll } from '@/lib/visible-polling'
+import { broadcastCsvFilename } from './broadcast-csv-filename'
 
 interface BroadcastDetailProps {
   broadcastId: string
+}
+
+function percentText(rate: number | null | undefined): string {
+  if (rate == null || !Number.isFinite(rate)) return '—'
+  const percentage = rate <= 1 ? rate * 100 : rate
+  return `${percentage.toFixed(1)}%`
 }
 
 export default function BroadcastDetail({ broadcastId }: BroadcastDetailProps) {
@@ -41,10 +50,19 @@ export default function BroadcastDetail({ broadcastId }: BroadcastDetailProps) {
     uniqueImpression: number | null;
     uniqueClick: number | null;
   }> | null>(null)
-  const [tags, setTags] = useState<Tag[]>([])
   const [showSegmentBuilder, setShowSegmentBuilder] = useState(false)
+  /*
+   * 送達台帳の内訳（#662）。届いた・届かなかった・送達不明・送信中。
+   *
+   * 「送信成功 N人」だけを出すと、運用者は「残りは失敗したのだから
+   * 送り直せる」と読む。**送達不明は送り直せない。**外へ出たかもしれない
+   * 相手へもう一度送ると、相手のトークに2通残って取り消せないため。
+   */
+  const [ledger, setLedger] = useState<BroadcastLedger | null>(null)
 
   const load = useCallback(async () => {
+    // 別 broadcast へ移動後の遅い応答は捨てる(順序逆転防止、#630)。
+    const requestId = id
     setLoading(true)
     // SPA routing で別 broadcast を開いた時に前回の breakdown / per-account stats / insight が
     // 残ると confirm modal や本文に別 broadcast の数値が表示されてしまう。draft データを
@@ -53,19 +71,37 @@ export default function BroadcastDetail({ broadcastId }: BroadcastDetailProps) {
     setPerAccountStats(null)
     setInsight(null)
     setTargetCount(null)
+    setLedger(null)
     try {
-      const [res, tagsRes] = await Promise.all([
-        api.broadcasts.get(id),
-        api.tags.list(),
-      ])
+      const res = await api.broadcasts.get(id)
+      if (requestId !== latestIdRef.current) return
       if (res.success && res.data) {
-        setBroadcast(res.data)
+        const fresh = res.data
+        // 進捗が先に送信完了を見ていたら、古い全文で戻さない。
+        // 同じ配信のときだけ守る。ID を見ないと、送信済みAから
+        // 送信中Bへ移った瞬間に「Aは送信済み」を理由にBの全文を捨て、
+        // 画面がAのまま残る(#630)。
+        setBroadcast((prev) =>
+          prev && prev.id === fresh.id && prev.status === 'sent' && fresh.status !== 'sent'
+            ? prev
+            : fresh,
+        )
+        /*
+         * 送達台帳を読む（#662）。送信中でも送信完了でも要る。
+         * 送信完了の画面には進捗の巡回が回らないので、ここで1回だけ引かないと
+         * 「失敗した相手へ送り直す」に出す人数が無い。
+         */
+        if (fresh.status === 'sending' || fresh.status === 'sent') {
+          api.broadcasts.getProgress(id).then((r) => {
+            if (requestId !== latestIdRef.current) return
+            if (r.success && r.data?.ledger) setLedger(r.data.ledger)
+          }).catch(() => {/* ignore — 台帳が読めなくても本文は出す */})
+        }
         if (res.data.totalCount > 0) {
           setTargetCount(res.data.totalCount)
         } else if (res.data.status === 'draft' || res.data.status === 'scheduled') {
           // draft 中は totalCount=0 のまま。送信前の対象人数を preview-count API で取りに行く。
           // confirm modal の「対象 X人」表示と「送信ボタンの (X人)」表示で使う。
-          const requestId = id
           api.broadcasts.previewCount(id).then((r) => {
             // race guard: 古い id の応答は無視する。
             if (requestId !== latestIdRef.current) return
@@ -78,43 +114,70 @@ export default function BroadcastDetail({ broadcastId }: BroadcastDetailProps) {
       } else {
         setError('配信が見つかりません')
       }
-      if (tagsRes.success) setTags(tagsRes.data)
     } catch {
+      if (requestId !== latestIdRef.current) return
       setError('読み込みに失敗しました')
     } finally {
-      setLoading(false)
+      // 新しい取得が走っている間のスピナーを古い取得で消さない。
+      if (requestId === latestIdRef.current) setLoading(false)
     }
   }, [id])
 
   useEffect(() => { load() }, [load])
 
-  // Poll progress while sending
+  // 送信中は進捗とアカウント別内訳を同じ応答で読む。5秒起点の1本だけで、
+  // タブ非表示では止め、連続失敗は待ちを延ばして上限後は再試行を出す(#630)。
+  const [progressStalled, setProgressStalled] = useState(false)
+  const [pollRetryKey, setPollRetryKey] = useState(0)
   useEffect(() => {
     if (broadcast?.status !== 'sending') return
-    const interval = setInterval(async () => {
-      const res = await api.broadcasts.getProgress(id)
-      if (res.success && res.data) {
-        setBroadcast(prev => prev ? {
+    setProgressStalled(false)
+    let finished = false
+    const poll = startVisiblePoll({
+      shouldPoll: () => !finished,
+      work: async () => {
+        // 別 broadcast へ移動後の遅い応答は捨て、失敗にも数えない。
+        const requestId = id
+        const res = await api.broadcasts.getProgress(id)
+        if (requestId !== latestIdRef.current) return
+        if (!res.success || !res.data) throw new Error('進捗を読み込めませんでした')
+        // 閉じ込めた関数の中では絞り込みが外れるので、先に取り出す。
+        const data = res.data
+        // 全文がまだ前の配信のときは混ぜない。別配信の進捗を前の
+        // 全文へ足すと、題名Aに進捗Bという画面になる(#630)。
+        setBroadcast(prev => prev && prev.id === requestId ? {
           ...prev,
-          status: res.data!.status as ApiBroadcast['status'],
-          totalCount: res.data!.totalCount,
-          successCount: res.data!.successCount,
+          status: data.status as ApiBroadcast['status'],
+          totalCount: data.totalCount,
+          successCount: data.successCount,
+          // 停止の状態と版を、進捗と同じ応答で最新にする。版が古いままだと
+          // 停止ボタンが必ず 409 になる。
+          stopped: data.stopped ?? prev.stopped,
+          stoppedAt: data.stoppedAt ?? prev.stoppedAt,
+          sendAttemptNo: data.sendAttemptNo ?? prev.sendAttemptNo,
         } : prev)
-        if (res.data.status === 'sent') {
-          clearInterval(interval)
+        if (data.ledger) setLedger(data.ledger)
+        setPerAccountStats(data.perAccountStats)
+        if (data.status === 'sent') {
+          finished = true
           load()
         }
-      }
-    }, 3000)
-    return () => clearInterval(interval)
-  }, [broadcast?.status, id, load])
+      },
+      onGiveUp: () => setProgressStalled(true),
+      onRecovered: () => setProgressStalled(false),
+    })
+    return () => poll.stop()
+  }, [broadcast?.status, id, load, pollRetryKey])
 
   // Load insight for sent broadcasts
   useEffect(() => {
     if (broadcast?.status !== 'sent') return
+    // 別 broadcast へ移動後の遅い応答は捨てる(順序逆転防止、#630)。
+    const requestId = id
     api.broadcasts.getInsight(id).then(res => {
+      if (requestId !== latestIdRef.current) return
       if (res.success && res.data) setInsight(res.data)
-    })
+    }).catch(() => {/* ignore */})
   }, [broadcast?.status, id])
 
   // Load per-account stats — 送信中 (進捗) + 送信完了 (実績) どちらでも取得する。
@@ -123,7 +186,7 @@ export default function BroadcastDetail({ broadcastId }: BroadcastDetailProps) {
   // each account token で fetch されるので時間かかる (3-5 秒/アカ) — fire-and-forget。
   useEffect(() => {
     const status = broadcast?.status
-    if (status !== 'sending' && status !== 'sent') return
+    if (status !== 'sent') return
 
     let cancelled = false
     const requestId = id
@@ -138,15 +201,6 @@ export default function BroadcastDetail({ broadcastId }: BroadcastDetailProps) {
 
     fetchStats()
 
-    // 送信中は 3s ごとに再 fetch して per-account 進捗を更新する。
-    // 既存の successCount poll と同期させる目的。送信完了 (sent) では再 fetch 不要。
-    if (status === 'sending') {
-      const interval = setInterval(fetchStats, 3000)
-      return () => {
-        cancelled = true
-        clearInterval(interval)
-      }
-    }
     return () => { cancelled = true }
   }, [broadcast?.status, id])
 
@@ -177,7 +231,7 @@ export default function BroadcastDetail({ broadcastId }: BroadcastDetailProps) {
       <div>
         <Header title="配信詳細" />
         <div className="animate-pulse space-y-4">
-          <div className="h-8 bg-gray-200 rounded w-64" />
+          <div className="h-8 bg-canvas-sunken rounded w-64" />
           <div className="h-40 bg-canvas-sunken rounded" />
         </div>
       </div>
@@ -193,8 +247,131 @@ export default function BroadcastDetail({ broadcastId }: BroadcastDetailProps) {
     )
   }
 
-  const raw = broadcast as unknown as Record<string, unknown>
-  const accountId = raw.lineAccountId as string | null
+  /* 配信元のアカウント。型が持っているので逃げ道は要らない（#490 軽3）。 */
+  const accountId = broadcast.lineAccountId
+
+  if (broadcast.status === 'sent') {
+    const delivered = insight?.delivered ?? broadcast.successCount
+    const opened = insight?.opens?.count ?? insight?.uniqueImpression ?? null
+    const openRate = insight?.opens?.rate ?? insight?.openRate ?? null
+    const failed = Math.max(0, broadcast.totalCount - broadcast.successCount)
+
+    const exportCsv = () => {
+      const rows = [
+        ['項目', '人数', '割合'],
+        ['送信成功', String(delivered ?? ''), delivered != null && broadcast.totalCount > 0 ? percentText(delivered / broadcast.totalCount) : ''],
+        ['開封', String(opened ?? ''), percentText(openRate)],
+        ['クリック', String(insight?.uniqueClick ?? ''), percentText(insight?.clickRate)],
+        ['送信失敗', String(failed), broadcast.totalCount > 0 ? percentText(failed / broadcast.totalCount) : ''],
+      ]
+      const csv = rows.map((row) => row.map((value) => `"${value.replaceAll('"', '""')}"`).join(',')).join('\n')
+      const url = URL.createObjectURL(new Blob([`\ufeff${csv}`], { type: 'text/csv;charset=utf-8' }))
+      const anchor = document.createElement('a')
+      anchor.href = url
+      anchor.download = broadcastCsvFilename(broadcast.title, broadcast.id)
+      anchor.click()
+      URL.revokeObjectURL(url)
+    }
+
+    return (
+      <div>
+        <Header
+          title={`配信結果：${broadcast.title}`}
+          action={(
+            <div className="flex items-center gap-2">
+              <Button href="/broadcasts">一斉配信一覧</Button>
+              <Button type="button" onClick={exportCsv}>CSVで書き出す</Button>
+            </div>
+          )}
+        />
+
+        <nav aria-label="配信結果の表示" className="border-hairline mb-5 flex gap-6 border-b text-sm font-semibold">
+          {['概要', 'クリック', '友だち', 'エラー', '配信内容'].map((label, index) => (
+            <span key={label} className={index === 0 ? 'border-accent text-accent border-b-2 px-1 pb-3' : 'text-ink-secondary px-1 pb-3'}>{label}</span>
+          ))}
+        </nav>
+
+        <BroadcastStopControls
+          broadcastId={id}
+          status={broadcast.status}
+          stopped={!!broadcast.stopped}
+          version={broadcast.version ?? 1}
+          ledger={ledger}
+          targetType={broadcast.targetType}
+          onChanged={load}
+        />
+
+        <section className="mb-4">
+          <h2 className="text-ink text-lg font-bold">配信結果</h2>
+          <p className="text-ink-secondary mt-1 text-sm">送信・開封・クリック・ブロックを確認します。</p>
+          <div className="mt-3 grid gap-3 md:grid-cols-3">
+            {[
+              { label: '送信成功', value: delivered, rate: broadcast.totalCount > 0 && delivered != null ? delivered / broadcast.totalCount : null, note: '届いた人' },
+              { label: '開封', value: opened, rate: openRate, note: '開いた人' },
+              { label: 'クリック', value: insight?.uniqueClick ?? null, rate: insight?.clickRate ?? null, note: '反応した人' },
+            ].map((item) => (
+              <div key={item.label} className="bg-canvas border-hairline rounded-card border p-4">
+                <p className="text-ink-secondary text-xs font-semibold">{item.label}</p>
+                <p className="text-ink mt-2 text-2xl font-bold">{percentText(item.rate)}</p>
+                <p className="text-ink mt-1 text-sm font-semibold">{item.value == null ? '—' : `${item.value.toLocaleString('ja-JP')}人`}</p>
+                <p className="text-ink-faint mt-1 text-xs">{item.note}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <div className="grid gap-4 xl:grid-cols-3">
+          <div className="space-y-4 xl:col-span-2">
+            <section className="bg-canvas border-hairline rounded-card border p-4">
+              <h2 className="text-ink text-base font-bold">反応</h2>
+              <p className="text-ink-secondary mt-1 text-sm">ボタンとリンクごとの結果です。</p>
+              {insight?.links?.length ? (
+                <div className="mt-3 divide-y divide-hairline">
+                  {insight.links.map((link) => (
+                    <div key={link.id} className="flex items-center justify-between gap-4 py-3">
+                      <div className="min-w-0">
+                        <p className="text-ink truncate text-sm font-semibold" title={link.label}>{link.label}</p>
+                        <p className="text-ink-faint truncate text-xs" title={link.url}>{link.url}</p>
+                      </div>
+                      <p className="text-ink shrink-0 text-sm">クリック {link.uniqueClickCount.toLocaleString('ja-JP')}人（{percentText(link.clickRate)}）</p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-ink-faint mt-3 text-sm">計測したボタン・リンクはありません。</p>
+              )}
+            </section>
+
+            <section className="bg-canvas border-hairline rounded-card border p-4">
+              <h2 className="text-ink text-base font-bold">エラー</h2>
+              <p className="text-ink-secondary mt-2 text-sm">送信失敗 {failed.toLocaleString('ja-JP')}人</p>
+            </section>
+
+            <section className="bg-canvas border-hairline rounded-card border p-4">
+              <h2 className="text-ink text-base font-bold">配信した設定</h2>
+              <p className="text-ink-secondary mt-1 text-sm">この配信で使った対象と送信方法です。</p>
+              <dl className="mt-3 grid gap-3 sm:grid-cols-3">
+                <div><dt className="text-ink-faint text-xs">配信済み</dt><dd className="text-ink mt-1 font-bold">{delivered?.toLocaleString('ja-JP') ?? '—'}人</dd></div>
+                <div><dt className="text-ink-faint text-xs">開封率</dt><dd className="text-ink mt-1 font-bold">{percentText(openRate)}</dd></div>
+                <div><dt className="text-ink-faint text-xs">クリック率</dt><dd className="text-ink mt-1 font-bold">{percentText(insight?.clickRate)}</dd></div>
+              </dl>
+            </section>
+          </div>
+
+          <section className="bg-canvas border-hairline rounded-card border p-4">
+            <h2 className="text-ink text-base font-bold">メッセージプレビュー</h2>
+            <p className="text-ink-secondary mt-1 text-xs">実際のLINE表示に近い確認用プレビューです。</p>
+            <div className="bg-canvas-sunken mt-3 rounded-card p-4">
+              <div className="bg-success text-on-accent rounded-2xl rounded-tl-sm px-4 py-3 text-sm whitespace-pre-wrap">{broadcast.messageContent}</div>
+              {broadcast.messageOptions?.buttons?.map((button) => (
+                <div key={`${button.label}-${button.value}`} className="border-hairline bg-canvas text-action mt-2 truncate rounded-control border px-3 py-2 text-center text-sm font-semibold" title={button.value}>{button.label}</div>
+              ))}
+            </div>
+          </section>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div>
@@ -228,7 +405,7 @@ export default function BroadcastDetail({ broadcastId }: BroadcastDetailProps) {
               } catch { return <p className="text-ink-faint text-sm">画像プレビュー不可</p> }
             })()
           ) : (
-            <div className="bg-green-500 text-white rounded-2xl rounded-tl-sm px-4 py-3 max-w-[300px] text-sm whitespace-pre-wrap">
+            <div className="bg-success text-white rounded-2xl rounded-tl-sm px-4 py-3 max-w-[300px] text-sm whitespace-pre-wrap">
               {broadcast.messageContent}
             </div>
           )}
@@ -252,13 +429,20 @@ export default function BroadcastDetail({ broadcastId }: BroadcastDetailProps) {
             <div className="flex justify-between">
               <dt className="text-ink-faint">ステータス</dt>
               <dd>
-                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                <span data-testid="broadcast-status-badge" className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
                   broadcast.status === 'draft' ? 'bg-canvas-sunken text-ink-secondary' :
-                  broadcast.status === 'scheduled' ? 'bg-blue-100 text-blue-700' :
-                  broadcast.status === 'sending' ? 'bg-warning-bg text-yellow-700' :
-                  'bg-success-bg text-green-700'
+                  broadcast.status === 'scheduled' ? 'bg-info-bg text-info' :
+                  broadcast.status === 'sending' ? 'bg-warning-bg text-warning' :
+                  'bg-success-bg text-success'
                 }`}>
-                  {broadcast.status === 'draft' ? '下書き' : broadcast.status === 'scheduled' ? '予約済み' : broadcast.status === 'sending' ? '送信中' : '送信完了'}
+                  {/*
+                    停止中を「送信中」と出さない（#662）。運用者が停止を押した
+                    のに送信中のままだと、効いていないと読んでもう一度押す。
+                  */}
+                  {broadcast.status === 'draft' ? '下書き'
+                    : broadcast.status === 'scheduled' ? '予約済み'
+                    : broadcast.status === 'sending' ? (broadcast.stopped ? '停止中' : '送信中')
+                    : '送信完了'}
                 </span>
               </dd>
             </div>
@@ -278,16 +462,15 @@ export default function BroadcastDetail({ broadcastId }: BroadcastDetailProps) {
           {!showSegmentBuilder ? (
             <button
               onClick={() => setShowSegmentBuilder(true)}
-              className="text-xs text-blue-500 hover:text-blue-700"
+              className="text-xs text-accent hover:underline"
             >
               セグメント条件を編集
             </button>
           ) : (
             <SegmentBuilder
-              tags={tags}
-              accountId={accountId}
+              initialConditions={broadcast.segmentConditions}
               onApply={async (conditions) => {
-                await api.broadcasts.update(id, { segmentConditions: JSON.stringify(conditions) } as unknown as Parameters<typeof api.broadcasts.update>[1])
+                await api.broadcasts.update(id, { segmentConditions: conditions })
                 setShowSegmentBuilder(false)
                 load()
               }}
@@ -329,35 +512,38 @@ export default function BroadcastDetail({ broadcastId }: BroadcastDetailProps) {
 
       {/* Send Progress */}
       {broadcast.status === 'sending' && (
+        <BroadcastStopControls
+          broadcastId={id}
+          status={broadcast.status}
+          stopped={!!broadcast.stopped}
+          version={broadcast.version ?? 1}
+          ledger={ledger}
+          targetType={broadcast.targetType}
+          onChanged={load}
+        />
+      )}
+
+      {broadcast.status === 'sending' && (
         <div className="mb-4">
           <ProgressBar totalCount={broadcast.totalCount} successCount={broadcast.successCount} />
+          {progressStalled && (
+            <div className="mt-2 rounded-card border border-warning bg-warning-bg px-4 py-3 text-sm text-warning">
+              進捗の更新を一時停止しています（接続できません）。
+              <button
+                type="button"
+                onClick={() => setPollRetryKey((key) => key + 1)}
+                className="font-bold underline"
+              >
+                再試行する
+              </button>
+            </div>
+          )}
         </div>
       )}
 
-      {/* Insight */}
-      {broadcast.status === 'sent' && insight && (
-        <div className="bg-canvas rounded-card border border-hairline p-4 mb-4">
-          <h3 className="text-sm font-semibold text-ink-secondary mb-2">配信実績</h3>
-          <div className="grid grid-cols-3 gap-4 text-center">
-            <div>
-              <p className="text-2xl font-bold text-ink">{insight.delivered?.toLocaleString('ja-JP') ?? '-'}</p>
-              <p className="text-xs text-ink-faint">配信</p>
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-blue-600">{insight.uniqueImpression?.toLocaleString('ja-JP') ?? '-'}</p>
-              <p className="text-xs text-ink-faint">開封 {insight.openRate != null ? `(${(insight.openRate * 100).toFixed(1)}%)` : ''}</p>
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-green-600">{insight.uniqueClick?.toLocaleString('ja-JP') ?? '-'}</p>
-              <p className="text-xs text-ink-faint">クリック {insight.clickRate != null ? `(${(insight.clickRate * 100).toFixed(1)}%)` : ''}</p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Per-account breakdown — multi-account-dedup の sending/sent 状態でのみ表示 */}
+      {/* Per-account breakdown — 送信中だけ表示。完了後は上のV6結果画面に集約する。 */}
       {broadcast.targetType === 'multi-account-dedup' &&
-        (broadcast.status === 'sending' || broadcast.status === 'sent') &&
+        broadcast.status === 'sending' &&
         perAccountStats && perAccountStats.length > 0 && (
         <div className="bg-canvas rounded-card border border-hairline p-4 mb-4">
           <h3 className="text-sm font-semibold text-ink-secondary mb-3">アカウント別内訳</h3>
@@ -371,7 +557,7 @@ export default function BroadcastDetail({ broadcastId }: BroadcastDetailProps) {
                   <th className="px-2 py-2 text-right text-xs font-medium text-ink-faint">クリック</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-hairline">
                 {perAccountStats.map((row) => {
                   // accounts list から displayName を引く (なければ row.accountName 内部ラベル)
                   const acc = accounts.find((a) => a.id === row.accountId)
@@ -388,26 +574,26 @@ export default function BroadcastDetail({ broadcastId }: BroadcastDetailProps) {
                       <td className="px-2 py-2 text-right text-ink">{row.sent.toLocaleString('ja-JP')}</td>
                       <td className="px-2 py-2 text-right">
                         {row.uniqueImpression != null ? (
-                          <span className="text-blue-600">
+                          <span className="text-info">
                             {row.uniqueImpression.toLocaleString('ja-JP')}
                             {openRate != null && (
                               <span className="ml-1 text-xs text-ink-faint">({openRate.toFixed(1)}%)</span>
                             )}
                           </span>
                         ) : (
-                          <span className="text-gray-300">-</span>
+                          <span className="text-ink-faint">-</span>
                         )}
                       </td>
                       <td className="px-2 py-2 text-right">
                         {row.uniqueClick != null ? (
-                          <span className="text-green-600">
+                          <span className="text-success">
                             {row.uniqueClick.toLocaleString('ja-JP')}
                             {clickRate != null && (
                               <span className="ml-1 text-xs text-ink-faint">({clickRate.toFixed(1)}%)</span>
                             )}
                           </span>
                         ) : (
-                          <span className="text-gray-300">-</span>
+                          <span className="text-ink-faint">-</span>
                         )}
                       </td>
                     </tr>
@@ -438,26 +624,26 @@ export default function BroadcastDetail({ broadcastId }: BroadcastDetailProps) {
                       <td className="px-2 py-2 text-right text-ink">{totalSent.toLocaleString('ja-JP')}</td>
                       <td className="px-2 py-2 text-right">
                         {totalImpr != null ? (
-                          <span className="text-blue-600">
+                          <span className="text-info">
                             {totalImpr.toLocaleString('ja-JP')}
                             {totalOpenRate != null && (
                               <span className="ml-1 text-xs text-ink-faint">({totalOpenRate.toFixed(1)}%)</span>
                             )}
                           </span>
                         ) : (
-                          <span className="text-gray-300">-</span>
+                          <span className="text-ink-faint">-</span>
                         )}
                       </td>
                       <td className="px-2 py-2 text-right">
                         {totalClick != null ? (
-                          <span className="text-green-600">
+                          <span className="text-success">
                             {totalClick.toLocaleString('ja-JP')}
                             {totalClickRate != null && (
                               <span className="ml-1 text-xs text-ink-faint">({totalClickRate.toFixed(1)}%)</span>
                             )}
                           </span>
                         ) : (
-                          <span className="text-gray-300">-</span>
+                          <span className="text-ink-faint">-</span>
                         )}
                       </td>
                     </tr>
@@ -466,13 +652,6 @@ export default function BroadcastDetail({ broadcastId }: BroadcastDetailProps) {
               </tbody>
             </table>
           </div>
-          {broadcast.status === 'sent' && perAccountStats.some((r) => r.sent > 0 && r.uniqueImpression == null) && (
-            <p className="text-xs text-ink-faint mt-2">
-              開封・クリックは LINE 側の集計反映に〜30分程度かかります。後でリロードしてください。
-              <br />
-              送信数が約 200 未満のアカウントは LINE の仕様で per-account 数値が出ません。
-            </p>
-          )}
         </div>
       )}
 

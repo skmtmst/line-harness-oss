@@ -27,14 +27,31 @@ const PREVIEW_CSS = fs.readFileSync(path.join(COMPONENTS, 'step-preview.module.c
 const TABS_CSS = fs.readFileSync(path.join(COMPONENTS, 'message-type-tabs.module.css'), 'utf8')
 
 describe('V6 1通目設定の契約', () => {
+  it('画面名を上部バーだけに置き、本文はパンくずとキャンセルから始める', () => {
+    expect(PAGE).toContain("usePageTitle('1通目を設定')")
+    expect(PAGE).not.toContain("import Header from '@/components/layout/header'")
+    expect(PAGE).not.toContain('<Header')
+    expect(PAGE).toContain('✕ キャンセル')
+  })
+
   it('設計Node IDを画面に残す', () => {
     expect(PAGE).toContain('data-design-node="kk8dz"')
   })
 
   it('段の見出しを設計の言葉にする', () => {
+    expect(PAGE).toContain("usePageTitle('1通目を設定')")
     expect(PAGE).toContain('この1通目を誰に送るか')
     expect(PAGE).toContain('1通目の内容')
     expect(PAGE).not.toContain('>配信対象の絞り込み</h2>')
+  })
+
+  it('作成の現在地と保存前の要点を同時に確認できる', () => {
+    expect(PAGE).toContain('aria-label="シナリオ作成の進み方"')
+    expect(PAGE).toContain('label="シナリオ情報" state="done"')
+    expect(PAGE).toContain('label="配信方式" state="done"')
+    expect(PAGE).toContain('label="1通目を設定" state="current"')
+    expect(PREVIEW).toContain('LINEプレビュー')
+    expect(PREVIEW).toContain('設定サマリー')
   })
 
   it('下見は「配信の流れ」1枚にまとめる', () => {
@@ -83,6 +100,13 @@ describe('V6 1通目設定の契約', () => {
   it('本文の文字数を出す', () => {
     expect(PAGE).toContain('const bodyLength = countTemplateTextCharacters(body)')
     expect(PAGE).toContain('<CharCounter length={bodyLength} />')
+  })
+
+  it('作成途中へ戻ったときは既存の1通目を表示し、重複追加せず更新する', () => {
+    expect(PAGE).toContain('setExistingStepId(first.id)')
+    expect(PAGE).toContain('setBody(first.messageContent)')
+    expect(PAGE).toContain('api.scenarios.updateStep(id, existingStepId, stepPayload)')
+    expect(PAGE).toContain('api.scenarios.addStep(id, stepPayload)')
   })
 
   it('上限を超えた本文では保存を押せなくし、理由を本文に出す', () => {

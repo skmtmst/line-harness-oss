@@ -3,6 +3,12 @@ import {
   buildAliasId,
   resolveSwitcherActions,
   publishRichMenuGroup,
+  createRichMenuShells,
+  switchRichMenuLive,
+  restorePreSwitchLive,
+  restorePreSwitchDefault,
+  deletableAfterCompensation,
+  deleteRichMenuShells,
   RichMenuValidationError,
   validateRichMenuGroupForPublish,
   unpublishRichMenuGroup,
@@ -394,8 +400,9 @@ describe('publishRichMenuGroup', () => {
       r2,
     );
     // isDefaultForAll=false かつ LINE current default なし → clear-default は呼ばない (Round 2 修正)
+    // 切替前の実default読み(get-default)が切替の前に入る(段階公開の補償用)。
     expect(line.calls).toEqual([
-      'create', 'upload', 'upsert-alias', 'get-default', 'delete-old',
+      'create', 'upload', 'get-default', 'upsert-alias', 'get-default', 'delete-old',
     ]);
     expect(line.calls).not.toContain('clear-default');
     expect(result.pages).toEqual([{ pageId: 'p1', newRichMenuId: 'lm-1' }]);
@@ -417,7 +424,7 @@ describe('publishRichMenuGroup', () => {
     );
     expect(result.pages.map((p) => p.newRichMenuId)).toEqual(['lm-1', 'lm-2']);
     expect(line.calls.slice(0, 6)).toEqual([
-      'create', 'upload', 'create', 'upload', 'upsert-alias', 'upsert-alias',
+      'create', 'upload', 'create', 'upload', 'get-default', 'upsert-alias',
     ]);
     // 旧 ID なしなので delete-old は呼ばれない
     expect(line.calls.filter((c) => c === 'delete-old')).toHaveLength(0);
@@ -607,8 +614,10 @@ describe('publishRichMenuGroup', () => {
       line,
       makeMockR2(),
     )).rejects.toThrow('default failed');
+    // 切替前のdefault読みの後、失敗時は旧aliasへ戻し、defaultは現在の値が
+    // 今回の新メニューでないため触らず、新メニューを片付ける。
     expect(line.calls).toEqual([
-      'create', 'upload', 'upsert-alias', 'set-default', 'upsert-alias', 'delete-old',
+      'create', 'upload', 'get-default', 'upsert-alias', 'set-default', 'upsert-alias', 'get-default', 'delete-old',
     ]);
   });
 
@@ -728,6 +737,18 @@ describe('linkRichMenuBulkChunked', () => {
     const result = await linkRichMenuBulkChunked(line, 'lm-1', ids);
     expect(result).toEqual({ chunks: 3, total: 1100 });
     expect(line.calls).toEqual(['link-bulk-500', 'link-bulk-500', 'link-bulk-100']);
+  });
+
+  it('成功したチャンクだけを順番に台帳コールバックへ渡す', async () => {
+    const line = makeMockLineClient();
+    const ids = Array.from({ length: 501 }, (_, i) => `U${i}`);
+    const recorded: Array<{ size: number; index: number }> = [];
+
+    await linkRichMenuBulkChunked(line, 'lm-1', ids, async (chunk, index) => {
+      recorded.push({ size: chunk.length, index });
+    });
+
+    expect(recorded).toEqual([{ size: 500, index: 0 }, { size: 1, index: 1 }]);
   });
 
   it('空配列は no-op', async () => {
@@ -884,6 +905,17 @@ describe('intent から LINE の action への変換', () => {
     });
   });
 
+  it('テキストを送る（シナリオ開始付きの場合）→ タップを受け取る postback へ寄せる', async () => {
+    const [action] = await publishAndReadActions(
+      groupWithAreas([{ id: 'a1', bounds: BOUNDS, actionType: 'message', actionData: { text: '案内を見る', scenarioId: 'scenario-a' }, intent: 'text' }]),
+    );
+    expect(action).toEqual({
+      type: 'postback',
+      data: 'rma=a1&d=%E6%A1%88%E5%86%85%E3%82%92%E8%A6%8B%E3%82%8B',
+      displayText: '案内を見る',
+    });
+  });
+
   it('スコアだけ設定した場合も postback へ寄せる', async () => {
     const [action] = await publishAndReadActions(
       groupWithAreas([
@@ -1013,5 +1045,117 @@ describe('intent の入力チェック', () => {
         r2,
       ),
     ).rejects.toThrowError(/送るテンプレートを選んでください/);
+  });
+});
+
+describe('段階公開 (E-08 #621 案A)', () => {
+  const group = {
+    id: 'gid12345-aaaa', size: 'large' as const, chatBarText: 'm', isDefaultForAll: false,
+    pages: [{
+      id: 'p1', orderIndex: 0, name: 'p1',
+      imageR2Key: 'a.png', imageContentType: 'image/png',
+      lineRichMenuId: 'old-1', areas: [],
+    }],
+  };
+
+  it('createRichMenuShells は alias/default を触らない', async () => {
+    const line = makeMockLineClient();
+    const { shells } = await createRichMenuShells(group, line, makeMockR2());
+    expect(shells).toEqual([{ pageId: 'p1', orderIndex: 0, newRichMenuId: 'lm-1' }]);
+    expect(line.calls).toEqual(['create', 'upload']);
+  });
+
+  it('切替失敗の補償は旧aliasへ戻し、戻せない分だけ新メニューを残す', async () => {
+    const line = makeMockLineClient({ currentDefault: 'lm-1' });
+    line.upsertRichMenuAlias = vi.fn(async (aliasId: string) => {
+      line.calls.push('upsert-alias');
+      // 切替(新ID)は通し、補償の戻し(旧ID)だけ失敗させる。
+      if (aliasId === buildAliasId(group.id, 0) && line.calls.filter((c) => c === 'upsert-alias').length > 1) {
+        throw new Error('alias unavailable');
+      }
+    });
+    const { shells } = await createRichMenuShells(group, line, makeMockR2());
+    await switchRichMenuLive(line, group, shells);
+    const prev = {
+      oldIds: [{ pageId: 'p1', orderIndex: 0, lineRichMenuId: 'old-1' as string | null }],
+      previousDefaultId: null,
+    };
+    const unrestored = await restorePreSwitchLive(line, group.id, prev);
+    // 戻しに失敗したページは新メニューを消さない。
+    expect(unrestored).toEqual(new Set(['p1']));
+    await restorePreSwitchDefault(line, prev, shells.map((s) => s.newRichMenuId));
+    // 現在defaultは新メニューだが切替前defaultが無いため外す。
+    expect(line.calls).toContain('clear-default');
+  });
+
+  it('切替前のdefaultがあれば補償で戻す', async () => {
+    const line = makeMockLineClient({ currentDefault: 'lm-1' });
+    await restorePreSwitchDefault(
+      line,
+      { oldIds: [], previousDefaultId: 'old-default-1' },
+      ['lm-1'],
+    );
+    expect(line.calls).toEqual(['get-default', 'set-default']);
+    expect((line.setDefaultRichMenu as ReturnType<typeof vi.fn>).mock.calls[0][0]).toBe('old-default-1');
+  });
+
+  it('その間に外から変わったdefaultは触らない', async () => {
+    const line = makeMockLineClient({ currentDefault: 'external-1' });
+    await restorePreSwitchDefault(
+      line,
+      { oldIds: [], previousDefaultId: 'old-default-1' },
+      ['lm-1'],
+    );
+    expect(line.calls).toEqual(['get-default']);
+    expect(line.calls).not.toContain('set-default');
+    expect(line.calls).not.toContain('clear-default');
+  });
+
+  it('default復元の結果を返し、戻せなかった新メニューは消せる集合から外す', async () => {
+    const line = makeMockLineClient({ currentDefault: 'lm-1' });
+    line.setDefaultRichMenu = vi.fn(async () => {
+      throw new Error('LINE setDefaultRichMenu failed: 500');
+    });
+    const outcome = await restorePreSwitchDefault(
+      line,
+      { oldIds: [], previousDefaultId: 'old-default-1' },
+      ['lm-1', 'lm-2'],
+    );
+    expect(outcome).toEqual({ state: 'failed', retainedId: 'lm-1' });
+    // defaultが指したままの lm-1 は消さない。指されていない lm-2 は消す。
+    expect(
+      deletableAfterCompensation(
+        [
+          { pageId: 'p1', newRichMenuId: 'lm-1' },
+          { pageId: 'p2', newRichMenuId: 'lm-2' },
+        ],
+        new Set<string>(),
+        outcome,
+      ),
+    ).toEqual(['lm-2']);
+  });
+
+  it('defaultを読めなければ、どれが指されているか分からないので1つも消さない', async () => {
+    const line = makeMockLineClient({ currentDefault: 'lm-1' });
+    line.getCurrentDefaultRichMenuId = vi.fn(async () => {
+      throw new Error('LINE getCurrentDefaultRichMenu failed: 500');
+    });
+    const outcome = await restorePreSwitchDefault(
+      line,
+      { oldIds: [], previousDefaultId: 'old-default-1' },
+      ['lm-1'],
+    );
+    expect(outcome).toEqual({ state: 'failed', retainedId: null });
+    expect(
+      deletableAfterCompensation([{ pageId: 'p1', newRichMenuId: 'lm-1' }], new Set<string>(), outcome),
+    ).toEqual([]);
+  });
+
+  it('deleteRichMenuShells は失敗を飲み込む', async () => {
+    const line = makeMockLineClient();
+    line.deleteRichMenu = vi.fn(async () => {
+      throw new Error('LINE 500');
+    });
+    await expect(deleteRichMenuShells(line, ['lm-1', 'lm-2'])).resolves.toBeUndefined();
   });
 });

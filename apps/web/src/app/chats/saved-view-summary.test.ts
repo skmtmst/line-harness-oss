@@ -7,7 +7,7 @@ function conditions(patch: Partial<InboxSavedViewConditions> = {}): InboxSavedVi
   return {
     version: 1, query: '', channels: [], statuses: [], assignees: [],
     unread: 'all', messageTypes: [], receivedFrom: null, receivedTo: null,
-    sort: 'newest', ...patch,
+    sort: 'newest', due: 'all', ...patch,
   }
 }
 
@@ -71,6 +71,10 @@ describe('保存した検索の要約', () => {
   it('対応状況は用語表の言い方で出す', () => {
     expect(savedViewSummary(conditions({ statuses: ['resolved'] }))).toBe('対応状況：対応済み')
     expect(savedViewSummary(conditions({ statuses: ['on_hold'] }))).toBe('対応状況：保留')
+  })
+
+  it('期限超過を保存したときは条件の要約へ出す', () => {
+    expect(savedViewSummary(conditions({ due: 'overdue' }))).toBe('期限：超過')
   })
 
   it('並び順は、既定でないときだけ出す', () => {

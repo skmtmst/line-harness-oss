@@ -37,6 +37,7 @@ function account(overrides: Partial<LineAccount> = {}): LineAccount {
     og_site_name: null,
     og_default_image_url: null,
     og_default_description: null,
+    official_profile_url: null,
     friend_capacity: null,
     capacity_warn_at: null,
     icon_url: null,
@@ -243,7 +244,7 @@ describe('LINE credential AES-GCM encryption', () => {
                 channel_secret: String(insertValues[4]),
                 channel_access_token_encrypted: String(insertValues[5]),
                 channel_secret_encrypted: String(insertValues[6]),
-                tenant_id: String(insertValues[20]),
+                tenant_id: String(insertValues[24]),
               });
             }
             return null;
@@ -270,7 +271,7 @@ describe('LINE credential AES-GCM encryption', () => {
     expect(insertValues[7]).toEqual(expect.any(String));
     expect(insertValues[8]).toEqual(expect.any(String));
     expect(insertValues[9]).toBeNull();
-    expect(insertValues[20]).toBe(DEFAULT_TENANT_ID);
+    expect(insertValues[24]).toBe(DEFAULT_TENANT_ID);
     expect(created.tenant_id).toBe(DEFAULT_TENANT_ID);
     expect(created.channel_access_token).toBe('token-value');
     expect(created.channel_secret).toBe('secret-value');

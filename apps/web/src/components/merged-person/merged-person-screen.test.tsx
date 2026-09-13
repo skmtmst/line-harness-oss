@@ -1,11 +1,15 @@
 import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { MergedPersonDetail } from '@line-crm/shared'
 import MergedDeliveryDialog from './merged-delivery-dialog'
+import MergedProfileDialog, {
+  emptyProfileCandidateDraft,
+  selectedProfileCandidateCount,
+} from './merged-profile-dialog'
 import {
   MergedAdminCard,
   MergedDeliveryCard,
@@ -17,6 +21,8 @@ import {
 
 const SRC = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
 const read = (path: string) => readFileSync(join(SRC, path), 'utf8')
+
+afterEach(() => vi.unstubAllGlobals())
 
 /**
  * 画面確認（`scripts/visual-qa/fixtures.mjs` の `MERGED_PERSON_DETAIL`）と
@@ -191,6 +197,61 @@ describe('配信元を変える窓', () => {
   })
 })
 
+describe('プロフィールの採用値を変える窓', () => {
+  const candidates = [{
+    fieldKey: 'display_name',
+    fieldLabel: 'LINE表示名',
+    options: [
+      {
+        candidateId: `pc_${'a'.repeat(64)}`,
+        sourceFriendId: 'friend-identity-left',
+        sourceLabel: '支店の友だち情報',
+        valuePreview: '田中 はなこ',
+        verified: false,
+      },
+      {
+        candidateId: `pc_${'b'.repeat(64)}`,
+        sourceFriendId: 'friend-identity-right',
+        sourceLabel: '本店の友だち情報',
+        valuePreview: '田中 花子',
+        verified: false,
+      },
+    ],
+  }]
+
+  it('候補を選ぶまで保存できず、画面にはマスク済み値と取得元だけを出す', () => {
+    // 共通 SelectField は Next.js の自動 JSX runtime 前提。SSR 単体試験でも同じ前提を置く。
+    vi.stubGlobal('React', React)
+    const draft = emptyProfileCandidateDraft(candidates)
+    const html = renderToStaticMarkup(
+      <MergedProfileDialog
+        open
+        candidates={candidates}
+        draft={draft}
+        revision={4}
+        busy={false}
+        onChange={() => {}}
+        onCancel={() => {}}
+        onSave={() => {}}
+      />,
+    )
+    expect(html).toContain('統合プロフィールを編集')
+    expect(html).toContain('田中 はなこ ／ 支店の友だち情報')
+    expect(html).toContain('読み込んだのは第4版です')
+    expect(html).toMatch(/<button[^>]*disabled[^>]*>選んだ0項目を保存</)
+    expect(html).not.toContain(`pc_${'a'.repeat(64)}`)
+    expect(selectedProfileCandidateCount(candidates, draft)).toBe(0)
+  })
+
+  it('選んだ候補だけを保存対象にする', () => {
+    const draft = {
+      ...emptyProfileCandidateDraft(candidates),
+      display_name: { optionIndex: '1', updateMode: 'fixed' as const },
+    }
+    expect(selectedProfileCandidateCount(candidates, draft)).toBe(1)
+  })
+})
+
 describe('画面のつなぎ', () => {
   const detail = read('components/merged-person/merged-person-detail.tsx')
   const row = read('components/users/user-row.tsx')
@@ -209,6 +270,9 @@ describe('画面のつなぎ', () => {
 
   it('保存に読み込んだ版を付ける', () => {
     expect(detail).toContain('expectedRevision: person.revision')
+    expect(detail).toContain('api.mergedPeople.updateProfileValues')
+    expect(detail).toContain('api.mergedPeople.unlink')
+    expect(detail).toContain('元の友だちと過去の履歴は消さず')
   })
 
   it('同じ画面を二重に作らず、一覧の面を差し替える', () => {

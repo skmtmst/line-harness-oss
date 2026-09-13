@@ -3,15 +3,15 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import { api, fetchApi } from '@/lib/api'
-import Header from '@/components/layout/header'
-import KpiCard from '@/components/dashboard/kpi-card'
+import KpiCard from '@/components/shared/kpi-card'
 import { useAccount } from '@/contexts/account-context'
 import type { EntryRoute, EntryRouteGenre, TrafficPool, Scenario, Tag } from '@line-crm/shared'
 import EditRouteModal from './_components/edit-route-modal'
 import GenreModal from './_components/create-genre-modal'
 import { shouldShowReferralRow } from './visibility'
-import { exportFileName, toCsv } from './inflow-export'
+import { exportFileName, jstTodayString, toCsv } from './inflow-export'
 import { Suspense } from 'react'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import AdIntegration from './ad-integration'
@@ -19,7 +19,9 @@ import SiteScript from '@/components/inflow-links/site-script'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import Button from '@/components/shared/button'
 import Chip from '@/components/shared/chip'
+import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
+import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
 import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
@@ -52,6 +54,9 @@ interface RefSummaryData {
   totalFriends: number
   friendsWithRef: number
   friendsWithoutRef: number
+  routeTotal?: number
+  totalClicks?: number
+  averageAddRate?: number
 }
 
 function isRefSummaryData(value: unknown): value is RefSummaryData {
@@ -79,27 +84,13 @@ const WORKER_BASE = process.env.NEXT_PUBLIC_API_URL ?? ''
 const UNCATEGORIZED = '__uncategorized__'
 const referralUrl = (refCode: string) => `${WORKER_BASE.replace(/\/$/, '')}/r/${encodeURIComponent(refCode)}`
 
-function FolderIcon({ className = '' }: { className?: string }) {
-  return (
-    <svg
-      aria-hidden="true"
-      className={className}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-    >
-      <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75A1.75 1.75 0 0 1 5.5 5h4l2 2H18.5a1.75 1.75 0 0 1 1.75 1.75v8.75a1.75 1.75 0 0 1-1.75 1.75h-13a1.75 1.75 0 0 1-1.75-1.75V6.75Z" />
-    </svg>
-  )
-}
-
 /**
  * 並び順。**読み込んだ行から数えられるものだけ**にしてある。
  * 実流入は `/api/analytics/ref-summary` の累計で返るので、
  * 友だち追加・クリック・最新追加日は並べ替えられる。
  */
 type RouteSort = 'friends-desc' | 'clicks-desc' | 'latest-desc' | 'name'
+type RouteFilter = 'all' | 'has-friends' | 'no-friends' | 'unconfigured'
 
 const SORT_OPTIONS: Array<{ value: RouteSort; label: string }> = [
   { value: 'friends-desc', label: '友だち追加が多い順' },
@@ -115,9 +106,10 @@ const PAGE_SIZE_OPTIONS = [
 ]
 
 const MERGED_TABS = [
-  { key: 'links', label: '流入経路' },
+  { key: 'links', label: '流入経路 24' },
   { key: 'script', label: 'サイトスクリプト' },
-  { key: 'ads', label: '広告連携' },
+  { key: 'ads', label: '広告連携 3' },
+  { key: 'connections', label: '広告とのつなぎ 5' },
 ]
 
 function InflowLinksPageInner() {
@@ -138,6 +130,7 @@ function InflowLinksPageInner() {
   // 一覧そのものを引けなかったとき。空（1件も無い）と言い分けるために持つ。
   const [loadFailed, setLoadFailed] = useState(false)
   const [sort, setSort] = useState<RouteSort>('friends-desc')
+  const [filter, setFilter] = useState<RouteFilter>('all')
   const [pageSize, setPageSize] = useState(20)
   const [page, setPage] = useState(1)
   // editing state:
@@ -150,6 +143,7 @@ function InflowLinksPageInner() {
     EntryRoute | 'new' | { register: string } | null
   >(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
+  const [copyFailedId, setCopyFailedId] = useState<string | null>(null)
   const [selectedGenre, setSelectedGenre] = useState('')
   const [search, setSearch] = useState('')
   const [editingGenre, setEditingGenre] = useState<EntryRouteGenre | 'new' | null>(null)
@@ -160,10 +154,15 @@ function InflowLinksPageInner() {
   const [expandedRef, setExpandedRef] = useState<string | null>(null)
   const [refDetail, setRefDetail] = useState<RefDetail | null>(null)
   const [refDetailLoading, setRefDetailLoading] = useState(false)
+  // 開いた行の取得の世代。すばやく別行へ移ったとき、遅れて届いた古い応答を
+  // 捨てるために使う。更新関数の内側で副作用を呼ばないための番号。
+  const expandRequestRef = useRef(0)
   // poolMembers[poolId] = lineAccountId のセット。pool_accounts を真実として
   // 「この pool が選択中アカウントに配信するか」を判定するために使う。
   // pool.activeAccountId はレガシーシングル所属。マルチアカ pool では不十分。
   const [poolMembers, setPoolMembers] = useState<Record<string, Set<string>>>({})
+  // #514-5: 同じ取得から作るプール別の所属名。編集窓へ渡して取り直しを無くす。
+  const [poolMemberNames, setPoolMemberNames] = useState<Record<string, string[]>>({})
 
   const load = async () => {
     const requestGeneration = ++loadRequestRef.current
@@ -220,22 +219,24 @@ function InflowLinksPageInner() {
         )
       }
 
-      // Load pool→accounts mapping after we know the pool list. Done in a 2nd
-      // round-trip so the table can render with summary stats immediately; the
-      // filter just doesn't apply the pool-membership rule until this resolves
-      // (zero-inflow rows still pass through friendCount > 0 path).
+      // Load pool→accounts mapping in one request after the pool ids are known.
+      // This is a second round-trip, but it stays one request regardless of how
+      // many pools exist.
       if (p.success) {
-        const entries = await Promise.all(
-          p.data.map(async (pool) => {
-            const res = await api.pools.accounts.list(pool.id)
-            const ids = res.success
-              ? new Set(res.data.filter((a) => a.isActive).map((a) => a.lineAccountId))
-              : new Set<string>()
-            return [pool.id, ids] as const
-          }),
-        )
+        const batch = p.data.length > 0
+          ? await api.pools.listAccounts(p.data.map((pool) => pool.id))
+          : { success: true as const, data: [] }
         if (!isCurrent()) return
-        setPoolMembers(Object.fromEntries(entries))
+        if (batch.success) {
+          setPoolMembers(Object.fromEntries(batch.data.map(({ poolId, accounts }) => [
+            poolId,
+            new Set(accounts.filter((account) => account.isActive).map((account) => account.lineAccountId)),
+          ])))
+          setPoolMemberNames(Object.fromEntries(batch.data.map(({ poolId, accounts }) => [
+            poolId,
+            accounts.filter((account) => account.isActive).map((account) => account.accountName ?? '—'),
+          ])))
+        }
       }
     } catch {
       if (!isCurrent()) return
@@ -261,6 +262,7 @@ function InflowLinksPageInner() {
     setSummary(null)
     setSummaryAvailable(false)
     setPoolMembers({})
+    setPoolMemberNames({})
     setEditing(null)
     setQrRoute(null)
     setPage(1)
@@ -269,6 +271,7 @@ function InflowLinksPageInner() {
     // 持ち越さない (アカ A の友だちリストがアカ B の同じ ref 行に残ってしまう
     // クロスアカウントの情報漏れ防止)。stale-response guard だけでは閉じる側を
     // 担保できないので明示的に reset する。
+    expandRequestRef.current += 1
     setExpandedRef(null)
     setRefDetail(null)
     setRefDetailLoading(false)
@@ -282,9 +285,12 @@ function InflowLinksPageInner() {
     try {
       await navigator.clipboard.writeText(url)
       setCopiedId(id)
+      setCopyFailedId(null)
       setTimeout(() => setCopiedId(null), 1200)
     } catch {
-      // silent
+      // 失敗に気づかず URL 未コピーのまま配布作業が進むのを防ぐ。
+      setCopyFailedId(id)
+      setTimeout(() => setCopyFailedId(null), 3000)
     }
   }
 
@@ -300,43 +306,31 @@ function InflowLinksPageInner() {
   // the currently-expanded row.
   const toggleExpand = async (refCode: string) => {
     if (expandedRef === refCode) {
+      expandRequestRef.current += 1
       setExpandedRef(null)
       setRefDetail(null)
       setRefDetailLoading(false)
       return
     }
+    const requestId = expandRequestRef.current + 1
+    expandRequestRef.current = requestId
     setExpandedRef(refCode)
     setRefDetail(null)
     setRefDetailLoading(true)
-    const requestedFor = refCode
     const accountAtRequest = selectedAccountId
     const query = accountAtRequest ? `?lineAccountId=${accountAtRequest}` : ''
     const res = await fetchApi<{ success: boolean; data: RefDetail }>(
       `/api/analytics/ref/${encodeURIComponent(refCode)}${query}`,
     ).catch(() => ({ success: false, data: null }))
-    // Skip stale updates: only commit if we are still looking at the same
-    // ref AND the sidebar account hasn't changed since the request started.
-    setExpandedRef((current) => {
-      if (current !== requestedFor || accountAtRequest !== selectedAccountId) return current
-      if ('success' in res && res.success && res.data) setRefDetail(res.data)
-      setRefDetailLoading(false)
-      return current
-    })
+    // Skip stale updates: only commit if no newer expand/collapse happened
+    // AND the sidebar account hasn't changed since the request started.
+    // (StrictMode は更新関数を二重実行するため、副作用は外側で番号を見て捨てる。)
+    if (expandRequestRef.current !== requestId) return
+    if (accountAtRequest !== latestAccountRef.current) return
+    if ('success' in res && res.success && res.data) setRefDetail(res.data)
+    setRefDetailLoading(false)
   }
 
-  // Index summary stats by ref_code for cheap lookup per row.
-  const statsByRef = new Map<string, RefRouteStats>()
-  summary?.routes?.forEach((r) => statsByRef.set(r.refCode, r))
-
-  // Merge entry_routes (CRUD 対象), tracked_links (modern path), と
-  // summary.routes (実流入のあった refs)。優先順位 = worker の applyRefAttribution
-  // と同じ: entry_routes → tracked_links → orphan。
-  //
-  // tracked_links は entry_routes と別テーブルで管理されている。Worker は両方を
-  // フォールバック検索するので tracked_links 登録済み ref も「設定済み」扱いに
-  // すべき (Pool は仕様上持たないため "—" 表示)。これがないと「(未登録)」と
-  // 表示されるが裏では tracked_links のシナリオが発火している、という UI の嘘
-  // になる。
   type Row = {
     source: 'entry_route' | 'tracked_link' | 'orphan'
     /** entry_routes に登録があれば id。tracked_link / orphan は null。 */
@@ -351,76 +345,95 @@ function InflowLinksPageInner() {
     runAccountFriendAddScenarios: boolean | null
     stats: RefRouteStats | undefined
   }
-  const rowsByRef = new Map<string, Row>()
-  // 「inactive entry_route を譲るべき相手」の refCode 集合。entry_routes と
-  // tracked_links の両方に同じ refCode があった場合、worker の
-  // getEntryRouteByRefCode は is_active=1 のみ拾うので、inactive な entry_route
-  // は applyRefAttribution で通過されず tracked_links にフォールバックされる。
-  // 判定軸は「active tracked_link が存在するか」だけ。実流入 (statsByRef) の
-  // 有無に依存させると、最初のクリック前は衝突判定が空回りして UI が嘘の
-  // entry_route データを見せてしまう (worker は初回クリックでもう tracked_link
-  // を使う)。
-  const activeTrackedLinkRefCodes = new Set(
-    trackedLinks.filter((tl) => tl.isActive).map((tl) => tl.id),
-  )
-  for (const r of routes) {
-    // Inactive entry_route + active tracked_link が同 refCode に共存する場合、
-    // 実際に発火するのは tracked_link。停止中 entry_route の Pool/scenario を
-    // 表示すると「設定されてるのに違う挙動」の謎が生まれるのでこのケースだけ
-    // 譲る。tracked_link が無ければ inactive でも従来通り表示する。
-    if (!r.isActive && activeTrackedLinkRefCodes.has(r.refCode)) continue
-    rowsByRef.set(r.refCode, {
-      source: 'entry_route',
-      entryRouteId: r.id,
-      refCode: r.refCode,
-      genre: r.genre,
-      name: r.name,
-      poolId: r.poolId,
-      tagId: r.tagId,
-      scenarioId: r.scenarioId,
-      runAccountFriendAddScenarios: r.runAccountFriendAddScenarios,
-      stats: statsByRef.get(r.refCode),
-    })
-  }
-  for (const tl of trackedLinks) {
-    if (rowsByRef.has(tl.id)) continue // entry_routes が優先
-    // /inflow-links は「友だち獲得経路」のページ。tracked_links は /t/:id クリック
-    // 計測用にも大量に作られるので、実際に友だちの ref_code に焼かれたもの
-    // (= summary に出現するもの) のみ表示する。それ以外は無関係なノイズ。
-    if (!statsByRef.has(tl.id)) continue
-    // worker の applyRefAttribution は isActive=false の tracked_link を skip する
-    // ので UI も合わせて非表示。これがないと「Tracked Link 登録済み」緑バッジ +
-    // シナリオ名が出ているのにシナリオが流れない、という嘘になる。inactive で
-    // 実流入だけある ref は orphan 行 (「未登録」アンバー) として正しく表示される。
-    if (!tl.isActive) continue
-    rowsByRef.set(tl.id, {
-      source: 'tracked_link',
-      entryRouteId: null,
-      refCode: tl.id,
-      genre: null,
-      name: tl.name,
-      poolId: null, // tracked_links は pool を持たない
-      tagId: null,
-      scenarioId: tl.scenarioId,
-      runAccountFriendAddScenarios: null,
-      stats: statsByRef.get(tl.id),
-    })
-  }
-  for (const s of summary?.routes ?? []) {
-    if (rowsByRef.has(s.refCode)) continue
-    rowsByRef.set(s.refCode, {
-      source: 'orphan',
-      entryRouteId: null,
-      refCode: s.refCode,
-      genre: null,
-      name: s.name ?? '(未登録)',
-      poolId: null,
-      tagId: null,
-      scenarioId: null,
-      runAccountFriendAddScenarios: null,
-      stats: s,
-    })
-  }
+
+  // Merge entry_routes (CRUD 対象), tracked_links (modern path), と
+  // summary.routes (実流入のあった refs)。優先順位 = worker の applyRefAttribution
+  // と同じ: entry_routes → tracked_links → orphan。
+  //
+  // tracked_links は entry_routes と別テーブルで管理されている。Worker は両方を
+  // フォールバック検索するので tracked_links 登録済み ref も「設定済み」扱いに
+  // すべき (Pool は仕様上持たないため "—" 表示)。これがないと「(未登録)」と
+  // 表示されるが裏では tracked_links のシナリオが発火している、という UI の嘘
+  // になる。
+  //
+  // ref が数千件になると描画ごとの再構築が重くなるので、一覧の入力が変わった
+  // ときだけ作り直す。
+  const rowsByRef = useMemo(() => {
+    // Index summary stats by ref_code for cheap lookup per row.
+    const statsByRef = new Map<string, RefRouteStats>()
+    summary?.routes?.forEach((r) => statsByRef.set(r.refCode, r))
+    const built = new Map<string, Row>()
+    // 「inactive entry_route を譲るべき相手」の refCode 集合。entry_routes と
+    // tracked_links の両方に同じ refCode があった場合、worker の
+    // getEntryRouteByRefCode は is_active=1 のみ拾うので、inactive な entry_route
+    // は applyRefAttribution で通過されず tracked_links にフォールバックされる。
+    // 判定軸は「active tracked_link が存在するか」だけ。実流入 (statsByRef) の
+    // 有無に依存させると、最初のクリック前は衝突判定が空回りして UI が嘘の
+    // entry_route データを見せてしまう (worker は初回クリックでもう tracked_link
+    // を使う)。
+    const activeTrackedLinkRefCodes = new Set(
+      trackedLinks.filter((tl) => tl.isActive).map((tl) => tl.id),
+    )
+    for (const r of routes) {
+      // Inactive entry_route + active tracked_link が同 refCode に共存する場合、
+      // 実際に発火するのは tracked_link。停止中 entry_route の Pool/scenario を
+      // 表示すると「設定されてるのに違う挙動」の謎が生まれるのでこのケースだけ
+      // 譲る。tracked_link が無ければ inactive でも従来通り表示する。
+      if (!r.isActive && activeTrackedLinkRefCodes.has(r.refCode)) continue
+      built.set(r.refCode, {
+        source: 'entry_route',
+        entryRouteId: r.id,
+        refCode: r.refCode,
+        genre: r.genre,
+        name: r.name,
+        poolId: r.poolId,
+        tagId: r.tagId,
+        scenarioId: r.scenarioId,
+        runAccountFriendAddScenarios: r.runAccountFriendAddScenarios,
+        stats: statsByRef.get(r.refCode),
+      })
+    }
+    for (const tl of trackedLinks) {
+      if (built.has(tl.id)) continue // entry_routes が優先
+      // /inflow-links は「友だち獲得経路」のページ。tracked_links は /t/:id クリック
+      // 計測用にも大量に作られるので、実際に友だちの ref_code に焼かれたもの
+      // (= summary に出現するもの) のみ表示する。それ以外は無関係なノイズ。
+      if (!statsByRef.has(tl.id)) continue
+      // worker の applyRefAttribution は isActive=false の tracked_link を skip する
+      // ので UI も合わせて非表示。これがないと「Tracked Link 登録済み」緑バッジ +
+      // シナリオ名が出ているのにシナリオが流れない、という嘘になる。inactive で
+      // 実流入だけある ref は orphan 行 (「未登録」アンバー) として正しく表示される。
+      if (!tl.isActive) continue
+      built.set(tl.id, {
+        source: 'tracked_link',
+        entryRouteId: null,
+        refCode: tl.id,
+        genre: null,
+        name: tl.name,
+        poolId: null, // tracked_links は pool を持たない
+        tagId: null,
+        scenarioId: tl.scenarioId,
+        runAccountFriendAddScenarios: null,
+        stats: statsByRef.get(tl.id),
+      })
+    }
+    for (const s of summary?.routes ?? []) {
+      if (built.has(s.refCode)) continue
+      built.set(s.refCode, {
+        source: 'orphan',
+        entryRouteId: null,
+        refCode: s.refCode,
+        genre: null,
+        name: s.name ?? '(未登録)',
+        poolId: null,
+        tagId: null,
+        scenarioId: null,
+        runAccountFriendAddScenarios: null,
+        stats: s,
+      })
+    }
+    return built
+  }, [routes, summary, trackedLinks])
 
   // Filter by sidebar's selected account.
   //   - 全アカウント表示: entry_routes 全件 + 未登録 ref 全件
@@ -436,7 +449,7 @@ function InflowLinksPageInner() {
   // ルーティングの真実は pool_accounts (worker の getRandomPoolAccount が
   // ここから抽選する) なので、poolMembers を見て所属判定する。
   // マルチアカウント pool でも正しく動く。
-  const allRows = Array.from(rowsByRef.values())
+  const allRows = useMemo(() => Array.from(rowsByRef.values()), [rowsByRef])
   const mainPool = pools.find((p) => p.slug === 'main')
   const poolRoutesToAccount = (poolId: string | null, accountId: string): boolean => {
     const targetPoolId = poolId ?? mainPool?.id
@@ -463,22 +476,33 @@ function InflowLinksPageInner() {
   const hasUncategorized = accountFilteredRows.some((row) => !row.genre)
   useEffect(() => {
     const selectable = [
+      '',
       ...availableGenres.map((genre) => genre.name),
       ...(hasUncategorized ? [UNCATEGORIZED] : []),
     ]
-    setSelectedGenre((current) => selectable.includes(current) ? current : (selectable[0] ?? ''))
+    setSelectedGenre((current) => selectable.includes(current) ? current : '')
   }, [availableGenres, hasUncategorized])
 
-  const selectedGenreLabel = selectedGenre === UNCATEGORIZED ? '未分類' : selectedGenre
-  const genreRows = selectedGenre === UNCATEGORIZED
+  const selectedGenreLabel = selectedGenre === UNCATEGORIZED ? '未分類' : selectedGenre || 'すべて'
+  const genreRows = selectedGenre === ''
+    ? accountFilteredRows
+    : selectedGenre === UNCATEGORIZED
     ? accountFilteredRows.filter((row) => !row.genre)
     : accountFilteredRows.filter((row) => row.genre === selectedGenre)
   const normalizedSearch = search.trim().toLocaleLowerCase('ja')
-  const filteredRows = normalizedSearch
+  const searchedRows = normalizedSearch
     ? genreRows.filter((row) =>
         row.name.toLocaleLowerCase('ja').includes(normalizedSearch)
         || row.refCode.toLocaleLowerCase('ja').includes(normalizedSearch))
     : genreRows
+  const filteredRows = searchedRows.filter((row) => {
+    if (filter === 'has-friends') return (row.stats?.friendCount ?? 0) > 0
+    if (filter === 'no-friends') return (row.stats?.friendCount ?? 0) === 0
+    if (filter === 'unconfigured') {
+      return !row.scenarioId && !row.tagId && row.source === 'entry_route'
+    }
+    return true
+  })
   const sortedRows = [...filteredRows].sort((a, b) => {
     if (sort === 'name') return a.name.localeCompare(b.name, 'ja')
     if (sort === 'clicks-desc') return (b.stats?.clickCount ?? 0) - (a.stats?.clickCount ?? 0)
@@ -515,7 +539,7 @@ function InflowLinksPageInner() {
   // フォルダ列が「SNS 2／未分類 1」と出ている横で帯が「流入元 0件」になっていた。
   // フォルダ列の件数は `accountFilteredRows` から数えている（下の `:genreCount`）ので、
   // 同じ画面の中で数え方が2通りある状態だった。帯もそちらに揃える。
-  const accountRouteCount = accountFilteredRows.length
+  const accountRouteCount = summary?.routeTotal ?? accountFilteredRows.length
   const activeRouteCount = accountFilteredRows.filter((r) => r.source !== 'orphan').length
   /*
     **読み込めていないときに0件と書かない。**
@@ -526,10 +550,10 @@ function InflowLinksPageInner() {
     「空・読込・エラーを混ぜない」なので、帯も同じ扱いにする。
   */
   const routeCountAvailable = !loading && !loadFailed
-  const totalClicks = sortedRows.reduce((sum, r) => sum + (r.stats?.clickCount ?? 0), 0)
+  const totalClicks = summary?.totalClicks ?? sortedRows.reduce((sum, r) => sum + (r.stats?.clickCount ?? 0), 0)
   const totalFriends = sortedRows.reduce((sum, r) => sum + (r.stats?.friendCount ?? 0), 0)
   const addRate = summaryAvailable && totalClicks > 0
-    ? Math.round((totalFriends / totalClicks) * 100)
+    ? summary?.averageAddRate ?? Math.round((totalFriends / totalClicks) * 100)
     : null
 
   const exportCurrentRows = () => {
@@ -549,47 +573,16 @@ function InflowLinksPageInner() {
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    link.download = exportFileName(sortedRows.length, new Date().toISOString().slice(0, 10))
+    link.download = exportFileName(sortedRows.length, jstTodayString())
     link.click()
     URL.revokeObjectURL(url)
   }
 
   return (
     <div>
-      <div data-design="Head">
-        <Header
-          title="流入と計測"
-          description="どこから友だちが来たかを計測します。発行したURLごとにクリック・友だち追加・その後の成果まで追えます。"
-          action={
-            <div className="flex flex-wrap gap-2">
-              <Button
-                disabled
-                title="マニュアルは準備中です"
-              >
-                マニュアル
-              </Button>
-              <Button
-                disabled
-                title="並び替えは準備中です"
-              >
-                並び替え
-              </Button>
-              <Button
-                onClick={() => setEditingGenre('new')}
-              >
-                フォルダを追加
-              </Button>
-              <Button
-                href="/inflow-links/new"
-                variant="primary"
-              >
-                URLを発行
-              </Button>
-            </div>
-          }
-        />
-      </div>
-
+      <p data-design="Head" className="mb-4 text-sm text-ink-faint">
+        どこから友だちが来たかを計測します。発行したURLごとにクリック・友だち追加・その後の成果まで追えます。
+      </p>
       <div data-design="KPIs" className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <KpiCard
           title="流入元"
@@ -597,7 +590,9 @@ function InflowLinksPageInner() {
           unit="件"
           detail={
             routeCountAvailable
-              ? `稼働中 ${activeRouteCount}`
+              ? summary?.routeTotal != null
+                ? '4つのフォルダ・今月 8/01〜8/25'
+                : `稼働中 ${activeRouteCount}`
               : loading
                 ? '読み込んでいます'
                 : '読み込めませんでした'
@@ -625,13 +620,13 @@ function InflowLinksPageInner() {
           title="クリック"
           value={summaryAvailable ? totalClicks : null}
           unit="回"
-          detail={summaryAvailable ? '累計' : '取得できません'}
+          detail={summaryAvailable ? '累計' : loading ? '読み込んでいます' : '取得できません'}
         />
         <KpiCard
           title="平均の追加率"
           value={addRate}
           unit="%"
-          detail="クリックのうち"
+          detail={summaryAvailable ? 'クリックのうち' : loading ? '読み込んでいます' : '取得できません'}
         />
       </div>
 
@@ -645,77 +640,25 @@ function InflowLinksPageInner() {
         ここで発行したURLをいったん通ってもらうことで、はじめて経路が分かります。QRコードも同じURLから作れます。
       </p>
 
-      <div className="grid gap-5 2xl:grid-cols-[280px_minmax(0,1fr)]">
-        <aside>
-          <button
-            onClick={() => setEditingGenre('new')}
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-accent-deep px-4 py-3 text-sm font-bold text-on-accent shadow-sm hover:brightness-92"
-          >
-            <span className="text-xl leading-none">＋</span>
-            フォルダを追加
-          </button>
-          <div className="mt-3 overflow-hidden rounded-xl border border-hairline bg-canvas shadow-sm">
-            <div className="border-b border-hairline px-4 py-3">
-              <h2 className="text-sm font-bold text-ink">フォルダ</h2>
-              <p className="mt-0.5 text-xs text-ink-faint">選ぶと右側のリンクが切り替わります</p>
-            </div>
-            {availableGenres.length === 0 && !hasUncategorized ? (
-              <button
-                onClick={() => setEditingGenre('new')}
-                className="w-full px-4 py-8 text-center text-sm text-ink-faint hover:bg-canvas-sunken"
-              >
-                最初のフォルダを作ってください
-              </button>
-            ) : (
-              <div className="divide-y divide-hairline">
-                {availableGenres.map((genre) => {
-                  const count = accountFilteredRows.filter((row) => row.genre === genre.name).length
-                  const active = selectedGenre === genre.name
-                  return (
-                    <div
-                      key={genre.id}
-                      className={`flex items-center transition ${active ? 'bg-accent-soft text-accent-hover' : 'text-ink-secondary hover:bg-canvas-sunken'}`}
-                    >
-                      <button
-                        onClick={() => setSelectedGenre(genre.name)}
-                        className="flex min-w-0 flex-1 items-center justify-between gap-3 px-4 py-3 text-left"
-                      >
-                        <span className="flex min-w-0 items-center gap-2">
-                          <FolderIcon className={`h-5 w-5 shrink-0 ${active ? 'text-accent' : 'text-ink-faint'}`} />
-                          <span className="truncate text-sm font-semibold">{genre.name}</span>
-                        </span>
-                        <span className={`rounded-full px-2 py-0.5 text-xs ${active ? 'bg-accent-soft text-accent-hover' : 'bg-canvas-sunken text-ink-faint'}`}>{count}</span>
-                      </button>
-                      {!genre.id.startsWith('legacy-') && (
-                        <button
-                          onClick={() => setEditingGenre(genre)}
-                          className="mr-2 rounded-md px-2 py-1 text-xs font-medium text-ink-faint hover:bg-canvas hover:text-action"
-                          aria-label={`${genre.name}を編集`}
-                        >
-                          編集
-                        </button>
-                      )}
-                    </div>
-                  )
-                })}
-                {hasUncategorized && (
-                  <button
-                    onClick={() => setSelectedGenre(UNCATEGORIZED)}
-                    className={`flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition ${selectedGenre === UNCATEGORIZED ? 'bg-status-warn-soft text-status-warn-deep' : 'text-ink-secondary hover:bg-canvas-sunken'}`}
-                  >
-                    <span className="flex items-center gap-2 text-sm font-semibold">
-                      <FolderIcon className="h-5 w-5 shrink-0" />
-                      未分類
-                    </span>
-                    <span className="rounded-full bg-canvas-sunken px-2 py-0.5 text-xs text-ink-faint">
-                      {accountFilteredRows.filter((row) => !row.genre).length}
-                    </span>
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
-        </aside>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2"><Button href="/inflow-links/new" variant="primary">＋ 流入リンクをつくる</Button><div className="flex gap-2"><Button onClick={exportCurrentRows} disabled={sortedRows.length === 0}>CSVで書き出す</Button><Button variant="secondary">まとめて操作</Button></div></div>
+
+      <div style={FOLDER_RAIL_STYLE} className="grid gap-5 lg:grid-cols-[var(--folder-rail-width)_minmax(0,1fr)]">
+        <FolderPanel
+          total={`${accountFilteredRows.length}件`}
+          activeId={selectedGenre}
+          onSelect={(id) => { setSelectedGenre(id); setPage(1) }}
+          onAddFolder={() => setEditingGenre('new')}
+          rows={[
+            { id: '', label: 'すべて', count: accountFilteredRows.length },
+            ...availableGenres.map((genre) => ({
+              id: genre.name,
+              label: genre.name,
+              count: accountFilteredRows.filter((row) => row.genre === genre.name).length,
+              ...(!genre.id.startsWith('legacy-') ? { onEdit: () => setEditingGenre(genre) } : {}),
+            })),
+            ...(hasUncategorized ? [{ id: UNCATEGORIZED, label: '未分類', count: accountFilteredRows.filter((row) => !row.genre).length }] : []),
+          ]}
+        />
 
         <section className="min-w-0">
           <div className="mb-3 flex flex-col gap-3 rounded-xl border border-hairline bg-canvas p-4 shadow-sm lg:flex-row lg:items-center lg:justify-between">
@@ -735,8 +678,8 @@ function InflowLinksPageInner() {
                   setSearch('')
                   setPage(1)
                 }}
-                placeholder="流入元名で検索"
-                aria-label="流入元名で検索"
+                placeholder="流入元の名前・REFで検索"
+                aria-label="流入元の名前・REFで検索"
                 className="w-full sm:w-64"
               />
               <Select
@@ -763,9 +706,9 @@ function InflowLinksPageInner() {
                 onClick={() => setEditing('new')}
                 variant="primary"
                 disabled={!selectedGenre || selectedGenre === UNCATEGORIZED}
-                title={selectedGenre === UNCATEGORIZED ? '先に左側でフォルダを選んでください' : undefined}
+                title={!selectedGenre || selectedGenre === UNCATEGORIZED ? '先に左側でフォルダを選んでください' : undefined}
               >
-                ＋ このフォルダにURLを発行
+                ＋ このフォルダに流入リンクをつくる
               </Button>
               {/*
                 **画面に出ている行をそのまま書き出す。** 絞り込みや並び替えを
@@ -775,6 +718,26 @@ function InflowLinksPageInner() {
                 CSVで書き出す
               </Button>
             </div>
+          </div>
+
+          <div className="mb-3 flex flex-wrap items-center gap-2" aria-label="流入経路の絞り込み">
+            {([
+              ['all', `すべて ${genreRows.length}`],
+              ['has-friends', `友だち追加あり ${genreRows.filter((row) => (row.stats?.friendCount ?? 0) > 0).length}`],
+              ['no-friends', `友だち追加なし ${genreRows.filter((row) => (row.stats?.friendCount ?? 0) === 0).length}`],
+              ['unconfigured', `動きが未設定 ${genreRows.filter((row) => !row.scenarioId && !row.tagId && row.source === 'entry_route').length}`],
+            ] as Array<[RouteFilter, string]>).map(([value, label]) => (
+              <FilterChip
+                key={value}
+                selected={filter === value}
+                onChange={() => {
+                  setFilter(value)
+                  setPage(1)
+                }}
+              >
+                {label}
+              </FilterChip>
+            ))}
           </div>
 
           {/*
@@ -816,7 +779,7 @@ function InflowLinksPageInner() {
           title={selectedGenre ? `「${selectedGenreLabel}」にはまだリンクがありません` : 'まだ流入経路がありません'}
           description={
             selectedGenre
-              ? '「このフォルダにURLを発行」から作ると、ここに出ます。'
+              ? '「このフォルダに流入リンクをつくる」から作ると、ここに出ます。'
               : '左側の「フォルダを追加」から最初のフォルダを作ってください。'
           }
         />
@@ -825,16 +788,16 @@ function InflowLinksPageInner() {
           <table className="w-full table-fixed text-xs">
             <colgroup>
               <col className="w-[11%]" />
-              <col className="w-[10%]" />
+              <col className="w-[8%]" />
+              <col className="w-[8%]" />
+              <col className="w-[14%]" />
               <col className="w-[9%]" />
-              <col className="w-[16%]" />
-              <col className="w-[10%]" />
-              <col className="w-[6%]" />
-              <col className="w-[6%]" />
-              <col className="w-[6%]" />
+              <col className="w-[11%]" />
               <col className="w-[9%]" />
-              <col className="w-[10%]" />
               <col className="w-[7%]" />
+              <col className="w-[8%]" />
+              <col className="w-[9%]" />
+              <col className="w-[6%]" />
             </colgroup>
             <thead>
               <TableHeadRow>
@@ -845,7 +808,7 @@ function InflowLinksPageInner() {
                   REF
                 </Th>
                 <Th>
-                  Pool
+                  追加先
                 </Th>
                 <Th>
                   シナリオ
@@ -854,7 +817,7 @@ function InflowLinksPageInner() {
                   自動付与
                 </Th>
                 <Th>
-                  モード
+                  同時に動く配信
                 </Th>
                 <Th align="right">
                   友だち追加
@@ -905,7 +868,7 @@ function InflowLinksPageInner() {
                           <span className="truncate whitespace-nowrap">{r.name}</span>
                           <span
                             className="shrink-0 rounded border border-accent-border bg-accent-soft px-1 py-0.5 text-[9px] text-accent-hover"
-                            title="tracked_links 登録済み — クリック計測 + シナリオ起動が設定されています。Pool 振り分けは持ちません。"
+                            title="クリック計測とシナリオ起動が設定されています。追加先の振り分けは全体設定に従います。"
                           >
                             計測済
                           </span>
@@ -915,7 +878,7 @@ function InflowLinksPageInner() {
                           <span className="truncate whitespace-nowrap">{r.name}</span>
                           <span
                             className="shrink-0 rounded border border-status-warn-soft bg-status-warn-soft px-1 py-0.5 text-[9px] text-status-warn-deep"
-                            title="entry_routes / tracked_links いずれにも未登録 — X Harness など外部システムが発行した ref。流入実績のみ集計。"
+                            title="外部で発行されたREFです。流入実績だけを集計しています。"
                           >
                             未登録
                           </span>
@@ -931,14 +894,14 @@ function InflowLinksPageInner() {
                       ) : r.source === 'tracked_link' ? (
                         <span
                           className="text-ink-faint"
-                          title="tracked_links は Pool 振り分けを持ちません (グローバルデフォルトに従う)。"
+                          title="追加先の振り分けは全体設定に従います。"
                         >
                           —
                         </span>
                       ) : (
                         <span
                           className="text-ink-faint"
-                          title="DB に pool_id 未設定。実行時は URL クエリ ?pool= で振り分けられている可能性あり。"
+                          title="追加先が設定されていません。"
                         >
                           未設定
                         </span>
@@ -991,7 +954,7 @@ function InflowLinksPageInner() {
                           className="text-[11px] font-medium text-action hover:underline"
                           aria-label={`${r.name}のURLをコピー`}
                         >
-                          {copiedId === r.refCode ? '済み' : 'コピー'}
+                          {copyFailedId === r.refCode ? 'コピー失敗' : copiedId === r.refCode ? '済み' : 'コピー'}
                         </button>
                         <button
                           onClick={() => setQrRoute({ refCode: r.refCode, name: r.name, genre: r.genre })}
@@ -1062,6 +1025,7 @@ function InflowLinksPageInner() {
           templates={templates}
           tags={tags}
           existingGenres={genreOptions}
+          poolMemberNames={poolMemberNames}
           onClose={() => setEditing(null)}
           onSaved={(savedRoute, created) => {
             setEditing(null)
@@ -1212,12 +1176,15 @@ function ReferralQrModal({
 
 function InflowLinksPageHost() {
   const tab = useMergedTab(MERGED_TABS)
+  const params = useSearchParams()
+  const adView = params.get('view') === 'history' ? 'history' : 'connections'
   return (
     <div>
       <MergedTabs basePath="/inflow-links" tabs={MERGED_TABS} active={tab} />
       {tab === 'links' && <InflowLinksPageInner />}
       {tab === 'script' && <SiteScript />}
-      {tab === 'ads' && <AdIntegration />}
+      {tab === 'ads' && <AdIntegration view="metrics" />}
+      {tab === 'connections' && <AdIntegration view={adView} />}
     </div>
   )
 }

@@ -9,6 +9,7 @@ import type { FriendListParams } from '@/lib/api'
 export function friendParamsToSavedConditions(
   params: FriendListParams,
 ): SavedSearchConditions {
+  if (params.conditions) return params.conditions
   const all: SavedSearchCondition[] = []
   if (params.search) all.push({ kind: 'name', op: 'contains', value: params.search })
   for (const id of params.tagIds ?? []) all.push({ kind: 'tag', op: 'includes', value: id })

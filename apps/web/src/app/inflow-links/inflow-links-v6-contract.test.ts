@@ -14,6 +14,14 @@ const PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
  * 素のTailwind色を共通部品とV6トークンへ寄せたことも、ここで止める。
  */
 describe('V6 流入経路一覧の契約', () => {
+  it('共通フォルダ欄の統一幅を使い、追加ボタンを欄内だけに置く', () => {
+    expect(PAGE).toContain('lg:grid-cols-[var(--folder-rail-width)_minmax(0,1fr)]')
+    expect(PAGE).toContain('style={FOLDER_RAIL_STYLE}')
+    expect(PAGE).not.toContain('選ぶと右側のリンクが切り替わります')
+    expect(PAGE).toContain("onAddFolder={() => setEditingGenre('new')}")
+    expect(PAGE).not.toMatch(/<Button[^>]*>フォルダを追加<\/Button>/)
+  })
+
   it('空・読込・取得失敗の3状態を共通ListStateで言い分ける', () => {
     expect(PAGE).toContain('data-design-node="BMmxU"')
     expect(PAGE).toContain("import ListState from '@/components/shared/list-state'")
@@ -80,6 +88,20 @@ describe('V6 流入経路一覧の契約', () => {
     for (const fake of ['追加率が高い', '計測停止中']) {
       expect(PAGE, `${fake} は取れない条件なので札にしない`).not.toContain(fake)
     }
+  })
+
+  it('行一覧の組み立ては描画ごとに作り直さない', () => {
+    expect(PAGE).toContain('const rowsByRef = useMemo(')
+  })
+
+  it('行の開閉は更新関数の内側で副作用を呼ばない', () => {
+    expect(PAGE).toContain('expandRequestRef')
+    expect(PAGE).not.toContain('setExpandedRef((current)')
+  })
+
+  it('コピーの失敗を無言にしない', () => {
+    expect(PAGE).toContain('コピー失敗')
+    expect(PAGE).not.toContain('// silent')
   })
 
   it('素のTailwind色を残さず、V6トークンで塗る', () => {

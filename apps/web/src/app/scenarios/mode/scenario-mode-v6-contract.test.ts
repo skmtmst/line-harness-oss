@@ -7,6 +7,14 @@ const here = dirname(fileURLToPath(import.meta.url))
 const page = readFileSync(join(here, 'page.tsx'), 'utf8')
 
 describe('V6 シナリオ作成・配信方式 cCB7r', () => {
+  it('画面名を上部バーだけに置き、本文はパンくずとキャンセルから始める', () => {
+    expect(page).toContain("usePageTitle('シナリオを作成')")
+    expect(page).not.toContain("import Header from '@/components/layout/header'")
+    expect(page).not.toContain('<Header')
+    expect(page).toContain('<span>新規作成</span>')
+    expect(page).toContain('✕ キャンセル')
+  })
+
   it('Pencilの実Nodeと3段の進み方を表示する', () => {
     expect(page).toContain('data-design-node="cCB7r"')
     /*

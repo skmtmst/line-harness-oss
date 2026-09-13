@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import SummaryCard from '@/components/shared/summary-card'
+import type { UserRowData } from './user-row'
 import { api } from '@/lib/api'
 import { createLatestRequestGuard } from './summary-request-guard'
 
@@ -19,7 +20,7 @@ type LoadStatus = 'loading' | 'ready' | 'error'
  * 面・角丸・文字は共通 SummaryCard に任せる。ここで手書きしていたときは
  * 値が24pxになっていて、設計の22pxと1画面ぶんずれていた。
  */
-export default function SummaryBar() {
+export default function SummaryBar({ rows = [] }: { rows?: UserRowData[] }) {
   const [stats, setStats] = useState<Stats | null>(null)
   const [status, setStatus] = useState<LoadStatus>('loading')
   const [requestGuard] = useState(createLatestRequestGuard)
@@ -58,8 +59,7 @@ export default function SummaryBar() {
   const failure = status === 'error'
   const detailOf = (ready: string) =>
     loading ? '読み込んでいます' : failure ? <FailureDetail onRetry={load} /> : ready
-  const dupRate =
-    stats && stats.totalFollowing > 0 ? (stats.friendDups / stats.totalFollowing) * 100 : stats ? 0 : null
+  const linkedUidCount = rows.filter((row) => row.identityKeyKind === 'uid').length
 
   return (
     <div
@@ -87,17 +87,17 @@ export default function SummaryBar() {
         1人が3アカウントに居れば +2 と数える。通数でも金額でもない。
       */}
       <SummaryCard
-        title="重複している行"
-        value={stats?.friendDups ?? null}
-        unit="件"
-        detail={detailOf('複数登録による余分')}
+        title="UID連携済み"
+        value={status === 'ready' ? linkedUidCount : null}
+        unit="人"
+        detail={detailOf('このページでUID確認済み')}
         loading={loading}
       />
       <SummaryCard
-        title="重複率"
-        value={dupRate === null ? null : Number(dupRate.toFixed(1))}
-        unit="%"
-        detail={detailOf('紐付く友だちのうち余分')}
+        title="重複配信の削減"
+        value={null}
+        unit="通/月"
+        detail={detailOf('配信前プレビューの実績を接続後に表示')}
         loading={loading}
       />
     </div>

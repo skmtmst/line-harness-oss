@@ -72,3 +72,10 @@
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
+
+/*
+ * 2026-09-08（#580 軽）: `.workspace`・`.detailGrid`・`.reviewCanvas` を含む
+ * 旧3画面の規則を削除。現行3画面は Tailwind + 上の9クラスのみを使い、
+ * 契約テストが参照する `.body` の右カラム・`.sideCard` の角丸は残す。
+ * 未実装ボタンは消さず、実装時期の注記（`title`）を付けて残す。
+ */

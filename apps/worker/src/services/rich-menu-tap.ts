@@ -2,6 +2,7 @@ import {
   getRichMenuAreaTapTarget,
   getTemplateById,
   addScore,
+  enrollFriendInScenario,
   recordRichMenuAreaTap,
   type RichMenuAreaTapTarget,
 } from '@line-crm/db';
@@ -88,6 +89,7 @@ export async function handleRichMenuTap(
   if (!target) return { target: null, replyTokenConsumed: false };
 
   const lineAccountId = options.lineAccountId ?? null;
+  if (lineAccountId && target.accountId !== lineAccountId) return { target: null, replyTokenConsumed: false };
 
   // 押された記録。一覧の「今月のタップ」「最多タップ」はこれを数えている。
   // 記録に失敗しても、下のタグ付けやメッセージ送信は続ける。
@@ -122,6 +124,14 @@ export async function handleRichMenuTap(
       });
     } catch (err) {
       console.error('[richMenuTap] failed to add score', err);
+    }
+  }
+
+  if (target.scenarioId) {
+    try {
+      await enrollFriendInScenario(db, friend.id, target.scenarioId);
+    } catch (err) {
+      console.error(`[richMenuTap] failed to start scenario ${target.scenarioId}`, err);
     }
   }
 

@@ -82,11 +82,31 @@ function resolveFile(base) {
   return candidates.find((c) => existsSync(c) && statSync(c).isFile()) ?? null
 }
 
+/**
+ * import 先をファイル一覧ごとに一度だけ解決する。
+ *
+ * 以前は対象部品を1つ調べるたびに全TS/TSXを構文解析していたため、同じ
+ * 561ファイルをButton/CSS/Paginationごとに繰り返し読んでいた。
+ */
+export function createImportIndex(files) {
+  return new Map(files.map((file) => [
+    file,
+    importsOf(file).local.map(resolveFile).filter(Boolean),
+  ]))
+}
+
+const importIndexCache = new WeakMap()
+
 /** 名前ではなくimport先が対象ファイルと一致するファイルだけを返す。 */
-export function directImporters(files, targetFile) {
+export function directImporters(files, targetFile, suppliedIndex) {
   if (!targetFile) return []
+  let index = suppliedIndex ?? importIndexCache.get(files)
+  if (!index) {
+    index = createImportIndex(files)
+    importIndexCache.set(files, index)
+  }
   return files.filter((file) =>
-    importsOf(file).local.some((spec) => resolveFile(spec) === targetFile),
+    index.get(file)?.includes(targetFile),
   )
 }
 

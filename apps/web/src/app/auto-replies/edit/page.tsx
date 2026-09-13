@@ -4,8 +4,9 @@ import { Suspense, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { api } from '@/lib/api'
-import Header from '@/components/layout/header'
-import EditDialog, { toDraft, type AutoReplyDraft } from '@/components/auto-replies/edit-dialog'
+import { usePageTitle } from '@/components/shell/page-chrome'
+import EditDialog, { toVersionDraft, type AutoReplyDraft } from '@/components/auto-replies/edit-dialog'
+import './issue481-height.css'
 
 /**
  * 自動応答の編集を、URL で開けるようにする。
@@ -17,6 +18,10 @@ function AutoReplyEditInner() {
   const router = useRouter()
   const params = useSearchParams()
   const id = params.get('id')
+  const requestedStep = params.get('step')
+  const step = requestedStep === 'trigger' || requestedStep === 'response' ? requestedStep : 'basic'
+  const stepLabel = step === 'basic' ? '基本設定' : step === 'trigger' ? 'どんなときに動くか' : '何を返すか'
+  usePageTitle(`自動応答ルールを作成・${stepLabel}`)
 
   const [draft, setDraft] = useState<AutoReplyDraft | null>(null)
   const [templates, setTemplates] = useState<
@@ -26,9 +31,15 @@ function AutoReplyEditInner() {
   const [error, setError] = useState('')
 
   useEffect(() => {
+    let active = true
     void (async () => {
       try {
-        const tplRes = await api.templates.list()
+        const [tplRes, draftRes, liveRes] = await Promise.all([
+          api.templates.list(),
+          id ? api.autoReplies.getDraft(id) : Promise.resolve(null),
+          id ? api.autoReplies.get(id).catch(() => null) : Promise.resolve(null),
+        ])
+        if (!active) return
         if (tplRes.success) {
           setTemplates(
             tplRes.data.map((t) => ({
@@ -40,11 +51,19 @@ function AutoReplyEditInner() {
           )
         }
         if (id) {
-          const res = await api.autoReplies.get(id)
-          if (res.success) {
-            setDraft(toDraft(res.data))
+          if (draftRes?.success) {
+            const [conflictRes, summaryRes] = await Promise.all([
+              api.autoReplies.conflicts(id).catch(() => null),
+              api.autoReplies.summary(draftRes.data.settings.lineAccountId).catch(() => null),
+            ])
+            if (!active) return
+            setDraft(toVersionDraft(draftRes.data, {
+              isActive: liveRes?.success ? liveRes.data.isActive : true,
+              conflictAttentionCount: conflictRes?.success ? conflictRes.data.conflicts.length : null,
+              receiveSourceCounts: summaryRes?.success ? summaryRes.data.receiveSourceCounts : null,
+            }))
           } else {
-            setError(res.error)
+            setError(draftRes?.error ?? '下書きを読み込めませんでした')
           }
         } else {
           setDraft({
@@ -60,20 +79,18 @@ function AutoReplyEditInner() {
           })
         }
       } catch {
-        setError('読み込みに失敗しました')
+        if (active) setError('読み込みに失敗しました')
       } finally {
-        setLoading(false)
+        if (active) setLoading(false)
       }
     })()
+    return () => {
+      active = false
+    }
   }, [id])
 
   return (
-    <div>
-      <Header
-        title={id ? '自動応答を編集' : '自動応答を作る'}
-        description="決めた言葉が届いたときに、自動で返します。"
-      />
-
+    <div data-issue481-height>
       <nav className="text-ink-faint mb-4 text-xs">
         <Link href="/auto-replies" className="hover:underline">
           自動応答
@@ -94,10 +111,18 @@ function AutoReplyEditInner() {
         </div>
       ) : draft ? (
         <EditDialog
+          page
+          step={step}
           draft={draft}
           templates={templates}
           onClose={() => router.push('/auto-replies')}
           onSaved={() => router.push('/auto-replies')}
+          onStepChange={(nextStep) => {
+            const query = new URLSearchParams()
+            if (id) query.set('id', id)
+            query.set('step', nextStep)
+            router.replace(`/auto-replies/edit?${query.toString()}`)
+          }}
         />
       ) : null}
     </div>

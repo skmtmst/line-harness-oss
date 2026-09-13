@@ -24,7 +24,7 @@ export interface FriendAttributesV2Fixture {
 const QA_GROUPS: TagGroup[] = [
   ['VIP', '#F59E0B'], ['ペット', '#EC4899'], ['会員', '#10B981'],
   ['健康', '#06B6D4'], ['購入', '#3B82F6'],
-].map(([name, color], index) => ({ id: `qa-group-${index}`, name, color, sortOrder: index, createdAt: '', updatedAt: '' }))
+].map(([name, color], index) => ({ id: `qa-group-${index}`, accountId: null, name, color, sortOrder: index, createdAt: '', updatedAt: '' }))
 
 export const FRIEND_ATTRIBUTES_V2_QA_FIXTURE: FriendAttributesV2Fixture = {
   groups: QA_GROUPS,

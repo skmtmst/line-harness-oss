@@ -3,11 +3,12 @@ import { Hono } from 'hono';
 import type { Env } from '../index.js';
 
 const mocks = {
+  ANALYTICS_REPORT_SECTIONS: ['friends', 'reactions', 'routes', 'usage', 'mileage'],
+  DEFAULT_TENANT_ID: 'tenant-default',
   getDailyMessageCounts: vi.fn(),
   getTrackedLinkStats: vi.fn(),
   getLinkClickSummary: vi.fn(),
   getBroadcastSummary: vi.fn(),
-  getTagFieldCross: vi.fn(),
   getFunnelsWithCurrentVersions: vi.fn(),
   getLegacyFunnels: vi.fn(),
   getFunnelById: vi.fn(),
@@ -30,10 +31,14 @@ const mocks = {
   createSavedAnalyticsFromResult: vi.fn(),
   getSavedAnalytics: vi.fn(),
   getSavedAnalyticsSnapshots: vi.fn(),
+  getAnalyticsReportSchedules: vi.fn(),
+  createAnalyticsReportSchedule: vi.fn(),
+  getStaffMembers: vi.fn(),
   createAnalyticsCrossAudience: vi.fn(),
   getCurrentFunnelVersion: vi.fn(),
   getLineAccountById: vi.fn(),
   getLineAccounts: vi.fn(),
+  getLineAccountScopeEntries: vi.fn(async (...args: unknown[]) => mocks.getLineAccounts(...args)),
   getStaffById: vi.fn(),
   getStaffAccountScopeIds: vi.fn(),
   FUNNEL_STEP_KINDS: [
@@ -76,7 +81,26 @@ staffApp.use('*', async (c, next) => {
   return next();
 });
 staffApp.route('/', analytics);
-const env = { DB: {} as D1Database };
+// 実行間隔ガード(点検#508の中4)が読む最小の入れ物。テストごとに中身を変える。
+const guardRows: { crossBusy: { id: string } | null; lastFunnelRunAt: string | null } = {
+  crossBusy: null,
+  lastFunnelRunAt: null,
+};
+const env = {
+  DB: {
+    prepare: (sql: string) => ({
+      bind: () => ({
+        first: async () => {
+          if (sql.includes('FROM analytics_cross_runs')) return guardRows.crossBusy;
+          if (sql.includes('FROM analytics_funnel_runs')) {
+            return guardRows.lastFunnelRunAt ? { created_at: guardRows.lastFunnelRunAt } : null;
+          }
+          return null;
+        },
+      }),
+    }),
+  } as unknown as D1Database,
+};
 
 function req(path: string, method = 'GET', body?: unknown) {
   return app.fetch(
@@ -104,13 +128,14 @@ const FUNNEL = { id: 'fn-1', line_account_id: 'account-a', name: '購入まで',
 
 beforeEach(() => {
   vi.clearAllMocks();
+  guardRows.crossBusy = null;
+  guardRows.lastFunnelRunAt = null;
   mocks.getStaffById.mockResolvedValue({ account_scope: 'all' });
   mocks.getStaffAccountScopeIds.mockResolvedValue([]);
   mocks.getDailyMessageCounts.mockResolvedValue([]);
   mocks.getTrackedLinkStats.mockResolvedValue([]);
   mocks.getLinkClickSummary.mockResolvedValue([]);
   mocks.getBroadcastSummary.mockResolvedValue([]);
-  mocks.getTagFieldCross.mockResolvedValue([]);
   mocks.getFunnelsWithCurrentVersions.mockResolvedValue({
     items: [{
       ...FUNNEL,
@@ -164,6 +189,7 @@ beforeEach(() => {
     id: 'cross-1', state: 'available', errorCode: null,
     result: { state: 'available', cells: [], totalValue: 0 },
     createdAt: '2026-08-26T00:00:00.000Z',
+    queuePosition: null, pendingAhead: 0, estimatedWaitMs: null, nextTickAt: null,
   });
   mocks.getAnalyticsFriendsOverview.mockResolvedValue({ lineAccountId: 'account-a', data: {} });
   mocks.getAnalyticsReactionsOverview.mockResolvedValue({ lineAccountId: 'account-a', data: {} });
@@ -175,6 +201,14 @@ beforeEach(() => {
   });
   mocks.getSavedAnalytics.mockResolvedValue([]);
   mocks.getSavedAnalyticsSnapshots.mockResolvedValue([]);
+  mocks.getAnalyticsReportSchedules.mockResolvedValue([]);
+  mocks.createAnalyticsReportSchedule.mockImplementation(async (_db, input) => ({
+    id: 'report-1', ...input, status: 'active', isOneTime: Boolean(input.isOneTime),
+    lineAccountId: input.lineAccountId, createdAt: input.now, updatedAt: input.now,
+  }));
+  mocks.getStaffMembers.mockResolvedValue([
+    { id: 'u-1', name: 'テスト', role: 'owner', email: 'owner@example.com', line_user_id: 'U1', is_active: 1, invite_status: 'active', account_scope: 'all' },
+  ]);
   mocks.createAnalyticsCrossAudience.mockResolvedValue({
     id: 'audience-cross-1', memberCount: 2, expiresAt: '2026-08-27T00:00:00.000Z',
   });
@@ -296,16 +330,10 @@ describe('V6分析の概要API', () => {
   });
 });
 
-describe('クロス集計', () => {
-  it('項目の指定が要る', async () => {
-    const res = await req(`/api/analytics/cross?${ACCOUNT}`);
-    expect(res.status).toBe(400);
-  });
-
-  it('項目を指定すれば返る', async () => {
+describe('旧クロス集計', () => {
+  it('画面未使用の同期GET口は公開しない', async () => {
     const res = await req(`/api/analytics/cross?${ACCOUNT}&fieldId=ff-1`);
-    expect(res.status).toBe(200);
-    expect(mocks.getTagFieldCross).toHaveBeenCalledWith(env.DB, 'account-a', 'ff-1');
+    expect(res.status).toBe(404);
   });
 });
 
@@ -331,10 +359,42 @@ describe('V6クロス分析API', () => {
     expect(await res.json()).toMatchObject({ data: { id: 'cross-1', state: 'pending' } });
   });
 
+  it('終わっていない集計がある間は受け付けず429にする(点検#508の中4)', async () => {
+    guardRows.crossBusy = { id: 'cross-0' };
+    const res = await req(`/api/analytics/cross/query?${ACCOUNT}`, 'POST', body);
+    expect(res.status).toBe(429);
+    expect(await res.json()).toMatchObject({ success: false, error: 'analytics_cross_busy' });
+    expect(mocks.createAnalyticsCrossRun).not.toHaveBeenCalled();
+  });
+
   it('選択中アカウント内の結果だけを返す', async () => {
     const res = await req(`/api/analytics/cross/results/cross-1?${ACCOUNT}`);
     expect(res.status).toBe(200);
     expect(mocks.getAnalyticsCrossRun).toHaveBeenCalledWith(env.DB, 'account-a', 'cross-1');
+  });
+
+  it('待ち順と目安を同一アカウントの範囲だけで返す', async () => {
+    mocks.getAnalyticsCrossRun.mockResolvedValueOnce({
+      id: 'cross-1', state: 'pending', errorCode: null, result: null,
+      createdAt: '2026-08-26T00:00:00.000Z',
+      queuePosition: 1, pendingAhead: 0, estimatedWaitMs: 300_000,
+      nextTickAt: '2026-08-26T00:06:00.000Z',
+    });
+    const res = await req(`/api/analytics/cross/results/cross-1?${ACCOUNT}`);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      data: {
+        id: 'cross-1', state: 'pending',
+        queuePosition: 1, pendingAhead: 0, estimatedWaitMs: 300_000,
+        nextTickAt: '2026-08-26T00:06:00.000Z',
+      },
+    });
+  });
+
+  it('別アカウントの結果は存在ごと404にする', async () => {
+    mocks.getAnalyticsCrossRun.mockResolvedValueOnce(null);
+    const res = await req(`/api/analytics/cross/results/cross-1?${ACCOUNT}`);
+    expect(res.status).toBe(404);
   });
 
   it('セルから友だちIDではなく24時間の対象者IDを返す', async () => {
@@ -558,6 +618,27 @@ describe('V6ファネルAPI', () => {
     expect(mocks.getLatestFunnelRun).toHaveBeenCalledWith(env.DB, 'account-a', 'fn-1');
   });
 
+  it('同一ファネルの60秒以内の再集計は429にする(点検#508の中4)', async () => {
+    guardRows.lastFunnelRunAt = new Date().toISOString();
+    const res = await req(`/api/analytics/funnels/fn-1/run?${ACCOUNT}`, 'POST', {
+      cohortFrom: '2026-08-01T00:00:00.000+09:00',
+      cohortTo: '2026-08-10T23:59:59.999+09:00',
+    });
+    expect(res.status).toBe(429);
+    expect(await res.json()).toMatchObject({ success: false, error: 'analytics_funnel_too_soon' });
+    expect(mocks.runChronologicalFunnel).not.toHaveBeenCalled();
+  });
+
+  it('61秒前の再集計は受け付ける(点検#508の中4)', async () => {
+    guardRows.lastFunnelRunAt = new Date(Date.now() - 61_000).toISOString();
+    const res = await req(`/api/analytics/funnels/fn-1/run?${ACCOUNT}`, 'POST', {
+      cohortFrom: '2026-08-01T00:00:00.000+09:00',
+      cohortTo: '2026-08-10T23:59:59.999+09:00',
+    });
+    expect(res.status).toBe(201);
+    expect(mocks.runChronologicalFunnel).toHaveBeenCalled();
+  });
+
   it('時刻にタイムゾーンがなければ集計しない', async () => {
     const res = await req(`/api/analytics/funnels/fn-1/run?${ACCOUNT}`, 'POST', {
       cohortFrom: '2026-08-01T00:00:00',
@@ -597,5 +678,55 @@ describe('LINE公式アカウントの分離', () => {
     const res = await req(`/api/funnels?${ACCOUNT}`);
     expect(res.status).toBe(200);
     expect(mocks.getLegacyFunnels).toHaveBeenCalledWith(env.DB, 'account-a');
+  });
+});
+
+describe('V6 定期レポートAPI', () => {
+  const body = {
+    name: '週次まとめ', sections: ['friends', 'reactions'], savedAnalysisIds: [],
+    cadence: 'weekly', weekday: 1, monthDay: null, sendTime: '09:00',
+    timeZone: 'Asia/Tokyo', periodDays: 7,
+    recipients: [{ kind: 'staff', staffId: 'u-1', label: 'テスト' }],
+    channels: ['dashboard', 'line'],
+    alertRules: [{ metric: 'friend_adds', operator: 'decrease_percent', threshold: 20, minimumSample: 20 }],
+  };
+
+  it('通常と空状態を同じアカウント境界で返す', async () => {
+    const res = await req(`/api/analytics/report-schedules?${ACCOUNT}`);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      success: true,
+      data: { items: [], options: { timeZone: 'Asia/Tokyo', recipients: [{ id: 'u-1' }] } },
+    });
+    expect(mocks.getAnalyticsReportSchedules).toHaveBeenCalledWith(env.DB, 'account-a');
+  });
+
+  it('統括は実在する保存分析と宛先だけで作れる', async () => {
+    const res = await req(`/api/analytics/report-schedules?${ACCOUNT}`, 'POST', body);
+    expect(res.status).toBe(201);
+    expect(mocks.createAnalyticsReportSchedule).toHaveBeenCalledWith(
+      env.DB,
+      expect.objectContaining({ lineAccountId: 'account-a', name: '週次まとめ', isOneTime: false }),
+    );
+  });
+
+  it('運用担当は閲覧できるが作成できない', async () => {
+    expect((await reqAsStaff(`/api/analytics/report-schedules?${ACCOUNT}`)).status).toBe(200);
+    expect((await reqAsStaff(`/api/analytics/report-schedules?${ACCOUNT}`, 'POST', body)).status).toBe(403);
+  });
+
+  it('権限外の宛先と別アカウントは拒否する', async () => {
+    const badRecipient = await req(`/api/analytics/report-schedules?${ACCOUNT}`, 'POST', {
+      ...body, recipients: [{ kind: 'staff', staffId: 'other', label: '別担当' }],
+    });
+    expect(badRecipient.status).toBe(422);
+    expect((await req('/api/analytics/report-schedules?account_id=account-b')).status).toBe(404);
+  });
+
+  it('読取失敗は500で返し、未取得を空に見せない', async () => {
+    mocks.getAnalyticsReportSchedules.mockRejectedValueOnce(new Error('db down'));
+    const res = await req(`/api/analytics/report-schedules?${ACCOUNT}`);
+    expect(res.status).toBe(500);
+    expect(await res.json()).toMatchObject({ success: false });
   });
 });

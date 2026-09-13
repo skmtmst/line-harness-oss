@@ -1,14 +1,14 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import Header from '@/components/layout/header'
-import { useEmbeddedPage } from '@/components/layout/embedded-page-context'
 import SummaryBar from '@/components/users/summary-bar'
 import UsersFilters from '@/components/users/users-filters'
 import UsersTable from '@/components/users/users-table'
 import MergedPersonDetailView from '@/components/merged-person/merged-person-detail'
+import Button from '@/components/shared/button'
 import { api } from '@/lib/api'
 import type { UserRowData } from '@/components/users/user-row'
+import { usePageTitle } from '@/components/shell/page-chrome'
 
 const PAGE_SIZE = 50
 
@@ -18,13 +18,14 @@ interface AccountOption {
 }
 
 export default function UsersPage() {
-  const embedded = useEmbeddedPage()
+  usePageTitle('統合ユーザー')
   const [rows, setRows] = useState<UserRowData[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
   const [q, setQ] = useState('')
   const [onlyDups, setOnlyDups] = useState(false)
   const [account, setAccount] = useState('')
+  const [uid, setUid] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [accountOptions, setAccountOptions] = useState<AccountOption[]>([])
@@ -115,15 +116,34 @@ export default function UsersPage() {
     load()
   }, [load])
 
-  const headerDescription = useMemo(
-    () => '複数のLINEアカウントにいる同じ人を、元の友だちを残したまま確認します。',
-    [],
-  )
+  const visibleRows = useMemo(() => rows.filter((row) => {
+    if (uid === 'linked') return row.identityKeyKind === 'uid'
+    if (uid === 'unlinked') return row.identityKeyKind !== 'uid'
+    return true
+  }), [rows, uid])
+
+  const exportCsv = () => {
+    const cell = (value: string) => `"${value.replaceAll('"', '""')}"`
+    const lines = [
+      ['統合ユーザー', '連絡先', '紐付くアカウント', 'UID', '最終接触'].map(cell).join(','),
+      ...visibleRows.map((row) => [
+        row.displayName ?? '', row.emails[0] ?? row.phones[0] ?? '',
+        row.accounts.map((item) => item.accountName).join('・'),
+        row.identityKeyKind === 'uid' ? '連携済み' : row.identityKeyKind === 'url_token' ? '要確認' : '未連携',
+        row.lastActivityAt,
+      ].map(cell).join(',')),
+    ]
+    const url = URL.createObjectURL(new Blob([`\uFEFF${lines.join('\n')}`], { type: 'text/csv;charset=utf-8' }))
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = 'merged-users.csv'
+    anchor.click()
+    URL.revokeObjectURL(url)
+  }
 
   if (openedPersonId) {
     return (
       <div className="space-y-4" data-users-design="v6">
-        {!embedded ? <Header title="統合ユーザー" description={headerDescription} /> : null}
         <MergedPersonDetailView
           personId={openedPersonId}
           onClose={() => setOpenedPersonId(null)}
@@ -134,8 +154,6 @@ export default function UsersPage() {
 
   return (
     <div className="space-y-4" data-users-design="v6" data-design-node="r7eSi">
-      {!embedded ? <Header title="統合ユーザー" description={headerDescription} /> : null}
-
       <section className="rounded-card border border-hairline bg-canvas px-4 py-3 shadow-card">
         <p className="text-sm font-bold text-ink">
           複数の友だちを、1人の顧客として横断管理します。
@@ -145,36 +163,41 @@ export default function UsersPage() {
         </p>
       </section>
 
-      <SummaryBar />
+      <SummaryBar rows={rows} />
 
-      <div className="flex items-stretch gap-3">
-        <div className="flex-1">
+      <div className="flex flex-wrap items-center gap-2" data-users-actions="true">
+        <Button href="/friends/identity-candidates" variant="primary">
+          ＋ 統合ユーザーを作成
+        </Button>
+        <div className="min-w-0 flex-1">
           <UsersFilters
             q={q}
             onlyDups={onlyDups}
             account={account}
+            uid={uid}
             accountOptions={accountOptions}
             onChange={(next) => {
               if (next.q !== undefined) setQ(next.q)
               if (next.onlyDups !== undefined) setOnlyDups(next.onlyDups)
               if (next.account !== undefined) setAccount(next.account)
+              if (next.uid !== undefined) setUid(next.uid)
             }}
           />
         </div>
-        <button
+        <Button type="button" onClick={exportCsv}>CSVで書き出す</Button>
+        <Button
           type="button"
           onClick={() => setPendingForceRefresh(true)}
           disabled={refreshing}
-          className="rounded-[9px] border border-[#DADDE2] bg-white px-4 text-xs font-semibold text-[#565F59] shadow-[1px_1px_2px_rgba(29,29,31,0.13)] hover:bg-[#F6F6F8] disabled:opacity-50"
           title="最新の状態を取得して一覧を更新"
         >
           {refreshing ? '再計算中…' : '再計算'}
-        </button>
+        </Button>
       </div>
 
       <UsersTable
-        rows={rows}
-        total={total}
+        rows={visibleRows}
+        total={uid ? visibleRows.length : total}
         page={page}
         pageSize={PAGE_SIZE}
         loading={loading}

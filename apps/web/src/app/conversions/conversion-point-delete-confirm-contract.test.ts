@@ -38,34 +38,46 @@ describe('成果地点の削除確認', () => {
     expect(PAGE).toContain("import ConfirmDialog from '@/components/shared/confirm-dialog'")
   })
 
-  it('削除の本体が二度押しを止め、返事を確かめ、finally で戻す', () => {
-    const body = slice(PAGE, 'const runDelete = async', '\n  const countByPoint')
-    expect(body, '処理中でも受け付けてしまう').toContain('if (!deleteTarget || deleting) return')
+  it('停止の本体が二度押しを止め、3操作の返事を確かめ、finally で戻す', () => {
+    const body = slice(PAGE, 'const runStop = async', '\n  const exportCsv')
+    expect(body, '処理中でも受け付けてしまう').toContain('if (!stopTarget || stopping) return')
     expect(body, '返事を確かめていない').toContain('if (!res.success) throw new Error(res.error)')
-    expect(body, '失敗を握りつぶしている').toContain(
-      "setDeleteError('この成果地点を削除できませんでした。状態を読み直してから、もう一度お試しください。')",
-    )
-    expect(body, '生のAPIエラーをそのまま出している').not.toContain('setDeleteError(res.error)')
-    expect(body, 'finally で処理中を戻していない').toMatch(/finally \{\s*setDeleting\(false\)/)
+    expect(body).toContain('api.conversions.stopDefinition')
+    expect(body).toContain('api.conversions.replaceDefinition')
+    expect(body).toContain('api.conversions.deleteDefinition')
+    expect(body, '失敗を握りつぶしている').toContain('この成果地点の計測を止められませんでした。')
+    expect(body, '生のAPIエラーをそのまま出している').not.toContain('setStopError(res.error)')
+    expect(body, 'finally で処理中を戻していない').toMatch(/finally \{\s*setStopping\(false\)/)
   })
 
-  it('取り消せない削除なので赤にし、設計の重ね画面を名乗る', () => {
-    const dialog = dialogWith(PAGE, 'open={deleteTarget !== null}')
-    expect(dialog, '赤にしていない').toContain('destructive')
+  it('安全な計測停止を既定にし、設計の重ね画面を名乗る', () => {
+    const dialog = dialogWith(PAGE, 'open={stopTarget !== null}')
+    expect(dialog, '物理削除の赤い確認に戻っている').not.toContain('destructive')
     expect(dialog, '設計の重ね画面のNodeが無い').toContain('designNode="d8d3Mz"')
-    expect(dialog, '処理中を窓へ渡していない').toContain('busy={deleting}')
-    expect(dialog, '失敗を窓の中に出していない').toContain('error={deleteError}')
+    expect(dialog, '処理中を窓へ渡していない').toContain('busy={stopping || stopImpactLoading}')
+    expect(dialog, '失敗を窓の中に出していない').toContain('error={stopError}')
+    for (const label of ['数えるのをやめる', '差し替えて数えるのをやめる', 'この成果地点を削除する']) {
+      expect(dialog).toContain(label)
+    }
   })
 
-  it('記録した成果も消えることと、数えられない参照を本文で断る', () => {
-    const dialog = dialogWith(PAGE, 'open={deleteTarget !== null}')
-    expect(dialog).toContain('この成果地点で記録した成果も一緒に消えます。')
-    // 使用先を数える口が無い。0件と書かず、数えていないことを断る。
-    expect(dialog).toContain(
-      'オートメーション・アフィリエイト案件からの参照は数えられていません。',
-    )
-    expect(dialog, '取れない数を0件として作っている').not.toContain('参照 0件')
-    // レポートが落ちているときは件数を作らず「読み込めませんでした」と出す。
-    expect(dialog).toContain('読み込めませんでした')
+  it('過去記録を残し、実データの利用先件数と3つの選択肢を本文で示す', () => {
+    const dialog = dialogWith(PAGE, 'open={stopTarget !== null}')
+    expect(dialog).toContain('の記録と金額は、そのまま残ります。')
+    expect(dialog).toContain('stopImpact.usages.map')
+    expect(dialog).toContain('利用先は実データです。')
+    for (const choice of ['数えるのをやめる（おすすめ）', '別の成果地点に差し替えてから削除する', 'このまま削除する']) {
+      expect(dialog).toContain(choice)
+    }
+    expect(dialog).toContain('stopTarget.metrics.netCount.toLocaleString')
+    expect(dialog).toContain('stopImpact?.canDelete')
+    expect(dialog).toContain('replacementCandidates')
+  })
+
+  it('窓を開く前に利用先・停止影響・削除可否を実APIから読む', () => {
+    const body = slice(PAGE, 'const openStop = async', '\n  const runStop')
+    expect(body).toContain('api.conversions.definitionDeleteImpact(target.id)')
+    expect(body).toContain('setStopImpact(response.data)')
+    expect(body).toContain('利用先と停止の影響を読み込めませんでした')
   })
 })

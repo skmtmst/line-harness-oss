@@ -3,10 +3,10 @@
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { bookingApi, type BookingRequest } from '@/lib/api'
+import { bookingApi, type BookingAdminDetail, type BookingHistorySummary, type BookingRequest } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
-import Header from '@/components/layout/header'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { usePageTitle } from '@/components/shell/page-chrome'
 
 type BookingAction = 'approve' | 'reject' | 'cancel' | 'complete' | 'no_show'
 
@@ -103,17 +103,38 @@ function approvedText(b: BookingRequest): string {
   ].join('\n')
 }
 
+function detailAsRequest(detail: BookingAdminDetail): BookingRequest {
+  return {
+    id: detail.id,
+    friend_id: detail.customer.friendId,
+    booking_customer_id: detail.customer.bookingCustomerId,
+    starts_at: detail.startsAt,
+    ends_at: detail.endsAt,
+    status: detail.status,
+    customer_note: detail.customerNote,
+    internal_note: detail.internalNote,
+    price_at_booking: detail.price,
+    menu_name: detail.menuName,
+    staff_name: detail.staffName,
+    friend_name: detail.customer.displayName,
+    requested_at: detail.requestedAt,
+    decided_at: detail.decidedAt,
+    external_event_id: null,
+  }
+}
+
 function BookingDetailInner() {
   const { selectedAccountId } = useAccount()
   const params = useSearchParams()
   const id = params.get('id') ?? ''
   const [booking, setBooking] = useState<BookingRequest | null>(null)
   /** 同じ友だちの予約。「これまでの予約」に使う。 */
-  const [history, setHistory] = useState<BookingRequest[]>([])
+  const [history, setHistory] = useState<BookingHistorySummary[]>([])
   const [loading, setLoading] = useState(true)
   const [acting, setActing] = useState(false)
   const [decideTarget, setDecideTarget] = useState<BookingAction | null>(null)
   const [error, setError] = useState('')
+  usePageTitle(booking ? `${booking.friend_name ?? 'お客様'} ／ ${booking.menu_name}` : '予約の詳細')
 
   const load = useCallback(async () => {
     if (!id || !selectedAccountId) {
@@ -122,12 +143,9 @@ function BookingDetailInner() {
     }
     setLoading(true)
     try {
-      const res = await bookingApi.listRequests(selectedAccountId, 'all')
-      const found = res.requests.find((r) => r.id === id) ?? null
-      setBooking(found)
-      setHistory(
-        found ? res.requests.filter((r) => r.friend_id === found.friend_id && r.id !== found.id) : [],
-      )
+      const res = await bookingApi.getBooking(selectedAccountId, id)
+      setBooking(detailAsRequest(res.booking))
+      setHistory(res.booking.history)
     } catch {
       setError('読み込みに失敗しました')
     } finally {
@@ -162,14 +180,13 @@ function BookingDetailInner() {
   const lastVisit = useMemo(() => {
     const past = history
       .filter((r) => r.status === 'completed' || r.status === 'confirmed')
-      .sort((a, b) => b.starts_at.localeCompare(a.starts_at))
+      .sort((a, b) => b.startsAt.localeCompare(a.startsAt))
     return past[0] ?? null
   }, [history])
 
   if (!id) {
     return (
       <div>
-        <Header title="予約の詳細" />
         <p className="text-ink-faint bg-canvas rounded-card border-hairline border p-8 text-center text-sm">
           予約が指定されていません。
           <Link href="/booking/bookings" className="text-accent ml-1 hover:underline">
@@ -184,34 +201,13 @@ function BookingDetailInner() {
 
   return (
     <div>
-      <div data-design="Head">
-        <nav className="text-ink-faint mb-2 text-xs">
-          <Link href="/booking/bookings" className="hover:underline">
-            予約管理
-          </Link>
-          <span className="mx-1.5">/</span>
-          <span>予約の詳細</span>
-        </nav>
-        <Header
-          title="予約の詳細"
-          description="内容を確認して、承認・拒否・日時の変更を行います。"
-        />
-        <div className="mb-4 flex flex-wrap items-center gap-2">
-          <Link
-            href="/booking/bookings"
-            className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken border px-3 py-2 text-sm"
-          >
-            一覧に戻る
-          </Link>
-          <button
-            disabled
-            title="この画面から予約の中身を書き換える仕組みは準備中です"
-            className="bg-accent-deep text-on-accent rounded-control px-4 py-2 text-sm font-medium opacity-50"
-          >
-            変更を保存
-          </button>
-        </div>
-      </div>
+      <nav className="text-ink-faint mb-2 text-xs" aria-label="パンくず">
+        <Link href="/booking/bookings" className="hover:underline">
+          予約管理
+        </Link>
+        <span className="mx-1.5">/</span>
+        <span>予約の詳細</span>
+      </nav>
 
       {error && (
         <div className="bg-danger-bg border-danger-bg text-danger mb-4 rounded-lg border p-4 text-sm">
@@ -257,12 +253,14 @@ function BookingDetailInner() {
             <section className="bg-canvas rounded-card border-hairline border p-5">
               <div className="mb-3 flex items-center justify-between gap-2">
                 <h2 className="text-ink text-sm font-semibold">お客さま</h2>
-                <Link
-                  href={`/friends/detail?id=${encodeURIComponent(booking.friend_id)}`}
-                  className="text-accent text-xs hover:underline"
-                >
-                  友だち詳細を見る
-                </Link>
+                {booking.friend_id ? (
+                  <Link
+                    href={`/friends/detail?id=${encodeURIComponent(booking.friend_id)}`}
+                    className="text-accent text-xs hover:underline"
+                  >
+                    友だち詳細を見る
+                  </Link>
+                ) : null}
               </div>
               <Row label="お名前">
                 {booking.friend_name ? `${booking.friend_name} さま` : '未設定'}
@@ -279,7 +277,7 @@ function BookingDetailInner() {
                 ) : (
                   <>
                     {history.length}件
-                    {lastVisit && `（直近 ${jpStamp(lastVisit.starts_at).slice(0, 10)}）`}
+                    {lastVisit && `（直近 ${jpStamp(lastVisit.startsAt).slice(0, 10)}）`}
                   </>
                 )}
               </Row>

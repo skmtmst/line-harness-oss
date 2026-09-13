@@ -13,6 +13,7 @@ const valid = {
   receivedFrom: null,
   receivedTo: null,
   sort: 'waiting_desc',
+  due: 'overdue',
 };
 
 describe('受信箱の保存検索条件', () => {
@@ -22,6 +23,7 @@ describe('受信箱の保存検索条件', () => {
     if (result.ok) {
       expect(result.value.query).toBe('予約');
       expect(result.value.statuses).toEqual(['unread', 'on_hold']);
+      expect(result.value.due).toBe('overdue');
     }
   });
 
@@ -35,5 +37,15 @@ describe('受信箱の保存検索条件', () => {
       ...valid,
       channels: [],
     }).ok).toBe(false);
+    expect(validateInboxSavedViewConditions({
+      ...valid,
+      due: 'tomorrow',
+    }).ok).toBe(false);
+  });
+
+  it('期限条件が無い既存データは「すべて」として読み継ぐ', () => {
+    const result = validateInboxSavedViewConditions({ ...valid, due: undefined });
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value.due).toBe('all');
   });
 });

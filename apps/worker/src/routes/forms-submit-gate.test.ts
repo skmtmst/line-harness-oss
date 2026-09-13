@@ -21,18 +21,39 @@ const mocks = vi.hoisted(() => ({
   getFormById: vi.fn(),
   getFriendByLineUserIdForAccount: vi.fn(),
   getFriendById: vi.fn(),
-  createFormSubmission: vi.fn(),
+  insertFormSubmissionRecord: vi.fn(),
+  resyncFormSubmitCount: vi.fn(),
+  createFormSubmitClaim: vi.fn(),
+  getFormSubmitClaim: vi.fn(),
+  takeoverFormSubmitClaim: vi.fn(),
+  readFormSubmitClaimSteps: vi.fn(),
+  appendFormSubmitClaimStep: vi.fn(),
+  saveFormSubmitClaimWebhook: vi.fn(),
+  completeFormSubmitClaim: vi.fn(),
+  failFormSubmitClaim: vi.fn(),
+  ensureFormSubmitOutboxEvent: vi.fn(),
+  getFormSubmitOutbox: vi.fn(),
+  markFormSubmitOutboxDelivered: vi.fn(),
+  readFormSubmitOutboxPayload: vi.fn(),
+  readFormSubmitClaimEffectStats: vi.fn(),
+  saveFormSubmitClaimEffectStats: vi.fn(),
+  findUnfinishedFormSubmitClaimByHash: vi.fn(),
+  getFormSubmissionById: vi.fn(),
+  applyMileageRulesForEvent: vi.fn(),
+  updateFormSubmissionDestinationWriteResult: vi.fn(),
   verifyCallerLineIdentity: vi.fn(),
   countFormSubmissionsByFriend: vi.fn(),
   countChoiceUsage: vi.fn(),
   attachTag: vi.fn(),
   setFriendFieldValue: vi.fn(),
   getFriendFieldById: vi.fn(),
-  awardActivityMileage: vi.fn(),
   formBelongsToLineAccount: vi.fn(),
 }));
 
 vi.mock('@line-crm/db', () => ({
+  // #648: 成果計測は packages/db へ移した。この差し替えに書き出しが無いと、
+  // 呼び出し口が 500 になる。数えること自体は実DBの試験で見ている。
+  recordConversionSourceEvent: vi.fn(async () => ({ matched: 0, recorded: 0, failed: 0, skipped: null })),
   getForms: vi.fn(),
   getFormsWithStats: vi.fn(),
   getFormById: mocks.getFormById,
@@ -42,8 +63,28 @@ vi.mock('@line-crm/db', () => ({
   deleteForm: vi.fn(),
   getFormSubmissions: vi.fn(),
   getFormSubmissionsPage: vi.fn(),
+  getFormSubmissionAnalytics: vi.fn(),
   getLatestFormSubmission: vi.fn(),
-  createFormSubmission: mocks.createFormSubmission,
+  insertFormSubmissionRecord: mocks.insertFormSubmissionRecord,
+  resyncFormSubmitCount: mocks.resyncFormSubmitCount,
+  createFormSubmitClaim: mocks.createFormSubmitClaim,
+  getFormSubmitClaim: mocks.getFormSubmitClaim,
+  takeoverFormSubmitClaim: mocks.takeoverFormSubmitClaim,
+  readFormSubmitClaimSteps: mocks.readFormSubmitClaimSteps,
+  appendFormSubmitClaimStep: mocks.appendFormSubmitClaimStep,
+  saveFormSubmitClaimWebhook: mocks.saveFormSubmitClaimWebhook,
+  completeFormSubmitClaim: mocks.completeFormSubmitClaim,
+  failFormSubmitClaim: mocks.failFormSubmitClaim,
+  ensureFormSubmitOutboxEvent: mocks.ensureFormSubmitOutboxEvent,
+  getFormSubmitOutbox: mocks.getFormSubmitOutbox,
+  markFormSubmitOutboxDelivered: mocks.markFormSubmitOutboxDelivered,
+  readFormSubmitOutboxPayload: mocks.readFormSubmitOutboxPayload,
+  readFormSubmitClaimEffectStats: mocks.readFormSubmitClaimEffectStats,
+  saveFormSubmitClaimEffectStats: mocks.saveFormSubmitClaimEffectStats,
+  findUnfinishedFormSubmitClaimByHash: mocks.findUnfinishedFormSubmitClaimByHash,
+  getFormSubmissionById: mocks.getFormSubmissionById,
+  applyMileageRulesForEvent: mocks.applyMileageRulesForEvent,
+  updateFormSubmissionDestinationWriteResult: mocks.updateFormSubmissionDestinationWriteResult,
   getFriendByLineUserIdForAccount: mocks.getFriendByLineUserIdForAccount,
   getFriendById: mocks.getFriendById,
   getTrackedLinkById: vi.fn(),
@@ -73,10 +114,6 @@ vi.mock('../services/local-line-proxy.js', () => ({
 
 vi.mock('../services/line-proxy-send.js', () => ({
   pushViaHarnessProxy: vi.fn(async () => undefined),
-}));
-
-vi.mock('../services/activity-mileage.js', () => ({
-  awardActivityMileage: mocks.awardActivityMileage,
 }));
 
 import { forms } from './forms.js';
@@ -156,7 +193,11 @@ function app() {
 function submit(data: Record<string, unknown>) {
   return new Request('https://worker.example.test/api/forms/form-1/submit', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer id-token' },
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: 'test-bearer-token',
+      'Idempotency-Key': '11111111-2222-4333-8444-555555555555',
+    },
     body: JSON.stringify({ data }),
   });
 }
@@ -184,13 +225,59 @@ beforeEach(() => {
   mocks.countFormSubmissionsByFriend.mockResolvedValue(0);
   mocks.countChoiceUsage.mockResolvedValue(new Map());
   mocks.getFriendFieldById.mockResolvedValue({ id: 'ff-1', ec_is_master: 0 });
-  mocks.createFormSubmission.mockImplementation(async (_db, input) => ({
-    id: 'submission-1',
-    form_id: input.formId,
-    friend_id: input.friendId,
-    data: input.data,
-    created_at: '2026-08-20T12:00:00+09:00',
+  mocks.getFormSubmitClaim.mockResolvedValue(null);
+  mocks.createFormSubmitClaim.mockImplementation(async (_db, input) => ({
+    claimed: true,
+    claim: { ...input, status: 'in_progress', steps: '[]', owner: input.owner },
   }));
+  mocks.readFormSubmitClaimSteps.mockReturnValue([]);
+  mocks.appendFormSubmitClaimStep.mockResolvedValue(true);
+  mocks.saveFormSubmitClaimWebhook.mockResolvedValue(true);
+  mocks.completeFormSubmitClaim.mockResolvedValue(true);
+  mocks.failFormSubmitClaim.mockResolvedValue(true);
+  mocks.findUnfinishedFormSubmitClaimByHash.mockResolvedValue(null);
+  mocks.readFormSubmitClaimEffectStats.mockReturnValue({});
+  mocks.saveFormSubmitClaimEffectStats.mockResolvedValue(true);
+  mocks.ensureFormSubmitOutboxEvent.mockImplementation(async (_db, _scope, _kind, eventId) => ({
+    event_id: eventId,
+    status: 'pending',
+    payload: null,
+  }));
+  mocks.getFormSubmitOutbox.mockResolvedValue(null);
+  mocks.markFormSubmitOutboxDelivered.mockResolvedValue(true);
+  mocks.readFormSubmitOutboxPayload.mockReturnValue(null);
+  const answer = {
+    id: 'submission-1',
+    form_id: 'form-1',
+    friend_id: 'friend-1',
+    data: JSON.stringify({ full_name: '山田' }),
+    destination_write_status: 'pending',
+    destination_write_attempted: null,
+    destination_write_succeeded: null,
+    destination_write_failed: null,
+    destination_write_completed_at: null,
+    created_at: '2026-08-20T12:00:00+09:00',
+  };
+  const answers = new Map<string, typeof answer>();
+  answers.set('submission-1', { ...answer });
+  mocks.insertFormSubmissionRecord.mockImplementation(async (_db, input) => {
+    const row = {
+      ...answer,
+      id: input.id ?? 'submission-1',
+      form_id: input.formId,
+      friend_id: input.friendId ?? null,
+      data: input.data,
+    };
+    answers.set(row.id, row);
+    return { ...row };
+  });
+  mocks.getFormSubmissionById.mockImplementation(async (_db, id) => {
+    const row = answers.get(id);
+    return row ? { ...row } : null;
+  });
+  mocks.resyncFormSubmitCount.mockResolvedValue(undefined);
+  mocks.applyMileageRulesForEvent.mockResolvedValue({ event: {}, granted: [], queued: true });
+  mocks.updateFormSubmissionDestinationWriteResult.mockResolvedValue('not_requested');
 });
 
 describe('送信の入口が、レイアウトの判定につながっている', () => {
@@ -201,7 +288,7 @@ describe('送信の入口が、レイアウトの判定につながっている'
 
     expect(res.status).toBe(400);
     expect(await errorOf(res)).toBe('お名前 は必須項目です');
-    expect(mocks.createFormSubmission).not.toHaveBeenCalled();
+    expect(mocks.insertFormSubmissionRecord).not.toHaveBeenCalled();
   });
 
   test('用意していない選択肢は、保存せずに断る', async () => {
@@ -211,7 +298,7 @@ describe('送信の入口が、レイアウトの判定につながっている'
 
     expect(res.status).toBe(400);
     expect(await errorOf(res)).toBe('飼っている子 に無い選択肢が選ばれています');
-    expect(mocks.createFormSubmission).not.toHaveBeenCalled();
+    expect(mocks.insertFormSubmissionRecord).not.toHaveBeenCalled();
   });
 
   test('回答期限を過ぎていたら、保存せずに断る', async () => {
@@ -227,7 +314,7 @@ describe('送信の入口が、レイアウトの判定につながっている'
 
     expect(res.status).toBe(400);
     expect(await errorOf(res)).toBe('締め切りました');
-    expect(mocks.createFormSubmission).not.toHaveBeenCalled();
+    expect(mocks.insertFormSubmissionRecord).not.toHaveBeenCalled();
   });
 
   test('1人1回のフォームに2回目を送ると、保存せずに断る', async () => {
@@ -240,7 +327,7 @@ describe('送信の入口が、レイアウトの判定につながっている'
 
     expect(res.status).toBe(400);
     expect(await errorOf(res)).toBe('1回だけです');
-    expect(mocks.createFormSubmission).not.toHaveBeenCalled();
+    expect(mocks.insertFormSubmissionRecord).not.toHaveBeenCalled();
   });
 
   test('全体の受付数に達していたら、保存せずに断る', async () => {
@@ -252,7 +339,7 @@ describe('送信の入口が、レイアウトの判定につながっている'
 
     expect(res.status).toBe(400);
     expect(await errorOf(res)).toBe('このフォームは受付を終了しました');
-    expect(mocks.createFormSubmission).not.toHaveBeenCalled();
+    expect(mocks.insertFormSubmissionRecord).not.toHaveBeenCalled();
   });
 
   test('定員が埋まった選択肢を選ぶと、保存せずに断る', async () => {
@@ -275,7 +362,7 @@ describe('送信の入口が、レイアウトの判定につながっている'
 
     expect(res.status).toBe(400);
     expect(await errorOf(res)).toBe('「午前」は定員に達しました');
-    expect(mocks.createFormSubmission).not.toHaveBeenCalled();
+    expect(mocks.insertFormSubmissionRecord).not.toHaveBeenCalled();
   });
 
   test('通れば保存し、選んだ選択肢のタグが付く', async () => {
@@ -284,7 +371,15 @@ describe('送信の入口が、レイアウトの判定につながっている'
     const res = await app().fetch(submit({ full_name: '山田', pet: '猫' }), env());
 
     expect(res.status).toBe(201);
-    expect(mocks.createFormSubmission).toHaveBeenCalledTimes(1);
+    expect(mocks.insertFormSubmissionRecord).toHaveBeenCalledTimes(1);
+    const createdId = (
+      mocks.insertFormSubmissionRecord.mock.calls[0][1] as { id: string }
+    ).id;
+    expect(mocks.updateFormSubmissionDestinationWriteResult).toHaveBeenCalledWith(
+      expect.anything(),
+      createdId,
+      { attempted: 0, succeeded: 0, failed: 0 },
+    );
 
     // 選んだほうだけが付く
     const attached = mocks.attachTag.mock.calls.map((call) => call[2]);

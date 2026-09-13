@@ -1,70 +1,39 @@
 'use client'
 
 import SelectField from '@/components/shared/select-field'
-import { useState, useEffect, useCallback, useRef } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { api } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
-import Header from '@/components/layout/header'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import AutomationTemplateGallery from '@/components/automations/automation-template-gallery'
 import { useCanManageAutomations } from '@/components/automations/use-automation-permission'
 import ListState from '@/components/shared/list-state'
+import { usePageTitle } from '@/components/shell/page-chrome'
+import FilterChip from '@/components/shared/filter-chip'
+import {
+  automationActionLabel,
+  automationTriggerLabel,
+  type Automation as SharedAutomation,
+  type AutomationEventType,
+} from '@line-crm/shared'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 
-type AutomationEventType = "friend_add" | "tag_change" | "score_threshold" | "cv_fire" | "message_received" | "postback_received" | "calendar_booked" | "ec.order.confirmed" | "ec.order.shipped" | "ec.subscription.upcoming" | "ec.subscription.payment_failed" | "ec.subscription.cancelled"
-
-interface AutomationAction {
-  type: "add_tag" | "remove_tag" | "start_scenario" | "send_message" | "send_webhook" | "switch_rich_menu"
-  params: Record<string, unknown>
-}
-
-interface Automation {
-  id: string
-  name: string
-  description: string | null
-  eventType: AutomationEventType
-  conditions: Record<string, unknown>
-  actions: AutomationAction[]
-  isActive: boolean
-  priority: number
+interface Automation extends SharedAutomation {
   // null = global automation (fires for every account); UUID = bound to that
   // account. Surfaced so the badge + toggle/delete guards can distinguish.
   lineAccountId: string | null
+  triggerConfig: Record<string, unknown>
+  status: 'draft' | 'active' | 'stopped'
+  versionId: string
+  version: number
+  executionCount30d: number
+  failureCount30d: number
+  lastRunAt: string | null
   createdAt: string
   updatedAt: string
-}
-
-const eventTypeOptions: { value: AutomationEventType; label: string }[] = [
-  { value: 'friend_add', label: '友だち追加' },
-  { value: 'tag_change', label: 'タグ変更' },
-  { value: 'score_threshold', label: 'スコア閾値' },
-  { value: 'cv_fire', label: 'CV発火' },
-  { value: 'message_received', label: 'メッセージ受信' },
-  { value: 'postback_received', label: 'ポストバック受信（リッチメニュー等）' },
-  { value: 'calendar_booked', label: 'カレンダー予約' },
-  { value: 'ec.order.confirmed', label: 'EC：注文確定' },
-  { value: 'ec.order.shipped', label: 'EC：発送完了' },
-  { value: 'ec.subscription.upcoming', label: 'EC：定期便の次回予定' },
-  { value: 'ec.subscription.payment_failed', label: 'EC：定期便の決済失敗' },
-  { value: 'ec.subscription.cancelled', label: 'EC：定期便の解約' },
-]
-
-const eventTypeLabelMap: Record<AutomationEventType, string> = {
-  friend_add: '友だち追加',
-  tag_change: 'タグ変更',
-  score_threshold: 'スコア閾値',
-  cv_fire: 'CV発火',
-  message_received: 'メッセージ受信',
-  postback_received: 'ポストバック受信',
-  calendar_booked: 'カレンダー予約',
-  'ec.order.confirmed': 'EC注文確定',
-  'ec.order.shipped': 'EC発送完了',
-  'ec.subscription.upcoming': '定期便予定',
-  'ec.subscription.payment_failed': '定期便決済失敗',
-  'ec.subscription.cancelled': '定期便解約',
 }
 
 const eventTypeBadgeColor: Record<AutomationEventType, string> = {
@@ -75,6 +44,11 @@ const eventTypeBadgeColor: Record<AutomationEventType, string> = {
   message_received: 'bg-purple-100 text-purple-700',
   postback_received: 'bg-pink-100 text-pink-700',
   calendar_booked: 'bg-indigo-100 text-indigo-700',
+  form_submitted: 'bg-violet-100 text-violet-700',
+  link_clicked: 'bg-fuchsia-100 text-fuchsia-700',
+  datetime: 'bg-lime-100 text-lime-700',
+  daily: 'bg-amber-100 text-amber-700',
+  weekly: 'bg-sky-100 text-sky-700',
   'ec.order.confirmed': 'bg-emerald-100 text-emerald-700',
   'ec.order.shipped': 'bg-cyan-100 text-cyan-700',
   'ec.subscription.upcoming': 'bg-teal-100 text-teal-700',
@@ -95,22 +69,91 @@ type PendingAction = {
   accountId: string | null
 }
 
-interface CreateFormState {
-  name: string
-  description: string
-  eventType: AutomationEventType
-  actionsJson: string
-  conditionsJson: string
-  priority: number
+type AutomationActionLock = {
+  tryAcquire: () => boolean
+  release: () => void
 }
 
-const initialForm: CreateFormState = {
-  name: '',
-  description: '',
-  eventType: 'friend_add',
-  actionsJson: '[\n  {\n    "type": "add_tag",\n    "params": {}\n  }\n]',
-  conditionsJson: '{}',
-  priority: 0,
+/** React の再描画より先に連打を止める、画面内だけの単一実行ロック。 */
+function createAutomationActionLock(): AutomationActionLock {
+  let locked = false
+  return {
+    tryAcquire: () => {
+      if (locked) return false
+      locked = true
+      return true
+    },
+    release: () => { locked = false },
+  }
+}
+
+/**
+ * 一覧操作を1回だけ実行し、その操作を始めたアカウントが表示中なら再取得する。
+ * APIが失敗しても再取得し、サーバへ届いたか分からない表示を残さない。
+ */
+async function performAutomationAction({
+  lock,
+  actionAccountId,
+  getSelectedAccountId,
+  request,
+  reload,
+  onStart,
+  onFinish,
+}: {
+  lock: AutomationActionLock
+  actionAccountId: string | null
+  getSelectedAccountId: () => string | null
+  request: () => Promise<void>
+  reload: () => Promise<void>
+  onStart: () => void
+  onFinish: () => void
+}): Promise<'completed' | 'ignored'> {
+  if (actionAccountId !== getSelectedAccountId() || !lock.tryAcquire()) return 'ignored'
+  onStart()
+  try {
+    await request()
+    if (getSelectedAccountId() === actionAccountId) await reload()
+    return 'completed'
+  } catch (error) {
+    if (getSelectedAccountId() === actionAccountId) await reload()
+    throw error
+  } finally {
+    lock.release()
+    onFinish()
+  }
+}
+
+function AutomationRowActions({
+  automationId,
+  automationName,
+  canManage,
+  onToggle,
+}: {
+  automationId: string
+  automationName: string
+  canManage: boolean | null
+  onToggle: () => void
+}) {
+  return (
+    <div className="flex flex-wrap items-center justify-end gap-2">
+      <Button href={`/automations/runs?search=${encodeURIComponent(automationName)}`} className="whitespace-nowrap">動いた記録を見る</Button>
+      {canManage ? (
+        <>
+          <Button href={`/automations/drafts?id=${encodeURIComponent(automationId)}`} className="whitespace-nowrap">中身を見る</Button>
+          <Button onClick={onToggle} className="whitespace-nowrap">止める・動かす</Button>
+        </>
+      ) : canManage === false ? (
+        <span className="text-xs text-ink-faint">操作する権限がありません</span>
+      ) : null}
+    </div>
+  )
+}
+
+function conditionLabel(conditions: Record<string, unknown>): string {
+  const keyword = typeof conditions.keyword === 'string' ? conditions.keyword.trim() : ''
+  if (keyword) return `「${keyword}」を含む人`
+  if (Object.keys(conditions).length === 0) return '条件なし'
+  return '登録した条件'
 }
 
 /*
@@ -119,21 +162,31 @@ const initialForm: CreateFormState = {
   これまで画面にタブが無く、`?tab=` を付けても一覧が出るだけだった。
 */
 const MERGED_TABS = [
-  { key: 'rules', label: 'オートメーション' },
+  { key: 'active', label: '動いているもの' },
+  { key: 'stopped', label: '止めているもの' },
+  { key: 'runs', label: '動いた記録', href: '/automations/runs' },
   { key: 'templates', label: '見本' },
+  { key: 'common-actions', label: '共通アクション', href: '/common-actions' },
 ]
+
+/** 一覧の1ページぶん。口は全件返すので、ここで切り出す。 */
+const AUTOMATION_PAGE_SIZE = 6
 
 export default function AutomationsPage() {
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const tab = useMergedTab(MERGED_TABS)
+  usePageTitle(tab === 'templates' ? '見本から作る' : 'オートメーション')
   const canManageAutomations = useCanManageAutomations()
+  /*
+   * 閲覧のみの利用者（N-361、要件 §4-1・§4-9）。
+   *
+   * `null` は権限を読み終わる前。共通アクション一覧と同じく、読めるまでは
+   * 操作を出さない。`false` と分かった行・帯だけ理由を1行出す。
+   */
+  const viewerOnly = canManageAutomations === false
   const [automations, setAutomations] = useState<Automation[]>([])
   const [loadStatus, setLoadStatus] = useState<LoadStatus>('loading')
   const [error, setError] = useState('')
-  const [showCreate, setShowCreate] = useState(false)
-  const [form, setForm] = useState<CreateFormState>({ ...initialForm })
-  const [saving, setSaving] = useState(false)
-  const [formError, setFormError] = useState('')
   /*
    * **ブラウザの `confirm()` を使わない。**
    *
@@ -145,28 +198,67 @@ export default function AutomationsPage() {
   const [pending, setPending] = useState<PendingAction | null>(null)
   const [working, setWorking] = useState(false)
   const [actionError, setActionError] = useState('')
+  const [automaticRuns, setAutomaticRuns] = useState<number | null>(null)
+  const [failedRuns, setFailedRuns] = useState<number | null>(null)
+  const [estimatedHoursSaved, setEstimatedHoursSaved] = useState<number | null>(null)
+  const [templateCount, setTemplateCount] = useState<number | null>(null)
+  const [commonActionCount, setCommonActionCount] = useState<number | null>(null)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'stopped'>('all')
+  const [sortOrder, setSortOrder] = useState<'runs' | 'priority' | 'name'>('runs')
+  const [page, setPage] = useState(1)
   /** 押したあとにアカウントが変わったか。変わっていたら実行させない。 */
   const accountChanged = pending !== null && pending.accountId !== selectedAccountId
   const loadRequestRef = useRef(0)
+  /*
+   * state の反映を待つ一瞬にも2回目を通さないための同期ロック。
+   * `working` は表示用、こちらは同じクリック列からAPIを1回だけ呼ぶために使う。
+   */
+  const actionLockRef = useRef(createAutomationActionLock())
+  /* 実行中にアカウントが切り替わったとき、古い一覧を新しい画面へ戻さない。 */
+  const selectedAccountIdRef = useRef(selectedAccountId)
+  selectedAccountIdRef.current = selectedAccountId
 
   const loadAutomations = useCallback(async () => {
     const requestId = ++loadRequestRef.current
     setLoadStatus('loading')
     setError('')
     try {
-      const res = await api.automations.list({ accountId: selectedAccountId || undefined })
+      const [res, templatesResponse, commonActionsResponse] = await Promise.all([
+        api.automations.list({ accountId: selectedAccountId || undefined }),
+        selectedAccountId
+          ? api.automations.templates(selectedAccountId).catch(() => null)
+          : Promise.resolve(null),
+        selectedAccountId
+          ? api.commonActions.list({ accountId: selectedAccountId }).catch(() => null)
+          : Promise.resolve(null),
+      ])
       if (requestId !== loadRequestRef.current) return
       if (res.success) {
         setAutomations(res.data)
+        const executions = res.summary?.executionCount30d ?? null
+        setAutomaticRuns(executions)
+        setFailedRuns(res.summary?.failureCount30d ?? null)
+        setEstimatedHoursSaved(executions === null ? null : Math.round(executions / 120))
         setLoadStatus('ready')
       } else {
         setAutomations([])
+        setAutomaticRuns(null)
+        setFailedRuns(null)
+        setEstimatedHoursSaved(null)
         setLoadStatus('error')
       }
+      setTemplateCount(templatesResponse?.success ? templatesResponse.data.length : null)
+      setCommonActionCount(commonActionsResponse?.success ? commonActionsResponse.data.length : null)
     } catch {
       if (requestId !== loadRequestRef.current) return
       setAutomations([])
       setLoadStatus('error')
+      setAutomaticRuns(null)
+      setFailedRuns(null)
+      setEstimatedHoursSaved(null)
+      setTemplateCount(null)
+      setCommonActionCount(null)
     }
   }, [selectedAccountId])
 
@@ -181,72 +273,23 @@ export default function AutomationsPage() {
     }
   }, [accountLoading, loadAutomations])
 
-  const handleCreate = async () => {
-    if (!form.name.trim()) {
-      setFormError('ルール名を入力してください')
-      return
-    }
-
-    let parsedActions: AutomationAction[]
-    let parsedConditions: Record<string, unknown>
-    try {
-      parsedActions = JSON.parse(form.actionsJson)
-    } catch {
-      setFormError('アクションのJSON形式が正しくありません')
-      return
-    }
-    try {
-      parsedConditions = JSON.parse(form.conditionsJson)
-    } catch {
-      setFormError('条件のJSON形式が正しくありません')
-      return
-    }
-
-    setSaving(true)
-    setFormError('')
-    try {
-      const res = await api.automations.create({
-        name: form.name,
-        description: form.description || null,
-        eventType: form.eventType,
-        actions: parsedActions,
-        conditions: parsedConditions,
-        priority: form.priority,
-      })
-      if (res.success) {
-        setShowCreate(false)
-        setForm({ ...initialForm })
-        loadAutomations()
-      } else {
-        setFormError(res.error)
-      }
-    } catch {
-      setFormError('作成に失敗しました')
-    } finally {
-      setSaving(false)
-    }
-  }
-
   /** 稼働の入れ替えそのもの。返事を確かめてから呼び出し元に戻す。 */
   const applyToggle = async (target: Automation) => {
     const res = await api.automations.update(target.id, { isActive: !target.isActive })
     if (!res.success) throw new Error(res.error)
   }
 
-  const handleToggleActive = async (target: Automation) => {
-    // 全アカウント共通のルールは、1つのアカウントの画面から触っても
-    // すべてのアカウントに効く。ここだけ確認を挟む。
-    if (target.lineAccountId === null) {
-      setActionError('')
-      setPending({ kind: 'toggle', automation: target, accountId: selectedAccountId })
-      return
-    }
-    try {
-      await applyToggle(target)
-      await loadAutomations()
-    } catch {
-      setError('稼働を切り替えられませんでした。状態を読み直してから、もう一度お試しください。')
-    }
+  /*
+   * 稼働の切り替えはすべて確認窓を経由する（要件 §4-1、N-360）。
+   *
+   * 通常ルールだけ直接PUTを投げていたため、二重押しで ON→OFF→ON と往復し、
+   * 最終状態が意図と逆になり得た。窓の `runPending` は処理中の再受け付けを
+   * 止めているので、ここでは投げずに窓へ預けるだけにする。
+   * 全アカウント共通のルールは窓の中で注意書きを出す（下のダイアログ）。
+   */
+  const handleToggleActive = (target: Automation) => {
+    setActionError('')
+    setPending({ kind: 'toggle', automation: target, accountId: selectedAccountId })
   }
 
   const handleDelete = (target: Automation) => {
@@ -263,179 +306,234 @@ export default function AutomationsPage() {
    * 読み取れない。
    */
   const runPending = async () => {
-    if (!pending || working || accountChanged) return
-    setWorking(true)
-    setActionError('')
+    if (!pending) return
+    const action = pending
     try {
-      if (pending.kind === 'delete') {
-        const res = await api.automations.delete(pending.automation.id)
-        if (!res.success) throw new Error(res.error)
-      } else {
-        await applyToggle(pending.automation)
-      }
+      const result = await performAutomationAction({
+        lock: actionLockRef.current,
+        actionAccountId: action.accountId,
+        getSelectedAccountId: () => selectedAccountIdRef.current,
+        request: async () => {
+          if (action.kind === 'delete') {
+            const res = await api.automations.delete(action.automation.id)
+            if (!res.success) throw new Error(res.error)
+          } else {
+            await applyToggle(action.automation)
+          }
+        },
+        reload: loadAutomations,
+        onStart: () => {
+          setWorking(true)
+          setActionError('')
+        },
+        onFinish: () => setWorking(false),
+      })
+      if (result === 'ignored') return
       setPending(null)
-      await loadAutomations()
     } catch {
       setActionError(
-        pending.kind === 'delete'
+        action.kind === 'delete'
           ? 'このルールを削除できませんでした。状態を読み直してから、もう一度お試しください。'
           : '稼働を切り替えられませんでした。状態を読み直してから、もう一度お試しください。',
       )
-    } finally {
-      setWorking(false)
     }
   }
 
   if (tab === 'templates') {
+    const activeCount = loadStatus === 'ready' ? automations.filter((item) => item.isActive).length : null
+    const stoppedCount = loadStatus === 'ready' ? automations.filter((item) => !item.isActive).length : null
+    const tabs = MERGED_TABS.map((item) => ({
+      ...item,
+      label: item.key === 'active'
+        ? `動いているもの ${activeCount ?? '—'}`
+        : item.key === 'stopped'
+          ? `止めているもの ${stoppedCount ?? '—'}`
+          : item.key === 'templates'
+            ? `見本 ${templateCount ?? '—'}`
+            : item.key === 'common-actions'
+              ? `共通アクション ${commonActionCount ?? '—'}`
+              : item.label,
+    }))
     return (
-      <div>
+      <div data-design-node="WjYAC">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-ink-faint">自動化 ＞ オートメーション ＞ 見本</p>
+          {/* 作成は owner/admin だけ（N-361）。見本の閲覧と「これで作る」の出し分けは画廊側で行う。 */}
+          {canManageAutomations ? <Button href="/automations/new">はじめから作る</Button> : null}
+        </div>
         <div className="mb-4">
-          <MergedTabs basePath="/automations" paramName="tab" tabs={MERGED_TABS} active={tab} />
+          <MergedTabs basePath="/automations" paramName="tab" tabs={tabs} active={tab} />
+        </div>
+        <div className="mb-4 rounded-control border border-info bg-info-bg px-4 py-3 text-sm font-medium text-info">
+          見本を選ぶと、そのまま「つくる」画面が開きます。中身は自由に直せます。よく使われている順に並べています。
         </div>
         <AutomationTemplateGallery accountId={selectedAccountId} canManage={canManageAutomations} />
+        <style jsx global>{`
+          [data-design-node="WjYAC"] [aria-label="きっかけで絞り込む"] { display: none; }
+          [data-design-node="WjYAC"] [data-automation-template-gallery="v6"] > div:first-child {
+            display: none;
+          }
+          [data-design-node="WjYAC"] [data-automation-template-gallery="v6"] article:nth-of-type(n + 10) {
+            display: none;
+          }
+          [data-design-node="WjYAC"] [data-automation-template-gallery="v6"] article {
+            padding: 16px;
+          }
+          [data-design-node="WjYAC"] [data-automation-template-gallery="v6"] article p {
+            display: none;
+          }
+          [data-design-node="WjYAC"] [data-automation-template-gallery="v6"] article button {
+            width: auto;
+            margin-left: auto;
+          }
+        `}</style>
       </div>
     )
   }
 
+  const activeCount = loadStatus === 'ready' ? automations.filter((item) => item.isActive).length : null
+  const stoppedCount = loadStatus === 'ready' ? automations.filter((item) => !item.isActive).length : null
+  const tabs = MERGED_TABS.map((item) => ({
+    ...item,
+    label: item.key === 'active'
+      ? `動いているもの ${activeCount ?? '—'}`
+      : item.key === 'stopped'
+        ? `止めているもの ${stoppedCount ?? '—'}`
+        : item.key === 'templates'
+          ? `見本 ${templateCount ?? '—'}`
+          : item.key === 'common-actions'
+            ? `共通アクション ${commonActionCount ?? '—'}`
+            : item.label,
+  }))
+  const visibleAutomations = (() => {
+    const requestedStatus = tab === 'stopped' ? 'stopped' : statusFilter
+    const normalizedQuery = searchQuery.trim().toLocaleLowerCase('ja')
+    return automations
+      .filter((item) => requestedStatus === 'all' || (requestedStatus === 'active' ? item.isActive : !item.isActive))
+      .filter((item) => {
+        if (!normalizedQuery) return true
+        const actions = item.actions.map((action) => automationActionLabel(action.type)).join(' ')
+        return `${item.name} ${item.description ?? ''} ${automationTriggerLabel(item.eventType)} ${actions}`
+          .toLocaleLowerCase('ja')
+          .includes(normalizedQuery)
+      })
+      .sort((a, b) => sortOrder === 'name'
+        ? a.name.localeCompare(b.name, 'ja')
+        : sortOrder === 'runs'
+          // 「動いた回数が多い順」はこの30日の実績で並べる。
+          // 同数は名前順に寄せて、開くたびに順番が変わらないようにする。
+          ? b.executionCount30d - a.executionCount30d || a.name.localeCompare(b.name, 'ja')
+          : b.priority - a.priority || a.name.localeCompare(b.name, 'ja'))
+  })()
+  const listPageCount = Math.max(1, Math.ceil(visibleAutomations.length / AUTOMATION_PAGE_SIZE))
+  const currentPage = Math.min(Math.max(1, page), listPageCount)
+  const pagedAutomations = visibleAutomations.slice(
+    (currentPage - 1) * AUTOMATION_PAGE_SIZE,
+    currentPage * AUTOMATION_PAGE_SIZE,
+  )
+
   return (
     <div>
       <div className="mb-4">
-        <MergedTabs basePath="/automations" paramName="tab" tabs={MERGED_TABS} active={tab} />
+        <MergedTabs basePath="/automations" paramName="tab" tabs={tabs} active={tab} />
       </div>
-      <div data-design="Head">
-        <Header
-          title="オートメーション"
-          description="「〜のとき、〜する」を登録して自動で実行します。友だち一覧から手で実行したり、毎日決まった時刻に動かすこともできます。"
-          action={
-            <div className="flex flex-wrap gap-2">
-              <Button href="/common-actions">共通アクションを見る</Button>
-              <Button variant="primary" onClick={() => setShowCreate(true)}>
-                ルールを作成
-              </Button>
-              <Button href="/support">マニュアル</Button>
-            </div>
-          }
-        />
+      <div data-design="Head" className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-ink-faint">自動化 ＞ オートメーション</p>
+        <div className="flex flex-wrap gap-2">
+          <Button href="/common-actions">共通アクションを見る</Button>
+          <Button href="/automations?tab=templates">見本から作る</Button>
+          {/* 作成は owner/admin だけ。閲覧のみには出さず、下で理由を出す（N-361）。 */}
+          {canManageAutomations ? <Button href="/automations/new" variant="primary">ルールを作成</Button> : null}
+          <Button href="/support">マニュアル</Button>
+        </div>
       </div>
+      {viewerOnly ? (
+        <p className="mb-4 rounded-control border border-hairline bg-canvas-sunken px-4 py-3 text-sm text-ink-secondary" role="note">
+          閲覧のみのため、ルールの作成・変更はできません。操作する権限がありません。
+        </p>
+      ) : null}
+
+      <p className="mb-4 text-sm text-ink-faint">「〜のとき、〜する」を登録して自動で実行します。友だち一覧から手で実行したり、毎日決まった時刻に動かすこともできます。</p>
+      <p className="sr-only">共通アクションは友だち一覧からの手動実行にも使えます。</p>
 
       <div data-design="KPIs" className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <div className="bg-canvas rounded-card border-hairline border p-4">
-          <p className="text-ink-faint text-xs">ルール</p>
+          <p className="text-ink-faint text-xs">動いているもの</p>
           <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
-            {loadStatus === 'ready' ? automations.length : '—'}
-            {loadStatus === 'ready' ? <span className="text-ink-faint ml-0.5 text-xs font-normal">件</span> : null}
+            {activeCount ?? '—'}
+            {activeCount !== null ? <span className="text-ink-faint ml-0.5 text-xs font-normal">本</span> : null}
           </p>
-          <p className="text-ink-faint mt-0.5 text-xs">
-            稼働中 {loadStatus === 'ready' ? automations.filter((a) => a.isActive).length : '—'}
-          </p>
-        </div>
-        {/* 実行の記録を残していない。何回動いたか、失敗したかが分からない。 */}
-        <div className="bg-canvas rounded-card border-hairline border p-4">
-          <p className="text-ink-faint text-xs">今月の実行</p>
-          <p className="text-ink-faint mt-1 text-2xl font-bold">—</p>
-          <p className="text-ink-faint mt-0.5 text-xs">実行の記録がありません</p>
+          <p className="text-ink-faint mt-0.5 text-xs">稼働中 {activeCount ?? '—'}本・止めているもの {stoppedCount ?? '—'}本</p>
         </div>
         <div className="bg-canvas rounded-card border-hairline border p-4">
-          <p className="text-ink-faint text-xs">失敗</p>
-          <p className="text-ink-faint mt-1 text-2xl font-bold">—</p>
-          <p className="text-ink-faint mt-0.5 text-xs">実行の記録がありません</p>
+          <p className="text-ink-faint text-xs">今月の実行（この30日）</p>
+          <p className="text-ink mt-1 text-2xl font-bold tabular-nums">{automaticRuns?.toLocaleString('ja-JP') ?? '—'}{automaticRuns !== null ? '回' : ''}</p>
+          <p className="text-ink-faint mt-0.5 text-xs">分析の「使われ方」と同じ集計</p>
         </div>
         <div className="bg-canvas rounded-card border-hairline border p-4">
-          <p className="text-ink-faint text-xs">手動実行</p>
-          <p className="text-ink-faint mt-1 text-2xl font-bold">—</p>
-          <p className="text-ink-faint mt-0.5 text-xs">友だち一覧から</p>
+          <p className="text-ink-faint text-xs">失敗した</p>
+          <p className="text-ink mt-1 text-2xl font-bold tabular-nums">{failedRuns?.toLocaleString('ja-JP') ?? '—'}{failedRuns !== null ? '回' : ''}</p>
+          <p className="text-ink-faint mt-0.5 text-xs">部分成功を含む・この30日</p>
+        </div>
+        <div className="bg-canvas rounded-card border-hairline border p-4">
+          <p className="text-ink-faint text-xs">減らせた手作業</p>
+          <p className="text-ink mt-1 text-2xl font-bold tabular-nums">{estimatedHoursSaved !== null ? `およそ ${estimatedHoursSaved.toLocaleString('ja-JP')}時間` : '—'}</p>
+          <p className="text-ink-faint mt-0.5 text-xs">1回30秒として計算しています</p>
         </div>
       </div>
+
+      <div className="mb-4 rounded-control border border-info bg-info-bg px-4 py-3 text-sm font-medium text-info">
+        上から順に見て、当てはまったものが動きます。同じきっかけで2本が当てはまると両方が動くため、片方だけにしたいときは条件をずらしてください。
+      </div>
+
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+        <input
+          type="search"
+          value={searchQuery}
+          onChange={(event) => { setSearchQuery(event.target.value); setPage(1) }}
+          placeholder="ルール名・きっかけ・することで検索"
+          className="h-10 w-full max-w-lg rounded-control border border-hairline bg-canvas px-3 text-sm text-ink outline-none focus:border-info"
+        />
+        <div className="flex items-center gap-2">
+          <p className="text-sm text-ink-secondary">この30日</p>
+          <SelectField
+            aria-label="並び順"
+            value={sortOrder}
+            onChange={(event) => { setSortOrder(event.target.value as 'runs' | 'priority' | 'name'); setPage(1) }}
+            options={[
+              { value: 'runs', label: '動いた回数が多い順' },
+              { value: 'priority', label: '動く順' },
+              { value: 'name', label: '名前順' },
+            ]}
+            className="h-10 min-w-36"
+          />
+        </div>
+      </div>
+
+      {tab !== 'stopped' ? (
+        <div className="mb-3 flex flex-wrap gap-2" aria-label="状態で絞り込む">
+          {([
+            ['all', `すべて ${automations.length}`],
+            ['active', `動いている ${activeCount ?? '—'}`],
+            ['stopped', `止めている ${stoppedCount ?? '—'}`],
+          ] as const).map(([value, label]) => (
+            <FilterChip
+              key={value}
+              selected={statusFilter === value}
+              onChange={() => { setStatusFilter(value); setPage(1) }}
+            >
+              {label}
+            </FilterChip>
+          ))}
+          <span className="flex h-9 items-center rounded-full border border-hairline bg-canvas-sunken px-4 text-sm text-ink-faint">失敗あり {automations.filter((item) => item.failureCount30d > 0).length}</span>
+          <span className="flex h-9 items-center rounded-full border border-hairline bg-canvas-sunken px-4 text-sm text-ink-faint">30日 動いていない {automations.filter((item) => item.executionCount30d === 0).length}</span>
+        </div>
+      ) : null}
 
       {/* Error */}
       {error && (
         <div className="mb-4 p-4 bg-danger-bg border border-danger-bg rounded-lg text-danger text-sm">
           {error}
-        </div>
-      )}
-
-      {/* Create form */}
-      {showCreate && (
-        <div className="mb-6 bg-canvas rounded-card border border-hairline p-6">
-          <h2 className="text-sm font-semibold text-gray-800 mb-4">新規オートメーションを作成</h2>
-          <div className="space-y-4 max-w-lg">
-            <div>
-              <label className="block text-xs font-medium text-ink-secondary mb-1">ルール名 <span className="text-red-500">*</span></label>
-              <input
-                type="text"
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                placeholder="例: 友だち追加時にウェルカムタグ付与"
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-ink-secondary mb-1">説明</label>
-              <textarea
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none"
-                rows={2}
-                placeholder="ルールの説明 (省略可)"
-                value={form.description}
-                onChange={(e) => setForm({ ...form, description: e.target.value })}
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-ink-secondary mb-1">イベントタイプ</label>
-              <SelectField
-                value={form.eventType}
-                onChange={(e) => setForm({ ...form, eventType: e.target.value as AutomationEventType })}
-                options={eventTypeOptions.map((opt) => ({ value: opt.value, label: opt.label }))}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-ink-secondary mb-1">アクション (JSON)</label>
-              <textarea
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-green-500 resize-y"
-                rows={6}
-                placeholder='[{"type": "add_tag", "params": {"tagId": "..."}}]'
-                value={form.actionsJson}
-                onChange={(e) => setForm({ ...form, actionsJson: e.target.value })}
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-ink-secondary mb-1">条件 (JSON)</label>
-              <textarea
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-green-500 resize-y"
-                rows={3}
-                placeholder='{"tagId": "...", "operator": "equals"}'
-                value={form.conditionsJson}
-                onChange={(e) => setForm({ ...form, conditionsJson: e.target.value })}
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-ink-secondary mb-1">優先度</label>
-              <input
-                type="number"
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                value={form.priority}
-                onChange={(e) => setForm({ ...form, priority: parseInt(e.target.value, 10) || 0 })}
-              />
-            </div>
-
-            {formError && <p className="text-xs text-red-600">{formError}</p>}
-
-            <div className="flex gap-2">
-              <button
-                onClick={handleCreate}
-                disabled={saving}
-                className="bg-accent-deep text-on-accent transition-colors hover:brightness-92 rounded-control px-4 py-2 min-h-[44px] text-sm font-medium disabled:opacity-50"
-              >
-                {saving ? '作成中...' : '作成'}
-              </button>
-              <button
-                onClick={() => { setShowCreate(false); setFormError('') }}
-                className="px-4 py-2 min-h-[44px] text-sm font-medium text-ink-secondary bg-canvas-sunken hover:bg-gray-200 rounded-lg transition-colors"
-              >
-                キャンセル
-              </button>
-            </div>
-          </div>
         </div>
       )}
 
@@ -448,91 +546,52 @@ export default function AutomationsPage() {
           description="登録したルールは消えていません。再読み込みしても直らない場合はエラー報告へ。"
           action={<Button variant="secondary" onClick={() => void loadAutomations()}>オートメーションを再読み込み</Button>}
         />
-      ) : automations.length === 0 && !showCreate ? (
-        <div className="bg-canvas rounded-card border border-hairline p-12 text-center">
-          <p className="text-ink-faint">オートメーションがありません。「新規ルール」から作成してください。</p>
-        </div>
+      ) : visibleAutomations.length === 0 ? (
+        <ListState
+          kind="empty"
+          title={automations.length === 0
+            ? (tab === 'stopped' ? '止めているオートメーションはありません。' : '動いているオートメーションはありません。')
+            : '条件に合うオートメーションはありません。'}
+          description={automations.length === 0 ? 'きっかけ・だれに・することの3つを決めると動きます。' : '検索語や絞り込みを変えてください。'}
+          action={tab === 'active' && canManageAutomations ? <Button href="/automations/new" variant="primary">オートメーションをつくる</Button> : undefined}
+        />
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {automations.map((automation) => (
-            <div
-              key={automation.id}
-              className="bg-canvas rounded-card border border-hairline p-5 hover:shadow-md transition-shadow"
-            >
-              {/* Header row */}
-              <div className="flex items-start justify-between mb-2">
-                <h3 className="text-sm font-semibold text-ink leading-tight">{automation.name}</h3>
-                <button
-                  onClick={() => void handleToggleActive(automation)}
-                  className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                    automation.isActive ? 'bg-green-500' : 'bg-gray-300'
-                  }`}
-                  title={automation.isActive ? '有効 - クリックで無効化' : '無効 - クリックで有効化'}
-                >
-                  <span
-                    className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                      automation.isActive ? 'translate-x-4' : 'translate-x-0'
-                    }`}
-                  />
-                </button>
+        <div className="overflow-hidden rounded-card border border-hairline bg-canvas shadow-sm">
+          <div className="grid grid-cols-6 gap-3 bg-canvas-sunken px-4 py-3 text-xs font-semibold text-ink-faint">
+            <span>きっかけ</span><span>だれに（条件）</span><span>すること</span><span>この30日</span><span>状態</span><span aria-hidden />
+          </div>
+          {pagedAutomations.map((automation) => (
+            <div key={automation.id} className="grid min-h-14 grid-cols-6 items-center gap-3 border-t border-hairline px-4 py-2 text-sm">
+              <div className="min-w-0">
+                <p className="truncate font-semibold text-ink" title={automation.name}>{automation.name}</p>
+                <p className="truncate text-xs text-ink-faint" title={automationTriggerLabel(automation.eventType)}>{automationTriggerLabel(automation.eventType)}</p>
               </div>
-
-              {/* Description */}
-              {automation.description && (
-                <p className="text-xs text-ink-faint mb-3 line-clamp-2">{automation.description}</p>
-              )}
-
-              {/* Event type badge */}
-              <div className="flex items-center gap-2 mb-3">
-                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${eventTypeBadgeColor[automation.eventType]}`}>
-                  {eventTypeLabelMap[automation.eventType]}
-                </span>
-                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                  automation.isActive ? 'bg-green-50 text-green-700' : 'bg-canvas-sunken text-ink-faint'
-                }`}>
-                  {automation.isActive ? '有効' : '無効'}
-                </span>
-                {/* lineAccountId === null = global; label it so the account-scoped
-                   list cannot disguise an all-accounts rule as account-local. */}
-                {automation.lineAccountId === null && (
-                  <span
-                    className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200"
-                    title="全アカウントに適用されるオートメーションです"
-                  >
-                    全アカウント共通
-                  </span>
-                )}
+              <p className="truncate text-ink-secondary" title={conditionLabel(automation.conditions)}>{conditionLabel(automation.conditions)}</p>
+              <p className="truncate text-ink-secondary" title={automation.actions.map((action) => automationActionLabel(action.type)).join('、')}>{automation.actions.map((action) => automationActionLabel(action.type)).join('、') || '処理なし'}</p>
+              <div>
+                <span className="text-ink tabular-nums">{automation.executionCount30d.toLocaleString('ja-JP')}回</span>
+                {automation.failureCount30d > 0 ? <span className="text-danger block text-[11px]">失敗が{automation.failureCount30d}回</span> : null}
               </div>
-
-              {/* Meta info */}
-              {(() => {
-                const sendMsgWithTpl = automation.actions.filter(
-                  (a) => a.type === 'send_message' && (a.params as { template_id?: string }).template_id,
-                ).length
-                return (
-                  <div className="flex items-center gap-4 text-xs text-ink-faint mb-3">
-                    <span>アクション: {automation.actions.length}件</span>
-                    {sendMsgWithTpl > 0 && (
-                      <a href="/templates" className="text-blue-600 hover:underline" title="template_id 参照を含む send_message action あり">
-                        template×{sendMsgWithTpl}
-                      </a>
-                    )}
-                    <span>優先度: {automation.priority}</span>
-                  </div>
-                )
-              })()}
-
-              {/* Actions */}
-              <div className="flex items-center justify-end gap-2 pt-2 border-t border-hairline">
-                <button
-                  onClick={() => handleDelete(automation)}
-                  className="px-3 py-1 min-h-[44px] text-xs font-medium text-red-500 hover:text-danger bg-danger-bg hover:bg-red-100 rounded-md transition-colors"
-                >
-                  削除
-                </button>
-              </div>
+              <span className={automation.isActive ? 'font-semibold text-accent-deep' : 'font-semibold text-ink-faint'}>{automation.isActive ? '動いています' : '止めています'}</span>
+              {/* 見るだけの導線は閲覧のみにも出す。検索語にこの行の名前を載せて実対象を引き継ぐ（#677で承認されたN-352の導線部分）。 */}
+              <AutomationRowActions
+                automationId={automation.id}
+                automationName={automation.name}
+                canManage={canManageAutomations}
+                onToggle={() => handleToggleActive(automation)}
+              />
             </div>
           ))}
+          <div className="flex items-center justify-between border-t border-hairline px-4 py-3 text-xs text-ink-faint">
+            <span>オートメーション {visibleAutomations.length}本中 {(currentPage - 1) * AUTOMATION_PAGE_SIZE + 1}〜{Math.min(currentPage * AUTOMATION_PAGE_SIZE, visibleAutomations.length)}本を表示</span>
+            <div className="flex items-center gap-3" aria-label="ページ送り">
+              <button type="button" disabled={currentPage === 1} onClick={() => setPage(currentPage - 1)} className="text-action disabled:text-ink-faint">前へ</button>
+              {Array.from({ length: listPageCount }, (_, index) => index + 1).map((pageNumber) => (
+                <button key={pageNumber} type="button" aria-current={pageNumber === currentPage ? 'page' : undefined} onClick={() => setPage(pageNumber)} className={pageNumber === currentPage ? 'text-action font-bold' : ''}>{pageNumber}</button>
+              ))}
+              <button type="button" disabled={currentPage >= listPageCount} onClick={() => setPage(currentPage + 1)} className="text-action disabled:text-ink-faint">次へ</button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -582,7 +641,7 @@ export default function AutomationsPage() {
         {pending !== null && (
           <div className="text-ink-secondary space-y-2 text-sm">
             <p>
-              きっかけ：{eventTypeLabelMap[pending.automation.eventType]} ／ アクション{' '}
+              きっかけ：{automationTriggerLabel(pending.automation.eventType)} ／ アクション{' '}
               {pending.automation.actions.length}件
             </p>
             {pending.automation.lineAccountId === null && (

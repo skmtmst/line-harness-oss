@@ -52,7 +52,10 @@ describe('Pen.dev V6を共通レイアウトの正本にする', () => {
 
   it('編集画面は矢印ではなくドラッグ・表示切替・プレビューで操作する', () => {
     // 2026-09-03: 設計 `ZN0ov` は「「今日やること」は4枠までです」と書く。
-    for (const label of ['カードと配置', 'プレビュー', '4枠までです', '変更を適用']) {
+    for (const label of ['表示するカードと位置を変更します', 'カードと配置', 'プレビュー', '4枠までです', 'ダッシュボードに反映']) {
+      expect(dashboardEditor).toContain(label)
+    }
+    for (const label of ['上部・小カード', 'メイン・横長', 'メイン・左カラム']) {
       expect(dashboardEditor).toContain(label)
     }
     expect(dashboardEditor).toContain('useSortable')

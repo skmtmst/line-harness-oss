@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import {
   LINK_STATUS_LABEL,
@@ -10,6 +13,7 @@ import {
   canEditTable,
   checkedLabel,
   localRows,
+  manualLinkRow,
   matchesQuery,
   matchesStatus,
   statusOf,
@@ -86,6 +90,16 @@ describe('出せないものを出せるように見せない', () => {
 })
 
 describe('いま出せる行', () => {
+  it('APIの画面ID・状態・確認日時を一覧の行へ変える', () => {
+    const row = manualLinkRow({
+      key: '2-1', keyKind: 'screen', name: '受信箱', url: 'https://example.com/inbox',
+      status: 'ok', lastCheckedAt: '2026-08-27T19:00:00.000Z', lastHttpStatus: 200,
+      lastError: null, version: 2,
+    })
+    expect(row).toMatchObject({ screenId: '2-1', taskId: null, status: 'ok' })
+    expect(checkedLabel(row.checkedAt)).toBe('8/28 04:00')
+  })
+
   it('手元にあるのは作業ID 4件だけで、どれも未設定', () => {
     const rows = localRows()
     expect(rows).toHaveLength(4)
@@ -140,10 +154,33 @@ describe('開けないリンクの知らせ', () => {
 })
 
 describe('触れる人', () => {
-  it('直せるのは運営だけ', () => {
-    expect(canEditTable('owner')).toBe(true)
-    expect(canEditTable('admin')).toBe(false)
-    expect(canEditTable('staff')).toBe(false)
+  it('運営の代表・権限保持者・代表者は表を見られる', () => {
+    expect(canEditTable({ id: 'env-owner', role: 'staff', permissionKeys: [] })).toBe(true)
+    expect(canEditTable({ id: 'other', role: 'staff', permissionKeys: ['manual.link.edit'] })).toBe(true)
+    expect(canEditTable({ id: 'other', role: 'owner', permissionKeys: [] })).toBe(true)
+  })
+
+  it('権限のない人・未ログインは表を見られない', () => {
+    expect(canEditTable({ id: 'other', role: 'staff', permissionKeys: [] })).toBe(false)
+    expect(canEditTable({ id: 'other', role: 'admin', permissionKeys: [] })).toBe(false)
     expect(canEditTable(null)).toBe(false)
+  })
+})
+
+describe('失敗の表示', () => {
+  const page = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'page.tsx'), 'utf8')
+
+  it('「確かめる」と「保存」の失敗を無言にしない', () => {
+    expect(page).toContain('actionError')
+    expect(page).toContain('role="alert"')
+    expect(page).toContain('確かめられませんでした')
+    expect(page).toContain('保存できませんでした')
+  })
+
+  it('競合は読み直し、権限不足は依頼先を出す', () => {
+    expect(page).toContain('ほかの人が先に変更しました')
+    expect(page).toContain('運営に依頼してください')
+    expect(page).toContain('error.status === 409')
+    expect(page).toContain('error.status === 403')
   })
 })

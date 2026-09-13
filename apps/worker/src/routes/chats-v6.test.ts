@@ -173,12 +173,25 @@ describe('V6受信箱の保存検索', () => {
       saved('shared', '共有', 'staff-2', 1),
       saved('private', '他人用', 'staff-2', 0),
     ]);
+    const db = {
+      prepare(sql: string) {
+        expect(sql).toContain('LIMIT 1001');
+        const statement = {
+          bind: vi.fn(() => statement),
+          first: vi.fn(async () => ({ count: 1001 })),
+        };
+        return statement;
+      },
+    } as unknown as D1Database;
     const response = await app().request('/api/inbox/saved-views?lineAccountId=account-1', {}, {
-      DB: {} as D1Database,
+      DB: db,
     } as Env['Bindings']);
     expect(response.status).toBe(200);
-    const body = await response.json() as { data: Array<{ id: string }> };
+    const body = await response.json() as {
+      data: Array<{ id: string; matchCount: number; matchCountCapped: boolean }>;
+    };
     expect(body.data.map((row) => row.id)).toEqual(['own', 'shared']);
+    expect(body.data[0]).toMatchObject({ matchCount: 1000, matchCountCapped: true });
   });
 
   test('同じ所有者の同名と未知の状態を個別に拒否する', async () => {
@@ -197,6 +210,24 @@ describe('V6受信箱の保存検索', () => {
       body: JSON.stringify({ name: '不正', conditions: { ...conditions, statuses: ['waiting'] } }),
     }, { DB: {} as D1Database } as Env['Bindings']);
     expect(invalid.status).toBe(422);
+  });
+
+  test('よく使う検索は既存の並び順を使って先頭へ保存する', async () => {
+    const created = { ...saved('favorite', '毎朝見る', 'staff-1', 0), display_order: -1 };
+    mocks.createSavedSearch.mockResolvedValue(created);
+    const conditions = { ...JSON.parse(created.conditions_json), due: 'overdue' };
+    const response = await app().request('/api/inbox/saved-views?lineAccountId=account-1', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: '毎朝見る', conditions, isFavorite: true }),
+    }, { DB: {} as D1Database } as Env['Bindings']);
+
+    expect(response.status).toBe(201);
+    expect(mocks.createSavedSearch).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      displayOrder: -1,
+      conditions: expect.objectContaining({ due: 'overdue' }),
+    }));
+    expect(await response.json()).toMatchObject({ data: { isFavorite: true } });
   });
 
   test('他人の個人検索と別アカウントIDは更新・削除できない', async () => {

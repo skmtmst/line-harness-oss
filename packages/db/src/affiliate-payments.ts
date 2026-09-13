@@ -9,25 +9,31 @@ export interface AffiliatePaymentSummary {
   heldConversions: number;
   heldReward: number;
   holdStatusUnknown: number;
+  unsettledConversions: number;
+  unsettledReward: number;
+  settledConversions: number;
+  settledReward: number;
 }
 
 /**
  * 選択中のLINE公式アカウントについて、支払い画面で安全に表示できる範囲だけを集計する。
  *
- * 支払済み台帳はまだ無いため、ここで返す金額は「未払い」ではなく
- * 「承認済みの合計」である。割合方式は成果時点の金額×紹介者の率、
- * 定額方式は成果に結びついた案件の固定額を使う。
+ * 承認済み全体、保留中、支払い確定前、確定済みを分けて返す。
+ * 金額はすべて承認時の計算版(affiliate_reward_calculations)を正本にし、
+ * 現在の率・売上・固定額では再計算しない。版が無い行は0として扱い、
+ * 約束できない金額を盛らない。確定後の設定編集で表示が変わらない。
  */
 export async function getAffiliatePaymentSummaries(
   db: D1Database,
   lineAccountId: string,
+  tenantId: string,
   now = new Date().toISOString(),
 ): Promise<AffiliatePaymentSummary[]> {
   const result = await db.prepare(
     `WITH scoped_affiliate_ids AS (
        SELECT id
          FROM affiliates
-        WHERE line_account_id = ?
+        WHERE line_account_id = ? AND tenant_id = ?
      )
      SELECT
        a.id AS affiliate_id,
@@ -39,9 +45,7 @@ export async function getAffiliatePaymentSummaries(
        COALESCE(SUM(
          CASE
            WHEN ce.id IS NULL THEN 0
-           WHEN a.commission_rate > 0
-             THEN COALESCE(ce.value_snapshot, cp.value, 0) * a.commission_rate / 100.0
-           ELSE COALESCE(off.reward_amount, 0)
+           ELSE COALESCE(snap.amount_minor, 0)
          END
        ), 0) AS approved_reward,
        COALESCE(SUM(
@@ -57,11 +61,7 @@ export async function getAffiliatePaymentSummaries(
            WHEN COALESCE(a.hold_days, 0) > 0
             AND ce.approved_at IS NOT NULL
             AND julianday(ce.approved_at) > julianday(?, '-' || a.hold_days || ' days')
-           THEN CASE
-             WHEN a.commission_rate > 0
-               THEN COALESCE(ce.value_snapshot, cp.value, 0) * a.commission_rate / 100.0
-             ELSE COALESCE(off.reward_amount, 0)
-           END
+           THEN COALESCE(snap.amount_minor, 0)
            ELSE 0
          END
        ), 0) AS held_reward,
@@ -71,6 +71,46 @@ export async function getAffiliatePaymentSummaries(
            THEN 1 ELSE 0
          END
        ), 0) AS hold_status_unknown
+       , COALESCE(SUM(
+         CASE WHEN ce.id IS NOT NULL
+          AND ce.approved_at IS NOT NULL
+          AND (
+            COALESCE(a.hold_days, 0) = 0
+            OR julianday(ce.approved_at) <= julianday(?, '-' || a.hold_days || ' days')
+          )
+          AND NOT EXISTS (
+           SELECT 1 FROM affiliate_reward_entries re
+            WHERE re.conversion_event_id = ce.id AND re.entry_type = 'credit'
+         ) THEN 1 ELSE 0 END
+       ), 0) AS unsettled_conversions
+       , COALESCE(SUM(
+         CASE WHEN ce.id IS NOT NULL
+          AND ce.approved_at IS NOT NULL
+          AND (
+            COALESCE(a.hold_days, 0) = 0
+            OR julianday(ce.approved_at) <= julianday(?, '-' || a.hold_days || ' days')
+          )
+          AND NOT EXISTS (
+           SELECT 1 FROM affiliate_reward_entries re
+            WHERE re.conversion_event_id = ce.id AND re.entry_type = 'credit'
+         ) THEN COALESCE(snap.amount_minor, 0) ELSE 0 END
+       ), 0) AS unsettled_reward
+       -- 確定済みは台帳(affiliate_reward_entries)が正本。成果の現在の承認状態
+       -- では数えない。確定後に取り消された分は反対仕訳(debit)で相殺され、
+       -- 締めの記録そのものは残る。
+       , (SELECT COUNT(*)
+            FROM affiliate_reward_entries sre
+           WHERE sre.affiliate_id = a.id
+             AND sre.line_account_id = a.line_account_id
+             AND sre.organization_id = a.tenant_id
+             AND sre.entry_type = 'credit'
+             AND sre.status <> 'reversed') AS settled_conversions
+       , (SELECT COALESCE(SUM(CASE WHEN sre.entry_type = 'credit'
+                                   THEN sre.amount_minor ELSE -sre.amount_minor END), 0)
+            FROM affiliate_reward_entries sre
+           WHERE sre.affiliate_id = a.id
+             AND sre.line_account_id = a.line_account_id
+             AND sre.organization_id = a.tenant_id) AS settled_reward
      FROM affiliates a
      JOIN scoped_affiliate_ids scoped ON scoped.id = a.id
      LEFT JOIN conversion_events ce
@@ -84,22 +124,25 @@ export async function getAffiliatePaymentSummaries(
         SELECT 1 FROM conversion_points csp
          WHERE csp.id = ce.conversion_point_id AND csp.line_account_id = ?
       )
-     LEFT JOIN conversion_points cp ON cp.id = ce.conversion_point_id
-     LEFT JOIN affiliate_links al
-       ON al.ref_code = ce.attributed_ref_code
-      AND al.affiliate_id = a.id
-      AND al.line_account_id = ?
-     LEFT JOIN affiliate_offers off
-       ON off.id = al.offer_id
-      AND off.line_account_id = ?
-     GROUP BY a.id, a.name, a.code, a.hold_days, a.payout_cycle, a.commission_rate
+     -- 承認/保留/未確定の金額は現在値で再計算せず、承認時の版を正本にする。
+     -- 版が無い行は0(約束できない金額は盛らない)。版は紹介者と同じ
+     -- tenant/account/紹介者のものだけを採る(別アカウントの版で払わない)。
+     LEFT JOIN affiliate_reward_calculations snap
+       ON snap.conversion_event_id = ce.id
+      AND snap.formula IN ('rate', 'fixed', 'legacy')
+      AND snap.organization_id = a.tenant_id
+      AND snap.line_account_id = a.line_account_id
+      AND snap.affiliate_id = a.id
+     GROUP BY a.id, a.name, a.code, a.hold_days, a.payout_cycle, a.commission_rate,
+              a.line_account_id, a.tenant_id
      ORDER BY approved_reward DESC, a.name ASC`,
   ).bind(
     lineAccountId,
+    tenantId,
     now,
     now,
-    lineAccountId,
-    lineAccountId,
+    now,
+    now,
     lineAccountId,
     lineAccountId,
   ).all<{
@@ -113,6 +156,10 @@ export async function getAffiliatePaymentSummaries(
     held_conversions: number;
     held_reward: number;
     hold_status_unknown: number;
+    unsettled_conversions: number;
+    unsettled_reward: number;
+    settled_conversions: number;
+    settled_reward: number;
   }>();
 
   return result.results.map((row) => ({
@@ -126,5 +173,9 @@ export async function getAffiliatePaymentSummaries(
     heldConversions: Number(row.held_conversions),
     heldReward: Math.round(Number(row.held_reward)),
     holdStatusUnknown: Number(row.hold_status_unknown),
+    unsettledConversions: Number(row.unsettled_conversions),
+    unsettledReward: Math.round(Number(row.unsettled_reward)),
+    settledConversions: Number(row.settled_conversions),
+    settledReward: Math.round(Number(row.settled_reward)),
   }));
 }

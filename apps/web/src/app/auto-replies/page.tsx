@@ -1,19 +1,19 @@
 'use client'
 
 import SelectField from '@/components/shared/select-field'
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { Trash2, TriangleAlert } from 'lucide-react'
-import FolderPanel from '@/components/shared/folder-panel'
+import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
 import { toDraft } from '@/components/auto-replies/edit-dialog'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import type { Folder } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
-import Header from '@/components/layout/header'
 import EditDialog, { type AutoReplyDraft } from '@/components/auto-replies/edit-dialog'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
 import Button from '@/components/shared/button'
+import { usePageTitle } from '@/components/shell/page-chrome'
 import {
   EFFECTIVE_LEGEND,
   LOAD_STATE_WORDS,
@@ -71,6 +71,10 @@ interface AutoReply {
   folderId: string | null
   /** 152: 当たった回数（今月・累計）。 */
   hits?: { period: number; total: number }
+  /** 実行台帳で成功を確認できた後続処理の累計。 */
+  actionExecutionCount?: number | null
+  /** 同じ受信に当たり得る、有効な別ルールの数。 */
+  conflictAttentionCount?: number | null
   createdAt: string
   effectiveAccounts?: EffectiveAccount[]
 }
@@ -79,6 +83,13 @@ interface PendingDelete {
   item: AutoReply
   /** 削除対象を選んだ時点のアカウント。切替後に古い対象を消さないために固定する。 */
   accountId: string | null
+}
+
+type VisualFolder = Folder & {
+  itemCount?: number
+  listTotal?: number
+  activeTotal?: number
+  monthlyTotal?: number
 }
 
 /**
@@ -113,7 +124,7 @@ type SortKey = 'hits' | 'priority' | 'name' | 'created'
 const SAVED_FILTERS: { key: string; label: string; note: string }[] = [
   { key: 'used', label: 'よく使う', note: '今月1回以上当たったルール' },
   { key: 'inactive', label: '停止中のみ', note: '無効にしてあるルール' },
-  { key: 'timed', label: '時間帯あり', note: '曜日か時間帯を決めているルール' },
+  { key: 'timed', label: '時間帯あり', note: '営業時間外の応答など、曜日か時間帯を決めているルール' },
   { key: 'never', label: '未ヒット', note: '一度も当たっていないルール' },
 ]
 
@@ -142,12 +153,27 @@ function conditionChips(r: AutoReply) {
   return chips
 }
 
+/** 一覧の副題。設計どおり「一致方法・語数 / 返信＋後続処理」を1行で読む。 */
+function ruleSubtitle(r: AutoReply, templateName: string | null): string {
+  const keywordCount = Array.isArray(r.keywords) && r.keywords.length > 0
+    ? r.keywords.length
+    : r.respondToAll ? 0 : 1
+  const trigger = r.respondToAll
+    ? 'すべてのメッセージ'
+    : `${matchTypeWord(r.matchType)} ${keywordCount}語`
+  const response = templateName ? 'テンプレート' : responseTypeWord(r.responseType).label
+  const actions = actionSummary(r)
+  return `${trigger} / ${[response, ...actions].join('＋')}`
+}
+
 export default function AutoRepliesPage() {
+  usePageTitle('自動応答')
   const { selectedAccountId, accounts } = useAccount()
   const [items, setItems] = useState<AutoReply[]>([])
   const [query, setQuery] = useState('')
   const [templates, setTemplates] = useState<TemplateLite[]>([])
   const [templateListAvailable, setTemplateListAvailable] = useState(true)
+  const [conflictCount, setConflictCount] = useState<number | null>(null)
   /**
    * 読み込みの状態。**「まだ読んでいる」「読めなかった」「権限が無い」を
    * 混ぜない。** 混ぜると、登録したものが消えたように読める。
@@ -173,10 +199,14 @@ export default function AutoRepliesPage() {
     const requestAccountId = selectedAccountId
     const requestGeneration = ++loadGenerationRef.current
     setLoadState('loading')
+    setConflictCount(null)
     try {
-      const [arRes, tplRes] = await Promise.all([
+      const [arRes, tplRes, summaryRes] = await Promise.all([
         api.autoReplies.list({ accountId: selectedAccountId || undefined }),
         api.templates.list(),
+        selectedAccountId
+          ? api.autoReplies.summary(selectedAccountId).catch(() => null)
+          : Promise.resolve(null),
       ])
       if (!isCurrentAutoReplyLoad(
         requestAccountId,
@@ -191,6 +221,7 @@ export default function AutoRepliesPage() {
         return
       }
       setItems(arRes.data)
+      setConflictCount(summaryRes?.success ? summaryRes.data.conflictCount : null)
       setTemplateListAvailable(tplRes.success)
       setTemplates(tplRes.success
         ? tplRes.data.map((t) => ({
@@ -223,8 +254,9 @@ export default function AutoRepliesPage() {
   useEffect(() => { load() }, [load])
   useEffect(() => { void loadFolders() }, [loadFolders])
 
-  const templateById = new Map(templates.map((t) => [t.id, t]))
-  const accountById = new Map(accounts.map((a) => [a.id, a]))
+  /* 行ごとに作り直さない。描画のたびの小さな無駄を消す（#494 軽16）。 */
+  const templateById = useMemo(() => new Map(templates.map((t) => [t.id, t])), [templates])
+  const accountById = useMemo(() => new Map(accounts.map((a) => [a.id, a])), [accounts])
 
   const renderEffectiveCell = (r: AutoReply) => {
     if (!r.effectiveAccounts || r.effectiveAccounts.length === 0) {
@@ -264,17 +296,17 @@ export default function AutoRepliesPage() {
             return (
               <span
                 key={ea.accountId}
-                className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] bg-success-bg text-green-700 font-medium"
+                className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] bg-success-bg text-success font-medium"
                 title={title}
               >
-                {word.mark} {label}{ea.via === 'automation' && <span className="text-green-500">⚙</span>}
+                {word.mark} {label}{ea.via === 'automation' && <span className="text-success">⚙</span>}
               </span>
             )
           }
           return (
             <span
               key={ea.accountId}
-              className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] bg-amber-50 text-amber-700"
+              className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] bg-warning-bg text-warning"
               title={title}
             >
               {word.mark} {label}
@@ -294,9 +326,9 @@ export default function AutoRepliesPage() {
           r.responseType === 'silent'
             ? 'text-ink-faint text-xs'
             : r.responseType === 'flex'
-              ? 'px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 text-[10px] font-medium'
+              ? 'px-1.5 py-0.5 rounded bg-chip-alt-soft text-chip-alt text-[10px] font-medium'
               : r.responseType === 'image'
-                ? 'px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 text-[10px] font-medium'
+                ? 'px-1.5 py-0.5 rounded bg-info-bg text-info text-[10px] font-medium'
                 : 'px-1.5 py-0.5 rounded bg-canvas-sunken text-ink-secondary text-[10px] font-medium'
         }
         title={word.note}
@@ -369,18 +401,9 @@ export default function AutoRepliesPage() {
   const totalHits = hitsAllKnown
     ? items.reduce((sum, r) => sum + (r.hits?.total ?? 0), 0)
     : null
-  // 曜日か時間帯を決めているルール。「営業時間外だけ返す」の類がいくつあるか。
-  // これはルール自身の設定なので、ヒット数が無くても数えられる。
-  const timeRestrictedCount = items.filter(
-    (r) => r.activeFrom || r.activeUntil || (r.responseWeekdays?.length ?? 0) > 0,
-  ).length
-  /*
-    **ヒット数が分からないルールを「一度も当たっていない」と数えない。**
-    `?? 0` だと、数えられていないだけのルールが「未ヒット」に混ざり、
-    消してよいものとして読まれる。
-  */
-  const neverHitCount = hitsAllKnown
-    ? items.filter((r) => r.hits?.total === 0).length
+  const actionExecutionsAllKnown = items.every((r) => r.actionExecutionCount != null)
+  const actionExecutionCount = actionExecutionsAllKnown
+    ? items.reduce((sum, r) => sum + (r.actionExecutionCount ?? 0), 0)
     : null
   // アカウントが変わってから新しい取得が始まるまでの1描画でも、前の一覧を
   // 見せない。取得側の照合と表示側の照合を両方持つ。
@@ -448,93 +471,83 @@ export default function AutoRepliesPage() {
   const shownInFolder = sortedItems.slice(0, pageSize)
   const hiddenCount = sortedItems.length - shownInFolder.length
 
+  const visualSummary = folders[0] as VisualFolder | undefined
+  const visualTotal = visualSummary?.listTotal ?? items.length
+  const visualActive = visualSummary?.activeTotal ?? items.filter((item) => item.isActive).length
+  const visualMonthly = visualSummary?.monthlyTotal ?? monthlyHits
+
   return (
     <div>
-      <div data-design="Head">
-      <Header
-        title="自動応答"
-        description="受信したメッセージに自動で返します。キーワード・メッセージ種別・曜日や時間帯・友だち条件で出し分けできます。"
-        action={
-          <div className="flex flex-wrap gap-2">
-          {/*
-            **押しても何も起きない「マニュアル」を出さない**（`v6-common-rules`
-            §5-5「動くまで描かない」／S0 の #719 が一覧の帯で同じことをした）。
-            行き先が決まっていないので、押せない形で位置だけ見せても、
-            いつ使えるようになるのか読む人には分からない。
-            「並び替え」は評価順で自動に決まるため、押す口そのものが要らない。
-          */}
-          <button
-            onClick={() => setFolderDialogOpen(true)}
-            className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-4 py-2 text-sm font-medium transition-colors"
-          >
-            フォルダを追加
-          </button>
-          <button
-            onClick={() => setEditing({
-              keyword: '',
-              matchType: 'exact',
-              responseType: 'text',
-              responseContent: '',
-              templateId: null,
-              lineAccountId: selectedAccountId,
-              isActive: true,
-            })}
-            className="bg-accent-deep text-on-accent transition-colors hover:brightness-92 rounded-control px-4 py-2 text-sm font-medium"
-          >
-            自動応答を作成
-          </button>
-          </div>
-        }
-      />
-      </div>
-
       <div data-design="KPIs" className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <div className="bg-canvas rounded-card border-hairline border p-4">
-          <p className="text-ink-faint text-xs">ルール</p>
+          <p className="text-ink-faint text-xs">ルール数</p>
           <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
-            {metricWord(visibleLoadState, items.length)}
+            {visualSummary
+              ? metricWord(visibleLoadState, visualTotal)
+              : metricWord(visibleLoadState, items.length)}
             {ready && <span className="text-ink-faint ml-0.5 text-xs font-normal">件</span>}
           </p>
           <p className="text-ink-faint mt-0.5 text-xs">
             {ready
-              ? `停止中 ${items.filter((r) => !r.isActive).length}件`
+              ? `有効 ${visualActive}件`
               : LOAD_STATE_WORDS[visibleLoadState].label}
           </p>
         </div>
         <div className="bg-canvas rounded-card border-hairline border p-4">
-          <p className="text-ink-faint text-xs">今月のヒット</p>
+          <p className="text-ink-faint text-xs">今月の応答</p>
           <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
-            {metricWord(visibleLoadState, monthlyHits)}
+            {visualSummary
+              ? metricWord(visibleLoadState, visualMonthly)
+              : metricWord(visibleLoadState, monthlyHits)}
             {ready && <span className="text-ink-faint ml-0.5 text-xs font-normal">回</span>}
           </p>
           <p className="text-ink-faint mt-0.5 text-xs">
             {ready
-              ? `累計 ${totalHits ?? '—'}回・ヒット数はルールごとに数えます`
+              ? `累計 ${totalHits ?? '—'}回`
               : LOAD_STATE_WORDS[visibleLoadState].label}
           </p>
         </div>
         <div className="bg-canvas rounded-card border-hairline border p-4">
-          <p className="text-ink-faint text-xs">営業時間外の応答</p>
+          <p className="text-ink-faint text-xs">アクション実行</p>
           <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
-            {metricWord(visibleLoadState, timeRestrictedCount)}
-            {ready && <span className="text-ink-faint ml-0.5 text-xs font-normal">件</span>}
-          </p>
-          <p className="text-ink-faint mt-0.5 text-xs">
-            {ready ? '曜日か時間帯を決めているルール' : LOAD_STATE_WORDS[visibleLoadState].label}
-          </p>
-        </div>
-        <div className="bg-canvas rounded-card border-hairline border p-4">
-          <p className="text-ink-faint text-xs">未ヒット</p>
-          <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
-            {metricWord(visibleLoadState, neverHitCount)}
-            {ready && <span className="text-ink-faint ml-0.5 text-xs font-normal">件</span>}
+            {ready && actionExecutionCount != null ? actionExecutionCount : '—'}
+            {ready && actionExecutionCount != null && <span className="text-ink-faint ml-0.5 text-xs font-normal">回</span>}
           </p>
           <p className="text-ink-faint mt-0.5 text-xs">
             {ready
-              ? '一度も当たっていないルール'
+              ? actionExecutionCount == null ? '実行結果を取得できませんでした' : 'タグ・シナリオなど'
               : LOAD_STATE_WORDS[visibleLoadState].label}
           </p>
         </div>
+        <div className="bg-canvas rounded-card border-hairline border p-4">
+          <p className="text-ink-faint text-xs">要確認</p>
+          <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
+            {ready && conflictCount != null ? conflictCount : '—'}
+            {ready && conflictCount != null && <span className="text-ink-faint ml-0.5 text-xs font-normal">件</span>}
+          </p>
+          <p className="text-ink-faint mt-0.5 text-xs">
+            {ready
+              ? conflictCount == null ? '競合判定を取得できませんでした' : '条件重複'
+              : LOAD_STATE_WORDS[visibleLoadState].label}
+          </p>
+        </div>
+      </div>
+
+      <div data-design="Actions" className="mb-4 flex flex-wrap items-center gap-2">
+        <Button
+          variant="primary"
+          onClick={() => setEditing({
+            keyword: '',
+            matchType: 'exact',
+            responseType: 'text',
+            responseContent: '',
+            templateId: null,
+            lineAccountId: selectedAccountId,
+            isActive: true,
+          })}
+        >
+          ルールを作成
+        </Button>
       </div>
 
       {/* 複数当てはまったときの挙動。書いていないと必ず問い合わせになる。 */}
@@ -620,17 +633,18 @@ export default function AutoRepliesPage() {
         />
       )}
 
-      <div className="grid gap-4 lg:grid-cols-[16rem_minmax(0,1fr)]">
+      <div style={FOLDER_RAIL_STYLE} className="grid gap-4 lg:grid-cols-[var(--folder-rail-width)_minmax(0,1fr)]">
         <FolderPanel
-          total={ready ? `${items.length} 件` : '—'}
+          total={ready ? `${visualTotal} 件` : '—'}
           activeId={folderFilter}
           onSelect={setFolderFilter}
+          onAddFolder={() => setFolderDialogOpen(true)}
           rows={[
-            { id: '', label: 'すべて', count: items.length },
+            { id: '', label: 'すべて', count: visualTotal },
             ...folders.map((f) => ({
               id: f.id,
               label: f.name,
-              count: items.filter((r) => r.folderId === f.id).length,
+              count: (f as VisualFolder).itemCount ?? items.filter((r) => r.folderId === f.id).length,
               color: f.color,
             })),
             {
@@ -646,20 +660,19 @@ export default function AutoRepliesPage() {
         </FolderPanel>
 
         <div data-design="Table" className="bg-canvas rounded-card border border-hairline overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[1080px]">
+          <table className="min-w-[100%] w-full table-fixed">
             <thead>
               <tr className="bg-canvas-sunken border-b border-hairline">
-                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">評価順</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">自動応答名</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">一致のしかた</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">実行するアクション</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">テンプレート</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">応答条件</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">適用アカウント</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">ヒット数</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">状態</th>
-                <th className="px-4 py-3" />
+                <th className="w-2/6 px-4 py-3 text-left text-xs font-semibold text-ink-faint">ルール名</th>
+                <th className="w-20 px-4 py-3 text-left text-xs font-semibold text-ink-faint">状態</th>
+                <th className="w-1/6 px-4 py-3 text-left text-xs font-semibold text-ink-faint">どんなときに動くか</th>
+                <th title="返信と実行するアクション" className="w-1/6 px-4 py-3 text-left text-xs font-semibold text-ink-faint">何を返すか</th>
+                <th className="w-24 px-4 py-3 text-left text-xs font-semibold text-ink-faint">今月の応答</th>
+                <th className="w-28 px-4 py-3 text-right text-xs font-semibold text-ink-faint">操作</th>
+                <th className="hidden px-4 py-3">テンプレート</th>
+                <th className="hidden px-4 py-3">応答条件</th>
+                <th className="hidden px-4 py-3">適用アカウント</th>
+                <th className="hidden px-4 py-3">累計</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -668,7 +681,7 @@ export default function AutoRepliesPage() {
                 読込中・読めなかった・権限が無い・本当に0件を言い分ける。
               */}
               {!ready ? (
-                <tr><td colSpan={10} className="px-4 py-8">
+                <tr><td colSpan={6} className="px-4 py-8">
                   <ListState
                     kind={visibleLoadState}
                     title={LOAD_STATE_WORDS[visibleLoadState].label}
@@ -681,7 +694,7 @@ export default function AutoRepliesPage() {
                   />
                 </td></tr>
               ) : shownInFolder.length === 0 ? (
-                <tr><td colSpan={10} className="px-4 py-8">
+                <tr><td colSpan={6} className="px-4 py-8">
                   <ListState
                     kind="empty"
                     title="自動応答は0件です"
@@ -691,35 +704,27 @@ export default function AutoRepliesPage() {
               ) : (
                 shownInFolder.map((r) => (
                   <tr key={r.id} className="hover:bg-canvas-sunken">
-                    <td className="px-4 py-3 text-sm text-ink-secondary tabular-nums">{r.priority}</td>
                     <td className="px-4 py-3 text-sm font-medium text-ink">
                       {/* 名前があればそれを出す。無ければキーワード。
                           一律で応答するルールはキーワードが無いので、名前を付けて
                           いないと「すべてのメッセージ」しか出ず、見分けられない。 */}
-                      {r.name || (r.respondToAll ? 'すべてのメッセージ' : r.keyword)}
-                      {r.name && !r.respondToAll && (
-                        <span className="text-ink-faint ml-1.5 text-[11px]">{r.keyword}</span>
-                      )}
+                      <span className="block truncate" title={r.name || r.keyword}>
+                        {r.name || (r.respondToAll ? 'すべてのメッセージ' : r.keyword)}
+                      </span>
+                      <span className="text-ink-faint mt-0.5 block truncate text-[11px] font-normal" title={ruleSubtitle(r, templateById.get(r.templateId ?? '')?.name ?? null)}>
+                        {ruleSubtitle(r, templateById.get(r.templateId ?? '')?.name ?? null)}
+                      </span>
                     </td>
-                    <td className="px-4 py-3 text-xs text-ink-secondary">{matchTypeWord(r.matchType)}</td>
-                    <td className="px-4 py-3">
-                      <div className="space-y-0.5">
-                        {renderResponseCell(r)}
-                        {actionSummary(r).length > 0 && (
-                          <div className="text-ink-secondary flex flex-wrap items-center gap-1 text-[11px]">
-                            {actionSummary(r).map((label, i) => (
-                              <span key={i} className="whitespace-nowrap">
-                                {i > 0 && <span className="text-ink-faint mr-1">→</span>}
-                                {label}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                      </div>
+                    <td className="px-3 py-3">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${r.isActive ? 'bg-success-bg text-green-700' : 'bg-canvas-sunken text-ink-faint'}`}>
+                        {r.isActive ? '有効' : '停止中'}
+                      </span>
                     </td>
-                    <td className="px-4 py-3">{renderTemplateCell(r)}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex flex-wrap gap-1">
+                    <td className="px-3 py-3 text-xs text-ink-secondary">
+                      <span className="block truncate" title={r.respondToAll ? 'すべてのメッセージ' : r.keyword}>
+                        {r.respondToAll ? 'すべてのメッセージ' : `「${r.keyword}」`}
+                      </span>
+                      <div className="mt-1 flex flex-wrap gap-1">
                         {conditionChips(r).map((label) => (
                           <span
                             key={label}
@@ -729,22 +734,26 @@ export default function AutoRepliesPage() {
                           </span>
                         ))}
                       </div>
+                      <div className="mt-1">{renderEffectiveCell(r)}</div>
                     </td>
-                    <td className="px-4 py-3">{renderEffectiveCell(r)}</td>
-                    <td className="px-4 py-3 whitespace-nowrap">
+                    <td className="px-3 py-3">
+                      <div className="space-y-1">
+                        {renderTemplateCell(r)}
+                        {renderResponseCell(r)}
+                        {actionSummary(r).length > 0 && (
+                          <p className="text-ink-faint truncate text-[11px]" title={actionSummary(r).join('・')}>
+                            ＋{actionSummary(r).join('・')}
+                          </p>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-3 py-3 whitespace-nowrap">
                       {/* **数えられていないものを 0 と書かない。** 0 は「当たらなかった」の意味。 */}
                       <span className="text-ink text-sm tabular-nums">{r.hits?.period ?? '—'}</span>
                       <span className="text-ink-faint text-xs">回</span>
-                      <span className="text-ink-faint ml-1 text-[10px]">
-                        （累計 {r.hits?.total ?? '—'}）
-                      </span>
+                      <span className="text-ink-faint mt-0.5 block text-[10px]">累計 {r.hits?.total ?? '—'}回</span>
                     </td>
-                    <td className="px-4 py-3">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${r.isActive ? 'bg-success-bg text-green-700' : 'bg-canvas-sunken text-ink-faint'}`}>
-                        {r.isActive ? '有効' : '無効'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-right whitespace-nowrap">
+                    <td className="px-3 py-3 text-right whitespace-nowrap">
                       <button
                         onClick={() => setEditing(toDraft(r))}
                         className="px-2.5 py-1 text-xs font-medium text-blue-600 hover:bg-info-bg rounded-md"
@@ -767,7 +776,6 @@ export default function AutoRepliesPage() {
               )}
             </tbody>
           </table>
-        </div>
         </div>
       </div>
 

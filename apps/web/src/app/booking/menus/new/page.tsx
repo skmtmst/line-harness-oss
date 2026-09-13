@@ -1,17 +1,23 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { bookingApi, type BookingStaff } from '@/lib/api'
+import { api, ApiError, bookingApi, type BookingSettings, type BookingStaff } from '@/lib/api'
+import type { Tag } from '@line-crm/shared'
 import { useAccount } from '@/contexts/account-context'
+import { usePageTitle } from '@/components/shell/page-chrome'
 import CreatePage, {
   AsideCard,
   Field,
   FormSection,
   inputClass,
 } from '@/components/shared/create-page'
+import SelectField from '@/components/shared/select-field'
+import SearchField from '@/components/shared/search-field'
+import Button from '@/components/shared/button'
+import { bookingMenuError } from '../menu-validation'
 
 /**
- * メニューを追加する（設計 V2 8-2-1 / node swtmr）。
+ * メニューを追加する（設計 V6 28-1-B / node GhOb3）。
  *
  * 設計は左に番号つきの4節、右に「予約画面での見え方」と「気をつけること」。
  * 入力欄だけ縦に並んでいると、どこまで埋めれば予約を受けられるのかが
@@ -19,6 +25,7 @@ import CreatePage, {
  * 保存できてしまうのに予約が入らないという分かりにくい失敗をする。
  */
 export default function NewBookingMenuPage() {
+  usePageTitle('予約メニューをつくる')
   const { selectedAccountId } = useAccount()
   const [name, setName] = useState('')
   const [categoryLabel, setCategoryLabel] = useState('')
@@ -27,30 +34,99 @@ export default function NewBookingMenuPage() {
   const [bufferAfterMinutes, setBufferAfterMinutes] = useState('0')
   const [basePrice, setBasePrice] = useState('')
   const [concurrentCapacity, setConcurrentCapacity] = useState('1')
-  const [windowDays, setWindowDays] = useState('30')
+  const [windowDays, setWindowDays] = useState('')
   const [cutoffHours, setCutoffHours] = useState('')
   const [cancelDeadlineHours, setCancelDeadlineHours] = useState('')
   const [intakeQuestion, setIntakeQuestion] = useState('')
   const [isActive, setIsActive] = useState(true)
   const [staff, setStaff] = useState<BookingStaff[]>([])
+  /** 担当一覧の取得に失敗したときは「未登録」と混ぜずに文言を分ける。 */
+  const [staffLoadFailed, setStaffLoadFailed] = useState(false)
+  const [storeSettings, setStoreSettings] = useState<BookingSettings | null>(null)
+  const [bookingMileage, setBookingMileage] = useState<number | null>(null)
+  const [createdMenuNeedingStaff, setCreatedMenuNeedingStaff] = useState<string | null>(null)
   /** チェックした担当。保存後に staff_menus へ流し込む。 */
   const [assigned, setAssigned] = useState<Set<string>>(new Set())
+  /** 予約後に自動で付けるタグ。null は「付けない」。 */
+  const [autoTagId, setAutoTagId] = useState<string | null>(null)
+  const [tagQuery, setTagQuery] = useState('')
+  const [tags, setTags] = useState<Tag[]>([])
+  /** タグ候補の取得状態。失敗・未取得でもタグなしの保存は止めない。 */
+  const [tagLoadState, setTagLoadState] = useState<'loading' | 'ready' | 'error'>('loading')
 
   useEffect(() => {
-    if (!selectedAccountId) return
+    if (!selectedAccountId) {
+      setStaff([])
+      setStoreSettings(null)
+      return
+    }
     let alive = true
-    bookingApi
-      .listStaff(selectedAccountId)
-      .then((r) => {
-        if (alive) setStaff(r.staff)
+    Promise.all([
+      bookingApi.listStaff(selectedAccountId),
+      bookingApi.getSettings(selectedAccountId),
+    ])
+      .then(([staffResult, settingsResult]) => {
+        if (!alive) return
+        setStaff(staffResult.staff)
+        setStaffLoadFailed(false)
+        setStoreSettings(settingsResult.success ? settingsResult.data : null)
       })
       .catch(() => {
-        // 担当の一覧が出ないだけ。あとで割り当て画面から設定できる。
+        // 取得失敗は「未登録」と混ぜない。登録作業へ誘導しない。
+        if (alive) {
+          setStaff([])
+          setStaffLoadFailed(true)
+          setStoreSettings(null)
+        }
       })
     return () => {
       alive = false
     }
   }, [selectedAccountId])
+
+  useEffect(() => {
+    let cancelled = false
+    setTagLoadState('loading')
+    api.tags
+      .list()
+      .then((r) => {
+        if (cancelled) return
+        // 取得失敗はタグなし保存の妨げにしない。候補が出ないだけで残す。
+        if (r.success) {
+          setTags(r.data)
+          setTagLoadState('ready')
+        } else {
+          setTagLoadState('error')
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setTagLoadState('error')
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  // アカウントを変えたら前の選択を残さない。別アカウントのタグを
+  // そのまま送ると Worker が tag_not_found で落とすうえ、意図しない結び付きになる。
+  useEffect(() => {
+    setAutoTagId(null)
+    setTagQuery('')
+  }, [selectedAccountId])
+
+  useEffect(() => {
+    let alive = true
+    api.mileage.rules()
+      .then((response) => {
+        if (!alive || !response.success) return
+        const rule = response.data.find((item) => item.eventType === 'booking_created' && item.isActive)
+        setBookingMileage(rule?.amount ?? null)
+      })
+      .catch(() => {
+        if (alive) setBookingMileage(null)
+      })
+    return () => { alive = false }
+  }, [])
 
   function toggle(id: string) {
     setAssigned((cur) => {
@@ -61,35 +137,82 @@ export default function NewBookingMenuPage() {
     })
   }
 
+  // 候補は「今選んでいるアカウントの有効なタグ」だけ。別アカウントのものと
+  // 整理済み(archived)は選ばせない。保存側の tag_not_found 検証と二重化する。
+  const tagCandidates = tags.filter(
+    (t) => t.lineAccountId === selectedAccountId && t.status !== 'archived',
+  )
+  const trimmedQuery = tagQuery.trim()
+  const visibleTagCandidates = trimmedQuery === ''
+    ? tagCandidates
+    : tagCandidates.filter((t) => t.name.includes(trimmedQuery))
+  // 検索で選んだタグが隠れても選択自体は残す。検索を消せば戻る。
+  const selectedTag = tagCandidates.find((t) => t.id === autoTagId) ?? null
+  const tagOptions = selectedTag != null
+      && !visibleTagCandidates.some((t) => t.id === selectedTag.id)
+    ? [selectedTag, ...visibleTagCandidates]
+    : visibleTagCandidates
+
+  const priceMode = basePrice.trim() === ''
+    ? 'inquiry'
+    : Number(basePrice) === 0
+      ? 'free'
+      : 'fixed'
+  const priceLabel = priceMode === 'inquiry'
+    ? 'お問い合わせ'
+    : priceMode === 'free'
+      ? '無料'
+      : `¥${Number(basePrice).toLocaleString()}`
+
   return (
     <CreatePage
       designNode="GhOb3"
-      title="メニューを追加する"
+      title="予約メニューをつくる"
       description="お客様が予約するときに選ぶ内容を登録します。"
       parent={['予約設定', '/booking/menus']}
-      saveLabel="メニューを追加"
+      saveLabel={isActive ? 'つくって出す' : '下書きに保存'}
       showHeader={false}
+      variant="v6"
+      statusLabel={isActive ? 'まだ出していません' : '下書きとして保存'}
       validate={() => {
         if (!selectedAccountId) return '先に上部でLINEアカウントを選んでください'
-        if (!name.trim()) return 'メニュー名を入力してください'
-        if (Number(durationMinutes) < 1) return '所要時間は1分以上にしてください'
-        if (assigned.size === 0)
-          return '担当できる人を1人以上選んでください。0人だと予約画面に枠が出ません'
+        const validationError = bookingMenuError({
+          name,
+          durationMinutes,
+          bufferAfterMinutes,
+          sortOrder: 0,
+          assignedStaffCount: assigned.size,
+        })
+        if (validationError) return validationError
+        // 候補にないタグ(削除済み・別アカウント)は送らない。入力は残して選び直させる。
+        if (
+          autoTagId != null
+          && tagLoadState === 'ready'
+          && !tagCandidates.some((t) => t.id === autoTagId)
+        ) {
+          return '選んだタグは使えなくなりました。選び直すか「なし」にしてください'
+        }
         return null
       }}
       onReset={() => {
         setName('')
         setDescription('')
         setAssigned(new Set())
+        setAutoTagId(null)
+        setTagQuery('')
+        setCreatedMenuNeedingStaff(null)
       }}
       onSave={async () => {
-        const res = await bookingApi.createMenu(selectedAccountId!, {
+        let res
+        try {
+          res = await bookingApi.createMenu(selectedAccountId!, {
           name: name.trim(),
           category_label: categoryLabel.trim() || null,
           description: description.trim() || null,
           duration_minutes: Number(durationMinutes),
           buffer_after_minutes: Number(bufferAfterMinutes) || 0,
           base_price: Number(basePrice) || 0,
+          price_mode: priceMode,
           concurrent_capacity: Number(concurrentCapacity) || 1,
           booking_window_days: windowDays ? Number(windowDays) : null,
           cutoff_hours_before: cutoffHours ? Number(cutoffHours) : null,
@@ -98,29 +221,43 @@ export default function NewBookingMenuPage() {
             : null,
           intake_question: intakeQuestion.trim() || null,
           is_active: isActive ? 1 : 0,
-        })
+          auto_tag_id: autoTagId,
+          })
+        } catch (e) {
+          // 選んだ後にタグが消えた場合は Worker が tag_not_found で落とす。
+          // 入力は残る(CreatePage が失敗時に初期化しない)ので選び直せる。
+          if (e instanceof ApiError && e.code === 'tag_not_found') {
+            throw new Error('選んだタグは削除されたため保存できませんでした。タグを選び直してください。')
+          }
+          throw e
+        }
         // 担当の割り当ては staff 側の表に入るので、作ったあとに1人ずつ足す。
         // ここで失敗しても、メニュー自体は作れている。
-        await Promise.all(
-          [...assigned].map(async (staffId) => {
-            const { matrix } = await bookingApi.getStaffMenus(selectedAccountId!, staffId)
-            await bookingApi.putStaffMenus(
-              selectedAccountId!,
-              staffId,
-              matrix.map((row) => ({
-                menu_id: row.menu_id,
-                is_offered: row.menu_id === res.id ? true : Boolean(row.is_offered),
-                override_duration_minutes: row.override_duration_minutes ?? null,
-                override_price: row.override_price ?? null,
-              })),
-            )
-          }),
-        )
+        try {
+          await Promise.all(
+            [...assigned].map(async (staffId) => {
+              const { matrix } = await bookingApi.getStaffMenus(selectedAccountId!, staffId)
+              await bookingApi.putStaffMenus(
+                selectedAccountId!,
+                staffId,
+                matrix.map((row) => ({
+                  menu_id: row.menu_id,
+                  is_offered: row.menu_id === res.id ? true : Boolean(row.is_offered),
+                  override_duration_minutes: row.override_duration_minutes ?? null,
+                  override_price: row.override_price ?? null,
+                })),
+              )
+            }),
+          )
+        } catch {
+          setCreatedMenuNeedingStaff(res.id)
+          throw new Error('メニューは作成されましたが、担当スタッフを保存できませんでした。下のボタンから担当を設定してください。')
+        }
         return res.id
       }}
       aside={
         <>
-          <AsideCard title="予約画面での見え方" note="プレビュー">
+          <AsideCard title="メニューをえらぶ画面では こう見えます" note="プレビュー">
             <div className="border-hairline rounded-card border p-3">
               <p className="text-ink text-sm font-medium">{name || 'メニュー名'}</p>
               {description && (
@@ -129,7 +266,7 @@ export default function NewBookingMenuPage() {
               <div className="text-ink-faint mt-2 flex items-center gap-3 text-xs">
                 <span>{durationMinutes || '—'}分</span>
                 <span>
-                  {basePrice ? `¥${Number(basePrice).toLocaleString()}` : '料金は当日ご案内'}
+                  {priceLabel}
                 </span>
               </div>
               <div className="bg-accent-deep text-on-accent rounded-control mt-3 px-3 py-2 text-center text-xs font-medium">
@@ -142,12 +279,22 @@ export default function NewBookingMenuPage() {
             <ul className="text-ink-secondary space-y-1.5 text-xs leading-5">
               <li>・担当スタッフを1人も選ばないと予約できません</li>
               <li>・所要時間は受付時間の区切りに合わせて表示されます</li>
-              <li>・料金を空欄にすると「料金は当日ご案内」と表示されます</li>
+              <li>・料金を空欄にすると「お問い合わせ」と表示されます</li>
             </ul>
           </AsideCard>
         </>
       }
     >
+      {createdMenuNeedingStaff && (
+        <div className="border-warning bg-warning-bg text-warning rounded-control border p-3 text-sm">
+          <p>作成済みのメニューに担当スタッフを設定してください。</p>
+          <div className="mt-2">
+            <Button href={`/booking/menus?tab=staff&menu=${encodeURIComponent(createdMenuNeedingStaff)}`}>
+              担当スタッフを設定する
+            </Button>
+          </div>
+        </div>
+      )}
       <FormSection step={1} label="お客様に見える情報">
         <Field label="メニュー名" htmlFor="bm-name" required>
           <input
@@ -171,7 +318,7 @@ export default function NewBookingMenuPage() {
               className={`${inputClass} tabular-nums`}
             />
           </Field>
-          <Field label="料金" htmlFor="bm-price" note="税込の金額を入力してください。">
+          <Field label="料金" htmlFor="bm-price" note="税込の金額。0円は「無料」、空けると「お問い合わせ」と出ます。">
             <input
               id="bm-price"
               type="number"
@@ -226,7 +373,7 @@ export default function NewBookingMenuPage() {
           <Field
             label="予約を受け付ける期間"
             htmlFor="bm-window"
-            note="当日から何日先まで受けるか。空欄なら制限なし。"
+            note={`空欄なら店舗設定を使います${storeSettings ? `（現在 ${storeSettings.bookingWindowDays}日）` : ''}。`}
           >
             <div className="flex items-center gap-1.5">
               <input
@@ -235,7 +382,7 @@ export default function NewBookingMenuPage() {
                 min={1}
                 value={windowDays}
                 onChange={(e) => setWindowDays(e.target.value)}
-                placeholder="なし"
+                placeholder={storeSettings ? String(storeSettings.bookingWindowDays) : '店舗設定'}
                 className={`${inputClass} tabular-nums`}
               />
               <span className="text-ink-faint text-xs whitespace-nowrap">日先まで</span>
@@ -244,7 +391,7 @@ export default function NewBookingMenuPage() {
           <Field
             label="締め切り"
             htmlFor="bm-cutoff"
-            note="開始の何時間前まで受けるか。空欄なら直前まで受けます。"
+            note={`空欄なら店舗設定を使います${storeSettings ? `（現在 ${storeSettings.cutoffMinutesBefore / 60}時間前）` : ''}。`}
           >
             <div className="flex items-center gap-1.5">
               <input
@@ -253,7 +400,7 @@ export default function NewBookingMenuPage() {
                 min={1}
                 value={cutoffHours}
                 onChange={(e) => setCutoffHours(e.target.value)}
-                placeholder="なし"
+                placeholder={storeSettings ? String(storeSettings.cutoffMinutesBefore / 60) : '店舗設定'}
                 className={`${inputClass} tabular-nums`}
               />
               <span className="text-ink-faint text-xs whitespace-nowrap">時間前</span>
@@ -262,7 +409,7 @@ export default function NewBookingMenuPage() {
           <Field
             label="キャンセル期限"
             htmlFor="bm-cancel"
-            note="開始の何時間前までキャンセルできるか。"
+            note={`空欄なら店舗設定を使います${storeSettings ? `（現在 ${storeSettings.cancelDeadlineMinutesBefore / 60}時間前）` : ''}。`}
           >
             <div className="flex items-center gap-1.5">
               <input
@@ -271,7 +418,7 @@ export default function NewBookingMenuPage() {
                 min={1}
                 value={cancelDeadlineHours}
                 onChange={(e) => setCancelDeadlineHours(e.target.value)}
-                placeholder="なし"
+                placeholder={storeSettings ? String(storeSettings.cancelDeadlineMinutesBefore / 60) : '店舗設定'}
                 className={`${inputClass} tabular-nums`}
               />
               <span className="text-ink-faint text-xs whitespace-nowrap">時間前</span>
@@ -300,7 +447,11 @@ export default function NewBookingMenuPage() {
         label="このメニューを担当できる人"
         note="チェックした人だけ、お客様が指名できます。"
       >
-        {staff.length === 0 ? (
+        {staffLoadFailed ? (
+          <p className="text-ink-faint text-sm">
+            担当を読み込めませんでした。開き直してください。
+          </p>
+        ) : staff.length === 0 ? (
           <p className="text-ink-faint text-sm">
             まだスタッフが登録されていません。先に予約設定の「担当スタッフ」から登録してください。
           </p>
@@ -331,6 +482,72 @@ export default function NewBookingMenuPage() {
 
       <FormSection
         step={4}
+        label="予約を受けたときにすること"
+        note="現在つながっている自動処理を確認できます。"
+      >
+        <div className="space-y-2">
+          <ActionSummary
+            title="予約を受け付けたことを知らせる"
+            detail="日時・メニュー・場所を書いた案内をLINEへ送ります。"
+            status="自動"
+          />
+          <ActionSummary
+            title="前日・開始前に思い出してもらう"
+            detail="確定した予約は、前日と設定時間前のリマインダへ登録されます。"
+            status="自動"
+          />
+          <ActionSummary
+            title={bookingMileage === null ? '予約時のマイル' : `マイルを ${bookingMileage.toLocaleString()} 付ける`}
+            detail={bookingMileage === null ? '「予約した」のマイル設定を取得できませんでした。' : 'たまる決めごと「予約してくれた」が適用されます。'}
+            status={bookingMileage === null ? '未取得' : `予約で ${bookingMileage.toLocaleString()}`}
+            href="/mileage/score-rules"
+          />
+        </div>
+        <Field
+          label="予約後に付けるタグ"
+          htmlFor="bm-auto-tag"
+          note="このメニューで予約が入ると、予約した人の友だちに自動で付きます。付けないときは「なし」のままにしてください。"
+        >
+          {tagLoadState === 'loading' ? (
+            <p className="text-ink-faint text-sm">タグを読み込んでいます…</p>
+          ) : tagLoadState === 'error' ? (
+            <p className="text-ink-faint text-sm">
+              タグを読み込めませんでした。タグなしで保存できます。
+            </p>
+          ) : tagCandidates.length === 0 ? (
+            <p className="text-ink-faint text-sm">
+              このアカウントに使えるタグがありません。タグなしで保存できます。
+            </p>
+          ) : (
+            <div className="space-y-2">
+              <SearchField
+                value={tagQuery}
+                onChange={setTagQuery}
+                onClear={() => setTagQuery('')}
+                placeholder="タグを検索"
+                maxLength={100}
+                aria-label="タグを検索"
+              />
+              <SelectField
+                id="bm-auto-tag"
+                aria-label="予約後に付けるタグ"
+                value={autoTagId ?? ''}
+                onChange={(e) => setAutoTagId(e.target.value === '' ? null : e.target.value)}
+                options={[{ value: '', label: '— なし —' }, ...tagOptions.map((t) => ({ value: t.id, label: t.name }))]}
+                className="w-full"
+              />
+              {trimmedQuery !== '' && visibleTagCandidates.length === 0 && (
+                <p className="text-ink-faint text-xs">
+                  「{trimmedQuery}」に合うタグがありません。
+                </p>
+              )}
+            </div>
+          )}
+        </Field>
+      </FormSection>
+
+      <FormSection
+        step={5}
         label="予約時に質問を出す"
         note="犬種・体重など、当日必要な情報を先に聞けます。"
       >
@@ -362,5 +579,28 @@ export default function NewBookingMenuPage() {
         </label>
       </FormSection>
     </CreatePage>
+  )
+}
+
+function ActionSummary({ title, detail, status, href }: {
+  title: string
+  detail: string
+  status: string
+  href?: string
+}) {
+  const content = (
+    <>
+      <span className="min-w-0">
+        <span className="text-ink block text-sm font-medium">{title}</span>
+        <span className="text-ink-faint mt-0.5 block text-xs">{detail}</span>
+      </span>
+      <span className="bg-success-bg text-success rounded-pill ml-auto shrink-0 px-2 py-1 text-xs font-medium">{status}</span>
+    </>
+  )
+  return (
+    <div className="border-hairline flex items-center gap-3 rounded-control border p-3">
+      {content}
+      {href && <Button href={href}>設定を見る</Button>}
+    </div>
   )
 }

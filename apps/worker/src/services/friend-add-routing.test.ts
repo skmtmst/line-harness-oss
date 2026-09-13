@@ -8,6 +8,7 @@ import {
 } from './friend-add-routing.js';
 import { createTestD1, insertFriend } from '../test-utils/d1-sqlite.js';
 import { FRIEND_ADD_ROUTING_DEFAULT } from '@line-crm/shared';
+import { publishScenarioVersion } from '@line-crm/db';
 
 describe('classifyFriend', () => {
   test('ブロックしたことが無ければ「はじめて」', () => {
@@ -76,6 +77,58 @@ describe('previewFriendAddRoutingDefinition', () => {
       });
   });
 });
+
+describe('V6の流入経路別ルール', () => {
+  async function setupRule(routeIds: string[], options: { fallback?: boolean; scenarioId?: string | null; priority?: number } = {}) {
+    const { db, raw } = createTestD1()
+    raw.prepare(`INSERT INTO line_accounts (id, name, channel_id, channel_secret, channel_access_token)
+                 VALUES ('acc-v6', 'テスト', 'c', 's', 't')`).run()
+    insertFriend(raw, 'friend-v6', { line_account_id: 'acc-v6', unfollow_count: 0 })
+    raw.prepare(`INSERT INTO scenarios (id, name, trigger_type, is_active, line_account_id)
+                 VALUES ('scenario-v6', 'ようこそ', 'friend_add', 1, 'acc-v6')`).run()
+    // 実行時は設定が指す流入リンクの持ち物も確かめるので、実データを置く。
+    for (const [index, routeId] of routeIds.entries()) {
+      raw.prepare(`INSERT OR IGNORE INTO entry_routes (id, name, ref_code, is_active, line_account_id)
+                   VALUES (?, ?, ?, 1, 'acc-v6')`).run(routeId, routeId, `REF-${index}-${routeId}`)
+    }
+    // 参加には明示公開が要る（351）。
+    await publishScenarioVersion(db, 'scenario-v6', { staffId: null, idempotencyKey: 'routing-v6' })
+    const ruleId = options.fallback ? 'rule-fallback' : 'rule-route'
+    const versionId = `${ruleId}-v1`
+    raw.prepare(`INSERT INTO friend_add_rules
+      (id, line_account_id, friend_kind, name, priority, is_unknown_route_fallback, status, current_version_id)
+      VALUES (?, 'acc-v6', 'first_time', ?, ?, ?, 'published', ?)`).run(
+      ruleId, ruleId, options.priority ?? 1, options.fallback ? 1 : 0, versionId,
+    )
+    raw.prepare(`INSERT INTO friend_add_rule_versions
+      (id, rule_id, version_number, definition_snapshot, status)
+      VALUES (?, ?, 1, ?, 'published')`).run(versionId, ruleId, JSON.stringify({
+      routeIds,
+      scenarioId: options.scenarioId === undefined ? 'scenario-v6' : options.scenarioId,
+      messageType: 'scenario', messageText: '', timing: 'scenario', actions: [],
+      friendCondition: '', activeFrom: null, activeUntil: null,
+    }))
+    return { db, raw, ruleId, versionId }
+  }
+
+  test('確定した流入リンクに合う公開版を1件だけ選ぶ', async () => {
+    const { db, ruleId, versionId } = await setupRule(['route-known'])
+    const result = await applyFriendAddRouting(
+      db, 'acc-v6', { id: 'friend-v6', unfollow_count: 0 }, undefined, { entryRouteId: 'route-known' },
+    )
+    expect(result).toMatchObject({ routed: true, ruleId, ruleVersionId: versionId, suppressed: false })
+    expect(result.enrollments).toHaveLength(1)
+  })
+
+  test('経路を確定できないときは削除できない受け皿を選び、未設定なら安全に抑止する', async () => {
+    const { db, ruleId, versionId } = await setupRule([], { fallback: true, scenarioId: null, priority: 9999 })
+    const result = await applyFriendAddRouting(
+      db, 'acc-v6', { id: 'friend-v6', unfollow_count: 0 }, undefined, { entryRouteId: null },
+    )
+    expect(result).toMatchObject({ routed: true, ruleId, ruleVersionId: versionId, suppressed: true })
+    expect(result.enrollments).toEqual([])
+  })
+})
 
 describe('normalizeRouting', () => {
   test('空の入力は既定に落ちる', () => {
@@ -175,9 +228,11 @@ describe('ブロックを解除した人への配信', () => {
                  VALUES ('sc-1', 'ようこそ', 'friend_add', 1, 'acc-1')`).run()
     raw.prepare(`INSERT INTO scenario_steps (id, scenario_id, step_order, delay_minutes, message_type, message_content)
                  VALUES ('st-1','sc-1',0,0,'text','1通目'), ('st-2','sc-1',1,60,'text','2通目')`).run()
+    // 参加には明示公開が要る（351）。止まった購読は移行後の姿（版付き）で置く。
+    const published = await publishScenarioVersion(db, 'sc-1', { staffId: null, idempotencyKey: 'routing-resume' })
     // 1通目まで読んだところでブロックされ、購読が止まっている。
-    raw.prepare(`INSERT INTO friend_scenarios (id, friend_id, scenario_id, current_step_order, status, started_at, updated_at)
-                 VALUES ('fs-1','f-back','sc-1',0,'paused','2026-01-01T00:00:00.000','2026-01-01T00:00:00.000')`).run()
+    raw.prepare(`INSERT INTO friend_scenarios (id, friend_id, scenario_id, current_step_order, status, started_at, updated_at, published_version_id)
+                 VALUES ('fs-1','f-back','sc-1',0,'paused','2026-01-01T00:00:00.000','2026-01-01T00:00:00.000', ?)`).run(published.id)
 
     await saveFriendAddRouting(db, 'acc-1', {
       ...FRIEND_ADD_ROUTING_DEFAULT,
@@ -279,6 +334,8 @@ describe('書きかけの設定', () => {
                  VALUES ('sc-1', 'ようこそ', 'friend_add', 1, 'acc-1')`).run()
     raw.prepare(`INSERT INTO scenario_steps (id, scenario_id, step_order, delay_minutes, message_type, message_content)
                  VALUES ('st-1','sc-1',0,0,'text','1通目')`).run()
+    // 参加には明示公開が要る（351）。
+    await publishScenarioVersion(db, 'sc-1', { staffId: null, idempotencyKey: 'routing-draft' })
 
     await saveFriendAddRouting(db, 'acc-1', {
       ...FRIEND_ADD_ROUTING_DEFAULT,

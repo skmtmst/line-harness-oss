@@ -7,6 +7,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const dbMocks = {
   // eager module-load deps (mirror other route tests)
   getLineAccounts: vi.fn().mockResolvedValue([]),
+  getLineAccountScopeEntries: vi.fn(async (...args: unknown[]) => dbMocks.getLineAccounts(...args)),
+  getAccountSetting: vi.fn().mockResolvedValue(null),
+  getVersionedAccountSetting: vi.fn().mockResolvedValue({
+    version: 1,
+    data: { features: { affiliates: true } },
+  }),
   getStaffByApiKey: vi.fn(),
   recoverStalledBroadcasts: vi.fn(),
   recoverStuckDeliveries: vi.fn(),
@@ -46,21 +52,23 @@ const env = {
 } as unknown as import('../index.js').Env['Bindings'];
 
 function get(path: string) {
+  const separator = path.includes('?') ? '&' : '?';
   const headers = new Headers({ Authorization: `Bearer ${API_KEY}` });
   return worker.fetch(
-    new Request(`https://worker.example.com${path}`, { method: 'GET', headers }),
+    new Request(`https://worker.example.com${path}${separator}accountId=${ACCOUNT_ID}`, { method: 'GET', headers }),
     env,
     { waitUntil() {}, passThroughOnException() {} } as unknown as ExecutionContext,
   );
 }
 
 function post(path: string, body: unknown) {
+  const separator = path.includes('?') ? '&' : '?';
   const headers = new Headers({
     Authorization: `Bearer ${API_KEY}`,
     'Content-Type': 'application/json',
   });
   return worker.fetch(
-    new Request(`https://worker.example.com${path}`, {
+    new Request(`https://worker.example.com${path}${separator}accountId=${ACCOUNT_ID}`, {
       method: 'POST',
       headers,
       body: JSON.stringify(body),
@@ -71,21 +79,23 @@ function post(path: string, body: unknown) {
 }
 
 function remove(path: string) {
+  const separator = path.includes('?') ? '&' : '?';
   const headers = new Headers({ Authorization: `Bearer ${API_KEY}` });
   return worker.fetch(
-    new Request(`https://worker.example.com${path}`, { method: 'DELETE', headers }),
+    new Request(`https://worker.example.com${path}${separator}accountId=${ACCOUNT_ID}`, { method: 'DELETE', headers }),
     env,
     { waitUntil() {}, passThroughOnException() {} } as unknown as ExecutionContext,
   );
 }
 
 function put(path: string, body: unknown) {
+  const separator = path.includes('?') ? '&' : '?';
   const headers = new Headers({
     Authorization: `Bearer ${API_KEY}`,
     'Content-Type': 'application/json',
   });
   return worker.fetch(
-    new Request(`https://worker.example.com${path}`, {
+    new Request(`https://worker.example.com${path}${separator}accountId=${ACCOUNT_ID}`, {
       method: 'PUT', headers, body: JSON.stringify(body),
     }),
     env,
@@ -400,5 +410,40 @@ describe('紹介者の停止と履歴保持', () => {
     const res = await post('/api/affiliates/click', { code: 'stopped1' });
     expect(res.status).toBe(404);
     expect(dbMocks.recordAffiliateClick).not.toHaveBeenCalled();
+  });
+});
+
+describe('報酬率の範囲検査（#554 点検#505中2）', () => {
+  it.each([101, 1000, -1, Number.NaN, 'high'])('commissionRate=%s の作成を400で弾く', async (rate) => {
+    const res = await post('/api/affiliates', { name: 'Alice', commissionRate: rate });
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toContain('0から100');
+    expect(dbMocks.createAffiliateWithRandomCode).not.toHaveBeenCalled();
+    expect(dbMocks.createAffiliate).not.toHaveBeenCalled();
+  });
+
+  it.each([0, 100])('commissionRate=%s の作成は通す', async (rate) => {
+    dbMocks.createAffiliateWithRandomCode.mockResolvedValue({
+      id: 'aff-1', name: 'Alice', code: 'Ab3xYz', commission_rate: rate,
+      is_active: 1, created_at: '2026-07-07T00:00:00.000+09:00', friend_id: null,
+    });
+    const res = await post('/api/affiliates', { name: 'Alice', commissionRate: rate });
+    expect(res.status).toBe(201);
+  });
+
+  it('更新で100超を400で弾き、保存しない', async () => {
+    const res = await put('/api/affiliates/aff-1', { commissionRate: 10000 });
+    expect(res.status).toBe(400);
+    expect(dbMocks.updateAffiliate).not.toHaveBeenCalled();
+  });
+
+  it('更新で100は通す', async () => {
+    dbMocks.updateAffiliate.mockResolvedValue({
+      id: 'aff-1', name: 'Alice', code: 'Ab3xYz', commission_rate: 100,
+      is_active: 1, created_at: '2026-07-07T00:00:00.000+09:00', friend_id: null,
+    });
+    const res = await put('/api/affiliates/aff-1', { commissionRate: 100 });
+    expect(res.status).toBe(200);
   });
 });

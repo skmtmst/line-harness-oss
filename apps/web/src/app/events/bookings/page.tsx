@@ -3,13 +3,16 @@
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import Header from '@/components/layout/header'
 import { useAccount } from '@/contexts/account-context'
+import { usePageTitle } from '@/components/shell/page-chrome'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
-import { eventsApi, type EventBookingItem, type EventDetail } from '@/lib/api'
+import Pagination from '@/components/shared/pagination'
+import { eventsApi, type EventBookingItem, type EventBookingSummary, type EventDetail } from '@/lib/api'
 import { describeBookingCapacity } from '../event-attention'
+
+const PAGE_SIZE = 20
 
 const STATUS_TABS: Array<{ key: string; label: string }> = [
   { key: 'requested', label: '承認待ち' },
@@ -23,24 +26,51 @@ const STATUS_TABS: Array<{ key: string; label: string }> = [
 ]
 
 const statusBadge: Record<string, string> = {
-  requested: 'bg-yellow-100 text-yellow-800',
-  confirmed: 'bg-green-100 text-green-800',
-  rejected: 'bg-gray-100 text-gray-700',
-  cancelled: 'bg-gray-100 text-gray-600',
-  expired: 'bg-gray-100 text-gray-500',
-  attended: 'bg-blue-100 text-blue-800',
-  no_show: 'bg-red-100 text-red-800',
+  requested: 'bg-warning-bg text-warning',
+  confirmed: 'bg-success-bg text-success',
+  rejected: 'bg-canvas-sunken text-ink-secondary',
+  cancelled: 'bg-canvas-sunken text-ink-secondary',
+  expired: 'bg-canvas-sunken text-ink-faint',
+  attended: 'bg-accent-soft text-accent',
+  no_show: 'bg-danger-bg text-danger',
+  waitlist: 'bg-warning-bg text-warning',
 }
 
-function formatJp(iso: string): string {
-  return new Date(iso).toLocaleString('ja-JP', {
+const STATUS_LABELS = new Map([
+  ...STATUS_TABS.map(({ key, label }) => [key, label] as const),
+  ['waitlist', 'キャンセル待ち'] as const,
+])
+
+function formatJp(iso: string | null | undefined, fallback: string): string {
+  if (!iso) return fallback
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return fallback
+  return date.toLocaleString('ja-JP', {
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
     hour: '2-digit',
     minute: '2-digit',
+    timeZone: 'Asia/Tokyo',
   })
 }
+
+/**
+ * 記録の宛先。**押した時点のLINEアカウントとイベントを鍵に含める。**
+ * 予約IDだけで数えると、切り替えたあとの画面でも同じ鍵になり、前の
+ * アカウントへ投げた更新が今の行の状態として扱われる。
+ */
+function bookingScopeKey(accountId: string | null, eventId: string | null): string {
+  return JSON.stringify([accountId, eventId])
+}
+
+function bookingActionKey(accountId: string, eventId: string, bookingId: string): string {
+  return JSON.stringify([accountId, eventId, bookingId])
+}
+
+/** 切替のたびに新しい入れ物を作らないための空。中身は書き換えない。 */
+const EMPTY_MARKING_KEYS: ReadonlySet<string> = new Set<string>()
+const EMPTY_MARK_ERRORS: Record<string, string> = {}
 
 function BookingsInner() {
   const params = useSearchParams()
@@ -48,9 +78,11 @@ function BookingsInner() {
   const { selectedAccountId, accounts } = useAccount()
   const [event, setEvent] = useState<EventDetail | null>(null)
   const [items, setItems] = useState<EventBookingItem[]>([])
-  const [totalCapacity, setTotalCapacity] = useState<number | null>(null)
-  const [capacityStatus, setCapacityStatus] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [bookingsTotal, setBookingsTotal] = useState(0)
+  const [summary, setSummary] = useState<EventBookingSummary | null>(null)
+  const [summaryStatus, setSummaryStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [tab, setTab] = useState<string>('requested')
+  const [page, setPage] = useState(1)
   /*
    * **読めなかったのか、0件なのかを分ける。**
    *
@@ -61,8 +93,63 @@ function BookingsInner() {
   const [loadStatus, setLoadStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [busy, setBusy] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
+  const [markingKeys, setMarkingKeys] = useState<ReadonlySet<string>>(() => new Set())
+  const [markErrors, setMarkErrors] = useState<Record<string, string>>({})
+  /*
+   * 画面更新を待たずに同じ行の二度押しを止める。state だけでは、最初の
+   * click の再描画より先に二度目の click が入り、2本ともAPIへ届く。
+   */
+  const markingKeysRef = useRef(new Set<string>())
+  const markRequestRef = useRef(new Map<string, number>())
+  /*
+   * 送った順に番号を振る。行ごとの数え上げだと、切り替えて戻ってから
+   * 同じ行を押し直したときに番号が振り出しへ戻り、**まだ返ってきて
+   * いない前の応答が「最新」に見える。**
+   */
+  const markSeqRef = useRef(0)
+  /*
+   * 記録の世代。アカウントかイベントが変わるたびに上げ、**切替前に
+   * 押した更新の応答を、成功でも失敗でも画面へ書かせない。**
+   */
+  const markGenerationRef = useRef(0)
+  /** 今どのアカウントの、どのイベントを見ているか。応答の照合に使う。 */
+  const scopeRef = useRef(bookingScopeKey(selectedAccountId, eventId))
   /** 切り替え前の遅い応答を、次のイベント・次の絞り込みの一覧へ混ぜない。 */
   const loadRequestRef = useRef(0)
+  const summaryRequestRef = useRef(0)
+
+  /*
+   * **アカウント・イベントを切り替えたら、進行中の記録を失効させる。**
+   *
+   * Aで「参加済」を押したまま切り替えてBを表示し、そのあとAの更新が
+   * 成功で返ると、前は行の書き換えと再取得・集計がそのまま走り、
+   * **Bの画面へAの予約者と件数が入り込んだ。** 誰の予約を見ているのか
+   * 分からないまま、Bの承認待ちを見落とす。世代を上げて、旧アカウント
+   * の応答には一切書かせない。
+   *
+   * **描いている時点で失効させる。** これを `useEffect` に置くと、
+   * Bを描き終えてから後片付けが動くまでの隙間ができる。**その隙間で
+   * Aの応答が返ると、まだAのままの宛先を「今の宛先」と読んでしまい、
+   * 行の書き換えとAの取り直しへ進む。** 描画のたびに宛先を見て、
+   * 変わっていれば同じ描画のうちに世代を上げる。
+   */
+  const scope = bookingScopeKey(selectedAccountId, eventId)
+  if (scopeRef.current !== scope) {
+    scopeRef.current = scope
+    markGenerationRef.current += 1
+    markRequestRef.current.clear()
+    markingKeysRef.current.clear()
+  }
+  /*
+   * 行の「記録中…」と失敗文も、Bを画面へ出す前に畳む。描画中に
+   * 直すので、切替後の最初の絵から前のアカウントの操作跡が消える。
+   */
+  const [markScope, setMarkScope] = useState(scope)
+  if (markScope !== scope) {
+    setMarkScope(scope)
+    setMarkingKeys(EMPTY_MARKING_KEYS)
+    setMarkErrors(EMPTY_MARK_ERRORS)
+  }
   /*
    * **ブラウザの `confirm()` を使わない。**
    *
@@ -82,82 +169,126 @@ function BookingsInner() {
   const [rejectTarget, setRejectTarget] = useState<EventBookingItem | null>(null)
   const [rejectReason, setRejectReason] = useState('')
   const [rejectError, setRejectError] = useState('')
-  const dataReady = loadStatus === 'ready'
+  const dataReady = summaryStatus === 'ready' && summary !== null
+  usePageTitle(event?.name ? event.name + ' の申込者' : 'イベントの申込者')
 
-  const refresh = useCallback(async () => {
+  // タブ切替では申込一覧だけ取り直す(点検#520軽13)。詳細・待ち列はタブと無関係。
+  const refreshList = useCallback(async () => {
     if (!selectedAccountId || !eventId) return
     const requestId = ++loadRequestRef.current
+    /*
+      **番号だけでは足りない。** 切り替え前に押した記録の成功から
+      呼ばれると、この取得自体が古い宛先のまま最新の番号を取り、
+      **今の画面へ前のアカウントの一覧を書き込む。** 番号を見たあと、
+      始めた時点の宛先(`scope`)と今の宛先も照らし合わせる。
+    */
     setLoadStatus('loading')
     setActionError(null)
     try {
       const filters = tab === 'all' ? {} : { status: tab }
-      /*
-        **前のイベントの控えを使い回さない。** `event` が入っていれば取りに
-        行かない作りだったので、アカウントやイベントを切り替えたあとも
-        **上の帯に前のイベント名と定員が残った。** どのイベントの
-        申込を見ているのか読み違える。毎回取り直す。
-      */
-      const [evRes, listRes] = await Promise.all([
-        eventsApi.getEvent(selectedAccountId, eventId),
-        eventsApi.listBookings(selectedAccountId, eventId, filters),
-      ])
+      // タブとページの切替では、この一覧だけを取り直す。
+      const listRes = await eventsApi.listBookings(selectedAccountId, eventId, {
+        ...filters,
+        page,
+        limit: PAGE_SIZE,
+      })
       if (requestId !== loadRequestRef.current) return
+      if (scopeRef.current !== scope) return
       /*
         **器の形を確かめてから入れる。** `items` が無い返事をそのまま
         入れると、下の `filter` で**画面ごと落ちる。** 取れなかったのと
         同じ扱いにして、失敗の言葉を出す。
       */
       if (!Array.isArray(listRes?.items)) throw new Error('malformed')
-      setEvent(evRes)
       setItems(listRes.items)
+      setBookingsTotal(typeof listRes.total === 'number' ? listRes.total : listRes.items.length)
       setLoadStatus('ready')
     } catch {
       if (requestId !== loadRequestRef.current) return
+      if (scopeRef.current !== scope) return
       /*
         **数を持ち越さない。** 前の絞り込みの行を残したまま失敗を出すと、
         古い数の上に「取れませんでした」が乗って、どちらが本当か読めない。
       */
-      setEvent(null)
       setItems([])
+      setBookingsTotal(0)
       setLoadStatus('error')
     }
-    // 控えの `event` を読まなくなったので、依存の除外は要らない。
-  }, [selectedAccountId, eventId, tab])
+  }, [selectedAccountId, eventId, scope, tab, page])
 
-  useEffect(() => {
-    void refresh()
-  }, [refresh])
-
-  /*
-    枠の合計＝定員。一覧APIからしか取れない。
-
-    **「定員なし」と「定員を取れなかった」を分ける。** 前は失敗しても
-    `totalCapacity` が null のままで「定員なし」と出た。**上限が無いのか、
-    読めなかったのかが分からず、締め切りの判断を誤る。**
-  */
-  useEffect(() => {
+  // 詳細はイベント/アカウント変更時のみ取り直す(点検#520軽13)。
+  // 待ち列の件数は概要(summary)から取るようになったため、ここでは読まない。
+  const refreshMeta = useCallback(async () => {
     if (!selectedAccountId || !eventId) return
-    let alive = true
-    setCapacityStatus('loading')
-    setTotalCapacity(null)
-    eventsApi
-      .listEvents(selectedAccountId)
-      .then((r) => {
-        if (!alive) return
-        setTotalCapacity(r.items.find((x) => x.id === eventId)?.total_capacity ?? null)
-        setCapacityStatus('ready')
-      })
-      .catch(() => {
-        // 定員が出ないだけ。一覧と操作はできる。
-        if (alive) setCapacityStatus('error')
-      })
-    return () => {
-      alive = false
+    const requestId = ++loadRequestRef.current
+    try {
+      /*
+        **前のイベントの控えを使い回さない。** `event` が入っていれば取りに
+        行かない作りだったので、アカウントやイベントを切り替えたあとも
+        **上の帯に前のイベント名と定員が残った。** どのイベントの
+        申込を見ているのか読み違える。毎回取り直す。
+      */
+      const evRes = await eventsApi.getEvent(selectedAccountId, eventId)
+      if (requestId !== loadRequestRef.current) return
+      if (scopeRef.current !== scope) return
+      setEvent((current) => (typeof evRes?.name === 'string' ? evRes : current))
+    } catch {
+      if (requestId !== loadRequestRef.current) return
+      if (scopeRef.current !== scope) return
+      setEvent(null)
     }
+  }, [selectedAccountId, eventId, scope])
+
+  const refresh = useCallback(async () => {
+    await refreshMeta()
+    await refreshList()
+    // 控えの `event` を読まなくなったので、依存の除外は要らない。
+  }, [refreshMeta, refreshList])
+
+  useEffect(() => {
+    void refreshMeta()
+  }, [refreshMeta])
+
+  useEffect(() => {
+    void refreshList()
+  }, [refreshList])
+
+  const refreshSummary = useCallback(async () => {
+    if (!selectedAccountId || !eventId) return
+    const requestId = ++summaryRequestRef.current
+    setSummaryStatus('loading')
+    try {
+      const [eventRes, summaryRes] = await Promise.all([
+        eventsApi.getEvent(selectedAccountId, eventId),
+        eventsApi.getBookingSummary(selectedAccountId, eventId),
+      ])
+      if (requestId !== summaryRequestRef.current) return
+      if (scopeRef.current !== scope) return
+      setEvent(eventRes)
+      setSummary(summaryRes)
+      setSummaryStatus('ready')
+    } catch {
+      if (requestId !== summaryRequestRef.current) return
+      if (scopeRef.current !== scope) return
+      setEvent(null)
+      setSummary(null)
+      setSummaryStatus('error')
+    }
+  }, [selectedAccountId, eventId, scope])
+
+  useEffect(() => {
+    void refreshSummary()
+    return () => {
+      summaryRequestRef.current += 1
+    }
+  }, [refreshSummary])
+
+  useEffect(() => {
+    setPage(1)
   }, [selectedAccountId, eventId])
 
   if (!eventId) {
-    return <div className="p-4 text-red-700">id クエリが必要です</div>
+    return <div className="text-danger p-4">イベントを選び直してください</div>
   }
 
   /*
@@ -179,7 +310,7 @@ function BookingsInner() {
         setRejectReason('')
         setRejectError('')
       }
-      await refresh()
+      await Promise.all([refresh(), refreshSummary()])
     } catch {
       /*
         **内部の文字をそのまま出さない。** `e.message` は
@@ -216,7 +347,7 @@ function BookingsInner() {
       )
       if (!res?.ok) throw new Error('cancel_not_applied')
       setCancelTarget(null)
-      await refresh()
+      await Promise.all([refresh(), refreshSummary()])
     } catch {
       setCancelError(
         'この予約をキャンセルできませんでした。ほかの操作で状態が変わっている場合があります。一覧を読み直してから、もう一度お試しください。',
@@ -227,25 +358,73 @@ function BookingsInner() {
     }
   }
 
+  /**
+   * 来場・不参加を記録する。
+   *
+   * **宛先を押した時点で固定する。** `selectedAccountId` は待っている間に
+   * 変わるので、更新の送信先も、返ってきたあとの照合も、押した時点の
+   * 値で行う。返事が届いたら、行の書き換え・一覧の取り直し・集計の
+   * 取り直しの**どれを行う前にも**、押した時点の宛先と世代が今も
+   * 生きているかを確かめる。**旧アカウントの成功をBの画面へ
+   * 書き込ませない。**
+   */
   async function markStatus(id: string, status: 'attended' | 'no_show') {
-    if (!selectedAccountId || !eventId) return
-    setBusy(true)
+    const accountId = selectedAccountId
+    if (!accountId || !eventId) return
+    // `scope` は今描いている宛先。押した時点の値をそのまま持ち回る。
+    const startedScope = scope
+    const actionKey = bookingActionKey(accountId, eventId, id)
+    if (markingKeysRef.current.has(actionKey)) return
+    const generation = markGenerationRef.current
+    const requestId = ++markSeqRef.current
+    markRequestRef.current.set(actionKey, requestId)
+    markingKeysRef.current.add(actionKey)
+    setMarkingKeys(new Set(markingKeysRef.current))
+    setMarkErrors((current) => {
+      if (!(actionKey in current)) return current
+      const next = { ...current }
+      delete next[actionKey]
+      return next
+    })
+    const isCurrent = () => (
+      markGenerationRef.current === generation
+      && scopeRef.current === startedScope
+      && markRequestRef.current.get(actionKey) === requestId
+    )
     try {
-      await eventsApi.updateBooking(selectedAccountId, eventId, id, { status })
-      await refresh()
+      await eventsApi.updateBooking(accountId, eventId, id, { status })
+      if (!isCurrent()) return
+      setItems((current) => current.map((booking) => (
+        booking.id === id ? { ...booking, status } : booking
+      )))
+      /*
+        `refresh` と `refreshSummary` は押した時点のアカウントを掴んで
+        いる。切り替わったあとに呼ぶと、**前のアカウントの一覧と件数を
+        取りに行き、今の画面へ入れてしまう。** 呼ぶ直前にもう一度見る。
+      */
+      if (!isCurrent()) return
+      await Promise.all([refresh(), refreshSummary()])
     } catch {
-      setActionError('来場・不参加の記録を変えられませんでした。一覧を読み直してから、もう一度お試しください。')
+      if (!isCurrent()) return
+      setMarkErrors((current) => ({
+        ...current,
+        [actionKey]: '来場・不参加の記録を変えられませんでした。一覧を読み直してから、もう一度お試しください。',
+      }))
     } finally {
-      setBusy(false)
+      if (isCurrent()) {
+        markingKeysRef.current.delete(actionKey)
+        setMarkingKeys(new Set(markingKeysRef.current))
+      }
     }
   }
 
-  const confirmed = items.filter((b) => b.status === 'confirmed').length
-  const pending = items.filter((b) => b.status === 'requested').length
-  const cancelled = items.filter((b) => b.status === 'cancelled').length
+  const confirmed = summary?.confirmed ?? 0
+  const pending = summary?.requested ?? 0
+  const cancelled = summary?.cancelled ?? 0
   const applied = confirmed + pending
-  // 定員は一覧APIが持っている（枠の合計）。詳細APIには入っていない。
-  const capacity = totalCapacity ?? 0
+  const capacity = summary?.totalCapacity ?? 0
+  const pageCount = Math.max(1, Math.ceil(bookingsTotal / PAGE_SIZE))
+  const currentPage = Math.min(page, pageCount)
 
   return (
     <div>
@@ -261,36 +440,12 @@ function BookingsInner() {
         <span>予約者</span>
       </nav>
 
-      <div data-design="Head">
-        <Header
-          title="イベントの予約者"
-          description="申込の確認・承認・キャンセルを行います。承認制のイベントは、承認するまで確定しません。"
-        />
-        <div className="mb-4 flex flex-wrap items-center gap-2">
-          <button
-            disabled
-            title="操作マニュアルは準備中です"
-            className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm opacity-50"
-          >
-            マニュアル
-          </button>
-          <button
-            disabled
-            title="書き出しは準備中です"
-            className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm opacity-50"
-          >
-            CSVで書き出す
-          </button>
-          {/* 予約者だけに送る仕組みが無い。一斉配信はいまのところ
-              タグや友だち全体が単位で、イベントの申込者を宛先にできない。 */}
-          <button
-            disabled
-            title="予約者だけを宛先にする配信は準備中です"
-            className="bg-accent-deep text-on-accent rounded-control px-4 py-2 text-sm font-medium opacity-50"
-          >
-            予約者に一斉送信
-          </button>
-        </div>
+      <div data-design="Head" className="mb-4">
+        <h2 className="text-ink text-lg font-semibold">イベントの予約者</h2>
+        <p className="text-ink-faint mt-1 text-sm">
+          申込の確認・承認・キャンセルを行います。承認制のイベントは、承認するまで確定しません。
+          マニュアル・CSVで書き出す・予約者に一斉送信は、接続後にここから使えます。
+        </p>
       </div>
 
       <div data-design="Sel" className="bg-canvas rounded-card border-hairline mb-4 border p-3">
@@ -319,14 +474,12 @@ function BookingsInner() {
           unit={dataReady ? '人' : ''}
           detail={!dataReady
             ? '取得できませんでした'
-            : capacityStatus === 'error'
-              ? '定員は取得できませんでした'
-              /*
+            : /*
                 残りの席数を出すだけだと、**あと2席なのか20席なのかで
                 同じ言い方**になる。一覧の「あと少しで満席」と同じ
                 目安（残り1〜3席）で、声をかける回だけ言い方を変える。
               */
-              : describeBookingCapacity(applied, capacity)}
+              describeBookingCapacity(applied, capacity)}
         />
         {/*
           **数の下に「次にすること」を書く。** 「対応が必要」だけだと、
@@ -341,12 +494,11 @@ function BookingsInner() {
             ? pending > 0 ? `対応が必要：${pending}件を確認してください` : '確認待ちはありません'
             : '取得できませんでした'}
         />
-        {/* event_bookings に「キャンセル待ち」という状態が無い。
-            イベント側に waitlist_enabled はあるが、待っている人を数える
-            場所がまだない。数を作らずに、受けるかどうかだけ出す。 */}
+        {/* 実APIでは別の待ち列だが、画面確認用の応答は同じ一覧に含む。
+            行が無いときは設定だけを示し、人数を推測しない。 */}
         <EventKpi
           title="キャンセル待ち"
-          value="—"
+          value={dataReady ? String(summary?.waitlist ?? 0) : '—'}
           unit={dataReady ? '人' : ''}
           /*
             **読めていない設定を言い切らない。** `event` が取れていないと
@@ -355,7 +507,9 @@ function BookingsInner() {
           */
           detail={!dataReady
             ? '取得できませんでした'
-            : event?.waitlist_enabled ? '空きが出たら順に案内' : '受け付けない設定です'}
+            : (summary?.waitlist ?? 0) > 0
+              ? '取り消しが出たら順に案内します'
+              : event?.waitlist_enabled ? '空きが出たら順に案内' : '受け付けない設定です'}
         />
         <EventKpi
           title="キャンセル"
@@ -378,16 +532,19 @@ function BookingsInner() {
           </div>
         )}
 
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-          <div className="flex border-b border-gray-200 overflow-x-auto">
+        <div className="bg-canvas rounded-card border-hairline overflow-hidden border">
+          <div className="border-hairline flex overflow-x-auto border-b">
             {STATUS_TABS.map((t) => (
               <button
                 key={t.key}
-                onClick={() => setTab(t.key)}
+                onClick={() => {
+                  setPage(1)
+                  setTab(t.key)
+                }}
                 className={`px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
                   tab === t.key
-                    ? 'border-blue-600 text-blue-600 bg-blue-50'
-                    : 'border-transparent text-gray-600 hover:bg-gray-50'
+                    ? 'border-accent text-accent bg-accent-soft'
+                    : 'text-ink-secondary hover:bg-canvas-sunken border-transparent'
                 }`}
               >
                 {t.label}
@@ -405,52 +562,70 @@ function BookingsInner() {
             <ListState
               kind="error"
               description="受け付けた予約は消えていません。再読み込みしても直らない場合はエラー報告へ。"
-              action={<Button onClick={() => void refresh()}>予約を再読み込み</Button>}
+              action={<Button onClick={() => void Promise.all([refresh(), refreshSummary()])}>予約を再読み込み</Button>}
             />
           ) : items.length === 0 ? (
-            <div className="p-12 text-center text-gray-500 text-sm">
+            <div className="text-ink-faint p-12 text-center text-sm">
               該当する予約はありません
             </div>
           ) : (
+            <>
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50 text-gray-600">
+              <table className="w-full min-w-full text-sm">
+                <thead className="bg-canvas-sunken text-ink-secondary">
                   <tr>
-                    <th className="text-left px-4 py-2 font-medium">友だち</th>
-                    <th className="text-left px-4 py-2 font-medium">経由アカウント</th>
-                    <th className="text-left px-4 py-2 font-medium">予約枠</th>
-                    <th className="text-left px-4 py-2 font-medium">状態</th>
-                    <th className="text-left px-4 py-2 font-medium">受付日時</th>
-                    <th className="text-right px-4 py-2 font-medium">操作</th>
+                    <th className="px-4 py-2 text-left font-medium">申込者</th>
+                    <th className="px-4 py-2 text-left font-medium">申し込み</th>
+                    <th className="px-4 py-2 text-left font-medium">予約枠</th>
+                    <th className="px-4 py-2 text-left font-medium">連れてくるペット</th>
+                    <th className="px-4 py-2 text-left font-medium">この方について</th>
+                    <th className="px-4 py-2 text-right font-medium">状態と操作</th>
                   </tr>
                 </thead>
                 <tbody>
                   {items.map((b) => {
                     const acct = accounts.find((a) => a.id === b.line_account_id)
+                    const friendName = b.friend_display_name ?? b.friend_name
+                    const actionKey = selectedAccountId
+                      ? bookingActionKey(selectedAccountId, eventId, b.id)
+                      : ''
+                    const marking = markingKeys.has(actionKey)
                     const accountLabel = acct
                       ? `${acct.country ? acct.country + ' ' : ''}${acct.name}`
+                      : b.line_account_name
+                        ? b.line_account_name
                       /* **内部IDを画面に出さない。** 運用者にとって手がかりにならない。 */
-                      : 'アカウントは未取得'
+                        : 'アカウントは未取得'
                     return (
-                    <tr key={b.id} className="border-t border-gray-100 hover:bg-gray-50">
-                      <td className="px-4 py-3 text-gray-800">
-                        {b.friend_display_name ?? '友だちは未取得'}
+                    <tr key={b.id} className="border-hairline hover:bg-canvas-sunken border-t">
+                      <td className="text-ink px-4 py-3">
+                        <span className="block font-medium">{friendName ?? '友だちは未取得'}</span>
+                        <span className="text-ink-faint mt-0.5 block text-xs">{accountLabel}</span>
                       </td>
-                      <td className="px-4 py-3 text-gray-700 text-xs">{accountLabel}</td>
-                      <td className="px-4 py-3 text-gray-700">{formatJp(b.slot_starts_at)}</td>
-                      <td className="px-4 py-3">
-                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${statusBadge[b.status] ?? 'bg-gray-100'}`}>
-                          {STATUS_TABS.find((t) => t.key === b.status)?.label ?? b.status}
-                        </span>
+                      <td className="text-ink-secondary px-4 py-3 text-xs">
+                        {formatJp(b.requested_at ?? b.created_at, '受付日時は未取得')}
                       </td>
-                      <td className="px-4 py-3 text-gray-500 text-xs">{formatJp(b.requested_at)}</td>
+                      <td className="text-ink-secondary px-4 py-3">
+                        {formatJp(b.slot_starts_at, '予約枠は未取得')}
+                      </td>
+                      <td className="text-ink-secondary px-4 py-3">
+                        {b.companion_note ?? '登録情報は未接続'}
+                      </td>
+                      <td className="text-ink-secondary px-4 py-3">
+                        {b.is_first_time == null
+                          ? '来店情報は未接続'
+                          : b.is_first_time === 1 ? 'はじめての方です' : '来店履歴があります'}
+                      </td>
                       <td className="px-4 py-3 text-right">
+                        <span className={`rounded-pill px-2 py-0.5 text-xs font-medium ${statusBadge[b.status] ?? 'bg-canvas-sunken text-ink-secondary'}`}>
+                          {STATUS_LABELS.get(b.status) ?? '状態は未取得'}
+                        </span>
                         {b.status === 'requested' && (
-                          <div className="inline-flex gap-1.5">
+                          <div className="ml-2 inline-flex gap-1.5">
                             <button
                               onClick={() => decide(b.id, 'confirm')}
                               disabled={busy}
-                              className="px-3 py-1 bg-green-600 text-white rounded-lg text-xs font-medium hover:bg-green-700 disabled:opacity-50"
+                              className="bg-success text-on-accent rounded-control px-3 py-1 text-xs font-medium hover:brightness-95 disabled:opacity-50"
                             >
                               承認
                             </button>
@@ -462,27 +637,31 @@ function BookingsInner() {
                                 setRejectTarget(b)
                               }}
                               disabled={busy}
-                              className="px-3 py-1 bg-gray-500 text-white rounded-lg text-xs font-medium hover:bg-gray-600 disabled:opacity-50"
+                              className="bg-ink-secondary text-on-accent rounded-control px-3 py-1 text-xs font-medium hover:brightness-95 disabled:opacity-50"
                             >
                               拒否
                             </button>
                           </div>
                         )}
                         {b.status === 'confirmed' && (
-                          <div className="inline-flex gap-1.5">
+                          <div className="ml-2 inline-flex gap-1.5">
                             <button
+                              data-booking-id={b.id}
+                              data-booking-action="attended"
                               onClick={() => markStatus(b.id, 'attended')}
-                              disabled={busy}
-                              className="px-3 py-1 bg-blue-600 text-white rounded-lg text-xs font-medium hover:bg-blue-700 disabled:opacity-50"
+                              disabled={busy || marking}
+                              className="bg-accent-deep text-on-accent rounded-control px-3 py-1 text-xs font-medium hover:brightness-95 disabled:opacity-50"
                             >
-                              参加済
+                              {marking ? '記録中…' : '参加済'}
                             </button>
                             <button
+                              data-booking-id={b.id}
+                              data-booking-action="no_show"
                               onClick={() => markStatus(b.id, 'no_show')}
-                              disabled={busy}
-                              className="px-3 py-1 bg-red-500 text-white rounded-lg text-xs font-medium hover:bg-red-600 disabled:opacity-50"
+                              disabled={busy || marking}
+                              className="bg-danger text-on-accent rounded-control px-3 py-1 text-xs font-medium hover:brightness-95 disabled:opacity-50"
                             >
-                              無断
+                              {marking ? '記録中…' : '無断'}
                             </button>
                             <button
                               data-qa-open="i5SN2j-cancel"
@@ -492,10 +671,15 @@ function BookingsInner() {
                                 setCancelTarget({ booking: b, accountId: selectedAccountId })
                               }}
                               disabled={busy}
-                              className="px-3 py-1 border border-gray-300 rounded-lg text-xs font-medium hover:bg-white disabled:opacity-50"
+                              className="border-hairline rounded-control hover:bg-canvas border px-3 py-1 text-xs font-medium disabled:opacity-50"
                             >
                               キャンセル
                             </button>
+                            {markErrors[actionKey] && (
+                              <span className="text-danger block max-w-64 text-left text-xs" role="alert">
+                                {markErrors[actionKey]}
+                              </span>
+                            )}
                           </div>
                         )}
                       </td>
@@ -505,6 +689,13 @@ function BookingsInner() {
                 </tbody>
               </table>
             </div>
+            <div className="border-hairline flex items-center justify-between border-t px-4 py-3">
+              <span className="text-ink-faint text-xs">
+                {(currentPage - 1) * PAGE_SIZE + 1}〜{Math.min(currentPage * PAGE_SIZE, bookingsTotal)}件 / 全{bookingsTotal}件
+              </span>
+              <Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} />
+            </div>
+            </>
           )}
         </div>
 
@@ -531,7 +722,7 @@ function BookingsInner() {
               友だち：
               {cancelTarget.booking.friend_display_name ?? '友だちは未取得'}
             </p>
-            <p>予約枠：{formatJp(cancelTarget.booking.slot_starts_at)}</p>
+            <p>予約枠：{formatJp(cancelTarget.booking.slot_starts_at, '未取得')}</p>
             <p className="text-ink-faint text-xs">
               この予約に紐づくリマインダの送信予定も止まります。すでに送ったぶんは残ります。
             </p>
@@ -564,8 +755,8 @@ function BookingsInner() {
       >
         {rejectTarget && (
           <div className="text-ink-secondary space-y-2 text-sm">
-            <p>友だち：{rejectTarget.friend_display_name ?? '友だちは未取得'}</p>
-            <p>予約枠：{formatJp(rejectTarget.slot_starts_at)}</p>
+            <p>友だち：{rejectTarget.friend_display_name ?? rejectTarget.friend_name ?? '友だちは未取得'}</p>
+            <p>予約枠：{formatJp(rejectTarget.slot_starts_at, '未取得')}</p>
             <label className="block">
               <span className="text-ink-faint text-xs">断る理由（任意）</span>
               <textarea
@@ -618,7 +809,7 @@ function EventKpi({
 
 export default function EventBookingsPage() {
   return (
-    <Suspense fallback={<div className="p-4 text-gray-500">読み込み中...</div>}>
+    <Suspense fallback={<div className="text-ink-faint p-4">読み込み中...</div>}>
       <BookingsInner />
     </Suspense>
   )

@@ -52,6 +52,8 @@ export interface LineAccount {
   og_site_name: string | null;
   og_default_image_url: string | null;
   og_default_description: string | null;
+  /** LINE公式プロフィールで発行した lin.ee の短縮URL。未設定なら null。 */
+  official_profile_url: string | null;
   /** 友だち数の上限。NULL なら上限を管理しない */
   friend_capacity: number | null;
   /** 何人で警告を出すか。NULL なら警告しない */
@@ -64,9 +66,23 @@ export interface LineAccount {
   tenant_id: string | null;
   /** V6の日時指定と日別分析で使うIANAタイムゾーン。 */
   timezone?: string;
+  /** 楽観ロックに使う版番号。変更の保存ごとに1増える。 */
+  revision?: number;
   created_at: string;
   updated_at: string;
 }
+
+/** Non-secret fields required to resolve admin account visibility. */
+export type LineAccountScopeEntry = Pick<
+  LineAccount,
+  | 'id'
+  | 'tenant_id'
+  | 'parent_line_account_id'
+  | 'is_active'
+  | 'archived_at'
+  | 'login_channel_id'
+  | 'liff_id'
+>;
 
 export type LineCredentialField = 'channel_access_token' | 'channel_secret';
 
@@ -120,6 +136,10 @@ export interface CreateLineAccountInput {
   ogSiteName?: string | null;
   ogDefaultImageUrl?: string | null;
   ogDefaultDescription?: string | null;
+  officialProfileUrl?: string | null;
+  timezone?: string;
+  country?: string | null;
+  role?: string | null;
   parentLineAccountId?: string | null;
   tenantId?: string | null;
 }
@@ -154,6 +174,7 @@ export async function createLineAccount(
           login_channel_id, login_channel_secret, liff_id,
           is_active, is_default, display_order,
           og_site_name, og_default_image_url, og_default_description,
+          official_profile_url, timezone, country, role,
           parent_line_account_id, tenant_id,
           created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1,
@@ -161,7 +182,7 @@ export async function createLineAccount(
            SELECT 1 FROM line_accounts
             WHERE COALESCE(tenant_id, ?) = ? AND archived_at IS NULL
           ) THEN 0 ELSE 1 END,
-          ?, ?, ?, ?, ?, ?, ?, ?)`,
+          ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -183,6 +204,10 @@ export async function createLineAccount(
       input.ogSiteName ?? null,
       input.ogDefaultImageUrl ?? null,
       input.ogDefaultDescription ?? null,
+      input.officialProfileUrl ?? null,
+      input.timezone ?? 'Asia/Tokyo',
+      input.country ?? null,
+      input.role ?? null,
       input.parentLineAccountId ?? null,
       input.tenantId ?? DEFAULT_TENANT_ID,
       now,
@@ -191,6 +216,137 @@ export async function createLineAccount(
     .run();
 
   return (await getLineAccountById(db, id, encryptionKey))!;
+}
+
+export type LineAccountConnectionCheckKind =
+  | 'bot_info'
+  | 'webhook_endpoint'
+  | 'webhook_test'
+  | 'liff_config'
+  | 'token_refresh';
+
+export type LineAccountConnectionCheckResult =
+  | 'matched'
+  | 'mismatched'
+  | 'unconfigured'
+  | 'unknown'
+  | 'ok'
+  | 'failed';
+
+export interface LineAccountConnectionCheck {
+  id: string;
+  line_account_id: string;
+  check_kind: LineAccountConnectionCheckKind;
+  result: LineAccountConnectionCheckResult;
+  expected_url: string | null;
+  registered_url: string | null;
+  webhook_active: number | null;
+  http_status: number | null;
+  checked_by: string;
+  checked_at: string;
+  correlation_id: string;
+  idempotency_key: string;
+  account_revision: number;
+}
+
+export interface SaveLineAccountConnectionChecksInput {
+  lineAccountId: string;
+  expectedRevision: number;
+  checkedBy: string;
+  checkedAt: string;
+  correlationId: string;
+  idempotencyKey: string;
+  checks: Array<{
+    kind: LineAccountConnectionCheckKind;
+    result: LineAccountConnectionCheckResult;
+    expectedUrl?: string | null;
+    registeredUrl?: string | null;
+    webhookActive?: boolean | null;
+    httpStatus?: number | null;
+  }>;
+}
+
+export class LineAccountRevisionConflictError extends Error {
+  constructor() {
+    super('REVISION_CONFLICT');
+    this.name = 'LineAccountRevisionConflictError';
+  }
+}
+
+export async function getLineAccountConnectionChecksByIdempotencyKey(
+  db: D1Database,
+  lineAccountId: string,
+  idempotencyKey: string,
+): Promise<LineAccountConnectionCheck[]> {
+  const result = await db
+    .prepare(
+      `SELECT * FROM line_account_connection_checks
+        WHERE line_account_id = ? AND idempotency_key = ?
+        ORDER BY CASE check_kind
+          WHEN 'bot_info' THEN 1
+          WHEN 'webhook_endpoint' THEN 2
+          WHEN 'webhook_test' THEN 3
+          WHEN 'liff_config' THEN 4
+          ELSE 5 END`,
+    )
+    .bind(lineAccountId, idempotencyKey)
+    .all<LineAccountConnectionCheck>();
+  return result.results;
+}
+
+/**
+ * Saves one complete check run and advances the account revision in one D1 batch.
+ * The INSERTs only select a row after the guarded UPDATE succeeded.
+ */
+export async function saveLineAccountConnectionChecks(
+  db: D1Database,
+  input: SaveLineAccountConnectionChecksInput,
+): Promise<LineAccountConnectionCheck[]> {
+  const nextRevision = input.expectedRevision + 1;
+  const statements = [
+    db.prepare(
+      `UPDATE line_accounts
+          SET revision = revision + 1, updated_at = ?
+        WHERE id = ? AND revision = ? AND archived_at IS NULL`,
+    ).bind(input.checkedAt, input.lineAccountId, input.expectedRevision),
+    ...input.checks.map((check) => db.prepare(
+      `INSERT INTO line_account_connection_checks (
+         id, line_account_id, check_kind, result, expected_url, registered_url,
+         webhook_active, http_status, checked_by, checked_at, correlation_id,
+         idempotency_key, account_revision
+       )
+       SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+        WHERE EXISTS (
+          SELECT 1 FROM line_accounts
+           WHERE id = ? AND revision = ? AND archived_at IS NULL
+        )`,
+    ).bind(
+      crypto.randomUUID(),
+      input.lineAccountId,
+      check.kind,
+      check.result,
+      check.expectedUrl ?? null,
+      check.registeredUrl ?? null,
+      check.webhookActive == null ? null : (check.webhookActive ? 1 : 0),
+      check.httpStatus ?? null,
+      input.checkedBy,
+      input.checkedAt,
+      input.correlationId,
+      input.idempotencyKey,
+      nextRevision,
+      input.lineAccountId,
+      nextRevision,
+    )),
+  ];
+  const results = await db.batch(statements);
+  if (Number(results[0]?.meta?.changes ?? 0) !== 1) {
+    throw new LineAccountRevisionConflictError();
+  }
+  return getLineAccountConnectionChecksByIdempotencyKey(
+    db,
+    input.lineAccountId,
+    input.idempotencyKey,
+  );
 }
 
 /**
@@ -345,6 +501,50 @@ export async function getLineAccounts(
   );
 }
 
+/**
+ * Returns only the non-secret account fields used by authorization scope checks.
+ * The tenant wall is applied by D1 before rows enter Worker memory.
+ */
+export async function getLineAccountScopeEntries(
+  db: D1Database,
+  tenantId: string,
+): Promise<LineAccountScopeEntry[]> {
+  const result = await db
+    .prepare(
+      `SELECT id, tenant_id, parent_line_account_id, is_active, archived_at,
+              login_channel_id, liff_id
+         FROM line_accounts
+        WHERE COALESCE(tenant_id, ?) = ?
+        ORDER BY display_order ASC, created_at ASC`,
+    )
+    .bind(DEFAULT_TENANT_ID, tenantId)
+    .all<LineAccountScopeEntry>();
+  return result.results;
+}
+
+/** Load and decrypt only accounts that a caller has already authorized. */
+export async function getLineAccountsByIds(
+  db: D1Database,
+  ids: readonly string[],
+  credentialEncryptionKey?: string,
+): Promise<LineAccount[]> {
+  if (ids.length === 0) return [];
+  const encryptionKey = await resolveCredentialEncryptionKey(credentialEncryptionKey);
+  const result = await db
+    .prepare(
+      `SELECT account.*
+         FROM line_accounts account
+         INNER JOIN json_each(?) requested
+           ON account.id = CAST(requested.value AS TEXT)
+        ORDER BY account.display_order ASC, account.created_at ASC`,
+    )
+    .bind(JSON.stringify(ids))
+    .all<LineAccount>();
+  return Promise.all(
+    result.results.map((row) => decryptLineAccountCredentials(row, encryptionKey)),
+  );
+}
+
 export interface LineAccountListStats {
   friendCount: number;
   activeScenarios: number;
@@ -459,6 +659,7 @@ export type UpdateLineAccountInput = Partial<
     | 'og_site_name'
     | 'og_default_image_url'
     | 'og_default_description'
+    | 'official_profile_url'
     | 'friend_capacity'
     | 'capacity_warn_at'
     | 'icon_url'
@@ -550,6 +751,10 @@ export async function updateLineAccount(
   if (updates.og_default_description !== undefined) {
     fields.push('og_default_description = ?');
     values.push(updates.og_default_description);
+  }
+  if (updates.official_profile_url !== undefined) {
+    fields.push('official_profile_url = ?');
+    values.push(updates.official_profile_url);
   }
 
   if (fields.length === 0) return getLineAccountById(db, id, encryptionKey);
@@ -747,6 +952,8 @@ export interface UpdateLineAccountFieldsInput {
   ogSiteName?: string | null;
   ogDefaultImageUrl?: string | null;
   ogDefaultDescription?: string | null;
+  /** LINE公式プロフィールで発行した lin.ee の短縮URL。null で未設定に戻す。 */
+  officialProfileUrl?: string | null;
   /** 友だち数の上限。null で「上限を管理しない」に戻す */
   friendCapacity?: number | null;
   /** 何人で警告を出すか。null で「警告しない」に戻す */
@@ -805,6 +1012,10 @@ export async function updateLineAccountFields(
   if (input.ogDefaultDescription !== undefined) {
     sets.push('og_default_description = ?');
     binds.push(input.ogDefaultDescription);
+  }
+  if (input.officialProfileUrl !== undefined) {
+    sets.push('official_profile_url = ?');
+    binds.push(input.officialProfileUrl);
   }
   if (input.friendCapacity !== undefined) {
     sets.push('friend_capacity = ?');

@@ -101,6 +101,16 @@ export interface Tag {
   displayOrder?: number;
   /** 作成日時 (ISO 8601) */
   createdAt: string;
+  /** 選択中のLINE公式アカウント。V6の定義詳細で返る。 */
+  lineAccountId?: string | null;
+  description?: string | null;
+  manualAssignmentAllowed?: boolean;
+  reapplyPolicy?: "first_only" | "every_time";
+  linkedEnabled?: boolean;
+  status?: "active" | "archived";
+  /** 楽観ロックに使う定義版。 */
+  version?: number;
+  updatedAt?: string;
   /** このタグが付与されている友だち数 (GET /api/tags のみ付与) */
   friendCount?: number;
   /** 自動付与のきっかけ。履歴から断定できない場合は省略する。 */
@@ -115,6 +125,13 @@ export interface Tag {
   };
   /** このタグが付いた後に動く、マイル以外のアクション数。0件なら省略する。 */
   otherActionCount?: number;
+  /** タグ編集画面で再表示する、保存済みの連動アクション。 */
+  linkedActions?: Array<{
+    id: string;
+    type: string;
+    label: string;
+    timing: string;
+  }>;
   /** タグ管理の整理候補に入る理由。withCounts=1 のときだけ返る。 */
   cleanupReasons?: Array<"unused" | "duplicate_name">;
 }
@@ -179,12 +196,15 @@ export type FriendFieldType =
   | "textarea"
   | "number"
   | "date"
+  | "datetime"
   | "select"
   | "multi_select"
   | "checkbox"
   | "url"
   | "tel"
-  | "email";
+  | "email"
+  | "image"
+  | "pdf";
 
 /**
  * 友だち情報欄の項目。
@@ -213,11 +233,19 @@ export interface FriendField {
   displayOrder: number;
   createdAt: string;
   updatedAt: string;
+  status?: "active" | "read_only" | "archived";
+  version?: number;
+  /** 画像・PDFは本文へ文字として差し込まない。 */
+  canInsertText?: boolean;
   /** GET /api/friends/:id/fields のときだけ付く */
   value?: string | null;
   updatedBy?: string | null;
   /** ?withUsage=1 のときだけ付く */
   usageCount?: number;
+  /** この項目へ回答を保存する回答フォーム数。未取得時は省略する。 */
+  formUsageCount?: number;
+  /** 一覧で運用者へ示す表示・利用先。未取得時は省略する。 */
+  displayTargets?: string[];
   /** 選択中アカウント専用でなく、移行前からある共通項目。 */
   isInherited?: boolean;
 }
@@ -246,6 +274,15 @@ export interface Folder {
   color: string | null;
   createdAt: string;
   updatedAt: string;
+  /**
+   * 選択中アカウントの可視範囲で数えた、このフォルダに属する件数（#631）。
+   *
+   * `kind` が件数の数え方（対応表・アカウント境界）を確立できていない種別
+   * （#730）や `kind` を指定しない呼び出しでは `undefined`。**`undefined`
+   * は「0件」ではなく「数えていない」を意味する。**画面はキャストで
+   * フォールバック計算をせず、そのまま「—」等を出すこと。
+   */
+  itemCount?: number;
 }
 
 /** 対応マーク */
@@ -257,6 +294,8 @@ export interface SupportMark {
   autoOnInbound: boolean;
   displayOrder: number;
   createdAt: string;
+  updatedAt?: string;
+  version?: number;
   /** 旧環境から共有されているマーク。編集時に選択中アカウントへ複製される。 */
   isInherited?: boolean;
   /** GET /api/support-marks の一覧で返る実参照数。省略は未取得、0は参照なし。 */
@@ -267,6 +306,10 @@ export interface SupportMark {
     savedSearches: number;
     automations: number;
   };
+  /** 一覧で示す自動変更の要約。未取得時は autoOnInbound だけで判定する。 */
+  automaticChangeLabel?: string;
+  /** このマークを選べる・確認できる画面。 */
+  displayTargets?: Array<"inbox" | "friend_list" | "friend_detail" | "dashboard" | "broadcast" | "automation">;
 }
 
 /** メディアライブラリの1件 */
@@ -444,6 +487,41 @@ export interface CommonVarDeleteImpact {
   recommendedAction: "delete" | "review_references";
 }
 
+/**
+ * 共通情報を**変える前**の1件（POST /api/common-vars/:id/impact-preview）。
+ *
+ * 削除前の1件に、保存すると何がどう変わるかを足したもの。
+ */
+export interface CommonVarChangeImpactItem extends CommonVarDeleteImpactItem {
+  /** 保存すると変わるか。**送信済みの記録は変わらない。** */
+  changesOnSave: boolean;
+  /** 差し込みの目印を本文から読み取れたか。読めないと変更後の文を作れない。 */
+  previewAvailable: boolean;
+  /** 変更後の文。作れないときは `null`。**空文字と混ぜない。** */
+  nextPreview: string | null;
+  currentCharacterCount: number;
+  /** 変更後の文字数。変更後の文を作れないときは `null`。**0と混ぜない。** */
+  nextCharacterCount: number | null;
+  /** LINEの本文になる使用先だけ上限がある。無いものは `null`。 */
+  characterLimit: number | null;
+  exceedsCharacterLimit: boolean;
+  /** 保存を止める理由。空なら止めない。 */
+  errors: string[];
+  /** 保存はできるが、目で確かめてほしいこと。 */
+  warnings: string[];
+}
+
+/** 共通情報の変更前確認（POST /api/common-vars/:id/impact-preview）。 */
+export interface CommonVarChangeImpact extends Omit<CommonVarDeleteImpact, "items" | "variable" | "recommendedAction"> {
+  variable: { id: string; name: string; varKey: string; currentValue: string; nextValue: string };
+  items: CommonVarChangeImpactItem[];
+  errorTotal: number;
+  warningTotal: number;
+  /** 1件でも `errors` があれば保存させない。 */
+  canSave: boolean;
+  recommendedAction: "fix_errors" | "confirm_changes" | "save";
+}
+
 export type SavedSearchConditionKind =
   | "name"
   | "tag"
@@ -451,11 +529,18 @@ export type SavedSearchConditionKind =
   | "form"
   | "purchase"
   | "mark"
+  | "assignee"
   | "scenario"
+  | "event_booking"
+  | "calendar_booking"
   | "chat_status"
+  | "last_activity"
+  | "reminder"
+  | "memo"
   | "following"
   | "status_message"
-  | "created_at";
+  | "created_at"
+  | "common_event";
 
 /** 保存した検索の条件1本。kind ごとに op / key / value の意味が変わる。 */
 export interface SavedSearchCondition {
@@ -541,6 +626,10 @@ export interface SavedSearch {
   isShared: boolean;
   displayOrder: number;
   createdAt: string;
+  conditionFormat?: "search_v1" | "segment_v1";
+  updatedBy?: string | null;
+  updatedAt?: string;
+  revision?: number;
   /** 現在の保存条件に一致する友だち数。評価不能・未取得は null。 */
   matchCount?: number | null;
   /** matchCount が null のとき、黙って0件にせず理由を返す。 */
@@ -549,6 +638,8 @@ export interface SavedSearch {
   usedIn?: SavedSearchUsage[];
   /** 使用先が無いとサーバーで確認できたときだけ true。 */
   canDelete?: boolean;
+  /** 今月、この保存条件が呼び出された回数。未取得時は省略する。 */
+  callCountThisMonth?: number;
 }
 
 /** 共通の配信対象として保存した条件。友だち検索とJSONの形を混ぜない。 */
@@ -583,6 +674,8 @@ export interface SavedSearchUsage {
   name: string;
   mode: SavedSearchReferenceMode;
   lastUsedAt: string | null;
+  revision?: number | null;
+  callCountThisMonth?: number;
 }
 
 /**
@@ -592,6 +685,8 @@ export interface SavedSearchUsage {
 export interface TagGroup {
   /** 主キー (UUIDv4) */
   id: string;
+  /** 所有するLINE公式アカウント。移行前の共通分類だけ null。 */
+  accountId: string | null;
   /** 分類名 */
   name: string;
   /** 一覧での並び順。小さいほど上 */
@@ -1130,6 +1225,8 @@ export interface ConversionPoint {
   attributionDays?: number | null;
   /** 集計対象を1アカウントに絞る場合。null なら全アカウント */
   lineAccountId?: string | null;
+  /** 楽観ロック版。更新・停止にはこの版の一致が要る */
+  version: number;
   /** 作成日時 (ISO 8601) */
   createdAt: string;
 }
@@ -1550,6 +1647,11 @@ export type AutomationEventType =
   | "message_received"
   | "postback_received"
   | "calendar_booked"
+  | "form_submitted"
+  | "link_clicked"
+  | "datetime"
+  | "daily"
+  | "weekly"
   | "ec.order.confirmed"
   | "ec.order.shipped"
   | "ec.subscription.upcoming"
@@ -1593,6 +1695,8 @@ export interface AutomationLog {
 // -----------------------------------------------------------------------------
 export interface StaffMember {
   id: string;
+  /** 認証済み本人APIが返すテナント識別子。古いAPI応答との互換のため任意。 */
+  tenantId?: string;
   name: string;
   email: string | null;
   role: 'owner' | 'admin' | 'staff' | 'viewer';
@@ -1824,7 +1928,7 @@ export const FRIEND_ADD_ROUTING_DEFAULT: FriendAddRouting = {
 /** V6の友だち追加履歴。Pencil共通デザインはこの契約だけを見て描画する。 */
 export type FriendAddEventKind = "first_time" | "returning";
 export type FriendAddEventAttributionStatus = "captured" | "unavailable";
-export type FriendAddEventRoutingStatus = "pending" | "completed" | "failed" | "suppressed";
+export type FriendAddEventRoutingStatus = "pending" | "completed" | "failed" | "suppressed" | "partial_failed";
 
 export interface FriendAddEventItem {
   id: string;
@@ -1880,6 +1984,8 @@ export interface AutoReplyDraftInput {
   skipWhenOperatorActive: boolean;
   priority: number;
   messageKinds: string[] | null;
+  /** 受信経路。空は許さず、既存版は LINE として読む。 */
+  receiveSources: Array<"line" | "email">;
   friendConditions: Record<string, unknown> | null;
   actions: unknown[] | null;
   responseWeekdays: number[] | null;
@@ -1895,6 +2001,12 @@ export interface AutoReplyDraftInput {
   name: string | null;
   keywordMatchMode: "any" | "all";
   folderId: string | null;
+  /** 管理者だけが読む補足。友だちへ送る本文には含めない。 */
+  internalMemo: string | null;
+  /** 受信してから返信するまで待つ秒数。null は即時。 */
+  replyDelaySeconds: number | null;
+  /** 条件に一致しなかったときの後続処理。 */
+  unmatchedAction: Record<string, unknown> | null;
 }
 
 export interface AutoReplyDraftVersion {
@@ -1906,6 +2018,8 @@ export interface AutoReplyDraftVersion {
   lastTestStatus: "succeeded" | "failed" | null;
   lastTestedAt: string | null;
   publishedAt: string | null;
+  /** 過去28日の実測一致数。集計できなかったときは null。 */
+  matchedLast28Days?: number | null;
 }
 
 export type AutoReplyTestReasonCode =
@@ -2066,7 +2180,9 @@ export type ExecutionRunStatus =
   | "partial"
   | "skipped"
   | "pending"
-  | "cancelled";
+  | "cancelled"
+  | "claimed"
+  | "permanent_failed";
 
 /** リマインダの書込台帳だけが持つ詳細状態。共通状態へ潰さず保存する。 */
 export type ReminderDeliveryRunStatus =

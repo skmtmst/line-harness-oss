@@ -13,6 +13,7 @@ const dbMocks = {
   getAutomationLogs: vi.fn(),
   getAutomationExecutionRuns: vi.fn(),
   getLineAccounts: vi.fn(),
+  getLineAccountScopeEntries: vi.fn(),
   getStaffById: vi.fn(),
   getStaffAccountScopeIds: vi.fn(),
 };
@@ -20,51 +21,7 @@ vi.mock('@line-crm/db', () => dbMocks);
 
 const { automations } = await import('./automations.js');
 
-interface AutomationRow {
-  id: string;
-  name: string;
-  description: string | null;
-  event_type: string;
-  conditions: string;
-  actions: string;
-  is_active: number;
-  priority: number;
-  created_at: string;
-  updated_at: string;
-  line_account_id: string | null;
-}
-
-function makeAutomationDb(rows: AutomationRow[]) {
-  const calls: { sql: string; binds: unknown[] }[] = [];
-  const db = {
-    prepare(sql: string) {
-      let bound: unknown[] = [];
-      const stmt = {
-        bind(...args: unknown[]) {
-          bound = args;
-          return stmt;
-        },
-        async all() {
-          calls.push({ sql, binds: bound });
-          // NULL-aware filter: row matches when its line_account_id is NULL
-          // (global) OR equals the bound lineAccountId.
-          if (/FROM automations\b/i.test(sql) && /line_account_id IS NULL/i.test(sql)) {
-            const [lineAccountId] = bound as [string];
-            const filtered = rows.filter(
-              (r) => r.line_account_id == null || r.line_account_id === lineAccountId,
-            );
-            return { results: filtered };
-          }
-          return { results: [] };
-        },
-      };
-      return stmt;
-    },
-  } as unknown as D1Database;
-  return { db, calls };
-}
-
-function setupApp(db: D1Database) {
+function setupApp(db: D1Database, staff?: Partial<AuthenticatedStaff>) {
   const app = new Hono<{
     Bindings: { DB: D1Database };
     Variables: { staff: AuthenticatedStaff };
@@ -80,6 +37,7 @@ function setupApp(db: D1Database) {
       assignedLineAccountId: null,
       canAccessDescendantAccounts: false,
       tenantId: '00000000-0000-4000-8000-000000000001',
+      ...staff,
     });
     await next();
   });
@@ -87,19 +45,13 @@ function setupApp(db: D1Database) {
   return app;
 }
 
-const rowBase = {
-  description: null,
-  event_type: 'message_received',
-  conditions: '{}',
-  actions: '[]',
-  is_active: 1,
-  priority: 0,
-  created_at: '2026-05-20T00:00:00.000',
-  updated_at: '2026-05-20T00:00:00.000',
-};
+const STAFF_WITHOUT_KEY = { role: 'staff', permissionKeys: [] } as Partial<AuthenticatedStaff>;
+const STAFF_WITH_KEY = { role: 'staff', permissionKeys: ['/automations'] } as Partial<AuthenticatedStaff>;
 
 beforeEach(() => {
   for (const fn of Object.values(dbMocks)) fn.mockReset();
+  dbMocks.getLineAccountScopeEntries.mockImplementation(async (...args: unknown[]) =>
+    dbMocks.getLineAccounts(...args));
   dbMocks.getLineAccounts.mockResolvedValue([
     { id: 'acc-1', name: '本店', tenant_id: '00000000-0000-4000-8000-000000000001' },
     { id: 'acc-2', name: '二号店', tenant_id: '00000000-0000-4000-8000-000000000001' },
@@ -141,7 +93,7 @@ describe('GET /api/automation-runs', () => {
     expect(body.data.items[0]).toMatchObject({
       ownerKind: 'automation', status: 'permanent_failed', subject: '田中さん', accountLabel: '本店',
       triggerLabel: 'メッセージが届いたとき', detail: 'メッセージを送信。外部連携先が応答しませんでした',
-      durationMs: 1200, canRetry: false,
+      durationMs: 1200, canRetry: true,
     });
     expect(body.data.items[1]).toMatchObject({
       status: 'skipped', subject: null, detail: '条件に合わなかったため、何もしていません', durationMs: null,
@@ -186,65 +138,6 @@ describe('GET /api/automation-runs', () => {
   });
 });
 
-describe('GET /api/automations?lineAccountId=X', () => {
-  test('includes both account-bound and global (NULL) automations', async () => {
-    const rows: AutomationRow[] = [
-      { id: 'a-global', name: 'global', line_account_id: null, ...rowBase },
-      { id: 'a-acc1', name: 'acc1', line_account_id: 'acc-1', ...rowBase },
-      { id: 'a-acc2', name: 'acc2', line_account_id: 'acc-2', ...rowBase },
-    ];
-    const { db, calls } = makeAutomationDb(rows);
-
-    const res = await setupApp(db).request('/api/automations?lineAccountId=acc-1');
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as {
-      success: boolean;
-      data: { id: string; lineAccountId: string | null }[];
-    };
-    expect(body.success).toBe(true);
-    const ids = body.data.map((d) => d.id).sort();
-    // The engine (event-bus.ts:149) fires automations whose line_account_id
-    // is NULL OR equal to the active account. The list endpoint must mirror
-    // that scope, otherwise globals + freshly-created records disappear in
-    // the UI even though they will still execute.
-    expect(ids).toEqual(['a-acc1', 'a-global']);
-    // Scope must be surfaced so callers can tell globals from account-bound
-    // rows — otherwise the UI cannot safely offer per-account edit/disable.
-    const byId = new Map(body.data.map((d) => [d.id, d.lineAccountId] as const));
-    expect(byId.get('a-global')).toBeNull();
-    expect(byId.get('a-acc1')).toBe('acc-1');
-    expect(calls).toHaveLength(1);
-    expect(calls[0].sql).toMatch(/line_account_id IS NULL/);
-    expect(calls[0].sql).toMatch(/line_account_id = \?/);
-    expect(calls[0].binds).toEqual(['acc-1']);
-  });
-
-  test('falls back to getAutomations helper when no lineAccountId is provided', async () => {
-    dbMocks.getAutomations.mockResolvedValue([
-      { id: 'a-x', name: 'x', line_account_id: null, ...rowBase },
-    ]);
-    const { db } = makeAutomationDb([]);
-
-    const res = await setupApp(db).request('/api/automations');
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as { success: boolean; data: { id: string }[] };
-    expect(body.data.map((d) => d.id)).toEqual(['a-x']);
-    expect(dbMocks.getAutomations).toHaveBeenCalledTimes(1);
-  });
-
-  test('returns empty array when filter matches nothing and no globals exist', async () => {
-    const rows: AutomationRow[] = [
-      { id: 'a-other', name: 'other', line_account_id: 'acc-other', ...rowBase },
-    ];
-    const { db } = makeAutomationDb(rows);
-
-    const res = await setupApp(db).request('/api/automations?lineAccountId=acc-1');
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as { success: boolean; data: unknown[] };
-    expect(body.data).toEqual([]);
-  });
-});
-
 describe('GET /api/automations/:id/logs', () => {
   test.each([
     ['999999', 200],
@@ -260,5 +153,60 @@ describe('GET /api/automations/:id/logs', () => {
       'automation-1',
       expected,
     );
+  });
+});
+
+describe('旧作成口の削除（#554 点検#519中6）', () => {
+  test('POST /api/automations は404を返し、何も作らない', async () => {
+    const res = await setupApp({} as D1Database).request('/api/automations', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'x', eventType: 'message_received', actions: [] }),
+    });
+    expect(res.status).toBe(404);
+    expect(dbMocks.createAutomation).not.toHaveBeenCalled();
+  });
+});
+
+describe('権限キー検査（#554 点検#519中4・中5）', () => {
+  test('実行記録の一覧は権限キーのないstaffに403を返す', async () => {
+    const res = await setupApp({} as D1Database, STAFF_WITHOUT_KEY)
+      .request('/api/automation-runs?lineAccountId=acc-1');
+    expect(res.status).toBe(403);
+    expect(dbMocks.getAutomationExecutionRuns).not.toHaveBeenCalled();
+  });
+
+  test('実行記録の一覧は権限キーを持つstaffに200を返す', async () => {
+    dbMocks.getAutomationExecutionRuns.mockResolvedValue({
+      rows: [],
+      total: 0,
+      summary: { total: 0, executed: 0, skipped: 0, failed: 0, most_run_name: null, most_run_count: null },
+    });
+    const res = await setupApp({} as D1Database, STAFF_WITH_KEY)
+      .request('/api/automation-runs?lineAccountId=acc-1');
+    expect(res.status).toBe(200);
+  });
+
+  test('詳細は権限キーのないstaffに403を返す（アカウント範囲内でも）', async () => {
+    dbMocks.getAutomationById.mockResolvedValue({ id: 'automation-1', line_account_id: 'acc-1' });
+    const res = await setupApp({} as D1Database, STAFF_WITHOUT_KEY)
+      .request('/api/automations/automation-1');
+    expect(res.status).toBe(403);
+  });
+
+  test('ログは権限キーのないstaffに403を返す', async () => {
+    dbMocks.getAutomationById.mockResolvedValue({ id: 'automation-1', line_account_id: 'acc-1' });
+    const res = await setupApp({} as D1Database, STAFF_WITHOUT_KEY)
+      .request('/api/automations/automation-1/logs');
+    expect(res.status).toBe(403);
+    expect(dbMocks.getAutomationLogs).not.toHaveBeenCalled();
+  });
+
+  test('ログは権限キーを持つstaffに200を返す', async () => {
+    dbMocks.getAutomationById.mockResolvedValue({ id: 'automation-1', line_account_id: 'acc-1' });
+    dbMocks.getAutomationLogs.mockResolvedValue([]);
+    const res = await setupApp({} as D1Database, STAFF_WITH_KEY)
+      .request('/api/automations/automation-1/logs');
+    expect(res.status).toBe(200);
   });
 });

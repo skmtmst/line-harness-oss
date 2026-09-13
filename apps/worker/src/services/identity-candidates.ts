@@ -11,6 +11,7 @@ import type {
   IdentityConfidenceLabel,
   IdentityReprocessMode,
 } from '@line-crm/shared';
+import { resolveFriendProfileSelections } from './friend-profile-candidates.js';
 
 type CandidateRow = {
   id: string;
@@ -500,6 +501,35 @@ export async function decideIdentityCandidate(
     throw new IdentityCandidateError(422, 'REASON_REQUIRED', '理由を3文字以上500文字以内で入力してください');
   }
   const reprocessJson = validateReprocess(row, request);
+  if (request.profileSelections?.length
+      && (row.kind !== 'friend_duplicate' || request.decision !== 'linked')) {
+    throw new IdentityCandidateError(
+      422,
+      'PROFILE_SELECTION_NOT_ALLOWED',
+      'プロフィールの採用値は友だち同士を結び付ける場合だけ指定できます',
+    );
+  }
+  let profileSelections: Awaited<ReturnType<typeof resolveFriendProfileSelections>> = [];
+  if (request.profileSelections?.length) {
+    try {
+      profileSelections = await resolveFriendProfileSelections(
+        db,
+        [row.left_subject_id, row.right_subject_id],
+        request.profileSelections,
+      );
+    } catch (error) {
+      const code = error instanceof Error ? error.message : '';
+      throw new IdentityCandidateError(
+        422,
+        code === 'PROFILE_SELECTION_DUPLICATE'
+          ? 'PROFILE_SELECTION_DUPLICATE'
+          : 'PROFILE_SELECTION_NOT_FOUND',
+        code === 'PROFILE_SELECTION_DUPLICATE'
+          ? '同じプロフィール項目を複数回選べません'
+          : '採用するプロフィール値が現在の友だち情報に見つかりません',
+      );
+    }
+  }
   const now = isoNow();
   const nextVersion = row.version + 1;
   const statements: D1PreparedStatement[] = [
@@ -545,6 +575,46 @@ export async function decideIdentityCandidate(
       statements.push(
         db.prepare('UPDATE friends SET user_id = ?, updated_at = ? WHERE id = ?')
           .bind(userId, now, friendId),
+      );
+    }
+    for (const selection of profileSelections) {
+      statements.push(
+        db.prepare(
+          `UPDATE user_profile_values
+              SET is_active = 0, updated_at = ?
+            WHERE tenant_id = ? AND user_id = ? AND field_key = ? AND is_active = 1`,
+        ).bind(now, row.tenant_id, userId, selection.fieldKey),
+        db.prepare(
+          `INSERT INTO user_profile_values (
+            id, tenant_id, user_id, field_key, field_label, value_json, value_preview,
+            source_type, source_id, source_label, source_friend_id, verified_at,
+            selected_by, selected_by_name, selected_at, update_mode, is_active,
+            created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
+        ).bind(
+          crypto.randomUUID(), row.tenant_id, userId, selection.fieldKey,
+          selection.fieldLabel, JSON.stringify(selection.value), selection.valuePreview,
+          selection.sourceType, selection.sourceId, selection.sourceLabel,
+          selection.sourceFriendId, selection.verifiedAt, actor.id, actor.name, now,
+          selection.updateMode, now, now,
+        ),
+      );
+    }
+    if (profileSelections.length > 0) {
+      statements.push(
+        db.prepare(
+          `INSERT INTO identity_events (
+            id, tenant_id, user_id, candidate_id, event_type, summary,
+            before_json, after_json, actor_staff_id, actor_name, occurred_at, correlation_id
+          ) VALUES (?, ?, ?, ?, 'profile', ?, NULL, ?, ?, ?, ?, ?)`,
+        ).bind(
+          crypto.randomUUID(), row.tenant_id, userId, row.id,
+          `重複候補の確認でプロフィールの採用値を${profileSelections.length}件保存しました`,
+          JSON.stringify(profileSelections), actor.id, actor.name, now, crypto.randomUUID(),
+        ),
+        db.prepare(
+          'UPDATE users SET revision = revision + 1, updated_at = ? WHERE id = ? AND tenant_id = ?',
+        ).bind(now, userId, row.tenant_id),
       );
     }
   }

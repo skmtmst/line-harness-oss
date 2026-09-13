@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   type LockPayload,
   STALE_AFTER_MINUTES,
+  currentHolder,
   describeLock,
   evaluateLockForDeploy,
   evaluateRelease,
@@ -11,6 +12,26 @@ import {
   lockRef,
   parseLockPayload,
 } from './deploy-lock';
+
+describe('currentHolder', () => {
+  it('uses the signed GitHub Actions actor without querying a personal user', () => {
+    let queried = false;
+    const holder = currentHolder(
+      { GITHUB_ACTIONS: 'true', GITHUB_ACTOR: 'github-actions[bot]' },
+      () => {
+        queried = true;
+        return 'unexpected';
+      },
+    );
+
+    expect(holder).toBe('github-actions[bot]');
+    expect(queried).toBe(false);
+  });
+
+  it('keeps the authenticated gh login for interactive runs', () => {
+    expect(currentHolder({}, () => 'masato')).toBe('masato');
+  });
+});
 
 const lock: LockPayload = {
   env: 'staging',

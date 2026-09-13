@@ -1,3 +1,4 @@
+import type { CommonVarChangeImpact } from '@line-crm/shared'
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import type { CommonVarDeleteImpact, CommonVarDeleteImpactItem } from '@line-crm/shared'
@@ -5,7 +6,11 @@ import { ApiError } from '@/lib/api'
 import {
   CHANGE_PREVIEW_SOURCE,
   changeCounts,
+  blockingErrors,
   changePreviewNotConnected,
+  characterCountText,
+  isChangeItem,
+  reviewWarnings,
   changeSummaryText,
   hiddenText,
   historicalText,
@@ -13,9 +18,11 @@ import {
   impactStateFromError,
   impactStateText,
   saveErrorText,
+  scheduleErrorText,
 } from './change-impact'
 
 const EDIT = readFileSync(new URL('./edit/page.tsx', import.meta.url), 'utf8')
+const IMPACT_REVIEW = readFileSync(new URL('./impact-review.tsx', import.meta.url), 'utf8')
 
 /**
  * **ファイル全体を `toContain` で見ない。** 画面のどこかに同じ字が
@@ -117,7 +124,7 @@ describe('影響確認は、変わる場所と変わらない場所を分ける'
 
   it('保存すると何か所が変わるかを、差し込み名つきで言う', () => {
     const text = changeSummaryText(impact({ total: 15, blockingTotal: 15 }))
-    expect(text).toContain('{{var.shop_hours}}')
+    expect(text).toContain('{営業時間}')
     expect(text).toContain('15か所')
     expect(text).toContain('すぐ変わります')
   })
@@ -155,7 +162,11 @@ describe('影響確認は、変わる場所と変わらない場所を分ける'
 })
 
 describe('取れないものは、取れないと書く', () => {
-  it('変更後の文と文字数の検査は、口が無いので未接続と言う', () => {
+  /*
+    2026-09-04: 変更後の文と文字数の検査は #773 でつながった。
+    未接続の言い方は、**まだ他に取れないものが出たときのために残す。**
+  */
+  it('未接続の言い方は「まだ繋がっていません」＋取得元', () => {
     expect(changePreviewNotConnected())
       .toBe(`まだ繋がっていません。${CHANGE_PREVIEW_SOURCE}が接続されると表示されます。`)
   })
@@ -180,16 +191,50 @@ describe('共通情報編集（uNBlA）の画面', () => {
     expect(SAVE_FN).not.toContain("setError('保存に失敗しました')")
   })
 
+  it('予約の catch は生文言を出さず、予約用の変換を通す（#578 L7）', () => {
+    expect(EDIT).toContain('setError(scheduleErrorText(e))')
+    expect(EDIT).not.toContain("e.message : '予約に失敗しました'")
+  })
+
+  it('入力を変えたら古い「保存しました。」を消す（#578 L9）', () => {
+    expect(EDIT).toContain('{saved &&')
+    expect(EDIT).toContain('setSaved(false); setName')
+    expect(EDIT).toContain('setSaved(false); setValue')
+  })
+
+  it('一覧の読み込み失敗は権限なしと通信障害で分ける（#578 L8）', () => {
+    const LIST = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
+    expect(LIST).toContain('見る権限がありません')
+    expect(LIST).toContain('接続を確かめて')
+  })
+
   it('影響確認の節を必ず出す。読めないときも節ごと消さない', () => {
     expect(IMPACT_SECTION).toContain('影響確認')
-    expect(IMPACT_SECTION).toContain('{NOT_AVAILABLE}')
+    expect(IMPACT_SECTION).toContain(': NOT_AVAILABLE')
     expect(IMPACT_SECTION).toContain('impactStateText(impactState)')
   })
 
-  it('節の中で、変わる場所・送信済み・変更後の文を書き分ける', () => {
+  it('節の中で、変わる場所・送信済み・使用先の種類を書き分ける', () => {
     expect(IMPACT_SECTION).toContain('changeSummaryText(impact)')
     expect(IMPACT_SECTION).toContain('historicalText(impact)')
-    expect(IMPACT_SECTION).toContain('changePreviewNotConnected()')
+    expect(IMPACT_SECTION).toContain('usageGroups.map')
+    expect(IMPACT_SECTION).toContain('group.count.toLocaleString')
+  })
+
+  it('1件ずつ見る画面では、保存後の文を作れない行を空文字で埋めない', () => {
+    // 空で出すと「保存すると空になる」と読める。
+    expect(IMPACT_REVIEW).toContain("item.nextPreview ?? '—（未取得）'")
+  })
+
+  it('1件ずつ見る画面では、上限を超える行の文字数を強調する', () => {
+    expect(IMPACT_REVIEW).toContain('item.exceedsCharacterLimit')
+    expect(IMPACT_REVIEW).toContain('characterCountText(item)')
+  })
+
+  it('状態の語彙は口とそろえる。「公開中」は出さない（#578 L12）', () => {
+    expect(IMPACT_REVIEW).not.toContain('公開中')
+    expect(IMPACT_REVIEW).toContain('配信予約中')
+    expect(EDIT).toContain('配信予約中・配信中の設定にも反映されます')
   })
 
   it('読み込めなかったときだけ再読み込みを出す', () => {
@@ -199,5 +244,98 @@ describe('共通情報編集（uNBlA）の画面', () => {
 
   it('未取得を0か所として描かない', () => {
     expect(IMPACT_SECTION).toContain("impactState !== 'ready' || !impact")
+  })
+})
+
+describe('変更前確認（#773 の口）', () => {
+  const item = (over: Partial<CommonVarChangeImpact['items'][number]> = {}) => ({
+    kind: 'template' as const,
+    kindLabel: 'テンプレート',
+    name: '来店お礼',
+    status: '配信中',
+    href: '/templates/1',
+    blocksDeletion: true,
+    currentPreview: 'ありがとうございます',
+    changesOnSave: true,
+    previewAvailable: true,
+    nextPreview: 'ありがとうございました',
+    currentCharacterCount: 10,
+    nextCharacterCount: 11,
+    characterLimit: 5000,
+    exceedsCharacterLimit: false,
+    errors: [],
+    warnings: [],
+    ...over,
+  })
+  const impact = (items: ReturnType<typeof item>[]): CommonVarChangeImpact => ({
+    variable: { id: 'cv-1', name: '店名', varKey: 'shop', currentValue: 'A', nextValue: 'B' },
+    total: items.length,
+    blockingTotal: items.filter((i) => i.changesOnSave).length,
+    historicalTotal: 0,
+    unscopedFormTotal: 0,
+    canDelete: false,
+    byKind: {} as CommonVarChangeImpact['byKind'],
+    items,
+    unavailableReferences: [],
+    checkedAt: '2026-09-04T00:00:00+09:00',
+    errorTotal: items.reduce((s, i) => s + i.errors.length, 0),
+    warningTotal: items.reduce((s, i) => s + i.warnings.length, 0),
+    canSave: items.every((i) => i.errors.length === 0),
+    recommendedAction: 'save',
+  })
+
+  it('止める理由は重ねず、1つずつ出す', () => {
+    // 30か所が同じ理由で落ちるとき、30行並べても読めない。
+    const same = '変更後の文が5,000文字を超えます'
+    expect(blockingErrors(impact([
+      item({ errors: [same] }),
+      item({ errors: [same] }),
+    ]))).toEqual([same])
+  })
+
+  it('確かめてほしいことは、止める理由と混ぜない', () => {
+    const i = impact([item({ warnings: ['変更後の文は使用先を開いて確認してください'] })])
+    expect(blockingErrors(i)).toEqual([])
+    expect(reviewWarnings(i)).toEqual(['変更後の文は使用先を開いて確認してください'])
+  })
+
+  it('上限が無い使用先に「/ 5,000」と書かない', () => {
+    // 無い決まりを作ってしまう。
+    expect(characterCountText(item({ characterLimit: null, nextCharacterCount: 12 }))).toBe('12文字')
+    expect(characterCountText(item({ characterLimit: 5000, nextCharacterCount: 12 }))).toBe('12 / 5,000文字')
+  })
+
+  it('文字数を数えられないときは 0 ではなく —', () => {
+    // 0文字と「数えられない」は別のこと。0と書くと空になると読める。
+    expect(characterCountText(item({ nextCharacterCount: null }))).toBe('—')
+  })
+
+  it('変更前確認の1件だけを見分ける', () => {
+    expect(isChangeItem(item())).toBe(true)
+    expect(isChangeItem({
+      kind: 'template', kindLabel: 'テンプレート', name: '来店お礼',
+      status: '配信中', href: '/templates/1', blocksDeletion: true, currentPreview: 'a',
+    })).toBe(false)
+  })
+})
+
+describe('予約の登録失敗（#578 L7）', () => {
+  it('400の日本語はそのまま返す', () => {
+    expect(scheduleErrorText(new ApiError(400, '過去の日時は指定できません')))
+      .toBe('過去の日時は指定できません')
+  })
+
+  it('500の生文言は出さず予約用の定型文にする', () => {
+    const text = scheduleErrorText(new ApiError(500, 'Internal server error'))
+    expect(text).not.toContain('Internal server error')
+    expect(text).toContain('予約を登録できませんでした')
+  })
+
+  it('403は権限の文にする', () => {
+    expect(scheduleErrorText(new ApiError(403, 'API error: 403'))).toContain('管理者だけです')
+  })
+
+  it('通信失敗は予約用の文にする', () => {
+    expect(scheduleErrorText(new TypeError('Failed to fetch'))).toContain('予約を登録できませんでした')
   })
 })

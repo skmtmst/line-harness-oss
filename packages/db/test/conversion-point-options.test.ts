@@ -6,10 +6,12 @@ import { fileURLToPath } from 'node:url';
 
 import {
   createConversionPoint,
+  getConversionPoints,
   updateConversionPoint,
   getUrlReachConversionPoints,
   trackConversion,
 } from '../src/conversions.js';
+import { asD1 } from './d1-test-helper.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PKG_ROOT = join(__dirname, '..');
@@ -31,7 +33,16 @@ function execSafe(db: Database.Database, sql: string): void {
   }
 }
 
+/*
+ * 移行の再生は全部同期で走る。テストごとに繰り返すとその間ワーカーが
+ * 止まり、CI が vitest の状況報告待ちで落ちる。1度だけ組み立てて中身を
+ * 控え、以後は写しから起こす。写しは独立したDBなので、テスト同士は
+ * 影響し合わない。
+ */
+let migratedSnapshot: Buffer | null = null;
+
 function setupDb(): Database.Database {
+  if (migratedSnapshot) return new Database(migratedSnapshot);
   const db = new Database(':memory:');
   execSafe(db, readFileSync(join(PKG_ROOT, 'schema.sql'), 'utf8'));
   for (const file of readdirSync(MIGRATIONS_DIR)
@@ -39,41 +50,8 @@ function setupDb(): Database.Database {
     .sort()) {
     execSafe(db, readFileSync(join(MIGRATIONS_DIR, file), 'utf8'));
   }
+  migratedSnapshot = db.serialize();
   return db;
-}
-
-function asD1(sqlite: Database.Database): D1Database {
-  return {
-    prepare(query: string) {
-      return {
-        bind(...params: unknown[]) {
-          const stmt = sqlite.prepare(query);
-          return {
-            async run() {
-              stmt.run(...params);
-              return { results: [], success: true, meta: {} };
-            },
-            async first<T>() {
-              return (stmt.get(...params) as T) ?? null;
-            },
-            async all<T>() {
-              return { results: stmt.all(...params) as T[], success: true, meta: {} };
-            },
-          };
-        },
-        async run() {
-          sqlite.prepare(query).run();
-          return { results: [], success: true, meta: {} };
-        },
-        async first<T>() {
-          return (sqlite.prepare(query).get() as T) ?? null;
-        },
-        async all<T>() {
-          return { results: sqlite.prepare(query).all() as T[], success: true, meta: {} };
-        },
-      };
-    },
-  } as unknown as D1Database;
 }
 
 function insertFriend(sqlite: Database.Database, id: string): void {
@@ -101,6 +79,35 @@ describe('既定値', () => {
     expect(point.count_repeat).toBe(1); // 毎回数える = 従来どおり
     expect(point.attribution_days).toBeNull();
     expect(point.line_account_id).toBeNull();
+  });
+});
+
+describe('一覧のアカウント境界', () => {
+  test('許可アカウントと未割当だけをSQLで取得する', async () => {
+    sqlite.prepare(
+      `INSERT INTO line_accounts (id, name, channel_id, channel_secret, channel_access_token, created_at, updated_at)
+       VALUES ('acc-1', 'A店', 'scope-c1', 's1', 't1', '2024-01-01', '2024-01-01'),
+              ('acc-2', 'B店', 'scope-c2', 's2', 't2', '2024-01-01', '2024-01-01')`,
+    ).run();
+    const unassigned = await createConversionPoint(db, { name: '共通', eventType: 'purchase' });
+    const allowed = await createConversionPoint(db, {
+      name: 'A店', eventType: 'purchase', lineAccountId: 'acc-1',
+    });
+    await createConversionPoint(db, {
+      name: 'B店', eventType: 'purchase', lineAccountId: 'acc-2',
+    });
+
+    const visible = await getConversionPoints(db, {
+      allowedLineAccountIds: ['acc-1'], includeUnassigned: true,
+    });
+    expect(visible.map((point) => point.id).sort()).toEqual([allowed.id, unassigned.id].sort());
+  });
+
+  test('権限が無ければ全件取得してから絞らず0件を返す', async () => {
+    await createConversionPoint(db, { name: '共通', eventType: 'purchase' });
+    expect(await getConversionPoints(db, {
+      allowedLineAccountIds: [], includeUnassigned: false,
+    })).toEqual([]);
   });
 });
 

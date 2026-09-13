@@ -1,8 +1,9 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 
 import type { Env } from '../index.js';
 import { createTestD1 } from '../test-utils/d1-sqlite.js';
+import { signOperationsEvent } from '../services/operations-signature.js';
 import { EMERGENCY_CONTROL_PERMISSION, operations } from './operations.js';
 
 function app(
@@ -28,24 +29,46 @@ function app(
 
 let testDb: ReturnType<typeof createTestD1>;
 
-beforeEach(() => {
+async function hash(value: string): Promise<string> {
+  const bytes = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value)));
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+beforeEach(async () => {
   testDb = createTestD1();
   testDb.raw.prepare(
     `INSERT INTO line_accounts (id, channel_id, name, channel_access_token, channel_secret)
      VALUES ('account-1', 'channel-1', 'LINE 1', 'token', 'secret')`,
   ).run();
+  const expiresAt = new Date(Date.now() + 60 * 60_000).toISOString();
+  testDb.raw.prepare(
+    `INSERT INTO auth_step_up_grants (token_hash, staff_id, purpose, expires_at, created_at)
+     VALUES (?, 'owner-1', 'operations.control', ?, ?),
+            (?, 'admin-1', 'operations.control', ?, ?)`
+  ).run(
+    await hash('step-up-stop'), expiresAt, new Date().toISOString(),
+    await hash('step-up-admin'), expiresAt, new Date().toISOString(),
+  );
+  testDb.raw.prepare(
+    `INSERT INTO auth_step_up_grants (token_hash, staff_id, purpose, expires_at, created_at)
+     VALUES (?, 'owner-1', 'operations.control', ?, ?)`
+  ).run(await hash('step-up-restore'), expiresAt, new Date().toISOString());
 });
 
-function bindings(): Env['Bindings'] {
-  return { DB: testDb.db } as Env['Bindings'];
+afterEach(() => vi.unstubAllGlobals());
+
+function bindings(overrides: Partial<Env['Bindings']> = {}): Env['Bindings'] {
+  return { DB: testDb.db, ...overrides } as Env['Bindings'];
 }
 
-function stopRequest(lineAccountId: string | null = 'account-1'): RequestInit {
+function stopRequest(lineAccountId: string | null = 'account-1', stepUpToken = 'step-up-stop'): RequestInit {
   return {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
       'x-confirm-irreversible': 'operation-stop',
+      'x-step-up-token': stepUpToken,
+      'idempotency-key': 'stop-request-1',
     },
     body: JSON.stringify({
       lineAccountId,
@@ -58,6 +81,20 @@ function stopRequest(lineAccountId: string | null = 'account-1'): RequestInit {
 }
 
 describe('緊急停止の保存API', () => {
+  it('step-up tokenと再実行キーがない重要操作を拒否する', async () => {
+    const request = stopRequest();
+    const headers = { ...(request.headers as Record<string, string>) };
+    delete headers['x-step-up-token'];
+    request.headers = headers;
+    expect((await app().request('/api/operations/incidents', request, bindings())).status).toBe(401);
+
+    const noKey = stopRequest();
+    const noKeyHeaders = { ...(noKey.headers as Record<string, string>) };
+    delete noKeyHeaders['idempotency-key'];
+    noKey.headers = noKeyHeaders;
+    expect((await app().request('/api/operations/incidents', noKey, bindings())).status).toBe(400);
+  });
+
   it('確認ヘッダーと合言葉がない停止を拒否する', async () => {
     const noHeader = await app().request('/api/operations/incidents', {
       method: 'POST',
@@ -93,7 +130,7 @@ describe('緊急停止の保存API', () => {
       '/api/operations/incidents', stopRequest(null), bindings(),
     )).status).toBe(403);
     expect((await app('admin').request(
-      '/api/operations/incidents', stopRequest('account-1'), bindings(),
+      '/api/operations/incidents', stopRequest('account-1', 'step-up-admin'), bindings(),
     )).status).toBe(201);
   });
 
@@ -138,6 +175,8 @@ describe('緊急停止の保存API', () => {
         headers: {
           'content-type': 'application/json',
           'x-confirm-irreversible': 'operation-restore',
+          'x-step-up-token': 'step-up-restore',
+          'idempotency-key': 'restore-request-1',
         },
         body: JSON.stringify({
           expectedVersion: ownerStoppedBody.data.control.version,
@@ -265,6 +304,8 @@ describe('緊急停止の保存API', () => {
         headers: {
           'content-type': 'application/json',
           'x-confirm-irreversible': 'operation-restore',
+          'x-step-up-token': 'step-up-restore',
+          'idempotency-key': 'restore-request-1',
         },
         body: JSON.stringify({ expectedVersion: stoppedBody.data.control.version, confirmation: '復旧' }),
       },
@@ -283,6 +324,337 @@ describe('緊急停止の保存API', () => {
     expect(await history.json()).toMatchObject({
       success: true,
       data: [expect.objectContaining({ id: stoppedBody.data.incident.id, status: 'resolved' })],
+    });
+  });
+
+  it('同じ停止要求を二重実行せず、LINEとメールを別キューへ積む', async () => {
+    const first = await app().request('/api/operations/incidents', stopRequest(), bindings());
+    expect(first.status).toBe(201);
+    const firstBody = await first.json() as { data: { incident: { id: string } } };
+
+    const replay = await app().request('/api/operations/incidents', stopRequest(), bindings());
+    expect(replay.status).toBe(200);
+    expect(await replay.json()).toMatchObject({
+      success: true,
+      duplicate: true,
+      data: { incident: { id: firstBody.data.incident.id } },
+    });
+    const jobs = testDb.raw.prepare(
+      `SELECT channel, status FROM operation_notification_outbox
+        WHERE incident_id = ? ORDER BY channel`,
+    ).all(firstBody.data.incident.id) as Array<{ channel: string; status: string }>;
+    expect(jobs).toEqual([
+      { channel: 'email', status: 'queued' },
+      { channel: 'line', status: 'queued' },
+    ]);
+  });
+});
+
+describe('運用状態checkと配備履歴', () => {
+  it('未実行はunknown/stale、権限外scopeは403で返す', async () => {
+    const empty = await app('admin').request(
+      '/api/operations/health?account_id=account-1', {}, bindings(),
+    );
+    expect(await empty.json()).toMatchObject({
+      success: true,
+      data: { latestRun: null, overallStatus: 'stale', lastCheckedAt: null, nextCheckAt: null },
+    });
+
+    testDb.raw.prepare("INSERT INTO tenants (id, name) VALUES ('tenant-2', '統括2')").run();
+    testDb.raw.prepare("UPDATE line_accounts SET tenant_id = 'tenant-2' WHERE id = 'account-1'").run();
+    expect((await app('admin', true, 'tenant-1').request(
+      '/api/operations/health?account_id=account-1', {}, bindings(),
+    )).status).toBe(403);
+  });
+
+  it('同じ5分窓の手動checkを冪等化し、6項目を実データで保存する', async () => {
+    const now = new Date().toISOString();
+    testDb.raw.prepare(
+      `INSERT INTO account_health_logs
+         (id, line_account_id, error_code, error_count, check_period, risk_level, created_at)
+       VALUES ('health-1', 'account-1', NULL, 0, '5m', 'normal', ?)`,
+    ).run(now);
+    testDb.raw.prepare(
+      `INSERT INTO friend_daily_snapshots
+         (date, line_account_id, active, total, added, blocked)
+       VALUES ('2026-09-06', 'account-1', 100, 100, 2, 1),
+              ('2026-09-07', 'account-1', 102, 102, 3, 1)`,
+    ).run();
+    testDb.raw.prepare(
+      `INSERT INTO line_webhook_events
+         (webhook_event_id, line_account_id, event_type, status, received_at, updated_at)
+       VALUES ('webhook-1', 'account-1', 'message', 'succeeded', ?, ?)`,
+    ).run(now, now);
+    vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request) => {
+      const url = String(input);
+      if (url.endsWith('/quota/consumption')) return Response.json({ totalUsage: 100 });
+      return Response.json({ type: 'limited', value: 1_000 });
+    }));
+
+    const request = {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ lineAccountId: 'account-1' }),
+    };
+    const first = await app('admin').request('/api/operations/health/runs', request, bindings());
+    expect(first.status).toBe(201);
+    const firstBody = await first.json() as { data: { latestRun: { id: string; results: unknown[] } } };
+    expect(firstBody.data.latestRun.results).toHaveLength(6);
+    const second = await app('admin').request('/api/operations/health/runs', request, bindings());
+    expect(second.status).toBe(200);
+    expect(await second.json()).toMatchObject({
+      success: true,
+      duplicate: true,
+      data: { latestRun: { id: firstBody.data.latestRun.id } },
+    });
+  });
+
+  it('署名なしの配備eventを拒否し、署名済みeventを履歴へ一度だけ追加する', async () => {
+    const body = JSON.stringify({
+      deploymentId: 'deploy-1', phase: 'succeeded', environment: 'staging',
+      toCommit: 'abc123', version: 'v1.2.3', migrations: ['314'],
+      rollbackAvailable: true, pullRequest: 1133, releaseSummary: '運用状態を更新',
+      actor: 'github-actions', occurredAt: new Date().toISOString(), smokeCheck: { status: 'ok' },
+    });
+    const secret = 'operations-signing-secret-is-at-least-32-bytes';
+    expect((await app().request('/api/internal/deployments/events', {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body,
+    }, bindings({ OPERATIONS_DEPLOYMENT_SIGNING_SECRET: secret }))).status).toBe(401);
+
+    const timestamp = String(Math.floor(Date.now() / 1000));
+    const signature = await signOperationsEvent(secret, timestamp, body);
+    const signed = {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-operations-timestamp': timestamp,
+        'x-operations-signature': signature,
+      },
+      body,
+    };
+    expect((await app().request(
+      '/api/internal/deployments/events', signed, bindings({ OPERATIONS_DEPLOYMENT_SIGNING_SECRET: secret }),
+    )).status).toBe(201);
+    expect((await app().request(
+      '/api/internal/deployments/events', signed, bindings({ OPERATIONS_DEPLOYMENT_SIGNING_SECRET: secret }),
+    )).status).toBe(200);
+    const history = await app('admin').request('/api/operations/history', {}, bindings());
+    expect(await history.json()).toMatchObject({
+      success: true,
+      data: [expect.objectContaining({ historyKind: 'deployment', reason: '運用状態を更新' })],
+    });
+  });
+});
+
+describe('停止不可理由の機械コード(N-453/N-455)', () => {
+  async function grant(token: string, staffId: string): Promise<void> {
+    const expiresAt = new Date(Date.now() + 60 * 60_000).toISOString();
+    testDb.raw.prepare(
+      `INSERT INTO auth_step_up_grants (token_hash, staff_id, purpose, expires_at, created_at)
+       VALUES (?, ?, 'operations.control', ?, ?)`,
+    ).run(await hash(token), staffId, expiresAt, new Date().toISOString());
+  }
+
+  function stopBody(overrides: Record<string, unknown> = {}): string {
+    return JSON.stringify({
+      lineAccountId: 'account-1',
+      capabilities: ['broadcast_dispatch'],
+      reason: '障害対応',
+      expectedVersion: 0,
+      confirmation: '停止',
+      ...overrides,
+    });
+  }
+
+  function stopInit(stepUpToken: string, key: string, body: string): RequestInit {
+    return {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-confirm-irreversible': 'operation-stop',
+        'x-step-up-token': stepUpToken,
+        'idempotency-key': key,
+      },
+      body,
+    };
+  }
+
+  it('停止可のときpreviewは理由コードなし、停止不可のとき理由コード付きで返す', async () => {
+    const ownerPreview = await app('owner').request(
+      '/api/operations/control/preview?account_id=account-1', {}, bindings(),
+    );
+    expect(ownerPreview.status).toBe(200);
+    expect(await ownerPreview.json()).toMatchObject({
+      success: true,
+      data: { permissions: { canControl: true, reasonCode: null } },
+    });
+
+    const blockedPreview = await app('admin', false).request(
+      '/api/operations/control/preview?account_id=account-1', {}, bindings(),
+    );
+    expect(blockedPreview.status).toBe(200);
+    expect(await blockedPreview.json()).toMatchObject({
+      success: true,
+      data: { permissions: { canControl: false, reasonCode: 'EMERGENCY_CONTROL_FORBIDDEN' } },
+    });
+  });
+
+  it('停止不可の403に機械コードを付けて返す', async () => {
+    const forbidden = await app('admin', false).request(
+      '/api/operations/incidents', stopRequest('account-1'), bindings(),
+    );
+    expect(forbidden.status).toBe(403);
+    expect(await forbidden.json()).toMatchObject({
+      success: false,
+      code: 'EMERGENCY_CONTROL_FORBIDDEN',
+    });
+
+    const outOfScope = await app('admin').request(
+      '/api/operations/incidents', stopRequest(null, 'step-up-admin'), bindings(),
+    );
+    expect(outOfScope.status).toBe(403);
+    expect(await outOfScope.json()).toMatchObject({
+      success: false,
+      code: 'EMERGENCY_SCOPE_FORBIDDEN',
+    });
+  });
+
+  it('古い版の停止を409と最新状態で返す', async () => {
+    const first = await app().request(
+      '/api/operations/incidents', stopRequest('account-1'), bindings(),
+    );
+    expect(first.status).toBe(201);
+
+    await grant('step-up-stop-2', 'owner-1');
+    const stale = await app().request(
+      '/api/operations/incidents',
+      stopInit('step-up-stop-2', 'stop-request-2', stopBody({ expectedVersion: 0 })),
+      bindings(),
+    );
+    expect(stale.status).toBe(409);
+    const staleBody = await stale.json() as {
+      success: boolean; code: string; data: { version: number };
+    };
+    expect(staleBody).toMatchObject({
+      success: false,
+      code: 'VERSION_CONFLICT',
+      data: { version: 1 },
+    });
+  });
+
+  it('停止→復旧のあと古い版で停止すると、activeIncidentIdに頼らず版比較だけで409になる', async () => {
+    // 1. 停止(expectedVersion:0) → version=1, activeIncidentIdが付く。
+    const stopped = await app().request(
+      '/api/operations/incidents', stopRequest('account-1'), bindings(),
+    );
+    expect(stopped.status).toBe(201);
+    const stoppedBody = await stopped.json() as {
+      data: { control: { version: number }; incident: { id: string } };
+    };
+    expect(stoppedBody.data.control.version).toBe(1);
+
+    // 2. 復旧(expectedVersion:1) → version=2, activeIncidentIdはnullへ戻る。
+    const restored = await app().request(
+      `/api/operations/incidents/${stoppedBody.data.incident.id}/restore`,
+      {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-confirm-irreversible': 'operation-restore',
+          'x-step-up-token': 'step-up-restore',
+          'idempotency-key': 'restore-request-1',
+        },
+        body: JSON.stringify({ expectedVersion: 1, confirmation: '復旧' }),
+      },
+      bindings(),
+    );
+    expect(restored.status).toBe(200);
+    const restoredBody = await restored.json() as {
+      data: { control: { version: number; activeIncidentId: string | null } };
+    };
+    expect(restoredBody.data.control.version).toBe(2);
+    expect(restoredBody.data.control.activeIncidentId).toBeNull();
+
+    // 3. activeIncidentIdがnullのまま、古い版(1)で再び停止を試みる。
+    //    ここでの409はactiveIncidentIdの門を通らないので、版比較だけが理由になる。
+    await grant('step-up-stop-3', 'owner-1');
+    const stale = await app().request(
+      '/api/operations/incidents',
+      stopInit('step-up-stop-3', 'stop-request-3', stopBody({ expectedVersion: 1 })),
+      bindings(),
+    );
+    expect(stale.status).toBe(409);
+    const staleBody = await stale.json() as {
+      success: boolean; code: string; data: { version: number; activeIncidentId: string | null };
+    };
+    expect(staleBody).toMatchObject({ success: false, code: 'VERSION_CONFLICT' });
+    // 版比較だけが効いたことの証拠: 競合を返した時点でactiveIncidentIdはnullのまま。
+    expect(staleBody.data.activeIncidentId).toBeNull();
+    expect(staleBody.data.version).toBe(2);
+  });
+
+  it('再実行キーの使い回しを409と機械コードで返す', async () => {
+    expect((await app().request(
+      '/api/operations/incidents', stopRequest('account-1'), bindings(),
+    )).status).toBe(201);
+
+    await grant('step-up-stop-2', 'owner-1');
+    const reused = await app().request(
+      '/api/operations/incidents',
+      stopInit('step-up-stop-2', 'stop-request-1', stopBody({ reason: '別の理由' })),
+      bindings(),
+    );
+    expect(reused.status).toBe(409);
+    expect(await reused.json()).toMatchObject({
+      success: false,
+      code: 'IDEMPOTENCY_CONFLICT',
+    });
+  });
+
+  it('停止していない復旧を409と機械コードで返す', async () => {
+    const stopped = await app().request(
+      '/api/operations/incidents', stopRequest('account-1'), bindings(),
+    );
+    const stoppedBody = await stopped.json() as {
+      data: { control: { version: number }; incident: { id: string } };
+    };
+    const restoreHeaders = {
+      'content-type': 'application/json',
+      'x-confirm-irreversible': 'operation-restore',
+      'x-step-up-token': 'step-up-restore',
+      'idempotency-key': 'restore-request-1',
+    };
+    const restored = await app().request(
+      `/api/operations/incidents/${stoppedBody.data.incident.id}/restore`,
+      {
+        method: 'POST',
+        headers: restoreHeaders,
+        body: JSON.stringify({
+          expectedVersion: stoppedBody.data.control.version,
+          confirmation: '復旧',
+        }),
+      },
+      bindings(),
+    );
+    expect(restored.status).toBe(200);
+
+    await grant('step-up-restore-2', 'owner-1');
+    const again = await app().request(
+      `/api/operations/incidents/${stoppedBody.data.incident.id}/restore`,
+      {
+        method: 'POST',
+        headers: {
+          ...restoreHeaders,
+          'x-step-up-token': 'step-up-restore-2',
+          'idempotency-key': 'restore-request-2',
+        },
+        body: JSON.stringify({ expectedVersion: 2, confirmation: '復旧' }),
+      },
+      bindings(),
+    );
+    expect(again.status).toBe(409);
+    expect(await again.json()).toMatchObject({
+      success: false,
+      code: 'OPERATION_NOT_STOPPED',
     });
   });
 });
