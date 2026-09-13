@@ -17,4 +17,23 @@ describe('ダッシュボードの更新時刻と鮮度表示(#759)', () => {
   it('壊れた時刻をHH:MMへ誤変換しない', () => {
     expect(formatDashboardAsOf('not-a-date')).toBeNull()
   })
+
+  it.each(['Asia/Tokyo', 'Asia/Ho_Chi_Minh', 'UTC'])(
+    'timezone無しD1時刻は閲覧端末TZ=%sに依存せずJSTとして表示する',
+    (timezone) => {
+      const previous = process.env.TZ
+      process.env.TZ = timezone
+      try {
+        expect(formatDashboardAsOf('2026-09-13 03:04:00')).toBe('03:04')
+        expect(formatDashboardAsOf('2026-09-13T03:04:00.123')).toBe('03:04')
+      } finally {
+        process.env.TZ = previous
+      }
+    },
+  )
+
+  it('Z・offset付き時刻は指定された絶対時刻を維持する', () => {
+    expect(formatDashboardAsOf('2026-09-13T03:04:00.000Z')).toBe('12:04')
+    expect(formatDashboardAsOf('2026-09-13T03:04:00+07:00')).toBe('05:04')
+  })
 })

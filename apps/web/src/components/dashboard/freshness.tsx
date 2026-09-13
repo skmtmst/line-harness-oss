@@ -14,7 +14,12 @@ function dashboardFreshnessReasonText(reason: Reason): string | null {
 
 export function formatDashboardAsOf(asOf: string | null | undefined): string | null {
   if (!asOf) return null
-  const date = new Date(asOf)
+  // APIが返すtimezone無しD1時刻は、server側と同じ既存契約に従ってJSTとして扱う。
+  // Z / offset 付きの値は絶対時刻なので、その指定をそのまま維持する。
+  const normalized = /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(?:\.\d+)?$/.test(asOf)
+    ? `${asOf.replace(' ', 'T')}+09:00`
+    : asOf
+  const date = new Date(normalized)
   if (Number.isNaN(date.getTime())) return null
   return date.toLocaleTimeString('ja-JP', {
     hour: '2-digit',
