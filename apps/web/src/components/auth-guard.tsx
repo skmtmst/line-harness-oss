@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { adminSessionHeaders, captureAdminSessionHandoff } from '@/lib/admin-session'
 import { clearSelectionAfterAuthentication } from '@/lib/hq-navigation'
+import { isPublicAuthPath } from '@/lib/auth-email'
 
 export default function AuthGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter()
@@ -12,7 +13,7 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let cancelled = false
 
-    if (pathname === '/login' || pathname === '/login/two-factor') {
+    if (isPublicAuthPath(pathname)) {
       setChecked(true)
       return () => { cancelled = true }
     }

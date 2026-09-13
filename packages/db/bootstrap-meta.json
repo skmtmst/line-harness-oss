@@ -340,7 +340,12 @@
     "379_form_content_revision.sql",
     "380_broadcast_stop_and_send_claims.sql",
     "381_hq_templates.sql",
-    "382_tags_account_name_scope.sql"
+    "382_tags_account_name_scope.sql",
+    "385_banner_generation.sql",
+    "386_hq_support_requests.sql",
+    "387_tenant_billing.sql",
+    "388_email_password_auth.sql",
+    "389_banner_reference_image.sql"
   ],
-  "migrationCount": 341
+  "migrationCount": 346
 }
