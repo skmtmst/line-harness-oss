@@ -767,6 +767,21 @@ describe('getAvailability の例外日（休業日・終日・時間帯）', () 
     expect(result.by_staff[0].slots).toEqual([]);
   });
 
+  test('必要数がcapacityを超える資源は消費snapshot集計へ進む前に閉じる', async () => {
+    const seen: Array<{ sql: string; args: unknown[] }> = [];
+    const result = await getAvailability(stubDB({
+      menu: MENU_BASIC,
+      staff: STAFF_S1,
+      shifts: [{ staff_id: 'S1', work_date: '2026-05-09', start_time: '10:00', end_time: '12:00' }],
+      menuResources: [{ id: 'R1', capacity: 1, quantity: 2 }],
+    }, seen), {
+      lineAccountId: 'A1', menuId: 'M1', from: '2026-05-09', to: '2026-05-09',
+      now: new Date('2026-05-08T00:00:00Z'), minLeadTimeMinutes: 0,
+    });
+    expect(result.by_staff[0].slots).toEqual([]);
+    expect(seen.some((call) => call.sql.includes('booking_resource_consumptions'))).toBe(false);
+  });
+
   test('未知の種類の行は無視する', async () => {
     const db = stubDB({
       menu: MENU_BASIC,

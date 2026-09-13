@@ -74,13 +74,26 @@ function asD1(sqlite: Database.Database, beforeRun?: (sql: string) => Promise<vo
           return { success: true, results: [], meta: { changes } } as T;
         },
         raw: async () => [],
+        runSyncForBatch: <T>() => {
+          const changes = statement.reader
+            ? (call((...a) => statement.all(...a), params) as unknown[]).length
+            : call((...a) => statement.run(...a), params).changes;
+          return { success: true, results: [], meta: { changes } } as T;
+        },
+        beforeRunForBatch: beforeRun ? () => beforeRun(sql) : undefined,
       } as unknown as D1PreparedStatement);
       return bound([]);
     },
     async batch(statements: D1PreparedStatement[]) {
-      const out = [];
-      for (const statement of statements) out.push(await statement.run());
-      return out;
+      for (const statement of statements) {
+        const hook = (statement as unknown as { beforeRunForBatch?: () => Promise<void> })
+          .beforeRunForBatch;
+        if (hook) await hook();
+      }
+      return sqlite.transaction(() => statements.map((statement) => {
+        const runSync = (statement as unknown as { runSyncForBatch: () => unknown }).runSyncForBatch;
+        return runSync();
+      }))();
     },
   };
   return db as unknown as D1Database;
@@ -261,6 +274,15 @@ describe('非JST店舗の予約作成 HTTP E2E（実DB・America/New_York）', (
       .run(id,start,end,end);
   }
 
+  function resourceCapacity(capacity: number, quantity = 1) {
+    storeCapacity(10);
+    sqlite.prepare(`INSERT INTO booking_resources
+      (id,line_account_id,name,resource_type,capacity,is_active)
+      VALUES ('room-shared','account-ny','共用室','room',?,1)`).run(capacity);
+    sqlite.prepare(`INSERT INTO booking_menu_resources (menu_id,resource_id,quantity)
+      VALUES ('menu-ny','room-shared',?)`).run(quantity);
+  }
+
   test.each(['liff', 'admin', 'mixed'])('店舗定員1・メニュー5の同時予約を担当横断で原子的に守る (%s)', async (mode) => {
     storeCapacity(1);
     stubExternal();
@@ -283,6 +305,84 @@ describe('非JST店舗の予約作成 HTTP E2E（実DB・America/New_York）', (
     expect(arrived).toBe(2);
     expect(responses.map(r => r.status).sort()).toEqual([201,409]);
     expect(bookingRows()).toHaveLength(1);
+  });
+
+  test.each(['liff', 'admin', 'mixed'])('共用資源1の同時予約を担当横断で原子的に守りsnapshotを1件だけ残す (%s)', async (mode) => {
+    resourceCapacity(1);
+    stubExternal();
+    let release!: () => void;
+    const bothReady = new Promise<void>(resolve => { release = resolve; });
+    let arrived = 0;
+    db = asD1(sqlite, async sql => {
+      if (!sql.includes('INSERT INTO bookings')) return;
+      arrived++;
+      if (arrived === 2) release();
+      await bothReady;
+    });
+    env = { DB: db };
+    const first = mode === 'admin' ? adminCreate : liffCreate;
+    const second = mode === 'liff' ? liffCreate : adminCreate;
+    const responses = await Promise.all([
+      first(NY_NOV2_1000, 'resource-first'),
+      second(NY_NOV2_1000, 'resource-second', { staff_id: 'staff-other' }),
+    ]);
+    expect(arrived).toBe(2);
+    expect(responses.map(response => response.status).sort()).toEqual([201, 409]);
+    expect(bookingRows()).toHaveLength(1);
+    expect(sqlite.prepare(`SELECT resource_id,quantity,snapshot_source
+      FROM booking_resource_consumptions`).all()).toEqual([
+      { resource_id: 'room-shared', quantity: 1, snapshot_source: 'booking' },
+    ]);
+  });
+
+  test.each(['liff', 'admin'])('空き再検証後に資源を停止しても予約INSERTをfail-closedにする (%s)', async (mode) => {
+    resourceCapacity(1);
+    stubExternal();
+    let changed = false;
+    db = asD1(sqlite, async sql => {
+      if (changed || !sql.includes('INSERT INTO bookings')) return;
+      changed = true;
+      sqlite.exec(`UPDATE booking_resources SET is_active=0 WHERE id='room-shared'`);
+    });
+    env = { DB: db };
+    const create = mode === 'liff' ? liffCreate : adminCreate;
+    const response = await create(NY_NOV2_1000, `resource-stop-${mode}`);
+    expect(changed).toBe(true);
+    expect(response.status).toBe(409);
+    expect(bookingRows()).toEqual([]);
+    expect(sqlite.prepare(`SELECT COUNT(*) AS count FROM booking_resource_consumptions`).get())
+      .toEqual({ count: 0 });
+  });
+
+  test('管理: snapshot保存失敗は予約をrollbackし、自分の202冪等予約を解放する', async () => {
+    resourceCapacity(1);
+    stubExternal();
+    sqlite.exec(`CREATE TRIGGER test_route_snapshot_failure
+      BEFORE INSERT ON booking_resource_consumptions
+      BEGIN SELECT RAISE(ABORT, 'forced_route_snapshot_failure'); END;`);
+    const response = await adminCreate(NY_NOV2_1000, 'resource-batch-failure');
+    expect(response.status).toBe(500);
+    expect(bookingRows()).toEqual([]);
+    expect(sqlite.prepare(`SELECT key FROM booking_idempotency_keys
+      WHERE key='resource-batch-failure'`).get()).toBeUndefined();
+  });
+
+  test.each(['liff', 'admin'])('取消は資源を解放し、予約時snapshotは割当変更後も残る (%s)', async (mode) => {
+    resourceCapacity(1);
+    stubExternal();
+    const create = mode === 'liff' ? liffCreate : adminCreate;
+    expect((await create(NY_NOV2_1000, `resource-book-${mode}`)).status).toBe(201);
+    const first = sqlite.prepare(`SELECT id FROM bookings`).get() as { id: string };
+    sqlite.prepare(`UPDATE bookings SET status='cancelled' WHERE id=?`).run(first.id);
+    sqlite.exec(`DELETE FROM booking_menu_resources WHERE menu_id='menu-ny'`);
+    expect(sqlite.prepare(`SELECT resource_id,quantity FROM booking_resource_consumptions
+      WHERE booking_id=?`).get(first.id)).toEqual({ resource_id: 'room-shared', quantity: 1 });
+    sqlite.exec(`INSERT INTO booking_menu_resources (menu_id,resource_id,quantity)
+      VALUES ('menu-ny','room-shared',1)`);
+    expect((await create(NY_NOV2_1000, `resource-rebook-${mode}`, {
+      staff_id: 'staff-other',
+    })).status).toBe(201);
+    expect(bookingRows()).toHaveLength(2);
   });
 
   test.each(['liff', 'admin'])('営業時間snapshot後に閉店しても旧条件で予約を作らない (%s)', async (mode) => {

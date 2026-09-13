@@ -255,8 +255,8 @@ function scriptedDb(handlers: [string, Handler][]) {
         },
       };
     },
-    async batch(stmts: unknown[]) {
-      return stmts;
+    async batch(stmts: D1PreparedStatement[]) {
+      return Promise.all(stmts.map((statement) => statement.run()));
     },
   };
 }
