@@ -45,6 +45,7 @@ import {
   DEFAULT_OPENAI_IMAGE_MODEL,
   generateOpenAIImage,
   OpenAIImageError,
+  type OpenAIReferenceImage,
 } from '../services/openai-images.js';
 
 /**
@@ -66,6 +67,14 @@ const DAILY_DIVISOR = 5;
 const AUTO_PAUSE_FAILURES = 3;
 const AUTO_PAUSE_WINDOW_MS = 15 * 60 * 1000;
 const UPLOAD_MAX_BYTES = 10 * 1024 * 1024;
+
+/** 参照画像が実行時に見つからない（一覧から外された・実体が消えた）。 */
+class ReferenceMissingError extends Error {
+  constructor() {
+    super('参照画像が見つかりません。ライブラリから選び直してください');
+    this.name = 'ReferenceMissingError';
+  }
+}
 const UPLOAD_ALLOWED: Record<string, { ext: string }> = {
   'image/png': { ext: 'png' },
   'image/jpeg': { ext: 'jpg' },
@@ -189,6 +198,8 @@ function serializeGeneration(g: BannerGeneration) {
     failedCount: g.failed_count,
     unitsPerImage: g.units_per_image,
     errorMessage: g.error_message,
+    referenceImageId: g.reference_image_id ?? null,
+    referenceMode: g.reference_mode ?? null,
     createdBy: g.created_by,
     createdAt: g.created_at,
     startedAt: g.started_at,
@@ -436,9 +447,21 @@ hqBanners.post('/api/hq/banners/projects/:id/generations', async (c) => {
     }
     const quality = resolveBannerQuality(c.env.BANNER_IMAGE_QUALITY);
 
+    // 参照画像はこの統括のライブラリにある、消していない画像だけ。
+    if (v.referenceImageId) {
+      const reference = await getBannerImageWithDetail(c.env.DB, v.referenceImageId, tenantId);
+      if (!reference || reference.deleted_at) {
+        return c.json({ success: false, error: '参照画像が見つかりません。ライブラリから選び直してください' }, 400);
+      }
+      if (!(reference.media.mime_type in UPLOAD_ALLOWED)) {
+        return c.json({ success: false, error: '参照画像は PNG・JPEG・WebP の画像だけ使えます' }, 400);
+      }
+    }
+
     const finalPrompt = buildBannerPrompt({
       mode: v.mode,
       preset: v.preset,
+      referenceMode: v.referenceMode,
       textLines: v.textLines,
       mainColor: v.mainColor,
       subColor: v.subColor,
@@ -465,6 +488,8 @@ hqBanners.post('/api/hq/banners/projects/:id/generations', async (c) => {
       modelName: c.env.OPENAI_IMAGE_MODEL || DEFAULT_OPENAI_IMAGE_MODEL,
       requestedCount: v.count,
       unitsPerImage: 1,
+      referenceImageId: v.referenceImageId,
+      referenceMode: v.referenceMode,
       createdBy: c.get('staff')?.id ?? null,
     });
     await touchBannerProject(c.env.DB, project.id);
@@ -520,12 +545,27 @@ hqBanners.post('/api/hq/banners/generations/:id/run', async (c) => {
   const sequence = generation.done_count + generation.failed_count + 1;
 
   try {
+    // 参照画像（★V6 35-2）。R2 から読んで OpenAI へ添える。消えていれば分かる言葉で止める。
+    let referenceImage: OpenAIReferenceImage | undefined;
+    if (generation.reference_image_id) {
+      const reference = await getBannerImageWithDetail(db, generation.reference_image_id, tenantId);
+      const object = reference ? await c.env.IMAGES.get(reference.media.r2_key) : null;
+      if (!reference || !object) {
+        throw new ReferenceMissingError();
+      }
+      referenceImage = {
+        bytes: new Uint8Array(await object.arrayBuffer()),
+        mimeType: reference.media.mime_type,
+        filename: reference.media.filename || 'reference',
+      };
+    }
     const result = await generateOpenAIImage({
       apiKey: c.env.OPENAI_API_KEY,
       model,
       prompt: generation.final_prompt,
       size: generation.api_size as '1024x1024' | '1536x1024' | '1024x1536',
       quality: generation.quality,
+      referenceImage,
     });
 
     const project = await getBannerProject(db, generation.project_id, tenantId);
@@ -558,14 +598,16 @@ hqBanners.post('/api/hq/banners/generations/:id/run', async (c) => {
       generationId: generation.id,
       mediaId: media.id,
       sequence,
-      source: 'generated',
+      // 描き直しは「元の画像の派生」として source='edited'。参考は新しい画像だが元をたどれるよう parent を持つ。
+      source: generation.reference_mode === 'edit' ? 'edited' : 'generated',
+      parentImageId: generation.reference_image_id ?? null,
       createdBy: c.get('staff')?.id ?? null,
     });
     await recordBannerUsage(db, {
       tenantId,
       generationId: generation.id,
       units: 1,
-      reason: 'generate',
+      reason: generation.reference_mode === 'edit' ? 'edit' : 'generate',
     });
     const nowDone = generation.done_count + 1;
     const isFinished = nowDone + generation.failed_count >= generation.requested_count;
@@ -589,11 +631,15 @@ hqBanners.post('/api/hq/banners/generations/:id/run', async (c) => {
   } catch (error) {
     const message = error instanceof OpenAIImageError
       ? error.userMessage
-      : '画像の保存に失敗しました。もう一度お試しください';
-    if (!(error instanceof OpenAIImageError)) {
-      console.error('banner generation run error:', error);
-    } else {
+      : error instanceof ReferenceMissingError
+        ? error.message
+        : '画像の保存に失敗しました。もう一度お試しください';
+    if (error instanceof OpenAIImageError) {
       console.warn('banner generation rejected:', error.kind, error.status);
+    } else if (error instanceof ReferenceMissingError) {
+      console.warn('banner generation rejected: reference image missing');
+    } else {
+      console.error('banner generation run error:', error);
     }
     // 失敗したら、その生成はそこで止める。成功分はそのまま残す。
     await updateBannerGenerationProgress(db, generation.id, {
@@ -607,7 +653,7 @@ hqBanners.post('/api/hq/banners/generations/:id/run', async (c) => {
       success: false,
       error: message,
       data: { generation: serializeGeneration(latest!), image: null, finished: true },
-    }, error instanceof OpenAIImageError && error.kind === 'safety' ? 422 : 502);
+    }, error instanceof OpenAIImageError && error.kind === 'safety' ? 422 : error instanceof ReferenceMissingError ? 400 : 502);
   }
 });
 

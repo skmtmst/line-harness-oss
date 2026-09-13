@@ -92,7 +92,7 @@ OpenAI の公式価格はトークン単位（gpt-image-2: 出力 $15/1M トー�
 | 表 | 役割 |
 |---|---|
 | `banner_projects` | プロジェクト。統括ごと。アーカイブは `archived_at` |
-| `banner_generations` | 1回の「生成する」。条件・プロンプト・進み具合・失敗理由 |
+| `banner_generations` | 1回の「生成する」。条件・プロンプト・進み具合・失敗理由。参照画像は `reference_image_id`（`banner_images`）と `reference_mode`（edit／inspire、migration 389） |
 | `banner_images` | 画像1枚。実体は `media`（`line_account_id` が NULL＝統括所有） |
 | `banner_image_deliveries` | 店舗へ渡した記録。店舗側の `media` 行との対応 |
 | `banner_usage_ledger` | 利用量の台帳（`units` は 1枚＝1） |
@@ -112,7 +112,7 @@ OpenAI の公式価格はトークン単位（gpt-image-2: 出力 $15/1M トー�
 | GET | `/api/hq/banners/projects/:id` | 詳細（画像・生成の一覧つき） |
 | PATCH | `/api/hq/banners/projects/:id` | 名前・説明・お気に入り・アーカイブ |
 | POST | `/api/hq/banners/projects/:id/duplicate` | 複製（画像は実体を共有） |
-| POST | `/api/hq/banners/projects/:id/generations` | 生成条件を登録 |
+| POST | `/api/hq/banners/projects/:id/generations` | 生成条件を登録。参照画像は `referenceImageId`（この統括のライブラリの画像）と `referenceMode`（`edit`=土台に描き直す／`inspire`=雰囲気を参考にする）。ある場合は `run` が OpenAI の `images/edits` に画像を添えて呼び、できた画像は `parent_image_id` で元をたどれる（edit は `source='edited'`、台帳の理由は `edit`） |
 | POST | `/api/hq/banners/projects/:id/uploads` | 手持ち画像の取り込み（PNG/JPEG/WebP、10MB まで） |
 | GET | `/api/hq/banners/generations/:id` | 生成の状態 |
 | POST | `/api/hq/banners/generations/:id/run` | 1枚生成して保存 |
@@ -129,14 +129,22 @@ OpenAI の公式価格はトークン単位（gpt-image-2: 出力 $15/1M トー�
 |---|---|---|
 | プロジェクト一覧 | `/hq/banners` | 35-1 `aH6NX`、状態 35-4 `xY2wj` |
 | 画像ライブラリ | `/hq/banners?tab=library` | 35-3 `w3ZDsD`、詳細モーダル 35-3-A `g4MyEA` |
-| プロジェクト詳細と生成 | `/hq/banners/project?id=<プロジェクトID>` | 35-2 `g1WVyR`、生成中 35-2-A `QGiQI` |
+| プロジェクト詳細と生成 | `/hq/banners/project?id=<プロジェクトID>` | 35-2 `g1WVyR`（生成パネル `GcJHv`、参照画像欄 `jZi2W`。2026-09-13 に参照画像欄を足して作り直し）、生成中 35-2-A `QGiQI`、参照画像を選ぶ 35-2-B `L5PMT`（モーダル `biOEb`） |
 
 - 生成は画面が `run` を1枚ずつ繰り返す。**画面を閉じると、その時点で止まる**（成功した枚数は残る）。開き直すと、途中の生成を自動で続きから動かす
 - 同じプロジェクトを2つの画面で同時に開いて生成すると、`run` が並走して枚数が1枚多くなることがある。運用上は避ける（後続で直す）
 - 画像の実体は Worker の `/images/<r2_key>` から配信される。管理画面とは別サイトなので、ダウンロードは新しいタブで開く
 
+## 参照画像（2026-09-13 追加、★V6 35-2 / 35-2-B）
+
+- 生成パネルの「参照画像」で、ライブラリの画像か手元のファイル（PNG・JPEG・WebP、10MB まで）を 1 枚選べる。手元のファイルは先にそのプロジェクトへ取り込まれ（ライブラリにも残る）、それを参照にする
+- 使い方は 2 つ。**土台に描き直す**（構図・配色を保ち、文字や背景を指示で変える。テキストが無くても「追加の指示」だけで生成できる）／**雰囲気を参考にする**（色・トーン・質感を引き継いで新しく作る）
+- どちらも OpenAI の `images/edits`（multipart）に画像を添える。違いはプロンプトの先頭で伝える（`services/banner-prompt.ts`）
+- 枚数の上限・1 日の上限・1 回 4 枚までは同じ。参照画像が消されていたら、その生成は分かる言葉で止まる（OpenAI は呼ばない）
+- 画像の詳細モーダルの「参照画像にする」でも選べる
+
 ## まだやっていないこと
 
 - LINE 規格サイズへの正確なリサイズ、リッチメッセージ（1040×1040 の固定サイズ）への変換
-- 参照画像つき生成、指示文による編集、背景除去、高画質化
+- 背景除去、高画質化（参照画像つき生成と指示文による描き直しは 2026-09-13 に追加）
 - トライアル終了・解約から 90 日後のデータ削除

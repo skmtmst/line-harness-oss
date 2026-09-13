@@ -80,7 +80,7 @@ const image: BannerImage = {
 }
 
 describe('生成条件の手元の検査', () => {
-  const base = { mode: 'banner' as const, presetKey: 'line_rich_message', textLines: ['A'], mainColor: null, subColor: null, personOption: 'without' as const, customPrompt: '', freePrompt: '', count: 1 }
+  const base = { mode: 'banner' as const, presetKey: 'line_rich_message', textLines: ['A'], mainColor: null, subColor: null, personOption: 'without' as const, customPrompt: '', freePrompt: '', count: 1, referenceImageId: null, referenceMode: 'edit' as const }
 
   it('用途・テキスト・枚数がそろえば通る', () => {
     expect(validateGenerationInput(base, 4)).toBeNull()
@@ -168,5 +168,26 @@ describe('画像の表示', () => {
   it('動いている生成だけを拾う', () => {
     expect(activeGeneration([generation])).toBeNull()
     expect(activeGeneration([{ ...generation, status: 'running' }])?.id).toBe('g1')
+  })
+})
+
+describe('参照画像（35-2）', () => {
+  const base = { mode: 'banner' as const, presetKey: 'line_rich_message', textLines: [''], mainColor: null, subColor: null, personOption: 'without' as const, customPrompt: '', freePrompt: '', count: 1, referenceImageId: 'i1', referenceMode: 'edit' as const }
+
+  it('土台に描き直すなら、テキストが無くても指示があれば通る', () => {
+    expect(validateGenerationInput({ ...base, customPrompt: '文字を秋にする' }, 4)).toBeNull()
+    expect(validateGenerationInput(base, 4)).toContain('描き直しの指示')
+    expect(validateGenerationInput({ ...base, referenceMode: 'inspire', customPrompt: 'x' }, 4)).toContain('テキスト')
+    expect(validateGenerationInput({ ...base, referenceImageId: null, customPrompt: 'x' }, 4)).toContain('テキスト')
+  })
+
+  it('条件の表と「同じ設定でもう一度」に参照画像が乗る', () => {
+    const withRef = { ...image, generation: { ...generation, referenceImageId: 'i0', referenceMode: 'inspire' as const } }
+    expect(generationConditionRows(withRef, presets).find((r) => r.label === '参照画像')?.value).toBe('雰囲気を参考にする')
+    expect(generationConditionRows(image, presets).some((r) => r.label === '参照画像')).toBe(false)
+    const input = inputFromGeneration(withRef.generation)
+    expect(input.referenceImageId).toBe('i0')
+    expect(input.referenceMode).toBe('inspire')
+    expect(inputFromGeneration(generation).referenceImageId).toBeNull()
   })
 })

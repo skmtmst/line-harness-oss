@@ -1,6 +1,6 @@
 'use client'
 
-import { Download, RefreshCw, Star, Store, Trash2, X } from 'lucide-react'
+import { Download, ImagePlus, RefreshCw, Star, Store, Trash2, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import Button from '@/components/shared/button'
@@ -34,6 +34,7 @@ export default function ImageDetailModal({
   onDeliver,
   onRemove,
   onRegenerate,
+  onUseAsReference,
 }: {
   image: BannerImage
   presets: BannerPreset[]
@@ -49,6 +50,8 @@ export default function ImageDetailModal({
   onRemove: () => Promise<void>
   /** 生成画像だけ。取り込み画像では出さない。 */
   onRegenerate?: () => void
+  /** 「参照画像にする」（★V6 35-2 の参照画像欄へ入れる）。ライブラリから開いたときは渡さない。 */
+  onUseAsReference?: () => void
 }) {
   const panelRef = useOverlayFocus(true, onClose, busy)
   const [mounted, setMounted] = useState(false)
@@ -213,6 +216,12 @@ export default function ImageDetailModal({
             <Button onClick={onRegenerate} disabled={busy}>
               <RefreshCw aria-hidden="true" className="h-4 w-4" />
               同じ設定でもう一度生成
+            </Button>
+          ) : null}
+          {onUseAsReference ? (
+            <Button onClick={onUseAsReference} disabled={busy}>
+              <ImagePlus aria-hidden="true" className="h-4 w-4" />
+              参照画像にする
             </Button>
           ) : null}
           <Button onClick={onClose} disabled={busy}>閉じる</Button>

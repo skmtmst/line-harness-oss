@@ -471,3 +471,93 @@ describe('画像ライブラリと店舗への受け渡し', () => {
     expect(storeMedia.n).toBe(1);
   });
 });
+
+describe('参照画像つき生成（35-2）', () => {
+  async function uploadedImage(projectId: string) {
+    const res = await call('POST', `/api/hq/banners/projects/${projectId}/uploads`, {
+      filename: 'chirashi.png',
+      data: `data:image/png;base64,${toB64(PNG)}`,
+    });
+    expect(res.status).toBe(201);
+    return (await res.json<{ data: { id: string } }>()).data;
+  }
+
+  it('土台に描き直す: 参照画像を R2 から読んで OpenAI に添え、できた画像は source=edited で元をたどれる', async () => {
+    const project = await createProject();
+    const base = await uploadedImage(project.id);
+    let res = await call('POST', `/api/hq/banners/projects/${project.id}/generations`, {
+      ...GENERATE_BODY,
+      count: 1,
+      textLines: [],
+      customPrompt: '文字を「秋の感謝祭」に変えて',
+      referenceImageId: base.id,
+      referenceMode: 'edit',
+    });
+    expect(res.status).toBe(201);
+    const generation = (await res.json<{ data: { id: string; referenceImageId: string; referenceMode: string; finalPrompt: string } }>()).data;
+    expect(generation.referenceImageId).toBe(base.id);
+    expect(generation.referenceMode).toBe('edit');
+    expect(generation.finalPrompt).toContain('土台にして描き直して');
+    expect(generation.finalPrompt).toContain('追加の指示: 文字を「秋の感謝祭」に変えて');
+
+    openai.generate.mockResolvedValue({ bytes: JPEG, mimeType: 'image/jpeg', model: 'gpt-image-2' });
+    res = await call('POST', `/api/hq/banners/generations/${generation.id}/run`);
+    expect(res.status).toBe(200);
+    const run = (await res.json<{ data: { image: { id: string; source: string } } }>()).data;
+    expect(run.image.source).toBe('edited');
+
+    const sent = openai.generate.mock.calls[0][0] as { referenceImage?: { bytes: Uint8Array; mimeType: string; filename: string } };
+    expect(sent.referenceImage?.mimeType).toBe('image/png');
+    expect(sent.referenceImage?.filename).toBe('chirashi.png');
+    expect(sent.referenceImage?.bytes).toEqual(PNG);
+
+    const row = testDb.raw.prepare('SELECT parent_image_id, source FROM banner_images WHERE id = ?').get(run.image.id) as { parent_image_id: string; source: string };
+    expect(row.parent_image_id).toBe(base.id);
+    expect(testDb.raw.prepare("SELECT reason FROM banner_usage_ledger ORDER BY rowid DESC LIMIT 1").get()).toEqual({ reason: 'edit' });
+  });
+
+  it('雰囲気を参考にする: 参考の文がプロンプトに入り、できた画像は generated のまま元をたどれる', async () => {
+    const project = await createProject();
+    const base = await uploadedImage(project.id);
+    let res = await call('POST', `/api/hq/banners/projects/${project.id}/generations`, {
+      ...GENERATE_BODY,
+      count: 1,
+      referenceImageId: base.id,
+      referenceMode: 'inspire',
+    });
+    expect(res.status).toBe(201);
+    const generation = (await res.json<{ data: { id: string; finalPrompt: string } }>()).data;
+    expect(generation.finalPrompt).toContain('添付した画像は参考です');
+    expect(generation.finalPrompt).toContain('「春の感謝祭」');
+    openai.generate.mockResolvedValue({ bytes: JPEG, mimeType: 'image/jpeg', model: 'gpt-image-2' });
+    res = await call('POST', `/api/hq/banners/generations/${generation.id}/run`);
+    const run = (await res.json<{ data: { image: { id: string; source: string } } }>()).data;
+    expect(run.image.source).toBe('generated');
+    const row = testDb.raw.prepare('SELECT parent_image_id FROM banner_images WHERE id = ?').get(run.image.id) as { parent_image_id: string };
+    expect(row.parent_image_id).toBe(base.id);
+  });
+
+  it('参照画像は自分の統括の消していない画像だけ。使い方が無いと 400', async () => {
+    const project = await createProject();
+    const base = await uploadedImage(project.id);
+    let res = await call('POST', `/api/hq/banners/projects/${project.id}/generations`, { ...GENERATE_BODY, referenceImageId: base.id });
+    expect(res.status).toBe(400);
+    res = await call('POST', `/api/hq/banners/projects/${project.id}/generations`, { ...GENERATE_BODY, referenceImageId: 'no-such', referenceMode: 'edit' });
+    expect(res.status).toBe(400);
+    await call('DELETE', `/api/hq/banners/images/${base.id}`);
+    res = await call('POST', `/api/hq/banners/projects/${project.id}/generations`, { ...GENERATE_BODY, referenceImageId: base.id, referenceMode: 'edit' });
+    expect(res.status).toBe(400);
+  });
+
+  it('実行時に参照画像の実体が消えていたら、分かる言葉で止めて OpenAI は呼ばない', async () => {
+    const project = await createProject();
+    const base = await uploadedImage(project.id);
+    let res = await call('POST', `/api/hq/banners/projects/${project.id}/generations`, { ...GENERATE_BODY, count: 1, referenceImageId: base.id, referenceMode: 'edit' });
+    const generation = (await res.json<{ data: { id: string } }>()).data;
+    r2.store.clear();
+    res = await call('POST', `/api/hq/banners/generations/${generation.id}/run`);
+    expect(res.status).toBe(400);
+    expect((await res.json<{ error: string }>()).error).toContain('参照画像が見つかりません');
+    expect(openai.generate).not.toHaveBeenCalled();
+  });
+});
