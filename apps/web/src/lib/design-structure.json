@@ -2998,6 +2998,48 @@
         "1通目はあとで書く"
       ]
     },
+    "/accounts/new": {
+      "node": "a8qMXX oeVQQ YEHCR K1zHyx VPh1U t3Mlu",
+      "name": "V6 33-2 LINEアカウント登録（全5手順）",
+      "visualVerification": {
+        "status": "unverified",
+        "referenceNodeIds": [
+          "a8qMXX",
+          "oeVQQ",
+          "YEHCR",
+          "K1zHyx",
+          "VPh1U",
+          "t3Mlu"
+        ],
+        "requiredViewports": [
+          1440,
+          1920
+        ],
+        "reason": "V6正本.penの新1〜5を実装済み。保存済みの設計PNGと同寸法の実装画像をPR証拠として比較するまで未検証"
+      },
+      "sections": [
+        "Head",
+        "Steps",
+        "Body",
+        "Actions"
+      ],
+      "parts": [
+        "LINEアカウントを登録",
+        "表示名（任意）",
+        "LINE公式アカウントを作る（LINE Official Account Manager）",
+        "Messaging API",
+        "アクセストークンはmusuboが自動で発行します。",
+        "LINE Login",
+        "LIFFは自動で作成します。Messaging APIと同じプロバイダーのチャネルを入力してください。",
+        "取得方法を見る",
+        "Callback URL",
+        "設定方法を見る",
+        "接続して設定する",
+        "接続して保存",
+        "登録したアカウントを見る",
+        "既存の友だちの取り込み"
+      ]
+    },
     "/register": {
       "node": "JBd7P",
       "name": "V6 36-4 会員登録",
