@@ -4,6 +4,7 @@ import { Suspense, useCallback, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Button from '@/components/shared/button'
 import Card, { CardHeader } from '@/components/shared/card'
+import ConditionBuilder, { pruneCondition } from '@/components/shared/condition-builder'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { Field, TextArea, TextInput } from '@/components/shared/form-controls'
 import ListState from '@/components/shared/list-state'
@@ -12,6 +13,7 @@ import Select from '@/components/shared/select'
 import StickyBar from '@/components/shared/sticky-bar'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
+import { localDateTime, utcDateTime } from '@/lib/presentation'
 import { validateReward, type FormState } from './reward-form'
 import {
   api,
@@ -20,7 +22,10 @@ import {
   type MileageRewardFailurePolicy,
   type MileageRewardKind,
   type MileageRewardSummary,
+  type MileageRewardTestResult,
 } from '@/lib/api'
+
+type CommonActionOption = { id: string; label: string }
 
 /**
  * マイルの使い道をつくる・編集する（設計 `p9CcEB` 17-1-G）。
@@ -67,6 +72,7 @@ const EMPTY: FormState = {
   endsAt: '',
   benefitExpiresDays: '',
   commonActionVersionId: '',
+  targetConditions: null,
   failurePolicy: 'retry',
   customerMessage: '',
 }
@@ -81,13 +87,24 @@ function formOf(reward: MileageRewardSummary): FormState {
     /* **`null` は「限りなし」なので空文字へ。0 は「0」のまま残す。** */
     stockLimit: version?.stockLimit == null ? '' : String(version.stockLimit),
     perFriendLimit: version?.perFriendLimit == null ? '' : String(version.perFriendLimit),
-    startsAt: version?.startsAt?.slice(0, 16) ?? '',
-    endsAt: version?.endsAt?.slice(0, 16) ?? '',
+    startsAt: localDateTime(version?.startsAt),
+    endsAt: localDateTime(version?.endsAt),
     benefitExpiresDays: version?.benefitExpiresDays == null ? '' : String(version.benefitExpiresDays),
     commonActionVersionId: version?.commonActionVersionId ?? '',
+    targetConditions: version?.targetConditions ?? null,
     failurePolicy: version?.failurePolicy ?? 'retry',
     customerMessage: version?.customerMessage ?? '',
   }
+}
+
+function isMileageRewardSummary(value: unknown): value is MileageRewardSummary {
+  if (!value || typeof value !== 'object') return false
+  const candidate = value as Partial<MileageRewardSummary>
+  return typeof candidate.id === 'string'
+    && typeof candidate.name === 'string'
+    && typeof candidate.rewardKind === 'string'
+    && typeof candidate.status === 'string'
+    && (candidate.currentVersion === null || typeof candidate.currentVersion === 'object')
 }
 
 /** 空文字は `null`（限りなし・決めない）。**0 を null に潰さない。** */
@@ -106,10 +123,11 @@ function draftOf(form: FormState): MileageRewardDraftInput {
     requiredMiles: Number(form.requiredMiles),
     stockLimit: numberOrNull(form.stockLimit),
     perFriendLimit: numberOrNull(form.perFriendLimit),
-    startsAt: form.startsAt ? new Date(form.startsAt).toISOString() : null,
-    endsAt: form.endsAt ? new Date(form.endsAt).toISOString() : null,
+    startsAt: utcDateTime(form.startsAt),
+    endsAt: utcDateTime(form.endsAt),
     benefitExpiresDays: numberOrNull(form.benefitExpiresDays),
     commonActionVersionId: form.commonActionVersionId.trim() || null,
+    targetConditions: pruneCondition(form.targetConditions),
     failurePolicy: form.failurePolicy,
     customerMessage: form.customerMessage.trim(),
   }
@@ -124,8 +142,12 @@ function MileageRewardEditorInner() {
   const [reward, setReward] = useState<MileageRewardSummary | null>(null)
   const [state, setState] = useState<'loading' | 'ready' | 'error' | 'forbidden'>(editing ? 'loading' : 'ready')
   const [saving, setSaving] = useState(false)
+  const [testing, setTesting] = useState(false)
+  const [testResult, setTestResult] = useState<MileageRewardTestResult | null>(null)
   const [publishOpen, setPublishOpen] = useState(false)
   const [failure, setFailure] = useState('')
+  const [commonActions, setCommonActions] = useState<CommonActionOption[]>([])
+  const [commonActionsFailed, setCommonActionsFailed] = useState(false)
   const [touched, setTouched] = useState(false)
   usePageTitle(editing ? '使い道を編集' : '使い道をつくる')
 
@@ -133,16 +155,42 @@ function MileageRewardEditorInner() {
     if (!rewardId || !selectedAccountId) return
     setState('loading')
     try {
-      const res = await api.mileage.reward(rewardId, selectedAccountId)
-      if (!res.success) throw new Error('failed')
-      setReward(res.data)
-      setForm(formOf(res.data))
+      const [detail, overview] = await Promise.all([
+        api.mileage.reward(rewardId, selectedAccountId).catch(() => null),
+        api.mileage.rewards(selectedAccountId).catch(() => null),
+      ])
+      const fallback = overview?.success
+        ? overview.data.rewards.find((item) => item.id === rewardId)
+        : undefined
+      const found = detail?.success && isMileageRewardSummary(detail.data) ? detail.data : fallback
+      if (!found) throw new Error('failed')
+      setReward(found)
+      setForm(formOf(found))
       setState('ready')
     } catch (err) {
       /* 権限不足は取得失敗と別。次にすることが違う。 */
       setState(err instanceof ApiError && err.status === 403 ? 'forbidden' : 'error')
     }
   }, [rewardId, selectedAccountId])
+
+  useEffect(() => {
+    if (!selectedAccountId) {
+      setCommonActions([])
+      return
+    }
+    let cancelled = false
+    setCommonActionsFailed(false)
+    void api.commonActions.resources(selectedAccountId).then((response) => {
+      if (!response.success) throw new Error(response.error)
+      if (!cancelled) setCommonActions(response.data.commonActions.map((item) => ({
+        id: item.currentPublishedVersionId,
+        label: `${item.name}（公開版 v${item.version}）`,
+      })))
+    }).catch(() => {
+      if (!cancelled) setCommonActionsFailed(true)
+    })
+    return () => { cancelled = true }
+  }, [selectedAccountId])
 
   useEffect(() => {
     if (!editing) { setState('ready'); return }
@@ -153,6 +201,33 @@ function MileageRewardEditorInner() {
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) => {
     setForm((now) => ({ ...now, [key]: value }))
     setFailure('')
+    setTestResult(null)
+  }
+
+  const persistDraft = async () => {
+    if (!selectedAccountId) throw new Error('account-required')
+    const draft = draftOf(form)
+    let saved
+    if (rewardId) {
+      let expectedVersionId = reward?.currentDraftVersionId
+      if (!expectedVersionId) {
+        const createdDraft = await api.mileage.createRewardDraft(rewardId, selectedAccountId)
+        if (!createdDraft.success || !createdDraft.data.currentDraftVersionId) throw new Error('failed')
+        expectedVersionId = createdDraft.data.currentDraftVersionId
+      }
+      saved = await api.mileage.saveRewardDraft(
+        rewardId,
+        selectedAccountId,
+        expectedVersionId,
+        draft,
+      )
+    } else {
+      saved = await api.mileage.createReward(selectedAccountId, draft)
+    }
+    if (!saved.success) throw new Error('failed')
+    setReward(saved.data)
+    if (!rewardId) router.replace(`/mileage/rewards/edit?id=${encodeURIComponent(saved.data.id)}`)
+    return saved.data
   }
 
   const save = async (thenPublish: boolean) => {
@@ -161,27 +236,9 @@ function MileageRewardEditorInner() {
     setSaving(true)
     setFailure('')
     try {
-      const draft = draftOf(form)
-      let saved
-      if (rewardId) {
-        let expectedVersionId = reward?.currentDraftVersionId
-        if (!expectedVersionId) {
-          const createdDraft = await api.mileage.createRewardDraft(rewardId, selectedAccountId)
-          if (!createdDraft.success || !createdDraft.data.currentDraftVersionId) throw new Error('failed')
-          expectedVersionId = createdDraft.data.currentDraftVersionId
-        }
-        saved = await api.mileage.saveRewardDraft(
-          rewardId,
-          selectedAccountId,
-          expectedVersionId,
-          draft,
-        )
-      } else {
-        saved = await api.mileage.createReward(selectedAccountId, draft)
-      }
-      if (!saved.success) throw new Error('failed')
+      const saved = await persistDraft()
       if (thenPublish) {
-        const published = await api.mileage.publishReward(saved.data.id, selectedAccountId)
+        const published = await api.mileage.publishReward(saved.id, selectedAccountId)
         if (!published.success) throw new Error('failed')
       }
       setPublishOpen(false)
@@ -199,6 +256,29 @@ function MileageRewardEditorInner() {
       )
     } finally {
       setSaving(false)
+    }
+  }
+
+  const testExchange = async () => {
+    setTouched(true)
+    if (!selectedAccountId || errors.length > 0) return
+    setTesting(true)
+    setFailure('')
+    setTestResult(null)
+    try {
+      /* 保存結果の版を試すので、この順番は依存している。 */
+      const saved = await persistDraft()
+      const tested = await api.mileage.testReward(saved.id, selectedAccountId)
+      if (!tested.success) throw new Error('failed')
+      setTestResult(tested.data)
+    } catch (err) {
+      setFailure(
+        err instanceof ApiError && err.message && !/^API error/.test(err.message)
+          ? err.message
+          : '交換テストを実行できませんでした。時間をおいてもう一度お試しください。',
+      )
+    } finally {
+      setTesting(false)
     }
   }
 
@@ -225,6 +305,16 @@ function MileageRewardEditorInner() {
       </div>
 
       {failure ? <NoteBar tone="danger">{failure}</NoteBar> : null}
+      {testResult ? (
+        <div
+          role="status"
+          className={`rounded-control px-4 py-3 text-sm ${testResult.canDeliver ? 'bg-success-bg text-success' : 'bg-warning-bg text-warning'}`}
+        >
+          {testResult.canDeliver
+            ? `交換テストに合格しました。${testResult.requiredMiles.toLocaleString('ja-JP')}マイルで受け渡せます。残高と在庫は動かしていません。`
+            : `交換テストで確認が必要です。${testResult.warning ?? '受け渡す内容を確認してください'}。残高と在庫は動かしていません。`}
+        </div>
+      ) : null}
       {published ? (
         <NoteBar tone="info">
           {/* 画面に出る文なので、強調の記号を書かない（そのまま文字として出る）。 */}
@@ -232,14 +322,14 @@ function MileageRewardEditorInner() {
         </NoteBar>
       ) : null}
 
-      <div className="grid gap-4 xl:grid-cols-2">
+      <div className="grid gap-4 xl:grid-cols-3">
         <Card padding="default">
           <CardHeader title="基本" />
           <Field label="使い道の名前" htmlFor="reward-name" required error={touched && !form.name.trim() ? '使い道の名前を入力してください' : undefined}>
             <TextInput id="reward-name" value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="例：送料無料クーポン" />
           </Field>
           <Field label="説明" htmlFor="reward-description" note="一覧と交換の画面に出ます。空でも出せます">
-            <TextArea id="reward-description" rows={3} value={form.description} onChange={(e) => set('description', e.target.value)} />
+            <TextArea id="reward-description" rows={2} className="!min-h-20" value={form.description} onChange={(e) => set('description', e.target.value)} />
           </Field>
           <Field
             label="必要マイル"
@@ -290,7 +380,20 @@ function MileageRewardEditorInner() {
                 : '共通アクションの版を指定します'}
               error={touched && errors.includes('交換後に渡すものを選んでください') ? '交換後に渡すものを選んでください' : undefined}
             >
-              <TextInput id="reward-action" value={form.commonActionVersionId} onChange={(e) => set('commonActionVersionId', e.target.value)} placeholder="共通アクションの版" />
+              <Select
+                id="reward-action"
+                aria-label="交換後に渡すもの"
+                value={form.commonActionVersionId}
+                onChange={(value) => set('commonActionVersionId', value)}
+                options={[
+                  { value: '', label: commonActionsFailed ? '公開版を読み込めませんでした' : '公開中の共通アクションを選ぶ' },
+                  ...(form.commonActionVersionId && !commonActions.some((item) => item.id === form.commonActionVersionId)
+                    ? [{ value: form.commonActionVersionId, label: '現在選択中の公開版' }]
+                    : []),
+                  ...commonActions.map((item) => ({ value: item.id, label: item.label })),
+                ]}
+                disabled={commonActionsFailed}
+              />
             </Field>
           </div>
         </Card>
@@ -331,8 +434,27 @@ function MileageRewardEditorInner() {
             />
           </Field>
           <Field label="交換したときの案内" htmlFor="reward-message" note="お客様に届く文です。空なら既定の文を送ります">
-            <TextArea id="reward-message" rows={3} value={form.customerMessage} onChange={(e) => set('customerMessage', e.target.value)} />
+            <TextArea id="reward-message" rows={2} className="!min-h-20" value={form.customerMessage} onChange={(e) => set('customerMessage', e.target.value)} />
           </Field>
+        </Card>
+
+        <Card padding="default" className="xl:col-span-2">
+          <CardHeader title="だれが交換できますか" />
+          <p className="mb-4 text-xs text-ink-secondary">
+            条件を付けない場合は全員が対象です。ランク・タグ・購入の有無など15の軸から組み合わせられます。
+          </p>
+          <details className="rounded-control border border-hairline px-3 py-2">
+            <summary className="cursor-pointer text-xs font-semibold text-action">
+              {form.targetConditions ? '設定中の交換対象条件を編集' : '条件を足す（15の軸から選べます）'}
+            </summary>
+            <div className="mt-3">
+              <ConditionBuilder
+                value={form.targetConditions}
+                onChange={(next) => set('targetConditions', next)}
+                label="交換対象の条件"
+              />
+            </div>
+          </details>
         </Card>
       </div>
 
@@ -341,10 +463,13 @@ function MileageRewardEditorInner() {
         actions={(
           <>
             <Button href="/mileage?tab=rewards">キャンセル</Button>
-            <Button onClick={() => void save(false)} disabled={saving}>
+            <Button onClick={() => void testExchange()} disabled={saving || testing}>
+              {testing ? '交換テスト中' : '自分で交換をテスト'}
+            </Button>
+            <Button onClick={() => void save(false)} disabled={saving || testing}>
               {saving ? '保存中' : '下書きを保存'}
             </Button>
-            <Button variant="primary" onClick={requestPublish} disabled={saving}>
+            <Button variant="primary" onClick={requestPublish} disabled={saving || testing}>
               保存して出す
             </Button>
           </>

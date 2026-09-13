@@ -16,6 +16,7 @@ const db = {
   upsertManualLink: vi.fn(),
   recordCheck: vi.fn(),
   countBroken: vi.fn(),
+  ManualLinkVersionConflictError: class ManualLinkVersionConflictError extends Error {},
 };
 vi.mock('@line-crm/db', () => db);
 
@@ -23,10 +24,14 @@ const { manualLinks } = await import('./manual-links.js');
 
 const env = { DB: {} as D1Database };
 
-function makeApp(role: 'owner' | 'admin' = 'owner') {
+function makeApp(
+  role: 'owner' | 'admin' | 'staff' = 'owner',
+  id = role === 'owner' ? 'env-owner' : 'u-1',
+  permissionKeys: string[] = [],
+) {
   const app = new Hono<Env>();
   app.use('*', async (c, next) => {
-    c.set('staff', { id: 'u-1', name: 'テスト', role, readOnly: false });
+    c.set('staff', { id, name: 'テスト', role, readOnly: false, permissionKeys });
     return next();
   });
   app.route('/', manualLinks);
@@ -41,6 +46,8 @@ const ROW = {
   status: 'ok' as const,
   last_checked_at: '2026-08-28T04:00:00+09:00',
   last_error: null,
+  last_http_status: 200,
+  version: 1,
   updated_by: null,
   updated_at: '2026-08-28T04:00:00+09:00',
 };
@@ -50,6 +57,7 @@ beforeEach(() => {
   db.listManualLinks.mockResolvedValue([ROW]);
   db.getManualLink.mockResolvedValue(ROW);
   db.countBroken.mockResolvedValue(0);
+  db.upsertManualLink.mockResolvedValue(ROW);
 });
 afterEach(() => vi.unstubAllGlobals());
 
@@ -60,6 +68,14 @@ describe('画面から URL を引く', () => {
       env,
     );
     expect(await res.json()).toMatchObject({ data: { url: 'https://help.example.com/inbox', status: 'ok' } });
+  });
+
+  it('正本の契約どおり GET /api/manual-links?screen= でも1件を返す', async () => {
+    const res = await makeApp().fetch(
+      new Request('https://example.com/api/manual-links?screen=2-1'),
+      env,
+    );
+    expect(await res.json()).toMatchObject({ data: { key: '2-1', status: 'ok', version: 1 } });
   });
 
   /* **押しても何も出ないボタンを画面に出さない。** */
@@ -92,6 +108,12 @@ describe('正本表', () => {
     expect(res.status).toBe(403);
   });
 
+  it('運営権限を持つスタッフは見られる', async () => {
+    const res = await makeApp('staff', 'staff-1', ['manual.link.edit'])
+      .fetch(new Request('https://example.com/api/manual-links'), env);
+    expect(res.status).toBe(200);
+  });
+
   it('開けないリンクの数を返す', async () => {
     db.countBroken.mockResolvedValue(2);
     const res = await makeApp().fetch(new Request('https://example.com/api/manual-links'), env);
@@ -103,12 +125,13 @@ describe('直す', () => {
   it.each([
     ['形が違う', 'ほげ'],
     ['https でない', 'http://help.example.com/x'],
+    ['ローカル宛先', 'https://127.0.0.1/x'],
   ])('%s URL は断る', async (_label, url) => {
     const res = await makeApp().fetch(
       new Request('https://example.com/api/manual-links/2-1', {
         method: 'PUT',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ url }),
+        body: JSON.stringify({ url, expectedVersion: 1 }),
       }),
       env,
     );
@@ -121,12 +144,41 @@ describe('直す', () => {
       new Request('https://example.com/api/manual-links/2-1', {
         method: 'PUT',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ url: 'https://help.example.com/new' }),
+        body: JSON.stringify({ url: 'https://help.example.com/new', expectedVersion: 1 }),
       }),
       env,
     );
     expect(res.status).toBe(200);
     expect(db.upsertManualLink).toHaveBeenCalled();
+  });
+
+  it('PUT /api/manual-links はkeyと版を本文で受ける', async () => {
+    const res = await makeApp().fetch(
+      new Request('https://example.com/api/manual-links', {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ key: '2-1', url: 'https://help.example.com/new', expectedVersion: 1 }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(db.upsertManualLink).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      key: '2-1', expectedVersion: 1,
+    }));
+  });
+
+  it('古い版は409にする', async () => {
+    db.upsertManualLink.mockRejectedValue(new db.ManualLinkVersionConflictError());
+    const res = await makeApp().fetch(
+      new Request('https://example.com/api/manual-links', {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ key: '2-1', url: 'https://help.example.com/new', expectedVersion: 0 }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ code: 'VERSION_CONFLICT' });
   });
 });
 
@@ -151,7 +203,9 @@ describe('いま全部を確かめる', () => {
     expect(await res.json()).toMatchObject({ data: { checked: 2, ok: 1, broken: 1 } });
     expect(db.recordCheck).toHaveBeenCalledWith(expect.anything(), '3-1', {
       ok: false,
-      error: 'HTTP 404',
+      httpStatus: 404,
+      errorCode: 'HTTP_404',
+      checkedBy: 'env-owner',
     });
   });
 
@@ -176,7 +230,19 @@ describe('いま全部を確かめる', () => {
     expect(res.status).toBe(200);
     expect(db.recordCheck).toHaveBeenCalledWith(expect.anything(), '2-1', {
       ok: false,
-      error: 'timeout',
+      errorCode: 'NETWORK_ERROR',
+      checkedBy: 'env-owner',
     });
+  });
+
+  it('ローカル宛先は確認せずunsafeに数える', async () => {
+    db.listManualLinks.mockResolvedValue([{ ...ROW, url: 'https://127.0.0.1/manual' }]);
+    vi.stubGlobal('fetch', vi.fn());
+    const res = await makeApp().fetch(
+      new Request('https://example.com/api/manual-links/check', { method: 'POST' }),
+      env,
+    );
+    expect(await res.json()).toMatchObject({ data: { checked: 0, unsafe: 1 } });
+    expect(fetch).not.toHaveBeenCalled();
   });
 });

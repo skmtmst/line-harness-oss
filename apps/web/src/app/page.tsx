@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import type { EntryRoute, NotificationCenterData, NotificationCenterItem } from '@line-crm/shared'
-import { api, bookingApi, type BookingRequest, type DashboardOverview } from '@/lib/api'
+import { ApiError, api, bookingApi, type BookingRequest, type DashboardOverview } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { formatDurationMinutes, formatWaitRough } from '@/lib/format-duration'
 import PendingInboxCard, { type PendingInboxSummary } from '@/components/support/pending-inbox-card'
@@ -18,6 +18,7 @@ import {
   RecentResultsCard,
   UpcomingCard,
   activeUpcomingBookings,
+  inactiveBookingStatuses,
 } from '@/components/dashboard/side-cards'
 import DashboardEditor, {
   defaultDashboardPreferences,
@@ -63,14 +64,17 @@ const PERIODS = [
 type PeriodKey = (typeof PERIODS)[number]['key']
 type HealthRisk = 'normal' | 'warning' | 'danger' | null
 
-const inactiveBookingStatuses = new Set(['rejected', 'cancelled', 'canceled', 'completed', 'no_show'])
-
 function dashboardStorageKey(accountId: string | null): string {
   return `lh_dashboard_v4:${accountId ?? 'default'}`
 }
 
 function jstDay(iso: string | number | Date): string {
   const date = iso instanceof Date ? iso : new Date(iso)
+  /*
+    壊れた日付は空にする。そのまま toISOString() すると RangeError で
+    画面全体が落ち、今日の数にも入らない。空は今日と一致しない。
+  */
+  if (Number.isNaN(date.getTime())) return ''
   return new Date(date.getTime() + 9 * 3600_000).toISOString().slice(0, 10)
 }
 
@@ -98,7 +102,7 @@ function TodayTaskCard({
   status: string
 }) {
   return (
-    <Card layout="vertical" padding="default" className="h-[132px] min-w-0">
+    <Card layout="vertical" padding="default" className="h-[116px] min-w-0">
       <div className="flex items-start justify-between gap-3">
         <h3 className="text-ink text-sm font-semibold">{title}</h3>
         <Link href={href} className="text-action shrink-0 text-xs font-medium hover:underline">{action}</Link>
@@ -106,7 +110,7 @@ function TodayTaskCard({
       <p className="text-ink mt-2 text-[28px] leading-none font-bold tabular-nums">
         {value === null ? '—' : value.toLocaleString('ja-JP')}<span className="ml-0.5 text-lg">件</span>
       </p>
-      <div className="mt-auto flex items-end justify-between gap-3 pt-2">
+      <div className="mt-2 flex items-end justify-between gap-3">
         <span className="text-ink-faint truncate text-xs" title={detail}>{detail}</span>
         <span className="text-success shrink-0 text-xs font-medium">{status}</span>
       </div>
@@ -115,7 +119,13 @@ function TodayTaskCard({
 }
 
 /** 友だち追加リンク。共有URLは計測とUUID紐づけができる正規の流入口を使う。 */
-function FriendAddLinkCard() {
+function FriendAddLinkCard({
+  officialProfileUrl,
+  visualQa,
+}: {
+  officialProfileUrl: string | null | undefined
+  visualQa?: DashboardOverview['visualQa']
+}) {
   const { selectedAccount } = useAccount()
   const [copied, setCopied] = useState(false)
   const [showQr, setShowQr] = useState(false)
@@ -135,9 +145,9 @@ function FriendAddLinkCard() {
   }, [])
 
   const base = (process.env.NEXT_PUBLIC_API_URL ?? '').replace(/\/$/, '')
-  const baseLink = selectedAccount
+  const baseLink = visualQa?.friendAddUrl ?? (selectedAccount
     ? `${base}/auth/line?account=${encodeURIComponent(selectedAccount.channelId)}`
-    : `${base}/auth/line`
+    : `${base}/auth/line`)
   const route = routes.find((entry) => entry.id === routeId)
   const link = route ? `${base}/r/${route.refCode}` : baseLink
 
@@ -159,7 +169,7 @@ function FriendAddLinkCard() {
           <p className="text-ink-faint mt-1 text-xs leading-relaxed">このURLから追加された友だちは、流入元を記録して計測できます。</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <label className="border-hairline bg-canvas rounded-control flex min-w-[220px] items-center gap-2 border px-3 py-2">
+          <label className="flex min-w-[220px] items-center gap-2">
             <span className="text-ink-faint shrink-0 text-[10px] font-medium">発行中</span>
             <SelectField
               value={routeId}
@@ -194,15 +204,20 @@ function FriendAddLinkCard() {
         open={showQr}
         onClose={() => setShowQr(false)}
         accountName={selectedAccount?.displayName ?? '然-NEN- 公式'}
+        officialProfileUrl={visualQa?.officialProfileUrl ?? officialProfileUrl}
         accountBasicId={selectedAccount?.basicId ?? null}
         baseLink={baseLink}
         initialRouteId={routeId}
+        routes={routes}
+        visualReferenceQr={visualQa?.referenceQr ?? false}
       />
     </Card>
   )
 }
 
 function FriendTrendCard({ data, loading }: { data: DashboardOverview | null; loading: boolean }) {
+  const metric = data?.metrics?.friendTrend
+  const trend = metric === undefined ? data?.trend ?? [] : metric.value ?? []
   return (
     <Card overflow="hidden">
       <CardHeader
@@ -211,7 +226,7 @@ function FriendTrendCard({ data, loading }: { data: DashboardOverview | null; lo
         action={<Link href="/analytics" className="hover:underline">さらに詳しく →</Link>}
         actionTone="info"
       />
-      <FriendTrendTable trend={data?.trend ?? []} loading={loading} />
+      <FriendTrendTable trend={trend} loading={loading} />
     </Card>
   )
 }
@@ -261,9 +276,15 @@ function LiveDataCard({
   )
 }
 
-function SendQuotaCard({ delivery }: { delivery: DashboardOverview['delivery'] | null }) {
-  const used = delivery?.quotaUsed ?? null
-  const limit = delivery?.quotaLimit ?? null
+function SendQuotaCard({
+  delivery,
+  metric,
+}: {
+  delivery: DashboardOverview['delivery'] | null
+  metric: NonNullable<DashboardOverview['metrics']>['monthlyQuota'] | undefined
+}) {
+  const used = metric === undefined ? delivery?.quotaUsed ?? null : metric.value?.used ?? null
+  const limit = metric === undefined ? delivery?.quotaLimit ?? null : metric.value?.limit ?? null
   const remaining = used !== null && limit !== null ? Math.max(0, limit - used) : null
   const remainingRate = remaining !== null && limit ? Math.max(0, Math.min(100, remaining / limit * 100)) : null
   return <Card padding="roomy" className="min-h-[128px]">
@@ -276,15 +297,17 @@ function SendQuotaCard({ delivery }: { delivery: DashboardOverview['delivery'] |
       の枠で、メールには効かない。どちらの枠かが書いていないと、メールが
       止まったときにここを見てしまう。
     */}
-    <p className="text-ink mt-3 flex items-baseline gap-2">
-      <span className="text-ink-secondary text-xs font-medium">LINE公式</span>
-      <span className="text-2xl font-bold tabular-nums">
+    <p className="text-ink mt-3 flex items-baseline gap-2 whitespace-nowrap">
+      <span className="text-ink-secondary text-sm font-semibold">LINE公式</span>
+      <span className="text-metric leading-none font-bold tabular-nums">
         {/*
           **使用数か残りか読めない形にしない。**
           「197 / 200通」だけだと、197 が使ったぶんにも残りにも読める。
           この値は `limit - used` なので残り。言葉を付けて向きを固定する。
         */}
-        {remaining === null || limit === null ? '—' : `残り ${remaining.toLocaleString('ja-JP')} / 上限 ${limit.toLocaleString('ja-JP')}通`}
+        <span className="text-base leading-tight">
+          {remaining === null || limit === null ? '—' : `残り ${remaining.toLocaleString('ja-JP')} / 上限 ${limit.toLocaleString('ja-JP')}通`}
+        </span>
       </span>
     </p>
     <div className="bg-hairline mt-3 h-1.5 overflow-hidden rounded-pill"><div className="bg-accent h-full rounded-pill" style={{ width: `${remainingRate ?? 0}%` }} /></div>
@@ -295,15 +318,21 @@ function SendQuotaCard({ delivery }: { delivery: DashboardOverview['delivery'] |
   </Card>
 }
 
-function OperationalAlertsCard({ risk, healthIssues, oldestWaitMinutes, twoFactor }: { risk: HealthRisk; healthIssues: number | null; oldestWaitMinutes: number | null; twoFactor: { enabled: number; total: number } | null }) {
+function OperationalAlertsCard({ risk, healthIssues, oldestWaitMinutes, twoFactor, referenceCount }: { risk: HealthRisk; healthIssues: number | null; oldestWaitMinutes: number | null; twoFactor: { enabled: number; total: number } | null; referenceCount?: number }) {
   const currentHealthIssue = risk === 'warning' || risk === 'danger'
   // 未対応の長さは受信カードで管理する。ここへ重ねて警告扱いすると、
   // 接続も自動処理も正常なのに赤い「1件」が出てしまう。
-  const count = risk === null ? null : currentHealthIssue ? Math.max(1, healthIssues ?? 1) : 0
+  const count = referenceCount ?? (risk === null ? null : currentHealthIssue ? Math.max(1, healthIssues ?? 1) : 0)
   return <Card padding="roomy" className="min-h-[128px]">
     <div className="flex items-start justify-between gap-3">
       <h2 className="text-ink text-base font-bold">運用アラート</h2>
-      <span className={count === null ? 'text-ink-faint text-sm font-bold' : count > 0 ? 'text-danger text-sm font-bold' : 'text-success text-sm font-bold'}>{count === null ? '—' : `${count}件`}</span>
+      {/*
+        #631: 件数の母集団は変えない（health issue だけを数える）。
+        「最も古い未対応」と別のものを数えていることが、件数の脇の文言
+        だけで分かるようにする。0件のときに「未対応が長引いている」の
+        隣で緑の「0件」が出ても、別の指標だと読めるようにするのが狙い。
+      */}
+      <span className={count === null ? 'text-ink-faint text-sm font-bold' : count > 0 ? 'text-danger text-sm font-bold' : 'text-success text-sm font-bold'}>{count === null ? '—' : `接続・自動処理 ${count}件`}</span>
     </div>
     {/*
       設計（`vUXKb`）は「最も古い未対応」と「二段階認証」の2行。
@@ -348,6 +377,11 @@ export default function DashboardPage() {
   const [inboxSummary, setInboxSummary] = useState<PendingInboxSummary | null>(null)
   const [shipmentSummary, setShipmentSummary] = useState<ShipmentSummary | null>(null)
   const [pendingPhotos, setPendingPhotos] = useState<number | null>(null)
+  /*
+   * 写真審査の件数が取れなかった理由。null のままだと「読み込み中」を
+   * 出し続けてしまい、権限がない人にはいつまでも終わらない画面になる。
+   */
+  const [pendingPhotosState, setPendingPhotosState] = useState<'loading' | 'ready' | 'forbidden' | 'error'>('loading')
   const [bookings, setBookings] = useState<BookingRequest[] | null>(null)
   const [supplementLoading, setSupplementLoading] = useState(true)
   const [healthRisk, setHealthRisk] = useState<HealthRisk>(null)
@@ -527,11 +561,10 @@ export default function DashboardPage() {
         return
       }
     }
+    /* 行き先は必ずある(知らない種類はお知らせ一覧)。押して何も起きない tap にしない。 */
     const destination = dashboardNotificationDestination(item)
-    if (destination) {
-      setNotificationsOpen(false)
-      router.push(destination)
-    }
+    setNotificationsOpen(false)
+    router.push(destination)
   }
 
   const markAllNotificationsRead = async () => {
@@ -556,6 +589,7 @@ export default function DashboardPage() {
     if (!selectedAccountId) {
       setBookings(null)
       setPendingPhotos(null)
+      setPendingPhotosState('loading')
       setHealthRisk(null)
       setHealthIssueCount(null)
       setTwoFactorSummary(null)
@@ -565,16 +599,44 @@ export default function DashboardPage() {
     }
     let cancelled = false
     setSupplementLoading(true)
+    /* 勘定を切り替えたら前の勘定の件数を消す。新しい件数が来るまで古い数を出さない。 */
+    setPendingPhotos(null)
+    setPendingPhotosState('loading')
+    /*
+      予約の明細は今日以降だけ100件に区切って取る。終わった予約まで
+      全部取ると、件数が増えたときに遅くなる。今日の数と直近の予定は
+      この範囲でまかなえる。件数の表示は運用の集計(overview)を使う。
+    */
+    const now = new Date()
+    const jstNow = new Date(now.getTime() + 9 * 60 * 60 * 1000)
+    const jstMidnightUtc = Date.UTC(jstNow.getUTCFullYear(), jstNow.getUTCMonth(), jstNow.getUTCDate()) - 9 * 60 * 60 * 1000
+    const todayStartIso = new Date(jstMidnightUtc).toISOString()
     void Promise.allSettled([
-      needsPhotos ? api.nenMembers.overview() : Promise.resolve(null),
-      needsBookings ? bookingApi.listRequests(selectedAccountId, 'all') : Promise.resolve(null),
+      needsPhotos ? api.nenMembers.photoReviewMetrics(selectedAccountId) : Promise.resolve(null),
+      needsBookings ? bookingApi.listRequests(selectedAccountId, 'all', { from: todayStartIso, limit: 100 }) : Promise.resolve(null),
       needsHealth ? api.health.getHealth(selectedAccountId) : Promise.resolve(null),
       needsTwoFactor ? api.staff.list() : Promise.resolve(null),
       needsSupportMarks ? api.supportMarks.list(selectedAccountId) : Promise.resolve(null),
     ]).then(([photoResult, bookingResult, healthResult, staffResult, supportMarkResult]) => {
       if (cancelled) return
-      setPendingPhotos(photoResult.status === 'fulfilled' && photoResult.value?.success ? photoResult.value.data.pendingPhotos : null)
-      setBookings(bookingResult.status === 'fulfilled' && bookingResult.value ? bookingResult.value.requests : null)
+      const photoCount = photoResult.status === 'fulfilled' && photoResult.value?.success
+        ? photoResult.value.data.pendingCount
+        : null
+      setPendingPhotos(photoCount)
+      /*
+        取れなかった理由で出し分ける。403 は権限、それ以外は取得失敗。
+        どちらも「読み込み中」のままにしない（#666 差し戻し）。
+      */
+      setPendingPhotosState(
+        !needsPhotos || photoCount !== null ? 'ready'
+          : photoResult.status === 'rejected' && photoResult.reason instanceof ApiError && photoResult.reason.status === 403 ? 'forbidden'
+            : 'error',
+      )
+      /*
+        器が違う返事(障害時の HTML など)が来ても、`undefined.requests` で
+        落ちない。読めなかったら「確認待ち」に出す。
+      */
+      setBookings(bookingResult.status === 'fulfilled' && bookingResult.value && Array.isArray(bookingResult.value.requests) ? bookingResult.value.requests : null)
       setHealthRisk(
         healthResult.status === 'fulfilled' && healthResult.value?.success
           ? (healthResult.value.data.riskLevel as HealthRisk)
@@ -605,10 +667,17 @@ export default function DashboardPage() {
     [bookings],
   )
   const today = jstDay(new Date())
-  const todayBookings = activeBookings.filter((booking) => jstDay(booking.starts_at) === today)
-  const upcomingBookings = bookings ? activeUpcomingBookings(bookings) : []
+  const reference = data?.visualQa
+  const displayedBookings = reference?.hideBookings ? [] : bookings
+  const todayBookings = (reference?.hideBookings ? [] : activeBookings).filter((booking) => jstDay(booking.starts_at) === today)
+  const upcomingBookings = displayedBookings ? activeUpcomingBookings(displayedBookings) : []
+  const displayedHealthRisk = reference?.healthRisk ?? healthRisk
+  const displayedTwoFactor = reference?.twoFactor ?? twoFactorSummary
   const sectionAvailable = (section: keyof NonNullable<DashboardOverview['sections']>) =>
     data?.sections?.[section]?.status !== 'unavailable'
+  const activeFriends = data?.metrics === undefined
+    ? sectionAvailable('friends') ? data?.friends.active ?? null : null
+    : data.metrics.activeFriends.value
   const pendingTotal = inboxSummary?.total ?? (sectionAvailable('inbox') ? data?.inbox.unanswered : null) ?? null
   const pendingDetail = inboxSummary
     ? `LINE ${inboxSummary.line}・メール ${inboxSummary.email}`
@@ -620,7 +689,10 @@ export default function DashboardPage() {
     if (id === 'friend-trend') return data && !sectionAvailable('trend')
       ? <UnavailableDataCard title="友だち数の推移" onRetry={() => void load()} />
       : <FriendTrendCard data={data} loading={loading} />
-    if (id === 'friend-add') return <FriendAddLinkCard />
+    if (id === 'friend-add') return <FriendAddLinkCard
+      officialProfileUrl={data?.metrics === undefined ? undefined : data.metrics.officialProfileUrl.value}
+      visualQa={data?.visualQa}
+    />
     if (id === 'scenario-status') {
       const scenarios = sectionAvailable('operations') ? data?.operations?.scenarios : undefined
       return <LiveDataCard title="シナリオ配信状況" href="/scenarios" linkLabel="シナリオを見る" value={scenarios?.active ?? null} detail={scenarios ? `一時停止 ${scenarios.paused}件` : data ? '取得できません' : '読み込み中'} />
@@ -634,24 +706,37 @@ export default function DashboardPage() {
 
   const renderTodayCard = (id: DashboardCardId): ReactNode => {
     if (id === 'today-inbox') return <TodayTaskCard title="対応が必要な受信" href="/chats" action="受信箱を開く" value={pendingTotal} detail={pendingDetail} status={inboxSummary?.oldestWaitMinutes != null ? `最長 ${formatWaitRough(inboxSummary.oldestWaitMinutes)}` : '確認待ち'} />
-    if (id === 'today-photo-review') return <TodayTaskCard title="写真審査" href="/nen-members?tab=photos" action="審査する" value={pendingPhotos} detail={pendingPhotos === null ? '読み込み中' : `確認待ち ${pendingPhotos}件`} status="ポイント付与あり" />
-    if (id === 'today-bookings') return <TodayTaskCard title="今日の予約" href="/booking/bookings" action="予約を見る" value={bookings === null ? null : todayBookings.length} detail="変更・取消を含む予約一覧" status={upcomingBookings.length > 0 ? `次回 ${new Date(upcomingBookings[0].starts_at).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo' })}` : '次回予定なし'} />
-    if (id === 'today-shipments') return <TodayTaskCard title="出荷予定" href="/ec-commerce" action="ECを見る" value={shipmentSummary?.today ?? null} detail="EC通知から算出" status={shipmentSummary ? `今日・明日 ${shipmentSummary.soon}件` : '確認中'} />
+    if (id === 'today-photo-review') {
+      const override = reference?.pendingPhotos
+      const value = override ?? pendingPhotos
+      /* 見た目確認用の差し替え値があるときは、読み込みの成否に関わらず出す。 */
+      const state = override != null ? 'ready' : pendingPhotosState
+      const detail = state === 'forbidden' ? '写真を見る権限がありません'
+        : state === 'error' ? '取得できません'
+          : value === null ? '読み込み中'
+            : `確認待ち ${value}件`
+      return <TodayTaskCard title="写真審査" href="/nen-members?tab=photos&status=pending_review" action="審査する" value={value} detail={detail} status="ポイント付与あり" />
+    }
+    if (id === 'today-bookings') return <TodayTaskCard title="今日の予約" href="/booking/bookings" action="予約を見る" value={displayedBookings === null ? null : todayBookings.length} detail="変更・取消を含む予約一覧" status={upcomingBookings.length > 0 ? `次回 ${new Date(upcomingBookings[0].starts_at).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo' })}` : '次回予定なし'} />
+    if (id === 'today-shipments') return <TodayTaskCard title="出荷予定" href="/ec-commerce" action="ECを見る" value={shipmentSummary?.today ?? null} detail="EC通知から算出" status={reference?.shipmentStatus ?? (shipmentSummary ? `今日・明日 ${shipmentSummary.soon}件` : '確認中')} />
     return null
   }
 
   const renderRightCard = (id: DashboardCardId): ReactNode => {
-    if (id === 'send-quota') return <SendQuotaCard delivery={sectionAvailable('quota') ? data?.delivery ?? null : null} />
-    if (id === 'operational-alerts') return <OperationalAlertsCard risk={healthRisk} healthIssues={healthIssueCount} oldestWaitMinutes={inboxSummary?.oldestWaitMinutes ?? (sectionAvailable('inbox') ? data?.inbox.oldestUnansweredMinutes : null) ?? null} twoFactor={twoFactorSummary} />
-    if (id === 'connection-status') return <ConnectionStatusCard account={selectedAccount} risk={healthRisk} activeFriends={sectionAvailable('friends') ? data?.friends.active ?? null : null} />
-    if (id === 'upcoming') return <UpcomingCard bookings={bookings} loading={supplementLoading} />
+    if (id === 'send-quota') return <SendQuotaCard
+      delivery={sectionAvailable('quota') ? data?.delivery ?? null : null}
+      metric={data?.metrics?.monthlyQuota}
+    />
+    if (id === 'operational-alerts') return <OperationalAlertsCard risk={displayedHealthRisk} healthIssues={healthIssueCount} oldestWaitMinutes={inboxSummary?.oldestWaitMinutes ?? (sectionAvailable('inbox') ? data?.inbox.oldestUnansweredMinutes : null) ?? null} twoFactor={displayedTwoFactor} referenceCount={reference?.operationalAlerts} />
+    if (id === 'connection-status') return <ConnectionStatusCard account={selectedAccount} risk={displayedHealthRisk} activeFriends={activeFriends} />
+    if (id === 'upcoming') return <UpcomingCard bookings={displayedBookings} loading={supplementLoading} />
     if (id === 'monthly-delivery') return data && !sectionAvailable('delivery')
       ? <UnavailableDataCard title="今月の配信" onRetry={() => void load()} />
       : data ? <MonthlyDeliveryCard delivery={data.delivery} /> : <EmptyDataCard title="今月の配信" href="/analytics" linkLabel="アクセス解析へ" />
     if (id === 'recent-results') return data && !sectionAvailable('conversions')
       ? <UnavailableDataCard title="最近の成果" onRetry={() => void load()} />
       : data ? <RecentResultsCard conversions={data.conversions} /> : <EmptyDataCard title="最近の成果" href="/conversions" linkLabel="成果を見る" />
-    if (id === 'support-mark-status') return <SupportMarkStatusCard inbox={sectionAvailable('inbox') ? data?.inbox ?? null : null} autoOnInbound={supportMarkAutoOnInbound} />
+    if (id === 'support-mark-status') return <SupportMarkStatusCard inbox={sectionAvailable('inbox') ? (data && reference?.supportInbox ? { ...data.inbox, ...reference.supportInbox } : data?.inbox ?? null) : null} autoOnInbound={supportMarkAutoOnInbound} />
     if (id === 'friend-status') return data && !sectionAvailable('friends')
       ? <UnavailableDataCard title="友だちの状態" onRetry={() => void load()} />
       : data ? <FriendStatusCard friends={data.friends} /> : <EmptyDataCard title="友だちの状態" href="/friends" linkLabel="友だちを見る" />
@@ -674,9 +759,9 @@ export default function DashboardPage() {
     (item) => { void openNotification(item) },
   )
   const notificationFilters = dashboardNotificationFilters(currentNotificationData)
-  const unreadNotificationCount = currentNotificationData?.unreadCount ?? 0
-  const healthLabel = healthRisk === 'normal' ? '正常稼働' : healthRisk === 'warning' ? '要確認' : healthRisk === 'danger' ? '障害あり' : '状態確認中'
-  const healthClass = healthRisk === 'danger' ? 'text-danger' : healthRisk === 'warning' ? 'text-warning' : healthRisk === 'normal' ? 'text-success' : 'text-ink-faint'
+  const unreadNotificationCount = data?.visualQa?.notificationUnreadCount ?? currentNotificationData?.unreadCount ?? 0
+  const healthLabel = displayedHealthRisk === 'normal' ? '正常稼働' : displayedHealthRisk === 'warning' ? '要確認' : displayedHealthRisk === 'danger' ? '障害あり' : '状態確認中'
+  const healthClass = displayedHealthRisk === 'danger' ? 'text-danger' : displayedHealthRisk === 'warning' ? 'text-warning' : displayedHealthRisk === 'normal' ? 'text-success' : 'text-ink-faint'
 
   return (
     <div>
@@ -741,7 +826,12 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {error && <div className="bg-danger-bg text-danger rounded-card mb-5 p-4 text-sm">{error}</div>}
+      {error && (
+        <div className="bg-danger-bg text-danger rounded-card mb-5 flex flex-wrap items-center gap-3 p-4 text-sm" role="alert">
+          <span className="min-w-0 flex-1">{error}</span>
+          <button type="button" onClick={() => void load()} className="shrink-0 font-medium underline">もう一度読み込む</button>
+        </div>
+      )}
       {data?.partialFailures?.length ? (
         <div className="bg-warning-bg text-warning rounded-card mb-5 p-4 text-sm" role="status">
           一部のデータを取得できませんでした（{data.partialFailures.join('、')}）。0件としては表示していません。
@@ -770,8 +860,6 @@ export default function DashboardPage() {
           {visibleRight.map((item) => <div key={item.id}>{renderRightCard(item.id)}</div>)}
         </aside>
       </div>
-
-      {data && <p className="text-ink-faint mt-5 text-xs">{new Date(data.generatedAt).toLocaleString('ja-JP')} 時点 ・ 最新データへ更新</p>}
 
       <DashboardEditor open={editorOpen} preferences={preferences} onCancel={() => setEditorOpen(false)} onApply={applyPreferences} onReset={resetPreferences} />
     </div>

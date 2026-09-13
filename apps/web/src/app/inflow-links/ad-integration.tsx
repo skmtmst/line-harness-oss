@@ -1,230 +1,442 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { Fragment, useCallback, useEffect, useState } from 'react'
 import { api } from '@/lib/api'
 import type { AdConversionLog, AdPlatform } from '@/lib/api'
+import Button from '@/components/shared/button'
+import ListState from '@/components/shared/list-state'
+import Pagination from '@/components/shared/pagination'
+import SearchField from '@/components/shared/search-field'
+import Select from '@/components/shared/select'
+import { TableHeadRow, Th } from '@/components/shared/table'
 
-/**
- * 広告連携（設計 V2 6-8）。
- *
- * できているのは「LINEで起きた成果を広告に返す」ほうだけ。返した記録は
- * ad_conversion_logs に残っているので、そこは本物の数字を出せる。
- *
- * 設計にある**広告費・クリック数・キャンペーン別・売上**は、広告側から
- * 取り込む口が無い。ad_platforms が持っているのは送信用の鍵だけで、
- * 費用や表示回数は一度も取ってきていない。ここを埋めるには Google Ads の
- * レポートAPIを叩く仕組みが要る。数字を作らず「—」を出している。
- */
+type AdView = 'metrics' | 'connections' | 'history'
 
-const PLATFORM_LABEL: Record<string, string> = {
-  google: 'Google広告',
-  meta: 'Meta広告',
-  x: 'X広告',
-  tiktok: 'TikTok広告',
-}
+/** #514-6: 送信履歴を一度に描く件数。これを超えるぶんはページ送りで見る。 */
+const LOG_PAGE_SIZE = 20
+
+const PROVIDERS = [
+  { key: 'meta', label: 'Meta広告', clickId: 'fbclid' },
+  { key: 'google', label: 'Google広告', clickId: 'gclid' },
+  { key: 'x', label: 'X（旧Twitter）', clickId: 'twclid' },
+  { key: 'tiktok', label: 'TikTok', clickId: 'ttclid' },
+] as const
 
 const STATUS_LABEL: Record<string, string> = {
-  sent: '送信済み',
-  success: '送信済み',
-  pending: '送信待ち',
-  failed: '失敗',
-  skipped: '送信しない',
+  sent: '送れました',
+  success: '送れました',
+  pending: '待っています',
+  failed: '断られました',
+  skipped: '送っていません',
 }
 
-/** 表示に使う口座番号などを config から拾う。鍵は伏せて返ってくる。 */
+const STATUS_OPTIONS = [
+  { value: 'all', label: 'すべての状態' },
+  { value: 'sent', label: '送れたもの' },
+  { value: 'pending', label: '待っているもの' },
+  { value: 'failed', label: '断られたもの' },
+]
+
+function platformLabel(platform: AdPlatform): string {
+  return PROVIDERS.find((provider) => provider.key === platform.name)?.label
+    ?? platform.displayName
+    ?? platform.name
+}
+
 function accountLabel(platform: AdPlatform): string | null {
-  const c = platform.config
   for (const key of ['customer_id', 'pixel_id', 'pixel_code', 'account_id']) {
-    const v = c[key]
-    if (typeof v === 'string' && v) return v
+    const value = platform.config[key]
+    if (typeof value === 'string' && value) return value
   }
   return null
 }
 
-export default function AdIntegration() {
+function configNumber(platforms: AdPlatform[], key: string): number | null {
+  for (const platform of platforms) {
+    const value = platform.config[key]
+    if (typeof value === 'number' && Number.isFinite(value)) return value
+  }
+  return null
+}
+
+/**
+ * #514-8: 送信履歴の口が返すのは id・adPlatformId・friendId・eventName・
+ * clickId(clickIdType)・status・errorMessage・createdAt だけ。口の返さない
+ * friendName・conversionName・nextRetryAt は読まない(本番で常に空になる)。
+ */
+function syncLabel(platform: AdPlatform): string | null {
+  const syncedAt = platform.config.synced_at
+  if (typeof syncedAt !== 'string' || !syncedAt) return null
+  const date = new Date(syncedAt)
+  if (Number.isNaN(date.getTime())) return null
+  return `${date.getMonth() + 1}/${date.getDate()} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+}
+
+/** #514-8: 次の予定は口に無い。取れない時刻は書かず状態だけ出す。 */
+function nextScheduleText(log: AdConversionLog): string {
+  if (log.status === 'pending') return '送信待ちです'
+  if (log.status === 'failed') return '予定はありません'
+  return '—'
+}
+
+function matchesStatus(log: AdConversionLog, status: string): boolean {
+  if (status === 'all') return true
+  if (status === 'sent') return log.status === 'sent' || log.status === 'success'
+  return log.status === status
+}
+
+function safeCsv(logs: AdConversionLog[]): string {
+  const quote = (value: string) => `"${value.replaceAll('"', '""')}"`
+  const rows = logs.map((log) => [
+    log.createdAt,
+    log.eventName,
+    log.clickIdType ?? '経路不明',
+    STATUS_LABEL[log.status] ?? '状態不明',
+  ].map((value) => quote(value)).join(','))
+  return ['"日時","成果","クリックの種類","状態"', ...rows].join('\n')
+}
+
+export default function AdIntegration({ view }: { view: AdView }) {
   const [platforms, setPlatforms] = useState<AdPlatform[]>([])
   const [logs, setLogs] = useState<AdConversionLog[]>([])
+  const [logTotal, setLogTotal] = useState(0)
   const [loading, setLoading] = useState(true)
+  const [failed, setFailed] = useState(false)
+  const [query, setQuery] = useState('')
+  const [status, setStatus] = useState('all')
+  // #514-6: 媒体横断の共通一覧口から20件ずつ取得する。
+  const [logPage, setLogPage] = useState(1)
+  // #514-13: 失敗理由は口の errorMessage を開いて見せる(「理由を見る」を効かせる)。
+  const [expandedLogId, setExpandedLogId] = useState<string | null>(null)
 
-  useEffect(() => {
-    let cancelled = false
-    void (async () => {
-      const res = await api.adPlatforms.list()
-      if (cancelled || !res.success) {
-        if (!cancelled) setLoading(false)
+  const load = useCallback(async () => {
+    setLoading(true)
+    setFailed(false)
+    try {
+      const [platformResponse, logResponse] = await Promise.all([
+        api.adPlatforms.list(),
+        api.adPlatforms.logsPage({ page: logPage, limit: LOG_PAGE_SIZE, status, query }),
+      ])
+      if (!platformResponse.success || !logResponse.success) {
+        setFailed(true)
         return
       }
-      setPlatforms(res.data)
-      const active = res.data.find((p) => p.isActive) ?? res.data[0]
-      if (active) {
-        const logRes = await api.adPlatforms.logs(active.id, 20)
-        if (!cancelled && logRes.success) setLogs(logRes.data)
-      }
-      if (!cancelled) setLoading(false)
-    })()
-    return () => {
-      cancelled = true
+      setPlatforms(platformResponse.data)
+      setLogs(logResponse.data.items)
+      setLogTotal(logResponse.data.total)
+    } catch {
+      setFailed(true)
+    } finally {
+      setLoading(false)
     }
-  }, [])
+  }, [logPage, query, status])
 
-  const connected = platforms.filter((p) => p.isActive)
-  const sentCount = logs.filter((l) => l.status === 'sent' || l.status === 'success').length
+  useEffect(() => {
+    void load()
+  }, [load])
+
+  const connected = platforms.filter((platform) => platform.isActive)
+  const sentCount = configNumber(platforms, 'sent_count') ?? logs.filter((log) => matchesStatus(log, 'sent')).length
+  const pendingCount = configNumber(platforms, 'pending_count') ?? logs.filter((log) => log.status === 'pending').length
+  const failedCount = configNumber(platforms, 'failed_count') ?? logs.filter((log) => log.status === 'failed').length
+  // #514-13: 取れない数を 0 と書かない。retry_success_count が無ければ「—」。
+  const retrySuccessCount = configNumber(platforms, 'retry_success_count')
+  const visibleLogs = logs
+  const logPageCount = Math.max(1, Math.ceil(logTotal / LOG_PAGE_SIZE))
+  const safeLogPage = Math.min(logPage, logPageCount)
+
+  const exportLogs = () => {
+    const blob = new Blob([`\uFEFF${safeCsv(visibleLogs)}`], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = `広告への送信履歴_${new Date().toISOString().slice(0, 10)}.csv`
+    anchor.click()
+    URL.revokeObjectURL(url)
+  }
 
   if (loading) {
+    return <ListState kind="loading" title="広告との接続状況を読み込んでいます" />
+  }
+
+  if (failed) {
     return (
-      <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-12 text-center text-sm">
-        読み込み中...
+      <ListState
+        kind="error"
+        title="広告との接続状況を表示できませんでした"
+        description="接続設定は消えていません。状態を読み直して、もう一度お試しください。"
+        action={<Button onClick={() => void load()}>広告の状態を再読み込み</Button>}
+      />
+    )
+  }
+
+  if (view === 'history') {
+    return (
+      <div className="space-y-4" data-design-node="Im2b1">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-xs text-ink-faint">広告とのつなぎ</p>
+            <h2 className="text-lg font-bold text-ink">広告への送信履歴</h2>
+          </div>
+          <Button href="/inflow-links?tab=connections">広告とのつなぎへ戻る</Button>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <Metric label="送った件数" value={sentCount} detail="この30日" />
+          <Metric label="待っている" value={pendingCount} detail="送信処理を待っています" />
+          <Metric label="断られた" value={failedCount} detail="理由を確認してください" tone={failedCount > 0 ? 'danger' : 'default'} />
+          <Metric label="やり直して成功" value={retrySuccessCount} detail="二重にはなっていません" />
+        </div>
+
+        <p className="rounded-card bg-info-bg px-4 py-3 text-xs leading-relaxed text-ink-secondary">
+          送るのは、成果と広告のクリックが結びついたものだけです。結びつかないものは送りません。
+        </p>
+
+        {/*
+          #514-13: まとめてやり直す口は無い。効かないボタンは出さない。
+          書き出し(CSV)は口から取った行をそのまま出すので残す。
+        */}
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-xs text-ink-faint">失敗した送信のやり直しは、口ができたらここに足します。</p>
+          <Button onClick={exportLogs} disabled={visibleLogs.length === 0}>CSVで書き出す</Button>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <SearchField
+            value={query}
+            onChange={(value) => { setQuery(value); setLogPage(1) }}
+            onClear={() => { setQuery(''); setLogPage(1) }}
+            placeholder="成果・クリックの種類で探す"
+            aria-label="成果・クリックの種類で探す"
+            className="w-full sm:w-80"
+          />
+          <Select value={status} onChange={(value) => { setStatus(value); setLogPage(1) }} options={STATUS_OPTIONS} aria-label="送信状態" />
+        </div>
+
+        {visibleLogs.length === 0 ? (
+          <ListState
+            kind="empty"
+            title="条件に合う送信履歴はありません"
+            description="成果と広告のクリックが結びつき、送信処理が始まるとここに並びます。"
+          />
+        ) : (
+          <section className="overflow-hidden rounded-card border border-hairline bg-canvas">
+            <table className="w-full table-fixed text-xs">
+              <thead className="border-b border-hairline bg-canvas-sunken text-ink-faint">
+                <TableHeadRow>
+                  <Th>いつ・何の成果</Th>
+                  <Th>媒体</Th>
+                  <Th>成果の名前</Th>
+                  <Th>状態</Th>
+                  <Th>次の予定</Th>
+                  <Th align="right">操作</Th>
+                </TableHeadRow>
+              </thead>
+              <tbody className="divide-y divide-hairline">
+                {visibleLogs.map((log) => {
+                  const platform = platforms.find((item) => item.id === log.adPlatformId)
+                  const expanded = expandedLogId === log.id
+                  return (
+                    <Fragment key={log.id}>
+                    <tr>
+                      <td className="px-4 py-3 text-ink">
+                        <span className="block font-semibold">{log.eventName}</span>
+                        <span className="mt-0.5 block text-ink-faint">目印 {log.clickIdType ?? '—'}</span>
+                      </td>
+                      <td className="px-4 py-3 text-ink-secondary">{platform ? platformLabel(platform) : '—'}</td>
+                      <td className="px-4 py-3 text-ink-secondary">{log.eventName}</td>
+                      <td className="px-4 py-3">
+                        <span className={log.status === 'failed' ? 'font-semibold text-status-danger' : 'text-ink-secondary'}>
+                          {STATUS_LABEL[log.status] ?? '状態不明'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-ink-faint">
+                        {nextScheduleText(log)}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        {log.status === 'failed'
+                          ? <Button variant="secondary" onClick={() => setExpandedLogId(expanded ? null : log.id)}>{expanded ? '理由を閉じる' : '理由を見る'}</Button>
+                          : <span className="text-ink-faint">—</span>}
+                      </td>
+                    </tr>
+                    {expanded && (
+                      <tr>
+                        <td colSpan={6} className="bg-canvas-sunken px-4 py-3 text-xs leading-relaxed text-ink-secondary">
+                          失敗理由: {log.errorMessage || '理由の記録がありません。広告側の接続設定を確かめてください。'}
+                        </td>
+                      </tr>
+                    )}
+                    </Fragment>
+                  )
+                })}
+              </tbody>
+            </table>
+            <div className="flex items-center justify-end gap-2 border-t border-hairline px-4 py-3 text-xs">
+              <span className="text-ink-faint tabular-nums">全 {logTotal} 件</span>
+              <Pagination page={safeLogPage} pageCount={logPageCount} onPageChange={setLogPage} />
+            </div>
+          </section>
+        )}
+
+        <p className="text-xs leading-relaxed text-ink-faint">
+          失敗理由を確認してからやり直します。成功した成果を重ねて送る操作は表示しません。
+        </p>
+      </div>
+    )
+  }
+
+  if (view === 'connections') {
+    return (
+      <div className="space-y-4" data-design-node="BuVDB">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-xs text-ink-faint">流入と計測</p>
+            <h2 className="text-lg font-bold text-ink">広告とのつなぎ</h2>
+          </div>
+          <Button href="/inflow-links?tab=connections&view=history">送信履歴を見る</Button>
+        </div>
+
+        <p className="rounded-card bg-info-bg px-4 py-3 text-xs leading-relaxed text-ink-secondary">
+          広告をつながなくても流入リンクの計測は使えます。つなぐと、成果を広告側へ安全に返せるようになります。
+        </p>
+
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_390px]">
+        <div className="space-y-4">
+        <section className="rounded-card border border-hairline bg-canvas p-4">
+          <h3 className="text-sm font-bold text-ink">つないでいる広告</h3>
+          <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2">
+            {PROVIDERS.map((provider) => {
+              const platform = platforms.find((item) => item.name === provider.key)
+              const active = platform?.isActive === true
+              // #514-13: 同期日時は直書きしない。口の synced_at が無ければ出さない。
+              const synced = platform ? syncLabel(platform) : null
+              return (
+                <div key={provider.key} className="rounded-control border border-hairline p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-semibold text-ink">{provider.label}</p>
+                      <p className="mt-1 text-xs text-ink-faint">クリックの目印 {provider.clickId}</p>
+                      {platform && accountLabel(platform) && (
+                        <p className="mt-1 text-xs text-ink-faint">広告アカウント {accountLabel(platform)}</p>
+                      )}
+                    </div>
+                    <span className={`rounded-pill px-2 py-1 text-xs font-semibold ${active ? 'bg-accent-soft text-accent-deep' : 'bg-canvas-sunken text-ink-faint'}`}>
+                      {active ? 'つながっています' : 'つないでいません'}
+                    </span>
+                  </div>
+                  {!platform && (
+                    <p className="mt-3 text-xs leading-relaxed text-ink-faint">
+                      まだ接続されていません。
+                    </p>
+                  )}
+                  {/*
+                    #514-13: 設定・接続の操作画面は無い。効かないボタンは出さず、
+                    状態の文だけにする。
+                  */}
+                  <div className="mt-3 flex items-center justify-between gap-2 text-xs text-ink-faint">
+                    <span>{active ? (synced ? `${synced} に同期` : '同期日時は取得できません') : platform?.config.connection_error === '権限が足りません' ? 'もう一度つなぎ直してください' : '接続すると成果を返せます'}</span>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </section>
+
+        {/*
+          #514-13: 成果地点と広告名の対応表は口に無い。直書きの対応・件数と
+          効かない操作ボタンは出さず、未接続の旨にする。
+        */}
+        <section className="rounded-card border border-hairline bg-canvas p-4">
+          <h3 className="text-sm font-bold text-ink">成果地点と、広告に返す名前の対応</h3>
+          <p className="mt-1 text-xs leading-relaxed text-ink-faint">
+            左がうちの成果地点、右が広告側の名前です。対応が付いていないものは返せません。
+          </p>
+          <div className="mt-3">
+            <ListState
+              kind="empty"
+              title="対応表はまだ表示できません"
+              description="成果地点と広告側の名前の対応を取れていないため、件数は表示しません。対応が取れたらここに並びます。"
+            />
+          </div>
+        </section>
+        </div>
+
+        <aside className="space-y-4">
+          <section className="rounded-card border border-hairline bg-canvas p-4">
+            <h3 className="text-sm font-bold text-ink">返すしくみ</h3>
+            <ol className="mt-3 space-y-2 text-xs leading-relaxed text-ink-secondary">
+              <li><strong>1. クリックの目印を持ち帰る</strong><br />中継リンクを通った人だけ広告と結びつきます。</li>
+              <li><strong>2. 成果が出たら順に送る</strong><br />待ち行列に入れてから送ります。</li>
+              <li><strong>3. 同じ成果は2回送らない</strong><br />やり直しても同じ目印を使います。</li>
+            </ol>
+          </section>
+          <section className="rounded-card border border-hairline bg-canvas p-4">
+            <h3 className="text-sm font-bold text-ink">気をつけること</h3>
+            <ul className="mt-3 space-y-2 text-xs leading-relaxed text-ink-secondary">
+              <li>中継リンクを通らないと広告と結びつきません。</li>
+              <li>秘密の鍵は画面に表示しません。</li>
+              <li>お客様の名前やメールアドレスは広告へ送りません。</li>
+            </ul>
+          </section>
+        </aside>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="space-y-4">
-      <p className="text-ink-secondary text-sm leading-relaxed">
-        広告から来た友だちを計測し、LINEで起きた成果を広告側に返します。広告費に対して実際にいくら売れたかを見るには、広告側の費用を取り込む必要があり、そちらはまだできていません。
+    <div className="space-y-4" data-design-node="v0HaI">
+      <p className="rounded-card bg-info-bg px-4 py-3 text-xs leading-relaxed text-ink-secondary">
+        広告の管理画面では「クリック数」までしか分かりません。ここでは、そのクリックが友だちになり、成果になったところまで1本でつながって見えます。
       </p>
 
-      {/* ---- つながっているか ---- */}
-      <section className="bg-canvas rounded-card border-hairline border p-4">
-        {connected.length === 0 ? (
-          <div>
-            <p className="text-ink text-sm font-bold">まだ広告とつながっていません</p>
-            <p className="text-ink-faint mt-1 text-xs leading-relaxed">
-              広告を使っていない場合は、このままで問題ありません。つなぐと、LINEで起きた成果を広告側に返せるようになります。
-            </p>
-            {/* 接続を作る画面が無い。いまは API を直に叩くしかない。 */}
-            <button
-              disabled
-              title="接続を作る画面は準備中です"
-              className="border-hairline text-ink-faint rounded-control mt-3 border px-3 py-2 text-sm font-medium opacity-50"
-            >
-              連携を設定
-            </button>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {connected.map((p) => (
-              <div key={p.id} className="flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  <p className="text-ink text-sm font-bold">
-                    {PLATFORM_LABEL[p.name] ?? p.displayName ?? p.name}とつながっています
-                  </p>
-                  <p className="text-ink-faint mt-0.5 text-xs">
-                    {accountLabel(p) ? `アカウント ${accountLabel(p)} ・ ` : ''}
-                    成果の送信 有効
-                    {/* 同期という考え方が実装に無い。成果が起きたその場で送っている。 */}
-                    {' ・ '}成果が起きたその場で送ります
-                  </p>
-                </div>
-                <button
-                  disabled
-                  title="接続設定の画面は準備中です"
-                  className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm font-medium opacity-50"
-                >
-                  接続設定
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
-
-      {/* ---- KPI ---- */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        <div className="bg-canvas rounded-card border-hairline border p-4">
-          <p className="text-ink-faint text-xs">広告側へ返した成果</p>
-          <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
-            {sentCount}
-            <span className="text-ink-faint ml-0.5 text-xs font-normal">件</span>
-          </p>
-          <p className="text-ink-faint mt-0.5 text-xs">直近{logs.length}件のうち</p>
-        </div>
-        {/* 以下4枚は広告側から取り込む数字。取り込む口が無い。 */}
-        {[
-          ['広告経由の友だち', 'クリックIDと友だちの結び付けを集計していません'],
-          ['広告費', '広告側の費用を取り込んでいません'],
-          ['成果1件あたり', '広告費が無いので出せません'],
-          ['売上・ROAS', '広告費が無いので出せません'],
-        ].map(([label, why]) => (
-          <div key={label} className="bg-canvas rounded-card border-hairline border p-4">
-            <p className="text-ink-faint text-xs">{label}</p>
-            <p className="text-ink-faint mt-1 text-2xl font-bold">—</p>
-            <p className="text-ink-faint mt-0.5 text-xs">{why}</p>
-          </div>
-        ))}
+      {/*
+        #514-13: 広告費の内訳・1人あたり・1件あたり・まとまり別の表は口に無い。
+        直書きの数と効かない操作ボタンは出さず、取れる数(つないだ広告・
+        今月の広告費の合計)だけ残す。
+      */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <Metric label="つないだ広告" value={connected.length} detail={connected.length > 0 ? connected.map(platformLabel).join('・') : 'まだ接続がありません'} />
+        <Metric label="今月の広告費" value={configNumber(platforms, 'monthly_cost') == null ? null : platforms.reduce((sum, platform) => sum + (typeof platform.config.monthly_cost === 'number' ? platform.config.monthly_cost : 0), 0)} detail="つないだ広告の今月ぶんの合計" prefix="¥" />
+        <Metric label="友だち1人あたり" value={null} detail="広告ごとの費用と人数は未接続のため表示できません" prefix="¥" />
+        <Metric label="成果1件あたり" value={null} detail="認めた成果の件数は未接続のため表示できません" prefix="¥" />
       </div>
 
-      {/* ---- キャンペーン別 ---- */}
-      <section className="bg-canvas rounded-card border-hairline border">
-        <div className="border-hairline border-b px-4 py-3">
-          <h2 className="text-ink text-sm font-bold">キャンペーン別の成果</h2>
-        </div>
-        <p className="text-ink-faint p-8 text-center text-sm leading-relaxed">
-          キャンペーンごとのクリック・友だち追加・広告費は、広告側から取り込む必要があります。その取り込みがまだありません。
-        </p>
-      </section>
+      <section className="grid grid-cols-1 gap-3 lg:grid-cols-3">{['google','meta','yahoo'].map((name) => { const platform = platforms.find((item) => item.name === name); const label = name === 'google' ? 'Google広告' : name === 'meta' ? 'Meta広告' : 'Yahoo!広告'; const cost = platform && typeof platform.config.monthly_cost === 'number' ? platform.config.monthly_cost : null; const synced = platform ? syncLabel(platform) : null; return <div key={name} className="rounded-card border border-hairline bg-canvas p-4"><div className="flex items-center justify-between"><div><p className="text-sm font-semibold text-ink">{label}</p><p className="text-xs text-ink-faint">{platform?.isActive ? (synced ? `つながっています ／ ${synced} に取り込みました` : 'つながっています ／ 取り込み日時は取得できません') : 'つないでいません'}</p></div><span className="font-bold text-ink">{cost == null ? '—' : `¥${cost.toLocaleString('ja-JP')}`}</span></div></div> })}</section>
 
-      {/* ---- 返している成果 ---- */}
-      <section className="bg-canvas rounded-card border-hairline border">
-        <div className="border-hairline border-b px-4 py-3">
-          <h2 className="text-ink text-sm font-bold">広告へ返している成果</h2>
-          <p className="text-ink-faint mt-0.5 text-xs">
-            LINEで起きた成果を、広告のクリックに結びつけて送っています。
-          </p>
+      <section className="rounded-card border border-hairline bg-canvas p-4">
+        <h3 className="text-sm font-bold text-ink">広告のまとまり別の成果</h3>
+        <div className="mt-3">
+          <ListState
+            kind="empty"
+            title="まとまり別の成果はまだ表示できません"
+            description="広告ごとの費用・クリック・友だち追加を取れていないため、数は表示しません。取れたらここに並びます。"
+          />
         </div>
-        {logs.length === 0 ? (
-          <p className="text-ink-faint p-8 text-center text-sm">まだ送った記録がありません。</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[560px] text-sm">
-              <thead className="bg-canvas-sunken text-ink-faint text-xs">
-                <tr>
-                  <th className="px-4 py-2 text-left font-medium">日時</th>
-                  <th className="px-4 py-2 text-left font-medium">成果</th>
-                  <th className="px-4 py-2 text-left font-medium">クリックの種類</th>
-                  <th className="px-4 py-2 text-left font-medium">状態</th>
-                </tr>
-              </thead>
-              <tbody className="divide-hairline divide-y">
-                {logs.map((l) => (
-                  <tr key={l.id}>
-                    <td className="text-ink-secondary px-4 py-2 tabular-nums">
-                      {l.createdAt.slice(5, 16).replace('T', ' ').replaceAll('-', '/')}
-                    </td>
-                    <td className="text-ink px-4 py-2">{l.eventName}</td>
-                    <td className="text-ink-faint px-4 py-2">
-                      {l.clickId ? (l.clickIdType ?? 'クリックID') : '経路が不明'}
-                    </td>
-                    <td className="px-4 py-2">
-                      <span
-                        className={
-                          l.status === 'failed' ? 'text-danger text-xs' : 'text-ink-secondary text-xs'
-                        }
-                        title={l.errorMessage ?? undefined}
-                      >
-                        {STATUS_LABEL[l.status] ?? l.status}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
       </section>
+    </div>
+  )
+}
 
-      {/* ---- 注意 ---- */}
-      <section className="bg-canvas-sunken rounded-card border-hairline border p-4">
-        <h2 className="text-ink text-sm font-bold">気をつけること</h2>
-        <ul className="text-ink-faint mt-2 space-y-1 text-xs leading-relaxed">
-          <li>・広告のクリックIDは90日で失効します。それ以降の成果は結びつきません</li>
-          <li>
-            ・お客様の名前やメールアドレスは送っていません。クリックIDと成果の名前だけを送ります
-          </li>
-          <li>・送った記録を残しているので、同じ成果を二重に送ることはありません</li>
-          <li>・広告を使っていない場合、この機能はオフのままで問題ありません</li>
-        </ul>
-      </section>
+function Metric({
+  label,
+  value,
+  detail,
+  tone = 'default',
+  prefix = '',
+}: {
+  label: string
+  value: number | null
+  detail: string
+  tone?: 'default' | 'danger'
+  prefix?: string
+}) {
+  return (
+    <div className="rounded-card border border-hairline bg-canvas p-4">
+      <p className="text-xs text-ink-faint">{label}</p>
+      <p className={`mt-1 text-2xl font-bold tabular-nums ${tone === 'danger' ? 'text-status-danger' : 'text-ink'}`}>
+        {value == null ? '—' : `${prefix}${value.toLocaleString('ja-JP')}`}
+      </p>
+      <p className="mt-1 text-xs leading-relaxed text-ink-faint">{detail}</p>
     </div>
   )
 }

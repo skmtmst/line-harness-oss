@@ -1,12 +1,15 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
+import Button from '@/components/shared/button'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 import PageHeader from '@/components/shared/page-header'
+import Toggle from '@/components/shared/toggle'
 import { useAccount } from '@/contexts/account-context'
-import { api } from '@/lib/api'
+import { api, ApiError, fetchApi, type AnalyticsUsageOverview } from '@/lib/api'
+import { createAccountRequestGuard } from './account-request-guard'
 import {
-  DEFAULT_FEATURES,
   FEATURE_SETTINGS_UPDATED_EVENT,
   groupEnabledCount,
   groupFeatureCount,
@@ -18,42 +21,19 @@ import {
   type FeatureItem,
   type MenuItemOrder,
 } from '@/lib/feature-settings'
-
-function Switch({
-  checked,
-  disabled = false,
-  label,
-  onChange,
-}: {
-  checked: boolean
-  disabled?: boolean
-  label: string
-  onChange?: (next: boolean) => void
-}) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      aria-label={label}
-      disabled={disabled}
-      onClick={() => onChange?.(!checked)}
-      className={`relative h-6 w-10 shrink-0 rounded-full transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#06c755] ${
-        checked && !disabled ? 'bg-[#06c755]' : 'bg-[#dedede]'
-      } ${disabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}
-    >
-      <span
-        className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white transition-transform ${
-          checked ? 'translate-x-4' : 'translate-x-0'
-        }`}
-      />
-    </button>
-  )
-}
+import {
+  CATALOG_DEFAULT_FEATURES,
+  FEATURE_SETTINGS_CONFLICT_MESSAGE,
+  applyItemOrder,
+  featureSettingsAreDirty,
+  featureSettingsErrorMessage,
+  normalizeFeatureSettings,
+  splitFeatureGroups,
+} from './feature-settings-view'
 
 function LockIcon() {
   return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="h-5 w-5 text-[#7d7d7d]">
+    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="h-5 w-5 text-ink-faint">
       <path d="M7 10V7a5 5 0 0 1 10 0v3M6 10h12a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1Z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   )
@@ -75,7 +55,7 @@ function EyeOffIcon({ className = 'h-4 w-4' }: { className?: string }) {
  */
 function GripIcon() {
   return (
-    <svg aria-hidden="true" viewBox="0 0 12 20" className="h-5 w-3 shrink-0 text-[#c4c4c4]">
+    <svg aria-hidden="true" viewBox="0 0 12 20" className="h-5 w-3 shrink-0 text-ink-faint">
       {[6, 10, 14].map((y) => (
         <g key={y}>
           <circle cx="4" cy={y} r="1.4" fill="currentColor" />
@@ -95,9 +75,92 @@ function groupSummary(group: FeatureGroup, features: Record<string, boolean>) {
   return `${total}機能中 ${enabled}つが有効`
 }
 
-function FeatureRow({ item, features, canMoveUp, canMoveDown, onMove, onToggle }: {
+type UsageCategory = AnalyticsUsageOverview['data']['categories'][number]
+
+/**
+ * オフ前の影響確認(票643)の応答。件数と対象種別だけを持ち、
+ * 稼働中の行そのもの(宛先・内容)はサーバから出さない。
+ */
+type FeatureImpactItem = {
+  kind: 'published' | 'scheduled' | 'dependent'
+  targetType: string
+  count: number
+}
+
+type FeatureImpactGroup = {
+  feature: string
+  items: FeatureImpactItem[]
+  blocking: boolean
+}
+
+type FeatureImpactResponse = {
+  success: boolean
+  error: string
+  data: {
+    version: number
+    impacts: FeatureImpactGroup[]
+    requiresConfirmation: boolean
+    impactToken: string | null
+  }
+}
+
+type FeatureSaveResponse = {
+  success: boolean
+  error: string
+  data: { version: number }
+}
+
+const USAGE_ITEM_IDS_BY_KEY: Record<string, string[]> = {
+  templates: ['templates'],
+  scenarios: ['scenarios'],
+  forms: ['forms'],
+  rich_menus: ['rich-menus'],
+  friend_attributes: ['friend-attributes'],
+  inflow_conversion: ['inflow', 'conversions'],
+  automations: ['automations'],
+  media_vars: ['common-vars', 'contents'],
+}
+
+function UsageBadge({ category, onRetry }: { category: UsageCategory; onRetry?: () => void }) {
+  const created = category.created.value
+  const inUse = category.inUse.value
+  if (created === null || inUse === null) {
+    return (
+      <span
+        className="rounded-pill border-hairline bg-canvas-sunken whitespace-nowrap border px-2 py-0.5 text-[10px] font-bold text-ink-faint"
+        title={category.inUse.reason ?? category.created.reason ?? '利用状況を取得できません'}
+      >
+        利用数は未取得
+        {onRetry && (
+          <button
+            type="button"
+            onClick={onRetry}
+            aria-label="利用数を読み直す"
+            className="ml-1 cursor-pointer underline hover:no-underline"
+          >
+            読み直す
+          </button>
+        )}
+      </span>
+    )
+  }
+  return (
+    <span
+      className="rounded-pill border-info bg-info-bg text-info whitespace-nowrap border px-2 py-0.5 text-[10px] font-bold"
+      title={`${category.label}：作成 ${created.toLocaleString('ja-JP')}、利用中 ${inUse.toLocaleString('ja-JP')}`}
+    >
+      利用中 {inUse.toLocaleString('ja-JP')} / 作成 {created.toLocaleString('ja-JP')}
+    </span>
+  )
+}
+
+function FeatureRow({ item, features, ordering, usage, usageRetry, sharedSwitch, canMoveUp, canMoveDown, onMove, onToggle }: {
   item: FeatureItem
   features: Record<string, boolean>
+  ordering: boolean
+  usage?: UsageCategory
+  usageRetry?: () => void
+  sharedSwitch: boolean
   canMoveUp: boolean
   canMoveDown: boolean
   onMove: (itemId: string, direction: -1 | 1) => void
@@ -105,50 +168,55 @@ function FeatureRow({ item, features, canMoveUp, canMoveDown, onMove, onToggle }
 }) {
   const enabled = itemIsEnabled(item, features)
   return (
-    <li className="flex min-h-[62px] items-center justify-between gap-4 px-4 py-3 sm:px-5">
+    <li className="flex min-h-14 items-center justify-between gap-3 px-3 py-2">
       <div className="flex min-w-0 items-start gap-2.5">
-        <span className="mt-0.5"><GripIcon /></span>
+        {ordering && <span className="mt-0.5"><GripIcon /></span>}
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <p className="text-sm font-bold text-[#565656]">{item.label}</p>
+            <p className="whitespace-nowrap text-sm font-bold text-ink">{item.label}</p>
+            {sharedSwitch && (
+              <span className="rounded-pill border-hairline whitespace-nowrap border px-1.5 py-0.5 text-[9px] font-bold text-ink-faint">
+                同じスイッチ
+              </span>
+            )}
             {item.badge && (
-              <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
+              <span className="rounded-pill bg-accent-soft px-2 py-0.5 text-[10px] font-bold text-accent-deep">
                 {item.badge}
               </span>
             )}
+            {usage && <UsageBadge category={usage} onRetry={usageRetry} />}
           </div>
-          <p className="mt-0.5 text-[11px] leading-relaxed text-[#777]">{item.note}</p>
+          <p className="mt-0.5 truncate text-[11px] leading-relaxed text-ink-faint" title={item.note}>{item.note}</p>
         </div>
       </div>
-      <div className="flex shrink-0 items-center gap-2.5">
-        <button
-          type="button"
-          aria-label={`${item.label}を上へ`}
-          title="上へ移動"
-          disabled={!canMoveUp}
-          onClick={() => onMove(item.id, -1)}
-          className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-md border border-[#dedede] bg-white text-xs font-bold text-[#565656] hover:bg-[#f7f7f5] disabled:cursor-not-allowed disabled:opacity-30"
-        >
-          ↑
-        </button>
-        <button
-          type="button"
-          aria-label={`${item.label}を下へ`}
-          title="下へ移動"
-          disabled={!canMoveDown}
-          onClick={() => onMove(item.id, 1)}
-          className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-md border border-[#dedede] bg-white text-xs font-bold text-[#565656] hover:bg-[#f7f7f5] disabled:cursor-not-allowed disabled:opacity-30"
-        >
-          ↓
-        </button>
-        <span aria-hidden="true" className="mx-0.5 h-5 w-px bg-[#dedede]" />
-        <span className={`text-xs font-bold ${enabled && !item.required ? 'text-[#00b84f]' : 'text-[#777]'}`}>
-          {item.required ? '必須' : enabled ? 'オン' : 'オフ'}
-        </span>
+      <div className="flex shrink-0 items-center gap-2">
+        {ordering && (
+          <>
+            <Button
+              variant="secondary"
+              aria-label={`${item.label}を上へ`}
+              title="上へ移動"
+              disabled={!canMoveUp}
+              onClick={() => onMove(item.id, -1)}
+            >
+              ↑
+            </Button>
+            <Button
+              variant="secondary"
+              aria-label={`${item.label}を下へ`}
+              title="下へ移動"
+              disabled={!canMoveDown}
+              onClick={() => onMove(item.id, 1)}
+            >
+              ↓
+            </Button>
+          </>
+        )}
+        {item.required && <span className="text-xs font-bold text-ink-faint">必須</span>}
         {item.required && <LockIcon />}
-        <Switch
+        <Toggle
           checked={enabled}
-          disabled={item.required}
+          locked={item.required}
           label={item.required ? `${item.label}は必須機能です` : `${item.label}を${enabled ? 'オフ' : 'オン'}にする`}
           onChange={(next) => onToggle(item, next)}
         />
@@ -157,39 +225,51 @@ function FeatureRow({ item, features, canMoveUp, canMoveDown, onMove, onToggle }
   )
 }
 
-function FeatureSection({ group, features, onItemToggle, onGroupToggle, onMove }: {
+function FeatureSection({ group, features, ordering, usageByItemId, usageRetry, onItemToggle, onGroupToggle, onMove }: {
   group: FeatureGroup
   features: Record<string, boolean>
+  ordering: boolean
+  usageByItemId: Map<string, UsageCategory>
+  usageRetry?: () => void
   onItemToggle: (item: FeatureItem, next: boolean) => void
   onGroupToggle: (group: FeatureGroup, next: boolean) => void
   onMove: (groupId: string, itemId: string, direction: -1 | 1) => void
 }) {
   const total = groupFeatureCount(group)
   const allEnabled = total === 0 || groupEnabledCount(group, features) === total
+  const switchCount = new Map<string, number>()
+  for (const item of group.items) {
+    const key = item.keys[0]
+    if (key) switchCount.set(key, (switchCount.get(key) ?? 0) + 1)
+  }
   return (
-    <section className="overflow-hidden rounded-[18px] border border-[#dedede] bg-white">
-      <div className="flex min-h-[42px] items-center justify-between gap-4 border-b border-[#e5e5e5] bg-[#fafafa] px-4 py-2.5 sm:px-5">
+    <section className="border-hairline overflow-hidden rounded-xl border bg-canvas">
+      <div className="border-hairline bg-canvas-sunken flex min-h-12 items-center justify-between gap-3 border-b px-3 py-2.5">
         <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-          <h2 className="text-sm font-bold text-[#202020]">{group.label}</h2>
-          <p className="text-[10px] text-[#777]">{groupSummary(group, features)}</p>
+          <h2 className="text-sm font-bold text-ink">{group.label}</h2>
+          <p className="text-[10px] text-ink-faint">{groupSummary(group, features)}</p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <button
             type="button"
             aria-disabled={total === 0}
             onClick={() => total > 0 && onGroupToggle(group, !allEnabled)}
-            className={`text-[11px] font-bold text-[#0066d6] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0066d6] ${total === 0 ? 'cursor-default' : 'cursor-pointer'}`}
+            className={`text-action focus-visible:outline-info text-[11px] font-bold focus-visible:outline-2 focus-visible:outline-offset-2 ${total === 0 ? 'cursor-default' : 'cursor-pointer'}`}
           >
-            グループごと切替
+            まとめて切替
           </button>
         </div>
       </div>
-      <ul className="divide-y divide-[#e8e8e8]">
+      <ul className="divide-y divide-hairline">
         {group.items.map((item, index) => (
           <FeatureRow
             key={item.id}
             item={item}
             features={features}
+            ordering={ordering}
+            usage={usageByItemId.get(item.id)}
+            usageRetry={usageRetry}
+            sharedSwitch={Boolean(item.keys[0]) && (switchCount.get(item.keys[0]) ?? 0) > 1}
             canMoveUp={index > 0}
             canMoveDown={index < group.items.length - 1}
             onMove={(itemId, direction) => onMove(group.id, itemId, direction)}
@@ -217,11 +297,11 @@ function SidebarPreview({ groups, features }: {
   }
   return (
     <aside data-design="サイドメニューの見え方" className="xl:sticky xl:top-6">
-      <div className="overflow-hidden rounded-[22px] border border-[#dedede] bg-white">
+      <div className="border-hairline bg-canvas overflow-hidden rounded-[22px] border">
         <div className="max-h-[calc(100vh-8rem)] space-y-4 overflow-y-auto px-6 pb-3 pt-6">
           {groups.map((group) => (
             <div key={group.id}>
-              <p className="mb-2 text-xs font-bold text-[#777]">{group.label}</p>
+              <p className="mb-2 text-xs font-bold text-ink-faint">{group.label}</p>
               <div className="space-y-0.5 pl-3">
                 {group.items.map((item) => {
                   const enabled = itemIsEnabled(item, features)
@@ -229,24 +309,24 @@ function SidebarPreview({ groups, features }: {
                     <div
                       key={item.id}
                       className={`flex min-h-7 items-center gap-2 text-[13px] font-medium ${
-                        enabled ? 'text-[#333]' : 'text-[#999]'
+                        enabled ? 'text-ink' : 'text-ink-faint'
                       }`}
                     >
-                      <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${enabled ? 'bg-[#06c755]' : 'bg-[#dedede]'}`} />
+                      <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${enabled ? 'bg-accent' : 'bg-canvas-sunken'}`} />
                       <span className="truncate">{item.label}</span>
-                      {!enabled && <EyeOffIcon className="ml-auto h-4 w-4 shrink-0 text-[#8b8b8b]" />}
+                      {!enabled && <EyeOffIcon className="ml-auto h-4 w-4 shrink-0 text-ink-faint" />}
                     </div>
                   )
                 })}
               </div>
             </div>
           ))}
-          <div className="border-t border-[#ededed] pb-1 pt-3 text-xs">
-            <p className="flex items-center gap-2 text-[#777]">
+          <div className="border-hairline border-t pb-1 pt-3 text-xs">
+            <p className="flex items-center gap-2 text-ink-faint">
               <EyeOffIcon className="h-4 w-4 shrink-0" />
               この印はメニューに表示されません
             </p>
-            <p className="mt-2 font-bold text-[#c94900]">
+            <p className="mt-2 font-bold text-warning">
               {hidden > 0 ? `${hidden} 項目が非表示になります` : 'すべての項目が表示されます'}
             </p>
           </div>
@@ -258,76 +338,133 @@ function SidebarPreview({ groups, features }: {
 
 export default function SettingsPage() {
   const { selectedAccountId } = useAccount()
-  const [savedFeatures, setSavedFeatures] = useState<Record<string, boolean>>(DEFAULT_FEATURES)
-  const [features, setFeatures] = useState<Record<string, boolean>>(DEFAULT_FEATURES)
+  const [savedFeatures, setSavedFeatures] = useState<Record<string, boolean>>(CATALOG_DEFAULT_FEATURES)
+  const [features, setFeatures] = useState<Record<string, boolean>>(CATALOG_DEFAULT_FEATURES)
   const [savedItemOrder, setSavedItemOrder] = useState<MenuItemOrder>({})
   const [itemOrder, setItemOrder] = useState<MenuItemOrder>({})
   const [specializedFeatureKeys, setSpecializedFeatureKeys] = useState<string[]>([])
+  const [usageCategories, setUsageCategories] = useState<UsageCategory[]>([])
+  /** 利用数の取得に失敗したときだけ出す「読み直す」の印。 */
+  const [usageFailed, setUsageFailed] = useState(false)
+  const [ordering, setOrdering] = useState(false)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  /** GET で受けた版。保存時に送り返し、競合(409)を検出する。 */
+  const [settingsVersion, setSettingsVersion] = useState(0)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  /**
+   * オフ前の影響確認(票643)。止まる仕事があるときだけ開く。
+   * トークンは保持せず、押すたびに取り直してから保存する。
+   */
+  const [impactOpen, setImpactOpen] = useState(false)
+  const [impactGroups, setImpactGroups] = useState<FeatureImpactGroup[]>([])
+  const [impactBusy, setImpactBusy] = useState(false)
+  const [impactError, setImpactError] = useState('')
+  /**
+   * 世代guard。アカウントが変わったら古い応答を捨てる。
+   * Aの応答をBの画面へ混ぜないし、Aの版でBへ保存しない。
+   */
+  const accountGuard = useMemo(() => createAccountRequestGuard(), [])
+  const accountRef = useRef(selectedAccountId)
+  useEffect(() => {
+    if (accountRef.current !== selectedAccountId) {
+      accountRef.current = selectedAccountId
+      accountGuard.advance()
+    }
+  }, [selectedAccountId, accountGuard])
+
+  /**
+   * 利用数だけ後から読む。設定の表示を重い集計で待たせない。
+   *
+   * 集計が8系統の数え直しで重いため、以前は設定と一緒に待っていた。
+   * 先に設定を出して、数は届き次第バッジに足す。失敗しても設定は
+   * 触れるままにし、バッジの「読み直す」から取り直せる。
+   */
+  const loadUsage = useCallback(async () => {
+    if (!selectedAccountId) return
+    const ticket = accountGuard.issue(selectedAccountId)
+    setUsageFailed(false)
+    try {
+      const usageResponse = await api.analytics.usageOverview(selectedAccountId)
+      if (!accountGuard.isCurrent(ticket, selectedAccountId)) return
+      if (usageResponse?.success) {
+        setUsageCategories(usageResponse.data.data.categories)
+      } else {
+        setUsageFailed(true)
+      }
+    } catch {
+      if (!accountGuard.isCurrent(ticket, selectedAccountId)) return
+      setUsageFailed(true)
+    }
+  }, [selectedAccountId, accountGuard])
 
   const load = useCallback(async () => {
     if (!selectedAccountId) {
       setLoading(false)
       return
     }
+    const ticket = accountGuard.issue(selectedAccountId)
     setLoading(true)
     setError('')
     try {
       const response = await api.featureSettings.get(selectedAccountId)
+      if (!accountGuard.isCurrent(ticket, selectedAccountId)) return
       if (!response.success) {
         setError(response.error)
         return
       }
-      const next = { ...DEFAULT_FEATURES, ...response.data.features }
+      const next = normalizeFeatureSettings(response.data.features)
       setSavedFeatures(next)
       setFeatures(next)
       const nextOrder = response.data.sidebarItemOrder ?? {}
       setSavedItemOrder(nextOrder)
+      setSettingsVersion(response.data.version ?? 0)
       setItemOrder(nextOrder)
       setSpecializedFeatureKeys(response.data.specializedFeatureKeys ?? [])
-    } catch {
-      setError('機能設定を読み込めませんでした。時間をおいてもう一度お試しください。')
+      // 設定を先に出し、利用数は後から足す（表示を集計で待たせない）。
+      void loadUsage()
+    } catch (error) {
+      if (!accountGuard.isCurrent(ticket, selectedAccountId)) return
+      setError(featureSettingsErrorMessage(error instanceof ApiError ? error.status : undefined, 'load'))
     } finally {
-      setLoading(false)
+      if (accountGuard.isCurrent(ticket, selectedAccountId)) setLoading(false)
     }
-  }, [selectedAccountId])
+  }, [selectedAccountId, loadUsage, accountGuard])
 
   useEffect(() => { void load() }, [load])
 
   /** 並び順を当てたあとの区分。画面も見え方の欄もこれを見る。 */
   const groups = useMemo(() => {
-    return visibleFeatureGroups({ specializedFeatureKeys }).map((group) => {
-      const order = itemOrder[group.id]
-      if (!order || order.length === 0) return group
-      const byId = new Map(group.items.map((item) => [item.id, item]))
-      const sorted: FeatureItem[] = []
-      for (const id of order) {
-        const item = byId.get(id)
-        if (item && !sorted.includes(item)) sorted.push(item)
-      }
-      return { ...group, items: [...sorted, ...group.items.filter((item) => !sorted.includes(item))] }
-    })
+    return applyItemOrder(
+      visibleFeatureGroups({ specializedFeatureKeys, includeRestaurantTest: true }),
+      itemOrder,
+    )
   }, [itemOrder, specializedFeatureKeys])
 
   const currentOrder = useMemo(() => itemOrderFromGroups(groups), [groups])
-  const dirty =
-    Object.keys(DEFAULT_FEATURES).some((key) => features[key] !== savedFeatures[key]) ||
-    JSON.stringify(currentOrder) !== JSON.stringify(itemOrderFromGroups(
-      visibleFeatureGroups({ specializedFeatureKeys }).map((group) => {
-        const order = savedItemOrder[group.id]
-        if (!order || order.length === 0) return group
-        const byId = new Map(group.items.map((item) => [item.id, item]))
-        const sorted: FeatureItem[] = []
-        for (const id of order) {
-          const item = byId.get(id)
-          if (item && !sorted.includes(item)) sorted.push(item)
-        }
-        return { ...group, items: [...sorted, ...group.items.filter((item) => !sorted.includes(item))] }
-      }),
-    ))
+  const savedGroups = useMemo(() => applyItemOrder(
+    visibleFeatureGroups({ specializedFeatureKeys, includeRestaurantTest: true }),
+    savedItemOrder,
+  ), [savedItemOrder, specializedFeatureKeys])
+  const dirty = featureSettingsAreDirty({
+    savedFeatures,
+    features,
+    savedOrder: itemOrderFromGroups(savedGroups),
+    currentOrder,
+  })
+
+  const usageByItemId = useMemo(() => {
+    const result = new Map<string, UsageCategory>()
+    for (const category of usageCategories) {
+      for (const itemId of USAGE_ITEM_IDS_BY_KEY[category.key] ?? []) result.set(itemId, category)
+    }
+    return result
+  }, [usageCategories])
+
+  const groupColumns = useMemo(() => {
+    return splitFeatureGroups(groups, 3)
+  }, [groups])
 
   const toggleItem = (item: FeatureItem, next: boolean) => {
     if (item.required || item.keys.length === 0) return
@@ -365,31 +502,221 @@ export default function SettingsPage() {
     setNotice('')
   }
 
-  const save = async () => {
-    if (!selectedAccountId || !dirty) return
+  /** 機能の目印→表示名。確認ダイアログで内部IDを出さないために使う。 */
+  const featureLabelByKey = useMemo(() => {
+    const labels = new Map<string, string>()
+    for (const group of groups) {
+      for (const item of group.items) {
+        for (const key of item.keys) {
+          if (!labels.has(key)) labels.set(key, item.label)
+        }
+      }
+    }
+    return labels
+  }, [groups])
+
+  /** 最新の保存済み状態を読み直す。編集中身は残す。 */
+  const reloadSaved = useCallback(async () => {
+    if (!selectedAccountId) return
+    const ticket = accountGuard.issue(selectedAccountId)
+    try {
+      const latest = await api.featureSettings.get(selectedAccountId)
+      if (!accountGuard.isCurrent(ticket, selectedAccountId)) return
+      if (latest.success) {
+        setSavedFeatures(normalizeFeatureSettings(latest.data.features))
+        setSavedItemOrder(latest.data.sidebarItemOrder ?? {})
+        setSettingsVersion(latest.data.version ?? 0)
+      }
+    } catch {
+      // 読み直しに失敗しても編集中身は残す。
+    }
+  }, [selectedAccountId, accountGuard])
+
+  /**
+   * オフ前の影響確認(票643)。変更案だけ送り、保存はしない。
+   * 版が古ければ読み直して null を返す(呼び出し側は保存へ進まない)。
+   * 途中でアカウントが変わったら捨てて null を返す。
+   */
+  const checkImpact = useCallback(async () => {
+    if (!selectedAccountId) return null
+    const ticket = accountGuard.issue(selectedAccountId)
+    try {
+      const impact = await fetchApi<FeatureImpactResponse>(
+        `/api/settings/features/impact?account_id=${encodeURIComponent(selectedAccountId)}`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ features, expectedVersion: settingsVersion }),
+        },
+      )
+      if (!accountGuard.isCurrent(ticket, selectedAccountId)) return null
+      if (!impact.success) {
+        setError(impact.error)
+        return null
+      }
+      return impact.data
+    } catch (error) {
+      if (!accountGuard.isCurrent(ticket, selectedAccountId)) return null
+      // ほかの管理者が先に保存したときは、編集中身は残したまま
+      // 最新を読み直し、内容を確認してもう一度保存してもらう。
+      if (error instanceof ApiError && error.status === 409) {
+        await reloadSaved()
+        setError(FEATURE_SETTINGS_CONFLICT_MESSAGE)
+        return null
+      }
+      setError(featureSettingsErrorMessage(error instanceof ApiError ? error.status : undefined, 'save'))
+      return null
+    }
+  }, [selectedAccountId, features, settingsVersion, reloadSaved, accountGuard])
+
+  const persist = async (impactToken?: string): Promise<boolean> => {
+    if (!selectedAccountId) return false
+    const ticket = accountGuard.issue(selectedAccountId)
     setSaving(true)
     setError('')
     setNotice('')
     try {
-      const response = await api.featureSettings.save(selectedAccountId, {
-        features,
-        sidebarItemOrder: currentOrder,
-      })
+      const response = await fetchApi<FeatureSaveResponse>(
+        `/api/settings/features?account_id=${encodeURIComponent(selectedAccountId)}`,
+        {
+          method: 'PUT',
+          body: JSON.stringify({
+            features,
+            sidebarItemOrder: currentOrder,
+            expectedVersion: settingsVersion,
+            ...(impactToken ? { impactToken } : {}),
+          }),
+        },
+      )
+      // 途中でアカウントが変わったら、応答を捨てて保存へ進まない。
+      if (!accountGuard.isCurrent(ticket, selectedAccountId)) return false
       if (!response.success) {
         setError(response.error)
-        return
+        return false
       }
-      setSavedFeatures({ ...features })
-      setSavedItemOrder(currentOrder)
-      setItemOrder(currentOrder)
+      /*
+       * 保存したつもりの値をそのまま確定しない。サーバーが正した値
+       * （無効環境の飲食店テストなど）を、そのままオン表示にすると
+       * 読み直すまで誤った状態を見せる。サーバ値を読み直して確定する。
+       */
+      try {
+        const latest = await api.featureSettings.get(selectedAccountId)
+        if (!accountGuard.isCurrent(ticket, selectedAccountId)) return false
+        if (latest.success) {
+          const serverFeatures = normalizeFeatureSettings(latest.data.features)
+          setSavedFeatures(serverFeatures)
+          setFeatures(serverFeatures)
+          const serverOrder = latest.data.sidebarItemOrder ?? {}
+          setSavedItemOrder(serverOrder)
+          setItemOrder(serverOrder)
+          setSettingsVersion(latest.data.version ?? response.data.version)
+          setSpecializedFeatureKeys(latest.data.specializedFeatureKeys ?? [])
+        } else {
+          setSettingsVersion(response.data.version)
+          setSavedFeatures({ ...features })
+          setSavedItemOrder(currentOrder)
+          setItemOrder(currentOrder)
+        }
+      } catch {
+        setSettingsVersion(response.data.version)
+        setSavedFeatures({ ...features })
+        setSavedItemOrder(currentOrder)
+        setItemOrder(currentOrder)
+      }
       setNotice('機能設定を保存しました。サイドメニューにも反映されています。')
       window.dispatchEvent(new CustomEvent(FEATURE_SETTINGS_UPDATED_EVENT, { detail: { accountId: selectedAccountId } }))
-    } catch {
-      setError('保存できませんでした。通信状態を確認して、もう一度お試しください。')
+      return true
+    } catch (error) {
+      if (!accountGuard.isCurrent(ticket, selectedAccountId)) return false
+      // 確認後に稼働中が変わったときは、最新の影響で確認し直す。
+      // 編集中身は残したまま、ダイアログを開き直す。
+      if (error instanceof ApiError && error.status === 409
+        && error.code === 'IMPACT_CONFIRMATION_REQUIRED') {
+        const data = error.data as { impacts?: FeatureImpactGroup[] } | undefined
+        if (data?.impacts) {
+          setImpactGroups(data.impacts)
+          setImpactError('状態が変わったため、内容を確認し直してください。')
+          setImpactOpen(true)
+        } else {
+          setError(featureSettingsErrorMessage(error.status, 'save'))
+        }
+        await reloadSaved()
+        return false
+      }
+      // ほかの管理者が先に保存したときは、編集中身は残したまま
+      // 最新を読み直し、内容を確認してもう一度保存してもらう。
+      if (error instanceof ApiError && error.status === 409) {
+        await reloadSaved()
+        setError(FEATURE_SETTINGS_CONFLICT_MESSAGE)
+        return false
+      }
+      setError(featureSettingsErrorMessage(error instanceof ApiError ? error.status : undefined, 'save'))
+      return false
     } finally {
       setSaving(false)
     }
   }
+
+  /**
+   * 保存ボタン。オフに変わる機能があるときだけ先に影響確認し、
+   * 止まる仕事があるときは確認ダイアログを開いて止める。
+   */
+  const save = async () => {
+    if (!selectedAccountId || !dirty) return
+    const offKeys = Object.keys(features).filter(
+      (key) => savedFeatures[key] === true && features[key] === false,
+    )
+    if (offKeys.length === 0) {
+      await persist()
+      return
+    }
+    setSaving(true)
+    setError('')
+    try {
+      const data = await checkImpact()
+      if (!data) return
+      if (data.requiresConfirmation) {
+        setImpactGroups(data.impacts)
+        setImpactError('')
+        setImpactOpen(true)
+        return
+      }
+      await persist()
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  /**
+   * 確認ダイアログの「確認して保存」。押すたびに影響を取り直し、
+   * その場のトークンで保存する。トークンの持ち回しはしない。
+   */
+  const confirmImpactSave = async () => {
+    if (impactBusy || !selectedAccountId) return
+    setImpactBusy(true)
+    setImpactError('')
+    try {
+      const data = await checkImpact()
+      if (!data) {
+        setImpactError('確認を取り直せませんでした。閉じてもう一度保存してください。')
+        return
+      }
+      if (!data.requiresConfirmation || !data.impactToken) {
+        setImpactOpen(false)
+        await persist()
+        return
+      }
+      setImpactGroups(data.impacts)
+      setImpactOpen(true)
+      const ok = await persist(data.impactToken)
+      if (ok) setImpactOpen(false)
+    } finally {
+      setImpactBusy(false)
+    }
+  }
+
+  const impactSummary = (group: FeatureImpactGroup) => group.items
+    .map((item) => `${item.targetType} ${item.count.toLocaleString('ja-JP')}件`)
+    .join('、')
 
   return (
     <div>
@@ -397,95 +724,144 @@ export default function SettingsPage() {
         className="mb-5"
         breadcrumb={[{ label: '設定' }, { label: '機能設定' }]}
         title="機能設定"
-        description="使わない機能をオフにすると、サイドメニューから消えます。データは残るので、あとからオンに戻せば元どおりです。並び順は↑↓で、同じ区分の中だけ入れ替えられます。"
+        description=""
         actions={(
           <>
-          <button
-            type="button"
+          <Button
+            variant="secondary"
+            onClick={() => setOrdering((current) => !current)}
+            disabled={loading || saving}
+          >
+            {ordering ? '並び替えを閉じる' : '並びを変える'}
+          </Button>
+          <Button
+            variant="secondary"
             onClick={() => {
-              setFeatures({ ...DEFAULT_FEATURES })
+              setFeatures({ ...CATALOG_DEFAULT_FEATURES })
               setItemOrder({})
               setNotice('')
             }}
             disabled={loading || saving}
-            className="min-h-10 cursor-pointer rounded-lg border border-[#d9d9d9] bg-white px-4 text-sm font-bold text-[#444] hover:bg-[#fafafa] disabled:cursor-not-allowed disabled:opacity-40"
           >
             初期値に戻す
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
+            variant="primary"
             onClick={() => void save()}
-            disabled={loading || saving}
-            className="inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-lg bg-accent-deep px-5 text-sm font-bold text-white hover:bg-accent-deep/90 disabled:cursor-not-allowed disabled:opacity-40"
+            disabled={loading || saving || !dirty}
+            title={!dirty && !loading ? '変更すると保存できます' : undefined}
           >
             <svg aria-hidden="true" viewBox="0 0 20 20" fill="none" className="h-4 w-4">
               <path d="m4 10 3.5 3.5L16 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
-            {saving ? '保存中…' : '保存'}
-          </button>
+            {saving ? '保存中…' : '機能設定を保存'}
+          </Button>
+          {!loading && !dirty && <span className="self-center text-xs text-ink-faint">変更すると保存できます</span>}
           </>
         )}
       />
 
-      <div className="mb-5 flex items-start gap-3 rounded-[16px] bg-[#edf8ff] px-5 py-3.5 text-xs leading-relaxed text-[#3f4b53]">
-        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="mt-px h-4 w-4 shrink-0 text-[#0066d6]">
+      <div className="bg-info-bg text-ink-secondary mb-4 flex items-start gap-3 rounded-card px-5 py-2.5 text-xs leading-relaxed">
+        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="mt-px h-4 w-4 shrink-0 text-info">
           <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.7" />
           <path d="M12 10.5v6M12 7.5h.01" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
         </svg>
-        <p>オフにしても、その機能で作ったデータ（タグ・配信履歴・予約など）は削除されません。APIも動いたままなので、管理画面から隠れるだけです。</p>
+        <p>使わない機能をオフにすると、サイドメニューから消えます。オフにしても作ったデータは削除されません。公開中のページや動いている配信・予約は、それぞれの画面で止めてからオフにしてください。並び順はここでは変えません。「並びを変える」から入れ替えてください。</p>
       </div>
 
       {!selectedAccountId ? (
-        <p className="rounded-xl border border-gray-200 bg-white p-8 text-center text-sm text-gray-500">
+        <p className="border-hairline bg-canvas text-ink-faint rounded-card border p-8 text-center text-sm">
           先に上部でLINEアカウントを選んでください。
         </p>
       ) : (
         <>
           <div aria-live="polite">
-            {error && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div>}
-            {notice && <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">{notice}</div>}
+            {error && <div className="border-danger bg-danger-bg text-danger mb-4 rounded-control border p-4 text-sm">{error}</div>}
+            {notice && <div className="border-success bg-success-bg text-success mb-4 rounded-control border p-4 text-sm">{notice}</div>}
           </div>
 
           {loading ? (
-            <div className="rounded-xl border border-gray-200 bg-white p-10 text-center text-sm text-gray-500">読み込み中…</div>
+            <div className="border-hairline bg-canvas text-ink-faint rounded-card border p-10 text-center text-sm">読み込み中…</div>
           ) : (
-            <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_20rem]">
+            <div className={ordering ? 'grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_20rem]' : ''}>
               {/*
                 区分ごとの印は付けない。区分と項目はサイドメニューと同じ一覧
                 （src/lib/menu.ts）から作るので、並びと顔ぶれは
                 sidebar-design.test.ts が見ている。ここで二重に縛ると、
                 項目を1つ足すたびに2か所直すことになる。
               */}
-              <div data-design="機能の一覧" className="space-y-5">
-                {groups.map((group) => (
-                  <div key={group.id}>
-                    <FeatureSection
-                      group={group}
-                      features={features}
-                      onItemToggle={toggleItem}
-                      onGroupToggle={toggleGroup}
-                      onMove={moveItem}
-                    />
+              <div
+                data-design="機能の一覧"
+                className={ordering ? 'space-y-4' : 'grid items-start gap-4 xl:grid-cols-3'}
+              >
+                {(ordering ? [groups] : groupColumns).map((column, columnIndex) => (
+                  <div key={columnIndex} className="space-y-3">
+                    {column.map((group) => (
+                      <FeatureSection
+                        key={group.id}
+                        group={group}
+                        features={features}
+                        ordering={ordering}
+                        usageByItemId={usageByItemId}
+                        usageRetry={usageFailed ? () => void loadUsage() : undefined}
+                        onItemToggle={toggleItem}
+                        onGroupToggle={toggleGroup}
+                        onMove={moveItem}
+                      />
+                    ))}
                   </div>
                 ))}
               </div>
-              <SidebarPreview groups={groups} features={features} />
+              {ordering && <SidebarPreview groups={groups} features={features} />}
               {/*
                 運営だけが触る表への入口。要件 v6-34 §5-2「呼び出し元: 31 機能設定の
                 『運営』区分」。**入口をここに 1 つだけ置く。**
                 画面の中身は開いた先で権限を確かめる（運営以外には出さない）。
               */}
-              <div data-design="運営" className="rounded-card border-hairline bg-canvas mt-5 border p-4">
+              {ordering && <div data-design="運営" className="rounded-card border-hairline bg-canvas mt-5 border p-4">
                 <p className="text-ink text-sm font-bold">運営</p>
                 <p className="text-ink-secondary mt-1 text-xs leading-5">お客さまの組織からは見えません。</p>
                 <Link href="/settings/manual-links" className="text-accent-deep mt-3 inline-block text-sm font-bold">
                   マニュアルの正本表
                 </Link>
-              </div>
+              </div>}
             </div>
           )}
         </>
       )}
+
+      {/*
+        オフ前の影響確認(票643)。止まる仕事の件数と対象種別を並べ、
+        確認したうえで保存する。標準の確認窓は使わない。
+      */}
+      <ConfirmDialog
+        open={impactOpen}
+        title="オフにする前に確認"
+        description="止まる仕事があります。オフにしてもデータは削除されず、再度オンにすると再開できます。公開中のページや動いている配信・予約は、それぞれの画面で止めてからオフにしてください。"
+        confirmLabel="確認して保存"
+        destructive
+        busy={impactBusy || saving}
+        error={impactError || undefined}
+        onCancel={() => {
+          if (impactBusy || saving) return
+          setImpactOpen(false)
+          setImpactError('')
+        }}
+        onConfirm={() => void confirmImpactSave()}
+      >
+        <div className="space-y-3">
+          {impactGroups.map((group) => (
+            <div key={group.feature}>
+              <p className="text-sm font-bold text-ink">
+                {featureLabelByKey.get(group.feature) ?? group.feature}
+              </p>
+              <p className="mt-1 text-xs leading-relaxed text-ink-secondary">
+                {impactSummary(group)}
+              </p>
+            </div>
+          ))}
+        </div>
+      </ConfirmDialog>
     </div>
   )
 }

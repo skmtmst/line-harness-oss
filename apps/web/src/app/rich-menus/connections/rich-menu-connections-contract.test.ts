@@ -14,7 +14,7 @@ describe('V6 リッチメニューの切替つながり', () => {
 
   it('既存のgroup取得だけを使い、切替数を固定値で作らない', () => {
     expect(PAGE).toContain('api.richMenuGroups.get(groupId)')
-    expect(PAGE).toContain('`${analysis.edges.length}件`')
+    expect(PAGE).toContain('analysis.edges.filter((edge) => edge.fromPageId === page.id)')
     expect(PAGE).not.toContain('切替ボタン" value="5件')
   })
 

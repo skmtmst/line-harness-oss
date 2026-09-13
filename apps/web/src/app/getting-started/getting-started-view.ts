@@ -5,6 +5,7 @@ import type {
   Scenario,
   StaffMember,
 } from '@line-crm/shared'
+import type { GettingStartedStep } from '@/lib/api'
 
 /**
  * 設計 ★V6 34-1「はじめの設定」（`RAW35`）の順路。
@@ -218,6 +219,74 @@ export function buildSteps(input: GettingStartedInput): StepResult[] {
     scenarioStep(input),
     firstMessageStep(input),
   ]
+}
+
+/**
+ * サーバが判定した5段を、設計の説明と操作へ結び付ける。
+ * 完了判定を画面で再計算しないため、状態・権限・行き先は必ずAPIを正本にする。
+ */
+export function buildStepsFromApi(serverSteps: ReadonlyArray<GettingStartedStep>): StepResult[] {
+  const byKey = new Map(serverSteps.map((step) => [step.key, step]))
+  const display = buildSteps({
+    accounts: [],
+    tagCount: 0,
+    friendFieldCount: 0,
+    friendAdd: null,
+    friendAddDraft: null,
+    scenarios: [],
+    role: null,
+  })
+
+  return display.map((base) => {
+    const server = byKey.get(base.key)
+    if (!server) return { ...base, state: 'unknown', action: null, blockedReason: '状態を取得できませんでした' }
+
+    const state = server.state
+    const nextByState: Record<StepKey, Partial<Record<StepState, string>>> = {
+      accounts: {
+        done: '終わっています。つなぎ先を見直したいときはこちらから。',
+        stalled: server.reason ?? 'Webhookかシークレットがまだ確かめられていません。',
+        todo: 'LINEアカウントを1つ登録して、Webhookをつなぎます。',
+      },
+      attributes: {
+        done: '終わっています。タグを増やすときはこちらから。',
+        todo: 'タグを1つ作ると、友だちを分けて配信できるようになります。',
+      },
+      friendAdd: {
+        done: '終わっています。振り分けを見直したいときはこちらから。',
+        stalled: server.reason ?? '下書きのルールがありますが、まだ公開していません。公開すると動きはじめます。',
+        todo: '友だちが増えたときに何をするかを決めて、公開します。',
+      },
+      scenario: {
+        done: '終わっています。中身を直すときはこちらから。',
+        stalled: server.reason ?? 'シナリオはありますが、段3のルールから始まるものがまだありません。',
+        todo: 'レシピから作ると、7通ぶんの下書きが一度にできます。',
+      },
+      firstMessage: {
+        done: '終わっています。最初の配信を見直すときはこちらから。',
+        todo: 'QRを読んで自分を友だちに追加するか、テスト受信者へ送ります。',
+        unknown: server.reason ?? '届いたかどうかを確かめられません。受信箱で確認してください。',
+        forbidden: 'QRを読んで自分を友だちに追加するか、テスト受信者へ送ります。',
+      },
+    }
+    const labels: Record<StepKey, string> = {
+      accounts: state === 'done' ? '接続の確認を見る' : 'LINEアカウントを開く',
+      attributes: 'タグを見る',
+      friendAdd: '友だち追加時の配信を開く',
+      scenario: state === 'todo' ? 'レシピから作る' : 'シナリオを開く',
+      firstMessage: 'ダッシュボードでQRを見る',
+    }
+    const href = base.key === 'scenario' && state === 'todo' ? '/recipes' : server.href
+    const action = href && state !== 'forbidden' ? { label: labels[base.key], href } : null
+
+    return {
+      ...base,
+      state,
+      next: nextByState[base.key][state] ?? server.reason ?? '状態を確認してください。',
+      action,
+      blockedReason: action ? null : server.reason,
+    }
+  })
 }
 
 /** 終わった段の数。**`unknown` は終わっていない側に数える。** */

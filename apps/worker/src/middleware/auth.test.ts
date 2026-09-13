@@ -1,7 +1,13 @@
 import { describe, expect, test, vi } from 'vitest';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
-import { authMiddleware } from './auth.js';
+import {
+  authMiddleware,
+  isPublicApiBoundary,
+  isStaffExplicitAllow,
+  isStaffSelfEndpoint,
+  permissionForApiPath,
+} from './auth.js';
 import { resolveCorsOrigin } from './admin-auth-config.js';
 import { adminAuth } from '../routes/admin-auth.js';
 import { encryptTotpSecret, totpAtStep } from '../lib/totp.js';
@@ -16,6 +22,14 @@ vi.mock('@line-crm/db', () => ({
     if (token === 'mileage-key') return { id: 'mileage-1', name: 'Mileage Staff', role: 'staff', permission_keys: '["/mileage"]' };
     if (token === 'auto-replies-key') return { id: 'auto-replies-1', name: 'Auto Replies Staff', role: 'staff', permission_keys: '["/auto-replies"]' };
     if (token === 'automations-key') return { id: 'automations-1', name: 'Automations Staff', role: 'staff', permission_keys: '["/automations"]' };
+    if (token === 'booking-key') return { id: 'booking-1', name: 'Booking Staff', role: 'staff', permission_keys: '["/booking/bookings"]' };
+    if (token === 'events-key') return { id: 'events-1', name: 'Events Staff', role: 'staff', permission_keys: '["/events"]' };
+    if (token === 'contents-key') return { id: 'contents-1', name: 'Contents Staff', role: 'staff', permission_keys: '["/contents"]' };
+    if (token === 'photo-view-key') return { id: 'photo-view-1', name: 'Photo Viewer', role: 'staff', permission_keys: '["photo.submission.view"]' };
+    if (token === 'photo-review-key') return { id: 'photo-review-1', name: 'Photo Reviewer', role: 'staff', permission_keys: '["photo.submission.review"]' };
+    if (token === 'photo-bulk-key') return { id: 'photo-bulk-1', name: 'Photo Bulk Reviewer', role: 'staff', permission_keys: '["photo.submission.bulk_review"]' };
+    if (token === 'photo-download-key') return { id: 'photo-download-1', name: 'Photo Downloader', role: 'staff', permission_keys: '["photo.original.download"]' };
+    if (token === 'rich-menus-key') return { id: 'rich-menus-1', name: 'Rich Menu Staff', role: 'staff', permission_keys: '["/rich-menus"]' };
     if (token === 'no-permissions-key') return { id: 'none-1', name: 'No Permission Staff', role: 'staff', permission_keys: '[]' };
     if (token !== 'staff-key') return null;
     return {
@@ -42,6 +56,10 @@ vi.mock('@line-crm/db', () => ({
   incrementTwoFactorChallengeAttempts: vi.fn(async () => undefined),
   deleteTwoFactorChallenge: vi.fn(async () => undefined),
   claimStaffTotpStep: vi.fn(async () => true),
+  reserveStepUpAttempt: vi.fn(async () => ({
+    attempts: 1, maxAttempts: 5, windowStartedAt: new Date().toISOString(),
+  })),
+  createStepUpGrant: vi.fn(async () => true),
   updateStaffMember: vi.fn(async () => null),
   deleteAdminSession: vi.fn(async () => undefined),
   // ログイン・ログアウト・失敗を記録する。本体では例外を握るので、
@@ -97,9 +115,12 @@ function app() {
   a.post('/api/forms/:id/partial', (c) => c.json({ success: true }));
   a.post('/api/forms/:id/opened', (c) => c.json({ success: true }));
   a.post('/api/integrations/codex-slack/events', (c) => c.json({ success: true }));
+  a.post('/api/integrations/ai-loop/reports', (c) => c.json({ success: true }));
   a.post('/api/integrations/slack/actions', (c) => c.json({ success: true }));
   a.post('/api/integrations/slack/events', (c) => c.json({ success: true }));
   a.get('/api/public/brand', (c) => c.json({ success: true, staff: c.get('staff') ?? null }));
+  a.get('/api/site/script.js', (c) => c.json({ success: true, staff: c.get('staff') ?? null }));
+  a.post('/api/site/collect', (c) => c.json({ success: true, staff: c.get('staff') ?? null }));
   for (const path of [
     '/api/support', '/api/operators', '/api/support-marks', '/api/saved-searches',
     '/api/folders', '/api/tag-groups', '/api/friends/:id', '/api/friends/:id/messages',
@@ -109,6 +130,35 @@ function app() {
   }
   a.get('/api/mileage/history', (c) => c.json({ success: true }));
   a.get('/api/action-scores/rules', (c) => c.json({ success: true }));
+  a.get('/api/booking/admin/customers', (c) => c.json({ success: true }));
+  a.post('/api/booking/admin/customers', (c) => c.json({ success: true }));
+  a.patch('/api/booking/admin/requests/:id', (c) => c.json({ success: true }));
+  a.get('/api/meet-consultations', (c) => c.json({ success: true }));
+  a.post('/api/meet-consultations', (c) => c.json({ success: true }));
+  a.delete('/api/meet-consultations/:externalEventId', (c) => c.json({ success: true }));
+  // 本番で staff 到達可な予約口だけを載せる (枠の作成・変更・削除は owner/admin 専用のため除外)。
+  a.put('/api/events/admin/events/:id/bookings/:bookingId', (c) => c.json({ success: true }));
+  a.post('/api/events/admin/events/:id/bookings/:bookingId/decide', (c) => c.json({ success: true }));
+  a.post('/api/events/admin/events/:id/bookings/:bookingId/cancel', (c) => c.json({ success: true }));
+  a.get('/api/nen-members/photos', (c) => c.json({ success: true }));
+  a.get('/api/nen-members/photos/photo-1/assets/status', (c) => c.json({ success: true }));
+  a.post('/api/nen-members/photos/photo-1/review', (c) => c.json({ success: true }));
+  a.post('/api/nen-members/photos/photo-1/assets/process', (c) => c.json({ success: true }));
+  a.post('/api/nen-members/photos/decisions/bulk', (c) => c.json({ success: true }));
+  a.post('/api/nen-members/photos/photo-1/original-download', (c) => c.json({ success: true }));
+  a.get('/api/nen-members/photos/original-download/token', (c) => c.json({ success: true }));
+  a.get('/api/media', (c) => c.json({ success: true }));
+  a.get('/api/media/md-1/download', (c) => c.json({ success: true }));
+  a.get('/api/media/md-1/content', (c) => c.json({ success: true }));
+  a.get('/api/rich-menu-groups', (c) => c.json({ success: true }));
+  // 本人IDと同じ動的 path だけ通り、将来追加される固定1セグメント path は閉じる。
+  a.get('/api/staff/friends-1', (c) => c.json({ success: true }));
+  a.patch('/api/staff/friends-1', (c) => c.json({ success: true }));
+  a.get('/api/staff/export', (c) => c.json({ success: true }));
+  a.patch('/api/staff/policy', (c) => c.json({ success: true }));
+  // N-423 の未登録経路。permissionForApiPath が null を返す口。
+  a.get('/api/coverage-unmapped-demo', (c) => c.json({ success: true }));
+  a.post('/api/coverage-unmapped-demo', (c) => c.json({ success: true }));
   return a;
 }
 
@@ -259,6 +309,38 @@ describe('Authenticator verification', () => {
     expect(cookieFor(response, 'lh_admin_session')).toBeTruthy();
     expect(db.claimStaffTotpStep).toHaveBeenCalledWith(expect.anything(), 'staff-1', expect.any(Number));
   });
+
+  test.each(['operations.control', 'photo.original.download'])(
+    'authenticated operator exchanges a TOTP code for a one-time %s step-up grant',
+    async (purpose) => {
+    const db = await import('@line-crm/db');
+    const secret = 'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ';
+    const masterKey = 'test-master-key-which-is-longer-than-32-characters';
+    vi.mocked(db.getStaffById).mockResolvedValueOnce({
+      id: 'staff-1', name: 'Staff One', email: 'staff@example.com', role: 'admin', access_level: 'full', api_key: 'hidden', line_user_id: 'U1', is_active: 1,
+      permission_keys: '[]', notification_preferences: '{}', invite_status: 'active', invite_token_hash: null, invite_expires_at: null, email_verified_at: null, line_linked_at: null,
+      totp_secret_enc: await encryptTotpSecret(secret, masterKey), totp_pending_secret_enc: null, totp_enabled_at: new Date().toISOString(), totp_last_used_step: null,
+      tenant_id: '00000000-0000-4000-8000-000000000001',
+      created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+    });
+    const response = await app().request('/api/auth/step-up', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer staff-key' },
+      body: JSON.stringify({
+        purpose,
+        code: await totpAtStep(secret, Math.floor(Date.now() / 30_000)),
+      }),
+    }, env({ TOTP_ENCRYPTION_KEY: masterKey }));
+    expect(response.status).toBe(201);
+    expect(await response.json()).toMatchObject({
+      success: true,
+      data: { token: expect.any(String), purpose, expiresAt: expect.any(String) },
+    });
+    expect(db.createStepUpGrant).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      staffId: 'staff-1', purpose, tokenHash: expect.any(String),
+    }));
+    },
+  );
 });
 
 describe('topology guard', () => {
@@ -323,7 +405,7 @@ describe('protected API access', () => {
   });
 
   test('keeps read-only access when using the Bearer fallback', async () => {
-    const get = await app().request('/api/protected', {
+    const get = await app().request('/api/auth/session', {
       headers: { Authorization: 'Bearer lh_session:viewer-session' },
     }, crossSiteEnv());
     expect(get.status).toBe(200);
@@ -345,7 +427,7 @@ describe('protected API access', () => {
   });
 
   test('allows read-only accounts to read authenticated APIs', async () => {
-    const res = await app().request('/api/protected', { headers: { Authorization: 'Bearer viewer-key' } }, crossSiteEnv());
+    const res = await app().request('/api/auth/session', { headers: { Authorization: 'Bearer viewer-key' } }, crossSiteEnv());
     expect(res.status).toBe(200);
     const body = await res.json() as { data: { role: string; readOnly: boolean } };
     expect(body.data.role).toBe('staff');
@@ -410,9 +492,107 @@ describe('staff feature permissions', () => {
     expect((await app().request('/api/automation-runs', bearer('friends-key'), crossSiteEnv())).status).toBe(403);
   });
 
+  test('booking permission protects phone customer reads and writes', async () => {
+    for (const method of ['GET', 'POST']) {
+      const path = '/api/booking/admin/customers';
+      expect((await app().request(path, { ...bearer('booking-key'), method }, crossSiteEnv())).status)
+        .toBe(200);
+      expect((await app().request(path, { ...bearer('friends-key'), method }, crossSiteEnv())).status)
+        .toBe(403);
+    }
+  });
+
+  test('booking permission protects change/cancel (N-065 #623)', async () => {
+    const path = '/api/booking/admin/requests/bk-1';
+    expect((await app().request(path, { ...bearer('booking-key'), method: 'PATCH' }, crossSiteEnv())).status)
+      .toBe(200);
+    expect((await app().request(path, { ...bearer('friends-key'), method: 'PATCH' }, crossSiteEnv())).status)
+      .toBe(403);
+    expect((await app().request(path, { ...bearer('no-permissions-key'), method: 'PATCH' }, crossSiteEnv())).status)
+      .toBe(403);
+  });
+
+  test('meet consultations require the booking permission (N-065 #623)', async () => {
+    const paths = [
+      ['GET', '/api/meet-consultations'],
+      ['POST', '/api/meet-consultations'],
+      ['DELETE', '/api/meet-consultations/google-event-1'],
+    ] as const;
+    for (const [method, path] of paths) {
+      // owner/admin は従来どおり通る。
+      expect((await app().request(path, { ...bearer('staff-key'), method }, crossSiteEnv())).status)
+        .toBe(200);
+      // 予約権限つき staff は通る。
+      expect((await app().request(path, { ...bearer('booking-key'), method }, crossSiteEnv())).status)
+        .toBe(200);
+      // 権限なし staff は 403。
+      expect((await app().request(path, { ...bearer('friends-key'), method }, crossSiteEnv())).status)
+        .toBe(403);
+      expect((await app().request(path, { ...bearer('no-permissions-key'), method }, crossSiteEnv())).status)
+        .toBe(403);
+    }
+    // read_only は書込み不可。
+    expect((await app().request('/api/meet-consultations', { ...bearer('viewer-key'), method: 'POST' }, crossSiteEnv())).status)
+      .toBe(403);
+  });
+
+  test('events permission protects booking decide/cancel/update (N-065 #623)', async () => {
+    const paths = [
+      ['PUT', '/api/events/admin/events/ev-1/bookings/bk-1'],
+      ['POST', '/api/events/admin/events/ev-1/bookings/bk-1/decide'],
+      ['POST', '/api/events/admin/events/ev-1/bookings/bk-1/cancel'],
+    ] as const;
+    for (const [method, path] of paths) {
+      expect((await app().request(path, { ...bearer('events-key'), method }, crossSiteEnv())).status)
+        .toBe(200);
+      expect((await app().request(path, { ...bearer('friends-key'), method }, crossSiteEnv())).status)
+        .toBe(403);
+      expect((await app().request(path, { ...bearer('no-permissions-key'), method }, crossSiteEnv())).status)
+        .toBe(403);
+    }
+  });
+
+  test('permission mapping matches the production routes (N-065 #623)', async () => {
+    const { permissionForApiPath } = await import('./auth.js');
+    // 予約の変更・取消と個別相談は予約権限、イベント口はイベント権限。
+    expect(permissionForApiPath('/api/booking/admin/requests/bk-1')).toBe('/booking/bookings');
+    expect(permissionForApiPath('/api/meet-consultations')).toBe('/booking/bookings');
+    expect(permissionForApiPath('/api/meet-consultations/google-event-1')).toBe('/booking/bookings');
+    expect(permissionForApiPath('/api/events/admin/events/ev-1/bookings/bk-1')).toBe('/events');
+    expect(permissionForApiPath('/api/events/admin/events/ev-1/bookings/bk-1/decide')).toBe('/events');
+    expect(permissionForApiPath('/api/events/admin/events/ev-1/bookings/bk-1/cancel')).toBe('/events');
+    // 公開コールバックは権限の対象外。
+    expect(permissionForApiPath('/api/meet-callback')).toBeNull();
+  });
+
+  test('写真審査は閲覧・判断・一括判断・原本取得の専用権限を分離する', async () => {
+    const checks = [
+      ['GET', '/api/nen-members/photos', 'photo-view-key'],
+      ['GET', '/api/nen-members/photos/photo-1/assets/status', 'photo-view-key'],
+      ['POST', '/api/nen-members/photos/photo-1/review', 'photo-review-key'],
+      ['POST', '/api/nen-members/photos/photo-1/assets/process', 'photo-review-key'],
+      ['POST', '/api/nen-members/photos/decisions/bulk', 'photo-bulk-key'],
+      ['POST', '/api/nen-members/photos/photo-1/original-download', 'photo-download-key'],
+      ['GET', '/api/nen-members/photos/original-download/token', 'photo-download-key'],
+    ] as const;
+    for (const [method, path, token] of checks) {
+      expect((await app().request(path, { ...bearer(token), method }, crossSiteEnv())).status).toBe(200);
+      expect((await app().request(path, { ...bearer('no-permissions-key'), method }, crossSiteEnv())).status).toBe(403);
+    }
+  });
+
   test.each(['/api/support', '/api/friends/friend-1', '/api/support-marks'])(
     'missing feature permission fails closed for %s',
     async (path) => {
+      expect((await app().request(path, bearer('no-permissions-key'), crossSiteEnv())).status).toBe(403);
+    },
+  );
+
+  test.each(['/api/media', '/api/media/md-1/download', '/api/media/md-1/content'])(
+    'contents permission protects %s (fail-closed)',
+    async (path) => {
+      expect((await app().request(path, bearer('contents-key'), crossSiteEnv())).status).toBe(200);
+      expect((await app().request(path, bearer('friends-key'), crossSiteEnv())).status).toBe(403);
       expect((await app().request(path, bearer('no-permissions-key'), crossSiteEnv())).status).toBe(403);
     },
   );
@@ -456,9 +636,21 @@ describe('public form method boundaries', () => {
   });
 });
 
+describe('公開サイト計測の認証境界', () => {
+  test.each([
+    ['GET', '/api/site/script.js'],
+    ['POST', '/api/site/collect'],
+  ])('%s %s は管理者認証より前へ通す', async (method, path) => {
+    const res = await app().request(path, { method }, crossSiteEnv());
+    expect(res.status).toBe(200);
+    expect((await res.json() as { staff: unknown }).staff).toBeNull();
+  });
+});
+
 describe('署名検証を持つSlack連携入口', () => {
   test.each([
     '/api/integrations/codex-slack/events',
+    '/api/integrations/ai-loop/reports',
     '/api/integrations/slack/actions',
     '/api/integrations/slack/events',
   ])('%s は管理者認証より前へ通す', async (path) => {
@@ -609,5 +801,186 @@ describe('CORS allowed / blocked origins', () => {
       headers: { Origin: 'https://evil.example.com', Cookie: 'lh_admin_session=staff-key' },
     }, crossSiteEnv());
     expect(res.headers.get('Access-Control-Allow-Origin')).toBeNull();
+  });
+});
+
+describe('N-423 staff deny-by-default (#670)', () => {
+  const staffBearer = (token: string) => ({ headers: { Authorization: `Bearer ${token}` } });
+
+  test.each(['GET', 'POST'] as const)('%s 未登録の管理APIは staff に 403', async (method) => {
+    for (const token of ['friends-key', 'no-permissions-key']) {
+      const res = await app().request('/api/coverage-unmapped-demo', { ...staffBearer(token), method }, crossSiteEnv());
+      expect(res.status).toBe(403);
+      expect((await res.json() as { error: string }).error).toBe('この機能を操作する権限がありません');
+    }
+  });
+
+  test.each(['GET', 'POST'] as const)('%s 未登録でも owner/admin は通る', async (method) => {
+    // staff-key は管理者、env-key はオーナーとして受け付ける。
+    for (const token of ['staff-key', 'env-key']) {
+      const res = await app().request('/api/coverage-unmapped-demo', { ...staffBearer(token), method }, crossSiteEnv());
+      expect(res.status).toBe(200);
+    }
+  });
+
+  test('未登録は認証なしだと 401 (403 の手前で止める)', async () => {
+    expect((await app().request('/api/coverage-unmapped-demo', {}, crossSiteEnv())).status).toBe(401);
+  });
+
+  test('追加した権限表が staff の可否を分ける', async () => {
+    // /rich-menus 鍵つきは通る。
+    expect((await app().request('/api/rich-menu-groups', staffBearer('rich-menus-key'), crossSiteEnv())).status).toBe(200);
+    // 別の鍵・鍵なしは 403。
+    expect((await app().request('/api/rich-menu-groups', staffBearer('friends-key'), crossSiteEnv())).status).toBe(403);
+    expect((await app().request('/api/rich-menu-groups', staffBearer('no-permissions-key'), crossSiteEnv())).status).toBe(403);
+  });
+
+  test('起動時のセッション取得は staff でも通る', async () => {
+    const res = await app().request('/api/auth/session', staffBearer('friends-key'), crossSiteEnv());
+    expect(res.status).toBe(200);
+    const body = await res.json() as { data: { role: string } };
+    expect(body.data.role).toBe('staff');
+  });
+
+  test('追加した権限表の対応', () => {
+    expect(permissionForApiPath('/api/rich-menus')).toBe('/rich-menus');
+    expect(permissionForApiPath('/api/rich-menus/m1')).toBe('/rich-menus');
+    expect(permissionForApiPath('/api/rich-menu-groups')).toBe('/rich-menus');
+    expect(permissionForApiPath('/api/rich-menu-groups/g1/publish')).toBe('/rich-menus');
+    expect(permissionForApiPath('/api/rich-menu-images/key')).toBe('/rich-menus');
+    expect(permissionForApiPath('/api/friend-add-rules')).toBe('/friend-add-settings');
+    expect(permissionForApiPath('/api/friend-add-runs/r1')).toBe('/friend-add-settings');
+    expect(permissionForApiPath('/api/scoring-rules')).toBe('/scoring');
+    expect(permissionForApiPath('/api/common-vars')).toBe('/contents/vars');
+    expect(permissionForApiPath('/api/common-vars/v1/schedules')).toBe('/contents/vars');
+    expect(permissionForApiPath('/api/entry-routes')).toBe('/inflow-links');
+    expect(permissionForApiPath('/api/entry-route-genres')).toBe('/inflow-links');
+    expect(permissionForApiPath('/api/message-templates')).toBe('/inflow-links');
+    expect(permissionForApiPath('/api/funnels')).toBe('/analytics');
+    expect(permissionForApiPath('/api/support-mark-rules/r1')).toBe('/tags');
+    expect(permissionForApiPath('/api/friend-reminders/fr1')).toBe('/reminders');
+    expect(permissionForApiPath('/api/reminder-runs/rr1/retry')).toBe('/reminders');
+    expect(permissionForApiPath('/api/line-notifications/deliveries')).toBe('/line-notifications');
+    expect(permissionForApiPath('/api/dashboard/overview')).toBe('/');
+    expect(permissionForApiPath('/api/getting-started')).toBe('/getting-started');
+    // 帰属を決められない集計は未登録のまま fail-closed。
+    expect(permissionForApiPath('/api/list-stats')).toBeNull();
+    expect(permissionForApiPath('/api/account-handovers')).toBeNull();
+    expect(permissionForApiPath('/api/coverage-unmapped-demo')).toBeNull();
+  });
+
+  test('本人・自組織の口は役割に関わらず通す', () => {
+    for (const [method, path] of [
+      ['GET', '/api/auth/session'],
+      ['POST', '/api/auth/step-up'],
+      ['GET', '/api/staff/me'],
+      ['GET', '/api/staff/abc'],
+      ['PATCH', '/api/staff/abc'],
+      ['POST', '/api/staff/abc/two-factor/setup'],
+      ['POST', '/api/staff/abc/two-factor/confirm'],
+      ['DELETE', '/api/staff/abc/two-factor'],
+      ['GET', '/api/tenants/me'],
+      ['POST', '/api/client-errors'],
+      ['GET', '/api/capabilities'],
+      ['GET', '/api/line-accounts'],
+      ['GET', '/api/line-accounts/summary'],
+      ['GET', '/api/settings/features'],
+      ['POST', '/api/images'],
+    ] as const) {
+      expect(isStaffSelfEndpoint(method, path, 'abc')).toBe(true);
+    }
+  });
+
+  test('本人・自組織の口の method 違い・他人宛て・固定path候補は通さない', () => {
+    for (const [method, path] of [
+      ['POST', '/api/auth/session'],
+      ['GET', '/api/auth/step-up'],
+      ['POST', '/api/staff/me'],
+      ['DELETE', '/api/staff/abc'],
+      ['POST', '/api/staff/abc'],
+      ['GET', '/api/staff/abc/two-factor/setup'],
+      ['GET', '/api/staff'],
+      ['POST', '/api/staff'],
+      ['PATCH', '/api/tenants/me'],
+      ['GET', '/api/client-errors'],
+      ['POST', '/api/capabilities'],
+      ['POST', '/api/line-accounts'],
+      ['GET', '/api/line-accounts/abc'],
+      ['PUT', '/api/settings/features'],
+      ['GET', '/api/images'],
+      ['DELETE', '/api/images/abc'],
+      ['GET', '/api/operations/health'],
+      ['GET', '/api/staff/export'],
+      ['PATCH', '/api/staff/policy'],
+    ] as const) {
+      expect(isStaffSelfEndpoint(method, path, 'abc')).toBe(false);
+    }
+    expect(isStaffSelfEndpoint('GET', '/api/staff/other', 'abc')).toBe(false);
+    expect(isStaffSelfEndpoint('PATCH', '/api/staff/other', 'abc')).toBe(false);
+  });
+
+  test('実リクエストは本人IDだけ通し、同じ形の固定pathと他人IDを403にする', async () => {
+    expect((await app().request('/api/staff/friends-1', staffBearer('friends-key'), crossSiteEnv())).status).toBe(200);
+    expect((await app().request('/api/staff/friends-1', {
+      ...staffBearer('friends-key'), method: 'PATCH',
+    }, crossSiteEnv())).status).toBe(200);
+
+    for (const [method, path, token] of [
+      ['GET', '/api/staff/export', 'friends-key'],
+      ['PATCH', '/api/staff/policy', 'friends-key'],
+      ['GET', '/api/staff/friends-1', 'no-permissions-key'],
+      ['PATCH', '/api/staff/friends-1', 'no-permissions-key'],
+    ] as const) {
+      const res = await app().request(path, { ...staffBearer(token), method }, crossSiteEnv());
+      expect(res.status).toBe(403);
+      expect((await res.json() as { error: string }).error).toBe('この機能を操作する権限がありません');
+    }
+  });
+
+  test('明示許可の写しは route の staff 許可と一致する (司令塔裁定 #670)', () => {
+    for (const [method, path] of [
+      ['GET', '/api/staff'],
+      ['GET', '/api/restaurant-test/stores'],
+      ['GET', '/api/restaurant-test/store-context'],
+      ['GET', '/api/restaurant-test/terms-agreement'],
+      ['POST', '/api/restaurant-test/stores/selection/clear'],
+      ['POST', '/api/restaurant-test/stores/abc/select'],
+      ['GET', '/api/restaurant-test/snapshot'],
+      ['POST', '/api/restaurant-test/reservations/manual'],
+    ] as const) {
+      expect(isStaffExplicitAllow(method, path)).toBe(true);
+    }
+    for (const [method, path] of [
+      ['POST', '/api/staff'],
+      ['DELETE', '/api/staff/abc'],
+      ['POST', '/api/restaurant-test/terms-agreement'],
+      ['POST', '/api/restaurant-test/stores'],
+      ['GET', '/api/restaurant-test/stores/abc/select'],
+      ['POST', '/api/restaurant-test/intake-addresses'],
+      ['GET', '/api/staff/me'],
+    ] as const) {
+      expect(isStaffExplicitAllow(method, path)).toBe(false);
+    }
+  });
+
+  test('公開境界の method 境界', () => {
+    expect(isPublicApiBoundary('GET', '/api/forms/f1')).toBe(true);
+    expect(isPublicApiBoundary('PUT', '/api/forms/f1')).toBe(false);
+    expect(isPublicApiBoundary('DELETE', '/api/forms/f1')).toBe(false);
+    expect(isPublicApiBoundary('POST', '/api/forms/f1/submit')).toBe(true);
+    expect(isPublicApiBoundary('POST', '/api/forms/f1/opened')).toBe(true);
+    expect(isPublicApiBoundary('POST', '/api/forms/f1/partial')).toBe(true);
+    expect(isPublicApiBoundary('DELETE', '/api/forms/f1/submit')).toBe(false);
+    expect(isPublicApiBoundary('POST', '/api/integrations/slack/events')).toBe(true);
+    expect(isPublicApiBoundary('GET', '/api/webhooks/incoming/abc/receive')).toBe(true);
+    expect(isPublicApiBoundary('GET', '/api/meet-callback')).toBe(true);
+    expect(isPublicApiBoundary('GET', '/api/health')).toBe(true);
+    expect(isPublicApiBoundary('GET', '/api/qr')).toBe(true);
+    expect(isPublicApiBoundary('GET', '/api/public/brand')).toBe(true);
+    expect(isPublicApiBoundary('GET', '/api/liff/config')).toBe(true);
+    expect(isPublicApiBoundary('GET', '/api/protected')).toBe(false);
+    expect(isPublicApiBoundary('GET', '/api/public/brands')).toBe(false);
+    expect(isPublicApiBoundary('GET', '/api/auth/session')).toBe(false);
+    expect(isPublicApiBoundary('GET', '/api/staff')).toBe(false);
   });
 });

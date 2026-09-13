@@ -75,6 +75,94 @@ describe('マイルのタブ', () => {
     expect(PAGE).toMatch(/<MileageRewardsTab[\s\S]{0,120}accountId=/)
   })
 })
+describe('届かなかった交換', () => {
+  const code = withoutComments(TAB)
+
+  it('店ごとに失敗中の一覧を読む', () => {
+    // アカウントを渡さないと、ほかの店の交換まで混ざる。
+    expect(code).toMatch(/\/api\/mileage\/redemptions\?accountId=/)
+    expect(code).toContain('encodeURIComponent(accountId)')
+  })
+
+  it('理由・回数・最終日時を出す', () => {
+    expect(code).toMatch(/failureMessage\s*\|\|\s*item\.failureCode/)
+    expect(code).toMatch(/attemptCount\.toLocaleString/)
+    expect(code).toMatch(/formatMileageDate\(item\.updatedAt\)/)
+  })
+
+  it('失敗中だけを並べる', () => {
+    // 成功済み・返金済みを並べると、やり直しの押し間違いの素になる。
+    expect(code).toMatch(/item\.status\s*===\s*'delivery_failed'/)
+  })
+
+  it('無いとき・取れないときに欄ごと出さない', () => {
+    // 0件・失敗を「0件」と書くと、届いていない交換が無いことになる。
+    expect(code).toMatch(/setRedemptionsVisible\(false\)/)
+    expect(code).toMatch(/redemptionsVisible && failedRedemptions\.length > 0/)
+  })
+
+  it('やり直しは失敗中の口へ店と一緒に送る', () => {
+    expect(code).toMatch(/\/retry-fulfillment/)
+    expect(code).toMatch(/JSON\.stringify\(\{\s*accountId/)
+  })
+
+  it('同時クリック・再送を1回にまとめる', () => {
+    // 先に立てた旗でボタンも関数も止める。
+    expect(code).toMatch(/disabled=\{retryingId !== null\}/)
+    expect(code).toMatch(/if\s*\(!accountId \|\| retryingId\) return/)
+    expect(code).toMatch(/setRetryingId\(redemption\.id\)/)
+  })
+
+  it('同時押しは描画の外の旗で止める', () => {
+    /*
+     * `retryingId` だけでは同じ束のクリックを止められない。状態は再描画まで
+     * 古いままなので、2回目・3回目もそのまま裏側へ飛ぶ（本物のReactで確認）。
+     * 実挙動は mileage-retry-react.test.tsx が当てる。ここは口の形だけ見る。
+     */
+    expect(code).toMatch(/createSingleFlightLock/)
+    expect(code).toMatch(/if \(!retryLock\.acquire\(redemption\.id\)\) return/)
+    expect(code).toMatch(/retryLock\.release\(redemption\.id\)/)
+    expect(code).toMatch(/retryLock\.reset\(\)/)
+  })
+
+  it('やり直しのあとは一覧を読み直す', () => {
+    expect(code).toMatch(/await loadFailedRedemptions\(\)/)
+  })
+
+  it('店切替で古い応答が後着しない', () => {
+    // Aの応答がBの表示を上書きすると、別店の交換に触ってしまう。
+    expect(code).toMatch(/createMileageRewardsFetchGuards/)
+    expect(code).toMatch(/overviewGuard\.issue\(\)/)
+    expect(code).toMatch(/redemptionsGuard\.issue\(\)/)
+    expect(code).toMatch(/if \(!overviewGuard\.isCurrent\(requestId\)\) return/)
+    expect(code).toMatch(/if \(!redemptionsGuard\.isCurrent\(requestId\)\) return/)
+  })
+
+  it('2つの取得で1つの札を使い回さない', () => {
+    // 開いた瞬間に後の取得が先を古くし、一覧が loading のまま残る。
+    expect(code).not.toMatch(/requestGuard\.issue\(\)/)
+    expect(code).toMatch(/overview:\s*overviewGuard/)
+    expect(code).toMatch(/redemptions:\s*redemptionsGuard/)
+  })
+
+  it('やり直しは押したときの店と応答時の店を比べる', () => {
+    // Aで押してBへ切り替えたあと、古い閉じ込めがAを読み直さない。
+    expect(code).toMatch(/createAccountTracker/)
+    expect(code).toMatch(/accountTracker\.track\(/)
+    expect(code).toMatch(/if \(!accountTracker\.isCurrent\(operation\)\) return/)
+  })
+
+  it('店が替わったらやり直しの旗を降ろす', () => {
+    // 降ろさないとBのボタンが押せないまま残る。
+    expect(code).toMatch(/setRetryingId\(null\)/)
+  })
+
+  it('再取得のたびに店の世代を確かめる', () => {
+    // 1つ目の再取得待ちにBへ切り替わると、2つ目がBを上書きする。
+    expect(code).toMatch(/await loadFailedRedemptions\(\)[\s\S]*?if \(!accountTracker\.isCurrent\(operation\)\) return[\s\S]*?await load\(\)/)
+  })
+})
+
 describe('いちばん使われた', () => {
   const code = withoutComments(TAB)
 

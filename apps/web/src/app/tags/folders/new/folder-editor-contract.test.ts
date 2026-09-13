@@ -8,13 +8,18 @@ const read = (path: string) => readFileSync(resolve(root, path), 'utf8')
 const FOLDER_EDITOR = 'app/tags/folders/new/page.tsx'
 
 describe('フォルダの作成・編集（設計 byqIW）', () => {
-  it('画面名を共通トップバーだけに置き、本文の大見出しへ戻さない', () => {
+  it('友だち属性の一覧に、追加・編集で同じモーダルを重ねる', () => {
     const source = read(FOLDER_EDITOR)
-    // 上部バーと同じ文字が本文にもう一度出ていた（`<h1 class="text-[32px]">`）。
-    expect(source).toContain("usePageTitle(editId ? 'フォルダを編集' : 'フォルダを追加')")
+    expect(source).toContain("usePageTitle('友だち属性')")
     expect(source).not.toContain('<h1')
-    // 32px はトークン外（`--text-display` は 30px）。値を直接書かない。
     expect(source).not.toContain('text-[32px]')
+    expect(source).toContain('<TagsPageV4 accountId={selectedAccountId} />')
+    expect(source).toContain('role="dialog"')
+    expect(source).toContain("{editId ? 'フォルダを編集' : 'フォルダを追加'}")
+    expect(source).toContain('useOverlayFocus(!deleteOpen, close, saving)')
+    expect(source).toContain('max-w-[620px]')
+    expect(source).toContain('名前と色を変えられます。削除しても中の項目は未分類に残ります。')
+    expect(source).toContain('aria-label="閉じる"')
   })
 
   it('色見本は枠38×38の中に20×20の円で、枠ごと塗らない', () => {
@@ -26,6 +31,7 @@ describe('フォルダの作成・編集（設計 byqIW）', () => {
     expect(source).not.toContain('h-9 w-9 rounded-full')
     // 選択中は円の上に16pxのチェック。
     expect(source).toContain('<Check size={16}')
+    expect(source).toContain("{ value: '#7C3AED', name: '紫' }")
   })
 
   it('「一覧での表示」の見本が、選んだ色と入力中の名前で出る', () => {
@@ -80,6 +86,21 @@ describe('フォルダの作成・編集（設計 byqIW）', () => {
     // 押せない見た目だけにしない。
     expect(source).toContain("{loadState === 'ready' && blockedReason && (")
   })
+
+  it('編集時はフォルダだけを削除し、中のタグを残すことを確認する', () => {
+    const source = read(FOLDER_EDITOR)
+    expect(source).toContain('api.tagGroups.delete(editId, folderAccountId)')
+    expect(source).toContain('このフォルダを削除')
+    expect(source).toContain('中にあるタグは削除されず、未分類へ戻ります。')
+    expect(source).toContain('フォルダを保存')
+  })
+
+  it('選択中のLINE公式アカウントを分類の読込・保存へ渡す', () => {
+    const source = read(FOLDER_EDITOR)
+    expect(source).toContain('.list(selectedAccountId)')
+    expect(source).toContain('accountId: selectedAccountId')
+    expect(source).toContain('setFolderAccountId(group.accountId)')
+  })
 })
 
 describe('友だち属性の一覧（設計 hqrOv）', () => {
@@ -97,11 +118,12 @@ describe('友だち属性の一覧（設計 hqrOv）', () => {
 
   it('ツールバーを枠付きカードで包まず、フォルダは240で置く', () => {
     const source = read('components/friend-fields/tags-page-v4.tsx')
-    // 設計 `XchZz` に枠は無い。中の3つは h=36(h-9)・r=8(`rounded-control`)・13。
+    // Issue #456 で Pencil `XchZz` も更新。検索は余白を使い、選択欄は
+    // 最長文字＋矢印余白を確保する。すべて h=40 で文字を切らない。
     expect(source).toContain('mb-[10px] flex flex-wrap items-center gap-2')
-    expect(source).toMatch(/h-9 w-\[144px\] rounded-control/u)
-    expect(source).toMatch(/h-9 w-\[129px\] rounded-control/u)
-    expect(source).toMatch(/h-9 w-\[116px\] rounded-control/u)
+    expect(source).toContain('h-10 min-w-45 flex-1 rounded-control')
+    expect(source).toContain('h-10 min-w-44 rounded-control')
+    expect(source).toContain('h-10 min-w-38 rounded-control')
     // 設計 `DgeL8` はフォルダ 240 固定。
     expect(source).toContain('xl:grid-cols-[240px_minmax(0,1fr)]')
   })

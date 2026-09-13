@@ -60,7 +60,8 @@
   "app/booking/menus/page.tsx": {
     "arbitrary-value": 2,
     "direct-th": 8,
-    "direct-primary-button": 1
+    "direct-primary-button": 1,
+    "direct-secondary-button": 2
   },
   "app/booking/menus/staff/page.tsx": {
     "direct-secondary-button": 2,
@@ -134,9 +135,7 @@
     "unresolved-classname": 11
   },
   "app/ec-commerce/page.tsx": {
-    "unresolved-classname": 2,
-    "direct-secondary-button": 4,
-    "arbitrary-value": 3
+    "unresolved-classname": 11
   },
   "app/emergency/page.tsx": {
     "unresolved-classname": 5,
@@ -285,6 +284,9 @@
   },
   "app/recipes/page.tsx": {
     "unresolved-classname": 17
+  },
+  "app/reminders/detail/page.tsx": {
+    "unresolved-classname": 30
   },
   "app/reminders/edit/page.tsx": {
     "unresolved-classname": 9,
@@ -435,15 +437,18 @@
   },
   "app/webinars/edit/page.tsx": {
     "direct-th": 13,
-    "unresolved-classname": 8,
-    "arbitrary-value": 22,
+    "unresolved-classname": 9,
+    "arbitrary-value": 26,
     "direct-secondary-button": 1
   },
   "app/webinars/page.tsx": {
     "direct-primary-button": 1,
     "direct-secondary-button": 2,
-    "unresolved-classname": 1,
-    "arbitrary-value": 2
+    "unresolved-classname": 2,
+    "arbitrary-value": 9
+  },
+  "app/webinars/published/page.tsx": {
+    "arbitrary-value": 5
   },
   "components/accounts/account-form-fields.tsx": {
     "arbitrary-value": 3
@@ -601,7 +606,7 @@
     "unresolved-classname": 30
   },
   "components/friend-fields/edit-tag-page-v4.tsx": {
-    "arbitrary-value": 2,
+    "arbitrary-value": 3,
     "direct-secondary-button": 1
   },
   "components/friend-fields/field-list.tsx": {
@@ -635,7 +640,7 @@
     "arbitrary-value": 57
   },
   "components/friends/bulk-run-dialog.tsx": {
-    "unresolved-classname": 42
+    "unresolved-classname": 54
   },
   "components/friends/friend-list-row.tsx": {
     "unresolved-classname": 1
@@ -650,7 +655,7 @@
     "unresolved-classname": 8
   },
   "components/identity/identity-decision-dialog.tsx": {
-    "unresolved-classname": 15
+    "unresolved-classname": 23
   },
   "components/identity/identity-parts.tsx": {
     "unresolved-classname": 38
@@ -677,13 +682,19 @@
     "unresolved-classname": 12
   },
   "components/merged-person/merged-person-detail.tsx": {
-    "unresolved-classname": 10
+    "unresolved-classname": 15
   },
   "components/merged-person/merged-person-sections.tsx": {
-    "unresolved-classname": 46
+    "unresolved-classname": 49
   },
   "components/reminders/reminder-publish-flow.tsx": {
     "unresolved-classname": 5
+  },
+  "components/reminders/reminder-step-editor-v6.tsx": {
+    "unresolved-classname": 5
+  },
+  "components/reminders/reminder-v6-ui.tsx": {
+    "unresolved-classname": 24
   },
   "components/rich-menus/area-properties.tsx": {
     "arbitrary-value": 12,
@@ -774,6 +785,9 @@
   "components/shared/row-actions.tsx": {
     "unresolved-classname": 4
   },
+  "components/shared/save-conflict-bar.tsx": {
+    "unresolved-classname": 4
+  },
   "components/shared/select-field.tsx": {
     "unresolved-classname": 1
   },
@@ -827,5 +841,17 @@
   },
   "components/webinars/webinar-line-preview.tsx": {
     "unresolved-classname": 7
+  },
+  "app/ec-commerce/connector-panel.tsx": {
+    "unresolved-classname": 36
+  },
+  "app/ec-commerce/subscriptions-panel.tsx": {
+    "unresolved-classname": 16
+  },
+  "app/hq/templates/template-console.tsx": {
+    "unresolved-classname": 88
+  },
+  "app/hq/templates/template-definition-editor.tsx": {
+    "unresolved-classname": 69
   }
 }

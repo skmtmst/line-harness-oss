@@ -11,8 +11,8 @@
  */
 
 import { useEffect, useState } from 'react'
-import { api } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
+import { scenarioReferenceData } from './scenario-reference-data'
 
 export type ChoiceBehavior = 'none' | 'url' | 'tel' | 'add_friend' | 'mail' | 'form' | 'scenario'
 
@@ -110,9 +110,9 @@ export default function QuestionEditor({
     }
     void (async () => {
       const [tagRes, fieldRes, scenarioRes] = await Promise.all([
-        api.tags.list(),
-        api.friendFields.list(selectedAccountId),
-        api.scenarios.list(),
+        scenarioReferenceData.tags(selectedAccountId),
+        scenarioReferenceData.friendFields(selectedAccountId),
+        scenarioReferenceData.scenarios(selectedAccountId),
       ])
       if (tagRes.success) setTags(tagRes.data.map((t) => ({ id: t.id, name: t.name })))
       if (fieldRes.success) setFields(fieldRes.data.map((f) => ({ id: f.id, name: f.name })))
@@ -178,7 +178,10 @@ export default function QuestionEditor({
             <div className="border-hairline bg-canvas-sunken flex flex-wrap items-center justify-between gap-2 border-b px-4 py-2.5">
               <button
                 type="button"
-                onClick={() => setOpenChoice(openChoice === index ? null : index)}
+                onClick={() => {
+                  if (!choiceColumns) setOpenChoice(openChoice === index ? null : index)
+                }}
+                aria-expanded={choiceColumns || openChoice === index}
                 className="text-ink min-w-0 text-left text-sm font-bold"
               >
                 選択肢{index + 1}
@@ -209,7 +212,7 @@ export default function QuestionEditor({
               </div>
             </div>
 
-            {openChoice === index && (
+            {(choiceColumns || openChoice === index) && (
               <div className="space-y-4 px-4 py-4">
                 <div>
                   <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -353,31 +356,6 @@ export default function QuestionEditor({
 
                 <div>
                   <div className="flex flex-wrap items-baseline justify-between gap-2">
-                    <span className="text-ink-secondary text-xs font-medium">ユーザーメッセージ</span>
-                    <CharCount value={choice.userMessage ?? ''} max={60} />
-                  </div>
-                  <input
-                    value={choice.userMessage ?? ''}
-                    onChange={(e) => setChoice(index, { userMessage: e.target.value })}
-                    placeholder={choice.label || '空欄なら選択肢の文字が使われます'}
-                    disabled={choice.hideUserMessage === true}
-                    className={`${inputClass} mt-1.5 disabled:opacity-50`}
-                  />
-                  <p className="text-ink-faint mt-1 text-xs leading-relaxed">
-                    ボタンを押したときに、友だちの発言としてトークに残る文です。
-                  </p>
-                  <label className="text-ink-secondary mt-1.5 flex items-center gap-1.5 text-xs">
-                    <input
-                      type="checkbox"
-                      checked={choice.hideUserMessage === true}
-                      onChange={(e) => setChoice(index, { hideUserMessage: e.target.checked })}
-                    />
-                    ユーザーメッセージを使用しない
-                  </label>
-                </div>
-
-                <div>
-                  <div className="flex flex-wrap items-baseline justify-between gap-2">
                     <span className="text-ink-secondary text-xs font-medium">選択時の返信</span>
                     <CharCount value={choice.reply ?? ''} max={4500} />
                   </div>
@@ -390,69 +368,101 @@ export default function QuestionEditor({
                   />
                 </div>
 
-                <div>
-                  <div className="flex flex-wrap items-baseline justify-between gap-2">
-                    <span className="text-ink-secondary text-xs font-medium">二度押し時の返信</span>
-                    <CharCount value={choice.repeatReply ?? ''} max={4500} />
-                  </div>
-                  <textarea
-                    rows={2}
-                    value={choice.repeatReply ?? ''}
-                    onChange={(e) => setChoice(index, { repeatReply: e.target.value })}
-                    placeholder="すでに押されています！"
-                    className={`${areaClass} mt-1.5`}
-                  />
-                  <p className="text-ink-faint mt-1 text-xs leading-relaxed">
-                    空欄なら「すでに押されています！」を返します。2度目はタグもシナリオも動かしません。
-                  </p>
-                </div>
+                <details className="border-hairline rounded-control border">
+                  <summary className="text-ink-secondary cursor-pointer px-3 py-2 text-xs font-medium">
+                    タグ・記録などの詳しい設定
+                  </summary>
+                  <div className="border-hairline space-y-4 border-t px-3 py-3">
+                    <div>
+                      <div className="flex flex-wrap items-baseline justify-between gap-2">
+                        <span className="text-ink-secondary text-xs font-medium">ユーザーメッセージ</span>
+                        <CharCount value={choice.userMessage ?? ''} max={60} />
+                      </div>
+                      <input
+                        value={choice.userMessage ?? ''}
+                        onChange={(e) => setChoice(index, { userMessage: e.target.value })}
+                        placeholder={choice.label || '空欄なら選択肢の文字が使われます'}
+                        disabled={choice.hideUserMessage === true}
+                        className={`${inputClass} mt-1.5 disabled:opacity-50`}
+                      />
+                      <p className="text-ink-faint mt-1 text-xs leading-relaxed">
+                        ボタンを押したときに、友だちの発言としてトークに残る文です。
+                      </p>
+                      <label className="text-ink-secondary mt-1.5 flex items-center gap-1.5 text-xs">
+                        <input
+                          type="checkbox"
+                          checked={choice.hideUserMessage === true}
+                          onChange={(e) => setChoice(index, { hideUserMessage: e.target.checked })}
+                        />
+                        ユーザーメッセージを使用しない
+                      </label>
+                    </div>
 
-                <TagPicker
-                  label="選択時に追加するタグ"
-                  tags={tags}
-                  selected={choice.addTagIds ?? []}
-                  onChange={(ids) => setChoice(index, { addTagIds: ids })}
-                />
-                <TagPicker
-                  label="選択時にはずすタグ"
-                  tags={tags}
-                  selected={choice.removeTagIds ?? []}
-                  onChange={(ids) => setChoice(index, { removeTagIds: ids })}
-                />
+                    <div>
+                      <div className="flex flex-wrap items-baseline justify-between gap-2">
+                        <span className="text-ink-secondary text-xs font-medium">二度押し時の返信</span>
+                        <CharCount value={choice.repeatReply ?? ''} max={4500} />
+                      </div>
+                      <textarea
+                        rows={2}
+                        value={choice.repeatReply ?? ''}
+                        onChange={(e) => setChoice(index, { repeatReply: e.target.value })}
+                        placeholder="すでに押されています！"
+                        className={`${areaClass} mt-1.5`}
+                      />
+                      <p className="text-ink-faint mt-1 text-xs leading-relaxed">
+                        空欄なら「すでに押されています！」を返します。2度目はタグもシナリオも動かしません。
+                      </p>
+                    </div>
 
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-ink-secondary text-xs font-medium">友だち情報欄</span>
-                  <select
-                    value={choice.field?.fieldId ?? ''}
-                    onChange={(e) =>
-                      setChoice(index, {
-                        field: e.target.value
-                          ? { fieldId: e.target.value, value: choice.field?.value ?? '' }
-                          : undefined,
-                      })
-                    }
-                    className={selectClass}
-                  >
-                    <option value="">設定しない</option>
-                    {fields.map((f) => (
-                      <option key={f.id} value={f.id}>
-                        {f.name}
-                      </option>
-                    ))}
-                  </select>
-                  {choice.field?.fieldId && (
-                    <input
-                      value={choice.field.value}
-                      onChange={(e) =>
-                        setChoice(index, {
-                          field: { fieldId: choice.field!.fieldId, value: e.target.value },
-                        })
-                      }
-                      placeholder="セットする値（既存の値は上書き）"
-                      className="border-hairline rounded-control text-ink h-9 min-w-0 flex-1 border px-3 text-sm"
+                    <TagPicker
+                      label="選択時に追加するタグ"
+                      tags={tags}
+                      selected={choice.addTagIds ?? []}
+                      onChange={(ids) => setChoice(index, { addTagIds: ids })}
                     />
-                  )}
-                </div>
+                    <TagPicker
+                      label="選択時にはずすタグ"
+                      tags={tags}
+                      selected={choice.removeTagIds ?? []}
+                      onChange={(ids) => setChoice(index, { removeTagIds: ids })}
+                    />
+
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-ink-secondary text-xs font-medium">友だち情報欄</span>
+                      <select
+                        value={choice.field?.fieldId ?? ''}
+                        onChange={(e) =>
+                          setChoice(index, {
+                            field: e.target.value
+                              ? { fieldId: e.target.value, value: choice.field?.value ?? '' }
+                              : undefined,
+                          })
+                        }
+                        className={selectClass}
+                      >
+                        <option value="">設定しない</option>
+                        {fields.map((f) => (
+                          <option key={f.id} value={f.id}>
+                            {f.name}
+                          </option>
+                        ))}
+                      </select>
+                      {choice.field?.fieldId && (
+                        <input
+                          value={choice.field.value}
+                          onChange={(e) =>
+                            setChoice(index, {
+                              field: { fieldId: choice.field?.fieldId ?? '', value: e.target.value },
+                            })
+                          }
+                          placeholder="セットする値（既存の値は上書き）"
+                          className="border-hairline rounded-control text-ink h-9 min-w-0 flex-1 border px-3 text-sm"
+                        />
+                      )}
+                    </div>
+                  </div>
+                </details>
               </div>
             )}
           </div>
@@ -500,28 +510,44 @@ function TagPicker({
   selected: string[]
   onChange: (ids: string[]) => void
 }) {
+  const selectedTags = selected.map((id) => ({
+    id,
+    name: tags.find((tag) => tag.id === id)?.name ?? '選択済みのタグ',
+  }))
+  const availableTags = tags.filter((tag) => !selected.includes(tag.id))
+
   return (
     <div>
       <span className="text-ink-secondary text-xs font-medium">{label}</span>
-      <div className="mt-1.5 flex flex-wrap gap-1.5">
-        {tags.map((tag) => {
-          const on = selected.includes(tag.id)
-          return (
-            <button
-              key={tag.id}
-              type="button"
-              onClick={() =>
-                onChange(on ? selected.filter((id) => id !== tag.id) : [...selected, tag.id])
-              }
-              className={`rounded-pill h-8 px-3 text-xs transition-colors ${
-                on ? 'bg-accent-deep text-on-accent' : 'border-hairline text-ink-secondary border'
-              }`}
-            >
-              {tag.name}
-            </button>
-          )
-        })}
-        {tags.length === 0 && <span className="text-ink-faint text-xs">タグがまだありません</span>}
+      <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+        {selectedTags.map((tag) => (
+          <button
+            key={tag.id}
+            type="button"
+            onClick={() => onChange(selected.filter((id) => id !== tag.id))}
+            aria-label={`${tag.name}を選択から外す`}
+            className="bg-accent-soft text-accent-deep rounded-pill h-8 px-3 text-xs font-medium"
+          >
+            {tag.name} ×
+          </button>
+        ))}
+        {tags.length > 0 ? (
+          <select
+            aria-label={label}
+            value=""
+            onChange={(event) => {
+              if (event.target.value) onChange([...selected, event.target.value])
+            }}
+            className="border-hairline rounded-control bg-canvas text-ink focus:ring-accent border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
+          >
+            <option value="">{selected.length > 0 ? 'ほかのタグを選ぶ' : 'タグを選ぶ'}</option>
+            {availableTags.map((tag) => (
+              <option key={tag.id} value={tag.id}>{tag.name}</option>
+            ))}
+          </select>
+        ) : (
+          <span className="text-ink-faint text-xs">タグがまだありません</span>
+        )}
       </div>
     </div>
   )

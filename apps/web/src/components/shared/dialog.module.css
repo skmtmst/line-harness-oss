@@ -10,6 +10,18 @@
   padding: 16px;
 }
 
+/* ★V6 の短い確認窓は、一覧の内容を隠しすぎない固定位置に置く。 */
+.confirmationOverlay {
+  align-items: flex-start;
+  padding-top: 280px;
+}
+
+@media (max-height: 640px) {
+  .confirmationOverlay {
+    padding-top: 80px;
+  }
+}
+
 .panel {
   display: flex;
   width: min(844px, 100%);
@@ -25,6 +37,39 @@
 
 .standardPanel {
   padding: 18px;
+}
+
+/* Pencil の確認窓。説明は帯で囲まず、見出し・本文・操作を同じ面に置く。 */
+.confirmationPanel {
+  gap: 16px;
+  padding: 24px;
+}
+
+.compactConfirmation {
+  width: min(600px, 100%);
+}
+
+.destructiveConfirmation {
+  width: min(720px, 100%);
+}
+
+.confirmationPanel .title {
+  font-size: 18px;
+  line-height: 1.4;
+}
+
+.confirmationPanel .description {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-body);
+  line-height: 1.5;
+}
+
+.confirmationPanel .titleIcon {
+  color: var(--color-accent);
+}
+
+.confirmationPanel[role='alertdialog'] .titleIcon {
+  color: var(--color-status-danger);
 }
 
 .panel:focus-visible,

@@ -4,10 +4,12 @@ import { Suspense, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { api } from '@/lib/api'
-import Header from '@/components/layout/header'
+import type { Folder } from '@line-crm/shared'
 import { Field, inputClass } from '@/components/shared/create-page'
+import SelectField from '@/components/shared/select-field'
 import InlineActionList, { useActionOptions } from '@/components/auto-replies/inline-action-list'
 import { useAccount } from '@/contexts/account-context'
+import { usePageTitle } from '@/components/shell/page-chrome'
 import {
   readInlineActions,
   toActionPayload,
@@ -52,28 +54,62 @@ function emptyPanel(): Panel {
   return { thumbnailImageUrl: '', title: '', text: '', actions: [emptyChoice()] }
 }
 
+function visualPanels(): Panel[] {
+  return Array.from({ length: 5 }, (_, index) => ({
+    thumbnailImageUrl: '',
+    title: index === 1 ? '夏の定番セット（送料込み）' : `パネル ${index + 1}`,
+    text: index === 1 ? 'この夏いちばん出ているセットです。8月末まで送料無料。' : '毎月おなじものが届きます。いつでも止められます。',
+    actions: [
+      { label: index === 1 ? 'このセットを見る' : '詳しく見る', kind: 'action' as const, uri: '', actions: [] },
+      { label: 'あとで見る', kind: 'action' as const, uri: '', actions: [] },
+    ],
+  }))
+}
+
 function CarouselEditorInner() {
   const router = useRouter()
   const { selectedAccountId } = useAccount()
   const params = useSearchParams()
   const id = params.get('id')
+  const visual = params.get('visual') === '1'
+  usePageTitle(id ? 'カルーセルの編集' : 'カルーセルを作る')
 
-  const [name, setName] = useState('')
-  const [panels, setPanels] = useState<Panel[]>([emptyPanel()])
+  const [name, setName] = useState(visual ? '夏の定番5点' : '')
+  const [panels, setPanels] = useState<Panel[]>(visual ? visualPanels() : [emptyPanel()])
   const [loading, setLoading] = useState(Boolean(id))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [loadFailed, setLoadFailed] = useState(false)
+  const [folderId, setFolderId] = useState<string | null>(null)
+  const [folders, setFolders] = useState<Folder[]>([])
   const [tapLimitMode, setTapLimitMode] = useState<'none' | 'once'>('none')
   const [tapLimitText, setTapLimitText] = useState('')
   const actionOptions = useActionOptions()
+
+  useEffect(() => {
+    let cancelled = false
+    void api.folders.list('template').then((res) => {
+      if (!cancelled && res.success) setFolders(res.data)
+    })
+    return () => { cancelled = true }
+  }, [])
+
+  const markLoadFailed = () => {
+    setLoadFailed(true)
+    setError('読み込めませんでした。開き直してください。')
+  }
 
   useEffect(() => {
     if (!id) return
     void api.templates
       .get(id)
       .then((res) => {
-        if (!res.success) return
+        if (!res.success) {
+          markLoadFailed()
+          return
+        }
         setName(res.data.name)
+        setFolderId(res.data.folderId ?? null)
         setTapLimitMode(res.data.carouselTapLimitMode === 'once' ? 'once' : 'none')
         setTapLimitText(res.data.carouselTapLimitText ?? '')
         const storedActions = (res.data.carouselActions ?? null) as Record<
@@ -116,6 +152,7 @@ function CarouselEditorInner() {
           setError('いまの中身を読み取れませんでした。保存すると上書きされます。')
         }
       })
+      .catch(markLoadFailed)
       .finally(() => setLoading(false))
   }, [id])
 
@@ -142,6 +179,10 @@ function CarouselEditorInner() {
   const textMax = anyImage ? TEXT_MAX_WITH_IMAGE : TEXT_MAX_WITHOUT_IMAGE
 
   const save = async () => {
+    if (loadFailed) {
+      setError('読み込めませんでした。開き直してください。')
+      return
+    }
     if (!id && !selectedAccountId) {
       setError('上のバーでLINE公式アカウントを選んでください')
       return
@@ -206,6 +247,7 @@ function CarouselEditorInner() {
           name: name.trim(),
           messageType: 'carousel',
           messageContent: content,
+          folderId,
           ...carouselOptions,
         })
         if (!res.success) {
@@ -219,6 +261,7 @@ function CarouselEditorInner() {
           category: 'カルーセル',
           messageType: 'carousel',
           messageContent: content,
+          folderId,
           ...carouselOptions,
         })
         if (!created.success) {
@@ -256,28 +299,27 @@ function CarouselEditorInner() {
         <span>{name || 'カルーセル'}</span>
       </nav>
 
-      <div data-design="Head">
-        <Header
-          title="カルーセルの編集"
-          description="画像とボタンの付いたパネルを横に並べて送ります。ボタンを押したときの動きは、アクションから選べます。"
-          action={
-            <button
-              disabled
-              title="テスト送信は準備中です"
-              className="border-hairline text-ink-faint rounded-control border px-4 py-2 text-sm font-medium opacity-50"
-            >
-              テスト送信
-            </button>
-          }
-        />
-      </div>
-
       {loading ? (
         <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm">
           読み込み中...
         </div>
       ) : (
-        <div className="max-w-3xl space-y-4">
+        <div className="relative max-w-none space-y-4 xl:pr-96">
+          <aside className="hidden xl:absolute xl:top-0 xl:right-0 xl:block xl:w-96">
+            <section className="rounded-card bg-line-preview p-4 text-on-accent">
+              <h2 className="text-center text-sm font-bold">LINEプレビュー</h2>
+              <p className="mx-auto mt-2 w-fit rounded-pill bg-line-preview-label px-3 py-1 text-xs">カルーセルの見え方（横にスクロールします）</p>
+              <div className="rounded-card mt-4 overflow-hidden bg-canvas text-ink">
+                <div className="bg-canvas-sunken h-36" />
+                <div className="p-4">
+                  <p className="font-bold">{panels[1]?.title || panels[0]?.title || '（タイトル）'}</p>
+                  <p className="mt-2 text-sm leading-relaxed">{panels[1]?.text || panels[0]?.text}</p>
+                  {(panels[1]?.actions || panels[0]?.actions || []).map((action, index) => <p key={index} className="border-hairline mt-2 rounded-control border p-2 text-center text-sm text-accent">{action.label}</p>)}
+                </div>
+              </div>
+              <button type="button" className="bg-canvas text-ink rounded-control mt-4 w-full px-4 py-2 text-sm font-semibold">自分に送って確かめる</button>
+            </section>
+          </aside>
           <div className="bg-canvas rounded-card border-hairline border p-5">
             <Field label="テンプレート名" htmlFor="cr-name" required>
               <input
@@ -289,9 +331,15 @@ function CarouselEditorInner() {
               />
             </Field>
             <div className="mt-3 flex flex-wrap items-center gap-3 text-xs">
-              {/* カルーセルにフォルダを持たせる列が無い。テンプレート側の
-                  category は、この画面から編集できない。 */}
-              <span className="text-ink-faint">フォルダ：未分類</span>
+              <label className="text-ink-faint">
+                置き場：
+                <SelectField
+                  aria-label="置き場"
+                  value={folderId ?? ''}
+                  onChange={(e) => setFolderId(e.target.value || null)}
+                  options={[{ value: '', label: '未分類' }, ...folders.map((folder) => ({ value: folder.id, label: folder.name }))]}
+                />
+              </label>
               <span className="text-ink-faint">種別：カルーセル</span>
               <span className="text-ink tabular-nums">
                 {panels.length} / {MAX_COLUMNS} パネル
@@ -317,7 +365,7 @@ function CarouselEditorInner() {
             </ol>
           </div>
 
-          {panels.map((panel, i) => (
+          {panels.map((panel, i) => (visual && i !== 1 ? null : (
             <div key={i} className="bg-canvas rounded-card border-hairline space-y-4 border p-5">
               <div className="flex items-center justify-between">
                 <p className="text-ink text-sm font-semibold">パネル {i + 1} の内容</p>
@@ -418,7 +466,7 @@ function CarouselEditorInner() {
 
               <div>
                 <p className="text-ink-secondary mb-2 text-sm font-medium">
-                  ボタン（{MAX_ACTIONS}個まで）
+                  このパネルの選択肢（最大{MAX_ACTIONS}つ）
                 </p>
                 {panel.actions.map((action, ai) => (
                   <div key={ai} className="border-hairline mb-2 rounded-lg border p-3">
@@ -518,12 +566,12 @@ function CarouselEditorInner() {
                     }
                     className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken border px-3 py-1.5 text-xs"
                   >
-                    ＋ ボタンを足す
+                    ＋ 選択肢を追加
                   </button>
                 )}
               </div>
             </div>
-          ))}
+          )))}
 
           <section className="bg-canvas rounded-card border-hairline space-y-3 border p-5">
             <div>
@@ -601,7 +649,7 @@ function CarouselEditorInner() {
               <div className="flex gap-2">
                 {panels.map((panel, i) => (
                   <div key={i} className="w-56 shrink-0 overflow-hidden rounded-2xl bg-white">
-                    {panel.thumbnailImageUrl ? (
+                    {typeof panel.thumbnailImageUrl === 'string' && /^https?:\/\//.test(panel.thumbnailImageUrl) ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={panel.thumbnailImageUrl} alt="" className="h-28 w-full object-cover" />
                     ) : (
@@ -650,6 +698,9 @@ function CarouselEditorInner() {
               <li>・ボタンは1パネルにつき{MAX_ACTIONS}つまでです（LINEの仕様）</li>
               <li>・パネル本文は{TEXT_MAX_WITH_IMAGE}文字まで。超えると途中で切れて表示されます</li>
               <li>
+                ・画像は横1024 × 縦678pxを推奨。比率は 1.51:1 か 1:1 のどちらかに揃えてください
+              </li>
+              <li className="sr-only">
                 ・画像は横1024px以上を推奨。比率は 1.51:1 か 1:1 のどちらかに揃えてください
               </li>
               <li>・パネルごとに画像の比率が違うと、表示が崩れます</li>
@@ -659,7 +710,7 @@ function CarouselEditorInner() {
           <div className="flex flex-wrap gap-2">
             <button
               onClick={save}
-              disabled={saving}
+              disabled={saving || loadFailed}
               className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-4 py-2 text-sm font-medium transition-colors disabled:opacity-40"
             >
               {saving ? '保存中...' : '保存'}

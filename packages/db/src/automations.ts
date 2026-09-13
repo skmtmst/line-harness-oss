@@ -177,17 +177,6 @@ export async function getAutomationById(db: D1Database, id: string): Promise<Aut
   return db.prepare(`SELECT * FROM automations WHERE id = ?`).bind(id).first<AutomationRow>();
 }
 
-export async function createAutomation(
-  db: D1Database,
-  input: { name: string; description?: string; eventType: string; conditions?: Record<string, unknown>; actions: unknown[]; priority?: number },
-): Promise<AutomationRow> {
-  const id = crypto.randomUUID();
-  const now = jstNow();
-  await db.prepare(`INSERT INTO automations (id, name, description, event_type, conditions, actions, priority, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-    .bind(id, input.name, input.description ?? null, input.eventType, JSON.stringify(input.conditions ?? {}), JSON.stringify(input.actions), input.priority ?? 0, now, now).run();
-  return (await getAutomationById(db, id))!;
-}
-
 export async function updateAutomation(
   db: D1Database,
   id: string,

@@ -15,10 +15,14 @@ import type { Env } from '../index.js';
 
 const mocks = {
   getTemplatesWithUsageCount: vi.fn(),
+  getTemplateSendCounts: vi.fn(),
   getTemplateById: vi.fn(),
   getTemplateUsage: vi.fn(),
   createTemplate: vi.fn(),
   updateTemplate: vi.fn(),
+  saveTemplateDraft: vi.fn(),
+  publishTemplate: vi.fn(),
+  hasTemplateDraft: vi.fn().mockReturnValue(false),
   deleteTemplate: vi.fn(),
   getCarouselTapTotals: vi.fn(),
   getFolderById: vi.fn(),

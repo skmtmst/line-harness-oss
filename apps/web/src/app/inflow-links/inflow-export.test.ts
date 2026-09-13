@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { EXPORT_HEADER, exportFileName, toCsv, type ExportRow } from './inflow-export'
+import { EXPORT_HEADER, exportFileName, jstTodayString, toCsv, type ExportRow } from './inflow-export'
 
 const row = (over: Partial<ExportRow> = {}): ExportRow => ({
   name: '夏のInstagram投稿',
@@ -42,6 +42,12 @@ describe('流入経路の書き出し', () => {
 
   it('何本をいつ書き出したかが名前で分かる', () => {
     expect(exportFileName(24, '2026-08-31')).toBe('流入経路_24本_2026-08-31.csv')
+  })
+
+  it('ファイル名の日付は日本時間で組み立てる', () => {
+    // UTC 8/31 15:00 は JST 9/1 00:00。UTC のまま切ると1日ずれる。
+    expect(jstTodayString(new Date('2026-08-31T15:00:00.000Z'))).toBe('2026-09-01')
+    expect(jstTodayString(new Date('2026-08-31T14:59:59.000Z'))).toBe('2026-08-31')
   })
 })
 

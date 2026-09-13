@@ -88,38 +88,18 @@ const DESIGN_WORDS: Record<string, number> = {
  *   絞り込みの「30日以上の絞り込みは準備中」と、行き先の決まっていない「マニュアル」。
  */
 const REMAINING: Record<string, number> = {
-  'app/accounts/migration.tsx': 2,
   'app/booking/bookings/detail/page.tsx': 4,
   'app/booking/bookings/page.tsx': 5,
-  'app/booking/menus/staff/page.tsx': 1,
   'app/booking/staff/new/page.tsx': 2,
-  'app/booking/staff/shifts/page.tsx': 1,
-  'app/broadcasts/detail/page.tsx': 2,
-  'app/broadcasts/page.tsx': 3,
-  'app/conversions/new/page.tsx': 1,
-  'app/ec-commerce/page.tsx': 2,
-  'app/events/bookings/page.tsx': 3,
-  'app/events/page.tsx': 6,
-  'app/form-submissions/edit/page.tsx': 1,
-  'app/friends/detail/page.tsx': 1,
-  'app/inflow-links/ad-integration.tsx': 2,
-  'app/inflow-links/detail/page.tsx': 1,
-  'app/inflow-links/page.tsx': 2,
-  'app/reminders/page.tsx': 1,
+  /* 2026-09-08 #605 で「同じ設定で作り直す」を実動作へ接続し 0 件になったので行を消した。 */
   'app/restaurant-test/stores/new/page.tsx': 1,
   'app/scenarios/detail/scenario-detail-client.tsx': 1,
-  'app/scenarios/first-step/page.tsx': 1,
-  'app/scenarios/mode/page.tsx': 1,
-  'app/scenarios/page.tsx': 1,
   'app/search-console/page.tsx': 3,
   'app/templates/carousel/page.tsx': 2,
   'app/templates/edit/page.tsx': 4,
-  'app/webinars/page.tsx': 1,
   'components/broadcasts/broadcast-form.tsx': 7,
   'components/events/event-wizard.tsx': 2,
-  'components/friends/bulk-run-dialog.tsx': 1,
   'components/friends/friend-timeline.tsx': 1,
-  'components/inflow-links/site-script.tsx': 5,
 }
 
 describe('画面に「準備中」を置かない', () => {
@@ -127,7 +107,7 @@ describe('画面に「準備中」を置かない', () => {
     // 数え漏れ（読む場所を間違えて 0 件になる）だけを見張る。
     // ちょうどの枚数は画面が増えるたびに動くので、下限をゆるく取る。
     expect(FILES.length).toBeGreaterThan(300)
-    expect(FILES.filter((f) => /^app\/.*\/page\.tsx$/.test(f.p) || f.p === 'app/page.tsx')).toHaveLength(147)  // 2026-09-13: 統括のメンバー管理・お問い合わせ（/hq/members、/hq/support）を足した実測値。
+    expect(FILES.filter((f) => /^app\/.*\/page\.tsx$/.test(f.p) || f.p === 'app/page.tsx')).toHaveLength(157)  // 2026-09-13: 統括のメンバー管理・お問い合わせを足した実測値。
   })
 
   it('共通部品に「準備中」が1つも無い', () => {

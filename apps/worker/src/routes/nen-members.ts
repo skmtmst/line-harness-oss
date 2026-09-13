@@ -1,8 +1,17 @@
 import { Hono, type Context } from 'hono';
 import type { Message } from '@line-crm/line-sdk';
-import { getFriendByLineUserIdForAccount, jstNow, resolveLineCredential } from '@line-crm/db';
+import {
+  claimPhotoNotificationDelivery,
+  completePhotoNotificationDelivery,
+  getFriendByLineUserIdForAccount,
+  getPhotoNotificationState,
+  jstNow,
+  resolveLineCredential,
+  findOrCreateGlobalTag,
+} from '@line-crm/db';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
+import { requirePhotoPermission } from './nen-photo-operations.js';
 import { verifyCallerLineIdentity } from '../services/liff-auth.js';
 import { pushViaHarnessProxy } from '../services/line-proxy-send.js';
 import { dispatchLineProxyLocally } from '../services/local-line-proxy.js';
@@ -27,7 +36,17 @@ const PHOTO_REVIEW_REASON_LABELS = {
   duplicate: '同じ写真がすでに投稿されている',
   other: 'そのほか',
 } as const;
-type PhotoReviewReasonCode = keyof typeof PHOTO_REVIEW_REASON_LABELS;
+export type PhotoReviewReasonCode = keyof typeof PHOTO_REVIEW_REASON_LABELS;
+
+function detectedImageMime(bytes: Uint8Array): keyof typeof IMAGE_TYPES | null {
+  if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return 'image/jpeg';
+  if (bytes.length >= 8 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e
+      && bytes[3] === 0x47 && bytes[4] === 0x0d && bytes[5] === 0x0a
+      && bytes[6] === 0x1a && bytes[7] === 0x0a) return 'image/png';
+  if (bytes.length >= 12 && String.fromCharCode(...bytes.slice(0, 4)) === 'RIFF'
+      && String.fromCharCode(...bytes.slice(8, 12)) === 'WEBP') return 'image/webp';
+  return null;
+}
 
 const CONSULTATION_TAG_RULES = [
   { key: '食事', pattern: /ご飯|ごはん|フード|食欲|食いつき|食べ|偏食|おやつ|栄養|サプリ|水分|飲み水/ },
@@ -135,7 +154,7 @@ async function pushPetCard(c: Context<Env>, friend: FriendRow, pet: Record<strin
   );
 }
 
-type ReviewPhotoRow = Record<string, unknown> & {
+export type ReviewPhotoRow = Record<string, unknown> & {
   id: string;
   friend_id: string;
   line_user_id: string;
@@ -153,7 +172,7 @@ function photoReviewMessage(
   if (status === 'adopted') {
     return [
       'お写真をご投稿いただきありがとうございます。',
-      '今回のお写真を採用し、5ポイントを付与しました。',
+      '今回のお写真を採用し、5ポイントを付ける手続きを始めました。',
       '公開への同意をいただいている場合だけ、公開ギャラリーへ掲載します。',
     ].join('\n');
   }
@@ -166,7 +185,7 @@ function photoReviewMessage(
   ].join('\n');
 }
 
-async function sendPhotoReviewNotification(
+export async function sendPhotoReviewNotification(
   c: Context<Env>,
   photo: ReviewPhotoRow,
   status: 'adopted' | 'rejected',
@@ -181,14 +200,143 @@ async function sendPhotoReviewNotification(
     { lineAccountId: photo.line_account_id, field: 'channel_access_token' },
   );
   const message = photoReviewMessage(status, reasonCode, reasonNote);
+  // X-Line-Retry-Key はLINE仕様でUUID形式が必須のため、UUIDのdecisionIdをそのまま使う。
+  // `nen-photo-review:` 接頭辞を付けると実送信が400で失敗する。
   await pushViaHarnessProxy(
     c.env.WORKER_PUBLIC_URL || new URL(c.req.url).origin,
     accessToken,
     photo.line_user_id,
     [{ type: 'text', text: message }],
-    `nen-photo-review:${decisionId}`,
+    decisionId,
     (request) => dispatchLineProxyLocally(request, c.env, c.executionCtx),
   );
+}
+
+/**
+ * 通知先の1行を取る。単票・一括どちらも同じ絞り込み
+ *（写真ID＋LINEアカウント＋友だちの所属アカウント）で、他アカウントへは届けない。
+ */
+export async function loadPhotoReviewRecipient(
+  db: D1Database,
+  input: { photoId: string; lineAccountId: string },
+): Promise<ReviewPhotoRow | null> {
+  return db.prepare(
+    `SELECT ps.*, s.customer_id, f.line_user_id, f.line_account_id, f.is_following,
+            a.channel_access_token, a.channel_access_token_encrypted
+       FROM nen_photo_submissions ps
+       JOIN friends f ON f.id = ps.friend_id
+       JOIN line_accounts a ON a.id = f.line_account_id
+       LEFT JOIN nen_ec_member_snapshots s ON s.friend_id = ps.friend_id
+      WHERE ps.id = ? AND ps.line_account_id = ? AND f.line_account_id = ?`,
+  ).bind(input.photoId, input.lineAccountId, input.lineAccountId).first<ReviewPhotoRow>();
+}
+
+/**
+ * 通知leaseの有効期間。確定に失敗した送信中は、切れた後に同じ安定keyで
+ * 再送・再照合できる（送達状態機械）。
+ */
+export const PHOTO_NOTIFICATION_LEASE_TTL_MS = 5 * 60 * 1000;
+
+export async function mirrorReviewNotificationStatus(
+  db: D1Database,
+  input: { photoId: string; lineAccountId: string; status: 'pending' | 'sent' | 'failed'; now?: string },
+): Promise<void> {
+  try {
+    await db.prepare(
+      `UPDATE nen_photo_submissions SET review_notification_status = ?, updated_at = ?
+        WHERE id = ? AND line_account_id = ?`,
+    ).bind(
+      input.status, input.now ?? new Date().toISOString(), input.photoId, input.lineAccountId,
+    ).run();
+  } catch (error) {
+    console.error('mirror review notification status failed', input.photoId, error);
+  }
+}
+
+/*
+ * 通知の送達オーケストレーション。claim→送信（安定key）→世代条件付き確定。
+ * 確定に失敗したら送達不明のまま残し、lease切れ後の再送で復旧できる。
+ * relayed は今回の呼び出しが実際に送信したかどうか。
+ */
+export async function deliverPhotoReviewNotification(
+  db: D1Database,
+  c: Context<Env>,
+  recipient: ReviewPhotoRow,
+  input: {
+    lineAccountId: string;
+    photoId: string;
+    status: 'adopted' | 'rejected';
+    reasonCode: PhotoReviewReasonCode | null;
+    reasonNote: string | null;
+    decisionId: string;
+  },
+): Promise<{ notificationStatus: 'sent' | 'failed'; notificationError: string | null; busy: boolean; relayed: boolean }> {
+  const now = new Date().toISOString();
+  const claimed = await claimPhotoNotificationDelivery(db, {
+    decisionId: input.decisionId, lineAccountId: input.lineAccountId,
+    leaseId: crypto.randomUUID(),
+    leaseExpiresAt: new Date(Date.now() + PHOTO_NOTIFICATION_LEASE_TTL_MS).toISOString(),
+    now,
+  });
+  if (!claimed) {
+    const state = await getPhotoNotificationState(db, {
+      decisionId: input.decisionId, lineAccountId: input.lineAccountId,
+    }).catch(() => null);
+    if (state?.status === 'sent') {
+      await mirrorReviewNotificationStatus(db, {
+        photoId: input.photoId, lineAccountId: input.lineAccountId, status: 'sent',
+      });
+      return { notificationStatus: 'sent', notificationError: null, busy: false, relayed: false };
+    }
+    if (state?.status === 'sending') {
+      return {
+        notificationStatus: 'failed', busy: true, relayed: false,
+        notificationError: 'ほかの処理が通知を実行中です。しばらくしてから再送してください。',
+      };
+    }
+    return {
+      notificationStatus: 'failed', busy: false, relayed: false,
+      notificationError: '通知の送信権を確保できませんでした。再送してください。',
+    };
+  }
+  let sendError: string | null = null;
+  let relayed = false;
+  try {
+    await sendPhotoReviewNotification(
+      c, recipient, input.status, input.reasonCode, input.reasonNote, input.decisionId,
+    );
+    relayed = true;
+  } catch (error) {
+    sendError = error instanceof Error ? error.message : '審査結果をLINEで通知できませんでした';
+  }
+  try {
+    const completed = await completePhotoNotificationDelivery(db, {
+      decisionId: input.decisionId, lineAccountId: input.lineAccountId,
+      generation: claimed.generation, status: sendError ? 'failed' : 'sent', error: sendError,
+    });
+    if (completed) {
+      const finalStatus = sendError ? 'failed' : 'sent';
+      await mirrorReviewNotificationStatus(db, {
+        photoId: input.photoId, lineAccountId: input.lineAccountId, status: finalStatus,
+      });
+      return { notificationStatus: finalStatus, notificationError: sendError, busy: false, relayed };
+    }
+  } catch (error) {
+    console.error('complete photo notification failed', input.decisionId, error);
+  }
+  const state = await getPhotoNotificationState(db, {
+    decisionId: input.decisionId, lineAccountId: input.lineAccountId,
+  }).catch(() => null);
+  if (state?.status === 'sent') {
+    await mirrorReviewNotificationStatus(db, {
+      photoId: input.photoId, lineAccountId: input.lineAccountId, status: 'sent',
+    });
+    return { notificationStatus: 'sent', notificationError: null, busy: false, relayed };
+  }
+  return {
+    notificationStatus: 'failed', busy: false, relayed,
+    notificationError: '送達の記録を確定できませんでした。しばらくしてから再送してください。',
+  };
 }
 
 function mapPet(row: Record<string, unknown>) {
@@ -264,7 +412,7 @@ nenMembers.get('/api/liff/nen/member', async (c) => {
 nenMembers.get('/api/public/nen/adopted-photos', async (c) => {
   const lineAccountId = c.req.query('lineAccountId')?.trim();
   if (!lineAccountId) return c.json({ success: false, error: 'lineAccountId is required' }, 400);
-  const rows = await c.env.DB.prepare(`SELECT ps.id, ps.image_url, ps.caption, ps.reviewed_at,
+  const rows = await c.env.DB.prepare(`SELECT ps.id, ps.public_image_url AS image_url, ps.caption, ps.reviewed_at,
       CASE WHEN ps.public_pet_name = 1 THEN p.name ELSE NULL END pet_name
     FROM nen_photo_submissions ps
     JOIN nen_pet_profiles p ON p.id = ps.pet_id
@@ -273,6 +421,7 @@ nenMembers.get('/api/public/nen/adopted-photos', async (c) => {
       AND ps.line_account_id = ? AND f.line_account_id = ?
       AND ps.publication_consent_at IS NOT NULL
       AND ps.publication_withdrawn_at IS NULL
+      AND ps.public_image_url IS NOT NULL
     ORDER BY ps.reviewed_at DESC, ps.created_at DESC LIMIT 24`)
     .bind(lineAccountId, lineAccountId).all<Record<string, unknown>>();
   const origin = c.req.header('Origin') || '';
@@ -434,21 +583,31 @@ nenMembers.post('/api/liff/nen/photos', async (c) => {
   let bytes: Uint8Array;
   try { bytes = Uint8Array.from(atob(raw), (ch) => ch.charCodeAt(0)); } catch { return c.json({ success: false, error: '画像を読み込めません' }, 400); }
   if (bytes.byteLength > 8 * 1024 * 1024) return c.json({ success: false, error: '画像は8MB以下にしてください' }, 400);
+  if (detectedImageMime(bytes) !== body.mimeType) {
+    return c.json({ success: false, error: '画像の内容と形式が一致しません' }, 400);
+  }
   const id = crypto.randomUUID();
-  const key = `nen-pets/${friend.id}/${id}.${IMAGE_TYPES[body.mimeType]}`;
-  await c.env.IMAGES.put(key, bytes, { httpMetadata: { contentType: body.mimeType }, customMetadata: { friendId: friend.id, petId: body.petId || '' } });
-  const imageUrl = `${c.env.WORKER_PUBLIC_URL || new URL(c.req.url).origin}/images/${key}`;
+  const extension = IMAGE_TYPES[body.mimeType];
+  const key = `nen-photo-originals/${friend.id}/${id}.${extension}`;
+  const reviewKey = `nen-photo-review/${friend.id}/${id}-v1.${extension}`;
+  const metadata = { friendId: friend.id, petId: body.petId || '', photoId: id };
+  await Promise.all([
+    c.env.IMAGES.put(key, bytes, { httpMetadata: { contentType: body.mimeType }, customMetadata: metadata }),
+    c.env.IMAGES.put(reviewKey, bytes, { httpMetadata: { contentType: body.mimeType }, customMetadata: { ...metadata, derivative: 'review-v1' } }),
+  ]);
+  const reviewImageUrl = `${c.env.WORKER_PUBLIC_URL || new URL(c.req.url).origin}/images/${reviewKey}`;
   const now = jstNow();
   await c.env.DB.prepare(`INSERT INTO nen_photo_submissions
     (id, friend_id, pet_id, r2_key, image_url, content_type, caption, status,
-     created_at, updated_at, line_account_id)
-    VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)`)
+     created_at, updated_at, line_account_id, review_image_url, image_byte_size)
+    VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?)`)
     .bind(
-      id, friend.id, body.petId, key, imageUrl, body.mimeType,
+      id, friend.id, body.petId, key, reviewImageUrl, body.mimeType,
       String(body.caption || '').trim().slice(0, 300), now, now, friend.line_account_id,
+      reviewImageUrl, bytes.byteLength,
     ).run();
   await syncNenPhotoTags(c.env.DB, friend.id);
-  return c.json({ success: true, data: { id, imageUrl, status: 'pending' } }, 201);
+  return c.json({ success: true, data: { id, imageUrl: reviewImageUrl, status: 'pending' } }, 201);
 });
 
 nenMembers.put('/api/liff/nen/photos/:id/publication-consent', async (c) => {
@@ -540,9 +699,7 @@ function aiText(result: unknown): string {
 async function assignConsultationTags(c: Context<Env>, friendId: string, animalType: 'dog' | 'cat', detected: string[]) {
   const names = [`AI相談：${animalType === 'dog' ? 'わんちゃん' : 'ねこちゃん'}`, ...detected.map((tag) => `AI相談：${tag}`)];
   for (const name of names) {
-    await c.env.DB.prepare(`INSERT OR IGNORE INTO tags (id, name, color, created_at) VALUES (?, ?, '#16815B', ?)`)
-      .bind(crypto.randomUUID(), name, jstNow()).run();
-    const tag = await c.env.DB.prepare(`SELECT id FROM tags WHERE name = ?`).bind(name).first<{ id: string }>();
+    const tag = await findOrCreateGlobalTag(c.env.DB, { name, color: '#16815B' });
     if (tag) await attachTagAndFireSideEffects(c.env.DB, friendId, tag.id);
   }
   return names;
@@ -653,29 +810,272 @@ nenMembers.put('/api/nen-members/care-flags/:id', requireRole('owner', 'admin', 
   return c.json({ success: true });
 });
 
-nenMembers.get('/api/nen-members/photos', async (c) => {
+/** 1ページの枚数。指定なし・壊れた指定は 200。上限も 200 で頭打ちにする。 */
+function photoPageSize(raw: string | undefined): number {
+  const value = Number(raw);
+  if (!Number.isFinite(value)) return 200;
+  return Math.min(200, Math.max(1, Math.trunc(value)));
+}
+
+/** 何枚目から取るか。指定なし・負・壊れた指定は 0。 */
+function photoPageOffset(raw: string | undefined): number {
+  const value = Number(raw);
+  if (!Number.isFinite(value) || value <= 0) return 0;
+  return Math.trunc(value);
+}
+
+nenMembers.get('/api/nen-members/photos', requirePhotoPermission('photo.submission.view'), async (c) => {
   const accountId = c.req.query('accountId')?.trim();
   if (!accountId) return c.json({ success: false, error: 'accountId is required' }, 400);
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
     return c.json({ success: false, error: 'このLINEアカウントを表示する権限がありません' }, 403);
   }
+  /*
+   * 続きを取れるようにする。前は 200 枚で打ち切りだったので、審査待ちが
+   * 201 枚以上あるとダッシュボードの件数に届かなかった（#666）。
+   * 1ページの上限は 200 のまま。offset で次の 200 枚を取る。
+   */
+  const limit = photoPageSize(c.req.query('limit'));
+  const offset = photoPageOffset(c.req.query('offset'));
   const rows = await c.env.DB.prepare(
-    `SELECT ps.*, p.name pet_name, f.display_name owner_name
+    `SELECT ps.id, ps.friend_id, ps.pet_id, ps.review_image_url AS image_url,
+            ps.caption, ps.status, ps.awarded_points, ps.created_at, ps.reviewed_at,
+            ps.updated_at, ps.review_version, ps.publication_consent_at,
+            ps.publication_withdrawn_at, ps.public_pet_name, ps.review_reason_code,
+            ps.review_reason_note, ps.review_notification_status,
+            p.name pet_name, f.display_name owner_name,
+            (SELECT r.flag FROM nen_photo_risk_assessments r
+              WHERE r.photo_id = ps.id AND r.line_account_id = ps.line_account_id
+              ORDER BY r.created_at DESC, r.id DESC LIMIT 1) AS latest_risk_flag,
+            (SELECT r.confidence FROM nen_photo_risk_assessments r
+              WHERE r.photo_id = ps.id AND r.line_account_id = ps.line_account_id
+              ORDER BY r.created_at DESC, r.id DESC LIMIT 1) AS latest_risk_confidence,
+            CASE WHEN EXISTS (
+              SELECT 1 FROM nen_photo_asset_jobs j
+               WHERE j.photo_id = ps.id AND j.line_account_id = ps.line_account_id AND j.status = 'failed'
+            ) THEN 1 ELSE 0 END AS has_failed_asset_job
        FROM nen_photo_submissions ps
        JOIN nen_pet_profiles p ON p.id = ps.pet_id
        JOIN friends f ON f.id = ps.friend_id
       WHERE ps.line_account_id = ? AND f.line_account_id = ?
-      ORDER BY ps.created_at DESC LIMIT 200`,
-  ).bind(accountId, accountId).all<Record<string, unknown>>();
+      ORDER BY ps.created_at DESC, ps.id DESC LIMIT ? OFFSET ?`,
+  ).bind(accountId, accountId, limit, offset).all<Record<string, unknown>>();
   return c.json({ success: true, data: rows.results });
 });
 
-nenMembers.put('/api/nen-members/photos/:id/review', requireRole('owner', 'admin', 'staff'), async (c) => {
+nenMembers.get(
+  '/api/nen-members/photos/publications',
+  requirePhotoPermission('photo.submission.view'),
+  async (c) => {
+    const accountId = c.req.query('accountId')?.trim();
+    if (!accountId) return c.json({ success: false, error: 'accountId is required' }, 400);
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+      return c.json({ success: false, error: 'このLINEアカウントを表示する権限がありません' }, 403);
+    }
+    const rows = await c.env.DB.prepare(
+      `SELECT pub.id, pub.photo_id, pub.status, pub.show_owner_name, pub.view_count,
+              pub.version, pub.published_at, ps.public_image_url AS image_url,
+              ps.publication_consent_at, p.name AS pet_name,
+              CASE WHEN pub.show_owner_name = 1 THEN f.display_name ELSE NULL END AS owner_name
+         FROM nen_photo_publications pub
+         JOIN nen_photo_submissions ps ON ps.id = pub.photo_id AND ps.line_account_id = pub.line_account_id
+         JOIN nen_pet_profiles p ON p.id = ps.pet_id
+         JOIN friends f ON f.id = ps.friend_id AND f.line_account_id = pub.line_account_id
+        WHERE pub.line_account_id = ? AND pub.status = 'published'
+          AND ps.status = 'adopted' AND ps.publication_consent_at IS NOT NULL
+          AND ps.publication_withdrawn_at IS NULL
+        ORDER BY pub.published_at DESC LIMIT 200`,
+    ).bind(accountId).all<Record<string, unknown>>();
+    /*
+     * 掲載先は1発で取る。写真ごとに1件ずつ取りに行くと、掲載数が増えるほど
+     * 遅くなる（N+1）。表示の形は変えない。
+     */
+    const publicationIds = rows.results.map((row) => String(row.id));
+    const placementRows = publicationIds.length === 0 ? [] : (await c.env.DB.prepare(
+      `SELECT publication_id, id, placement_type, placement_label, view_count
+         FROM nen_photo_publication_placements
+        WHERE publication_id IN (${publicationIds.map(() => '?').join(',')})
+          AND line_account_id = ? AND active = 1
+        ORDER BY created_at`,
+    ).bind(...publicationIds, accountId).all<Record<string, unknown>>()).results;
+    const placementsByPublication = new Map<string, Array<Record<string, unknown>>>();
+    for (const placement of placementRows) {
+      const key = String(placement.publication_id);
+      const list = placementsByPublication.get(key) ?? [];
+      // 返す列は従来どおり4つ（publication_id は振り分け用で返さない）。
+      list.push({
+        id: placement.id,
+        placement_type: placement.placement_type,
+        placement_label: placement.placement_label,
+        view_count: placement.view_count,
+      });
+      placementsByPublication.set(key, list);
+    }
+    const items = rows.results.map((row) => (
+      { ...row, placements: placementsByPublication.get(String(row.id)) ?? [] }
+    )) as Array<Record<string, unknown> & {
+      placements: Array<Record<string, unknown>>;
+    }>;
+    const measured = items.filter((item) => item.view_count !== null && item.view_count !== undefined);
+    return c.json({ success: true, data: {
+      summary: {
+        publishedCount: items.length,
+        placementCount: new Set(items.flatMap((item) => (
+          item.placements
+        ).map((placement) => `${placement.placement_type}:${placement.placement_label}`))).size,
+        topPhoto: measured.length
+          ? measured.reduce((top, item) => Number(item.view_count) > Number(top.view_count) ? item : top)
+          : null,
+        consentedCount: items.length,
+      },
+      items,
+    } });
+  },
+);
+
+nenMembers.put('/api/nen-members/photos/publications/:id/withdraw', requireRole('owner', 'admin', 'staff'), requirePhotoPermission('photo.submission.review'), async (c) => {
+  const body = await c.req.json<{ accountId?: string; expectedVersion?: number }>().catch(() => null);
+  const accountId = body?.accountId?.trim();
+  const idempotencyKey = c.req.header('Idempotency-Key')?.trim().slice(0, 120);
+  if (!accountId || !Number.isInteger(body?.expectedVersion) || !idempotencyKey) {
+    return c.json({ success: false, error: 'accountId、expectedVersion、Idempotency-Key は必須です' }, 400);
+  }
+  if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+    return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
+  }
+  const publication = await c.env.DB.prepare(
+    `SELECT id, photo_id, status, version, last_idempotency_key
+       FROM nen_photo_publications WHERE id = ? AND line_account_id = ?`,
+  ).bind(c.req.param('id'), accountId).first<{
+    id: string; photo_id: string; status: string; version: number; last_idempotency_key: string | null;
+  }>();
+  if (!publication) return c.json({ success: false, error: 'Not found' }, 404);
+  if (publication.last_idempotency_key === idempotencyKey) {
+    return c.json({ success: true, data: { status: publication.status, version: publication.version } });
+  }
+  if (publication.status !== 'published' || publication.version !== body!.expectedVersion) {
+    return c.json({ success: false, error: '別の人が先に掲載状態を変更しました' }, 409);
+  }
+  const now = jstNow();
+  const reviewer = c.get('staff');
+  const results = await c.env.DB.batch([
+    c.env.DB.prepare(
+      `UPDATE nen_photo_publications
+          SET status = 'withdrawn', withdrawn_at = ?, withdrawn_by = ?, version = version + 1,
+              last_idempotency_key = ?, updated_at = ?
+        WHERE id = ? AND line_account_id = ? AND status = 'published' AND version = ?`,
+    ).bind(now, reviewer.id, idempotencyKey, now, publication.id, accountId, body!.expectedVersion),
+    c.env.DB.prepare(
+      `UPDATE nen_photo_publication_placements SET active = 0, removed_at = ?
+        WHERE publication_id = ? AND line_account_id = ? AND active = 1`,
+    ).bind(now, publication.id, accountId),
+    c.env.DB.prepare(
+      `UPDATE nen_photo_submissions SET publication_withdrawn_at = ?, updated_at = ?
+        WHERE id = ? AND line_account_id = ?`,
+    ).bind(now, now, publication.photo_id, accountId),
+  ]);
+  if (!results[0]?.meta.changes) {
+    return c.json({ success: false, error: '別の人が先に掲載状態を変更しました' }, 409);
+  }
+  return c.json({ success: true, data: { status: 'withdrawn', version: publication.version + 1 } });
+});
+
+nenMembers.put('/api/nen-members/photos/publications/:id/placements', requireRole('owner', 'admin', 'staff'), requirePhotoPermission('photo.submission.review'), async (c) => {
+  const body = await c.req.json<{
+    accountId?: string;
+    expectedVersion?: number;
+    placements?: Array<{ type?: string; label?: string }>;
+  }>().catch(() => null);
+  const accountId = body?.accountId?.trim();
+  const idempotencyKey = c.req.header('Idempotency-Key')?.trim().slice(0, 120);
+  const allowed = new Set(['rich_menu', 'column', 'form', 'site']);
+  const placements = (body?.placements ?? []).map((placement) => ({
+    type: String(placement.type || ''), label: String(placement.label || '').trim().slice(0, 120),
+  }));
+  if (!accountId || !Number.isInteger(body?.expectedVersion) || !idempotencyKey
+      || placements.length > 20 || placements.some((placement) => !allowed.has(placement.type) || !placement.label)) {
+    return c.json({ success: false, error: '掲載先、accountId、expectedVersion、Idempotency-Key を確認してください' }, 400);
+  }
+  if (new Set(placements.map((placement) => `${placement.type}:${placement.label}`)).size !== placements.length) {
+    return c.json({ success: false, error: '同じ掲載先が重複しています' }, 400);
+  }
+  if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+    return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
+  }
+  const publication = await c.env.DB.prepare(
+    `SELECT id, status, version, last_idempotency_key
+       FROM nen_photo_publications WHERE id = ? AND line_account_id = ?`,
+  ).bind(c.req.param('id'), accountId).first<{
+    id: string; status: string; version: number; last_idempotency_key: string | null;
+  }>();
+  if (!publication) return c.json({ success: false, error: 'Not found' }, 404);
+  if (publication.last_idempotency_key === idempotencyKey) {
+    return c.json({ success: true, data: { version: publication.version, placementCount: placements.length } });
+  }
+  if (publication.status !== 'published' || publication.version !== body!.expectedVersion) {
+    return c.json({ success: false, error: '別の人が先に掲載先を変更しました' }, 409);
+  }
+  const now = jstNow();
+  const results = await c.env.DB.batch([
+    c.env.DB.prepare(
+      `UPDATE nen_photo_publications SET version = version + 1, last_idempotency_key = ?, updated_at = ?
+        WHERE id = ? AND line_account_id = ? AND status = 'published' AND version = ?`,
+    ).bind(idempotencyKey, now, publication.id, accountId, body!.expectedVersion),
+    c.env.DB.prepare(
+      `UPDATE nen_photo_publication_placements SET active = 0, removed_at = ?
+        WHERE publication_id = ? AND line_account_id = ? AND active = 1`,
+    ).bind(now, publication.id, accountId),
+    ...placements.map((placement) => c.env.DB.prepare(
+      `INSERT INTO nen_photo_publication_placements
+        (id, publication_id, line_account_id, placement_type, placement_label, active, created_at, removed_at)
+       VALUES (?, ?, ?, ?, ?, 1, ?, NULL)
+       ON CONFLICT(publication_id, placement_type, placement_label)
+       DO UPDATE SET active = 1, removed_at = NULL`,
+    ).bind(crypto.randomUUID(), publication.id, accountId, placement.type, placement.label, now)),
+  ]);
+  if (!results[0]?.meta.changes) {
+    return c.json({ success: false, error: '別の人が先に掲載先を変更しました' }, 409);
+  }
+  return c.json({ success: true, data: { version: publication.version + 1, placementCount: placements.length } });
+});
+
+nenMembers.get('/api/nen-members/photos/:id', requirePhotoPermission('photo.submission.view'), async (c) => {
+  const accountId = c.req.query('accountId')?.trim();
+  if (!accountId) return c.json({ success: false, error: 'accountId is required' }, 400);
+  if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+    return c.json({ success: false, error: 'このLINEアカウントを表示する権限がありません' }, 403);
+  }
+  const photo = await c.env.DB.prepare(
+    `SELECT ps.id, ps.review_image_url AS image_url, ps.caption, ps.status,
+            ps.image_width, ps.image_height, ps.image_byte_size, ps.captured_device,
+            ps.review_version, ps.created_at, ps.publication_consent_at,
+            ps.publication_withdrawn_at, p.name AS pet_name, p.animal_type, p.breed,
+            p.birthday, f.display_name AS owner_name,
+            (SELECT COUNT(*) FROM nen_photo_submissions prior
+              WHERE prior.friend_id = ps.friend_id AND prior.created_at <= ps.created_at) AS submission_count,
+            (SELECT COUNT(*) FROM nen_photo_submissions returned
+              WHERE returned.friend_id = ps.friend_id AND returned.status = 'rejected') AS returned_count
+       FROM nen_photo_submissions ps
+       JOIN nen_pet_profiles p ON p.id = ps.pet_id
+       JOIN friends f ON f.id = ps.friend_id
+      WHERE ps.id = ? AND ps.line_account_id = ? AND f.line_account_id = ?`,
+  ).bind(c.req.param('id'), accountId, accountId).first<Record<string, unknown>>();
+  if (!photo) return c.json({ success: false, error: 'Not found' }, 404);
+  const risks = await c.env.DB.prepare(
+    `SELECT flag, confidence, note, provider, model_version, assessed_at
+       FROM nen_photo_risk_assessments
+      WHERE photo_id = ? AND line_account_id = ? ORDER BY created_at DESC`,
+  ).bind(c.req.param('id'), accountId).all<Record<string, unknown>>();
+  return c.json({ success: true, data: { ...photo, risks: risks.results } });
+});
+
+nenMembers.put('/api/nen-members/photos/:id/review', requireRole('owner', 'admin', 'staff'), requirePhotoPermission('photo.submission.review'), async (c) => {
   const body = await c.req.json<{
     accountId?: string;
     status?: string;
     reasonCode?: string;
     reasonNote?: string;
+    expectedVersion?: number;
   }>().catch(() => null);
   const accountId = body?.accountId?.trim();
   if (!accountId) return c.json({ success: false, error: 'accountId is required' }, 400);
@@ -684,6 +1084,7 @@ nenMembers.put('/api/nen-members/photos/:id/review', requireRole('owner', 'admin
   }
   const status = String(body?.status || '');
   if (!['adopted', 'rejected'].includes(status)) return c.json({ success: false, error: 'Invalid review' }, 400);
+  if (!Number.isInteger(body?.expectedVersion)) return c.json({ success: false, error: 'expectedVersion is required' }, 400);
   const reasonCode = status === 'rejected' ? String(body?.reasonCode || '') : '';
   const reasonNote = String(body?.reasonNote || '').trim().slice(0, 500);
   if (status === 'rejected' && !Object.prototype.hasOwnProperty.call(PHOTO_REVIEW_REASON_LABELS, reasonCode)) {
@@ -692,40 +1093,17 @@ nenMembers.put('/api/nen-members/photos/:id/review', requireRole('owner', 'admin
   if (status === 'rejected' && reasonCode === 'other' && !reasonNote) {
     return c.json({ success: false, error: 'そのほかの理由を入力してください' }, 400);
   }
-  const photo = await c.env.DB.prepare(
-    `SELECT ps.*, s.customer_id, f.line_user_id, f.line_account_id, f.is_following,
-            a.channel_access_token, a.channel_access_token_encrypted
-       FROM nen_photo_submissions ps
-       JOIN friends f ON f.id = ps.friend_id
-       JOIN line_accounts a ON a.id = f.line_account_id
-       LEFT JOIN nen_ec_member_snapshots s ON s.friend_id = ps.friend_id
-      WHERE ps.id = ? AND ps.line_account_id = ? AND f.line_account_id = ?`,
-  ).bind(c.req.param('id'), accountId, accountId).first<ReviewPhotoRow>();
+  const photo = await loadPhotoReviewRecipient(
+    c.env.DB, { photoId: c.req.param('id'), lineAccountId: accountId },
+  );
   if (!photo) return c.json({ success: false, error: 'Not found' }, 404);
-  if (photo.status !== 'pending') return c.json({ success: false, error: 'Already reviewed' }, 409);
-  let awarded = 0;
-  let pointBalance: number | null = null;
-  if (status === 'adopted') {
-    if (!c.env.NEN_EC_BASE_URL || !c.env.ECCUBE_WEBHOOK_SECRET || !photo.customer_id) {
-      return c.json({ success: false, error: 'ECポイント連携が設定されていません' }, 503);
-    }
-    const payload = JSON.stringify({
-      customerId: String(photo.customer_id),
-      awardKey: `nen-photo:${String(photo.id)}`,
-      points: PHOTO_ADOPTION_POINTS,
-    });
-    const timestamp = String(Math.floor(Date.now() / 1000));
-    const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(c.env.ECCUBE_WEBHOOK_SECRET), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
-    const signature = Array.from(new Uint8Array(await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(`${timestamp}.${payload}`))))
-      .map((byte) => byte.toString(16).padStart(2, '0')).join('');
-    const response = await fetch(`${c.env.NEN_EC_BASE_URL.replace(/\/$/, '')}/line-harness/photo-points`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Nen-Timestamp': timestamp, 'X-Nen-Signature': `sha256=${signature}` }, body: payload,
-    });
-    const result = await response.json().catch(() => ({})) as { success?: boolean; pointBalance?: number; error?: string };
-    if (!response.ok || !result.success) return c.json({ success: false, error: result.error || 'ECポイントを付与できませんでした' }, 502);
-    awarded = PHOTO_ADOPTION_POINTS;
-    pointBalance = Number(result.pointBalance || 0);
+  if (photo.status !== 'pending' || Number(photo.review_version) !== body!.expectedVersion) {
+    return c.json({ success: false, error: 'Already reviewed' }, 409);
   }
+  const awarded = status === 'adopted' ? PHOTO_ADOPTION_POINTS : 0;
+  const pointSync: 'pending' | 'needs_attention' | 'not_required' = status !== 'adopted'
+    ? 'not_required'
+    : photo.customer_id ? 'pending' : 'needs_attention';
   const now = jstNow();
   const decisionId = crypto.randomUUID();
   try {
@@ -737,21 +1115,30 @@ nenMembers.put('/api/nen-members/photos/:id/review', requireRole('owner', 'admin
            awarded_points, reviewed_by, reviewed_by_name, notification_status, created_at, updated_at)
          SELECT ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, 'pending', ?, ?
            FROM nen_photo_submissions
-          WHERE id = ? AND line_account_id = ? AND status = 'pending'`,
+          WHERE id = ? AND line_account_id = ? AND status = 'pending' AND review_version = ?`,
       ).bind(
         decisionId, c.req.param('id'), accountId, status, reasonCode || null, reasonNote || null,
-        awarded, reviewer.id, reviewer.name, now, now, c.req.param('id'), accountId,
+        awarded, reviewer.id, reviewer.name, now, now, c.req.param('id'), accountId, body!.expectedVersion,
       ),
       c.env.DB.prepare(
         `UPDATE nen_photo_submissions
             SET status = ?, awarded_points = ?, review_reason_code = ?, review_reason_note = ?,
                 reviewed_by = ?, reviewed_by_name = ?, review_notification_status = 'pending',
-                reviewed_at = ?, updated_at = ?
-          WHERE id = ? AND line_account_id = ? AND status = 'pending'`,
+                reviewed_at = ?, review_version = review_version + 1, updated_at = ?
+          WHERE id = ? AND line_account_id = ? AND status = 'pending' AND review_version = ?`,
       ).bind(
         status, awarded, reasonCode || null, reasonNote || null, reviewer.id, reviewer.name,
-        now, now, c.req.param('id'), accountId,
+        now, now, c.req.param('id'), accountId, body!.expectedVersion,
       ),
+      ...(status === 'adopted' && photo.customer_id ? [c.env.DB.prepare(
+        `INSERT INTO nen_photo_reward_outbox
+          (id, photo_id, line_account_id, friend_id, customer_id, provider_award_key,
+           policy_version, points, status, next_attempt_at, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, 'legacy-5', ?, 'pending', ?, ?, ?)`,
+      ).bind(
+        crypto.randomUUID(), photo.id, accountId, photo.friend_id, photo.customer_id,
+        `nen-photo:${String(photo.id)}`, awarded, now, now, now,
+      )] : []),
     ]);
     if (!results[0]?.meta.changes || !results[1]?.meta.changes) {
       return c.json({ success: false, error: 'Already reviewed' }, 409);
@@ -762,65 +1149,37 @@ nenMembers.put('/api/nen-members/photos/:id/review', requireRole('owner', 'admin
     }
     return c.json({ success: false, error: '同じ写真がほかの担当者により更新されました' }, 409);
   }
-  if (pointBalance !== null) {
-    await c.env.DB.prepare(`UPDATE nen_ec_member_snapshots SET point_balance=?, synced_at=? WHERE friend_id=?`)
-      .bind(pointBalance, now, photo.friend_id).run();
-    await c.env.DB.prepare(`INSERT OR IGNORE INTO nen_point_ledger (id, friend_id, amount, balance_after, reason, external_ref, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`)
-      .bind(crypto.randomUUID(), photo.friend_id, awarded, pointBalance, '写真採用', `nen-photo:${String(photo.id)}`, now).run();
-  }
   await syncNenPhotoTags(c.env.DB, String(photo.friend_id));
-  let notificationStatus: 'sent' | 'failed' = 'sent';
-  let notificationError: string | null = null;
-  try {
-    await sendPhotoReviewNotification(
-      c,
-      photo,
-      status as 'adopted' | 'rejected',
-      reasonCode ? reasonCode as PhotoReviewReasonCode : null,
-      reasonNote || null,
-      decisionId,
-    );
-  } catch (error) {
-    notificationStatus = 'failed';
-    notificationError = error instanceof Error ? error.message : '審査結果をLINEで通知できませんでした';
-  }
-  const notificationUpdatedAt = jstNow();
-  await c.env.DB.batch([
-    c.env.DB.prepare(
-      `UPDATE nen_photo_submissions SET review_notification_status = ?, updated_at = ? WHERE id = ?`,
-    ).bind(notificationStatus, notificationUpdatedAt, photo.id),
-    c.env.DB.prepare(
-      `UPDATE nen_photo_review_events
-          SET notification_status = ?, notification_error = ?, notification_attempt_count = 1,
-              notification_first_failed_at = ?, notification_sent_at = ?, updated_at = ?
-        WHERE id = ?`,
-    ).bind(
-      notificationStatus,
-      notificationError,
-      notificationStatus === 'failed' ? notificationUpdatedAt : null,
-      notificationStatus === 'sent' ? notificationUpdatedAt : null,
-      notificationUpdatedAt,
-      decisionId,
-    ),
-  ]);
+  const delivery = await deliverPhotoReviewNotification(c.env.DB, c, photo, {
+    lineAccountId: accountId,
+    photoId: photo.id,
+    status: status as 'adopted' | 'rejected',
+    reasonCode: reasonCode ? reasonCode as PhotoReviewReasonCode : null,
+    reasonNote: reasonNote || null,
+    decisionId,
+  });
   return c.json({
     success: true,
     data: {
       awardedPoints: awarded,
-      pointBalance,
-      pointSync: status === 'adopted' ? 'synced' : 'not_required',
-      notificationStatus,
+      pointBalance: null,
+      pointSync,
+      notificationStatus: delivery.notificationStatus,
     },
   });
 });
 
-nenMembers.post('/api/nen-members/photos/:id/notification/retry', requireRole('owner', 'admin', 'staff'), async (c) => {
+nenMembers.post('/api/nen-members/photos/:id/notification/retry', requireRole('owner', 'admin', 'staff'), requirePhotoPermission('photo.submission.review'), async (c) => {
   const body = await c.req.json<{ accountId?: string }>().catch(() => null);
   const accountId = body?.accountId?.trim();
   if (!accountId) return c.json({ success: false, error: 'accountId is required' }, 400);
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
     return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
   }
+  const now = new Date().toISOString();
+  // 拾い上げる状態は claimPhotoNotificationDelivery の送信権条件と揃える。
+  // pending（一括の通知準備で落ちた対象など、まだ一度も送れていないもの）を
+  // 外すと、画面に失敗と出ているのに再送だけ 409 で断る食い違いが起きる。
   const row = await c.env.DB.prepare(
     `SELECT ps.id, ps.friend_id, f.line_user_id, f.line_account_id, f.is_following,
             a.channel_access_token, a.channel_access_token_encrypted,
@@ -830,46 +1189,43 @@ nenMembers.post('/api/nen-members/photos/:id/notification/retry', requireRole('o
        JOIN line_accounts a ON a.id = f.line_account_id
        JOIN nen_photo_review_events e ON e.photo_id = ps.id
       WHERE ps.id = ? AND ps.line_account_id = ? AND f.line_account_id = ?
-        AND e.notification_status = 'failed'
+        AND (e.notification_status IN ('pending', 'failed')
+          OR (e.notification_status = 'sending'
+            AND (e.notification_lease_expires_at IS NULL OR e.notification_lease_expires_at <= ?)))
       ORDER BY e.created_at DESC LIMIT 1`,
-  ).bind(c.req.param('id'), accountId, accountId).first<ReviewPhotoRow & {
+  ).bind(c.req.param('id'), accountId, accountId, now).first<ReviewPhotoRow & {
     decision_id: string;
     to_status: 'adopted' | 'rejected';
     reason_code: PhotoReviewReasonCode | null;
     reason_note: string | null;
   }>();
-  if (!row) return c.json({ success: false, error: '再送する通知がありません' }, 409);
-  try {
-    await sendPhotoReviewNotification(
-      c, row, row.to_status, row.reason_code, row.reason_note, row.decision_id,
-    );
-  } catch (error) {
-    const message = error instanceof Error ? error.message : '審査結果をLINEで通知できませんでした';
-    const failedAt = jstNow();
-    await c.env.DB.prepare(
-      `UPDATE nen_photo_review_events
-          SET notification_status = 'failed', notification_error = ?,
-              notification_attempt_count = notification_attempt_count + 1,
-              notification_first_failed_at = COALESCE(notification_first_failed_at, ?),
-              updated_at = ?
-        WHERE id = ?`,
-    ).bind(message, failedAt, failedAt, row.decision_id).run();
-    return c.json({ success: false, error: message }, 502);
+  if (!row) {
+    const settled = await c.env.DB.prepare(
+      `SELECT e.notification_status AS notification_status
+         FROM nen_photo_review_events e
+        WHERE e.photo_id = ? AND e.line_account_id = ?
+        ORDER BY e.created_at DESC LIMIT 1`,
+    ).bind(c.req.param('id'), accountId).first<{ notification_status: string }>();
+    if (settled?.notification_status === 'sent') {
+      return c.json({ success: true, data: { notificationStatus: 'sent', resent: false } });
+    }
+    return c.json({ success: false, error: '再送する通知がありません' }, 409);
   }
-  const now = jstNow();
-  await c.env.DB.batch([
-    c.env.DB.prepare(
-      `UPDATE nen_photo_submissions SET review_notification_status = 'sent', updated_at = ? WHERE id = ?`,
-    ).bind(now, row.id),
-    c.env.DB.prepare(
-      `UPDATE nen_photo_review_events
-          SET notification_status = 'sent',
-              notification_attempt_count = notification_attempt_count + 1,
-              notification_sent_at = ?, updated_at = ?
-        WHERE id = ?`,
-    ).bind(now, now, row.decision_id),
-  ]);
-  return c.json({ success: true, data: { notificationStatus: 'sent' } });
+  const delivery = await deliverPhotoReviewNotification(c.env.DB, c, row, {
+    lineAccountId: accountId,
+    photoId: row.id,
+    status: row.to_status,
+    reasonCode: row.reason_code,
+    reasonNote: row.reason_note,
+    decisionId: row.decision_id,
+  });
+  if (delivery.notificationStatus === 'sent') {
+    return c.json({ success: true, data: { notificationStatus: 'sent', resent: delivery.relayed } });
+  }
+  if (delivery.busy) {
+    return c.json({ success: false, error: delivery.notificationError }, 409);
+  }
+  return c.json({ success: false, error: delivery.notificationError }, 502);
 });
 
 nenMembers.post('/api/nen-members/tags/resync', requireRole('owner', 'admin'), async (c) => {
@@ -883,7 +1239,7 @@ nenMembers.post('/api/nen-members/tags/resync', requireRole('owner', 'admin'), a
   return c.json({ success: true, data: result });
 });
 
-nenMembers.get('/api/nen-members/friends/:friendId', async (c) => {
+nenMembers.get('/api/nen-members/friends/:friendId', requireRole('owner', 'admin', 'staff'), async (c) => {
   const friendId = c.req.param('friendId');
   const friend = await c.env.DB.prepare(
     `SELECT f.id, f.line_user_id, f.display_name, f.picture_url, f.is_following,
@@ -898,7 +1254,20 @@ nenMembers.get('/api/nen-members/friends/:friendId', async (c) => {
     c.env.DB.prepare(`SELECT * FROM nen_ec_member_snapshots WHERE friend_id = ?`).bind(friendId).first<Record<string, unknown>>(),
     c.env.DB.prepare(`SELECT * FROM nen_pet_profiles WHERE friend_id = ? ORDER BY created_at ASC`).bind(friendId).all<Record<string, unknown>>(),
     c.env.DB.prepare(`SELECT * FROM nen_health_logs WHERE friend_id = ? ORDER BY logged_on DESC LIMIT 100`).bind(friendId).all<Record<string, unknown>>(),
-    c.env.DB.prepare(`SELECT ps.*, p.name AS pet_name FROM nen_photo_submissions ps LEFT JOIN nen_pet_profiles p ON p.id = ps.pet_id WHERE ps.friend_id = ? ORDER BY ps.created_at DESC LIMIT 100`).bind(friendId).all<Record<string, unknown>>(),
+    c.env.DB.prepare(
+      `SELECT ps.id, ps.friend_id, ps.pet_id, ps.caption, ps.status, ps.awarded_points,
+              ps.point_transaction_id, ps.created_at, ps.reviewed_at, ps.updated_at,
+              ps.line_account_id, ps.publication_consent_version, ps.publication_consent_at,
+              ps.publication_withdrawn_at, ps.public_pet_name, ps.review_reason_code,
+              ps.review_reason_note, ps.reviewed_by, ps.reviewed_by_name,
+              ps.review_notification_status, ps.review_image_url, ps.public_image_url,
+              ps.image_width, ps.image_height, ps.image_byte_size, ps.captured_device,
+              ps.review_version, p.name AS pet_name
+         FROM nen_photo_submissions ps
+         LEFT JOIN nen_pet_profiles p ON p.id = ps.pet_id
+        WHERE ps.friend_id = ?
+        ORDER BY ps.created_at DESC LIMIT 100`,
+    ).bind(friendId).all<Record<string, unknown>>(),
     c.env.DB.prepare(`SELECT * FROM nen_point_ledger WHERE friend_id = ? ORDER BY created_at DESC LIMIT 100`).bind(friendId).all<Record<string, unknown>>(),
     c.env.DB.prepare(`SELECT id, source, external_event_id, event_type, customer_id, status, error_message, received_at, processed_at FROM ec_events WHERE friend_id = ? ORDER BY received_at DESC LIMIT 100`).bind(friendId).all<Record<string, unknown>>(),
   ]);

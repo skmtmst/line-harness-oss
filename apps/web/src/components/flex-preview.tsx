@@ -61,6 +61,23 @@ function getSize(s?: string) { return s ? sizeMap[s] || s : undefined }
 function getMargin(m?: string) { return m ? marginMap[m] || m : undefined }
 function getSpacing(s?: string) { return s ? spacingMap[s] || s : undefined }
 
+export function safeFlexAssetUrl(value?: string): string | null {
+  if (!value) return null
+  try {
+    const url = new URL(value)
+    if (url.protocol !== 'https:' || url.username || url.password) return null
+    const host = url.hostname.toLowerCase()
+    if (host === 'localhost' || host.endsWith('.local')) return null
+    if (/^(?:127\.|10\.|192\.168\.|169\.254\.)/.test(host)) return null
+    const match = host.match(/^172\.(\d+)\./)
+    if (match && Number(match[1]) >= 16 && Number(match[1]) <= 31) return null
+    if (host === '::1' || host.startsWith('fc') || host.startsWith('fd') || host.startsWith('fe8')) return null
+    return url.toString()
+  } catch {
+    return null
+  }
+}
+
 function FlexText({ node }: { node: FlexNode }) {
   const style: React.CSSProperties = {
     fontSize: getSize(node.size) || '14px',
@@ -107,7 +124,8 @@ function FlexSeparator({ node }: { node: FlexNode }) {
 }
 
 function FlexImage({ node }: { node: FlexNode }) {
-  if (!node.url) return null
+  const url = safeFlexAssetUrl(node.url)
+  if (!url) return null
   const style: React.CSSProperties = {
     width: node.size === 'full' ? '100%' : (getSize(node.size) || '100%'),
     maxWidth: '100%',
@@ -115,13 +133,14 @@ function FlexImage({ node }: { node: FlexNode }) {
     objectFit: (node.aspectMode === 'cover' ? 'cover' : 'contain') as React.CSSProperties['objectFit'],
     ...(node.aspectRatio ? { aspectRatio: node.aspectRatio.replace(':', '/') } : {}),
   }
-  return <img src={node.url} alt="" style={style} />
+  return <img src={url} alt="" style={style} referrerPolicy="no-referrer" loading="lazy" />
 }
 
 function FlexIcon({ node }: { node: FlexNode }) {
-  if (!node.url) return null
+  const url = safeFlexAssetUrl(node.url)
+  if (!url) return null
   const s = getSize(node.size) || '16px'
-  return <img src={node.url} alt="" style={{ width: s, height: s, objectFit: 'contain' }} />
+  return <img src={url} alt="" style={{ width: s, height: s, objectFit: 'contain' }} referrerPolicy="no-referrer" loading="lazy" />
 }
 
 function FlexSpacer({ node }: { node: FlexNode }) {

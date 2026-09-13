@@ -17,6 +17,21 @@ vi.mock('@line-crm/db', () => ({
   getWebhookInteractionById: vi.fn(),
   listFailedWebhookInteractionsForRetry: vi.fn(),
   listWebhookInteractions: vi.fn(),
+  getOutgoingWebhookDeliverySummaries: vi.fn(),
+  updateIncomingWebhookConfig: vi.fn(),
+  updateIncomingWebhookMaskedSample: vi.fn(),
+  backfillWebhookSecrets: vi.fn(),
+  hasWebhookSecret: vi.fn((row: { secret?: unknown; secret_encrypted?: unknown }) =>
+    Boolean(row?.secret_encrypted) ||
+    (typeof row?.secret === 'string' && row.secret.length >= 32)),
+  resolveWebhookSecret: vi.fn(async (row: { secret?: unknown; secret_encrypted?: unknown }) => {
+    if (typeof row?.secret_encrypted === 'string') {
+      if (row.secret_encrypted.startsWith('v1-broken')) throw new Error('Unable to decrypt webhook secret');
+      return 'r'.repeat(32);
+    }
+    return (row?.secret as string | null) ?? null;
+  }),
+  WEBHOOK_SECRET_MIN_LENGTH: 32,
 }));
 
 vi.mock('../services/webhook-interactions.js', () => ({
@@ -29,6 +44,16 @@ vi.mock('../services/webhook-interactions.js', () => ({
 // verification rather than the full event-bus + DB graph.
 vi.mock('../services/event-bus.js', () => ({
   fireEvent: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('../services/incoming-webhook-actions.js', () => ({
+  executeIncomingWebhookActions: vi.fn().mockResolvedValue({
+    matchedFriendId: null, executed: 0, failed: 0,
+  }),
+}));
+
+vi.mock('../services/outgoing-webhook-delivery.js', () => ({
+  deliverWebhook: vi.fn().mockResolvedValue({ ok: true, attempts: 1, lastStatus: 204 }),
 }));
 
 vi.mock('../services/account-access.js', () => ({
@@ -51,10 +76,18 @@ import {
   getWebhookInteractionById,
   listFailedWebhookInteractionsForRetry,
   listWebhookInteractions,
+  getOutgoingWebhookDeliverySummaries,
+  updateIncomingWebhookConfig,
+  updateIncomingWebhookMaskedSample,
+  backfillWebhookSecrets,
+  hasWebhookSecret,
+  resolveWebhookSecret,
 } from '@line-crm/db';
 import { retryWebhookInteraction } from '../services/webhook-interactions.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import { fireEvent } from '../services/event-bus.js';
+import { executeIncomingWebhookActions } from '../services/incoming-webhook-actions.js';
+import { deliverWebhook } from '../services/outgoing-webhook-delivery.js';
 import type { Env } from '../index.js';
 import { webhooks } from './webhooks.js';
 
@@ -62,13 +95,37 @@ const VALID_SECRET = 'a'.repeat(32);
 const SHORT_SECRET = 'a'.repeat(31);
 const ACCOUNT_ID = 'account-a';
 
-function setupApp(tenantId?: string) {
+const incomingWebhookRow = (overrides: Record<string, unknown> = {}) => ({
+  id: 'iwh-1',
+  name: 'test',
+  source_type: 'custom',
+  secret: VALID_SECRET,
+  secret_encrypted: null,
+  is_active: 1,
+  line_account_id: ACCOUNT_ID,
+  version: 1,
+  identity_match_json: '{"methods":[],"onNotFound":"do_nothing"}',
+  action_refs_json: '[]',
+  latest_masked_sample_json: null,
+  latest_received_at: null,
+  created_at: '2026-05-08T00:00:00.000+09:00',
+  updated_at: '2026-05-08T00:00:00.000+09:00',
+  ...overrides,
+});
+
+function setupApp(
+  tenantId?: string,
+  role: 'owner' | 'admin' | 'staff' = 'owner',
+  permissionKeys?: string[],
+) {
   const app = new Hono<Env>();
   // Webhook の作成・更新・削除はオーナー限定になった。ここで見たいのは
   // 入力の検証なので、認証は通った状態にしてから本体へ渡す。
   // 権限そのものの検証は middleware/role-guard.test.ts にある。
   app.use('*', async (c, next) => {
-    c.set('staff', { id: 'owner-1', name: 'Owner', role: 'owner', readOnly: false, tenantId });
+    c.set('staff', {
+      id: 'staff-1', name: 'Staff', role, readOnly: false, tenantId, permissionKeys,
+    });
     return next();
   });
   app.route('/', webhooks);
@@ -76,6 +133,17 @@ function setupApp(tenantId?: string) {
 }
 
 const baseEnv = { DB: {} as D1Database } as Record<string, unknown>;
+
+async function webhookSignature(body: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    'raw', encoder.encode(VALID_SECRET), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'],
+  );
+  const signature = await crypto.subtle.sign('HMAC', key, encoder.encode(body));
+  return Array.from(new Uint8Array(signature))
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('');
+}
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -95,13 +163,17 @@ beforeEach(() => {
     summary: { total: 0, outgoing: 0, incoming: 0, succeeded: 0, failed: 0, averageDurationMs: null },
   });
   vi.mocked(listFailedWebhookInteractionsForRetry).mockResolvedValue([]);
-  vi.mocked(getIncomingWebhookById).mockResolvedValue({
-    id: 'iwh-1', name: 'test', source_type: 'custom', secret: VALID_SECRET,
-    is_active: 1, line_account_id: ACCOUNT_ID, created_at: '2026-05-08', updated_at: '2026-05-08',
+  vi.mocked(getOutgoingWebhookDeliverySummaries).mockResolvedValue([]);
+  vi.mocked(updateIncomingWebhookMaskedSample).mockResolvedValue(undefined);
+  vi.mocked(executeIncomingWebhookActions).mockResolvedValue({
+    matchedFriendId: null, executed: 0, failed: 0,
   });
+  vi.mocked(deliverWebhook).mockResolvedValue({ ok: true, attempts: 1, lastStatus: 204 });
+  vi.mocked(getIncomingWebhookById).mockResolvedValue(incomingWebhookRow());
   vi.mocked(getOutgoingWebhookById).mockResolvedValue({
     id: 'wh-1', name: 'test', url: 'https://example.com/hook', event_types: '["*"]',
     secret: VALID_SECRET, is_active: 1, max_retries: 0, consecutive_failures: 0,
+    secret_encrypted: null,
     last_failed_at: null, created_at: '2026-05-08', updated_at: '2026-05-08',
   });
 });
@@ -141,6 +213,7 @@ describe('POST /api/webhooks/outgoing — validation', () => {
           url: 'https://example.com/hook',
           eventTypes: ['*'],
           secret: SHORT_SECRET,
+          secret_encrypted: null,
         }),
       },
       baseEnv,
@@ -161,6 +234,7 @@ describe('POST /api/webhooks/outgoing — validation', () => {
           url: 'http://example.com/hook',
           eventTypes: ['*'],
           secret: VALID_SECRET,
+          secret_encrypted: null,
           lineAccountId: ACCOUNT_ID,
         }),
       },
@@ -182,6 +256,7 @@ describe('POST /api/webhooks/outgoing — validation', () => {
           url: 'not-a-url',
           eventTypes: ['*'],
           secret: VALID_SECRET,
+          secret_encrypted: null,
         }),
       },
       baseEnv,
@@ -197,6 +272,7 @@ describe('POST /api/webhooks/outgoing — validation', () => {
       url: 'https://example.com/hook',
       event_types: '["*"]',
       secret: VALID_SECRET,
+      secret_encrypted: null,
       is_active: 1,
       max_retries: 0,
       consecutive_failures: 0,
@@ -216,6 +292,7 @@ describe('POST /api/webhooks/outgoing — validation', () => {
           url: 'https://example.com/hook',
           eventTypes: ['*'],
           secret: VALID_SECRET,
+          secret_encrypted: null,
           lineAccountId: ACCOUNT_ID,
         }),
       },
@@ -230,7 +307,7 @@ describe('POST /api/webhooks/outgoing — validation', () => {
     expect(body.success).toBe(true);
     expect(body.data.secret).toBe(VALID_SECRET);
     expect(body.data.id).toBe('wh-1');
-    expect(createOutgoingWebhook).toHaveBeenCalledWith(baseEnv.DB, expect.objectContaining({ lineAccountId: ACCOUNT_ID }));
+    expect(createOutgoingWebhook).toHaveBeenCalledWith(baseEnv.DB, expect.objectContaining({ lineAccountId: ACCOUNT_ID }), { current: undefined, previous: undefined });
   });
 
   test('既定でない統括はLINEアカウントを省略できない', async () => {
@@ -325,6 +402,7 @@ describe('PUT /api/webhooks/outgoing/:id — validation', () => {
       url: 'https://example.com/hook',
       event_types: '["*"]',
       secret: null,
+      secret_encrypted: null,
       is_active: 0,
       max_retries: 0,
       consecutive_failures: 0,
@@ -354,6 +432,7 @@ describe('PUT /api/webhooks/outgoing/:id — validation', () => {
       url: 'http://example.com/hook',
       event_types: '["*"]',
       secret: VALID_SECRET,
+      secret_encrypted: null,
       is_active: 0,
       max_retries: 0,
       consecutive_failures: 0,
@@ -383,6 +462,7 @@ describe('PUT /api/webhooks/outgoing/:id — validation', () => {
       url: 'https://example.com/hook',
       event_types: '["*"]',
       secret: VALID_SECRET,
+      secret_encrypted: null,
       is_active: 1,
       max_retries: 0,
       consecutive_failures: 0,
@@ -428,6 +508,7 @@ describe('GET /api/webhooks/outgoing — secret exposure', () => {
         url: 'https://example.com/hook',
         event_types: '["*"]',
         secret: VALID_SECRET,
+        secret_encrypted: null,
         is_active: 1,
         max_retries: 0,
         consecutive_failures: 0,
@@ -456,6 +537,7 @@ describe('GET /api/webhooks/outgoing — secret exposure', () => {
         url: 'https://example.com/hook',
         event_types: '["*"]',
         secret: null,
+        secret_encrypted: null,
         is_active: 0,
         max_retries: 0,
         consecutive_failures: 0,
@@ -470,6 +552,80 @@ describe('GET /api/webhooks/outgoing — secret exposure', () => {
     const body = (await res.json()) as { data: Array<Record<string, unknown>> };
     expect(body.data[0]).not.toHaveProperty('secret');
     expect(body.data[0].hasSecret).toBe(false);
+  });
+
+  test('接続ごとの直近30日集計と、安全に再送できるかを返す', async () => {
+    vi.mocked(getOutgoingWebhooks).mockResolvedValue([{
+      id: 'wh-1', name: '顧客管理', url: 'https://example.com/hook', event_types: '["friend.added"]',
+      secret: VALID_SECRET, is_active: 1, max_retries: 2, consecutive_failures: 1,
+      secret_encrypted: null,
+      last_failed_at: '2026-09-06T10:00:00.000+09:00',
+      created_at: '2026-05-08T00:00:00.000+09:00', updated_at: '2026-09-06T10:00:00.000+09:00',
+    }]);
+    vi.mocked(getOutgoingWebhookDeliverySummaries).mockResolvedValue([{
+      webhook_id: 'wh-1', total: 4, succeeded: 3, failed: 1, pending: 0,
+      last_status: 'failed', last_response_status: 500,
+      last_completed_at: '2026-09-06T10:00:01.000+09:00',
+      last_failure_reason: 'response_5xx', can_retry: 1,
+    }]);
+
+    const res = await setupApp().request(
+      `/api/webhooks/outgoing?lineAccountId=${ACCOUNT_ID}`,
+      { method: 'GET' },
+      baseEnv,
+    );
+    expect(res.status).toBe(200);
+    expect(getOutgoingWebhookDeliverySummaries).toHaveBeenCalledWith(baseEnv.DB, ACCOUNT_ID, 30);
+    const body = await res.json() as { data: Array<Record<string, unknown>> };
+    expect(body.data[0]).toMatchObject({
+      deliverySummary: {
+        periodDays: 30, total: 4, succeeded: 3, failed: 1, pending: 0,
+        successRate: 75, canRetry: true,
+        lastResult: { status: 'failed', responseStatus: 500, failureReason: '安全な失敗理由' },
+      },
+    });
+  });
+
+  test('履歴がない接続は0件・成功率未計算として返す', async () => {
+    vi.mocked(getOutgoingWebhooks).mockResolvedValue([{
+      id: 'wh-empty', name: '未送信', url: 'https://example.com/empty', event_types: '["*"]',
+      secret: VALID_SECRET, is_active: 1, max_retries: 0, consecutive_failures: 0,
+      secret_encrypted: null,
+      last_failed_at: null, created_at: '2026-05-08', updated_at: '2026-05-08',
+    }]);
+
+    const res = await setupApp().request(
+      `/api/webhooks/outgoing?lineAccountId=${ACCOUNT_ID}`,
+      { method: 'GET' },
+      baseEnv,
+    );
+    const body = await res.json() as { data: Array<{ deliverySummary: Record<string, unknown> }> };
+    expect(body.data[0].deliverySummary).toMatchObject({
+      total: 0, succeeded: 0, failed: 0, pending: 0, successRate: null,
+      lastResult: null, canRetry: false,
+    });
+  });
+
+  test('対象外アカウントの集計を読めない', async () => {
+    vi.mocked(canAccessAllLineAccounts).mockResolvedValue(false);
+    const res = await setupApp().request(
+      '/api/webhooks/outgoing?lineAccountId=account-b',
+      { method: 'GET' },
+      baseEnv,
+    );
+    expect(res.status).toBe(403);
+    expect(getOutgoingWebhookDeliverySummaries).not.toHaveBeenCalled();
+  });
+
+  test('集計取得に失敗したら安全な500を返す', async () => {
+    vi.mocked(getOutgoingWebhookDeliverySummaries).mockRejectedValue(new Error('private DB detail'));
+    const res = await setupApp().request(
+      `/api/webhooks/outgoing?lineAccountId=${ACCOUNT_ID}`,
+      { method: 'GET' },
+      baseEnv,
+    );
+    expect(res.status).toBe(500);
+    expect(await res.text()).not.toContain('private DB detail');
   });
 });
 
@@ -526,16 +682,7 @@ describe('POST /api/webhooks/incoming — validation', () => {
   });
 
   test('accepts 32-char secret with 201, returns secret on create only', async () => {
-    vi.mocked(createIncomingWebhook).mockResolvedValue({
-      id: 'iwh-1',
-      name: 'test',
-      source_type: 'custom',
-      secret: VALID_SECRET,
-      is_active: 1,
-      line_account_id: ACCOUNT_ID,
-      created_at: '2026-05-08T00:00:00.000+09:00',
-      updated_at: '2026-05-08T00:00:00.000+09:00',
-    });
+    vi.mocked(createIncomingWebhook).mockResolvedValue(incomingWebhookRow());
 
     const app = setupApp();
     const res = await app.request(
@@ -549,7 +696,7 @@ describe('POST /api/webhooks/incoming — validation', () => {
     );
     expect(res.status).toBe(201);
     expect(createIncomingWebhook).toHaveBeenCalledOnce();
-    expect(createIncomingWebhook).toHaveBeenCalledWith(baseEnv.DB, expect.objectContaining({ lineAccountId: ACCOUNT_ID }));
+    expect(createIncomingWebhook).toHaveBeenCalledWith(baseEnv.DB, expect.objectContaining({ lineAccountId: ACCOUNT_ID }), { current: undefined, previous: undefined });
     const body = (await res.json()) as { data: { id: string; secret: string } };
     expect(body.data.secret).toBe(VALID_SECRET);
   });
@@ -586,16 +733,9 @@ describe('PUT /api/webhooks/incoming/:id — validation', () => {
   });
 
   test('rejects re-activating webhook whose stored secret is too short (migration bypass)', async () => {
-    vi.mocked(getIncomingWebhookById).mockResolvedValue({
-      id: 'iwh-legacy',
-      name: 'legacy',
-      source_type: 'custom',
-      secret: null,
-      is_active: 0,
-      line_account_id: null,
-      created_at: '2026-05-08T00:00:00.000+09:00',
-      updated_at: '2026-05-08T00:00:00.000+09:00',
-    });
+    vi.mocked(getIncomingWebhookById).mockResolvedValue(incomingWebhookRow({
+      id: 'iwh-legacy', name: 'legacy', secret: null, is_active: 0, line_account_id: null,
+    }));
 
     const app = setupApp();
     const res = await app.request(
@@ -627,18 +767,7 @@ describe('DELETE /api/webhooks/incoming/:id — tenant scope', () => {
 
 describe('GET /api/webhooks/incoming — secret exposure', () => {
   test('does not include secret in response payload', async () => {
-    vi.mocked(getIncomingWebhooks).mockResolvedValue([
-      {
-        id: 'iwh-1',
-        name: 'test',
-        source_type: 'custom',
-        secret: VALID_SECRET,
-        is_active: 1,
-        line_account_id: ACCOUNT_ID,
-        created_at: '2026-05-08T00:00:00.000+09:00',
-        updated_at: '2026-05-08T00:00:00.000+09:00',
-      },
-    ]);
+    vi.mocked(getIncomingWebhooks).mockResolvedValue([incomingWebhookRow()]);
 
     const app = setupApp();
     const res = await app.request(`/api/webhooks/incoming?lineAccountId=${ACCOUNT_ID}`, { method: 'GET' }, baseEnv);
@@ -650,22 +779,183 @@ describe('GET /api/webhooks/incoming — secret exposure', () => {
   });
 });
 
+describe('受け取り口の詳細と設定', () => {
+  test('値を隠した最新項目と構造化設定だけを返す', async () => {
+    vi.mocked(getIncomingWebhookById).mockResolvedValue(incomingWebhookRow({
+      version: 3,
+      identity_match_json: '{"methods":[{"kind":"external_customer_id","path":"$.customer.id"}],"onNotFound":"unmatched_box"}',
+      action_refs_json: '[{"refKind":"tag","refId":"tag-a","refVersionId":null}]',
+      latest_masked_sample_json: '{"fields":[{"path":"$.customer.email","type":"string","maskedValue":"••••"}],"truncated":false}',
+      latest_received_at: '2026-09-07T09:00:00.000+09:00',
+    }));
+
+    const res = await setupApp().request(
+      `/api/webhooks/incoming/iwh-1?lineAccountId=${ACCOUNT_ID}`,
+      { method: 'GET' },
+      baseEnv,
+    );
+    expect(res.status).toBe(200);
+    const text = await res.text();
+    expect(text).not.toContain(VALID_SECRET);
+    const body = JSON.parse(text) as { data: Record<string, unknown> };
+    expect(body.data).toMatchObject({
+      version: 3,
+      identityMatching: {
+        methods: [{ kind: 'external_customer_id', path: '$.customer.id' }],
+        onNotFound: 'unmatched_box',
+      },
+      actions: [{ refKind: 'tag', refId: 'tag-a', refVersionId: null }],
+      actionExecution: { state: 'connected' },
+      latestSample: {
+        receivedAt: '2026-09-07T09:00:00.000+09:00',
+        fields: [{ path: '$.customer.email', type: 'string', maskedValue: '••••' }],
+      },
+      templateFields: [{
+        path: '$.customer.email', type: 'string', token: '{{payload.customer.email}}',
+      }],
+    });
+  });
+
+  test('受信前は最新見本と差し込み項目を空で返す', async () => {
+    const res = await setupApp().request(
+      `/api/webhooks/incoming/iwh-1?lineAccountId=${ACCOUNT_ID}`,
+      { method: 'GET' },
+      baseEnv,
+    );
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      data: {
+        latestSample: null,
+        templateFields: [],
+        actionExecution: { state: 'not_configured', reason: null },
+      },
+    });
+  });
+
+  test('詳細取得に失敗したら顧客値を含まない500を返す', async () => {
+    vi.mocked(getIncomingWebhookById).mockRejectedValue(new Error('private@example.com'));
+    const res = await setupApp().request(
+      `/api/webhooks/incoming/iwh-1?lineAccountId=${ACCOUNT_ID}`,
+      { method: 'GET' },
+      baseEnv,
+    );
+    expect(res.status).toBe(500);
+    expect(await res.text()).not.toContain('private@example.com');
+  });
+
+  test('対象外アカウントは存在も返さない', async () => {
+    vi.mocked(canAccessAllLineAccounts).mockResolvedValue(false);
+    const res = await setupApp().request(
+      '/api/webhooks/incoming/iwh-1?lineAccountId=account-b',
+      { method: 'GET' },
+      baseEnv,
+    );
+    expect(res.status).toBe(404);
+    expect(getIncomingWebhookById).not.toHaveBeenCalled();
+  });
+
+  test('権限キーのないスタッフは詳細を読めない', async () => {
+    const res = await setupApp(undefined, 'staff', []).request(
+      `/api/webhooks/incoming/iwh-1?lineAccountId=${ACCOUNT_ID}`,
+      { method: 'GET' },
+      baseEnv,
+    );
+    expect(res.status).toBe(403);
+    expect(getIncomingWebhookById).not.toHaveBeenCalled();
+  });
+
+  test('オーナーは版を指定して照合方法と実行参照を保存できる', async () => {
+    vi.mocked(updateIncomingWebhookConfig).mockResolvedValue({
+      status: 'updated', item: incomingWebhookRow({ version: 4 }),
+    });
+    const res = await setupApp().request(
+      `/api/webhooks/incoming/iwh-1/config?lineAccountId=${ACCOUNT_ID}`,
+      {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          expectedVersion: 3,
+          identityMatching: {
+            methods: [{ kind: 'harness_friend_id', path: '$.friend.id' }],
+            onNotFound: 'do_nothing',
+          },
+          actions: [{ refKind: 'scenario', refId: 'scenario-a', refVersionId: 'version-a' }],
+        }),
+      },
+      baseEnv,
+    );
+    expect(res.status).toBe(200);
+    expect(updateIncomingWebhookConfig).toHaveBeenCalledWith(baseEnv.DB, {
+      id: 'iwh-1', lineAccountId: ACCOUNT_ID, expectedVersion: 3,
+      identityMatching: {
+        methods: [{ kind: 'harness_friend_id', path: '$.friend.id' }],
+        onNotFound: 'do_nothing',
+      },
+      actions: [{ refKind: 'scenario', refId: 'scenario-a', refVersionId: 'version-a' }],
+    });
+  });
+
+  test('古い版の保存は409と現在版を返す', async () => {
+    vi.mocked(updateIncomingWebhookConfig).mockResolvedValue({
+      status: 'conflict', currentVersion: 5,
+    });
+    const res = await setupApp().request(
+      `/api/webhooks/incoming/iwh-1/config?lineAccountId=${ACCOUNT_ID}`,
+      {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          expectedVersion: 4,
+          identityMatching: { methods: [], onNotFound: 'do_nothing' },
+          actions: [],
+        }),
+      },
+      baseEnv,
+    );
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({
+      success: false, code: 'version_conflict', data: { currentVersion: 5 },
+    });
+  });
+
+  test('名前照合や自由記述アクションを受け付けない', async () => {
+    const res = await setupApp().request(
+      `/api/webhooks/incoming/iwh-1/config?lineAccountId=${ACCOUNT_ID}`,
+      {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          expectedVersion: 1,
+          identityMatching: {
+            methods: [{ kind: 'name', path: '$.name' }], onNotFound: 'do_nothing',
+          },
+          actions: [{ refKind: 'free_text', refId: '何かする' }],
+        }),
+      },
+      baseEnv,
+    );
+    expect(res.status).toBe(400);
+    expect(updateIncomingWebhookConfig).not.toHaveBeenCalled();
+  });
+
+  test('オーナー以外は設定を更新できない', async () => {
+    const res = await setupApp(undefined, 'admin').request(
+      `/api/webhooks/incoming/iwh-1/config?lineAccountId=${ACCOUNT_ID}`,
+      {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      },
+      baseEnv,
+    );
+    expect(res.status).toBe(403);
+    expect(updateIncomingWebhookConfig).not.toHaveBeenCalled();
+  });
+});
+
 // =====================================================
 // POST /api/webhooks/incoming/:id/receive — signature verification
 // =====================================================
 
 describe('POST /api/webhooks/incoming/:id/receive — signature', () => {
   test('rejects request without X-Webhook-Signature with 401', async () => {
-    vi.mocked(getIncomingWebhookById).mockResolvedValue({
-      id: 'iwh-1',
-      name: 'test',
-      source_type: 'custom',
-      secret: VALID_SECRET,
-      is_active: 1,
-      line_account_id: null,
-      created_at: '2026-05-08T00:00:00.000+09:00',
-      updated_at: '2026-05-08T00:00:00.000+09:00',
-    });
+    vi.mocked(getIncomingWebhookById).mockResolvedValue(incomingWebhookRow({ line_account_id: null }));
 
     const app = setupApp();
     const res = await app.request(
@@ -681,16 +971,7 @@ describe('POST /api/webhooks/incoming/:id/receive — signature', () => {
   });
 
   test('rejects invalid signature with 401', async () => {
-    vi.mocked(getIncomingWebhookById).mockResolvedValue({
-      id: 'iwh-1',
-      name: 'test',
-      source_type: 'custom',
-      secret: VALID_SECRET,
-      is_active: 1,
-      line_account_id: null,
-      created_at: '2026-05-08T00:00:00.000+09:00',
-      updated_at: '2026-05-08T00:00:00.000+09:00',
-    });
+    vi.mocked(getIncomingWebhookById).mockResolvedValue(incomingWebhookRow({ line_account_id: null }));
 
     const app = setupApp();
     const res = await app.request(
@@ -709,30 +990,10 @@ describe('POST /api/webhooks/incoming/:id/receive — signature', () => {
   });
 
   test('accepts valid HMAC-SHA256 hex signature', async () => {
-    vi.mocked(getIncomingWebhookById).mockResolvedValue({
-      id: 'iwh-1',
-      name: 'test',
-      source_type: 'custom',
-      secret: VALID_SECRET,
-      is_active: 1,
-      line_account_id: 'account-a',
-      created_at: '2026-05-08T00:00:00.000+09:00',
-      updated_at: '2026-05-08T00:00:00.000+09:00',
-    });
+    vi.mocked(getIncomingWebhookById).mockResolvedValue(incomingWebhookRow());
 
     const body = JSON.stringify({ ping: true });
-    const encoder = new TextEncoder();
-    const key = await crypto.subtle.importKey(
-      'raw',
-      encoder.encode(VALID_SECRET),
-      { name: 'HMAC', hash: 'SHA-256' },
-      false,
-      ['sign'],
-    );
-    const signature = await crypto.subtle.sign('HMAC', key, encoder.encode(body));
-    const hexSignature = Array.from(new Uint8Array(signature))
-      .map((b) => b.toString(16).padStart(2, '0'))
-      .join('');
+    const hexSignature = await webhookSignature(body);
 
     const app = setupApp();
     const res = await app.request(
@@ -765,6 +1026,92 @@ describe('POST /api/webhooks/incoming/:id/receive — signature', () => {
       'interaction-1',
       'account-a',
       expect.objectContaining({ status: 'succeeded', responseStatus: 200 }),
+    );
+    expect(updateIncomingWebhookMaskedSample).toHaveBeenCalledWith(
+      baseEnv.DB,
+      'iwh-1',
+      ACCOUNT_ID,
+      {
+        fields: [{ path: '$.ping', type: 'boolean', maskedValue: '••••' }],
+        truncated: false,
+      },
+    );
+    expect(JSON.stringify(vi.mocked(updateIncomingWebhookMaskedSample).mock.calls)).not.toContain('true');
+  });
+
+  test('照合設定と実行参照を受信後の実行器へ渡す', async () => {
+    vi.mocked(getIncomingWebhookById).mockResolvedValue(incomingWebhookRow({
+      identity_match_json: '{"methods":[{"kind":"harness_friend_id","path":"$.friendId"}],"onNotFound":"do_nothing"}',
+      action_refs_json: '[{"refKind":"tag","refId":"tag-a","refVersionId":null}]',
+    }));
+    vi.mocked(executeIncomingWebhookActions).mockResolvedValue({
+      matchedFriendId: 'friend-a', executed: 1, failed: 0,
+    });
+    const body = JSON.stringify({ friendId: 'friend-a' });
+    const res = await setupApp().request(
+      '/api/webhooks/incoming/iwh-1/receive',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Webhook-Signature': await webhookSignature(body),
+        },
+        body,
+      },
+      baseEnv,
+    );
+    expect(res.status).toBe(200);
+    expect(executeIncomingWebhookActions).toHaveBeenCalledWith(baseEnv.DB, expect.objectContaining({
+      lineAccountId: ACCOUNT_ID,
+      webhookId: 'iwh-1',
+      payload: { friendId: 'friend-a' },
+      actions: [{ refKind: 'tag', refId: 'tag-a', refVersionId: null }],
+    }));
+    expect(fireEvent).toHaveBeenCalledWith(
+      baseEnv.DB,
+      'incoming_webhook.custom',
+      expect.objectContaining({ friendId: 'friend-a' }),
+      undefined,
+      ACCOUNT_ID,
+    );
+  });
+
+  test('最新項目の保存が失敗しても署名済みの受信処理は止めない', async () => {
+    vi.mocked(updateIncomingWebhookMaskedSample).mockRejectedValue(new Error('D1 unavailable'));
+    const body = JSON.stringify({ customer: { email: 'private@example.com' } });
+    const res = await setupApp().request(
+      '/api/webhooks/incoming/iwh-1/receive',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Webhook-Signature': await webhookSignature(body),
+        },
+        body,
+      },
+      baseEnv,
+    );
+    expect(res.status).toBe(200);
+    expect(fireEvent).toHaveBeenCalledOnce();
+  });
+});
+
+describe('POST /api/webhooks/outgoing/:id/test', () => {
+  test('アカウント内の有効な送り先へ1回試し送信して記録する', async () => {
+    const res = await setupApp().request(
+      `/api/webhooks/outgoing/wh-1/test?lineAccountId=${ACCOUNT_ID}`,
+      { method: 'POST' },
+      baseEnv,
+    );
+    expect(res.status).toBe(200);
+    expect(deliverWebhook).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'wh-1' }),
+      expect.stringContaining('webhook.test'),
+      { idempotencyKey: 'interaction-1', credentialKeys: { current: undefined, previous: undefined } },
+    );
+    expect(finishWebhookInteraction).toHaveBeenCalledWith(
+      baseEnv.DB, 'interaction-1', ACCOUNT_ID,
+      expect.objectContaining({ status: 'succeeded', responseStatus: 204 }),
     );
   });
 });
@@ -823,6 +1170,490 @@ describe('Webhookやり取り記録', () => {
     );
     expect(res.status).toBe(200);
     expect(getWebhookInteractionById).toHaveBeenCalledWith(baseEnv.DB, 'run-a', ACCOUNT_ID);
-    expect(retryWebhookInteraction).toHaveBeenCalledWith(baseEnv.DB, failedRow);
+    expect(retryWebhookInteraction).toHaveBeenCalledWith(baseEnv.DB, failedRow, { current: undefined, previous: undefined });
+  });
+
+  test('secretを読めない送り直しは503にし、秘密値を出さない(#650)', async () => {
+    vi.mocked(getWebhookInteractionById).mockResolvedValue(failedRow);
+    vi.mocked(retryWebhookInteraction).mockRejectedValueOnce(new Error('webhook_secret_unavailable'));
+    const res = await setupApp().request(
+      `/api/webhooks/interactions/run-a/retry?lineAccountId=${ACCOUNT_ID}`,
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' },
+      keyedEnv,
+    );
+    expect(res.status).toBe(503);
+    expect(retryWebhookInteraction).toHaveBeenCalledWith(keyedEnv.DB, failedRow, { current: TEST_KEY, previous: undefined });
+    const retryBody = (await res.json()) as { error: string };
+    expect(retryBody.error).toBe('secret を確認できないため送り直しを止めました');
   });
 });
+
+// =====================================================
+// #506 中: 壊れた event_types の1行で一覧全体を500にしない (W2)
+// =====================================================
+
+describe('GET /api/webhooks/outgoing — broken event_types (#506 W2)', () => {
+  const brokenRow = {
+    id: 'wh-broken', name: '壊れた送り先', url: 'https://example.com/hook',
+    event_types: '{broken-json', secret: VALID_SECRET, is_active: 1,
+    max_retries: 0, consecutive_failures: 0, last_failed_at: null,
+    created_at: '2026-08-01', updated_at: '2026-08-01',
+  };
+
+  test('壊れた行は空の種類で返し、一覧は 200 のまま', async () => {
+    vi.mocked(getOutgoingWebhooks).mockResolvedValue([brokenRow]);
+    const res = await setupApp().request(
+      `/api/webhooks/outgoing?lineAccountId=${ACCOUNT_ID}`,
+      { method: 'GET' },
+      baseEnv,
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json() as { data: Array<{ id: string; eventTypes: unknown; name: string }> };
+    expect(body.data).toHaveLength(1);
+    expect(body.data[0].eventTypes).toEqual([]);
+    expect(body.data[0].name).toBe('壊れた送り先');
+  });
+});
+
+// =====================================================
+// #506 中: 一覧にも受信詳細と同じ権限境界を適用する (W4)
+// =====================================================
+
+describe('webhook 一覧の権限統一 (#506 W4)', () => {
+  test('権限キーのないスタッフは受信一覧を読めない', async () => {
+    const res = await setupApp(undefined, 'staff', []).request(
+      `/api/webhooks/incoming?lineAccountId=${ACCOUNT_ID}`,
+      { method: 'GET' },
+      baseEnv,
+    );
+    expect(res.status).toBe(403);
+    expect(getIncomingWebhooks).not.toHaveBeenCalled();
+  });
+
+  test('権限キーのないスタッフは送信一覧を読めない', async () => {
+    const res = await setupApp(undefined, 'staff', []).request(
+      `/api/webhooks/outgoing?lineAccountId=${ACCOUNT_ID}`,
+      { method: 'GET' },
+      baseEnv,
+    );
+    expect(res.status).toBe(403);
+    expect(getOutgoingWebhooks).not.toHaveBeenCalled();
+  });
+
+  test('/webhooks 権限ありスタッフは両方の一覧を読める', async () => {
+    vi.mocked(getIncomingWebhooks).mockResolvedValue([]);
+    vi.mocked(getOutgoingWebhooks).mockResolvedValue([]);
+    for (const path of [
+      `/api/webhooks/incoming?lineAccountId=${ACCOUNT_ID}`,
+      `/api/webhooks/outgoing?lineAccountId=${ACCOUNT_ID}`,
+    ]) {
+      const res = await setupApp(undefined, 'staff', ['/webhooks']).request(
+        path, { method: 'GET' }, baseEnv,
+      );
+      expect(res.status).toBe(200);
+    }
+  });
+});
+
+// =====================================================
+// #506 中: 使われない受信設定口は API 単体テストで担保する (W5)
+// =====================================================
+
+describe('PATCH /api/webhooks/incoming/:id/config (#506 W5)', () => {
+  const validBody = {
+    expectedVersion: 3,
+    identityMatching: {
+      methods: [{ kind: 'harness_friend_id', path: '$.friend.id' }],
+      onNotFound: 'do_nothing',
+    },
+    actions: [{ refKind: 'scenario', refId: 'scenario-a', refVersionId: 'version-a' }],
+  };
+  const patchConfig = (body: unknown) => setupApp().request(
+    `/api/webhooks/incoming/iwh-1/config?lineAccountId=${ACCOUNT_ID}`,
+    { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) },
+    baseEnv,
+  );
+
+  test('版の不一致は 409 と現在の版を返す', async () => {
+    vi.mocked(updateIncomingWebhookConfig).mockResolvedValue({ status: 'conflict', currentVersion: 5 });
+    const res = await patchConfig(validBody);
+    expect(res.status).toBe(409);
+    const body = await res.json() as { code: string; data: { currentVersion: number } };
+    expect(body.code).toBe('version_conflict');
+    expect(body.data.currentVersion).toBe(5);
+  });
+
+  test('入力不備は保存せず 400', async () => {
+    const res = await patchConfig({ ...validBody, expectedVersion: 0 });
+    expect(res.status).toBe(400);
+    expect(updateIncomingWebhookConfig).not.toHaveBeenCalled();
+  });
+});
+
+describe('名前・種別の上限 (#506 軽)', () => {
+  const post = (path: string, body: unknown) => setupApp().request(
+    path,
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) },
+    baseEnv,
+  );
+  const validOutgoing = {
+    name: 'test', url: 'https://example.com/hook', eventTypes: ['order.created'],
+    secret: VALID_SECRET, lineAccountId: ACCOUNT_ID,
+    secret_encrypted: null,
+  };
+
+  test('送り先の作成は名前121文字・種別21件・種別101文字を400で拒否する', async () => {
+    for (const body of [
+      { ...validOutgoing, name: 'あ'.repeat(121) },
+      { ...validOutgoing, eventTypes: Array.from({ length: 21 }, (_, i) => `type-${i}`) },
+      { ...validOutgoing, eventTypes: [`${'a'.repeat(101)}`] },
+    ]) {
+      const res = await post('/api/webhooks/outgoing', body);
+      expect(res.status).toBe(400);
+    }
+    expect(createOutgoingWebhook).not.toHaveBeenCalled();
+  });
+
+  test('受け取り口の作成は名前121文字を400で拒否する', async () => {
+    const res = await post('/api/webhooks/incoming', {
+      name: 'あ'.repeat(121), secret: VALID_SECRET, lineAccountId: ACCOUNT_ID,
+    });
+    expect(res.status).toBe(400);
+    expect(createIncomingWebhook).not.toHaveBeenCalled();
+  });
+});
+
+// =====================================================
+// #650 再審査: secret-backfill口の契約
+// =====================================================
+
+describe('#650 POST /api/webhooks/maintenance/secret-backfill', () => {
+  const report = {
+    dryRun: true, batchSize: 50, legacyTotal: 2, rekeyTotal: 0,
+    processed: 0, migrated: 0, failed: [], remainingLegacy: 2, remainingRekey: 0, done: false,
+  };
+
+  test('既定はdry-runで件数だけ返し、鍵束を渡す', async () => {
+    vi.mocked(backfillWebhookSecrets).mockResolvedValueOnce(report);
+    const res = await setupApp().request(
+      '/api/webhooks/maintenance/secret-backfill',
+      {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lineAccountId: ACCOUNT_ID }),
+      },
+      keyedEnv,
+    );
+    expect(res.status).toBe(200);
+    expect(backfillWebhookSecrets).toHaveBeenCalledWith(keyedEnv.DB, {
+      lineAccountId: ACCOUNT_ID, dryRun: true, batchSize: 50,
+      keys: { current: TEST_KEY, previous: undefined },
+    });
+    const body = (await res.json()) as { data: typeof report };
+    expect(body.data.legacyTotal).toBe(2);
+    expect(body.data.done).toBe(false);
+  });
+
+  test('dryRun=falseとbatchSizeを通し、不正値は400にする', async () => {
+    vi.mocked(backfillWebhookSecrets).mockResolvedValueOnce({ ...report, dryRun: false });
+    const res = await setupApp().request(
+      '/api/webhooks/maintenance/secret-backfill',
+      {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lineAccountId: ACCOUNT_ID, dryRun: false, batchSize: 10 }),
+      },
+      keyedEnv,
+    );
+    expect(res.status).toBe(200);
+    expect(backfillWebhookSecrets).toHaveBeenCalledWith(keyedEnv.DB, expect.objectContaining({
+      dryRun: false, batchSize: 10,
+    }));
+
+    const bad = await setupApp().request(
+      '/api/webhooks/maintenance/secret-backfill',
+      {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lineAccountId: ACCOUNT_ID, batchSize: 0 }),
+      },
+      keyedEnv,
+    );
+    expect(bad.status).toBe(400);
+    const missing = await setupApp().request(
+      '/api/webhooks/maintenance/secret-backfill',
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) },
+      keyedEnv,
+    );
+    expect(missing.status).toBe(400);
+  });
+
+  test('他アカウントは403にし、鍵なしは503にする', async () => {
+    vi.mocked(canAccessAllLineAccounts).mockResolvedValueOnce(false);
+    const forbidden = await setupApp().request(
+      '/api/webhooks/maintenance/secret-backfill',
+      {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lineAccountId: 'account-b' }),
+      },
+      keyedEnv,
+    );
+    expect(forbidden.status).toBe(403);
+    expect(backfillWebhookSecrets).not.toHaveBeenCalled();
+
+    const keyError = new Error('LINE_CREDENTIAL_ENCRYPTION_KEY is not configured');
+    keyError.name = 'CredentialEncryptionKeyError';
+    vi.mocked(backfillWebhookSecrets).mockRejectedValueOnce(keyError);
+    const noKey = await setupApp().request(
+      '/api/webhooks/maintenance/secret-backfill',
+      {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lineAccountId: ACCOUNT_ID }),
+      },
+      baseEnv,
+    );
+    expect(noKey.status).toBe(503);
+  });
+});
+
+// =====================================================
+// #650 secret の暗号化保存 — secret-safe と fail-closed の契約
+// =====================================================
+
+const TEST_KEY = 'test-key-for-webhook-secret-encryption-01';
+const keyedEnv = { DB: {} as D1Database, LINE_CREDENTIAL_ENCRYPTION_KEY: TEST_KEY } as Record<string, unknown>;
+const ENCRYPTED_ROW = {
+  id: 'wh-1', name: 'test', url: 'https://example.com/hook', event_types: '["*"]',
+  secret: null, secret_encrypted: 'v1-enc-abc', is_active: 1, max_retries: 0,
+  consecutive_failures: 0, last_failed_at: null,
+  created_at: '2026-05-08', updated_at: '2026-05-08',
+};
+const BROKEN_ROW = { ...ENCRYPTED_ROW, secret_encrypted: 'v1-broken-xyz' };
+
+describe('#650 secret-safe: 平文を保存・表示しない', () => {
+  test('作成は鍵を渡して暗号化保存し、平文は作成直後の1回だけ返す', async () => {
+    vi.mocked(createOutgoingWebhook).mockResolvedValueOnce({ ...ENCRYPTED_ROW, id: 'wh-new' });
+    const res = await setupApp().request(
+      `/api/webhooks/outgoing?lineAccountId=${ACCOUNT_ID}`,
+      {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: 'test', url: 'https://example.com/hook',
+          secret: VALID_SECRET, lineAccountId: ACCOUNT_ID,
+          secret_encrypted: null,
+        }),
+      },
+      keyedEnv,
+    );
+    expect(res.status).toBe(201);
+    expect(createOutgoingWebhook).toHaveBeenCalledWith(
+      keyedEnv.DB,
+      expect.objectContaining({ secret: VALID_SECRET }),
+      { current: TEST_KEY, previous: undefined },
+    );
+    const body = (await res.json()) as { data: { secret: string } };
+    expect(body.data.secret).toBe(VALID_SECRET);
+  });
+
+  test('一覧・詳細は暗号文も含めてsecretを出さず、hasSecretだけ返す', async () => {
+    vi.mocked(getOutgoingWebhooks).mockResolvedValueOnce([ENCRYPTED_ROW]);
+    const list = await setupApp().request(
+      `/api/webhooks/outgoing?lineAccountId=${ACCOUNT_ID}`,
+      { method: 'GET' },
+      baseEnv,
+    );
+    expect(list.status).toBe(200);
+    const listBody = (await list.json()) as { data: Array<Record<string, unknown>> };
+    expect(listBody.data[0].hasSecret).toBe(true);
+    expect(listBody.data[0]).not.toHaveProperty('secret');
+    expect(listBody.data[0]).not.toHaveProperty('secret_encrypted');
+    expect(JSON.stringify(listBody)).not.toContain('v1-enc-abc');
+
+    vi.mocked(getIncomingWebhookById).mockResolvedValueOnce({
+      ...incomingWebhookRow(), secret: null, secret_encrypted: 'v1-enc-abc',
+    });
+    const detail = await setupApp().request(
+      `/api/webhooks/incoming/iwh-1?lineAccountId=${ACCOUNT_ID}`,
+      { method: 'GET' },
+      baseEnv,
+    );
+    expect(detail.status).toBe(200);
+    const detailBody = await detail.text();
+    expect(detailBody).not.toContain('v1-enc-abc');
+    expect(JSON.stringify(JSON.parse(detailBody).data)).not.toContain('secret_encrypted');
+  });
+
+  test('secretの入れ直しは鍵付きで保存し、2回目の保存が残る', async () => {
+    const rotated = 'z'.repeat(32);
+    vi.mocked(getOutgoingWebhookById)
+      .mockResolvedValueOnce({ ...ENCRYPTED_ROW })
+      .mockResolvedValueOnce({ ...ENCRYPTED_ROW, secret_encrypted: 'v1-enc-new' })
+      .mockResolvedValueOnce({ ...ENCRYPTED_ROW, secret_encrypted: 'v1-enc-new' })
+      .mockResolvedValueOnce({ ...ENCRYPTED_ROW, secret_encrypted: 'v1-enc-new', name: 'renamed' });
+    const first = await setupApp().request(
+      `/api/webhooks/outgoing/wh-1?lineAccountId=${ACCOUNT_ID}`,
+      {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ secret: rotated }),
+      },
+      keyedEnv,
+    );
+    expect(first.status).toBe(200);
+    expect(updateOutgoingWebhook).toHaveBeenCalledWith(
+      keyedEnv.DB, 'wh-1', ACCOUNT_ID, expect.objectContaining({ secret: rotated }), { current: TEST_KEY, previous: undefined },
+    );
+    const second = await setupApp().request(
+      `/api/webhooks/outgoing/wh-1?lineAccountId=${ACCOUNT_ID}`,
+      {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: 'renamed' }),
+      },
+      keyedEnv,
+    );
+    expect(second.status).toBe(200);
+    const secondBody = (await second.json()) as { data: { name: string; hasSecret: boolean } };
+    expect(secondBody.data.name).toBe('renamed');
+    expect(secondBody.data.hasSecret).toBe(true);
+  });
+});
+
+describe('#650 fail-closed: 鍵不足・復号失敗は安全に止める', () => {
+  test('鍵なしの作成は503にし、秘密値を表に出さない', async () => {
+    const keyError = new Error('LINE_CREDENTIAL_ENCRYPTION_KEY is not configured');
+    keyError.name = 'CredentialEncryptionKeyError';
+    vi.mocked(createOutgoingWebhook).mockRejectedValueOnce(keyError);
+    const res = await setupApp().request(
+      `/api/webhooks/outgoing?lineAccountId=${ACCOUNT_ID}`,
+      {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: 'test', url: 'https://example.com/hook',
+          secret: VALID_SECRET, lineAccountId: ACCOUNT_ID,
+          secret_encrypted: null,
+        }),
+      },
+      baseEnv,
+    );
+    expect(res.status).toBe(503);
+    expect(await res.text()).not.toContain(VALID_SECRET);
+  });
+
+  test('復号できない送り先の再有効化は503にし、止めたままにする', async () => {
+    vi.mocked(getOutgoingWebhookById).mockResolvedValueOnce({ ...BROKEN_ROW, is_active: 0 });
+    const res = await setupApp().request(
+      `/api/webhooks/outgoing/wh-1?lineAccountId=${ACCOUNT_ID}`,
+      {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isActive: true }),
+      },
+      keyedEnv,
+    );
+    expect(res.status).toBe(503);
+    expect(updateOutgoingWebhook).not.toHaveBeenCalled();
+  });
+
+  test('復号できない送り先の試し送信は503にし、送らない', async () => {
+    vi.mocked(getOutgoingWebhookById).mockResolvedValueOnce(BROKEN_ROW);
+    const res = await setupApp().request(
+      `/api/webhooks/outgoing/wh-1/test?lineAccountId=${ACCOUNT_ID}`,
+      { method: 'POST' },
+      keyedEnv,
+    );
+    expect(res.status).toBe(503);
+    expect(await res.text()).not.toContain('v1-broken-xyz');
+    expect(deliverWebhook).not.toHaveBeenCalled();
+  });
+
+  test('試し送信は復号した値で署名し、他アカウントは403にする', async () => {
+    vi.mocked(getOutgoingWebhookById).mockResolvedValueOnce(ENCRYPTED_ROW);
+    const res = await setupApp().request(
+      `/api/webhooks/outgoing/wh-1/test?lineAccountId=${ACCOUNT_ID}`,
+      { method: 'POST' },
+      keyedEnv,
+    );
+    expect(res.status).toBe(200);
+    expect(resolveWebhookSecret).toHaveBeenCalledWith(expect.objectContaining({ id: 'wh-1' }), { current: TEST_KEY, previous: undefined });
+    // 署名用の復号は deliverWebhook が行う。ここでは鍵がそのまま渡ることを見る。
+    // 呼び出し元で復号した値を詰め替える形に戻すと、鍵を渡し忘れた経路が
+    // 黙って署名なしで送るので、鍵の受け渡しの方を固定する(#650 再審査)。
+    expect(deliverWebhook).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'wh-1', secret_encrypted: 'v1-enc-abc' }),
+      expect.stringContaining('webhook.test'),
+      { idempotencyKey: 'interaction-1', credentialKeys: { current: TEST_KEY, previous: undefined } },
+    );
+
+    vi.mocked(canAccessAllLineAccounts).mockResolvedValueOnce(false);
+    const forbidden = await setupApp().request(
+      `/api/webhooks/outgoing/wh-1/test?lineAccountId=account-b`,
+      { method: 'POST' },
+      keyedEnv,
+    );
+    expect(forbidden.status).toBe(403);
+  });
+
+  test('受信照合は暗号文ではなく復号値で検証し、壊れた行は503にする', async () => {
+    vi.mocked(getIncomingWebhookById).mockResolvedValueOnce({
+      ...incomingWebhookRow(), secret: null, secret_encrypted: 'v1-enc-abc',
+    });
+    const okBody = JSON.stringify({ hello: 'world' });
+    const ok = await setupApp().request(
+      '/api/webhooks/incoming/iwh-1/receive',
+      {
+        method: 'POST', headers: {
+          'Content-Type': 'application/json',
+          'X-Webhook-Signature': await signedWith('r'.repeat(32), okBody),
+        },
+        body: okBody,
+      },
+      keyedEnv,
+    );
+    expect(ok.status).toBe(200);
+
+    vi.mocked(getIncomingWebhookById).mockResolvedValueOnce({
+      ...incomingWebhookRow(), secret: null, secret_encrypted: 'v1-broken-xyz',
+    });
+    const broken = await setupApp().request(
+      '/api/webhooks/incoming/iwh-1/receive',
+      {
+        method: 'POST', headers: {
+          'Content-Type': 'application/json',
+          'X-Webhook-Signature': await signedWith('r'.repeat(32), okBody),
+        },
+        body: okBody,
+      },
+      keyedEnv,
+    );
+    expect(broken.status).toBe(503);
+    expect(await broken.text()).not.toContain('v1-broken-xyz');
+
+    // 旧平文が残っている行でも、暗号文が読めないなら旧平文へ落ちない。
+    // 落ちると、鍵から外した古い secret の署名がいつまでも通ってしまう。
+    const staleSecret = 'l'.repeat(32);
+    vi.mocked(getIncomingWebhookById).mockResolvedValueOnce({
+      ...incomingWebhookRow(), secret: staleSecret, secret_encrypted: 'v1-broken-xyz',
+    });
+    const stale = await setupApp().request(
+      '/api/webhooks/incoming/iwh-1/receive',
+      {
+        method: 'POST', headers: {
+          'Content-Type': 'application/json',
+          'X-Webhook-Signature': await signedWith(staleSecret, okBody),
+        },
+        body: okBody,
+      },
+      keyedEnv,
+    );
+    expect(stale.status).toBe(503);
+    const staleBody = await stale.text();
+    expect(staleBody).not.toContain(staleSecret);
+    expect(staleBody).not.toContain('v1-broken-xyz');
+  });
+});
+
+async function signedWith(secret: string, body: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    'raw', encoder.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'],
+  );
+  const signature = await crypto.subtle.sign('HMAC', key, encoder.encode(body));
+  return Array.from(new Uint8Array(signature))
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('');
+}

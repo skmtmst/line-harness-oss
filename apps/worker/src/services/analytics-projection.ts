@@ -7,6 +7,7 @@ import {
   saveAnalyticsProjectionSchedulerCursor,
   type LineAccount,
 } from '@line-crm/db';
+import { featureJobCanRun } from './feature-enforcement.js';
 
 export interface AnalyticsProjectionRefreshResult {
   processed: number;
@@ -42,6 +43,11 @@ export async function refreshRecentAnalyticsProjections(
   const schedulerCursor = await getAnalyticsProjectionSchedulerCursor(db, cutoffAt);
   const account = selectNextAnalyticsProjectionAccount(accounts, schedulerCursor);
   if (!account) return result;
+  // 機能オフ中は集計も記録もしない。巡回は進むため他アカウントは止まらず、
+  // 再オン後の巡回で再開する。
+  if (!await featureJobCanRun(db, { accountId: account.id, featureId: 'analytics', job: 'analytics projection' })) {
+    return result;
+  }
   result.processed = 1;
   try {
     // 現在のWorkerが受付開始から欠けなく記録できる種類だけを「取得可能」にする。

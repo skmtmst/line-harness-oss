@@ -1,4 +1,5 @@
 import type { FeatureKey } from '@/lib/feature-settings'
+import type { Recipe as ApiRecipe } from '@/lib/api'
 
 /**
  * レシピの正本。設計 ★V6 34-2「レシピ一覧」（`y0P0Qx`）の 3 本。
@@ -129,6 +130,43 @@ export const RECIPES: ReadonlyArray<Recipe> = [
   },
 ]
 
+const FEATURE_LABELS: Record<string, string> = {
+  friend_add_routing: '友だち追加時の配信',
+  scenarios: 'シナリオ配信',
+  reminders: 'リマインダ',
+  templates: 'テンプレート',
+  webinars: 'ウェビナー',
+  auto_replies: '自動応答',
+}
+
+export function featureLabel(key: string): string {
+  return FEATURE_LABELS[key] ?? key
+}
+
+/** 友だち属性は切れない機能なのでAPIの必要機能配列には入らない。 */
+export function apiRecipeRequirements(recipe: ApiRecipe): Array<{ key: string | null; label: string; on: boolean }> {
+  const missing = new Set(recipe.missingFeatures)
+  return [
+    { key: null, label: '友だち属性', on: true },
+    ...recipe.requiredFeatures.map((key) => ({ key, label: featureLabel(key), on: !missing.has(key) })),
+  ]
+}
+
+/** 設計が省略表示する内訳。APIの件数を正本にし、内訳名だけ設計定義から補う。 */
+export function apiRecipeRest(recipe: ApiRecipe): string | null {
+  const catalog = RECIPES.find((item) => item.id === recipe.id)
+  if (catalog?.itemsRest) return catalog.itemsRest
+  if (!recipe.items || recipe.itemCount == null || recipe.itemCount <= recipe.items.length) return null
+  return `ほか ${recipe.itemCount - recipe.items.length}件`
+}
+
+export function apiRecipeFeatureSummary(recipe: ApiRecipe): string {
+  const missing = recipe.missingFeatures.map(featureLabel)
+  return missing.length === 0
+    ? 'すべてオンなので、このまま作れます。'
+    : `${missing.join('と')}がオフです。「機能設定」でオンにすると使えます。`
+}
+
 /** 機能が入っているか。**鍵の無い機能は、いつでも入っている。** */
 export function requirementIsOn(
   requirement: RecipeRequirement,
@@ -219,7 +257,7 @@ export function featureSummary(recipe: Recipe, features: Record<string, boolean>
 }
 
 /** 下の帯のボタンの文字。件数が決まっていないときは件数を言わない。 */
-export function createButtonLabel(recipe: Recipe): string {
+export function createButtonLabel(recipe: Pick<Recipe, 'itemCount'>): string {
   return recipe.itemCount != null ? `${recipe.itemCount}件を下書きで作る` : '下書きで作る'
 }
 

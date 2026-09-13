@@ -5,7 +5,7 @@ export { buildMessage };
 import { resolveInterpolationExtra } from './interpolation-context.js';
 import {
   getFriendScenariosDueForDelivery,
-  getScenarioSteps,
+  getStepsForDelivery,
   advanceFriendScenario,
   completeFriendScenario,
   pauseFriendScenario,
@@ -15,7 +15,7 @@ import {
   getFriendById,
   jstNow,
   computeNextDeliveryAt,
-  resolveStepContent,
+  scenarioStepExists,
   addTagToFriend,
   type DeliveryMode,
   type Friend,
@@ -25,6 +25,7 @@ import type { Message } from '@line-crm/line-sdk';
 import { jitterDeliveryTime, addJitter, sleep } from './stealth.js';
 import { matchesCondition, parseCondition } from './segment-query.js';
 import { runScenarioActions, resumePreviousScenario, runScenarioOp } from './scenario-actions.js';
+import { featureJobCanRun } from './feature-enforcement.js';
 import { parseQuestion, buildQuestionMessages } from './scenario-question.js';
 import { expandDateVariables } from './interpolation-date.js';
 
@@ -205,6 +206,15 @@ export async function processStepDeliveries(
     const fs = dueFriendScenarios[i];
     attemptCount++;
     try {
+      // 機能オフ中はclaimせずactiveのまま残す。再オンで再開する。
+      // アカウント未割当の旧行は持ち主が分からないため従来どおり進める。
+      const ownerRow = await db
+        .prepare(`SELECT line_account_id FROM scenarios WHERE id = ?`)
+        .bind(fs.scenario_id)
+        .first<{ line_account_id: string | null }>();
+      if (ownerRow?.line_account_id && !await featureJobCanRun(db, { accountId: ownerRow.line_account_id, featureId: 'scenarios', job: 'scenario deliveries' })) {
+        continue;
+      }
       // Stealth: add small random delay between deliveries to avoid burst patterns
       if (i > 0) {
         await sleep(addJitter(50, 200));
@@ -275,6 +285,7 @@ async function processSingleDelivery(
     current_step_order: number;
     status: string;
     next_delivery_at: string | null;
+    published_version_id?: string | null;
     started_at: string;
   },
   workerUrl?: string,
@@ -329,10 +340,22 @@ async function processSingleDelivery(
 
   // Get all steps for this scenario.
   //
+  // 購読に固定した公開版だけを読む（351）。開始後の下書き編集は既存配信へ
+  // 混入しない。版が無い・欠損しているときは送らずに止める。live の表へ
+  // 戻ると編集中身が混入するので、安全停止が契約。
+  //
   // 下書き (is_draft) はここで落とす。落としておけば「次の通」を探す処理が
   // そのまま次の公開ぶんを選ぶ。あとから条件で弾く作りにすると、下書きに
   // 到達した時点で止まって見える。
-  const steps = (await getScenarioSteps(db, fs.scenario_id)).filter((s) => (s.is_draft ?? 0) === 0);
+  const source = await getStepsForDelivery(db, fs.scenario_id, fs.published_version_id ?? null);
+  if (!source) {
+    await pauseFriendScenarioDelivery(db, fs.id);
+    console.warn(
+      `[step-delivery] paused enrollment=${fs.id}: no pinned published version for scenario=${fs.scenario_id}`,
+    );
+    return false;
+  }
+  const steps = source.steps.filter((s) => (s.is_draft ?? 0) === 0);
   if (steps.length === 0) {
     await completeFriendScenario(db, fs.id);
     return false;
@@ -345,8 +368,8 @@ async function processSingleDelivery(
    * 変わった等）。外れた人には**送らずに止める**。完了にしないのは、
    * 条件に戻ったときに人が再開できるようにするため。
    */
-  const audience = parseCondition(scenarioRow.audience_condition_json);
-  if (scenarioRow.audience_condition_json && !audience) {
+  const audience = parseCondition(source.audienceConditionJson);
+  if (source.audienceConditionJson && !audience) {
     console.error(
       `[step-delivery] unreadable audience condition scenario=${fs.scenario_id} — paused enrollment=${fs.id}`,
     );
@@ -366,17 +389,22 @@ async function processSingleDelivery(
   const nowJstDate = new Date(Date.now() + 9 * 60 * 60_000);
   const nextDeliveryFor = (step: { delay_minutes: number; offset_days: number | null; offset_minutes: number | null; delivery_time: string | null }): Date =>
     computeNextDeliveryAt(
-      { delivery_mode: scenarioRow.delivery_mode },
+      { delivery_mode: source.deliveryMode },
       step,
       { enrolledAt: enrolledAtDate, previousDeliveredAt: nowJstDate, now: nowJstDate },
     );
+  // 終了後の処理も固定した版の値で決める。開始後に変えた値は次版の購読から使う。
+  const onComplete = {
+    on_complete_mode: source.onCompleteMode,
+    on_complete_scenario_id: source.onCompleteScenarioId,
+  };
 
   // Steps are sorted by step_order but may not be contiguous (e.g., 1, 3, 5 after deletions).
   // Find the next step whose step_order > current_step_order.
   const currentStep = steps.find((s) => s.step_order > fs.current_step_order);
 
   if (!currentStep) {
-    await finishScenario(db, fs.id, fs.scenario_id, fs.friend_id, scenarioRow);
+    await finishScenario(db, fs.id, fs.scenario_id, fs.friend_id, onComplete);
     return false;
   }
 
@@ -437,13 +465,28 @@ async function processSingleDelivery(
         jitteredDate.toISOString().slice(0, -1) + '+09:00',
       );
     } else {
-      await finishScenario(db, fs.id, fs.scenario_id, fs.friend_id, scenarioRow);
+      await finishScenario(db, fs.id, fs.scenario_id, fs.friend_id, onComplete);
     }
     return false;
   }
 
-  // Resolve template_id → templates table (参照型). template_id 未設定なら step 値そのまま。
-  const resolved = await resolveStepContent(db, currentStep);
+  // 実際に配信するアカウント。リンクの所有アカウント計算
+  // (下の decorateForFriendPush 呼び出し)と同じ値を使う。
+  const friendAccountId = friend.line_account_id;
+  const deliveryAccountId = scenarioRow.line_account_id ?? friendAccountId;
+
+  // 通の文面・質問は公開時に確定した写しを使う（351）。配信時に templates 表を
+  // 読み直さないので、公開後の template 編集は固定済みの購読へ混入しない。
+  //
+  // テンプレートの公開版をシナリオの持ち主アカウントだけで解決する(#645)のは、
+  // 公開時の写し作り（packages/db/src/scenarios.ts の版snapshot）へ移した。
+  // 配信時にはもう templates 表を読まないので、ここでは解決しない。
+  const resolved = {
+    messageType: currentStep.message_type,
+    messageContent: currentStep.message_content,
+    templateIdAtSend: currentStep.template_id_at_send ?? null,
+    questionJson: currentStep.question_json ?? null,
+  };
 
   // Expand template variables ({{name}}, {{uid}}, {{auth_url:CHANNEL_ID}}, {{metadata.KEY}}, etc.)
   const resolvedMeta = await resolveMetadata(db, { user_id: (friend as unknown as Record<string, string | null>).user_id, metadata: (friend as unknown as Record<string, string | null>).metadata });
@@ -466,8 +509,6 @@ async function processSingleDelivery(
   // Auto-wrap URLs with tracking links + bake f=<friendId> into /t links —
   // shared pipeline with the instant first-step push (immediate-first-step.ts).
   // リンクの所有アカウントは実際に配信するアカウント (= friend の account) に合わせる
-  const friendAccountId = friend.line_account_id;
-  const deliveryAccountId = scenarioRow.line_account_id ?? friendAccountId;
   const { decorateForFriendPush } = await import('./auto-track.js');
   const tracked = await decorateForFriendPush(db, resolved.messageType, expandedContent, workerUrl, {
     lineAccountId: deliveryAccountId ?? null,
@@ -479,6 +520,12 @@ async function processSingleDelivery(
    * 前文があるぶん複数通になるので、以降は配列で扱う。差し込みは前文にも
    * 効かせたいので、質問の組み立ては差し込みのあとに置いている。
    */
+  // live 側の通IDは履歴づけの控え。消されたあとは版所有の通IDに倒す。
+  // 質問の回答受け・アクション・ログの突き合わせは、live が残っている間は
+  // 従来どおり live の通IDで行う。
+  const liveStepId = (await scenarioStepExists(db, currentStep.live_step_id ?? null))
+    ? currentStep.live_step_id!
+    : null;
   const question = parseQuestion(resolved.questionJson);
   const messages: Message[] = question
     ? buildQuestionMessages(
@@ -489,7 +536,17 @@ async function processSingleDelivery(
             : question.intro,
           text: expandVariables(question.text, friendWithMeta, workerUrl, 'text', extra),
         },
-        currentStep.id,
+        // 押し口は、どちらの通IDを載せたかが分かる形で渡す。
+        //
+        // 文字列で渡すと `toQuestionStepRef` が無条件に旧形（下書きの通ID）
+        // として扱う。下書きを消したあとは版所有の通ID（`<版ID>:<通番>`）が
+        // 入るので、旧形として送ると受信側の `parseQuestionPostback` が
+        // 「旧形にコロンは入らない」で弾き、押しても無反応になる。
+        // 下書き削除後も配信が続くのはこの票で新しく作った振る舞いなので、
+        // その経路の押し口もここで揃える（#644 独立審査）。
+        liveStepId
+          ? { kind: 'live' as const, stepId: liveStepId }
+          : { kind: 'version' as const, stepId: currentStep.id },
       )
     : [buildMessage(tracked.messageType, tracked.content)];
   // Resolve the correct LINE client for this friend's account
@@ -511,7 +568,11 @@ async function processSingleDelivery(
 
   // Log what we actually pushed: variables expanded, URLs auto-tracked, AND
   // any cleanEmptyNodes() mutation or parse-failure text fallback applied by
-  // buildMessage(). Use scenario_step_id to recover the original template.
+  // buildMessage().
+  //
+  // 二重送信防止の正体は scenario_version_step_id（版所有の通ID）。下書きの
+  // 通を消しても照合が外れない。scenario_step_id には live が残っている
+  // ときだけ入れ、消されたあとは NULL（外部キーを壊さない）。
   //
   // 質問は前文と本体で2通になることがある。押した記録と突き合わせられるよう、
   // 送った通ぶんすべて残す。
@@ -519,10 +580,10 @@ async function processSingleDelivery(
     const logPayload = messageToLogPayload(sent);
     await db
       .prepare(
-        `INSERT INTO messages_log (id, friend_id, direction, message_type, content, broadcast_id, scenario_step_id, source, template_id_at_send, line_account_id, created_at)
-         VALUES (?, ?, 'outgoing', ?, ?, NULL, ?, 'scenario', ?, ?, ?)`,
+        `INSERT INTO messages_log (id, friend_id, direction, message_type, content, broadcast_id, scenario_step_id, scenario_version_step_id, source, template_id_at_send, line_account_id, created_at)
+         VALUES (?, ?, 'outgoing', ?, ?, NULL, ?, ?, 'scenario', ?, ?, ?)`,
       )
-      .bind(crypto.randomUUID(), friend.id, logPayload.messageType, logPayload.content, currentStep.id, resolved.templateIdAtSend, deliveryAccountId, jstNow())
+      .bind(crypto.randomUUID(), friend.id, logPayload.messageType, logPayload.content, liveStepId, currentStep.id, resolved.templateIdAtSend, deliveryAccountId, jstNow())
       .run();
   }
 
@@ -546,7 +607,7 @@ async function processSingleDelivery(
     await advanceFriendScenario(db, fs.id, currentStep.step_order, jitteredDate.toISOString().slice(0, -1) + '+09:00');
   } else {
     // This was the last step
-    await finishScenario(db, fs.id, fs.scenario_id, fs.friend_id, scenarioRow);
+    await finishScenario(db, fs.id, fs.scenario_id, fs.friend_id, onComplete);
   }
 
   // 到達タグ付与 (advance / complete の後 = 再送が起きてもタグ付与は影響しない順序)
@@ -571,7 +632,7 @@ async function processSingleDelivery(
     scenarioId: fs.scenario_id,
     hook: 'step_sent',
     friendId: friend.id,
-    stepId: currentStep.id,
+    stepId: liveStepId ?? currentStep.id,
   });
 
   return true;

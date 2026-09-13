@@ -10,6 +10,7 @@ import styles from './button.module.css'
 
 type CommonProps = {
   variant?: 'primary' | 'secondary'
+  size?: 'standard' | 'field'
   className?: string
   children: ReactNode
 }
@@ -37,10 +38,11 @@ export type ButtonProps = NativeButtonProps | LinkButtonProps
  */
 export default function Button(props: ButtonProps) {
   const variant = props.variant ?? 'secondary'
-  const classes = [styles.button, styles[variant], props.className].filter(Boolean).join(' ')
+  const size = props.size ?? 'standard'
+  const classes = [styles.button, styles[variant], styles[size], props.className].filter(Boolean).join(' ')
 
   if ('href' in props && props.href !== undefined) {
-    const { children, className: _className, href, variant: _variant, ...linkProps } = props
+    const { children, className: _className, href, size: _size, variant: _variant, ...linkProps } = props
     return (
       <Link href={href} className={classes} {...linkProps}>
         {children}
@@ -51,6 +53,7 @@ export default function Button(props: ButtonProps) {
   const {
     children,
     className: _className,
+    size: _size,
     type = 'button',
     variant: _variant,
     ...buttonProps

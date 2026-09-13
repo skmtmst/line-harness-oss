@@ -42,6 +42,7 @@ export default function NewStaffPage() {
   const [permissionKeys, setPermissionKeys] = useState<string[]>([])
   const [accounts, setAccounts] = useState<LineAccount[]>([])
   const [assignedLineAccountId, setAssignedLineAccountId] = useState('')
+  const [inheritAccounts, setInheritAccounts] = useState(false)
   const [notifications, setNotifications] = useState<Record<string, Channel>>({
     operations: { email: true, line: true }, emergency: { email: true, line: true },
     security: { email: true, line: false }, updates: { email: false, line: true },
@@ -60,10 +61,10 @@ export default function NewStaffPage() {
     parent={['ログインユーザー', '/staff?tab=members']}
     saveLabel="招待メールを送る"
     showHeader={false}
-    validate={() => !name.trim() ? '名前を入力してください' : !email.trim() ? 'メールアドレスを入力してください' : !assignedLineAccountId ? '最初に表示するLINEアカウントを選択してください' : role === 'staff' && permissionKeys.length === 0 ? 'スタッフに表示する機能を1つ以上選択してください' : null}
-    onSave={async () => { if (!selectedAccountId) throw new Error('店舗を選択してください'); const res = await api.staff.create({ name: name.trim(), email: email.trim(), role, permissionKeys, notificationPreferences: notifications, assignedLineAccountId, canAccessDescendantAccounts: true, accountScope: 'accounts', scopedLineAccountIds: [selectedAccountId] }); if (!res.success) throw new Error(res.error); return res.data.id }}
+    validate={() => !name.trim() ? '名前を入力してください' : !email.trim() ? 'メールアドレスを入力してください' : !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) ? '正しいメールアドレスを入力してください' : !assignedLineAccountId ? '最初に表示するLINEアカウントを選択してください' : role === 'staff' && permissionKeys.length === 0 ? 'スタッフに表示する機能を1つ以上選択してください' : null}
+    onSave={async () => { if (!selectedAccountId) throw new Error('店舗を選択してください'); const res = await api.staff.create({ name: name.trim(), email: email.trim(), role, permissionKeys, notificationPreferences: notifications, assignedLineAccountId, canAccessDescendantAccounts: inheritAccounts, accountScope: 'accounts', scopedLineAccountIds: [selectedAccountId] }); if (!res.success) throw new Error(res.error); return res.data.id }}
     aside={<>
-      <AsideCard title="追加後の流れ"><ol className="space-y-3 text-sm text-ink-secondary"><li><b className="text-accent">1.</b> 招待メールでアドレスを確認</li><li><b className="text-accent">2.</b> 続けて届くメールからLINE認証</li><li><b className="text-accent">3.</b> 連携完了後はLINEでログイン</li></ol></AsideCard>
+      <AsideCard title="追加後の流れ"><ol className="space-y-3 text-sm text-ink-secondary"><li><b className="text-accent">1.</b> 招待メールでアドレスを確認</li><li><b className="text-accent">2.</b> 続けて届くメールからLINE認証</li><li><b className="text-accent">3.</b> 連携完了後はLINE認証でログイン</li></ol></AsideCard>
       <AsideCard title="設定内容"><dl className="space-y-2 text-sm"><div className="flex justify-between"><dt className="text-ink-faint">役割</dt><dd className="text-ink">{ROLES.find((item) => item.value === role)?.label}</dd></div><div className="flex justify-between"><dt className="text-ink-faint">表示機能</dt><dd className="text-ink">{role === 'staff' ? `${permissionKeys.length}件` : 'すべて'}</dd></div></dl></AsideCard>
     </>}
   >
@@ -93,6 +94,11 @@ export default function NewStaffPage() {
           ]}
         />
       </Field>
+      <label className="mt-4 flex cursor-pointer items-start gap-2 text-sm text-ink">
+        <input type="checkbox" checked={inheritAccounts} onChange={(e) => setInheritAccounts(e.target.checked)} className="mt-1" />
+        <span>この店舗より下のアカウントにも権限を付ける</span>
+      </label>
+      <p className="mt-2 text-xs text-ink-faint">担当範囲は{selectedAccount?.name ? `${selectedAccount.name}のみ` : 'この店舗のみ'}です。上のチェックを入れない限り、下のアカウントは付きません。</p>
     </FormSection>
 
     {role === 'staff' && <FormSection step={4} label="スタッフに表示する機能" note="選択した機能だけが左のメニューに表示され、操作できます。">

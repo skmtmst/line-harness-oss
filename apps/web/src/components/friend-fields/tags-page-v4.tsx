@@ -1,11 +1,11 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ArrowDown, ArrowUp, MoreHorizontal, Palette, Pencil, Trash2 } from 'lucide-react'
 import type { Tag, TagGroup } from '@line-crm/shared'
-import { api, ApiError, type TagDeleteImpact, type TagDeleteImpactReferences } from '@/lib/api'
+import { api, ApiError, type TagDependencies, type TagDeleteImpactReferences } from '@/lib/api'
 import ActionMenu from '@/components/shared/action-menu'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
@@ -19,6 +19,7 @@ import FriendFieldList from './field-list'
 import SupportMarkList from './mark-list'
 import SavedSearchList from './saved-search-list'
 import TagCsvImportDialog from './tag-csv-import-dialog'
+import { isCurrentTagListRequest, type TagListRequestKey } from './tag-list-state'
 
 const TABS = [
   ['tags', 'タグ'],
@@ -77,7 +78,7 @@ function TrashIcon() {
  * フォルダの選び直し。設計 `SgpDb` は「色の丸 ＋ 名前 ＋ ▾」の小さな札で、
  * 素の `select` ではない。見た目は札が持ち、操作と読み上げは `select` が持つ。
  */
-function FolderSelect({ tag, groups, onChanged }: { tag: Tag; groups: TagGroup[]; onChanged: () => void }) {
+function FolderSelect({ tag, groups, onItemsChange, onError }: { tag: Tag; groups: TagGroup[]; onItemsChange: (update: (current: Tag[]) => Tag[]) => void; onError: (message: string) => void }) {
   const group = groups.find((item) => item.id === tag.groupId)
   return (
     <span className="relative inline-flex h-7 items-center gap-1.5 rounded-mini border border-hairline bg-canvas px-2">
@@ -87,11 +88,24 @@ function FolderSelect({ tag, groups, onChanged }: { tag: Tag; groups: TagGroup[]
       <select
         aria-label={`${tag.name} のフォルダ`}
         value={tag.groupId ?? ''}
-        onChange={async (event) => { await api.tags.setGroup(tag.id, event.target.value || null); onChanged() }}
+        onChange={async (event) => {
+          const groupId = event.target.value || null
+          try {
+            const result = await api.tags.setGroup(tag.id, groupId)
+            if (!result.success) throw new Error(result.error)
+            /* 成功は手元だけ直す。withCounts 付き全件の取り直しは要らない。 */
+            onItemsChange((current) => current.map((item) => item.id === tag.id ? { ...item, groupId } : item))
+          } catch (reason) {
+            /* 失敗は再読込で隠さず、理由を出す。 */
+            onError(reason instanceof ApiError ? reason.message : 'フォルダを変更できませんでした')
+          }
+        }}
         className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
       >
         <option value="">未分類</option>
-        {groups.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+        {groups
+          .filter((item) => item.accountId === tag.lineAccountId)
+          .map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
       </select>
     </span>
   )
@@ -242,10 +256,10 @@ const QUICK_FILTERS: Array<[string, string]> = [
 const cardShadow = '[box-shadow:1px_1px_1px_rgba(15,23,42,0.14)]'
 
 export const FRIEND_ATTRIBUTES_QA_GROUPS: TagGroup[] = [
-  { id: 'qa-vip', name: 'VIP', sortOrder: 0, color: '#F59E0B', createdAt: '', updatedAt: '' },
-  { id: 'qa-pet', name: 'ペット', sortOrder: 1, color: '#EC4899', createdAt: '', updatedAt: '' },
-  { id: 'qa-member', name: '会員', sortOrder: 2, color: '#10B981', createdAt: '', updatedAt: '' },
-  { id: 'qa-purchase', name: '購入', sortOrder: 3, color: '#3B82F6', createdAt: '', updatedAt: '' },
+  { id: 'qa-vip', accountId: null, name: 'VIP', sortOrder: 0, color: '#F59E0B', createdAt: '', updatedAt: '' },
+  { id: 'qa-pet', accountId: null, name: 'ペット', sortOrder: 1, color: '#EC4899', createdAt: '', updatedAt: '' },
+  { id: 'qa-member', accountId: null, name: '会員', sortOrder: 2, color: '#10B981', createdAt: '', updatedAt: '' },
+  { id: 'qa-purchase', accountId: null, name: '購入', sortOrder: 3, color: '#3B82F6', createdAt: '', updatedAt: '' },
 ]
 
 export const FRIEND_ATTRIBUTES_QA_TAGS: Tag[] = [
@@ -287,8 +301,8 @@ function FolderList({ groups, items, countsKnown, active, onSelect, onChanged }:
     setBusy(true); setMenuError('')
     try {
       const [currentResult, otherResult] = await Promise.all([
-        api.tagGroups.update(group.id, { sortOrder: index + direction }),
-        api.tagGroups.update(other.id, { sortOrder: index }),
+        api.tagGroups.update(group.id, { sortOrder: index + direction, accountId: group.accountId }),
+        api.tagGroups.update(other.id, { sortOrder: index, accountId: other.accountId }),
       ])
       if (!currentResult.success) throw new Error(currentResult.error)
       if (!otherResult.success) throw new Error(otherResult.error)
@@ -303,7 +317,7 @@ function FolderList({ groups, items, countsKnown, active, onSelect, onChanged }:
     if (busy) return
     setBusy(true); setMenuError('')
     try {
-      const result = await api.tagGroups.delete(group.id)
+      const result = await api.tagGroups.delete(group.id, group.accountId)
       if (!result.success) throw new Error(result.error)
       if (active === group.id) onSelect('')
       setDeleteGroup(null)
@@ -387,6 +401,11 @@ function refSummary(
   return parts.length ? parts.join('・') : 'なし'
 }
 
+/** アフィリエイト参照は削除不可の警告欄で目立たせ、通常の参照行へ重ねて出さない。 */
+function manualRefSummary(refs: TagDeleteImpactReferences): string {
+  return refSummary(refs, MANUAL_REFS.filter(([key]) => key !== 'affiliateOffers'))
+}
+
 /**
  * 設計 `★ V6 4-1-F タグ削除の確認ダイアログ`（`dKlkz`）の影響5行。
  *
@@ -395,9 +414,9 @@ function refSummary(
  */
 function deleteImpactRows(
   tag: Tag,
-  impact: TagDeleteImpact | null,
+  impact: TagDependencies | null,
 ): Array<{ name: string; value: string; result: string }> {
-  const refs = impact?.references
+  const refs = impact?.referenceCounts
   const linked = [
     tag.mileageReward ? `本人+${tag.mileageReward}` : null,
     tag.referralMileageReward ? `紹介者+${tag.referralMileageReward}` : null,
@@ -405,16 +424,16 @@ function deleteImpactRows(
     tag.otherActionCount ? `アクション${tag.otherActionCount}件` : null,
   ].filter(Boolean).join('／')
 
-  return [
+  const rows = [
     {
       name: '付与人数',
       // 人数はサーバーが数え直したものを使う。取れなければ一覧の値。
       value: `${(impact?.friendCount ?? tag.friendCount ?? 0).toLocaleString('ja-JP')}人`,
       result: 'タグが外れます',
     },
-    { name: '参照先', value: refs ? refSummary(refs, MANUAL_REFS) : '—', result: '絞り込み条件から外れます' },
+    { name: '参照先', value: refs ? manualRefSummary(refs) : '—', result: '絞り込み条件から外れます' },
     { name: '参照先（自動）', value: refs ? refSummary(refs, AUTO_REFS) : '—', result: '開始条件が空になります' },
-    { name: '連動の停止', value: linked || 'なし', result: '以後は実行されません' },
+    { name: '連動の停止', value: impact?.mileageImpact.configured ? `本人+${impact.mileageImpact.self}／紹介者+${impact.mileageImpact.referrer}／${impact.mileageImpact.multiplier ? `${impact.mileageImpact.multiplier / 10000}倍` : '倍率なし'}／アクション${impact.linkedActions.length || tag.otherActionCount || 0}件` : linked || 'なし', result: '以後は実行されません' },
     /*
       **数は出さない。口も待たない。**（kenta 判断 2026-08-26）
 
@@ -425,12 +444,16 @@ function deleteImpactRows(
     */
     { name: '積んだマイル', value: 'そのまま残る', result: '取り消されません' },
   ]
+  if (impact?.linkedActions.length) {
+    rows.push({ name: '使用中の版', value: impact.linkedActions.map((item) => `${item.state === 'published' ? '公開' : '下書き'} v${item.version}`).join('・'), result: impact.linkedActions.some((item) => item.state === 'published') ? '公開している版があるので消せません' : '公開版はありません' })
+  }
+  return rows
 }
 
-function DeleteTagDialog({ tag, onCancel, onDeleted }: { tag: Tag; onCancel: () => void; onDeleted: () => void }) {
+function DeleteTagDialog({ tag, accountId, onCancel, onArchived }: { tag: Tag; accountId: string | null; onCancel: () => void; onArchived: (notice?: string) => void }) {
   const [text, setText] = useState('')
   const [saving, setSaving] = useState(false)
-  const [error, setError] = useState('')
+  const [saveError, setSaveError] = useState('')
   /**
    * 削除して何が失われるか（`GET /api/tags/:id/delete-impact`）。
    *
@@ -438,7 +461,7 @@ function DeleteTagDialog({ tag, onCancel, onDeleted }: { tag: Tag; onCancel: () 
    * 読み込み中と失敗のあいだも押せなくする。失敗を「参照0件」と読み違えて
    * 使用中のタグを消させないため。
    */
-  const [impact, setImpact] = useState<TagDeleteImpact | null>(null)
+  const [impact, setImpact] = useState<TagDependencies | null>(null)
   const [impactStatus, setImpactStatus] = useState<'loading' | 'ready' | 'error'>('loading')
 
   useEffect(() => {
@@ -446,7 +469,8 @@ function DeleteTagDialog({ tag, onCancel, onDeleted }: { tag: Tag; onCancel: () 
     setImpactStatus('loading')
     ;(async () => {
       try {
-        const res = await api.tags.deleteImpact(tag.id)
+        if (!accountId) throw new Error('account required')
+        const res = await api.tags.dependencies(tag.id, accountId)
         if (cancelled) return
         if (!res.success) throw new Error(res.error)
         setImpact(res.data)
@@ -456,45 +480,30 @@ function DeleteTagDialog({ tag, onCancel, onDeleted }: { tag: Tag; onCancel: () 
       }
     })()
     return () => { cancelled = true }
-  }, [tag.id])
+  }, [accountId, tag.id])
 
   /*
     共通の作法に寄せる。Escapeで閉じ、Tabが外へ出ず、**背景がスクロールしない**。
     自前で組むと毎回どれかが抜ける。実際、背景が裏で動いていた。
   */
-  const dialogRef = useOverlayFocus(true, onCancel, saving)
+  const dialogRef = useOverlayFocus(true, onCancel, false)
 
-  const blocked = impactStatus !== 'ready' || impact?.canDelete === false
+  const blocked = impactStatus !== 'ready' || !impact || !accountId || saving
   const blockedReason = impactStatus === 'loading'
     ? '影響を確認しています'
     : impactStatus === 'error'
       ? '影響を確認できませんでした。時間をおいて開き直してください'
-      : impact && !impact.canDelete
-        ? `使用中のため削除できません（${impact.blockingReferenceCount}件から参照されています）`
-        : ''
-
-  const remove = async () => {
-    if (blocked || text !== tag.name || saving) return
-    setSaving(true)
-    try {
-      const result = await api.tags.delete(tag.id)
-      if (!result.success) throw new Error(result.error)
-      onDeleted()
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : '削除に失敗しました')
-      setSaving(false)
-    }
-  }
+      : ''
 
   return (
-    <div ref={dialogRef} className="fixed inset-0 z-[90] flex items-center justify-center bg-ink/45 p-4" data-qa-dialog="tag-delete" data-impact={impactStatus}>
-      <section className="w-full max-w-[680px] rounded-card border border-hairline bg-canvas p-7 shadow-2xl" role="alertdialog" aria-modal="true">
-        <div className="flex items-start gap-3">
+    <div ref={dialogRef} className="fixed inset-0 z-[90] flex items-center justify-center bg-ink/35 p-4" data-qa-dialog="tag-delete" data-impact={impactStatus}>
+      <section className="w-full max-w-[670px] -translate-y-5 rounded-card border border-hairline bg-canvas p-7 shadow-2xl" role="alertdialog" aria-modal="true">
+        <div>
           {/* 設計 `iTwNX`/`lUbvQ`。赤いゴミ箱を22pxで見出しの左に置く。 */}
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-control bg-danger-bg text-danger">
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-danger-bg text-danger">
             <TrashIcon />
           </span>
-          <div className="min-w-0">
+          <div className="mt-5 min-w-0">
             <h2 className="text-xl font-bold text-ink">「{tag.name}」を削除しますか？</h2>
             <p className="mt-1 text-sm text-ink-secondary">このタグを使っている場所と、外れる友だちを確認してください。</p>
           </div>
@@ -513,24 +522,54 @@ function DeleteTagDialog({ tag, onCancel, onDeleted }: { tag: Tag; onCancel: () 
 
         {/* 設計 `WrDxu`。使用中で止まっているときだけ、その理由をここに出す。 */}
         {impactStatus === 'ready' && impact && !impact.canDelete && (
-          <div data-qa="tag-delete-blocked-warning" className="mt-4 rounded-control border border-danger/25 bg-danger-bg p-3 text-sm text-danger">
-            <p className="font-bold">使用中のため、このタグは削除できません</p>
-            <p className="mt-1 text-ink-secondary">先に参照している側の設定からこのタグを外してください。削除しても、過去のマイル履歴と配信ログは残ります。</p>
+          <div data-qa="tag-delete-blocked-warning" className="mt-4 rounded-control border border-danger/25 bg-danger-bg p-2 text-sm text-danger">
+            {impact.referenceCounts.affiliateOffers > 0 ? (
+              <><p className="font-bold">アフィリエイトのオファーで使用中のタグは削除できません</p><p className="mt-1">その場合は、先にオファー側の設定からこのタグを外してください。削除しても、過去のマイル履歴と配信ログは残ります。</p></>
+            ) : (
+              <><p className="font-bold">有効な参照があるタグは、完全に削除できません</p><p className="mt-1">参照中の設定を確認してから操作してください。過去のマイル履歴と配信ログは残ります。</p></>
+            )}
           </div>
         )}
 
         {/* 設計 `seGRS`。 */}
-        <label className="mt-5 block">
+        <label className="mt-4 block">
           <span className="mb-1.5 block text-xs font-semibold text-ink-secondary">確認のため、タグ名を入力してください</span>
           <input value={text} onChange={(event) => setText(event.target.value)} placeholder={tag.name} disabled={blocked} className="w-full rounded-control border border-hairline px-3 py-2.5 text-sm outline-none focus:border-danger disabled:bg-canvas-sunken" />
         </label>
-        {error && <p className="mt-3 text-sm text-danger" role="alert">{error}</p>}
-
         {/* 設計 `rHKRG`。左が「やめる」、右が「このタグを削除する」。 */}
-        <div className="mt-6 flex items-center justify-end gap-3">
+        <div className="mt-5 flex items-center justify-end gap-3">
           {blockedReason && <p className="min-w-0 flex-1 text-xs text-ink-faint">{blockedReason}</p>}
           <button type="button" onClick={onCancel} className="shrink-0 rounded-control border border-hairline px-4 py-2.5 text-sm font-medium text-ink-secondary">やめる</button>
-          <button type="button" disabled={blocked || saving || text !== tag.name} onClick={() => void remove()} className="shrink-0 rounded-control bg-danger px-4 py-2.5 text-sm font-bold text-on-accent disabled:opacity-40">{saving ? '削除中…' : 'このタグを削除する'}</button>
+          {saveError ? <p role="alert" className="min-w-0 flex-1 text-xs text-danger">{saveError}</p> : null}
+          <button
+            type="button"
+            disabled={blocked || text !== tag.name}
+            onClick={async () => {
+              if (!impact || !accountId) return
+              setSaving(true); setSaveError('')
+              try {
+                await api.tags.archive(tag.id, accountId, {
+                  expectedVersion: impact.tag.version,
+                  impactRevision: impact.revision,
+                }, crypto.randomUUID())
+                onArchived()
+              } catch (reason) {
+                /*
+                 * 「もう整理済み」は失敗ではない。着きたかった状態にはもう着いている
+                 * ので、赤い失敗ではなく、成功と同じ通知で見せて一覧を読み直す。
+                 * 409 をそのまま失敗として出すと、利用者からは「押したのに何が
+                 * 起きたか分からない」に見える（#708 の裁定）。
+                 */
+                if (reason instanceof ApiError && reason.code === 'already_archived') {
+                  onArchived('このタグはすでに整理されています。')
+                  return
+                }
+                setSaveError('アーカイブできませんでした。影響を読み直して、もう一度お試しください。')
+                setSaving(false)
+              }
+            }}
+            className="shrink-0 rounded-control bg-danger px-4 py-2.5 text-sm font-bold text-on-accent disabled:opacity-40"
+          >{saving ? '削除中…' : 'このタグを削除する'}</button>
         </div>
       </section>
     </div>
@@ -568,23 +607,33 @@ export default function TagsPageV4({
   const [page, setPage] = useState(1)
   const [dragId, setDragId] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Tag | null>(null)
+  /** 「すでに整理済み」など、失敗ではない結果を出すための通知。 */
+  const [notice, setNotice] = useState('')
   const [csvOpen, setCsvOpen] = useState(false)
+  const loadRequestRef = useRef<TagListRequestKey>({ accountId, generation: 0 })
 
   const load = useCallback(async () => {
     if (fixture) return
+    const request = { accountId, generation: loadRequestRef.current.generation + 1 }
+    loadRequestRef.current = request
     setStatus('loading')
     setError('')
     try {
-      const [tags, folders] = await Promise.all([api.tags.list({ withCounts: true }), api.tagGroups.list()])
+      const [tags, folders] = await Promise.all([
+        api.tags.list({ withCounts: true, accountId }),
+        api.tagGroups.list(accountId),
+      ])
+      if (!isCurrentTagListRequest(loadRequestRef.current, request)) return
       // `success: false` を黙って捨てない。捨てると空の表を「0件」として見せる。
       if (!tags.success) throw new Error(tags.error)
       setItems(tags.data)
       if (folders.success) setGroups(folders.data)
       setStatus('ready')
     } catch (reason) {
+      if (!isCurrentTagListRequest(loadRequestRef.current, request)) return
       setStatus(reason instanceof ApiError && reason.status === 403 ? 'forbidden' : 'error')
     }
-  }, [fixture])
+  }, [fixture, accountId])
   useEffect(() => { void load() }, [load])
 
   const filtered = useMemo(() => items.filter((tag) => {
@@ -646,11 +695,15 @@ export default function TagsPageV4({
 
   /** 友だち一覧への表示（★）。設計 `zMlMX`。押した瞬間に切り替える。 */
   const toggleStar = async (tag: Tag) => {
+    const next = !tag.isStarred
+    /* 成功は手元だけ直す。withCounts 付き全件の取り直しは要らない。 */
+    setItems((current) => current.map((item) => item.id === tag.id ? { ...item, isStarred: next } : item))
     try {
-      const res = await api.tags.update(tag.id, { isStarred: !tag.isStarred })
+      const res = await api.tags.update(tag.id, { isStarred: next })
       if (!res.success) throw new Error(res.error)
-      void load()
     } catch (reason) {
+      /* 失敗は元に戻して理由を出す。全面再取得は失敗時のみ。 */
+      setItems((current) => current.map((item) => item.id === tag.id ? { ...item, isStarred: tag.isStarred } : item))
       setError(reason instanceof ApiError ? reason.message : '表示の切り替えに失敗しました')
     }
   }
@@ -752,23 +805,21 @@ export default function TagsPageV4({
             <Button href="/tags/new" variant="primary">＋ タグを追加</Button>
           </div>
         )}
+        {notice && <Notice className="mb-4" tone="success" message={notice} onClose={() => setNotice('')} />}
         {error && <p className="mb-4 rounded-control border border-danger/20 bg-danger-bg p-3 text-sm text-danger">{error}</p>}
         {/* 設計 `HrwyW` は gap 14、フォルダは 240 固定（`DgeL8`）。 */}
         <div className="grid min-w-0 gap-[14px] xl:grid-cols-[240px_minmax(0,1fr)]">
           <FolderList groups={groups} items={items} countsKnown={ready} active={folder} onSelect={setFolder} onChanged={() => void load()} />
           <main className="min-w-0">
             {/*
-              設計 `XchZz タグツールバー`。左に検索群（`RAlQh` 405px＝
-              検索144・使用状態129・付与元116）、右に表示件数と範囲（`Olp2S`）。
-              **検索欄を伸ばさない。** 伸ばすと右の2つが端へ飛んで、
-              設計の並びと変わる。
+              検索・選択は最長の表示内容と矢印余白を確保し、残る幅は検索欄へ渡す。
+              狭いときだけ折り返し、文字と矢印を重ねない。
             */}
             <div className="mb-[10px] flex flex-wrap items-center gap-2">
-              <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="タグ名・用途で検索" className="h-9 w-[144px] rounded-control border border-hairline bg-canvas px-2 text-label outline-none focus:border-accent" />
-              <select value={usageFilter} onChange={(event) => setUsageFilter(event.target.value)} className="v6-select v6-select-tight h-9 w-[129px] rounded-control border border-hairline bg-canvas text-label font-semibold text-ink"><option value="all">使用状態：すべて</option><option value="linked">連動あり</option><option value="unused">未使用</option></select>
-              <select value={sourceFilter} onChange={(event) => setSourceFilter(event.target.value)} className="v6-select v6-select-tight h-9 w-[116px] rounded-control border border-hairline bg-canvas text-label font-semibold text-ink"><option value="all">付与元：すべて</option>{Object.entries(SOURCE_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
-              <span className="flex-1" />
-              <select value={pageSize} onChange={(event) => setPageSize(Number(event.target.value))} className="v6-select h-9 rounded-control border border-hairline bg-canvas pl-3 text-label font-semibold text-ink">{[20,30,40,50].map((size) => <option key={size} value={size}>{size}件表示</option>)}</select>
+              <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="タグ名・用途で検索" className="h-10 min-w-45 flex-1 rounded-control border border-hairline bg-canvas px-3 text-label outline-none focus:border-accent" />
+              <select value={usageFilter} onChange={(event) => setUsageFilter(event.target.value)} className="v6-select h-10 min-w-44 rounded-control border border-hairline bg-canvas pl-3 text-label font-semibold text-ink"><option value="all">使用状態：すべて</option><option value="linked">連動あり</option><option value="unused">未使用</option></select>
+              <select value={sourceFilter} onChange={(event) => setSourceFilter(event.target.value)} className="v6-select h-10 min-w-38 rounded-control border border-hairline bg-canvas pl-3 text-label font-semibold text-ink"><option value="all">付与元：すべて</option>{Object.entries(SOURCE_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
+              <select value={pageSize} onChange={(event) => setPageSize(Number(event.target.value))} className="v6-select ml-auto h-10 min-w-32 rounded-control border border-hairline bg-canvas pl-3 text-label font-semibold text-ink">{[20,30,40,50].map((size) => <option key={size} value={size}>{size}件表示</option>)}</select>
               <span className="text-xs tabular-nums text-ink-faint">{ready ? `${filtered.length === 0 ? 0 : (currentPage - 1) * pageSize + 1}–${Math.min(currentPage * pageSize, filtered.length)} / ${filtered.length}件` : '—'}</span>
             </div>
             {/* 設計 `UOmne`。**5つ。押した数だけ重ねて絞る。** */}
@@ -856,10 +907,12 @@ export default function TagsPageV4({
                             <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: group?.color ?? '#8b938d' }} />
                             {/* 設計 `VQykB` は青文字。押すと編集へ行く（編集ボタンは置かない）。 */}
                             <Link href={`/tags/edit?id=${tag.id}`} className="truncate text-label font-semibold text-status-info hover:underline" title={tag.name}>{tag.name}</Link>
+                            {/* 保管済みは一覧に出続けるが、開くと名前と説明しか直せない(#710)。 */}
+                            {tag.status === 'archived' && <span className="shrink-0 rounded-pill bg-canvas-sunken px-2 py-0.5 text-micro font-bold text-ink-faint">保管済み</span>}
                           </div>
                         </td>
                         <td className="px-3 py-3">
-                          <FolderSelect tag={tag} groups={groups} onChanged={() => void load()} />
+                          <FolderSelect tag={tag} groups={groups} onItemsChange={setItems} onError={setError} />
                         </td>
                         <td className="px-3 py-3 text-label tabular-nums">{tag.friendCount ?? 0}人</td>
                         <td className="truncate px-3 py-3 text-label text-ink" title={sourceLabel(tag)}>{sourceLabel(tag)}</td>
@@ -917,7 +970,7 @@ export default function TagsPageV4({
         ) : null}
       </> : tab === 'fields' ? <FriendFieldList accountId={accountId} /> : tab === 'marks' ? <SupportMarkList accountId={accountId} /> : <SavedSearchList accountId={accountId} />}
       </div>
-      {deleteTarget && <DeleteTagDialog tag={deleteTarget} onCancel={() => setDeleteTarget(null)} onDeleted={() => { setDeleteTarget(null); void load() }} />}
+      {deleteTarget && <DeleteTagDialog tag={deleteTarget} accountId={accountId} onCancel={() => setDeleteTarget(null)} onArchived={(result) => { setDeleteTarget(null); setNotice(result ?? ''); void load() }} />}
     </div>
   )
 }

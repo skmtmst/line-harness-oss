@@ -1,11 +1,19 @@
 import { describe, it, expect } from 'vitest';
 import { resolveStepContent } from './scenario-resolve.js';
 
-function mockDb(tplRow: { message_type: string; message_content: string; question_json?: string | null } | null): D1Database {
+function mockDb(tplRow: {
+  message_type: string; message_content: string; question_json?: string | null;
+  published_version?: number; line_account_id?: string | null;
+} | null): D1Database {
+  const row = tplRow && !('published_version' in tplRow)
+    // 独立審査(指摘3): 公開版あり・送り先と同じ持ち主の行と同じ扱いにする。
+    // 持ち主不明は送らない(fail-close)。
+    ? { ...tplRow, published_version: 1, line_account_id: 'account-1' }
+    : tplRow;
   return {
     prepare: () => ({
       bind: () => ({
-        first: async () => tplRow,
+        first: async () => row,
       }),
     }),
   } as unknown as D1Database;
@@ -17,7 +25,7 @@ describe('resolveStepContent', () => {
       template_id: null,
       message_type: 'text',
       message_content: 'hello',
-    });
+    }, null);
     expect(result).toEqual({
       messageType: 'text',
       messageContent: 'hello',
@@ -34,6 +42,7 @@ describe('resolveStepContent', () => {
         message_type: 'text',
         message_content: 'fallback',
       },
+      'account-1',
     );
     expect(result).toEqual({
       messageType: 'flex',
@@ -48,7 +57,7 @@ describe('resolveStepContent', () => {
       template_id: 'tpl-deleted',
       message_type: 'text',
       message_content: 'fallback',
-    });
+    }, null);
     expect(result).toEqual({
       messageType: 'text',
       messageContent: 'fallback',
@@ -57,7 +66,21 @@ describe('resolveStepContent', () => {
     });
   });
 
-  it('テンプレ messageType=carousel → flex に coerce (buildMessage 互換)', async () => {
+  /*
+   * carousel は flex に coerce しない。PR #177「カルーセルを送れるように
+   * する(配信が壊れていたのも直す)」(2026-08-19) で意図的に撤回された。
+   *
+   * 撤回の理由: カルーセルの中身は columns の配列で、Flex が要求するのは
+   * bubble か carousel の**オブジェクト**。coerce していた頃は配列のまま
+   * Flex の contents に入れて送っていたため LINE が 400 を返し、400 は
+   * 永続エラー扱いなので pauseFriendScenarioDelivery が走って、その人の
+   * 購読ごと止まっていた(詳細: packages/db/src/scenario-resolve.ts の
+   * normalizeMessageType のコメント)。carousel はそのまま返し、
+   * buildMessage が template メッセージ
+   * ({ type: 'template', template: { type: 'carousel', columns } }) に
+   * 組み立てる。
+   */
+  it('テンプレ messageType=carousel はそのまま carousel で返る(flex へ coerce しない)', async () => {
     const result = await resolveStepContent(
       mockDb({ message_type: 'carousel', message_content: '{"type":"carousel","contents":[]}' }),
       {
@@ -65,8 +88,9 @@ describe('resolveStepContent', () => {
         message_type: 'text',
         message_content: 'fallback',
       },
+      'account-1',
     );
-    expect(result.messageType).toBe('flex');
+    expect(result.messageType).toBe('carousel');
     expect(result.templateIdAtSend).toBe('tpl-carousel');
   });
 
@@ -80,6 +104,7 @@ describe('resolveStepContent', () => {
         message_content: '古い質問',
         question_json: JSON.stringify({ text: '古い質問', tapMode: 'single', choices: [{ label: 'はい', behavior: 'none' }] }),
       },
+      'account-1',
     );
     expect(result.questionJson).toBe(question);
     expect(result.templateIdAtSend).toBe('tpl-question');

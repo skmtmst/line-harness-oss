@@ -26,9 +26,6 @@ function sliceBetween(source: string, start: string, end: string): string {
 }
 
 const OFFERS_TAB = sliceBetween(TABS, 'export function OffersTab() {', '\nfunction SettlementEditor')
-/** 注記は画面の字なので `tabs.tsx` にある。設計照合もそこを読む。 */
-const CONFIRMED_DETAIL = sliceBetween(TABS, 'const CONFIRMED_DETAIL = {', '} as const')
-
 const KPI_BAND = sliceBetween(
   OFFERS_TAB,
   '<div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">',
@@ -136,38 +133,19 @@ describe('取れた0と、取れていないものを混ぜない', () => {
     expect(confirmedUnit('error', '円')).toBe('')
   })
 
-  it('注記は3つとも「承認待ちを含まない」ことを言う', () => {
-    const lines = CONFIRMED_DETAIL.split('\n').filter((line) => line.includes(':'))
-    expect(lines).toHaveLength(3)
-    for (const line of lines) expect(line).toContain('承認待ちは含みません')
-  })
-
-  it('設計の字（確定した件数・確定した報酬の合計・報酬をマイルで払う分）を落とさない', () => {
-    for (const word of ['確定した件数', '確定した報酬の合計', '報酬をマイルで払う分']) {
-      expect(CONFIRMED_DETAIL).toContain(word)
-    }
-  })
 })
 
 describe('V6 案件一覧（GH8VL）のKPIの帯', () => {
-  it('3枚とも状態つきの値・単位・注記を通す。素の数を直接置かない', () => {
-    for (const title of ['今月の成果', '支払い予定', '付与予定マイル']) {
+  it('設計どおり、案件数・最多成果・平均報酬・動き未設定を並べる', () => {
+    for (const title of ['紹介できる案件', 'いちばん成果が出た案件', '1件あたりの平均報酬', '動きが未設定の案件']) {
       expect(KPI_BAND).toContain(`title="${title}"`)
     }
-    expect(KPI_BAND.match(/confirmedValue\(confirmedState,/g) ?? []).toHaveLength(3)
-    expect(KPI_BAND.match(/confirmedUnit\(confirmedState,/g) ?? []).toHaveLength(3)
-    expect(KPI_BAND.match(/confirmedDetail\(confirmedState,/g) ?? []).toHaveLength(3)
-    expect(KPI_BAND.match(/loading=\{confirmedState === 'loading'\}/g) ?? []).toHaveLength(3)
-  })
-
-  it('「確定した件数」だけの注記を帯に残さない', () => {
-    expect(KPI_BAND).not.toContain('detail="確定した件数"')
-    expect(KPI_BAND).not.toContain('detail="確定した報酬の合計"')
-    expect(KPI_BAND).not.toContain('detail="報酬をマイルで払う分"')
+    expect(OFFERS_TAB).toContain('offerStats')
+    expect(OFFERS_TAB).toContain('introducerIds')
   })
 
   it('公開中の案件は読み込んだ行から数えるので、状態を付けない', () => {
-    expect(KPI_BAND).toContain('title="公開中の案件" value={openCount} unit="件"')
+    expect(KPI_BAND).toContain('title="紹介できる案件" value={openCount} unit="件"')
   })
 
   it('承認の取得が落ちたら error にする。黙って0のままにしない', () => {

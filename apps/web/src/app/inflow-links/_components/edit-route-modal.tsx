@@ -27,6 +27,11 @@ interface Props {
   initialGenre?: string
   /** Pre-filled ref_code for "register an unregistered inflow ref" flow. */
   initialRefCode?: string
+  /**
+   * #514-5: 親が一覧表示のために既に引いたプール別の所属名。渡されたら
+   * 取り直さない。編集窓を開くたびの N+1 を無くす。
+   */
+  poolMemberNames?: Record<string, string[]>
   onClose: () => void
   onSaved: (savedRoute: EntryRoute, created: boolean) => void
 }
@@ -40,28 +45,34 @@ export default function EditRouteModal({
   existingGenres,
   initialGenre,
   initialRefCode,
+  poolMemberNames,
   onClose,
   onSaved,
 }: Props) {
   // Per-pool member account names, loaded lazily so the dropdown can show
   // "Pool 名 — アカA, アカB" instead of just the pool name.
-  const [poolMembers, setPoolMembers] = useState<Record<string, string[]>>({})
+  const [poolMembers, setPoolMembers] = useState<Record<string, string[]>>(poolMemberNames ?? {})
   useEffect(() => {
+    if (poolMemberNames) {
+      setPoolMembers(poolMemberNames)
+      return
+    }
     let cancelled = false
     ;(async () => {
-      const entries = await Promise.all(
-        pools.map(async (p) => {
-          const res = await api.pools.accounts.list(p.id)
-          const names = res.success ? res.data.map((m) => m.accountName ?? '—') : []
-          return [p.id, names] as const
-        }),
-      )
-      if (!cancelled) setPoolMembers(Object.fromEntries(entries))
+      const result = pools.length > 0
+        ? await api.pools.listAccounts(pools.map((pool) => pool.id))
+        : { success: true as const, data: [] }
+      if (!cancelled && result.success) {
+        setPoolMembers(Object.fromEntries(result.data.map(({ poolId, accounts }) => [
+          poolId,
+          accounts.filter((account) => account.isActive).map((account) => account.accountName ?? '—'),
+        ])))
+      }
     })()
     return () => {
       cancelled = true
     }
-  }, [pools])
+  }, [pools, poolMemberNames])
   const isNew = !route
   const mainPool = pools.find((p) => p.slug === 'main')
   // Unregistered-ref registration flow: refCode is fixed (the actual ref code

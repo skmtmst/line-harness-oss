@@ -4,6 +4,8 @@ import type { Env } from '../index.js';
 
 const mocks = {
   getLineAccounts: vi.fn(),
+  getLineAccountScopeEntries: vi.fn(),
+  getLineAccountsByIds: vi.fn(),
   getLineAccountById: vi.fn(),
   createLineAccount: vi.fn(),
   updateLineAccount: vi.fn(),
@@ -67,6 +69,10 @@ function patch(body: unknown) {
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.getLineAccounts.mockResolvedValue([{ ...ACCOUNT, parent_line_account_id: null }]);
+  mocks.getLineAccountScopeEntries.mockResolvedValue([
+    { ...ACCOUNT, parent_line_account_id: null, tenant_id: null },
+  ]);
+  mocks.getLineAccountsByIds.mockResolvedValue([{ ...ACCOUNT, parent_line_account_id: null }]);
   mocks.getStaffById.mockResolvedValue({ account_scope: 'all' });
   mocks.getStaffAccountScopeIds.mockResolvedValue([]);
   mocks.getLineAccountById.mockResolvedValue(ACCOUNT);

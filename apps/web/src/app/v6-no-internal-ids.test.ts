@@ -27,6 +27,8 @@ const SCREENS = [
   { node: 'n5VVTb / jwrbf', path: 'affiliates/tabs.tsx' },
   { node: 'n5VVTb / jwrbf', path: 'conversions/page.tsx' },
   { node: 'voJtX', path: 'contents/page.tsx' },
+  { node: 'voJtX', path: 'contents/media-detail-dialog.tsx' },
+  { node: 'voJtX', path: 'contents/media-replacement-dialog.tsx' },
   { node: 'MvZm5', path: 'mileage/mileage-history-tab.tsx' },
   { node: 'HIU5O', path: 'mileage/friends/detail/page.tsx' },
 ] as const
@@ -123,7 +125,7 @@ describe('V6の画面に内部IDとDBの語を出さない', () => {
 describe('成果承認 n5VVTb の友だち列', () => {
   const CELL = between(
     read('affiliates/tabs.tsx'),
-    '{items.map((item) => (',
+    '{pagedItems.map((item) => (',
     '{item.affiliateName',
   )
 
@@ -176,15 +178,15 @@ describe('紹介者 jwrbf の内訳', () => {
 
 describe('登録メディア voJtX の使用箇所', () => {
   const LIST = between(
-    read('contents/page.tsx'),
-    '{usagesFor?.id === item.id && (',
+    read('contents/media-detail-dialog.tsx'),
+    'impact.references.map((reference: MediaDeleteImpactReference, index)',
     '</ul>',
   )
 
   it('表に無い種別を内部の記号のまま出さない', () => {
-    expect(LIST).toContain('{mediaUsageKindText(u.refKind)}')
-    // `?? u.refKind` に戻ると、表を足し忘れた種別が静かに漏れる。
-    expect(LIST).not.toContain('?? u.refKind')
+    expect(LIST).toContain('{referenceKindText(reference.kind)}')
+    // `?? reference.kind` に戻ると、表を足し忘れた種別が静かに漏れる。
+    expect(LIST).not.toContain('?? reference.kind')
     expect(LIST).not.toContain('REF_KIND_LABELS')
   })
 })

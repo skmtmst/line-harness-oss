@@ -58,6 +58,13 @@ function firedEventTypes(): Set<string> {
     if (entry.name.endsWith('.test.ts')) continue
     const source = readFileSync(join(entry.parentPath ?? root, entry.name), 'utf8')
     for (const m of source.matchAll(/fireEvent\([^,]*, '([^']+)'/g)) fired.add(m[1])
+    // フォーム・リンク・予約はルートがイベントバスへ渡し、日時系は
+    // trigger_type としてCronが拾う。直接 fireEvent の形だけに限定しない。
+    for (const m of source.matchAll(/(?:eventType|triggerType): '(form_submitted|link_clicked|calendar_booked|datetime|daily|weekly)'/g)) fired.add(m[1])
+    for (const m of source.matchAll(/trigger_type IN \('datetime', 'daily', 'weekly'\)/g)) {
+      for (const type of ['datetime', 'daily', 'weekly']) fired.add(type)
+    }
+    if (source.includes("'ec.order.confirmed'") && source.includes('EVENT_TRIGGER_TYPES')) fired.add('ec.order.confirmed')
   }
   return fired
 }
@@ -75,7 +82,7 @@ describe('V6 ルールを作る（Rv8Jv）', () => {
   it('保存・キャンセルは下部追従バーにしか置かない', () => {
     expect(PAGE).toContain("import StickyBar from '@/components/shared/sticky-bar'")
     const bar = PAGE.slice(PAGE.indexOf('<StickyBar'))
-    for (const label of ['キャンセル', '保存して続けて作る']) {
+    for (const label of ['キャンセル', '下書きに保存', 'つくって動かす']) {
       expect(bar, `${label} が追従バーの外にあります`).toContain(label)
     }
     // 追従バーより前に保存の押し口を置かない。
@@ -129,11 +136,16 @@ describe('V6 ルールを作る（Rv8Jv）', () => {
     expect(PAGE).toContain('data-design="Right"')
     expect(PAGE).toContain("import { CareCard, FeatureLinkCard } from '@/components/shared/side-cards'")
     expect(PAGE).toContain('当てはまりそうな人数')
+    expect(PAGE).toContain('いまの決めごとを文章にすると')
+    expect(PAGE).toContain('この文章のとおりに動きます。')
+    expect(PAGE).toContain('同じきっかけのルールは両方動きます')
+    expect(PAGE).toContain('15軸')
+    expect(PAGE).toContain('失敗したとき: 現在はここで止まります。')
   })
 
-  it('取れない数は未接続の言葉で出し、0件と書かない', () => {
+  it('保存後に見込み人数を確認でき、0件と書かない', () => {
     expect(PAGE).toContain(
-      'まだ繋がっていません。見込み人数を数える口が接続されると表示されます。',
+      '保存後に見込み人数を確認できます。',
     )
     // 見込み人数の枠に 0 を書かない。
     expect(PAGE).not.toContain('見込み人数: 0')
@@ -174,7 +186,7 @@ describe('V6 ルールを作る（Rv8Jv）', () => {
   })
 
   it('一度も動かない旧きっかけを戻さない', () => {
-    for (const dead of ['friend_added', 'tag_added', 'form_submitted', 'link_clicked']) {
+    for (const dead of ['friend_added', 'tag_added']) {
       expect(PAGE, `${dead} は発火しません`).not.toContain(`'${dead}'`)
     }
     expect(PAGE_CODE).not.toContain('準備中')
@@ -183,8 +195,28 @@ describe('V6 ルールを作る（Rv8Jv）', () => {
   it('すること（動き）を複数持てる', () => {
     expect(PAGE).toContain('動きを追加')
     expect(PAGE).toContain('この動きを消す')
-    expect(PAGE).toContain('actions: actions.map(')
+    // 送る形は `draftActions()` にまとめた（確認画面とのずれ検出でも同じ形を使う）。
+    // 名前が変わっても「入力の並びをそのまま送る」ことは崩さない。
+    expect(PAGE).toContain('const draftActions = (): AutomationDraftAction[] => actions.map(')
+    expect(PAGE).toContain('actions: draftActions(),')
     // 1つしか送らない形へ戻さない。
     expect(PAGE).not.toContain('actions: [\n')
+  })
+
+  it('設計の6種類を表示し、下書き・見込み人数・1人テスト・公開へ接続する', () => {
+    expect(screenEventValues()).toHaveLength(6)
+    expect(PAGE).toContain('api.automations.createDraftFromTemplate')
+    expect(PAGE).toContain('api.automations.updateDraft')
+    expect(PAGE).toContain('api.automations.audiencePreview')
+    expect(PAGE).toContain('api.automations.test')
+    expect(PAGE).toContain('api.automations.publishDraft')
+    expect(PAGE).toContain('つくって動かす')
+  })
+
+  it('同じきっかけ注意はこの店だけ見て選べない分岐を持たない (#580)', () => {
+    expect(PAGE).toContain('api.automations.list({ accountId: selectedAccountId })')
+    expect(PAGE).not.toContain('triggerConfig.trackedLinkId')
+    expect(PAGE).not.toContain('triggerConfig.bookingType')
+    expect(PAGE).toContain('保存した時点の内容で試します')
   })
 })

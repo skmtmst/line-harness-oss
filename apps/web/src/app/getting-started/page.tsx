@@ -2,22 +2,18 @@
 
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
-import type { StaffMember } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import ListState from '@/components/shared/list-state'
-import NoteBar from '@/components/shared/note-bar'
-import PageHeader from '@/components/shared/page-header'
 import StatusBadge from '@/components/shared/status-badge'
 import { CareCard, FeatureLinkCard } from '@/components/shared/side-cards'
 import {
   CARE_ITEMS,
   FEATURE_LINKS,
   STEP_STATE_LABEL,
-  type GettingStartedInput,
   type StepResult,
   type StepState,
-  buildSteps,
+  buildStepsFromApi,
   progressHeadline,
   stoppedReasons,
 } from './getting-started-view'
@@ -35,7 +31,7 @@ const STATE_TONE: Record<StepState, 'success' | 'warning' | 'neutral' | 'danger'
 /** 設計 ★V6 34-1（`RAW35`）。順路 4 段と最終確認。 */
 export default function GettingStartedPage() {
   const { selectedAccountId, loading: accountLoading } = useAccount()
-  const [input, setInput] = useState<GettingStartedInput | null>(null)
+  const [steps, setSteps] = useState<StepResult[]>([])
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
 
   useEffect(() => {
@@ -44,35 +40,16 @@ export default function GettingStartedPage() {
     let alive = true
     setStatus('loading')
 
-    /*
-      判定はサーバから取った実物だけで計算する。**キャッシュしない。**
-      `GET /api/getting-started` は無いので、いまある口を並べて数える
-      （足りないのは最終確認の「1通届いたか」だけ。§firstMessageStep）。
-    */
-    void Promise.all([
-      api.lineAccounts.list().catch(() => null),
-      api.tags.list().catch(() => null),
-      accountId ? api.friendFields.list(accountId).catch(() => null) : Promise.resolve(null),
-      accountId ? api.friendAddRouting.get(accountId).catch(() => null) : Promise.resolve(null),
-      accountId ? api.friendAddRouting.getDraft(accountId).catch(() => null) : Promise.resolve(null),
-      api.scenarios.list().catch(() => null),
-      api.staff.me().catch(() => null),
-    ]).then(([accounts, tags, fields, routing, draft, scenarios, me]) => {
+    void api.gettingStarted.get(accountId ?? undefined).then((res) => {
       if (!alive) return
-      if (!accounts?.success || !tags?.success || !scenarios?.success) {
+      if (!res.success) {
         setStatus('error')
         return
       }
-      setInput({
-        accounts: accounts.data ?? [],
-        tagCount: (tags.data ?? []).length,
-        friendFieldCount: fields?.success ? (fields.data ?? []).length : 0,
-        friendAdd: routing?.success && routing.data ? routing.data : null,
-        friendAddDraft: draft?.success && draft.data ? draft.data : null,
-        scenarios: scenarios.data ?? [],
-        role: (me?.success ? me.data?.role : null) as StaffMember['role'] | null,
-      })
+      setSteps(buildStepsFromApi(res.data.steps))
       setStatus('ready')
+    }).catch(() => {
+      if (alive) setStatus('error')
     })
 
     return () => {
@@ -80,27 +57,25 @@ export default function GettingStartedPage() {
     }
   }, [accountLoading, selectedAccountId])
 
-  const steps = input ? buildSteps(input) : []
-  const reasons = input ? stoppedReasons(steps) : []
+  const reasons = stoppedReasons(steps)
 
   return (
     <div className={styles.page}>
-      <PageHeader
-        breadcrumb={[{ label: '設定' }, { label: 'はじめの設定' }]}
-        title="はじめの設定"
-        description="順番はおすすめです。飛ばして進んでもかまいません。終わったかどうかは、画面を開いたかではなく、実際に作られたもので判断します。"
-      />
-
-      {status !== 'ready' || !input ? (
+      {status !== 'ready' ? (
         <ListState kind={status === 'error' ? 'error' : 'loading'} />
       ) : (
         <>
-          <NoteBar tone="info">
-            <strong className={styles.headline}>{progressHeadline(steps)}</strong>
+          <div className={styles.progress} role="note">
+            <div>
+              <strong>{progressHeadline(steps)}</strong>
+              <span>
+                順番はおすすめです。飛ばして進んでもかまいません。終わったかどうかは、画面を開いたかではなく、実際に作られたもので判断します。
+              </span>
+            </div>
             <span className={styles.headlineNote}>
               全部終わると、ダッシュボードの帯は出なくなります
             </span>
-          </NoteBar>
+          </div>
 
           <div className={styles.columns}>
             <ol className={styles.steps} aria-label="はじめの設定の順路">

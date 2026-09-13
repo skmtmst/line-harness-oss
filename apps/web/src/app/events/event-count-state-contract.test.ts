@@ -2,6 +2,8 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 const PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
+const WORKER = readFileSync(new URL('../../../../worker/src/index.ts', import.meta.url), 'utf8')
+const WAITLIST = readFileSync(new URL('../../../../worker/src/services/event-waitlist.ts', import.meta.url), 'utf8')
 
 describe('V6 イベント予約の件数状態', () => {
   it('読込中・失敗・成功を同じ補足にしない', () => {
@@ -17,7 +19,7 @@ describe('V6 イベント予約の件数状態', () => {
   })
 
   it('取得成功後の実値0は0件として表示できる', () => {
-    expect(PAGE).toContain("filtered.length === 0")
+    expect(PAGE).toContain("listTotal === 0")
     expect(PAGE).toContain("? '0件'")
   })
 
@@ -28,5 +30,18 @@ describe('V6 イベント予約の件数状態', () => {
     expect(PAGE).toContain("title=\"申し込みが少ない\"")
     expect(PAGE).toContain('daysUntilEvent(nearestLow)')
     expect(PAGE).not.toContain('title="定員の充足"')
+  })
+
+  it('終わった回は端末時計で数えず「—」にする(点検#520軽16)', () => {
+    // 端末時計がずれると件数が合わない。サーバー時刻の口が無いので出さない。
+    expect(PAGE).toContain('終わった回 <strong')
+    expect(PAGE).not.toContain('endedCount')
+  })
+
+  it('席が空いたあとの自動案内を、実際の定期処理があるときだけ案内する', () => {
+    expect(PAGE).toContain('キャンセルが出たら、キャンセル待ちの人に自動で順番が回ります。')
+    expect(WORKER).toContain('processEventWaitlistPromotionJobs')
+    expect(WAITLIST).toContain('enqueueEventWaitlistPromotion')
+    expect(WAITLIST).toContain('DEFAULT_OFFER_HOURS = 24')
   })
 })

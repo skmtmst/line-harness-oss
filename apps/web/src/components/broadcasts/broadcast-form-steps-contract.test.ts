@@ -41,7 +41,7 @@ function withoutComments(source: string): string {
   return source.replace(/\{\/\*[\s\S]*?\*\/\}/g, '')
 }
 
-const STEP_CALL = callArguments(FORM, 'const steps = broadcastSteps(')
+const STEP_CALL = callArguments(FORM, 'const progressSteps = broadcastSteps(')
 
 describe('作成画面の5段の帯（設計 LMiL2）', () => {
   it('帯を描いている', () => {
@@ -83,7 +83,7 @@ describe('作成画面の5段の帯（設計 LMiL2）', () => {
 describe('配信名の字数（設計 zZ9fA）', () => {
   it('入力欄のそばに「n / 60文字」を出す', () => {
     const label = FORM.slice(
-      FORM.indexOf('<span className="text-ink text-sm font-bold">管理用タイトル</span>'),
+      FORM.indexOf('<span className="text-ink text-sm font-bold">配信名'),
       FORM.indexOf('placeholder="例：8月キャンペーンのお知らせ"'),
     )
     expect(label).toContain('{title.trim().length} / {TITLE_MAX}文字')
@@ -99,7 +99,7 @@ describe('配信名の字数（設計 zZ9fA）', () => {
   })
 })
 
-describe('本文の節の番号', () => {
+describe('画面ごとの段の番号', () => {
   /**
    * **本文の番号が、画面に並ぶ順と合っていること。**
    *
@@ -108,14 +108,16 @@ describe('本文の節の番号', () => {
    * 見落としたと読まれる。** 設計 `zZ9fA` の段は
    * 基本設定 → 対象者 → メッセージ → 送信設定 → 確認 の5つ。
    */
-  it('番号は、画面に並ぶ順と同じ', () => {
-    const headings = [...FORM.matchAll(/font-bold[^>]*>(\d)\.\s*([^<]+)</g)].map((m) => [Number(m[1]), m[2].trim()] as const)
-    expect(headings.length, '番号つきの節が見つからない').toBeGreaterThanOrEqual(3)
-    // 出てくる順に、番号が増えていく
-    const numbers = headings.map(([n]) => n)
-    expect(numbers, `番号が並び順と合っていない: ${JSON.stringify(headings)}`).toEqual([...numbers].sort((a, b) => a - b))
-    // 上の段（STEP 1〜5）と同じ番号を使う。基本設定が 1、確認が 5。
-    expect(headings).toEqual([[2, '送る相手'], [3, '送る内容'], [4, '送る時間']])
+  it('5段の定義は、画面に並ぶ順と同じ', () => {
+    const definitions = [...STEPS.matchAll(/key: '([^']+)', label: '([^']+)'/g)]
+      .map((match) => [match[1], match[2]])
+    expect(definitions).toEqual([
+      ['basic', '基本設定'],
+      ['audience', '対象者'],
+      ['message', 'メッセージ'],
+      ['schedule', '送信設定'],
+      ['confirm', '確認'],
+    ])
   })
 })
 

@@ -1,11 +1,14 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import Header from '@/components/layout/header'
-import { bookingApi, type BookingMenu, type BookingRequest } from '@/lib/api'
+import { bookingApi, type BookingAdminDetail, type BookingMenu, type BookingRequest } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Button from '@/components/shared/button'
+import FolderPanel, { FOLDER_RAIL_WIDTH } from '@/components/shared/folder-panel'
+import { usePageTitle } from '@/components/shell/page-chrome'
+import BookingCalendar from './booking-calendar'
 
 /**
  * 予約管理（設計 V2 8-1 / node EAYvf）。
@@ -33,8 +36,8 @@ const statusBadgeColor: Record<string, string> = {
   rejected: 'bg-canvas-sunken text-ink-secondary',
   expired: 'bg-canvas-sunken text-ink-secondary',
   cancelled: 'bg-canvas-sunken text-ink-secondary',
-  completed: 'bg-blue-100 text-blue-800',
-  no_show: 'bg-red-100 text-red-800',
+  completed: 'bg-info-bg text-info',
+  no_show: 'bg-danger-bg text-danger',
 }
 
 const statusLabel: Record<string, string> = {
@@ -59,6 +62,8 @@ const actionLabel: Record<string, string> = {
 const PAGE_SIZE = 20
 
 function formatJpDateTime(iso: string): string {
+  // 不正な日時が来たら Invalid Date を出さず「—」に逃がす(点検#516軽6)。
+  if (Number.isNaN(new Date(iso).getTime())) return '—'
   return new Date(iso).toLocaleString('ja-JP', {
     year: 'numeric',
     month: '2-digit',
@@ -71,6 +76,7 @@ function formatJpDateTime(iso: string): string {
 
 /** 表の日時。設計は年を出していない（08/18 14:00）。 */
 function formatShort(iso: string): string {
+  if (Number.isNaN(new Date(iso).getTime())) return '—'
   return new Date(iso).toLocaleString('ja-JP', {
     month: '2-digit',
     day: '2-digit',
@@ -81,16 +87,12 @@ function formatShort(iso: string): string {
 }
 
 function formatJpTime(iso: string): string {
+  if (Number.isNaN(new Date(iso).getTime())) return '—'
   return new Date(iso).toLocaleTimeString('ja-JP', {
     hour: '2-digit',
     minute: '2-digit',
     timeZone: 'Asia/Tokyo',
   })
-}
-
-/** JSTでの年月（2026-08）。集計の区切りに使う。 */
-function jstMonth(iso: string): string {
-  return new Date(new Date(iso).getTime() + 9 * 3600_000).toISOString().slice(0, 7)
 }
 
 function jstDay(iso: string): string {
@@ -104,7 +106,9 @@ function monthKey(offset: number): string {
 }
 
 export default function BookingsPage() {
+  usePageTitle('予約管理')
   const { selectedAccountId, selectedAccount } = useAccount()
+  const [view, setView] = useState<'day' | 'week' | 'month' | 'list'>('day')
   const [tab, setTab] = useState<string>('requested')
   /** 「今日」「今週」の絞り込み。設計の「よく使う」にある。 */
   const [range, setRange] = useState<'all' | 'today' | 'week'>('all')
@@ -112,15 +116,28 @@ export default function BookingsPage() {
   const [query, setQuery] = useState('')
   const [page, setPage] = useState(1)
   const [items, setItems] = useState<BookingRequest[]>([])
-  /** KPIとメニュー別の件数を出すための全件。タブとは別に取る。 */
-  const [allItems, setAllItems] = useState<BookingRequest[]>([])
+  const [total, setTotal] = useState(0)
+  const [calendarItems, setCalendarItems] = useState<BookingRequest[]>([])
+  const [summary, setSummary] = useState({
+    total: 0, requested: 0, monthTotal: 0, monthConfirmed: 0,
+    monthCancelled: 0, lastMonthTotal: 0, todayTotal: 0, weekTotal: 0,
+    byMenu: [] as Array<{ name: string; total: number }>,
+  })
   const [menus, setMenus] = useState<BookingMenu[]>([])
+  // 集計の読み込み失敗は0表示と分ける。黙って0のままだと運用者が気づけない。
+  const [summaryError, setSummaryError] = useState(false)
+  const [summarySeq, setSummarySeq] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   // copied 状態は URL 単位で持つ。アカウント切替で shareUrl が変わると
   // 自動で「コピー済」が消えるので、A の URL をコピーしたまま B 画面で
   // 「B フォームと思い込んで送信」する事故を防ぐ。
   const [copiedUrl, setCopiedUrl] = useState<string | null>(null)
+  // コピー済み表示を消すタイマー。外したままにすると警告の元になる(点検#516軽6)。
+  const copyTimer = useRef<number | null>(null)
+  useEffect(() => () => {
+    if (copyTimer.current !== null) window.clearTimeout(copyTimer.current)
+  }, [])
   const [decideTarget, setDecideTarget] = useState<{ id: string; action: 'approve' | 'reject' | 'cancel' | 'no_show' | 'complete' } | null>(null)
   const [deciding, setDeciding] = useState(false)
   const [decideError, setDecideError] = useState('')
@@ -145,7 +162,8 @@ export default function BookingsPage() {
     try {
       await navigator.clipboard.writeText(url)
       setCopiedUrl(url)
-      setTimeout(() => {
+      if (copyTimer.current !== null) window.clearTimeout(copyTimer.current)
+      copyTimer.current = window.setTimeout(() => {
         setCopiedUrl((cur) => (cur === url ? null : cur))
       }, 2000)
     } catch {
@@ -161,41 +179,83 @@ export default function BookingsPage() {
     // 残ってしまい、誤って別ステータスの予約を操作してしまう事故を防ぐ。
     setItems([])
     try {
-      const r = await bookingApi.listRequests(selectedAccountId, tab)
+      const today = jstDay(new Date().toISOString())
+      const weekTo = jstDay(new Date(Date.now() + 7 * 86_400_000).toISOString())
+      const r = await bookingApi.listRequests(selectedAccountId, tab, {
+        limit: PAGE_SIZE,
+        offset: (page - 1) * PAGE_SIZE,
+        query: query.trim() || undefined,
+        menuName: menuFilter === 'all' ? undefined : menuFilter,
+        from: range === 'all' ? undefined : new Date(`${today}T00:00:00+09:00`).toISOString(),
+        to: range === 'today'
+          ? new Date(`${jstDay(new Date(Date.now() + 86_400_000).toISOString())}T00:00:00+09:00`).toISOString()
+          : range === 'week' ? new Date(`${weekTo}T00:00:00+09:00`).toISOString() : undefined,
+      })
       setItems(r.requests)
+      setTotal(r.total)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
       setLoading(false)
     }
-  }, [selectedAccountId, tab])
+  }, [menuFilter, page, query, range, selectedAccountId, tab])
 
   useEffect(() => {
     load()
   }, [load])
 
-  // KPIとメニュー棚は、いま見ているタブに関係なく全件から出す。
-  // タブを切り替えるたびに数が動くと、上の数字が何を指しているか読めない。
+  // KPIとメニュー棚は集計口から読む。一覧全件をブラウザへ運ばない。
   useEffect(() => {
     if (!selectedAccountId) return
     let alive = true
+    setSummaryError(false)
     void (async () => {
       try {
-        const [all, menuList] = await Promise.all([
-          bookingApi.listRequests(selectedAccountId, 'all'),
+        const today = jstDay(new Date().toISOString())
+        const [counts, menuList] = await Promise.all([
+          bookingApi.requestsSummary(selectedAccountId, {
+            month: monthKey(0), lastMonth: monthKey(-1), today,
+            weekTo: jstDay(new Date(Date.now() + 6 * 86_400_000).toISOString()),
+          }),
           bookingApi.listMenus(selectedAccountId),
         ])
         if (!alive) return
-        setAllItems(all.requests)
+        setSummary(counts)
         setMenus(menuList.menus)
       } catch {
         // KPI が出ないだけで一覧は使える。ここで画面全体を止めない。
+        // ただし0のまま黙ると気づけないので、KPI欄の上に理由と再試行を出す。
+        if (alive) setSummaryError(true)
       }
     })()
     return () => {
       alive = false
     }
-  }, [selectedAccountId])
+  }, [selectedAccountId, summarySeq])
+
+  // カレンダーは今日/今週の範囲だけをページごとに読み、200件を越えても欠落させない。
+  useEffect(() => {
+    if (!selectedAccountId || (view !== 'day' && view !== 'week')) return
+    let alive = true
+    void (async () => {
+      const today = jstDay(new Date().toISOString())
+      const endDay = jstDay(new Date(Date.now() + (view === 'day' ? 1 : 7) * 86_400_000).toISOString())
+      const collected: BookingRequest[] = []
+      let offset = 0
+      while (alive) {
+        const response = await bookingApi.listRequests(selectedAccountId, 'all', {
+          limit: 100, offset,
+          from: new Date(`${today}T00:00:00+09:00`).toISOString(),
+          to: new Date(`${endDay}T00:00:00+09:00`).toISOString(),
+        })
+        collected.push(...response.requests)
+        offset += response.requests.length
+        if (offset >= response.total || response.requests.length === 0) break
+      }
+      if (alive) setCalendarItems(collected)
+    })().catch(() => { if (alive) setError('カレンダーの読み込みに失敗しました') })
+    return () => { alive = false }
+  }, [selectedAccountId, view])
 
   type BookingAction = 'approve' | 'reject' | 'cancel' | 'no_show' | 'complete'
 
@@ -226,48 +286,17 @@ export default function BookingsPage() {
     setDecideTarget({ id, action })
   }
 
-  const kpi = useMemo(() => {
-    const thisMonth = monthKey(0)
-    const lastMonth = monthKey(-1)
-    const inThis = allItems.filter((b) => jstMonth(b.starts_at) === thisMonth)
-    const inLast = allItems.filter((b) => jstMonth(b.starts_at) === lastMonth)
-    const cancelled = inThis.filter(
-      (b) => b.status === 'cancelled' || b.status === 'rejected' || b.status === 'no_show',
-    ).length
-    return {
-      total: inThis.length,
-      diff: inThis.length - inLast.length,
-      confirmed: inThis.filter((b) => b.status === 'confirmed').length,
-      cancelled,
-      rate: inThis.length > 0 ? Math.round((cancelled / inThis.length) * 100) : null,
-    }
-  }, [allItems])
-
-  const menuCounts = useMemo(() => {
-    const counts = new Map<string, number>()
-    for (const b of allItems) counts.set(b.menu_name, (counts.get(b.menu_name) ?? 0) + 1)
-    return counts
-  }, [allItems])
-
-  const filtered = useMemo(() => {
-    const today = jstDay(new Date().toISOString())
-    const weekAhead = jstDay(new Date(Date.now() + 6 * 86_400_000).toISOString())
-    const q = query.trim()
-    return items.filter((b) => {
-      if (menuFilter !== 'all' && b.menu_name !== menuFilter) return false
-      if (q && !(b.friend_name ?? '').includes(q)) return false
-      if (range === 'today' && jstDay(b.starts_at) !== today) return false
-      if (range === 'week') {
-        const d = jstDay(b.starts_at)
-        if (d < today || d > weekAhead) return false
-      }
-      return true
-    })
-  }, [items, menuFilter, query, range])
-
-  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const kpi = {
+    total: summary.monthTotal,
+    diff: summary.monthTotal - summary.lastMonthTotal,
+    confirmed: summary.monthConfirmed,
+    cancelled: summary.monthCancelled,
+    rate: summary.monthTotal > 0 ? Math.round((summary.monthCancelled / summary.monthTotal) * 100) : null,
+  }
+  const menuCounts = new Map(summary.byMenu.map((item) => [item.name, item.total]))
+  const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE))
   const current = Math.min(page, pageCount)
-  const shown = filtered.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE)
+  const shown = items
 
   // 絞り込みが変わったら1ページ目に戻す。3ページ目のまま条件を狭めると
   // 「該当なし」に見えてしまう。
@@ -277,44 +306,108 @@ export default function BookingsPage() {
 
   // タブ切替やアカウント切替で items が入れ替わったとき、開いていた予約が
   // 一覧から消えることがある。その場合はパネルを閉じる。
-  const detail = detailId ? (items.find((b) => b.id === detailId) ?? null) : null
+  const detail = detailId
+    ? (calendarItems.find((b) => b.id === detailId) ?? items.find((b) => b.id === detailId) ?? null)
+    : null
   useEffect(() => {
-    if (detailId && !items.some((b) => b.id === detailId)) setDetailId(null)
-  }, [items, detailId])
+    if (detailId && !calendarItems.some((b) => b.id === detailId) && !items.some((b) => b.id === detailId)) {
+      setDetailId(null)
+    }
+  }, [calendarItems, items, detailId])
+
+  const todayCount = summary.todayTotal
+  const weekCount = summary.weekTotal
+
+  const pageHead = (
+    <>
+      <div data-design="Toolbar" className="mb-2 flex flex-wrap items-center justify-between gap-3">
+        <nav className="text-ink-faint text-xs" aria-label="パンくず">
+          <span>予約</span>
+          <span className="mx-1.5">/</span>
+          <span>予約管理</span>
+        </nav>
+        <Link
+          href="/booking/bookings/new"
+          className="bg-accent-deep text-on-accent rounded-control px-4 py-2 text-sm font-medium"
+        >
+          電話の予約を入れる
+        </Link>
+      </div>
+      <nav aria-label="予約の表示" className="border-hairline mb-4 flex items-center gap-7 border-b">
+        {([
+          ['day', `今日 ${todayCount}`],
+          ['week', `今週 ${weekCount}`],
+          ['month', `今月 ${kpi.total}`],
+          ['list', '一覧'],
+        ] as const).map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => setView(key)}
+            className={`border-b-2 px-1 py-3 text-sm font-semibold ${
+              view === key ? 'border-accent text-accent' : 'border-transparent text-ink-secondary'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </nav>
+    </>
+  )
+
+  const dialogs = (
+    <>
+      {detail && (
+        <BookingDetailPanel
+          booking={detail}
+          accountId={selectedAccountId}
+          onClose={() => setDetailId(null)}
+          onAction={(a) => handleDecide(detail.id, a)}
+        />
+      )}
+      <ConfirmDialog
+        open={decideTarget !== null}
+        title={`この予約を「${decideTarget ? actionLabel[decideTarget.action] : ''}」にしますか？`}
+        description="予約した人へ、この結果がLINEで届きます。取り消すには、もう一度状態を変える必要があります。"
+        confirmLabel={decideTarget ? actionLabel[decideTarget.action] : '実行する'}
+        destructive={decideTarget?.action === 'reject' || decideTarget?.action === 'cancel' || decideTarget?.action === 'no_show'}
+        busy={deciding}
+        error={decideError || undefined}
+        onCancel={() => { setDecideTarget(null); setDecideError('') }}
+        onConfirm={() => { if (decideTarget) void runDecide(decideTarget.id, decideTarget.action) }}
+      />
+    </>
+  )
+
+  if (view === 'day' || view === 'week') {
+    return (
+      <div>
+        {pageHead}
+        {error && (
+          <div className="bg-danger-bg border-danger-bg text-danger mb-4 rounded-lg border p-4 text-sm">
+            {error}
+          </div>
+        )}
+        <BookingCalendar mode={view} items={calendarItems} onOpen={setDetailId} />
+        {dialogs}
+      </div>
+    )
+  }
 
   return (
     <div>
-      <div data-design="Head">
-        <Header
-          title="予約管理"
-          description="トリミングなどの予約を管理します。友だちが自分で予約履歴を確認できるURLも発行できます。"
-        />
-        <div className="mb-4 flex flex-wrap items-center gap-2">
-          <button
-            disabled
-            title="操作マニュアルは準備中です"
-            className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm opacity-50"
-          >
-            マニュアル
-          </button>
-          <Link
-            href="/booking/staff/shifts"
-            className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken border px-3 py-2 text-sm"
-          >
-            受付時間を設定
-          </Link>
-          <Link
-            href="/booking/bookings/new"
-            className="bg-accent-deep text-on-accent rounded-control px-4 py-2 text-sm font-medium"
-          >
-            電話の予約を入れる
-          </Link>
-        </div>
-      </div>
+      {pageHead}
 
       {error && (
         <div className="bg-danger-bg border-danger-bg text-danger mb-4 rounded-lg border p-4 text-sm">
           {error}
+        </div>
+      )}
+
+      {summaryError && (
+        <div className="bg-warning-bg border-warning text-warning mb-4 rounded-lg border p-4 text-sm">
+          集計を読み込めませんでした。一覧はそのまま使えます。
+          <button className="ml-2 font-semibold underline" onClick={() => setSummarySeq((n) => n + 1)}>もう一度読み込む</button>
         </div>
       )}
 
@@ -330,7 +423,7 @@ export default function BookingsPage() {
             承認待ちを出す。要対応であることは変わらない。 */}
         <Kpi
           title="変更依頼"
-          value={allItems.filter((b) => b.status === 'requested').length}
+          value={summary.requested}
           unit="件"
           detail="要対応"
         />
@@ -342,36 +435,26 @@ export default function BookingsPage() {
         />
       </div>
 
-      <div data-design="Body" className="flex flex-col gap-4 xl:flex-row">
-        <aside
-          data-design="Folders"
-          className="bg-canvas rounded-card border-hairline h-fit shrink-0 border p-3 xl:w-56"
-        >
-          <div className="mb-2 flex items-center justify-between">
-            <span className="text-ink text-xs font-semibold">メニュー</span>
-            <span className="text-ink-faint text-xs">{allItems.length} 件</span>
-          </div>
-          <ul className="space-y-0.5">
-            <li>
-              <FolderRow
-                label="すべて"
-                count={allItems.length}
-                active={menuFilter === 'all'}
-                onClick={() => setMenuFilter('all')}
-              />
-            </li>
-            {menus.map((m) => (
-              <li key={m.id}>
-                <FolderRow
-                  label={m.name}
-                  count={menuCounts.get(m.name) ?? 0}
-                  active={menuFilter === m.name}
-                  onClick={() => setMenuFilter(m.name)}
-                />
-              </li>
-            ))}
-          </ul>
-        </aside>
+      <div
+        data-design="Body"
+        className="flex flex-col items-start gap-4 xl:flex-row"
+      >
+        <div data-design="Folders" className="shrink-0" style={{ width: FOLDER_RAIL_WIDTH }}>
+          <FolderPanel
+            heading="メニュー"
+            rows={[
+              { id: 'all', label: 'すべて', count: summary.total },
+              ...menus.map((menu) => ({
+                id: menu.name,
+                label: menu.name,
+                count: menuCounts.get(menu.name) ?? 0,
+              })),
+            ]}
+            activeId={menuFilter}
+            onSelect={setMenuFilter}
+            total={`${summary.total} 件`}
+          />
+        </div>
 
         <div className="min-w-0 flex-1">
           <div
@@ -483,20 +566,24 @@ export default function BookingsPage() {
                           {formatShort(b.starts_at)}
                         </td>
                         <td className="px-4 py-3 text-sm">
-                          <Link
-                            href={`/chats?friend=${b.friend_id}`}
-                            className="text-blue-600 hover:underline"
-                          >
-                            {b.friend_name ?? '-'}
-                          </Link>
+                          {b.friend_id ? (
+                            <Link
+                              href={`/chats?friend=${b.friend_id}`}
+                              className="text-blue-600 hover:underline"
+                            >
+                              {b.friend_name ?? '-'}
+                            </Link>
+                          ) : (
+                            <span>{b.friend_name ?? 'LINE未連携のお客さま'}</span>
+                          )}
                         </td>
                         <td className="px-4 py-3 text-sm">{b.menu_name}</td>
                         <td className="px-4 py-3 text-sm">{b.staff_name}</td>
-                        {/* 予約はいまLINE内の予約フォームからしか入らない。
-                            経路の列は bookings に無いので、実態どおり LINE と出す。 */}
                         <td className="px-4 py-3 text-sm">
-                          <span className="bg-canvas-sunken text-ink-secondary rounded-pill px-2 py-0.5 text-xs">
-                            LINE
+                          <span
+                            className={`${b.friend_id ? 'bg-success-bg text-success' : 'bg-info-bg text-info'} rounded-pill px-2 py-0.5 text-xs`}
+                          >
+                            {b.friend_id ? 'LINE' : '電話'}
                           </span>
                         </td>
                         <td className="px-4 py-3 text-right text-sm tabular-nums">
@@ -513,7 +600,7 @@ export default function BookingsPage() {
                           <div className="inline-flex items-center gap-1">
                             <button
                               onClick={() => setDetailId(b.id)}
-                              className="text-ink-secondary bg-canvas-sunken rounded-md px-3 py-1 text-xs font-medium hover:bg-gray-200"
+                              className="text-ink-secondary bg-canvas-sunken rounded-md px-3 py-1 text-xs font-medium hover:bg-hairline"
                             >
                               詳細
                             </button>
@@ -553,6 +640,11 @@ export default function BookingsPage() {
                 </button>
                 <span className="text-ink-faint text-xs">予約履歴URLは準備中です</span>
               </div>
+            ) : !workerBase ? (
+              // 配信先のURLが作れないのは、LIFF未設定ではなくAPI接続先の欠落(点検#516軽4)。
+              <p className="text-warning mt-2 text-xs">
+                予約URLを作れません。APIの接続先が設定されていません。管理者に連絡してください。
+              </p>
             ) : (
               <p className="text-warning mt-2 text-xs">
                 このアカウントには LIFF ID が未設定です。
@@ -565,7 +657,7 @@ export default function BookingsPage() {
           </div>
 
           <div data-design="tf" className="mt-3 flex flex-wrap items-center justify-between gap-2">
-            <span className="text-ink-faint text-xs">全 {filtered.length} 件</span>
+            <span className="text-ink-faint text-xs">全 {total} 件</span>
             <div className="flex items-center gap-1">
               <button
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
@@ -589,25 +681,7 @@ export default function BookingsPage() {
         </div>
       </div>
 
-      {detail && (
-        <BookingDetailPanel
-          booking={detail}
-          onClose={() => setDetailId(null)}
-          onAction={(a) => handleDecide(detail.id, a)}
-        />
-      )}
-
-      <ConfirmDialog
-        open={decideTarget !== null}
-        title={`この予約を「${decideTarget ? actionLabel[decideTarget.action] : ''}」にしますか？`}
-        description="予約した人へ、この結果がLINEで届きます。取り消すには、もう一度状態を変える必要があります。"
-        confirmLabel={decideTarget ? actionLabel[decideTarget.action] : '実行する'}
-        destructive={decideTarget?.action === 'reject' || decideTarget?.action === 'cancel' || decideTarget?.action === 'no_show'}
-        busy={deciding}
-        error={decideError || undefined}
-        onCancel={() => { setDecideTarget(null); setDecideError('') }}
-        onConfirm={() => { if (decideTarget) void runDecide(decideTarget.id, decideTarget.action) }}
-      />
+      {dialogs}
     </div>
   )
 }
@@ -643,30 +717,6 @@ function Kpi({
   )
 }
 
-function FolderRow({
-  label,
-  count,
-  active,
-  onClick,
-}: {
-  label: string
-  count: number
-  active: boolean
-  onClick: () => void
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={`flex w-full items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left text-xs ${
-        active ? 'bg-accent-deep text-on-accent' : 'text-ink-secondary hover:bg-canvas-sunken'
-      }`}
-    >
-      <span className="truncate">{label}</span>
-      <span className="shrink-0 tabular-nums">{count}</span>
-    </button>
-  )
-}
-
 function DetailRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="border-hairline flex gap-4 border-b py-2.5 last:border-b-0">
@@ -678,43 +728,61 @@ function DetailRow({ label, children }: { label: string; children: React.ReactNo
 
 function BookingDetailPanel({
   booking: b,
+  accountId,
   onClose,
   onAction,
 }: {
   booking: BookingRequest
+  accountId: string | null
   onClose: () => void
   onAction: (a: 'approve' | 'reject' | 'cancel' | 'no_show' | 'complete') => void
 }) {
+  const [detail, setDetail] = useState<BookingAdminDetail | null>(null)
+  const [detailError, setDetailError] = useState('')
+
+  useEffect(() => {
+    if (!accountId) return
+    let active = true
+    setDetailError('')
+    void bookingApi.getBooking(accountId, b.id)
+      .then((response) => { if (active) setDetail(response.booking) })
+      .catch(() => { if (active) setDetailError('予約の顧客カルテと通知実績を読み込めませんでした') })
+    return () => { active = false }
+  }, [accountId, b.id])
+
+  const lineOperation = detail?.operations.find((item) => item.kind === 'confirmation_line') ?? null
   return (
-    <div className="fixed inset-0 z-50 flex justify-end">
+    <div data-design-node="TnDbq" className="fixed inset-y-0 right-0 left-0 z-50 flex justify-end xl:left-64">
       <button
         type="button"
         aria-label="閉じる"
         onClick={onClose}
         className="absolute inset-0 bg-black/30"
       />
-      <aside className="relative h-full w-full max-w-md overflow-y-auto bg-white shadow-xl">
-        <div className="border-hairline sticky top-0 flex items-center justify-between gap-3 border-b bg-white px-5 py-4">
+      <aside className="relative h-full w-full overflow-y-auto bg-canvas-sunken shadow-xl">
+        <div className="border-hairline sticky top-0 z-10 flex min-h-16 items-center justify-between gap-3 border-b bg-canvas px-6 py-3">
           <div className="min-w-0">
-            <p className="text-ink-faint text-xs">予約の詳細</p>
-            <h2 className="text-ink truncate text-base font-semibold">{b.menu_name}</h2>
+            <p className="text-accent text-xs font-semibold">予約管理　›　今日　›　{formatJpTime(b.starts_at)} {b.friend_name ?? 'お客様'}さま</p>
+            <h2 className="text-ink mt-1 truncate text-xl font-semibold">{b.friend_name ?? 'お客様'} ／ {b.menu_name}</h2>
           </div>
-          <span
-            className={`shrink-0 rounded px-2 py-0.5 text-xs ${statusBadgeColor[b.status] ?? 'bg-canvas-sunken'}`}
-          >
-            {statusLabel[b.status] ?? b.status}
-          </span>
-          <button
-            onClick={onClose}
-            className="text-ink-faint hover:bg-canvas-sunken shrink-0 rounded-md px-2 py-1 text-sm"
-          >
-            閉じる
-          </button>
+          <div className="flex shrink-0 items-center gap-2">
+            <span className={`rounded-pill px-3 py-1 text-xs font-semibold ${statusBadgeColor[b.status] ?? 'bg-canvas-sunken'}`}>{statusLabel[b.status] ?? b.status}</span>
+            {b.friend_id ? <Button href={`/chats?friend=${b.friend_id}`} variant="primary">この人と話す</Button> : null}
+            <Button disabled title="日時変更は準備中です">時間や担当を変える</Button>
+            <Button onClick={() => onAction('cancel')} className="border-danger text-danger">予約を取り消す</Button>
+            <Button onClick={onClose}>閉じる</Button>
+          </div>
         </div>
 
-        <div className="px-5 py-4">
+        <div data-design="Body" className="grid gap-4 px-6 py-4 xl:grid-cols-4">
+          <main className="min-w-0 xl:col-span-3">
+          {detailError ? <p className="border-danger bg-danger-bg text-danger mb-4 rounded-card border px-4 py-3 text-sm">{detailError}</p> : null}
           <section className="mb-6">
-            <h3 className="text-ink mb-1 text-sm font-semibold">予約内容</h3>
+            <div className="bg-success-bg text-success mb-3 w-fit rounded-pill px-3 py-1 text-xs font-semibold">予約が入っています</div>
+            <p className="text-ink-secondary mb-3 text-sm">{formatJpDateTime(b.starts_at)}〜{formatJpTime(b.ends_at)} ／ 担当 {b.staff_name} ／ LINEから入りました。</p>
+            <div className="bg-canvas rounded-card border-hairline border p-5">
+            <h3 className="text-ink mb-1 text-base font-semibold">予約の中身</h3>
+            <DetailRow label="メニュー">{b.menu_name}</DetailRow>
             <DetailRow label="日時">
               {formatJpDateTime(b.starts_at)} 〜 {formatJpTime(b.ends_at)}
             </DetailRow>
@@ -725,56 +793,66 @@ function BookingDetailPanel({
             <DetailRow label="予約番号">
               <span className="text-ink-secondary font-mono text-xs">{b.id}</span>
             </DetailRow>
+            <DetailRow label="お客様からのご希望">{b.customer_note ?? <span className="text-ink-faint">記入なし</span>}</DetailRow>
+            </div>
           </section>
 
-          <section className="mb-6">
-            <h3 className="text-ink mb-1 text-sm font-semibold">お客様</h3>
-            <DetailRow label="お名前">
-              <Link href={`/chats?friend=${b.friend_id}`} className="text-blue-600 hover:underline">
-                {b.friend_name ?? '名前未設定'}
-              </Link>
-            </DetailRow>
-            <DetailRow label="ご要望">
-              {b.customer_note ? (
-                <span className="whitespace-pre-wrap">{b.customer_note}</span>
-              ) : (
-                <span className="text-ink-faint">記入なし</span>
-              )}
-            </DetailRow>
+          <section className="bg-canvas rounded-card border-hairline mb-4 border p-5">
+            <h3 className="text-ink text-base font-semibold">この方のこれまで</h3>
+            <p className="text-ink-faint mt-1 text-xs">顧客カルテの履歴は、友だち詳細で確認できます。前回のことを覚えていると、話が早くなります。</p>
+            <div className="border-hairline mt-4 grid grid-cols-4 gap-3 border-b pb-2 text-xs text-ink-faint"><span>いつ・何を</span><span>担当</span><span>金額</span><span>メモ</span></div>
+            {(detail?.history.length ? detail.history : [{ id: b.id, startsAt: b.starts_at, menuName: b.menu_name, staffName: b.staff_name, price: b.price_at_booking, customerNote: b.customer_note, handoverNote: null, status: b.status }]).slice(0, 3).map((item) => (
+              <div key={item.id} className="grid grid-cols-4 gap-3 py-3 text-sm"><span>{formatJpDateTime(item.startsAt)} {item.menuName}</span><span>{item.staffName}</span><span>¥{item.price.toLocaleString()}</span><span>{item.customerNote ?? '記入なし'}</span></div>
+            ))}
+            {b.friend_id ? <Link href={`/friends/detail?id=${encodeURIComponent(b.friend_id)}`} className="text-accent text-xs font-semibold">顧客カルテで以前の予約を見る →</Link> : null}
           </section>
 
-          <section className="mb-6">
-            <h3 className="text-ink mb-1 text-sm font-semibold">記録</h3>
-            <DetailRow label="申込日時">{formatJpDateTime(b.requested_at)}</DetailRow>
-            <DetailRow label="決定日時">
-              {b.decided_at ? (
-                formatJpDateTime(b.decided_at)
-              ) : (
-                <span className="text-ink-faint">未決定</span>
-              )}
-            </DetailRow>
-            <DetailRow label="カレンダー">
-              {b.external_event_id ? (
-                <span className="text-green-700">Googleカレンダーに登録済み</span>
-              ) : (
-                <span className="text-ink-faint">未連携</span>
-              )}
-            </DetailRow>
+          <section className="bg-canvas rounded-card border-hairline border p-5">
+            <h3 className="text-ink text-base font-semibold">この予約で動いたこと</h3>
+            <div className="mt-3 space-y-3 text-sm">
+              <p>✓ {formatJpDateTime(b.requested_at)} 予約を受け付けました</p>
+              {b.decided_at ? <p>✓ {formatJpDateTime(b.decided_at)} 予約を「{statusLabel[b.status] ?? b.status}」にしました</p> : null}
+              {lineOperation ? <p>{lineOperation.status === 'succeeded' ? '✓' : '…'} 予約確認LINE: {lineOperation.status === 'succeeded' ? '送信済み' : lineOperation.status === 'queued' ? '送信中' : lineOperation.status === 'retry_wait' ? '再試行中' : lineOperation.status === 'permanent_failed' ? '失敗' : '送信なし'}</p> : null}
+              {detail?.reminders.map((reminder) => <p key={reminder.id}>{reminder.status === 'sent' ? '✓' : '…'} {formatJpDateTime(reminder.scheduledAt)} リマインダ: {reminder.status}</p>)}
+              <p className="text-ink-faint">お知らせの開封状況は、受信箱で確認できます。</p>
+            </div>
           </section>
+          </main>
 
-          <div className="border-hairline border-t pt-4">
+          <aside className="space-y-4">
+          <section className="bg-canvas rounded-card border-hairline border p-5">
+            <h3 className="text-ink text-sm font-semibold">お客様とペット</h3>
+            <div className="mt-3 flex items-center gap-3"><span className="bg-action-soft text-action flex h-10 w-10 items-center justify-center rounded-full font-bold">{b.friend_name?.charAt(0) ?? '?'}</span><div>{b.friend_id ? <Link href={`/friends/detail?id=${encodeURIComponent(b.friend_id)}`} className="text-ink font-semibold hover:underline">{b.friend_name ?? '名前未設定'}さま</Link> : <span className="text-ink font-semibold">{b.friend_name ?? '名前未設定'}さま</span>}<p className="text-ink-faint text-xs">{b.friend_id ? 'LINEの友だち情報と来店履歴' : '電話受付のお客さま'}</p></div></div>
+            <DetailRow label="ペット">{detail?.customer.petName ?? '登録なし'}</DetailRow>
+            <DetailRow label="連絡先">{detail?.customer.phone ?? '登録なし'}</DetailRow>
+            {detail?.customer.tags.length ? <DetailRow label="タグ">{detail.customer.tags.map((tag) => tag.name).join('、')}</DetailRow> : null}
+            {detail?.customer.mileageBalance !== null && detail?.customer.mileageBalance !== undefined ? <DetailRow label="マイル">{detail.customer.mileageBalance.toLocaleString()}</DetailRow> : null}
+          </section>
+          <section className="border-warning bg-warning-bg rounded-card border p-5">
+            <h3 className="text-warning text-sm font-semibold">当日 気をつけること</h3>
+            <p className="text-warning mt-3 text-xs">{detail?.previousHandover ?? '前回の申し送りはありません。'}</p>
+          </section>
+          <section className="bg-canvas rounded-card border-hairline border p-5">
+            <h3 className="text-ink text-sm font-semibold">つながる先</h3>
+            <div className="mt-3 space-y-2 text-xs"><p><Link href="/booking/menus" className="text-accent font-semibold">→ 予約設定</Link>　メニューと受付枠</p><p><Link href="/reminders" className="text-accent font-semibold">→ リマインダ</Link>　前日・開始前のお知らせ</p>{b.friend_id ? <p><Link href={`/chats?friend=${b.friend_id}`} className="text-accent font-semibold">→ 受信箱</Link>　この方とのやりとり</p> : null}<p><Link href="/mileage" className="text-accent font-semibold">→ マイル</Link>　来店時の付与</p></div>
+          </section>
+          <div className="bg-canvas rounded-card border-hairline border p-5">
             <p className="text-ink-faint mb-2 text-xs">
               承認するとお客様のLINEに確定のお知らせが届きます。
             </p>
             <ActionButtons status={b.status} onAction={onAction} />
             <Link
               href={`/booking/bookings/detail?id=${encodeURIComponent(b.id)}`}
+              data-qa-open="TnDbq"
+              aria-label={`${b.friend_name ?? 'この予約'}の予約の詳細ページを開く`}
               className="text-ink-secondary mt-3 inline-block text-xs underline"
             >
               予約の詳細ページを開く
             </Link>
           </div>
+          </aside>
         </div>
+        <div className="border-hairline sticky bottom-0 z-10 flex items-center justify-between gap-4 border-t bg-canvas px-6 py-3"><p className="text-ink-faint text-xs">ここでの状態変更は、お客様のLINEにも自動で知らせます。</p><div className="flex gap-2"><Button onClick={() => onAction('cancel')}>キャンセル</Button><Button onClick={() => onAction('complete')}>来ていただきました にする</Button><Button variant="primary" disabled>変更を保存する</Button></div></div>
       </aside>
     </div>
   )
@@ -810,19 +888,19 @@ function ActionButtons({
       <div className="inline-flex gap-1">
         <button
           onClick={() => onAction('complete')}
-          className="rounded-md bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700 hover:bg-blue-100"
+          className="bg-info-bg text-info rounded-md px-3 py-1 text-xs font-medium hover:bg-hairline"
         >
           完了
         </button>
         <button
           onClick={() => onAction('no_show')}
-          className="rounded-md bg-orange-50 px-3 py-1 text-xs font-medium text-orange-700 hover:bg-orange-100"
+          className="bg-warning-bg text-warning rounded-md px-3 py-1 text-xs font-medium hover:bg-hairline"
         >
           無断
         </button>
         <button
           onClick={() => onAction('cancel')}
-          className="text-ink-secondary bg-canvas-sunken rounded-md px-3 py-1 text-xs font-medium hover:bg-gray-200"
+          className="text-ink-secondary bg-canvas-sunken rounded-md px-3 py-1 text-xs font-medium hover:bg-hairline"
         >
           取消
         </button>

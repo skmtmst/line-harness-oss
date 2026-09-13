@@ -50,3 +50,13 @@ export function toCsv(rows: ExportRow[]): string {
 export function exportFileName(count: number, today: string): string {
   return `流入経路_${count}本_${today}.csv`
 }
+
+/** ファイル名の日付を日本時間で組み立てる。UTC のまま切ると JST と1日ずれる。 */
+export function jstTodayString(now: Date = new Date()): string {
+  return new Intl.DateTimeFormat('ja-JP', {
+    timeZone: 'Asia/Tokyo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(now).replaceAll('/', '-')
+}

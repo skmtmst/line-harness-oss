@@ -11,8 +11,15 @@ import {
   getFriendFieldMap,
   getFriendFieldsWithValues,
   countFriendFieldValues,
+  getFriendFieldUsageForScope,
   validateFieldKey,
 } from '../src/friend-fields.js';
+import {
+  createFieldMigrationPreview,
+  executeFieldMigration,
+  getFieldMigrationRun,
+  queueFieldMigration,
+} from '../src/field-migrations.js';
 import {
   createSupportMark,
   updateSupportMark,
@@ -32,12 +39,23 @@ import {
   updateSavedSearch,
   deleteSavedSearch,
 } from '../src/saved-searches.js';
-import { sanitizePath, sanitizeReferrer, linkVisitorToFriend, recordSiteEvent } from '../src/site-tracking.js';
+import {
+  getOrCreateSiteTrackingKey,
+  getSiteTrackingAccountId,
+  getFriendSiteEvents,
+  getPageViewSummary,
+  linkVisitorToFriend,
+  recordSiteEvent,
+  sanitizeHost,
+  sanitizePath,
+  sanitizeReferrer,
+} from '../src/site-tracking.js';
 import {
   createCommonVar,
   createCommonVarSchedule,
   applyDueCommonVarSchedules,
   getCommonVarById,
+  getCommonVarVersions,
 } from '../src/common-vars.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -274,6 +292,16 @@ describe('友だち情報欄', () => {
     expect(await getFriendFieldMap(db, 'f-1')).toEqual({ pet_kind: '犬' });
   });
 
+  test('選択肢IDは本文へ差し込むとき表示名に戻し、画像・PDFは差し込まない', async () => {
+    await createFriendField(db, {
+      name: '都道府県', fieldKey: 'prefecture', type: 'select',
+      optionsJson: JSON.stringify([{ id: 'tokyo-id', label: '東京都', color: null, status: 'active', displayOrder: 0 }]),
+      defaultValue: 'tokyo-id',
+    });
+    await createFriendField(db, { name: '本人確認', fieldKey: 'identity_file', type: 'pdf' });
+    expect(await getFriendFieldMap(db, 'f-1')).toEqual({ prefecture: '東京都' });
+  });
+
   test('差し込み名は重複できない', async () => {
     await createFriendField(db, { name: 'A', fieldKey: 'dup', type: 'text' });
     await expect(
@@ -287,6 +315,63 @@ describe('友だち情報欄', () => {
     sqlite.prepare(`PRAGMA foreign_keys = ON`).run();
     sqlite.prepare(`DELETE FROM friends WHERE id = 'f-1'`).run();
     expect(await countFriendFieldValues(db, field.id)).toBe(0);
+  });
+
+  test.each(['datetime', 'image', 'pdf'] as const)('V6の%s型を既存表を残したまま保存できる', async (type) => {
+    const field = await createFriendField(db, { name: type, fieldKey: `field_${type}`, type });
+    expect(field.type).toBe(type);
+    const stored = sqlite.prepare(`SELECT type, type_v6, version, status FROM friend_fields WHERE id = ?`).get(field.id) as {
+      type: string; type_v6: string; version: number; status: string;
+    };
+    expect(stored).toMatchObject({ type: 'text', type_v6: type, version: 1, status: 'active' });
+  });
+
+  test('回答フォームの実参照を選択中アカウントだけで数える', async () => {
+    const field = await createFriendField(db, { name: '住所', fieldKey: 'address', type: 'textarea' });
+    sqlite.prepare(
+      `INSERT INTO forms (id, name, fields, status) VALUES ('form-1', '申込フォーム', ?, 'active')`,
+    ).run(JSON.stringify([{ id: 'address', friendFieldId: field.id }]));
+    sqlite.prepare(`INSERT INTO form_accounts (form_id, line_account_id) VALUES ('form-1', 'account-1')`).run();
+    expect(await getFriendFieldUsageForScope(db, [field.id], SCOPE)).toEqual([
+      { kind: 'form', id: 'form-1', name: '申込フォーム', fieldId: field.id, switchable: true },
+    ]);
+  });
+
+  test('移行台帳で値を型付き列へ移し、元項目を30日間読取専用にする', async () => {
+    const source = await createFriendField(db, { name: '年齢（旧）', fieldKey: 'age_old', type: 'text' });
+    const target = await createFriendField(db, { name: '年齢', fieldKey: 'age', type: 'number' });
+    await setFriendFieldValue(db, { friendId: 'f-1', fieldId: source.id, value: '12', updatedBy: 'staff-1' });
+    await createFieldMigrationPreview(db, {
+      runId: 'run-1', scope: SCOPE, sourceFieldId: source.id, targetFieldId: target.id,
+      sourceVersion: 1, targetVersion: 1, previewTokenHash: 'token-hash', snapshotHash: 'snapshot',
+      expiresAt: '2999-01-01T00:00:00.000Z', usageTargets: [], createdBy: 'staff-1',
+      items: [{ friendId: 'f-1', sourceValue: '12', convertedValue: '12', status: 'convertible', reason: null }],
+    });
+    expect(await queueFieldMigration(db, 'run-1', 'request-1')).toBe(true);
+    await executeFieldMigration(db, 'run-1', 'number', 'staff-1');
+    const value = sqlite.prepare(
+      `SELECT value, value_number, source_type, source_id FROM friend_field_values WHERE friend_id = 'f-1' AND field_id = ?`,
+    ).get(target.id);
+    expect(value).toEqual({ value: '12', value_number: 12, source_type: 'field_migration', source_id: 'run-1' });
+    expect(sqlite.prepare(`SELECT status FROM friend_fields WHERE id = ?`).get(source.id)).toEqual({ status: 'read_only' });
+    const run = await getFieldMigrationRun(db, 'run-1', SCOPE);
+    expect(run).toMatchObject({ status: 'succeeded', succeeded_count: 1, failed_count: 0 });
+    expect(run?.rollback_deadline).toBeTruthy();
+  });
+
+  test('要確認行が残る部分失敗では元項目を読取専用にしない', async () => {
+    const source = await createFriendField(db, { name: '年齢（旧）', fieldKey: 'age_review_old', type: 'text' });
+    const target = await createFriendField(db, { name: '年齢', fieldKey: 'age_review', type: 'number' });
+    await createFieldMigrationPreview(db, {
+      runId: 'run-partial', scope: SCOPE, sourceFieldId: source.id, targetFieldId: target.id,
+      sourceVersion: 1, targetVersion: 1, previewTokenHash: 'partial-token', snapshotHash: 'partial-snapshot',
+      expiresAt: '2999-01-01T00:00:00.000Z', usageTargets: [], createdBy: 'staff-1',
+      items: [{ friendId: 'f-1', sourceValue: '不明', convertedValue: null, status: 'review', reason: '数値ではありません' }],
+    });
+    await queueFieldMigration(db, 'run-partial', 'partial-request');
+    await executeFieldMigration(db, 'run-partial', 'number', 'staff-1');
+    expect(await getFieldMigrationRun(db, 'run-partial', SCOPE)).toMatchObject({ status: 'partial', failed_count: 1 });
+    expect(sqlite.prepare(`SELECT status FROM friend_fields WHERE id = ?`).get(source.id)).toEqual({ status: 'active' });
   });
 });
 
@@ -660,31 +745,85 @@ describe('サイトの記録', () => {
     expect(sanitizePath(undefined)).toBeNull();
   });
 
+  test('計測先ホストだけを正規化して保存できる形にする', () => {
+    expect(sanitizeHost(' Shop.Example.COM ')).toBe('shop.example.com');
+    expect(sanitizeHost('shop.example.com/path')).toBeNull();
+    expect(sanitizeHost('')).toBeNull();
+  });
+
   test('リファラも同じ扱い', () => {
     expect(sanitizeReferrer('https://google.com/search?q=secret')).toBe(
       'https://google.com/search',
     );
   });
 
+  test('旧計測鍵はLINEアカウントが1件の環境だけに帰属させる', async () => {
+    sqlite.prepare("DELETE FROM line_accounts WHERE id = 'account-2'").run();
+    expect(await getSiteTrackingAccountId(db, 'hk_9f3a2c81b4')).toBe('account-1');
+  });
+
   test('友だちと結びつくと、それまでの行動も紐づく', async () => {
     insertFriend('f-1');
-    await recordSiteEvent(db, { visitorId: 'v-1', eventType: 'page_view', path: '/a' });
-    await recordSiteEvent(db, { visitorId: 'v-1', eventType: 'page_view', path: '/b' });
-    expect(await linkVisitorToFriend(db, 'v-1', 'f-1', 'liff')).toBe(true);
+    await recordSiteEvent(db, { visitorId: 'v-1', lineAccountId: 'account-1', eventType: 'page_view', path: '/a' });
+    await recordSiteEvent(db, { visitorId: 'v-1', lineAccountId: 'account-1', eventType: 'page_view', path: '/b' });
+    expect(await linkVisitorToFriend(db, 'v-1', 'account-1', 'f-1', 'liff')).toBe(true);
     const { c } = sqlite
       .prepare(`SELECT COUNT(*) AS c FROM site_events WHERE friend_id = 'f-1'`)
       .get() as { c: number };
     expect(c).toBe(2);
   });
 
+  test('一覧と友だち詳細が計測先ホストを返す', async () => {
+    insertFriend('f-host');
+    await recordSiteEvent(db, {
+      visitorId: 'v-host', lineAccountId: 'account-1', eventType: 'page_view',
+      host: 'shop.example.com', path: '/thanks',
+    });
+    await linkVisitorToFriend(db, 'v-host', 'account-1', 'f-host', 'liff');
+
+    const pages = await getPageViewSummary(db, {
+      lineAccountId: 'account-1', from: '2000-01-01', to: '2999-12-31',
+    });
+    expect(pages).toContainEqual({ host: 'shop.example.com', path: '/thanks', views: 1, visitors: 1 });
+    const events = await getFriendSiteEvents(db, 'f-host', 'account-1');
+    expect(events[0]).toMatchObject({ host: 'shop.example.com', path: '/thanks' });
+  });
+
   test('一度結びついたら上書きしない', async () => {
     insertFriend('f-1');
     insertFriend('f-2');
-    await recordSiteEvent(db, { visitorId: 'v-1', eventType: 'page_view', path: '/a' });
-    await linkVisitorToFriend(db, 'v-1', 'f-1', 'liff');
+    await recordSiteEvent(db, { visitorId: 'v-1', lineAccountId: 'account-1', eventType: 'page_view', path: '/a' });
+    await linkVisitorToFriend(db, 'v-1', 'account-1', 'f-1', 'liff');
     // 同じ端末を家族で使う場合など、後から別の人に付け替わると
     // 過去の行動まで別人のものになる。
-    expect(await linkVisitorToFriend(db, 'v-1', 'f-2', 'form')).toBe(false);
+    expect(await linkVisitorToFriend(db, 'v-1', 'account-1', 'f-2', 'form')).toBe(false);
+  });
+
+  test('計測鍵と同じcookie IDをアカウントごとに分離する', async () => {
+    insertFriend('f-1', 'account-1');
+    insertFriend('f-2', 'account-2');
+    const key1 = await getOrCreateSiteTrackingKey(db, 'account-1');
+    const key2 = await getOrCreateSiteTrackingKey(db, 'account-2');
+    expect(await getOrCreateSiteTrackingKey(db, 'account-1')).toBe(key1);
+    expect(key2).not.toBe(key1);
+    expect(await getSiteTrackingAccountId(db, key1)).toBe('account-1');
+    expect(await getSiteTrackingAccountId(db, 'hk_unknown')).toBeNull();
+    expect(await getSiteTrackingAccountId(db, 'hk_9f3a2c81b4')).toBeNull();
+
+    await recordSiteEvent(db, {
+      visitorId: 'shared-cookie', lineAccountId: 'account-1', eventType: 'page_view', path: '/a',
+    });
+    await recordSiteEvent(db, {
+      visitorId: 'shared-cookie', lineAccountId: 'account-2', eventType: 'page_view', path: '/b',
+    });
+    expect(await linkVisitorToFriend(db, 'shared-cookie', 'account-1', 'f-1', 'liff')).toBe(true);
+    const visitors = sqlite.prepare(
+      `SELECT id, line_account_id, friend_id FROM site_visitors ORDER BY line_account_id`,
+    ).all() as Array<{ id: string; line_account_id: string; friend_id: string | null }>;
+    expect(visitors).toEqual([
+      { id: 'account-1:shared-cookie', line_account_id: 'account-1', friend_id: 'f-1' },
+      { id: 'account-2:shared-cookie', line_account_id: 'account-2', friend_id: null },
+    ]);
   });
 });
 
@@ -703,7 +842,14 @@ describe('共通情報の日付切り替え', () => {
     });
     const applied = await applyDueCommonVarSchedules(db, '2026-08-16T00:00:00.000');
     expect(applied).toBe(1);
-    expect((await getCommonVarById(db, v.id, 'account-1'))?.value).toBe('11-20');
+    expect(await getCommonVarById(db, v.id, 'account-1')).toMatchObject({
+      value: '11-20',
+      version: 2,
+    });
+    expect(await getCommonVarVersions(db, v.id, 'account-1')).toEqual([
+      expect.objectContaining({ version_no: 2, value: '11-20', change_reason: '予約適用' }),
+      expect.objectContaining({ version_no: 1, value: '10-19', change_reason: '作成' }),
+    ]);
   });
 
   test('二度反映されない', async () => {
@@ -715,6 +861,31 @@ describe('共通情報の日付切り替え', () => {
     });
     expect(await applyDueCommonVarSchedules(db, '2026-08-16T00:00:00.000')).toBe(1);
     expect(await applyDueCommonVarSchedules(db, '2026-08-16T00:00:00.000')).toBe(0);
+  });
+
+  test('値の書き込みが失敗したら履歴と適用済み印も残さない', async () => {
+    const v = await createCommonVar(db, {
+      lineAccountId: 'account-1', name: 'x', varKey: 'atomic_x', value: 'A',
+    });
+    const schedule = await createCommonVarSchedule(db, {
+      varId: v.id,
+      effectiveFrom: '2026-08-01T00:00:00.000',
+      value: 'B',
+    });
+    sqlite.exec(`
+      CREATE TRIGGER reject_scheduled_value
+      BEFORE UPDATE OF value ON common_vars
+      BEGIN
+        SELECT RAISE(ABORT, 'forced value failure');
+      END;
+    `);
+
+    await expect(applyDueCommonVarSchedules(db, '2026-08-16T00:00:00.000')).rejects.toThrow();
+    expect(await getCommonVarById(db, v.id, 'account-1')).toMatchObject({ value: 'A', version: 1 });
+    expect(sqlite.prepare(`SELECT applied_at FROM common_var_schedules WHERE id = ?`).get(schedule.id))
+      .toEqual({ applied_at: null });
+    expect(await getCommonVarVersions(db, v.id, 'account-1')).toHaveLength(1);
+    sqlite.exec(`DROP TRIGGER reject_scheduled_value`);
   });
 
   test('溜まった予約は古い順に当て、最後のものが残る', async () => {
@@ -731,6 +902,22 @@ describe('共通情報の日付切り替え', () => {
     });
     expect(await applyDueCommonVarSchedules(db, '2026-08-16T00:00:00.000')).toBe(2);
     expect((await getCommonVarById(db, v.id, 'account-1'))?.value).toBe('C');
+  });
+
+  test('1回の上限まで反映し、残りは次回に古い順で続ける', async () => {
+    const v = await createCommonVar(db, { lineAccountId: 'account-1', name: 'x', varKey: 'x', value: 'A' });
+    for (const [day, value] of [
+      ['2026-08-10T00:00:00.000', 'B'],
+      ['2026-08-11T00:00:00.000', 'C'],
+      ['2026-08-12T00:00:00.000', 'D'],
+    ]) {
+      await createCommonVarSchedule(db, { varId: v.id, effectiveFrom: day, value });
+    }
+
+    expect(await applyDueCommonVarSchedules(db, '2026-08-16T00:00:00.000', 2)).toBe(2);
+    expect((await getCommonVarById(db, v.id, 'account-1'))?.value).toBe('C');
+    expect(await applyDueCommonVarSchedules(db, '2026-08-16T00:00:00.000', 2)).toBe(1);
+    expect((await getCommonVarById(db, v.id, 'account-1'))?.value).toBe('D');
   });
 });
 

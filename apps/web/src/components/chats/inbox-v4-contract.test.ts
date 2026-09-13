@@ -64,7 +64,6 @@ describe('受信箱V4の画面契約', () => {
 
   it('承認済みV4の主要領域を持つ', () => {
     for (const marker of [
-      'data-inbox-v4="summary"',
       'data-inbox-v4="quick-filters"',
       'data-inbox-v4="conversation-list"',
       'data-inbox-v4="talk-pane"',
@@ -73,6 +72,8 @@ describe('受信箱V4の画面契約', () => {
     ]) {
       expect(PAGE).toContain(marker)
     }
+    expect(PAGE).not.toContain('data-inbox-v4="summary"')
+    expect(PAGE).toContain('対応ルール')
   })
 
   it('V4の検索・チャネル・表示切替を持つ', () => {

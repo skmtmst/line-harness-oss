@@ -28,6 +28,22 @@ describe('V6共通情報一覧', () => {
     expect(PAGE).not.toContain('api.commonVars.schedules(item.id)')
   })
 
+  it('編集画面は詳細APIからメモ・版・履歴を読み、楽観ロック付きで保存する', () => {
+    expect(EDIT_PAGE).toContain('api.commonVars.detail(id, accountAtRequest)')
+    expect(EDIT_PAGE).toContain('setMemo(found.memo)')
+    expect(EDIT_PAGE).toContain('item.history.slice(0, 5)')
+    expect(EDIT_PAGE).toContain('expectedVersion: item.version')
+    expect(EDIT_PAGE).not.toContain('メモを読み書きするAPIがまだありません')
+    expect(EDIT_PAGE).not.toContain('変更者と変更前後を返す履歴APIがまだありません')
+  })
+
+  it('独立した詳細・フォルダ・予約の読み込みは並列に行う', () => {
+    expect(EDIT_PAGE).toContain('const [detail, folderList, scheduleList] = await Promise.all([')
+    expect(EDIT_PAGE).toContain('api.commonVars.detail(id, accountAtRequest)')
+    expect(EDIT_PAGE).toContain("api.folders.list('common_var')")
+    expect(EDIT_PAGE).toContain('api.commonVars.schedules(id, accountAtRequest)')
+  })
+
   it('一覧は種別を出さず、WuKzUの6列を固定する', () => {
     const headings = [...PAGE.matchAll(/<Th[^>]*>([\s\S]*?)<\/Th>/g)]
       .map((match) => match[1].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim())
@@ -45,6 +61,15 @@ describe('V6共通情報一覧', () => {
     expect(PAGE).toContain("import { TableHeadRow, Th } from '@/components/shared/table'")
     expect(PAGE).toContain('item.usageCount === 0')
     expect(PAGE).toContain('formatListDate(item.updatedAt)')
+    expect(PAGE).toContain('placeholderText(item.name)')
+    expect(PAGE).not.toContain('>{`{{var.${item.varKey}}}`}</code>')
+  })
+
+  it('一覧は空・期限つき・未使用の絞り込みとCSVを実際に操作できる', () => {
+    expect(PAGE).toContain("setStateFilter(value)")
+    expect(PAGE).toContain("label: '使われている数が多い順'")
+    expect(PAGE).toContain('commonVarsCsv(filtered)')
+    expect(PAGE).toContain('中身が空のまま使われているものが')
   })
 
   it('初回空と検索0件を言い分ける', () => {
@@ -66,6 +91,6 @@ describe('V6共通情報一覧', () => {
     expect(API).toContain('accountId=${encodeURIComponent(accountId)}')
     expect(WORKER).toContain("c.req.query('accountId')")
     expect(WORKER).toContain('canAccessAllLineAccounts')
-    expect(WORKER).toContain('getCommonVarUsageCounts')
+    expect(WORKER).toContain('getCommonVarUsageSummaries')
   })
 })

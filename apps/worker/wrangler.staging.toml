@@ -8,7 +8,9 @@
 name = "nen-line-stg"
 main = "src/index.ts"
 compatibility_date = "2024-12-01"
-compatibility_flags = ["nodejs_compat"]
+# global_fetch_strictly_public: subrequest を公開インターネット経路に限定する
+# (N-366 の strict-public 保証。外向き Webhook の配送境界の一部)。
+compatibility_flags = ["nodejs_compat", "global_fetch_strictly_public"]
 workers_dev = true
 account_id = "55f40f5577bd68828d67716f8d900642"
 
@@ -58,6 +60,7 @@ ADMIN_ORIGIN = "https://nen-line-stg-admin.pages.dev"
 ADMIN_ALLOW_CROSS_SITE = "true"
 LIFF_PUBLIC_URL = "https://nen-line-stg.skmtmst.workers.dev"
 CF_ACCOUNT_ID = "55f40f5577bd68828d67716f8d900642"
+MEDIA_R2_BUCKET_NAME = "nen-line-stg-images"
 NEN_EC_BASE_URL = "https://stg.nen-petfood.com"
 NEN_RICH_MENU_STORE_URL = "https://stg.nen-petfood.com"
 CONTACT_EMAIL = "test-shed@stg.nen-petfood.com"
