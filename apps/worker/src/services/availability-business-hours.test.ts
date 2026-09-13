@@ -132,6 +132,11 @@ describe('営業時間が枠の開閉に効く（#748 / N-403）', () => {
     expect(starts[starts.length - 1], '勤務どおり 17:00 まで出す').toBe('17:00');
   });
 
+  test('営業時間を明示設定した後は、0行の曜日を定休日として閉じる', async () => {
+    sqlite.exec(`UPDATE booking_settings SET business_hours_configured = 1 WHERE id = 'bs-1'`);
+    expect(await slots(), '月曜を0行で保存したので枠を出さない').toEqual([]);
+  });
+
   test('臨時営業（例外日の open）は営業時間で切らない', async () => {
     businessHour('bh-1', '10:00', '17:00');
     sqlite.prepare(

@@ -136,6 +136,7 @@ describe('店舗共通の予約設定API', () => {
         menuCount: 2,
         activeMenuCount: 1,
         inactiveMenuCount: 1,
+        businessHoursConfigured: false,
         businessHours: expect.arrayContaining([{
           weekday: 1,
           intervals: [{ start: '09:00', end: '12:00', capacity: 1 }, { start: '13:00', end: '19:00', capacity: 1 }],
@@ -154,6 +155,7 @@ describe('店舗共通の予約設定API', () => {
       data: {
         version: 0,
         bookingWindowDays: 60,
+        businessHoursConfigured: false,
         businessHours: expect.arrayContaining([{ weekday: 0, intervals: [] }]),
         exceptions: [],
         menuCount: 0,
@@ -206,6 +208,154 @@ describe('店舗共通の予約設定API', () => {
       WHERE line_account_id = 'account-empty'`).get()).toEqual({
       booking_window_days: 90, version: 2,
     });
+  });
+
+  test('週全体の営業時間を初回作成し、0行曜日を明示した休業として返す', async () => {
+    const { app, env } = makeApp(db, 'admin');
+    const res = await app.request('/api/booking/admin/settings?account_id=account-empty', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        expectedVersion: 0,
+        timeZone: 'Asia/Tokyo',
+        bookingWindowDays: 60,
+        cutoffMinutesBefore: 1440,
+        cancelDeadlineMinutesBefore: 1440,
+        maxActiveBookingsPerFriend: 1,
+        approvalMode: 'automatic',
+        holdMinutes: 15,
+        slotGranularityMinutes: 15,
+        businessHours: [
+          { weekday: 6, intervals: [] },
+          { weekday: 1, intervals: [
+            { start: '14:00', end: '18:00', capacity: 2 },
+            { start: '09:00', end: '12:00', capacity: 3 },
+          ] },
+          { weekday: 0, intervals: [] },
+          { weekday: 2, intervals: [] },
+          { weekday: 3, intervals: [] },
+          { weekday: 4, intervals: [] },
+          { weekday: 5, intervals: [] },
+        ],
+      }),
+    }, env);
+    expect(res.status).toBe(201);
+    await expect(res.json()).resolves.toMatchObject({
+      success: true,
+      data: {
+        version: 1,
+        businessHoursConfigured: true,
+        businessHours: [
+          { weekday: 0, intervals: [] },
+          { weekday: 1, intervals: [
+            { start: '09:00', end: '12:00', capacity: 3 },
+            { start: '14:00', end: '18:00', capacity: 2 },
+          ] },
+          { weekday: 2, intervals: [] },
+          { weekday: 3, intervals: [] },
+          { weekday: 4, intervals: [] },
+          { weekday: 5, intervals: [] },
+          { weekday: 6, intervals: [] },
+        ],
+      },
+    });
+  });
+
+  test('営業時間の古い版は409で、週全体と別店舗を一切変更しない', async () => {
+    const { app, env } = makeApp(db);
+    const base = {
+      expectedVersion: 1,
+      timeZone: 'Asia/Tokyo',
+      bookingWindowDays: 60,
+      cutoffMinutesBefore: 1440,
+      cancelDeadlineMinutesBefore: 1440,
+      maxActiveBookingsPerFriend: 1,
+      approvalMode: 'automatic',
+      holdMinutes: 15,
+      slotGranularityMinutes: 15,
+      businessHours: Array.from({ length: 7 }, (_, weekday) => ({
+        weekday,
+        intervals: weekday === 1 ? [{ start: '10:00', end: '18:00', capacity: 2 }] : [],
+      })),
+    };
+    const saved = await app.request('/api/booking/admin/settings?account_id=account-a', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(base),
+    }, env);
+    expect(saved.status).toBe(200);
+
+    const stale = await app.request('/api/booking/admin/settings?account_id=account-a', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...base,
+        businessHours: base.businessHours.map((day) => day.weekday === 1
+          ? { weekday: 1, intervals: [{ start: '08:00', end: '20:00', capacity: 9 }] }
+          : day),
+      }),
+    }, env);
+    expect(stale.status).toBe(409);
+    expect(sqlite.prepare(`SELECT start_time, end_time, capacity FROM booking_business_hours
+      WHERE booking_settings_id = 'settings-a'`).all())
+      .toEqual([{ start_time: '10:00', end_time: '18:00', capacity: 2 }]);
+    expect(sqlite.prepare(`SELECT COUNT(*) AS count FROM booking_business_hours bh
+      JOIN booking_settings bs ON bs.id = bh.booking_settings_id
+      WHERE bs.line_account_id = 'account-b'`).get()).toEqual({ count: 0 });
+  });
+
+  test.each([
+    ['曜日不足', Array.from({ length: 6 }, (_, weekday) => ({ weekday, intervals: [] }))],
+    ['曜日重複', Array.from({ length: 7 }, () => ({ weekday: 1, intervals: [] }))],
+    ['時刻形式', Array.from({ length: 7 }, (_, weekday) => ({ weekday, intervals: weekday === 1 ? [{ start: '9:00', end: '18:00', capacity: 1 }] : [] }))],
+    ['開始と終了が同じ', Array.from({ length: 7 }, (_, weekday) => ({ weekday, intervals: weekday === 1 ? [{ start: '18:00', end: '18:00', capacity: 1 }] : [] }))],
+    ['24:00', Array.from({ length: 7 }, (_, weekday) => ({ weekday, intervals: weekday === 1 ? [{ start: '18:00', end: '24:00', capacity: 1 }] : [] }))],
+    ['日またぎ', Array.from({ length: 7 }, (_, weekday) => ({ weekday, intervals: weekday === 1 ? [{ start: '22:00', end: '02:00', capacity: 1 }] : [] }))],
+    ['重複', Array.from({ length: 7 }, (_, weekday) => ({ weekday, intervals: weekday === 1 ? [
+      { start: '09:00', end: '12:00', capacity: 1 },
+      { start: '11:00', end: '14:00', capacity: 1 },
+    ] : [] }))],
+    ['capacity', Array.from({ length: 7 }, (_, weekday) => ({ weekday, intervals: weekday === 1 ? [{ start: '09:00', end: '12:00', capacity: 0 }] : [] }))],
+  ])('%sの営業時間を400で拒否する', async (_label, businessHours) => {
+    const { app, env } = makeApp(db);
+    const res = await app.request('/api/booking/admin/settings?account_id=account-a', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        expectedVersion: 1,
+        timeZone: 'Asia/Tokyo',
+        bookingWindowDays: 60,
+        cutoffMinutesBefore: 1440,
+        cancelDeadlineMinutesBefore: 1440,
+        maxActiveBookingsPerFriend: 1,
+        approvalMode: 'automatic',
+        holdMinutes: 15,
+        slotGranularityMinutes: 15,
+        businessHours,
+      }),
+    }, env);
+    expect(res.status).toBe(400);
+  });
+
+  test('隣接した営業時間は重複とせず保存できる', async () => {
+    const { app, env } = makeApp(db);
+    const res = await app.request('/api/booking/admin/settings?account_id=account-a', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        expectedVersion: 1,
+        timeZone: 'Asia/Tokyo',
+        bookingWindowDays: 60,
+        cutoffMinutesBefore: 1440,
+        cancelDeadlineMinutesBefore: 1440,
+        maxActiveBookingsPerFriend: 1,
+        approvalMode: 'automatic',
+        holdMinutes: 15,
+        slotGranularityMinutes: 15,
+        businessHours: Array.from({ length: 7 }, (_, weekday) => ({
+          weekday,
+          intervals: weekday === 1 ? [
+            { start: '09:00', end: '12:00', capacity: 1 },
+            { start: '12:00', end: '18:00', capacity: 2 },
+          ] : [],
+        })),
+      }),
+    }, env);
+    expect(res.status).toBe(200);
   });
 
   test('存在しない店舗へ設定を作らず、担当外の店舗は保存処理前に拒否する', async () => {
