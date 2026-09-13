@@ -117,7 +117,7 @@ function formatKeys(keys: string[]): string {
  * 後続票で記載済みにした分はここから消す（残っているとテストが落とす）。
  */
 /** 未記載負債はこの件数より増やせない。 */
-const ALLOWLIST_MAX = 776;
+const ALLOWLIST_MAX = 775;
 
 /**
  * 記載済み operation の完全な基準一覧。
@@ -129,6 +129,7 @@ const ALLOWLIST_MAX = 776;
  */
 const BASELINE_DOCUMENTED = new Set<string>([
   'DELETE /api/affiliates/{id}',
+  'DELETE /api/booking/admin/resources/{id}',
   'DELETE /api/broadcasts/{id}',
   'DELETE /api/conversions/points/{id}',
   'DELETE /api/friends/{id}/tags/{tagId}',
@@ -150,6 +151,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'GET /api/auth/register/check',
   'GET /api/booking/admin/staff/{id}/break-dates',
   'GET /api/booking/admin/staff/{id}/breaks',
+  'GET /api/booking/admin/resources',
   'GET /api/booking/admin/settings',
   'GET /api/broadcasts',
   'GET /api/broadcasts/{id}',
@@ -207,6 +209,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'GET /api/users/{id}',
   'GET /api/users/{id}/accounts',
   'PATCH /api/hq/banners/images/{id}',
+  'PATCH /api/booking/admin/resources/{id}',
   'PATCH /api/hq/banners/projects/{id}',
   'PATCH /api/hq/templates/{id}',
   'PATCH /api/line-accounts/{id}',
@@ -219,6 +222,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'POST /api/auth/password/reset',
   'POST /api/auth/register/complete',
   'POST /api/auth/register/request',
+  'POST /api/booking/admin/resources',
   'POST /api/broadcasts',
   'POST /api/broadcasts/{id}/resume',
   'POST /api/broadcasts/{id}/retry-failed',
@@ -307,7 +311,6 @@ const ALLOWLIST = new Set<string>([
   'GET /api/booking/admin/reminder-preview',
   'GET /api/booking/admin/requests',
   'GET /api/booking/admin/requests-summary',
-  'GET /api/booking/admin/resources',
   'GET /api/booking/admin/staff',
   'GET /api/booking/admin/staff/{id}/availability-rules',
   'GET /api/booking/admin/staff/{id}/google-calendar',

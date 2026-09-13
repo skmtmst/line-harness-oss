@@ -1869,6 +1869,81 @@ const spec = {
         },
       },
     },
+    '/api/booking/admin/resources': {
+      get: {
+        tags: ['Booking'], summary: '予約設備を利用状況と版付きで一覧取得',
+        parameters: [{ name: 'account_id', in: 'query', required: true, schema: { type: 'string' } }],
+        responses: {
+          '200': { description: '設備、版、更新日時、メニュー・予約・例外日の参照件数' },
+          '403': { description: 'このLINEアカウントを表示する権限がない' },
+          '503': { description: '設備を取得できない' },
+        },
+      },
+      post: {
+        tags: ['Booking'], summary: '予約設備を作成',
+        parameters: [{ name: 'account_id', in: 'query', required: true, schema: { type: 'string' } }],
+        requestBody: { required: true, content: { 'application/json': { schema: {
+          type: 'object', additionalProperties: false, required: ['name', 'type', 'capacity'],
+          properties: {
+            name: { type: 'string', minLength: 1, maxLength: 100 },
+            type: { type: 'string', minLength: 1, maxLength: 50 },
+            capacity: { type: 'integer', minimum: 1, maximum: 1000 },
+            isActive: { type: 'boolean', default: true },
+          },
+        } } } },
+        responses: {
+          '201': { description: '作成済み設備' }, '400': { description: 'Invalid request' },
+          '403': { description: 'Owner or admin role required, or account is outside access scope' },
+          '503': { description: '設備を作成できない' },
+        },
+      },
+    },
+    '/api/booking/admin/resources/{id}': {
+      patch: {
+        tags: ['Booking'], summary: '予約設備を版付きで変更・停止・再開',
+        description: '稼働中の設備は将来予約の最大同時使用量を下回るcapacityへ縮小できない。停止は既存予約を残して新規受付だけを閉じる。',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        requestBody: { required: true, content: { 'application/json': { schema: {
+          type: 'object', additionalProperties: false, required: ['expectedVersion'],
+          properties: {
+            expectedVersion: { type: 'integer', minimum: 1 },
+            name: { type: 'string', minLength: 1, maxLength: 100 },
+            type: { type: 'string', minLength: 1, maxLength: 50 },
+            capacity: { type: 'integer', minimum: 1, maximum: 1000 },
+            isActive: { type: 'boolean' },
+          },
+        } } } },
+        responses: {
+          '200': { description: '変更済み設備' }, '400': { description: 'Invalid request' },
+          '403': { description: 'Owner or admin role required, or account is outside access scope' },
+          '404': { description: '設備が存在しない' },
+          '409': { description: '版競合または使用中のcapacity縮小' },
+          '503': { description: '設備を変更できない' },
+        },
+      },
+      delete: {
+        tags: ['Booking'], summary: '未参照の予約設備を版付きで削除',
+        description: 'メニュー、予約時点の消費snapshot、資源例外日から参照中なら削除せず、停止を案内する。',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        requestBody: { required: true, content: { 'application/json': { schema: {
+          type: 'object', additionalProperties: false, required: ['expectedVersion'],
+          properties: { expectedVersion: { type: 'integer', minimum: 1 } },
+        } } } },
+        responses: {
+          '200': { description: 'Deleted' }, '400': { description: 'Invalid request' },
+          '403': { description: 'Owner or admin role required, or account is outside access scope' },
+          '404': { description: '設備が存在しない' },
+          '409': { description: '版競合または参照中' },
+          '503': { description: '設備を削除できない' },
+        },
+      },
+    },
     // ── Booking staff breaks (N-405 #655) ────────────────────────────────────
     '/api/booking/admin/staff/{id}/breaks': {
       get: {

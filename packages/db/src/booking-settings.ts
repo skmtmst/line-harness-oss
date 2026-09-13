@@ -78,6 +78,15 @@ export interface BookingAdminResource {
   type: string;
   capacity: number;
   isActive: boolean;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+  usage: {
+    menuCount: number;
+    bookingCount: number;
+    exceptionCount: number;
+    referenced: boolean;
+  };
   businessHours: BookingInterval[];
   exceptions: BookingAvailabilityException[];
 }
@@ -362,10 +371,42 @@ export async function listBookingAdminResources(
   lineAccountId: string,
 ): Promise<BookingAdminResource[]> {
   const [resources, exceptions] = await Promise.all([
-    db.prepare(`SELECT id, line_account_id, name, resource_type, capacity, is_active
-      FROM booking_resources WHERE line_account_id = ? ORDER BY name ASC, id ASC`)
-      .bind(lineAccountId)
-      .all<{ id: string; line_account_id: string; name: string; resource_type: string; capacity: number; is_active: number }>(),
+    db.prepare(`WITH scoped_resources AS (
+        SELECT * FROM booking_resources WHERE line_account_id = ?
+      ), menu_usage AS (
+        SELECT mr.resource_id, COUNT(*) AS menu_count
+        FROM booking_menu_resources mr
+        INNER JOIN scoped_resources sr ON sr.id = mr.resource_id
+        GROUP BY mr.resource_id
+      ), booking_usage AS (
+        SELECT brc.resource_id, COUNT(DISTINCT brc.booking_id) AS booking_count
+        FROM booking_resource_consumptions brc
+        INNER JOIN scoped_resources sr ON sr.id = brc.resource_id
+        WHERE brc.line_account_id = ?
+        GROUP BY brc.resource_id
+      ), exception_usage AS (
+        SELECT e.scope_id AS resource_id, COUNT(*) AS exception_count
+        FROM booking_availability_exceptions e
+        INNER JOIN scoped_resources sr ON sr.id = e.scope_id
+        WHERE e.line_account_id = ? AND e.scope_kind = 'resource'
+        GROUP BY e.scope_id
+      )
+      SELECT r.id, r.line_account_id, r.name, r.resource_type, r.capacity,
+        r.is_active, r.version, r.created_at, r.updated_at,
+        COALESCE(m.menu_count, 0) AS menu_count,
+        COALESCE(b.booking_count, 0) AS booking_count,
+        COALESCE(e.exception_count, 0) AS exception_count
+      FROM scoped_resources r
+      LEFT JOIN menu_usage m ON m.resource_id = r.id
+      LEFT JOIN booking_usage b ON b.resource_id = r.id
+      LEFT JOIN exception_usage e ON e.resource_id = r.id
+      ORDER BY r.name ASC, r.id ASC`)
+      .bind(lineAccountId, lineAccountId, lineAccountId)
+      .all<{
+        id: string; line_account_id: string; name: string; resource_type: string;
+        capacity: number; is_active: number; version: number; created_at: string; updated_at: string;
+        menu_count: number; booking_count: number; exception_count: number;
+      }>(),
     db.prepare(`SELECT * FROM booking_availability_exceptions
       WHERE line_account_id = ? AND scope_kind = 'resource'
       ORDER BY date_from ASC, date_to ASC, id ASC`)
@@ -385,6 +426,15 @@ export async function listBookingAdminResources(
     type: row.resource_type,
     capacity: Number(row.capacity),
     isActive: row.is_active === 1,
+    version: Number(row.version),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    usage: {
+      menuCount: Number(row.menu_count),
+      bookingCount: Number(row.booking_count),
+      exceptionCount: Number(row.exception_count),
+      referenced: Number(row.menu_count) + Number(row.booking_count) + Number(row.exception_count) > 0,
+    },
     businessHours: [],
     exceptions: byResource.get(row.id) ?? [],
   }));

@@ -1,9 +1,64 @@
 import { jstNow } from './utils.js';
 
 export type BookingResourceUpdateResult =
-  | { status: 'updated' }
+  | { status: 'updated'; version?: number; item?: BookingResourceRecord }
   | { status: 'not_found' }
+  | { status: 'version_conflict'; currentVersion: number }
   | { status: 'capacity_conflict'; peakQuantity: number };
+
+export interface BookingResourceRecord {
+  id: string;
+  lineAccountId: string;
+  name: string;
+  type: string;
+  capacity: number;
+  isActive: boolean;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+type BookingResourceRow = {
+  id: string; line_account_id: string; name: string; resource_type: string;
+  capacity: number; is_active: number; version: number; created_at: string; updated_at: string;
+};
+
+function serializeResource(row: BookingResourceRow): BookingResourceRecord {
+  return {
+    id: row.id, lineAccountId: row.line_account_id, name: row.name, type: row.resource_type,
+    capacity: Number(row.capacity), isActive: row.is_active === 1, version: Number(row.version),
+    createdAt: row.created_at, updatedAt: row.updated_at,
+  };
+}
+
+export async function getBookingResource(
+  db: D1Database,
+  lineAccountId: string,
+  resourceId: string,
+): Promise<BookingResourceRecord | null> {
+  const row = await db.prepare(`SELECT id, line_account_id, name, resource_type, capacity,
+      is_active, version, created_at, updated_at
+    FROM booking_resources WHERE id = ? AND line_account_id = ?`)
+    .bind(resourceId, lineAccountId).first<BookingResourceRow>();
+  return row ? serializeResource(row) : null;
+}
+
+export async function createBookingResource(
+  db: D1Database,
+  input: { lineAccountId: string; name: string; type: string; capacity: number; isActive: boolean },
+): Promise<BookingResourceRecord> {
+  const id = crypto.randomUUID();
+  const now = jstNow();
+  const row = await db.prepare(`INSERT INTO booking_resources
+      (id, line_account_id, name, resource_type, capacity, is_active, version, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)
+    RETURNING id, line_account_id, name, resource_type, capacity, is_active,
+      version, created_at, updated_at`)
+    .bind(id, input.lineAccountId, input.name, input.type, input.capacity, input.isActive ? 1 : 0, now, now)
+    .first<BookingResourceRow>();
+  if (!row) throw new Error('booking_resource_create_failed');
+  return serializeResource(row);
+}
 
 export interface BookingResourceBackfillStats {
   bookingCount: number;
@@ -24,6 +79,9 @@ export async function updateBookingResourceSafely(
     resourceId: string;
     capacity: number;
     isActive: boolean;
+    expectedVersion?: number;
+    name?: string;
+    type?: string;
     now?: Date;
   },
 ): Promise<BookingResourceUpdateResult> {
@@ -32,10 +90,16 @@ export async function updateBookingResourceSafely(
   }
   const nowIso = (input.now ?? new Date()).toISOString();
   const active = input.isActive ? 1 : 0;
-  const result = await db.prepare(
+  const versionSet = input.expectedVersion === undefined ? '' : ', version = version + 1';
+  const versionWhere = input.expectedVersion === undefined ? '' : ' AND version = ?';
+  const returning = input.expectedVersion === undefined ? '' : ` RETURNING id, line_account_id,
+    name, resource_type, capacity, is_active, version, created_at, updated_at`;
+  const statement = db.prepare(
     `UPDATE booking_resources
-        SET capacity = ?, is_active = ?, updated_at = ?
+        SET name = COALESCE(?, name), resource_type = COALESCE(?, resource_type),
+            capacity = ?, is_active = ?, updated_at = ?${versionSet}
       WHERE id = ? AND line_account_id = ?
+        ${versionWhere}
         AND (? = 0 OR NOT EXISTS (
           SELECT 1
           FROM (
@@ -60,13 +124,16 @@ export async function updateBookingResourceSafely(
                AND julianday(b2.starts_at) <= julianday(points.point)
                AND julianday(b2.block_ends_at) > julianday(points.point)
           ) > ?
-        ))`,
+        ))${returning}`,
   ).bind(
+    input.name ?? null,
+    input.type ?? null,
     input.capacity,
     active,
     jstNow(),
     input.resourceId,
     input.lineAccountId,
+    ...(input.expectedVersion === undefined ? [] : [input.expectedVersion]),
     active,
     nowIso,
     input.lineAccountId,
@@ -75,13 +142,26 @@ export async function updateBookingResourceSafely(
     input.lineAccountId,
     input.resourceId,
     input.capacity,
-  ).run();
-  if ((result.meta?.changes ?? 0) > 0) return { status: 'updated' };
+  );
+  if (input.expectedVersion === undefined) {
+    const result = await statement.run();
+    if ((result.meta?.changes ?? 0) > 0) return { status: 'updated' };
+  } else {
+    const row = await statement.first<BookingResourceRow>();
+    if (row) {
+      const item = serializeResource(row);
+      return { status: 'updated', version: item.version, item };
+    }
+  }
 
   const resource = await db.prepare(
-    `SELECT 1 AS ok FROM booking_resources WHERE id = ? AND line_account_id = ?`,
-  ).bind(input.resourceId, input.lineAccountId).first<{ ok: number }>();
+    `SELECT ${input.expectedVersion === undefined ? '1 AS ok' : 'version'}
+      FROM booking_resources WHERE id = ? AND line_account_id = ?`,
+  ).bind(input.resourceId, input.lineAccountId).first<{ ok?: number; version?: number }>();
   if (!resource) return { status: 'not_found' };
+  if (input.expectedVersion !== undefined && Number(resource.version) !== input.expectedVersion) {
+    return { status: 'version_conflict', currentVersion: Number(resource.version) };
+  }
 
   const peak = await db.prepare(
     `SELECT COALESCE(MAX(used_quantity), 0) AS peak_quantity
@@ -117,6 +197,47 @@ export async function updateBookingResourceSafely(
     nowIso,
   ).first<{ peak_quantity: number }>();
   return { status: 'capacity_conflict', peakQuantity: Number(peak?.peak_quantity ?? 0) };
+}
+
+export type BookingResourceDeleteResult =
+  | { status: 'deleted' }
+  | { status: 'not_found' }
+  | { status: 'version_conflict'; currentVersion: number }
+  | { status: 'reference_conflict'; menuCount: number; bookingCount: number; exceptionCount: number };
+
+export async function deleteBookingResourceSafely(
+  db: D1Database,
+  input: { lineAccountId: string; resourceId: string; expectedVersion: number },
+): Promise<BookingResourceDeleteResult> {
+  const result = await db.prepare(`DELETE FROM booking_resources
+    WHERE id = ? AND line_account_id = ? AND version = ?
+      AND (0 = 1 OR (
+        NOT EXISTS (SELECT 1 FROM booking_menu_resources WHERE resource_id = ?)
+        AND NOT EXISTS (SELECT 1 FROM booking_resource_consumptions WHERE resource_id = ?)
+        AND NOT EXISTS (SELECT 1 FROM booking_availability_exceptions
+          WHERE scope_kind = 'resource' AND scope_id = ?)
+      ))`)
+    .bind(input.resourceId, input.lineAccountId, input.expectedVersion,
+      input.resourceId, input.resourceId, input.resourceId).run();
+  if ((result.meta?.changes ?? 0) > 0) return { status: 'deleted' };
+
+  const current = await db.prepare(`SELECT version,
+      (SELECT COUNT(*) FROM booking_menu_resources WHERE resource_id = r.id) AS menu_count,
+      (SELECT COUNT(DISTINCT booking_id) FROM booking_resource_consumptions WHERE resource_id = r.id) AS booking_count,
+      (SELECT COUNT(*) FROM booking_availability_exceptions
+        WHERE scope_kind = 'resource' AND scope_id = r.id) AS exception_count
+    FROM booking_resources r WHERE r.id = ? AND r.line_account_id = ?`)
+    .bind(input.resourceId, input.lineAccountId)
+    .first<{ version: number; menu_count: number; booking_count: number; exception_count: number }>();
+  if (!current) return { status: 'not_found' };
+  if (Number(current.version) !== input.expectedVersion) {
+    return { status: 'version_conflict', currentVersion: Number(current.version) };
+  }
+  return {
+    status: 'reference_conflict',
+    menuCount: Number(current.menu_count), bookingCount: Number(current.booking_count),
+    exceptionCount: Number(current.exception_count),
+  };
 }
 
 /** migration補完行を運用確認できる件数へまとめる。 */
