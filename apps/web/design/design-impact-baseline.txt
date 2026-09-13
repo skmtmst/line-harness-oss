@@ -71,6 +71,7 @@ shared-button-importer app/inflow-links/page.tsx
 shared-button-importer app/line-notifications/operator/new/page.tsx
 shared-button-importer app/line-notifications/operator-notification-rules.tsx
 shared-button-importer app/line-notifications/page.tsx
+shared-button-importer app/login/page.tsx
 shared-button-importer app/mileage/action-score-tab.tsx
 shared-button-importer app/mileage/friends/detail/mileage-adjustment-dialog.tsx
 shared-button-importer app/mileage/friends/detail/page.tsx
@@ -87,6 +88,11 @@ shared-button-importer app/nen-members/page.tsx
 shared-button-importer app/nen-members/photo-publications.tsx
 shared-button-importer app/nen-members/photo-review-detail.tsx
 shared-button-importer app/page.tsx
+shared-button-importer app/password/forgot/page.tsx
+shared-button-importer app/password/reset/page.tsx
+shared-button-importer app/register/complete/page.tsx
+shared-button-importer app/register/page.tsx
+shared-button-importer app/register/sent/page.tsx
 shared-button-importer app/reminders/detail/page.tsx
 shared-button-importer app/reminders/new/page.tsx
 shared-button-importer app/reminders/page.tsx

@@ -346,6 +346,8 @@ export function isPublicApiBoundary(method: string, path: string): boolean {
     path === '/api/auth/line' ||
     path === '/api/auth/line/callback' ||
     path === '/api/auth/two-factor/verify' ||
+    // 会員登録・メールログイン・パスワード再設定。Turnstile と回数制限で守る。
+    /^\/api\/auth\/(register|password)\//.test(path) ||
     /^\/api\/staff\/invitations\/[^/]+\/verify$/.test(path) ||
     path.startsWith('/auth/') ||
     path === '/setup' ||

@@ -1,15 +1,29 @@
 'use client'
-import { useEffect, useState } from 'react'
-import { useBrand } from '@/lib/use-brand'
+
+import { MessageCircle } from 'lucide-react'
+import Link from 'next/link'
+import { useEffect, useState, type FormEvent } from 'react'
+import AuthCard, { AuthField } from '@/components/auth/auth-card'
+import PasswordField from '@/components/auth/password-field'
+import Button from '@/components/shared/button'
+import { TextField } from '@/components/shared/text-field'
+import { storeAdminSession } from '@/lib/admin-session'
+import { authRequest, emailError } from '@/lib/auth-email'
 import { AUTH_SELECTION_CLEARED_KEY } from '@/lib/hq-navigation'
 
-/** 看板が取れないときに出す名前。 */
-const FALLBACK_NAME = '然-NEN- LINE管理システム'
-
+/**
+ * ログイン。★V6 0-1（`UufG8`、カード `m3tWJ`）。
+ *
+ * メール＋パスワードが主、LINE ログインが副（決定 2026-09-13）。
+ * 既存の権限者は今までどおり LINE で入れる。二段階認証を有効にしている人は
+ * パスワードのあとに既存の 6 桁コードの画面へ。
+ */
 export default function LoginPage() {
-  const [loading, setLoading] = useState(false)
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [emailMessage, setEmailMessage] = useState<string | null>(null)
+  const [busy, setBusy] = useState<'password' | 'line' | null>(null)
   const [error, setError] = useState('')
-  const brand = useBrand()
 
   useEffect(() => {
     const errorCode = new URLSearchParams(window.location.search).get('error')
@@ -20,86 +34,100 @@ export default function LoginPage() {
     }
   }, [])
 
-  const handleLogin = () => {
-    setLoading(true)
+  const submit = async (event: FormEvent) => {
+    event.preventDefault()
+    const emailProblem = emailError(email)
+    setEmailMessage(emailProblem)
+    if (emailProblem) return
+    if (!password) {
+      setError('パスワードを入力してください')
+      return
+    }
+    setBusy('password')
+    setError('')
+    const res = await authRequest<{ twoFactor: boolean; challengeToken?: string; sessionToken?: string }>('/api/auth/password/login', {
+      email: email.trim(),
+      password,
+    })
+    if (!res.ok || !res.data) {
+      setError(res.error || 'ログインできませんでした')
+      setBusy(null)
+      return
+    }
+    sessionStorage.removeItem(AUTH_SELECTION_CLEARED_KEY)
+    if (res.data.twoFactor && res.data.challengeToken) {
+      window.location.assign(`/login/two-factor#${new URLSearchParams({ lh_2fa: res.data.challengeToken }).toString()}`)
+      return
+    }
+    if (res.data.sessionToken) storeAdminSession(res.data.sessionToken, res.csrfToken)
+    else if (res.csrfToken) localStorage.setItem('lh_csrf', res.csrfToken)
+    window.location.assign('/')
+  }
+
+  const lineLogin = () => {
+    setBusy('line')
     sessionStorage.removeItem(AUTH_SELECTION_CLEARED_KEY)
     const apiUrl = process.env.NEXT_PUBLIC_API_URL
-    if (!apiUrl) return setLoading(false)
+    if (!apiUrl) return setBusy(null)
     window.location.assign(`${apiUrl}/api/auth/line`)
   }
 
   return (
-    // 地は沈んだ面。緑ベタの上に白カードを浮かせていたが、設計では
-    // 薄いグレーの上に置く。緑はボタンとロゴだけに残す。
-    <main className="flex min-h-[100svh] flex-col items-center justify-center bg-canvas-sunken px-4 py-8 sm:px-6 sm:py-12">
-      <section className="w-full max-w-lg rounded-card bg-canvas px-6 py-10 shadow-sm sm:px-12">
-        <div className="text-center">
-          {/* 設定したアイコンを出す。無いときだけ「然」の字に落ちる。
-              画像を出す先が公式アカウントなので、alt は名前をそのまま使う。 */}
-          {brand.iconUrl ? (
-            <img
-              src={brand.iconUrl}
-              alt={brand.name ?? FALLBACK_NAME}
-              className="mx-auto h-16 w-16 rounded-card object-cover"
-            />
-          ) : (
-            <div
-              className="mx-auto flex h-16 w-16 items-center justify-center rounded-card bg-accent-soft text-2xl font-bold text-accent"
-              aria-hidden="true"
-            >
-              然
-            </div>
-          )}
-          {/* 公式アカウントの表示名。友だちに見えているのはこちらで、
-              DB 側の呼び名（「本番」「テスト」など）ではない。 */}
-          <h1 className="mx-auto mt-5 max-w-sm text-xl font-bold leading-snug text-ink">
-            {brand.name ?? FALLBACK_NAME}
-          </h1>
-          <p className="mt-2 text-sm text-ink-secondary">管理画面にログイン</p>
-        </div>
-
-        <div className="mt-7">
-          {error && (
-            <p className="mb-4 rounded-control bg-danger-bg px-4 py-3 text-sm text-danger">{error}</p>
-          )}
-
-          <button
-            type="button"
-            onClick={handleLogin}
-            disabled={loading}
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-control bg-accent-deep px-4 text-base font-bold text-on-accent transition-colors hover:brightness-92 disabled:opacity-50"
-          >
-            {/* 白い四角の中に緑のアイコンを入れていたが、設計は白の線画そのまま。 */}
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="h-5 w-5 shrink-0"
-              aria-hidden="true"
-            >
-              <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5Z" />
-            </svg>
-            <span>{loading ? 'LINEへ移動中…' : 'LINEでログイン'}</span>
-          </button>
-          <p className="mt-5 text-center text-xs leading-relaxed text-ink-faint">
-            管理者または閲覧者として許可された<br className="sm:hidden" />LINEアカウントだけが
-            ログインできます。
+    <AuthCard
+      node="UufG8"
+      cardNode="m3tWJ"
+      title="ログイン"
+      description="メールアドレスとパスワードでログインします。LINE で登録した権限者は LINE でログインしてください。"
+    >
+      <form onSubmit={(event) => void submit(event)} noValidate className="flex w-full flex-col gap-4">
+        {error ? (
+          <p role="alert" className="rounded-control bg-status-danger-soft px-4 py-3 text-label text-status-danger">
+            {error}
           </p>
+        ) : null}
+        <AuthField label="メールアドレス" htmlFor="login-email" error={emailMessage}>
+          <TextField
+            id="login-email"
+            type="email"
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+            invalid={Boolean(emailMessage)}
+            autoComplete="email"
+            inputMode="email"
+            placeholder="you@example.com"
+            aria-describedby={emailMessage ? 'login-email-error' : undefined}
+          />
+        </AuthField>
+        <AuthField label="パスワード" htmlFor="login-password">
+          <PasswordField id="login-password" value={password} onChange={setPassword} autoComplete="current-password" />
+        </AuthField>
+        <div className="flex justify-end">
+          <Link href="/password/forgot" className="text-caption font-semibold text-accent-deep hover:underline">
+            パスワードを忘れた方はこちら
+          </Link>
         </div>
+        <Button type="submit" variant="primary" disabled={busy !== null} className="w-full">
+          {busy === 'password' ? 'ログインしています…' : 'ログイン'}
+        </Button>
+      </form>
 
-        <div className="mt-6 border-t border-hairline pt-6 text-center">
-          <p className="text-sm font-bold text-ink">ログインできない場合</p>
-          <p className="mt-1 text-xs leading-relaxed text-ink-faint">
-            管理者にアカウントの登録を依頼してください。
-          </p>
-        </div>
-      </section>
+      <div className="flex w-full items-center gap-3" aria-hidden="true">
+        <span className="h-px flex-1 bg-hairline" />
+        <span className="text-caption text-ink-faint">または</span>
+        <span className="h-px flex-1 bg-hairline" />
+      </div>
 
-      {/* 著作表示はカードの中ではなく、カードの外の下。 */}
-      <p className="mt-10 text-center text-xs text-ink-faint">© 然-NEN-</p>
-    </main>
+      <Button onClick={lineLogin} disabled={busy !== null} className="w-full">
+        <MessageCircle aria-hidden="true" className="h-4.5 w-4.5 text-line-choice" />
+        {busy === 'line' ? 'LINEへ移動中…' : 'LINE でログイン'}
+      </Button>
+
+      <p className="text-caption text-ink-faint">
+        はじめての方は{' '}
+        <Link href="/register" className="font-semibold text-accent-deep hover:underline">
+          無料で始める
+        </Link>
+      </p>
+    </AuthCard>
   )
 }

@@ -297,6 +297,54 @@ const spec = {
     },
   },
   paths: {
+    // ── Email authentication ───────────────────────────────────────────────
+    '/api/auth/register/request': {
+      post: {
+        tags: ['Auth'], summary: '会員登録用の確認メールを送信', security: [],
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['email', 'turnstileToken', 'agreed'], properties: { email: { type: 'string', format: 'email' }, turnstileToken: { type: 'string' }, agreed: { type: 'boolean' }, deviceMarker: { type: 'string' } } } } } },
+        responses: { '200': { description: 'Request accepted without exposing account existence' }, '400': { description: 'Invalid request' }, '429': { description: 'Rate limit exceeded' }, '503': { description: 'Turnstile or mail configuration unavailable' } },
+      },
+    },
+    '/api/auth/register/check': {
+      get: {
+        tags: ['Auth'], summary: '会員登録トークンを確認', security: [],
+        responses: { '200': { description: 'Token state' } },
+      },
+    },
+    '/api/auth/register/complete': {
+      post: {
+        tags: ['Auth'], summary: '会員登録を完了', security: [],
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object' } } } },
+        responses: { '200': { description: 'Tenant and owner account created' }, '400': { description: 'Invalid or expired token' }, '409': { description: 'Account already exists' } },
+      },
+    },
+    '/api/auth/password/login': {
+      post: {
+        tags: ['Auth'], summary: 'メールアドレスとパスワードでログイン', security: [],
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['email', 'password'], properties: { email: { type: 'string', format: 'email' }, password: { type: 'string' } } } } } },
+        responses: { '200': { description: 'Session issued' }, '401': { description: 'Invalid credentials' }, '429': { description: 'Rate limit exceeded' } },
+      },
+    },
+    '/api/auth/password/forgot': {
+      post: {
+        tags: ['Auth'], summary: 'パスワード再設定メールを送信', security: [],
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['email', 'turnstileToken'], properties: { email: { type: 'string', format: 'email' }, turnstileToken: { type: 'string' } } } } } },
+        responses: { '200': { description: 'Request accepted without exposing account existence' }, '429': { description: 'Rate limit exceeded' }, '503': { description: 'Turnstile or mail configuration unavailable' } },
+      },
+    },
+    '/api/auth/password/reset/check': {
+      get: {
+        tags: ['Auth'], summary: 'パスワード再設定トークンを確認', security: [],
+        responses: { '200': { description: 'Token state' } },
+      },
+    },
+    '/api/auth/password/reset': {
+      post: {
+        tags: ['Auth'], summary: 'パスワードを再設定', security: [],
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object' } } } },
+        responses: { '200': { description: 'Password updated and session issued' }, '400': { description: 'Invalid or expired token' } },
+      },
+    },
     // ── HQ Banners ─────────────────────────────────────────────────────────
     '/api/hq/banners/presets': {
       get: {

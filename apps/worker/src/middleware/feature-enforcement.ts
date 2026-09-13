@@ -199,6 +199,12 @@ export const FEATURE_ROUTE_MANIFEST: readonly FeatureRouteMetadata[] = [
 /** 同じ prefix 内で公開経路と管理経路が分かれる例外。 */
 export const FEATURE_ROUTE_PATTERN_MANIFEST: readonly FeatureRoutePatternMetadata[] = [
   {
+    pattern: /^\/api\/auth\/(?:register|password)\//,
+    methods: ['GET', 'POST'],
+    accountResolver: 'none',
+    classification: { kind: 'public', reason: '登録前・ログイン前にTurnstileと回数制限で守る認証経路' },
+  },
+  {
     pattern: /^\/api\/hq\/billing\/webhook$/,
     methods: ['POST'],
     accountResolver: 'none',

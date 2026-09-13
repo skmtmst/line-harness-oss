@@ -8,5 +8,5 @@ export async function sendStaffInviteEmail(env: Env['Bindings'], input: Invite):
 }
 
 export async function sendStaffLineLinkEmail(env: Env['Bindings'], input: Invite): Promise<void> {
-  await send(env, { to: input.email, subject: '【然-NEN-】LINE連携を完了してください', body: `${input.name} 様\n\nメールアドレスの確認が完了しました。次のURLからLINE認証を行うと、管理画面へログインできます。\n${input.lineUrl}\n\n以後のログインはLINEを使用します。` });
+  await send(env, { to: input.email, subject: '【musubo】LINE連携を完了してください', body: `${input.name} 様\n\nメールアドレスの確認が完了しました。次のURLからLINE認証を行うと、管理画面へログインできます。\n${input.lineUrl}\n\n以後のログインはLINEを使用します。` });
 }

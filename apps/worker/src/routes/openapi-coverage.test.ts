@@ -122,8 +122,8 @@ function formatKeys(keys: string[]): string {
  * - ALLOWLIST_MAX: 未記載負債はここより増やせない
  * 後続票で記載を増やしたら、実測に合わせて両方を同じ PR で更新する。
  */
-// 本流の95件に、#19 の統括バナー生成17口、#20〜#21 の6口、#22 の課金5口を足して123件。
-const DOCUMENTED_MIN = 123;
+// 本流の95件に、#19 の統括バナー生成17口、#20〜#21 の6口、#22 の課金5口、#23 の認証7口を足して130件。
+const DOCUMENTED_MIN = 130;
 const ALLOWLIST_MAX = 777;
 
 /**
@@ -153,6 +153,8 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'GET /api/affiliates/{id}',
   'GET /api/affiliates/{id}/report',
   'GET /api/auto-replies',
+  'GET /api/auth/password/reset/check',
+  'GET /api/auth/register/check',
   'GET /api/booking/admin/staff/{id}/break-dates',
   'GET /api/booking/admin/staff/{id}/breaks',
   'GET /api/broadcasts',
@@ -211,6 +213,11 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'PATCH /api/tags/{id}',
   'POST /api/affiliates',
   'POST /api/affiliates/click',
+  'POST /api/auth/password/forgot',
+  'POST /api/auth/password/login',
+  'POST /api/auth/password/reset',
+  'POST /api/auth/register/complete',
+  'POST /api/auth/register/request',
   'POST /api/broadcasts',
   'POST /api/broadcasts/{id}/send',
   'POST /api/broadcasts/dedup-preview',
