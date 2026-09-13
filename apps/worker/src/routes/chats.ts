@@ -477,6 +477,11 @@ chats.get('/api/chats', requireRole('owner', 'admin', 'staff'), async (c) => {
     const staff = c.get('staff');
     const status = c.req.query('status') ?? undefined;
     const operatorId = c.req.query('operatorId') ?? undefined;
+    const unreadOnly = c.req.query('unreadOnly') === '1' || c.req.query('unreadOnly') === 'true';
+    const quickFilter = c.req.query('quickFilter');
+    if (quickFilter && quickFilter !== 'reply' && quickFilter !== 'overdue') {
+      return c.json({ success: false, error: 'invalid_quick_filter' }, 400);
+    }
     const lineAccountId = c.req.query('lineAccountId') ?? undefined;
     const query = (c.req.query('q') ?? '').trim().slice(0, 200);
     const visibleScope = await getVisibleLineAccountScope(c.env.DB, staff);
@@ -487,6 +492,9 @@ chats.get('/api/chats', requireRole('owner', 'admin', 'staff'), async (c) => {
       c.req.query('unansweredOnly') === 'true' || c.req.query('unansweredOnly') === '1';
 
     if (unansweredOnly) {
+      if (unreadOnly || quickFilter || operatorId === 'unassigned') {
+        return c.json({ success: false, error: 'incompatible_filters' }, 400);
+      }
       const requestedLimit = Number.parseInt(c.req.query('limit') ?? '', 10);
       const limit = Number.isFinite(requestedLimit)
         ? Math.min(200, Math.max(1, requestedLimit))
@@ -602,8 +610,34 @@ chats.get('/api/chats', requireRole('owner', 'admin', 'staff'), async (c) => {
       conditionBindings.push(status);
     }
     if (operatorId) {
-      conditions.push('c.operator_id = ?');
-      conditionBindings.push(operatorId);
+      if (operatorId === 'unassigned') conditions.push('c.operator_id IS NULL');
+      else {
+        conditions.push('c.operator_id = ?');
+        conditionBindings.push(operatorId);
+      }
+    }
+    if (unreadOnly) {
+      conditions.push(`EXISTS (
+        SELECT 1 FROM messages_log incoming
+        LEFT JOIN inbox_staff_reads reads
+          ON reads.channel = 'line' AND reads.conversation_id = f.id AND reads.staff_id = ?
+        WHERE incoming.friend_id = f.id AND incoming.direction = 'incoming'
+          AND (incoming.delivery_type IS NULL OR incoming.delivery_type != 'test')
+          AND (reads.last_read_at IS NULL OR incoming.created_at > reads.last_read_at)
+      )`);
+      conditionBindings.push(staff.id);
+    }
+    if (quickFilter) {
+      conditions.push(`COALESCE(c.status, 'resolved') = 'unread'`);
+      if (quickFilter === 'overdue') {
+        // Keep the existing UI definition: one hour since the displayed latest message.
+        conditions.push(`julianday(COALESCE((
+          SELECT MAX(latest.created_at) FROM messages_log latest
+          WHERE latest.friend_id = f.id
+            AND (latest.delivery_type IS NULL OR latest.delivery_type != 'test')
+        ), d.last_message_at)) <= julianday(?)`);
+        conditionBindings.push(new Date(Date.now() - 60 * 60 * 1000).toISOString());
+      }
     }
     if (lineAccountId) {
       conditions.push('f.line_account_id = ?');
@@ -623,7 +657,7 @@ chats.get('/api/chats', requireRole('owner', 'admin', 'staff'), async (c) => {
     }
     // status / operator filter は chats を参照するので、その時だけ page CTE 側でも
     // chats を lookup する (無条件時は 全friend × chats lookup を省く)。
-    const pageNeedsChats = Boolean(status || operatorId);
+    const pageNeedsChats = Boolean(status || operatorId || quickFilter);
 
     // preview は **最新の incoming (ユーザー発)** を優先する。auto_reply / scenario 等の
     // outbound が直後に書き込まれて preview を上書きすると「ユーザーが何と言ったか」が
