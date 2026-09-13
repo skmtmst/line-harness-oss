@@ -1,4 +1,5 @@
 import type { TemplateInput, TemplateType } from './hq-templates-api'
+import { normalizeLayout } from '@line-crm/shared'
 
 export interface CreationScope { tenantId: string; actorId: string }
 export interface CreationAttempt { requestId: string; input: TemplateInput; distribute: boolean }
@@ -10,6 +11,15 @@ const text = (value: unknown, max: number): value is string => typeof value === 
 const optionalText = (value: unknown, max: number) => value === undefined || text(value, max)
 const nullableText = (value: unknown, max: number) => value === null || text(value, max)
 const nullableInteger = (value: unknown) => value === null || Number.isSafeInteger(value)
+const integerBetween = (value: unknown, min: number, max: number) => Number.isSafeInteger(value) && Number(value) >= min && Number(value) <= max
+
+function validTagAction(value: unknown): boolean {
+  if (!object(value, ['id', 'type', 'params', 'onFailure']) || !identifier(value.id) || !['send_message', 'grant_mileage'].includes(String(value.type)) || !['stop', 'continue'].includes(String(value.onFailure))) return false
+  const params = value.params
+  if (!object(params, ['delayMinutes', 'cancelIfTagRemoved', 'content', 'amount']) || (params.delayMinutes !== undefined && !integerBetween(params.delayMinutes, 0, 525_600)) || (params.cancelIfTagRemoved !== undefined && typeof params.cancelIfTagRemoved !== 'boolean')) return false
+  if (value.type === 'send_message') return text(params.content, 5000) && params.content.trim().length > 0 && params.amount === undefined
+  return integerBetween(params.amount, 1, 1_000_000) && params.content === undefined
+}
 
 export function sameCreationScope(a: CreationScope, b: CreationScope): boolean {
   return a.tenantId === b.tenantId && a.actorId === b.actorId
@@ -26,8 +36,13 @@ function validAttempt(value: unknown): value is CreationAttempt {
   if (input.type === 'tag') {
     if (!object(definition, ['schemaVersion', 'tag', 'folders']) || definition.schemaVersion !== 1 || !Array.isArray(definition.folders) || definition.folders.length > 8) return false
     const tag = definition.tag
-    if (!object(tag, ['name', 'color', 'description', 'folderId']) || !text(tag.name, 200) || !tag.name.trim() || !(tag.description === null || optionalText(tag.description, 2000))
-      || !(tag.folderId === null || tag.folderId === undefined || identifier(tag.folderId)) || (tag.color !== undefined && !/^#[0-9a-f]{6}$/i.test(String(tag.color)))) return false
+    if (!object(tag, ['name', 'color', 'description', 'folderId', 'isStarred', 'manualAssignmentAllowed', 'reapplyPolicy', 'linkedEnabled', 'mileage', 'actions']) || !text(tag.name, 200) || !tag.name.trim() || !(tag.description === null || optionalText(tag.description, 2000))
+      || !(tag.folderId === null || tag.folderId === undefined || identifier(tag.folderId)) || (tag.color !== undefined && !/^#[0-9a-f]{6}$/i.test(String(tag.color)))
+      || (tag.isStarred !== undefined && typeof tag.isStarred !== 'boolean') || (tag.manualAssignmentAllowed !== undefined && typeof tag.manualAssignmentAllowed !== 'boolean')
+      || (tag.reapplyPolicy !== undefined && !['first_only', 'every_time'].includes(String(tag.reapplyPolicy))) || (tag.linkedEnabled !== undefined && typeof tag.linkedEnabled !== 'boolean')) return false
+    if (tag.mileage !== undefined && (!object(tag.mileage, ['self', 'referrer', 'multiplier', 'priority']) || !integerBetween(tag.mileage.self, 0, 1_000_000)
+      || !integerBetween(tag.mileage.referrer, 0, 1_000_000) || !(tag.mileage.multiplier === null || integerBetween(tag.mileage.multiplier, 1000, 100_000)) || !integerBetween(tag.mileage.priority, 0, 1000))) return false
+    if (tag.actions !== undefined && (!Array.isArray(tag.actions) || tag.actions.length > 50 || !tag.actions.every(validTagAction))) return false
     return definition.folders.every(folder => object(folder, ['id', 'name', 'parentId', 'color']) && identifier(folder.id) && text(folder.name, 200)
       && (folder.parentId === null || folder.parentId === undefined || identifier(folder.parentId)) && (folder.color === null || folder.color === undefined || /^#[0-9a-f]{6}$/i.test(String(folder.color))))
   }
@@ -56,7 +71,7 @@ function validAttempt(value: unknown): value is CreationAttempt {
   }
   if (!object(definition, ['schemaVersion', 'form']) || definition.schemaVersion !== 1) return false
   const form = definition.form
-  if (!object(form, ['name', 'description', 'fields', 'layout', 'on_submit_tag_id', 'on_submit_scenario_id', 'save_to_metadata']) || !text(form.name, 200) || !nullableText(form.description, 2000) || !Array.isArray(form.fields) || form.fields.length > 100 || form.layout !== null || !(form.on_submit_tag_id === null || identifier(form.on_submit_tag_id)) || !(form.on_submit_scenario_id === null || identifier(form.on_submit_scenario_id)) || typeof form.save_to_metadata !== 'boolean') return false
+  if (!object(form, ['name', 'description', 'fields', 'layout', 'on_submit_tag_id', 'on_submit_scenario_id', 'save_to_metadata']) || !text(form.name, 200) || !nullableText(form.description, 2000) || !Array.isArray(form.fields) || form.fields.length > 100 || !(form.layout === null || normalizeLayout(form.layout) !== null) || !(form.on_submit_tag_id === null || identifier(form.on_submit_tag_id)) || !(form.on_submit_scenario_id === null || identifier(form.on_submit_scenario_id)) || typeof form.save_to_metadata !== 'boolean') return false
   return form.fields.every(field => object(field, ['name', 'label', 'type', 'required', 'options', 'placeholder', 'description']) && text(field.name, 200) && text(field.label, 200) && ['text', 'textarea', 'radio', 'checkbox', 'select', 'file', 'date', 'prefecture'].includes(String(field.type)) && (field.required === undefined || typeof field.required === 'boolean') && (field.options === undefined || Array.isArray(field.options) && field.options.length <= 100 && field.options.every(option => text(option, 200))) && (field.placeholder === undefined || nullableText(field.placeholder, 2000)) && (field.description === undefined || nullableText(field.description, 2000)))
 }
 export function loadCreationAttempt(storage: StoragePort, scope: CreationScope, type: TemplateType): CreationAttempt | null {

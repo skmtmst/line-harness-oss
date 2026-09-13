@@ -236,6 +236,11 @@ export const api = {
     get<{ items: EventBookingMine[] }>(`/api/liff/events/me?tab=${tab}`),
   cancelMyEventBooking: (bookingId: string) =>
     post<{ ok: true }>(`/api/liff/events/me/${bookingId}/cancel`, {}),
+  acceptEventWaitlistOffer: (token: string) =>
+    post<{
+      success: true;
+      data: { bookingId: string; status: 'confirmed'; alreadyConfirmed: boolean };
+    }>(`/api/liff/events/waitlist/${encodeURIComponent(token)}/accept`, {}),
 
   // ===== 回答フォーム =====
   getForm: (id: string) => get<PublicForm>(`/api/forms/${id}`),

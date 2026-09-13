@@ -154,9 +154,10 @@ describe('回答フォーム編集のページ削除', () => {
   })
 
   it('つなぎ直す分岐は全ページを見て数える', () => {
-    const body = fnBody(code(src), 'function jumpsInto')
-    expect(body, '一部のページしか見ていない').toContain('for (const section of layout.sections)')
-    expect(body, '選択肢の行き先を見ていない').toContain('c.jumpToSectionId === sectionId')
+    const operations = read('components', 'forms', 'form-definition-operations.ts')
+    const body = fnBody(code(operations), 'export function formJumpsInto')
+    expect(body, '一部のページしか見ていない').toContain('layout.sections.reduce')
+    expect(body, '選択肢の行き先を見ていない').toContain('choice.jumpToSectionId === sectionId')
   })
 })
 

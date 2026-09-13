@@ -6,8 +6,7 @@ import TopBar from '@/components/shared/top-bar'
 import { useAccount } from '@/contexts/account-context'
 import { usePageChrome } from './page-chrome'
 import { MENU_SECTIONS } from '@/lib/menu'
-import { adminSessionHeaders, clearAdminSession } from '@/lib/admin-session'
-import { AUTH_SELECTION_CLEARED_KEY } from '@/lib/hq-navigation'
+import { logoutAndGoToLogin } from '@/lib/logout'
 
 /**
  * 共通トップバーを、いまの画面の値へつなぐ層。
@@ -81,32 +80,7 @@ export default function AppTopBar() {
     router.push('/hq')
   }
 
-  const logout = async () => {
-    try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL
-      if (apiUrl) {
-        await fetch(`${apiUrl}/api/auth/logout`, {
-          method: 'POST',
-          credentials: 'include',
-          headers: adminSessionHeaders(),
-        })
-      }
-    } catch {
-      // 通信に失敗しても、手元の後始末は必ず行う
-    }
-    try {
-      localStorage.removeItem('lh_api_key')
-      localStorage.removeItem('lh_csrf')
-      localStorage.removeItem('lh_staff_name')
-      localStorage.removeItem('lh_staff_role')
-      localStorage.removeItem('lh_staff_permissions')
-      sessionStorage.removeItem(AUTH_SELECTION_CLEARED_KEY)
-    } catch {
-      // ストレージが使えなくても、行き先だけは変える
-    }
-    clearAdminSession()
-    window.location.href = '/login'
-  }
+  const logout = () => logoutAndGoToLogin()
 
   return (
     <TopBar

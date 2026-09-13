@@ -167,7 +167,7 @@ export default function NenCampaignsPage() {
   const saveSetting = async (setting: NenCampaignSetting, override?: Partial<NenCampaignSetting>) => {
     if (!selectedAccountId) return
     const next = { ...setting, ...override }; setSaving(setting.campaignKey); setNotice(null)
-    try { await api.nenCampaigns.updateSetting(selectedAccountId, setting.campaignKey, { isEnabled: next.isEnabled, title: next.title, bodyText: next.bodyText, delayDays: next.delayDays, deliveryTime: next.deliveryTime, buttonLabel: next.buttonLabel, buttonUrl: next.buttonUrl, imageUrl: next.imageUrl, afterActions: next.afterActions }); updateDraft(setting.campaignKey, next); setNotice({ tone: 'success', text: `${setting.label}の設定を保存しました。` }) }
+    try { await api.nenCampaigns.updateSetting(selectedAccountId, setting.campaignKey, { isEnabled: next.isEnabled, title: next.title, bodyText: next.bodyText, delayDays: next.delayDays, deliveryTime: next.deliveryTime, buttonLabel: next.buttonLabel, buttonUrl: next.buttonUrl, imageUrl: next.imageUrl, dedupWindowDays: next.dedupWindowDays, excludeFormRespondents: next.excludeFormRespondents, afterActions: next.afterActions }); updateDraft(setting.campaignKey, next); setNotice({ tone: 'success', text: `${setting.label}の設定を保存しました。` }) }
     catch { setNotice({ tone: 'error', text: `${setting.label}を保存できませんでした。` }) } finally { setSaving(null) }
   }
   // 停止・再開だけは専用の口を使い、本文などは送り直さない。保存済み本文が

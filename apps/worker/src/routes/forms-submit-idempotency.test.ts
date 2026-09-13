@@ -601,8 +601,9 @@ describe('フォーム回答の冪等予約', () => {
     expect(claim.status).toBe('completed');
     const steps = readSteps(claim);
     // 粗い完了だけでなく、layout の効果ごとの記録も残る。
+    // capacity(#751): 全体上限・選択肢定員の原子的な確保も工程の1つ。
     expect(steps.filter((step) => !step.startsWith('layout:')).sort()).toEqual(
-      ['answer', 'submit_count', 'mileage', 'layout_effects', 'reply', 'destination_status'].sort(),
+      ['answer', 'capacity', 'submit_count', 'mileage', 'layout_effects', 'reply', 'destination_status'].sort(),
     );
     expect(steps.some((step) => step.startsWith('layout:destinations:'))).toBe(true);
     // LINE 再送キーは UUID 形の固定値。

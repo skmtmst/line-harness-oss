@@ -51,8 +51,12 @@ function seed(raw: Database, options: { isActive: number }) {
   raw.prepare(
     `INSERT INTO forms (id, name, fields, layout, is_active, status, created_at, updated_at)
      VALUES ('form-1', 'アンケート', '[]', ?, ?, 'active', '2026-01-01', '2026-01-01')`,
-  ).run(JSON.stringify(LAYOUT), options.isActive);
+  // いったん公開してから停止する。公開版の無い純粋な下書きとは区別する。
+  ).run(JSON.stringify(LAYOUT), 1);
   raw.prepare(`INSERT INTO form_accounts (form_id, line_account_id) VALUES ('form-1','acc-a')`).run();
+  if (options.isActive === 0) {
+    raw.prepare(`UPDATE forms SET is_active = 0 WHERE id = 'form-1'`).run();
+  }
 }
 
 function insertSubmissions(raw: Database, count: number) {

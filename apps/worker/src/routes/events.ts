@@ -48,6 +48,7 @@ import { applyActionScoreEvent } from '../services/action-score-events.js';
 import { resolveLineCredential } from '@line-crm/db';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import {
+  acceptEventWaitlistOffer,
   createEventWaitlistOfferSender,
   enqueueEventWaitlistPromotion,
   getEventOccurrenceApplicants,
@@ -1281,6 +1282,111 @@ function startsAtJst(utcIso: string): string {
   return `${jst.slice(0, 10)} ${jst.slice(11, 16)}`;
 }
 
+events.post('/api/liff/events/waitlist/:token/accept', async (c) => {
+  const callerLineUserId = await verifyCallerLineUserId(c.req.header('Authorization'), c.env);
+  if (!callerLineUserId) return bad(c, 'unauthorized', 401);
+  const result = await acceptEventWaitlistOffer(c.env.DB, {
+    token: c.req.param('token'),
+    callerLineUserId,
+  });
+  if (result.kind === 'not_found') return bad(c, 'waitlist_offer_not_found', 404);
+  if (result.kind === 'expired') return bad(c, 'waitlist_offer_expired', 410);
+  if (result.kind === 'unavailable') return bad(c, 'waitlist_offer_unavailable', 409);
+
+  // DB上の予約確定が先。以降の派生処理が失敗しても、承諾そのものを失敗へ戻さない。
+  const reminders = computeRemindersForBooking({
+    starts_at_utc: result.startsAt,
+    reminder_day_before_enabled: result.reminderDayBeforeEnabled,
+    reminder_hours_before: result.reminderHoursBefore,
+  });
+  await insertRemindersForBooking(c.env.DB, result.bookingId, reminders)
+    .catch((error) => console.error('waitlist acceptance reminder creation failed', error));
+  await enrollByTrigger(c.env.DB, {
+    triggerType: 'event',
+    friendId: result.friendId,
+    startsAtIso: result.startsAt,
+    sourceId: result.bookingId,
+    sourceEventId: result.bookingId,
+    lineAccountId: result.lineAccountId,
+  }).catch((error) => console.error('waitlist acceptance reminder enroll failed', error));
+  await awardActivityMileage(c.env.DB, {
+    eventType: 'booking_created',
+    source: 'event_booking',
+    sourceEventId: result.bookingId,
+    friendId: result.friendId,
+    metadata: {
+      bookingType: 'event', bookingId: result.bookingId,
+      eventId: result.eventId, slotId: result.occurrenceId,
+    },
+    occurredAt: new Date().toISOString(),
+  }).catch((error) => console.error('waitlist acceptance mileage failed', error));
+  await applyActionScoreEvent(c.env.DB, {
+    lineAccountId: result.lineAccountId,
+    friendId: result.friendId,
+    eventType: 'booking_created',
+    source: 'event_booking',
+    sourceEventId: result.bookingId,
+    subjectKey: result.eventId,
+    occurredAt: new Date().toISOString(),
+  }).catch((error) => console.error('waitlist acceptance action score failed', error));
+
+  if (result.newlyConverted) {
+    const automation = dispatchAutomationEventWithLogging(c.env.DB, {
+      lineAccountId: result.lineAccountId,
+      eventType: 'calendar_booked',
+      sourceEventId: result.bookingId,
+      friendId: result.friendId,
+      eventData: {
+        bookingType: 'event', bookingId: result.bookingId,
+        eventId: result.eventId, slotId: result.occurrenceId,
+      },
+    }).catch((error) => console.error('waitlist acceptance automation failed', error));
+    const executionCtx = optionalExecutionCtx(c);
+    if (executionCtx) executionCtx.waitUntil(automation);
+    else await automation;
+
+    try {
+      const account = await c.env.DB.prepare(
+        `SELECT channel_access_token, channel_access_token_encrypted
+           FROM line_accounts WHERE id = ?`,
+      ).bind(result.lineAccountId).first<{
+        channel_access_token: string;
+        channel_access_token_encrypted: string | null;
+      }>();
+      if (account && (account.channel_access_token || account.channel_access_token_encrypted)) {
+        const accessToken = await resolveLineCredential(
+          account.channel_access_token_encrypted,
+          account.channel_access_token,
+          { lineAccountId: result.lineAccountId, field: 'channel_access_token' },
+        );
+        await sendEventBookingNotification({
+          channelAccessToken: accessToken,
+          toLineUserId: result.lineUserId,
+          kind: 'received_confirmed',
+          ctx: {
+            eventName: result.eventName,
+            startsAtJst: startsAtJst(result.startsAt),
+            venueName: result.venueName,
+            venueUrl: result.venueUrl,
+            confirmationExtra: result.confirmationExtra,
+          },
+        });
+      }
+    } catch (error) {
+      console.error('waitlist acceptance notification failed', error);
+    }
+  }
+
+  return c.json({
+    success: true,
+    data: {
+      bookingId: result.bookingId,
+      status: 'confirmed',
+      alreadyConfirmed: !result.newlyConverted,
+    },
+  });
+});
+
 events.post('/api/liff/events/:id/bookings', async (c) => {
   const account_id = await resolveAccountIdFromLiff(c);
   if (!account_id) return bad(c, 'liff_account_resolution_failed', 400);
@@ -1655,9 +1761,9 @@ events.post('/api/liff/events/:id/bookings', async (c) => {
 
   // Verify friend-limit again (identity_key ベース、cross-account 同一人物
   // を含めて再 COUNT)。並走 race の loser は DELETE してロールバック。
-  // effectiveMax = max_bookings_per_friend ?? 1 (max=null は 1 件まで)。
-  {
-    const effectiveMax = event.max_bookings_per_friend ?? 1;
+  // null は管理画面の「制限なし」なので、この検査自体を行わない。
+  if (event.max_bookings_per_friend != null) {
+    const effectiveMax = event.max_bookings_per_friend;
     const cnt2 = await c.env.DB
       .prepare(
         `SELECT COUNT(*) AS c FROM event_bookings

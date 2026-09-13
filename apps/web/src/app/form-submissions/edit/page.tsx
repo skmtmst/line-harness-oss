@@ -43,43 +43,15 @@ import { conflictMessage } from './form-conflict-message'
 import { EMPTY_REFS, type FormRefs } from '@/components/forms/form-refs'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
+import {
+  formJumpsInto as jumpsInto,
+  makeFormBlock as makeBlock,
+  takenFormAnswerNames as takenAnswerNames,
+  uniqueFormCopyName as uniqueCopyName,
+} from '@/components/forms/form-definition-operations'
 
 /** 共通ヘッダを指す番号。セクションの添字と混ぜないために -1 を使う。 */
 const HEADER_TAB = -1
-
-function makeBlock(kind: string, type?: FormInputType, count = 0): FormBlock {
-  const id = newBlockId()
-  switch (kind) {
-    case 'heading':
-      return { id, kind: 'heading', text: '見出し', level: 2 }
-    case 'text':
-      return { id, kind: 'text', text: '' }
-    case 'image':
-      return { id, kind: 'image', mediaUrl: '', size: 'normal' }
-    case 'button':
-      return { id, kind: 'button', label: 'ボタン', url: '', style: 'default' }
-    default:
-      return {
-        id,
-        kind: 'input',
-        type: type ?? 'text',
-        // 回答データの見出しは英数字で作る。日本語のままだと、受け渡しの
-        // 途中で化けることがある。
-        name: `q${count + 1}_${id.slice(2)}`,
-        label: '',
-        required: false,
-        ...(type === 'radio' || type === 'checkbox' || type === 'select'
-          ? {
-              choiceMode: 'tag' as const,
-              choices: [
-                { id: newBlockId('c'), label: '選択肢1' },
-                { id: newBlockId('c'), label: '選択肢2' },
-              ],
-            }
-          : {}),
-      }
-  }
-}
 
 /**
  * そのページへ飛ばしている選択肢の数。
@@ -89,40 +61,12 @@ function makeBlock(kind: string, type?: FormInputType, count = 0): FormBlock {
  * 全ページの入力ブロックを見る**（自分自身のページも数える。消えるまでは
  * 分岐として生きているため）。
  */
-function jumpsInto(layout: FormLayout, sectionId: string): number {
-  let count = 0
-  for (const section of layout.sections) {
-    for (const block of section.blocks) {
-      if (block.kind !== 'input' || !block.choices) continue
-      count += block.choices.filter((c) => c.jumpToSectionId === sectionId).length
-    }
-  }
-  return count
-}
-
 /**
  * 複製の回答キーを一意にする。
  *
  * 回答は `name` を鍵に保存される。`${base}_copy` が既にあれば
  * `_copy2`、`_copy3` と番号を足して、重ならない名前を作る。
  */
-function uniqueCopyName(base: string, taken: Set<string>): string {
-  const first = `${base}_copy`
-  if (!taken.has(first)) return first
-  let n = 2
-  while (taken.has(`${base}_copy${n}`)) n += 1
-  return `${base}_copy${n}`
-}
-
-/** 編集全体の入力欄が使う回答キーの一覧。 */
-function takenAnswerNames(layout: FormLayout): Set<string> {
-  return new Set(
-    layout.header
-      .concat(layout.sections.flatMap((s) => s.blocks))
-      .flatMap((b) => (b.kind === 'input' ? [b.name] : [])),
-  )
-}
-
 function FormEditInner() {
   const params = useSearchParams()
   const router = useRouter()
@@ -172,6 +116,7 @@ function FormEditInner() {
    * 保存成功のときだけ**入れ替える。
    */
   const [contentRevision, setContentRevision] = useState<number | null>(null)
+  const [publishedVersionId, setPublishedVersionId] = useState<string | null>(null)
   /**
    * ほかの人が先に保存していたとき（409）。
    *
@@ -248,6 +193,7 @@ function FormEditInner() {
     setOgImageUrl(loaded.ogImageUrl)
     setLayoutState(nextLayout)
     setContentRevision(res.data.contentRevision)
+    setPublishedVersionId(res.data.publishedVersionId)
     setConflict(null)
     // 未保存のままタブ移動したときの確認に使う。読み直しが基準。
     savedSnapshot.current = JSON.stringify(loaded)
@@ -495,7 +441,7 @@ function FormEditInner() {
     }
   }
 
-  const save = async (): Promise<boolean> => {
+  const save = async (publishAfter = false): Promise<boolean> => {
     if (!selectedAccountId) {
       setError('LINE公式アカウントを選んでください')
       return false
@@ -546,7 +492,8 @@ function FormEditInner() {
         description: description.trim() || null,
         layout,
         onSubmitTagId: onSubmitTagId || null,
-        isActive,
+        // 未公開の下書きは publish API が成功するまで受付中にしない。
+        isActive: publishedVersionId ? isActive : false,
         ogTitle: ogTitle.trim() || null,
         ogDescription: ogDescription.trim() || null,
         ogImageUrl: ogImageUrl.trim() || null,
@@ -560,8 +507,26 @@ function FormEditInner() {
       // 自分の1回目と衝突する。
       setContentRevision(res.data.contentRevision)
       setConflict(null)
-      setNotice('保存しました')
-      savedSnapshot.current = currentSnapshot
+      if (publishAfter) {
+        const published = await api.forms.publish(id, selectedAccountId, res.data.contentRevision)
+        if (!published.success) {
+          setError(published.error)
+          return false
+        }
+        setPublishedVersionId(published.data.id)
+        setIsActive(true)
+        setNotice(published.data.replayed ? 'この版は公開済みです' : 'この版を公開しました')
+      } else {
+        setNotice(publishedVersionId ? '下書きを保存しました。公開中の内容は変わっていません' : '下書きを保存しました')
+      }
+      if (publishAfter) {
+        savedSnapshot.current = JSON.stringify({
+            name, description, isActive: true, onSubmitTagId,
+            ogTitle, ogDescription, ogImageUrl, layout,
+          })
+      } else {
+        savedSnapshot.current = currentSnapshot
+      }
       return true
     } catch (e) {
       /*
@@ -958,13 +923,23 @@ function FormEditInner() {
 
       <StickyBar
         actions={(
-          <button
-            onClick={save}
-            disabled={saving}
-            className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-4 py-2 text-sm font-medium transition-colors disabled:opacity-40"
-          >
-            {saving ? '保存中...' : editorTab === 'design' ? 'デザインを保存' : 'フォームを保存'}
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => void save(false)}
+              disabled={saving}
+              title="フォームを保存（公開中の内容は変わりません）"
+              className="border-hairline text-ink bg-canvas hover:bg-canvas-sunken rounded-control border px-4 py-2 text-sm font-medium transition-colors disabled:opacity-40"
+            >
+              {saving ? '保存中...' : '下書きを保存'}
+            </button>
+            <button
+              onClick={() => void save(true)}
+              disabled={saving}
+              className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-4 py-2 text-sm font-medium transition-colors disabled:opacity-40"
+            >
+              {saving ? '処理中...' : 'この版を公開'}
+            </button>
+          </div>
         )}
       />
 

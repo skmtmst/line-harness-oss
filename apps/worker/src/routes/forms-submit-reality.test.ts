@@ -260,6 +260,10 @@ describe('フォーム回答の冪等化(実DB)', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(pushCalls.length).toBe(1);
     const answerId = answerIdOf(KEY, 'friend-1');
+    expect((sqlite.prepare(
+      `SELECT form_version_id FROM form_submissions WHERE id = ?`,
+    ).get(answerId) as { form_version_id: string }).form_version_id)
+      .toBe('form-version-v1-form-webhook');
     // LINE 再送キーは UUID 形の固定値。
     expect(pushCalls[0].retryKey).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
     expect(count('engagement_events', `source = 'form' AND source_event_id = '${answerId}'`)).toBe(1);

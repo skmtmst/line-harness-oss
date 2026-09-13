@@ -407,6 +407,117 @@ describe('GET /api/line-accounts/:id/follower-insight', () => {
   });
 });
 
+function installAutoConnectFetch() {
+  vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request, init: RequestInit = {}) => {
+    const url = String(input);
+    const method = init.method ?? 'GET';
+    if (url.endsWith('/v2/oauth/accessToken')) {
+      return Response.json({ access_token: 'issued-token', expires_in: 2_592_000, token_type: 'Bearer' });
+    }
+    if (url.endsWith('/v2/bot/info')) {
+      return Response.json({ displayName: 'LINE公式名', pictureUrl: 'https://example.com/icon.png', basicId: '@line', chatMode: 'bot' });
+    }
+    if (url.endsWith('/v2/bot/channel/webhook/endpoint') && method === 'PUT') return Response.json({});
+    if (url.endsWith('/v2/bot/channel/webhook/endpoint')) {
+      return Response.json({ endpoint: 'http://localhost/webhook', active: true });
+    }
+    if (url.endsWith('/v2/bot/channel/webhook/test')) return Response.json({ success: true });
+    if (url.endsWith('/liff/v1/apps') && method === 'GET') return Response.json({ apps: [] });
+    if (url.endsWith('/liff/v1/apps') && method === 'POST') return Response.json({ liffId: '2007123456-auto' });
+    if (url.includes('/liff/v1/apps/') && method === 'PUT') return Response.json({});
+    return new Response(null, { status: 404 });
+  }));
+}
+
+const autoConnectBody = {
+  channelId: '123456789',
+  channelSecret: 'messaging-secret',
+  loginChannelId: '2007123456',
+  loginChannelSecret: 'login-secret',
+};
+
+describe('POST /api/line-accounts/connect', () => {
+  test('接続失敗時はDBに行を作らない', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(null, { status: 401 })));
+    const res = await setupApp('owner').request('/api/line-accounts/connect/check', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(autoConnectBody),
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json() as { success: boolean; data: { steps: Array<{ order: number; state: string }> } };
+    expect(body.success).toBe(true);
+    expect(body.data.steps[0]).toMatchObject({ order: 1, state: 'failed' });
+    expect(dbMocks.createLineAccount).not.toHaveBeenCalled();
+  });
+
+  test('5段成功時に1行だけ保存し、認証済みなら友だち取り込みを開始する', async () => {
+    installAutoConnectFetch();
+    let followerSetting: string | null = null;
+    dbMocks.getAccountSetting.mockImplementation(async () => followerSetting);
+    dbMocks.setAccountSetting.mockImplementation(async (_db, _id, _key, value) => { followerSetting = value; });
+    dbMocks.createLineAccount.mockResolvedValue({
+      ...fakeAccount,
+      id: 'created-account',
+      name: 'LINE公式名',
+      channel_access_token: 'issued-token',
+      login_channel_id: '2007123456',
+      login_channel_secret: 'login-secret',
+      liff_id: '2007123456-auto',
+      revision: 1,
+    });
+    dbMocks.updateLineAccountFields.mockResolvedValue(fakeAccount);
+    lineClientMocks.getFollowerIds.mockResolvedValue({ userIds: [] });
+
+    const res = await setupApp('owner').request('/api/line-accounts/connect', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(autoConnectBody),
+    });
+    expect(res.status).toBe(201);
+    expect(dbMocks.createLineAccount).toHaveBeenCalledOnce();
+    expect(dbMocks.createLineAccount.mock.calls[0][1]).toMatchObject({
+      name: 'LINE公式名',
+      channelAccessToken: 'issued-token',
+      loginChannelId: '2007123456',
+      liffId: '2007123456-auto',
+      timezone: 'Asia/Tokyo',
+    });
+    expect(dbMocks.saveLineAccountConnectionChecks.mock.calls[0][1].checks)
+      .toContainEqual(expect.objectContaining({ kind: 'webhook_endpoint', webhookActive: true }));
+    const body = await res.json() as Record<string, unknown>;
+    expect(body).toMatchObject({
+      success: true,
+      data: {
+        id: 'created-account',
+        displayName: 'LINE公式名',
+        followerImport: { capability: 'available', phase: 'importing_ids' },
+      },
+    });
+    expect(JSON.stringify(body)).not.toContain('messaging-secret');
+    expect(JSON.stringify(body)).not.toContain('login-secret');
+  });
+
+  test('保存後に認証判定できなければ作成行を巻き戻す', async () => {
+    installAutoConnectFetch();
+    dbMocks.createLineAccount.mockResolvedValue({
+      ...fakeAccount,
+      id: 'rollback-account',
+      channel_access_token: 'issued-token',
+      revision: 1,
+    });
+    dbMocks.updateLineAccountFields.mockResolvedValue(fakeAccount);
+    lineClientMocks.getFollowerIds.mockRejectedValue(new Error('LINE API error: 503 Service Unavailable'));
+    const res = await setupApp('owner').request('/api/line-accounts/connect', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(autoConnectBody),
+    });
+    expect(res.status).toBe(502);
+    expect(dbMocks.deleteUncommittedLineAccount).toHaveBeenCalledWith(expect.anything(), 'rollback-account');
+  });
+});
+
 describe('POST /api/line-accounts', () => {
   test('passes loginChannelId / loginChannelSecret / liffId through to createLineAccount', async () => {
     dbMocks.createLineAccount.mockResolvedValue({

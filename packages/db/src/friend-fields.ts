@@ -499,14 +499,26 @@ export async function getFriendFieldUsageForScope(
   if (fieldIds.length === 0) return [];
   const idsJson = JSON.stringify(fieldIds);
   const forms = await db.prepare(
-    `SELECT DISTINCT f.id, f.name, CAST(j.value AS TEXT) AS field_id
-       FROM forms f
-       JOIN form_accounts fa ON fa.form_id = f.id
-       JOIN json_tree(COALESCE(f.fields, '[]')) j ON j.key = 'friendFieldId'
-      WHERE fa.line_account_id = ? AND f.status = 'active'
-        AND CAST(j.value AS TEXT) IN (SELECT CAST(value AS TEXT) FROM json_each(?))
-      ORDER BY f.name ASC`,
-  ).bind(scope.lineAccountId, idsJson).all<{ id: string; name: string; field_id: string }>();
+    `WITH form_defs(id, name, fields, switchable) AS (
+       SELECT f.id, f.name, f.fields, 1
+         FROM forms f JOIN form_accounts fa ON fa.form_id = f.id
+        WHERE fa.line_account_id = ? AND f.status = 'active'
+       UNION ALL
+       SELECT f.id, f.name, v.fields, 0
+         FROM forms f
+         JOIN form_accounts fa ON fa.form_id = f.id
+         JOIN form_versions v ON v.id = f.current_published_version_id
+        WHERE fa.line_account_id = ? AND f.status = 'active'
+     )
+     SELECT d.id, d.name, CAST(j.value AS TEXT) AS field_id,
+            MIN(d.switchable) AS switchable
+       FROM form_defs d
+       JOIN json_tree(COALESCE(d.fields, '[]')) j ON j.key = 'friendFieldId'
+      WHERE CAST(j.value AS TEXT) IN (SELECT CAST(value AS TEXT) FROM json_each(?))
+      GROUP BY d.id, d.name, CAST(j.value AS TEXT)
+      ORDER BY d.name ASC`,
+  ).bind(scope.lineAccountId, scope.lineAccountId, idsJson)
+    .all<{ id: string; name: string; field_id: string; switchable: number }>();
   const reminders = await db.prepare(
     `SELECT DISTINCT id, name, trigger_field_id AS field_id FROM reminders
       WHERE line_account_id = ? AND trigger_field_id IN (SELECT CAST(value AS TEXT) FROM json_each(?))
@@ -521,7 +533,14 @@ export async function getFriendFieldUsageForScope(
       ORDER BY s.name ASC`,
   ).bind(scope.lineAccountId, idsJson).all<{ id: string; name: string; field_id: string }>();
   return [
-    ...forms.results.map((row) => ({ kind: 'form' as const, id: row.id, name: row.name, fieldId: row.field_id, switchable: true })),
+    ...forms.results.map((row) => ({
+      kind: 'form' as const,
+      id: row.id,
+      name: row.name,
+      fieldId: row.field_id,
+      // 公開版は不変なので、移行処理が下書きだけを書き換えても公開側は残る。
+      switchable: Number(row.switchable) === 1,
+    })),
     ...reminders.results.map((row) => ({ kind: 'reminder' as const, id: row.id, name: row.name, fieldId: row.field_id, switchable: true })),
     ...searches.results.map((row) => ({ kind: 'saved_search' as const, id: row.id, name: row.name, fieldId: row.field_id, switchable: false })),
   ];

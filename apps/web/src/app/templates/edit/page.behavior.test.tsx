@@ -526,7 +526,7 @@ describe('差し込みボタンの押下', () => {
     const controls = insertControls({ onInsert: (token: string) => inserted.push(token) })
 
     const nameButton = findElement(controls, (element) =>
-      element.type === 'button' && childText(element) === '名前')
+      childText(element) === '名前' && typeof (element.props as { onClick?: unknown }).onClick === 'function')
     expect(nameButton).toBeDefined()
     ;(nameButton?.props as { onClick: () => void }).onClick()
 

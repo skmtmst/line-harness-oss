@@ -124,6 +124,37 @@ describe('リマインダ配信の実行記録', () => {
     ).get()).toEqual({ status: 'completed' })
   })
 
+  it('課金の状態で配信が止まっている統括は送らず、予約は残す（プランを選べば続きから届く）', async () => {
+    const { db, raw } = createTestD1()
+    seedReminder(raw)
+    const pushes: string[] = []
+    const client = makeClient(async (userId) => {
+      pushes.push(userId)
+      return { requestId: 'line-request-1' }
+    })
+    const now = new Date('2026-08-28T09:00:00.000Z')
+
+    const held = await processReminderDeliveries(db, client, {
+      now,
+      pause: noPause,
+      resolveClient: async () => client,
+      sendPermission: async () => ({ allowed: false, reason: '無料トライアルが終了', tenantId: 't', state: 'trial_expired' }),
+    })
+    expect(held.succeeded).toBe(0)
+    expect(held.skipped).toBeGreaterThan(0)
+    expect(pushes).toHaveLength(0)
+    expect(raw.prepare(`SELECT COUNT(*) AS n FROM reminder_delivery_runs`).get()).toEqual({ n: 0 })
+
+    const resumed = await processReminderDeliveries(db, client, {
+      now,
+      pause: noPause,
+      resolveClient: async () => client,
+      sendPermission: async () => ({ allowed: true, reason: null, tenantId: 't', state: 'active' }),
+    })
+    expect(resumed.succeeded).toBe(1)
+    expect(pushes).toEqual(['U-friend-1'])
+  })
+
   it('一時失敗は1分後に同じLINE再送キーで送り直し、成功後は止まる', async () => {
     const { db, raw } = createTestD1()
     seedReminder(raw)

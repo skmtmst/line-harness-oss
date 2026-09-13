@@ -137,6 +137,29 @@ describe('migration 313 共通情報の使用数・履歴・差し替え', () =>
       .toEqual({ replaced_usage_count: 2, status: 'completed' });
   });
 
+  it('下書きから外しても現在の公開フォームが使う変数の差し替えを止める', async () => {
+    sqlite.prepare(
+      `INSERT INTO forms (id, name, on_submit_message_content, status)
+       VALUES ('published-form', '公開中フォーム', '営業時間は{{var.old_hours}}', 'active')`,
+    ).run();
+    sqlite.prepare(
+      `INSERT INTO form_accounts (form_id, line_account_id) VALUES ('published-form', 'account-1')`,
+    ).run();
+    sqlite.prepare(
+      `UPDATE forms SET on_submit_message_content = '営業時間は{{var.new_hours}}' WHERE id = 'published-form'`,
+    ).run();
+    const source = (await getCommonVarById(db, 'source', 'account-1'))!;
+    const replacement = (await getCommonVarById(db, 'replacement', 'account-1'))!;
+
+    const plan = await getCommonVarReplacementPlan(db, source, replacement);
+    expect(plan).toMatchObject({ usageTotal: 3, replaceableTotal: 2, blockedTotal: 1 });
+    await expect(applyCommonVarReplacementPlan(db, plan, 'staff-1'))
+      .rejects.toThrow('Common variable replacement is blocked');
+    expect(sqlite.prepare(
+      `SELECT on_submit_message_content FROM form_versions WHERE form_id = 'published-form'`,
+    ).get()).toEqual({ on_submit_message_content: '営業時間は{{var.old_hours}}' });
+  });
+
   it('プレビュー後に本文が変わったら、一部だけ置換せず全体をロールバックする', async () => {
     const source = (await getCommonVarById(db, 'source', 'account-1'))!;
     const replacement = (await getCommonVarById(db, 'replacement', 'account-1'))!;

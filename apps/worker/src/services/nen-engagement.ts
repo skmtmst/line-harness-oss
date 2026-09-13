@@ -34,6 +34,10 @@ export type CampaignRow = {
   button_label: string | null;
   button_url: string | null;
   image_url: string | null;
+  /** 0 disables suppression; otherwise do not schedule the same campaign within this many days. */
+  dedup_window_days?: number;
+  /** When an open_form action is connected, skip friends who already submitted that form. */
+  exclude_form_respondents?: number;
   after_actions?: NenCampaignAfterAction[];
   updated_at?: string;
 };
@@ -178,12 +182,38 @@ function campaignSnapshot(campaign: CampaignRow): string {
   return JSON.stringify(campaign);
 }
 
+function campaignResponseFormId(campaign: CampaignRow): string | null {
+  return campaign.after_actions?.find(
+    (action): action is Extract<NenCampaignAfterAction, { kind: 'open_form' }> => action.kind === 'open_form',
+  )?.formId ?? null;
+}
+
+async function alreadyRespondedToCampaignForm(
+  db: D1Database,
+  campaign: CampaignRow,
+  friendId: string,
+): Promise<boolean> {
+  if (campaign.exclude_form_respondents !== 1) return false;
+  const formId = campaignResponseFormId(campaign);
+  if (!formId) return false;
+  const response = await db.prepare(
+    `SELECT 1 AS found FROM form_submissions WHERE form_id = ? AND friend_id = ? LIMIT 1`,
+  ).bind(formId, friendId).first<{ found: number }>();
+  return response?.found === 1;
+}
+
 export function readNenCampaignSnapshot(value: string | null, campaignKey: string): CampaignRow | null {
   if (!value) return null;
   try {
     const parsed = JSON.parse(value) as Partial<CampaignRow>;
     const delayDays = Number(parsed.delay_days);
     const enabled = Number(parsed.is_enabled);
+    const dedupWindowDays = parsed.dedup_window_days === undefined
+      ? 30
+      : Number(parsed.dedup_window_days);
+    const excludeFormRespondents = parsed.exclude_form_respondents === undefined
+      ? (campaignKey === 'review_request' ? 1 : 0)
+      : Number(parsed.exclude_form_respondents);
     if (
       parsed.campaign_key !== campaignKey
       || typeof parsed.title !== 'string'
@@ -196,6 +226,10 @@ export function readNenCampaignSnapshot(value: string | null, campaignKey: strin
       || typeof parsed.delivery_time !== 'string'
       || !/^([01]\d|2[0-3]):[0-5]\d$/.test(parsed.delivery_time)
       || ![0, 1].includes(enabled)
+      || !Number.isInteger(dedupWindowDays)
+      || dedupWindowDays < 0
+      || dedupWindowDays > 365
+      || ![0, 1].includes(excludeFormRespondents)
     ) return null;
     return {
       campaign_key: parsed.campaign_key,
@@ -210,6 +244,8 @@ export function readNenCampaignSnapshot(value: string | null, campaignKey: strin
       button_label: typeof parsed.button_label === 'string' ? parsed.button_label : null,
       button_url: typeof parsed.button_url === 'string' ? parsed.button_url : null,
       image_url: typeof parsed.image_url === 'string' ? parsed.image_url : null,
+      dedup_window_days: dedupWindowDays,
+      exclude_form_respondents: excludeFormRespondents,
       after_actions: parseNenCampaignAfterActions(parsed.after_actions),
       updated_at: typeof parsed.updated_at === 'string' ? parsed.updated_at : '',
     };
@@ -344,9 +380,15 @@ export async function getNenCampaign(
             title, body_text, button_label, button_url, image_url, updated_at
        FROM nen_campaign_settings WHERE campaign_key = ?`,
   ).bind(campaignKey).first<CampaignRow>();
-  if (!base || !lineAccountId) return base;
+  if (!base) return null;
+  const normalizedBase: CampaignRow = {
+    ...base,
+    dedup_window_days: 30,
+    exclude_form_respondents: campaignKey === 'review_request' ? 1 : 0,
+  };
+  if (!lineAccountId) return normalizedBase;
   const raw = await readAccountSetting(db, lineAccountId, campaignAccountSettingKey(campaignKey));
-  if (!raw) return base;
+  if (!raw) return normalizedBase;
   // 壊れたアカウント別設定を共通値へ黙って戻すと、止めたはずの配信が再開する。
   // 設定が存在するのに読めない場合は null にして、送信側を停止させる。
   return readNenCampaignSnapshot(raw, campaignKey);
@@ -446,16 +488,38 @@ export async function enqueuePostShippingFollowUps(
   let created = 0;
   for (const campaign of campaigns) {
     if (!FOLLOW_UP_KEYS.includes(campaign.campaign_key as typeof FOLLOW_UP_KEYS[number])) continue;
+    const scheduledAt = scheduledAfter(
+      event.shipping?.shipped_at || event.occurred_at,
+      campaign.delay_days,
+      campaign.delivery_time,
+    );
+    const formId = campaignResponseFormId(campaign);
+    const dedupWindowDays = campaign.dedup_window_days ?? 30;
+    const excludeFormRespondents = campaign.exclude_form_respondents ?? 0;
     const result = await db.prepare(
       `INSERT OR IGNORE INTO nen_delivery_jobs
         (id, campaign_key, friend_id, line_account_id, source_key, payload, campaign_snapshot,
          scheduled_at, status, attempts, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', 0, ?, ?)`,
+       SELECT ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 0, ?, ?
+        WHERE (? = 0 OR NOT EXISTS (
+          SELECT 1 FROM nen_delivery_jobs previous
+           WHERE previous.line_account_id = ?
+             AND previous.campaign_key = ?
+             AND previous.friend_id = ?
+             AND previous.status IN ('pending', 'processing', 'sent', 'failed')
+             AND ABS(julianday(previous.scheduled_at) - julianday(?)) < ?
+        ))
+          AND (? = 0 OR ? IS NULL OR NOT EXISTS (
+            SELECT 1 FROM form_submissions response
+             WHERE response.form_id = ? AND response.friend_id = ?
+          ))`,
     ).bind(
       crypto.randomUUID(), campaign.campaign_key, friendId, lineAccountId,
       event.event_id, JSON.stringify({ event }), campaignSnapshot(campaign),
-      scheduledAfter(event.shipping?.shipped_at || event.occurred_at, campaign.delay_days, campaign.delivery_time),
+      scheduledAt,
       now, now,
+      dedupWindowDays, lineAccountId, campaign.campaign_key, friendId, scheduledAt, dedupWindowDays,
+      excludeFormRespondents, formId, formId, friendId,
     ).run();
     created += result.meta.changes ?? 0;
   }
@@ -711,6 +775,13 @@ export async function processNenDeliveries(
         await db.prepare(
           `UPDATE nen_delivery_jobs SET status = 'skipped', last_error = ?, updated_at = ? WHERE id = ?`,
         ).bind(reason, jstNow(), job.id).run();
+        skipped++;
+        continue;
+      }
+      if (await alreadyRespondedToCampaignForm(db, campaign, friend.id)) {
+        await db.prepare(
+          `UPDATE nen_delivery_jobs SET status = 'skipped', last_error = ?, updated_at = ? WHERE id = ?`,
+        ).bind('campaign_form_already_submitted', jstNow(), job.id).run();
         skipped++;
         continue;
       }

@@ -8,6 +8,7 @@ const PAGE = readFileSync(join(HERE, 'page.tsx'), 'utf8')
 /* 種類の呼び方は `./template-message-type` に一本化した（#497 軽2）。 */
 const MESSAGE_TYPE = readFileSync(join(HERE, 'template-message-type.ts'), 'utf8')
 const EDIT_PAGE = readFileSync(join(HERE, 'edit/page.tsx'), 'utf8')
+const MESSAGE_EDITOR = readFileSync(join(HERE, '../../components/templates/message-template-editor.tsx'), 'utf8')
 const CAROUSEL_PAGE = readFileSync(join(HERE, 'carousel/page.tsx'), 'utf8')
 const ASSET_EDITOR = readFileSync(join(HERE, 'template-asset-editor.tsx'), 'utf8')
 
@@ -68,10 +69,11 @@ describe('使われている数', () => {
 
 describe('V6の作成画面', () => {
   it('本文のURLと差し込み後のLINE表示を確認できる', () => {
-    expect(EDIT_PAGE).toContain('本文に入れたURLの扱い')
-    expect(EDIT_PAGE).toContain('LINEプレビュー')
-    expect(EDIT_PAGE).toContain("if (name === 'name') return '山田 太郎'")
-    expect(EDIT_PAGE).toContain('preview.unresolved.length > 0')
+    expect(EDIT_PAGE).toContain('<MessageTemplateEditor')
+    expect(MESSAGE_EDITOR).toContain('本文に入れたURLの扱い')
+    expect(MESSAGE_EDITOR).toContain('LINEプレビュー')
+    expect(MESSAGE_EDITOR).toContain("if (name === 'name') return '山田 太郎'")
+    expect(MESSAGE_EDITOR).toContain('preview.unresolved.length > 0')
     expect(EDIT_PAGE).not.toContain('内容 / JSON')
   })
 

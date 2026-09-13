@@ -25,20 +25,24 @@ describe('D-3 店舗追加・一覧の統括集約', () => {
     expect(setupSource).toContain('data-design-node="b2NGxk"')
   })
 
-  it('登録画面で運用情報と3つの接続URLを保存前に確認できる', () => {
+  it('新設計の4項目入力・自動接続と5つの正本ノードを使う', () => {
     for (const value of [
-      'timezone,',
-      'country: country || null',
-      'role: role || null',
-      'parentLineAccountId: parentLineAccountId || null',
-      '`${workerBase}/webhook`',
       '`${workerBase}/auth/callback`',
-      '?liffId=',
+      'api.lineAccounts.connectCheck',
+      'api.lineAccounts.connect',
+      'api.lineAccounts.stepFollowerImport',
+      'data-design-node="a8qMXX"',
+      'data-design-node="oeVQQ"',
+      'data-design-node="YEHCR"',
+      'data-design-node="K1zHyx"',
+      "'VPh1U'",
+      "'t3Mlu'",
     ]) {
       expect(setupSource).toContain(value)
     }
-    expect(setupSource).toContain('api.lineAccounts.list()')
-    expect(setupSource).not.toContain('登録後に設定できます')
+    expect(setupSource).not.toContain('channel-access-token')
+    expect(setupSource).not.toContain('id="liff-id"')
+    expect(setupSource).not.toContain('account-timezone')
   })
 
   it('追加先の店舗ウィザードは利用規約を先頭にした5ステップを維持する', () => {

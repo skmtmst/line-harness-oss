@@ -194,6 +194,8 @@ export default function CampaignEditor({ campaignKey }: { campaignKey: string })
         buttonLabel: formAction?.buttonLabel ?? merged.buttonLabel,
         buttonUrl: formAction ? openFormUrl(selectedAccount?.liffId, formAction.formId) ?? merged.buttonUrl : merged.buttonUrl,
         imageUrl: merged.imageUrl,
+        dedupWindowDays: merged.dedupWindowDays,
+        excludeFormRespondents: merged.excludeFormRespondents,
         afterActions: actions,
       })
       if (!response.success) {
@@ -248,8 +250,8 @@ export default function CampaignEditor({ campaignKey }: { campaignKey: string })
              </div>
              {isBirthday && <p className="text-ink-faint mt-3 text-xs">この日時は誕生日配信の実行処理で固定されています。</p>}
              {!isBirthday && <div className="mt-4 space-y-3">
-              <label className="flex items-start gap-2 text-sm"><input type="checkbox" defaultChecked className="accent-accent mt-0.5" /><span><strong className="block">同じ人に何度も送らない</strong><span className="text-ink-faint text-xs">30日のあいだに1回だけにします。まとめ買いのときに何通も届くのを防ぎます。</span></span></label>
-              <label className="flex items-start gap-2 text-sm"><input type="checkbox" defaultChecked className="accent-accent mt-0.5" /><span><strong className="block">すでに口コミを書いた人には送らない</strong><span className="text-ink-faint text-xs">EC連携の口コミの記録を見ています。</span></span></label>
+              <label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={merged.dedupWindowDays > 0} onChange={(event) => setDraft((previous) => ({ ...previous, dedupWindowDays: event.target.checked ? 30 : 0 }))} className="accent-accent mt-0.5" /><span><strong className="block">同じ人に何度も送らない</strong><span className="text-ink-faint text-xs">30日のあいだに1回だけにします。まとめ買いのときに何通も届くのを防ぎます。</span></span></label>
+              {merged.campaignKey === 'review_request' && <label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={Boolean(formAction) && merged.excludeFormRespondents} disabled={!formAction} onChange={(event) => setDraft((previous) => ({ ...previous, excludeFormRespondents: event.target.checked }))} className="accent-accent mt-0.5" /><span><strong className="block">すでに口コミを書いた人には送らない</strong><span className="text-ink-faint text-xs">この配信につないだ口コミフォームの回答記録を見ます。先に回答フォームを選んでください。</span></span></label>}
             </div>}
           </section>
 

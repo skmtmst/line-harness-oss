@@ -160,7 +160,9 @@
 
 .button {
   display: inline-flex;
-  width: 112px;
+  min-width: 112px;
+  width: auto;
+  white-space: nowrap;
   min-height: 38px;
   align-items: center;
   justify-content: center;
@@ -181,7 +183,9 @@
 }
 
 .designButton {
-  width: 112px;
+  min-width: 112px;
+  width: auto;
+  white-space: nowrap;
 }
 
 .button:disabled {

@@ -1,4 +1,5 @@
 import type { LineClient } from '@line-crm/line-sdk';
+import { getSendPermissionForAccount } from './send-entitlements.js';
 import {
   ensureAutoReplyPublishedVersion,
   finishAutoReplyActionRun,
@@ -473,6 +474,14 @@ export async function matchAndReply(
     return { matched: true, replyTokenConsumed: true };
   }
   const evaluationId = reservation.row.id;
+
+  // 課金の状態（トライアル終了・解約）で配信が止まっている統括は自動応答も返さない。
+  // 受信そのものは受信箱に残る（運用者が手で返せる）。台帳には理由を残す。
+  const permission = await getSendPermissionForAccount(db, lineAccountId ?? friend.line_account_id ?? null);
+  if (!permission.allowed) {
+    await markAutoReplyEvaluationSkipped(db, evaluationId, 'billing_blocked');
+    return { matched: false, replyTokenConsumed: false };
+  }
 
   // グローバルルール (line_account_id IS NULL) + このアカウントのルール。
   // lineAccountId が null のときは `= NULL` が偽になるのでグローバルのみ残る。

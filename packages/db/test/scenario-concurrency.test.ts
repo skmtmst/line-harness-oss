@@ -53,6 +53,17 @@ beforeEach(() => {
 });
 
 describe('シナリオの並行購読', () => {
+  test('同じ受信行動の再試行は完了済み購読を再開しない', async () => {
+    const scenario = await withStep('webhook-retry');
+    const first = await enrollFriendInScenario(db, 'f-1', scenario.id, 'stable-webhook-action');
+    expect(first).not.toBeNull();
+    sqlite.prepare(`UPDATE friend_scenarios SET status='completed' WHERE id=?`).run(first!.id);
+    const retry = await enrollFriendInScenario(db, 'f-1', scenario.id, 'stable-webhook-action');
+    expect(retry?.id).toBe(first!.id);
+    expect(retry?.status).toBe('completed');
+    expect(sqlite.prepare('SELECT COUNT(*) AS n FROM friend_scenarios').get()).toEqual({ n: 1 });
+  });
+
   test('既定では並行を許す（従来どおり）', async () => {
     // ここを既定で塞ぐと、いま複数のシナリオに入っている人への配信が止まる。
     const a = await withStep('A');

@@ -94,6 +94,62 @@ export async function checkFormGates(input: FormGateInput): Promise<string | nul
   return null;
 }
 
+/** 全体上限・選択肢定員のうち、原子的に確保すべき1枠。 */
+export interface FormCapacitySlot {
+  /** `form_capacity_claims.slot_key`。全体は固定値、選択肢は `choice:ブロック名:ラベル`。 */
+  key: string;
+  limit: number;
+  /** 確保できなかったときに利用者へ見せる文言。 */
+  message: string;
+}
+
+/** 全体上限のキー。他のフォーム内容と衝突しない固定値。 */
+export const FORM_TOTAL_LIMIT_SLOT_KEY = '__total__';
+
+/**
+ * この回答が原子的に確保すべき枠を列挙する(N-167 / #751)。
+ *
+ * `checkFormGates` の全体上限・選択肢定員の判定は「数えてから比べる」
+ * だけで、同時に来た別の回答との間に隙間がある。ここで列挙した枠を
+ * `claimFormCapacitySlot` で1つずつ条件付き INSERT すれば、同時に来ても
+ * 定員ぶんしか勝てない。
+ *
+ * `checkFormGates` と同じ判定条件(enabled・limit の型)を使う。
+ * 対象が無ければ空配列を返す(ほとんどの回答はここに来ない)。
+ */
+export function collectCapacitySlots(layout: FormLayout, answers: FormAnswers): FormCapacitySlot[] {
+  const slots: FormCapacitySlot[] = [];
+  const options = layout.options ?? {};
+
+  if (options.totalLimit?.enabled && typeof options.totalLimit.max === 'number') {
+    slots.push({
+      key: FORM_TOTAL_LIMIT_SLOT_KEY,
+      limit: options.totalLimit.max,
+      message: options.totalLimit.message || 'このフォームは受付を終了しました',
+    });
+  }
+
+  for (const block of collectInputs(layout)) {
+    if (!hasChoices(block)) continue;
+    const limited = (block.choices ?? []).filter(
+      (c) => c.capacity?.enabled && typeof c.capacity.limit === 'number',
+    );
+    if (limited.length === 0) continue;
+
+    const selected = toLabels(answers[block.name]);
+    for (const choice of limited) {
+      if (!selected.includes(choice.label)) continue;
+      slots.push({
+        key: `choice:${block.name}:${choice.label}`,
+        limit: choice.capacity!.limit!,
+        message: `「${choice.label}」は定員に達しました`,
+      });
+    }
+  }
+
+  return slots;
+}
+
 /**
  * 期限の文字列を、日本時間として読む。
  *

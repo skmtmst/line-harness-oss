@@ -182,6 +182,8 @@ nenCampaigns.get('/api/nen-campaigns/settings', async (c) => {
     buttonLabel: row.button_label,
     buttonUrl: row.button_url,
     imageUrl: row.image_url,
+    dedupWindowDays: row.dedup_window_days ?? 30,
+    excludeFormRespondents: row.exclude_form_respondents === 1,
     afterActions: row.after_actions ?? [],
     updatedAt: row.updated_at ?? '',
   })) });
@@ -223,6 +225,16 @@ nenCampaigns.put('/api/nen-campaigns/settings/:campaignKey', requireRole('owner'
   }
   const current = await getNenCampaign(c.env.DB, key, accountId);
   if (!current) return c.json({ success: false, error: 'Campaign not found' }, 404);
+  const dedupWindowDays = body.dedupWindowDays === undefined
+    ? (current.dedup_window_days ?? 30)
+    : Number(body.dedupWindowDays);
+  const excludeFormRespondents = body.excludeFormRespondents === undefined
+    ? current.exclude_form_respondents === 1
+    : body.excludeFormRespondents;
+  if (!Number.isInteger(dedupWindowDays) || dedupWindowDays < 0 || dedupWindowDays > 365
+      || typeof excludeFormRespondents !== 'boolean') {
+    return c.json({ success: false, error: 'Invalid delivery safeguards' }, 400);
+  }
   await saveNenCampaignAccountSetting(c.env.DB, accountId, {
     ...current,
     is_enabled: body.isEnabled ? 1 : 0,
@@ -233,6 +245,8 @@ nenCampaigns.put('/api/nen-campaigns/settings/:campaignKey', requireRole('owner'
     button_label: buttonLabel || null,
     button_url: buttonUrl || null,
     image_url: imageUrl || null,
+    dedup_window_days: dedupWindowDays,
+    exclude_form_respondents: excludeFormRespondents ? 1 : 0,
     after_actions: afterActions,
     updated_at: jstNow(),
   });

@@ -6,12 +6,19 @@ export class HqTemplateError extends Error {
 }
 export type TagDefinition = {
   schemaVersion: 1;
-  tag: { name: string; color: string; description: string | null; folderId: string | null };
+  tag: {
+    name: string; color: string; description: string | null; folderId: string | null;
+    isStarred?: boolean; manualAssignmentAllowed?: boolean;
+    reapplyPolicy?: 'first_only' | 'every_time'; linkedEnabled?: boolean;
+    mileage?: { self: number; referrer: number; multiplier: number | null; priority: number };
+    actions?: TagAction[];
+  };
   folders: { id: string; name: string; parentId: string | null; color: string | null }[];
 };
+export type TagAction = { id: string; type: 'send_message' | 'grant_mileage'; params: Record<string, unknown>; onFailure: 'stop' | 'continue' };
 export type PreflightItem = { sourceId: string; itemKind: 'tag' | 'folder'; name: string; targetId: string | null; expectedRevision: string | null; duplicate: boolean; allowedModes: ('create' | 'overwrite' | 'alias')[] };
 type Snapshot = {
-  tags: { id: string; name: string; status: string; updated_at: string | null; version: number }[];
+  tags: { id: string; name: string; status: string; updated_at: string | null; version: number; action_id: string | null; draft_id: string | null; binding_version_id: string | null; action_count: number }[];
   folders: { id: string; name: string; parent_id: string | null; updated_at: string }[];
 };
 function object(v: unknown): Record<string, unknown> {
@@ -27,11 +34,46 @@ function color(v: unknown): string | null {
   if (typeof v !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(v)) throw new HqTemplateError('INVALID_DEFINITION');
   return v;
 }
+function boolean(v: unknown, fallback: boolean): boolean {
+  if (v === undefined) return fallback;
+  if (typeof v !== 'boolean') throw new HqTemplateError('INVALID_DEFINITION');
+  return v;
+}
+function integer(v: unknown, min: number, max: number, fallback: number): number {
+  if (v === undefined) return fallback;
+  if (!Number.isSafeInteger(v) || (v as number) < min || (v as number) > max) throw new HqTemplateError('INVALID_DEFINITION');
+  return v as number;
+}
+function actions(v: unknown): TagAction[] {
+  if (v === undefined) return [];
+  if (!Array.isArray(v) || v.length > 50) throw new HqTemplateError('INVALID_DEFINITION');
+  const parsed = v.map<TagAction>(value => {
+    const action = object(value), params = object(action.params);
+    if (Object.keys(action).some(key => !['id', 'type', 'params', 'onFailure'].includes(key))) throw new HqTemplateError('UNSUPPORTED_REFERENCE');
+    const id = boundedText(action.id, 80), onFailure: TagAction['onFailure'] | null = action.onFailure === 'continue' ? 'continue' : action.onFailure === 'stop' ? 'stop' : null;
+    if (!onFailure || (action.type !== 'send_message' && action.type !== 'grant_mileage')) throw new HqTemplateError('UNSUPPORTED_REFERENCE');
+    const common = new Set(['delayMinutes', 'cancelIfTagRemoved']);
+    const allowed = action.type === 'send_message' ? new Set([...common, 'content']) : new Set([...common, 'amount']);
+    if (Object.keys(params).some(key => !allowed.has(key))) throw new HqTemplateError('UNSUPPORTED_REFERENCE');
+    const delayMinutes = integer(params.delayMinutes, 0, 525600, 0);
+    const cancelIfTagRemoved = boolean(params.cancelIfTagRemoved, true);
+    if (action.type === 'send_message') {
+      const content = boundedText(params.content, 5000);
+      return { id, type: 'send_message', params: { delayMinutes, cancelIfTagRemoved, content }, onFailure };
+    }
+    const amount = integer(params.amount, 1, 1_000_000, 1);
+    return { id, type: 'grant_mileage', params: { delayMinutes, cancelIfTagRemoved, amount }, onFailure };
+  });
+  if (new Set(parsed.map(action => action.id)).size !== parsed.length) throw new HqTemplateError('INVALID_DEFINITION');
+  return parsed;
+}
 export function parseTagDefinition(v: unknown): TagDefinition {
   const root = object(v), tag = object(root.tag);
   if (root.schemaVersion !== 1 || !Array.isArray(root.folders) || root.folders.length > 8) throw new HqTemplateError('INVALID_DEFINITION');
+  if (Object.keys(root).some(key => !['schemaVersion', 'tag', 'folders'].includes(key))) throw new HqTemplateError('UNSUPPORTED_REFERENCE');
   const folders = root.folders.map(v => {
     const f = object(v);
+    if (Object.keys(f).some(key => !['id', 'name', 'parentId', 'color'].includes(key))) throw new HqTemplateError('UNSUPPORTED_REFERENCE');
     return { id: boundedText(f.id, 80), name: boundedText(f.name), parentId: f.parentId == null ? null : boundedText(f.parentId, 80), color: color(f.color) };
   });
   if (new Set(folders.map(f => f.id)).size !== folders.length) throw new HqTemplateError('INVALID_DEFINITION');
@@ -42,15 +84,36 @@ export function parseTagDefinition(v: unknown): TagDefinition {
     ordered.unshift(f); id = f.parentId;
   }
   if (ordered.length !== folders.length) throw new HqTemplateError('INVALID_DEFINITION');
-  return { schemaVersion: 1, tag: { name: boundedText(tag.name), color: color(tag.color) ?? '#3B82F6', description: tag.description == null || tag.description === '' ? null : boundedText(tag.description, 2000), folderId }, folders: ordered };
+  const mileageValue = tag.mileage === undefined ? null : object(tag.mileage);
+  const multiplier = mileageValue?.multiplier == null ? null : integer(mileageValue.multiplier, 1000, 100000, 10000);
+  const reapplyPolicy = tag.reapplyPolicy;
+  if (reapplyPolicy !== undefined && reapplyPolicy !== 'first_only' && reapplyPolicy !== 'every_time') throw new HqTemplateError('INVALID_DEFINITION');
+  const parsedActions = tag.actions === undefined ? undefined : actions(tag.actions);
+  const allowedTagKeys = new Set(['name','color','description','folderId','isStarred','manualAssignmentAllowed','reapplyPolicy','linkedEnabled','mileage','actions']);
+  if (Object.keys(tag).some(key => !allowedTagKeys.has(key))) throw new HqTemplateError('UNSUPPORTED_REFERENCE');
+  return { schemaVersion: 1, tag: {
+    name: boundedText(tag.name), color: color(tag.color) ?? '#3B82F6',
+    description: tag.description == null || tag.description === '' ? null : boundedText(tag.description, 2000), folderId,
+    ...(tag.isStarred === undefined ? {} : { isStarred: boolean(tag.isStarred, false) }),
+    ...(tag.manualAssignmentAllowed === undefined ? {} : { manualAssignmentAllowed: boolean(tag.manualAssignmentAllowed, true) }),
+    ...(reapplyPolicy === undefined ? {} : { reapplyPolicy }),
+    ...(tag.linkedEnabled === undefined ? {} : { linkedEnabled: boolean(tag.linkedEnabled, false) }),
+    ...(mileageValue === null ? {} : { mileage: {
+      self: integer(mileageValue.self, 0, 1_000_000, 0),
+      referrer: integer(mileageValue.referrer, 0, 1_000_000, 0),
+      multiplier,
+      priority: integer(mileageValue.priority, 0, 1000, 0),
+    } }),
+    ...(parsedActions === undefined ? {} : { actions: parsedActions }),
+  }, folders: ordered };
 }
 // This same projection is checked inside the write batch, closing the read/write race.
 const SNAPSHOT_SQL = `SELECT json_object(
- 'tags',json((SELECT json_group_array(json_object('id',id,'name',name,'normalized_name',normalized_name,'color',color,'description',description,'folder_id',folder_id,'updated_at',updated_at,'version',version,'status',status)) FROM (SELECT * FROM tags WHERE line_account_id=? ORDER BY id))),
+ 'tags',json((SELECT json_group_array(json_object('id',t.id,'name',t.name,'normalized_name',t.normalized_name,'color',t.color,'description',t.description,'folder_id',t.folder_id,'updated_at',t.updated_at,'version',t.version,'status',t.status,'action_id',(SELECT ca.id FROM common_action_bindings b JOIN common_actions ca ON ca.id=b.common_action_id AND ca.line_account_id=b.line_account_id WHERE b.line_account_id=? AND b.consumer_type='tag' AND b.consumer_id=t.id AND b.consumer_path='tag.added' ORDER BY ca.updated_at DESC,ca.id DESC LIMIT 1),'draft_id',(SELECT ca.current_draft_version_id FROM common_action_bindings b JOIN common_actions ca ON ca.id=b.common_action_id AND ca.line_account_id=b.line_account_id WHERE b.line_account_id=? AND b.consumer_type='tag' AND b.consumer_id=t.id AND b.consumer_path='tag.added' ORDER BY ca.updated_at DESC,ca.id DESC LIMIT 1),'binding_version_id',(SELECT b.common_action_version_id FROM common_action_bindings b JOIN common_actions ca ON ca.id=b.common_action_id AND ca.line_account_id=b.line_account_id WHERE b.line_account_id=? AND b.consumer_type='tag' AND b.consumer_id=t.id AND b.consumer_path='tag.added' ORDER BY ca.updated_at DESC,ca.id DESC LIMIT 1),'action_count',(SELECT COUNT(*) FROM common_action_bindings b WHERE b.line_account_id=? AND b.consumer_type='tag' AND b.consumer_id=t.id AND b.consumer_path='tag.added'))) FROM (SELECT * FROM tags WHERE line_account_id=? ORDER BY id) t)),
  'folders',json((SELECT json_group_array(json_object('id',id,'name',name,'parent_id',parent_id,'color',color,'updated_at',updated_at)) FROM (SELECT * FROM folders WHERE kind='tag' AND account_id=? ORDER BY id)))
 ) AS snapshot`;
 export async function tagSnapshot(db: D1Database, accountId: string): Promise<string> {
-  const row = await db.prepare(SNAPSHOT_SQL).bind(accountId, accountId).first<{ snapshot: string }>();
+  const row = await db.prepare(SNAPSHOT_SQL).bind(accountId, accountId, accountId, accountId, accountId, accountId).first<{ snapshot: string }>();
   if (!row) throw new HqTemplateError('SNAPSHOT_UNAVAILABLE', 500);
   return row.snapshot;
 }
@@ -66,6 +129,7 @@ export function inspectTags(def: TagDefinition, snapshot: string): PreflightItem
   const found = target.tags.filter(t => normalizeScopedTagName(t.name) === normalizeScopedTagName(def.tag.name));
   if (found.length > 1) throw new HqTemplateError('AMBIGUOUS_TAG', 409);
   const t = found[0];
+  if (t && t.action_count > 1 && def.tag.actions !== undefined) throw new HqTemplateError('AMBIGUOUS_ACTION_BINDING', 409);
   items.push({ sourceId: 'tag', itemKind: 'tag', name: def.tag.name, targetId: t?.id ?? null, expectedRevision: t ? `${t.updated_at ?? ''}:${t.version}` : null, duplicate: Boolean(t), allowedModes: t ? t.status === 'archived' ? ['alias'] : ['overwrite', 'alias'] : ['create'] });
   return items;
 }
@@ -78,7 +142,7 @@ export function planTags(input: { accountId: string; actorId: string; definition
   const { accountId, definition: def, snapshot } = input, state = JSON.parse(snapshot) as Snapshot;
   const items = inspectTags(def, snapshot);
   if (input.resolutions.length !== items.length || new Set(input.resolutions.map(r => r.sourceId)).size !== items.length) throw new HqTemplateError('SELECTION_REQUIRED', 409);
-  const statements: HqTemplateStatement[] = [{ sql: `SELECT json(CASE WHEN (${SNAPSHOT_SQL})=? THEN '{}' ELSE 'VERSION_CONFLICT' END)`, bindings: [accountId, accountId, snapshot] }];
+  const statements: HqTemplateStatement[] = [{ sql: `SELECT json(CASE WHEN (${SNAPSHOT_SQL})=? THEN '{}' ELSE 'VERSION_CONFLICT' END)`, bindings: [accountId, accountId, accountId, accountId, accountId, accountId, snapshot] }];
   const now = new Date().toISOString(), ids = new Map<string, string>(), resolutions: HqTemplateResolution[] = [];
   const counts = { created: 0, overwritten: 0, aliased: 0 };
   for (const item of items) {
@@ -95,8 +159,27 @@ export function planTags(input: { accountId: string; actorId: string; definition
       else statements.push({ sql: `INSERT INTO folders(id,kind,name,parent_id,color,account_id,created_at,updated_at) VALUES (?,'tag',?,?,?,?,?,?)`, bindings: [id, name, parent, f.color, accountId, now, now] });
     } else {
       const folderId = def.tag.folderId ? ids.get(`folder:${def.tag.folderId}`)! : null;
-      if (selection.mode === 'overwrite') statements.push({ sql: `UPDATE tags SET name=?,normalized_name=?,color=?,description=?,folder_id=?,version=version+1,updated_by=?,updated_at=? WHERE id=? AND line_account_id=?`, bindings: [name, normalizeScopedTagName(name), def.tag.color, def.tag.description, folderId, input.actorId, now, id, accountId] });
-      else statements.push({ sql: `INSERT INTO tags(id,name,normalized_name,color,description,folder_id,line_account_id,created_by,updated_by,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)`, bindings: [id, name, normalizeScopedTagName(name), def.tag.color, def.tag.description, folderId, accountId, input.actorId, input.actorId, now, now] });
+      const mileage = def.tag.mileage;
+      if (selection.mode === 'overwrite') statements.push({ sql: `UPDATE tags SET name=?,normalized_name=?,color=?,description=?,folder_id=?,is_starred=CASE WHEN ? THEN ? ELSE is_starred END,manual_assignment_allowed=CASE WHEN ? THEN ? ELSE manual_assignment_allowed END,reapply_policy=CASE WHEN ? THEN ? ELSE reapply_policy END,linked_enabled=CASE WHEN ? THEN ? ELSE linked_enabled END,mileage_reward=CASE WHEN ? THEN ? ELSE mileage_reward END,referral_mileage_reward=CASE WHEN ? THEN ? ELSE referral_mileage_reward END,mileage_multiplier_bps=CASE WHEN ? THEN ? ELSE mileage_multiplier_bps END,mileage_multiplier_priority=CASE WHEN ? THEN ? ELSE mileage_multiplier_priority END,version=version+1,updated_by=?,updated_at=? WHERE id=? AND line_account_id=?`, bindings: [name, normalizeScopedTagName(name), def.tag.color, def.tag.description, folderId, def.tag.isStarred !== undefined ? 1 : 0, def.tag.isStarred ? 1 : 0, def.tag.manualAssignmentAllowed !== undefined ? 1 : 0, def.tag.manualAssignmentAllowed ? 1 : 0, def.tag.reapplyPolicy !== undefined ? 1 : 0, def.tag.reapplyPolicy ?? 'first_only', def.tag.linkedEnabled !== undefined ? 1 : 0, def.tag.linkedEnabled ? 1 : 0, mileage !== undefined ? 1 : 0, mileage?.self ?? 0, mileage !== undefined ? 1 : 0, mileage?.referrer ?? 0, mileage !== undefined ? 1 : 0, mileage?.multiplier ?? null, mileage !== undefined ? 1 : 0, mileage?.priority ?? 0, input.actorId, now, id, accountId] });
+      else statements.push({ sql: `INSERT INTO tags(id,name,normalized_name,color,description,folder_id,line_account_id,is_starred,manual_assignment_allowed,reapply_policy,linked_enabled,mileage_reward,referral_mileage_reward,mileage_multiplier_bps,mileage_multiplier_priority,status,version,created_by,updated_by,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'active',1,?,?,?,?)`, bindings: [id, name, normalizeScopedTagName(name), def.tag.color, def.tag.description, folderId, accountId, def.tag.isStarred ? 1 : 0, def.tag.manualAssignmentAllowed === false ? 0 : 1, def.tag.reapplyPolicy ?? 'first_only', def.tag.linkedEnabled ? 1 : 0, mileage?.self ?? 0, mileage?.referrer ?? 0, mileage?.multiplier ?? null, mileage?.priority ?? 0, input.actorId, input.actorId, now, now] });
+
+      const existing = selection.mode === 'overwrite' ? state.tags.find(tag => tag.id === id) : null;
+      if ((def.tag.actions?.length ?? 0) > 0 || (def.tag.actions !== undefined && existing?.action_id)) {
+        const actionId = existing?.action_id ?? crypto.randomUUID(), versionId = crypto.randomUUID();
+        if (existing?.action_id) {
+          statements.push(
+            { sql: `INSERT INTO common_action_versions(id,common_action_id,version_number,status,action_config,created_by,created_at) SELECT ?,?,COALESCE(MAX(version_number),0)+1,'draft',?,?,? FROM common_action_versions WHERE common_action_id=?`, bindings: [versionId, actionId, JSON.stringify(def.tag.actions ?? []), input.actorId, now, actionId] },
+            { sql: `UPDATE common_actions SET name=?,description=?,status='draft',current_draft_version_id=?,updated_at=? WHERE id=? AND line_account_id=?`, bindings: [`${name} が付いたとき`, `タグ「${name}」の連動アクション`, versionId, now, actionId, accountId] },
+            { sql: `UPDATE common_action_bindings SET common_action_version_id=?,updated_at=? WHERE line_account_id=? AND common_action_id=? AND consumer_type='tag' AND consumer_id=? AND consumer_path='tag.added'`, bindings: [versionId, now, accountId, actionId, id] },
+          );
+        } else {
+          statements.push(
+            { sql: `INSERT INTO common_actions(id,line_account_id,name,description,status,current_draft_version_id,created_by,created_at,updated_at) VALUES (?,?,?,?,'draft',?,?,?,?)`, bindings: [actionId, accountId, `${name} が付いたとき`, `タグ「${name}」の連動アクション`, versionId, input.actorId, now, now] },
+            { sql: `INSERT INTO common_action_versions(id,common_action_id,version_number,status,action_config,created_by,created_at) VALUES (?,?,1,'draft',?,?,?)`, bindings: [versionId, actionId, JSON.stringify(def.tag.actions ?? []), input.actorId, now] },
+            { sql: `INSERT INTO common_action_bindings(id,line_account_id,common_action_id,common_action_version_id,consumer_type,consumer_id,consumer_path,created_by,created_at,updated_at) VALUES (?,?,?,?,'tag',?,'tag.added',?,?,?)`, bindings: [crypto.randomUUID(), accountId, actionId, versionId, id, input.actorId, now, now] },
+          );
+        }
+      }
     }
     if (selection.mode === 'create') counts.created++; else if (selection.mode === 'overwrite') counts.overwritten++; else counts.aliased++;
   }

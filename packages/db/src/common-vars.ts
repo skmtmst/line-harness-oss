@@ -181,19 +181,34 @@ const COMMON_VAR_USAGE_QUERIES: Array<{
   },
   {
     kind: 'form',
-    sql: `SELECT f.id AS source_id, NULL AS source_parent_id, f.name AS source_name,
-                 CASE WHEN f.is_active = 1 THEN 'active' ELSE 'stopped' END AS source_status,
-                 CASE WHEN instr(coalesce(f.on_submit_message_content, ''), ?) > 0
+    sql: `WITH target(token, account_id) AS (SELECT ?, ?)
+          SELECT f.id AS source_id, NULL AS source_parent_id, f.name AS source_name,
+                 CASE WHEN v.id IS NOT NULL AND (
+                            instr(coalesce(v.on_submit_message_content, ''), target.token) > 0
+                         OR instr(coalesce(v.fields, ''), target.token) > 0
+                         OR instr(coalesce(v.layout, ''), target.token) > 0)
+                      THEN 'published'
+                      WHEN f.is_active = 1 THEN 'active' ELSE 'stopped' END AS source_status,
+                 CASE WHEN instr(coalesce(v.on_submit_message_content, ''), target.token) > 0
+                      THEN v.on_submit_message_content
+                      WHEN instr(coalesce(v.fields, ''), target.token) > 0 THEN v.fields
+                      WHEN instr(coalesce(v.layout, ''), target.token) > 0 THEN v.layout
+                      WHEN instr(coalesce(f.on_submit_message_content, ''), target.token) > 0
                       THEN f.on_submit_message_content
-                      WHEN instr(coalesce(f.fields, ''), ?) > 0 THEN f.fields
+                      WHEN instr(coalesce(f.fields, ''), target.token) > 0 THEN f.fields
                       ELSE coalesce(f.layout, '') END AS source_content,
                  0 AS is_historical
             FROM forms f JOIN form_accounts fa ON fa.form_id = f.id
-           WHERE fa.line_account_id = ?
-             AND (instr(coalesce(f.on_submit_message_content, ''), ?) > 0
-               OR instr(coalesce(f.fields, ''), ?) > 0
-               OR instr(coalesce(f.layout, ''), ?) > 0)`,
-    values: (_varKey, token, account) => [token, token, account, token, token, token],
+            LEFT JOIN form_versions v ON v.id = f.current_published_version_id
+            CROSS JOIN target
+           WHERE fa.line_account_id = target.account_id
+             AND (instr(coalesce(f.on_submit_message_content, ''), target.token) > 0
+               OR instr(coalesce(f.fields, ''), target.token) > 0
+               OR instr(coalesce(f.layout, ''), target.token) > 0
+               OR instr(coalesce(v.on_submit_message_content, ''), target.token) > 0
+               OR instr(coalesce(v.fields, ''), target.token) > 0
+               OR instr(coalesce(v.layout, ''), target.token) > 0)`,
+    values: (_varKey, token, account) => [token, account],
   },
   {
     kind: 'automation',
@@ -272,10 +287,15 @@ const COMMON_VAR_USAGE_SUMMARY_SQL = `SELECT
   ${COMMON_VAR_USAGE_QUERIES.map((source) =>
     `(SELECT COUNT(*) FROM (${source.sql})) AS ${source.kind}`).join(',\n  ')},
   (SELECT COUNT(*) FROM forms f
+    LEFT JOIN form_versions v ON v.id = f.current_published_version_id
+    CROSS JOIN (SELECT ? AS token) target
     WHERE NOT EXISTS (SELECT 1 FROM form_accounts fa WHERE fa.form_id = f.id)
-      AND (instr(coalesce(f.on_submit_message_content, ''), ?) > 0
-        OR instr(coalesce(f.fields, ''), ?) > 0
-        OR instr(coalesce(f.layout, ''), ?) > 0)) AS unscoped_form`;
+      AND (instr(coalesce(f.on_submit_message_content, ''), target.token) > 0
+        OR instr(coalesce(f.fields, ''), target.token) > 0
+        OR instr(coalesce(f.layout, ''), target.token) > 0
+        OR instr(coalesce(v.on_submit_message_content, ''), target.token) > 0
+        OR instr(coalesce(v.fields, ''), target.token) > 0
+        OR instr(coalesce(v.layout, ''), target.token) > 0)) AS unscoped_form`;
 
 export interface CommonVarUsageSummary {
   total: number;
@@ -314,7 +334,7 @@ export async function getCommonVarUsageSummaries(
       const values = COMMON_VAR_USAGE_QUERIES.flatMap((source) =>
         source.values(varKey, token, lineAccountId));
       return db.prepare(COMMON_VAR_USAGE_SUMMARY_SQL)
-        .bind(...values, token, token, token);
+        .bind(...values, token);
     });
     const results = await db.batch<Record<CommonVarUsageKind, number> & { unscoped_form: number }>(statements);
     keys.forEach((varKey, index) => {
@@ -418,11 +438,16 @@ export async function getCommonVarUsageImpact(
   // 確定できない。名前や本文は返さず、件数だけ残して削除を安全側に止める。
   const unscopedForms = await db.prepare(
     `SELECT COUNT(*) AS count FROM forms f
+      LEFT JOIN form_versions v ON v.id = f.current_published_version_id
+      CROSS JOIN (SELECT ? AS token) target
       WHERE NOT EXISTS (SELECT 1 FROM form_accounts fa WHERE fa.form_id = f.id)
-        AND (instr(coalesce(f.on_submit_message_content, ''), ?) > 0
-          OR instr(coalesce(f.fields, ''), ?) > 0
-          OR instr(coalesce(f.layout, ''), ?) > 0)`,
-  ).bind(token, token, token).first<{ count: number }>();
+        AND (instr(coalesce(f.on_submit_message_content, ''), target.token) > 0
+          OR instr(coalesce(f.fields, ''), target.token) > 0
+          OR instr(coalesce(f.layout, ''), target.token) > 0
+          OR instr(coalesce(v.on_submit_message_content, ''), target.token) > 0
+          OR instr(coalesce(v.fields, ''), target.token) > 0
+          OR instr(coalesce(v.layout, ''), target.token) > 0)`,
+  ).bind(token).first<{ count: number }>();
   const unscopedFormTotal = Number(unscopedForms?.count ?? 0);
   byKind.form += unscopedFormTotal;
 
@@ -704,7 +729,7 @@ const COMMON_VAR_REPLACEMENT_SOURCES: ReplacementSource[] = [
   { table: 'scenario_actions', kind: 'scenario', columns: ['config_json'], sql: `SELECT sa.id, sa.config_json FROM scenario_actions sa JOIN scenarios s ON s.id = sa.scenario_id WHERE s.line_account_id = ? AND sa.action_type = 'common_var'` },
   { table: 'reminder_steps', kind: 'reminder', columns: ['message_content'], sql: `SELECT rs.id, rs.message_content FROM reminder_steps rs JOIN reminders r ON r.id = rs.reminder_id WHERE r.line_account_id = ?` },
   { table: 'auto_replies', kind: 'auto_reply', columns: ['response_content', 'actions_json'], sql: `SELECT id, response_content, actions_json FROM auto_replies WHERE line_account_id = ?` },
-  { table: 'forms', kind: 'form', columns: ['on_submit_message_content', 'fields', 'layout'], sql: `SELECT DISTINCT f.id, f.on_submit_message_content, f.fields, f.layout FROM forms f JOIN form_accounts fa ON fa.form_id = f.id WHERE fa.line_account_id = ?` },
+  { table: 'forms', kind: 'form', columns: ['on_submit_message_content', 'fields', 'layout'], sql: `SELECT DISTINCT f.id, f.on_submit_message_content, f.fields, f.layout, pv.on_submit_message_content AS published_on_submit_message_content, pv.fields AS published_fields, pv.layout AS published_layout FROM forms f JOIN form_accounts fa ON fa.form_id = f.id LEFT JOIN form_versions pv ON pv.id = f.current_published_version_id WHERE fa.line_account_id = ?` },
   { table: 'automations', kind: 'automation', columns: ['conditions', 'actions'], sql: `SELECT id, conditions, actions FROM automations WHERE line_account_id = ?` },
   { table: 'automation_versions', kind: 'automation', columns: ['trigger_config', 'condition_config', 'action_config'], sql: `SELECT v.id, v.trigger_config, v.condition_config, v.action_config FROM automation_versions v JOIN automation_definitions d ON d.id = v.automation_id WHERE d.line_account_id = ? AND v.id IN (d.current_draft_version_id, d.current_published_version_id)` },
   { table: 'account_settings', kind: 'friend_add', columns: ['value'], sql: `SELECT id, value FROM account_settings WHERE line_account_id = ? AND key = 'friend_add_routing'` },
@@ -775,6 +800,15 @@ export async function getCommonVarReplacementPlan(
       .bind(...replacementQueryValues(descriptor, source.line_account_id))
       .all<Record<string, string | null>>();
     for (const row of result.results) {
+      if (descriptor.table === 'forms' && [
+        row.published_on_submit_message_content,
+        row.published_fields,
+        row.published_layout,
+      ].some((value) => typeof value === 'string'
+        && replaceCommonVarText(value, source.var_key, replacement.var_key) !== null)) {
+        // 現在の公開版は不変。下書きだけ差し替えて元変数を消すと公開URLが壊れる。
+        continue;
+      }
       const columns: Record<string, string> = {};
       const originalColumns: Record<string, string> = {};
       const before: string[] = [];

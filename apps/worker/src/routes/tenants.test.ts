@@ -69,16 +69,16 @@ describe('current tenant', () => {
     const response = await app(operator(role)).request('/api/tenants/me', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: 'Shed Products株式会社', tenantId: otherTenantId }),
+      body: JSON.stringify({ name: '株式会社サンプル', tenantId: otherTenantId }),
     }, environment());
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
       success: true,
-      data: { name: 'Shed Products株式会社' },
+      data: { name: '株式会社サンプル' },
     });
     expect(testDb.raw.prepare('SELECT name FROM tenants WHERE id = ?').get(DEFAULT_TENANT_ID))
-      .toEqual({ name: 'Shed Products株式会社' });
+      .toEqual({ name: '株式会社サンプル' });
     expect(testDb.raw.prepare('SELECT name FROM tenants WHERE id = ?').get(otherTenantId))
       .toEqual({ name: '別の統括' });
   });

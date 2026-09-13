@@ -1,4 +1,4 @@
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
@@ -84,6 +84,12 @@ function toRoutePath(target: string): string {
   let path = target.split('?')[0].split('#')[0];
   if (path.length > 1) path = path.replace(/\/+$/, '');
   return path === '' ? '/' : path;
+}
+
+/** public 配下で静的配信するHTMLや画像も、実在すれば行き先として扱う。 */
+function publicTargetExists(target: string): boolean {
+  const path = toRoutePath(target).replace(/^\/+/, '');
+  return path !== '' && existsSync(join(PUBLIC_DIR, path));
 }
 
 /**
@@ -190,6 +196,7 @@ describe('行き止まり', () => {
       if (NON_PAGE_PREFIXES.some((p) => target.startsWith(p))) continue;
       const path = toRoutePath(target);
       if (ROUTE_SET.has(path)) continue;
+      if (publicTargetExists(target)) continue;
       broken.push(`${relative(APP_DIR, file)} → ${target}`);
     }
     expect(

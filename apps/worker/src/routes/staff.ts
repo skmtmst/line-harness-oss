@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import {
   getStaffMembers, getStaffById, getStaffByInviteTokenHash,
-  createStaffMember, updateStaffMember, deleteStaffMember, countLoginAudit,
+  createStaffMember, updateStaffMember, deleteStaffMember, countLoginAudit, getLastLoginByStaff,
   getStaffAccountScopeIds, getStaffAccountScopeMap, replaceStaffAccountScopes, revokeStaffAuthentication,
   reserveTwoFactorSetupAttempt, clearTwoFactorSetupAttempts,
 } from '@line-crm/db';
@@ -261,6 +261,54 @@ staff.get('/api/staff/:id/login-summary', requireRole('owner', 'admin'), async (
   } catch (error) {
     console.error('GET /api/staff/:id/login-summary error:', error);
     return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+/**
+ * 権限者ごとの最終ログイン（統括のメンバー管理の列）。
+ * 記録が無い人は入らない。値は日本時間の壁時計（login_audit と同じ）。
+ */
+staff.get('/api/staff/last-logins', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const members = await getStaffMembers(c.env.DB, currentTenantId(c));
+    const data = await getLastLoginByStaff(c.env.DB, members.map((member) => member.id));
+    return c.json({ success: true, data });
+  } catch (error) {
+    console.error('GET /api/staff/last-logins error:', error);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+/**
+ * 招待メールを送り直す。まだメールを確認していない人だけ。
+ * 前の URL は使えなくなり、有効期限は送り直した時点から数え直す。
+ */
+staff.post('/api/staff/:id/resend-invite', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const id = c.req.param('id');
+    const member = await getStaffById(c.env.DB, id);
+    if (!member || !isInCurrentTenant(c, member)) return c.json({ success: false, error: 'Staff member not found' }, 404);
+    if (member.invite_status !== 'pending_email' || !member.email) {
+      return c.json({ success: false, error: 'この権限者はすでにメールを確認しているため、送り直す必要はありません' }, 409);
+    }
+    if (!await hasAllAccountScope(c.env.DB, c.get('staff'))) {
+      return c.json({ success: false, error: '全店舗の担当者だけが招待を送り直せます' }, 403);
+    }
+    const token = randomToken();
+    await updateStaffMember(c.env.DB, member.id, {
+      invite_token_hash: await sha256Hex(token),
+      invite_expires_at: new Date(Date.now() + INVITE_TTL_MS).toISOString(),
+    });
+    await sendStaffInviteEmail(c.env, {
+      name: member.name,
+      email: member.email,
+      verifyUrl: `${new URL(c.req.url).origin}/api/staff/invitations/${encodeURIComponent(token)}/verify`,
+    });
+    const refreshed = await getStaffById(c.env.DB, member.id);
+    return c.json({ success: true, data: await serializeStaff(c.env.DB, refreshed ?? member) });
+  } catch (error) {
+    console.error('POST /api/staff/:id/resend-invite error:', error);
+    return c.json({ success: false, error: '招待メールを送信できませんでした' }, 500);
   }
 });
 

@@ -15,6 +15,6 @@ describe('スタッフ招待の確認画面', () => {
   })
 
   it('未ログインでも共通の認証ガードより手前で表示する', () => {
-    expect(appShell).toContain("pathname === '/staff/invite'")
+    expect(appShell).toContain('isPublicAuthPath(pathname)')
   })
 })

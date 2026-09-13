@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useSearchParams } from 'react-router-dom';
 import Booking from './pages/Booking.js';
 import BookingHistory from './pages/BookingHistory.js';
 import Event from './pages/Event.js';
@@ -8,8 +8,13 @@ import EventBookings from './pages/EventBookings.js';
 import Affiliate from './pages/Affiliate.js';
 import Webinar from './pages/Webinar.js';
 import Form from './pages/Form.js';
+import EventWaitlistOffer from './pages/EventWaitlistOffer.js';
 
 export default function App() {
+  const [search] = useSearchParams();
+  const waitlistToken = search.get('eventWaitlistToken');
+  if (waitlistToken) return <EventWaitlistOffer token={waitlistToken} />;
+
   return (
     <Routes>
       <Route path="/booking" element={<Booking />} />

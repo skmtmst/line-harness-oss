@@ -175,7 +175,11 @@ describe('タグの使用先集計', () => {
   it('分割後も各参照元を1件ずつ数える', async () => {
     sqlite.exec(`
       DELETE FROM broadcasts WHERE id != 'broadcast-1';
-      DELETE FROM forms WHERE id != 'form-1';
+      -- 公開版は履歴として削除しない。集計の邪魔になる参照だけ外す。
+      UPDATE forms
+         SET current_published_version_id = NULL,
+             on_submit_tag_id = NULL, layout = NULL, fields = '[]'
+       WHERE id != 'form-1';
       DELETE FROM scenarios WHERE id != 'scenario-1';
       DELETE FROM scenario_steps;
       DELETE FROM scenario_actions;
@@ -318,6 +322,23 @@ describe('タグの使用先集計', () => {
 
     await expect(collectTagUsageBlockingTagIds(db, [formLayoutSelect]))
       .resolves.toEqual(new Set(['tag-main']));
+  });
+
+  it('下書きから外したタグも現在の公開版が使う間は使用中にする', async () => {
+    sqlite.exec(`
+      UPDATE forms
+         SET on_submit_tag_id = NULL,
+             layout = NULL
+       WHERE id = 'form-1';
+    `);
+
+    const rows = await getTagsWithUsage(db);
+    expect(rows.find((row) => row.id === 'tag-main')).toMatchObject({
+      used_in_forms: 2,
+      cleanup_reasons: [],
+    });
+    await expect(collectTagUsageBlockingTagIds(db))
+      .resolves.toContain('tag-main');
   });
 
   it('全角・空白・大文字小文字だけ違う名前を重複候補にする', async () => {

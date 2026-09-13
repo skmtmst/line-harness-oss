@@ -126,9 +126,9 @@ afterEach(async () => {
 
 describe('保存が 409 で弾かれたときの知らせ（3つのタブ）', () => {
   for (const [tab, saveLabel] of [
-    ['basic', 'フォームを保存'],
-    ['design', 'デザインを保存'],
-    ['options', 'フォームを保存'],
+    ['basic', '下書きを保存'],
+    ['design', '下書きを保存'],
+    ['options', '下書きを保存'],
   ] as const) {
     it(`${tab} タブでも、文言と「読み直す」が DOM に出る`, async () => {
       navigation.query = `id=form-1&tab=${tab}`
@@ -166,7 +166,7 @@ describe('保存が 409 で弾かれたときの知らせ（3つのタブ）', (
     })
     await flush()
     await act(async () => {
-      findButton('デザインを保存')!.click()
+      findButton('下書きを保存')!.click()
     })
     await flush()
     expect(net.putCount).toBe(1)

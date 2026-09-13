@@ -10,7 +10,13 @@ export interface HqTemplate {
 }
 export interface TagDefinition {
   schemaVersion: 1
-  tag: { name: string; color?: string; description?: string | null; folderId?: string | null }
+  tag: {
+    name: string; color?: string; description?: string | null; folderId?: string | null
+    isStarred?: boolean; manualAssignmentAllowed?: boolean
+    reapplyPolicy?: 'first_only' | 'every_time'; linkedEnabled?: boolean
+    mileage?: { self: number; referrer: number; multiplier: number | null; priority: number }
+    actions?: Array<{ id: string; type: string; params: Record<string, unknown>; onFailure: 'stop' | 'continue' }>
+  }
   folders: { id: string; name: string; parentId?: string | null; color?: string | null }[]
 }
 export interface MessageTemplateDefinition {

@@ -132,7 +132,26 @@ function setupApp(
   return app;
 }
 
-const baseEnv = { DB: {} as D1Database } as Record<string, unknown>;
+/*
+ * この試験は `@line-crm/db` を丸ごとモックしているので、これまで `c.env.DB` は
+ * 一度も触られず空オブジェクトで足りていた。N-365 (#746) で受信口が
+ * `incoming_webhook_receipts` へ直接 INSERT するようになったため、
+ * **実 D1 と同じく `meta.changes` を返す**最小の代役を置く。
+ * 1 を返す = 予約が取れた(初回)。重複時の挙動は実SQLiteで
+ * webhook-incoming-replay.test.ts が見ている。
+ */
+const reserveRun = vi.fn(async () => ({ meta: { changes: 1 } }));
+const receiptPrepare = (sql: string) => ({ bind: () => ({
+  run: reserveRun,
+  first: async () => sql.includes('SELECT source_event_id,status,received_at')
+    ? { source_event_id: 'receipt-event-1', status: 'processing', received_at: '2026-09-12T00:00:00.000Z' }
+    : null,
+}) });
+const baseEnv = {
+  DB: {
+    prepare: receiptPrepare,
+  } as unknown as D1Database,
+} as Record<string, unknown>;
 
 async function webhookSignature(body: string): Promise<string> {
   const encoder = new TextEncoder();
@@ -1009,26 +1028,29 @@ describe('POST /api/webhooks/incoming/:id/receive — signature', () => {
       baseEnv,
     );
     expect(res.status).toBe(200);
+    const fencedDb = vi.mocked(fireEvent).mock.calls[0]![5]!.db;
+    expect(fencedDb).not.toBe(baseEnv.DB);
     expect(fireEvent).toHaveBeenCalledWith(
-      baseEnv.DB,
+      fencedDb,
       'incoming_webhook.custom',
       expect.anything(),
       undefined,
       'account-a',
+      expect.objectContaining({ sourceEventId: 'receipt-event-1', step: expect.any(Function) }),
     );
-    expect(createWebhookInteraction).toHaveBeenCalledWith(baseEnv.DB, expect.objectContaining({
+    expect(createWebhookInteraction).toHaveBeenCalledWith(fencedDb, expect.objectContaining({
       lineAccountId: 'account-a',
       direction: 'incoming',
       requestBodyJson: null,
     }));
     expect(finishWebhookInteraction).toHaveBeenCalledWith(
-      baseEnv.DB,
+      fencedDb,
       'interaction-1',
       'account-a',
       expect.objectContaining({ status: 'succeeded', responseStatus: 200 }),
     );
     expect(updateIncomingWebhookMaskedSample).toHaveBeenCalledWith(
-      baseEnv.DB,
+      fencedDb,
       'iwh-1',
       ACCOUNT_ID,
       {
@@ -1061,18 +1083,21 @@ describe('POST /api/webhooks/incoming/:id/receive — signature', () => {
       baseEnv,
     );
     expect(res.status).toBe(200);
-    expect(executeIncomingWebhookActions).toHaveBeenCalledWith(baseEnv.DB, expect.objectContaining({
+    const fencedDb = vi.mocked(fireEvent).mock.calls[0]![5]!.db;
+    expect(fencedDb).not.toBe(baseEnv.DB);
+    expect(executeIncomingWebhookActions).toHaveBeenCalledWith(fencedDb, expect.objectContaining({
       lineAccountId: ACCOUNT_ID,
       webhookId: 'iwh-1',
       payload: { friendId: 'friend-a' },
       actions: [{ refKind: 'tag', refId: 'tag-a', refVersionId: null }],
     }));
     expect(fireEvent).toHaveBeenCalledWith(
-      baseEnv.DB,
+      fencedDb,
       'incoming_webhook.custom',
       expect.objectContaining({ friendId: 'friend-a' }),
       undefined,
       ACCOUNT_ID,
+      expect.objectContaining({ sourceEventId: 'receipt-event-1', step: expect.any(Function) }),
     );
   });
 
@@ -1418,7 +1443,11 @@ describe('#650 POST /api/webhooks/maintenance/secret-backfill', () => {
 // =====================================================
 
 const TEST_KEY = 'test-key-for-webhook-secret-encryption-01';
-const keyedEnv = { DB: {} as D1Database, LINE_CREDENTIAL_ENCRYPTION_KEY: TEST_KEY } as Record<string, unknown>;
+// baseEnv と同じ理由で、受信口の予約 INSERT を受ける代役を置く(#746)。
+const keyedEnv = {
+  DB: { prepare: receiptPrepare } as unknown as D1Database,
+  LINE_CREDENTIAL_ENCRYPTION_KEY: TEST_KEY,
+} as Record<string, unknown>;
 const ENCRYPTED_ROW = {
   id: 'wh-1', name: 'test', url: 'https://example.com/hook', event_types: '["*"]',
   secret: null, secret_encrypted: 'v1-enc-abc', is_active: 1, max_retries: 0,
