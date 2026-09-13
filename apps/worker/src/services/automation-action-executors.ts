@@ -31,6 +31,7 @@ interface AutomationLineClient {
   pushMessage(to: string, messages: Message[], retryKey?: string): Promise<unknown>;
   linkRichMenuToUser(userId: string, richMenuId: string): Promise<unknown>;
   unlinkRichMenuFromUser(userId: string): Promise<unknown>;
+  getRichMenuIdOfUser?(userId: string): Promise<{ richMenuId: string }>;
 }
 
 export interface AutomationActionExecutorDependencies {
@@ -308,7 +309,9 @@ async function scenarioExecutor(context: AutomationActionContext): Promise<void>
 
   // 既存の登録規則（並行可否、初回配信日時）を保つため、DBヘルパーを使う。
   const { enrollFriendInScenario } = await import('@line-crm/db');
-  const enrolled = await enrollFriendInScenario(context.db, friend.id, scenario.id);
+  const enrolled = context.automationId.startsWith('incoming-webhook:')
+    ? await enrollFriendInScenario(context.db, friend.id, scenario.id, context.stepExecutionId)
+    : await enrollFriendInScenario(context.db, friend.id, scenario.id);
   if (!enrolled) throw invalid('scenario_enrollment_rejected', 'シナリオの開始条件を満たしていません');
 }
 
@@ -406,9 +409,22 @@ async function richMenuExecutor(
   try {
     const token = await resolveAccessToken(context, dependencies);
     const client = (dependencies.createLineClient ?? ((value) => new LineClient(value)))(token);
-    if (operation === 'link') {
+    let alreadyApplied = false;
+    if (context.automationId.startsWith('incoming-webhook:') && client.getRichMenuIdOfUser) {
+      try {
+        const current = await client.getRichMenuIdOfUser(friend.line_user_id);
+        alreadyApplied = operation === 'link' && current.richMenuId === richMenuId;
+      } catch (error) {
+        if (/LINE API error:\s*404\b/.test(error instanceof Error ? error.message : String(error))) {
+          alreadyApplied = operation === 'unlink';
+        } else {
+          throw error;
+        }
+      }
+    }
+    if (!alreadyApplied && operation === 'link') {
       await client.linkRichMenuToUser(friend.line_user_id, richMenuId!);
-    } else {
+    } else if (!alreadyApplied) {
       await client.unlinkRichMenuFromUser(friend.line_user_id);
     }
     await recordRichMenuAssignment(context.db, {
