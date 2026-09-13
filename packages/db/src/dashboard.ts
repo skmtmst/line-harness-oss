@@ -20,6 +20,48 @@ export interface DashboardSectionStatus {
   period: DashboardPeriod | 'latest' | 'last7-fixed' | 'this-month';
 }
 
+export type DashboardMetricState =
+  | 'available'
+  | 'empty'
+  | 'unavailable'
+  | 'estimated'
+  | 'partial'
+  | 'stale';
+
+export type DashboardMetricReason =
+  | 'source_failed'
+  | 'fetch_failed'
+  | 'not_connected'
+  | 'not_loaded'
+  | 'not_applicable'
+  | null;
+
+export interface DashboardMetric<T> {
+  /** 未取得・取得失敗時は0や空配列にせずnull。 */
+  value: T | null;
+  state: DashboardMetricState;
+  reason: DashboardMetricReason;
+  asOf: string | null;
+  period: DashboardSectionStatus['period'];
+}
+
+export interface DashboardFriendTrendPoint {
+  date: string;
+  added: number;
+  blocked: number;
+  /** その日の終わりの有効友だち数。 */
+  active: number;
+  /**
+   * 日次記録が無く、いまの友だちから逆算した日。
+   *
+   * 退会して行ごと消えた友だちは数に出ないので、実態より少なく見える。
+   * 画面はこの日を実線で結ばない。正しい記録と同じ見た目にすると、
+   * 見た人が違いに気づけない。
+   */
+  estimated: boolean;
+  sources: Array<{ name: string; count: number }>;
+}
+
 export interface DashboardOverview {
   period: DashboardPeriod;
   /** 集計した時刻（JST）。カードごとの基準日がずれていないことの証拠になる。 */
@@ -48,7 +90,11 @@ export interface DashboardOverview {
     averageFirstReplyMinutes: number | null;
   };
   delivery: {
-    /** 期間内に送った通数。 */
+    /**
+     * 今月に送った通数。見出し「今月の配信」どおり、選んだ期間に関わらず
+     * 今月1日から数える。messages_log は送信時に1行足すので created_at が
+     * 送信日時にあたる（予約分を先に書く口はない）。
+     */
     sent: number;
     /**
      * こちらから送った数（プッシュ）と、受信への応答（リプライ）。
@@ -58,7 +104,10 @@ export interface DashboardOverview {
      */
     push: number;
     reply: number;
-    /** 期間内の一斉配信の件数。 */
+    /**
+     * 今月の一斉配信の件数。sent と同じく今月1日から数える。
+     * 数えるのは送った日（sent_at）。作った日ではない。
+     */
     broadcasts: number;
     /** 今月の送信上限。LINE から取れないときは null。 */
     quotaLimit: number | null;
@@ -66,22 +115,7 @@ export interface DashboardOverview {
     quotaUsed: number | null;
   };
   /** 友だち数の推移。古い順。 */
-  trend: Array<{
-    date: string;
-    added: number;
-    blocked: number;
-    /** その日の終わりの有効友だち数。 */
-    active: number;
-    /**
-     * 日次記録が無く、いまの友だちから逆算した日。
-     *
-     * 退会して行ごと消えた友だちは数に出ないので、実態より少なく見える。
-     * 画面はこの日を実線で結ばない。正しい記録と同じ見た目にすると、
-     * 見た人が違いに気づけない。
-     */
-    estimated: boolean;
-    sources: Array<{ name: string; count: number }>;
-  }>;
+  trend: DashboardFriendTrendPoint[];
   conversions: {
     /** 期間内の成果の件数。 */
     total: number;
@@ -111,6 +145,20 @@ export interface DashboardOverview {
     conversions: DashboardSectionStatus;
     operations: DashboardSectionStatus;
   };
+  /**
+   * V6画面が使う、未取得をnullで区別できる指標契約。
+   * 上の既存フィールドは段階配備中の互換用に残す。
+   */
+  metrics: {
+    activeFriends: DashboardMetric<number>;
+    monthlyQuota: DashboardMetric<{
+      used: number | null;
+      limit: number | null;
+      remaining: number | null;
+    }>;
+    friendTrend: DashboardMetric<DashboardFriendTrendPoint[]>;
+    officialProfileUrl: DashboardMetric<string>;
+  };
 }
 
 /** JST の「いまの日付」。D1 は UTC なので、日付の境目を跨ぐ集計は必ずずれる。 */
@@ -133,6 +181,11 @@ export function periodStart(period: DashboardPeriod): string {
   if (period === 'today') return jstDate(0);
   if (period === 'last7') return jstDate(-6);
   return jstDate(-27);
+}
+
+/** 今月の始まり（JSTの日付）。「今月の配信」は選んだ期間に関わらず今月1日から数える。 */
+export function monthStart(): string {
+  return `${jstDate(0).slice(0, 8)}01`;
 }
 
 /** 期間に含まれる日数。推移の折れ線の点の数になる。 */
@@ -293,16 +346,33 @@ export async function recordFriendSnapshot(
   db: D1Database,
   accountId: string | null,
   date?: string,
+  limit = 1_000,
 ): Promise<void> {
   const day = date ?? jstDate(0);
   if (accountId === null) {
-    const accounts = await db
-      .prepare('SELECT id FROM line_accounts')
+    const batchLimit = Number.isFinite(limit)
+      ? Math.max(1, Math.min(Math.trunc(limit), 1_000))
+      : 1_000;
+    const targets = await db
+      .prepare(
+        `SELECT targets.id
+           FROM (
+             SELECT id FROM line_accounts
+             UNION ALL SELECT ? AS id
+           ) targets
+           LEFT JOIN friend_daily_snapshots snapshots
+             ON snapshots.date = ? AND snapshots.line_account_id = targets.id
+          ORDER BY
+            CASE WHEN snapshots.updated_at IS NULL THEN 0 ELSE 1 END ASC,
+            snapshots.updated_at ASC,
+            targets.id ASC
+          LIMIT ?`,
+      )
+      .bind(UNASSIGNED_SNAPSHOT_ACCOUNT_ID, day, batchLimit)
       .all<{ id: string }>();
-    await Promise.all([
-      ...accounts.results.map((account) => recordFriendSnapshot(db, account.id, day)),
-      recordFriendSnapshot(db, UNASSIGNED_SNAPSHOT_ACCOUNT_ID, day),
-    ]);
+    await Promise.all(
+      targets.results.map((target) => recordFriendSnapshot(db, target.id, day)),
+    );
     return;
   }
 
@@ -492,6 +562,7 @@ export async function getDashboardOverview(
   scope: AccountStatsScope,
 ): Promise<DashboardOverview> {
   const start = periodStart(period);
+  const month = monthStart();
   const partialFailures: string[] = [];
   const safe = async <T>(name: string, run: Promise<T>, fallback: T): Promise<T> => {
     try {
@@ -584,6 +655,7 @@ export async function getDashboardOverview(
     safe('conversions', conversionSummary(db, period, scope), { total: 0, byPoint: [] }),
     // プッシュ（こちらから）と リプライ（受信への応答）を分ける。
     // source は 028 で入っている。auto_reply と manual が応答。
+    // 見出し「今月の配信」どおり、選んだ期間ではなく今月1日から数える。
     db
       .prepare(
         `SELECT
@@ -592,15 +664,18 @@ export async function getDashboardOverview(
          FROM messages_log ml
           WHERE direction = 'outgoing' AND ml.created_at >= ? AND ${messageAccount.sql}`,
       )
-      .bind(start, ...messageAccount.binds)
+      .bind(month, ...messageAccount.binds)
       .first<{ sent: number; reply: number }>()
       .then((value) => value)
       .catch((error) => { partialFailures.push('delivery'); console.error('[dashboard] delivery failed', error); return null; }),
+    // 一斉配信は「作った日」ではなく「送った日」で数える。先月作って今月
+    // 送った配信を先月扱いにすると、見出し「今月の配信」と実際がずれる。
+    // sent_at が無い古い行だけ created_at で代用する（0件へ落とさない）。
     safe('broadcasts', count(
       db,
       `SELECT COUNT(*) AS n FROM broadcasts b
-        WHERE status = 'sent' AND b.created_at >= ? AND ${broadcastScope}`,
-      start, ...broadcastAccount.binds, ...broadcastJsonAccount.binds,
+        WHERE status = 'sent' AND COALESCE(b.sent_at, b.created_at) >= ? AND ${broadcastScope}`,
+      month, ...broadcastAccount.binds, ...broadcastJsonAccount.binds,
     ), 0),
     safe('operations', operationsPromise, emptyOperations),
   ]);
@@ -621,6 +696,27 @@ export async function getDashboardOverview(
   if (trendStatus.status === 'ok' && trend.some((point) => point.estimated)) {
     trendStatus.status = 'estimated';
   }
+  const sections: DashboardOverview['sections'] = {
+    friends: status('friends', friends.total === 0, 'latest'),
+    inbox: status('inbox', inbox.unanswered + inbox.inProgress + inbox.resolved === 0, 'latest'),
+    delivery: status(['delivery', 'broadcasts'], (sent?.sent ?? 0) === 0 && broadcasts === 0, 'this-month'),
+    quota: { status: 'unavailable', asOf: generatedAt, period: 'this-month' },
+    trend: trendStatus,
+    conversions: status('conversions', conversions.total === 0, period),
+    operations: status(
+      'operations',
+      operations.scenarios.active + operations.scenarios.paused
+        + operations.migrations.active + operations.migrations.completed
+        + operations.bookings.pending + operations.bookings.upcoming
+        + operations.funnelAlerts + operations.automationFailures === 0
+        && operations.inflowTop.length === 0,
+      period,
+    ),
+  };
+  const metricState = (section: DashboardSectionStatus): DashboardMetricState =>
+    section.status === 'ok' ? 'available' : section.status;
+  const metricReason = (section: DashboardSectionStatus): DashboardMetricReason =>
+    section.status === 'unavailable' ? 'source_failed' : null;
 
   return {
     period,
@@ -641,22 +737,36 @@ export async function getDashboardOverview(
     conversions,
     partialFailures,
     operations,
-    sections: {
-      friends: status('friends', friends.total === 0, 'latest'),
-      inbox: status('inbox', inbox.unanswered + inbox.inProgress + inbox.resolved === 0, 'latest'),
-      delivery: status(['delivery', 'broadcasts'], (sent?.sent ?? 0) === 0 && broadcasts === 0, period),
-      quota: { status: 'unavailable', asOf: generatedAt, period: 'this-month' },
-      trend: trendStatus,
-      conversions: status('conversions', conversions.total === 0, period),
-      operations: status(
-        'operations',
-        operations.scenarios.active + operations.scenarios.paused
-          + operations.migrations.active + operations.migrations.completed
-          + operations.bookings.pending + operations.bookings.upcoming
-          + operations.funnelAlerts + operations.automationFailures === 0
-          && operations.inflowTop.length === 0,
-        period,
-      ),
+    sections,
+    metrics: {
+      activeFriends: {
+        value: sections.friends.status === 'unavailable' ? null : friends.active,
+        state: metricState(sections.friends),
+        reason: metricReason(sections.friends),
+        asOf: sections.friends.status === 'unavailable' ? null : sections.friends.asOf,
+        period: sections.friends.period,
+      },
+      monthlyQuota: {
+        value: null,
+        state: 'unavailable',
+        reason: 'not_loaded',
+        asOf: null,
+        period: 'this-month',
+      },
+      friendTrend: {
+        value: sections.trend.status === 'unavailable' ? null : trend,
+        state: metricState(sections.trend),
+        reason: metricReason(sections.trend),
+        asOf: sections.trend.status === 'unavailable' ? null : sections.trend.asOf,
+        period: sections.trend.period,
+      },
+      officialProfileUrl: {
+        value: null,
+        state: 'unavailable',
+        reason: 'not_loaded',
+        asOf: null,
+        period: 'latest',
+      },
     },
   };
 }
@@ -844,9 +954,47 @@ export interface BroadcastStats {
  * 開封率は broadcast_insights から。LINEは20人未満の配信だと開封数を返さない
  * ので、その配信は平均から外す。0として混ぜると平均が不当に下がる。
  */
-export async function getBroadcastStats(db: D1Database): Promise<BroadcastStats> {
+type BroadcastStatsScope = {
+  allowedAccountIds: readonly string[];
+  canSeeUnassigned: boolean;
+};
+
+function broadcastStatsFilter(
+  accountId: string | undefined,
+  scope: BroadcastStatsScope | undefined,
+  alias = '',
+): { sql: string; binds: string[] } {
+  const column = `${alias}line_account_id`;
+  const targetType = `${alias}target_type`;
+  const accountIds = `${alias}account_ids`;
+  if (accountId) {
+    return {
+      sql: ` AND (${column} = ? OR (${targetType} = 'multi-account-dedup' AND ${accountIds} IS NOT NULL AND EXISTS (SELECT 1 FROM json_each(${accountIds}) WHERE value = ?)))`,
+      binds: [accountId, accountId],
+    };
+  }
+  if (!scope) return { sql: '', binds: [] };
+
+  const conditions: string[] = [];
+  const binds: string[] = [];
+  if (scope.allowedAccountIds.length > 0) {
+    const placeholders = scope.allowedAccountIds.map(() => '?').join(', ');
+    conditions.push(`(${column} IN (${placeholders}) OR (${targetType} = 'multi-account-dedup' AND ${accountIds} IS NOT NULL AND EXISTS (SELECT 1 FROM json_each(${accountIds}) WHERE value IN (${placeholders}))))`);
+    binds.push(...scope.allowedAccountIds, ...scope.allowedAccountIds);
+  }
+  if (scope.canSeeUnassigned) conditions.push(`(${column} IS NULL AND ${accountIds} IS NULL)`);
+  return { sql: ` AND (${conditions.length > 0 ? conditions.join(' OR ') : '0 = 1'})`, binds };
+}
+
+export async function getBroadcastStats(
+  db: D1Database,
+  accountId?: string,
+  scope?: BroadcastStatsScope,
+): Promise<BroadcastStats> {
   const monthStart = jstDate(0).slice(0, 7);
   const since = jstDate(-27);
+  const accountFilter = broadcastStatsFilter(accountId, scope);
+  const insightAccountFilter = broadcastStatsFilter(accountId, scope, 'b.');
 
   const [counts, reach] = await Promise.all([
     db
@@ -854,9 +1002,9 @@ export async function getBroadcastStats(db: D1Database): Promise<BroadcastStats>
         `SELECT
            SUM(CASE WHEN substr(created_at, 1, 7) = ? THEN 1 ELSE 0 END) AS this_month,
            SUM(CASE WHEN status = 'scheduled' THEN 1 ELSE 0 END) AS scheduled
-         FROM broadcasts`,
+         FROM broadcasts WHERE 1 = 1${accountFilter.sql}`,
       )
-      .bind(monthStart)
+      .bind(monthStart, ...accountFilter.binds)
       .first<{ this_month: number; scheduled: number }>(),
     db
       .prepare(
@@ -864,9 +1012,9 @@ export async function getBroadcastStats(db: D1Database): Promise<BroadcastStats>
            COALESCE(SUM(success_count), 0) AS delivered,
            COALESCE(SUM(total_count - success_count), 0) AS failed
          FROM broadcasts
-          WHERE status = 'sent' AND created_at >= ?`,
+          WHERE status = 'sent' AND created_at >= ?${accountFilter.sql}`,
       )
-      .bind(since)
+      .bind(since, ...accountFilter.binds)
       .first<{ delivered: number; failed: number }>(),
   ]);
 
@@ -877,9 +1025,11 @@ export async function getBroadcastStats(db: D1Database): Promise<BroadcastStats>
         // open_rate は取り込み時に計算済み。ここで割り直すと、
         // 分母の取り方が2か所に分かれて食い違う。
         `SELECT AVG(open_rate) * 100 AS rate
-           FROM broadcast_insights
-          WHERE delivered >= 20 AND open_rate IS NOT NULL`,
+           FROM broadcast_insights bi
+           JOIN broadcasts b ON b.id = bi.broadcast_id
+          WHERE delivered >= 20 AND open_rate IS NOT NULL${insightAccountFilter.sql}`,
       )
+      .bind(...insightAccountFilter.binds)
       .first<{ rate: number | null }>();
     openRate = row?.rate === null || row?.rate === undefined ? null : Math.round(row.rate * 10) / 10;
   } catch {

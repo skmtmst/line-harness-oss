@@ -47,6 +47,8 @@ export interface AutoReplyDraftSettings {
   skipWhenOperatorActive: boolean;
   priority: number;
   messageKinds: string | null;
+  /** 受信経路。版スナップショットだけに保存し、既存版は LINE として読む。 */
+  receiveSources: Array<'line' | 'email'>;
   friendConditions: string | null;
   actions: string | null;
   responseWeekdays: string | null;
@@ -57,6 +59,12 @@ export interface AutoReplyDraftSettings {
   name: string | null;
   keywordMatchMode: string;
   folderId: string | null;
+  /** 運用者だけが読むメモ。友だちへ送る本文には使わない。 */
+  internalMemo?: string | null;
+  /** 将来の遅延実行に渡す設定値。この保存口だけでは実行しない。 */
+  replyDelaySeconds?: number | null;
+  /** 条件不一致時に行う別動作。この保存口だけでは実行しない。 */
+  unmatchedAction?: string | null;
 }
 
 export interface AutoReplyEvaluationRow {
@@ -103,6 +111,7 @@ export function autoReplyDraftSettingsFromRow(rule: AutoReply): AutoReplyDraftSe
     skipWhenOperatorActive: rule.skip_when_operator_active === 1,
     priority: rule.priority,
     messageKinds: rule.message_kinds_json,
+    receiveSources: ['line'],
     friendConditions: rule.friend_conditions_json,
     actions: rule.actions_json,
     responseWeekdays: rule.response_weekdays_json,
@@ -113,11 +122,27 @@ export function autoReplyDraftSettingsFromRow(rule: AutoReply): AutoReplyDraftSe
     name: rule.name,
     keywordMatchMode: rule.keyword_match_mode,
     folderId: rule.folder_id,
+    internalMemo: null,
+    replyDelaySeconds: null,
+    unmatchedAction: null,
   };
 }
 
 export function autoReplyDefinitionSnapshot(rule: AutoReply): string {
   return JSON.stringify(autoReplyDraftSettingsFromRow(rule));
+}
+
+/**
+ * 保存だけ先行した運用項目は、Webhookが実行する定義の同一判定へ混ぜない。
+ * 混ぜると、公開版の社内メモ等が auto_replies 本体に無いだけで別版を増やしてしまう。
+ */
+function autoReplyRuntimeSnapshot(settings: AutoReplyDraftSettings): string {
+  return JSON.stringify({
+    ...settings,
+    internalMemo: null,
+    replyDelaySeconds: null,
+    unmatchedAction: null,
+  });
 }
 
 export function parseAutoReplyVersionSettings(row: AutoReplyVersionRow): AutoReplyDraftSettings {
@@ -135,6 +160,9 @@ export function parseAutoReplyVersionSettings(row: AutoReplyVersionRow): AutoRep
     skipWhenOperatorActive: parsed.skipWhenOperatorActive === true,
     priority: Number.isInteger(parsed.priority) ? Number(parsed.priority) : 0,
     messageKinds: parsed.messageKinds ?? null,
+    receiveSources: Array.isArray(parsed.receiveSources)
+      ? parsed.receiveSources.filter((source): source is 'line' | 'email' => source === 'line' || source === 'email')
+      : ['line'],
     friendConditions: parsed.friendConditions ?? null,
     actions: parsed.actions ?? null,
     responseWeekdays: parsed.responseWeekdays ?? null,
@@ -145,6 +173,11 @@ export function parseAutoReplyVersionSettings(row: AutoReplyVersionRow): AutoRep
     name: parsed.name ?? null,
     keywordMatchMode: parsed.keywordMatchMode === 'all' ? 'all' : 'any',
     folderId: parsed.folderId ?? null,
+    internalMemo: parsed.internalMemo ?? null,
+    replyDelaySeconds: Number.isInteger(parsed.replyDelaySeconds)
+      ? Number(parsed.replyDelaySeconds)
+      : null,
+    unmatchedAction: parsed.unmatchedAction ?? null,
   };
 }
 
@@ -434,7 +467,10 @@ export async function ensureAutoReplyPublishedVersion(
 ): Promise<AutoReplyVersionRow> {
   const snapshot = autoReplyDefinitionSnapshot(rule);
   const current = await getAutoReplyPublishedVersion(db, rule.id);
-  if (current?.definition_snapshot === snapshot) return current;
+  if (current && (
+    current.definition_snapshot === snapshot
+    || autoReplyRuntimeSnapshot(parseAutoReplyVersionSettings(current)) === snapshot
+  )) return current;
   const latest = await db
     .prepare(
       `SELECT * FROM auto_reply_versions
@@ -443,7 +479,10 @@ export async function ensureAutoReplyPublishedVersion(
     )
     .bind(rule.id)
     .first<AutoReplyVersionRow>();
-  if (latest?.status === 'published' && latest.definition_snapshot === snapshot) {
+  if (latest?.status === 'published' && (
+    latest.definition_snapshot === snapshot
+    || autoReplyRuntimeSnapshot(parseAutoReplyVersionSettings(latest)) === snapshot
+  )) {
     await db.prepare(
       `UPDATE auto_replies SET current_published_version_id = ? WHERE id = ?`,
     ).bind(latest.id, rule.id).run();

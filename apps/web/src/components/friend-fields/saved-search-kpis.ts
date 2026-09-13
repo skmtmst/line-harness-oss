@@ -14,7 +14,7 @@ export type SavedSearchKpiValues = {
  * また、使用先や該当人数が1件でも未取得なら、合計を少なく見せず null にする。
  */
 export function savedSearchKpiValues(
-  items: Array<Pick<SavedSearch, 'matchCount' | 'usedIn'>>,
+  items: Array<Pick<SavedSearch, 'matchCount' | 'usedIn' | 'callCountThisMonth'>>,
   available: boolean,
 ): SavedSearchKpiValues {
   if (!available) {
@@ -23,6 +23,7 @@ export function savedSearchKpiValues(
 
   const usageKnown = items.every((item) => item.usedIn !== undefined)
   const matchKnown = items.every((item) => typeof item.matchCount === 'number')
+  const callsKnown = items.every((item) => typeof item.callCountThisMonth === 'number')
 
   return {
     total: items.length,
@@ -32,8 +33,9 @@ export function savedSearchKpiValues(
     zeroMatches: matchKnown
       ? items.filter((item) => item.matchCount === 0).length
       : null,
-    // 呼び出し履歴はまだAPIに無い。設計の84回を固定値では置かない。
-    callsThisMonth: null,
+    callsThisMonth: callsKnown
+      ? items.reduce((sum, item) => sum + (item.callCountThisMonth ?? 0), 0)
+      : null,
   }
 }
 

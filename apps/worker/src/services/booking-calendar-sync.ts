@@ -3,6 +3,13 @@ import {
   getGoogleServiceAccountToken,
   type GoogleServiceAccountCredentials,
 } from './google-service-account.js';
+import {
+  findBookingOperation,
+  finishBookingOperation,
+  queueBookingOperation,
+} from './booking-operation-runs.js';
+import { accountFeatureOffExclusionSql } from '@line-crm/db';
+import { createFeatureJobGate } from './feature-enforcement.js';
 
 export interface StaffCalendarConnection {
   id: string;
@@ -67,11 +74,12 @@ export async function syncConfirmedBookingToGoogle(
   const row = await db
     .prepare(
       `SELECT b.id, b.starts_at, b.ends_at, b.customer_note, b.external_event_id,
-              f.display_name AS friend_name, m.name AS menu_name,
+              COALESCE(f.display_name, bc.display_name) AS customer_name, m.name AS menu_name,
               s.display_name AS staff_name,
               gc.id AS connection_id, gc.calendar_id, gc.auth_type, gc.access_token
          FROM bookings b
-         INNER JOIN friends f ON f.id = b.friend_id
+         LEFT JOIN friends f ON f.id = b.friend_id
+         LEFT JOIN booking_customers bc ON bc.id = b.booking_customer_id
          INNER JOIN menus m ON m.id = b.menu_id
          INNER JOIN staff s ON s.id = b.staff_id
          LEFT JOIN google_calendar_connections gc
@@ -87,7 +95,7 @@ export async function syncConfirmedBookingToGoogle(
       ends_at: string;
       customer_note: string | null;
       external_event_id: string | null;
-      friend_name: string | null;
+      customer_name: string | null;
       menu_name: string;
       staff_name: string;
       connection_id: string | null;
@@ -107,7 +115,7 @@ export async function syncConfirmedBookingToGoogle(
   };
   const client = await clientForConnection(connection, credentials);
   const created = await client.createEvent({
-    summary: `${row.friend_name ?? 'お客様'}｜${row.menu_name}`,
+    summary: `${row.customer_name ?? 'お客様'}｜${row.menu_name}`,
     start: row.starts_at,
     end: row.ends_at,
     description: [
@@ -126,6 +134,221 @@ export async function syncConfirmedBookingToGoogle(
     .bind(created.eventId, row.calendar_id, bookingId)
     .run();
   return { synced: true, eventId: created.eventId, calendarId: row.calendar_id };
+}
+
+/**
+ * 取消時の Calendar 削除を台帳駆動で1回だけ確実に行う。
+ *
+ * 安定キー (`<bookingId>:google-calendar:delete`) で台帳行を1行に保つ。
+ * - ずみ (succeeded/skipped) なら外部へ触らず返す (二重削除なし)。
+ * - 消す物が無ければ skipped で閉じる (外部へ出ない)。
+ * - 一時失敗は retry_wait で残し、次の取消再試行で同じ鍵で再実行する。
+ * - 外部成功→台帳失敗の間は queued のまま残るため、再実行は相手先の
+ *   410 (削除ずみ) を成功として回収する (deleteEvent が吸収する)。
+ * 投げない (取消処理を壊さない)。DB自体が使えないときだけ投げる。
+ */
+/**
+ * Calendar 削除の台帳の安定キー。取消の再送・cron が同じ1行に集まる。
+ * キーの作り方はここだけに置く (route 側の先行登録と実行側でずらさない)。
+ */
+export function calendarDeleteIdempotencyKey(bookingId: string): string {
+  return `${bookingId}:google-calendar:delete`;
+}
+
+/**
+ * V6 の fence 成功後に台帳行を残す。
+ *
+ * 実行側 (runCalendarDeleteOperation) の作成・検索が初期 DB 失敗すると
+ * retry_wait を返すだけで行が残らず、cron が回収できない。行さえあれば
+ * 再送・cron のどちらでも拾えるため、取消フローはここで失敗を落とさず
+ * 投げる (呼び出し側の取消再試行で回復できる)。INSERT OR IGNORE のため
+ * 二重登録にならない。schema 変更は要らない。
+ * 状態更新の直後ではなく fence 成功後に置く: 巻き戻した 409 の後に
+ * queued 行が残ると cron が確定ずみの予定を消してしまう。
+ */
+export async function enqueueCalendarDeleteOperation(
+  db: D1Database,
+  input: { bookingId: string; lineAccountId: string },
+): Promise<string> {
+  return queueBookingOperation(db, {
+    bookingId: input.bookingId,
+    lineAccountId: input.lineAccountId,
+    kind: 'google_calendar',
+    idempotencyKey: calendarDeleteIdempotencyKey(input.bookingId),
+    result: { direction: 'delete' },
+  });
+}
+
+export async function runCalendarDeleteOperation(
+  db: D1Database,
+  input: {
+    bookingId: string;
+    lineAccountId: string;
+    now?: Date;
+    remove: () => Promise<void>;
+  },
+): Promise<'succeeded' | 'skipped' | 'retry_wait'> {
+  const now = (input.now ?? new Date()).toISOString();
+  const idempotencyKey = calendarDeleteIdempotencyKey(input.bookingId);
+  try {
+    const existing = await findBookingOperation(db, {
+      lineAccountId: input.lineAccountId,
+      idempotencyKey,
+    });
+    if (existing && (existing.status === 'succeeded' || existing.status === 'skipped')) {
+      return existing.status;
+    }
+    const operationId = existing?.id ?? await queueBookingOperation(db, {
+      bookingId: input.bookingId,
+      lineAccountId: input.lineAccountId,
+      kind: 'google_calendar',
+      idempotencyKey,
+      result: { direction: 'delete' },
+    });
+    const booking = await db.prepare(
+      `SELECT external_event_id, status FROM bookings WHERE id = ?`,
+    ).bind(input.bookingId).first<{ external_event_id: string | null; status: string | null }>();
+    if (!booking?.external_event_id) {
+      await finishBookingOperation(db, {
+        id: operationId,
+        status: 'skipped',
+        completedAt: now,
+        result: { direction: 'delete', reason: 'no_external_event' },
+      });
+      return 'skipped';
+    }
+    // 実行の直前に予約の状態を再確認する。409 で巻き戻した確定ずみの予約や、
+    // 残留した古い queued 行の予定を消さない (原子的無効化の受け皿)。
+    if (booking.status !== 'cancelled' && booking.status !== 'expired') {
+      await finishBookingOperation(db, {
+        id: operationId,
+        status: 'skipped',
+        completedAt: now,
+        result: { direction: 'delete', reason: 'booking_not_cancelled' },
+      });
+      return 'skipped';
+    }
+    try {
+      await input.remove();
+    } catch (error) {
+      await finishBookingOperation(db, {
+        id: operationId,
+        status: 'retry_wait',
+        completedAt: now,
+        errorCode: error instanceof Error ? error.name : 'calendar_delete_failed',
+        result: { direction: 'delete' },
+      });
+      console.error('Google Calendar delete (cancel) failed:', error);
+      return 'retry_wait';
+    }
+    await finishBookingOperation(db, {
+      id: operationId,
+      status: 'succeeded',
+      completedAt: now,
+      result: { direction: 'delete' },
+    });
+    return 'succeeded';
+  } catch (error) {
+    console.error('Google Calendar delete operation failed:', error);
+    return 'retry_wait';
+  }
+}
+
+/**
+ * 初回 200 の後に残った Calendar 削除を cron で自動回収する。
+ *
+ * 安定キーで1行のため二重実行にならず、相手先の 410 を成功として回収する。
+ * 取得は opened_at の原子的な更新で行う (lease)。処理中に止まった worker
+ * の行は opened_at が古くなれば再取得する。status は queued/retry_wait の
+ * ままのため、スキーマ変更は要らない。
+ */
+export async function processPendingCalendarDeleteOperations(
+  db: D1Database,
+  input: {
+    now?: Date;
+    limit?: number;
+    /** lease切れとみなす分数。未指定なら 10。 */
+    staleAfterMinutes?: number;
+    remove: (bookingId: string, lineAccountId: string) => Promise<void>;
+  },
+): Promise<{ processed: number; succeeded: number; retrying: number; skipped: number }> {
+  const now = input.now ?? new Date();
+  const nowIso = now.toISOString();
+  const staleCutoff = new Date(
+    now.getTime() - (input.staleAfterMinutes ?? 10) * 60_000,
+  ).toISOString();
+  const limit = input.limit ?? 20;
+  /*
+   * 予約機能がオフのアカウントは claim もしない (#643)。
+   *
+   * claim してから判定すると opened_at を書き換えてしまい、オフ中でも
+   * 状態が動く。候補を読むだけの SELECT を先に置き、機能が動いている
+   * アカウントの行だけを claim する。オフの行は opened_at も status も
+   * 変えず、Google Calendar も呼ばない。skipped 監査だけ残し、
+   * 再オン後の tick でそのまま拾い直す。
+   *
+   * オフ判定は LIMIT を数える前に SQL で行う。読んでから弾くと、
+   * オフの古い行が上限ぶん先頭を占めたままになり、後ろに並ぶ
+   * 動作中アカウントの行が永久に処理されない。
+   */
+  const dueWhere = `kind = 'google_calendar'
+        AND json_extract(result_json, '$.direction') = 'delete'
+        AND status IN ('queued', 'retry_wait')
+        AND (opened_at IS NULL OR opened_at < ?)`;
+  const bookingOff = accountFeatureOffExclusionSql('booking_operation_runs.line_account_id', 'booking');
+  const candidates = await db.prepare(
+    `SELECT id, booking_id, line_account_id FROM booking_operation_runs
+      WHERE ${dueWhere}
+        AND NOT ${bookingOff}
+      ORDER BY updated_at ASC LIMIT ?`,
+  ).bind(staleCutoff, limit).all<{ id: string; booking_id: string; line_account_id: string }>();
+  const result = { processed: 0, succeeded: 0, retrying: 0, skipped: 0 };
+  const gate = createFeatureJobGate();
+  /*
+   * 止めた事実は監査に残す。行は読むだけで、状態は一切変えない。
+   * 監査は日・アカウント・機能・job で1件にまとまるため、
+   * アカウントごとに1行だけ読めば足りる。
+   */
+  const offOwners = await db.prepare(
+    `SELECT DISTINCT line_account_id FROM booking_operation_runs
+      WHERE ${dueWhere}
+        AND ${bookingOff}
+      ORDER BY line_account_id LIMIT ?`,
+  ).bind(staleCutoff, limit).all<{ line_account_id: string }>();
+  for (const owner of offOwners.results ?? []) {
+    await gate.canRun(db, owner.line_account_id, 'booking', 'booking calendar delete retry');
+  }
+  const runnableIds: string[] = [];
+  for (const candidate of candidates.results ?? []) {
+    // カタログ既定や設定の壊れ方に備え、claim 前にもう一度だけ確かめる。
+    if (await gate.canRun(db, candidate.line_account_id, 'booking', 'booking calendar delete retry')) {
+      runnableIds.push(candidate.id);
+    }
+  }
+  if (runnableIds.length === 0) return result;
+  // claim 条件は候補と同じ述語を残す。別 worker が先に取った行は
+  // ここで 0 行になり、二重に外部を呼ばない。
+  const claimed = await db.prepare(
+    `UPDATE booking_operation_runs SET opened_at = ?, updated_at = ?
+      WHERE id IN (${runnableIds.map(() => '?').join(', ')})
+        AND ${dueWhere}
+        AND NOT ${bookingOff}
+      RETURNING id, booking_id, line_account_id`,
+  ).bind(nowIso, nowIso, ...runnableIds, staleCutoff)
+    .all<{ id: string; booking_id: string; line_account_id: string }>();
+  for (const op of claimed.results ?? []) {
+    result.processed++;
+    const outcome = await runCalendarDeleteOperation(db, {
+      bookingId: op.booking_id,
+      lineAccountId: op.line_account_id,
+      now,
+      remove: () => input.remove(op.booking_id, op.line_account_id),
+    });
+    if (outcome === 'succeeded') result.succeeded++;
+    else if (outcome === 'skipped') result.skipped++;
+    else result.retrying++;
+  }
+  return result;
 }
 
 export async function removeBookingFromGoogle(

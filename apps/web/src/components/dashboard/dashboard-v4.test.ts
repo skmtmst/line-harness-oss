@@ -5,6 +5,7 @@ import {
   defaultDashboardPreferences,
   normalizeDashboardPreferences,
   reorderDashboardItems,
+  toggleDashboardItem,
 } from './dashboard-editor'
 import { activeUpcomingBookings } from './side-cards'
 import { hasInboundSupportMark, summarizeTwoFactor } from './live-summary'
@@ -15,7 +16,8 @@ import {
   isDashboardNotificationData,
   markDashboardNotificationRead,
 } from './notification-summary'
-import { formatTrendSources } from './friend-trend-table'
+import { formatDate, formatTrendSources } from './friend-trend-table'
+import { resolveOfficialProfileUrl } from './qr-dialog'
 import type { BookingRequest } from '@/lib/api'
 import type { NotificationCenterData, StaffMember } from '@line-crm/shared'
 
@@ -23,6 +25,7 @@ function booking(id: string, startsAt: string, status = 'confirmed'): BookingReq
   return {
     id,
     friend_id: `friend-${id}`,
+    booking_customer_id: null,
     starts_at: startsAt,
     ends_at: startsAt,
     status,
@@ -39,6 +42,53 @@ function booking(id: string, startsAt: string, status = 'confirmed'): BookingReq
 }
 
 describe('ダッシュボードV4の初期表示', () => {
+  it('編集パネルとQRコードをPencil V6の文言・寸法にそろえる', () => {
+    const editor = readFileSync(path.join(process.cwd(), 'src/components/dashboard/dashboard-editor.tsx'), 'utf8')
+    const qrDialog = readFileSync(path.join(process.cwd(), 'src/components/dashboard/qr-dialog.tsx'), 'utf8')
+
+    expect(editor).toContain('max-w-[540px]')
+    expect(editor).toContain('表示するカードと位置を変更します')
+    expect(editor).toContain('ダッシュボードに反映')
+    expect(editor).toContain('5つ目をONにすると、いちばん下のカードが自動でOFFになります。')
+    expect(qrDialog).toContain('style={{ maxWidth: 820 }}')
+    expect(qrDialog).toContain('border p-8 shadow-')
+    expect(qrDialog).toContain("{ value: '300x300', label: '小（300px）'")
+    expect(qrDialog).toContain('ダウンロード形式')
+    expect(qrDialog).toContain('画像をダウンロード')
+    expect(qrDialog).not.toContain('PNGをダウンロード')
+    expect(qrDialog).toContain("import QRCode from 'qrcode'")
+    expect(qrDialog).toContain('QRCode.toDataURL(link')
+    expect(qrDialog).toContain('src={qrDataUrl || qrSrc}')
+    expect(qrDialog).toContain('visualReferenceQr ?')
+    expect(qrDialog).toContain('<QrCode aria-label="友だち追加QRコード"')
+  })
+
+  it('新APIの指標を使い、旧Workerの値へだけ後方互換する', () => {
+    const source = readFileSync(path.join(process.cwd(), 'src/app/page.tsx'), 'utf8')
+    expect(source).toContain('data?.metrics?.friendTrend')
+    expect(source).toContain('data?.metrics?.monthlyQuota')
+    expect(source).toContain('data.metrics.activeFriends.value')
+    expect(source).toContain('data.metrics.officialProfileUrl.value')
+  })
+
+  it('基本QRはAPIのlin.ee短縮URLを優先し、旧WorkerだけbasicIdへ戻す', () => {
+    expect(resolveOfficialProfileUrl('https://lin.ee/nen-official', '@nen')).toBe(
+      'https://lin.ee/nen-official',
+    )
+    expect(resolveOfficialProfileUrl(undefined, 'nen')).toBe('https://line.me/R/ti/p/@nen')
+    expect(resolveOfficialProfileUrl(null, 'nen')).toBeNull()
+    expect(resolveOfficialProfileUrl(null, null)).toBeNull()
+  })
+
+  it('撮影固定応答だけが設計見本QRと固定URLを選べる', () => {
+    const page = readFileSync(path.join(process.cwd(), 'src/app/page.tsx'), 'utf8')
+    expect(page).toContain('visualQa?.friendAddUrl')
+    expect(page).toContain('visualReferenceQr={visualQa?.referenceQr ?? false}')
+    expect(page).toContain('data?.visualQa?.notificationUnreadCount')
+    expect(page).toContain('reference?.pendingPhotos')
+    expect(page).toContain('referenceCount={reference?.operationalAlerts}')
+  })
+
   it('画面名はV6共通トップバーだけに表示する', () => {
     const source = readFileSync(path.join(process.cwd(), 'src/app/page.tsx'), 'utf8')
     expect(source).not.toContain("import Header from '@/components/layout/header'")
@@ -47,6 +97,25 @@ describe('ダッシュボードV4の初期表示', () => {
     expect(source).not.toContain('<h1')
     expect(source).toContain('V6 `vUXKb/vwcM6`')
     expect(source).toContain('ダッシュボード編集')
+  })
+
+  it('Pencil vUXKbどおりカード内を詰め、送信枠を1行で表示する', () => {
+    const page = readFileSync(path.join(process.cwd(), 'src/app/page.tsx'), 'utf8')
+    const sideCards = readFileSync(path.join(process.cwd(), 'src/components/dashboard/side-cards.tsx'), 'utf8')
+
+    expect(page).toContain('className="mt-2 flex items-end justify-between gap-3"')
+    expect(page).not.toContain('className="mt-auto flex items-end justify-between gap-3 pt-2"')
+    expect(page).toContain('className="text-metric leading-none font-bold tabular-nums"')
+    expect(page).toContain('className="text-ink mt-3 flex items-baseline gap-2 whitespace-nowrap"')
+    expect(sideCards).toContain('<Card padding="roomy">')
+    expect(sideCards).toContain('className="flex flex-col gap-2.5"')
+    expect(sideCards).not.toContain('<CardHeader')
+  })
+
+  it('追加URLの発行中ラベルに二重の外枠を付けない', () => {
+    const source = readFileSync(path.join(process.cwd(), 'src/app/page.tsx'), 'utf8')
+    expect(source).toContain('<label className="flex min-w-[220px] items-center gap-2">')
+    expect(source).not.toContain('rounded-control flex min-w-[220px] items-center gap-2 border')
   })
 
   it('旧Workerが追加集計を返さなくてもダッシュボードを描画できる', () => {
@@ -65,6 +134,24 @@ describe('ダッシュボードV4の初期表示', () => {
       full: '広告 2',
       compact: '広告 2',
     })
+  })
+
+  it('壊れた日付はNaN表示にせず元の文字列をそのまま出す', () => {
+    expect(formatDate('2026-08-15')).toBe('8月15日(土)')
+    expect(formatDate('not-a-date')).toBe('not-a-date')
+    expect(formatDate('2026-08')).toBe('2026-08')
+  })
+
+  it('撮影専用のvisualQaが無くても本番の受信・予約・通知は描画できる', () => {
+    /*
+      `visualQa`(hideBookings・supportInbox・notificationUnreadCount 等)は
+      撮影モックだけの値で、本番 API は返さない。画面側は `?.`・`??` で
+      無視する。本番相当の値と食い違っていてもそろえない。
+    */
+    const source = readFileSync(path.join(process.cwd(), 'src/app/page.tsx'), 'utf8')
+    expect(source).toContain('reference?.hideBookings')
+    expect(source).toContain('data?.visualQa?.notificationUnreadCount ??')
+    expect(source).toContain('data?.inbox ?? null')
   })
 
   it('通知は選択中アカウントの取得・1件既読・全件既読へ接続する', () => {
@@ -135,6 +222,17 @@ describe('ダッシュボードV4の初期表示', () => {
       'today-bookings',
     ])
     expect(reordered.find((item) => item.id === 'today-photo-review')?.visible).toBe(false)
+  })
+
+  it('今日やることの5枚目をONにすると並びのいちばん下をOFFにする', () => {
+    const items = [
+      ...defaultDashboardPreferences().today,
+      { id: 'scenario-status' as const, visible: false },
+    ]
+    const toggled = toggleDashboardItem(items, 'scenario-status', 4)
+
+    expect(toggled.filter((item) => item.visible)).toHaveLength(4)
+    expect(toggled.at(-1)).toEqual({ id: 'scenario-status', visible: false })
   })
 })
 
@@ -270,6 +368,6 @@ describe('ダッシュボード通知', () => {
     expect(dashboardNotificationDestination({
       ...data.items[1],
       eventType: 'unknown',
-    })).toBeNull()
+    })).toBe('/updates')
   })
 })

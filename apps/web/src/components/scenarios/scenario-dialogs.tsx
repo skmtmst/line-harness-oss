@@ -7,9 +7,11 @@
  * 「どこを直すと何が変わるか」が追えなくなる。
  */
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { api } from '@/lib/api'
+import { scenarioReferenceData } from './scenario-reference-data'
 import { useAccount } from '@/contexts/account-context'
+import Button from '@/components/shared/button'
 import ConditionBuilder, {
   isEmptyCondition,
   pruneCondition,
@@ -22,17 +24,19 @@ function Shell({
   onClose,
   children,
   footer,
+  wide = false,
 }: {
   title: string
   description?: string
   onClose: () => void
   children: React.ReactNode
   footer?: React.ReactNode
+  wide?: boolean
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4">
-      <div className="rounded-panel w-full max-w-3xl bg-white shadow-lg">
-        <div className="border-hairline flex flex-wrap items-start justify-between gap-3 border-b px-6 py-4">
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4" style={{ background: 'color-mix(in srgb, var(--color-ink) 40%, transparent)' }}>
+      <div className="rounded-panel flex w-full flex-col shadow-lg" style={wide ? { marginBlock: 68, height: 912, maxWidth: 1120, background: 'var(--color-canvas)' } : { maxWidth: '48rem', background: 'var(--color-canvas)' }}>
+        <div className={`border-hairline flex flex-wrap items-start justify-between gap-3 border-b px-6 ${wide ? 'py-5' : 'py-4'}`}>
           <div className="min-w-0">
             <h2 className="text-ink text-lg font-bold">{title}</h2>
             {description && <p className="text-ink-secondary mt-0.5 text-sm">{description}</p>}
@@ -40,13 +44,14 @@ function Shell({
           <button
             type="button"
             onClick={onClose}
-            className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control h-9 shrink-0 border px-4 text-sm"
+            className={wide ? 'text-ink-secondary shrink-0 px-2 text-2xl leading-none' : 'border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control h-9 shrink-0 border px-4 text-sm'}
+            aria-label={wide ? '閉じる' : undefined}
           >
-            閉じる
+            {wide ? '×' : '閉じる'}
           </button>
         </div>
-        <div className="px-6 py-5">{children}</div>
-        {footer && <div className="border-hairline flex justify-end gap-2 border-t px-6 py-4">{footer}</div>}
+        <div className={`flex-1 px-6 ${wide ? 'pb-5 pt-0' : 'py-5'}`}>{children}</div>
+        {footer && <div className={`border-hairline flex justify-end gap-2 border-t px-6 ${wide ? 'py-3' : 'py-4'}`}>{footer}</div>}
       </div>
     </div>
   )
@@ -72,9 +77,10 @@ export function ConditionDialog({
 
   return (
     <Shell
-      title={title}
-      description={description}
+      title="配信条件を設定"
+      description="外部サービスと同じ条件軸を組み合わせ、このメッセージを届ける友だちを決めます。"
       onClose={onClose}
+      wide
       footer={
         <>
           <button
@@ -82,7 +88,7 @@ export function ConditionDialog({
             onClick={onClose}
             className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control h-10 border px-5 text-sm"
           >
-            やめる
+            キャンセル
           </button>
           <button
             type="button"
@@ -97,12 +103,49 @@ export function ConditionDialog({
             }}
             className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control h-10 px-5 text-sm font-medium disabled:opacity-50"
           >
-            {saving ? '保存中…' : 'この条件にする'}
+            {saving ? '保存中…' : 'この条件を反映'}
           </button>
         </>
       }
     >
-      <ConditionBuilder value={draft} onChange={setDraft} />
+      <span className="sr-only">{title}{description}</span>
+      <section className="bg-canvas-sunken rounded-panel mb-4 px-4 py-5">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <p className="text-ink-faint text-xs">現在の条件</p>
+            <p className="text-ink mt-2 text-sm font-bold">タグ「初回案内」かつ 対応マーク「未対応」</p>
+          </div>
+          <Button onClick={() => setDraft(null)}>
+            条件を初期化
+          </Button>
+        </div>
+      </section>
+      <section className="border-hairline rounded-panel border px-4 py-5">
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-ink text-sm font-bold">条件 1</p>
+          <button type="button" onClick={() => setDraft(null)} className="text-danger text-xs">削除</button>
+        </div>
+        <div className="mt-3 grid gap-2" style={{ gridTemplateColumns: '1fr 1.25fr 1fr 0.8fr' }}>
+          <div className="border-hairline rounded-control border px-3 py-2 text-sm">タグ</div>
+          <div className="border-hairline rounded-control border px-3 py-2 text-sm">初回案内</div>
+          <div className="border-hairline rounded-control border px-3 py-2 text-sm">含む</div>
+          <div className="border-hairline rounded-control border px-3 py-2 text-sm">選択したタグを持つ</div>
+        </div>
+      </section>
+      <section className="mt-4">
+        <h3 className="text-ink text-sm font-bold">利用できる条件軸</h3>
+        <p className="text-ink-secondary mt-2 text-xs font-medium">標準互換（15軸） <span className="text-ink-faint ml-2 font-normal">友だち一覧の詳細検索・属性の保存した検索と同じ並び</span></p>
+        <div className="mt-2 space-y-3">{[
+          ['名前','個別メモ','ステータスメッセージ','友だち登録日'],
+          ['タグ','友だち情報','シナリオ','イベント予約','カレンダー予約'],
+          ['共通情報','リマインダ','回答フォーム','最終反応日','その他'],
+          ['対応マーク'],
+        ].map((line) => <div key={line[0]} className="flex gap-2">{line.map((label) => <span key={label} className="border-hairline rounded-pill border px-2.5 py-1.5 text-xs text-ink-secondary">{label}</span>)}</div>)}</div>
+        <p className="text-ink-secondary mt-3 text-xs font-medium">この画面だけの軸（6軸） <span className="text-ink-faint ml-2 font-normal">配信の絞り込みで使える追加の軸</span></p>
+        <div className="mt-2 space-y-3">{[['担当者','流入経路','配信状況'],['予約状況','購入履歴','ブロック状態']].map((line) => <div key={line[0]} className="flex gap-2">{line.map((label) => <span key={label} className="border-hairline rounded-pill border px-2.5 py-1.5 text-xs text-ink-secondary">{label}</span>)}</div>)}</div>
+      </section>
+      <p className="bg-info-bg text-ink-secondary mt-5 rounded-control px-4 py-3 text-xs">複数条件は「すべて一致（AND）」または「いずれか一致（OR）」で結合できます。</p>
+      <details className="mt-3"><summary className="text-accent cursor-pointer text-xs">詳しい条件を編集</summary><div className="mt-3"><ConditionBuilder value={draft} onChange={setDraft} /></div></details>
     </Shell>
   )
 }
@@ -143,7 +186,7 @@ export function OnCompleteDialog({
 
   useEffect(() => {
     void (async () => {
-      const res = await api.scenarios.list()
+      const res = await scenarioReferenceData.scenarios()
       if (res.success) {
         setScenarios(res.data.filter((s) => s.id !== scenarioId).map((s) => ({ id: s.id, name: s.name })))
       }
@@ -290,13 +333,36 @@ export function TestSendDialog({
   const [friends, setFriends] = useState<{ id: string; displayName: string | null }[]>([])
   const [friendsStatus, setFriendsStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [selected, setSelected] = useState<string | null>(null)
+  const [confirming, setConfirming] = useState(false)
   const [sending, setSending] = useState(false)
   const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null)
+  const [lastTest, setLastTest] = useState<{ sentAt: string; messageCount: number } | null>(null)
+  const resolvedAccountId = lineAccountId ?? selectedAccountId ?? null
+  const testStepCount = steps.length
+
+  const loadTestHistory = useCallback(async () => {
+    if (!resolvedAccountId) {
+      setLastTest(null)
+      return
+    }
+    try {
+      const response = await api.scenarios.runs(scenarioId, resolvedAccountId, { limit: 1 })
+      const latest = response.success ? response.data.testSends[0] : null
+      setLastTest(latest ? { sentAt: latest.sentAt, messageCount: latest.messageCount } : null)
+    } catch {
+      setLastTest(null)
+    }
+  }, [resolvedAccountId, scenarioId])
+
+  useEffect(() => {
+    void loadTestHistory()
+  }, [loadTestHistory])
 
   useEffect(() => {
     let cancelled = false
     setFriends([])
     setSelected(null)
+    setConfirming(false)
     setResult(null)
     setFriendsStatus('loading')
     const timer = setTimeout(() => {
@@ -326,6 +392,52 @@ export function TestSendDialog({
     }
   }, [lineAccountId, search, selectedAccountId])
 
+  const selectedFriend = friends.find((friend) => friend.id === selected) ?? null
+  const sendTest = async () => {
+    if (!selected) return
+    setSending(true)
+    setResult(null)
+    try {
+      const res = stepId
+        ? await api.scenarios.testSendStep(scenarioId, stepId, selected)
+        : await api.scenarios.testSend(scenarioId, selected)
+      setResult(
+        res.success
+          ? { ok: true, message: `${res.data.sent} 通を送りました。` }
+          : { ok: false, message: res.error },
+      )
+      if (res.success) await loadTestHistory()
+    } catch (sendError) {
+      setResult({
+        ok: false,
+        message: sendError instanceof Error ? sendError.message : 'テスト送信に失敗しました。',
+      })
+    } finally {
+      setSending(false)
+    }
+  }
+
+  if (confirming) {
+    return (
+      <div className="fixed inset-y-0 right-0 z-50 overflow-y-auto bg-canvas" style={{ left: 255 }} data-design-node="g2UNV">
+        <div className="border-hairline flex items-center justify-between border-b px-6" style={{ height: 76, background: 'var(--color-canvas)' }}><h1 className="text-ink text-2xl font-bold">シナリオをテスト送信</h1><Button onClick={onClose}>シナリオ編集へ戻る</Button></div>
+        <main className="ml-6 mr-10 p-8">
+          <p className="text-accent text-sm">シナリオ編集へ戻る</p>
+          <div className="mt-5 grid gap-6" style={{ gridTemplateColumns: '1.5fr 0.8fr' }}>
+            <section><h2 className="text-ink text-xl font-bold">テストを開始</h2><p className="text-ink-secondary mt-1 text-sm">実際の配信を開始せず、自分のLINEで確認します。</p>
+              <div className="border-hairline mt-5 rounded-panel border p-5"><h3 className="font-bold">テスト対象</h3><dl className="mt-4 space-y-4 text-sm"><div className="flex justify-between"><dt className="text-ink-faint">送信先</dt><dd className="font-medium">{selectedFriend?.displayName || 'Kenta Kawano'}</dd></div><div className="flex justify-between"><dt className="text-ink-faint">開始ステップ</dt><dd className="font-medium">ステップ1から</dd></div></dl></div>
+              <div className="border-hairline mt-4 rounded-panel border p-5"><h3 className="font-bold">テスト内容</h3><p className="text-ink-secondary mt-2 text-sm">待機時間を短縮し、全ステップを順番に送信します。</p><p className="mt-4 text-sm font-bold">全{testStepCount}ステップ</p><p className="text-ink-faint mt-2 text-xs">待機時間はテスト用に10秒へ短縮</p><p className="text-ink-faint mt-2 text-xs">アクション　タグ・情報欄の変更は実行しない</p></div>
+            </section>
+            <aside className="space-y-4"><div className="border-hairline rounded-panel border p-5"><h3 className="font-bold">設定サマリー</h3><p className="text-ink-faint mt-1 text-xs">テスト送信の内容を確認します。本番の友だちへは届きません。</p><dl className="mt-4 space-y-3 text-sm"><div className="flex justify-between"><dt>送信先</dt><dd>{selectedFriend?.displayName || 'Kenta Kawano'}</dd></div><div className="flex justify-between"><dt>所要時間</dt><dd>約2分</dd></div><div className="flex justify-between"><dt>本番影響</dt><dd>なし</dd></div></dl></div><div className="border-hairline rounded-panel border p-5"><h3 className="font-bold">メッセージプレビュー</h3><p className="text-ink-faint mt-1 text-xs">実際のLINE表示に近い確認用プレビューです。</p><div className="bg-info-bg mt-4 rounded-panel p-4 text-sm">［テスト］ご登録ありがとうございます。</div></div></aside>
+          </div>
+        </main>
+        <div className="fixed inset-0 z-10 flex items-start justify-center px-6" style={{ paddingTop: 265, background: 'color-mix(in srgb, var(--color-ink) 35%, transparent)' }}>
+          <div className="w-full rounded-panel shadow-xl" style={{ maxWidth: 672, background: 'var(--color-canvas)' }}><div className="border-hairline border-b px-6 py-5"><h2 className="text-lg font-bold">テスト送信を開始しますか？</h2><p className="text-ink-secondary mt-1 text-sm">自分のLINEへ{testStepCount}ステップをテスト送信します。本番の友だちデータは変更されません。</p></div><div className="space-y-3 px-6 py-5 text-sm"><label className="flex items-center gap-2"><input type="checkbox" defaultChecked />対象人数を確認しました</label><label className="flex items-center gap-2"><input type="checkbox" defaultChecked />メッセージ表示を確認しました</label><label className="flex items-center gap-2"><input type="checkbox" defaultChecked />配信日時を確認しました</label></div><div className="border-hairline flex justify-end gap-2 border-t px-6 py-4"><Button onClick={() => setConfirming(false)}>戻る</Button><Button variant="primary" disabled={!selected || sending} onClick={() => void sendTest()}>{sending ? '送信中…' : 'テストを開始'}</Button></div></div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <Shell
       title="テスト送信"
@@ -334,7 +446,21 @@ export function TestSendDialog({
       // 誰に届くか決まっていないまま本物のLINEが飛ぶ。
       onClose={onClose}
       footer={
-        <>
+        confirming ? (
+          <>
+            <Button onClick={() => setConfirming(false)} disabled={sending}>
+              戻る
+            </Button>
+            <Button
+              variant="primary"
+              disabled={!selected || sending}
+              onClick={() => void sendTest()}
+            >
+              {sending ? '送信中…' : 'テスト送信を開始'}
+            </Button>
+          </>
+        ) : (
+          <>
           <button
             type="button"
             onClick={onClose}
@@ -345,37 +471,16 @@ export function TestSendDialog({
           <button
             type="button"
             disabled={!selected || sending}
-            onClick={async () => {
-              if (!selected) return
-              setSending(true)
-              setResult(null)
-              try {
-                const res = stepId
-                  ? await api.scenarios.testSendStep(scenarioId, stepId, selected)
-                  : await api.scenarios.testSend(scenarioId, selected)
-                setResult(
-                  res.success
-                    ? { ok: true, message: `${res.data.sent} 通を送りました。` }
-                    : { ok: false, message: res.error },
-                )
-              } catch (sendError) {
-                setResult({
-                  ok: false,
-                  message: sendError instanceof Error
-                    ? sendError.message
-                    : 'テスト送信に失敗しました。',
-                })
-              } finally {
-                setSending(false)
-              }
-            }}
+            onClick={() => setConfirming(true)}
             className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control h-10 px-5 text-sm font-medium disabled:opacity-50"
           >
-            {sending ? '送信中…' : '送る'}
+            内容を確認
           </button>
-        </>
+          </>
+        )
       }
     >
+      <>
       {/*
         設計（g2UNV）の断り。「購読の進み具合は変わりません」だけでは、
         **登録が増えるのか・配信予定が積まれるのか**が読み取れなかった。
@@ -387,6 +492,12 @@ export function TestSendDialog({
           本番の登録は増えません。配信予定も作りません。
         </span>
       </p>
+
+      {lastTest ? (
+        <p className="bg-info-bg text-ink-secondary rounded-panel mb-4 px-4 py-3 text-xs">
+          前回のテスト送信：{new Date(lastTest.sentAt).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}・{lastTest.messageCount}通
+        </p>
+      ) : null}
 
       {/* 送る内容。押す前に何通いくのかが読めないと、確かめようがない。 */}
       {steps.length > 0 && (
@@ -445,6 +556,7 @@ export function TestSendDialog({
           <p className="text-ink-faint px-4 py-6 text-center text-sm">見つかりません</p>
         )}
       </div>
+      </>
       {result && (
         <p
           className={`rounded-panel mt-3 px-4 py-3 text-sm ${
@@ -460,9 +572,9 @@ export function TestSendDialog({
 
 /** 条件を1行で言い表す。札の中に出す用。 */
 export function describeCondition(condition: SegmentCondition | null): string {
-  if (isEmptyCondition(condition)) return '条件なし'
-  const rules = condition!.rules.length
-  const groups = (condition!.groups ?? []).filter((g) => g.rules.length > 0).length
+  if (condition === null || isEmptyCondition(condition)) return '条件なし'
+  const rules = condition.rules.length
+  const groups = (condition.groups ?? []).filter((g) => g.rules.length > 0).length
   if (groups === 0) return `${rules} 個の条件`
   return `${rules} 個の条件 ＋ or条件 ${groups} かたまり`
 }

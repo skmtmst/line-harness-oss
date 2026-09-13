@@ -46,6 +46,7 @@ const RULE_KINDS: { type: string; label: string; make: () => SegmentRule }[] = [
   { type: 'support_mark', label: '対応マーク', make: () => ({ type: 'support_mark', value: { markIds: [], exclude: false } }) },
   { type: 'tag_exists', label: 'タグ', make: () => ({ type: 'tag_exists', value: '' }) },
   { type: 'friend_field', label: '友だち情報', make: () => ({ type: 'friend_field', value: { fieldId: '', op: 'contains', text: '' } }) },
+  { type: 'scenario_subscribed', label: 'シナリオ購読', make: () => ({ type: 'scenario_subscribed', value: '' }) },
   { type: 'scenario_state', label: 'シナリオ', make: () => ({ type: 'scenario_state', value: { scenarioId: '', state: 'subscribed' } }) },
   { type: 'form_answered', label: '回答フォーム', make: () => ({ type: 'form_answered', value: '' }) },
   { type: 'last_reaction_at', label: '最終反応日', make: () => ({ type: 'last_reaction_at', value: { from: '', to: '' } }) },
@@ -627,6 +628,19 @@ function RuleEditor({ rule, onChange, tags, fields, marks, scenarios }: RuleEdit
         </div>
       )
     }
+
+    case 'scenario_subscribed':
+      return (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-ink text-sm font-medium">シナリオ購読</span>
+          <SelectField
+            aria-label="購読中のシナリオ"
+            value={String(rule.value ?? '')}
+            onChange={(e) => onChange({ type: rule.type, value: e.target.value })}
+            options={[{ value: '', label: 'シナリオを選ぶ' }, ...scenarios.map((sc) => ({ value: sc.id, label: sc.name }))]}
+          />
+        </div>
+      )
 
     case 'scenario_state':
       return (

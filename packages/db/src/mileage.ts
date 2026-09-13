@@ -1,3 +1,4 @@
+import { accountFeatureOffExclusionSql, isAccountFeatureEnabled } from './account-settings.js';
 import { jstNow } from './utils.js';
 
 export const DEFAULT_MILEAGE_PROGRAM_ID = 'default';
@@ -292,6 +293,10 @@ export interface PostMileageAdjustmentInput {
   executedByStaffId: string;
   executedByStaffName: string;
   lineAccountId: string;
+  /** Positive adjustments create an expiring grant lot through the existing ledger trigger. */
+  expiresAt?: string | null;
+  /** Included in the idempotency fingerprint so a retry cannot add or remove delivery. */
+  notifyFriend?: boolean;
   occurredAt?: string;
 }
 
@@ -358,14 +363,19 @@ export async function postMileageAdjustment(
   const programId = input.programId ?? DEFAULT_MILEAGE_PROGRAM_ID;
   await ensureBuiltInProgram(db, programId);
 
-  const fingerprint = JSON.stringify({
+  const fingerprintInput: Record<string, unknown> = {
     friendId: input.friendId,
     amount: input.amount,
     reason: input.reason,
     reasonCategory: input.reasonCategory,
     sourceReferenceId: input.sourceReferenceId ?? null,
     lineAccountId: input.lineAccountId,
-  });
+  };
+  // Keep the original six-field shape when neither V6 option is used, so
+  // idempotent retries of adjustments created before this migration still work.
+  if (input.expiresAt) fingerprintInput.expiresAt = input.expiresAt;
+  if (input.notifyFriend) fingerprintInput.notifyFriend = true;
+  const fingerprint = JSON.stringify(fingerprintInput);
   const existing = await db
     .prepare(`SELECT * FROM mileage_ledger WHERE program_id = ? AND idempotency_key = ?`)
     .bind(programId, input.idempotencyKey)
@@ -381,6 +391,7 @@ export async function postMileageAdjustment(
     lineAccountId: input.lineAccountId,
     executedByStaffId: input.executedByStaffId,
     executedByStaffName: input.executedByStaffName,
+    expiresAt: input.expiresAt ?? null,
   });
 
   const write = await db
@@ -756,6 +767,8 @@ export async function getMileageEarningOpportunitiesForFriend(
           WHERE program_id = ?
             AND event_type IN ('friend_registered', ?, ?, ?, ?)
             AND is_active = 1
+            AND (line_account_id IS NULL
+                 OR line_account_id = (SELECT line_account_id FROM friends WHERE id = ?))
             AND (conditions IS NULL
                  OR COALESCE(json_extract(conditions, '$.beneficiary'), 'actor') = 'actor')
             AND (valid_from IS NULL OR valid_from <= ?)
@@ -765,6 +778,7 @@ export async function getMileageEarningOpportunitiesForFriend(
       .bind(
         DEFAULT_MILEAGE_PROGRAM_ID,
         ...eventTypes,
+        friendId,
         now,
         now,
       )
@@ -999,6 +1013,8 @@ export interface MileageRuleRow {
   amount: number;
   initial_status: 'pending' | 'available';
   conditions: string | null;
+  /** 334(#521): 帰属アカウント。NULL は変更不可の既存全店ルール。 */
+  line_account_id?: string | null;
   is_active: number;
   valid_from: string | null;
   valid_until: string | null;
@@ -1058,10 +1074,15 @@ export async function createMileageRule(
     /** 期間限定のキャンペーン。列も突き合わせも前からあったが、書き込む口が無かった。 */
     validFrom?: string | null;
     validUntil?: string | null;
+    /** 334(#521): 帰属アカウント。新規ルールでは必須。 */
+    lineAccountId: string;
   },
 ): Promise<MileageRuleRow> {
   if (!Number.isInteger(input.amount) || input.amount <= 0) {
     throw new Error('Mileage rule amount must be a positive integer');
+  }
+  if (!input.lineAccountId.trim()) {
+    throw new Error('Mileage rule line account is required');
   }
   await ensureDefaultMileageProgram(db);
   const id = crypto.randomUUID();
@@ -1070,8 +1091,8 @@ export async function createMileageRule(
     .prepare(
       `INSERT INTO mileage_rules
          (id, program_id, name, event_type, source, amount, initial_status,
-          conditions, is_active, valid_from, valid_until, created_at, updated_at)
-       VALUES (?, 'default', ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)`,
+          conditions, line_account_id, is_active, valid_from, valid_until, created_at, updated_at)
+       VALUES (?, 'default', ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -1081,6 +1102,7 @@ export async function createMileageRule(
       input.amount,
       input.initialStatus ?? 'available',
       input.conditions ? JSON.stringify(input.conditions) : null,
+      input.lineAccountId,
       input.validFrom ?? null,
       input.validUntil ?? null,
       now,
@@ -1131,8 +1153,20 @@ export async function updateMileageRule(
   return getMileageRuleById(db, id);
 }
 
-export async function deleteMileageRule(db: D1Database, id: string): Promise<void> {
-  await db.prepare(`DELETE FROM mileage_rules WHERE id = ?`).bind(id).run();
+/**
+ * 決めごとを履歴ごと消さないための原子削除。N-232 用。
+ * 台帳(mileage_ledger)に1件でも参照があれば消さない。void の行も数える。
+ * SELECTとDELETEを分けると、その間に付与履歴が作られる競合で履歴付き決めごとを
+ * 消せるため、DELETE文自体に NOT EXISTS 条件を持たせて1文で実行する。
+ * 戻り値は消えた件数。0なら履歴あり・存在しない・同時削除のいずれかで、呼び出し側は安全拒否する。
+ */
+export async function deleteMileageRule(db: D1Database, id: string): Promise<number> {
+  const result = await db.prepare(
+    `DELETE FROM mileage_rules
+      WHERE id = ?
+        AND NOT EXISTS (SELECT 1 FROM mileage_ledger WHERE mileage_rule_id = ?)`,
+  ).bind(id, id).run();
+  return result.meta?.changes ?? 0;
 }
 
 export interface ApplyMileageRulesInput {
@@ -1249,9 +1283,9 @@ async function applyMileageRulesImmediately(
   input: ApplyMileageRulesInput,
 ): Promise<{ event: EngagementEvent; granted: MileageLedgerEntry[] }> {
   const friend = await db
-    .prepare(`SELECT id, user_id FROM friends WHERE id = ?`)
+    .prepare(`SELECT id, user_id, line_account_id FROM friends WHERE id = ?`)
     .bind(input.friendId)
-    .first<{ id: string; user_id: string | null }>();
+    .first<{ id: string; user_id: string | null; line_account_id: string | null }>();
   if (!friend) throw new Error(`Mileage friend not found: ${input.friendId}`);
 
   const occurredAt = input.occurredAt ?? jstNow();
@@ -1277,11 +1311,12 @@ async function applyMileageRulesImmediately(
           AND event_type = ?
           AND (source IS NULL OR source = ?)
           AND is_active = 1
+          AND (line_account_id IS NULL OR line_account_id = ?)
           AND (valid_from IS NULL OR valid_from <= ?)
           AND (valid_until IS NULL OR valid_until >= ?)
         ORDER BY created_at ASC, id ASC`,
     )
-    .bind(input.eventType, input.source, occurredAt, occurredAt)
+    .bind(input.eventType, input.source, friend.line_account_id, occurredAt, occurredAt)
     .all<MileageRuleRow>();
 
   const identityKey = friend.user_id ? `user:${friend.user_id}` : `friend:${friend.id}`;
@@ -1466,6 +1501,20 @@ export interface MileageQueueResult {
   granted: number;
 }
 
+/**
+ * 付与キューの行の持ち主(=イベントの友だちが属するアカウント)が
+ * マイル機能オフかをSQL内で判定する式。持ち主不明の旧行は偽になり、
+ * 従来どおり進む。
+ */
+function mileageOwnerOffSql(eventIdColumn: string): string {
+  return `EXISTS (
+    SELECT 1 FROM engagement_events ee
+      JOIN friends f ON f.id = ee.actor_friend_id
+     WHERE ee.id = ${eventIdColumn}
+       AND ${accountFeatureOffExclusionSql('f.line_account_id', 'mileage')}
+  )`;
+}
+
 /** Drain a bounded batch. Safe for retries and overlapping cron invocations. */
 export async function processPendingMileageEvents(
   db: D1Database,
@@ -1473,16 +1522,21 @@ export async function processPendingMileageEvents(
 ): Promise<MileageQueueResult> {
   const limit = Math.min(250, Math.max(1, options.limit ?? 100));
   const now = options.now ?? jstNow();
+  // 停滞回収も機能オフ中のアカウントには当てない。OFF中は status も
+  // processing_started_at も updated_at も動かさず、再オンで回収する。
   await db
     .prepare(
       `UPDATE mileage_event_queue
           SET status = 'pending', processing_started_at = NULL, updated_at = ?
         WHERE status = 'processing'
-          AND datetime(processing_started_at) < datetime(?, '-10 minutes')`,
+          AND datetime(processing_started_at) < datetime(?, '-10 minutes')
+          AND NOT ${mileageOwnerOffSql('mileage_event_queue.engagement_event_id')}`,
     )
     .bind(now, now)
     .run();
 
+  // 機能オフ中の行は LIMIT を数える前に外す。後で弾くと、オフの古い行が
+  // 先頭を占めたままON中の他アカウントが永久に回らない。
   const due = await db
     .prepare(
       `SELECT q.engagement_event_id
@@ -1490,6 +1544,7 @@ export async function processPendingMileageEvents(
         WHERE q.status IN ('pending','failed')
           AND q.attempts < 5
           AND datetime(q.available_at) <= datetime(?)
+          AND NOT ${mileageOwnerOffSql('q.engagement_event_id')}
         ORDER BY q.created_at ASC, q.engagement_event_id ASC
         LIMIT ?`,
     )
@@ -1498,6 +1553,20 @@ export async function processPendingMileageEvents(
 
   const result: MileageQueueResult = { claimed: 0, processed: 0, failed: 0, granted: 0 };
   for (const item of due.results) {
+    // 機能オフ中はclaim(状態更新)も付与もしない。pendingのまま残し、
+    // 再オンで再開する。持ち主が分からない行は従来どおり進める。
+    const owner = await db
+      .prepare(
+        `SELECT f.line_account_id AS line_account_id
+           FROM engagement_events ee LEFT JOIN friends f ON f.id = ee.actor_friend_id
+          WHERE ee.id = ?`,
+      )
+      .bind(item.engagement_event_id)
+      .first<{ line_account_id: string | null }>();
+    if (owner?.line_account_id
+      && !await isAccountFeatureEnabled(db, owner.line_account_id, 'mileage')) {
+      continue;
+    }
     const claim = await db
       .prepare(
         `UPDATE mileage_event_queue
@@ -1578,6 +1647,7 @@ export interface FollowingMileageReconcileResult {
  * Materialize registration/continuous-follow milestones in bounded chunks.
  * Called on the existing 6-hour cron. Historic accounts are gradually caught
  * up without a full-table write spike; normal queue processing remains 5-minutely.
+ * 機能オフ中のアカウントの節目は作らない。再オン後の新しい節目から再開する。
  */
 export async function enqueueFollowingMileageMilestones(
   db: D1Database,
@@ -1615,6 +1685,7 @@ export async function enqueueFollowingMileageMilestones(
            FROM friends f
           WHERE f.is_following = 1
             AND ${eligibilitySql}
+            AND NOT ${accountFeatureOffExclusionSql('f.line_account_id', 'mileage')}
             AND NOT EXISTS (
               SELECT 1 FROM engagement_events ee WHERE ee.id = ${eventIdSql}
             )
@@ -1631,8 +1702,10 @@ export async function enqueueFollowingMileageMilestones(
            (engagement_event_id, status, attempts, available_at, created_at, updated_at)
          SELECT ee.id, 'pending', 0, ?, ?, ?
            FROM engagement_events ee
+           LEFT JOIN friends f ON f.id = ee.actor_friend_id
           WHERE ee.event_type = ?
             AND ee.source = 'line_relationship'
+            AND NOT ${accountFeatureOffExclusionSql('f.line_account_id', 'mileage')}
             AND NOT EXISTS (
               SELECT 1 FROM mileage_event_queue q WHERE q.engagement_event_id = ee.id
             )
@@ -1697,6 +1770,8 @@ export interface MileageAdminHistoryItem {
   ruleName: string | null;
   mode: 'automatic' | 'manual';
   executedByStaffName: string | null;
+  lineAccountName: string;
+  balanceAfter: number;
   occurredAt: string;
 }
 
@@ -1986,9 +2061,11 @@ export async function getMileageAdminHistory(
     SELECT CASE WHEN f.user_id IS NOT NULL THEN 'user:' || f.user_id ELSE 'friend:' || f.id END AS identity_key,
            MIN(f.id) AS primary_friend_id,
            COALESCE(MAX(u.display_name), MAX(f.display_name), '名前未設定') AS display_name,
-           MAX(f.picture_url) AS picture_url
+           MAX(f.picture_url) AS picture_url,
+           MAX(la.name) AS line_account_name
       FROM friends f
       LEFT JOIN users u ON u.id = f.user_id
+      JOIN line_accounts la ON la.id = f.line_account_id
      WHERE f.line_account_id = ?
      GROUP BY identity_key
   ), ledger_rows AS (
@@ -1997,7 +2074,14 @@ export async function getMileageAdminHistory(
              WHEN COALESCE(ml.beneficiary_user_id, bf.user_id) IS NOT NULL
                THEN 'user:' || COALESCE(ml.beneficiary_user_id, bf.user_id)
              ELSE 'friend:' || ml.beneficiary_friend_id
-           END AS identity_key
+           END AS identity_key,
+           SUM(CASE WHEN ml.status = 'available' THEN ml.amount ELSE 0 END) OVER (
+             PARTITION BY CASE
+               WHEN COALESCE(ml.beneficiary_user_id, bf.user_id) IS NOT NULL
+                 THEN 'user:' || COALESCE(ml.beneficiary_user_id, bf.user_id)
+               ELSE 'friend:' || ml.beneficiary_friend_id END
+             ORDER BY ml.occurred_at, ml.created_at, ml.id ROWS UNBOUNDED PRECEDING
+           ) AS balance_after
       FROM mileage_ledger ml
       LEFT JOIN friends bf ON bf.id = ml.beneficiary_friend_id
      WHERE ml.program_id = 'default'
@@ -2044,12 +2128,12 @@ export async function getMileageAdminHistory(
     db
       .prepare(
         `${ctes}
-         SELECT lr.id, sp.primary_friend_id, sp.display_name, sp.picture_url,
+         SELECT lr.id, sp.primary_friend_id, sp.display_name, sp.picture_url, sp.line_account_name,
                 lr.entry_type, lr.status, lr.amount, lr.reason, lr.source,
                 lr.source_event_id, mr.name AS rule_name,
                 json_extract(lr.metadata, '$.sourceReferenceId') AS source_reference_id,
                 json_extract(lr.metadata, '$.executedByStaffName') AS executed_by_staff_name,
-                lr.occurred_at
+                lr.occurred_at, lr.balance_after
            FROM ledger_rows lr
            INNER JOIN selected_profiles sp ON sp.identity_key = lr.identity_key
            LEFT JOIN mileage_rules mr ON mr.id = lr.mileage_rule_id
@@ -2073,6 +2157,8 @@ export async function getMileageAdminHistory(
         rule_name: string | null;
         executed_by_staff_name: string | null;
         occurred_at: string;
+        line_account_name: string;
+        balance_after: number;
       }>(),
     db
       .prepare(
@@ -2104,6 +2190,8 @@ export async function getMileageAdminHistory(
         ? 'manual'
         : 'automatic',
       executedByStaffName: row.executed_by_staff_name,
+      lineAccountName: row.line_account_name,
+      balanceAfter: Number(row.balance_after ?? 0),
       occurredAt: row.occurred_at,
     })),
     pagination: { total: Number(count?.total ?? 0), limit, offset },

@@ -1,7 +1,9 @@
-import { getFriendById, getLineAccountById, jstNow } from '@line-crm/db';
+import { accountFeatureOffExclusionSql, getFriendById, getLineAccountById, jstNow } from '@line-crm/db';
+import { NEN_CAMPAIGN_BODY_MAX_LENGTH } from '@line-crm/shared';
 import type { Message } from '@line-crm/line-sdk';
 import type { EcEvent } from '../routes/ec-integrations.js';
 import { logOutgoingMessage } from './event-bus.js';
+import { createFeatureJobGate, featureJobCanRun } from './feature-enforcement.js';
 import { createEccubeCoupon } from './eccube-coupon.js';
 import { pushViaHarnessProxy, type HarnessProxyDispatch } from './line-proxy-send.js';
 
@@ -15,6 +17,9 @@ const MAX_JOBS_PER_TICK = 30;
 // 送信に失敗した job を何回まで試すか。これを超えた job は拾われなくなり、
 // status='failed' のまま残る（last_error に理由が入る）。
 const MAX_DELIVERY_ATTEMPTS = 5;
+// コラム配信予約の1回のまとめ書き件数。D1 の batch は文が多すぎると
+// 1 回の呼び出しが重くなるため、100件ずつに区切る。
+const COLUMN_QUEUE_BATCH_SIZE = 100;
 
 export type CampaignRow = {
   campaign_key: string;
@@ -29,8 +34,51 @@ export type CampaignRow = {
   button_label: string | null;
   button_url: string | null;
   image_url: string | null;
+  after_actions?: NenCampaignAfterAction[];
   updated_at?: string;
 };
+
+export type NenCampaignAfterAction =
+  | { kind: 'open_form'; formId: string; formName: string; buttonLabel: string }
+  | { kind: 'award_mileage'; amount: number; trigger: 'form_submitted' };
+
+export function parseNenCampaignAfterActions(value: unknown): NenCampaignAfterAction[] {
+  if (!Array.isArray(value) || value.length > 10) return [];
+  return value.flatMap<NenCampaignAfterAction>((item) => {
+    if (!item || typeof item !== 'object') return [];
+    const action = item as Record<string, unknown>;
+    if (
+      action.kind === 'open_form'
+      && typeof action.formId === 'string'
+      && action.formId.trim().length > 0
+      && action.formId.length <= 100
+      && typeof action.formName === 'string'
+      && action.formName.trim().length > 0
+      && action.formName.length <= 120
+      && typeof action.buttonLabel === 'string'
+      && action.buttonLabel.trim().length > 0
+      && action.buttonLabel.length <= 20
+    ) {
+      return [{
+        kind: 'open_form',
+        formId: action.formId.trim(),
+        formName: action.formName.trim(),
+        buttonLabel: action.buttonLabel.trim(),
+      }];
+    }
+    const amount = Number(action.amount);
+    if (
+      action.kind === 'award_mileage'
+      && action.trigger === 'form_submitted'
+      && Number.isInteger(amount)
+      && amount >= 1
+      && amount <= 1_000_000
+    ) {
+      return [{ kind: 'award_mileage', amount, trigger: 'form_submitted' }];
+    }
+    return [];
+  });
+}
 
 export type NenBirthdayCouponSettingRow = {
   is_enabled: number;
@@ -68,6 +116,7 @@ type DeliveryJob = {
   source_key: string;
   payload: string;
   campaign_snapshot: string | null;
+  retry_generation?: number;
 };
 
 export type NenDeliveryOptions = {
@@ -102,6 +151,27 @@ function renderCampaignCopy(value: string, payload: Record<string, unknown>): st
     .replaceAll('{{pet_name}}', String(pet?.name || '大切なご家族'))
     .replaceAll('{{coupon_code}}', String(coupon?.code || ''))
     .replaceAll('{{coupon_expiry}}', String(coupon?.expires_at || '').slice(0, 10));
+}
+
+/**
+ * 送信直前の多重防御としての切り詰め。保存時の上限判定（#659）が効いて
+ * いれば、ここで実際に切ることは起きないはず。**発動したのなら、保存時の
+ * 検査をすり抜けたか、既存データが旧仕様のまま残っているなど、どこかに
+ * 不具合があるということ。** 黙って切ると、利用者が保存できた本文が
+ * 送信時に無言で短くなり、誰も気づけない。`nen_delivery_failed` と同じ
+ * 構造化ログの形で必ず記録する（`.catch` で握り潰さない）。
+ */
+function truncateForSend(value: string, maxLength: number, context: { campaignKey: string; field: string }): string {
+  if (value.length <= maxLength) return value;
+  console.error(JSON.stringify({
+    event: 'nen_body_truncated_at_send',
+    campaignKey: context.campaignKey,
+    field: context.field,
+    beforeLength: value.length,
+    afterLength: maxLength,
+    droppedLength: value.length - maxLength,
+  }));
+  return value.slice(0, maxLength);
 }
 
 function campaignSnapshot(campaign: CampaignRow): string {
@@ -140,6 +210,7 @@ export function readNenCampaignSnapshot(value: string | null, campaignKey: strin
       button_label: typeof parsed.button_label === 'string' ? parsed.button_label : null,
       button_url: typeof parsed.button_url === 'string' ? parsed.button_url : null,
       image_url: typeof parsed.image_url === 'string' ? parsed.image_url : null,
+      after_actions: parseNenCampaignAfterActions(parsed.after_actions),
       updated_at: typeof parsed.updated_at === 'string' ? parsed.updated_at : '',
     };
   } catch {
@@ -147,16 +218,43 @@ export function readNenCampaignSnapshot(value: string | null, campaignKey: strin
   }
 }
 
+/*
+ * 1500: `c7069559b`（2026-08-13）で導入。根拠の記録は無い。動かす前提が
+ * 出てきたら、この数値そのものを見直すこと（#711 の司令塔裁定で確認済み）。
+ */
+const NEN_COLUMN_INTRO_MAX_LENGTH = 1500;
+
+/**
+ * 保存時の多重防御としての切り詰め。入口（EC-Cube Webhookのtitle ≤120字、
+ * 管理画面のtitle ≤120字・excerpt ≤500字）が効いていれば、固定文言を足しても
+ * ここで実際に切ることは起きないはず。**発動したのなら、入口の検査をすり
+ * 抜けたか、固定文言が伸びたなど、どこかに不具合があるということ。** 黙って
+ * 切ると、紹介文の結びが途中で消えたことに誰も気づけない。`truncateForSend`
+ * （#659）と同じ考え方で、切ったときだけ記録する。
+ */
+function truncateColumnIntro(value: string, maxLength: number, context: { title: string }): string {
+  if (value.length <= maxLength) return value;
+  console.error(JSON.stringify({
+    event: 'nen_column_intro_truncated',
+    title: context.title.slice(0, 120),
+    beforeLength: value.length,
+    afterLength: maxLength,
+    droppedLength: value.length - maxLength,
+  }));
+  return value.slice(0, maxLength);
+}
+
 export function buildDefaultColumnIntro(title: string, excerpt: string): string {
   const summary = excerpt.trim();
-  return [
+  const text = [
     'こんにちは、然-NEN-です🌿',
     '',
     `今回のNENコラムでは「${title.trim()}」についてご紹介します。`,
     summary,
     '',
     '愛犬・愛猫との毎日に役立つ内容です。ぜひご覧ください。',
-  ].filter((line, index, lines) => line || (index > 0 && lines[index - 1])).join('\n').slice(0, 1500);
+  ].filter((line, index, lines) => line || (index > 0 && lines[index - 1])).join('\n');
+  return truncateColumnIntro(text, NEN_COLUMN_INTRO_MAX_LENGTH, { title });
 }
 
 function flexMessage(campaign: CampaignRow, payload: Record<string, unknown>): Message {
@@ -168,7 +266,16 @@ function flexMessage(campaign: CampaignRow, payload: Record<string, unknown>): M
     || (event?.event_type === 'ec.order.shipped' ? event.shipping?.tracking_url : event?.order?.detail_url)
     || campaign.button_url || '');
   const title = renderCampaignCopy(String(article?.title || campaign.title), payload);
-  const body = renderCampaignCopy(String(article?.excerpt || campaign.body_text), payload);
+  // 保存時は差し込み前の本文だけを見ており（#659差し戻し1点目）、差し込み
+  // 値（ペットの名前など）でここまで膨らみうる。保存時の検査だけに頼らず、
+  // 実際にLINEへ送る直前でも同じ採用上限で切る（多重防御）。UTF-16 code
+  // unit単位で、保存時の数え方と揃っている。発動したら記録する
+  // （`truncateForSend` を参照）。
+  const body = truncateForSend(
+    renderCampaignCopy(String(article?.excerpt || campaign.body_text), payload),
+    NEN_CAMPAIGN_BODY_MAX_LENGTH,
+    { campaignKey: campaign.campaign_key, field: 'body' },
+  );
   const details: Array<{ type: 'text'; text: string; size: 'sm'; color: string; wrap: true }> = [];
   if (event?.order?.number) details.push({ type: 'text', text: `注文番号：${event.order.number}`, size: 'sm', color: '#64748B', wrap: true });
   const items = event ? orderSummary(event) : '';
@@ -362,28 +469,38 @@ export async function queueColumnDelivery(
   scheduledAt: string,
 ): Promise<number> {
   const column = await db.prepare(
-    `SELECT id, title, excerpt, article_url, image_url, intro_text
+    `SELECT id, title, excerpt, article_url, image_url, intro_text, target_mode, target_tag_id
        FROM nen_columns WHERE id = ? AND line_account_id = ?`,
   ).bind(columnId, lineAccountId).first<Record<string, unknown>>();
   if (!column) throw new Error('Column not found');
   const campaign = await getNenCampaign(db, 'column', lineAccountId);
   if (!campaign || campaign.is_enabled !== 1) throw new Error('Column campaign is disabled');
   const friends = await db.prepare(
-    `SELECT id FROM friends WHERE line_account_id = ? AND is_following = 1`,
-  ).bind(lineAccountId).all<{ id: string }>();
+    `SELECT f.id FROM friends f
+      WHERE f.line_account_id = ? AND f.is_following = 1
+        AND (? != 'tag' OR EXISTS (
+          SELECT 1 FROM friend_tags ft WHERE ft.friend_id = f.id AND ft.tag_id = ?
+        ))`,
+  ).bind(lineAccountId, column.target_mode, column.target_tag_id).all<{ id: string }>();
   const now = jstNow();
+  // 友だち1人ずつ順番に書き込むと千人規模で千回超の書き込みになる(点検 #512 の中1)。
+  // 100件ずつまとめて送る。INSERT OR IGNORE なので入り直しても重複しない。
+  const articlePayload = JSON.stringify({ article: column });
+  const snapshot = campaignSnapshot(campaign);
+  const sourceKey = `column:${columnId}`;
   let queued = 0;
-  for (const friend of friends.results) {
-    const result = await db.prepare(
+  for (let offset = 0; offset < friends.results.length; offset += COLUMN_QUEUE_BATCH_SIZE) {
+    const chunk = friends.results.slice(offset, offset + COLUMN_QUEUE_BATCH_SIZE);
+    const results = await db.batch(chunk.map((friend) => db.prepare(
       `INSERT OR IGNORE INTO nen_delivery_jobs
         (id, campaign_key, friend_id, line_account_id, source_key, payload, campaign_snapshot,
          scheduled_at, status, attempts, created_at, updated_at)
        VALUES (?, 'column', ?, ?, ?, ?, ?, ?, 'pending', 0, ?, ?)`,
     ).bind(
-      crypto.randomUUID(), friend.id, lineAccountId, `column:${columnId}`,
-      JSON.stringify({ article: column }), campaignSnapshot(campaign), scheduledAt, now, now,
-    ).run();
-    queued += result.meta.changes ?? 0;
+      crypto.randomUUID(), friend.id, lineAccountId, sourceKey,
+      articlePayload, snapshot, scheduledAt, now, now,
+    )));
+    for (const result of results) queued += result.meta.changes ?? 0;
   }
   await db.prepare(
     `UPDATE nen_columns SET delivery_status = ?, delivery_at = ?, updated_at = ?
@@ -429,6 +546,10 @@ export async function enqueueBirthdayCoupons(
   let queued = 0;
   for (const pet of pets.results) {
     if (!pet.line_account_id) continue;
+    // 機能オフ中は発行も予約もしない。再オン後の誕生日から再開する。
+    if (!await featureJobCanRun(db, { accountId: pet.line_account_id, featureId: 'nen_campaigns', job: 'birthday coupon enqueue' })) {
+      continue;
+    }
     if (!accountConfiguration.has(pet.line_account_id)) {
       const [setting, campaign] = await Promise.all([
         getNenBirthdayCouponSetting(db, pet.line_account_id),
@@ -523,17 +644,42 @@ export async function processNenDeliveries(
   db: D1Database,
   options: NenDeliveryOptions,
 ): Promise<{ sent: number; failed: number; skipped: number }> {
+  const dueWhere = `status IN ('pending', 'failed') AND datetime(scheduled_at) <= datetime('now')
+        AND attempts < ?`;
+  const campaignsOff = accountFeatureOffExclusionSql('nen_delivery_jobs.line_account_id', 'nen_campaigns');
+  // オフ判定は LIMIT を数える前に SQL で行う。読んでから弾くと、オフの行が
+  // 上限ぶん先頭を占めたまま、後ろに並ぶ動作中アカウントの配信が進まない。
   const jobs = await db.prepare(
-    `SELECT id, campaign_key, friend_id, line_account_id, source_key, payload, campaign_snapshot
+    `SELECT id, campaign_key, friend_id, line_account_id, source_key, payload, campaign_snapshot,
+            retry_generation
        FROM nen_delivery_jobs
-      WHERE status IN ('pending', 'failed') AND datetime(scheduled_at) <= datetime('now')
-        AND attempts < ?
+      WHERE ${dueWhere}
+        AND NOT ${campaignsOff}
       ORDER BY scheduled_at ASC LIMIT ?`,
   ).bind(MAX_DELIVERY_ATTEMPTS, MAX_JOBS_PER_TICK).all<DeliveryJob>();
+  // 止めた行も同じ上限ぶんだけ読み、skipped に数えて監査を残す。
+  // 読むだけで status も attempts も動かさない。
+  const offJobs = await db.prepare(
+    `SELECT line_account_id FROM nen_delivery_jobs
+      WHERE ${dueWhere}
+        AND line_account_id IS NOT NULL
+        AND ${campaignsOff}
+      ORDER BY scheduled_at ASC LIMIT ?`,
+  ).bind(MAX_DELIVERY_ATTEMPTS, MAX_JOBS_PER_TICK).all<{ line_account_id: string }>();
   let sent = 0;
   let failed = 0;
   let skipped = 0;
+  const offGate = createFeatureJobGate();
+  for (const off of offJobs.results) {
+    await offGate.canRun(db, off.line_account_id, 'nen_campaigns', 'NEN campaign deliveries');
+    skipped += 1;
+  }
   for (const job of jobs.results) {
+    // 機能オフ中はclaimせずpendingのまま残す。再オンで再開する。
+    if (job.line_account_id && !await featureJobCanRun(db, { accountId: job.line_account_id, featureId: 'nen_campaigns', job: 'NEN campaign deliveries' })) {
+      skipped += 1;
+      continue;
+    }
     const claim = await db.prepare(
       `UPDATE nen_delivery_jobs SET status = 'processing', attempts = attempts + 1, updated_at = ?
         WHERE id = ? AND status IN ('pending', 'failed')`,
@@ -571,8 +717,12 @@ export async function processNenDeliveries(
       const accessToken = account.channel_access_token;
       const payload = JSON.parse(job.payload) as Record<string, unknown>;
       const messages = buildNenDeliveryMessages(campaign, payload);
+      const retryGeneration = Number(job.retry_generation ?? 0);
+      const idempotencyKey = retryGeneration > 0
+        ? `${job.id}:manual:${retryGeneration}`
+        : job.id;
       await pushViaHarnessProxy(
-        options.proxyBaseUrl, accessToken, friend.line_user_id, messages, job.id, options.proxyDispatch,
+        options.proxyBaseUrl, accessToken, friend.line_user_id, messages, idempotencyKey, options.proxyDispatch,
       );
       for (const message of messages) {
         await logOutgoingMessage(db, {

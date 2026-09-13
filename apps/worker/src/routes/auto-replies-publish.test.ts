@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   updateAutoReply: vi.fn(),
   deleteAutoReply: vi.fn(),
   getAutoReplyHitCounts: vi.fn(),
+  getAutoReplyHitCountSince: vi.fn(),
   getFolderById: vi.fn(),
   getFriendById: vi.fn(),
   getTemplateById: vi.fn(),
@@ -37,6 +38,7 @@ function settings(overrides: Partial<AutoReplyDraftSettings> = {}): AutoReplyDra
     cooldownMinutes: null,
     skipWhenOperatorActive: false,
     priority: 10,
+    receiveSources: ['line'],
     messageKinds: null,
     friendConditions: null,
     actions: null,
@@ -114,6 +116,7 @@ vi.mock('@line-crm/db', () => ({
   updateAutoReply: mocks.updateAutoReply,
   deleteAutoReply: mocks.deleteAutoReply,
   getAutoReplyHitCounts: mocks.getAutoReplyHitCounts,
+  getAutoReplyHitCountSince: mocks.getAutoReplyHitCountSince,
   getFolderById: mocks.getFolderById,
   getFriendById: mocks.getFriendById,
   getTemplateById: mocks.getTemplateById,
@@ -188,6 +191,7 @@ beforeEach(() => {
   mocks.createAutoReplyWithDraftVersion.mockResolvedValue({ rule: current, version: version() });
   mocks.saveAutoReplyDraftVersion.mockResolvedValue(version());
   mocks.getTemplateById.mockResolvedValue(null);
+  mocks.getAutoReplyHitCountSince.mockResolvedValue(214);
   mocks.canAccessAllLineAccounts.mockResolvedValue(true);
   mocks.getFriendById.mockResolvedValue({
     id: 'friend-a',
@@ -206,6 +210,29 @@ beforeEach(() => {
 });
 
 describe('自動応答の試験と公開', () => {
+  it('公開前の下書きに過去28日の実測一致数を添える', async () => {
+    const response = await app().request('/api/auto-replies/rule-draft/draft', {}, bindings);
+    const json = await response.json() as { data: { matchedLast28Days: number | null } };
+
+    expect(response.status).toBe(200);
+    expect(json.data.matchedLast28Days).toBe(214);
+    expect(mocks.getAutoReplyHitCountSince).toHaveBeenCalledWith(
+      db,
+      'rule-draft',
+      expect.any(String),
+    );
+  });
+
+  it('一致数を集計できないときは0件とせず未取得で返す', async () => {
+    mocks.getAutoReplyHitCountSince.mockRejectedValue(new Error('count failed'));
+
+    const response = await app().request('/api/auto-replies/rule-draft/draft', {}, bindings);
+    const json = await response.json() as { data: { matchedLast28Days: number | null } };
+
+    expect(response.status).toBe(200);
+    expect(json.data.matchedLast28Days).toBeNull();
+  });
+
   it('新規保存は公開中ルールを作らず、下書き作成だけを呼ぶ', async () => {
     const response = await app().request('/api/auto-replies/drafts', {
       method: 'POST',
@@ -222,7 +249,10 @@ describe('自動応答の試験と公開', () => {
     const response = await app().request('/api/auto-replies/rule-draft/draft', {
       method: 'PUT',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(settings({ responseContent: '下書きの新しい返事' })),
+      body: JSON.stringify({
+        ...settings({ responseContent: '下書きの新しい返事' }),
+        expectedVersion: 2,
+      }),
     }, bindings);
 
     expect(response.status).toBe(200);

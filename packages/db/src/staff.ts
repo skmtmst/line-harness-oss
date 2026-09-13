@@ -26,6 +26,7 @@ export interface StaffMember {
   assigned_line_account_id?: string | null;
   can_access_descendant_accounts?: number;
   account_scope?: 'all' | 'accounts';
+  policy_version?: number;
   tenant_id: string | null;
   created_at: string;
   updated_at: string;
@@ -177,7 +178,7 @@ export async function updateStaffMember(
   input: UpdateStaffInput,
 ): Promise<StaffMember | null> {
   const now = jstNow();
-  const sets: string[] = ['updated_at = ?'];
+  const sets: string[] = ['updated_at = ?', 'policy_version = policy_version + 1'];
   const values: (string | number | null)[] = [now];
 
   if (input.name !== undefined) { sets.push('name = ?'); values.push(input.name); }
@@ -218,6 +219,29 @@ export async function getStaffAccountScopeIds(db: D1Database, staffId: string): 
     .bind(staffId)
     .all<{ line_account_id: string }>();
   return result.results.map((row) => row.line_account_id);
+}
+
+/*
+ * 一覧の N+1 対策。1人ずつ getStaffAccountScopeIds を叩くと
+ * 人数分の往復になるので、一覧では IN で一括取得して振り分ける。
+ */
+export async function getStaffAccountScopeMap(
+  db: D1Database,
+  staffIds: string[],
+): Promise<Map<string, string[]>> {
+  const map = new Map<string, string[]>();
+  const ids = [...new Set(staffIds.filter((id) => typeof id === 'string' && id.length > 0))];
+  if (ids.length === 0) return map;
+  const result = await db
+    .prepare(`SELECT staff_id, line_account_id FROM staff_account_scopes WHERE staff_id IN (${ids.map(() => '?').join(',')}) ORDER BY staff_id, line_account_id`)
+    .bind(...ids)
+    .all<{ staff_id: string; line_account_id: string }>();
+  for (const row of result.results) {
+    const list = map.get(row.staff_id) ?? [];
+    list.push(row.line_account_id);
+    map.set(row.staff_id, list);
+  }
+  return map;
 }
 
 export async function replaceStaffAccountScopes(

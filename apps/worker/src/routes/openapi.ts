@@ -7,7 +7,7 @@ const spec = {
   openapi: '3.1.0',
   info: {
     title: 'LINE OSS CRM API',
-    version: '0.2.0',
+    version: '0.24.0',
     description: 'Open-source LINE Official Account CRM/marketing automation API. API-first design for Claude Code / AI agent integration.',
     license: { name: 'MIT' },
   },
@@ -50,6 +50,14 @@ const spec = {
           id: { type: 'string', format: 'uuid' },
           name: { type: 'string' },
           color: { type: 'string' },
+          lineAccountId: { type: 'string' },
+          description: { type: ['string', 'null'] },
+          manualAssignmentAllowed: { type: 'boolean' },
+          reapplyPolicy: { type: 'string', enum: ['first_only', 'every_time'] },
+          linkedEnabled: { type: 'boolean' },
+          status: { type: 'string', enum: ['active', 'archived'] },
+          version: { type: 'integer', minimum: 1 },
+          updatedAt: { type: 'string', format: 'date-time' },
           createdAt: { type: 'string', format: 'date-time' },
           cleanupReasons: {
             type: 'array',
@@ -86,6 +94,48 @@ const spec = {
           },
           blockingReferenceCount: { type: 'integer', minimum: 0 },
           canDelete: { type: 'boolean' },
+        },
+      },
+      TagDependencyImpact: {
+        type: 'object',
+        required: [
+          'tag', 'friendCount', 'references', 'linkedActions', 'pendingRunCount',
+          'mileageImpact', 'canArchive', 'canDelete', 'checkedAt', 'revision',
+        ],
+        properties: {
+          tag: {
+            type: 'object',
+            required: ['id', 'name', 'version', 'status'],
+            properties: {
+              id: { type: 'string' },
+              name: { type: 'string' },
+              version: { type: 'integer', minimum: 1 },
+              status: { type: 'string', enum: ['active', 'archived'] },
+            },
+          },
+          friendCount: { type: 'integer', minimum: 0 },
+          references: {
+            type: 'array',
+            items: {
+              type: 'object',
+              required: ['kind', 'name', 'href', 'state', 'count'],
+              properties: {
+                kind: { type: 'string' },
+                name: { type: 'string' },
+                href: { type: 'string' },
+                state: { type: 'string' },
+                count: { type: 'integer', minimum: 1 },
+                definitionVersion: { type: ['integer', 'null'] },
+              },
+            },
+          },
+          linkedActions: { type: 'array', items: { type: 'object' } },
+          pendingRunCount: { type: 'integer', minimum: 0 },
+          mileageImpact: { type: 'object' },
+          canArchive: { type: 'boolean' },
+          canDelete: { type: 'boolean' },
+          checkedAt: { type: 'string', format: 'date-time' },
+          revision: { type: 'string' },
         },
       },
       TagCsvImportRow: {
@@ -247,6 +297,327 @@ const spec = {
     },
   },
   paths: {
+    // ── Email authentication ───────────────────────────────────────────────
+    '/api/auth/register/request': {
+      post: {
+        tags: ['Auth'], summary: '会員登録用の確認メールを送信', security: [],
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['email', 'turnstileToken', 'agreed'], properties: { email: { type: 'string', format: 'email' }, turnstileToken: { type: 'string' }, agreed: { type: 'boolean' }, deviceMarker: { type: 'string' } } } } } },
+        responses: { '200': { description: 'Request accepted without exposing account existence' }, '400': { description: 'Invalid request' }, '429': { description: 'Rate limit exceeded' }, '503': { description: 'Turnstile or mail configuration unavailable' } },
+      },
+    },
+    '/api/auth/register/check': {
+      get: {
+        tags: ['Auth'], summary: '会員登録トークンを確認', security: [],
+        responses: { '200': { description: 'Token state' } },
+      },
+    },
+    '/api/auth/register/complete': {
+      post: {
+        tags: ['Auth'], summary: '会員登録を完了', security: [],
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object' } } } },
+        responses: { '200': { description: 'Tenant and owner account created' }, '400': { description: 'Invalid or expired token' }, '409': { description: 'Account already exists' } },
+      },
+    },
+    '/api/auth/password/login': {
+      post: {
+        tags: ['Auth'], summary: 'メールアドレスとパスワードでログイン', security: [],
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['email', 'password'], properties: { email: { type: 'string', format: 'email' }, password: { type: 'string' } } } } } },
+        responses: { '200': { description: 'Session issued' }, '401': { description: 'Invalid credentials' }, '429': { description: 'Rate limit exceeded' } },
+      },
+    },
+    '/api/auth/password/forgot': {
+      post: {
+        tags: ['Auth'], summary: 'パスワード再設定メールを送信', security: [],
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['email', 'turnstileToken'], properties: { email: { type: 'string', format: 'email' }, turnstileToken: { type: 'string' } } } } } },
+        responses: { '200': { description: 'Request accepted without exposing account existence' }, '429': { description: 'Rate limit exceeded' }, '503': { description: 'Turnstile or mail configuration unavailable' } },
+      },
+    },
+    '/api/auth/password/reset/check': {
+      get: {
+        tags: ['Auth'], summary: 'パスワード再設定トークンを確認', security: [],
+        responses: { '200': { description: 'Token state' } },
+      },
+    },
+    '/api/auth/password/reset': {
+      post: {
+        tags: ['Auth'], summary: 'パスワードを再設定', security: [],
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object' } } } },
+        responses: { '200': { description: 'Password updated and session issued' }, '400': { description: 'Invalid or expired token' } },
+      },
+    },
+    // ── HQ Banners ─────────────────────────────────────────────────────────
+    '/api/hq/banners/presets': {
+      get: {
+        tags: ['HQ Banners'], summary: 'バナー用途と生成上限を取得',
+        responses: { '200': { description: 'Presets and tenant usage limits' }, '403': { description: 'Owner or admin role required' } },
+      },
+    },
+    '/api/hq/banners/usage': {
+      get: {
+        tags: ['HQ Banners'], summary: 'バナー生成の月次・日次利用量を取得',
+        responses: { '200': { description: 'Tenant banner usage' }, '403': { description: 'Owner or admin role required' } },
+      },
+    },
+    '/api/hq/banners/stats': {
+      get: {
+        tags: ['HQ Banners'], summary: 'バナー生成画面の集計値を取得',
+        responses: { '200': { description: 'Tenant banner project and image statistics' }, '403': { description: 'Owner or admin role required' } },
+      },
+    },
+    '/api/hq/banners/projects': {
+      get: {
+        tags: ['HQ Banners'], summary: 'バナープロジェクト一覧を取得',
+        parameters: [
+          { name: 'archived', in: 'query', schema: { type: 'string', enum: ['0', '1'] } },
+          { name: 'q', in: 'query', schema: { type: 'string' } },
+        ],
+        responses: { '200': { description: 'Tenant-scoped banner projects' }, '403': { description: 'Owner or admin role required' } },
+      },
+      post: {
+        tags: ['HQ Banners'], summary: 'バナープロジェクトを作成',
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['name'], properties: { name: { type: 'string', minLength: 1 }, description: { type: 'string' } } } } } },
+        responses: { '201': { description: 'Created' }, '400': { description: 'Invalid request' }, '403': { description: 'Owner or admin role required' } },
+      },
+    },
+    '/api/hq/banners/projects/{id}': {
+      get: {
+        tags: ['HQ Banners'], summary: 'バナープロジェクトの詳細を取得',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'Project detail with images and generations' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Not found' } },
+      },
+      patch: {
+        tags: ['HQ Banners'], summary: 'バナープロジェクトを更新',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', properties: { name: { type: 'string' }, description: { type: 'string' }, isFavorite: { type: 'boolean' }, archived: { type: 'boolean' } } } } } },
+        responses: { '200': { description: 'Updated' }, '400': { description: 'Invalid request' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Not found' } },
+      },
+    },
+    '/api/hq/banners/projects/{id}/duplicate': {
+      post: {
+        tags: ['HQ Banners'], summary: 'バナープロジェクトを複製',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '201': { description: 'Duplicated' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Not found' } },
+      },
+    },
+    '/api/hq/banners/projects/{id}/generations': {
+      post: {
+        tags: ['HQ Banners'], summary: 'バナー生成条件を登録',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object' } } } },
+        responses: { '201': { description: 'Generation queued' }, '400': { description: 'Invalid request' }, '403': { description: 'Owner or admin role required' }, '429': { description: 'Usage limit or circuit breaker reached' } },
+      },
+    },
+    '/api/hq/banners/projects/{id}/uploads': {
+      post: {
+        tags: ['HQ Banners'], summary: '手持ち画像をプロジェクトへ取り込む',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: { required: true, content: { 'image/png': { schema: { type: 'string', format: 'binary' } }, 'image/jpeg': { schema: { type: 'string', format: 'binary' } }, 'image/webp': { schema: { type: 'string', format: 'binary' } } } },
+        responses: { '201': { description: 'Uploaded' }, '403': { description: 'Owner or admin role required' }, '413': { description: 'Image exceeds size limit' }, '422': { description: 'Unsupported image' } },
+      },
+    },
+    '/api/hq/banners/generations/{id}': {
+      get: {
+        tags: ['HQ Banners'], summary: 'バナー生成の進捗を取得',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'Generation status' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Not found' } },
+      },
+    },
+    '/api/hq/banners/generations/{id}/run': {
+      post: {
+        tags: ['HQ Banners'], summary: 'バナーを1枚生成して保存',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'One image generated' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Not found' }, '422': { description: 'Image request rejected' }, '502': { description: 'Image provider failure' } },
+      },
+    },
+    '/api/hq/banners/generations/{id}/cancel': {
+      post: {
+        tags: ['HQ Banners'], summary: '残りのバナー生成を中止',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'Cancelled' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Not found' } },
+      },
+    },
+    '/api/hq/banners/images': {
+      get: {
+        tags: ['HQ Banners'], summary: '統括のバナー画像一覧を取得',
+        parameters: [
+          { name: 'projectId', in: 'query', schema: { type: 'string' } },
+          { name: 'favorite', in: 'query', schema: { type: 'string', enum: ['0', '1'] } },
+          { name: 'preset', in: 'query', schema: { type: 'string' } },
+          { name: 'q', in: 'query', schema: { type: 'string' } },
+          { name: 'before', in: 'query', schema: { type: 'string' } },
+          { name: 'limit', in: 'query', schema: { type: 'integer', minimum: 1, maximum: 100 } },
+        ],
+        responses: { '200': { description: 'Tenant-scoped banner images' }, '403': { description: 'Owner or admin role required' } },
+      },
+    },
+    '/api/hq/banners/images/{id}': {
+      get: {
+        tags: ['HQ Banners'], summary: 'バナー画像の詳細を取得',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'Image detail and generation conditions' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Not found' } },
+      },
+      patch: {
+        tags: ['HQ Banners'], summary: 'バナー画像のお気に入り・所属を更新',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', properties: { isFavorite: { type: 'boolean' }, projectId: { type: ['string', 'null'] } } } } } },
+        responses: { '200': { description: 'Updated' }, '400': { description: 'Invalid request' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Not found' } },
+      },
+      delete: {
+        tags: ['HQ Banners'], summary: 'バナー画像を一覧から外す',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'Removed from the tenant library' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Not found' } },
+      },
+    },
+    '/api/hq/banners/images/{id}/deliver': {
+      post: {
+        tags: ['HQ Banners'], summary: 'バナー画像を選択店舗へ渡す',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['lineAccountIds'], properties: { lineAccountIds: { type: 'array', maxItems: 50, items: { type: 'string' } } } } } } },
+        responses: { '200': { description: 'Per-account delivery results' }, '400': { description: 'Invalid account selection' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Not found' } },
+      },
+    },
+    // ── HQ Billing ─────────────────────────────────────────────────────────
+    '/api/hq/billing/summary': {
+      get: {
+        tags: ['HQ Billing'], summary: '統括の契約状態と選択可能なプランを取得',
+        responses: { '200': { description: 'Tenant billing summary and plan entitlements' }, '404': { description: 'Tenant not found' } },
+      },
+    },
+    '/api/hq/billing/checkout': {
+      post: {
+        tags: ['HQ Billing'], summary: 'Stripe Checkoutの申込URLを作成',
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['planKey'], properties: { planKey: { type: 'string', enum: ['light', 'standard', 'pro'] } } } } } },
+        responses: { '200': { description: 'Checkout URL' }, '400': { description: 'Invalid plan' }, '403': { description: 'Owner role required' }, '409': { description: 'Already subscribed or billing exempt' }, '503': { description: 'Stripe or price configuration unavailable' } },
+      },
+    },
+    '/api/hq/billing/portal': {
+      post: {
+        tags: ['HQ Billing'], summary: 'StripeカスタマーポータルURLを作成',
+        responses: { '200': { description: 'Customer portal URL' }, '403': { description: 'Owner or admin role required' }, '409': { description: 'No active customer' }, '503': { description: 'Admin origin unavailable' } },
+      },
+    },
+    '/api/hq/billing/invoices': {
+      get: {
+        tags: ['HQ Billing'], summary: '統括の支払い履歴を取得',
+        responses: { '200': { description: 'Up to 12 tenant-scoped invoices' }, '403': { description: 'Owner or admin role required' }, '502': { description: 'Stripe API unavailable' } },
+      },
+    },
+    '/api/hq/billing/webhook': {
+      post: {
+        tags: ['HQ Billing'], summary: 'Stripe課金イベントを受信', security: [],
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object' } } } },
+        responses: { '200': { description: 'Event accepted idempotently' }, '400': { description: 'Invalid signature or payload' }, '413': { description: 'Payload too large' }, '503': { description: 'Webhook secret is not configured' } },
+      },
+    },
+    // ── HQ Support ─────────────────────────────────────────────────────────
+    '/api/hq/support/kinds': {
+      get: {
+        tags: ['HQ Support'], summary: '問い合わせ種別を取得',
+        responses: { '200': { description: 'Supported inquiry kinds' } },
+      },
+    },
+    '/api/hq/support/requests': {
+      get: {
+        tags: ['HQ Support'], summary: '統括の問い合わせ履歴を取得',
+        responses: { '200': { description: 'Tenant-scoped support requests' } },
+      },
+      post: {
+        tags: ['HQ Support'], summary: '運営への問い合わせを登録',
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['kind', 'subject', 'body'], properties: { kind: { type: 'string' }, subject: { type: 'string', maxLength: 100 }, body: { type: 'string', maxLength: 4000 }, lineAccountId: { type: 'string' }, attachments: { type: 'array', maxItems: 3, items: { type: 'object' } } } } } } },
+        responses: { '201': { description: 'Recorded; notification result is included' }, '400': { description: 'Invalid request' }, '403': { description: 'Read-only staff cannot submit' }, '404': { description: 'Line account not found in tenant scope' } },
+      },
+    },
+    // ── HQ Templates ───────────────────────────────────────────────────────
+    '/api/hq/templates/media': {
+      post: {
+        tags: ['HQ Templates'], summary: '統括ひな形のPNG/JPEG画像を登録',
+        parameters: [
+          { name: 'purpose', in: 'query', required: true, schema: { type: 'string', enum: ['message', 'rich_menu'] } },
+          { name: 'filename', in: 'query', required: true, schema: { type: 'string', minLength: 1, maxLength: 200 } },
+        ],
+        requestBody: { required: true, content: { 'image/png': { schema: { type: 'string', format: 'binary' } }, 'image/jpeg': { schema: { type: 'string', format: 'binary' } } } },
+        responses: { '201': { description: 'Immutable tenant-scoped image receipt; identical retries reuse it' }, '403': { description: 'Tenant-wide owner/admin write permission required' }, '422': { description: 'Invalid image, dimensions, size or unconfirmed upload' } },
+      },
+    },
+    '/api/hq/templates/accounts': {
+      get: {
+        tags: ['HQ Templates'],
+        summary: '配布先として選べるLINE公式アカウントを取得',
+        responses: { '200': { description: 'Tenant-scoped account list' }, '403': { description: 'Owner or admin role required' } },
+      },
+    },
+    '/api/hq/templates': {
+      get: {
+        tags: ['HQ Templates'],
+        summary: '統括ひな形一覧を取得',
+        parameters: [{ name: 'type', in: 'query', schema: { type: 'string', enum: ['tag', 'rich_menu', 'template', 'form'] } }],
+        responses: { '200': { description: 'Tenant-scoped template list' }, '400': { description: 'Invalid template type' }, '403': { description: 'Owner or admin role required' } },
+      },
+      post: {
+        tags: ['HQ Templates'],
+        summary: '統括ひな形を作成',
+        parameters: [{ name: 'Idempotency-Key', in: 'header', schema: { type: 'string' }, description: '再送時も同じ値を使用する作成依頼ID。省略時はbody.requestIdが必須' }],
+        requestBody: {
+          required: true,
+          content: { 'application/json': { schema: { type: 'object', required: ['type', 'name', 'definition'], properties: {
+            requestId: { type: 'string' }, type: { type: 'string', enum: ['tag', 'rich_menu', 'template', 'form'] },
+            name: { type: 'string', minLength: 1 }, description: { type: 'string' }, definition: { type: 'object' },
+          } } } },
+        },
+        responses: { '201': { description: 'Created, or the same idempotent result' }, '400': { description: 'Invalid request' }, '403': { description: 'Owner or admin role required' }, '409': { description: 'Idempotency conflict' } },
+      },
+    },
+    '/api/hq/templates/{id}': {
+      get: {
+        tags: ['HQ Templates'], summary: '統括ひな形の詳細を取得',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'Template detail' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Not found' } },
+      },
+      patch: {
+        tags: ['HQ Templates'], summary: '統括ひな形を改訂',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['expectedRevision', 'name', 'definition'], properties: {
+          expectedRevision: { type: 'integer', minimum: 1 }, name: { type: 'string', minLength: 1 }, description: { type: 'string' }, definition: { type: 'object' },
+        } } } } },
+        responses: { '200': { description: 'Updated' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Not found' }, '409': { description: 'Revision conflict' } },
+      },
+      delete: {
+        tags: ['HQ Templates'], summary: '統括ひな形を削除',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['expectedRevision'], properties: { expectedRevision: { type: 'integer', minimum: 1 } } } } } },
+        responses: { '200': { description: 'Deleted' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Not found' }, '409': { description: 'Revision conflict' } },
+      },
+    },
+    '/api/hq/templates/{id}/preflight': {
+      post: {
+        tags: ['HQ Templates'], summary: '配布先の競合を事前検査',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['accountIds'], properties: { accountIds: { type: 'array', items: { type: 'string' } } } } } } },
+        responses: { '200': { description: 'Preflight result with per-account conflicts' }, '400': { description: 'Invalid account selection' }, '403': { description: 'Owner or admin role required' } },
+      },
+    },
+    '/api/hq/templates/{id}/distribute': {
+      post: {
+        tags: ['HQ Templates'], summary: '事前検査済みの選択内容で店舗へ配布',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['preflightId', 'resolutions'], properties: {
+          preflightId: { type: 'string' }, resolutions: { type: 'array', maxItems: 270, items: { type: 'object', required: ['accountId', 'sourceId', 'mode'], properties: {
+            accountId: { type: 'string' }, sourceId: { type: 'string' }, mode: { type: 'string', enum: ['create', 'overwrite', 'alias'] }, targetId: { type: 'string' },
+          } } },
+        } } } } },
+        responses: { '200': { description: 'Distribution run result' }, '400': { description: 'Invalid or changed selection' }, '403': { description: 'Owner or admin role required' }, '409': { description: 'Template or target version conflict' } },
+      },
+    },
+    '/api/hq/templates/{id}/distributions/{runId}': {
+      get: {
+        tags: ['HQ Templates'], summary: '配布実行の結果を取得',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'runId', in: 'path', required: true, schema: { type: 'string' } },
+        ],
+        responses: { '200': { description: 'Distribution result' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Not found' } },
+      },
+    },
     // ── Friends ─────────────────────────────────────────────────────────────
     '/api/friends': {
       get: {
@@ -296,9 +667,9 @@ const spec = {
       get: { tags: ['Tags'], summary: 'タグ一覧取得', responses: { '200': { description: 'All tags' } } },
       post: {
         tags: ['Tags'],
-        summary: 'タグ作成',
-        requestBody: { content: { 'application/json': { schema: { type: 'object', properties: { name: { type: 'string' }, color: { type: 'string' } }, required: ['name'] } } } },
-        responses: { '201': { description: 'Tag created' } },
+        summary: 'タグと連動アクション下書きを作成',
+        requestBody: { content: { 'application/json': { schema: { type: 'object', properties: { lineAccountId: { type: 'string' }, name: { type: 'string', minLength: 1, maxLength: 80 }, description: { type: ['string', 'null'] }, groupId: { type: ['string', 'null'] }, isStarred: { type: 'boolean' }, manualAssignmentAllowed: { type: 'boolean' }, reapplyPolicy: { type: 'string', enum: ['first_only', 'every_time'] }, linkedEnabled: { type: 'boolean' }, mileage: { type: 'object' }, automationDraft: { type: 'object' }, applyToExisting: { type: 'boolean', const: false } }, required: ['lineAccountId', 'name', 'reapplyPolicy', 'linkedEnabled', 'mileage'] } } } },
+        responses: { '201': { description: 'Tag and common-action draft created' }, '404': { description: 'Account or folder not found' }, '409': { description: 'Normalized name conflict' } },
       },
     },
     '/api/tags/import/preview': {
@@ -354,6 +725,23 @@ const spec = {
       },
     },
     '/api/tags/{id}': {
+      get: {
+        tags: ['Tags'],
+        summary: 'タグ設定と連動アクションを取得',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } },
+          { name: 'withActions', in: 'query', schema: { type: 'integer', enum: [1] } },
+        ],
+        responses: { '200': { description: 'Tag definition' }, '404': { description: 'Not found in account scope' } },
+      },
+      patch: {
+        tags: ['Tags'],
+        summary: 'タグ設定と同じ共通アクション下書きを連動更新',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: { content: { 'application/json': { schema: { type: 'object', required: ['lineAccountId', 'expectedVersion'], properties: { lineAccountId: { type: 'string' }, expectedVersion: { type: 'integer', minimum: 1 }, automationId: { type: ['string', 'null'] }, automationDraftVersion: { type: ['string', 'null'] }, actions: { type: 'array' }, applyToExisting: { type: 'boolean', default: false } } } } } },
+        responses: { '200': { description: 'Updated' }, '404': { description: 'Not found in account scope' }, '409': { description: 'Tag or action draft version conflict' } },
+      },
       delete: {
         tags: ['Tags'],
         summary: 'タグ削除',
@@ -392,9 +780,152 @@ const spec = {
         },
       },
     },
+    '/api/tags/{id}/dependencies': {
+      get: {
+        tags: ['Tags'],
+        summary: 'タグの参照先・連動・待機実行・マイル影響を確認',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: 'Tag dependency impact', content: { 'application/json': { schema: { $ref: '#/components/schemas/TagDependencyImpact' } } } },
+          '403': { description: 'Owner or admin role required' },
+          '404': { description: 'Not found in account scope' },
+        },
+      },
+    },
+    '/api/media/{id}/download': {
+      get: {
+        tags: ['Contents'],
+        summary: '登録メディアを認証付きでダウンロード',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'accountId', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: 'Media file bytes with Content-Disposition: attachment' },
+          '403': { description: 'Staff role required' },
+          '404': { description: 'Media not found in account scope' },
+        },
+      },
+    },
+    '/api/media/{id}/content': {
+      get: {
+        tags: ['Contents'],
+        summary: '登録メディアの表示用中身を認証付きで取得',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'accountId', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: 'Media file bytes with Content-Disposition: inline' },
+          '403': { description: 'Staff role required' },
+          '404': { description: 'Media not found in account scope' },
+        },
+      },
+    },
+    '/api/common-actions/resources': {
+      get: {
+        tags: ['Common actions'],
+        summary: 'きっかけ別の処理schemaと選択肢を取得',
+        parameters: [
+          { name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } },
+          { name: 'trigger', in: 'query', schema: { type: 'string', enum: ['tag.added'] } },
+        ],
+        responses: { '200': { description: '13 action schemas and scoped resources' }, '422': { description: 'Unsupported trigger' } },
+      },
+    },
+    '/api/friends/{id}/fields': {
+      get: {
+        tags: ['Friends'], summary: '閲覧可能な友だちの情報欄を取得',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'Friend fields' }, '403': { description: 'Staff role required' }, '404': { description: 'Friend not found in account scope' } },
+      },
+      put: {
+        tags: ['Friends'], summary: '閲覧可能な友だちの情報欄を更新',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'Friend fields updated' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Friend not found in account scope' } },
+      },
+    },
+    '/api/reminders': {
+      get: {
+        tags: ['Reminders'], summary: 'LINEアカウント範囲内のリマインダ一覧を取得',
+        parameters: [{ name: 'lineAccountId', in: 'query', schema: { type: 'string' } }],
+        responses: { '200': { description: 'Visible reminders' }, '403': { description: 'Staff role required' }, '404': { description: 'LINE account not found in account scope' } },
+      },
+    },
+    '/api/reminders/{id}/steps/{stepId}': {
+      delete: {
+        tags: ['Reminders'], summary: '指定したリマインダに属する通を削除',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'stepId', in: 'path', required: true, schema: { type: 'string' } },
+        ],
+        responses: { '200': { description: 'Reminder step deleted' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Reminder or step not found in account scope' } },
+      },
+    },
+    '/api/friends/{friendId}/reminders': {
+      get: {
+        tags: ['Reminders'], summary: '閲覧可能な友だちのリマインダ登録を取得',
+        parameters: [{ name: 'friendId', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'Friend reminders' }, '403': { description: 'Staff role required' }, '404': { description: 'Friend not found in account scope' } },
+      },
+    },
+    '/api/auto-replies': {
+      get: {
+        tags: ['Auto replies'], summary: 'LINEアカウント範囲内の自動応答一覧を取得',
+        parameters: [{ name: 'accountId', in: 'query', schema: { type: 'string' } }],
+        responses: { '200': { description: 'Visible auto replies' }, '403': { description: 'Staff role required' }, '404': { description: 'LINE account not found in account scope' } },
+      },
+    },
+    '/api/mileage/rules': {
+      get: {
+        tags: ['Mileage'], summary: 'LINEアカウント範囲内のマイル付与ルールを取得',
+        responses: { '200': { description: 'Visible mileage rules' }, '403': { description: 'Staff role required' } },
+      },
+      post: {
+        tags: ['Mileage'], summary: 'LINEアカウントに属するマイル付与ルールを作成',
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['lineAccountId', 'name', 'eventType', 'amount'], properties: { lineAccountId: { type: 'string' }, name: { type: 'string' }, eventType: { type: 'string' }, amount: { type: 'integer', minimum: 1 } } } } } },
+        responses: { '201': { description: 'Mileage rule created' }, '400': { description: 'LINE account is required' }, '403': { description: 'Owner or admin role or account scope required' } },
+      },
+    },
+    '/api/mileage/rules/{id}': {
+      put: {
+        tags: ['Mileage'], summary: '所属LINEアカウント内のマイル付与ルールを更新',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'Mileage rule updated' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Not found in account scope' }, '409': { description: 'Legacy global rule is immutable' } },
+      },
+      delete: {
+        tags: ['Mileage'], summary: '所属LINEアカウント内のマイル付与ルールを削除',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'Mileage rule deleted' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Not found in account scope' }, '409': { description: 'Legacy global rule is immutable' } },
+      },
+    },
+    '/api/mileage/redemptions': {
+      get: {
+        tags: ['Mileage'], summary: '届かなかった特典交換の一覧を取得（既定は失敗中）',
+        parameters: [
+          { name: 'accountId', in: 'query', required: true, schema: { type: 'string' } },
+          { name: 'status', in: 'query', schema: { type: 'string', enum: ['all', 'reserved', 'delivering', 'succeeded', 'delivery_failed', 'refunded'] } },
+          { name: 'limit', in: 'query', schema: { type: 'integer', minimum: 1, maximum: 100 } },
+          { name: 'offset', in: 'query', schema: { type: 'integer', minimum: 0 } },
+        ],
+        responses: { '200': { description: 'Mileage redemptions with failure reason, attempts, and timestamps' }, '400': { description: 'Status is invalid' }, '403': { description: 'Staff role required' }, '404': { description: 'LINE account not found in account scope' } },
+      },
+    },
     // ── Scenarios ────────────────────────────────────────────────────────────
     '/api/scenarios': {
-      get: { tags: ['Scenarios'], summary: 'シナリオ一覧取得', responses: { '200': { description: 'All scenarios' } } },
+      get: {
+        tags: ['Scenarios'],
+        summary: '閲覧権限とLINEアカウント範囲内のシナリオ一覧取得',
+        parameters: [{ name: 'lineAccountId', in: 'query', schema: { type: 'string' } }],
+        responses: {
+          '200': { description: 'Visible scenarios' },
+          '403': { description: 'Scenario view permission required' },
+          '404': { description: 'LINE account not found in account scope' },
+        },
+      },
       post: {
         tags: ['Scenarios'],
         summary: 'シナリオ作成',
@@ -407,7 +938,11 @@ const spec = {
         tags: ['Scenarios'],
         summary: 'シナリオ詳細取得 (ステップ含む)',
         parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
-        responses: { '200': { description: 'Scenario with steps' } },
+        responses: {
+          '200': { description: 'Scenario with steps' },
+          '403': { description: 'Scenario view permission required' },
+          '404': { description: 'Not found in account scope' },
+        },
       },
       put: {
         tags: ['Scenarios'],
@@ -420,6 +955,95 @@ const spec = {
         summary: 'シナリオ削除',
         parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
         responses: { '200': { description: 'Deleted' } },
+      },
+    },
+    '/api/scenarios/{id}/preview': {
+      get: {
+        tags: ['Scenarios'], summary: 'シナリオの配信時系列を確認',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'Timeline preview' }, '403': { description: 'Scenario view permission required' }, '404': { description: 'Not found in account scope' } },
+      },
+    },
+    '/api/scenarios/{id}/stats': {
+      get: {
+        tags: ['Scenarios'], summary: 'シナリオの到達率を確認',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'Scenario statistics' }, '403': { description: 'Scenario view permission required' }, '404': { description: 'Not found in account scope' } },
+      },
+    },
+    '/api/scenarios/{id}/actions': {
+      get: {
+        tags: ['Scenarios'], summary: 'シナリオのアクションを確認',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'Scenario actions' }, '403': { description: 'Scenario view permission required' }, '404': { description: 'Not found in account scope' } },
+      },
+    },
+    '/api/scenarios/{id}/triggers': {
+      get: {
+        tags: ['Scenarios'], summary: 'シナリオの開始条件を確認',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'Scenario triggers' }, '403': { description: 'Scenario view permission required' }, '404': { description: 'Not found in account scope' } },
+      },
+    },
+    '/api/scenarios/{id}/simulate': {
+      post: {
+        tags: ['Scenarios'],
+        summary: '副作用なしで対象人数と通ごとの予定を試算',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: { required: true, content: { 'application/json': { schema: {
+          type: 'object',
+          required: ['lineAccountId'],
+          properties: {
+            lineAccountId: { type: 'string' },
+            startAt: { type: 'string', format: 'date-time' },
+          },
+        } } } },
+        responses: {
+          '200': { description: 'Audience counts and planned steps; no side effects' },
+          '403': { description: 'Scenario view permission required' },
+          '404': { description: 'Not found in account scope' },
+        },
+      },
+    },
+    '/api/scenarios/{id}/runs': {
+      get: {
+        tags: ['Scenarios'],
+        summary: '購読状況・テスト送信・送信枠・通別実績を取得',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } },
+          { name: 'status', in: 'query', schema: { type: 'string', enum: ['active', 'paused', 'completed', 'delivering'] } },
+          { name: 'cursor', in: 'query', schema: { type: 'string' } },
+          { name: 'limit', in: 'query', schema: { type: 'integer', minimum: 1, maximum: 100 } },
+        ],
+        responses: {
+          '200': { description: 'Scenario run summary and metrics' },
+          '403': { description: 'Scenario view permission required' },
+          '404': { description: 'Not found in account scope' },
+        },
+      },
+    },
+    '/api/scenarios/{id}/draft': {
+      put: {
+        tags: ['Scenarios'],
+        summary: '送信後アクション第2期までを楽観ロックで保存',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: { required: true, content: { 'application/json': { schema: {
+          type: 'object',
+          required: ['lineAccountId', 'expectedVersion', 'afterActions'],
+          properties: {
+            lineAccountId: { type: 'string' },
+            expectedVersion: { type: 'integer', minimum: 0 },
+            afterActions: { type: 'array', maxItems: 100, items: { type: 'object' } },
+          },
+        } } } },
+        responses: {
+          '200': { description: 'Draft updated with next version' },
+          '403': { description: 'scenario.definition.edit permission required' },
+          '404': { description: 'Not found in account scope' },
+          '409': { description: 'Version conflict' },
+          '422': { description: 'Invalid action or foreign account resource' },
+        },
       },
     },
     '/api/scenarios/{id}/steps': {
@@ -458,7 +1082,35 @@ const spec = {
           { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
           { name: 'friendId', in: 'path', required: true, schema: { type: 'string' } },
         ],
-        responses: { '201': { description: 'Enrolled' } },
+        responses: {
+          '201': { description: 'Enrolled' },
+          '404': { description: 'シナリオ・友だちなし' },
+          '409': { description: '登録済み・削除不可の連携あり' },
+          '422': { description: '未公開・停止中・ブロック中など登録不可' },
+        },
+      },
+    },
+    '/api/scenarios/{id}/publish': {
+      post: {
+        tags: ['Scenarios'],
+        summary: '公開版の固定',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          {
+            name: 'Idempotency-Key',
+            in: 'header',
+            required: true,
+            schema: { type: 'string' },
+            description: '公開操作の確認キー（8〜200字の英数._:-）。同じキーの再実行は同じ版を返し、別内容での使い回しは409。',
+          },
+        ],
+        responses: {
+          '200': { description: 'Published' },
+          '400': { description: '確認キー不足・不正' },
+          '403': { description: '権限不足' },
+          '404': { description: 'シナリオなし・他アカウント' },
+          '409': { description: '確認キーの使い回し・同時公開の競合' },
+        },
       },
     },
     // ── Broadcasts ───────────────────────────────────────────────────────────
@@ -489,6 +1141,60 @@ const spec = {
         responses: { '200': { description: 'Sent' } },
       },
     },
+    /*
+     * 送り始めた配信を止める・続きを送る・失敗した相手だけ送り直す（#662）。
+     * どれも `expectedVersion`（画面が読み込んだ版）が要る。版が食い違えば
+     * 409 で断り、二重の適用を止める。
+     */
+    '/api/broadcasts/{id}/stop': {
+      post: {
+        tags: ['Broadcasts'],
+        summary: '送信中の配信を停止',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: {
+          required: true,
+          content: { 'application/json': { schema: { type: 'object', properties: { expectedVersion: { type: 'integer' } }, required: ['expectedVersion'] } } },
+        },
+        responses: {
+          '200': { description: '停止した（すでに停止済みの再要求も 200）' },
+          '400': { description: 'expectedVersion が無い' },
+          '409': { description: '送信中でない／全員配信で止められない／版が食い違う' },
+        },
+      },
+    },
+    '/api/broadcasts/{id}/resume': {
+      post: {
+        tags: ['Broadcasts'],
+        summary: '停止した配信の続きを送る',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: {
+          required: true,
+          content: { 'application/json': { schema: { type: 'object', properties: { expectedVersion: { type: 'integer' } }, required: ['expectedVersion'] } } },
+        },
+        responses: {
+          '200': { description: '再開した' },
+          '400': { description: 'expectedVersion が無い' },
+          '409': { description: '停止中でない／版が食い違う' },
+        },
+      },
+    },
+    '/api/broadcasts/{id}/retry-failed': {
+      post: {
+        tags: ['Broadcasts'],
+        summary: '失敗した相手だけ再送（送達不明は含まない）',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: {
+          required: true,
+          content: { 'application/json': { schema: { type: 'object', properties: { expectedVersion: { type: 'integer' } }, required: ['expectedVersion'] } } },
+        },
+        responses: {
+          '202': { description: '再送を受け付けた' },
+          '400': { description: 'expectedVersion が無い' },
+          '409': { description: '再送できる相手がいない／送信済みでも停止中でもない／版が食い違う' },
+          '428': { description: '取り消せない操作の確認を経ていない' },
+        },
+      },
+    },
     '/api/broadcasts/dedup-preview': {
       post: {
         tags: ['Broadcasts'],
@@ -508,6 +1214,122 @@ const spec = {
           },
         },
         responses: { '200': { description: 'Preview computed (totalSelected, uniqueRecipients, reduction, perAccount)' } },
+      },
+    },
+    // ── NEN delivery ────────────────────────────────────────────────────────
+    '/api/nen-campaigns/metrics/flows': {
+      get: {
+        tags: ['NEN delivery'],
+        summary: 'NEN配信フローの実績を取得',
+        description: '開封率は取得できないためnull、関連成果は送信後7日以内の相関として返します。',
+        parameters: [
+          { name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } },
+          { name: 'days', in: 'query', schema: { type: 'integer', minimum: 1, maximum: 365, default: 30 } },
+        ],
+        responses: { '200': { description: 'Flow metrics' }, '403': { description: 'Account access denied' } },
+      },
+    },
+    '/api/nen-campaigns/metrics/columns': {
+      get: {
+        tags: ['NEN delivery'],
+        summary: 'NENコラムの配信・記事閲覧実績を取得',
+        description: '計測台帳がない記事閲覧と、未収集の読了率はnullで返します。',
+        parameters: [
+          { name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } },
+          { name: 'days', in: 'query', schema: { type: 'integer', minimum: 1, maximum: 365, default: 30 } },
+        ],
+        responses: { '200': { description: 'Column metrics' }, '403': { description: 'Account access denied' } },
+      },
+    },
+    '/api/nen-campaigns/metrics/pets': {
+      get: {
+        tags: ['NEN delivery'],
+        summary: 'ペット登録・誕生日クーポン実績を取得',
+        parameters: [
+          { name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } },
+          { name: 'days', in: 'query', schema: { type: 'integer', minimum: 1, maximum: 365, default: 30 } },
+        ],
+        responses: { '200': { description: 'Pet and birthday coupon metrics' }, '403': { description: 'Account access denied' } },
+      },
+    },
+    '/api/nen-campaigns/deliveries': {
+      get: {
+        tags: ['NEN delivery'],
+        summary: 'NEN配信履歴を取得',
+        parameters: [
+          { name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } },
+          { name: 'from', in: 'query', schema: { type: 'string', format: 'date-time' } },
+          { name: 'to', in: 'query', schema: { type: 'string', format: 'date-time' } },
+          { name: 'days', in: 'query', schema: { type: 'integer', minimum: 1, maximum: 365, default: 30 } },
+          { name: 'status', in: 'query', schema: { type: 'string', enum: ['pending', 'processing', 'sent', 'skipped', 'failed', 'cancelled'] } },
+          { name: 'cursor', in: 'query', schema: { type: 'string' } },
+          { name: 'limit', in: 'query', schema: { type: 'integer', minimum: 1, maximum: 100, default: 50 } },
+        ],
+        responses: { '200': { description: 'Scoped delivery history' }, '403': { description: 'Account access denied' } },
+      },
+    },
+    '/api/nen-campaigns/deliveries/{id}': {
+      get: {
+        tags: ['NEN delivery'],
+        summary: 'NEN配信履歴の安全な詳細を取得',
+        description: '注文情報やクーポンコードを含むraw payloadは返しません。',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: { '200': { description: 'Delivery detail' }, '404': { description: 'Not found in account scope' } },
+      },
+    },
+    '/api/nen-campaigns/deliveries/{id}/retry': {
+      post: {
+        tags: ['NEN delivery'],
+        summary: '恒久失敗したNEN配信を手動再送',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: { required: true, content: { 'application/json': { schema: {
+          type: 'object',
+          required: ['lineAccountId', 'expectedVersion', 'reason'],
+          properties: {
+            lineAccountId: { type: 'string' },
+            expectedVersion: { type: 'integer', minimum: 1 },
+            reason: { type: 'string', minLength: 1, maxLength: 500 },
+          },
+        } } } },
+        responses: {
+          '200': { description: 'Retry queued with a new idempotency generation' },
+          '403': { description: 'Owner or admin role required' },
+          '404': { description: 'Not found in account scope' },
+          '409': { description: 'Retry unavailable or version conflict' },
+        },
+      },
+    },
+    // ── Staff invitation ────────────────────────────────────────────────────
+    '/api/staff/last-logins': {
+      get: {
+        tags: ['Staff'], summary: '統括メンバーの最終ログイン一覧を取得',
+        responses: { '200': { description: 'Last login times by staff id' }, '403': { description: 'Owner or admin role required' } },
+      },
+    },
+    '/api/staff/{id}/resend-invite': {
+      post: {
+        tags: ['Staff'], summary: '統括メンバーへの招待を再送',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'Invitation resent' }, '403': { description: 'Owner or admin with all-account scope required' }, '404': { description: 'Not found in current tenant' }, '409': { description: 'Staff invitation is no longer pending' } },
+      },
+    },
+    '/api/staff/{id}/resend-invitation': {
+      post: {
+        tags: ['Staff'],
+        summary: '未受諾・期限切れのスタッフ招待を再送',
+        description: '同じ行を使い回して新しい招待トークンを発行する。旧トークンは即時に失効し、新しい期限は7日。',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: {
+          '200': { description: 'Invitation resent with a new token and expiry' },
+          '400': { description: 'No email address on the staff member' },
+          '403': { description: 'Owner or admin role required' },
+          '404': { description: 'Not found in current tenant' },
+          '409': { description: 'Already active; nothing to resend' },
+          '500': { description: 'Invitation mail could not be sent' },
+        },
       },
     },
     // ── Users (UUID Cross-Account) ──────────────────────────────────────────
@@ -616,7 +1438,84 @@ const spec = {
       put: { tags: ['LINE Accounts'], summary: 'LINEアカウント更新', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }], responses: { '200': { description: 'Updated' } } },
       delete: { tags: ['LINE Accounts'], summary: 'LINEアカウント削除', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }], responses: { '200': { description: 'Deleted' } } },
     },
+    '/api/accounts/health-summary': {
+      get: {
+        tags: ['LINE Accounts'],
+        summary: 'アカウントヘルス要約',
+        description: 'staff可視範囲のアカウントの最新riskLevelだけを1回で返す。ログ本文は含めない(サイドバーのN+1解消用 #630)。',
+        responses: { '200': { description: 'Health summary' } },
+      },
+    },
+    // ── Webhooks (保守) ──────────────────────────────────────────────────────
+    '/api/webhooks/maintenance/secret-backfill': {
+      post: {
+        tags: ['Webhook'],
+        summary: 'Webhook secret の暗号化移行',
+        description: '旧平文・旧鍵のWebhook secretを現行鍵へ寄せ直す(#650)。dryRunは件数だけ数えて書かない。'
+          + 'べき等なので中断したら同じ条件で呼び直せば残りが進む。秘密値は要求にも応答にも含めない。',
+        requestBody: {
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  lineAccountId: { type: 'string' },
+                  dryRun: { type: 'boolean', default: true },
+                  batchSize: { type: 'integer', minimum: 1, maximum: 500, default: 50 },
+                },
+                required: ['lineAccountId'],
+              },
+            },
+          },
+        },
+        responses: {
+          '200': { description: '件数と成否だけの報告' },
+          '400': { description: 'Invalid request' },
+          '403': { description: 'Forbidden' },
+          '503': { description: '鍵がないため移行できない' },
+        },
+      },
+    },
     // ── Conversions ─────────────────────────────────────────────────────────
+    '/api/conversions/definitions/{id}/revise': {
+      post: {
+        tags: ['Conversions'],
+        summary: '成果地点を履歴を保ったまま編集して次の版にする',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['expectedVersion', 'name', 'sourceType', 'deduplicationMode', 'valueMode', 'reversalPolicy'],
+                properties: {
+                  expectedVersion: { type: 'integer', minimum: 1 },
+                  name: { type: 'string', minLength: 1, maxLength: 120 },
+                  sourceType: { type: 'string' },
+                  sourceConfig: { type: 'object' },
+                  deduplicationMode: { type: 'string', enum: ['every', 'once_per_friend', 'window'] },
+                  deduplicationWindowDays: { type: ['integer', 'null'], minimum: 1, maximum: 365 },
+                  valueMode: { type: 'string', enum: ['source', 'fixed', 'none'] },
+                  fixedValue: { type: ['number', 'null'], minimum: 0 },
+                  reversalPolicy: { type: 'string', enum: ['source_cancelled', 'manual', 'none'] },
+                  attributionDays: { type: ['integer', 'null'], minimum: 1, maximum: 365 },
+                  targetUrl: { type: ['string', 'null'], maxLength: 2000 },
+                  reason: { type: 'string', maxLength: 200 },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': { description: '次の版になった。過去の成果と集計額は変わらない' },
+          '400': { description: '入力または expectedVersion が不正' },
+          '403': { description: '編集の権限が無い' },
+          '404': { description: '見えない・存在しない成果地点' },
+          '409': { description: '版が進んでいる・停止済み・同名がある（副作用は残さない）' },
+        },
+      },
+    },
     '/api/conversions/points': {
       get: { tags: ['Conversions'], summary: 'CV ポイント一覧', responses: { '200': { description: 'All conversion points' } } },
       post: {
@@ -698,8 +1597,130 @@ const spec = {
       post: {
         tags: ['Affiliates'],
         summary: 'クリック記録',
+        description: '紹介コードからの公開クリック記録。認証なしで呼べる。',
+        security: [],
         requestBody: { content: { 'application/json': { schema: { type: 'object', properties: { code: { type: 'string' }, url: { type: 'string' } }, required: ['code'] } } } },
         responses: { '201': { description: 'Recorded' } },
+      },
+    },
+    // ── Templates (#645 公開版固定) ─────────────────────────────────────────
+    '/api/templates/{id}/publish': {
+      post: {
+        tags: ['Templates'],
+        summary: 'テンプレートの下書きを公開版へ写す',
+        description: 'Idempotency-Key ヘッダ(必須)で再試行を見分ける。下書きがなくても成功し、その確認キーを版・下書き版・下書き指紋つきで記録する。同じ確認キー・同じ内容の再試行は記録時の版・本文をそのまま返す(固定応答)。同じ確認キーで別の下書きを出す使い回しは409。公開版(expectedVersion)・下書き版(expectedDraftRevision)が進んでいたら409。新規作成は未公開(版0)で始まり、初回の公開で版1になる。',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'Idempotency-Key', in: 'header', required: true, schema: { type: 'string', minLength: 8, maxLength: 200 }, description: '公開操作の確認キー。必須。同じキーの再試行は同じ結果を返す。' },
+        ],
+        requestBody: { content: { 'application/json': { schema: {
+          type: 'object',
+          required: ['expectedVersion', 'expectedDraftRevision'],
+          properties: {
+            expectedVersion: { type: 'integer', minimum: 0, description: '確認したときの公開版。必須。進んでいたら409。' },
+            expectedDraftRevision: { type: 'integer', minimum: 0, description: '確認したときの下書き版。必須。書き換わっていたら409。' },
+          },
+        } } } },
+        responses: {
+          '200': { description: '公開成功 { published: true }・再試行 { published: false, replayed: true }・下書きなし成功 { published: false, replayed: false }。data に publishedVersion・publishedAt・hasDraft・draftRevision を返す。' },
+          '400': { description: '確認キー不足・版の番号が数でない' },
+          '404': { description: 'Not found in account scope' },
+          '409': { description: '公開版の同時更新の負け・下書きの書き換わり・確認キーの別操作への使い回し' },
+        },
+      },
+    },
+    // ── Settings ─────────────────────────────────────────────────────────────
+    '/api/settings/features/impact': {
+      post: {
+        tags: ['Settings'],
+        summary: '機能設定の変更案が止める仕事を確認',
+        description: '有効から無効へ変わる機能ごとに、公開中・予約中・依存機能の件数と対象種別、対象行IDを返す。保存はしない。止まる仕事があるときだけ確認トークンを発行する。',
+        parameters: [{ name: 'account_id', in: 'query', required: true, schema: { type: 'string' } }],
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['features'], properties: { features: { type: 'object', additionalProperties: { type: 'boolean' } }, expectedVersion: { type: 'integer', minimum: 0 } } } } } },
+        responses: { '200': { description: 'Feature impacts with target ids and confirmation token' }, '400': { description: 'Unknown feature or invalid value' }, '403': { description: 'Staff role required' }, '409': { description: 'Version conflict, reread required' } },
+      },
+    },
+    // ── AI development reports ──────────────────────────────────────────────
+    '/api/integrations/ai-loop/reports': {
+      post: {
+        tags: ['Operations'],
+        summary: 'AI開発タスクの状態をSlackへ一方向で報告',
+        description: '署名済みの開始・完了・失敗・人間確認イベントだけを専用チャンネルへ表示する。Slackからの実行指示や承認は受け付けない。',
+        security: [],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                additionalProperties: false,
+                required: ['version', 'eventId', 'taskId', 'repository', 'title', 'commander', 'executor', 'model', 'status', 'summary', 'taskUrl', 'occurredAt', 'revision'],
+                properties: {
+                  version: { type: 'integer', const: 1 },
+                  eventId: { type: 'string', minLength: 3, maxLength: 255 },
+                  taskId: { type: 'string', minLength: 1, maxLength: 120 },
+                  repository: { type: 'string', pattern: '^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$' },
+                  title: { type: 'string', minLength: 1, maxLength: 120 },
+                  commander: { type: 'string', enum: ['codex', 'claude'] },
+                  executor: { type: 'string', enum: ['meta', 'codex'] },
+                  model: { type: 'string', minLength: 1, maxLength: 80 },
+                  status: { type: 'string', enum: ['started', 'completed', 'failed', 'approval'] },
+                  summary: { type: 'string', minLength: 1, maxLength: 500 },
+                  taskUrl: { type: 'string', format: 'uri' },
+                  prUrl: { type: 'string', format: 'uri' },
+                  occurredAt: { type: 'string', format: 'date-time' },
+                  revision: { type: 'integer', minimum: 946684800000, description: '状態確定時刻のUnixミリ秒。再実行を含め単調増加させる。' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': { description: 'Report created, updated, or ignored as stale' },
+          '400': { description: 'Invalid report payload' },
+          '401': { description: 'Invalid signature' },
+          '503': { description: 'Report channel is not configured' },
+        },
+      },
+    },
+    // ── Operator notifications ──────────────────────────────────────────────
+    '/api/notifications/operator-event-types': {
+      get: {
+        tags: ['Operator notifications'],
+        summary: '運用者通知が自動発火できるきっかけ一覧',
+        description: '公開済みルールが反応できる業務イベントと、実producerへの接続状況を返す。connected=false は未接続で、そのきっかけでは自動発火しない。',
+        parameters: [
+          { name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: 'きっかけ一覧（items[].connected と publishedRules、summary の接続済み・未接続件数）' },
+          '400': { description: 'lineAccountId が無い' },
+          '403': { description: 'このLINEアカウントを表示する権限がない' },
+        },
+      },
+    },
+    '/api/notifications/operator-outbox/sweep': {
+      post: {
+        tags: ['Operator notifications'],
+        summary: '送り残した運用者通知の回収と再送',
+        description: 'Worker中断や一時失敗で pending / retry_wait のまま残った送達を拾い直して送る。冪等キーで取るため同時実行でも二重送信しない。',
+        requestBody: {
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  lineAccountId: { type: 'string', description: '省略時は権限内の全アカウントを対象にする' },
+                  limit: { type: 'integer', minimum: 1, maximum: 100, default: 20 },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': { description: '回収結果（swept, accepted, excluded, failed, pending）' },
+          '403': { description: 'このLINEアカウントを変更する権限がない' },
+        },
       },
     },
     // ── Webhook ─────────────────────────────────────────────────────────────
@@ -712,16 +1733,95 @@ const spec = {
         responses: { '200': { description: 'OK' } },
       },
     },
+    // ── Booking staff breaks (N-405 #655) ────────────────────────────────────
+    '/api/booking/admin/staff/{id}/breaks': {
+      get: {
+        tags: ['Booking'],
+        summary: '担当者の休憩一覧取得',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: { '200': { description: 'Breaks with version' }, '404': { description: 'Staff not in account' } },
+      },
+      put: {
+        tags: ['Booking'],
+        summary: '担当者の休憩を週全体で置き換え',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        requestBody: { content: { 'application/json': { schema: { type: 'object', properties: { expectedVersion: { type: 'string' }, breaks: { type: 'array', maxItems: 28, items: { type: 'object', properties: { id: { type: 'string' }, weekday: { type: 'integer', minimum: 0, maximum: 6 }, start_time: { type: 'string' }, end_time: { type: 'string' } }, required: ['weekday', 'start_time', 'end_time'] } } }, required: ['breaks', 'expectedVersion'] } } } },
+        responses: { '200': { description: 'Replaced with version' }, '400': { description: 'Invalid request' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Staff not in account' }, '409': { description: 'Version conflict' }, '422': { description: 'Invalid weekday, overlap, outside hours, or time range' } },
+      },
+    },
+    '/api/booking/admin/staff/{id}/break-dates': {
+      get: {
+        tags: ['Booking'],
+        summary: '担当者の日付指定の休憩一覧取得',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: { '200': { description: 'Date breaks with version' }, '404': { description: 'Staff not in account' } },
+      },
+      put: {
+        tags: ['Booking'],
+        summary: '担当者の日付指定の休憩を全体で置き換え',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        requestBody: { content: { 'application/json': { schema: { type: 'object', properties: { expectedVersion: { type: 'string' }, breaks: { type: 'array', maxItems: 366, items: { type: 'object', properties: { id: { type: 'string' }, work_date: { type: 'string' }, start_time: { type: 'string' }, end_time: { type: 'string' } }, required: ['work_date', 'start_time', 'end_time'] } } }, required: ['breaks', 'expectedVersion'] } } } },
+        responses: { '200': { description: 'Replaced with version' }, '400': { description: 'Invalid request' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Staff not in account' }, '409': { description: 'Version conflict' }, '422': { description: 'Invalid date, DST gap, overlap, outside hours, or time range' } },
+      },
+    },
+    // ── Rich Menus (publish schedules) ────────────────────────────────────
+    '/api/rich-menu-groups/{groupId}/schedule': {
+      post: {
+        tags: ['Rich Menus'],
+        summary: 'リッチメニューの公開予約を作成',
+        parameters: [{ name: 'groupId', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: { content: { 'application/json': { schema: { type: 'object', properties: { mode: { type: 'string', enum: ['scheduled', 'period'] }, startsAt: { type: 'string', format: 'date-time' }, endsAt: { type: 'string', format: 'date-time' }, restoreGroupId: { type: 'string' } }, required: ['mode', 'startsAt'] } } } },
+        responses: { '201': { description: 'Schedule created' }, '200': { description: 'Same Idempotency-Key content exists' }, '400': { description: 'Invalid input' }, '404': { description: 'Not found' }, '409': { description: 'Idempotency-Key used with different content' } },
+      },
+    },
+    '/api/rich-menu-groups/{groupId}/schedules': {
+      get: {
+        tags: ['Rich Menus'],
+        summary: 'リッチメニューの公開予約一覧を取得',
+        parameters: [{ name: 'groupId', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'Schedules with status and retry info' }, '404': { description: 'Not found' } },
+      },
+    },
+    '/api/rich-menu-groups/{groupId}/schedules/{scheduleId}/cancel': {
+      post: {
+        tags: ['Rich Menus'],
+        summary: '実行前の公開予約を取り消し',
+        parameters: [
+          { name: 'groupId', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'scheduleId', in: 'path', required: true, schema: { type: 'string' } },
+        ],
+        responses: { '200': { description: 'Cancelled' }, '404': { description: 'Not found' }, '409': { description: 'Already started' } },
+      },
+    },
   },
   tags: [
     { name: 'Friends', description: '友だち管理' },
+    { name: 'HQ Templates', description: '統括ひな形の作成・事前検査・店舗配布' },
     { name: 'Tags', description: 'タグ管理' },
     { name: 'Scenarios', description: 'ステップ配信シナリオ' },
     { name: 'Broadcasts', description: '一斉配信' },
+    { name: 'NEN delivery', description: 'NEN専用配信・コラム・ペット実績' },
     { name: 'Users', description: 'UUID Cross-Account ユーザー管理' },
     { name: 'LINE Accounts', description: 'マルチLINEアカウント管理' },
     { name: 'Conversions', description: 'コンバージョン計測' },
     { name: 'Affiliates', description: 'アフィリエイト管理' },
+    { name: 'Booking', description: '予約設定' },
+    { name: 'Templates', description: 'テンプレート公開版' },
+    { name: 'Rich Menus', description: 'リッチメニュー公開予約' },
+    { name: 'Settings', description: '機能設定' },
+    { name: 'Operator notifications', description: '運用者へのお知らせの自動実行' },
     { name: 'Webhook', description: 'LINE Webhook' },
   ],
 };

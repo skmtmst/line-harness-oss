@@ -46,13 +46,45 @@ function wrap(raw: Database.Database, sql: string, args: unknown[]) {
   }
 }
 
-/** bootstrap.sql を流した空のDBを作る。 */
-export function createTestD1(): SqliteD1 {
-  const raw = new Database(':memory:')
-  raw.exec(readFileSync(join(DB_PKG_ROOT, 'bootstrap.sql'), 'utf8'))
+/**
+ * bootstrap.sql を流した空のDBを作る。
+ *
+ * `file` を渡すとファイルのDBを開く。**別々の接続を2本開けば、
+ * 2つの実行主体が同じDBを取り合う競合を実際に再現できる。**
+ * `attach` を渡した場合は既にあるDBへ繋ぐだけで、schemaは流さない。
+ */
+export function createTestD1(
+  options?: { foreignKeys?: boolean; file?: string; attach?: boolean },
+): SqliteD1 {
+  const raw = new Database(options?.file ?? ':memory:')
+  if (options?.file) {
+    /*
+     * 実DBと同じ見え方のまま、テストのディスク待ちだけ削る。
+     *
+     * **schema を流す前に立てること(#720)。** bootstrap.sql には BEGIN/COMMIT が
+     * 無く、900本を超える DDL が1文ずつ暗黙トランザクションで走る。既定の
+     * ロールバックジャーナルのままだと、その1文ごとにジャーナルファイルを
+     * 作って書いて消す。手元の実測で中央値 1,117ms かかり、journal_mode を
+     * 先に WAL へ倒すだけで 162ms(7分の1)になった。効いているのは
+     * journal_mode で、synchronous は12%しか効かない(= fsync の回数ではなく
+     * ファイル操作の回数が主因)。CI のような遅いファイルシステムでは
+     * さらに悪化し、`beforeAll` が 10 秒の hookTimeout を超えてゲートを
+     * 落としていた。
+     *
+     * 順序を変えても出来上がるスキーマは変わらない。d1-sqlite.test.ts で
+     * bootstrap.sql をそのまま流したものと sqlite_master が一致することを
+     * 固定してある。
+     */
+    raw.pragma('journal_mode = WAL')
+    raw.pragma('synchronous = OFF')
+    raw.pragma('busy_timeout = 2000')
+  }
+  if (!options?.attach) raw.exec(readFileSync(join(DB_PKG_ROOT, 'bootstrap.sql'), 'utf8'))
   // 参照整合性は本番の D1 と同じく既定で切っておく。ここだけ厳しくすると
   // テストのためだけに余分な行を用意することになり、読みにくくなる。
-  raw.pragma('foreign_keys = OFF')
+  // ただし外部キーに関わる不整合 (誤った通 ID の保存など) は OFF では隠れる。
+  // その種の回帰テストは { foreignKeys: true } で作り、実 D1 と同じ制約で確かめる。
+  raw.pragma(`foreign_keys = ${options?.foreignKeys ? 'ON' : 'OFF'}`)
 
   const db = {
     prepare: (sql: string) => ({

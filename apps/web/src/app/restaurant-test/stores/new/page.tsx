@@ -3,7 +3,6 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState, type ReactNode } from 'react'
-import Header from '@/components/layout/header'
 import { useAccount } from '@/contexts/account-context'
 import { TERMS_DOCUMENT } from '@/content/terms/musubo-terms'
 import { MANUAL_LINKS } from '@/lib/manual-links'
@@ -161,7 +160,9 @@ export default function NewRestaurantStorePage() {
   }
 
   return <div>
-    <Header description="利用規約の確認からLINE公式アカウントの接続まで、5つの手順で進めます。" action={<Link href="/hq" className="text-sm font-semibold text-action">統括へ戻る</Link>} />
+    <div className="mb-5 flex justify-end">
+      <Link href="/hq" className="text-sm font-semibold text-action">統括へ戻る</Link>
+    </div>
     <div className="grid items-start gap-5 xl:grid-cols-[220px_minmax(0,1fr)]">
       <ol className="rounded-card border border-hairline bg-canvas p-4">{steps.map(([title, description], index) => {
         const number = index + 1

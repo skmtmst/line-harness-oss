@@ -3,6 +3,7 @@
 // より前の過去リードを一斉送信しない。LINE送信は必ずHarnessプロキシ経由。
 
 import { getFriendById, getLineAccountById, jstNow } from '@line-crm/db';
+import { featureJobCanRun } from './feature-enforcement.js';
 import { pushViaHarnessProxy, type HarnessProxyDispatch } from './line-proxy-send.js';
 
 export type WebinarFollowupOptions = {
@@ -395,6 +396,10 @@ export async function processWebinarFollowups(
   let sent = 0;
   let failed = 0;
   for (const { candidate, kind } of due) {
+    // 機能オフ中は追跡行を作らず送らない。期限後も再オンで安全に再開する。
+    if (candidate.account_id && !await featureJobCanRun(db, { accountId: candidate.account_id, featureId: 'webinars', job: 'webinar followups' })) {
+      continue;
+    }
     const followup = await getOrCreateFollowup(db, candidate, kind);
     if (followup.status === 'sent') continue;
     try {

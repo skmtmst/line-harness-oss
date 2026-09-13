@@ -11,15 +11,19 @@ import {
 } from '@/lib/api'
 import CommonActionEditor, { newCommonActionStep } from '@/components/automations/common-action-editor'
 import Button from '@/components/shared/button'
-import PageHeader from '@/components/shared/page-header'
 import StickyBar from '@/components/shared/sticky-bar'
 import { useCanManageCommonActions } from '@/components/automations/use-common-action-permission'
-import { TextArea, TextField } from '@/components/shared/text-field'
+import { TextField } from '@/components/shared/text-field'
+import SelectField from '@/components/shared/select-field'
+import { usePageTitle } from '@/components/shell/page-chrome'
+import BranchEditors, { newBranchStep, updateBranchStep } from '../branch-editor'
 
 const EMPTY_RESOURCES: CommonActionResources = {
   tags: [], scenarios: [], templates: [], webhooks: [], richMenus: [], commonActions: [],
 }
+
 export default function NewCommonActionPage() {
+  usePageTitle('共通アクションをつくる')
   const canManage = useCanManageCommonActions()
   const router = useRouter()
   const { selectedAccountId, loading: accountLoading } = useAccount()
@@ -81,6 +85,23 @@ export default function NewCommonActionPage() {
     }
   }
 
+  const addExample = (id: string) => {
+    if (!id) return
+    setActions((current) => [...current, { ...newCommonActionStep('common_action'), params: { commonActionId: id } }])
+  }
+
+  const branches = actions.filter((action) => action.type === 'branch')
+  const plainActions = actions.filter((action) => action.type !== 'branch')
+
+  const updatePlainActions = (next: CommonActionStep[]) => setActions([...next, ...branches])
+
+  const updateBranch = (
+    id: string,
+    patch: { tagId?: string; thenId?: string; elseId?: string },
+  ) => {
+    setActions((current) => current.map((step) => step.id === id ? updateBranchStep(step, patch) : step))
+  }
+
   if (canManage === null) return <div className="text-ink-faint p-6 text-sm">権限を確認しています</div>
   if (!canManage) return (
     <div className="border-hairline rounded-card border bg-canvas p-6">
@@ -97,58 +118,90 @@ export default function NewCommonActionPage() {
 
   return (
     <div data-design-node="py5CG" className="pb-24">
-      <PageHeader
-        breadcrumb={[
-          { label: '共通アクション', href: '/common-actions' },
-          { label: '共通アクションをつくる' },
-        ]}
-        title="共通アクションをつくる"
-        description="上から順に、名前・処理・失敗時の動きを決めます。"
-      />
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+        <p className="text-sm text-ink-faint">オートメーション ＞ 共通アクション ＞ つくる</p>
+        <div className="text-right">
+          <Button disabled title="保存後に公開版を選ぶと、対象の友だちを指定して試せます">1人で試す</Button>
+          <p className="mt-1 text-xs text-ink-faint">保存後の公開版から対象を選んで試します</p>
+        </div>
+      </div>
 
       <div className="common-action-editor-grid grid items-start gap-4">
         <div className="space-y-4">
           <section className="border-hairline rounded-card border bg-canvas p-5">
-            <h2 className="text-ink font-semibold">名前と説明</h2>
-            <div className="mt-4 space-y-4">
+            <h2 className="text-ink font-semibold">どんなアクションか</h2>
+            <div className="mt-4 grid gap-4 lg:grid-cols-2">
               <label className="text-ink-secondary block text-sm">
-                共通アクション名
+                アクション名
                 <TextField value={name} onChange={(event) => setName(event.target.value)} maxLength={120} className="mt-1" placeholder="例：来店後のお礼を送る" />
               </label>
               <label className="text-ink-secondary block text-sm">
-                説明
-                <TextArea value={description} onChange={(event) => setDescription(event.target.value)} rows={3} className="mt-1" placeholder="使う場面や目的を書きます" />
+                ひとこと説明
+                <TextField value={description} onChange={(event) => setDescription(event.target.value)} maxLength={200} className="mt-1" placeholder="使う場面や目的を書きます" />
               </label>
             </div>
           </section>
 
-          <section>
+          <section className="border-hairline rounded-card border bg-canvas p-5">
             <div className="mb-3">
-              <h2 className="text-ink font-semibold">順番に動かす処理</h2>
-              <p className="text-ink-faint mt-1 text-sm">上から順に実行します。公開後の版は書き換わりません。</p>
+              <h2 className="text-ink font-semibold">処理を上から順に並べる</h2>
+              <p className="text-ink-faint mt-1 text-sm">上の行から順に実行します。途中で失敗したときの動きも、行ごとに決められます。公開後の版は書き換わりません。</p>
             </div>
             {resourcesLoading ? (
               <div className="border-hairline rounded-card border bg-canvas p-8 text-center text-sm text-ink-faint">選択肢を読み込んでいます</div>
             ) : (
-              <CommonActionEditor value={actions} resources={resources} onChange={setActions} />
+              <div className="compact-common-action-editor"><CommonActionEditor value={plainActions} resources={resources} onChange={updatePlainActions} /></div>
             )}
+            <BranchEditors
+              branches={branches}
+              offset={plainActions.length}
+              resources={resources}
+              onUpdate={updateBranch}
+              onRemove={(id) => setActions((current) => current.filter((item) => item.id !== id))}
+            />
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Button onClick={() => setActions((current) => [...current, newBranchStep()])}>条件で分ける</Button>
+              <Button onClick={() => setActions((current) => [...current, newCommonActionStep('wait')])}>待ち時間を入れる</Button>
+              {resources.commonActions.length > 0 ? (
+                <label className="text-ink-secondary flex items-center gap-2 text-sm">
+                  <span>見本から受け渡す</span>
+                  <SelectField className="min-w-48" defaultValue="" onChange={(event) => addExample(event.target.value)} options={[{ value: '', label: '選ぶ' }, ...resources.commonActions.map((item) => ({ value: item.id, label: `${item.name} v${item.version}` }))]} />
+                </label>
+              ) : null}
+            </div>
           </section>
         </div>
 
         <aside className="space-y-4 xl:sticky xl:top-4">
           <section className="border-hairline rounded-card border bg-canvas p-5">
-            <h2 className="text-ink font-semibold">このあと</h2>
-            <ol className="text-ink-secondary mt-3 space-y-3 text-sm">
+            <h2 className="text-ink font-semibold">版のこと</h2>
+            <ul className="text-ink-secondary mt-3 space-y-3 text-sm leading-6">
+              <li><strong className="text-ink">公開しても、いまの利用先は変わりません</strong><br />すでに呼び出している場所はいまの版のまま動きます。使う場所ごとに新しい版へ更新したときだけ切り替わります。</li>
+              <li><strong className="text-ink">動き始めたものは、その版のまま終わります</strong><br />途中で公開しても、いま動いているものには効きません。</li>
+              <li><strong className="text-ink">前の版から、新しい版を作れます</strong><br />公開済みの版と過去の実行記録は書き換わりません。</li>
+            </ul>
+            <ol className="text-ink-faint mt-4 space-y-1 border-t border-hairline pt-3 text-xs">
               <li>1. ここでは下書きとして保存します</li>
               <li>2. 内容を確認して版を公開します</li>
               <li>3. 利用先ごとに使う版を選びます</li>
             </ol>
           </section>
+          <section className="border-hairline rounded-card border bg-canvas p-5">
+            <h2 className="text-ink font-semibold">つながる先</h2>
+            <ul className="mt-3 space-y-2 text-sm">
+              <li><a href="/automations" className="font-semibold text-info">オートメーション</a><span className="float-right text-ink-faint">きっかけを決めて呼ぶ</span></li>
+              <li><a href="/scenarios" className="font-semibold text-info">シナリオ配信</a><span className="float-right text-ink-faint">送信後に呼ぶ</span></li>
+              <li><a href="/form-submissions" className="font-semibold text-info">回答フォーム</a><span className="float-right text-ink-faint">送信後に呼ぶ</span></li>
+              <li><a href="/auto-replies" className="font-semibold text-info">自動応答</a><span className="float-right text-ink-faint">返信後に呼ぶ</span></li>
+              <li><a href="/rich-menus" className="font-semibold text-info">リッチメニュー</a><span className="float-right text-ink-faint">押されたときに呼ぶ</span></li>
+            </ul>
+          </section>
           <section className="border-warning bg-warning-bg rounded-card border p-5">
             <h2 className="text-ink font-semibold">気をつけること</h2>
-            <p className="text-ink-secondary mt-2 text-sm leading-6">
-              新しい版を公開しても、すでに使っている場所は自動で切り替わりません。動いている処理の中身を途中で変えないためです。
-            </p>
+            <ul className="text-ink-secondary mt-2 space-y-2 text-sm leading-6">
+              <li><strong>同じアクションを呼び合わせない</strong><br />循環は公開前の検査で止めます。</li>
+              <li><strong>外に送る処理は、やり直しに気をつける</strong><br />同じものを2回送らない目印を付けます。</li>
+            </ul>
           </section>
         </aside>
       </div>
@@ -165,7 +218,12 @@ export default function NewCommonActionPage() {
           </>
         )}
       />
-      <style jsx>{`@media (min-width: 1280px) { .common-action-editor-grid { grid-template-columns: minmax(0, 1fr) 390px; } }`}</style>
+      <style jsx global>{`
+        @media (min-width: 1280px) { .common-action-editor-grid { grid-template-columns: minmax(0, 1fr) 390px; } }
+        .compact-common-action-editor section { background: var(--color-canvas-sunken); padding: 12px; }
+        .compact-common-action-editor section > div:first-child { margin-bottom: 8px; }
+        .compact-common-action-editor textarea { min-height: 64px; }
+      `}</style>
     </div>
   )
 }

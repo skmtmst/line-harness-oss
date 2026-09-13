@@ -3,13 +3,11 @@
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { Suspense, useEffect, useState } from 'react'
-import { api } from '@/lib/api'
+import { api, type Recipe } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
-import { DEFAULT_FEATURES } from '@/lib/feature-settings'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import ListState from '@/components/shared/list-state'
-import NoteBar from '@/components/shared/note-bar'
-import PageHeader from '@/components/shared/page-header'
+import SelectField from '@/components/shared/select-field'
 import StatusBadge from '@/components/shared/status-badge'
 import StickyBar from '@/components/shared/sticky-bar'
 import { TextField } from '@/components/shared/text-field'
@@ -17,13 +15,12 @@ import { Field } from '@/components/shared/form-controls'
 import { CareCard } from '@/components/shared/side-cards'
 import {
   CARE_ITEMS,
-  CLONE_UNAVAILABLE_NOTE,
   ITEMS_UNDECIDED_NOTE,
-  RECIPES,
+  apiRecipeFeatureSummary,
+  apiRecipeRequirements,
+  apiRecipeRest,
   createButtonLabel,
-  featureSummary,
   prefixedName,
-  requirementIsOn,
 } from '../recipe-catalog'
 import styles from './clone.module.css'
 
@@ -37,33 +34,28 @@ function RecipeClone() {
   */
   const search = useSearchParams()
   const id = search?.get('id') ?? ''
-  const recipe = RECIPES.find((r) => r.id === id) ?? null
 
   const { selectedAccountId, selectedAccount, loading: accountLoading } = useAccount()
-  const [features, setFeatures] = useState<Record<string, boolean> | null>(null)
+  const [recipe, setRecipe] = useState<Recipe | null>(null)
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [prefix, setPrefix] = useState('')
+  const [cloneState, setCloneState] = useState<'idle' | 'saving' | 'success' | 'error'>('idle')
 
-  usePageTitle(recipe?.name ?? null)
+  usePageTitle(recipe ? `${recipe.name}を作る` : null)
 
   useEffect(() => {
     if (accountLoading) return
-    if (!selectedAccountId) {
-      setFeatures(DEFAULT_FEATURES)
-      setStatus('ready')
-      return
-    }
     let alive = true
     setStatus('loading')
-    void api.featureSettings
-      .get(selectedAccountId)
+    void api.recipes
+      .get(id, selectedAccountId ?? undefined)
       .then((res) => {
         if (!alive) return
         if (!res.success) {
           setStatus('error')
           return
         }
-        setFeatures({ ...DEFAULT_FEATURES, ...res.data.features })
+        setRecipe(res.data)
         setStatus('ready')
       })
       .catch(() => {
@@ -72,14 +64,14 @@ function RecipeClone() {
     return () => {
       alive = false
     }
-  }, [accountLoading, selectedAccountId])
+  }, [accountLoading, id, selectedAccountId])
 
-  if (!recipe) {
+  if (status === 'error') {
     return (
       <ListState
-        kind="empty"
-        title="そのレシピはありません"
-        description="レシピ一覧から選び直してください。"
+        kind="error"
+        title="レシピを読み込めませんでした"
+        description="時間をおいてもう一度お試しください。"
         action={
           <Link href="/recipes" className={styles.backLink}>
             レシピ一覧へ
@@ -89,20 +81,36 @@ function RecipeClone() {
     )
   }
 
+  if (status !== 'ready' || !recipe) return <ListState kind="loading" />
+
+  const requirements = apiRecipeRequirements(recipe)
+  const rest = apiRecipeRest(recipe)
+  const canClone = Boolean(selectedAccountId) && recipe.missingFeatures.length === 0 && recipe.items !== null
+
+  const clone = async () => {
+    if (!selectedAccountId || !canClone || cloneState === 'saving') return
+    setCloneState('saving')
+    try {
+      const result = await api.recipes.clone(
+        recipe.id,
+        { accountId: selectedAccountId, namePrefix: prefix || null, expectedVersion: recipe.version },
+        crypto.randomUUID(),
+      )
+      setCloneState(result.success ? 'success' : 'error')
+    } catch {
+      setCloneState('error')
+    }
+  }
+
   return (
     <div className={styles.page}>
-      <PageHeader
-        breadcrumb={[{ label: 'レシピ', href: '/recipes' }, { label: recipe.name }]}
-        title={recipe.name}
-        description={recipe.purpose}
-      />
+      <nav className={styles.breadcrumb} aria-label="パンくず">
+        <Link href="/recipes">レシピ</Link>
+        <span aria-hidden>›</span>
+        <span>{recipe.name}</span>
+      </nav>
 
-      {status !== 'ready' || !features ? (
-        <ListState kind={status === 'error' ? 'error' : 'loading'} />
-      ) : (
-        <>
-          <NoteBar tone="warn">{CLONE_UNAVAILABLE_NOTE}</NoteBar>
-
+      <>
           <div className={styles.columns}>
             <div className={styles.main}>
               <section className={styles.block}>
@@ -119,13 +127,19 @@ function RecipeClone() {
                   付けると「{prefixedName(prefix, recipe.name)}
                   」のようになります。同じレシピを何度も使うとき、どれがどれか分かりやすくなります。
                 </p>
-              </section>
-
-              <section className={styles.block}>
-                <h2 className={styles.blockTitle}>どのLINEアカウントに作るか（必須）</h2>
-                <p className={styles.accountName}>
-                  {selectedAccount?.name ?? 'アカウントが選ばれていません'}
-                </p>
+                <label className={styles.accountLabel} htmlFor="recipe-clone-account">
+                  どのLINEアカウントに作るか（必須）
+                </label>
+                <SelectField
+                  id="recipe-clone-account"
+                  className={styles.accountSelect}
+                  value={selectedAccountId ?? ''}
+                  disabled={!selectedAccountId}
+                  options={[{
+                    value: selectedAccountId ?? '',
+                    label: selectedAccount?.name ?? 'アカウントが選ばれていません',
+                  }]}
+                />
                 <p className={styles.hint}>
                   作る先はいま選んでいるアカウントです。変えるときは上のLINEアカウントから選び直します。
                 </p>
@@ -154,29 +168,30 @@ function RecipeClone() {
                 ) : (
                   <p className={styles.undecided}>{ITEMS_UNDECIDED_NOTE}</p>
                 )}
-                {recipe.itemsRest ? <p className={styles.hint}>{recipe.itemsRest}</p> : null}
+                {rest ? <p className={styles.hint}>{rest}</p> : null}
               </section>
+            </div>
 
-              <section className={styles.block}>
-                <h2 className={styles.blockTitle}>必要な機能</h2>
+            <aside className={styles.side} aria-label="この画面の案内">
+              <section className={styles.sideCard}>
+                <h2 className={styles.sideTitle}>必要な機能</h2>
                 <ul className={styles.features}>
-                  {recipe.requirements.map((r) => {
-                    const on = requirementIsOn(r, features)
+                  {requirements.map((requirement) => {
                     return (
-                      <li key={r.label} className={styles.feature}>
-                        <StatusBadge tone={on ? 'success' : 'warning'} size="compact">
-                          {on ? 'オン' : 'オフ'}
+                      <li key={requirement.key ?? 'friend-attributes'} className={styles.feature}>
+                        <StatusBadge tone={requirement.on ? 'success' : 'warning'} size="compact">
+                          {requirement.on ? 'オン' : 'オフ'}
                         </StatusBadge>
-                        <span>{r.label}</span>
+                        <span>{requirement.label}</span>
                       </li>
                     )
                   })}
                 </ul>
-                <p className={styles.hint}>{featureSummary(recipe, features)}</p>
+                <p className={styles.hint}>{apiRecipeFeatureSummary(recipe)}</p>
               </section>
 
-              <section className={styles.block}>
-                <h2 className={styles.blockTitle}>作ったあと</h2>
+              <section className={styles.sideCard}>
+                <h2 className={styles.sideTitle}>作ったあと</h2>
                 <ul className={styles.notes}>
                   <li>できたものはすべて下書きです。放っておいても、友だちには何も届きません。</li>
                   <li>
@@ -186,26 +201,33 @@ function RecipeClone() {
                   <li>どのレシピから作ったかは記録に残ります。あとから見返せます。</li>
                 </ul>
               </section>
-            </div>
-
-            <aside className={styles.side} aria-label="この画面の案内">
               <CareCard items={[...CARE_ITEMS]} />
             </aside>
           </div>
 
           <StickyBar
-            status={CLONE_UNAVAILABLE_NOTE}
+            status={cloneState === 'success'
+              ? '下書きを作りました。レシピ一覧から作成回数を確認できます。'
+              : cloneState === 'error'
+                ? '作れませんでした。入力と必要な機能を確認して、もう一度お試しください。'
+                : undefined}
             actions={
               <>
                 <Link href="/recipes" className={styles.cancel}>
                   やめる
                 </Link>
-                <span className={styles.blocked}>{createButtonLabel(recipe)}</span>
+                <button
+                  type="button"
+                  className={canClone ? styles.primary : styles.blocked}
+                  disabled={!canClone || cloneState === 'saving'}
+                  onClick={() => void clone()}
+                >
+                  {cloneState === 'saving' ? '作っています…' : createButtonLabel(recipe)}
+                </button>
               </>
             }
           />
         </>
-      )}
     </div>
   )
 }

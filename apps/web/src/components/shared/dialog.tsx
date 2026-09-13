@@ -29,6 +29,10 @@ export type DialogProps = {
   modal?: boolean
   /** 画面固有のPencil Node。未指定なら共通部品のNodeだけを持つ。 */
   designNode?: string
+  /** ConfirmDialog の構造。重要操作でも説明を赤帯へ入れない。 */
+  confirmation?: boolean
+  /** 本文を持たない短い確認窓。 */
+  compact?: boolean
 }
 
 /** Pencil V6 `J6x4Q` と重要操作 `H2S1T4` を1つにした共通ダイアログ。 */
@@ -49,11 +53,18 @@ export default function Dialog({
   confirmIcon,
   modal = true,
   designNode,
+  confirmation = false,
+  compact = false,
 }: DialogProps) {
   const titleId = useId()
   const descriptionId = useId()
   const [mounted, setMounted] = useState(false)
   const panelRef = useOverlayFocus(open && modal, onCancel, busy)
+  const confirmationSizeClass = confirmation && compact
+    ? tone === 'destructive'
+      ? styles.destructiveConfirmation
+      : styles.compactConfirmation
+    : ''
 
   useEffect(() => setMounted(true), [])
   if (!open) return null
@@ -76,7 +87,7 @@ export default function Dialog({
   const panel = (
     <div
       ref={panelRef}
-      className={`${styles.panel} ${styles.standardPanel}`}
+      className={`${styles.panel} ${styles.standardPanel} ${confirmation ? styles.confirmationPanel : ''} ${confirmationSizeClass}`}
       role={tone === 'destructive' ? 'alertdialog' : 'dialog'}
       aria-modal={modal || undefined}
       aria-labelledby={titleId}
@@ -86,7 +97,7 @@ export default function Dialog({
       data-design-part="dialog"
       data-design-node={tone === 'destructive' ? 'H2S1T4' : 'J6x4Q'}
     >
-      {tone === 'destructive' ? <div className={styles.callout} data-qa-dialog-callout>{heading}</div> : heading}
+      {tone === 'destructive' && !confirmation ? <div className={styles.callout} data-qa-dialog-callout>{heading}</div> : heading}
       {children ? <div className={styles.content}>{children}</div> : null}
       {error ? <p className={styles.error} role="alert">{error}</p> : null}
       {footer ?? (
@@ -105,7 +116,7 @@ export default function Dialog({
 
   if (!modal) return panel
   const overlay = (
-    <div className={styles.overlay} role="presentation" data-design-node={designNode} onMouseDown={(event) => {
+    <div className={`${styles.overlay} ${confirmation && compact ? styles.confirmationOverlay : ''}`} role="presentation" data-design-node={designNode} onMouseDown={(event) => {
       if (!busy && event.target === event.currentTarget) onCancel()
     }}>
       {panel}

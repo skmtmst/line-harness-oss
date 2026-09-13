@@ -1,34 +1,39 @@
 'use client'
 
 import SelectField from '@/components/shared/select-field'
-import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import type {
   CommonVar,
+  CommonVarChangeImpact,
   CommonVarDeleteImpact,
   CommonVarSchedule,
   Folder,
 } from '@line-crm/shared'
-import { api, ApiError } from '@/lib/api'
+import { api, ApiError, type CommonVarDetail } from '@/lib/api'
 import { VAR_TYPE_LABELS, formatStamp } from '@/lib/common-vars'
 import { useAccount } from '@/contexts/account-context'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { NOT_AVAILABLE, STATE_TEXT } from '@/components/shared/not-connected'
-import { checkedAtText } from '../delete-impact'
+import { checkedAtText, placeholderText } from '../delete-impact'
 import Button from '@/components/shared/button'
 import StickyBar from '@/components/shared/sticky-bar'
 import {
-  changePreviewNotConnected,
+  blockingErrors,
   changeSummaryText,
-  hiddenText,
   historicalText,
+  isChangeItem,
+  reviewWarnings,
+  hiddenText,
   immediateItems,
   impactStateFromError,
   impactStateText,
   saveErrorText,
+  scheduleErrorText,
   type ChangeImpactState,
 } from '../change-impact'
+import ImpactReview from '../impact-review'
 
 /**
  * 共通情報の編集。
@@ -52,17 +57,19 @@ function EditCommonVarInner() {
   const params = useSearchParams()
   const id = params.get('id') ?? ''
 
-  const [item, setItem] = useState<CommonVar | null>(null)
+  const [item, setItem] = useState<CommonVarDetail | null>(null)
   const [folders, setFolders] = useState<Folder[]>([])
   const [schedules, setSchedules] = useState<CommonVarSchedule[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [saved, setSaved] = useState(false)
+  const [showImpactReview, setShowImpactReview] = useState(false)
 
   const [name, setName] = useState('')
   const [folderId, setFolderId] = useState('')
   const [value, setValue] = useState('')
+  const [memo, setMemo] = useState('')
 
   /** 予約を足す窓。開いていない間は null。 */
   const [draft, setDraft] = useState<{ date: string; time: string; value: string } | null>(null)
@@ -73,13 +80,26 @@ function EditCommonVarInner() {
    * 本体の読み込みとは別に持つ。使用先が読めなくても、名前や値の編集は
    * 続けられるべきだからである。**読めなかったことを0か所として描かない。**
    */
-  const [impact, setImpact] = useState<CommonVarDeleteImpact | null>(null)
+  const [impact, setImpact] = useState<CommonVarDeleteImpact | CommonVarChangeImpact | null>(null)
   const [impactState, setImpactState] = useState<ChangeImpactState>('loading')
 
-  const loadImpact = useCallback(async (varId: string, accountId: string) => {
+  /*
+    値を変えていないあいだは使用先台帳（`delete-impact`）だけを読む。
+    **変えた時点で変更前確認（`impact-preview`）へ切り替える。**
+    変えていないのに保存後の文を問い合わせても、いまの文と同じものが
+    返るだけで、読む人には差が見えない。
+  */
+  const loadImpact = useCallback(async (
+    varId: string,
+    accountId: string,
+    nextValue?: string,
+    expectedVersion?: number,
+  ) => {
     setImpactState('loading')
     try {
-      const res = await api.commonVars.deleteImpact(varId, accountId)
+      const res = nextValue === undefined
+        ? await api.commonVars.deleteImpact(varId, accountId)
+        : await api.commonVars.impactPreview(varId, accountId, nextValue, expectedVersion)
       if (accountId !== latestAccountRef.current) return
       if (!res.success) {
         setImpact(null)
@@ -94,6 +114,44 @@ function EditCommonVarInner() {
       setImpactState(impactStateFromError(e))
     }
   }, [])
+
+  /**
+   * 入力のたびに問い合わせない。**打っている途中の文で「空になります」と
+   * 出ると、消して打ち直しているだけの人を止めてしまう。** 手が止まって
+   * から引く。
+   */
+  useEffect(() => {
+    if (!item || !selectedAccountId) return
+    const nextValue = value === item.value ? undefined : value
+    const timer = setTimeout(() => {
+      void loadImpact(item.id, selectedAccountId, nextValue, item.version)
+    }, 400)
+    return () => clearTimeout(timer)
+  }, [item, selectedAccountId, value, loadImpact])
+
+  /*
+    保存を止める理由。**読めていないときは止めない。** 影響を確かめ
+    られなかったことを理由に保存を塞ぐと、口が落ちているあいだ誰も
+    値を直せなくなる。
+  */
+  const blocked = impact && 'canSave' in impact && impactState === 'ready'
+    ? blockingErrors(impact)
+    : []
+  const visibleImpactItems = impact ? immediateItems(impact) : []
+  const previewUsage = visibleImpactItems[0]
+  const usageGroups = useMemo(() => {
+    if (!impact) return []
+    const groups = new Map<string, { kind: keyof typeof impact.byKind; kindLabel: string; names: string[] }>()
+    for (const usage of immediateItems(impact)) {
+      const current = groups.get(usage.kind)
+      if (current) current.names.push(usage.name)
+      else groups.set(usage.kind, { kind: usage.kind, kindLabel: usage.kindLabel, names: [usage.name] })
+    }
+    return [...groups.values()].map((group) => ({
+      ...group,
+      count: impact.byKind[group.kind] ?? group.names.length,
+    }))
+  }, [impact])
 
   const load = useCallback(async () => {
     if (!id) {
@@ -111,15 +169,15 @@ function EditCommonVarInner() {
     setLoading(true)
     setError('')
     try {
-      const [vars, folderList, scheduleList] = await Promise.all([
-        api.commonVars.list(accountAtRequest),
+      const [detail, folderList, scheduleList] = await Promise.all([
+        api.commonVars.detail(id, accountAtRequest),
         api.folders.list('common_var'),
         api.commonVars.schedules(id, accountAtRequest),
       ])
       if (accountAtRequest !== latestAccountRef.current) return
       if (folderList.success) setFolders(folderList.data)
       if (scheduleList.success) setSchedules(scheduleList.data)
-      const found = vars.success ? vars.data.find((v) => v.id === id) : undefined
+      const found = detail.success ? detail.data : undefined
       if (!found) {
         setError('この共通情報は見つかりませんでした')
         return
@@ -128,13 +186,13 @@ function EditCommonVarInner() {
       setName(found.name)
       setFolderId(found.folderId ?? '')
       setValue(found.value)
-      void loadImpact(found.id, accountAtRequest)
+      setMemo(found.memo)
     } catch {
       if (accountAtRequest === latestAccountRef.current) setError('読み込みに失敗しました')
     } finally {
       if (accountAtRequest === latestAccountRef.current) setLoading(false)
     }
-  }, [accountLoading, id, loadImpact, selectedAccountId])
+  }, [accountLoading, id, selectedAccountId])
 
   useEffect(() => {
     void load()
@@ -154,7 +212,9 @@ function EditCommonVarInner() {
       const res = await api.commonVars.update(item.id, accountAtRequest, {
         name: name.trim(),
         value,
+        memo,
         folderId: folderId || null,
+        expectedVersion: item.version,
       })
       if (accountAtRequest !== latestAccountRef.current) return
       if (!res.success) {
@@ -162,6 +222,7 @@ function EditCommonVarInner() {
         return
       }
       setSaved(true)
+      setShowImpactReview(false)
       void load()
     } catch (e) {
       // `fetchApi` は2xx以外を投げる。ここで一言にまとめてしまうと、
@@ -270,7 +331,8 @@ function EditCommonVarInner() {
       setDraft(null)
       void load()
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : '予約に失敗しました')
+      // サーバの生文言（500の'Internal server error'など）は出さない。
+      setError(scheduleErrorText(e))
     }
   }
 
@@ -283,6 +345,17 @@ function EditCommonVarInner() {
     } catch {
       setError('予約の削除に失敗しました')
     }
+  }
+
+  if (showImpactReview && impact && 'canSave' in impact) {
+    return (
+      <ImpactReview
+        impact={impact}
+        busy={saving}
+        onBack={() => setShowImpactReview(false)}
+        onSave={() => void save()}
+      />
+    )
   }
 
   return (
@@ -313,222 +386,256 @@ function EditCommonVarInner() {
         </p>
       ) : (
         <>
-          <div className="bg-canvas rounded-card border-hairline max-w-3xl space-y-6 border p-6">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <label
-                  htmlFor="cv-name"
-                  className="text-ink-secondary mb-1 block text-sm font-medium"
-                >
-                  共通情報名 <span className="text-danger">*</span>
-                </label>
-                <input
-                  id="cv-name"
-                  type="text"
-                  maxLength={200}
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="border-hairline rounded-control focus:ring-accent w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
-                />
-              </div>
-              <div>
-                <label
-                  htmlFor="cv-folder"
-                  className="text-ink-secondary mb-1 block text-sm font-medium"
-                >
-                  フォルダ
-                </label>
-                <SelectField
-                  id="cv-folder"
-                  value={folderId}
-                  onChange={(e) => setFolderId(e.target.value)}
-                  options={[{ value: '', label: '未分類' }, ...folders.map((folder) => ({ value: folder.id, label: folder.name }))]}
-                />
-              </div>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <p className="text-ink-secondary mb-1 text-sm font-medium">差し込み名</p>
-                <code className="bg-canvas-sunken text-ink block rounded px-2 py-2 text-sm">{`{{var.${item.varKey}}}`}</code>
-                <p className="text-ink-faint mt-1 text-xs">
-                  あとから変えられません。変えるとテンプレートの差し込みが空になります。
-                </p>
-              </div>
-              <div>
-                <p className="text-ink-secondary mb-1 text-sm font-medium">
-                  種別{' '}
-                  <span className="text-ink-faint text-xs font-normal">※変更できません。</span>
-                </p>
-                <span className="bg-canvas-sunken text-ink-secondary rounded-pill inline-block px-3 py-1 text-sm">
-                  {VAR_TYPE_LABELS[item.type] ?? item.type}
-                </span>
-              </div>
-            </div>
-
-            <div>
-              <label htmlFor="cv-value" className="text-ink-secondary mb-1 block text-sm font-medium">
-                値
-              </label>
-              <input
-                id="cv-value"
-                type={item.type === 'number' ? 'number' : 'text'}
-                value={value}
-                onChange={(e) => setValue(e.target.value)}
-                className="border-hairline rounded-control w-full max-w-md border px-3 py-2 text-sm"
-              />
-            </div>
-
-            {/*
-              変える前の影響確認（設計 `uNBlA` 14-1-B）。
-              **節は必ず出す。** 読めないものは `—` と理由にする。
-            */}
-            <section data-design-node="uNBlA">
-              <p className="text-ink text-sm font-semibold">
-                影響確認{' '}
-                <span className="text-ink-faint text-xs font-normal">
-                  保存すると、この値を差し込んでいる場所がすぐ変わります
-                </span>
-              </p>
-
-              {impactState !== 'ready' || !impact ? (
-                <div className="border-hairline mt-2 rounded border p-4" data-impact-state={impactState}>
-                  <p className="text-ink text-sm">
-                    {NOT_AVAILABLE}
-                    <span className="text-ink-secondary ml-2">{impactStateText(impactState)}</span>
-                  </p>
-                  {impactState === 'error' && (
-                    <button
-                      onClick={() => {
-                        if (item && selectedAccountId) void loadImpact(item.id, selectedAccountId)
-                      }}
-                      className="text-info mt-2 text-sm hover:underline"
-                    >
-                      {STATE_TEXT.retry}
-                    </button>
-                  )}
-                </div>
-              ) : (
-                <div className="border-hairline mt-2 rounded border">
-                  <div className="border-hairline border-b p-3">
-                    <p className="text-ink text-sm">{changeSummaryText(impact)}</p>
-                    {historicalText(impact) && (
-                      <p className="text-ink-secondary mt-1 text-xs">{historicalText(impact)}</p>
-                    )}
-                    {hiddenText(impact) && (
-                      <p className="text-ink-secondary mt-1 text-xs">
-                        名前を確認できない使用先：{hiddenText(impact)}
-                      </p>
-                    )}
+          <div className="grid gap-4 xl:grid-cols-3" data-design-node="gBtaK">
+            <div className="space-y-4 xl:col-span-2">
+              <section className="bg-canvas rounded-card border-hairline space-y-5 border p-5">
+                <div className="grid gap-4 md:grid-cols-3">
+                  <div>
+                    <label htmlFor="cv-name" className="text-ink-secondary mb-1 block text-sm font-medium">
+                      名前 <span className="text-danger">必須</span>
+                    </label>
+                    <input
+                      id="cv-name"
+                      type="text"
+                      maxLength={200}
+                      value={name}
+                      onChange={(e) => { setSaved(false); setName(e.target.value) }}
+                      className="border-hairline rounded-control focus:ring-accent w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
+                    />
+                    <p className="text-ink-faint mt-1 text-xs">管理画面の中で探すときの名前</p>
                   </div>
+                  <div>
+                    <p className="text-ink-secondary mb-1 text-sm font-medium">
+                      差し込みキー <span className="text-danger">必須</span>
+                    </p>
+                    <code className="bg-canvas-sunken text-ink block rounded-control px-3 py-2 text-sm">{placeholderText(item.name)}</code>
+                    <p className="text-ink-faint mt-1 text-xs">本文にこの形で入ります</p>
+                  </div>
+                  <div>
+                    <label htmlFor="cv-folder" className="text-ink-secondary mb-1 block text-sm font-medium">フォルダ</label>
+                    <SelectField
+                      id="cv-folder"
+                      value={folderId}
+                      onChange={(e) => { setSaved(false); setFolderId(e.target.value) }}
+                      options={[{ value: '', label: '未分類' }, ...folders.map((folder) => ({ value: folder.id, label: folder.name }))]}
+                    />
+                  </div>
+                </div>
 
-                  {immediateItems(impact).length > 0 && (
-                    <ul className="divide-hairline divide-y">
-                      {immediateItems(impact).map((usage) => (
-                        <li key={`${usage.kind}-${usage.href}-${usage.name}`} className="p-3">
-                          <p className="text-ink-faint text-xs">
-                            {usage.kindLabel}・{usage.status}
-                          </p>
-                          <Link href={usage.href} className="text-info text-sm hover:underline">
-                            {usage.name}
-                          </Link>
-                          <p className="text-ink-secondary mt-1 text-xs break-all">
-                            いまの文：{usage.currentPreview}
-                          </p>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
+                <div>
+                  <div className="mb-1 flex items-center justify-between gap-3">
+                    <label htmlFor="cv-value" className="text-ink-secondary text-sm font-medium">差し込まれる文字</label>
+                    <span className="text-ink-faint text-xs tabular-nums">{value.length} / 200</span>
+                  </div>
+                  <input
+                    id="cv-value"
+                    type={item.type === 'number' ? 'number' : 'text'}
+                    maxLength={item.type === 'number' ? undefined : 200}
+                    value={value}
+                    onChange={(e) => { setSaved(false); setValue(e.target.value) }}
+                    className="border-hairline rounded-control w-full border px-3 py-3 text-sm"
+                  />
+                </div>
 
-                  <div className="border-hairline border-t p-3">
-                    <p className="text-ink-secondary text-xs">変更後の文と文字数の検査</p>
-                    <p className="text-ink mt-1 text-sm">
-                      {NOT_AVAILABLE}
-                      <span className="text-ink-secondary ml-2 text-xs">
-                        {changePreviewNotConnected()}
-                      </span>
+                {impactState === 'ready' && impact ? (
+                  <div className="bg-status-warning-soft text-status-warning rounded-control px-4 py-3 text-sm" role="status">
+                    <p className="font-bold">
+                      保存すると、この値を差し込んでいる{impact.total.toLocaleString('ja-JP')}か所が変わります
+                    </p>
+                    <p className="mt-1 text-xs">
+                      「{item.value || '（空）'}」→「{value || '（空）'}」。配信予約中・配信中の設定にも反映されます。
                     </p>
                   </div>
+                ) : null}
 
-                  <p className="text-ink-faint border-hairline border-t px-3 py-2 text-xs">
-                    {checkedAtText(impact.checkedAt)} 時点で確かめました。
-                  </p>
+                <div>
+                  <p className="text-ink-secondary mb-1 text-sm font-medium">社内向けのメモ（お客さまには出ません）</p>
+                  <input
+                    type="text"
+                    value={memo}
+                    onChange={(event) => { setSaved(false); setMemo(event.target.value) }}
+                    maxLength={1000}
+                    className="border-hairline rounded-control w-full border px-3 py-2 text-sm"
+                    placeholder="運用上の注意や、この値の使い方を書きます"
+                  />
                 </div>
-              )}
-            </section>
 
-            {/* 更新スケジュール。Lステップと同じく、値の下に表で置く。 */}
-            <section>
-              <p className="text-ink text-sm font-semibold">
-                更新スケジュール{' '}
-                <span className="text-ink-faint text-xs font-normal">
-                  予定を決めて自動で値を更新できます
-                </span>
-              </p>
-              <div className="border-hairline mt-2 overflow-hidden rounded border">
-                <table className="w-full">
-                  <thead>
-                    <tr className="bg-canvas-sunken border-hairline border-b">
-                      <th className="text-ink-faint px-3 py-2 text-left text-xs font-semibold">
-                        スケジュール
-                      </th>
-                      <th className="text-ink-faint px-3 py-2 text-left text-xs font-semibold">
-                        更新内容
-                      </th>
-                      <th className="w-16 px-3 py-2" />
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {schedules.length === 0 ? (
-                      <tr>
-                        <td colSpan={3} className="text-ink-faint px-3 py-6 text-center text-sm">
-                          スケジュールが設定されていません
-                        </td>
-                      </tr>
-                    ) : (
-                      schedules.map((s) => (
-                        <tr key={s.id}>
-                          <td className="text-ink-secondary px-3 py-2 text-sm">
-                            {formatStamp(s.effectiveFrom)} 実行
-                            {s.appliedAt && (
-                              <span className="text-success ml-2 text-xs">反映済み</span>
-                            )}
-                          </td>
-                          <td className="text-ink px-3 py-2 text-sm break-all">
-                            {s.value || <span className="text-ink-faint">（空）</span>} を代入する
-                          </td>
-                          <td className="px-3 py-2 text-right">
-                            <button
-                              onClick={() => void removeSchedule(s.id)}
-                              aria-label="この予約を消す"
-                              className="text-danger hover:bg-danger-bg rounded px-2 py-1 text-xs"
-                            >
-                              削除
-                            </button>
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-                <div className="border-hairline border-t">
-                  <button
-                    onClick={() => {
-                      const now = jstNowLocalInput()
-                      setDraft({ date: now.date, time: '00:00', value })
+                <p className="text-ink-faint text-xs">
+                  種別：{VAR_TYPE_LABELS[item.type] ?? item.type}（登録後は変更できません）
+                </p>
+              </section>
+
+              <section className="bg-canvas rounded-card border-hairline border p-4">
+                <label className="flex cursor-pointer items-start gap-3">
+                  <input
+                    type="checkbox"
+                    checked={schedules.length > 0}
+                    onChange={() => {
+                      if (schedules.length === 0) {
+                        const now = jstNowLocalInput()
+                        setDraft({ date: now.date, time: '00:00', value })
+                      }
                     }}
-                    className="text-accent hover:bg-accent-soft w-full py-2.5 text-sm font-medium"
-                  >
-                    ＋ 更新スケジュールを追加
-                  </button>
-                </div>
-              </div>
-              <p className="text-ink-faint mt-1 text-xs">
-                過去の日時は指定できません。指定した時刻を過ぎると、自動で値が入れ替わります。
-              </p>
-            </section>
+                    className="mt-1 accent-green-500"
+                  />
+                  <span>
+                    <span className="text-ink block text-sm font-semibold">この日を過ぎたら、自動で文字を変える</span>
+                    <span className="text-ink-faint mt-1 block text-xs">
+                      期間が終わったら出したくない案内や、次の値へ切り替えるときに使います。
+                    </span>
+                  </span>
+                </label>
+                {schedules.map((schedule) => (
+                  <div key={schedule.id} className="border-hairline mt-3 flex flex-wrap items-center justify-between gap-3 border-t pt-3 text-xs">
+                    <span className="text-ink-secondary">
+                      {formatStamp(schedule.effectiveFrom)} に「{schedule.value || '（空）'}」へ変更
+                    </span>
+                    <Button type="button" onClick={() => void removeSchedule(schedule.id)}>予定を削除</Button>
+                  </div>
+                ))}
+              </section>
 
-            {saved && <p className="text-success text-sm">保存しました。</p>}
+              <section className="bg-canvas rounded-card border-hairline border p-4">
+                <h2 className="text-ink text-sm font-bold">これまでの変更</h2>
+                {item.history.length > 0 ? (
+                  <ol className="divide-hairline mt-3 divide-y">
+                    {item.history.slice(0, 5).map((entry, index) => {
+                      const previous = item.history[index + 1]
+                      return (
+                        <li key={entry.id} className="py-3 first:pt-0">
+                          <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                            <span className="text-ink font-semibold">{formatStamp(entry.createdAt)}</span>
+                            <span className="text-ink-faint">{entry.actorName ?? (entry.actorId ? '担当者名を確認できません' : '担当者未記録')}</span>
+                          </div>
+                          <p className="text-ink-secondary mt-1 text-xs break-words">
+                            {previous
+                              ? `「${previous.value || '（空）'}」→「${entry.value || '（空）'}」`
+                              : 'はじめて登録'}
+                          </p>
+                          {entry.changeReason ? <p className="text-ink-faint mt-1 text-xs">理由：{entry.changeReason}</p> : null}
+                        </li>
+                      )
+                    })}
+                  </ol>
+                ) : (
+                  <p className="text-ink-faint mt-3 text-sm">まだ変更履歴はありません。</p>
+                )}
+                <p className="text-ink-faint mt-2 text-xs">
+                  変えた時点より前に送った配信の文面は、そのときの値のままです。あとから遡って変わることはありません。
+                </p>
+              </section>
+
+              {saved && <p className="text-success text-sm">保存しました。</p>}
+            </div>
+
+            <aside className="space-y-4">
+              {/* 変える前の影響確認（設計 `uNBlA` 14-1-B）。読めない値は0件にしない。 */}
+              <section data-design-node="uNBlA">
+                <div className="bg-canvas rounded-card border-hairline border">
+                  <div className="border-hairline flex items-center justify-between gap-3 border-b px-4 py-3">
+                    <div>
+                      <p className="text-ink-faint text-xs font-bold">影響確認</p>
+                      <h2 className="text-ink text-sm font-bold">使われている場所</h2>
+                    </div>
+                    <span className="text-action text-xs font-bold">
+                      {impactState === 'ready' && impact ? `${impact.total.toLocaleString('ja-JP')}か所` : NOT_AVAILABLE}
+                    </span>
+                  </div>
+                  {impactState !== 'ready' || !impact ? (
+                    <div className="p-4" data-impact-state={impactState}>
+                      <p className="text-ink-secondary text-sm">{impactStateText(impactState)}</p>
+                      {impactState === 'error' ? (
+                        <Button
+                          type="button"
+                          className="mt-3"
+                          onClick={() => {
+                            if (item && selectedAccountId) void loadImpact(item.id, selectedAccountId)
+                          }}
+                        >
+                          {STATE_TEXT.retry}
+                        </Button>
+                      ) : null}
+                    </div>
+                  ) : (
+                    <>
+                      <div className="border-hairline space-y-1 border-b px-4 py-3 text-xs">
+                        <p className="text-ink-secondary font-semibold">{changeSummaryText(impact)}</p>
+                        {historicalText(impact) ? (
+                          <p className="text-ink-faint">{historicalText(impact)}</p>
+                        ) : null}
+                      </div>
+                      {usageGroups.length > 0 ? (
+                        <ul className="divide-hairline divide-y">
+                          {usageGroups.map((group) => (
+                            <li key={group.kind} className="px-4 py-3">
+                              <p className="text-ink text-sm font-semibold">
+                                {group.kindLabel} {group.count.toLocaleString('ja-JP')}件
+                              </p>
+                              <p className="text-ink-faint mt-1 truncate text-xs" title={group.names.join(' ／ ')}>
+                                {group.names.join(' ／ ')}
+                                {group.count > group.names.length ? ` ほか${group.count - group.names.length}件` : ''}
+                              </p>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="text-ink-faint p-4 text-sm">現在の使用先はありません。</p>
+                      )}
+                      {hiddenText(impact) ? (
+                        <p className="text-ink-faint border-hairline border-t px-4 py-3 text-xs">
+                          名前を確認できない使用先：{hiddenText(impact)}
+                        </p>
+                      ) : null}
+                      <p className="text-ink-faint border-hairline border-t px-4 py-3 text-xs">
+                        {checkedAtText(impact.checkedAt)} 時点で確認
+                      </p>
+                      <p className="text-ink-faint border-hairline border-t px-4 py-3 text-xs">
+                        1件ずつ確かめるときは「{impact.blockingTotal.toLocaleString('ja-JP')}か所を1件ずつ見る」へ進んでください。
+                      </p>
+                    </>
+                  )}
+                </div>
+              </section>
+
+              <section className="bg-canvas rounded-card border-hairline border p-4">
+                <h2 className="text-ink text-sm font-bold">差し込んだときの見え方</h2>
+                {impactState === 'ready' && impact && previewUsage ? (
+                  <div className="mt-3 space-y-3 text-xs">
+                    <p className="text-ink-faint">
+                      {previewUsage.kindLabel}「{previewUsage.name}」
+                    </p>
+                    <div>
+                      <p className="text-ink-faint">いまの文</p>
+                      <p className="text-ink-secondary mt-1 break-words">{previewUsage.currentPreview}</p>
+                    </div>
+                    <div className="bg-accent-soft rounded-control p-3">
+                      <p className="text-accent font-semibold">保存したあとの文</p>
+                      <p className="text-ink mt-1 break-words">
+                        {isChangeItem(previewUsage)
+                          ? previewUsage.nextPreview ?? `${NOT_AVAILABLE}（使用先を開いて確認してください）`
+                          : '値を変えると、ここに保存後の文が出ます。'}
+                      </p>
+                    </div>
+                    {'canSave' in impact ? (
+                      <>
+                        {blockingErrors(impact).length > 0 ? (
+                          <ul className="text-danger list-disc space-y-1 pl-5">
+                            {blockingErrors(impact).map((message) => <li key={message}>{message}</li>)}
+                          </ul>
+                        ) : (
+                          <p className="text-success font-semibold">保存を止める問題は見つかりませんでした。</p>
+                        )}
+                        {reviewWarnings(impact).map((message) => (
+                          <p key={message} className="text-ink-secondary">{message}</p>
+                        ))}
+                      </>
+                    ) : null}
+                  </div>
+                ) : (
+                  <p className="text-ink-faint mt-3 text-sm">{NOT_AVAILABLE}（使用先の本文を確認中です）</p>
+                )}
+              </section>
+            </aside>
           </div>
 
           {/*
@@ -542,14 +649,39 @@ function EditCommonVarInner() {
                 onClick={() => void openDelete()}
                 className="rounded-control bg-status-danger text-on-accent px-4 py-2 text-sm font-bold"
               >
-                削除
+                この共通情報を削除
               </button>
             )}
             actions={(
               <>
-                <Button href="/contents/vars">共通情報一覧へ戻る</Button>
-                <Button type="button" variant="primary" disabled={saving} onClick={() => void save()}>
-                  {saving ? '保存中…' : '保存'}
+                <Button href="/contents/vars">キャンセル</Button>
+                {blocked.length > 0 && (
+                  <span className="text-danger text-xs">
+                    {blocked[0]}。直すまで保存できません。
+                  </span>
+                )}
+                {impact && 'canSave' in impact && impact.blockingTotal > 0 ? (
+                  <Button
+                    type="button"
+                    data-qa-open="uNBlA"
+                    onClick={() => setShowImpactReview(true)}
+                  >
+                    {impact.blockingTotal.toLocaleString('ja-JP')}か所を1件ずつ見る
+                  </Button>
+                ) : null}
+                <Button
+                  type="button"
+                  variant="primary"
+                  disabled={saving || blocked.length > 0}
+                  onClick={() => {
+                    if (impact && 'canSave' in impact && impact.blockingTotal > 0) {
+                      setShowImpactReview(true)
+                      return
+                    }
+                    void save()
+                  }}
+                >
+                  {saving ? '保存中…' : '共通情報を保存'}
                 </Button>
               </>
             )}
@@ -694,7 +826,7 @@ function EditCommonVarInner() {
                 ・消えること: この共通情報に登録した更新スケジュールも一緒に消えます。
               </p>
               <p className="text-ink-secondary">
-                ・残ること: テンプレートは残ります。{`{{var.${deleteTarget?.item.varKey ?? ''}}}`}
+                ・残ること: テンプレートは残ります。{placeholderText(deleteTarget?.item.name ?? '')}
                 と書いてある場所は、これから空欄で送られます。
               </p>
               <p className="text-ink-secondary">・残ること: すでに送ったものは変わりません。</p>

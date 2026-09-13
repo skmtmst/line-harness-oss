@@ -4,7 +4,9 @@ import type { Env } from '../index.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { hashPassword } from '../services/password-hash.js';
 
-const mail = vi.hoisted(() => ({ sendPlainMail: vi.fn(async () => {}) }));
+const mail = vi.hoisted(() => ({
+  sendPlainMail: vi.fn(async (_env: unknown, _message: { to: string; subject: string; body: string }) => {}),
+}));
 vi.mock('../services/plain-mail.js', () => ({ sendPlainMail: mail.sendPlainMail }));
 
 const turnstile = vi.hoisted(() => ({ result: { ok: true } as { ok: true } | { ok: false; reason: 'not_configured' | 'missing_token' | 'rejected' | 'unavailable' } }));
@@ -31,6 +33,25 @@ function app() {
   const instance = new Hono<Env>();
   instance.route('/', authEmail);
   return instance;
+}
+
+type AuthJson = {
+  csrfToken: string;
+  code: string;
+  error: string;
+  errors: Record<string, string>;
+  data: {
+    email: string;
+    trialDays: number;
+    deviceMarker: string;
+    tenantId: string;
+    twoFactor: boolean;
+    challengeToken: string;
+  };
+};
+
+async function json(response: Response): Promise<AuthJson> {
+  return response.json() as Promise<AuthJson>;
 }
 
 async function call(
@@ -83,7 +104,7 @@ describe('会員登録（36-4）', () => {
 
     const check = await call('GET', `/api/auth/register/check?token=${encodeURIComponent(token)}`);
     expect(check.status).toBe(200);
-    expect((await check.json()).data).toEqual({ email: 'owner@example.com', trialDays: 30 });
+    expect((await json(check)).data).toEqual({ email: 'owner@example.com', trialDays: 30 });
 
     const completed = await call('POST', '/api/auth/register/complete', {
       token,
@@ -92,7 +113,7 @@ describe('会員登録（36-4）', () => {
       password: 'Abcdefg1',
     });
     expect(completed.status).toBe(200);
-    const body = await completed.json();
+    const body = await json(completed);
     expect(body.csrfToken).toBeTruthy();
     expect(body.data.deviceMarker).toMatch(/^[A-Za-z0-9_-]{16,}$/);
     expect(completed.headers.get('set-cookie')).toContain('lh_admin_session=');
@@ -142,11 +163,11 @@ describe('会員登録（36-4）', () => {
     await call('POST', '/api/auth/register/request', validRequest);
     const token = lastMailToken();
     const completed = await call('POST', '/api/auth/register/complete', { token, tenantName: 'A', name: 'a', password: 'Abcdefg1' });
-    const marker = (await completed.json()).data.deviceMarker as string;
+    const marker = (await json(completed)).data.deviceMarker;
 
     const viaBody = await call('POST', '/api/auth/register/request', { ...validRequest, email: 'second@example.com', deviceMarker: marker });
     expect(viaBody.status).toBe(409);
-    expect((await viaBody.json()).code).toBe('device_registered');
+    expect((await json(viaBody)).code).toBe('device_registered');
 
     const viaCookie = await call('POST', '/api/auth/register/request', { ...validRequest, email: 'third@example.com' }, { headers: { cookie: `lh_signup_marker=${marker}` } });
     expect(viaCookie.status).toBe(409);
@@ -170,7 +191,7 @@ describe('会員登録（36-4）', () => {
     const token = lastMailToken();
     const res = await call('POST', '/api/auth/register/complete', { token, tenantName: '', name: '', password: 'short' });
     expect(res.status).toBe(400);
-    const body = await res.json();
+    const body = await json(res);
     expect(body.errors).toMatchObject({ tenantName: expect.any(String), name: expect.any(String), password: expect.any(String) });
     // 失敗しても URL は消費されない
     expect((await call('GET', `/api/auth/register/check?token=${token}`)).status).toBe(200);
@@ -197,7 +218,7 @@ describe('メール＋パスワードのログイン', () => {
     await seedOwner();
     const res = await call('POST', '/api/auth/password/login', { email: 'OWNER@example.com', password: 'Abcdefg1' });
     expect(res.status).toBe(200);
-    const body = await res.json();
+    const body = await json(res);
     expect(body.csrfToken).toBeTruthy();
     expect(body.data.twoFactor).toBe(false);
     expect(res.headers.get('set-cookie')).toContain('lh_admin_session=');
@@ -210,7 +231,7 @@ describe('メール＋パスワードのログイン', () => {
     expect(wrong.status).toBe(401);
     const unknown = await call('POST', '/api/auth/password/login', { email: 'nobody@example.com', password: 'Abcdefg1' });
     expect(unknown.status).toBe(401);
-    expect((await wrong.json()).error).toBe((await unknown.json()).error);
+    expect((await json(wrong)).error).toBe((await json(unknown)).error);
     expect(testDb.raw.prepare(`SELECT COUNT(*) AS n FROM login_audit WHERE action = 'fail'`).get()).toEqual({ n: 2 });
   });
 
@@ -234,7 +255,7 @@ describe('メール＋パスワードのログイン', () => {
     testDb.raw.prepare(`UPDATE staff_members SET totp_secret_enc = 'enc', totp_enabled_at = '2026-09-01T00:00:00.000+09:00' WHERE id = 's1'`).run();
     const res = await call('POST', '/api/auth/password/login', { email: 'owner@example.com', password: 'Abcdefg1' }, { env: { TOTP_ENCRYPTION_KEY: 'k' } });
     expect(res.status).toBe(200);
-    const body = await res.json();
+    const body = await json(res);
     expect(body.data.twoFactor).toBe(true);
     expect(body.data.challengeToken).toBeTruthy();
     expect(res.headers.get('set-cookie') ?? '').not.toContain('lh_admin_session=');

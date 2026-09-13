@@ -9,6 +9,13 @@ export type OperationImpactMetric = {
   friendCount: number | null;
   pendingCount?: number;
   nearestScheduledAt?: string | null;
+  /**
+   * `friendCount` が全件ではなく代表 `BROADCAST_AUDIENCE_SAMPLE_LIMIT` 件
+   * だけの合計であることを示す。省略時（`undefined`）は全件を数えている。
+   * サンプルの対象者数を切り捨てているだけなので、実際の対象者数は
+   * これ以上（下限）になる。
+   */
+  friendCountIsPartial?: boolean;
 };
 
 type PreviewCapability = Extract<OperationCapability,
@@ -30,19 +37,17 @@ function count(value: number | null | undefined): number {
   return Number(value ?? 0);
 }
 
-function earliestScheduledAt(values: Array<string | null>): string | null {
-  let earliest: { value: string; time: number } | null = null;
-  for (const value of values) {
-    if (!value) continue;
-    const time = Date.parse(value);
-    if (!Number.isFinite(time)) continue;
-    if (!earliest || time < earliest.time) earliest = { value, time };
-  }
-  return earliest?.value ?? null;
-}
+/**
+ * 対象者数を実測する配信の上限。これを超える分は件数(itemCount)には
+ * 数えるが、対象者数(friendCount)は先頭 N 件の合計(下限値)にとどめ、
+ * `friendCountIsPartial` で「概算」であることを示す。
+ * 停止対象が数千件に増えても、直前確認1回あたりのクエリ本数を
+ * 一定に保つための上限（Issue #737）。
+ */
+const BROADCAST_AUDIENCE_SAMPLE_LIMIT = 50;
 
-async function getActiveBroadcasts(db: D1Database, accountId: string | null): Promise<Broadcast[]> {
-  const accountWhere = accountId
+function activeBroadcastsWhere(accountId: string | null): string {
+  return accountId
     ? `AND (
          b.line_account_id = ?
          OR (
@@ -55,16 +60,48 @@ async function getActiveBroadcasts(db: D1Database, accountId: string | null): Pr
          )
        )`
     : '';
+}
+
+type ActiveBroadcastsAggregate = {
+  itemCount: number;
+  nearestScheduledAt: string | null;
+};
+
+/** 停止対象の件数と直近予約時刻だけを1クエリで数える。件数に比例しない。 */
+async function getActiveBroadcastsAggregate(db: D1Database, accountId: string | null): Promise<ActiveBroadcastsAggregate> {
+  const statement = db.prepare(
+    `SELECT COUNT(*) AS item_count,
+            MIN(CASE WHEN b.scheduled_at IS NOT NULL THEN b.scheduled_at END) AS nearest_scheduled_at
+       FROM broadcasts b
+      WHERE b.status IN ('scheduled', 'sending')
+      ${activeBroadcastsWhere(accountId)}`,
+  );
+  const row = accountId
+    ? await statement.bind(accountId, accountId).first<{ item_count: number | null; nearest_scheduled_at: string | null }>()
+    : await statement.first<{ item_count: number | null; nearest_scheduled_at: string | null }>();
+  return {
+    itemCount: Number(row?.item_count ?? 0),
+    nearestScheduledAt: row?.nearest_scheduled_at ?? null,
+  };
+}
+
+/**
+ * 対象者数を実測するための代表サンプル（最大 `limit` 件）を取る。
+ * 全件ではなく上限つきなので、`getBroadcastAudiencePreview` の呼び出し回数が
+ * 件数に比例せず一定に収まる。
+ */
+async function getActiveBroadcastsSample(db: D1Database, accountId: string | null, limit: number): Promise<Broadcast[]> {
   const statement = db.prepare(
     `SELECT b.*
        FROM broadcasts b
       WHERE b.status IN ('scheduled', 'sending')
-      ${accountWhere}
-      ORDER BY COALESCE(b.scheduled_at, b.created_at), b.id`,
+      ${activeBroadcastsWhere(accountId)}
+      ORDER BY COALESCE(b.scheduled_at, b.created_at), b.id
+      LIMIT ?`,
   );
   const result = accountId
-    ? await statement.bind(accountId, accountId).all<Broadcast>()
-    : await statement.all<Broadcast>();
+    ? await statement.bind(accountId, accountId, limit).all<Broadcast>()
+    : await statement.bind(limit).all<Broadcast>();
   return result.results ?? [];
 }
 
@@ -73,10 +110,9 @@ export async function getOperationImpactPreview(
   db: D1Database,
   accountId: string | null,
 ): Promise<OperationImpactPreview> {
-  const activeBroadcasts = await getActiveBroadcasts(db, accountId);
-  const [broadcastAudiences, scenarioRow, reminderRow, automationRow, autoReplyRow] = await Promise.all([
-    Promise.all(activeBroadcasts.map((broadcast) =>
-      getBroadcastAudiencePreview(db, broadcast, accountId))),
+  const [broadcastsAggregate, sampledBroadcasts, scenarioRow, reminderRow, automationRow, autoReplyRow] = await Promise.all([
+    getActiveBroadcastsAggregate(db, accountId),
+    getActiveBroadcastsSample(db, accountId, BROADCAST_AUDIENCE_SAMPLE_LIMIT),
     accountId
       ? db.prepare(
         `SELECT
@@ -150,16 +186,22 @@ export async function getOperationImpactPreview(
       ).first<CountRow>(),
   ]);
 
+  const broadcastAudiences = await Promise.all(
+    sampledBroadcasts.map((broadcast) => getBroadcastAudiencePreview(db, broadcast, accountId)),
+  );
+
   const hasUnknownBroadcastAudience = broadcastAudiences.some((preview) => preview.count === null);
   const broadcastFriendCount = hasUnknownBroadcastAudience
     ? null
     : broadcastAudiences.reduce((sum, preview) => sum + count(preview.count), 0);
+  const friendCountIsPartial = broadcastsAggregate.itemCount > sampledBroadcasts.length;
 
   return {
     broadcast_dispatch: {
-      itemCount: activeBroadcasts.length,
+      itemCount: broadcastsAggregate.itemCount,
       friendCount: broadcastFriendCount,
-      nearestScheduledAt: earliestScheduledAt(activeBroadcasts.map((broadcast) => broadcast.scheduled_at)),
+      nearestScheduledAt: broadcastsAggregate.nearestScheduledAt,
+      ...(friendCountIsPartial ? { friendCountIsPartial: true } : {}),
     },
     scenario_dispatch: {
       itemCount: count(scenarioRow?.item_count),

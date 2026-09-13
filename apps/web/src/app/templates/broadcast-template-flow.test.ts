@@ -26,8 +26,25 @@ describe('コンテンツテンプレートから一斉配信への引用導線'
   })
 
   it('loads both message and content templates into the broadcast picker', () => {
-    expect(formSource).toContain('api.templates.list()')
+    // #645 差し戻し: 選んでいるアカウントを必ず渡し、未公開・他アカウントを候補にしない。
+    expect(formSource).toContain('api.templates.list(undefined, requestAccountId)')
+    expect(formSource).toContain('filterSendableTemplates(templateResult.data')
     expect(formSource).toContain('api.broadcastMessageAssets.list')
-    expect(formSource).toContain('コンテンツのテンプレートを引用')
+    expect(formSource).toContain('テンプレートから選ぶ')
+  })
+
+  it('ignores stale template responses after switching accounts (generation check)', () => {
+    // 独立審査指摘4: アカウント切替で古い応答が混ざらないよう世代で照合する。
+    expect(formSource).toContain('createLoadGeneration()')
+    expect(formSource).toContain('.next()')
+    expect(formSource).toContain('.isCurrent(')
+    expect(formSource).toContain('if (!isCurrent()) return')
+  })
+
+  it('drops previous-account templates and bubbles on account switch', () => {
+    // 独立審査指摘4: 旧候補・選択・吹き出しを残さない。持ち主不明は保つ。
+    expect(formSource).toContain('setSelectedTemplate(null)')
+    expect(formSource).toContain('templateAccountId')
+    expect(formSource).toContain('owner == null || owner === selectedAccountId')
   })
 })

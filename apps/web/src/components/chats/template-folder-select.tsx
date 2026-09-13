@@ -50,6 +50,7 @@ export default function TemplateFolderSelect({
     >
       <div className={`rounded-control ${open ? 'ring-2 ring-accent/20' : ''}`}>
         <Button
+          size="field"
           aria-label="テンプレートのフォルダ"
           aria-haspopup="listbox"
           aria-expanded={open}

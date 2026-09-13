@@ -1,0 +1,194 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.topActions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.metric {
+  display: grid;
+  gap: 8px;
+  min-height: 92px;
+}
+
+.metric p {
+  color: var(--color-ink-faint);
+  font-size: var(--text-caption);
+  font-weight: 700;
+}
+
+.metric strong {
+  font-size: 26px;
+  line-height: 1.2;
+}
+
+.metricSuccess { color: var(--color-success); }
+.metricInfo { color: var(--color-info); }
+.metricWarning { color: var(--color-warning); }
+.metricDanger { color: var(--color-danger); }
+
+.columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 390px;
+  align-items: start;
+  gap: 16px;
+}
+
+.main,
+.side {
+  min-width: 0;
+}
+
+.main,
+.side {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.sectionNote {
+  margin: -4px 16px 12px;
+  color: var(--color-ink-faint);
+  font-size: var(--text-caption);
+}
+
+.tableWrap {
+  min-width: 0;
+}
+
+.cellMain {
+  display: block;
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.readNote {
+  margin: 12px 16px 16px;
+}
+
+.cellSub {
+  display: block;
+  overflow: hidden;
+  margin-top: 2px;
+  color: var(--color-ink-faint);
+  font-size: var(--text-nano);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 12px;
+  color: var(--color-ink-faint);
+  font-size: var(--text-caption);
+}
+
+.sideBody {
+  display: grid;
+  gap: 10px;
+  padding: 14px 16px 16px;
+}
+
+.fact {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: baseline;
+}
+
+.fact dt {
+  color: var(--color-ink-faint);
+  font-size: var(--text-caption);
+}
+
+.fact dd {
+  color: var(--color-ink);
+  font-size: var(--text-body);
+  font-weight: 700;
+  text-align: right;
+}
+
+.attention {
+  display: grid;
+  gap: 10px;
+  padding: 0 16px 16px;
+}
+
+.attention p,
+.attention span {
+  color: var(--color-ink-faint);
+  font-size: var(--text-caption);
+  line-height: 1.6;
+}
+
+.attention strong {
+  color: var(--color-danger);
+  font-size: var(--text-body);
+}
+
+.previewAction {
+  display: block;
+  margin-top: 12px;
+  padding: 8px 12px;
+  border-radius: var(--radius-control);
+  background: var(--color-success);
+  color: white;
+  font-weight: 700;
+  text-align: center;
+}
+
+/* 1440pxでは右390pxを下へ送り、一覧に読むための幅を渡す。 */
+@media (max-width: 1535px) {
+  .columns {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .side {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .topActions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .summary,
+  .side {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/*
+  LINE要求ID。**長いので折り返さず、はみ出させない。**
+  問い合わせのときに写せればよく、全部を一度に見せる必要はない。
+*/
+.requestId {
+  display: block;
+  max-width: 14ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-ink-secondary);
+}

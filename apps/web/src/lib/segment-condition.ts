@@ -66,6 +66,8 @@ export function isRuleComplete(rule: SegmentRule): boolean {
       return typeof v?.fieldId === 'string' && v.fieldId !== ''
     case 'scenario_state':
       return typeof v?.scenarioId === 'string' && v.scenarioId !== ''
+    case 'scenario_subscribed':
+      return typeof rule.value === 'string' && rule.value !== ''
     case 'score_range': {
       const minProvided = v?.min !== null && v?.min !== undefined && v.min !== ''
       const maxProvided = v?.max !== null && v?.max !== undefined && v.max !== ''

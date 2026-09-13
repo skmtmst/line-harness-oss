@@ -64,8 +64,11 @@ export default function FolderAddDialog({
     setSaving(true)
     setError('')
     try {
+      // `api.folders.update` の実体は部分更新をそのまま送る。変数にまとめて、
+      // 名前だけ直して選んだ色を捨てる以前の挙動へ戻さない。
+      const folderUpdates = { name: trimmed, color }
       const res = folder
-        ? await api.folders.update(folder.id, { name: trimmed })
+        ? await api.folders.update(folder.id, folderUpdates)
         : await api.folders.create({ kind, name: trimmed, color })
       if (!res.success) {
         setError(res.error)
@@ -136,7 +139,7 @@ export default function FolderAddDialog({
             disabled={saving || !name.trim()}
             className="bg-accent-deep hover:brightness-92 text-on-accent rounded-control px-4 py-2 text-sm font-bold disabled:opacity-50"
           >
-            {saving ? '追加中…' : '追加する'}
+            {saving ? (folder ? '保存中…' : '追加中…') : (folder ? '変更を保存' : '追加する')}
           </button>
         </div>
       </div>

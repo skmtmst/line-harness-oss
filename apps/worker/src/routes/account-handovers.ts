@@ -219,6 +219,21 @@ accountHandovers.post('/api/account-handovers/:id/preview', requireRole('owner',
         422,
       );
     }
+    /*
+      **申告の人数をうのみにしない。** 画面の表示数・手作り呼び出しが
+      そのまま「事前確認の結果」として残るのを、元の友だち数を
+      数え直して防ぐ。合わなければ確認のやり直しを求める。
+    */
+    const actual = await c.env.DB.prepare(
+      'SELECT COUNT(*) AS count FROM friends WHERE line_account_id = ?',
+    ).bind(handover.from_account_id).first<{ count: number }>();
+    const actualTotal = actual?.count ?? 0;
+    if (total !== actualTotal) {
+      return c.json(
+        { success: false, error: `元の友だち数が変わっています（今は${actualTotal}人）。事前確認をやり直してください` },
+        422,
+      );
+    }
     const saved = await savePreview(c.env.DB, handover.id, {
       sourceFriendTotal: total,
       counts: value,

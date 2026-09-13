@@ -187,10 +187,12 @@ export default function Sidebar({
       const mySeq = ++seq
       try {
         const { api } = await import('@/lib/api')
-        const [unanswered, nen, accounts] = await Promise.allSettled([
+        // 運用警告は要約APIを1回だけ呼ぶ。件数分の個別取得は呼ばない(#630)。
+        // ログ本文は要らない(警告数だけ)。staff に見える分だけが返る。
+        const [unanswered, nen, summary] = await Promise.allSettled([
           api.inbox.unanswered.count(),
           api.nenMembers.overview(),
-          api.health.accounts(),
+          api.health.summary(),
         ])
         if (cancelled || mySeq !== seq) return
         if (unanswered.status === 'fulfilled' && unanswered.value.success) {
@@ -200,19 +202,8 @@ export default function Sidebar({
         if (nen.status === 'fulfilled' && nen.value.success) {
           setPendingPhotoCount(nen.value.data.pendingPhotos)
         }
-        if (accounts.status === 'fulfilled' && accounts.value.success) {
-          const health = await Promise.allSettled(
-            accounts.value.data.map((account) => api.health.getHealth(account.id)),
-          )
-          if (cancelled || mySeq !== seq) return
-          setOperationIssueCount(
-            health.filter(
-              (result) =>
-                result.status === 'fulfilled' &&
-                result.value.success &&
-                (result.value.data.riskLevel === 'danger' || result.value.data.riskLevel === 'warning'),
-            ).length,
-          )
+        if (summary.status === 'fulfilled' && summary.value.success) {
+          setOperationIssueCount(summary.value.data.warningCount + summary.value.data.dangerCount)
         }
       } catch {
         // サイレント失敗

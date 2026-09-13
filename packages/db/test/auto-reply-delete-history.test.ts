@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
-import { deleteAutoReply } from '../src/auto-replies.js'
+import { deleteAutoReply, getAutoReplyHitCountSince } from '../src/auto-replies.js'
 
 const packageRoot = join(dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -17,6 +17,9 @@ function asD1(sqlite: Database.Database): D1Database {
             async run() {
               const result = statement.run(...params)
               return { success: true, results: [], meta: { changes: result.changes } }
+            },
+            async first<T>() {
+              return (statement.get(...params) as T) ?? null
             },
           }
         },
@@ -42,5 +45,25 @@ describe('自動応答を削除した後の実行履歴', () => {
 
     expect(sqlite.prepare('SELECT COUNT(*) AS count FROM auto_replies').get()).toEqual({ count: 0 })
     expect(sqlite.prepare('SELECT auto_reply_id FROM auto_reply_hits').get()).toEqual({ auto_reply_id: 'rule-1' })
+  })
+
+  it('公開前確認の一致数は指定日時より後だけを数える', async () => {
+    const sqlite = new Database(':memory:')
+    sqlite.exec(readFileSync(join(packageRoot, 'bootstrap.sql'), 'utf8'))
+    sqlite.prepare(
+      `INSERT INTO auto_replies (id, keyword, match_type, response_type, response_content)
+       VALUES ('rule-1', '予約', 'contains', 'text', 'ご予約ですね')`,
+    ).run()
+    const insert = sqlite.prepare(
+      `INSERT INTO auto_reply_hits (id, auto_reply_id, matched_keyword, hit_at)
+       VALUES (?, 'rule-1', '予約', ?)`,
+    )
+    insert.run('hit-old', '2026-07-01T00:00:00.000Z')
+    insert.run('hit-new-1', '2026-08-20T00:00:00.000Z')
+    insert.run('hit-new-2', '2026-08-25T00:00:00.000Z')
+
+    await expect(
+      getAutoReplyHitCountSince(asD1(sqlite), 'rule-1', '2026-08-01T00:00:00.000Z'),
+    ).resolves.toBe(2)
   })
 })

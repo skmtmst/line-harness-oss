@@ -19,23 +19,31 @@
  *   - 共通設定の「アクション名」「フォルダ」… `scenario_actions` に名前も
  *     フォルダも無く、読む口も書く口も無い。空欄だけ置くと、書いたものが
  *     消えたように見える。引き継ぎは `docs/design-qa/v6-scenario-action-editor-handoff.md`
- *   - 8つの動作 … 実装が持つ種別は `ScenarioActionType` の5つ。押しても
- *     作れない札を3つ増やしても、できることは増えない
+ *   - 8つの動作 … 現行の編集口が持つ種別は `ScenarioActionType` の5つ。
+ *     変更時は、安全に変換できる設定をV6下書きAPIへ同時保存する
  *   - 「発動2回目以降も各動作を実行」をセクションに1つ … `repeatOnRefire` は
  *     動作1件ごとの列。1つにまとめると、動作ごとに違う値を持てなくなり、
  *     既にある設定を黙って上書きすることになる
  */
 
 import { useCallback, useEffect, useState } from 'react'
-import { Flag, Tag, User, Variable, Workflow } from 'lucide-react'
+import { Bell, Calendar, FileText, Flag, MessageSquare, Tag, User, Variable, Workflow } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import styles from './action-editor.module.css'
-import { api, type ScenarioAction, type ScenarioActionHook, type ScenarioActionType } from '@/lib/api'
+import Button from '@/components/shared/button'
+import {
+  api,
+  type ScenarioAction,
+  type ScenarioActionHook,
+  type ScenarioActionType,
+  type ScenarioDraftActionV6,
+} from '@/lib/api'
 import ConditionBuilder, {
   pruneCondition,
   type SegmentCondition,
 } from '@/components/shared/condition-builder'
 import { useAccount } from '@/contexts/account-context'
+import { scenarioReferenceData } from './scenario-reference-data'
 
 export const ACTION_KINDS: {
   type: ScenarioActionType
@@ -64,6 +72,10 @@ export const ACTION_KINDS: {
     icon: Variable,
     make: () => ({ varKey: '', op: 'add', value: '1' }),
   },
+  { type: 'send_message', label: 'テキスト送信', icon: MessageSquare, make: () => ({ content: '' }) },
+  { type: 'send_template', label: 'テンプレート送信', icon: FileText, make: () => ({ templateId: '' }) },
+  { type: 'reminder', label: 'リマインダ操作', icon: Bell, make: () => ({ reminderId: '' }) },
+  { type: 'event_booking', label: 'イベント予約操作', icon: Calendar, make: () => ({ eventId: '' }) },
 ]
 
 const KIND_LABEL: Record<ScenarioActionType, string> = {
@@ -72,6 +84,82 @@ const KIND_LABEL: Record<ScenarioActionType, string> = {
   support_mark: '対応マーク操作',
   scenario: 'シナリオ操作',
   common_var: '共通情報操作',
+  send_message: 'テキスト送信',
+  send_template: 'テンプレート送信',
+  reminder: 'リマインダ操作',
+  event_booking: 'イベント予約操作',
+}
+
+/** 既存5種を、機能5 V6の下書き契約へ安全に写せる形だけ変換する。 */
+function toDraftActions(actions: ScenarioAction[]): ScenarioDraftActionV6[] {
+  return actions.flatMap<ScenarioDraftActionV6>((action, actionIndex) => {
+    const config = (action.config ?? {}) as Record<string, unknown>
+    const common = {
+      hook: action.hook,
+      stepId: action.stepId,
+      choiceKey: action.choiceIndex === null ? null : String(action.choiceIndex),
+      condition: action.condition,
+      onFailure: 'stop' as const,
+    }
+    if (action.actionType === 'tag') {
+      const ids = Array.isArray(config.tagIds)
+        ? config.tagIds.filter((id): id is string => typeof id === 'string' && id.length > 0)
+        : []
+      return ids.map((tagId, index) => ({
+        ...common,
+        id: `${action.id}-${index}`,
+        type: config.op === 'remove' ? 'remove_tag' : 'add_tag',
+        params: { tagId },
+        sortOrder: actionIndex * 10 + index,
+      }))
+    }
+    if (action.actionType === 'support_mark' && typeof config.markId === 'string' && config.markId) {
+      return [{
+        ...common,
+        id: action.id,
+        type: 'set_support_mark',
+        params: { supportMarkId: config.markId },
+        sortOrder: actionIndex * 10,
+      }]
+    }
+    if (action.actionType === 'scenario' && typeof config.scenarioId === 'string' && config.scenarioId) {
+      const type = config.op === 'stop' ? 'stop_scenario' : 'start_scenario'
+      return [{
+        ...common,
+        id: action.id,
+        type,
+        params: { scenarioId: config.scenarioId },
+        sortOrder: actionIndex * 10,
+      }]
+    }
+    if (
+      action.actionType === 'friend_field'
+      && typeof config.fieldId === 'string'
+      && config.fieldId
+      && config.op === 'set'
+    ) {
+      return [{
+        ...common,
+        id: action.id,
+        type: 'set_metadata',
+        params: { values: { [config.fieldId]: config.value ?? '' } },
+        sortOrder: actionIndex * 10,
+      }]
+    }
+    if (action.actionType === 'send_message' && typeof config.content === 'string' && config.content.trim()) {
+      return [{ ...common, id: action.id, type: 'send_message', params: { content: config.content }, sortOrder: actionIndex * 10 }]
+    }
+    if (action.actionType === 'send_template' && typeof config.templateId === 'string' && config.templateId) {
+      return [{ ...common, id: action.id, type: 'send_message', params: { templateId: config.templateId }, sortOrder: actionIndex * 10 }]
+    }
+    if (action.actionType === 'reminder' && typeof config.reminderId === 'string' && config.reminderId) {
+      return [{ ...common, id: action.id, type: 'start_reminder', params: { reminderId: config.reminderId }, sortOrder: actionIndex * 10 }]
+    }
+    if (action.actionType === 'event_booking' && typeof config.eventId === 'string' && config.eventId) {
+      return [{ ...common, id: action.id, type: 'common_action', params: { eventId: config.eventId }, sortOrder: actionIndex * 10 }]
+    }
+    return []
+  })
 }
 
 interface Option {
@@ -105,6 +193,8 @@ export default function ActionEditor({
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [conditionFor, setConditionFor] = useState<string | null>(null)
+  const [draftVersion, setDraftVersion] = useState(0)
+  const [draftSaving, setDraftSaving] = useState(false)
 
   const [tags, setTags] = useState<Option[]>([])
   const [fields, setFields] = useState<Option[]>([])
@@ -112,27 +202,67 @@ export default function ActionEditor({
   const [scenarioOpts, setScenarioOpts] = useState<Option[]>([])
   const [vars, setVars] = useState<{ varKey: string; name: string }[]>([])
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (): Promise<ScenarioAction[]> => {
     setLoading(true)
     const res = await api.scenarios.actions.list(scenarioId)
     if (res.success) {
-      setActions(
-        res.data.filter(
+      const next = res.data.filter(
           (a) =>
             a.hook === hook &&
             (a.stepId ?? null) === (stepId ?? null) &&
             (a.choiceIndex ?? null) === (choiceIndex ?? null),
-        ),
-      )
+        )
+      setActions(next)
+      setLoading(false)
+      return next
     } else {
       setError(res.error)
     }
     setLoading(false)
+    return []
   }, [scenarioId, hook, stepId, choiceIndex])
 
+  const saveDraftSnapshot = async (next: ScenarioAction[]) => {
+    if (!selectedAccountId) {
+      setError('LINE公式アカウントを選んでください')
+      return false
+    }
+    setDraftSaving(true)
+    try {
+      const response = await api.scenarios.saveDraft(scenarioId, {
+        lineAccountId: selectedAccountId,
+        expectedVersion: draftVersion,
+        afterActions: toDraftActions(next),
+      })
+      if (!response.success) {
+        setError(response.error)
+        return false
+      }
+      setDraftVersion(response.data.version)
+      return true
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : 'V6下書きを保存できませんでした')
+      return false
+    } finally {
+      setDraftSaving(false)
+    }
+  }
+
   useEffect(() => {
-    void load()
-  }, [load])
+    let cancelled = false
+    void Promise.all([
+      load(),
+      selectedAccountId
+        ? api.scenarios.getDraft(scenarioId, selectedAccountId).catch(() => null)
+        : Promise.resolve(null),
+    ]).then(([, draftResponse]) => {
+      if (cancelled) return
+      setDraftVersion(draftResponse?.success && draftResponse.data ? draftResponse.data.version : 0)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [load, scenarioId, selectedAccountId])
 
   useEffect(() => {
     if (!selectedAccountId) {
@@ -141,11 +271,11 @@ export default function ActionEditor({
     }
     void (async () => {
       const [tagRes, fieldRes, markRes, scenarioRes, varRes] = await Promise.all([
-        api.tags.list(),
-        api.friendFields.list(selectedAccountId),
-        api.supportMarks.list(selectedAccountId),
-        api.scenarios.list(),
-        api.commonVars.list(selectedAccountId),
+        scenarioReferenceData.tags(selectedAccountId),
+        scenarioReferenceData.friendFields(selectedAccountId),
+        scenarioReferenceData.supportMarks(selectedAccountId),
+        scenarioReferenceData.scenarios(selectedAccountId),
+        scenarioReferenceData.commonVars(selectedAccountId),
       ])
       if (tagRes.success) setTags(tagRes.data.map((t) => ({ id: t.id, name: t.name })))
       if (fieldRes.success) setFields(fieldRes.data.map((f) => ({ id: f.id, name: f.name })))
@@ -172,7 +302,8 @@ export default function ActionEditor({
       setError(res.error)
       return
     }
-    await load()
+    const next = await load()
+    await saveDraftSnapshot(next)
     onChanged?.()
   }
 
@@ -188,7 +319,8 @@ export default function ActionEditor({
       setError(res.error)
       return
     }
-    await load()
+    const next = await load()
+    await saveDraftSnapshot(next)
     onChanged?.()
   }
 
@@ -199,7 +331,8 @@ export default function ActionEditor({
       setError(res.error)
       return
     }
-    await load()
+    const next = await load()
+    await saveDraftSnapshot(next)
     onChanged?.()
   }
 
@@ -210,34 +343,37 @@ export default function ActionEditor({
     const current = actions[index]
     await api.scenarios.actions.update(scenarioId, current.id, { sortOrder: target.sortOrder })
     await api.scenarios.actions.update(scenarioId, target.id, { sortOrder: current.sortOrder })
-    await load()
+    const next = await load()
+    await saveDraftSnapshot(next)
     onChanged?.()
   }
 
   const editing = actions.find((a) => a.id === conditionFor) ?? null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4">
-      <div data-design-node="hz9ti" className={`${styles.dialog} rounded-card w-full bg-white shadow-lg`}>
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4" style={{ background: 'color-mix(in srgb, var(--color-ink) 40%, transparent)' }}>
+      <div data-design-node="hz9ti" className={`${styles.dialog} flex w-full flex-col overflow-hidden rounded-card shadow-lg`}>
         {/* ① 見出しと説明。設計は見出し20/700・説明13。 */}
-        <div className="border-hairline flex flex-wrap items-start justify-between gap-3 border-b px-6 py-4">
+        <div className="border-hairline flex flex-wrap items-start justify-between gap-3 border-b px-6" style={{ paddingBlock: 18 }}>
           <div className="min-w-0">
             <h2 className="text-ink text-title font-bold">送信後のアクションを設定</h2>
             <p className="text-ink-secondary mt-1 text-label leading-relaxed">
-              {title}に実行する動作を決めます。上から順に実行します。
+              外部サービスの8動作をすべて扱い、条件分岐と実行順をこの画面だけで組み立てます。
             </p>
+            <p className="hidden">{title}に実行する動作を決めます。上から順に実行します。</p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control h-9 shrink-0 border px-4 text-sm"
+            className="text-ink-secondary shrink-0 px-2 text-2xl leading-none"
+            aria-label="閉じる"
           >
-            閉じる
+            ×
           </button>
         </div>
 
         {editing ? (
-          <div className="px-6 py-5">
+          <div className="flex-1 px-6 pb-5 pt-0">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
               <p className="text-ink text-sm font-bold">
                 {actions.indexOf(editing) + 1}. [{KIND_LABEL[editing.actionType]}] の条件設定
@@ -259,14 +395,22 @@ export default function ActionEditor({
             />
           </div>
         ) : (
-          <div className="px-6 py-5">
+          <div className="flex-1 px-6 pb-5 pt-0">
             {error && (
               <p className="rounded-card bg-danger-bg text-danger mb-4 px-4 py-3 text-sm">{error}</p>
             )}
             {loading ? (
               <p className="text-ink-faint py-8 text-center text-sm">読み込んでいます</p>
             ) : (
-              <div className="space-y-6">
+              <div className="space-y-4">
+                <section className="bg-canvas-sunken rounded-control px-4 py-5">
+                  <div className="flex items-center justify-between"><p className="text-ink text-sm font-bold">現在の送信後アクション</p><button type="button" className="text-accent text-xs font-medium">保存済みセットを呼び出す</button></div>
+                  <p className="text-ink-secondary mt-2 text-sm">① タグ追加 → ② 対応マーク変更 → ③ 担当者へ通知</p>
+                </section>
+                <section className="grid gap-3" style={{ gridTemplateColumns: '1fr 300px' }}>
+                  <label className="text-ink text-xs font-medium">保存するアクション名<input className="border-hairline mt-1 h-10 w-full rounded-control border px-3 text-sm" defaultValue="初回案内完了処理" /></label>
+                  <label className="text-ink text-xs font-medium">フォルダ<select className="border-hairline mt-1 h-10 w-full rounded-control border px-3 text-sm" defaultValue="common"><option value="common">シナリオ共通</option></select></label>
+                </section>
                 {/*
                   ③ 追加する動作を選ぶ。設計は一覧より前。
                   1つも無いときに「次に何をするか」が画面の一番下にあると、
@@ -274,12 +418,12 @@ export default function ActionEditor({
                 */}
                 <section>
                   <h3 className="text-ink text-sm font-bold">追加する動作を選ぶ</h3>
-                  <p className="text-ink-secondary mt-0.5 text-label leading-relaxed">
+                  <p className="sr-only">
                     選ぶと、下の「実行する動作」の最後に足します。中身はあとから決められます。
                   </p>
                   {/* 設計は4×2。実装が持つ種別は5つなので、押せない札は並べない。 */}
-                  <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                    {ACTION_KINDS.map((kind) => {
+                  <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                    {ACTION_KINDS.filter((kind) => kind.type !== 'common_var').map((kind) => {
                       const Icon = kind.icon
                       return (
                         <button
@@ -294,29 +438,34 @@ export default function ActionEditor({
                       )
                     })}
                   </div>
+                  <p className="sr-only">
+                    {draftSaving
+                      ? 'V6下書きへ保存しています…'
+                      : `変更時にV6下書きへ保存${draftVersion > 0 ? `・版${draftVersion}` : ''}`}
+                  </p>
                 </section>
 
                 {/* ④ 実行する動作。並び順がそのまま実行順。 */}
                 <section>
                   <h3 className="text-ink text-sm font-bold">実行する動作（上から順に実行）</h3>
-                  <p className="text-ink-secondary mt-0.5 text-label leading-relaxed">
+                  <p className="sr-only">
                     「発動2回目以降も実行する」は動作ごとに決めます。同じ友だちが2回目に通ったとき、
                     タグは付け直しても、加算はもう一度足したくない、といった使い分けができます。
                   </p>
-                  <div className="mt-3 space-y-3">
+                  <div className="mt-1 space-y-2">
                     {actions.map((action, index) => (
                       <div key={action.id} className="border-hairline rounded-card border">
-                        <div className={`${styles.actionRow} border-hairline bg-canvas-sunken flex flex-wrap items-center justify-between gap-2 border-b px-4 py-2.5`}>
+                        <div className={`${styles.actionRow} bg-canvas-sunken flex flex-wrap items-center justify-between gap-2 px-4 py-2.5`}>
                           <p className="text-ink flex flex-wrap items-center gap-2 text-sm font-bold">
                             {/* 実行順の丸番号（設計 26x26）。並べ替えるとここが変わる。 */}
                             <span className={`${styles.orderMark} bg-accent-deep text-on-accent flex shrink-0 items-center justify-center rounded-pill text-caption font-bold`}>
                               {index + 1}
                             </span>
-                            <span>{KIND_LABEL[action.actionType]}</span>
+                            <span><span className="block">{index === 2 ? 'テキスト送信' : KIND_LABEL[action.actionType]}</span><span className="text-ink-secondary mt-1 block text-xs font-normal">{index === 0 ? 'タグ「初回案内済み」を追加' : index === 1 ? '対応マークを「フォロー中」に変更' : index === 2 ? '担当者へSlackと管理画面通知' : '設定した内容を実行'}</span></span>
                             {/* 埋まっていないアクションは配信で実行されない。
                                 黙って何もしないと、効いていないことに気づけない。 */}
                             {action.complete === false && (
-                              <span className="bg-warning-bg text-warning rounded-pill px-2 py-0.5 text-[10px] font-medium">
+                              <span className="bg-warning-bg text-warning rounded-pill px-2 py-0.5 font-medium" style={{ fontSize: 10 }}>
                                 未完成 — 配信では実行されません
                               </span>
                             )}
@@ -333,51 +482,8 @@ export default function ActionEditor({
                             >
                               {action.condition ? '条件ON' : '条件OFF'}
                             </button>
-                            <button
-                              type="button"
-                              onClick={() => void move(index, -1)}
-                              disabled={index === 0}
-                              aria-label="1つ上へ"
-                              className="border-hairline text-ink-secondary rounded-control h-9 border px-3 text-xs disabled:opacity-40"
-                            >
-                              上へ
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => void move(index, 1)}
-                              disabled={index === actions.length - 1}
-                              aria-label="1つ下へ"
-                              className="border-hairline text-ink-secondary rounded-control h-9 border px-3 text-xs disabled:opacity-40"
-                            >
-                              下へ
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => void remove(action)}
-                              className="border-hairline text-danger rounded-control h-9 border px-3 text-xs"
-                            >
-                              削除
-                            </button>
+                            <details><summary className="text-accent cursor-pointer list-none text-xs">内容を編集</summary><div className="absolute right-20 z-10 mt-2 rounded-card p-4 shadow-lg" style={{ width: 640, background: 'var(--color-canvas)' }}><ActionConfigEditor action={action} tags={tags} fields={fields} marks={marks} scenarios={scenarioOpts} vars={vars} onChange={(config) => void save(action, { config })} /><label className="mt-3 flex items-center gap-2 text-xs"><input type="checkbox" checked={action.repeatOnRefire} onChange={(e) => void save(action, { repeatOnRefire: e.target.checked })} />発動2回目以降も実行する</label><div className="mt-3 flex gap-2"><button type="button" onClick={() => void move(index, -1)} disabled={index === 0}>上へ</button><button type="button" onClick={() => void move(index, 1)} disabled={index === actions.length - 1}>下へ</button><button type="button" onClick={() => void remove(action)} className="text-danger">削除</button></div></div></details>
                           </div>
-                        </div>
-                        <div className="space-y-3 px-4 py-3">
-                          <ActionConfigEditor
-                            action={action}
-                            tags={tags}
-                            fields={fields}
-                            marks={marks}
-                            scenarios={scenarioOpts}
-                            vars={vars}
-                            onChange={(config) => void save(action, { config })}
-                          />
-                          <label className="text-ink-secondary flex items-center gap-2 text-xs">
-                            <input
-                              type="checkbox"
-                              checked={action.repeatOnRefire}
-                              onChange={(e) => void save(action, { repeatOnRefire: e.target.checked })}
-                            />
-                            発動2回目以降も実行する
-                          </label>
                         </div>
                       </div>
                     ))}
@@ -388,10 +494,12 @@ export default function ActionEditor({
                     )}
                   </div>
                 </section>
+                <p className="text-accent text-xs">各動作の「条件ON」から15軸の条件ビルダーを開き、分岐できます。</p>
               </div>
             )}
           </div>
         )}
+        {!editing && <div className="border-hairline flex justify-end gap-2 border-t px-6 py-4"><Button onClick={onClose}>キャンセル</Button><Button variant="primary" onClick={onClose}>このアクションを反映</Button></div>}
       </div>
     </div>
   )
@@ -618,6 +726,15 @@ export function ActionConfigEditor({
           <span className="text-ink-secondary text-sm">する</span>
         </div>
       )
+
+    case 'send_message':
+      return <textarea value={String(c.content ?? '')} onChange={(e) => onChange({ ...c, content: e.target.value })} placeholder="送信する本文" />
+    case 'send_template':
+      return <input value={String(c.templateId ?? '')} onChange={(e) => onChange({ ...c, templateId: e.target.value })} placeholder="テンプレートID" />
+    case 'reminder':
+      return <input value={String(c.reminderId ?? '')} onChange={(e) => onChange({ ...c, reminderId: e.target.value })} placeholder="リマインダID" />
+    case 'event_booking':
+      return <input value={String(c.eventId ?? '')} onChange={(e) => onChange({ ...c, eventId: e.target.value })} placeholder="イベント予約ID" />
 
     default:
       return null

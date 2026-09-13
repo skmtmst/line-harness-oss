@@ -121,7 +121,7 @@ export const LEGAL_LINKS = {
 export const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || null
 
 /** ログイン前に開ける画面。`app-shell` と `auth-guard` の両方がこれを見る（片方だけ足すと壊れる）。 */
-export const PUBLIC_AUTH_PATHS = ['/login', '/login/two-factor', '/register', '/register/sent', '/register/complete', '/password/forgot', '/password/reset'] as const
+export const PUBLIC_AUTH_PATHS = ['/login', '/login/two-factor', '/staff/invite', '/register', '/register/sent', '/register/complete', '/password/forgot', '/password/reset'] as const
 
 export function isPublicAuthPath(pathname: string | null | undefined): boolean {
   if (!pathname) return false

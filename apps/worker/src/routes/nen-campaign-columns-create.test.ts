@@ -97,7 +97,7 @@ describe('POST /api/nen-campaigns/columns', () => {
     expect(await response.json()).toMatchObject({ success: true, data: { id: expect.any(String) } });
     expect(mocks.canAccess).toHaveBeenCalledWith(expect.anything(), expect.anything(), ['account-a']);
     expect(state.preparedSql).toHaveLength(2);
-    expect(state.preparedSql[1]).toContain("VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?)");
+    expect(state.preparedSql[1]).toContain("VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?, ?, ?, ?, ?, ?, ?)");
     expect(state.insertBinds).toEqual([
       expect.any(String),
       'NEN-Guide',
@@ -109,6 +109,11 @@ describe('POST /api/nen-campaigns/columns', () => {
       'https://cdn.example.com/NEN-Guide.jpg',
       '2026-08-31T01:30:00.000Z',
       'account-a',
+      'all',
+      null,
+      null,
+      null,
+      null,
       '2026-08-31 11:30:00',
       '2026-08-31 11:30:00',
     ]);

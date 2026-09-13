@@ -27,6 +27,7 @@ describe('V6 機能20 分析', () => {
     ]) expect(API).toContain(path)
     expect(PAGE).toContain('api.analytics.v6Funnels.list')
     expect(PAGE).toContain('api.analytics.runCross')
+    expect(API).not.toContain('`/api/analytics/cross?account_id=')
     expect(PAGE).not.toContain('api.funnels.create')
     expect(PAGE).not.toContain('api.funnels.result')
   })
@@ -70,5 +71,38 @@ describe('V6 機能20 分析', () => {
     expect(PAGE).toContain('結果の保存と個人一覧への移動は、統括・管理者だけが行えます。')
     expect(PAGE).toContain('canManage && <Button onClick={() => void prepareCrossAudience()}')
     expect(PAGE).toContain('canManage && <Button onClick={() => void prepareFunnelAudience()}')
+  })
+
+  it('結果待ちは打ち切りと間隔延長があり、無限に叩かない(点検#508の中2)', () => {
+    expect(PAGE).not.toContain('setInterval')
+    // board #633独立差し戻し: 2分で止めず5分cronを待つ。打ち切りは最短目安+余裕(上限あり)。
+    // board #633独立審査: 確認失敗のbackoffを積む前にも打ち切りを見る。
+    expect(PAGE).toContain('stopIfDeadlinePassed')
+    expect(PAGE).toContain('Date.now() < deadline')
+    expect(PAGE).toContain('CROSS_AUTO_POLL_MAX_MS')
+    // board #633独立再審査: 打ち切り後もrunを保持し再接続する。新規の送り直しは促さない。
+    expect(PAGE).toContain('自動の確認を止めました')
+    expect(PAGE).toContain('結果をもう一度確認')
+    expect(PAGE).not.toContain('時間切れです。条件をゆるめて集計し直してください')
+    expect(PAGE).toContain('attempts < 10 ? 3000 : 10000')
+  })
+
+  it('一覧の取得失敗は空表示と分け、実行制限は運用の言葉で出す(点検#508の中3・中4)', () => {
+    expect(PAGE).toContain('友だち情報欄を読み込めませんでした。開き直してください。')
+    expect(PAGE).toContain('ファネルを読み込めませんでした。開き直してください。')
+    expect(PAGE).toContain('analytics_cross_busy')
+    expect(PAGE).toContain('他の集計が動いています。終わってからもう一度押してください')
+    expect(PAGE).toContain('analytics_funnel_too_soon')
+    expect(PAGE).toContain('さきほど集計したばかりです。少し待ってから押してください')
+  })
+
+  it('200件で切れるときは注意を出し、CSVも範囲内と書く(点検#508の中5)', () => {
+    expect(PAGE).toContain('overview.hasMore')
+    expect(PAGE).toContain('200件まで表示しています。探す言葉を足して絞ってください。CSVの書き出しも、表示している範囲だけが入ります。')
+  })
+
+  it('未集計のファネルは壊れた表示にせず案内を出す(点検#508軽13)', () => {
+    expect(PAGE).toContain('setNoRun')
+    expect(PAGE).toContain('まだ集計がありません。「この30日を再集計」を押してください')
   })
 })

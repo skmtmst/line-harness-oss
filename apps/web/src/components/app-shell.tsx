@@ -7,6 +7,7 @@ import { AccountProvider } from '@/contexts/account-context'
 import SessionLostNotice from './session-lost-notice'
 import RootLandingGate from './root-landing-gate'
 import StoreSelectionGate from './store-selection-gate'
+import FeatureDisabledGate from './feature-disabled-gate'
 import AppTopBar from './shell/app-top-bar'
 import { PageChromeProvider, usePageChrome } from './shell/page-chrome'
 import styles from './app-shell.module.css'
@@ -16,6 +17,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const isFriendAttributesV2 = pathname === '/tags-v2' || pathname === '/visual-qa/friend-attributes-v2'
   const isFriendAttributesV3 = pathname === '/tags-v3' || pathname === '/visual-qa/friend-attributes-v3'
+  const isAccountCreate = pathname === '/accounts/new'
 
   if (isPublicAuthPath(pathname)) {
     return <>{children}</>
@@ -38,27 +40,51 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     )
   }
 
+  const guardedContent = <RootLandingGate><StoreSelectionGate><FeatureDisabledGate>{children}</FeatureDisabledGate></StoreSelectionGate></RootLandingGate>
+
   return (
     <AuthGuard>
       <AccountProvider>
         <PageChromeProvider>
-          <div className={styles.shell}>
-            {/* Cookieが届いていないときの案内。全画面で同じものを1つだけ出す。 */}
-            <SessionLostNotice />
-            {/* Phase 6: banner above sidebar+header so it pins to the top of the
-                admin shell. Renders nothing while loading; one of latest/fork/
-                upgrade once /admin/version + manifest resolve. */}
-            <UpdateBanner />
-            <div className={`${styles.workspace} ${isFriendAttributesV2 ? 'friend-attributes-v2-shell' : ''}`}>
-              <Sidebar friendAttributesV2Mode={isFriendAttributesV2} />
-              <Workspace>
-                <RootLandingGate><StoreSelectionGate>{children}</StoreSelectionGate></RootLandingGate>
-              </Workspace>
+          {isAccountCreate ? (
+            <AccountCreateWorkspace>{guardedContent}</AccountCreateWorkspace>
+          ) : (
+            <div className={styles.shell}>
+              {/* Cookieが届いていないときの案内。全画面で同じものを1つだけ出す。 */}
+              <SessionLostNotice />
+              {/* Phase 6: banner above sidebar+header so it pins to the top of the
+                  admin shell. Renders nothing while loading; one of latest/fork/
+                  upgrade once /admin/version + manifest resolve. */}
+              <UpdateBanner />
+              <div className={`${styles.workspace} ${isFriendAttributesV2 ? 'friend-attributes-v2-shell' : ''}`}>
+                <Sidebar friendAttributesV2Mode={isFriendAttributesV2} />
+                <Workspace>
+                  {guardedContent}
+                </Workspace>
+              </div>
             </div>
-          </div>
+          )}
         </PageChromeProvider>
       </AccountProvider>
     </AuthGuard>
+  )
+}
+
+/** `/accounts/new` 専用。認証とアカウント文脈を保ち、通常のナビゲーションだけを外す。 */
+function AccountCreateWorkspace({ children }: { children: React.ReactNode }) {
+  return (
+    <div className={styles.shell} data-account-create-shell="true">
+      <SessionLostNotice />
+      <UpdateBanner />
+      <main className={styles.main}>
+        <div
+          data-design-shell="account-create"
+          className={`${styles.content} ${styles.contentFull}`}
+        >
+          {children}
+        </div>
+      </main>
+    </div>
   )
 }
 

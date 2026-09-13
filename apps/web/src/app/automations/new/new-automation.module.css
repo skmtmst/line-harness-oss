@@ -67,6 +67,125 @@
   padding: 20px;
 }
 
+.summaryBar {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 12px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas);
+  padding: 14px 18px;
+}
+
+.summaryStep {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+}
+
+.summaryText {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.summaryText small {
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  font-weight: 700;
+}
+
+.summaryText strong {
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.eventCards {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.eventCard {
+  display: flex;
+  min-height: 82px;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 5px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+  padding: 12px;
+  text-align: left;
+}
+
+.eventCardSelected {
+  border-color: var(--color-accent);
+  background: var(--color-success-bg);
+}
+
+.eventCardTitle {
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 700;
+}
+
+.eventCardNote {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: 1.5;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.nameRow {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.conditionRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.conditionChip,
+.conditionAdd {
+  display: inline-flex;
+  min-height: 34px;
+  align-items: center;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-pill);
+  padding: 0 12px;
+  background: var(--color-canvas);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  font-weight: 700;
+}
+
+.conditionAdd:disabled {
+  cursor: not-allowed;
+}
+
+.targetCount {
+  margin-top: 12px;
+  color: var(--color-status-info);
+  font-size: var(--text-caption);
+  font-weight: 700;
+}
+
 /* カードの中のまとまり。設計は r8。 */
 .group {
   border: 1px solid var(--color-hairline);
@@ -267,6 +386,12 @@
   gap: 12px;
 }
 
+.actionFields {
+  display: grid;
+  grid-template-columns: minmax(190px, 0.8fr) minmax(260px, 1.2fr);
+  gap: 12px;
+}
+
 .rowHead {
   display: flex;
   align-items: center;
@@ -285,9 +410,21 @@
 }
 
 .textareaTall {
-  min-height: 120px; /* 設計 本文 h120 */
+  min-height: 120px;
 }
 
 .stickyBar {
   margin-top: 16px;
+}
+
+@media (max-width: 1100px) {
+  .eventCards,
+  .summaryBar,
+  .actionFields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .nameRow {
+    grid-template-columns: 1fr;
+  }
 }

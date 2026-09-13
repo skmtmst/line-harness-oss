@@ -32,7 +32,7 @@ export default function SendConfirmDialog({ title, targetCount, accountName, isM
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-sm w-full p-6">
+      <div className="bg-canvas rounded-lg shadow-xl max-w-sm w-full p-6">
         <h3 className="text-base font-semibold text-ink mb-4">配信を送信しますか？</h3>
         <dl className="space-y-2 text-sm mb-4">
           <div className="flex justify-between">
@@ -59,7 +59,7 @@ export default function SendConfirmDialog({ title, targetCount, accountName, isM
                     </div>
                   ))
                 ) : (
-                  <p className="text-xs text-amber-600">送信可能なアカウントがありません（全アカウント無効）</p>
+                  <p className="text-xs text-warning">送信可能なアカウントがありません（全アカウント無効）</p>
                 )}
               </dd>
             </div>
@@ -70,7 +70,7 @@ export default function SendConfirmDialog({ title, targetCount, accountName, isM
             </div>
           )}
         </dl>
-        <p className="text-xs text-amber-600 mb-4">送信後は取り消せません</p>
+        <p className="text-xs text-warning mb-4">送信後は取り消せません</p>
         <div className="flex gap-2">
           <button
             onClick={onConfirm}
@@ -81,7 +81,7 @@ export default function SendConfirmDialog({ title, targetCount, accountName, isM
           </button>
           <button
             onClick={onCancel}
-            className="flex-1 px-4 py-2 min-h-[44px] text-sm font-medium text-ink-secondary bg-canvas-sunken hover:bg-gray-200 rounded-lg transition-colors"
+            className="flex-1 px-4 py-2 min-h-[44px] text-sm font-medium text-ink-secondary bg-canvas-sunken hover:bg-hairline rounded-lg transition-colors"
           >
             キャンセル
           </button>

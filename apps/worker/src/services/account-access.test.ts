@@ -8,11 +8,19 @@ import {
   validateAccountHierarchy,
 } from './account-access.js';
 
+const dbMocks = vi.hoisted(() => ({
+  getLineAccountScopeEntries: vi.fn(),
+  getLineAccounts: vi.fn(),
+  decryptLineAccountCredentials: vi.fn(),
+}));
+
 vi.mock('@line-crm/db', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@line-crm/db')>();
   return {
     ...actual,
-    getLineAccounts: vi.fn(async () => accounts),
+    getLineAccountScopeEntries: dbMocks.getLineAccountScopeEntries,
+    getLineAccounts: dbMocks.getLineAccounts,
+    decryptLineAccountCredentials: dbMocks.decryptLineAccountCredentials,
     getStaffById: vi.fn(async (_db: D1Database, id: string) => staffRows.get(id) ?? null),
     getStaffAccountScopeIds: vi.fn(async (_db: D1Database, id: string) => scopeIds.get(id) ?? []),
   };
@@ -30,7 +38,8 @@ function account(
     channel_access_token_updated_at: null, channel_secret_updated_at: null,
     login_channel_secret_updated_at: null,
     role: null, display_order: 0, token_expires_at: null, og_site_name: null,
-    og_default_image_url: null, og_default_description: null, friend_capacity: null,
+    og_default_image_url: null, og_default_description: null, official_profile_url: null,
+    friend_capacity: null,
     capacity_warn_at: null, icon_url: null,
     tenant_id: options.tenantId === undefined ? DEFAULT_TENANT_ID : options.tenantId,
     created_at: '', updated_at: '',
@@ -54,9 +63,14 @@ const staff = (tenantId: string | null = DEFAULT_TENANT_ID) => ({
 
 describe('filterVisibleLineAccounts', () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     accounts = [...defaultAccounts, tenantBAccount];
     staffRows = new Map([['s', { account_scope: 'all' }]]);
     scopeIds = new Map();
+    dbMocks.getLineAccountScopeEntries.mockImplementation(async (_db, tenantId) =>
+      accounts.filter(
+        (item) => (item.tenant_id ?? DEFAULT_TENANT_ID) === tenantId,
+      ));
   });
   it('既定統括のスタッフには既定統括の3アカウントだけを返す', () => {
     expect(filterVisibleLineAccounts(accounts, staff()).map((item) => item.id))
@@ -81,6 +95,7 @@ describe('filterVisibleLineAccounts', () => {
       allowedAccountIds: [],
       canSeeUnassigned: false,
       ids: [],
+      isAccountScoped: true,
     });
   });
 
@@ -106,6 +121,12 @@ describe('filterVisibleLineAccounts', () => {
       ids: ['parent', 'child', 'grandchild'],
       canSeeUnassigned: true,
     });
+    expect(dbMocks.getLineAccountScopeEntries).toHaveBeenCalledWith(
+      expect.anything(),
+      DEFAULT_TENANT_ID,
+    );
+    expect(dbMocks.getLineAccounts).not.toHaveBeenCalled();
+    expect(dbMocks.decryptLineAccountCredentials).not.toHaveBeenCalled();
   });
 
   it('既定統括以外は自分のアカウントだけを閲覧し、未割当行を閲覧できない', async () => {
@@ -113,6 +134,10 @@ describe('filterVisibleLineAccounts', () => {
       allowedAccountIds: ['tenant-b-account'],
       canSeeUnassigned: false,
     });
+    expect(dbMocks.getLineAccountScopeEntries).toHaveBeenCalledWith(
+      expect.anything(),
+      'tenant-B',
+    );
   });
 
   it('アカウントが0件の統括には空の一覧を返す', async () => {
@@ -166,6 +191,18 @@ describe('filterVisibleLineAccounts', () => {
     await expect(getVisibleLineAccountScope({} as D1Database, owner)).resolves.toMatchObject({
       allowedAccountIds: ['parent', 'child', 'grandchild'],
       canSeeUnassigned: true,
+    });
+  });
+
+  it('機能オフ middleware の一時範囲を通常のtenant・担当範囲へ重ねる', async () => {
+    const featureScoped = {
+      ...staff(),
+      featureEnabledLineAccountIds: ['child', 'tenant-b-account'],
+    };
+    await expect(getVisibleLineAccountScope({} as D1Database, featureScoped)).resolves.toMatchObject({
+      allowedAccountIds: ['child'],
+      ids: ['child'],
+      canSeeUnassigned: false,
     });
   });
 });

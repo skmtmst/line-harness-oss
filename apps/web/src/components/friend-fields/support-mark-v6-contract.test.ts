@@ -15,7 +15,7 @@ describe('V6 対応マーク', () => {
     for (const label of ['マークの種類', '未対応', '対応中', '過去7日の変更']) expect(LIST).toContain(label)
     // 見出しは表の中だけを見る。注釈や他の行に同じ言葉があっても通さない。
     const thead = element(LIST, 'thead')
-    for (const label of ['順番', 'マーク', '使用中', '初期値', '自動変更', '使用先', '操作']) expect(thead).toContain(label)
+    for (const label of ['順番', 'マーク', '使用中', '初期値', '自動変更', '表示先', '操作']) expect(thead).toContain(label)
     expect(LIST).toContain('利用状態：すべて')
     expect(LIST).toContain('api.supportMarks.list(accountId)')
   })
@@ -27,14 +27,17 @@ describe('V6 対応マーク', () => {
     expect(EDITOR).toContain('api.supportMarks.create')
     expect(EDITOR).toContain('api.supportMarks.update')
     expect(EDITOR).toContain('api.supportMarks.list(selectedAccountId)')
-    for (const label of ['マーク名', '色', '並び順', '新着時の初期値にする']) expect(EDITOR).toContain(label)
+    for (const label of ['マーク名', '色', '並び順', '新しい友だちに最初から付ける']) expect(EDITOR).toContain(label)
   })
 
-  it('未接続の自動変更ルールを作ったように見せず、既存の受信時設定だけを残す', () => {
-    expect(EDITOR).not.toContain('>自動変更ルール</h2>')
-    expect(EDITOR).toContain('メッセージ受信時にこのマークへ変更')
-    expect(EDITOR).toContain('現在接続済みの受信時設定だけを変更します')
-    expect(EDITOR).not.toContain('担当者割当・期限超過')
+  it('基本情報・自動変更・使用先を同じ段で確認できる', () => {
+    expect(EDITOR).toContain('xl:grid-cols-3')
+    expect(EDITOR).toContain('<SupportMarkRulesPanel')
+    for (const label of ['受信箱の絞り込み', '友だち一覧の列と絞り込み', 'ダッシュボードの絞り込み', '配信の絞り込み条件', 'オートメーションの動作']) {
+      expect(EDITOR).toContain(label)
+    }
+    expect(EDITOR).not.toContain('メッセージ受信時にこのマークへ変更')
+    expect(EDITOR).not.toContain('現在接続済みの受信時設定だけを変更します')
   })
 
   it('保存と保管の失敗で内部のAPI文言をそのまま表示しない', () => {
@@ -44,15 +47,25 @@ describe('V6 対応マーク', () => {
     expect(LIST).not.toContain("reason instanceof ApiError ? reason.message : '削除できませんでした'")
   })
 
-  it('友だち以外の使用先も使用中として扱い、確認後に物理削除しない', () => {
+  it('影響確認の版と冪等キーを使い、選んだマークへ置換して保管する', () => {
     expect(LIST).toContain('function isUsed(mark: MarkRow)')
     expect(LIST).toContain('referenceCount(mark) > 0')
-    expect(LIST).toContain('replacementMarkId: defaultMark.id')
-    expect(LIST).toContain('expectedImpact:')
-    expect(LIST).toContain('先にすべての使用先から外してください')
-    expect(LIST).toContain('referenceCount(pendingDelete) === 0')
-    expect(LIST).toContain('変更履歴は残ります')
+    expect(LIST).toContain('api.supportMarks.archiveImpact(mark.id, accountId)')
+    expect(LIST).toContain('impactRevision: archiveImpact.impactRevision')
+    expect(LIST).toContain('expectedVersion: archiveImpact.expectedVersion')
+    expect(LIST).toContain('crypto.randomUUID()')
+    expect(LIST).toContain('value={replacementMarkId}')
+    expect(LIST).toContain('履歴を残します')
     expect(LIST).not.toContain('force: mark.friendCount > 0')
+  })
+
+  it('保管確認は zGZMA の位置と幅で、置換先と対象人数に絞る', () => {
+    expect(LIST).toContain('data-design-node="zGZMA"')
+    expect(LIST).toContain('保管後は新しく選べません')
+    expect(LIST).toContain('{impact.friendCount}人を「{selected.name}」へ置き換えます。')
+    expect(LIST).toContain("[data-design-part='archive-position']")
+    expect(LIST).toContain('margin-top: 310px')
+    expect(LIST).toContain('max-width: 680px')
   })
 
   it('タブ行から追加画面へ進める', () => {

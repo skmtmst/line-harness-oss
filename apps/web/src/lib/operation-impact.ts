@@ -33,7 +33,9 @@ export function operationImpactText(
   */
   const metric = impact[target]
   if (!metric || typeof metric.itemCount !== 'number') return '影響を確認できません'
-  const friends = metric.friendCount === null ? '—人' : `${formatCount(metric.friendCount)}人`
+  const friends = metric.friendCount === null
+    ? '—人'
+    : `${formatCount(metric.friendCount)}人${metric.friendCountIsPartial ? '以上' : ''}`
 
   switch (target) {
     case 'broadcast_dispatch': {

@@ -2,17 +2,27 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 
 const mocks = vi.hoisted(() => ({
+  dispatchOperatorEvent: vi.fn(),
   getAccount: vi.fn(),
   getFriend: vi.fn(),
   lineClient: vi.fn(),
+  upsertReadModels: vi.fn(),
+  attachOrderFriend: vi.fn(),
+  setActionStatus: vi.fn(),
 }));
 vi.mock('@line-crm/db', () => ({
+  attachEcOrderFriend: mocks.attachOrderFriend,
   getLineAccountById: mocks.getAccount,
   getFriendByLineUserIdForAccount: mocks.getFriend,
   jstNow: vi.fn(() => '2026-08-28 02:00:00'),
+  setEcActionExecutionStatus: mocks.setActionStatus,
+  upsertEcEventReadModels: mocks.upsertReadModels,
 }));
 vi.mock('@line-crm/line-sdk', () => ({ LineClient: mocks.lineClient }));
 vi.mock('../services/event-bus.js', () => ({ fireEvent: vi.fn(), logOutgoingMessage: vi.fn() }));
+vi.mock('../services/operator-notification-dispatch.js', () => ({
+  dispatchOperatorEvent: mocks.dispatchOperatorEvent,
+}));
 vi.mock('../services/nen-tag-sync.js', () => ({ syncNenEcTags: vi.fn(), syncNenPetTags: vi.fn() }));
 vi.mock('../services/nen-engagement.js', () => ({ enqueuePostShippingFollowUps: vi.fn() }));
 
@@ -103,6 +113,12 @@ describe('EC-CUBE event account and identity boundary', () => {
     const insert = statements.find((entry) => entry.query.includes('INSERT OR IGNORE INTO ec_events'));
     expect(insert?.query).toContain('line_account_id');
     expect(insert?.bindings).toEqual(expect.arrayContaining(['eccube:account-a', 'account-a', null]));
+    expect(mocks.upsertReadModels).toHaveBeenCalledWith(db, expect.objectContaining({
+      sourceKey: 'eccube:account-a', lineAccountId: 'account-a', customerId: 'customer-1',
+    }), '2026-08-28 02:00:00');
+    expect(mocks.setActionStatus).toHaveBeenCalledWith(db, expect.objectContaining({
+      lineAccountId: 'account-a', status: 'skipped', errorCode: 'line_identity_unmatched',
+    }));
   });
 
   it('looks up a supplied LINE identity only inside the selected account', async () => {

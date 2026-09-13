@@ -106,32 +106,74 @@ export interface CreateAffiliateInput {
   commissionRate?: number;
   /** Optional LINE friend UUID to bind for self-serve (LIFF) affiliates. */
   friendId?: string | null;
+  /**
+   * Stable per-attempt UUID from the client (#686). When the create commits
+   * but the response is lost, the client retries with the SAME operationId;
+   * this lets the retry recover the original row instead of creating a
+   * duplicate affiliate.
+   */
+  operationId?: string | null;
+}
+
+/** Look up a prior create by its client-supplied operation UUID (idempotent replay, #686). */
+async function findAffiliateByOperationId(
+  db: D1Database,
+  tenantId: string,
+  lineAccountId: string,
+  operationId: string,
+): Promise<Affiliate | null> {
+  return db
+    .prepare(
+      `SELECT * FROM affiliates WHERE tenant_id = ? AND line_account_id = ? AND operation_id = ?`,
+    )
+    .bind(tenantId, lineAccountId, operationId)
+    .first<Affiliate>();
+}
+
+function isOperationIdConflict(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return /UNIQUE constraint failed/i.test(msg) && /affiliates\.operation_id/i.test(msg);
 }
 
 export async function createAffiliate(
   db: D1Database,
   input: CreateAffiliateInput,
 ): Promise<Affiliate> {
+  if (input.operationId) {
+    const existing = await findAffiliateByOperationId(db, input.tenantId, input.lineAccountId, input.operationId);
+    if (existing) return existing;
+  }
+
   const id = crypto.randomUUID();
   const now = jstNow();
 
-  await db
-    .prepare(
-      `INSERT INTO affiliates
-         (id, tenant_id, line_account_id, name, code, commission_rate, is_active, created_at, friend_id)
-       VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)`,
-    )
-    .bind(
-      id,
-      input.tenantId,
-      input.lineAccountId,
-      input.name,
-      input.code,
-      input.commissionRate ?? 0,
-      now,
-      input.friendId ?? null,
-    )
-    .run();
+  try {
+    await db
+      .prepare(
+        `INSERT INTO affiliates
+           (id, tenant_id, line_account_id, name, code, commission_rate, is_active, created_at, friend_id, operation_id)
+         VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`,
+      )
+      .bind(
+        id,
+        input.tenantId,
+        input.lineAccountId,
+        input.name,
+        input.code,
+        input.commissionRate ?? 0,
+        now,
+        input.friendId ?? null,
+        input.operationId ?? null,
+      )
+      .run();
+  } catch (err) {
+    // A concurrent retry of the same operationId won the race; recover its row.
+    if (input.operationId && isOperationIdConflict(err)) {
+      const winner = await findAffiliateByOperationId(db, input.tenantId, input.lineAccountId, input.operationId);
+      if (winner) return winner;
+    }
+    throw err;
+  }
 
   return (await getAffiliateById(db, id))!;
 }
@@ -143,6 +185,8 @@ export interface CreateAffiliateWithRandomCodeInput {
   commissionRate?: number;
   /** Optional LINE friend UUID to bind (enforced 1:1 by the partial UNIQUE index). */
   friendId?: string | null;
+  /** See CreateAffiliateInput.operationId (#686). */
+  operationId?: string | null;
 }
 
 /**
@@ -163,6 +207,11 @@ export async function createAffiliateWithRandomCode(
   input: CreateAffiliateWithRandomCodeInput,
   _slugGen: (len: number) => string = generateRefSlug,
 ): Promise<Affiliate> {
+  if (input.operationId) {
+    const existing = await findAffiliateByOperationId(db, input.tenantId, input.lineAccountId, input.operationId);
+    if (existing) return existing;
+  }
+
   const id = crypto.randomUUID();
   const now = jstNow();
 
@@ -176,8 +225,8 @@ export async function createAffiliateWithRandomCode(
       await db
         .prepare(
           `INSERT INTO affiliates
-             (id, tenant_id, line_account_id, name, code, commission_rate, is_active, created_at, friend_id)
-           VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)`,
+             (id, tenant_id, line_account_id, name, code, commission_rate, is_active, created_at, friend_id, operation_id)
+           VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`,
         )
         .bind(
           id,
@@ -188,11 +237,18 @@ export async function createAffiliateWithRandomCode(
           input.commissionRate ?? 0,
           now,
           input.friendId ?? null,
+          input.operationId ?? null,
         )
         .run();
 
       return (await getAffiliateById(db, id))!;
     } catch (err) {
+      // A concurrent retry of the same operationId won the race; recover its row
+      // instead of continuing to burn code-collision retries.
+      if (input.operationId && isOperationIdConflict(err)) {
+        const winner = await findAffiliateByOperationId(db, input.tenantId, input.lineAccountId, input.operationId);
+        if (winner) return winner;
+      }
       const msg = err instanceof Error ? err.message : String(err);
       // Retry ONLY on a code collision. Any other UNIQUE violation (notably the
       // friend_id partial index) must propagate so the caller can return 409.
@@ -455,13 +511,14 @@ export async function getAffiliateReport(
           WHERE (ce.affiliate_id = a.id OR ce.affiliate_code = a.code)
             AND cef.line_account_id IS a.line_account_id
             AND cp.line_account_id IS a.line_account_id${cvDateCond}) as total_revenue,
-         (SELECT COALESCE(SUM(off.reward_amount), 0)
+         (SELECT COALESCE(SUM(COALESCE(calc.amount_minor, 0)), 0)
             FROM conversion_events ce
             JOIN friends cef ON cef.id = ce.friend_id
-            JOIN affiliate_links al
-              ON al.ref_code = ce.attributed_ref_code
-             AND al.affiliate_id = a.id
-            JOIN affiliate_offers off ON off.id = al.offer_id
+            LEFT JOIN affiliate_reward_calculations calc
+              ON calc.conversion_event_id = ce.id
+             AND calc.formula IN ('rate', 'fixed', 'legacy')
+             AND calc.line_account_id IS a.line_account_id
+             AND calc.affiliate_id = a.id
            WHERE (ce.affiliate_id = a.id OR ce.affiliate_code = a.code)
              AND cef.line_account_id IS a.line_account_id
              AND EXISTS (
@@ -469,8 +526,6 @@ export async function getAffiliateReport(
                 WHERE cep.id = ce.conversion_point_id
                   AND cep.line_account_id IS a.line_account_id
              )
-             AND al.line_account_id IS a.line_account_id
-             AND off.line_account_id IS a.line_account_id
              AND COALESCE(ce.approval_status, 'pending') = 'approved'${cvDateCond}) as confirmed_reward,
          (SELECT COUNT(*) FROM affiliate_links al
            WHERE al.affiliate_id = a.id

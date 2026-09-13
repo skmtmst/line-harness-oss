@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest'
 const directory = dirname(fileURLToPath(import.meta.url))
 const staffSource = readFileSync(join(directory, 'page.tsx'), 'utf8')
 const newStaffSource = readFileSync(join(directory, 'new/page.tsx'), 'utf8')
+const auditSource = readFileSync(join(directory, '../../components/staff/login-audit.tsx'), 'utf8')
 const switchSource = readFileSync(join(directory, '../../components/ui/notification-switch.tsx'), 'utf8')
 
 describe('V6 30 ログインユーザーの画面契約', () => {
@@ -15,7 +16,9 @@ describe('V6 30 ログインユーザーの画面契約', () => {
     expect(staffSource).toContain('data-design-node="jwVlo"')
     expect(newStaffSource).toContain('data-design-node="I3ZSrU"')
     expect(staffSource).toContain('<MergedTabs')
-    expect(staffSource).toContain("{ key: 'audit', label: '入った記録' }")
+    for (const tab of ['いまいる人', '招待中', '入った記録', '権限のかたまり']) {
+      expect(staffSource).toContain(tab)
+    }
   })
 
   it('画面名は共通トップバーだけに置き、本文へ重ねない', () => {
@@ -59,5 +62,30 @@ describe('V6 30 ログインユーザーの画面契約', () => {
     expect(staffSource).toContain('w-full table-fixed text-sm')
     expect(staffSource).toContain('colSpan={7}')
     expect(staffSource).not.toContain('min-w-[1180px]')
+  })
+
+  it('入った記録は異変を拾える札と設計順の5列を持つ', () => {
+    for (const word of ['消した操作', '配信した操作', 'いつもと違う場所から', '気になるもの', '元の値 → 新しい値']) {
+      expect(auditSource).toContain(word)
+    }
+    expect(auditSource).toContain('colSpan={6}')
+    expect(auditSource).toContain('row.actor.name')
+    expect(auditSource).toContain('targetLabel(row)')
+    expect(auditSource).toContain('locationLabel(row)')
+  })
+
+  it('一覧と権限はアクセス契約の読み取り口を使う', () => {
+    expect(staffSource).toContain('api.access.users')
+    expect(staffSource).toContain('api.access.roles')
+    expect(auditSource).toContain('api.audit.events')
+  })
+
+  it('EOTS4は役割比較の小窓ではなく個人の全画面編集として開く', () => {
+    expect(staffSource).toContain('function PermissionScopeView')
+    expect(staffSource).toContain('かたまりから選ぶ')
+    expect(staffSource).toContain('項目ごとに決める')
+    expect(staffSource).toContain('この決め方で、この人にはこう見えます')
+    expect(staffSource).toContain('見せる範囲を保存')
+    expect(staffSource).not.toContain('function RolePermissionMatrix')
   })
 })

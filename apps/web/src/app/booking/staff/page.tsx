@@ -2,13 +2,13 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import Header from '@/components/layout/header'
 import ImageUploader from '@/components/shared/image-uploader'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { bookingApi, type BookingStaff } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
+import { usePageTitle } from '@/components/shell/page-chrome'
 
 const EMPTY: Partial<BookingStaff> = {
   name: '',
@@ -24,6 +24,7 @@ const EMPTY: Partial<BookingStaff> = {
 type LoadStatus = 'loading' | 'ready' | 'error'
 
 export default function BookingStaffPage() {
+  usePageTitle('予約設定')
   const { selectedAccountId } = useAccount()
   const [items, setItems] = useState<BookingStaff[]>([])
   const [editing, setEditing] = useState<Partial<BookingStaff> | null>(null)
@@ -91,19 +92,21 @@ export default function BookingStaffPage() {
 
   return (
     <div>
-      <Header
-        title="予約スタッフ"
-        description="予約担当スタッフの管理（指名なし枠も含む）"
-        action={
-          <button
-            onClick={() => setEditing(EMPTY)}
-            disabled={!selectedAccountId || loadStatus !== 'ready'}
-            className="bg-accent-deep text-on-accent rounded-control px-4 py-2 text-sm font-medium transition-colors hover:brightness-92 disabled:opacity-50"
-          >
-            + 新規スタッフ
-          </button>
-        }
-      />
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <nav data-design="Crumb" className="text-ink-faint text-xs" aria-label="パンくず">
+          <Link href="/booking/menus" className="hover:underline">予約設定</Link>
+          <span className="mx-1.5">/</span>
+          <span>担当スタッフ</span>
+        </nav>
+        <button
+          data-design="Actions"
+          onClick={() => setEditing(EMPTY)}
+          disabled={!selectedAccountId || loadStatus !== 'ready'}
+          className="bg-accent-deep text-on-accent rounded-control px-4 py-2 text-sm font-medium transition-colors hover:brightness-92 disabled:opacity-50"
+        >
+          + 新規スタッフ
+        </button>
+      </div>
 
       {!selectedAccountId ? (
         <ListState kind="empty" title="LINEアカウントを選んでください" description="共通メニューで、予約スタッフを管理するLINEアカウントを選んでください。" />
@@ -119,7 +122,7 @@ export default function BookingStaffPage() {
       ) : items.length === 0 ? (
         <ListState kind="empty" title="予約スタッフはまだいません" description="「＋ 新規スタッフ」から最初のスタッフを追加してください。" />
       ) : (
-        <div className="bg-canvas rounded-card border border-hairline overflow-hidden">
+        <div data-design="Table" className="bg-canvas rounded-card border border-hairline overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[640px]">
               <thead>

@@ -8,6 +8,14 @@ import Button from '@/components/shared/button'
 import StickyBar from '@/components/shared/sticky-bar'
 import { ApiError } from '@/lib/api'
 
+const SAVE_FALLBACK = '保存に失敗しました。入力内容を確認して、もう一度お試しください。'
+
+export function createPageErrorMessage(error: unknown): string {
+  if (error instanceof ApiError) return error.message
+  if (error instanceof Error && /[ぁ-んァ-ヶ一-龠]/u.test(error.message)) return error.message
+  return SAVE_FALLBACK
+}
+
 /**
  * 作成画面の寸法の版。
  *
@@ -104,11 +112,7 @@ export default function CreatePage({
       // 作った行を一覧で目立たせる。どこに増えたのか探させない。
       router.push(successHref ? successHref(id) : id ? `${parent[1]}?highlight=${id}` : parent[1])
     } catch (e) {
-      if (e instanceof ApiError) {
-        setError(e.message)
-      } else {
-        setError(e instanceof Error ? e.message : '保存に失敗しました')
-      }
+      setError(createPageErrorMessage(e))
     } finally {
       setSaving(false)
     }

@@ -22,6 +22,13 @@ const LIST_STATE = readFileSync(
  * もう一度お試しください。」で、ほかの画面は「表示できませんでした」だった。
  */
 describe('リマインダ一覧の空と失敗', () => {
+  it('一覧のフォルダ欄を共通パネルの統一幅で表示する', () => {
+    expect(PAGE).toContain('lg:grid-cols-[var(--folder-rail-width)_minmax(0,1fr)]')
+    expect(PAGE).toContain('style={FOLDER_RAIL_STYLE}')
+    expect(PAGE).toContain('onAddFolder={() => setFolderDialogOpen(true)}')
+    expect(PAGE).not.toContain('lg:grid-cols-[13rem_minmax(0,1fr)]')
+  })
+
   it('失敗の言い方を画面で書き直さない', () => {
     // 共通部品から引く。ここに文字列を直接書かない。
     expect(PAGE).toContain('LIST_STATE_PRESETS.error.title')
@@ -39,7 +46,7 @@ describe('リマインダ一覧の空と失敗', () => {
   it('3つの状態を言い分ける', () => {
     // 読めない / そもそも0件 / 絞り込みで0件 は、運用者にとって意味が違う。
     expect(PAGE).toContain('上の案内をご覧ください')
-    expect(PAGE).toContain('リマインダがありません。「＋ 新しいリマインダ」から作成してください。')
+    expect(PAGE).toContain('リマインダがありません。「リマインダを作成」から作成してください。')
     expect(PAGE).toContain('この条件に合うリマインダはありません。')
   })
 })

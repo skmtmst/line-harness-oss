@@ -17,10 +17,12 @@ export const SITE_EVENT_TYPES = [
   'custom',
   'purchase',
 ] as const;
+const LEGACY_SITE_TRACKING_KEY = 'hk_9f3a2c81b4';
 export type SiteEventType = (typeof SITE_EVENT_TYPES)[number];
 
 export interface SiteVisitor {
   id: string;
+  line_account_id: string | null;
   friend_id: string | null;
   first_seen_at: string;
   last_seen_at: string;
@@ -31,8 +33,10 @@ export interface SiteVisitor {
 export interface SiteEvent {
   id: string;
   visitor_id: string;
+  line_account_id: string | null;
   friend_id: string | null;
   event_type: string;
+  host: string | null;
   path: string | null;
   label: string | null;
   value_num: number | null;
@@ -63,6 +67,19 @@ export function sanitizePath(raw: unknown): string | null {
   return path.slice(0, 512);
 }
 
+/** 計測したページ自身のホスト。参照元(referrer)とは混ぜない。 */
+export function sanitizeHost(raw: unknown): string | null {
+  if (typeof raw !== 'string') return null;
+  const value = raw.trim().toLowerCase();
+  if (!value || value.length > 253 || /[/?#@\s]/.test(value)) return null;
+  try {
+    const hostname = new URL(`http://${value}`).hostname.replace(/^\[|\]$/g, '');
+    return hostname && hostname.length <= 253 ? hostname : null;
+  } catch {
+    return null;
+  }
+}
+
 /** リファラも同じ扱い。出どころは知りたいが、中身のパラメータは要らない。 */
 export function sanitizeReferrer(raw: unknown): string | null {
   if (typeof raw !== 'string' || raw === '') return null;
@@ -74,20 +91,64 @@ export function sanitizeReferrer(raw: unknown): string | null {
 export async function getOrCreateVisitor(
   db: D1Database,
   visitorId: string,
+  lineAccountId: string,
 ): Promise<SiteVisitor> {
+  // The browser cookie is scoped to the installed website, not to LINE Harness.
+  // Prefix it before storage so the same cookie value cannot merge visitors from
+  // two LINE accounts that installed the script on the same domain.
+  const storedVisitorId = `${lineAccountId}:${visitorId}`;
   const now = jstNow();
   await db
     .prepare(
-      `INSERT INTO site_visitors (id, first_seen_at, last_seen_at)
-       VALUES (?, ?, ?)
+      `INSERT INTO site_visitors (id, line_account_id, first_seen_at, last_seen_at)
+       VALUES (?, ?, ?, ?)
        ON CONFLICT(id) DO UPDATE SET last_seen_at = excluded.last_seen_at`,
     )
-    .bind(visitorId, now, now)
+    .bind(storedVisitorId, lineAccountId, now, now)
     .run();
   return (await db
-    .prepare(`SELECT * FROM site_visitors WHERE id = ?`)
-    .bind(visitorId)
+    .prepare(`SELECT * FROM site_visitors WHERE id = ? AND line_account_id = ?`)
+    .bind(storedVisitorId, lineAccountId)
     .first<SiteVisitor>())!;
+}
+
+export async function getOrCreateSiteTrackingKey(
+  db: D1Database,
+  lineAccountId: string,
+): Promise<string> {
+  const existing = await db.prepare(
+    'SELECT tracking_key FROM site_tracking_keys WHERE line_account_id = ?',
+  ).bind(lineAccountId).first<{ tracking_key: string }>();
+  if (existing) return existing.tracking_key;
+
+  const trackingKey = `hk_${crypto.randomUUID().replace(/-/g, '')}`;
+  await db.prepare(
+    `INSERT OR IGNORE INTO site_tracking_keys (id, line_account_id, tracking_key)
+     VALUES (?, ?, ?)`,
+  ).bind(crypto.randomUUID(), lineAccountId, trackingKey).run();
+  const saved = await db.prepare(
+    'SELECT tracking_key FROM site_tracking_keys WHERE line_account_id = ?',
+  ).bind(lineAccountId).first<{ tracking_key: string }>();
+  if (!saved) throw new Error('site tracking key could not be created');
+  return saved.tracking_key;
+}
+
+export async function getSiteTrackingAccountId(
+  db: D1Database,
+  trackingKey: string,
+): Promise<string | null> {
+  const row = await db.prepare(
+    'SELECT line_account_id FROM site_tracking_keys WHERE tracking_key = ?',
+  ).bind(trackingKey).first<{ line_account_id: string }>();
+  if (row) return row.line_account_id;
+  if (trackingKey !== LEGACY_SITE_TRACKING_KEY) return null;
+
+  // The first screen shipped one shared key. Keep existing single-account
+  // installations alive, but never guess an owner when multiple accounts exist.
+  const accounts = await db.prepare(
+    'SELECT id FROM line_accounts ORDER BY created_at, id LIMIT 2',
+  ).all<{ id: string }>();
+  return accounts.results.length === 1 ? accounts.results[0].id : null;
 }
 
 /**
@@ -99,23 +160,32 @@ export async function getOrCreateVisitor(
 export async function linkVisitorToFriend(
   db: D1Database,
   visitorId: string,
+  lineAccountId: string,
   friendId: string,
   linkedBy: 'entry_route' | 'liff' | 'form' | 'manual',
 ): Promise<boolean> {
+  const storedVisitorId = `${lineAccountId}:${visitorId}`;
   const result = await db
     .prepare(
       `UPDATE site_visitors
           SET friend_id = ?, linked_at = ?, linked_by = ?
-        WHERE id = ? AND friend_id IS NULL`,
+        WHERE id = ? AND line_account_id = ? AND friend_id IS NULL
+          AND EXISTS (
+            SELECT 1 FROM friends f
+             WHERE f.id = ? AND f.line_account_id = site_visitors.line_account_id
+          )`,
     )
-    .bind(friendId, jstNow(), linkedBy, visitorId)
+    .bind(friendId, jstNow(), linkedBy, storedVisitorId, lineAccountId, friendId)
     .run();
   const linked = (result.meta?.changes ?? 0) > 0;
   if (linked) {
     // 結びつく前に貯めた行動も、その人のものとして見えるようにする。
     await db
-      .prepare(`UPDATE site_events SET friend_id = ? WHERE visitor_id = ? AND friend_id IS NULL`)
-      .bind(friendId, visitorId)
+      .prepare(
+        `UPDATE site_events SET friend_id = ?
+          WHERE visitor_id = ? AND line_account_id = ? AND friend_id IS NULL`,
+      )
+      .bind(friendId, storedVisitorId, lineAccountId)
       .run();
   }
   return linked;
@@ -125,25 +195,29 @@ export async function recordSiteEvent(
   db: D1Database,
   input: {
     visitorId: string;
+    lineAccountId: string;
     eventType: SiteEventType;
+    host?: unknown;
     path?: unknown;
     label?: string | null;
     valueNum?: number | null;
     referrer?: unknown;
   },
 ): Promise<void> {
-  const visitor = await getOrCreateVisitor(db, input.visitorId);
+  const visitor = await getOrCreateVisitor(db, input.visitorId, input.lineAccountId);
   await db
     .prepare(
       `INSERT INTO site_events
-         (id, visitor_id, friend_id, event_type, path, label, value_num, referrer, occurred_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         (id, visitor_id, line_account_id, friend_id, event_type, host, path, label, value_num, referrer, occurred_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       crypto.randomUUID(),
-      input.visitorId,
+      visitor.id,
+      input.lineAccountId,
       visitor.friend_id,
       input.eventType,
+      sanitizeHost(input.host),
       sanitizePath(input.path),
       input.label ? String(input.label).slice(0, 200) : null,
       input.valueNum ?? null,
@@ -156,22 +230,22 @@ export async function recordSiteEvent(
 /** ページ別の閲覧数。多い順。 */
 export async function getPageViewSummary(
   db: D1Database,
-  opts: { from: string; to: string; limit?: number },
-): Promise<Array<{ path: string; views: number; visitors: number }>> {
+  opts: { lineAccountId: string; from: string; to: string; limit?: number },
+): Promise<Array<{ host: string | null; path: string; views: number; visitors: number }>> {
   const result = await db
     .prepare(
-      `SELECT path,
+      `SELECT host, path,
               COUNT(*) AS views,
               COUNT(DISTINCT visitor_id) AS visitors
          FROM site_events
-        WHERE event_type = 'page_view' AND path IS NOT NULL
+        WHERE line_account_id = ? AND event_type = 'page_view' AND path IS NOT NULL
           AND occurred_at >= ? AND occurred_at <= ?
-        GROUP BY path
+        GROUP BY host, path
         ORDER BY views DESC
         LIMIT ?`,
     )
-    .bind(opts.from, opts.to, opts.limit ?? 50)
-    .all<{ path: string; views: number; visitors: number }>();
+    .bind(opts.lineAccountId, opts.from, opts.to, opts.limit ?? 50)
+    .all<{ host: string | null; path: string; views: number; visitors: number }>();
   return result.results;
 }
 
@@ -179,13 +253,16 @@ export async function getPageViewSummary(
 export async function getFriendSiteEvents(
   db: D1Database,
   friendId: string,
+  lineAccountId: string,
   limit = 100,
 ): Promise<SiteEvent[]> {
   const result = await db
     .prepare(
-      `SELECT * FROM site_events WHERE friend_id = ? ORDER BY occurred_at DESC LIMIT ?`,
+      `SELECT * FROM site_events
+        WHERE friend_id = ? AND line_account_id = ?
+        ORDER BY occurred_at DESC LIMIT ?`,
     )
-    .bind(friendId, limit)
+    .bind(friendId, lineAccountId, limit)
     .all<SiteEvent>();
   return result.results;
 }
@@ -215,7 +292,10 @@ export interface SiteTrackingSummary {
  *
  * occurred_at は JST の文字列なので、先頭10文字が日付になる。
  */
-export async function getSiteTrackingSummary(db: D1Database): Promise<SiteTrackingSummary> {
+export async function getSiteTrackingSummary(
+  db: D1Database,
+  lineAccountId: string,
+): Promise<SiteTrackingSummary> {
   const today = new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 10);
   const row = await db
     .prepare(
@@ -227,9 +307,10 @@ export async function getSiteTrackingSummary(db: D1Database): Promise<SiteTracki
          COUNT(DISTINCT path) AS path_count,
          COUNT(DISTINCT event_type) AS event_type_count,
          MAX(occurred_at) AS last_event_at
-       FROM site_events`,
+       FROM site_events
+      WHERE line_account_id = ?2`,
     )
-    .bind(today)
+    .bind(today, lineAccountId)
     .first<{
       today_events: number | null;
       today_page_views: number | null;

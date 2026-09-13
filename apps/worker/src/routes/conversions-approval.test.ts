@@ -8,6 +8,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // pass-through, and the 404 for missing / non-attributed events.
 const dbMocks = {
   getLineAccounts: vi.fn().mockResolvedValue([]),
+  getLineAccountScopeEntries: vi.fn(async (...args: unknown[]) => dbMocks.getLineAccounts(...args)),
+  getAccountSetting: vi.fn().mockResolvedValue(null),
+  getVersionedAccountSetting: vi.fn().mockResolvedValue({
+    version: 1,
+    data: { features: { affiliates: true } },
+  }),
   getStaffByApiKey: vi.fn(),
   recoverStalledBroadcasts: vi.fn(),
   recoverStuckDeliveries: vi.fn(),
@@ -23,6 +29,13 @@ const dbMocks = {
   setConversionApproval: vi.fn(),
   getConversionApprovalNotifyInfo: vi.fn(),
   syncAffiliateConversionMileage: vi.fn().mockResolvedValue(undefined),
+  listConversionDefinitions: vi.fn(),
+  getConversionDefinitionDetail: vi.fn(),
+  addConversionDefinitionUsage: vi.fn(),
+  getConversionDefinitionReport: vi.fn(),
+  listConversionDefinitionsForExport: vi.fn(),
+  ConversionDefinitionError: class ConversionDefinitionError extends Error {},
+  CONVERSION_DEFINITION_USAGE_KINDS: [],
 };
 vi.mock('@line-crm/db', () => dbMocks);
 
@@ -51,10 +64,12 @@ const env = {
 } as unknown as import('../index.js').Env['Bindings'];
 
 function req(method: string, path: string, body?: unknown) {
+  const separator = path.includes('?') ? '&' : '?';
+  const scopedPath = `${path}${separator}accountId=account-1`;
   const headers = new Headers({ Authorization: `Bearer ${API_KEY}` });
   if (body !== undefined) headers.set('Content-Type', 'application/json');
   return worker.fetch(
-    new Request(`https://worker.example.com${path}`, {
+    new Request(`https://worker.example.com${scopedPath}`, {
       method,
       headers,
       body: body !== undefined ? JSON.stringify(body) : undefined,
@@ -66,7 +81,9 @@ function req(method: string, path: string, body?: unknown) {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  dbMocks.getLineAccounts.mockResolvedValue([]);
+  dbMocks.getLineAccounts.mockResolvedValue([
+    { id: 'account-1', tenant_id: '00000000-0000-4000-8000-000000000001' },
+  ]);
   dbMocks.syncAffiliateConversionMileage.mockResolvedValue(undefined);
 });
 

@@ -13,6 +13,7 @@ import { describe, expect, it } from 'vitest'
 const HERE = dirname(fileURLToPath(import.meta.url))
 const EVENTS = readFileSync(join(HERE, 'page.tsx'), 'utf8')
 const BOOKINGS = readFileSync(join(HERE, 'bookings', 'page.tsx'), 'utf8')
+const EDIT = readFileSync(join(HERE, 'edit', 'page.tsx'), 'utf8')
 
 /** 説明の文だけで通ってしまわないよう、判定の前にコメントを落とす。 */
 function code(source: string): string {
@@ -57,22 +58,54 @@ describe('V6 イベント・申込者一覧の状態', () => {
     expect(body).toContain('受け付けた予約は消えていません。')
   })
 
-  it('申込者一覧は「定員なし」と「定員を取れなかった」を分ける', () => {
+  it('申込者一覧は定員と全状態の件数を小さい集計APIから読む', () => {
     const body = code(BOOKINGS)
-    // 上限が無いのか読めなかったのかで、締め切りの判断が変わる。
-    expect(body).toContain('capacityStatus')
-    expect(body).toContain("'定員は取得できませんでした'")
-    // 「定員なし」の言い分けは `event-attention.ts` の
-    // `describeBookingCapacity` に寄せた（帯と窓で同じ言い方にするため）。
+    expect(body).toContain('eventsApi.getBookingSummary(selectedAccountId, eventId)')
+    expect(body).not.toContain('.listSlots(selectedAccountId, eventId)')
+    expect(body).not.toContain('.listWaitlist(selectedAccountId, eventId)')
     expect(body).toContain('describeBookingCapacity(applied, capacity)')
   })
 
   it('申込者一覧は切替後に前のイベント名と定員を残さない', () => {
     const body = code(BOOKINGS)
     expect(body).toContain('setEvent(null)')
-    expect(body).toContain('setTotalCapacity(null)')
+    expect(body).toContain('setSummary(null)')
     // 控えがあれば取りに行かない、をやめる（前のイベント名が残る）。
     expect(body).not.toContain('Promise.resolve(event)')
+  })
+
+  it('編集画面から申込者一覧へのリンクは申込者画面の読む引数名と揃える', () => {
+    // 申込者画面は `id` だけを読む。一覧と作成フォームは `?id=` で正しい。
+    expect(code(BOOKINGS)).toContain("params.get('id')")
+    expect(code(EDIT)).toContain('/events/bookings?id=${eventId}')
+    expect(code(EDIT)).toContain('/events/bookings?id=${id}')
+    // `?eventId=` では「イベントを選び直してください」になり、承認待ちへ行けない。
+    expect(code(EDIT)).not.toContain('bookings?eventId=')
+  })
+
+  it('イベントと申込者は共通のoffsetページ送りを使う(点検#520の中8)', () => {
+    const body = code(BOOKINGS)
+    expect(body).not.toContain('eventsApi.listEvents(')
+    expect(body).toContain('setBookingsTotal')
+    expect(body).toContain('page,')
+    expect(body).toContain('limit: PAGE_SIZE')
+    expect(body).toContain('<Pagination')
+    const list = code(EVENTS)
+    expect(list).toContain('setListTotal')
+    expect(list).toContain('q: query.trim() || undefined')
+    expect(list).toContain('filter,')
+    expect(list).toContain('sort,')
+    expect(EVENTS).not.toContain('200件まで表示しています')
+  })
+
+  it('編集画面は取得失敗を黙って0件にせず帯と読み直しを出す(点検#520の中10)', () => {
+    const body = code(EDIT)
+    expect(body).toContain('setLoadError')
+    expect(body).toContain('setReloadSeq')
+    expect(EDIT).toContain('一部を取得できませんでした。取得できなかった数は「—」で表示しています。')
+    expect(EDIT).toContain('読み直す')
+    expect(body).toContain('eventsApi.getBookingSummary(accountId, eventId)')
+    expect(body).not.toContain('eventsApi.listBookings(accountId, eventId)')
   })
 
   it('操作の失敗を内部の文字で出さず、一覧は残す', () => {

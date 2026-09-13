@@ -4,11 +4,14 @@ import { describe, expect, test, beforeEach, vi } from 'vitest';
 
 const dbMocks = {
   getWebinars: vi.fn(),
+  getWebinarList: vi.fn(),
   getWebinarById: vi.fn(),
   getWebinarBySlug: vi.fn(),
   createWebinar: vi.fn(),
   updateWebinar: vi.fn(),
-  deleteWebinar: vi.fn(),
+  archiveWebinar: vi.fn(),
+  getWebinarActions: vi.fn(),
+  replaceWebinarActions: vi.fn(),
   getWebinarComments: vi.fn(),
   getWebinarCtas: vi.fn(),
   replaceWebinarCtas: vi.fn(),
@@ -28,6 +31,13 @@ const dbMocks = {
   getWebinarDailyStats: vi.fn(),
   getWebinarFormFunnelStats: vi.fn(),
   getWebinarOverview: vi.fn(),
+  getFolderById: vi.fn(),
+  countWebinarList: vi.fn(),
+  webinarListSort: vi.fn((filters: { sort?: string }) => {
+    if (filters?.sort === 'created') return [{ field: 'createdAt', direction: 'desc' }];
+    if (filters?.sort === 'name') return [{ field: 'title', direction: 'asc' }];
+    return [{ field: 'updatedAt', direction: 'desc' }];
+  }),
   getFriendByLineUserId: vi.fn(),
   getFriendByLineUserIdForAccount: vi.fn(),
   getFriendById: vi.fn(),
@@ -39,6 +49,18 @@ const dbMocks = {
   applyMileageRulesForEvent: vi.fn(),
   getDueWebinarRegistrations: vi.fn(),
   markWebinarRegistrationNotified: vi.fn(),
+  recordWebinarViewSegment: vi.fn(),
+  getWebinarEditorSettings: vi.fn(),
+  saveWebinarEditorSettings: vi.fn(),
+  publishWebinarEditorVersion: vi.fn(),
+  getWebinarViewSegmentCoverage: vi.fn(),
+  getWebinarParticipantOperations: vi.fn(),
+  getWebinarMonitoringSummary: vi.fn(),
+  getWebinarPublicAccount: vi.fn(),
+  formBelongsToLineAccount: vi.fn(),
+  // #648: 成果計測は packages/db へ移した。この差し替えに書き出しが無いと、
+  // 呼び出し口が 500 になる。数えること自体は実DBの試験で見ている。
+  recordConversionSourceEvent: vi.fn(async () => ({ matched: 0, recorded: 0, failed: 0, skipped: null })),
 };
 vi.mock('@line-crm/db', () => dbMocks);
 
@@ -91,6 +113,12 @@ function makeWebinar(over: Record<string, unknown> = {}) {
     cta_json: '{"label":"申込","url":"https://pay.example.com","showAtSeconds":5400}',
     tag_on_attend: 'tag-attend',
     tag_on_cta_click: null,
+    folder_id: null,
+    publication_starts_at: null,
+    publication_ends_at: null,
+    folder_name: null,
+    registration_count: 0,
+    viewer_count: 0,
     created_at: 'x',
     updated_at: 'x',
     ...over,
@@ -133,11 +161,34 @@ beforeEach(() => {
   dbMocks.getWebinarOverview.mockResolvedValue({
     state: 'partial', registrationMode: 'people', metrics: {},
   });
+  dbMocks.getWebinarList.mockResolvedValue([]);
+  dbMocks.countWebinarList.mockResolvedValue(0);
+  dbMocks.getFolderById.mockResolvedValue({ id: 'folder-1', kind: 'webinar', account_id: 'account-a' });
+  dbMocks.getWebinarActions.mockResolvedValue([]);
+  dbMocks.replaceWebinarActions.mockResolvedValue([]);
   dbMocks.getWebinarComments.mockResolvedValue([
     { id: 'c1', webinar_id: 'w1', at_seconds: 10, author_name: '田中', body: '楽しみ!', created_at: 'x' },
   ]);
   dbMocks.upsertWebinarViewer.mockResolvedValue({ firstJoin: true });
   dbMocks.getWebinarCtas.mockResolvedValue([]);
+  dbMocks.getWebinarEditorSettings.mockResolvedValue(null);
+  dbMocks.saveWebinarEditorSettings.mockImplementation(async (_db, webinarId, expectedVersion, input) => ({
+    webinar_id: webinarId, version: Number(expectedVersion) + 1,
+    delivery_kind: input.deliveryKind ?? 'scheduled',
+    viewing_condition_json: JSON.stringify(input.viewingCondition ?? { kind: 'registered', label: '申込者向け' }),
+    public_description: input.publicDescription ?? '', registration_form_id: input.registrationFormId ?? null,
+    notification_messages_json: JSON.stringify(input.notificationMessages ?? {}), notification_test_json: null,
+    action_template_body: input.actionTemplateBody ?? '', missing_result_policy: input.missingResultPolicy ?? 'escalate',
+    public_page_test_json: null, published_version: null, published_at: null, created_at: 'x', updated_at: 'x',
+  }));
+  dbMocks.getWebinarViewSegmentCoverage.mockResolvedValue([]);
+  dbMocks.getWebinarParticipantOperations.mockResolvedValue([]);
+  dbMocks.getWebinarMonitoringSummary.mockResolvedValue({
+    notification_failures: 0, duplicate_registrations: 0, view_segment_failures: 0, action_failures: 0,
+  });
+  dbMocks.getWebinarPublicAccount.mockResolvedValue({ id: 'account-a', liff_id: '999-test' });
+  dbMocks.formBelongsToLineAccount.mockResolvedValue(true);
+  dbMocks.recordWebinarViewSegment.mockResolvedValue(undefined);
   dbMocks.getUpcomingWebinarRegistration.mockResolvedValue(null);
   dbMocks.getWebinarRegistration.mockResolvedValue({
     id: 'reg-current', webinar_id: 'w1', friend_id: 'friend-1',
@@ -210,35 +261,95 @@ describe('admin webinar tenant scope', () => {
     expect(dbMocks.getWebinarOverview).not.toHaveBeenCalled();
   });
 
-  test('一覧はリクエスト元の統括から見えるアカウントだけをSQLで絞る', async () => {
-    const all = vi.fn(async () => ({ results: [makeWebinar({ account_id: 'account-a' })] }));
-    const bind = vi.fn(() => ({ all }));
-    const prepare = vi.fn((_sql: string) => ({ bind }));
-    const originalDb = env.DB;
-    env.DB = { prepare } as unknown as D1Database;
+  test('一覧はリクエスト元の統括から見えるアカウントだけをDBへ渡す', async () => {
+    dbMocks.getWebinarList.mockResolvedValue([makeWebinar({ account_id: 'account-a' })]);
+    dbMocks.countWebinarList.mockResolvedValue(1);
 
     const res = await adminReq('/api/webinars');
 
-    env.DB = originalDb;
     expect(res.status).toBe(200);
-    expect(String(prepare.mock.calls[0]?.[0])).toContain('account_id IN (?)');
-    expect(bind).toHaveBeenCalledWith('account-a');
-    expect((await res.json() as { data: unknown[] }).data).toHaveLength(1);
+    expect(dbMocks.getWebinarList).toHaveBeenCalledWith({}, {
+      allowedAccountIds: ['account-a'],
+      canSeeUnassigned: false,
+      accountId: undefined,
+    }, { limit: 50, offset: 0 }, { q: undefined, folderId: undefined, status: undefined, sort: 'updated' });
+    const body = await res.json() as { data: { items: unknown[]; total: number; limit: number } };
+    expect(body.data.items).toHaveLength(1);
+    expect(body.data.total).toBe(1);
+    expect(body.data.limit).toBe(50);
   });
 
-  test('一覧で選んだLINEアカウントだけをSQLで絞る', async () => {
-    const all = vi.fn(async () => ({ results: [makeWebinar({ account_id: 'account-a' })] }));
-    const bind = vi.fn(() => ({ all }));
-    const prepare = vi.fn((_sql: string) => ({ bind }));
-    const originalDb = env.DB;
-    env.DB = { prepare } as unknown as D1Database;
+  test('一覧で選んだLINEアカウントだけをDBへ渡す', async () => {
+    dbMocks.getWebinarList.mockResolvedValue([makeWebinar({ account_id: 'account-a' })]);
 
     const res = await adminReq('/api/webinars?account_id=account-a');
 
-    env.DB = originalDb;
     expect(res.status).toBe(200);
-    expect(String(prepare.mock.calls[0]?.[0])).toContain('WHERE account_id = ?');
-    expect(bind).toHaveBeenCalledWith('account-a');
+    expect(dbMocks.getWebinarList).toHaveBeenCalledWith({}, {
+      allowedAccountIds: ['account-a'],
+      canSeeUnassigned: false,
+      accountId: 'account-a',
+    }, { limit: 50, offset: 0 }, { q: undefined, folderId: undefined, status: undefined, sort: 'updated' });
+  });
+
+  test('一覧は頁ごとに区切って総件数と並び順を返す', async () => {
+    dbMocks.getWebinarList.mockResolvedValue([makeWebinar({ account_id: 'account-a' })]);
+    dbMocks.countWebinarList.mockResolvedValue(45);
+
+    const res = await adminReq('/api/webinars?account_id=account-a&page=2&limit=20&sort=name&status=active&folder=folder-1&q=セミナー');
+
+    expect(res.status).toBe(200);
+    expect(dbMocks.getWebinarList).toHaveBeenCalledWith({}, {
+      allowedAccountIds: ['account-a'],
+      canSeeUnassigned: false,
+      accountId: 'account-a',
+    }, { limit: 20, offset: 20 }, { q: 'セミナー', folderId: 'folder-1', status: 'active', sort: 'name' });
+    expect(await res.json()).toMatchObject({
+      data: { total: 45, limit: 20, sort: [{ field: 'title', direction: 'asc' }] },
+    });
+  });
+
+  test('一覧の件数指定が壊れていても既定に寄せる', async () => {
+    const res = await adminReq('/api/webinars?account_id=account-a&page=0&limit=9999');
+
+    expect(res.status).toBe(200);
+    /* limit は上限200へ丸め、page は1始まりへ戻す。 */
+    expect(dbMocks.getWebinarList).toHaveBeenCalledWith({}, expect.anything(), { limit: 200, offset: 0 }, expect.anything());
+    expect(await res.json()).toMatchObject({ data: { limit: 200 } });
+  });
+
+  test('一覧は固定契約の集計値と公開5状態を返す', async () => {
+    dbMocks.getWebinarList.mockResolvedValue([
+      makeWebinar({
+        id: 'period', folder_id: 'folder-1', folder_name: '販売',
+        registration_count: 12, viewer_count: 8,
+        publication_starts_at: '2026-07-01T00:00:00.000Z',
+        publication_ends_at: '2026-08-01T00:00:00.000Z',
+      }),
+      makeWebinar({ id: 'always', registration_count: 3, viewer_count: 2 }),
+      makeWebinar({
+        id: 'scheduled', status: 'draft', registration_count: 0, viewer_count: null,
+        publication_starts_at: '2026-08-10T00:00:00.000Z',
+      }),
+      makeWebinar({ id: 'unset', status: 'draft', registration_count: 0, viewer_count: 0 }),
+      makeWebinar({
+        id: 'ended', registration_count: 7, viewer_count: 6,
+        publication_ends_at: '2026-07-01T00:00:00.000Z',
+      }),
+    ]);
+
+    const res = await adminReq('/api/webinars');
+    const body = await res.json() as { data: { items: Array<Record<string, unknown>> } };
+
+    expect(body.data.items.map((row) => row.publicationState)).toEqual([
+      'period', 'always', 'scheduled', 'unset', 'ended',
+    ]);
+    expect(body.data.items[0]).toMatchObject({
+      folderId: 'folder-1', folderName: '販売', registrationCount: 12, viewerCount: 8,
+      publicationStartsAt: '2026-07-01T00:00:00.000Z',
+      publicationEndsAt: '2026-08-01T00:00:00.000Z',
+    });
+    expect(body.data.items[2]?.viewerCount).toBeNull();
   });
 
   test('一覧で別統括のLINEアカウントを指定しても存在を返さない', async () => {
@@ -259,6 +370,10 @@ describe('admin webinar tenant scope', () => {
     ['GET', '/api/webinars/w-other/notifications'],
     ['PUT', '/api/webinars/w-other/notifications'],
     ['POST', '/api/webinars/w-other/notifications/test'],
+    ['GET', '/api/webinars/w-other/actions'],
+    ['PUT', '/api/webinars/w-other/actions'],
+    ['POST', '/api/webinars/w-other/archive'],
+    ['GET', '/api/webinars/w-other/participants.csv'],
   ])('%s %s は別統括のウェビナーを404にする', async (method, path) => {
     dbMocks.getWebinarById.mockResolvedValue(makeWebinar({ id: 'w-other', account_id: 'account-b' }));
     accountAccessMock.canAccessAllLineAccounts.mockResolvedValue(false);
@@ -680,6 +795,9 @@ describe('POST /api/liff/webinars/:slug/heartbeat', () => {
     expect(dbMocks.updateWebinarViewerPosition).toHaveBeenCalledWith(
       expect.anything(), 'w1', 'friend-1', SESSION_START, 1234,
     );
+    expect(dbMocks.recordWebinarViewSegment).toHaveBeenCalledWith(
+      expect.anything(), 'w1', 'friend-1', SESSION_START, 1234,
+    );
   });
 
   test('90%視聴で完了通知を一度だけ作る処理へ渡す', async () => {
@@ -1064,6 +1182,73 @@ describe('admin CRUD', () => {
     expect(body.data.schedule).toEqual([{ type: 'once', at: '2026-07-29T20:00:00+09:00' }]);
   });
 
+  test('POST — ウェビナーフォルダと公開期間を検証して保存する', async () => {
+    dbMocks.getWebinarBySlug.mockResolvedValue(null);
+    dbMocks.createWebinar.mockResolvedValue(makeWebinar({
+      folder_id: 'folder-1',
+      publication_starts_at: '2026-08-01T00:00:00.000Z',
+      publication_ends_at: '2026-08-31T00:00:00.000Z',
+    }));
+
+    const res = await adminReq('/api/webinars', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        accountId: 'account-a', title: '期間公開', slug: 'period-webinar',
+        folderId: 'folder-1',
+        publicationStartsAt: '2026-08-01T00:00:00.000Z',
+        publicationEndsAt: '2026-08-31T00:00:00.000Z',
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(dbMocks.getFolderById).toHaveBeenCalledWith({}, 'folder-1');
+    expect(dbMocks.createWebinar).toHaveBeenCalledWith({}, expect.objectContaining({
+      folderId: 'folder-1',
+      publicationStartsAt: '2026-08-01T00:00:00.000Z',
+      publicationEndsAt: '2026-08-31T00:00:00.000Z',
+    }));
+  });
+
+  test('POST — 別種類のフォルダと逆転した公開期間を拒否する', async () => {
+    dbMocks.getWebinarBySlug.mockResolvedValue(null);
+    dbMocks.getFolderById.mockResolvedValue({ id: 'folder-1', kind: 'template' });
+    const invalidFolder = await adminReq('/api/webinars', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        accountId: 'account-a', title: '不正', slug: 'invalid-folder', folderId: 'folder-1',
+      }),
+    });
+    const invalidPeriod = await adminReq('/api/webinars', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        accountId: 'account-a', title: '不正', slug: 'invalid-period',
+        publicationStartsAt: '2026-09-01T00:00:00.000Z',
+        publicationEndsAt: '2026-08-01T00:00:00.000Z',
+      }),
+    });
+
+    expect(invalidFolder.status).toBe(400);
+    expect(invalidPeriod.status).toBe(400);
+    expect(dbMocks.createWebinar).not.toHaveBeenCalled();
+  });
+
+  test('POST — 別アカウントのウェビナーフォルダへの付け替えを拒否する', async () => {
+    dbMocks.getWebinarBySlug.mockResolvedValue(null);
+    dbMocks.getFolderById.mockResolvedValue({
+      id: 'folder-other', kind: 'webinar', account_id: 'account-other',
+    });
+    const res = await adminReq('/api/webinars', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        accountId: 'account-a', title: '不正', slug: 'wrong-account-folder', folderId: 'folder-other',
+      }),
+    });
+
+    expect(res.status).toBe(400);
+    expect(dbMocks.createWebinar).not.toHaveBeenCalled();
+  });
+
   test('POST — title/slug 欠落・slug 形式違反は 400', async () => {
     dbMocks.getWebinarBySlug.mockResolvedValue(null);
     const noTitle = await adminReq('/api/webinars', {
@@ -1108,6 +1293,20 @@ describe('admin CRUD', () => {
     ]);
   });
 
+  test('PUT /api/webinars/:id/comments — 201件以上は400で止めて書かない', async () => {
+    dbMocks.getWebinarById.mockResolvedValue(makeWebinar());
+    const comments = Array.from({ length: 201 }, (_, index) => ({
+      atSeconds: index, authorName: '田中', body: `コメント${index}`,
+    }));
+    const res = await adminReq('/api/webinars/w1/comments', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ comments }),
+    });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({ error: 'too_many_comments' });
+    expect(dbMocks.replaceWebinarComments).not.toHaveBeenCalled();
+  });
+
   test('PUT comments — 負の atSeconds (待機ルーム) は -3600 まで許容', async () => {
     dbMocks.getWebinarById.mockResolvedValue(makeWebinar());
     dbMocks.replaceWebinarComments.mockResolvedValue(1);
@@ -1138,6 +1337,129 @@ describe('admin CRUD', () => {
     });
     expect(res.status).toBe(400);
     expect(dbMocks.replaceWebinarComments).not.toHaveBeenCalled();
+  });
+
+  test('GET editor — 視聴条件・フォーム詳細・LIFF・監視結果を同じ版で返す', async () => {
+    dbMocks.getWebinarById.mockResolvedValue(makeWebinar({ account_id: 'account-a' }));
+    dbMocks.getWebinarEditorSettings.mockResolvedValue({
+      webinar_id: 'w1', version: 4, delivery_kind: 'on_demand',
+      viewing_condition_json: '{"kind":"registered","label":"申込済みの友だち"}',
+      public_description: '説明', registration_form_id: 'form-1',
+      notification_messages_json: '{"registration":"申込完了です"}',
+      notification_test_json: '{"status":"passed"}', action_template_body: '視聴後メッセージ',
+      missing_result_policy: 'escalate', public_page_test_json: '{"status":"passed"}',
+      published_version: 3, published_at: '2026-09-07T00:00:00.000Z', created_at: 'x', updated_at: 'x',
+    });
+    dbMocks.getFormById.mockResolvedValue({
+      id: 'form-1', name: '申込フォーム', is_active: 1,
+      fields: '[{"label":"お名前"},{"label":"会社名"}]',
+      on_submit_tag_id: 'tag-1', on_submit_scenario_id: 'scenario-1',
+      on_submit_message_type: 'text', on_submit_webhook_url: null,
+    });
+
+    const res = await adminReq('/api/webinars/w1/editor');
+    const body = (await res.json()) as { data: Record<string, any> };
+
+    expect(res.status).toBe(200);
+    expect(body.data).toMatchObject({
+      version: 4, deliveryKind: 'on_demand', publicDescription: '説明',
+      viewingCondition: { kind: 'registered', label: '申込済みの友だち' },
+      publicPage: {
+        liffId: '999-test', form: {
+          name: '申込フォーム', fields: ['お名前', '会社名'],
+          completionActions: ['タグを付ける', 'シナリオを開始する', '完了メッセージを送る'],
+        },
+      },
+      monitoring: { notificationFailures: 0, duplicateRegistrations: 0 },
+    });
+  });
+
+  test('PUT editor — expectedVersion を必須にして保存結果を返す', async () => {
+    dbMocks.getWebinarById.mockResolvedValue(makeWebinar({ account_id: 'account-a' }));
+    dbMocks.getFormById.mockResolvedValue({ id: 'form-1', is_active: 1 });
+    const missingVersion = await adminReq('/api/webinars/w1/editor', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ publicDescription: '更新' }),
+    });
+    const saved = await adminReq('/api/webinars/w1/editor', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ expectedVersion: 4, registrationFormId: 'form-1', publicDescription: '更新' }),
+    });
+
+    expect(missingVersion.status).toBe(400);
+    expect(saved.status).toBe(200);
+    expect(dbMocks.saveWebinarEditorSettings).toHaveBeenCalledWith(
+      expect.anything(), 'w1', 4, expect.objectContaining({ publicDescription: '更新' }),
+    );
+  });
+
+  test('POST public-page/test — LIFF・動画・フォームを検査して結果を版付き保存する', async () => {
+    dbMocks.getWebinarById.mockResolvedValue(makeWebinar({ account_id: 'account-a' }));
+    dbMocks.getWebinarEditorSettings.mockResolvedValue({
+      webinar_id: 'w1', version: 4, delivery_kind: 'scheduled',
+      viewing_condition_json: '{}', public_description: '', registration_form_id: 'form-1',
+      notification_messages_json: '{}', notification_test_json: null,
+      action_template_body: '', missing_result_policy: 'escalate', public_page_test_json: null,
+      published_version: null, published_at: null, created_at: 'x', updated_at: 'x',
+    });
+    dbMocks.getFormById.mockResolvedValue({ id: 'form-1', name: '申込フォーム', is_active: 1, fields: '[]' });
+
+    const res = await adminReq('/api/webinars/w1/public-page/test', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ expectedVersion: 4 }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(dbMocks.saveWebinarEditorSettings).toHaveBeenCalledWith(
+      expect.anything(), 'w1', 4,
+      expect.objectContaining({ publicPageTest: expect.objectContaining({ status: 'passed', failures: [] }) }),
+    );
+  });
+
+  test('GET publish-validation — 公開ページ・通知・重複を検査する', async () => {
+    dbMocks.getWebinarById.mockResolvedValue(makeWebinar({ account_id: 'account-a' }));
+    dbMocks.getWebinarEditorSettings.mockResolvedValue({
+      webinar_id: 'w1', version: 4, delivery_kind: 'scheduled',
+      viewing_condition_json: '{}', public_description: '', registration_form_id: 'form-1',
+      notification_messages_json: '{}', notification_test_json: '{"status":"passed"}',
+      action_template_body: '', missing_result_policy: 'escalate',
+      public_page_test_json: '{"status":"passed"}', published_version: null, published_at: null,
+      created_at: 'x', updated_at: 'x',
+    });
+    dbMocks.getFormById.mockResolvedValue({ id: 'form-1', name: '申込フォーム', is_active: 1, fields: '[]' });
+    dbMocks.getWebinarCtas.mockResolvedValue([{ at_seconds: 300, kind: 'url', url: 'https://example.com' }]);
+    dbMocks.getWebinarActions.mockResolvedValue([{ id: 'action-1' }]);
+
+    const res = await adminReq('/api/webinars/w1/publish-validation');
+    const body = (await res.json()) as { data: { blockers: string[]; checks: Array<{ key: string; status: string }> } };
+
+    expect(res.status).toBe(200);
+    expect(body.data.blockers).toEqual([]);
+    expect(body.data.checks).toEqual(expect.arrayContaining([
+      expect.objectContaining({ key: 'public_page_test', status: 'passed' }),
+      expect.objectContaining({ key: 'notification_test', status: 'passed' }),
+      expect.objectContaining({ key: 'notification_duplicates', status: 'passed' }),
+    ]));
+  });
+
+  test('GET participants — 実行エラーと担当者連携状態をカーソル付きで返す', async () => {
+    dbMocks.getWebinarById.mockResolvedValue(makeWebinar());
+    dbMocks.getWebinarParticipantOperations.mockResolvedValue([{
+      friend_id: 'friend-1', friend_name: '山田太郎', picture_url: null, sessions: 1,
+      first_joined_at: '2026-09-07T00:00:00.000Z', latest_joined_at: '2026-09-07T00:30:00.000Z',
+      max_watched_seconds: 1200, cta_clicked_at: null, registered: 1, form_submitted_at: null,
+      action_status: 'failed', action_error: 'シナリオ開始に失敗', integration_status: 'needs_attention',
+    }]);
+
+    const res = await adminReq('/api/webinars/w1/participants?limit=20');
+    const body = (await res.json()) as { data: { items: Array<Record<string, unknown>>; nextCursor: string | null } };
+
+    expect(res.status).toBe(200);
+    expect(body.data.items[0]).toMatchObject({
+      friendId: 'friend-1', actionStatus: 'failed', errorDetail: 'シナリオ開始に失敗',
+      staffIntegrationStatus: 'needs_attention',
+    });
+    expect(body.data.nextCursor).toBeNull();
   });
 
   test('GET /api/webinars/:id/analytics — summary + trend + participants', async () => {
@@ -1231,11 +1553,83 @@ describe('admin CRUD', () => {
     });
   });
 
-  test('DELETE /api/webinars/:id', async () => {
-    dbMocks.getWebinarById.mockResolvedValue(makeWebinar());
+  test('POST /api/webinars/:id/archive は履歴を消さずアーカイブする', async () => {
+    const archived = makeWebinar({ status: 'archived' });
+    dbMocks.getWebinarById.mockResolvedValue(makeWebinar({ status: 'draft' }));
+    dbMocks.archiveWebinar.mockResolvedValue(archived);
+    const res = await adminReq('/api/webinars/w1/archive', { method: 'POST' });
+    expect(res.status).toBe(200);
+    expect(dbMocks.archiveWebinar).toHaveBeenCalledWith(expect.anything(), 'w1');
+    await expect(res.json()).resolves.toMatchObject({ data: { status: 'archived' } });
+  });
+
+  test('公開中は停止前にアーカイブできない', async () => {
+    dbMocks.getWebinarById.mockResolvedValue(makeWebinar({ status: 'active' }));
+    const res = await adminReq('/api/webinars/w1/archive', { method: 'POST' });
+    expect(res.status).toBe(409);
+    await expect(res.json()).resolves.toMatchObject({ error: 'webinar_pause_required' });
+    expect(dbMocks.archiveWebinar).not.toHaveBeenCalled();
+  });
+
+  test('旧DELETE経路も物理削除せずアーカイブする', async () => {
+    dbMocks.getWebinarById.mockResolvedValue(makeWebinar({ status: 'draft' }));
+    dbMocks.archiveWebinar.mockResolvedValue(makeWebinar({ status: 'archived' }));
     const res = await adminReq('/api/webinars/w1', { method: 'DELETE' });
     expect(res.status).toBe(200);
-    expect(dbMocks.deleteWebinar).toHaveBeenCalledWith(expect.anything(), 'w1');
+    expect(dbMocks.archiveWebinar).toHaveBeenCalledWith(expect.anything(), 'w1');
+  });
+
+  test('視聴後アクションを共通アクション名で保存する', async () => {
+    dbMocks.getWebinarById.mockResolvedValue(makeWebinar({ status: 'draft' }));
+    dbMocks.replaceWebinarActions.mockResolvedValue([{
+      id: 'action-1', webinar_id: 'w1', trigger: 'completed', action_type: 'add_tag',
+      config_json: '{"tagId":"tag-1"}', position: 0, version: 2, enabled: 1,
+      created_at: 'x', updated_at: 'x',
+    }]);
+    const res = await adminReq('/api/webinars/w1/actions', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ actions: [{ trigger: 'completed', actionType: 'add_tag', config: { tagId: 'tag-1' } }] }),
+    });
+    expect(res.status).toBe(200);
+    expect(dbMocks.replaceWebinarActions).toHaveBeenCalledWith(expect.anything(), 'w1', [{
+      trigger: 'completed', actionType: 'add_tag', config: { tagId: 'tag-1' },
+    }]);
+    await expect(res.json()).resolves.toMatchObject({ data: [{ actionType: 'add_tag', version: 2 }] });
+  });
+
+  test('未知の視聴後アクションは保存しない', async () => {
+    dbMocks.getWebinarById.mockResolvedValue(makeWebinar({ status: 'draft' }));
+    const res = await adminReq('/api/webinars/w1/actions', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ actions: [{ trigger: 'completed', actionType: 'run_sql', config: {} }] }),
+    });
+    expect(res.status).toBe(400);
+    expect(dbMocks.replaceWebinarActions).not.toHaveBeenCalled();
+  });
+
+  test('視聴後アクションは参照先IDが空の設定を拒否する', async () => {
+    dbMocks.getWebinarById.mockResolvedValue(makeWebinar({ status: 'draft' }));
+    const res = await adminReq('/api/webinars/w1/actions', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        actions: [{ trigger: 'completed', actionType: 'add_tag', config: { tagId: '  ' } }],
+      }),
+    });
+    expect(res.status).toBe(400);
+    expect(dbMocks.replaceWebinarActions).not.toHaveBeenCalled();
+  });
+
+  test('参加者CSVは個人データを式として実行させず書き出す', async () => {
+    dbMocks.getWebinarById.mockResolvedValue(makeWebinar());
+    dbMocks.getWebinarParticipantStats.mockResolvedValue([{
+      friend_id: 'friend-1', friend_name: '=HYPERLINK("https://bad.example")', picture_url: null,
+      sessions: 1, first_joined_at: '2026-09-06T10:00:00+09:00', latest_joined_at: '2026-09-06T10:30:00+09:00',
+      max_watched_seconds: 1800, cta_clicked_at: null, registered: 1, form_submitted_at: null,
+    }]);
+    const res = await adminReq('/api/webinars/w1/participants.csv');
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-type')).toContain('text/csv');
+    expect(await res.text()).toContain("'=HYPERLINK")
   });
 
   test('PUT /api/webinars/:id — 空 title は 400 で updateWebinar が呼ばれない', async () => {
@@ -1270,7 +1664,7 @@ describe('webinar CTA cards', () => {
   });
 
   test('PUT /api/webinars/:id/ctas — form kind は forms 実在チェック後に置換', async () => {
-    dbMocks.getWebinarById.mockResolvedValue(makeWebinar());
+    dbMocks.getWebinarById.mockResolvedValue(makeWebinar({ account_id: 'account-a' }));
     dbMocks.getFormById.mockResolvedValue({ id: 'form-1', is_active: 1 });
     dbMocks.replaceWebinarCtas.mockResolvedValue(1);
     const res = await adminReq('/api/webinars/w1/ctas', {

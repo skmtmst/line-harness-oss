@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { RichMenuAreaIntent } from '@/lib/api'
+import { RICH_MENU_DIMENSIONS, type RichMenuAreaIntent } from '@line-crm/shared'
 
 export type Area = {
   id: string
@@ -24,11 +24,6 @@ export type Area = {
   formId?: string | null
   trackedLinkId?: string | null
 }
-
-const SIZE_DIMS = {
-  large: { width: 2500, height: 1686 },
-  compact: { width: 2500, height: 843 },
-} as const
 
 const SNAP_PX = 4
 const MIN_AREA = 20
@@ -97,14 +92,16 @@ export function CanvasEditor({
   onPreviewAction,
 }: Props) {
   const canvasRef = useRef<HTMLDivElement>(null)
-  const dims = SIZE_DIMS[size]
+  const dims = RICH_MENU_DIMENSIONS[size]
   const [scale, setScale] = useState(0.3)
   const [drag, setDrag] = useState<DragState>(null)
   /** 上限に当たったときの知らせ。**`alert()` の代わりに画面へ残す。** */
   const [limitNotice, setLimitNotice] = useState('')
 
   function toImageCoord(clientX: number, clientY: number) {
-    const rect = canvasRef.current!.getBoundingClientRect()
+    // 描画前は ref がまだ無い。非null断言の代わりに原点へ倒す。
+    const rect = canvasRef.current?.getBoundingClientRect()
+    if (!rect) return { x: 0, y: 0 }
     return {
       x: Math.round((clientX - rect.left) / scale),
       y: Math.round((clientY - rect.top) / scale),
@@ -254,7 +251,7 @@ export function CanvasEditor({
   useEffect(() => {
     if (!selectedAreaId || preview) return
     function onKey(e: KeyboardEvent) {
-      const target = e.target as HTMLElement | null
+      const target = e.target instanceof HTMLElement ? e.target : null
       const tag = target?.tagName
       // INPUT/TEXTAREA/SELECT に focus がある間は area 操作を無効化
       // (右パネルの action-type / target-page select で矢印キーが奪われる事故防止)

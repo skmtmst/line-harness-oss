@@ -9,7 +9,7 @@ const PAGE = fs.readFileSync(path.join(__dirname, '..', '..', 'app', 'chats', 'p
 describe('受信箱 保存した検索の完了判定', () => {
   it('保存先の成功を確認してからだけ完了表示へ進む', () => {
     expect(DIALOG).toContain('Promise<SavedViewSaveResult>')
-    expect(DIALOG).toContain('const result = await onSave(trimmed)')
+    expect(DIALOG).toContain('const result = await onSave({ name: trimmed, status, due, channel, assignee, favorite })')
     expect(DIALOG).toContain('if (!result.success)')
     expect(DIALOG.indexOf('setDone(true)')).toBeGreaterThan(DIALOG.indexOf('if (!result.success)'))
   })
@@ -23,7 +23,7 @@ describe('受信箱 保存した検索の完了判定', () => {
 
   it('呼び出し元が保存結果をモーダルへ返す', () => {
     expect(PAGE).toContain('Promise<SavedViewSaveResult>')
-    expect(PAGE).toContain('return createSavedView(name)')
+    expect(PAGE).toContain('return createSavedView(draft)')
     expect(PAGE).toContain('return { success: true }')
     expect(PAGE).toContain('return { success: false, error: message }')
   })
@@ -58,5 +58,43 @@ describe('受信箱 保存した検索の完了判定', () => {
     expect(DIALOG).toContain("${error || nameMissing ? 'border-danger' : 'border-hairline'}")
     // 自前の小さな赤字へ戻さない（共通部品を通す）。
     expect(DIALOG).not.toContain('className="text-danger mt-1.5 text-xs" role="alert"')
+  })
+
+  it('設計と同じ入力案内と保存ボタン名を使う', () => {
+    expect(DIALOG).toContain('placeholder="検索名を入力してください"')
+    expect(DIALOG).toContain("{saving ? '保存中' : '検索条件を保存'}")
+    expect(PAGE).toContain('現在の条件を保存')
+  })
+
+  it('保存する4条件をモーダル内で変更でき、よく使う状態も保存する', () => {
+    expect(DIALOG).toContain('aria-label="保存する対応状況"')
+    expect(DIALOG).toContain('aria-label="保存する期限"')
+    expect(DIALOG).toContain('aria-label="保存する受信経路"')
+    expect(DIALOG).toContain('aria-label="保存する担当者"')
+    expect(DIALOG).toContain('aria-label="よく使うに追加"')
+    expect(PAGE).toContain('conditions: currentSavedViewConditions(draft)')
+    expect(PAGE).toContain('isFavorite: draft?.favorite ?? false')
+    expect(PAGE).toContain("setQuickFilter(conditions.due === 'overdue' ? 'overdue' : 'all')")
+  })
+
+  it('保存内容の注意を入力済みでも残し、設計と同じ濃さで背景を暗くする', () => {
+    expect(DIALOG).toContain('bg-ink/35')
+    expect(DIALOG).toContain('保存されるのは検索条件です。受信件数は最新の状態に自動更新されます。')
+    expect(DIALOG).toContain('tone="validation"')
+  })
+
+  it('顧客情報を開いても会話一覧の幅を保つ', () => {
+    expect(PAGE).toContain("showFriendInfo ? 'lg:w-72 2xl:w-[420px]'")
+  })
+
+  it('保存条件ごとの件数が未接続なら0件にせず理由を出す', () => {
+    expect(PAGE).toContain("typeof view.matchCount === 'number' ? `${view.matchCount}件` : '—件'")
+    expect(PAGE).toContain('「—件」は0件ではありません。')
+  })
+
+  it('削除は名前の隣へ常設せず、その他操作へ畳む', () => {
+    expect(PAGE).toContain("import { MoreAction } from '@/components/shared/row-actions'")
+    expect(PAGE).toContain('label={`${view.name}の操作`}')
+    expect(PAGE).toContain('保存した検索を削除')
   })
 })

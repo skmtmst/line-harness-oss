@@ -2,6 +2,15 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api, type EventDetail, type EventSlot, type EventBookingMine } from '../lib/api.js';
 
+/**
+ * 表示してよいURLか。保存時に弾き切れない古い行もあるため、表示側でも
+ * https だけをリンク・画像にする (#607)。http・javascript:・不正文字列は
+ * 出さない（Worker側の保存拒否とあわせた二層防御）。
+ */
+export function isHttpsUrl(value: unknown): value is string {
+  return typeof value === 'string' && /^https:\/\//i.test(value.trim());
+}
+
 function formatJp(iso: string): string {
   return new Date(iso).toLocaleString('ja-JP', {
     year: 'numeric',
@@ -79,7 +88,7 @@ export default function Event() {
 
   return (
     <div className="pb-16">
-      {event.image_url ? (
+      {isHttpsUrl(event.image_url) ? (
         <img src={event.image_url} alt="" className="w-full h-48 object-cover bg-gray-100" />
       ) : (
         <div className="w-full h-48 bg-gradient-to-br from-blue-100 to-blue-200" />
@@ -89,7 +98,7 @@ export default function Event() {
         {event.venue_name && (
           <div className="text-sm text-gray-700 mb-1">📍 {event.venue_name}</div>
         )}
-        {event.venue_url && (
+        {isHttpsUrl(event.venue_url) && (
           <a
             href={event.venue_url}
             target="_blank"

@@ -35,6 +35,21 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      # `@line-crm/shared` の入口 (package.json の main / exports) は dist を
+      # 指している。`test:scripts` が読む scripts/verify-staging-operational-path.ts
+      # は packages/db/src 経由で shared を読むので、dist が無いと vite が入口を
+      # 解決できず、**試験を1件も走らせないまま**読み込みの段階で落ちる。
+      #
+      # PR は required-pr-gate.yml の `repository-checks` が install の直後に
+      # 同じ build を置いているため緑になる。本流に入ってから走るこの workflow
+      # だけが落ちていた (#714。2026-09-10 に6回連続で failure)。
+      #
+      # build するのは shared だけでよい。db や line-sdk まで足さなくても
+      # `test:scripts` が緑になること、後段の typecheck は dist 無しでも通ることを、
+      # dist を消した状態で実際に走らせて確かめている。
+      - name: Build the shared package
+        run: pnpm --filter @line-crm/shared build
+
       - name: Vitest (scripts)
         # Includes the git-backed deploy lock integration tests, which drive
         # real git against a temporary bare repository.

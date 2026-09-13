@@ -137,13 +137,18 @@ export function groupEnabledCount(group: FeatureGroup, features: Record<string, 
  * サービスでは区分ごと出さない。切り替えられる項目が1つも無い区分
  * （設定など）は、スイッチが並ばないので出さない。
  */
-export function visibleFeatureGroups(options: { specializedFeatureKeys: string[] }): FeatureGroup[] {
+export function visibleFeatureGroups(options: {
+  specializedFeatureKeys: string[]
+  includeRestaurantTest?: boolean
+}): FeatureGroup[] {
   const specialized = new Set(options.specializedFeatureKeys)
   return FEATURE_GROUPS.map((group) =>
     group.id === 'specialized'
       ? { ...group, items: group.items.filter((item) => item.keys.some((key) => specialized.has(key))) }
       : group,
-  ).filter((group) => group.items.length > 0 && group.id !== 'restaurant-test')
+  ).filter((group) =>
+    group.items.length > 0 && (options.includeRestaurantTest || group.id !== 'restaurant-test'),
+  )
 }
 
 /** 並び順の保存の形。区分の目印ごとに、項目の目印を並べて持つ。 */

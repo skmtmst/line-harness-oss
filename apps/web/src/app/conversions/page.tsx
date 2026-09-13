@@ -1,9 +1,15 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
-import { api, type ConversionApprovalItem } from '@/lib/api'
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  api,
+  type ConversionDefinitionList,
+  type ConversionDefinitionListItem,
+  type ConversionDefinitionDeleteImpact,
+  type ConversionDefinitionReport,
+} from '@/lib/api'
 import type { ConversionPoint } from '@line-crm/shared'
-import KpiCard from '@/components/dashboard/kpi-card'
+import KpiCard from '@/components/shared/kpi-card'
 
 /**
  * 数え方を運用者の言葉にする。既定（manual）も省略せずに出す。
@@ -12,6 +18,54 @@ import KpiCard from '@/components/dashboard/kpi-card'
  * そのまま書いている。「URL到達」だと、誰がどのURLに来たときの話なのかが
  * 読み取れない。
  */
+/**
+ * 編集の入力（N-252）。
+ *
+ * 数値は入力途中で空になるので文字列で持ち、送るときだけ数へ直す。
+ * 途中を数値に強制すると「消して打ち直す」ができない。
+ */
+type EditForm = {
+  name: string
+  sourceType: string
+  deduplicationMode: 'every' | 'once_per_friend' | 'window'
+  deduplicationWindowDays: string
+  valueMode: 'source' | 'fixed' | 'none'
+  fixedValue: string
+  reversalPolicy: 'source_cancelled' | 'manual' | 'none'
+  attributionDays: string
+  targetUrl: string
+}
+
+function toEditForm(item: ConversionDefinitionListItem): EditForm {
+  return {
+    name: item.name,
+    sourceType: item.sourceType,
+    deduplicationMode: item.deduplicationMode,
+    deduplicationWindowDays: item.deduplicationWindowDays == null ? '' : String(item.deduplicationWindowDays),
+    valueMode: item.valueMode,
+    fixedValue: item.value == null ? '' : String(item.value),
+    reversalPolicy: item.reversalPolicy,
+    attributionDays: item.attributionDays == null ? '' : String(item.attributionDays),
+    targetUrl: item.targetUrl ?? '',
+  }
+}
+
+const VALUE_MODE_OPTIONS = [
+  { value: 'fixed', label: '1件あたりの金額を決める' },
+  { value: 'source', label: '連携元の金額を使う' },
+  { value: 'none', label: '金額を数えない' },
+]
+const DEDUP_OPTIONS = [
+  { value: 'every', label: '毎回数える' },
+  { value: 'once_per_friend', label: '1人1回だけ数える' },
+  { value: 'window', label: '決めた日数のあいだは1回だけ数える' },
+]
+const REVERSAL_OPTIONS = [
+  { value: 'manual', label: '人が取り消す' },
+  { value: 'source_cancelled', label: '連携元の取消に合わせる' },
+  { value: 'none', label: '取り消さない' },
+]
+
 function measureLabel(method: ConversionPoint['measureMethod']): string {
   if (method === 'url_reach') return '指定ページへの到達'
   if (method === 'webhook') return 'EC連携からの通知'
@@ -39,13 +93,13 @@ const EVENT_TYPE_LABELS: Record<string, string> = {
   keyword_sent: 'キーワード',
   liff_view: 'LIFF閲覧',
   custom: 'その他',
+  ec_order_confirmed: '購入',
+  ec_subscription_confirmed: '購入',
+  form_submitted: '申込・登録',
+  reservation_confirmed: '来店・参加',
+  webinar_completed: 'その他',
 }
 
-/** 過去28日ぶんに絞る。設計のKPIはどれも「過去28日」で数えている。 */
-function within28Days(iso: string): boolean {
-  return Date.now() - new Date(iso).getTime() <= 28 * 24 * 3600_000
-}
-import { Suspense } from 'react'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import { AffiliatorsTab, OffersTab, ApprovalQueue } from '@/app/affiliates/tabs'
 import AffiliatePaymentTab from '@/app/affiliates/payment-tab'
@@ -57,13 +111,61 @@ import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Dialog from '@/components/shared/dialog'
+import { TextField } from '@/components/shared/text-field'
 
-interface ConversionReportItem {
-  conversionPointId: string
-  conversionPointName: string
-  eventType: string
-  totalCount: number
-  totalValue: number
+const DAY_MS = 24 * 60 * 60 * 1000
+
+function definitionRange(days: number): { from: string; to: string } {
+  const end = new Date()
+  const start = new Date(end.getTime() - (days - 1) * DAY_MS)
+  const format = (value: Date) => new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(value)
+  return { from: format(start), to: format(end) }
+}
+
+/**
+ * 受け取ったCSVをそのまま保存させる。一覧とレポートで二重に書いていた
+ * 範囲再計算とファイル名違いだけの重複をここに寄せる(#513 L2)。
+ */
+function downloadCsvBlob(blob: Blob, filename: string): void {
+  const href = URL.createObjectURL(blob)
+  const anchor = document.createElement('a')
+  anchor.href = href
+  anchor.download = filename
+  anchor.click()
+  URL.revokeObjectURL(href)
+}
+
+function rangeLabel(days: number): string {
+  const { from, to } = definitionRange(days)
+  const format = (value: string) => {
+    const [, month, day] = value.split('-')
+    return `${Number(month)}/${Number(day)}`
+  }
+  return `この${days}日（${format(from)}〜${format(to)}）`
+}
+
+function sourceTriggerLabel(point: Pick<ConversionDefinitionListItem, 'measureMethod' | 'sourceType' | 'targetUrl'>): string {
+  if (point.measureMethod === 'url_reach') {
+    return point.targetUrl ? `サイトの「${point.targetUrl}」に到達` : '指定したページに到達'
+  }
+  if (point.measureMethod === 'webhook') {
+    if (point.sourceType === 'purchase' || point.sourceType === 'ec_order_confirmed') return 'EC連携の「注文が確定」'
+    if (point.sourceType === 'ec_subscription_confirmed') return 'EC連携の「定期が確定」'
+    if (point.sourceType === 'form_submit' || point.sourceType === 'form_submitted') return '回答フォームの送信'
+    if (point.sourceType === 'visit' || point.sourceType === 'reservation_confirmed') return '予約管理の「予約が確定」'
+    if (point.sourceType === 'webinar_completed') return 'ウェビナーの「視聴完了」'
+    return '接続したシステムから成果の通知を受信'
+  }
+  return '管理画面から担当者が記録'
+}
+
+function usageLabel(point: ConversionDefinitionListItem): string {
+  if (point.usageCount === 0) return 'どこからも使われていません'
+  if (point.usageNames?.length) return point.usageNames.join('・')
+  return `${point.usageCount.toLocaleString('ja-JP')}か所で使用中`
 }
 
 /**
@@ -78,7 +180,7 @@ const MERGED_TABS = [
   { key: 'affiliates', label: 'アフィリエイター' },
   { key: 'offers', label: '案件' },
   { key: 'approvals', label: '成果承認' },
-  { key: 'points', label: '成果地点（CV）' },
+  { key: 'points', label: '成果地点' },
   { key: 'report', label: 'レポート' },
   /*
     **「支払い」を戻した。** 設計 `njLGA`（16-1-C）はこのタブを持つのに、
@@ -104,22 +206,48 @@ const SORT_OPTIONS: Array<{ value: PointSort; label: string }> = [
   { value: 'name', label: '成果地点名順' },
 ]
 
-const PAGE_SIZE = 20
+const PAGE_SIZE = 6
 
-function ConversionsPageInner() {
-  const [points, setPoints] = useState<ConversionPoint[]>([])
-  const [report, setReport] = useState<ConversionReportItem[]>([])
-  const [reportAvailable, setReportAvailable] = useState(false)
+/**
+ * 画面の並びと言葉を、口の並びに写す(#513 M3)。
+ *
+ * 口の `sort` は `count_desc`・`value_desc`・`updated_desc`・`name_asc`
+ * の4つで、同値時は更新日・IDまで固定されている(共通一覧契約§3)。
+ * 画面の3つの並びはその先頭3つに対応する。`unused`(使われていない)は
+ * 口に無い絞りなので、完全に読み込んだあと画面で絞る。
+ */
+const SORT_TO_API: Record<PointSort, 'count_desc' | 'value_desc' | 'name_asc'> = {
+  'cv-desc': 'count_desc',
+  'value-desc': 'value_desc',
+  'name': 'name_asc',
+}
+
+function ConversionsPageInner({ accountId }: { accountId: string | null }) {
+  const [definitions, setDefinitions] = useState<ConversionDefinitionList | null>(null)
+  const [summaryReport, setSummaryReport] = useState<ConversionDefinitionReport | null>(null)
+  // 5000 件の安全弁で止まったときだけ KPI に注記を出す。通常は false。
+  const [listTruncated, setListTruncated] = useState(false)
   const [loading, setLoading] = useState(true)
-  const [pending, setPending] = useState<ConversionApprovalItem[]>([])
-  const [approved, setApproved] = useState<ConversionApprovalItem[]>([])
-  const [openOffers, setOpenOffers] = useState(0)
   const [query, setQuery] = useState('')
   const [sort, setSort] = useState<PointSort>('cv-desc')
+  const [status, setStatus] = useState<'all' | 'active' | 'stopped' | 'unused'>('all')
   const [page, setPage] = useState(1)
-  // 成果地点そのものが引けなかったときだけ「読み込めませんでした」を出す。
-  // KPI に使う承認・案件が落ちても、表は出せる。
   const [loadFailed, setLoadFailed] = useState(false)
+  const [exporting, setExporting] = useState(false)
+  const [exportError, setExportError] = useState('')
+  /**
+   * 読み込みの世代番号(#513 M6)。
+   *
+   * アカウントの高速切替や検索の連打で古い応答が残っていると、新しい
+   * 表示を上書きしてしまう。応答が返った時点で番号が変わっていたら捨てる。
+   */
+  const loadSeq = useRef(0)
+  /** 検索は1文字ごとに口を叩かず、少し待ってから読み直す。 */
+  const [debouncedQuery, setDebouncedQuery] = useState('')
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedQuery(query.trim()), 300)
+    return () => window.clearTimeout(timer)
+  }, [query])
   /*
    * **ブラウザの `confirm()` を使わない。**
    *
@@ -131,53 +259,85 @@ function ConversionsPageInner() {
    * はアカウントで絞らない）ので、押した時点のアカウントを窓に固定する必要は
    * ない。
    */
-  const [deleteTarget, setDeleteTarget] = useState<ConversionPoint | null>(null)
-  const [deleting, setDeleting] = useState(false)
-  const [deleteError, setDeleteError] = useState('')
+  const [stopTarget, setStopTarget] = useState<ConversionDefinitionListItem | null>(null)
+  const [stopImpact, setStopImpact] = useState<ConversionDefinitionDeleteImpact | null>(null)
+  const [stopImpactLoading, setStopImpactLoading] = useState(false)
+  const [stopAction, setStopAction] = useState<'stop' | 'replace' | 'delete'>('stop')
+  const [replacementId, setReplacementId] = useState('')
+  const [detailTarget, setDetailTarget] = useState<ConversionDefinitionListItem | null>(null)
+  const [stopping, setStopping] = useState(false)
+  const [stopError, setStopError] = useState('')
+  /*
+   * 編集（新版化）。開いたときの版を控えて、送るときにそのまま渡す（N-252）。
+   * 別の人が先に直していたら口が409を返すので、勝手に上書きしない。
+   */
+  const [editTarget, setEditTarget] = useState<ConversionDefinitionListItem | null>(null)
+  const [editForm, setEditForm] = useState<EditForm | null>(null)
+  const [editSaving, setEditSaving] = useState(false)
+  const [editError, setEditError] = useState('')
 
-  const load = async () => {
+  /**
+   * 一覧は検索・並びを口へ渡し、続く頁をすべて読む(#513 M2・M3)。
+   *
+   * 以前は先頭100件だけ読んで画面内で探していたので、101件目以降が
+   * 「すべて N」と出ながら見えず、検索にも掛からなかった。口は
+   * `q`・`sort`・`cursor/nextCursor` を受け付けるので、条件に合うものを
+   * 残らず読む(50頁・5000件で止め、切れたら断る)。状態の絞り(`active`・`stopped`・
+   * `unused`)は口に `unused` が無いため、完全な一覧のあと画面で絞る。
+   * そうしても件数は狂わない(1頁の切り取りを再加工しない)。
+   */
+  const load = useCallback(async () => {
+    const seq = ++loadSeq.current
     setLoading(true)
     setLoadFailed(false)
-    setPoints([])
-    setReport([])
-    setReportAvailable(false)
-    setPending([])
-    setApproved([])
-    setOpenOffers(0)
-    try {
-      // 上のKPIは成果地点だけでは出ない。承認の待ち・確定と、公開中の案件を
-      // 一緒に引く。1つ落ちても他は出せるよう allSettled。
-      const [pointsRes, reportRes, pendingRes, approvedRes, offersRes] = await Promise.allSettled([
-        api.conversions.points(),
-        api.conversions.report(),
-        api.conversionApprovals.list({ status: 'pending', limit: 200 }),
-        api.conversionApprovals.list({ status: 'approved', limit: 200 }),
-        api.affiliateOffers.list({ activeOnly: true }),
-      ])
-      if (pointsRes.status === 'fulfilled' && pointsRes.value.success && Array.isArray(pointsRes.value.data)) {
-        setPoints(pointsRes.value.data)
+    setDefinitions(null)
+    setSummaryReport(null)
+    setListTruncated(false)
+    const range = definitionRange(30)
+    const listParams = {
+      ...range,
+      lineAccountId: accountId ?? undefined,
+      q: debouncedQuery || undefined,
+      sort: SORT_TO_API[sort],
+      limit: 100,
+    }
+    // cursor を辿って条件に合うものを残らず読む。安全弁として 50 頁
+    // (5000 件)で止め、切れたら `truncated` で本文に断る(#505 重大2の流儀)。
+    const fetchAllDefinitions = async (): Promise<{ data: ConversionDefinitionList; truncated: boolean } | null> => {
+      const items: ConversionDefinitionList['items'] = []
+      let cursor: string | undefined
+      let first: ConversionDefinitionList | null = null
+      for (let page = 0; page < 50; page += 1) {
+        const response = await api.conversions.definitions({ ...listParams, cursor })
+        if (!response.success || !Array.isArray(response.data.items)) return null
+        if (!first) first = response.data
+        items.push(...response.data.items)
+        cursor = response.data.pagination.nextCursor ?? undefined
+        if (!cursor) return { data: { ...response.data, items }, truncated: false }
       }
-      else setLoadFailed(true)
-      if (reportRes.status === 'fulfilled' && reportRes.value.success && Array.isArray(reportRes.value.data)) {
-        setReport(reportRes.value.data)
-        setReportAvailable(true)
-      }
-      if (pendingRes.status === 'fulfilled' && pendingRes.value.success && Array.isArray(pendingRes.value.data)) {
-        setPending(pendingRes.value.data)
-      }
-      if (approvedRes.status === 'fulfilled' && approvedRes.value.success && Array.isArray(approvedRes.value.data)) {
-        setApproved(approvedRes.value.data)
-      }
-      if (offersRes.status === 'fulfilled' && offersRes.value.success && Array.isArray(offersRes.value.data)) {
-        setOpenOffers(offersRes.value.data.length)
-      }
-    } catch {
+      return first ? { data: { ...first, items }, truncated: true } : null
+    }
+    const [listResult, reportResult] = await Promise.allSettled([
+      fetchAllDefinitions(),
+      api.conversions.definitionReport({ ...range, lineAccountId: accountId ?? undefined }),
+    ])
+    // 古い読み込みの応答は捨てる(#513 M6)。アカウント切替や検索連打で
+    // 先に叩いた方が後に返っても、新しい表示を上書きしない。
+    if (loadSeq.current !== seq) return
+    if (listResult.status === 'fulfilled' && listResult.value !== null) {
+      setDefinitions(listResult.value.data)
+      setListTruncated(listResult.value.truncated)
+    } else {
       setLoadFailed(true)
     }
+    if (reportResult.status === 'fulfilled' && reportResult.value.success
+      && Array.isArray(reportResult.value.data.byDefinition)) {
+      setSummaryReport(reportResult.value.data)
+    }
     setLoading(false)
-  }
+  }, [accountId, debouncedQuery, sort])
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { void load() }, [load])
 
   /**
    * 成果地点を消す。
@@ -186,49 +346,175 @@ function ConversionsPageInner() {
    * 「消せませんでした」と出る。消えているのに失敗に見える）。
    * 失敗は握りつぶさず、窓の中に運用者の言葉で出す。
    */
-  const runDelete = async () => {
-    if (!deleteTarget || deleting) return
-    setDeleting(true)
-    setDeleteError('')
+  const openEdit = (target: ConversionDefinitionListItem) => {
+    setDetailTarget(null)
+    setEditTarget(target)
+    setEditForm(toEditForm(target))
+    setEditError('')
+  }
+
+  /**
+   * 編集を送る（N-252）。
+   *
+   * **開いたときの版をそのまま渡す。** 送る直前に読み直して版を取り直すと、
+   * 「別の人が直したこと」を自分で消してしまう。口が409を返したら、
+   * 上書きせずに読み直しを促す。
+   */
+  const submitEdit = async () => {
+    if (!editTarget || !editForm || editSaving) return
+    const name = editForm.name.trim()
+    if (!name) {
+      setEditError('名前を入れてください')
+      return
+    }
+    if (editForm.valueMode === 'fixed' && !editForm.fixedValue.trim()) {
+      setEditError('1件あたりの金額を入れてください')
+      return
+    }
+    if (editForm.deduplicationMode === 'window' && !editForm.deduplicationWindowDays.trim()) {
+      setEditError('数えない日数を入れてください')
+      return
+    }
+    setEditSaving(true)
+    setEditError('')
     try {
-      const res = await api.conversions.deletePoint(deleteTarget.id)
+      const res = await api.conversions.reviseDefinition(editTarget.id, {
+        // 版は編集対象の控えが正本。入力の側にも持つと、片方だけ直したときに食い違う。
+        expectedVersion: editTarget.version,
+        name,
+        sourceType: editForm.sourceType,
+        sourceConfig: editTarget.sourceConfig,
+        deduplicationMode: editForm.deduplicationMode,
+        deduplicationWindowDays: editForm.deduplicationMode === 'window'
+          ? Number(editForm.deduplicationWindowDays) : null,
+        valueMode: editForm.valueMode,
+        fixedValue: editForm.valueMode === 'fixed' ? Number(editForm.fixedValue) : null,
+        reversalPolicy: editForm.reversalPolicy,
+        attributionDays: editForm.attributionDays.trim() ? Number(editForm.attributionDays) : null,
+        targetUrl: editForm.targetUrl.trim() ? editForm.targetUrl.trim() : null,
+        reason: '管理画面で成果地点を編集',
+      })
       if (!res.success) throw new Error(res.error)
-      setDeleteTarget(null)
+      setEditTarget(null)
+      setEditForm(null)
       await load()
-    } catch {
-      setDeleteError('この成果地点を削除できませんでした。状態を読み直してから、もう一度お試しください。')
+    } catch (error) {
+      const message = error instanceof Error ? error.message : ''
+      setEditError(message.includes('更新されています')
+        ? 'ほかの人がこの成果地点を先に直しました。上書きしていません。画面を閉じて読み直してから、もう一度お試しください。'
+        : message || '編集できませんでした。入力を確かめて、もう一度お試しください。')
     } finally {
-      setDeleting(false)
+      setEditSaving(false)
     }
   }
 
-  // 成果地点ごとのCV数。レポートは成果地点IDで返る。
-  const countByPoint = useMemo(() => {
-    const m = new Map<string, number>()
-    for (const r of report) m.set(r.conversionPointId, r.totalCount)
-    return m
-  }, [report])
+  const openStop = async (target: ConversionDefinitionListItem) => {
+    setDetailTarget(null)
+    setStopTarget(target)
+    setStopImpact(null)
+    setStopError('')
+    setStopAction('stop')
+    setReplacementId('')
+    setStopImpactLoading(true)
+    try {
+      const response = await api.conversions.definitionDeleteImpact(target.id)
+      if (!response.success) throw new Error(response.error)
+      setStopImpact(response.data)
+    } catch {
+      setStopError('利用先と停止の影響を読み込めませんでした。画面を閉じて、もう一度お試しください。')
+    } finally {
+      setStopImpactLoading(false)
+    }
+  }
+
+  /**
+   * 影響が読めていないまま確定を押しても、黙って終わらない(#513 M4)。
+   *
+   * 読み込み中は確定ボタンを `busy` で止め、読み込み失敗時は窓の中に
+   * 理由を出す。閉じて開き直すと `openStop` が影響を読み直す。
+   */
+  const runStop = async () => {
+    if (!stopTarget || stopping) return
+    if (stopImpactLoading) return
+    if (!stopImpact) {
+      setStopError('利用先と停止の影響を読み込めませんでした。画面を閉じて、もう一度お試しください。')
+      return
+    }
+    setStopping(true)
+    setStopError('')
+    try {
+      const replacement = stopImpact.replacementCandidates.find((item) => item.id === replacementId)
+      const res = stopAction === 'replace'
+        ? replacement
+          ? await api.conversions.replaceDefinition(stopTarget.id, {
+              replacementId: replacement.id,
+              expectedVersion: stopImpact.definition.version,
+              replacementExpectedVersion: replacement.version,
+              reason: '管理画面で利用先を差し替え',
+            })
+          : { success: false as const, error: '差し替え先を選んでください' }
+        : stopAction === 'delete'
+          ? await api.conversions.deleteDefinition(stopTarget.id, {
+              expectedVersion: stopImpact.definition.version,
+              reason: '未使用の成果地点を削除',
+            })
+          : await api.conversions.stopDefinition(stopTarget.id, {
+              expectedVersion: stopImpact.definition.version,
+              reason: '管理画面で計測を停止',
+            })
+      if (!res.success) throw new Error(res.error)
+      setStopTarget(null)
+      await load()
+    } catch {
+      setStopError(stopAction === 'replace'
+        ? '利用先を差し替えられませんでした。状態を読み直して、もう一度お試しください。'
+        : stopAction === 'delete'
+          ? 'この成果地点は削除できませんでした。利用先と成果件数を確認してください。'
+          : 'この成果地点の計測を止められませんでした。状態を読み直してから、もう一度お試しください。')
+    } finally {
+      setStopping(false)
+    }
+  }
+
+  const exportCsv = async () => {
+    if (exporting) return
+    setExporting(true)
+    setExportError('')
+    try {
+      const blob = await api.conversions.exportDefinitions({
+        ...definitionRange(30), lineAccountId: accountId ?? undefined,
+      })
+      downloadCsvBlob(blob, `conversion-definitions-${definitionRange(1).to}.csv`)
+    } catch {
+      setExportError('CSVを書き出せませんでした。権限を確認して、もう一度お試しください。')
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  const points = useMemo(() => definitions?.items ?? [], [definitions])
 
   const kpi = useMemo(() => {
-    const approvedRecent = approved.filter((a) => within28Days(a.createdAt))
     return {
-      confirmed: approvedRecent.length,
-      confirmedYen: approvedRecent.reduce((s, a) => s + (a.value ?? 0), 0),
-      pendingCount: pending.length,
-      pendingYen: pending.reduce((s, a) => s + (a.value ?? 0), 0),
+      currentCount: summaryReport?.kpis.netCount ?? points.reduce((sum, row) => sum + row.metrics.netCount, 0),
+      previousCount: summaryReport?.kpis.previousNetCount ?? null,
+      currentValue: summaryReport?.kpis.netValue ?? points.reduce((sum, row) => sum + row.metrics.netValue, 0),
+      unusedCount: points.filter((row) => row.usageCount === 0).length,
     }
-  }, [approved, pending])
+  }, [points, summaryReport])
 
+  /**
+   * 画面で絞るのは状態だけ(#513 M3)。探す言葉と並びは口が済ませているので、
+   * ここで探し直し・並べ直しはしない(口の `name_asc` はバイナリ順で、
+   * 画面の `localeCompare` と順がずれるため)。
+   */
   const shown = useMemo(() => {
-    const q = query.trim()
-    const matched = q ? points.filter((p) => p.name.includes(q)) : points
-    return matched.toSorted((left, right) => {
-      if (sort === 'name') return left.name.localeCompare(right.name, 'ja')
-      if (sort === 'value-desc') return (right.value ?? 0) - (left.value ?? 0)
-      if (!reportAvailable) return 0
-      return (countByPoint.get(right.id) ?? 0) - (countByPoint.get(left.id) ?? 0)
+    return points.filter((point) => {
+      if (status === 'all') return true
+      if (status === 'unused') return point.usageCount === 0
+      return point.status === status
     })
-  }, [countByPoint, points, query, reportAvailable, sort])
+  }, [points, status])
 
   const pageCount = Math.max(1, Math.ceil(shown.length / PAGE_SIZE))
   const current = useMemo(
@@ -245,82 +531,108 @@ function ConversionsPageInner() {
 
       <div data-design="KPIs" className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <KpiCard
-          title="確定した成果"
-          value={kpi.confirmed}
-          unit="件"
-          detail="過去28日"
+          title="決めてある成果地点"
+          value={definitions?.pagination.total ?? null}
+          unit="個"
+          detail={definitions ? `動いているもの ${definitions.stateCounts.active}個` : '読み込み中'}
           loading={loading}
         />
         <KpiCard
-          title="承認待ち"
-          value={kpi.pendingCount}
+          title="この30日の成果"
+          value={summaryReport ? kpi.currentCount : null}
           unit="件"
-          detail={`合計 ¥${kpi.pendingYen.toLocaleString()}`}
-          action={{ label: '成果承認', href: '/conversions?tab=approvals' }}
+          badge={summaryReport?.kpis.countChangeRate == null
+            ? undefined
+            : `${summaryReport.kpis.countChangeRate > 0 ? '+' : ''}${summaryReport.kpis.countChangeRate}%`}
+          detail={kpi.previousCount === null
+            ? '前の30日の比較は読み込めませんでした'
+            : `前の30日 ${kpi.previousCount.toLocaleString()}件`}
           loading={loading}
         />
-        {/* 設計は「確定報酬」。報酬そのものを持つ列が無いので、確定した成果の
-            金額を出している。案件の料率で計算した額とは一致しない。 */}
         <KpiCard
-          title="確定報酬"
-          value={kpi.confirmedYen}
+          title="金額がついた成果"
+          value={summaryReport ? kpi.currentValue : null}
           unit="円"
-          detail="過去28日・成果の金額"
+          detail={`${points.filter((point) => point.value !== null).length}個の成果地点で金額を記録${listTruncated ? '（直近5000件まで）' : ''}`}
           loading={loading}
         />
         <KpiCard
-          title="公開中の案件"
-          value={openOffers}
-          unit="件"
-          detail="紹介できる案件"
-          action={{ label: '案件', href: '/conversions?tab=offers' }}
+          title="1件も起きていない"
+          value={definitions ? kpi.unusedCount : null}
+          unit="個"
+          badge={kpi.unusedCount > 0 ? '確認' : undefined}
+          badgeTone={kpi.unusedCount > 0 ? 'neutral' : 'accent'}
+          detail={listTruncated ? '決めたのに使われていません（直近5000件まで）' : '決めたのに使われていません'}
           loading={loading}
         />
       </div>
+
+      <p className="bg-info-bg text-info mb-4 rounded-control px-4 py-3 text-sm font-semibold">
+        成果地点は「数え方の決めごと」です。ここで決めたものを、案件・自動応答・分析などから呼び出して使います。
+      </p>
+
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <Button href="/conversions/new" variant="primary">＋ 成果地点をつくる</Button>
+        <Button onClick={() => void exportCsv()} disabled={exporting}>
+          {exporting ? '書き出しています' : 'CSVで書き出す'}
+        </Button>
+      </div>
+      {exportError ? <p className="text-danger mb-3 text-sm" role="alert">{exportError}</p> : null}
 
       <div
         data-design="Bar"
-        className="bg-canvas rounded-card border-hairline mb-3 flex flex-wrap items-center gap-2 border p-3"
+        className="mb-3 space-y-3"
       >
-        <SearchField
-          value={query}
-          onChange={(value) => {
-            setQuery(value)
-            setPage(1)
-          }}
-          onClear={() => {
-            setQuery('')
-            setPage(1)
-          }}
-          placeholder="CV名で検索"
-          aria-label="CV名で検索"
-          className="min-w-64 flex-1"
-        />
-        <Select
-          aria-label="並び順"
-          label="並び順"
-          value={sort}
-          options={SORT_OPTIONS}
-          onChange={(value) => {
-            setSort(value as PointSort)
-            setPage(1)
-          }}
-        />
-        {/*
-          **期間と書き出しは押せる形にしない。**
-          成果地点の一覧も `/api/conversions/report` も期間を受け取らないので、
-          「今月」に絞った数は作れない。書き出しの口（CSV）も無い。
-          押せない札を置くより、無いことを言葉で出す。
-        */}
-        <p className="text-ink-faint text-caption">
-          <span className="text-ink-secondary font-medium">期間</span>{' '}
-          <span className="tabular-nums">—</span>{' '}
-          まだ繋がっていません。期間で絞る仕組みが接続されると表示されます。
-        </p>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <SearchField
+            value={query}
+            onChange={(value) => {
+              setQuery(value)
+              setPage(1)
+            }}
+            onClear={() => {
+              setQuery('')
+              setPage(1)
+            }}
+            placeholder="成果地点の名前で検索"
+            aria-label="成果地点の名前で検索"
+            className="min-w-64"
+          />
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-ink-secondary text-sm tabular-nums">{rangeLabel(30)}</p>
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {([
+            ['all', `すべて ${definitions?.pagination.total ?? 0}`],
+            ['active', `動いている ${definitions?.stateCounts.active ?? 0}`],
+            ['stopped', `止めている ${definitions?.stateCounts.stopped ?? 0}`],
+            ['unused', `どこからも使われていない ${kpi.unusedCount}`],
+          ] as const).map(([value, label]) => (
+            <Button
+              key={value}
+              variant={status === value ? 'primary' : 'secondary'}
+              aria-pressed={status === value}
+              onClick={() => {
+                setStatus(value)
+                setPage(1)
+              }}
+            >
+              {label}
+            </Button>
+          ))}
+          <Select
+            aria-label="並び順"
+            value={sort}
+            options={SORT_OPTIONS}
+            onChange={(value) => {
+              setSort(value as PointSort)
+              setPage(1)
+            }}
+          />
+        </div>
       </div>
 
-      {/* 設計の表は7列。報酬と状態は持っている列が無いので「—」を出す。
-          列ごと消すと、その考え方が無い画面に見えてしまう。 */}
       {loading ? (
         <ListState kind="loading" title="成果地点を読み込んでいます" />
       ) : loadFailed ? (
@@ -341,77 +653,58 @@ function ConversionsPageInner() {
           description={
             query
               ? '検索の言葉を変えてください。'
-              : '右上の「成果地点を追加」から登録すると、ここに出ます。'
+              : '右上の「成果地点をつくる」から登録すると、ここに出ます。'
           }
         />
       ) : (
-        <div data-design="Table" className="bg-canvas rounded-card border-hairline overflow-x-auto border">
-          <table className="w-full min-w-[880px]">
+        <div data-design="Table" className="bg-canvas rounded-card border-hairline border">
+          <table className="w-full table-fixed">
             <thead>
               <TableHeadRow>
-                <Th>成果地点（CV）名</Th>
-                <Th>種別</Th>
-                <Th>計測方法</Th>
-                <Th align="right">成果単価</Th>
-                <Th align="right">CV数</Th>
-                <Th>報酬</Th>
-                <Th>状態</Th>
+                <Th>成果地点</Th>
+                <Th>何が起きたら数えるか</Th>
+                <Th align="right">この30日</Th>
+                <Th align="right">金額</Th>
+                <Th>使われている場所</Th>
                 <Th align="right">操作</Th>
               </TableHeadRow>
             </thead>
             <tbody className="divide-hairline divide-y">
               {current.map((point) => (
                 <tr key={point.id} className="hover:bg-canvas-sunken">
-                  <td className="text-ink px-4 py-3 text-sm font-medium">
+                  <td className="text-ink w-1/5 px-4 py-3 text-sm font-medium">
                     {point.name}
-                    {point.targetUrl && (
-                      <p className="text-ink-faint mt-0.5 max-w-[22rem] truncate text-[11px]" title={point.targetUrl}>
-                        {point.targetUrl}
-                      </p>
-                    )}
+                    <p className="text-ink-faint mt-0.5 text-xs">{EVENT_TYPE_LABELS[point.sourceType] ?? 'その他'}</p>
                   </td>
-                  <td className="text-ink-secondary px-4 py-3 text-sm">
-                    {EVENT_TYPE_LABELS[point.eventType] ?? point.eventType}
-                  </td>
-                  <td className="text-ink-secondary px-4 py-3 text-sm">
-                    <div className="flex flex-wrap items-center gap-1">
-                      <span className="bg-canvas-sunken text-ink-secondary rounded-pill px-2 py-0.5 text-[11px] whitespace-nowrap">
-                        {measureLabel(point.measureMethod)}
-                      </span>
-                      {point.countRepeat === false && (
-                        <span className="bg-canvas-sunken text-ink-secondary rounded-pill px-2 py-0.5 text-[11px] whitespace-nowrap">
-                          一人一回
-                        </span>
-                      )}
-                      {point.attributionDays != null && (
-                        <span className="bg-canvas-sunken text-ink-secondary rounded-pill px-2 py-0.5 text-[11px] whitespace-nowrap tabular-nums">
-                          {point.attributionDays}日
-                        </span>
-                      )}
-                    </div>
-                  </td>
-                  <td className="text-ink-secondary px-4 py-3 text-right text-sm tabular-nums">
-                    {point.value !== null ? `¥${point.value.toLocaleString()}` : '—'}
+                  <td className="text-ink-secondary w-1/4 px-4 py-3 text-sm">
+                    {sourceTriggerLabel(point)}
+                    <p className="text-ink-faint mt-0.5 text-xs">
+                      {measureLabel(point.measureMethod)}・{point.countRepeat === false ? '1人1回' : '毎回数える'}
+                    </p>
                   </td>
                   <td className="text-ink px-4 py-3 text-right text-sm tabular-nums">
-                    {reportAvailable ? (countByPoint.get(point.id) ?? 0) : '—'}
+                    {point.metrics.netCount.toLocaleString('ja-JP')}件
                   </td>
-                  {/* 報酬は案件ごとの料率で決まる。成果地点と案件を結ぶ列が無いので出せない。 */}
-                  <td className="text-ink-faint px-4 py-3 text-sm">—</td>
-                  {/* 計測を止める仕組みが無い。作った成果地点は常に計測中。 */}
-                  <td className="px-4 py-3 text-sm">
-                    <span className="bg-success-bg text-success rounded-pill px-2 py-0.5 text-[11px]">計測中</span>
+                  <td className="text-ink-secondary px-4 py-3 text-right text-sm tabular-nums">
+                    {point.value === null
+                      ? '金額なし'
+                      : `¥${point.metrics.netValue.toLocaleString('ja-JP')}`}
+                  </td>
+                  <td className={point.usageCount === 0
+                    ? 'text-warning w-1/5 px-4 py-3 text-sm'
+                    : 'text-ink-secondary w-1/5 px-4 py-3 text-sm'}>
+                    {usageLabel(point)}
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <button
-                      onClick={() => {
-                        setDeleteError('')
-                        setDeleteTarget(point)
-                      }}
-                      className="text-danger text-sm hover:underline"
-                    >
-                      削除
-                    </button>
+                    <div className="flex justify-end gap-2">
+                      <Button onClick={() => setDetailTarget(point)}>中身を見る</Button>
+                      <Button
+                        href={`/analytics?conversionPointId=${encodeURIComponent(point.id)}`}
+                        variant="primary"
+                      >
+                        使う場所を足す
+                      </Button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -421,56 +714,230 @@ function ConversionsPageInner() {
       )}
 
       <div data-design="tf" className="mt-3 flex flex-wrap items-center justify-between gap-2">
-        <p className="text-ink-faint text-xs">
-          成果が出たあとの承認は「成果承認」タブで行います。旧デザインではCV計測とアフィリエイトが別ページに分かれていて、定義と承認の間で画面を往復する必要がありました。
-          <br />
-          書き出しはまだ繋がっていません。CSVを作る口が接続されると、この場所に操作が出ます。
-        </p>
+        <p className="text-ink-faint text-xs">利用先の名前は詳細で確認できます。追加するときは分析画面でこの成果地点を選びます。</p>
         <div className="flex items-center gap-2 text-xs">
-          <span className="text-ink-faint tabular-nums">全 {shown.length} 件</span>
+          <span className="text-ink-faint tabular-nums">
+            成果地点 {definitions?.pagination.total ?? shown.length}個中 {shown.length === 0 ? 0 : (page - 1) * PAGE_SIZE + 1}〜
+            {Math.min(page * PAGE_SIZE, shown.length)}個を表示
+          </span>
           <Pagination page={page} pageCount={pageCount} onPageChange={setPage} />
         </div>
       </div>
 
+      <Dialog
+        open={detailTarget !== null}
+        title={detailTarget?.name ?? ''}
+        description="この成果地点の数え方と利用状況です。"
+        onCancel={() => setDetailTarget(null)}
+        footer={detailTarget ? (
+          <div className="flex justify-end gap-2">
+            <Button onClick={() => setDetailTarget(null)}>閉じる</Button>
+            {detailTarget.status === 'active' ? (
+              <Button onClick={() => openEdit(detailTarget)}>
+                編集
+              </Button>
+            ) : null}
+            {detailTarget.status === 'active' ? (
+              <Button onClick={() => void openStop(detailTarget)}>
+                停止・削除
+              </Button>
+            ) : null}
+          </div>
+        ) : null}
+      >
+        {detailTarget ? (
+          <dl className="grid grid-cols-2 gap-3 text-sm">
+            <div><dt className="text-ink-faint">何が起きたら数えるか</dt><dd className="text-ink mt-1 font-semibold">{sourceTriggerLabel(detailTarget)}</dd></div>
+            <div><dt className="text-ink-faint">数え方</dt><dd className="text-ink mt-1 font-semibold">{detailTarget.countRepeat ? '毎回数える' : '1人1回'}</dd></div>
+            <div><dt className="text-ink-faint">この30日</dt><dd className="text-ink mt-1 font-semibold">{detailTarget.metrics.netCount.toLocaleString('ja-JP')}件</dd></div>
+            <div><dt className="text-ink-faint">利用先</dt><dd className="text-ink mt-1 font-semibold">{usageLabel(detailTarget)}</dd></div>
+            <div><dt className="text-ink-faint">取消内訳</dt><dd className="text-ink mt-1 font-semibold">{detailTarget.metrics.cancellationCount == null ? '取消台帳は未接続' : `${detailTarget.metrics.cancellationCount}件・¥${(detailTarget.metrics.cancellationValue ?? 0).toLocaleString('ja-JP')}`}</dd></div>
+          </dl>
+        ) : null}
+      </Dialog>
+
+      <Dialog
+        open={editTarget !== null && editForm !== null}
+        title={editTarget ? `「${editTarget.name}」を編集` : ''}
+        description="直すと次の版になります。過去に数えた成果と金額は、そのまま残ります。"
+        onCancel={() => { setEditTarget(null); setEditForm(null) }}
+        footer={(
+          <div className="flex justify-end gap-2">
+            <Button onClick={() => { setEditTarget(null); setEditForm(null) }}>やめる</Button>
+            <Button variant="primary" disabled={editSaving} onClick={() => void submitEdit()}>
+              {editSaving ? '保存中...' : 'この内容にする'}
+            </Button>
+          </div>
+        )}
+      >
+        {editForm ? (
+          <div className="space-y-3 text-sm">
+            <label className="block">
+              <span className="text-ink-faint text-xs">名前</span>
+              <TextField
+                aria-label="成果地点の名前"
+                value={editForm.name}
+                maxLength={120}
+                onChange={(event) => setEditForm({ ...editForm, name: event.target.value })}
+              />
+            </label>
+            <label className="block">
+              <span className="text-ink-faint text-xs">金額の決め方</span>
+              <Select
+                aria-label="金額の決め方"
+                value={editForm.valueMode}
+                options={VALUE_MODE_OPTIONS}
+                onChange={(value) => setEditForm({ ...editForm, valueMode: value as EditForm['valueMode'] })}
+              />
+            </label>
+            {editForm.valueMode === 'fixed' ? (
+              <label className="block">
+                <span className="text-ink-faint text-xs">1件あたりの金額</span>
+                <TextField
+                  aria-label="1件あたりの金額"
+                  inputMode="numeric"
+                  value={editForm.fixedValue}
+                  onChange={(event) => setEditForm({ ...editForm, fixedValue: event.target.value })}
+                />
+              </label>
+            ) : null}
+            <label className="block">
+              <span className="text-ink-faint text-xs">同じ人を何回数えるか</span>
+              <Select
+                aria-label="同じ人を何回数えるか"
+                value={editForm.deduplicationMode}
+                options={DEDUP_OPTIONS}
+                onChange={(value) => setEditForm({ ...editForm, deduplicationMode: value as EditForm['deduplicationMode'] })}
+              />
+            </label>
+            {editForm.deduplicationMode === 'window' ? (
+              <label className="block">
+                <span className="text-ink-faint text-xs">数えない日数（1〜365）</span>
+                <TextField
+                  aria-label="数えない日数"
+                  inputMode="numeric"
+                  value={editForm.deduplicationWindowDays}
+                  onChange={(event) => setEditForm({ ...editForm, deduplicationWindowDays: event.target.value })}
+                />
+              </label>
+            ) : null}
+            <label className="block">
+              <span className="text-ink-faint text-xs">取り消しの扱い</span>
+              <Select
+                aria-label="取り消しの扱い"
+                value={editForm.reversalPolicy}
+                options={REVERSAL_OPTIONS}
+                onChange={(value) => setEditForm({ ...editForm, reversalPolicy: value as EditForm['reversalPolicy'] })}
+              />
+            </label>
+            <p className="text-ink-faint text-xs leading-5">
+              いま使っている場所（{usageLabel(editTarget!)}）は、この成果地点のまま次の版へ引き継がれます。
+              過去の成果は数えたときの金額のままなので、集計額は変わりません。
+            </p>
+            {editError ? <p className="text-xs font-semibold text-ink">{editError}</p> : null}
+          </div>
+        ) : null}
+      </Dialog>
+
       <ConfirmDialog
-        open={deleteTarget !== null}
+        open={stopTarget !== null}
         designNode="d8d3Mz"
-        title={deleteTarget ? `「${deleteTarget.name}」を削除しますか？` : ''}
-        description="この成果地点で記録した成果も一緒に消えます。承認済み・承認待ちの成果もまとめて消え、集計から外れます。この操作は取り消せません。"
-        confirmLabel="削除する"
-        destructive
-        busy={deleting}
-        error={deleteError}
-        onConfirm={() => void runDelete()}
+        title={stopTarget ? `「${stopTarget.name}」を削除しますか？` : ''}
+        description="使っている場所と、止めたあとに残る記録を確認してから操作を選びます。"
+        confirmLabel={stopAction === 'replace'
+          ? '差し替えて数えるのをやめる'
+          : stopAction === 'delete' ? 'この成果地点を削除する' : '数えるのをやめる'}
+        busy={stopping || stopImpactLoading}
+        error={stopError}
+        onConfirm={() => void runStop()}
         onCancel={() => {
-          if (deleting) return
-          setDeleteTarget(null)
-          setDeleteError('')
+          if (stopping) return
+          setStopTarget(null)
+          setStopImpact(null)
+          setStopError('')
         }}
       >
-        {deleteTarget && (
-          <div className="text-ink-secondary space-y-2 text-sm">
-            <p>
-              種別：{EVENT_TYPE_LABELS[deleteTarget.eventType] ?? deleteTarget.eventType} ／ 計測方法：
-              {measureLabel(deleteTarget.measureMethod)}
-            </p>
-            <p>
-              記録した成果：
-              {reportAvailable ? (
-                <span className="tabular-nums">{(countByPoint.get(deleteTarget.id) ?? 0).toLocaleString('ja-JP')}件</span>
-              ) : (
-                <>— 読み込めませんでした。件数が分からないまま消すことになります。</>
-              )}
-            </p>
-            {/*
-              **取れない数を作らない。**
-              オートメーション（CV発火）やアフィリエイト案件がこの成果地点を
-              指していても、それを数える口が無い。「0件」と書くと、参照が
-              無いのか数えていないのか区別が付かなくなる。
-            */}
-            <p className="text-ink-faint text-xs">
-              オートメーション・アフィリエイト案件からの参照は数えられていません。消したあとに参照が切れることがあります。
-            </p>
+        {stopTarget && (
+          <div className="space-y-4">
+            <section className="border-danger bg-danger-bg rounded-control border p-4">
+              <h3 className="text-danger text-sm font-bold">いま、この成果地点を使っている場所</h3>
+              <div className="border-danger/20 mt-3 rounded-control border bg-canvas px-3 py-3">
+                {stopImpactLoading ? (
+                  <p className="text-ink-faint text-sm">利用先と影響を読み込んでいます。</p>
+                ) : stopImpact?.usages.length ? (
+                  <ul className="space-y-2">
+                    {stopImpact.usages.map((usage) => (
+                      <li key={usage.id} className="text-ink text-sm">
+                        <span className="font-semibold">{usage.usageName}</span>
+                        <span className="text-ink-faint ml-2 text-xs">停止後も記録を残します</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-ink text-sm font-semibold">どこからも使われていません</p>
+                )}
+                <p className="text-ink-faint mt-2 text-xs leading-relaxed">
+                  利用先は実データです。停止後も、過去の成果と利用先の記録は残ります。
+                </p>
+              </div>
+            </section>
+
+            <section className="bg-canvas-sunken rounded-control px-4 py-3">
+              <p className="text-ink-secondary text-sm">
+                これまでに数えた{' '}
+                <strong className="text-ink tabular-nums">
+                  {stopTarget.metrics.netCount.toLocaleString('ja-JP')}件
+                </strong>
+                の記録と金額は、そのまま残ります。停止の影響は {stopImpact?.stopImpact.affectedUsageCount ?? '—'}か所です。
+              </p>
+            </section>
+
+            <section>
+              <h3 className="text-ink text-sm font-bold">どうしますか？</h3>
+              <div className="mt-2 space-y-2">
+                <label className={`rounded-control flex cursor-pointer items-start gap-3 border p-3 ${stopAction === 'stop' ? 'border-accent bg-accent-soft' : 'border-hairline'}`}>
+                  <input type="radio" name="conversion-stop-action" checked={stopAction === 'stop'} onChange={() => setStopAction('stop')} className="mt-0.5" />
+                  <div>
+                    <p className="text-ink text-sm font-semibold">数えるのをやめる（おすすめ）</p>
+                    <p className="text-ink-faint mt-0.5 text-xs">これから先は数えません。過去の記録と分析は残します。</p>
+                  </div>
+                </label>
+                <label className={`rounded-control flex cursor-pointer items-start gap-3 border p-3 ${stopAction === 'replace' ? 'border-accent bg-accent-soft' : 'border-hairline'}`}>
+                  <input type="radio" name="conversion-stop-action" checked={stopAction === 'replace'} onChange={() => setStopAction('replace')} className="mt-0.5" disabled={!stopImpact?.replacementCandidates.length} />
+                  <div>
+                    <p className="text-ink text-sm font-semibold">別の成果地点に差し替えてから削除する</p>
+                    <p className="text-ink-faint mt-0.5 text-xs">利用先を別の成果地点へ切り替え、過去の数字を残します。</p>
+                    {stopAction === 'replace' ? (
+                      <Select
+                        aria-label="差し替え先の成果地点"
+                        value={replacementId}
+                        options={[
+                          { value: '', label: '差し替え先を選ぶ' },
+                          ...(stopImpact?.replacementCandidates ?? []).map((item) => ({ value: item.id, label: item.name })),
+                        ]}
+                        onChange={setReplacementId}
+                        className="mt-2"
+                      />
+                    ) : null}
+                  </div>
+                </label>
+                <label className={`rounded-control flex items-start gap-3 border p-3 ${stopImpact?.canDelete ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'} ${stopAction === 'delete' ? 'border-accent bg-accent-soft' : 'border-hairline'}`}>
+                  <input type="radio" name="conversion-stop-action" checked={stopAction === 'delete'} onChange={() => setStopAction('delete')} className="mt-0.5" disabled={!stopImpact?.canDelete} />
+                  <div>
+                    <p className="text-ink text-sm font-semibold">このまま削除する</p>
+                    <p className="text-ink-faint mt-0.5 text-xs">{stopImpact?.canDelete
+                      ? '成果0件・利用先0件のため、この成果地点だけを削除できます。'
+                      : '成果または利用先があるため、物理削除は選べません。'}</p>
+                  </div>
+                </label>
+              </div>
+            </section>
+
+            <p className="text-ink-faint text-xs">{stopAction === 'replace'
+              ? '選んだ成果地点へ利用先を差し替えたあと、元の計測を停止します。'
+              : stopAction === 'delete'
+                ? '成果も利用先もない場合だけ削除できます。'
+                : '「数えるのをやめる」を選ぶと停止として記録され、過去の成果は削除されません。'}</p>
           </div>
         )}
       </ConfirmDialog>
@@ -485,19 +952,35 @@ function ConversionsPageInner() {
  * あちらは「どう数えるか」を確かめる画面で、こちらは「いくらになったか」を
  * 見る画面なので、金額を主にしている。
  */
-function ReportTab() {
-  const [rows, setRows] = useState<ConversionReportItem[]>([])
+function ReportTab({ accountId }: { accountId: string | null }) {
+  const [report, setReport] = useState<ConversionDefinitionReport | null>(null)
+  const [periodDays, setPeriodDays] = useState(30)
   const [loading, setLoading] = useState(true)
+  const [loadFailed, setLoadFailed] = useState(false)
+  const [exporting, setExporting] = useState(false)
+  const [exportError, setExportError] = useState('')
+  /** 失敗時の「もう一度読む」用。一覧タブと同じ導線(#513 L6)。 */
+  const [reloadSeq, setReloadSeq] = useState(0)
 
   useEffect(() => {
     let cancelled = false
-    void api.conversions
-      .report()
-      .then((r) => {
-        if (!cancelled && r.success) setRows(r.data)
+    setLoading(true)
+    setLoadFailed(false)
+    setReport(null)
+    void api.conversions.definitionReport({
+      ...definitionRange(periodDays), lineAccountId: accountId ?? undefined,
+    })
+      .then((response) => {
+        if (cancelled) return
+        if (response.success && Array.isArray(response.data.byDefinition)
+          && Array.isArray(response.data.daily) && Array.isArray(response.data.byRoute)) {
+          setReport(response.data)
+        } else {
+          setLoadFailed(true)
+        }
       })
       .catch(() => {
-        // レポートが引けなくても、他のタブは使える。
+        if (!cancelled) setLoadFailed(true)
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -505,60 +988,235 @@ function ReportTab() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [accountId, periodDays, reloadSeq])
 
-  const total = rows.reduce((s, r) => s + r.totalValue, 0)
+  const exportCsv = async () => {
+    if (exporting) return
+    setExporting(true)
+    setExportError('')
+    try {
+      const blob = await api.conversions.exportDefinitions({
+        ...definitionRange(periodDays), lineAccountId: accountId ?? undefined,
+      })
+      downloadCsvBlob(blob, `conversion-report-${definitionRange(1).to}.csv`)
+    } catch {
+      setExportError('CSVを書き出せませんでした。権限を確認して、もう一度お試しください。')
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  const daily = useMemo(() => {
+    if (!report) return { names: [], days: [], max: 1 }
+    const names = report.byDefinition.slice(0, 3).map((row) => row.conversionPointName)
+    const byDay = new Map<string, Map<string, number>>()
+    for (const row of report.daily) {
+      const values = byDay.get(row.day) ?? new Map<string, number>()
+      values.set(row.conversionPointName, (values.get(row.conversionPointName) ?? 0) + row.netCount)
+      byDay.set(row.day, values)
+    }
+    const days = [...byDay].map(([day, values]) => {
+      const first = values.get(names[0] ?? '') ?? 0
+      const second = values.get(names[1] ?? '') ?? 0
+      const third = values.get(names[2] ?? '') ?? 0
+      const total = [...values.values()].reduce((sum, value) => sum + value, 0)
+      return { day, first, second, third, other: Math.max(0, total - first - second - third), total }
+    }).toSorted((left, right) => left.day.localeCompare(right.day))
+    return { names, days, max: Math.max(1, ...days.map((row) => row.total)) }
+  }, [report])
 
   if (loading) {
+    return <ListState kind="loading" title="成果レポートを読み込んでいます" />
+  }
+
+  if (loadFailed) {
     return (
-      <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm">
-        読み込み中...
-      </div>
+      <ListState
+        kind="error"
+        title="成果レポートを読み込めませんでした"
+        description="成果地点の一覧はそのまま使えます。時間を置いて、このタブを開き直してください。"
+        action={
+          <Button variant="secondary" onClick={() => setReloadSeq((current) => current + 1)}>
+            成果レポートを再読み込み
+          </Button>
+        }
+      />
     )
   }
 
-  if (rows.length === 0) {
-    return (
-      <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm">
-        まだ成果の記録がありません。成果地点を作って計測が始まると、ここに出ます。
-      </div>
-    )
-  }
+  if (!report) return null
+
+  /*
+   * 「いちばん伸びた」は口の `kpis.fastestGrowing`(増分数順)をそのまま使う。
+   * 画面で率順に再計算すると、口の選び方と食い違う(#513 L7)。
+   */
+  const fastest = report.kpis.fastestGrowing
+  const fastestRate = fastest && fastest.previousNetCount > 0
+    ? Math.round((fastest.countChange / fastest.previousNetCount) * 100)
+    : fastest?.netCount ? 100 : 0
+  const previousAverage = report.kpis.previousNetCount > 0
+    ? Math.round(report.kpis.previousNetValue / report.kpis.previousNetCount)
+    : null
+  const topRoute = report.byRoute[0]
 
   return (
-    <div className="bg-canvas rounded-card border-hairline overflow-x-auto border">
-      <table className="w-full min-w-[560px]">
-        <thead>
-          <TableHeadRow>
-            <Th>成果地点（CV）名</Th>
-            <Th>種別</Th>
-            <Th align="right">CV数</Th>
-            <Th align="right">金額</Th>
-          </TableHeadRow>
-        </thead>
-        <tbody className="divide-hairline divide-y">
-          {rows.map((r) => (
-            <tr key={r.conversionPointId} className="hover:bg-canvas-sunken">
-              <td className="text-ink px-4 py-3 text-sm font-medium">{r.conversionPointName}</td>
-              <td className="text-ink-secondary px-4 py-3 text-sm">
-                {EVENT_TYPE_LABELS[r.eventType] ?? r.eventType}
-              </td>
-              <td className="text-ink px-4 py-3 text-right text-sm tabular-nums">{r.totalCount}</td>
-              <td className="text-ink-secondary px-4 py-3 text-right text-sm tabular-nums">
-                {r.totalValue > 0 ? `¥${r.totalValue.toLocaleString()}` : '—'}
-              </td>
-            </tr>
-          ))}
-          <tr className="bg-canvas-sunken">
-            <td className="text-ink-secondary px-4 py-3 text-sm font-medium" colSpan={3}>
-              合計
-            </td>
-            <td className="text-ink px-4 py-3 text-right text-sm font-semibold tabular-nums">
-              ¥{total.toLocaleString()}
-            </td>
-          </tr>
-        </tbody>
-      </table>
+    <div className="space-y-4" data-conversion-report-design="v6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <Select
+          aria-label="集計期間"
+          label="期間"
+          value={String(periodDays)}
+          options={[
+            { value: '7', label: 'この7日' },
+            { value: '30', label: 'この30日' },
+            { value: '90', label: 'この90日' },
+          ]}
+          onChange={(value) => setPeriodDays(Number(value))}
+        />
+        <Button onClick={() => void exportCsv()} disabled={exporting}>
+          {exporting ? '書き出しています' : '成果地点の一覧をCSVで書き出す'}
+        </Button>
+      </div>
+      {exportError ? <p className="text-danger text-sm" role="alert">{exportError}</p> : null}
+
+      <div data-design="KPIs" className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <KpiCard
+          title={`この${periodDays}日の成果`}
+          value={report.kpis.netCount}
+          unit="件"
+          badge={report.kpis.countChangeRate == null
+            ? undefined
+            : `${report.kpis.countChangeRate > 0 ? '+' : ''}${report.kpis.countChangeRate}%`}
+          detail={`前の${periodDays}日 ${report.kpis.previousNetCount.toLocaleString('ja-JP')}件`}
+        />
+        <KpiCard
+          title="金額"
+          value={report.kpis.netValue}
+          unit="円"
+          detail={`前の${periodDays}日 ¥${report.kpis.previousNetValue.toLocaleString('ja-JP')}`}
+        />
+        <KpiCard
+          title="1件あたり"
+          value={report.kpis.averageNetValue === null ? null : Math.round(report.kpis.averageNetValue)}
+          unit="円"
+          detail={previousAverage === null ? `前の${periodDays}日は成果なし` : `前の${periodDays}日 ¥${previousAverage.toLocaleString('ja-JP')}`}
+        />
+        <KpiCard
+          title="いちばん伸びた"
+          value={fastest ? fastestRate : 0}
+          unit="%"
+          badge={fastest && fastestRate > 0 ? `+${fastestRate}%` : undefined}
+          detail={fastest
+            ? `${fastest.conversionPointName} ${fastest.netCount.toLocaleString('ja-JP')}件（前の${periodDays}日 ${fastest.previousNetCount.toLocaleString('ja-JP')}件）`
+            : '比較できる成果はありません'}
+        />
+      </div>
+
+      <p className="bg-info-bg text-info rounded-control px-4 py-3 text-sm font-semibold">
+        成果地点ごとの件数と、どこから来たかです。数え方は「成果地点」で決めます。
+      </p>
+
+      <section className="bg-canvas rounded-card border-hairline border p-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="text-ink text-base font-bold">日ごとの成果（この{periodDays}日）</h2>
+            <p className="text-ink-faint mt-1 text-xs">棒の色は成果地点です。日ごとの実績を積み上げています。</p>
+          </div>
+          {daily && daily.names.length > 0 ? (
+            <ul className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-faint" aria-label="棒の色と成果地点の対応">
+              {daily.names.map((name, index) => (
+                <li key={name} className="flex items-center gap-1">
+                  <span aria-hidden="true" className={`inline-block h-2.5 w-2.5 rounded-sm ${index === 0 ? 'bg-success' : index === 1 ? 'bg-action' : index === 2 ? 'bg-info' : 'bg-canvas-sunken'}`} />
+                  {name}
+                </li>
+              ))}
+              <li className="flex items-center gap-1">
+                <span aria-hidden="true" className="bg-canvas-sunken inline-block h-2.5 w-2.5 rounded-sm" />
+                そのほか
+              </li>
+            </ul>
+          ) : null}
+        </div>
+        {daily && daily.days.length > 0 ? (
+          <div className="mt-4 flex h-40 items-end gap-1" aria-label="日ごとの成果グラフ">
+            {daily.days.map((day, index) => (
+              <div key={day.day} className="flex h-full min-w-0 flex-1 flex-col justify-end">
+                <div
+                  className="flex w-full flex-col-reverse overflow-hidden rounded-sm"
+                  style={{ height: `${Math.max(4, Math.round((day.total / daily.max) * 100))}%` }}
+                  title={`${day.day} ${day.total}件`}
+                >
+                  {day.first > 0 ? <span className="bg-success" style={{ flexGrow: day.first }} /> : null}
+                  {day.second > 0 ? <span className="bg-action" style={{ flexGrow: day.second }} /> : null}
+                  {day.third > 0 ? <span className="bg-info" style={{ flexGrow: day.third }} /> : null}
+                  {day.other > 0 ? <span className="bg-canvas-sunken" style={{ flexGrow: day.other }} /> : null}
+                </div>
+                {(index === 0 || index === daily.days.length - 1 || index % 5 === 0) ? (
+                  <span className="text-ink-faint mt-1 truncate text-center text-xs">{day.day.slice(5).replace('-', '/')}</span>
+                ) : <span className="mt-1 text-xs">&nbsp;</span>}
+              </div>
+            ))}
+          </div>
+        ) : <p className="text-ink-faint mt-4 text-sm">この期間には日ごとの成果がありません。</p>}
+      </section>
+
+      {report.byDefinition.length === 0 ? (
+        <ListState
+          kind="empty"
+          title="この期間には成果がありません"
+          description="期間を変えるか、成果地点の計測状況を確認してください。"
+        />
+      ) : (
+        <div data-design="Table" className="bg-canvas rounded-card border-hairline border">
+          <table className="w-full table-fixed">
+            <thead>
+              <TableHeadRow>
+                <Th>成果地点</Th>
+                <Th align="right">この期間</Th>
+                <Th align="right">前の期間</Th>
+                <Th align="right">増減</Th>
+                <Th>いちばん多い経路</Th>
+                <Th align="right">操作</Th>
+              </TableHeadRow>
+            </thead>
+            <tbody className="divide-hairline divide-y">
+              {report.byDefinition.filter((row) => row.netCount > 0 || row.previousNetCount > 0).map((row) => {
+                const changeRate = row.previousNetCount > 0
+                  ? Math.round((row.countChange / row.previousNetCount) * 100)
+                  : row.netCount > 0 ? 100 : 0
+                return (
+                  <tr key={row.conversionPointId} className="hover:bg-canvas-sunken">
+                    <td className="text-ink px-4 py-3 text-sm font-medium">
+                      {row.conversionPointName}
+                      <p className="text-ink-faint mt-0.5 text-xs">
+                        {EVENT_TYPE_LABELS[row.sourceType] ?? 'その他'}
+                      </p>
+                    </td>
+                    <td className="text-ink px-4 py-3 text-right text-sm tabular-nums">
+                      {row.netCount.toLocaleString('ja-JP')}件
+                    </td>
+                    <td className="text-ink-secondary px-4 py-3 text-right text-sm tabular-nums">
+                      {row.previousNetCount.toLocaleString('ja-JP')}件
+                    </td>
+                    <td className={changeRate > 0
+                      ? 'text-success px-4 py-3 text-right text-sm font-semibold tabular-nums'
+                      : 'text-ink-secondary px-4 py-3 text-right text-sm tabular-nums'}>
+                      {changeRate > 0 ? '+' : changeRate === 0 ? '±' : ''}{changeRate}%
+                    </td>
+                    <td className="text-ink-secondary px-4 py-3 text-sm">
+                      {row.routes?.length ? row.routes.slice(0, 2).map((route) => `${route.label} ${route.netCount}件`).join('・') : (topRoute ? `全体では ${topRoute.label}` : '経路の記録はありません')}
+                      <p className="text-ink-faint mt-1 text-xs">取消: {row.cancellationCount == null ? '台帳未接続' : `${row.cancellationCount}件・¥${(row.cancellationValue ?? 0).toLocaleString('ja-JP')}`}</p>
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <Button href="/conversions?tab=points">中身を見る</Button>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   )
 }
@@ -592,13 +1250,12 @@ function ConversionsPageHost() {
         tabs={MERGED_TABS}
         active={tab}
         defaultKey={DEFAULT_TAB}
-        actions={tab === 'points' ? <Button href="/conversions/new" variant="primary">成果地点を追加</Button> : undefined}
       />
-      {tab === 'points' && <ConversionsPageInner />}
-      {tab === 'affiliates' && <AffiliatorsTab />}
+      {tab === 'points' && <ConversionsPageInner accountId={selectedAccountId} />}
+      {tab === 'affiliates' && <AffiliatorsTab accountId={selectedAccountId} />}
       {tab === 'offers' && <OffersTab />}
       {tab === 'approvals' && <ApprovalQueue />}
-      {tab === 'report' && <ReportTab />}
+      {tab === 'report' && <ReportTab accountId={selectedAccountId} />}
       {tab === 'payment' && (selectedAccountId
         ? <AffiliatePaymentTab accountId={selectedAccountId} />
         : <p className="text-ink-secondary p-8 text-center text-sm">上のバーからLINEアカウントを選んでください。</p>)}
