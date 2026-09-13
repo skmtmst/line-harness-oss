@@ -422,6 +422,8 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
    * 成功したら消す。ふだんは何も出ない。
    */
   const [emailError, setEmailError] = useState('')
+  // 初回・条件変更時の取得中。追加読み込みとは分け、0件表示を先走らせない。
+  const [emailLoading, setEmailLoading] = useState(true)
   // 中央ペインで開いているメール。LINEのトークと排他。
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null)
   const [allFriends, setAllFriends] = useState<FriendItem[]>([])
@@ -531,6 +533,8 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
    */
   const [sendMode, setSendMode] = useState<'enter' | 'shift-enter'>('shift-enter')
   const [loading, setLoading] = useState(true)
+  // 送信や詳細取得の error と混ぜず、一覧0件と一覧障害を判別する。
+  const [chatListFailed, setChatListFailed] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
   const [hasMoreChats, setHasMoreChats] = useState(false)
   const [detailLoading, setDetailLoading] = useState(false)
@@ -606,6 +610,8 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
       setHasMoreEmails(false)
       emailMoreLockRef.current = false
       setLoadingMoreEmails(false)
+      setEmailLoading(true)
+      setEmailError('')
     }
     try {
       const res = await fetchApi<{
@@ -652,6 +658,9 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
         emailMoreLockRef.current = false
         setLoadingMoreEmails(false)
       }
+      if (!append && listFilterKeyRef.current === listFilterKey && emailListRequestRef.current === requestId) {
+        setEmailLoading(false)
+      }
     }
   }, [statusFilter, debouncedNameQuery, assigneeFilter, unreadOnly, quickFilter, listFilterKey])
 
@@ -666,20 +675,26 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     setHasMoreChats(false)
     setLoadingMore(false)
     setLoading(true)
+    setChatListFailed(false)
     setError('')
     try {
       const chatRes = await api.chats.list(buildListParams(null))
       if (listFilterKeyRef.current !== listFilterKey || chatListRequestRef.current !== requestId) return
       if (chatRes.success) {
+        setChatListFailed(false)
         const rows = chatRes.data
         setChats(rows)
         const last = rows[rows.length - 1]
         nextCursorRef.current = last?.lastMessageAt ? { at: last.lastMessageAt, id: last.id } : null
         // ページ丁度いっぱい返ってきた = 続きがある可能性が高い
         setHasMoreChats(rows.length === CHAT_PAGE_SIZE)
+      } else {
+        setChatListFailed(true)
+        setError('チャットの読み込みに失敗しました。もう一度お試しください。')
       }
     } catch {
       if (listFilterKeyRef.current !== listFilterKey || chatListRequestRef.current !== requestId) return
+      setChatListFailed(true)
       setError('チャットの読み込みに失敗しました。もう一度お試しください。')
     } finally {
       if (listFilterKeyRef.current === listFilterKey && chatListRequestRef.current === requestId) setLoading(false)
@@ -1416,6 +1431,28 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
       visibleMailItems.filter((item) => item.status === 'unread' && isOlderThanOneHour(item.lastIncomingAt)).length
       + visibleLineItems.filter((chat) => chat.status === 'unread' && isOlderThanOneHour(chat.lastMessageAt)).length,
   }
+  const hasInboxFilters = Boolean(
+    nameQuery.trim()
+      || statusFilter !== 'all'
+      || quickFilter !== 'all'
+      || assigneeFilter !== 'all'
+      || unreadOnly,
+  )
+  // 入力からdebounce反映までを「0件」と断定しない。古い条件の結果が一瞬見えるため。
+  const nameQueryPending = nameQuery.trim() !== debouncedNameQuery
+  const inboxListLoading = nameQueryPending
+    || (channel !== 'email' && loading)
+    || (channel !== 'line' && emailLoading)
+  const inboxListFailed = (channel !== 'email' && chatListFailed)
+    || (channel !== 'line' && Boolean(emailError))
+  const clearInboxFilters = () => {
+    setNameQuery('')
+    setDebouncedNameQuery('')
+    setStatusFilter('all')
+    setQuickFilter('all')
+    setAssigneeFilter('all')
+    setUnreadOnly(false)
+  }
   const activeFriendId = selectedFriendId
     ?? (chatDetail?.id === selectedChatId ? chatDetail.friendId : null)
     ?? chats.find((chat) => chat.id === selectedChatId)?.friendId
@@ -1716,22 +1753,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
 
           {/* Chat List */}
           <div className="flex-1 overflow-y-auto">
-            {loading ? (
-              <div>
-                {[...Array(5)].map((_, i) => (
-                  <div key={i} className="px-4 py-3 border-b border-hairline animate-pulse">
-                    <div className="flex items-center gap-3">
-                      <div className="flex-1 space-y-2">
-                        <div className="h-3 bg-hairline rounded w-32" />
-                        <div className="h-2 bg-canvas-sunken rounded w-20" />
-                      </div>
-                      <div className="h-5 bg-canvas-sunken rounded-full w-12" />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <>
+            <>
                 {/*
                   メール一覧の失敗行。LINEだけ見ているときは出さない。
                   以前は失敗が無言で「メール0件」に見え、未対応の見落としになった。
@@ -1961,9 +1983,41 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                   )
                   return { at: chat.lastMessageAt ?? '', node }
                 })
-                  return [...mailRows, ...lineRows]
+                  const rows = [...mailRows, ...lineRows]
                     .sort((a, b) => String(b.at).localeCompare(String(a.at)))
-                    .map((r) => r.node)
+                  if (rows.length > 0) return rows.map((row) => row.node)
+                  if (inboxListLoading) {
+                    return (
+                      <div
+                        role="status"
+                        data-inbox-list-state="loading"
+                        className="text-ink-faint flex min-h-36 items-center justify-center px-4 py-8 text-center text-sm"
+                      >
+                        会話を読み込んでいます...
+                      </div>
+                    )
+                  }
+                  // 障害を0件と誤認させない。具体的な理由は各チャネルのエラー表示に任せる。
+                  if (inboxListFailed) return null
+                  return (
+                    <div
+                      data-inbox-list-state={hasInboxFilters ? 'filtered-empty' : 'empty'}
+                      className="text-ink-faint flex min-h-36 flex-col items-center justify-center px-4 py-8 text-center"
+                    >
+                      <p className="text-sm font-semibold text-ink-secondary">
+                        {hasInboxFilters ? '条件に一致する会話がありません' : 'まだ会話がありません'}
+                      </p>
+                      {hasInboxFilters && (
+                        <button
+                          type="button"
+                          onClick={clearInboxFilters}
+                          className="text-action mt-3 text-sm font-semibold underline underline-offset-2"
+                        >
+                          絞り込みを解除
+                        </button>
+                      )}
+                    </div>
+                  )
                 })()}
 
                 {hasMoreChats && (
@@ -1989,8 +2043,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                     {loadingMoreEmails ? '読み込み中...' : 'メールの続きを読み込む'}
                   </button>
                 )}
-              </>
-            )}
+            </>
           </div>
         </div>
 
