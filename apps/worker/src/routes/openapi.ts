@@ -297,6 +297,236 @@ const spec = {
     },
   },
   paths: {
+    // ── Email authentication ───────────────────────────────────────────────
+    '/api/auth/register/request': {
+      post: {
+        tags: ['Auth'], summary: '会員登録用の確認メールを送信', security: [],
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['email', 'turnstileToken', 'agreed'], properties: { email: { type: 'string', format: 'email' }, turnstileToken: { type: 'string' }, agreed: { type: 'boolean' }, deviceMarker: { type: 'string' } } } } } },
+        responses: { '200': { description: 'Request accepted without exposing account existence' }, '400': { description: 'Invalid request' }, '429': { description: 'Rate limit exceeded' }, '503': { description: 'Turnstile or mail configuration unavailable' } },
+      },
+    },
+    '/api/auth/register/check': {
+      get: {
+        tags: ['Auth'], summary: '会員登録トークンを確認', security: [],
+        responses: { '200': { description: 'Token state' } },
+      },
+    },
+    '/api/auth/register/complete': {
+      post: {
+        tags: ['Auth'], summary: '会員登録を完了', security: [],
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object' } } } },
+        responses: { '200': { description: 'Tenant and owner account created' }, '400': { description: 'Invalid or expired token' }, '409': { description: 'Account already exists' } },
+      },
+    },
+    '/api/auth/password/login': {
+      post: {
+        tags: ['Auth'], summary: 'メールアドレスとパスワードでログイン', security: [],
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['email', 'password'], properties: { email: { type: 'string', format: 'email' }, password: { type: 'string' } } } } } },
+        responses: { '200': { description: 'Session issued' }, '401': { description: 'Invalid credentials' }, '429': { description: 'Rate limit exceeded' } },
+      },
+    },
+    '/api/auth/password/forgot': {
+      post: {
+        tags: ['Auth'], summary: 'パスワード再設定メールを送信', security: [],
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['email', 'turnstileToken'], properties: { email: { type: 'string', format: 'email' }, turnstileToken: { type: 'string' } } } } } },
+        responses: { '200': { description: 'Request accepted without exposing account existence' }, '429': { description: 'Rate limit exceeded' }, '503': { description: 'Turnstile or mail configuration unavailable' } },
+      },
+    },
+    '/api/auth/password/reset/check': {
+      get: {
+        tags: ['Auth'], summary: 'パスワード再設定トークンを確認', security: [],
+        responses: { '200': { description: 'Token state' } },
+      },
+    },
+    '/api/auth/password/reset': {
+      post: {
+        tags: ['Auth'], summary: 'パスワードを再設定', security: [],
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object' } } } },
+        responses: { '200': { description: 'Password updated and session issued' }, '400': { description: 'Invalid or expired token' } },
+      },
+    },
+    // ── HQ Banners ─────────────────────────────────────────────────────────
+    '/api/hq/banners/presets': {
+      get: {
+        tags: ['HQ Banners'], summary: 'バナー用途と生成上限を取得',
+        responses: { '200': { description: 'Presets and tenant usage limits' }, '403': { description: 'Owner or admin role required' } },
+      },
+    },
+    '/api/hq/banners/usage': {
+      get: {
+        tags: ['HQ Banners'], summary: 'バナー生成の月次・日次利用量を取得',
+        responses: { '200': { description: 'Tenant banner usage' }, '403': { description: 'Owner or admin role required' } },
+      },
+    },
+    '/api/hq/banners/stats': {
+      get: {
+        tags: ['HQ Banners'], summary: 'バナー生成画面の集計値を取得',
+        responses: { '200': { description: 'Tenant banner project and image statistics' }, '403': { description: 'Owner or admin role required' } },
+      },
+    },
+    '/api/hq/banners/projects': {
+      get: {
+        tags: ['HQ Banners'], summary: 'バナープロジェクト一覧を取得',
+        parameters: [
+          { name: 'archived', in: 'query', schema: { type: 'string', enum: ['0', '1'] } },
+          { name: 'q', in: 'query', schema: { type: 'string' } },
+        ],
+        responses: { '200': { description: 'Tenant-scoped banner projects' }, '403': { description: 'Owner or admin role required' } },
+      },
+      post: {
+        tags: ['HQ Banners'], summary: 'バナープロジェクトを作成',
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['name'], properties: { name: { type: 'string', minLength: 1 }, description: { type: 'string' } } } } } },
+        responses: { '201': { description: 'Created' }, '400': { description: 'Invalid request' }, '403': { description: 'Owner or admin role required' } },
+      },
+    },
+    '/api/hq/banners/projects/{id}': {
+      get: {
+        tags: ['HQ Banners'], summary: 'バナープロジェクトの詳細を取得',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'Project detail with images and generations' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Not found' } },
+      },
+      patch: {
+        tags: ['HQ Banners'], summary: 'バナープロジェクトを更新',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', properties: { name: { type: 'string' }, description: { type: 'string' }, isFavorite: { type: 'boolean' }, archived: { type: 'boolean' } } } } } },
+        responses: { '200': { description: 'Updated' }, '400': { description: 'Invalid request' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Not found' } },
+      },
+    },
+    '/api/hq/banners/projects/{id}/duplicate': {
+      post: {
+        tags: ['HQ Banners'], summary: 'バナープロジェクトを複製',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '201': { description: 'Duplicated' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Not found' } },
+      },
+    },
+    '/api/hq/banners/projects/{id}/generations': {
+      post: {
+        tags: ['HQ Banners'], summary: 'バナー生成条件を登録',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object' } } } },
+        responses: { '201': { description: 'Generation queued' }, '400': { description: 'Invalid request' }, '403': { description: 'Owner or admin role required' }, '429': { description: 'Usage limit or circuit breaker reached' } },
+      },
+    },
+    '/api/hq/banners/projects/{id}/uploads': {
+      post: {
+        tags: ['HQ Banners'], summary: '手持ち画像をプロジェクトへ取り込む',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: { required: true, content: { 'image/png': { schema: { type: 'string', format: 'binary' } }, 'image/jpeg': { schema: { type: 'string', format: 'binary' } }, 'image/webp': { schema: { type: 'string', format: 'binary' } } } },
+        responses: { '201': { description: 'Uploaded' }, '403': { description: 'Owner or admin role required' }, '413': { description: 'Image exceeds size limit' }, '422': { description: 'Unsupported image' } },
+      },
+    },
+    '/api/hq/banners/generations/{id}': {
+      get: {
+        tags: ['HQ Banners'], summary: 'バナー生成の進捗を取得',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'Generation status' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Not found' } },
+      },
+    },
+    '/api/hq/banners/generations/{id}/run': {
+      post: {
+        tags: ['HQ Banners'], summary: 'バナーを1枚生成して保存',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'One image generated' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Not found' }, '422': { description: 'Image request rejected' }, '502': { description: 'Image provider failure' } },
+      },
+    },
+    '/api/hq/banners/generations/{id}/cancel': {
+      post: {
+        tags: ['HQ Banners'], summary: '残りのバナー生成を中止',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'Cancelled' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Not found' } },
+      },
+    },
+    '/api/hq/banners/images': {
+      get: {
+        tags: ['HQ Banners'], summary: '統括のバナー画像一覧を取得',
+        parameters: [
+          { name: 'projectId', in: 'query', schema: { type: 'string' } },
+          { name: 'favorite', in: 'query', schema: { type: 'string', enum: ['0', '1'] } },
+          { name: 'preset', in: 'query', schema: { type: 'string' } },
+          { name: 'q', in: 'query', schema: { type: 'string' } },
+          { name: 'before', in: 'query', schema: { type: 'string' } },
+          { name: 'limit', in: 'query', schema: { type: 'integer', minimum: 1, maximum: 100 } },
+        ],
+        responses: { '200': { description: 'Tenant-scoped banner images' }, '403': { description: 'Owner or admin role required' } },
+      },
+    },
+    '/api/hq/banners/images/{id}': {
+      get: {
+        tags: ['HQ Banners'], summary: 'バナー画像の詳細を取得',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'Image detail and generation conditions' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Not found' } },
+      },
+      patch: {
+        tags: ['HQ Banners'], summary: 'バナー画像のお気に入り・所属を更新',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', properties: { isFavorite: { type: 'boolean' }, projectId: { type: ['string', 'null'] } } } } } },
+        responses: { '200': { description: 'Updated' }, '400': { description: 'Invalid request' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Not found' } },
+      },
+      delete: {
+        tags: ['HQ Banners'], summary: 'バナー画像を一覧から外す',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'Removed from the tenant library' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Not found' } },
+      },
+    },
+    '/api/hq/banners/images/{id}/deliver': {
+      post: {
+        tags: ['HQ Banners'], summary: 'バナー画像を選択店舗へ渡す',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['lineAccountIds'], properties: { lineAccountIds: { type: 'array', maxItems: 50, items: { type: 'string' } } } } } } },
+        responses: { '200': { description: 'Per-account delivery results' }, '400': { description: 'Invalid account selection' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Not found' } },
+      },
+    },
+    // ── HQ Billing ─────────────────────────────────────────────────────────
+    '/api/hq/billing/summary': {
+      get: {
+        tags: ['HQ Billing'], summary: '統括の契約状態と選択可能なプランを取得',
+        responses: { '200': { description: 'Tenant billing summary and plan entitlements' }, '404': { description: 'Tenant not found' } },
+      },
+    },
+    '/api/hq/billing/checkout': {
+      post: {
+        tags: ['HQ Billing'], summary: 'Stripe Checkoutの申込URLを作成',
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['planKey'], properties: { planKey: { type: 'string', enum: ['light', 'standard', 'pro'] } } } } } },
+        responses: { '200': { description: 'Checkout URL' }, '400': { description: 'Invalid plan' }, '403': { description: 'Owner role required' }, '409': { description: 'Already subscribed or billing exempt' }, '503': { description: 'Stripe or price configuration unavailable' } },
+      },
+    },
+    '/api/hq/billing/portal': {
+      post: {
+        tags: ['HQ Billing'], summary: 'StripeカスタマーポータルURLを作成',
+        responses: { '200': { description: 'Customer portal URL' }, '403': { description: 'Owner or admin role required' }, '409': { description: 'No active customer' }, '503': { description: 'Admin origin unavailable' } },
+      },
+    },
+    '/api/hq/billing/invoices': {
+      get: {
+        tags: ['HQ Billing'], summary: '統括の支払い履歴を取得',
+        responses: { '200': { description: 'Up to 12 tenant-scoped invoices' }, '403': { description: 'Owner or admin role required' }, '502': { description: 'Stripe API unavailable' } },
+      },
+    },
+    '/api/hq/billing/webhook': {
+      post: {
+        tags: ['HQ Billing'], summary: 'Stripe課金イベントを受信', security: [],
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object' } } } },
+        responses: { '200': { description: 'Event accepted idempotently' }, '400': { description: 'Invalid signature or payload' }, '413': { description: 'Payload too large' }, '503': { description: 'Webhook secret is not configured' } },
+      },
+    },
+    // ── HQ Support ─────────────────────────────────────────────────────────
+    '/api/hq/support/kinds': {
+      get: {
+        tags: ['HQ Support'], summary: '問い合わせ種別を取得',
+        responses: { '200': { description: 'Supported inquiry kinds' } },
+      },
+    },
+    '/api/hq/support/requests': {
+      get: {
+        tags: ['HQ Support'], summary: '統括の問い合わせ履歴を取得',
+        responses: { '200': { description: 'Tenant-scoped support requests' } },
+      },
+      post: {
+        tags: ['HQ Support'], summary: '運営への問い合わせを登録',
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['kind', 'subject', 'body'], properties: { kind: { type: 'string' }, subject: { type: 'string', maxLength: 100 }, body: { type: 'string', maxLength: 4000 }, lineAccountId: { type: 'string' }, attachments: { type: 'array', maxItems: 3, items: { type: 'object' } } } } } } },
+        responses: { '201': { description: 'Recorded; notification result is included' }, '400': { description: 'Invalid request' }, '403': { description: 'Read-only staff cannot submit' }, '404': { description: 'Line account not found in tenant scope' } },
+      },
+    },
     // ── HQ Templates ───────────────────────────────────────────────────────
     '/api/hq/templates/media': {
       post: {
@@ -1073,6 +1303,19 @@ const spec = {
       },
     },
     // ── Staff invitation ────────────────────────────────────────────────────
+    '/api/staff/last-logins': {
+      get: {
+        tags: ['Staff'], summary: '統括メンバーの最終ログイン一覧を取得',
+        responses: { '200': { description: 'Last login times by staff id' }, '403': { description: 'Owner or admin role required' } },
+      },
+    },
+    '/api/staff/{id}/resend-invite': {
+      post: {
+        tags: ['Staff'], summary: '統括メンバーへの招待を再送',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'Invitation resent' }, '403': { description: 'Owner or admin with all-account scope required' }, '404': { description: 'Not found in current tenant' }, '409': { description: 'Staff invitation is no longer pending' } },
+      },
+    },
     '/api/staff/{id}/resend-invitation': {
       post: {
         tags: ['Staff'],

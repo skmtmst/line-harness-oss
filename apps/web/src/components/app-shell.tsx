@@ -11,6 +11,7 @@ import FeatureDisabledGate from './feature-disabled-gate'
 import AppTopBar from './shell/app-top-bar'
 import { PageChromeProvider, usePageChrome } from './shell/page-chrome'
 import styles from './app-shell.module.css'
+import { isPublicAuthPath } from '@/lib/auth-email'
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
@@ -18,7 +19,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const isFriendAttributesV3 = pathname === '/tags-v3' || pathname === '/visual-qa/friend-attributes-v3'
   const isAccountCreate = pathname === '/accounts/new'
 
-  if (pathname === '/login' || pathname === '/login/two-factor' || pathname === '/staff/invite') {
+  if (isPublicAuthPath(pathname)) {
     return <>{children}</>
   }
 

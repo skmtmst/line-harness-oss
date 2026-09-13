@@ -978,6 +978,12 @@ describe('N-423 staff deny-by-default (#670)', () => {
     expect(isPublicApiBoundary('GET', '/api/qr')).toBe(true);
     expect(isPublicApiBoundary('GET', '/api/public/brand')).toBe(true);
     expect(isPublicApiBoundary('GET', '/api/liff/config')).toBe(true);
+    expect(isPublicApiBoundary('POST', '/api/auth/register/request')).toBe(true);
+    expect(isPublicApiBoundary('GET', '/api/auth/register/check')).toBe(true);
+    expect(isPublicApiBoundary('POST', '/api/auth/password/login')).toBe(true);
+    expect(isPublicApiBoundary('POST', '/api/auth/password/forgot')).toBe(true);
+    expect(isPublicApiBoundary('GET', '/api/auth/password/reset/check')).toBe(true);
+    expect(isPublicApiBoundary('POST', '/api/auth/password/reset')).toBe(true);
     expect(isPublicApiBoundary('GET', '/api/protected')).toBe(false);
     expect(isPublicApiBoundary('GET', '/api/public/brands')).toBe(false);
     expect(isPublicApiBoundary('GET', '/api/auth/session')).toBe(false);
