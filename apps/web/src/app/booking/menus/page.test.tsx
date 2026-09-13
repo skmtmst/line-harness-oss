@@ -17,6 +17,17 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { act } from 'react'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 
+const localStorageValues = new Map<string, string>()
+Object.defineProperty(window, 'localStorage', {
+  configurable: true,
+  value: {
+    getItem: (key: string) => localStorageValues.get(key) ?? null,
+    setItem: (key: string, value: string) => { localStorageValues.set(key, String(value)) },
+    removeItem: (key: string) => { localStorageValues.delete(key) },
+    clear: () => { localStorageValues.clear() },
+  },
+})
+
 const fixture = vi.hoisted(() => ({
   selectedAccountId: 'account-a' as string | null,
   activeTab: 'menus',
@@ -25,6 +36,8 @@ const fixture = vi.hoisted(() => ({
   listMenus: null as null | ((...args: unknown[]) => Promise<unknown>),
   getSettings: null as null | ((...args: unknown[]) => Promise<unknown>),
   saveSettings: null as null | ((...args: unknown[]) => Promise<unknown>),
+  listResources: null as null | ((...args: unknown[]) => Promise<unknown>),
+  saveMenuResources: null as null | ((...args: unknown[]) => Promise<unknown>),
 }))
 
 /**
@@ -86,6 +99,8 @@ vi.mock('@/lib/api', () => {
       patchMenu: async () => ({ ok: true }),
       getSettings: (...args: unknown[]) => fixture.getSettings!(...args),
       saveSettings: (...args: unknown[]) => fixture.saveSettings!(...args),
+      listResources: (...args: unknown[]) => fixture.listResources!(...args),
+      saveMenuResources: (...args: unknown[]) => fixture.saveMenuResources!(...args),
     },
   }
 })
@@ -129,6 +144,7 @@ function optionLabels(select: HTMLSelectElement): string[] {
 }
 
 beforeEach(() => {
+  window.localStorage.setItem('lh_staff_role', 'owner')
   fixture.selectedAccountId = 'account-a'
   fixture.activeTab = 'menus'
   fixture.tagsList = async () => ({ success: true, data: TAGS })
@@ -139,12 +155,102 @@ beforeEach(() => {
     success: true,
     data: { ...SETTINGS, ...body, id: 'settings-a', version: 1 },
   }))
+  fixture.listResources = vi.fn(async () => ({ data: { resources: [
+    { id: 'room-a', name: '個室A', type: 'room', capacity: 3, isActive: true, version: 1 },
+    { id: 'seat-a', name: '席A', type: 'seat', capacity: 2, isActive: true, version: 1 },
+  ] } }))
+  fixture.saveMenuResources = vi.fn(async (_accountId, _menuId, body: { expectedVersion: number; resources: unknown[] }) => ({
+    success: true, data: { id: 'menu-1', version: body.expectedVersion + 1, resources: body.resources },
+  }))
 })
 
 afterEach(() => {
   cleanup()
   accountSetters.clear()
   vi.restoreAllMocks()
+  window.localStorage.clear()
+})
+
+describe('既存メニューの編集窓: 共有設備の割当', () => {
+  function menu() {
+    return {
+      id: 'menu-1', name: 'カット', category_label: null, description: null,
+      duration_minutes: 60, buffer_after_minutes: 0, base_price: 8000,
+      price_mode: 'fixed', sort_order: 0, is_active: 1, auto_tag_id: null,
+      concurrent_capacity: 1, booking_window_days: null, cutoff_hours_before: null,
+      cancel_deadline_hours_before: null, intake_question: null, assigned_staff: [{ id: 'staff-a', display_name: '担当A' }],
+      assigned_resources: [{
+        menuId: 'menu-1', resourceId: 'room-a', name: '個室A', type: 'room', capacity: 3,
+        quantity: 1, isActive: true, warning: null,
+      }],
+      version: 1,
+    }
+  }
+
+  async function openEditor() {
+    fixture.listMenus = vi.fn(async () => ({ menus: [menu()] }))
+    render(<MenusPage />)
+    fireEvent.click(await screen.findByRole('button', { name: '中身を見る' }))
+    await screen.findByText('メニュー編集')
+  }
+
+  test('複数選択・quantityを独立保存し、連打しても1要求だけ送る', async () => {
+    let resolveSave!: (value: unknown) => void
+    fixture.saveMenuResources = vi.fn(() => new Promise((resolve) => { resolveSave = resolve }))
+    await openEditor()
+    await screen.findByText('席A')
+    fireEvent.click(screen.getByRole('checkbox', { name: /席A/ }))
+    fireEvent.change(screen.getByRole('spinbutton', { name: '個室Aの必要数' }), { target: { value: '2' } })
+    const saveButton = screen.getByRole('button', { name: '設備の割当を保存' })
+    // 同じ描画中に2イベントを届け、disabledへの再描画ではなくuseRefの
+    // single-flight guardそのものが二重要求を止めることを確かめる。
+    act(() => {
+      saveButton.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      saveButton.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+    expect(fixture.saveMenuResources).toHaveBeenCalledTimes(1)
+    expect(fixture.saveMenuResources).toHaveBeenCalledWith('account-a', 'menu-1', {
+      expectedVersion: 1,
+      resources: [{ resourceId: 'room-a', quantity: 2 }, { resourceId: 'seat-a', quantity: 1 }],
+    })
+    await act(async () => {
+      resolveSave({ success: true, data: { id: 'menu-1', version: 2, resources: [] } })
+      await Promise.resolve()
+    })
+    expect(screen.getByRole('status').textContent).toContain('設備の割当を保存しました')
+  })
+
+  test('409でも入力を保持し、最新内容の読み直しを案内する', async () => {
+    fixture.saveMenuResources = vi.fn(async () => { throw new ApiError(409, 'conflict', 'version_conflict') })
+    await openEditor()
+    const quantity = await screen.findByRole('spinbutton', { name: '個室Aの必要数' })
+    fireEvent.change(quantity, { target: { value: '2' } })
+    fireEvent.click(screen.getByRole('button', { name: '設備の割当を保存' }))
+    await waitFor(() => expect(screen.getByRole('status').textContent).toContain('最新の内容を読み直して'))
+    expect((quantity as HTMLInputElement).value).toBe('2')
+  })
+
+  test('account切替後に旧保存応答を画面へ反映しない', async () => {
+    let resolveSave!: (value: unknown) => void
+    fixture.saveMenuResources = vi.fn(() => new Promise((resolve) => { resolveSave = resolve }))
+    await openEditor()
+    fireEvent.click(screen.getByRole('button', { name: '設備の割当を保存' }))
+    switchAccount('account-b')
+    await act(async () => {
+      resolveSave({ success: true, data: { id: 'menu-1', version: 2, resources: [] } })
+      await Promise.resolve()
+    })
+    expect(screen.queryByText('設備の割当を保存しました。新しい予約枠から反映されます。')).toBeNull()
+    expect(screen.queryByText('メニュー編集')).toBeNull()
+  })
+
+  test('staffは割当を閲覧できるが変更・保存できない', async () => {
+    window.localStorage.setItem('lh_staff_role', 'staff')
+    await openEditor()
+    expect(await screen.findByText('設備の割当は閲覧のみです。変更は管理者へ依頼してください。')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '設備の割当を保存' })).toBeNull()
+    expect((screen.getByRole('checkbox', { name: /個室A/ }) as HTMLInputElement).disabled).toBe(true)
+  })
 })
 
 describe('既存メニューの編集窓: 予約申込時に自動付与するタグ', () => {

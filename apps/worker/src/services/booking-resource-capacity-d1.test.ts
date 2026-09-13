@@ -257,7 +257,7 @@ describe('予約資源の実Miniflare D1 transaction', () => {
     await expect(createBooking(native, 'booking-d1-after-stop')).resolves.toMatchObject({ inserted: false });
   }, 30_000);
 
-  test('縮小が先に確定する競合では、必要数超過になる予約batchをfail-closedにする', async () => {
+  test('割当必要数未満の縮小を先に試しても拒否し、待機中の予約batchを壊さない', async () => {
     const entered = deferred();
     const release = deferred();
     const gated = gateBookingBatch(native, entered.resolve, release.promise);
@@ -269,10 +269,10 @@ describe('予約資源の実Miniflare D1 transaction', () => {
     });
     release.resolve();
     const booking = await bookingPromise;
-    expect(shrunk).toEqual({ status: 'updated' });
-    expect(booking.inserted).toBe(false);
+    expect(shrunk).toEqual({ status: 'assignment_conflict', requiredQuantity: 2 });
+    expect(booking.inserted).toBe(true);
     expect(await native.prepare(`SELECT COUNT(*) AS count FROM bookings`).first())
-      .toEqual({ count: 0 });
+      .toEqual({ count: 1 });
   }, 30_000);
 
   test('予約が先に確定する縮小競合では、予約snapshotを根拠に縮小を409相当で止める', async () => {

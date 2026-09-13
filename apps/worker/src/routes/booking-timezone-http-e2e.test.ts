@@ -20,6 +20,7 @@ import { join } from 'node:path';
 import Database from 'better-sqlite3';
 import { Hono } from 'hono';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { replaceBookingMenuResources } from '@line-crm/db';
 
 import type { Env } from '../index.js';
 
@@ -307,6 +308,36 @@ describe('非JST店舗の予約作成 HTTP E2E（実DB・America/New_York）', (
     sqlite.prepare(`INSERT INTO booking_menu_resources (menu_id,resource_id,quantity)
       VALUES ('menu-ny','room-shared',?)`).run(quantity);
   }
+
+  test('#763 helperの割当が空き枠と管理者予約へ即時反映し、snapshotを作る', async () => {
+    storeCapacity(10);
+    sqlite.prepare(`INSERT INTO booking_resources
+      (id,line_account_id,name,resource_type,capacity,is_active)
+      VALUES ('room-shared','account-ny','共用室','room',1,1)`).run();
+    await expect(replaceBookingMenuResources(db, {
+      menuId: 'menu-ny', lineAccountId: 'account-ny', expectedVersion: 1,
+      resources: [{ resourceId: 'room-shared', quantity: 1 }],
+    })).resolves.toMatchObject({ status: 'updated', version: 2 });
+
+    const before = await app.request(
+      '/api/booking/admin/availability?account_id=account-ny&menu_id=menu-ny'
+        + '&staff_id=staff-ny&from=2026-11-02&to=2026-11-02',
+      {}, env, execCtx,
+    );
+    const beforeBody = await before.json() as { by_staff: Array<{ slots: Array<{ startUtc: string; remaining: number }> }> };
+    expect(beforeBody.by_staff[0].slots.some((slot) => (
+      new Date(slot.startUtc).toISOString() === NY_NOV2_1000 && slot.remaining === 1
+    ))).toBe(true);
+
+    stubExternal();
+    expect((await adminCreate(NY_NOV2_1000, 'n406-helper-booking')).status).toBe(201);
+    expect(resourceSnapshot((sqlite.prepare('SELECT id FROM bookings').get() as { id: string }).id)).toEqual([
+      { booking_id: expect.any(String), resource_id: 'room-shared', quantity: 1, snapshot_source: 'booking' },
+    ]);
+    expect((await adminCreate(NY_NOV2_1000, 'n406-helper-over-capacity', {
+      staff_id: 'staff-other',
+    })).status).toBe(409);
+  });
 
   test.each(['liff', 'admin', 'mixed'])('店舗定員1・メニュー5の同時予約を担当横断で原子的に守る (%s)', async (mode) => {
     storeCapacity(1);

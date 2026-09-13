@@ -28,6 +28,7 @@ import {
   createBookingResource,
   deleteBookingResourceSafely,
   updateBookingResourceSafely,
+  replaceBookingMenuResources,
   type BookingExceptionKind,
   type BookingExceptionScope,
   type BookingInterval,
@@ -1240,6 +1241,41 @@ function readBookingResourceInput(
   };
 }
 
+function readBookingMenuResources(body: Record<string, unknown>):
+  | { ok: true; expectedVersion: number; resources: Array<{ resourceId: string; quantity: number }> }
+  | { ok: false; error: string } {
+  if (Object.keys(body).some((key) => key !== 'expectedVersion' && key !== 'resources')) {
+    return { ok: false, error: '指定できない項目があります' };
+  }
+  if (!Number.isInteger(body.expectedVersion) || Number(body.expectedVersion) < 1) {
+    return { ok: false, error: 'expectedVersionは1以上の整数で指定してください' };
+  }
+  if (!Array.isArray(body.resources) || body.resources.length > 30) {
+    return { ok: false, error: 'resourcesは30件以内の配列で指定してください' };
+  }
+  const resources: Array<{ resourceId: string; quantity: number }> = [];
+  const seen = new Set<string>();
+  for (const raw of body.resources) {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+      return { ok: false, error: '資源の指定が正しくありません' };
+    }
+    const item = raw as Record<string, unknown>;
+    if (Object.keys(item).some((key) => key !== 'resourceId' && key !== 'quantity')) {
+      return { ok: false, error: '資源の指定が正しくありません' };
+    }
+    const resourceId = typeof item.resourceId === 'string' ? item.resourceId.trim() : '';
+    if (!resourceId || seen.has(resourceId)) {
+      return { ok: false, error: '資源IDは空欄や重複のない形で指定してください' };
+    }
+    if (!Number.isInteger(item.quantity) || Number(item.quantity) < 1 || Number(item.quantity) > 1000) {
+      return { ok: false, error: 'quantityは1〜1000の整数で指定してください' };
+    }
+    seen.add(resourceId);
+    resources.push({ resourceId, quantity: Number(item.quantity) });
+  }
+  return { ok: true, expectedVersion: Number(body.expectedVersion), resources };
+}
+
 booking.get('/api/booking/admin/settings', async (c) => {
   const accountId = await resolveAccountIdAdmin(c);
   if (!accountId) return c.json({ success: false, error: 'missing_account_id' }, 400);
@@ -1353,6 +1389,13 @@ booking.patch('/api/booking/admin/resources/:id', requireRole('owner', 'admin'),
         success: false, code: 'capacity_conflict',
         error: `今後の予約で最大${result.peakQuantity}枠を使用するため、この数には減らせません`,
         data: { peakQuantity: result.peakQuantity },
+      }, 409);
+    }
+    if (result.status === 'assignment_conflict') {
+      return c.json({
+        success: false, code: 'assignment_conflict',
+        error: `メニューで最大${result.requiredQuantity}個を必要としているため、先にメニューの設備割当を変更してください`,
+        data: { requiredQuantity: result.requiredQuantity },
       }, 409);
     }
     if (!result.item) throw new Error('booking_resource_update_missing_result');
@@ -1594,6 +1637,29 @@ booking.get('/api/booking/admin/menus', async (c) => {
                 m.sort_order, m.is_active, m.auto_tag_id,
                 m.concurrent_capacity, m.booking_window_days, m.cutoff_hours_before,
                 m.cancel_deadline_hours_before, m.intake_question,
+                COALESCE((
+                  SELECT json_group_array(json_object(
+                    'menuId', assigned.menu_id,
+                    'resourceId', assigned.resource_id,
+                    'name', assigned.name,
+                    'type', assigned.resource_type,
+                    'capacity', assigned.capacity,
+                    'quantity', assigned.quantity,
+                    'isActive', assigned.is_active = 1,
+                    'warning', CASE
+                      WHEN assigned.is_active != 1 THEN 'resource_inactive'
+                      WHEN assigned.quantity > assigned.capacity THEN 'capacity_exceeded'
+                      ELSE NULL END
+                  ))
+                  FROM (
+                    SELECT mr.menu_id, mr.resource_id, mr.quantity,
+                           r.name, r.resource_type, r.capacity, r.is_active
+                    FROM booking_menu_resources mr
+                    INNER JOIN booking_resources r ON r.id = mr.resource_id
+                    WHERE mr.menu_id = m.id AND r.line_account_id = m.line_account_id
+                    ORDER BY r.name ASC, r.id ASC
+                  ) assigned
+                ), '[]') AS assigned_resources_json,
                 COALESCE(bs.booking_window_days, 60) AS store_booking_window_days,
                 COALESCE(bs.cutoff_minutes_before, 1440) AS store_cutoff_minutes_before,
                 COALESCE(bs.cancel_deadline_minutes_before, 1440) AS store_cancel_deadline_minutes_before
@@ -1651,6 +1717,16 @@ booking.get('/api/booking/admin/menus', async (c) => {
         cancel_deadline_hours_before: row.cancel_deadline_hours_before,
         intake_question: row.intake_question,
         assigned_staff: staffByMenu.get(String(row.id)) ?? [],
+        // menu版と割当を同じSELECT snapshotで返す。別々に読むと、保存batchが
+        // 間へ入ったとき「新しい版＋古い割当」を利用者へ返してしまう。
+        assigned_resources: (JSON.parse(String(row.assigned_resources_json ?? '[]')) as Array<Record<string, unknown>>)
+          .map((resource) => ({
+            ...resource,
+            isActive: Number(resource.isActive) === 1,
+            warning: Number(resource.isActive) !== 1
+              ? 'resource_inactive'
+              : Number(resource.quantity) > Number(resource.capacity) ? 'capacity_exceeded' : null,
+          })),
         booking_count_30_days: countByMenu.get(String(row.id)) ?? 0,
         effectiveBookingRules: {
           bookingWindowDays: row.booking_window_days ?? row.store_booking_window_days,
@@ -1671,6 +1747,42 @@ booking.get('/api/booking/admin/menus', async (c) => {
   } catch {
     console.error(JSON.stringify({ event: 'booking_menu_list_failed' }));
     return c.json({ error: 'booking_menu_data_unavailable' }, 503);
+  }
+});
+
+booking.put('/api/booking/admin/menus/:id/resources', requireRole('owner', 'admin'), async (c) => {
+  const accountId = await resolveAccountIdAdmin(c);
+  if (!accountId) return c.json({ success: false, error: 'missing_account_id' }, 400);
+  try {
+    const body = await c.req.json<Record<string, unknown>>().catch(() => null);
+    if (!body) return c.json({ success: false, error: 'invalid_json' }, 400);
+    const parsed = readBookingMenuResources(body);
+    if (!parsed.ok) return c.json({ success: false, error: parsed.error }, 400);
+    const result = await replaceBookingMenuResources(c.env.DB, {
+      menuId: c.req.param('id'), lineAccountId: accountId,
+      expectedVersion: parsed.expectedVersion, resources: parsed.resources,
+    });
+    if (result.status === 'not_found') return c.json({ success: false, error: 'not_found' }, 404);
+    if (result.status === 'conflict') {
+      return c.json({
+        success: false, code: 'version_conflict',
+        error: '予約メニューが更新されています。読み直してください',
+        data: { currentVersion: result.currentVersion },
+      }, 409);
+    }
+    if (result.status === 'invalid_resource') {
+      return c.json({
+        success: false, code: 'invalid_resource',
+        error: '選択した設備を利用できません。設備の状態と必要数を確認してください',
+      }, 400);
+    }
+    return c.json({
+      success: true,
+      data: { id: c.req.param('id'), version: result.version, resources: result.resources },
+    });
+  } catch {
+    console.error(JSON.stringify({ event: 'booking_menu_resources_update_failed' }));
+    return c.json({ success: false, error: 'booking_menu_resources_save_failed' }, 503);
   }
 });
 
