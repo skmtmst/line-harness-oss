@@ -1181,9 +1181,9 @@ CREATE TABLE booking_idempotency_keys (
   expires_at       TEXT NOT NULL                  -- UTC ISO8601
 );
 
-CREATE TABLE booking_menu_resources (
+CREATE TABLE "booking_menu_resources" (
   menu_id TEXT NOT NULL REFERENCES menus(id) ON DELETE CASCADE,
-  resource_id TEXT NOT NULL REFERENCES booking_resources(id) ON DELETE CASCADE,
+  resource_id TEXT NOT NULL REFERENCES booking_resources(id) ON DELETE RESTRICT,
   quantity INTEGER NOT NULL DEFAULT 1 CHECK (quantity BETWEEN 1 AND 1000),
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   PRIMARY KEY (menu_id, resource_id)
@@ -1222,6 +1222,17 @@ CREATE TABLE "booking_reminders" (
                   CHECK (status IN ('pending','sent','failed','failed_permanent','cancelled')),
   retry_count   INTEGER NOT NULL DEFAULT 0,
   last_error    TEXT
+);
+
+CREATE TABLE booking_resource_consumptions (
+  booking_id TEXT NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE RESTRICT,
+  resource_id TEXT NOT NULL REFERENCES booking_resources(id) ON DELETE RESTRICT,
+  quantity INTEGER NOT NULL CHECK (quantity BETWEEN 1 AND 1000),
+  snapshot_source TEXT NOT NULL
+    CHECK (snapshot_source IN ('booking', 'migration_current_assignment')),
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  PRIMARY KEY (booking_id, resource_id)
 );
 
 CREATE TABLE booking_resources (
@@ -6019,6 +6030,9 @@ CREATE INDEX idx_booking_operation_runs_status
 CREATE INDEX idx_booking_reminders_v298_status_scheduled
   ON booking_reminders(status, scheduled_at);
 
+CREATE INDEX idx_booking_resource_consumptions_resource
+  ON booking_resource_consumptions(line_account_id, resource_id, booking_id);
+
 CREATE INDEX idx_booking_resources_account_active
   ON booking_resources(line_account_id, is_active, id);
 
@@ -7278,6 +7292,26 @@ CREATE UNIQUE INDEX uq_google_calendar_connections_active_staff
 CREATE TRIGGER analytics_projection_friend_stage_count
 AFTER INSERT ON analytics_projection_friend_stage
 BEGIN UPDATE analytics_projection_metric_stage SET unique_friend_count = unique_friend_count + 1 WHERE line_account_id = NEW.line_account_id AND cycle_id = NEW.cycle_id AND metric_date = NEW.metric_date AND event_type = NEW.event_type; END;
+
+CREATE TRIGGER booking_resource_consumptions_account_insert
+BEFORE INSERT ON booking_resource_consumptions
+FOR EACH ROW
+WHEN NOT EXISTS (
+  SELECT 1
+  FROM bookings b
+  INNER JOIN booking_resources r ON r.id = NEW.resource_id
+  WHERE b.id = NEW.booking_id
+    AND b.line_account_id = NEW.line_account_id
+    AND r.line_account_id = NEW.line_account_id
+)
+BEGIN
+  SELECT RAISE(ABORT, 'booking_resource_consumption_account_mismatch'); END;
+
+CREATE TRIGGER booking_resource_consumptions_immutable
+BEFORE UPDATE ON booking_resource_consumptions
+FOR EACH ROW
+BEGIN
+  SELECT RAISE(ABORT, 'booking_resource_consumption_immutable'); END;
 
 CREATE TRIGGER conversion_points_prevent_delete
 BEFORE DELETE ON conversion_points
