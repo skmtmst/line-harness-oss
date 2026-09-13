@@ -141,6 +141,7 @@ import { dashboard } from './routes/dashboard.js';
 import { siteTracking } from './routes/site-tracking.js';
 import { restaurantTest } from './routes/restaurant-test.js';
 import { tenants } from './routes/tenants.js';
+import { hqBanners } from './routes/hq-banners.js';
 import { codexSlackEvents } from './routes/codex-slack-events.js';
 import { aiLoopSlackReports } from './routes/ai-loop-slack-reports.js';
 import { clientErrors } from './routes/client-errors.js';
@@ -218,6 +219,14 @@ export type Env = {
     LINE_LOGIN_CHANNEL_SECRET: string;
     /** Stripe Webhook署名キー。未設定時はStripe受信ルートだけ503で拒否する。 */
     STRIPE_WEBHOOK_SECRET?: string;
+    /** 統括のバナー生成（OpenAI 画像生成）。未設定時は生成だけ503で断る。 */
+    OPENAI_API_KEY?: string;
+    /** 画像生成モデル名。未設定時は gpt-image-1。 */
+    OPENAI_IMAGE_MODEL?: string;
+    /** 統括ごとの月間生成上限（枚）。未設定時は150。料金プラン導入後はプランの値を使う。 */
+    BANNER_MONTHLY_IMAGES?: string;
+    /** 生成の品質（low|medium|high）。運用者には選ばせず、未設定時は medium。 */
+    BANNER_IMAGE_QUALITY?: string;
     TOTP_ENCRYPTION_KEY?: string;
     /** 署名済みの配備イベント受信用。管理画面へは公開しない。 */
     OPERATIONS_DEPLOYMENT_SIGNING_SECRET?: string;
@@ -457,6 +466,7 @@ app.route('/', siteTracking);
 // 飲食店向けの検証専用領域。既存NEN機能とはAPI/DB名前空間を分離する。
 app.route('/', restaurantTest);
 app.route('/', tenants);
+app.route('/', hqBanners);
 app.route('/', codexSlackEvents);
 app.route('/', aiLoopSlackReports);
 app.route('/', clientErrors);
