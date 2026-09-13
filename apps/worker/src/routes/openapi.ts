@@ -1804,6 +1804,30 @@ const spec = {
         },
       },
     },
+    // ── Event waitlist ────────────────────────────────────────────────────
+    '/api/liff/events/waitlist/{token}/accept': {
+      post: {
+        tags: ['Events'],
+        summary: 'キャンセル待ちの繰上げ案内を本人が承諾',
+        security: [],
+        parameters: [
+          {
+            name: 'token',
+            in: 'path',
+            required: true,
+            schema: { type: 'string', minLength: 32, maxLength: 256 },
+            description: 'LINEで本人へ送った期限付き案内token',
+          },
+        ],
+        responses: {
+          '200': { description: '確定予約へ変換済み（同じ案内の再実行を含む）' },
+          '401': { description: 'LINE本人確認に失敗' },
+          '404': { description: '案内なし、または案内対象と異なるLINEユーザー' },
+          '409': { description: '満席・本人上限などにより確定不能' },
+          '410': { description: '回答期限切れ' },
+        },
+      },
+    },
     // ── Rich Menus (publish schedules) ────────────────────────────────────
     '/api/rich-menu-groups/{groupId}/schedule': {
       post: {
@@ -1846,6 +1870,7 @@ const spec = {
     { name: 'Conversions', description: 'コンバージョン計測' },
     { name: 'Affiliates', description: 'アフィリエイト管理' },
     { name: 'Booking', description: '予約設定' },
+    { name: 'Events', description: 'イベント予約とキャンセル待ち' },
     { name: 'Templates', description: 'テンプレート公開版' },
     { name: 'Forms', description: '回答フォーム' },
     { name: 'Rich Menus', description: 'リッチメニュー公開予約' },
