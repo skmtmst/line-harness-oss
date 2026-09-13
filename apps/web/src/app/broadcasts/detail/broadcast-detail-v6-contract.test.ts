@@ -6,8 +6,8 @@ import { describe, expect, it } from 'vitest'
 const PAGE = fs.readFileSync(path.join(__dirname, 'page.tsx'), 'utf8')
 
 describe('V6 一斉配信詳細の契約', () => {
-  it('配信内容を見る操作を、同じ画面の送信内容へ接続する', () => {
-    expect(PAGE).toContain("contentRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })")
+  it('概要から配信内容まで、同じ結果画面のタブとして示す', () => {
+    expect(PAGE).toContain("['概要', 'クリック', '友だち', 'エラー', '配信内容']")
     expect(PAGE).toContain('id="broadcast-content"')
     expect(PAGE).not.toContain('配信内容の別画面は準備中です')
   })
@@ -25,6 +25,17 @@ describe('V6 一斉配信詳細の契約', () => {
   it('期間集計ではなく配信自身の保存済みインサイトを読む', () => {
     expect(PAGE).toContain('api.broadcasts.getInsight(id)')
     expect(PAGE).not.toContain('api.analytics.broadcasts(selectedAccountId)')
+  })
+
+  it('画面にある実測値をCSVで書き出せる', () => {
+    expect(PAGE).toContain('CSVで書き出す')
+    expect(PAGE).toContain('broadcastDetailCsv({')
+    expect(PAGE).toContain('URL.revokeObjectURL(url)')
+  })
+
+  it('壊れた日時を Invalid Date のまま出さない', () => {
+    expect(PAGE).toContain('formatBroadcastDateTime(broadcast.createdAt)')
+    expect(PAGE).not.toContain('new Date(broadcast.createdAt).toLocaleString')
   })
 })
 
@@ -57,7 +68,10 @@ describe('V6 一斉配信詳細の、取れない数の断り', () => {
     expect(PAGE).toContain('まだ送っていません')
   })
 
-  it('押せない操作の理由を吹き出しだけに置かない', () => {
-    expect(PAGE).toContain('種にして作り直す口がまだないため押せません')
+  it('作り直しは押せる操作として置き、押せない言い訳を残さない', () => {
+    // #605 で実動作へ接続。押せない前提の文言は消す。
+    expect(PAGE).toContain('/broadcasts/new?duplicateFrom=')
+    expect(PAGE).toContain('同じ設定で作り直す')
+    expect(PAGE).not.toContain('種にして作り直す口がまだないため押せません')
   })
 })

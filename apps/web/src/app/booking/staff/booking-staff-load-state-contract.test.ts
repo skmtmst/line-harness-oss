@@ -18,14 +18,19 @@ describe('V6 予約スタッフ・受付時間の一覧状態', () => {
 
     it(`${name}は失敗時に再読み込みできる`, () => {
       expect(source).toContain('kind="error"')
-      expect(source).toContain('onClick={() => void load()}')
+      if (name === '受付時間') {
+        expect(source).toContain('onClick={() => setReloadKey((value) => value + 1)}')
+      } else {
+        expect(source).toContain('onClick={() => void load()}')
+      }
       expect(source).toContain('再読み込み</Button>')
     })
 
     it(`${name}はアカウント切替前の遅い応答を採用しない`, () => {
-      expect(source).toContain('const loadRequestRef = useRef(0)')
-      expect(source).toContain('if (requestId !== loadRequestRef.current) return')
-      expect(source).toContain('loadRequestRef.current += 1')
+      const requestRef = name === '受付時間' ? 'requestRef' : 'loadRequestRef'
+      expect(source).toContain(`const ${requestRef} = useRef(0)`)
+      expect(source).toContain(`if (requestId !== ${requestRef}.current) return`)
+      expect(source).toContain(`${requestRef}.current += 1`)
     })
   }
 
@@ -39,16 +44,16 @@ describe('V6 予約スタッフ・受付時間の一覧状態', () => {
   })
 
   it('受付時間は読込失敗時に初期値の設定画面を出さない', () => {
-    const errorBranch = SHIFTS.indexOf("loadStatus === 'error' && loadError")
-    const contentBranch = SHIFTS.indexOf('<div className="space-y-4">')
+    const errorBranch = SHIFTS.indexOf("loadStatus === 'error' || !settings")
+    const contentBranch = SHIFTS.indexOf('data-design="Body"')
     expect(errorBranch).toBeGreaterThan(-1)
     expect(contentBranch).toBeGreaterThan(errorBranch)
     expect(SHIFTS).toContain('保存済みの設定は消えていません。')
   })
 
-  it('受付時間の保存・接続失敗で内部のエラー文をそのまま出さない', () => {
+  it('休業日の保存失敗で内部のエラー文をそのまま出さない', () => {
     expect(SHIFTS).not.toContain("setError(e instanceof Error ? e.message : String(e))")
-    expect(SHIFTS).toContain('受付時間を保存できませんでした。')
-    expect(SHIFTS).toContain('Googleカレンダーへ接続できませんでした。')
+    expect(SHIFTS).toContain('休業日を保存できませんでした。')
+    expect(SHIFTS).toContain('bookingApi.createException(selectedAccountId')
   })
 })

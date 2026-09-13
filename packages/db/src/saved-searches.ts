@@ -35,6 +35,9 @@ export interface SavedSearch {
   is_shared: number;
   display_order: number;
   created_at: string;
+  revision?: number;
+  updated_by?: string | null;
+  updated_at?: string | null;
 }
 
 export interface SavedSearchAccess {
@@ -57,13 +60,25 @@ export interface SavedSearchReference {
   reference_id: string;
   reference_name: string;
   reference_mode: SavedSearchReferenceMode;
+  revision?: number | null;
   last_used_at: string | null;
   created_at: string;
+}
+
+export interface SavedSearchUsageCount {
+  saved_search_id: string;
+  call_count_this_month: number;
+}
+
+export interface SavedSearchReferenceUsageCount extends SavedSearchUsageCount {
+  reference_kind: string;
+  reference_id: string | null;
 }
 
 export const INBOX_SAVED_VIEW_STATUSES = ['unread', 'in_progress', 'on_hold', 'resolved'] as const;
 export const INBOX_SAVED_VIEW_CHANNELS = ['line', 'email'] as const;
 export const INBOX_SAVED_VIEW_SORTS = ['newest', 'waiting_desc'] as const;
+export const INBOX_SAVED_VIEW_DUE = ['all', 'overdue'] as const;
 
 /** 受信箱専用。友だち検索の AND/OR 条件と混ぜず、版を持って移行できる形にする。 */
 export interface InboxSavedViewConditions {
@@ -77,6 +92,7 @@ export interface InboxSavedViewConditions {
   receivedFrom: string | null;
   receivedTo: string | null;
   sort: (typeof INBOX_SAVED_VIEW_SORTS)[number];
+  due: (typeof INBOX_SAVED_VIEW_DUE)[number];
 }
 
 const CONDITION_KINDS = new Set([
@@ -86,11 +102,18 @@ const CONDITION_KINDS = new Set([
   'form',
   'purchase',
   'mark',
+  'assignee',
   'scenario',
+  'event_booking',
+  'calendar_booking',
   'chat_status',
+  'last_activity',
+  'reminder',
+  'memo',
   'following',
   'status_message',
   'created_at',
+  'common_event',
 ]);
 
 /**
@@ -281,6 +304,10 @@ export function validateInboxSavedViewConditions(
   if (!(INBOX_SAVED_VIEW_SORTS as readonly unknown[]).includes(input.sort)) {
     return { ok: false, error: '並び順が正しくありません' };
   }
+  const due = input.due === undefined ? 'all' : input.due;
+  if (!(INBOX_SAVED_VIEW_DUE as readonly unknown[]).includes(due)) {
+    return { ok: false, error: '期限条件が正しくありません' };
+  }
   const query = typeof input.query === 'string' ? input.query.trim().slice(0, 200) : '';
   const receivedFrom = input.receivedFrom === null || typeof input.receivedFrom === 'string'
     ? input.receivedFrom as string | null
@@ -301,6 +328,7 @@ export function validateInboxSavedViewConditions(
       receivedFrom,
       receivedTo,
       sort: input.sort as InboxSavedViewConditions['sort'],
+      due: due as InboxSavedViewConditions['due'],
     },
   };
 }
@@ -381,7 +409,7 @@ export async function getSavedSearchReferences(
   const result = await db
     .prepare(
       `SELECT saved_search_id, line_account_id, reference_kind, reference_id,
-              reference_name, reference_mode, last_used_at, created_at
+              reference_name, reference_mode, revision, last_used_at, created_at
          FROM saved_search_references
         WHERE line_account_id = ? AND saved_search_id IN (${placeholders})
         ORDER BY reference_kind ASC, reference_name ASC, reference_id ASC`,
@@ -401,18 +429,20 @@ export async function upsertSavedSearchReference(
     referenceId: string;
     referenceName: string;
     mode: SavedSearchReferenceMode;
+    revision?: number | null;
     lastUsedAt?: string | null;
   },
 ): Promise<void> {
   await db.prepare(
     `INSERT INTO saved_search_references
        (saved_search_id, line_account_id, reference_kind, reference_id,
-        reference_name, reference_mode, last_used_at, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        reference_name, reference_mode, revision, last_used_at, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(saved_search_id, reference_kind, reference_id) DO UPDATE SET
        line_account_id = excluded.line_account_id,
        reference_name = excluded.reference_name,
        reference_mode = excluded.reference_mode,
+       revision = excluded.revision,
        last_used_at = excluded.last_used_at`,
   ).bind(
     input.savedSearchId,
@@ -421,8 +451,92 @@ export async function upsertSavedSearchReference(
     input.referenceId,
     input.referenceName,
     input.mode,
+    input.revision ?? null,
     input.lastUsedAt ?? null,
     jstNow(),
+  ).run();
+}
+
+function savedSearchMonth(now = jstNow()): string {
+  return now.slice(0, 7);
+}
+
+/** 一覧の「今月の呼び出し」を検索ごとにまとめて返す。 */
+export async function getSavedSearchUsageCounts(
+  db: D1Database,
+  savedSearchIds: string[],
+  lineAccountId: string,
+  now = jstNow(),
+): Promise<Map<string, number>> {
+  const ids = [...new Set(savedSearchIds.filter(Boolean))];
+  if (ids.length === 0) return new Map();
+  const placeholders = ids.map(() => '?').join(', ');
+  const result = await db.prepare(
+    `SELECT saved_search_id, COUNT(*) AS call_count_this_month
+       FROM saved_search_usage_events
+      WHERE line_account_id = ?
+        AND saved_search_id IN (${placeholders})
+        AND substr(used_at, 1, 7) = ?
+      GROUP BY saved_search_id`,
+  ).bind(lineAccountId, ...ids, savedSearchMonth(now)).all<SavedSearchUsageCount>();
+  return new Map(result.results.map((row) => [
+    row.saved_search_id,
+    Number(row.call_count_this_month),
+  ]));
+}
+
+/** 詳細の使用先ごとに、今月何回呼ばれたかを返す。 */
+export async function getSavedSearchReferenceUsageCounts(
+  db: D1Database,
+  savedSearchIds: string[],
+  lineAccountId: string,
+  now = jstNow(),
+): Promise<Map<string, number>> {
+  const ids = [...new Set(savedSearchIds.filter(Boolean))];
+  if (ids.length === 0) return new Map();
+  const placeholders = ids.map(() => '?').join(', ');
+  const result = await db.prepare(
+    `SELECT saved_search_id, reference_kind, reference_id,
+            COUNT(*) AS call_count_this_month
+       FROM saved_search_usage_events
+      WHERE line_account_id = ?
+        AND saved_search_id IN (${placeholders})
+        AND substr(used_at, 1, 7) = ?
+      GROUP BY saved_search_id, reference_kind, reference_id`,
+  ).bind(lineAccountId, ...ids, savedSearchMonth(now)).all<SavedSearchReferenceUsageCount>();
+  return new Map(result.results.map((row) => [
+    `${row.saved_search_id}:${row.reference_kind}:${row.reference_id ?? ''}`,
+    Number(row.call_count_this_month),
+  ]));
+}
+
+/** 保存した検索を実際に使った時だけ追記する。 */
+export async function recordSavedSearchUsage(
+  db: D1Database,
+  input: {
+    savedSearchId: string;
+    lineAccountId: string;
+    revision: number;
+    referenceKind: 'friends' | SavedSearchReferenceKind;
+    referenceId?: string | null;
+    usedBy?: string | null;
+    usedAt?: string;
+  },
+): Promise<void> {
+  await db.prepare(
+    `INSERT INTO saved_search_usage_events
+       (id, saved_search_id, line_account_id, revision, reference_kind,
+        reference_id, used_by, used_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).bind(
+    crypto.randomUUID(),
+    input.savedSearchId,
+    input.lineAccountId,
+    input.revision,
+    input.referenceKind,
+    input.referenceId ?? null,
+    input.usedBy ?? null,
+    input.usedAt ?? jstNow(),
   ).run();
 }
 
@@ -450,11 +564,14 @@ export async function createSavedSearch(
   },
 ): Promise<SavedSearch> {
   const id = crypto.randomUUID();
-  await db
-    .prepare(
+  const now = jstNow();
+  await db.batch([
+    db.prepare(
       `INSERT INTO saved_searches
-         (id, name, scope, condition_format, conditions_json, created_by, line_account_id, is_shared, display_order, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         (id, name, scope, condition_format, conditions_json, created_by,
+          line_account_id, is_shared, display_order, created_at, revision,
+          updated_by, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
     )
     .bind(
       id,
@@ -466,10 +583,103 @@ export async function createSavedSearch(
       input.lineAccountId,
       input.isShared === false ? 0 : 1,
       input.displayOrder ?? 0,
-      jstNow(),
-    )
-    .run();
+      now,
+      input.createdBy ?? null,
+      now,
+    ),
+    db.prepare(
+      `INSERT INTO saved_search_revisions
+         (saved_search_id, line_account_id, revision, name, conditions_json,
+          is_shared, display_order, updated_by, created_at)
+       VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?)`,
+    ).bind(
+      id,
+      input.lineAccountId,
+      input.name,
+      JSON.stringify(input.conditions),
+      input.isShared === false ? 0 : 1,
+      input.displayOrder ?? 0,
+      input.createdBy ?? null,
+      now,
+    ),
+  ]);
   return (await getSavedSearchById(db, id, input.lineAccountId))!;
+}
+
+export type SavedSearchRevisionUpdateResult =
+  | { status: 'updated'; search: SavedSearch }
+  | { status: 'not_found' }
+  | { status: 'conflict'; current: SavedSearch };
+
+/** 読み込んだrevisionと同じ時だけ更新し、変更後の版を履歴へ残す。 */
+export async function updateSavedSearchWithRevision(
+  db: D1Database,
+  id: string,
+  access: SavedSearchAccess,
+  expectedRevision: number,
+  input: {
+    name?: string;
+    conditions?: SearchConditions | InboxSavedViewConditions | SavedSegmentConditions;
+    isShared?: boolean;
+    displayOrder?: number;
+  },
+): Promise<SavedSearchRevisionUpdateResult> {
+  const sets: string[] = [];
+  const values: unknown[] = [];
+  if (input.name !== undefined) {
+    sets.push('name = ?');
+    values.push(input.name);
+  }
+  if (input.conditions !== undefined) {
+    sets.push('conditions_json = ?');
+    values.push(JSON.stringify(input.conditions));
+  }
+  if (input.isShared !== undefined) {
+    sets.push('is_shared = ?');
+    values.push(input.isShared ? 1 : 0);
+  }
+  if (input.displayOrder !== undefined) {
+    sets.push('display_order = ?');
+    values.push(input.displayOrder);
+  }
+
+  const existing = await getSavedSearchById(db, id, access.lineAccountId);
+  if (!existing || (existing.created_by !== access.staffId && !access.canManageAll)) {
+    return { status: 'not_found' };
+  }
+  const currentRevision = Number(existing.revision ?? 1);
+  if (currentRevision !== expectedRevision) {
+    return { status: 'conflict', current: existing };
+  }
+  if (sets.length === 0) return { status: 'updated', search: existing };
+
+  const now = jstNow();
+  sets.push('revision = revision + 1', 'updated_by = ?', 'updated_at = ?');
+  values.push(access.staffId, now, id, access.lineAccountId, access.staffId,
+    access.canManageAll ? 1 : 0, expectedRevision);
+  const statements = [
+    db.prepare(
+      `UPDATE saved_searches SET ${sets.join(', ')}
+       WHERE id = ? AND line_account_id = ?
+         AND (created_by = ? OR ? = 1) AND revision = ?`,
+    ).bind(...values),
+    db.prepare(
+      `INSERT OR IGNORE INTO saved_search_revisions
+         (saved_search_id, line_account_id, revision, name, conditions_json,
+          is_shared, display_order, updated_by, created_at)
+       SELECT id, line_account_id, revision, name, conditions_json,
+              is_shared, display_order, updated_by, updated_at
+         FROM saved_searches
+        WHERE id = ? AND line_account_id = ? AND revision = ?`,
+    ).bind(id, access.lineAccountId, expectedRevision + 1),
+  ];
+  const [result] = await db.batch(statements);
+  if (Number(result?.meta?.changes ?? 0) === 0) {
+    const current = await getSavedSearchById(db, id, access.lineAccountId);
+    return current ? { status: 'conflict', current } : { status: 'not_found' };
+  }
+  const updated = await getSavedSearchById(db, id, access.lineAccountId);
+  return updated ? { status: 'updated', search: updated } : { status: 'not_found' };
 }
 
 export async function updateSavedSearch(

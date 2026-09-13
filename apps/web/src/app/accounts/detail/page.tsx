@@ -1,15 +1,17 @@
 'use client'
 
 import { useSearchParams } from 'next/navigation'
+import Link from 'next/link'
 import { Suspense, useCallback, useEffect, useState } from 'react'
 import type { LineAccount } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
-import PageHeader from '@/components/shared/page-header'
+import Breadcrumb from '@/components/shared/breadcrumb'
 import StatusBadge from '@/components/shared/status-badge'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { Tabs } from '@/components/shared/tabs'
+import { usePageTitle } from '@/components/shell/page-chrome'
 import { connectionLabel, webhookLabel } from '../account-list-view'
 import {
   DETAIL_TABS,
@@ -19,6 +21,16 @@ import {
   parentLabel,
   toTab,
 } from './account-detail-view'
+
+type AccountDetailView = LineAccount & {
+  timezone?: string
+  stats?: { friendCount: number; activeScenarios: number; messagesThisMonth: number }
+  connection?: {
+    lastTestAt: string | null
+    lastTestStatus: 'succeeded' | 'failed' | null
+    lastReceivedAt: string | null
+  }
+}
 
 /** 設計 ★V6 33-3（`T9rA9`）。概要 / 接続の確認 / 資格情報 / 乗り換え の 4 タブ。 */
 function AccountDetail() {
@@ -31,7 +43,7 @@ function AccountDetail() {
   const id = search?.get('id') ?? ''
   const tab = toTab(search?.get('tab') ?? null)
 
-  const [account, setAccount] = useState<LineAccount | null>(null)
+  const [account, setAccount] = useState<AccountDetailView | null>(null)
   const [all, setAll] = useState<LineAccount[]>([])
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [stopTarget, setStopTarget] = useState<LineAccount | null>(null)
@@ -53,6 +65,7 @@ function AccountDetail() {
   }, [id])
 
   useEffect(() => { void load() }, [load])
+  usePageTitle(account?.name)
 
   /** 送受信の停止・再開。**何が止まって何が残るかを、押す前に読ませる。** */
   const toggleActive = async () => {
@@ -86,11 +99,9 @@ function AccountDetail() {
 
   return (
     <div data-design-node="T9rA9">
-      <PageHeader
-        breadcrumb={[{ label: 'LINEアカウント', href: '/accounts' }, { label: account.name }]}
-        title={account.name}
-        description="登録の内容と接続の状態を確かめ、必要なら差し替えます。"
-      />
+      <div data-design="Head" className="mb-4">
+        <Breadcrumb items={[{ label: 'LINEアカウント', href: '/accounts' }, { label: account.name }]} />
+      </div>
 
       {/* タブは `?tab=` のまま。共有・再読込・戻るに強い（§2-2）。 */}
       <Tabs
@@ -102,61 +113,129 @@ function AccountDetail() {
       />
 
       {tab === 'overview' && (
-        <div className="mt-4 space-y-4">
-          <section className="bg-canvas rounded-card border-hairline border p-5">
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-ink text-sm font-bold">登録の内容</p>
-              <Button href={`/accounts/detail?id=${account.id}&tab=credentials`}>編集する</Button>
-            </div>
-            <dl className="mt-3 grid gap-x-6 gap-y-3 sm:grid-cols-2">
-              <Row label="表示名" value={account.name} />
-              <Row label="チャネルID" value={account.channelId} />
-              <Row label="国・地域" value={account.country ?? '未設定'} />
-              <Row label="役割メモ" value={account.role ?? '未設定'} />
-              <Row label="親アカウント" value={parentLabel(account, all)} />
-              <Row label="友だち数の上限" value={capacityLabel(account)} />
-            </dl>
-            <div className="mt-3">
-              <StatusBadge tone={connection.tone}>{connection.label}</StatusBadge>
-            </div>
-          </section>
+        <div className="mt-4 grid gap-4 xl:grid-cols-4">
+          <div className="space-y-4 xl:col-span-3">
+            <section className="bg-canvas rounded-card border-hairline border p-5">
+              <div className="flex items-start justify-between gap-3">
+                <p className="text-ink text-base font-bold">登録の内容</p>
+                <Button href={`/accounts/detail?id=${account.id}&tab=credentials`}>編集する</Button>
+              </div>
+              <dl className="mt-3">
+                <InlineRow label="表示名" value={account.name} />
+                <InlineRow label="チャネルID" value={account.channelId} />
+                <InlineRow label="タイムゾーン" value={account.timezone ?? 'Asia/Tokyo'} />
+                <InlineRow label="国・地域" value={account.country ?? '未設定'} />
+                <InlineRow label="役割メモ" value={account.role ?? '未設定'} />
+                <InlineRow label="親アカウント" value={parentLabel(account, all)} />
+                <InlineRow
+                  label="友だち数"
+                  value={account.stats
+                    ? `${account.stats.friendCount.toLocaleString('ja-JP')}人（${capacityLabel(account)}）`
+                    : `—（${capacityLabel(account)}）`}
+                />
+                <InlineRow label="状態" value={connection.label} tone={account.isActive ? 'success' : 'muted'} />
+              </dl>
+            </section>
 
-          <section className="bg-canvas rounded-card border-hairline border p-5">
-            <p className="text-ink text-sm font-bold">このアカウントでできること</p>
-            <div className="mt-3 space-y-3">
-              {accountActions(account).map((action) => (
-                <div key={action.key} className="border-hairline rounded-control border p-3">
-                  <p className="text-ink text-sm font-medium">{action.title}</p>
-                  <p className="text-ink-secondary mt-1 text-xs leading-relaxed">{action.description}</p>
-                  {/*
-                    **押せないものは押し口を置かず、理由を本文で言う。**
-                    押せるのに何も起きない口は「やった」と誤解させる（§7-10）。
-                  */}
-                  {action.blockedReason ? (
-                    <p className="text-ink-faint mt-2 text-xs leading-relaxed">{action.blockedReason}</p>
-                  ) : action.key === 'handover' ? (
-                    <Button href={`/accounts/handover?id=${account.id}`} className="mt-2">
-                      {action.actionLabel}
-                    </Button>
-                  ) : (
-                    <Button type="button" className="mt-2" onClick={() => setStopTarget(account)}>
-                      {action.actionLabel}
-                    </Button>
-                  )}
+            <section className="bg-canvas rounded-card border-hairline border p-5">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-ink text-sm font-bold">資格情報</p>
+                  <p className="text-ink-secondary mt-1 text-xs">秘密値そのものは表示しません。</p>
                 </div>
-              ))}
-            </div>
-            {actionError && <p role="alert" className="text-danger mt-3 text-xs">{actionError}</p>}
-          </section>
+                <Button href={`/accounts/detail?id=${account.id}&tab=credentials`}>差し替える</Button>
+              </div>
+              <dl className="mt-3">
+                <CredentialRow
+                  label="チャネルシークレット"
+                  configured={account.channelSecretConfigured}
+                  last4={account.channelSecretLast4}
+                  updatedAt={account.channelSecretUpdatedAt}
+                />
+                <CredentialRow
+                  label="チャネルアクセストークン"
+                  configured={account.channelAccessTokenConfigured}
+                  last4={account.channelAccessTokenLast4}
+                  updatedAt={account.channelAccessTokenUpdatedAt}
+                />
+                <CredentialRow
+                  label="Loginチャネルシークレット"
+                  configured={account.loginChannelSecretConfigured}
+                  last4={account.loginChannelSecretLast4}
+                  updatedAt={account.loginChannelSecretUpdatedAt}
+                />
+                <InlineRow
+                  label="シークレットの確認"
+                  value={account.connection?.lastTestStatus === 'succeeded' && account.connection.lastTestAt
+                    ? `確かめました（${formatMonthDay(account.connection.lastTestAt)} の受信で署名が合いました）`
+                    : '未取得'}
+                  tone={account.connection?.lastTestStatus === 'succeeded' ? 'success' : 'muted'}
+                />
+              </dl>
+              <div className="bg-canvas-sunken rounded-control mt-3 px-3 py-2">
+                <p className="text-ink text-xs font-bold">値そのものは、ここにも出しません</p>
+                <p className="text-ink-secondary mt-1 text-xs">差し替えるときは、新しい値を入れて保存し直します。今の値を見たり直したりはできません。</p>
+              </div>
+            </section>
 
-          <section className="bg-canvas rounded-card border-hairline border p-5">
-            <p className="text-ink text-sm font-bold">気をつけること</p>
-            <ul className="text-ink-secondary mt-2 space-y-1 text-xs leading-relaxed">
-              <li>・送受信を止めても、友だちと履歴は消えません。予約している配信は止まります。</li>
-              <li>・アーカイブすると一覧から外れます。記録は残り、あとから戻せます。</li>
-              <li>・資格情報を差し替えると、古いトークンは使えなくなります。差し替える前に接続を確かめます。</li>
-            </ul>
-          </section>
+            <section className="bg-canvas rounded-card border-hairline border p-5">
+              <p className="text-ink text-sm font-bold">このアカウントでできること</p>
+              <div className="mt-3 space-y-2">
+                {accountActions(account).map((action) => (
+                  <div key={action.key} className="border-hairline rounded-control flex items-center justify-between gap-4 border px-3 py-2">
+                    <div>
+                      <p className={action.key === 'archive' ? 'text-danger text-sm font-medium' : 'text-ink text-sm font-medium'}>{action.title}</p>
+                      <p className="text-ink-secondary mt-1 text-xs leading-relaxed">{action.description}</p>
+                    </div>
+                    {action.blockedReason ? null : action.key === 'handover' ? (
+                      <Button href={`/accounts/handover?id=${account.id}`}>{action.actionLabel}</Button>
+                    ) : (
+                      <Button type="button" onClick={() => setStopTarget(account)}>{action.actionLabel}</Button>
+                    )}
+                  </div>
+                ))}
+              </div>
+              {actionError && <p role="alert" className="text-danger mt-3 text-xs">{actionError}</p>}
+            </section>
+          </div>
+
+          <aside className="space-y-4">
+            <section className="bg-canvas rounded-card border-hairline border p-5">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-ink text-sm font-bold">Webhookの突合</p>
+                <StatusBadge tone={webhook.tone}>{webhook.label}</StatusBadge>
+              </div>
+              <dl className="mt-4 space-y-3">
+                <InlineRow label="LINE側に登録したURL" value={webhook.label === '一致・利用中' ? 'このシステムと一致' : webhook.label} tone={webhook.tone === 'success' ? 'success' : 'muted'} />
+                <InlineRow label="Webhookの利用" value={account.webhook?.active === null || account.webhook?.active === undefined ? '確かめていません' : account.webhook.active ? 'オン' : 'オフ'} tone={account.webhook?.active ? 'success' : 'muted'} />
+                <InlineRow label="最後のテスト" value={account.connection?.lastTestAt ? `${formatMonthDayTime(account.connection.lastTestAt)} に${account.connection.lastTestStatus === 'succeeded' ? '成功' : '失敗'}` : '未取得'} tone={account.connection?.lastTestStatus === 'succeeded' ? 'success' : 'muted'} />
+                <InlineRow label="最後の受信" value={account.connection?.lastReceivedAt ? formatMonthDayTime(account.connection.lastReceivedAt) : '未取得'} />
+              </dl>
+              <p className="text-ink-secondary mt-3 break-all text-xs">{account.webhook?.actualUrl ?? '—'}</p>
+              <Button href={`/accounts/detail?id=${account.id}&tab=connection`} className="mt-4">
+                いまの状態をもう一度確かめる
+              </Button>
+            </section>
+
+            <section className="bg-canvas rounded-card border-hairline border p-5">
+              <p className="text-ink text-sm font-bold">つながる先</p>
+              <ul className="text-ink-secondary mt-3 space-y-3 text-xs">
+                <li><Link className="text-action hover:underline" href="/">ダッシュボード</Link><p className="mt-1">友だち追加URLとQRはここに出ます。</p></li>
+                <li><Link className="text-action hover:underline" href="/staff">ログインユーザー</Link><p className="mt-1">人ごとの既定のアカウントはここで決めます。</p></li>
+                <li><Link className="text-action hover:underline" href="/emergency">運用状態</Link><p className="mt-1">接続の異常や停止は、ここで見張ります。</p></li>
+                <li><Link className="text-action hover:underline" href="/friends">友だち</Link><p className="mt-1">このアカウントの友だち{account.stats ? `${account.stats.friendCount.toLocaleString('ja-JP')}人` : 'は未取得'}はここに並びます。</p></li>
+              </ul>
+            </section>
+
+            <section className="bg-canvas rounded-card border-hairline border p-5">
+              <p className="text-ink text-sm font-bold">気をつけること</p>
+              <ul className="text-ink-secondary mt-2 space-y-2 text-xs leading-relaxed">
+                <li>・停止しても、友だちと履歴は消えません。</li>
+                <li>・資格情報を差し替える前に接続を確かめます。</li>
+                <li>・アーカイブした記録はあとから戻せます。</li>
+              </ul>
+            </section>
+          </aside>
         </div>
       )}
 
@@ -239,6 +318,65 @@ function Row({ label, value }: { label: string; value: string }) {
       <dd className="text-ink mt-0.5 text-sm break-words">{value}</dd>
     </div>
   )
+}
+
+function formatMonthDay(value: string): string {
+  return new Intl.DateTimeFormat('ja-JP', {
+    month: 'numeric', day: 'numeric', timeZone: 'Asia/Tokyo',
+  }).format(new Date(value))
+}
+
+function formatMonthDayTime(value: string): string {
+  return new Intl.DateTimeFormat('ja-JP', {
+    month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo',
+  }).format(new Date(value))
+}
+
+function InlineRow({
+  label,
+  value,
+  tone = 'default',
+}: {
+  label: string
+  value: string
+  tone?: 'default' | 'success' | 'muted'
+}) {
+  return (
+    <div
+      className="grid min-w-0 gap-3 border-b border-hairline py-1 last:border-b-0"
+      style={{ gridTemplateColumns: '9rem minmax(0, 1fr)' }}
+    >
+      <dt className="text-ink-faint text-xs">{label}</dt>
+      <dd className={tone === 'success'
+        ? 'text-success min-w-0 break-words text-right text-sm font-medium'
+        : tone === 'muted'
+          ? 'text-ink-secondary min-w-0 break-words text-right text-sm'
+          : 'text-ink min-w-0 break-words text-right text-sm'}>
+        {value}
+      </dd>
+    </div>
+  )
+}
+
+function CredentialRow({
+  label,
+  configured,
+  last4,
+  updatedAt,
+}: {
+  label: string
+  configured: boolean | undefined
+  last4: string | null
+  updatedAt: string | null
+}) {
+  const value = configured
+    ? [
+      last4 || updatedAt ? '入っています' : credentialLabel(true),
+      last4 ? `末尾 ****${last4}` : null,
+      updatedAt ? `${formatMonthDay(updatedAt)} 更新` : '更新日は未取得',
+    ].filter(Boolean).join(' ・ ')
+    : credentialLabel(false)
+  return <InlineRow label={label} value={value} tone={configured ? 'success' : 'muted'} />
 }
 
 export default function AccountDetailPage() {

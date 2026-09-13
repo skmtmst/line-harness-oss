@@ -70,8 +70,6 @@ const ALLOWED_H1: Record<string, string> = {
   // 画面名の「統括コンソール」は、その上に小さく出る別の行。
   'app/hq/page.tsx': '出しているのはテナント名',
   'app/hq/open/page.tsx': '出しているのはテナント名',
-  // 画面名ではなく読み物の見出し（「購入後も、LINEで丁寧につながる」）。
-  'app/nen-campaigns/page.tsx': '読み物の見出し',
   // 消す予定の画面。docs/v6-directives.md §4「/updates を /emergency へ
   // 一本化」「V2/V3 の検証島を消す」。触らない。
   'app/updates/page.tsx': '消す予定（/emergency へ一本化）',
@@ -80,7 +78,7 @@ const ALLOWED_H1: Record<string, string> = {
 
 describe('画面名を本文とトップバーで2回出さない', () => {
   it('全ページを読めている', () => {
-    expect(PAGES.length).toBe(148)  // 2026-09-13: 統括のメンバー管理・お問い合わせ・課金プラン（/hq/members、/hq/support、/hq/billing）を足した実測値。
+    expect(PAGES.length).toBe(158)  // 2026-09-13: 統括のメンバー管理・お問い合わせ・課金プランを足した実測値。
   })
 
   it('page.tsx が h1 を直接持たない', () => {

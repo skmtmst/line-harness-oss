@@ -27,6 +27,16 @@ describe('V6 質問テンプレート', () => {
     expect(editor).toContain("choiceColumns ? 'grid gap-3 xl:grid-cols-2'")
   })
 
+  it('タグは全件を展開せず、閉じた選択欄と選択済みの札だけを表示する', () => {
+    expect(editor).toContain('<select')
+    expect(editor).toContain('aria-label={label}')
+    expect(editor).toContain("'タグを選ぶ'")
+    expect(editor).toContain('selectedTags.map')
+    expect(editor).not.toContain('tags.map((tag) => {')
+    expect(editor).toContain('(choiceColumns || openChoice === index)')
+    expect(editor).toContain('タグ・記録などの詳しい設定')
+  })
+
   it('下書きは選択肢へ出さず、公開した質問だけをシナリオへ渡す', () => {
     expect(page).toContain("save('draft')")
     expect(page).toContain("save('published')")

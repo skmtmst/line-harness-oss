@@ -15,6 +15,14 @@ const FORM = readFileSync(
  * 見ない。同じことを2か所で数えると、片方だけ直したときに食い違う。
  */
 describe('一斉配信の作成', () => {
+  it('右側をLINEプレビューと明記し、確認済みを利用者が記録できる', () => {
+    expect(FORM).toContain('実際のLINE表示に近い確認用プレビューです。')
+    expect(FORM).toContain("previewConfirmed ? 'LINEプレビュー確認済み' : 'LINEプレビューが未確認です'")
+    expect(FORM).toContain('setPreviewConfirmed(event.target.checked)')
+    expect(FORM).toContain('+ (previewConfirmed ? 0 : 1)')
+    expect(FORM).toContain('}, [bubbles, scheduledDate, scheduledTime, sendMode, visualQaAugustCampaign])')
+  })
+
   it('本文の上限を直書きしない', () => {
     // 500 が3か所に散っていて、片方だけ直すと数え方がずれていた。
     expect(FORM).not.toMatch(/maxLength=\{500\}/)
@@ -40,7 +48,7 @@ describe('一斉配信の作成', () => {
 
   it('上限超過を、押す前に本文の文字で出す', () => {
     /* 右の点検欄は宛先と本文が決まるまで出ないので、こちらは常に出す。 */
-    expect(FORM).toContain("{lengthNotice.tone === 'error' && (")
+    expect(FORM).toContain("{shows('message') && lengthNotice.tone === 'error' && (")
     expect(FORM).toContain('<p className="text-danger text-sm font-bold">{lengthNotice.title}</p>')
     expect(FORM, '押せない理由が吹き出しに出ない').toContain(
       "title={lengthNotice.tone === 'error' ? lengthNotice.description : undefined}",

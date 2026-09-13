@@ -3,8 +3,14 @@ import { Hono } from 'hono';
 
 const dbMocks = {
   getStaffByApiKey: vi.fn().mockResolvedValue(null),
+  getFriendById: vi.fn(),
   getMileageAdminOverview: vi.fn(),
   getMileageAdminHistory: vi.fn(),
+  getMileageEarningRulesV6: vi.fn(),
+  getMileageFriendsV6: vi.fn(),
+  getMileageHistoryPeriodSummary: vi.fn(),
+  getMileageRewardReachMetrics: vi.fn(),
+  saveMileageEarningRuleDraft: vi.fn(),
   getMileageRules: vi.fn(),
   getMileageRuleById: vi.fn(),
   createMileageRule: vi.fn(),
@@ -29,6 +35,7 @@ const dbMocks = {
   getMileageReward: vi.fn(),
   getMileageRewardAdminOverview: vi.fn(),
   getMileageRedemption: vi.fn(),
+  listMileageRedemptions: vi.fn(),
   importMileageRewardCodes: vi.fn(),
   publishMileageReward: vi.fn(),
   reorderMileageRewards: vi.fn(),
@@ -44,14 +51,29 @@ const dbMocks = {
   MileageAdjustmentError: class MileageAdjustmentError extends Error {
     constructor(public readonly code: string) { super(code); }
   },
+  MileageV6Error: class MileageV6Error extends Error {
+    constructor(
+      public readonly code: string,
+      message: string,
+      public readonly status = 422,
+      public readonly field?: string,
+    ) { super(message); }
+  },
 };
 vi.mock('@line-crm/db', () => dbMocks);
 
 const deliveryMocks = { deliverMileageReward: vi.fn() };
 vi.mock('../services/mileage-reward-delivery.js', () => deliveryMocks);
 
+const adjustmentNotificationMocks = {
+  mileageAdjustmentMessage: vi.fn().mockReturnValue('通知本文'),
+  sendMileageAdjustmentNotification: vi.fn(),
+};
+vi.mock('../services/mileage-adjustment-notification.js', () => adjustmentNotificationMocks);
+
 const accountAccessMocks = {
   getVisibleLineAccountScope: vi.fn(),
+  canAccessAllLineAccounts: vi.fn(),
 };
 vi.mock('../services/account-access.js', () => accountAccessMocks);
 
@@ -88,7 +110,14 @@ beforeEach(() => {
   accountAccessMocks.getVisibleLineAccountScope.mockResolvedValue({
     allowedAccountIds: ['account-1'], canSeeUnassigned: false, ids: ['account-1'], accounts: [],
   });
+  accountAccessMocks.canAccessAllLineAccounts.mockResolvedValue(true);
+  dbMocks.deleteMileageRule.mockResolvedValue(1);
   dbMocks.getMileageRewardAdminOverview.mockResolvedValue({ rewards: [], summary: {} });
+  dbMocks.getMileageRewardReachMetrics.mockResolvedValue([]);
+  dbMocks.getMileageHistoryPeriodSummary.mockResolvedValue({ byType: [], totalAmount: 0, manualCount: 0 });
+  adjustmentNotificationMocks.sendMileageAdjustmentNotification.mockResolvedValue({
+    id: 'notification-1', status: 'sent', attemptCount: 1,
+  });
   deliveryMocks.deliverMileageReward.mockResolvedValue({
     status: 'succeeded', rewardName: '交換品', customerMessage: '', rewardCode: null,
     retryAt: null, failurePolicy: 'retry', message: null,
@@ -99,6 +128,7 @@ describe('mileage admin API', () => {
   it('keeps the reward list inside the selected account boundary', async () => {
     expect((await call('/api/mileage/rewards?accountId=account-1')).status).toBe(200);
     expect(dbMocks.getMileageRewardAdminOverview).toHaveBeenCalledWith(env.DB, 'account-1');
+    expect(dbMocks.getMileageRewardReachMetrics).toHaveBeenCalledWith(env.DB, 'account-1');
 
     accountAccessMocks.getVisibleLineAccountScope.mockResolvedValueOnce({
       allowedAccountIds: ['account-1'], canSeeUnassigned: false, ids: ['account-1'], accounts: [],
@@ -113,12 +143,18 @@ describe('mileage admin API', () => {
       method: 'PATCH',
       body: JSON.stringify({
         accountId: 'account-1', expectedVersionId: 'version-1',
-        draft: { name: '交換品', rewardKind: 'coupon', requiredMiles: 300 },
+        draft: {
+          name: '交換品', rewardKind: 'coupon', requiredMiles: 300,
+          targetConditions: { operator: 'AND', rules: [{ type: 'tag_exists', value: '会員' }] },
+        },
       }),
     });
     expect(draft.status).toBe(200);
     expect(dbMocks.updateMileageRewardDraft).toHaveBeenCalledWith(env.DB, expect.objectContaining({
       id: 'reward-1', lineAccountId: 'account-1', expectedVersionId: 'version-1',
+      draft: expect.objectContaining({
+        targetConditions: { operator: 'AND', rules: [{ type: 'tag_exists', value: '会員' }] },
+      }),
     }));
 
     dbMocks.setMileageRewardStatus.mockResolvedValueOnce({ id: 'reward-1', status: 'stopped' });
@@ -233,6 +269,74 @@ describe('mileage admin API', () => {
     expect(deliveryMocks.deliverMileageReward).not.toHaveBeenCalled();
   });
 
+  it('lists failed redemptions inside the account boundary without secrets', async () => {
+    dbMocks.listMileageRedemptions.mockResolvedValueOnce({
+      items: [{
+        id: 'redemption-9', lineAccountId: 'account-1', rewardId: 'reward-1',
+        rewardName: '500円引き', status: 'delivery_failed', attemptCount: 2,
+        failureCode: 'reward_delivery_failed', failureMessage: '特典を渡せませんでした',
+        updatedAt: '2026-09-07T01:02:03.000Z', createdAt: '2026-09-07T00:00:00.000Z',
+        idempotencyKey: 'secret-key', requestFingerprint: 'secret-fingerprint',
+      }],
+      pagination: { total: 1, limit: 100, offset: 0 },
+    });
+    const response = await call('/api/mileage/redemptions?accountId=account-1&limit=999');
+    expect(response.status).toBe(200);
+    expect(dbMocks.listMileageRedemptions).toHaveBeenCalledWith(env.DB, {
+      lineAccountId: 'account-1', status: 'delivery_failed', limit: 100, offset: 0,
+    });
+    const body = await response.json() as {
+      data: { items: Array<Record<string, unknown>>; pagination: Record<string, unknown> };
+    };
+    expect(body.data.pagination).toMatchObject({ total: 1 });
+    expect(body.data.items[0]).toMatchObject({
+      id: 'redemption-9', status: 'delivery_failed', attemptCount: 2,
+      failureMessage: '特典を渡せませんでした', updatedAt: '2026-09-07T01:02:03.000Z',
+    });
+    const text = JSON.stringify(body);
+    expect(text).not.toContain('secret-key');
+    expect(text).not.toContain('secret-fingerprint');
+  });
+
+  it('keeps the redemption list inside the account boundary', async () => {
+    expect((await call('/api/mileage/redemptions?accountId=hidden')).status).toBe(404);
+    expect(dbMocks.listMileageRedemptions).not.toHaveBeenCalled();
+    expect((await call('/api/mileage/redemptions?accountId=account-1&status=bogus')).status).toBe(400);
+    expect(dbMocks.listMileageRedemptions).not.toHaveBeenCalled();
+  });
+
+  it('retries only a failed fulfillment and keeps the same redemption', async () => {
+    dbMocks.getMileageRedemption.mockResolvedValue({
+      id: 'redemption-9', lineAccountId: 'account-1', status: 'delivery_failed',
+    });
+    deliveryMocks.deliverMileageReward.mockResolvedValueOnce({
+      status: 'succeeded', rewardName: '500円引き', customerMessage: '',
+      rewardCode: null, retryAt: null, failurePolicy: 'retry', message: null,
+    });
+    const response = await call('/api/mileage/redemptions/redemption-9/retry-fulfillment', {
+      method: 'POST', body: JSON.stringify({ accountId: 'account-1' }),
+    });
+    expect(response.status).toBe(200);
+    expect(deliveryMocks.deliverMileageReward).toHaveBeenCalledTimes(1);
+    expect(deliveryMocks.deliverMileageReward).toHaveBeenCalledWith(
+      env.DB, 'redemption-9', expect.objectContaining({}),
+    );
+  });
+
+  it('refuses to retry a redemption that is not failing', async () => {
+    for (const status of ['reserved', 'delivering', 'succeeded', 'refunded']) {
+      dbMocks.getMileageRedemption.mockResolvedValueOnce({
+        id: `redemption-${status}`, lineAccountId: 'account-1', status,
+      });
+      const response = await call(`/api/mileage/redemptions/redemption-${status}/retry-fulfillment`, {
+        method: 'POST', body: JSON.stringify({ accountId: 'account-1' }),
+      });
+      expect(response.status).toBe(409);
+      expect(await response.json()).toMatchObject({ code: 'redemption_not_retryable' });
+    }
+    expect(deliveryMocks.deliverMileageReward).not.toHaveBeenCalled();
+  });
+
   it('maps insufficient mileage and out-of-stock exchange failures without a 500', async () => {
     for (const code of ['insufficient_miles', 'out_of_stock']) {
       dbMocks.reserveMileageRewardRedemption.mockRejectedValueOnce(
@@ -287,6 +391,59 @@ describe('mileage admin API', () => {
     );
   });
 
+  it('returns account-scoped mileage friends and bounds the page size', async () => {
+    dbMocks.getMileageFriendsV6.mockResolvedValue({
+      summary: { totalMembers: 1, available: 300 }, items: [],
+      pagination: { total: 1, limit: 100, offset: 0 }, measuredAt: '2026-09-07T00:00:00.000Z',
+    });
+    const response = await call('/api/mileage/friends?accountId=account-1&search=%E7%94%B0&limit=999');
+    expect(response.status).toBe(200);
+    expect(dbMocks.getMileageFriendsV6).toHaveBeenCalledWith(env.DB, {
+      lineAccountId: 'account-1', visibleAccountIds: ['account-1'], search: '田', limit: 100, offset: 0,
+    });
+  });
+
+  it('lists earning rules and saves a versioned draft only for an authorized account', async () => {
+    dbMocks.getMileageEarningRulesV6.mockResolvedValue({ items: [], pagination: { total: 0 } });
+    expect((await call('/api/mileage/earning-rules?accountId=account-1&limit=999')).status).toBe(200);
+    expect(dbMocks.getMileageEarningRulesV6).toHaveBeenCalledWith(env.DB, {
+      lineAccountId: 'account-1', limit: 100, offset: 0,
+    });
+
+    const draft = {
+      name: '購入マイル', eventType: 'order_paid', source: 'ec', amount: 100,
+      initialStatus: 'available', validFrom: null, validUntil: null,
+      expiresAfterDays: 365, cancellationEventTypes: ['order_cancelled'],
+      targetConditions: { operator: 'AND', rules: [{ type: 'tag_exists', value: '購入者' }] },
+      sortOrder: 1,
+      notification: {
+        enabled: true,
+        messageTemplate: '{awardedMiles}マイル付きました。残高は{balance}マイルです。',
+      },
+    };
+    dbMocks.saveMileageEarningRuleDraft.mockResolvedValue({ ruleId: 'rule-1', version: 2, draft });
+    const response = await call('/api/mileage/earning-rules/rule-1/draft', {
+      method: 'PATCH', body: JSON.stringify({ accountId: 'account-1', expectedVersion: 1, draft }),
+    });
+    expect(response.status).toBe(200);
+    expect(dbMocks.saveMileageEarningRuleDraft).toHaveBeenCalledWith(env.DB, {
+      ruleId: 'rule-1', lineAccountId: 'account-1', expectedVersion: 1,
+      draft, updatedByStaffId: 'env-owner',
+    });
+  });
+
+  it('returns a conflict when an earning-rule draft is stale', async () => {
+    dbMocks.saveMileageEarningRuleDraft.mockRejectedValueOnce(
+      new dbMocks.MileageV6Error('version_conflict', '下書きを読み直してください', 409),
+    );
+    const response = await call('/api/mileage/earning-rules/rule-1/draft', {
+      method: 'PATCH',
+      body: JSON.stringify({ accountId: 'account-1', expectedVersion: 1, draft: {} }),
+    });
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ code: 'version_conflict' });
+  });
+
   it('requires and authorizes the selected account before reading history', async () => {
     expect((await call('/api/mileage/history')).status).toBe(400);
     expect(dbMocks.getMileageAdminHistory).not.toHaveBeenCalled();
@@ -317,6 +474,12 @@ describe('mileage admin API', () => {
       to: '2026-08-31',
       limit: 100,
       offset: 0,
+    });
+    expect(dbMocks.getMileageHistoryPeriodSummary).toHaveBeenCalledWith(env.DB, {
+      lineAccountId: 'account-1', from: '2026-08-01', to: '2026-08-31',
+    });
+    expect(await response.json()).toMatchObject({
+      data: { summary: { totalAmount: 0, manualCount: 0 } },
     });
   });
 
@@ -352,15 +515,88 @@ describe('mileage admin API', () => {
   });
 
   it('serializes editable mileage rules', async () => {
-    dbMocks.getMileageRules.mockResolvedValue([{
-      id: 'rule-1', program_id: 'default', name: 'メッセージ送信', event_type: 'message_received',
-      source: 'line', amount: 1, initial_status: 'available', conditions: '{"dailyCapActions":5}',
-      is_active: 1, created_at: '2026-08-09', updated_at: '2026-08-09',
-    }]);
+    const base = {
+      program_id: 'default', source: 'line', amount: 1, initial_status: 'available',
+      conditions: '{"dailyCapActions":5}', is_active: 1,
+      created_at: '2026-08-09', updated_at: '2026-08-09',
+    };
+    dbMocks.getMileageRules.mockResolvedValue([
+      { ...base, id: 'rule-1', name: 'メッセージ送信', event_type: 'message_received', line_account_id: 'account-1' },
+      { ...base, id: 'rule-other', name: '他店ルール', event_type: 'visit', line_account_id: 'account-other' },
+      { ...base, id: 'legacy', name: '旧全店ルール', event_type: 'legacy', line_account_id: null },
+    ]);
     const response = await call('/api/mileage/rules');
     expect(response.status).toBe(200);
-    const body = await response.json() as { data: Array<{ amount: number; conditions: { dailyCapActions: number } }> };
+    const body = await response.json() as { data: Array<{
+      id: string; amount: number; conditions: { dailyCapActions: number };
+    }> };
+    expect(body.data.map((rule) => rule.id)).toEqual(['rule-1']);
     expect(body.data[0]).toMatchObject({ amount: 1, conditions: { dailyCapActions: 5 } });
+  });
+
+  it('creates mileage rules only inside an authorized LINE account', async () => {
+    const body = { name: '来店', eventType: 'visit', amount: 10 };
+    expect((await call('/api/mileage/rules', {
+      method: 'POST', body: JSON.stringify(body),
+    })).status).toBe(400);
+
+    accountAccessMocks.canAccessAllLineAccounts.mockResolvedValue(false);
+    expect((await call('/api/mileage/rules', {
+      method: 'POST', body: JSON.stringify({ ...body, lineAccountId: 'account-other' }),
+    })).status).toBe(403);
+    expect(dbMocks.createMileageRule).not.toHaveBeenCalled();
+
+    accountAccessMocks.canAccessAllLineAccounts.mockResolvedValue(true);
+    dbMocks.createMileageRule.mockResolvedValue({
+      id: 'rule-1', name: '来店', event_type: 'visit', amount: 10,
+      line_account_id: 'account-1', initial_status: 'available', is_active: 1,
+    });
+    expect((await call('/api/mileage/rules', {
+      method: 'POST', body: JSON.stringify({ ...body, lineAccountId: 'account-1' }),
+    })).status).toBe(201);
+    expect(dbMocks.createMileageRule).toHaveBeenCalledWith(env.DB, expect.objectContaining({
+      lineAccountId: 'account-1',
+    }));
+  });
+
+  it.each(['PUT', 'DELETE'] as const)('%s cannot modify another account mileage rule', async (method) => {
+    dbMocks.getMileageRuleById.mockResolvedValue({ id: 'rule-other', line_account_id: 'account-other' });
+    accountAccessMocks.canAccessAllLineAccounts.mockResolvedValue(false);
+    const response = await call('/api/mileage/rules/rule-other', {
+      method,
+      ...(method === 'PUT' ? { body: JSON.stringify({ amount: 2 }) } : {}),
+    });
+    expect(response.status).toBe(404);
+    expect(dbMocks.updateMileageRule).not.toHaveBeenCalled();
+    expect(dbMocks.deleteMileageRule).not.toHaveBeenCalled();
+  });
+
+  it.each(['PUT', 'DELETE'] as const)('%s cannot change a legacy global mileage rule', async (method) => {
+    dbMocks.getMileageRuleById.mockResolvedValue({ id: 'legacy', line_account_id: null });
+    const response = await call('/api/mileage/rules/legacy', {
+      method,
+      ...(method === 'PUT' ? { body: JSON.stringify({ amount: 2 }) } : {}),
+    });
+    expect(response.status).toBe(409);
+  });
+
+  it('DELETE refuses a rule with grant history (atomic delete returns 0)', async () => {
+    dbMocks.getMileageRuleById.mockResolvedValue({ id: 'rule-1', line_account_id: 'account-1' });
+    dbMocks.deleteMileageRule.mockResolvedValue(0);
+    const first = await call('/api/mileage/rules/rule-1', { method: 'DELETE' });
+    expect(first.status).toBe(409);
+    expect(await first.json()).toMatchObject({ success: false });
+    const second = await call('/api/mileage/rules/rule-1', { method: 'DELETE' });
+    expect(second.status).toBe(409);
+    expect(dbMocks.deleteMileageRule).toHaveBeenCalledWith(env.DB, 'rule-1');
+  });
+
+  it('DELETE removes a rule without history (atomic delete returns 1)', async () => {
+    dbMocks.getMileageRuleById.mockResolvedValue({ id: 'rule-1', line_account_id: 'account-1' });
+    dbMocks.deleteMileageRule.mockResolvedValue(1);
+    const response = await call('/api/mileage/rules/rule-1', { method: 'DELETE' });
+    expect(response.status).toBe(200);
+    expect(dbMocks.deleteMileageRule).toHaveBeenCalledWith(env.DB, 'rule-1');
   });
 
   it('rejects a zero-mile rule update before touching D1', async () => {
@@ -416,6 +652,77 @@ describe('mileage admin API', () => {
       friendId: 'friend-1', amount: -250, idempotencyKey: '11111111-2222-4333-8444-555555555555',
       lineAccountId: 'account-1', executedByStaffId: 'env-owner',
     }));
+  });
+
+  it('creates an expiration lot and reports automatic LINE notification delivery', async () => {
+    dbMocks.postMileageAdjustment.mockResolvedValue({
+      entry: { id: 'entry-expiring', amount: 300 }, balanceBefore: 100, balanceAfter: 400, replayed: false,
+    });
+    const expiresAt = '2099-12-31T15:00:00.000Z';
+    const response = await call('/api/mileage/adjustments', {
+      method: 'POST',
+      headers: {
+        'Idempotency-Key': '11111111-2222-4333-8444-555555555555',
+        'X-Confirm-Irreversible': 'mileage-adjustment',
+      },
+      body: JSON.stringify({
+        accountId: 'account-1', friendId: 'friend-1', direction: 'increase', amount: 300,
+        reasonCategory: 'campaign', reason: '個別キャンペーン', expiresAt, notifyFriend: true,
+      }),
+    });
+    expect(response.status).toBe(201);
+    expect(dbMocks.postMileageAdjustment).toHaveBeenCalledWith(env.DB, expect.objectContaining({ expiresAt }));
+    expect(adjustmentNotificationMocks.sendMileageAdjustmentNotification).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        lineAccountId: 'account-1', friendId: 'friend-1', ledgerEntryId: 'entry-expiring',
+        idempotencyKey: '11111111-2222-4333-8444-555555555555', message: '通知本文',
+      }),
+    );
+    expect(await response.json()).toMatchObject({
+      data: { expiresAt, notification: { status: 'sent' } },
+    });
+  });
+
+  it('keeps a completed adjustment successful when notification delivery infrastructure fails', async () => {
+    dbMocks.postMileageAdjustment.mockResolvedValue({
+      entry: { id: 'entry-notify-failed', amount: 50 }, balanceBefore: 100, balanceAfter: 150, replayed: false,
+    });
+    adjustmentNotificationMocks.sendMileageAdjustmentNotification.mockRejectedValueOnce(new Error('D1 unavailable'));
+    const response = await call('/api/mileage/adjustments', {
+      method: 'POST',
+      headers: {
+        'Idempotency-Key': '11111111-2222-4333-8444-555555555555',
+        'X-Confirm-Irreversible': 'mileage-adjustment',
+      },
+      body: JSON.stringify({
+        accountId: 'account-1', friendId: 'friend-1', direction: 'increase', amount: 50,
+        reasonCategory: 'other', reason: '個別調整', notifyFriend: true,
+      }),
+    });
+    expect(response.status).toBe(201);
+    expect(await response.json()).toMatchObject({
+      data: {
+        entryId: 'entry-notify-failed',
+        notification: { status: 'failed', errorCode: 'notification_record_failed' },
+      },
+    });
+  });
+
+  it('rejects expiration on a deduction before writing the ledger', async () => {
+    const response = await call('/api/mileage/adjustments', {
+      method: 'POST',
+      headers: {
+        'Idempotency-Key': '11111111-2222-4333-8444-555555555555',
+        'X-Confirm-Irreversible': 'mileage-adjustment',
+      },
+      body: JSON.stringify({
+        accountId: 'account-1', friendId: 'friend-1', direction: 'decrease', amount: 10,
+        reasonCategory: 'other', reason: '訂正', expiresAt: '2099-12-31T15:00:00.000Z',
+      }),
+    });
+    expect(response.status).toBe(400);
+    expect(dbMocks.postMileageAdjustment).not.toHaveBeenCalled();
   });
 
   it('allows an admin to adjust mileage but rejects staff even with mileage visibility', async () => {
@@ -550,5 +857,40 @@ describe('mileage admin API', () => {
       body: JSON.stringify({ accountId: 'account-1', approvalThreshold: 1_000 }),
     });
     expect(admin.status).toBe(403);
+  });
+
+  it('reads a visible friend score but hides other-account friends', async () => {
+    dbMocks.getFriendById.mockResolvedValue({ id: 'friend-1', line_account_id: 'account-1' });
+    dbMocks.getFriendScore.mockResolvedValue(42);
+    dbMocks.getFriendScoreHistory.mockResolvedValue([]);
+    const visible = await call('/api/friends/friend-1/score');
+    expect(visible.status).toBe(200);
+    expect(dbMocks.getFriendScore).toHaveBeenCalledWith(env.DB, 'friend-1');
+
+    dbMocks.getFriendById.mockResolvedValue({ id: 'friend-2', line_account_id: 'account-2' });
+    accountAccessMocks.canAccessAllLineAccounts.mockResolvedValueOnce(false);
+    const hidden = await call('/api/friends/friend-2/score');
+    expect(hidden.status).toBe(404);
+    expect(dbMocks.getFriendScore).toHaveBeenCalledTimes(1);
+  });
+
+  it('adds a score only for a visible friend', async () => {
+    dbMocks.getFriendById.mockResolvedValue({ id: 'friend-1', line_account_id: 'account-1' });
+    dbMocks.getFriendScore.mockResolvedValue(45);
+    const added = await call('/api/friends/friend-1/score', {
+      method: 'POST', body: JSON.stringify({ scoreChange: 3, reason: '対応記録' }),
+    });
+    expect(added.status).toBe(201);
+    expect(dbMocks.addScore).toHaveBeenCalledWith(env.DB, {
+      friendId: 'friend-1', scoreChange: 3, reason: '対応記録',
+    });
+
+    dbMocks.getFriendById.mockResolvedValue({ id: 'friend-2', line_account_id: 'account-2' });
+    accountAccessMocks.canAccessAllLineAccounts.mockResolvedValueOnce(false);
+    const hidden = await call('/api/friends/friend-2/score', {
+      method: 'POST', body: JSON.stringify({ scoreChange: 3 }),
+    });
+    expect(hidden.status).toBe(404);
+    expect(dbMocks.addScore).toHaveBeenCalledTimes(1);
   });
 });

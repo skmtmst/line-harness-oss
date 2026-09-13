@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { api, type BroadcastStats } from '@/lib/api'
+import { api, type BroadcastListKpis, type BroadcastStats } from '@/lib/api'
 import { buildBroadcastKpiCards, countText } from './broadcast-kpi-values'
 
 /** 帯の副題に出す数。中身は `broadcast-kpi-values.ts`。 */
@@ -21,16 +21,26 @@ export { countText }
  * はテナント全体を数える）。基準の違う数を同じ帯に並べると、足しても
  * 合わない4枚になる。取れないものは `—` のままにする。
  */
-export default function BroadcastKpis() {
-  const [stats, setStats] = useState<BroadcastStats | null>(null)
-  const [loading, setLoading] = useState(true)
+export default function BroadcastKpis({
+  unavailable = false,
+  listKpis,
+}: {
+  unavailable?: boolean
+  listKpis?: BroadcastListKpis | null
+}) {
+  const [fallbackStats, setFallbackStats] = useState<BroadcastStats | null>(null)
+  const [loading, setLoading] = useState(listKpis === undefined)
 
   useEffect(() => {
+    if (listKpis !== undefined) {
+      setLoading(false)
+      return
+    }
     let cancelled = false
     ;(async () => {
       try {
         const res = await api.broadcastStats.get()
-        if (!cancelled && res.success) setStats(res.data)
+        if (!cancelled && res.success) setFallbackStats(res.data)
       } catch {
         // 数が出ないだけで一覧は使える。
       } finally {
@@ -40,8 +50,9 @@ export default function BroadcastKpis() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [listKpis])
 
+  const stats = listKpis === undefined ? fallbackStats : listKpis
   const cards = buildBroadcastKpiCards(stats)
 
   return (
@@ -66,7 +77,9 @@ export default function BroadcastKpis() {
               </>
             )}
           </p>
-          <p className="text-ink-faint mt-1 text-[11px] leading-relaxed">{card.detail}</p>
+          <p className="text-ink-faint mt-1 text-[11px] leading-relaxed">
+            {unavailable ? '読み込めていません' : card.detail}
+          </p>
         </div>
       ))}
     </div>

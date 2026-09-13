@@ -1,4 +1,5 @@
 import { jstNow } from './utils.js';
+import { getAccountSetting, getVersionedAccountSetting } from './account-settings.js';
 
 /**
  * 共通情報。
@@ -19,6 +20,11 @@ export interface CommonVar {
   var_key: string;
   type: string;
   value: string;
+  memo: string;
+  version: number;
+  updated_by: string | null;
+  archived_at: string | null;
+  replacement_run_id: string | null;
   created_at: string;
   updated_at: string;
   /** 一覧用。未反映の次回予約を一覧APIでまとめて返し、行ごとのAPI呼出を避ける。 */
@@ -27,6 +33,20 @@ export interface CommonVar {
   pending_schedule_count?: number;
   /** 一覧用。現在・過去を含め、差し込まれている場所の合計。 */
   usage_count?: number;
+  usage_by_kind?: Record<CommonVarUsageKind, number>;
+}
+
+export interface CommonVarVersion {
+  id: string;
+  common_var_id: string;
+  version_no: number;
+  name: string;
+  value: string;
+  memo: string;
+  change_reason: string;
+  actor_id: string | null;
+  actor_name: string | null;
+  created_at: string;
 }
 
 export type CommonVarUsageKind =
@@ -248,14 +268,19 @@ const COMMON_VAR_USAGE_QUERIES: Array<{
   },
 ];
 
-const COMMON_VAR_USAGE_TOTAL_SQL = `SELECT
+const COMMON_VAR_USAGE_SUMMARY_SQL = `SELECT
   ${COMMON_VAR_USAGE_QUERIES.map((source) =>
-    `(SELECT COUNT(*) FROM (${source.sql}))`).join('\n  + ')}
-  + (SELECT COUNT(*) FROM forms f
-      WHERE NOT EXISTS (SELECT 1 FROM form_accounts fa WHERE fa.form_id = f.id)
-        AND (instr(coalesce(f.on_submit_message_content, ''), ?) > 0
-          OR instr(coalesce(f.fields, ''), ?) > 0
-          OR instr(coalesce(f.layout, ''), ?) > 0)) AS total`;
+    `(SELECT COUNT(*) FROM (${source.sql})) AS ${source.kind}`).join(',\n  ')},
+  (SELECT COUNT(*) FROM forms f
+    WHERE NOT EXISTS (SELECT 1 FROM form_accounts fa WHERE fa.form_id = f.id)
+      AND (instr(coalesce(f.on_submit_message_content, ''), ?) > 0
+        OR instr(coalesce(f.fields, ''), ?) > 0
+        OR instr(coalesce(f.layout, ''), ?) > 0)) AS unscoped_form`;
+
+export interface CommonVarUsageSummary {
+  total: number;
+  byKind: Record<CommonVarUsageKind, number>;
+}
 
 /**
  * 一覧に出す使用先件数をまとめて数える。
@@ -268,8 +293,18 @@ export async function getCommonVarUsageCounts(
   varKeys: string[],
   lineAccountId: string,
 ): Promise<Map<string, number>> {
+  const summaries = await getCommonVarUsageSummaries(db, varKeys, lineAccountId);
+  return new Map([...summaries].map(([key, summary]) => [key, summary.total]));
+}
+
+/** 一覧1回で、合計だけでなくテンプレート・配信等の種類別件数も返す。 */
+export async function getCommonVarUsageSummaries(
+  db: D1Database,
+  varKeys: string[],
+  lineAccountId: string,
+): Promise<Map<string, CommonVarUsageSummary>> {
   const uniqueKeys = [...new Set(varKeys)];
-  const counts = new Map<string, number>();
+  const summaries = new Map<string, CommonVarUsageSummary>();
   const batchSize = 80;
 
   for (let offset = 0; offset < uniqueKeys.length; offset += batchSize) {
@@ -278,16 +313,24 @@ export async function getCommonVarUsageCounts(
       const token = `{{var.${varKey}}}`;
       const values = COMMON_VAR_USAGE_QUERIES.flatMap((source) =>
         source.values(varKey, token, lineAccountId));
-      return db.prepare(COMMON_VAR_USAGE_TOTAL_SQL)
+      return db.prepare(COMMON_VAR_USAGE_SUMMARY_SQL)
         .bind(...values, token, token, token);
     });
-    const results = await db.batch<{ total: number }>(statements);
+    const results = await db.batch<Record<CommonVarUsageKind, number> & { unscoped_form: number }>(statements);
     keys.forEach((varKey, index) => {
-      counts.set(varKey, Number(results[index]?.results[0]?.total ?? 0));
+      const row = results[index]?.results[0];
+      const byKind = Object.fromEntries(COMMON_VAR_USAGE_QUERIES.map(({ kind }) => [
+        kind,
+        Number(row?.[kind] ?? 0) + (kind === 'form' ? Number(row?.unscoped_form ?? 0) : 0),
+      ])) as Record<CommonVarUsageKind, number>;
+      summaries.set(varKey, {
+        total: Object.values(byKind).reduce((sum, count) => sum + count, 0),
+        byKind,
+      });
     });
   }
 
-  return counts;
+  return summaries;
 }
 
 export interface CommonVarSchedule {
@@ -298,10 +341,31 @@ export interface CommonVarSchedule {
   applied_at: string | null;
 }
 
-export async function getCommonVars(
+/**
+ * 一覧の総件数。件数上限で切ったときに「絞り込み誘導」を出すために使う。
+ *
+ * 未取得を0件と見せない規則と同じく、切ったことを黙らない。
+ */
+export async function countCommonVars(
   db: D1Database,
   opts: { folderId?: string; lineAccountId: string },
+): Promise<number> {
+  const row = opts.folderId
+    ? await db.prepare(`SELECT COUNT(*) AS total FROM common_vars WHERE line_account_id = ? AND archived_at IS NULL AND folder_id = ?`)
+      .bind(opts.lineAccountId, opts.folderId).first<{ total: number }>()
+    : await db.prepare(`SELECT COUNT(*) AS total FROM common_vars WHERE line_account_id = ? AND archived_at IS NULL`)
+      .bind(opts.lineAccountId).first<{ total: number }>();
+  return Number(row?.total ?? 0);
+}
+
+/** 一覧の1回の上限。件数に比例して使用先の走査が重くなるため、上限と絞り込み誘導で守る。 */
+export const COMMON_VARS_LIST_LIMIT = 200;
+
+export async function getCommonVars(
+  db: D1Database,
+  opts: { folderId?: string; lineAccountId: string; limit?: number },
 ): Promise<CommonVar[]> {
+  const limit = Math.max(1, Math.min(Math.floor(opts.limit ?? COMMON_VARS_LIST_LIMIT), COMMON_VARS_LIST_LIMIT));
   const overview = `,
     (SELECT s.effective_from FROM common_var_schedules s
       WHERE s.var_id = common_vars.id AND s.applied_at IS NULL
@@ -313,14 +377,14 @@ export async function getCommonVars(
       WHERE s.var_id = common_vars.id AND s.applied_at IS NULL) AS pending_schedule_count`;
   if (opts.folderId) {
     const result = await db
-      .prepare(`SELECT common_vars.* ${overview} FROM common_vars WHERE line_account_id = ? AND folder_id = ? ORDER BY name ASC`)
-      .bind(opts.lineAccountId, opts.folderId)
+      .prepare(`SELECT common_vars.* ${overview} FROM common_vars WHERE line_account_id = ? AND archived_at IS NULL AND folder_id = ? ORDER BY name ASC LIMIT ?`)
+      .bind(opts.lineAccountId, opts.folderId, limit)
       .all<CommonVar>();
     return result.results;
   }
   const result = await db
-    .prepare(`SELECT common_vars.* ${overview} FROM common_vars WHERE line_account_id = ? ORDER BY name ASC`)
-    .bind(opts.lineAccountId)
+    .prepare(`SELECT common_vars.* ${overview} FROM common_vars WHERE line_account_id = ? AND archived_at IS NULL ORDER BY name ASC LIMIT ?`)
+    .bind(opts.lineAccountId, limit)
     .all<CommonVar>();
   return result.results;
 }
@@ -382,8 +446,48 @@ export async function getCommonVarById(
   id: string,
   lineAccountId: string,
 ): Promise<CommonVar | null> {
+  return db.prepare(`SELECT * FROM common_vars WHERE id = ? AND line_account_id = ? AND archived_at IS NULL`)
+    .bind(id, lineAccountId).first<CommonVar>();
+}
+
+/** 履歴表示専用。更新・削除の判定には使わず、アーカイブ済みも参照できる。 */
+export async function getCommonVarByIdIncludingArchived(
+  db: D1Database,
+  id: string,
+  lineAccountId: string,
+): Promise<CommonVar | null> {
   return db.prepare(`SELECT * FROM common_vars WHERE id = ? AND line_account_id = ?`)
     .bind(id, lineAccountId).first<CommonVar>();
+}
+
+export class CommonVarVersionConflictError extends Error {
+  constructor(readonly currentVersion: number) {
+    super('Common variable version conflict');
+  }
+}
+
+export class CommonVarFolderError extends Error {
+  constructor() {
+    super('Common variable folder not found or wrong kind');
+  }
+}
+
+export class CommonVarKeyConflictError extends Error {
+  constructor() {
+    super('Common variable key already exists in this account');
+  }
+}
+
+/**
+ * フォルダの存在と種別を確認する。
+ *
+ * 違う画面のフォルダIDを指定されると、絞り込み表示が想定外になる。
+ * 共通情報以外のフォルダ・存在しないフォルダは受け付けない。
+ */
+async function assertCommonVarFolder(db: D1Database, folderId: string): Promise<void> {
+  const row = await db.prepare(`SELECT id FROM folders WHERE id = ? AND kind = 'common_var'`)
+    .bind(folderId).first<{ id: string }>();
+  if (!row) throw new CommonVarFolderError();
 }
 
 export async function createCommonVar(
@@ -395,27 +499,47 @@ export async function createCommonVar(
     value?: string;
     type?: CommonVarType;
     folderId?: string | null;
+    memo?: string;
+    actorId?: string | null;
   },
 ): Promise<CommonVar> {
   const id = crypto.randomUUID();
   const now = jstNow();
-  await db
-    .prepare(
-      `INSERT INTO common_vars (id, line_account_id, folder_id, name, var_key, type, value, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    )
-    .bind(
-      id,
-      input.lineAccountId,
-      input.folderId ?? null,
-      input.name,
-      input.varKey,
-      input.type ?? 'text',
-      input.value ?? '',
-      now,
-      now,
-    )
-    .run();
+  const memo = input.memo ?? '';
+  const value = input.value ?? '';
+  if (input.folderId) await assertCommonVarFolder(db, input.folderId);
+  const duplicate = await db.prepare(
+    `SELECT id FROM common_vars
+      WHERE line_account_id = ? AND var_key = ?
+      LIMIT 1`,
+  ).bind(input.lineAccountId, input.varKey).first<{ id: string }>();
+  if (duplicate) throw new CommonVarKeyConflictError();
+  try {
+    await db.batch([
+      db.prepare(
+        `INSERT INTO common_vars
+           (id, line_account_id, folder_id, name, var_key, type, value, memo, version,
+            updated_by, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`,
+      ).bind(
+        id, input.lineAccountId, input.folderId ?? null, input.name, input.varKey,
+        input.type ?? 'text', value, memo, input.actorId ?? null, now, now,
+      ),
+      db.prepare(
+        `INSERT INTO common_var_versions
+           (id, common_var_id, version_no, name, value, memo, change_reason, actor_id, created_at)
+         VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?)`,
+      ).bind(
+        crypto.randomUUID(), id, input.name, value, memo, '作成', input.actorId ?? null, now,
+      ),
+    ]);
+  } catch (error) {
+    if (error instanceof Error
+      && error.message.includes('UNIQUE constraint failed: common_vars.line_account_id, common_vars.var_key')) {
+      throw new CommonVarKeyConflictError();
+    }
+    throw error;
+  }
   return (await getCommonVarById(db, id, input.lineAccountId))!;
 }
 
@@ -423,8 +547,21 @@ export async function updateCommonVar(
   db: D1Database,
   id: string,
   lineAccountId: string,
-  input: { name?: string; value?: string; folderId?: string | null },
+  input: {
+    name?: string;
+    value?: string;
+    memo?: string;
+    folderId?: string | null;
+    expectedVersion?: number;
+    actorId?: string | null;
+    changeReason?: string;
+  },
 ): Promise<CommonVar | null> {
+  const existing = await getCommonVarById(db, id, lineAccountId);
+  if (!existing) return null;
+  if (input.expectedVersion !== undefined && input.expectedVersion !== existing.version) {
+    throw new CommonVarVersionConflictError(existing.version);
+  }
   const sets: string[] = [];
   const values: unknown[] = [];
   if (input.name !== undefined) {
@@ -435,21 +572,329 @@ export async function updateCommonVar(
     sets.push('value = ?');
     values.push(input.value);
   }
+  if (input.memo !== undefined) {
+    sets.push('memo = ?');
+    values.push(input.memo);
+  }
   if ('folderId' in input) {
+    if (input.folderId) await assertCommonVarFolder(db, input.folderId);
     sets.push('folder_id = ?');
     values.push(input.folderId ?? null);
   }
   if (sets.length > 0) {
-    sets.push('updated_at = ?');
-    values.push(jstNow(), id);
-    values.push(lineAccountId);
-    await db.prepare(`UPDATE common_vars SET ${sets.join(', ')} WHERE id = ? AND line_account_id = ?`).bind(...values).run();
+    const now = jstNow();
+    const nextVersion = existing.version + 1;
+    sets.push('version = ?', 'updated_by = ?', 'updated_at = ?');
+    values.push(nextVersion, input.actorId ?? null, now, id, lineAccountId, existing.version);
+    const results = await db.batch([
+      db.prepare(
+        `UPDATE common_vars SET ${sets.join(', ')}
+          WHERE id = ? AND line_account_id = ? AND version = ? AND archived_at IS NULL`,
+      ).bind(...values),
+      db.prepare(
+        `INSERT INTO common_var_versions
+           (id, common_var_id, version_no, name, value, memo, change_reason, actor_id, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ).bind(
+        crypto.randomUUID(), id, nextVersion,
+        input.name ?? existing.name,
+        input.value ?? existing.value,
+        input.memo ?? existing.memo,
+        input.changeReason?.trim() || '編集',
+        input.actorId ?? null,
+        now,
+      ),
+    ]);
+    if (Number(results[0]?.meta.changes ?? 0) === 0) {
+      throw new CommonVarVersionConflictError(
+        (await getCommonVarById(db, id, lineAccountId))?.version ?? existing.version,
+      );
+    }
   }
   return getCommonVarById(db, id, lineAccountId);
 }
 
-export async function deleteCommonVar(db: D1Database, id: string, lineAccountId: string): Promise<void> {
-  await db.prepare(`DELETE FROM common_vars WHERE id = ? AND line_account_id = ?`).bind(id, lineAccountId).run();
+export async function getCommonVarVersions(
+  db: D1Database,
+  commonVarId: string,
+  lineAccountId: string,
+  limit = 20,
+): Promise<CommonVarVersion[]> {
+  const result = await db.prepare(
+    `SELECT v.*, sm.name AS actor_name
+       FROM common_var_versions v
+       JOIN common_vars cv ON cv.id = v.common_var_id
+       LEFT JOIN staff_members sm ON sm.id = v.actor_id
+      WHERE v.common_var_id = ? AND cv.line_account_id = ?
+      ORDER BY v.version_no DESC
+      LIMIT ?`,
+  ).bind(commonVarId, lineAccountId, Math.max(1, Math.min(limit, 100))).all<CommonVarVersion>();
+  return result.results;
+}
+
+export async function deleteCommonVar(
+  db: D1Database,
+  id: string,
+  lineAccountId: string,
+  actorId: string | null,
+  changeReason = '未使用のため削除（アーカイブ）',
+): Promise<void> {
+  const existing = await getCommonVarById(db, id, lineAccountId);
+  if (!existing) return;
+  const now = jstNow();
+  const nextVersion = existing.version + 1;
+  const results = await db.batch([
+    db.prepare(
+      `UPDATE common_vars
+          SET archived_at = ?, version = ?, updated_by = ?, updated_at = ?
+        WHERE id = ? AND line_account_id = ? AND version = ? AND archived_at IS NULL`,
+    ).bind(now, nextVersion, actorId, now, id, lineAccountId, existing.version),
+    db.prepare(
+      `INSERT INTO common_var_versions
+         (id, common_var_id, version_no, name, value, memo, change_reason, actor_id, created_at)
+       SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?
+        WHERE EXISTS (
+          SELECT 1 FROM common_vars
+           WHERE id = ? AND line_account_id = ? AND version = ? AND archived_at = ?
+        )`,
+    ).bind(
+      crypto.randomUUID(), id, nextVersion, existing.name, existing.value, existing.memo,
+      changeReason.trim() || '削除（アーカイブ）', actorId, now,
+      id, lineAccountId, nextVersion, now,
+    ),
+  ]);
+  if (Number(results[0]?.meta.changes ?? 0) === 0) {
+    throw new CommonVarVersionConflictError(
+      (await getCommonVarByIdIncludingArchived(db, id, lineAccountId))?.version ?? existing.version,
+    );
+  }
+}
+
+export interface CommonVarReplacementTarget {
+  table: string;
+  id: string;
+  kind: CommonVarUsageKind;
+  columns: Record<string, string>;
+  originalColumns: Record<string, string>;
+  fingerprint: string;
+}
+
+export interface CommonVarReplacementPlan {
+  source: CommonVar;
+  replacement: CommonVar;
+  targets: CommonVarReplacementTarget[];
+  usageTotal: number;
+  replaceableTotal: number;
+  blockedTotal: number;
+  historicalTotal: number;
+  unscopedFormTotal: number;
+}
+
+type ReplacementSource = {
+  table: string;
+  kind: CommonVarUsageKind;
+  columns: string[];
+  sql: string;
+};
+
+const COMMON_VAR_REPLACEMENT_SOURCES: ReplacementSource[] = [
+  { table: 'templates', kind: 'template', columns: ['message_content', 'question_json', 'carousel_actions_json'], sql: `SELECT id, message_content, question_json, carousel_actions_json FROM templates WHERE line_account_id = ?` },
+  { table: 'broadcasts', kind: 'broadcast', columns: ['message_content', 'message_bubbles_json'], sql: `SELECT id, message_content, message_bubbles_json FROM broadcasts WHERE status != 'sent' AND (line_account_id = ? OR EXISTS (SELECT 1 FROM json_each(coalesce(account_ids, '[]')) WHERE value = ?))` },
+  { table: 'scenario_steps', kind: 'scenario', columns: ['message_content', 'message_bubbles_json', 'question_json'], sql: `SELECT ss.id, ss.message_content, ss.message_bubbles_json, ss.question_json FROM scenario_steps ss JOIN scenarios s ON s.id = ss.scenario_id WHERE s.line_account_id = ?` },
+  { table: 'scenario_actions', kind: 'scenario', columns: ['config_json'], sql: `SELECT sa.id, sa.config_json FROM scenario_actions sa JOIN scenarios s ON s.id = sa.scenario_id WHERE s.line_account_id = ? AND sa.action_type = 'common_var'` },
+  { table: 'reminder_steps', kind: 'reminder', columns: ['message_content'], sql: `SELECT rs.id, rs.message_content FROM reminder_steps rs JOIN reminders r ON r.id = rs.reminder_id WHERE r.line_account_id = ?` },
+  { table: 'auto_replies', kind: 'auto_reply', columns: ['response_content', 'actions_json'], sql: `SELECT id, response_content, actions_json FROM auto_replies WHERE line_account_id = ?` },
+  { table: 'forms', kind: 'form', columns: ['on_submit_message_content', 'fields', 'layout'], sql: `SELECT DISTINCT f.id, f.on_submit_message_content, f.fields, f.layout FROM forms f JOIN form_accounts fa ON fa.form_id = f.id WHERE fa.line_account_id = ?` },
+  { table: 'automations', kind: 'automation', columns: ['conditions', 'actions'], sql: `SELECT id, conditions, actions FROM automations WHERE line_account_id = ?` },
+  { table: 'automation_versions', kind: 'automation', columns: ['trigger_config', 'condition_config', 'action_config'], sql: `SELECT v.id, v.trigger_config, v.condition_config, v.action_config FROM automation_versions v JOIN automation_definitions d ON d.id = v.automation_id WHERE d.line_account_id = ? AND v.id IN (d.current_draft_version_id, d.current_published_version_id)` },
+  { table: 'account_settings', kind: 'friend_add', columns: ['value'], sql: `SELECT id, value FROM account_settings WHERE line_account_id = ? AND key = 'friend_add_routing'` },
+  { table: 'common_action_versions', kind: 'common_action', columns: ['action_config'], sql: `SELECT v.id, v.action_config FROM common_action_versions v JOIN common_actions a ON a.id = v.common_action_id WHERE a.line_account_id = ? AND v.id IN (a.current_draft_version_id, a.current_published_version_id)` },
+];
+
+function replaceStructuredCommonVar(value: unknown, sourceKey: string, replacementKey: string): boolean {
+  let changed = false;
+  if (Array.isArray(value)) {
+    for (const item of value) changed = replaceStructuredCommonVar(item, sourceKey, replacementKey) || changed;
+    return changed;
+  }
+  if (!value || typeof value !== 'object') return false;
+  for (const [key, item] of Object.entries(value as Record<string, unknown>)) {
+    if (key === 'varKey' && item === sourceKey) {
+      (value as Record<string, unknown>)[key] = replacementKey;
+      changed = true;
+    } else {
+      changed = replaceStructuredCommonVar(item, sourceKey, replacementKey) || changed;
+    }
+  }
+  return changed;
+}
+
+function replaceCommonVarText(text: string, sourceKey: string, replacementKey: string): string | null {
+  const sourceToken = `{{var.${sourceKey}}}`;
+  const replacementToken = `{{var.${replacementKey}}}`;
+  let next = text.replaceAll(sourceToken, replacementToken);
+  let structuredChanged = false;
+  try {
+    const parsed = JSON.parse(next) as unknown;
+    structuredChanged = replaceStructuredCommonVar(parsed, sourceKey, replacementKey);
+    if (structuredChanged) next = JSON.stringify(parsed);
+  } catch {
+    // 通常本文はJSONではない。厳密な従来トークンだけを置換する。
+  }
+  return next !== text || structuredChanged ? next : null;
+}
+
+function replacementQueryValues(source: ReplacementSource, accountId: string): string[] {
+  return source.table === 'broadcasts' ? [accountId, accountId] : [accountId];
+}
+
+export async function getCommonVarReplacementCandidates(
+  db: D1Database,
+  source: CommonVar,
+): Promise<CommonVar[]> {
+  const result = await db.prepare(
+    `SELECT * FROM common_vars
+      WHERE line_account_id = ? AND id != ? AND type = ? AND archived_at IS NULL
+      ORDER BY name ASC, id ASC`,
+  ).bind(source.line_account_id, source.id, source.type).all<CommonVar>();
+  return result.results;
+}
+
+export async function getCommonVarReplacementPlan(
+  db: D1Database,
+  source: CommonVar,
+  replacement: CommonVar,
+): Promise<CommonVarReplacementPlan> {
+  if (!source.line_account_id || source.line_account_id !== replacement.line_account_id
+    || source.type !== replacement.type || source.id === replacement.id) {
+    throw new Error('Incompatible common variable replacement');
+  }
+  const targets: CommonVarReplacementTarget[] = [];
+  for (const descriptor of COMMON_VAR_REPLACEMENT_SOURCES) {
+    const result = await db.prepare(descriptor.sql)
+      .bind(...replacementQueryValues(descriptor, source.line_account_id))
+      .all<Record<string, string | null>>();
+    for (const row of result.results) {
+      const columns: Record<string, string> = {};
+      const originalColumns: Record<string, string> = {};
+      const before: string[] = [];
+      for (const column of descriptor.columns) {
+        const current = row[column];
+        if (typeof current !== 'string') continue;
+        const next = replaceCommonVarText(current, source.var_key, replacement.var_key);
+        if (next !== null) {
+          columns[column] = next;
+          originalColumns[column] = current;
+          before.push(`${column}:${current}`);
+        }
+      }
+      if (Object.keys(columns).length > 0) {
+        targets.push({
+          table: descriptor.table,
+          id: String(row.id),
+          kind: descriptor.kind,
+          columns,
+          originalColumns,
+          fingerprint: before.join('\n'),
+        });
+      }
+    }
+  }
+  const impact = await getCommonVarUsageImpact(db, source.var_key, source.line_account_id);
+  const blockedTotal = Math.max(0, impact.blockingTotal - targets.length);
+  return {
+    source,
+    replacement,
+    targets,
+    usageTotal: impact.total,
+    replaceableTotal: targets.length,
+    blockedTotal,
+    historicalTotal: impact.historicalTotal,
+    unscopedFormTotal: impact.unscopedFormTotal,
+  };
+}
+
+export async function applyCommonVarReplacementPlan(
+  db: D1Database,
+  plan: CommonVarReplacementPlan,
+  actorId: string | null,
+): Promise<{ runId: string; replacedUsageCount: number; archivedVersion: number }> {
+  if (!plan.source.line_account_id || plan.blockedTotal > 0) {
+    throw new Error('Common variable replacement is blocked');
+  }
+  const now = jstNow();
+  const runId = crypto.randomUUID();
+  const archivedVersion = plan.source.version + 1;
+  const assertions = plan.targets.map((target) => {
+    const originals = Object.entries(target.originalColumns);
+    return db.prepare(
+      `SELECT CASE WHEN EXISTS (
+         SELECT 1 FROM ${target.table}
+          WHERE id = ? AND ${originals.map(([column]) => `${column} IS ?`).join(' AND ')}
+       ) THEN 1 ELSE json('') END AS unchanged`,
+    ).bind(target.id, ...originals.map(([, value]) => value));
+  });
+  const updates = plan.targets.map((target) => {
+    const entries = Object.entries(target.columns);
+    const originals = Object.entries(target.originalColumns);
+    return db.prepare(
+      `UPDATE ${target.table}
+          SET ${entries.map(([column]) => `${column} = ?`).join(', ')}
+        WHERE id = ? AND ${originals.map(([column]) => `${column} IS ?`).join(' AND ')}
+          AND EXISTS (
+          SELECT 1 FROM common_vars
+           WHERE id = ? AND replacement_run_id = ? AND version = ?
+        )`,
+    ).bind(
+      ...entries.map(([, value]) => value), target.id,
+      ...originals.map(([, value]) => value),
+      plan.source.id, runId, archivedVersion,
+    );
+  });
+  const results = await db.batch([
+    ...assertions,
+    db.prepare(
+      `UPDATE common_vars
+          SET archived_at = ?, replacement_run_id = ?, version = ?, updated_by = ?, updated_at = ?
+        WHERE id = ? AND line_account_id = ? AND version = ? AND archived_at IS NULL`,
+    ).bind(
+      now, runId, archivedVersion, actorId, now, plan.source.id,
+      plan.source.line_account_id, plan.source.version,
+    ),
+    ...updates,
+    db.prepare(
+      `INSERT INTO common_var_versions
+         (id, common_var_id, version_no, name, value, memo, change_reason, actor_id, created_at)
+       SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?
+        WHERE EXISTS (
+          SELECT 1 FROM common_vars
+           WHERE id = ? AND replacement_run_id = ? AND version = ?
+        )`,
+    ).bind(
+      crypto.randomUUID(), plan.source.id, archivedVersion, plan.source.name,
+      plan.source.value, plan.source.memo, `「${plan.replacement.name}」へ差し替えてアーカイブ`,
+      actorId, now, plan.source.id, runId, archivedVersion,
+    ),
+    db.prepare(
+      `INSERT INTO common_var_replacement_runs
+         (id, line_account_id, source_common_var_id, replacement_common_var_id,
+          source_version, expected_usage_count, replaced_usage_count, actor_id, status, created_at)
+       SELECT ?, ?, ?, ?, ?, ?, ?, ?, 'completed', ?
+        WHERE EXISTS (
+          SELECT 1 FROM common_vars
+           WHERE id = ? AND replacement_run_id = ? AND version = ?
+        )`,
+    ).bind(
+      runId, plan.source.line_account_id, plan.source.id, plan.replacement.id,
+      plan.source.version, plan.replaceableTotal, plan.replaceableTotal, actorId, now,
+      plan.source.id, runId, archivedVersion,
+    ),
+  ]);
+  const archiveResult = results[assertions.length];
+  if (Number(archiveResult?.meta.changes ?? 0) === 0) {
+    throw new CommonVarVersionConflictError(plan.source.version);
+  }
+  return { runId, replacedUsageCount: plan.replaceableTotal, archivedVersion };
 }
 
 /** 差し込み用に key => value でまとめて返す。 */
@@ -459,7 +904,7 @@ export async function getCommonVarMap(
 ): Promise<Record<string, string>> {
   if (!lineAccountId) return {};
   const result = await db
-    .prepare(`SELECT var_key, value FROM common_vars WHERE line_account_id = ?`)
+    .prepare(`SELECT var_key, value FROM common_vars WHERE line_account_id = ? AND archived_at IS NULL`)
     .bind(lineAccountId)
     .all<{ var_key: string; value: string }>();
   const out: Record<string, string> = {};
@@ -515,29 +960,114 @@ export async function deleteCommonVarSchedule(
  * 同じ変数に複数の予約が溜まっている場合は古い順に当て、最後のものが残る。
  * 途中を飛ばすと「一度も適用されなかった値」が残るので、順番に当てる。
  */
+/**
+ * このアカウントで共通情報が有効か。worker の accountFeatureIsEnabled と
+ * 同じ順序(一括設定→個別設定→初期値)で読む。正本は worker 側にあり、
+ * ここは dispatcher が db 層だけで止めるための最小複製。
+ */
+export async function isCommonVarsEnabled(db: D1Database, accountId: string): Promise<boolean> {
+  const bundle = await getVersionedAccountSetting<{ features?: Record<string, unknown> }>(
+    db,
+    accountId,
+    'feature.settings_bundle_v1',
+  );
+  const fromBundle = bundle?.data.features?.['common_vars'];
+  if (typeof fromBundle === 'boolean') return fromBundle;
+  const legacy = await getAccountSetting(db, accountId, 'feature.common_vars');
+  if (legacy) {
+    try {
+      const parsed = JSON.parse(legacy) as { enabled?: unknown };
+      if (typeof parsed.enabled === 'boolean') return parsed.enabled;
+    } catch {
+      // 壊れた値は初期値に倒す。
+    }
+  }
+  return true;
+}
+
 export async function applyDueCommonVarSchedules(
   db: D1Database,
   now: string,
+  limit = 1_000,
 ): Promise<number> {
+  const batchLimit = Number.isFinite(limit)
+    ? Math.max(1, Math.min(Math.trunc(limit), 1_000))
+    : 1_000;
   const due = await db
     .prepare(
       `SELECT * FROM common_var_schedules
         WHERE applied_at IS NULL AND effective_from <= ?
-        ORDER BY effective_from ASC`,
+        ORDER BY effective_from ASC, id ASC
+        LIMIT ?`,
     )
-    .bind(now)
+    .bind(now, batchLimit)
     .all<CommonVarSchedule>();
   let applied = 0;
   for (const row of due.results) {
-    await db
-      .prepare(`UPDATE common_vars SET value = ?, updated_at = ? WHERE id = ?`)
-      .bind(row.value, jstNow(), row.var_id)
-      .run();
-    await db
-      .prepare(`UPDATE common_var_schedules SET applied_at = ? WHERE id = ?`)
-      .bind(jstNow(), row.id)
-      .run();
-    applied++;
+    // 適用のたびに版を1つ進め、履歴に1行残す。値・版・履歴・適用済み印を
+    // 同じ batch にして、途中で落ちたら「値だけ変わって記録なし」にしない。
+    // 版の一致を条件に入れるので、利用者の同時編集とぶつかった回は
+    // 何も書かず、次回の Cron で当て直す。
+    const current = await db
+      .prepare(
+        `SELECT name, value, memo, version, line_account_id FROM common_vars
+          WHERE id = ? AND archived_at IS NULL`,
+      )
+      .bind(row.var_id)
+      .first<{ name: string; value: string; memo: string | null; version: number; line_account_id: string | null }>();
+    // 機能オフ中は適用せず未適用のまま残す。再オンで再開する。
+    // 正本は services/feature-enforcement.ts の accountFeatureIsEnabled。
+    if (current?.line_account_id && !await isCommonVarsEnabled(db, current.line_account_id)) {
+      continue;
+    }
+    const stamp = jstNow();
+    if (!current) {
+      // 変数自体が無い(削除済み等)の予約は、繰り返し拾わないよう印だけ打つ。
+      await db
+        .prepare(`UPDATE common_var_schedules SET applied_at = ? WHERE id = ?`)
+        .bind(stamp, row.id)
+        .run();
+      applied++;
+      continue;
+    }
+    const nextVersion = current.version + 1;
+    const results = await db.batch([
+      // SELECT後からbatch開始までに画面保存が入っていたら、意図的にSQLエラーを
+      // 起こしてbatch全体を戻す。batch内は同一トランザクションなので、この確認後に
+      // 値・履歴・適用済み印が分かれることはない。
+      db.prepare(
+        `SELECT CASE WHEN EXISTS (
+           SELECT 1 FROM common_vars
+            WHERE id = ? AND version = ? AND archived_at IS NULL
+         ) THEN 1 ELSE json('') END AS version_is_current`,
+      ).bind(row.var_id, current.version),
+      db.prepare(
+        `UPDATE common_vars SET value = ?, version = ?, updated_by = NULL, updated_at = ?
+          WHERE id = ? AND version = ? AND archived_at IS NULL`,
+      ).bind(row.value, nextVersion, stamp, row.var_id, current.version),
+      db.prepare(
+        `INSERT INTO common_var_versions
+           (id, common_var_id, version_no, name, value, memo, change_reason, actor_id, created_at)
+         SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?
+          WHERE EXISTS (
+            SELECT 1 FROM common_vars
+             WHERE id = ? AND version = ? AND archived_at IS NULL
+          )`,
+      ).bind(
+        crypto.randomUUID(), row.var_id, nextVersion,
+        current.name, row.value, current.memo ?? '',
+        '予約適用', null, stamp,
+        row.var_id, nextVersion,
+      ),
+      db.prepare(
+        `UPDATE common_var_schedules SET applied_at = ?
+          WHERE id = ? AND applied_at IS NULL AND EXISTS (
+            SELECT 1 FROM common_vars
+             WHERE id = ? AND version = ? AND archived_at IS NULL
+          )`,
+      ).bind(stamp, row.id, row.var_id, nextVersion),
+    ]);
+    if ((results[1].meta?.changes ?? 0) > 0) applied++;
   }
   return applied;
 }

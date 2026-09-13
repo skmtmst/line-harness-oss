@@ -26,6 +26,10 @@ export interface SupportMark {
   display_order: number;
   created_at: string;
   archived_at: string | null;
+  version: number;
+  updated_at: string;
+  created_by: string | null;
+  updated_by: string | null;
   /** NULL は移行前からあるテナント共通マーク。 */
   line_account_id: string | null;
   tenant_id: string;
@@ -41,9 +45,31 @@ export interface SupportMarkWithUsage extends SupportMark {
   automations: number;
 }
 
+export interface SupportMarkArchiveImpact {
+  mark: SupportMarkWithUsage;
+  revision: string;
+  canArchive: boolean;
+  checkedAt: string;
+}
+
+export function supportMarkImpactRevision(mark: SupportMarkWithUsage): string {
+  return [
+    mark.id,
+    Number(mark.version ?? 1),
+    Number(mark.friend_count),
+    Number(mark.broadcasts),
+    Number(mark.scenarios),
+    Number(mark.auto_replies),
+    Number(mark.saved_searches),
+    Number(mark.automations),
+  ].join(':');
+}
+
 const MARK_SELECT = `
   SELECT sm.id, sm.name, sm.color, sm.is_default, sm.auto_on_inbound,
-         sm.display_order, sm.created_at, sm.archived_at,
+         sm.display_order, sm.created_at, sm.archived_at, sm.version,
+         COALESCE(sm.updated_at, sm.created_at) AS updated_at,
+         sm.created_by, sm.updated_by,
          sms.line_account_id,
          COALESCE(sms.tenant_id, '${LEGACY_TENANT_ID}') AS tenant_id,
          CASE WHEN sms.mark_id IS NULL OR sms.line_account_id IS NULL THEN 1 ELSE 0 END AS is_inherited
@@ -235,6 +261,26 @@ export async function getSupportMarksWithUsage(
   );
 }
 
+export async function getSupportMarkArchiveImpact(
+  db: D1Database,
+  scope: SupportMarkScope,
+  markId: string,
+): Promise<SupportMarkArchiveImpact | null> {
+  const mark = (await getSupportMarksWithUsage(db, scope)).find((item) => item.id === markId);
+  if (!mark) return null;
+  const referenceCount = Number(mark.broadcasts)
+    + Number(mark.scenarios)
+    + Number(mark.auto_replies)
+    + Number(mark.saved_searches)
+    + Number(mark.automations);
+  return {
+    mark,
+    revision: supportMarkImpactRevision(mark),
+    canArchive: mark.is_default !== 1 && mark.is_inherited !== 1 && referenceCount === 0,
+    checkedAt: jstNow(),
+  };
+}
+
 export async function getSupportMarkById(
   db: D1Database,
   id: string,
@@ -289,26 +335,51 @@ export async function createSupportMark(
     displayOrder?: number;
   },
 ): Promise<SupportMark> {
+  return createSupportMarkWithAutomationRules(db, scope, input, null, []);
+}
+
+export interface NewSupportMarkAutomationRule {
+  name: string;
+  event: string;
+  condition?: unknown;
+  priority: number;
+  manualProtectionMinutes: number;
+  isActive: boolean;
+}
+
+/** マーク本体と自動変更ルールを同じD1バッチで確定する。 */
+export async function createSupportMarkWithAutomationRules(
+  db: D1Database,
+  scope: SupportMarkScope,
+  input: {
+    name: string;
+    color?: string;
+    isDefault?: boolean;
+    autoOnInbound?: boolean;
+    displayOrder?: number;
+  },
+  actorId: string | null,
+  automationRules: NewSupportMarkAutomationRule[],
+): Promise<SupportMark> {
   const id = crypto.randomUUID();
+  const now = jstNow();
+  const statements: D1PreparedStatement[] = [];
   if (input.isDefault) {
-    await db
-      .prepare(
+    statements.push(db.prepare(
         `UPDATE support_marks SET is_default = 0
           WHERE id IN (
             SELECT mark_id FROM support_mark_scopes
              WHERE tenant_id = ? AND line_account_id = ?
           )`,
-      )
-      .bind(scope.tenantId, scope.lineAccountId)
-      .run();
+      ).bind(scope.tenantId, scope.lineAccountId));
   }
-  const now = jstNow();
-  await db.batch([
+  statements.push(
     db
       .prepare(
         `INSERT INTO support_marks
-           (id, name, color, is_default, auto_on_inbound, display_order, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+           (id, name, color, is_default, auto_on_inbound, display_order, created_at,
+            version, updated_at, created_by, updated_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`,
       )
       .bind(
         id,
@@ -318,6 +389,9 @@ export async function createSupportMark(
         input.autoOnInbound ? 1 : 0,
         input.displayOrder ?? 0,
         now,
+        now,
+        actorId,
+        actorId,
       ),
     db
       .prepare(
@@ -325,7 +399,61 @@ export async function createSupportMark(
          VALUES (?, ?, ?, ?)`,
       )
       .bind(id, scope.tenantId, scope.lineAccountId, now),
-  ]);
+  );
+  for (const rule of automationRules) {
+    const automationId = crypto.randomUUID();
+    const versionId = crypto.randomUUID();
+    statements.push(
+      db.prepare(
+        `INSERT INTO automation_definitions
+           (id, line_account_id, name, description, status, priority, created_by, created_at, updated_at)
+         VALUES (?, ?, ?, '対応マークの自動変更', ?, ?, ?, ?, ?)`,
+      ).bind(
+        automationId,
+        scope.lineAccountId,
+        rule.name.trim(),
+        rule.isActive ? 'active' : 'stopped',
+        rule.priority,
+        actorId,
+        now,
+        now,
+      ),
+      db.prepare(
+        `INSERT INTO automation_versions
+           (id, automation_id, version_number, status, trigger_type, trigger_config,
+            condition_config, action_config, created_by, created_at, published_at)
+         VALUES (?, ?, 1, 'published', 'support_mark_change', ?, ?, ?, ?, ?, ?)`,
+      ).bind(
+        versionId,
+        automationId,
+        JSON.stringify({ kind: 'support_mark_rule', event: rule.event }),
+        JSON.stringify(rule.condition ?? {}),
+        JSON.stringify([{
+          id: 'set-support-mark',
+          type: 'set_support_mark',
+          params: { markId: id, manualProtectionMinutes: rule.manualProtectionMinutes },
+          onFailure: 'stop',
+        }]),
+        actorId,
+        now,
+        now,
+      ),
+      db.prepare(
+        'UPDATE automation_definitions SET current_published_version_id = ? WHERE id = ?',
+      ).bind(versionId, automationId),
+    );
+  }
+  statements.push(db.prepare(
+    `INSERT INTO operation_audit
+       (id, target_kind, target_id, action, actor_id, friend_id, detail_json)
+     VALUES (?, 'support_mark', ?, 'created', ?, NULL, ?)`,
+  ).bind(
+    crypto.randomUUID(),
+    id,
+    actorId,
+    JSON.stringify({ lineAccountId: scope.lineAccountId, automationRuleCount: automationRules.length }),
+  ));
+  await db.batch(statements);
   return (await getSupportMarkById(db, id, scope))!;
 }
 
@@ -339,6 +467,7 @@ export async function updateSupportMark(
     isDefault?: boolean;
     autoOnInbound?: boolean;
     displayOrder?: number;
+    actorId?: string | null;
   },
 ): Promise<SupportMark | null> {
   const existing = await getSupportMarkById(db, id, scope);
@@ -388,6 +517,9 @@ export async function updateSupportMark(
   if (input.autoOnInbound !== undefined) put('auto_on_inbound', input.autoOnInbound ? 1 : 0);
   if (input.displayOrder !== undefined) put('display_order', input.displayOrder);
   if (sets.length > 0) {
+    sets.push('version = version + 1');
+    put('updated_at', jstNow());
+    put('updated_by', input.actorId ?? null);
     values.push(id, scope.tenantId, scope.lineAccountId);
     await db
       .prepare(
@@ -463,10 +595,11 @@ export async function replaceAndArchiveSupportMark(
     db
       .prepare(
         `UPDATE support_marks
-            SET archived_at = ?, is_default = 0, auto_on_inbound = 0
+            SET archived_at = ?, is_default = 0, auto_on_inbound = 0,
+                version = version + 1, updated_at = ?, updated_by = ?
           WHERE id = ? AND archived_at IS NULL`,
       )
-      .bind(archivedAt, markId),
+      .bind(archivedAt, archivedAt, actorId ?? null, markId),
     db
       .prepare(
         `INSERT INTO operation_audit
@@ -481,6 +614,199 @@ export async function replaceAndArchiveSupportMark(
   ]);
 
   return Number(results[1]?.meta?.changes ?? 0);
+}
+
+export type SupportMarkArchiveErrorCode =
+  | 'not_found'
+  | 'default_mark'
+  | 'inherited_mark'
+  | 'referenced'
+  | 'replacement_invalid'
+  | 'version_conflict'
+  | 'impact_changed'
+  | 'idempotency_conflict';
+
+export class SupportMarkArchiveError extends Error {
+  constructor(public readonly code: SupportMarkArchiveErrorCode, message: string) {
+    super(message);
+    this.name = 'SupportMarkArchiveError';
+  }
+}
+
+export interface SupportMarkArchiveResult {
+  archived: true;
+  markId: string;
+  replacementMarkId: string;
+  replacedFriendCount: number;
+  version: number;
+}
+
+/**
+ * V6の確認版に一致する場合だけ、友だちの置換と保管を一括で行う。
+ * 同じIdempotency-Keyの再送は保存済み結果を返す。
+ */
+export async function archiveSupportMarkWithReplacement(
+  db: D1Database,
+  scope: SupportMarkScope,
+  input: {
+    markId: string;
+    replacementMarkId: string;
+    expectedVersion: number;
+    impactRevision: string;
+    idempotencyKey: string;
+    actorId: string | null;
+  },
+): Promise<SupportMarkArchiveResult> {
+  const fingerprint = JSON.stringify({
+    markId: input.markId,
+    replacementMarkId: input.replacementMarkId,
+    expectedVersion: input.expectedVersion,
+    impactRevision: input.impactRevision,
+  });
+  const previous = await db.prepare(
+    `SELECT request_fingerprint, response_json
+       FROM support_mark_archive_requests
+      WHERE line_account_id = ? AND idempotency_key = ?`,
+  ).bind(scope.lineAccountId, input.idempotencyKey).first<{
+    request_fingerprint: string;
+    response_json: string;
+  }>();
+  if (previous) {
+    if (previous.request_fingerprint !== fingerprint) {
+      throw new SupportMarkArchiveError(
+        'idempotency_conflict',
+        '同じ処理IDに異なる保管内容が指定されました',
+      );
+    }
+    return JSON.parse(previous.response_json) as SupportMarkArchiveResult;
+  }
+
+  if (input.markId === input.replacementMarkId) {
+    throw new SupportMarkArchiveError('replacement_invalid', '置換先は別のマークを指定してください');
+  }
+  const [impact, replacement] = await Promise.all([
+    getSupportMarkArchiveImpact(db, scope, input.markId),
+    getSupportMarkById(db, input.replacementMarkId, scope),
+  ]);
+  if (!impact) throw new SupportMarkArchiveError('not_found', '対応マークが見つかりません');
+  if (!replacement || replacement.archived_at) {
+    throw new SupportMarkArchiveError('replacement_invalid', '置換先の対応マークが見つかりません');
+  }
+  if (impact.mark.is_default === 1) {
+    throw new SupportMarkArchiveError('default_mark', '初期値の対応マークは保管できません');
+  }
+  if (impact.mark.is_inherited === 1) {
+    throw new SupportMarkArchiveError('inherited_mark', '共通の対応マークは保管できません');
+  }
+  if (Number(impact.mark.version ?? 1) !== input.expectedVersion) {
+    throw new SupportMarkArchiveError('version_conflict', 'ほかの担当者が先に変更しました');
+  }
+  if (impact.revision !== input.impactRevision) {
+    throw new SupportMarkArchiveError('impact_changed', '確認後に使用状況が変わりました');
+  }
+  if (!impact.canArchive) {
+    throw new SupportMarkArchiveError('referenced', '使用先を外してから保管してください');
+  }
+
+  const archivedAt = jstNow();
+  const result: SupportMarkArchiveResult = {
+    archived: true,
+    markId: input.markId,
+    replacementMarkId: input.replacementMarkId,
+    replacedFriendCount: Number(impact.mark.friend_count),
+    version: input.expectedVersion + 1,
+  };
+  const guard = `EXISTS (
+    SELECT 1 FROM support_marks guarded
+     WHERE guarded.id = ? AND guarded.archived_at = ?
+  )`;
+  const detail = JSON.stringify({
+    previousMarkId: input.markId,
+    replacementMarkId: input.replacementMarkId,
+    reason: 'archived_mark_replacement',
+  });
+  const results = await db.batch([
+    db.prepare(
+      `UPDATE support_marks
+          SET archived_at = ?, is_default = 0, auto_on_inbound = 0,
+              version = version + 1, updated_at = ?, updated_by = ?
+        WHERE id = ? AND archived_at IS NULL AND version = ?
+          AND (SELECT COUNT(*) FROM friends
+                WHERE support_mark_id = ? AND line_account_id = ?) = ?`,
+    ).bind(
+      archivedAt,
+      archivedAt,
+      input.actorId,
+      input.markId,
+      input.expectedVersion,
+      input.markId,
+      scope.lineAccountId,
+      impact.mark.friend_count,
+    ),
+    db.prepare(
+      `INSERT INTO operation_audit
+         (id, target_kind, target_id, action, actor_id, friend_id, detail_json)
+       SELECT lower(hex(randomblob(16))), 'support_mark', ?, 'changed', ?, id, ?
+         FROM friends
+        WHERE support_mark_id = ? AND line_account_id = ? AND ${guard}`,
+    ).bind(
+      input.replacementMarkId,
+      input.actorId,
+      detail,
+      input.markId,
+      scope.lineAccountId,
+      input.markId,
+      archivedAt,
+    ),
+    db.prepare(
+      `UPDATE friends SET support_mark_id = ?
+        WHERE support_mark_id = ? AND line_account_id = ? AND ${guard}`,
+    ).bind(
+      input.replacementMarkId,
+      input.markId,
+      scope.lineAccountId,
+      input.markId,
+      archivedAt,
+    ),
+    db.prepare(
+      `INSERT INTO operation_audit
+         (id, target_kind, target_id, action, actor_id, friend_id, detail_json)
+       SELECT lower(hex(randomblob(16))), 'support_mark', ?, 'archived', ?, NULL, ?
+        WHERE ${guard}`,
+    ).bind(input.markId, input.actorId, detail, input.markId, archivedAt),
+    db.prepare(
+      `INSERT OR IGNORE INTO support_mark_archive_requests
+         (id, line_account_id, mark_id, idempotency_key, request_fingerprint,
+          response_json, created_at)
+       SELECT ?, ?, ?, ?, ?, ?, ? WHERE ${guard}`,
+    ).bind(
+      crypto.randomUUID(),
+      scope.lineAccountId,
+      input.markId,
+      input.idempotencyKey,
+      fingerprint,
+      JSON.stringify(result),
+      archivedAt,
+      input.markId,
+      archivedAt,
+    ),
+  ]);
+
+  if ((results[0]?.meta?.changes ?? 0) !== 1) {
+    const raced = await db.prepare(
+      `SELECT request_fingerprint, response_json
+         FROM support_mark_archive_requests
+        WHERE line_account_id = ? AND idempotency_key = ?`,
+    ).bind(scope.lineAccountId, input.idempotencyKey).first<{
+      request_fingerprint: string;
+      response_json: string;
+    }>();
+    if (raced?.request_fingerprint === fingerprint) {
+      return JSON.parse(raced.response_json) as SupportMarkArchiveResult;
+    }
+    throw new SupportMarkArchiveError('version_conflict', 'ほかの担当者が先に変更しました');
+  }
+  return result;
 }
 
 /** そのマークが付いている友だちの数。削除前の確認に使う。 */

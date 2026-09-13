@@ -3,13 +3,15 @@
 import { Suspense, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { ApiError, api, type ApiBroadcast } from '@/lib/api'
-import Header from '@/components/layout/header'
+import { ApiError, api, type ApiBroadcast, type BroadcastInsight } from '@/lib/api'
 import Button from '@/components/shared/button'
+import StickyBar from '@/components/shared/sticky-bar'
 import { useAccount } from '@/contexts/account-context'
 import { messageTypeLabel } from '@/lib/broadcast-summary'
 import { broadcastBelongsToSelectedAccount } from './broadcast-detail-account'
-import { clickInsightDetail, openInsightDetail } from './broadcast-insight-display'
+import { clickInsightDetail, formatBroadcastDateTime, openInsightDetail } from './broadcast-insight-display'
+import { broadcastDetailCsv } from './broadcast-detail-export'
+import { broadcastCsvFilename } from '@/components/broadcasts/broadcast-csv-filename'
 import { usePageTitle } from '@/components/shell/page-chrome'
 
 const STATUS_LABELS: Record<string, string> = {
@@ -24,18 +26,35 @@ function BroadcastDetailInner() {
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const id = params.get('id') ?? ''
   const [broadcast, setBroadcast] = useState<ApiBroadcast | null>(null)
-  const [insight, setInsight] = useState<{
-    delivered: number | null
-    uniqueImpression: number | null
-    uniqueClick: number | null
-    suppressedByAudienceSize: boolean
-  } | null>(null)
+  usePageTitle(broadcast ? `配信結果：${broadcast.title}` : '配信の詳細')
+  const [insight, setInsight] = useState<(BroadcastInsight & { suppressedByAudienceSize: boolean }) | null>(null)
   // 集計は配信本体とは別に取る。取れていないのか、取りに行って失敗したのかを
   // 「—」に混ぜると、待てば出るのか操作が要るのかを運用者が判断できない。
   const [insightState, setInsightState] = useState<'loading' | 'ready' | 'error'>('loading')
   const [loadState, setLoadState] = useState<'loading' | 'ready' | 'not-found' | 'error'>('loading')
   const [reloadToken, setReloadToken] = useState(0)
   const contentRef = useRef<HTMLElement>(null)
+
+  const exportCsv = () => {
+    if (!broadcast) return
+    const csv = broadcastDetailCsv({
+      title: broadcast.title,
+      status: broadcast.status,
+      sentAt: broadcast.sentAt,
+      scheduledAt: broadcast.scheduledAt,
+      totalCount: broadcast.totalCount,
+      successCount: broadcast.successCount,
+      delivered: insight?.delivered ?? null,
+      uniqueImpression: insight?.uniqueImpression ?? null,
+      uniqueClick: insight?.uniqueClick ?? null,
+    }, formatBroadcastDateTime)
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
+    const link = document.createElement('a')
+    link.href = url
+    link.download = broadcastCsvFilename(broadcast.title, broadcast.id)
+    link.click()
+    URL.revokeObjectURL(url)
+  }
 
   useEffect(() => {
     let active = true
@@ -69,9 +88,7 @@ function BroadcastDetailInner() {
           if (!active) return
           if (stats.success && stats.data) {
             setInsight({
-              delivered: stats.data.delivered,
-              uniqueImpression: stats.data.uniqueImpression,
-              uniqueClick: stats.data.uniqueClick,
+              ...stats.data,
               suppressedByAudienceSize:
                 stats.data.uniqueImpression == null
                 && (stats.data.delivered ?? 0) > 0
@@ -119,44 +136,11 @@ function BroadcastDetailInner() {
 
   return (
     <div>
-      <nav data-design="Crumb" className="text-ink-faint mb-2 text-xs">
+      <nav data-design="Crumb" className="text-ink-faint mb-4 text-xs">
         <Link href="/broadcasts" className="hover:underline">
-          一斉配信
+          ← 一斉配信一覧
         </Link>
-        <span className="mx-1.5">/</span>
-        <span>{broadcast?.title ?? '詳細'}</span>
       </nav>
-
-      <div data-design="Head">
-        <Header
-          title={broadcast?.title ?? '配信の詳細'}
-          description={
-            broadcast?.sentAt
-              ? `${new Date(broadcast.sentAt).toLocaleString('ja-JP')} に送信`
-              : broadcast?.scheduledAt
-                ? `${new Date(broadcast.scheduledAt).toLocaleString('ja-JP')} に予約`
-                : undefined
-          }
-          action={
-            <div className="flex flex-wrap gap-2">
-              <Button
-                onClick={() => contentRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-                disabled={!broadcast}
-              >
-                配信内容を見る
-              </Button>
-              {/* 既存の配信を種にして作り直す口が無い。作成は空から始まる。 */}
-              <button
-                disabled
-                title="複製は準備中です"
-                className="border-hairline text-ink-faint rounded-control border px-4 py-2 text-sm font-medium opacity-50"
-              >
-                複製して作る
-              </button>
-            </div>
-          }
-        />
-      </div>
 
       {loadState === 'loading' ? (
         <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm">
@@ -172,8 +156,16 @@ function BroadcastDetailInner() {
         </div>
       ) : loadState === 'not-found' || !broadcast ? (
         <p className="text-ink-faint bg-canvas rounded-card border-hairline border p-8 text-center text-sm">
-          このLINEアカウントで確認できる配信は見つかりませんでした。
+          {/*
+            未選択と対象外を書き分ける。未選択のまま「確認できる配信は
+            見つかりません」と出すと、権限の問題に読み違える（#490 軽6）。
+          */}
+          {!selectedAccountId
+            ? 'LINE公式アカウントを選んでください。選ぶと配信を確認できます。'
+            : 'このLINEアカウントで確認できる配信は見つかりませんでした。'}
         </p>
+      ) : String(broadcast.status) === 'sent' ? (
+        <SentResult broadcast={broadcast} insight={insight} insightState={insightState} contentRef={contentRef} />
       ) : (
         <div className="max-w-3xl space-y-4">
           <section className="bg-canvas rounded-card border-hairline border p-5">
@@ -204,7 +196,7 @@ function BroadcastDetailInner() {
             {/* 開始・完了の時刻を別々に持っていない。sent_at は完了だけ。 */}
             <p className="text-ink-faint mt-2 text-xs">
               {broadcast.sentAt
-                ? `完了 ${new Date(broadcast.sentAt).toLocaleTimeString('ja-JP')}`
+                ? `完了 ${formatBroadcastDateTime(broadcast.sentAt)}`
                 : '開始・完了の時刻は記録していません'}
             </p>
           </section>
@@ -293,18 +285,15 @@ function BroadcastDetailInner() {
           <section className="bg-canvas rounded-card border-hairline border p-5">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-ink text-sm font-semibold">この配信の設定</p>
-              <button
-                disabled
-                title="同じ設定での作り直しは準備中です"
-                className="border-hairline text-ink-faint rounded-control border px-3 py-1 text-xs opacity-50"
+              <Link
+                href={`/broadcasts/new?duplicateFrom=${encodeURIComponent(broadcast.id)}`}
+                className="border-hairline text-accent rounded-control border px-3 py-1 text-xs hover:underline"
               >
                 同じ設定で作り直す
-              </button>
+              </Link>
             </div>
-            {/* 押せない理由は吹き出しだけでなく本文にも置く。触って初めて
-                分かる形にすると、押せないことしか伝わらない。 */}
             <p className="text-ink-faint mt-2 text-xs leading-relaxed">
-              「複製して作る」「同じ設定で作り直す」は、既にある配信を種にして作り直す口がまだないため押せません。作成は空から始まります。
+              複製して作る操作です。題名と本文を引き継いで新規作成を開きます。宛先・予約日時は引き継がないので、送る前に確かめてください。
             </p>
             <dl className="mt-3 space-y-2 text-sm">
               <Row label="宛先の条件" value={broadcast.targetType === 'all' ? 'すべての友だち' : '絞り込みあり'} />
@@ -317,12 +306,17 @@ function BroadcastDetailInner() {
                 label="送信タイミング"
                 value={
                   broadcast.scheduledAt
-                    ? `${new Date(broadcast.scheduledAt).toLocaleString('ja-JP')} に予約`
+                    ? `${formatBroadcastDateTime(broadcast.scheduledAt)} に予約`
                     : '即時配信'
                 }
               />
               {/* 誰が作ったかを記録していない。 */}
-              <Row label="作成者" value={`記録していません ・ ${new Date(broadcast.createdAt).toLocaleString('ja-JP')} 作成`} />
+              <Row
+                label="作成者"
+                value={broadcast.createdAt
+                  ? `記録していません ・ ${formatBroadcastDateTime(broadcast.createdAt)} 作成`
+                  : '記録していません ・ 作成日時 —'}
+              />
             </dl>
           </section>
 
@@ -345,7 +339,8 @@ function BroadcastDetailInner() {
             className="bg-canvas rounded-card border-hairline scroll-mt-20 border p-5"
           >
             <p className="text-ink text-sm font-semibold">送った内容</p>
-            <p className="text-ink-faint mt-0.5 mb-2 text-xs">実際に届いた形</p>
+            <p className="text-ink-faint mt-0.5 text-xs">実際に届いた形</p>
+            <p className="text-ink-faint mb-2 mt-1 text-xs">実際のLINE表示に近い確認用プレビューです。</p>
             <div className="bg-canvas-sunken rounded-card p-3">
               <p className="text-ink rounded-2xl bg-white px-4 py-3 text-sm leading-6 whitespace-pre-wrap">
                 {broadcast.messageContent}
@@ -376,6 +371,111 @@ function BroadcastDetailInner() {
           </Link>
         </div>
       )}
+      <StickyBar
+        className="mt-6"
+        actions={<Button onClick={exportCsv} disabled={!broadcast}>CSVで書き出す</Button>}
+      />
+    </div>
+  )
+}
+
+function rateText(rate: number | null | undefined): string {
+  if (rate == null || !Number.isFinite(rate)) return '—'
+  return `${((rate <= 1 ? rate * 100 : rate)).toFixed(1)}%`
+}
+
+function SentResult({
+  broadcast,
+  insight,
+  insightState,
+  contentRef,
+}: {
+  broadcast: ApiBroadcast
+  insight: (BroadcastInsight & { suppressedByAudienceSize: boolean }) | null
+  insightState: 'loading' | 'ready' | 'error'
+  contentRef: { current: HTMLElement | null }
+}) {
+  const delivered = insight?.delivered ?? broadcast.successCount
+  const opened = insight?.opens?.count ?? insight?.uniqueImpression ?? null
+  const openRate = insight?.opens?.rate ?? insight?.openRate ?? null
+  const failed = Math.max(0, broadcast.totalCount - broadcast.successCount)
+
+  return (
+    <div className="space-y-4">
+      <nav aria-label="配信内容を見る" className="bg-canvas-sunken rounded-card grid grid-cols-5 p-1 text-center text-sm font-semibold">
+        {['概要', 'クリック', '友だち', 'エラー', '配信内容'].map((label, index) => (
+          <span key={label} className={index === 0 ? 'bg-canvas text-accent rounded-control px-3 py-2' : 'text-ink-secondary px-3 py-2'}>{label}</span>
+        ))}
+      </nav>
+
+      <div className="grid gap-4 xl:grid-cols-3">
+        <div className="space-y-4 xl:col-span-2">
+          <section className="bg-canvas rounded-card border-hairline border p-5">
+            <h2 className="text-ink text-base font-bold">配信結果</h2>
+            <p className="text-ink-faint mt-1 text-xs">送信・開封・クリック・ブロックを確認します。</p>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <div className="border-hairline rounded-control border p-3">
+                <p className="text-ink-faint text-xs font-semibold">送信成功</p>
+                <p className="text-ink mt-2 text-sm font-bold">{broadcast.totalCount > 0 ? rateText(delivered / broadcast.totalCount) : '—'}</p>
+                <p className="text-ink mt-1 text-lg font-bold">{delivered.toLocaleString('ja-JP')}人</p>
+                <p className="text-ink-faint text-xs">届いた人</p>
+              </div>
+              <div className="border-hairline rounded-control border p-3">
+                <p className="text-ink-faint text-xs font-semibold">開封</p>
+                <p className="text-ink mt-2 text-sm font-bold">{insightState === 'loading' ? '読込中' : rateText(openRate)}</p>
+                <p className="text-ink mt-1 text-lg font-bold">{opened == null ? '—' : `${opened.toLocaleString('ja-JP')}人`}</p>
+                <p className="text-ink-faint text-xs">開いた人</p>
+              </div>
+            </div>
+          </section>
+
+          <section className="bg-canvas rounded-card border-hairline border p-5">
+            <h2 className="text-ink text-base font-bold">反応</h2>
+            <p className="text-ink-faint mt-1 text-xs">ボタンとリンクごとの結果です。</p>
+            {insight?.links?.length ? (
+              <div className="mt-3 space-y-2">
+                {insight.links.map((link) => (
+                  <div key={link.id} className="bg-canvas-sunken rounded-control flex items-center justify-between gap-4 p-3">
+                    <div className="min-w-0"><p className="text-ink truncate text-sm font-bold" title={link.label}>{link.label}</p><p className="text-ink-faint truncate text-xs" title={link.url}>{link.url}</p></div>
+                    <p className="text-ink-secondary shrink-0 text-xs">クリック {link.uniqueClickCount.toLocaleString('ja-JP')}人（{rateText(link.clickRate)}）</p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-ink-faint bg-canvas-sunken mt-3 rounded-control p-3 text-xs">計測したボタン・リンクはありません。</p>
+            )}
+            <div className="bg-canvas-sunken mt-3 rounded-control p-3">
+              <p className="text-ink text-sm font-bold">エラー</p>
+              <p className="text-ink-faint mt-1 text-xs">送信失敗 {failed.toLocaleString('ja-JP')}人</p>
+            </div>
+          </section>
+        </div>
+
+        <div className="space-y-4">
+          <section className="bg-canvas rounded-card border-hairline border p-5">
+            <h2 className="text-ink text-base font-bold">配信した設定</h2>
+            <p className="text-ink-faint mt-1 text-xs">この配信で使った対象と送信方法です。</p>
+            <dl className="mt-4 space-y-3 text-sm">
+              <Row label="配信済み" value={`${delivered.toLocaleString('ja-JP')}人`} />
+              <Row label="開封率" value={rateText(openRate)} />
+              <Row label="クリック率" value={rateText(insight?.clickRate)} />
+            </dl>
+          </section>
+
+          <section ref={contentRef} id="broadcast-content" className="bg-canvas rounded-card border-hairline border p-5">
+            <h2 className="text-ink text-base font-bold">メッセージプレビュー</h2>
+            <p className="text-ink-faint mt-1 text-xs">実際のLINE表示に近い確認用プレビューです。</p>
+            <div className="bg-info mt-3 min-h-48 rounded-card p-4">
+              <p className="text-ink bg-canvas rounded-control px-4 py-3 text-sm leading-6 whitespace-pre-wrap">{broadcast.messageContent}</p>
+              {broadcast.messageOptions?.buttons?.map((button) => (
+                <p key={`${button.label}-${button.value}`} className="text-action bg-canvas mt-2 truncate rounded-control px-3 py-2 text-center text-xs font-bold" title={button.value}>{button.label}</p>
+              ))}
+            </div>
+          </section>
+        </div>
+      </div>
+
+      {insightState === 'error' && <p role="alert" className="text-danger text-xs">開封・クリックを読み込めませんでした。</p>}
     </div>
   )
 }
@@ -413,7 +513,6 @@ function Row({ label, value }: { label: string; value: string }) {
 }
 
 export default function BroadcastDetailPage() {
-  usePageTitle('配信の詳細')
   // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
   return (
     <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中...</div>}>

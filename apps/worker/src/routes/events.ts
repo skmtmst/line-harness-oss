@@ -12,7 +12,7 @@
 import { Hono, type Context } from 'hono';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
-import { enrollByTrigger } from '../services/reminder-trigger.js';
+import { cancelByTrigger, enrollByTrigger, reconcileV6ToStartsAt, rescheduleByTrigger } from '../services/reminder-trigger.js';
 import {
   EVENT_NAME_MAX,
   EVENT_DESCRIPTION_MAX,
@@ -23,6 +23,7 @@ import {
 import { getSlotsWithRemaining } from '../services/event-availability.js';
 import { verifyCallerLineUserId } from '../services/liff-auth.js';
 import { computeIdentityKey } from '../lib/identity-key.js';
+import { buildOffsetListResponse, parseOffsetPaging } from '../lib/list-paging.js';
 import {
   reserveEventIdempotency,
   finalizeEventIdempotencyResponse,
@@ -46,6 +47,13 @@ import { dispatchAutomationEventWithLogging } from '../services/automation-trigg
 import { applyActionScoreEvent } from '../services/action-score-events.js';
 import { resolveLineCredential } from '@line-crm/db';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
+import {
+  createEventWaitlistOfferSender,
+  enqueueEventWaitlistPromotion,
+  getEventOccurrenceApplicants,
+  getEventOccurrenceUsedSeats,
+  promoteEventWaitlist,
+} from '../services/event-waitlist.js';
 
 const events = new Hono<Env>();
 const ACCOUNT_ACCESS_ERROR = 'このLINEアカウントを操作する権限がありません';
@@ -80,6 +88,23 @@ events.use('/api/events/admin/*', async (c, next) => {
 
 function getAccountId(c: Context<Env>): string | null {
   return c.req.query('account_id') ?? null;
+}
+
+const EVENT_PARTY_SIZE_MAX = 20;
+const EVENT_ANSWER_SNAPSHOT_MAX_BYTES = 16_384;
+
+function serializeAnswerSnapshot(value: unknown): { ok: true; json: string | null } | { ok: false } {
+  if (value == null) return { ok: true, json: null };
+  if (typeof value !== 'object' || Array.isArray(value)) return { ok: false };
+  try {
+    const json = JSON.stringify(value);
+    if (new TextEncoder().encode(json).byteLength > EVENT_ANSWER_SNAPSHOT_MAX_BYTES) {
+      return { ok: false };
+    }
+    return { ok: true, json };
+  } catch {
+    return { ok: false };
+  }
 }
 
 async function resolveAccountIdFromLiff(c: Context<Env>): Promise<string | null> {
@@ -117,7 +142,8 @@ function validateEventInput(
   const has = (k: string) => Object.prototype.hasOwnProperty.call(body, k);
   if (isCreate || has('name')) {
     const name = body.name;
-    if (typeof name !== 'string' || name.length === 0 || name.length > EVENT_NAME_MAX) {
+    // 空白だけの名前は通さない(点検#520軽14)。画面はtrim検査済みだがAPIは未検査だった。
+    if (typeof name !== 'string' || name.trim().length === 0 || name.length > EVENT_NAME_MAX) {
       return { ok: false, code: 'invalid_name' };
     }
   }
@@ -125,6 +151,17 @@ function validateEventInput(
     const d = body.description;
     if (typeof d !== 'string' || d.length > EVENT_DESCRIPTION_MAX) {
       return { ok: false, code: 'invalid_description' };
+    }
+  }
+  // LIFF側はURLをそのまま出している。空は許すが、中身があるときは
+  // http(s)だけにする。javascript: などが保存されると友だち側で
+  // 想定外の動きになる。LIFF側の表示がわりは別票の範囲。
+  for (const key of ['venue_url', 'image_url', 'og_image_url'] as const) {
+    if (has(key) && body[key] != null && body[key] !== '') {
+      const v = body[key];
+      if (typeof v !== 'string' || !/^https?:\/\//i.test(v)) {
+        return { ok: false, code: `invalid_${key}` };
+      }
     }
   }
   for (const key of ['confirmation_message_extra', 'reminder_message_extra'] as const) {
@@ -148,14 +185,17 @@ function validateEventInput(
       }
     }
   }
-  for (const key of ['description_centered', 'requires_approval', 'reminder_day_before_enabled', 'is_published'] as const) {
+  // waitlist_enabled は画面が `=== 1` で読むので2等を保存させない(点検#520軽14)。
+  for (const key of ['description_centered', 'requires_approval', 'reminder_day_before_enabled', 'is_published', 'waitlist_enabled'] as const) {
     if (has(key) && body[key] != null) {
       const v = body[key];
       if (v !== 0 && v !== 1) return { ok: false, code: `invalid_${key}` };
     }
   }
   if (has('sort_order') && body.sort_order != null) {
-    if (!Number.isInteger(body.sort_order)) return { ok: false, code: 'invalid_sort_order' };
+    if (!Number.isInteger(body.sort_order) || (body.sort_order as number) < 0) {
+      return { ok: false, code: 'invalid_sort_order' };
+    }
   }
   if (has('target_type') && body.target_type != null) {
     if (body.target_type !== 'single' && body.target_type !== 'multi-account-dedup') {
@@ -257,6 +297,44 @@ events.post('/api/events/admin/events', requireRole('owner', 'admin'), async (c)
 events.get('/api/events/admin/events', async (c) => {
   const account_id = getAccountId(c);
   if (!account_id) return bad(c, 'account_id_required', 400);
+  const q = c.req.query('q')?.trim() ?? '';
+  const filter = c.req.query('filter') ?? 'all';
+  const sort = c.req.query('sort') ?? 'soon';
+  if (!['all', 'open', 'pending', 'full'].includes(filter)) return bad(c, 'filter_invalid', 400);
+  if (!['soon', 'name'].includes(sort)) return bad(c, 'sort_invalid', 400);
+  // 1行ごとに副問い合わせが4つ走る。件数が増えても一覧が重くならないよう、
+  // 共通一覧契約(offset方式)で件数を切る。並びは固定のままにする。
+  const paging = parseOffsetPaging(
+    { page: c.req.query('page'), limit: c.req.query('limit') },
+    { defaultLimit: 200, maxLimit: 200 },
+  );
+  const conditions = [`e.deleted_at IS NULL`, `(
+         (e.target_type = 'single' AND e.line_account_id = ?)
+         OR (e.target_type = 'multi-account-dedup'
+             AND EXISTS (SELECT 1 FROM json_each(e.account_ids) WHERE value = ?))
+       )`];
+  const params: unknown[] = [account_id, account_id];
+  if (q) {
+    conditions.push(`e.name LIKE ? ESCAPE '\\'`);
+    params.push(`%${q.replace(/[\\%_]/g, '\\$&')}%`);
+  }
+  if (filter === 'open') conditions.push(`e.is_published = 1`);
+  if (filter === 'pending') conditions.push(`EXISTS (
+    SELECT 1 FROM event_bookings pending WHERE pending.event_id = e.id AND pending.status = 'requested'
+  )`);
+  if (filter === 'full') conditions.push(`
+    EXISTS (SELECT 1 FROM event_slots cap WHERE cap.event_id = e.id AND cap.deleted_at IS NULL AND cap.is_active = 1)
+    AND NOT EXISTS (SELECT 1 FROM event_slots cap WHERE cap.event_id = e.id AND cap.deleted_at IS NULL AND cap.is_active = 1 AND cap.capacity IS NULL)
+    AND (SELECT COALESCE(SUM(cap.capacity), 0) FROM event_slots cap WHERE cap.event_id = e.id AND cap.deleted_at IS NULL AND cap.is_active = 1)
+      <= ((SELECT COALESCE(SUM(b.party_size), 0) FROM event_bookings b WHERE b.event_id = e.id AND b.status IN ('requested','confirmed'))
+        + (SELECT COALESCE(SUM(w.party_size), 0) FROM event_waitlist w WHERE w.event_id = e.id AND w.status IN ('offered','accepted')))
+  `);
+  const where = `FROM events e
+       WHERE ${conditions.join(' AND ')}`;
+  const counted = await c.env.DB
+    .prepare(`SELECT COUNT(*) AS c ${where}`)
+    .bind(...params)
+    .first<{ c: number }>();
   const { results } = await c.env.DB
     .prepare(
       `SELECT
@@ -268,13 +346,25 @@ events.get('/api/events/admin/events', async (c) => {
              AND s.is_active = 1
              AND s.starts_at >= strftime('%Y-%m-%dT%H:%M:%fZ','now')
          ) AS next_slot_starts_at,
-         (SELECT COALESCE(SUM(s.capacity), NULL)
-            FROM event_slots s
-           WHERE s.event_id = e.id AND s.deleted_at IS NULL AND s.is_active = 1
+         -- 定員なしの枠が1つでも混ざっていたら合計は出さない(null)。
+         -- 編集画面は同じ決め方で「—」と出している。一覧だけ数を出すと、
+         -- 残りの判断がずれる。全部が定員なしのときも SUM は null になる。
+         (CASE WHEN EXISTS (
+            SELECT 1 FROM event_slots s
+             WHERE s.event_id = e.id AND s.deleted_at IS NULL AND s.is_active = 1
+               AND s.capacity IS NULL
+          ) THEN NULL ELSE (
+            SELECT COALESCE(SUM(s.capacity), NULL)
+              FROM event_slots s
+             WHERE s.event_id = e.id AND s.deleted_at IS NULL AND s.is_active = 1
+          ) END
          ) AS total_capacity,
-         (SELECT COUNT(*)
-            FROM event_bookings b
-           WHERE b.event_id = e.id AND b.status IN ('requested','confirmed')
+         ((SELECT COALESCE(SUM(b.party_size), 0)
+             FROM event_bookings b
+            WHERE b.event_id = e.id AND b.status IN ('requested','confirmed'))
+          + (SELECT COALESCE(SUM(w.party_size), 0)
+               FROM event_waitlist w
+              WHERE w.event_id = e.id AND w.status IN ('offered','accepted'))
          ) AS total_active,
          (SELECT COUNT(*)
             FROM event_bookings b
@@ -284,17 +374,22 @@ events.get('/api/events/admin/events', async (c) => {
          -- タグが消されていると NULL になるので、ID の有無と名前の有無は
          -- 呼び出し側で別に見ること。
          (SELECT t.name FROM tags t WHERE t.id = e.visible_tag_id) AS visible_tag_name
-       FROM events e
-       WHERE e.deleted_at IS NULL AND (
-         (e.target_type = 'single' AND e.line_account_id = ?)
-         OR (e.target_type = 'multi-account-dedup'
-             AND EXISTS (SELECT 1 FROM json_each(e.account_ids) WHERE value = ?))
-       )
-       ORDER BY e.sort_order ASC, e.created_at DESC`,
+       ${where}
+       ORDER BY ${sort === 'name'
+         ? `e.name COLLATE NOCASE ASC, e.id ASC`
+         : `next_slot_starts_at IS NULL ASC, next_slot_starts_at ASC, e.id ASC`}
+       LIMIT ? OFFSET ?`,
     )
-    .bind(account_id, account_id)
+    .bind(...params, paging.limit, paging.offset)
     .all();
-  return c.json({ items: results ?? [] });
+  return c.json(buildOffsetListResponse({
+    items: results ?? [],
+    total: counted?.c ?? 0,
+    paging,
+    sort: sort === 'name'
+      ? [{ field: 'name', direction: 'asc' }, { field: 'id', direction: 'asc' }]
+      : [{ field: 'next_slot_starts_at', direction: 'asc' }, { field: 'id', direction: 'asc' }],
+  }));
 });
 
 events.get('/api/events/admin/events/:id', async (c) => {
@@ -492,10 +587,13 @@ events.delete('/api/events/admin/events/:id', requireRole('owner', 'admin'), asy
   // requested/confirmed bookings unmanageable but still firing reminders.
   const active = await c.env.DB
     .prepare(
-      `SELECT COUNT(*) AS c FROM event_bookings
-        WHERE event_id = ? AND status IN ('requested','confirmed')`,
+      `SELECT
+         (SELECT COUNT(*) FROM event_bookings
+           WHERE event_id = ? AND status IN ('requested','confirmed'))
+         + (SELECT COUNT(*) FROM event_waitlist
+             WHERE event_id = ? AND status IN ('offered','accepted')) AS c`,
     )
-    .bind(id)
+    .bind(id, id)
     .first<{ c: number }>();
   if ((active?.c ?? 0) > 0) return bad(c, 'event_has_active_bookings', 409);
   const now = new Date().toISOString();
@@ -574,7 +672,8 @@ events.get('/api/events/admin/events/:id/slots', async (c) => {
     .prepare(
       `SELECT
          s.*,
-         (SELECT COUNT(*) FROM event_bookings b WHERE b.slot_id = s.id AND b.status IN ('requested','confirmed')) AS active_count
+         ((SELECT COALESCE(SUM(b.party_size), 0) FROM event_bookings b WHERE b.slot_id = s.id AND b.status IN ('requested','confirmed'))
+          + (SELECT COALESCE(SUM(w.party_size), 0) FROM event_waitlist w WHERE w.slot_id = s.id AND w.status IN ('offered','accepted'))) AS active_count
        FROM event_slots s
        WHERE s.event_id = ? AND s.deleted_at IS NULL
        ORDER BY s.sort_order ASC, s.starts_at ASC`,
@@ -586,21 +685,21 @@ events.get('/api/events/admin/events/:id/slots', async (c) => {
 
 // GET /api/events/admin/events/:id/waitlist — キャンセル待ちの一覧
 //
-// 空きが出たときに誰へ声をかけるかを見るための画面用。並び順は「先に
-// 並んだ人から」。自動では繰り上げない。誰を通すかは運用の判断で、
-// 勝手に確定させると定員や承認の設定と食い違う。
+// 空きが出たときに誰へ案内したかも含めて見るための互換一覧。
+// V6の開催回別画面は /occurrences/:id/applicants を使う。
 events.get('/api/events/admin/events/:id/waitlist', async (c) => {
   const account_id = getAccountId(c);
   if (!account_id) return bad(c, 'account_id_required', 400);
   const { results } = await c.env.DB
     .prepare(
-      `SELECT w.id, w.slot_id, w.friend_id, w.status, w.notified_at, w.created_at,
+      `SELECT w.id, w.slot_id, w.friend_id, w.status, w.party_size,
+              w.offered_at, w.offer_expires_at, w.notified_at, w.created_at,
               s.starts_at AS slot_starts_at,
               f.display_name AS friend_name
          FROM event_waitlist w
          JOIN event_slots s ON s.id = w.slot_id
          LEFT JOIN friends f ON f.id = w.friend_id
-        WHERE w.event_id = ? AND w.status IN ('waiting', 'invited')
+        WHERE w.event_id = ? AND w.status IN ('waiting', 'offered', 'accepted')
         ORDER BY s.starts_at ASC, w.created_at ASC
         LIMIT 500`,
     )
@@ -608,6 +707,54 @@ events.get('/api/events/admin/events/:id/waitlist', async (c) => {
     .all();
   return c.json({ waitlist: results });
 });
+
+// V6では event_slots を「開催回(occurrence)」として扱う。
+events.get(
+  '/api/events/admin/occurrences/:id/applicants',
+  requireRole('owner', 'admin', 'staff'),
+  async (c) => {
+    const accountId = getAccountId(c);
+    if (!accountId) return bad(c, 'account_id_required', 400);
+    const data = await getEventOccurrenceApplicants(c.env.DB, {
+      occurrenceId: c.req.param('id'),
+      lineAccountId: accountId,
+    });
+    if (!data) return bad(c, 'not_found', 404);
+    return c.json({ success: true, data });
+  },
+);
+
+events.post(
+  '/api/events/admin/occurrences/:id/waitlist/promote',
+  requireRole('owner', 'admin', 'staff'),
+  async (c) => {
+    const accountId = getAccountId(c);
+    if (!accountId) return bad(c, 'account_id_required', 400);
+    const body = (await c.req.json().catch(() => ({}))) as { expectedVersion?: unknown };
+    if (!Number.isInteger(body.expectedVersion) || (body.expectedVersion as number) < 1) {
+      return bad(c, 'expected_version_required', 422);
+    }
+    try {
+      const result = await promoteEventWaitlist(c.env.DB, {
+        occurrenceId: c.req.param('id'),
+        lineAccountId: accountId,
+        expectedVersion: body.expectedVersion as number,
+        sender: createEventWaitlistOfferSender(c.env.DB, { liffUrl: c.env.LIFF_URL }),
+      });
+      if (result.kind === 'not_found') return bad(c, 'not_found', 404);
+      if (result.kind === 'conflict') {
+        return c.json(
+          { error: 'version_conflict', currentVersion: result.currentVersion },
+          409,
+        );
+      }
+      return c.json({ success: true, data: result });
+    } catch (error) {
+      console.error('[event-waitlist] manual promotion failed', error);
+      return c.json({ error: 'waitlist_notification_failed' }, 503);
+    }
+  },
+);
 
 events.post('/api/events/admin/events/:id/slots', requireRole('owner', 'admin'), async (c) => {
   const account_id = getAccountId(c);
@@ -686,6 +833,14 @@ events.put('/api/events/admin/events/:id/slots/:slotId', requireRole('owner', 'a
   const v = validateSlotInput(merged, false);
   if (!v.ok) return bad(c, v.code, 422);
 
+  // 申込が入った枠の定員は、使われている席より小さくできない。
+  // 削除側は slot_has_bookings で止めている。ここも同じ約束にする。
+  // ウィザードの右欄の説明どおりにする。null(定員なし)への変更は許す。
+  if (Object.prototype.hasOwnProperty.call(body, 'capacity') && body.capacity != null) {
+    const usedSeats = await getEventOccurrenceUsedSeats(c.env.DB, slot_id);
+    if (body.capacity < usedSeats) return bad(c, 'slot_capacity_below_bookings', 409);
+  }
+
   const updatable = ['starts_at', 'ends_at', 'capacity', 'is_active', 'sort_order'] as const;
   const setClauses: string[] = [];
   const setValues: unknown[] = [];
@@ -698,15 +853,94 @@ events.put('/api/events/admin/events/:id/slots/:slotId', requireRole('owner', 'a
   if (setClauses.length === 0) {
     return c.json(slot);
   }
+  // If the slot time moved, reminders for the slot's confirmed bookings are
+  // now stale (they still point at the old starts_at).
+  // N-065: V6 の未来予定だけを先に新基準日へ移す (枠更新より前)。
+  // 枠を先に更新すると、V6 の途中失敗後の再送で旧起点が分からなくなり、
+  // 移行前の行が旧日のまま残る。V6 を先にすると失敗時は枠が untouched の
+  // まま 500 になるため、同じリクエストの再送がそのまま回復になる。
+  // 送信済みは残し、現在の枠時刻へ直すため再送は冪等。
+  const slotStartsAtChanging = Object.prototype.hasOwnProperty.call(body, 'starts_at');
+  if (slotStartsAtChanging) {
+    const oldStartsAt = slot.starts_at as string;
+    const newStartsAt = body.starts_at as string;
+    const confirmed = await c.env.DB
+      .prepare(
+        `SELECT id, friend_id, line_account_id FROM event_bookings
+          WHERE slot_id = ? AND status = 'confirmed'`,
+      )
+      .bind(slot_id)
+      .all<{ id: string; friend_id: string; line_account_id: string }>();
+    const bookings = confirmed.results ?? [];
+    if (oldStartsAt !== newStartsAt) {
+      // 複数予約を1件ずつ移す。途中で落ちると一部だけ新日時になるため、
+      // (1) 各件の前に旧起点へ戻して同じ形からやり直し (heal-first)、
+      // (2) 失敗時は動かし終えた分を旧起点へ戻して (補償)、
+      // 枠 untouched のまま 500 にする。再送はそのまま回復になる。
+      const moved: typeof bookings = [];
+      try {
+        for (const bookingRow of bookings) {
+          const v6Base = {
+            triggerType: 'event' as const,
+            sourceId: bookingRow.id,
+            sourceEventId: bookingRow.id,
+            friendId: bookingRow.friend_id,
+            lineAccountId: bookingRow.line_account_id,
+          };
+          await reconcileV6ToStartsAt(c.env.DB, { ...v6Base, startsAtIso: oldStartsAt });
+          await rescheduleByTrigger(c.env.DB, {
+            ...v6Base,
+            oldStartsAtIso: oldStartsAt,
+            newStartsAtIso: newStartsAt,
+          });
+          await reconcileV6ToStartsAt(c.env.DB, { ...v6Base, startsAtIso: newStartsAt });
+          moved.push(bookingRow);
+        }
+      } catch (error) {
+        for (const bookingRow of moved) {
+          try {
+            await rescheduleByTrigger(c.env.DB, {
+              triggerType: 'event',
+              sourceId: bookingRow.id,
+              sourceEventId: bookingRow.id,
+              friendId: bookingRow.friend_id,
+              oldStartsAtIso: newStartsAt,
+              newStartsAtIso: oldStartsAt,
+              lineAccountId: bookingRow.line_account_id,
+            });
+            await reconcileV6ToStartsAt(c.env.DB, {
+              triggerType: 'event',
+              sourceId: bookingRow.id,
+              sourceEventId: bookingRow.id,
+              friendId: bookingRow.friend_id,
+              startsAtIso: oldStartsAt,
+            });
+          } catch (compensationError) {
+            console.error('slot reminder compensation failed:', compensationError);
+          }
+        }
+        throw error;
+      }
+    } else {
+      for (const bookingRow of bookings) {
+        await reconcileV6ToStartsAt(c.env.DB, {
+          triggerType: 'event',
+          sourceId: bookingRow.id,
+          sourceEventId: bookingRow.id,
+          friendId: bookingRow.friend_id,
+          startsAtIso: newStartsAt,
+        });
+      }
+    }
+  }
   setClauses.push(`updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')`);
   setValues.push(slot_id);
   await c.env.DB
     .prepare(`UPDATE event_slots SET ${setClauses.join(', ')} WHERE id = ?`)
     .bind(...setValues)
     .run();
-  // If the slot time moved, reminders for the slot's confirmed bookings are
-  // now stale (they still point at the old starts_at).
-  if (Object.prototype.hasOwnProperty.call(body, 'starts_at')) {
+  if (slotStartsAtChanging) {
+    // 旧表の作り直しは更新後の枠時刻を読むため、枠更新の後に行う。
     await rebuildRemindersForSlot(c.env.DB, slot_id);
   }
   const row = await c.env.DB.prepare(`SELECT * FROM event_slots WHERE id = ?`).bind(slot_id).first();
@@ -808,31 +1042,107 @@ events.post('/api/liff/events/me/:bookingId/cancel', async (c) => {
 
   const row = await c.env.DB
     .prepare(
-      `SELECT b.id, b.status, e.cancel_deadline_hours_before, s.starts_at AS slot_starts_at
+      `SELECT b.id, b.status, b.line_account_id, b.event_id, b.slot_id,
+              e.cancel_deadline_hours_before, s.starts_at AS slot_starts_at
          FROM event_bookings b
          JOIN events e ON e.id = b.event_id
          JOIN event_slots s ON s.id = b.slot_id
         WHERE b.id = ? AND b.friend_id = ? AND b.line_account_id = ?`,
     )
     .bind(c.req.param('bookingId'), friend.id, account_id)
-    .first<{ id: string; status: string; cancel_deadline_hours_before: number | null; slot_starts_at: string }>();
+    .first<{
+      id: string;
+      status: string;
+      line_account_id: string;
+      event_id: string;
+      slot_id: string;
+      cancel_deadline_hours_before: number | null;
+      slot_starts_at: string;
+    }>();
   if (!row) return bad(c, 'not_found', 404);
+  const nowIso = new Date().toISOString();
+  const waitlistParams = {
+    lineAccountId: row.line_account_id,
+    eventId: row.event_id,
+    occurrenceId: row.slot_id,
+    sourceKey: `booking:${row.id}:cancelled`,
+  };
+  // 再試行の受付: V6 取消が投げた直後の再送は V6 だけ直す。
+  // 送信権の貸出中は 409 で再試行させる (strict fence。live claim を残して
+  // 成功にしない)。待機者ジョブの再登録も受け付ける (二重登録なし)。
+  if (row.status === 'cancelled') {
+    try {
+      await cancelByTrigger(c.env.DB, {
+        triggerType: 'event',
+        sourceId: row.id,
+        sourceEventId: row.id,
+        friendId: friend.id,
+        startsAtIso: row.slot_starts_at,
+        lineAccountId: row.line_account_id,
+        cancelReason: `event_cancel:${row.id}:by:friend-retry`,
+        failOnSendInFlight: true,
+      });
+    } catch (error) {
+      if (error instanceof Error && error.message === 'REMINDER_SEND_IN_FLIGHT') {
+        return bad(c, 'send_in_flight_retry', 409);
+      }
+      throw error;
+    }
+    // 初回の途中失敗で旧表だけ未取消のまま残ることがある。同じ取消要求の
+    // 再送でそろえる (V6 fence 成功後なので 409 で巻き戻す物は無い)。
+    await cancelPendingRemindersFor(c.env.DB, row.id);
+    await enqueueEventWaitlistPromotion(c.env.DB, waitlistParams);
+    return c.json({ ok: true });
+  }
   if (row.status !== 'requested' && row.status !== 'confirmed') return bad(c, 'invalid_state', 409);
   if (row.cancel_deadline_hours_before == null) return bad(c, 'cancel_not_allowed', 403);
   const deadlineMs =
     new Date(row.slot_starts_at).getTime() - row.cancel_deadline_hours_before * 3600_000;
   if (deadlineMs <= Date.now()) return bad(c, 'cancel_deadline_passed', 409);
 
-  const nowIso = new Date().toISOString();
-  await c.env.DB
+  // 条件付き状態更新: 同時取消の race を防ぐ。0 件なら相手に任せて再試行させる。
+  const priorStatus = row.status;
+  const upd = await c.env.DB
     .prepare(
       `UPDATE event_bookings
           SET status = 'cancelled', cancelled_at = ?, cancelled_by = 'friend', updated_at = ?
-        WHERE id = ?`,
+        WHERE id = ? AND status IN ('requested', 'confirmed')`,
     )
     .bind(nowIso, nowIso, row.id)
     .run();
+  if ((upd.meta?.changes ?? 0) === 0) return bad(c, 'invalid_state', 409);
+  // N-065: V6 の未送信予定だけを止める。送信済み履歴は残す。
+  // 旧表の取消は V6 fence 成功の後に回す (409 では旧表も含めて完全 rollback)。
+  // 送信権の貸出中は状態更新を巻き戻して 409 にする
+  // (取消確定後の送信を起こさない)。
+  try {
+    await cancelByTrigger(c.env.DB, {
+      triggerType: 'event',
+      sourceId: row.id,
+      sourceEventId: row.id,
+      friendId: friend.id,
+      startsAtIso: row.slot_starts_at,
+      lineAccountId: row.line_account_id,
+      cancelReason: `event_cancel:${row.id}:by:friend`,
+      failOnSendInFlight: true,
+    });
+  } catch (error) {
+    if (error instanceof Error && error.message === 'REMINDER_SEND_IN_FLIGHT') {
+      await c.env.DB
+        .prepare(
+          `UPDATE event_bookings
+              SET status = ?, cancelled_at = NULL, cancelled_by = NULL, updated_at = ?
+            WHERE id = ? AND status = 'cancelled'`,
+        )
+        .bind(priorStatus, nowIso, row.id)
+        .run();
+      return bad(c, 'send_in_flight_retry', 409);
+    }
+    throw error;
+  }
+  // 旧表の取消は V6 fence 成功の後 (409 では旧表も含めて完全 rollback)。
   await cancelPendingRemindersFor(c.env.DB, row.id);
+  await enqueueEventWaitlistPromotion(c.env.DB, waitlistParams);
   return c.json({ ok: true });
 });
 
@@ -1055,7 +1365,12 @@ events.post('/api/liff/events/:id/bookings', async (c) => {
     .first<EventDbRow>();
   if (!event) return finalize(409, { error: 'event_unpublished' });
 
-  const body = (await c.req.json().catch(() => ({}))) as { slot_id?: string; customer_note?: string | null };
+  const body = (await c.req.json().catch(() => ({}))) as {
+    slot_id?: string;
+    customer_note?: string | null;
+    party_size?: unknown;
+    answers?: unknown;
+  };
   if (typeof body.slot_id !== 'string' || body.slot_id.length === 0) {
     return finalize(422, { error: 'invalid_slot_id' });
   }
@@ -1064,6 +1379,23 @@ events.post('/api/liff/events/:id/bookings', async (c) => {
       return finalize(422, { error: 'invalid_customer_note' });
     }
   }
+  const requestedPartySize = body.party_size == null ? 1 : body.party_size;
+  if (!Number.isInteger(requestedPartySize) || (requestedPartySize as number) < 1 || (requestedPartySize as number) > EVENT_PARTY_SIZE_MAX) {
+    return finalize(422, { error: 'invalid_party_size' });
+  }
+  const partySize = requestedPartySize as number;
+  const answerSnapshot = serializeAnswerSnapshot(body.answers);
+  if (!answerSnapshot.ok) return finalize(422, { error: 'invalid_answers' });
+  const firstParticipationCheckedAt = new Date().toISOString();
+  const attended = await c.env.DB
+    .prepare(
+      `SELECT COUNT(*) AS c FROM event_bookings
+        WHERE friend_id = ? AND status = 'attended' AND requested_at < ?`,
+    )
+    .bind(friend.id, firstParticipationCheckedAt)
+    .first<{ c: number }>();
+  const priorAttendedCount = attended?.c ?? 0;
+  const firstParticipationIsFirst = priorAttendedCount === 0 ? 1 : 0;
 
   const slot = await c.env.DB
     .prepare(
@@ -1093,6 +1425,100 @@ events.post('/api/liff/events/:id/bookings', async (c) => {
     if (Date.now() >= cutoffAt) return finalize(410, { error: 'entry_closed' });
   }
 
+  const identityKey = computeIdentityKey(friend);
+
+  /*
+   * 満席のときキャンセル待ちへ入れる。**申込前の空き確認と、INSERT 後の
+   * 再検査で負けたときの両方から呼ぶ** (#747 / N-416)。
+   *
+   * 以前はここが申込前の分岐の中だけにあったので、**同時申込で負けた側は
+   * 待ちが有効でも `slot_full` で終わっていた**。空き確認を通った時点では
+   * 席があったのに、後から来た再検査で弾かれるという、利用者からは
+   * 区別のつかない負け方をする。待ちが有効なら、どちらの負け方でも
+   * 同じ行き先にする。
+   *
+   * キャンセル待ちは event_bookings に入れない。定員を数えている箇所が
+   * 多く、そこへ「待ちは数えない」条件を足して回ると必ずどこかで漏れる。
+   * 同じ(枠, 同一人物)の重複は部分UNIQUE索引が弾くので INSERT OR IGNORE。
+   */
+  // 巻き上げられる function 宣言にすると、外側の const に効いている絞り込みが
+  // 消える (このファイルの runBookingFlow と同じ理由)。const の arrow にする。
+  const enterWaitlist = async (): Promise<Response> => {
+    // 別キーの同時申込で、この本人の予約が先に成立した可能性がある。
+    // 確認と待ち登録を同じ文にして、その間に予約が割り込む隙間も閉じる。
+    const entered = await c.env.DB
+      .prepare(
+        `INSERT OR IGNORE INTO event_waitlist
+           (id, line_account_id, event_id, slot_id, friend_id, identity_key, status,
+            party_size, answer_snapshot_json, first_participation,
+            first_participation_attended_count, first_participation_checked_at,
+            created_at, updated_at)
+         SELECT ?, ?, ?, ?, ?, ?, 'waiting', ?, ?, ?, ?, ?, ?, ?
+          WHERE NOT EXISTS (
+            SELECT 1 FROM event_bookings
+             WHERE event_id = ? AND slot_id = ? AND identity_key = ?
+               AND status IN ('requested','confirmed')
+          )
+            AND (? IS NULL OR (
+              SELECT COUNT(*) FROM event_bookings
+               WHERE event_id = ? AND identity_key = ?
+                 AND status IN ('requested','confirmed')
+            ) < ?)`,
+      )
+      .bind(
+        crypto.randomUUID(),
+        account_id,
+        event.id,
+        slot.id,
+        friend.id,
+        identityKey,
+        partySize,
+        answerSnapshot.json,
+        firstParticipationIsFirst,
+        priorAttendedCount,
+        firstParticipationCheckedAt,
+        firstParticipationCheckedAt,
+        firstParticipationCheckedAt,
+        event.id, slot.id, identityKey,
+        event.max_bookings_per_friend, event.id, identityKey, event.max_bookings_per_friend,
+      )
+      .run();
+    if ((entered.meta.changes ?? 0) === 0) {
+      const existing = await c.env.DB
+        .prepare(
+          `SELECT b.id, b.status, b.slot_id, s.starts_at AS slot_starts_at, COUNT(*) OVER () AS total
+             FROM event_bookings b
+             JOIN event_slots s ON s.id = b.slot_id
+            WHERE b.event_id = ? AND b.identity_key = ?
+              AND b.status IN ('requested','confirmed')
+            ORDER BY (b.slot_id = ?) DESC, b.requested_at ASC, b.id ASC
+            LIMIT 1`,
+        )
+        .bind(event.id, identityKey, slot.id)
+        .first<{ id: string; status: string; slot_id: string; slot_starts_at: string; total: number }>();
+      if (existing && (existing.slot_id === slot.id
+        || (event.max_bookings_per_friend != null && existing.total >= event.max_bookings_per_friend))) {
+        if (existing.slot_id === slot.id || event.max_bookings_per_friend === 1) {
+          return finalize(409, {
+            error: 'duplicate_friend_booking',
+            existing: { id: existing.id, status: existing.status, slot_starts_at: existing.slot_starts_at },
+          });
+        }
+        return finalize(409, { error: 'over_friend_limit' });
+      }
+      // 判定後に予約が取り消された場合も、未登録を「待ち」と返さない。
+      const waiting = await c.env.DB
+        .prepare(`SELECT id FROM event_waitlist WHERE event_id = ? AND slot_id = ?
+                   AND identity_key = ? AND status IN ('waiting','offered') LIMIT 1`)
+        .bind(event.id, slot.id, identityKey)
+        .first<{ id: string }>();
+      if (!waiting) return finalize(409, { error: 'slot_full' });
+    }
+    // 200 で返す。409 だと画面側は失敗として扱い、「待ちに入りました」を
+    // 出せない。画面は waitlisted を見て確定と区別する。
+    return finalize(200, { waitlisted: true, slot_id: slot.id });
+  };
+
   // Pre-flight friend-limit check は identity_key ベースに統合済 (後段の
   // sameIdentityActive ブロック参照)。friend_id ベースの単一アカウント
   // 内カウントは cross-account 同一人物を捉えられないので使わない。
@@ -1102,43 +1528,12 @@ events.post('/api/liff/events/:id/bookings', async (c) => {
     .bind(slot.id)
     .first<{ capacity: number | null }>();
   if (slotRow?.capacity != null) {
-    const cnt = await c.env.DB
-      .prepare(
-        `SELECT COUNT(*) AS c FROM event_bookings
-          WHERE slot_id = ? AND status IN ('requested','confirmed')`,
-      )
-      .bind(slot.id)
-      .first<{ c: number }>();
-    if ((cnt?.c ?? 0) >= slotRow.capacity) {
+    const usedSeats = await getEventOccurrenceUsedSeats(c.env.DB, slot.id);
+    if (usedSeats + partySize > slotRow.capacity) {
       if (event.waitlist_enabled !== 1) return finalize(409, { error: 'slot_full' });
-      // キャンセル待ちは event_bookings に入れない。定員を数えている箇所が
-      // 多く、そこへ「待ちは数えない」条件を足して回ると必ずどこかで漏れる。
-      const identityKeyForWait = computeIdentityKey(friend);
-      await c.env.DB
-        .prepare(
-          `INSERT OR IGNORE INTO event_waitlist
-             (id, event_id, slot_id, friend_id, identity_key, status, created_at)
-           VALUES (?, ?, ?, ?, ?, 'waiting', ?)`,
-        )
-        .bind(
-          crypto.randomUUID(),
-          event.id,
-          slot.id,
-          friend.id,
-          identityKeyForWait,
-          new Date().toISOString(),
-        )
-        .run();
-      // 200 で返す。409 だと画面側は失敗として扱い、「待ちに入りました」を
-      // 出せない。
-      return finalize(200, { waitlisted: true, slot_id: slot.id });
+      return enterWaitlist();
     }
   }
-
-  // identity_key 算出: broadcasts dedup と同じ式 (url_token > uid > solo)。
-  // computeIdentityKey は friends.picture_url の url_token を最優先、なければ
-  // user_id (UUID)、ともになければ自分自身のみ ('solo:'+id) にフォールバック。
-  const identityKey = computeIdentityKey(friend);
 
   // 同一人物 (cross-account) の active 予約数を identity_key ベースでカウント。
   // 重複制限ロジック:
@@ -1181,36 +1576,68 @@ events.post('/api/liff/events/:id/bookings', async (c) => {
   // is enforced by the INSERT timestamp (newest row loses).
   const status = event.requires_approval === 1 ? 'requested' : 'confirmed';
   const id = crypto.randomUUID();
-  const nowIso = new Date().toISOString();
-  await c.env.DB
+  const nowIso = firstParticipationCheckedAt;
+  const bookingInserted = await c.env.DB
     .prepare(
       `INSERT INTO event_bookings
-         (id, line_account_id, event_id, slot_id, friend_id, status, customer_note, requested_at, identity_key)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         (id, line_account_id, event_id, slot_id, friend_id, status, customer_note,
+          requested_at, identity_key, party_size, answer_snapshot_json,
+          first_participation, first_participation_attended_count,
+          first_participation_checked_at)
+       SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+        WHERE NOT EXISTS (
+          SELECT 1 FROM event_waitlist
+           WHERE event_id = ? AND slot_id = ? AND identity_key = ?
+             AND status IN ('waiting','offered','accepted')
+        )
+          AND (? IS NULL OR (
+            (SELECT COUNT(*) FROM event_bookings
+              WHERE event_id = ? AND identity_key = ? AND status IN ('requested','confirmed'))
+            + (SELECT COUNT(*) FROM event_waitlist
+                WHERE event_id = ? AND identity_key = ? AND status IN ('offered','accepted'))
+          ) < ?)`,
     )
-    .bind(id, account_id, event.id, slot.id, friend.id, status, body.customer_note ?? null, nowIso, identityKey)
+    .bind(
+      id, account_id, event.id, slot.id, friend.id, status,
+      body.customer_note ?? null, nowIso, identityKey, partySize,
+      answerSnapshot.json, firstParticipationIsFirst, priorAttendedCount,
+      firstParticipationCheckedAt,
+      event.id, slot.id, identityKey,
+      event.max_bookings_per_friend, event.id, identityKey,
+      event.id, identityKey, event.max_bookings_per_friend,
+    )
     .run();
+  if ((bookingInserted.meta?.changes ?? 0) === 0) {
+    // 同じ回の待ちが先に成立した場合は、その順番・人数・回答を維持する。
+    // 別の回のwaitingは予約上限を消費せず、席を保留したoffered/acceptedだけ数える。
+    const waiting = await c.env.DB
+      .prepare(`SELECT id FROM event_waitlist WHERE event_id = ? AND slot_id = ?
+                 AND identity_key = ? AND status IN ('waiting','offered','accepted') LIMIT 1`)
+      .bind(event.id, slot.id, identityKey)
+      .first<{ id: string }>();
+    if (waiting) return finalize(409, { error: 'duplicate_friend_booking' });
+    return finalize(409, { error: event.max_bookings_per_friend === 1 ? 'duplicate_friend_booking' : 'over_friend_limit' });
+  }
 
   // Verify capacity again. If there is a race winner ahead of us — i.e. an
   // earlier (smaller requested_at, then smaller id) row — we are the loser
   // and roll back our row.
   if (slotRow?.capacity != null) {
-    const cnt = await c.env.DB
-      .prepare(
-        `SELECT COUNT(*) AS c FROM event_bookings
-          WHERE slot_id = ? AND status IN ('requested','confirmed')`,
-      )
-      .bind(slot.id)
-      .first<{ c: number }>();
-    if ((cnt?.c ?? 0) > slotRow.capacity) {
+    const usedSeats = await getEventOccurrenceUsedSeats(c.env.DB, slot.id);
+    if (usedSeats > slotRow.capacity) {
       const winner = await c.env.DB
         .prepare(
-          `SELECT id FROM event_bookings
-            WHERE slot_id = ? AND status IN ('requested','confirmed')
-            ORDER BY requested_at ASC, id ASC
-            LIMIT ?`,
+          `SELECT id FROM (
+             SELECT id,
+                    SUM(party_size) OVER (ORDER BY requested_at ASC, id ASC) AS occupied_seats
+               FROM event_bookings
+              WHERE slot_id = ? AND status IN ('requested','confirmed')
+           ) WHERE occupied_seats <= MAX(0, ? - COALESCE((
+             SELECT SUM(party_size) FROM event_waitlist
+              WHERE slot_id = ? AND status IN ('offered','accepted')
+           ), 0))`,
         )
-        .bind(slot.id, slotRow.capacity)
+        .bind(slot.id, slotRow.capacity, slot.id)
         .all<{ id: string }>();
       const winners = new Set((winner.results ?? []).map((r) => r.id));
       if (!winners.has(id)) {
@@ -1218,6 +1645,9 @@ events.post('/api/liff/events/:id/bookings', async (c) => {
           .prepare(`DELETE FROM event_bookings WHERE id = ?`)
           .bind(id)
           .run();
+        // 席を戻してから待ちへ入れる。順序が逆だと、自分の予約行が残った
+        // まま待ちの行が増え、一瞬だけ定員を二重に押さえる。
+        if (event.waitlist_enabled === 1) return enterWaitlist();
         return finalize(409, { error: 'slot_full' });
       }
     }
@@ -1297,6 +1727,9 @@ events.post('/api/liff/events/:id/bookings', async (c) => {
       triggerType: 'event',
       friendId: friend.id,
       startsAtIso: slot.starts_at as string,
+      sourceId: id,
+      sourceEventId: id,
+      lineAccountId: account_id,
     }).catch((err) => console.error('reminder enroll (event) failed:', err));
     optionalExecutionCtx(c)?.waitUntil(
       dispatchAutomationEventWithLogging(c.env.DB, {
@@ -1365,11 +1798,8 @@ events.delete('/api/events/admin/events/:id/slots/:slotId', requireRole('owner',
     .bind(slot_id, event_id)
     .first<{ id: string }>();
   if (!slot) return bad(c, 'not_found', 404);
-  const active = await c.env.DB
-    .prepare(`SELECT COUNT(*) AS c FROM event_bookings WHERE slot_id = ? AND status IN ('requested','confirmed')`)
-    .bind(slot_id)
-    .first<{ c: number }>();
-  if ((active?.c ?? 0) > 0) return bad(c, 'slot_has_bookings', 409);
+  const usedSeats = await getEventOccurrenceUsedSeats(c.env.DB, slot_id);
+  if (usedSeats > 0) return bad(c, 'slot_has_bookings', 409);
   const now = new Date().toISOString();
   await c.env.DB
     .prepare(`UPDATE event_slots SET deleted_at = ?, updated_at = ? WHERE id = ?`)
@@ -1413,20 +1843,88 @@ events.get('/api/events/admin/events/:id/bookings', async (c) => {
     conditions.push('b.slot_id = ?');
     params.push(slot_id);
   }
+  // 申込が増えても一覧が重くならないよう、共通一覧契約(offset方式)で切る。
+  // 並びは固定し、同刻は id で一意にする。
+  const paging = parseOffsetPaging(
+    { page: c.req.query('page'), limit: c.req.query('limit') },
+    { defaultLimit: 200, maxLimit: 200 },
+  );
+  const fromWhere = `FROM event_bookings b
+         JOIN event_slots s ON s.id = b.slot_id
+         LEFT JOIN friends f ON f.id = b.friend_id
+        WHERE ${conditions.join(' AND ')}`;
+  const counted = await c.env.DB
+    .prepare(`SELECT COUNT(*) AS c ${fromWhere}`)
+    .bind(...params)
+    .first<{ c: number }>();
   const { results } = await c.env.DB
     .prepare(
       `SELECT b.*,
               s.starts_at AS slot_starts_at, s.ends_at AS slot_ends_at,
               f.display_name AS friend_display_name, f.line_user_id AS friend_line_user_id
-         FROM event_bookings b
-         JOIN event_slots s ON s.id = b.slot_id
-         LEFT JOIN friends f ON f.id = b.friend_id
-        WHERE ${conditions.join(' AND ')}
-        ORDER BY b.requested_at DESC`,
+         ${fromWhere}
+        ORDER BY b.requested_at DESC, b.id DESC
+        LIMIT ? OFFSET ?`,
     )
-    .bind(...params)
+    .bind(...params, paging.limit, paging.offset)
     .all();
-  return c.json({ items: results ?? [] });
+  return c.json(buildOffsetListResponse({
+    items: results ?? [],
+    total: counted?.c ?? 0,
+    paging,
+    sort: [
+      { field: 'requested_at', direction: 'desc' },
+      { field: 'id', direction: 'desc' },
+    ],
+  }));
+});
+
+events.get('/api/events/admin/events/:id/bookings/summary', async (c) => {
+  const account_id = getAccountId(c);
+  if (!account_id) return bad(c, 'account_id_required', 400);
+  const event_id = c.req.param('id');
+  if (!(await ownsEvent(c.env.DB, event_id, account_id))) return bad(c, 'not_found', 404);
+
+  const bookingCounts = await c.env.DB
+    .prepare(`SELECT
+      COUNT(*) AS total,
+      SUM(CASE WHEN status = 'requested' THEN 1 ELSE 0 END) AS requested_count,
+      SUM(CASE WHEN status = 'confirmed' THEN 1 ELSE 0 END) AS confirmed_count,
+      SUM(CASE WHEN status = 'rejected' THEN 1 ELSE 0 END) AS rejected_count,
+      SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) AS cancelled_count,
+      SUM(CASE WHEN status = 'expired' THEN 1 ELSE 0 END) AS expired_count,
+      SUM(CASE WHEN status = 'attended' THEN 1 ELSE 0 END) AS attended_count,
+      SUM(CASE WHEN status = 'no_show' THEN 1 ELSE 0 END) AS no_show_count
+      FROM event_bookings WHERE event_id = ?`)
+    .bind(event_id)
+    .first<Record<string, number | null>>();
+  const waitlist = await c.env.DB
+    .prepare(`SELECT COUNT(*) AS c FROM event_waitlist WHERE event_id = ? AND status IN ('waiting','offered','accepted')`)
+    .bind(event_id)
+    .first<{ c: number }>();
+  const capacity = await c.env.DB
+    .prepare(`SELECT
+      COUNT(*) AS slot_count,
+      SUM(CASE WHEN capacity IS NULL THEN 1 ELSE 0 END) AS uncapped_count,
+      SUM(capacity) AS total_capacity
+      FROM event_slots WHERE event_id = ? AND deleted_at IS NULL AND is_active = 1`)
+    .bind(event_id)
+    .first<{ slot_count: number; uncapped_count: number; total_capacity: number | null }>();
+
+  return c.json({
+    total: bookingCounts?.total ?? 0,
+    requested: bookingCounts?.requested_count ?? 0,
+    confirmed: bookingCounts?.confirmed_count ?? 0,
+    rejected: bookingCounts?.rejected_count ?? 0,
+    cancelled: bookingCounts?.cancelled_count ?? 0,
+    expired: bookingCounts?.expired_count ?? 0,
+    attended: bookingCounts?.attended_count ?? 0,
+    noShow: bookingCounts?.no_show_count ?? 0,
+    waitlist: waitlist?.c ?? 0,
+    totalCapacity: !capacity?.slot_count || capacity.uncapped_count > 0
+      ? null
+      : capacity.total_capacity,
+  });
 });
 
 interface BookingActionRow {
@@ -1518,6 +2016,31 @@ async function notifyBookingFriend(
   }
 }
 
+/**
+ * 落選ずみの予約の V6 未送信予定だけを止める (再送の修復受付と初回で共用)。
+ * 状態更新の後に呼ぶ。送信権の貸出中は投げる (呼び出し側は 409 で再試行)。
+ */
+async function repairRejectedBookingV6(
+  db: D1Database,
+  booking: BookingActionRow,
+  cancelReason: string,
+): Promise<void> {
+  const slot = await db
+    .prepare(`SELECT starts_at FROM event_slots WHERE id = ?`)
+    .bind(booking.slot_id)
+    .first<{ starts_at: string }>();
+  await cancelByTrigger(db, {
+    triggerType: 'event',
+    sourceId: booking.id,
+    sourceEventId: booking.id,
+    friendId: booking.friend_id,
+    startsAtIso: slot?.starts_at ?? null,
+    lineAccountId: booking.line_account_id,
+    cancelReason,
+    failOnSendInFlight: true,
+  });
+}
+
 events.post('/api/events/admin/events/:id/bookings/:bookingId/decide', requireRole('owner', 'admin', 'staff'), async (c) => {
   const account_id = getAccountId(c);
   if (!account_id) return bad(c, 'account_id_required', 400);
@@ -1525,15 +2048,57 @@ events.post('/api/events/admin/events/:id/bookings/:bookingId/decide', requireRo
   if (!(await ownsEvent(c.env.DB, event_id, account_id))) return bad(c, 'not_found', 404);
   const booking = await loadBookingForAction(c.env.DB, account_id, event_id, c.req.param('bookingId'));
   if (!booking) return bad(c, 'not_found', 404);
-  if (booking.decided_at != null) return bad(c, 'already_decided', 409);
 
   const body = (await c.req.json().catch(() => ({}))) as { action?: string; reason?: string };
   if (body.action !== 'confirm' && body.action !== 'reject') {
     return bad(c, 'invalid_action', 422);
   }
   const action: EventBookingAction = body.action;
+  if (booking.decided_at != null) {
+    // 落選ずみへの却下の再送は V6 修復を受け付ける (状態更新後の V6 失敗を
+    // 回復するため。修復不能な 409 にしない)。承認の再送・競合敗北は 409。
+    if (action === 'reject' && booking.status === 'rejected') {
+      try {
+        await repairRejectedBookingV6(c.env.DB, booking, `event_reject:${booking.id}:by:${c.get('staff')?.id ?? 'admin'}-retry`);
+      } catch (error) {
+        if (error instanceof Error && error.message === 'REMINDER_SEND_IN_FLIGHT') {
+          return bad(c, 'send_in_flight_retry', 409);
+        }
+        throw error;
+      }
+      // 初回の待機者ジョブ登録が失敗したままのとき、同じ却下要求の再送で
+      // 再登録する (V6修復だけの早期returnでは待機者が進まない)。
+      // source_key が同じため二重登録にならない。
+      await enqueueEventWaitlistPromotion(c.env.DB, {
+        lineAccountId: booking.line_account_id,
+        eventId: booking.event_id,
+        occurrenceId: booking.slot_id,
+        sourceKey: `booking:${booking.id}:rejected`,
+      });
+      const updated = await c.env.DB
+        .prepare(`SELECT * FROM event_bookings WHERE id = ?`)
+        .bind(booking.id)
+        .first();
+      return c.json(updated);
+    }
+    return bad(c, 'already_decided', 409);
+  }
   if (!canTransition(booking.status as never, action)) return bad(c, 'invalid_state', 409);
   const next = nextStatus(booking.status as never, action);
+
+  // 承認する前に枠の残席を確かめる。使われている席の数には、この承認待ち
+  // 自身が入っている。LIFFの即時予約側は同じ数え方で締めている。管理者が
+  // 待ちを全部承認しても定員を超えた確定を作らない。条件付き更新は残す。
+  if (action === 'confirm') {
+    const slotRow = await c.env.DB
+      .prepare(`SELECT capacity FROM event_slots WHERE id = ?`)
+      .bind(booking.slot_id)
+      .first<{ capacity: number | null }>();
+    if (slotRow?.capacity != null) {
+      const usedSeats = await getEventOccurrenceUsedSeats(c.env.DB, booking.slot_id);
+      if (usedSeats > slotRow.capacity) return bad(c, 'slot_full', 409);
+    }
+  }
 
   const nowIso = new Date().toISOString();
   const staff = c.get('staff');
@@ -1548,7 +2113,38 @@ events.post('/api/events/admin/events/:id/bookings/:bookingId/decide', requireRo
     )
     .bind(next, nowIso, staff?.id ?? null, nowIso, booking.id, booking.status)
     .run();
-  if ((upd.meta?.changes ?? 0) === 0) return bad(c, 'already_decided', 409);
+  if ((upd.meta?.changes ?? 0) === 0) {
+    // 同時確定との競合敗北は成功にしない。落選ずみへの承認は 409。
+    // 落選ずみへの却下の再送だけ V6 修復を受け付けて 200 にする。
+    const current = await c.env.DB
+      .prepare(`SELECT status FROM event_bookings WHERE id = ?`)
+      .bind(booking.id)
+      .first<{ status: string }>();
+    if (action === 'reject' && current?.status === 'rejected') {
+      try {
+        await repairRejectedBookingV6(c.env.DB, booking, `event_reject:${booking.id}:by:${staff?.id ?? 'admin'}-retry`);
+      } catch (error) {
+        if (error instanceof Error && error.message === 'REMINDER_SEND_IN_FLIGHT') {
+          return bad(c, 'send_in_flight_retry', 409);
+        }
+        throw error;
+      }
+      // 同時確定の競合敗北後の再送でも、待機者ジョブの再登録を受け付ける
+      // (決定ゲートの再送枝と同趣旨。二重登録は source_key で吸収する)。
+      await enqueueEventWaitlistPromotion(c.env.DB, {
+        lineAccountId: booking.line_account_id,
+        eventId: booking.event_id,
+        occurrenceId: booking.slot_id,
+        sourceKey: `booking:${booking.id}:rejected`,
+      });
+      const updated = await c.env.DB
+        .prepare(`SELECT * FROM event_bookings WHERE id = ?`)
+        .bind(booking.id)
+        .first();
+      return c.json(updated);
+    }
+    return bad(c, 'already_decided', 409);
+  }
 
   if (action === 'reject' && body.reason) {
     await c.env.DB
@@ -1580,6 +2176,16 @@ events.post('/api/events/admin/events/:id/bookings/:bookingId/decide', requireRo
         reminder_hours_before: evRow.reminder_hours_before,
       });
       await insertRemindersForBooking(c.env.DB, booking.id, reminders);
+      // N-065: 承認で確定した予約も V6 へ登録する (source 連動つき)。
+      // 登録失敗で承認自体を壊さない。二重登録は enroll 側で吸収する。
+      await enrollByTrigger(c.env.DB, {
+        triggerType: 'event',
+        friendId: booking.friend_id,
+        startsAtIso: slot.starts_at,
+        sourceId: booking.id,
+        sourceEventId: booking.id,
+        lineAccountId: booking.line_account_id,
+      }).catch((err) => console.error('reminder enroll (event decide) failed:', err));
     }
     optionalExecutionCtx(c)?.waitUntil(
       dispatchAutomationEventWithLogging(c.env.DB, {
@@ -1594,6 +2200,35 @@ events.post('/api/events/admin/events/:id/bookings/:bookingId/decide', requireRo
       })
         .catch((error) => console.error('event booking automation event failed:', error)),
     );
+  }
+  if (action === 'reject') {
+    // N-065: 落選した予約の V6 未送信予定だけを止める。
+    // 送信権の貸出中は状態更新を巻き戻して 409 にする。貸出中の送信は
+    // 確定ずみの予約への送信になるため正当で、再試行は巻き戻し後の状態から
+    // 再開する (再送の修復受付も残す)。
+    try {
+      await repairRejectedBookingV6(c.env.DB, booking, `event_reject:${booking.id}:by:${c.get('staff')?.id ?? 'admin'}`);
+    } catch (error) {
+      if (error instanceof Error && error.message === 'REMINDER_SEND_IN_FLIGHT') {
+        await c.env.DB
+          .prepare(
+            `UPDATE event_bookings
+                SET status = 'requested', decided_at = NULL,
+                    decided_by_staff_id = NULL, updated_at = ?
+              WHERE id = ? AND status = 'rejected'`,
+          )
+          .bind(nowIso, booking.id)
+          .run();
+        return bad(c, 'send_in_flight_retry', 409);
+      }
+      throw error;
+    }
+    await enqueueEventWaitlistPromotion(c.env.DB, {
+      lineAccountId: booking.line_account_id,
+      eventId: booking.event_id,
+      occurrenceId: booking.slot_id,
+      sourceKey: `booking:${booking.id}:rejected`,
+    });
   }
 
   await notifyBookingFriend(c.env.DB, booking.id, action === 'confirm' ? 'confirmed' : 'rejected');
@@ -1611,6 +2246,43 @@ events.post('/api/events/admin/events/:id/bookings/:bookingId/cancel', requireRo
   if (!(await ownsEvent(c.env.DB, event_id, account_id))) return bad(c, 'not_found', 404);
   const booking = await loadBookingForAction(c.env.DB, account_id, event_id, c.req.param('bookingId'));
   if (!booking) return bad(c, 'not_found', 404);
+  // 再試行の受付: V6 取消が投げた直後の再送は V6 だけ直す (409 にしない)。
+  // 送信権の貸出中は 409 で再試行させる。
+  if (booking.status === 'cancelled') {
+    const slot = await c.env.DB
+      .prepare(`SELECT starts_at FROM event_slots WHERE id = ?`)
+      .bind(booking.slot_id)
+      .first<{ starts_at: string }>();
+    try {
+      await cancelByTrigger(c.env.DB, {
+        triggerType: 'event',
+        sourceId: booking.id,
+        sourceEventId: booking.id,
+        friendId: booking.friend_id,
+        startsAtIso: slot?.starts_at ?? null,
+        lineAccountId: booking.line_account_id,
+        cancelReason: `event_cancel:${booking.id}:by:${c.get('staff')?.id ?? 'admin'}-retry`,
+        failOnSendInFlight: true,
+      });
+    } catch (error) {
+      if (error instanceof Error && error.message === 'REMINDER_SEND_IN_FLIGHT') {
+        return bad(c, 'send_in_flight_retry', 409);
+      }
+      throw error;
+    }
+    // 初回の途中失敗で旧表だけ未取消のまま残ることがある。同じ取消要求の
+    // 再送でそろえる (V6 fence 成功後なので 409 で巻き戻す物は無い)。
+    await cancelPendingRemindersFor(c.env.DB, booking.id);
+    // 初回の取消確定後に待機者ジョブ登録だけ失敗しても、
+    // 同じ取消要求の再送で復旧する。source_key が重複登録を吸収する。
+    await enqueueEventWaitlistPromotion(c.env.DB, {
+      lineAccountId: booking.line_account_id,
+      eventId: booking.event_id,
+      occurrenceId: booking.slot_id,
+      sourceKey: `booking:${booking.id}:cancelled`,
+    });
+    return c.json({ ok: true });
+  }
   if (!canTransition(booking.status as never, 'cancel')) return bad(c, 'invalid_state', 409);
 
   const nowIso = new Date().toISOString();
@@ -1625,7 +2297,46 @@ events.post('/api/events/admin/events/:id/bookings/:bookingId/cancel', requireRo
     .bind(nowIso, nowIso, booking.id, booking.status)
     .run();
   if ((upd.meta?.changes ?? 0) === 0) return bad(c, 'invalid_state', 409);
+  const slot = await c.env.DB
+    .prepare(`SELECT starts_at FROM event_slots WHERE id = ?`)
+    .bind(booking.slot_id)
+    .first<{ starts_at: string }>();
+  // N-065: V6 の未送信予定だけを止める。送信済み履歴は残す。
+  // 旧表の取消は V6 fence 成功の後に回す (409 の完全 rollback のため)。
+  // 送信権の貸出中は状態更新を巻き戻して 409 にする (取消確定後の送信を起こさない)。
+  try {
+    await cancelByTrigger(c.env.DB, {
+      triggerType: 'event',
+      sourceId: booking.id,
+      sourceEventId: booking.id,
+      friendId: booking.friend_id,
+      startsAtIso: slot?.starts_at ?? null,
+      lineAccountId: booking.line_account_id,
+      cancelReason: `event_cancel:${booking.id}:by:${c.get('staff')?.id ?? 'admin'}`,
+      failOnSendInFlight: true,
+    });
+  } catch (error) {
+    if (error instanceof Error && error.message === 'REMINDER_SEND_IN_FLIGHT') {
+      await c.env.DB
+        .prepare(
+          `UPDATE event_bookings
+              SET status = ?, cancelled_at = NULL, cancelled_by = NULL, updated_at = ?
+            WHERE id = ? AND status = 'cancelled'`,
+        )
+        .bind(booking.status, nowIso, booking.id)
+        .run();
+      return bad(c, 'send_in_flight_retry', 409);
+    }
+    throw error;
+  }
+  // 旧表の取消は V6 fence 成功の後 (409 では触らない)。
   await cancelPendingRemindersFor(c.env.DB, booking.id);
+  await enqueueEventWaitlistPromotion(c.env.DB, {
+    lineAccountId: booking.line_account_id,
+    eventId: booking.event_id,
+    occurrenceId: booking.slot_id,
+    sourceKey: `booking:${booking.id}:cancelled`,
+  });
   await notifyBookingFriend(c.env.DB, booking.id, 'cancelled_by_admin');
   return c.json({ ok: true });
 });
@@ -1643,6 +2354,10 @@ events.put('/api/events/admin/events/:id/bookings/:bookingId', requireRole('owne
   const setValues: unknown[] = [];
 
   if ('internal_note' in body) {
+    // 顧客メモと同等の上限(点検#520軽14)。無制限だと一覧が重くなる。
+    if (typeof body.internal_note === 'string' && body.internal_note.length > 5000) {
+      return bad(c, 'invalid_internal_note', 422);
+    }
     setClauses.push('internal_note = ?');
     setValues.push(body.internal_note ?? null);
   }

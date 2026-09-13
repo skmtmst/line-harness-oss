@@ -17,7 +17,12 @@ describe('resolveStepContent question template', () => {
       choices: [{ label: 'はい', behavior: 'none' }],
     })
     const result = await resolveStepContent(
-      mockDb({ message_type: 'text', message_content: '続けますか？', question_json: latest }),
+      mockDb({
+        message_type: 'text', message_content: '続けますか？', question_json: latest,
+        // 独立審査(指摘3): 公開済みかつ送り先と同じ持ち主だけ送る。
+        // 持ち主不明は送らない(fail-close)。
+        published_version: 1, line_account_id: 'account-1',
+      }),
       {
         template_id: 'question-template-1',
         message_type: 'text',
@@ -28,6 +33,7 @@ describe('resolveStepContent question template', () => {
           choices: [{ label: 'はい', behavior: 'none' }],
         }),
       },
+      'account-1',
     )
 
     expect(result.questionJson).toBe(latest)

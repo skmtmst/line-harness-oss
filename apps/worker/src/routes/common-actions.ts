@@ -9,6 +9,7 @@ import {
   createCommonActionDraft,
   duplicateCommonAction,
   getCommonActionDetail,
+  getCommonActionsSummary,
   listCommonActionResources,
   listCommonActions,
   publishCommonActionDraft,
@@ -19,7 +20,7 @@ import {
 const commonActions = new Hono<Env>();
 
 function accountId(c: Context<Env>): string | null {
-  return c.req.query('account_id') || null;
+  return c.req.query('account_id') || c.req.query('lineAccountId') || null;
 }
 
 async function requireAccount(c: Context<Env>): Promise<string | Response> {
@@ -46,6 +47,36 @@ function validationResponse(c: Context<Env>, error: CommonActionValidationError)
   }, status);
 }
 
+function nonNegativeInteger(value: string | undefined, field: string): number | undefined {
+  if (value === undefined) return undefined;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 0) {
+    throw new CommonActionValidationError('pagination_invalid', 'ページ指定を確認してください', field);
+  }
+  return parsed;
+}
+
+function csvCell(value: string | number | null): string {
+  let text = value === null ? '' : String(value);
+  if (/^[=+\-@]/.test(text)) text = `'${text}`;
+  return `"${text.replaceAll('"', '""')}"`;
+}
+
+function commonActionsCsv(items: Awaited<ReturnType<typeof listCommonActions>>['items']): string {
+  const header = ['名前', '状態', '公開版', '中の処理', '呼び出し場所', '今月の実行', '今月の失敗', '最終実行'];
+  const rows = items.map((item) => [
+    item.name,
+    item.status,
+    item.publishedVersion,
+    item.actionCount,
+    item.bindingCount,
+    item.executionCountThisMonth,
+    item.failureCountThisMonth,
+    item.lastRunAt,
+  ]);
+  return `\uFEFF${[header, ...rows].map((row) => row.map(csvCell).join(',')).join('\r\n')}\r\n`;
+}
+
 async function endpoint<T>(
   c: Context<Env>,
   run: () => Promise<T>,
@@ -68,11 +99,52 @@ async function endpoint<T>(
 commonActions.get('/api/common-actions', requireRole('owner', 'admin', 'staff'), async (c) => {
   const id = await requireAccount(c);
   if (typeof id !== 'string') return id;
-  return endpoint(c, () => listCommonActions(c.env.DB, {
-    lineAccountId: id,
-    status: c.req.query('status'),
-    query: c.req.query('query'),
-  }));
+  try {
+    const format = c.req.query('format');
+    if (format && format !== 'csv') {
+      throw new CommonActionValidationError('format_invalid', '書き出し形式を確認してください', 'format');
+    }
+    if (format === 'csv') {
+      const staff = c.get('staff');
+      if (staff?.role === 'staff' && !staff.permissionKeys?.includes('automation.run.export')) {
+        return c.json({ success: false, error: 'CSVを書き出す権限がありません' }, 403);
+      }
+    }
+    const requestedLimit = nonNegativeInteger(c.req.query('limit'), 'limit');
+    const limit = requestedLimit === undefined ? undefined : Math.max(1, Math.min(requestedLimit, 500));
+    const offset = nonNegativeInteger(c.req.query('offset'), 'offset') ?? 0;
+    const [result, summary] = await Promise.all([
+      listCommonActions(c.env.DB, {
+        lineAccountId: id,
+        status: c.req.query('status'),
+        query: c.req.query('query'),
+        ...(format === 'csv' ? {} : { limit, offset }),
+      }),
+      // 札・KPI用の集計。絞り込みに依らずアカウント全体で数える。
+      // 画面が全件取得を2回投げないための口（#554 点検#519中2）。
+      format === 'csv' ? null : getCommonActionsSummary(c.env.DB, id),
+    ]);
+    if (format === 'csv') {
+      return c.body(commonActionsCsv(result.items), 200, {
+        'Content-Type': 'text/csv; charset=utf-8',
+        'Content-Disposition': 'attachment; filename="common-actions.csv"',
+      });
+    }
+    return c.json({
+      success: true,
+      data: result.items,
+      pagination: { total: result.total, limit: limit ?? null, offset },
+      summary,
+      freshness: 'available',
+    });
+  } catch (error) {
+    if (error instanceof CommonActionValidationError) return validationResponse(c, error);
+    console.error(JSON.stringify({
+      event: 'common_action_api_failed', path: c.req.path,
+      reason: error instanceof Error ? error.message : String(error),
+    }));
+    return c.json({ success: false, error: '共通アクションを処理できませんでした' }, 500);
+  }
 });
 
 commonActions.post('/api/common-actions', requireRole('owner', 'admin'), async (c) => {
@@ -99,9 +171,18 @@ commonActions.post('/api/common-actions', requireRole('owner', 'admin'), async (
 commonActions.get('/api/common-actions/resources', requireRole('owner', 'admin'), async (c) => {
   const id = await requireAccount(c);
   if (typeof id !== 'string') return id;
+  const trigger = c.req.query('trigger');
+  if (trigger && trigger !== 'tag.added') {
+    return c.json({
+      success: false,
+      code: 'trigger_invalid',
+      error: '対応していないきっかけです',
+    }, 422);
+  }
   return endpoint(c, () => listCommonActionResources(c.env.DB, {
     lineAccountId: id,
     excludeCommonActionId: c.req.query('exclude_id'),
+    trigger: trigger === 'tag.added' ? trigger : undefined,
   }));
 });
 
@@ -184,14 +265,16 @@ commonActions.post(
   async (c) => {
     const id = await requireAccount(c);
     if (typeof id !== 'string') return id;
-    const body = await c.req.json<{ versionId?: unknown }>()
-      .catch(() => ({} as { versionId?: unknown }));
+    const body = await c.req.json<{ versionId?: unknown; expectedVersionId?: unknown }>()
+      .catch(() => ({} as { versionId?: unknown; expectedVersionId?: unknown }));
     return endpoint(c, async () => {
       await updateCommonActionBindingVersion(c.env.DB, {
         id: c.req.param('id'),
         bindingId: c.req.param('bindingId'),
         lineAccountId: id,
         versionId: body.versionId,
+        expectedVersionId: body.expectedVersionId,
+        actorId: c.get('staff')?.id,
       });
       return { updated: true };
     });

@@ -42,8 +42,9 @@ describe('テンプレート一覧のV6画面構造', () => {
   it('W7LBcどおりKPIを挟まず、252pxのフォルダ列と一覧列を横に並べる', () => {
     expect(page).not.toContain("import ListKpis from '@/components/shared/list-kpis'")
     expect(page).not.toContain('<ListKpis')
-    expect(styles).toContain('width: 252px')
-    expect(styles).toContain('flex: 0 0 252px')
+    expect(page).toContain('style={FOLDER_RAIL_STYLE}')
+    expect(styles).toContain('width: var(--folder-rail-width)')
+    expect(styles).toContain('flex: 0 0 var(--folder-rail-width)')
     // 2026-09-04: 自前で描いていた帯を共通 `FolderPanel` へ寄せた。
     // 読み上げ名は部品が持つ（`aria-label="フォルダ"`）。
     expect(page).toContain('<FolderPanel')
@@ -53,7 +54,7 @@ describe('テンプレート一覧のV6画面構造', () => {
 
   it('参照中は強制削除せず、使用先を確認させる', () => {
     expect(page).toContain('使用先を見る')
-    expect(page).toContain('使用先を差し替えてから削除してください。')
+    expect(page).toContain('使用中は削除できません。差し替え後にもう一度この画面から操作してください。')
     expect(page).not.toContain('削除すると参照がクリアされます')
     for (const usage of ['scenarioSteps', 'reminderSteps', 'richMenuAreas', 'trackedLinks']) {
       expect(page).toContain(usage)

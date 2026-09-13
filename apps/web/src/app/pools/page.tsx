@@ -3,7 +3,6 @@
 import SelectField from '@/components/shared/select-field'
 import { useEffect, useState } from 'react'
 import { api } from '@/lib/api'
-import Header from '@/components/layout/header'
 import type { TrafficPool, PoolAccount, LineAccount } from '@line-crm/shared'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -37,10 +36,6 @@ export default function PoolsPage() {
 
   return (
     <div>
-      <Header
-        description="LINE 公式アカウントの分散先を管理します。アカウントが 1 つでも『メインプール』として表示されます。"
-      />
-
       <div className="flex justify-between items-center mb-4">
         <span className="text-sm text-gray-500">{pools.length} プール</span>
         <button

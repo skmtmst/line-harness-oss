@@ -1,6 +1,4 @@
-import { readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { FEATURE_IDS } from '@line-crm/shared'
 import { describe, expect, it } from 'vitest'
 import { MENU_SECTIONS, orderedMenuSections } from './menu'
 import {
@@ -55,6 +53,13 @@ describe('機能設定とサイドメニューが同じ一覧を見る', () => {
       '店舗ダッシュボード', '組織・権限', '承認ワークフロー', '予約台帳', '座席・卓管理',
       '予約枠・在庫', 'メニュー管理', 'Google・口コミ', 'LINE来店フォロー',
     ])
+  })
+
+  it('飲食店向けテストは機能設定でだけ表示を選べる', () => {
+    expect(visibleFeatureGroups({ specializedFeatureKeys: [] })
+      .some((group) => group.id === 'restaurant-test')).toBe(false)
+    expect(visibleFeatureGroups({ specializedFeatureKeys: [], includeRestaurantTest: true })
+      .some((group) => group.id === 'restaurant-test')).toBe(true)
   })
 
   it('サイドメニューにある切り替え可能な項目には、必ずキーがある', () => {
@@ -144,24 +149,8 @@ describe('並び替え', () => {
 })
 
 describe('保存の受け口', () => {
-  /**
-   * 画面が使うキーを、サーバーが1つ残らず受け付けること。
-   *
-   * サーバーは知らないキーを 400 で弾く。片方にだけキーを足すと、
-   * スイッチは動くのに保存だけ落ちる（画面には「保存できませんでした」としか
-   * 出ない）。実際に、友だち追加時の配信・コンテンツ・分析・自動化・予約は
-   * 受け口が無いままメニューに並んでいた。
-   */
-  it('worker の TOGGLEABLE_FEATURES が、画面の使うキーを全部含む', () => {
-    const workerSource = readFileSync(
-      join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'worker', 'src', 'routes', 'feature-settings.ts'),
-      'utf8',
-    )
-    const start = workerSource.indexOf('export const TOGGLEABLE_FEATURES = [')
-    const end = workerSource.indexOf('] as const;', start)
-    const accepted = new Set(
-      [...workerSource.slice(start, end).matchAll(/'([a-z_]+)'/g)].map((m) => m[1]),
-    )
+  it('画面のキーはすべて共有カタログに存在する', () => {
+    const accepted = new Set<string>(FEATURE_IDS)
     const used = MENU_SECTIONS.flatMap((section) =>
       section.items.map((item) => item.featureKey).filter((key): key is NonNullable<typeof key> => Boolean(key)),
     )

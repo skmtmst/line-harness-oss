@@ -54,10 +54,13 @@ export function dashboardNotificationItems(
 
 export function dashboardNotificationDestination(
   item: NotificationCenterItem,
-): string | null {
+): string {
   if (item.eventType.startsWith('account_health_')) return '/emergency'
-  if (item.eventType === 'release' || item.eventType.startsWith('deployment_')) return '/updates'
-  return null
+  /*
+    知らない種類はお知らせ一覧へ。行き先なし(null)にすると、
+    押したのに何も起きない(既読だけ付く)死に tap になる。
+  */
+  return '/updates'
 }
 
 export function markDashboardNotificationRead(

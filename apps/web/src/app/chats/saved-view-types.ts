@@ -16,6 +16,7 @@ export type InboxSavedViewConditions = {
   receivedFrom: string | null
   receivedTo: string | null
   sort: 'newest' | 'waiting_desc'
+  due: 'all' | 'overdue'
 }
 
 /** 何も絞っていない状態。**分からない形は、これに倒す。** */
@@ -30,6 +31,7 @@ const NOTHING_FILTERED: InboxSavedViewConditions = {
   receivedFrom: null,
   receivedTo: null,
   sort: 'newest',
+  due: 'all',
 }
 
 const isStringArray = (value: unknown): value is string[] =>
@@ -66,5 +68,6 @@ export function normalizeSavedViewConditions(raw: unknown): InboxSavedViewCondit
     receivedFrom: typeof source.receivedFrom === 'string' ? source.receivedFrom : null,
     receivedTo: typeof source.receivedTo === 'string' ? source.receivedTo : null,
     sort: source.sort === 'waiting_desc' ? 'waiting_desc' : 'newest',
+    due: source.due === 'overdue' ? 'overdue' : 'all',
   }
 }

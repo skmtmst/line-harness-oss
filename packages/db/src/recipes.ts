@@ -27,6 +27,10 @@ export interface RecipeItem {
   kind: string;
   name: string;
   note: string;
+  /** レシピ内の参照に使う安定キー。無い場合は種類と順番から作る。 */
+  ref?: string;
+  /** 種類ごとの下書き設定。確定していない値は入れない。 */
+  config?: Record<string, unknown>;
 }
 
 export interface CloneRunRow {
@@ -35,8 +39,9 @@ export interface CloneRunRow {
   recipe_version: number;
   line_account_id: string;
   name_prefix: string | null;
-  status: 'running' | 'succeeded' | 'failed';
+  status: 'queued' | 'succeeded' | 'failed' | 'rolled_back';
   idempotency_key: string;
+  request_fingerprint: string;
   created_count: number;
   failure_reason: string | null;
   created_by: string | null;
@@ -130,6 +135,7 @@ export async function startCloneRun(
     lineAccountId: string;
     namePrefix?: string | null;
     idempotencyKey: string;
+    requestFingerprint: string;
     createdBy?: string | null;
   },
 ): Promise<CloneRunRow> {
@@ -137,8 +143,9 @@ export async function startCloneRun(
   await db
     .prepare(
       `INSERT INTO recipe_clone_runs
-         (id, recipe_id, recipe_version, line_account_id, name_prefix, idempotency_key, created_by, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+         (id, recipe_id, recipe_version, line_account_id, name_prefix, status,
+          idempotency_key, request_fingerprint, created_by, created_at)
+       VALUES (?, ?, ?, ?, ?, 'queued', ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -147,6 +154,7 @@ export async function startCloneRun(
       input.lineAccountId,
       input.namePrefix ?? null,
       input.idempotencyKey,
+      input.requestFingerprint,
       input.createdBy ?? null,
       jstNow(),
     )
@@ -181,7 +189,11 @@ export async function listCloneItems(
 export async function finishCloneRun(
   db: D1Database,
   id: string,
-  result: { status: 'succeeded' | 'failed'; createdCount: number; failureReason?: string | null },
+  result: {
+    status: 'succeeded' | 'failed' | 'rolled_back';
+    createdCount: number;
+    failureReason?: string | null;
+  },
 ): Promise<void> {
   await db
     .prepare(

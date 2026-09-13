@@ -49,14 +49,16 @@ describe('一覧の取得失敗からその場で読み直せる契約', () => {
       }
     }
 
-    expect(errorCount).toBe(22)
+    // 友だち一覧の状態表示を FriendListTable へ集約した後の実測値。
+    // #543: 回答フォーム一覧の到達不能な回答表（M2削除）にあった失敗表示ぶん1減。
+    expect(errorCount).toBe(21)
   })
 
   it('URLだけでは対象を特定できない状態に、直らない再読み込みを出さない', () => {
     const markEdit = readFileSync(join(HERE, 'tags/marks/edit/page.tsx'), 'utf8')
     const connections = readFileSync(join(HERE, 'rich-menus/connections/page.tsx'), 'utf8')
 
-    expect(markEdit).toContain('<ListState kind="empty" description="編集する対応マークが指定されていません。')
+    expect(markEdit).toContain('<SupportMarkEditor markId={id ?? undefined} />')
     expect(connections).toContain('<ListState kind="empty" title="メニューを特定できませんでした"')
   })
 })

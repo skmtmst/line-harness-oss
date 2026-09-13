@@ -126,6 +126,8 @@ export type AuthenticatedStaff = {
   canAccessDescendantAccounts?: boolean;
   /** 所属する統括。認可への実適用は後続工程で行う。 */
   tenantId?: string | null;
+  /** 機能オフ middleware が一覧処理へ渡す、このリクエストだけの追加絞り込み。 */
+  featureEnabledLineAccountIds?: string[];
 };
 
 function toAuthenticatedStaff(staff: {
@@ -156,16 +158,39 @@ const STAFF_API_PERMISSIONS: Array<[string, string]> = [
   ['/api/inbox', '/chats'], ['/api/chats', '/chats'], ['/api/conversations', '/chats'],
   ['/api/support', '/chats'], ['/api/operators', '/chats'],
   ['/api/friends', '/friends'], ['/api/tags', '/tags'], ['/api/friend-fields', '/tags'],
-  ['/api/tag-groups', '/tags'], ['/api/support-marks', '/tags'], ['/api/saved-searches', '/tags'], ['/api/folders', '/tags'],
+  ['/api/tag-groups', '/tags'], ['/api/support-marks', '/tags'], ['/api/support-mark-rules', '/tags'],
+  ['/api/saved-searches', '/tags'], ['/api/folders', '/tags'],
   ['/api/scenarios', '/scenarios'], ['/api/broadcasts', '/broadcasts'], ['/api/reminders', '/reminders'],
+  ['/api/friend-reminders', '/reminders'], ['/api/reminder-runs', '/reminders'],
   ['/api/auto-replies', '/auto-replies'], ['/api/auto-reply-runs', '/auto-replies'], ['/api/friend-add', '/friend-add-settings'], ['/api/webinars', '/webinars'],
-  ['/api/templates', '/templates'], ['/api/rich-menu', '/rich-menus'], ['/api/forms', '/form-submissions'], ['/api/contents', '/contents'],
-  ['/api/conversions', '/conversions'], ['/api/scoring', '/scoring'], ['/api/tracked-links', '/inflow-links'], ['/api/analytics', '/analytics'],
+  ['/api/templates', '/templates'], ['/api/rich-menu', '/rich-menus'], ['/api/rich-menus', '/rich-menus'],
+  ['/api/rich-menu-groups', '/rich-menus'], ['/api/rich-menu-images', '/rich-menus'],
+  ['/api/forms', '/form-submissions'], ['/api/contents', '/contents'], ['/api/media', '/contents'],
+  // 共通情報は登録メディアと同じ contents.ts 配下。メニューの href と同じ鍵を使う。
+  ['/api/common-vars', '/contents/vars'],
+  // 流入計測の入口経路と文面は /inflow-links 画面が呼ぶ。
+  ['/api/entry-routes', '/inflow-links'], ['/api/entry-route-genres', '/inflow-links'],
+  ['/api/message-templates', '/inflow-links'],
+  ['/api/funnels', '/analytics'],
+  // ダッシュボード(ホーム)の数字と表示設定。'/' 鍵はメニューの href と同じ。
+  // /api/list-stats は複数画面の集計で帰属を決められないため登録しない
+  // (fail-closed。N-423 の残課題として司令塔へ報告する)。
+  ['/api/dashboard', '/'],
+  ['/api/getting-started', '/getting-started'],
+  ['/api/conversions', '/conversions'], ['/api/scoring', '/scoring'], ['/api/scoring-rules', '/scoring'],
+  ['/api/tracked-links', '/inflow-links'], ['/api/analytics', '/analytics'],
   ['/api/mileage', '/mileage'], ['/api/action-scores', '/mileage'],
   ['/api/automations', '/automations'], ['/api/automation-runs', '/automations'],
   ['/api/automation-templates', '/automations'], ['/api/automation-drafts', '/automations'],
   ['/api/automation-draft-resources', '/automations'], ['/api/common-actions', '/automations'],
-  ['/api/webhooks', '/webhooks'], ['/api/booking', '/booking/bookings'], ['/api/events', '/events'],
+  ['/api/webhooks', '/webhooks'], ['/api/line-notifications', '/line-notifications'],
+  ['/api/booking', '/booking/bookings'], ['/api/events', '/events'],
+  // 個別相談の変更・取消は予約と同じ `/booking/bookings` 権限で守る
+  // (N-065 #623 司令塔裁定。`/api/meet-callback` は公開コールバックのため対象外)。
+  ['/api/meet-consultations', '/booking/bookings'],
+  // 友だち追加時の配信ルールと実行記録。旧 `/api/friend-add` 項目に
+  // 合う実経路は無いが、互換のため残す。
+  ['/api/friend-add-rules', '/friend-add-settings'], ['/api/friend-add-runs', '/friend-add-settings'],
   ['/api/nen-campaigns', '/nen-campaigns'], ['/api/nen-members', '/nen-members'], ['/api/ec-commerce', '/ec-commerce'],
 ];
 
@@ -175,16 +200,171 @@ const STAFF_API_PERMISSIONS: Array<[string, string]> = [
  * cannot inherit chat or friend-attribute access from the friends permission.
  */
 const STAFF_API_PERMISSION_OVERRIDES: Array<[RegExp, string]> = [
+  [/^\/api\/nen-members\/photos\/decisions\/bulk(?:\/|$)/, 'photo.submission.bulk_review'],
+  [/^\/api\/nen-members\/photos\/(?:original-download\/[^/]+|[^/]+\/original-download)(?:\/|$)/, 'photo.original.download'],
+  [/^\/api\/nen-members\/photos\/[^/]+\/(?:assessments\/re-evaluate|assets\/process|review|notification\/retry)(?:\/|$)/, 'photo.submission.review'],
+  [/^\/api\/nen-members\/photos(?:\/|$)/, 'photo.submission.view'],
   [/^\/api\/friends\/[^/]+\/messages(?:\/|$)/, '/chats'],
   [/^\/api\/friends\/[^/]+\/fields(?:\/|$)/, '/tags'],
   [/^\/api\/friends\/[^/]+\/support-mark(?:\/|$)/, '/tags'],
   [/^\/api\/friends\/support-mark\/bulk(?:\/|$)/, '/tags'],
 ];
 
-function permissionForApiPath(path: string): string | null {
+export function permissionForApiPath(path: string): string | null {
   const override = STAFF_API_PERMISSION_OVERRIDES.find(([pattern]) => pattern.test(path));
   if (override) return override[1];
   return STAFF_API_PERMISSIONS.find(([prefix]) => path === prefix || path.startsWith(`${prefix}/`))?.[1] ?? null;
+}
+
+/**
+ * 役割に関わらず認証済みなら通す本人・自組織・シェル必須の口。
+ *
+ * いずれも route 側で対象を絞っている: 自分の表示・自組織の名前・
+ * 可視アカウントだけの一覧・秘密値を含まない版情報・自分の二段階認証
+ * (handler 内で本人確認)・失敗報告の受付。exact 一致で列挙し、
+ * 新しい口は fail-closed (staff 403) に倒す。
+ */
+const STAFF_SELF_ENDPOINTS: Array<[method: string, path: string]> = [
+  ['GET', '/api/auth/session'],
+  ['POST', '/api/auth/step-up'],
+  ['GET', '/api/staff/me'],
+  ['GET', '/api/tenants/me'],
+  ['POST', '/api/client-errors'],
+  ['GET', '/api/capabilities'],
+  ['GET', '/api/line-accounts'],
+  ['GET', '/api/line-accounts/summary'],
+  // 殻の表示に要る機能設定の読み取り。更新は owner/admin 専用。
+  ['GET', '/api/settings/features'],
+  // 共通アップローダ。受信箱の 1 対 1 返信など staff の付与機能から使う。
+  // 読み取りは公開の /images/* 経由で、鍵は機能 API の応答で渡る。
+  ['POST', '/api/images'],
+];
+
+/**
+ * route 定義を静的検査するときだけ本人系として扱う template。
+ * 固定 path を `:id` と同じ形で判定しないため、実リクエスト用の判定とは分ける。
+ */
+const STAFF_SELF_ROUTE_TEMPLATES: Array<[method: string, path: string]> = [
+  ['GET', '/api/staff/:id'],
+  ['PATCH', '/api/staff/:id'],
+  ['POST', '/api/staff/:id/two-factor/setup'],
+  ['POST', '/api/staff/:id/two-factor/confirm'],
+  ['DELETE', '/api/staff/:id/two-factor'],
+];
+
+export function isStaffSelfRouteTemplate(method: string, path: string): boolean {
+  const normalizedMethod = method.toUpperCase();
+  if (STAFF_SELF_ENDPOINTS.some(([m, p]) => m === normalizedMethod && p === path)) return true;
+  return STAFF_SELF_ROUTE_TEMPLATES.some(([m, p]) => m === normalizedMethod && p === path);
+}
+
+/**
+ * `/api/staff/:id` 配下の本人操作。
+ *
+ * URL の形だけでは本人系にしない。将来 `/api/staff/export` のような固定 path が
+ * 追加されても permission 検査を迂回しないよう、path 内の id と認証済み staff.id
+ * が一致する場合だけ通す。
+ */
+const STAFF_SELF_PATH_PATTERNS: Array<[method: string, pattern: RegExp]> = [
+  ['GET', /^\/api\/staff\/([^/]+)$/],
+  ['PATCH', /^\/api\/staff\/([^/]+)$/],
+  ['POST', /^\/api\/staff\/([^/]+)\/two-factor\/(?:setup|confirm)$/],
+  ['DELETE', /^\/api\/staff\/([^/]+)\/two-factor$/],
+];
+
+export function isStaffSelfEndpoint(method: string, path: string, staffId?: string): boolean {
+  const normalizedMethod = method.toUpperCase();
+  if (STAFF_SELF_ENDPOINTS.some(([m, p]) => m === normalizedMethod && p === path)) return true;
+  if (!staffId) return false;
+  return STAFF_SELF_PATH_PATTERNS.some(([m, pattern]) => {
+    if (m !== normalizedMethod) return false;
+    return pattern.exec(path)?.[1] === staffId;
+  });
+}
+
+/**
+ * route が staff へ明示許可している既存の口の写し。
+ *
+ * 旧一覧の GET /api/staff は handler が他人のメールを伏せる意図的な
+ * 仕様として維持する(司令塔裁定 #670)。飲食店テストは点検対象外の
+ * ため route の明示許可を写すだけで、闇雲に広げない。
+ */
+const STAFF_EXPLICIT_ALLOW: Array<[method: string, path: string]> = [
+  ['GET', '/api/staff'],
+  ['GET', '/api/restaurant-test/stores'],
+  ['GET', '/api/restaurant-test/store-context'],
+  ['GET', '/api/restaurant-test/terms-agreement'],
+  ['POST', '/api/restaurant-test/stores/selection/clear'],
+  ['GET', '/api/restaurant-test/snapshot'],
+  ['POST', '/api/restaurant-test/reservations/manual'],
+];
+
+const STAFF_EXPLICIT_ALLOW_PATTERNS: Array<[method: string, pattern: RegExp]> = [
+  ['POST', /^\/api\/restaurant-test\/stores\/[^/]+\/select$/],
+];
+
+export function isStaffExplicitAllow(method: string, path: string): boolean {
+  const normalizedMethod = method.toUpperCase();
+  if (STAFF_EXPLICIT_ALLOW.some(([m, p]) => m === normalizedMethod && p === path)) return true;
+  return STAFF_EXPLICIT_ALLOW_PATTERNS.some(([m, pattern]) => m === normalizedMethod && pattern.test(path));
+}
+
+/**
+ * 管理者認証より手前へ通す公開境界。authMiddleware の skip 判定と
+ * 同じ意味で、method を区別する口もここで扱う。
+ */
+export function isPublicApiBoundary(method: string, path: string): boolean {
+  const normalizedMethod = method.toUpperCase();
+  // フォーム定義の GET は LIFF が認証なしで読む。PUT/DELETE は管理 API。
+  if (normalizedMethod === 'GET' && /^\/api\/forms\/[^/]+$/.test(path)) return true;
+  // LIFF の回答・開封・途中保存は route 側で LINE 署名を見る。
+  if (
+    normalizedMethod === 'POST' &&
+    (/^\/api\/forms\/[^/]+\/submit$/.test(path) ||
+      /^\/api\/forms\/[^/]+\/opened$/.test(path) ||
+      /^\/api\/forms\/[^/]+\/partial$/.test(path))
+  ) {
+    return true;
+  }
+  return (
+    path === '/webhook' ||
+    path === '/docs' ||
+    path === '/openapi.json' ||
+    path === '/api/affiliates/click' ||
+    path === '/webhooks/xserver/support-email' ||
+    path === '/api/public/nen/adopted-photos' ||
+    path === '/api/public/nen/gallery-preview' ||
+    path === '/api/site/collect' ||
+    path === '/api/site/script.js' ||
+    path.startsWith('/t/') ||
+    path.startsWith('/r/') ||
+    path.startsWith('/pool/') ||
+    path.startsWith('/images/') ||
+    path.startsWith('/api/liff/') ||
+    path === '/api/auth/login' ||
+    path === '/api/auth/logout' ||
+    path === '/api/auth/line' ||
+    path === '/api/auth/line/callback' ||
+    path === '/api/auth/two-factor/verify' ||
+    /^\/api\/staff\/invitations\/[^/]+\/verify$/.test(path) ||
+    path.startsWith('/auth/') ||
+    path === '/setup' ||
+    path === '/api/integrations/stripe/webhook' ||
+    // 課金の Stripe Webhook は route 内で署名検証する。
+    path === '/api/hq/billing/webhook' ||
+    path === '/api/integrations/eccube/events' ||
+    path === '/api/integrations/eccube/columns' ||
+    path === '/api/internal/deployments/events' ||
+    path === '/api/integrations/codex-slack/events' ||
+    path === '/api/integrations/ai-loop/reports' ||
+    path === '/api/integrations/slack/actions' ||
+    path === '/api/integrations/slack/events' ||
+    /^\/api\/webhooks\/incoming\/[^/]+\/receive$/.test(path) ||
+    path === '/api/meet-callback' ||
+    path === '/api/qr' ||
+    path === '/api/public/brand' ||
+    path === '/api/health'
+  );
 }
 
 export async function sha256Hex(value: string): Promise<string> {
@@ -302,59 +482,10 @@ export async function authMiddleware(c: Context<Env>, next: Next): Promise<Respo
     return next();
   }
 
-  // These LIFF actions perform their own LINE ID-token verification inside
-  // the route. They cannot use the admin auth gate because their Bearer token
-  // is a LINE ID token, not a Harness staff API key.
-  const isPublicFormAction =
-    method === 'POST' &&
-    (/^\/api\/forms\/[^/]+\/submit$/.test(path) ||
-      /^\/api\/forms\/[^/]+\/opened$/.test(path) ||
-      /^\/api\/forms\/[^/]+\/partial$/.test(path));
-  if (isPublicFormAction) return next();
-
-  if (
-    path === '/webhook' ||
-    path === '/docs' ||
-    path === '/openapi.json' ||
-    path === '/api/affiliates/click' ||
-    path === '/webhooks/xserver/support-email' ||
-    path === '/api/public/nen/adopted-photos' ||
-    path === '/api/public/nen/gallery-preview' ||
-    path.startsWith('/t/') ||
-    path.startsWith('/r/') ||
-    path.startsWith('/pool/') ||
-    path.startsWith('/images/') ||
-    path.startsWith('/api/liff/') ||
-    // Admin login/logout — issue/clear the session cookie before auth exists.
-    path === '/api/auth/login' ||
-    path === '/api/auth/logout' ||
-    path === '/api/auth/line' ||
-    path === '/api/auth/line/callback' ||
-    path === '/api/auth/two-factor/verify' ||
-    /^\/api\/staff\/invitations\/[^/]+\/verify$/.test(path) ||
-    path.startsWith('/auth/') ||
-    path === '/setup' ||
-    path === '/api/integrations/stripe/webhook' ||
-    // 課金（サブスクリプション）の Stripe Webhook。署名で守る（routes/hq-billing.ts）。
-    path === '/api/hq/billing/webhook' ||
-    path === '/api/integrations/eccube/events' ||
-    path === '/api/integrations/eccube/columns' ||
-    // Codex clients sign the exact body with a dedicated shared secret.
-    path === '/api/integrations/codex-slack/events' ||
-    // Slack button actions are verified with the Slack app signing secret.
-    path === '/api/integrations/slack/actions' ||
-    // Slack Events are also verified with the Slack app signing secret.
-    path === '/api/integrations/slack/events' ||
-    path.match(/^\/api\/webhooks\/incoming\/[^/]+\/receive$/) ||
-    path === '/api/meet-callback' || // Meet Harness completion callback
-    path === '/api/qr' || // Public QR proxy — used by desktop landing pages
-    // ログイン画面の看板（公式アカウントの表示名とアイコン）。認証より手前の
-    // 画面が読むので通す。返すのは LINE 上で公開されている2つの値だけ。
-    path === '/api/public/brand' ||
-    path === '/api/health' // Liveness probe (update CLI / self-update verify)
-  ) {
-    return next();
-  }
+  // 公開境界(LIFF・webhook・署名検証の入口)は認証より手前へ通す。
+  // 判定の中身は isPublicApiBoundary に集約し、契約テストと共有する。
+  // (LIFF の回答系は route 側で LINE 署名を見るため管理認証の対象外)
+  if (isPublicApiBoundary(method, path)) return next();
 
   const bearer = bearerToken(c);
   const cookie = adminSessionTokenFromCookie(c);
@@ -369,9 +500,11 @@ export async function authMiddleware(c: Context<Env>, next: Next): Promise<Respo
     return c.json({ success: false, error: '閲覧のみの権限では変更操作を実行できません' }, 403);
   }
 
-  if (staff.role === 'staff') {
+  // N-423 (#670): staff は deny-by-default。権限表に無い管理 API は
+  // 本人・自組織と明示許可の口以外すべて 403。owner/admin は従来どおり通す。
+  if (staff.role === 'staff' && !isStaffSelfEndpoint(method, path, staff.id) && !isStaffExplicitAllow(method, path)) {
     const requiredPermission = permissionForApiPath(path);
-    if (requiredPermission && !staff.permissionKeys?.includes(requiredPermission)) {
+    if (!requiredPermission || !staff.permissionKeys?.includes(requiredPermission)) {
       return c.json({ success: false, error: 'この機能を操作する権限がありません' }, 403);
     }
   }

@@ -20,12 +20,15 @@ export const FRIEND_FIELD_TYPES = [
   'textarea',
   'number',
   'date',
+  'datetime',
   'select',
   'multi_select',
   'checkbox',
   'url',
   'tel',
   'email',
+  'image',
+  'pdf',
 ] as const;
 
 export type FriendFieldType = (typeof FRIEND_FIELD_TYPES)[number];
@@ -36,6 +39,7 @@ export interface FriendField {
   name: string;
   field_key: string;
   type: string;
+  type_v6?: string | null;
   options_json: string | null;
   default_value: string | null;
   source: string;
@@ -46,6 +50,8 @@ export interface FriendField {
   display_order: number;
   created_at: string;
   updated_at: string;
+  status?: 'active' | 'read_only' | 'archived';
+  version?: number;
 }
 
 export interface ScopedFriendField extends FriendField {
@@ -59,8 +65,8 @@ export interface FriendFieldListSummary {
   inUse: number;
   registeredFriends: number;
   updatedThisMonth: number;
-  /** forms 自体にアカウント所属が無いため、誤った全体件数を返さない。 */
-  formLinks: null;
+  formLinks: number | null;
+  formLinksUnavailableReason?: string;
 }
 
 const SCOPED_FIELD_SELECT = `
@@ -82,6 +88,22 @@ export interface FriendFieldValue {
 export interface FriendFieldMigrationSourceValue {
   friend_id: string;
   value: string;
+}
+
+export interface FriendFieldUsageTarget {
+  kind: 'form' | 'reminder' | 'saved_search';
+  fieldId: string;
+  id: string;
+  name: string;
+  switchable: boolean;
+}
+
+function normalizeFriendField<T extends FriendField>(row: T): T {
+  return { ...row, type: row.type_v6 ?? row.type };
+}
+
+function legacyStoredType(type: FriendFieldType): string {
+  return type === 'datetime' || type === 'image' || type === 'pdf' ? 'text' : type;
 }
 
 /**
@@ -132,34 +154,36 @@ export async function getFriendFields(
       )
       .bind(opts.folderId)
       .all<FriendField>();
-    return result.results;
+    return result.results.map(normalizeFriendField);
   }
   const result = await db
     .prepare(`SELECT * FROM friend_fields ORDER BY display_order ASC, name ASC`)
     .all<FriendField>();
-  return result.results;
+  return result.results.map(normalizeFriendField);
 }
 
 /** 選択中のLINE公式アカウントから見える項目だけを返す。 */
 export async function getFriendFieldsForScope(
   db: D1Database,
   scope: FriendFieldScope,
-  opts: { folderId?: string } = {},
+  opts: { folderId?: string; status?: 'active' | 'read_only' | 'archived' } = {},
 ): Promise<ScopedFriendField[]> {
   const folder = opts.folderId ? ' AND ff.folder_id = ?' : '';
+  const status = opts.status ? ' AND ff.status = ?' : '';
   const binds: unknown[] = [LEGACY_TENANT_ID, scope.tenantId, scope.lineAccountId];
   if (opts.folderId) binds.push(opts.folderId);
+  if (opts.status) binds.push(opts.status);
   const result = await db
     .prepare(
       `${SCOPED_FIELD_SELECT}
         WHERE COALESCE(ffs.tenant_id, ?) = ?
-          AND (ffs.line_account_id = ? OR ffs.line_account_id IS NULL)${folder}
+          AND (ffs.line_account_id = ? OR ffs.line_account_id IS NULL)${folder}${status}
         ORDER BY CASE WHEN ffs.line_account_id = ? THEN 0 ELSE 1 END,
                  ff.display_order ASC, ff.name ASC`,
     )
     .bind(...binds, scope.lineAccountId)
     .all<ScopedFriendField>();
-  return result.results;
+  return result.results.map(normalizeFriendField);
 }
 
 /** ID直指定でも、担当外アカウントの項目を返さない。 */
@@ -168,7 +192,7 @@ export async function getFriendFieldByIdForScope(
   id: string,
   scope: FriendFieldScope,
 ): Promise<ScopedFriendField | null> {
-  return db
+  const row = await db
     .prepare(
       `${SCOPED_FIELD_SELECT}
         WHERE ff.id = ?
@@ -177,13 +201,15 @@ export async function getFriendFieldByIdForScope(
     )
     .bind(id, LEGACY_TENANT_ID, scope.tenantId, scope.lineAccountId)
     .first<ScopedFriendField>();
+  return row ? normalizeFriendField(row) : null;
 }
 
 export async function getFriendFieldById(
   db: D1Database,
   id: string,
 ): Promise<FriendField | null> {
-  return db.prepare(`SELECT * FROM friend_fields WHERE id = ?`).bind(id).first<FriendField>();
+  const row = await db.prepare(`SELECT * FROM friend_fields WHERE id = ?`).bind(id).first<FriendField>();
+  return row ? normalizeFriendField(row) : null;
 }
 
 export interface CreateFriendFieldInput {
@@ -212,15 +238,15 @@ export async function createFriendField(
       `INSERT INTO friend_fields
          (id, folder_id, name, field_key, type, options_json, default_value,
           source, ec_field_path, ec_is_master, is_personal, is_starred,
-          display_order, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          display_order, type_v6, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
       input.folderId ?? null,
       input.name,
       input.fieldKey,
-      input.type,
+      legacyStoredType(input.type),
       input.optionsJson ?? null,
       input.defaultValue ?? null,
       input.source ?? 'manual',
@@ -229,6 +255,7 @@ export async function createFriendField(
       input.isPersonal ? 1 : 0,
       input.isStarred ? 1 : 0,
       input.displayOrder ?? 0,
+      input.type,
       now,
       now,
     )
@@ -250,15 +277,15 @@ export async function createFriendFieldForScope(
         `INSERT INTO friend_fields
            (id, folder_id, name, field_key, type, options_json, default_value,
             source, ec_field_path, ec_is_master, is_personal, is_starred,
-            display_order, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            display_order, type_v6, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .bind(
         id,
         input.folderId ?? null,
         input.name,
         input.fieldKey,
-        input.type,
+        legacyStoredType(input.type),
         input.optionsJson ?? null,
         input.defaultValue ?? null,
         input.source ?? 'manual',
@@ -267,6 +294,7 @@ export async function createFriendFieldForScope(
         input.isPersonal ? 1 : 0,
         input.isStarred ? 1 : 0,
         input.displayOrder ?? 0,
+        input.type,
         now,
         now,
       ),
@@ -282,6 +310,7 @@ export async function createFriendFieldForScope(
 }
 
 export interface UpdateFriendFieldInput {
+  expectedVersion?: number;
   name?: string;
   folderId?: string | null;
   optionsJson?: string | null;
@@ -321,12 +350,16 @@ export async function updateFriendField(
   if (input.isStarred !== undefined) put('is_starred', input.isStarred ? 1 : 0);
   if (input.displayOrder !== undefined) put('display_order', input.displayOrder);
   if (sets.length > 0) {
+    sets.push('version = version + 1');
     sets.push('updated_at = ?');
     values.push(jstNow(), id);
-    await db
-      .prepare(`UPDATE friend_fields SET ${sets.join(', ')} WHERE id = ?`)
+    const versionClause = input.expectedVersion === undefined ? '' : ' AND version = ?';
+    if (input.expectedVersion !== undefined) values.push(input.expectedVersion);
+    const result = await db
+      .prepare(`UPDATE friend_fields SET ${sets.join(', ')} WHERE id = ?${versionClause}`)
       .bind(...values)
       .run();
+    if (input.expectedVersion !== undefined && Number(result.meta.changes ?? 0) === 0) return null;
   }
   return getFriendFieldById(db, id);
 }
@@ -362,6 +395,35 @@ export async function countFriendFieldValuesForScope(
   return Number(row?.c ?? 0);
 }
 
+/**
+ * withUsage 一覧用。項目ごとの件数を1クエリでまとめて数える。
+ *
+ * 項目ごとに `countFriendFieldValuesForScope` を呼ぶと項目数ぶんの
+ * クエリが走る(N+1)。`GROUP BY` で一括集計し、値は単体版と同じ条件。
+ */
+export async function countFriendFieldValuesForScopes(
+  db: D1Database,
+  fieldIds: string[],
+  scope: FriendFieldScope,
+): Promise<Map<string, number>> {
+  const counts = new Map<string, number>();
+  if (fieldIds.length === 0) return counts;
+  const placeholders = fieldIds.map(() => '?').join(',');
+  const result = await db
+    .prepare(
+      `SELECT v.field_id AS field_id, COUNT(*) AS c
+         FROM friend_field_values v
+         JOIN friends f ON f.id = v.friend_id
+        WHERE v.field_id IN (${placeholders}) AND f.line_account_id = ?
+          AND v.value IS NOT NULL AND v.value != ''
+        GROUP BY v.field_id`,
+    )
+    .bind(...fieldIds, scope.lineAccountId)
+    .all<{ field_id: string; c: number }>();
+  for (const row of result.results ?? []) counts.set(row.field_id, Number(row.c ?? 0));
+  return counts;
+}
+
 /** dry-run用。選択中アカウントの値だけを読み、値そのものは変更しない。 */
 export async function getFriendFieldValuesForMigration(
   db: D1Database,
@@ -390,7 +452,7 @@ export async function getFriendFieldListSummary(
   const monthStart = `${jstNow().slice(0, 7)}-01`;
   const fields = await getFriendFieldsForScope(db, scope);
   if (fields.length === 0) {
-    return { total: 0, inUse: 0, registeredFriends: 0, updatedThisMonth: 0, formLinks: null };
+    return { total: 0, inUse: 0, registeredFriends: 0, updatedThisMonth: 0, formLinks: 0 };
   }
   const ids = fields.map((field) => field.id);
   const placeholders = ids.map(() => '?').join(',');
@@ -406,13 +468,63 @@ export async function getFriendFieldListSummary(
     )
     .bind(monthStart, scope.lineAccountId, ...ids)
     .first<{ in_use: number; friends: number; updated_this_month: number }>();
-  return {
+  const base = {
     total: fields.length,
     inUse: Number(row?.in_use ?? 0),
     registeredFriends: Number(row?.friends ?? 0),
     updatedThisMonth: Number(row?.updated_this_month ?? 0),
-    formLinks: null,
   };
+  try {
+    const usages = await getFriendFieldUsageForScope(db, ids, scope);
+    return {
+      ...base,
+      formLinks: new Set(usages.filter((usage) => usage.kind === 'form').map((usage) => usage.id)).size,
+    };
+  } catch (error) {
+    console.error('friend field form usage unavailable:', error);
+    return {
+      ...base,
+      formLinks: null,
+      formLinksUnavailableReason: '回答フォームの使用数を確認できませんでした。再読み込みしてください。',
+    };
+  }
+}
+
+/** 回答フォーム・リマインダ・保存検索から、現在の実参照をアカウント範囲内で探す。 */
+export async function getFriendFieldUsageForScope(
+  db: D1Database,
+  fieldIds: string[],
+  scope: FriendFieldScope,
+): Promise<FriendFieldUsageTarget[]> {
+  if (fieldIds.length === 0) return [];
+  const idsJson = JSON.stringify(fieldIds);
+  const forms = await db.prepare(
+    `SELECT DISTINCT f.id, f.name, CAST(j.value AS TEXT) AS field_id
+       FROM forms f
+       JOIN form_accounts fa ON fa.form_id = f.id
+       JOIN json_tree(COALESCE(f.fields, '[]')) j ON j.key = 'friendFieldId'
+      WHERE fa.line_account_id = ? AND f.status = 'active'
+        AND CAST(j.value AS TEXT) IN (SELECT CAST(value AS TEXT) FROM json_each(?))
+      ORDER BY f.name ASC`,
+  ).bind(scope.lineAccountId, idsJson).all<{ id: string; name: string; field_id: string }>();
+  const reminders = await db.prepare(
+    `SELECT DISTINCT id, name, trigger_field_id AS field_id FROM reminders
+      WHERE line_account_id = ? AND trigger_field_id IN (SELECT CAST(value AS TEXT) FROM json_each(?))
+      ORDER BY name ASC`,
+  ).bind(scope.lineAccountId, idsJson).all<{ id: string; name: string; field_id: string }>();
+  const searches = await db.prepare(
+    `SELECT DISTINCT s.id, s.name, CAST(j.value AS TEXT) AS field_id
+       FROM saved_searches s
+       JOIN json_tree(s.conditions_json) j
+      WHERE s.line_account_id = ?
+        AND CAST(j.value AS TEXT) IN (SELECT CAST(value AS TEXT) FROM json_each(?))
+      ORDER BY s.name ASC`,
+  ).bind(scope.lineAccountId, idsJson).all<{ id: string; name: string; field_id: string }>();
+  return [
+    ...forms.results.map((row) => ({ kind: 'form' as const, id: row.id, name: row.name, fieldId: row.field_id, switchable: true })),
+    ...reminders.results.map((row) => ({ kind: 'reminder' as const, id: row.id, name: row.name, fieldId: row.field_id, switchable: true })),
+    ...searches.results.map((row) => ({ kind: 'saved_search' as const, id: row.id, name: row.name, fieldId: row.field_id, switchable: false })),
+  ];
 }
 
 export async function deleteFriendField(db: D1Database, id: string): Promise<void> {
@@ -439,20 +551,211 @@ export async function getFriendFieldsWithValues(
     )
     .bind(friendId)
     .all<FriendField & { value: string | null; updated_by: string | null }>();
-  return result.results;
+  return result.results.map(normalizeFriendField);
+}
+
+export interface FriendFieldValueCheckTarget {
+  type: string;
+  options_json?: string | null;
+}
+
+/** 選択肢の持ち方は2通りある。文字列のままか、ID付きの形か。 */
+function parseValueCheckOptions(optionsJson: string | null | undefined): Array<{ id: string; label: string }> {
+  if (!optionsJson) return [];
+  try {
+    const parsed = JSON.parse(optionsJson) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    const out: Array<{ id: string; label: string }> = [];
+    for (const option of parsed) {
+      const id = typeof option === 'string'
+        ? option.trim()
+        : option && typeof option === 'object'
+          ? String((option as { id?: unknown }).id ?? (option as { label?: unknown }).label ?? '').trim()
+          : '';
+      const label = typeof option === 'string'
+        ? option.trim()
+        : option && typeof option === 'object'
+          ? String((option as { label?: unknown }).label ?? (option as { id?: unknown }).id ?? '').trim()
+          : '';
+      if (id && label) out.push({ id, label });
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}
+
+/** YYYY-MM-DDの形に加え、暦に存在する日かまで見る。 */
+function isExistingCalendarDate(value: string): boolean {
+  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return false;
+  const date = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(date.getTime())
+    && date.getUTCFullYear() === Number(match[1])
+    && date.getUTCMonth() + 1 === Number(match[2])
+    && date.getUTCDate() === Number(match[3]);
 }
 
 /**
- * 値を書き込む。
+ * 項目の型に合わせて保存値を検証・正規化する。
+ *
+ * 単票更新・一括更新・フォーム回答・自動化など、値の書き込み口は複数ある。
+ * どれか1つでも型に合わない値を許すと、絞り込み配信の数値比較や
+ * テンプレートの差し込みで矛盾・失敗が起きる。書き込む前にこの関数へ通し、
+ * 通らなければ保存せず項目単位の422で返す。正規化した値を保存することで、
+ * 後段（配信条件・差し込み・自動化）は同じ形の値だけを読む。
+ *
+ * 空（null・undefined・空文字）は「消す」扱いで value: null を返す。
+ * setFriendFieldValue が空文字で行を消す動きと合わせている。
+ */
+/**
+ * 保存値を受け付ける種類をここに列挙する。載っていない種類は fail-closed で止める。
+ *
+ * 項目の種類は作成時に FRIEND_FIELD_TYPES からしか選べないが、古い行や
+ * 直接書き込みで想定外の種類が残っている可能性がある。未知の種類を
+ * 無条件で通すと、不正値の波及という N-042 の問題が残る。
+ */
+const VALUE_CHECKABLE_TYPES = new Set<string>(FRIEND_FIELD_TYPES);
+
+export function validateFriendFieldValue(
+  field: FriendFieldValueCheckTarget,
+  raw: unknown,
+): { ok: true; value: string | null } | { ok: false; error: string } {
+  const type = typeof field.type === 'string' ? field.type : '';
+  if (!VALUE_CHECKABLE_TYPES.has(type)) {
+    return { ok: false, error: 'この項目の種類では値を保存できません' };
+  }
+  if (raw === null || raw === undefined) return { ok: true, value: null };
+  if (typeof raw === 'string' && raw.trim() === '') return { ok: true, value: null };
+
+  if (type === 'checkbox') {
+    if (raw === true || raw === '1' || (typeof raw === 'string' && raw.trim().toLowerCase() === 'true')) {
+      return { ok: true, value: '1' };
+    }
+    if (raw === false || raw === '0' || (typeof raw === 'string' && raw.trim().toLowerCase() === 'false')) {
+      return { ok: true, value: '0' };
+    }
+    return { ok: false, error: 'チェック項目ははい・いいえで入力してください' };
+  }
+  if (type === 'multi_select') {
+    let items: unknown[];
+    if (Array.isArray(raw)) {
+      items = raw;
+    } else if (typeof raw === 'string') {
+      try {
+        const parsed = JSON.parse(raw) as unknown;
+        items = Array.isArray(parsed) ? parsed : [raw];
+      } catch {
+        items = [raw];
+      }
+    } else {
+      return { ok: false, error: '複数選択は選択肢から選んでください' };
+    }
+    const options = parseValueCheckOptions(field.options_json);
+    const ids: string[] = [];
+    for (const item of items) {
+      const text = String(item ?? '').trim();
+      if (!text) continue;
+      const option = options.find((o) => o.id === text || o.label === text);
+      if (!option) return { ok: false, error: '登録済みの選択肢から選んでください' };
+      if (!ids.includes(option.id)) ids.push(option.id);
+    }
+    if (ids.length === 0) return { ok: true, value: null };
+    return { ok: true, value: JSON.stringify(ids) };
+  }
+  if (type === 'select') {
+    if (typeof raw !== 'string') return { ok: false, error: '登録済みの選択肢から選んでください' };
+    const text = raw.trim();
+    const option = parseValueCheckOptions(field.options_json).find((o) => o.id === text || o.label === text);
+    return option
+      ? { ok: true, value: option.id }
+      : { ok: false, error: '登録済みの選択肢から選んでください' };
+  }
+  if (type === 'number') {
+    const text = typeof raw === 'number' ? String(raw) : typeof raw === 'string' ? raw.trim().replace(/,/g, '') : '';
+    if (!text || !/^[-+]?(\d+(\.\d+)?|\.\d+)$/.test(text) || !Number.isFinite(Number(text))) {
+      return { ok: false, error: '数値で入力してください' };
+    }
+    return { ok: true, value: text.startsWith('+') ? text.slice(1) : text };
+  }
+  if (type === 'date') {
+    if (typeof raw !== 'string' || !isExistingCalendarDate(raw.trim())) {
+      return { ok: false, error: 'YYYY-MM-DDの存在する日付で入力してください' };
+    }
+    return { ok: true, value: raw.trim() };
+  }
+  if (type === 'datetime') {
+    if (typeof raw !== 'string' || Number.isNaN(Date.parse(raw.trim()))) {
+      return { ok: false, error: '日時形式で入力してください' };
+    }
+    return { ok: true, value: new Date(raw.trim()).toISOString() };
+  }
+  if (type === 'email') {
+    if (typeof raw !== 'string') return { ok: false, error: 'メールアドレス形式で入力してください' };
+    const text = raw.trim().toLowerCase();
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(text)
+      ? { ok: true, value: text }
+      : { ok: false, error: 'メールアドレス形式で入力してください' };
+  }
+  if (type === 'tel') {
+    if (typeof raw !== 'string') return { ok: false, error: '電話番号形式で入力してください' };
+    const text = raw.trim();
+    return /^\+?[0-9() -]{8,20}$/.test(text)
+      ? { ok: true, value: text }
+      : { ok: false, error: '電話番号形式で入力してください' };
+  }
+  if (type === 'url') {
+    if (typeof raw !== 'string') return { ok: false, error: 'httpまたはhttpsのURLで入力してください' };
+    const text = raw.trim();
+    try {
+      if (!['http:', 'https:'].includes(new URL(text).protocol)) throw new Error();
+    } catch {
+      return { ok: false, error: 'httpまたはhttpsのURLで入力してください' };
+    }
+    return { ok: true, value: text };
+  }
+  if (type === 'image' || type === 'pdf') {
+    if (typeof raw !== 'string' || !raw.trim() || raw.trim().length > 2000) {
+      return { ok: false, error: '画像・PDFの指定を確認してください' };
+    }
+    return { ok: true, value: raw.trim() };
+  }
+  if (type === 'text' || type === 'textarea') {
+    if (typeof raw === 'number' && Number.isFinite(raw)) return { ok: true, value: String(raw) };
+    if (typeof raw !== 'string') return { ok: false, error: '文字で入力してください' };
+    const limit = type === 'textarea' ? 2000 : 200;
+    const text = raw.trim();
+    if (text.length > limit) return { ok: false, error: `${limit}文字以内で入力してください` };
+    return { ok: true, value: text === '' ? null : text };
+  }
+  return { ok: false, error: 'この項目の種類では値を保存できません' };
+}
+
+/**
+ * 値を書き込む中央の口。
+ *
+ * field（種類と選択肢）を渡すと、保存前に validateFriendFieldValue で
+ * 検証・正規化し、正規化した値を保存する。通らない値は例外で止める。
+ * 口（単票・一括など）は事前に検証して項目単位の422を返すのが役目で、
+ * ここは「検証済みのはず」の安全網として働く。
+ *
+ * field が無い呼び出しは従来どおり素通しする。フォーム・シナリオ系の
+ * 接続が終わるまでの暫定で、新しい接続は必ず field を渡す。
  *
  * 空文字は行を消す。「空欄にした」と「一度も入れていない」を分けても
  * 画面上は同じ見え方になり、分けた分だけ判定が増えるため。
  */
 export async function setFriendFieldValue(
   db: D1Database,
-  input: { friendId: string; fieldId: string; value: string | null; updatedBy: string },
+  input: { friendId: string; fieldId: string; value: string | null; updatedBy: string; field?: FriendFieldValueCheckTarget },
 ): Promise<void> {
-  if (input.value === null || input.value === '') {
+  let value = input.value;
+  if (input.field) {
+    const checked = validateFriendFieldValue(input.field, value);
+    if (!checked.ok) throw new Error(`invalid friend field value: ${checked.error}`);
+    value = checked.value;
+  }
+  if (value === null || value === '') {
     await db
       .prepare(`DELETE FROM friend_field_values WHERE friend_id = ? AND field_id = ?`)
       .bind(input.friendId, input.fieldId)
@@ -467,7 +770,7 @@ export async function setFriendFieldValue(
        DO UPDATE SET value = excluded.value, updated_by = excluded.updated_by,
                      updated_at = excluded.updated_at`,
     )
-    .bind(input.friendId, input.fieldId, input.value, input.updatedBy, jstNow())
+    .bind(input.friendId, input.fieldId, value, input.updatedBy, jstNow())
     .run();
 }
 
@@ -484,16 +787,35 @@ export async function getFriendFieldMap(
 ): Promise<Record<string, string>> {
   const result = await db
     .prepare(
-      `SELECT f.field_key, COALESCE(v.value, f.default_value) AS value
+      `SELECT f.field_key, COALESCE(f.type_v6, f.type) AS field_type, f.options_json,
+              COALESCE(v.value, f.default_value) AS value
          FROM friend_fields f
          LEFT JOIN friend_field_values v
            ON v.field_id = f.id AND v.friend_id = ?`,
     )
     .bind(friendId)
-    .all<{ field_key: string; value: string | null }>();
+    .all<{ field_key: string; field_type: string; options_json: string | null; value: string | null }>();
   const out: Record<string, string> = {};
   for (const row of result.results) {
-    if (row.value != null) out[row.field_key] = row.value;
+    if (row.value == null || row.field_type === 'image' || row.field_type === 'pdf') continue;
+    if (row.field_type === 'select' || row.field_type === 'multi_select') {
+      try {
+        const options = JSON.parse(row.options_json ?? '[]') as Array<string | { id?: string; label?: string }>;
+        const labels = new Map(options.map((option) => typeof option === 'string'
+          ? [option, option]
+          : [String(option.id ?? option.label ?? ''), String(option.label ?? '')]));
+        if (row.field_type === 'multi_select') {
+          const ids = JSON.parse(row.value) as unknown;
+          if (Array.isArray(ids)) out[row.field_key] = ids.map((id) => labels.get(String(id)) ?? String(id)).join('、');
+        } else {
+          out[row.field_key] = labels.get(row.value) ?? row.value;
+        }
+      } catch {
+        out[row.field_key] = row.value;
+      }
+      continue;
+    }
+    out[row.field_key] = row.value;
   }
   return out;
 }

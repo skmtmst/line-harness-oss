@@ -252,6 +252,23 @@ describe('友だち数の推移', () => {
     const { trend } = await getDashboardOverview(db, 'today', { allTenants: true });
     expect(trend.find((d) => d.date === jstDate(0))?.active).toBe(2);
   });
+
+  test('日次記録は1回の上限まで進め、未記録の残りを次回に続ける', async () => {
+    for (const id of ['account-a', 'account-b', 'account-c']) insertAccount(id);
+
+    await recordFriendSnapshot(db, null, jstDate(0), 2);
+    expect(sqlite.prepare(`SELECT COUNT(*) AS count FROM friend_daily_snapshots`).get())
+      .toEqual({ count: 2 });
+
+    await recordFriendSnapshot(db, null, jstDate(0), 2);
+    expect(sqlite.prepare(`SELECT line_account_id FROM friend_daily_snapshots ORDER BY line_account_id`).all())
+      .toEqual([
+        { line_account_id: '__unassigned__' },
+        { line_account_id: 'account-a' },
+        { line_account_id: 'account-b' },
+        { line_account_id: 'account-c' },
+      ]);
+  });
 });
 
 describe('受信箱の状態', () => {
@@ -370,5 +387,145 @@ describe('全体', () => {
     const { delivery } = await getDashboardOverview(db, 'today', { allTenants: true });
     expect(delivery.quotaLimit).toBeNull();
     expect(delivery.quotaUsed).toBeNull();
+  });
+
+  test('実データの0件と未取得を指標契約で区別する', async () => {
+    const { metrics } = await getDashboardOverview(db, 'today', { allTenants: true });
+
+    expect(metrics.activeFriends).toMatchObject({
+      value: 0, state: 'empty', reason: null, period: 'latest',
+    });
+    expect(metrics.friendTrend).toMatchObject({
+      state: 'estimated', reason: null, period: 'last7-fixed',
+    });
+    expect(metrics.friendTrend.value).toHaveLength(7);
+    expect(metrics.friendTrend.value?.every((point) => point.active === 0 && point.estimated)).toBe(true);
+    expect(metrics.monthlyQuota).toEqual({
+      value: null, state: 'unavailable', reason: 'not_loaded', asOf: null, period: 'this-month',
+    });
+    expect(metrics.officialProfileUrl).toEqual({
+      value: null, state: 'unavailable', reason: 'not_loaded', asOf: null, period: 'latest',
+    });
+  });
+
+  test('友だち集計に失敗した場合は0件に見せずnullを返す', async () => {
+    const healthyDb = asD1(sqlite);
+    const failedFriendsDb = {
+      ...healthyDb,
+      prepare(query: string) {
+        if (query.includes('COUNT(*) AS total') && query.includes('FROM friends')) {
+          return {
+            bind: () => ({ first: async () => { throw new Error('friends unavailable'); } }),
+          };
+        }
+        return healthyDb.prepare(query);
+      },
+    } as D1Database;
+
+    const { metrics, partialFailures } = await getDashboardOverview(
+      failedFriendsDb,
+      'today',
+      { allTenants: true },
+    );
+
+    expect(metrics.activeFriends).toEqual({
+      value: null, state: 'unavailable', reason: 'source_failed', asOf: null, period: 'latest',
+    });
+    expect(partialFailures).toContain('friends');
+  });
+});
+
+describe('今月の配信(#666 N-003)', () => {
+  function firstOfMonth(): string {
+    return `${jstDate(0).slice(0, 8)}01`;
+  }
+
+  function prevMonthLastDay(): string {
+    return new Date(Date.parse(`${firstOfMonth()}T00:00:00Z`) - 1000).toISOString().slice(0, 10);
+  }
+
+  function seedDelivery(): void {
+    insertAccount('account-a');
+    insertAccount('account-b');
+    insertFriend('friend-a', { lineAccountId: 'account-a' });
+    insertFriend('friend-b', { lineAccountId: 'account-b' });
+    const today = jstDate(0);
+    const first = firstOfMonth();
+    const prev = prevMonthLastDay();
+    const messages = [
+      // [id, friend, account, createdAt, source, counted]
+      ['m-today', 'friend-a', 'account-a', `${today}T10:00:00.000+09:00`, 'manual', true],
+      ['m-month', 'friend-a', 'account-a', `${first}T12:00:00.000+09:00`, 'scenario', true],
+      ['m-edge', 'friend-a', 'account-a', `${first}T00:00:00.000+09:00`, 'manual', true],
+      ['m-prev', 'friend-a', 'account-a', `${prev}T23:59:59.000+09:00`, 'manual', false],
+      ['m-other', 'friend-b', 'account-b', `${today}T10:00:00.000+09:00`, 'manual', false],
+    ] as const;
+    for (const [id, friend, account, createdAt, source] of messages) {
+      sqlite.prepare(
+        `INSERT INTO messages_log
+          (id, friend_id, direction, message_type, content, source, line_account_id, created_at)
+         VALUES (?, ?, 'outgoing', 'text', '本文', ?, ?, ?)`,
+      ).run(id, friend, source, account, createdAt);
+    }
+    const broadcasts = [
+      // [id, account, createdAt, sentAt, status, 数えるか]
+      ['b-today', 'account-a', `${today}T09:00:00.000+09:00`, `${today}T09:05:00.000+09:00`, 'sent', true],
+      ['b-edge', 'account-a', `${first}T00:00:00.000+09:00`, `${first}T00:00:00.000+09:00`, 'sent', true],
+      ['b-prev', 'account-a', `${prev}T23:59:59.000+09:00`, `${prev}T23:59:59.000+09:00`, 'sent', false],
+      // 先月作って今月送った分。送った日で数えるので今月に入る。
+      ['b-made-last-month', 'account-a', `${prev}T20:00:00.000+09:00`, `${first}T09:00:00.000+09:00`, 'sent', true],
+      // 今月作ったが送ったのは先月末（予約の作り直しなど）。今月には入れない。
+      ['b-sent-last-month', 'account-a', `${today}T08:00:00.000+09:00`, `${prev}T22:00:00.000+09:00`, 'sent', false],
+      // 送った日時が残っていない古い行。作った日で代用し、0件へ落とさない。
+      ['b-legacy', 'account-a', `${first}T01:00:00.000+09:00`, null, 'sent', true],
+      ['b-other', 'account-b', `${today}T09:00:00.000+09:00`, `${today}T09:00:00.000+09:00`, 'sent', false],
+      ['b-draft', 'account-a', `${today}T09:00:00.000+09:00`, null, 'draft', false],
+    ] as const;
+    for (const [id, account, createdAt, sentAt, status] of broadcasts) {
+      sqlite.prepare(
+        `INSERT INTO broadcasts
+          (id, title, message_type, message_content, target_type, status, created_at, sent_at, line_account_id, account_ids)
+         VALUES (?, ?, 'text', '本文', 'all', ?, ?, ?, ?, NULL)`,
+      ).run(id, id, status, createdAt, sentAt, account);
+    }
+    return {
+      countedBroadcasts: broadcasts.filter(([, , , , , counted]) => counted).map(([id]) => id),
+    };
+  }
+
+  test('期間「今日」でも今月1日からの送信を数え、先月と他アカウントを混ぜない', async () => {
+    const { countedBroadcasts } = seedDelivery();
+    const overview = await getDashboardOverview(db, 'today', { allowedAccountIds: ['account-a'], includeUnassigned: false });
+    expect(overview.delivery.sent).toBe(3);
+    expect(overview.delivery.reply).toBe(2);
+    expect(overview.delivery.push).toBe(1);
+    // 期待値は仕込みの「数えるか」から作る。定数を書き写すと、仕込みを
+    // 増やしたときに数だけ直して中身の確認が抜ける。
+    expect(overview.delivery.broadcasts).toBe(countedBroadcasts.length);
+    expect(countedBroadcasts).toEqual(['b-today', 'b-edge', 'b-made-last-month', 'b-legacy']);
+  });
+
+  test('一斉配信は送った日で数える。先月作って今月送った分は入り、今月作って先月送った分は入らない', async () => {
+    seedDelivery();
+    const scope = { allowedAccountIds: ['account-a'], includeUnassigned: false } as const;
+    const before = (await getDashboardOverview(db, 'today', scope)).delivery.broadcasts;
+    // 今月送った1本を先月送りへ動かすと、ちょうど1本減る。作った日で
+    // 数えていると created_at は今月のままなので減らない。
+    sqlite.prepare('UPDATE broadcasts SET sent_at = ? WHERE id = ?')
+      .run(`${prevMonthLastDay()}T21:00:00.000+09:00`, 'b-made-last-month');
+    const after = (await getDashboardOverview(db, 'today', scope)).delivery.broadcasts;
+    expect(after).toBe(before - 1);
+  });
+
+  test('期間を切り替えても「今月の配信」の範囲は変わらず、区画の期間表示は this-month', async () => {
+    const { countedBroadcasts } = seedDelivery();
+    const scope = { allowedAccountIds: ['account-a'], includeUnassigned: false } as const;
+    for (const period of ['today', 'last7', 'last28'] as const) {
+      const overview = await getDashboardOverview(db, period, scope);
+      expect(overview.delivery.sent).toBe(3);
+      expect(overview.delivery.broadcasts).toBe(countedBroadcasts.length);
+      expect(overview.sections.delivery.period).toBe('this-month');
+      expect(overview.period).toBe(period);
+    }
   });
 });

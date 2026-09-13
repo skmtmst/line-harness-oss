@@ -19,6 +19,11 @@ import {
   getMileageRewardRedemptionCounts,
   reserveMileageRewardRedemption,
   MileageRewardError,
+  encryptCredential,
+  getAffiliateBankProfile,
+  saveAffiliateBankProfile,
+  listAffiliateStatementsForSelf,
+  getAffiliateStatementDownload,
   type Affiliate,
   type AffiliateLink,
   type AffiliateLinkStat,
@@ -461,6 +466,149 @@ affiliateSelfRoutes.get('/api/liff/affiliate/me', async (c) => {
   } catch (err) {
     console.error('GET /api/liff/affiliate/me error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+/** 本人の振込先。口座番号は復号せず、末尾4桁だけを返す。 */
+affiliateSelfRoutes.get('/api/liff/affiliate/bank', async (c) => {
+  try {
+    const token = c.req.query('lineAccessToken');
+    if (!token) return c.json({ success: false, error: 'lineAccessToken is required' }, 400);
+    const resolved = await resolveFriendFromLineToken(c.env, token);
+    if (resolved.status !== 'ok') return unresolvedResponse(c, resolved);
+    if (!resolved.lineAccountId || resolved.friend.line_account_id !== resolved.lineAccountId) {
+      return c.json({ success: false, error: 'Friend not found' }, 404);
+    }
+    const affiliate = await getAffiliateByFriendId(c.env.DB, resolved.friend.id, resolved.lineAccountId);
+    if (!affiliate) return c.json({ success: false, error: 'Not registered as an affiliate' }, 404);
+    const data = await getAffiliateBankProfile(c.env.DB, {
+      tenantId: resolved.tenantId, lineAccountId: resolved.lineAccountId, affiliateId: affiliate.id,
+    });
+    return c.json({ success: true, data });
+  } catch (error) {
+    console.error('GET /api/liff/affiliate/bank error:', error);
+    return c.json({ success: false, error: '振込先を確認できませんでした' }, 500);
+  }
+});
+
+/** LINEへtokenを再照合した本人だけが振込先を登録・変更できる。 */
+affiliateSelfRoutes.put('/api/liff/affiliate/bank', async (c) => {
+  try {
+    const key = c.req.header('Idempotency-Key')?.trim() ?? '';
+    type BankBody = {
+      lineAccessToken?: unknown; bankCode?: unknown; bankName?: unknown;
+      branchCode?: unknown; branchName?: unknown; accountType?: unknown;
+      accountNumber?: unknown; accountHolderName?: unknown; expectedVersion?: unknown;
+    };
+    const body = await c.req.json<BankBody>().catch((): BankBody => ({}));
+    if (!isValidIdempotencyKey(key) || typeof body.lineAccessToken !== 'string'
+      || typeof body.bankCode !== 'string' || !/^\d{4}$/.test(body.bankCode)
+      || typeof body.bankName !== 'string' || !body.bankName.trim() || body.bankName.length > 100
+      || typeof body.branchCode !== 'string' || !/^\d{3}$/.test(body.branchCode)
+      || typeof body.branchName !== 'string' || !body.branchName.trim() || body.branchName.length > 100
+      || (body.accountType !== 'ordinary' && body.accountType !== 'checking')
+      || typeof body.accountNumber !== 'string' || !/^\d{1,8}$/.test(body.accountNumber)
+      || typeof body.accountHolderName !== 'string' || !body.accountHolderName.trim()
+      || body.accountHolderName.length > 64 || !Number.isInteger(body.expectedVersion)
+      || Number(body.expectedVersion) < 0) {
+      return c.json({ success: false, error: '振込先、版、再実行キーを確認してください' }, 400);
+    }
+    const resolved = await resolveFriendFromLineToken(c.env, body.lineAccessToken);
+    if (resolved.status !== 'ok') return unresolvedResponse(c, resolved);
+    if (!resolved.lineAccountId || resolved.friend.line_account_id !== resolved.lineAccountId) {
+      return c.json({ success: false, error: 'Friend not found' }, 404);
+    }
+    const affiliate = await getAffiliateByFriendId(c.env.DB, resolved.friend.id, resolved.lineAccountId);
+    if (!affiliate) return c.json({ success: false, error: 'Not registered as an affiliate' }, 404);
+    const canonical = {
+      bankCode: body.bankCode, bankName: body.bankName.trim(), branchCode: body.branchCode,
+      branchName: body.branchName.trim(), accountType: body.accountType as 'ordinary' | 'checking',
+      accountNumber: body.accountNumber, accountHolderName: body.accountHolderName.trim(),
+      expectedVersion: Number(body.expectedVersion),
+    };
+    const result = await saveAffiliateBankProfile(c.env.DB, {
+      tenantId: resolved.tenantId, lineAccountId: resolved.lineAccountId,
+      affiliateId: affiliate.id, ...canonical,
+      encryptedAccountNumber: await encryptCredential(body.accountNumber, c.env.LINE_CREDENTIAL_ENCRYPTION_KEY),
+      accountLast4: body.accountNumber.slice(-4),
+      accountFingerprint: await sha256Hex(body.accountNumber),
+      idempotencyKey: key,
+      requestFingerprint: await sha256Hex(JSON.stringify(canonical)),
+    });
+    if (result.kind === 'changed') {
+      return c.json({ success: false, error: '振込先が更新されています', code: 'VERSION_CONFLICT' }, 409);
+    }
+    if (result.kind === 'idempotency_conflict') {
+      return c.json({ success: false, error: '同じ再実行キーが別の入力に使われています', code: 'IDEMPOTENCY_CONFLICT' }, 409);
+    }
+    console.log(JSON.stringify({
+      tag: 'audit', action: 'affiliate.bank.update', actorId: affiliate.id,
+      actorRole: 'affiliate-self', targetKind: 'affiliate-bank-profile', targetId: affiliate.id,
+      at: new Date().toISOString(),
+    }));
+    return c.json({ success: true, data: result.profile }, result.kind === 'created' ? 201 : 200);
+  } catch (error) {
+    console.error('PUT /api/liff/affiliate/bank error:', error);
+    return c.json({ success: false, error: '振込先を保存できませんでした' }, 500);
+  }
+});
+
+/** 本人の支払明細一覧。 */
+affiliateSelfRoutes.get('/api/liff/affiliate/statements', async (c) => {
+  try {
+    const token = c.req.query('lineAccessToken');
+    if (!token) return c.json({ success: false, error: 'lineAccessToken is required' }, 400);
+    const resolved = await resolveFriendFromLineToken(c.env, token);
+    if (resolved.status !== 'ok') return unresolvedResponse(c, resolved);
+    if (!resolved.lineAccountId || resolved.friend.line_account_id !== resolved.lineAccountId) {
+      return c.json({ success: false, error: 'Friend not found' }, 404);
+    }
+    const affiliate = await getAffiliateByFriendId(c.env.DB, resolved.friend.id, resolved.lineAccountId);
+    if (!affiliate) return c.json({ success: false, error: 'Not registered as an affiliate' }, 404);
+    const data = await listAffiliateStatementsForSelf(c.env.DB, {
+      tenantId: resolved.tenantId, lineAccountId: resolved.lineAccountId, affiliateId: affiliate.id,
+    });
+    return c.json({ success: true, data });
+  } catch (error) {
+    console.error('GET /api/liff/affiliate/statements error:', error);
+    return c.json({ success: false, error: '支払明細を確認できませんでした' }, 500);
+  }
+});
+
+/** 本人の有効な明細だけをR2から返す。 */
+affiliateSelfRoutes.get('/api/liff/affiliate/statements/:id/download', async (c) => {
+  try {
+    const token = c.req.query('lineAccessToken');
+    if (!token) return c.json({ success: false, error: 'lineAccessToken is required' }, 400);
+    const resolved = await resolveFriendFromLineToken(c.env, token);
+    if (resolved.status !== 'ok') return unresolvedResponse(c, resolved);
+    if (!resolved.lineAccountId || resolved.friend.line_account_id !== resolved.lineAccountId) {
+      return c.json({ success: false, error: 'Friend not found' }, 404);
+    }
+    const affiliate = await getAffiliateByFriendId(c.env.DB, resolved.friend.id, resolved.lineAccountId);
+    if (!affiliate) return c.json({ success: false, error: 'Not registered as an affiliate' }, 404);
+    const file = await getAffiliateStatementDownload(c.env.DB, {
+      tenantId: resolved.tenantId, lineAccountId: resolved.lineAccountId,
+      affiliateId: affiliate.id, statementId: c.req.param('id'),
+    });
+    if (!file) return c.json({ success: false, error: '支払明細が見つからないか期限切れです' }, 404);
+    const object = await c.env.IMAGES.get(file.objectKey);
+    if (!object) return c.json({ success: false, error: '支払明細が見つかりません' }, 404);
+    console.log(JSON.stringify({
+      tag: 'audit', action: 'affiliate.statement.download', actorId: affiliate.id,
+      actorRole: 'affiliate-self', targetKind: 'affiliate-statement', targetId: file.statement.id,
+      at: new Date().toISOString(),
+    }));
+    return new Response(object.body, {
+      headers: {
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `attachment; filename="affiliate-statement-${file.statement.id}.pdf"`,
+        'Cache-Control': 'private, no-store',
+      },
+    });
+  } catch (error) {
+    console.error('GET /api/liff/affiliate/statements/:id/download error:', error);
+    return c.json({ success: false, error: '支払明細を取得できませんでした' }, 500);
   }
 });
 

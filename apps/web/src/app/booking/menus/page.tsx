@@ -4,22 +4,24 @@ import SelectField from '@/components/shared/select-field'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import Button from '@/components/shared/button'
+import Breadcrumb from '@/components/shared/breadcrumb'
 import ListState from '@/components/shared/list-state'
-import Select from '@/components/shared/select'
+import Pagination from '@/components/shared/pagination'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import {
   api,
   ApiError,
   bookingApi,
   type BookingMenu,
-  type BookingRequest,
-  type BookingStaff,
+  type BookingSettings,
 } from '@/lib/api'
 import type { Tag } from '@line-crm/shared'
 import { useAccount } from '@/contexts/account-context'
 import { Suspense } from 'react'
 import { useMergedTab } from '@/components/layout/merged-tabs'
 import BookingStaffPage from '@/app/booking/staff/page'
+import { bookingMenuError } from './menu-validation'
+import { bookingWindowEnd, businessHourSummary } from '../lib/format-time'
 
 /**
  * 予約設定（設計 V2 8-2 / node nFCBf）。
@@ -31,8 +33,11 @@ import BookingStaffPage from '@/app/booking/staff/page'
 
 const MERGED_TABS = [
   { key: 'menus', label: 'メニュー' },
+  { key: 'rules', label: '予約のルール' },
   { key: 'staff', label: '担当スタッフ' },
 ]
+
+const MENU_PAGE_SIZE = 6
 
 type SupportingLoadState = 'loading' | 'ready' | 'error'
 
@@ -55,79 +60,63 @@ function supportingDetail(
   return readyDetail
 }
 
-/** JSTでの年月。今月の予約を数えるのに使う。 */
-function jstMonth(iso: string): string {
-  return new Date(new Date(iso).getTime() + 9 * 3600_000).toISOString().slice(0, 7)
-}
-
-function monthKey(offset: number): string {
-  const now = new Date(Date.now() + 9 * 3600_000)
-  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + offset, 1))
-    .toISOString()
-    .slice(0, 7)
-}
-
-function MenusPageInner() {
-  const { selectedAccountId, selectedAccount } = useAccount()
+function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuCount: (count: number | null) => void }) {
+  const { selectedAccountId } = useAccount()
   const [items, setItems] = useState<BookingMenu[]>([])
-  const [editing, setEditing] = useState<Partial<BookingMenu> | null>(null)
+  const [settings, setSettings] = useState<BookingSettings | null>(null)
+  const [editing, setEditing] = useState<BookingMenu | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   // copy 状態は menu.id 単位で持つ。複数メニューを連続でコピーしたとき
   // 直近にコピーした行だけ「コピー済」が出る。
-  const [copiedMenuId, setCopiedMenuId] = useState<string | null>(null)
-  const [removeTarget, setRemoveTarget] = useState<BookingMenu | null>(null)
-  const [deleting, setDeleting] = useState(false)
+  const [visibilityTarget, setVisibilityTarget] = useState<BookingMenu | null>(null)
+  const [updatingVisibility, setUpdatingVisibility] = useState(false)
+  const [visibilityError, setVisibilityError] = useState<string | null>(null)
   const [tags, setTags] = useState<Tag[]>([])
-  const [staff, setStaff] = useState<BookingStaff[]>([])
   /** メニューID → 担当できるスタッフの表示名。 */
   const [menuStaff, setMenuStaff] = useState<Map<string, string[]>>(new Map())
-  /** 担当を引けなかったスタッフの表示名。空でなければ「担当なし」は当てにならない。 */
-  const [staffReadFailed, setStaffReadFailed] = useState<string[]>([])
-  const [bookings, setBookings] = useState<BookingRequest[]>([])
   const [supportingLoadState, setSupportingLoadState] = useState<SupportingLoadState>('loading')
-  const [query, setQuery] = useState('')
-  const [sort, setSort] = useState<'bookings' | 'order' | 'name'>('bookings')
-  const [period, setPeriod] = useState<'current' | 'previous' | 'all'>('current')
+  const [page, setPage] = useState(1)
   const loadGenerationRef = useRef(0)
-
-  const liffId = selectedAccount?.liffId ?? null
-  const workerBase = process.env.NEXT_PUBLIC_API_URL ?? ''
-
-  async function copyMenuUrl(menuId: string) {
-    if (!workerBase || !liffId) return
-    const url = `${workerBase}/o?liffId=${encodeURIComponent(liffId)}&page=salon-book&menu_id=${encodeURIComponent(menuId)}`
-    try {
-      await navigator.clipboard.writeText(url)
-      setCopiedMenuId(menuId)
-      setTimeout(() => {
-        setCopiedMenuId((cur) => (cur === menuId ? null : cur))
-      }, 2000)
-    } catch {
-      window.prompt('コピーしてください:', url)
-    }
-  }
 
   const load = useCallback(async () => {
     const requestGeneration = ++loadGenerationRef.current
     if (!selectedAccountId) {
       setItems([])
+      setSettings(null)
+      setMenuStaff(new Map())
+      setSupportingLoadState('loading')
       setLoading(false)
       setError(null)
       return
     }
     setLoading(true)
     setError(null)
+    setSupportingLoadState('loading')
     // アカウント切替時は前 account の menus が表示・操作可能なまま残らないよう
     // 先にクリア。fetch 失敗でも cross-account の操作事故が起きない。
     setItems([])
+    setSettings(null)
+    setMenuStaff(new Map())
     try {
-      const r = await bookingApi.listMenus(selectedAccountId)
+      const [r, bookingSettingsResponse] = await Promise.all([
+        bookingApi.listMenus(selectedAccountId),
+        bookingApi.getSettings(selectedAccountId).catch(() => null),
+      ])
       if (loadGenerationRef.current !== requestGeneration) return
-      setItems(r.menus)
+      // 状態撮影や移行途中の口が空の器を返しても、画面全体を落とさず0件として扱う。
+      const menus = Array.isArray(r.menus) ? r.menus : []
+      setItems(menus)
+      setMenuStaff(new Map(menus.map((menu) => [
+        menu.id,
+        (menu.assigned_staff ?? []).map((person) => person.display_name || person.id),
+      ])))
+      setSupportingLoadState('ready')
+      setSettings(bookingSettingsResponse?.success ? bookingSettingsResponse.data : null)
     } catch (e) {
       if (loadGenerationRef.current !== requestGeneration) return
       setError(bookingErrorMessage(e, '読み込み'))
+      setSupportingLoadState('error')
     } finally {
       if (loadGenerationRef.current === requestGeneration) setLoading(false)
     }
@@ -136,6 +125,10 @@ function MenusPageInner() {
   useEffect(() => {
     load()
   }, [load])
+
+  useEffect(() => {
+    onMenuCount(!loading && !error ? settings?.menuCount ?? items.length : null)
+  }, [error, items.length, loading, onMenuCount, settings?.menuCount])
 
   useEffect(() => {
     let cancelled = false
@@ -152,163 +145,85 @@ function MenusPageInner() {
     }
   }, [])
 
-  // スタッフ・割り当て・予約件数。表の右半分と上のKPIに要る。
-  // 割り当てはスタッフ単位でしか引けないので、人数ぶん引いて裏返す。
-  // 店のスタッフは数人なので、この回数で困ることはない。
-  useEffect(() => {
-    setStaff([])
-    setBookings([])
-    setMenuStaff(new Map())
-    setStaffReadFailed([])
-    setSupportingLoadState('loading')
+  async function save(m: BookingMenu) {
     if (!selectedAccountId) return
-    let alive = true
-    void (async () => {
-      try {
-        const [staffRes, bookingRes] = await Promise.all([
-          bookingApi.listStaff(selectedAccountId),
-          bookingApi.listRequests(selectedAccountId, 'all'),
-        ])
-        if (!alive) return
-        setStaff(staffRes.staff)
-        setBookings(bookingRes.requests)
-
-        const map = new Map<string, string[]>()
-        const failed: string[] = []
-        await Promise.all(
-          staffRes.staff.map(async (s) => {
-            try {
-              const { matrix } = await bookingApi.getStaffMenus(selectedAccountId, s.id)
-              for (const row of matrix) {
-                if (!row.is_offered) continue
-                map.set(row.menu_id, [...(map.get(row.menu_id) ?? []), s.display_name || s.name])
-              }
-            } catch {
-              // 1人ぶん引けなくても、他の行は出せる。ただし黙って捨てると、
-              // この人だけが担当のメニューが「担当なし」＝予約枠が出ない、と
-              // 誤って読める。名前を控えて表の上で断る。
-              failed.push(s.display_name || s.name)
-            }
-          }),
-        )
-        if (alive) {
-          setMenuStaff(map)
-          setStaffReadFailed(failed)
-          setSupportingLoadState('ready')
-        }
-      } catch {
-        if (alive) setSupportingLoadState('error')
-      }
-    })()
-    return () => {
-      alive = false
-    }
-  }, [selectedAccountId])
-
-  async function save(m: Partial<BookingMenu>) {
-    if (!selectedAccountId) return
-    if (m.id) {
-      await bookingApi.updateMenu(selectedAccountId, m.id, m)
-    } else {
-      await bookingApi.createMenu(selectedAccountId, m)
-    }
+    await bookingApi.updateMenu(selectedAccountId, m.id, m)
     setEditing(null)
     await load()
   }
 
   /**
-   * 消す前に、**何が消えて何が残るかを本文で読ませる。**
-   * ブラウザの `confirm()` は見た目がブラウザ任せで、設計の確認窓と違ううえ、
-   * 画像比較にも写らない（確認の絵をそもそも撮れない）。
+   * 公開状態を変える前に、**何が止まり何が残るかを本文で読ませる。**
+   * 既存予約を残したまま新規受付だけを止めるため、確認窓を挟む。
    */
-  async function remove(id: string) {
+  /**
+   * 公開切替だけを版付きで送る(PATCH)。PUT は送らなかった項目まで
+   * 既定値で上書きしてしまうため、ここでは使わない。
+   */
+  async function toggleVisibility(menu: BookingMenu) {
     if (!selectedAccountId) return
-    setDeleting(true)
+    setUpdatingVisibility(true)
+    setVisibilityError(null)
     try {
-      await bookingApi.deleteMenu(selectedAccountId, id)
-      setRemoveTarget(null)
+      const version = menu.version
+      if (typeof version !== 'number' || !Number.isInteger(version) || version < 1) {
+        // 版が無ければ最新を読み直してからやり直してもらう。
+        await load()
+        setVisibilityError('最新の状態を読み直しました。もう一度お試しください。')
+        return
+      }
+      await bookingApi.patchMenu(selectedAccountId, menu.id, version, { is_active: !menu.is_active })
+      setVisibilityTarget(null)
+      setVisibilityError(null)
       await load()
+    } catch (error) {
+      // 失敗しても窓は開けたままにし、理由を窓の中で伝える。
+      setVisibilityError(bookingErrorMessage(error, '保存'))
     } finally {
-      setDeleting(false)
+      setUpdatingVisibility(false)
     }
   }
 
-  const thisMonth = monthKey(0)
-  const kpi = useMemo(() => {
-    const inThis = bookings.filter((b) => jstMonth(b.starts_at) === thisMonth).length
-    const inLast = bookings.filter((b) => jstMonth(b.starts_at) === monthKey(-1)).length
-    return { inThis, diff: inThis - inLast }
-  }, [bookings, thisMonth])
-
-  const periodBookings = useMemo(() => {
-    const month = period === 'current' ? thisMonth : period === 'previous' ? monthKey(-1) : null
-    return month ? bookings.filter((booking) => jstMonth(booking.starts_at) === month) : bookings
-  }, [bookings, period, thisMonth])
-
-  /** メニュー名 → 選択期間の予約件数。 */
+  /** メニューID → Workerで集計済みの直近30日予約件数。 */
   const bookingCounts = useMemo(() => {
-    const counts = new Map<string, number>()
-    for (const b of periodBookings) {
-      counts.set(b.menu_name, (counts.get(b.menu_name) ?? 0) + 1)
-    }
-    return counts
-  }, [periodBookings])
+    return new Map(items.map((menu) => [menu.id, menu.booking_count_30_days ?? 0]))
+  }, [items])
 
   const shown = useMemo(() => {
-    const q = query.trim()
-    const filtered = q ? items.filter((m) => m.name.includes(q)) : items
-    return [...filtered].sort((a, b) => {
-      if (sort === 'bookings') {
-        const diff = (bookingCounts.get(b.name) ?? 0) - (bookingCounts.get(a.name) ?? 0)
-        if (diff !== 0) return diff
-      }
-      if (sort === 'name') return a.name.localeCompare(b.name, 'ja')
-      return a.sort_order - b.sort_order || a.id.localeCompare(b.id)
-    })
-  }, [bookingCounts, items, query, sort])
+    return [...items].sort((a, b) => a.sort_order - b.sort_order || a.id.localeCompare(b.id))
+  }, [items])
 
-  function exportCsv() {
-    const escape = (value: string | number) => `"${String(value).replaceAll('"', '""')}"`
-    const rows = shown.map((menu) => [
-      menu.name,
-      menu.category_label ?? '',
-      menu.duration_minutes,
-      menu.buffer_after_minutes,
-      menu.base_price,
-      supportingLoadState === 'ready' ? (menuStaff.get(menu.id) ?? []).join('・') : '—',
-      supportingLoadState === 'ready' ? bookingCounts.get(menu.name) ?? 0 : '—',
-      menu.is_active ? '公開中' : '非公開',
-    ])
-    const csv = [
-      ['メニュー名', '分類', '所要時間（分）', '後片付け（分）', '料金（円）', '担当者', '予約件数', '状態'],
-      ...rows,
-    ].map((row) => row.map(escape).join(',')).join('\r\n')
-    const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' }))
-    const anchor = document.createElement('a')
-    anchor.href = url
-    anchor.download = `予約メニュー-${period === 'current' ? '今月' : period === 'previous' ? '前月' : '全期間'}.csv`
-    document.body.append(anchor)
-    anchor.click()
-    anchor.remove()
-    window.setTimeout(() => URL.revokeObjectURL(url), 0)
-  }
+  const pageCount = Math.max(1, Math.ceil(shown.length / MENU_PAGE_SIZE))
+  const visible = shown.slice((page - 1) * MENU_PAGE_SIZE, page * MENU_PAGE_SIZE)
+
+  useEffect(() => {
+    setPage((current) => Math.min(current, pageCount))
+  }, [pageCount])
+
+  const favorite = useMemo(() => {
+    if (supportingLoadState !== 'ready' || items.length === 0) return null
+    return items.reduce((best, menu) =>
+      (bookingCounts.get(menu.id) ?? 0) > (bookingCounts.get(best.id) ?? 0) ? menu : best,
+    items[0])
+  }, [bookingCounts, items, supportingLoadState])
+
+  const activeWindowDays = useMemo(
+    () => [...new Set(items.filter((menu) => menu.is_active).map((menu) => menu.booking_window_days).filter((days): days is number => typeof days === 'number'))].sort((a, b) => a - b),
+    [items],
+  )
+  const businessHours = businessHourSummary(settings?.businessHours)
+  const configuredWindowDays = settings?.bookingWindowDays
+  const bookingWindowDays = typeof configuredWindowDays === 'number' && configuredWindowDays > 0
+    ? configuredWindowDays
+    : (activeWindowDays.length === 1 ? activeWindowDays[0] : null)
 
   return (
     <div data-design-node="QSLEH">
-      <div data-design="Head" className="mb-4 flex flex-wrap items-center gap-2">
-        <Button variant="primary" href="/booking/menus/new">
-          予約メニューを作る
-        </Button>
-        <div className="ml-auto">
-          <Button href="/booking/staff/shifts">受付枠と休業日を設定</Button>
-        </div>
-      </div>
-
       <div data-design="KPIs" className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">
         <Kpi
-          title="メニュー"
-          value={!selectedAccountId || loading || error ? '—' : String(items.length)}
-          unit="件"
+          title="出しているメニュー"
+          value={!selectedAccountId || loading || error ? '—' : String(settings?.activeMenuCount ?? items.filter((m) => m.is_active).length)}
+          unit="つ"
           detail={
             !selectedAccountId
               ? 'アカウントを選択'
@@ -316,79 +231,47 @@ function MenusPageInner() {
                 ? '読み込み中'
                 : error
                   ? '取得できませんでした'
-                  : `公開中 ${items.filter((m) => m.is_active).length}`
+                  : `止めているもの ${settings?.inactiveMenuCount ?? items.filter((m) => !m.is_active).length}つ`
           }
         />
         <Kpi
-          title="担当スタッフ"
-          value={supportingLoadState === 'ready' ? String(staff.length) : '—'}
-          unit="人"
+          title="いちばん選ばれた"
+          value={favorite?.name ?? '—'}
+          unit=""
           detail={supportingDetail(
             Boolean(selectedAccountId),
             supportingLoadState,
-            `稼働中 ${staff.filter((s) => s.is_active).length}`,
+            favorite ? `この30日で ${bookingCounts.get(favorite.id) ?? 0}件` : '予約実績はありません',
           )}
         />
         <Kpi
-          title="今月の予約"
-          value={supportingLoadState === 'ready' ? String(kpi.inThis) : '—'}
-          unit="件"
-          detail={supportingDetail(
-            Boolean(selectedAccountId),
-            supportingLoadState,
-            `前月比 ${kpi.diff >= 0 ? '+' : ''}${kpi.diff}`,
-          )}
+          title="受け付けている時間"
+          value={loading || error ? '—' : businessHours.value}
+          unit=""
+          detail={loading || error ? '受付枠で曜日ごとに確認' : businessHours.detail || '受付枠で曜日ごとに確認'}
         />
-        {/* 枠の稼働率は「公開している枠のうち何割が埋まったか」。
-            受付時間の総枠数を数える仕組みがまだ無いので出せない。 */}
-        <Kpi title="枠の稼働率" value="—" unit="%" detail="公開枠のうち" />
+        <Kpi
+          title="先の予約が取れる範囲"
+          value={loading || error || bookingWindowDays === null
+            ? '—'
+            : `${bookingWindowDays}日先まで`}
+          unit=""
+          detail={bookingWindowDays === null ? '予約のルールで確認' : `今日から ${bookingWindowEnd(bookingWindowDays)} まで`}
+        />
       </div>
 
-      <div
-        data-design="Bar"
-        className="bg-canvas rounded-card border-hairline mb-3 flex flex-wrap items-center gap-2 border p-3"
-      >
-        <input
-          type="search"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="メニュー名で検索"
-          aria-label="メニュー名で検索"
-          className="border-hairline rounded-control focus:ring-accent min-w-0 flex-1 border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
-        />
-        <Select
-          aria-label="並び順"
-          value={sort}
-          onChange={(value) => setSort(value as typeof sort)}
-          options={[
-            { value: 'bookings', label: '予約が多い順' },
-            { value: 'order', label: '公開順' },
-            { value: 'name', label: '名前順' },
-          ]}
-        />
-        <Select
-          aria-label="集計期間"
-          value={period}
-          onChange={(value) => setPeriod(value as typeof period)}
-          options={[
-            { value: 'current', label: '今月' },
-            { value: 'previous', label: '前月' },
-            { value: 'all', label: '全期間' },
-          ]}
-        />
-        <Button onClick={exportCsv} disabled={loading || Boolean(error) || shown.length === 0}>
-          CSVで書き出す
-        </Button>
+      <div data-design="Bar" className="bg-info-bg text-info mb-4 rounded-control px-4 py-3 text-xs font-semibold">
+        ⓘ　上から並んだ順に、お客様の画面に出ます。かかる時間を長めにしておくと、あとの予約とぶつかりません。金額を空けておくと「お問い合わせ」と出ます。
       </div>
 
-      {staffReadFailed.length > 0 && (
-        <div className="bg-warning-bg text-warning rounded-card mb-3 px-4 py-3 text-xs">
-          {staffReadFailed.join('・')} の担当を読み取れませんでした。
-          この人だけが担当しているメニューは、実際には担当がいても「担当なし」と出ます。
-          時間をおいて開き直してください。
-        </div>
-      )}
-
+      {activeTab === 'rules' ? (
+        <BookingRulesSummary
+          items={items}
+          loading={loading}
+          error={error}
+          onRetry={() => void load()}
+        />
+      ) : <>
       {!selectedAccountId ? (
         <div data-design-node="W6465r"><ListState kind="empty" title="LINEアカウントを選んでください" description="共通メニューで、予約設定を開くLINEアカウントを選んでください。" /></div>
       ) : loading ? (
@@ -399,9 +282,9 @@ function MenusPageInner() {
         <div data-design-node="W6465r">
           <ListState
             kind="empty"
-            title={query ? '条件に合う予約メニューはありません' : 'まだ予約メニューがありません'}
-            description={query ? '検索語を変えてください。' : '最初の予約メニューを作ると、ここに並びます。'}
-            action={query ? undefined : <Button variant="primary" href="/booking/menus/new">予約メニューを作る</Button>}
+            title="まだ予約メニューがありません"
+            description="メニューを作ると、お客様の予約画面に出ます。"
+            action={<Button variant="primary" href="/booking/menus/new">＋ 予約メニューを作る</Button>}
           />
         </div>
       ) : (
@@ -413,23 +296,22 @@ function MenusPageInner() {
             <table className="w-full min-w-[880px]">
               <thead>
                 <tr className="bg-canvas-sunken border-b border-hairline">
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint">メニュー名</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint">所要時間</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-ink-faint">料金</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint">担当できるスタッフ</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint">メニュー</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint">かかる時間</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold text-ink-faint">金額</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint">だれが受けられるか</th>
                   <th className="px-4 py-3 text-right text-xs font-semibold text-ink-faint">
-                    {period === 'current' ? '今月' : period === 'previous' ? '前月' : '全期間'}の予約
+                    この30日
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint">予約URL</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint">状態</th>
                   <th className="px-4 py-3 text-right text-xs font-semibold text-ink-faint">操作</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {shown.map((m) => (
-                  <tr key={m.id} className="hover:bg-canvas-sunken">
+                {visible.map((m) => (
+                  <tr key={m.id} className={`hover:bg-canvas-sunken ${m.is_active ? '' : 'text-ink-faint'}`}>
                     <td className="px-4 py-3 text-sm font-medium">
-                      {m.name}
+                      <span className="text-ink-faint mr-4" aria-hidden="true">⠿</span>{m.name}{m.is_active ? '' : '（休止中）'}
+                      {m.description && <span className="text-ink-faint mt-1 block max-w-72 truncate text-xs" title={m.description}>{m.description}</span>}
                       {m.category_label && (
                         <span className="bg-canvas-sunken text-ink-faint ml-2 inline-block rounded px-2 py-0.5 text-xs">
                           {m.category_label}
@@ -438,13 +320,14 @@ function MenusPageInner() {
                     </td>
                     <td className="px-4 py-3 text-sm text-ink-secondary tabular-nums">
                       {m.duration_minutes} 分
-                      {m.buffer_after_minutes > 0 && (
-                        <span className="text-xs text-ink-faint ml-1">+{m.buffer_after_minutes}</span>
-                      )}
                     </td>
-                    <td className="px-4 py-3 text-sm text-right tabular-nums">¥{m.base_price.toLocaleString()}</td>
+                    <td className={`px-4 py-3 text-sm text-right tabular-nums ${m.base_price === 0 ? 'text-accent font-semibold' : ''}`}>
+                      {m.base_price === 0 ? '無料' : `¥${m.base_price.toLocaleString()}`}
+                    </td>
                     <td className="px-4 py-3 text-sm text-ink-secondary">
-                      {supportingLoadState !== 'ready' ? (
+                      {!m.is_active ? (
+                        <span className="text-warning text-xs">だれもいません</span>
+                      ) : supportingLoadState !== 'ready' ? (
                         <span className="text-ink-faint text-xs">—（未取得）</span>
                       ) : (menuStaff.get(m.id) ?? []).length === 0 ? (
                         // 担当が0人だと、公開していても予約フォームに枠が出ない。
@@ -455,55 +338,17 @@ function MenusPageInner() {
                       )}
                     </td>
                     <td className="px-4 py-3 text-right text-sm tabular-nums">
-                      {supportingLoadState === 'ready' ? `${bookingCounts.get(m.name) ?? 0} 件` : '—'}
-                    </td>
-                    <td className="px-4 py-3 text-sm">
-                      <div className="inline-flex gap-2 text-xs">
-                        {!liffId ? (
-                          <span className="text-gray-300" title="LIFF ID 未設定">コピー</span>
-                        ) : !m.is_active ? (
-                          // is_active=0 のメニューは /api/liff/booking/menus が
-                          // 返さないので、URL を送っても LIFF は解決失敗して
-                          // 通常のメニュー一覧に fallback する。間違って「指定メニュー
-                          // 直通」のつもりで送って別メニュー予約されるのを防ぐため、
-                          // 有効化されるまでコピー不可にする。
-                          <span className="text-gray-300" title="メニューを有効化するとコピーできます">コピー</span>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => copyMenuUrl(m.id)}
-                            className="text-blue-600 hover:underline"
-                            title={`${workerBase}/o?liffId=${encodeURIComponent(liffId)}&page=salon-book&menu_id=${encodeURIComponent(m.id)}`}
-                          >
-                            {copiedMenuId === m.id ? '✓ コピー済' : 'コピー'}
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-sm">
-                      {m.is_active ? (
-                        <span className="bg-success-bg text-success rounded-pill inline-block px-2 py-0.5 text-xs">
-                          公開中
-                        </span>
-                      ) : (
-                        <span className="bg-canvas-sunken text-ink-faint rounded-pill inline-block px-2 py-0.5 text-xs">
-                          非公開
-                        </span>
-                      )}
+                      {supportingLoadState === 'ready' ? `${bookingCounts.get(m.id) ?? 0} 件` : '—'}
                     </td>
                     <td className="px-4 py-3 text-right">
                       <div className="inline-flex gap-2 text-xs">
-                        <button onClick={() => setEditing(m)} className="text-blue-600 hover:underline">
-                          編集
+                        {/* QSLEH の行操作は共通Button（高さ36px）より小さいため、
+                            表の行高を設計どおり保つ専用の小ボタンにする。 */}
+                        <button onClick={() => setEditing(m)} className="border-hairline rounded-control border px-2 py-1 font-semibold">
+                          中身を見る
                         </button>
-                        <Link
-                          href={`/booking/menus/staff?menu_id=${m.id}`}
-                          className="text-blue-600 hover:underline"
-                        >
-                          スタッフ割当
-                        </Link>
-                        <button onClick={() => setRemoveTarget(m)} className="text-red-600 hover:underline">
-                          削除
+                        <button onClick={() => setVisibilityTarget(m)} className="border-hairline rounded-control border px-2 py-1 font-semibold">
+                          止める・出す
                         </button>
                       </div>
                     </td>
@@ -515,23 +360,79 @@ function MenusPageInner() {
         </div>
       )}
 
-      <div className="mt-3">
-        <span className="text-ink-faint text-xs">全 {shown.length} 件</span>
+      <div className="mt-3 flex items-center justify-between gap-3">
+        <span className="text-ink-faint text-xs">メニュー {settings?.menuCount ?? items.length}つのうち {visible.length}つを表示</span>
+        <Pagination page={page} pageCount={pageCount} onPageChange={setPage} ariaLabel="予約メニューのページ送り" />
       </div>
+      </>}
 
-      {editing && <Modal menu={editing} tags={tags} onSave={save} onClose={() => setEditing(null)} />}
+      {editing && (
+        <EditMenuModal
+          menu={editing}
+          tags={tags}
+          accountId={selectedAccountId}
+          onSave={save}
+          onClose={() => setEditing(null)}
+        />
+      )}
 
       <ConfirmDialog
-        open={removeTarget !== null}
-        title={`「${removeTarget?.name ?? ''}」を削除しますか？`}
-        description="このメニューを一覧から削除します。すでに入っている予約はそのまま残ります。この操作は取り消せません。"
-        confirmLabel="削除する"
-        destructive
-        busy={deleting}
-        onCancel={() => setRemoveTarget(null)}
-        onConfirm={() => { if (removeTarget) void remove(removeTarget.id) }}
+        open={visibilityTarget !== null}
+        title={`「${visibilityTarget?.name ?? ''}」を${visibilityTarget?.is_active ? '止め' : '公開し'}ますか？`}
+        description={visibilityTarget?.is_active
+          ? 'お客様の画面から外し、新しい予約を止めます。すでに入っている予約はそのまま残ります。'
+          : 'お客様の画面へ出し、新しい予約を受け付けます。担当と受付枠を確認してから公開してください。'}
+        confirmLabel={visibilityTarget?.is_active ? '新しい予約を止める' : 'お客様の画面へ出す'}
+        destructive={Boolean(visibilityTarget?.is_active)}
+        busy={updatingVisibility}
+        error={visibilityError ?? undefined}
+        onCancel={() => { setVisibilityTarget(null); setVisibilityError(null) }}
+        onConfirm={() => { if (visibilityTarget) void toggleVisibility(visibilityTarget) }}
       />
     </div>
+  )
+}
+
+function BookingRulesSummary({ items, loading, error, onRetry }: {
+  items: BookingMenu[]
+  loading: boolean
+  error: string | null
+  onRetry: () => void
+}) {
+  if (loading) return <ListState kind="loading" description="予約のルールを読み込んでいます。" />
+  if (error) return <ListState kind="error" description={error} onRetry={onRetry} />
+  if (items.length === 0) return <ListState kind="empty" title="確認できる予約のルールがありません" description="メニューを作ると、メニューごとの受付期間・締め切り・キャンセル期限をここで見比べられます。" />
+
+  const rows = [
+    { label: '先の予約が取れる範囲', key: 'booking_window_days' as const, unit: '日先まで', none: '制限なし' },
+    { label: '受付の締め切り', key: 'cutoff_hours_before' as const, unit: '時間前', none: '直前まで' },
+    { label: 'キャンセル期限', key: 'cancel_deadline_hours_before' as const, unit: '時間前', none: '制限なし' },
+  ]
+  return (
+    <section data-booking-rules className="space-y-4">
+      <div className="bg-accent-soft rounded-card border-accent/30 border p-4">
+        <h2 className="text-ink text-base font-semibold">予約のルールをまとめて確認</h2>
+        <p className="text-ink-secondary mt-1 text-sm">いまはメニューごとに保存されている3つのルールを、ここで横並びに確認できます。</p>
+        <p className="text-ink-faint mt-2 text-xs">店舗共通の初期値を一度で保存するAPIは未接続です。接続後は共通値をここで変更し、各メニューは必要な項目だけ上書きします。</p>
+      </div>
+      <div className="bg-canvas rounded-card border-hairline overflow-hidden border">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-canvas-sunken text-ink-secondary">
+              <tr><th className="px-4 py-3 text-left font-medium">メニュー</th>{rows.map((row) => <th key={row.key} className="px-4 py-3 text-left font-medium">{row.label}</th>)}</tr>
+            </thead>
+            <tbody className="divide-hairline divide-y">
+              {items.map((menu) => (
+                <tr key={menu.id}>
+                  <td className="px-4 py-3 font-medium">{menu.name}</td>
+                  {rows.map((row) => <td key={row.key} className="text-ink-secondary px-4 py-3 tabular-nums">{menu[row.key] == null ? row.none : `${menu[row.key]}${row.unit}`}</td>)}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
   )
 }
 
@@ -558,26 +459,59 @@ function Kpi({
   )
 }
 
-function Modal({
+function EditMenuModal({
   menu,
   tags,
+  accountId,
   onSave,
   onClose,
 }: {
-  menu: Partial<BookingMenu>
+  menu: BookingMenu
   tags: Tag[]
-  onSave: (m: Partial<BookingMenu>) => Promise<void>
+  accountId: string | null
+  onSave: (m: BookingMenu) => Promise<void>
   onClose: () => void
 }) {
-  const [form, setForm] = useState<Partial<BookingMenu>>(menu)
+  const [form, setForm] = useState<BookingMenu>(menu)
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState<string | null>(null)
 
-  function set<K extends keyof BookingMenu>(k: K, v: BookingMenu[K] | string | null) {
+  /*
+   * 候補は「今のアカウントの有効なタグ」だけ。api.tags.list() は見えている
+   * アカウント全部と整理済み(archived)まで返すので、そのまま並べると別アカウントの
+   * タグが選べてしまい、保存時に Worker が tag_not_found で落とす。新規作成画面
+   * (new/page.tsx)と同じ絞り方にそろえ、保存側の検証と二重化する。
+   */
+  const tagCandidates = tags.filter(
+    (t) => t.lineAccountId === accountId && t.status !== 'archived',
+  )
+  /*
+   * 設定した後にタグが整理された既存メニューは、候補に無い ID を抱えたまま開く。
+   * 黙って「なし」に見せると気付かないまま保存で消えるので、選択は残したまま
+   * 何が起きたかを出して選び直させる。保存し直せば Worker 側の active 検証で
+   * 400 になるため、ここで先に知らせる。
+   */
+  const storedTagId = form.auto_tag_id ?? null
+  const danglingAutoTag = storedTagId != null && !tagCandidates.some((t) => t.id === storedTagId)
+  const danglingTagName = tags.find((t) => t.id === storedTagId)?.name ?? null
+
+  /** 数値欄に文字列が入らないよう、鍵と値の型をそろえる。 */
+  function set<K extends keyof BookingMenu>(k: K, v: BookingMenu[K]) {
     setForm({ ...form, [k]: v })
   }
 
   async function submit() {
+    const validationError = bookingMenuError({
+      name: form.name,
+      durationMinutes: form.duration_minutes,
+      bufferAfterMinutes: form.buffer_after_minutes,
+      sortOrder: form.sort_order,
+      assignedStaffCount: form.assigned_staff?.length ?? 0,
+    })
+    if (validationError) {
+      setErr(validationError)
+      return
+    }
     setSaving(true)
     setErr(null)
     try {
@@ -593,7 +527,7 @@ function Modal({
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
         <div className="px-6 py-4 border-b border-hairline">
-          <h2 className="text-base font-semibold">{form.id ? 'メニュー編集' : '新規メニュー'}</h2>
+          <h2 className="text-base font-semibold">メニュー編集</h2>
         </div>
         <div className="px-6 py-4 space-y-4">
           <Field label="名前" required>
@@ -601,7 +535,7 @@ function Modal({
               type="text"
               value={form.name ?? ''}
               onChange={(e) => set('name', e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+              className="border-hairline rounded-control focus:ring-accent w-full border px-3 py-2 text-sm focus:outline-none focus:ring-2"
               placeholder="例: カット"
             />
           </Field>
@@ -610,7 +544,7 @@ function Modal({
               type="text"
               value={form.category_label ?? ''}
               onChange={(e) => set('category_label', e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+              className="border-hairline rounded-control focus:ring-accent w-full border px-3 py-2 text-sm focus:outline-none focus:ring-2"
               placeholder="例: カット / カラー / パーマ"
             />
           </Field>
@@ -618,7 +552,7 @@ function Modal({
             <textarea
               value={form.description ?? ''}
               onChange={(e) => set('description', e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-y"
+              className="border-hairline rounded-control focus:ring-accent w-full border px-3 py-2 text-sm focus:outline-none focus:ring-2 resize-y"
               rows={2}
               placeholder="顧客に表示される説明文"
             />
@@ -651,8 +585,27 @@ function Modal({
             <SelectField
               value={form.auto_tag_id ?? ''}
               onChange={(e) => set('auto_tag_id', e.target.value === '' ? null : e.target.value)}
-              options={[{ value: '', label: '— なし —' }, ...tags.map((t) => ({ value: t.id, label: t.name }))]}
+              options={[
+                { value: '', label: '— なし —' },
+                ...(danglingAutoTag
+                  ? [{
+                      value: storedTagId as string,
+                      label: `${danglingTagName ?? '不明なタグ'}（今は使えません）`,
+                    }]
+                  : []),
+                ...tagCandidates.map((t) => ({ value: t.id, label: t.name })),
+              ]}
             />
+            {danglingAutoTag && (
+              <p className="mt-1 text-xs text-danger">
+                設定されていたタグは整理済みか、このアカウントのタグではありません。選び直すか「なし」にしてください。
+              </p>
+            )}
+            {!danglingAutoTag && tagCandidates.length === 0 && (
+              <p className="mt-1 text-xs text-ink-faint">
+                このアカウントに使えるタグがありません。タグなしで保存できます。
+              </p>
+            )}
             <p className="mt-1 text-xs text-ink-faint">
               このメニューが予約されると、申込者の友だちに自動でこのタグが付きます。タグは既存のものから選択してください (友だち画面 / シナリオ等で使われているタグ)。
             </p>
@@ -796,7 +749,7 @@ function NumField({
         type="number"
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
-        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 tabular-nums"
+        className="border-hairline rounded-control focus:ring-accent w-full border px-3 py-2 text-sm focus:outline-none focus:ring-2 tabular-nums"
       />
     </Field>
   )
@@ -804,8 +757,18 @@ function NumField({
 
 function MenusPageHost() {
   const tab = useMergedTab(MERGED_TABS)
+  const { selectedAccount } = useAccount()
+  const [menuCount, setMenuCount] = useState<number | null>(null)
+  const workerBase = process.env.NEXT_PUBLIC_API_URL ?? ''
+  const previewUrl = selectedAccount?.liffId
+    ? `${workerBase}/o?liffId=${encodeURIComponent(selectedAccount.liffId)}&page=salon-book`
+    : null
   return (
     <div>
+      <div data-design="Head" className="mb-5 flex min-h-10 flex-wrap items-center justify-between gap-3">
+        <Breadcrumb items={[{ label: '予約' }, { label: '予約設定' }]} />
+        {previewUrl && <Button href={previewUrl}>お客様に見える画面を確かめる</Button>}
+      </div>
       {/* 既存の2タブはこの画面の中で切り替わり、
           受付時間は別URLへ移動する。
           MergedTabs は「同じ画面の中で切り替わるもの」しか扱えないので
@@ -815,30 +778,34 @@ function MenusPageHost() {
           href="/booking/menus?tab=menus"
           className={`rounded-t-md px-4 py-2 text-sm ${
             tab === 'menus'
-              ? 'border-accent text-ink border-b-2 font-medium'
+              ? 'border-accent text-accent border-b-2 font-medium'
               : 'text-ink-faint hover:text-ink-secondary'
           }`}
         >
-          メニュー
-        </Link>
-        <Link
-          href="/booking/menus?tab=staff"
-          className={`rounded-t-md px-4 py-2 text-sm ${
-            tab === 'staff'
-              ? 'border-accent text-ink border-b-2 font-medium'
-              : 'text-ink-faint hover:text-ink-secondary'
-          }`}
-        >
-          担当スタッフ
+          メニュー {menuCount ?? '—'}
         </Link>
         <Link
           href="/booking/staff/shifts"
+          className={`rounded-t-md px-4 py-2 text-sm ${
+            'text-ink-faint hover:text-ink-secondary'
+          }`}
+        >
+          受付枠
+        </Link>
+        <Link
+          href="/booking/staff/shifts#special"
           className="text-ink-faint hover:text-ink-secondary rounded-t-md px-4 py-2 text-sm"
         >
-          受付時間
+          休業日
+        </Link>
+        <Link
+          href="/booking/menus?tab=rules"
+          className={`rounded-t-md px-4 py-2 text-sm ${tab === 'rules' ? 'border-accent text-ink border-b-2 font-medium' : 'text-ink-faint hover:text-ink-secondary'}`}
+        >
+          予約のルール
         </Link>
       </div>
-      {tab === 'menus' && <MenusPageInner />}
+      {(tab === 'menus' || tab === 'rules') && <MenusPageInner activeTab={tab} onMenuCount={setMenuCount} />}
       {tab === 'staff' && <BookingStaffPage />}
     </div>
   )

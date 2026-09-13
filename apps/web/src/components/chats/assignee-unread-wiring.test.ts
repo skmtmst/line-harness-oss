@@ -48,8 +48,14 @@ describe('V6 担当者ごとの未読数（YZaDK）の配線', () => {
       担当者一覧そのものは `/api/operators` の結果を保つ。
     */
     expect(EFFECT).toContain("if (!res.success) throw new Error('failed')")
-    expect(EFFECT).toContain('if (!cancelled) setAssigneeUnread(null)')
+    expect(EFFECT).toContain('if (!cancelled) {')
+    expect(EFFECT).toContain('setAssigneeUnread(null)')
+    expect(EFFECT).toContain("setAssigneeUnreadStatus('error')")
     expect(EFFECT).not.toContain('setOperators([])')
+  })
+
+  it('失敗時だけ、0件ではない理由を選び口へ渡す', () => {
+    expect(PAGE).toContain("unreadUnavailable={assigneeUnreadStatus === 'error'}")
   })
 
   it('初期値は未取得であって0件ではない', () => {

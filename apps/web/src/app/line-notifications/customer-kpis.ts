@@ -1,6 +1,7 @@
 export type CustomerNotificationKpi = {
   label: string
   value: number | null
+  unit: '種類' | '通'
   note: string
   href: string | null
 }
@@ -9,19 +10,22 @@ export function customerNotificationKpis(input: {
   ready: boolean
   settingsCount: number
   enabledCount: number
-  processed: number | null
+  sentToday: number | null
+  sentBreakdown: string
   failed: number | null
 }): CustomerNotificationKpi[] {
   const value = (count: number | null): number | null => input.ready ? count : null
+  const stoppedCount = Math.max(0, input.settingsCount - input.enabledCount)
 
   return [
-    { label: '通知テンプレート', value: value(input.settingsCount), note: '顧客向けの重要通知', href: null },
-    { label: '通知ON', value: value(input.enabledCount), note: '現在送信する設定', href: null },
-    { label: '送信完了', value: value(input.processed), note: 'EC連携からの累計', href: null },
+    { label: '出しているお知らせ', value: value(input.enabledCount), unit: '種類', note: input.ready ? `全${input.settingsCount}種類のうち` : '件数を取得中', href: null },
+    { label: '止めているもの', value: value(stoppedCount), unit: '種類', note: '履歴はそのまま残ります', href: null },
+    { label: '今日 送った', value: value(input.sentToday), unit: '通', note: input.sentBreakdown || '種類別の件数は未取得', href: null },
     {
-      label: '要確認',
+      label: '送れなかった',
       value: value(input.failed),
-      note: '送信に失敗した通知',
+      unit: '通',
+      note: '確認と別の連絡が必要',
       href: '/line-notifications?tab=failures',
     },
   ]

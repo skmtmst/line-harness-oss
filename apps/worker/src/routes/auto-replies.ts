@@ -7,6 +7,7 @@ import {
   updateAutoReply,
   deleteAutoReply,
   getAutoReplyHitCounts,
+  getAutoReplyHitCountSince,
   getFriendById,
   getTemplateById,
   autoReplyRowFromDraftSettings,
@@ -27,8 +28,9 @@ import type {
 } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
+import { buildOffsetListResponse, parseOffsetPaging } from '../lib/list-paging.js';
 import { currentMonthRange } from '../lib/jst-range.js';
-import { canAccessAllLineAccounts } from '../services/account-access.js';
+import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import {
   compareAutoReplyCandidates,
   evaluateAutoReplyCandidates,
@@ -123,6 +125,7 @@ interface SerializedAutoReply {
   skipWhenOperatorActive: boolean;
   priority: number;
   messageKinds: string[] | null;
+  receiveSources: Array<'line' | 'email'>;
   /** 151: 応答したときに順に実行すること。 */
   actions: unknown[] | null;
   /** 151: 応答する曜日（0=日 … 6=土）。null なら曜日を問わない。 */
@@ -145,6 +148,10 @@ interface SerializedAutoReply {
   folderId: string | null;
   /** 152: 当たった回数。一覧でだけ入る。 */
   hits?: { period: number; total: number };
+  /** 実行台帳で成功を確認できた後続処理の累計。 */
+  actionExecutionCount?: number | null;
+  /** 同じ受信に当たり得る、有効な別ルールの数。 */
+  conflictAttentionCount?: number | null;
   createdAt: string;
   effectiveAccounts?: EffectiveAccount[];
 }
@@ -162,6 +169,7 @@ interface AutoReplyDraftInput {
   skipWhenOperatorActive: boolean;
   priority: number;
   messageKinds: string[] | null;
+  receiveSources: Array<'line' | 'email'>;
   friendConditions: Record<string, unknown> | null;
   actions: unknown[] | null;
   responseWeekdays: number[] | null;
@@ -177,6 +185,9 @@ interface AutoReplyDraftInput {
   name: string | null;
   keywordMatchMode: 'any' | 'all';
   folderId: string | null;
+  internalMemo: string | null;
+  replyDelaySeconds: number | null;
+  unmatchedAction: Record<string, unknown> | null;
 }
 
 interface AutoReplyDraftVersion {
@@ -188,6 +199,7 @@ interface AutoReplyDraftVersion {
   lastTestStatus: 'succeeded' | 'failed' | null;
   lastTestedAt: string | null;
   publishedAt: string | null;
+  matchedLast28Days?: number | null;
 }
 
 interface AutoReplyConflict {
@@ -195,6 +207,14 @@ interface AutoReplyConflict {
   name: string;
   certainty: 'certain' | 'possible';
   winnerAutoReplyId: string;
+  reason: string;
+}
+
+interface AutoReplyConflictPair {
+  leftAutoReplyId: string;
+  rightAutoReplyId: string;
+  winnerAutoReplyId: string;
+  certainty: 'certain' | 'possible';
   reason: string;
 }
 
@@ -240,6 +260,9 @@ function readExtras(body: Record<string, unknown>):
       name?: string | null;
       keywordMatchMode?: 'any' | 'all';
       folderId?: string | null;
+      internalMemo?: string | null;
+      replyDelaySeconds?: number | null;
+      unmatchedAction?: Record<string, unknown> | null;
     } }
   | { ok: false; error: string } {
   const value: Record<string, unknown> = {};
@@ -268,7 +291,7 @@ function readExtras(body: Record<string, unknown>):
   if ('keywords' in body) {
     const parsed = readKeywords(body.keywords);
     if (!parsed.ok) {
-      return { ok: false, error: 'keywords must be an array of { keyword, matchType?, minLength?, caseSensitive? }' };
+      return { ok: false, error: `keywords must be an array of { keyword, matchType?, minLength?, caseSensitive? } (at most ${AUTO_REPLY_KEYWORDS_MAX} items, ${AUTO_REPLY_KEYWORD_MAX} characters each)` };
     }
     value.keywords = parsed.value;
   }
@@ -309,6 +332,38 @@ function readExtras(body: Record<string, unknown>):
       value.name = body.name;
     }
   }
+  if ('internalMemo' in body) {
+    if (body.internalMemo === null || body.internalMemo === '') {
+      value.internalMemo = null;
+    } else if (typeof body.internalMemo !== 'string') {
+      return { ok: false, error: 'internalMemo must be a string' };
+    } else if ([...body.internalMemo].length > 1_000) {
+      return { ok: false, error: 'internalMemo must be 1000 characters or fewer' };
+    } else {
+      value.internalMemo = body.internalMemo;
+    }
+  }
+  if ('replyDelaySeconds' in body) {
+    if (body.replyDelaySeconds === null || body.replyDelaySeconds === 0) {
+      value.replyDelaySeconds = null;
+    } else if (!Number.isInteger(body.replyDelaySeconds)
+      || Number(body.replyDelaySeconds) < 0
+      || Number(body.replyDelaySeconds) > 86_400) {
+      return { ok: false, error: 'replyDelaySeconds must be an integer from 0 to 86400' };
+    } else {
+      value.replyDelaySeconds = Number(body.replyDelaySeconds);
+    }
+  }
+  if ('unmatchedAction' in body) {
+    if (body.unmatchedAction === null) {
+      value.unmatchedAction = null;
+    } else if (!body.unmatchedAction || typeof body.unmatchedAction !== 'object'
+      || Array.isArray(body.unmatchedAction)) {
+      return { ok: false, error: 'unmatchedAction must be an object' };
+    } else {
+      value.unmatchedAction = body.unmatchedAction as Record<string, unknown>;
+    }
+  }
 
   return { ok: true, value };
 }
@@ -343,13 +398,20 @@ function readHolidayRule(raw: unknown): Read<string | null> {
 }
 
 /** キーワードの複数行。1行ずつ言葉と当て方を持つ。 */
+/** 保存できる言葉の上限。際限なく足すと一覧の描画と送信判定が重くなる。 */
+export const AUTO_REPLY_KEYWORD_MAX = 200;
+export const AUTO_REPLY_KEYWORDS_MAX = 100;
+export const AUTO_REPLY_RESPONSE_MAX = 5000;
+
 function readKeywords(raw: unknown): Read<unknown[] | null> {
   if (raw === undefined || raw === null) return { ok: true, value: null };
   if (!Array.isArray(raw)) return { ok: false };
+  if (raw.length > AUTO_REPLY_KEYWORDS_MAX) return { ok: false };
   for (const item of raw) {
     if (!item || typeof item !== 'object') return { ok: false };
     const r = item as Record<string, unknown>;
     if (typeof r.keyword !== 'string' || r.keyword === '') return { ok: false };
+    if ([...r.keyword].length > AUTO_REPLY_KEYWORD_MAX) return { ok: false };
     if (r.matchType !== undefined && r.matchType !== 'exact' && r.matchType !== 'contains') {
       return { ok: false };
     }
@@ -409,6 +471,7 @@ function draftInputFromSettings(settings: AutoReplyDraftSettings): AutoReplyDraf
     skipWhenOperatorActive: settings.skipWhenOperatorActive,
     priority: settings.priority,
     messageKinds: readJson<string[]>(settings.messageKinds),
+    receiveSources: settings.receiveSources,
     friendConditions: readJson<Record<string, unknown>>(settings.friendConditions),
     actions: readJson<unknown[]>(settings.actions),
     responseWeekdays: readJson<number[]>(settings.responseWeekdays),
@@ -419,6 +482,9 @@ function draftInputFromSettings(settings: AutoReplyDraftSettings): AutoReplyDraf
     name: settings.name,
     keywordMatchMode: settings.keywordMatchMode === 'all' ? 'all' : 'any',
     folderId: settings.folderId,
+    internalMemo: settings.internalMemo ?? null,
+    replyDelaySeconds: settings.replyDelaySeconds ?? null,
+    unmatchedAction: readJson<Record<string, unknown>>(settings.unmatchedAction),
   };
 }
 
@@ -450,6 +516,9 @@ async function readDraftSettings(db: D1Database, raw: unknown): Promise<DraftRea
   if (!respondToAll && !keyword) {
     return { ok: false, error: '応答する言葉を入力してください' };
   }
+  if ([...keyword].length > AUTO_REPLY_KEYWORD_MAX) {
+    return { ok: false, error: `応答する言葉は${AUTO_REPLY_KEYWORD_MAX}文字までです` };
+  }
   if (body.matchType !== 'exact' && body.matchType !== 'contains') {
     return { ok: false, error: '言葉の一致方法を選んでください' };
   }
@@ -467,8 +536,22 @@ async function readDraftSettings(db: D1Database, raw: unknown): Promise<DraftRea
   if (!priority.ok) return { ok: false, error: '優先順位が正しくありません' };
   const messageKinds = readMessageKinds(body.messageKinds);
   if (!messageKinds.ok) return { ok: false, error: '対象にするメッセージの種類が正しくありません' };
+  const receiveSources = Array.isArray(body.receiveSources)
+    ? [...new Set(body.receiveSources)]
+    : ['line'];
+  if (receiveSources.length === 0
+    || receiveSources.some((source) => source !== 'line' && source !== 'email')) {
+    return { ok: false, error: '受信元はLINEまたはメールを1つ以上選んでください' };
+  }
   const extras = readExtras(body);
   if (!extras.ok) return { ok: false, error: extras.error };
+  // 絞り込みと後続処理は小さな設定のはず。際限なく大きいとDB肥大と描画肥大を招く。
+  for (const [key, label] of [['friendConditions', '絞り込み条件'], ['actions', '応答したあとの処理']] as const) {
+    const raw = extras.value[key];
+    if (raw !== undefined && raw !== null && JSON.stringify(raw).length > 20000) {
+      return { ok: false, error: `${label}が大きすぎます` };
+    }
+  }
   const folderError = await validateAutoReplyFolder(db, extras.value.folderId);
   if (folderError) return { ok: false, error: folderError };
   if (extras.value.actions) {
@@ -490,6 +573,10 @@ async function readDraftSettings(db: D1Database, raw: unknown): Promise<DraftRea
   if (responseType !== 'silent' && !templateId && !responseContent) {
     return { ok: false, error: '返信する内容を入力してください' };
   }
+  // LINEのテキスト上限と同じ基準。試し文の2000字より緩いが、保存文の上限として見る。
+  if ([...responseContent].length > AUTO_REPLY_RESPONSE_MAX) {
+    return { ok: false, error: `返信する内容は${AUTO_REPLY_RESPONSE_MAX.toLocaleString('ja-JP')}文字までです` };
+  }
 
   return {
     ok: true,
@@ -506,6 +593,7 @@ async function readDraftSettings(db: D1Database, raw: unknown): Promise<DraftRea
       skipWhenOperatorActive: body.skipWhenOperatorActive === true,
       priority: priority.value,
       messageKinds: jsonText(messageKinds.value),
+      receiveSources: receiveSources as Array<'line' | 'email'>,
       friendConditions: jsonText(extras.value.friendConditions),
       actions: jsonText(extras.value.actions),
       responseWeekdays: jsonText(extras.value.responseWeekdays),
@@ -516,6 +604,9 @@ async function readDraftSettings(db: D1Database, raw: unknown): Promise<DraftRea
       name: extras.value.name ?? null,
       keywordMatchMode: extras.value.keywordMatchMode ?? 'any',
       folderId: extras.value.folderId ?? null,
+      internalMemo: extras.value.internalMemo ?? null,
+      replyDelaySeconds: extras.value.replyDelaySeconds ?? null,
+      unmatchedAction: jsonText(extras.value.unmatchedAction),
     },
   };
 }
@@ -609,6 +700,85 @@ async function conflictsForDraft(
     .filter((item): item is AutoReplyConflict => item !== null);
 }
 
+function conflictPairs(rules: DbAutoReply[]): AutoReplyConflictPair[] {
+  const pairs: AutoReplyConflictPair[] = [];
+  for (let leftIndex = 0; leftIndex < rules.length; leftIndex += 1) {
+    for (let rightIndex = leftIndex + 1; rightIndex < rules.length; rightIndex += 1) {
+      const left = rules[leftIndex]!;
+      const right = rules[rightIndex]!;
+      const conflict = conflictBetween(left, right);
+      if (!conflict) continue;
+      pairs.push({
+        leftAutoReplyId: left.id,
+        rightAutoReplyId: right.id,
+        winnerAutoReplyId: conflict.winnerAutoReplyId,
+        certainty: conflict.certainty,
+        reason: conflict.reason,
+      });
+    }
+  }
+  return pairs;
+}
+
+function conflictCounts(pairs: AutoReplyConflictPair[]): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const pair of pairs) {
+    counts.set(pair.leftAutoReplyId, (counts.get(pair.leftAutoReplyId) ?? 0) + 1);
+    counts.set(pair.rightAutoReplyId, (counts.get(pair.rightAutoReplyId) ?? 0) + 1);
+  }
+  return counts;
+}
+
+async function actionExecutionCounts(
+  db: D1Database,
+  accountId: string | null,
+): Promise<Map<string, number>> {
+  const result = await db.prepare(
+    `SELECT e.winning_auto_reply_id AS auto_reply_id, COUNT(*) AS action_count
+       FROM auto_reply_action_runs action_run
+       JOIN auto_reply_evaluations e ON e.id = action_run.evaluation_id
+      WHERE action_run.status = 'succeeded'
+        AND e.winning_auto_reply_id IS NOT NULL
+        AND (? IS NULL OR e.line_account_id = ?)
+      GROUP BY e.winning_auto_reply_id`,
+  ).bind(accountId, accountId).all<{ auto_reply_id: string; action_count: number }>();
+  return new Map((result.results ?? [])
+    .filter((row) => typeof row.auto_reply_id === 'string')
+    .map((row) => [row.auto_reply_id, Number(row.action_count)]));
+}
+
+async function autoReplyReceiveSummary(
+  db: D1Database,
+  accountId: string,
+  since: string,
+): Promise<{
+    receiveSourceCounts: Array<{ source: string; count: number }>;
+    matchedLast28Days: number;
+  }> {
+  const [sources, matched] = await Promise.all([
+    db.prepare(
+      `SELECT message_kind AS source, COUNT(*) AS count
+         FROM auto_reply_evaluations
+        WHERE line_account_id = ? AND evaluated_at >= ?
+        GROUP BY message_kind
+        ORDER BY count DESC, message_kind ASC`,
+    ).bind(accountId, since).all<{ source: string; count: number }>(),
+    db.prepare(
+      `SELECT COUNT(*) AS count
+         FROM auto_reply_evaluations
+        WHERE line_account_id = ? AND evaluated_at >= ?
+          AND winning_auto_reply_id IS NOT NULL`,
+    ).bind(accountId, since).first<{ count: number }>(),
+  ]);
+  return {
+    receiveSourceCounts: (sources.results ?? []).map((row) => ({
+      source: row.source,
+      count: Number(row.count),
+    })),
+    matchedLast28Days: Number(matched?.count ?? 0),
+  };
+}
+
 async function validateDraft(
   db: D1Database,
   version: AutoReplyVersionRow,
@@ -657,6 +827,7 @@ function serializeAutoReply(row: DbAutoReply): SerializedAutoReply {
     messageKinds: row.message_kinds_json
       ? (JSON.parse(row.message_kinds_json) as string[])
       : null,
+    receiveSources: ['line'],
     actions: readJson<unknown[]>(row.actions_json),
     responseWeekdays: readJson<number[]>(row.response_weekdays_json),
     responseHolidayRule: row.response_holiday_rule,
@@ -731,22 +902,44 @@ async function buildAutomationKeywordIndex(db: D1Database): Promise<Map<string, 
 }
 
 // GET /api/auto-replies — list all auto-replies (optional ?accountId filter)
-autoReplies.get('/api/auto-replies', async (c) => {
+autoReplies.get('/api/auto-replies', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
     const accountId = c.req.query('accountId');
-    const items = await getAutoReplies(c.env.DB, accountId || undefined);
+    const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+    if (accountId) {
+      if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+        return c.json({ success: false, error: '自動応答を確認できません' }, 404);
+      }
+    }
+    const items = (await getAutoReplies(c.env.DB, accountId || undefined)).filter((item) => {
+      const itemAccountId = (item as { line_account_id?: string | null }).line_account_id ?? null;
+      return itemAccountId == null
+        ? scope.canSeeUnassigned
+        : scope.allowedAccountIds.includes(itemAccountId);
+    });
+    const activeItems = items.filter((item) => item.is_active === 1);
+    const conflictsById = conflictCounts(conflictPairs(activeItems));
 
     // active LINE accounts を取得 + automations の keyword -> accounts インデックスを構築
-    const accRes = await c.env.DB
-      .prepare(`SELECT id, name FROM line_accounts WHERE is_active = 1 ORDER BY name`)
-      .all<{ id: string; name: string }>();
-    const activeAccounts = accRes.results ?? [];
+    const activeAccounts = scope.allowedAccountIds.length
+      ? (await c.env.DB
+        .prepare(
+          `SELECT id, name FROM line_accounts
+            WHERE is_active = 1
+              AND id IN (${scope.allowedAccountIds.map(() => '?').join(',')})
+            ORDER BY name`,
+        )
+        .bind(...scope.allowedAccountIds)
+        .all<{ id: string; name: string }>()).results ?? []
+      : [];
     const automationIdx = await buildAutomationKeywordIndex(c.env.DB);
 
     // 当たった回数（152）。今月と累計を並べて出す。
     // 数が取れなくても一覧は出す。付随情報なので、落ちても本体は止めない。
     const range = currentMonthRange(jstNow());
-    let hitsById = new Map<string, { period: number; total: number }>();
+    // 集計が取れないときは hits を付けない。0 で埋めると画面の
+    // 「未取得は —」判定が常に真になり、数え損ないが「未ヒット 0 回」に見える。
+    let hitsById: Map<string, { period: number; total: number }> | null = null;
     try {
       const counts = await getAutoReplyHitCounts(
         c.env.DB,
@@ -759,18 +952,85 @@ autoReplies.get('/api/auto-replies', async (c) => {
       console.error('GET /api/auto-replies — failed to count hits', err);
     }
 
+    let actionsById: Map<string, number> | null = null;
+    try {
+      actionsById = await actionExecutionCounts(c.env.DB, accountId || null);
+    } catch (err) {
+      console.error('GET /api/auto-replies — failed to count action executions', err);
+    }
+
     const data: SerializedAutoReply[] = await Promise.all(
       items.map(async (row) => {
-        const base = { ...serializeAutoReply(row), hits: hitsById.get(row.id) ?? { period: 0, total: 0 } };
+        const base: SerializedAutoReply = {
+          ...serializeAutoReply(row),
+          ...(hitsById ? { hits: hitsById.get(row.id) ?? { period: 0, total: 0 } } : {}),
+          actionExecutionCount: actionsById?.get(row.id) ?? (actionsById ? 0 : null),
+          conflictAttentionCount: row.is_active === 1 ? conflictsById.get(row.id) ?? 0 : 0,
+        };
         base.effectiveAccounts = await computeEffectiveAccounts(c.env.DB, row, activeAccounts, automationIdx);
         return base;
       }),
     );
 
+    // 共通一覧契約。page/limit を付けたときだけ新形（items/total/limit/sort）で返す。
+    // 画面はまだ旧形（配列）を読むため、付けない限り形を変えない。
+    if (c.req.query('page') !== undefined || c.req.query('limit') !== undefined) {
+      const paging = parseOffsetPaging({ page: c.req.query('page'), limit: c.req.query('limit') });
+      return c.json({
+        success: true,
+        data: buildOffsetListResponse({
+          items: data.slice(paging.offset, paging.offset + paging.limit),
+          total: data.length,
+          paging,
+          sort: [
+            { field: 'priority', direction: 'asc' },
+            { field: 'created_at', direction: 'asc' },
+          ],
+        }),
+      });
+    }
     return c.json({ success: true, data });
   } catch (err) {
     console.error('GET /api/auto-replies error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+/** V6一覧・競合画面用。公開中ルール同士と、直近28日の実測だけを返す。 */
+autoReplies.get('/api/auto-replies/conflicts', async (c) => {
+  try {
+    const accountId = c.req.query('accountId') ?? c.req.query('account_id');
+    if (!accountId) {
+      return c.json({ success: false, error: 'accountId を指定してください' }, 400);
+    }
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+      return c.json({ success: false, error: '自動応答を確認できません' }, 404);
+    }
+    const rules = (await getAutoReplies(c.env.DB, accountId))
+      .filter((item) => item.is_active === 1);
+    const conflicts = conflictPairs(rules);
+    const since = new Date(Date.now() - 28 * 24 * 60 * 60 * 1_000).toISOString();
+    let receiveSourceCounts: Array<{ source: string; count: number }> | null = null;
+    let matchedLast28Days: number | null = null;
+    try {
+      const summary = await autoReplyReceiveSummary(c.env.DB, accountId, since);
+      receiveSourceCounts = summary.receiveSourceCounts;
+      matchedLast28Days = summary.matchedLast28Days;
+    } catch (err) {
+      console.error('GET /api/auto-replies/conflicts — failed to load receive summary', err);
+    }
+    return c.json({
+      success: true,
+      data: {
+        conflicts,
+        conflictCount: conflicts.length,
+        receiveSourceCounts,
+        matchedLast28Days,
+      },
+    });
+  } catch (err) {
+    console.error('GET /api/auto-replies/conflicts error:', err);
+    return c.json({ success: false, error: '競合する自動応答を確認できませんでした' }, 500);
   }
 });
 
@@ -813,7 +1073,20 @@ autoReplies.get('/api/auto-replies/:id/draft', async (c) => {
     const version = await getAutoReplyDraftVersion(c.env.DB, id)
       ?? await getAutoReplyPublishedVersion(c.env.DB, id);
     if (!version) return c.json({ success: false, error: '確認する設定がありません' }, 404);
-    return c.json({ success: true, data: draftVersionResponse(version) });
+    let matchedLast28Days: number | null = null;
+    try {
+      const since = new Date(Date.now() - 28 * 24 * 60 * 60 * 1_000).toISOString();
+      matchedLast28Days = await getAutoReplyHitCountSince(c.env.DB, version.auto_reply_id, since);
+    } catch (err) {
+      console.error(JSON.stringify({
+        message: 'failed to count 28 day auto reply hits',
+        error: err instanceof Error ? err.message : String(err),
+      }));
+    }
+    return c.json({
+      success: true,
+      data: { ...draftVersionResponse(version), matchedLast28Days },
+    });
   } catch (err) {
     console.error('GET /api/auto-replies/:id/draft error:', err);
     return c.json({ success: false, error: '自動応答の下書きを読み込めませんでした' }, 500);
@@ -822,7 +1095,22 @@ autoReplies.get('/api/auto-replies/:id/draft', async (c) => {
 
 autoReplies.put('/api/auto-replies/:id/draft', requireRole('owner', 'admin'), async (c) => {
   try {
-    const parsed = await readDraftSettings(c.env.DB, await c.req.json());
+    const body = await c.req.json<Record<string, unknown>>();
+    if (!Number.isInteger(body.expectedVersion) || Number(body.expectedVersion) < 1) {
+      return c.json({ success: false, error: 'expectedVersion を指定してください' }, 400);
+    }
+    const current = await getAutoReplyDraftVersion(c.env.DB, c.req.param('id'))
+      ?? await getAutoReplyPublishedVersion(c.env.DB, c.req.param('id'));
+    if (!current) return c.json({ success: false, error: '自動応答が見つかりません' }, 404);
+    if (Number(current.version_number) !== Number(body.expectedVersion)) {
+      return c.json({
+        success: false,
+        code: 'VERSION_CONFLICT',
+        error: 'ほかの変更が先に保存されました。最新の状態を読み直してください',
+        data: { currentVersion: Number(current.version_number) },
+      }, 409);
+    }
+    const parsed = await readDraftSettings(c.env.DB, body);
     if (!parsed.ok) return c.json({ success: false, error: parsed.error }, 400);
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [parsed.value.lineAccountId])) {
       return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
@@ -839,7 +1127,9 @@ autoReplies.put('/api/auto-replies/:id/draft', requireRole('owner', 'admin'), as
   }
 });
 
-autoReplies.post('/api/auto-replies/:id/validate', async (c) => {
+// 下書きの確認・試運転は、下書きを書ける人だけ。test は成功・失敗どちらの
+// 経路でも版の最終テスト状態を書き換える（DB 書込）ため、閲覧権限では叩けない。
+autoReplies.post('/api/auto-replies/:id/validate', requireRole('owner', 'admin'), async (c) => {
   try {
     const version = await getAutoReplyDraftVersion(c.env.DB, c.req.param('id'));
     if (!version) return c.json({ success: false, error: '公開する下書きがありません' }, 404);
@@ -850,7 +1140,7 @@ autoReplies.post('/api/auto-replies/:id/validate', async (c) => {
   }
 });
 
-autoReplies.get('/api/auto-replies/:id/conflicts', async (c) => {
+autoReplies.get('/api/auto-replies/:id/conflicts', requireRole('owner', 'admin'), async (c) => {
   try {
     const version = await getAutoReplyDraftVersion(c.env.DB, c.req.param('id'));
     if (!version) return c.json({ success: false, error: '確認する下書きがありません' }, 404);
@@ -865,7 +1155,7 @@ autoReplies.get('/api/auto-replies/:id/conflicts', async (c) => {
   }
 });
 
-autoReplies.post('/api/auto-replies/:id/test', async (c) => {
+autoReplies.post('/api/auto-replies/:id/test', requireRole('owner', 'admin'), async (c) => {
   let version: AutoReplyVersionRow | null = null;
   try {
     const id = c.req.param('id');
@@ -1031,6 +1321,11 @@ autoReplies.post('/api/auto-replies/:id/publish', requireRole('owner', 'admin'),
 });
 
 // POST /api/auto-replies — create
+// 用途: 一覧の編集ダイアログからの新規作成と、既存ルールの直接更新（PUT :id）。
+// 下書き経由（PUT :id/draft → validate/conflicts/test → publish）に寄せていない
+// 理由: 新規作成時は下書きが存在せず、版の取得・テスト必須の公開フローに
+// 乗せられない。公開前のテスト・競合確認は公開画面のフローで担保する。
+// いずれも owner/admin 専用で、本文の長さ上限は下書きと同じ基準を見る。
 autoReplies.post('/api/auto-replies', requireRole('owner', 'admin'), async (c) => {
   try {
     const body = await c.req.json<{
@@ -1056,6 +1351,12 @@ autoReplies.post('/api/auto-replies', requireRole('owner', 'admin'), async (c) =
     // ただし列は NOT NULL なので、空文字を入れておく。
     if (!body.keyword && body.respondToAll !== true) {
       return c.json({ success: false, error: 'keyword is required' }, 400);
+    }
+    if (typeof body.keyword === 'string' && [...body.keyword].length > AUTO_REPLY_KEYWORD_MAX) {
+      return c.json({ success: false, error: `keyword must be ${AUTO_REPLY_KEYWORD_MAX} characters or fewer` }, 400);
+    }
+    if (typeof body.responseContent === 'string' && [...body.responseContent].length > AUTO_REPLY_RESPONSE_MAX) {
+      return c.json({ success: false, error: `responseContent must be ${AUTO_REPLY_RESPONSE_MAX} characters or fewer` }, 400);
     }
     if (body.lineAccountId !== null && body.lineAccountId !== undefined
       && (!body.lineAccountId
@@ -1155,10 +1456,20 @@ autoReplies.put('/api/auto-replies/:id', requireRole('owner', 'admin'), async (c
     }>();
 
     const input: Record<string, unknown> = {};
-    if (body.keyword !== undefined) input.keyword = body.keyword;
+    if (body.keyword !== undefined) {
+      if (typeof body.keyword === 'string' && [...body.keyword].length > AUTO_REPLY_KEYWORD_MAX) {
+        return c.json({ success: false, error: `keyword must be ${AUTO_REPLY_KEYWORD_MAX} characters or fewer` }, 400);
+      }
+      input.keyword = body.keyword;
+    }
     if (body.matchType !== undefined) input.matchType = body.matchType;
     if (body.responseType !== undefined) input.responseType = body.responseType;
-    if (body.responseContent !== undefined) input.responseContent = body.responseContent;
+    if (body.responseContent !== undefined) {
+      if (typeof body.responseContent === 'string' && [...body.responseContent].length > AUTO_REPLY_RESPONSE_MAX) {
+        return c.json({ success: false, error: `responseContent must be ${AUTO_REPLY_RESPONSE_MAX} characters or fewer` }, 400);
+      }
+      input.responseContent = body.responseContent;
+    }
     if ('templateId' in body) input.templateId = body.templateId;
     if ('lineAccountId' in body) {
       if (body.lineAccountId !== null && body.lineAccountId !== undefined) {

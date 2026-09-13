@@ -45,9 +45,12 @@ export default function ShipmentPanel({
   const [bucket, setBucket] = useState<Bucket>('soon')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [attempt, setAttempt] = useState(0)
 
   useEffect(() => {
     let cancelled = false
+    setLoading(true)
+    setError(null)
     api.ecCommerce
       .shipments({ limit: 10 })
       .then((r) => {
@@ -60,9 +63,10 @@ export default function ShipmentPanel({
           later: r.data.laterCount,
         })
       })
-      .catch((e: unknown) => {
+      .catch(() => {
         if (cancelled) return
-        setError(e instanceof Error ? e.message : String(e))
+        /* 生の例外文(通信機器の応答など)を出さない。決まった文と読み直しを出す。 */
+        setError('出荷予定を取得できませんでした')
         onSummaryChange?.(null)
       })
       .finally(() => {
@@ -71,7 +75,7 @@ export default function ShipmentPanel({
     return () => {
       cancelled = true
     }
-  }, [onSummaryChange])
+  }, [onSummaryChange, attempt])
 
   const rows = data ? (bucket === 'soon' ? data.soon : data.later) : []
 
@@ -85,16 +89,17 @@ export default function ShipmentPanel({
       />
       <div className="px-[18px] pb-[18px]">
         {loading ? (
-          <p className="py-6 text-center text-sm text-gray-500">読み込み中…</p>
+          <p className="py-6 text-center text-sm text-ink-faint">読み込み中…</p>
         ) : error ? (
-          <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-xs text-red-700">
-            出荷予定を読み込めませんでした。{error}
+          <div className="rounded-lg border border-danger/20 bg-danger-bg p-3 text-xs text-danger">
+            <p>出荷予定を読み込めませんでした。{error}</p>
+            <button type="button" onClick={() => setAttempt((count) => count + 1)} className="mt-1 font-medium underline">もう一度読み込む</button>
           </div>
         ) : !data || (data.soonCount === 0 && data.laterCount === 0) ? (
-          <p className="py-6 text-center text-sm text-gray-500">
+          <p className="py-6 text-center text-sm text-ink-faint">
             出荷予定はまだありません。
             <br />
-            <span className="text-xs text-gray-400">
+            <span className="text-xs text-ink-faint">
               ECから注文や定期便の通知を受け取ると、ここに並びます。
             </span>
           </p>
@@ -115,14 +120,13 @@ export default function ShipmentPanel({
                   key={key}
                   onClick={() => setBucket(key)}
                   className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
-                    bucket === key ? 'text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    bucket === key ? 'bg-action text-on-action' : 'bg-canvas-sunken text-ink-secondary'
                   }`}
-                  style={bucket === key ? { backgroundColor: 'var(--color-accent)' } : undefined}
                 >
                   {label}
                   <span
                     className={`rounded-full px-1.5 text-[10px] tabular-nums ${
-                      bucket === key ? 'bg-white/25' : 'bg-white text-gray-500'
+                      bucket === key ? 'bg-white/25' : 'bg-canvas text-ink-faint'
                     }`}
                   >
                     {count}
@@ -132,7 +136,7 @@ export default function ShipmentPanel({
             </div>
 
             {rows.length === 0 ? (
-              <p className="py-6 text-center text-sm text-gray-500">この期間の出荷予定はありません</p>
+              <p className="py-6 text-center text-sm text-ink-faint">この期間の出荷予定はありません</p>
             ) : (
             /*
               設計 `出荷予定` は表。注文番号・お客様・商品・数量・出荷予定・状態の6列。

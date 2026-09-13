@@ -23,6 +23,7 @@ import {
   type ParsedBundle,
   type ReleaseEntry,
   type WorkerBinding,
+  WORKER_COMPATIBILITY_FLAGS,
 } from "@line-harness/update-engine";
 import { configureAdminAuth } from "../steps/admin-auth.js";
 import { ensureWorkersDevSubdomain } from "../steps/ensure-subdomain.js";
@@ -33,10 +34,6 @@ import {
   resolveInstalledWranglerConfig,
   type SavedInstallConfig,
 } from "../lib/installed-wrangler.js";
-
-/** Must mirror apps/worker/wrangler.toml — the script upload API replaces
- *  metadata wholesale, so omitting this would strip nodejs_compat. */
-const WORKER_COMPATIBILITY_FLAGS = ["nodejs_compat"];
 
 /**
  * Shape of `.line-harness-config.json` written by `setup.ts` after

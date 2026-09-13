@@ -52,8 +52,28 @@ describe('NEN column create contract', () => {
         imageUrl: 'https://cdn.example.com/guide.jpg',
         publishedAt: '2026-08-31T01:30:00.000Z',
         slug: 'NEN-Guide',
+        targetMode: 'all',
+        targetTagId: null,
+        scheduledAt: null,
+        completionEventName: null,
+        completionTagId: null,
+        sourceColumnId: null,
       },
     });
+  });
+
+  it('validates targeting, schedule and completion settings', () => {
+    expect(validateNenColumnCreateBody({
+      title: '秋の食事', articleUrl: 'https://example.com/columns/autumn',
+      targetMode: 'tag', targetTagId: 'tag-1', scheduledAt: '2026-09-08T10:00:00+09:00',
+      completionEventName: '秋の食事を読了', completionTagId: 'tag-read',
+    })).toMatchObject({ ok: true, value: {
+      targetMode: 'tag', targetTagId: 'tag-1', scheduledAt: '2026-09-08T01:00:00.000Z',
+      completionEventName: '秋の食事を読了', completionTagId: 'tag-read',
+    } });
+    expect(validateNenColumnCreateBody({
+      title: '秋の食事', articleUrl: 'https://example.com/columns/autumn', targetMode: 'tag',
+    })).toEqual({ ok: false, error: 'target_invalid' });
   });
 
   it('keeps omitted publication and image values null instead of inventing them', () => {

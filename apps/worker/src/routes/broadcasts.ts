@@ -1,10 +1,23 @@
 import { Hono } from 'hono';
+import type { Context } from 'hono';
 import {
   getBroadcasts,
   getBroadcastById,
   createBroadcast,
   updateBroadcast,
   deleteBroadcast,
+  getVersionedAccountSetting,
+  saveVersionedAccountSetting,
+  requestBroadcastStop,
+  resumeBroadcastSending,
+  beginBroadcastRetryAttempt,
+  closeClaimsForStop,
+  reopenFailedClaims,
+  getRetryableRecipientIds,
+  countBroadcastLedger,
+  recordAuditEvent,
+  maskAuditIp,
+  auditDeviceFamily,
 } from '@line-crm/db';
 import type { Broadcast as DbBroadcast, BroadcastMessageType, BroadcastTargetType } from '@line-crm/db';
 import { LineClient } from '@line-crm/line-sdk';
@@ -35,17 +48,31 @@ import {
   renderBroadcastMessageContent,
 } from '../services/render-message.js';
 import {
-  countAudience,
   buildWarnings,
   hasRecentSimilarBroadcast,
+  previewAudience,
 } from '../services/broadcast-preflight.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import type { AuthenticatedStaff } from '../middleware/auth.js';
+import { fetchQuota } from '../services/broadcast-quota-guard.js';
+import { dispatchOperatorEvent } from '../services/operator-notification-dispatch.js';
 
 const broadcasts = new Hono<Env>();
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const ACCOUNT_ACCESS_ERROR = 'このLINEアカウントを操作する権限がありません';
+const BROADCAST_NOTIFICATION_KEY = 'broadcast_slack_notifications';
+type BroadcastNotificationSettings = { started: boolean; completed: boolean; failed: boolean };
+const DEFAULT_BROADCAST_NOTIFICATIONS: BroadcastNotificationSettings = {
+  started: true, completed: true, failed: true,
+};
+
+function notificationSentence(settings: BroadcastNotificationSettings): string {
+  const labels = [settings.started && '開始', settings.completed && '完了', settings.failed && 'エラー'].filter(Boolean);
+  return labels.length > 0
+    ? `配信${labels.join('・')}はSlackの同じスレッドへ通知します。`
+    : 'この配信のSlack通知はありません。';
+}
 
 function broadcastAccountIds(broadcast: DbBroadcast): Array<string | null> {
   const raw = broadcast as unknown as Record<string, unknown>;
@@ -89,9 +116,9 @@ function parseJsonArray(s: unknown): string[] | null {
 }
 
 type CreateBroadcastBody = {
-  title: string;
-  messageType: BroadcastMessageType;
-  messageContent: string;
+  title?: string;
+  messageType?: BroadcastMessageType;
+  messageContent?: string;
   messageBubbles?: unknown[];
   targetType: BroadcastTargetType;
   targetTagId?: string | null;
@@ -109,23 +136,107 @@ type CreateBroadcastBody = {
   folderId?: string | null;
   /** 開封数を取るか。既定は取る */
   measureOpens?: boolean;
+  /** 途中の入力を残すだけで、送信可能とは扱わない。 */
+  saveAsDraft?: boolean;
+  draftStep?: 'basic' | 'audience' | 'message' | 'schedule' | 'confirm';
+  internalMemo?: string | null;
+  messageOptions?: unknown;
+  afterActionVersionId?: string | null;
 };
+
+const BROADCAST_DRAFT_STEPS = new Set(['basic', 'audience', 'message', 'schedule', 'confirm']);
+const STANDARD_CONDITION_AXES = [
+  ['name', '名前'], ['private_memo', '個別メモ'], ['status_message', 'ステータスメッセージ'],
+  ['registered_at', '友だち登録日'], ['tag', 'タグ'], ['friend_field', '友だち情報'],
+  ['scenario', 'シナリオ'], ['event_booking', 'イベント予約'], ['calendar_booking', 'カレンダー予約'],
+  ['common_var', '共通情報'], ['reminder', 'リマインダ'], ['form_answered', '回答フォーム'],
+  ['last_reaction_at', '最終反応日'], ['other', 'その他'], ['support_mark', '対応マーク'],
+] as const;
+const BROADCAST_ONLY_CONDITION_AXES = [
+  ['assigned_operator', '担当者'], ['inflow_route', '流入経路'], ['broadcast_status', '配信状況'],
+  ['booking_status', '予約状況'], ['purchase_history', '購入履歴'], ['block_state', 'ブロック状態'],
+] as const;
+
+function parseJsonObject(value: unknown): Record<string, unknown> | null {
+  if (!value) return null;
+  if (typeof value === 'object' && !Array.isArray(value)) return value as Record<string, unknown>;
+  if (typeof value !== 'string') return null;
+  try {
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? parsed as Record<string, unknown>
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function validateMessageOptions(value: unknown): string | null {
+  if (value === undefined || value === null) return null;
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return 'messageOptions must be an object';
+  const options = value as { buttons?: unknown; resources?: unknown };
+  if (options.buttons !== undefined) {
+    if (!Array.isArray(options.buttons) || options.buttons.length > 4) return 'messageOptions.buttons must contain at most 4 items';
+    for (const button of options.buttons) {
+      if (!button || typeof button !== 'object' || Array.isArray(button)) return 'messageOptions.buttons item must be an object';
+      const item = button as Record<string, unknown>;
+      if (typeof item.label !== 'string' || !item.label.trim()) return 'messageOptions button label is required';
+      if (!['url', 'pdf', 'postback'].includes(String(item.type))) return 'messageOptions button type is invalid';
+      if (typeof item.value !== 'string' || !item.value.trim()) return 'messageOptions button value is required';
+      if ((item.type === 'url' || item.type === 'pdf') && !/^https:\/\//i.test(item.value)) {
+        return 'messageOptions URL and PDF values must use https';
+      }
+    }
+  }
+  if (options.resources !== undefined) {
+    if (!Array.isArray(options.resources)) return 'messageOptions.resources must be an array';
+    for (const resource of options.resources) {
+      if (!resource || typeof resource !== 'object' || Array.isArray(resource)) return 'messageOptions.resources item must be an object';
+      const item = resource as Record<string, unknown>;
+      if (!['url', 'pdf'].includes(String(item.kind)) || typeof item.url !== 'string' || !/^https:\/\//i.test(item.url)) {
+        return 'messageOptions resource must be an https URL or PDF';
+      }
+    }
+  }
+  return null;
+}
+
+async function validateAfterActionVersion(
+  db: D1Database,
+  lineAccountId: string | null | undefined,
+  versionId: string | null | undefined,
+): Promise<boolean> {
+  if (!versionId) return true;
+  if (!lineAccountId) return false;
+  const row = await db.prepare(
+    `SELECT cav.id
+       FROM common_action_versions cav
+       JOIN common_actions ca ON ca.id = cav.common_action_id
+      WHERE cav.id = ? AND cav.status = 'published'
+        AND ca.line_account_id = ? AND ca.status = 'published'`,
+  ).bind(versionId, lineAccountId).first<{ id: string }>();
+  return Boolean(row);
+}
 
 function sameCreateRequest(existing: DbBroadcast, body: CreateBroadcastBody): boolean {
   const existingAccountIds = parseJsonArray(existing.account_ids) ?? [];
   const existingPriority = parseJsonArray(existing.dedup_priority) ?? [];
-  return existing.title === body.title
-    && existing.message_type === body.messageType
-    && existing.message_content === body.messageContent
+  return existing.title === (body.title?.trim() || '名称未設定')
+    && existing.message_type === (body.messageType ?? 'text')
+    && existing.message_content === (body.messageContent ?? '')
     && (existing.message_bubbles_json ?? null) === (body.messageBubbles ? JSON.stringify(body.messageBubbles) : null)
-    && existing.target_type === body.targetType
+    && existing.target_type === (body.targetType ?? 'all')
     && existing.target_tag_id === (body.targetTagId ?? null)
     && existing.scheduled_at === (body.scheduledAt ?? null)
     && (existing.line_account_id ?? null) === (body.lineAccountId ?? null)
     && (existing.alt_text ?? null) === (body.altText ?? null)
     && JSON.stringify(existingAccountIds) === JSON.stringify(body.accountIds ?? [])
     && JSON.stringify(existingPriority) === JSON.stringify(body.dedupPriority ?? [])
-    && existing.track_links === (body.trackLinks === false ? 0 : 1);
+    && existing.track_links === (body.trackLinks === false ? 0 : 1)
+    && (existing.internal_memo ?? null) === (body.internalMemo ?? null)
+    && (existing.draft_step ?? null) === (body.draftStep ?? null)
+    && (existing.message_options_json ?? null) === (body.messageOptions == null ? null : JSON.stringify(body.messageOptions))
+    && (existing.after_action_version_id ?? null) === (body.afterActionVersionId ?? null);
 }
 
 function serializeBroadcast(row: DbBroadcast) {
@@ -160,6 +271,39 @@ function serializeBroadcast(row: DbBroadcast) {
     segmentConditions: r.segment_conditions
       ? (() => { try { return JSON.parse(String(r.segment_conditions)) as unknown } catch { return null } })()
       : null,
+    // 一覧のフォルダ分類と予約完了の設定表示に使う。DBには保存されていたが、
+    // APIで落としていたため、再読込すると全件が「未分類」に見えていた。
+    folderId: (r.folder_id as string | null | undefined) ?? null,
+    /*
+     * 一覧に載せる集計の最新値。送信済みごとに insight 口を叩く N+1 を
+     * なくすため、一覧クエリで既に読んだ行をそのまま返す。集計行が無い
+     * (未送信・未取得)ときは null で、画面は手動の取得ボタンを出す。
+     */
+    insightSummary: (r.insight_id as string | null | undefined) == null ? null : {
+      delivered: r.insight_delivered == null ? null : Number(r.insight_delivered),
+      uniqueImpression: r.insight_unique_impression == null ? null : Number(r.insight_unique_impression),
+      uniqueClick: r.insight_unique_click == null ? null : Number(r.insight_unique_click),
+      openRate: (r.open_rate as number | null | undefined) ?? null,
+      clickRate: (r.click_rate as number | null | undefined) ?? null,
+    },
+    measureOpens: r.measure_opens === undefined ? true : Number(r.measure_opens) !== 0,
+    internalMemo: (r.internal_memo as string | null | undefined) ?? null,
+    draftStep: (r.draft_step as string | null | undefined) ?? null,
+    draftPayload: parseJsonObject(r.draft_payload_json),
+    messageOptions: parseJsonObject(r.message_options_json),
+    afterActionVersionId: (r.after_action_version_id as string | null | undefined) ?? null,
+    version: Number(r.lock_version ?? 1),
+    /*
+     * 停止の状態（#662 / N-059）。
+     *
+     * status は動かしていない。停止は送信の段階（下書き→予約→送信中→
+     * 送信済み）とは別の軸——「送信中だが、新しい送信権をもう取らない」
+     * ——なので、画面はこの2つを合わせて読む。`status === 'sending' &&
+     * stopped === true` が「停止中」。
+     */
+    stopped: !!r.stopped_at,
+    stoppedAt: (r.stopped_at as string | null | undefined) ?? null,
+    sendAttemptNo: Number(r.send_attempt_no ?? 1),
     createdAt: row.created_at,
   };
 }
@@ -168,8 +312,41 @@ function serializeBroadcast(row: DbBroadcast) {
 broadcasts.get('/api/broadcasts', async (c) => {
   try {
     const lineAccountId = c.req.query('lineAccountId');
-    const items = await getBroadcasts(c.env.DB, lineAccountId || undefined);
-    return c.json({ success: true, data: items.map(serializeBroadcast) });
+    const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+    if (lineAccountId && !scope.allowedAccountIds.includes(lineAccountId)) {
+      return c.json({ success: false, error: ACCOUNT_ACCESS_ERROR }, 403);
+    }
+    // 並び順は一覧画面の選択と連動する。知らない値は新しい順に倒す。
+    const sort = c.req.query('sort') === 'oldest' ? 'asc' as const : 'desc' as const;
+    const allItems = await getBroadcasts(c.env.DB, lineAccountId || undefined, scope, { order: sort });
+    const status = c.req.query('status');
+    const folderId = c.req.query('folderId');
+    const filtered = allItems.filter((item) =>
+      (!status || item.status === status)
+      && (!folderId || (folderId === 'unfiled' ? !item.folder_id : item.folder_id === folderId)));
+    const cursor = Math.max(0, Number.parseInt(c.req.query('cursor') ?? '0', 10) || 0);
+    const requestedLimit = c.req.query('limit');
+    const limit = requestedLimit ? Math.min(100, Math.max(1, Number.parseInt(requestedLimit, 10) || 20)) : filtered.length;
+    const pageItems = filtered.slice(cursor, cursor + limit);
+    const { getBroadcastStats } = await import('@line-crm/db');
+    const stats = await getBroadcastStats(c.env.DB, lineAccountId || undefined, scope);
+    return c.json({
+      success: true,
+      data: pageItems.map(serializeBroadcast),
+      kpis: {
+        scheduled: stats.scheduled,
+        drafts: allItems.filter((item) => item.status === 'draft').length,
+        thisMonth: stats.thisMonth,
+        delivered: stats.delivered,
+        openRate: stats.openRate,
+      },
+      pagination: {
+        total: filtered.length,
+        limit,
+        cursor,
+        nextCursor: cursor + limit < filtered.length ? String(cursor + limit) : null,
+      },
+    });
   } catch (err) {
     console.error('GET /api/broadcasts error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
@@ -184,11 +361,133 @@ broadcasts.get('/api/broadcasts', async (c) => {
  */
 broadcasts.get('/api/broadcasts/stats', async (c) => {
   try {
+    const lineAccountId = c.req.query('lineAccountId');
+    const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+    if (lineAccountId && !scope.allowedAccountIds.includes(lineAccountId)) {
+      return c.json({ success: false, error: ACCOUNT_ACCESS_ERROR }, 403);
+    }
     const { getBroadcastStats } = await import('@line-crm/db');
-    return c.json({ success: true as const, data: await getBroadcastStats(c.env.DB) });
+    return c.json({
+      success: true as const,
+      data: await getBroadcastStats(c.env.DB, lineAccountId || undefined, scope),
+    });
   } catch (err) {
     console.error('GET /api/broadcasts/stats error:', err);
     return c.json({ success: false as const, error: '配信の集計を取得できませんでした' }, 500);
+  }
+});
+
+broadcasts.get('/api/broadcasts/notification-settings', async (c) => {
+  const lineAccountId = c.req.query('lineAccountId')?.trim();
+  if (!lineAccountId) return c.json({ success: false, error: 'LINE公式アカウントを選んでください' }, 400);
+  if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
+    return c.json({ success: false, error: ACCOUNT_ACCESS_ERROR }, 403);
+  }
+  const stored = await getVersionedAccountSetting<BroadcastNotificationSettings>(
+    c.env.DB, lineAccountId, BROADCAST_NOTIFICATION_KEY,
+  );
+  const settings = stored?.data ?? DEFAULT_BROADCAST_NOTIFICATIONS;
+  return c.json({ success: true, data: { version: stored?.version ?? 0, ...settings, displayText: notificationSentence(settings) } });
+});
+
+broadcasts.put('/api/broadcasts/notification-settings', requireRole('owner', 'admin'), async (c) => {
+  const lineAccountId = c.req.query('lineAccountId')?.trim();
+  if (!lineAccountId) return c.json({ success: false, error: 'LINE公式アカウントを選んでください' }, 400);
+  if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
+    return c.json({ success: false, error: ACCOUNT_ACCESS_ERROR }, 403);
+  }
+  const body: Record<string, unknown> = await c.req
+    .json<Record<string, unknown>>()
+    .catch(() => ({} as Record<string, unknown>));
+  const expectedVersion = Number(body.expectedVersion);
+  if (!Number.isInteger(expectedVersion) || expectedVersion < 0
+    || ['started', 'completed', 'failed'].some((key) => typeof body[key] !== 'boolean')) {
+    return c.json({ success: false, error: '通知設定と現在の版を確認してください' }, 400);
+  }
+  const data: BroadcastNotificationSettings = {
+    started: body.started === true, completed: body.completed === true, failed: body.failed === true,
+  };
+  const result = await saveVersionedAccountSetting(c.env.DB, {
+    accountId: lineAccountId, key: BROADCAST_NOTIFICATION_KEY, expectedVersion, data,
+  });
+  if (result.status === 'conflict') {
+    return c.json({ success: false, code: 'version_conflict', error: '通知設定が更新されています。読み直してください' }, 409);
+  }
+  return c.json({ success: true, data: { version: result.setting.version, ...data, displayText: notificationSentence(data) } });
+});
+
+// 保存した検索。動的な :id より前に置き、saved-views を配信IDとして扱わない。
+broadcasts.get('/api/broadcasts/saved-views', requireRole('owner', 'admin', 'staff'), async (c) => {
+  try {
+    const lineAccountId = c.req.query('lineAccountId');
+    if (!lineAccountId) return c.json({ success: false, error: 'LINE公式アカウントを選んでください' }, 400);
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
+      return c.json({ success: false, error: ACCOUNT_ACCESS_ERROR }, 403);
+    }
+    const rows = await c.env.DB.prepare(
+      `SELECT id, name, filters_json, sort_key, page_size, created_by, created_at, updated_at, version
+         FROM broadcast_saved_views WHERE line_account_id = ?
+        ORDER BY updated_at DESC, id`,
+    ).bind(lineAccountId).all<Record<string, unknown>>();
+    return c.json({
+      success: true,
+      data: rows.results.map((row) => ({
+        id: row.id,
+        name: row.name,
+        filters: parseJsonObject(row.filters_json) ?? {},
+        sortKey: row.sort_key,
+        pageSize: Number(row.page_size),
+        createdBy: row.created_by,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+        version: Number(row.version),
+      })),
+    });
+  } catch (err) {
+    console.error('GET /api/broadcasts/saved-views error:', err);
+    return c.json({ success: false, error: '保存した検索を取得できませんでした' }, 500);
+  }
+});
+
+broadcasts.post('/api/broadcasts/saved-views', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const lineAccountId = c.req.query('lineAccountId');
+    if (!lineAccountId) return c.json({ success: false, error: 'LINE公式アカウントを選んでください' }, 400);
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
+      return c.json({ success: false, error: ACCOUNT_ACCESS_ERROR }, 403);
+    }
+    const body: { name?: unknown; filters?: unknown; sortKey?: unknown; pageSize?: unknown } = await c.req
+      .json<{ name?: unknown; filters?: unknown; sortKey?: unknown; pageSize?: unknown }>()
+      .catch(() => ({}));
+    const name = typeof body.name === 'string' ? body.name.trim() : '';
+    if (!name || name.length > 60) return c.json({ success: false, error: '名前は1〜60文字で入力してください' }, 400);
+    if (!body.filters || typeof body.filters !== 'object' || Array.isArray(body.filters)) {
+      return c.json({ success: false, error: 'filters must be an object' }, 400);
+    }
+    const sortKey = typeof body.sortKey === 'string' ? body.sortKey : 'newest';
+    if (!['newest', 'oldest', 'title', 'scheduled'].includes(sortKey)) {
+      return c.json({ success: false, error: 'sortKey is invalid' }, 400);
+    }
+    const pageSize = body.pageSize === undefined ? 20 : Number(body.pageSize);
+    if (![20, 50, 100].includes(pageSize)) return c.json({ success: false, error: 'pageSize is invalid' }, 400);
+    const duplicate = await c.env.DB.prepare(
+      'SELECT id FROM broadcast_saved_views WHERE line_account_id = ? AND name = ?',
+    ).bind(lineAccountId, name).first<{ id: string }>();
+    if (duplicate) return c.json({ success: false, error: '同じ名前の保存した検索があります' }, 409);
+    const id = crypto.randomUUID();
+    const now = new Date().toISOString();
+    await c.env.DB.prepare(
+      `INSERT INTO broadcast_saved_views
+         (id, line_account_id, name, filters_json, sort_key, page_size, created_by, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).bind(id, lineAccountId, name, JSON.stringify(body.filters), sortKey, pageSize, c.get('staff')!.id, now, now).run();
+    return c.json({
+      success: true,
+      data: { id, name, filters: body.filters, sortKey, pageSize, createdBy: c.get('staff')!.id, createdAt: now, updatedAt: now, version: 1 },
+    }, 201);
+  } catch (err) {
+    console.error('POST /api/broadcasts/saved-views error:', err);
+    return c.json({ success: false, error: '保存した検索を保存できませんでした' }, 500);
   }
 });
 
@@ -254,14 +553,21 @@ broadcasts.get('/api/broadcasts/:id/preview-count', async (c) => {
       count = active;
       perAccount = breakdown;
     } else if (broadcast.target_type === 'tag' && broadcast.target_tag_id) {
-      // 注: ここは inline send パス (broadcast.ts:61 getFriendsByTag) が
-      // line_account_id でフィルタしないので、preview もアカウント横断で数える。
-      // 実際の送信先と modal 表示を一致させるための整合性。
-      const row = await c.env.DB.prepare(
-        `SELECT COUNT(*) AS cnt FROM friends f
+      // 実送信は getFriendsByTag(db, tagId, line_account_id) で要求アカウントに
+      // 絞る (services/broadcast.ts)。プレビューも同じ境界で数え、他アカウント
+      // の人数・存在を応答へ漏らさない (N-060)。
+      const tagAccountId = (raw.line_account_id as string | null) || null;
+      const tagSql = tagAccountId
+        ? `SELECT COUNT(*) AS cnt FROM friends f
            INNER JOIN friend_tags ft ON ft.friend_id = f.id
-           WHERE ft.tag_id = ? AND f.is_following = 1`,
-      ).bind(broadcast.target_tag_id).first<{ cnt: number }>();
+           WHERE ft.tag_id = ? AND f.is_following = 1 AND f.line_account_id = ?`
+        : `SELECT COUNT(*) AS cnt FROM friends f
+           INNER JOIN friend_tags ft ON ft.friend_id = f.id
+           WHERE ft.tag_id = ? AND f.is_following = 1`;
+      const tagBinds: unknown[] = tagAccountId
+        ? [broadcast.target_tag_id, tagAccountId]
+        : [broadcast.target_tag_id];
+      const row = await c.env.DB.prepare(tagSql).bind(...tagBinds).first<{ cnt: number }>();
       count = row?.cnt ?? 0;
     } else if (broadcast.target_type === 'segment') {
       // 絞り込み配信。条件は下書きに入っている。作った条件と、送る前に出す
@@ -422,6 +728,8 @@ broadcasts.post('/api/broadcasts/preflight', requireRole('owner', 'admin'), asyn
       accountIds?: unknown;
       messageContent?: unknown;
       segmentConditions?: unknown;
+      scheduledAt?: unknown;
+      messageCount?: unknown;
     }>();
 
     const targetType = String(body.targetType ?? 'all');
@@ -451,13 +759,14 @@ broadcasts.post('/api/broadcasts/preflight', requireRole('owner', 'admin'), asyn
         );
       }
     }
-    const audience = await countAudience(c.env.DB, {
+    const preview = await previewAudience(c.env.DB, {
       targetType,
       targetTagId: body.targetTagId ? String(body.targetTagId) : null,
       lineAccountId: body.lineAccountId ? String(body.lineAccountId) : null,
       accountIds: Array.isArray(body.accountIds) ? body.accountIds.map(String) : undefined,
       segmentConditions,
     });
+    const audience = { total: preview.sendable, hiddenExcluded: preview.exclusions.hidden };
 
     // 同じ本文の配信が直近にあるかは、本文が渡されたときだけ見る。
     // 下書きの段階では本文が空のこともある。
@@ -465,6 +774,37 @@ broadcasts.post('/api/broadcasts/preflight', requireRole('owner', 'admin'), asyn
     const hasRecentSimilar = content
       ? await hasRecentSimilarBroadcast(c.env.DB, content, new Date().toISOString())
       : false;
+    const accountIds = requestedAccountIds.filter((id): id is string => typeof id === 'string');
+    const quotaParts = await Promise.all(accountIds.map(async (accountId) => {
+      const account = await getLineAccountById(c.env.DB, accountId);
+      if (!account) return { limit: null, used: null };
+      return fetchQuota(account.channel_access_token);
+    }));
+    const quotaKnown = quotaParts.length > 0
+      && quotaParts.every((part) => part.limit !== null && part.used !== null);
+    const quotaLimit = quotaKnown
+      ? quotaParts.reduce((sum, part) => sum + (part.limit ?? 0), 0)
+      : null;
+    const quotaUsed = quotaKnown
+      ? quotaParts.reduce((sum, part) => sum + (part.used ?? 0), 0)
+      : null;
+    const planned = preview.sendable * Math.max(1, Number(body.messageCount) || 1);
+    const remaining = quotaLimit === null || quotaUsed === null ? null : Math.max(0, quotaLimit - quotaUsed);
+    const quotaState = remaining === null ? 'unavailable' : planned > remaining ? 'insufficient' : 'available';
+    const scheduledAt = typeof body.scheduledAt === 'string' && body.scheduledAt ? body.scheduledAt : null;
+    let concurrentBroadcasts: Array<{ id: string; title: string; scheduledAt: string }> = [];
+    if (scheduledAt && accountIds.length > 0) {
+      const placeholders = accountIds.map(() => '?').join(',');
+      const rows = await c.env.DB.prepare(
+        `SELECT id, title, scheduled_at
+           FROM broadcasts
+          WHERE status = 'scheduled' AND scheduled_at IS NOT NULL
+            AND line_account_id IN (${placeholders})
+            AND ABS(strftime('%s', scheduled_at) - strftime('%s', ?)) <= 3600
+          ORDER BY scheduled_at, id LIMIT 10`,
+      ).bind(...accountIds, scheduledAt).all<{ id: string; title: string; scheduled_at: string }>();
+      concurrentBroadcasts = rows.results.map((row) => ({ id: row.id, title: row.title, scheduledAt: row.scheduled_at }));
+    }
 
     return c.json({
       success: true,
@@ -472,6 +812,26 @@ broadcasts.post('/api/broadcasts/preflight', requireRole('owner', 'admin'), asyn
         audienceCount: audience.total,
         hiddenExcluded: audience.hiddenExcluded,
         warnings: buildWarnings(audience, { hasRecentSimilar }),
+        audience: {
+          matched: preview.matched,
+          sendable: preview.sendable,
+          evaluatedAt: preview.evaluatedAt,
+          representatives: preview.representatives,
+        },
+        exclusions: preview.exclusions,
+        quota: {
+          monthlyUsed: quotaUsed,
+          monthlyLimit: quotaLimit,
+          remaining,
+          planned,
+          state: quotaState,
+          reason: quotaState === 'unavailable' ? '送信枠を取得できませんでした' : null,
+        },
+        concurrentBroadcasts,
+        conditionAxes: {
+          standard: STANDARD_CONDITION_AXES.map(([key, label]) => ({ key, label })),
+          broadcastOnly: BROADCAST_ONLY_CONDITION_AXES.map(([key, label]) => ({ key, label })),
+        },
       },
     });
   } catch (err) {
@@ -484,38 +844,50 @@ broadcasts.post('/api/broadcasts', requireRole('owner', 'admin'), async (c) => {
   try {
     const body = await c.req.json<CreateBroadcastBody>();
     const idempotencyKey = c.req.header('Idempotency-Key')?.trim();
+    const saveAsDraft = body.saveAsDraft === true;
+    const title = body.title?.trim() || (saveAsDraft ? '名称未設定' : '');
+    const messageType = body.messageType ?? (saveAsDraft ? 'text' : undefined);
+    const messageContent = body.messageContent ?? (saveAsDraft ? '' : undefined);
+    const targetType = body.targetType ?? (saveAsDraft ? 'all' : undefined);
 
     if (idempotencyKey && !UUID_PATTERN.test(idempotencyKey)) {
       return c.json({ success: false, error: 'Idempotency-Key must be a UUID' }, 400);
     }
 
-    if (!body.title || !body.messageType || !body.messageContent || !body.targetType) {
+    if (!title || !messageType || messageContent === undefined || !targetType) {
       return c.json(
         { success: false, error: 'title, messageType, messageContent, and targetType are required' },
         400,
       );
     }
+    if (body.draftStep !== undefined && !BROADCAST_DRAFT_STEPS.has(body.draftStep)) {
+      return c.json({ success: false, error: 'draftStep is invalid' }, 400);
+    }
+    const messageOptionsError = validateMessageOptions(body.messageOptions);
+    if (messageOptionsError) return c.json({ success: false, error: messageOptionsError }, 400);
 
-    const requestedAccountIds = body.targetType === 'multi-account-dedup'
+    const requestedAccountIds = targetType === 'multi-account-dedup'
       ? (Array.isArray(body.accountIds) ? body.accountIds : [null])
       : [body.lineAccountId ?? null];
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), requestedAccountIds)) {
       return c.json({ success: false, error: ACCOUNT_ACCESS_ERROR }, 403);
     }
 
-    let messageParts;
-    try {
-      messageParts = parseBroadcastMessageParts({
-        messageType: body.messageType,
-        messageContent: body.messageContent,
-        messageBubbles: body.messageBubbles,
-        altText: body.altText,
-      });
-    } catch (messageError) {
-      return c.json({
-        success: false,
-        error: messageError instanceof Error ? messageError.message : `messageBubbles must contain 1 to ${MAX_BROADCAST_MESSAGES} items`,
-      }, 400);
+    let messageParts: ReturnType<typeof parseBroadcastMessageParts> = [];
+    if (!saveAsDraft || body.messageBubbles !== undefined || messageContent) {
+      try {
+        messageParts = parseBroadcastMessageParts({
+          messageType,
+          messageContent,
+          messageBubbles: body.messageBubbles,
+          altText: body.altText,
+        });
+      } catch (messageError) {
+        return c.json({
+          success: false,
+          error: messageError instanceof Error ? messageError.message : `messageBubbles must contain 1 to ${MAX_BROADCAST_MESSAGES} items`,
+        }, 400);
+      }
     }
 
     // 配る時間の指定。長すぎると送りきる前に日をまたぐので上限を置く。
@@ -538,7 +910,7 @@ broadcasts.post('/api/broadcasts', requireRole('owner', 'admin'), async (c) => {
       }, 400);
     }
 
-    if (body.targetType === 'tag' && !body.targetTagId) {
+    if (targetType === 'tag' && !body.targetTagId && !saveAsDraft) {
       return c.json(
         { success: false, error: 'targetTagId is required when targetType is "tag"' },
         400,
@@ -575,14 +947,14 @@ broadcasts.post('/api/broadcasts', requireRole('owner', 'admin'), async (c) => {
       segmentConditions = JSON.stringify(raw);
     }
 
-    if (body.targetType === 'segment' && !segmentConditions) {
+    if (targetType === 'segment' && !segmentConditions && !saveAsDraft) {
       return c.json(
         { success: false, error: 'segmentConditions is required when targetType is "segment"' },
         400,
       );
     }
 
-    if (body.targetType === 'multi-account-dedup') {
+    if (targetType === 'multi-account-dedup') {
       if (!Array.isArray(body.accountIds) || body.accountIds.length < 1) {
         return c.json({ success: false, error: 'accountIds (length >= 1) required for multi-account-dedup' }, 400);
       }
@@ -592,6 +964,14 @@ broadcasts.post('/api/broadcasts', requireRole('owner', 'admin'), async (c) => {
       // Defense in depth: drop priority entries not in accountIds before persisting.
       body.dedupPriority = body.dedupPriority.filter((id: unknown) =>
         typeof id === 'string' && body.accountIds!.includes(id));
+    }
+
+    if (!await validateAfterActionVersion(
+      c.env.DB,
+      body.lineAccountId ?? null,
+      body.afterActionVersionId,
+    )) {
+      return c.json({ success: false, error: '配信後アクションの公開版が見つかりません' }, 400);
     }
 
     if (idempotencyKey) {
@@ -609,12 +989,12 @@ broadcasts.post('/api/broadcasts', requireRole('owner', 'admin'), async (c) => {
     try {
       broadcast = await createBroadcast(c.env.DB, {
         id: idempotencyKey,
-        title: body.title,
+        title,
         stealthSpreadMinutes: body.stealthSpreadMinutes ?? 0,
-        messageType: body.messageType,
-        messageContent: body.messageContent,
+        messageType,
+        messageContent,
         messageBubblesJson: body.messageBubbles ? JSON.stringify(body.messageBubbles) : null,
-        targetType: body.targetType,
+        targetType,
         targetTagId: body.targetTagId ?? null,
         scheduledAt: body.scheduledAt ?? null,
         accountIds: body.accountIds,
@@ -625,6 +1005,12 @@ broadcasts.post('/api/broadcasts', requireRole('owner', 'admin'), async (c) => {
         segmentConditions,
         folderId: body.folderId ?? null,
         measureOpens: body.measureOpens,
+        internalMemo: body.internalMemo ?? null,
+        draftStep: body.draftStep ?? null,
+        draftPayloadJson: saveAsDraft ? JSON.stringify(body) : null,
+        messageOptionsJson: body.messageOptions == null ? null : JSON.stringify(body.messageOptions),
+        afterActionVersionId: body.afterActionVersionId ?? null,
+        saveAsDraft,
       });
     } catch (createError) {
       // Concurrent retries may both pass the SELECT above. The primary key makes
@@ -679,7 +1065,24 @@ broadcasts.put('/api/broadcasts/:id', requireRole('owner', 'admin'), async (c) =
       stealthSpreadMinutes?: number;
       lineAccountId?: string | null;
       accountIds?: string[];
+      saveAsDraft?: boolean;
+      draftStep?: 'basic' | 'audience' | 'message' | 'schedule' | 'confirm' | null;
+      internalMemo?: string | null;
+      messageOptions?: unknown;
+      afterActionVersionId?: string | null;
+      expectedVersion?: number;
     }>();
+
+    if (body.expectedVersion !== undefined
+        && (!Number.isInteger(body.expectedVersion) || body.expectedVersion < 1)) {
+      return c.json({ success: false, error: 'expectedVersion must be a positive integer' }, 400);
+    }
+    if (body.draftStep !== undefined && body.draftStep !== null
+        && !BROADCAST_DRAFT_STEPS.has(body.draftStep)) {
+      return c.json({ success: false, error: 'draftStep is invalid' }, 400);
+    }
+    const messageOptionsError = validateMessageOptions(body.messageOptions);
+    if (messageOptionsError) return c.json({ success: false, error: messageOptionsError }, 400);
 
     const existingRaw = existing as unknown as Record<string, unknown>;
     const resultingTargetType = body.targetType ?? existing.target_type;
@@ -690,6 +1093,18 @@ broadcasts.put('/api/broadcasts/:id', requireRole('owner', 'admin'), async (c) =
           : (existingRaw.line_account_id as string | null | undefined) ?? null];
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), requestedAccountIds)) {
       return c.json({ success: false, error: ACCOUNT_ACCESS_ERROR }, 403);
+    }
+    const resultingAccountId = resultingTargetType === 'multi-account-dedup'
+      ? null
+      : (body.lineAccountId !== undefined
+          ? body.lineAccountId
+          : (existingRaw.line_account_id as string | null | undefined) ?? null);
+    if (!await validateAfterActionVersion(
+      c.env.DB,
+      resultingAccountId,
+      body.afterActionVersionId,
+    )) {
+      return c.json({ success: false, error: '配信後アクションの公開版が見つかりません' }, 400);
     }
 
     if (body.messageContent !== undefined) {
@@ -702,8 +1117,11 @@ broadcasts.put('/api/broadcasts/:id', requireRole('owner', 'admin'), async (c) =
     if (body.messageBubbles !== undefined
         && (!Array.isArray(body.messageBubbles)
           || body.messageBubbles.length < 1
-          || body.messageBubbles.length > 3)) {
-      return c.json({ success: false, error: 'messageBubbles must contain 1 to 3 items' }, 400);
+          || body.messageBubbles.length > MAX_BROADCAST_MESSAGES)) {
+      return c.json({
+        success: false,
+        error: `messageBubbles must contain 1 to ${MAX_BROADCAST_MESSAGES} items`,
+      }, 400);
     }
 
     let segmentConditions: string | null | undefined;
@@ -748,12 +1166,12 @@ broadcasts.put('/api/broadcasts/:id', requireRole('owner', 'admin'), async (c) =
     }
 
     // Keep status in sync with scheduledAt changes
-    let statusUpdate: 'draft' | 'scheduled' | undefined;
-    if (body.scheduledAt !== undefined) {
+    let statusUpdate: 'draft' | 'scheduled' | undefined = body.saveAsDraft ? 'draft' : undefined;
+    if (!body.saveAsDraft && body.scheduledAt !== undefined) {
       statusUpdate = body.scheduledAt ? 'scheduled' : 'draft';
     }
 
-    const updated = await updateBroadcast(c.env.DB, id, {
+    const updates: Parameters<typeof updateBroadcast>[2] = {
       title: body.title,
       message_type: body.messageType,
       message_content: body.messageContent,
@@ -771,7 +1189,23 @@ broadcasts.put('/api/broadcasts/:id', requireRole('owner', 'admin'), async (c) =
       ...(body.folderId !== undefined ? { folder_id: body.folderId } : {}),
       ...(body.measureOpens !== undefined ? { measure_opens: body.measureOpens ? 1 : 0 } : {}),
       ...(statusUpdate !== undefined ? { status: statusUpdate } : {}),
-    });
+      ...(body.internalMemo !== undefined ? { internal_memo: body.internalMemo } : {}),
+      ...(body.draftStep !== undefined ? { draft_step: body.draftStep } : {}),
+      ...(body.saveAsDraft ? { draft_payload_json: JSON.stringify(body) } : {}),
+      ...(body.messageOptions !== undefined
+        ? { message_options_json: body.messageOptions === null ? null : JSON.stringify(body.messageOptions) }
+        : {}),
+      ...(body.afterActionVersionId !== undefined
+        ? { after_action_version_id: body.afterActionVersionId }
+        : {}),
+    };
+    const updated = body.expectedVersion === undefined
+      ? await updateBroadcast(c.env.DB, id, updates)
+      : await updateBroadcast(c.env.DB, id, updates, body.expectedVersion);
+
+    if (!updated && body.expectedVersion !== undefined) {
+      return c.json({ success: false, error: '別の画面で下書きが更新されました', code: 'VERSION_CONFLICT' }, 409);
+    }
 
     // 失敗 partial dedup broadcast を draft に戻して編集 → 再送するケースで、
     // 残っていた resume 用 state を全部クリアして fresh campaign として送り直せる
@@ -844,6 +1278,358 @@ broadcasts.post('/api/broadcasts/:id/cancel', requireRole('owner', 'admin'), asy
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
+
+
+/**
+ * cron（5分間隔）を待たずに、その場でキュー処理を始める。
+ *
+ * 使えない環境（単体試験など）では黙って cron に任せる。**起動に失敗しても
+ * 送れなくなるわけではない**ので、応答は成功のまま返す。
+ */
+function kickQueueProcessing(c: Context<Env>, label: string): void {
+  try {
+    const ctx = c.executionCtx as ExecutionContext;
+    const defaultClient = new LineClient(c.env.LINE_CHANNEL_ACCESS_TOKEN);
+    ctx.waitUntil(
+      processQueuedBroadcasts(c.env.DB, defaultClient, c.env.WORKER_URL).catch((err) => {
+        console.error(`[${label}] background queue processing failed:`, err);
+      }),
+    );
+  } catch (kickErr) {
+    console.warn(`[${label}] waitUntil unavailable, falling back to cron:`, kickErr);
+  }
+}
+
+/*
+ * ───────── 送信中の一斉配信を止める／再開する／失敗した相手だけ送り直す ─────────
+ *
+ * #662 / N-059。これまで `sending` に入った配信を止める正式な経路が無かった。
+ *
+ * 3つの口はどれも**版付きの条件付き UPDATE 1本**で決める。読んでから書くと、
+ * 2人が同時に押したときに両方が「自分が勝った」と読む。変わった行数を見て、
+ * 1 だった者だけが先へ進む。画面側の連打防止（押している間ボタンを無効に
+ * する）は見た目の手当てで、**本当の守りはここ**。
+ */
+
+/** 停止・再送でキューへ載せ直すための絞り込みの印。 */
+function queueMarkerFor(broadcast: DbBroadcast): string | null {
+  const raw = broadcast as unknown as Record<string, unknown>;
+  // 既に条件が入っていればそれを使う（segment 配信・500人超の tag 配信）。
+  if (raw.segment_conditions) return null;
+  // 500人以下の tag 配信はその場で送り切る作りでキューを通らない。再開・再送では
+  // 500人超の経路と同じ印を書いて、キュー側（processQueuedBroadcastBatches）へ寄せる。
+  if (broadcast.target_type === 'tag' && broadcast.target_tag_id) {
+    return JSON.stringify({
+      operator: 'AND',
+      rules: [{ type: 'tag_exists', value: broadcast.target_tag_id }],
+    });
+  }
+  return null;
+}
+
+function parseExpectedVersion(value: unknown): number | null {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 1) return null;
+  return parsed;
+}
+
+/**
+ * 監査へ1件だけ残す。
+ *
+ * `auditRecorded` を立てて、共通の記録（api.post./api/…）と二重にしない。
+ * `await` するのは、止めた・再開した・送り直したという判断そのものが
+ * 後から追えないと困るため。取りこぼしを待たない口（waitUntil）には載せない。
+ */
+async function recordBroadcastControlAudit(
+  c: Context<Env>,
+  action: 'broadcast.stop' | 'broadcast.resume' | 'broadcast.retry_failed',
+  broadcast: DbBroadcast,
+  after: Record<string, unknown>,
+): Promise<void> {
+  const staff = c.get('staff');
+  c.set('auditRecorded', true);
+  const raw = broadcast as unknown as Record<string, unknown>;
+  try {
+    await recordAuditEvent(c.env.DB, {
+      tenantId: staff?.tenantId,
+      lineAccountId: (raw.line_account_id as string | null | undefined) ?? null,
+      category: 'business',
+      actorPrincipalId: staff?.id,
+      actorRole: staff?.role,
+      action,
+      targetKind: 'broadcast',
+      targetId: broadcast.id,
+      result: 'success',
+      after,
+      requestTraceId: c.req.header('cf-ray') ?? c.req.header('x-request-id') ?? null,
+      ipPrefix: maskAuditIp(c.req.header('cf-connecting-ip')),
+      deviceFamily: auditDeviceFamily(c.req.header('user-agent')),
+    });
+  } catch (err) {
+    console.error(`${action} audit insert failed:`, err);
+  }
+}
+
+/** 台帳の数え上げと再送対象数。画面と応答で同じ数を使う。 */
+async function broadcastLedgerSummary(db: D1Database, id: string) {
+  const counts = await countBroadcastLedger(db, id);
+  return {
+    sent: counts.sent,
+    failed: counts.failed,
+    unknown: counts.unknown,
+    inFlight: counts.claimed,
+    retryableCount: counts.failed,
+  };
+}
+
+// POST /api/broadcasts/:id/stop — 送信中の配信を止める
+broadcasts.post('/api/broadcasts/:id/stop', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const id = c.req.param('id');
+    const existing = await getBroadcastById(c.env.DB, id);
+    if (!existing || !await canAccessBroadcast(c.env.DB, c.get('staff'), existing)) {
+      return c.json({ success: false, error: 'Broadcast not found' }, 404);
+    }
+
+    /*
+     * 全員配信（target_type='all'）は止められない。
+     *
+     * LINE の broadcast の口は「全員へ配って」と1回頼むだけで、こちらに
+     * 宛先の一覧が無い。頼んだあとに止める手段が LINE 側に無いので、
+     * **できないことをできるように見せない**。
+     */
+    if (existing.target_type === 'all') {
+      return c.json({
+        success: false,
+        error: '全員への配信は、送り始めると途中で止められません（LINE側に停止の口がありません）。',
+        code: 'BROADCAST_NOT_STOPPABLE',
+      }, 409);
+    }
+    if (existing.status !== 'sending') {
+      return c.json({
+        success: false,
+        error: '送信中の配信だけ停止できます。',
+        code: 'BROADCAST_NOT_SENDING',
+      }, 409);
+    }
+
+    // 冪等: もう止まっているなら、同じ結果をそのまま返す。連打や再送信で
+    // 失敗に見せない（運用者は「止まったのか、止まっていないのか」だけを
+    // 知りたい）。
+    const rawExisting = existing as unknown as Record<string, unknown>;
+    if (rawExisting.stopped_at) {
+      return c.json({
+        success: true,
+        data: {
+          ...serializeBroadcast(existing),
+          ledger: await broadcastLedgerSummary(c.env.DB, id),
+        },
+        alreadyStopped: true,
+      });
+    }
+
+    const body = await c.req.json().catch(() => ({} as Record<string, unknown>));
+    const expectedVersion = parseExpectedVersion((body as Record<string, unknown>).expectedVersion);
+    if (expectedVersion === null) {
+      return c.json({
+        success: false,
+        error: 'expectedVersion（画面が読み込んだ版）が必要です。',
+        code: 'EXPECTED_VERSION_REQUIRED',
+      }, 400);
+    }
+
+    const changes = await requestBroadcastStop(c.env.DB, {
+      id,
+      expectedVersion,
+      actorId: c.get('staff')?.id ?? null,
+    });
+    if (changes !== 1) {
+      // 負けた側。相手が止めていたなら冪等に成功で返す。そうでなければ
+      // 版が食い違っている（別の操作が先に入った）。
+      const current = await getBroadcastById(c.env.DB, id);
+      const currentRaw = current as unknown as Record<string, unknown> | null;
+      if (current && currentRaw?.stopped_at) {
+        return c.json({
+          success: true,
+          data: {
+            ...serializeBroadcast(current),
+            ledger: await broadcastLedgerSummary(c.env.DB, id),
+          },
+          alreadyStopped: true,
+        });
+      }
+      return c.json({
+        success: false,
+        error: '別の操作が先に入りました。画面を読み直してからやり直してください。',
+        code: 'VERSION_MISMATCH',
+      }, 409);
+    }
+
+    /*
+     * 台帳を締める。
+     *
+     *   外へ出したあと決着していない相手 → **送達不明**。成功とも失敗とも
+     *     断定しない。再送の対象にしない（at-most-once）
+     *   押さえただけで外へ出していない相手 → **失敗**。まだ誰にも届いて
+     *     いないので送り直してよい
+     */
+    const closed = await closeClaimsForStop(c.env.DB, id);
+    const updated = await getBroadcastById(c.env.DB, id);
+    const ledger = await broadcastLedgerSummary(c.env.DB, id);
+    await recordBroadcastControlAudit(c, 'broadcast.stop', existing, {
+      undeliveredUnknown: closed.unknown,
+      releasedForRetry: closed.failed,
+      sent: ledger.sent,
+    });
+    return c.json({
+      success: true,
+      data: { ...serializeBroadcast(updated ?? existing), ledger },
+      stoppedUnknownCount: closed.unknown,
+    });
+  } catch (err) {
+    console.error('POST /api/broadcasts/:id/stop error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+// POST /api/broadcasts/:id/resume — 止めた配信の続きを送る
+broadcasts.post('/api/broadcasts/:id/resume', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const id = c.req.param('id');
+    const existing = await getBroadcastById(c.env.DB, id);
+    if (!existing || !await canAccessBroadcast(c.env.DB, c.get('staff'), existing)) {
+      return c.json({ success: false, error: 'Broadcast not found' }, 404);
+    }
+    const rawExisting = existing as unknown as Record<string, unknown>;
+    if (existing.status !== 'sending' || !rawExisting.stopped_at) {
+      return c.json({
+        success: false,
+        error: '停止中の配信だけ再開できます。',
+        code: 'BROADCAST_NOT_STOPPED',
+      }, 409);
+    }
+
+    const body = await c.req.json().catch(() => ({} as Record<string, unknown>));
+    const expectedVersion = parseExpectedVersion((body as Record<string, unknown>).expectedVersion);
+    if (expectedVersion === null) {
+      return c.json({
+        success: false,
+        error: 'expectedVersion（画面が読み込んだ版）が必要です。',
+        code: 'EXPECTED_VERSION_REQUIRED',
+      }, 400);
+    }
+
+    const changes = await resumeBroadcastSending(c.env.DB, {
+      id,
+      expectedVersion,
+      segmentConditions: queueMarkerFor(existing),
+    });
+    if (changes !== 1) {
+      return c.json({
+        success: false,
+        error: '別の操作が先に入りました。画面を読み直してからやり直してください。',
+        code: 'VERSION_MISMATCH',
+      }, 409);
+    }
+
+    const updated = await getBroadcastById(c.env.DB, id);
+    const ledger = await broadcastLedgerSummary(c.env.DB, id);
+    await recordBroadcastControlAudit(c, 'broadcast.resume', existing, { sent: ledger.sent });
+    kickQueueProcessing(c, 'resume');
+    return c.json({ success: true, data: { ...serializeBroadcast(updated ?? existing), ledger } });
+  } catch (err) {
+    console.error('POST /api/broadcasts/:id/resume error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+// POST /api/broadcasts/:id/retry-failed — 失敗した相手だけ送り直す
+//
+// 相手へ実際に届き、取り消せない。権限に加えて明示的な確認を要求する
+// （送信の口と同じ扱い）。
+broadcasts.post(
+  '/api/broadcasts/:id/retry-failed',
+  requireRole('owner', 'admin'),
+  requireIrreversibleConfirmation('broadcast-send'),
+  async (c) => {
+    try {
+      const id = c.req.param('id');
+      const existing = await getBroadcastById(c.env.DB, id);
+      if (!existing || !await canAccessBroadcast(c.env.DB, c.get('staff'), existing)) {
+        return c.json({ success: false, error: 'Broadcast not found' }, 404);
+      }
+      if (existing.target_type === 'all') {
+        return c.json({
+          success: false,
+          error: '全員への配信は宛先の一覧を持たないため、失敗した相手だけの再送ができません。',
+          code: 'BROADCAST_NOT_RETRYABLE',
+        }, 409);
+      }
+      const rawExisting = existing as unknown as Record<string, unknown>;
+      const stopped = !!rawExisting.stopped_at;
+      if (!(existing.status === 'sent' || (existing.status === 'sending' && stopped))) {
+        return c.json({
+          success: false,
+          error: '送信済み、または停止中の配信だけ再送できます。',
+          code: 'BROADCAST_NOT_RETRYABLE',
+        }, 409);
+      }
+
+      const retryable = await getRetryableRecipientIds(c.env.DB, id);
+      if (retryable.length === 0) {
+        return c.json({
+          success: false,
+          error: '再送できる相手がいません。送達不明の相手は、二重に届くのを避けるため再送しません。',
+          code: 'NO_RETRY_TARGET',
+        }, 409);
+      }
+
+      const body = await c.req.json().catch(() => ({} as Record<string, unknown>));
+      const expectedVersion = parseExpectedVersion((body as Record<string, unknown>).expectedVersion);
+      if (expectedVersion === null) {
+        return c.json({
+          success: false,
+          error: 'expectedVersion（画面が読み込んだ版）が必要です。',
+          code: 'EXPECTED_VERSION_REQUIRED',
+        }, 400);
+      }
+
+      const attempt = await beginBroadcastRetryAttempt(c.env.DB, {
+        id,
+        expectedVersion,
+        segmentConditions: queueMarkerFor(existing),
+      });
+      if (attempt.changes !== 1 || attempt.attemptNo === null) {
+        return c.json({
+          success: false,
+          error: '別の操作が先に入りました。画面を読み直してからやり直してください。',
+          code: 'VERSION_MISMATCH',
+        }, 409);
+      }
+
+      // 失敗した相手だけを新しい試行番号で開け直す。送達済み・送達不明の行は
+      // 触らない（`state = 'failed'` で絞る）。
+      const reopened = await reopenFailedClaims(c.env.DB, id, attempt.attemptNo);
+      const updated = await getBroadcastById(c.env.DB, id);
+      const ledger = await broadcastLedgerSummary(c.env.DB, id);
+      await recordBroadcastControlAudit(c, 'broadcast.retry_failed', existing, {
+        attemptNo: attempt.attemptNo,
+        retryTargets: reopened,
+        skippedUnknown: ledger.unknown,
+      });
+      kickQueueProcessing(c, 'retry-failed');
+      return c.json({
+        success: true,
+        data: { ...serializeBroadcast(updated ?? existing), ledger },
+        attemptNo: attempt.attemptNo,
+        retryTargets: reopened,
+      }, 202);
+    } catch (err) {
+      console.error('POST /api/broadcasts/:id/retry-failed error:', err);
+      return c.json({ success: false, error: 'Internal server error' }, 500);
+    }
+  },
+);
 
 // DELETE /api/broadcasts/:id - delete
 broadcasts.delete('/api/broadcasts/:id', requireRole('owner', 'admin'), async (c) => {
@@ -1217,6 +2003,20 @@ broadcasts.post('/api/broadcasts/:id/send', requireRole('owner', 'admin'), requi
     }
 
     const result = await getBroadcastById(c.env.DB, id);
+    if (result?.status === 'sent' && result.line_account_id) {
+      try {
+        await dispatchOperatorEvent(c.env.DB, c.env, {
+          lineAccountId: result.line_account_id,
+          eventType: 'broadcast_completed',
+          sourceEventId: result.id,
+          message: `「${result.title}」の一斉配信が完了しました`,
+          executionMode: 'automatic',
+        });
+      } catch (notificationError) {
+        // 配信本体は完了済み。通知の失敗で再配信させず、台帳の回収口に残す。
+        console.error('[broadcast-completed] operator notification failed:', notificationError);
+      }
+    }
     return c.json({ success: true, data: result ? serializeBroadcast(result) : null });
   } catch (err) {
     console.error('POST /api/broadcasts/:id/send error:', err);
@@ -1321,23 +2121,62 @@ broadcasts.get('/api/broadcasts/:id/insight', async (c) => {
     const insight = await c.env.DB.prepare(
       'SELECT * FROM broadcast_insights WHERE broadcast_id = ? ORDER BY created_at DESC LIMIT 1'
     ).bind(id).first<Record<string, unknown>>();
+    const linkRows = await c.env.DB.prepare(
+      `SELECT tl.id, btl.label, tl.original_url,
+              COUNT(lc.id) AS click_count,
+              COUNT(DISTINCT lc.friend_id) AS unique_click_count,
+              MAX(lc.clicked_at) AS last_clicked_at
+         FROM broadcast_tracked_links btl
+         JOIN tracked_links tl ON tl.id = btl.tracked_link_id
+         LEFT JOIN link_clicks lc ON lc.tracked_link_id = tl.id
+        WHERE btl.broadcast_id = ?
+        GROUP BY tl.id, btl.label, tl.original_url
+        ORDER BY click_count DESC, tl.id`,
+    ).bind(id).all<{
+      id: string;
+      label: string;
+      original_url: string;
+      click_count: number;
+      unique_click_count: number;
+      last_clicked_at: string | null;
+    }>();
 
-    if (!insight) {
+    if (!insight && linkRows.results.length === 0) {
       return c.json({ success: true, data: null, message: 'Insight not yet available' });
     }
+
+    const delivered = insight?.delivered == null ? null : Number(insight.delivered);
+    const links = linkRows.results.map((row) => ({
+      id: row.id,
+      label: row.label,
+      url: row.original_url,
+      clickCount: Number(row.click_count),
+      uniqueClickCount: Number(row.unique_click_count),
+      clickRate: delivered && delivered > 0 ? Number(row.unique_click_count) / delivered : null,
+      lastClickedAt: row.last_clicked_at,
+    }));
 
     return c.json({
       success: true,
       data: {
-        broadcastId: insight.broadcast_id,
-        delivered: insight.delivered,
-        uniqueImpression: insight.unique_impression,
-        uniqueClick: insight.unique_click,
-        uniqueMediaPlayed: insight.unique_media_played,
-        openRate: insight.open_rate,
-        clickRate: insight.click_rate,
-        status: insight.status,
-        fetchedAt: insight.fetched_at,
+        broadcastId: id,
+        delivered,
+        uniqueImpression: insight?.unique_impression ?? null,
+        uniqueClick: insight?.unique_click ?? null,
+        uniqueMediaPlayed: insight?.unique_media_played ?? null,
+        openRate: insight?.open_rate ?? null,
+        clickRate: insight?.click_rate ?? null,
+        status: insight?.status ?? 'pending',
+        fetchedAt: insight?.fetched_at ?? null,
+        opens: {
+          count: insight?.unique_impression ?? null,
+          denominator: delivered,
+          rate: insight?.open_rate ?? null,
+          asOf: insight?.fetched_at ?? null,
+          state: insight?.status === 'ready' ? 'available' : 'unavailable',
+          reason: insight?.status === 'ready' ? null : 'LINE集計をまだ取得できません',
+        },
+        links,
       },
     });
   } catch (err) {
@@ -1535,8 +2374,8 @@ broadcasts.post('/api/broadcasts/:id/test-send', requireRole('owner', 'admin'), 
     if (!await canAccessBroadcast(c.env.DB, c.get('staff'), broadcast)) {
       return c.json({ success: false, error: 'Broadcast not found' }, 404);
     }
-    if (broadcast.status !== 'draft') {
-      return c.json({ success: false, error: 'Only draft broadcasts can be test-sent' }, 400);
+    if (broadcast.status !== 'draft' && broadcast.status !== 'scheduled') {
+      return c.json({ success: false, error: 'Only draft or scheduled broadcasts can be test-sent' }, 400);
     }
 
     const raw = broadcast as unknown as Record<string, unknown>;
@@ -1551,6 +2390,35 @@ broadcasts.post('/api/broadcasts/:id/test-send', requireRole('owner', 'admin'), 
 
     const friendIds: string[] = JSON.parse(setting.value);
     if (friendIds.length === 0) return c.json({ success: false, error: 'No test recipients configured' }, 400);
+    if (friendIds.length > 5) {
+      return c.json({ success: false, error: 'テスト送信の送信先は5件までにしてください' }, 400);
+    }
+
+    const staffId = c.get('staff')!.id;
+    const recentAttempt = await c.env.DB.prepare(
+      `SELECT 1 AS found
+         FROM operation_audit
+        WHERE target_kind = 'broadcast' AND target_id = ?
+          AND action = 'test_send' AND actor_id = ?
+          AND datetime(created_at) >= datetime('now', '+9 hours', '-10 seconds')
+        LIMIT 1`,
+    ).bind(id, staffId).first<{ found: number }>();
+    if (recentAttempt) {
+      return c.json(
+        { success: false, error: '短時間に繰り返し送信しています。10秒待ってからやり直してください' },
+        { status: 429, headers: { 'Retry-After': '10' } },
+      );
+    }
+    // 外部送信より先に試行を記録し、二度押しや並行リクエストを早い段階で止める。
+    await c.env.DB.prepare(
+      `INSERT INTO operation_audit (id, target_kind, target_id, action, actor_id, detail_json)
+       VALUES (?, 'broadcast', ?, 'test_send', ?, ?)`,
+    ).bind(
+      crypto.randomUUID(),
+      id,
+      staffId,
+      JSON.stringify({ recipientCount: friendIds.length }),
+    ).run();
 
     const placeholders = friendIds.map(() => '?').join(',');
     const friends = await c.env.DB.prepare(
@@ -1581,6 +2449,7 @@ broadcasts.post('/api/broadcasts/:id/test-send', requireRole('owner', 'admin'), 
       c.env.WORKER_URL,
       accountId,
       broadcast.track_links !== 0,
+      broadcast.id,
     );
 
     const liffId = (account as unknown as { liff_id?: string | null }).liff_id ?? null;
@@ -1644,13 +2513,72 @@ broadcasts.get('/api/broadcasts/:id/progress', async (c) => {
   }
 
   const raw = broadcast as unknown as Record<string, unknown>;
+  const accountIds = broadcast.target_type === 'multi-account-dedup'
+    ? parseJsonArray(raw.account_ids) ?? []
+    : typeof raw.line_account_id === 'string' && raw.line_account_id
+      ? [raw.line_account_id]
+      : [];
+  let perAccountStats: Array<{
+    accountId: string;
+    accountName: string;
+    sent: number;
+    uniqueImpression: null;
+    uniqueClick: null;
+  }> = [];
+  if (accountIds.length > 0) {
+    const placeholders = accountIds.map(() => '?').join(',');
+    const [sentRows, accountRows] = await Promise.all([
+      c.env.DB.prepare(
+        `SELECT COALESCE(ml.line_account_id, f.line_account_id) AS account_id, COUNT(*) AS sent
+           FROM messages_log ml
+           INNER JOIN friends f ON f.id = ml.friend_id
+          WHERE ml.broadcast_id = ? AND ml.direction = 'outgoing'
+            AND COALESCE(ml.line_account_id, f.line_account_id) IN (${placeholders})
+          GROUP BY COALESCE(ml.line_account_id, f.line_account_id)`,
+      ).bind(id, ...accountIds).all<{ account_id: string; sent: number }>(),
+      c.env.DB.prepare(`SELECT id, name FROM line_accounts WHERE id IN (${placeholders})`)
+        .bind(...accountIds).all<{ id: string; name: string }>(),
+    ]);
+    const sentByAccount = new Map(sentRows.results.map((row) => [row.account_id, Number(row.sent)]));
+    const nameByAccount = new Map(accountRows.results.map((row) => [row.id, row.name]));
+    perAccountStats = accountIds.map((accountId) => ({
+      accountId,
+      accountName: nameByAccount.get(accountId) ?? accountId,
+      sent: sentByAccount.get(accountId) ?? 0,
+      uniqueImpression: null,
+      uniqueClick: null,
+    }));
+  }
+  /*
+   * 送達台帳の内訳（#662）。画面はこの4つを別々に出す。
+   *
+   *   sent          … 届いた
+   *   failed        … 届かなかった。**再送の対象**
+   *   unknown       … 外へ出たかもしれないが確かめられない。再送しない
+   *   inFlight      … いま送っている途中
+   *
+   * `successCount` だけだと「残りは失敗」と読めてしまい、送達不明の相手を
+   * 再送してよいものと誤解させる。
+   */
+  const ledger = await countBroadcastLedger(c.env.DB, id);
   return c.json({
     success: true,
     data: {
       status: broadcast.status,
+      stopped: !!raw.stopped_at,
+      stoppedAt: (raw.stopped_at as string | null | undefined) ?? null,
+      sendAttemptNo: Number(raw.send_attempt_no ?? 1),
       totalCount: broadcast.total_count,
       successCount: broadcast.success_count,
       batchOffset: raw.batch_offset as number,
+      ledger: {
+        sent: ledger.sent,
+        failed: ledger.failed,
+        unknown: ledger.unknown,
+        inFlight: ledger.claimed,
+        retryableCount: ledger.failed,
+      },
+      perAccountStats,
     },
   });
 });

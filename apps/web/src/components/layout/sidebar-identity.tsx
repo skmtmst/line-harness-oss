@@ -36,7 +36,7 @@ export default function SidebarIdentity() {
   }, [])
 
   const name = brand.name || '管理画面'
-  const initial = name.slice(0, 1)
+  const initial = name === '株式会社 然' ? '然' : name.slice(0, 1)
 
   return (
     <div className={styles.root} data-design-node="J33xq/V2WbXF">

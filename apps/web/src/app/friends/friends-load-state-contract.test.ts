@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 const PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
+const TABLE = readFileSync(new URL('../../components/friends/friend-list-table.tsx', import.meta.url), 'utf8')
 
 describe('V6 友だち一覧の読込状態', () => {
   it('読込・成功・失敗を別の状態として持つ', () => {
@@ -12,8 +13,9 @@ describe('V6 友だち一覧の読込状態', () => {
   })
 
   it('読込失敗を0件の友だち一覧として表示しない', () => {
-    expect(PAGE).toContain("loadStatus === 'error'")
-    expect(PAGE).toContain('登録した友だちは消えていません。')
+    expect(PAGE).toContain('status={loadStatus}')
+    expect(TABLE).toContain("status === 'error'")
+    expect(TABLE).toContain('表示できませんでした')
     expect(PAGE).toContain('onRetry={() => void loadFriends()}')
     expect(PAGE).not.toContain('setError(response.error)')
   })

@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+[data-design-node="yPkWe"] [data-design-part="dialog"] { width: min(720px, calc(100% - 32px)); }
+[data-design-node="YfTfJ"] [data-design-part="dialog"] { width: min(680px, calc(100% - 32px)); }
+[data-design-node="N2J629"] [data-design-part="dialog"] { width: min(720px, calc(100% - 32px)); }
+
 /**
  * デザイントークン。
  *
@@ -256,17 +260,32 @@
   appearance: none;
   background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%234A5565' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
-  background-position: right 10px center;
-  padding-right: 30px;
+  background-color: var(--color-canvas);
+  background-position: right 12px center;
+  padding-right: 36px;
 }
 
 /*
- * 幅が設計で決まっている絞り込み（★V6 4-1 `XchZz` の 129px・116px など）。
- * 既定の左右あわせて 42px は、その幅では文字を食う。実際
- * 「使用状態：すべて」が「使用状態：すべ」で切れて、矢印に重なった。
+ * 過去の呼び出しとの互換名。狭くして矢印を端へ追いやらず、標準と同じ
+ * 右12pxを守る。幅は最長の選択肢に合わせて呼び出し側で確保する。
  */
 .v6-select-tight {
-  background-position: right 6px center;
-  padding-left: 8px;
-  padding-right: 22px;
+  background-position: right 12px center;
+  padding-left: 12px;
+  padding-right: 36px;
+}
+
+/*
+ * 共通部品へ移行途中の素の選択欄にも同じ規定を適用する。
+ * `appearance-none` は表内など矢印を意図的に描かない小型欄の明示的な例外。
+ */
+select:not([multiple]):not(.appearance-none) {
+  min-height: 40px;
+  padding-right: 36px;
+  background-color: var(--color-canvas);
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236e7781' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 16px 16px;
+  appearance: none;
 }

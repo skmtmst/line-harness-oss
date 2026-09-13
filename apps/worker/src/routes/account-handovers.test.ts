@@ -129,6 +129,13 @@ describe('段3 事前確認', () => {
   });
 
   it('合っていれば保存する', async () => {
+    prepare.mockImplementationOnce((_sql: string) => ({
+      bind: vi.fn((..._values: unknown[]) => ({
+        run,
+        first: vi.fn().mockResolvedValue({ count: 100 }),
+        all: vi.fn().mockResolvedValue({ results: [] }),
+      })),
+    }));
     const res = await makeApp().fetch(
       post('/api/account-handovers/ho-1/preview', {
         sourceFriendTotal: 100,
@@ -141,6 +148,30 @@ describe('段3 事前確認', () => {
       sourceFriendTotal: 100,
       counts: { auto: 60, review: 20, unmatched: 15, lookalike: 5 },
     });
+  });
+
+  /*
+    **申告の人数をうのみにしない。** 画面の表示数・手作り呼び出しが
+    そのまま「事前確認の結果」として残るのを防ぐ。
+  */
+  it('申告の合計が実際の友だち数と違えば 422 で断る', async () => {
+    prepare.mockImplementationOnce((_sql: string) => ({
+      bind: vi.fn((..._values: unknown[]) => ({
+        run,
+        first: vi.fn().mockResolvedValue({ count: 90 }),
+        all: vi.fn().mockResolvedValue({ results: [] }),
+      })),
+    }));
+    const res = await makeApp().fetch(
+      post('/api/account-handovers/ho-1/preview', {
+        sourceFriendTotal: 100,
+        counts: { auto: 60, review: 20, unmatched: 15, lookalike: 5 },
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    expect(await res.json()).toMatchObject({ error: expect.stringContaining('友だち数が変わっています') });
+    expect(db.savePreview).not.toHaveBeenCalled();
   });
 
   it('区分が1つでも欠けていたら断る（0 で埋めない）', async () => {

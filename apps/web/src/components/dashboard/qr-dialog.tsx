@@ -1,8 +1,12 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react'
+import QRCode from 'qrcode'
+import { QrCode } from 'lucide-react'
 import type { EntryRoute } from '@line-crm/shared'
 import { api } from '@/lib/api'
+import Button from '@/components/shared/button'
+import SelectField from '@/components/shared/select-field'
 
 /**
  * 友だち追加のQRコード（設計 V2 1-1-1）。
@@ -15,41 +19,80 @@ import { api } from '@/lib/api'
  * 選べば、外部サービスへデータを送らずにPDF化できる。
  */
 
+/*
+ * 選べる大きさ（#689）。
+ *
+ * Worker の /api/qr は 64〜1024px、かつ縦×横が 1,048,576 まで（`normalizeQrSize`）。
+ * 以前は「大」を 1200px にしていたため、正しく選んだ人だけが 400 で保存できなかった。
+ * ここに足すときは、必ず 1024px 以下・面積 1,048,576 以下にする。
+ */
 const SIZES = [
-  { value: '1200x1200', label: '大（1200px）', note: '印刷向け' },
+  { value: '1024x1024', label: '大（1024px）', note: '印刷向け' },
   { value: '600x600', label: '中（600px）', note: '画面向け' },
-  { value: '240x240', label: '小（240px）', note: '確認用' },
+  { value: '300x300', label: '小（300px）', note: '確認用' },
 ]
 
 /** Worker の /api/qr が受ける形式。順番はよく使うものから。 */
 const FORMATS = [
   { value: 'png', label: 'PNG' },
-  { value: 'svg', label: 'SVG' },
   { value: 'jpg', label: 'JPG' },
+  { value: 'svg', label: 'SVG' },
 ]
+
+export function resolveOfficialProfileUrl(
+  officialProfileUrl?: string | null,
+  accountBasicId?: string | null,
+): string | null {
+  if (officialProfileUrl !== undefined) return officialProfileUrl
+  if (!accountBasicId) return null
+  const basicId = accountBasicId.startsWith('@') ? accountBasicId : `@${accountBasicId}`
+  return `https://line.me/R/ti/p/${basicId}`
+}
+
+function DownloadIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <path d="M10 3v9m0 0 3-3m-3 3L7 9M4 14v2h12v-2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
 
 export default function QrDialog({
   open,
   onClose,
   accountName,
+  officialProfileUrl,
   accountBasicId,
   baseLink,
   initialRouteId = '',
+  visualReferenceQr = false,
+  routes: routesProp,
 }: {
   open: boolean
   onClose: () => void
   accountName: string
+  /** LINE公式プロフィールで発行した lin.ee の短縮URL。 */
+  officialProfileUrl?: string | null
   /** 公式アカウントのID（`@nen` など）。QRの下に出す案内先の組み立てに使う。 */
   accountBasicId?: string | null
   baseLink: string
   /** 呼び出し元で選んでいた経路。開いたときの初期値になる。 */
   initialRouteId?: string
+  /** 撮影固定応答でだけ使うPencilの簡略見本。通常時は実URLのQRを生成する。 */
+  visualReferenceQr?: boolean
+  /*
+    呼び出し元が既に取った経路一覧。渡されたら取り直さない。
+    同じ口を外と中で2回叩かない。
+  */
+  routes?: EntryRoute[]
 }) {
-  const [routes, setRoutes] = useState<EntryRoute[]>([])
+  const [fetchedRoutes, setFetchedRoutes] = useState<EntryRoute[]>([])
+  const routes = routesProp ?? fetchedRoutes
   const [routeId, setRouteId] = useState(initialRouteId)
   const [size, setSize] = useState(SIZES[0].value)
   const [format, setFormat] = useState(FORMATS[0].value)
   const [copied, setCopied] = useState(false)
+  const [qrDataUrl, setQrDataUrl] = useState('')
 
   // 開くたびに呼び出し元の選択に合わせる。閉じている間に向こうで
   // 経路を変えていたら、次に開いたときはそちらが正。
@@ -58,12 +101,12 @@ export default function QrDialog({
   }, [open, initialRouteId])
 
   useEffect(() => {
-    if (!open) return
+    if (!open || routesProp) return
     let cancelled = false
     void api.entryRoutes.list()
       .then((res) => {
         // 停止中の経路のQRを配ると、読み取っても友だち追加できない。
-        if (!cancelled && res.success) setRoutes(res.data.filter((r) => r.isActive))
+        if (!cancelled && res.success) setFetchedRoutes(res.data.filter((r) => r.isActive))
       })
       .catch(() => {
         // 経路一覧だけが取れなくても、基本の追加URLのQRは表示できる。
@@ -71,13 +114,29 @@ export default function QrDialog({
     return () => {
       cancelled = true
     }
-  }, [open])
-
-  if (!open) return null
+  }, [open, routesProp])
 
   const base = (process.env.NEXT_PUBLIC_API_URL ?? '').replace(/\/$/, '')
   const route = routes.find((r) => r.id === routeId)
   const link = route ? `${base}/r/${route.refCode}` : baseLink
+
+  useEffect(() => {
+    let cancelled = false
+    setQrDataUrl('')
+    void QRCode.toDataURL(link, {
+      width: 220,
+      margin: 1,
+      color: { dark: '#171717', light: '#ffffff' },
+    }).then((dataUrl) => {
+      if (!cancelled) setQrDataUrl(dataUrl)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [link])
+
+  if (!open) return null
+
   const qrSrc = `${base}/api/qr?size=${size}&format=${format}&data=${encodeURIComponent(link)}`
   const saveHref = `${qrSrc}&download=1&filename=${encodeURIComponent(
     route ? `qr-${route.refCode}` : 'qr-friend-add',
@@ -89,15 +148,12 @@ export default function QrDialog({
    * 経路を選んでいればその経路のリンク。経路ごとに分けて発行したのに
    * ここが公式アカウントのままだと、どのQRを見ているのか分からない。
    *
-   * 基本のときは公式アカウントのURL。LINE が配る lin.ee の短縮URLは
-   * API から取れないので、公式ID（basicId）から組み立てる。同じ場所に
-   * 着く。ID が無いアカウントでは何も出さない。
+   * 基本のときはAPIが返した公式プロフィール短縮URLを優先する。
+   * 段階配備中の旧Workerでは公式ID（basicId）から同じ行き先を組み立てる。
    */
   const profileUrl = route
     ? link
-    : accountBasicId
-      ? `https://line.me/R/ti/p/${accountBasicId.startsWith('@') ? accountBasicId : `@${accountBasicId}`}`
-      : null
+    : resolveOfficialProfileUrl(officialProfileUrl, accountBasicId)
 
   const copy = async () => {
     try {
@@ -137,14 +193,15 @@ export default function QrDialog({
   return (
     <div
       data-design="QR"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4"
       role="dialog"
       aria-modal="true"
       aria-label="友だち追加のQRコード"
       onClick={onClose}
     >
       <div
-        className="bg-canvas rounded-panel border-hairline max-h-[90vh] w-full max-w-3xl overflow-y-auto border p-6 shadow-[1px_1px_2px_rgba(29,29,31,0.13)]"
+        className="bg-canvas rounded-panel border-hairline max-h-[90vh] w-full overflow-y-auto border p-8 shadow-[1px_1px_2px_rgba(29,29,31,0.13)]"
+        style={{ maxWidth: 820 }}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex items-start justify-between gap-3">
@@ -166,15 +223,19 @@ export default function QrDialog({
         <div className="grid gap-5 sm:grid-cols-[auto_1fr]">
           {/* 名前はQRの下。読み取る人が見るのは絵で、名前はその確認に使う。 */}
           <div className="flex flex-col items-center">
-            <div className="bg-canvas-sunken rounded-panel flex h-[240px] w-[240px] items-center justify-center">
-              {/* eslint-disable-next-line @next/next/no-img-element -- Worker のQRプロキシ。静的アセットではない */}
-              <img
-                src={qrSrc}
-                alt="友だち追加QRコード"
-                width={200}
-                height={200}
-                className="h-[200px] w-[200px]"
-              />
+            <div className="bg-canvas-sunken rounded-panel flex h-[280px] w-[280px] items-center justify-center">
+              {visualReferenceQr ? (
+                <QrCode aria-label="友だち追加QRコード" className="text-ink" size={150} strokeWidth={3.8} />
+              ) : (
+                /* eslint-disable-next-line @next/next/no-img-element -- Worker のQRプロキシ。静的アセットではない */
+                <img
+                  src={qrDataUrl || qrSrc}
+                  alt="友だち追加QRコード"
+                  width={220}
+                  height={220}
+                  className="h-[220px] w-[220px]"
+                />
+              )}
             </div>
             <p className="text-ink mt-3 text-sm font-medium">{accountName}</p>
             {profileUrl && (
@@ -182,7 +243,7 @@ export default function QrDialog({
                 href={profileUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="text-action mt-1 max-w-[240px] truncate text-xs hover:underline"
+                className="text-action mt-1 max-w-[280px] truncate text-xs hover:underline"
               >
                 {profileUrl}
               </a>
@@ -194,19 +255,16 @@ export default function QrDialog({
               <label htmlFor="qr-route" className="text-ink-secondary mb-1 block text-xs font-medium">
                 発行中の追加URL
               </label>
-              <select
+              <SelectField
                 id="qr-route"
                 value={routeId}
                 onChange={(e) => setRouteId(e.target.value)}
-                className="border-hairline rounded-control w-full border px-3 py-2 text-sm"
-              >
-                <option value="">基本の追加URL</option>
-                {routes.map((r) => (
-                  <option key={r.id} value={r.id}>
-                    {r.name}
-                  </option>
-                ))}
-              </select>
+                className="w-full"
+                options={[
+                  { value: '', label: '基本の追加URL' },
+                  ...routes.map((r) => ({ value: r.id, label: r.name })),
+                ]}
+              />
               <p className="text-ink-faint mt-1 text-xs">
                 選んだ経路のQRコードとURLが表示されます。
               </p>
@@ -217,22 +275,17 @@ export default function QrDialog({
                 <label htmlFor="qr-size" className="text-ink-secondary mb-1 block text-xs font-medium">
                   画像の大きさ
                 </label>
-                <select
+                <SelectField
                   id="qr-size"
                   value={size}
                   onChange={(e) => setSize(e.target.value)}
-                  className="border-hairline rounded-control w-full border px-3 py-2 text-sm"
-                >
-                  {SIZES.map((s) => (
-                    <option key={s.value} value={s.value}>
-                      {s.label}
-                    </option>
-                  ))}
-                </select>
+                  className="w-full"
+                  options={SIZES.map((s) => ({ value: s.value, label: s.label }))}
+                />
               </div>
               <div>
                 <span className="text-ink-secondary mb-1 block text-xs font-medium">
-                  形式
+                  ダウンロード形式
                 </span>
                 <div className="border-hairline rounded-control flex overflow-hidden border" aria-label="画像形式">
                   {FORMATS.map((entry) => (
@@ -257,20 +310,18 @@ export default function QrDialog({
               >
                 友だち追加リンク
               </label>
-              <div className="flex items-stretch gap-2">
-                <input
+              <div className="border-hairline bg-canvas-sunken rounded-control relative flex items-stretch border">
+                <textarea
                   id="qr-link"
                   readOnly
+                  rows={2}
                   value={link}
                   onFocus={(e) => e.currentTarget.select()}
-                  className="border-hairline bg-canvas-sunken text-ink-secondary rounded-control min-w-0 flex-1 truncate border px-3 py-2 font-mono text-xs"
+                  className="text-ink-secondary min-w-0 flex-1 resize-none bg-transparent px-3 py-2 pr-16 font-mono text-xs leading-relaxed focus:outline-none"
                 />
                 <button
                   onClick={copy}
-                  className="text-on-accent rounded-control shrink-0 px-4 text-xs font-medium"
-                  style={{
-                    backgroundColor: copied ? 'var(--color-success)' : 'var(--color-accent)',
-                  }}
+                  className="text-action absolute right-2 top-2 rounded px-1.5 py-1 text-xs font-medium hover:underline"
                 >
                   {copied ? 'コピーしました ✓' : 'コピー'}
                 </button>
@@ -281,12 +332,12 @@ export default function QrDialog({
             </div>
 
             <div className="flex flex-wrap gap-2">
-              <a
+              <Button
                 href={saveHref}
-                className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-3 py-2 text-sm font-medium"
+                variant="primary"
               >
-                {format.toUpperCase()}をダウンロード
-              </a>
+                <DownloadIcon />画像をダウンロード
+              </Button>
               <button
                 type="button"
                 onClick={printQr}
@@ -295,16 +346,16 @@ export default function QrDialog({
                 PDFで印刷
               </button>
             </div>
-          </div>
-        </div>
 
-        <div className="border-hairline mt-5 border-t pt-4">
-          <h3 className="text-ink text-sm font-bold">使うときのヒント</h3>
-          <ul className="text-ink-faint mt-2 space-y-1 text-xs leading-relaxed">
-            <li>・印刷は 1200px 以上を推奨します（小さいと読み取れないことがあります）</li>
-            <li>・流入経路ごとにリンクを分けると、どこから来たかを計測できます</li>
-            <li>・QRの周囲は余白を1cm以上あけてください</li>
-          </ul>
+            <div className="border-hairline bg-surface-pearl rounded-control border p-4">
+              <h3 className="text-ink text-sm font-bold">使うときのヒント</h3>
+              <ul className="text-ink-faint mt-2 space-y-1 text-xs leading-relaxed">
+                <li>・印刷には「大（1024px）」を選んでください（小さいと読み取れないことがあります）</li>
+                <li>・流入経路ごとにリンクを分けると、どこから来たかを計測できます</li>
+                <li>・QRの周囲は余白を1cm以上あけてください</li>
+              </ul>
+            </div>
+          </div>
         </div>
       </div>
     </div>

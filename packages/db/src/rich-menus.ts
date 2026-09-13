@@ -22,6 +22,10 @@ export interface RichMenuGroup {
   is_default_for_all: number;
   status: 'draft' | 'published';
   publishing_at: string | null;
+  /** 公開leaseの所有者(run ID等)。NULLは誰も持っていない。 */
+  publishing_owner: string | null;
+  /** 公開leaseの期限(UTCのISO8601)。過ぎたら別runが回収できる。 */
+  publishing_expires_at: string | null;
   /** 出し分けの条件（SegmentCondition の JSON）。未設定なら null。 */
   targeting_condition: string | null;
   /** 複数のメニューに当てはまったときの順番。小さいほうが先。 */
@@ -117,6 +121,8 @@ export interface CreateRichMenuGroupInput {
   chatBarText: string;
   size: 'large' | 'compact';
   pages: RichMenuPageInput[];
+  /** 作成直後のフォルダ。#502中: 作成後の付け直し2口目をなくし1口で決める。 */
+  folderId?: string | null;
 }
 
 export interface UpdateRichMenuGroupMetaInput {
@@ -177,8 +183,9 @@ export interface RichMenuDeleteImpactNextCandidate {
  * リッチメニューを消す前に、DBで確認できる影響をまとめたもの。
  *
  * LINEは「いま各友だちに何が表示されているか」の台帳を返さないため、
- * currentAudience は作り物の0にせず常に null とする。削除可否は、公開状態、
- * LINE上の実体、DB内の参照をサーバー側で再確認して決める。
+ * currentAudience は自前の割当台帳に記録できた現在値だけを返す。導入前の割当を
+ * 推測で補わず partial と明示する。削除可否は、公開状態、LINE上の実体、DB内の
+ * 参照をサーバー側で再確認して決める。
  */
 export interface RichMenuDeleteImpact {
   group: {
@@ -188,8 +195,9 @@ export interface RichMenuDeleteImpact {
     status: RichMenuGroup['status'];
   };
   currentAudience: {
-    value: number | null;
-    reason: 'assignment_ledger_unavailable';
+    value: number;
+    state: 'partial';
+    reason: 'preexisting_assignments_not_backfilled';
   };
   nextDisplay: {
     guaranteedGroupId: null;
@@ -314,7 +322,7 @@ export async function getRichMenuDeleteImpact(
   const group = await getRichMenuGroupById(db, groupId);
   if (!group) return null;
 
-  const [pagesResult, incomingResult, candidatesResult, referencesResult] = await Promise.all([
+  const [pagesResult, incomingResult, candidatesResult, referencesResult, currentAudience] = await Promise.all([
     db
       .prepare(
         `SELECT id, name, line_richmenu_id
@@ -446,6 +454,7 @@ export async function getRichMenuDeleteImpact(
         owner_id: string;
         owner_name: string;
       }>(),
+    getRichMenuCurrentAudience(db, group.account_id, group.id, group.is_default_for_all === 1),
   ]);
 
   const pages = pagesResult.results ?? [];
@@ -490,8 +499,9 @@ export async function getRichMenuDeleteImpact(
       status: group.status,
     },
     currentAudience: {
-      value: null,
-      reason: 'assignment_ledger_unavailable',
+      value: currentAudience,
+      state: 'partial',
+      reason: 'preexisting_assignments_not_backfilled',
     },
     nextDisplay: {
       guaranteedGroupId: null,
@@ -589,8 +599,8 @@ export async function createRichMenuGroup(
       .prepare(
         `INSERT INTO rich_menu_groups
            (id, account_id, name, chat_bar_text, size, default_page_id,
-            is_default_for_all, status, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, 0, 'draft', ?, ?)`,
+            folder_id, is_default_for_all, status, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 0, 'draft', ?, ?)`,
       )
       .bind(
         groupId,
@@ -599,6 +609,7 @@ export async function createRichMenuGroup(
         input.chatBarText,
         input.size,
         defaultPageId,
+        input.folderId ?? null,
         now,
         now,
       ),
@@ -848,85 +859,227 @@ export async function pageBelongsToGroup(
   return !!row;
 }
 
-// Publish ロックを取る。既にロックされていれば false (HTTP 409 用)。
-export async function acquirePublishLock(
+// Publish lease を取る。所有者(owner=run ID等)と期限(既定10分)付き。
+// 有効期限内の他人所有だけが false (HTTP 409 用)。期限切れ・未所有・
+// 旧形式(publishing_atのみ)の行は回収して取り直す。停止したWorkerが
+// 残したlockで再試行と手動公開が塞がれないようにする。
+// 手動公開も予約実行も同じ関数を使う。
+export const PUBLISH_LEASE_MS = 10 * 60_000;
+
+/** lease期限(UTCのISO8601)を作る。 */
+export function publishLeaseExpiresAt(nowIso: string, ttlMs = PUBLISH_LEASE_MS): string {
+  const time = Date.parse(nowIso);
+  if (!Number.isFinite(time)) throw new Error('lease timestamp must be ISO 8601');
+  return new Date(time + ttlMs).toISOString();
+}
+
+/**
+ * publish lease の持ち主を表す札。
+ *
+ * owner だけでは足りない。公開確定 (markRichMenuGroupPublished) や解放で
+ * owner は NULL に戻るため、「まだ自分のものか」と「自分のあとに誰かが取って
+ * 手放したか」を区別できない。世代 (取得のたびに +1、戻さない) を併せて持ち、
+ * 確定は世代一致を書込み条件にする。
+ */
+export type PublishLeaseFence = { owner: string; generation: number };
+
+/**
+ * lease を取る。取れたらその世代を返し、取れなければ null。
+ *
+ * 有効期限内の他人所有だけが null (HTTP 409 用)。期限切れ・未所有・
+ * 旧形式(publishing_atのみ)の行は回収して取り直す。停止したWorkerが
+ * 残したlockで再試行と手動公開が塞がれないようにする。
+ * 手動公開も予約実行も同じ関数を使う。
+ */
+export async function acquirePublishLease(
   db: D1Database,
   groupId: string,
+  owner: string,
+  nowIso: string,
+  ttlMs = PUBLISH_LEASE_MS,
+): Promise<number | null> {
+  // 取得と世代の採番を1文にする。別々にすると、間に割り込んだ取得の世代を
+  // 自分のものと取り違える。
+  const row = await db
+    .prepare(
+      `UPDATE rich_menu_groups
+         SET publishing_at = ?, publishing_owner = ?, publishing_expires_at = ?,
+             publishing_generation = publishing_generation + 1
+       WHERE id = ?
+         AND (publishing_owner IS NULL
+           OR publishing_expires_at IS NULL
+           OR publishing_expires_at <= ?)
+       RETURNING publishing_generation`,
+    )
+    .bind(jstNow(), owner, publishLeaseExpiresAt(nowIso, ttlMs), groupId, nowIso)
+    .first<{ publishing_generation: number }>();
+  return row ? row.publishing_generation : null;
+}
+
+/**
+ * 外部工程(LINE呼び出し)の直前に期限を延ばす。所有者か世代が変わっていたら false。
+ *
+ * `nowIso` は**そのときの実現在時刻**を渡す。処理の入口で一度作った時刻を
+ * 使い回すと、延ばしているつもりで期限が前に進まず、長い公開の途中で
+ * lease が切れて別の実行に回収される。
+ * false の run は live 切替も DB 確定もしてはいけない(回収した新所有者に任せる)。
+ */
+export async function renewPublishLease(
+  db: D1Database,
+  groupId: string,
+  fence: PublishLeaseFence,
+  nowIso: string,
+  ttlMs = PUBLISH_LEASE_MS,
 ): Promise<boolean> {
   const result = await db
     .prepare(
       `UPDATE rich_menu_groups
-         SET publishing_at = ?
-       WHERE id = ? AND publishing_at IS NULL`,
+         SET publishing_at = ?, publishing_expires_at = ?
+       WHERE id = ? AND publishing_owner = ? AND publishing_generation = ?`,
     )
-    .bind(jstNow(), groupId)
+    .bind(jstNow(), publishLeaseExpiresAt(nowIso, ttlMs), groupId, fence.owner, fence.generation)
     .run();
   return (result.meta?.changes ?? 0) > 0;
 }
 
-export async function releasePublishLock(
+/**
+ * 持ち主だけが開けられる解放。所有者か世代が変わっていたら何もせず false。
+ * false は lease を失った合図で、呼び出し側は切替・確定をやめる。
+ */
+export async function releasePublishLease(
   db: D1Database,
   groupId: string,
-): Promise<void> {
-  await db
-    .prepare(`UPDATE rich_menu_groups SET publishing_at = NULL WHERE id = ?`)
-    .bind(groupId)
+  fence: PublishLeaseFence,
+): Promise<boolean> {
+  const result = await db
+    .prepare(
+      `UPDATE rich_menu_groups
+         SET publishing_at = NULL, publishing_owner = NULL, publishing_expires_at = NULL
+       WHERE id = ? AND publishing_owner = ? AND publishing_generation = ?`,
+    )
+    .bind(groupId, fence.owner, fence.generation)
     .run();
+  return (result.meta?.changes ?? 0) > 0;
+}
+
+/**
+ * いま他人が有効に持っているか。手動公開の事前409判定用。
+ * 期限切れ・旧形式の残留は「持っていない」扱いで、取得時に回収される。
+ */
+export async function isPublishLeaseHeld(
+  db: D1Database,
+  groupId: string,
+  nowIso: string,
+): Promise<boolean> {
+  const row = await db
+    .prepare(
+      `SELECT 1 AS hit FROM rich_menu_groups
+        WHERE id = ? AND publishing_owner IS NOT NULL
+          AND (publishing_expires_at IS NULL OR publishing_expires_at > ?)`,
+    )
+    .bind(groupId, nowIso)
+    .first<{ hit: number }>();
+  return !!row;
+}
+
+/**
+ * lease を持っている run だけが書けるようにする条件句。
+ * 札を渡さない呼び出し(lease を取らない初期公開など)は条件なしで書く。
+ */
+function fenceClause(fence: PublishLeaseFence | undefined, groupIdColumn: string): string {
+  if (!fence) return '';
+  return ` AND EXISTS (SELECT 1 FROM rich_menu_groups g
+                        WHERE g.id = ${groupIdColumn}
+                          AND g.publishing_owner = ?
+                          AND g.publishing_generation = ?)`;
+}
+
+function fenceBinds(fence: PublishLeaseFence | undefined): unknown[] {
+  return fence ? [fence.owner, fence.generation] : [];
 }
 
 export async function setPageRichMenuId(
   db: D1Database,
   pageId: string,
   lineRichMenuId: string,
-): Promise<void> {
-  await db
+  fence?: PublishLeaseFence,
+): Promise<boolean> {
+  // 札があるときは「まだ自分が lease を持っている」ことを同じ1文の条件にする。
+  // 先に確認してから書くと、確認と書込みの間に回収された旧holderが
+  // 新しい所有者の反映を古いIDで上書きできてしまう。
+  const result = await db
     .prepare(
-      `UPDATE rich_menu_pages SET line_richmenu_id = ?, updated_at = ? WHERE id = ?`,
+      `UPDATE rich_menu_pages SET line_richmenu_id = ?, updated_at = ?
+        WHERE id = ?${fenceClause(fence, 'rich_menu_pages.group_id')}`,
     )
-    .bind(lineRichMenuId, jstNow(), pageId)
+    .bind(lineRichMenuId, jstNow(), pageId, ...fenceBinds(fence))
     .run();
+  return (result.meta?.changes ?? 0) > 0;
 }
 
+/**
+ * 公開の確定。札があるときは持ち主だけが通る1文で、ここが唯一の分かれ目。
+ *
+ * lease はここでは開けない。確定と解放を1文に混ぜると、
+ * (1) 解放後に続く外部操作が無防備になり、
+ * (2) 「自分が開けた」と「他人に取られた」が owner=NULL で見分けられなくなる。
+ * 解放は所有者付きの releasePublishLease で別に行う。
+ */
 export async function markRichMenuGroupPublished(
   db: D1Database,
   groupId: string,
-): Promise<void> {
-  await db
+  fence?: PublishLeaseFence,
+): Promise<boolean> {
+  const result = await db
     .prepare(
       `UPDATE rich_menu_groups
-         SET status = 'published', publishing_at = NULL, updated_at = ?
-       WHERE id = ?`,
+         SET status = 'published', updated_at = ?
+       WHERE id = ?${fence ? ' AND publishing_owner = ? AND publishing_generation = ?' : ''}`,
     )
-    .bind(jstNow(), groupId)
+    .bind(jstNow(), groupId, ...fenceBinds(fence))
     .run();
+  return (result.meta?.changes ?? 0) > 0;
 }
 
 // Unpublish 完了時の DB 整合: 全 page の line_richmenu_id を null に戻し、
 // group.status を 'draft' に戻す。is_default_for_all も 0 に戻す
 // (LINE 側で default unlink された前提)。LINE 側で alias / richmenu / default
 // の削除が成功した後に呼ばれる想定。
+/**
+ * 停止の確定。**分かれ目は group の1文だけ**にする。
+ *
+ * 以前は page を先に消してから group を落としていた。その間に別の接続へ
+ * 引き継がれると、負けた旧holderが page ID だけ消して group はそのまま、
+ * という中途半端な状態を作れた(公開中の page ID が null になる)。
+ * 札が合わなければ**何も書かない**ようにするため、まず group を1文で決め、
+ * 通ったときだけ page を掃除する。page 側にも同じ札を付けるので、
+ * 決めたあとに引き継がれても新しい所有者の反映は消さない。
+ * lease はここでは開けない(所有者付きの releasePublishLease で別に開ける)。
+ */
 export async function markRichMenuGroupUnpublished(
   db: D1Database,
   groupId: string,
-): Promise<void> {
+  fence?: PublishLeaseFence,
+): Promise<boolean> {
   const now = jstNow();
-  await db.batch([
-    db
-      .prepare(
-        `UPDATE rich_menu_pages
-            SET line_richmenu_id = NULL, updated_at = ?
-          WHERE group_id = ?`,
-      )
-      .bind(now, groupId),
-    db
-      .prepare(
-        `UPDATE rich_menu_groups
-            SET status = 'draft', publishing_at = NULL,
-                is_default_for_all = 0, updated_at = ?
-          WHERE id = ?`,
-      )
-      .bind(now, groupId),
-  ]);
+  const decided = await db
+    .prepare(
+      `UPDATE rich_menu_groups
+          SET status = 'draft', is_default_for_all = 0, updated_at = ?
+        WHERE id = ?${fence ? ' AND publishing_owner = ? AND publishing_generation = ?' : ''}`,
+    )
+    .bind(now, groupId, ...fenceBinds(fence))
+    .run();
+  if ((decided.meta?.changes ?? 0) === 0) return false;
+  await db
+    .prepare(
+      `UPDATE rich_menu_pages
+          SET line_richmenu_id = NULL, updated_at = ?
+        WHERE group_id = ?${fenceClause(fence, 'rich_menu_pages.group_id')}`,
+    )
+    .bind(now, groupId, ...fenceBinds(fence))
+    .run();
+  return true;
 }
 
 // =============================================================================
@@ -948,6 +1101,7 @@ export interface RichMenuAreaTapTarget {
   scoreChange: number | null;
   templateId: string | null;
   formId: string | null;
+  scenarioId: string | null;
 }
 
 export async function getRichMenuAreaTapTarget(
@@ -964,6 +1118,7 @@ export async function getRichMenuAreaTapTarget(
               a.score_change  AS score_change,
               a.template_id   AS template_id,
               a.form_id       AS form_id,
+              a.action_data   AS action_data,
               p.group_id      AS group_id,
               g.account_id    AS account_id
          FROM rich_menu_areas a
@@ -981,10 +1136,16 @@ export async function getRichMenuAreaTapTarget(
       score_change: number | null;
       template_id: string | null;
       form_id: string | null;
+      action_data: string;
       group_id: string;
       account_id: string;
     }>();
   if (!row) return null;
+  let scenarioId: string | null = null;
+  try {
+    const data = JSON.parse(row.action_data) as Record<string, unknown>;
+    if (typeof data.scenarioId === 'string' && data.scenarioId) scenarioId = data.scenarioId;
+  } catch { /* Invalid legacy action data has no executable scenario. */ }
   return {
     areaId: row.area_id,
     pageId: row.page_id,
@@ -996,6 +1157,7 @@ export async function getRichMenuAreaTapTarget(
     scoreChange: row.score_change,
     templateId: row.template_id,
     formId: row.form_id,
+    scenarioId,
   };
 }
 
@@ -1050,6 +1212,301 @@ export interface RichMenuTapStats {
   byArea: RichMenuAreaTapCount[];
   byGroup: { groupId: string; taps: number }[];
   total: number;
+}
+
+// =============================================================================
+// 個別割当の現在値・実行履歴（309）
+// =============================================================================
+
+export interface RichMenuAudienceStat {
+  groupId: string;
+  currentAudience: number;
+  monthlyUniqueAudience: number;
+}
+
+export interface RecordRichMenuAssignmentInput {
+  friendId: string;
+  lineAccountId: string;
+  /** null は個別割当を外してアカウント既定へ戻したことを表す。 */
+  lineRichMenuId: string | null;
+  reasonKind: string;
+  reasonEventId?: string | null;
+  idempotencyKey?: string;
+  assignedAt?: string;
+}
+
+/**
+ * LINE の link / unlink が成功した後に呼び、現在値と成功履歴を同じ batch で記録する。
+ * 管理画面外の rich menu が指定された場合は、以前の管理対象割当だけを現在値から
+ * 外す。外部メニューを管理中の group へ推測で結び付けない。
+ */
+export async function recordRichMenuAssignment(
+  db: D1Database,
+  input: RecordRichMenuAssignmentInput,
+): Promise<void> {
+  const target = input.lineRichMenuId
+    ? await db
+      .prepare(
+        `SELECT g.id AS group_id
+           FROM rich_menu_pages p
+           JOIN rich_menu_groups g ON g.id = p.group_id
+          WHERE g.account_id = ? AND p.line_richmenu_id = ?
+          LIMIT 1`,
+      )
+      .bind(input.lineAccountId, input.lineRichMenuId)
+      .first<{ group_id: string }>()
+    : null;
+  const previous = await db
+    .prepare(
+      `SELECT id FROM rich_menu_assignments
+        WHERE line_account_id = ? AND friend_id = ?`,
+    )
+    .bind(input.lineAccountId, input.friendId)
+    .first<{ id: string }>();
+  const now = input.assignedAt ?? jstNow();
+  const idempotencyKey = input.idempotencyKey ?? crypto.randomUUID();
+  const run = db
+    .prepare(
+      `INSERT INTO rich_menu_assignment_runs
+         (id, version_id, friend_id, line_account_id, group_id, source_event_id,
+          idempotency_key, previous_assignment_id, operation, status, attempt_count,
+          next_retry_at, last_error_code, started_at, completed_at)
+       VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, 'succeeded', 1, NULL, NULL, ?, ?)
+       ON CONFLICT(line_account_id, idempotency_key) DO NOTHING`,
+    )
+    .bind(
+      crypto.randomUUID(),
+      input.friendId,
+      input.lineAccountId,
+      target?.group_id ?? null,
+      input.reasonEventId ?? null,
+      idempotencyKey,
+      previous?.id ?? null,
+      input.lineRichMenuId ? 'link' : 'unlink',
+      now,
+      now,
+    );
+
+  const current = target && input.lineRichMenuId
+    ? db
+      .prepare(
+        `INSERT INTO rich_menu_assignments
+           (id, friend_id, line_account_id, group_id, version_id, line_richmenu_id,
+            reason_kind, reason_event_id, assigned_at, updated_at)
+         VALUES (?, ?, ?, ?, NULL, ?, ?, ?, ?, ?)
+         ON CONFLICT(line_account_id, friend_id) DO UPDATE SET
+           group_id = excluded.group_id,
+           version_id = excluded.version_id,
+           line_richmenu_id = excluded.line_richmenu_id,
+           reason_kind = excluded.reason_kind,
+           reason_event_id = excluded.reason_event_id,
+           assigned_at = excluded.assigned_at,
+           updated_at = excluded.updated_at`,
+      )
+      .bind(
+        previous?.id ?? crypto.randomUUID(),
+        input.friendId,
+        input.lineAccountId,
+        target.group_id,
+        input.lineRichMenuId,
+        input.reasonKind,
+        input.reasonEventId ?? null,
+        now,
+        now,
+      )
+    : db
+      .prepare(
+        `DELETE FROM rich_menu_assignments
+          WHERE line_account_id = ? AND friend_id = ?`,
+      )
+      .bind(input.lineAccountId, input.friendId);
+
+  await db.batch([run, current]);
+}
+
+/** 成功した bulk link の1チャンクを、LINE user id からまとめて台帳へ反映する。 */
+export async function recordRichMenuAssignmentsByLineUserIds(
+  db: D1Database,
+  input: {
+    lineAccountId: string;
+    groupId: string;
+    lineRichMenuId: string;
+    lineUserIds: string[];
+    reasonKind: string;
+    reasonEventId?: string | null;
+    idempotencyPrefix?: string;
+    assignedAt?: string;
+  },
+): Promise<void> {
+  if (input.lineUserIds.length === 0) return;
+  const now = input.assignedAt ?? jstNow();
+  const prefix = input.idempotencyPrefix ?? crypto.randomUUID();
+  const userIdsJson = JSON.stringify(input.lineUserIds);
+  const run = db
+    .prepare(
+      `INSERT INTO rich_menu_assignment_runs
+         (id, version_id, friend_id, line_account_id, group_id, source_event_id,
+          idempotency_key, previous_assignment_id, operation, status, attempt_count,
+          next_retry_at, last_error_code, started_at, completed_at)
+       SELECT lower(hex(randomblob(16))), NULL, f.id, ?, ?, ?,
+              ? || ':' || f.id, current.id, 'link', 'succeeded', 1,
+              NULL, NULL, ?, ?
+         FROM friends f
+         JOIN json_each(?) requested ON requested.value = f.line_user_id
+         LEFT JOIN rich_menu_assignments current
+           ON current.line_account_id = ? AND current.friend_id = f.id
+        WHERE f.line_account_id = ?
+       ON CONFLICT(line_account_id, idempotency_key) DO NOTHING`,
+    )
+    .bind(
+      input.lineAccountId,
+      input.groupId,
+      input.reasonEventId ?? null,
+      prefix,
+      now,
+      now,
+      userIdsJson,
+      input.lineAccountId,
+      input.lineAccountId,
+    );
+  const current = db
+    .prepare(
+      `INSERT INTO rich_menu_assignments
+         (id, friend_id, line_account_id, group_id, version_id, line_richmenu_id,
+          reason_kind, reason_event_id, assigned_at, updated_at)
+       SELECT COALESCE(existing.id, lower(hex(randomblob(16)))), f.id, ?, ?, NULL, ?, ?, ?, ?, ?
+         FROM friends f
+         JOIN json_each(?) requested ON requested.value = f.line_user_id
+         LEFT JOIN rich_menu_assignments existing
+           ON existing.line_account_id = ? AND existing.friend_id = f.id
+        WHERE f.line_account_id = ?
+       ON CONFLICT(line_account_id, friend_id) DO UPDATE SET
+         group_id = excluded.group_id,
+         version_id = excluded.version_id,
+         line_richmenu_id = excluded.line_richmenu_id,
+         reason_kind = excluded.reason_kind,
+         reason_event_id = excluded.reason_event_id,
+         assigned_at = excluded.assigned_at,
+         updated_at = excluded.updated_at`,
+    )
+    .bind(
+      input.lineAccountId,
+      input.groupId,
+      input.lineRichMenuId,
+      input.reasonKind,
+      input.reasonEventId ?? null,
+      now,
+      now,
+      userIdsJson,
+      input.lineAccountId,
+      input.lineAccountId,
+    );
+  await db.batch([run, current]);
+}
+
+/** LINE 側から group を取り下げた後、表示中ではなくなった現在値を残さない。 */
+export async function clearRichMenuAssignmentsForGroup(
+  db: D1Database,
+  groupId: string,
+): Promise<void> {
+  await db
+    .prepare(`DELETE FROM rich_menu_assignments WHERE group_id = ?`)
+    .bind(groupId)
+    .run();
+}
+
+async function getRichMenuCurrentAudience(
+  db: D1Database,
+  accountId: string,
+  groupId: string,
+  isDefaultForAll: boolean,
+): Promise<number> {
+  const row = isDefaultForAll
+    ? await db
+      .prepare(
+        `SELECT COUNT(*) AS count
+           FROM friends f
+           LEFT JOIN rich_menu_assignments current
+             ON current.line_account_id = ? AND current.friend_id = f.id
+          WHERE f.line_account_id = ?
+            AND f.is_following = 1
+            AND (current.id IS NULL OR current.group_id = ?)`,
+      )
+      .bind(accountId, accountId, groupId)
+      .first<{ count: number }>()
+    : await db
+      .prepare(
+        `SELECT COUNT(*) AS count
+           FROM rich_menu_assignments current
+           JOIN friends f ON f.id = current.friend_id
+          WHERE current.line_account_id = ?
+            AND current.group_id = ?
+            AND f.is_following = 1`,
+      )
+      .bind(accountId, groupId)
+      .first<{ count: number }>();
+  return Number(row?.count ?? 0);
+}
+
+/** 一覧用に、現在表示中の既知人数と今月の割当ユニーク人数をまとめて返す。 */
+export async function getRichMenuAudienceStats(
+  db: D1Database,
+  accountId: string,
+  from: string,
+  to: string,
+  knownGroups?: RichMenuGroup[],
+): Promise<RichMenuAudienceStat[]> {
+  const [groups, rows, currentRows, followerRow] = await Promise.all([
+    knownGroups ?? getRichMenuGroups(db, accountId),
+    db
+      .prepare(
+        `SELECT group_id, COUNT(DISTINCT friend_id) AS unique_audience
+           FROM rich_menu_assignment_runs
+          WHERE line_account_id = ?
+            AND operation = 'link'
+            AND status = 'succeeded'
+            AND completed_at >= ? AND completed_at < ?
+            AND group_id IS NOT NULL
+          GROUP BY group_id`,
+      )
+      .bind(accountId, from, to)
+      .all<{ group_id: string; unique_audience: number }>(),
+    db
+      .prepare(
+        `SELECT current.group_id AS group_id, COUNT(*) AS current_audience
+           FROM rich_menu_assignments current
+           JOIN friends f ON f.id = current.friend_id
+          WHERE current.line_account_id = ? AND f.is_following = 1
+          GROUP BY current.group_id`,
+      )
+      .bind(accountId)
+      .all<{ group_id: string; current_audience: number }>(),
+    db
+      .prepare(
+        `SELECT COUNT(*) AS count FROM friends
+          WHERE line_account_id = ? AND is_following = 1`,
+      )
+      .bind(accountId)
+      .first<{ count: number }>(),
+  ]);
+  const monthlyByGroup = new Map(
+    (rows.results ?? []).map((row) => [row.group_id, Number(row.unique_audience)]),
+  );
+  const currentByGroup = new Map(
+    (currentRows.results ?? []).map((row) => [row.group_id, Number(row.current_audience)]),
+  );
+  const explicitAudience = [...currentByGroup.values()].reduce((sum, value) => sum + value, 0);
+  const followingAudience = Number(followerRow?.count ?? 0);
+  return groups.map((group) => {
+    const explicitForGroup = currentByGroup.get(group.id) ?? 0;
+    return {
+      groupId: group.id,
+      currentAudience: group.is_default_for_all === 1
+        ? Math.max(0, followingAudience - explicitAudience + explicitForGroup)
+        : explicitForGroup,
+      monthlyUniqueAudience: monthlyByGroup.get(group.id) ?? 0,
+    };
+  });
 }
 
 /**

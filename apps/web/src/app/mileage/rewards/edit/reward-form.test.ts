@@ -29,6 +29,7 @@ const base: FormState = {
   endsAt: '',
   benefitExpiresDays: '',
   commonActionVersionId: '',
+  targetConditions: null,
   failurePolicy: 'retry',
   customerMessage: '',
 }
@@ -97,6 +98,14 @@ describe('V6 17-1-G の配線', () => {
     expect(API).toContain("'X-Confirm-Irreversible': 'mileage-reward-publish'")
   })
 
+  it('保存した下書きを、残高と在庫を動かさず交換テストする', () => {
+    expect(PAGE).toContain('自分で交換をテスト')
+    expect(PAGE).toContain('api.mileage.testReward(saved.id, selectedAccountId)')
+    expect(PAGE).toContain('残高と在庫は動かしていません')
+    expect(API).toContain('/api/mileage/rewards/${encodeURIComponent(id)}/test')
+    expect(API).toContain('ApiResponse<MileageRewardTestResult>')
+  })
+
   it('一覧から行き止まりを作らない', () => {
     expect(LIST).toContain('href="/mileage/rewards/edit"')
     expect(LIST).toContain('使い道をつくる')
@@ -108,5 +117,27 @@ describe('V6 17-1-G の配線', () => {
     expect(PAGE).not.toMatch(/>\s*(coupon|early_access|failurePolicy)\s*</)
     // 強調の記号は画面にそのまま出るので書かない。
     expect(PAGE).not.toMatch(/\*\*[^*\n]+\*\*[^\n]*<\/NoteBar>/)
+  })
+
+  it('1件取得の形が壊れていても一覧から同じIDを探し、画面全体を落とさない', () => {
+    expect(PAGE).toContain('isMileageRewardSummary(detail.data)')
+    expect(PAGE).toContain('overview.data.rewards.find((item) => item.id === rewardId)')
+    expect(PAGE).toContain('const [detail, overview] = await Promise.all([')
+  })
+
+  it('共通アクションの公開版を選択肢から保存する', () => {
+    expect(PAGE).toContain('api.commonActions.resources(selectedAccountId)')
+    expect(PAGE).toContain('item.currentPublishedVersionId')
+    expect(PAGE).not.toContain('api.commonActions.get(item.id')
+    expect(PAGE).toContain('公開中の共通アクションを選ぶ')
+    expect(PAGE).not.toContain('placeholder="共通アクションの版"')
+  })
+
+  it('交換対象を15軸の共通条件部品で作り、下書きへ保存する', () => {
+    expect(PAGE).toContain("import ConditionBuilder, { pruneCondition }")
+    expect(PAGE).toContain('value={form.targetConditions}')
+    expect(PAGE).toContain("set('targetConditions', next)")
+    expect(PAGE).toContain('targetConditions: pruneCondition(form.targetConditions)')
+    expect(API).toContain('targetConditions?: MileageTargetConditionV6 | null')
   })
 })

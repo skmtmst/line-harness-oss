@@ -1,10 +1,11 @@
 import type Database from 'better-sqlite3';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite';
+import { createTestD1, insertFriend, type SqliteD1 } from '../test-utils/d1-sqlite';
 import {
   AutomationActionError,
   processAutomationRun,
   processDueAutomationRuns,
+  retryAutomationRun,
   startAutomationRun,
   type ActionDefinition,
 } from './automation-engine';
@@ -138,6 +139,37 @@ describe('V6オートメーション実行エンジン', () => {
     expect(executor).not.toHaveBeenCalled();
   });
 
+  it('条件分岐は一致した側だけを動かし、選ばなかった側を履歴へ残す', async () => {
+    insertFriend(testDb.raw, 'friend-1', { line_account_id: 'account-1' });
+    testDb.raw.prepare(`INSERT INTO tags (id, name, line_account_id) VALUES ('vip', 'VIP', 'account-1')`).run();
+    testDb.raw.prepare(`INSERT INTO friend_tags (friend_id, tag_id) VALUES ('friend-1', 'vip')`).run();
+    const setup = addPublishedAutomation(testDb.raw, {
+      actions: [{
+        id: 'branch', type: 'branch', onFailure: 'stop',
+        params: {
+          condition: { operator: 'AND', rules: [{ type: 'tag_exists', value: 'vip' }] },
+          then: [action('yes')],
+          else: [action('no')],
+        },
+      }],
+    });
+    const created = await start(testDb.db, setup);
+    const seen: string[] = [];
+    expect(await processAutomationRun(testDb.db, created.runId!, {
+      now: T0,
+      executors: { record: async ({ action: current }) => { seen.push(current.id); } },
+    })).toBe('success');
+    expect(seen).toEqual(['branch/then/yes']);
+    expect(testDb.raw.prepare(
+      `SELECT step_key, status FROM automation_run_steps
+        WHERE automation_run_id = ? ORDER BY step_key`,
+    ).all(created.runId)).toEqual([
+      { step_key: 'branch', status: 'success' },
+      { step_key: 'branch/else/no', status: 'skipped' },
+      { step_key: 'branch/then/yes', status: 'success' },
+    ]);
+  });
+
   it('5分単位で待機し、期限後に同じ版の次の処理から再開する', async () => {
     const setup = addPublishedAutomation(testDb.raw, {
       actions: [action('pause', 'wait', { durationMinutes: 5 }), action('after-wait')],
@@ -241,6 +273,45 @@ describe('V6オートメーション実行エンジン', () => {
       `SELECT status, error_code FROM automation_run_steps
         WHERE automation_run_id = ? AND step_key = 'unknown'`,
     ).get(created.runId)).toEqual({ status: 'failed', error_code: 'unsupported_action_type' });
+  });
+
+  it('手動再実行は失敗した処理だけを新しい試行として動かす', async () => {
+    const setup = addPublishedAutomation(testDb.raw, {
+      actions: [action('already-done'), action('failed-once')],
+    });
+    const created = await start(testDb.db, setup);
+    const firstCalls: string[] = [];
+    expect(await processAutomationRun(testDb.db, created.runId!, {
+      now: T0,
+      executors: {
+        record: async ({ action: current }) => {
+          firstCalls.push(current.id);
+          if (current.id === 'failed-once') {
+            throw new AutomationActionError('permanent', '入力を直してください', false);
+          }
+        },
+      },
+    })).toBe('failed');
+    expect(firstCalls).toEqual(['already-done', 'failed-once']);
+
+    expect(await retryAutomationRun(testDb.db, {
+      runId: created.runId!,
+      allowedAccountIds: [setup.lineAccountId],
+      now: '2026-08-26T02:00:00.000Z',
+    })).toMatchObject({ retryStepCount: 1, status: 'waiting' });
+    const retryCalls: string[] = [];
+    expect(await processAutomationRun(testDb.db, created.runId!, {
+      now: '2026-08-26T02:00:00.000Z',
+      executors: { record: async ({ action: current }) => { retryCalls.push(current.id); } },
+    })).toBe('success');
+    expect(retryCalls).toEqual(['failed-once']);
+    expect(testDb.raw.prepare(
+      `SELECT step_key, attempt_number, status FROM automation_run_steps
+        WHERE automation_run_id = ? ORDER BY step_key`,
+    ).all(created.runId)).toEqual([
+      { step_key: 'already-done', attempt_number: 1, status: 'success' },
+      { step_key: 'failed-once', attempt_number: 2, status: 'success' },
+    ]);
   });
 
   it('実行開始時に共通アクション版を固定する', async () => {

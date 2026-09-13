@@ -20,6 +20,35 @@ type Mode =
 export function ApplyToTagModal({ groupId, groupName, onClose }: Props) {
   const [tags, setTags] = useState<Tag[]>([])
   const [mode, setMode] = useState<Mode>({ kind: 'all-followers' })
+  /*
+    #502中: 一括適用の冪等キー。窓を開いたときと条件を変えたときに振り直す。
+    失敗後の「やり直す」は同じ鍵を使い回す——同じ鍵のやり直しは台帳へ
+    重複記録されない。新しい実行のたびに変える。
+  */
+  const [idempotencyKey, setIdempotencyKey] = useState(() => crypto.randomUUID())
+  function pickMode(next: Mode) {
+    setMode(next)
+    setIdempotencyKey(crypto.randomUUID())
+  }
+  // タグが読めない理由を黙らせない。失敗時は注記と再試しを出す。
+  const [tagsLoadError, setTagsLoadError] = useState(false)
+  const [tagsLoading, setTagsLoading] = useState(true)
+  const loadTags = () => {
+    setTagsLoading(true)
+    setTagsLoadError(false)
+    api.tags
+      .list()
+      .then((r) => {
+        if (r.success) setTags(r.data ?? [])
+        else setTagsLoadError(true)
+      })
+      .catch(() => {
+        setTagsLoadError(true)
+      })
+      .finally(() => {
+        setTagsLoading(false)
+      })
+  }
   const [phase, setPhase] = useState<'config' | 'running' | 'done' | 'error'>(
     'config',
   )
@@ -34,15 +63,9 @@ export function ApplyToTagModal({ groupId, groupName, onClose }: Props) {
   const [defaultBusy, setDefaultBusy] = useState(false)
   const [defaultError, setDefaultError] = useState('')
 
+  // 初回だけ読む。再試しは失敗注記のボタンから loadTags を直接呼ぶ。
   useEffect(() => {
-    api.tags
-      .list()
-      .then((r) => {
-        if (r.success) setTags(r.data ?? [])
-      })
-      .catch(() => {
-        // タグ取得失敗 = 一覧空のまま
-      })
+    loadTags()
   }, [])
 
   /*
@@ -90,7 +113,8 @@ export function ApplyToTagModal({ groupId, groupName, onClose }: Props) {
           : mode.kind === 'all-followers'
             ? { mode: 'bulk-link' as const, tagId: null }
             : { mode: 'set-default' as const }
-      const res = await api.richMenuGroups.applyToTag(groupId, params)
+      // やり直しは同じ鍵——二重送信・記録重複にしない。条件を変えたら鍵も変わる。
+      const res = await api.richMenuGroups.applyToTag(groupId, params, idempotencyKey)
       if (!res.success) throw new Error(res.error ?? '適用失敗')
       setResult(res.data)
       setPhase('done')
@@ -114,14 +138,14 @@ export function ApplyToTagModal({ groupId, groupName, onClose }: Props) {
               <div className="space-y-3 mb-5">
                 <RadioOption
                   checked={mode.kind === 'all-followers'}
-                  onChange={() => setMode({ kind: 'all-followers' })}
+                  onChange={() => pickMode({ kind: 'all-followers' })}
                   label="このアカウントの全員に適用"
                   description="現時点で friend 状態の友だち全員に LINE のメニューを link します。新規友だちには適用されません。"
                 />
                 <RadioOption
                   checked={mode.kind === 'tag'}
                   onChange={() =>
-                    setMode({
+                    pickMode({
                       kind: 'tag',
                       tagId: tags[0]?.id ?? '',
                     })
@@ -131,28 +155,44 @@ export function ApplyToTagModal({ groupId, groupName, onClose }: Props) {
                   disabled={tags.length === 0}
                 >
                   {mode.kind === 'tag' && (
-                    <select
-                      value={mode.tagId}
-                      onChange={(e) =>
-                        setMode({ kind: 'tag', tagId: e.target.value })
-                      }
-                      className="mt-2 block w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                    >
-                      {tags.length === 0 ? (
-                        <option value="">タグがありません</option>
-                      ) : (
-                        tags.map((t) => (
-                          <option key={t.id} value={t.id}>
-                            {t.name}
+                    <>
+                      <select
+                        value={mode.tagId}
+                        onChange={(e) =>
+                          pickMode({ kind: 'tag', tagId: e.target.value })
+                        }
+                        className="mt-2 block w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                      >
+                        {tags.length === 0 ? (
+                          <option value="">
+                            {tagsLoading ? 'タグを読み込んでいます' : 'タグがありません'}
                           </option>
-                        ))
+                        ) : (
+                          tags.map((t) => (
+                            <option key={t.id} value={t.id}>
+                              {t.name}
+                            </option>
+                          ))
+                        )}
+                      </select>
+                      {tagsLoadError && (
+                        <p className="text-ink-faint mt-2 text-xs">
+                          タグを読み込めませんでした。タグの絞り込みは使えません。
+                          <button
+                            type="button"
+                            onClick={loadTags}
+                            className="text-action ml-1 font-medium underline"
+                          >
+                            もう一度読み込む
+                          </button>
+                        </p>
                       )}
-                    </select>
+                    </>
                   )}
                 </RadioOption>
                 <RadioOption
                   checked={mode.kind === 'set-default'}
-                  onChange={() => setMode({ kind: 'set-default' })}
+                  onChange={() => pickMode({ kind: 'set-default' })}
                   label="全員のデフォルトに設定する"
                   description="LINE 公式アカウントのデフォルトメニューにします。新規友だちも含め全員に自動で表示されます。同じアカウント内の他のメニューのデフォルト設定は解除されます。"
                   warn

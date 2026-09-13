@@ -178,6 +178,13 @@ describe('配信対象の言い表し方', () => {
 })
 
 describe('通の編集を設計の段へ分ける', () => {
+  it('通の編集中はシナリオ全体の一覧を隠し、専用画面として表示する', () => {
+    expect(detail).toContain('{editingStepId ? (')
+    expect(detail).toContain('<section data-design-node="xfYLn"')
+    expect(detail).toContain('{renderStepForm()}')
+    expect(detail).toContain("usePageTitle(editingStepId ? `${stepForm.stepOrder}通目を編集` : 'シナリオ詳細')")
+  })
+
   it('4つの面を、1枚の中で段に分ける', () => {
     expect(stepForm).toContain('node="xfYLn"')
     expect(stepForm).toContain('node="r6Gzsu"')
@@ -226,8 +233,8 @@ describe('EvVO5 開始条件', () => {
     )
   })
 
-  it('押す前に一致人数を出す。数える口は segments.count', () => {
-    expect(triggerEditor).toContain('await api.segments.count(usableCondition, lineAccountId ?? undefined)')
+  it('押す前に一致人数を出す。購読の重なりも分かる試算APIを使う', () => {
+    expect(triggerEditor).toContain('await api.scenarios.simulate(scenarioId, lineAccountId)')
     expect(matchBlock).toContain('一致')
     expect(matchBlock).toContain('すでに購読中')
     expect(matchBlock).toContain('新規開始予定')
@@ -236,11 +243,9 @@ describe('EvVO5 開始条件', () => {
 
   it('新規開始予定を引き算で作らない', () => {
     const planned = slice(matchBlock, '<dt className="text-ink-faint text-xs">新規開始予定</dt>', '</dd>')
-    expect(planned).toContain('>—</dd>')
-    expect(planned).not.toMatch(/activeNow|match\.count/)
-    expect(triggerEditor).toContain(
-      '新規開始予定はまだ繋がっていません。一致と購読中の重なりを数える取得口が接続されると表示されます。',
-    )
+    expect(planned).toContain('match.newStartPlanned')
+    expect(planned).not.toMatch(/activeNow|match\.matched\s*-/)
+    expect(triggerEditor).toContain('試算では配信も購読も始まりません。')
   })
 
   it('読込中・取得失敗の言葉を決まりどおりにそろえる', () => {
@@ -274,6 +279,13 @@ describe('g2UNV 一括テスト送信', () => {
 
   it('送り先を選ぶまで送れない', () => {
     expect(testSendBody).toContain('disabled={!selected || sending}')
+  })
+
+  it('送り先を選んだあと、誰へ何通送るかを確認してから実送信する', () => {
+    expect(testSendBody).toContain('const [confirming, setConfirming] = useState(false)')
+    expect(testSendBody).toContain('内容を確認')
+    expect(testSendBody).toContain('selectedFriend?.displayName')
+    expect(testSendBody).toContain('テスト送信を開始')
   })
 
   it('詳細画面から、送る通を渡す', () => {

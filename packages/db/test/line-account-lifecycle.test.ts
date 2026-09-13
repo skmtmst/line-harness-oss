@@ -28,6 +28,21 @@ function setup() {
 }
 
 describe('LINE account default and archive lifecycle', () => {
+  it('stores and clears an official profile short URL', async () => {
+    const { sqlite, db } = setup();
+
+    const stored = await updateLineAccountFields(db, 'account-b', {
+      officialProfileUrl: 'https://lin.ee/nen-official',
+    });
+    expect(stored?.official_profile_url).toBe('https://lin.ee/nen-official');
+    expect(sqlite.prepare(
+      `SELECT official_profile_url FROM line_accounts WHERE id = 'account-b'`,
+    ).get()).toEqual({ official_profile_url: 'https://lin.ee/nen-official' });
+
+    const cleared = await updateLineAccountFields(db, 'account-b', { officialProfileUrl: null });
+    expect(cleared?.official_profile_url).toBeNull();
+  });
+
   it('keeps exactly one active default in an organization', async () => {
     const { sqlite, db } = setup();
 

@@ -1,32 +1,108 @@
 import { Hono } from 'hono';
-import { getFriendByLineUserIdForAccount, getLineAccountById, jstNow } from '@line-crm/db';
+import {
+  attachEcOrderFriend,
+  getFriendByLineUserIdForAccount,
+  getLineAccountById,
+  jstNow,
+  setEcActionExecutionStatus,
+  upsertEcEventReadModels,
+} from '@line-crm/db';
 import { LineClient } from '@line-crm/line-sdk';
 import type { Message } from '@line-crm/line-sdk';
+import { EC_EVENT_TYPES } from '@line-crm/shared';
 import type { Env } from '../index.js';
 import { fireEvent, logOutgoingMessage } from '../services/event-bus.js';
+import { buildEcV6Event, ecDispatchIdempotencyKey, ecNotificationRetryKey } from '../services/ec-event-publish.js';
+import { dispatchOperatorEvent } from '../services/operator-notification-dispatch.js';
+
+export type EcDispatchSubscriber = 'notification' | 'v6';
+
+async function getEcDispatchStatus(
+  db: D1Database, eventId: string, subscriber: EcDispatchSubscriber,
+): Promise<string | null> {
+  const row = await db.prepare(
+    `SELECT status FROM ec_v6_dispatches WHERE event_id = ? AND subscriber = ?`,
+  ).bind(eventId, subscriber).first<{ status: string }>();
+  return row?.status ?? null;
+}
+
+async function markEcDispatch(
+  db: D1Database,
+  input: {
+    eventId: string; subscriber: EcDispatchSubscriber; status: 'pending' | 'sent' | 'failed';
+    error?: string | null; idempotencyKey: string; now: string;
+  },
+): Promise<void> {
+  await db.prepare(
+    `INSERT INTO ec_v6_dispatches
+       (event_id, subscriber, status, attempt_count, last_error, idempotency_key, updated_at)
+     VALUES (?, ?, ?, 1, ?, ?, ?)
+     ON CONFLICT(event_id, subscriber) DO UPDATE SET
+       status = excluded.status,
+       attempt_count = ec_v6_dispatches.attempt_count + 1,
+       last_error = excluded.last_error,
+       idempotency_key = excluded.idempotency_key,
+       updated_at = excluded.updated_at`,
+  ).bind(
+    input.eventId, input.subscriber, input.status,
+    input.error ?? null, input.idempotencyKey, input.now,
+  ).run();
+}
+
+/**
+ * V6へ1回分の連携を行い、購読台帳へ結果を残す。V6側の失敗は台帳へ
+ * `failed` として残してから投げ直す(呼び出し側は再試行へ回す)。
+ * 送信済みの記録自体に失敗したときは黙殺せず、そのまま投げる。
+ */
+async function fireEcV6Event(
+  db: D1Database,
+  input: {
+    eventId: string; lineAccountId: string; externalEventId: string;
+    event: EcEvent; friendId: string; accessToken: string; now: string;
+  },
+): Promise<void> {
+  const idempotencyKey = ecDispatchIdempotencyKey(input.lineAccountId, input.externalEventId, 'v6');
+  // 送信済みの購読先は送らない。実行状態の更新失敗で再試行になっても、
+  // 成功済みV6を再発火させない。並行受信は台帳claim(atomic UPDATE)が fence する。
+  if (await getEcDispatchStatus(db, input.eventId, 'v6') === 'sent') return;
+  const v6Event = buildEcV6Event(input.event, input.friendId);
+  try {
+    await fireEvent(db, v6Event.eventType, v6Event.payload, input.accessToken, input.lineAccountId);
+  } catch (error) {
+    try {
+      await markEcDispatch(db, {
+        eventId: input.eventId, subscriber: 'v6', status: 'failed',
+        error: error instanceof Error ? error.message.slice(0, 500) : 'Unknown error',
+        idempotencyKey, now: input.now,
+      });
+    } catch (markError) {
+      console.error(`[ec-event] v6 dispatch ledger failed event=${input.externalEventId}`, markError);
+    }
+    throw error;
+  }
+  await markEcDispatch(db, {
+    eventId: input.eventId, subscriber: 'v6', status: 'sent', idempotencyKey, now: input.now,
+  });
+}
 import { enqueuePostShippingFollowUps } from '../services/nen-engagement.js';
+import { recordConversionSourceEvent } from '@line-crm/db';
 import { ecFlexMessage } from '../services/ec-notification-message.js';
 import { syncNenEcTags, syncNenPetTags } from '../services/nen-tag-sync.js';
 
 const ecIntegrations = new Hono<Env>();
 const MAX_BODY_BYTES = 256 * 1024;
 const MAX_CLOCK_SKEW_SECONDS = 5 * 60;
-export const EC_EVENT_TYPES = [
-  'ec.order.confirmed',
-  'ec.order.payment_received',
-  'ec.order.bank_transfer_reminder',
-  'ec.order.shipped',
-  'ec.order.cancelled',
-  'ec.order.refunded',
-  'ec.subscription.upcoming',
-  'ec.subscription.payment_failed',
-  'ec.subscription.card_updated',
-  'ec.subscription.cancelled',
-  'ec.customer.profile_updated',
-] as const;
+export { EC_EVENT_TYPES } from '@line-crm/shared';
 const EVENT_TYPES = new Set<string>(EC_EVENT_TYPES);
 
-type EcItem = { name: string; quantity: number; product_id?: string | number | null; product_url?: string | null };
+type EcItem = {
+  name: string;
+  quantity: number;
+  product_id?: string | number | null;
+  product_url?: string | null;
+  unit_amount?: number | null;
+  line_amount?: number | null;
+};
 export type EcEvent = {
   event_id: string;
   event_type: string;
@@ -39,6 +115,8 @@ export type EcEvent = {
   order?: {
     number?: string;
     total?: number;
+    currency?: string;
+    date?: string;
     payment_method?: string;
     items?: EcItem[];
     delivery_date?: string | null;
@@ -351,8 +429,50 @@ ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
         `SELECT id, status FROM ec_events WHERE source = ? AND external_event_id = ?`,
       ).bind(source, event.event_id).first<{ id: string; status: string }>();
   if (!row) return c.json({ success: false, error: 'Event ledger failure' }, 500);
+  try {
+    await upsertEcEventReadModels(c.env.DB, {
+      eventId: row.id,
+      sourceKey: source,
+      externalEventId: event.event_id,
+      eventType: event.event_type,
+      lineAccountId,
+      customerId: event.customer_id == null ? null : String(event.customer_id),
+      occurredAt: event.occurred_at,
+      order: event.order,
+      refund: event.refund,
+    }, now);
+  } catch (error) {
+    await c.env.DB.prepare(
+      `UPDATE ec_events SET status = 'failed', error_message = 'read_model_failed', updated_at = ? WHERE id = ?`,
+    ).bind(now, row.id).run();
+    await setEcActionExecutionStatus(c.env.DB, {
+      eventId: row.id, lineAccountId, status: 'retryable_failed',
+      errorCode: 'read_model_failed', errorMessageSafe: '注文情報を取り込めませんでした', now,
+    }).catch(() => undefined);
+    console.error(`[ec-event] read model failed event=${event.event_id}`, error);
+    return c.json({ success: false, error: 'Event processing failed' }, 503);
+  }
   if (row.status === 'processed' || row.status === 'skipped') {
     return c.json({ success: true, duplicate: true, status: row.status });
+  }
+
+  // 受注は運用者へ知らせる。LINEの友だちが見つからなくても受注自体は起きて
+  // いるので、この先の照合結果を待たずにここで出す。台帳の行IDを発生元に
+  // 使うため、EC側の再送でも通知は1件しか作られない。
+  if (event.event_type === 'ec.order.confirmed') {
+    try {
+      const orderNumber = event.order?.number?.trim();
+      await dispatchOperatorEvent(c.env.DB, c.env, {
+        lineAccountId,
+        eventType: 'ec_order_received',
+        sourceEventId: row.id,
+        message: orderNumber ? `ECで注文${orderNumber}を受け付けました` : 'ECで新しい注文を受け付けました',
+        executionMode: 'automatic',
+      });
+    } catch (notificationError) {
+      // 受注の取り込みは通知の失敗で止めない。送り残しは回収口から拾う。
+      console.error(`[ec-event] operator notification failed event=${event.event_id}`, notificationError);
+    }
   }
 
   if (!event.line_user_id) {
@@ -361,6 +481,10 @@ ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
           SET status = 'identity_pending', error_message = 'line_identity_unmatched', updated_at = ?
         WHERE id = ? AND status IN ('received', 'failed', 'identity_pending')`,
     ).bind(now, row.id).run();
+    await setEcActionExecutionStatus(c.env.DB, {
+      eventId: row.id, lineAccountId, status: 'skipped',
+      errorCode: 'line_identity_unmatched', errorMessageSafe: 'LINEの友だちが見つかりません', now,
+    });
     return c.json({ success: true, status: 'identity_pending' }, 202);
   }
 
@@ -382,15 +506,43 @@ ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
         now,
         row.id,
       ).run();
+      await setEcActionExecutionStatus(c.env.DB, {
+        eventId: row.id, lineAccountId, status: 'skipped',
+        errorCode: friend ? 'friend_not_following' : 'line_identity_unmatched',
+        errorMessageSafe: friend ? 'LINEの友だちが現在フォローしていません' : 'LINEの友だちが見つかりません',
+        now,
+      });
       return c.json({ success: true, status: friend ? 'skipped' : 'identity_pending' }, 202);
     }
 
     if (friend.line_account_id !== lineAccountId) throw new Error('EC event account mismatch');
+    await attachEcOrderFriend(c.env.DB, { eventId: row.id, lineAccountId, friendId: friend.id, now });
     const accessToken = account.channel_access_token;
     if (!accessToken) throw new Error('LINE access token is not configured');
 
     await syncMemberSnapshot(c.env.DB, friend.id, event, now);
     await syncNenEcTags(c.env.DB, friend.id);
+
+    // 注文の確定を成果計測へ接続する(#648)。「注文が確定した」を起点に選んだ
+    // 地点は、ここを通らないと 0 件のままになる。
+    //
+    // この位置は、この後のどの出口(通知停止で skipped / 通常の processed)を
+    // 通っても必ず通る。冪等キーは EC 側の event_id なので、同じ注文の再送
+    // (台帳 claim をすり抜けた再試行を含む)でも二度数えない。
+    // 記録に失敗しても注文処理は続ける(通知を落とさない)。
+    if (event.event_type === 'ec.order.confirmed') {
+      try {
+        await recordConversionSourceEvent(c.env.DB, {
+          sourceType: 'ec_order_confirmed',
+          lineAccountId,
+          friendId: friend.id,
+          sourceEventId: event.event_id,
+          metadata: { ecEventId: event.event_id, orderNumber: event.order?.number ?? null },
+        });
+      } catch (error) {
+        console.error(`[ec-event] conversion record failed event=${event.event_id}`, error);
+      }
+    }
 
     if (event.event_type === 'ec.customer.profile_updated') {
       const { syncNenPetProfiles } = await import('../services/nen-engagement.js');
@@ -399,15 +551,29 @@ ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
       await c.env.DB.prepare(
         `UPDATE ec_events SET friend_id = ?, status = 'processed', processed_at = ?, updated_at = ? WHERE id = ?`,
       ).bind(friend.id, now, now, row.id).run();
-      await fireEvent(c.env.DB, event.event_type, { friendId: friend.id, eventData: event }, accessToken, account.id);
+      await fireEcV6Event(c.env.DB, {
+        eventId: row.id, lineAccountId, externalEventId: event.event_id,
+        event, friendId: friend.id, accessToken, now,
+      });
+      await setEcActionExecutionStatus(c.env.DB, {
+        eventId: row.id, lineAccountId, status: 'succeeded', now,
+      });
       return c.json({ success: true, status: 'processed' });
     }
 
     const setting = await c.env.DB.prepare(
-      `SELECT is_enabled, title_override, intro_text, outro_text,
-              button_label, button_url, image_url
-         FROM ec_notification_settings WHERE event_type = ?`,
-    ).bind(event.event_type).first<{
+      `SELECT COALESCE(a.is_enabled, s.is_enabled) AS is_enabled,
+              CASE WHEN a.line_account_id IS NULL THEN s.title_override ELSE a.title_override END AS title_override,
+              CASE WHEN a.line_account_id IS NULL THEN s.intro_text ELSE a.intro_text END AS intro_text,
+              CASE WHEN a.line_account_id IS NULL THEN s.outro_text ELSE a.outro_text END AS outro_text,
+              CASE WHEN a.line_account_id IS NULL THEN s.button_label ELSE a.button_label END AS button_label,
+              CASE WHEN a.line_account_id IS NULL THEN s.button_url ELSE a.button_url END AS button_url,
+              CASE WHEN a.line_account_id IS NULL THEN s.image_url ELSE a.image_url END AS image_url
+         FROM ec_notification_settings s
+         LEFT JOIN ec_notification_account_settings a
+           ON a.event_type = s.event_type AND a.line_account_id = ?
+        WHERE s.event_type = ?`,
+    ).bind(lineAccountId, event.event_type).first<{
       is_enabled: number; title_override: string | null; intro_text: string | null; outro_text: string | null;
       button_label: string | null; button_url: string | null; image_url: string | null;
     }>();
@@ -424,10 +590,14 @@ ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
       await c.env.DB.prepare(
         `UPDATE ec_events SET friend_id = ?, status = 'skipped', error_message = 'notification_disabled', processed_at = ?, updated_at = ? WHERE id = ?`,
       ).bind(friend.id, now, now, row.id).run();
-      await fireEvent(c.env.DB, event.event_type, {
-        friendId: friend.id,
-        eventData: event,
-      }, accessToken, account.id);
+      await fireEcV6Event(c.env.DB, {
+        eventId: row.id, lineAccountId, externalEventId: event.event_id,
+        event, friendId: friend.id, accessToken, now,
+      });
+      await setEcActionExecutionStatus(c.env.DB, {
+        eventId: row.id, lineAccountId, status: 'skipped',
+        errorCode: 'notification_disabled', errorMessageSafe: 'この通知は設定で停止されています', now,
+      });
       return c.json({ success: true, status: 'skipped' }, 202);
     }
 
@@ -439,25 +609,59 @@ ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
       buttonUrl: setting?.button_url,
       imageUrl: setting?.image_url,
     });
+    // 通知は購読先別の台帳で管理する。照合契約:
+    // - sent → 送らない(再試行・並行とも)
+    // - failed/なし → 固定retry keyで送る
+    // - pending(送達不明: 送信後に台帳書込が落ちた) → 同じ固定keyで送り直す。
+    //   LINE側がキーで重複を抑える(X-Line-Retry-Key、受理済みは409)ため安全。
     const lineClient = new LineClient(accessToken);
-    await lineClient.pushMessage(event.line_user_id, [message]);
-    await logOutgoingMessage(c.env.DB, {
-      friendId: friend.id,
-      messageType: message.type,
-      content: message.type === 'text' ? message.text : JSON.stringify(message),
-      deliveryType: 'push',
-      source: 'ec_transactional',
-      lineAccountId: account.id,
-    });
+    if (await getEcDispatchStatus(c.env.DB, row.id, 'notification') !== 'sent') {
+      const notificationKey = ecDispatchIdempotencyKey(lineAccountId, event.event_id, 'notification');
+      const retryKey = await ecNotificationRetryKey(lineAccountId, event.event_id);
+      await markEcDispatch(c.env.DB, {
+        eventId: row.id, subscriber: 'notification', status: 'pending',
+        idempotencyKey: notificationKey, now,
+      });
+      try {
+        await lineClient.pushMessage(event.line_user_id, [message], retryKey);
+      } catch (pushError) {
+        try {
+          await markEcDispatch(c.env.DB, {
+            eventId: row.id, subscriber: 'notification', status: 'failed',
+            error: pushError instanceof Error ? pushError.message.slice(0, 500) : 'Unknown error',
+            idempotencyKey: notificationKey, now,
+          });
+        } catch (markError) {
+          console.error(`[ec-event] notification ledger failed event=${event.event_id}`, markError);
+        }
+        throw pushError;
+      }
+      await markEcDispatch(c.env.DB, {
+        eventId: row.id, subscriber: 'notification', status: 'sent',
+        idempotencyKey: notificationKey, now,
+      });
+      await logOutgoingMessage(c.env.DB, {
+        friendId: friend.id,
+        messageType: message.type,
+        content: message.type === 'text' ? message.text : JSON.stringify(message),
+        deliveryType: 'push',
+        source: 'ec_transactional',
+        lineAccountId: account.id,
+      });
+    }
 
     await c.env.DB.prepare(
       `UPDATE ec_events SET friend_id = ?, status = 'processed', processed_at = ?, updated_at = ? WHERE id = ?`,
     ).bind(friend.id, now, now, row.id).run();
 
-    await fireEvent(c.env.DB, event.event_type, {
-      friendId: friend.id,
-      eventData: event,
-    }, accessToken, account.id);
+    await fireEcV6Event(c.env.DB, {
+      eventId: row.id, lineAccountId, externalEventId: event.event_id,
+      event, friendId: friend.id, accessToken, now,
+    });
+
+    await setEcActionExecutionStatus(c.env.DB, {
+      eventId: row.id, lineAccountId, status: 'succeeded', now,
+    });
 
     return c.json({ success: true, status: 'processed' });
   } catch (error) {
@@ -465,6 +669,11 @@ ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
     await c.env.DB.prepare(
       `UPDATE ec_events SET status = 'failed', error_message = ?, updated_at = ? WHERE id = ?`,
     ).bind(message, jstNow(), row.id).run();
+    await setEcActionExecutionStatus(c.env.DB, {
+      eventId: row.id, lineAccountId, status: 'retryable_failed',
+      errorCode: 'event_processing_failed', errorMessageSafe: 'ECの処理を完了できませんでした',
+      now: jstNow(),
+    }).catch(() => undefined);
     console.error(`[ec-event] processing failed event=${event.event_id}`, error);
     return c.json({ success: false, error: 'Event processing failed' }, 503);
   }

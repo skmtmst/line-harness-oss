@@ -14,6 +14,15 @@
   transition: background-color 120ms ease-out, border-color 120ms ease-out, filter 120ms ease-out;
 }
 
+/* Pencilの通常ボタンは36px。選択欄として使う押し口だけ入力欄と同じ40px。 */
+.standard {
+  height: 36px;
+}
+
+.field {
+  height: 40px;
+}
+
 .button[hidden] {
   display: none;
 }

@@ -59,6 +59,25 @@ describe('一覧の状態（設計 6-1-N `TmHjF`）', () => {
   })
 })
 
+describe('フォルダ操作（設計 6-1-M `xkRDb`）', () => {
+  it('画面名は上部バーだけに出し、フォルダ追加を左欄へ置く', () => {
+    expect(PAGE).toContain("usePageTitle('一斉配信')")
+    expect(PAGE).not.toContain('<Header')
+    expect(PAGE).not.toContain('<h1')
+    expect(PAGE.indexOf('<BroadcastKpis')).toBeLessThan(PAGE.indexOf('data-design="Body"'))
+    expect(PAGE).toContain('onAddFolder={() => setFolderDialogOpen(true)}')
+    expect(PAGE.indexOf('data-design="Body"')).toBeLessThan(PAGE.indexOf('onAddFolder={() => setFolderDialogOpen(true)}'))
+  })
+
+  it('追加と配信作成は実際の処理へつなぐ', () => {
+    expect(PAGE).toContain('onAddFolder={() => setFolderDialogOpen(true)}')
+    expect(PAGE).toContain('onClick={() => { setOpenTemplatePicker(false); setShowCreate(true) }}')
+    expect(PAGE).toContain('openTemplatePickerInitially={openTemplatePicker}')
+    expect(PAGE).not.toContain('テンプレートから作成')
+    expect(PAGE).toContain('配信を作成')
+  })
+})
+
 /**
  * 帯の4枚（設計 `q76C35`）。
  *
@@ -75,15 +94,15 @@ describe('一覧の帯（設計 6-1 `q76C35`）', () => {
     expect([...at].sort((a, b) => a - b), '設計の並びと違う').toEqual(at)
   })
 
-  it('口が返さない「下書き」と「今日」を 0 件と書かない', () => {
+  it('旧集計が返さない「下書き」と「今日」を 0 件と書かない', () => {
     /*
      * `/api/broadcasts/stats` が返すのは 今月の配信・予約中・到達・失敗・
      * 平均開封率 だけ。一覧から数えると**基準が違う**（一覧はLINEアカウントで
      * 絞れるのに集計は絞らない）ので、足しても合わない4枚になる。
      */
     expect(KPIS).toContain("detail: '今日 —（未取得）'")
-    expect(KPIS).toContain("detail: '編集途中 ・ 未取得'")
-    expect(KPIS, '下書きに数を入れている').toMatch(/title: '下書き',\s*\n\s*value: null,/)
+    expect(KPIS).toContain("stats?.drafts == null ? '編集途中 ・ 未取得' : '編集途中'")
+    expect(KPIS, '一覧の新しい集計値を捨てている').toMatch(/title: '下書き',\s*\n\s*value: numberOrNull\(stats\?\.drafts\),/)
   })
 
   it('平均開封率の副題を設計どおり「過去28日」だけにする', () => {

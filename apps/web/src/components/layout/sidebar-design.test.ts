@@ -4,9 +4,9 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 /**
- * サイドバーが Pen.dev の V5正式共通メニュー（J33xq）と一致していることを確かめる。
+ * サイドバーが Pencil の V6正式共通メニュー（J33xq）と一致していることを確かめる。
  *
- * 設計（`V2 1-1 ダッシュボード` のサイドバー）が出どころで、
+ * 設計（★V6 260画面の共通サイドバー）が出どころで、
  * 区分・並び・呼び名を勝手に変えないための歯止め。
  *
  * 画面を足すときに「ついでにサイドバーへ」とやると、設計から静かにずれる。
@@ -23,11 +23,10 @@ const MENU = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'lib', 'm
 const MENU_START = 'export const MENU_SECTIONS: MenuSection[] = [';
 const MENU_END = '/** 区分の目印から中身を引く。 */';
 
-/** Pen.dev V5を基本に、運用中の承認済み追加機能を含めた区分と項目。 */
+/** Pencil V6を基本に、運用中の承認済み追加機能を含めた区分と項目。 */
 const DESIGN: Array<{ section: string | null; items: string[] }> = [
-  // 上の4つは見出しを付けない。設計でも「対応」「友だち属性」の見出しは無く、
-  // 毎日開くものが見出し無しでひとかたまりになっている。
-  { section: null, items: ['ダッシュボード', '受信箱', '友だち', '友だち属性'] },
+  // 毎日開く4項目は、先頭の「メイン」区分にまとめる。
+  { section: 'メイン', items: ['ダッシュボード', '受信箱', '友だち', '友だち属性'] },
   {
     section: '配信',
     items: [
@@ -144,7 +143,7 @@ const ROUTES: Record<string, string> = {
   LINE来店フォロー: '/restaurant-test/line-followup',
 };
 
-describe('サイドバーが V5正式共通メニューの契約と一致する', () => {
+describe('サイドバーが V6正式共通メニューの契約と一致する', () => {
   const actual = readSidebar();
 
   it('区分の数と並びが設計どおり', () => {

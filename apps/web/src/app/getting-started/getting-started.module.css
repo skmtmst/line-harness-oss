@@ -12,6 +12,30 @@
   gap: 20px; /* gap: 20 */
 }
 
+.progress {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 16px 20px;
+  border-radius: var(--radius-card);
+  background: var(--color-accent-soft);
+  color: var(--color-accent-deep);
+}
+
+.progress > div {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.progress > div > span {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: 1.5;
+}
+
 .columns {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 390px; /* 右カラムは 390 固定 */
@@ -68,16 +92,18 @@
 }
 
 .stepBody {
-  display: flex;
-  flex-direction: column; /* layout: vertical */
-  gap: 8px; /* gap: 8 */
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px 16px;
   min-width: 0;
 }
 
 .stepHead {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 8px; /* gap: 8 */
+  grid-column: 1 / -1;
 }
 
 .stepTitle {
@@ -87,6 +113,7 @@
 }
 
 .stepLine {
+  grid-column: 1;
   color: var(--color-ink-secondary); /* fill: $ink-secondary */
   font-size: var(--text-body); /* fontSize: $size-body */
   line-height: 1.6;
@@ -98,7 +125,9 @@
 }
 
 .stepAction {
-  align-self: flex-start;
+  grid-column: 2;
+  grid-row: 2 / 4;
+  align-self: end;
   padding: 8px 16px; /* padding: 8 16 */
   border: 1px solid var(--color-hairline); /* stroke: $hairline */
   border-radius: var(--radius-control); /* cornerRadius: $radius-sm */
@@ -108,15 +137,56 @@
   font-weight: 700; /* fontWeight: 700 */
 }
 
+.step[data-step-state='stalled'] {
+  border-color: var(--color-danger);
+}
+
+.step[data-step-state='stalled'] .mark {
+  border-color: var(--color-danger-bg);
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+}
+
+.step[data-step-state='stalled'] .stepLine:last-of-type {
+  color: var(--color-danger);
+  font-weight: 700;
+}
+
+.step[data-step-state='stalled'] .stepAction,
+.step[data-step-state='todo'] .stepAction {
+  border-color: var(--color-accent-deep);
+  background: var(--color-accent-deep);
+  color: var(--color-on-accent);
+}
+
 .stepAction:hover {
   background: var(--color-canvas-sunken);
 }
 
 /* 押せないときは、押せそうな形にしない。**理由だけを文字で置く。** */
 .stepBlocked {
-  align-self: flex-start;
-  color: var(--color-ink-faint); /* fill: $ink-faint */
+  grid-column: 2;
+  grid-row: 2 / 4;
+  align-self: end;
+  color: var(--color-warning); /* fill: $warning */
   font-size: var(--text-label); /* fontSize: $size-label */
+}
+
+@media (max-width: 720px) {
+  .progress {
+    flex-direction: column;
+  }
+
+  .stepBody {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .stepAction,
+  .stepBlocked {
+    grid-column: 1;
+    grid-row: auto;
+    justify-self: start;
+  }
 }
 
 /* --- 右：いま止まっている理由 ----------------------------------------- */
@@ -151,13 +221,13 @@
 
 /* --- 案内帯の中身 ----------------------------------------------------- */
 
-.headline {
+.progress strong {
   font-weight: 700; /* fontWeight: 700 */
 }
 
 /* 補足は帯の2行目。**言い切りの1行と、条件の1行を混ぜない。** */
 .headlineNote {
-  display: block;
+  flex: none;
   color: var(--color-ink-secondary); /* fill: $ink-secondary */
   font-size: var(--text-caption); /* fontSize: $size-caption */
 }

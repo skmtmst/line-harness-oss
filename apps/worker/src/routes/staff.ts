@@ -2,7 +2,8 @@ import { Hono } from 'hono';
 import {
   getStaffMembers, getStaffById, getStaffByInviteTokenHash,
   createStaffMember, updateStaffMember, deleteStaffMember, countLoginAudit, getLastLoginByStaff,
-  getStaffAccountScopeIds, replaceStaffAccountScopes, revokeStaffAuthentication,
+  getStaffAccountScopeIds, getStaffAccountScopeMap, replaceStaffAccountScopes, revokeStaffAuthentication,
+  reserveTwoFactorSetupAttempt, clearTwoFactorSetupAttempts,
 } from '@line-crm/db';
 import type { StaffMember } from '@line-crm/db';
 import { requireRole } from '../middleware/role-guard.js';
@@ -15,7 +16,17 @@ import { getVisibleLineAccountScope } from '../services/account-access.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 
 const staff = new Hono<Env>();
-const INVITE_TTL_MS = 48 * 60 * 60 * 1000;
+// 招待の有効期限は7日。要件 v6-30 §9-2・§17(既存の48時間招待はその期限のまま守り、新規・再送から7日)。
+const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const TWO_FACTOR_ATTEMPT_LIMIT_ERROR = '入力回数を超えました。しばらく待ってからやり直してください';
+
+function invitationConfirmationUrl(c: { env: Env['Bindings']; req: { url: string } }, token: string): string {
+  const base = c.env.ADMIN_PUBLIC_URL?.trim() || new URL(c.req.url).origin;
+  const url = new URL('/staff/invite', base);
+  // fragment はHTTPリクエストやアクセスログへ送られない。確認画面が読み取ったら即座に消す。
+  url.hash = new URLSearchParams({ invite: token }).toString();
+  return url.toString();
+}
 
 function safeJson<T>(value: string | null | undefined, fallback: T): T {
   try { return value ? JSON.parse(value) as T : fallback; } catch { return fallback; }
@@ -26,12 +37,32 @@ function displayRole(row: StaffMember): 'admin' | 'staff' | 'viewer' {
   return row.role === 'staff' ? 'staff' : 'admin';
 }
 
-async function serializeStaff(db: D1Database, row: StaffMember) {
+function maskEmail(email: string | null): string | null {
+  if (!email) return null;
+  const at = email.indexOf('@');
+  return at > 0 ? `${email.slice(0, 1)}***${email.slice(at)}` : '***';
+}
+
+function canViewStaffEmail(c: { get: (key: 'staff') => Env['Variables']['staff'] }, targetId: string): boolean {
+  const current = c.get('staff');
+  return current.id === targetId || current.role === 'owner' || current.role === 'admin'
+    || current.permissionKeys?.includes('access.user.email.view') === true;
+}
+
+async function serializeStaff(
+  db: D1Database,
+  row: StaffMember,
+  exposeEmail = true,
+  preloadedScopes?: Map<string, string[]>,
+) {
   const accountScope = row.account_scope ?? 'all';
   return {
     id: row.id,
+    // The browser uses this authenticated scope to namespace recoverable
+    // idempotency receipts. It is an identifier, never a credential.
+    tenantId: row.tenant_id ?? DEFAULT_TENANT_ID,
     name: row.name,
-    email: row.email,
+    email: exposeEmail ? row.email : maskEmail(row.email),
     role: displayRole(row),
     lineLinked: Boolean(row.line_user_id),
     twoFactorEnabled: Boolean(row.totp_enabled_at && row.totp_secret_enc),
@@ -39,12 +70,16 @@ async function serializeStaff(db: D1Database, row: StaffMember) {
     permissionKeys: safeJson<string[]>(row.permission_keys, []),
     notificationPreferences: safeJson<Record<string, { email: boolean; line: boolean }>>(row.notification_preferences, {}),
     inviteStatus: row.invite_status || 'active',
+    inviteExpiresAt: row.invite_expires_at ?? null,
+    policyVersion: Number(row.policy_version ?? 1),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     assignedLineAccountId: row.assigned_line_account_id ?? null,
     canAccessDescendantAccounts: Boolean(row.can_access_descendant_accounts),
     accountScope,
-    scopedLineAccountIds: accountScope === 'accounts' ? await getStaffAccountScopeIds(db, row.id) : [],
+    scopedLineAccountIds: accountScope === 'accounts'
+      ? (preloadedScopes?.get(row.id) ?? await getStaffAccountScopeIds(db, row.id))
+      : [],
   };
 }
 
@@ -143,6 +178,36 @@ async function guardLastAdmin(
   return '管理者が一人もいなくなります。先に別の管理者を有効にしてください。';
 }
 
+const NOTIFICATION_KEYS = new Set(['operations', 'emergency', 'security', 'updates']);
+const PERMISSION_KEY_PATTERN = /^[A-Za-z0-9_./-]{1,200}$/;
+
+/*
+ * 権限キーと通知設定の検証(#515 中3)。
+ * 存在しない権限パスで「権限あり」に見える・将来の判定の抜け道になるのを防ぐ。
+ * キー表は画面側( staff/page.tsx・staff/new/page.tsx )と他機能の点キー
+ * (ec.event.view 等)が混在するため、ここでは形式と通知の種類を締める。
+ * パス表の完全なホワイトリスト化はキー台帳の整備後に行う。
+ */
+function invalidPermissionKeys(value: unknown): string | null {
+  if (value === undefined) return null;
+  if (!Array.isArray(value)) return '表示する機能の形式が正しくありません';
+  if (value.length > 200) return '表示する機能が多すぎます';
+  const bad = value.some((key) => typeof key !== 'string' || !PERMISSION_KEY_PATTERN.test(key));
+  return bad ? '表示する機能に使えない文字があります' : null;
+}
+
+function invalidNotificationPreferences(value: unknown): string | null {
+  if (value === undefined) return null;
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return '通知設定の形式が正しくありません';
+  for (const [key, channels] of Object.entries(value as Record<string, unknown>)) {
+    if (!NOTIFICATION_KEYS.has(key)) return '通知設定にない種類があります';
+    if (!channels || typeof channels !== 'object' || Array.isArray(channels)) return '通知設定の形式が正しくありません';
+    const { email, line } = channels as Record<string, unknown>;
+    if (typeof email !== 'boolean' || typeof line !== 'boolean') return '通知設定はオン・オフで指定してください';
+  }
+  return null;
+}
+
 function randomToken(bytes = 32): string {
   const value = new Uint8Array(bytes);
   crypto.getRandomValues(value);
@@ -155,7 +220,7 @@ staff.get('/api/staff/me', async (c) => {
   try {
     const current = c.get('staff');
     if (current.id === 'env-owner') {
-      return c.json({ success: true, data: { id: current.id, name: '管理者', role: 'admin', email: null, permissionKeys: [], assignedLineAccountId: null, canAccessDescendantAccounts: true, accountScope: 'all', scopedLineAccountIds: [] } });
+      return c.json({ success: true, data: { id: current.id, tenantId: current.tenantId ?? DEFAULT_TENANT_ID, name: '管理者', role: 'admin', email: null, permissionKeys: [], assignedLineAccountId: null, canAccessDescendantAccounts: true, accountScope: 'all', scopedLineAccountIds: [] } });
     }
     const member = await getStaffById(c.env.DB, current.id);
     if (!member) return c.json({ success: false, error: 'Staff member not found' }, 404);
@@ -169,7 +234,17 @@ staff.get('/api/staff/me', async (c) => {
 staff.get('/api/staff', async (c) => {
   try {
     const members = await getStaffMembers(c.env.DB, currentTenantId(c));
-    return c.json({ success: true, data: await Promise.all(members.map((member) => serializeStaff(c.env.DB, member))) });
+    // 担当範囲を1人ずつ読むと人数分の往復になるので一括取得する(#515 中1)。
+    const scopes = await getStaffAccountScopeMap(
+      c.env.DB,
+      members.filter((member) => (member.account_scope ?? 'all') === 'accounts').map((member) => member.id),
+    );
+    return c.json({
+      success: true,
+      data: await Promise.all(members.map((member) => (
+        serializeStaff(c.env.DB, member, canViewStaffEmail(c, member.id), scopes)
+      ))),
+    });
   } catch (error) {
     console.error('GET /api/staff error:', error);
     return c.json({ success: false, error: 'Internal server error' }, 500);
@@ -237,10 +312,15 @@ staff.post('/api/staff/:id/resend-invite', requireRole('owner', 'admin'), async 
   }
 });
 
-staff.get('/api/staff/:id', async (c) => {
-  const member = await getStaffById(c.env.DB, c.req.param('id'));
+staff.get('/api/staff/:id', requireRole('owner', 'admin', 'staff'), async (c) => {
+  const id = c.req.param('id');
+  const current = c.get('staff');
+  if (current.id !== id && current.role !== 'owner' && current.role !== 'admin') {
+    return c.json({ success: false, error: 'この情報を表示する権限がありません' }, 403);
+  }
+  const member = await getStaffById(c.env.DB, id);
   return member && isInCurrentTenant(c, member)
-    ? c.json({ success: true, data: await serializeStaff(c.env.DB, member) })
+    ? c.json({ success: true, data: await serializeStaff(c.env.DB, member, canViewStaffEmail(c, member.id)) })
     : c.json({ success: false, error: 'Staff member not found' }, 404);
 });
 
@@ -253,6 +333,8 @@ staff.post('/api/staff', requireRole('owner', 'admin'), async (c) => {
       canAccessDescendantAccounts?: boolean;
       accountScope?: 'all' | 'accounts'; scopedLineAccountIds?: string[]; managementContext?: 'hq';
     }>();
+    const keyError = invalidPermissionKeys(body.permissionKeys) ?? invalidNotificationPreferences(body.notificationPreferences);
+    if (keyError) return c.json({ success: false, error: keyError }, 400);
     const accountScope = normalizeAccountScopeInput(body);
     if ('error' in accountScope) return c.json({ success: false, error: accountScope.error }, 400);
     if (accountScope.accountScope === undefined) return c.json({ success: false, error: '担当範囲を選んでください' }, 400);
@@ -282,7 +364,14 @@ staff.post('/api/staff', requireRole('owner', 'admin'), async (c) => {
     if (accountScope.accountScope !== undefined && !await mayAssignAccountScopes(c.env.DB, current, accountScope.accountScope, accountScope.scopedLineAccountIds)) {
       return c.json({ success: false, error: '権限のないLINEアカウントは指定できません' }, 403);
     }
-    if ((await getStaffMembers(c.env.DB, currentTenantId(c))).some((item) => item.email?.toLowerCase() === email)) {
+    // 同じメールの行があるときは作り直さない。要件 v6-30 §9-2(既存メールは新規行を作らず、管理者へ安全な案内)。
+    // 招待中・期限切れなら再送へ案内し、利用開始済みなら従来どおり登録済みで断る(N-425)。
+    const duplicateInvite = (await getStaffMembers(c.env.DB, currentTenantId(c)))
+      .find((item) => item.email?.toLowerCase() === email);
+    if (duplicateInvite) {
+      if (duplicateInvite.invite_status === 'pending_email' || duplicateInvite.invite_status === 'pending_line' || duplicateInvite.invite_status === 'expired') {
+        return c.json({ success: false, error: 'このメールアドレスは招待中です。新しく作り直さず、ログインユーザー画面の「招待中」タブからもう一度送り直してください。' }, 409);
+      }
       return c.json({ success: false, error: 'このメールアドレスは登録済みです' }, 409);
     }
 
@@ -306,7 +395,7 @@ staff.post('/api/staff', requireRole('owner', 'admin'), async (c) => {
       await replaceStaffAccountScopes(c.env.DB, member.id, accountScope.scopedLineAccountIds);
       await sendStaffInviteEmail(c.env, {
         name, email,
-        verifyUrl: `${new URL(c.req.url).origin}/api/staff/invitations/${encodeURIComponent(token)}/verify`,
+        verifyUrl: invitationConfirmationUrl(c, token),
       });
     } catch (error) {
       await deleteStaffMember(c.env.DB, member.id);
@@ -321,9 +410,18 @@ staff.post('/api/staff', requireRole('owner', 'admin'), async (c) => {
 
 staff.get('/api/staff/invitations/:token/verify', async (c) => {
   const token = c.req.param('token');
+  return c.redirect(invitationConfirmationUrl(c, token), 302);
+});
+
+staff.post('/api/staff/invitations/confirm/verify', async (c) => {
+  const body = await c.req.json<{ token?: string }>().catch(() => ({} as { token?: string }));
+  const token = body.token?.trim() ?? '';
+  if (!token || token.length > 512) {
+    return c.json({ success: false, error: '招待情報が正しくありません' }, 400);
+  }
   const member = await getStaffByInviteTokenHash(c.env.DB, await sha256Hex(token));
   if (!member || !member.email || !member.invite_expires_at || Date.parse(member.invite_expires_at) < Date.now()) {
-    return c.html('<!doctype html><meta charset="utf-8"><title>招待の有効期限切れ</title><p>この招待は無効または期限切れです。管理者へ再発行を依頼してください。</p>', 410);
+    return c.json({ success: false, error: 'この招待は無効または期限切れです。管理者へ再発行を依頼してください。' }, 410);
   }
   if (member.invite_status === 'pending_email') {
     await updateStaffMember(c.env.DB, member.id, { invite_status: 'pending_line', email_verified_at: new Date().toISOString() });
@@ -332,7 +430,60 @@ staff.get('/api/staff/invitations/:token/verify', async (c) => {
       lineUrl: `${new URL(c.req.url).origin}/api/auth/line?invite=${encodeURIComponent(token)}`,
     });
   }
-  return c.html('<!doctype html><meta charset="utf-8"><title>メール確認完了</title><main style="font-family:sans-serif;max-width:560px;margin:80px auto;padding:24px"><h1>メールアドレスを確認しました</h1><p>続けて届くメールからLINE連携を完了してください。</p></main>');
+  return c.json({ success: true, data: { status: 'pending_line' } });
+});
+
+/*
+ * 招待の再送(N-425)。未受諾・期限切れの招待だけ owner/admin が送り直せる。
+ * 同じ行を使い回す(新規行を作らず、作成日時などの履歴を残す)。旧トークンは
+ * 上書きで失効し、新トークンの期限は7日(N-432)。二重押し・同時再送は後勝ちで、
+ * 生き残るのは最後に発行した1つだけ。旧リンクの受諾は410で再発行を案内する。
+ * 自動再送はしない(要件 v6-30 §9-2)。管理者が対象を確かめて押す運用にする。
+ */
+staff.post('/api/staff/:id/resend-invitation', requireRole('owner', 'admin'), async (c) => {
+  const id = c.req.param('id');
+  const target = await getStaffById(c.env.DB, id);
+  if (!target || !isInCurrentTenant(c, target)) return c.json({ success: false, error: 'Staff member not found' }, 404);
+  if (target.invite_status === 'active') {
+    return c.json({ success: false, error: 'このユーザーはすでに利用を開始しています。招待の再送はできません。' }, 409);
+  }
+  if (!target.email) {
+    return c.json({ success: false, error: 'メールアドレスがないため招待を再送できません。' }, 400);
+  }
+  try {
+    const token = randomToken();
+    const updated = await updateStaffMember(c.env.DB, id, {
+      invite_token_hash: await sha256Hex(token),
+      invite_expires_at: new Date(Date.now() + INVITE_TTL_MS).toISOString(),
+    });
+    if (!updated) return c.json({ success: false, error: 'Staff member not found' }, 404);
+    try {
+      /*
+       * どこで止まっているかで送る便りを変える。メール確認まで済んでいる人
+       * (pending_line)へ確認メールを送り直しても、確認画面は pending_email
+       * のときしか先へ進めないので、LINE連携の案内が誰にも届かないまま
+       * 「送った」ことになる。止まっている一歩のほうを送り直す。
+       */
+      if (updated.invite_status === 'pending_line') {
+        await sendStaffLineLinkEmail(c.env, {
+          name: updated.name, email: updated.email ?? target.email,
+          lineUrl: `${new URL(c.req.url).origin}/api/auth/line?invite=${encodeURIComponent(token)}`,
+        });
+      } else {
+        await sendStaffInviteEmail(c.env, {
+          name: updated.name, email: updated.email ?? target.email,
+          verifyUrl: invitationConfirmationUrl(c, token),
+        });
+      }
+    } catch (error) {
+      console.error('POST /api/staff/:id/resend-invitation error:', error);
+      return c.json({ success: false, error: '招待メールを送信できませんでした。時間をおいて、もう一度送り直してください。' }, 500);
+    }
+    return c.json({ success: true, data: await serializeStaff(c.env.DB, updated) });
+  } catch (error) {
+    console.error('POST /api/staff/:id/resend-invitation error:', error);
+    return c.json({ success: false, error: '招待を再送できませんでした' }, 500);
+  }
 });
 
 staff.patch('/api/staff/:id', async (c) => {
@@ -344,6 +495,8 @@ staff.patch('/api/staff/:id', async (c) => {
     assignedLineAccountId?: string | null; canAccessDescendantAccounts?: boolean;
     accountScope?: 'all' | 'accounts'; scopedLineAccountIds?: string[]; managementContext?: 'hq';
   }>();
+  const keyError = invalidPermissionKeys(body.permissionKeys) ?? invalidNotificationPreferences(body.notificationPreferences);
+  if (keyError) return c.json({ success: false, error: keyError }, 400);
   const accountScope = normalizeAccountScopeInput(body);
   if ('error' in accountScope) return c.json({ success: false, error: accountScope.error }, 400);
 
@@ -449,7 +602,7 @@ staff.post('/api/staff/:id/two-factor/setup', async (c) => {
   const id = c.req.param('id');
   const member = await getStaffById(c.env.DB, id);
   if (!member || !isInCurrentTenant(c, member)) return c.json({ success: false, error: 'Staff member not found' }, 404);
-  if (!canEditMember(c, id)) return c.json({ success: false, error: '自分の二段階認証だけ設定できます' }, 403);
+  if (c.get('staff').id !== id) return c.json({ success: false, error: '自分の二段階認証だけ設定できます' }, 403);
   const key = totpMasterKey(c);
   if (!key) return c.json({ success: false, error: '二段階認証の暗号鍵が設定されていません' }, 503);
 
@@ -470,21 +623,31 @@ staff.post('/api/staff/:id/two-factor/confirm', async (c) => {
   const id = c.req.param('id');
   const member = await getStaffById(c.env.DB, id);
   if (!member || !isInCurrentTenant(c, member)) return c.json({ success: false, error: 'Staff member not found' }, 404);
-  if (!canEditMember(c, id)) return c.json({ success: false, error: '自分の二段階認証だけ設定できます' }, 403);
+  if (c.get('staff').id !== id) return c.json({ success: false, error: '自分の二段階認証だけ設定できます' }, 403);
   const key = totpMasterKey(c);
   if (!key) return c.json({ success: false, error: '二段階認証の暗号鍵が設定されていません' }, 503);
   if (!member?.totp_pending_secret_enc) return c.json({ success: false, error: '先にQRコードを表示してください' }, 400);
   const body = await c.req.json<{ code?: string }>().catch(() => ({} as { code?: string }));
+  const attempt = await reserveTwoFactorSetupAttempt(c.env.DB, id);
+  if (!attempt) return c.json({ success: false, error: TWO_FACTOR_ATTEMPT_LIMIT_ERROR }, 429);
   const encrypted = member.totp_pending_secret_enc;
   const result = await verifyTotp(await decryptTotpSecret(encrypted, key), body.code ?? '');
-  if (!result.valid) return c.json({ success: false, error: '認証コードが正しくありません' }, 400);
+  if (!result.valid) {
+    return c.json(
+      { success: false, error: attempt.attempts >= attempt.maxAttempts ? TWO_FACTOR_ATTEMPT_LIMIT_ERROR : '認証コードが正しくありません' },
+      attempt.attempts >= attempt.maxAttempts ? 429 : 400,
+    );
+  }
   const updated = await updateStaffMember(c.env.DB, id, {
     totp_secret_enc: encrypted,
     totp_pending_secret_enc: null,
     totp_enabled_at: new Date().toISOString(),
     totp_last_used_step: null,
   });
-  if (updated) await revokeStaffAuthentication(c.env.DB, id);
+  if (updated) {
+    await clearTwoFactorSetupAttempts(c.env.DB, id);
+    await revokeStaffAuthentication(c.env.DB, id);
+  }
   return c.json({ success: true, data: await serializeStaff(c.env.DB, updated!) });
 });
 

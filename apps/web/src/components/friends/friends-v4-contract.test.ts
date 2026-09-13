@@ -91,7 +91,7 @@ describe('友だちV6の画面契約', () => {
     expect(PAGE).toContain('名前・LINE名・タグ・メモで検索')
     expect(PAGE).toContain('詳細条件')
     expect(PAGE).toContain('SavedSearchDialog')
-    expect(PAGE).toContain('api.savedSearches.list')
+    expect(PAGE).toContain('api.friendSavedViews.list')
     expect(PAGE).toContain('savedSearchId')
     expect(ADVANCED).toContain('この条件で表示')
     expect(PAGE).toContain('友だち追加の新しい順')
@@ -114,7 +114,8 @@ describe('友だちV6の画面契約', () => {
   })
 
   it('未対応・注目・表示列の選択状態を目と再読み込み後の両方で確認できる', () => {
-    expect(PAGE).toContain("responseFilter === 'unhandled' ? 'bg-status-danger-selected ring-2")
+    expect(PAGE).toContain("responseFilter === 'unhandled' ? 'border-status-danger-border bg-status-danger-selected")
+    expect(PAGE).toContain("responseFilter === 'unhandled'\n              ? <Check")
     expect(PAGE).toContain('aria-pressed={attentionOnly}')
     expect(TABLE).toContain("localStorage.getItem('friends.visibleColumns')")
     expect(TABLE).toContain("localStorage.setItem('friends.visibleColumns'")

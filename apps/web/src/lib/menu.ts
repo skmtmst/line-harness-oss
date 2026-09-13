@@ -1,5 +1,4 @@
 import type { FeatureKey } from './feature-settings'
-import { hqOpenHref } from './hq-navigation'
 
 /**
  * サイドメニューの項目。**ここが正本。**
@@ -52,13 +51,10 @@ export const HQ_MENU_SECTIONS: MenuSection[] = [
     title: '統括',
     items: [
       { href: '/hq', label: '店舗管理', icon: 'M3 21h18M5 21V7l7-4 7 4v14M9 10h2m2 0h2m-6 4h2m2 0h2m-6 4h2m2 0h2', id: 'hq-stores', note: '統括に属するLINE公式アカウントを管理します', required: true },
-      { href: hqOpenHref('tags'), label: 'タグ', icon: 'M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z', id: 'hq-tags', note: '店舗を選んでタグ管理を開きます', required: true },
-      { href: hqOpenHref('templates'), label: 'テンプレート管理', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z', id: 'hq-templates', note: '店舗を選んでテンプレート管理を開きます', required: true },
-      { href: hqOpenHref('rich-menus'), label: 'リッチメニュー管理', icon: 'M4 4h6v6H4V4zm0 10h6v6H4v-6zm10-10h6v6h-6V4zm0 10h6v6h-6v-6z', id: 'hq-rich-menus', note: '店舗を選んでリッチメニュー管理を開きます', required: true },
-      { href: hqOpenHref('form-submissions'), label: '回答フォーム管理', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2', id: 'hq-forms', note: '店舗を選んで回答フォーム管理を開きます', required: true },
-      // ★V6 35-1 `aH6NX/EMiz0` の並び。統括で画像を作り、店舗へ渡す。
-      // 「設定」は 2026-09-12 に外した。統括名・権限者は左下のアカウントメニュー →
-      // メンバー管理（/hq/members）から入る（★V6 36-1・36-5）。
+      { href: '/hq/friend-attributes', label: '友だち属性', icon: 'M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z', id: 'hq-tags', note: 'タグのひな形を作成し、店舗へ配布します', required: true },
+      { href: '/hq/templates', label: 'テンプレート', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z', id: 'hq-templates', note: 'メッセージのひな形を作成し、店舗へ配布します', required: true },
+      { href: '/hq/rich-menus', label: 'リッチメニュー', icon: 'M4 4h6v6H4V4zm0 10h6v6H4v-6zm10-10h6v6h-6V4zm0 10h6v6h-6v-6z', id: 'hq-rich-menus', note: 'リッチメニューのひな形を作成し、店舗へ配布します', required: true },
+      { href: '/hq/form-submissions', label: '回答フォーム', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2', id: 'hq-forms', note: '回答フォームのひな形を作成し、店舗へ配布します', required: true },
       { href: '/hq/banners', label: 'バナー生成', icon: 'M4 5a2 2 0 012-2h12a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm4 5a1.5 1.5 0 100-3 1.5 1.5 0 000 3zm12 5l-5-5L5 21', id: 'hq-banners', note: '配信やリッチメニューに使う画像をAIで作り、店舗へ渡します', required: true },
     ],
   },
@@ -66,14 +62,9 @@ export const HQ_MENU_SECTIONS: MenuSection[] = [
 
 export const MENU_SECTIONS: MenuSection[] = [
   {
-    /*
-     * 見出しを付けない。毎日開くものが、ここに見出し無しでひとかたまりに
-     * なっている。以前は「対応」「友だち属性」と2つ見出しを挟んでいたが、
-     * 項目が1〜2個の区分に見出しを付けると、行数のわりに縦が伸びる。
-     */
     id: 'basic',
-    label: null,
-    title: '基本',
+    label: 'メイン',
+    title: 'メイン',
     items: [
       { href: '/', label: 'ダッシュボード', icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6' , id: 'dashboard', note: '数字と、今日やることのまとめ', required: true },
       { href: '/chats', label: '受信箱', icon: 'M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5', badge: 'unanswered' , id: 'inbox', note: 'LINEとメールの問い合わせをまとめて扱います', required: true },

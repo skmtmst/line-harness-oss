@@ -8,9 +8,11 @@ const read = (...parts: string[]) => readFileSync(join(HERE, ...parts), 'utf8')
 const LIST = read('page.tsx')
 const CREATE = read('new', 'page.tsx')
 const EDIT = read('edit', 'page.tsx')
+const BRANCH_EDITOR = read('branch-editor.tsx')
 const VERSIONS = read('versions', 'page.tsx')
 const EDITOR = read('..', '..', 'components', 'automations', 'common-action-editor.tsx')
-const PERMISSION = read('..', '..', 'components', 'automations', 'use-common-action-permission.ts')
+// #580: 権限の実体は use-can-manage.ts へ1本化。旧2ファイルは互換の再送出。
+const PERMISSION = read('..', '..', 'components', 'automations', 'use-can-manage.ts')
 const API = read('..', '..', 'lib', 'api.ts')
 const WORKER = read('..', '..', '..', '..', 'worker', 'src', 'services', 'common-actions.ts')
 const ENGINE = read('..', '..', '..', '..', 'worker', 'src', 'services', 'automation-engine.ts')
@@ -29,7 +31,8 @@ describe('V6共通アクションの画面契約', () => {
     expect(LIST).toContain('共通アクションはまだありません')
     expect(LIST).toContain('共通アクションを読み込めませんでした')
     expect(LIST).toContain('中身を見る')
-    expect(LIST).toContain('複製して下書きを作る')
+    expect(LIST).toContain('使われている場所')
+    expect(LIST).toContain('公開する')
     expect(LIST).toContain('/common-actions/versions?id=')
     expect(LIST).not.toContain('準備中')
   })
@@ -40,6 +43,20 @@ describe('V6共通アクションの画面契約', () => {
     expect(EDITOR).toContain('処理を追加')
     expect(EDITOR).not.toContain('actionsJson')
     expect(CREATE).not.toContain('<main className=')
+    expect(EDITOR).toContain('テンプレート「{selected.name}」')
+    expect(EDITOR).toContain('版: —（未取得。テンプレートの版を返す口が接続されると表示します）')
+    expect(CREATE).toContain('すでに呼び出している場所はいまの版のまま動きます')
+  })
+
+  it('条件分岐はタグ条件と両方の公開版を保存・実行契約へ接続する', () => {
+    expect(CREATE + EDIT).toContain('<BranchEditors')
+    expect(BRANCH_EDITOR).toContain('条件のタグ')
+    expect(BRANCH_EDITOR).toContain('当てはまるとき')
+    expect(BRANCH_EDITOR).toContain('当てはまらないとき')
+    expect(WORKER).toContain("'branch'")
+    expect(WORKER).toContain('branch_too_deep')
+    expect(ENGINE).toContain("type: 'branch_marker'")
+    expect(ENGINE).toContain('branch_not_selected')
   })
 
   it('利用版の変更前に差分と進行中への影響を確認する', () => {
@@ -48,12 +65,49 @@ describe('V6共通アクションの画面契約', () => {
     expect(VERSIONS).toContain('更新後')
     expect(VERSIONS).toContain('実行中・待機中の処理は変えず')
     expect(VERSIONS).toContain('<Dialog')
+    expect(VERSIONS).toContain('versionChangeSummary')
+    expect(VERSIONS).toContain('summary?.executionCountThisMonth')
+    expect(VERSIONS).toContain('summary?.failureCountThisMonth')
+    expect(VERSIONS).toContain('このアクションを実行中')
+    expect(VERSIONS).toContain('待ち時間の途中')
+    expect(VERSIONS).not.toContain('内容を取得できません')
+    expect(VERSIONS).not.toContain('確認できません')
+  })
+
+  it('一覧の集計・絞り込み・CSVを新しい契約へ接続する', () => {
+    expect(LIST).toContain('summary?.executions')
+    expect(LIST).toContain('summary?.failures')
+    expect(LIST).toContain('api.commonActions.csvUrl(selectedAccountId)')
+    expect(LIST).toContain('古い版あり')
+    expect(LIST).toContain('limit: PAGE_SIZE')
+    expect(LIST).toContain('offset: (page - 1) * PAGE_SIZE')
+    expect(LIST).toContain("aria-label=\"ページ送り\"")
   })
 
   it('閲覧権限と編集権限を画面でも分ける', () => {
     expect(PERMISSION).toContain("role === 'owner' || role === 'admin'")
     expect(CREATE + EDIT).toContain('共通アクションは閲覧のみです')
     expect(LIST + VERSIONS).toContain('canManage')
+  })
+
+  it('版操作は店が外れていたら実行しない (#580)', () => {
+    expect(VERSIONS).toContain('if (!selectedAccountId) {')
+    expect(VERSIONS).toContain('LINEアカウントを選び直してください')
+  })
+
+  it('手順IDは1本の採番で非HTTPSにも落ちる (#580)', () => {
+    expect(EDITOR).toContain('export function newStepId()')
+    expect(BRANCH_EDITOR).toContain('newStepId()')
+    expect(BRANCH_EDITOR).not.toContain('crypto.randomUUID()')
+  })
+
+  it('権限フックの実体は1本で旧名は再送出する (#580)', () => {
+    const automation = read('..', '..', 'components', 'automations', 'use-automation-permission.ts')
+    const commonAction = read('..', '..', 'components', 'automations', 'use-common-action-permission.ts')
+    expect(automation).toContain("from './use-can-manage'")
+    expect(commonAction).toContain("from './use-can-manage'")
+    expect(automation).not.toContain('localStorage')
+    expect(commonAction).not.toContain('localStorage')
   })
 
   it('ヘッダーの最後をマニュアルにする', () => {
@@ -69,11 +123,29 @@ describe('V6共通アクションの機能契約', () => {
     }
   })
 
+  it('一覧の複製操作を下書き作成APIへ接続する', () => {
+    expect(LIST).toContain('api.commonActions.duplicate(item.id, selectedAccountId)')
+    expect(LIST).toContain('複製して下書きを作る')
+    expect(LIST).toContain('共通アクションを複製できませんでした')
+    expect(LIST).toContain('/common-actions/edit?id=')
+  })
+
   it('公開版を直接変更せず、実行開始時の計画へ展開する', () => {
     expect(FOUNDATION).toContain('trg_common_action_published_version_immutable')
     expect(WORKER).toContain('common_action_cycle')
     expect(ENGINE).toContain('buildExecutionPlan')
     expect(ENGINE).toContain('execution_plan_json')
     expect(ENGINE).toContain('common_action_marker')
+  })
+
+  it('札・KPIは集計口で受け、件数表示の全件取得はしない（#554 点検#519中2）', () => {
+    expect(LIST.match(/api\.commonActions\.list\(/g)).toHaveLength(1)
+    expect(LIST).toContain('response.summary')
+    expect(LIST).toContain('summary?.total')
+    expect(LIST).toContain('summary?.outdatedItems')
+    expect(LIST).not.toContain('summaryResponse')
+    expect(LIST).not.toContain('summaryItems')
+    // 暫定の注記ではなく、口の集計を使う
+    expect(API).toContain('summary?: {')
   })
 })

@@ -22,6 +22,8 @@ const readWeb = (relative: string) =>
 
 const MARK_LIST = read('mark-list.tsx')
 const SAVED_LIST = read('saved-search-list.tsx')
+const FIELD_LIST = read('field-list.tsx')
+const TAG_EDITOR = read('tag-editor-v4.tsx')
 const CSV_DIALOG = read('tag-csv-import-dialog.tsx')
 const EDIT_PAGE = readWeb('src/app/tags/searches/edit/page.tsx')
 
@@ -48,18 +50,17 @@ describe('rIhbN 対応マーク一覧', () => {
 
   it('使用先の列に、隣の「使用中」と同じ友だちの人数を重ねて出さない', () => {
     expect(usageLabel).not.toContain('友だち')
-    expect(usageLabel).toContain('配信${mark.usedIn.broadcasts}件')
-    expect(usageLabel).toContain('シナリオ${mark.usedIn.scenarios}件')
+    expect(usageLabel).toContain('配信${usedIn.broadcasts}件')
+    expect(usageLabel).toContain('シナリオ${usedIn.scenarios}件')
   })
 
   it('使用先が未取得のときは「なし」ではなく「—」を出す', () => {
-    expect(usageLabel).toContain("if (mark.usedIn === undefined) return '—'")
+    expect(usageLabel).toContain("mark.usedIn === undefined ? '—' : 'なし'")
     expect(usageLabel.indexOf('undefined')).toBeLessThan(usageLabel.indexOf("'なし'"))
   })
 
-  it('見出しは、その列に実際に出しているもの（使用先）に合わせる', () => {
-    expect(thead).toContain('使用先')
-    expect(thead).not.toContain('表示先')
+  it('見出しは、APIが返す画面の表示先に合わせる', () => {
+    expect(thead).toContain('表示先')
     for (const label of ['順番', 'マーク', '使用中', '初期値', '自動変更', '操作']) {
       expect(thead).toContain(label)
     }
@@ -104,11 +105,15 @@ describe('QKx8Q 保存した検索の一覧', () => {
     expect(filterSavedSearches(unknown, '', 'unused')).toHaveLength(1)
   })
 
-  it('設計のツールバー2つを画面に置き、絞った結果を一覧に渡す', () => {
-    const toolbar = between(SAVED_LIST, 'type="search"', '</select>')
+  it('設計の3つの絞り込みと表の列を画面に置き、絞った結果を一覧に渡す', () => {
+    const toolbar = between(SAVED_LIST, 'type="search"', '<span className="flex-1"')
     expect(toolbar).toContain('placeholder="条件名で検索"')
     expect(toolbar).toContain('使用先：すべて')
+    expect(toolbar).toContain('該当人数：すべて')
     expect(toolbar).toContain('setUsageFilter')
+    expect(toolbar).toContain('setMatchFilter')
+    expect(SAVED_LIST).toContain('<Th className="w-1/4 px-3 py-3">条件の要約</Th>')
+    expect(SAVED_LIST).toContain('<Th className="w-1/6 px-3 py-3">使用先</Th>')
     expect(withoutComments(SAVED_LIST)).toContain('{visible.map((search)')
     expect(withoutComments(SAVED_LIST)).not.toContain('{items.map((search)')
   })
@@ -117,6 +122,25 @@ describe('QKx8Q 保存した検索の一覧', () => {
     const limitNote = between(SAVED_LIST, '{ready\n', '</p>')
     expect(limitNote).toContain('ready')
     expect(limitNote).toContain('いまの件数は読み込めていません')
+  })
+})
+
+describe('機能4の一覧・編集画面は取得済みの設計値を表示する', () => {
+  it('友だち情報欄はフォーム使用数と表示先をAPI応答から読む', () => {
+    expect(FIELD_LIST).toContain('field.formUsageCount')
+    expect(FIELD_LIST).toContain('field.displayTargets')
+  })
+
+  it('対応マークはAPIが返す自動変更ルールを優先する', () => {
+    expect(MARK_LIST).toContain('mark.automationRules.map')
+  })
+
+  it('タグ編集は保存済みの連動アクションを復元する', () => {
+    expect(TAG_EDITOR).toContain('tag?.linkedActions ?? []')
+  })
+
+  it('保存検索の該当人数は一覧で取得済みの値を初期表示に使う', () => {
+    expect(EDIT_PAGE).toContain('setPreviewCount(found.matchCount ?? null)')
   })
 })
 
@@ -139,10 +163,10 @@ describe('sfTEW CSVで一括登録の確認画面', () => {
     ]) expect(summary).toContain(detail)
   })
 
-  it('押す前に、同じ名前のタグを上書きしないことと、直す場所を書く', () => {
+  it('押す前に、同じ名前のタグを上書きしないことと、直し方を書く', () => {
     expect(warnBar).toContain('同じ名前のタグは上書きしません')
-    expect(warnBar).toContain('タグ一覧から編集してください')
-    expect(warnBar).toContain('入力確認の${preview.summary.invalid}行は登録されません')
+    expect(warnBar).toContain('エラーの行はCSVを直してから')
+    expect(warnBar).toContain('エラーの${preview.summary.invalid}行は登録されません')
   })
 })
 
@@ -157,7 +181,7 @@ describe('XBkiQ 保存した検索の編集', () => {
   it('件数を読めていないときは、数を作らずに上限だけ書く', () => {
     expect(shareField).toContain("savedCount === null")
     expect(shareField).toContain("'保存できるのは50件までです。'")
-    expect(withoutComments(EDIT_PAGE)).toContain('setSavedCount(searches.success ? searches.data.length : null)')
+    expect(withoutComments(EDIT_PAGE)).toContain('setSavedCount(searches.success ? searches.summary.total : null)')
   })
 
   it('読込中の言い方を、共通の「読み込んでいます」にそろえる', () => {

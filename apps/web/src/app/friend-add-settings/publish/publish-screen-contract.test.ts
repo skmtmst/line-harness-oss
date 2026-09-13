@@ -34,10 +34,25 @@ describe('友だち追加時配信の公開画面', () => {
     expect(PAGE).toContain('disabled={!ready}')
   })
 
-  it('公開前の対象見込みは validation の値を使う', () => {
+  it('公開前の対象見込みはルールの28日集計を優先し、旧契約にも戻せる', () => {
     // 公開後の返事を先取りしたり、設計の数字を置いたりしない。
-    expect(PAGE).toContain('audienceText(validation?.estimatedAudienceCount)')
+    // 過去28日の実績を未来の対象人数として見せない。
+    expect(PAGE).toContain('audienceText(matchedLast28Days)')
+    expect(PAGE).toContain('label="過去28日の該当"')
+    expect(PAGE).not.toContain('label="対象見込み"')
     expect(PAGE).not.toContain('214人')
+  })
+
+  it('確認は鍵で突き合わせ、説明文はサーバ値をそのまま出す', () => {
+    // 順番 (配列の位置) で割り振ると、行が欠ける・意味がずれる。
+    expect(PAGE).not.toContain('keys[index]')
+    expect(PAGE).toContain('{check.detail}')
+  })
+
+  it('idが無いときは固定値で開かず、空の面にする', () => {
+    // fixture の ID が無い環境で404・空画面になる。
+    expect(PAGE).not.toContain("?? 'rule-referral'")
+    expect(PAGE).toContain('if (!ruleId)')
   })
 
   it('実行結果へは、つながっているときだけリンクする', () => {
@@ -58,6 +73,8 @@ describe('友だち追加時配信の公開画面', () => {
     // 最後の試験は、下書きが持っている記録から読む。
     expect(PAGE).toContain('draft.lastTestStatus')
     expect(PAGE).toContain('draft.lastTestedAt')
+    expect(PAGE).toContain('ruleDetail?.rule.lastTestedByStaffId')
+    expect(PAGE).toContain('ruleDetail.rule.lastTestedByStaffName')
   })
 
   it('アカウントを変えたら前の結果を捨てる', () => {
@@ -73,7 +90,40 @@ describe('友だち追加時配信の公開画面', () => {
 
   it('最終確認は5段目を現在地にする', () => {
     expect(PAGE).toContain('current={5}')
+    expect(PAGE).toContain('complete')
     expect(PAGE).not.toContain('current={4}')
+  })
+
+  it('設計の最終確認に必要な時刻・プレビュー・監視状態を表示する', () => {
+    expect(PAGE).toContain('登録直後から5分以内')
+    expect(PAGE).toContain('LINEプレビュー')
+    expect(PAGE).toContain("ruleDetail?.staffNotification?.status === 'connected'")
+    expect(PAGE).toContain('ruleDetail?.rule.definition.messageText')
+  })
+
+  it('運用者向けの画面に内部の仕組みの名前を出さない', () => {
+    expect(PAGE).not.toContain('value="webhookの記録で防ぎます"')
+    expect(PAGE).not.toContain('value="有効（webhookの記録で判定）"')
+    // 確認の説明文はサーバ値をそのまま出す。画面に固定文を持たない
+    // (#542 点検 #501)。文言自体は Worker が返し、Worker の契約テストで守る。
+    expect(PAGE).not.toContain('同じ友だち追加通知は1回だけ処理します。')
+  })
+
+  it('有効化後に次の操作と監視対象を説明する', () => {
+    for (const label of [
+      '配信を一時停止',
+      '内容を編集する',
+      'テストを再送信',
+      '別の経路用に複製',
+      '未送信',
+      '二重送信',
+      '再追加の連続実行',
+      'シナリオ開始失敗',
+    ]) {
+      expect(PAGE).toContain(label)
+    }
+    expect(PAGE).toContain('未送信・二重送信・シナリオ開始失敗はSlackへ通知します。')
+    expect(PAGE).toContain('api.friendAddRules.stop(accountId, detail.rule.id, detail.rule.version)')
   })
 
   it('公開中にアカウントを変えられたら、返事を映さない', () => {

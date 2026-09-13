@@ -87,7 +87,34 @@ describe('feature settings scope and versioning', () => {
     }
   });
 
-  it('rejects duplicate ordering and non-boolean feature values', async () => {
+  it('一括保存でも無効環境の飲食店テストは無効で残る（画面の保存後再読込の前提）', async () => {
+    const testDb = createTestD1();
+    try {
+      const saved = await app().request('/api/settings/features?account_id=account-1', {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          expectedVersion: 0,
+          features: { restaurant_test: true, scenarios: false },
+        }),
+      }, { DB: testDb.db, RESTAURANT_TEST_ENABLED: 'false' });
+      expect(saved.status).toBe(200);
+
+      const loaded = await app().request(
+        '/api/settings/features?account_id=account-1',
+        {},
+        { DB: testDb.db, RESTAURANT_TEST_ENABLED: 'false' },
+      );
+      expect(await loaded.json()).toMatchObject({
+        success: true,
+        data: { features: { restaurant_test: false, scenarios: false } },
+      });
+    } finally {
+      testDb.raw.close();
+    }
+  });
+
+  it('rejects duplicate ordering, non-boolean values, and feature IDs outside the catalog', async () => {
     const testDb = createTestD1();
     try {
       const duplicate = await app().request('/api/settings/features?account_id=account-1', {
@@ -106,6 +133,17 @@ describe('feature settings scope and versioning', () => {
         body: JSON.stringify({ expectedVersion: 0, features: { scenarios: 'off' } }),
       }, { DB: testDb.db, RESTAURANT_TEST_ENABLED: 'true' });
       expect(invalid.status).toBe(400);
+
+      const unknown = await app().request('/api/settings/features?account_id=account-1', {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ expectedVersion: 0, features: { not_in_feature_catalog: true } }),
+      }, { DB: testDb.db, RESTAURANT_TEST_ENABLED: 'true' });
+      expect(unknown.status).toBe(400);
+      expect(await unknown.json()).toMatchObject({
+        success: false,
+        error: '知らない機能です: not_in_feature_catalog',
+      });
     } finally {
       testDb.raw.close();
     }

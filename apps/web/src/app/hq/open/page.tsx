@@ -7,7 +7,6 @@ import Button from '@/components/shared/button'
 import { useAccount, type AccountWithStats } from '@/contexts/account-context'
 import { api } from '@/lib/api'
 import { resolveHqOpenTarget, type HqOpenTarget } from '@/lib/hq-navigation'
-import { restaurantTestUiEnabled } from '@/lib/environment-features'
 
 export default function HqOpenPage() {
   const router = useRouter()
@@ -79,9 +78,7 @@ export default function HqOpenPage() {
         <section data-design="Empty" className="rounded-card border border-hairline bg-canvas px-6 py-16 text-center shadow-sm">
           <h2 className="text-xl font-bold text-ink">まだ店舗がありません</h2>
           <p className="mt-2 text-sm text-ink-secondary">最初のLINE公式アカウントを登録してください。</p>
-          {restaurantTestUiEnabled() ? (
-            <Button href="/restaurant-test/stores/new" variant="primary" className="mt-6">＋店舗の新規アカウント登録</Button>
-          ) : null}
+          <Button href="/accounts/new" variant="primary" className="mt-6">＋LINEアカウントを新規登録</Button>
         </section>
       ) : null}
       {!error && !loading && accounts.length > 0 ? (

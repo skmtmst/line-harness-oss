@@ -135,7 +135,11 @@ hqSupport.post('/api/hq/support/requests', requireRole('owner', 'admin', 'staff'
       const account = accounts.find((a) => a.id === body.lineAccountId);
       if (!account) return c.json({ success: false, error: '関係する店舗が見つかりません' }, 404);
       lineAccountId = account.id;
-      lineAccountName = account.name;
+      const accountLabel = await c.env.DB
+        .prepare('SELECT name FROM line_accounts WHERE id = ? AND COALESCE(tenant_id, ?) = ?')
+        .bind(account.id, DEFAULT_TENANT_ID, tenantId)
+        .first<{ name: string }>();
+      lineAccountName = accountLabel?.name ?? null;
     }
 
     const attachmentsRaw = Array.isArray(body.attachments) ? body.attachments : [];

@@ -1,10 +1,11 @@
-import { Hono, type Context } from 'hono';
+import { Hono, type Context, type MiddlewareHandler } from 'hono';
 import {
   getScoringRules,
   getScoringRuleById,
   createScoringRule,
   updateScoringRule,
   deleteScoringRule,
+  getFriendById,
   getFriendScore,
   getFriendScoreHistory,
   addScore,
@@ -15,11 +16,17 @@ import {
   deleteMileageRule,
   getMileageAdminOverview,
   getMileageAdminHistory,
+  getMileageEarningRulesV6,
+  getMileageFriendsV6,
+  getMileageHistoryPeriodSummary,
+  getMileageRewardReachMetrics,
   applyMileageRulesForEvent,
   getMileageManualAdjustmentPolicy,
   setMileageManualAdjustmentPolicy,
   postMileageAdjustment,
   MileageAdjustmentError,
+  MileageV6Error,
+  saveMileageEarningRuleDraft,
   getActionScoreOverview,
   getActionScoreBands,
   createMileageRewardDraft,
@@ -27,6 +34,7 @@ import {
   getMileageReward,
   getMileageRewardAdminOverview,
   getMileageRedemption,
+  listMileageRedemptions,
   importMileageRewardCodes,
   publishMileageReward,
   reorderMileageRewards,
@@ -41,16 +49,21 @@ import type {
   ActionScoreSort,
   MileageEntryStatus,
   MileageEntryType,
+  MileageRedemptionListStatus,
   MileageRuleRow,
   MileageRewardDraftInput,
 } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { auditLog } from '../lib/audit-log.js';
 import { requireIrreversibleConfirmation, requireRole } from '../middleware/role-guard.js';
-import { getVisibleLineAccountScope } from '../services/account-access.js';
+import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import { isValidIdempotencyKey } from '../services/outbound-idempotency.js';
 import { sha256Hex } from '../middleware/auth.js';
 import { deliverMileageReward } from '../services/mileage-reward-delivery.js';
+import {
+  mileageAdjustmentMessage,
+  sendMileageAdjustmentNotification,
+} from '../services/mileage-adjustment-notification.js';
 
 const scoring = new Hono<Env>();
 
@@ -62,11 +75,38 @@ function mileageRewardError(c: Parameters<typeof auditLog>[0], error: unknown) {
   return c.json({ success: false, error: '使い道を処理できませんでした' }, 500);
 }
 
+function mileageV6Error(c: Parameters<typeof auditLog>[0], error: unknown) {
+  if (error instanceof MileageV6Error) {
+    return c.json({
+      success: false,
+      error: error.message,
+      code: error.code,
+      ...(error.field ? { field: error.field } : {}),
+    }, error.status as 400);
+  }
+  console.error('mileage V6 API error:', error);
+  return c.json({ success: false, error: 'マイル情報を処理できませんでした' }, 500);
+}
+
 async function canUseMileageAccount(c: Parameters<typeof auditLog>[0], accountId: string) {
   if (!accountId) return false;
   const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
   return scope.allowedAccountIds.includes(accountId);
 }
+
+/*
+ * 友だちの可視検査。`friends.ts` の `requireVisibleFriend` と同じ約束:
+ * 担当外・別アカウントの友だちは「いない」ものとして 404 を返す。
+ * スコアの口だけ別実装にしないため、振る舞いをここに寄せる。
+ */
+const requireVisibleFriendForScore: MiddlewareHandler<Env> = async (c, next) => {
+  const friend = await getFriendById(c.env.DB, c.req.param('id') ?? '');
+  const accountId = (friend as unknown as Record<string, unknown> | null)?.line_account_id as string | null ?? null;
+  if (!friend || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+    return c.json({ success: false, error: 'Friend not found' }, 404);
+  }
+  await next();
+};
 
 function serializeMileageRule(rule: MileageRuleRow) {
   let conditions: Record<string, unknown> = {};
@@ -81,6 +121,8 @@ function serializeMileageRule(rule: MileageRuleRow) {
     amount: rule.amount,
     initialStatus: rule.initial_status,
     conditions,
+    // 334(#521): 帰属アカウント。null は変更不可の既存全店ルール。
+    lineAccountId: rule.line_account_id ?? null,
     isActive: Boolean(rule.is_active),
     validFrom: rule.valid_from,
     validUntil: rule.valid_until,
@@ -131,7 +173,19 @@ scoring.get('/api/mileage/rewards', requireRole('owner', 'admin', 'staff'), asyn
     if (!await canUseMileageAccount(c, accountId)) {
       return c.json({ success: false, error: 'LINE公式アカウントが見つかりません' }, 404);
     }
-    return c.json({ success: true, data: await getMileageRewardAdminOverview(c.env.DB, accountId) });
+    const [overview, reachMetrics] = await Promise.all([
+      getMileageRewardAdminOverview(c.env.DB, accountId),
+      getMileageRewardReachMetrics(c.env.DB, accountId),
+    ]);
+    return c.json({
+      success: true,
+      data: {
+        ...overview,
+        reachMetrics,
+        rankBenefits: reachMetrics.filter((item) => item.rewardKind === 'rank'),
+        measuredAt: new Date().toISOString(),
+      },
+    });
   } catch (error) {
     return mileageRewardError(c, error);
   }
@@ -382,6 +436,46 @@ scoring.post(
   },
 );
 
+const MILEAGE_REDEMPTION_LIST_STATUSES = new Set<string>([
+  'all', 'reserved', 'delivering', 'succeeded', 'delivery_failed', 'refunded',
+]);
+
+// 交換履歴の一覧。残高を減らしたのに特典が届かなかった交換を、管理画面で
+// 見つけるための口。既定は失敗中だけ。秘密の処理IDは落として返す。
+scoring.get(
+  '/api/mileage/redemptions',
+  requireRole('owner', 'admin', 'staff'),
+  async (c) => {
+    try {
+      const accountId = c.req.query('accountId')?.trim() ?? '';
+      if (!await canUseMileageAccount(c, accountId)) {
+        return c.json({ success: false, error: '交換履歴が見つかりません' }, 404);
+      }
+      const statusValue = c.req.query('status')?.trim() || 'delivery_failed';
+      if (!MILEAGE_REDEMPTION_LIST_STATUSES.has(statusValue)) {
+        return c.json({ success: false, error: 'status is invalid' }, 400);
+      }
+      const requestedLimit = Number(c.req.query('limit') || 20);
+      const requestedOffset = Number(c.req.query('offset') || 0);
+      const listed = await listMileageRedemptions(c.env.DB, {
+        lineAccountId: accountId,
+        status: statusValue as MileageRedemptionListStatus,
+        limit: Number.isFinite(requestedLimit) ? Math.min(100, Math.max(1, requestedLimit)) : 20,
+        offset: Number.isFinite(requestedOffset) ? Math.max(0, requestedOffset) : 0,
+      });
+      return c.json({
+        success: true,
+        data: {
+          items: listed.items.map((item) => publicMileageRedemption(item)),
+          pagination: listed.pagination,
+        },
+      });
+    } catch (error) {
+      return mileageRewardError(c, error);
+    }
+  },
+);
+
 scoring.get(
   '/api/mileage/redemptions/:id',
   requireRole('owner', 'admin', 'staff'),
@@ -416,6 +510,19 @@ scoring.post(
       if (!redemption || redemption.lineAccountId !== accountId) {
         return c.json({ success: false, error: '交換履歴が見つかりません' }, 404);
       }
+      /*
+       * 失敗中だけやり直せる。成功済み・返金済みの再実行は二重特典の素、
+       * 予約中・配送中の再実行は最初の配送と競合するので、どちらも断る。
+       * やり直しは同じ交換IDを続け、残高の減算はしない
+       * (deliverMileageReward は予約時の減算に触らない)。
+       */
+      if (redemption.status !== 'delivery_failed') {
+        return c.json({
+          success: false,
+          error: '失敗中の交換だけやり直せます',
+          code: 'redemption_not_retryable',
+        }, 409);
+      }
       const delivery = await deliverMileageReward(c.env.DB, redemption.id, {
         credentialEncryptionKey: c.env.LINE_CREDENTIAL_ENCRYPTION_KEY,
       });
@@ -427,6 +534,78 @@ scoring.post(
     }
   },
 );
+
+scoring.get('/api/mileage/friends', requireRole('owner', 'admin', 'staff'), async (c) => {
+  try {
+    const accountId = c.req.query('accountId')?.trim() ?? '';
+    if (!accountId) return c.json({ success: false, error: 'accountId is required' }, 400);
+    const accountScope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+    if (!accountScope.allowedAccountIds.includes(accountId)) {
+      return c.json({ success: false, error: 'LINE account not found' }, 404);
+    }
+    const requestedLimit = Number(c.req.query('limit') || 20);
+    const requestedOffset = Number(c.req.query('offset') || 0);
+    const data = await getMileageFriendsV6(c.env.DB, {
+      lineAccountId: accountId,
+      visibleAccountIds: accountScope.allowedAccountIds,
+      search: c.req.query('search')?.trim() ?? '',
+      limit: Number.isFinite(requestedLimit) ? Math.min(100, Math.max(1, requestedLimit)) : 20,
+      offset: Number.isFinite(requestedOffset) ? Math.max(0, requestedOffset) : 0,
+    });
+    return c.json({ success: true, data });
+  } catch (error) {
+    return mileageV6Error(c, error);
+  }
+});
+
+scoring.get('/api/mileage/earning-rules', requireRole('owner', 'admin', 'staff'), async (c) => {
+  try {
+    const accountId = c.req.query('accountId')?.trim() ?? '';
+    if (!await canUseMileageAccount(c, accountId)) {
+      return c.json({ success: false, error: 'LINE account not found' }, accountId ? 404 : 400);
+    }
+    const requestedLimit = Number(c.req.query('limit') || 20);
+    const requestedOffset = Number(c.req.query('offset') || 0);
+    const data = await getMileageEarningRulesV6(c.env.DB, {
+      lineAccountId: accountId,
+      limit: Number.isFinite(requestedLimit) ? Math.min(100, Math.max(1, requestedLimit)) : 20,
+      offset: Number.isFinite(requestedOffset) ? Math.max(0, requestedOffset) : 0,
+    });
+    return c.json({ success: true, data });
+  } catch (error) {
+    return mileageV6Error(c, error);
+  }
+});
+
+scoring.patch('/api/mileage/earning-rules/:id/draft', requireRole('owner', 'admin'), async (c) => {
+  try {
+    type Body = { accountId?: unknown; expectedVersion?: unknown; draft?: unknown };
+    const body = await c.req.json<Body>().catch((): Body => ({}));
+    const accountId = typeof body.accountId === 'string' ? body.accountId.trim() : '';
+    if (!await canUseMileageAccount(c, accountId)) {
+      return c.json({ success: false, error: 'LINE account not found' }, accountId ? 404 : 400);
+    }
+    const expectedVersion = body.expectedVersion === null || body.expectedVersion === undefined
+      ? null
+      : Number(body.expectedVersion);
+    if (expectedVersion !== null && (!Number.isInteger(expectedVersion) || expectedVersion < 0)) {
+      return c.json({ success: false, error: 'expectedVersion is invalid' }, 400);
+    }
+    const data = await saveMileageEarningRuleDraft(c.env.DB, {
+      ruleId: c.req.param('id'),
+      lineAccountId: accountId,
+      expectedVersion,
+      draft: body.draft,
+      updatedByStaffId: c.get('staff').id,
+    });
+    auditLog(c, 'mileage.rule.update', {
+      kind: 'mileage_rule', id: c.req.param('id'),
+    });
+    return c.json({ success: true, data });
+  } catch (error) {
+    return mileageV6Error(c, error);
+  }
+});
 
 scoring.get('/api/mileage/overview', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
@@ -493,7 +672,7 @@ scoring.get('/api/mileage/history', requireRole('owner', 'admin', 'staff'), asyn
     }
     const requestedLimit = Number(c.req.query('limit') || 50);
     const requestedOffset = Number(c.req.query('offset') || 0);
-    const history = await getMileageAdminHistory(c.env.DB, {
+    const historyInput = {
       accountId,
       visibleAccountIds: accountScope.allowedAccountIds,
       search: c.req.query('search') || '',
@@ -504,8 +683,16 @@ scoring.get('/api/mileage/history', requireRole('owner', 'admin', 'staff'), asyn
       to: toValue || undefined,
       limit: Number.isFinite(requestedLimit) ? Math.min(100, Math.max(1, requestedLimit)) : 50,
       offset: Number.isFinite(requestedOffset) ? Math.max(0, requestedOffset) : 0,
-    });
-    return c.json({ success: true, data: history });
+    };
+    const [history, summary] = await Promise.all([
+      getMileageAdminHistory(c.env.DB, historyInput),
+      getMileageHistoryPeriodSummary(c.env.DB, {
+        lineAccountId: accountId,
+        from: fromValue || undefined,
+        to: toValue || undefined,
+      }),
+    ]);
+    return c.json({ success: true, data: { ...history, summary } });
   } catch (err) {
     console.error('GET /api/mileage/history error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
@@ -580,6 +767,8 @@ scoring.post(
         reasonCategory?: unknown;
         reason?: unknown;
         sourceReferenceId?: unknown;
+        expiresAt?: unknown;
+        notifyFriend?: unknown;
       }>();
       const accountId = typeof body.accountId === 'string' ? body.accountId.trim() : '';
       const friendId = typeof body.friendId === 'string' ? body.friendId.trim() : '';
@@ -592,6 +781,13 @@ scoring.post(
       const sourceReferenceId = typeof body.sourceReferenceId === 'string'
         ? body.sourceReferenceId.trim()
         : '';
+      if (body.expiresAt !== undefined && body.expiresAt !== null && body.expiresAt !== ''
+        && typeof body.expiresAt !== 'string') {
+        return c.json({ success: false, error: 'expiresAt must be a date-time string' }, 400);
+      }
+      const expiresAtValue = typeof body.expiresAt === 'string' ? body.expiresAt.trim() : '';
+      const expiresAt = expiresAtValue ? new Date(expiresAtValue) : null;
+      const notifyFriend = body.notifyFriend === undefined ? false : body.notifyFriend;
       if (!accountId || !friendId || !direction || !Number.isInteger(amount) || amount <= 0) {
         return c.json({ success: false, error: 'accountId, friendId, direction and a positive integer amount are required' }, 400);
       }
@@ -603,6 +799,15 @@ scoring.post(
       }
       if (!reason || reason.length > 500 || sourceReferenceId.length > 128) {
         return c.json({ success: false, error: 'reason is required and one or more fields are too long' }, 400);
+      }
+      if (typeof notifyFriend !== 'boolean') {
+        return c.json({ success: false, error: 'notifyFriend must be a boolean' }, 400);
+      }
+      if (expiresAt && (Number.isNaN(expiresAt.getTime()) || expiresAt.getTime() <= Date.now())) {
+        return c.json({ success: false, error: 'expiresAt must be a future date-time' }, 400);
+      }
+      if (expiresAt && direction !== 'increase') {
+        return c.json({ success: false, error: 'expiresAt can only be set when increasing mileage' }, 400);
       }
 
       const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
@@ -643,8 +848,29 @@ scoring.post(
         executedByStaffId: staff.id,
         executedByStaffName: staff.name,
         lineAccountId: accountId,
+        expiresAt: expiresAt?.toISOString() ?? null,
+        notifyFriend,
       });
       auditLog(c, 'mileage.adjustment.create', { kind: 'mileage_ledger', id: result.entry.id });
+      const notification = notifyFriend
+        ? await sendMileageAdjustmentNotification(c, {
+            lineAccountId: accountId,
+            friendId,
+            ledgerEntryId: result.entry.id,
+            idempotencyKey,
+            message: mileageAdjustmentMessage({
+              direction,
+              amount,
+              balanceAfter: result.balanceAfter,
+              expiresAt: expiresAt?.toISOString() ?? null,
+            }),
+          }).catch(() => ({
+            id: null,
+            status: 'failed' as const,
+            attemptCount: 0,
+            errorCode: 'notification_record_failed',
+          }))
+        : null;
       return c.json({
         success: true,
         data: {
@@ -653,6 +879,8 @@ scoring.post(
           amount: result.entry.amount,
           balanceAfter: result.balanceAfter,
           replayed: result.replayed,
+          expiresAt: expiresAt?.toISOString() ?? null,
+          notification,
         },
       }, result.replayed ? 200 : 201);
     } catch (err) {
@@ -673,9 +901,12 @@ scoring.post(
   },
 );
 
-scoring.get('/api/mileage/rules', async (c) => {
+scoring.get('/api/mileage/rules', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
-    const rules = await getMileageRules(c.env.DB);
+    const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+    const rules = (await getMileageRules(c.env.DB)).filter((rule) => rule.line_account_id == null
+      ? scope.canSeeUnassigned
+      : scope.allowedAccountIds.includes(rule.line_account_id));
     return c.json({ success: true, data: rules.map(serializeMileageRule) });
   } catch (err) {
     console.error('GET /api/mileage/rules error:', err);
@@ -752,9 +983,17 @@ scoring.post('/api/mileage/rules', requireRole('owner', 'admin'), async (c) => {
       } | null;
       validFrom?: string | null;
       validUntil?: string | null;
+      /** 334(#521): 帰属アカウント。 */
+      lineAccountId?: string;
     }>();
     if (!body.name?.trim() || !body.eventType?.trim() || !Number.isInteger(body.amount) || (body.amount ?? 0) <= 0) {
       return c.json({ success: false, error: 'name, eventType and a positive integer amount are required' }, 400);
+    }
+    if (!body.lineAccountId?.trim()) {
+      return c.json({ success: false, error: 'lineAccountId is required' }, 400);
+    }
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.lineAccountId])) {
+      return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
     }
     const rule = await createMileageRule(c.env.DB, {
       name: body.name.trim(),
@@ -765,6 +1004,7 @@ scoring.post('/api/mileage/rules', requireRole('owner', 'admin'), async (c) => {
       conditions: body.conditions,
       validFrom: body.validFrom ?? null,
       validUntil: body.validUntil ?? null,
+      lineAccountId: body.lineAccountId,
     });
     return c.json({ success: true, data: serializeMileageRule(rule) }, 201);
   } catch (err) {
@@ -796,7 +1036,15 @@ scoring.put('/api/mileage/rules/:id', requireRole('owner', 'admin'), async (c) =
     if (body.amount !== undefined && (!Number.isInteger(body.amount) || body.amount <= 0)) {
       return c.json({ success: false, error: 'amount must be a positive integer' }, 400);
     }
-    const updated = await updateMileageRule(c.env.DB, c.req.param('id'), body);
+    const existing = await getMileageRuleById(c.env.DB, c.req.param('id'));
+    if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
+    if (existing.line_account_id == null) {
+      return c.json({ success: false, error: '全店共通の旧ルールは変更できません' }, 409);
+    }
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [existing.line_account_id])) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
+    const updated = await updateMileageRule(c.env.DB, existing.id, body);
     if (!updated) return c.json({ success: false, error: 'Not found' }, 404);
     return c.json({ success: true, data: serializeMileageRule(updated) });
   } catch (err) {
@@ -810,7 +1058,19 @@ scoring.delete('/api/mileage/rules/:id', requireRole('owner', 'admin'), async (c
   try {
     const existing = await getMileageRuleById(c.env.DB, c.req.param('id'));
     if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
-    await deleteMileageRule(c.env.DB, existing.id);
+    if (existing.line_account_id == null) {
+      return c.json({ success: false, error: '全店共通の旧ルールは削除できません' }, 409);
+    }
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [existing.line_account_id])) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
+    // N-232: 付与履歴がある決めごとは1文の原子DELETEで守る。SELECTとDELETEを分けると
+    // その間に履歴が作られる競合で消せてしまう。0件なら履歴ありとして409で安全拒否し、
+    // 停止(PUT isActive=false)へ誘導する。
+    const deleted = await deleteMileageRule(c.env.DB, existing.id);
+    if (deleted === 0) {
+      return c.json({ success: false, error: '付与履歴があるため削除できません。先に停止してください' }, 409);
+    }
     return c.json({ success: true, data: null });
   } catch (err) {
     console.error('DELETE /api/mileage/rules/:id error:', err);
@@ -938,7 +1198,7 @@ scoring.delete('/api/scoring-rules/:id', requireRole('owner', 'admin'), async (c
 
 // ========== 友だちスコア ==========
 
-scoring.get('/api/friends/:id/score', async (c) => {
+scoring.get('/api/friends/:id/score', requireVisibleFriendForScore, async (c) => {
   try {
     const friendId = c.req.param('id');
     const [score, history] = await Promise.all([
@@ -966,7 +1226,7 @@ scoring.get('/api/friends/:id/score', async (c) => {
 });
 
 // 手動スコア加算
-scoring.post('/api/friends/:id/score', requireRole('owner', 'admin'), async (c) => {
+scoring.post('/api/friends/:id/score', requireRole('owner', 'admin'), requireVisibleFriendForScore, async (c) => {
   try {
     const friendId = c.req.param('id');
     const body = await c.req.json<{ scoreChange: number; reason?: string }>();
