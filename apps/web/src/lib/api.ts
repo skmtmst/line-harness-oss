@@ -9645,6 +9645,15 @@ export interface BookingResource {
   type: string;
   capacity: number;
   isActive: boolean;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+  usage: {
+    menuCount: number;
+    bookingCount: number;
+    exceptionCount: number;
+    referenced: boolean;
+  };
   businessHours: Array<{ start: string; end: string; capacity?: number }>;
   exceptions: BookingException[];
 }
@@ -9829,6 +9838,23 @@ export const bookingApi = {
   listResources: (accountId: string) =>
     fetchApi<{ success: true; data: { resources: BookingResource[] } }>(
       withAccount('/api/booking/admin/resources', accountId),
+    ),
+  createResource: (accountId: string, body: {
+    name: string; type: string; capacity: number; isActive?: boolean;
+  }) => fetchApi<{ success: true; data: BookingResource }>(
+    withAccount('/api/booking/admin/resources', accountId),
+    { method: 'POST', body: JSON.stringify(body) },
+  ),
+  updateResource: (accountId: string, id: string, body: {
+    expectedVersion: number; name?: string; type?: string; capacity?: number; isActive?: boolean;
+  }) => fetchApi<{ success: true; data: BookingResource }>(
+    withAccount(`/api/booking/admin/resources/${id}`, accountId),
+    { method: 'PATCH', body: JSON.stringify(body) },
+  ),
+  deleteResource: (accountId: string, id: string, expectedVersion: number) =>
+    fetchApi<{ success: true; data: { id: string } }>(
+      withAccount(`/api/booking/admin/resources/${id}`, accountId),
+      { method: 'DELETE', body: JSON.stringify({ expectedVersion }) },
     ),
   createException: (
     accountId: string,
