@@ -3,6 +3,7 @@ import {
   completeIdempotencyResponse,
   findIdempotencyResponse,
   purgeExpiredIdempotency,
+  releaseReservedIdempotencyResponse,
   reserveIdempotencyResponse,
   saveIdempotencyResponse,
 } from './booking-idempotency.js';
@@ -70,6 +71,16 @@ function memDB(): { db: D1Database; rows: Map<string, Row> } {
             return { success: true, meta: { changes: 1 } };
           }
           if (sql.startsWith('DELETE')) {
+            if (bound.length === 4) {
+              const [key, accountId, friendId, bookingId] = bound as [string, string, string, string];
+              const row = rows.get(key);
+              const matches = row?.line_account_id === accountId
+                && row.friend_id === friendId
+                && row.response_status === 202
+                && (JSON.parse(row.response_body) as { booking_id?: string }).booking_id === bookingId;
+              if (matches) rows.delete(key);
+              return { success: true, meta: { changes: matches ? 1 : 0 } };
+            }
             const cutoff = String(bound[0]);
             let deleted = 0;
             for (const [key, row] of rows) {
@@ -122,6 +133,27 @@ describe('idempotency', () => {
       status: 201,
       body: { booking_id: 'B1', status: 'confirmed' },
     });
+  });
+
+  test('失敗した予約自身の202だけを解放し、別booking/accountの行は消さない', async () => {
+    const { db, rows } = memDB();
+    await reserveIdempotencyResponse(db, {
+      key: 'admin-failed', lineAccountId: 'A1', friendId: 'F1',
+      body: { error: 'request_in_progress', booking_id: 'B1' },
+      ttlMinutes: 5, now: new Date('2026-05-08T00:00:00Z'),
+    });
+    await releaseReservedIdempotencyResponse(db, {
+      key: 'admin-failed', lineAccountId: 'A1', friendId: 'F1', bookingId: 'other',
+    });
+    expect(rows.has('admin-failed')).toBe(true);
+    await releaseReservedIdempotencyResponse(db, {
+      key: 'admin-failed', lineAccountId: 'A2', friendId: 'F1', bookingId: 'B1',
+    });
+    expect(rows.has('admin-failed')).toBe(true);
+    await releaseReservedIdempotencyResponse(db, {
+      key: 'admin-failed', lineAccountId: 'A1', friendId: 'F1', bookingId: 'B1',
+    });
+    expect(rows.has('admin-failed')).toBe(false);
   });
 
   test('save → find returns same response', async () => {
