@@ -3111,6 +3111,10 @@ export type DashboardOverview = {
   period: 'today' | 'last7' | 'last28'
   /** 集計した時刻。カードごとの基準がずれていないことの手がかり。 */
   generatedAt: string
+  /** 取得に成功した元データのうち最も古い時刻。 */
+  asOf?: string | null
+  /** 元データの鮮度。段階配備中の旧Workerでは未返却。 */
+  freshness?: 'fresh' | 'delayed' | 'stale' | 'unavailable' | 'partial'
   friends: {
     active: number
     total: number
@@ -3154,8 +3158,10 @@ export type DashboardOverview = {
   sections?: Record<
     'friends' | 'inbox' | 'delivery' | 'quota' | 'trend' | 'conversions' | 'operations',
     {
-      status: 'ok' | 'empty' | 'unavailable' | 'stale' | 'estimated'
-      asOf: string
+      status: 'ok' | 'empty' | 'unavailable' | 'stale' | 'estimated' | 'partial'
+      asOf: string | null
+      freshness?: 'fresh' | 'delayed' | 'stale' | 'unavailable' | 'partial'
+      reason?: 'source_failed' | 'fetch_failed' | 'not_connected' | 'not_loaded' | 'not_applicable' | null
       period: 'today' | 'last7' | 'last28' | 'latest' | 'last7-fixed' | 'this-month'
     }
   >

@@ -71,6 +71,13 @@ describe('ダッシュボードV4の初期表示', () => {
     expect(source).toContain('data.metrics.officialProfileUrl.value')
   })
 
+  it('応答生成時刻ではなく取得元の時刻と鮮度を表示する', () => {
+    const source = readFileSync(path.join(process.cwd(), 'src/app/page.tsx'), 'utf8')
+    expect(source).toContain('<DashboardFreshness freshness={data?.freshness} asOf={data?.asOf} />')
+    expect(source).toContain('freshness={section.freshness} asOf={section.asOf}')
+    expect(source).not.toContain('asOf={data?.generatedAt}')
+  })
+
   it('基本QRはAPIのlin.ee短縮URLを優先し、旧WorkerだけbasicIdへ戻す', () => {
     expect(resolveOfficialProfileUrl('https://lin.ee/nen-official', '@nen')).toBe(
       'https://lin.ee/nen-official',
