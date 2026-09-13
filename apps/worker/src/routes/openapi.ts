@@ -1786,6 +1786,67 @@ const spec = {
         responses: { '200': { description: 'OK' } },
       },
     },
+    // ── Booking settings (N-406 #754) ────────────────────────────────────────
+    '/api/booking/admin/settings': {
+      get: {
+        tags: ['Booking'],
+        summary: '店舗共通の予約ルールを取得',
+        description: '設定行がまだ無い店舗は、表示と初回保存に使う version=0 の既定値を返す。この取得ではDB行を作成しない。',
+        parameters: [
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: '店舗共通ルール、メニュー件数、営業時間、例外日' },
+          '403': { description: 'このLINEアカウントを表示する権限がない' },
+          '404': { description: 'LINEアカウントが存在しない' },
+          '503': { description: '設定を取得できない' },
+        },
+      },
+      put: {
+        tags: ['Booking'],
+        summary: '店舗共通の予約ルールを版付きで作成・更新',
+        description: 'expectedVersion=0 は設定行が無い実在店舗だけに初回行を作る。既存行は版一致時だけ更新する。',
+        parameters: [
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: [
+                  'expectedVersion', 'timeZone', 'bookingWindowDays',
+                  'cutoffMinutesBefore', 'cancelDeadlineMinutesBefore',
+                  'maxActiveBookingsPerFriend', 'approvalMode', 'holdMinutes',
+                  'slotGranularityMinutes',
+                ],
+                properties: {
+                  expectedVersion: { type: 'integer', minimum: 0 },
+                  timeZone: { type: 'string', minLength: 1, maxLength: 100 },
+                  bookingWindowDays: { type: 'integer', minimum: 1, maximum: 365 },
+                  cutoffMinutesBefore: { type: 'integer', minimum: 0, maximum: 43200 },
+                  cancelDeadlineMinutesBefore: { type: 'integer', minimum: 0, maximum: 43200 },
+                  maxActiveBookingsPerFriend: { type: 'integer', minimum: 1, maximum: 100 },
+                  approvalMode: { type: 'string', enum: ['automatic', 'manual'] },
+                  holdMinutes: { type: 'integer', minimum: 1, maximum: 1440 },
+                  slotGranularityMinutes: { type: 'integer', enum: [5, 10, 15, 30, 60] },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': { description: 'Updated' },
+          '201': { description: 'Created' },
+          '400': { description: 'Invalid request' },
+          '403': { description: 'Owner or admin role required, or account is outside access scope' },
+          '404': { description: 'LINE account not found' },
+          '409': { description: 'Version conflict' },
+          '503': { description: 'Settings unavailable' },
+        },
+      },
+    },
     // ── Booking staff breaks (N-405 #655) ────────────────────────────────────
     '/api/booking/admin/staff/{id}/breaks': {
       get: {

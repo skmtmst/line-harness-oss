@@ -49,6 +49,14 @@ function bookingErrorMessage(error: unknown, action: '読み込み' | '保存'):
   return `予約メニューを${action}できませんでした。通信状態を確認して、もう一度お試しください。`
 }
 
+function bookingRulesErrorMessage(error: unknown, action: '読み込み' | '保存'): string {
+  if (error instanceof ApiError) {
+    if (error.status === 403) return `予約の基本ルールを${action}する権限がありません。`
+    if (error.status === 409) return 'ほかの担当者が先に保存しました。最新の内容を読み直してから、もう一度変更してください。'
+  }
+  return `予約の基本ルールを${action}できませんでした。通信状態を確認して、もう一度お試しください。`
+}
+
 function supportingDetail(
   hasAccount: boolean,
   state: SupportingLoadState,
@@ -64,6 +72,7 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
   const { selectedAccountId } = useAccount()
   const [items, setItems] = useState<BookingMenu[]>([])
   const [settings, setSettings] = useState<BookingSettings | null>(null)
+  const [settingsError, setSettingsError] = useState<string | null>(null)
   const [editing, setEditing] = useState<BookingMenu | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -78,12 +87,15 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
   const [supportingLoadState, setSupportingLoadState] = useState<SupportingLoadState>('loading')
   const [page, setPage] = useState(1)
   const loadGenerationRef = useRef(0)
+  const selectedAccountIdRef = useRef(selectedAccountId)
+  selectedAccountIdRef.current = selectedAccountId
 
   const load = useCallback(async () => {
     const requestGeneration = ++loadGenerationRef.current
     if (!selectedAccountId) {
       setItems([])
       setSettings(null)
+      setSettingsError(null)
       setMenuStaff(new Map())
       setSupportingLoadState('loading')
       setLoading(false)
@@ -92,6 +104,7 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
     }
     setLoading(true)
     setError(null)
+    setSettingsError(null)
     setSupportingLoadState('loading')
     // アカウント切替時は前 account の menus が表示・操作可能なまま残らないよう
     // 先にクリア。fetch 失敗でも cross-account の操作事故が起きない。
@@ -99,9 +112,14 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
     setSettings(null)
     setMenuStaff(new Map())
     try {
-      const [r, bookingSettingsResponse] = await Promise.all([
+      const [r, bookingSettingsResult] = await Promise.all([
         bookingApi.listMenus(selectedAccountId),
-        bookingApi.getSettings(selectedAccountId).catch(() => null),
+        bookingApi.getSettings(selectedAccountId)
+          .then((response) => ({ response, error: null }))
+          .catch((settingsLoadError: unknown) => ({
+            response: null,
+            error: bookingRulesErrorMessage(settingsLoadError, '読み込み'),
+          })),
       ])
       if (loadGenerationRef.current !== requestGeneration) return
       // 状態撮影や移行途中の口が空の器を返しても、画面全体を落とさず0件として扱う。
@@ -112,7 +130,8 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
         (menu.assigned_staff ?? []).map((person) => person.display_name || person.id),
       ])))
       setSupportingLoadState('ready')
-      setSettings(bookingSettingsResponse?.success ? bookingSettingsResponse.data : null)
+      setSettings(bookingSettingsResult.response?.success ? bookingSettingsResult.response.data : null)
+      setSettingsError(bookingSettingsResult.error)
     } catch (e) {
       if (loadGenerationRef.current !== requestGeneration) return
       setError(bookingErrorMessage(e, '読み込み'))
@@ -266,10 +285,18 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
 
       {activeTab === 'rules' ? (
         <BookingRulesSummary
+          accountId={selectedAccountId}
+          settings={settings}
           items={items}
           loading={loading}
-          error={error}
+          error={error ?? settingsError}
           onRetry={() => void load()}
+          onSaved={(next) => {
+            // 保存中に店舗を切り替えた場合、旧店舗の遅い応答を新店舗へ反映しない。
+            if (selectedAccountIdRef.current !== selectedAccountId) return
+            setSettings(next)
+            setSettingsError(null)
+          }}
         />
       ) : <>
       {!selectedAccountId ? (
@@ -393,15 +420,20 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
   )
 }
 
-function BookingRulesSummary({ items, loading, error, onRetry }: {
+function BookingRulesSummary({ accountId, settings, items, loading, error, onRetry, onSaved }: {
+  accountId: string | null
+  settings: BookingSettings | null
   items: BookingMenu[]
   loading: boolean
   error: string | null
   onRetry: () => void
+  onSaved: (settings: BookingSettings) => void
 }) {
+  if (!accountId) return <ListState kind="empty" title="LINEアカウントを選んでください" description="共通メニューで、基本ルールを設定するLINEアカウントを選んでください。" />
   if (loading) return <ListState kind="loading" description="予約のルールを読み込んでいます。" />
-  if (error) return <ListState kind="error" description={error} onRetry={onRetry} />
-  if (items.length === 0) return <ListState kind="empty" title="確認できる予約のルールがありません" description="メニューを作ると、メニューごとの受付期間・締め切り・キャンセル期限をここで見比べられます。" />
+  if (error || !settings) {
+    return <ListState kind="error" description={error ?? '予約の基本ルールを読み込めませんでした。'} onRetry={onRetry} />
+  }
 
   const rows = [
     { label: '先の予約が取れる範囲', key: 'booking_window_days' as const, unit: '日先まで', none: '制限なし' },
@@ -411,11 +443,21 @@ function BookingRulesSummary({ items, loading, error, onRetry }: {
   return (
     <section data-booking-rules className="space-y-4">
       <div className="bg-accent-soft rounded-card border-accent/30 border p-4">
-        <h2 className="text-ink text-base font-semibold">予約のルールをまとめて確認</h2>
-        <p className="text-ink-secondary mt-1 text-sm">いまはメニューごとに保存されている3つのルールを、ここで横並びに確認できます。</p>
-        <p className="text-ink-faint mt-2 text-xs">店舗共通の初期値を一度で保存するAPIは未接続です。接続後は共通値をここで変更し、各メニューは必要な項目だけ上書きします。</p>
+        <h2 className="text-ink text-base font-semibold">店舗共通の予約ルール</h2>
+        <p className="text-ink-secondary mt-1 text-sm">新しく作るメニューや、個別の指定がないメニューに使う基本値です。</p>
       </div>
-      <div className="bg-canvas rounded-card border-hairline overflow-hidden border">
+      <BookingRulesEditor
+        key={accountId}
+        accountId={accountId}
+        initial={settings}
+        onRetry={onRetry}
+        onSaved={onSaved}
+      />
+      {items.length > 0 && <div className="bg-canvas rounded-card border-hairline overflow-hidden border">
+        <div className="border-hairline border-b px-4 py-3">
+          <h3 className="text-ink text-sm font-semibold">メニューごとの上書き</h3>
+          <p className="text-ink-faint mt-1 text-xs">個別に値を入れたメニューは、下の値が優先されます。</p>
+        </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-canvas-sunken text-ink-secondary">
@@ -431,8 +473,134 @@ function BookingRulesSummary({ items, loading, error, onRetry }: {
             </tbody>
           </table>
         </div>
-      </div>
+      </div>}
     </section>
+  )
+}
+
+function BookingRulesEditor({ accountId, initial, onRetry, onSaved }: {
+  accountId: string
+  initial: BookingSettings
+  onRetry: () => void
+  onSaved: (settings: BookingSettings) => void
+}) {
+  const [draft, setDraft] = useState(initial)
+  const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
+  const [saved, setSaved] = useState(false)
+
+  function set<K extends keyof BookingSettings>(key: K, value: BookingSettings[K]) {
+    setDraft((current) => ({ ...current, [key]: value }))
+    setSaved(false)
+  }
+
+  async function submit() {
+    setSaving(true)
+    setSaveError(null)
+    setSaved(false)
+    try {
+      const response = await bookingApi.saveSettings(accountId, {
+        expectedVersion: draft.version,
+        timeZone: draft.timeZone.trim(),
+        bookingWindowDays: draft.bookingWindowDays,
+        cutoffMinutesBefore: draft.cutoffMinutesBefore,
+        cancelDeadlineMinutesBefore: draft.cancelDeadlineMinutesBefore,
+        maxActiveBookingsPerFriend: draft.maxActiveBookingsPerFriend,
+        approvalMode: draft.approvalMode,
+        holdMinutes: draft.holdMinutes,
+        slotGranularityMinutes: draft.slotGranularityMinutes,
+      })
+      if (!response.success) throw new Error('booking_settings_save_failed')
+      setDraft(response.data)
+      setSaved(true)
+      onSaved(response.data)
+    } catch (saveFailure) {
+      setSaveError(bookingRulesErrorMessage(saveFailure, '保存'))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="bg-canvas rounded-card border-hairline border p-5">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <Field label="タイムゾーン" required>
+          <input
+            aria-label="タイムゾーン"
+            type="text"
+            value={draft.timeZone}
+            onChange={(event) => set('timeZone', event.target.value)}
+            placeholder="Asia/Tokyo"
+            className="border-hairline rounded-control focus:ring-accent w-full border px-3 py-2 text-sm focus:outline-none focus:ring-2"
+          />
+        </Field>
+        <RuleNumberField label="何日先まで受け付けるか" unit="日" min={1} max={365} value={draft.bookingWindowDays} onChange={(value) => set('bookingWindowDays', value)} />
+        <RuleNumberField label="受付の締め切り" unit="分前" min={0} max={43200} value={draft.cutoffMinutesBefore} onChange={(value) => set('cutoffMinutesBefore', value)} />
+        <RuleNumberField label="キャンセルの期限" unit="分前" min={0} max={43200} value={draft.cancelDeadlineMinutesBefore} onChange={(value) => set('cancelDeadlineMinutesBefore', value)} />
+        <RuleNumberField label="1人が同時に持てる予約" unit="件" min={1} max={100} value={draft.maxActiveBookingsPerFriend} onChange={(value) => set('maxActiveBookingsPerFriend', value)} />
+        <Field label="予約の承認" required>
+          <SelectField
+            value={draft.approvalMode}
+            onChange={(event) => set('approvalMode', event.target.value as 'automatic' | 'manual')}
+            options={[{ value: 'automatic', label: '自動で確定' }, { value: 'manual', label: '確認してから確定' }]}
+          />
+        </Field>
+        <RuleNumberField label="仮押さえの保持時間" unit="分" min={1} max={1440} value={draft.holdMinutes} onChange={(value) => set('holdMinutes', value)} />
+        <Field label="予約枠の間隔" required>
+          <SelectField
+            value={String(draft.slotGranularityMinutes)}
+            onChange={(event) => set(
+              'slotGranularityMinutes',
+              Number(event.target.value) as BookingSettings['slotGranularityMinutes'],
+            )}
+            options={[5, 10, 15, 30, 60].map((value) => ({ value: String(value), label: `${value}分` }))}
+          />
+        </Field>
+      </div>
+      <p className="text-ink-faint mt-4 text-xs">0分前は、開始直前まで受け付ける・キャンセルできる設定です。</p>
+      {saveError && (
+        <div className="bg-danger-bg text-danger mt-4 rounded-control p-3 text-sm" role="alert">
+          <p>{saveError}</p>
+          {saveError.includes('先に保存') && <button type="button" onClick={onRetry} className="mt-2 font-semibold underline">最新の内容を読み直す</button>}
+        </div>
+      )}
+      {saved && <p className="text-success mt-4 text-sm font-semibold" role="status">予約の基本ルールを保存しました。</p>}
+      <div className="border-hairline mt-5 flex justify-end border-t pt-4">
+        <Button
+          onClick={() => void submit()}
+          disabled={saving}
+          variant="primary"
+        >
+          {saving ? '保存中…' : initial.version === 0 ? '基本ルールを作成' : '変更を保存'}
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+function RuleNumberField({ label, unit, min, max, value, onChange }: {
+  label: string
+  unit: string
+  min: number
+  max: number
+  value: number
+  onChange: (value: number) => void
+}) {
+  return (
+    <Field label={label} required>
+      <div className="flex items-center gap-2">
+        <input
+          aria-label={label}
+          type="number"
+          min={min}
+          max={max}
+          value={value}
+          onChange={(event) => onChange(Number(event.target.value))}
+          className="border-hairline rounded-control focus:ring-accent w-full border px-3 py-2 text-sm tabular-nums focus:outline-none focus:ring-2"
+        />
+        <span className="text-ink-faint whitespace-nowrap text-xs">{unit}</span>
+      </div>
+    </Field>
   )
 }
 

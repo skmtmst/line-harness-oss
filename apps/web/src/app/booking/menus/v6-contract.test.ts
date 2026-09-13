@@ -22,11 +22,14 @@ describe('V6 予約設定', () => {
     expect(LIST).toContain('休業日')
   })
 
-  it('設計どおり4つの設定入口と、散らばっていた予約ルールの一覧を持つ', () => {
+  it('設計どおり4つの設定入口と、店舗共通・メニュー別の予約ルールを持つ', () => {
     expect(LIST).toContain('受付枠')
     expect(LIST).toContain('休業日')
     expect(LIST).toContain('予約のルール')
-    expect(LIST).toContain('予約のルールをまとめて確認')
+    expect(LIST).toContain('店舗共通の予約ルール')
+    expect(LIST).toContain('bookingApi.saveSettings(accountId, {')
+    expect(LIST).toContain('expectedVersion: draft.version')
+    expect(LIST).toContain('メニューごとの上書き')
     expect(LIST).toContain("key: 'booking_window_days'")
     expect(LIST).toContain("key: 'cutoff_hours_before'")
     expect(LIST).toContain("key: 'cancel_deadline_hours_before'")
