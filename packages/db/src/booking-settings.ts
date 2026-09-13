@@ -53,6 +53,7 @@ export interface BookingAdminSettings {
   menuCount: number;
   activeMenuCount: number;
   inactiveMenuCount: number;
+  businessHoursConfigured: boolean;
   businessHours: Array<{ weekday: number; intervals: BookingInterval[] }>;
   exceptions: BookingAvailabilityException[];
   updatedAt: string;
@@ -67,6 +68,7 @@ export interface BookingAdminSettingsInput {
   approvalMode: 'automatic' | 'manual';
   holdMinutes: number;
   slotGranularityMinutes: 5 | 10 | 15 | 30 | 60;
+  businessHours?: Array<{ weekday: number; intervals: BookingInterval[] }>;
 }
 
 export interface BookingAdminResource {
@@ -148,6 +150,7 @@ export async function getBookingAdminSettings(
         approval_mode: 'automatic' | 'manual';
         hold_minutes: number;
         slot_granularity_minutes: 5 | 10 | 15 | 30 | 60;
+        business_hours_configured: number;
         version: number;
         updated_at: string;
       }>(),
@@ -199,6 +202,7 @@ export async function getBookingAdminSettings(
     menuCount,
     activeMenuCount,
     inactiveMenuCount: Math.max(0, menuCount - activeMenuCount),
+    businessHoursConfigured: setting?.business_hours_configured === 1,
     businessHours: [...grouped.entries()].map(([weekday, intervals]) => ({ weekday, intervals })),
     exceptions: (exceptionResult.results ?? []).map(serializeBookingException),
     updatedAt: setting?.updated_at ?? account.created_at,
@@ -227,16 +231,77 @@ export async function saveBookingAdminSettings(
   const now = jstNow();
   let changed = 0;
   if (input.expectedVersion === 0) {
-    const result = await db.prepare(`INSERT INTO booking_settings
+    const settingsId = crypto.randomUUID();
+    const create = db.prepare(`INSERT INTO booking_settings
       (id, line_account_id, timezone, booking_window_days, cutoff_minutes_before,
        cancel_deadline_minutes_before, max_active_bookings_per_friend,
-       approval_mode, hold_minutes, slot_granularity_minutes, created_at, updated_at)
-      SELECT ?, id, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+       approval_mode, hold_minutes, slot_granularity_minutes, business_hours_configured,
+       created_at, updated_at)
+      SELECT ?, id, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
       FROM line_accounts
       WHERE id = ?
       ON CONFLICT(line_account_id) DO NOTHING`)
       .bind(
-        crypto.randomUUID(),
+        settingsId,
+        input.timeZone,
+        input.bookingWindowDays,
+        input.cutoffMinutesBefore,
+        input.cancelDeadlineMinutesBefore,
+        input.maxActiveBookingsPerFriend,
+        input.approvalMode,
+        input.holdMinutes,
+        input.slotGranularityMinutes,
+        input.businessHours === undefined ? 0 : 1,
+        now,
+        now,
+        input.lineAccountId,
+      );
+    if (input.businessHours === undefined) {
+      const result = await create.run();
+      changed = result.meta.changes ?? 0;
+    } else {
+      const statements: D1PreparedStatement[] = [create];
+      for (const day of input.businessHours) {
+        for (const interval of day.intervals) {
+          statements.push(db.prepare(`INSERT INTO booking_business_hours
+            (id, booking_settings_id, weekday, start_time, end_time, capacity)
+            SELECT ?, id, ?, ?, ?, ? FROM booking_settings
+            WHERE id = ? AND line_account_id = ? AND version = 1`)
+            .bind(
+              crypto.randomUUID(), day.weekday, interval.start, interval.end,
+              interval.capacity ?? 1, settingsId, input.lineAccountId,
+            ));
+        }
+      }
+      const results = await db.batch(statements);
+      changed = results[0]?.meta.changes ?? 0;
+    }
+  } else if (input.businessHours !== undefined) {
+    const statements: D1PreparedStatement[] = [
+      db.prepare(`DELETE FROM booking_business_hours
+        WHERE booking_settings_id IN (
+          SELECT id FROM booking_settings WHERE line_account_id = ? AND version = ?
+        )`).bind(input.lineAccountId, input.expectedVersion),
+    ];
+    for (const day of input.businessHours) {
+      for (const interval of day.intervals) {
+        statements.push(db.prepare(`INSERT INTO booking_business_hours
+          (id, booking_settings_id, weekday, start_time, end_time, capacity)
+          SELECT ?, id, ?, ?, ?, ? FROM booking_settings
+          WHERE line_account_id = ? AND version = ?`)
+          .bind(
+            crypto.randomUUID(), day.weekday, interval.start, interval.end,
+            interval.capacity ?? 1, input.lineAccountId, input.expectedVersion,
+          ));
+      }
+    }
+    statements.push(db.prepare(`UPDATE booking_settings
+      SET timezone = ?, booking_window_days = ?, cutoff_minutes_before = ?,
+          cancel_deadline_minutes_before = ?, max_active_bookings_per_friend = ?,
+          approval_mode = ?, hold_minutes = ?, slot_granularity_minutes = ?,
+          business_hours_configured = 1, version = version + 1, updated_at = ?
+      WHERE line_account_id = ? AND version = ?`)
+      .bind(
         input.timeZone,
         input.bookingWindowDays,
         input.cutoffMinutesBefore,
@@ -246,11 +311,11 @@ export async function saveBookingAdminSettings(
         input.holdMinutes,
         input.slotGranularityMinutes,
         now,
-        now,
         input.lineAccountId,
-      )
-      .run();
-    changed = result.meta.changes ?? 0;
+        input.expectedVersion,
+      ));
+    const results = await db.batch(statements);
+    changed = results[results.length - 1]?.meta.changes ?? 0;
   } else {
     const result = await db.prepare(`UPDATE booking_settings
       SET timezone = ?, booking_window_days = ?, cutoff_minutes_before = ?,

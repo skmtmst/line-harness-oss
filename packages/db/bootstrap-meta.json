@@ -348,7 +348,8 @@
     "387_tenant_billing.sql",
     "388_email_password_auth.sql",
     "389_banner_reference_image.sql",
-    "390_form_published_versions.sql"
+    "390_form_published_versions.sql",
+    "391_booking_business_hours_configured.sql"
   ],
-  "migrationCount": 349
+  "migrationCount": 350
 }
