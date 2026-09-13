@@ -11,9 +11,9 @@
 export type CheckState = 'passed' | 'failed' | 'skipped'
 
 export interface CheckStep {
-  /** 設計の番号（1〜4）。 */
+  /** 設計の番号（1〜5）。 */
   order: number
-  label: string
+  message: string
   state: CheckState
 }
 
@@ -25,14 +25,7 @@ export const CHECK_STATE_LABEL: Record<CheckState, string> = {
 }
 
 /** 接続確認の返事。`api.lineAccounts.verifyConnection` の形。 */
-export interface VerifyResult {
-  messagingApi: boolean
-  webhook: boolean
-  lineLogin: boolean
-  liff: boolean
-  webhookUrl: string | null
-  errors: string[]
-}
+export interface VerifyResult { steps: CheckStep[] }
 
 /**
  * 返事を設計の 4 段に並べ直す。
@@ -41,37 +34,17 @@ export interface VerifyResult {
  * 4 つあるように見えてしまう。実際に直すのは止まった 1 つだけ。
  */
 export function toSteps(result: VerifyResult | null): CheckStep[] {
-  const labels = [
-    'LoginチャネルID・シークレット・LIFF IDの形',
-    'アクセストークンが使えるか',
-    'LINE側に登録したWebhookのURLと、利用する設定',
-    'Webhookに実際に届くかのテスト',
+  const messages = [
+    'チャネルIDとシークレットでアクセストークンを発行',
+    '公式アカウントの名前とアイコンを取得',
+    'Webhook URLを登録して、実際に届くかテスト',
+    'LINE Loginチャネルを確認して、LIFFアプリを作成',
+    '認証済みアカウントかを判定',
   ]
   if (!result) {
-    return labels.map((label, i) => ({ order: i + 1, label, state: 'skipped' as const }))
+    return messages.map((message, i) => ({ order: i + 1, message, state: 'skipped' as const }))
   }
-  const passes = [
-    result.lineLogin && result.liff,
-    result.messagingApi,
-    result.webhook,
-    // webhook=true はURL一致・利用設定・LINEの接続テストまで通った結果。
-    result.webhook,
-  ]
-  const steps: CheckStep[] = []
-  let stopped = false
-  labels.forEach((label, i) => {
-    if (stopped) {
-      steps.push({ order: i + 1, label, state: 'skipped' })
-      return
-    }
-    if (passes[i]) {
-      steps.push({ order: i + 1, label, state: 'passed' })
-      return
-    }
-    steps.push({ order: i + 1, label, state: 'failed' })
-    stopped = true
-  })
-  return steps
+  return result.steps.map((item) => ({ ...item }))
 }
 
 /** 止まった段。通っていれば null。 */
@@ -79,7 +52,7 @@ export function stoppedAt(steps: CheckStep[]): CheckStep | null {
   return steps.find((s) => s.state === 'failed') ?? null
 }
 
-/** 保存してよいか。4段すべて通ったときだけ保存する。 */
+/** 保存してよいか。5段すべて通ったときだけ保存する。 */
 export function canSave(steps: CheckStep[]): boolean {
   return steps.every((s) => s.state === 'passed')
 }
