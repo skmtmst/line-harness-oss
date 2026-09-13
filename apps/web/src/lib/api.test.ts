@@ -54,6 +54,24 @@ describe('bookingApi 予約設備CRUD', () => {
       method: 'DELETE', body: JSON.stringify({ expectedVersion: 4 }),
     })
   })
+
+  it('メニュー資源割当をaccount・menu・version付きPUTで送る', async () => {
+    const fetchSpy = vi.fn(async () => new Response(
+      JSON.stringify({ success: true, data: { id: 'menu/1', version: 4, resources: [] } }),
+      { status: 200, headers: { 'content-type': 'application/json' } },
+    ))
+    vi.stubGlobal('fetch', fetchSpy)
+    await bookingApi.saveMenuResources('account/1', 'menu/1', {
+      expectedVersion: 3, resources: [{ resourceId: 'room/1', quantity: 2 }],
+    })
+    expect(fetchSpy).toHaveBeenCalledWith(
+      'https://worker.example.com/api/booking/admin/menus/menu/1/resources?account_id=account%2F1',
+      expect.objectContaining({
+        method: 'PUT',
+        body: JSON.stringify({ expectedVersion: 3, resources: [{ resourceId: 'room/1', quantity: 2 }] }),
+      }),
+    )
+  })
 })
 
 describe('api.nenMembers の写真審査運用契約', () => {

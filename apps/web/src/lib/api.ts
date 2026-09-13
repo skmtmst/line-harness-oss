@@ -9443,6 +9443,8 @@ export interface BookingMenu {
   intake_question?: string | null;
   /** 一覧と同じ応答で返す担当。メニュー件数ぶんの追加通信をしない。 */
   assigned_staff?: Array<{ id: string; display_name: string }>;
+  /** 1予約で消費する共有設備。停止済みも警告表示のため残して返す。 */
+  assigned_resources?: BookingMenuResourceAssignment[];
   /** 個人情報を含む予約明細ではなく、Workerで集計した直近30日の件数。 */
   booking_count_30_days?: number;
   effectiveBookingRules?: {
@@ -9455,6 +9457,17 @@ export interface BookingMenu {
       cancelDeadlineMinutesBefore: 'store' | 'menu';
     };
   };
+}
+
+export interface BookingMenuResourceAssignment {
+  menuId: string;
+  resourceId: string;
+  name: string;
+  type: string;
+  capacity: number;
+  quantity: number;
+  isActive: boolean;
+  warning: 'resource_inactive' | 'capacity_exceeded' | null;
 }
 
 export interface BookingException {
@@ -9918,6 +9931,16 @@ export const bookingApi = {
       method: 'PUT',
       body: JSON.stringify(body),
     }),
+  saveMenuResources: (
+    accountId: string,
+    id: string,
+    body: { expectedVersion: number; resources: Array<{ resourceId: string; quantity: number }> },
+  ) => fetchApi<{
+    success: true;
+    data: { id: string; version: number; resources: Array<{ resourceId: string; quantity: number }> };
+  }>(withAccount(`/api/booking/admin/menus/${id}/resources`, accountId), {
+    method: 'PUT', body: JSON.stringify(body),
+  }),
   patchMenu: (
     accountId: string,
     id: string,

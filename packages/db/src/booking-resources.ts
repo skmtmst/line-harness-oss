@@ -4,6 +4,7 @@ export type BookingResourceUpdateResult =
   | { status: 'updated'; version?: number; item?: BookingResourceRecord }
   | { status: 'not_found' }
   | { status: 'version_conflict'; currentVersion: number }
+  | { status: 'assignment_conflict'; requiredQuantity: number }
   | { status: 'capacity_conflict'; peakQuantity: number };
 
 export interface BookingResourceRecord {
@@ -101,6 +102,10 @@ export async function updateBookingResourceSafely(
       WHERE id = ? AND line_account_id = ?
         ${versionWhere}
         AND (? = 0 OR NOT EXISTS (
+          SELECT 1 FROM booking_menu_resources
+           WHERE resource_id = ? AND quantity > ?
+        ))
+        AND (? = 0 OR NOT EXISTS (
           SELECT 1
           FROM (
             SELECT ? AS point
@@ -134,6 +139,9 @@ export async function updateBookingResourceSafely(
     input.resourceId,
     input.lineAccountId,
     ...(input.expectedVersion === undefined ? [] : [input.expectedVersion]),
+    active,
+    input.resourceId,
+    input.capacity,
     active,
     nowIso,
     input.lineAccountId,
@@ -196,7 +204,17 @@ export async function updateBookingResourceSafely(
     input.resourceId,
     nowIso,
   ).first<{ peak_quantity: number }>();
-  return { status: 'capacity_conflict', peakQuantity: Number(peak?.peak_quantity ?? 0) };
+  const peakQuantity = Number(peak?.peak_quantity ?? 0);
+  if (peakQuantity > input.capacity) return { status: 'capacity_conflict', peakQuantity };
+
+  const assignment = await db.prepare(`SELECT COALESCE(MAX(quantity), 0) AS required_quantity
+    FROM booking_menu_resources WHERE resource_id = ?`)
+    .bind(input.resourceId)
+    .first<{ required_quantity: number }>();
+  return {
+    status: 'assignment_conflict',
+    requiredQuantity: Number(assignment?.required_quantity ?? 0),
+  };
 }
 
 export type BookingResourceDeleteResult =

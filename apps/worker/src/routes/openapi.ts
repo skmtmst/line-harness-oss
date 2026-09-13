@@ -1901,7 +1901,7 @@ const spec = {
     '/api/booking/admin/resources/{id}': {
       patch: {
         tags: ['Booking'], summary: '予約設備を版付きで変更・停止・再開',
-        description: '稼働中の設備は将来予約の最大同時使用量を下回るcapacityへ縮小できない。停止は既存予約を残して新規受付だけを閉じる。',
+        description: '稼働中の設備は、将来予約の最大同時使用量またはメニュー割当の必要数を下回るcapacityへ縮小できない。メニュー割当が競合する場合は、先にメニュー側の設備割当を変更する。停止は既存予約を残して新規受付だけを閉じる。',
         parameters: [
           { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
           { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
@@ -1926,7 +1926,7 @@ const spec = {
           '200': { description: '変更済み設備' }, '400': { description: 'Invalid request' },
           '403': { description: 'Owner or admin role required, or account is outside access scope' },
           '404': { description: '設備が存在しない' },
-          '409': { description: '版競合または使用中のcapacity縮小' },
+          '409': { description: '版競合、予約使用量を下回る縮小、またはメニュー割当の必要数を下回る縮小（先にメニュー割当を変更）' },
           '503': { description: '設備を変更できない' },
         },
       },
@@ -1947,6 +1947,40 @@ const spec = {
           '404': { description: '設備が存在しない' },
           '409': { description: '版競合または参照中' },
           '503': { description: '設備を削除できない' },
+        },
+      },
+    },
+    '/api/booking/admin/menus/{id}/resources': {
+      put: {
+        tags: ['Booking'], summary: '予約メニューへ必要な設備と数量を版付きで一括割当',
+        description: '割当全体を原子的に置換する。停止中・別アカウント・不存在の設備は同じエラーで拒否し、既存予約の設備snapshotは変更しない。',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        requestBody: { required: true, content: { 'application/json': { schema: {
+          type: 'object', additionalProperties: false, required: ['expectedVersion', 'resources'],
+          properties: {
+            expectedVersion: { type: 'integer', minimum: 1 },
+            resources: {
+              type: 'array', maxItems: 30, uniqueItems: true,
+              items: {
+                type: 'object', additionalProperties: false, required: ['resourceId', 'quantity'],
+                properties: {
+                  resourceId: { type: 'string', minLength: 1 },
+                  quantity: { type: 'integer', minimum: 1, maximum: 1000 },
+                },
+              },
+            },
+          },
+        } } } },
+        responses: {
+          '200': { description: '更新後のメニュー版と、この保存で確定した割当' },
+          '400': { description: '入力不備、または設備を利用できない' },
+          '403': { description: 'Owner or admin role required, or account is outside access scope' },
+          '404': { description: '対象アカウントにメニューが存在しない' },
+          '409': { description: 'メニュー版が更新済み' },
+          '503': { description: '設備割当を保存できない' },
         },
       },
     },
