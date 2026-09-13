@@ -92,8 +92,7 @@ export default function HqAccountMenu() {
           role="menu"
           aria-label="アカウントメニュー"
           data-design-node="bfhe6"
-          className="absolute bottom-full left-2 z-30 mb-2 flex flex-col rounded-panel border border-hairline bg-canvas shadow-card"
-          style={{ width: 300 }}
+          className="absolute bottom-full left-0 z-30 mb-2 flex w-full flex-col rounded-panel border border-hairline bg-canvas shadow-card"
         >
           <div className="flex flex-col gap-1 px-4 pb-3 pt-4">
             <p className="text-body font-bold text-ink">{name}</p>
