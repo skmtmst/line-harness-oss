@@ -1,7 +1,8 @@
 'use client'
 
-import { Plus, Sparkles, X } from 'lucide-react'
-import { useId, type ReactNode } from 'react'
+import { Images, Plus, Sparkles, Upload, X } from 'lucide-react'
+import { useId, useRef, type ReactNode } from 'react'
+import Button from '@/components/shared/button'
 import SelectField from '@/components/shared/select-field'
 import { TextArea, TextField } from '@/components/shared/text-field'
 import {
@@ -14,14 +15,16 @@ import {
   groupPresets,
   isHexColor,
   presetOptionLabel,
+  tileCaption,
   type BannerGenerationInput,
+  type BannerImage,
   type BannerPreset,
 } from '@/lib/hq-banners'
 
 /**
- * 右 390px の生成パネル。Pencil 35-2 `UKR6a`。
+ * 右 390px の生成パネル。Pencil 35-2 `GcJHv`（2026-09-13 に参照画像欄を足して作り直し）。
  *
- * 運用者に見せるのは「用途・テキスト・色・人物・追加の指示・枚数」だけ。
+ * 運用者に見せるのは「用途・参照画像・テキスト・色・人物・追加の指示・枚数」だけ。
  * 品質やクレジットの選択は置かない（2026-09-12 決定、`docs/hq-banner-generation.md`）。
  *
  * 単一選択（モード・人物・枚数・色の見本）は radio で組む。見た目は label が持つ。
@@ -32,14 +35,26 @@ export default function GenerationPanel({
   value,
   onChange,
   disabled,
+  reference,
+  onPickReference,
+  onUploadReference,
+  referenceBusy,
 }: {
   presets: BannerPreset[]
   maxCount: number
   value: BannerGenerationInput
   onChange: (next: BannerGenerationInput) => void
   disabled?: boolean
+  /** 選んでいる参照画像（`value.referenceImageId` の実体）。無ければ null。 */
+  reference: BannerImage | null
+  /** 「ライブラリから選ぶ」。親が 35-2-B のダイアログを開く。 */
+  onPickReference: () => void
+  /** 「ファイルを選ぶ」。親がプロジェクトへ取り込んでから参照にする。 */
+  onUploadReference: (file: File) => void
+  referenceBusy?: boolean
 }) {
   const uid = useId()
+  const fileRef = useRef<HTMLInputElement | null>(null)
   const set = <K extends keyof BannerGenerationInput>(key: K, next: BannerGenerationInput[K]) =>
     onChange({ ...value, [key]: next })
 
@@ -50,7 +65,7 @@ export default function GenerationPanel({
 
   return (
     <aside
-      data-design-node="UKR6a"
+      data-design-node="GcJHv"
       className="flex w-full shrink-0 flex-col self-start rounded-card border border-hairline bg-canvas xl:sticky xl:top-4"
       style={{ maxWidth: 390 }}
       aria-label="画像を生成"
@@ -77,7 +92,7 @@ export default function GenerationPanel({
       </div>
       <div className="border-t border-hairline" />
 
-      <div data-design-node="E82WuU" className="flex flex-col gap-4 p-4">
+      <div data-design-node="E8oZc" className="flex flex-col gap-4 p-4">
         <Field label="用途" note="LINE と SNS の規格から選ぶ" htmlFor={`${uid}-preset`}>
           <SelectField
             id={`${uid}-preset`}
@@ -89,6 +104,61 @@ export default function GenerationPanel({
             options={value.presetKey ? presetOptions : [{ value: '', label: '用途を選んでください' }, ...presetOptions]}
           />
           {selectedPreset ? <p className="text-micro text-ink-faint">{selectedPreset.note}</p> : null}
+        </Field>
+
+        <Field label="参照画像" note="任意・元にする画像を1枚">
+          <div data-design-node="jZi2W" className="flex flex-col gap-2">
+            {reference ? (
+              <>
+                <div data-design-node="hGpey" className="flex items-center gap-3 rounded-control border border-hairline bg-surface-pearl px-3 py-2.5">
+                  {/* 統括の画像は Worker から配信されるので next/image の最適化は使わない（image-tile と同じ） */}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={reference.media.url} alt="" className="h-14 w-14 shrink-0 rounded-mini bg-step-idle object-cover" />
+                  <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                    <p className="truncate text-label font-bold text-ink">{referenceTitle(reference)}</p>
+                    <p className="truncate text-micro text-ink-faint">{tileCaption(reference, presets)}</p>
+                  </div>
+                  <Button disabled={disabled || referenceBusy} onClick={() => set('referenceImageId', null)}>
+                    外す
+                  </Button>
+                </div>
+                <fieldset data-design-node="RPm7W" className="grid grid-cols-2 gap-1.5" disabled={disabled}>
+                  <legend className="sr-only">参照画像の使い方</legend>
+                  <SegmentOption name={`${uid}-ref`} checked={value.referenceMode === 'edit'} onSelect={() => set('referenceMode', 'edit')} label="土台に描き直す" />
+                  <SegmentOption name={`${uid}-ref`} checked={value.referenceMode === 'inspire'} onSelect={() => set('referenceMode', 'inspire')} label="雰囲気を参考にする" />
+                </fieldset>
+                <p className="text-micro text-ink-faint">
+                  描き直す: 構図と配色を保ったまま、文字や背景を指示で変えます。参考にする: 色やトーンだけ引き継いで新しく作ります。
+                </p>
+              </>
+            ) : (
+              <>
+                <div className="grid grid-cols-2 gap-2">
+                  <Button disabled={disabled || referenceBusy} onClick={onPickReference} className="w-full">
+                    <Images aria-hidden="true" className="h-4 w-4" />
+                    ライブラリから選ぶ
+                  </Button>
+                  <Button disabled={disabled || referenceBusy} onClick={() => fileRef.current?.click()} className="w-full">
+                    <Upload aria-hidden="true" className="h-4 w-4" />
+                    {referenceBusy ? '取り込んでいます…' : 'ファイルを選ぶ'}
+                  </Button>
+                  <input
+                    ref={fileRef}
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    className="sr-only"
+                    aria-label="参照画像のファイルを選ぶ"
+                    onChange={(event) => {
+                      const file = event.target.files?.[0]
+                      event.target.value = ''
+                      if (file) onUploadReference(file)
+                    }}
+                  />
+                </div>
+                <p className="text-micro text-ink-faint">ライブラリの画像か、手元の画像（PNG・JPEG・WebP、10MB まで）を 1 枚選べます。</p>
+              </>
+            )}
+          </div>
         </Field>
 
         {value.mode === 'banner' ? (
@@ -212,6 +282,11 @@ export default function GenerationPanel({
       </div>
     </aside>
   )
+}
+
+/** 参照画像の見出し。ファイル名から拡張子を落とす（「春のキャンペーン-1」「chirashi」）。 */
+function referenceTitle(image: BannerImage): string {
+  return image.media.filename.replace(/\.[a-z0-9]+$/i, '') || '画像'
 }
 
 function Field({

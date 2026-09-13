@@ -21,6 +21,8 @@ export const BANNER_PERSON_OPTIONS = ['with', 'without'] as const;
 export type BannerPersonOption = (typeof BANNER_PERSON_OPTIONS)[number];
 
 export const BANNER_IMAGE_SOURCES = ['generated', 'upload', 'edited'] as const;
+export type BannerReferenceMode = 'edit' | 'inspire';
+
 export type BannerImageSource = (typeof BANNER_IMAGE_SOURCES)[number];
 
 export interface BannerProject {
@@ -63,6 +65,8 @@ export interface BannerGeneration {
   failed_count: number;
   units_per_image: number;
   error_message: string | null;
+  reference_image_id?: string | null;
+  reference_mode?: BannerReferenceMode | null;
   created_by: string | null;
   created_at: string;
   started_at: string | null;
@@ -215,6 +219,8 @@ export async function createBannerGeneration(
     modelName: string | null;
     requestedCount: number;
     unitsPerImage: number;
+    referenceImageId?: string | null;
+    referenceMode?: BannerReferenceMode | null;
     createdBy?: string | null;
   },
 ): Promise<BannerGeneration> {
@@ -225,8 +231,8 @@ export async function createBannerGeneration(
          (id, tenant_id, project_id, status, mode, preset_key, aspect_ratio, api_size, quality,
           text_lines, main_color, sub_color, person_option, custom_prompt, free_prompt, final_prompt,
           engine, model_name, requested_count, done_count, failed_count, units_per_image,
-          error_message, created_by, created_at)
-       VALUES (?, ?, ?, 'queued', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?, NULL, ?, ?)`,
+          error_message, reference_image_id, reference_mode, created_by, created_at)
+       VALUES (?, ?, ?, 'queued', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?, NULL, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -248,6 +254,8 @@ export async function createBannerGeneration(
       input.modelName,
       input.requestedCount,
       input.unitsPerImage,
+      input.referenceImageId ?? null,
+      input.referenceImageId ? (input.referenceMode ?? 'inspire') : null,
       input.createdBy ?? null,
       jstNow(),
     )

@@ -7,6 +7,7 @@ import GenerationPanel from '@/components/hq/banners/generation-panel'
 import ImageDetailModal from '@/components/hq/banners/image-detail-modal'
 import ImageTile, { PendingTile } from '@/components/hq/banners/image-tile'
 import ProjectFormDialog from '@/components/hq/banners/project-form-dialog'
+import ReferencePickerDialog from '@/components/hq/banners/reference-picker-dialog'
 import UploadButton from '@/components/hq/banners/upload-button'
 import Breadcrumb from '@/components/shared/breadcrumb'
 import Button from '@/components/shared/button'
@@ -22,6 +23,7 @@ import {
   activeGeneration,
   inputFromGeneration,
   progressBadgeText,
+  readFileAsBase64,
   usageRefusal,
   usageStatusText,
   validateGenerationInput,
@@ -80,6 +82,11 @@ function ProjectInner() {
   const [formError, setFormError] = useState('')
   const [archiveConfirm, setArchiveConfirm] = useState(false)
   const [busyAction, setBusyAction] = useState<string | null>(null)
+  // 参照画像（★V6 35-2 / 35-2-B）。実体は一覧かライブラリから引く。他プロジェクトの画像はここに置く。
+  const [referenceImage, setReferenceImage] = useState<BannerImage | null>(null)
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const [referenceBusy, setReferenceBusy] = useState(false)
+  const [allProjects, setAllProjects] = useState<BannerProject[]>([])
   const cancelRef = useRef(false)
   const loopRef = useRef<string | null>(null)
   const panelRef = useRef<HTMLDivElement>(null)
@@ -313,7 +320,52 @@ function ProjectInner() {
     if (!res.success) throw new Error(res.error)
     setImages((prev) => [res.data, ...prev])
     setProject((p) => (p ? { ...p, imageCount: p.imageCount + 1 } : p))
+    return res.data
   }
+
+  /** 参照画像として使う。実体を手元に置き、パネルの入力に ID を入れる。 */
+  const applyReference = (image: BannerImage) => {
+    setReferenceImage(image)
+    setInput((cur) => ({ ...cur, referenceImageId: image.id }))
+    setPickerOpen(false)
+  }
+
+  /** 手元のファイルを参照にする: プロジェクトへ取り込んでから参照にする（画像はライブラリにも残る）。 */
+  const uploadReference = async (file: File) => {
+    if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) {
+      setGenerationError('参照画像は PNG・JPEG・WebP のみ使えます')
+      return
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      setGenerationError('ファイルが大きすぎます（上限 10MB）')
+      return
+    }
+    setReferenceBusy(true)
+    setGenerationError('')
+    try {
+      const data = await readFileAsBase64(file)
+      const uploaded = await upload({ filename: file.name, mimeType: file.type, data })
+      if (uploaded) applyReference(uploaded)
+    } catch (caught) {
+      setGenerationError(caught instanceof Error && caught.message ? caught.message : '画像を取り込めませんでした')
+    } finally {
+      setReferenceBusy(false)
+    }
+  }
+
+  const openPicker = () => {
+    setPickerOpen(true)
+    if (allProjects.length === 0) {
+      void api.hqBanners.projects.list().then((res) => {
+        if (res.success) setAllProjects(res.data)
+      }).catch(() => undefined)
+    }
+  }
+
+  // 入力の参照 ID に合う実体。一覧に無ければ（他プロジェクト）手元の実体を使う。ID が消えたら実体も消す。
+  const reference = input.referenceImageId
+    ? images.find((i) => i.id === input.referenceImageId) ?? (referenceImage?.id === input.referenceImageId ? referenceImage : null)
+    : null
 
   const pendingCount = running ? Math.max(running.requestedCount - running.doneCount - running.failedCount, 0) : 0
   const visible = useMemo(
@@ -360,7 +412,9 @@ function ProjectInner() {
         <span className="flex-1" />
         <UploadButton
           disabled={busy || Boolean(project.archivedAt)}
-          onUpload={upload}
+          onUpload={async (file) => {
+            await upload(file)
+          }}
           onError={setActionError}
         />
         <Button
@@ -458,6 +512,10 @@ function ProjectInner() {
             value={input}
             onChange={setInput}
             disabled={Boolean(running) || Boolean(project.archivedAt) || !engineReady}
+            reference={reference}
+            onPickReference={openPicker}
+            onUploadReference={(file) => void uploadReference(file)}
+            referenceBusy={referenceBusy}
           />
         </div>
       </div>
@@ -566,8 +624,27 @@ function ProjectInner() {
                 }
               : undefined
           }
+          onUseAsReference={() => {
+            applyReference(openImage)
+            setOpenImage(null)
+            panelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+          }}
         />
       ) : null}
+
+      <ReferencePickerDialog
+        open={pickerOpen}
+        projectId={project.id}
+        presets={presets}
+        projects={allProjects.length > 0 ? allProjects : [project]}
+        selectedId={input.referenceImageId}
+        onClose={() => setPickerOpen(false)}
+        onPick={applyReference}
+        onUpload={(file) => {
+          setPickerOpen(false)
+          void uploadReference(file)
+        }}
+      />
     </div>
   )
 }

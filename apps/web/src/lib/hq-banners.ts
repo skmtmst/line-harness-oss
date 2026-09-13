@@ -65,6 +65,8 @@ export interface BannerProject {
 export type BannerGenerationStatus = 'queued' | 'running' | 'done' | 'failed' | 'canceled'
 export type BannerMode = 'banner' | 'free'
 export type BannerPersonOption = 'with' | 'without'
+/** 参照画像の使い方（★V6 35-2）。edit=土台に描き直す、inspire=雰囲気を参考にする。 */
+export type BannerReferenceMode = 'edit' | 'inspire'
 
 export interface BannerGeneration {
   id: string
@@ -89,6 +91,8 @@ export interface BannerGeneration {
   failedCount: number
   unitsPerImage: number
   errorMessage: string | null
+  referenceImageId?: string | null
+  referenceMode?: BannerReferenceMode | null
   createdBy: string | null
   createdAt: string
   startedAt: string | null
@@ -150,6 +154,9 @@ export interface BannerGenerationInput {
   customPrompt: string
   freePrompt: string
   count: number
+  /** 参照画像（ライブラリの画像 ID）。無ければ null。 */
+  referenceImageId: string | null
+  referenceMode: BannerReferenceMode
 }
 
 /** 生成パネルの初期値。用途は一覧の先頭を画面側で入れる。 */
@@ -163,6 +170,8 @@ export const EMPTY_GENERATION_INPUT: BannerGenerationInput = {
   customPrompt: '',
   freePrompt: '',
   count: 1,
+  referenceImageId: null,
+  referenceMode: 'edit',
 }
 
 /** 見本の色。Pencil 35-2 `h5eMj` / `fRYho` のとおり。 */
@@ -192,7 +201,11 @@ export function validateGenerationInput(
   }
   if (input.mode === 'banner') {
     const lines = input.textLines.map((line) => line.trim()).filter(Boolean)
-    if (lines.length === 0) return '画像に入れるテキストを1行以上入力してください'
+    // 「土台に描き直す」は指示だけでも成り立つ（文字を入れない差し替えもある）。
+    const editing = Boolean(input.referenceImageId) && input.referenceMode === 'edit'
+    if (lines.length === 0 && !(editing && input.customPrompt.trim())) {
+      return editing ? '描き直しの指示（追加の指示）か、画像に入れるテキストを入力してください' : '画像に入れるテキストを1行以上入力してください'
+    }
     if (lines.length > TEXT_LINE_MAX) return `テキストは${TEXT_LINE_MAX}行までです`
     if (lines.some((line) => line.length > TEXT_LINE_LENGTH_MAX)) {
       return `テキストは1行${TEXT_LINE_LENGTH_MAX}文字までです`
@@ -391,6 +404,9 @@ export function generationConditionRows(
     rows.push({ label: '人物', value: g.personOption === 'with' ? '入れる' : '入れない' })
     rows.push({ label: '追加の指示', value: g.customPrompt || '（なし）' })
   }
+  if (g.referenceImageId) {
+    rows.push({ label: '参照画像', value: g.referenceMode === 'edit' ? '土台に描き直す' : '雰囲気を参考にする' })
+  }
   rows.push({ label: '作成', value: shortDateTime(image.createdAt) })
   return rows
 }
@@ -407,6 +423,8 @@ export function inputFromGeneration(g: BannerGeneration): BannerGenerationInput 
     customPrompt: g.customPrompt ?? '',
     freePrompt: g.freePrompt ?? '',
     count: 1,
+    referenceImageId: g.referenceImageId ?? null,
+    referenceMode: g.referenceMode ?? 'edit',
   }
 }
 

@@ -77,9 +77,13 @@ export function isHexColor(value: unknown): value is string {
   return typeof value === 'string' && HEX_COLOR.test(value);
 }
 
+export type BannerReferenceMode = 'edit' | 'inspire';
+
 export interface BannerPromptInput {
   mode: BannerMode;
   preset: BannerPreset;
+  /** 参照画像の使い方。参照画像が無いときは null。 */
+  referenceMode?: BannerReferenceMode | null;
   textLines: string[];
   mainColor: string | null;
   subColor: string | null;
@@ -98,6 +102,13 @@ const ROLE_HINTS = ['メインのキャッチコピー', 'サブコピー', '訴
  */
 export function buildBannerPrompt(input: BannerPromptInput): string {
   const parts: string[] = [];
+
+  // 参照画像（★V6 35-2）。添えた画像をどう扱うかを最初に言い切る。
+  if (input.referenceMode === 'edit') {
+    parts.push('添付した画像を土台にして描き直してください。構図・配色・雰囲気・主役の配置は元の画像を保ち、下の指示にある部分だけを変えてください。指示に無い要素は増やさないでください。');
+  } else if (input.referenceMode === 'inspire') {
+    parts.push('添付した画像は参考です。色使い・トーン・質感・雰囲気を引き継ぎつつ、構図やレイアウトはそのまま写さず、下の指示に合う新しい画像を作ってください。元の画像にある文字は使わないでください。');
+  }
 
   if (input.mode === 'free') {
     parts.push(input.freePrompt.trim());
@@ -163,6 +174,9 @@ export interface BannerRequestValidation {
     customPrompt: string;
     freePrompt: string;
     count: number;
+    /** 参照画像（banner_images.id）。無ければ null。 */
+    referenceImageId: string | null;
+    referenceMode: BannerReferenceMode | null;
   };
 }
 
@@ -211,10 +225,22 @@ export function validateBannerRequest(body: Record<string, unknown> | null): Ban
     return { ok: false, error: `プロンプトは${BANNER_MAX_FREE_PROMPT_LENGTH}文字までにしてください` };
   }
 
+  const referenceRaw = body.referenceImageId;
+  const referenceImageId = typeof referenceRaw === 'string' && referenceRaw.trim() ? referenceRaw.trim() : null;
+  if (referenceRaw != null && referenceRaw !== '' && !referenceImageId) {
+    return { ok: false, error: '参照画像の指定が正しくありません' };
+  }
+  const modeRaw = body.referenceMode;
+  const referenceMode: BannerReferenceMode | null = referenceImageId ? (modeRaw === 'edit' ? 'edit' : 'inspire') : null;
+  if (referenceImageId && modeRaw !== 'edit' && modeRaw !== 'inspire') {
+    return { ok: false, error: '参照画像の使い方（描き直す／参考にする）を選んでください' };
+  }
+
   if (mode === 'free' && !freePrompt) {
     return { ok: false, error: '作りたい画像の説明を入力してください' };
   }
-  if (mode === 'banner' && textLines.length === 0 && !customPrompt) {
+  // 「土台に描き直す」は指示だけで成り立つ（文字を入れない差し替えもある）。
+  if (mode === 'banner' && textLines.length === 0 && !customPrompt && referenceMode !== 'edit') {
     return { ok: false, error: 'バナーに入れるテキストか、追加の指示を入力してください' };
   }
 
@@ -230,6 +256,8 @@ export function validateBannerRequest(body: Record<string, unknown> | null): Ban
       customPrompt,
       freePrompt,
       count: countRaw,
+      referenceImageId,
+      referenceMode,
     },
   };
 }

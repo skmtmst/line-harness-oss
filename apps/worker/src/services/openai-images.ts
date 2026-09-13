@@ -19,10 +19,22 @@ export interface OpenAIImageRequest {
   quality: OpenAIImageQuality;
   /** 0〜100。JPEG の圧縮率。 */
   outputCompression?: number;
+  /**
+   * 参照画像（★V6 35-2 の参照画像欄）。あるときは generations ではなく edits を呼ぶ。
+   * 「土台に描き直す」も「雰囲気を参考にする」も同じ入口で、違いはプロンプトで伝える。
+   */
+  referenceImage?: OpenAIReferenceImage;
   /** テストで差し替えるため。 */
   fetchImpl?: typeof fetch;
   /** OpenAI の応答を待つ上限（ミリ秒）。 */
   timeoutMs?: number;
+}
+
+export interface OpenAIReferenceImage {
+  bytes: Uint8Array;
+  /** image/png・image/jpeg・image/webp のどれか。 */
+  mimeType: string;
+  filename: string;
 }
 
 export interface OpenAIImageResult {
@@ -62,6 +74,8 @@ export class OpenAIImageError extends Error {
 /** 既定モデル。gpt-image-1 は 2026-10 に廃止予定なので、Banas と同じ gpt-image-2 を使う。 */
 export const DEFAULT_OPENAI_IMAGE_MODEL = 'gpt-image-2';
 const OPENAI_IMAGES_URL = 'https://api.openai.com/v1/images/generations';
+/** 参照画像つき。multipart/form-data で画像を添える。 */
+export const OPENAI_IMAGE_EDITS_URL = 'https://api.openai.com/v1/images/edits';
 const DEFAULT_TIMEOUT_MS = 120_000;
 
 function decodeBase64(value: string): Uint8Array {
@@ -87,25 +101,43 @@ export async function generateOpenAIImage(request: OpenAIImageRequest): Promise<
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), request.timeoutMs ?? DEFAULT_TIMEOUT_MS);
 
+  const compression = String(request.outputCompression ?? 85);
+  let url = OPENAI_IMAGES_URL;
+  let body: BodyInit;
+  const headers: Record<string, string> = { Authorization: `Bearer ${request.apiKey}` };
+  if (request.referenceImage) {
+    // edits は JSON ではなく multipart。Content-Type は fetch が boundary 付きで付けるので書かない。
+    url = OPENAI_IMAGE_EDITS_URL;
+    const form = new FormData();
+    form.set('model', request.model);
+    form.set('prompt', request.prompt);
+    form.set('n', '1');
+    form.set('size', request.size);
+    form.set('quality', request.quality);
+    form.set('output_format', 'jpeg');
+    form.set('output_compression', compression);
+    form.set(
+      'image',
+      new Blob([request.referenceImage.bytes as unknown as ArrayBuffer], { type: request.referenceImage.mimeType }),
+      request.referenceImage.filename,
+    );
+    body = form;
+  } else {
+    headers['Content-Type'] = 'application/json';
+    body = JSON.stringify({
+      model: request.model,
+      prompt: request.prompt,
+      n: 1,
+      size: request.size,
+      quality: request.quality,
+      output_format: 'jpeg',
+      output_compression: request.outputCompression ?? 85,
+    });
+  }
+
   let response: Response;
   try {
-    response = await fetchImpl(OPENAI_IMAGES_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${request.apiKey}`,
-      },
-      body: JSON.stringify({
-        model: request.model,
-        prompt: request.prompt,
-        n: 1,
-        size: request.size,
-        quality: request.quality,
-        output_format: 'jpeg',
-        output_compression: request.outputCompression ?? 85,
-      }),
-      signal: controller.signal,
-    });
+    response = await fetchImpl(url, { method: 'POST', headers, body, signal: controller.signal });
   } catch (error) {
     if (error instanceof Error && error.name === 'AbortError') {
       throw new OpenAIImageError('timeout', 'OpenAI image generation timed out');

@@ -123,3 +123,25 @@ describe('生成条件の検査', () => {
     expect(new Set(BANNER_PRESETS.map((p) => p.key)).size).toBe(BANNER_PRESETS.length);
   });
 });
+
+describe('参照画像（35-2）', () => {
+  const preset = BANNER_PRESETS[0];
+  it('描き直すと参考にするで先頭の言い方が変わる', () => {
+    const base = { mode: 'banner' as const, preset, textLines: ['秋の感謝祭'], mainColor: null, subColor: null, personOption: 'without' as const, customPrompt: '', freePrompt: '' };
+    expect(buildBannerPrompt({ ...base, referenceMode: 'edit' })).toMatch(/^添付した画像を土台にして描き直してください/);
+    expect(buildBannerPrompt({ ...base, referenceMode: 'inspire' })).toMatch(/^添付した画像は参考です/);
+    expect(buildBannerPrompt({ ...base, referenceMode: null })).not.toContain('添付した画像');
+  });
+
+  it('参照画像があるときは使い方が必須。描き直すなら文字も指示も無くてよい', () => {
+    const body = { presetKey: preset.key, count: 1, textLines: [], personOption: 'without' };
+    expect(validateBannerRequest({ ...body, referenceImageId: 'img-1' }).error).toContain('使い方');
+    expect(validateBannerRequest({ ...body, referenceImageId: 'img-1', referenceMode: 'edit' }).ok).toBe(true);
+    expect(validateBannerRequest({ ...body, referenceImageId: 'img-1', referenceMode: 'inspire' }).error).toContain('テキストか');
+    expect(validateBannerRequest({ ...body, referenceImageId: 42, referenceMode: 'edit' }).error).toContain('参照画像');
+    const ok = validateBannerRequest({ ...body, textLines: ['a'], referenceImageId: ' img-2 ', referenceMode: 'inspire' });
+    expect(ok.value?.referenceImageId).toBe('img-2');
+    expect(ok.value?.referenceMode).toBe('inspire');
+    expect(validateBannerRequest({ ...body, textLines: ['a'] }).value?.referenceImageId).toBeNull();
+  });
+});

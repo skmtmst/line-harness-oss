@@ -122,4 +122,21 @@ describe('統括 バナー生成', () => {
       expect(arbitrary).toEqual([])
     }
   })
+
+  it('参照画像（35-2）: ライブラリから選ぶ／ファイルを選ぶ、使い方の 2 択、条件と詳細から戻せる', () => {
+    expect(panel).toContain('ライブラリから選ぶ')
+    expect(panel).toContain('ファイルを選ぶ')
+    expect(panel).toContain('土台に描き直す')
+    expect(panel).toContain('雰囲気を参考にする')
+    expect(panel).toContain('data-design-node="jZi2W"')
+    expect(panel).toContain("accept=\"image/png,image/jpeg,image/webp\"")
+    expect(modal).toContain('参照画像にする')
+    const picker = read('../../../components/hq/banners/reference-picker-dialog.tsx')
+    expect(picker).toContain('designNode="biOEb"')
+    expect(picker).toContain('この画像を参照にする')
+    expect(picker).toContain('手元のファイルを選ぶ')
+    // 手元のファイルはプロジェクトへ取り込んでから参照にする（ライブラリにも残る）
+    expect(projectPage).toContain('const uploadReference = async (file: File)')
+    expect(projectPage).toContain('applyReference(uploaded)')
+  })
 })

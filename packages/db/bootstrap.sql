@@ -1065,7 +1065,8 @@ CREATE TABLE banner_generations (
   created_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   started_at       TEXT,
   finished_at      TEXT
-);
+, reference_image_id TEXT REFERENCES banner_images(id), reference_mode TEXT
+  CHECK (reference_mode IS NULL OR reference_mode IN ('edit', 'inspire')));
 
 CREATE TABLE banner_image_deliveries (
   id               TEXT PRIMARY KEY,
@@ -5914,6 +5915,9 @@ CREATE INDEX idx_automations_event ON automations (event_type);
 
 CREATE INDEX idx_banner_generations_project
   ON banner_generations(project_id, created_at DESC);
+
+CREATE INDEX idx_banner_generations_reference
+  ON banner_generations(reference_image_id) WHERE reference_image_id IS NOT NULL;
 
 CREATE INDEX idx_banner_generations_tenant_status
   ON banner_generations(tenant_id, status);

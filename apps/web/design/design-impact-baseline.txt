@@ -151,12 +151,14 @@ shared-button-importer components/forms/options-dialog.tsx
 shared-button-importer components/friends/advanced-search-dialog.tsx
 shared-button-importer components/friends/bulk-run-dialog.tsx
 shared-button-importer components/hq/account-list.tsx
+shared-button-importer components/hq/banners/generation-panel.tsx
 shared-button-importer components/hq/banners/image-detail-modal.tsx
 shared-button-importer components/hq/banners/library-section.tsx
 shared-button-importer components/hq/banners/limit-state.tsx
 shared-button-importer components/hq/banners/projects-section.tsx
 shared-button-importer components/hq/banners/upload-button.tsx
 shared-button-importer components/hq/banners/upload-target-dialog.tsx
+shared-button-importer components/hq/banners/reference-picker-dialog.tsx
 shared-button-importer components/identity/identity-decision-dialog.tsx
 shared-button-importer components/inflow-links/site-script.tsx
 shared-button-importer components/line-notifications/notification-run-list.tsx
