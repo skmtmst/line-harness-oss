@@ -1324,8 +1324,14 @@ export async function enrollFriendInScenario(
   db: D1Database,
   friendId: string,
   scenarioId: string,
+  sourceEnrollmentId?: string,
 ): Promise<FriendScenario | null> {
-  const id = crypto.randomUUID();
+  const id = sourceEnrollmentId ?? crypto.randomUUID();
+  if (sourceEnrollmentId) {
+    const previous = await db.prepare(`SELECT * FROM friend_scenarios WHERE id=? AND friend_id=? AND scenario_id=?`)
+      .bind(id, friendId, scenarioId).first<FriendScenario>();
+    if (previous) return previous;
+  }
   const now = jstNow();
 
   // delivery_mode を取得（migration 037 適用前の DB では 'relative' が DEFAULT で既に入っている）

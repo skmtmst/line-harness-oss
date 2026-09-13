@@ -3,6 +3,7 @@ import type {
   IncomingWebhookIdentityMatch,
 } from '@line-crm/db';
 import type { ActionDefinition, AutomationActionContext } from './automation-engine.js';
+import { stableWebhookStepId, type IncomingWebhookExecution } from './incoming-webhook-receipts.js';
 import {
   createAutomationActionExecutors,
   type AutomationActionExecutorDependencies,
@@ -105,38 +106,55 @@ export async function executeIncomingWebhookActions(
     identityMatching: IncomingWebhookIdentityMatch;
     actions: IncomingWebhookActionRef[];
     dependencies?: AutomationActionExecutorDependencies;
+    execution?: IncomingWebhookExecution;
   },
 ): Promise<ActionRunResult> {
+  db = input.execution?.db ?? db;
   if (input.actions.length === 0) return { matchedFriendId: null, executed: 0, failed: 0 };
-  const friendId = await resolveFriendId(
-    db, input.lineAccountId, input.payload, input.identityMatching,
-  );
+  const resolve = () => resolveFriendId(db, input.lineAccountId, input.payload, input.identityMatching);
+  const friendId = input.execution ? await input.execution.step('matched-friend', resolve) : await resolve();
   if (!friendId) return { matchedFriendId: null, executed: 0, failed: 0 };
 
   const executors = createAutomationActionExecutors(input.dependencies);
   let executed = 0;
   let failed = 0;
   let sequence = 0;
-  for (const ref of input.actions) {
+  const plans: Array<{ refIndex: number; ref: IncomingWebhookActionRef; plan: ActionDefinition[] }> = [];
+  for (const [refIndex, ref] of input.actions.entries()) {
     let plan: ActionDefinition[];
     try {
-      plan = ref.refKind === 'common_action'
+      const makePlan = async () => ref.refKind === 'common_action'
         ? await commonActionPlan(db, input.lineAccountId, ref)
         : [directAction(ref, sequence)].filter((item): item is ActionDefinition => item !== null);
+      plan = input.execution ? await input.execution.step(`plan:${refIndex}`, makePlan) : await makePlan();
       if (plan.length === 0) throw new Error(`未対応の受信Webhook処理です: ${ref.refKind}`);
     } catch (error) {
       console.error('[incoming-webhook-actions] plan failed', error);
+      // 再送する受信は完了済みの先頭部分だけを省略する。途中を飛ばすと、
+      // 復旧後に先の処理が再実行されて後の処理の結果を上書きしてしまう。
+      if (input.execution) throw error;
       failed++;
       continue;
     }
-    for (const action of plan) {
-      sequence++;
+    plans.push({ refIndex, ref, plan });
+    sequence += plan.length;
+  }
+  // LINE rich-menu link/unlink has no provider Retry-Key. A receipt may retry
+  // one final-state operation, but must never replay an earlier state over a later one.
+  if (input.execution && plans.flatMap(({ plan }) => plan)
+    .filter(action => action.type === 'switch_rich_menu' || action.type === 'remove_rich_menu').length > 1) {
+    throw new Error('incoming_rich_menu_multiple_final_states');
+  }
+  for (const { refIndex, ref, plan } of plans) {
+    for (const [actionIndex, action] of plan.entries()) {
       const executor = executors[action.type];
       if (!executor) {
+        if (input.execution) throw new Error(`未対応の受信Webhook行動です: ${action.type}`);
         failed++;
         continue;
       }
-      const stepExecutionId = `${input.sourceEventId}:${sequence}`;
+      const stepKey = `action:${refIndex}:${actionIndex}`;
+      const stepExecutionId = await stableWebhookStepId(input.sourceEventId, stepKey);
       const context: AutomationActionContext = {
         db,
         runId: input.sourceEventId,
@@ -154,10 +172,17 @@ export async function executeIncomingWebhookActions(
         isTest: false,
       };
       try {
-        await executor(context);
+        if (input.execution) {
+          await input.execution.step(stepKey, () => executor(context));
+        } else {
+          await executor(context);
+        }
         executed++;
       } catch (error) {
         console.error(`[incoming-webhook-actions] action=${action.id} failed`, error);
+        // 副作用の成功後でも、checkpointが保存できなければ後続へ進まない。
+        // actionのonFailureに関係なく受信全体を再試行し、順序を維持する。
+        if (input.execution) throw error;
         failed++;
       }
     }
