@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { billingBanner, billingChip, trialDaysLabel, yen, type BillingSummary } from './hq-billing'
 
 const base: BillingSummary = {
-  state: 'trialing', planKey: null, planName: null, planStatus: 'trialing', trialEndsAt: '2026-10-12T00:00:00.000', trialEndsLabel: '10/12',
+  state: 'trialing', planKey: null, planInterval: null, planName: null, planStatus: 'trialing', trialEndsAt: '2026-10-12T00:00:00.000', trialEndsLabel: '10/12',
   trialDaysLeft: 25, trialMonthlyImages: 20, currentPeriodEndsAt: null, currentPeriodEndsLabel: null, canSend: true, canGenerate: true,
   blockedReason: null, dataRetentionDays: 90, stripeReady: true, portalAvailable: false, plans: [],
 }
@@ -29,5 +29,11 @@ describe('課金の札と帯', () => {
 
   it('金額は円の桁区切り', () => {
     expect(yen(29800)).toBe('¥29,800')
+  })
+
+  it.each([['month', '月払い'], ['year', '年払い']] as const)('契約中は %s と更新日を表示する', (planInterval, label) => {
+    const summary = { ...base, state: 'active' as const, planInterval, planName: 'プロ', currentPeriodEndsLabel: '9/13' }
+    expect(billingBanner(summary).title).toBe(`プロを契約中（${label}・次回の更新 9/13）`)
+    expect(billingBanner({ ...summary, state: 'past_due' }).title).toContain(label)
   })
 })

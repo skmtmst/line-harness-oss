@@ -9,6 +9,16 @@ import type { TenantBilling } from '@line-crm/db';
  */
 
 export type PlanKey = 'light' | 'standard' | 'pro';
+export type BillingInterval = 'month' | 'year';
+
+interface BillingPriceEnv {
+  STRIPE_PRICE_LIGHT?: string;
+  STRIPE_PRICE_STANDARD?: string;
+  STRIPE_PRICE_PRO?: string;
+  STRIPE_PRICE_LIGHT_YEAR?: string;
+  STRIPE_PRICE_STANDARD_YEAR?: string;
+  STRIPE_PRICE_PRO_YEAR?: string;
+}
 
 export interface BillingPlan {
   key: PlanKey;
@@ -17,6 +27,8 @@ export interface BillingPlan {
   description: string;
   /** 仮の月額（税込）。Stripe の価格が取れたらそちらを優先する。 */
   fallbackMonthlyYen: number;
+  /** 仮の年額（税込）。月あたりは年額を12で割って切り捨てる。 */
+  fallbackYearlyYen: number;
   /** バナー生成の月間枚数。 */
   monthlyImages: number;
   /** 権限者の上限。null は無制限。 */
@@ -24,7 +36,7 @@ export interface BillingPlan {
   /** 画面に出す内容の箇条書き。 */
   features: string[];
   recommended?: boolean;
-  /** ボタンの種類。checkout は Stripe の申込画面へ、contact はお問い合わせへ（設計 36-2 のプロ）。 */
+  /** ボタンの種類。3プランとも Stripe の申込画面へ。 */
   cta: 'checkout' | 'contact';
 }
 
@@ -34,6 +46,7 @@ export const BILLING_PLANS: BillingPlan[] = [
     name: 'ライト',
     description: '1店舗で始める',
     fallbackMonthlyYen: 9800,
+    fallbackYearlyYen: 99000,
     monthlyImages: 50,
     maxStaff: 3,
     features: ['LINE公式アカウント 1', '権限者 3人', '配信 月 5,000通', 'バナー生成 月 50枚', '登録メディア 5GB'],
@@ -44,6 +57,7 @@ export const BILLING_PLANS: BillingPlan[] = [
     name: 'スタンダード',
     description: '複数店舗をまとめて運用',
     fallbackMonthlyYen: 29800,
+    fallbackYearlyYen: 303000,
     monthlyImages: 150,
     maxStaff: 10,
     features: ['LINE公式アカウント 5', '権限者 10人', '配信 月 30,000通', 'バナー生成 月 150枚', '登録メディア 30GB', '統括ひな形の配布'],
@@ -55,10 +69,11 @@ export const BILLING_PLANS: BillingPlan[] = [
     name: 'プロ',
     description: '本部主導で大きく回す',
     fallbackMonthlyYen: 59800,
+    fallbackYearlyYen: 609000,
     monthlyImages: 500,
     maxStaff: null,
     features: ['LINE公式アカウント 無制限', '権限者 無制限', '配信 月 100,000通', 'バナー生成 月 500枚', '登録メディア 200GB', '優先サポート・API'],
-    cta: 'contact',
+    cta: 'checkout',
   },
 ];
 
@@ -74,22 +89,29 @@ export function findPlan(key: string | null | undefined): BillingPlan | null {
   return BILLING_PLANS.find((p) => p.key === key) ?? null;
 }
 
-/** Stripe の価格 ID → プラン。価格 ID は env（値は Git に書かない）。 */
+/** Stripe の価格 ID → プランと周期。価格 ID は env（値は Git に書かない）。 */
 export function planKeyForPrice(
-  env: { STRIPE_PRICE_LIGHT?: string; STRIPE_PRICE_STANDARD?: string; STRIPE_PRICE_PRO?: string },
+  env: BillingPriceEnv,
   priceId: string | null | undefined,
-): PlanKey | null {
+): { key: PlanKey; interval: BillingInterval } | null {
   if (!priceId) return null;
-  if (env.STRIPE_PRICE_LIGHT && priceId === env.STRIPE_PRICE_LIGHT) return 'light';
-  if (env.STRIPE_PRICE_STANDARD && priceId === env.STRIPE_PRICE_STANDARD) return 'standard';
-  if (env.STRIPE_PRICE_PRO && priceId === env.STRIPE_PRICE_PRO) return 'pro';
+  for (const plan of BILLING_PLANS) {
+    for (const interval of ['month', 'year'] as const) {
+      if (priceIdForPlan(env, plan.key, interval) === priceId) return { key: plan.key, interval };
+    }
+  }
   return null;
 }
 
 export function priceIdForPlan(
-  env: { STRIPE_PRICE_LIGHT?: string; STRIPE_PRICE_STANDARD?: string; STRIPE_PRICE_PRO?: string },
+  env: BillingPriceEnv,
   key: PlanKey,
+  interval: BillingInterval = 'month',
 ): string | null {
+  if (interval === 'year') {
+    const id = key === 'light' ? env.STRIPE_PRICE_LIGHT_YEAR : key === 'standard' ? env.STRIPE_PRICE_STANDARD_YEAR : env.STRIPE_PRICE_PRO_YEAR;
+    return id || null;
+  }
   const id = key === 'light' ? env.STRIPE_PRICE_LIGHT : key === 'standard' ? env.STRIPE_PRICE_STANDARD : env.STRIPE_PRICE_PRO;
   return id || null;
 }

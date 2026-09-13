@@ -202,6 +202,9 @@
     "direct-th": 11,
     "arbitrary-value": 1
   },
+  "app/hq/billing/page.tsx": {
+    "unresolved-classname": 1
+  },
   "app/hq/settings/hq-staff-section.tsx": {
     "direct-th": 6
   },

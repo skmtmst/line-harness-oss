@@ -238,6 +238,9 @@ export type Env = {
     STRIPE_PRICE_LIGHT?: string;
     STRIPE_PRICE_STANDARD?: string;
     STRIPE_PRICE_PRO?: string;
+    STRIPE_PRICE_LIGHT_YEAR?: string;
+    STRIPE_PRICE_STANDARD_YEAR?: string;
+    STRIPE_PRICE_PRO_YEAR?: string;
     /** 会員登録・パスワード再設定のロボット対策（Cloudflare Turnstile）の秘密の鍵。未設定なら登録を受け付けない。 */
     TURNSTILE_SECRET_KEY?: string;
     TOTP_ENCRYPTION_KEY?: string;

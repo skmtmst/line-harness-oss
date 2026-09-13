@@ -21,6 +21,7 @@ import {
   planKeyForPrice,
   priceIdForPlan,
   resolveEntitlements,
+  type BillingInterval,
   type PlanKey,
 } from '../services/billing-plans.js';
 import { StripeApiError, stripeApi, type StripeSubscription } from '../services/stripe-api.js';
@@ -88,7 +89,7 @@ async function applySubscription(c: Context<Env>, tenant: TenantBilling, subscri
     });
   }
   const priceId = subscription.items?.data?.[0]?.price?.id ?? null;
-  const planKey = planKeyForPrice(c.env, priceId) ?? (subscription.metadata?.plan_key as PlanKey | undefined) ?? tenant.plan_key;
+  const planKey = planKeyForPrice(c.env, priceId)?.key ?? (subscription.metadata?.plan_key as PlanKey | undefined) ?? tenant.plan_key;
   const planStatus = mapStripeSubscriptionStatus(subscription.status);
   return updateTenantBilling(c.env.DB, tenant.id, {
     plan_key: planKey ?? null,
@@ -110,24 +111,40 @@ hqBilling.get('/api/hq/billing/summary', async (c) => {
     const entitlements = resolveEntitlements(billing, { exemptMonthlyImages: exemptMonthlyImages(c) });
 
     // 金額は Stripe の価格が正本。取れなければ仮の表示。
-    const prices = await Promise.all(
-      BILLING_PLANS.map(async (plan) => {
-        const priceId = priceIdForPlan(c.env, plan.key);
-        if (!priceId || !stripeReady(c)) return null;
-        try {
-          const price = await stripeApi.retrievePrice(c.env, priceId);
-          return price.unit_amount ?? null;
-        } catch {
-          return null;
-        }
-      }),
-    );
+    const readPrice = async (key: PlanKey, interval: BillingInterval): Promise<number | null> => {
+      const priceId = priceIdForPlan(c.env, key, interval);
+      if (!priceId || !stripeReady(c)) return null;
+      try {
+        const price = await stripeApi.retrievePrice(c.env, priceId);
+        return price.currency === 'jpy' ? price.unit_amount ?? null : null;
+      } catch {
+        return null;
+      }
+    };
+    // 周期は Stripe の契約の価格IDから読む。取得失敗時に月払いと決めつけない。
+    const readInterval = async (): Promise<BillingInterval | null> => {
+      if (!billing.stripe_subscription_id || !stripeReady(c)) return null;
+      try {
+        const subscription = await stripeApi.retrieveSubscription(c.env, billing.stripe_subscription_id);
+        return planKeyForPrice(c.env, subscription.items?.data?.[0]?.price?.id)?.interval ?? null;
+      } catch {
+        return null;
+      }
+    };
+    const [prices, planInterval] = await Promise.all([
+      Promise.all(BILLING_PLANS.map(async (plan) => {
+        const [month, year] = await Promise.all([readPrice(plan.key, 'month'), readPrice(plan.key, 'year')]);
+        return { month, year };
+      })),
+      readInterval(),
+    ]);
 
     return c.json({
       success: true,
       data: {
         state: entitlements.state,
         planKey: billing.plan_key,
+        planInterval,
         planName: entitlements.plan?.name ?? null,
         planStatus: billing.plan_status,
         trialEndsAt: billing.trial_ends_at,
@@ -147,13 +164,16 @@ hqBilling.get('/api/hq/billing/summary', async (c) => {
           name: plan.name,
           description: plan.description,
           cta: plan.cta,
-          monthlyYen: prices[index] ?? plan.fallbackMonthlyYen,
-          priceFromStripe: prices[index] !== null,
+          monthlyYen: prices[index].month ?? plan.fallbackMonthlyYen,
+          yearlyYen: prices[index].year ?? plan.fallbackYearlyYen,
+          priceFromStripe: prices[index].month !== null,
+          yearlyPriceFromStripe: prices[index].year !== null,
           monthlyImages: plan.monthlyImages,
           maxStaff: plan.maxStaff,
           features: plan.features,
           recommended: Boolean(plan.recommended),
           available: stripeReady(c) && Boolean(priceIdForPlan(c.env, plan.key)),
+          yearlyAvailable: stripeReady(c) && Boolean(priceIdForPlan(c.env, plan.key, 'year')),
           current: billing.plan_key === plan.key && (billing.plan_status === 'active' || billing.plan_status === 'past_due'),
         })),
       },
@@ -169,11 +189,13 @@ hqBilling.get('/api/hq/billing/summary', async (c) => {
 hqBilling.post('/api/hq/billing/checkout', requireRole('owner'), async (c) => {
   try {
     const tenantId = tenantOf(c);
-    const body = await c.req.json<{ planKey?: string }>().catch(() => ({} as { planKey?: string }));
-    const plan = findPlan(body.planKey);
+    const body = await c.req.json<{ planKey?: string; interval?: unknown } | null>().catch(() => null);
+    const plan = findPlan(body?.planKey);
     if (!plan) return c.json({ success: false, error: 'プランを選んでください' }, 400);
+    const interval = body?.interval === undefined ? 'month' : body.interval;
+    if (interval !== 'month' && interval !== 'year') return c.json({ success: false, error: '月払いまたは年払いを選んでください' }, 400);
     if (!stripeReady(c)) return c.json({ success: false, error: '決済の接続設定がまだありません。運営にお問い合わせください' }, 503);
-    const priceId = priceIdForPlan(c.env, plan.key);
+    const priceId = priceIdForPlan(c.env, plan.key, interval);
     if (!priceId) return c.json({ success: false, error: 'このプランの価格がまだ設定されていません。運営にお問い合わせください' }, 503);
     const origin = adminOrigin(c);
     if (!origin) return c.json({ success: false, error: '管理画面のURLが設定されていないため、申込画面へ進めません' }, 503);
