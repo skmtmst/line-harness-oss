@@ -51,6 +51,18 @@ describe('受付枠と休業日のV6契約', () => {
     expect(PAGE).toContain('exceptions: [...current.exceptions, response.data]')
   })
 
+  it('営業時間は共通versionで週全体を保存し、未設定の0行曜日を定休日と誤表示しない', () => {
+    expect(PAGE).toContain('businessHoursConfigured')
+    expect(PAGE).toContain('bookingApi.saveSettings(accountId')
+    expect(PAGE).toContain('expectedVersion: settings.version')
+    expect(PAGE).toContain('businessHours: draft')
+    expect(PAGE).toContain('未設定（現在は担当者の勤務時間どおり）')
+    expect(PAGE).toContain('営業時間は日ごとに分けて入力してください')
+    expect(PAGE).toContain('activeRef.current')
+    expect(PAGE).not.toContain('1時間に受けられる数')
+    expect(PAGE).not.toContain('件／時')
+  })
+
   it('日時の表示は予約設定内の共通整形を使う', () => {
     expect(PAGE).toContain("from '../../lib/format-time'")
     expect(PAGE).not.toContain('function openHours(')

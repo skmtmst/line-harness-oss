@@ -9482,6 +9482,7 @@ export interface BookingSettings {
   menuCount: number;
   activeMenuCount: number;
   inactiveMenuCount: number;
+  businessHoursConfigured: boolean;
   businessHours: Array<{
     weekday: number;
     intervals: Array<{ start: string; end: string; capacity?: number }>;
@@ -9500,7 +9501,10 @@ export type SaveBookingSettings = Pick<
   | 'approvalMode'
   | 'holdMinutes'
   | 'slotGranularityMinutes'
-> & { expectedVersion: number };
+> & {
+  expectedVersion: number;
+  businessHours?: BookingSettings['businessHours'];
+};
 
 export interface BookingStaff {
   id: string;
