@@ -397,6 +397,28 @@ describe('前から満席だった申込', () => {
 });
 
 describe('同時申込で負けた申込', () => {
+  it('本人上限なしなら、同じ人が別の回へ同時に申し込んでも両方を残す', async () => {
+    const { db, raw } = createTestD1();
+    seed(raw, { capacity: 1, waitlist: 1 });
+    raw.prepare('UPDATE events SET max_bookings_per_friend = NULL').run();
+    raw.prepare(`INSERT INTO event_slots (id, event_id, starts_at, ends_at, capacity, is_active)
+      VALUES ('slot-2', 'ev-1', '2099-06-02T10:00:00.000Z', '2099-06-02T11:00:00.000Z', 1, 1)`).run();
+    const { app, env } = makeApp(db);
+
+    const results = await Promise.all([
+      book(app, env, 'unlimited-a', 'L1', 'slot-1'),
+      book(app, env, 'unlimited-b', 'L1', 'slot-2'),
+    ]);
+
+    expect(results.map(result => result.status)).toEqual([201, 201]);
+    expect(bookingRows(raw)).toEqual([
+      { friend_id: 'friend-1', status: 'confirmed' },
+      { friend_id: 'friend-1', status: 'confirmed' },
+    ]);
+    expect(waitlistRows(raw)).toEqual([]);
+    raw.close();
+  });
+
   it.each([1, 3, null])('同じ本人が別キーで同時申込しても、予約と待ちに二重所属しない（本人上限 %s）', async (max) => {
     const { db, raw } = createTestD1();
     seed(raw, { capacity: 1, waitlist: 1 });
