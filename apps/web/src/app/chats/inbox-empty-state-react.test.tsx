@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
 import React, { act } from 'react'
+import { flushSync } from 'react-dom'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import ChatsPage from './page'
@@ -71,7 +72,47 @@ async function click(label: string) {
   expect(button, label).toBeTruthy()
   await act(async () => { button!.click() })
 }
-
+const isFilteredRequest = (url: URL) => Boolean(
+  url.searchParams.get('q')
+    || (url.searchParams.get('status') && url.searchParams.get('status') !== 'all')
+    || url.searchParams.get('operatorId')
+    || url.searchParams.get('assignee')
+    || url.searchParams.get('unreadOnly')
+    || url.searchParams.get('quickFilter'),
+)
+async function renderWithRowsUnlessFiltered() {
+  handler = (url) => {
+    if (url.pathname === '/api/chats') return response(linePayload(isFilteredRequest(url) ? [] : ['通常の会話']))
+    if (url.pathname === '/api/support/inbox') return response(emailPayload())
+    return base(url)
+  }
+  await act(async () => root.render(<ChatsPage />))
+}
+async function applySingleFilter(kind: 'search' | 'status' | 'quick' | 'assignee' | 'unread') {
+  if (kind === 'search') {
+    await act(async () => {
+      const input = host.querySelector<HTMLInputElement>('[aria-label="名前・メールアドレス・内容で検索"]')!
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, '該当なし')
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    await eventually(() => expect(
+      calls.filter((url) => url.pathname === '/api/chats').at(-1)?.searchParams.get('q'),
+    ).toBe('該当なし'))
+    return
+  }
+  if (kind === 'status') { await click('未対応'); return }
+  if (kind === 'quick') { await click('期限超過'); return }
+  await click('絞り込み')
+  if (kind === 'assignee') {
+    await act(async () => {
+      const select = host.querySelector<HTMLSelectElement>('[aria-label="担当者で絞り込む（パネル）"]')!
+      select.value = 'operator-a'
+      select.dispatchEvent(new Event('change', { bubbles: true }))
+    })
+    return
+  }
+  await act(async () => { host.querySelector<HTMLInputElement>('[aria-label="未読だけ表示"]')!.click() })
+}
 beforeEach(() => {
   calls = []; pending = []; handler = base
   fixture.accountId = 'account-a'; fixture.params = new URLSearchParams()
@@ -132,6 +173,16 @@ test('障害時は0件と断定しない', async () => {
   expect(state('empty')).toBeNull()
 })
 
+test('LINE一覧の障害時も0件と断定しない', async () => {
+  handler = (url) => url.pathname === '/api/chats'
+    ? response({ success: false }, 503)
+    : base(url)
+  await act(async () => root.render(<ChatsPage />))
+  await settle()
+  expect(host.textContent).toContain('チャットの読み込みに失敗しました。')
+  expect(state('empty')).toBeNull()
+})
+
 test('line 選択時はメールの待機や障害から独立して通常0件を表示する', async () => {
   fixture.params = new URLSearchParams('channel=line')
   const email = hold()
@@ -140,6 +191,64 @@ test('line 選択時はメールの待機や障害から独立して通常0件�
   await settle()
   expect(state('empty')).toBeTruthy()
   expect(list().textContent).not.toContain('メールの読み込みに失敗しました。')
+})
+
+test('line 選択時はメールが失敗しても通常0件を表示する', async () => {
+  fixture.params = new URLSearchParams('channel=line')
+  handler = (url) => url.pathname === '/api/support/inbox'
+    ? response({ success: false }, 503)
+    : base(url)
+  await act(async () => root.render(<ChatsPage />))
+  await settle()
+  expect(state('empty')).toBeTruthy()
+  expect(list().textContent).not.toContain('メールの読み込みに失敗しました。')
+})
+
+test.each([
+  ['検索', 'search'],
+  ['状態', 'status'],
+  ['期限', 'quick'],
+  ['担当', 'assignee'],
+  ['未読', 'unread'],
+] as const)('%s条件だけで0件なら条件用空状態にする', async (_label, kind) => {
+  await renderWithRowsUnlessFiltered()
+  expect(list().textContent).toContain('通常の会話')
+  await applySingleFilter(kind)
+  await eventually(() => expect(state('filtered-empty')).toBeTruthy())
+  expect(state('empty')).toBeNull()
+})
+
+test('条件変更の描画から新条件取得開始まで旧0件を空状態として出さない', async () => {
+  await act(async () => root.render(<ChatsPage />))
+  expect(state('empty')).toBeTruthy()
+  const next = hold()
+  handler = (url) => isFilteredRequest(url) ? next.promise.then((value) => value.clone()) : base(url)
+  const button = [...host.querySelectorAll('button')].find((item) => item.textContent?.trim() === '未対応')!
+  act(() => {
+    flushSync(() => button.click())
+    expect(state('loading')).toBeTruthy()
+    expect(state('filtered-empty')).toBeNull()
+  })
+})
+
+test('条件解除の描画から再取得開始まで旧0件を通常0件として出さない', async () => {
+  handler = (url) => {
+    if (url.pathname === '/api/chats') return response(linePayload())
+    if (url.pathname === '/api/support/inbox') return response(emailPayload())
+    return base(url)
+  }
+  await act(async () => root.render(<ChatsPage />))
+  await click('未対応')
+  await eventually(() => expect(state('filtered-empty')).toBeTruthy())
+
+  const next = hold()
+  handler = (url) => isFilteredRequest(url) ? base(url) : next.promise.then((value) => value.clone())
+  const button = [...host.querySelectorAll('button')].find((item) => item.textContent?.trim() === '絞り込みを解除')!
+  act(() => {
+    flushSync(() => button.click())
+    expect(state('loading')).toBeTruthy()
+    expect(state('empty')).toBeNull()
+  })
 })
 
 test('全条件の結果0件を区別し、解除後に会話を戻す', async () => {
