@@ -1378,6 +1378,24 @@ describe('OpenAPIと公開APIの同期', () => {
     expect(problems, `responseの不足が ${problems.length} 件あります:\n${formatKeys(problems)}`).toEqual([]);
   });
 
+  test('予約設備PATCHは版に加えて変更項目を1つ以上要求する', async () => {
+    const spec = await loadSpec();
+    const operation = spec.paths['/api/booking/admin/resources/{id}']?.patch as {
+      requestBody?: { content?: { 'application/json'?: { schema?: {
+        required?: string[];
+        anyOf?: Array<{ required?: string[] }>;
+      } } } };
+    } | undefined;
+    const schema = operation?.requestBody?.content?.['application/json']?.schema;
+    expect(schema?.required).toEqual(['expectedVersion']);
+    expect(schema?.anyOf).toEqual([
+      { required: ['name'] },
+      { required: ['type'] },
+      { required: ['capacity'] },
+      { required: ['isActive'] },
+    ]);
+  });
+
   test('$refの指す先がすべて存在する', async () => {
     const spec = await loadSpec();
     const broken: string[] = [];

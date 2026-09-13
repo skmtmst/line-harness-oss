@@ -91,6 +91,7 @@ beforeAll(async () => {
 afterAll(async () => { await mf?.dispose(); });
 
 beforeEach(async () => {
+  await db.prepare('DELETE FROM booking_availability_exceptions').run();
   await db.prepare('DELETE FROM booking_resources').run();
   access.canAccessAllLineAccounts.mockClear();
 });
@@ -174,5 +175,115 @@ describe('予約設備 CRUD HTTP', () => {
     }, guardedUpdate.env);
     expect(updated.status).toBe(200);
     await expect(updated.json()).resolves.toMatchObject({ data: { capacity: 3, version: 2 } });
+  });
+
+  test('資源例外の作成が先なら、実D1の次の設備削除を409で止める', async () => {
+    const { app, env } = appFor(db);
+    const created = await app.request('/api/booking/admin/resources?account_id=account-a', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: '例外あり個室', type: 'room', capacity: 1 }),
+    }, env);
+    const resource = (await created.json() as { data: { id: string; version: number } }).data;
+
+    const exception = await app.request('/api/booking/admin/exceptions?account_id=account-a', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        scopeKind: 'resource', scopeId: resource.id,
+        dateFrom: '2030-01-01', dateTo: '2030-01-01', kind: 'closed', intervals: [],
+      }),
+    }, env);
+    expect(exception.status).toBe(201);
+
+    const removed = await app.request(`/api/booking/admin/resources/${resource.id}?account_id=account-a`, {
+      method: 'DELETE', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ expectedVersion: resource.version }),
+    }, env);
+    expect(removed.status).toBe(409);
+    await expect(removed.json()).resolves.toMatchObject({
+      code: 'resource_in_use', data: { exceptionCount: 1 },
+    });
+    await expect(db.prepare(`SELECT
+      (SELECT COUNT(*) FROM booking_resources WHERE id = ?) AS resource_count,
+      (SELECT COUNT(*) FROM booking_availability_exceptions
+        WHERE scope_kind = 'resource' AND scope_id = ?) AS exception_count`)
+      .bind(resource.id, resource.id).first()).resolves.toEqual({
+      resource_count: 1, exception_count: 1,
+    });
+  });
+
+  test('設備削除が先なら、実D1の資源例外作成を拒否する', async () => {
+    const { app, env } = appFor(db);
+    const resourceResponse = await app.request('/api/booking/admin/resources?account_id=account-a', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: '削除後作成', type: 'room', capacity: 1 }),
+    }, env);
+    const createTarget = (await resourceResponse.json() as {
+      data: { id: string; version: number };
+    }).data;
+    const removed = await app.request(`/api/booking/admin/resources/${createTarget.id}?account_id=account-a`, {
+      method: 'DELETE', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ expectedVersion: createTarget.version }),
+    }, env);
+    expect(removed.status).toBe(200);
+    const rejectedCreate = await app.request('/api/booking/admin/exceptions?account_id=account-a', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        scopeKind: 'resource', scopeId: createTarget.id,
+        dateFrom: '2030-01-02', dateTo: '2030-01-02', kind: 'closed', intervals: [],
+      }),
+    }, env);
+    expect(rejectedCreate.status).toBe(422);
+
+    const orphan = await db.prepare(`SELECT COUNT(*) AS count
+      FROM booking_availability_exceptions e
+      WHERE e.scope_kind = 'resource'
+        AND NOT EXISTS (SELECT 1 FROM booking_resources r
+          WHERE r.id = e.scope_id AND r.line_account_id = e.line_account_id)`)
+      .first<{ count: number }>();
+    expect(orphan?.count).toBe(0);
+  });
+
+  test('設備削除が先なら、実D1の既存例外を削除済み資源へ変更できない', async () => {
+    const { app, env } = appFor(db);
+    const resourceResponse = await app.request('/api/booking/admin/resources?account_id=account-a', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: '削除後更新', type: 'room', capacity: 1 }),
+    }, env);
+    const updateTarget = (await resourceResponse.json() as {
+      data: { id: string; version: number };
+    }).data;
+    const storeException = await app.request('/api/booking/admin/exceptions?account_id=account-a', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        scopeKind: 'store', scopeId: null,
+        dateFrom: '2030-01-03', dateTo: '2030-01-03', kind: 'closed', intervals: [],
+      }),
+    }, env);
+    expect(storeException.status).toBe(201);
+    const stored = (await storeException.json() as { data: { id: string; version: number } }).data;
+    const removed = await app.request(`/api/booking/admin/resources/${updateTarget.id}?account_id=account-a`, {
+      method: 'DELETE', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ expectedVersion: updateTarget.version }),
+    }, env);
+    expect(removed.status).toBe(200);
+    const rejectedUpdate = await app.request(
+      `/api/booking/admin/exceptions/${stored.id}?account_id=account-a`,
+      {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          expectedVersion: stored.version, scopeKind: 'resource', scopeId: updateTarget.id,
+        }),
+      },
+      env,
+    );
+    expect(rejectedUpdate.status).toBe(422);
+
+    const orphan = await db.prepare(`SELECT COUNT(*) AS count
+      FROM booking_availability_exceptions e
+      WHERE e.scope_kind = 'resource'
+        AND NOT EXISTS (SELECT 1 FROM booking_resources r
+          WHERE r.id = e.scope_id AND r.line_account_id = e.line_account_id)`)
+      .first<{ count: number }>();
+    expect(orphan?.count).toBe(0);
   });
 });

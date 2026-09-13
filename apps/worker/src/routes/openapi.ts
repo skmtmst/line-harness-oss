@@ -1908,6 +1908,12 @@ const spec = {
         ],
         requestBody: { required: true, content: { 'application/json': { schema: {
           type: 'object', additionalProperties: false, required: ['expectedVersion'],
+          anyOf: [
+            { required: ['name'] },
+            { required: ['type'] },
+            { required: ['capacity'] },
+            { required: ['isActive'] },
+          ],
           properties: {
             expectedVersion: { type: 'integer', minimum: 1 },
             name: { type: 'string', minLength: 1, maxLength: 100 },
