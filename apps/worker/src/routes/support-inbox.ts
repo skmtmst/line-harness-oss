@@ -211,9 +211,14 @@ supportInbox.get('/api/support/inbox', requireRole('owner', 'admin', 'staff'), a
       if (status === 'unread' || status === 'in_progress' || status === 'on_hold') bindings.push(status);
       let searchSql = '';
       if (query) {
-        searchSql = 'AND (t.customer_email LIKE ? OR t.customer_name LIKE ? OR t.subject LIKE ?)';
+        searchSql = `AND (
+          t.customer_email LIKE ? OR t.customer_name LIKE ? OR t.subject LIKE ? OR EXISTS (
+            SELECT 1 FROM support_email_messages searched
+            WHERE searched.thread_id = t.id AND searched.body_text LIKE ?
+          )
+        )`;
         const like = `%${query}%`;
-        bindings.push(like, like, like);
+        bindings.push(like, like, like, like);
       }
       if (assignee) {
         if (assignee === 'unassigned') searchSql += ' AND t.assigned_staff_id IS NULL';
