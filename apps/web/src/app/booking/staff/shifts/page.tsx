@@ -86,6 +86,9 @@ function BusinessHoursEditor({ accountId, settings, onSaved, onReload }: {
   const inFlightRef = useRef(false)
 
   useEffect(() => () => { activeRef.current = false }, [])
+  useEffect(() => {
+    setDraft(initialBusinessHours(settings))
+  }, [settings])
 
   function updateDay(weekday: number, update: (intervals: BusinessHourInterval[]) => BusinessHourInterval[]) {
     setDraft((current) => current.map((day) => day.weekday === weekday
@@ -147,7 +150,7 @@ function BusinessHoursEditor({ accountId, settings, onSaved, onReload }: {
     <section data-design="Week" className="bg-canvas border-hairline overflow-hidden rounded-card border">
       <div className="border-hairline border-b px-4 py-4">
         <h2 className="text-ink font-semibold">開ける時間</h2>
-        <p className="text-ink-faint mt-1 text-xs">曜日ごとの受付時間と、同時に受け付けられる数を決めます。閉めた曜日は、お客様の画面に出ません。</p>
+        <p className="text-ink-faint mt-1 text-xs">曜日ごとの受付時間と休けいを決めます。同時受付数は「1時間に受けられる数」ではなく、同じ時間に重ねられる予約数です。閉めた曜日は、お客様の画面に出ません。</p>
         {!settings.businessHoursConfigured ? (
           <p className="bg-warning-bg text-warning mt-3 rounded-control px-3 py-2 text-xs" role="note">
             まだ週全体の営業時間を保存していません。入力済みの時間帯は適用されていますが、時間帯がない曜日は現在は担当者の勤務時間どおりに受け付けます。保存すると、その曜日は休業になります。
@@ -159,8 +162,8 @@ function BusinessHoursEditor({ accountId, settings, onSaved, onReload }: {
           const intervals = draft.find((item) => item.weekday === day.weekday)?.intervals ?? []
           const accepts = intervals.length > 0
           return (
-            <div className="grid gap-3 px-4 py-3 text-sm lg:grid-cols-[7rem_1fr]" key={day.weekday}>
-              <label className="flex items-center gap-2 font-semibold whitespace-nowrap">
+            <div className="grid gap-3 px-4 py-3 text-sm lg:grid-cols-6" key={day.weekday}>
+              <label className="flex items-center gap-2 font-semibold whitespace-nowrap lg:col-span-1">
                 <input
                   aria-label={`${day.label}を受け付ける`}
                   type="checkbox"
@@ -170,9 +173,9 @@ function BusinessHoursEditor({ accountId, settings, onSaved, onReload }: {
                 {day.label}
               </label>
               {!accepts ? (
-                <p className="text-ink-faint">{settings.businessHoursConfigured ? '休み（定休日）' : '未設定（現在は担当者の勤務時間どおり）'}</p>
+                <p className="text-ink-faint lg:col-span-5">{settings.businessHoursConfigured ? '休み（定休日）' : '未設定（現在は担当者の勤務時間どおり）'}</p>
               ) : (
-                <div className="space-y-2">
+                <div className="space-y-2 lg:col-span-5">
                   {intervals.map((interval, index) => (
                     <div className="flex flex-wrap items-end gap-2" key={`${day.weekday}-${index}`}>
                       <label className="text-ink-secondary text-xs">
@@ -263,6 +266,7 @@ function StoreShiftsView() {
   const [savingClosed, setSavingClosed] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const requestRef = useRef(0)
+  const loadedAccountRef = useRef<string | null>(null)
 
   const workerBase = process.env.NEXT_PUBLIC_API_URL ?? ''
   const previewUrl = selectedAccount?.liffId
@@ -273,12 +277,13 @@ function StoreShiftsView() {
   useEffect(() => {
     const requestId = ++requestRef.current
     if (!selectedAccountId) {
+      loadedAccountRef.current = null
       setSettings(null)
       setSlots([])
       setLoadStatus('ready')
       return
     }
-    setLoadStatus('loading')
+    if (loadedAccountRef.current !== selectedAccountId) setLoadStatus('loading')
     setPreviewError(false)
     setSaveError(null)
 
@@ -290,6 +295,7 @@ function StoreShiftsView() {
       if (requestId !== requestRef.current) return
       if (!settingsResult.success) throw new Error(settingsResult.error)
       setSettings(settingsResult.data)
+      loadedAccountRef.current = selectedAccountId
       // 予約設定APIは {success,data:{resources}} を返す(撮影用APIも同じ器)。
       setResources(resourcesResult.data.resources)
       setLoadStatus('ready')
@@ -419,7 +425,7 @@ function StoreShiftsView() {
         <div data-design="Body" className="flex flex-col gap-4 xl:flex-row">
           <div className="min-w-0 flex-1 space-y-4">
             <BusinessHoursEditor
-              key={`${selectedAccountId}-${settings.version}`}
+              key={selectedAccountId}
               accountId={selectedAccountId}
               settings={settings}
               onReload={() => setReloadKey((value) => value + 1)}

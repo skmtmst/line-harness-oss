@@ -59,7 +59,7 @@ describe('受付枠と休業日のV6契約', () => {
     expect(PAGE).toContain('未設定（現在は担当者の勤務時間どおり）')
     expect(PAGE).toContain('営業時間は日ごとに分けて入力してください')
     expect(PAGE).toContain('activeRef.current')
-    expect(PAGE).not.toContain('1時間に受けられる数')
+    expect(PAGE).toContain('同時受付数は「1時間に受けられる数」ではなく、同じ時間に重ねられる予約数です')
     expect(PAGE).not.toContain('件／時')
   })
 

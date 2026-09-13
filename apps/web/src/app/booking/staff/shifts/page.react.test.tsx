@@ -143,6 +143,7 @@ describe('店舗営業時間の編集', () => {
     }))
     await waitFor(() => expect(fixture.getSettings.mock.calls.length).toBeGreaterThanOrEqual(2))
     expect(fixture.getAvailability.mock.calls.length).toBeGreaterThanOrEqual(2)
+    expect((await screen.findByRole('status')).textContent).toContain('営業時間を保存しました。')
   })
 
   test('同じ曜日の重複区間はAPIへ送らず画面内で止める', async () => {
