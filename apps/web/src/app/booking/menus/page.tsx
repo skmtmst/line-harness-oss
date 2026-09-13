@@ -431,8 +431,9 @@ function BookingRulesSummary({ accountId, settings, items, loading, error, onRet
 }) {
   if (!accountId) return <ListState kind="empty" title="LINEアカウントを選んでください" description="共通メニューで、基本ルールを設定するLINEアカウントを選んでください。" />
   if (loading) return <ListState kind="loading" description="予約のルールを読み込んでいます。" />
-  if (error) return <ListState kind="error" description={error} onRetry={onRetry} />
-  if (!settings) return <ListState kind="error" description="予約の基本ルールを読み込めませんでした。" onRetry={onRetry} />
+  if (error || !settings) {
+    return <ListState kind="error" description={error ?? '予約の基本ルールを読み込めませんでした。'} onRetry={onRetry} />
+  }
 
   const rows = [
     { label: '先の予約が取れる範囲', key: 'booking_window_days' as const, unit: '日先まで', none: '制限なし' },
@@ -565,14 +566,13 @@ function BookingRulesEditor({ accountId, initial, onRetry, onSaved }: {
       )}
       {saved && <p className="text-success mt-4 text-sm font-semibold" role="status">予約の基本ルールを保存しました。</p>}
       <div className="border-hairline mt-5 flex justify-end border-t pt-4">
-        <button
-          type="button"
+        <Button
           onClick={() => void submit()}
           disabled={saving}
-          className="bg-accent-deep text-on-accent rounded-control px-4 py-2 text-sm font-semibold hover:brightness-95 disabled:opacity-50"
+          variant="primary"
         >
           {saving ? '保存中…' : initial.version === 0 ? '基本ルールを作成' : '変更を保存'}
-        </button>
+        </Button>
       </div>
     </div>
   )
