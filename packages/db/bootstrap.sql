@@ -1244,7 +1244,7 @@ CREATE TABLE booking_resources (
   is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-);
+, version INTEGER NOT NULL DEFAULT 1 CHECK (version > 0));
 
 CREATE TABLE booking_settings (
   id TEXT PRIMARY KEY,

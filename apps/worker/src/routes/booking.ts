@@ -25,6 +25,9 @@ import {
   listBookingAvailabilityExceptions,
   updateBookingAvailabilityException,
   updateBookingMenuSettings,
+  createBookingResource,
+  deleteBookingResourceSafely,
+  updateBookingResourceSafely,
   type BookingExceptionKind,
   type BookingExceptionScope,
   type BookingInterval,
@@ -1195,6 +1198,48 @@ function readPriceModeAndAmount(input: { price_mode?: unknown; base_price?: unkn
   return { ok: true, priceMode, basePrice };
 }
 
+type BookingResourceInput = { name: string; type: string; capacity: number; isActive: boolean };
+const BOOKING_RESOURCE_MUTABLE_FIELDS = ['name', 'type', 'capacity', 'isActive'] as const;
+
+function readBookingResourceInput(
+  body: Record<string, unknown>,
+  current?: BookingResourceInput,
+  mode: 'create' | 'update' = 'create',
+): { ok: true; value: BookingResourceInput } | { ok: false; error: string } {
+  const allowed = new Set<string>([
+    ...BOOKING_RESOURCE_MUTABLE_FIELDS,
+    ...(mode === 'update' ? ['expectedVersion'] : []),
+  ]);
+  const unknown = Object.keys(body).find((key) => !allowed.has(key));
+  if (unknown) return { ok: false, error: `${unknown}は指定できません` };
+  if (mode === 'update' && !BOOKING_RESOURCE_MUTABLE_FIELDS.some((key) => (
+    Object.prototype.hasOwnProperty.call(body, key)
+  ))) return { ok: false, error: '変更する項目を1つ以上指定してください' };
+  const supplied = (key: typeof BOOKING_RESOURCE_MUTABLE_FIELDS[number], fallback: unknown) => (
+    Object.prototype.hasOwnProperty.call(body, key) ? body[key] : fallback
+  );
+  const rawName = supplied('name', current?.name);
+  const rawType = supplied('type', current?.type);
+  const rawCapacity = supplied('capacity', current?.capacity);
+  const rawActive = supplied('isActive', current?.isActive ?? true);
+  if (typeof rawName !== 'string' || rawName.trim().length === 0 || rawName.trim().length > 100) {
+    return { ok: false, error: 'nameは1〜100文字で指定してください' };
+  }
+  if (typeof rawType !== 'string' || rawType.trim().length === 0 || rawType.trim().length > 50) {
+    return { ok: false, error: 'typeは1〜50文字で指定してください' };
+  }
+  if (!Number.isInteger(rawCapacity) || Number(rawCapacity) < 1 || Number(rawCapacity) > 1000) {
+    return { ok: false, error: 'capacityは1〜1000の整数で指定してください' };
+  }
+  if (typeof rawActive !== 'boolean') {
+    return { ok: false, error: 'isActiveはbooleanで指定してください' };
+  }
+  return {
+    ok: true,
+    value: { name: rawName.trim(), type: rawType.trim(), capacity: Number(rawCapacity), isActive: rawActive },
+  };
+}
+
 booking.get('/api/booking/admin/settings', async (c) => {
   const accountId = await resolveAccountIdAdmin(c);
   if (!accountId) return c.json({ success: false, error: 'missing_account_id' }, 400);
@@ -1250,6 +1295,111 @@ booking.get('/api/booking/admin/resources', async (c) => {
   } catch {
     console.error(JSON.stringify({ event: 'booking_resources_read_failed' }));
     return c.json({ success: false, error: 'booking_resources_unavailable' }, 503);
+  }
+});
+
+booking.post('/api/booking/admin/resources', requireRole('owner', 'admin'), async (c) => {
+  const accountId = await resolveAccountIdAdmin(c);
+  if (!accountId) return c.json({ success: false, error: 'missing_account_id' }, 400);
+  try {
+    const body = await c.req.json<Record<string, unknown>>().catch(() => null);
+    if (!body) return c.json({ success: false, error: 'invalid_json' }, 400);
+    const parsed = readBookingResourceInput(body);
+    if (!parsed.ok) return c.json({ success: false, error: parsed.error }, 400);
+    const created = await createBookingResource(c.env.DB, { lineAccountId: accountId, ...parsed.value });
+    const item = {
+      ...created,
+      businessHours: [],
+      exceptions: [],
+      usage: { menuCount: 0, bookingCount: 0, exceptionCount: 0, referenced: false },
+    };
+    return c.json({ success: true, data: item }, 201);
+  } catch {
+    console.error(JSON.stringify({ event: 'booking_resource_create_failed' }));
+    return c.json({ success: false, error: 'booking_resource_save_failed' }, 503);
+  }
+});
+
+booking.patch('/api/booking/admin/resources/:id', requireRole('owner', 'admin'), async (c) => {
+  const accountId = await resolveAccountIdAdmin(c);
+  if (!accountId) return c.json({ success: false, error: 'missing_account_id' }, 400);
+  try {
+    const body = await c.req.json<Record<string, unknown>>().catch(() => null);
+    const expectedVersion = body?.expectedVersion;
+    if (!body || !Number.isInteger(expectedVersion) || Number(expectedVersion) < 1) {
+      return c.json({ success: false, error: 'expectedVersionは1以上の整数で指定してください' }, 400);
+    }
+    const current = (await listBookingAdminResources(c.env.DB, accountId))
+      .find((resource) => resource.id === c.req.param('id'));
+    if (!current) return c.json({ success: false, error: 'not_found' }, 404);
+    const parsed = readBookingResourceInput(body, current, 'update');
+    if (!parsed.ok) return c.json({ success: false, error: parsed.error }, 400);
+    const result = await updateBookingResourceSafely(c.env.DB, {
+      lineAccountId: accountId,
+      resourceId: current.id,
+      expectedVersion: Number(expectedVersion),
+      ...parsed.value,
+    });
+    if (result.status === 'not_found') return c.json({ success: false, error: 'not_found' }, 404);
+    if (result.status === 'version_conflict') {
+      return c.json({
+        success: false, code: 'version_conflict',
+        error: '設備が更新されています。読み直してください',
+        data: { currentVersion: result.currentVersion },
+      }, 409);
+    }
+    if (result.status === 'capacity_conflict') {
+      return c.json({
+        success: false, code: 'capacity_conflict',
+        error: `今後の予約で最大${result.peakQuantity}枠を使用するため、この数には減らせません`,
+        data: { peakQuantity: result.peakQuantity },
+      }, 409);
+    }
+    if (!result.item) throw new Error('booking_resource_update_missing_result');
+    const item = {
+      ...result.item,
+      businessHours: current.businessHours,
+      exceptions: current.exceptions,
+      usage: current.usage,
+    };
+    return c.json({ success: true, data: item });
+  } catch {
+    console.error(JSON.stringify({ event: 'booking_resource_update_failed' }));
+    return c.json({ success: false, error: 'booking_resource_save_failed' }, 503);
+  }
+});
+
+booking.delete('/api/booking/admin/resources/:id', requireRole('owner', 'admin'), async (c) => {
+  const accountId = await resolveAccountIdAdmin(c);
+  if (!accountId) return c.json({ success: false, error: 'missing_account_id' }, 400);
+  try {
+    const body = await c.req.json<Record<string, unknown>>().catch(() => null);
+    const expectedVersion = body?.expectedVersion;
+    if (!body || Object.keys(body).some((key) => key !== 'expectedVersion')
+      || !Number.isInteger(expectedVersion) || Number(expectedVersion) < 1) {
+      return c.json({ success: false, error: 'expectedVersionは1以上の整数で指定してください' }, 400);
+    }
+    const result = await deleteBookingResourceSafely(c.env.DB, {
+      lineAccountId: accountId, resourceId: c.req.param('id'), expectedVersion: Number(expectedVersion),
+    });
+    if (result.status === 'not_found') return c.json({ success: false, error: 'not_found' }, 404);
+    if (result.status === 'version_conflict') {
+      return c.json({
+        success: false, code: 'version_conflict', error: '設備が更新されています。読み直してください',
+        data: { currentVersion: result.currentVersion },
+      }, 409);
+    }
+    if (result.status === 'reference_conflict') {
+      return c.json({
+        success: false, code: 'resource_in_use',
+        error: '予約やメニューで使われている設備は削除できません。停止してください',
+        data: result,
+      }, 409);
+    }
+    return c.json({ success: true, data: { id: c.req.param('id') } });
+  } catch {
+    console.error(JSON.stringify({ event: 'booking_resource_delete_failed' }));
+    return c.json({ success: false, error: 'booking_resource_delete_failed' }, 503);
   }
 });
 

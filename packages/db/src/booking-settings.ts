@@ -78,6 +78,15 @@ export interface BookingAdminResource {
   type: string;
   capacity: number;
   isActive: boolean;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+  usage: {
+    menuCount: number;
+    bookingCount: number;
+    exceptionCount: number;
+    referenced: boolean;
+  };
   businessHours: BookingInterval[];
   exceptions: BookingAvailabilityException[];
 }
@@ -362,10 +371,42 @@ export async function listBookingAdminResources(
   lineAccountId: string,
 ): Promise<BookingAdminResource[]> {
   const [resources, exceptions] = await Promise.all([
-    db.prepare(`SELECT id, line_account_id, name, resource_type, capacity, is_active
-      FROM booking_resources WHERE line_account_id = ? ORDER BY name ASC, id ASC`)
-      .bind(lineAccountId)
-      .all<{ id: string; line_account_id: string; name: string; resource_type: string; capacity: number; is_active: number }>(),
+    db.prepare(`WITH scoped_resources AS (
+        SELECT * FROM booking_resources WHERE line_account_id = ?
+      ), menu_usage AS (
+        SELECT mr.resource_id, COUNT(*) AS menu_count
+        FROM booking_menu_resources mr
+        INNER JOIN scoped_resources sr ON sr.id = mr.resource_id
+        GROUP BY mr.resource_id
+      ), booking_usage AS (
+        SELECT brc.resource_id, COUNT(DISTINCT brc.booking_id) AS booking_count
+        FROM booking_resource_consumptions brc
+        INNER JOIN scoped_resources sr ON sr.id = brc.resource_id
+        WHERE brc.line_account_id = ?
+        GROUP BY brc.resource_id
+      ), exception_usage AS (
+        SELECT e.scope_id AS resource_id, COUNT(*) AS exception_count
+        FROM booking_availability_exceptions e
+        INNER JOIN scoped_resources sr ON sr.id = e.scope_id
+        WHERE e.line_account_id = ? AND e.scope_kind = 'resource'
+        GROUP BY e.scope_id
+      )
+      SELECT r.id, r.line_account_id, r.name, r.resource_type, r.capacity,
+        r.is_active, r.version, r.created_at, r.updated_at,
+        COALESCE(m.menu_count, 0) AS menu_count,
+        COALESCE(b.booking_count, 0) AS booking_count,
+        COALESCE(e.exception_count, 0) AS exception_count
+      FROM scoped_resources r
+      LEFT JOIN menu_usage m ON m.resource_id = r.id
+      LEFT JOIN booking_usage b ON b.resource_id = r.id
+      LEFT JOIN exception_usage e ON e.resource_id = r.id
+      ORDER BY r.name ASC, r.id ASC`)
+      .bind(lineAccountId, lineAccountId, lineAccountId)
+      .all<{
+        id: string; line_account_id: string; name: string; resource_type: string;
+        capacity: number; is_active: number; version: number; created_at: string; updated_at: string;
+        menu_count: number; booking_count: number; exception_count: number;
+      }>(),
     db.prepare(`SELECT * FROM booking_availability_exceptions
       WHERE line_account_id = ? AND scope_kind = 'resource'
       ORDER BY date_from ASC, date_to ASC, id ASC`)
@@ -385,6 +426,15 @@ export async function listBookingAdminResources(
     type: row.resource_type,
     capacity: Number(row.capacity),
     isActive: row.is_active === 1,
+    version: Number(row.version),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    usage: {
+      menuCount: Number(row.menu_count),
+      bookingCount: Number(row.booking_count),
+      exceptionCount: Number(row.exception_count),
+      referenced: Number(row.menu_count) + Number(row.booking_count) + Number(row.exception_count) > 0,
+    },
     businessHours: [],
     exceptions: byResource.get(row.id) ?? [],
   }));
@@ -413,23 +463,20 @@ export async function getBookingAvailabilityException(
   return row ? serializeBookingException(row) : null;
 }
 
-async function bookingExceptionScopeExists(
-  db: D1Database,
+function bookingExceptionScopeWriteGuard(
   lineAccountId: string,
   scopeKind: BookingExceptionScope,
   scopeId: string | null,
-): Promise<boolean> {
-  if (scopeKind === 'store') return scopeId === null;
-  if (!scopeId) return false;
-  const sql = scopeKind === 'staff'
-    ? `SELECT 1 AS ok FROM staff
-        WHERE id = ? AND line_account_id = ? AND is_active = 1`
-    : `SELECT 1 AS ok FROM booking_resources
-        WHERE id = ? AND line_account_id = ? AND is_active = 1`;
-  const row = await db.prepare(sql)
-    .bind(scopeId, lineAccountId)
-    .first<{ ok: number }>();
-  return Boolean(row?.ok);
+): { sql: string; values: Array<string | null> } {
+  if (scopeKind === 'store') {
+    return { sql: '? IS NULL', values: [scopeId] };
+  }
+  const table = scopeKind === 'staff' ? 'staff' : 'booking_resources';
+  return {
+    sql: `EXISTS (SELECT 1 FROM ${table}
+      WHERE id = ? AND line_account_id = ? AND is_active = 1)`,
+    values: [scopeId, lineAccountId],
+  };
 }
 
 export async function createBookingAvailabilityException(
@@ -445,15 +492,19 @@ export async function createBookingAvailabilityException(
     reason: string | null;
   },
 ): Promise<BookingAvailabilityException | null> {
-  if (!await bookingExceptionScopeExists(db, input.lineAccountId, input.scopeKind, input.scopeId)) {
-    return null;
-  }
   const id = crypto.randomUUID();
   const now = jstNow();
-  await db.prepare(`INSERT INTO booking_availability_exceptions
+  const guard = bookingExceptionScopeWriteGuard(
+    input.lineAccountId,
+    input.scopeKind,
+    input.scopeId,
+  );
+  const row = await db.prepare(`INSERT INTO booking_availability_exceptions
     (id, line_account_id, scope_kind, scope_id, date_from, date_to,
      kind, hours_json, reason, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+    SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+    WHERE ${guard.sql}
+    RETURNING *`)
     .bind(
       id,
       input.lineAccountId,
@@ -466,11 +517,8 @@ export async function createBookingAvailabilityException(
       input.reason,
       now,
       now,
+      ...guard.values,
     )
-    .run();
-  const row = await db.prepare(`SELECT * FROM booking_availability_exceptions
-    WHERE id = ? AND line_account_id = ?`)
-    .bind(id, input.lineAccountId)
     .first<BookingAvailabilityExceptionRow>();
   return row ? serializeBookingException(row) : null;
 }
@@ -495,13 +543,17 @@ export async function updateBookingAvailabilityException(
   | { status: 'not_found' }
   | { status: 'scope_not_found' }
 > {
-  if (!await bookingExceptionScopeExists(db, input.lineAccountId, input.scopeKind, input.scopeId)) {
-    return { status: 'scope_not_found' };
-  }
-  const result = await db.prepare(`UPDATE booking_availability_exceptions
+  const guard = bookingExceptionScopeWriteGuard(
+    input.lineAccountId,
+    input.scopeKind,
+    input.scopeId,
+  );
+  const row = await db.prepare(`UPDATE booking_availability_exceptions
     SET scope_kind = ?, scope_id = ?, date_from = ?, date_to = ?, kind = ?,
         hours_json = ?, reason = ?, version = version + 1, updated_at = ?
-    WHERE id = ? AND line_account_id = ? AND version = ?`)
+    WHERE id = ? AND line_account_id = ? AND version = ?
+      AND ${guard.sql}
+    RETURNING *`)
     .bind(
       input.scopeKind,
       input.scopeId,
@@ -514,24 +566,18 @@ export async function updateBookingAvailabilityException(
       input.id,
       input.lineAccountId,
       input.expectedVersion,
+      ...guard.values,
     )
-    .run();
-  if ((result.meta.changes ?? 0) > 0) {
-    const row = await db.prepare(`SELECT * FROM booking_availability_exceptions
-      WHERE id = ? AND line_account_id = ?`)
-      .bind(input.id, input.lineAccountId)
-      .first<BookingAvailabilityExceptionRow>();
-    return row
-      ? { status: 'updated', item: serializeBookingException(row) }
-      : { status: 'not_found' };
-  }
+    .first<BookingAvailabilityExceptionRow>();
+  if (row) return { status: 'updated', item: serializeBookingException(row) };
   const current = await db.prepare(`SELECT version FROM booking_availability_exceptions
     WHERE id = ? AND line_account_id = ?`)
     .bind(input.id, input.lineAccountId)
     .first<{ version: number }>();
-  return current
-    ? { status: 'conflict', currentVersion: Number(current.version) }
-    : { status: 'not_found' };
+  if (!current) return { status: 'not_found' };
+  return Number(current.version) === input.expectedVersion
+    ? { status: 'scope_not_found' }
+    : { status: 'conflict', currentVersion: Number(current.version) };
 }
 
 export async function updateBookingMenuSettings(

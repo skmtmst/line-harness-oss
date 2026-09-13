@@ -9,6 +9,9 @@ const fixture = vi.hoisted(() => ({
   saveSettings: vi.fn(),
   listMenus: vi.fn(),
   listResources: vi.fn(),
+  createResource: vi.fn(),
+  updateResource: vi.fn(),
+  deleteResource: vi.fn(),
   getAvailability: vi.fn(),
 }))
 
@@ -51,6 +54,9 @@ vi.mock('@/lib/api', () => {
       saveSettings: (...args: unknown[]) => fixture.saveSettings(...args),
       listMenus: (...args: unknown[]) => fixture.listMenus(...args),
       listResources: (...args: unknown[]) => fixture.listResources(...args),
+      createResource: (...args: unknown[]) => fixture.createResource(...args),
+      updateResource: (...args: unknown[]) => fixture.updateResource(...args),
+      deleteResource: (...args: unknown[]) => fixture.deleteResource(...args),
       getAvailability: (...args: unknown[]) => fixture.getAvailability(...args),
       createException: vi.fn(),
     },
@@ -87,7 +93,37 @@ function settings(accountId = 'account-a', overrides: Record<string, unknown> = 
   }
 }
 
+function resource(id = 'resource-a', overrides: Record<string, unknown> = {}) {
+  return {
+    id,
+    lineAccountId: 'account-a',
+    name: '個室A',
+    type: 'room',
+    capacity: 2,
+    isActive: true,
+    version: 1,
+    createdAt: '2026-09-01T00:00:00+09:00',
+    updatedAt: '2026-09-01T00:00:00+09:00',
+    businessHours: [],
+    exceptions: [],
+    usage: { menuCount: 0, bookingCount: 0, exceptionCount: 0, referenced: false },
+    ...overrides,
+  }
+}
+
 beforeEach(() => {
+  const stored = new Map<string, string>()
+  Object.defineProperty(window, 'localStorage', {
+    configurable: true,
+    value: {
+      clear: () => stored.clear(),
+      getItem: (key: string) => stored.get(key) ?? null,
+      setItem: (key: string, value: string) => stored.set(key, value),
+      removeItem: (key: string) => stored.delete(key),
+    },
+  })
+  window.localStorage.clear()
+  window.localStorage.setItem('lh_staff_role', 'owner')
   fixture.selectedAccountId = 'account-a'
   fixture.getSettings.mockImplementation(async (accountId: string) => ({ success: true, data: settings(accountId) }))
   fixture.saveSettings.mockImplementation(async (accountId: string, body: Record<string, unknown>) => ({
@@ -101,6 +137,13 @@ beforeEach(() => {
   }))
   fixture.listMenus.mockResolvedValue({ menus: [{ id: 'menu-1', is_active: 1 }] })
   fixture.listResources.mockResolvedValue({ data: { resources: [] } })
+  fixture.createResource.mockImplementation(async (accountId: string, body: Record<string, unknown>) => ({
+    data: resource('resource-new', { lineAccountId: accountId, ...body }),
+  }))
+  fixture.updateResource.mockImplementation(async (_accountId: string, _id: string, body: Record<string, unknown>) => ({
+    data: resource('resource-a', { ...body, version: 2 }),
+  }))
+  fixture.deleteResource.mockResolvedValue({ data: { id: 'resource-a' } })
   fixture.getAvailability.mockResolvedValue({ by_staff: [] })
 })
 
@@ -192,5 +235,104 @@ describe('店舗営業時間の編集', () => {
     expect(fixture.getSettings.mock.calls.filter(([id]) => id === 'account-b')).toHaveLength(1)
     expect(screen.queryByText('営業時間を保存しました。')).toBeNull()
     expect(screen.getByText(/まだ週全体の営業時間を保存していません/)).toBeTruthy()
+  })
+})
+
+describe('予約設備の編集', () => {
+  test('保存失敗でも入力を残し、再試行でき、連打は1要求にまとめる', async () => {
+    fixture.listResources.mockResolvedValue({ data: { resources: [resource()] } })
+    let rejectFirst!: (reason: unknown) => void
+    fixture.updateResource.mockImplementationOnce(() => new Promise((_resolve, reject) => { rejectFirst = reject }))
+    await renderEditor()
+    const name = await screen.findByLabelText('個室Aの設備名') as HTMLInputElement
+    fireEvent.change(name, { target: { value: '個室B' } })
+    const save = screen.getByRole('button', { name: '設備を保存' })
+    act(() => {
+      save.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      save.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+    expect(fixture.updateResource).toHaveBeenCalledTimes(1)
+    await act(async () => { rejectFirst(new Error('network')); await Promise.resolve() })
+    expect((await screen.findByRole('alert')).textContent).toContain('入力内容は残っています')
+    expect(name.value).toBe('個室B')
+
+    fireEvent.click(screen.getByRole('button', { name: '設備を保存' }))
+    await waitFor(() => expect(fixture.updateResource).toHaveBeenCalledTimes(2))
+    expect(fixture.updateResource).toHaveBeenLastCalledWith('account-a', 'resource-a', expect.objectContaining({
+      expectedVersion: 1, name: '個室B', capacity: 2,
+    }))
+  })
+
+  test('停止・再開・削除はexpectedVersion付きで送り、staffは閲覧だけ', async () => {
+    fixture.listResources.mockResolvedValue({ data: { resources: [resource()] } })
+    await renderEditor()
+    fireEvent.click(await screen.findByRole('button', { name: '受付を停止' }))
+    await waitFor(() => expect(fixture.updateResource).toHaveBeenCalledWith(
+      'account-a', 'resource-a', expect.objectContaining({ expectedVersion: 1, isActive: false }),
+    ))
+
+    cleanup()
+    accountSetters.clear()
+    window.localStorage.setItem('lh_staff_role', 'staff')
+    fixture.listResources.mockResolvedValue({ data: { resources: [resource()] } })
+    await renderEditor()
+    expect((await screen.findByLabelText('個室Aの設備名') as HTMLInputElement).disabled).toBe(true)
+    expect(screen.queryByRole('button', { name: '設備を保存' })).toBeNull()
+    expect(screen.getByText(/閲覧のみです/)).toBeTruthy()
+  })
+
+  test('account切替直後は旧設備を新accountとして描画せず、旧保存応答も捨てる', async () => {
+    fixture.listResources.mockImplementation(async (accountId: string) => ({
+      data: { resources: accountId === 'account-a' ? [resource()] : [] },
+    }))
+    let resolveSave!: (value: unknown) => void
+    fixture.updateResource.mockImplementationOnce(() => new Promise((resolve) => { resolveSave = resolve }))
+    await renderEditor()
+    fireEvent.click(await screen.findByRole('button', { name: '設備を保存' }))
+    await waitFor(() => expect(fixture.updateResource).toHaveBeenCalledTimes(1))
+
+    switchAccount('account-b')
+    expect(screen.queryByLabelText('個室Aの設備名')).toBeNull()
+    await screen.findByText('設備は登録されていません')
+    await act(async () => {
+      resolveSave({ data: resource('resource-a', { name: '旧応答', version: 2 }) })
+      await Promise.resolve()
+    })
+    expect(screen.queryByText('旧応答')).toBeNull()
+    expect(screen.getByText('設備は登録されていません')).toBeTruthy()
+  })
+
+  test('切替先の読込失敗は永久loadingにせず、エラーから再試行できる', async () => {
+    fixture.listResources.mockImplementation(async (accountId: string) => {
+      if (accountId === 'account-b' && fixture.listResources.mock.calls.filter(([id]) => id === 'account-b').length === 1) {
+        throw new Error('temporary')
+      }
+      return { data: { resources: [] } }
+    })
+    await renderEditor()
+    switchAccount('account-b')
+    await screen.findByText('受付時間と休業日を表示できませんでした')
+    fireEvent.click(screen.getByRole('button', { name: '受付時間と休業日を再読み込み' }))
+    await waitFor(() => expect(fixture.listResources.mock.calls.filter(([id]) => id === 'account-b')).toHaveLength(2))
+    await screen.findByText('設備は登録されていません')
+  })
+
+  test('設備追加の連打を1要求にし、成功した設備を一覧へ反映する', async () => {
+    let resolveCreate!: (value: unknown) => void
+    fixture.createResource.mockImplementationOnce(() => new Promise((resolve) => { resolveCreate = resolve }))
+    await renderEditor()
+    fireEvent.change(await screen.findByLabelText('新しい設備名'), { target: { value: '新個室' } })
+    fireEvent.change(screen.getByLabelText('新しい設備の種類'), { target: { value: 'room' } })
+    const add = screen.getByRole('button', { name: '設備を追加' })
+    act(() => {
+      add.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      add.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+    expect(fixture.createResource).toHaveBeenCalledTimes(1)
+    await act(async () => {
+      resolveCreate({ data: resource('resource-new', { name: '新個室' }) })
+      await Promise.resolve()
+    })
+    await screen.findByLabelText('新個室の設備名')
   })
 })
