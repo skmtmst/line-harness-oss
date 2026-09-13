@@ -202,8 +202,12 @@ describe('既存メニューの編集窓: 共有設備の割当', () => {
     fireEvent.click(screen.getByRole('checkbox', { name: /席A/ }))
     fireEvent.change(screen.getByRole('spinbutton', { name: '個室Aの必要数' }), { target: { value: '2' } })
     const saveButton = screen.getByRole('button', { name: '設備の割当を保存' })
-    fireEvent.click(saveButton)
-    fireEvent.click(saveButton)
+    // 同じ描画中に2イベントを届け、disabledへの再描画ではなくuseRefの
+    // single-flight guardそのものが二重要求を止めることを確かめる。
+    act(() => {
+      saveButton.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      saveButton.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
     expect(fixture.saveMenuResources).toHaveBeenCalledTimes(1)
     expect(fixture.saveMenuResources).toHaveBeenCalledWith('account-a', 'menu-1', {
       expectedVersion: 1,
