@@ -37,6 +37,11 @@ import { canTransition, nextStatus, type BookingAction } from '../services/booki
 import { getAccountTimeZone, getAvailability, getStoreCapacitySnapshot, tzDateStr, tzHHMM } from '../services/availability.js';
 import { STORE_CAPACITY_GUARD_SQL, STORE_SETTINGS_VERSION_GUARD_SQL } from '../services/booking-store-capacity.js';
 import {
+  BOOKING_RESOURCE_CAPACITY_GUARD_SQL,
+  bookingResourceGuardBindings,
+  insertBookingWithResourceSnapshot,
+} from '../services/booking-resource-capacity.js';
+import {
   enqueueCalendarDeleteOperation,
   removeBookingFromGoogle,
   runCalendarDeleteOperation,
@@ -46,6 +51,7 @@ import {
 import {
   completeIdempotencyResponse,
   findIdempotencyResponse,
+  releaseReservedIdempotencyResponse,
   reserveIdempotencyResponse,
   saveIdempotencyResponse,
 } from '../services/booking-idempotency.js';
@@ -642,8 +648,7 @@ booking.post('/api/liff/booking/requests', async (c) => {
   // 競合チェックと INSERT を 1 ステートメントで原子化する。
   // INSERT ... SELECT WHERE NOT EXISTS パターンで、同一スタッフの overlap 行がある場合は
   // 0 行 INSERT に落とす。changes=0 を 409 として扱う。
-  const insertResult = await c.env.DB
-    .prepare(
+  const bookingInsert = c.env.DB.prepare(
       `INSERT INTO bookings
         (id, line_account_id, friend_id, staff_id, menu_id,
          starts_at, ends_at, block_ends_at, status,
@@ -669,7 +674,8 @@ booking.post('/api/liff/booking/requests', async (c) => {
              AND menu_id = ?
         ) < ?
         ${STORE_CAPACITY_GUARD_SQL}
-        ${STORE_SETTINGS_VERSION_GUARD_SQL}`,
+        ${STORE_SETTINGS_VERSION_GUARD_SQL}
+        ${BOOKING_RESOURCE_CAPACITY_GUARD_SQL}`,
     )
     .bind(
       bookingId,
@@ -697,9 +703,20 @@ booking.post('/api/liff/booking/requests', async (c) => {
       Math.max(1, menuRow.concurrent_capacity ?? 1),
       JSON.stringify(storeCapacity.windows), accountId, accountId,
       accountId, storeCapacity.settingsVersion,
-    )
-    .run();
-  if ((insertResult.meta?.changes ?? 0) === 0) {
+      ...bookingResourceGuardBindings({
+        menuId: body.menu_id,
+        lineAccountId: accountId,
+        startsAt: startsAt.toISOString(),
+        blockEndsAt: blockEndsAt.toISOString(),
+      }),
+    );
+  const insertResult = await insertBookingWithResourceSnapshot(c.env.DB, {
+    bookingInsert,
+    bookingId,
+    lineAccountId: accountId,
+    menuId: body.menu_id,
+  });
+  if (!insertResult.inserted) {
     const err = { error: 'slot_conflict' };
     await saveIdempotencyResponse(c.env.DB, {
       key: idemKey,
@@ -2113,8 +2130,7 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
     day_before: sendLineConfirmation,
     hours_before: sendLineConfirmation,
   });
-  const insertResult = await c.env.DB
-    .prepare(
+  const bookingInsert = c.env.DB.prepare(
       `INSERT INTO bookings
         (id, line_account_id, friend_id, booking_customer_id, staff_id, menu_id,
          starts_at, ends_at, block_ends_at, status,
@@ -2141,7 +2157,8 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
              AND menu_id = ?
         ) < ?
         ${STORE_CAPACITY_GUARD_SQL}
-        ${STORE_SETTINGS_VERSION_GUARD_SQL}`,
+        ${STORE_SETTINGS_VERSION_GUARD_SQL}
+        ${BOOKING_RESOURCE_CAPACITY_GUARD_SQL}`,
     )
     .bind(
       bookingId,
@@ -2174,9 +2191,31 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
       Math.max(1, menuRow.concurrent_capacity ?? 1),
       JSON.stringify(storeCapacity.windows), accountId, accountId,
       accountId, storeCapacity.settingsVersion,
-    )
-    .run();
-  if ((insertResult.meta?.changes ?? 0) === 0) {
+      ...bookingResourceGuardBindings({
+        menuId: body.menu_id,
+        lineAccountId: accountId,
+        startsAt: startsAt.toISOString(),
+        blockEndsAt: blockEndsAt.toISOString(),
+      }),
+    );
+  let insertResult: { inserted: boolean; consumptionCount: number };
+  try {
+    insertResult = await insertBookingWithResourceSnapshot(c.env.DB, {
+      bookingInsert,
+      bookingId,
+      lineAccountId: accountId,
+      menuId: body.menu_id,
+    });
+  } catch (error) {
+    await releaseReservedIdempotencyResponse(c.env.DB, {
+      key: idemKey,
+      lineAccountId: accountId,
+      friendId: idempotencySubject,
+      bookingId,
+    });
+    throw error;
+  }
+  if (!insertResult.inserted) {
     const alternatives = await bookingConflictAlternatives(c.env.DB, c.env, {
       lineAccountId: accountId,
       menuId: body.menu_id,

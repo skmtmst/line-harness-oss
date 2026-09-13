@@ -149,7 +149,19 @@ interface StubData {
   shifts?: Array<{ staff_id: string; work_date: string; start_time: string; end_time: string }>;
   rules?: Array<{ staff_id: string; weekday: number; start_time: string; end_time: string }>;
   bookings?: Array<{ staff_id: string; starts_at: string; block_ends_at: string }>;
-  menuResources?: Array<{ id: string; capacity: number; quantity: number }>;
+  menuResources?: Array<{
+    id: string;
+    capacity: number | null;
+    quantity: number;
+    resource_account_id?: string | null;
+    is_active?: number | null;
+  }>;
+  resourceBookings?: Array<{
+    resource_id: string;
+    quantity: number;
+    starts_at: string;
+    block_ends_at: string;
+  }>;
   exceptions?: StubException[];
   timezone?: string | null;
   calendarConnection?: {
@@ -180,8 +192,17 @@ function stubDB(data: StubData, seen?: Array<{ sql: string; args: unknown[] }>):
           if (sql.includes('booking_availability_exceptions')) {
             return { results: data.exceptions ?? [] };
           }
+          if (sql.includes('booking_resource_consumptions')) {
+            return { results: data.resourceBookings ?? [] };
+          }
           if (sql.includes('booking_menu_resources')) {
-            return { results: data.menuResources ?? [] };
+            return {
+              results: (data.menuResources ?? []).map((row) => ({
+                resource_account_id: 'A1',
+                is_active: 1,
+                ...row,
+              })),
+            };
           }
           if (sql.includes('FROM staff') && sql.includes('staff_menus')) {
             return { results: data.staff ?? [] };
@@ -699,6 +720,66 @@ describe('getAvailability の例外日（休業日・終日・時間帯）', () 
       params,
     );
     expect(unusedClosed.by_staff[0].slots.map((s) => s.start)).toEqual(['10:00', '10:30', '11:00']);
+  });
+
+  test('別スタッフ・別メニューのsnapshot消費も合算し、buffer終端までは資源枠を塞ぐ', async () => {
+    const result = await getAvailability(stubDB({
+      menu: { ...MENU_BASIC, concurrent_capacity: 5 },
+      staff: STAFF_S1,
+      shifts: [{ staff_id: 'S1', work_date: '2026-05-09', start_time: '10:00', end_time: '13:00' }],
+      menuResources: [{ id: 'R1', capacity: 3, quantity: 2 }],
+      resourceBookings: [
+        {
+          resource_id: 'R1', quantity: 1,
+          starts_at: '2026-05-09T01:30:00Z', block_ends_at: '2026-05-09T03:00:00Z',
+        },
+        {
+          resource_id: 'R1', quantity: 1,
+          starts_at: '2026-05-09T02:00:00Z', block_ends_at: '2026-05-09T03:00:00Z',
+        },
+      ],
+    }), {
+      lineAccountId: 'A1', menuId: 'M1', from: '2026-05-09', to: '2026-05-09',
+      now: new Date('2026-05-08T00:00:00Z'), minLeadTimeMinutes: 0,
+    });
+    const starts = result.by_staff[0].slots.map((slot) => slot.start);
+    expect(starts).not.toContain('10:30');
+    expect(starts).not.toContain('11:00');
+    expect(starts).not.toContain('11:30');
+    expect(starts).toContain('12:00');
+  });
+
+  test.each([
+    { label: '停止', row: { id: 'R1', capacity: 2, quantity: 1, is_active: 0 } },
+    { label: '欠損', row: { id: 'R1', capacity: null, quantity: 1, resource_account_id: null, is_active: null } },
+    { label: '別account', row: { id: 'R1', capacity: 2, quantity: 1, resource_account_id: 'A2' } },
+    { label: '必要数超過', row: { id: 'R1', capacity: 1, quantity: 2 } },
+  ])('$label 資源を含むメニューはfail-closed', async ({ row }) => {
+    const result = await getAvailability(stubDB({
+      menu: MENU_BASIC,
+      staff: STAFF_S1,
+      shifts: [{ staff_id: 'S1', work_date: '2026-05-09', start_time: '10:00', end_time: '12:00' }],
+      menuResources: [row],
+    }), {
+      lineAccountId: 'A1', menuId: 'M1', from: '2026-05-09', to: '2026-05-09',
+      now: new Date('2026-05-08T00:00:00Z'), minLeadTimeMinutes: 0,
+    });
+    expect(result.by_staff[0].slots).toEqual([]);
+  });
+
+  test('必要数がcapacityを超える資源は消費snapshot集計へ進む前に閉じる', async () => {
+    const seen: Array<{ sql: string; args: unknown[] }> = [];
+    const result = await getAvailability(stubDB({
+      menu: MENU_BASIC,
+      staff: STAFF_S1,
+      shifts: [{ staff_id: 'S1', work_date: '2026-05-09', start_time: '10:00', end_time: '12:00' }],
+      menuResources: [{ id: 'R1', capacity: 1, quantity: 2 }],
+    }, seen), {
+      lineAccountId: 'A1', menuId: 'M1', from: '2026-05-09', to: '2026-05-09',
+      now: new Date('2026-05-08T00:00:00Z'), minLeadTimeMinutes: 0,
+    });
+    expect(result.by_staff[0].slots).toEqual([]);
+    expect(seen.some((call) => call.sql.includes('booking_resource_consumptions'))).toBe(false);
   });
 
   test('未知の種類の行は無視する', async () => {

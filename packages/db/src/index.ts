@@ -25,6 +25,7 @@ export * from './conversion-event-sources';
 export * from './affiliates';
 export * from './webhooks';
 export * from './booking-settings';
+export * from './booking-resources';
 export * from './line-webhook-events';
 export * from './friend-add-events';
 export * from './friend-add-routing-versions';
