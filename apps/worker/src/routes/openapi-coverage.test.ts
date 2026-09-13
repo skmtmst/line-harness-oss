@@ -122,8 +122,8 @@ function formatKeys(keys: string[]): string {
  * - ALLOWLIST_MAX: 未記載負債はここより増やせない
  * 後続票で記載を増やしたら、実測に合わせて両方を同じ PR で更新する。
  */
-// 本流の95件に、#19 の統括バナー生成17口を足して112件。
-const DOCUMENTED_MIN = 112;
+// 本流の95件に、#19 の統括バナー生成17口と #20 の集計1口を足して113件。
+const DOCUMENTED_MIN = 113;
 const ALLOWLIST_MAX = 777;
 
 /**
@@ -170,6 +170,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'GET /api/hq/banners/presets',
   'GET /api/hq/banners/projects',
   'GET /api/hq/banners/projects/{id}',
+  'GET /api/hq/banners/stats',
   'GET /api/hq/banners/usage',
   'GET /api/line-accounts',
   'GET /api/line-accounts/{id}',
