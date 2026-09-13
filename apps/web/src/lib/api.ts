@@ -3516,6 +3516,8 @@ export type NenCampaignSetting = {
   buttonLabel: string | null
   buttonUrl: string | null
   imageUrl: string | null
+  dedupWindowDays: number
+  excludeFormRespondents: boolean
   afterActions: NenCampaignAfterAction[]
   updatedAt: string
 }
@@ -7720,7 +7722,7 @@ export const api = {
       `/api/nen-campaigns/settings?lineAccountId=${encodeURIComponent(accountId)}`,
     ),
     updateSetting: (accountId: string, campaignKey: string, data: Pick<NenCampaignSetting,
-      'isEnabled' | 'title' | 'bodyText' | 'delayDays' | 'deliveryTime' | 'buttonLabel' | 'buttonUrl' | 'imageUrl' | 'afterActions'>) =>
+      'isEnabled' | 'title' | 'bodyText' | 'delayDays' | 'deliveryTime' | 'buttonLabel' | 'buttonUrl' | 'imageUrl' | 'dedupWindowDays' | 'excludeFormRespondents' | 'afterActions'>) =>
       fetchApi<{ success: boolean }>(`/api/nen-campaigns/settings/${encodeURIComponent(campaignKey)}?lineAccountId=${encodeURIComponent(accountId)}`, {
         method: 'PUT', body: JSON.stringify(data),
       }),

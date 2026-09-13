@@ -35,13 +35,18 @@ const campaign = {
   image_url: null,
 };
 
-function createDb(lineAccountId = 'account-a', retryGeneration = 0) {
+function createDb(
+  lineAccountId = 'account-a',
+  retryGeneration = 0,
+  options: { campaign?: typeof campaign; alreadyResponded?: boolean } = {},
+) {
   const updates: Array<{ sql: string; values: unknown[] }> = [];
+  const selectedCampaign = options.campaign ?? campaign;
   const job = {
-    id: 'job-1', campaign_key: 'arrival_check', friend_id: 'friend-1',
+    id: 'job-1', campaign_key: selectedCampaign.campaign_key, friend_id: 'friend-1',
     line_account_id: lineAccountId, source_key: 'order:1',
     payload: JSON.stringify({}),
-    campaign_snapshot: JSON.stringify({ ...campaign, title: '予約時の見出し' }),
+    campaign_snapshot: JSON.stringify({ ...selectedCampaign, title: '予約時の見出し' }),
     retry_generation: retryGeneration,
   };
   const db = {
@@ -58,7 +63,8 @@ function createDb(lineAccountId = 'account-a', retryGeneration = 0) {
           return { results: [] };
         },
         async first() {
-          if (sql.includes('FROM nen_campaign_settings')) return campaign;
+          if (sql.includes('FROM nen_campaign_settings')) return selectedCampaign;
+          if (sql.includes('FROM form_submissions')) return options.alreadyResponded ? { found: 1 } : null;
           return null;
         },
         async run() {
@@ -129,5 +135,37 @@ describe('processNenDeliveries account and snapshot safety', () => {
       'https://proxy.example.com', 'account-token', 'U1', expect.any(Array),
       'job-1:manual:2', undefined,
     );
+  });
+
+  it('skips a queued review request when the friend responds before delivery', async () => {
+    const reviewCampaign = {
+      ...campaign,
+      campaign_key: 'review_request',
+      exclude_form_respondents: 1,
+      after_actions: [{
+        kind: 'open_form' as const,
+        formId: 'review-form',
+        formName: '口コミ',
+        buttonLabel: '回答する',
+      }],
+    };
+    const { db, updates } = createDb('account-a', 0, {
+      campaign: reviewCampaign,
+      alreadyResponded: true,
+    });
+    dbMocks.getFriendById.mockResolvedValue({
+      id: 'friend-1', line_user_id: 'U1', line_account_id: 'account-a', is_following: 1,
+    });
+    dbMocks.getLineAccountById.mockResolvedValue({ id: 'account-a', channel_access_token: 'account-token' });
+
+    await expect(processNenDeliveries(db, {
+      proxyBaseUrl: 'https://proxy.example.com', defaultAccessToken: 'must-not-be-used',
+    })).resolves.toEqual({ sent: 0, failed: 0, skipped: 1 });
+
+    expect(pushViaHarnessProxy).not.toHaveBeenCalled();
+    expect(updates).toContainEqual(expect.objectContaining({
+      sql: expect.stringContaining("status = 'skipped'"),
+      values: ['campaign_form_already_submitted', '2026-08-28 01:00:00', 'job-1'],
+    }));
   });
 });
