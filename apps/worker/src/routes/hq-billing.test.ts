@@ -51,6 +51,9 @@ function env(overrides: Partial<Env['Bindings']> = {}): Env['Bindings'] {
     STRIPE_PRICE_LIGHT: 'price_light',
     STRIPE_PRICE_STANDARD: 'price_standard',
     STRIPE_PRICE_PRO: 'price_pro',
+    STRIPE_PRICE_LIGHT_YEAR: 'price_test_light_year',
+    STRIPE_PRICE_STANDARD_YEAR: 'price_test_standard_year',
+    STRIPE_PRICE_PRO_YEAR: 'price_test_pro_year',
     ...overrides,
   } as Env['Bindings'];
 }
@@ -98,6 +101,31 @@ beforeEach(() => {
 });
 
 describe('契約状況（summary）', () => {
+  it('年も Stripe の金額が正本で、価格IDは応答に含まない', async () => {
+    stripe.retrievePrice.mockImplementation(async (_env, id: string) => ({ unit_amount: id.endsWith('_year') ? 100001 : 10000, currency: 'jpy' }));
+    const res = await call('GET', '/api/hq/billing/summary');
+    const json = await res.json<{ data: { plans: Array<Record<string, unknown>> } }>();
+    expect(json.data.plans[0]).toMatchObject({ monthlyYen: 10000, yearlyYen: 100001, yearlyPriceFromStripe: true, yearlyAvailable: true });
+    expect(JSON.stringify(json)).not.toMatch(/price_test_|sk_test_|whsec_/);
+  });
+
+  it('年の価格が取れなくても仮の決定額を出し、未設定のプランだけ年の申込みを止める', async () => {
+    stripe.retrievePrice.mockRejectedValue(new Error('unavailable'));
+    const res = await call('GET', '/api/hq/billing/summary', undefined, { env: { STRIPE_PRICE_LIGHT_YEAR: undefined } });
+    const { data } = await res.json<{ data: { plans: Array<Record<string, unknown>> } }>();
+    expect(data.plans.map((p) => p.yearlyYen)).toEqual([99000, 303000, 609000]);
+    expect(data.plans[0]).toMatchObject({ available: true, yearlyAvailable: false, yearlyPriceFromStripe: false });
+    expect(data.plans[1]).toMatchObject({ available: true, yearlyAvailable: true, yearlyPriceFromStripe: false });
+  });
+
+  it('Stripe の契約取得に失敗しても画面は返し、月払いと誤表示しない', async () => {
+    setTenant({ plan_key: 'light', plan_status: 'active', stripe_subscription_id: 'sub_test' });
+    stripe.retrieveSubscription.mockRejectedValue(new Error('unavailable'));
+    const res = await call('GET', '/api/hq/billing/summary');
+    expect(res.status).toBe(200);
+    expect((await res.json<{ data: { planInterval: string | null } }>()).data.planInterval).toBeNull();
+  });
+
   it('既存の統括は課金対象外で、何も止まらない', async () => {
     const res = await call('GET', '/api/hq/billing/summary', undefined, { env: { STRIPE_SECRET_KEY: undefined } });
     expect(res.status).toBe(200);
@@ -135,6 +163,29 @@ describe('申込（checkout）', () => {
     setTenant({ plan_status: 'trialing', trial_ends_at: '2020-01-01T00:00:00.000' });
     stripe.createCustomer.mockResolvedValue({ id: 'cus_1', email: 'masato@example.com', name: '既定の統括' });
     stripe.createCheckoutSession.mockResolvedValue({ id: 'cs_1', url: 'https://checkout.stripe.com/c/pay/cs_1', customer: 'cus_1', subscription: null, client_reference_id: DEFAULT_TENANT_ID });
+  });
+
+  it.each(['light', 'standard', 'pro'])('%s を年払いで申し込むと年の Price を選ぶ', async (planKey) => {
+    const res = await call('POST', '/api/hq/billing/checkout', { planKey, interval: 'year' });
+    expect(res.status).toBe(200);
+    expect(stripe.createCheckoutSession.mock.calls[0][1]).toMatchObject({ planKey, priceId: `price_test_${planKey}_year` });
+  });
+
+  it('年の Price 未設定は503と案内文、顧客・Checkoutは作らない（月払いは使える）', async () => {
+    const opts = { env: { STRIPE_PRICE_LIGHT_YEAR: undefined } };
+    const res = await call('POST', '/api/hq/billing/checkout', { planKey: 'light', interval: 'year' }, opts);
+    expect(res.status).toBe(503);
+    expect((await res.json<{ error: string }>()).error).toBe('このプランの価格がまだ設定されていません。運営にお問い合わせください');
+    expect(stripe.createCustomer).not.toHaveBeenCalled();
+    expect(stripe.createCheckoutSession).not.toHaveBeenCalled();
+    expect((await call('POST', '/api/hq/billing/checkout', { planKey: 'light', interval: 'month' }, opts)).status).toBe(200);
+    expect(stripe.createCheckoutSession.mock.calls[0][1].priceId).toBe('price_light');
+  });
+
+  it.each(['week', '', null, 1, {}, []])('不正な周期 %j は400で止める', async (interval) => {
+    expect((await call('POST', '/api/hq/billing/checkout', { planKey: 'light', interval })).status).toBe(400);
+    expect(stripe.createCheckoutSession).not.toHaveBeenCalled();
+    expect(stripe.createCustomer).not.toHaveBeenCalled();
   });
 
   it('オーナーがプランを選ぶと、顧客を作って Checkout の URL を返す', async () => {
@@ -207,6 +258,19 @@ describe('課金 Webhook', () => {
     expect((await webhook(completed(), { secret: 'wrong' })).status).toBe(400);
     expect((await webhook(completed(), { env: { STRIPE_BILLING_WEBHOOK_SECRET: undefined } })).status).toBe(503);
     expect(tenantRow().plan_status).toBe('trialing');
+  });
+
+  it.each(['checkout.session.completed', 'customer.subscription.created', 'customer.subscription.updated'])('%s で年払いを契約中にし、年の更新日をそのまま保存する', async (type) => {
+    const end = Math.floor(Date.parse('2027-09-13T00:00:00Z') / 1000);
+    const subscription = { id: 'sub_1', status: 'active', customer: 'cus_1', metadata: { plan_key: 'light' },
+      items: { data: [{ price: { id: 'price_test_pro_year' }, current_period_end: end }] } };
+    setTenant({ stripe_customer_id: 'cus_1' });
+    stripe.retrieveSubscription.mockResolvedValue(subscription);
+    const event = type === 'checkout.session.completed' ? completed() : { id: 'evt_test_year', type, data: { object: subscription } };
+    expect((await webhook(event)).status).toBe(200);
+    expect(tenantRow()).toMatchObject({ plan_key: 'pro', plan_status: 'active', current_period_ends_at: '2027-09-13T00:00:00.000Z' });
+    const res = await call('GET', '/api/hq/billing/summary');
+    expect((await res.json<{ data: Record<string, unknown> }>()).data).toMatchObject({ planInterval: 'year', planKey: 'pro', state: 'active', currentPeriodEndsAt: '2027-09-13T00:00:00.000Z' });
   });
 
   it('申込が完了すると契約中になり、プランは Stripe の価格から決まる', async () => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatJstMonthDay, planKeyForPrice, priceIdForPlan, resolveEntitlements } from './billing-plans.js';
+import { BILLING_PLANS, formatJstMonthDay, planKeyForPrice, priceIdForPlan, resolveEntitlements } from './billing-plans.js';
 
 const now = new Date('2026-09-13T00:00:00Z');
 
@@ -34,11 +34,31 @@ describe('プランと権利の判定', () => {
 
   it('価格 ID とプランの対応は env から引く（値は書かない）', () => {
     const env = { STRIPE_PRICE_LIGHT: 'price_l', STRIPE_PRICE_STANDARD: 'price_s', STRIPE_PRICE_PRO: 'price_p' };
-    expect(planKeyForPrice(env, 'price_s')).toBe('standard');
+    expect(planKeyForPrice(env, 'price_s')).toEqual({ key: 'standard', interval: 'month' });
     expect(planKeyForPrice(env, 'price_x')).toBeNull();
     expect(planKeyForPrice({}, 'price_l')).toBeNull();
     expect(priceIdForPlan(env, 'pro')).toBe('price_p');
     expect(priceIdForPlan({}, 'pro')).toBeNull();
+  });
+
+  it.each(['light', 'standard', 'pro'] as const)('%s の月・年は別の価格で往復でき、未設定なら混ぜない', (key) => {
+    const names = { light: 'LIGHT', standard: 'STANDARD', pro: 'PRO' };
+    const env = { [`STRIPE_PRICE_${names[key]}`]: 'price_test_month', [`STRIPE_PRICE_${names[key]}_YEAR`]: 'price_test_year' };
+    for (const interval of ['month', 'year'] as const) {
+      const price = priceIdForPlan(env, key, interval);
+      expect(price).toBe(`price_test_${interval}`);
+      expect(planKeyForPrice(env, price)).toEqual({ key, interval });
+      expect(priceIdForPlan({}, key, interval)).toBeNull();
+    }
+    expect(priceIdForPlan({ [`STRIPE_PRICE_${names[key]}`]: 'price_test_month' }, key, 'year')).toBeNull();
+    expect(planKeyForPrice(env, '')).toBeNull();
+    expect(planKeyForPrice(env, null)).toBeNull();
+  });
+
+  it('税込の決定額を持ち、プロも申込みできる', () => {
+    expect(BILLING_PLANS.map((p) => [p.fallbackMonthlyYen, p.fallbackYearlyYen, p.cta])).toEqual([
+      [9800, 99000, 'checkout'], [29800, 303000, 'checkout'], [59800, 609000, 'checkout'],
+    ]);
   });
 
   it('期限の表示は日本時間の月/日', () => {

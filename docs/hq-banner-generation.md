@@ -80,7 +80,8 @@ OpenAI の公式価格はトークン単位（gpt-image-2: 出力 $15/1M トー�
 | `BANNER_MONTHLY_IMAGES` | var（任意） | 課金対象外の統括の月間上限（枚）。未設定は 150。課金中・トライアル中はプランの値が優先 |
 | `STRIPE_SECRET_KEY` | **secret** | 課金プラン（36-2）の申込・ポータル・請求の取得に使う。未設定は申込ボタンが押せないだけ |
 | `STRIPE_BILLING_WEBHOOK_SECRET` | **secret** | `POST /api/hq/billing/webhook` の署名検証。EC 側の Webhook とは別の値 |
-| `STRIPE_PRICE_LIGHT`／`STRIPE_PRICE_STANDARD`／`STRIPE_PRICE_PRO` | var | Stripe の価格 ID。無いプランは申し込めない |
+| `STRIPE_PRICE_LIGHT`／`STRIPE_PRICE_STANDARD`／`STRIPE_PRICE_PRO` | secret | 月払いの Stripe 価格 ID。無いプランは申し込めない |
+| `STRIPE_PRICE_LIGHT_YEAR`／`STRIPE_PRICE_STANDARD_YEAR`／`STRIPE_PRICE_PRO_YEAR` | secret | 年払いの Stripe 価格 ID。未設定なら年払いだけ申し込めない。料金と手順は [課金プラン](hq-billing.md) |
 | `BANNER_IMAGE_QUALITY` | var（任意） | 生成の品質（low／medium／high）。未設定は medium |
 
 （統括の「お問い合わせ」の宛先は `SUPPORT_NOTIFY_EMAIL`。未設定なら `CONTACT_EMAIL` へ届く。値は Git に書かない）

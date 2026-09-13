@@ -13,7 +13,7 @@ import type {
   BannerUsage,
 } from './hq-banners'
 import type { HqSupportKind, HqSupportRequest } from './hq-support'
-import type { BillingInvoice, BillingSummary, PlanKey } from './hq-billing'
+import type { BillingInterval, BillingInvoice, BillingSummary, PlanKey } from './hq-billing'
 import type {
   ReminderDraftSettings,
   ReminderDraftVersion,
@@ -6073,8 +6073,8 @@ export const api = {
   hqBilling: {
     summary: () => fetchApi<ApiResponse<BillingSummary>>('/api/hq/billing/summary'),
     /** Stripe の申込画面の URL。オーナーだけ。 */
-    checkout: (planKey: PlanKey) =>
-      fetchApi<ApiResponse<{ url: string }>>('/api/hq/billing/checkout', { method: 'POST', body: JSON.stringify({ planKey }) }),
+    checkout: (planKey: PlanKey, interval: BillingInterval = 'month') =>
+      fetchApi<ApiResponse<{ url: string }>>('/api/hq/billing/checkout', { method: 'POST', body: JSON.stringify({ planKey, interval }) }),
     /** 支払い方法・解約（Stripe のカスタマーポータル）の URL。 */
     portal: () => fetchApi<ApiResponse<{ url: string }>>('/api/hq/billing/portal', { method: 'POST', body: JSON.stringify({}) }),
     invoices: () => fetchApi<ApiResponse<BillingInvoice[]>>('/api/hq/billing/invoices'),

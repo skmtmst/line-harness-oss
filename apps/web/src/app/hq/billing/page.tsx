@@ -6,6 +6,7 @@ import { Suspense, useCallback, useEffect, useState } from 'react'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
+import Toggle from '@/components/shared/toggle'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { api, ApiError } from '@/lib/api'
@@ -13,16 +14,19 @@ import { shortDateTime } from '@/lib/hq-banners'
 import {
   INVOICE_STATUS_LABELS,
   billingBanner,
+  billingPlanPrice,
   yen,
   type BillingInvoice,
+  type BillingInterval,
   type BillingPlanView,
   type BillingSummary,
 } from '@/lib/hq-billing'
+import styles from './billing.module.css'
 
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
 /**
- * 課金プラン。★V6 36-2（`q7FP5k`）。
+ * 課金プラン。★V6 36-2（OjkqO）・36-2-A（clQZw）。
  *
  * 契約状況の帯 → プラン 3 枚 → 注記 → 支払い履歴。
  * 申込は Stripe Checkout（別画面）へ、支払い方法・解約は Stripe のポータルへ。
@@ -47,6 +51,7 @@ function BillingInner() {
   const [role, setRole] = useState('')
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState('')
+  const [interval, setInterval] = useState<BillingInterval>('month')
 
   const load = useCallback(async () => {
     setStatus('loading')
@@ -77,11 +82,11 @@ function BillingInner() {
     return () => clearTimeout(timer)
   }, [checkoutResult, load])
 
-  const checkout = async (plan: BillingPlanView) => {
+  const checkout = async (plan: BillingPlanView, selectedInterval: BillingInterval) => {
     setBusy(plan.key)
     setError('')
     try {
-      const res = await api.hqBilling.checkout(plan.key)
+      const res = await api.hqBilling.checkout(plan.key, selectedInterval)
       if (!res.success) throw new Error(res.error)
       window.location.href = res.data.url
     } catch (caught) {
@@ -115,7 +120,7 @@ function BillingInner() {
   const canChoose = isOwner && summary.state !== 'exempt' && summary.state !== 'active' && summary.state !== 'past_due'
 
   return (
-    <div data-design-node="q7FP5k" className="flex flex-col gap-4">
+    <div data-design-node={interval === 'year' ? 'clQZw' : 'OjkqO'} className="flex flex-col gap-4">
       {checkoutResult === 'success' ? (
         <div className="rounded-card bg-accent-soft px-4 py-3 text-label text-ink" role="status">
           お申し込みを受け付けました。決済の確認が済むと「契約中」に変わります（数秒〜1分ほどかかります）。
@@ -127,7 +132,7 @@ function BillingInner() {
         </div>
       ) : null}
 
-      <div data-design-node="G8n7TD">
+      <div data-design="Status" data-design-node={interval === 'year' ? 'D9Ics' : 'bNTX7'}>
         <NoteBar
           tone={banner.tone}
           action={
@@ -144,10 +149,19 @@ function BillingInner() {
         </NoteBar>
       </div>
 
+      <div data-design="Interval" data-design-node={interval === 'year' ? 'k8DFrR' : 'T4S2Qb'} className="flex flex-wrap items-center justify-end gap-3">
+        <span className={interval === 'month' ? 'text-label font-bold text-ink' : 'text-label font-semibold text-ink-faint'}>月払い</span>
+        <Toggle label="年払い" checked={interval === 'year'} onChange={(yearly) => setInterval(yearly ? 'year' : 'month')} className={styles.intervalToggle} />
+        <span className={interval === 'year' ? 'text-label font-bold text-ink' : 'text-label font-semibold text-ink-faint'}>年払い</span>
+        <span className="text-nano text-ink-faint">年払いは約15% OFF</span>
+      </div>
+
       {error ? <p className="text-label text-status-danger" role="alert">{error}</p> : null}
 
-      <div data-design-node="na3K3" className="grid gap-4 md:grid-cols-3">
-        {summary.plans.map((plan) => (
+      <div data-design="Plans" data-design-node={interval === 'year' ? 'TIeHO' : 'sWyx8'} className="grid gap-4 md:grid-cols-3">
+        {summary.plans.map((plan) => {
+          const price = billingPlanPrice(plan, interval)
+          return (
           <section
             key={plan.key}
             className={
@@ -157,10 +171,13 @@ function BillingInner() {
             }
           >
             <div className="flex flex-col gap-1">
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <h2 className="text-heading font-bold text-ink">{plan.name}</h2>
                 {plan.recommended ? (
                   <span className="inline-flex h-5 items-center rounded-pill bg-accent-soft px-2 text-nano font-bold text-accent-deep">おすすめ</span>
+                ) : null}
+                {interval === 'year' ? (
+                  <span className="inline-flex h-5 items-center rounded-pill bg-accent-soft px-2 text-nano font-bold text-accent-deep">約15% OFF</span>
                 ) : null}
                 {plan.current ? (
                   <span className="inline-flex h-5 items-center rounded-pill bg-status-info-soft px-2 text-nano font-bold text-status-info">利用中</span>
@@ -168,9 +185,12 @@ function BillingInner() {
               </div>
               <p className="text-caption text-ink-faint">{plan.description}</p>
             </div>
-            <div className="flex items-baseline gap-2">
-              <span className="text-display font-bold text-ink">{yen(plan.monthlyYen)}</span>
-              <span className="text-caption text-ink-faint">/月（税込{plan.priceFromStripe ? '' : '・仮'}）</span>
+            <div className="flex flex-col gap-2" data-price-source={price.fromStripe ? 'stripe' : 'fallback'}>
+              <div className="flex items-baseline gap-2">
+                <span className="text-display font-bold text-ink">{yen(price.monthlyYen)}</span>
+                <span className="text-caption text-ink-faint">/月（税込）</span>
+              </div>
+              {price.yearlyYen !== null ? <p className="text-caption text-ink-faint">年額 {yen(price.yearlyYen)}（税込）</p> : null}
             </div>
             <div className="border-t border-hairline" />
             <ul className="flex flex-1 flex-col gap-2">
@@ -181,27 +201,27 @@ function BillingInner() {
                 </li>
               ))}
             </ul>
-            {plan.cta === 'contact' ? (
-              <Button href="/hq/support" className="w-full">相談する</Button>
-            ) : plan.current ? (
+            {plan.current ? (
               <Button onClick={() => void portal()} disabled={busy !== null || !summary.portalAvailable} className="w-full">
                 変更する
               </Button>
             ) : (
               <Button
                 variant={plan.recommended ? 'primary' : 'secondary'}
-                onClick={() => void checkout(plan)}
-                disabled={busy !== null || !canChoose || !plan.available}
+                onClick={() => void checkout(plan, interval)}
+                disabled={busy !== null || !canChoose || !price.available}
                 className="w-full"
               >
                 {busy === plan.key ? '申込画面へ移動中…' : 'このプランにする'}
               </Button>
             )}
+            {!price.available && !plan.current ? <p className="text-caption text-ink-faint">価格がまだ設定されていません</p> : null}
           </section>
-        ))}
+          )
+        })}
       </div>
 
-      <p data-design-node="Fopep" className="flex items-center gap-1.5 text-caption text-ink-faint">
+      <p data-design="Note" data-design-node={interval === 'year' ? 'CqhfL' : 'MAzqO'} className="flex items-center gap-1.5 text-caption text-ink-faint">
         <Info aria-hidden="true" className="h-3.5 w-3.5" />
         {!summary.stripeReady
           ? '決済の接続設定がまだのため、申込ボタンは押せません。料金と内容は仮置きです。'
@@ -210,7 +230,7 @@ function BillingInner() {
             : '料金と内容は仮置きです。決済は Stripe で行い、請求書と領収書は支払い方法の管理画面から取得できます。'}
       </p>
 
-      <section data-design-node="UhUtX" className="flex flex-col rounded-card border border-hairline bg-canvas">
+      <section data-design="History" data-design-node={interval === 'year' ? 'N4u2jV' : 'x6Xjm'} className="flex flex-col rounded-card border border-hairline bg-canvas">
         <h2 className="px-4 py-3 text-body font-bold text-ink">支払い履歴</h2>
         <div className="border-t border-hairline" />
         {invoices === null || invoices.length === 0 ? (

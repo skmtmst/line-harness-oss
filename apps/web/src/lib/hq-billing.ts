@@ -4,6 +4,7 @@
 
 export type BillingState = 'exempt' | 'trialing' | 'active' | 'past_due' | 'trial_expired' | 'canceled'
 export type PlanKey = 'light' | 'standard' | 'pro'
+export type BillingInterval = 'month' | 'year'
 
 export interface BillingPlanView {
   key: PlanKey
@@ -11,19 +12,23 @@ export interface BillingPlanView {
   description: string
   cta: 'checkout' | 'contact'
   monthlyYen: number
+  yearlyYen: number
   priceFromStripe: boolean
+  yearlyPriceFromStripe: boolean
   monthlyImages: number
   maxStaff: number | null
   features: string[]
   recommended: boolean
   /** Stripe の鍵と価格 ID がそろっていて申し込めるか。 */
   available: boolean
+  yearlyAvailable: boolean
   current: boolean
 }
 
 export interface BillingSummary {
   state: BillingState
   planKey: PlanKey | null
+  planInterval: BillingInterval | null
   planName: string | null
   planStatus: 'exempt' | 'trialing' | 'active' | 'past_due' | 'canceled'
   trialEndsAt: string | null
@@ -80,6 +85,8 @@ export function trialDaysLabel(summary: Pick<BillingSummary, 'state' | 'trialDay
 /** 契約状況の帯。見出し・本文・色。 */
 export function billingBanner(summary: BillingSummary): { tone: 'info' | 'warn' | 'danger'; title: string; body: string } {
   const keep = `データは${summary.dataRetentionDays}日間保持されます。`
+  const interval = summary.planInterval === 'year' ? '年払い' : summary.planInterval === 'month' ? '月払い' : null
+  const renewal = [interval, summary.currentPeriodEndsLabel ? `次回の更新 ${summary.currentPeriodEndsLabel}` : null].filter(Boolean).join('・')
   switch (summary.state) {
     case 'exempt':
       return { tone: 'info', title: '課金の対象外です', body: 'この統括は運営用のため、料金はかかりません。プランの内容はここで確認できます。' }
@@ -92,13 +99,13 @@ export function billingBanner(summary: BillingSummary): { tone: 'info' | 'warn' 
     case 'active':
       return {
         tone: 'info',
-        title: `${summary.planName ?? 'プラン'}を契約中${summary.currentPeriodEndsLabel ? `（次回の更新 ${summary.currentPeriodEndsLabel}）` : ''}`,
+        title: `${summary.planName ?? 'プラン'}を契約中${renewal ? `（${renewal}）` : ''}`,
         body: 'プランの変更・支払い方法・解約は「支払い方法を管理」から行えます。',
       }
     case 'past_due':
       return {
         tone: 'danger',
-        title: '支払いを確認できていません',
+        title: `支払いを確認できていません${interval ? `（${interval}）` : ''}`,
         body: 'カードの期限切れなどで引き落としができていません。「支払い方法を管理」から更新してください。確認できるまで機能は止めません。',
       }
     case 'trial_expired':
@@ -110,6 +117,13 @@ export function billingBanner(summary: BillingSummary): { tone: 'info' | 'warn' 
 
 export function yen(amount: number): string {
   return `¥${amount.toLocaleString('ja-JP')}`
+}
+
+/** 表示も申込み可否も、選んだ周期だけを見る。月払いへの暗黙の代替はしない。 */
+export function billingPlanPrice(plan: BillingPlanView, interval: BillingInterval) {
+  return interval === 'year'
+    ? { monthlyYen: Math.floor(plan.yearlyYen / 12), yearlyYen: plan.yearlyYen, fromStripe: plan.yearlyPriceFromStripe, available: plan.yearlyAvailable }
+    : { monthlyYen: plan.monthlyYen, yearlyYen: null, fromStripe: plan.priceFromStripe, available: plan.available }
 }
 
 export const INVOICE_STATUS_LABELS: Record<string, string> = {

@@ -25,6 +25,7 @@ import { fileURLToPath } from 'node:url'
 /** このファイル自身の指紋。動いている中身が古くないかを言うために持つ。 */
 const FINGERPRINT = createHash('sha256').update(readFileSync(fileURLToPath(import.meta.url))).digest('hex').slice(0, 16)
 import { readArrayGetPaths } from './api-shapes.mjs'
+import { BILLING_SUMMARY } from './billing-fixture.mjs'
 import {
   mileageWriteResponse,
   MILEAGE_REWARDS,
@@ -1276,6 +1277,12 @@ function nenMetricsBody(data, query) {
 }
 
 function bodyFor(method, pathname, query = new URLSearchParams()) {
+  if (method === 'GET' && pathname === '/api/hq/billing/summary') {
+    return { success: true, data: BILLING_SUMMARY }
+  }
+  if (method === 'GET' && pathname === '/api/hq/billing/invoices') {
+    return { success: true, data: [] }
+  }
   if (pathname === '/api/auth/session') {
     return { success: true, data: STAFF, csrfToken: 'visual-qa-csrf' }
   }
