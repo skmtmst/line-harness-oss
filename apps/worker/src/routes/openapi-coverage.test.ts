@@ -117,7 +117,7 @@ function formatKeys(keys: string[]): string {
  * 後続票で記載済みにした分はここから消す（残っているとテストが落とす）。
  */
 /** 未記載負債はこの件数より増やせない。 */
-const ALLOWLIST_MAX = 777;
+const ALLOWLIST_MAX = 776;
 
 /**
  * 記載済み operation の完全な基準一覧。
@@ -150,6 +150,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'GET /api/auth/register/check',
   'GET /api/booking/admin/staff/{id}/break-dates',
   'GET /api/booking/admin/staff/{id}/breaks',
+  'GET /api/booking/admin/settings',
   'GET /api/broadcasts',
   'GET /api/broadcasts/{id}',
   'GET /api/common-actions/resources',
@@ -272,6 +273,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'POST /api/users/match',
   'POST /api/webhooks/maintenance/secret-backfill',
   'POST /webhook',
+  'PUT /api/booking/admin/settings',
   'PUT /api/affiliates/{id}',
   'PUT /api/booking/admin/staff/{id}/break-dates',
   'PUT /api/booking/admin/staff/{id}/breaks',
@@ -286,7 +288,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
 ]);
 
 const ALLOWLIST = new Set<string>([
-  // 機能「booking」の管理画面用API（OpenAPI未記載・順次記載）（42件）
+  // 機能「booking」の管理画面用API（OpenAPI未記載・順次記載）（41件）
   'DELETE /api/booking/admin/menus/{id}',
   'DELETE /api/booking/admin/staff/{id}',
   'DELETE /api/booking/admin/staff/{id}/google-calendar',
@@ -306,7 +308,6 @@ const ALLOWLIST = new Set<string>([
   'GET /api/booking/admin/requests',
   'GET /api/booking/admin/requests-summary',
   'GET /api/booking/admin/resources',
-  'GET /api/booking/admin/settings',
   'GET /api/booking/admin/staff',
   'GET /api/booking/admin/staff/{id}/availability-rules',
   'GET /api/booking/admin/staff/{id}/google-calendar',

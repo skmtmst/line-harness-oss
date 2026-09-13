@@ -232,9 +232,10 @@ function groupLabel(group: DashboardGroup): string {
   return '右サイド'
 }
 
-export default function DashboardEditor({ open, preferences, onCancel, onApply, onReset }: {
+export default function DashboardEditor({ open, preferences, saving = false, onCancel, onApply, onReset }: {
   open: boolean
   preferences: DashboardPreferences
+  saving?: boolean
   onCancel: () => void
   onApply: (next: DashboardPreferences) => void
   onReset?: () => void
@@ -290,7 +291,7 @@ export default function DashboardEditor({ open, preferences, onCancel, onApply, 
           </div>
           <div className="mt-4 flex items-center justify-between gap-4">
             <p className="text-ink-secondary text-xs">持ち手をドラッグして移動。スイッチで表示を切り替えます。</p>
-            <button type="button" onClick={() => onReset ? onReset() : setDraft(defaultDashboardPreferences())} className="text-action shrink-0 text-xs font-medium hover:underline">初期状態に戻す</button>
+            <button type="button" disabled={saving} onClick={() => onReset ? onReset() : setDraft(defaultDashboardPreferences())} className="text-action shrink-0 text-xs font-medium hover:underline">初期状態に戻す</button>
           </div>
           <div className="mt-3 flex gap-2" role="tablist" aria-label="ダッシュボード編集モード">
             <Button role="tab" aria-selected={mode === 'cards'} onClick={() => setMode('cards')} variant={mode === 'cards' ? 'primary' : 'secondary'}>カードと配置</Button>
@@ -337,7 +338,7 @@ export default function DashboardEditor({ open, preferences, onCancel, onApply, 
 
         <footer className="border-hairline flex items-center justify-center gap-2 border-t px-[22px] py-4">
           <Button onClick={onCancel}>キャンセル</Button>
-          <Button onClick={() => onApply(draft)} variant="primary">ダッシュボードに反映</Button>
+          <Button onClick={() => onApply(draft)} disabled={saving} aria-busy={saving} variant="primary">{saving ? '保存中…' : 'ダッシュボードに反映'}</Button>
         </footer>
       </aside>
     </div>

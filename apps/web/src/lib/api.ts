@@ -9478,7 +9478,7 @@ export interface BookingSettings {
   maxActiveBookingsPerFriend: number;
   approvalMode: 'automatic' | 'manual';
   holdMinutes: number;
-  slotGranularityMinutes: number;
+  slotGranularityMinutes: 5 | 10 | 15 | 30 | 60;
   menuCount: number;
   activeMenuCount: number;
   inactiveMenuCount: number;
@@ -9489,6 +9489,18 @@ export interface BookingSettings {
   exceptions: BookingException[];
   updatedAt: string;
 }
+
+export type SaveBookingSettings = Pick<
+  BookingSettings,
+  | 'timeZone'
+  | 'bookingWindowDays'
+  | 'cutoffMinutesBefore'
+  | 'cancelDeadlineMinutesBefore'
+  | 'maxActiveBookingsPerFriend'
+  | 'approvalMode'
+  | 'holdMinutes'
+  | 'slotGranularityMinutes'
+> & { expectedVersion: number };
 
 export interface BookingStaff {
   id: string;
@@ -9798,6 +9810,10 @@ export const bookingApi = {
     }),
   getSettings: (accountId: string) =>
     fetchApi<ApiResponse<BookingSettings>>(withAccount('/api/booking/admin/settings', accountId)),
+  saveSettings: (accountId: string, body: SaveBookingSettings) =>
+    fetchApi<ApiResponse<BookingSettings>>(withAccount('/api/booking/admin/settings', accountId), {
+      method: 'PUT', body: JSON.stringify(body),
+    }),
   listResources: (accountId: string) =>
     fetchApi<{ success: true; data: { resources: BookingResource[] } }>(
       withAccount('/api/booking/admin/resources', accountId),

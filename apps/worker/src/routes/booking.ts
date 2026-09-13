@@ -19,6 +19,7 @@ import {
   searchBookingCustomers,
   createBookingAvailabilityException,
   getBookingAdminSettings,
+  saveBookingAdminSettings,
   listBookingAdminResources,
   getBookingAvailabilityException,
   listBookingAvailabilityExceptions,
@@ -936,6 +937,79 @@ booking.post(
 const BOOKING_EXCEPTION_KINDS = new Set<BookingExceptionKind>(['closed', 'custom_hours', 'open']);
 const BOOKING_EXCEPTION_SCOPES = new Set<BookingExceptionScope>(['store', 'staff', 'resource']);
 const BOOKING_PRICE_MODES = new Set<BookingPriceMode>(['fixed', 'free', 'inquiry']);
+const BOOKING_APPROVAL_MODES = new Set(['automatic', 'manual'] as const);
+const BOOKING_SLOT_GRANULARITIES = new Set([5, 10, 15, 30, 60] as const);
+
+function integerInRange(value: unknown, min: number, max: number): number | null {
+  const number = typeof value === 'number' ? value : Number.NaN;
+  return Number.isInteger(number) && number >= min && number <= max ? number : null;
+}
+
+function isValidTimeZone(value: string): boolean {
+  if (!value || value.length > 100) return false;
+  try {
+    new Intl.DateTimeFormat('ja-JP', { timeZone: value }).format();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function readBookingAdminSettings(input: Record<string, unknown>):
+  | {
+    ok: true;
+    value: {
+      expectedVersion: number;
+      timeZone: string;
+      bookingWindowDays: number;
+      cutoffMinutesBefore: number;
+      cancelDeadlineMinutesBefore: number;
+      maxActiveBookingsPerFriend: number;
+      approvalMode: 'automatic' | 'manual';
+      holdMinutes: number;
+      slotGranularityMinutes: 5 | 10 | 15 | 30 | 60;
+    };
+  }
+  | { ok: false; error: string } {
+  const expectedVersion = integerInRange(input.expectedVersion, 0, Number.MAX_SAFE_INTEGER);
+  const timeZone = typeof input.timeZone === 'string' ? input.timeZone.trim() : '';
+  const bookingWindowDays = integerInRange(input.bookingWindowDays, 1, 365);
+  const cutoffMinutesBefore = integerInRange(input.cutoffMinutesBefore, 0, 43_200);
+  const cancelDeadlineMinutesBefore = integerInRange(input.cancelDeadlineMinutesBefore, 0, 43_200);
+  const maxActiveBookingsPerFriend = integerInRange(input.maxActiveBookingsPerFriend, 1, 100);
+  const approvalMode = input.approvalMode;
+  const holdMinutes = integerInRange(input.holdMinutes, 1, 1_440);
+  const slotGranularityMinutes = integerInRange(input.slotGranularityMinutes, 5, 60);
+
+  if (expectedVersion === null) return { ok: false, error: 'expectedVersionが正しくありません' };
+  if (!isValidTimeZone(timeZone)) return { ok: false, error: 'タイムゾーンが正しくありません' };
+  if (bookingWindowDays === null) return { ok: false, error: '受付期間は1〜365日で指定してください' };
+  if (cutoffMinutesBefore === null) return { ok: false, error: '受付締切は0〜43200分で指定してください' };
+  if (cancelDeadlineMinutesBefore === null) return { ok: false, error: 'キャンセル期限は0〜43200分で指定してください' };
+  if (maxActiveBookingsPerFriend === null) return { ok: false, error: '同時予約数は1〜100件で指定してください' };
+  if (!BOOKING_APPROVAL_MODES.has(approvalMode as 'automatic' | 'manual')) {
+    return { ok: false, error: '承認方式が正しくありません' };
+  }
+  if (holdMinutes === null) return { ok: false, error: '仮押さえ時間は1〜1440分で指定してください' };
+  if (slotGranularityMinutes === null
+    || !BOOKING_SLOT_GRANULARITIES.has(slotGranularityMinutes as 5 | 10 | 15 | 30 | 60)) {
+    return { ok: false, error: '予約枠の間隔が正しくありません' };
+  }
+  return {
+    ok: true,
+    value: {
+      expectedVersion,
+      timeZone,
+      bookingWindowDays,
+      cutoffMinutesBefore,
+      cancelDeadlineMinutesBefore,
+      maxActiveBookingsPerFriend,
+      approvalMode: approvalMode as 'automatic' | 'manual',
+      holdMinutes,
+      slotGranularityMinutes: slotGranularityMinutes as 5 | 10 | 15 | 30 | 60,
+    },
+  };
+}
 
 function isCalendarDate(value: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
@@ -1043,6 +1117,39 @@ booking.get('/api/booking/admin/settings', async (c) => {
   } catch {
     console.error(JSON.stringify({ event: 'booking_settings_read_failed' }));
     return c.json({ success: false, error: 'booking_settings_unavailable' }, 503);
+  }
+});
+
+booking.put('/api/booking/admin/settings', requireRole('owner', 'admin'), async (c) => {
+  const accountId = await resolveAccountIdAdmin(c);
+  if (!accountId) return c.json({ success: false, error: 'missing_account_id' }, 400);
+  try {
+    const body = await c.req.json<Record<string, unknown>>().catch(() => null);
+    if (!body) return c.json({ success: false, error: 'invalid_json' }, 400);
+    const parsed = readBookingAdminSettings(body);
+    if (!parsed.ok) return c.json({ success: false, error: parsed.error }, 400);
+    const result = await saveBookingAdminSettings(c.env.DB, {
+      lineAccountId: accountId,
+      ...parsed.value,
+    });
+    if (result.status === 'not_found') {
+      return c.json({ success: false, error: 'not_found' }, 404);
+    }
+    if (result.status === 'conflict') {
+      return c.json({
+        success: false,
+        code: 'version_conflict',
+        error: '予約の基本ルールが更新されています。読み直してください',
+        data: { currentVersion: result.currentVersion },
+      }, 409);
+    }
+    return c.json(
+      { success: true, data: result.item },
+      result.status === 'created' ? 201 : 200,
+    );
+  } catch {
+    console.error(JSON.stringify({ event: 'booking_settings_save_failed' }));
+    return c.json({ success: false, error: 'booking_settings_save_failed' }, 503);
   }
 });
 
