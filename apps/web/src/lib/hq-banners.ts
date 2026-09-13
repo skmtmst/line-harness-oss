@@ -30,6 +30,10 @@ export interface BannerUsage {
   today: BannerUsageBucket
   paused: boolean
   pausedReason: string | null
+  /** 課金の状態（トライアル終了・解約）で止まっているか。理由は blockedReason。 */
+  blocked?: boolean
+  blockedReason?: string | null
+  planState?: string
 }
 
 export interface BannerPresetsResponse {
@@ -209,6 +213,7 @@ export function validateGenerationInput(
  */
 export function usageRefusal(usage: BannerUsage | null, needed: number): string | null {
   if (!usage) return null
+  if (usage.blocked) return usage.blockedReason ?? '配信とバナー生成は止まっています。課金プランを確認してください'
   if (usage.paused) return usage.pausedReason ?? '失敗が続いたため一時停止しています'
   if (needed > usage.month.remaining) {
     return `今月の生成上限（${usage.month.limit}枚）に達します（残り ${usage.month.remaining}枚・必要 ${needed}枚）`

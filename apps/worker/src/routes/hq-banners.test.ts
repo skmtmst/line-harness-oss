@@ -335,6 +335,31 @@ describe('生成', () => {
     expect(data.usage.today.limit).toBe(30);
   });
 
+  it('無料トライアル中は月 20枚、期限が過ぎたら課金プランの案内つきで断る', async () => {
+    testDb.raw.prepare("UPDATE tenants SET plan_status = 'trialing', trial_ends_at = '2999-01-01T00:00:00.000' WHERE id = ?").run(DEFAULT_TENANT_ID);
+    let res = await call('GET', '/api/hq/banners/usage');
+    let usage = (await res.json<{ data: { month: { limit: number }; blocked: boolean; planState: string } }>()).data;
+    expect(usage.month.limit).toBe(20);
+    expect(usage.blocked).toBe(false);
+    expect(usage.planState).toBe('trialing');
+
+    testDb.raw.prepare("UPDATE tenants SET trial_ends_at = '2020-01-01T00:00:00.000' WHERE id = ?").run(DEFAULT_TENANT_ID);
+    res = await call('GET', '/api/hq/banners/usage');
+    usage = (await res.json<{ data: { month: { limit: number }; blocked: boolean; planState: string } }>()).data;
+    expect(usage.blocked).toBe(true);
+    expect(usage.planState).toBe('trial_expired');
+    const project = await createProject();
+    res = await call('POST', `/api/hq/banners/projects/${project.id}/generations`, GENERATE_BODY);
+    expect(res.status).toBe(409);
+    expect((await res.json<{ error: string }>()).error).toContain('無料トライアルが終了');
+  });
+
+  it('契約中はプランの枚数が上限になる', async () => {
+    testDb.raw.prepare("UPDATE tenants SET plan_status = 'active', plan_key = 'pro' WHERE id = ?").run(DEFAULT_TENANT_ID);
+    const res = await call('GET', '/api/hq/banners/usage');
+    expect((await res.json<{ data: { month: { limit: number } } }>()).data.month.limit).toBe(500);
+  });
+
   it('アーカイブ済みのプロジェクトでは生成できない', async () => {
     const project = await createProject();
     await call('PATCH', `/api/hq/banners/projects/${project.id}`, { archived: true });

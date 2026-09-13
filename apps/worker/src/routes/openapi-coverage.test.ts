@@ -122,14 +122,15 @@ function formatKeys(keys: string[]): string {
  * - ALLOWLIST_MAX: 未記載負債はここより増やせない
  * 後続票で記載を増やしたら、実測に合わせて両方を同じ PR で更新する。
  */
-// 本流の95件に、#19 の統括バナー生成17口と #20〜#21 の6口を足して118件。
-const DOCUMENTED_MIN = 118;
+// 本流の95件に、#19 の統括バナー生成17口、#20〜#21 の6口、#22 の課金5口を足して123件。
+const DOCUMENTED_MIN = 123;
 const ALLOWLIST_MAX = 777;
 
 /**
  * PR #1456 時点の記載済み 83 件＋本流で増えた 5 件＋#655 休憩 4 件
  * ＋#663 の運用者通知 2 口＋#19 の統括バナー生成17口
- * ＋#20〜#21 の統括バナー統計・問い合わせ・メンバー管理6口の基準一覧。
+ * ＋#20〜#21 の統括バナー統計・問い合わせ・メンバー管理6口
+ * ＋#22 の統括課金5口の基準一覧。
  * 既存仕様を ALLOWLIST へ移して後退させる変更を落とすためのもの。
  * 件数が変わらなくても、ここにある1件が消えたら落ちる。
  * 後続票で記載を増やしたら、増えた分をここへ足す。
@@ -173,6 +174,8 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'GET /api/hq/banners/projects/{id}',
   'GET /api/hq/banners/stats',
   'GET /api/hq/banners/usage',
+  'GET /api/hq/billing/invoices',
+  'GET /api/hq/billing/summary',
   'GET /api/hq/support/kinds',
   'GET /api/hq/support/requests',
   'GET /api/line-accounts',
@@ -222,6 +225,9 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'POST /api/hq/banners/projects/{id}/duplicate',
   'POST /api/hq/banners/projects/{id}/generations',
   'POST /api/hq/banners/projects/{id}/uploads',
+  'POST /api/hq/billing/checkout',
+  'POST /api/hq/billing/portal',
+  'POST /api/hq/billing/webhook',
   'POST /api/hq/support/requests',
   'POST /api/line-accounts',
   'POST /api/mileage/rules',

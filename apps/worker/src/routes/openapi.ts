@@ -428,6 +428,39 @@ const spec = {
         responses: { '200': { description: 'Per-account delivery results' }, '400': { description: 'Invalid account selection' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Not found' } },
       },
     },
+    // ── HQ Billing ─────────────────────────────────────────────────────────
+    '/api/hq/billing/summary': {
+      get: {
+        tags: ['HQ Billing'], summary: '統括の契約状態と選択可能なプランを取得',
+        responses: { '200': { description: 'Tenant billing summary and plan entitlements' }, '404': { description: 'Tenant not found' } },
+      },
+    },
+    '/api/hq/billing/checkout': {
+      post: {
+        tags: ['HQ Billing'], summary: 'Stripe Checkoutの申込URLを作成',
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['planKey'], properties: { planKey: { type: 'string', enum: ['light', 'standard', 'pro'] } } } } } },
+        responses: { '200': { description: 'Checkout URL' }, '400': { description: 'Invalid plan' }, '403': { description: 'Owner role required' }, '409': { description: 'Already subscribed or billing exempt' }, '503': { description: 'Stripe or price configuration unavailable' } },
+      },
+    },
+    '/api/hq/billing/portal': {
+      post: {
+        tags: ['HQ Billing'], summary: 'StripeカスタマーポータルURLを作成',
+        responses: { '200': { description: 'Customer portal URL' }, '403': { description: 'Owner or admin role required' }, '409': { description: 'No active customer' }, '503': { description: 'Admin origin unavailable' } },
+      },
+    },
+    '/api/hq/billing/invoices': {
+      get: {
+        tags: ['HQ Billing'], summary: '統括の支払い履歴を取得',
+        responses: { '200': { description: 'Up to 12 tenant-scoped invoices' }, '403': { description: 'Owner or admin role required' }, '502': { description: 'Stripe API unavailable' } },
+      },
+    },
+    '/api/hq/billing/webhook': {
+      post: {
+        tags: ['HQ Billing'], summary: 'Stripe課金イベントを受信', security: [],
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object' } } } },
+        responses: { '200': { description: 'Event accepted idempotently' }, '400': { description: 'Invalid signature or payload' }, '413': { description: 'Payload too large' }, '503': { description: 'Webhook secret is not configured' } },
+      },
+    },
     // ── HQ Support ─────────────────────────────────────────────────────────
     '/api/hq/support/kinds': {
       get: {

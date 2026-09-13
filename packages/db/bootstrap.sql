@@ -1094,6 +1094,14 @@ CREATE TABLE banner_usage_ledger (
   created_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
 
+CREATE TABLE billing_events (
+  id           TEXT PRIMARY KEY,
+  type         TEXT NOT NULL,
+  tenant_id    TEXT,
+  summary      TEXT NOT NULL DEFAULT '',
+  received_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+);
+
 CREATE TABLE booking_availability_exceptions (
   id TEXT PRIMARY KEY,
   line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
@@ -5186,7 +5194,8 @@ CREATE TABLE tenants (
   status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'suspended', 'archived')),
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-, feature_packs TEXT NOT NULL DEFAULT '[]');
+, feature_packs TEXT NOT NULL DEFAULT '[]', plan_key TEXT, plan_status TEXT NOT NULL DEFAULT 'exempt'
+  CHECK (plan_status IN ('exempt', 'trialing', 'active', 'past_due', 'canceled')), trial_ends_at TEXT, stripe_customer_id TEXT, stripe_subscription_id TEXT, current_period_ends_at TEXT, plan_updated_at TEXT);
 
 CREATE TABLE tracked_links (
   id TEXT PRIMARY KEY,
@@ -5894,6 +5903,9 @@ CREATE INDEX idx_banner_projects_tenant
 
 CREATE INDEX idx_banner_usage_tenant_created
   ON banner_usage_ledger(tenant_id, created_at);
+
+CREATE INDEX idx_billing_events_tenant
+  ON billing_events(tenant_id, received_at DESC);
 
 CREATE INDEX idx_booking_business_hours_setting_weekday
   ON booking_business_hours(booking_settings_id, weekday, start_time);
@@ -7019,6 +7031,9 @@ CREATE INDEX idx_templates_line_account
   ON templates(line_account_id, display_order, id);
 
 CREATE INDEX idx_templates_publish_key ON templates (publish_idempotency_key);
+
+CREATE UNIQUE INDEX idx_tenants_stripe_customer
+  ON tenants(stripe_customer_id) WHERE stripe_customer_id IS NOT NULL;
 
 CREATE UNIQUE INDEX idx_tracked_links_dedup_key
   ON tracked_links (dedup_key) WHERE dedup_key IS NOT NULL;

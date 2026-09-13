@@ -148,6 +148,7 @@ export const FEATURE_ROUTE_MANIFEST: readonly FeatureRouteMetadata[] = [
   exempt('/api/setup', 'core', '初期設定'),
   exempt('/api/getting-started', 'core', '初期設定'),
   exempt('/api/hq/banners', 'core', '統括バナー生成。ルート内でtenantと統括編集権限を検証'),
+  exempt('/api/hq/billing', 'core', '統括の契約・課金基盤。管理APIはtenant境界と役割、WebhookはStripe署名を検証'),
   exempt('/api/hq/support', 'core', '統括利用者から運営への問い合わせ。ルート内でtenant境界と役割を検証'),
   exempt('/api/hq/templates', 'core', '統括ひな形。ルート内でtenantと統括編集権限を検証'),
   exempt('/api/recipes', 'core', '設定テンプレート'),
@@ -197,6 +198,12 @@ export const FEATURE_ROUTE_MANIFEST: readonly FeatureRouteMetadata[] = [
 
 /** 同じ prefix 内で公開経路と管理経路が分かれる例外。 */
 export const FEATURE_ROUTE_PATTERN_MANIFEST: readonly FeatureRoutePatternMetadata[] = [
+  {
+    pattern: /^\/api\/hq\/billing\/webhook$/,
+    methods: ['POST'],
+    accountResolver: 'none',
+    classification: { kind: 'public', reason: 'Stripe署名で検証する課金イベント受信' },
+  },
   {
     pattern: /^\/api\/integrations\/ai-loop\/reports$/,
     methods: ['POST'],

@@ -1,11 +1,12 @@
 'use client'
 
-import { ChevronsUpDown, LogOut, MessageCircleQuestion, Users } from 'lucide-react'
+import { ChevronsUpDown, CreditCard, LogOut, MessageCircleQuestion, Users } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useId, useRef, useState } from 'react'
 import type { StaffMember } from '@line-crm/shared'
 import { api } from '@/lib/api'
+import { billingChip, trialDaysLabel, type BillingSummary } from '@/lib/hq-billing'
 import { logoutAndGoToLogin } from '@/lib/logout'
 
 /**
@@ -14,9 +15,9 @@ import { logoutAndGoToLogin } from '@/lib/logout'
  *
  * `docs/v6-common-rules.md` §1-2 の統括だけの例外。店舗の画面には置かない。
  *
- * プランの札（無料トライアル・残り日数）は課金（36-2）ができるまで置かず、
- * 代わりに役割の札を出す。「プロフィールを編集」「課金プラン」も同じ理由でまだ出さない
- * （出す＝使える、§7-10）。
+ * プランの札（無料トライアル・残り日数）は課金の状態（`api.hqBilling.summary`）から出す。
+ * 課金対象外（運営）の統括には札を出さず、役割の札だけにする。
+ * 「プロフィールを編集」は本人の情報を変える画面ができるまで出さない（出す＝使える、§7-10）。
  */
 const ROLE_LABELS: Record<string, string> = {
   owner: '統括',
@@ -29,6 +30,7 @@ export default function HqAccountMenu() {
   const pathname = usePathname()
   const menuId = useId()
   const [me, setMe] = useState<StaffMember | null>(null)
+  const [billing, setBilling] = useState<BillingSummary | null>(null)
   const [fallbackName, setFallbackName] = useState('')
   const [open, setOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
@@ -45,6 +47,11 @@ export default function HqAccountMenu() {
       if (!cancelled && res.success) setMe(res.data)
     }).catch(() => {
       // 取れなければ手元の名前だけで出す
+    })
+    void api.hqBilling.summary().then((res) => {
+      if (!cancelled && res.success) setBilling(res.data)
+    }).catch(() => {
+      // 課金の状態が取れなければ札を出さないだけ
     })
     return () => {
       cancelled = true
@@ -75,7 +82,8 @@ export default function HqAccountMenu() {
   const name = me?.name || fallbackName || '—'
   const role = me?.role ? ROLE_LABELS[me.role] ?? me.role : ''
   const initial = name.trim().slice(0, 1).toUpperCase() || '?'
-
+  const chip = billing ? billingChip(billing) : null
+  const daysLeft = billing ? trialDaysLabel(billing) : null
   return (
     <div ref={rootRef} className="relative shrink-0 border-t border-hairline" data-design-node="X6G9j6">
       {open ? (
@@ -90,9 +98,18 @@ export default function HqAccountMenu() {
           <div className="flex flex-col gap-1 px-4 pb-3 pt-4">
             <p className="text-body font-bold text-ink">{name}</p>
             {me?.email ? <p className="truncate text-caption text-ink-faint">{me.email}</p> : null}
-            {role ? (
-              <span className="mt-1 inline-flex h-5 w-fit items-center rounded-pill bg-accent-soft px-2 text-nano font-bold text-accent-deep">{role}</span>
-            ) : null}
+            <div className="mt-1 flex flex-wrap items-center gap-2">
+              {role ? (
+                <span className="inline-flex h-5 w-fit items-center rounded-pill bg-accent-soft px-2 text-nano font-bold text-accent-deep">{role}</span>
+              ) : null}
+              {chip ? <PlanChip chip={chip} /> : null}
+              {billing?.state === 'trialing' && billing.trialEndsLabel ? (
+                <span className="text-caption text-ink-secondary">{billing.trialEndsLabel} まで・{daysLeft}</span>
+              ) : null}
+              {billing?.state === 'active' && billing.currentPeriodEndsLabel ? (
+                <span className="text-caption text-ink-secondary">次回の更新 {billing.currentPeriodEndsLabel}</span>
+              ) : null}
+            </div>
           </div>
           <div className="border-t border-hairline" />
           <div className="flex flex-col p-2">
@@ -106,6 +123,19 @@ export default function HqAccountMenu() {
               <span className="flex-1" />
               <span className="whitespace-nowrap text-micro font-normal text-ink-faint">権限者・担当店舗</span>
             </Link>
+            {me?.role !== 'staff' ? (
+              // 担当者には出さない（権限表: 課金プランは担当者 不可）。
+              <Link
+                href="/hq/billing"
+                role="menuitem"
+                className="flex h-10 items-center gap-3 rounded-control px-2 text-label font-semibold text-ink hover:bg-canvas-sunken focus-visible:bg-canvas-sunken"
+              >
+                <CreditCard aria-hidden="true" className="h-4.5 w-4.5 text-ink-secondary" />
+                <span className="whitespace-nowrap">課金プラン</span>
+                <span className="flex-1" />
+                <span className="whitespace-nowrap text-micro font-normal text-ink-faint">プランと支払い</span>
+              </Link>
+            ) : null}
             <Link
               href="/hq/support"
               role="menuitem"
@@ -142,12 +172,36 @@ export default function HqAccountMenu() {
         </span>
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
           <span className="truncate text-label font-bold text-ink">{name}</span>
-          {role ? (
-            <span className="inline-flex h-4.5 w-fit items-center rounded-pill bg-accent-soft px-2 text-nano font-bold text-accent-deep">{role}</span>
-          ) : null}
+          <span className="flex items-center gap-1.5">
+            {chip ? (
+              <PlanChip chip={chip} />
+            ) : role ? (
+              <span className="inline-flex h-4.5 w-fit items-center rounded-pill bg-accent-soft px-2 text-nano font-bold text-accent-deep">{role}</span>
+            ) : null}
+            {daysLeft ? <span className="text-nano text-ink-faint">{daysLeft}</span> : null}
+          </span>
         </span>
         <ChevronsUpDown aria-hidden="true" className="h-4 w-4 shrink-0 text-ink-faint" />
       </button>
     </div>
+  )
+}
+
+/** プランの札。色は課金の状態ごと（`billingChip` の tone）。 */
+function PlanChip({ chip }: { chip: { label: string; tone: string } }) {
+  return (
+    <span
+      className={
+        chip.tone === 'warn'
+          ? 'inline-flex h-4.5 w-fit items-center rounded-pill bg-status-warn-soft px-2 text-nano font-bold text-status-warn-deep'
+          : chip.tone === 'danger'
+            ? 'inline-flex h-4.5 w-fit items-center rounded-pill bg-status-danger-soft px-2 text-nano font-bold text-status-danger'
+            : chip.tone === 'ok'
+              ? 'inline-flex h-4.5 w-fit items-center rounded-pill bg-accent-soft px-2 text-nano font-bold text-accent-deep'
+              : 'inline-flex h-4.5 w-fit items-center rounded-pill bg-step-idle px-2 text-nano font-bold text-ink-secondary'
+      }
+    >
+      {chip.label}
+    </span>
   )
 }

@@ -13,6 +13,7 @@ import {
   getBannerStats,
   getBannerUsageThisMonth,
   getBannerUsageToday,
+  getTenantBilling,
   countRecentFailedBannerGenerations,
   listBannerGenerations,
   listBannerImages,
@@ -31,6 +32,7 @@ import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
+import { resolveEntitlements } from '../services/billing-plans.js';
 import {
   BANNER_MAX_COUNT,
   BANNER_PRESETS,
@@ -80,13 +82,18 @@ function workerUrl(c: Context<Env>): string {
   return c.env.WORKER_URL || new URL(c.req.url).origin;
 }
 
-function monthlyImageLimit(c: Context<Env>): number {
+/**
+ * 課金対象外（運営）の統括の月間上限。`BANNER_MONTHLY_IMAGES` で上書きできる。
+ * 契約中・トライアル中の統括はプランの値を使う（`resolveEntitlements`）。
+ */
+function exemptMonthlyImages(c: Context<Env>): number {
   const raw = Number(c.env.BANNER_MONTHLY_IMAGES ?? '');
   return Number.isFinite(raw) && raw > 0 ? Math.floor(raw) : DEFAULT_MONTHLY_IMAGES;
 }
 
-function dailyImageLimit(c: Context<Env>): number {
-  return Math.max(1, Math.ceil(monthlyImageLimit(c) / DAILY_DIVISOR));
+async function tenantEntitlements(c: Context<Env>, tenantId: string) {
+  const billing = await getTenantBilling(c.env.DB, tenantId).catch(() => null);
+  return resolveEntitlements(billing, { exemptMonthlyImages: exemptMonthlyImages(c) });
 }
 
 type UsageSnapshot = {
@@ -94,27 +101,36 @@ type UsageSnapshot = {
   today: { used: number; limit: number; remaining: number };
   paused: boolean;
   pausedReason: string | null;
+  /** 課金の状態で止まっているとき（トライアル終了・解約）。理由は blockedReason。 */
+  blocked: boolean;
+  blockedReason: string | null;
+  planState: string;
 };
 
 async function usageSnapshot(c: Context<Env>, tenantId: string): Promise<UsageSnapshot> {
-  const [usedMonth, usedToday, recentFailures] = await Promise.all([
+  const [usedMonth, usedToday, recentFailures, entitlements] = await Promise.all([
     getBannerUsageThisMonth(c.env.DB, tenantId),
     getBannerUsageToday(c.env.DB, tenantId),
     countRecentFailedBannerGenerations(c.env.DB, tenantId, toJstString(new Date(Date.now() - AUTO_PAUSE_WINDOW_MS))),
+    tenantEntitlements(c, tenantId),
   ]);
-  const monthLimit = monthlyImageLimit(c);
-  const dayLimit = dailyImageLimit(c);
+  const monthLimit = entitlements.monthlyImages;
+  const dayLimit = Math.max(1, Math.ceil(monthLimit / DAILY_DIVISOR));
   const paused = recentFailures >= AUTO_PAUSE_FAILURES;
   return {
     month: { used: usedMonth, limit: monthLimit, remaining: Math.max(monthLimit - usedMonth, 0) },
     today: { used: usedToday, limit: dayLimit, remaining: Math.max(dayLimit - usedToday, 0) },
     paused,
+    blocked: !entitlements.canGenerate,
+    blockedReason: entitlements.blockedReason,
+    planState: entitlements.state,
     pausedReason: paused ? '短時間に生成の失敗が続いたため、15分ほど生成を止めています。時間をおいてからお試しください' : null,
   };
 }
 
 /** 生成を受け付けられないときは理由を返す。受け付けられるときは null。 */
 function refusal(usage: UsageSnapshot, needed: number): string | null {
+  if (usage.blocked) return usage.blockedReason;
   if (usage.paused) return usage.pausedReason;
   if (needed > usage.month.remaining) {
     return `今月の生成上限（${usage.month.limit}枚）に達します（残り ${usage.month.remaining}枚、必要 ${needed}枚）。枚数を減らすか、来月までお待ちください`;

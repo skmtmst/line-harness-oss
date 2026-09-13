@@ -143,6 +143,7 @@ import { restaurantTest } from './routes/restaurant-test.js';
 import { tenants } from './routes/tenants.js';
 import { hqBanners } from './routes/hq-banners.js';
 import { hqSupport } from './routes/hq-support.js';
+import { hqBilling } from './routes/hq-billing.js';
 import { codexSlackEvents } from './routes/codex-slack-events.js';
 import { aiLoopSlackReports } from './routes/ai-loop-slack-reports.js';
 import { clientErrors } from './routes/client-errors.js';
@@ -230,6 +231,12 @@ export type Env = {
     BANNER_IMAGE_QUALITY?: string;
     /** 統括からのお問い合わせを知らせる運営の宛先。未設定なら CONTACT_EMAIL。 */
     SUPPORT_NOTIFY_EMAIL?: string;
+    /** 統括の課金（Stripe サブスクリプション）。値は secret／var で持ち、ここには書かない。 */
+    STRIPE_SECRET_KEY?: string;
+    STRIPE_BILLING_WEBHOOK_SECRET?: string;
+    STRIPE_PRICE_LIGHT?: string;
+    STRIPE_PRICE_STANDARD?: string;
+    STRIPE_PRICE_PRO?: string;
     TOTP_ENCRYPTION_KEY?: string;
     /** 署名済みの配備イベント受信用。管理画面へは公開しない。 */
     OPERATIONS_DEPLOYMENT_SIGNING_SECRET?: string;
@@ -471,6 +478,7 @@ app.route('/', restaurantTest);
 app.route('/', tenants);
 app.route('/', hqBanners);
 app.route('/', hqSupport);
+app.route('/', hqBilling);
 app.route('/', codexSlackEvents);
 app.route('/', aiLoopSlackReports);
 app.route('/', clientErrors);

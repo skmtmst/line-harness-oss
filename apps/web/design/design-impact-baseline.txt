@@ -60,6 +60,7 @@ shared-button-importer app/friends/identity-candidates/page.tsx
 shared-button-importer app/friends/migrations/page.tsx
 shared-button-importer app/friends/page.tsx
 shared-button-importer app/hq/banners/project/page.tsx
+shared-button-importer app/hq/billing/page.tsx
 shared-button-importer app/hq/members/page.tsx
 shared-button-importer app/hq/open/page.tsx
 shared-button-importer app/hq/page.tsx

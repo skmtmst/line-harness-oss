@@ -350,6 +350,8 @@ export function isPublicApiBoundary(method: string, path: string): boolean {
     path.startsWith('/auth/') ||
     path === '/setup' ||
     path === '/api/integrations/stripe/webhook' ||
+    // 課金の Stripe Webhook は route 内で署名検証する。
+    path === '/api/hq/billing/webhook' ||
     path === '/api/integrations/eccube/events' ||
     path === '/api/integrations/eccube/columns' ||
     path === '/api/internal/deployments/events' ||
