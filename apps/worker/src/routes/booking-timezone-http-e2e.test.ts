@@ -54,12 +54,18 @@ function asD1(sqlite: Database.Database, beforeRun?: (sql: string) => Promise<vo
       const statement = sqlite.prepare(sql);
       const bound = (params: unknown[]): D1PreparedStatement => ({
         bind: (...next: unknown[]) => bound(next),
-        all: async <T>() => ({
-          success: true,
-          results: call((...a) => statement.all(...a), params) as T[],
-          meta: {},
-        }),
-        first: async <T>() => (call((...a) => statement.get(...a), params) as T | undefined) ?? null,
+        all: async <T>() => {
+          if (beforeRun) await beforeRun(sql);
+          return {
+            success: true,
+            results: call((...a) => statement.all(...a), params) as T[],
+            meta: {},
+          };
+        },
+        first: async <T>() => {
+          if (beforeRun) await beforeRun(sql);
+          return (call((...a) => statement.get(...a), params) as T | undefined) ?? null;
+        },
         run: async <T>() => {
           if (beforeRun) await beforeRun(sql);
           const changes = statement.reader
@@ -294,6 +300,24 @@ describe('非JST店舗の予約作成 HTTP E2E（実DB・America/New_York）', (
     const response = await create(NY_NOV2_1000, `hours-close-${mode}`);
     expect(changed).toBe(true);
     expect(response.status).toBe(409);
+    expect(bookingRows()).toEqual([]);
+  });
+
+  test.each(['liff', 'admin'])('空き枠計算後・容量snapshot直前に閉店しても予約を作らない (%s)', async (mode) => {
+    storeCapacity(1);
+    stubExternal();
+    let changed = false;
+    db = asD1(sqlite, async sql => {
+      if (changed || !sql.includes('booking_store_capacity_snapshot')) return;
+      changed = true;
+      sqlite.exec(`DELETE FROM booking_business_hours WHERE booking_settings_id='settings-ny';
+        UPDATE booking_settings SET version=version+1 WHERE id='settings-ny';`);
+    });
+    env = { DB: db };
+    const create = mode === 'liff' ? liffCreate : adminCreate;
+    const response = await create(NY_NOV2_1000, `hours-close-before-snapshot-${mode}`);
+    expect(changed).toBe(true);
+    expect(response.status).toBe(mode === 'liff' ? 422 : 409);
     expect(bookingRows()).toEqual([]);
   });
 

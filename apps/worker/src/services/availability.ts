@@ -300,7 +300,8 @@ export async function getStoreCapacitySnapshot(
   start: Date,
   end: Date,
 ): Promise<StoreCapacitySnapshot> {
-  const snapshot = await db.prepare(`SELECT bs.timezone, bs.version,
+  const snapshot = await db.prepare(`/* booking_store_capacity_snapshot */
+    SELECT bs.timezone, bs.version,
       bh.weekday, bh.start_time, bh.end_time, bh.capacity
     FROM booking_settings bs
     LEFT JOIN booking_business_hours bh ON bh.booking_settings_id = bs.id

@@ -619,6 +619,10 @@ booking.post('/api/liff/booking/requests', async (c) => {
   }
   const endsAt = new Date(startsAt.getTime() + menuRow.dur * 60_000);
   const blockEndsAt = new Date(endsAt.getTime() + menuRow.buffer_after_minutes * 60_000);
+  // 営業時間snapshotを空き枠の再計算より先に固定する。以後に営業時間が
+  // 変われば、再計算が新条件で拒否するか、INSERT時のversion guardが
+  // このsnapshotとの差を検知する。逆順だと両読取の間の閉店を見逃す。
+  const storeCapacity = await getStoreCapacitySnapshot(c.env.DB, accountId, startsAt, blockEndsAt);
 
   // Server-side availability 再検証: 曜日受付時間 / Google Calendar /
   // リードタイム / 既存予約を、確定直前にもう一度突合する。
@@ -635,7 +639,6 @@ booking.post('/api/liff/booking/requests', async (c) => {
 
   const bookingId = crypto.randomUUID();
   const nowIso = new Date().toISOString();
-  const storeCapacity = await getStoreCapacitySnapshot(c.env.DB, accountId, startsAt, blockEndsAt);
   // 競合チェックと INSERT を 1 ステートメントで原子化する。
   // INSERT ... SELECT WHERE NOT EXISTS パターンで、同一スタッフの overlap 行がある場合は
   // 0 行 INSERT に落とす。changes=0 を 409 として扱う。
@@ -2056,6 +2059,9 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
   }
   const endsAt = new Date(startsAt.getTime() + menuRow.dur * 60_000);
   const blockEndsAt = new Date(endsAt.getTime() + menuRow.buffer_after_minutes * 60_000);
+  // LIFFと同じ順序で営業時間snapshotを先に固定し、その後の変更を
+  // availability再計算または原子的なversion guardのどちらかで止める。
+  const storeCapacity = await getStoreCapacitySnapshot(c.env.DB, accountId, startsAt, blockEndsAt);
 
   // Recurring-hours + Google Calendar + internal-booking validation.
   // LIFF と同じ契約で照合する。店舗タイムゾーンの暦日で取り直した候補の
@@ -2107,7 +2113,6 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
     day_before: sendLineConfirmation,
     hours_before: sendLineConfirmation,
   });
-  const storeCapacity = await getStoreCapacitySnapshot(c.env.DB, accountId, startsAt, blockEndsAt);
   const insertResult = await c.env.DB
     .prepare(
       `INSERT INTO bookings
