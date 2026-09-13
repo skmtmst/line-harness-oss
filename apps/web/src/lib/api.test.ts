@@ -10,6 +10,7 @@ let extractFeatureDisabledDetail: typeof import('./api').extractFeatureDisabledD
 let shouldAnnounceFeatureDisabled: typeof import('./api').shouldAnnounceFeatureDisabled
 let eventsApi: typeof import('./api').eventsApi
 let webinarApi: typeof import('./api').webinarApi
+let bookingApi: typeof import('./api').bookingApi
 let api: typeof import('./api').api
 
 beforeAll(async () => {
@@ -24,8 +25,35 @@ beforeAll(async () => {
     shouldAnnounceFeatureDisabled,
     eventsApi,
     webinarApi,
+    bookingApi,
     api,
   } = await import('./api'))
+})
+
+describe('bookingApi 予約設備CRUD', () => {
+  it('accountをqueryへ固定し、版付きPATCH/DELETEを送る', async () => {
+    const fetchSpy = vi.fn(async (_url: string | URL | Request) => new Response(
+      JSON.stringify({ success: true, data: {} }),
+      { status: 200, headers: { 'content-type': 'application/json' } },
+    ))
+    vi.stubGlobal('fetch', fetchSpy)
+
+    await bookingApi.createResource('account/1', { name: '個室', type: 'room', capacity: 2 })
+    await bookingApi.updateResource('account/1', 'resource/1', { expectedVersion: 3, isActive: false })
+    await bookingApi.deleteResource('account/1', 'resource/1', 4)
+
+    expect(fetchSpy.mock.calls.map(([url]) => String(url))).toEqual([
+      'https://worker.example.com/api/booking/admin/resources?account_id=account%2F1',
+      'https://worker.example.com/api/booking/admin/resources/resource/1?account_id=account%2F1',
+      'https://worker.example.com/api/booking/admin/resources/resource/1?account_id=account%2F1',
+    ])
+    expect(fetchSpy.mock.calls[1]?.[1]).toMatchObject({
+      method: 'PATCH', body: JSON.stringify({ expectedVersion: 3, isActive: false }),
+    })
+    expect(fetchSpy.mock.calls[2]?.[1]).toMatchObject({
+      method: 'DELETE', body: JSON.stringify({ expectedVersion: 4 }),
+    })
+  })
 })
 
 describe('api.nenMembers の写真審査運用契約', () => {

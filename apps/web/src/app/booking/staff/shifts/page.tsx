@@ -250,6 +250,160 @@ function StaffShiftsPageContent() {
   return <StoreShiftsView />
 }
 
+function resourceSaveError(error: unknown): string {
+  if (error instanceof ApiError && error.status === 409) return error.message
+  if (error instanceof ApiError && error.status === 400) return error.message
+  return '設備を保存できませんでした。入力内容は残っています。もう一度お試しください。'
+}
+
+function ResourceEditor({ accountId, resource, canManage, onSaved, onDeleted }: {
+  accountId: string
+  resource: BookingResource
+  canManage: boolean
+  onSaved: (resource: BookingResource) => void
+  onDeleted: (id: string) => void
+}) {
+  const [name, setName] = useState(resource.name)
+  const [type, setType] = useState(resource.type)
+  const [capacity, setCapacity] = useState(String(resource.capacity))
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const activeRef = useRef(true)
+  const inFlightRef = useRef(false)
+  useEffect(() => () => { activeRef.current = false }, [])
+
+  async function update(nextActive = resource.isActive) {
+    if (inFlightRef.current) return
+    const parsedCapacity = Number(capacity)
+    if (!name.trim() || name.trim().length > 100 || !type.trim() || type.trim().length > 50
+      || !Number.isInteger(parsedCapacity) || parsedCapacity < 1 || parsedCapacity > 1000) {
+      setError('設備名は1〜100文字、種類は1〜50文字、受付上限は1〜1000の整数で入力してください。')
+      return
+    }
+    inFlightRef.current = true
+    setSaving(true)
+    setError(null)
+    try {
+      const response = await bookingApi.updateResource(accountId, resource.id, {
+        expectedVersion: resource.version,
+        name: name.trim(),
+        type: type.trim(),
+        capacity: parsedCapacity,
+        isActive: nextActive,
+      })
+      if (activeRef.current) onSaved(response.data)
+    } catch (cause) {
+      if (activeRef.current) setError(resourceSaveError(cause))
+    } finally {
+      inFlightRef.current = false
+      if (activeRef.current) setSaving(false)
+    }
+  }
+
+  async function remove() {
+    if (inFlightRef.current) return
+    inFlightRef.current = true
+    setSaving(true)
+    setError(null)
+    try {
+      await bookingApi.deleteResource(accountId, resource.id, resource.version)
+      if (activeRef.current) onDeleted(resource.id)
+    } catch (cause) {
+      if (activeRef.current) setError(resourceSaveError(cause))
+    } finally {
+      inFlightRef.current = false
+      if (activeRef.current) setSaving(false)
+    }
+  }
+
+  return (
+    <div className="border-hairline rounded-control border p-3">
+      <div className="grid gap-2 sm:grid-cols-2">
+        <label className="text-ink-secondary text-xs">設備名
+          <input aria-label={`${resource.name}の設備名`} value={name} onChange={(event) => setName(event.target.value)} disabled={!canManage || saving} maxLength={100} className="border-hairline rounded-control mt-1 w-full border bg-canvas px-3 py-2 text-sm disabled:opacity-60" />
+        </label>
+        <label className="text-ink-secondary text-xs">種類
+          <input aria-label={`${resource.name}の種類`} value={type} onChange={(event) => setType(event.target.value)} disabled={!canManage || saving} maxLength={50} className="border-hairline rounded-control mt-1 w-full border bg-canvas px-3 py-2 text-sm disabled:opacity-60" />
+        </label>
+        <label className="text-ink-secondary text-xs">受付上限
+          <input aria-label={`${resource.name}の受付上限`} type="number" min={1} max={1000} value={capacity} onChange={(event) => setCapacity(event.target.value)} disabled={!canManage || saving} className="border-hairline rounded-control mt-1 w-full border bg-canvas px-3 py-2 text-sm disabled:opacity-60" />
+        </label>
+      </div>
+      <p className="text-ink-faint mt-2 text-xs">
+        メニュー {resource.usage.menuCount}件 ／ 予約 {resource.usage.bookingCount}件 ／ 例外日 {resource.usage.exceptionCount}件
+      </p>
+      {error ? <p className="text-danger mt-2 text-xs" role="alert">{error}</p> : null}
+      {canManage ? (
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Button variant="primary" onClick={() => void update()} disabled={saving}>{saving ? '保存中…' : '設備を保存'}</Button>
+          <Button onClick={() => void update(!resource.isActive)} disabled={saving}>{resource.isActive ? '受付を停止' : '受付を再開'}</Button>
+          {!resource.usage.referenced ? <Button onClick={() => void remove()} disabled={saving}>設備を削除</Button> : null}
+        </div>
+      ) : <p className="text-ink-faint mt-2 text-xs">閲覧のみです。変更はオーナーまたは管理者が行えます。</p>}
+    </div>
+  )
+}
+
+function NewResourceEditor({ accountId, onCreated }: {
+  accountId: string
+  onCreated: (resource: BookingResource) => void
+}) {
+  const [name, setName] = useState('')
+  const [type, setType] = useState('')
+  const [capacity, setCapacity] = useState('1')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const activeRef = useRef(true)
+  const inFlightRef = useRef(false)
+  useEffect(() => () => { activeRef.current = false }, [])
+
+  async function create() {
+    if (inFlightRef.current) return
+    const parsedCapacity = Number(capacity)
+    if (!name.trim() || name.trim().length > 100 || !type.trim() || type.trim().length > 50
+      || !Number.isInteger(parsedCapacity) || parsedCapacity < 1 || parsedCapacity > 1000) {
+      setError('設備名は1〜100文字、種類は1〜50文字、受付上限は1〜1000の整数で入力してください。')
+      return
+    }
+    inFlightRef.current = true
+    setSaving(true)
+    setError(null)
+    try {
+      const response = await bookingApi.createResource(accountId, {
+        name: name.trim(), type: type.trim(), capacity: parsedCapacity,
+      })
+      if (!activeRef.current) return
+      onCreated(response.data)
+      setName('')
+      setType('')
+      setCapacity('1')
+    } catch (cause) {
+      if (activeRef.current) setError(resourceSaveError(cause))
+    } finally {
+      inFlightRef.current = false
+      if (activeRef.current) setSaving(false)
+    }
+  }
+
+  return (
+    <div className="border-hairline bg-canvas-sunken rounded-control border p-3">
+      <div className="grid gap-2 sm:grid-cols-2">
+        <label className="text-ink-secondary text-xs">設備名
+          <input aria-label="新しい設備名" value={name} onChange={(event) => setName(event.target.value)} disabled={saving} maxLength={100} className="border-hairline rounded-control mt-1 w-full border bg-canvas px-3 py-2 text-sm" />
+        </label>
+        <label className="text-ink-secondary text-xs">種類
+          <input aria-label="新しい設備の種類" value={type} onChange={(event) => setType(event.target.value)} disabled={saving} maxLength={50} placeholder="例: 部屋・席・機器" className="border-hairline rounded-control mt-1 w-full border bg-canvas px-3 py-2 text-sm" />
+        </label>
+        <label className="text-ink-secondary text-xs">受付上限
+          <input aria-label="新しい設備の受付上限" type="number" min={1} max={1000} value={capacity} onChange={(event) => setCapacity(event.target.value)} disabled={saving} className="border-hairline rounded-control mt-1 w-full border bg-canvas px-3 py-2 text-sm" />
+        </label>
+      </div>
+      {error ? <p className="text-danger mt-2 text-xs" role="alert">{error}</p> : null}
+      <Button className="mt-3" variant="primary" onClick={() => void create()} disabled={saving}>{saving ? '追加中…' : '設備を追加'}</Button>
+    </div>
+  )
+}
+
 function StoreShiftsView() {
   usePageTitle('予約設定')
   const { selectedAccountId, selectedAccount } = useAccount()
@@ -265,8 +419,11 @@ function StoreShiftsView() {
   const [closedReason, setClosedReason] = useState('')
   const [savingClosed, setSavingClosed] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [canManageResources, setCanManageResources] = useState(false)
   const requestRef = useRef(0)
   const loadedAccountRef = useRef<string | null>(null)
+  const activeAccountRef = useRef(selectedAccountId)
+  activeAccountRef.current = selectedAccountId
 
   const workerBase = process.env.NEXT_PUBLIC_API_URL ?? ''
   const previewUrl = selectedAccount?.liffId
@@ -275,10 +432,16 @@ function StoreShiftsView() {
   const dates = useMemo(previewDates, [])
 
   useEffect(() => {
+    const role = window.localStorage.getItem('lh_staff_role')
+    setCanManageResources(role === 'owner' || role === 'admin')
+  }, [])
+
+  useEffect(() => {
     const requestId = ++requestRef.current
     if (!selectedAccountId) {
       loadedAccountRef.current = null
       setSettings(null)
+      setResources([])
       setSlots([])
       setLoadStatus('ready')
       return
@@ -412,15 +575,15 @@ function StoreShiftsView() {
 
       {!selectedAccountId ? (
         <ListState kind="empty" title="LINEアカウントを選んでください" description="受付枠を確認するアカウントを選びます。" />
-      ) : loadStatus === 'loading' ? (
-        <ListState kind="loading" title="受付時間と休業日を読み込んでいます" />
-      ) : loadStatus === 'error' || !settings ? (
+      ) : loadStatus === 'error' || !settings && loadedAccountRef.current === selectedAccountId ? (
         <ListState
           kind="error"
           title="受付時間と休業日を表示できませんでした"
           description="保存済みの設定は消えていません。時間をおいて、もう一度読み込んでください。"
           action={<Button onClick={() => setReloadKey((value) => value + 1)}>受付時間と休業日を再読み込み</Button>}
         />
+      ) : loadStatus === 'loading' || loadedAccountRef.current !== selectedAccountId || !settings ? (
+        <ListState kind="loading" title="受付時間と休業日を読み込んでいます" />
       ) : (
         <div data-design="Body" className="flex flex-col gap-4 xl:flex-row">
           <div className="min-w-0 flex-1 space-y-4">
@@ -530,9 +693,25 @@ function StoreShiftsView() {
             </section>
 
             <details className="bg-canvas border-hairline rounded-card border p-3">
-              <summary className="text-accent cursor-pointer text-sm font-semibold">設備ごとの受付上限を見る</summary>
-              <div className="mt-3 space-y-2 text-sm">
-                {resources.length === 0 ? <p className="text-ink-faint">設備は登録されていません</p> : resources.map((resource) => <div key={resource.id} className="flex justify-between"><span>{resource.name}</span><span>{resource.isActive ? `${resource.capacity}枠` : '停止中'}</span></div>)}
+              <summary className="text-accent cursor-pointer text-sm font-semibold">設備ごとの受付上限を管理</summary>
+              <div className="mt-3 space-y-3 text-sm">
+                {canManageResources ? <NewResourceEditor key={`new:${selectedAccountId}`} accountId={selectedAccountId} onCreated={(created) => {
+                  if (activeAccountRef.current === selectedAccountId) setResources((current) => [...current, created].sort((a, b) => a.name.localeCompare(b.name, 'ja')))
+                }} /> : null}
+                {resources.length === 0 ? <p className="text-ink-faint">設備は登録されていません</p> : resources.map((resource) => (
+                  <ResourceEditor
+                    key={`${selectedAccountId}:${resource.id}:${resource.version}`}
+                    accountId={selectedAccountId}
+                    resource={resource}
+                    canManage={canManageResources}
+                    onSaved={(saved) => {
+                      if (activeAccountRef.current === selectedAccountId) setResources((current) => current.map((item) => item.id === saved.id ? { ...item, ...saved, usage: item.usage } : item))
+                    }}
+                    onDeleted={(id) => {
+                      if (activeAccountRef.current === selectedAccountId) setResources((current) => current.filter((item) => item.id !== id))
+                    }}
+                  />
+                ))}
               </div>
             </details>
 
