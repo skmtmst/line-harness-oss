@@ -135,7 +135,7 @@ function CompleteInner() {
             invalid={Boolean(messages.tenantName)}
             autoComplete="organization"
             maxLength={80}
-            placeholder="例：Shed Products株式会社"
+            placeholder="例：株式会社サンプル"
           />
         </AuthField>
         <AuthField label="あなたの名前" htmlFor="complete-name" error={messages.name}>
@@ -146,7 +146,7 @@ function CompleteInner() {
             invalid={Boolean(messages.name)}
             autoComplete="name"
             maxLength={80}
-            placeholder="例：坂本 真人"
+            placeholder="例：山田 太郎"
           />
         </AuthField>
         <AuthField label="パスワード" hint="8文字以上・英字と数字" htmlFor="complete-password" error={messages.password}>

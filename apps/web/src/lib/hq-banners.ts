@@ -330,7 +330,7 @@ export function formatLabel(mimeType: string): string {
 export function groupPresets(presets: BannerPreset[]): Array<{ group: BannerPresetGroup; label: string; items: BannerPreset[] }> {
   return [
     { group: 'line' as const, label: 'LINE', items: presets.filter((p) => p.group === 'line') },
-    { group: 'sns' as const, label: 'ほかのSNS', items: presets.filter((p) => p.group === 'sns') },
+    { group: 'sns' as const, label: 'SNS', items: presets.filter((p) => p.group === 'sns') },
   ].filter((g) => g.items.length > 0)
 }
 
