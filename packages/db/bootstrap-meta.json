@@ -345,7 +345,8 @@
     "386_hq_support_requests.sql",
     "387_tenant_billing.sql",
     "388_email_password_auth.sql",
-    "389_banner_reference_image.sql"
+    "389_banner_reference_image.sql",
+    "390_form_published_versions.sql"
   ],
-  "migrationCount": 346
+  "migrationCount": 347
 }

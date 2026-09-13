@@ -1,5 +1,5 @@
 import { beforeEach, afterEach, describe, expect, test } from 'vitest';
-import { updateForm } from '@line-crm/db';
+import { publishFormVersion, updateForm } from '@line-crm/db';
 import { createTestD1, type SqliteD1 } from '../../test-utils/d1-sqlite.js';
 import { createFormHqTemplateAdapter, inspectFormTemplate, formTemplatePublicUrl, formTemplateSnapshot, formTemplateSnapshotToken, parseFormTemplateDefinition, type FormTemplateDependencies } from './form.js';
 import type { HqTemplateAdapterInput, HqTemplateAdapterContext, HqTemplateAdapterResult, HqTemplateAuthority, HqTemplateStoreAtomicCommitPlan } from './contract.js';
@@ -52,7 +52,8 @@ describe('HQ form atomic plans', () => {
     test('overwrite preserves form ID, answers, URL and old editor conflict semantics', async () => {
         const id = await commit(await plan((await preflight('a1')).context));
         fixture.raw.prepare("INSERT INTO form_submissions(id,form_id,data) VALUES ('answer',?,'{\"answer\":\"synthetic\"}')").run(id);
-        fixture.raw.prepare('UPDATE forms SET is_active=1,submit_count=7 WHERE id=?').run(id);
+        expect((await publishFormVersion(fixture.db, id, 1)).kind).toBe('published');
+        fixture.raw.prepare('UPDATE forms SET submit_count=7 WHERE id=?').run(id);
         const answer = fixture.raw.prepare('SELECT * FROM form_submissions').get(), url = await formTemplatePublicUrl(fixture.db, authority, 'a1', id);
         const { context } = await preflight('a1', 'overwrite');
         await commit(await plan(context));

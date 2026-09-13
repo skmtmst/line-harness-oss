@@ -2147,7 +2147,7 @@ CREATE TABLE form_submissions (
   data TEXT NOT NULL DEFAULT '{}',
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 , destination_write_status TEXT NOT NULL DEFAULT 'unknown'
-  CHECK (destination_write_status IN ('pending', 'succeeded', 'partial', 'failed', 'not_requested', 'unknown')), destination_write_attempted INTEGER, destination_write_succeeded INTEGER, destination_write_failed INTEGER, destination_write_completed_at TEXT);
+  CHECK (destination_write_status IN ('pending', 'succeeded', 'partial', 'failed', 'not_requested', 'unknown')), destination_write_attempted INTEGER, destination_write_succeeded INTEGER, destination_write_failed INTEGER, destination_write_completed_at TEXT, form_version_id TEXT REFERENCES form_versions(id));
 
 CREATE TABLE form_submit_claims (
   tenant_id TEXT NOT NULL DEFAULT '',
@@ -2187,6 +2187,33 @@ CREATE TABLE form_submit_outbox (
   PRIMARY KEY (tenant_id, line_account_id, form_id, friend_id, idempotency_key, kind)
 );
 
+CREATE TABLE form_versions (
+  id                             TEXT PRIMARY KEY,
+  form_id                        TEXT NOT NULL REFERENCES forms(id) ON DELETE CASCADE,
+  version_number                 INTEGER NOT NULL CHECK (version_number >= 1),
+  source_content_revision        INTEGER NOT NULL CHECK (source_content_revision >= 1),
+  name                           TEXT NOT NULL,
+  description                    TEXT,
+  fields                         TEXT NOT NULL DEFAULT '[]',
+  layout                         TEXT,
+  on_submit_tag_id               TEXT,
+  on_submit_scenario_id          TEXT,
+  on_submit_message_type         TEXT CHECK (on_submit_message_type IN ('text', 'flex')),
+  on_submit_message_content      TEXT,
+  on_submit_webhook_url          TEXT,
+  on_submit_webhook_headers      TEXT,
+  on_submit_webhook_fail_message TEXT,
+  save_to_metadata               INTEGER NOT NULL CHECK (save_to_metadata IN (0, 1)),
+  og_title                       TEXT,
+  og_description                 TEXT,
+  og_image_url                   TEXT,
+  status                         TEXT NOT NULL DEFAULT 'published' CHECK (status = 'published'),
+  published_at                   TEXT NOT NULL,
+  created_at                     TEXT NOT NULL,
+  UNIQUE (form_id, version_number),
+  UNIQUE (form_id, source_content_revision)
+);
+
 CREATE TABLE forms (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
@@ -2202,7 +2229,7 @@ CREATE TABLE forms (
 , on_submit_message_type TEXT CHECK (on_submit_message_type IN ('text', 'flex')) DEFAULT NULL, on_submit_message_content TEXT DEFAULT NULL, on_submit_webhook_url TEXT, on_submit_webhook_headers TEXT, on_submit_webhook_fail_message TEXT, og_title TEXT, og_description TEXT, og_image_url TEXT, layout TEXT, status TEXT NOT NULL DEFAULT 'active'
   CHECK (status IN ('active', 'archived')), archived_at TEXT, revision INTEGER NOT NULL DEFAULT 1
   CHECK (revision >= 1), content_revision INTEGER NOT NULL DEFAULT 1
-  CHECK (content_revision >= 1));
+  CHECK (content_revision >= 1), current_published_version_id TEXT);
 
 CREATE TABLE "friend_add_action_runs" (
   id                  TEXT PRIMARY KEY,
@@ -6226,11 +6253,18 @@ CREATE INDEX idx_form_submissions_form_write_status
 
 CREATE INDEX idx_form_submissions_friend ON form_submissions (friend_id);
 
+CREATE INDEX idx_form_submissions_version
+  ON form_submissions(form_version_id)
+  WHERE form_version_id IS NOT NULL;
+
 CREATE INDEX idx_form_submit_claims_submission
   ON form_submit_claims (submission_id);
 
 CREATE INDEX idx_form_submit_claims_updated
   ON form_submit_claims (updated_at);
+
+CREATE INDEX idx_form_versions_form_number
+  ON form_versions(form_id, version_number DESC);
 
 CREATE INDEX idx_forms_status_updated
   ON forms(status, updated_at DESC);
@@ -7464,6 +7498,42 @@ CREATE TRIGGER trg_common_action_published_version_no_delete
 BEFORE DELETE ON common_action_versions
 WHEN OLD.status = 'published'
 BEGIN SELECT RAISE(ABORT, 'published common action version cannot be deleted'); END;
+
+CREATE TRIGGER trg_form_versions_immutable
+BEFORE UPDATE ON form_versions
+BEGIN SELECT RAISE(ABORT, 'published form versions are immutable'); END;
+
+CREATE TRIGGER trg_form_versions_no_delete
+BEFORE DELETE ON form_versions
+BEGIN SELECT RAISE(ABORT, 'published form versions cannot be deleted'); END;
+
+CREATE TRIGGER trg_forms_activation_requires_published_version
+BEFORE UPDATE OF is_active ON forms
+WHEN NEW.is_active = 1 AND NEW.current_published_version_id IS NULL
+BEGIN SELECT RAISE(ABORT, 'form publish is required before activation'); END;
+
+CREATE TRIGGER trg_forms_initial_published_version
+AFTER INSERT ON forms
+WHEN NEW.status = 'active' AND NEW.is_active = 1
+BEGIN INSERT INTO form_versions (id, form_id, version_number, source_content_revision, name, description, fields, layout, on_submit_tag_id, on_submit_scenario_id, on_submit_message_type, on_submit_message_content, on_submit_webhook_url, on_submit_webhook_headers, on_submit_webhook_fail_message, save_to_metadata, og_title, og_description, og_image_url, status, published_at, created_at) VALUES ('form-version-v1-' || NEW.id, NEW.id, 1, NEW.content_revision, NEW.name, NEW.description, NEW.fields, NEW.layout, NEW.on_submit_tag_id, NEW.on_submit_scenario_id, NEW.on_submit_message_type, NEW.on_submit_message_content, NEW.on_submit_webhook_url, NEW.on_submit_webhook_headers, NEW.on_submit_webhook_fail_message, NEW.save_to_metadata, NEW.og_title, NEW.og_description, NEW.og_image_url, 'published', NEW.updated_at, NEW.updated_at); UPDATE forms SET current_published_version_id = 'form-version-v1-' || NEW.id WHERE id = NEW.id; END;
+
+CREATE TRIGGER trg_forms_published_version_ownership_insert
+BEFORE INSERT ON forms
+WHEN NEW.current_published_version_id IS NOT NULL
+ AND NOT EXISTS (
+   SELECT 1 FROM form_versions
+   WHERE id = NEW.current_published_version_id AND form_id = NEW.id
+ )
+BEGIN SELECT RAISE(ABORT, 'published version belongs to another form'); END;
+
+CREATE TRIGGER trg_forms_published_version_ownership_update
+BEFORE UPDATE OF current_published_version_id ON forms
+WHEN NEW.current_published_version_id IS NOT NULL
+ AND NOT EXISTS (
+   SELECT 1 FROM form_versions
+   WHERE id = NEW.current_published_version_id AND form_id = NEW.id
+ )
+BEGIN SELECT RAISE(ABORT, 'published version belongs to another form'); END;
 
 CREATE TRIGGER trg_forms_revision_account_delete
 AFTER DELETE ON form_accounts

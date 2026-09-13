@@ -133,6 +133,12 @@ export const TAG_USAGE_BLOCKING_REFERENCE_SELECTS = [
   'SELECT on_submit_tag_id AS tag_id FROM forms WHERE on_submit_tag_id IS NOT NULL',
   `SELECT CAST(j.value AS TEXT) AS tag_id FROM forms f,
      json_tree(CASE WHEN json_valid(f.layout) THEN f.layout ELSE 'null' END) j WHERE j.type = 'text'`,
+  `SELECT v.on_submit_tag_id AS tag_id FROM forms f
+     JOIN form_versions v ON v.id = f.current_published_version_id
+    WHERE v.on_submit_tag_id IS NOT NULL`,
+  `SELECT CAST(j.value AS TEXT) AS tag_id FROM forms f
+     JOIN form_versions v ON v.id = f.current_published_version_id,
+     json_tree(CASE WHEN json_valid(v.layout) THEN v.layout ELSE 'null' END) j WHERE j.type = 'text'`,
   'SELECT trigger_tag_id AS tag_id FROM scenarios WHERE trigger_tag_id IS NOT NULL',
   `SELECT CAST(j.value AS TEXT) AS tag_id FROM scenarios s,
      json_tree(CASE WHEN json_valid(s.audience_condition_json) THEN s.audience_condition_json ELSE 'null' END) j
@@ -344,6 +350,15 @@ export async function getTagsWithUsage(
          SELECT CAST(j.value AS TEXT), f.id
            FROM forms f,
                 json_tree(CASE WHEN json_valid(f.layout) THEN f.layout ELSE 'null' END) j
+          WHERE j.type = 'text'
+         UNION
+         SELECT v.on_submit_tag_id, f.id
+           FROM forms f JOIN form_versions v ON v.id = f.current_published_version_id
+          WHERE v.on_submit_tag_id IS NOT NULL
+         UNION
+         SELECT CAST(j.value AS TEXT), f.id
+           FROM forms f JOIN form_versions v ON v.id = f.current_published_version_id,
+                json_tree(CASE WHEN json_valid(v.layout) THEN v.layout ELSE 'null' END) j
           WHERE j.type = 'text'
        )`,
     used_in_auto_replies: `WITH refs(tag_id, entity_id) AS (
@@ -666,12 +681,22 @@ export async function getTagDeleteImpact(
                                              THEN b.segment_conditions ELSE 'null' END) j
                  WHERE j.type = 'text' AND CAST(j.value AS TEXT) = t.id
               )) AS broadcasts,
-            (SELECT COUNT(*) FROM forms f
-              WHERE f.on_submit_tag_id = t.id OR EXISTS (
-                SELECT 1 FROM json_tree(CASE WHEN json_valid(f.layout)
-                                             THEN f.layout ELSE 'null' END) j
-                 WHERE j.type = 'text' AND CAST(j.value AS TEXT) = t.id
-              )) AS forms,
+            (SELECT COUNT(*) FROM (
+               SELECT f.id FROM forms f
+                WHERE f.on_submit_tag_id = t.id OR EXISTS (
+                  SELECT 1 FROM json_tree(CASE WHEN json_valid(f.layout)
+                                               THEN f.layout ELSE 'null' END) j
+                   WHERE j.type = 'text' AND CAST(j.value AS TEXT) = t.id
+                )
+               UNION
+               SELECT f.id FROM forms f
+                 JOIN form_versions v ON v.id = f.current_published_version_id
+                WHERE v.on_submit_tag_id = t.id OR EXISTS (
+                  SELECT 1 FROM json_tree(CASE WHEN json_valid(v.layout)
+                                               THEN v.layout ELSE 'null' END) j
+                   WHERE j.type = 'text' AND CAST(j.value AS TEXT) = t.id
+                )
+             )) AS forms,
             (SELECT COUNT(*) FROM scenario_refs) AS scenarios,
             (SELECT COUNT(*) FROM auto_replies a WHERE EXISTS (
               SELECT 1 FROM json_tree(CASE WHEN json_valid(a.actions_json)

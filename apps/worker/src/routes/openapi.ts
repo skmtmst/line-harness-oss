@@ -1829,6 +1829,34 @@ const spec = {
         responses: { '200': { description: 'Replaced with version' }, '400': { description: 'Invalid request' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Staff not in account' }, '409': { description: 'Version conflict' }, '422': { description: 'Invalid date, DST gap, overlap, outside hours, or time range' } },
       },
     },
+    // ── Forms ────────────────────────────────────────────────────────────
+    '/api/forms/{id}/publish': {
+      post: {
+        tags: ['Forms'],
+        summary: '保存済みのフォーム編集版を不変の公開版として公開',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object', required: ['expectedContentRevision'],
+                properties: { expectedContentRevision: { type: 'integer', minimum: 1 } },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': { description: '公開済み（同じ編集版の再実行を含む）' },
+          '400': { description: '確認した編集版が不正' },
+          '404': { description: 'フォームが無い、または権限範囲外' },
+          '409': { description: '保存後に編集内容が変わった' },
+        },
+      },
+    },
     // ── Event waitlist ────────────────────────────────────────────────────
     '/api/liff/events/waitlist/{token}/accept': {
       post: {
@@ -1897,6 +1925,7 @@ const spec = {
     { name: 'Booking', description: '予約設定' },
     { name: 'Events', description: 'イベント予約とキャンセル待ち' },
     { name: 'Templates', description: 'テンプレート公開版' },
+    { name: 'Forms', description: '回答フォーム' },
     { name: 'Rich Menus', description: 'リッチメニュー公開予約' },
     { name: 'Settings', description: '機能設定' },
     { name: 'Operator notifications', description: '運用者へのお知らせの自動実行' },
