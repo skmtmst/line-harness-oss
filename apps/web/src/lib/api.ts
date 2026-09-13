@@ -12,6 +12,7 @@ import type {
   BannerStats,
   BannerUsage,
 } from './hq-banners'
+import type { HqSupportKind, HqSupportRequest } from './hq-support'
 import type {
   ReminderDraftSettings,
   ReminderDraftVersion,
@@ -6035,6 +6036,22 @@ export const api = {
         body: JSON.stringify({ name }),
       }),
   },
+  /** 統括から運営へのお問い合わせ（★V6 36-3）。形は `apps/worker/src/routes/hq-support.ts`。 */
+  hqSupport: {
+    kinds: () => fetchApi<ApiResponse<Array<{ key: HqSupportKind; label: string }>>>('/api/hq/support/kinds'),
+    list: () => fetchApi<ApiResponse<HqSupportRequest[]>>('/api/hq/support/requests'),
+    create: (input: {
+      kind: HqSupportKind
+      subject: string
+      body: string
+      lineAccountId?: string | null
+      attachments?: Array<{ mimeType: string; data: string }>
+    }) =>
+      fetchApi<ApiResponse<HqSupportRequest & { notified: boolean }>>('/api/hq/support/requests', {
+        method: 'POST',
+        body: JSON.stringify(input),
+      }),
+  },
   /**
    * 統括「バナー生成」。統括の管理者・オーナーだけが呼べる。
    * 形は `apps/worker/src/routes/hq-banners.ts`、説明は `docs/hq-banner-generation.md`。
@@ -8540,6 +8557,11 @@ export const api = {
       }),
     loginSummary: (id: string) =>
       fetchApi<ApiResponse<{ loginCount: number }>>(`/api/staff/${id}/login-summary`),
+    /** 権限者ごとの最終ログイン（統括のメンバー管理）。記録が無い人は入らない。 */
+    lastLogins: () => fetchApi<ApiResponse<Record<string, string>>>('/api/staff/last-logins'),
+    /** 招待メールを送り直す。まだメールを確認していない人だけ。 */
+    resendInvite: (id: string) =>
+      fetchApi<ApiResponse<StaffMember>>(`/api/staff/${encodeURIComponent(id)}/resend-invite`, { method: 'POST', body: JSON.stringify({}) }),
     delete: (id: string) =>
       fetchApi<ApiResponse<StaffMember>>(`/api/staff/${id}`, { method: 'DELETE' }),
     acceptInvitation: (token: string) =>

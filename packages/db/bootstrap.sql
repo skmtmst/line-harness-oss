@@ -2611,6 +2611,24 @@ CREATE TABLE google_calendar_connections (
   updated_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
 
+CREATE TABLE hq_support_requests (
+  id               TEXT PRIMARY KEY,
+  tenant_id        TEXT NOT NULL REFERENCES tenants(id),
+  staff_id         TEXT,
+  staff_name       TEXT NOT NULL DEFAULT '',
+  staff_email      TEXT,
+  kind             TEXT NOT NULL CHECK (kind IN ('usage', 'bug', 'billing', 'feature', 'other')),
+  subject          TEXT NOT NULL,
+  body             TEXT NOT NULL,
+  line_account_id  TEXT REFERENCES line_accounts(id) ON DELETE SET NULL,
+  -- 添付した画像の R2 キー（JSON 配列）。実体は IMAGES バケットの support/ 配下。
+  attachment_keys  TEXT NOT NULL DEFAULT '[]',
+  status           TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'answered', 'closed')),
+  notified_at      TEXT,
+  created_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  updated_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+);
+
 CREATE TABLE hq_template_distribution_results (
   run_id TEXT NOT NULL,
   tenant_id TEXT NOT NULL,
@@ -6336,6 +6354,9 @@ CREATE INDEX idx_handover_decisions_handover
   ON account_handover_decisions (handover_id);
 
 CREATE INDEX idx_health_logs_account ON account_health_logs (line_account_id);
+
+CREATE INDEX idx_hq_support_requests_tenant
+  ON hq_support_requests(tenant_id, created_at DESC);
 
 CREATE INDEX idx_hq_template_owned_r2_reconcile
   ON hq_template_owned_r2_keys(tenant_id, state, updated_at);

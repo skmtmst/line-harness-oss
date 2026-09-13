@@ -51,7 +51,7 @@ describe('統括コンソール', () => {
   it('統括と店舗のサイドバーを分け、採用フローを作らない', () => {
     expect(sidebar).toContain('HQ_MENU_SECTIONS')
     expect(HQ_MENU_SECTIONS.flatMap((section) => section.items).map((item) => item.label)).toEqual([
-      '店舗管理', '友だち属性', 'テンプレート', 'リッチメニュー', '回答フォーム', 'バナー生成', '設定',
+      '店舗管理', '友だち属性', 'テンプレート', 'リッチメニュー', '回答フォーム', 'バナー生成',
     ])
     expect(HQ_MENU_SECTIONS.flatMap((section) => section.items).some((item) => item.label === '採用フロー管理')).toBe(false)
     expect(HQ_MENU_SECTIONS.flatMap((section) => section.items).map((item) => item.href)).toEqual([
@@ -61,8 +61,10 @@ describe('統括コンソール', () => {
       '/hq/rich-menus',
       '/hq/form-submissions',
       '/hq/banners',
-      '/hq/settings',
     ])
+    // 「設定」は左下のアカウントメニュー（メンバー管理）へ移した。★V6 36-1。
+    expect(HQ_MENU_SECTIONS.flatMap((section) => section.items).some((item) => item.href === '/hq/settings')).toBe(false)
+    expect(sidebar).toContain('<HqAccountMenu />')
     expect(templatePage).toContain('HqTemplatePage')
     expect(sharedTemplatePage).toContain('HQ_TEMPLATE_DISTRIBUTION_ENABLED')
     expect(sharedTemplatePage).toContain('hqOpenHref(target)')

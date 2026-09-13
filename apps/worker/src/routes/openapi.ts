@@ -428,6 +428,24 @@ const spec = {
         responses: { '200': { description: 'Per-account delivery results' }, '400': { description: 'Invalid account selection' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Not found' } },
       },
     },
+    // ── HQ Support ─────────────────────────────────────────────────────────
+    '/api/hq/support/kinds': {
+      get: {
+        tags: ['HQ Support'], summary: '問い合わせ種別を取得',
+        responses: { '200': { description: 'Supported inquiry kinds' } },
+      },
+    },
+    '/api/hq/support/requests': {
+      get: {
+        tags: ['HQ Support'], summary: '統括の問い合わせ履歴を取得',
+        responses: { '200': { description: 'Tenant-scoped support requests' } },
+      },
+      post: {
+        tags: ['HQ Support'], summary: '運営への問い合わせを登録',
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['kind', 'subject', 'body'], properties: { kind: { type: 'string' }, subject: { type: 'string', maxLength: 100 }, body: { type: 'string', maxLength: 4000 }, lineAccountId: { type: 'string' }, attachments: { type: 'array', maxItems: 3, items: { type: 'object' } } } } } } },
+        responses: { '201': { description: 'Recorded; notification result is included' }, '400': { description: 'Invalid request' }, '403': { description: 'Read-only staff cannot submit' }, '404': { description: 'Line account not found in tenant scope' } },
+      },
+    },
     // ── HQ Templates ───────────────────────────────────────────────────────
     '/api/hq/templates/media': {
       post: {
@@ -1204,6 +1222,19 @@ const spec = {
       },
     },
     // ── Staff invitation ────────────────────────────────────────────────────
+    '/api/staff/last-logins': {
+      get: {
+        tags: ['Staff'], summary: '統括メンバーの最終ログイン一覧を取得',
+        responses: { '200': { description: 'Last login times by staff id' }, '403': { description: 'Owner or admin role required' } },
+      },
+    },
+    '/api/staff/{id}/resend-invite': {
+      post: {
+        tags: ['Staff'], summary: '統括メンバーへの招待を再送',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'Invitation resent' }, '403': { description: 'Owner or admin with all-account scope required' }, '404': { description: 'Not found in current tenant' }, '409': { description: 'Staff invitation is no longer pending' } },
+      },
+    },
     '/api/staff/{id}/resend-invitation': {
       post: {
         tags: ['Staff'],

@@ -107,7 +107,7 @@ describe('画面に「準備中」を置かない', () => {
     // 数え漏れ（読む場所を間違えて 0 件になる）だけを見張る。
     // ちょうどの枚数は画面が増えるたびに動くので、下限をゆるく取る。
     expect(FILES.length).toBeGreaterThan(300)
-    expect(FILES.filter((f) => /^app\/.*\/page\.tsx$/.test(f.p) || f.p === 'app/page.tsx')).toHaveLength(155)  // 2026-09-13: 統括バナー生成（/hq/banners、/hq/banners/project）を足した実測値。
+    expect(FILES.filter((f) => /^app\/.*\/page\.tsx$/.test(f.p) || f.p === 'app/page.tsx')).toHaveLength(157)  // 2026-09-13: 統括のメンバー管理・お問い合わせを足した実測値。
   })
 
   it('共通部品に「準備中」が1つも無い', () => {

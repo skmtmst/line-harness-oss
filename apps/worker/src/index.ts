@@ -142,6 +142,7 @@ import { siteTracking } from './routes/site-tracking.js';
 import { restaurantTest } from './routes/restaurant-test.js';
 import { tenants } from './routes/tenants.js';
 import { hqBanners } from './routes/hq-banners.js';
+import { hqSupport } from './routes/hq-support.js';
 import { codexSlackEvents } from './routes/codex-slack-events.js';
 import { aiLoopSlackReports } from './routes/ai-loop-slack-reports.js';
 import { clientErrors } from './routes/client-errors.js';
@@ -227,6 +228,8 @@ export type Env = {
     BANNER_MONTHLY_IMAGES?: string;
     /** 生成の品質（low|medium|high）。運用者には選ばせず、未設定時は medium。 */
     BANNER_IMAGE_QUALITY?: string;
+    /** 統括からのお問い合わせを知らせる運営の宛先。未設定なら CONTACT_EMAIL。 */
+    SUPPORT_NOTIFY_EMAIL?: string;
     TOTP_ENCRYPTION_KEY?: string;
     /** 署名済みの配備イベント受信用。管理画面へは公開しない。 */
     OPERATIONS_DEPLOYMENT_SIGNING_SECRET?: string;
@@ -467,6 +470,7 @@ app.route('/', siteTracking);
 app.route('/', restaurantTest);
 app.route('/', tenants);
 app.route('/', hqBanners);
+app.route('/', hqSupport);
 app.route('/', codexSlackEvents);
 app.route('/', aiLoopSlackReports);
 app.route('/', clientErrors);

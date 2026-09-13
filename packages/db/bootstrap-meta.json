@@ -341,7 +341,8 @@
     "380_broadcast_stop_and_send_claims.sql",
     "381_hq_templates.sql",
     "382_tags_account_name_scope.sql",
-    "385_banner_generation.sql"
+    "385_banner_generation.sql",
+    "386_hq_support_requests.sql"
   ],
-  "migrationCount": 342
+  "migrationCount": 343
 }
