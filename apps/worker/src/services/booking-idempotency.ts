@@ -100,6 +100,27 @@ export async function completeIdempotencyResponse(
     .run();
 }
 
+/**
+ * 予約作成transactionが失敗したとき、その呼び出し自身の202予約だけを解放する。
+ * key/account/subjectに加えて仮応答中のbooking_idまで照合し、別retryの確保を消さない。
+ */
+export async function releaseReservedIdempotencyResponse(
+  db: D1Database,
+  params: { key: string; lineAccountId: string; friendId: string; bookingId: string },
+): Promise<void> {
+  await db.prepare(
+    `DELETE FROM booking_idempotency_keys
+      WHERE key = ? AND line_account_id = ? AND friend_id = ?
+        AND response_status = 202
+        AND json_extract(response_body, '$.booking_id') = ?`,
+  ).bind(
+    params.key,
+    params.lineAccountId,
+    params.friendId,
+    params.bookingId,
+  ).run();
+}
+
 // caller(account+friend) と一致した行のみを返す。同じ key を別 caller が使った場合は
 // nothing-cached 扱いとし、そちらは新規 INSERT で衝突 (PK重複) して別の handling 経路に流れる。
 // global lookup にすると tenant 越しに booking_id が漏れるので必須。
