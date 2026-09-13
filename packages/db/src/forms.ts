@@ -892,6 +892,54 @@ export async function createFormSubmission(
   return record;
 }
 
+/**
+ * 全体上限・選択肢定員の枠を1つ、原子的に確保する(N-167 / #751)。
+ *
+ * 「数えてから比べる」のではなく、**条件付き INSERT 1本で決める**。
+ * 空きがあるかの判定(`COUNT < limit`)と確保(行を1つ増やす)を同じ文の
+ * 中で行うため、2件が同時に来ても両方が「空きあり」と読むことはない。
+ * 取れたかどうかは `changes` が 1 か 0 かで分かる。
+ *
+ * 同じ (formId, slotKey, submissionId) を2回確保しようとしても、主キーが
+ * 重複するので2回目は素通り(INSERT 0行)になる。冪等な再開でも枠を
+ * 二重に消費しない。
+ */
+export async function claimFormCapacitySlot(
+  db: D1Database,
+  formId: string,
+  slotKey: string,
+  submissionId: string,
+  limit: number,
+): Promise<boolean> {
+  const result = await db
+    .prepare(
+      `INSERT INTO form_capacity_claims (form_id, slot_key, submission_id, created_at)
+       SELECT ?, ?, ?, ?
+        WHERE (SELECT COUNT(*) FROM form_capacity_claims WHERE form_id = ? AND slot_key = ?) < ?`,
+    )
+    .bind(formId, slotKey, submissionId, jstNow(), formId, slotKey, limit)
+    .run();
+  return (result.meta?.changes ?? 0) > 0;
+}
+
+/**
+ * 確保に失敗した回答の後始末。確保済みの枠(あれば)を消す。
+ *
+ * 枠の確保は回答行(form_submissions)の保存より前に行うことがあるため、
+ * `form_capacity_claims.submission_id` は外部キーにしていない。取り消しは
+ * ここで明示的に行う。
+ */
+export async function releaseFormCapacityClaims(
+  db: D1Database,
+  formId: string,
+  submissionId: string,
+): Promise<void> {
+  await db
+    .prepare(`DELETE FROM form_capacity_claims WHERE form_id = ? AND submission_id = ?`)
+    .bind(formId, submissionId)
+    .run();
+}
+
 export interface FormDestinationWriteResult {
   attempted: number;
   succeeded: number;

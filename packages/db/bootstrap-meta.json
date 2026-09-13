@@ -341,6 +341,7 @@
     "380_broadcast_stop_and_send_claims.sql",
     "381_hq_templates.sql",
     "382_tags_account_name_scope.sql",
+    "383_form_capacity_claims.sql",
     "385_banner_generation.sql",
     "386_hq_support_requests.sql",
     "387_tenant_billing.sql",
@@ -348,5 +349,5 @@
     "389_banner_reference_image.sql",
     "390_form_published_versions.sql"
   ],
-  "migrationCount": 347
+  "migrationCount": 348
 }
