@@ -87,6 +87,13 @@ describe('V5 B4 オーバーレイ共通部品', () => {
     }
   })
 
+  it('ダイアログのボタンは最小幅を保ち、長いラベルを折り返さない', () => {
+    const css = read('dialog.module.css')
+    for (const className of ['button', 'designButton']) {
+      expect(css).toMatch(new RegExp(`\\.${className} \\{[^}]*min-width: 112px;[^}]*width: auto;[^}]*white-space: nowrap;`, 's'))
+    }
+  })
+
   it('契約はB4の部品・実ノード・宣言数を固定する', () => {
     const contract = JSON.parse(readFileSync(join(WEB, 'design', 'design-parts.json'), 'utf8'))
     const inventory = JSON.parse(readFileSync(join(WEB, 'design', 'pencil-component-inventory.json'), 'utf8'))
