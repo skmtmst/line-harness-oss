@@ -54,7 +54,7 @@ describe('#548-7 会話詳細の型は口の実応答に従う', () => {
 })
 
 describe('#548-9 メール取得の失敗は専用の行で知らせる', () => {
-  const loader = region(PAGE, 'const loadEmails = useCallback', '}, [statusFilter, debouncedNameQuery, loadingMoreEmails])')
+  const loader = region(PAGE, 'const loadEmails = useCallback', '\n  useEffect(() => {\n    void loadEmails()')
 
   it('失敗したら専用の文言を出し、成功したら消す', () => {
     expect(PAGE).toContain('const [emailError, setEmailError]')

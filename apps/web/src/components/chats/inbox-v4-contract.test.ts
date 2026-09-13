@@ -2,9 +2,11 @@ import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
+import { buildSupportEmailInboxQuery } from '../../app/chats/support-email-query'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const PAGE = readFileSync(join(HERE, '..', '..', 'app', 'chats', 'page.tsx'), 'utf8')
+const API = readFileSync(join(HERE, '..', '..', 'lib', 'api.ts'), 'utf8')
 const TEMPLATE_PICKER = readFileSync(join(HERE, 'template-picker.tsx'), 'utf8')
 const FRIEND_INFO = readFileSync(join(HERE, 'friend-info-sidebar.tsx'), 'utf8')
 const INBOX_KPIS = readFileSync(join(HERE, 'inbox-kpis.tsx'), 'utf8')
@@ -22,6 +24,14 @@ const VISUAL_QA_MOCK = readFileSync(
   join(HERE, '..', '..', '..', '..', '..', 'scripts', 'visual-qa', 'mock-api.mjs'),
   'utf8',
 )
+
+function region(source: string, start: string, end: string): string {
+  const from = source.indexOf(start)
+  expect(from, start).toBeGreaterThanOrEqual(0)
+  const to = source.indexOf(end, from + start.length)
+  expect(to, end).toBeGreaterThan(from)
+  return source.slice(from, to)
+}
 
 describe('受信箱V4で既存機能を失わない', () => {
   it('担当者別既読をLINEとメールの両方に残す', () => {
@@ -137,9 +147,54 @@ describe('受信箱V4の画面契約', () => {
   it('自分担当チップを外し、担当者プルダウンでLINEとメールを絞る', () => {
     expect(PAGE).not.toContain("{ key: 'mine' as const, label: '自分担当' }")
     expect(PAGE).toContain('ariaLabel="担当者で絞り込む"')
-    expect(PAGE).toContain("assigneeFilter === 'unassigned'")
-    expect(PAGE).toContain('item.assignedStaffId === assigneeFilter')
-    expect(PAGE).toContain('chat.operatorId !== assigneeFilter')
+    const lineParams = region(PAGE, 'const buildListParams = useCallback', 'return params')
+    expect(lineParams).toContain("if (assigneeFilter !== 'all') params.operatorId = assigneeFilter")
+    expect(lineParams).toContain('if (unreadOnly) params.unreadOnly = true')
+    expect(lineParams).toContain("if (quickFilter !== 'all') params.quickFilter = quickFilter")
+    const lineQuery = region(API, '  chats: {', 'get: (id: string, params?')
+    expect(lineQuery).toContain('query.operatorId = params.operatorId')
+    expect(lineQuery).toContain("query.unreadOnly = '1'")
+    expect(lineQuery).toContain('query.quickFilter = params.quickFilter')
+    const emailLoader = region(PAGE, 'const loadEmails = useCallback', '\n  useEffect(() => {\n    void loadEmails()')
+    expect(emailLoader).toMatch(/assignee: assigneeFilter,\s+unreadOnly,\s+quickFilter: quickFilter === 'all' \? undefined : quickFilter/)
+    for (const assignee of ['staff-1', 'unassigned']) {
+      for (const quickFilter of ['reply', 'overdue'] as const) {
+        const query = new URLSearchParams(buildSupportEmailInboxQuery({ status: 'all', assignee, unreadOnly: true, quickFilter }))
+        expect(query.get('assignee')).toBe(assignee)
+        expect(query.get('unreadOnly')).toBe('1')
+        expect(query.get('quickFilter')).toBe(quickFilter)
+      }
+    }
+  })
+
+  it('担当・未割当・未読・待ち時間はサーバーでLIMIT前に適用する', () => {
+    expect(WORKER_CHATS).toContain("conditions.push('c.operator_id = ?')")
+    expect(WORKER_CHATS).toContain("conditions.push('c.operator_id IS NULL')")
+    expect(WORKER_CHATS).toContain("reads.staff_id = ?")
+    expect(WORKER_CHATS).toContain("reads.last_read_at IS NULL OR incoming.created_at > reads.last_read_at")
+    const linePage = region(WORKER_CHATS, 'page AS MATERIALIZED (', 'LIMIT ?')
+    // 最新chatを1行選ぶlookupのLIMIT 1は許可するが、候補全体の先行LIMITは禁止。
+    expect(linePage).toContain('FROM deduped d')
+    expect(linePage).toContain("conditions.join(' AND ')")
+    expect(WORKER_EMAIL).toContain("searchSql += ' AND t.assigned_staff_id = ?'")
+    expect(WORKER_EMAIL).toContain("searchSql += ' AND t.assigned_staff_id IS NULL'")
+    expect(WORKER_EMAIL).toContain('sr.last_read_at IS NULL OR t.last_incoming_at > sr.last_read_at')
+    expect(WORKER_EMAIL).toContain("searchSql += ' AND julianday(t.last_incoming_at) <= julianday(?)'")
+    const emailPage = region(WORKER_EMAIL, 'FROM support_email_threads t', 'LIMIT')
+    expect(emailPage).toContain('WHERE ${statusSql} ${searchSql}')
+    for (const source of [WORKER_CHATS, WORKER_EMAIL]) {
+      expect(source).toContain("quickFilter === 'overdue'")
+      expect(source).toContain('Date.now() - 60 * 60 * 1000')
+    }
+  })
+
+  it('取得済みの200件を担当・未読・待ち時間で再び絞り込まない', () => {
+    // 表示内容や既読印は残し、行の選別部分だけを検査する。印が欠けても失敗する。
+    const emailFilters = region(PAGE, 'const mailRows =', '.map((item) =>')
+    const lineFilters = region(PAGE, 'const lineRows =', '.map((chat) =>')
+    for (const filters of [emailFilters, lineFilters]) {
+      expect(filters).not.toMatch(/assigneeFilter|assignedStaffId|operatorId|unreadOnly|isUnread|quickFilter|isOlderThanOneHour/)
+    }
   })
 
   it('担当と対応をV6専用プルダウンで操作し、開状態も確認できる', () => {

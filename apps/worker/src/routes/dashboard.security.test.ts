@@ -20,6 +20,26 @@ const dbMocks = vi.hoisted(() => ({
 
 vi.mock('@line-crm/db', () => ({
   ...dbMocks,
+  dashboardFreshness: (
+    asOf: string | null,
+    options: { failedSources?: number; totalSources?: number } = {},
+  ) => {
+    const failed = options.failedSources ?? 0;
+    const total = options.totalSources ?? 1;
+    if (failed >= total || !asOf) return 'unavailable';
+    return failed > 0 ? 'partial' : 'fresh';
+  },
+  summarizeDashboardFreshness: (sections: Record<string, { asOf: string | null; freshness: string }>) => {
+    const values = Object.values(sections);
+    const missing = values.filter((section) => section.freshness === 'unavailable').length;
+    return {
+      asOf: values.map((section) => section.asOf).find((value) => value !== null) ?? null,
+      freshness: values.some((section) => section.freshness === 'partial')
+        || (missing > 0 && missing < values.length)
+        ? 'partial'
+        : missing === values.length ? 'unavailable' : 'fresh',
+    };
+  },
 }));
 
 import { dashboard } from './dashboard.js';
@@ -51,8 +71,15 @@ function env(): Env['Bindings'] {
 function overview(delivery: Record<string, unknown> = {}) {
   return {
     delivery,
+    asOf: '2026-08-26T10:00:00+09:00',
+    freshness: 'fresh',
     partialFailures: [],
-    sections: { quota: { status: 'unavailable', asOf: '2026-08-26T10:00:00+09:00', period: 'this-month' } },
+    sections: {
+      quota: {
+        status: 'unavailable', asOf: null, freshness: 'unavailable',
+        reason: 'not_loaded', period: 'this-month',
+      },
+    },
     metrics: {
       activeFriends: {
         value: 0, state: 'empty', reason: null,
@@ -215,7 +242,40 @@ describe('dashboard organization account policy', () => {
     expect(body.data.metrics.monthlyQuota).toMatchObject({
       value: null, state: 'unavailable', reason: 'fetch_failed', asOf: null,
     });
+    expect(body.data.sections.quota).toMatchObject({
+      status: 'unavailable', freshness: 'unavailable', reason: 'fetch_failed', asOf: null,
+    });
     expect(body.data.partialFailures).toContain('quota');
+  });
+
+  test('organization quotaの一部取得失敗はokや全体成功に見せずpartial', async () => {
+    dbMocks.getLineAccounts.mockResolvedValue([
+      { ...account('account-1'), tenant_id: 'tenant-b' },
+      { ...account('account-2'), tenant_id: 'tenant-b' },
+    ]);
+    dbMocks.getDashboardOverview.mockResolvedValue(overview());
+    vi.mocked(fetch).mockImplementation(async (input, init) => {
+      const authorization = (init?.headers as Record<string, string> | undefined)?.Authorization ?? '';
+      if (authorization.includes('account-2-token')) return new Response(null, { status: 503 });
+      return String(input).endsWith('/quota')
+        ? Response.json({ type: 'limited', value: 100 })
+        : Response.json({ totalUsage: 1 });
+    });
+
+    const response = await app('tenant-b', 'owner').request(
+      '/api/dashboard/organization-overview', {}, env(),
+    );
+    const body = await response.json() as { data: ReturnType<typeof overview> };
+
+    expect(response.status).toBe(200);
+    expect(body.data.sections.quota).toMatchObject({
+      status: 'partial', freshness: 'partial', reason: 'fetch_failed',
+    });
+    expect(body.data.metrics.monthlyQuota).toMatchObject({
+      value: null, state: 'partial', reason: 'fetch_failed',
+    });
+    expect(body.data.partialFailures).toContain('quota');
+    expect(body.data.freshness).toBe('partial');
   });
 
   test('loads the signed-in staff preference for the selected account', async () => {

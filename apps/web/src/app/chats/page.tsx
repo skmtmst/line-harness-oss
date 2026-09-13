@@ -563,18 +563,30 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   const buildListParams = useCallback((cursor: { at: string; id: string } | null) => {
     const params: {
       status?: string; accountId?: string; q?: string;
+      operatorId?: string; unreadOnly?: boolean; quickFilter?: 'reply' | 'overdue';
       limit?: number; beforeAt?: string; beforeId?: string;
     } = {}
     if (statusFilter !== 'all') params.status = statusFilter
     if (selectedAccountId) params.accountId = selectedAccountId
     if (debouncedNameQuery) params.q = debouncedNameQuery
+    if (assigneeFilter !== 'all') params.operatorId = assigneeFilter
+    if (unreadOnly) params.unreadOnly = true
+    if (quickFilter !== 'all') params.quickFilter = quickFilter
     params.limit = CHAT_PAGE_SIZE
     if (cursor) {
       params.beforeAt = cursor.at
       params.beforeId = cursor.id
     }
     return params
-  }, [statusFilter, selectedAccountId, debouncedNameQuery])
+  }, [statusFilter, selectedAccountId, debouncedNameQuery, assigneeFilter, unreadOnly, quickFilter])
+
+  // Compare at render time too: an old request can finish before the next effect runs.
+  const listFilterKey = JSON.stringify([statusFilter, selectedAccountId, debouncedNameQuery, assigneeFilter, unreadOnly, quickFilter])
+  const listFilterKeyRef = useRef(listFilterKey)
+  listFilterKeyRef.current = listFilterKey
+  const chatListRequestRef = useRef(0)
+  const emailListRequestRef = useRef(0)
+  const emailMoreLockRef = useRef(false)
 
   // メール一覧の1ページ件数。上限200切りっぱなしだった offset なし取得を、
   // LINE側と同じく「さらに読み込む」で遡れるようにする。
@@ -584,9 +596,16 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
 
   /** メールの問い合わせを取る。LINEと同じ一覧に混ぜるため。 */
   const loadEmails = useCallback(async (offset = 0, append = false) => {
+    const requestId = append ? emailListRequestRef.current : ++emailListRequestRef.current
     if (append) {
-      if (loadingMoreEmails) return
+      if (emailMoreLockRef.current) return
+      emailMoreLockRef.current = true
       setLoadingMoreEmails(true)
+    } else {
+      setEmailItems([])
+      setHasMoreEmails(false)
+      emailMoreLockRef.current = false
+      setLoadingMoreEmails(false)
     }
     try {
       const res = await fetchApi<{
@@ -598,8 +617,12 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
           query: debouncedNameQuery,
           limit: EMAIL_PAGE_SIZE,
           offset,
+          assignee: assigneeFilter,
+          unreadOnly,
+          quickFilter: quickFilter === 'all' ? undefined : quickFilter,
         })}`,
       )
+      if (listFilterKeyRef.current !== listFilterKey || emailListRequestRef.current !== requestId) return
       if (res.success) {
         setEmailError('')
         if (append) {
@@ -620,23 +643,33 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
         if (!append) setEmailItems([])
       }
     } catch {
+      if (listFilterKeyRef.current !== listFilterKey || emailListRequestRef.current !== requestId) return
       // メールが出ないだけ。LINEのトークは使えるが、0件と区別できるよう失敗を出す。
       setEmailError('メールの読み込みに失敗しました。')
       if (!append) setEmailItems([])
     } finally {
-      if (append) setLoadingMoreEmails(false)
+      if (append && listFilterKeyRef.current === listFilterKey && emailListRequestRef.current === requestId) {
+        emailMoreLockRef.current = false
+        setLoadingMoreEmails(false)
+      }
     }
-  }, [statusFilter, debouncedNameQuery, loadingMoreEmails])
+  }, [statusFilter, debouncedNameQuery, assigneeFilter, unreadOnly, quickFilter, listFilterKey])
 
   useEffect(() => {
     void loadEmails()
   }, [loadEmails])
 
   const loadChats = useCallback(async () => {
+    const requestId = ++chatListRequestRef.current
+    setChats([])
+    nextCursorRef.current = null
+    setHasMoreChats(false)
+    setLoadingMore(false)
     setLoading(true)
     setError('')
     try {
       const chatRes = await api.chats.list(buildListParams(null))
+      if (listFilterKeyRef.current !== listFilterKey || chatListRequestRef.current !== requestId) return
       if (chatRes.success) {
         const rows = chatRes.data
         setChats(rows)
@@ -646,11 +679,12 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
         setHasMoreChats(rows.length === CHAT_PAGE_SIZE)
       }
     } catch {
+      if (listFilterKeyRef.current !== listFilterKey || chatListRequestRef.current !== requestId) return
       setError('チャットの読み込みに失敗しました。もう一度お試しください。')
     } finally {
-      setLoading(false)
+      if (listFilterKeyRef.current === listFilterKey && chatListRequestRef.current === requestId) setLoading(false)
     }
-  }, [buildListParams])
+  }, [buildListParams, listFilterKey])
 
   // 「さらに読み込む」— サーバ由来カーソルの続きを取得して末尾に追加する。
   // 楽観更新との競合に備えて既存 id は除外し、重複表示を防ぐ。
@@ -662,8 +696,10 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
       return
     }
     setLoadingMore(true)
+    const requestId = chatListRequestRef.current
     try {
       const chatRes = await api.chats.list(buildListParams(cursor))
+      if (listFilterKeyRef.current !== listFilterKey || chatListRequestRef.current !== requestId) return
       if (chatRes.success) {
         const rows = chatRes.data
         setChats((prev) => {
@@ -675,11 +711,12 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
         setHasMoreChats(rows.length === CHAT_PAGE_SIZE)
       }
     } catch {
+      if (listFilterKeyRef.current !== listFilterKey || chatListRequestRef.current !== requestId) return
       setError('チャットの追加読み込みに失敗しました。')
     } finally {
-      setLoadingMore(false)
+      if (listFilterKeyRef.current === listFilterKey && chatListRequestRef.current === requestId) setLoadingMore(false)
     }
-  }, [loadingMore, buildListParams])
+  }, [loadingMore, buildListParams, listFilterKey])
 
   // Friends list (for the "new direct message" modal) — loaded lazily in the background
   // Previously fetched 800 friends in parallel with chats, which blocked the initial render.
@@ -1741,13 +1778,6 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                           .some((value) => String(value).toLowerCase().includes(nameQuery.trim().toLowerCase())),
                   )
                   .filter((item) => statusFilter === 'all' || item.status === statusFilter)
-                  .filter((item) => assigneeFilter === 'all'
-                    || (assigneeFilter === 'unassigned' ? !item.assignedStaffId : item.assignedStaffId === assigneeFilter))
-                  .filter((item) => {
-                    if (quickFilter === 'reply') return item.status === 'unread'
-                    if (quickFilter === 'overdue') return item.status === 'unread' && isOlderThanOneHour(item.lastIncomingAt)
-                    return true
-                  })
                   .map((item) => ({
                     at: item.lastIncomingAt,
                     node: (
@@ -1823,14 +1853,6 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                           .filter(Boolean)
                           .some((value) => String(value).toLowerCase().includes(nameQuery.trim().toLowerCase())),
                   )
-                  .filter((chat) => {
-                    if (assigneeFilter !== 'all') {
-                      if (assigneeFilter === 'unassigned' ? Boolean(chat.operatorId) : chat.operatorId !== assigneeFilter) return false
-                    }
-                    if (quickFilter === 'reply') return chat.status === 'unread'
-                    if (quickFilter === 'overdue') return chat.status === 'unread' && isOlderThanOneHour(chat.lastMessageAt)
-                    return true
-                  })
                   .map((chat) => {
                   const isSelected = selectedChatId === chat.id
                   const operatorName = operators.find((operator) => operator.id === chat.operatorId)?.name ?? null

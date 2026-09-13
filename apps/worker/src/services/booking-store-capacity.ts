@@ -50,3 +50,12 @@ export const STORE_CAPACITY_GUARD_SQL = `AND NOT EXISTS (
      ) >= json_extract(store_window.value, '$.capacity')
    )
 )`;
+
+/**
+ * 営業時間を読んだ時点の版が、予約INSERT時にも同じことを確かめる。
+ * 設定行が無い既存店舗はversion=0として後方互換を保つ。
+ * Bind: account, settings version.
+ */
+export const STORE_SETTINGS_VERSION_GUARD_SQL = `AND COALESCE((
+  SELECT version FROM booking_settings WHERE line_account_id = ?
+), 0) = ?`;

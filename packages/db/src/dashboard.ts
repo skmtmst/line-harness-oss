@@ -10,12 +10,18 @@
 /** 期間の指定。設計の「今日 / 過去7日 / 過去28日」に対応する。 */
 export type DashboardPeriod = 'today' | 'last7' | 'last28';
 
-export type DashboardSectionState = 'ok' | 'empty' | 'unavailable' | 'stale' | 'estimated';
+export type DashboardSectionState = 'ok' | 'empty' | 'unavailable' | 'stale' | 'estimated' | 'partial';
+
+export type DashboardFreshness = 'fresh' | 'delayed' | 'stale' | 'unavailable' | 'partial';
 
 export interface DashboardSectionStatus {
   status: DashboardSectionState;
   /** The latest time represented by this section. */
-  asOf: string;
+  asOf: string | null;
+  /** The age/availability of the source represented by asOf. */
+  freshness: DashboardFreshness;
+  /** Why a source is unavailable or partial. */
+  reason: DashboardMetricReason;
   /** Human-readable fixed period key; the UI maps it to Japanese labels. */
   period: DashboardPeriod | 'latest' | 'last7-fixed' | 'this-month';
 }
@@ -66,6 +72,10 @@ export interface DashboardOverview {
   period: DashboardPeriod;
   /** 集計した時刻（JST）。カードごとの基準日がずれていないことの証拠になる。 */
   generatedAt: string;
+  /** 取得に成功した元データのうち、最も古い基準時刻。 */
+  asOf: string | null;
+  /** セクション全体のうち最も注意が必要な鮮度。 */
+  freshness: DashboardFreshness;
   friends: {
     /** 有効＝ブロックされておらず、非表示にもしていない。 */
     active: number;
@@ -158,6 +168,82 @@ export interface DashboardOverview {
     }>;
     friendTrend: DashboardMetric<DashboardFriendTrendPoint[]>;
     officialProfileUrl: DashboardMetric<string>;
+  };
+}
+
+const FRESH_MINUTES = 5;
+const DELAYED_MINUTES = 15;
+const STALE_MINUTES = 60;
+
+function parseDashboardTime(value: string): number {
+  const normalized = /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(?:\.\d+)?$/.test(value)
+    ? `${value.replace(' ', 'T')}+09:00`
+    : value;
+  return Date.parse(normalized);
+}
+
+/** 正本 §6-2 の境界をserver側で判定する。画面の時計では判定しない。 */
+export function dashboardFreshness(
+  asOf: string | null,
+  options: {
+    now?: number;
+    failedSources?: number;
+    totalSources?: number;
+    checkIntervalMinutes?: number;
+  } = {},
+): DashboardFreshness {
+  const failedSources = options.failedSources ?? 0;
+  const totalSources = Math.max(options.totalSources ?? 1, 1);
+  if (failedSources >= totalSources) return 'unavailable';
+  if (failedSources > 0) return 'partial';
+  if (!asOf) return 'unavailable';
+  const timestamp = parseDashboardTime(asOf);
+  if (!Number.isFinite(timestamp)) return 'unavailable';
+  const ageMinutes = Math.max(0, ((options.now ?? Date.now()) - timestamp) / 60_000);
+  if (
+    (options.checkIntervalMinutes !== undefined
+      && ageMinutes > options.checkIntervalMinutes * 2)
+    || ageMinutes > STALE_MINUTES
+  ) return 'stale';
+  if (ageMinutes <= FRESH_MINUTES) return 'fresh';
+  if (ageMinutes <= DELAYED_MINUTES) return 'delayed';
+  // 共通状態は5種類だけなので、delayedの上限を超えた値はstaleへ送る。
+  return 'stale';
+}
+
+function oldestDashboardTime(values: Array<string | null | undefined>): string | null {
+  const valid = values
+    .filter((value): value is string => typeof value === 'string' && Number.isFinite(parseDashboardTime(value)))
+    .sort((left, right) => parseDashboardTime(left) - parseDashboardTime(right));
+  return valid[0] ?? null;
+}
+
+function latestDashboardTime(values: Array<string | null | undefined>): string | null {
+  const valid = values
+    .filter((value): value is string => typeof value === 'string' && Number.isFinite(parseDashboardTime(value)))
+    .sort((left, right) => parseDashboardTime(right) - parseDashboardTime(left));
+  return valid[0] ?? null;
+}
+
+/** 一部だけ失敗した応答を unavailable ではなく partial としてまとめる。 */
+export function summarizeDashboardFreshness(
+  sections: DashboardOverview['sections'],
+): { asOf: string | null; freshness: DashboardFreshness } {
+  const values = Object.values(sections);
+  const unavailable = values.filter((section) => section.freshness === 'unavailable').length;
+  const freshness: DashboardFreshness = values.some((section) => section.freshness === 'partial')
+    || (unavailable > 0 && unavailable < values.length)
+    ? 'partial'
+    : unavailable === values.length
+      ? 'unavailable'
+      : values.some((section) => section.freshness === 'stale')
+        ? 'stale'
+        : values.some((section) => section.freshness === 'delayed')
+          ? 'delayed'
+          : 'fresh';
+  return {
+    asOf: oldestDashboardTime(values.map((section) => section.asOf)),
+    freshness,
   };
 }
 
@@ -451,21 +537,22 @@ function snapshotScopeSql(scope: AccountStatsScope): { sql: string; binds: strin
 async function friendTrend(
   db: D1Database,
   scope: AccountStatsScope,
-): Promise<DashboardOverview['trend']> {
+): Promise<{ points: DashboardOverview['trend']; asOf: string | null }> {
   const days = TREND_DAYS;
   const start = jstDate(-(TREND_DAYS - 1));
   const snapshotScope = snapshotScopeSql(scope);
 
   const recorded = await db
     .prepare(
-      `SELECT date, SUM(active) AS active, SUM(added) AS added, SUM(blocked) AS blocked
+      `SELECT date, SUM(active) AS active, SUM(added) AS added, SUM(blocked) AS blocked,
+              MIN(updated_at) AS updatedAt
          FROM friend_daily_snapshots
         WHERE ${snapshotScope.sql} AND date >= ?
         GROUP BY date
         ORDER BY date`,
     )
     .bind(...snapshotScope.binds, start)
-    .all<{ date: string; active: number; added: number; blocked: number }>();
+    .all<{ date: string; active: number; added: number; blocked: number; updatedAt: string }>();
   const byDate = new Map(recorded.results.map((r) => [r.date, r]));
 
   const friends = accountScopeSql(scope, 'line_account_id');
@@ -517,7 +604,12 @@ async function friendTrend(
     }
     running -= addedByDate.get(date) ?? 0;
   }
-  return out.reverse();
+  return {
+    points: out.reverse(),
+    // snapshot があるときは、画面を再取得した時刻ではなく保存済みの成功時刻を返す。
+    // 全日が推定なら、現在の friends を直接読み終えた時刻が取得成功時刻になる。
+    asOf: latestDashboardTime(recorded.results.map((row) => row.updatedAt)) ?? new Date().toISOString(),
+  };
 }
 
 async function conversionSummary(
@@ -564,9 +656,12 @@ export async function getDashboardOverview(
   const start = periodStart(period);
   const month = monthStart();
   const partialFailures: string[] = [];
+  const sourceAsOf = new Map<string, string>();
   const safe = async <T>(name: string, run: Promise<T>, fallback: T): Promise<T> => {
     try {
-      return await run;
+      const value = await run;
+      sourceAsOf.set(name, new Date().toISOString());
+      return value;
     } catch (error) {
       partialFailures.push(name);
       console.error(`[dashboard] ${name} failed`, error);
@@ -635,7 +730,7 @@ export async function getDashboardOverview(
     automationFailures,
   }));
 
-  const [friends, inbox, trend, conversions, sent, broadcasts, operations] = await Promise.all([
+  const [friends, inbox, trendResult, conversions, sent, broadcasts, operations] = await Promise.all([
     safe('friends', friendBreakdown(db, null, accountScopeSql(scope, 'line_account_id')), {
       active: 0,
       total: 0,
@@ -651,12 +746,12 @@ export async function getDashboardOverview(
       averageFirstReplyMinutes: null,
     }),
     // 推移だけは period を渡さない。上の切り替えに関わらず直近7日で見る。
-    safe('trend', friendTrend(db, scope), []),
+    safe('trend', friendTrend(db, scope), { points: [], asOf: null }),
     safe('conversions', conversionSummary(db, period, scope), { total: 0, byPoint: [] }),
     // プッシュ（こちらから）と リプライ（受信への応答）を分ける。
     // source は 028 で入っている。auto_reply と manual が応答。
     // 見出し「今月の配信」どおり、選んだ期間ではなく今月1日から数える。
-    db
+    safe('delivery', db
       .prepare(
         `SELECT
            COUNT(*) AS sent,
@@ -666,8 +761,7 @@ export async function getDashboardOverview(
       )
       .bind(month, ...messageAccount.binds)
       .first<{ sent: number; reply: number }>()
-      .then((value) => value)
-      .catch((error) => { partialFailures.push('delivery'); console.error('[dashboard] delivery failed', error); return null; }),
+      .then((value) => value), null),
     // 一斉配信は「作った日」ではなく「送った日」で数える。先月作って今月
     // 送った配信を先月扱いにすると、見出し「今月の配信」と実際がずれる。
     // sent_at が無い古い行だけ created_at で代用する（0件へ落とさない）。
@@ -681,17 +775,32 @@ export async function getDashboardOverview(
   ]);
 
   const generatedAt = new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().replace('Z', '+09:00');
+  const trend = trendResult.points;
+  if (trendResult.asOf) sourceAsOf.set('trend', trendResult.asOf);
   const status = (
     names: string | string[],
     empty: boolean,
     sectionPeriod: DashboardSectionStatus['period'],
-  ): DashboardSectionStatus => ({
-    status: (Array.isArray(names) ? names : [names]).some((name) => partialFailures.includes(name))
-      ? 'unavailable'
-      : empty ? 'empty' : 'ok',
-    asOf: generatedAt,
-    period: sectionPeriod,
-  });
+  ): DashboardSectionStatus => {
+    const sources = Array.isArray(names) ? names : [names];
+    const failedSources = sources.filter((name) => partialFailures.includes(name)).length;
+    const asOf = oldestDashboardTime(sources.map((name) => sourceAsOf.get(name)));
+    const freshness = dashboardFreshness(asOf, {
+      failedSources,
+      totalSources: sources.length,
+    });
+    return {
+      status: failedSources === sources.length
+        ? 'unavailable'
+        : failedSources > 0
+          ? 'partial'
+          : freshness === 'stale' ? 'stale' : empty ? 'empty' : 'ok',
+      asOf,
+      freshness,
+      reason: failedSources > 0 ? 'source_failed' : null,
+      period: sectionPeriod,
+    };
+  };
   const trendStatus = status('trend', trend.length === 0, 'last7-fixed');
   if (trendStatus.status === 'ok' && trend.some((point) => point.estimated)) {
     trendStatus.status = 'estimated';
@@ -700,7 +809,10 @@ export async function getDashboardOverview(
     friends: status('friends', friends.total === 0, 'latest'),
     inbox: status('inbox', inbox.unanswered + inbox.inProgress + inbox.resolved === 0, 'latest'),
     delivery: status(['delivery', 'broadcasts'], (sent?.sent ?? 0) === 0 && broadcasts === 0, 'this-month'),
-    quota: { status: 'unavailable', asOf: generatedAt, period: 'this-month' },
+    quota: {
+      status: 'unavailable', asOf: null, freshness: 'unavailable',
+      reason: 'not_loaded', period: 'this-month',
+    },
     trend: trendStatus,
     conversions: status('conversions', conversions.total === 0, period),
     operations: status(
@@ -714,13 +826,18 @@ export async function getDashboardOverview(
     ),
   };
   const metricState = (section: DashboardSectionStatus): DashboardMetricState =>
-    section.status === 'ok' ? 'available' : section.status;
+    section.freshness === 'stale' || section.freshness === 'partial'
+      ? section.freshness
+      : section.status === 'ok' ? 'available' : section.status;
   const metricReason = (section: DashboardSectionStatus): DashboardMetricReason =>
-    section.status === 'unavailable' ? 'source_failed' : null;
+    section.status === 'unavailable' || section.status === 'partial' ? 'source_failed' : null;
+
+  const summary = summarizeDashboardFreshness(sections);
 
   return {
     period,
     generatedAt,
+    ...summary,
     friends,
     inbox,
     delivery: {

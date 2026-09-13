@@ -1249,7 +1249,8 @@ CREATE TABLE booking_settings (
   version INTEGER NOT NULL DEFAULT 1 CHECK (version > 0),
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-);
+, business_hours_configured INTEGER NOT NULL DEFAULT 0
+  CHECK (business_hours_configured IN (0, 1)));
 
 CREATE TABLE "bookings" (
   id                           TEXT PRIMARY KEY,
