@@ -1382,6 +1382,59 @@ const spec = {
         responses: { '201': { description: 'Account created' } },
       },
     },
+    '/api/line-accounts/connect/check': {
+      post: {
+        tags: ['LINE Accounts'],
+        summary: '4つのチャネル情報でLINE側を自動設定して接続確認',
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  name: { type: 'string', maxLength: 40 },
+                  channelId: { type: 'string', pattern: '^\\d+$' },
+                  channelSecret: { type: 'string', format: 'password' },
+                  loginChannelId: { type: 'string', pattern: '^\\d+$' },
+                  loginChannelSecret: { type: 'string', format: 'password' },
+                },
+                required: ['channelId', 'channelSecret', 'loginChannelId', 'loginChannelSecret'],
+              },
+            },
+          },
+        },
+        responses: { '200': { description: 'Five connection steps; no musubo DB row is created' } },
+      },
+    },
+    '/api/line-accounts/connect': {
+      post: {
+        tags: ['LINE Accounts'],
+        summary: 'LINE側の自動設定・接続確認・アカウント保存',
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  name: { type: 'string', maxLength: 40 },
+                  channelId: { type: 'string', pattern: '^\\d+$' },
+                  channelSecret: { type: 'string', format: 'password' },
+                  loginChannelId: { type: 'string', pattern: '^\\d+$' },
+                  loginChannelSecret: { type: 'string', format: 'password' },
+                },
+                required: ['channelId', 'channelSecret', 'loginChannelId', 'loginChannelSecret'],
+              },
+            },
+          },
+        },
+        responses: {
+          '201': { description: 'Account created and follower import started when available' },
+          '400': { description: 'A connection step failed; no account row remains' },
+        },
+      },
+    },
     '/api/line-accounts/order': {
       patch: {
         tags: ['LINE Accounts'],

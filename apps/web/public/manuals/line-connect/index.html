@@ -1,0 +1,120 @@
+<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>musubo LINE接続マニュアル</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;600;700&display=swap">
+<style>
+:root{--canvas:#ffffff;--ground:#f7f7f5;--ink:#1d1d1f;--ink-2:#4a5565;--ink-3:#6e7781;--hair:#dadde2;--accent:#087a3e;--accent-soft:#e8f8ee;--warn-soft:#fff7e6;--warn-deep:#a15c00;--info:#175cd3;--info-soft:#e9f1ff;--red:#e5484d;color-scheme:light}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--canvas:#1c1d1f;--ground:#141516;--ink:#f0f0f2;--ink-2:#c3c7ce;--ink-3:#9aa0a8;--hair:#33363b;--accent:#4fca86;--accent-soft:#163a27;--warn-soft:#3a2d12;--warn-deep:#f0c070;--info:#8ab4ff;--info-soft:#1c2a44;color-scheme:dark}}
+:root[data-theme="dark"]{--canvas:#1c1d1f;--ground:#141516;--ink:#f0f0f2;--ink-2:#c3c7ce;--ink-3:#9aa0a8;--hair:#33363b;--accent:#4fca86;--accent-soft:#163a27;--warn-soft:#3a2d12;--warn-deep:#f0c070;--info:#8ab4ff;--info-soft:#1c2a44;color-scheme:dark}
+body{margin:0;background:var(--ground);color:var(--ink);font-family:"Noto Sans JP","Hiragino Sans","Hiragino Kaku Gothic ProN",Meiryo,sans-serif;font-size:15px;line-height:1.7;padding-block:24px 64px;padding-inline:16px}
+.wrap{max-width:1000px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+h1{font-size:22px;margin:0;font-weight:700;text-wrap:balance}
+.lead{color:var(--ink-2);margin:0;font-size:14px}
+nav.tabs{display:flex;flex-wrap:wrap;gap:8px}
+nav.tabs a{display:block;padding:8px 12px;border:1px solid var(--hair);border-radius:8px;background:var(--canvas);color:var(--ink);text-decoration:none;font-size:13px;font-weight:600}
+nav.tabs a:hover,nav.tabs a:focus-visible{border-color:var(--accent);outline:none}
+section.card{background:var(--canvas);border:1px solid var(--hair);border-radius:12px;padding:20px;display:flex;flex-direction:column;gap:14px;scroll-margin-top:16px}
+section.card h2{font-size:18px;margin:0;font-weight:700}
+section.card h3{font-size:15px;margin:8px 0 0;font-weight:700;color:var(--ink)}
+.desc{color:var(--ink-2);font-size:13px;margin:0}
+ol.steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
+ol.steps li{display:flex;gap:10px;align-items:flex-start}
+ol.steps li>div{flex:1;min-width:0}
+.n{flex:none;width:24px;height:24px;border-radius:9999px;background:#ff3b30;color:#fff;font-weight:700;font-size:13px;display:inline-flex;align-items:center;justify-content:center;margin-top:3px}
+figure{margin:0;border:1px solid var(--hair);border-radius:8px;overflow:hidden;background:#fff}
+figure img{display:block;width:100%;height:auto;max-width:100%}
+.note{margin:0;padding:10px 12px;border-radius:8px;font-size:13px}
+.note.warn{background:var(--warn-soft);color:var(--warn-deep)}
+.note.info{background:var(--info-soft);color:var(--info)}
+.note.ok{background:var(--accent-soft);color:var(--accent)}
+code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px;background:var(--ground);border:1px solid var(--hair);border-radius:4px;padding:0 5px}
+.kv{display:grid;grid-template-columns:max-content 1fr;gap:6px 12px;font-size:13px;margin:0}
+.kv dt{color:var(--ink-3)}.kv dd{margin:0}
+.sub{color:var(--ink-3);font-size:12px}
+a{color:var(--info)}
+.pill{display:inline-block;border:1px solid var(--hair);border-radius:9999px;padding:1px 10px;font-size:12px;color:var(--ink-2);background:var(--canvas)}
+</style>
+</head><body>
+<div class="wrap">
+<h1>musubo LINE接続マニュアル</h1>
+<p class="lead">「LINEアカウントを登録」の画面で押す「取得方法を見る」「設定方法を見る」の中身です。手順の番号は、画像の赤い番号と同じです。</p>
+<nav class="tabs" aria-label="マニュアルの一覧">
+<a href="#m1">手順2　チャネルID・シークレットの取得（Messaging API）</a>
+<a href="#m2">手順3　LoginチャネルID・シークレットの取得（LINE Login）</a>
+<a href="#m3">手順4　LINE側の設定（Webhook・応答・Callback）</a>
+</nav>
+
+<section class="card" id="m1"><h2>手順2　チャネルID・チャネルシークレットの取得（Messaging API）</h2>
+<p class="desc">つなぐ公式アカウントの「チャネルID」と「チャネルシークレット」を、musubo の手順2の欄に貼ります。一番かんたんなのは LINE公式アカウントマネージャーから取る方法です。</p>
+<h3>用意するもの</h3>
+<dl class="kv"><dt>LINEアカウント</dt><dd>その公式アカウントの「管理者」としてログインできるもの</dd><dt>開くサイト</dt><dd><a href="https://manager.line.biz/" target="_blank" rel="noreferrer">LINE公式アカウントマネージャー（manager.line.biz）</a></dd></dl>
+<h3>まだ Messaging API を使っていないとき（新しい公式アカウント）</h3>
+<p class="desc">作ったばかりの公式アカウントは「ステータス：未利用」になっています。先にこれを済ませます。</p>
+<ol class="steps"><li><span class="n">1</span><div>LINE公式アカウントマネージャーで公式アカウントを選び、右上の <b>「設定」</b> を押します。</div></li><li><span class="n">2</span><div>左のメニューで <b>「Messaging API」</b> を押します。</div></li><li><span class="n">3</span><div><b>「Messaging APIを利用する」</b> を押します。</div></li><li><span class="n">4</span><div>初めてなら「プロバイダーを作成」に会社名や店名を入れます（例：株式会社サンプル）。</div></li><li><span class="n">5</span><div>すでにプロバイダーがあるときは、その名前を選びます。<span class="sub">プロバイダーは「会社の箱」です。手順3の LINE Login チャネルも同じ箱に作ります。あとから変えられません。</span></div></li><li><span class="n">6</span><div><b>「同意する」</b> を押します。</div></li><li><span class="n">7</span><div>「プライバシーポリシーと利用規約」の画面が出ます。2つとも空のまま <b>「OK」</b> を押します（あとから登録できます）。</div></li><li><span class="n">8</span><div>確認の画面で、プロバイダー名が自分の会社名になっていることを確かめて <b>「OK」</b> を押します。</div></li><li><span class="n">9</span><div>ステータスが <b>「利用中」</b> になれば完了です。続けて下の「取り方」へ進みます。</div></li></ol>
+<figure><img src="images/m1-oam-unused.jpg" alt="Messaging API が未利用のときの画面" loading="lazy"></figure>
+<figure><img src="images/m1-oam-provider.jpg" alt="プロバイダーを選ぶ画面" loading="lazy"></figure>
+<figure><img src="images/m1-oam-privacy.jpg" alt="プライバシーポリシーと利用規約の画面" loading="lazy"></figure>
+<figure><img src="images/m1-oam-confirm.jpg" alt="Messaging APIを利用の確認画面" loading="lazy"></figure>
+<figure><img src="images/m1-oam-inuse.jpg" alt="ステータスが利用中になった画面" loading="lazy"></figure>
+<h3>取り方（LINE公式アカウントマネージャー）</h3>
+<ol class="steps"><li><span class="n">1</span><div>LINE公式アカウントマネージャーを開き、つなぐ公式アカウントを選びます。画面右上の <b>「設定」</b> を押します。</div></li><li><span class="n">2</span><div>左のメニューで <b>「Messaging API」</b> を押します。</div></li><li><span class="n">3</span><div>「Channel ID」の右の <b>「コピー」</b> を押し、musubo の <b>チャネルID</b> の欄に貼ります。</div></li><li><span class="n">4</span><div>「Channel secret」の右の <b>「コピー」</b> を押し、musubo の <b>チャネルシークレット</b> の欄に貼ります。</div></li></ol>
+<figure><img src="images/m1-oam-messaging-api.jpg" alt="LINE公式アカウントマネージャーの Messaging API 画面" loading="lazy"></figure>
+<p class="note info">「Webhook URL」の欄は空のままで進めてください。musubo が手順4で自動で入れます。</p>
+<h3>別の取り方（LINE Developers から）</h3>
+<p class="desc">LINE Developers（developers.line.biz/console）にログインし、プロバイダー →「Messaging API」のチャネルを開きます。</p>
+<ol class="steps"><li><span class="n">1</span><div><b>「チャネル基本設定」</b> タブを開きます。</div></li><li><span class="n">2</span><div>「チャネルID」を musubo の <b>チャネルID</b> の欄に貼ります（右のコピーの印を押すとコピーできます）。</div></li><li><span class="n">3</span><div>同じ画面を下へ進み、「チャネルシークレット」を musubo の <b>チャネルシークレット</b> の欄に貼ります。</div></li></ol>
+<figure><img src="images/m1-dev-id.jpg" alt="LINE Developers チャネル基本設定のチャネルID" loading="lazy"></figure>
+<figure><img src="images/m1-dev-secret.jpg" alt="LINE Developers チャネル基本設定のチャネルシークレット" loading="lazy"></figure>
+<p class="note warn">「発行」ボタンは押さないでください。押すとシークレットが新しい値に変わり、いままでの接続が切れます。</p>
+</section>
+<section class="card" id="m2"><h2>手順3　LoginチャネルID・Loginチャネルシークレットの取得（LINE Login）</h2>
+<p class="desc">友だち追加URL・QR・LIFF（LINEの中で開く画面）に使う「LINE Login チャネル」の情報を、musubo の手順3の欄に貼ります。LINE Developers で取ります。</p>
+<p class="note warn">LINE Login チャネルは、手順2の Messaging API と <b>同じプロバイダー</b> に置いてください。プロバイダーが違うと、同じ人が別の友だちとして数えられます。</p>
+<h3>取り方</h3>
+<ol class="steps"><li><span class="n">1</span><div><a href="https://developers.line.biz/console/" target="_blank" rel="noreferrer">LINE Developers コンソール</a> にログインし、「プロバイダー」の一覧から自分のプロバイダー（会社名）を押します。</div></li><li><span class="n">2</span><div>「LINEログイン」と書かれたチャネルを押します。<span class="sub">無いときは、下の「LINE Login チャネルの作り方」で作ってから戻ってください。</span></div></li><li><span class="n">3</span><div><b>「チャネル基本設定」</b> タブを開きます。</div></li><li><span class="n">4</span><div>「チャネルID」を musubo の <b>LoginチャネルID</b> の欄に貼ります。</div></li><li><span class="n">5</span><div>下へ進み、「チャネルシークレット」を musubo の <b>Loginチャネルシークレット</b> の欄に貼ります。</div></li></ol>
+<figure><img src="images/m2-home.jpg" alt="LINE Developers ホームのプロバイダー一覧" loading="lazy"></figure>
+<figure><img src="images/m2-provider.jpg" alt="プロバイダーのチャネル一覧" loading="lazy"></figure>
+<p class="note warn">チャネル名の横が <b>「開発中」</b> のときは、その文字を押して「公開」にしてください。開発中のままだと、管理者以外の人が友だち追加URLからログインできません。</p>
+<figure><img src="images/m2-publish.jpg" alt="開発中を公開にする" loading="lazy"></figure>
+<figure><img src="images/m2-login-id.jpg" alt="LINE Login チャネルのチャネルID" loading="lazy"></figure>
+<figure><img src="images/m2-login-secret.jpg" alt="LINE Login チャネルのチャネルシークレット" loading="lazy"></figure>
+<h3>LINE Login チャネルの作り方（まだ無い人）</h3>
+<p class="desc">プロバイダーの画面で「新規チャネル作成」を押すと、作る画面になります。5分ほどで終わります。</p>
+<ol class="steps"><li><span class="n">1</span><div>チャネルの種類で <b>「LINEログイン」</b> を選びます。</div></li><li><span class="n">2</span><div>「プロバイダー」が手順2の Messaging API と同じ会社名になっていることを確かめます。</div></li><li><span class="n">3</span><div>「サービスを提供する地域」は <b>日本</b> を選びます。</div></li><li><span class="n">4</span><div>「会社・事業者の所在国・地域」は <b>日本</b> を選びます。</div></li><li><span class="n">5</span><div>「チャネル名」に会社名や店名を入れます（例：株式会社サンプル）。</div></li><li><span class="n">6</span><div>「チャネル説明」に一言入れます（例：musubo で使う）。</div></li><li><span class="n">7</span><div>「アプリタイプ」は <b>ウェブアプリ</b> にチェックします。</div></li><li><span class="n">8</span><div>「2要素認証の必須化」はオンのままでかまいません。</div></li><li><span class="n">9</span><div>「メールアドレス」に連絡が取れるメールアドレスを入れます。</div></li><li><span class="n">10</span><div>「LINE開発者契約に同意します」にチェックします。</div></li><li><span class="n">11</span><div><b>「作成」</b> を押します。作ったチャネルの「チャネル基本設定」が開きます。</div></li><li><span class="n">12</span><div>チャネル名の横の <b>「開発中」</b> を押して「公開」にします。そのあと、上の取り方の 4・5 に進みます。</div></li></ol>
+<figure><img src="images/m2-create-1.jpg" alt="新規チャネル作成でLINEログインを選ぶ" loading="lazy"></figure>
+<figure><img src="images/m2-create-2.jpg" alt="プロバイダーと地域の入力" loading="lazy"></figure>
+<figure><img src="images/m2-create-3.jpg" alt="チャネル名・説明・アプリタイプの入力" loading="lazy"></figure>
+<figure><img src="images/m2-create-4.jpg" alt="メールアドレスの入力" loading="lazy"></figure>
+<figure><img src="images/m2-create-5.jpg" alt="同意して作成" loading="lazy"></figure>
+<p class="note info">チャネルアイコン・プライバシーポリシーURL・サービス利用規約URLは空のままで作れます。</p>
+</section>
+<section class="card" id="m3"><h2>手順4　LINE側の設定（Webhook・応答・Callback）</h2>
+<p class="desc">musubo が「接続して設定する」を押したあとに自動でできないものが4つあります。LINE側で行い、musubo の手順4に戻って「接続して保存」を押してください。</p>
+<dl class="kv"><dt>A</dt><dd>「Webhookの利用」をオンにする（LINE Developers）</dd><dt>B</dt><dd>あいさつメッセージ・応答メッセージをオフにする（LINE公式アカウントマネージャー）</dd><dt>C</dt><dd>Callback URL を貼る（LINE Developers・LINE Login チャネル）</dd><dt>D</dt><dd>公式アカウントをリンクする（LINE Developers・LINE Login チャネル）</dd></dl>
+<h3>A　「Webhookの利用」をオンにする</h3>
+<p class="desc">LINE Developers でプロバイダー →「Messaging API」のチャネルを開きます。</p>
+<ol class="steps"><li><span class="n">1</span><div><b>「Messaging API設定」</b> タブを押します。</div></li><li><span class="n">2</span><div>「Webhook設定」の <b>「Webhookの利用」</b> を押してオン（緑）にします。「Webhook URL」には musubo が入れた URL が入っています。触らないでください。</div></li></ol>
+<figure><img src="images/m3-tab.jpg" alt="Messaging API設定タブ" loading="lazy"></figure>
+<figure><img src="images/m3-webhook-on.jpg" alt="Webhookの利用をオンにする" loading="lazy"></figure>
+<p class="note info">「Webhook URL」が空のときは、musubo の手順4で「接続して設定する」がまだ通っていません。musubo に戻って先に接続してください。</p>
+<h3>B　あいさつメッセージ・応答メッセージをオフにする</h3>
+<p class="desc">オンのままだと、musubo の配信と LINE の自動返信が二重に届きます。LINE公式アカウントマネージャーで切ります。</p>
+<ol class="steps"><li><span class="n">1</span><div>LINE公式アカウントマネージャーで公式アカウントを選び、右上の <b>「設定」</b> を押します。</div></li><li><span class="n">2</span><div>左のメニューで <b>「応答設定」</b> を押します。</div></li><li><span class="n">3</span><div><b>「あいさつメッセージ」</b> をオフにします。</div></li><li><span class="n">4</span><div><b>「応答メッセージ」</b> をオフにします。「チャット」はオフのままにしてください（オンにすると musubo にメッセージが届きません）。</div></li></ol>
+<figure><img src="images/m3-oam-response.jpg" alt="LINE公式アカウントマネージャーの応答設定" loading="lazy"></figure>
+<p class="sub">LINE Developers の「Messaging API設定」にある「応答メッセージ」「あいさつメッセージ」の右の「編集」からも、同じ画面を開けます。</p>
+<figure><img src="images/m3-dev-response.jpg" alt="LINE Developers から応答設定を開く" loading="lazy"></figure>
+<h3>C　Callback URL を貼る</h3>
+<p class="desc">パソコンのブラウザから友だち追加する人のために必要です。LINE Developers でプロバイダー →「LINEログイン」のチャネルを開きます。</p>
+<ol class="steps"><li><span class="n">1</span><div><b>「LINEログイン設定」</b> タブを押します。</div></li><li><span class="n">2</span><div>「ウェブアプリでLINEログインを利用する」がオン（緑）になっていることを確かめます。オフなら押してオンにします。</div></li><li><span class="n">3</span><div>「コールバックURL」の <b>「編集」</b> を押します。</div></li><li><span class="n">4</span><div>musubo の手順4の画面にある <b>Callback URL</b> を「コピー」して、ここに貼ります。</div></li><li><span class="n">5</span><div><b>「更新」</b> を押します。</div></li></ol>
+<figure><img src="images/m3-login-tab.jpg" alt="LINEログイン設定タブ" loading="lazy"></figure>
+<figure><img src="images/m3-callback-1.jpg" alt="コールバックURLの編集を押す" loading="lazy"></figure>
+<figure><img src="images/m3-callback-2.jpg" alt="Callback URL を貼って更新" loading="lazy"></figure>
+<p class="note info">すでに別の URL が入っているときは、消さずに改行して下の行に足してください（1行に1つ）。</p>
+<h3>D　公式アカウントをリンクする</h3>
+<p class="desc">友だち追加URLから開いたときに「友だち追加」の案内を出すために必要です。LINE Login チャネルの「チャネル基本設定」タブの一番下にあります。</p>
+<ol class="steps"><li><span class="n">1</span><div>「友だち追加オプション」の「リンクされたLINE公式アカウント」で <b>「編集」</b> を押します。</div></li><li><span class="n">2</span><div>一覧から、手順2でつないだ公式アカウントを選びます。</div></li><li><span class="n">3</span><div><b>「更新」</b> を押します。</div></li></ol>
+<figure><img src="images/m3-linked-oa.jpg" alt="リンクされたLINE公式アカウント" loading="lazy"></figure>
+<figure><img src="images/m3-linked-edit.jpg" alt="公式アカウントを選んで更新" loading="lazy"></figure>
+<p class="note ok">4つ終わったら、musubo の手順4に戻って「接続して保存」を押してください。設定がまだの項目は、その行に理由が出ます。</p>
+</section>
+<p class="sub">画像の値（チャネルID・シークレット・メールアドレスなど）は説明用の例です。実際の値は自分の画面のものを使ってください。</p></div>
+</body></html>

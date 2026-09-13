@@ -349,6 +349,8 @@ const STAFF_FAIL_CLOSED_SNAPSHOT: string[] = [
     'POST /api/line-accounts/:id/follower-import/start',
     'POST /api/line-accounts/:id/follower-import/step',
     'POST /api/line-accounts/:id/restore',
+    'POST /api/line-accounts/connect',
+    'POST /api/line-accounts/connect/check',
     'POST /api/line-accounts/verify-connection',
     'POST /api/line-webhook-events/:id/retry',
     'POST /api/links/wrap',

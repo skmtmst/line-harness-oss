@@ -2108,6 +2108,21 @@ export type FollowerImportState = {
   profileErrors: number
   lastError: string | null
 }
+export type LineAccountConnectStep = {
+  order: 1 | 2 | 3 | 4 | 5
+  state: 'passed' | 'failed' | 'skipped'
+  message: string
+}
+export type LineAccountConnectData = {
+  steps: LineAccountConnectStep[]
+  id?: string
+  displayName?: string
+  pictureUrl: string | null
+  basicId: string | null
+  liffId?: string
+  followerImport: Pick<FollowerImportState, 'capability' | 'phase'>
+  remainingActions: string[]
+}
 export type FriendFormSubmission = {
   id: string
   formId: string
@@ -6382,6 +6397,24 @@ export const api = {
         method: 'POST',
         body: JSON.stringify(data),
       }),
+    connectCheck: (data: {
+      name?: string
+      channelId: string
+      channelSecret: string
+      loginChannelId: string
+      loginChannelSecret: string
+    }) => fetchApi<ApiResponse<LineAccountConnectData>>('/api/line-accounts/connect/check', {
+      method: 'POST', body: JSON.stringify(data),
+    }),
+    connect: (data: {
+      name?: string
+      channelId: string
+      channelSecret: string
+      loginChannelId: string
+      loginChannelSecret: string
+    }) => fetchApi<ApiResponse<LineAccountConnectData>>('/api/line-accounts/connect', {
+      method: 'POST', body: JSON.stringify(data),
+    }),
     // Smart method routing:
     //   - rotating Messaging credentials (channelAccessToken / channelSecret)
     //     requires PUT (owner-only on the worker)
