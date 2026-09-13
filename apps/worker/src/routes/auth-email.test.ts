@@ -108,8 +108,8 @@ describe('会員登録（36-4）', () => {
 
     const completed = await call('POST', '/api/auth/register/complete', {
       token,
-      tenantName: 'Shed Products株式会社',
-      name: '坂本 真人',
+      tenantName: '株式会社サンプル',
+      name: '山田 太郎',
       password: 'Abcdefg1',
     });
     expect(completed.status).toBe(200);
@@ -120,7 +120,7 @@ describe('会員登録（36-4）', () => {
     expect(completed.headers.get('set-cookie')).toContain('lh_signup_marker=');
 
     const tenant = testDb.raw.prepare('SELECT name, plan_status, trial_ends_at, signup_device_marker FROM tenants WHERE id = ?').get(body.data.tenantId) as Record<string, string>;
-    expect(tenant.name).toBe('Shed Products株式会社');
+    expect(tenant.name).toBe('株式会社サンプル');
     expect(tenant.plan_status).toBe('trialing');
     expect(Date.parse(tenant.trial_ends_at) - Date.now()).toBeGreaterThan(29 * 24 * 60 * 60 * 1000);
     expect(tenant.signup_device_marker).toBe(body.data.deviceMarker);
@@ -210,7 +210,7 @@ describe('メール＋パスワードのログイン', () => {
   async function seedOwner(overrides: Record<string, unknown> = {}) {
     const hash = await hashPassword('Abcdefg1');
     testDb.raw
-      .prepare(`INSERT INTO staff_members (id, name, email, role, api_key, is_active, password_hash) VALUES ('s1', '坂本 真人', 'owner@example.com', 'owner', 'key-1', ?, ?)`)
+      .prepare(`INSERT INTO staff_members (id, name, email, role, api_key, is_active, password_hash) VALUES ('s1', '山田 太郎', 'owner@example.com', 'owner', 'key-1', ?, ?)`)
       .run((overrides.is_active as number) ?? 1, hash);
   }
 
@@ -266,7 +266,7 @@ describe('メール＋パスワードのログイン', () => {
 describe('パスワード再設定（36-6）', () => {
   it('メールの URL から新しいパスワードを設定でき、古いセッションは消える', async () => {
     const hash = await hashPassword('Abcdefg1');
-    testDb.raw.prepare(`INSERT INTO staff_members (id, name, email, role, api_key, password_hash) VALUES ('s1', '坂本 真人', 'owner@example.com', 'owner', 'key-1', ?)`).run(hash);
+    testDb.raw.prepare(`INSERT INTO staff_members (id, name, email, role, api_key, password_hash) VALUES ('s1', '山田 太郎', 'owner@example.com', 'owner', 'key-1', ?)`).run(hash);
     testDb.raw.prepare(`INSERT INTO admin_sessions (token_hash, staff_id, expires_at) VALUES ('old', 's1', '2099-01-01T00:00:00.000Z')`).run();
 
     const forgot = await call('POST', '/api/auth/password/forgot', { email: 'owner@example.com', turnstileToken: 'tok' });

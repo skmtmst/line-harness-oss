@@ -37,6 +37,12 @@ describe('統括の左下アカウントメニュー', () => {
     expect(menu).toContain("addEventListener('mousedown'")
     expect(menu).toContain('triggerRef.current?.focus()')
   })
+
+  it('開いたメニューは固定幅にせず、左サイドバーの幅に揃える', () => {
+    expect(menu).toContain('absolute bottom-full left-0')
+    expect(menu).toContain('w-full flex-col')
+    expect(menu).not.toContain('style={{ width: 300 }}')
+  })
 })
 
 describe('メンバー管理（36-5）', () => {

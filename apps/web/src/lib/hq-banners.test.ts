@@ -3,6 +3,7 @@ import {
   activeGeneration,
   aspectBadge,
   generationConditionRows,
+  groupPresets,
   imageMatchesQuery,
   inputFromGeneration,
   parseJstDateTime,
@@ -99,6 +100,15 @@ describe('生成条件の手元の検査', () => {
 
   it('自由入力ではテキストが無くてもよい', () => {
     expect(validateGenerationInput({ ...base, mode: 'free', textLines: [], freePrompt: '餃子の写真風' }, 4)).toBeNull()
+  })
+})
+
+describe('用途の見出し', () => {
+  it('LINE と SNS に分ける', () => {
+    expect(groupPresets(presets).map(({ group, label }) => ({ group, label }))).toEqual([
+      { group: 'line', label: 'LINE' },
+      { group: 'sns', label: 'SNS' },
+    ])
   })
 })
 

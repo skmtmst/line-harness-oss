@@ -2484,8 +2484,8 @@
       ],
       "cssPrefix": "dialog",
       "pencilUsage": "既存ConfirmDialog利用画面と友だち属性へ適用",
-      "lastCheckedAt": "2026-08-24",
-      "note": "標準確認と重要操作の警告面をtoneへ統合し、busy/error/focus/Escape/フォーカス循環をコード側で補った。V6代表11画面の直接refは0件のためV5を基準にする。",
+      "lastCheckedAt": "2026-09-13",
+      "note": "標準確認と重要操作の警告面をtoneへ統合し、busy/error/focus/Escape/フォーカス循環をコード側で補った。V6代表11画面の直接refは0件のためV5を基準にする。長い操作名は112pxを最小幅として横に広げ、1行で表示する。",
       "routes": {
         "active": [
           "/tags",
@@ -2594,9 +2594,9 @@
           "resolved": "10px"
         },
         {
-          "pencil": "J6x4Q button width: 112",
+          "pencil": "J6x4Q button minWidth: 112",
           "class": "designButton",
-          "prop": "width",
+          "prop": "min-width",
           "source": "112px",
           "resolved": "112px"
         },

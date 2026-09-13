@@ -3,7 +3,7 @@ import type { StaffMember } from '@line-crm/shared'
 import { canResendInvite, lastLoginLabel, memberKpis, memberStatus, scopeLabel, sortMembers } from './hq-members'
 
 const base: StaffMember = {
-  id: 's1', name: '坂本 真人', email: 'm@example.com', role: 'admin', lineLinked: true, twoFactorEnabled: false,
+  id: 's1', name: '山田 太郎', email: 'm@example.com', role: 'admin', lineLinked: true, twoFactorEnabled: false,
   isActive: true, permissionKeys: [], notificationPreferences: {}, inviteStatus: 'active', createdAt: '', updatedAt: '',
   assignedLineAccountId: null, canAccessDescendantAccounts: true, accountScope: 'all', scopedLineAccountIds: [],
 }

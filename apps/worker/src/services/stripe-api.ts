@@ -112,7 +112,7 @@ export interface StripeSubscription {
   current_period_end?: number;
   cancel_at_period_end?: boolean;
   metadata?: Record<string, string>;
-  items: { data: Array<{ price: { id: string } }> };
+  items: { data: Array<{ price: { id: string }; current_period_end?: number }> };
 }
 
 export interface StripeInvoice {

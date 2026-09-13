@@ -25,7 +25,7 @@ const WEBHOOK_SECRET = 'whsec_test_secret';
 
 const staffOf = (overrides: Partial<AuthenticatedStaff> = {}): AuthenticatedStaff => ({
   id: 'staff-1',
-  name: '坂本 真人',
+  name: '山田 太郎',
   role: 'owner',
   readOnly: false,
   tenantId: DEFAULT_TENANT_ID,
@@ -85,7 +85,7 @@ function setTenant(patch: Record<string, string | null>) {
 }
 
 function tenantRow() {
-  return testDb.raw.prepare('SELECT plan_key, plan_status, trial_ends_at, stripe_customer_id, stripe_subscription_id FROM tenants WHERE id = ?').get(DEFAULT_TENANT_ID) as Record<string, string | null>;
+  return testDb.raw.prepare('SELECT plan_key, plan_status, trial_ends_at, stripe_customer_id, stripe_subscription_id, current_period_ends_at FROM tenants WHERE id = ?').get(DEFAULT_TENANT_ID) as Record<string, string | null>;
 }
 
 beforeEach(() => {
@@ -93,7 +93,7 @@ beforeEach(() => {
   for (const fn of Object.values(stripe)) fn.mockReset();
   stripe.retrievePrice.mockResolvedValue({ id: 'price', unit_amount: 12345, currency: 'jpy' });
   testDb.raw.prepare(
-    `INSERT INTO staff_members (id, name, email, role, api_key, tenant_id) VALUES ('staff-1', '坂本 真人', 'masato@example.com', 'admin', 'key-1', ?)`,
+    `INSERT INTO staff_members (id, name, email, role, api_key, tenant_id) VALUES ('staff-1', '山田 太郎', 'masato@example.com', 'admin', 'key-1', ?)`,
   ).run(DEFAULT_TENANT_ID);
 });
 
@@ -213,6 +213,57 @@ describe('課金 Webhook', () => {
     const res = await webhook(completed());
     expect(res.status).toBe(200);
     expect(tenantRow()).toMatchObject({ plan_status: 'active', plan_key: 'standard', stripe_customer_id: 'cus_1', stripe_subscription_id: 'sub_1', trial_ends_at: null });
+  });
+
+  it('active のあとに incomplete の作成通知が届いても契約中を保つ', async () => {
+    await webhook(completed());
+    stripe.retrieveSubscription.mockRejectedValueOnce(new Error('temporary Stripe failure'));
+
+    await webhook({
+      id: 'evt_incomplete_after_active',
+      type: 'customer.subscription.created',
+      data: { object: { id: 'sub_1', status: 'incomplete', customer: 'cus_1', items: { data: [{ price: { id: 'price_standard' } }] } } },
+    });
+
+    expect(tenantRow()).toMatchObject({ plan_status: 'active', plan_key: 'standard', stripe_customer_id: 'cus_1', stripe_subscription_id: 'sub_1' });
+  });
+
+  it('作成通知が incomplete でも Stripe の現在値が active なら契約中にする', async () => {
+    setTenant({ stripe_customer_id: 'cus_1' });
+    stripe.retrieveSubscription.mockResolvedValueOnce({
+      id: 'sub_1',
+      status: 'active',
+      customer: 'cus_1',
+      current_period_end: 1_760_000_000,
+      items: { data: [{ price: { id: 'price_standard' } }] },
+    });
+
+    await webhook({
+      id: 'evt_retrieve_active',
+      type: 'customer.subscription.created',
+      data: { object: { id: 'sub_1', status: 'incomplete', customer: 'cus_1', items: { data: [{ price: { id: 'price_standard' } }] } } },
+    });
+
+    expect(stripe.retrieveSubscription).toHaveBeenCalledWith(expect.anything(), 'sub_1');
+    expect(tenantRow()).toMatchObject({ plan_status: 'active', plan_key: 'standard' });
+  });
+
+  it('明細の current_period_end から次回更新日を記録する', async () => {
+    setTenant({ stripe_customer_id: 'cus_1' });
+    stripe.retrieveSubscription.mockResolvedValueOnce({
+      id: 'sub_1',
+      status: 'active',
+      customer: 'cus_1',
+      items: { data: [{ price: { id: 'price_standard' }, current_period_end: 1_760_000_000 }] },
+    });
+
+    await webhook({
+      id: 'evt_item_period_end',
+      type: 'customer.subscription.updated',
+      data: { object: { id: 'sub_1', status: 'active', customer: 'cus_1', items: { data: [{ price: { id: 'price_standard' } }] } } },
+    });
+
+    expect(tenantRow().current_period_ends_at).toBe(new Date(1_760_000_000 * 1000).toISOString());
   });
 
   it('同じイベントは二度処理しない', async () => {

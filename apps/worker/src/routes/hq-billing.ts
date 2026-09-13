@@ -59,7 +59,7 @@ function stripeReady(c: Context<Env>): boolean {
   return Boolean(c.env.STRIPE_SECRET_KEY);
 }
 
-export function mapStripeSubscriptionStatus(status: string): TenantPlanStatus {
+export function mapStripeSubscriptionStatus(status: string): TenantPlanStatus | null {
   switch (status) {
     case 'active':
     case 'trialing':
@@ -67,22 +67,32 @@ export function mapStripeSubscriptionStatus(status: string): TenantPlanStatus {
     case 'past_due':
     case 'unpaid':
       return 'past_due';
+    case 'incomplete':
+      return null;
     default:
-      // canceled / incomplete / incomplete_expired / paused
+      // canceled / incomplete_expired / paused
       return 'canceled';
   }
 }
 
-function periodEndIso(subscription: Pick<StripeSubscription, 'current_period_end'>): string | null {
-  return subscription.current_period_end ? new Date(subscription.current_period_end * 1000).toISOString() : null;
+function periodEndIso(subscription: Pick<StripeSubscription, 'current_period_end' | 'items'>): string | null {
+  const periodEnd = subscription.current_period_end ?? subscription.items?.data?.[0]?.current_period_end;
+  return periodEnd ? new Date(periodEnd * 1000).toISOString() : null;
 }
 
 async function applySubscription(c: Context<Env>, tenant: TenantBilling, subscription: StripeSubscription): Promise<TenantBilling | null> {
+  if (subscription.status === 'incomplete') {
+    return updateTenantBilling(c.env.DB, tenant.id, {
+      stripe_subscription_id: subscription.id,
+      stripe_customer_id: subscription.customer,
+    });
+  }
   const priceId = subscription.items?.data?.[0]?.price?.id ?? null;
   const planKey = planKeyForPrice(c.env, priceId) ?? (subscription.metadata?.plan_key as PlanKey | undefined) ?? tenant.plan_key;
+  const planStatus = mapStripeSubscriptionStatus(subscription.status);
   return updateTenantBilling(c.env.DB, tenant.id, {
     plan_key: planKey ?? null,
-    plan_status: mapStripeSubscriptionStatus(subscription.status),
+    plan_status: planStatus ?? tenant.plan_status,
     stripe_subscription_id: subscription.id,
     stripe_customer_id: subscription.customer,
     current_period_ends_at: periodEndIso(subscription),
@@ -335,9 +345,21 @@ hqBilling.post('/api/hq/billing/webhook', async (c) => {
         break;
       }
       case 'customer.subscription.created':
-      case 'customer.subscription.updated':
+      case 'customer.subscription.updated': {
+        const payload = object as unknown as StripeSubscription;
+        let subscription = payload;
+        if (stripeReady(c)) {
+          try {
+            subscription = await stripeApi.retrieveSubscription(c.env, payload.id);
+          } catch (error) {
+            console.warn('billing webhook: subscription fetch failed', error instanceof Error ? error.message : error);
+          }
+        }
+        await applySubscription(c, tenant, subscription);
+        break;
+      }
       case 'customer.subscription.deleted': {
-        await applySubscription(c, tenant, object as unknown as StripeSubscription);
+        await applySubscription(c, tenant, { ...(object as unknown as StripeSubscription), status: 'canceled' });
         break;
       }
       case 'invoice.paid': {
