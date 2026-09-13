@@ -14,6 +14,14 @@ export async function build({
 } = {}) {
   if (!isHttpsOrigin(settings.stagingAppOrigin))
     throw new Error("検証用アプリURLはHTTPSのoriginで指定してください");
+  if (
+    !production &&
+    (!isHttpsOrigin(settings.previewOrigin) ||
+      settings.previewOrigin === settings.origin)
+  )
+    throw new Error(
+      "確認用サイトは本番と異なるHTTPSのoriginで指定してください",
+    );
   if (production) {
     const issues = publicationIssues(settings);
     if (issues.length)
@@ -58,9 +66,19 @@ export async function build({
     join(output, "sitemap.xml"),
     `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${production ? pages.map((page) => `<url><loc>${settings.origin}${page.path}</loc></url>`).join("") : ""}</urlset>`,
   );
+  const previewHost = production
+    ? ""
+    : new URL(settings.previewOrigin).hostname.replace(
+        /[.*+?^${}()|[\]\\]/g,
+        "\\$&",
+      );
+  // Xserver subdomains live under the apex web root. Deny the alternate apex path.
+  const hostGuard = production
+    ? ""
+    : `RewriteEngine On\nRewriteCond %{HTTP_HOST} !^${previewHost}(?::80|:443)?$ [NC]\nRewriteRule ^ - [F,L]\nRewriteCond %{HTTPS} !on\nRewriteRule ^ ${settings.previewOrigin}%{REQUEST_URI} [R=301,L]\n`;
   await writeFile(
     join(output, ".htaccess"),
-    `Options -Indexes\nDirectoryIndex index.html\n<IfModule mod_headers.c>\n Header always set X-Content-Type-Options "nosniff"\n Header always set Referrer-Policy "strict-origin-when-cross-origin"\n Header always set X-Frame-Options "DENY"\n Header always set Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'"\n${production ? "" : ' Header always set X-Robots-Tag "noindex, nofollow"\n'} Header always set Cache-Control "no-cache"\n</IfModule>\n`,
+    `${hostGuard}Options -Indexes\nDirectoryIndex index.html\n<IfModule mod_headers.c>\n Header always set X-Content-Type-Options "nosniff"\n Header always set Referrer-Policy "strict-origin-when-cross-origin"\n Header always set X-Frame-Options "DENY"\n Header always set Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'"\n${production ? "" : ' Header always set X-Robots-Tag "noindex, nofollow"\n'} Header always set Cache-Control "no-cache"\n</IfModule>\n`,
   );
   return { output, paths: pages.map((page) => page.path) };
 }

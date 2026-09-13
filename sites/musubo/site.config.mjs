@@ -1,6 +1,7 @@
 // Public information only. Never put credentials or customer data in this file.
 export default {
   origin: "https://musubo.jp",
+  previewOrigin: "https://stg.musubo.jp",
   stagingAppOrigin: "https://nen-line-stg-admin.pages.dev",
   // Set only after the production /register AND /login pages have been verified.
   productionAppOrigin: "",

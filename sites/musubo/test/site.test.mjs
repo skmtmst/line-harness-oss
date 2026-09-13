@@ -67,7 +67,7 @@ test("internal links, assets and fragment targets resolve on every page", async 
   }
 });
 
-test("preview is unmistakably non-public, non-indexable and cannot be used as production", async () => {
+test("preview is unmistakably a review site, non-indexable and cannot be used as production", async () => {
   for (const route of preview.paths) {
     const html = await page(route);
     assert.match(html, /確認用サイト/);
@@ -87,6 +87,33 @@ test("preview is unmistakably non-public, non-indexable and cannot be used as pr
     /正式公開を停止/,
   );
   await assert.rejects(stat(join(dir, "blocked")), { code: "ENOENT" });
+});
+
+test("review hostname is separated and the alternate apex path is denied", async () => {
+  assert.equal(config.previewOrigin, "https://stg.musubo.jp");
+  assert.equal(config.origin, "https://musubo.jp");
+  const htaccess = await readFile(join(preview.output, ".htaccess"), "utf8");
+  assert.ok(htaccess.includes("!^stg\\.musubo\\.jp(?::80|:443)?$ [NC]"));
+  assert.ok(htaccess.includes("RewriteRule ^ - [F,L]"));
+  assert.ok(
+    htaccess.includes(
+      "RewriteRule ^ https://stg.musubo.jp%{REQUEST_URI} [R=301,L]",
+    ),
+  );
+  for (const previewOrigin of [
+    config.origin,
+    "http://stg.musubo.jp",
+    "https://stg.musubo.jp/path",
+    "",
+  ]) {
+    await assert.rejects(
+      build({
+        settings: { ...config, previewOrigin },
+        output: join(dir, "invalid-host"),
+      }),
+      /本番と異なるHTTPS/,
+    );
+  }
 });
 
 test("company identity is user-supplied, missing contacts and unapproved prices are not invented", async () => {
@@ -195,6 +222,10 @@ test("approved fixture builds production with correct URLs and without draft cop
   assert.match(
     await readFile(join(production.output, "sitemap.xml"), "utf8"),
     /https:\/\/musubo.jp\/legal\//,
+  );
+  assert.doesNotMatch(
+    await readFile(join(production.output, ".htaccess"), "utf8"),
+    /stg\\\.musubo|HTTP_HOST/,
   );
   settings.productionAppOrigin = settings.stagingAppOrigin;
   assert.ok(
