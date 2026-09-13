@@ -78,7 +78,7 @@ const ALLOWED_H1: Record<string, string> = {
 
 describe('画面名を本文とトップバーで2回出さない', () => {
   it('全ページを読めている', () => {
-    expect(PAGES.length).toBe(153)  // 2026-09-12: 統括の4機能を独立画面に分けた実測値。
+    expect(PAGES.length).toBe(155)  // 2026-09-13: 統括バナー生成（/hq/banners、/hq/banners/project）を足した実測値。
   })
 
   it('page.tsx が h1 を直接持たない', () => {

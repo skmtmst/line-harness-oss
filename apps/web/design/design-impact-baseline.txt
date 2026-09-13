@@ -59,6 +59,7 @@ shared-button-importer app/friends/detail/page.tsx
 shared-button-importer app/friends/identity-candidates/page.tsx
 shared-button-importer app/friends/migrations/page.tsx
 shared-button-importer app/friends/page.tsx
+shared-button-importer app/hq/banners/project/page.tsx
 shared-button-importer app/hq/open/page.tsx
 shared-button-importer app/hq/page.tsx
 shared-button-importer app/hq/settings/hq-staff-section.tsx
@@ -143,6 +144,12 @@ shared-button-importer components/forms/options-dialog.tsx
 shared-button-importer components/friends/advanced-search-dialog.tsx
 shared-button-importer components/friends/bulk-run-dialog.tsx
 shared-button-importer components/hq/account-list.tsx
+shared-button-importer components/hq/banners/image-detail-modal.tsx
+shared-button-importer components/hq/banners/library-section.tsx
+shared-button-importer components/hq/banners/limit-state.tsx
+shared-button-importer components/hq/banners/projects-section.tsx
+shared-button-importer components/hq/banners/upload-button.tsx
+shared-button-importer components/hq/banners/upload-target-dialog.tsx
 shared-button-importer components/identity/identity-decision-dialog.tsx
 shared-button-importer components/inflow-links/site-script.tsx
 shared-button-importer components/line-notifications/notification-run-list.tsx

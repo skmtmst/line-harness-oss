@@ -51,7 +51,7 @@ describe('統括コンソール', () => {
   it('統括と店舗のサイドバーを分け、採用フローを作らない', () => {
     expect(sidebar).toContain('HQ_MENU_SECTIONS')
     expect(HQ_MENU_SECTIONS.flatMap((section) => section.items).map((item) => item.label)).toEqual([
-      '店舗管理', '友だち属性', 'テンプレート', 'リッチメニュー', '回答フォーム', '設定',
+      '店舗管理', '友だち属性', 'テンプレート', 'リッチメニュー', '回答フォーム', 'バナー生成', '設定',
     ])
     expect(HQ_MENU_SECTIONS.flatMap((section) => section.items).some((item) => item.label === '採用フロー管理')).toBe(false)
     expect(HQ_MENU_SECTIONS.flatMap((section) => section.items).map((item) => item.href)).toEqual([
@@ -60,6 +60,7 @@ describe('統括コンソール', () => {
       '/hq/templates',
       '/hq/rich-menus',
       '/hq/form-submissions',
+      '/hq/banners',
       '/hq/settings',
     ])
     expect(templatePage).toContain('HqTemplatePage')

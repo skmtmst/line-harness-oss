@@ -310,6 +310,12 @@ const spec = {
         responses: { '200': { description: 'Tenant banner usage' }, '403': { description: 'Owner or admin role required' } },
       },
     },
+    '/api/hq/banners/stats': {
+      get: {
+        tags: ['HQ Banners'], summary: 'バナー生成画面の集計値を取得',
+        responses: { '200': { description: 'Tenant banner project and image statistics' }, '403': { description: 'Owner or admin role required' } },
+      },
+    },
     '/api/hq/banners/projects': {
       get: {
         tags: ['HQ Banners'], summary: 'バナープロジェクト一覧を取得',

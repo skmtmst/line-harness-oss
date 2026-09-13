@@ -100,6 +100,7 @@ OpenAI の公式価格はトークン単位（gpt-image-2: 出力 $15/1M トー�
 |---|---|---|
 | GET | `/api/hq/banners/presets` | 用途（LINE／SNS）・一度の上限枚数・今月と今日の利用量・接続設定の有無 |
 | GET | `/api/hq/banners/usage` | 今月と今日の利用量、一時停止中か |
+| GET | `/api/hq/banners/stats` | 数値カード帯の数（プロジェクト数、店舗へ渡した画像・店舗の数） |
 | GET | `/api/hq/banners/projects?archived=0\|1&q=` | プロジェクト一覧 |
 | POST | `/api/hq/banners/projects` | 作成 |
 | GET | `/api/hq/banners/projects/:id` | 詳細（画像・生成の一覧つき） |
@@ -116,9 +117,20 @@ OpenAI の公式価格はトークン単位（gpt-image-2: 出力 $15/1M トー�
 | DELETE | `/api/hq/banners/images/:id` | 一覧から外す |
 | POST | `/api/hq/banners/images/:id/deliver` | 店舗へ渡す（`lineAccountIds: []`、50件まで） |
 
+## 画面（2026-09-12 追加）
+
+| 画面 | ルート | Pencil |
+|---|---|---|
+| プロジェクト一覧 | `/hq/banners` | 35-1 `aH6NX`、状態 35-4 `xY2wj` |
+| 画像ライブラリ | `/hq/banners?tab=library` | 35-3 `w3ZDsD`、詳細モーダル 35-3-A `g4MyEA` |
+| プロジェクト詳細と生成 | `/hq/banners/project?id=<プロジェクトID>` | 35-2 `g1WVyR`、生成中 35-2-A `QGiQI` |
+
+- 生成は画面が `run` を1枚ずつ繰り返す。**画面を閉じると、その時点で止まる**（成功した枚数は残る）。開き直すと、途中の生成を自動で続きから動かす
+- 同じプロジェクトを2つの画面で同時に開いて生成すると、`run` が並走して枚数が1枚多くなることがある。運用上は避ける（後続で直す）
+- 画像の実体は Worker の `/images/<r2_key>` から配信される。管理画面とは別サイトなので、ダウンロードは新しいタブで開く
+
 ## まだやっていないこと
 
-- 画面（Pencil ★V6 の設計後に実装）
 - LINE 規格サイズへの正確なリサイズ、リッチメッセージ（1040×1040 の固定サイズ）への変換
 - 参照画像つき生成、指示文による編集、背景除去、高画質化
 - 料金プランと連動した上限
