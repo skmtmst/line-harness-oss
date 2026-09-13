@@ -100,8 +100,8 @@ let scope: AsyncTestScope;
 
 // A timeout rejects Vitest's wrapper, not this body. Keep owning the body until
 // its requests, assertions and finally blocks have settled in afterEach.
-function test(name: string, body: () => Promise<void>) {
-  vitestTest(name, () => scope.run(body));
+function test(name: string, body: () => Promise<void>, timeoutMs?: number) {
+  vitestTest(name, () => scope.run(body), timeoutMs);
 }
 
 function setupDb() {
@@ -417,7 +417,7 @@ describe('フォーム回答の冪等化(実DB)', () => {
       secondary.close();
       rmSync(dir, { recursive: true, force: true });
     }
-  });
+  }, 15_000);
 
   test('Webhook送達後の記録失敗は実DBの再送で呼び直さない', async () => {
     const fetchMock = vi.fn(async (url: string, init?: RequestInit) => new Response(

@@ -34,8 +34,8 @@ import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { cancelByTrigger, enrollByTrigger } from '../services/reminder-trigger.js';
 import { canTransition, nextStatus, type BookingAction } from '../services/booking-state.js';
-import { getAccountTimeZone, getAvailability, getStoreCapacityWindows, tzDateStr, tzHHMM } from '../services/availability.js';
-import { STORE_CAPACITY_GUARD_SQL } from '../services/booking-store-capacity.js';
+import { getAccountTimeZone, getAvailability, getStoreCapacitySnapshot, tzDateStr, tzHHMM } from '../services/availability.js';
+import { STORE_CAPACITY_GUARD_SQL, STORE_SETTINGS_VERSION_GUARD_SQL } from '../services/booking-store-capacity.js';
 import {
   enqueueCalendarDeleteOperation,
   removeBookingFromGoogle,
@@ -619,6 +619,10 @@ booking.post('/api/liff/booking/requests', async (c) => {
   }
   const endsAt = new Date(startsAt.getTime() + menuRow.dur * 60_000);
   const blockEndsAt = new Date(endsAt.getTime() + menuRow.buffer_after_minutes * 60_000);
+  // 営業時間snapshotを空き枠の再計算より先に固定する。以後に営業時間が
+  // 変われば、再計算が新条件で拒否するか、INSERT時のversion guardが
+  // このsnapshotとの差を検知する。逆順だと両読取の間の閉店を見逃す。
+  const storeCapacity = await getStoreCapacitySnapshot(c.env.DB, accountId, startsAt, blockEndsAt);
 
   // Server-side availability 再検証: 曜日受付時間 / Google Calendar /
   // リードタイム / 既存予約を、確定直前にもう一度突合する。
@@ -635,7 +639,6 @@ booking.post('/api/liff/booking/requests', async (c) => {
 
   const bookingId = crypto.randomUUID();
   const nowIso = new Date().toISOString();
-  const storeWindows = await getStoreCapacityWindows(c.env.DB, accountId, startsAt, blockEndsAt);
   // 競合チェックと INSERT を 1 ステートメントで原子化する。
   // INSERT ... SELECT WHERE NOT EXISTS パターンで、同一スタッフの overlap 行がある場合は
   // 0 行 INSERT に落とす。changes=0 を 409 として扱う。
@@ -665,7 +668,8 @@ booking.post('/api/liff/booking/requests', async (c) => {
              AND block_ends_at > ?
              AND menu_id = ?
         ) < ?
-        ${STORE_CAPACITY_GUARD_SQL}`,
+        ${STORE_CAPACITY_GUARD_SQL}
+        ${STORE_SETTINGS_VERSION_GUARD_SQL}`,
     )
     .bind(
       bookingId,
@@ -691,7 +695,8 @@ booking.post('/api/liff/booking/requests', async (c) => {
       startsAt.toISOString(),
       body.menu_id,
       Math.max(1, menuRow.concurrent_capacity ?? 1),
-      JSON.stringify(storeWindows), accountId, accountId,
+      JSON.stringify(storeCapacity.windows), accountId, accountId,
+      accountId, storeCapacity.settingsVersion,
     )
     .run();
   if ((insertResult.meta?.changes ?? 0) === 0) {
@@ -955,6 +960,66 @@ function isValidTimeZone(value: string): boolean {
   }
 }
 
+type BookingBusinessHours = Array<{
+  weekday: number;
+  intervals: Array<{ start: string; end: string; capacity: number }>;
+}>;
+
+function readBookingBusinessHours(input: unknown):
+  | { ok: true; value: BookingBusinessHours }
+  | { ok: false; error: string } {
+  if (!Array.isArray(input) || input.length !== 7) {
+    return { ok: false, error: '営業時間は日曜から土曜まで7曜日分を指定してください' };
+  }
+  const weekdays = new Set<number>();
+  const days: BookingBusinessHours = [];
+  for (const rawDay of input) {
+    if (!rawDay || typeof rawDay !== 'object') {
+      return { ok: false, error: '営業時間の曜日が正しくありません' };
+    }
+    const day = rawDay as Record<string, unknown>;
+    const weekday = integerInRange(day.weekday, 0, 6);
+    if (weekday === null || weekdays.has(weekday)) {
+      return { ok: false, error: '営業時間の曜日が重複しているか正しくありません' };
+    }
+    weekdays.add(weekday);
+    if (!Array.isArray(day.intervals) || day.intervals.length > 8) {
+      return { ok: false, error: '1曜日の営業時間は8区間以内で指定してください' };
+    }
+    const intervals: BookingBusinessHours[number]['intervals'] = [];
+    for (const rawInterval of day.intervals) {
+      if (!rawInterval || typeof rawInterval !== 'object') {
+        return { ok: false, error: '営業時間の区間が正しくありません' };
+      }
+      const interval = rawInterval as Record<string, unknown>;
+      const start = typeof interval.start === 'string' ? interval.start : '';
+      const end = typeof interval.end === 'string' ? interval.end : '';
+      const capacity = integerInRange(interval.capacity, 1, 1_000);
+      if (!/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(start)
+        || !/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(end)
+        || start >= end) {
+        return {
+          ok: false,
+          error: '営業時間は同日内で開始時刻より後の終了時刻を指定してください。24:00と日またぎは使えません',
+        };
+      }
+      if (capacity === null) {
+        return { ok: false, error: '同時受付数は1〜1000の整数で指定してください' };
+      }
+      intervals.push({ start, end, capacity });
+    }
+    intervals.sort((a, b) => a.start.localeCompare(b.start));
+    for (let index = 1; index < intervals.length; index++) {
+      if (intervals[index - 1].end > intervals[index].start) {
+        return { ok: false, error: '同じ曜日の営業時間を重ねることはできません' };
+      }
+    }
+    days.push({ weekday, intervals });
+  }
+  days.sort((a, b) => a.weekday - b.weekday);
+  return { ok: true, value: days };
+}
+
 function readBookingAdminSettings(input: Record<string, unknown>):
   | {
     ok: true;
@@ -968,6 +1033,7 @@ function readBookingAdminSettings(input: Record<string, unknown>):
       approvalMode: 'automatic' | 'manual';
       holdMinutes: number;
       slotGranularityMinutes: 5 | 10 | 15 | 30 | 60;
+      businessHours?: BookingBusinessHours;
     };
   }
   | { ok: false; error: string } {
@@ -980,6 +1046,9 @@ function readBookingAdminSettings(input: Record<string, unknown>):
   const approvalMode = input.approvalMode;
   const holdMinutes = integerInRange(input.holdMinutes, 1, 1_440);
   const slotGranularityMinutes = integerInRange(input.slotGranularityMinutes, 5, 60);
+  const businessHours = Object.hasOwn(input, 'businessHours')
+    ? readBookingBusinessHours(input.businessHours)
+    : null;
 
   if (expectedVersion === null) return { ok: false, error: 'expectedVersionが正しくありません' };
   if (!isValidTimeZone(timeZone)) return { ok: false, error: 'タイムゾーンが正しくありません' };
@@ -995,6 +1064,7 @@ function readBookingAdminSettings(input: Record<string, unknown>):
     || !BOOKING_SLOT_GRANULARITIES.has(slotGranularityMinutes as 5 | 10 | 15 | 30 | 60)) {
     return { ok: false, error: '予約枠の間隔が正しくありません' };
   }
+  if (businessHours && !businessHours.ok) return businessHours;
   return {
     ok: true,
     value: {
@@ -1007,6 +1077,7 @@ function readBookingAdminSettings(input: Record<string, unknown>):
       approvalMode: approvalMode as 'automatic' | 'manual',
       holdMinutes,
       slotGranularityMinutes: slotGranularityMinutes as 5 | 10 | 15 | 30 | 60,
+      ...(businessHours ? { businessHours: businessHours.value } : {}),
     },
   };
 }
@@ -1988,6 +2059,9 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
   }
   const endsAt = new Date(startsAt.getTime() + menuRow.dur * 60_000);
   const blockEndsAt = new Date(endsAt.getTime() + menuRow.buffer_after_minutes * 60_000);
+  // LIFFと同じ順序で営業時間snapshotを先に固定し、その後の変更を
+  // availability再計算または原子的なversion guardのどちらかで止める。
+  const storeCapacity = await getStoreCapacitySnapshot(c.env.DB, accountId, startsAt, blockEndsAt);
 
   // Recurring-hours + Google Calendar + internal-booking validation.
   // LIFF と同じ契約で照合する。店舗タイムゾーンの暦日で取り直した候補の
@@ -2039,7 +2113,6 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
     day_before: sendLineConfirmation,
     hours_before: sendLineConfirmation,
   });
-  const storeWindows = await getStoreCapacityWindows(c.env.DB, accountId, startsAt, blockEndsAt);
   const insertResult = await c.env.DB
     .prepare(
       `INSERT INTO bookings
@@ -2067,7 +2140,8 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
              AND block_ends_at > ?
              AND menu_id = ?
         ) < ?
-        ${STORE_CAPACITY_GUARD_SQL}`,
+        ${STORE_CAPACITY_GUARD_SQL}
+        ${STORE_SETTINGS_VERSION_GUARD_SQL}`,
     )
     .bind(
       bookingId,
@@ -2098,7 +2172,8 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
       startsAt.toISOString(),
       body.menu_id,
       Math.max(1, menuRow.concurrent_capacity ?? 1),
-      JSON.stringify(storeWindows), accountId, accountId,
+      JSON.stringify(storeCapacity.windows), accountId, accountId,
+      accountId, storeCapacity.settingsVersion,
     )
     .run();
   if ((insertResult.meta?.changes ?? 0) === 0) {

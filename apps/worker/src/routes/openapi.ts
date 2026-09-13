@@ -1791,7 +1791,7 @@ const spec = {
       get: {
         tags: ['Booking'],
         summary: '店舗共通の予約ルールを取得',
-        description: '設定行がまだ無い店舗は、表示と初回保存に使う version=0 の既定値を返す。この取得ではDB行を作成しない。',
+        description: '設定行がまだ無い店舗は、表示と初回保存に使う version=0 の既定値を返す。この取得ではDB行を作成しない。businessHoursConfigured=false の0行曜日は後方互換で営業時間制限なし、true の0行曜日は休業。',
         parameters: [
           { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
         ],
@@ -1805,7 +1805,7 @@ const spec = {
       put: {
         tags: ['Booking'],
         summary: '店舗共通の予約ルールを版付きで作成・更新',
-        description: 'expectedVersion=0 は設定行が無い実在店舗だけに初回行を作る。既存行は版一致時だけ更新する。',
+        description: 'expectedVersion=0 は設定行が無い実在店舗だけに初回行を作る。既存行は版一致時だけ更新する。businessHoursを指定した場合は7曜日を原子的に置換し、0行曜日を休業として明示設定する。',
         parameters: [
           { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
         ],
@@ -1831,6 +1831,28 @@ const spec = {
                   approvalMode: { type: 'string', enum: ['automatic', 'manual'] },
                   holdMinutes: { type: 'integer', minimum: 1, maximum: 1440 },
                   slotGranularityMinutes: { type: 'integer', enum: [5, 10, 15, 30, 60] },
+                  businessHours: {
+                    type: 'array', minItems: 7, maxItems: 7,
+                    description: 'weekday 0（日曜）〜6（土曜）を各1回。空のintervalsは休業。24:00と日またぎは不可。',
+                    items: {
+                      type: 'object',
+                      required: ['weekday', 'intervals'],
+                      properties: {
+                        weekday: { type: 'integer', minimum: 0, maximum: 6 },
+                        intervals: {
+                          type: 'array', maxItems: 8,
+                          items: {
+                            type: 'object', required: ['start', 'end', 'capacity'],
+                            properties: {
+                              start: { type: 'string', pattern: '^(?:[01]\\d|2[0-3]):[0-5]\\d$' },
+                              end: { type: 'string', pattern: '^(?:[01]\\d|2[0-3]):[0-5]\\d$' },
+                              capacity: { type: 'integer', minimum: 1, maximum: 1000 },
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
                 },
               },
             },

@@ -283,13 +283,39 @@ function storeCapacityWindows(hours: BusinessHour[], timeZone: string, startMs: 
   return windows;
 }
 
-/** Capacity applies only to business-hour intervals touched by this occupancy. */
-export async function getStoreCapacityWindows(db: D1Database, accountId: string, start: Date, end: Date): Promise<StoreCapacityWindow[]> {
-  const timeZone = await getAccountTimeZone(db, accountId);
-  const hours = await db.prepare(`SELECT bh.weekday, bh.start_time, bh.end_time, bh.capacity
-    FROM booking_business_hours bh JOIN booking_settings bs ON bs.id = bh.booking_settings_id
-    WHERE bs.line_account_id = ?`).bind(accountId).all<BusinessHour>();
-  return storeCapacityWindows(hours.results ?? [], timeZone, start.getTime(), end.getTime());
+export interface StoreCapacitySnapshot {
+  windows: StoreCapacityWindow[];
+  settingsVersion: number;
+}
+
+/**
+ * Capacity applies only to business-hour intervals touched by this occupancy.
+ * Settings and hours are read by one LEFT JOIN so the returned version describes
+ * exactly the rows used to build the capacity windows, including a configured
+ * all-closed week that has no child rows.
+ */
+export async function getStoreCapacitySnapshot(
+  db: D1Database,
+  accountId: string,
+  start: Date,
+  end: Date,
+): Promise<StoreCapacitySnapshot> {
+  const snapshot = await db.prepare(`/* booking_store_capacity_snapshot */
+    SELECT bs.timezone, bs.version,
+      bh.weekday, bh.start_time, bh.end_time, bh.capacity
+    FROM booking_settings bs
+    LEFT JOIN booking_business_hours bh ON bh.booking_settings_id = bs.id
+    WHERE bs.line_account_id = ?
+    ORDER BY bh.weekday, bh.start_time`)
+    .bind(accountId)
+    .all<BusinessHour & { timezone: string | null; version: number }>();
+  const rows = snapshot.results ?? [];
+  const timeZone = normalizeTimeZone(rows[0]?.timezone ?? FALLBACK_TIME_ZONE);
+  const hours = rows.filter((row) => row.weekday != null);
+  return {
+    windows: storeCapacityWindows(hours, timeZone, start.getTime(), end.getTime()),
+    settingsVersion: Number(rows[0]?.version ?? 0),
+  };
 }
 
 function googleBusyForDate(
@@ -436,9 +462,9 @@ export async function getAvailability(
         AND date_to >= ?`)
       .bind(params.lineAccountId, params.to, params.from)
       .all<AvailabilityExceptionRow>(),
-    db.prepare(`SELECT timezone FROM booking_settings WHERE line_account_id = ?`)
+    db.prepare(`SELECT timezone, business_hours_configured FROM booking_settings WHERE line_account_id = ?`)
       .bind(params.lineAccountId)
-      .first<{ timezone: string | null }>(),
+      .first<{ timezone: string | null; business_hours_configured: number }>(),
   ]);
   // 店舗のタイムゾーンで日付・時刻を読む。未設定・壊れた値は Asia/Tokyo。
   const timeZone = normalizeTimeZone(settingsRow?.timezone ?? FALLBACK_TIME_ZONE);
@@ -649,9 +675,8 @@ export async function getAvailability(
        * 枠の開閉には効いていなかった。営業 10:00-17:00・勤務 09:00-18:00 の
        * 店で 09:00 の枠が出て、17:00-18:00 まではみ出していた。
        *
-       * **その曜日の行が1件も無ければ、制限しない。**閉じる側へ倒すと、
-       * 営業時間を1件も持たない既存の店（いま営業時間を作る口が無い＝N-406）
-       * の枠が全部消える。行が入っている店だけを縛る。
+       * 明示設定前だけは、その曜日の行が1件も無ければ制限しない。
+       * 管理画面から一度でも週全体を保存した後は、0行曜日を定休日として閉じる。
        *
        * 同じ曜日に複数行あるときは区間として束ねる（10:00-13:00 と
        * 14:00-18:00 なら昼休みは閉じる）。
@@ -665,7 +690,9 @@ export async function getAvailability(
       const businessIntervals = mergeIntervals(
         dayHours.map((hour) => ({ start: hour.start_time, end: hour.end_time })),
       );
-      const coreWithinBusiness = businessIntervals.length > 0
+      const shouldApplyBusinessHours = businessIntervals.length > 0
+        || settingsRow?.business_hours_configured === 1;
+      const coreWithinBusiness = shouldApplyBusinessHours
         ? intersectIntervals(coreWorking, businessIntervals)
         : coreWorking;
       let workingList = mergeIntervals([...coreWithinBusiness, ...staffOpenHours]);

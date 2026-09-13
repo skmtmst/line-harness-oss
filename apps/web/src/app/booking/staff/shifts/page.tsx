@@ -6,6 +6,7 @@ import { useSearchParams } from 'next/navigation'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import StaffDetail from './staff-detail'
 import {
+  ApiError,
   bookingApi,
   type BookingAvailabilitySlot,
   type BookingResource,
@@ -14,7 +15,7 @@ import {
 import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
-import { breakHours, openHours, shortDate } from '../../lib/format-time'
+import { shortDate } from '../../lib/format-time'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 type PreviewMark = '○' | '×' | '休'
@@ -28,6 +29,196 @@ const DAYS = [
   { weekday: 6, label: '土曜日' },
   { weekday: 0, label: '日曜日' },
 ] as const
+
+type BusinessHoursDay = BookingSettings['businessHours'][number]
+type BusinessHourInterval = BusinessHoursDay['intervals'][number]
+
+function initialBusinessHours(settings: BookingSettings): BusinessHoursDay[] {
+  return DAYS.map(({ weekday }) => ({
+    weekday,
+    intervals: (settings.businessHours.find((day) => day.weekday === weekday)?.intervals ?? [])
+      .map((interval) => ({ ...interval, capacity: interval.capacity ?? 1 })),
+  }))
+}
+
+function validateBusinessHours(days: BusinessHoursDay[]): string | null {
+  const timePattern = /^(?:[01]\d|2[0-3]):[0-5]\d$/
+  for (const day of days) {
+    if (day.intervals.length > 8) return '1曜日の営業時間は8区間までです。'
+    const sorted = [...day.intervals].sort((a, b) => a.start.localeCompare(b.start))
+    for (const interval of sorted) {
+      if (!timePattern.test(interval.start) || !timePattern.test(interval.end) || interval.start >= interval.end) {
+        return '営業時間は日ごとに分けて入力してください。終了は同じ日の開始より後にし、24:00は使えません。'
+      }
+      const capacity = Number(interval.capacity)
+      if (!Number.isInteger(capacity) || capacity < 1 || capacity > 1000) {
+        return '同時に受け付ける数は1〜1000件で入力してください。'
+      }
+    }
+    for (let index = 1; index < sorted.length; index += 1) {
+      if (sorted[index - 1].end > sorted[index].start) {
+        return '同じ曜日の営業時間は重ならないように入力してください。'
+      }
+    }
+  }
+  return null
+}
+
+function businessHoursSaveError(error: unknown): string {
+  if (error instanceof ApiError && error.status === 409) {
+    return 'ほかの担当者が先に保存しました。最新の内容を読み直してから、もう一度変更してください。'
+  }
+  if (error instanceof ApiError && error.status === 400) return error.message
+  return '営業時間を保存できませんでした。入力内容を確かめて、もう一度お試しください。'
+}
+
+function BusinessHoursEditor({ accountId, settings, onSaved, onReload }: {
+  accountId: string
+  settings: BookingSettings
+  onSaved: (settings: BookingSettings) => void
+  onReload: () => void
+}) {
+  const [draft, setDraft] = useState(() => initialBusinessHours(settings))
+  const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
+  const [saved, setSaved] = useState(false)
+  const activeRef = useRef(true)
+  const inFlightRef = useRef(false)
+
+  useEffect(() => () => { activeRef.current = false }, [])
+  useEffect(() => {
+    setDraft(initialBusinessHours(settings))
+  }, [settings])
+
+  function updateDay(weekday: number, update: (intervals: BusinessHourInterval[]) => BusinessHourInterval[]) {
+    setDraft((current) => current.map((day) => day.weekday === weekday
+      ? { ...day, intervals: update(day.intervals) }
+      : day))
+    setSaved(false)
+    setSaveError(null)
+  }
+
+  function setAccepts(weekday: number, accepts: boolean) {
+    updateDay(weekday, (intervals) => accepts
+      ? intervals.length > 0 ? intervals : [{ start: '09:00', end: '18:00', capacity: 1 }]
+      : [])
+  }
+
+  function updateInterval(weekday: number, index: number, change: Partial<BusinessHourInterval>) {
+    updateDay(weekday, (intervals) => intervals.map((interval, currentIndex) => (
+      currentIndex === index ? { ...interval, ...change } : interval
+    )))
+  }
+
+  async function submit() {
+    if (inFlightRef.current) return
+    const validationError = validateBusinessHours(draft)
+    if (validationError) {
+      setSaveError(validationError)
+      return
+    }
+    inFlightRef.current = true
+    setSaving(true)
+    setSaveError(null)
+    setSaved(false)
+    try {
+      const response = await bookingApi.saveSettings(accountId, {
+        expectedVersion: settings.version,
+        timeZone: settings.timeZone,
+        bookingWindowDays: settings.bookingWindowDays,
+        cutoffMinutesBefore: settings.cutoffMinutesBefore,
+        cancelDeadlineMinutesBefore: settings.cancelDeadlineMinutesBefore,
+        maxActiveBookingsPerFriend: settings.maxActiveBookingsPerFriend,
+        approvalMode: settings.approvalMode,
+        holdMinutes: settings.holdMinutes,
+        slotGranularityMinutes: settings.slotGranularityMinutes,
+        businessHours: draft,
+      })
+      if (!activeRef.current) return
+      if (!response.success) throw new Error('booking_business_hours_save_failed')
+      setSaved(true)
+      onSaved(response.data)
+    } catch (error) {
+      if (activeRef.current) setSaveError(businessHoursSaveError(error))
+    } finally {
+      inFlightRef.current = false
+      if (activeRef.current) setSaving(false)
+    }
+  }
+
+  return (
+    <section data-design="Week" className="bg-canvas border-hairline overflow-hidden rounded-card border">
+      <div className="border-hairline border-b px-4 py-4">
+        <h2 className="text-ink font-semibold">開ける時間</h2>
+        <p className="text-ink-faint mt-1 text-xs">曜日ごとの受付時間と休けいを決めます。同時受付数は「1時間に受けられる数」ではなく、同じ時間に重ねられる予約数です。閉めた曜日は、お客様の画面に出ません。</p>
+        {!settings.businessHoursConfigured ? (
+          <p className="bg-warning-bg text-warning mt-3 rounded-control px-3 py-2 text-xs" role="note">
+            まだ週全体の営業時間を保存していません。入力済みの時間帯は適用されていますが、時間帯がない曜日は現在は担当者の勤務時間どおりに受け付けます。保存すると、その曜日は休業になります。
+          </p>
+        ) : null}
+      </div>
+      <div className="divide-hairline divide-y">
+        {DAYS.map((day) => {
+          const intervals = draft.find((item) => item.weekday === day.weekday)?.intervals ?? []
+          const accepts = intervals.length > 0
+          return (
+            <div className="grid gap-3 px-4 py-3 text-sm lg:grid-cols-6" key={day.weekday}>
+              <label className="flex items-center gap-2 font-semibold whitespace-nowrap lg:col-span-1">
+                <input
+                  aria-label={`${day.label}を受け付ける`}
+                  type="checkbox"
+                  checked={accepts}
+                  onChange={(event) => setAccepts(day.weekday, event.target.checked)}
+                />
+                {day.label}
+              </label>
+              {!accepts ? (
+                <p className="text-ink-faint lg:col-span-5">{settings.businessHoursConfigured ? '休み（定休日）' : '未設定（現在は担当者の勤務時間どおり）'}</p>
+              ) : (
+                <div className="space-y-2 lg:col-span-5">
+                  {intervals.map((interval, index) => (
+                    <div className="flex flex-wrap items-end gap-2" key={`${day.weekday}-${index}`}>
+                      <label className="text-ink-secondary text-xs">
+                        開始
+                        <input aria-label={`${day.label} ${index + 1}件目の開始`} type="time" value={interval.start} onChange={(event) => updateInterval(day.weekday, index, { start: event.target.value })} className="border-hairline rounded-control mt-1 block border bg-canvas px-2 py-1.5 text-sm tabular-nums" />
+                      </label>
+                      <span className="pb-2 text-xs">〜</span>
+                      <label className="text-ink-secondary text-xs">
+                        終了
+                        <input aria-label={`${day.label} ${index + 1}件目の終了`} type="time" value={interval.end} onChange={(event) => updateInterval(day.weekday, index, { end: event.target.value })} className="border-hairline rounded-control mt-1 block border bg-canvas px-2 py-1.5 text-sm tabular-nums" />
+                      </label>
+                      <label className="text-ink-secondary text-xs">
+                        同時受付数
+                        <input aria-label={`${day.label} ${index + 1}件目の同時受付数`} type="number" min={1} max={1000} value={interval.capacity ?? 1} onChange={(event) => updateInterval(day.weekday, index, { capacity: Number(event.target.value) })} className="border-hairline rounded-control mt-1 block w-24 border bg-canvas px-2 py-1.5 text-sm tabular-nums" />
+                      </label>
+                      <button type="button" className="text-danger mb-1.5 px-2 py-1 text-xs underline" onClick={() => updateDay(day.weekday, (current) => current.filter((_, currentIndex) => currentIndex !== index))}>この時間を削除</button>
+                    </div>
+                  ))}
+                  {intervals.length < 8 ? (
+                    <button type="button" className="text-accent text-xs font-semibold underline" onClick={() => updateDay(day.weekday, (current) => [...current, { start: '09:00', end: '18:00', capacity: 1 }])}>時間帯を追加</button>
+                  ) : null}
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+      <div className="border-hairline border-t px-4 py-4">
+        <p className="text-ink-faint text-xs">日をまたぐ営業は、日ごとに分けて入力してください。終了時刻に24:00は使えません。</p>
+        {saveError ? (
+          <div className="bg-danger-bg text-danger mt-3 rounded-control p-3 text-sm" role="alert">
+            <p>{saveError}</p>
+            {saveError.includes('先に保存') ? <button type="button" onClick={onReload} className="mt-2 font-semibold underline">最新の内容を読み直す</button> : null}
+          </div>
+        ) : null}
+        {saved ? <p className="text-success mt-3 text-sm font-semibold" role="status">営業時間を保存しました。</p> : null}
+        <div className="mt-3 flex justify-end">
+          <Button variant="primary" onClick={() => void submit()} disabled={saving}>{saving ? '保存中…' : '営業時間を保存'}</Button>
+        </div>
+      </div>
+    </section>
+  )
+}
 
 function isoDate(date: Date): string {
   return date.toISOString().slice(0, 10)
@@ -75,6 +266,7 @@ function StoreShiftsView() {
   const [savingClosed, setSavingClosed] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const requestRef = useRef(0)
+  const loadedAccountRef = useRef<string | null>(null)
 
   const workerBase = process.env.NEXT_PUBLIC_API_URL ?? ''
   const previewUrl = selectedAccount?.liffId
@@ -85,12 +277,13 @@ function StoreShiftsView() {
   useEffect(() => {
     const requestId = ++requestRef.current
     if (!selectedAccountId) {
+      loadedAccountRef.current = null
       setSettings(null)
       setSlots([])
       setLoadStatus('ready')
       return
     }
-    setLoadStatus('loading')
+    if (loadedAccountRef.current !== selectedAccountId) setLoadStatus('loading')
     setPreviewError(false)
     setSaveError(null)
 
@@ -102,6 +295,7 @@ function StoreShiftsView() {
       if (requestId !== requestRef.current) return
       if (!settingsResult.success) throw new Error(settingsResult.error)
       setSettings(settingsResult.data)
+      loadedAccountRef.current = selectedAccountId
       // 予約設定APIは {success,data:{resources}} を返す(撮影用APIも同じ器)。
       setResources(resourcesResult.data.resources)
       setLoadStatus('ready')
@@ -151,13 +345,14 @@ function StoreShiftsView() {
     })
     const hours = settings?.businessHours.find((entry) => entry.weekday === weekday)?.intervals ?? []
     let mark: PreviewMark = slotDates.has(item.date) ? '○' : '×'
-    if (exception?.kind === 'closed' || (!exception && hours.length === 0)) mark = '休'
+    if (exception?.kind === 'closed'
+      || (!exception && settings?.businessHoursConfigured && hours.length === 0)) mark = '休'
     return { ...item, mark }
   }), [dates, settings, slotDates, storeExceptions])
 
-  const closedWeekdays = DAYS.filter((day) => (
+  const closedWeekdays = settings?.businessHoursConfigured ? DAYS.filter((day) => (
     settings?.businessHours.find((entry) => entry.weekday === day.weekday)?.intervals.length === 0
-  )).map((day) => day.label)
+  )).map((day) => day.label) : []
 
   async function saveClosedDay() {
     if (!selectedAccountId || !closedFrom || !closedTo || closedFrom > closedTo) {
@@ -229,29 +424,16 @@ function StoreShiftsView() {
       ) : (
         <div data-design="Body" className="flex flex-col gap-4 xl:flex-row">
           <div className="min-w-0 flex-1 space-y-4">
-            <section data-design="Week" className="bg-canvas border-hairline overflow-hidden rounded-card border">
-              <div className="border-hairline border-b px-4 py-4">
-                <h2 className="text-ink font-semibold">開ける時間</h2>
-                <p className="text-ink-faint mt-1 text-xs">曜日ごとの受付時間と1時間に受けられる数を決めます。閉めた曜日は、お客様の画面に出ません。</p>
-              </div>
-              <div className="divide-hairline divide-y">
-                {DAYS.map((day) => {
-                  const intervals = settings.businessHours.find((item) => item.weekday === day.weekday)?.intervals ?? []
-                  const accepts = intervals.length > 0
-                  return (
-                    <div className="flex min-h-10 items-center gap-3 px-4 py-2 text-sm" key={day.weekday}>
-                      <strong className="w-24 shrink-0 whitespace-nowrap">{day.label}</strong>
-                      <span className="text-ink-secondary flex flex-wrap gap-x-4 gap-y-1">
-                        <span>{accepts ? '受け付ける' : '休み（定休日）'}</span>
-                        {accepts ? <span className="tabular-nums">{openHours(intervals)}</span> : null}
-                        {accepts ? <span className="tabular-nums">休けい {breakHours(intervals)}</span> : null}
-                        {accepts ? <span>{intervals[0]?.capacity ?? '—'}件／時</span> : null}
-                      </span>
-                    </div>
-                  )
-                })}
-              </div>
-            </section>
+            <BusinessHoursEditor
+              key={selectedAccountId}
+              accountId={selectedAccountId}
+              settings={settings}
+              onReload={() => setReloadKey((value) => value + 1)}
+              onSaved={(savedSettings) => {
+                setSettings(savedSettings)
+                setReloadKey((value) => value + 1)
+              }}
+            />
 
             <section id="special" data-design="Special" className="bg-canvas border-hairline rounded-card border p-4">
               <div className="flex flex-wrap items-start gap-3">
@@ -359,7 +541,9 @@ function StoreShiftsView() {
               <dl className="mt-3 space-y-3 text-xs leading-5">
                 <div>
                   <dt className="font-semibold">閉めている曜日</dt>
-                  <dd>{closedWeekdays.length > 0 ? closedWeekdays.join('・') : 'ありません'}</dd>
+                  <dd>{!settings.businessHoursConfigured
+                    ? '営業時間はまだ未設定です'
+                    : closedWeekdays.length > 0 ? closedWeekdays.join('・') : 'ありません'}</dd>
                 </div>
                 <div>
                   <dt className="font-semibold">直前の予約が多くて準備できない</dt>

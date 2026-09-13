@@ -173,6 +173,16 @@ supportInbox.get('/api/support/inbox', requireRole('owner', 'admin', 'staff'), a
   try {
     const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
     const channel = c.req.query('channel') || 'all';
+    const assignee = c.req.query('assignee');
+    const unreadOnly = c.req.query('unreadOnly') === '1' || c.req.query('unreadOnly') === 'true';
+    const quickFilter = c.req.query('quickFilter');
+    if (quickFilter && quickFilter !== 'reply' && quickFilter !== 'overdue') {
+      return c.json({ success: false, error: 'invalid_quick_filter' }, 400);
+    }
+    // These filters belong to the email list; LINE uses /api/chats.
+    if ((assignee || unreadOnly || quickFilter) && channel !== 'email') {
+      return c.json({ success: false, error: 'email_channel_required' }, 400);
+    }
     const status = c.req.query('status') || 'open';
     const query = (c.req.query('q') || '').trim();
     const selectedLineAccountId = (c.req.query('lineAccountId') || '').trim();
@@ -205,7 +215,25 @@ supportInbox.get('/api/support/inbox', requireRole('owner', 'admin', 'staff'), a
         const like = `%${query}%`;
         bindings.push(like, like, like);
       }
-      bindings.push(fetchLimit);
+      if (assignee) {
+        if (assignee === 'unassigned') searchSql += ' AND t.assigned_staff_id IS NULL';
+        else {
+          searchSql += ' AND t.assigned_staff_id = ?';
+          bindings.push(assignee);
+        }
+      }
+      if (unreadOnly) {
+        searchSql += ' AND (sr.last_read_at IS NULL OR t.last_incoming_at > sr.last_read_at)';
+      }
+      if (quickFilter) {
+        searchSql += " AND t.status = 'unread'";
+        if (quickFilter === 'overdue') {
+          searchSql += ' AND julianday(t.last_incoming_at) <= julianday(?)';
+          bindings.push(new Date(Date.now() - 60 * 60 * 1000).toISOString());
+        }
+      }
+      bindings.push(channel === 'email' ? limit : fetchLimit);
+      if (channel === 'email') bindings.push(offset);
       const emailRows = await c.env.DB.prepare(
         `SELECT t.id, t.customer_email, t.customer_name, t.subject, t.status, t.revision,
                 COUNT(*) OVER() AS total_count,
@@ -231,8 +259,8 @@ supportInbox.get('/api/support/inbox', requireRole('owner', 'admin', 'staff'), a
                     WHEN 'on_hold' THEN 2
                     ELSE 3
                   END,
-                  t.last_message_at DESC
-         LIMIT ?`,
+                  t.last_message_at DESC, t.id DESC
+         LIMIT ? ${channel === 'email' ? 'OFFSET ?' : ''}`,
       ).bind(...bindings).all<EmailThreadRow>();
       emailTotal = emailRows.results[0]?.total_count ?? 0;
       emailUnread = emailRows.results[0]?.unread_count ?? 0;
@@ -300,7 +328,7 @@ supportInbox.get('/api/support/inbox', requireRole('owner', 'admin', 'staff'), a
     return c.json({
       success: true,
       data: {
-        items: paginateSupportInboxItems(items, offset, limit),
+        items: channel === 'email' ? items : paginateSupportInboxItems(items, offset, limit),
         summary: {
           total: lineTotal + emailTotal,
           line: lineTotal,

@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 import {
   getDashboardOverview,
+  dashboardFreshness,
   recordFriendSnapshot,
   periodDays,
   periodStart,
@@ -89,6 +90,29 @@ describe('期間の解釈', () => {
     expect(periodStart('today')).toBe(jstDate(0));
     expect(periodStart('last7')).toBe(jstDate(-6));
     expect(periodStart('last28')).toBe(jstDate(-27));
+  });
+});
+
+describe('鮮度の判定', () => {
+  const now = Date.parse('2026-09-13T12:00:00.000Z');
+  const ago = (minutes: number) => new Date(now - minutes * 60_000).toISOString();
+
+  test('5分以内はfresh、15分以内はdelayed、1時間超はstale', () => {
+    expect(dashboardFreshness(ago(5), { now })).toBe('fresh');
+    expect(dashboardFreshness(ago(5.01), { now })).toBe('delayed');
+    expect(dashboardFreshness(ago(15), { now })).toBe('delayed');
+    expect(dashboardFreshness(ago(15.01), { now })).toBe('stale');
+    expect(dashboardFreshness(ago(60.01), { now })).toBe('stale');
+  });
+
+  test('5分周期のcheckは2周期を超えたらstale', () => {
+    expect(dashboardFreshness(ago(10), { now, checkIntervalMinutes: 5 })).toBe('delayed');
+    expect(dashboardFreshness(ago(10.01), { now, checkIntervalMinutes: 5 })).toBe('stale');
+  });
+
+  test('全取得失敗はunavailable、一部失敗はpartial', () => {
+    expect(dashboardFreshness(null, { now, failedSources: 1, totalSources: 1 })).toBe('unavailable');
+    expect(dashboardFreshness(ago(1), { now, failedSources: 1, totalSources: 2 })).toBe('partial');
   });
 });
 
@@ -253,6 +277,35 @@ describe('友だち数の推移', () => {
     expect(trend.find((d) => d.date === jstDate(0))?.active).toBe(2);
   });
 
+  test('古いsnapshotの更新時刻は再取得や期間切替で進まない', async () => {
+    insertAccount('account-a');
+    insertAccount('account-b');
+    const sourceAsOf = new Date(Date.now() - 2 * 60 * 60_000).toISOString();
+    sqlite.prepare(
+      `INSERT INTO friend_daily_snapshots
+        (date, line_account_id, active, total, blocked_by_them, hidden_by_us, added, blocked, updated_at)
+       VALUES (?, 'account-a', 3, 3, 0, 0, 1, 0, ?)`,
+    ).run(jstDate(0), sourceAsOf);
+    sqlite.prepare(
+      `INSERT INTO friend_daily_snapshots
+        (date, line_account_id, active, total, blocked_by_them, hidden_by_us, added, blocked, updated_at)
+       VALUES (?, 'account-b', 99, 99, 0, 0, 99, 0, ?)`,
+    ).run(jstDate(0), new Date().toISOString());
+
+    const today = await getDashboardOverview(db, 'today', {
+      allowedAccountIds: ['account-a'], includeUnassigned: false,
+    });
+    const last28 = await getDashboardOverview(db, 'last28', {
+      allowedAccountIds: ['account-a'], includeUnassigned: false,
+    });
+
+    expect(today.sections.trend.asOf).toBe(sourceAsOf);
+    expect(last28.sections.trend.asOf).toBe(sourceAsOf);
+    expect(today.sections.trend.asOf).not.toBe(today.generatedAt);
+    expect(today.sections.trend.status).toBe('stale');
+    expect(today.sections.trend.freshness).toBe('stale');
+  });
+
   test('日次記録は1回の上限まで進め、未記録の残りを次回に続ける', async () => {
     for (const id of ['account-a', 'account-b', 'account-c']) insertAccount(id);
 
@@ -408,6 +461,16 @@ describe('全体', () => {
     });
   });
 
+  test('直接集計の正常な0件は古い業務行の有無に関係なくfresh', async () => {
+    insertFriend('old', { createdAt: '2020-01-01T00:00:00.000+09:00' });
+    const overview = await getDashboardOverview(db, 'today', { allTenants: true });
+    expect(overview.conversions.total).toBe(0);
+    expect(overview.sections.conversions).toMatchObject({
+      status: 'empty', freshness: 'fresh', reason: null,
+    });
+    expect(overview.sections.conversions.asOf).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+  });
+
   test('友だち集計に失敗した場合は0件に見せずnullを返す', async () => {
     const healthyDb = asD1(sqlite);
     const failedFriendsDb = {
@@ -422,7 +485,7 @@ describe('全体', () => {
       },
     } as D1Database;
 
-    const { metrics, partialFailures } = await getDashboardOverview(
+    const { metrics, partialFailures, sections } = await getDashboardOverview(
       failedFriendsDb,
       'today',
       { allTenants: true },
@@ -431,7 +494,33 @@ describe('全体', () => {
     expect(metrics.activeFriends).toEqual({
       value: null, state: 'unavailable', reason: 'source_failed', asOf: null, period: 'latest',
     });
+    expect(sections.friends).toMatchObject({
+      status: 'unavailable', freshness: 'unavailable', asOf: null,
+    });
     expect(partialFailures).toContain('friends');
+  });
+
+  test('複数取得元の一部だけ失敗した区画はpartial', async () => {
+    const healthyDb = asD1(sqlite);
+    const failedMessagesDb = {
+      ...healthyDb,
+      prepare(query: string) {
+        if (query.includes('FROM messages_log')) {
+          return {
+            bind: () => ({ first: async () => { throw new Error('messages unavailable'); } }),
+          };
+        }
+        return healthyDb.prepare(query);
+      },
+    } as D1Database;
+
+    const overview = await getDashboardOverview(failedMessagesDb, 'today', { allTenants: true });
+
+    expect(overview.sections.delivery).toMatchObject({
+      status: 'partial', freshness: 'partial', reason: 'source_failed',
+    });
+    expect(overview.sections.delivery.asOf).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    expect(overview.partialFailures).toContain('delivery');
   });
 });
 

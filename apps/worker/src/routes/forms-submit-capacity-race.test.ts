@@ -149,6 +149,10 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+// GitHub Actions runs this real-file, two-connection race test alongside the
+// full Worker suite. Keep the assertions strict while allowing CI I/O load.
+const CONCURRENCY_TEST_TIMEOUT_MS = 15_000;
+
 describe('N-167: 全体上限は同時回答でも超えない(実DB・2接続)', () => {
   test('totalLimit.max=1 のフォームへ、別々の友だちが同時に送っても1件しか保存されない', async () => {
     const { primary, env1, env2, cleanup } = twoConnections(`
@@ -182,7 +186,7 @@ describe('N-167: 全体上限は同時回答でも超えない(実DB・2接続)'
     } finally {
       cleanup();
     }
-  });
+  }, CONCURRENCY_TEST_TIMEOUT_MS);
 });
 
 describe('N-167: 選択肢の定員は同時回答でも超えない(実DB・2接続)', () => {
@@ -217,7 +221,7 @@ describe('N-167: 選択肢の定員は同時回答でも超えない(実DB・2�
     } finally {
       cleanup();
     }
-  });
+  }, CONCURRENCY_TEST_TIMEOUT_MS);
 
   test('同じ回答が全体上限と選択肢定員を両方要求し、片方だけ空きが無い場合はどちらの枠も残らない', async () => {
     const layout = JSON.stringify({
@@ -264,5 +268,5 @@ describe('N-167: 選択肢の定員は同時回答でも超えない(実DB・2�
     } finally {
       cleanup();
     }
-  });
+  }, CONCURRENCY_TEST_TIMEOUT_MS);
 });

@@ -3111,6 +3111,10 @@ export type DashboardOverview = {
   period: 'today' | 'last7' | 'last28'
   /** 集計した時刻。カードごとの基準がずれていないことの手がかり。 */
   generatedAt: string
+  /** 取得に成功した元データのうち最も古い時刻。 */
+  asOf?: string | null
+  /** 元データの鮮度。段階配備中の旧Workerでは未返却。 */
+  freshness?: 'fresh' | 'delayed' | 'stale' | 'unavailable' | 'partial'
   friends: {
     active: number
     total: number
@@ -3154,8 +3158,10 @@ export type DashboardOverview = {
   sections?: Record<
     'friends' | 'inbox' | 'delivery' | 'quota' | 'trend' | 'conversions' | 'operations',
     {
-      status: 'ok' | 'empty' | 'unavailable' | 'stale' | 'estimated'
-      asOf: string
+      status: 'ok' | 'empty' | 'unavailable' | 'stale' | 'estimated' | 'partial'
+      asOf: string | null
+      freshness?: 'fresh' | 'delayed' | 'stale' | 'unavailable' | 'partial'
+      reason?: 'source_failed' | 'fetch_failed' | 'not_connected' | 'not_loaded' | 'not_applicable' | null
       period: 'today' | 'last7' | 'last28' | 'latest' | 'last7-fixed' | 'this-month'
     }
   >
@@ -7933,13 +7939,15 @@ export const api = {
     installRichMenu: (accountId: string) => fetchApi<ApiResponse<{ richMenuId: string; liffId: string }>>('/api/nen-members/rich-menu/install', { method: 'POST', body: JSON.stringify({ accountId }) }),
   },
   chats: {
-    list: (params?: { status?: string; operatorId?: string; accountId?: string; q?: string; unansweredOnly?: boolean; limit?: number; beforeAt?: string; beforeId?: string }) => {
+    list: (params?: { status?: string; operatorId?: string; accountId?: string; q?: string; unansweredOnly?: boolean; unreadOnly?: boolean; quickFilter?: 'reply' | 'overdue'; limit?: number; beforeAt?: string; beforeId?: string }) => {
       const query: Record<string, string> = {}
       if (params?.status) query.status = params.status
       if (params?.operatorId) query.operatorId = params.operatorId
       if (params?.accountId) query.lineAccountId = params.accountId
       if (params?.q) query.q = params.q
       if (params?.unansweredOnly) query.unansweredOnly = '1'
+      if (params?.unreadOnly) query.unreadOnly = '1'
+      if (params?.quickFilter) query.quickFilter = params.quickFilter
       if (params?.limit !== undefined) query.limit = String(params.limit)
       // カーソルページング: (lastMessageAt, friendId) の複合カーソルより古い行を返す
       if (params?.beforeAt) query.beforeAt = params.beforeAt
@@ -9482,6 +9490,7 @@ export interface BookingSettings {
   menuCount: number;
   activeMenuCount: number;
   inactiveMenuCount: number;
+  businessHoursConfigured: boolean;
   businessHours: Array<{
     weekday: number;
     intervals: Array<{ start: string; end: string; capacity?: number }>;
@@ -9500,7 +9509,10 @@ export type SaveBookingSettings = Pick<
   | 'approvalMode'
   | 'holdMinutes'
   | 'slotGranularityMinutes'
-> & { expectedVersion: number };
+> & {
+  expectedVersion: number;
+  businessHours?: BookingSettings['businessHours'];
+};
 
 export interface BookingStaff {
   id: string;

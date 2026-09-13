@@ -22,6 +22,10 @@ const capacityMigration = readFileSync(
   join(import.meta.dirname, '..', 'migrations', '326_booking_capacity_and_menu_resources.sql'),
   'utf8',
 );
+const businessHoursConfiguredMigration = readFileSync(
+  join(import.meta.dirname, '..', 'migrations', '391_booking_business_hours_configured.sql'),
+  'utf8',
+);
 
 describe('migration 323 店舗共通の予約設定', () => {
   let sqlite: Database.Database;
@@ -69,6 +73,7 @@ describe('migration 323 店舗共通の予約設定', () => {
     `);
     sqlite.exec(migration);
     sqlite.exec(capacityMigration);
+    sqlite.exec(businessHoursConfiguredMigration);
     sqlite.exec(`
       INSERT INTO booking_business_hours
         (id, booking_settings_id, weekday, start_time, end_time)
@@ -95,6 +100,10 @@ describe('migration 323 店舗共通の予約設定', () => {
       approval_mode: 'automatic',
       version: 1,
     });
+    expect(sqlite.prepare(`SELECT business_hours_configured FROM booking_settings
+      WHERE line_account_id = 'account-a'`).get()).toEqual({ business_hours_configured: 0 });
+    expect(() => sqlite.prepare(`UPDATE booking_settings SET business_hours_configured = 2
+      WHERE line_account_id = 'account-a'`).run()).toThrow(/CHECK/);
     expect(sqlite.prepare(`SELECT price_mode, version FROM menus WHERE id = 'menu-a'`).get())
       .toEqual({ price_mode: 'fixed', version: 1 });
     expect(() => sqlite.prepare(`UPDATE menus SET price_mode = 'inquiry' WHERE id = 'menu-a'`).run())
@@ -124,6 +133,7 @@ describe('migration 323 店舗共通の予約設定', () => {
       menuCount: 2,
       activeMenuCount: 1,
       inactiveMenuCount: 1,
+      businessHoursConfigured: false,
       businessHours: expect.arrayContaining([{
         weekday: 1,
         intervals: [
@@ -173,6 +183,120 @@ describe('migration 323 店舗共通の予約設定', () => {
     })).resolves.toEqual({ status: 'not_found' });
     expect(sqlite.prepare(`SELECT COUNT(*) AS count FROM booking_settings`).get())
       .toEqual({ count: 2 });
+  });
+
+  it('行が無い実在店舗へ営業時間を初回作成し、明示設定済みにする', async () => {
+    sqlite.prepare(`DELETE FROM booking_settings WHERE line_account_id = 'account-b'`).run();
+    const result = await saveBookingAdminSettings(db, {
+      lineAccountId: 'account-b',
+      expectedVersion: 0,
+      timeZone: 'Asia/Tokyo',
+      bookingWindowDays: 60,
+      cutoffMinutesBefore: 1440,
+      cancelDeadlineMinutesBefore: 1440,
+      maxActiveBookingsPerFriend: 1,
+      approvalMode: 'automatic',
+      holdMinutes: 15,
+      slotGranularityMinutes: 15,
+      businessHours: [
+        { weekday: 0, intervals: [] },
+        { weekday: 1, intervals: [{ start: '10:00', end: '18:00', capacity: 2 }] },
+        { weekday: 2, intervals: [] },
+        { weekday: 3, intervals: [] },
+        { weekday: 4, intervals: [] },
+        { weekday: 5, intervals: [] },
+        { weekday: 6, intervals: [] },
+      ],
+    });
+    expect(result).toMatchObject({
+      status: 'created',
+      item: {
+        lineAccountId: 'account-b', version: 1, businessHoursConfigured: true,
+        businessHours: expect.arrayContaining([{
+          weekday: 1, intervals: [{ start: '10:00', end: '18:00', capacity: 2 }],
+        }]),
+      },
+    });
+    expect(sqlite.prepare(`SELECT COUNT(*) AS count FROM booking_business_hours bh
+      JOIN booking_settings bs ON bs.id = bh.booking_settings_id
+      WHERE bs.line_account_id = 'account-b'`).get()).toEqual({ count: 1 });
+  });
+
+  it('週全体を版付きで置換し、古い版では営業時間を一切変えない', async () => {
+    sqlite.prepare(`INSERT INTO booking_business_hours
+      (id, booking_settings_id, weekday, start_time, end_time, capacity)
+      VALUES ('hours-b', 'booking-settings-account-b', 2, '11:00', '17:00', 4)`).run();
+    const base = {
+      lineAccountId: 'account-a',
+      expectedVersion: 1,
+      timeZone: 'Asia/Tokyo',
+      bookingWindowDays: 60,
+      cutoffMinutesBefore: 1440,
+      cancelDeadlineMinutesBefore: 1440,
+      maxActiveBookingsPerFriend: 1,
+      approvalMode: 'automatic' as const,
+      holdMinutes: 15,
+      slotGranularityMinutes: 15 as const,
+      businessHours: [
+        { weekday: 0, intervals: [] },
+        { weekday: 1, intervals: [{ start: '10:00', end: '18:00', capacity: 3 }] },
+        { weekday: 2, intervals: [] },
+        { weekday: 3, intervals: [] },
+        { weekday: 4, intervals: [] },
+        { weekday: 5, intervals: [] },
+        { weekday: 6, intervals: [] },
+      ],
+    };
+    await expect(saveBookingAdminSettings(db, base)).resolves.toMatchObject({
+      status: 'updated',
+      item: { version: 2, businessHoursConfigured: true },
+    });
+    expect(sqlite.prepare(`SELECT weekday, start_time, end_time, capacity
+      FROM booking_business_hours WHERE booking_settings_id = 'booking-settings-account-a'`).all())
+      .toEqual([{ weekday: 1, start_time: '10:00', end_time: '18:00', capacity: 3 }]);
+
+    await expect(saveBookingAdminSettings(db, {
+      ...base,
+      businessHours: base.businessHours.map((day) => day.weekday === 1
+        ? { weekday: 1, intervals: [{ start: '08:00', end: '20:00', capacity: 9 }] }
+        : day),
+    })).resolves.toEqual({ status: 'conflict', currentVersion: 2 });
+    expect(sqlite.prepare(`SELECT start_time, end_time, capacity
+      FROM booking_business_hours WHERE booking_settings_id = 'booking-settings-account-a'`).all())
+      .toEqual([{ start_time: '10:00', end_time: '18:00', capacity: 3 }]);
+    expect(sqlite.prepare(`SELECT weekday, start_time, end_time, capacity
+      FROM booking_business_hours WHERE booking_settings_id = 'booking-settings-account-b'`).all())
+      .toEqual([{ weekday: 2, start_time: '11:00', end_time: '17:00', capacity: 4 }]);
+    expect(sqlite.prepare(`SELECT version FROM booking_settings
+      WHERE line_account_id = 'account-b'`).get()).toEqual({ version: 1 });
+  });
+
+  it('営業時間batchの途中で制約違反なら削除とversion増加をrollbackする', async () => {
+    await expect(saveBookingAdminSettings(db, {
+      lineAccountId: 'account-a',
+      expectedVersion: 1,
+      timeZone: 'Asia/Tokyo',
+      bookingWindowDays: 60,
+      cutoffMinutesBefore: 1440,
+      cancelDeadlineMinutesBefore: 1440,
+      maxActiveBookingsPerFriend: 1,
+      approvalMode: 'automatic',
+      holdMinutes: 15,
+      slotGranularityMinutes: 15,
+      businessHours: [{
+        weekday: 1,
+        intervals: [{ start: '10:00', end: '18:00', capacity: 0 }],
+      }],
+    })).rejects.toThrow(/CHECK/);
+    expect(sqlite.prepare(`SELECT start_time, end_time FROM booking_business_hours
+      WHERE booking_settings_id = 'booking-settings-account-a' ORDER BY start_time`).all())
+      .toEqual([
+        { start_time: '09:00', end_time: '12:00' },
+        { start_time: '13:00', end_time: '19:00' },
+      ]);
+    expect(sqlite.prepare(`SELECT version, business_hours_configured FROM booking_settings
+      WHERE line_account_id = 'account-a'`).get())
+      .toEqual({ version: 1, business_hours_configured: 0 });
   });
 
   it('休業・短縮・臨時営業を対象別に保存し、古い版と別店舗を拒否する', async () => {

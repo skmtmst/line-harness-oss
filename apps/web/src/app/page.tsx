@@ -11,6 +11,7 @@ import PendingInboxCard, { type PendingInboxSummary } from '@/components/support
 import ShipmentPanel, { type ShipmentSummary } from '@/components/dashboard/shipment-panel'
 import QrDialog from '@/components/dashboard/qr-dialog'
 import FriendTrendTable from '@/components/dashboard/friend-trend-table'
+import DashboardFreshness from '@/components/dashboard/freshness'
 import {
   FriendStatusCard,
   SupportMarkStatusCard,
@@ -218,6 +219,7 @@ function FriendAddLinkCard({
 function FriendTrendCard({ data, loading }: { data: DashboardOverview | null; loading: boolean }) {
   const metric = data?.metrics?.friendTrend
   const trend = metric === undefined ? data?.trend ?? [] : metric.value ?? []
+  const section = data?.sections?.trend
   return (
     <Card overflow="hidden">
       <CardHeader
@@ -227,6 +229,11 @@ function FriendTrendCard({ data, loading }: { data: DashboardOverview | null; lo
         actionTone="info"
       />
       <FriendTrendTable trend={trend} loading={loading} />
+      {section ? (
+        <div className="border-hairline flex justify-end border-t px-5 py-2.5">
+          <DashboardFreshness freshness={section.freshness} asOf={section.asOf} reason={section.reason} />
+        </div>
+      ) : null}
     </Card>
   )
 }
@@ -245,12 +252,20 @@ function EmptyDataCard({ title, href, linkLabel }: { title: string; href: string
   )
 }
 
-function UnavailableDataCard({ title, onRetry }: { title: string; onRetry: () => void }) {
+function UnavailableDataCard({ title, onRetry, section }: {
+  title: string
+  onRetry: () => void
+  section?: NonNullable<DashboardOverview['sections']>[keyof NonNullable<DashboardOverview['sections']>]
+}) {
+  const partial = section?.status === 'partial'
   return (
     <Card overflow="hidden">
       <CardHeader size="roomy" title={title} />
       <div className="px-5 py-7 text-center">
-        <p className="text-ink-faint text-sm">データを取得できませんでした。</p>
+        <p className="text-ink-faint text-sm">{partial ? '一部のデータを取得できませんでした。' : 'データを取得できませんでした。'}</p>
+        <div className="mt-1 flex justify-center">
+          <DashboardFreshness freshness={section?.freshness} asOf={section?.asOf} reason={section?.reason} />
+        </div>
         <button type="button" onClick={onRetry} className="text-action mt-2 text-xs font-medium hover:underline">もう一度読み込む</button>
       </div>
     </Card>
@@ -258,9 +273,10 @@ function UnavailableDataCard({ title, onRetry }: { title: string; onRetry: () =>
 }
 
 function LiveDataCard({
-  title, href, linkLabel, value, unit = '件', detail,
+  title, href, linkLabel, value, unit = '件', detail, freshness,
 }: {
   title: string; href: string; linkLabel: string; value: number | null; unit?: string; detail: string
+  freshness?: NonNullable<DashboardOverview['sections']>[keyof NonNullable<DashboardOverview['sections']>]
 }) {
   return (
     <Card padding="roomy">
@@ -271,7 +287,10 @@ function LiveDataCard({
       <p className="text-ink mt-4 text-2xl font-bold tabular-nums">
         {value === null ? '—' : value.toLocaleString('ja-JP')}<span className="ml-1 text-sm font-medium">{unit}</span>
       </p>
-      <p className="text-ink-faint mt-2 truncate text-xs" title={detail}>{detail}</p>
+      <div className="mt-2 flex items-end justify-between gap-3">
+        <p className="text-ink-faint min-w-0 truncate text-xs" title={detail}>{detail}</p>
+        <DashboardFreshness freshness={freshness?.freshness} asOf={freshness?.asOf} reason={freshness?.reason} />
+      </div>
     </Card>
   )
 }
@@ -684,6 +703,7 @@ export default function DashboardPage() {
   const displayedTwoFactor = reference?.twoFactor ?? twoFactorSummary
   const sectionAvailable = (section: keyof NonNullable<DashboardOverview['sections']>) =>
     data?.sections?.[section]?.status !== 'unavailable'
+      && data?.sections?.[section]?.status !== 'partial'
   const activeFriends = data?.metrics === undefined
     ? sectionAvailable('friends') ? data?.friends.active ?? null : null
     : data.metrics.activeFriends.value
@@ -696,7 +716,7 @@ export default function DashboardPage() {
   const renderMainCard = (id: DashboardCardId): ReactNode => {
     if (id === 'pending-inbox') return <PendingInboxCard onSummaryChange={setInboxSummary} />
     if (id === 'friend-trend') return data && !sectionAvailable('trend')
-      ? <UnavailableDataCard title="友だち数の推移" onRetry={() => void load()} />
+      ? <UnavailableDataCard title="友だち数の推移" section={data.sections?.trend} onRetry={() => void load()} />
       : <FriendTrendCard data={data} loading={loading} />
     if (id === 'friend-add') return <FriendAddLinkCard
       officialProfileUrl={data?.metrics === undefined ? undefined : data.metrics.officialProfileUrl.value}
@@ -704,11 +724,11 @@ export default function DashboardPage() {
     />
     if (id === 'scenario-status') {
       const scenarios = sectionAvailable('operations') ? data?.operations?.scenarios : undefined
-      return <LiveDataCard title="シナリオ配信状況" href="/scenarios" linkLabel="シナリオを見る" value={scenarios?.active ?? null} detail={scenarios ? `一時停止 ${scenarios.paused}件` : data ? '取得できません' : '読み込み中'} />
+      return <LiveDataCard title="シナリオ配信状況" href="/scenarios" linkLabel="シナリオを見る" value={scenarios?.active ?? null} detail={scenarios ? `一時停止 ${scenarios.paused}件` : data ? '取得できません' : '読み込み中'} freshness={data?.sections?.operations} />
     }
     if (id === 'uid-migration') {
       const migrations = sectionAvailable('operations') ? data?.operations?.migrations : undefined
-      return <LiveDataCard title="UID移行状況" href="/health" linkLabel="移行状況を見る" value={migrations?.active ?? null} detail={migrations ? `完了 ${migrations.completed}件` : data ? '取得できません' : '読み込み中'} />
+      return <LiveDataCard title="UID移行状況" href="/health" linkLabel="移行状況を見る" value={migrations?.active ?? null} detail={migrations ? `完了 ${migrations.completed}件` : data ? '取得できません' : '読み込み中'} freshness={data?.sections?.operations} />
     }
     return null
   }
@@ -740,25 +760,25 @@ export default function DashboardPage() {
     if (id === 'connection-status') return <ConnectionStatusCard account={selectedAccount} risk={displayedHealthRisk} activeFriends={activeFriends} />
     if (id === 'upcoming') return <UpcomingCard bookings={displayedBookings} loading={supplementLoading} />
     if (id === 'monthly-delivery') return data && !sectionAvailable('delivery')
-      ? <UnavailableDataCard title="今月の配信" onRetry={() => void load()} />
+      ? <UnavailableDataCard title="今月の配信" section={data.sections?.delivery} onRetry={() => void load()} />
       : data ? <MonthlyDeliveryCard delivery={data.delivery} /> : <EmptyDataCard title="今月の配信" href="/analytics" linkLabel="アクセス解析へ" />
     if (id === 'recent-results') return data && !sectionAvailable('conversions')
-      ? <UnavailableDataCard title="最近の成果" onRetry={() => void load()} />
+      ? <UnavailableDataCard title="最近の成果" section={data.sections?.conversions} onRetry={() => void load()} />
       : data ? <RecentResultsCard conversions={data.conversions} /> : <EmptyDataCard title="最近の成果" href="/conversions" linkLabel="成果を見る" />
     if (id === 'support-mark-status') return <SupportMarkStatusCard inbox={sectionAvailable('inbox') ? (data && reference?.supportInbox ? { ...data.inbox, ...reference.supportInbox } : data?.inbox ?? null) : null} autoOnInbound={supportMarkAutoOnInbound} />
     if (id === 'friend-status') return data && !sectionAvailable('friends')
-      ? <UnavailableDataCard title="友だちの状態" onRetry={() => void load()} />
+      ? <UnavailableDataCard title="友だちの状態" section={data.sections?.friends} onRetry={() => void load()} />
       : data ? <FriendStatusCard friends={data.friends} /> : <EmptyDataCard title="友だちの状態" href="/friends" linkLabel="友だちを見る" />
     if (id === 'booking-status') {
       const bookingsStatus = sectionAvailable('operations') ? data?.operations?.bookings : undefined
-      return <LiveDataCard title="予約状況" href="/booking/bookings" linkLabel="予約を見る" value={bookingsStatus?.upcoming ?? null} detail={bookingsStatus ? `承認待ち ${bookingsStatus.pending}件` : data ? '取得できません' : '読み込み中'} />
+      return <LiveDataCard title="予約状況" href="/booking/bookings" linkLabel="予約を見る" value={bookingsStatus?.upcoming ?? null} detail={bookingsStatus ? `承認待ち ${bookingsStatus.pending}件` : data ? '取得できません' : '読み込み中'} freshness={data?.sections?.operations} />
     }
     if (id === 'inflow-top') {
       const inflowTop = sectionAvailable('operations') ? data?.operations?.inflowTop : undefined
-      return <LiveDataCard title="流入経路TOP3" href="/inflow-links" linkLabel="流入経路を見る" value={inflowTop?.[0]?.count ?? (inflowTop ? 0 : null)} detail={inflowTop ? inflowTop.map((item) => `${item.name} ${item.count}`).join('、') || '期間内の追加なし' : data ? '取得できません' : '読み込み中'} />
+      return <LiveDataCard title="流入経路TOP3" href="/inflow-links" linkLabel="流入経路を見る" value={inflowTop?.[0]?.count ?? (inflowTop ? 0 : null)} detail={inflowTop ? inflowTop.map((item) => `${item.name} ${item.count}`).join('、') || '期間内の追加なし' : data ? '取得できません' : '読み込み中'} freshness={data?.sections?.operations} />
     }
-    if (id === 'funnel-alert') return <LiveDataCard title="ファネル要注意" href="/analytics" linkLabel="分析を見る" value={sectionAvailable('operations') ? data?.operations?.funnelAlerts ?? null : null} detail="3人以上追加・成果0件の経路" />
-    if (id === 'automation-failures') return <LiveDataCard title="オートメーション失敗" href="/automations" linkLabel="実行状況を見る" value={sectionAvailable('operations') ? data?.operations?.automationFailures ?? null : null} detail="期間内の失敗・一部失敗" />
+    if (id === 'funnel-alert') return <LiveDataCard title="ファネル要注意" href="/analytics" linkLabel="分析を見る" value={sectionAvailable('operations') ? data?.operations?.funnelAlerts ?? null : null} detail="3人以上追加・成果0件の経路" freshness={data?.sections?.operations} />
+    if (id === 'automation-failures') return <LiveDataCard title="オートメーション失敗" href="/automations" linkLabel="実行状況を見る" value={sectionAvailable('operations') ? data?.operations?.automationFailures ?? null : null} detail="期間内の失敗・一部失敗" freshness={data?.sections?.operations} />
     return null
   }
 
@@ -780,6 +800,7 @@ export default function DashboardPage() {
           <EditIcon />ダッシュボード編集
         </Button>
         <div className="flex flex-wrap items-center justify-end gap-2.5">
+          <DashboardFreshness freshness={data?.freshness} asOf={data?.asOf} />
           <span className={`${healthClass} inline-flex items-center gap-1.5 text-xs font-medium`}><span className="h-2 w-2 rounded-full bg-current" />{healthLabel}</span>
           <div className="flex gap-2">
             {PERIODS.map((item) => (
