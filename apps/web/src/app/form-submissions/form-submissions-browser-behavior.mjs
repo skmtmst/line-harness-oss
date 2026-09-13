@@ -448,7 +448,7 @@ try {
     )
 
     await nameInput.fill('わたしが直した名前')
-    await page.getByRole('button', { name: 'フォームを保存' }).click()
+    await page.getByRole('button', { name: '下書きを保存' }).click()
 
     const conflictButton = page.getByRole('button', { name: '最新の内容を読み込む（入力中の内容は消えます）' })
     await conflictButton.waitFor({ timeout: 15_000 })
@@ -586,7 +586,7 @@ try {
     // 直接URLで開くと1件取得が走らずフォーム名が空のままなので、保存の
     // 前提条件だけ満たす（#725 の対象外。上の但し書きを参照）。
     await page.locator('#fm-name').fill('ごはんの相談')
-    await page.getByRole('button', { name: 'フォームを保存' }).click()
+    await page.getByRole('button', { name: '下書きを保存' }).click()
     for (let i = 0; i < 100 && state.formWrites.length === 0; i += 1) await page.waitForTimeout(50)
     assert.equal(state.formWrites.length, 1, '保存が1回だけ飛ぶ')
     assert.equal(state.formWrites[0].ogTitle, 'ごはんの相談フォーム', '打った見出しが保存へ乗る')
