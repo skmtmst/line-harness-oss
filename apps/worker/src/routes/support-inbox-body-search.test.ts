@@ -133,6 +133,15 @@ describe('N-017 メール本文検索（実SQLite・実Honoルート）', () => 
     expect((await items({ q: '件名キー' })).items.map((item) => item.threadId)).toEqual(['by-subject']);
   });
 
+  test('明示statusと本文検索をANDし、status用placeholderを検索bindより先に渡す', async () => {
+    seedThread('status-and-body-match', { status: 'in_progress', bodies: ['needle'] });
+    seedThread('wrong-status', { status: 'unread', bodies: ['needle'] });
+    seedThread('wrong-body', { status: 'in_progress', bodies: ['通常本文'] });
+
+    const result = await items({ status: 'in_progress', q: 'needle' });
+    expect(result.items.map((item) => item.threadId)).toEqual(['status-and-body-match']);
+  });
+
   test('本文検索をstatus・担当・閲覧者別未読・1時間超過とLIMIT前にANDする', async () => {
     seedThread('match-all', { ageMs: 2 * 3600_000, bodies: ['needle'], assignee: 'target' });
     seedThread('wrong-assignee', { ageMs: 2 * 3600_000, bodies: ['needle'], assignee: 'other' });
