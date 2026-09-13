@@ -256,6 +256,31 @@ describe('非JST店舗の予約作成 HTTP E2E（実DB・America/New_York）', (
       Array<{ id: string; starts_at: string; status: string }>;
   }
 
+  function adminTransition(bookingId: string, action: 'approve' | 'reject' | 'cancel') {
+    return app.request(
+      `/api/booking/admin/requests/${bookingId}?account_id=account-ny`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({ action }),
+        headers: { 'Content-Type': 'application/json' },
+      },
+      env,
+      execCtx,
+    );
+  }
+
+  function resourceSnapshot(bookingId: string) {
+    return sqlite.prepare(`SELECT booking_id,resource_id,quantity,snapshot_source
+      FROM booking_resource_consumptions WHERE booking_id=? ORDER BY resource_id`).all(bookingId);
+  }
+
+  function activeResourceUsage(resourceId: string) {
+    return sqlite.prepare(`SELECT COALESCE(SUM(brc.quantity),0) AS quantity
+      FROM booking_resource_consumptions brc
+      INNER JOIN bookings b ON b.id=brc.booking_id
+      WHERE brc.resource_id=? AND b.status IN ('requested','confirmed')`).get(resourceId);
+  }
+
   function storeCapacity(capacity: number, start = '09:00', end = '23:00') {
     sqlite.prepare(`INSERT INTO booking_business_hours (id,booking_settings_id,weekday,start_time,end_time,capacity)
       VALUES (?,'settings-ny',1,?,?,?)`).run(`hours-${start}`, start, end, capacity);
@@ -383,6 +408,76 @@ describe('非JST店舗の予約作成 HTTP E2E（実DB・America/New_York）', (
       staff_id: 'staff-other',
     })).status).toBe(201);
     expect(bookingRows()).toHaveLength(2);
+  });
+
+  test('管理HTTPの取消・二重取消はsnapshotを変えず、資源だけ再利用可能にする', async () => {
+    resourceCapacity(1);
+    stubExternal();
+    expect((await adminCreate(NY_NOV2_1000, 'resource-http-cancel')).status).toBe(201);
+    const bookingId = bookingRows()[0].id;
+    const before = resourceSnapshot(bookingId);
+    expect(before).toEqual([{
+      booking_id: bookingId,
+      resource_id: 'room-shared',
+      quantity: 1,
+      snapshot_source: 'booking',
+    }]);
+    expect(activeResourceUsage('room-shared')).toEqual({ quantity: 1 });
+
+    const cancelled = await adminTransition(bookingId, 'cancel');
+    expect(cancelled.status).toBe(200);
+    await expect(cancelled.json()).resolves.toEqual({ status: 'cancelled' });
+    expect(resourceSnapshot(bookingId)).toEqual(before);
+    expect(activeResourceUsage('room-shared')).toEqual({ quantity: 0 });
+
+    const retried = await adminTransition(bookingId, 'cancel');
+    expect(retried.status).toBe(200);
+    await expect(retried.json()).resolves.toEqual({ status: 'cancelled' });
+    expect(resourceSnapshot(bookingId)).toEqual(before);
+    expect(activeResourceUsage('room-shared')).toEqual({ quantity: 0 });
+
+    expect((await adminCreate(NY_NOV2_1000, 'resource-http-after-cancel', {
+      staff_id: 'staff-other',
+    })).status).toBe(201);
+  });
+
+  test('管理HTTPの却下はsnapshotを変えず、資源だけ再利用可能にする', async () => {
+    resourceCapacity(1);
+    stubExternal();
+    expect((await liffCreate(NY_NOV2_1000, 'resource-http-reject')).status).toBe(201);
+    const bookingId = bookingRows()[0].id;
+    const before = resourceSnapshot(bookingId);
+    expect(activeResourceUsage('room-shared')).toEqual({ quantity: 1 });
+
+    const rejected = await adminTransition(bookingId, 'reject');
+    expect(rejected.status).toBe(200);
+    await expect(rejected.json()).resolves.toEqual({ status: 'rejected' });
+    expect(resourceSnapshot(bookingId)).toEqual(before);
+    expect(activeResourceUsage('room-shared')).toEqual({ quantity: 0 });
+
+    expect((await adminCreate(NY_NOV2_1000, 'resource-http-after-reject', {
+      staff_id: 'staff-other',
+    })).status).toBe(201);
+  });
+
+  test('管理HTTPの承認はsnapshotを増減せず、同じ資源の二重予約を防ぐ', async () => {
+    resourceCapacity(1);
+    stubExternal();
+    expect((await liffCreate(NY_NOV2_1000, 'resource-http-approve')).status).toBe(201);
+    const bookingId = bookingRows()[0].id;
+    const before = resourceSnapshot(bookingId);
+    expect(activeResourceUsage('room-shared')).toEqual({ quantity: 1 });
+
+    const approved = await adminTransition(bookingId, 'approve');
+    expect(approved.status).toBe(200);
+    await expect(approved.json()).resolves.toEqual({ status: 'confirmed' });
+    expect(resourceSnapshot(bookingId)).toEqual(before);
+    expect(activeResourceUsage('room-shared')).toEqual({ quantity: 1 });
+
+    expect((await adminCreate(NY_NOV2_1000, 'resource-http-after-approve', {
+      staff_id: 'staff-other',
+    })).status).toBe(409);
+    expect(resourceSnapshot(bookingId)).toEqual(before);
   });
 
   test.each(['liff', 'admin'])('営業時間snapshot後に閉店しても旧条件で予約を作らない (%s)', async (mode) => {
