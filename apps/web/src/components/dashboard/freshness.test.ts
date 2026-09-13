@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
+import { createElement } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
 
-import { dashboardFreshnessText, formatDashboardAsOf } from './freshness'
+import DashboardFreshness, { dashboardFreshnessText, formatDashboardAsOf } from './freshness'
 
 describe('ダッシュボードの更新時刻と鮮度表示(#759)', () => {
   it('取得元の時刻を日本時間の「更新 HH:MM」で表示する', () => {
@@ -35,5 +37,19 @@ describe('ダッシュボードの更新時刻と鮮度表示(#759)', () => {
   it('Z・offset付き時刻は指定された絶対時刻を維持する', () => {
     expect(formatDashboardAsOf('2026-09-13T03:04:00.000Z')).toBe('12:04')
     expect(formatDashboardAsOf('2026-09-13T03:04:00+07:00')).toBe('05:04')
+  })
+
+  it.each([
+    ['fresh', 'text-ink-faint'],
+    ['delayed', 'text-warning'],
+    ['stale', 'text-warning'],
+    ['partial', 'text-warning'],
+    ['unavailable', 'text-danger'],
+  ] as const)('%sの表示色を静的Tailwind classで維持する', (freshness, className) => {
+    const html = renderToStaticMarkup(createElement(DashboardFreshness, {
+      freshness,
+      asOf: freshness === 'unavailable' ? null : '2026-09-13T03:04:00.000Z',
+    }))
+    expect(html).toContain(`class="${className} shrink-0 text-xs font-medium"`)
   })
 })

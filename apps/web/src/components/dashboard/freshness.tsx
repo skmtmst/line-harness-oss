@@ -56,13 +56,12 @@ export default function DashboardFreshness({
   reason?: Reason
 }) {
   if (!freshness) return null
-  const tone = freshness === 'unavailable'
-    ? 'text-danger'
-    : freshness === 'partial' || freshness === 'stale' || freshness === 'delayed'
-      ? 'text-warning'
-      : 'text-ink-faint'
   return (
-    <span className={`${tone} shrink-0 text-xs font-medium`}>
+    <span className={freshness === 'unavailable'
+      ? 'text-danger shrink-0 text-xs font-medium'
+      : freshness === 'partial' || freshness === 'stale' || freshness === 'delayed'
+        ? 'text-warning shrink-0 text-xs font-medium'
+        : 'text-ink-faint shrink-0 text-xs font-medium'}>
       {dashboardFreshnessText(freshness, asOf, reason)}
     </span>
   )
