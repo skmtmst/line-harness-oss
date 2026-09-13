@@ -116,6 +116,7 @@ function FormEditInner() {
    * 保存成功のときだけ**入れ替える。
    */
   const [contentRevision, setContentRevision] = useState<number | null>(null)
+  const [publishedVersionId, setPublishedVersionId] = useState<string | null>(null)
   /**
    * ほかの人が先に保存していたとき（409）。
    *
@@ -192,6 +193,7 @@ function FormEditInner() {
     setOgImageUrl(loaded.ogImageUrl)
     setLayoutState(nextLayout)
     setContentRevision(res.data.contentRevision)
+    setPublishedVersionId(res.data.publishedVersionId)
     setConflict(null)
     // 未保存のままタブ移動したときの確認に使う。読み直しが基準。
     savedSnapshot.current = JSON.stringify(loaded)
@@ -439,7 +441,7 @@ function FormEditInner() {
     }
   }
 
-  const save = async (): Promise<boolean> => {
+  const save = async (publishAfter = false): Promise<boolean> => {
     if (!selectedAccountId) {
       setError('LINE公式アカウントを選んでください')
       return false
@@ -490,7 +492,8 @@ function FormEditInner() {
         description: description.trim() || null,
         layout,
         onSubmitTagId: onSubmitTagId || null,
-        isActive,
+        // 未公開の下書きは publish API が成功するまで受付中にしない。
+        isActive: publishedVersionId ? isActive : false,
         ogTitle: ogTitle.trim() || null,
         ogDescription: ogDescription.trim() || null,
         ogImageUrl: ogImageUrl.trim() || null,
@@ -504,8 +507,26 @@ function FormEditInner() {
       // 自分の1回目と衝突する。
       setContentRevision(res.data.contentRevision)
       setConflict(null)
-      setNotice('保存しました')
-      savedSnapshot.current = currentSnapshot
+      if (publishAfter) {
+        const published = await api.forms.publish(id, selectedAccountId, res.data.contentRevision)
+        if (!published.success) {
+          setError(published.error)
+          return false
+        }
+        setPublishedVersionId(published.data.id)
+        setIsActive(true)
+        setNotice(published.data.replayed ? 'この版は公開済みです' : 'この版を公開しました')
+      } else {
+        setNotice(publishedVersionId ? '下書きを保存しました。公開中の内容は変わっていません' : '下書きを保存しました')
+      }
+      if (publishAfter) {
+        savedSnapshot.current = JSON.stringify({
+            name, description, isActive: true, onSubmitTagId,
+            ogTitle, ogDescription, ogImageUrl, layout,
+          })
+      } else {
+        savedSnapshot.current = currentSnapshot
+      }
       return true
     } catch (e) {
       /*
@@ -902,13 +923,23 @@ function FormEditInner() {
 
       <StickyBar
         actions={(
-          <button
-            onClick={save}
-            disabled={saving}
-            className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-4 py-2 text-sm font-medium transition-colors disabled:opacity-40"
-          >
-            {saving ? '保存中...' : editorTab === 'design' ? 'デザインを保存' : 'フォームを保存'}
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => void save(false)}
+              disabled={saving}
+              title="フォームを保存（公開中の内容は変わりません）"
+              className="border-hairline text-ink bg-canvas hover:bg-canvas-sunken rounded-control border px-4 py-2 text-sm font-medium transition-colors disabled:opacity-40"
+            >
+              {saving ? '保存中...' : '下書きを保存'}
+            </button>
+            <button
+              onClick={() => void save(true)}
+              disabled={saving}
+              className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-4 py-2 text-sm font-medium transition-colors disabled:opacity-40"
+            >
+              {saving ? '処理中...' : 'この版を公開'}
+            </button>
+          </div>
         )}
       />
 

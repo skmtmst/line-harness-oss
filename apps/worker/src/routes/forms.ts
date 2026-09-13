@@ -10,6 +10,7 @@ import {
   formBelongsToLineAccount,
   createForm,
   updateForm,
+  publishFormVersion,
   type UpdateFormInput,
   archiveFormAtRevision,
   deleteFormAtRevision,
@@ -254,6 +255,8 @@ function serializeForm(
     archivedAt: row.archived_at,
     revision: row.revision,
     contentRevision: row.content_revision,
+    publishedVersionId: row.current_published_version_id,
+    publishedContentRevision: row.published_content_revision ?? null,
     submitCount: row.submit_count,
     ogTitle: row.og_title,
     ogDescription: row.og_description,
@@ -336,6 +339,7 @@ function serializeSubmission(row: DbFormSubmission & { friend_name?: string | nu
   return {
     id: row.id,
     formId: row.form_id,
+    formVersionId: row.form_version_id,
     friendId: row.friend_id,
     friendName: row.friend_name || null,
     data: JSON.parse(row.data || '{}') as Record<string, unknown>,
@@ -517,20 +521,69 @@ forms.get('/api/forms', requireRole('owner', 'admin', 'staff'), async (c) => {
 forms.get('/api/forms/:id', async (c) => {
   try {
     const id = c.req.param('id');
-    const form = await getFormById(c.env.DB, id);
+    const staff = c.get('staff');
+    // ログイン中の運用者が公開URLを開いても、account_id を明示した管理画面取得で
+    // ない限り下書きを漏らさない。
+    const adminView = Boolean(staff && c.req.query('account_id'));
+    const form = await getFormById(c.env.DB, id, { published: !adminView });
     if (!form) {
       return c.json({ success: false, error: 'Form not found' }, 404);
     }
-    const staff = c.get('staff');
-    if (staff && !await canUseFormFromAccount(c, id, c.req.query('account_id'))) {
+    if (adminView && !await canUseFormFromAccount(c, id, c.req.query('account_id'))) {
       return c.json({ success: false, error: 'Form not found' }, 404);
     }
-    const data = staff
+    const data = adminView
       ? serializeForm(form, undefined, { redactSecrets: staff.role === 'staff' })
       : serializePublicForm(form);
     return c.json({ success: true, data });
   } catch (err) {
     console.error('GET /api/forms/:id error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+// POST /api/forms/:id/publish — 保存済みの編集内容を不変版にして公開する。
+forms.post('/api/forms/:id/publish', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const id = c.req.param('id');
+    if (!await canUseFormFromAccount(c, id, c.req.query('account_id'))) {
+      return c.json({ success: false, error: 'Form not found' }, 404);
+    }
+    const body = await c.req.json<{ expectedContentRevision?: unknown }>()
+      .catch(() => ({} as { expectedContentRevision?: unknown }));
+    const expected = typeof body.expectedContentRevision === 'number'
+      ? body.expectedContentRevision
+      : Number.NaN;
+    if (!Number.isInteger(expected) || expected < 1) {
+      return c.json({ success: false, error: '確認した版が必要です' }, 400);
+    }
+    const result = await publishFormVersion(c.env.DB, id, expected);
+    if (result.kind === 'not_found') {
+      return c.json({ success: false, error: 'Form not found' }, 404);
+    }
+    if (result.kind === 'conflict') {
+      return c.json({
+        success: false,
+        error: 'form_content_changed',
+        message: 'ほかの人が先に保存しました。最新の内容を読み込んでから、もう一度お試しください。',
+        data: {
+          contentRevision: result.form.content_revision,
+          updatedAt: result.form.updated_at,
+        },
+      }, 409);
+    }
+    return c.json({
+      success: true,
+      data: {
+        id: result.version.id,
+        versionNumber: result.version.version_number,
+        contentRevision: result.form.content_revision,
+        publishedAt: result.version.published_at,
+        replayed: result.replayed,
+      },
+    });
+  } catch (err) {
+    console.error('POST /api/forms/:id/publish error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -935,7 +988,7 @@ forms.post('/api/forms/:id/opened', async (c) => {
      * 表示を邪魔しないため。**すぐ下の「関係のない公式アカウント」も同じ形**
      * ——記録せずに 200 を返す。
      */
-    const openedForm = await getFormById(c.env.DB, formId);
+    const openedForm = await getFormById(c.env.DB, formId, { published: true });
     if (!openedForm) {
       return c.json({ success: false, error: 'Form not found' }, 404);
     }
@@ -1000,7 +1053,7 @@ forms.post('/api/forms/:id/partial', async (c) => {
       return c.json({ success: false, error: 'Friend not found' }, 404);
     }
 
-    const form = await getFormById(c.env.DB, c.req.param('id'));
+    const form = await getFormById(c.env.DB, c.req.param('id'), { published: true });
     if (!form) {
       return c.json({ success: false, error: 'Form not found' }, 404);
     }
@@ -1067,7 +1120,7 @@ forms.post('/api/forms/:id/partial', async (c) => {
 forms.post('/api/forms/:id/files', async (c) => {
   try {
     const formId = c.req.param('id');
-    const form = await getFormById(c.env.DB, formId);
+    const form = await getFormById(c.env.DB, formId, { published: true });
     if (!form) {
       return c.json({ success: false, error: 'Form not found' }, 404);
     }
@@ -1151,7 +1204,7 @@ forms.post('/api/forms/:id/files', async (c) => {
 forms.get('/api/forms/:id/my-latest', async (c) => {
   try {
     const formId = c.req.param('id');
-    const form = await getFormById(c.env.DB, formId);
+    const form = await getFormById(c.env.DB, formId, { published: true });
     if (!form) {
       return c.json({ success: false, error: 'Form not found' }, 404);
     }
@@ -1213,7 +1266,7 @@ forms.post('/api/forms/:id/submit', async (c) => {
     if (!FORM_IDEMPOTENCY_KEY_PATTERN.test(idempotencyKey)) {
       return c.json({ success: false, error: 'Idempotency-Key must be a UUID' }, 400);
     }
-    const form = await getFormById(c.env.DB, formId);
+    const form = await getFormById(c.env.DB, formId, { published: true });
     if (!form) {
       return c.json({ success: false, error: 'Form not found' }, 404);
     }
@@ -1539,6 +1592,7 @@ forms.post('/api/forms/:id/submit', async (c) => {
             await insertFormSubmissionRecord(c.env.DB, {
               id: ctx.submissionId,
               formId,
+              formVersionId: form.current_published_version_id,
               friendId,
               data,
             });

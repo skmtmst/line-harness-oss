@@ -5020,6 +5020,10 @@ export const api = {
            * されていた。型に無いものは、来ていないことに誰も気づけない。
            */
           contentRevision: number
+          /** お客さまに出している不変版。null は未公開。 */
+          publishedVersionId: string | null
+          /** 現在公開版の元になった編集版。 */
+          publishedContentRevision: number | null
         }>
       >(`/api/forms/${id}?account_id=${encodeURIComponent(accountId)}`),
     create: (
@@ -5064,6 +5068,17 @@ export const api = {
         `/api/forms/${id}?account_id=${encodeURIComponent(accountId)}`,
         { method: 'PUT', body: JSON.stringify(data) },
       ),
+    publish: (id: string, accountId: string, expectedContentRevision: number) =>
+      fetchApi<ApiResponse<{
+        id: string
+        versionNumber: number
+        contentRevision: number
+        publishedAt: string
+        replayed: boolean
+      }>>(`/api/forms/${id}/publish?account_id=${encodeURIComponent(accountId)}`, {
+        method: 'POST',
+        body: JSON.stringify({ expectedContentRevision }),
+      }),
     deleteImpact: (id: string, accountId: string) =>
       fetchApi<ApiResponse<FormDeleteImpact>>(
         `/api/forms/${id}/delete-impact?account_id=${encodeURIComponent(accountId)}`,
