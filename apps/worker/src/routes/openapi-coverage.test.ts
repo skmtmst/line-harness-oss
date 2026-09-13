@@ -25,8 +25,8 @@ import { routeClassification } from '../middleware/feature-enforcement.js';
  *
  * 運用: 新しい route を足したら OpenAPI（openapi.ts）へ記載する。
  * ALLOWLIST への追加は原則禁止。新 route は OpenAPI 記載が必要。
- * 後続票で記載を増やしたら ALLOWLIST から消し、DOCUMENTED_MIN・
- * ALLOWLIST_MAX・BASELINE_DOCUMENTED の基準値も同じ PR で更新する。
+ * 後続票で記載を増やしたら ALLOWLIST から消し、ALLOWLIST_MAX と
+ * BASELINE_DOCUMENTED の基準も同じ PR で更新する。
  * version は repo の package.json と一致させる（自動取得ではなく検査で同期）。
  * request/response の中身までは見ない。本文の parity は順次対応。
  */
@@ -116,24 +116,16 @@ function formatKeys(keys: string[]): string {
  * 追加は原則禁止。新 route は openapi.ts へ記載する。
  * 後続票で記載済みにした分はここから消す（残っているとテストが落とす）。
  */
-/**
- * 網羅率の後退防止ゲートの基準値（PR #1456 時点の実測＋#1446 の予約3口）。
- * - DOCUMENTED_MIN: 記載済み operation 数はここ未満へ減らせない
- * - ALLOWLIST_MAX: 未記載負債はここより増やせない
- * 後続票で記載を増やしたら、実測に合わせて両方を同じ PR で更新する。
- */
-// 本流の95件に、#19 の統括バナー生成17口、#20〜#21 の6口、#22 の課金5口、#23 の認証7口、#754 の予約設定2口を足して132件。
-const DOCUMENTED_MIN = 132;
+/** 未記載負債はこの件数より増やせない。 */
 const ALLOWLIST_MAX = 776;
 
 /**
- * PR #1456 時点の記載済み 83 件＋本流で増えた 5 件＋#655 休憩 4 件
- * ＋#663 の運用者通知 2 口＋#19 の統括バナー生成17口
- * ＋#20〜#21 の統括バナー統計・問い合わせ・メンバー管理6口
- * ＋#22 の統括課金5口の基準一覧。
- * 既存仕様を ALLOWLIST へ移して後退させる変更を落とすためのもの。
- * 件数が変わらなくても、ここにある1件が消えたら落ちる。
- * 後続票で記載を増やしたら、増えた分をここへ足す。
+ * 記載済み operation の完全な基準一覧。
+ *
+ * 件数の下限もこの Set の size から導く。別の数値定数を置くと、OpenAPI を
+ * 増やしたときに片方だけ更新され、後退を見逃すため。既存仕様を ALLOWLIST
+ * へ移した場合も、新しい記載をここへ足し忘れた場合もテストで落とす。
+ * 後続票で記載を増やしたら、同じ PR でここへ追加する。
  */
 const BASELINE_DOCUMENTED = new Set<string>([
   'DELETE /api/affiliates/{id}',
@@ -141,6 +133,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'DELETE /api/conversions/points/{id}',
   'DELETE /api/friends/{id}/tags/{tagId}',
   'DELETE /api/hq/banners/images/{id}',
+  'DELETE /api/hq/templates/{id}',
   'DELETE /api/line-accounts/{id}',
   'DELETE /api/mileage/rules/{id}',
   'DELETE /api/reminders/{id}/steps/{stepId}',
@@ -181,8 +174,14 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'GET /api/hq/billing/summary',
   'GET /api/hq/support/kinds',
   'GET /api/hq/support/requests',
+  'GET /api/hq/templates',
+  'GET /api/hq/templates/accounts',
+  'GET /api/hq/templates/{id}',
+  'GET /api/hq/templates/{id}/distributions/{runId}',
   'GET /api/line-accounts',
   'GET /api/line-accounts/{id}',
+  'GET /api/media/{id}/content',
+  'GET /api/media/{id}/download',
   'GET /api/mileage/redemptions',
   'GET /api/mileage/rules',
   'GET /api/nen-campaigns/deliveries',
@@ -209,6 +208,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'GET /api/users/{id}/accounts',
   'PATCH /api/hq/banners/images/{id}',
   'PATCH /api/hq/banners/projects/{id}',
+  'PATCH /api/hq/templates/{id}',
   'PATCH /api/line-accounts/{id}',
   'PATCH /api/line-accounts/order',
   'PATCH /api/tags/{id}',
@@ -220,12 +220,16 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'POST /api/auth/register/complete',
   'POST /api/auth/register/request',
   'POST /api/broadcasts',
+  'POST /api/broadcasts/{id}/resume',
+  'POST /api/broadcasts/{id}/retry-failed',
   'POST /api/broadcasts/{id}/send',
+  'POST /api/broadcasts/{id}/stop',
   'POST /api/broadcasts/dedup-preview',
   'POST /api/conversions/definitions/{id}/revise',
   'POST /api/conversions/points',
   'POST /api/conversions/track',
   'POST /api/friends/{id}/tags',
+  'POST /api/forms/{id}/publish',
   'POST /api/hq/banners/generations/{id}/cancel',
   'POST /api/hq/banners/generations/{id}/run',
   'POST /api/hq/banners/images/{id}/deliver',
@@ -237,7 +241,15 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'POST /api/hq/billing/portal',
   'POST /api/hq/billing/webhook',
   'POST /api/hq/support/requests',
+  'POST /api/hq/templates',
+  'POST /api/hq/templates/media',
+  'POST /api/hq/templates/{id}/distribute',
+  'POST /api/hq/templates/{id}/preflight',
+  'POST /api/integrations/ai-loop/reports',
+  'POST /api/liff/events/waitlist/{token}/accept',
   'POST /api/line-accounts',
+  'POST /api/line-accounts/connect',
+  'POST /api/line-accounts/connect/check',
   'POST /api/mileage/rules',
   'POST /api/nen-campaigns/deliveries/{id}/retry',
   'POST /api/notifications/operator-outbox/sweep',
@@ -248,9 +260,11 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'POST /api/scenarios/{id}/steps',
   'POST /api/settings/features/impact',
   'POST /api/staff/{id}/resend-invite',
+  'POST /api/staff/{id}/resend-invitation',
   'POST /api/tags',
   'POST /api/tags/import',
   'POST /api/tags/import/preview',
+  'POST /api/templates/{id}/publish',
   'POST /api/rich-menu-groups/{groupId}/schedule',
   'GET /api/rich-menu-groups/{groupId}/schedules',
   'POST /api/rich-menu-groups/{groupId}/schedules/{scheduleId}/cancel',
@@ -1250,13 +1264,13 @@ describe('OpenAPIと公開APIの同期', () => {
     ).toEqual([]);
   });
 
-  test('記載済みoperation数は88以上（後退禁止）', async () => {
+  test('記載済みoperation数は基準一覧の件数以上（後退禁止）', async () => {
     const spec = await loadSpec();
     const count = documentedKeys(spec).size;
     expect(
-      count >= DOCUMENTED_MIN,
-      `記載済みが ${count} 件で基準 ${DOCUMENTED_MIN} 件を下回っています。` +
-        '既存仕様を消す・ALLOWLISTへ移す変更は禁止です。後続票で記載を増やした場合は基準値を同じPRで更新してください。',
+      count >= BASELINE_DOCUMENTED.size,
+      `記載済みが ${count} 件で基準 ${BASELINE_DOCUMENTED.size} 件を下回っています。` +
+        '既存仕様を消す・ALLOWLISTへ移す変更は禁止です。後続票で記載を増やした場合は基準一覧を同じPRで更新してください。',
     ).toBe(true);
   });
 
@@ -1268,15 +1282,17 @@ describe('OpenAPIと公開APIの同期', () => {
     ).toBe(true);
   });
 
-  test('基準の記載88件が残っている（allowlistへの移し替え検出）', async () => {
+  test('基準一覧と記載済みoperationが一致する（移し替え・更新漏れ検出）', async () => {
     const spec = await loadSpec();
     const documented = documentedKeys(spec);
     const lost = [...BASELINE_DOCUMENTED].filter((key) => !documented.has(key)).sort();
+    const untracked = [...documented.keys()].filter((key) => !BASELINE_DOCUMENTED.has(key)).sort();
     expect(
-      lost,
-      `基準の記載 ${BASELINE_DOCUMENTED.size} 件のうち ${lost.length} 件が消えています:\n${formatKeys(lost)}\n` +
-        '既存仕様をALLOWLISTへ移す変更は禁止です。routeが本当に消えた場合は基準一覧も同じPRで更新してください。',
-    ).toEqual([]);
+      { lost, untracked },
+      `基準から消えた記載が ${lost.length} 件、基準へ未登録の記載が ${untracked.length} 件あります。\n` +
+        `消えた記載:\n${formatKeys(lost)}\n未登録の記載:\n${formatKeys(untracked)}\n` +
+        'OpenAPIと基準一覧は同じPRで更新してください。',
+    ).toEqual({ lost: [], untracked: [] });
   });
 
   test('path parameterは名前まで実装と一致して宣言されている', async () => {
