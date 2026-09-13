@@ -68,6 +68,8 @@ const UNAUTHENTICATED_PATTERNS: Array<string | RegExp> = [
   // サイトスクリプトの受け口。認証が無く、外のサイトから直接叩かれる。
   '/api/site/collect',
   '/api/qr',
+  // 会員登録・メールログイン・パスワード再設定。認証前に叩かれる入口なので低い上限にする。
+  /^\/api\/auth\/(register|password)\//,
 ];
 
 function isUnauthenticatedPath(path: string): boolean {

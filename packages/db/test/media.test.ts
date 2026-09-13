@@ -1,7 +1,36 @@
 import { describe, expect, it, vi } from 'vitest'
-import { countMedia, getMedia } from '../src/media.js'
+import { countMedia, createMedia, getMedia } from '../src/media.js'
 
 describe('登録メディア一覧', () => {
+  it('統括所有のメディアも版履歴を作り、NULLの所有範囲から取得する', async () => {
+    const prepared: Array<{ sql: string; values: unknown[] }> = []
+    const first = vi.fn().mockResolvedValue({ id: 'media-hq', line_account_id: null })
+    const prepare = vi.fn((sql: string) => ({
+      bind: vi.fn((...values: unknown[]) => {
+        prepared.push({ sql, values })
+        return sql.startsWith('SELECT') ? { first } : { sql, values }
+      }),
+    }))
+    const batch = vi.fn().mockResolvedValue([])
+    const db = { prepare, batch } as unknown as D1Database
+
+    const media = await createMedia(db, {
+      kind: 'image',
+      lineAccountId: null,
+      filename: '統括バナー.png',
+      mimeType: 'image/png',
+      sizeBytes: 123,
+      r2Key: 'hq/banner.png',
+    })
+
+    expect(batch).toHaveBeenCalledWith(expect.any(Array))
+    expect(prepared.some(({ sql }) => sql.includes('INSERT INTO media_versions'))).toBe(true)
+    const lookup = prepared.find(({ sql }) => sql.startsWith('SELECT'))
+    expect(lookup?.sql).toContain('line_account_id IS NULL')
+    expect(lookup?.values).toHaveLength(1)
+    expect(media.line_account_id).toBeNull()
+  })
+
   it('使用先件数を同じ問い合わせで取得する', async () => {
     const all = vi.fn().mockResolvedValue({
       results: [

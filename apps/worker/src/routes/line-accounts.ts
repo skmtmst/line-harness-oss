@@ -45,6 +45,11 @@ import { copyLineAccountSettings, normalizeCopyItems } from '../services/account
 import { IDENTITY_KEY_SQL } from '../lib/identity-key.js';
 import { fetchLineMonthlyPlan } from '../services/line-monthly-plan.js';
 import { fetchWebhookEndpointState } from '../services/line-webhook-state.js';
+import {
+  lineConnectStep,
+  prepareLineConnection,
+  type LineConnectStep,
+} from '../services/line-account-connect.js';
 import type { Env } from '../index.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 
@@ -920,6 +925,196 @@ async function checkUniqueLoginAndLiff(
   }
   return null;
 }
+
+type ConnectBody = {
+  name?: unknown;
+  channelId?: unknown;
+  channelSecret?: unknown;
+  loginChannelId?: unknown;
+  loginChannelSecret?: unknown;
+};
+
+function readConnectBody(body: ConnectBody):
+  | { ok: true; value: { name: string; channelId: string; channelSecret: string; loginChannelId: string; loginChannelSecret: string } }
+  | { ok: false; error: string } {
+  const name = typeof body.name === 'string' ? body.name.trim() : '';
+  const channelId = typeof body.channelId === 'string' ? body.channelId.trim() : '';
+  const channelSecret = typeof body.channelSecret === 'string' ? body.channelSecret.trim() : '';
+  const loginChannelId = typeof body.loginChannelId === 'string' ? body.loginChannelId.trim() : '';
+  const loginChannelSecret = typeof body.loginChannelSecret === 'string' ? body.loginChannelSecret.trim() : '';
+  if (name.length > 40) return { ok: false, error: '表示名は40文字以内で入力してください' };
+  if (!/^\d+$/.test(channelId)) return { ok: false, error: 'Messaging APIのチャネルIDは半角数字で入力してください' };
+  if (!channelSecret) return { ok: false, error: 'Messaging APIのチャネルシークレットを入力してください' };
+  if (!/^\d+$/.test(loginChannelId)) return { ok: false, error: 'LINE LoginのチャネルIDは半角数字で入力してください' };
+  if (!loginChannelSecret) return { ok: false, error: 'LINE Loginのチャネルシークレットを入力してください' };
+  return { ok: true, value: { name, channelId, channelSecret, loginChannelId, loginChannelSecret } };
+}
+
+async function readConnectRequest(c: Context<Env>) {
+  try {
+    return readConnectBody(await c.req.json<ConnectBody>());
+  } catch {
+    return { ok: false as const, error: 'request body must be valid JSON' };
+  }
+}
+
+async function probeFollowerCapability(channelAccessToken: string): Promise<'available' | 'unavailable' | 'unknown'> {
+  try {
+    await new LineClient(channelAccessToken).getFollowerIds(1);
+    return 'available';
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return /LINE API error:\s*403/i.test(message) ? 'unavailable' : 'unknown';
+  }
+}
+
+function publicConnectData(
+  prepared: Awaited<ReturnType<typeof prepareLineConnection>>,
+  steps: LineConnectStep[],
+  followerImport: { capability: 'unknown' | 'available' | 'unavailable'; phase: string },
+  id?: string,
+) {
+  return {
+    steps,
+    id,
+    displayName: prepared.bot?.displayName,
+    pictureUrl: prepared.bot?.pictureUrl ?? null,
+    basicId: prepared.bot?.basicId ?? null,
+    liffId: prepared.liffId,
+    followerImport,
+    remainingActions: prepared.bot?.chatMode === 'chat' ? ['LINE Official Account Managerでチャットをオフにしてください'] : [],
+  };
+}
+
+// UI用の自動接続確認。LINE側のWebhook・LIFFは設定するが、musuboのDBには書き込まない。
+lineAccounts.post('/api/line-accounts/connect/check', requireRole('owner'), async (c) => {
+  const parsed = await readConnectRequest(c);
+  if (!parsed.ok) return c.json({ success: false, error: parsed.error }, 422);
+  const baseUrl = (c.env.WORKER_PUBLIC_URL || c.env.WORKER_URL || new URL(c.req.url).origin).replace(/\/$/, '');
+  const prepared = await prepareLineConnection({ ...parsed.value, baseUrl });
+  if (!prepared.success || !prepared.channelAccessToken) {
+    return c.json({
+      success: true,
+      data: publicConnectData(prepared, prepared.steps, { capability: 'unknown', phase: 'not_started' }),
+    });
+  }
+  const capability = await probeFollowerCapability(prepared.channelAccessToken);
+  const finalStep = capability === 'unknown'
+    ? lineConnectStep(5, 'failed', '認証状態を確認できませんでした。時間をおいて、もう一度お試しください。')
+    : lineConnectStep(5, 'passed');
+  return c.json({
+    success: true,
+    data: publicConnectData(
+      prepared,
+      [...prepared.steps.slice(0, 4), finalStep],
+      { capability, phase: 'not_started' },
+    ),
+  });
+});
+
+// UI用の自動接続・保存。5段目が完了しなければ作成途中の行を必ず巻き戻す。
+lineAccounts.post('/api/line-accounts/connect', requireRole('owner'), async (c) => {
+  const parsed = await readConnectRequest(c);
+  if (!parsed.ok) return c.json({ success: false, error: parsed.error }, 422);
+  const baseUrl = (c.env.WORKER_PUBLIC_URL || c.env.WORKER_URL || new URL(c.req.url).origin).replace(/\/$/, '');
+  const prepared = await prepareLineConnection({ ...parsed.value, baseUrl });
+  if (!prepared.success || !prepared.channelAccessToken || !prepared.bot || !prepared.liffId) {
+    return c.json({
+      success: false,
+      error: prepared.steps.find((item) => item.state === 'failed')?.message ?? '接続設定を完了できませんでした',
+      data: publicConnectData(prepared, prepared.steps, { capability: 'unknown', phase: 'not_started' }),
+    }, 400);
+  }
+
+  const duplicate = await checkUniqueLoginAndLiff(c.env.DB, {
+    loginChannelId: parsed.value.loginChannelId,
+    liffId: prepared.liffId,
+  }, null);
+  if (duplicate) return c.json({ success: false, error: duplicate }, 409);
+
+  let account: DbLineAccount | null = null;
+  try {
+    account = await createLineAccount(c.env.DB, {
+      channelId: parsed.value.channelId,
+      name: parsed.value.name || prepared.bot.displayName,
+      channelAccessToken: prepared.channelAccessToken,
+      channelSecret: parsed.value.channelSecret,
+      loginChannelId: parsed.value.loginChannelId,
+      loginChannelSecret: parsed.value.loginChannelSecret,
+      liffId: prepared.liffId,
+      timezone: 'Asia/Tokyo',
+      tenantId: c.get('staff').tenantId ?? DEFAULT_TENANT_ID,
+    }, c.env.LINE_CREDENTIAL_ENCRYPTION_KEY);
+    if (prepared.bot.pictureUrl) {
+      await updateLineAccountFields(c.env.DB, account.id, { iconUrl: prepared.bot.pictureUrl });
+    }
+
+    const followerState = await detectFollowerImportCapability(
+      c.env.DB,
+      new LineClient(prepared.channelAccessToken) as unknown as FollowerImportClient,
+      account.id,
+    );
+    if (followerState.capability === 'unknown') {
+      throw new Error('FOLLOWER_CAPABILITY_UNKNOWN');
+    }
+    const started = followerState.capability === 'available'
+      ? await startFollowerImport(c.env.DB, account.id)
+      : followerState;
+
+    await saveLineAccountConnectionChecks(c.env.DB, {
+      lineAccountId: account.id,
+      expectedRevision: account.revision ?? 1,
+      checkedBy: c.get('staff').id,
+      checkedAt: jstNow(),
+      correlationId: crypto.randomUUID(),
+      idempotencyKey: `auto-connect-${crypto.randomUUID()}`,
+      checks: [
+        { kind: 'bot_info', result: 'ok', httpStatus: 200 },
+        {
+          kind: 'webhook_endpoint',
+          result: prepared.webhook.registeredUrl === prepared.webhook.expectedUrl ? 'matched' : 'mismatched',
+          expectedUrl: prepared.webhook.expectedUrl,
+          registeredUrl: prepared.webhook.registeredUrl,
+          webhookActive: prepared.webhook.active,
+          httpStatus: 200,
+        },
+        { kind: 'webhook_test', result: prepared.webhook.testPassed ? 'ok' : 'failed', httpStatus: 200 },
+        {
+          kind: 'liff_config',
+          result: 'matched',
+          expectedUrl: `${baseUrl}?liffId=${encodeURIComponent(prepared.liffId)}`,
+          registeredUrl: `${baseUrl}?liffId=${encodeURIComponent(prepared.liffId)}`,
+          httpStatus: 200,
+        },
+      ],
+    });
+
+    const steps = [...prepared.steps.slice(0, 4), lineConnectStep(5, 'passed')];
+    return c.json({
+      success: true,
+      data: publicConnectData(prepared, steps, {
+        capability: started.capability,
+        phase: started.phase,
+      }, account.id),
+    }, 201);
+  } catch (error) {
+    if (account) await deleteUncommittedLineAccount(c.env.DB, account.id);
+    if (error instanceof CredentialEncryptionKeyError) {
+      return c.json({ success: false, error: 'LINE資格情報の暗号鍵が未設定です' }, 503);
+    }
+    const message = error instanceof Error ? error.message : String(error);
+    const duplicateChannel = /UNIQUE constraint failed/i.test(message);
+    return c.json({
+      success: false,
+      error: duplicateChannel ? 'channelId already registered' : '認証状態を確認できなかったため、アカウントは保存していません',
+      data: publicConnectData(
+        prepared,
+        [...prepared.steps.slice(0, 4), lineConnectStep(5, 'failed', '認証状態を確認できませんでした。時間をおいて、もう一度お試しください。')],
+        { capability: 'unknown', phase: 'not_started' },
+      ),
+    }, duplicateChannel ? 409 : 502);
+  }
+});
 
 // POST /api/line-accounts - create
 lineAccounts.post('/api/line-accounts', requireRole('owner'), async (c) => {

@@ -24,6 +24,10 @@ export interface Form {
   revision: number;
   /** 編集の版(#723 / migration 379)。updateForm だけが増やす。 */
   content_revision: number;
+  /** お客さまへ出している不変版。NULL は一度も公開していない下書き。 */
+  current_published_version_id: string | null;
+  /** 管理画面の取得時だけ入る、現在公開版の元になった編集版。 */
+  published_content_revision?: number | null;
   submit_count: number;
   og_title: string | null;
   og_description: string | null;
@@ -36,6 +40,7 @@ export interface FormSubmission {
   id: string;
   form_id: string;
   friend_id: string | null;
+  form_version_id: string | null;
   data: string; // JSON string
   destination_write_status: FormDestinationWriteStatus;
   destination_write_attempted: number | null;
@@ -206,12 +211,146 @@ export async function attachFormAccounts(
 export async function getFormById(
   db: D1Database,
   id: string,
-  options: { includeArchived?: boolean } = {},
+  options: { includeArchived?: boolean; published?: boolean } = {},
 ): Promise<Form | null> {
+  if (options.published) {
+    return db
+      .prepare(
+        `SELECT f.id,
+                v.name, v.description, v.fields, v.layout,
+                v.on_submit_tag_id, v.on_submit_scenario_id,
+                v.on_submit_message_type, v.on_submit_message_content,
+                v.on_submit_webhook_url, v.on_submit_webhook_headers,
+                v.on_submit_webhook_fail_message, v.save_to_metadata,
+                f.is_active, f.status, f.archived_at, f.revision,
+                f.content_revision, f.current_published_version_id,
+                v.source_content_revision AS published_content_revision,
+                f.submit_count, v.og_title, v.og_description, v.og_image_url,
+                f.created_at, v.published_at AS updated_at
+           FROM forms f
+           JOIN form_versions v
+             ON v.id = f.current_published_version_id AND v.form_id = f.id
+          WHERE f.id = ? AND f.status = 'active'`,
+      )
+      .bind(id)
+      .first<Form>();
+  }
   return db
-    .prepare(`SELECT * FROM forms WHERE id = ?${options.includeArchived ? '' : " AND status = 'active'"}`)
+    .prepare(
+      `SELECT f.*,
+              (SELECT source_content_revision FROM form_versions v
+                WHERE v.id = f.current_published_version_id AND v.form_id = f.id)
+                AS published_content_revision
+         FROM forms f
+        WHERE f.id = ?${options.includeArchived ? '' : " AND f.status = 'active'"}`,
+    )
     .bind(id)
     .first<Form>();
+}
+
+export interface PublishedFormVersion {
+  id: string;
+  form_id: string;
+  version_number: number;
+  source_content_revision: number;
+  published_at: string;
+}
+
+export type PublishFormVersionResult =
+  | { kind: 'published'; version: PublishedFormVersion; replayed: boolean; form: Form }
+  | { kind: 'not_found' }
+  | { kind: 'conflict'; form: Form };
+
+/** 編集中の1行を不変版へ写し、回答URLの参照先を原子的に切り替える。 */
+export async function publishFormVersion(
+  db: D1Database,
+  id: string,
+  expectedContentRevision: number,
+): Promise<PublishFormVersionResult> {
+  const existing = await getFormById(db, id);
+  if (!existing) return { kind: 'not_found' };
+
+  const current = existing.current_published_version_id
+    ? await db.prepare(
+        `SELECT id, form_id, version_number, source_content_revision, published_at
+           FROM form_versions WHERE id = ? AND form_id = ?`,
+      ).bind(existing.current_published_version_id, id).first<PublishedFormVersion>()
+    : null;
+  if (current?.source_content_revision === expectedContentRevision) {
+    if (!existing.is_active) {
+      await db.prepare(
+        `UPDATE forms SET is_active = 1, revision = revision + 1, updated_at = ?
+          WHERE id = ? AND current_published_version_id = ?`,
+      ).bind(jstNow(), id, current.id).run();
+    }
+    return {
+      kind: 'published', version: current, replayed: true,
+      form: (await getFormById(db, id))!,
+    };
+  }
+  if (existing.content_revision !== expectedContentRevision) {
+    return { kind: 'conflict', form: existing };
+  }
+
+  const versionId = crypto.randomUUID();
+  const now = jstNow();
+  const results = await db.batch([
+    db.prepare(
+      `INSERT OR IGNORE INTO form_versions (
+         id, form_id, version_number, source_content_revision,
+         name, description, fields, layout,
+         on_submit_tag_id, on_submit_scenario_id,
+         on_submit_message_type, on_submit_message_content,
+         on_submit_webhook_url, on_submit_webhook_headers, on_submit_webhook_fail_message,
+         save_to_metadata, og_title, og_description, og_image_url,
+         status, published_at, created_at
+       )
+       SELECT ?, f.id,
+              COALESCE((SELECT MAX(v.version_number) FROM form_versions v WHERE v.form_id = f.id), 0) + 1,
+              f.content_revision,
+              f.name, f.description, f.fields, f.layout,
+              f.on_submit_tag_id, f.on_submit_scenario_id,
+              f.on_submit_message_type, f.on_submit_message_content,
+              f.on_submit_webhook_url, f.on_submit_webhook_headers, f.on_submit_webhook_fail_message,
+              f.save_to_metadata, f.og_title, f.og_description, f.og_image_url,
+              'published', ?, ?
+         FROM forms f
+        WHERE f.id = ? AND f.status = 'active' AND f.content_revision = ?`,
+    ).bind(versionId, now, now, id, expectedContentRevision),
+    db.prepare(
+      `UPDATE forms
+          SET current_published_version_id = ?, is_active = 1,
+              revision = revision + 1, updated_at = ?
+        WHERE id = ? AND content_revision = ?
+          AND EXISTS (
+            SELECT 1 FROM form_versions v
+             WHERE v.id = ? AND v.form_id = forms.id
+               AND v.source_content_revision = forms.content_revision
+          )`,
+    ).bind(versionId, now, id, expectedContentRevision, versionId),
+  ]);
+
+  if ((results[1]?.meta?.changes ?? 0) === 1) {
+    const version = await db.prepare(
+      `SELECT id, form_id, version_number, source_content_revision, published_at
+         FROM form_versions WHERE id = ?`,
+    ).bind(versionId).first<PublishedFormVersion>();
+    const form = await getFormById(db, id);
+    if (version && form) return { kind: 'published', version, replayed: false, form };
+  }
+
+  // 同じ編集版の二重公開は UNIQUE(form_id, source_content_revision) で1版になる。
+  const raced = await db.prepare(
+    `SELECT v.id, v.form_id, v.version_number, v.source_content_revision, v.published_at
+       FROM form_versions v
+       JOIN forms f ON f.current_published_version_id = v.id
+      WHERE v.form_id = ? AND v.source_content_revision = ?`,
+  ).bind(id, expectedContentRevision).first<PublishedFormVersion>();
+  const latest = await getFormById(db, id);
+  if (raced && latest) {
+    return { kind: 'published', version: raced, replayed: true, form: latest };
+  }
+  return latest ? { kind: 'conflict', form: latest } : { kind: 'not_found' };
 }
 
 export type FormDeleteReference = {
@@ -243,7 +382,9 @@ export type FormDeleteImpact = {
   blockers: Array<'published' | 'has_submissions' | 'has_opens' | 'in_use' | 'already_archived'>;
 };
 
-type FormImpactRow = Pick<Form, 'id' | 'name' | 'is_active' | 'status' | 'revision' | 'content_revision'>;
+type FormImpactRow = Pick<Form,
+  'id' | 'name' | 'is_active' | 'status' | 'revision' | 'content_revision' | 'current_published_version_id'
+>;
 type FormImpactReferenceRow = {
   kind: FormDeleteReference['kind'];
   name: string | null;
@@ -262,7 +403,8 @@ export async function getFormDeleteImpact(
 ): Promise<FormDeleteImpact | null> {
   const results = await db.batch([
     db.prepare(
-      `SELECT f.id, f.name, f.is_active, f.status, f.revision, f.content_revision
+      `SELECT f.id, f.name, f.is_active, f.status, f.revision, f.content_revision,
+              f.current_published_version_id
          FROM forms f
          JOIN form_accounts fa ON fa.form_id = f.id
         WHERE f.id = ? AND fa.line_account_id = ?`,
@@ -309,7 +451,7 @@ export async function getFormDeleteImpact(
   }));
   const blockers: FormDeleteImpact['blockers'] = [];
   if (row.status === 'archived') blockers.push('already_archived');
-  if (Boolean(row.is_active)) blockers.push('published');
+  if (row.current_published_version_id) blockers.push('published');
   if (submissionCount > 0) blockers.push('has_submissions');
   if (openCount > 0) blockers.push('has_opens');
   if (references.length > 0) blockers.push('in_use');
@@ -368,6 +510,7 @@ export async function deleteFormAtRevision(
       WHERE id = ?
         AND status = 'active'
         AND is_active = 0
+        AND current_published_version_id IS NULL
         AND revision = ?
         AND NOT EXISTS (SELECT 1 FROM form_submissions WHERE form_id = forms.id)
         AND NOT EXISTS (SELECT 1 FROM form_opens WHERE form_id = forms.id)
@@ -413,7 +556,7 @@ export async function createForm(db: D1Database, input: CreateFormInput): Promis
           save_to_metadata, is_active, submit_count,
           og_title, og_description, og_image_url,
           created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?, ?, ?, ?, ?)`,
       )
       .bind(
         id,
@@ -429,7 +572,6 @@ export async function createForm(db: D1Database, input: CreateFormInput): Promis
         input.onSubmitWebhookHeaders ?? null,
         input.onSubmitWebhookFailMessage ?? null,
         input.saveToMetadata !== false ? 1 : 0,
-        input.isActive === false ? 0 : 1,
         input.ogTitle ?? null,
         input.ogDescription ?? null,
         input.ogImageUrl ?? null,
@@ -439,6 +581,10 @@ export async function createForm(db: D1Database, input: CreateFormInput): Promis
       .run();
 
     await attachFormAccounts(db, id, input.lineAccountIds ?? []);
+    if (input.isActive !== false) {
+      const published = await publishFormVersion(db, id, 1);
+      if (published.kind !== 'published') throw new Error('initial form version publish failed');
+    }
   } catch (error) {
     // 所属だけ保存に失敗したフォームを残さない。管理画面から見えない孤立行になるため。
     await db.prepare(`DELETE FROM forms WHERE id = ?`).bind(id).run().catch(() => undefined);
@@ -556,7 +702,9 @@ export async function updateForm(
       'saveToMetadata' in input
         ? (input.saveToMetadata !== false ? 1 : 0)
         : existing.save_to_metadata,
-      'isActive' in input ? (input.isActive ? 1 : 0) : existing.is_active,
+      'isActive' in input
+        ? (input.isActive && existing.current_published_version_id ? 1 : 0)
+        : existing.is_active,
       'ogTitle' in input ? (input.ogTitle ?? null) : existing.og_title,
       'ogDescription' in input ? (input.ogDescription ?? null) : existing.og_description,
       'ogImageUrl' in input ? (input.ogImageUrl ?? null) : existing.og_image_url,
@@ -672,6 +820,7 @@ export async function getFormSubmissionsByFriend(
 
 export interface CreateFormSubmissionInput {
   formId: string;
+  formVersionId?: string | null;
   friendId?: string | null;
   data: string; // JSON string
 }
@@ -692,10 +841,10 @@ export async function insertFormSubmissionRecord(
   await db
     .prepare(
       `INSERT INTO form_submissions
-         (id, form_id, friend_id, data, destination_write_status, created_at)
-       VALUES (?, ?, ?, ?, 'pending', ?)`,
+         (id, form_id, friend_id, form_version_id, data, destination_write_status, created_at)
+       VALUES (?, ?, ?, ?, ?, 'pending', ?)`,
     )
-    .bind(id, input.formId, input.friendId ?? null, input.data, now)
+    .bind(id, input.formId, input.friendId ?? null, input.formVersionId ?? null, input.data, now)
     .run();
 
   return (await db
@@ -741,6 +890,54 @@ export async function createFormSubmission(
   const record = await insertFormSubmissionRecord(db, input);
   await incrementFormSubmitCount(db, input.formId);
   return record;
+}
+
+/**
+ * 全体上限・選択肢定員の枠を1つ、原子的に確保する(N-167 / #751)。
+ *
+ * 「数えてから比べる」のではなく、**条件付き INSERT 1本で決める**。
+ * 空きがあるかの判定(`COUNT < limit`)と確保(行を1つ増やす)を同じ文の
+ * 中で行うため、2件が同時に来ても両方が「空きあり」と読むことはない。
+ * 取れたかどうかは `changes` が 1 か 0 かで分かる。
+ *
+ * 同じ (formId, slotKey, submissionId) を2回確保しようとしても、主キーが
+ * 重複するので2回目は素通り(INSERT 0行)になる。冪等な再開でも枠を
+ * 二重に消費しない。
+ */
+export async function claimFormCapacitySlot(
+  db: D1Database,
+  formId: string,
+  slotKey: string,
+  submissionId: string,
+  limit: number,
+): Promise<boolean> {
+  const result = await db
+    .prepare(
+      `INSERT INTO form_capacity_claims (form_id, slot_key, submission_id, created_at)
+       SELECT ?, ?, ?, ?
+        WHERE (SELECT COUNT(*) FROM form_capacity_claims WHERE form_id = ? AND slot_key = ?) < ?`,
+    )
+    .bind(formId, slotKey, submissionId, jstNow(), formId, slotKey, limit)
+    .run();
+  return (result.meta?.changes ?? 0) > 0;
+}
+
+/**
+ * 確保に失敗した回答の後始末。確保済みの枠(あれば)を消す。
+ *
+ * 枠の確保は回答行(form_submissions)の保存より前に行うことがあるため、
+ * `form_capacity_claims.submission_id` は外部キーにしていない。取り消しは
+ * ここで明示的に行う。
+ */
+export async function releaseFormCapacityClaims(
+  db: D1Database,
+  formId: string,
+  submissionId: string,
+): Promise<void> {
+  await db
+    .prepare(`DELETE FROM form_capacity_claims WHERE form_id = ? AND submission_id = ?`)
+    .bind(formId, submissionId)
+    .run();
 }
 
 export interface FormDestinationWriteResult {

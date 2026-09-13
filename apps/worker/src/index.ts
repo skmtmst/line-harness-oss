@@ -141,6 +141,10 @@ import { dashboard } from './routes/dashboard.js';
 import { siteTracking } from './routes/site-tracking.js';
 import { restaurantTest } from './routes/restaurant-test.js';
 import { tenants } from './routes/tenants.js';
+import { hqBanners } from './routes/hq-banners.js';
+import { hqSupport } from './routes/hq-support.js';
+import { hqBilling } from './routes/hq-billing.js';
+import { authEmail } from './routes/auth-email.js';
 import { codexSlackEvents } from './routes/codex-slack-events.js';
 import { aiLoopSlackReports } from './routes/ai-loop-slack-reports.js';
 import { clientErrors } from './routes/client-errors.js';
@@ -218,6 +222,24 @@ export type Env = {
     LINE_LOGIN_CHANNEL_SECRET: string;
     /** Stripe Webhook署名キー。未設定時はStripe受信ルートだけ503で拒否する。 */
     STRIPE_WEBHOOK_SECRET?: string;
+    /** 統括のバナー生成（OpenAI 画像生成）。未設定時は生成だけ503で断る。 */
+    OPENAI_API_KEY?: string;
+    /** 画像生成モデル名。未設定時は gpt-image-1。 */
+    OPENAI_IMAGE_MODEL?: string;
+    /** 統括ごとの月間生成上限（枚）。未設定時は150。料金プラン導入後はプランの値を使う。 */
+    BANNER_MONTHLY_IMAGES?: string;
+    /** 生成の品質（low|medium|high）。運用者には選ばせず、未設定時は medium。 */
+    BANNER_IMAGE_QUALITY?: string;
+    /** 統括からのお問い合わせを知らせる運営の宛先。未設定なら CONTACT_EMAIL。 */
+    SUPPORT_NOTIFY_EMAIL?: string;
+    /** 統括の課金（Stripe サブスクリプション）。値は secret／var で持ち、ここには書かない。 */
+    STRIPE_SECRET_KEY?: string;
+    STRIPE_BILLING_WEBHOOK_SECRET?: string;
+    STRIPE_PRICE_LIGHT?: string;
+    STRIPE_PRICE_STANDARD?: string;
+    STRIPE_PRICE_PRO?: string;
+    /** 会員登録・パスワード再設定のロボット対策（Cloudflare Turnstile）の秘密の鍵。未設定なら登録を受け付けない。 */
+    TURNSTILE_SECRET_KEY?: string;
     TOTP_ENCRYPTION_KEY?: string;
     /** 署名済みの配備イベント受信用。管理画面へは公開しない。 */
     OPERATIONS_DEPLOYMENT_SIGNING_SECRET?: string;
@@ -457,6 +479,10 @@ app.route('/', siteTracking);
 // 飲食店向けの検証専用領域。既存NEN機能とはAPI/DB名前空間を分離する。
 app.route('/', restaurantTest);
 app.route('/', tenants);
+app.route('/', hqBanners);
+app.route('/', hqSupport);
+app.route('/', hqBilling);
+app.route('/', authEmail);
 app.route('/', codexSlackEvents);
 app.route('/', aiLoopSlackReports);
 app.route('/', clientErrors);

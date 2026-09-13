@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import {
+  acceptEventWaitlistOffer,
   createEventWaitlistOfferSender,
   enqueueEventWaitlistPromotion,
   getEventOccurrenceApplicants,
@@ -31,7 +32,14 @@ function asD1(sqlite: Database.Database, beforeRun?: (query: string) => Promise<
     } as unknown as D1PreparedStatement);
     return make([]);
   }
-  return { prepare } as unknown as D1Database;
+  return {
+    prepare,
+    async batch(statements: D1PreparedStatement[]) {
+      const results = [];
+      for (const statement of statements) results.push(await statement.run());
+      return results;
+    },
+  } as unknown as D1Database;
 }
 
 describe('V6 event waitlist and applicants', () => {
@@ -91,6 +99,18 @@ describe('V6 event waitlist and applicants', () => {
     `);
   }
 
+  async function seedOffered(token: string, expiresAt = '2099-06-02T00:00:00.000Z'): Promise<void> {
+    seedWaitlist();
+    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token));
+    const hash = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
+    sqlite.prepare(
+      `UPDATE event_waitlist
+          SET status = 'offered', offered_at = '2099-05-31T00:00:00.000Z',
+              offer_expires_at = ?, offer_token_hash = ?, notified_at = '2099-05-31T00:00:00.000Z'
+        WHERE id = 'wait-a'`,
+    ).run(expiresAt, hash);
+  }
+
   test('normal: 申込時点の人数・回答・初回判定を同じアカウントへ返す', async () => {
     seedBooking();
     seedWaitlist();
@@ -113,6 +133,62 @@ describe('V6 event waitlist and applicants', () => {
         },
       ],
     });
+  });
+
+  test('繰上げURLを本人が承諾すると、回答内容を保った確定予約へ一度だけ変換する', async () => {
+    const token = 'valid-offer-token-123456789012345678901234567890';
+    await seedOffered(token);
+    sqlite.prepare(`UPDATE events SET max_bookings_per_friend = NULL WHERE id = 'event-a'`).run();
+    const now = new Date('2099-06-01T00:00:00.000Z');
+
+    const first = await acceptEventWaitlistOffer(db, { token, callerLineUserId: 'Ub', now });
+    expect(first).toMatchObject({
+      kind: 'accepted', newlyConverted: true,
+      bookingId: 'event-waitlist:wait-a', friendId: 'friend-b', occurrenceId: 'slot-a',
+    });
+    expect(sqlite.prepare(
+      `SELECT id, status, friend_id, party_size, answer_snapshot_json
+         FROM event_bookings WHERE id = 'event-waitlist:wait-a'`,
+    ).get()).toEqual({
+      id: 'event-waitlist:wait-a', status: 'confirmed', friend_id: 'friend-b',
+      party_size: 1, answer_snapshot_json: '{"pet":"ミミ"}',
+    });
+    expect(sqlite.prepare(`SELECT status FROM event_waitlist WHERE id = 'wait-a'`).get())
+      .toEqual({ status: 'converted' });
+
+    const retry = await acceptEventWaitlistOffer(db, { token, callerLineUserId: 'Ub', now });
+    expect(retry).toMatchObject({
+      kind: 'accepted', newlyConverted: false, bookingId: 'event-waitlist:wait-a',
+    });
+    expect(sqlite.prepare(`SELECT COUNT(*) AS count FROM event_bookings`).get())
+      .toEqual({ count: 1 });
+  });
+
+  test('繰上げURLが漏れても、別のLINEユーザーは承諾できない', async () => {
+    const token = 'private-offer-token-12345678901234567890123456789';
+    await seedOffered(token);
+
+    await expect(acceptEventWaitlistOffer(db, {
+      token, callerLineUserId: 'Ua', now: new Date('2099-06-01T00:00:00.000Z'),
+    })).resolves.toEqual({ kind: 'not_found' });
+    expect(sqlite.prepare(`SELECT status FROM event_waitlist WHERE id = 'wait-a'`).get())
+      .toEqual({ status: 'offered' });
+    expect(sqlite.prepare(`SELECT COUNT(*) AS count FROM event_bookings`).get())
+      .toEqual({ count: 0 });
+  });
+
+  test('期限切れの繰上げURLは失効させ、次の候補を案内するjobを残す', async () => {
+    const token = 'expired-offer-token-12345678901234567890123456789';
+    await seedOffered(token, '2099-05-31T23:59:59.000Z');
+
+    await expect(acceptEventWaitlistOffer(db, {
+      token, callerLineUserId: 'Ub', now: new Date('2099-06-01T00:00:00.000Z'),
+    })).resolves.toEqual({ kind: 'expired' });
+    expect(sqlite.prepare(`SELECT status FROM event_waitlist WHERE id = 'wait-a'`).get())
+      .toEqual({ status: 'expired' });
+    expect(sqlite.prepare(
+      `SELECT status, source_key FROM event_waitlist_promotion_jobs`,
+    ).get()).toEqual({ status: 'pending', source_key: 'waitlist:wait-a:offer-expired' });
   });
 
   test('empty / forbidden: 空の開催回と所属外アカウントを区別する', async () => {

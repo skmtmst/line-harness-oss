@@ -122,13 +122,15 @@ function formatKeys(keys: string[]): string {
  * - ALLOWLIST_MAX: 未記載負債はここより増やせない
  * 後続票で記載を増やしたら、実測に合わせて両方を同じ PR で更新する。
  */
-// 本流の93件に、この票の運用者通知2口(operator-event-types の GET・operator-outbox/sweep の POST)を足して95件。
-const DOCUMENTED_MIN = 95;
+// 本流の95件に、#19 の統括バナー生成17口、#20〜#21 の6口、#22 の課金5口、#23 の認証7口を足して130件。
+const DOCUMENTED_MIN = 130;
 const ALLOWLIST_MAX = 777;
 
 /**
  * PR #1456 時点の記載済み 83 件＋本流で増えた 5 件＋#655 休憩 4 件
- * ＋#663 の運用者通知 2 口の基準一覧。
+ * ＋#663 の運用者通知 2 口＋#19 の統括バナー生成17口
+ * ＋#20〜#21 の統括バナー統計・問い合わせ・メンバー管理6口
+ * ＋#22 の統括課金5口の基準一覧。
  * 既存仕様を ALLOWLIST へ移して後退させる変更を落とすためのもの。
  * 件数が変わらなくても、ここにある1件が消えたら落ちる。
  * 後続票で記載を増やしたら、増えた分をここへ足す。
@@ -138,6 +140,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'DELETE /api/broadcasts/{id}',
   'DELETE /api/conversions/points/{id}',
   'DELETE /api/friends/{id}/tags/{tagId}',
+  'DELETE /api/hq/banners/images/{id}',
   'DELETE /api/line-accounts/{id}',
   'DELETE /api/mileage/rules/{id}',
   'DELETE /api/reminders/{id}/steps/{stepId}',
@@ -150,6 +153,8 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'GET /api/affiliates/{id}',
   'GET /api/affiliates/{id}/report',
   'GET /api/auto-replies',
+  'GET /api/auth/password/reset/check',
+  'GET /api/auth/register/check',
   'GET /api/booking/admin/staff/{id}/break-dates',
   'GET /api/booking/admin/staff/{id}/breaks',
   'GET /api/broadcasts',
@@ -163,6 +168,18 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'GET /api/friends/{id}',
   'GET /api/friends/{id}/fields',
   'GET /api/friends/count',
+  'GET /api/hq/banners/generations/{id}',
+  'GET /api/hq/banners/images',
+  'GET /api/hq/banners/images/{id}',
+  'GET /api/hq/banners/presets',
+  'GET /api/hq/banners/projects',
+  'GET /api/hq/banners/projects/{id}',
+  'GET /api/hq/banners/stats',
+  'GET /api/hq/banners/usage',
+  'GET /api/hq/billing/invoices',
+  'GET /api/hq/billing/summary',
+  'GET /api/hq/support/kinds',
+  'GET /api/hq/support/requests',
   'GET /api/line-accounts',
   'GET /api/line-accounts/{id}',
   'GET /api/mileage/redemptions',
@@ -181,6 +198,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'GET /api/scenarios/{id}/runs',
   'GET /api/scenarios/{id}/stats',
   'GET /api/scenarios/{id}/triggers',
+  'GET /api/staff/last-logins',
   'GET /api/tags',
   'GET /api/tags/{id}',
   'GET /api/tags/{id}/delete-impact',
@@ -188,11 +206,18 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'GET /api/users',
   'GET /api/users/{id}',
   'GET /api/users/{id}/accounts',
+  'PATCH /api/hq/banners/images/{id}',
+  'PATCH /api/hq/banners/projects/{id}',
   'PATCH /api/line-accounts/{id}',
   'PATCH /api/line-accounts/order',
   'PATCH /api/tags/{id}',
   'POST /api/affiliates',
   'POST /api/affiliates/click',
+  'POST /api/auth/password/forgot',
+  'POST /api/auth/password/login',
+  'POST /api/auth/password/reset',
+  'POST /api/auth/register/complete',
+  'POST /api/auth/register/request',
   'POST /api/broadcasts',
   'POST /api/broadcasts/{id}/send',
   'POST /api/broadcasts/dedup-preview',
@@ -200,6 +225,17 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'POST /api/conversions/points',
   'POST /api/conversions/track',
   'POST /api/friends/{id}/tags',
+  'POST /api/hq/banners/generations/{id}/cancel',
+  'POST /api/hq/banners/generations/{id}/run',
+  'POST /api/hq/banners/images/{id}/deliver',
+  'POST /api/hq/banners/projects',
+  'POST /api/hq/banners/projects/{id}/duplicate',
+  'POST /api/hq/banners/projects/{id}/generations',
+  'POST /api/hq/banners/projects/{id}/uploads',
+  'POST /api/hq/billing/checkout',
+  'POST /api/hq/billing/portal',
+  'POST /api/hq/billing/webhook',
+  'POST /api/hq/support/requests',
   'POST /api/line-accounts',
   'POST /api/mileage/rules',
   'POST /api/nen-campaigns/deliveries/{id}/retry',
@@ -210,6 +246,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'POST /api/scenarios/{id}/simulate',
   'POST /api/scenarios/{id}/steps',
   'POST /api/settings/features/impact',
+  'POST /api/staff/{id}/resend-invite',
   'POST /api/tags',
   'POST /api/tags/import',
   'POST /api/tags/import/preview',

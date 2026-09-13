@@ -1,4 +1,5 @@
 import { spawnSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
@@ -22,5 +23,13 @@ describe('staging-deploy argument parsing', () => {
 
     expect(result.status).toBe(1);
     expect(result.stderr).toContain('不明な引数: --unknown');
+  });
+
+  it('passes the local Turnstile site key to the admin build', () => {
+    const source = readFileSync(script, 'utf8');
+
+    expect(source).toContain(
+      'NEXT_PUBLIC_TURNSTILE_SITE_KEY="${NEXT_PUBLIC_TURNSTILE_SITE_KEY:-}"',
+    );
   });
 });

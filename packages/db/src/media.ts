@@ -158,8 +158,12 @@ export async function countMedia(
 export async function getMediaById(
   db: D1Database,
   id: string,
-  lineAccountId: string,
+  lineAccountId: string | null,
 ): Promise<Media | null> {
+  if (lineAccountId === null) {
+    return db.prepare(`SELECT * FROM media WHERE id = ? AND line_account_id IS NULL`)
+      .bind(id).first<Media>();
+  }
   return db.prepare(`SELECT * FROM media WHERE id = ? AND line_account_id = ?`)
     .bind(id, lineAccountId).first<Media>();
 }
@@ -168,7 +172,8 @@ export async function createMedia(
   db: D1Database,
   input: {
     kind: MediaKind;
-    lineAccountId: string;
+    /** null は統括所有（バナー生成など、店舗に属さないメディア）。 */
+    lineAccountId: string | null;
     filename: string;
     mimeType: string;
     sizeBytes: number;
