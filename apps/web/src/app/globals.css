@@ -104,6 +104,8 @@
   --color-divider-soft: #eaebed;
   --color-status-danger-selected: #ffe4e7;
   --color-status-danger-border: #f3b8bb;
+  /* 暗幕。Pencil `$scrim`（#11182755）。モーダルの下敷き（`docs/v6-common-rules.md` §1-7）。 */
+  --color-scrim: #11182755;
   /*
    * 2つ目以降のタグの札。1つ目は `accent` 系で、それと分けるための色。
    *

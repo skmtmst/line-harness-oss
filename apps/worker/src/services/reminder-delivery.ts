@@ -23,6 +23,7 @@ import {
 } from '@line-crm/db';
 import { LineClient } from '@line-crm/line-sdk';
 import { addJitter, sleep } from './stealth.js';
+import { getSendPermissionForAccount, type SendPermission, type SendPermissionCache } from './send-entitlements.js';
 import { buildMessage } from './line-message.js';
 import { expandVariables, resolveMetadata } from './step-delivery.js';
 import { resolveInterpolationExtra } from './interpolation-context.js';
@@ -42,6 +43,8 @@ type PushClient = Pick<LineClient, 'pushMessageWithRequestId'>;
 
 export interface ReminderDeliveryOptions {
   now?: Date;
+  /** 試験用。課金の状態による配信可否を差し替える。 */
+  sendPermission?: (db: D1Database, accountId: string | null, cache?: SendPermissionCache) => Promise<SendPermission>;
   pause?: (milliseconds: number) => Promise<void>;
   resolveClient?: (accountId: string | null, fallback: PushClient) => Promise<PushClient>;
   /**
@@ -124,6 +127,7 @@ export async function processReminderDeliveries(
   const leaseExpiresAt = new Date(now.getTime() + LEASE_MINUTES * 60_000).toISOString();
   const pending = await getPendingReminderDeliveries(db);
   const result: ReminderDeliveryResult = { succeeded: 0, skipped: 0, retrying: 0, failed: 0 };
+  const sendPermissions: SendPermissionCache = new Map();
 
   /*
    * 配信時刻が来た通だけに絞る。
@@ -150,6 +154,14 @@ export async function processReminderDeliveries(
     const accountId = enrollment.line_account_id ?? friendAccountId;
     // 機能オフ中はclaimせずactiveのまま残す。再オンで再開する。
     if (accountId && !await featureJobCanRun(db, { accountId, featureId: 'reminders', job: 'reminder deliveries' })) {
+      result.skipped += enrollment.steps.length;
+      continue;
+    }
+
+    // 課金の状態（トライアル終了・解約）で配信が止まっている統括は送らない。
+    // 予約は触らず、次の cron でまた確かめる。プランを選べば続きから届く。
+    const permission = await (options.sendPermission ?? getSendPermissionForAccount)(db, accountId, sendPermissions);
+    if (!permission.allowed) {
       result.skipped += enrollment.steps.length;
       continue;
     }
