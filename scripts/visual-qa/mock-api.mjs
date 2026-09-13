@@ -324,6 +324,9 @@ const DASHBOARD_PREFERENCES = {
 const DASHBOARD_OVERVIEW = {
   period: 'today',
   generatedAt: `${FIXED_TO}T00:00:00.000Z`,
+  // timezone無しD1値でも、閲覧端末のtimezoneに左右されず「更新 09:30」と確認できる。
+  asOf: `${FIXED_TO} 09:30:00`,
+  freshness: 'fresh',
   friends: { active: 398, total: 621, blockedByThem: 223, hiddenByUs: 0, blockedBoth: 0 },
   inbox: {
     unanswered: 5,
@@ -338,6 +341,15 @@ const DASHBOARD_OVERVIEW = {
   trend: DASHBOARD_TREND,
   conversions: { total: 0, byPoint: [] },
   partialFailures: [],
+  sections: {
+    friends: { status: 'ok', asOf: `${FIXED_TO} 09:30:00`, freshness: 'fresh', reason: null, period: 'latest' },
+    inbox: { status: 'ok', asOf: `${FIXED_TO} 09:30:00`, freshness: 'fresh', reason: null, period: 'latest' },
+    delivery: { status: 'empty', asOf: `${FIXED_TO} 09:30:00`, freshness: 'fresh', reason: null, period: 'this-month' },
+    quota: { status: 'ok', asOf: `${FIXED_TO} 09:30:00`, freshness: 'fresh', reason: null, period: 'this-month' },
+    trend: { status: 'estimated', asOf: `${FIXED_TO} 09:30:00`, freshness: 'fresh', reason: null, period: 'last7-fixed' },
+    conversions: { status: 'empty', asOf: `${FIXED_TO} 09:30:00`, freshness: 'fresh', reason: null, period: 'today' },
+    operations: { status: 'ok', asOf: `${FIXED_TO} 09:30:00`, freshness: 'fresh', reason: null, period: 'today' },
+  },
   operations: {
     scenarios: { active: 0, paused: 0 },
     migrations: { active: 0, completed: 0 },

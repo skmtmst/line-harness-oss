@@ -9,6 +9,8 @@ import {
   deleteDashboardPreference,
   saveDashboardDefaultPreference,
   saveDashboardPreference,
+  dashboardFreshness,
+  summarizeDashboardFreshness,
   type DashboardPeriod,
   type DashboardOverview,
 } from '@line-crm/db';
@@ -185,7 +187,12 @@ dashboard.get('/api/dashboard/overview', async (c) => {
     }
     const quotaAvailable = quota.reason === null;
     overview.sections.quota.status = quotaAvailable ? 'ok' : 'unavailable';
-    overview.sections.quota.asOf = quota.asOf ?? overview.generatedAt;
+    overview.sections.quota.asOf = quota.asOf;
+    overview.sections.quota.freshness = dashboardFreshness(quota.asOf, {
+      failedSources: quotaAvailable ? 0 : 1,
+      totalSources: 1,
+    });
+    overview.sections.quota.reason = quota.reason;
     overview.metrics.monthlyQuota = {
       value: quotaAvailable ? {
         used: quota.used,
@@ -207,6 +214,7 @@ dashboard.get('/api/dashboard/overview', async (c) => {
       asOf: officialProfileUrl ? selectedAccount.updated_at : null,
       period: 'latest',
     };
+    Object.assign(overview, summarizeDashboardFreshness(overview.sections));
 
     return c.json({
       success: true as const,
@@ -240,29 +248,46 @@ dashboard.get('/api/dashboard/organization-overview', requireRole('owner'), asyn
       5,
       (account) => fetchQuota(account.channel_access_token),
     );
-    const quotaFailed = quotas.some((quota) => quota.failed);
-    if (quotaFailed) {
+    const successfulQuotas = quotas.filter((quota) => quota.reason === null);
+    const failedQuotaCount = quotas.length - successfulQuotas.length;
+    if (failedQuotaCount > 0) {
       overview.partialFailures.push('quota');
     }
-    const quotaUnavailable = quotas.length === 0
-      || quotaFailed
-      || quotas.some((quota) => quota.reason !== null);
-    overview.sections.quota.status = quotaUnavailable ? 'unavailable' : 'ok';
+    const quotaStatus = quotas.length === 0 || successfulQuotas.length === 0
+      ? 'unavailable'
+      : failedQuotaCount > 0 ? 'partial' : 'ok';
+    const successfulAsOf = successfulQuotas
+      .map((quota) => quota.asOf)
+      .filter((value): value is string => value !== null)
+      .sort((left, right) => Date.parse(left) - Date.parse(right))[0] ?? null;
+    overview.sections.quota.status = quotaStatus;
+    overview.sections.quota.asOf = successfulAsOf;
+    overview.sections.quota.freshness = dashboardFreshness(successfulAsOf, {
+      failedSources: quotas.length === 0 ? 1 : failedQuotaCount,
+      totalSources: Math.max(quotas.length, 1),
+    });
+    overview.sections.quota.reason = quotaStatus === 'ok'
+      ? null
+      : quotas.some((quota) => quota.reason === 'fetch_failed') ? 'fetch_failed' : 'not_connected';
     const everyLimitKnown = quotas.length > 0 && quotas.every((quota) => quota.limit !== null);
     const everyUsageKnown = quotas.length > 0 && quotas.every((quota) => quota.used !== null);
-    const quotaLimit = everyLimitKnown ? quotas.reduce((sum, quota) => sum + (quota.limit ?? 0), 0) : null;
-    const quotaUsed = everyUsageKnown ? quotas.reduce((sum, quota) => sum + (quota.used ?? 0), 0) : null;
+    const quotaLimit = quotaStatus === 'ok' && everyLimitKnown
+      ? quotas.reduce((sum, quota) => sum + (quota.limit ?? 0), 0)
+      : null;
+    const quotaUsed = quotaStatus === 'ok' && everyUsageKnown
+      ? quotas.reduce((sum, quota) => sum + (quota.used ?? 0), 0)
+      : null;
     overview.metrics.monthlyQuota = {
-      value: quotaUnavailable ? null : {
+      value: quotaStatus === 'ok' ? {
         used: quotaUsed,
         limit: quotaLimit,
         remaining: quotaLimit === null || quotaUsed === null ? null : Math.max(quotaLimit - quotaUsed, 0),
-      },
-      state: quotaUnavailable ? 'unavailable' : 'available',
-      reason: quotaUnavailable
+      } : null,
+      state: quotaStatus === 'ok' ? 'available' : quotaStatus,
+      reason: quotaStatus !== 'ok'
         ? (quotas.some((quota) => quota.reason === 'fetch_failed') ? 'fetch_failed' : 'not_connected')
         : null,
-      asOf: quotaUnavailable ? null : new Date().toISOString(),
+      asOf: successfulAsOf,
       period: 'this-month',
     };
     overview.metrics.officialProfileUrl = {
@@ -272,6 +297,7 @@ dashboard.get('/api/dashboard/organization-overview', requireRole('owner'), asyn
       asOf: null,
       period: 'latest',
     };
+    Object.assign(overview, summarizeDashboardFreshness(overview.sections));
     return c.json({
       success: true as const,
       data: {
