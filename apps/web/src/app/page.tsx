@@ -374,6 +374,8 @@ export default function DashboardPage() {
   const [editorOpen, setEditorOpen] = useState(false)
   const [preferences, setPreferences] = useState<DashboardPreferences>(defaultDashboardPreferences)
   const [preferenceVersion, setPreferenceVersion] = useState(0)
+  const [preferenceSaving, setPreferenceSaving] = useState(false)
+  const preferenceSaveInFlight = useRef(false)
   const [inboxSummary, setInboxSummary] = useState<PendingInboxSummary | null>(null)
   const [shipmentSummary, setShipmentSummary] = useState<ShipmentSummary | null>(null)
   const [pendingPhotos, setPendingPhotos] = useState<number | null>(null)
@@ -442,12 +444,16 @@ export default function DashboardPage() {
   }, [selectedAccountId])
 
   const applyPreferences = async (next: DashboardPreferences) => {
+    // 同じ描画内の連打も、状態の再描画を待たずに止める。
+    if (preferenceSaveInFlight.current) return
     if (!selectedAccountId) {
       setError('LINEアカウントを選択してください')
       return
     }
-    const normalized = normalizeDashboardPreferences(next)
+    preferenceSaveInFlight.current = true
+    setPreferenceSaving(true)
     try {
+      const normalized = normalizeDashboardPreferences(next)
       const response = await api.dashboard.preferences.save(selectedAccountId, {
         version: preferenceVersion,
         cards: normalized,
@@ -462,6 +468,9 @@ export default function DashboardPage() {
       setError(caught instanceof Error && 'status' in caught && caught.status === 409
         ? '別の画面で配置が更新されました。再読み込みしてください'
         : 'ダッシュボードの配置を保存できませんでした')
+    } finally {
+      preferenceSaveInFlight.current = false
+      setPreferenceSaving(false)
     }
   }
 
@@ -861,7 +870,7 @@ export default function DashboardPage() {
         </aside>
       </div>
 
-      <DashboardEditor open={editorOpen} preferences={preferences} onCancel={() => setEditorOpen(false)} onApply={applyPreferences} onReset={resetPreferences} />
+      <DashboardEditor open={editorOpen} preferences={preferences} saving={preferenceSaving} onCancel={() => setEditorOpen(false)} onApply={applyPreferences} onReset={resetPreferences} />
     </div>
   )
 }
