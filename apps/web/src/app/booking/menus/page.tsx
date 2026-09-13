@@ -13,6 +13,7 @@ import {
   ApiError,
   bookingApi,
   type BookingMenu,
+  type BookingResource,
   type BookingSettings,
 } from '@/lib/api'
 import type { Tag } from '@line-crm/shared'
@@ -86,6 +87,7 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
   const [menuStaff, setMenuStaff] = useState<Map<string, string[]>>(new Map())
   const [supportingLoadState, setSupportingLoadState] = useState<SupportingLoadState>('loading')
   const [page, setPage] = useState(1)
+  const [canManageResources, setCanManageResources] = useState(false)
   const loadGenerationRef = useRef(0)
   const selectedAccountIdRef = useRef(selectedAccountId)
   selectedAccountIdRef.current = selectedAccountId
@@ -144,6 +146,16 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
   useEffect(() => {
     load()
   }, [load])
+
+  useEffect(() => {
+    const role = window.localStorage.getItem('lh_staff_role')
+    setCanManageResources(role === 'owner' || role === 'admin')
+  }, [])
+
+  useEffect(() => {
+    // 切替前accountの編集窓を、新しいaccount上へ残さない。
+    setEditing(null)
+  }, [selectedAccountId])
 
   useEffect(() => {
     onMenuCount(!loading && !error ? settings?.menuCount ?? items.length : null)
@@ -398,7 +410,13 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
           menu={editing}
           tags={tags}
           accountId={selectedAccountId}
+          canManageResources={canManageResources}
           onSave={save}
+          onResourcesSaved={(menuId, version, assignedResources) => {
+            setItems((current) => current.map((item) => item.id === menuId
+              ? { ...item, version, assigned_resources: assignedResources }
+              : item))
+          }}
           onClose={() => setEditing(null)}
         />
       )}
@@ -631,18 +649,54 @@ function EditMenuModal({
   menu,
   tags,
   accountId,
+  canManageResources,
   onSave,
+  onResourcesSaved,
   onClose,
 }: {
   menu: BookingMenu
   tags: Tag[]
   accountId: string | null
+  canManageResources: boolean
   onSave: (m: BookingMenu) => Promise<void>
+  onResourcesSaved: (
+    menuId: string,
+    version: number,
+    resources: NonNullable<BookingMenu['assigned_resources']>,
+  ) => void
   onClose: () => void
 }) {
   const [form, setForm] = useState<BookingMenu>(menu)
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState<string | null>(null)
+  const [resources, setResources] = useState<BookingResource[]>([])
+  const [resourceLoadError, setResourceLoadError] = useState<string | null>(null)
+  const [resourceSaving, setResourceSaving] = useState(false)
+  const [resourceMessage, setResourceMessage] = useState<string | null>(null)
+  const [resourceAssignments, setResourceAssignments] = useState<Map<string, number>>(() => new Map(
+    (menu.assigned_resources ?? []).map((item) => [item.resourceId, item.quantity]),
+  ))
+  const resourceSubmitRef = useRef(false)
+  const resourceLoadGenerationRef = useRef(0)
+
+  useEffect(() => {
+    const generation = ++resourceLoadGenerationRef.current
+    setResourceLoadError(null)
+    setResources([])
+    if (!accountId) return
+    bookingApi.listResources(accountId)
+      .then((response) => {
+        if (resourceLoadGenerationRef.current === generation) {
+          setResources(response.data.resources)
+        }
+      })
+      .catch(() => {
+        if (resourceLoadGenerationRef.current === generation) {
+          setResourceLoadError('設備を読み込めませんでした。編集内容はそのままです。')
+        }
+      })
+    return () => { resourceLoadGenerationRef.current += 1 }
+  }, [accountId])
 
   /*
    * 候補は「今のアカウントの有効なタグ」だけ。api.tags.list() は見えている
@@ -688,6 +742,70 @@ function EditMenuModal({
       setErr(bookingErrorMessage(e, '保存'))
     } finally {
       setSaving(false)
+    }
+  }
+
+  function toggleResource(resourceId: string, checked: boolean) {
+    setResourceMessage(null)
+    setResourceAssignments((current) => {
+      const next = new Map(current)
+      if (checked) next.set(resourceId, current.get(resourceId) ?? 1)
+      else next.delete(resourceId)
+      return next
+    })
+  }
+
+  function setResourceQuantity(resourceId: string, quantity: number) {
+    setResourceMessage(null)
+    setResourceAssignments((current) => new Map(current).set(resourceId, quantity))
+  }
+
+  async function submitResources() {
+    if (resourceSubmitRef.current || !accountId) return
+    const submissionGeneration = resourceLoadGenerationRef.current
+    const expectedVersion = form.version
+    if (!Number.isInteger(expectedVersion) || Number(expectedVersion) < 1) {
+      setResourceMessage('最新のメニュー情報を読み直してから、もう一度お試しください。')
+      return
+    }
+    const selected = [...resourceAssignments.entries()].map(([resourceId, quantity]) => ({ resourceId, quantity }))
+    if (selected.some((item) => !Number.isInteger(item.quantity) || item.quantity < 1 || item.quantity > 1000)) {
+      setResourceMessage('必要数は1〜1000の整数で入力してください。')
+      return
+    }
+    resourceSubmitRef.current = true
+    setResourceSaving(true)
+    setResourceMessage(null)
+    try {
+      const response = await bookingApi.saveMenuResources(accountId, menu.id, {
+        expectedVersion: Number(expectedVersion), resources: selected,
+      })
+      if (resourceLoadGenerationRef.current !== submissionGeneration) return
+      const assigned = selected.map((item) => {
+        const candidate = resources.find((resource) => resource.id === item.resourceId)
+          ?? menu.assigned_resources?.find((resource) => resource.resourceId === item.resourceId)
+        return {
+          menuId: menu.id,
+          resourceId: item.resourceId,
+          name: candidate?.name ?? '不明な設備',
+          type: candidate && 'type' in candidate ? candidate.type : '',
+          capacity: candidate?.capacity ?? item.quantity,
+          quantity: item.quantity,
+          isActive: candidate && 'isActive' in candidate ? candidate.isActive : false,
+          warning: candidate && 'isActive' in candidate && candidate.isActive ? null : 'resource_inactive' as const,
+        }
+      })
+      setForm((current) => ({ ...current, version: response.data.version, assigned_resources: assigned }))
+      onResourcesSaved(menu.id, response.data.version, assigned)
+      setResourceMessage('設備の割当を保存しました。新しい予約枠から反映されます。')
+    } catch (error) {
+      if (resourceLoadGenerationRef.current !== submissionGeneration) return
+      setResourceMessage(error instanceof ApiError && error.status === 409
+        ? 'ほかの担当者が先に保存しました。画面を閉じて最新の内容を読み直してください。'
+        : '設備の割当を保存できませんでした。入力は残っています。もう一度お試しください。')
+    } finally {
+      resourceSubmitRef.current = false
+      if (resourceLoadGenerationRef.current === submissionGeneration) setResourceSaving(false)
     }
   }
 
@@ -778,6 +896,76 @@ function EditMenuModal({
               このメニューが予約されると、申込者の友だちに自動でこのタグが付きます。タグは既存のものから選択してください (友だち画面 / シナリオ等で使われているタグ)。
             </p>
           </Field>
+
+          <div className="border-hairline space-y-3 rounded-lg border p-3">
+            <div>
+              <p className="text-ink-secondary text-sm font-semibold">このメニューで使う設備</p>
+              <p className="text-ink-faint mt-1 text-xs">部屋・席・機材を複数選び、1件の予約に必要な数を指定します。</p>
+            </div>
+            {resourceLoadError ? (
+              <p role="alert" className="text-danger text-xs">{resourceLoadError}</p>
+            ) : resources.length === 0 && (menu.assigned_resources ?? []).length === 0 ? (
+              <p className="text-ink-faint text-xs">利用できる設備がありません。設備設定で作成してください。</p>
+            ) : (
+              <div className="space-y-2">
+                {[
+                  ...resources,
+                  ...(menu.assigned_resources ?? [])
+                    .filter((assigned) => !resources.some((resource) => resource.id === assigned.resourceId))
+                    .map((assigned) => ({
+                      id: assigned.resourceId, name: assigned.name, type: assigned.type,
+                      capacity: assigned.capacity, isActive: assigned.isActive,
+                    } as BookingResource)),
+                ].map((resource) => {
+                  const checked = resourceAssignments.has(resource.id)
+                  return (
+                    <div key={resource.id} className="bg-canvas-sunken rounded-control flex items-center gap-3 p-2">
+                      <label className="flex min-w-0 flex-1 items-center gap-2 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          disabled={!canManageResources || (!resource.isActive && !checked)}
+                          onChange={(event) => toggleResource(resource.id, event.target.checked)}
+                        />
+                        <span className="truncate" title={resource.name}>{resource.name}</span>
+                        {!resource.isActive && <span className="text-warning text-xs">停止中・新規受付不可</span>}
+                        {resource.isActive && checked
+                          && (resourceAssignments.get(resource.id) ?? 1) > resource.capacity
+                          && <span className="text-warning text-xs">必要数が受付上限超過・新規受付不可</span>}
+                      </label>
+                      {checked && (
+                        <label className="flex items-center gap-1 text-xs">
+                          必要数
+                          <input
+                            aria-label={`${resource.name}の必要数`}
+                            type="number" min={1} max={Math.min(1000, resource.capacity)}
+                            value={resourceAssignments.get(resource.id) ?? 1}
+                            disabled={!canManageResources || !resource.isActive}
+                            onChange={(event) => setResourceQuantity(resource.id, Number(event.target.value))}
+                            className="border-hairline rounded-control w-20 border px-2 py-1 tabular-nums"
+                          />
+                          / {resource.capacity}
+                        </label>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+            {canManageResources ? (
+              <button
+                type="button"
+                onClick={() => void submitResources()}
+                disabled={resourceSaving || resourceLoadError !== null}
+                className="border-accent text-accent rounded-control border px-3 py-2 text-sm font-semibold disabled:opacity-50"
+              >
+                {resourceSaving ? '設備の割当を保存中…' : '設備の割当を保存'}
+              </button>
+            ) : (
+              <p className="text-ink-faint text-xs">設備の割当は閲覧のみです。変更は管理者へ依頼してください。</p>
+            )}
+            {resourceMessage && <p role="status" className="text-xs text-ink-secondary">{resourceMessage}</p>}
+          </div>
 
           {/* 受付条件。空欄は「制限しない」で、これまでと同じ動きになる。 */}
           <div className="border-hairline space-y-3 rounded-lg border p-3">

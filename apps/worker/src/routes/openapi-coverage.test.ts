@@ -210,6 +210,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'GET /api/users/{id}/accounts',
   'PATCH /api/hq/banners/images/{id}',
   'PATCH /api/booking/admin/resources/{id}',
+  'PUT /api/booking/admin/menus/{id}/resources',
   'PATCH /api/hq/banners/projects/{id}',
   'PATCH /api/hq/templates/{id}',
   'PATCH /api/line-accounts/{id}',
