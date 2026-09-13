@@ -50,6 +50,12 @@ describe('Deploy Cloudflare Staging workflow', () => {
     expect(workflow).not.toContain('echo "$CLOUDFLARE_ACCOUNT_ID"');
   });
 
+  it('passes the staging Turnstile site key to the admin build', () => {
+    expect(workflow).toContain(
+      'NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${{ vars.NEXT_PUBLIC_TURNSTILE_SITE_KEY }}',
+    );
+  });
+
   it('uses separate Worker and Pages credentials with safe fallbacks', () => {
     expect(workflow).toContain(
       'secrets.CLOUDFLARE_WORKERS_API_TOKEN || secrets.CLOUDFLARE_API_TOKEN || secrets.CF_API_TOKEN',
