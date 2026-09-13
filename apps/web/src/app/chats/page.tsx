@@ -591,6 +591,10 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   const chatListRequestRef = useRef(0)
   const emailListRequestRef = useRef(0)
   const emailMoreLockRef = useRef(false)
+  // 描画中の条件と、各一覧が最後まで取得できた条件を結び付ける。
+  // useEffect が loading を立てる前の1描画でも、旧条件の0件を新条件の0件と誤認しない。
+  const [chatListCompletedKey, setChatListCompletedKey] = useState<string | null>(null)
+  const [emailListCompletedKey, setEmailListCompletedKey] = useState<string | null>(null)
 
   // メール一覧の1ページ件数。上限200切りっぱなしだった offset なし取得を、
   // LINE側と同じく「さらに読み込む」で遡れるようにする。
@@ -659,6 +663,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
         setLoadingMoreEmails(false)
       }
       if (!append && listFilterKeyRef.current === listFilterKey && emailListRequestRef.current === requestId) {
+        setEmailListCompletedKey(listFilterKey)
         setEmailLoading(false)
       }
     }
@@ -697,7 +702,10 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
       setChatListFailed(true)
       setError('チャットの読み込みに失敗しました。もう一度お試しください。')
     } finally {
-      if (listFilterKeyRef.current === listFilterKey && chatListRequestRef.current === requestId) setLoading(false)
+      if (listFilterKeyRef.current === listFilterKey && chatListRequestRef.current === requestId) {
+        setChatListCompletedKey(listFilterKey)
+        setLoading(false)
+      }
     }
   }, [buildListParams, listFilterKey])
 
@@ -1440,7 +1448,10 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   )
   // 入力からdebounce反映までを「0件」と断定しない。古い条件の結果が一瞬見えるため。
   const nameQueryPending = nameQuery.trim() !== debouncedNameQuery
+  const currentFilterNotLoaded = (channel !== 'email' && chatListCompletedKey !== listFilterKey)
+    || (channel !== 'line' && emailListCompletedKey !== listFilterKey)
   const inboxListLoading = nameQueryPending
+    || currentFilterNotLoaded
     || (channel !== 'email' && loading)
     || (channel !== 'line' && emailLoading)
   const inboxListFailed = (channel !== 'email' && chatListFailed)
@@ -1985,7 +1996,6 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                 })
                   const rows = [...mailRows, ...lineRows]
                     .sort((a, b) => String(b.at).localeCompare(String(a.at)))
-                  if (rows.length > 0) return rows.map((row) => row.node)
                   if (inboxListLoading) {
                     return (
                       <div
@@ -1997,6 +2007,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                       </div>
                     )
                   }
+                  if (rows.length > 0) return rows.map((row) => row.node)
                   // 障害を0件と誤認させない。具体的な理由は各チャネルのエラー表示に任せる。
                   if (inboxListFailed) return null
                   return (
