@@ -122,9 +122,9 @@ function formatKeys(keys: string[]): string {
  * - ALLOWLIST_MAX: 未記載負債はここより増やせない
  * 後続票で記載を増やしたら、実測に合わせて両方を同じ PR で更新する。
  */
-// 本流の95件に、#19 の統括バナー生成17口、#20〜#21 の6口、#22 の課金5口、#23 の認証7口を足して130件。
-const DOCUMENTED_MIN = 130;
-const ALLOWLIST_MAX = 777;
+// 本流の95件に、#19 の統括バナー生成17口、#20〜#21 の6口、#22 の課金5口、#23 の認証7口、#754 の予約設定2口を足して132件。
+const DOCUMENTED_MIN = 132;
+const ALLOWLIST_MAX = 776;
 
 /**
  * PR #1456 時点の記載済み 83 件＋本流で増えた 5 件＋#655 休憩 4 件
@@ -157,6 +157,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'GET /api/auth/register/check',
   'GET /api/booking/admin/staff/{id}/break-dates',
   'GET /api/booking/admin/staff/{id}/breaks',
+  'GET /api/booking/admin/settings',
   'GET /api/broadcasts',
   'GET /api/broadcasts/{id}',
   'GET /api/common-actions/resources',
@@ -258,6 +259,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'POST /api/users/match',
   'POST /api/webhooks/maintenance/secret-backfill',
   'POST /webhook',
+  'PUT /api/booking/admin/settings',
   'PUT /api/affiliates/{id}',
   'PUT /api/booking/admin/staff/{id}/break-dates',
   'PUT /api/booking/admin/staff/{id}/breaks',
@@ -272,7 +274,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
 ]);
 
 const ALLOWLIST = new Set<string>([
-  // 機能「booking」の管理画面用API（OpenAPI未記載・順次記載）（42件）
+  // 機能「booking」の管理画面用API（OpenAPI未記載・順次記載）（41件）
   'DELETE /api/booking/admin/menus/{id}',
   'DELETE /api/booking/admin/staff/{id}',
   'DELETE /api/booking/admin/staff/{id}/google-calendar',
@@ -292,7 +294,6 @@ const ALLOWLIST = new Set<string>([
   'GET /api/booking/admin/requests',
   'GET /api/booking/admin/requests-summary',
   'GET /api/booking/admin/resources',
-  'GET /api/booking/admin/settings',
   'GET /api/booking/admin/staff',
   'GET /api/booking/admin/staff/{id}/availability-rules',
   'GET /api/booking/admin/staff/{id}/google-calendar',

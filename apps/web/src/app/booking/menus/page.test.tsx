@@ -19,9 +19,12 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 
 const fixture = vi.hoisted(() => ({
   selectedAccountId: 'account-a' as string | null,
+  activeTab: 'menus',
   tagsList: null as null | (() => Promise<unknown>),
   updateMenu: null as null | ((...args: unknown[]) => Promise<unknown>),
   listMenus: null as null | ((...args: unknown[]) => Promise<unknown>),
+  getSettings: null as null | ((...args: unknown[]) => Promise<unknown>),
+  saveSettings: null as null | ((...args: unknown[]) => Promise<unknown>),
 }))
 
 /**
@@ -54,7 +57,7 @@ vi.mock('@/contexts/account-context', () => ({
 
 vi.mock('@/components/layout/merged-tabs', () => ({
   default: () => <nav aria-label="予約設定のタブ" />,
-  useMergedTab: () => 'menus',
+  useMergedTab: () => fixture.activeTab,
 }))
 
 vi.mock('@/app/booking/staff/page', () => ({
@@ -81,12 +84,14 @@ vi.mock('@/lib/api', () => {
       updateMenu: (...args: unknown[]) => fixture.updateMenu!(...args),
       listMenus: (...args: unknown[]) => fixture.listMenus!(...args),
       patchMenu: async () => ({ ok: true }),
-      getSettings: async () => ({ success: true, data: { menuCount: 1 } }),
+      getSettings: (...args: unknown[]) => fixture.getSettings!(...args),
+      saveSettings: (...args: unknown[]) => fixture.saveSettings!(...args),
     },
   }
 })
 
 import MenusPage from './page'
+import { ApiError } from '@/lib/api'
 
 /** 同アカウントの有効タグ／同アカウントの整理済み／別アカウントの有効タグ。 */
 const TAGS = [
@@ -97,6 +102,27 @@ const TAGS = [
   { id: 'tag-b-only', name: 'B店だけの分類', color: '#555555', createdAt: '2026-09-01T00:00:00Z', lineAccountId: 'account-b', status: 'active' },
 ]
 
+const SETTINGS = {
+  id: null,
+  lineAccountId: 'account-a',
+  organizationName: '本店',
+  version: 0,
+  timeZone: 'Asia/Tokyo',
+  bookingWindowDays: 60,
+  cutoffMinutesBefore: 1440,
+  cancelDeadlineMinutesBefore: 1440,
+  maxActiveBookingsPerFriend: 1,
+  approvalMode: 'automatic',
+  holdMinutes: 15,
+  slotGranularityMinutes: 15,
+  menuCount: 0,
+  activeMenuCount: 0,
+  inactiveMenuCount: 0,
+  businessHours: [],
+  exceptions: [],
+  updatedAt: '2026-09-01T00:00:00+09:00',
+}
+
 /** 選べる中身。プルダウンの option をそのまま読む。 */
 function optionLabels(select: HTMLSelectElement): string[] {
   return [...select.querySelectorAll('option')].map((option) => option.textContent ?? '')
@@ -104,9 +130,15 @@ function optionLabels(select: HTMLSelectElement): string[] {
 
 beforeEach(() => {
   fixture.selectedAccountId = 'account-a'
+  fixture.activeTab = 'menus'
   fixture.tagsList = async () => ({ success: true, data: TAGS })
   fixture.updateMenu = vi.fn(async () => ({ ok: true }))
   fixture.listMenus = vi.fn(async () => ({ menus: [] }))
+  fixture.getSettings = vi.fn(async () => ({ success: true, data: SETTINGS }))
+  fixture.saveSettings = vi.fn(async (_accountId, body: Record<string, unknown>) => ({
+    success: true,
+    data: { ...SETTINGS, ...body, id: 'settings-a', version: 1 },
+  }))
 })
 
 afterEach(() => {
@@ -224,5 +256,103 @@ describe('既存メニューの編集窓: 予約申込時に自動付与する�
     await openEditor({ auto_tag_id: null })
     expect(optionLabels(autoTagSelect())).toEqual(['— なし —'])
     expect(screen.getByText('このアカウントに使えるタグがありません。タグなしで保存できます。')).toBeTruthy()
+  })
+})
+
+describe('店舗共通の予約ルール', () => {
+  test('行が無い店舗の既定値を編集し、version=0で初回保存する', async () => {
+    fixture.activeTab = 'rules'
+    render(<MenusPage />)
+
+    const windowDays = await screen.findByRole('spinbutton', { name: '何日先まで受け付けるか' })
+    expect((windowDays as HTMLInputElement).value).toBe('60')
+    fireEvent.change(windowDays, { target: { value: '90' } })
+    fireEvent.change(screen.getByRole('combobox', { name: /予約の承認/ }), {
+      target: { value: 'manual' },
+    })
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '基本ルールを作成' }))
+    })
+
+    await waitFor(() => { expect(fixture.saveSettings).toHaveBeenCalled() })
+    expect(fixture.saveSettings).toHaveBeenCalledWith('account-a', expect.objectContaining({
+      expectedVersion: 0,
+      bookingWindowDays: 90,
+      approvalMode: 'manual',
+      slotGranularityMinutes: 15,
+    }))
+    expect((await screen.findByRole('status')).textContent).toContain('予約の基本ルールを保存しました。')
+  })
+
+  test('版競合は自動上書きせず、最新内容の読み直しを案内する', async () => {
+    fixture.activeTab = 'rules'
+    fixture.getSettings = vi.fn(async () => ({ success: true, data: { ...SETTINGS, id: 'settings-a', version: 3 } }))
+    fixture.saveSettings = vi.fn(async () => {
+      throw new ApiError(409, 'version_conflict', 'version_conflict')
+    })
+    render(<MenusPage />)
+
+    await screen.findByRole('button', { name: '変更を保存' })
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '変更を保存' }))
+    })
+
+    expect((await screen.findByRole('alert')).textContent).toContain('ほかの担当者が先に保存しました。')
+    expect(screen.getByRole('button', { name: '最新の内容を読み直す' })).toBeTruthy()
+  })
+
+  test('既存行は読み込んだversionを付けて更新する', async () => {
+    fixture.activeTab = 'rules'
+    fixture.getSettings = vi.fn(async () => ({ success: true, data: { ...SETTINGS, id: 'settings-a', version: 3 } }))
+    fixture.saveSettings = vi.fn(async (_accountId, body: Record<string, unknown>) => ({
+      success: true,
+      data: { ...SETTINGS, ...body, id: 'settings-a', version: 4 },
+    }))
+    render(<MenusPage />)
+
+    const holdMinutes = await screen.findByRole('spinbutton', { name: '仮押さえの保持時間' })
+    fireEvent.change(holdMinutes, { target: { value: '30' } })
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '変更を保存' }))
+    })
+
+    await waitFor(() => { expect(fixture.saveSettings).toHaveBeenCalled() })
+    expect(fixture.saveSettings).toHaveBeenCalledWith('account-a', expect.objectContaining({
+      expectedVersion: 3,
+      holdMinutes: 30,
+    }))
+    expect((await screen.findByRole('status')).textContent).toContain('予約の基本ルールを保存しました。')
+  })
+
+  test('保存待ち中に店舗を切り替えても、旧店舗の応答を新店舗へ反映しない', async () => {
+    fixture.activeTab = 'rules'
+    fixture.getSettings = vi.fn(async (accountId: string) => ({
+      success: true,
+      data: accountId === 'account-b'
+        ? { ...SETTINGS, id: 'settings-b', lineAccountId: 'account-b', version: 2, bookingWindowDays: 30 }
+        : SETTINGS,
+    }))
+    let resolveOldSave!: (value: unknown) => void
+    fixture.saveSettings = vi.fn(() => new Promise((resolve) => { resolveOldSave = resolve }))
+    render(<MenusPage />)
+
+    await screen.findByRole('button', { name: '基本ルールを作成' })
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '基本ルールを作成' }))
+    })
+    switchAccount('account-b')
+
+    const currentWindowDays = await screen.findByRole('spinbutton', { name: '何日先まで受け付けるか' })
+    await waitFor(() => { expect((currentWindowDays as HTMLInputElement).value).toBe('30') })
+    await act(async () => {
+      resolveOldSave({
+        success: true,
+        data: { ...SETTINGS, id: 'settings-a', version: 1, bookingWindowDays: 90 },
+      })
+      await Promise.resolve()
+    })
+
+    expect((screen.getByRole('spinbutton', { name: '何日先まで受け付けるか' }) as HTMLInputElement).value).toBe('30')
+    expect(screen.queryByRole('status')).toBeNull()
   })
 })

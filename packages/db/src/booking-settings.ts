@@ -58,6 +58,17 @@ export interface BookingAdminSettings {
   updatedAt: string;
 }
 
+export interface BookingAdminSettingsInput {
+  timeZone: string;
+  bookingWindowDays: number;
+  cutoffMinutesBefore: number;
+  cancelDeadlineMinutesBefore: number;
+  maxActiveBookingsPerFriend: number;
+  approvalMode: 'automatic' | 'manual';
+  holdMinutes: number;
+  slotGranularityMinutes: 5 | 10 | 15 | 30 | 60;
+}
+
 export interface BookingAdminResource {
   id: string;
   lineAccountId: string;
@@ -192,6 +203,93 @@ export async function getBookingAdminSettings(
     exceptions: (exceptionResult.results ?? []).map(serializeBookingException),
     updatedAt: setting?.updated_at ?? account.created_at,
   };
+}
+
+/**
+ * 店舗共通の予約ルールを版付きで保存する。
+ *
+ * version=0 はまだ行が無い店舗の初回保存だけに使う。INSERT ... SELECT で
+ * line_accounts の存在を同じ文の中で確かめるため、存在しないアカウントへ
+ * 孤立した設定行を作らない。既存行は line_account_id と version の両方を
+ * UPDATE 条件に含め、読んだ後に別の保存が入った場合は上書きしない。
+ */
+export async function saveBookingAdminSettings(
+  db: D1Database,
+  input: BookingAdminSettingsInput & {
+    lineAccountId: string;
+    expectedVersion: number;
+  },
+): Promise<
+  | { status: 'created' | 'updated'; item: BookingAdminSettings }
+  | { status: 'conflict'; currentVersion: number }
+  | { status: 'not_found' }
+> {
+  const now = jstNow();
+  let changed = 0;
+  if (input.expectedVersion === 0) {
+    const result = await db.prepare(`INSERT INTO booking_settings
+      (id, line_account_id, timezone, booking_window_days, cutoff_minutes_before,
+       cancel_deadline_minutes_before, max_active_bookings_per_friend,
+       approval_mode, hold_minutes, slot_granularity_minutes, created_at, updated_at)
+      SELECT ?, id, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+      FROM line_accounts
+      WHERE id = ?
+      ON CONFLICT(line_account_id) DO NOTHING`)
+      .bind(
+        crypto.randomUUID(),
+        input.timeZone,
+        input.bookingWindowDays,
+        input.cutoffMinutesBefore,
+        input.cancelDeadlineMinutesBefore,
+        input.maxActiveBookingsPerFriend,
+        input.approvalMode,
+        input.holdMinutes,
+        input.slotGranularityMinutes,
+        now,
+        now,
+        input.lineAccountId,
+      )
+      .run();
+    changed = result.meta.changes ?? 0;
+  } else {
+    const result = await db.prepare(`UPDATE booking_settings
+      SET timezone = ?, booking_window_days = ?, cutoff_minutes_before = ?,
+          cancel_deadline_minutes_before = ?, max_active_bookings_per_friend = ?,
+          approval_mode = ?, hold_minutes = ?, slot_granularity_minutes = ?,
+          version = version + 1, updated_at = ?
+      WHERE line_account_id = ? AND version = ?`)
+      .bind(
+        input.timeZone,
+        input.bookingWindowDays,
+        input.cutoffMinutesBefore,
+        input.cancelDeadlineMinutesBefore,
+        input.maxActiveBookingsPerFriend,
+        input.approvalMode,
+        input.holdMinutes,
+        input.slotGranularityMinutes,
+        now,
+        input.lineAccountId,
+        input.expectedVersion,
+      )
+      .run();
+    changed = result.meta.changes ?? 0;
+  }
+
+  if (changed > 0) {
+    const item = await getBookingAdminSettings(db, input.lineAccountId);
+    return item
+      ? { status: input.expectedVersion === 0 ? 'created' : 'updated', item }
+      : { status: 'not_found' };
+  }
+
+  const current = await db.prepare(`SELECT la.id AS account_id, bs.version
+    FROM line_accounts la
+    LEFT JOIN booking_settings bs ON bs.line_account_id = la.id
+    WHERE la.id = ?`)
+    .bind(input.lineAccountId)
+    .first<{ account_id: string; version: number | null }>();
+  if (!current) return { status: 'not_found' };
+  return { status: 'conflict', currentVersion: Number(current.version ?? 0) };
 }
 
 export async function listBookingAdminResources(

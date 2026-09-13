@@ -8,6 +8,7 @@ import {
   createBookingAvailabilityException,
   getBookingAdminSettings,
   listBookingAvailabilityExceptions,
+  saveBookingAdminSettings,
   updateBookingAvailabilityException,
   updateBookingMenuSettings,
 } from '../src/booking-settings.js';
@@ -135,6 +136,43 @@ describe('migration 323 店舗共通の予約設定', () => {
       })],
     });
     await expect(getBookingAdminSettings(db, 'missing')).resolves.toBeNull();
+  });
+
+  it('行が無い実在店舗だけに既定行を作り、以後は版が一致した更新だけを通す', async () => {
+    sqlite.prepare(`DELETE FROM booking_settings WHERE line_account_id = 'account-b'`).run();
+    const initial = {
+      lineAccountId: 'account-b',
+      expectedVersion: 0,
+      timeZone: 'Asia/Tokyo',
+      bookingWindowDays: 60,
+      cutoffMinutesBefore: 1440,
+      cancelDeadlineMinutesBefore: 1440,
+      maxActiveBookingsPerFriend: 1,
+      approvalMode: 'automatic' as const,
+      holdMinutes: 15,
+      slotGranularityMinutes: 15 as const,
+    };
+    await expect(saveBookingAdminSettings(db, initial)).resolves.toMatchObject({
+      status: 'created', item: { lineAccountId: 'account-b', version: 1 },
+    });
+    await expect(saveBookingAdminSettings(db, initial)).resolves.toEqual({
+      status: 'conflict', currentVersion: 1,
+    });
+    await expect(saveBookingAdminSettings(db, {
+      ...initial,
+      expectedVersion: 1,
+      bookingWindowDays: 90,
+      approvalMode: 'manual',
+    })).resolves.toMatchObject({
+      status: 'updated',
+      item: { version: 2, bookingWindowDays: 90, approvalMode: 'manual' },
+    });
+    await expect(saveBookingAdminSettings(db, {
+      ...initial,
+      lineAccountId: 'missing-account',
+    })).resolves.toEqual({ status: 'not_found' });
+    expect(sqlite.prepare(`SELECT COUNT(*) AS count FROM booking_settings`).get())
+      .toEqual({ count: 2 });
   });
 
   it('休業・短縮・臨時営業を対象別に保存し、古い版と別店舗を拒否する', async () => {

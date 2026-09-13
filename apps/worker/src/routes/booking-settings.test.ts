@@ -161,6 +161,118 @@ describe('店舗共通の予約設定API', () => {
     });
   });
 
+  test('未設定の実在店舗へ既定値を作り、版一致の更新だけを保存する', async () => {
+    const { app, env } = makeApp(db);
+    const initialBody = {
+      expectedVersion: 0,
+      timeZone: 'Asia/Tokyo',
+      bookingWindowDays: 60,
+      cutoffMinutesBefore: 1440,
+      cancelDeadlineMinutesBefore: 1440,
+      maxActiveBookingsPerFriend: 1,
+      approvalMode: 'automatic',
+      holdMinutes: 15,
+      slotGranularityMinutes: 15,
+    };
+    const created = await app.request('/api/booking/admin/settings?account_id=account-empty', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(initialBody),
+    }, env);
+    expect(created.status).toBe(201);
+    await expect(created.json()).resolves.toMatchObject({
+      success: true,
+      data: { lineAccountId: 'account-empty', version: 1, bookingWindowDays: 60 },
+    });
+
+    const updated = await app.request('/api/booking/admin/settings?account_id=account-empty', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...initialBody, expectedVersion: 1, bookingWindowDays: 90 }),
+    }, env);
+    expect(updated.status).toBe(200);
+    await expect(updated.json()).resolves.toMatchObject({
+      success: true,
+      data: { version: 2, bookingWindowDays: 90 },
+    });
+
+    const stale = await app.request('/api/booking/admin/settings?account_id=account-empty', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...initialBody, expectedVersion: 1, bookingWindowDays: 120 }),
+    }, env);
+    expect(stale.status).toBe(409);
+    await expect(stale.json()).resolves.toMatchObject({
+      code: 'version_conflict', data: { currentVersion: 2 },
+    });
+    expect(sqlite.prepare(`SELECT booking_window_days, version FROM booking_settings
+      WHERE line_account_id = 'account-empty'`).get()).toEqual({
+      booking_window_days: 90, version: 2,
+    });
+  });
+
+  test('存在しない店舗へ設定を作らず、担当外の店舗は保存処理前に拒否する', async () => {
+    const body = JSON.stringify({
+      expectedVersion: 0,
+      timeZone: 'Asia/Tokyo',
+      bookingWindowDays: 60,
+      cutoffMinutesBefore: 1440,
+      cancelDeadlineMinutesBefore: 1440,
+      maxActiveBookingsPerFriend: 1,
+      approvalMode: 'automatic',
+      holdMinutes: 15,
+      slotGranularityMinutes: 15,
+    });
+    const { app, env } = makeApp(db);
+    const missing = await app.request('/api/booking/admin/settings?account_id=missing-account', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body,
+    }, env);
+    expect(missing.status).toBe(404);
+
+    accountAccessMocks.canAccessAllLineAccounts.mockResolvedValueOnce(false);
+    const forbidden = await app.request('/api/booking/admin/settings?account_id=account-b', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body,
+    }, env);
+    expect(forbidden.status).toBe(403);
+    expect(sqlite.prepare(`SELECT booking_window_days, version FROM booking_settings
+      WHERE line_account_id = 'account-b'`).get()).toBeUndefined();
+  });
+
+  test('スタッフは店舗共通の予約ルールを保存できない', async () => {
+    const { app, env } = makeApp(db, 'staff');
+    const res = await app.request('/api/booking/admin/settings?account_id=account-a', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: '{}',
+    }, env);
+    expect(res.status).toBe(403);
+  });
+
+  test.each([
+    ['expectedVersion', { expectedVersion: -1 }],
+    ['受付期間', { bookingWindowDays: 0 }],
+    ['受付締切', { cutoffMinutesBefore: 43_201 }],
+    ['キャンセル期限', { cancelDeadlineMinutesBefore: -1 }],
+    ['同時予約数', { maxActiveBookingsPerFriend: 101 }],
+    ['承認方式', { approvalMode: 'sometimes' }],
+    ['保持時間', { holdMinutes: 0 }],
+    ['予約枠の間隔', { slotGranularityMinutes: 20 }],
+    ['タイムゾーン', { timeZone: 'not/a-time-zone' }],
+  ])('%sの範囲外を400で拒否する', async (_label, change) => {
+    const { app, env } = makeApp(db);
+    const res = await app.request('/api/booking/admin/settings?account_id=account-a', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        expectedVersion: 1,
+        timeZone: 'Asia/Tokyo',
+        bookingWindowDays: 60,
+        cutoffMinutesBefore: 1440,
+        cancelDeadlineMinutesBefore: 1440,
+        maxActiveBookingsPerFriend: 1,
+        approvalMode: 'automatic',
+        holdMinutes: 15,
+        slotGranularityMinutes: 15,
+        ...change,
+      }),
+    }, env);
+    expect(res.status).toBe(400);
+  });
+
   test('取得失敗はDB詳細を返さず、担当外アカウントは処理前に403', async () => {
     const broken = {
       prepare: () => { throw new Error('private database detail'); },
