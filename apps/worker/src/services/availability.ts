@@ -447,12 +447,19 @@ export async function getAvailability(
       WHERE bs.line_account_id = ? ORDER BY bh.weekday, bh.start_time`)
       .bind(params.lineAccountId)
       .all<{ weekday: number; start_time: string; end_time: string; capacity: number }>(),
-    db.prepare(`SELECT r.id, r.capacity, mr.quantity
+    db.prepare(`SELECT mr.resource_id AS id, mr.quantity, r.capacity,
+                       r.line_account_id AS resource_account_id, r.is_active
       FROM booking_menu_resources mr
-      INNER JOIN booking_resources r ON r.id = mr.resource_id
-      WHERE mr.menu_id = ? AND r.line_account_id = ? AND r.is_active = 1`)
-      .bind(params.menuId, params.lineAccountId)
-      .all<{ id: string; capacity: number; quantity: number }>(),
+      LEFT JOIN booking_resources r ON r.id = mr.resource_id
+      WHERE mr.menu_id = ?`)
+      .bind(params.menuId)
+      .all<{
+        id: string;
+        capacity: number | null;
+        quantity: number;
+        resource_account_id: string | null;
+        is_active: number | null;
+      }>(),
     // 休業日・例外日。要求アカウントのものだけ読む（他アカウントの休業を見ない）。
     // 期間が要求範囲と重なる行だけに絞る。変更直後に読むため結果を溜め置かない。
     db.prepare(`SELECT scope_kind, scope_id, date_from, date_to, kind, hours_json
@@ -468,8 +475,25 @@ export async function getAvailability(
   ]);
   // 店舗のタイムゾーンで日付・時刻を読む。未設定・壊れた値は Asia/Tokyo。
   const timeZone = normalizeTimeZone(settingsRow?.timezone ?? FALLBACK_TIME_ZONE);
-  const resourceCapacity = (menuResources.results ?? []).reduce(
-    (min, row) => Math.min(min, Math.floor(Number(row.capacity) / Math.max(1, Number(row.quantity)))),
+  const requiredResources = menuResources.results ?? [];
+  const hasInvalidResource = requiredResources.some((row) =>
+    row.capacity == null
+    || row.resource_account_id !== params.lineAccountId
+    || row.is_active !== 1
+    || !Number.isInteger(Number(row.quantity))
+    || Number(row.quantity) < 1
+    || Number(row.quantity) > Number(row.capacity));
+  if (hasInvalidResource) {
+    return {
+      by_staff: staffRows.results.map((staff) => ({
+        staff_id: staff.id,
+        display_name: staff.display_name,
+        slots: [],
+      })),
+    };
+  }
+  const resourceCapacity = requiredResources.reduce(
+    (min, row) => Math.min(min, Math.floor(Number(row.capacity) / Number(row.quantity))),
     Number.POSITIVE_INFINITY,
   );
   const menuResourceIds = new Set(
@@ -518,6 +542,28 @@ export async function getAvailability(
     )
     .bind(params.lineAccountId, rangeEnd.toISOString(), rangeStart.toISOString())
     .all<{ staff_id: string; menu_id: string; starts_at: string; block_ends_at: string }>();
+
+  // 現在のメニューが必要とする資源について、予約時点のsnapshot消費を
+  // スタッフ・メニュー横断で読む。現在のメニュー割当を過去予約へ再適用しない。
+  const resourceBookings = requiredResources.length === 0
+    ? { results: [] as Array<{ resource_id: string; quantity: number; starts_at: string; block_ends_at: string }> }
+    : await db.prepare(
+      `SELECT brc.resource_id, brc.quantity, b.starts_at, b.block_ends_at
+         FROM booking_resource_consumptions brc
+         INNER JOIN bookings b ON b.id = brc.booking_id
+         INNER JOIN booking_menu_resources current_requirement
+           ON current_requirement.resource_id = brc.resource_id
+          AND current_requirement.menu_id = ?
+        WHERE brc.line_account_id = ?
+          AND b.status IN ('requested', 'confirmed')
+          AND julianday(b.starts_at) < julianday(?)
+          AND julianday(b.block_ends_at) > julianday(?)`,
+    ).bind(
+      params.menuId,
+      params.lineAccountId,
+      rangeEnd.toISOString(),
+      rangeStart.toISOString(),
+    ).all<{ resource_id: string; quantity: number; starts_at: string; block_ends_at: string }>();
 
   const menuForCalc = {
     duration_minutes: menu.override_duration ?? menu.duration_minutes,
@@ -725,7 +771,7 @@ export async function getAvailability(
       // 外の予定は定員に関係なく塞ぐ（sameMenu を付けない）。
       if (googleBusy) dayBookings.push(...googleBusyForDate(googleBusy, date, timeZone));
       // Staff/menu concurrency is distinct from the store-wide seat budget.
-      const staffCapacity = Math.max(1, Math.min(Number(menu.concurrent_capacity ?? 1), resourceCapacity));
+      const staffCapacity = Math.max(1, Number(menu.concurrent_capacity ?? 1));
       const daySlots = computeSlots({
         working: workingList,
         busy: dayBookings,
@@ -791,8 +837,44 @@ export async function getAvailability(
         const sameMenuCount = Math.max(wallSameCount, instantSameCount);
         const storeSeats = storeSeatsForSlot(storeWindows, storeBookings, slotStartMs, slotEndMs);
         if (storeSeats.remaining === 0) continue;
-        const effectiveCapacity = Math.min(staffCapacity, storeSeats.capacity);
-        const remaining = Math.max(0, Math.min(staffCapacity - sameMenuCount, storeSeats.remaining));
+        let resourceRemaining = Number.POSITIVE_INFINITY;
+        for (const resource of requiredResources) {
+          const overlaps = (resourceBookings.results ?? []).flatMap((booking) => {
+            if (booking.resource_id !== resource.id) return [];
+            const startMs = new Date(booking.starts_at).getTime();
+            const endMs = new Date(booking.block_ends_at).getTime();
+            return startMs < slotEndMs && slotStartMs < endMs
+              ? [{ startMs, endMs, quantity: Number(booking.quantity) }]
+              : [];
+          });
+          const points = [
+            slotStartMs,
+            ...overlaps.map((booking) => booking.startMs)
+              .filter((point) => slotStartMs < point && point < slotEndMs),
+          ];
+          const peakUsed = points.reduce((peak, point) => Math.max(
+            peak,
+            overlaps.reduce(
+              (used, booking) => used + (
+                booking.startMs <= point && point < booking.endMs ? booking.quantity : 0
+              ),
+              0,
+            ),
+          ), 0);
+          resourceRemaining = Math.min(
+            resourceRemaining,
+            Math.max(0, Math.floor(
+              (Number(resource.capacity) - peakUsed) / Number(resource.quantity),
+            )),
+          );
+        }
+        if (resourceRemaining === 0) continue;
+        const effectiveCapacity = Math.min(staffCapacity, storeSeats.capacity, resourceCapacity);
+        const remaining = Math.max(0, Math.min(
+          staffCapacity - sameMenuCount,
+          storeSeats.remaining,
+          resourceRemaining,
+        ));
         slots.push({
           date,
           start: slot.start,
