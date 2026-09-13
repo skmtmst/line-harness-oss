@@ -333,7 +333,20 @@ describe('友だち情報欄', () => {
     ).run(JSON.stringify([{ id: 'address', friendFieldId: field.id }]));
     sqlite.prepare(`INSERT INTO form_accounts (form_id, line_account_id) VALUES ('form-1', 'account-1')`).run();
     expect(await getFriendFieldUsageForScope(db, [field.id], SCOPE)).toEqual([
-      { kind: 'form', id: 'form-1', name: '申込フォーム', fieldId: field.id, switchable: true },
+      { kind: 'form', id: 'form-1', name: '申込フォーム', fieldId: field.id, switchable: false },
+    ]);
+  });
+
+  test('下書きから外した友だち項目も現在の公開版が使う間は使用中にする', async () => {
+    const field = await createFriendField(db, { name: '住所', fieldKey: 'published_address', type: 'textarea' });
+    sqlite.prepare(
+      `INSERT INTO forms (id, name, fields, status) VALUES ('form-published', '公開中フォーム', ?, 'active')`,
+    ).run(JSON.stringify([{ id: 'address', friendFieldId: field.id }]));
+    sqlite.prepare(`INSERT INTO form_accounts (form_id, line_account_id) VALUES ('form-published', 'account-1')`).run();
+    sqlite.prepare(`UPDATE forms SET fields = '[]' WHERE id = 'form-published'`).run();
+
+    expect(await getFriendFieldUsageForScope(db, [field.id], SCOPE)).toEqual([
+      { kind: 'form', id: 'form-published', name: '公開中フォーム', fieldId: field.id, switchable: false },
     ]);
   });
 

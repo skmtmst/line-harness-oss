@@ -1,6 +1,20 @@
 import { adminSessionHeaders } from './admin-session'
 import type { SegmentCondition } from './segment-condition'
 import type {
+  BannerDeliveryResult,
+  BannerGeneration,
+  BannerGenerationInput,
+  BannerImage,
+  BannerPresetsResponse,
+  BannerProject,
+  BannerProjectDetail,
+  BannerRunResult,
+  BannerStats,
+  BannerUsage,
+} from './hq-banners'
+import type { HqSupportKind, HqSupportRequest } from './hq-support'
+import type { BillingInvoice, BillingSummary, PlanKey } from './hq-billing'
+import type {
   ReminderDraftSettings,
   ReminderDraftVersion,
   ReminderPreviewResult,
@@ -2094,6 +2108,21 @@ export type FollowerImportState = {
   profileErrors: number
   lastError: string | null
 }
+export type LineAccountConnectStep = {
+  order: 1 | 2 | 3 | 4 | 5
+  state: 'passed' | 'failed' | 'skipped'
+  message: string
+}
+export type LineAccountConnectData = {
+  steps: LineAccountConnectStep[]
+  id?: string
+  displayName?: string
+  pictureUrl: string | null
+  basicId: string | null
+  liffId?: string
+  followerImport: Pick<FollowerImportState, 'capability' | 'phase'>
+  remainingActions: string[]
+}
 export type FriendFormSubmission = {
   id: string
   formId: string
@@ -3502,6 +3531,8 @@ export type NenCampaignSetting = {
   buttonLabel: string | null
   buttonUrl: string | null
   imageUrl: string | null
+  dedupWindowDays: number
+  excludeFormRespondents: boolean
   afterActions: NenCampaignAfterAction[]
   updatedAt: string
 }
@@ -5020,6 +5051,10 @@ export const api = {
            * されていた。型に無いものは、来ていないことに誰も気づけない。
            */
           contentRevision: number
+          /** お客さまに出している不変版。null は未公開。 */
+          publishedVersionId: string | null
+          /** 現在公開版の元になった編集版。 */
+          publishedContentRevision: number | null
         }>
       >(`/api/forms/${id}?account_id=${encodeURIComponent(accountId)}`),
     create: (
@@ -5064,6 +5099,17 @@ export const api = {
         `/api/forms/${id}?account_id=${encodeURIComponent(accountId)}`,
         { method: 'PUT', body: JSON.stringify(data) },
       ),
+    publish: (id: string, accountId: string, expectedContentRevision: number) =>
+      fetchApi<ApiResponse<{
+        id: string
+        versionNumber: number
+        contentRevision: number
+        publishedAt: string
+        replayed: boolean
+      }>>(`/api/forms/${id}/publish?account_id=${encodeURIComponent(accountId)}`, {
+        method: 'POST',
+        body: JSON.stringify({ expectedContentRevision }),
+      }),
     deleteImpact: (id: string, accountId: string) =>
       fetchApi<ApiResponse<FormDeleteImpact>>(
         `/api/forms/${id}/delete-impact?account_id=${encodeURIComponent(accountId)}`,
@@ -6023,6 +6069,128 @@ export const api = {
         body: JSON.stringify({ name }),
       }),
   },
+  /** 統括の課金（★V6 36-2）。形は `apps/worker/src/routes/hq-billing.ts`。 */
+  hqBilling: {
+    summary: () => fetchApi<ApiResponse<BillingSummary>>('/api/hq/billing/summary'),
+    /** Stripe の申込画面の URL。オーナーだけ。 */
+    checkout: (planKey: PlanKey) =>
+      fetchApi<ApiResponse<{ url: string }>>('/api/hq/billing/checkout', { method: 'POST', body: JSON.stringify({ planKey }) }),
+    /** 支払い方法・解約（Stripe のカスタマーポータル）の URL。 */
+    portal: () => fetchApi<ApiResponse<{ url: string }>>('/api/hq/billing/portal', { method: 'POST', body: JSON.stringify({}) }),
+    invoices: () => fetchApi<ApiResponse<BillingInvoice[]>>('/api/hq/billing/invoices'),
+  },
+  /** 統括から運営へのお問い合わせ（★V6 36-3）。形は `apps/worker/src/routes/hq-support.ts`。 */
+  hqSupport: {
+    kinds: () => fetchApi<ApiResponse<Array<{ key: HqSupportKind; label: string }>>>('/api/hq/support/kinds'),
+    list: () => fetchApi<ApiResponse<HqSupportRequest[]>>('/api/hq/support/requests'),
+    create: (input: {
+      kind: HqSupportKind
+      subject: string
+      body: string
+      lineAccountId?: string | null
+      attachments?: Array<{ mimeType: string; data: string }>
+    }) =>
+      fetchApi<ApiResponse<HqSupportRequest & { notified: boolean }>>('/api/hq/support/requests', {
+        method: 'POST',
+        body: JSON.stringify(input),
+      }),
+  },
+  /**
+   * 統括「バナー生成」。統括の管理者・オーナーだけが呼べる。
+   * 形は `apps/worker/src/routes/hq-banners.ts`、説明は `docs/hq-banner-generation.md`。
+   */
+  hqBanners: {
+    presets: () => fetchApi<ApiResponse<BannerPresetsResponse>>('/api/hq/banners/presets'),
+    usage: () => fetchApi<ApiResponse<BannerUsage>>('/api/hq/banners/usage'),
+    /** 数値カード帯の数（プロジェクト数・店舗へ渡した画像と店舗の数）。 */
+    stats: () => fetchApi<ApiResponse<BannerStats>>('/api/hq/banners/stats'),
+    projects: {
+      list: (params?: { archived?: boolean; q?: string }) => {
+        const q = new URLSearchParams()
+        if (params?.archived) q.set('archived', '1')
+        if (params?.q) q.set('q', params.q)
+        const query = q.toString()
+        return fetchApi<ApiResponse<BannerProject[]>>(`/api/hq/banners/projects${query ? `?${query}` : ''}`)
+      },
+      create: (input: { name: string; description?: string | null }) =>
+        fetchApi<ApiResponse<BannerProject>>('/api/hq/banners/projects', {
+          method: 'POST',
+          body: JSON.stringify(input),
+        }),
+      get: (id: string) =>
+        fetchApi<ApiResponse<BannerProjectDetail>>(`/api/hq/banners/projects/${encodeURIComponent(id)}`),
+      update: (
+        id: string,
+        input: { name?: string; description?: string | null; isFavorite?: boolean; archived?: boolean },
+      ) =>
+        fetchApi<ApiResponse<BannerProject>>(`/api/hq/banners/projects/${encodeURIComponent(id)}`, {
+          method: 'PATCH',
+          body: JSON.stringify(input),
+        }),
+      duplicate: (id: string) =>
+        fetchApi<ApiResponse<BannerProject>>(`/api/hq/banners/projects/${encodeURIComponent(id)}/duplicate`, {
+          method: 'POST',
+          body: JSON.stringify({}),
+        }),
+      /** 条件を登録するだけ。画像はまだ作らない。 */
+      createGeneration: (id: string, input: BannerGenerationInput) =>
+        fetchApi<ApiResponse<BannerGeneration>>(`/api/hq/banners/projects/${encodeURIComponent(id)}/generations`, {
+          method: 'POST',
+          body: JSON.stringify(input),
+        }),
+      /** 手持ちの画像を取り込む。data は base64（data: なし）。 */
+      upload: (id: string, input: { filename: string; mimeType: string; data: string }) =>
+        fetchApi<ApiResponse<BannerImage>>(`/api/hq/banners/projects/${encodeURIComponent(id)}/uploads`, {
+          method: 'POST',
+          body: JSON.stringify(input),
+        }),
+    },
+    generations: {
+      get: (id: string) =>
+        fetchApi<ApiResponse<BannerGeneration>>(`/api/hq/banners/generations/${encodeURIComponent(id)}`),
+      /** 1回で1枚作る。画面が枚数ぶん繰り返す。 */
+      run: (id: string) =>
+        fetchApi<ApiResponse<BannerRunResult>>(`/api/hq/banners/generations/${encodeURIComponent(id)}/run`, {
+          method: 'POST',
+          body: JSON.stringify({}),
+        }),
+      cancel: (id: string) =>
+        fetchApi<ApiResponse<BannerGeneration>>(`/api/hq/banners/generations/${encodeURIComponent(id)}/cancel`, {
+          method: 'POST',
+          body: JSON.stringify({}),
+        }),
+    },
+    images: {
+      list: (params?: { projectId?: string; favorite?: boolean; preset?: string; q?: string; before?: string; limit?: number }) => {
+        const q = new URLSearchParams()
+        if (params?.projectId) q.set('projectId', params.projectId)
+        if (params?.favorite) q.set('favorite', '1')
+        if (params?.preset) q.set('preset', params.preset)
+        if (params?.q) q.set('q', params.q)
+        if (params?.before) q.set('before', params.before)
+        if (params?.limit) q.set('limit', String(params.limit))
+        const query = q.toString()
+        return fetchApi<ApiResponse<BannerImage[]> & { nextBefore?: string | null }>(
+          `/api/hq/banners/images${query ? `?${query}` : ''}`,
+        )
+      },
+      get: (id: string) => fetchApi<ApiResponse<BannerImage>>(`/api/hq/banners/images/${encodeURIComponent(id)}`),
+      update: (id: string, input: { isFavorite?: boolean; projectId?: string }) =>
+        fetchApi<ApiResponse<BannerImage>>(`/api/hq/banners/images/${encodeURIComponent(id)}`, {
+          method: 'PATCH',
+          body: JSON.stringify(input),
+        }),
+      /** 一覧から外す。実体と渡した先は残る。 */
+      remove: (id: string) =>
+        fetchApi<ApiResponse<null>>(`/api/hq/banners/images/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+      /** 店舗へ渡す。同じ店舗へ二度渡しても増えない。 */
+      deliver: (id: string, lineAccountIds: string[]) =>
+        fetchApi<ApiResponse<BannerDeliveryResult>>(`/api/hq/banners/images/${encodeURIComponent(id)}/deliver`, {
+          method: 'POST',
+          body: JSON.stringify({ lineAccountIds }),
+        }),
+    },
+  },
   /** はじめの設定の順路。台帳 #134。**毎回いまの中身を数える（キャッシュしない）。** */
   gettingStarted: {
     get: (accountId?: string) =>
@@ -6229,6 +6397,24 @@ export const api = {
         method: 'POST',
         body: JSON.stringify(data),
       }),
+    connectCheck: (data: {
+      name?: string
+      channelId: string
+      channelSecret: string
+      loginChannelId: string
+      loginChannelSecret: string
+    }) => fetchApi<ApiResponse<LineAccountConnectData>>('/api/line-accounts/connect/check', {
+      method: 'POST', body: JSON.stringify(data),
+    }),
+    connect: (data: {
+      name?: string
+      channelId: string
+      channelSecret: string
+      loginChannelId: string
+      loginChannelSecret: string
+    }) => fetchApi<ApiResponse<LineAccountConnectData>>('/api/line-accounts/connect', {
+      method: 'POST', body: JSON.stringify(data),
+    }),
     // Smart method routing:
     //   - rotating Messaging credentials (channelAccessToken / channelSecret)
     //     requires PUT (owner-only on the worker)
@@ -7584,7 +7770,7 @@ export const api = {
       `/api/nen-campaigns/settings?lineAccountId=${encodeURIComponent(accountId)}`,
     ),
     updateSetting: (accountId: string, campaignKey: string, data: Pick<NenCampaignSetting,
-      'isEnabled' | 'title' | 'bodyText' | 'delayDays' | 'deliveryTime' | 'buttonLabel' | 'buttonUrl' | 'imageUrl' | 'afterActions'>) =>
+      'isEnabled' | 'title' | 'bodyText' | 'delayDays' | 'deliveryTime' | 'buttonLabel' | 'buttonUrl' | 'imageUrl' | 'dedupWindowDays' | 'excludeFormRespondents' | 'afterActions'>) =>
       fetchApi<{ success: boolean }>(`/api/nen-campaigns/settings/${encodeURIComponent(campaignKey)}?lineAccountId=${encodeURIComponent(accountId)}`, {
         method: 'PUT', body: JSON.stringify(data),
       }),
@@ -8432,6 +8618,11 @@ export const api = {
       }),
     loginSummary: (id: string) =>
       fetchApi<ApiResponse<{ loginCount: number }>>(`/api/staff/${id}/login-summary`),
+    /** 権限者ごとの最終ログイン（統括のメンバー管理）。記録が無い人は入らない。 */
+    lastLogins: () => fetchApi<ApiResponse<Record<string, string>>>('/api/staff/last-logins'),
+    /** 招待メールを送り直す。まだメールを確認していない人だけ。 */
+    resendInvite: (id: string) =>
+      fetchApi<ApiResponse<StaffMember>>(`/api/staff/${encodeURIComponent(id)}/resend-invite`, { method: 'POST', body: JSON.stringify({}) }),
     delete: (id: string) =>
       fetchApi<ApiResponse<StaffMember>>(`/api/staff/${id}`, { method: 'DELETE' }),
     acceptInvitation: (token: string) =>
@@ -10209,6 +10400,14 @@ export type WebinarNotificationSettingsInput = Omit<
   'webinarId' | 'version' | 'updatedAt'
 >
 
+export type WebinarSkipReasonCount = {
+  /** 記録された理由の符号。古い行では null のことがある。 */
+  code: string | null
+  /** 画面に出す日本語。 */
+  label: string
+  count: number
+}
+
 export type WebinarNotificationOverview = {
   total: number
   pending: number
@@ -10216,6 +10415,13 @@ export type WebinarNotificationOverview = {
   failed: number
   skipped: number
   cancelled: number
+  /**
+   * 見送りの内訳（#745）。
+   *
+   * 「見送り 5件」だけでは、**視聴済みだから送らなかった**（正常）のか、
+   * **対象回が終了済みで落ちた**（もう取り戻せない）のかが分かりません。
+   */
+  skippedReasons: WebinarSkipReasonCount[]
   audience: {
     people: number
     bookings: number

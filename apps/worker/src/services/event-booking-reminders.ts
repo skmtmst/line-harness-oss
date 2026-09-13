@@ -72,9 +72,16 @@ export async function insertRemindersForBooking(
       .prepare(
         `INSERT INTO event_booking_reminders
            (id, booking_id, kind, scheduled_at, status, retry_count)
-         VALUES (?, ?, ?, ?, 'pending', 0)`,
+         SELECT ?, ?, ?, ?, 'pending', 0
+          WHERE NOT EXISTS (
+            SELECT 1 FROM event_booking_reminders
+             WHERE booking_id = ? AND kind = ? AND scheduled_at = ?
+          )`,
       )
-      .bind(crypto.randomUUID(), booking_id, r.kind, r.scheduled_at)
+      .bind(
+        crypto.randomUUID(), booking_id, r.kind, r.scheduled_at,
+        booking_id, r.kind, r.scheduled_at,
+      )
       .run();
   }
 }

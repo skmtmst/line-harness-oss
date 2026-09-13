@@ -1,0 +1,29 @@
+name: Musubo service site
+
+on:
+  pull_request:
+    paths:
+      - "sites/musubo/**"
+      - ".github/workflows/musubo-site-ci.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: musubo-site-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  site:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+      - name: Test isolated static site
+        run: node --test sites/musubo/test/*.test.mjs
+      - name: Build review site (never deploy)
+        run: node sites/musubo/build.mjs

@@ -104,7 +104,7 @@ export type EventWaitlistPromotionResult =
   | { kind: 'conflict'; currentVersion: number }
   | {
       kind: 'noop';
-      reason: 'no_waiting' | 'no_capacity' | 'offer_pending' | 'occurrence_started' | 'party_too_large';
+      reason: 'no_waiting' | 'no_capacity' | 'offer_pending' | 'occurrence_started' | 'party_too_large' | 'applicant_ineligible';
       occurrenceVersion: number;
       promoted: null;
     }
@@ -119,6 +119,28 @@ export type EventWaitlistPromotionResult =
         offeredAt: string;
         expiresAt: string;
       };
+    };
+
+export type EventWaitlistAcceptanceResult =
+  | { kind: 'not_found' }
+  | { kind: 'expired' }
+  | { kind: 'unavailable' }
+  | {
+      kind: 'accepted';
+      newlyConverted: boolean;
+      bookingId: string;
+      lineAccountId: string;
+      friendId: string;
+      lineUserId: string;
+      eventId: string;
+      occurrenceId: string;
+      eventName: string;
+      startsAt: string;
+      venueName: string | null;
+      venueUrl: string | null;
+      confirmationExtra: string | null;
+      reminderDayBeforeEnabled: boolean;
+      reminderHoursBefore: number | null;
     };
 
 function parseSnapshot(value: string | null): unknown | null {
@@ -319,6 +341,197 @@ async function sha256(value: string): Promise<string> {
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
+interface WaitlistOfferAcceptanceRow {
+  id: string;
+  line_account_id: string;
+  friend_id: string;
+  line_user_id: string;
+  event_id: string;
+  slot_id: string;
+  status: string;
+  offer_expires_at: string | null;
+  event_name: string;
+  starts_at: string;
+  venue_name: string | null;
+  venue_url: string | null;
+  confirmation_message_extra: string | null;
+  reminder_day_before_enabled: number;
+  reminder_hours_before: number | null;
+}
+
+/**
+ * 期限付きの繰上げ案内を、本人の明示承諾で確定予約へ変換する。
+ * token は保存せずハッシュだけ照合し、同じURLの再送は同じ予約を返す。
+ */
+export async function acceptEventWaitlistOffer(
+  db: D1Database,
+  params: { token: string; callerLineUserId: string; now?: Date },
+): Promise<EventWaitlistAcceptanceResult> {
+  if (params.token.length < 32 || params.token.length > 256) return { kind: 'not_found' };
+  const tokenHash = await sha256(params.token);
+  const now = params.now ?? new Date();
+  const nowIso = now.toISOString();
+  const offer = await db
+    .prepare(
+      `SELECT w.id, w.line_account_id, w.friend_id, f.line_user_id,
+              w.event_id, w.slot_id, w.status, w.offer_expires_at,
+              e.name AS event_name, s.starts_at, e.venue_name, e.venue_url,
+              e.confirmation_message_extra, e.reminder_day_before_enabled,
+              e.reminder_hours_before
+         FROM event_waitlist w
+         JOIN friends f ON f.id = w.friend_id AND f.line_account_id = w.line_account_id
+         JOIN events e ON e.id = w.event_id AND e.deleted_at IS NULL
+         JOIN event_slots s ON s.id = w.slot_id AND s.deleted_at IS NULL
+        WHERE w.offer_token_hash = ? AND f.line_user_id = ?
+        LIMIT 1`,
+    )
+    .bind(tokenHash, params.callerLineUserId)
+    .first<WaitlistOfferAcceptanceRow>();
+  if (!offer) return { kind: 'not_found' };
+
+  const bookingId = `event-waitlist:${offer.id}`;
+  if (offer.status === 'offered' && (!offer.offer_expires_at || offer.offer_expires_at <= nowIso)) {
+    const sourceKey = `waitlist:${offer.id}:offer-expired`;
+    // 失効と次候補のjobを同じtransactionへ入れる。失効だけ成功すると、
+    // 次の待ち人が永久に案内されないため、別々には確定しない。
+    await db.batch([
+      db.prepare(
+        `UPDATE event_waitlist
+            SET status = 'expired', version = version + 1, updated_at = ?
+          WHERE id = ? AND status = 'offered' AND offer_token_hash = ?
+            AND (offer_expires_at IS NULL OR offer_expires_at <= ?)`,
+      )
+        .bind(nowIso, offer.id, tokenHash, nowIso),
+      db.prepare(
+        `INSERT OR IGNORE INTO event_waitlist_promotion_jobs (
+           id, line_account_id, event_id, slot_id, source_key,
+           status, attempts, available_at, created_at, updated_at
+         )
+         SELECT ?, line_account_id, event_id, slot_id, ?, 'pending', 0, ?, ?, ?
+           FROM event_waitlist
+          WHERE id = ? AND status = 'expired' AND offer_token_hash = ?`,
+      ).bind(crypto.randomUUID(), sourceKey, nowIso, nowIso, nowIso, offer.id, tokenHash),
+    ]);
+    return { kind: 'expired' };
+  }
+
+  if (!['offered', 'accepted', 'converted'].includes(offer.status)) {
+    return { kind: 'unavailable' };
+  }
+
+  const results = await db.batch([
+    db.prepare(
+      `UPDATE event_waitlist
+          SET status = 'accepted', version = version + 1, updated_at = ?
+        WHERE id = ? AND status = 'offered' AND offer_token_hash = ?
+          AND offer_expires_at > ?
+          AND NOT EXISTS (
+            SELECT 1 FROM event_bookings b
+             WHERE b.event_id = event_waitlist.event_id
+               AND b.slot_id = event_waitlist.slot_id
+               AND b.identity_key = event_waitlist.identity_key
+               AND b.status IN ('requested','confirmed')
+          )
+          AND EXISTS (
+            SELECT 1 FROM event_slots slot
+             WHERE slot.id = event_waitlist.slot_id
+               AND (slot.capacity IS NULL OR (
+                 COALESCE((SELECT SUM(b.party_size) FROM event_bookings b
+                   WHERE b.slot_id = slot.id AND b.status IN ('requested','confirmed')), 0)
+                 + COALESCE((SELECT SUM(w.party_size) FROM event_waitlist w
+                   WHERE w.slot_id = slot.id AND w.status IN ('offered','accepted')), 0)
+               ) <= slot.capacity)
+          )
+          AND EXISTS (
+            SELECT 1 FROM events e WHERE e.id = event_waitlist.event_id
+              AND (e.max_bookings_per_friend IS NULL OR (
+                (SELECT COUNT(*) FROM event_bookings b
+                  WHERE b.event_id = e.id AND b.identity_key = event_waitlist.identity_key
+                    AND b.status IN ('requested','confirmed'))
+                + (SELECT COUNT(*) FROM event_waitlist held
+                    WHERE held.event_id = e.id AND held.identity_key = event_waitlist.identity_key
+                      AND held.status IN ('offered','accepted'))
+              ) <= e.max_bookings_per_friend)
+          )`,
+    ).bind(nowIso, offer.id, tokenHash, nowIso),
+    db.prepare(
+      `INSERT OR IGNORE INTO event_bookings (
+         id, line_account_id, event_id, slot_id, friend_id, status, requested_at,
+         identity_key, party_size, answer_snapshot_json, first_participation,
+         first_participation_attended_count, first_participation_checked_at,
+         created_at, updated_at
+       )
+       SELECT ?, w.line_account_id, w.event_id, w.slot_id, w.friend_id, 'confirmed', ?,
+              w.identity_key, w.party_size, w.answer_snapshot_json, w.first_participation,
+              w.first_participation_attended_count, w.first_participation_checked_at, ?, ?
+         FROM event_waitlist w
+         JOIN friends f ON f.id = w.friend_id AND f.line_account_id = w.line_account_id
+         JOIN events e ON e.id = w.event_id AND e.deleted_at IS NULL
+         JOIN event_slots slot ON slot.id = w.slot_id AND slot.deleted_at IS NULL
+        WHERE w.id = ? AND w.status = 'accepted' AND w.offer_token_hash = ?
+          AND f.line_user_id = ?
+          AND NOT EXISTS (
+            SELECT 1 FROM event_bookings same_slot
+             WHERE same_slot.event_id = w.event_id AND same_slot.slot_id = w.slot_id
+               AND same_slot.identity_key = w.identity_key
+               AND same_slot.status IN ('requested','confirmed')
+          )
+          AND (slot.capacity IS NULL OR (
+            COALESCE((SELECT SUM(b.party_size) FROM event_bookings b
+              WHERE b.slot_id = slot.id AND b.status IN ('requested','confirmed')), 0)
+            + COALESCE((SELECT SUM(held.party_size) FROM event_waitlist held
+              WHERE held.slot_id = slot.id AND held.id != w.id
+                AND held.status IN ('offered','accepted')), 0)
+            + w.party_size
+          ) <= slot.capacity)
+          AND (e.max_bookings_per_friend IS NULL OR (
+            (SELECT COUNT(*) FROM event_bookings b
+              WHERE b.event_id = e.id AND b.identity_key = w.identity_key
+                AND b.status IN ('requested','confirmed'))
+            + (SELECT COUNT(*) FROM event_waitlist held
+                WHERE held.event_id = e.id AND held.identity_key = w.identity_key
+                  AND held.id != w.id AND held.status IN ('offered','accepted'))
+            + 1
+          ) <= e.max_bookings_per_friend)`,
+    ).bind(bookingId, nowIso, nowIso, nowIso, offer.id, tokenHash, params.callerLineUserId),
+    db.prepare(
+      `UPDATE event_waitlist
+          SET status = 'converted', version = version + 1, updated_at = ?
+        WHERE id = ? AND status = 'accepted' AND offer_token_hash = ?
+          AND EXISTS (SELECT 1 FROM event_bookings b WHERE b.id = ?)`,
+    ).bind(nowIso, offer.id, tokenHash, bookingId),
+  ]);
+
+  const converted = await db
+    .prepare(
+      `SELECT 1 AS found FROM event_waitlist w
+        JOIN event_bookings b ON b.id = ? AND b.event_id = w.event_id
+          AND b.slot_id = w.slot_id AND b.friend_id = w.friend_id
+       WHERE w.id = ? AND w.status = 'converted' AND w.offer_token_hash = ?`,
+    )
+    .bind(bookingId, offer.id, tokenHash)
+    .first<{ found: number }>();
+  if (!converted) return { kind: 'unavailable' };
+
+  return {
+    kind: 'accepted',
+    newlyConverted: (results[2]?.meta?.changes ?? 0) > 0,
+    bookingId,
+    lineAccountId: offer.line_account_id,
+    friendId: offer.friend_id,
+    lineUserId: offer.line_user_id,
+    eventId: offer.event_id,
+    occurrenceId: offer.slot_id,
+    eventName: offer.event_name,
+    startsAt: offer.starts_at,
+    venueName: offer.venue_name,
+    venueUrl: offer.venue_url,
+    confirmationExtra: offer.confirmation_message_extra,
+    reminderDayBeforeEnabled: offer.reminder_day_before_enabled === 1,
+    reminderHoursBefore: offer.reminder_hours_before,
+  };
+}
+
 export async function promoteEventWaitlist(
   db: D1Database,
   params: {
@@ -418,16 +631,73 @@ export async function promoteEventWaitlist(
   const expiresAt = new Date(
     now.getTime() + (params.offerHours ?? DEFAULT_OFFER_HOURS) * 3600_000,
   ).toISOString();
+  // 事前SELECTの空席は他の予約・繰上げで変わる。人数分の容量確認と
+  // offered（期限付き席保留）への遷移を、同じSQLの中で確定する。
+  // 案内なし判定も再検査し、古い読取結果で次の待ちを追い越さない。
   const claimed = await db
     .prepare(
       `UPDATE event_waitlist
           SET status = 'offered', offered_at = ?, offer_expires_at = ?,
               offer_token_hash = ?, version = version + 1, updated_at = ?
-        WHERE id = ? AND status = 'waiting' AND version = ?`,
+        WHERE id = ? AND status = 'waiting' AND version = ?
+          AND EXISTS (
+            SELECT 1 FROM event_slots slot
+             WHERE slot.id = event_waitlist.slot_id AND slot.capacity IS NOT NULL
+               AND COALESCE((SELECT SUM(b.party_size) FROM event_bookings b
+                     WHERE b.slot_id = slot.id AND b.status IN ('requested','confirmed')), 0)
+                 + COALESCE((SELECT SUM(held.party_size) FROM event_waitlist held
+                     WHERE held.slot_id = slot.id AND held.status IN ('offered','accepted')), 0)
+                 + event_waitlist.party_size <= slot.capacity
+          )
+          AND NOT EXISTS (
+            SELECT 1 FROM event_waitlist pending
+             WHERE pending.slot_id = event_waitlist.slot_id
+               AND pending.status = 'offered' AND pending.offer_expires_at > ?
+          )
+          AND NOT EXISTS (
+            SELECT 1 FROM event_bookings b
+             WHERE b.event_id = event_waitlist.event_id
+               AND b.slot_id = event_waitlist.slot_id
+               AND b.identity_key = event_waitlist.identity_key
+               AND b.status IN ('requested','confirmed')
+          )
+          AND EXISTS (
+            SELECT 1 FROM events e WHERE e.id = event_waitlist.event_id
+              AND (e.max_bookings_per_friend IS NULL OR (
+                (SELECT COUNT(*) FROM event_bookings b
+                  WHERE b.event_id = e.id AND b.identity_key = event_waitlist.identity_key
+                    AND b.status IN ('requested','confirmed'))
+                + (SELECT COUNT(*) FROM event_waitlist held
+                    WHERE held.event_id = e.id AND held.identity_key = event_waitlist.identity_key
+                      AND held.id != event_waitlist.id AND held.status IN ('offered','accepted'))
+              ) < e.max_bookings_per_friend)
+          )`,
     )
-    .bind(nowIso, expiresAt, tokenHash, nowIso, waiting.id, waiting.version)
+    .bind(nowIso, expiresAt, tokenHash, nowIso, waiting.id, waiting.version, nowIso)
     .run();
   if ((claimed.meta?.changes ?? 0) === 0) {
+    // 競合負けでは席も通知も確保しない。待ち順・版・申込内容を残す。
+    // 以下の再読取は表示理由だけに使い、席の確保判断には使わない。
+    const unchanged = await db
+      .prepare(`SELECT id FROM event_waitlist WHERE id = ? AND status = 'waiting' AND version = ?`)
+      .bind(waiting.id, waiting.version)
+      .first<{ id: string }>();
+    if (unchanged) {
+      const pending = await db
+        .prepare(`SELECT id FROM event_waitlist WHERE slot_id = ?
+                    AND status = 'offered' AND offer_expires_at > ? LIMIT 1`)
+        .bind(occurrence.id, nowIso)
+        .first<{ id: string }>();
+      if (pending) return { kind: 'noop', reason: 'offer_pending', occurrenceVersion, promoted: null };
+      const latest = await loadOccurrence(db, occurrence.id, params.lineAccountId);
+      if (latest?.capacity == null) {
+        return { kind: 'noop', reason: 'no_capacity', occurrenceVersion, promoted: null };
+      }
+      if (waiting.party_size > latest.capacity - await getEventOccurrenceUsedSeats(db, occurrence.id)) {
+        return { kind: 'noop', reason: 'party_too_large', occurrenceVersion, promoted: null };
+      }
+      return { kind: 'noop', reason: 'applicant_ineligible', occurrenceVersion, promoted: null };
+    }
     const latest = await loadOccurrence(db, occurrence.id, params.lineAccountId);
     return { kind: 'conflict', currentVersion: latest?.version ?? occurrence.version };
   }

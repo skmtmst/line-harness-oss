@@ -10,6 +10,8 @@ const DESIGN_SETTINGS = readFileSync(join(HERE, 'edit', 'form-design-settings.ts
 const RESPONSES_PAGE = readFileSync(join(HERE, 'responses', 'page.tsx'), 'utf8')
 const FORM_PREVIEW = readFileSync(join(HERE, '..', '..', 'components', 'forms', 'form-preview.tsx'), 'utf8')
 const API = readFileSync(join(HERE, '..', '..', 'lib', 'api.ts'), 'utf8')
+const FORM_OPERATIONS = readFileSync(join(HERE, '..', '..', 'components', 'forms', 'form-definition-operations.ts'), 'utf8')
+const FORM_VALIDATION = readFileSync(join(HERE, '..', '..', 'components', 'forms', 'form-definition-validation.ts'), 'utf8')
 
 describe('V6回答フォーム一覧', () => {
   it('EMBIKどおり画面名は共通トップバーだけに置く', () => {
@@ -228,9 +230,9 @@ describe('V6回答フォームの重大修正(#503 R1・R2)', () => {
   })
 
   it('複製で回答キーを一意にし、保存前に重複を止める', () => {
-    expect(EDIT_PAGE).toContain('function uniqueCopyName')
+    expect(FORM_OPERATIONS).toContain('function uniqueFormCopyName')
     expect(EDIT_PAGE).toContain('uniqueCopyName(source.name, taken)')
-    expect(EDIT_PAGE).toContain('回答キーが重なっています')
+    expect(FORM_VALIDATION).toContain('回答データの見出し「${block.name}」が重複しています')
     expect(EDIT_PAGE).not.toContain('`${source.name}_copy`')
     expect(EDIT_PAGE).not.toContain('`${b.name}_copy`')
   })

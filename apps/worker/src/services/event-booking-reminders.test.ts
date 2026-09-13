@@ -110,6 +110,13 @@ function memDB(state: { rows: ReminderRow[] }): D1Database {
         async run() {
           if (sql.startsWith('INSERT INTO event_booking_reminders')) {
             const [id, booking_id, kind, scheduled_at] = bound as [string, string, string, string];
+            if (state.rows.some((row) => (
+              row.booking_id === booking_id
+              && row.kind === kind
+              && row.scheduled_at === scheduled_at
+            ))) {
+              return { success: true, meta: { changes: 0 } };
+            }
             state.rows.push({ id, booking_id, kind, scheduled_at, status: 'pending', retry_count: 0 });
             return { success: true, meta: { changes: 1 } };
           }
@@ -150,6 +157,20 @@ describe('insertRemindersForBooking', () => {
     const db = memDB(state);
     await insertRemindersForBooking(db, 'b1', []);
     expect(state.rows).toHaveLength(0);
+  });
+
+  test('同じ予約の同じ通知を再登録しても重複しない', async () => {
+    const state = { rows: [] as ReminderRow[] };
+    const db = memDB(state);
+    const reminders = [
+      { kind: 'day_before' as const, scheduled_at: '2099-05-31T09:00:00.000Z' },
+      { kind: 'hours_before' as const, scheduled_at: '2099-06-01T08:00:00.000Z' },
+    ];
+
+    await insertRemindersForBooking(db, 'b1', reminders);
+    await insertRemindersForBooking(db, 'b1', reminders);
+
+    expect(state.rows).toHaveLength(2);
   });
 });
 

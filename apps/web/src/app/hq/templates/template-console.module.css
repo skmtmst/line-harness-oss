@@ -28,7 +28,8 @@
 .notice { padding: 14px; border-radius: var(--radius-control); background: var(--color-warning-bg); color: var(--color-warning); margin-bottom: 16px; }
 .error { background: var(--color-danger-bg); color: var(--color-danger); }
 .success { background: var(--color-success-bg); color: var(--color-success); }
-.account { display: flex; align-items: center; gap: 12px; padding: 16px 0; border-bottom: 1px solid var(--color-hairline); }
+.account { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 0; border-bottom: 1px solid var(--color-hairline); }
+.accountChoice { display: flex; align-items: center; gap: 12px; min-width: 0; flex: 1; }
 .account:last-child { border-bottom: 0; }
 .console input[type='checkbox'] { accent-color: var(--color-accent-deep); width: 16px; height: 16px; flex: none; }
 .selection { font-size: 28px; font-weight: 700; color: var(--color-accent-deep); }

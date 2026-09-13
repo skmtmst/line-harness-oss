@@ -1,6 +1,6 @@
 import { describe, expect, test, vi } from 'vitest';
 
-import { createTestD1, insertFriend } from '../test-utils/d1-sqlite.js';
+import { createTestD1, insertFriend, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import {
   calculateWebinarNotificationSchedule,
   enqueueWebinarCompletedNotification,
@@ -44,6 +44,415 @@ function seedBase(raw: import('better-sqlite3').Database) {
   ).run(NOW.toISOString(), NOW.toISOString());
   insertFriend(raw, 'friend-1', { line_account_id: 'account-1', line_user_id: 'U001' });
 }
+
+describe('緊急停止と通知取得・送信の競合 (#745)', () => {
+  const epoch = Math.floor(NOW.getTime() / 1000);
+  const deliveryOptions = {
+    now: NOW, proxyBaseUrl: 'https://worker.example.com',
+    defaultAccessToken: 'fallback', defaultLiffId: null,
+  };
+
+  async function fixture(count = 1) {
+    const store = createTestD1();
+    seedBase(store.raw);
+    await saveWebinarNotificationSettings(store.db, 'webinar-1', SETTINGS, NOW);
+    for (let index = 1; index <= count; index++) {
+      if (index > 1) insertFriend(store.raw, `friend-${index}`, {
+        line_account_id: 'account-1', line_user_id: `U${index}`,
+      });
+      await registerWebinarSession(store.db, 'webinar-1', `friend-${index}`, SESSION, NOW);
+    }
+    store.raw.prepare(`UPDATE webinar_notification_jobs SET scheduled_at=?, next_retry_at=? WHERE kind='day_before'`)
+      .run(epoch, epoch);
+    store.raw.prepare(`INSERT INTO operation_control_sets
+      (scope_key, line_account_id, version, states_json, updated_at)
+      VALUES ('account-1', 'account-1', 1, '{"reminder_dispatch":"running"}', ?)`)
+      .run(NOW.toISOString());
+    return store;
+  }
+
+  function stop(store: SqliteD1, stopped = true) {
+    store.raw.prepare(`UPDATE operation_control_sets SET states_json=? WHERE scope_key='account-1'`)
+      .run(JSON.stringify({ reminder_dispatch: stopped ? 'stopped' : 'running' }));
+  }
+
+  function state(store: SqliteD1) {
+    return store.raw.prepare(`SELECT status, attempt_count, lease_expires_at, next_retry_at, last_error_code
+      FROM webinar_notification_jobs WHERE kind='day_before'`).get();
+  }
+
+  // 故障点だけを差し込む。SELECT/UPDATE/changesはすべて実SQLiteの結果を使う。
+  function intercept(
+    db: D1Database,
+    hook: (sql: string, method: string, run: () => Promise<unknown>) => Promise<unknown>,
+  ): D1Database {
+    const wrap = (sql: string, statement: D1PreparedStatement): D1PreparedStatement => new Proxy(statement, {
+      get(target, key) {
+        if (key === 'bind') return (...args: unknown[]) => wrap(sql, target.bind(...args));
+        if (key === 'run' || key === 'all' || key === 'first') {
+          return () => hook(sql, key, () => target[key]());
+        }
+        return Reflect.get(target, key);
+      },
+    });
+    return new Proxy(db, {
+      get(target, key) {
+        if (key === 'prepare') return (sql: string) => wrap(sql, target.prepare(sql));
+        return Reflect.get(target, key);
+      },
+    });
+  }
+
+  // 本物のProxy認証・友だち検索・初回チャット作成・履歴保存も同じDBへ通す。
+  // 外部LINEだけ代役にし、waitUntilの記録まで待って全SQL文を数える。
+  async function proxyFixture(count: number) {
+    const store = await fixture(count);
+    for (let index = 1; index <= count; index++) {
+      store.raw.prepare('UPDATE friends SET line_user_id=? WHERE id=?')
+        .run(`U${index.toString(16).padStart(32, '0')}`, `friend-${index}`);
+    }
+    const { lineProxy } = await import('../routes/line-proxy.js');
+    let queries = 0;
+    const countedDb = intercept(store.db, async (_sql, _method, run) => {
+      queries++;
+      if (queries > 1000) throw new Error('D1 1000 queries per invocation exceeded');
+      return run();
+    });
+    return {
+      store,
+      async tick(now = NOW) {
+        queries = 0;
+        // この通知専用の1000枠ではない。他cron用に500文を先に消費して検証する。
+        for (let i = 0; i < 500; i++) await countedDb.prepare('SELECT 1').first();
+        const pending: Promise<unknown>[] = [];
+        const result = await processWebinarNotificationJobs(countedDb, {
+          ...deliveryOptions,
+          now,
+          proxyDispatch: (request) => Promise.resolve(lineProxy.fetch(request, {
+            DB: countedDb, LINE_CHANNEL_ACCESS_TOKEN: 'fallback',
+          }, {
+            waitUntil(promise: Promise<unknown>) { pending.push(promise); },
+            passThroughOnException() {},
+            props: {},
+          })),
+        });
+        await Promise.all(pending);
+        expect(queries).toBeLessThanOrEqual(1000);
+        // 実経路が増えても、500文の共通枠を削って黙って通さない。
+        expect(queries - 500).toBeLessThanOrEqual(400);
+        return { result, queries: queries - 500 };
+      },
+    };
+  }
+
+  test('実Proxy込み100件をD1上限内の複数tickに分け、送信と履歴を各1回にする', async () => {
+    const real = await proxyFixture(100);
+    const upstream = vi.fn(async (_url: RequestInfo | URL, _init?: RequestInit) => new Response('{}', { status: 200 }));
+    vi.stubGlobal('fetch', upstream);
+    try {
+      const counts: number[] = [];
+      const queries: number[] = [];
+      for (let tick = 0; tick < 5; tick++) {
+        const result = await real.tick();
+        counts.push(result.result.sent);
+        queries.push(result.queries);
+        expect(result.result).toMatchObject({ failed: 0, skipped: 0, heldByStop: 0 });
+      }
+      expect(counts).toEqual([20, 20, 20, 20, 20]);
+      expect(queries).toEqual([301, 301, 301, 301, 301]);
+      expect((await real.tick()).result.sent).toBe(0);
+      expect(upstream).toHaveBeenCalledTimes(100);
+      expect(new Set(upstream.mock.calls.map(([, init]) => new Headers(init?.headers).get('X-Line-Retry-Key'))).size).toBe(100);
+      expect(real.store.raw.prepare(`SELECT COUNT(*) AS n FROM webinar_notification_jobs
+        WHERE kind='day_before' AND status='succeeded' AND attempt_count=1 AND lease_expires_at IS NULL`).get()).toEqual({ n: 100 });
+      expect(real.store.raw.prepare('SELECT COUNT(*) AS n FROM messages_log').get()).toEqual({ n: 100 });
+      expect(real.store.raw.prepare('SELECT COUNT(*) AS n FROM chats').get()).toEqual({ n: 100 });
+    } finally {
+      vi.unstubAllGlobals();
+      real.store.raw.close();
+    }
+  });
+
+  async function addAccount(store: SqliteD1, account: number, firstFriend: number, count: number) {
+    store.raw.prepare(`INSERT INTO line_accounts
+      (id, channel_id, name, channel_access_token, channel_secret, is_active, liff_id)
+      VALUES (?, ?, '別店舗', ?, 'secret', 1, ?)`)
+      .run(`account-${account}`, `channel-${account}`, `token-${account}`, `liff-${account}`);
+    store.raw.prepare(`INSERT INTO account_settings (id, line_account_id, key, value)
+      VALUES (?, ?, 'feature.webinars', '{"enabled":true}')`)
+      .run(`feature-${account}`, `account-${account}`);
+    store.raw.prepare(`INSERT INTO webinars
+      (id, account_id, title, slug, status, duration_seconds, schedule_json, created_at, updated_at)
+      VALUES (?, ?, '別店舗説明会', ?, 'active', 3600, '[]', ?, ?)`)
+      .run(`webinar-${account}`, `account-${account}`, `live-${account}`, NOW.toISOString(), NOW.toISOString());
+    await saveWebinarNotificationSettings(store.db, `webinar-${account}`, SETTINGS, NOW);
+    for (let index = firstFriend; index < firstFriend + count; index++) {
+      insertFriend(store.raw, `friend-${index}`, {
+        line_account_id: `account-${account}`, line_user_id: `U${index.toString(16).padStart(32, '0')}`,
+      });
+      await registerWebinarSession(store.db, `webinar-${account}`, `friend-${index}`, SESSION, NOW);
+      store.raw.prepare(`UPDATE webinar_notification_jobs SET scheduled_at=?, next_retry_at=?
+        WHERE friend_id=? AND kind='day_before'`).run(epoch + 1 + index % 7, epoch + 1, `friend-${index}`);
+    }
+  }
+
+  test('停止20件があっても別2アカウントへ進み、100件を予算内で予定順に各1回送る', async () => {
+    const real = await proxyFixture(20);
+    await addAccount(real.store, 2, 21, 40);
+    await addAccount(real.store, 3, 61, 40);
+    stop(real.store);
+    const before = real.store.raw.prepare(`SELECT * FROM webinar_notification_jobs WHERE webinar_id='webinar-1' ORDER BY id`).all();
+    const expectedOrder = (accountSql: string) => (real.store.raw.prepare(`
+      SELECT f.line_user_id FROM webinar_notification_jobs j JOIN friends f ON f.id=j.friend_id
+      WHERE j.kind='day_before' AND ${accountSql} ORDER BY j.scheduled_at, j.id`).all() as Array<{ line_user_id: string }>).map(row => row.line_user_id);
+    const activeOrder = expectedOrder("j.webinar_id != 'webinar-1'");
+    const heldOrder = expectedOrder("j.webinar_id = 'webinar-1'");
+    const upstream = vi.fn(async (_url: RequestInfo | URL, _init?: RequestInit) => new Response('{}', { status: 200 }));
+    vi.stubGlobal('fetch', upstream);
+    try {
+      for (let tick = 1; tick <= 4; tick++) {
+        // 実cron同様、tickの時刻も5分ずつ進める。
+        expect((await real.tick(new Date(NOW.getTime() + tick * 300_000))).result)
+          .toEqual({ sent: 20, failed: 0, skipped: 0, heldByStop: 0 });
+      }
+      expect(real.store.raw.prepare(`SELECT * FROM webinar_notification_jobs WHERE webinar_id='webinar-1' ORDER BY id`).all()).toEqual(before);
+      expect(upstream.mock.calls.map(([, init]) => JSON.parse(String(init?.body)).to)).toEqual(activeOrder);
+      expect((await real.tick(new Date(NOW.getTime() + 5 * 300_000))).result)
+        .toEqual({ sent: 0, failed: 0, skipped: 0, heldByStop: 20 });
+      stop(real.store, false);
+      expect((await real.tick(new Date(NOW.getTime() + 6 * 300_000))).result.sent).toBe(20);
+      expect((await real.tick(new Date(NOW.getTime() + 7 * 300_000))).result.sent).toBe(0);
+      expect(upstream.mock.calls.map(([, init]) => JSON.parse(String(init?.body)).to)).toEqual([...activeOrder, ...heldOrder]);
+      expect(new Set(upstream.mock.calls.map(([, init]) => new Headers(init?.headers).get('X-Line-Retry-Key'))).size).toBe(100);
+      expect(real.store.raw.prepare(`SELECT COUNT(*) AS n FROM webinar_notification_jobs
+        WHERE kind='day_before' AND status='succeeded' AND attempt_count=1 AND lease_expires_at IS NULL`).get()).toEqual({ n: 100 });
+      expect(real.store.raw.prepare('SELECT COUNT(*) AS n FROM messages_log').get()).toEqual({ n: 100 });
+    } finally {
+      vi.unstubAllGlobals();
+      real.store.raw.close();
+    }
+  });
+
+  test('全体停止は全アカウントの行を保持し、全体解除後も個別停止は維持する', async () => {
+    const real = await proxyFixture(20);
+    await addAccount(real.store, 2, 21, 1);
+    stop(real.store);
+    real.store.raw.prepare(`INSERT INTO operation_control_sets
+      (scope_key, line_account_id, version, states_json, updated_at)
+      VALUES ('*', NULL, 1, '{"reminder_dispatch":"stopped"}', ?)`).run(NOW.toISOString());
+    const before = real.store.raw.prepare('SELECT * FROM webinar_notification_jobs ORDER BY id').all();
+    const upstream = vi.fn(async () => new Response('{}', { status: 200 }));
+    vi.stubGlobal('fetch', upstream);
+    try {
+      const now = new Date(NOW.getTime() + 300_000);
+      for (let tick = 0; tick < 2; tick++) {
+        expect((await real.tick(now)).result).toEqual({ sent: 0, failed: 0, skipped: 0, heldByStop: 20 });
+      }
+      expect(upstream).not.toHaveBeenCalled();
+      expect(real.store.raw.prepare('SELECT * FROM webinar_notification_jobs ORDER BY id').all()).toEqual(before);
+      real.store.raw.prepare(`DELETE FROM operation_control_sets WHERE scope_key='*'`).run();
+      expect((await real.tick(now)).result).toEqual({ sent: 1, failed: 0, skipped: 0, heldByStop: 19 });
+      expect(upstream).toHaveBeenCalledTimes(1);
+      expect(real.store.raw.prepare(`SELECT status, attempt_count FROM webinar_notification_jobs
+        WHERE friend_id='friend-21' AND kind='day_before'`).get()).toEqual({ status: 'succeeded', attempt_count: 1 });
+      expect(real.store.raw.prepare(`SELECT COUNT(*) AS n FROM webinar_notification_jobs
+        WHERE webinar_id='webinar-1' AND kind='day_before' AND status='queued' AND attempt_count=0`).get()).toEqual({ n: 20 });
+    } finally {
+      vi.unstubAllGlobals();
+      real.store.raw.close();
+    }
+  });
+
+  test('停止中の正本がJSON nullでも正常アカウントを塞がず、安全側で保留する', async () => {
+    const real = await proxyFixture(20);
+    await addAccount(real.store, 2, 21, 1);
+    real.store.raw.prepare(`UPDATE operation_control_sets
+      SET states_json=' null ', active_incident_id='incident-1' WHERE scope_key='account-1'`).run();
+    const before = real.store.raw.prepare(`SELECT * FROM webinar_notification_jobs WHERE webinar_id='webinar-1' ORDER BY id`).all();
+    const upstream = vi.fn(async () => new Response('{}', { status: 200 }));
+    vi.stubGlobal('fetch', upstream);
+    try {
+      expect((await real.tick(new Date(NOW.getTime() + 300_000))).result)
+        .toEqual({ sent: 1, failed: 0, skipped: 0, heldByStop: 19 });
+      expect(upstream).toHaveBeenCalledTimes(1);
+      expect(real.store.raw.prepare(`SELECT * FROM webinar_notification_jobs WHERE webinar_id='webinar-1' ORDER BY id`).all()).toEqual(before);
+    } finally {
+      vi.unstubAllGlobals();
+      real.store.raw.close();
+    }
+  });
+
+  test('実Proxy送信中の停止を次tickへ持ち越し、解除後は残りだけ1回ずつ送る', async () => {
+    const real = await proxyFixture(100);
+    const upstream = vi.fn(async (_url: RequestInfo | URL, _init?: RequestInit) => {
+      stop(real.store);
+      return new Response('{}', { status: 200 });
+    });
+    vi.stubGlobal('fetch', upstream);
+    try {
+      expect((await real.tick()).result).toEqual({ sent: 1, failed: 0, skipped: 0, heldByStop: 19 });
+      expect((await real.tick()).result).toEqual({ sent: 0, failed: 0, skipped: 0, heldByStop: 20 });
+      expect(upstream).toHaveBeenCalledTimes(1);
+      expect(real.store.raw.prepare(`SELECT COUNT(*) AS n FROM webinar_notification_jobs
+        WHERE kind='day_before' AND status='queued' AND attempt_count=0 AND lease_expires_at IS NULL`).get()).toEqual({ n: 99 });
+      stop(real.store, false);
+      upstream.mockImplementation(async () => new Response('{}', { status: 200 }));
+      const resumed = [];
+      for (let tick = 0; tick < 5; tick++) resumed.push((await real.tick()).result.sent);
+      expect(resumed).toEqual([20, 20, 20, 20, 19]);
+      expect((await real.tick()).result.sent).toBe(0);
+      expect(upstream).toHaveBeenCalledTimes(100);
+      expect(new Set(upstream.mock.calls.map(([, init]) => new Headers(init?.headers).get('X-Line-Retry-Key'))).size).toBe(100);
+      expect(real.store.raw.prepare('SELECT COUNT(*) AS n FROM messages_log').get()).toEqual({ n: 100 });
+    } finally {
+      vi.unstubAllGlobals();
+      real.store.raw.close();
+    }
+  });
+
+  test('100件の1件目送信中に停止すると残り99件は未取得で残り、解除後一度ずつ届く', async () => {
+    const store = await fixture(100);
+    let claims = 0;
+    const countedDb = intercept(store.db, async (sql, method, run) => {
+      if (method === 'run' && sql.includes("SET status='claimed', attempt_count")) claims++;
+      return run();
+    });
+    const dispatch = vi.fn(async (_request: Request) => {
+      stop(store);
+      return new Response('{}', { status: 200 });
+    });
+    expect(await processWebinarNotificationJobs(countedDb, { ...deliveryOptions, proxyDispatch: dispatch }))
+      .toEqual({ sent: 1, failed: 0, skipped: 0, heldByStop: 19 });
+    expect(dispatch).toHaveBeenCalledTimes(1);
+    expect(claims, '停止後の99件にはclaim自体を行わない').toBe(1);
+    expect(store.raw.prepare(`SELECT COUNT(*) AS count FROM webinar_notification_jobs
+      WHERE kind='day_before' AND status='queued' AND attempt_count=0 AND lease_expires_at IS NULL`).get())
+      .toEqual({ count: 99 });
+    stop(store, false);
+    dispatch.mockImplementation(async () => new Response('{}', { status: 200 }));
+    const resumed = [];
+    for (let tick = 0; tick < 5; tick++) {
+      resumed.push(await processWebinarNotificationJobs(store.db, { ...deliveryOptions, proxyDispatch: dispatch }));
+    }
+    expect(resumed.map((result) => result.sent)).toEqual([20, 20, 20, 20, 19]);
+    expect(resumed.every((result) => result.failed + result.skipped + result.heldByStop === 0)).toBe(true);
+    await processWebinarNotificationJobs(store.db, { ...deliveryOptions, proxyDispatch: dispatch });
+    expect(dispatch).toHaveBeenCalledTimes(100);
+    expect(new Set(dispatch.mock.calls.map(([request]) => request.headers.get('X-Line-Retry-Key'))).size).toBe(100);
+    store.raw.close();
+  });
+
+  test.each(['queued', 'retry_wait', 'claimed'] as const)(
+    '未停止判定後・claim直前に停止した%sは試行回数とleaseを消費せず、解除後一度だけ届く',
+    async (initialStatus) => {
+      const store = await fixture();
+      const attempts = initialStatus === 'queued' ? 0 : 2;
+      store.raw.prepare(`UPDATE webinar_notification_jobs SET status=?, attempt_count=?,
+        lease_expires_at=?, last_error_code=? WHERE kind='day_before'`)
+        .run(initialStatus, attempts, initialStatus === 'claimed' ? epoch - 1 : null,
+          initialStatus === 'retry_wait' ? 'line_temporary_failure' : null);
+      let raced = false;
+      const racedDb = intercept(store.db, async (sql, method, run) => {
+        if (!raced && method === 'run' && sql.includes("SET status='claimed', attempt_count")) {
+          raced = true;
+          stop(store);
+        }
+        return run();
+      });
+      const dispatch = vi.fn(async () => new Response('{}', { status: 200 }));
+      expect(await processWebinarNotificationJobs(racedDb, { ...deliveryOptions, proxyDispatch: dispatch }))
+        .toEqual({ sent: 0, failed: 0, skipped: 0, heldByStop: 1 });
+      expect(raced).toBe(true);
+      expect(dispatch).not.toHaveBeenCalled();
+      expect(state(store)).toEqual({
+        status: initialStatus === 'retry_wait' ? 'retry_wait' : 'queued',
+        attempt_count: attempts, lease_expires_at: null, next_retry_at: epoch,
+        last_error_code: initialStatus === 'retry_wait' ? 'line_temporary_failure' : null,
+      });
+      stop(store, false);
+      await processWebinarNotificationJobs(store.db, { ...deliveryOptions, proxyDispatch: dispatch });
+      await processWebinarNotificationJobs(store.db, { ...deliveryOptions, proxyDispatch: dispatch });
+      expect(dispatch).toHaveBeenCalledTimes(1);
+      expect(state(store)).toMatchObject({ status: 'succeeded', attempt_count: attempts + 1, lease_expires_at: null });
+      store.raw.close();
+    },
+  );
+
+  test('claim直前に停止した期限切れ通知を、停止中にskippedへ確定しない', async () => {
+    const store = await fixture();
+    store.raw.prepare(`UPDATE webinar_notification_jobs SET session_start_at=? WHERE kind='day_before'`)
+      .run(epoch - 3601);
+    const racedDb = intercept(store.db, async (sql, method, run) => {
+      if (method === 'run' && sql.includes("SET status='claimed', attempt_count")) stop(store);
+      return run();
+    });
+    const dispatch = vi.fn(async () => new Response('{}', { status: 200 }));
+    expect(await processWebinarNotificationJobs(racedDb, { ...deliveryOptions, proxyDispatch: dispatch }))
+      .toEqual({ sent: 0, failed: 0, skipped: 0, heldByStop: 1 });
+    expect(state(store)).toMatchObject({ status: 'queued', attempt_count: 0, lease_expires_at: null });
+    expect(dispatch).not.toHaveBeenCalled();
+    store.raw.close();
+  });
+
+  test('claim後の設定取得中に停止しても外部送信直前に止まり、解除後一度だけ届く', async () => {
+    const store = await fixture();
+    const racedDb = intercept(store.db, async (sql, method, run) => {
+      const result = await run();
+      if (method === 'first' && sql === 'SELECT liff_id FROM line_accounts WHERE id=?') stop(store);
+      return result;
+    });
+    const dispatch = vi.fn(async () => new Response('{}', { status: 200 }));
+    expect(await processWebinarNotificationJobs(racedDb, { ...deliveryOptions, proxyDispatch: dispatch }))
+      .toEqual({ sent: 0, failed: 0, skipped: 0, heldByStop: 1 });
+    expect(dispatch).not.toHaveBeenCalled();
+    expect(state(store)).toMatchObject({ status: 'queued', attempt_count: 0, lease_expires_at: null });
+    stop(store, false);
+    await processWebinarNotificationJobs(store.db, { ...deliveryOptions, proxyDispatch: dispatch });
+    await processWebinarNotificationJobs(store.db, { ...deliveryOptions, proxyDispatch: dispatch });
+    expect(dispatch).toHaveBeenCalledTimes(1);
+    store.raw.close();
+  });
+
+  test.each(['attempt', 'lease', 'cancelled'] as const)('停止で返す直前に%sが変わった他の処理の行は上書きしない', async (changed) => {
+    const store = await fixture();
+    const racedDb = intercept(store.db, async (sql, method, run) => {
+      if (method === 'run' && sql.includes("SET status='claimed', attempt_count")) stop(store);
+      if (method === 'run' && sql.includes('attempt_count=attempt_count-1')) {
+        store.raw.prepare(`UPDATE webinar_notification_jobs SET status=?, attempt_count=?, lease_expires_at=?
+          WHERE kind='day_before'`).run(
+          changed === 'cancelled' ? 'cancelled' : 'claimed',
+          changed === 'attempt' ? 2 : 1,
+          changed === 'lease' ? epoch + 601 : epoch + 300,
+        );
+      }
+      return run();
+    });
+    const dispatch = vi.fn(async () => new Response('{}', { status: 200 }));
+    await processWebinarNotificationJobs(racedDb, { ...deliveryOptions, proxyDispatch: dispatch });
+    expect(state(store)).toMatchObject({
+      status: changed === 'cancelled' ? 'cancelled' : 'claimed',
+      attempt_count: changed === 'attempt' ? 2 : 1,
+      lease_expires_at: changed === 'lease' ? epoch + 601 : epoch + 300,
+    });
+    expect(dispatch).not.toHaveBeenCalled();
+    store.raw.close();
+  });
+
+  test('取得一覧の後に試行世代が変わった行を古い情報でclaimしない', async () => {
+    const store = await fixture();
+    const racedDb = intercept(store.db, async (sql, method, run) => {
+      if (method === 'run' && sql.includes("SET status='claimed', attempt_count")) {
+        store.raw.prepare(`UPDATE webinar_notification_jobs SET attempt_count=1 WHERE kind='day_before'`).run();
+      }
+      return run();
+    });
+    const dispatch = vi.fn(async () => new Response('{}', { status: 200 }));
+    await processWebinarNotificationJobs(racedDb, { ...deliveryOptions, proxyDispatch: dispatch });
+    expect(dispatch).not.toHaveBeenCalled();
+    expect(state(store)).toMatchObject({ status: 'queued', attempt_count: 1, lease_expires_at: null });
+    store.raw.close();
+  });
+});
 
 describe('calculateWebinarNotificationSchedule', () => {
   test('JSTの前日・開始前・開始時・翌日の時刻を固定する', () => {
@@ -158,7 +567,7 @@ describe('webinar notification jobs', () => {
       defaultAccessToken: 'fallback',
       defaultLiffId: null,
       proxyDispatch: dispatch,
-    })).toEqual({ sent: 1, failed: 0, skipped: 0 });
+    })).toEqual({ sent: 1, failed: 0, skipped: 0, heldByStop: 0 });
     expect(dispatch).toHaveBeenCalledTimes(1);
     const request = dispatch.mock.calls[0]?.[0];
     expect(request.headers.get('X-Line-Retry-Key')).toBe(job.line_retry_key);
@@ -190,7 +599,7 @@ describe('webinar notification jobs', () => {
       defaultAccessToken: 'fallback',
       defaultLiffId: null,
       proxyDispatch: dispatch,
-    })).toEqual({ sent: 0, failed: 0, skipped: 1 });
+    })).toEqual({ sent: 0, failed: 0, skipped: 1, heldByStop: 0 });
     expect(dispatch).not.toHaveBeenCalled();
     expect(raw.prepare(
       `SELECT status, attempt_count FROM webinar_notification_jobs WHERE id=?`,
@@ -224,7 +633,7 @@ describe('webinar notification jobs', () => {
       defaultAccessToken: 'fallback',
       defaultLiffId: null,
       proxyDispatch: dispatch,
-    })).toEqual({ sent: 0, failed: 0, skipped: 1 });
+    })).toEqual({ sent: 0, failed: 0, skipped: 1, heldByStop: 0 });
     expect(dispatch).not.toHaveBeenCalled();
     expect(raw.prepare(`SELECT status FROM webinar_notification_jobs WHERE id=?`).get(missed.id))
       .toEqual({ status: 'skipped' });
@@ -267,7 +676,81 @@ describe('webinar notification jobs', () => {
     });
   });
 
-  test('緊急停止中は送信直前に止め、停止理由を履歴へ残す', async () => {
+  /*
+   * #745 の裁定で契約が変わりました。**緊急停止は「捨てる」から「止める」へ。**
+   *
+   * 元の表明（`status='skipped'`, `last_error_code='operation_stopped'` に
+   * なること）が捕まえていた壊し方は2つです。
+   *
+   *   1. 緊急停止中なのに外部へ送ってしまう
+   *      → 下の `expect(dispatch).not.toHaveBeenCalled()` が引き続き捕まえます
+   *   2. 緊急停止が判定されず、何事も無かったことにされる
+   *      → 元は「skipped が1件」で見ていました。いまは `heldByStop: 1` で見ます
+   *
+   * そして元の表明は、**復旧しても永久に届かない**という壊れ方を
+   * 通していました（`skipped` を戻す経路が無いため）。新しい表明は
+   * 「行が触られていないこと」と「復旧したら実際に届くこと」まで見るので、
+   * 元より強くなっています。
+   */
+  test('緊急停止中は行を確定させず、復旧したら実際に届く', async () => {
+    const { db, raw } = createTestD1();
+    seedBase(raw);
+    await saveWebinarNotificationSettings(db, 'webinar-1', SETTINGS, NOW);
+    await registerWebinarSession(db, 'webinar-1', 'friend-1', SESSION, NOW);
+    const job = raw.prepare(
+      `SELECT id FROM webinar_notification_jobs WHERE kind='day_before'`,
+    ).get() as { id: string };
+    raw.prepare(
+      `UPDATE webinar_notification_jobs SET scheduled_at=?, next_retry_at=? WHERE id=?`,
+    ).run(Math.floor(NOW.getTime() / 1000), Math.floor(NOW.getTime() / 1000), job.id);
+    raw.prepare(
+      `INSERT INTO operation_control_sets
+         (scope_key, line_account_id, version, states_json, active_incident_id, updated_at)
+       VALUES ('account-1', 'account-1', 1, ?, 'incident-1', ?)`,
+    ).run(JSON.stringify({ reminder_dispatch: 'stopped' }), NOW.toISOString());
+    const dispatch = vi.fn(async () => new Response('{}', { status: 200 }));
+    const options = {
+      now: NOW,
+      proxyBaseUrl: 'https://worker.example.com',
+      defaultAccessToken: 'fallback',
+      defaultLiffId: null,
+      proxyDispatch: dispatch,
+    };
+
+    expect(await processWebinarNotificationJobs(db, options))
+      .toEqual({ sent: 0, failed: 0, skipped: 0, heldByStop: 1 });
+    expect(dispatch).not.toHaveBeenCalled();
+    // **行に触らない。**claim もしない（attempt_count が毎tick増えると、
+    // 取り出しの上限に当たった時点でやはり黙って届かなくなる）。
+    expect(raw.prepare(
+      `SELECT status, attempt_count, last_error_code, lease_expires_at
+         FROM webinar_notification_jobs WHERE id=?`,
+    ).get(job.id)).toEqual({
+      status: 'queued', attempt_count: 0, last_error_code: null, lease_expires_at: null,
+    });
+
+    // 止めている間、何tick回しても増えない。
+    await processWebinarNotificationJobs(db, options);
+    await processWebinarNotificationJobs(db, options);
+    expect(raw.prepare(`SELECT attempt_count FROM webinar_notification_jobs WHERE id=?`).get(job.id))
+      .toEqual({ attempt_count: 0 });
+
+    // 復旧したら届く。ここが元の表明では通っていた壊れ方（永久に届かない）。
+    raw.prepare(`UPDATE operation_control_sets SET states_json=?, active_incident_id=NULL WHERE scope_key='account-1'`)
+      .run(JSON.stringify({ reminder_dispatch: 'running' }));
+    expect(await processWebinarNotificationJobs(db, options))
+      .toEqual({ sent: 1, failed: 0, skipped: 0, heldByStop: 0 });
+    expect(dispatch).toHaveBeenCalledTimes(1);
+    expect(raw.prepare(`SELECT status FROM webinar_notification_jobs WHERE id=?`).get(job.id))
+      .toEqual({ status: 'succeeded' });
+  });
+
+  /*
+   * 落とす理由は「期限を過ぎた」であって「止まっていた」ではない（#745）。
+   * 停止中は判断そのものを先送りし、復旧したときに、そのジョブ自身の
+   * 予定時刻で改めて判断する。
+   */
+  test('停止をまたいで期限が切れたら、停止ではなく期限を理由に落ちる', async () => {
     const { db, raw } = createTestD1();
     seedBase(raw);
     await saveWebinarNotificationSettings(db, 'webinar-1', SETTINGS, NOW);
@@ -285,17 +768,70 @@ describe('webinar notification jobs', () => {
     ).run(JSON.stringify({ reminder_dispatch: 'stopped' }), NOW.toISOString());
     const dispatch = vi.fn(async () => new Response('{}', { status: 200 }));
 
+    // 停止中は落とさない。行は queued のまま。
     expect(await processWebinarNotificationJobs(db, {
-      now: NOW,
-      proxyBaseUrl: 'https://worker.example.com',
-      defaultAccessToken: 'fallback',
-      defaultLiffId: null,
-      proxyDispatch: dispatch,
-    })).toEqual({ sent: 0, failed: 0, skipped: 1 });
+      now: NOW, proxyBaseUrl: 'https://worker.example.com',
+      defaultAccessToken: 'fallback', defaultLiffId: null, proxyDispatch: dispatch,
+    })).toEqual({ sent: 0, failed: 0, skipped: 0, heldByStop: 1 });
+    expect(raw.prepare(`SELECT status FROM webinar_notification_jobs WHERE id=?`).get(job.id))
+      .toEqual({ status: 'queued' });
+
+    // 復旧したときには、対象回が終わっている。
+    raw.prepare(`UPDATE operation_control_sets SET states_json=?, active_incident_id=NULL WHERE scope_key='account-1'`)
+      .run(JSON.stringify({ reminder_dispatch: 'running' }));
+    const afterSession = new Date((SESSION + 3600 + 60) * 1000);
+    // 前日・開始前・開始時の3件がまとめて期限切れになる（対象回が終わったため）。
+    // 見逃し案内(missed)はまだ予定時刻に達していないので対象外。
+    expect(await processWebinarNotificationJobs(db, {
+      now: afterSession, proxyBaseUrl: 'https://worker.example.com',
+      defaultAccessToken: 'fallback', defaultLiffId: null, proxyDispatch: dispatch,
+    })).toEqual({ sent: 0, failed: 0, skipped: 3, heldByStop: 0 });
     expect(dispatch).not.toHaveBeenCalled();
+    // 理由は notification_expired。operation_stopped ではない。
     expect(raw.prepare(
       `SELECT status, last_error_code FROM webinar_notification_jobs WHERE id=?`,
-    ).get(job.id)).toEqual({ status: 'skipped', last_error_code: 'operation_stopped' });
+    ).get(job.id)).toEqual({ status: 'skipped', last_error_code: 'notification_expired' });
+  });
+
+  /*
+   * 「見送り 5件」だけでは、取るべき行動が決まらない（#745）。
+   * 視聴済み（正常）と対象回の終了（届かないまま終わった）を分けて出す。
+   */
+  test('見送りの内訳を理由ごとに数えて返す', async () => {
+    const { db, raw } = createTestD1();
+    seedBase(raw);
+    const insert = raw.prepare(
+      `INSERT INTO webinar_notification_jobs
+         (id, webinar_id, registration_id, friend_id, session_start_at, settings_version, kind,
+          scheduled_at, status, attempt_count, line_retry_key, last_error_code, created_at, updated_at)
+       VALUES (?, 'webinar-1', ?, 'friend-1', ?, 1, ?, ?, 'skipped', 1, ?, ?, ?, ?)`,
+    );
+    raw.prepare(
+      `INSERT INTO webinar_registrations (id, webinar_id, friend_id, session_start_at, status, created_at)
+       VALUES ('registration-1','webinar-1','friend-1',?, 'active', ?)`,
+    ).run(SESSION, NOW.toISOString());
+    insert.run('j1', 'registration-1', SESSION, 'day_before', SESSION - 86400, 'rk1', 'notification_expired', NOW.toISOString(), NOW.toISOString());
+    insert.run('j2', 'registration-1', SESSION, 'hour_before', SESSION - 3600, 'rk2', 'notification_expired', NOW.toISOString(), NOW.toISOString());
+    insert.run('j3', 'registration-1', SESSION, 'missed', SESSION + 86400, 'rk3', 'already_viewed', NOW.toISOString(), NOW.toISOString());
+    insert.run('j4', 'registration-1', SESSION, 'session_start', SESSION, 'rk4', null, NOW.toISOString(), NOW.toISOString());
+    // 見送り以外の行にも理由の符号は付く。**内訳に混ぜない。**
+    // 混ぜると「対象回が終了済み 2件」の隣に、送信の再試行が尽きた失敗が
+    // 並び、運用者は見送りの件数を読み違える。
+    raw.prepare(
+      `INSERT INTO webinar_notification_jobs
+         (id, webinar_id, registration_id, friend_id, session_start_at, settings_version, kind,
+          scheduled_at, status, attempt_count, line_retry_key, last_error_code, created_at, updated_at)
+       VALUES ('j5','webinar-1','registration-1','friend-1',?,1,'completed',?, 'permanent_failed', 3, 'rk5',
+               'retry_exhausted', ?, ?)`,
+    ).run(SESSION, SESSION + 7200, NOW.toISOString(), NOW.toISOString());
+
+    const overview = await getWebinarNotificationOverview(db, 'webinar-1');
+    expect(overview.skipped).toBe(4);
+    expect(overview.skippedReasons).toEqual([
+      { code: 'notification_expired', label: '対象回が終了済み', count: 2 },
+      { code: null, label: '理由の記録なし', count: 1 },
+      { code: 'already_viewed', label: 'すでに視聴済み', count: 1 },
+    ]);
   });
 
   test('テスト送信先だけへ自動送信として通知イメージを送る', async () => {

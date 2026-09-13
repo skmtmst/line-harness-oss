@@ -40,7 +40,7 @@ const { default: booking } = await import('./booking.js');
  * `?1` を「名前付き」と数えるため、並びで渡すと "Too many parameter
  * values" になる。並びで通らなかったときだけ 1 始まりの名前へ組み替える。
  */
-function asD1(sqlite: Database.Database): D1Database {
+function asD1(sqlite: Database.Database, beforeRun?: (sql: string) => Promise<void>): D1Database {
   function call<T>(run: (...args: unknown[]) => T, params: unknown[]): T {
     try {
       return run(...params);
@@ -61,6 +61,7 @@ function asD1(sqlite: Database.Database): D1Database {
         }),
         first: async <T>() => (call((...a) => statement.get(...a), params) as T | undefined) ?? null,
         run: async <T>() => {
+          if (beforeRun) await beforeRun(sql);
           const changes = statement.reader
             ? (call((...a) => statement.all(...a), params) as unknown[]).length
             : call((...a) => statement.run(...a), params).changes;
@@ -79,8 +80,9 @@ function asD1(sqlite: Database.Database): D1Database {
   return db as unknown as D1Database;
 }
 
+const pending: Promise<unknown>[] = [];
 const execCtx = {
-  waitUntil: () => undefined,
+  waitUntil: (promise: Promise<unknown>) => { pending.push(promise); },
   passThroughOnException: () => undefined,
 } as unknown as ExecutionContext;
 
@@ -140,13 +142,14 @@ describe('非JST店舗の予約作成 HTTP E2E（実DB・America/New_York）', (
     env = { DB: db };
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    while (pending.length) await Promise.all(pending.splice(0));
     sqlite.close();
     vi.useRealTimers();
     vi.unstubAllGlobals();
   });
 
-  function adminCreate(startsAt: string, key: string) {
+  function adminCreate(startsAt: string, key: string, extra: Record<string, unknown> = {}) {
     return app.request(
       '/api/booking/admin/bookings?account_id=account-ny',
       {
@@ -157,6 +160,7 @@ describe('非JST店舗の予約作成 HTTP E2E（実DB・America/New_York）', (
           staff_id: 'staff-ny',
           starts_at: startsAt,
           send_line_confirmation: false,
+          ...extra,
         }),
         headers: { 'Content-Type': 'application/json', 'Idempotency-Key': key },
       },
@@ -206,7 +210,7 @@ describe('非JST店舗の予約作成 HTTP E2E（実DB・America/New_York）', (
     `);
   }
 
-  function liffCreate(startsAt: string, key: string) {
+  function liffCreate(startsAt: string, key: string, extra: Record<string, unknown> = {}) {
     return app.request(
       '/api/liff/booking/requests?liffId=liff-ny-1',
       {
@@ -215,6 +219,7 @@ describe('非JST店舗の予約作成 HTTP E2E（実DB・America/New_York）', (
           menu_id: 'menu-ny',
           staff_id: 'staff-ny',
           starts_at: startsAt,
+          ...extra,
         }),
         headers: {
           'Content-Type': 'application/json',
@@ -231,6 +236,104 @@ describe('非JST店舗の予約作成 HTTP E2E（実DB・America/New_York）', (
     return sqlite.prepare(`SELECT id, starts_at, status FROM bookings ORDER BY starts_at`).all() as
       Array<{ id: string; starts_at: string; status: string }>;
   }
+
+  function storeCapacity(capacity: number, start = '09:00', end = '23:00') {
+    sqlite.prepare(`INSERT INTO booking_business_hours (id,booking_settings_id,weekday,start_time,end_time,capacity)
+      VALUES (?,'settings-ny',1,?,?,?)`).run(`hours-${start}`, start, end, capacity);
+    sqlite.exec(`UPDATE menus SET concurrent_capacity=5;
+      INSERT OR IGNORE INTO staff (id,line_account_id,name,display_name) VALUES ('staff-other','account-ny','別担当','別担当');
+      INSERT OR IGNORE INTO staff_menus (staff_id,menu_id,is_offered) VALUES ('staff-other','menu-ny',1);
+      INSERT OR IGNORE INTO staff_shifts (id,staff_id,work_date,start_time,end_time)
+        VALUES ('shift-other','staff-other','2026-11-02','00:00','23:00');`);
+  }
+
+  function otherBooking(id: string, start: string, end: string) {
+    sqlite.prepare(`INSERT INTO bookings
+      (id,line_account_id,friend_id,staff_id,menu_id,starts_at,ends_at,block_ends_at,status,price_at_booking,requested_at)
+      VALUES (?,'account-ny','friend-ny','staff-other','menu-ny',?,?,?,'confirmed',1000,'2026-10-01')`)
+      .run(id,start,end,end);
+  }
+
+  test.each(['liff', 'admin', 'mixed'])('店舗定員1・メニュー5の同時予約を担当横断で原子的に守る (%s)', async (mode) => {
+    storeCapacity(1);
+    stubExternal();
+    let release!: () => void;
+    const bothReady = new Promise<void>(resolve => { release = resolve; });
+    let arrived = 0;
+    db = asD1(sqlite, async sql => {
+      if (!sql.includes('INSERT INTO bookings')) return;
+      arrived++;
+      if (arrived === 2) release();
+      await bothReady;
+    });
+    env = { DB: db };
+    const first = mode === 'admin' ? adminCreate : liffCreate;
+    const second = mode === 'liff' ? liffCreate : adminCreate;
+    const responses = await Promise.all([
+      first(NY_NOV2_1000,'capacity-first'),
+      second(NY_NOV2_1000,'capacity-second',{staff_id:'staff-other'}),
+    ]);
+    expect(arrived).toBe(2);
+    expect(responses.map(r => r.status).sort()).toEqual([201,409]);
+    expect(bookingRows()).toHaveLength(1);
+  });
+
+  test.each(['liff', 'admin'])('店舗の空きは隣接した予約を過剰合算せずピーク使用数で数える (%s)', async (mode) => {
+    storeCapacity(2);
+    sqlite.exec(`UPDATE menus SET duration_minutes=120 WHERE id='menu-ny'`);
+    otherBooking('first','2026-11-02T15:00:00Z','2026-11-02T16:00:00Z');
+    otherBooking('second','2026-11-02T16:00:00Z','2026-11-02T17:00:00Z');
+    stubExternal();
+    const create = mode === 'liff' ? liffCreate : adminCreate;
+    expect((await create(NY_NOV2_1000,'peak')).status).toBe(201);
+    expect(bookingRows()).toHaveLength(3);
+  });
+
+  test.each(['liff', 'admin'])('確定直前に後片付け区間の店舗定員が埋まっても原子的に断る (%s)', async (mode) => {
+    storeCapacity(3,'09:00','13:00');
+    storeCapacity(1,'13:00','23:00');
+    sqlite.exec(`UPDATE menus SET buffer_after_minutes=30 WHERE id='menu-ny'`);
+    stubExternal();
+    let inserted = false;
+    db = asD1(sqlite, async sql => {
+      if (inserted || !sql.includes('INSERT INTO bookings')) return;
+      inserted = true;
+      otherBooking('buffer-racer','2026-11-02T18:00:00Z','2026-11-02T19:00:00Z');
+    });
+    env = { DB: db };
+    const create = mode === 'liff' ? liffCreate : adminCreate;
+    // NY12:00開始、13:00終了、13:30まで後片付け。別担当の13:00予約が競合。
+    const response = await create('2026-11-02T17:00:00Z','buffer-race');
+    expect(inserted).toBe(true);
+    expect(response.status).toBe(409);
+    expect(bookingRows()).toHaveLength(1);
+    expect(bookingRows()[0].id).toBe('buffer-racer');
+  });
+
+  test.each(['liff', 'admin'])('NYの前日開始予約が翌日枠の店舗定員を消費する (%s)', async (mode) => {
+    storeCapacity(1,'00:00','03:00');
+    sqlite.exec(`UPDATE staff_shifts SET start_time='00:00',end_time='03:00' WHERE id='shift-nov2'`);
+    otherBooking('overnight','2026-11-01T23:00:00-05:00','2026-11-02T00:30:00-05:00');
+    stubExternal();
+    const create = mode === 'liff' ? liffCreate : adminCreate;
+    expect((await create('2026-11-02T05:00:00Z','midnight')).status).toBe(mode === 'liff' ? 422 : 409);
+    // 半開区間。前の予約が終わった00:30からは確保できる。
+    expect((await create('2026-11-02T05:30:00Z','after-midnight')).status).toBe(201);
+    expect(bookingRows()).toHaveLength(2);
+  });
+
+  test.each(['liff', 'admin'])('単人数APIはparty_size=1だけ互換許可し他の人数を黙って受けない (%s)', async (mode) => {
+    storeCapacity(5);
+    stubExternal();
+    const create = mode === 'liff' ? liffCreate : adminCreate;
+    for (const party_size of [0,2,1.5,-1,'1',null]) {
+      const response = await create(NY_NOV2_1000,`party-${String(party_size)}`,{party_size});
+      expect(response.status).toBe(422);
+      expect(await response.json()).toMatchObject({error:'unsupported_party_size'});
+    }
+    expect(bookingRows()).toHaveLength(0);
+    expect((await create(NY_NOV2_1000,'party-one',{party_size:1})).status).toBe(201);
+  });
 
   test('管理: NY 10:00 の正規 instant で予約が入る', async () => {
     const res = await adminCreate(NY_NOV2_1000, 'ny-ok-1');

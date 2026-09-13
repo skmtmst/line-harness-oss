@@ -773,6 +773,19 @@ CREATE TABLE audit_events (
   UNIQUE (source_kind, source_id)
 );
 
+CREATE TABLE auth_email_tokens (
+  id             TEXT PRIMARY KEY,
+  purpose        TEXT NOT NULL CHECK (purpose IN ('signup', 'password_reset')),
+  token_hash     TEXT NOT NULL UNIQUE,
+  email          TEXT NOT NULL,
+  staff_id       TEXT,
+  ip_hash        TEXT,
+  device_marker  TEXT,
+  expires_at     TEXT NOT NULL,
+  consumed_at    TEXT,
+  created_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+);
+
 CREATE TABLE auth_step_up_attempts (
   staff_id          TEXT PRIMARY KEY,
   attempts          INTEGER NOT NULL DEFAULT 0 CHECK (attempts >= 0),
@@ -788,6 +801,13 @@ CREATE TABLE auth_step_up_grants (
   expires_at  TEXT NOT NULL,
   consumed_at TEXT,
   created_at  TEXT NOT NULL
+);
+
+CREATE TABLE auth_throttles (
+  key           TEXT PRIMARY KEY,
+  count         INTEGER NOT NULL DEFAULT 0,
+  window_start  TEXT NOT NULL,
+  updated_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
 
 CREATE TABLE auto_replies (
@@ -1015,6 +1035,93 @@ CREATE TABLE automations (
   created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 , line_account_id TEXT);
+
+CREATE TABLE banner_generations (
+  id               TEXT PRIMARY KEY,
+  tenant_id        TEXT NOT NULL REFERENCES tenants(id),
+  project_id       TEXT NOT NULL REFERENCES banner_projects(id) ON DELETE CASCADE,
+  status           TEXT NOT NULL DEFAULT 'queued'
+                     CHECK (status IN ('queued', 'running', 'done', 'failed', 'canceled')),
+  mode             TEXT NOT NULL CHECK (mode IN ('banner', 'free')),
+  preset_key       TEXT NOT NULL,
+  aspect_ratio     TEXT NOT NULL,
+  api_size         TEXT NOT NULL,
+  quality          TEXT NOT NULL CHECK (quality IN ('low', 'medium', 'high')),
+  text_lines       TEXT NOT NULL DEFAULT '[]',
+  main_color       TEXT,
+  sub_color        TEXT,
+  person_option    TEXT NOT NULL DEFAULT 'without' CHECK (person_option IN ('with', 'without')),
+  custom_prompt    TEXT NOT NULL DEFAULT '',
+  free_prompt      TEXT NOT NULL DEFAULT '',
+  final_prompt     TEXT NOT NULL,
+  engine           TEXT NOT NULL DEFAULT 'openai',
+  model_name       TEXT,
+  requested_count  INTEGER NOT NULL DEFAULT 1,
+  done_count       INTEGER NOT NULL DEFAULT 0,
+  failed_count     INTEGER NOT NULL DEFAULT 0,
+  units_per_image  INTEGER NOT NULL DEFAULT 1,
+  error_message    TEXT,
+  created_by       TEXT,
+  created_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  started_at       TEXT,
+  finished_at      TEXT
+, reference_image_id TEXT REFERENCES banner_images(id), reference_mode TEXT
+  CHECK (reference_mode IS NULL OR reference_mode IN ('edit', 'inspire')));
+
+CREATE TABLE banner_image_deliveries (
+  id               TEXT PRIMARY KEY,
+  banner_image_id  TEXT NOT NULL REFERENCES banner_images(id) ON DELETE CASCADE,
+  line_account_id  TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  media_id         TEXT NOT NULL REFERENCES media(id) ON DELETE CASCADE,
+  delivered_by     TEXT,
+  created_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  UNIQUE (banner_image_id, line_account_id)
+);
+
+CREATE TABLE banner_images (
+  id               TEXT PRIMARY KEY,
+  tenant_id        TEXT NOT NULL REFERENCES tenants(id),
+  project_id       TEXT NOT NULL REFERENCES banner_projects(id) ON DELETE CASCADE,
+  generation_id    TEXT REFERENCES banner_generations(id) ON DELETE SET NULL,
+  media_id         TEXT NOT NULL REFERENCES media(id) ON DELETE CASCADE,
+  sequence         INTEGER NOT NULL DEFAULT 1,
+  source           TEXT NOT NULL DEFAULT 'generated'
+                     CHECK (source IN ('generated', 'upload', 'edited')),
+  parent_image_id  TEXT,
+  is_favorite      INTEGER NOT NULL DEFAULT 0,
+  deleted_at       TEXT,
+  created_by       TEXT,
+  created_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+);
+
+CREATE TABLE banner_projects (
+  id           TEXT PRIMARY KEY,
+  tenant_id    TEXT NOT NULL REFERENCES tenants(id),
+  name         TEXT NOT NULL,
+  description  TEXT NOT NULL DEFAULT '',
+  is_favorite  INTEGER NOT NULL DEFAULT 0,
+  archived_at  TEXT,
+  created_by   TEXT,
+  created_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  updated_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+);
+
+CREATE TABLE banner_usage_ledger (
+  id             TEXT PRIMARY KEY,
+  tenant_id      TEXT NOT NULL REFERENCES tenants(id),
+  generation_id  TEXT,
+  units          INTEGER NOT NULL,
+  reason         TEXT NOT NULL CHECK (reason IN ('generate', 'refund', 'edit')),
+  created_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+);
+
+CREATE TABLE billing_events (
+  id           TEXT PRIMARY KEY,
+  type         TEXT NOT NULL,
+  tenant_id    TEXT,
+  summary      TEXT NOT NULL DEFAULT '',
+  received_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+);
 
 CREATE TABLE booking_availability_exceptions (
   id TEXT PRIMARY KEY,
@@ -2048,7 +2155,7 @@ CREATE TABLE form_submissions (
   data TEXT NOT NULL DEFAULT '{}',
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 , destination_write_status TEXT NOT NULL DEFAULT 'unknown'
-  CHECK (destination_write_status IN ('pending', 'succeeded', 'partial', 'failed', 'not_requested', 'unknown')), destination_write_attempted INTEGER, destination_write_succeeded INTEGER, destination_write_failed INTEGER, destination_write_completed_at TEXT);
+  CHECK (destination_write_status IN ('pending', 'succeeded', 'partial', 'failed', 'not_requested', 'unknown')), destination_write_attempted INTEGER, destination_write_succeeded INTEGER, destination_write_failed INTEGER, destination_write_completed_at TEXT, form_version_id TEXT REFERENCES form_versions(id));
 
 CREATE TABLE form_submit_claims (
   tenant_id TEXT NOT NULL DEFAULT '',
@@ -2088,6 +2195,33 @@ CREATE TABLE form_submit_outbox (
   PRIMARY KEY (tenant_id, line_account_id, form_id, friend_id, idempotency_key, kind)
 );
 
+CREATE TABLE form_versions (
+  id                             TEXT PRIMARY KEY,
+  form_id                        TEXT NOT NULL REFERENCES forms(id) ON DELETE CASCADE,
+  version_number                 INTEGER NOT NULL CHECK (version_number >= 1),
+  source_content_revision        INTEGER NOT NULL CHECK (source_content_revision >= 1),
+  name                           TEXT NOT NULL,
+  description                    TEXT,
+  fields                         TEXT NOT NULL DEFAULT '[]',
+  layout                         TEXT,
+  on_submit_tag_id               TEXT,
+  on_submit_scenario_id          TEXT,
+  on_submit_message_type         TEXT CHECK (on_submit_message_type IN ('text', 'flex')),
+  on_submit_message_content      TEXT,
+  on_submit_webhook_url          TEXT,
+  on_submit_webhook_headers      TEXT,
+  on_submit_webhook_fail_message TEXT,
+  save_to_metadata               INTEGER NOT NULL CHECK (save_to_metadata IN (0, 1)),
+  og_title                       TEXT,
+  og_description                 TEXT,
+  og_image_url                   TEXT,
+  status                         TEXT NOT NULL DEFAULT 'published' CHECK (status = 'published'),
+  published_at                   TEXT NOT NULL,
+  created_at                     TEXT NOT NULL,
+  UNIQUE (form_id, version_number),
+  UNIQUE (form_id, source_content_revision)
+);
+
 CREATE TABLE forms (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
@@ -2103,7 +2237,7 @@ CREATE TABLE forms (
 , on_submit_message_type TEXT CHECK (on_submit_message_type IN ('text', 'flex')) DEFAULT NULL, on_submit_message_content TEXT DEFAULT NULL, on_submit_webhook_url TEXT, on_submit_webhook_headers TEXT, on_submit_webhook_fail_message TEXT, og_title TEXT, og_description TEXT, og_image_url TEXT, layout TEXT, status TEXT NOT NULL DEFAULT 'active'
   CHECK (status IN ('active', 'archived')), archived_at TEXT, revision INTEGER NOT NULL DEFAULT 1
   CHECK (revision >= 1), content_revision INTEGER NOT NULL DEFAULT 1
-  CHECK (content_revision >= 1));
+  CHECK (content_revision >= 1), current_published_version_id TEXT);
 
 CREATE TABLE "friend_add_action_runs" (
   id                  TEXT PRIMARY KEY,
@@ -2539,6 +2673,24 @@ CREATE TABLE google_calendar_connections (
   last_error    TEXT,
   created_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+);
+
+CREATE TABLE hq_support_requests (
+  id               TEXT PRIMARY KEY,
+  tenant_id        TEXT NOT NULL REFERENCES tenants(id),
+  staff_id         TEXT,
+  staff_name       TEXT NOT NULL DEFAULT '',
+  staff_email      TEXT,
+  kind             TEXT NOT NULL CHECK (kind IN ('usage', 'bug', 'billing', 'feature', 'other')),
+  subject          TEXT NOT NULL,
+  body             TEXT NOT NULL,
+  line_account_id  TEXT REFERENCES line_accounts(id) ON DELETE SET NULL,
+  -- 添付した画像の R2 キー（JSON 配列）。実体は IMAGES バケットの support/ 配下。
+  attachment_keys  TEXT NOT NULL DEFAULT '[]',
+  status           TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'answered', 'closed')),
+  notified_at      TEXT,
+  created_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  updated_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
 
 CREATE TABLE hq_template_distribution_results (
@@ -4905,7 +5057,7 @@ CREATE TABLE staff_members (
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 , line_user_id TEXT, totp_secret_enc TEXT, totp_pending_secret_enc TEXT, totp_enabled_at TEXT, totp_last_used_step INTEGER, assigned_line_account_id TEXT REFERENCES line_accounts(id) ON DELETE SET NULL, can_access_descendant_accounts INTEGER NOT NULL DEFAULT 0, tenant_id TEXT REFERENCES tenants(id), account_scope TEXT NOT NULL DEFAULT 'all'
-  CHECK (account_scope IN ('all', 'accounts')), policy_version INTEGER NOT NULL DEFAULT 1);
+  CHECK (account_scope IN ('all', 'accounts')), policy_version INTEGER NOT NULL DEFAULT 1, password_hash TEXT, password_updated_at TEXT);
 
 CREATE TABLE staff_menus (
   staff_id                  TEXT NOT NULL,
@@ -5098,7 +5250,8 @@ CREATE TABLE tenants (
   status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'suspended', 'archived')),
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-, feature_packs TEXT NOT NULL DEFAULT '[]');
+, feature_packs TEXT NOT NULL DEFAULT '[]', plan_key TEXT, plan_status TEXT NOT NULL DEFAULT 'exempt'
+  CHECK (plan_status IN ('exempt', 'trialing', 'active', 'past_due', 'canceled')), trial_ends_at TEXT, stripe_customer_id TEXT, stripe_subscription_id TEXT, current_period_ends_at TEXT, plan_updated_at TEXT, signup_device_marker TEXT);
 
 CREATE TABLE tracked_links (
   id TEXT PRIMARY KEY,
@@ -5709,6 +5862,12 @@ CREATE INDEX idx_audit_events_actor_created
 CREATE INDEX idx_audit_events_tenant_created
   ON audit_events (tenant_id, created_at DESC);
 
+CREATE INDEX idx_auth_email_tokens_email
+  ON auth_email_tokens(purpose, email, created_at DESC);
+
+CREATE INDEX idx_auth_email_tokens_ip
+  ON auth_email_tokens(purpose, ip_hash, created_at DESC);
+
 CREATE INDEX idx_auth_step_up_grants_staff_expiry
   ON auth_step_up_grants(staff_id, expires_at);
 
@@ -5788,6 +5947,30 @@ CREATE INDEX idx_automation_versions_automation_status
 CREATE INDEX idx_automations_active ON automations (is_active);
 
 CREATE INDEX idx_automations_event ON automations (event_type);
+
+CREATE INDEX idx_banner_generations_project
+  ON banner_generations(project_id, created_at DESC);
+
+CREATE INDEX idx_banner_generations_reference
+  ON banner_generations(reference_image_id) WHERE reference_image_id IS NOT NULL;
+
+CREATE INDEX idx_banner_generations_tenant_status
+  ON banner_generations(tenant_id, status);
+
+CREATE INDEX idx_banner_images_project
+  ON banner_images(project_id, deleted_at, created_at DESC);
+
+CREATE INDEX idx_banner_images_tenant
+  ON banner_images(tenant_id, deleted_at, created_at DESC);
+
+CREATE INDEX idx_banner_projects_tenant
+  ON banner_projects(tenant_id, archived_at, updated_at DESC);
+
+CREATE INDEX idx_banner_usage_tenant_created
+  ON banner_usage_ledger(tenant_id, created_at);
+
+CREATE INDEX idx_billing_events_tenant
+  ON billing_events(tenant_id, received_at DESC);
 
 CREATE INDEX idx_booking_business_hours_setting_weekday
   ON booking_business_hours(booking_settings_id, weekday, start_time);
@@ -6084,11 +6267,18 @@ CREATE INDEX idx_form_submissions_form_write_status
 
 CREATE INDEX idx_form_submissions_friend ON form_submissions (friend_id);
 
+CREATE INDEX idx_form_submissions_version
+  ON form_submissions(form_version_id)
+  WHERE form_version_id IS NOT NULL;
+
 CREATE INDEX idx_form_submit_claims_submission
   ON form_submit_claims (submission_id);
 
 CREATE INDEX idx_form_submit_claims_updated
   ON form_submit_claims (updated_at);
+
+CREATE INDEX idx_form_versions_form_number
+  ON form_versions(form_id, version_number DESC);
 
 CREATE INDEX idx_forms_status_updated
   ON forms(status, updated_at DESC);
@@ -6254,6 +6444,9 @@ CREATE INDEX idx_handover_decisions_handover
   ON account_handover_decisions (handover_id);
 
 CREATE INDEX idx_health_logs_account ON account_health_logs (line_account_id);
+
+CREATE INDEX idx_hq_support_requests_tenant
+  ON hq_support_requests(tenant_id, created_at DESC);
 
 CREATE INDEX idx_hq_template_owned_r2_reconcile
   ON hq_template_owned_r2_keys(tenant_id, state, updated_at);
@@ -6840,11 +7033,17 @@ CREATE UNIQUE INDEX idx_staff_members_api_key ON staff_members(api_key);
 CREATE INDEX idx_staff_members_assigned_line_account
   ON staff_members(assigned_line_account_id);
 
+CREATE INDEX idx_staff_members_email_lower
+  ON staff_members(lower(email));
+
 CREATE INDEX idx_staff_members_invite_token ON staff_members(invite_token_hash);
 
 CREATE UNIQUE INDEX idx_staff_members_line_user_id
   ON staff_members(line_user_id)
   WHERE line_user_id IS NOT NULL;
+
+CREATE UNIQUE INDEX idx_staff_members_password_email
+  ON staff_members(lower(email)) WHERE password_hash IS NOT NULL;
 
 CREATE INDEX idx_staff_members_role ON staff_members(role);
 
@@ -6916,6 +7115,12 @@ CREATE INDEX idx_templates_line_account
   ON templates(line_account_id, display_order, id);
 
 CREATE INDEX idx_templates_publish_key ON templates (publish_idempotency_key);
+
+CREATE INDEX idx_tenants_signup_device_marker
+  ON tenants(signup_device_marker) WHERE signup_device_marker IS NOT NULL;
+
+CREATE UNIQUE INDEX idx_tenants_stripe_customer
+  ON tenants(stripe_customer_id) WHERE stripe_customer_id IS NOT NULL;
 
 CREATE UNIQUE INDEX idx_tracked_links_dedup_key
   ON tracked_links (dedup_key) WHERE dedup_key IS NOT NULL;
@@ -7307,6 +7512,42 @@ CREATE TRIGGER trg_common_action_published_version_no_delete
 BEFORE DELETE ON common_action_versions
 WHEN OLD.status = 'published'
 BEGIN SELECT RAISE(ABORT, 'published common action version cannot be deleted'); END;
+
+CREATE TRIGGER trg_form_versions_immutable
+BEFORE UPDATE ON form_versions
+BEGIN SELECT RAISE(ABORT, 'published form versions are immutable'); END;
+
+CREATE TRIGGER trg_form_versions_no_delete
+BEFORE DELETE ON form_versions
+BEGIN SELECT RAISE(ABORT, 'published form versions cannot be deleted'); END;
+
+CREATE TRIGGER trg_forms_activation_requires_published_version
+BEFORE UPDATE OF is_active ON forms
+WHEN NEW.is_active = 1 AND NEW.current_published_version_id IS NULL
+BEGIN SELECT RAISE(ABORT, 'form publish is required before activation'); END;
+
+CREATE TRIGGER trg_forms_initial_published_version
+AFTER INSERT ON forms
+WHEN NEW.status = 'active' AND NEW.is_active = 1
+BEGIN INSERT INTO form_versions (id, form_id, version_number, source_content_revision, name, description, fields, layout, on_submit_tag_id, on_submit_scenario_id, on_submit_message_type, on_submit_message_content, on_submit_webhook_url, on_submit_webhook_headers, on_submit_webhook_fail_message, save_to_metadata, og_title, og_description, og_image_url, status, published_at, created_at) VALUES ('form-version-v1-' || NEW.id, NEW.id, 1, NEW.content_revision, NEW.name, NEW.description, NEW.fields, NEW.layout, NEW.on_submit_tag_id, NEW.on_submit_scenario_id, NEW.on_submit_message_type, NEW.on_submit_message_content, NEW.on_submit_webhook_url, NEW.on_submit_webhook_headers, NEW.on_submit_webhook_fail_message, NEW.save_to_metadata, NEW.og_title, NEW.og_description, NEW.og_image_url, 'published', NEW.updated_at, NEW.updated_at); UPDATE forms SET current_published_version_id = 'form-version-v1-' || NEW.id WHERE id = NEW.id; END;
+
+CREATE TRIGGER trg_forms_published_version_ownership_insert
+BEFORE INSERT ON forms
+WHEN NEW.current_published_version_id IS NOT NULL
+ AND NOT EXISTS (
+   SELECT 1 FROM form_versions
+   WHERE id = NEW.current_published_version_id AND form_id = NEW.id
+ )
+BEGIN SELECT RAISE(ABORT, 'published version belongs to another form'); END;
+
+CREATE TRIGGER trg_forms_published_version_ownership_update
+BEFORE UPDATE OF current_published_version_id ON forms
+WHEN NEW.current_published_version_id IS NOT NULL
+ AND NOT EXISTS (
+   SELECT 1 FROM form_versions
+   WHERE id = NEW.current_published_version_id AND form_id = NEW.id
+ )
+BEGIN SELECT RAISE(ABORT, 'published version belongs to another form'); END;
 
 CREATE TRIGGER trg_forms_revision_account_delete
 AFTER DELETE ON form_accounts
