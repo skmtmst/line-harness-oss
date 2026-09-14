@@ -83,6 +83,7 @@ describe('createBroadcast', () => {
       targetType: 'all',
     });
 
+    // #772: 版を付けて更新する（版なしは route で400になる）。
     const updated = await updateBroadcast(db, created.id, {
       title: 'テスト後',
       message_content: '直した本文',
@@ -90,7 +91,7 @@ describe('createBroadcast', () => {
       target_type: 'segment',
       segment_conditions: JSON.stringify({ operator: 'AND', rules: [{ type: 'tag_exists', value: 'tag-1' }] }),
       stealth_spread_minutes: 45,
-    });
+    }, 1);
 
     expect(updated).toMatchObject({
       id: created.id,
@@ -122,8 +123,9 @@ describe('createBroadcast', () => {
     expect(updated).toMatchObject({ internal_memo: '更新後', lock_version: 2 });
     await expect(updateBroadcast(db, created.id, { internal_memo: '古い更新' }, 1)).resolves.toBeNull();
 
-    const legacyUpdated = await updateBroadcast(db, created.id, { internal_memo: '互換更新' });
-    expect(legacyUpdated).toMatchObject({ internal_memo: '互換更新', lock_version: 3 });
+    // #772: 版なし迂回はなくし、現在の版を付けて更新する。
+    const versionedUpdated = await updateBroadcast(db, created.id, { internal_memo: '版付き更新' }, 2);
+    expect(versionedUpdated).toMatchObject({ internal_memo: '版付き更新', lock_version: 3 });
     await expect(updateBroadcast(db, created.id, {}, 2)).resolves.toBeNull();
   });
 });
