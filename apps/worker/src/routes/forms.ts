@@ -6,6 +6,7 @@ import {
   type FormSubmitClaim,
   type FormSubmitClaimScope,
   getFormAccountIds,
+  getFolderById,
   getFormDeleteImpact,
   formBelongsToLineAccount,
   createForm,
@@ -261,6 +262,7 @@ function serializeForm(
     revision: row.revision,
     contentRevision: row.content_revision,
     publishedVersionId: row.current_published_version_id,
+    folderId: row.folder_id ?? null,
     publishedContentRevision: row.published_content_revision ?? null,
     submitCount: row.submit_count,
     ogTitle: row.og_title,
@@ -539,7 +541,22 @@ forms.get('/api/forms', requireRole('owner', 'admin', 'staff'), async (c) => {
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
       return c.json({ success: false, error: 'Not found' }, 404);
     }
-    const items = await getFormsWithStats(c.env.DB, { lineAccountIds: [accountId] });
+    // N-175 (#805): folder条件もサーバーで絞る。kind=formの既存フォルダだけ受け付け、
+    // 存在なし・異種別はfail-closedにする。未分類はfolder_id IS NULLで絞る。
+    const folderParam = c.req.query('folder_id')?.trim();
+    let folderScope: { folderId?: string; unfiledOnly?: boolean } = {};
+    if (folderParam !== undefined && folderParam !== '' && folderParam !== 'all') {
+      if (folderParam === 'unfiled') {
+        folderScope = { unfiledOnly: true };
+      } else {
+        const folder = await getFolderById(c.env.DB, folderParam);
+        if (!folder || folder.kind !== 'form') {
+          return c.json({ success: false, error: 'Not found' }, 404);
+        }
+        folderScope = { folderId: folder.id };
+      }
+    }
+    const items = await getFormsWithStats(c.env.DB, { lineAccountIds: [accountId], ...folderScope });
     const redactSecrets = c.get('staff')?.role === 'staff';
     const data = items.map((row) =>
       serializeForm(row, {

@@ -26,6 +26,8 @@ export interface Form {
   content_revision: number;
   /** お客さまへ出している不変版。NULL は一度も公開していない下書き。 */
   current_published_version_id: string | null;
+  /** フォルダ所属(N-175 / migration 395)。NULL は未分類。 */
+  folder_id: string | null;
   /** 管理画面の取得時だけ入る、現在公開版の元になった編集版。 */
   published_content_revision?: number | null;
   submit_count: number;
@@ -89,6 +91,10 @@ export interface FormWithStats extends Form {
 export interface FormAccountScope {
   lineAccountIds?: string[];
   includeUnassigned?: boolean;
+  /** N-175 (#805): 指定フォルダだけに絞る。 */
+  folderId?: string;
+  /** N-175 (#805): 未分類(f.folder_id IS NULL)だけに絞る。 */
+  unfiledOnly?: boolean;
 }
 
 export async function getFormsWithStats(
@@ -113,6 +119,13 @@ export async function getFormsWithStats(
              ? `OR NOT EXISTS (SELECT 1 FROM form_accounts pending WHERE pending.form_id = f.id)`
              : ''}
          )`;
+  }
+  const folderBinds: string[] = [];
+  if (scope.unfiledOnly) {
+    scopeClause += ` AND f.folder_id IS NULL`;
+  } else if (scope.folderId !== undefined) {
+    scopeClause += ` AND f.folder_id = ?`;
+    folderBinds.push(scope.folderId);
   }
   // Single query: forms + last submission + per-account submission counts.
   // json_group_array returns '[]' (not NULL) when subquery yields no rows.
@@ -150,7 +163,7 @@ export async function getFormsWithStats(
          last_submitted_at DESC,
          f.created_at DESC`,
     )
-    .bind(...accountIds)
+    .bind(...accountIds, ...folderBinds)
     .all<Form & {
       last_submitted_at: string | null;
       account_scope_review_required: number;
