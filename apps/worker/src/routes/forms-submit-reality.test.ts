@@ -375,8 +375,11 @@ describe('フォーム回答の冪等化(実DB)', () => {
     const dir = mkdtempSync(join(tmpdir(), 'form-2conn-'));
     const file = join(dir, 'test.sqlite');
     const primary = new Database(file);
+    // #743: 起動SQLの素の再生は文ごとに確定・fsyncし、列車274では並行
+    // 480ファイルの確定待ちで行列して準備だけで15秒を超えた。1つの確定に
+    // まとめる(判定内容・待ち時間は変えない。WAL化は確定の後)。
+    primary.exec('BEGIN;');
     primary.exec(BOOTSTRAP);
-    primary.exec(`PRAGMA journal_mode=WAL;`);
     primary.exec(`
     INSERT OR IGNORE INTO tenants (id, name) VALUES ('tenant-1', 'T1');
     INSERT INTO line_accounts (id, channel_id, name, channel_access_token, channel_secret, tenant_id)
@@ -388,6 +391,8 @@ describe('フォーム回答の冪等化(実DB)', () => {
     INSERT INTO form_accounts (form_id, line_account_id)
     VALUES ('form-2conn', 'account-a');
     `);
+    primary.exec('COMMIT;');
+    primary.exec(`PRAGMA journal_mode=WAL;`);
     const secondary = new Database(file);
     secondary.exec(`PRAGMA journal_mode=WAL;`);
     const injected2: { current: Inject } = { current: null };
