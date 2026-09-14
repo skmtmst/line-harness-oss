@@ -9,6 +9,8 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
+// #740: 一覧の Kpi と一字一句同じだったため、機能内共有の1部品へ統合した。
+import EventKpi from '@/components/events/event-kpi'
 import { eventsApi, type EventBookingItem, type EventBookingSummary, type EventDetail } from '@/lib/api'
 import { describeBookingCapacity } from '../event-attention'
 
@@ -779,30 +781,6 @@ function BookingsInner() {
           </div>
         )}
       </ConfirmDialog>
-    </div>
-  )
-}
-
-/** KPIの札。予約まわりの他画面と同じ形にそろえる。 */
-function EventKpi({
-  title,
-  value,
-  unit,
-  detail,
-}: {
-  title: string
-  value: string
-  unit: string
-  detail: string
-}) {
-  return (
-    <div className="bg-canvas rounded-card border-hairline border p-4">
-      <p className="text-ink-faint text-xs">{title}</p>
-      <p className="text-ink mt-1 text-2xl font-semibold tabular-nums">
-        {value}
-        <span className="text-ink-faint ml-1 text-xs font-normal">{unit}</span>
-      </p>
-      <p className="text-ink-faint mt-1 text-xs">{detail}</p>
     </div>
   )
 }
