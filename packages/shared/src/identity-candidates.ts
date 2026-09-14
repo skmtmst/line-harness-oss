@@ -136,3 +136,14 @@ export interface UndoIdentityCandidateRequest {
   expectedVersion: number;
   reason: string;
 }
+
+/**
+ * 計量キーの正本(#517 軽4)。
+ *
+ * 保存済みの `impact_json` を読む2か所(集計 `potentialRevenue` と画面表示)で
+ * 共有する。キー名がずれると画面が黙って「—(未取得)」になり、型でも守れない
+ * (`IdentityCandidateImpactMetric.key` は `string`)ため、手書きの重複を持たない。
+ * 未知のキーは両側の試験(webの見本キー洗い・dbの未知キー除外)が捕まえる。
+ */
+export const ORDER_IMPACT_KEYS: readonly string[] = ['orders', 'order_count'];
+export const REVENUE_IMPACT_KEYS: readonly string[] = ['sales', 'revenue', 'order_amount'];

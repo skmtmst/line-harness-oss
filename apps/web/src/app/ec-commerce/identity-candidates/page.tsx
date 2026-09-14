@@ -22,14 +22,12 @@ import { impactText, maskedText, NOT_AVAILABLE } from '@/components/identity/ide
 import styles from '@/components/identity/identity-review.module.css'
 import { useAccount } from '@/contexts/account-context'
 import { ApiError, api, type EcIdentityCandidateOperationsList } from '@/lib/api'
-import type { IdentityCandidateImpactMetric } from '@line-crm/shared'
+import { ORDER_IMPACT_KEYS, REVENUE_IMPACT_KEYS, type IdentityCandidateImpactMetric } from '@line-crm/shared'
 import EcTabs from '../ec-tabs-view'
 import ecStyles from '../ec-commerce-v6.module.css'
 
-// #517 軽: 影響の計量は共有の型で受け、表示は `impactText` 系に寄せる。
-// 計量名の変更は型では守れないため、候補名の表はここに残す。
-const ORDER_IMPACT_KEYS = ['orders', 'order_count']
-const REVENUE_IMPACT_KEYS = ['sales', 'revenue', 'order_amount']
+// #517 軽4: 計量キーは共有の正本を使う。手書きの重複を持たない。
+// 影響の計量は共有の型で受け、表示は `impactText` 系に寄せる。
 
 const isImpactMetric = (value: unknown): value is IdentityCandidateImpactMetric => {
   if (!value || typeof value !== 'object') return false
