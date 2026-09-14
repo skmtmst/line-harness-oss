@@ -389,9 +389,28 @@ const DEEP_LINK_NOTICE = {
   otherAccount: '指定の会話は、いま選んでいるLINEアカウントの相手ではありません。返信の送信元が変わって別のアカウントから送ってしまうため、開きません。上のアカウント切替で相手のアカウントに変えてから開き直してください。',
 } as const
 
+/** URLに残す保存検索IDの名前。再読込・共有で同じ条件を復元する足場(N-021)。 */
+const SAVED_VIEW_URL_KEY = 'savedView'
+
+/**
+ * 受信箱のURLを組み立てる。
+ *
+ * 保存検索を選んだあとは `savedView=<id>` を channel と一緒に残す。
+ * URLが条件を持たないと、再読込・共有のたびに絞り込みが消える(N-021)。
+ */
+function buildInboxUrl(channel: 'all' | 'line' | 'email', savedViewId: string | null): string {
+  const query = new URLSearchParams()
+  if (channel !== 'all') query.set('channel', channel)
+  if (savedViewId) query.set(SAVED_VIEW_URL_KEY, savedViewId)
+  const text = query.toString()
+  return text ? `/chats?${text}` : '/chats'
+}
+
 function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   const router = useRouter()
   const params = useSearchParams()
+  // URLが指す保存検索のID。再読込・URL共有からの復元元(N-021)。
+  const savedViewParam = (params.get(SAVED_VIEW_URL_KEY) ?? '').trim()
   const { selectedAccountId, selectedAccount, loading: accountsLoading } = useAccount()
   const [chats, setChats] = useState<Chat[]>([])
   /**
@@ -447,6 +466,13 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   const [savedViewError, setSavedViewError] = useState('')
   const [savingView, setSavingView] = useState(false)
   const [savedViewSuccess, setSavedViewSuccess] = useState(false)
+  /*
+   * savedViews が「どのアカウント分」か。アカウント切替で一覧が
+   * 取り直される間、前のアカウントの一覧でURLのIDを誤適用しない(N-021)。
+   */
+  const [savedViewsAccountId, setSavedViewsAccountId] = useState<string | null>(null)
+  // URLの保存検索IDが見つからなかったときの案内。適用せず既定条件へ戻したことを伝える。
+  const [savedViewNotice, setSavedViewNotice] = useState('')
   // 担当の選択肢（設計 `TalkPane` の「担当」）。
   const [operators, setOperators] = useState<Array<{ id: string; name: string }>>([])
   /*
@@ -558,6 +584,15 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   // 上書きしない。注目操作が別の友だちへ向く事故もここで防ぐ。
   const detailRequestIdRef = useRef(0)
   const detailAccountRef = useRef(selectedAccountId)
+  // 保存検索一覧の取得がどのアカウントに向けたものか。切替中に遅れて届いた
+  // 旧アカウントの応答で、新しいアカウントの一覧を上書きしない(N-021)。
+  const savedViewsRequestAccountRef = useRef<string | null>(null)
+  /*
+   * 処理済みのURL savedView値。router.replace の反映より描画が先に走る
+   * 隙間に、復元効果が同じIDをもう一度適用して手動の条件変更を
+   * 上書きするのを防ぐ(N-021)。
+   */
+  const savedViewConsumedRef = useRef<string | null>(null)
 
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedNameQuery(nameQuery.trim()), 250)
@@ -770,20 +805,61 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     } catch { /* localStorage unavailable */ }
   }, [])
 
+  /*
+    保存検索の条件を画面の絞り込みへ写す。戻り値は条件が指す channel。
+    ドロップダウンからの適用と、URLからの復元の両方が同じ手順を使う(N-021)。
+
+    **形を確かめてから読む。** 受信箱より前に作られた行は
+    `{ all: [], any: [] }` の形で入っていて、`conditions.statuses.length` を
+    そのまま読むと受信箱ごと真っ白になる。
+  */
+  const applySavedViewConditions = useCallback((view: InboxSavedView): 'all' | 'line' | 'email' => {
+    const conditions = normalizeSavedViewConditions(view.conditions)
+    setNameQuery(conditions.query ?? '')
+    setStatusFilter(conditions.statuses.length === 1 ? conditions.statuses[0] : 'all')
+    setAssigneeFilter(conditions.assignees.length === 1 ? conditions.assignees[0] : 'all')
+    setQuickFilter(conditions.due === 'overdue' ? 'overdue' : 'all')
+    return conditions.channels.length === 1 ? conditions.channels[0] : 'all'
+  }, [])
+
+  /*
+    手で条件を変えたら、URLの savedView は現在の条件を指さなくなる。
+    残すと再読込・URL共有で古い条件が復活するので外す(N-021)。
+    channel・friend・thread など他の指定はそのまま残す。
+  */
+  const dropSavedViewParam = useCallback(() => {
+    const current = params.get(SAVED_VIEW_URL_KEY)
+    if (!current) return
+    // URLの更新が届くまでの間に復元効果が同じIDを再適用しないよう、
+    // 外す時点で処理済みにする(N-021)。
+    savedViewConsumedRef.current = current
+    const next = new URLSearchParams(params.toString())
+    next.delete(SAVED_VIEW_URL_KEY)
+    const text = next.toString()
+    router.replace(text ? `/chats?${text}` : '/chats')
+  }, [params, router])
+
   const loadSavedViews = useCallback(async () => {
-    if (!selectedAccountId) {
+    const accountId = selectedAccountId
+    // 切替中に前のアカウントの応答が遅れて届いても、新しい一覧を上書きしない。
+    savedViewsRequestAccountRef.current = accountId
+    if (!accountId) {
       setSavedViews([])
+      setSavedViewsAccountId(null)
       return
     }
     try {
-      const response = await api.chats.savedViews.list(selectedAccountId)
+      const response = await api.chats.savedViews.list(accountId)
+      if (savedViewsRequestAccountRef.current !== accountId) return
       if (response.success) {
         setSavedViews(response.data.map((view) => ({
           ...view,
           conditions: normalizeSavedViewConditions(view.conditions),
         })))
+        setSavedViewsAccountId(accountId)
       }
     } catch {
+      if (savedViewsRequestAccountRef.current !== accountId) return
       setSavedViewError('保存した検索を読み込めませんでした')
     }
   }, [selectedAccountId])
@@ -791,6 +867,54 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   useEffect(() => {
     void loadSavedViews()
   }, [loadSavedViews])
+
+  /*
+    URLの `savedView=<id>` を、いま選んでいるアカウントの保存検索へ照合して復元する(N-021)。
+
+    - 一覧はアカウントごとに取り直す。現在のアカウント分が届くまでは
+      何もしない。届く前に前のアカウントの一覧で探すと、別アカウントの
+      IDを誤って適用する。
+    - IDが見つからない（削除済み・別アカウント・不正）ときは適用せず、
+      既定条件へ戻して案内し、URLからも外す。残すと再読込のたびに
+      同じ案内が出る。
+    - 見つかったときは条件を写す。保存された channel が今と違えば
+      URL側をそろえる（channel はURLが正本）。
+    - 手で条件を変えたときは dropSavedViewParam が先にIDを外すので、
+      ここで古い条件が再上書きされることはない。
+  */
+  useEffect(() => {
+    if (!savedViewParam) {
+      // URLから外れたら処理済み印も戻す。同じ検索を選び直せるようにする。
+      savedViewConsumedRef.current = null
+      return
+    }
+    // 同じ値は一度だけ処理する。手動変更で外した直後の再適用を防ぐ。
+    if (savedViewConsumedRef.current === savedViewParam) return
+    if (accountsLoading) return
+    if (selectedAccountId && savedViewsAccountId !== selectedAccountId) return
+    savedViewConsumedRef.current = savedViewParam
+    const view = savedViews.find((item) => item.id === savedViewParam)
+    if (!view) {
+      setNameQuery('')
+      setDebouncedNameQuery('')
+      setStatusFilter('all')
+      setQuickFilter('all')
+      setAssigneeFilter('all')
+      setUnreadOnly(false)
+      setSavedViewNotice('URLの保存した検索は見つかりませんでした。削除されたか、別のLINEアカウントの検索の可能性があります。既定の条件で表示しています。')
+      dropSavedViewParam()
+      return
+    }
+    const nextChannel = applySavedViewConditions(view)
+    setSavedViewNotice('')
+    if (nextChannel !== channel) {
+      const next = new URLSearchParams(params.toString())
+      if (nextChannel === 'all') next.delete('channel')
+      else next.set('channel', nextChannel)
+      const text = next.toString()
+      router.replace(text ? `/chats?${text}` : '/chats')
+    }
+  }, [savedViewParam, savedViews, savedViewsAccountId, selectedAccountId, accountsLoading, channel, params, router, applySavedViewConditions, dropSavedViewParam])
 
   const currentSavedViewConditions = (draft?: Omit<SavedViewDraft, 'name' | 'favorite'>): InboxSavedViewConditions => ({
     version: 1,
@@ -855,18 +979,11 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   }
 
   const applySavedView = (view: InboxSavedView) => {
-    /*
-      **形を確かめてから読む。** 受信箱より前に作られた行は
-      `{ all: [], any: [] }` の形で入っていて、`conditions.statuses.length` を
-      そのまま読むと受信箱ごと真っ白になる。
-    */
-    const conditions = normalizeSavedViewConditions(view.conditions)
-    setNameQuery(conditions.query ?? '')
-    setStatusFilter(conditions.statuses.length === 1 ? conditions.statuses[0] : 'all')
-    setAssigneeFilter(conditions.assignees.length === 1 ? conditions.assignees[0] : 'all')
-    setQuickFilter(conditions.due === 'overdue' ? 'overdue' : 'all')
-    const nextChannel = conditions.channels.length === 1 ? conditions.channels[0] : 'all'
-    router.push(nextChannel === 'all' ? '/chats' : `/chats?channel=${nextChannel}`)
+    const nextChannel = applySavedViewConditions(view)
+    setSavedViewNotice('')
+    // savedView=<id> をURLへ残す。残さないと再読込・共有で条件が消える(N-021)。
+    savedViewConsumedRef.current = view.id
+    router.push(buildInboxUrl(nextChannel, view.id))
     setSavedViewsOpen(false)
   }
   useEffect(() => {
@@ -1150,7 +1267,8 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     deepLinkIdRef.current = null
     setDeepLinkNotice('')
     setSelectedChatId(null)
-    router.replace(channel === 'all' ? '/chats' : `/chats?channel=${channel}`)
+    // 会話の指定だけ外す。保存検索は一覧の条件なので残す(N-021)。
+    router.replace(buildInboxUrl(channel, savedViewParam || null))
   }
 
   const handleSelectChat = (chatId: string) => {
@@ -1162,7 +1280,8 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     deepLinkIdRef.current = null
     setDeepLinkNotice('')
     setSelectedChatId(chatId)
-    router.replace(channel === 'all' ? '/chats' : `/chats?channel=${channel}`)
+    // friend は外すが、一覧条件の savedView は残す(N-021)。
+    router.replace(buildInboxUrl(channel, savedViewParam || null))
     // 既読はログイン中の担当者だけに反映する。対応状況は変えない。
     setChats((prev) => prev.map((chat) => (
       chat.id === chatId ? { ...chat, isUnread: false } : chat
@@ -1524,6 +1643,8 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     setQuickFilter('all')
     setAssigneeFilter('all')
     setUnreadOnly(false)
+    // 手動で解除したので、URLの保存検索IDも外す(N-021)。
+    dropSavedViewParam()
   }
   const activeFriendId = selectedFriendId
     ?? (chatDetail?.id === selectedChatId ? chatDetail.friendId : null)
@@ -1555,6 +1676,15 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
           {error}
         </div>
       )}
+      {/*
+        URLの保存検索IDが見つからなかったときの案内(N-021)。
+        既定条件へ戻したことだけを伝える。障害ではないので error とは分ける。
+      */}
+      {savedViewNotice && (
+        <div role="status" className="mb-4 rounded-lg border border-hairline bg-canvas-sunken p-3 text-sm text-ink-secondary">
+          {savedViewNotice}
+        </div>
+      )}
 
       <section
         data-design="Filters"
@@ -1570,7 +1700,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
           <button
             key={filter.key}
             type="button"
-            onClick={() => setQuickFilter(filter.key)}
+            onClick={() => { setQuickFilter(filter.key); dropSavedViewParam() }}
             aria-pressed={quickFilter === filter.key}
             className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
               quickFilter === filter.key
@@ -1726,7 +1856,10 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
             setAssigneeFilter(next.assignee)
             setUnreadOnly(next.unreadOnly)
             if (next.channel !== channel) {
-              router.push(next.channel === 'all' ? '/chats' : `/chats?channel=${next.channel}`)
+              // 手動の条件変更なので savedView は残さない(N-021)。
+              router.push(buildInboxUrl(next.channel, null))
+            } else {
+              dropSavedViewParam()
             }
           }}
           onReset={() => {
@@ -1761,7 +1894,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
               <input
               type="search"
               value={nameQuery}
-              onChange={(e) => setNameQuery(e.target.value)}
+              onChange={(e) => { setNameQuery(e.target.value); dropSavedViewParam() }}
               placeholder="名前・メールアドレス・内容で検索"
               aria-label="名前・メールアドレス・内容で検索"
               className="w-full rounded-lg border border-[#E5E7EB] bg-canvas py-2 pr-3 pl-9 text-xs text-[#1F2937] outline-none focus:border-[#06C755] focus:ring-2 focus:ring-[#06C755]/15"
@@ -1778,7 +1911,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                 <OperatorDropdown
                   value={assigneeFilter}
                   operators={operators}
-                  onChange={setAssigneeFilter}
+                  onChange={(next) => { setAssigneeFilter(next); dropSavedViewParam() }}
                   label="担当者"
                   ariaLabel="担当者で絞り込む"
                   unreadOf={unreadLookup(assigneeUnread)}
@@ -1791,7 +1924,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                 <button
                   key={item.key}
                   type="button"
-                  onClick={() => router.push(item.key === 'all' ? '/chats' : `/chats?channel=${item.key}`)}
+                  onClick={() => router.push(buildInboxUrl(item.key, null))}
                   aria-label={item.label}
                   title={item.label}
                   aria-pressed={channel === item.key}
@@ -1811,7 +1944,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
             {statusFilters.map((f) => (
               <button
                 key={f.key}
-                onClick={() => setStatusFilter(f.key)}
+                onClick={() => { setStatusFilter(f.key); dropSavedViewParam() }}
                 className={`shrink-0 whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium transition-colors ${
                   statusFilter === f.key
                     ? 'bg-[#06C755] text-on-accent'
@@ -1887,7 +2020,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                         setSelectedChatId(null)
                         setSelectedFriendId(null)
                         setSelectedThreadId(item.threadId)
-                        router.replace(channel === 'all' ? '/chats' : `/chats?channel=${channel}`)
+                        router.replace(buildInboxUrl(channel, savedViewParam || null))
                         setEmailItems((prev) => prev.map((email) => (
                           email.threadId === item.threadId ? { ...email, isUnread: false } : email
                         )))
