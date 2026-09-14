@@ -218,6 +218,108 @@ describe('友だち情報欄', () => {
   })
 })
 
+describe('N-042 型検証の接続(#702)', () => {
+  function addSelectField() {
+    raw
+      .prepare(
+        `INSERT INTO friend_fields (id, name, field_key, type, options_json)
+         VALUES ('fld-sel','プラン','plan','select','["松","竹"]')`,
+      )
+      .run()
+  }
+
+  it('S1 数値項目へ文字の代入は保存せず失敗に数える', async () => {
+    addAction('a1', 'friend_field', { fieldId: 'fld1', op: 'set', value: 'あいう' })
+    const result = await runScenarioActions(db, {
+      scenarioId: SCENARIO,
+      hook: 'step_sent',
+      friendId: 'f1',
+      stepId: STEP,
+    })
+    expect(result.failed).toBe(1)
+    expect(result.executed).toBe(0)
+    expect(fieldValue('f1', 'fld1')).toBeNull()
+  })
+
+  it('S1 数値のカンマは正規化して保存する', async () => {
+    addAction('a1', 'friend_field', { fieldId: 'fld1', op: 'set', value: '1,000' })
+    const result = await runScenarioActions(db, {
+      scenarioId: SCENARIO,
+      hook: 'step_sent',
+      friendId: 'f1',
+      stepId: STEP,
+    })
+    expect(result.failed).toBe(0)
+    expect(fieldValue('f1', 'fld1')).toBe('1000')
+  })
+
+  it('S1 空の代入は行を消す（中央の口の意味に統一）', async () => {
+    raw
+      .prepare(`INSERT INTO friend_field_values (friend_id, field_id, value) VALUES ('f1','fld1','5')`)
+      .run()
+    addAction('a1', 'friend_field', { fieldId: 'fld1', op: 'set', value: '' })
+    const result = await runScenarioActions(db, {
+      scenarioId: SCENARIO,
+      hook: 'step_sent',
+      friendId: 'f1',
+      stepId: STEP,
+    })
+    expect(result.failed).toBe(0)
+    expect(fieldValue('f1', 'fld1')).toBeNull()
+  })
+
+  it('S1 選択肢外の値は保存しない', async () => {
+    addSelectField()
+    addAction('a1', 'friend_field', { fieldId: 'fld-sel', op: 'set', value: '梅' })
+    const result = await runScenarioActions(db, {
+      scenarioId: SCENARIO,
+      hook: 'step_sent',
+      friendId: 'f1',
+      stepId: STEP,
+    })
+    expect(result.failed).toBe(1)
+    expect(fieldValue('f1', 'fld-sel')).toBeNull()
+  })
+
+  it('S1 選択肢内の値は保存する', async () => {
+    addSelectField()
+    addAction('a1', 'friend_field', { fieldId: 'fld-sel', op: 'set', value: '松' })
+    const result = await runScenarioActions(db, {
+      scenarioId: SCENARIO,
+      hook: 'step_sent',
+      friendId: 'f1',
+      stepId: STEP,
+    })
+    expect(result.failed).toBe(0)
+    expect(fieldValue('f1', 'fld-sel')).toBe('松')
+  })
+
+  it('S1 項目が無ければ孤立した行を作らない', async () => {
+    addAction('a1', 'friend_field', { fieldId: 'fld-gone', op: 'set', value: '5' })
+    const result = await runScenarioActions(db, {
+      scenarioId: SCENARIO,
+      hook: 'step_sent',
+      friendId: 'f1',
+      stepId: STEP,
+    })
+    expect(result.failed).toBe(1)
+    expect(fieldValue('f1', 'fld-gone')).toBeNull()
+  })
+
+  it('S1 数値以外への加算結果は保存しない', async () => {
+    addSelectField()
+    addAction('a1', 'friend_field', { fieldId: 'fld-sel', op: 'add', value: '1' })
+    const result = await runScenarioActions(db, {
+      scenarioId: SCENARIO,
+      hook: 'step_sent',
+      friendId: 'f1',
+      stepId: STEP,
+    })
+    expect(result.failed).toBe(1)
+    expect(fieldValue('f1', 'fld-sel')).toBeNull()
+  })
+})
+
 describe('並び順と失敗', () => {
   it('並び順のとおりに動く（前のアクションの結果を次の条件で使える）', async () => {
     addAction('a1', 'tag', { op: 'add', tagIds: ['t1'] }, { sortOrder: 0 })

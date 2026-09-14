@@ -793,11 +793,33 @@ async function executeOperation(
       const id = `${item.id}:conversion`;
       const existing = await db.prepare(`SELECT id FROM conversion_events WHERE id = ?`).bind(id).first<{ id: string }>();
       if (existing) return { status: 'skipped', before: null, after: { id } };
+      // #718: 主経路(conversions.ts)と同じ4つのsnapshotを保存時点で凍結する。
+      // affiliate_id はNULLのままにする。これは控え忘れではない。一括操作は
+      // 紹介コードの文脈を持たず attribution を解決しないため、埋めるほうが嘘になる。
+      // なお一括ダイアログに成果タイルは無く通常はUIから到達不能だが、
+      // API直接呼び出しでは実行できるため凍結は必要。
+      const point = await db.prepare(
+        `SELECT name, event_type, value, version FROM conversion_points WHERE id = ?`,
+      ).bind(operation.conversionPointId).first<{
+        name: string; event_type: string; value: number | null; version: number;
+      }>();
+      if (!point) throw new ItemExecutionError('conversion_point_not_found', '成果地点が見つかりません', false);
       await db.prepare(
         `INSERT INTO conversion_events
-           (id, conversion_point_id, friend_id, metadata, created_at, approval_status)
-         VALUES (?, ?, ?, ?, ?, 'approved')`,
-      ).bind(id, operation.conversionPointId, friend.id, JSON.stringify({ source: 'friend_bulk_run', runId: run.id }), now).run();
+           (id, conversion_point_id, friend_id, metadata, created_at, approval_status,
+            point_name_snapshot, event_type_snapshot, value_snapshot, point_version_snapshot)
+         VALUES (?, ?, ?, ?, ?, 'approved', ?, ?, ?, ?)`,
+      ).bind(
+        id,
+        operation.conversionPointId,
+        friend.id,
+        JSON.stringify({ source: 'friend_bulk_run', runId: run.id }),
+        now,
+        point.name,
+        point.event_type,
+        Number(point.value ?? 0),
+        point.version,
+      ).run();
       return { status: 'success', before: null, after: { id } };
     }
     case 'remove_conversion': {
