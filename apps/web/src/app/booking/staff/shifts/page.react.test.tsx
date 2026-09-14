@@ -169,7 +169,8 @@ describe('店舗営業時間の編集', () => {
   test('7曜日をexpectedVersion付きで1回だけ保存し、設定と空き枠を読み直す', async () => {
     await renderEditor()
     fireEvent.click(screen.getByRole('checkbox', { name: '月曜日を受け付ける' }))
-    fireEvent.change(screen.getByLabelText('月曜日 1件目の開始'), { target: { value: '10:00' } })
+    const mondayStart = await screen.findByLabelText('月曜日 1件目の開始')
+    fireEvent.change(mondayStart, { target: { value: '10:00' } })
     fireEvent.change(screen.getByLabelText('月曜日 1件目の終了'), { target: { value: '18:00' } })
     fireEvent.change(screen.getByLabelText('月曜日 1件目の同時受付数'), { target: { value: '3' } })
     const save = screen.getByRole('button', { name: '営業時間を保存' })
@@ -201,7 +202,8 @@ describe('店舗営業時間の編集', () => {
   test('24:00・日またぎを黙って丸めず画面内で案内する', async () => {
     await renderEditor()
     fireEvent.click(screen.getByRole('checkbox', { name: '月曜日を受け付ける' }))
-    fireEvent.change(screen.getByLabelText('月曜日 1件目の開始'), { target: { value: '22:00' } })
+    const mondayStart = await screen.findByLabelText('月曜日 1件目の開始')
+    fireEvent.change(mondayStart, { target: { value: '22:00' } })
     fireEvent.change(screen.getByLabelText('月曜日 1件目の終了'), { target: { value: '02:00' } })
     fireEvent.click(screen.getByRole('button', { name: '営業時間を保存' }))
     expect((await screen.findByRole('alert')).textContent).toContain('日ごとに分けて入力してください')

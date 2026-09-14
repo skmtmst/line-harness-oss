@@ -41,6 +41,8 @@ vi.mock('../services/broadcast.js', () => ({
   processBroadcastSend: mocks.processBroadcastSend,
   processQueuedBroadcasts: mocks.processQueuedBroadcasts,
   buildMessage: vi.fn(),
+  // N-062: 即時送信の直前再確認はこの試験の対象外のため通す。枠の拒否は専用試験で見る。
+  guardScheduledBroadcastQuota: async () => ({ blocked: false }),
 }));
 vi.mock('../services/operator-notification-dispatch.js', () => ({
   dispatchOperatorEvent: mocks.dispatchOperatorEvent,
