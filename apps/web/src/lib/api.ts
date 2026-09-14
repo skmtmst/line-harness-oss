@@ -7992,6 +7992,13 @@ export const api = {
         headers: { 'Idempotency-Key': idempotencyKey },
         body: JSON.stringify(data),
       }),
+    // N-022: 画像と本文を1回の送信単位にする結合口。両方あるときだけ使う。
+    sendCombined: (id: string, data: { image: { originalContentUrl: string; previewImageUrl: string }; text: string; revision?: number }, idempotencyKey: string) =>
+      fetchApi<ApiResponse<{ sent: true; messageId: string; messageIds: string[]; sentByStaffName: string; revision: number }>>(`/api/chats/${id}/send-combined`, {
+        method: 'POST',
+        headers: { 'Idempotency-Key': idempotencyKey },
+        body: JSON.stringify(data),
+      }),
     markRead: (id: string) =>
       fetchApi<ApiResponse<{ isUnread: false }>>(`/api/chats/${id}/read`, {
         method: 'POST',
