@@ -126,7 +126,7 @@ describe('回答フォーム一覧の管理者確認(#724)', () => {
 
   it('専用ビューで未割当だけが出てバッジと#771説明が出る', async () => {
     await render()
-    await click(byExactText('button', '管理者確認（担当未割当）'))
+    await click(byExactText('button', '管理者確認（担当未割り当て）'))
     expect(fetchApi.mock.calls.some(([path]) => String(path).startsWith('/api/forms/unassigned'))).toBe(true)
     expect(host.textContent).toContain('旧フォーム要確認')
     expect(host.textContent).toContain('管理者確認')
@@ -144,7 +144,7 @@ describe('回答フォーム一覧の管理者確認(#724)', () => {
       return { success: true, data: [] }
     })
     await render()
-    await click(byExactText('button', '管理者確認（担当未割当）'))
-    expect(host.textContent).toContain('確認できる未割当フォームはありません')
+    await click(byExactText('button', '管理者確認（担当未割り当て）'))
+    expect(host.textContent).toContain('確認できる未割り当てフォームはありません')
   })
 })

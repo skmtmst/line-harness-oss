@@ -492,14 +492,14 @@ export default function FormSubmissionsPage() {
           </div>
 
           <div className="mb-3 flex flex-wrap items-center gap-2">
-            <button
+            <Button
               type="button"
+              variant={reviewMode ? 'primary' : 'secondary'}
               aria-pressed={reviewMode}
               onClick={() => { setReviewMode((mode) => !mode); setPage(1) }}
-              className={`rounded-pill cursor-pointer border px-3 py-1 text-xs ${reviewMode ? 'border-accent bg-accent-soft text-ink' : 'border-hairline bg-white text-ink-secondary'}`}
             >
-              {reviewMode ? '通常の一覧に戻る' : '管理者確認（担当未割当）'}
-            </button>
+              {reviewMode ? '通常の一覧に戻る' : '管理者確認（担当未割り当て）'}
+            </Button>
           </div>
           {reviewMode && (
             <div className="border-hairline rounded-card mb-3 border bg-white p-3 text-xs text-ink-secondary">
@@ -533,13 +533,13 @@ export default function FormSubmissionsPage() {
         ) : reviewMode && reviewForbidden ? (
           <ListState
             kind="empty"
-            title="確認できる未割当フォームはありません"
+            title="確認できる未割り当てフォームはありません"
             description="管理者確認は既定テナントの管理者のみ利用できます。"
           />
         ) : reviewMode && forms.length === 0 ? (
           <ListState
             kind="empty"
-            title="担当未割当のフォームはありません"
+            title="担当未割り当てのフォームはありません"
             description="担当の決まっていない旧フォームはここに出ます。"
           />
         ) : forms.length === 0 ? (
