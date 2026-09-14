@@ -100,6 +100,24 @@ describe('EC subscriptions and connector', () => {
     expect(JSON.parse(text).data.connector).toMatchObject({ secretConfigured: true, secretLastFour: '8f3a' })
   })
 
+  it('returns a null connector retry policy like the visual-QA mock', async () => {
+    // #517 中5b: つなぎ先単位のやり直し方針は口に無い。本番が null を返すことを
+    // 固定し、モックだけ別物になる逆変異(どちらかを変える)を赤で捕まえる。
+    // モック側の一致は web の契約試験が見張る。
+    const { app } = harness({
+      connector: {
+        id: 'connector-a', provider: 'shopify', shop_domain: 'nen.myshopify.com',
+        status: 'connected', inbound_secret_encrypted: 'ciphertext', inbound_secret_last4: '8f3a',
+        secret_updated_at: '2026-09-01', event_types_json: '["ec.order.confirmed"]',
+        identity_rules_json: '["verified_email"]', version: 3, updated_at: '2026-09-01',
+      },
+      health: { today: 2, last_30_days: 20, failed: 1, last_received_at: '2026-09-06', last_succeeded_at: '2026-09-06' },
+    })
+    const response = await app.request('/api/ec-commerce/connector?lineAccountId=account-a')
+    expect(response.status).toBe(200)
+    expect(JSON.parse(await response.text()).data).toMatchObject({ retryPolicy: null })
+  })
+
   it('encrypts a new secret and uses optimistic versioning', async () => {
     const { app, calls } = harness({ connector: null })
     const response = await app.request('/api/ec-commerce/connector?lineAccountId=account-a', {
