@@ -1006,8 +1006,10 @@ forms.get('/api/forms/:id/submissions', requireRole('owner', 'admin', 'staff'), 
     }
     const page = listPage(c.req.query('page'));
     const limit = listLimit(c.req.query('limit'), 20);
+    // N-171/N-179: 一覧・件数・CSV が同じ検索条件になるよう、検索語をページング前に渡す。
+    const search = (c.req.query('q') ?? '').trim().slice(0, 200) || undefined;
     const [submissions, summary] = await Promise.all([
-      getFormSubmissionsPage(c.env.DB, id, { page, limit, lineAccountId: c.req.query('account_id')! }),
+      getFormSubmissionsPage(c.env.DB, id, { page, limit, lineAccountId: c.req.query('account_id')!, search }),
       getFormSubmissionAnalytics(
         c.env.DB,
         id,

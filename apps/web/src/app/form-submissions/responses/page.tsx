@@ -104,7 +104,12 @@ function FormResponsesInner() {
   // ページ送りを速く押すと遅い応答が後勝ちする。最新の要求だけを描く。
   const loadRequest = useRef(0)
 
-  const load = useCallback(async (nextPage = 1, nextLimit = 20) => {
+  // N-171/N-179: 絞り込みはサーバー側へ渡し、ページング前に絞らせる。
+  // 一覧・件数・CSV が同じ条件になる。空の検索語は送らない（全件のまま）。
+  // query を deps に入れると1文字ごとに即時再取得が走るため、既定値は ref で読む。
+  const queryRef = useRef(query)
+  queryRef.current = query
+  const load = useCallback(async (nextPage = 1, nextLimit = 20, searchText?: string) => {
     if (!selectedAccountId || !formId) {
       setLoading(false)
       return
@@ -114,10 +119,12 @@ function FormResponsesInner() {
     setError('')
     try {
       const account = `account_id=${encodeURIComponent(selectedAccountId)}`
+      const needle = (searchText ?? queryRef.current).trim()
+      const search = needle ? `&q=${encodeURIComponent(needle)}` : ''
       const [formResult, responseResult] = await Promise.all([
         fetchApi<{ success: boolean; data: FormDetail }>(`/api/forms/${formId}?${account}`),
         fetchApi<{ success: boolean; data: SubmissionPage }>(
-          `/api/forms/${formId}/submissions?page=${nextPage}&limit=${nextLimit}&${account}`,
+          `/api/forms/${formId}/submissions?page=${nextPage}&limit=${nextLimit}&${account}${search}`,
         ),
       ])
       if (!formResult.success || !responseResult.success) throw new Error('load_failed')
@@ -144,6 +151,22 @@ function FormResponsesInner() {
     void load(1, 20)
   }, [load])
 
+  // 検索語が変わったら1ページ目から取り直す。打ち終わりを捉えるため少し待つ。
+  const firstQuery = useRef(true)
+  useEffect(() => {
+    if (firstQuery.current) {
+      firstQuery.current = false
+      return
+    }
+    if (!selectedAccountId || !formId) return
+    const timer = setTimeout(() => {
+      void load(1, pageSize, query)
+    }, 300)
+    return () => clearTimeout(timer)
+    // query の変化だけを見る。load・pageSize は安定または別経路で再取得するため除外する。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query])
+
   const fields = useMemo(() => {
     if (!form) return []
     if (Array.isArray(form.fields)) return form.fields
@@ -160,14 +183,9 @@ function FormResponsesInner() {
     const fromRows = items.flatMap((item) => Object.keys(item.data as Record<string, unknown>))
     return [...new Set([...fromDefinition, ...fromRows])]
   }, [fields, items])
-  const shown = useMemo(() => {
-    const needle = query.trim().toLocaleLowerCase('ja-JP')
-    if (!needle) return items
-    return items.filter((item) => [
-      item.friendName ?? '',
-      ...Object.values(item.data as Record<string, unknown>).map(valueText),
-    ].some((value) => value.toLocaleLowerCase('ja-JP').includes(needle)))
-  }, [items, query])
+  // N-171: 絞り込みはサーバー側が済ませている。手元で重ねて絞ると、
+  // サーバー結果と表示がずれるため、そのまま使う。
+  const shown = items
   const summaries = useMemo(() => fieldKeys.map((key) => {
     const counts = new Map<string, number>()
     for (const item of shown) {
@@ -195,9 +213,12 @@ function FormResponsesInner() {
       const all: Submission[] = []
       let currentPage = 1
       let expected = 0
+      // N-179: 書き出しも一覧と同じ検索条件で全件取る。検索中は検索結果だけを出す。
+      const exportNeedle = query.trim()
+      const exportSearch = exportNeedle ? `&q=${encodeURIComponent(exportNeedle)}` : ''
       do {
         const result = await fetchApi<{ success: boolean; data: SubmissionPage }>(
-          `/api/forms/${formId}/submissions?page=${currentPage}&limit=${EXPORT_PAGE_LIMIT}&account_id=${encodeURIComponent(selectedAccountId)}`,
+          `/api/forms/${formId}/submissions?page=${currentPage}&limit=${EXPORT_PAGE_LIMIT}&account_id=${encodeURIComponent(selectedAccountId)}${exportSearch}`,
         )
         if (!result.success) throw new Error('export_failed')
         expected = result.data.total
@@ -277,7 +298,7 @@ function FormResponsesInner() {
       </div>
 
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <label className="text-ink-secondary text-xs" htmlFor="form-response-filter">表示中の{items.length}件を絞り込む</label>
+        <label className="text-ink-secondary text-xs" htmlFor="form-response-filter">名前・回答内容で検索（全件から探す）</label>
         <input id="form-response-filter" type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="名前・回答内容で検索" className="border-hairline bg-canvas text-ink rounded-control w-full border px-3 py-2 text-sm sm:w-72" />
       </div>
       {exportError && <p className="text-danger mb-3 text-sm">{exportError}</p>}
@@ -285,7 +306,7 @@ function FormResponsesInner() {
         <p className="text-ink-secondary mb-3 text-sm" role="status">{exportProgress}</p>
       )}
 
-      {total === 0 ? (
+      {total === 0 && !query.trim() ? (
         <ListState kind="empty" title="まだ回答がありません" description="フォームが回答されると、ここに1件ずつ並びます。" />
       ) : view === 'summary' ? (
         <div className="grid gap-3 md:grid-cols-2">
