@@ -176,8 +176,11 @@ function InflowLinksPageInner() {
     // pool 紐付け判定よりも、こちらの実流入ベースの方が運用実態に合う。
     try {
       const summaryQuery = accountAtRequest ? `?lineAccountId=${accountAtRequest}` : ''
+      // N-011: 経路一覧も選択accountで絞る。api.tsの共通呼び出し層は変えず、
+      // この画面だけfetchApiで直接account_idを渡す。
+      const routeQuery = accountAtRequest ? `?account_id=${encodeURIComponent(accountAtRequest)}` : ''
       const [r, genreRes, p, s, t, tagRes, sum, tl] = await Promise.all([
-        api.entryRoutes.list(),
+        fetchApi<{ success: boolean; data: EntryRoute[] }>(`/api/entry-routes${routeQuery}`),
         // Worker と Pages の反映順に短い時間差があっても、旧 Worker に対して
         // 画面全体をエラーにしない。ジャンル一覧だけ空として既存リンクを表示する。
         api.entryRouteGenres.list().catch(() => ({
