@@ -231,6 +231,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'POST /api/broadcasts/{id}/send',
   'POST /api/broadcasts/{id}/stop',
   'POST /api/broadcasts/dedup-preview',
+  'POST /api/chats/{id}/send-combined',
   'POST /api/conversions/approvals/bulk',
   'POST /api/conversions/definitions/{id}/revise',
   'POST /api/conversions/points',
