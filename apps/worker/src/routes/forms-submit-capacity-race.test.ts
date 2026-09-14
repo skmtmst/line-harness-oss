@@ -125,9 +125,17 @@ function twoConnections(seedSql: string) {
   const dir = mkdtempSync(join(tmpdir(), 'form-capacity-race-'));
   const file = join(dir, 'test.sqlite');
   const primary = new Database(file);
+  // #743: 起動SQL(約1000文)の素の再生は、文ごとに確定・fsyncする。
+  // 列車274では全480ファイル並行の確定待ちで行列し、準備だけで15秒を
+  // 超えた(実装の行き詰まりではない。確保は条件付きINSERT1本で待機なし、
+  // 別キー・別友だちで共有状態を持たないため)。1つの確定にまとめ、
+  // 判定内容・待ち時間・行数は変えない。WAL化は確定の後(確定の中では
+  // 切り替えられないため)。
+  primary.exec('BEGIN;');
   primary.exec(BOOTSTRAP);
-  primary.exec(`PRAGMA journal_mode=WAL;`);
   primary.exec(seedSql);
+  primary.exec('COMMIT;');
+  primary.exec(`PRAGMA journal_mode=WAL;`);
   const secondary = new Database(file);
   secondary.exec(`PRAGMA journal_mode=WAL;`);
   const injected1: { current: Inject } = { current: null };
