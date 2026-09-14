@@ -296,7 +296,11 @@ async function requireFormManage(
   accountIds: Array<string | null | undefined>,
 ): Promise<Response | null> {
   const staff = c.get('staff');
-  if (staff?.role === 'owner' || staff?.role === 'admin') return null;
+  // 未認証は旧requireRoleと同じく403にする（400より先に判定する）。
+  if (!staff) {
+    return c.json({ success: false, error: 'この操作には管理者権限が必要です' }, 403);
+  }
+  if (staff.role === 'owner' || staff.role === 'admin') return null;
   const decision = await resolveRequestBoundaries(c.env.DB, staff, accountIds, {
     requiredPermissionKey: FORM_MANAGE_PERMISSION_KEY,
   });
@@ -702,11 +706,11 @@ forms.post('/api/forms', async (c) => {
     if (!body.name) {
       return c.json({ success: false, error: 'name is required' }, 400);
     }
+    const createGate = await requireFormManage(c, [body.accountId]);
+    if (createGate) return createGate;
     if (!body.accountId) {
       return c.json({ success: false, error: 'accountId is required' }, 400);
     }
-    const createGate = await requireFormManage(c, [body.accountId]);
-    if (createGate) return createGate;
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.accountId])) {
       return c.json({ success: false, error: 'Not found' }, 404);
     }
@@ -744,11 +748,11 @@ forms.post('/api/forms/drafts', async (c) => {
   try {
     const body = await c.req.json<{ name?: string; accountId?: string }>()
       .catch(() => ({} as { name?: string; accountId?: string }));
+    const draftsGate = await requireFormManage(c, [body.accountId]);
+    if (draftsGate) return draftsGate;
     if (!body.accountId) {
       return c.json({ success: false, error: 'accountId is required' }, 400);
     }
-    const draftsGate = await requireFormManage(c, [body.accountId]);
-    if (draftsGate) return draftsGate;
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.accountId])) {
       return c.json({ success: false, error: 'Not found' }, 404);
     }
