@@ -890,6 +890,13 @@ const spec = {
         responses: { '201': { description: 'Mileage rule created' }, '400': { description: 'LINE account is required' }, '403': { description: 'Owner or admin role or account scope required' } },
       },
     },
+    '/api/mileage/rules/export': {
+      get: {
+        tags: ['Mileage'], summary: '許可範囲内のたまる決めごとをCSVで書き出し（N-237。監査へ記録）',
+        parameters: [{ name: 'accountId', in: 'query', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'Mileage earning rules CSV' }, '400': { description: 'LINE account is required' }, '403': { description: 'Staff role required' }, '404': { description: 'LINE account not found in account scope' } },
+      },
+    },
     '/api/mileage/earning-rules/{id}/publish': {
       post: {
         tags: ['Mileage'], summary: 'たまる決めごとの下書きを公開版として固定し実行へ反映（N-231 案1）',
