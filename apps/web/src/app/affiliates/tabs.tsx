@@ -38,6 +38,7 @@ import {
   personNameText,
 } from './affiliate-display'
 import { AffiliateArchiveDialog } from './action-dialogs'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 import {
   OFFER_FILTERS,
   OFFER_PAGE_SIZES,
@@ -1596,13 +1597,16 @@ export function ApprovalQueue() {
 
   useEffect(() => { void loadItems() }, [loadItems])
 
-  const handleApprove = useCallback(async (eventId: string) => {
+  const handleApprove = useCallback(async (eventId: string, expectedStatus: 'pending' | 'approved' | 'rejected') => {
     if (actioning) return
     setActioning(eventId)
     setError(null)
     try {
-      const res = await api.conversionApprovals.approve(eventId)
+      const res = await api.conversionApprovals.approve(eventId, expectedStatus)
       if (res.success) {
+        await loadItems()
+      } else if (res.code === 'approval_conflict') {
+        setError('ほかの人が先に判断しました。一覧を読み直しました。')
         await loadItems()
       } else {
         setError(res.error ?? '承認に失敗しました')
@@ -1613,13 +1617,16 @@ export function ApprovalQueue() {
     setActioning(null)
   }, [actioning, loadItems])
 
-  const handleReject = useCallback(async (eventId: string) => {
+  const handleReject = useCallback(async (eventId: string, expectedStatus: 'pending' | 'approved' | 'rejected') => {
     if (actioning) return
     setActioning(eventId)
     setError(null)
     try {
-      const res = await api.conversionApprovals.reject(eventId)
+      const res = await api.conversionApprovals.reject(eventId, expectedStatus)
       if (res.success) {
+        await loadItems()
+      } else if (res.code === 'approval_conflict') {
+        setError('ほかの人が先に判断しました。一覧を読み直しました。')
         await loadItems()
       } else {
         setError(res.error ?? '却下に失敗しました')
@@ -1629,6 +1636,78 @@ export function ApprovalQueue() {
     }
     setActioning(null)
   }, [actioning, loadItems])
+
+  type BulkOutcome = 'approved' | 'rejected'
+  type BulkResult = {
+    action: BulkOutcome
+    succeeded: string[]
+    conflicted: Array<{ id: string; currentStatus: string }>
+    denied: string[]
+    failed: Array<{ id: string; error: string }>
+  }
+  const [bulkConfirm, setBulkConfirm] = useState<{ action: BulkOutcome; items: ConversionApprovalItem[] } | null>(null)
+  const [bulkResult, setBulkResult] = useState<BulkResult | null>(null)
+
+  const nameOf = useCallback((eventId: string) => {
+    const item = items.find((entry) => entry.eventId === eventId)
+    return item ? personNameText(item.friendName) : eventId
+  }, [items])
+
+  const runBulkDecide = useCallback(async (action: BulkOutcome, targets: ConversionApprovalItem[]) => {
+    setActioning(action === 'approved' ? 'bulk' : 'bulk-reject')
+    setError(null)
+    try {
+      const res = await api.conversionApprovals.bulkDecide(
+        targets.map((item) => ({
+          id: item.eventId,
+          status: action,
+          expectedStatus: item.approvalStatus,
+        })),
+      )
+      await loadItems()
+      if (res.success && res.data) {
+        setBulkResult({ action, ...res.data })
+        const leftovers = res.data.conflicted.length + res.data.denied.length + res.data.failed.length
+        if (leftovers === 0) setSelected(new Set())
+        else {
+          // 残った対象だけ選び直せるようにする。成功分は外す。
+          setSelected((current) => {
+            const next = new Set<string>()
+            for (const eventId of current) {
+              if (!res.data!.succeeded.includes(eventId)) next.add(eventId)
+            }
+            return next
+          })
+        }
+      } else {
+        setError(res.error ?? 'まとめて処理できませんでした')
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'まとめて処理できませんでした')
+    } finally {
+      setBulkConfirm(null)
+      setActioning(null)
+    }
+  }, [loadItems])
+
+  const retryBulkLeftovers = useCallback(() => {
+    if (!bulkResult) return
+    const leftoverIds = new Set([
+      ...bulkResult.conflicted.map((entry) => entry.id),
+      ...bulkResult.denied,
+      ...bulkResult.failed.map((entry) => entry.id),
+    ])
+    // 読み直し後の最新状態で選び直す。競合で状態が変わった対象は
+    // 最新の一覧から外れるため、誤って再送しない。
+    const retryable = items.filter((item) => leftoverIds.has(item.eventId) && item.approvalStatus === 'pending')
+    setBulkResult(null)
+    if (retryable.length === 0) {
+      setSelected(new Set())
+      return
+    }
+    setSelected(new Set(retryable.map((item) => item.eventId)))
+    setBulkConfirm({ action: bulkResult.action, items: retryable })
+  }, [bulkResult, items])
 
   const counts = {
     pending: items.filter((item) => item.approvalStatus === 'pending').length,
@@ -1674,39 +1753,15 @@ export function ApprovalQueue() {
   const allSafeSelected = safePendingIds.length > 0
     && safePendingIds.every((eventId) => selected.has(eventId))
 
-  const handleBulkApprove = useCallback(async () => {
-    const eventIds = [...selected]
-    if (actioning || eventIds.length === 0) return
-    setActioning('bulk')
-    setError(null)
-    try {
-      const results = await Promise.all(eventIds.map((eventId) => api.conversionApprovals.approve(eventId)))
-      const failed = results.filter((result) => !result.success).length
-      await loadItems()
-      if (failed > 0) setError(`${failed}件を承認できませんでした。一覧を確認してください。`)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'まとめて承認できませんでした')
-    } finally {
-      setActioning(null)
-    }
-  }, [actioning, loadItems, selected])
-
-  const handleBulkReject = useCallback(async () => {
-    const eventIds = [...selected]
-    if (actioning || eventIds.length === 0) return
-    setActioning('bulk-reject')
-    setError(null)
-    try {
-      const results = await Promise.all(eventIds.map((eventId) => api.conversionApprovals.reject(eventId)))
-      const failed = results.filter((result) => !result.success).length
-      await loadItems()
-      if (failed > 0) setError(`${failed}件を却下できませんでした。一覧を確認してください。`)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'まとめて却下できませんでした')
-    } finally {
-      setActioning(null)
-    }
-  }, [actioning, loadItems, selected])
+  const openBulkConfirm = useCallback((action: BulkOutcome) => {
+    if (actioning) return
+    // 確認を開く前に選んだ対象を確定する。確認画面に並んだ顔ぶれが
+    // 実行対象とずれないようにするため、開いた後は選び直しを受けない。
+    const targets = items.filter((item) => selected.has(item.eventId) && item.approvalStatus === 'pending')
+    if (targets.length === 0) return
+    setBulkResult(null)
+    setBulkConfirm({ action, items: targets })
+  }, [actioning, items, selected])
 
   const exportApprovalsCsv = () => {
     const header = ['日時', '友だち', 'アフィリエイター', '案件', '成果地点', '金額', '確認状態']
@@ -1803,13 +1858,13 @@ export function ApprovalQueue() {
           <>
             <AffiliateButton
               variant="primary"
-              onClick={() => { void handleBulkApprove() }}
+              onClick={() => { openBulkConfirm('approved') }}
               disabled={selected.size === 0 || actioning !== null}
             >
               選んだ{selected.size}件をまとめて認める
             </AffiliateButton>
             <AffiliateButton
-              onClick={() => { void handleBulkReject() }}
+              onClick={() => { openBulkConfirm('rejected') }}
               disabled={selected.size === 0 || actioning !== null}
             >
               まとめて却下する
@@ -1945,14 +2000,14 @@ export function ApprovalQueue() {
                     <td className="px-4 py-3 text-center">
                       <div className="flex items-center justify-center gap-2">
                         <AffiliateButton
-                          onClick={() => { void handleApprove(item.eventId) }}
+                          onClick={() => { void handleApprove(item.eventId, item.approvalStatus) }}
                           disabled={actioning !== null}
                           variant="primary"
                         >
                           認める
                         </AffiliateButton>
                         <AffiliateButton
-                          onClick={() => { void handleReject(item.eventId) }}
+                          onClick={() => { void handleReject(item.eventId, item.approvalStatus) }}
                           disabled={actioning !== null}
                           title="却下理由はまだ保存できません"
                         >
@@ -1997,6 +2052,70 @@ export function ApprovalQueue() {
       )}
 
       <p className="text-ink-faint mt-3 text-xs">却下理由の記録は未接続です。却下状態はまとめて保存できます。</p>
+
+      {bulkConfirm && (
+        <ConfirmDialog
+          open
+          title={bulkConfirm.action === 'approved' ? `選んだ${bulkConfirm.items.length}件をまとめて認めますか` : `選んだ${bulkConfirm.items.length}件をまとめて却下しますか`}
+          description="実行すると1件ずつ同じ判断の契約で処理します。ほかの人が先に判断した対象は上書きせず残します。"
+          confirmLabel={bulkConfirm.action === 'approved' ? 'まとめて認める' : 'まとめて却下する'}
+          destructive={bulkConfirm.action === 'rejected'}
+          busy={actioning !== null}
+          onConfirm={() => { void runBulkDecide(bulkConfirm.action, bulkConfirm.items) }}
+          onCancel={() => { setBulkConfirm(null) }}
+        >
+          <ul className="text-ink-secondary mt-2 max-h-48 space-y-1 overflow-y-auto text-sm">
+            {bulkConfirm.items.map((item) => (
+              <li key={item.eventId}>
+                {personNameText(item.friendName)}／{item.affiliateName ?? '紹介者名を取得できませんでした'}／{item.offerName ?? '案件未設定'}
+              </li>
+            ))}
+          </ul>
+        </ConfirmDialog>
+      )}
+
+      {bulkResult && (
+        <div className="bg-canvas rounded-card border-hairline mt-3 border p-4" role="status" aria-label="まとめて処理の結果">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h3 className="text-ink text-sm font-semibold">まとめて処理の結果</h3>
+              <p className="text-ink-secondary mt-1 text-sm">
+                成功 {bulkResult.succeeded.length}件
+                ／ほかの人が先に判断 {bulkResult.conflicted.length}件
+                ／権限なし {bulkResult.denied.length}件
+                ／失敗 {bulkResult.failed.length}件
+              </p>
+              {bulkResult.conflicted.length > 0 && (
+                <ul className="text-ink-secondary mt-2 space-y-1 text-sm">
+                  {bulkResult.conflicted.map((entry) => (
+                    <li key={entry.id}>先に判断されました：{nameOf(entry.id)}（いま{entry.currentStatus === 'approved' ? '承認済み' : entry.currentStatus === 'rejected' ? '却下済み' : '未判断'}）</li>
+                  ))}
+                </ul>
+              )}
+              {bulkResult.denied.length > 0 && (
+                <ul className="text-ink-secondary mt-2 space-y-1 text-sm">
+                  {bulkResult.denied.map((eventId) => (
+                    <li key={eventId}>権限がありません：{nameOf(eventId)}</li>
+                  ))}
+                </ul>
+              )}
+              {bulkResult.failed.length > 0 && (
+                <ul className="text-ink-secondary mt-2 space-y-1 text-sm">
+                  {bulkResult.failed.map((entry) => (
+                    <li key={entry.id}>失敗しました：{nameOf(entry.id)}（{entry.error}）</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            <div className="flex shrink-0 gap-2">
+              {(bulkResult.conflicted.length + bulkResult.denied.length + bulkResult.failed.length) > 0 && (
+                <AffiliateButton onClick={() => { retryBulkLeftovers() }}>残りを選び直して再試行</AffiliateButton>
+              )}
+              <AffiliateButton onClick={() => { setBulkResult(null) }}>閉じる</AffiliateButton>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

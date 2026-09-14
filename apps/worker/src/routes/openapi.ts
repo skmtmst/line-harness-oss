@@ -1577,6 +1577,44 @@ const spec = {
         },
       },
     },
+    '/api/conversions/approvals/bulk': {
+      post: {
+        tags: ['Conversions'],
+        summary: '成果をまとめて承認・却下する',
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['items'],
+                properties: {
+                  items: {
+                    type: 'array',
+                    minItems: 1,
+                    maxItems: 100,
+                    items: {
+                      type: 'object',
+                      required: ['id', 'status', 'expectedStatus'],
+                      properties: {
+                        id: { type: 'string' },
+                        status: { type: 'string', enum: ['approved', 'rejected'] },
+                        expectedStatus: { type: 'string', enum: ['pending', 'approved', 'rejected'] },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': { description: '成功ID・競合ID・権限拒否ID・失敗IDに分けて返す' },
+          '400': { description: 'itemsが0件・101件以上' },
+          '403': { description: '承認の権限が無い' },
+        },
+      },
+    },
     '/api/conversions/points': {
       get: { tags: ['Conversions'], summary: 'CV ポイント一覧', responses: { '200': { description: 'All conversion points' } } },
       post: {
