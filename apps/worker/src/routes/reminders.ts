@@ -34,7 +34,12 @@ import {
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
-import { isValidIdempotencyKey } from '../services/outbound-idempotency.js';
+import {
+  completeOutboundSendStatement,
+  hashOutboundPayload,
+  isValidIdempotencyKey,
+  reserveOutboundSend,
+} from '../services/outbound-idempotency.js';
 import {
   previewReminderDraft,
   testReminderDraft,
@@ -115,6 +120,105 @@ function runDurationMs(startedAt: string | null, completedAt: string | null): nu
   return Number.isFinite(duration) && duration >= 0 ? duration : null;
 }
 type TriggerType = (typeof TRIGGER_TYPES)[number];
+
+/*
+ * N-067: 手動登録の二重防止。通信再送・二重押下・応答不明でも、同じ手動
+ * 登録から reminders を2行作らない。キーなしの従来呼び出しは変えない。
+ *
+ * 保証（キー付き経路）:
+ * - 同一key＋同一内容→同じID・同じ応答、reminders・予約は1組だけ
+ * - 同一key＋別内容→409（上書きしない）
+ * - keyはaccountごとに名前空間を分け、別accountの同じkeyとは分離する
+ * - 予約後・登録前の失敗は in_progress のまま残し、成功扱いに固定しない。
+ *   再送は同じ束を通って回収する
+ * - 同時押下はIDをkeyから決めるため何回通っても1行に収まる
+ */
+async function reminderIdForKey(namespacedKey: string): Promise<string> {
+  const hex = await hashOutboundPayload(namespacedKey);
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-8${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
+}
+
+async function createReminderIdempotent(
+  db: D1Database,
+  args: {
+    lineAccountId: string;
+    name: string;
+    description?: string;
+    trigger: Record<string, unknown>;
+    requestKey: string;
+  },
+): Promise<{ status: 201 | 409; body: unknown }> {
+  // 衝突判定は保存される値だけを正規化する。account・きっかけの決め方・
+  // 対象・版（フォルダ）を含め、保存に影響しない余分は入れない。
+  const normalized = {
+    lineAccountId: args.lineAccountId,
+    name: args.name,
+    description: args.description ?? null,
+    triggerType: args.trigger.triggerType ?? 'manual',
+    triggerOffsetMinutes: args.trigger.triggerOffsetMinutes ?? null,
+    sendAtTime: args.trigger.sendAtTime ?? null,
+    targetTagId: args.trigger.targetTagId ?? null,
+    deliveryMode: args.trigger.deliveryMode ?? null,
+    triggerFieldId: args.trigger.triggerFieldId ?? null,
+    repeatYearly: args.trigger.repeatYearly ?? false,
+    folderId: args.trigger.folderId ?? null,
+  };
+  const namespacedKey = `reminder:${args.lineAccountId}:${args.requestKey}`;
+  const now = new Date().toISOString();
+  const reservation = await reserveOutboundSend(db, {
+    key: namespacedKey,
+    channel: 'line',
+    resourceId: args.lineAccountId,
+    payloadHash: await hashOutboundPayload(JSON.stringify(normalized)),
+    retryInProgress: true,
+    now,
+  });
+  if (reservation.kind === 'conflict') {
+    return { status: 409, body: { success: false, error: '同じ登録キーを別の内容には使用できません' } };
+  }
+  if (reservation.kind === 'replay') {
+    const existing = await getReminderById(db, reservation.responseId);
+    if (existing) {
+      return {
+        status: 201,
+        body: { success: true, data: { id: existing.id, name: existing.name, createdAt: existing.created_at } },
+      };
+    }
+    // 成功確定のはずが行方不明。下の束で作り直す（INSERT OR IGNORE のため安全）。
+  }
+  const reminderId = await reminderIdForKey(namespacedKey);
+  await db.batch([
+    db.prepare(
+      `INSERT OR IGNORE INTO reminders
+         (id, name, description, trigger_type, trigger_offset_minutes,
+          send_at_time, target_tag_id, delivery_mode,
+          trigger_field_id, repeat_yearly, folder_id, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).bind(
+      reminderId,
+      args.name,
+      args.description ?? null,
+      (args.trigger.triggerType as string) ?? 'manual',
+      (args.trigger.triggerOffsetMinutes as number | null) ?? null,
+      (args.trigger.sendAtTime as string | null) ?? null,
+      (args.trigger.targetTagId as string | null) ?? null,
+      (args.trigger.deliveryMode as string) ?? 'countdown',
+      (args.trigger.triggerFieldId as string | null) ?? null,
+      args.trigger.repeatYearly ? 1 : 0,
+      (args.trigger.folderId as string | null) ?? null,
+      now,
+      now,
+    ),
+    db.prepare(`UPDATE reminders SET line_account_id = ? WHERE id = ?`).bind(args.lineAccountId, reminderId),
+    completeOutboundSendStatement(db, { key: namespacedKey, responseId: reminderId, now }),
+  ]);
+  const created = await getReminderById(db, reminderId);
+  if (!created) throw new Error('reminder idempotency recovery failed');
+  return {
+    status: 201,
+    body: { success: true, data: { id: created.id, name: created.name, createdAt: created.created_at } },
+  };
+}
 
 async function validateReminderFolder(
   db: D1Database,
@@ -864,6 +968,21 @@ reminders.post('/api/reminders', requireRole('owner', 'admin'), async (c) => {
     if (!trigger.ok) return c.json({ success: false, error: trigger.error }, 400);
     const folderError = await validateReminderFolder(c.env.DB, trigger.value.folderId);
     if (folderError) return c.json({ success: false, error: folderError }, 422);
+    // N-067: Idempotency-Key 付きの登録は二重作成しない。キーなしは従来通り。
+    const requestKey = c.req.header('Idempotency-Key')?.trim();
+    if (requestKey !== undefined && requestKey !== '') {
+      if (!isValidIdempotencyKey(requestKey)) {
+        return c.json({ success: false, error: '有効なIdempotency-Keyが必要です' }, 400);
+      }
+      const result = await createReminderIdempotent(c.env.DB, {
+        lineAccountId: body.lineAccountId.trim(),
+        name: body.name,
+        description: typeof body.description === 'string' ? body.description : undefined,
+        trigger: trigger.value,
+        requestKey,
+      });
+      return c.json(result.body, result.status);
+    }
     const item = await createReminder(c.env.DB, { ...body, ...trigger.value });
     // Save line_account_id if provided
     if (body.lineAccountId) {

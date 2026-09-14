@@ -1580,4 +1580,246 @@ chats.post('/api/chats/:id/send', requireRole('owner', 'admin', 'staff'), requir
   }
 });
 
+/**
+ * POST /api/chats/:id/send-combined — 画像と本文を1回の送信単位にする(N-022)。
+ *
+ * 単体送信口を2回呼ぶと、画像だけ届いて本文が落ちる部分送信になる。
+ * 結合口は画像URL・本文長・権限・所属を外部送信前にすべて検証し、
+ * LINEへは1回のpush要求のメッセージ配列として送る。片方の検証失敗時は
+ * LINE呼び出し0回・保存0件。冪等予約は単体口と共用する。
+ */
+chats.post('/api/chats/:id/send-combined', requireRole('owner', 'admin', 'staff'), requireVisibleChat, async (c) => {
+  let leasedConversationId: string | null = null;
+  try {
+    const chatId = c.req.param('id');
+    const idempotencyKey = c.req.header('Idempotency-Key')?.trim();
+    if (!isValidIdempotencyKey(idempotencyKey)) {
+      return c.json({ success: false, error: '有効なIdempotency-Keyが必要です' }, 400);
+    }
+    const chat = await resolveOrCreateChat(c.env.DB, chatId);
+    if (!chat) return c.json({ success: false, error: 'Chat not found' }, 404);
+
+    let body: { image?: { originalContentUrl?: unknown; previewImageUrl?: unknown } | null; text?: unknown; revision?: number };
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ success: false, error: 'content is required' }, 400);
+    }
+    const image = body.image ?? null;
+    const text = typeof body.text === 'string' ? body.text : null;
+    if (!image && !text) return c.json({ success: false, error: 'content is required' }, 400);
+    if (body.revision !== undefined && body.revision !== chat.revision) {
+      return c.json({
+        success: false,
+        error: 'ほかの担当者が先に更新しました。最新の会話を確認してください',
+        code: 'REVISION_CONFLICT',
+        data: { revision: chat.revision },
+      }, 409);
+    }
+
+    const { friend, accessToken } = await resolveFriendAndAccessToken(
+      c.env.DB,
+      chat.friend_id,
+      c.env.LINE_CHANNEL_ACCESS_TOKEN,
+      'chats.manual-send',
+    );
+    if (!friend) return c.json({ success: false, error: 'Friend not found' }, 404);
+
+    if (!await canAccessAllLineAccounts(
+      c.env.DB,
+      c.get('staff'),
+      [friend.line_account_id ?? null],
+    )) {
+      return c.json({ success: false, error: 'Chat not found' }, 404);
+    }
+
+    // 外部送信の前に両方を検証する。片方でも壊れていれば送らず保存しない。
+    let imagePart: { originalContentUrl: string; previewImageUrl: string } | null = null;
+    if (image) {
+      if (typeof image.originalContentUrl !== 'string' || !image.originalContentUrl
+        || typeof image.previewImageUrl !== 'string' || !image.previewImageUrl) {
+        return c.json({ success: false, error: '画像メッセージの形式が正しくありません' }, 400);
+      }
+      imagePart = {
+        originalContentUrl: image.originalContentUrl,
+        previewImageUrl: image.previewImageUrl,
+      };
+    }
+    let textPart: string | null = null;
+    if (text) {
+      if (text.length > 5000) {
+        return c.json({ success: false, error: 'メッセージは5000文字以内で入力してください' }, 400);
+      }
+      textPart = text;
+    }
+    const messages: Message[] = [
+      ...(imagePart ? [{ type: 'image', ...imagePart } as Message] : []),
+      ...(textPart !== null ? [{ type: 'text', text: textPart } as Message] : []),
+    ];
+
+    const leaseNow = new Date();
+    const lease = await acquireInboxReplyLease(c.env.DB, {
+      channel: 'line',
+      conversationId: friend.id,
+      staffId: c.get('staff').id,
+      conversationRevision: chat.revision,
+      now: leaseNow.toISOString(),
+      expiresAt: new Date(leaseNow.getTime() + 60_000).toISOString(),
+    });
+    if (!lease.acquired) {
+      return c.json({
+        success: false,
+        error: 'ほかの担当者が返信中です。送信せず、少し待って最新の会話を確認してください',
+        code: 'REPLY_LEASE_CONFLICT',
+        data: { staffId: lease.staffId, expiresAt: lease.expiresAt },
+      }, 409);
+    }
+    leasedConversationId = friend.id;
+
+    const payloadHash = await hashOutboundPayload(
+      JSON.stringify({
+        chatId: chat.id,
+        friendId: friend.id,
+        combined: true,
+        image: imagePart,
+        text: textPart,
+      }),
+    );
+    const reservation = await reserveOutboundSend(c.env.DB, {
+      key: idempotencyKey,
+      channel: 'line',
+      resourceId: chat.id,
+      payloadHash,
+      retryInProgress: true,
+      now: new Date().toISOString(),
+    });
+    if (reservation.kind === 'conflict') {
+      await releaseInboxReplyLease(c.env.DB, { channel: 'line', conversationId: friend.id, staffId: c.get('staff').id });
+      leasedConversationId = null;
+      return c.json({ success: false, error: '同じ送信キーを別の内容には使用できません' }, 409);
+    }
+    if (reservation.kind === 'in_progress') {
+      await releaseInboxReplyLease(c.env.DB, { channel: 'line', conversationId: friend.id, staffId: c.get('staff').id });
+      leasedConversationId = null;
+      return c.json({ success: false, error: '同じメッセージを送信中です' }, 409);
+    }
+    if (reservation.kind === 'replay') {
+      await releaseInboxReplyLease(c.env.DB, { channel: 'line', conversationId: friend.id, staffId: c.get('staff').id });
+      leasedConversationId = null;
+      return c.json({
+        success: true,
+        data: {
+          sent: true,
+          messageId: reservation.responseId,
+          sentByStaffName: c.get('staff').name,
+          revision: chat.revision,
+          replayed: true,
+        },
+      });
+    }
+
+    // 1回のpush要求にまとめる。2回の独立pushにしない。
+    const { LineClient } = await import('@line-crm/line-sdk');
+    const lineClient = new LineClient(accessToken);
+    await lineClient.pushMessage(friend.line_user_id, messages, idempotencyKey);
+
+    const logBaseId = idempotencyKey;
+    const sentAt = jstNow();
+    const rows = [
+      ...(imagePart ? [{
+        id: `${logBaseId}:0`,
+        messageType: 'image',
+        content: JSON.stringify(imagePart),
+      }] : []),
+      ...(textPart !== null ? [{
+        id: `${logBaseId}:${imagePart ? 1 : 0}`,
+        messageType: 'text',
+        content: textPart,
+      }] : []),
+    ];
+    await c.env.DB.batch([
+      ...rows.map((row) =>
+        c.env.DB
+          .prepare(`INSERT OR IGNORE INTO messages_log
+            (id, friend_id, direction, message_type, content, source, line_account_id,
+             sent_by_staff_id, created_at)
+            VALUES (?, ?, 'outgoing', ?, ?, 'manual', ?, ?, ?)`)
+          .bind(
+            row.id,
+            friend.id,
+            row.messageType,
+            row.content,
+            friend.line_account_id ?? null,
+            c.get('staff').id,
+            sentAt,
+          ),
+      ),
+      completeOutboundSendStatement(c.env.DB, {
+        key: idempotencyKey,
+        responseId: logBaseId,
+        now: new Date().toISOString(),
+      }),
+    ]);
+
+    await updateChat(c.env.DB, chat.id, { status: 'in_progress', lastMessageAt: sentAt });
+    const updatedChat = await getChatById(c.env.DB, chat.id);
+    await inboxEventStatement(c.env.DB, {
+      channel: 'line',
+      conversationId: friend.id,
+      eventType: 'send',
+      before: null,
+      after: { messageId: logBaseId, status: 'in_progress', source: 'manual' },
+      actorStaffId: c.get('staff').id,
+      correlationId: idempotencyKey,
+      createdAt: sentAt,
+    }).run();
+
+    try {
+      await c.env.DB
+        .prepare(
+          `UPDATE chats SET first_replied_at = ?
+            WHERE id = ? AND first_replied_at IS NULL`,
+        )
+        .bind(jstNow(), chat.id)
+        .run();
+    } catch (e) {
+      console.error('first_replied_at update error:', e);
+    }
+
+    await fireEvent(c.env.DB, 'manual_reply_sent', {
+      sourceEventId: logBaseId,
+      sourceKind: 'manual_reply',
+      occurredAt: sentAt,
+      friendId: friend.id,
+      eventData: { staffId: c.get('staff').id },
+    }, undefined, friend.line_account_id).catch((error) => {
+      console.error('manual_reply_sent automation error:', error);
+    });
+
+    await releaseInboxReplyLease(c.env.DB, {
+      channel: 'line', conversationId: friend.id, staffId: c.get('staff').id,
+    });
+    leasedConversationId = null;
+
+    return c.json({
+      success: true,
+      data: {
+        sent: true,
+        messageId: logBaseId,
+        messageIds: rows.map((row) => row.id),
+        sentByStaffName: c.get('staff').name,
+        revision: updatedChat?.revision ?? chat.revision + 1,
+      },
+    });
+  } catch (err) {
+    if (leasedConversationId) {
+      await releaseInboxReplyLease(c.env.DB, {
+        channel: 'line', conversationId: leasedConversationId, staffId: c.get('staff').id,
+      }).catch(() => undefined);
+    }
+    console.error('POST /api/chats/:id/send-combined error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
 export { chats };
