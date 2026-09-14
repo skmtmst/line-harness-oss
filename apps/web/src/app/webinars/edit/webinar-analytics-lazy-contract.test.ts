@@ -17,6 +17,9 @@ describe('V6 ウェビナー編集の集計の遅延読み込みの契約', () =
   })
 
   it('子の独自取得はコメントと参加者だけ', () => {
-    expect(PAGE).toContain('Promise.all([webinarApi.userComments(webinarId), webinarApi.participants(webinarId, undefined, 8)])')
+    // 参加者口は staff には 403 が返る(N-118)。403 を個別に捌くため
+    // 変数へ切り出してあるが、取る口はコメントと参加者の2つのまま。
+    expect(PAGE).toContain('webinarApi.participants(webinarId, undefined, 8)')
+    expect(PAGE).toContain('Promise.all([webinarApi.userComments(webinarId), participantsRequest])')
   })
 })
