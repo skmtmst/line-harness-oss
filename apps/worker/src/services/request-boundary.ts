@@ -93,6 +93,10 @@ export async function resolveRequestBoundaries(
   if (!hasRequiredPermission(staff, options.requiredPermissionKey)) {
     return { allowed: false, reason: 'forbidden', scope };
   }
+  // 空配列は何も認めない(fail-closed)。all([]) が true になるのをそのまま通さない。
+  if (requestedAccountIds.length === 0) {
+    return { allowed: false, reason: 'outside-scope', scope };
+  }
   const allowed = await canAccessAllLineAccounts(db, staff, requestedAccountIds);
   if (!allowed) {
     return { allowed: false, reason: 'outside-scope', scope };

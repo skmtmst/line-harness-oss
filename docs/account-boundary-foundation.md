@@ -21,13 +21,13 @@
 
 ## 後続N/E-ID接続表
 
-| ID | 内容 | 使う口 | 状態 |
+| N/E-ID | route | permission key | resource account解決元 |
 | --- | --- | --- | --- |
-| N-032 | 友だち集計4口が明示アカウント指定の権限確認をしていない | 単票の指定ID判定 | 未着手。後続票で接続 |
-| N-136 | 一斉配信・個別トークの選択画面が別アカウントの文を読む | 一覧の範囲絞り込み | 未着手。後続票で接続 |
-| N-175 | フォームのフォルダ絞り込み・権限が未接続 | 単票の指定ID判定+一覧の範囲絞り込み | 未着手。後続票で接続 |
-| N-171/N-179 | フォーム回答の検索・CSVが全件条件(PR #88) | 参考実装(手書き境界)。土台への寄せは後続で判断 | 対応済み |
-| N-423 | 対応表に無いAPIはスタッフ権限で通る | auth.tsの対応表。土台の範囲外 | 対象外(auth.tsは本票の禁止領域) |
+| N-032 | 友だち集計4口(apps/worker/src/routes/friends.ts:819-941周辺) | /friends 系(STAFF_API_PERMISSIONSで /api/friends→/friends) | 明示IDは resolveRequestBoundary の単票判定、一覧は scope.allowedAccountIds。後続票で接続 |
+| N-136 | 選択画面(apps/web/src/components/broadcasts/broadcast-form.tsx:616-617)が読む文面API | /broadcasts 系 | 読む側APIの一覧へ scope.allowedAccountIds を適用する設計は後続票で確定 |
+| N-175 | フォルダ絞り込み(apps/web/src/app/form-submissions/page.tsx:263-274。worker側folders口なし) | /form-submissions 系 | 単票判定+一覧絞り込み。worker側の口新設は後続票の設計 |
+| N-171/N-179 | 回答検索・CSV(apps/worker/src/routes/forms.ts submissions。PR #88) | /form-submissions 系 | 参考実装(対応済み)。土台への寄せは後続で判断 |
+| N-423 | auth.tsの対応表 | — | 対象外(auth.tsは本票の禁止領域) |
 
 - E-IDに境界ものは現在ない(docs/audit-status.mdで確認)。
 - N-043(友だち属性の一括更新)は本流統合済みのため表に入れない。

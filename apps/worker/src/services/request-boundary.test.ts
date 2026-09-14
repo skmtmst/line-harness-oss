@@ -13,11 +13,12 @@ const NOW = '2026-09-14T00:00:00+09:00';
 function staff(
   id: string,
   tenantId: string | null,
-  options: { permissionKeys?: string[]; readOnly?: boolean } = {},
+  options: { permissionKeys?: string[]; readOnly?: boolean; featureIds?: string[] } = {},
 ): AuthenticatedStaff {
   return {
     id, name: id, role: 'owner', readOnly: options.readOnly ?? false,
     permissionKeys: options.permissionKeys, tenantId,
+    featureEnabledLineAccountIds: options.featureIds,
   } as AuthenticatedStaff;
 }
 
@@ -34,8 +35,9 @@ function seed(testDb: SqliteD1): void {
     `INSERT INTO staff_members (id, name, role, api_key, tenant_id, account_scope)
      VALUES ('owner-1', 'owner-1', 'owner', 'key-1', ?, 'all'),
             ('scoped-1', 'scoped-1', 'staff', 'key-2', ?, 'accounts'),
+            ('scoped-empty', 'scoped-empty', 'staff', 'key-4', ?, 'accounts'),
             ('b-1', 'b-1', 'admin', 'key-3', ?, 'all')`,
-  ).run(DEFAULT_TENANT_ID, DEFAULT_TENANT_ID, TENANT_B);
+  ).run(DEFAULT_TENANT_ID, DEFAULT_TENANT_ID, DEFAULT_TENANT_ID, TENANT_B);
   testDb.raw.prepare(
     `INSERT INTO staff_account_scopes (staff_id, line_account_id, created_at) VALUES ('scoped-1', 'acc-1', ?)`,
   ).run(NOW);
@@ -148,6 +150,39 @@ describe('request-boundary', () => {
     const scoped = staff('scoped-1', DEFAULT_TENANT_ID);
     expect((await resolveRequestBoundaries(testDb.db, scoped, ['acc-1'])).allowed).toBe(true);
     expect((await resolveRequestBoundaries(testDb.db, scoped, ['acc-1', 'acc-2'])).allowed).toBe(false);
+  });
+
+  it('割当なしの個別範囲staffは何も指定できない', async () => {
+    const testDb = createTestD1();
+    seed(testDb);
+    const me = staff('scoped-empty', DEFAULT_TENANT_ID);
+    // 空の割当は空のまま(広げない)。
+    const denied = await resolveRequestBoundary(testDb.db, me, 'acc-1');
+    expect(denied.allowed).toBe(false);
+    if (!denied.allowed) expect(denied.reason).toBe('outside-scope');
+    const listed = await resolveRequestBoundary(testDb.db, me, undefined);
+    expect(listed.allowed).toBe(true);
+    if (listed.allowed) expect(listed.scope.allowedAccountIds).toEqual([]);
+  });
+
+  it('機能絞り込みがあると範囲外は指定できない', async () => {
+    const testDb = createTestD1();
+    seed(testDb);
+    const me = staff('owner-1', DEFAULT_TENANT_ID, { featureIds: ['acc-1'] });
+    expect((await resolveRequestBoundary(testDb.db, me, 'acc-1')).allowed).toBe(true);
+    const denied = await resolveRequestBoundary(testDb.db, me, 'acc-2');
+    expect(denied.allowed).toBe(false);
+    if (!denied.allowed) expect(denied.reason).toBe('outside-scope');
+  });
+
+  it('複数IDの空配列は閉じ側へ倒して不許可', async () => {
+    const testDb = createTestD1();
+    seed(testDb);
+    const decision = await resolveRequestBoundaries(
+      testDb.db, staff('owner-1', DEFAULT_TENANT_ID), [],
+    );
+    expect(decision.allowed).toBe(false);
+    if (!decision.allowed) expect(decision.reason).toBe('outside-scope');
   });
 
   it('複数IDのnullは未割当可視のときだけ通る', async () => {
