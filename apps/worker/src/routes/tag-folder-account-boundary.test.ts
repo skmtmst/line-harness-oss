@@ -86,9 +86,11 @@ describe('existing tag/folder endpoints enforce account ownership', () => {
     expect((await req('/api/folders/folder-a', 'PATCH', { parentId: 'folder-b' })).status).toBe(400);
     expect(fixture.raw.prepare('SELECT folder_id FROM tags WHERE id=?').get('tag-a')).toEqual({ folder_id: 'folder-a' });
   });
-  it('cannot mutate or inspect another account tag through legacy endpoints', async () => {
+  it('cannot mutate or inspect another account tag through versioned endpoints', async () => {
     for (const id of ['b', 'c']) {
       expect((await req(`/api/tags/tag-${id}/delete-impact`)).status).toBe(404);
+      expect((await req(`/api/tags/tag-${id}`, 'PATCH', { name: 'bad', lineAccountId: id, expectedVersion: 1 })).status).toBe(404);
+      // 版なしの他アカウント要求も404で伏せる。許可対象の版なしが400なのと区別する。
       expect((await req(`/api/tags/tag-${id}`, 'PATCH', { name: 'bad' })).status).toBe(404);
       expect((await req(`/api/tags/tag-${id}/group`, 'PATCH', { groupId: null })).status).toBe(404);
       expect((await req(`/api/tags/tag-${id}/mileage`, 'PATCH', { multiplierBps: null })).status).toBe(404);

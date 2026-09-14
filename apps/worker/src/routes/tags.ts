@@ -14,7 +14,6 @@ import {
   createTagGroup,
   updateTagGroup,
   assignTagToGroup,
-  updateTag,
   reorderTags,
   normalizeTagNameForCleanup,
   createTagDefinition,
@@ -780,21 +779,42 @@ tags.patch('/api/tags/reorder', requireRole('owner', 'admin'), async (c) => {
 tags.patch('/api/tags/:id', requireRole('owner', 'admin'), async (c) => {
   try {
     const body = await c.req.json<Record<string, unknown>>();
-    // 保管済み(archived)タグの保護(#710)は、この分岐(expectedVersion 付き
-    // → updateTagDefinition)にしか効かない。expectedVersion 無しは下の
-    // else で updateTag（version も status も見ないレガシー経路）を通る。
-    // 塞げていない。別票 #715 で扱う。
-    if (body.expectedVersion !== undefined) {
+    // タグ自身は色を持たない(115以前の名残)。受けて保存すると読む側は無視するので
+    // 「保存したのに出ない」になる。版の有無にかかわらず400で案内する（従来どおり）。
+    if (body.color !== undefined && body.color !== null) {
+      return c.json({ success: false, error: 'tag color is not supported; set the folder color instead' }, 400);
+    }
+    // expectedVersion は必須(#715)。無し・不正は400、古い版は409。
+    // 保管済み(archived)タグの保護(#710)は updateTagDefinition 側（変更なし）。
+    // 順序は秘匿が先(#715差し戻し)。範囲外・不在は404で伏せ、許可対象にだけ
+    // 版の400を返す。版を先にすると範囲外のIDの有無が400/404で見分けられる。
+    {
       const lineAccountId = requestedLineAccountId(c, body);
+      if (lineAccountId) {
+        const denied = await requireVisibleLineAccount(c, lineAccountId);
+        if (denied) return denied;
+      } else {
+        const current = await visibleTag(c, c.req.param('id'));
+        if (current instanceof Response) return current;
+      }
+      if (body.expectedVersion === undefined) {
+        return c.json({ success: false, error: 'expectedVersion is required' }, 400);
+      }
+      const expectedVersion = Number(body.expectedVersion);
+      if (!Number.isInteger(expectedVersion) || expectedVersion < 1) {
+        return c.json({ success: false, error: 'expectedVersion must be a positive integer' }, 400);
+      }
+      // 版付き経路は従来どおり担当必須。ここへ来るのは範囲内の対象だけ。
       if (!lineAccountId) {
         return c.json({ success: false, error: 'lineAccountId is required' }, 400);
       }
-      const denied = await requireVisibleLineAccount(c, lineAccountId);
-      if (denied) return denied;
-      const expectedVersion = integer(body.expectedVersion, 0, 1, Number.MAX_SAFE_INTEGER, 'expectedVersion');
       const name = text(body.name);
       if (body.name !== undefined && (!name || name.length > 80)) {
         return c.json({ success: false, error: 'name must be between 1 and 80 characters' }, 400);
+      }
+      // レガシー分岐の廃止(#715)で落とさない。改行入りタグが一覧・CSVの表示を崩す。
+      if (name !== undefined && TAG_NAME_CONTROL_CHARACTER_PATTERN.test(name)) {
+        return c.json({ success: false, error: 'name must not contain control characters' }, 400);
       }
       const reapplyPolicy = body.reapplyPolicy;
       if (reapplyPolicy !== undefined
@@ -841,39 +861,6 @@ tags.patch('/api/tags/:id', requireRole('owner', 'admin'), async (c) => {
         data: { ...tagDefinitionResponse(detail), queued },
       });
     }
-
-    const legacyBody = body as { name?: unknown; color?: unknown; isStarred?: unknown };
-    const patch: { name?: string; color?: string; isStarred?: boolean } = {};
-
-    if (legacyBody.isStarred !== undefined) {
-      patch.isStarred = legacyBody.isStarred === true || legacyBody.isStarred === 1;
-    }
-
-    if (legacyBody.name !== undefined) {
-      const name = typeof legacyBody.name === 'string' ? legacyBody.name.trim() : '';
-      if (!name) return c.json({ success: false, error: 'name must not be empty' }, 400);
-      if (name.length > 80) {
-        return c.json({ success: false, error: 'name must be between 1 and 80 characters' }, 400);
-      }
-      if (TAG_NAME_CONTROL_CHARACTER_PATTERN.test(name)) {
-        return c.json({ success: false, error: 'name must not contain control characters' }, 400);
-      }
-      patch.name = name;
-    }
-    // タグ自身は色を持たない(115以前の名残)。受けて保存すると、
-    // 読む側は無視するので「保存したのに出ない」になる。400で案内する。
-    if (legacyBody.color !== undefined && legacyBody.color !== null) {
-      return c.json({ success: false, error: 'tag color is not supported; set the folder color instead' }, 400);
-    }
-    if (Object.keys(patch).length === 0) {
-      return c.json({ success: false, error: 'name or isStarred is required' }, 400);
-    }
-
-    const current = await visibleTag(c, c.req.param('id'));
-    if (current instanceof Response) return current;
-    const tag = await updateTag(c.env.DB, c.req.param('id'), patch);
-    if (!tag) return c.json({ success: false, error: 'tag not found' }, 404);
-    return c.json({ success: true, data: serializeTag(tag) });
   } catch (err) {
     const handled = tagDefinitionError(c, err);
     if (handled) return handled;
