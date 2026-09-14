@@ -247,6 +247,41 @@ export async function saveMileageEarningRuleDraft(
   return mapDraft(saved);
 }
 
+/**
+ * N-243: 「たまる決めごと」の並び順を全件まとめて保存する。
+ *
+ * 並び順は下書きJSONの sortOrder に入っている。1件ずつ下書きPATCHを
+ * 並列に投げると途中失敗で一部だけ反映され得るため、アカウントの
+ * 決めごと全件と一致する並びだけを1トランザクションで書く。
+ * 一覧とずれた要求(別アカウント混入・件数不足・重複)はまるごと拒否し、
+ * 部分適用しない。版を上げるので、保存前に開いた古い版の下書き保存は
+ * 競合として止まり、並び順を黙って戻す取りこぼしが起きない。
+ */
+export async function reorderMileageEarningRules(
+  db: D1Database,
+  input: { lineAccountId: string; ids: string[]; updatedByStaffId?: string | null },
+): Promise<void> {
+  if (!input.ids.length || new Set(input.ids).size !== input.ids.length
+    || input.ids.some((id) => typeof id !== 'string' || !id)) {
+    throw new MileageV6Error('invalid_order', '並び順を確認してください', 422);
+  }
+  const existing = await db.prepare(
+    `SELECT rule_id FROM mileage_earning_rule_drafts WHERE line_account_id = ?`,
+  ).bind(input.lineAccountId).all<{ rule_id: string }>();
+  if (existing.results.length !== input.ids.length
+    || existing.results.some((row) => !input.ids.includes(row.rule_id))) {
+    throw new MileageV6Error('invalid_order', '最新の決めごと一覧と一致しません。読み直してください', 409);
+  }
+  const now = new Date().toISOString();
+  await db.batch(input.ids.map((id, index) => db.prepare(
+    `UPDATE mileage_earning_rule_drafts
+        SET version = version + 1,
+            draft_json = json_set(draft_json, '$.sortOrder', ?),
+            updated_by_staff_id = ?, updated_at = ?
+      WHERE rule_id = ? AND line_account_id = ?`,
+  ).bind(index, input.updatedByStaffId ?? null, now, id, input.lineAccountId)));
+}
+
 export async function getMileageEarningRulesV6(
   db: D1Database,
   input: { lineAccountId: string; limit: number; offset: number },
