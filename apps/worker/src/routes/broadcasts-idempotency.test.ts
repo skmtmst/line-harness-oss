@@ -215,6 +215,8 @@ describe('PUT /api/broadcasts/:id', () => {
         targetType: 'segment',
         segmentConditions: { operator: 'AND', rules: [{ type: 'tag_exists', value: 'tag-1' }] },
         stealthSpreadMinutes: 45,
+        // #772: 版を付けて更新する（版なしは400になる）。
+        expectedVersion: 3,
       }),
     });
 
@@ -228,7 +230,24 @@ describe('PUT /api/broadcasts/:id', () => {
         segment_conditions: expect.stringContaining('tag_exists'),
         stealth_spread_minutes: 45,
       }),
+      3,
     );
+  });
+
+  // #772: 版なしPUTは400で止め、更新関数を呼ばない。
+  test('版なしの更新は400で止める', async () => {
+    dbMocks.getBroadcastById.mockResolvedValueOnce({ ...row, status: 'draft', scheduled_at: null });
+    const response = await setupApp().request(`/api/broadcasts/${KEY}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: '版なし更新' }),
+    });
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({
+      success: false, code: 'EXPECTED_VERSION_REQUIRED',
+    });
+    expect(dbMocks.updateBroadcast).not.toHaveBeenCalled();
   });
 
   test('does not update a segment draft when its conditions cannot be evaluated', async () => {
@@ -239,6 +258,8 @@ describe('PUT /api/broadcasts/:id', () => {
       body: JSON.stringify({
         targetType: 'segment',
         segmentConditions: { operator: 'AND', rules: [{ type: 'unknown_rule', value: true }] },
+        // #772: 版を付けて絞り込み検証まで進める（版なしだと手前で400になる）。
+        expectedVersion: 3,
       }),
     });
 

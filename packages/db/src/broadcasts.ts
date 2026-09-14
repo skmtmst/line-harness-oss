@@ -263,11 +263,12 @@ export type UpdateBroadcastInput = Partial<
   >
 >;
 
+// #772: 版を必須にし、版なし迂回を残さない。呼び元は PUT 経路だけ。
 export async function updateBroadcast(
   db: D1Database,
   id: string,
   updates: UpdateBroadcastInput,
-  expectedVersion?: number,
+  expectedVersion: number,
 ): Promise<Broadcast | null> {
   const fields: string[] = [];
   const values: unknown[] = [];
@@ -347,17 +348,12 @@ export async function updateBroadcast(
 
   if (fields.length > 0) {
     fields.push('lock_version = lock_version + 1');
-    if (expectedVersion !== undefined) {
-      values.push(id, expectedVersion);
-    } else {
-      values.push(id);
-    }
     const result = await db
-      .prepare(`UPDATE broadcasts SET ${fields.join(', ')} WHERE id = ?${expectedVersion !== undefined ? ' AND lock_version = ?' : ''}`)
-      .bind(...values)
+      .prepare(`UPDATE broadcasts SET ${fields.join(', ')} WHERE id = ? AND lock_version = ?`)
+      .bind(...values, id, expectedVersion)
       .run();
-    if (expectedVersion !== undefined && !result.meta.changes) return null;
-  } else if (expectedVersion !== undefined) {
+    if (!result.meta.changes) return null;
+  } else {
     const current = await getBroadcastById(db, id);
     if (!current || Number(current.lock_version ?? 1) !== expectedVersion) return null;
   }
