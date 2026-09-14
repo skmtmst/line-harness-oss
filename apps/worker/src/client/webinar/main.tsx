@@ -10,6 +10,12 @@
 
 import { StrictMode, useCallback, useEffect, useRef, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
+import {
+  buildFormSubmitHeaders,
+  newFormIdempotencyKey,
+  toFormIdempotencyKey,
+  type FormIdempotencyKey,
+} from '@line-crm/shared';
 import { buildMeetingDateOptions } from './date-options.js';
 import './styles.css';
 
@@ -996,7 +1002,7 @@ export function FormSheet({
   // 新しいキーに付け替えず、利用者の操作のときだけ送り直す。
   const [resendOffer, setResendOffer] = useState(false);
   // 論理送信単位の安定した冪等キー。連打・通信再送は同じキーで送る。
-  const idemKeyRef = useRef<{ defId: string; key: string } | null>(null);
+  const idemKeyRef = useRef<{ defId: string; key: FormIdempotencyKey } | null>(null);
   const startedRef = useRef(false);
   const completedFieldsRef = useRef(new Set<string>());
   const bookingRedirectTimerRef = useRef<number | null>(null);
@@ -1047,13 +1053,14 @@ export function FormSheet({
     setError(null);
     setResendOffer(false);
     if (idemKeyRef.current?.defId !== def.id) {
-      idemKeyRef.current = { defId: def.id, key: crypto.randomUUID() };
+      idemKeyRef.current = { defId: def.id, key: newFormIdempotencyKey() };
     }
     const idemKey = idemKeyRef.current.key;
-    const postOnce = async (key: string) => {
+    // #729: ヘッダ組立は共有部品へ寄せる。認証の取得(ctx)・URL・再送はここに残す。
+    const postOnce = async (key: FormIdempotencyKey) => {
       const r = await fetch(`/api/forms/${encodeURIComponent(def.id)}/submit`, {
         method: 'POST',
-        headers: buildAuthHeaders(ctx, { 'Content-Type': 'application/json', 'Idempotency-Key': key }),
+        headers: buildAuthHeaders(ctx, buildFormSubmitHeaders(key)),
         body: JSON.stringify({ data: values }),
       });
       const json = (await r.json().catch(() => null)) as {
@@ -1081,8 +1088,8 @@ export function FormSheet({
           ? attempt.json?.idempotencyKey
           : undefined;
         if (attempt.status === 409 && guided && guided !== currentKey) {
-          currentKey = guided;
-          idemKeyRef.current = { defId: def.id, key: guided };
+          currentKey = toFormIdempotencyKey(guided);
+          idemKeyRef.current = { defId: def.id, key: currentKey };
           attempt = await postOnce(currentKey);
           continue;
         }
