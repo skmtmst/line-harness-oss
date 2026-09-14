@@ -349,25 +349,19 @@ function MileagePageInner() {
 
   const saveRuleOrder = async () => {
     if (!selectedAccountId || savingRuleOrder || !ruleOrderDirty) return
-    const byId = new Map(rules.map((rule) => [rule.id, rule]))
-    const changed = ruleOrder.flatMap((id, index) => {
-      const rule = byId.get(id)
-      return rule && rule.draft.sortOrder !== index ? [{ rule, sortOrder: index }] : []
-    })
     setSavingRuleOrder(true)
     setLoadError('')
     try {
-      await Promise.all(changed.map(async ({ rule, sortOrder }) => {
-        const response = await api.mileage.saveEarningRuleDraft(rule.id, {
-          accountId: selectedAccountId,
-          expectedVersion: rule.draftVersion,
-          draft: { ...rule.draft, sortOrder },
-        })
-        if (!response.success) throw new Error(response.error)
-      }))
+      // N-243: 全順序を一括口へ1回で送る。1件ずつPATCHすると途中失敗で部分適用になる。
+      const response = await api.mileage.saveEarningRulesOrder({
+        accountId: selectedAccountId,
+        ids: ruleOrder,
+      })
+      if (!response.success) throw new Error(response.error)
       await loadRules()
     } catch {
       setLoadError('並び順を保存できませんでした。最新の状態を読み直してから、もう一度お試しください。')
+      await loadRules().catch(() => {})
     } finally {
       setSavingRuleOrder(false)
     }
