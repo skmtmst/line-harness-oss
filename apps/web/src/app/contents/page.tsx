@@ -260,7 +260,8 @@ export default function MediaLibraryPage() {
           limit: pageSize,
           offset: (page - 1) * pageSize,
         }),
-        api.folders.list('media'),
+        // #730: 選択中の1件に閉じた母集団で数える。
+        api.folders.list('media', accountAtRequest),
         api.media.quota(accountAtRequest).catch(() => null),
       ])
       if (accountAtRequest !== latestAccountRef.current) return

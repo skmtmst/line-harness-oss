@@ -13,6 +13,7 @@ const AUTO_REPLIES = read('auto-replies', 'page.tsx')
 const TEMPLATES = read('templates', 'page.tsx')
 const CONTENTS = read('contents', 'page.tsx')
 const VARS = read('contents', 'vars', 'page.tsx')
+const RICHMENUS = read('rich-menus', 'page.tsx')
 
 /**
  * フォルダ件数の `??` フォールバック（現在ページの行だけを数える）が
@@ -59,8 +60,8 @@ describe('フォルダ件数フォールバックの削除(#631)', () => {
     expect(TEMPLATES).toContain('unfiledCount')
   })
 
-  it('contents・vars: 件数未対応の種別では件数を出さず「—」にする(#721)', () => {
-    // kind=media・common_var は API が件数を返さない。読み込み済み範囲の
+  it('contents・vars: 読み込み済み範囲の行数でフォルダ件数を出さない(#721)', () => {
+    // #730 で kind=media・common_var も件数対応した。読み込み済み範囲の
     // 行数を出す計算が残っていると、黙って別の母集団にすり替わる。
     expect(CONTENTS).not.toMatch(/items\.filter\(\(item\) => item\.folderId === folder\.id\)\.length/)
     expect(CONTENTS).not.toMatch(/items\.filter\(\(item\) => item\.folderId === null\)\.length/)
@@ -68,6 +69,14 @@ describe('フォルダ件数フォールバックの削除(#631)', () => {
     expect(VARS).not.toMatch(/items\.filter\(\(item\) => item\.folderId === folder\.id\)\.length/)
     expect(VARS).not.toMatch(/items\.filter\(\(item\) => item\.folderId === null\)\.length/)
     expect(VARS).toContain('folder.itemCount')
+  })
+
+  it('media・common_var・rich_menu: 選択中の1件に閉じた母集団で数えるよう、folders APIへ選択中IDを渡す(#730)', () => {
+    // account_id を付けないと職員の可視範囲全体で数え、単一アカウントの
+    // 一覧と母集団がずれる。未割当NULL行は一覧に出ないため件数へ入れない。
+    expect(CONTENTS).toContain(`api.folders.list('media', accountAtRequest)`)
+    expect(VARS).toContain(`api.folders.list('common_var', accountAtRequest)`)
+    expect(RICHMENUS).toContain(`api.folders.list('rich_menu', accountId)`)
   })
 
   it('3画面とも「未分類」の件数はAPIから来た値(unfiledCount)を使い、現在ページのフィルタ計算をしていない', () => {
