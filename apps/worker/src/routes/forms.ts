@@ -62,6 +62,7 @@ import type { Env } from '../index.js';
 import { resolveLineToken } from '../services/line-token.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
+import { resolveRequestBoundaries } from '../services/request-boundary.js';
 import { applyMileageRulesForEvent } from '@line-crm/db';
 import { createBroadcastRetryKey } from '../services/broadcast-retry-key.js';
 import { dispatchAutomationEventWithLogging } from '../services/automation-triggers.js';
@@ -281,6 +282,33 @@ async function canUseFormFromAccount(
   if (!accountId) return false;
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) return false;
   return formBelongsToLineAccount(c.env.DB, formId, accountId);
+}
+
+/**
+ * N-170 (#802): フォームの管理操作の関門。owner/adminは従来どおり通す。
+ * それ以外は /form-submissions 鍵の完全一致とDB解決した所属を共通土台が決める。
+ * readOnlyの更新拒否は鍵指定時の土台側とauthMiddlewareの両方で止まる。
+ */
+const FORM_MANAGE_PERMISSION_KEY = '/form-submissions';
+
+async function requireFormManage(
+  c: Context<Env>,
+  accountIds: Array<string | null | undefined>,
+): Promise<Response | null> {
+  const staff = c.get('staff');
+  // 未認証は旧requireRoleと同じく403にする（400より先に判定する）。
+  if (!staff) {
+    return c.json({ success: false, error: 'この操作には管理者権限が必要です' }, 403);
+  }
+  if (staff.role === 'owner' || staff.role === 'admin') return null;
+  const decision = await resolveRequestBoundaries(c.env.DB, staff, accountIds, {
+    requiredPermissionKey: FORM_MANAGE_PERMISSION_KEY,
+  });
+  if (decision.allowed) return null;
+  if (decision.reason === 'forbidden') {
+    return c.json({ success: false, error: 'この機能を操作する権限がありません' }, 403);
+  }
+  return c.json({ success: false, error: 'Not found' }, 404);
 }
 
 /** 選択中だけでなく、フォームが所属する全アカウントを扱える人だけが実行する。 */
@@ -606,9 +634,11 @@ forms.get('/api/forms/:id', async (c) => {
 });
 
 // POST /api/forms/:id/publish — 保存済みの編集内容を不変版にして公開する。
-forms.post('/api/forms/:id/publish', requireRole('owner', 'admin'), async (c) => {
+forms.post('/api/forms/:id/publish', async (c) => {
   try {
     const id = c.req.param('id');
+    const manageGate = await requireFormManage(c, await getFormAccountIds(c.env.DB, id));
+    if (manageGate) return manageGate;
     if (!await canUseFormFromAccount(c, id, c.req.query('account_id'))) {
       return c.json({ success: false, error: 'Form not found' }, 404);
     }
@@ -652,7 +682,7 @@ forms.post('/api/forms/:id/publish', requireRole('owner', 'admin'), async (c) =>
 });
 
 // POST /api/forms — create form
-forms.post('/api/forms', requireRole('owner', 'admin'), async (c) => {
+forms.post('/api/forms', async (c) => {
   try {
     const body = await c.req.json<{
       name: string;
@@ -676,6 +706,8 @@ forms.post('/api/forms', requireRole('owner', 'admin'), async (c) => {
     if (!body.name) {
       return c.json({ success: false, error: 'name is required' }, 400);
     }
+    const createGate = await requireFormManage(c, [body.accountId]);
+    if (createGate) return createGate;
     if (!body.accountId) {
       return c.json({ success: false, error: 'accountId is required' }, 400);
     }
@@ -712,10 +744,12 @@ forms.post('/api/forms', requireRole('owner', 'admin'), async (c) => {
 });
 
 // POST /api/forms/drafts — 公開されていない空の下書きを作り、編集画面へ進む。
-forms.post('/api/forms/drafts', requireRole('owner', 'admin'), async (c) => {
+forms.post('/api/forms/drafts', async (c) => {
   try {
     const body = await c.req.json<{ name?: string; accountId?: string }>()
       .catch(() => ({} as { name?: string; accountId?: string }));
+    const draftsGate = await requireFormManage(c, [body.accountId]);
+    if (draftsGate) return draftsGate;
     if (!body.accountId) {
       return c.json({ success: false, error: 'accountId is required' }, 400);
     }
@@ -737,9 +771,11 @@ forms.post('/api/forms/drafts', requireRole('owner', 'admin'), async (c) => {
 });
 
 // PUT /api/forms/:id — update form
-forms.put('/api/forms/:id', requireRole('owner', 'admin'), async (c) => {
+forms.put('/api/forms/:id', async (c) => {
   try {
     const id = c.req.param('id');
+    const putGate = await requireFormManage(c, await getFormAccountIds(c.env.DB, id));
+    if (putGate) return putGate;
     if (!await canUseFormFromAccount(c, id, c.req.query('account_id'))) {
       return c.json({ success: false, error: 'Form not found' }, 404);
     }
@@ -858,10 +894,12 @@ forms.get('/api/forms/:id/delete-impact', requireRole('owner', 'admin'), async (
 });
 
 // POST /api/forms/:id/archive — 公開を止め、回答と利用先を残して保管する。
-forms.post('/api/forms/:id/archive', requireRole('owner', 'admin'), async (c) => {
+forms.post('/api/forms/:id/archive', async (c) => {
   try {
     const accountId = c.req.query('account_id')?.trim();
     if (!accountId) return c.json({ success: false, error: 'account_id is required' }, 400);
+    const archiveGate = await requireFormManage(c, await getFormAccountIds(c.env.DB, c.req.param('id')));
+    if (archiveGate) return archiveGate;
     const body = await readBoundedFormArchiveBody(c.req.raw);
     const expectedRevision = typeof body.expectedRevision === 'number'
       ? body.expectedRevision
@@ -925,7 +963,7 @@ forms.post('/api/forms/:id/archive', requireRole('owner', 'admin'), async (c) =>
 });
 
 // DELETE /api/forms/:id — 影響0件・非公開・同じ版のときだけ物理削除する。
-forms.delete('/api/forms/:id', requireRole('owner', 'admin'), async (c) => {
+forms.delete('/api/forms/:id', async (c) => {
   try {
     const id = c.req.param('id');
     const accountId = c.req.query('account_id')?.trim();
@@ -934,6 +972,8 @@ forms.delete('/api/forms/:id', requireRole('owner', 'admin'), async (c) => {
     if (!Number.isInteger(expectedRevision) || expectedRevision < 1) {
       return c.json({ success: false, error: '確認した版が必要です' }, 400);
     }
+    const deleteGate = await requireFormManage(c, await getFormAccountIds(c.env.DB, id));
+    if (deleteGate) return deleteGate;
     const authorized = await authorizedDeleteImpact(c, id, accountId);
     if (authorized.kind === 'not_found') {
       return c.json({ success: false, error: 'not found' }, 404);
