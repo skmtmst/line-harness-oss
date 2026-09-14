@@ -154,7 +154,9 @@ export default function AutomationRunsPage() {
         { method: 'POST' },
       )
       if (!response.success) throw new Error(response.error)
-      setRetryNotice('失敗した処理だけを、もう一度実行しました。')
+      // #736: 実行完了を待たず受け付けだけ返すため、結果は実行記録の再取得で確認する。
+      // 無期限ポーリングはしない。
+      setRetryNotice('再実行を受け付けました。結果は実行記録で確認してください')
       setSelectedRun(null)
       await load()
     } catch (caught) {

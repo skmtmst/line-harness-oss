@@ -276,6 +276,10 @@ jobs:
           --filter @line-harness/update-engine
           build
       - run: pnpm --filter @line-crm/db check:bootstrap
+      # 追加のみ方針の静的検査(#742)。release.yml の tag push 時にも同じ
+      # 検査が走るため、ここで落として次のリリースを止めない。
+      - name: Migration safety check
+        run: pnpm tsx scripts/check-migrations.ts
       - name: Test database package
         if: needs.changes.outputs.db_tests == 'true'
         run: pnpm --filter @line-crm/db test

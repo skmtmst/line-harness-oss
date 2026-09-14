@@ -28,10 +28,8 @@ import {
 } from '../services/automation-definitions.js';
 import {
   AutomationRunRetryError,
-  processAutomationRun,
   retryAutomationRun,
 } from '../services/automation-engine.js';
-import { createAutomationActionExecutors } from '../services/automation-action-executors.js';
 import { listLimit } from './list-pagination.js';
 import { automationActionLabel, automationTriggerLabel } from '@line-crm/shared';
 
@@ -540,12 +538,16 @@ automations.post(
         runId: c.req.param('id'),
         allowedAccountIds: scope.allowedAccountIds,
       });
-      const status = await processAutomationRun(c.env.DB, prepared.runId, {
-        executors: createAutomationActionExecutors({
-          credentialEncryptionKey: c.env.LINE_CREDENTIAL_ENCRYPTION_KEY,
-        }),
-      });
-      return c.json({ success: true, data: { ...prepared, status } }, 202);
+      // #736: 実行完了を待たず受け付けだけ返す。実行は既存5分cronの
+      // processDueAutomationRuns が拾う(retry は resume_at=now を入れる)。
+      // 新規 queue・migration・waitUntil は作らない。
+      return c.json({
+        success: true,
+        data: {
+          ...prepared,
+          notice: '再実行を受け付けました。結果は実行記録で確認してください',
+        },
+      }, 202);
     } catch (error) {
       if (error instanceof AutomationRunRetryError) {
         const status = error.code === 'not_found' ? 404 : 409;
@@ -612,11 +614,35 @@ automations.get(
 // `automation_definitions` 系と不整合を起こすうえ、唯一の呼び元だった
 // 画面内蔵フォームは到達不能だった。作成は下書き→公開の流れを使う。
 // 稼働切替・削除で使う PUT・DELETE は残す。
+// #736: 旧 PUT の受理は isActive boolean だけに絞る。唯一の呼び元は
+// 稼働切替の { isActive } で、eventType/actions を送る画面経路はない。
+// 未知キー・空 body・型違いは黙って無視せず 400 で拒否する。
+function parseAutomationToggle(body: unknown): { ok: true; isActive: boolean } | { ok: false; error: string } {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return { ok: false, error: 'isActive を true か false で送ってください' };
+  }
+  const keys = Object.keys(body);
+  if (keys.length === 0) {
+    return { ok: false, error: 'isActive を true か false で送ってください' };
+  }
+  const unknown = keys.filter((key) => key !== 'isActive');
+  if (unknown.length > 0) {
+    return { ok: false, error: `isActive 以外の項目は送れません: ${unknown.join(', ')}` };
+  }
+  const isActive = (body as Record<string, unknown>).isActive;
+  if (typeof isActive !== 'boolean') {
+    return { ok: false, error: 'isActive は true か false で送ってください' };
+  }
+  return { ok: true, isActive };
+}
+
 automations.put('/api/automations/:id', requireRole('owner', 'admin'), async (c) => {
   try {
     const id = c.req.param('id');
-    const body = await c.req.json();
-    await updateAutomation(c.env.DB, id, body);
+    const body = await c.req.json().catch(() => undefined);
+    const toggle = parseAutomationToggle(body);
+    if (!toggle.ok) return c.json({ success: false, error: toggle.error }, 400);
+    await updateAutomation(c.env.DB, id, { isActive: toggle.isActive });
     const updated = await getAutomationById(c.env.DB, id);
     if (!updated) return c.json({ success: false, error: 'Not found' }, 404);
     return c.json({

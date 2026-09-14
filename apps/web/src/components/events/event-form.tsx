@@ -11,6 +11,8 @@ import { useAccount } from '@/contexts/account-context'
 import { generateBulkSlots, type BulkSlotInput } from './bulk-slot-generator'
 import { jstHHMMToUtcIso } from './jst'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+// #740: 下書きの初期値と字数上限は作成画面と共有する。片方だけ変えないこと。
+import { EVENT_DEFAULT_DRAFT, EVENT_DESCRIPTION_MAX_LENGTH, EVENT_NAME_MAX_LENGTH } from './event-draft-shared'
 
 type Tab = 'overview' | 'slots' | 'publish'
 
@@ -20,30 +22,7 @@ const TABS: Array<{ key: Tab; label: string; saveLabel: string; sub: string }> =
   { key: 'publish', label: '3. 公開設定', saveLabel: '公開設定を保存', sub: '承認制・リマインダ・公開' },
 ]
 
-const DEFAULT_DRAFT: EventDetail = {
-  id: '',
-  name: '',
-  venue_name: null,
-  venue_url: null,
-  image_url: null,
-  description: null,
-  description_centered: 0,
-  max_bookings_per_friend: null,
-  requires_approval: 0,
-  cancel_deadline_hours_before: null,
-  reminder_day_before_enabled: 1,
-  reminder_hours_before: null,
-  is_published: 0,
-  sort_order: 0,
-  confirmation_message_extra: null,
-  reminder_message_extra: null,
-  og_title: null,
-  og_description: null,
-  og_image_url: null,
-  visible_tag_id: null,
-  waitlist_enabled: 0,
-  entry_cutoff_hours_before: null,
-}
+const DEFAULT_DRAFT: EventDetail = EVENT_DEFAULT_DRAFT
 
 export interface EventFormProps {
   accountId: string
@@ -153,8 +132,8 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
     setError(null)
     try {
       if (!draft.name.trim()) throw new Error('イベント名は必須です')
-      if (draft.name.length > 255) throw new Error('イベント名は255字以内で入力してください')
-      if (draft.description && draft.description.length > 20000) {
+      if (draft.name.length > EVENT_NAME_MAX_LENGTH) throw new Error('イベント名は255字以内で入力してください')
+      if (draft.description && draft.description.length > EVENT_DESCRIPTION_MAX_LENGTH) {
         throw new Error('詳細は20000字以内で入力してください')
       }
       const targetType = draft.target_type ?? 'single'
@@ -509,7 +488,7 @@ function OverviewTab({
           type="text"
           value={draft.name}
           onChange={(e) => update('name', e.target.value)}
-          maxLength={255}
+          maxLength={EVENT_NAME_MAX_LENGTH}
           placeholder="例: 第1回 AAA 説明会"
           className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
