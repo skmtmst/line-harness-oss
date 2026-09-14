@@ -204,8 +204,10 @@ export default function FormSubmissionsPage() {
     setLoadError('')
     try {
       const account = `account_id=${encodeURIComponent(selectedAccountId)}`
+      // N-175 (#805): フォルダ絞りはサーバーが正本。選択をfolder_idで渡す。
+      const folder = `&folder_id=${encodeURIComponent(activeFolderId)}`
       const [res, folderRes] = await Promise.all([
-        fetchApi<{ success: boolean; data: FormListResponse }>(`/api/forms?${account}&with_list_summary=1`),
+        fetchApi<{ success: boolean; data: FormListResponse }>(`/api/forms?${account}${folder}&with_list_summary=1`),
         fetchApi<{ success: boolean; data: FormFolder[] }>(`/api/folders?kind=form&${account}`),
       ])
       if (!res.success || !folderRes.success) throw new Error('load_failed')
@@ -223,7 +225,7 @@ export default function FormSubmissionsPage() {
     } finally {
       if (request === formRequest.current) setLoading(false)
     }
-  }, [reviewMode, selectedAccountId])
+  }, [reviewMode, selectedAccountId, activeFolderId])
 
   useEffect(() => {
     void loadForms()
@@ -388,8 +390,7 @@ export default function FormSubmissionsPage() {
   const filteredForms = useMemo(() => {
     const normalizedQuery = query.trim().toLocaleLowerCase('ja-JP')
     return sortedForms.filter((form) => {
-      if (activeFolderId === 'unfiled' && form.folderId) return false
-      if (activeFolderId !== 'all' && activeFolderId !== 'unfiled' && form.folderId !== activeFolderId) return false
+      // N-175 (#805): フォルダ絞りはサーバーが済ませている。画面では絞らない。
       if (formFilter === 'published' && !form.isActive) return false
       if (formFilter === 'draft' && form.isActive) return false
       if (formFilter === 'stored' && !hasStoredDestination(form.layout, form.onSubmitTagId)) return false
@@ -400,7 +401,7 @@ export default function FormSubmissionsPage() {
         || form.usedByAccounts.some((account) => account.name.toLocaleLowerCase('ja-JP').includes(normalizedQuery))
       )
     })
-  }, [activeFolderId, formFilter, query, sortedForms])
+  }, [formFilter, query, sortedForms])
 
   const pageCount = Math.max(1, Math.ceil(filteredForms.length / pageSize))
   const visiblePage = Math.min(page, pageCount)

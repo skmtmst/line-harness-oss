@@ -1127,10 +1127,32 @@ friends.put('/api/friends/:id/metadata', requireRole('owner', 'admin', 'staff'),
     }
     const now = jstNow();
 
-    await db
-      .prepare('UPDATE friends SET metadata = ?, updated_at = ? WHERE id = ?')
-      .bind(JSON.stringify(merged), now, friendId)
-      .run();
+    // N-040(#808): 改訂値付きの更新は1回の条件付きUPDATEで突合する。
+    // 指定なしは従来どおり無条件更新（既存互換）。
+    const expectedUpdatedAt = c.req.query('expectedUpdatedAt')?.trim() || null;
+    if (expectedUpdatedAt) {
+      const applied = await db
+        .prepare('UPDATE friends SET metadata = ?, updated_at = ? WHERE id = ? AND updated_at = ?')
+        .bind(JSON.stringify(merged), now, friendId, expectedUpdatedAt)
+        .run();
+      if ((applied.meta?.changes ?? 0) === 0) {
+        const current = await getFriendById(db, friendId);
+        if (!current) {
+          return c.json({ success: false, error: 'Friend not found' }, 404);
+        }
+        return c.json({
+          success: false,
+          code: 'METADATA_CONFLICT',
+          error: 'ほかの変更が先に保存されました。最新の状態を読み直して、もう一度お試しください',
+          currentUpdatedAt: (current as unknown as Record<string, unknown>).updated_at ?? null,
+        }, 409);
+      }
+    } else {
+      await db
+        .prepare('UPDATE friends SET metadata = ?, updated_at = ? WHERE id = ?')
+        .bind(JSON.stringify(merged), now, friendId)
+        .run();
+    }
 
     const updated = await getFriendById(db, friendId);
     const tags = await getFriendTags(db, friendId);

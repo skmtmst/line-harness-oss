@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { Bookmark, Check, Circle, SlidersHorizontal, Star } from 'lucide-react'
 import type { Scenario, Tag } from '@line-crm/shared'
-import { api, type FriendListItem, type FriendSavedView, type SupportMarkListItem } from '@/lib/api'
+import { api, ApiError, fetchApi, type FriendListItem, type FriendSavedView, type SupportMarkListItem } from '@/lib/api'
 import FriendKpis from '@/components/friends/friend-kpis'
 import FriendListTable from '@/components/friends/friend-list-table'
 import AdvancedSearchDialog, { type AdvancedSearchResult } from '@/components/friends/advanced-search-dialog'
@@ -242,10 +242,19 @@ function FriendsPageInner({
   const toggleAttention = useCallback(async (friend: FriendListItem) => {
     const current = String(friend.metadata?.__attention ?? '') === '1'
     try {
-      await api.friends.updateMetadata(friend.id, { __attention: current ? null : '1' })
+      // N-040(#808): 読んだ改訂値を付けて送り、競合は上書きしない。
+      await fetchApi<{ success: boolean; data: unknown }>(
+        `/api/friends/${friend.id}/metadata?expectedUpdatedAt=${encodeURIComponent(friend.updatedAt)}`,
+        { method: 'PUT', body: JSON.stringify({ __attention: current ? null : '1' }) },
+      )
       await loadFriends()
-    } catch {
-      onNotice({ title: '注目の変更に失敗しました', message: '通信状態を確認して、もう一度お試しください。' })
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 409) {
+        await loadFriends()
+        onNotice({ title: '注目がほかの変更と重なりました', message: '最新の状態を読み直しました。確認してもう一度お試しください。' })
+      } else {
+        onNotice({ title: '注目の変更に失敗しました', message: '通信状態を確認して、もう一度お試しください。' })
+      }
     }
   }, [loadFriends, onNotice])
 
