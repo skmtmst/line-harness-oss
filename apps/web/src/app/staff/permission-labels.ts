@@ -25,6 +25,7 @@ export const PERMISSION_LABELS: Record<string, string> = {
   '/contents/vars': '共通情報',
   '/contents': '登録メディア一覧',
   '/conversions': '成果とアフィリエイト',
+  'conversion.approval.edit': '成果を承認・却下する',
   '/mileage': 'マイル',
   '/inflow-links': '流入と計測',
   '/analytics': '分析',
@@ -42,4 +43,37 @@ export const PERMISSION_LABELS: Record<string, string> = {
 /** 知らない権限パスが来たら件数表示に落とす前の名前解決。 */
 export function permissionLabel(path: string): string {
   return PERMISSION_LABELS[path] ?? ''
+}
+
+/** 成果承認の表示権限と操作権限。操作だけ・表示なしの組み合わせは作らない。 */
+export const CONVERSIONS_VIEW_KEY = '/conversions'
+export const CONVERSION_APPROVAL_EDIT_KEY = 'conversion.approval.edit'
+
+/**
+ * 権限の付け外し（追加・編集の両画面で共有）。
+ *
+ * 操作権限を選んだら表示権限も組で付け、表示権限を外したら操作権限も
+ * 外す。操作だけ残る・表示なしで操作できる組み合わせを作らないため。
+ */
+export function toggleStaffPermissionKey(current: string[], key: string): string[] {
+  if (current.includes(key)) {
+    const next = current.filter((item) => item !== key)
+    if (key === CONVERSIONS_VIEW_KEY) {
+      return next.filter((item) => item !== CONVERSION_APPROVAL_EDIT_KEY)
+    }
+    return next
+  }
+  const next = [...current, key]
+  if (key === CONVERSION_APPROVAL_EDIT_KEY && !next.includes(CONVERSIONS_VIEW_KEY)) {
+    next.push(CONVERSIONS_VIEW_KEY)
+  }
+  return next
+}
+
+/** 保存直前の組立て直し。操作権限だけが残っていたら表示権限を足す。 */
+export function normalizeStaffPermissionKeys(keys: string[]): string[] {
+  if (keys.includes(CONVERSION_APPROVAL_EDIT_KEY) && !keys.includes(CONVERSIONS_VIEW_KEY)) {
+    return [...keys, CONVERSIONS_VIEW_KEY]
+  }
+  return keys
 }
