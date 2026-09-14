@@ -354,6 +354,55 @@ describe('V6 友だち一括操作', () => {
   });
 });
 
+describe('一括の成果登録は主経路と同じ4つのsnapshotを凍結する（#718）', () => {
+  let testDb: SqliteD1;
+
+  beforeEach(() => {
+    testDb = createTestD1();
+    addAccount(testDb.raw, 'account-1');
+    insertFriend(testDb.raw, 'friend-1', { line_account_id: 'account-1', is_following: 1 });
+    testDb.raw.prepare(
+      `INSERT INTO conversion_points (id, name, event_type, value, line_account_id, version)
+       VALUES ('point-718', '成約', 'manual', 5000, 'account-1', 3)`,
+    ).run();
+  });
+
+  it('add_conversionで4列を控え、affiliate_idはNULLのまま件数と金額の両方に数える', async () => {
+    const created = await startFriendBulkRun(testDb.db, staff, {
+      selection: { kind: 'explicit', friendIds: ['friend-1'] },
+      operation: { kind: 'add_conversion', conversionPointId: 'point-718' },
+      idempotencyKey: crypto.randomUUID(), now: NOW,
+    });
+    expect(await processFriendBulkRun(testDb.db, created.run.id, { now: NOW }))
+      .toMatchObject({ status: 'success' });
+
+    const row = testDb.raw.prepare(
+      `SELECT point_name_snapshot, event_type_snapshot, value_snapshot,
+              point_version_snapshot, affiliate_id
+         FROM conversion_events WHERE conversion_point_id = 'point-718'`,
+    ).get() as {
+      point_name_snapshot: string | null;
+      event_type_snapshot: string | null;
+      value_snapshot: number | null;
+      point_version_snapshot: number | null;
+      affiliate_id: string | null;
+    };
+    expect(row).toEqual({
+      point_name_snapshot: '成約',
+      event_type_snapshot: 'manual',
+      value_snapshot: 5000,
+      point_version_snapshot: 3,
+      affiliate_id: null,
+    });
+
+    const total = testDb.raw.prepare(
+      `SELECT COUNT(*) AS netCount, SUM(COALESCE(value_snapshot, 0)) AS netValue
+         FROM conversion_events WHERE conversion_point_id = 'point-718'`,
+    ).get() as { netCount: number; netValue: number };
+    expect(total).toEqual({ netCount: 1, netValue: 5000 });
+  });
+});
+
 describe('一括操作の友だち情報は型どおりに検証する（N-042）', () => {
   let testDb: SqliteD1;
 
