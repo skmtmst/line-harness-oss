@@ -22,7 +22,7 @@ import {
 import type { Broadcast as DbBroadcast, BroadcastMessageType, BroadcastTargetType } from '@line-crm/db';
 import { LineClient } from '@line-crm/line-sdk';
 import { getSendPermissionForAccount } from '../services/send-entitlements.js';
-import { processBroadcastSend, buildMessage, processQueuedBroadcasts } from '../services/broadcast.js';
+import { processBroadcastSend, buildMessage, processQueuedBroadcasts, guardScheduledBroadcastQuota } from '../services/broadcast.js';
 import {
   MAX_BROADCAST_MESSAGES,
   addTestLabel,
@@ -216,6 +216,37 @@ async function validateAfterActionVersion(
         AND ca.line_account_id = ? AND ca.status = 'published'`,
   ).bind(versionId, lineAccountId).first<{ id: string }>();
   return Boolean(row);
+}
+
+/*
+ * N-062: 即時送信の直前再確認。作成・更新時と違い、取消・欠損・他アカウントを
+ * 言い分けて運用者が判断できる文にする。送らない理由だけを見て、行は変えない。
+ */
+async function checkSendableAfterActionVersion(
+  db: D1Database,
+  lineAccountId: string | null,
+  versionId: string | null | undefined,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!versionId) return { ok: true };
+  if (!lineAccountId) {
+    return { ok: false, error: '配信後アクションの公開版を確認できません。LINEアカウントを選び直してください' };
+  }
+  const row = await db.prepare(
+    `SELECT cav.status AS version_status, ca.line_account_id AS owner_account, ca.status AS action_status
+       FROM common_action_versions cav
+       JOIN common_actions ca ON ca.id = cav.common_action_id
+      WHERE cav.id = ?`,
+  ).bind(versionId).first<{ version_status: string; owner_account: string | null; action_status: string }>();
+  if (!row) {
+    return { ok: false, error: '配信後アクションの公開版が見つかりません。下書きを開き直してください' };
+  }
+  if (row.owner_account !== lineAccountId) {
+    return { ok: false, error: '配信後アクションが別のLINEアカウントのものです。同じアカウントの公開版を選び直してください' };
+  }
+  if (row.version_status !== 'published' || row.action_status !== 'published') {
+    return { ok: false, error: '配信後アクションの公開が取り消されています。公開中の版を選び直してください' };
+  }
+  return { ok: true };
 }
 
 function sameCreateRequest(existing: DbBroadcast, body: CreateBroadcastBody): boolean {
@@ -1973,6 +2004,22 @@ broadcasts.post('/api/broadcasts/:id/send', requireRole('owner', 'admin'), requi
       context: 'broadcasts.immediate-send',
     });
     const lineClient = new LineClient(accessToken);
+
+    // N-062: 即時送信も LINE 送信の直前に枠と後続アクション版を見直す。
+    // ここで止めれば status は draft のまま。確認後の競合は claim と台帳境界が防ぐ。
+    const sendAccountId = (broadcastAccountId as string | null) ?? null;
+    const afterActionCheck = await checkSendableAfterActionVersion(
+      c.env.DB,
+      sendAccountId,
+      existing.after_action_version_id ?? null,
+    );
+    if (!afterActionCheck.ok) {
+      return c.json({ success: false, error: afterActionCheck.error }, 409);
+    }
+    const quotaCheck = await guardScheduledBroadcastQuota(c.env.DB, existing, sendAccountId);
+    if (quotaCheck.blocked) {
+      return c.json({ success: false, error: quotaCheck.message ?? '送信枠が足りないため送れません' }, 409);
+    }
 
     // atomic lock — 'draft' と 'scheduled' を分けて単一 UPDATE で claim する。
     // 各 UPDATE は単一 write statement なので read-then-write transaction の
