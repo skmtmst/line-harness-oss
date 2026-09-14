@@ -761,11 +761,19 @@ export interface FormSubmissionPage {
   limit: number;
 }
 
+/**
+ * LIKE の特別文字を無効化する。`%` と `_` を含む検索語でも、その文字どおりに探す。
+ * N-171: `%` を素通しすると「何にでも一致」になり、別ページの一致行を見落とす。
+ */
+function escapeLikeLiteral(value: string): string {
+  return value.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
+}
+
 /** 管理画面向け回答一覧。全件をブラウザへ渡さず、D1側でページ分けする。 */
 export async function getFormSubmissionsPage(
   db: D1Database,
   formId: string,
-  options: { page?: number; limit?: number; lineAccountId?: string } = {},
+  options: { page?: number; limit?: number; lineAccountId?: string; search?: string } = {},
 ): Promise<FormSubmissionPage> {
   const requestedPage = options.page;
   const page = Number.isSafeInteger(requestedPage) && (requestedPage ?? 0) >= 1
@@ -775,24 +783,29 @@ export async function getFormSubmissionsPage(
   const offset = (page - 1) * limit;
   const accountClause = options.lineAccountId ? ' AND f.line_account_id = ?' : '';
   const accountBindings = options.lineAccountId ? [options.lineAccountId] : [];
+  // N-171/N-179: 名前と回答内容をページング前にサーバー側で絞り込む。件数と一覧と
+  // CSV が同じ条件になるよう、COUNT と取得で WHERE を共有する。空の検索語は絞らない。
+  const needle = options.search?.trim() ?? '';
+  const searchClause = needle ? ` AND (f.display_name LIKE ? ESCAPE '\\' OR fs.data LIKE ? ESCAPE '\\')` : '';
+  const searchBindings = needle ? [`%${escapeLikeLiteral(needle)}%`, `%${escapeLikeLiteral(needle)}%`] : [];
   const count = await db
     .prepare(
       `SELECT COUNT(*) AS total
          FROM form_submissions fs
          LEFT JOIN friends f ON f.id = fs.friend_id
-        WHERE fs.form_id = ?${accountClause}`,
+        WHERE fs.form_id = ?${accountClause}${searchClause}`,
     )
-    .bind(formId, ...accountBindings)
+    .bind(formId, ...accountBindings, ...searchBindings)
     .first<{ total: number }>();
   const result = await db
     .prepare(
       `SELECT fs.*, f.display_name as friend_name FROM form_submissions fs
        LEFT JOIN friends f ON f.id = fs.friend_id
-       WHERE fs.form_id = ?${accountClause}
+       WHERE fs.form_id = ?${accountClause}${searchClause}
        ORDER BY fs.created_at DESC, fs.id DESC
        LIMIT ? OFFSET ?`,
     )
-    .bind(formId, ...accountBindings, limit, offset)
+    .bind(formId, ...accountBindings, ...searchBindings, limit, offset)
     .all<FormSubmission & { friend_name: string | null }>();
   return { items: result.results, total: count?.total ?? 0, page, limit };
 }
