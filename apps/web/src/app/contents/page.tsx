@@ -31,6 +31,7 @@ import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
 import { useAccount } from '@/contexts/account-context'
 import MediaDetailDialog from './media-detail-dialog'
+import { MediaQuotaGuidance } from './media-quota-guidance'
 import MediaReplacementDialog from './media-replacement-dialog'
 import MediaUploadDialog from './media-upload-dialog'
 
@@ -588,16 +589,16 @@ export default function MediaLibraryPage() {
           <p className="text-ink-secondary text-nano font-semibold">
             使っている容量 <span className="text-ink ml-1">{quota ? `${formatStorage(quota.usageBytes)} / ${formatStorage(quota.limitBytes)}` : '—（未取得）'}</span>
           </p>
-          {quota ? (
-            <>
-              <div className="bg-canvas-sunken mt-1 ml-auto h-1.5 w-56 overflow-hidden rounded-pill" role="progressbar" aria-label="保存容量" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.min(100, Math.round(quota.usageRate * 100))}>
-                <div className={`h-full rounded-pill ${quota.state === 'full' ? 'bg-danger' : quota.state === 'warning' ? 'bg-warning' : 'bg-accent-deep'}`} style={{ width: `${Math.min(100, quota.usageRate * 100)}%` }} />
-              </div>
-              <p className="text-ink-faint mt-1 text-xs">残り {formatStorage(quota.remainingBytes)}{quota.reservedBytes > 0 ? `（送信のため確保中 ${formatStorage(quota.reservedBytes)} を含む）` : ''}</p>
-            </>
-          ) : (
-            <p className={quotaFailed ? 'text-danger text-xs' : 'text-ink-faint text-xs'}>保存容量を確認できませんでした。</p>
-          )}
+          <MediaQuotaGuidance
+            quota={quota}
+            failed={quotaFailed}
+            onShowNearLimit={() => {
+              setShowNearLimitOnly(true)
+              setShowUnusedOnly(false)
+              setKinds(new Set(KINDS.map((kind) => kind.key)))
+              setPage(1)
+            }}
+          />
         </div>
       </div>
 

@@ -7,6 +7,7 @@ import type {
   MediaReplacementReference,
 } from '@line-crm/shared';
 import { jstNow } from './utils.js';
+import { getMediaStorageQuota } from './media-uploads.js';
 
 const LOOKUP_CHUNK = 90;
 const MEDIA_USAGE_WRITE_CHUNK = 20;
@@ -20,6 +21,15 @@ const MEDIA_USAGE_WRITE_CHUNK = 20;
 
 export const MEDIA_KINDS = ['image', 'video', 'audio', 'file'] as const;
 export type MediaKind = (typeof MEDIA_KINDS)[number];
+
+/**
+ * N-198/N-204 (#796):「上限に近い」は1ファイルの固定値(旧: 画像8MB等)では
+ * なく、契約上限への圧迫で決める。契約上限のこの割合以上を1行で占める
+ * ファイルだけを返す。分母は getMediaStorageQuota と同じ計算元の
+ * limitBytes を使い、要求値や画面内推定は使わない。既定10GBの0.1%は
+ * 約10MBで、旧しきい値(画像8MB級)と同じ帯に寄せている。
+ */
+export const MEDIA_NEAR_LIMIT_SHARE = 0.001;
 
 export const MEDIA_REF_KINDS = [
   'template',
@@ -105,9 +115,13 @@ export async function getMedia(
     conditions.push('(SELECT COUNT(*) FROM media_usages u WHERE u.media_id = m.id) = 0');
   }
   if (opts.nearLimitOnly) {
-    conditions.push(`m.size_bytes >= CASE m.kind
-      WHEN 'image' THEN ? WHEN 'file' THEN ? ELSE ? END`);
-    values.push(8 * 1024 * 1024, 16 * 1024 * 1024, 160 * 1024 * 1024);
+    // 一覧口と同じ計算元。INSERT OR IGNORE で上限行が無い口座にも既定値が入る。
+    // 上限未設定(limit<=0)は安全側で何も返さない。壊れ値(負値・NULL)は
+    // 正のしきい値との比較で自然に外れる。
+    const quota = await getMediaStorageQuota(db, opts.lineAccountId);
+    if (!(quota.limitBytes > 0)) return [];
+    conditions.push('m.size_bytes >= ?');
+    values.push(quota.limitBytes * MEDIA_NEAR_LIMIT_SHARE);
   }
   const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
   const orderBy = opts.sort === 'oldest' ? 'm.created_at ASC'
@@ -147,8 +161,10 @@ export async function countMedia(
   }
   if (opts.unusedOnly) conditions.push('(SELECT COUNT(*) FROM media_usages u WHERE u.media_id = m.id) = 0');
   if (opts.nearLimitOnly) {
-    conditions.push(`m.size_bytes >= CASE m.kind WHEN 'image' THEN ? WHEN 'file' THEN ? ELSE ? END`);
-    values.push(8 * 1024 * 1024, 16 * 1024 * 1024, 160 * 1024 * 1024);
+    const quota = await getMediaStorageQuota(db, opts.lineAccountId);
+    if (!(quota.limitBytes > 0)) return 0;
+    conditions.push('m.size_bytes >= ?');
+    values.push(quota.limitBytes * MEDIA_NEAR_LIMIT_SHARE);
   }
   const row = await db.prepare(`SELECT COUNT(*) AS total FROM media m WHERE ${conditions.join(' AND ')}`)
     .bind(...values).first<{ total: number }>();
