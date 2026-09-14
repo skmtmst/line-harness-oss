@@ -1083,6 +1083,9 @@ const nenCampaignSetting = (campaignKey, label, category, triggerEvent, delayDay
   buttonLabel,
   buttonUrl: buttonLabel ? 'https://example.com/nen' : null,
   imageUrl: null,
+  // 実口・型と揃える(#728)。値は未設定時の実口の決めごとと同じ。
+  dedupWindowDays: 30,
+  excludeFormRespondents: false,
   afterActions: campaignKey === 'review_request' ? [
     { kind: 'open_form', formId: 'form-review', formName: '口コミ', buttonLabel: '感想を書く（30秒）' },
     { kind: 'award_mileage', amount: 200, trigger: 'form_submitted' },

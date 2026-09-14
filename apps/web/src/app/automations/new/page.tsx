@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import type { Automation } from '@line-crm/shared'
+import { AUTOMATION_DRAFT_ACTION_OPTIONS } from '@line-crm/shared'
 import { api, ApiError, type AutomationDraftAction, type AutomationDraftDetail } from '@/lib/api'
 import Breadcrumb from '@/components/shared/breadcrumb'
 import StickyBar from '@/components/shared/sticky-bar'
@@ -30,14 +31,16 @@ import Button from '@/components/shared/button'
  */
 
 /**
- * 画面に出すきっかけ。
+ * 画面に出すきっかけ(#734: 設計の6種で凍結)。
  *
- * **実際に発火するものだけを並べる。** `apps/worker/src/services/event-bus.ts`
- * の `fireEvent` 呼び出し元と、`processAutomations` の完全一致で決まる。
- * 以前ここには `friend_added` `tag_added` `form_submitted` `link_clicked` が
- * 並んでいたが、どれも `AutomationEventType` に無い値で、保存はできても
- * 一度も動かない。V6は「実装されていない選択肢を表示しない」と決めている
- * （`docs/v6-requirements/v6-25-automation-requirements-draft.md` §4-2・§11）。
+ * **実際に動くものだけを並べる。** 6種すべて実行門で動く
+ * (`apps/worker/src/services/automation-triggers.ts` の `EVENT_TRIGGER_TYPES`
+ * +`SCHEDULE_TRIGGER_TYPES`)。V6は「実装されていない選択肢を表示しない」と
+ * 決めている（`docs/v6-requirements/v6-25-automation-requirements-draft.md`
+ * §4-2・§11）。設計(Rv8Jv)が6種のため、残り4種(link_clicked・
+ * calendar_booked・daily・weekly)は下書き編集で扱う。6種が共有の正本
+ * (`AUTOMATION_DRAFT_TRIGGER_OPTIONS`)から外れていないことは、
+ * `automation-new-options.test.ts` の N1 が見張る。
  */
 const EVENTS: ReadonlyArray<{ value: Automation['eventType']; label: string; note: string }> = [
   {
@@ -73,19 +76,15 @@ const CONDITION_AXES = [
 ] as const
 
 /**
- * 画面に出す「すること」。
+ * 画面に出す「すること」(#734: 共有の正本から描画する)。
  *
- * `executeAction` が実行できるもののうち、選ぶ一覧をこの画面が読めるものだけ。
- * `start_scenario` `remove_tag` `send_webhook` `switch_rich_menu` は実行側には
- * あるが、選択肢（シナリオ・Webhook・リッチメニュー）を読んでいないので、
- * 出しても選べない。読む口を足すときに一緒に増やす。
+ * 下書きunionの3処理と一致させる。`remove_tag` `send_webhook`
+ * `switch_rich_menu` など実行側の残りは、下書きの口が受け付けない
+ * (`action_unsupported`)ので出さない。
  */
-const ACTIONS = [
-  { value: 'add_tag', label: 'タグを付ける' },
-  { value: 'send_message', label: 'メッセージを送る' },
-] as const
+const ACTIONS: ReadonlyArray<{ value: string; label: string }> = [...AUTOMATION_DRAFT_ACTION_OPTIONS]
 
-type ActionType = (typeof ACTIONS)[number]['value']
+type ActionType = string
 
 interface ActionDraft {
   /** 行を取り違えないための、画面の中だけの番号。 */
@@ -93,6 +92,7 @@ interface ActionDraft {
   type: ActionType
   tagId: string
   message: string
+  scenarioId: string
 }
 
 let actionKeySeed = 0
@@ -101,6 +101,7 @@ const newActionDraft = (): ActionDraft => ({
   type: 'add_tag',
   tagId: '',
   message: '',
+  scenarioId: '',
 })
 
 /**
@@ -228,6 +229,53 @@ interface TestConfirmation {
   effects: string[]
 }
 
+/**
+ * タグ・シナリオの選択行(#734: 借金を増やさないため1つにまとめた)。
+ *
+ * 2つの行は見出し・選択肢・文言だけが違い、骨組みは同じ。複写すると
+ * 借金計数(`unresolved-classname`)が増えて試験が赤くなるため、部品化する。
+ */
+function ResourcePickRow(props: {
+  title: string
+  id: string
+  selectLabel: string
+  value: string
+  onPick: (value: string) => void
+  options: Array<{ value: string; label: string }>
+  tagsLoading: boolean
+  tagsFailed: boolean
+  failedNote: string
+}) {
+  const { title, id, selectLabel, value, onPick, options, tagsLoading, tagsFailed, failedNote } = props
+  return (
+    <div className={styles.field}>
+      <label className={styles.label} htmlFor={id}>
+        {title}<span className={styles.required}>必須</span>
+      </label>
+      <div className={styles.field}>
+        <SelectField
+          id={id}
+          value={value}
+          disabled={tagsLoading || tagsFailed}
+          onChange={(event) => onPick(event.target.value)}
+          aria-label={selectLabel}
+          className={styles.select}
+          options={[
+            { value: '', label: '— 選んでください —' },
+            ...options.map((option) => ({ value: option.value, label: option.label })),
+          ]}
+        />
+        {tagsLoading ? <p className={styles.note}>読み込んでいます</p> : null}
+        {tagsFailed ? (
+          <p className={styles.note}>
+            {failedNote}
+          </p>
+        ) : null}
+      </div>
+    </div>
+  )
+}
+
 export default function NewAutomationPage() {
   usePageTitle('ルールを作る')
   const router = useRouter()
@@ -247,6 +295,7 @@ export default function NewAutomationPage() {
   const [tags, setTags] = useState<Array<{ id: string; name: string }>>([])
   const [tagsLoading, setTagsLoading] = useState(true)
   const [tagsFailed, setTagsFailed] = useState(false)
+  const [scenarios, setScenarios] = useState<Array<{ id: string; name: string }>>([])
   const [saving, setSaving] = useState(false)
   const [testing, setTesting] = useState(false)
   const [preparingTest, setPreparingTest] = useState(false)
@@ -267,6 +316,7 @@ export default function NewAutomationPage() {
     setTagsFailed(false)
     if (!selectedAccountId) {
       setTags([])
+      setScenarios([])
       setTagsLoading(false)
       return
     }
@@ -274,8 +324,10 @@ export default function NewAutomationPage() {
       .draftResources(selectedAccountId)
       .then((res) => {
         if (cancelled) return
-        if (res.success) setTags(res.data.tags)
-        else setTagsFailed(true)
+        if (res.success) {
+          setTags(res.data.tags)
+          setScenarios(res.data.scenarios)
+        } else setTagsFailed(true)
       })
       .catch(() => {
         if (!cancelled) setTagsFailed(true)
@@ -341,12 +393,14 @@ export default function NewAutomationPage() {
   const draftActions = (): AutomationDraftAction[] => actions.map((row, index) => (
     row.type === 'add_tag'
       ? { id: `step-${index + 1}`, type: 'add_tag' as const, params: { tagId: row.tagId }, onFailure: 'stop' as const }
-      : {
-          id: `step-${index + 1}`,
-          type: 'send_message' as const,
-          params: { messageType: 'text', content: row.message.trim() },
-          onFailure: 'stop' as const,
-        }
+      : row.type === 'start_scenario'
+        ? { id: `step-${index + 1}`, type: 'start_scenario' as const, params: { scenarioId: row.scenarioId }, onFailure: 'stop' as const }
+        : {
+            id: `step-${index + 1}`,
+            type: 'send_message' as const,
+            params: { messageType: 'text', content: row.message.trim() },
+            onFailure: 'stop' as const,
+          }
   ))
 
   /**
@@ -413,6 +467,7 @@ export default function NewAutomationPage() {
     if (actions.length === 0) return 'することを1つ以上決めてください'
     for (const row of actions) {
       if (row.type === 'add_tag' && !row.tagId) return '付けるタグを選んでください'
+      if (row.type === 'start_scenario' && !row.scenarioId) return '始めるシナリオを選んでください'
       if (row.type === 'send_message' && !row.message.trim()) return '送る文面を入力してください'
     }
     return null
@@ -771,31 +826,29 @@ export default function NewAutomationPage() {
                   </div>
 
                   {row.type === 'add_tag' ? (
-                    <div className={styles.field}>
-                      <label className={styles.label} htmlFor={`au-tag-${row.key}`}>
-                        付けるタグ<span className={styles.required}>必須</span>
-                      </label>
-                      <div className={styles.field}>
-                        <SelectField
-                          id={`au-tag-${row.key}`}
-                          value={row.tagId}
-                          disabled={tagsLoading || tagsFailed}
-                          onChange={(event) => updateAction(row.key, { tagId: event.target.value })}
-                          aria-label="自動化で付けるタグ"
-                          className={styles.select}
-                          options={[
-                            { value: '', label: '— 選んでください —' },
-                            ...tags.map((tag) => ({ value: tag.id, label: tag.name })),
-                          ]}
-                        />
-                        {tagsLoading ? <p className={styles.note}>読み込んでいます</p> : null}
-                        {tagsFailed ? (
-                          <p className={styles.note}>
-                            タグを読み込めませんでした。画面を再読み込みしてください。
-                          </p>
-                        ) : null}
-                      </div>
-                    </div>
+                    <ResourcePickRow
+                      title="付けるタグ"
+                      id={`au-tag-${row.key}`}
+                      selectLabel="自動化で付けるタグ"
+                      value={row.tagId}
+                      onPick={(value) => updateAction(row.key, { tagId: value })}
+                      options={tags.map((tag) => ({ value: tag.id, label: tag.name }))}
+                      tagsLoading={tagsLoading}
+                      tagsFailed={tagsFailed}
+                      failedNote="タグを読み込めませんでした。画面を再読み込みしてください。"
+                    />
+                  ) : row.type === 'start_scenario' ? (
+                    <ResourcePickRow
+                      title="始めるシナリオ"
+                      id={`au-scenario-${row.key}`}
+                      selectLabel="自動化で始めるシナリオ"
+                      value={row.scenarioId}
+                      onPick={(value) => updateAction(row.key, { scenarioId: value })}
+                      options={scenarios.map((scenario) => ({ value: scenario.id, label: scenario.name }))}
+                      tagsLoading={tagsLoading}
+                      tagsFailed={tagsFailed}
+                      failedNote="シナリオを読み込めませんでした。画面を再読み込みしてください。"
+                    />
                   ) : (
                     <div className={styles.field}>
                       <label className={styles.label} htmlFor={`au-message-${row.key}`}>

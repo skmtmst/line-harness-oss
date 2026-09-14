@@ -3,23 +3,27 @@ import type { NenCampaignSetting } from '@/lib/api'
 type TimingSetting = Pick<NenCampaignSetting, 'campaignKey' | 'delayDays' | 'deliveryTime'>
 type ContentSetting = Pick<NenCampaignSetting, 'campaignKey' | 'buttonLabel'>
 
+/*
+ * NEN表示キー(#728)。実キー5つだけを持つ。order_thanks / shipping_notice /
+ * care_check は出さない・止めたキーで、column は種データ由来の実キー。
+ *
+ * worker 側の CAMPAIGN_KEYS から導けない。CAMPAIGN_KEYS はサーバ側正本で
+ * 所有外のため触れず、shared への移動も範囲外。実キーが変わったら
+ * ここも手で揃える。4者突合の試験が、実口・型・見本とのずれを捕まえる。
+ */
 const timingByCampaign: Record<string, string> = {
-  order_thanks: '注文の確定ですぐ',
-  shipping_notice: '発送を登録した当日',
   arrival_check: '到着の翌日 10:00',
-  care_check: '到着から3日後 19:00',
   review_request: '到着から7日後 20:00',
   cross_sell: '到着から30日後',
+  column: '予約した日時',
   birthday_coupon: '誕生日の3日前 10:00',
 }
 
 const contentByCampaign: Record<string, string> = {
-  order_thanks: 'テキスト＋注文の明細',
-  shipping_notice: 'テキスト＋追跡リンク',
   arrival_check: 'カルーセル 3枚',
-  care_check: '質問（2択）',
   review_request: 'リッチメッセージ',
   cross_sell: 'テキスト＋クーポン',
+  column: '紹介文＋コラム',
   birthday_coupon: 'テキスト＋クーポン',
 }
 
