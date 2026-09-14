@@ -31,6 +31,7 @@ import {
   jstNow,
   removeTagFromFriend,
   setFriendFieldValue,
+  validateFriendFieldValue,
 } from '@line-crm/db';
 import { attachTagAndFireSideEffects } from './friend-tag-attach.js';
 
@@ -405,11 +406,18 @@ async function writeDestinations(
     const target = await getFriendFieldById(db, fieldId);
     if (!target || target.ec_is_master === 1) continue;
     await trackDestinationWrite(stats, 1, async () => {
+      // N-042: 生の回答を項目の型で検証し、正規化した値を保存する。
+      // toText で先に文字列化すると、multi_select の正しい選択まで
+      // 1つの文字列として弾かれるので、配列のまま検証する。
+      const rawForCheck = Array.isArray(value) && target.type === 'multi_select' ? value : text;
+      const checked = validateFriendFieldValue(target, rawForCheck);
+      if (!checked.ok) throw new Error(`invalid friend field value: ${checked.error}`);
       await setFriendFieldValue(db, {
         friendId,
         fieldId,
-        value: text === '' ? null : text,
+        value: checked.value,
         updatedBy: 'form',
+        field: target,
       });
       return true;
     });
@@ -518,11 +526,16 @@ async function applyChoiceFriendField(
   await trackDestinationWrite(stats, 1, async () => {
     // 値を書いていない選択肢は、ラベルをそのまま入れる
     const value = choice.value && choice.value !== '' ? choice.value : choice.label;
+    // N-042: 選択肢の値も項目の型で検証する。合わなければ保存せず
+    // 失敗に数える(設定側の直しが必要なため、黙って通さない)。
+    const checked = validateFriendFieldValue(target, value);
+    if (!checked.ok) throw new Error(`invalid friend field value: ${checked.error}`);
     await setFriendFieldValue(input.db, {
       friendId: input.friendId,
       fieldId,
-      value,
+      value: checked.value,
       updatedBy: 'form',
+      field: target,
     });
     return true;
   });
@@ -587,11 +600,15 @@ export async function runFormAction(
       const target = await getFriendFieldById(db, action.fieldId);
       if (!target || target.ec_is_master === 1) return;
       const write = async () => {
+        // N-042: 動作の値も項目の型で検証する。合わなければ保存しない。
+        const checked = validateFriendFieldValue(target, action.value ?? '');
+        if (!checked.ok) throw new Error(`invalid friend field value: ${checked.error}`);
         await setFriendFieldValue(db, {
           friendId,
           fieldId: action.fieldId!,
-          value: action.value ?? '',
+          value: checked.value,
           updatedBy: 'form',
+          field: target,
         });
         return true;
       };

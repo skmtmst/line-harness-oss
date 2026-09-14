@@ -440,7 +440,7 @@ async function writeLegacyFriendFields(
   const result: FormDestinationWriteResult = { attempted: 0, succeeded: 0, failed: 0 };
   const targets = parseFormFields(form.fields).filter((field) => field.friendFieldId);
   if (targets.length === 0) return result;
-  const { setFriendFieldValue, getFriendFieldById } = await import('@line-crm/db');
+  const { setFriendFieldValue, getFriendFieldById, validateFriendFieldValue } = await import('@line-crm/db');
   for (const field of targets) {
     const answer = submissionData[field.name ?? field.id ?? ''];
     if (answer === undefined) continue;
@@ -451,15 +451,29 @@ async function writeLegacyFriendFields(
         result.failed += 1;
         continue;
       }
-      await setFriendFieldValue(db, {
-        friendId,
-        fieldId: field.friendFieldId!,
-        value: answer == null
+      // N-042: 回答を項目の型で検証し、正規化した値を保存する。
+      // multi_select の配列回答は配列のまま検証する(先に文字列化すると
+      // 正しい選択まで1つの文字列として弾かれる)。型に合わなければ
+      // 保存せず失敗に数える。
+      const rawForCheck = Array.isArray(answer) && target.type === 'multi_select'
+        ? answer
+        : answer == null
           ? null
           : Array.isArray(answer)
             ? answer.join(', ')
-            : String(answer),
+            : String(answer);
+      const checked = validateFriendFieldValue(target, rawForCheck);
+      if (!checked.ok) {
+        result.failed += 1;
+        console.error('form -> friend_fields invalid:', checked.error);
+        continue;
+      }
+      await setFriendFieldValue(db, {
+        friendId,
+        fieldId: field.friendFieldId!,
+        value: checked.value,
         updatedBy: 'form',
+        field: target,
       });
       result.succeeded += 1;
     } catch (error) {

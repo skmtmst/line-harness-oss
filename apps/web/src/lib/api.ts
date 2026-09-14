@@ -3662,9 +3662,11 @@ export type NenDelivery = {
   version: number; updatedAt: string
 }
 
+export type NenSkippedReasonCode = 'friend_unavailable' | 'line_account_unavailable' | 'line_account_mismatch' | 'campaign_snapshot_missing' | 'campaign_disabled' | 'unknown'
+
 export type NenDeliveryList = {
   range: NenMetricsRange
-  summary: { pending: number; processing: number; sent: number; skipped: number; failed: number; cancelled: number; retryRequired: number; unmetReasons: Partial<Record<'blocked' | 'unfollowed' | 'other', number>> }
+  summary: { pending: number; processing: number; sent: number; skipped: number; failed: number; cancelled: number; retryRequired: number; unmetReasons: Partial<Record<'blocked' | 'unfollowed' | 'other', number>>; skippedReasons?: Partial<Record<NenSkippedReasonCode, number>> }
   deliveries: NenDelivery[]
   pagination: { total: number; limit: number; cursor: string; nextCursor: string | null }
 }

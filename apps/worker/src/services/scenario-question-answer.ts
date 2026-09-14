@@ -18,11 +18,14 @@
 import {
   addTagToFriend,
   removeTagFromFriend,
+  getFriendFieldById,
   getPinnedScenarioStep,
   isResourceInScenarioAccount,
   parseScenarioVersionActions,
   parseScenarioVersionSteps,
   jstNow,
+  setFriendFieldValue,
+  validateFriendFieldValue,
   type PinnedScenarioAction,
   type ScenarioVersion,
 } from '@line-crm/db'
@@ -347,15 +350,19 @@ async function applyChoiceSideEffects(
 
   if (choice.field?.fieldId) {
     try {
-      await db
-        .prepare(
-          `INSERT INTO friend_field_values (friend_id, field_id, value, updated_by, updated_at)
-           VALUES (?, ?, ?, 'scenario', ?)
-           ON CONFLICT (friend_id, field_id)
-           DO UPDATE SET value = excluded.value, updated_by = 'scenario', updated_at = excluded.updated_at`,
-        )
-        .bind(friendId, choice.field.fieldId, choice.field.value ?? '', jstNow())
-        .run()
+      // N-042: 選択肢の固定値も項目の型で検証し、合わなければ保存しない。
+      // 項目が無い(削除済み)ときも孤立した行を作らず飛ばす。
+      const target = await getFriendFieldById(db, choice.field.fieldId)
+      if (!target) throw new Error(`field not found: ${choice.field.fieldId}`)
+      const checked = validateFriendFieldValue(target, choice.field.value ?? '')
+      if (!checked.ok) throw new Error(`invalid friend field value: ${checked.error}`)
+      await setFriendFieldValue(db, {
+        friendId,
+        fieldId: choice.field.fieldId,
+        value: checked.value,
+        updatedBy: 'scenario',
+        field: target,
+      })
     } catch (err) {
       console.error('[scenario-question] set field failed', err)
     }
