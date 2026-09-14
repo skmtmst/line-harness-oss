@@ -38,6 +38,32 @@ beforeEach(() => {
   calls.preflight.mockImplementation(async () => checked()); calls.distribute.mockResolvedValue(completed); calls.result.mockResolvedValue(completed)
 })
 afterEach(cleanup)
+// #743: happy-dom の Storage は Proxy で包まれており、vi.spyOn での
+// メソッド上書きが無言で効かないことがある(設置しても読むと元に戻り、
+// 直接呼んでも投げない)。「保存場所の故障」を spyOn で注入する書き方は、
+// 故障が入らないまま成功表示へ進み、findBy の既定1秒を使い切って落ちる。
+// 確実に効かせるため、window.sessionStorage ごと委譲つきの故障品に差し替え、
+// 終わったら元の記述子へ戻す。差し替え直後に直接呼んで投がることを確かめ、
+// 将来の無言無効化は即時の明示失敗にする(1秒待ちの謎失敗にしない)。
+function replaceSessionStorage(overrides: Partial<Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>>) {
+  const real = window.sessionStorage
+  const original = Object.getOwnPropertyDescriptor(window, 'sessionStorage')
+  const fake = {
+    get length() { return real.length },
+    key: (index: number) => real.key(index),
+    getItem: (key: string) => real.getItem(key),
+    setItem: (key: string, value: string) => real.setItem(key, value),
+    removeItem: (key: string) => real.removeItem(key),
+    clear: () => real.clear(),
+    ...overrides,
+  }
+  Object.defineProperty(window, 'sessionStorage', { value: fake, writable: true, configurable: true })
+  if (window.sessionStorage !== (fake as unknown as Storage)) throw new Error('保存場所の差し替えが効きませんでした')
+  for (const key of Object.keys(overrides) as ('getItem' | 'setItem' | 'removeItem')[]) {
+    if (window.sessionStorage[key] !== fake[key]) throw new Error(`保存場所の故障(${key})が効きませんでした`)
+  }
+  return () => { if (original) Object.defineProperty(window, 'sessionStorage', original) }
+}
 async function list() { render(<TemplateConsole type="tag" useCanonicalEditors={false} />); await screen.findByLabelText('来店済みの操作'); fireEvent.click(screen.getByLabelText('来店済みの操作')) }
 async function chooseStores() {
   await list(); fireEvent.click(screen.getByRole('button', { name: '来店済みを配布' })); await screen.findByRole('checkbox', { name: '銀座本店' })
@@ -283,9 +309,18 @@ describe('HQひな形の配布フロー', () => {
     if (outcome === 'definite-rejection') calls.create.mockRejectedValueOnce(Object.assign(new Error('入力を修正'), { requestNotApplied: true, status: 422 }))
     await list(); fireEvent.click(screen.getByRole('button', { name: '＋ひな形を作成' }))
     fireEvent.change(screen.getByLabelText('名前'), { target: { value: '消去待ちの内容' } })
-    const remove = vi.spyOn(window.sessionStorage, 'removeItem')
-      .mockImplementationOnce(() => { throw new Error('storage unavailable') })
-      .mockImplementationOnce(() => { throw new Error('storage still unavailable') })
+    // #743: removeItem の spyOn 上書きは Proxy に飲まれて効かないため、
+    // 最初の2回だけ投げて3回目から本物へ通す委譲品に差し替える。
+    let removeFailures = 2
+    const removeCalls: string[] = []
+    const real = window.sessionStorage
+    const restoreStorage = replaceSessionStorage({
+      removeItem: (key: string) => {
+        removeCalls.push(key)
+        if (removeFailures > 0) { removeFailures -= 1; throw new Error('storage still unavailable') }
+        real.removeItem(key)
+      },
+    })
     try {
       fireEvent.click(screen.getByRole('button', { name: '保存して配布先を選ぶ' }))
       await screen.findByRole('button', { name: '前回の保存を再確認' })
@@ -298,7 +333,7 @@ describe('HQひな形の配布フロー', () => {
       expect(screen.queryByText('ひな形を保存しました。')).toBeNull()
       expect(window.sessionStorage.length).toBe(1)
       fireEvent.click(screen.getByRole('button', { name: '前回の保存を再確認' }))
-      await waitFor(() => expect(remove).toHaveBeenCalledTimes(2))
+      await waitFor(() => expect(removeCalls).toHaveLength(2))
       expect((screen.getByLabelText('名前') as HTMLInputElement).disabled).toBe(true)
       expect(window.sessionStorage.length).toBe(1)
       expect(calls.create).toHaveBeenCalledTimes(1)
@@ -316,13 +351,16 @@ describe('HQひな形の配布フロー', () => {
         expect(calls.create.mock.calls[1][0].name).toBe('修正した新しい内容')
         expect(calls.create.mock.calls[1][1]).not.toBe(original[1])
       }
-    } finally { remove.mockRestore() }
+    } finally { restoreStorage() }
   })
   it('保存場所が使えなければ新規POSTを開始しない', async () => {
     await list(); fireEvent.click(screen.getByRole('button', { name: '＋ひな形を作成' }))
     fireEvent.change(screen.getByLabelText('名前'), { target: { value: '保存しない' } })
-    const write = vi.spyOn(window.sessionStorage, 'setItem').mockImplementation(() => { throw new Error('quota') })
-    fireEvent.click(screen.getByRole('button', { name: '下書き保存' })); await screen.findByRole('alert')
-    expect(calls.create).not.toHaveBeenCalled(); write.mockRestore()
+    // #743: setItem の spyOn 上書きは Proxy に飲まれて効かないため差し替える。
+    const restoreStorage = replaceSessionStorage({ setItem: () => { throw new Error('quota') } })
+    try {
+      fireEvent.click(screen.getByRole('button', { name: '下書き保存' })); await screen.findByRole('alert')
+      expect(calls.create).not.toHaveBeenCalled()
+    } finally { restoreStorage() }
   })
 })
