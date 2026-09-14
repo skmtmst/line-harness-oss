@@ -7,6 +7,7 @@ const DETAIL = readFileSync(new URL('./media-detail-dialog.tsx', import.meta.url
 const REPLACEMENT = readFileSync(new URL('./media-replacement-dialog.tsx', import.meta.url), 'utf8')
 const API = readFileSync(new URL('../../lib/api.ts', import.meta.url), 'utf8')
 const WORKER = readFileSync(new URL('../../../../worker/src/routes/contents.ts', import.meta.url), 'utf8')
+const GUIDANCE = readFileSync(new URL('./media-quota-guidance.tsx', import.meta.url), 'utf8')
 
 describe('V6 登録メディア一覧の契約', () => {
   it('V6の実Nodeと共通状態部品を使う', () => {
@@ -58,10 +59,15 @@ describe('V6 登録メディア一覧の契約', () => {
     expect(PAGE).toContain('api.media.quota(accountAtRequest)')
     expect(PAGE).toContain('quota.usageBytes')
     expect(PAGE).toContain('quota.limitBytes')
-    expect(PAGE).toContain('quota.remainingBytes')
-    expect(PAGE).toContain('style={{ width')
+    expect(PAGE).toContain('<MediaQuotaGuidance')
+    expect(PAGE).toContain('quota={quota}')
     expect(PAGE).toContain('selected={showNearLimitOnly}')
     expect(PAGE).toContain('nearLimitOnly: showNearLimitOnly')
+    // 棒と残量とstate別の案内は案内側に寄せている。
+    expect(GUIDANCE).toContain('quota.remainingBytes')
+    expect(GUIDANCE).toContain('style={{ width')
+    expect(GUIDANCE).toContain('80%以上')
+    expect(GUIDANCE).toContain('上限に達しました')
   })
 
   it('格子と一覧の切り替えを持つ', () => {
