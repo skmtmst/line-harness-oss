@@ -9,6 +9,7 @@ import {
   getNenPetMetrics,
   listNenDeliveries,
   nenMetricsRange,
+  normalizeDeliveryStatus,
   retryNenDelivery,
 } from './nen-campaign-metrics.js';
 
@@ -232,6 +233,98 @@ describe('NEN campaign metrics', () => {
       prepare: () => ({ all: async () => { throw new Error('db unavailable'); } }),
     } as unknown as D1Database;
     await expect(getNenFlowMetrics(broken, 'account-a', RANGE)).rejects.toThrow('db unavailable');
+  });
+
+  // #727: チップに出ている数を押したら、その数だけ並ぶ。
+  it('複数状態の絞り込みを受け付け、単一状態の誤りはそのまま400にする', () => {
+    expect(normalizeDeliveryStatus(undefined)).toBeUndefined();
+    expect(normalizeDeliveryStatus('failed')).toBe('failed');
+    expect(normalizeDeliveryStatus('skipped')).toBe('skipped');
+    // 「これから」チップは pending+processing の複数状態で絞る。
+    expect(normalizeDeliveryStatus('pending,processing')).toBe('pending,processing');
+    expect(() => normalizeDeliveryStatus('failed,skipped,unknown_state')).toThrowError(NenCampaignMetricsError);
+    try {
+      normalizeDeliveryStatus('bogus');
+    } catch (error) {
+      expect(error).toMatchObject({ code: 'status_invalid', status: 400, field: 'status' });
+    }
+  });
+
+  // #727: failed と skipped は別チップで単一状態ずつ絞る。
+  // 「これから」は pending,processing の複数状態で絞る。
+  it('failed・skipped・pending+processingの絞り込みがチップの数と一致する', async () => {
+    insertJob(testDb.raw, {
+      id: 'chip-failed', accountId: 'account-a', friendId: 'friend-a', status: 'failed',
+      attempts: 5, sentAt: null, lastError: 'boom',
+    });
+    insertJob(testDb.raw, {
+      id: 'chip-skipped', accountId: 'account-a', friendId: 'friend-a', status: 'skipped',
+      attempts: 0, sentAt: null, lastError: 'campaign_disabled',
+    });
+    insertJob(testDb.raw, {
+      id: 'chip-pending', accountId: 'account-a', friendId: 'friend-a', status: 'pending',
+      attempts: 0, sentAt: null,
+    });
+    insertJob(testDb.raw, {
+      id: 'chip-processing', accountId: 'account-a', friendId: 'friend-a', status: 'processing',
+      attempts: 1, sentAt: null,
+    });
+    insertJob(testDb.raw, {
+      id: 'chip-sent', accountId: 'account-a', friendId: 'friend-a', status: 'sent',
+    });
+
+    const failed = await listNenDeliveries(testDb.db, {
+      lineAccountId: 'account-a', range: RANGE, status: normalizeDeliveryStatus('failed'), cursor: 0, limit: 50,
+    });
+    expect(failed.deliveries.map((row) => row.id)).toEqual(['chip-failed']);
+    expect(failed.summary).toMatchObject({ failed: 1, skipped: 1, pending: 1, processing: 1 });
+
+    const skipped = await listNenDeliveries(testDb.db, {
+      lineAccountId: 'account-a', range: RANGE, status: normalizeDeliveryStatus('skipped'), cursor: 0, limit: 50,
+    });
+    expect(skipped.deliveries.map((row) => row.id)).toEqual(['chip-skipped']);
+
+    const upcoming = await listNenDeliveries(testDb.db, {
+      lineAccountId: 'account-a', range: RANGE, status: normalizeDeliveryStatus('pending,processing'), cursor: 0, limit: 50,
+    });
+    expect(upcoming.deliveries.map((row) => row.id).sort()).toEqual(['chip-pending', 'chip-processing'].sort());
+    expect(upcoming.pagination.total).toBe(2);
+  });
+
+  // #727: skipped の内訳は5つの理由コードそのまま。運用で直せる2理由が
+  // 「その他」に落ちないこと。failed 側の文字列一致分類は触らない。
+  it('skippedの内訳を5理由で出し、直せる2理由がその他に落ちない', async () => {
+    insertJob(testDb.raw, {
+      id: 'skip-fixable-a', accountId: 'account-a', friendId: 'friend-a', status: 'skipped',
+      attempts: 0, sentAt: null, lastError: 'line_account_unavailable',
+    });
+    insertJob(testDb.raw, {
+      id: 'skip-fixable-b', accountId: 'account-a', friendId: 'friend-a', status: 'skipped',
+      attempts: 0, sentAt: null, lastError: 'campaign_disabled',
+    });
+    insertJob(testDb.raw, {
+      id: 'skip-other', accountId: 'account-a', friendId: 'friend-a', status: 'skipped',
+      attempts: 0, sentAt: null, lastError: 'friend_unavailable',
+    });
+    insertJob(testDb.raw, {
+      id: 'failed-block', accountId: 'account-a', friendId: 'friend-a', status: 'failed',
+      attempts: 5, sentAt: null, lastError: 'blocked by user',
+    });
+
+    const list = await listNenDeliveries(testDb.db, {
+      lineAccountId: 'account-a', range: RANGE, cursor: 0, limit: 50,
+    });
+    expect(list.summary.skippedReasons).toMatchObject({
+      line_account_unavailable: 1, campaign_disabled: 1, friend_unavailable: 1,
+    });
+    // failed 側の分類は従来どおり文字列一致。
+    expect(list.summary.unmetReasons).toMatchObject({ blocked: 1 });
+    // skipped が other に混ざらないこと。
+    expect(list.summary.unmetReasons?.other ?? 0).toBe(0);
+    expect(list.deliveries.find((row) => row.id === 'skip-fixable-a')?.unmetReason)
+      .toBe('LINE公式アカウントの送信設定を確認できません');
+    expect(list.deliveries.find((row) => row.id === 'skip-fixable-b')?.unmetReason)
+      .toBe('配信の決めごとが停止中です');
   });
 
   it('入力不正は安定したエラー情報を返す', () => {

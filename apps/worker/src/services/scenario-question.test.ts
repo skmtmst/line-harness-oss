@@ -194,3 +194,72 @@ describe('押されたとき', () => {
     expect(await hasAnsweredBefore(db, 'f1', 'st1', 1)).toBe(false)
   })
 })
+
+describe('N-042 型検証の接続(#702)', () => {
+  let db: D1Database
+  let raw: Database.Database
+  let client: LineClient
+
+  const friend = { id: 'f1', line_user_id: 'Uf1' }
+
+  function fieldValue(fieldId: string): string | null {
+    const row = raw
+      .prepare(`SELECT value FROM friend_field_values WHERE friend_id = 'f1' AND field_id = ?`)
+      .get(fieldId) as { value: string } | undefined
+    return row?.value ?? null
+  }
+
+  beforeEach(() => {
+    const created = createTestD1()
+    db = created.db
+    raw = created.raw
+    client = {
+      replyMessage: vi.fn(async () => undefined),
+      pushMessage: vi.fn(async () => undefined),
+    } as unknown as LineClient
+
+    insertFriend(raw, 'f1')
+    raw
+      .prepare(`INSERT INTO scenarios (id, name, trigger_type, delivery_mode) VALUES ('s1','テスト','manual','relative')`)
+      .run()
+    raw
+      .prepare(
+        `INSERT INTO friend_fields (id, name, field_key, type) VALUES ('fld-num','来店','visits','number')`,
+      )
+      .run()
+  })
+
+  function setQuestion(field: { fieldId: string; value: string }) {
+    raw
+      .prepare(
+        `INSERT INTO scenario_steps (id, scenario_id, step_order, delay_minutes, message_type, message_content, question_json)
+         VALUES ('st1','s1',1,0,'text','', ?)`,
+      )
+      .run(JSON.stringify({
+        text: '教えてください',
+        tapMode: 'single',
+        choices: [{ label: '送る', behavior: 'none', field }],
+      }))
+  }
+
+  it('S2 正しい値は保存する', async () => {
+    setQuestion({ fieldId: 'fld-num', value: '5' })
+    const result = await handleQuestionAnswer(db, client, friend, { stepId: 'st1', choiceIndex: 0 }, 'tok')
+    expect(result.handled).toBe(true)
+    expect(fieldValue('fld-num')).toBe('5')
+  })
+
+  it('S2 型に合わない値は保存せず、回答自体は処理する', async () => {
+    setQuestion({ fieldId: 'fld-num', value: 'あいう' })
+    const result = await handleQuestionAnswer(db, client, friend, { stepId: 'st1', choiceIndex: 0 }, 'tok')
+    expect(result.handled).toBe(true)
+    expect(fieldValue('fld-num')).toBeNull()
+  })
+
+  it('S2 項目が無ければ孤立した行を作らない', async () => {
+    setQuestion({ fieldId: 'fld-gone', value: '5' })
+    const result = await handleQuestionAnswer(db, client, friend, { stepId: 'st1', choiceIndex: 0 }, 'tok')
+    expect(result.handled).toBe(true)
+    expect(fieldValue('fld-gone')).toBeNull()
+  })
+})
