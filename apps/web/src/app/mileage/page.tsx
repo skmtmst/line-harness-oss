@@ -22,6 +22,7 @@ import {
   type MileageEarningRulesV6Overview,
   type MileageFriendsV6Overview,
 } from '@/lib/api'
+import { adminSessionHeaders } from '@/lib/admin-session'
 import { csvCell } from '@/lib/presentation'
 import { formatMileageDate, formatMileageNumber } from './mileage-display'
 import { mileagePaginationTotal } from './mileage-response-state'
@@ -379,26 +380,31 @@ function MileagePageInner() {
     }
   }
 
-  const exportRulesCsv = () => {
-    const rows = shownRules.map((rule) => [
-      rule.draft.name,
-      ruleEventLabel(rule.draft.eventType, EVENT_LABELS),
-      rule.draft.amount,
-      rule.metrics30d.granted,
-      rule.draft.expiresAfterDays ?? '失効なし',
-      rule.published.status === 'published' ? '動いています' : '止めています',
-    ])
-    const csv = [['決めごと', '対象の行動', 'たまるマイル', 'この30日の付与回数', '失効', '状態'], ...rows]
-      .map((row) => row.map((value) => csvCell(value)).join(','))
-      .join('\r\n')
-    const url = URL.createObjectURL(
-      new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' }),
-    )
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `mileage-earning-rules-${new Date().toISOString().slice(0, 10)}.csv`
-    a.click()
-    URL.revokeObjectURL(url)
+  const [exportingRules, setExportingRules] = useState(false)
+  const exportRulesCsv = async () => {
+    // N-237: CSVはサーバー側で作る。許可scope内の決めごとだけが出て、監査へ残る。
+    // ブラウザだけで権限判定を完結させない。api.tsの共通呼び出し層は変えない。
+    if (!selectedAccountId || exportingRules) return
+    setExportingRules(true)
+    setRuleActionError('')
+    try {
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/mileage/rules/export?accountId=${encodeURIComponent(selectedAccountId)}`,
+        { credentials: 'include', headers: adminSessionHeaders() },
+      )
+      if (!res.ok) throw new Error('export_failed')
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `mileage-earning-rules-${new Date().toISOString().slice(0, 10)}.csv`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch {
+      setRuleActionError('CSVを書き出せませんでした。権限を確認して、もう一度お試しください。')
+    } finally {
+      setExportingRules(false)
+    }
   }
 
   const summary = overview?.summary
