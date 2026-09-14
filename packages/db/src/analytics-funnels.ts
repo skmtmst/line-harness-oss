@@ -764,7 +764,15 @@ export async function assertFunnelReferences(
         valid = await referenceExists(db, `SELECT id FROM friend_fields WHERE id = ?`, [step.match.fieldId]);
         break;
       case 'form':
-        valid = await referenceExists(db, `SELECT id FROM forms WHERE id = ?`, [step.match.formId]);
+        // N-282 (#802): 参照フォームのaccount所属をDBで確かめる。別account・
+        // 存在なし・未割当legacy行はfail-closedにする(存在扱いにしない)。
+        valid = await referenceExists(
+          db,
+          `SELECT f.id FROM forms f WHERE f.id = ?
+             AND EXISTS (SELECT 1 FROM form_accounts fa
+                         WHERE fa.form_id = f.id AND fa.line_account_id = ?)`,
+          [step.match.formId, lineAccountId],
+        );
         break;
       case 'link_click':
         valid = await referenceExists(
