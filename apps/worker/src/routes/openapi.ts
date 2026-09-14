@@ -2118,6 +2118,18 @@ const spec = {
         responses: { '200': { description: 'Replaced with version' }, '400': { description: 'Invalid request' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Staff not in account' }, '409': { description: 'Version conflict' }, '422': { description: 'Invalid date, DST gap, overlap, outside hours, or time range' } },
       },
     },
+    // ── Booking staff×menu matrix bulk save (N-410 #819) ──────────────────
+    '/api/booking/admin/staff-menus': {
+      put: {
+        tags: ['Booking'],
+        summary: '担当者×メニューの割り当てを全員分まとめて置き換え（全件成功または全件不適用）',
+        parameters: [
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        requestBody: { content: { 'application/json': { schema: { type: 'object', properties: { staff: { type: 'array', items: { type: 'object', properties: { staff_id: { type: 'string' }, menus: { type: 'array', items: { type: 'object', properties: { menu_id: { type: 'string' }, is_offered: { type: 'boolean' }, override_duration_minutes: { type: ['integer', 'null'] }, override_price: { type: ['integer', 'null'] } }, required: ['menu_id', 'is_offered'] } } }, required: ['staff_id', 'menus'] } } }, required: ['staff'] } } } },
+        responses: { '200': { description: 'Replaced' }, '400': { description: 'Invalid request' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Staff or menu not found in account' }, '422': { description: 'Duplicate staff_id' } },
+      },
+    },
     // ── Forms ────────────────────────────────────────────────────────────
     '/api/forms/unassigned': {
       get: {
