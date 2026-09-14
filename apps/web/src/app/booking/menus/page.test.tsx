@@ -353,6 +353,7 @@ describe('既存メニューの編集窓: 予約申込時に自動付与する�
     expect(fixture.updateMenu).toHaveBeenCalledWith(
       'account-a',
       'menu-1',
+      1,
       expect.objectContaining({ auto_tag_id: 'tag-active-2' }),
     )
   })
@@ -460,5 +461,134 @@ describe('店舗共通の予約ルール', () => {
 
     expect((screen.getByRole('spinbutton', { name: '何日先まで受け付けるか' }) as HTMLInputElement).value).toBe('30')
     expect(screen.queryByRole('status')).toBeNull()
+  })
+})
+
+describe('既存メニューの編集窓: 版管理と料金モード', () => {
+  function menu(overrides: Record<string, unknown> = {}) {
+    return {
+      id: 'menu-1',
+      name: 'カット',
+      category_label: null,
+      description: null,
+      duration_minutes: 60,
+      buffer_after_minutes: 0,
+      base_price: 8000,
+      price_mode: 'fixed',
+      sort_order: 0,
+      is_active: 1,
+      auto_tag_id: null,
+      concurrent_capacity: 1,
+      booking_window_days: null,
+      cutoff_hours_before: null,
+      cancel_deadline_hours_before: null,
+      intake_question: null,
+      assigned_staff: [{ id: 'staff-a', display_name: '担当A' }],
+      version: 3,
+      ...overrides,
+    }
+  }
+
+  async function openEditor(target: Record<string, unknown> = {}) {
+    fixture.listMenus = vi.fn(async () => ({ menus: [menu(target)] }))
+    render(<MenusPage />)
+    const row = await screen.findByRole('button', { name: '中身を見る' })
+    await act(async () => { fireEvent.click(row) })
+    await screen.findByText('メニュー編集')
+  }
+
+  function priceModeSelect(): HTMLSelectElement {
+    return screen.getByRole('combobox', { name: '料金の形' }) as HTMLSelectElement
+  }
+
+  test('保存は読み込んだ version を expectedVersion として送る', async () => {
+    await openEditor()
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '保存' }))
+    })
+    await waitFor(() => { expect(fixture.updateMenu).toHaveBeenCalled() })
+    expect(fixture.updateMenu).toHaveBeenCalledWith(
+      'account-a',
+      'menu-1',
+      3,
+      expect.objectContaining({ name: 'カット' }),
+    )
+  })
+
+  test('version が無い一覧では保存せず、読み直してやり直す案内を出す', async () => {
+    await openEditor({ version: undefined })
+    const callsBefore = (fixture.listMenus as ReturnType<typeof vi.fn>).mock.calls.length
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '保存' }))
+    })
+    expect(fixture.updateMenu).not.toHaveBeenCalled()
+    expect((await screen.findByRole('alert')).textContent).toContain('最新の内容を読み直して')
+    expect((fixture.listMenus as ReturnType<typeof vi.fn>).mock.calls.length).toBeGreaterThan(callsBefore)
+  })
+
+  test('409 ではモーダルを閉じず、読み直しボタンで一覧更新して窓を閉じる', async () => {
+    fixture.updateMenu = vi.fn(async () => { throw new ApiError(409, 'version_conflict', 'version_conflict') })
+    await openEditor()
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '保存' }))
+    })
+
+    // 競合を出しても窓は開いたまま。文言で次の手順を案内する。
+    expect((await screen.findByRole('alert')).textContent).toContain('ほかの担当者が先に保存しました')
+    expect(screen.getByText('メニュー編集')).toBeTruthy()
+
+    const reload = screen.getByRole('button', { name: '最新の内容を読み直す' })
+    await act(async () => { fireEvent.click(reload) })
+    await waitFor(() => expect(screen.queryByText('メニュー編集')).toBeNull())
+    expect(fixture.listMenus).toHaveBeenCalledTimes(2)
+  })
+
+  test('料金モードは3択で、無料にすると金額欄を閉じて base_price=0 を送る', async () => {
+    await openEditor()
+    expect(optionLabels(priceModeSelect())).toEqual(['固定料金', '無料', 'お問い合わせ'])
+    expect(priceModeSelect().value).toBe('fixed')
+
+    fireEvent.change(priceModeSelect(), { target: { value: 'free' } })
+    expect(screen.queryByRole('spinbutton', { name: '料金（円）' })).toBeNull()
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '保存' }))
+    })
+    await waitFor(() => { expect(fixture.updateMenu).toHaveBeenCalled() })
+    expect(fixture.updateMenu).toHaveBeenCalledWith(
+      'account-a',
+      'menu-1',
+      3,
+      expect.objectContaining({ price_mode: 'free', base_price: 0 }),
+    )
+  })
+
+  test('保存した料金モードは開き直しても選択が残る', async () => {
+    await openEditor({ price_mode: 'inquiry', base_price: 0 })
+    expect(priceModeSelect().value).toBe('inquiry')
+    expect(screen.queryByRole('spinbutton', { name: '料金（円）' })).toBeNull()
+  })
+
+  test('一覧はinquiryを「お問い合わせ」、freeだけを「無料」、fixedを「¥」で出し分ける', async () => {
+    fixture.listMenus = vi.fn(async () => ({
+      menus: [
+        menu({ id: 'menu-inquiry', name: '相談', price_mode: 'inquiry', base_price: 0 }),
+        menu({ id: 'menu-free', name: '体験', price_mode: 'free', base_price: 0 }),
+        menu({ id: 'menu-fixed', name: 'カット', price_mode: 'fixed', base_price: 8000 }),
+      ],
+    }))
+    render(<MenusPage />)
+
+    // 名前はKPI「いちばん選ばれた」にも出るので、表の行の中で探す。
+    await waitFor(() => {
+      const rows = screen.getAllByRole('row')
+      expect(rows.some((row) => within(row).queryByText('相談'))).toBe(true)
+    })
+    const rows = screen.getAllByRole('row')
+    const byName = (name: string) => rows.find((row) => within(row).queryByText(name)) as HTMLElement
+    expect(within(byName('相談')).getByText('お問い合わせ')).toBeTruthy()
+    expect(within(byName('相談')).queryByText('無料')).toBeNull()
+    expect(within(byName('体験')).getByText('無料')).toBeTruthy()
+    expect(within(byName('カット')).getByText('¥8,000')).toBeTruthy()
   })
 })
