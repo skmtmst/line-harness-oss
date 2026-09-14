@@ -10,6 +10,12 @@ export default defineConfig({
      */
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
+      /*
+       * 実物の worker ルートを画面試験へ mount すると、packages/db が
+       * Workers 専用の 'cloudflare:workers' を読みにいって解決に落ちる。
+       * 読み出し側は「無い環境」を try/catch で許容するので空の実物を当てる。
+       */
+      'cloudflare:workers': fileURLToPath(new URL('./src/test-utils/cloudflare-workers-stub.ts', import.meta.url)),
     },
   },
   /*

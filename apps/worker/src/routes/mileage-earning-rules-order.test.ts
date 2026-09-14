@@ -186,6 +186,26 @@ describe('決めごと並び順の部分適用(N-243)', () => {
     expect(name.name).toBe('決めごとC');
   });
 
+  test('101件(一覧APIの1頁目を超える件数)も全IDを1回で並び替える', async () => {
+    const ids: string[] = [];
+    for (let i = 0; i < 101; i += 1) {
+      ids.push(await makeRule(ACC_A, `決めごと${i}`, i));
+    }
+
+    // 先頭100件への打ち切りが残っていると、ここで全件不一致=409になる。
+    const reversed = [...ids].reverse();
+    const res = await putOrder(ACC_A, reversed, KEY_OWNER);
+    expect(res.status).toBe(200);
+    for (let i = 0; i < ids.length; i += 1) {
+      expect(draftRow(ids[i]).sort_order).toBe(ids.length - 1 - i);
+    }
+
+    // 逆に100件だけの並びは拒否される = 全件一致を要求する口のまま。
+    const truncated = await putOrder(ACC_A, reversed.slice(0, 100), KEY_OWNER);
+    expect(truncated.status).not.toBe(200);
+    expect(draftRow(ids[0]).sort_order).toBe(100);
+  });
+
   test('一括保存で下書きの版が進むので、古い版の1件保存は競合になる', async () => {
     const ruleA = await makeRule(ACC_A, '決めごとA', 0);
     const ruleB = await makeRule(ACC_A, '決めごとB', 1);
