@@ -1112,12 +1112,24 @@ reminders.delete('/api/reminders/:id/steps/:stepId', requireRole('owner', 'admin
 
 // ========== 友だちリマインダ登録 ==========
 
-reminders.post('/api/reminders/:id/enroll/:friendId', requireRole('owner', 'admin'), async (c) => {
+reminders.post('/api/reminders/:id/enroll/:friendId', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
     const reminderId = c.req.param('id');
     const friendId = c.req.param('friendId');
     const body = await c.req.json<{ targetDate: string }>();
     if (!body.targetDate) return c.json({ success: false, error: 'targetDate is required' }, 400);
+    // staff も通す分、担当外アカウントのリマインダ・友だちはここで隠す。
+    const reminder = await getReminderById(c.env.DB, reminderId);
+    const friend = await getFriendById(c.env.DB, friendId);
+    const reminderAccountId = reminder
+      ? (reminder as { line_account_id?: string | null }).line_account_id ?? null
+      : null;
+    const friendAccountId = friend
+      ? ((friend as unknown as Record<string, unknown>).line_account_id as string | null) ?? null
+      : null;
+    if (!reminder || !friend || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [reminderAccountId, friendAccountId])) {
+      return c.json({ success: false, error: 'Reminder or friend not found' }, 404);
+    }
     const enrollment = await enrollFriendInReminder(c.env.DB, { friendId, reminderId, targetDate: body.targetDate });
     return c.json({
       success: true,
@@ -1157,8 +1169,26 @@ reminders.get('/api/friends/:friendId/reminders', requireRole('owner', 'admin', 
   }
 });
 
-reminders.delete('/api/friend-reminders/:id', requireRole('owner', 'admin'), async (c) => {
+reminders.delete('/api/friend-reminders/:id', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
+    // staff も通す分、先に登録行の所属を引いて担当外アカウントを隠す。
+    const enrollmentRow = await c.env.DB.prepare(
+      `SELECT friend_id, reminder_id FROM friend_reminders WHERE id = ?`,
+    ).bind(c.req.param('id')).first<{ friend_id: string; reminder_id: string }>();
+    if (!enrollmentRow) {
+      return c.json({ success: false, error: 'Friend reminder not found' }, 404);
+    }
+    const friend = await getFriendById(c.env.DB, enrollmentRow.friend_id);
+    const reminder = await getReminderById(c.env.DB, enrollmentRow.reminder_id);
+    const friendAccountId = friend
+      ? ((friend as unknown as Record<string, unknown>).line_account_id as string | null) ?? null
+      : null;
+    const reminderAccountId = reminder
+      ? (reminder as { line_account_id?: string | null }).line_account_id ?? null
+      : null;
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [friendAccountId, reminderAccountId])) {
+      return c.json({ success: false, error: 'Friend reminder not found' }, 404);
+    }
     await cancelFriendReminder(c.env.DB, c.req.param('id'));
     return c.json({ success: true, data: null });
   } catch (err) {
