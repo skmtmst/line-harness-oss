@@ -441,8 +441,9 @@ export interface ConversionOfferActionPlan {
  * 案件を誤って拾わないための二重の守り）。
  *
  * 成果が無い・帰属でない・案件を結んでいないリンク経由のときは null。
- * 案件が停止中でも実行計画は返す — 承認は「すでに起きた成果」への判断なので、
- * 停止した案件の報酬確定と同じく、設定された動作もその成果へ適用する。
+ * 停止中(is_active=0)の案件も null を返す — 承認自体は「すでに起きた成果」への
+ * 判断として通すが、止めた案件の付帯動作は新たに実行しない。案件を動かし
+ * 直したあとに承認を再送すれば、already_set 経路で動作だけを走り直せる。
  */
 export async function getConversionOfferActionPlan(
   db: D1Database,
@@ -470,7 +471,8 @@ export async function getConversionOfferActionPlan(
          JOIN affiliate_offers off ON off.id = al.offer_id
          LEFT JOIN tags t ON t.id = off.tag_id
          LEFT JOIN scenarios s ON s.id = off.scenario_id
-        WHERE ce.id = ? AND ce.affiliate_id IS NOT NULL`,
+        WHERE ce.id = ? AND ce.affiliate_id IS NOT NULL
+          AND off.is_active = 1`,
     )
     .bind(eventId)
     .first<{

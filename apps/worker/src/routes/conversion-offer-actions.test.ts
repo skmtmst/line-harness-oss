@@ -153,14 +153,14 @@ function seedScenario(
 function seedOffer(
   id: string,
   accountId: string,
-  refs: { tagId?: string | null; scenarioId?: string | null } = {},
+  refs: { tagId?: string | null; scenarioId?: string | null; isActive?: boolean } = {},
 ): void {
   sqlite.raw.prepare(
     `INSERT INTO affiliate_offers
        (id, name, description, reward_amount, reward_miles, mileage_program_id,
         line_account_id, tag_id, scenario_id, is_active, created_at)
-     VALUES (?, ?, NULL, 1000, 0, 'default', ?, ?, ?, 1, ?)`,
-  ).run(id, `案件-${id}`, accountId, refs.tagId ?? null, refs.scenarioId ?? null, TS);
+     VALUES (?, ?, NULL, 1000, 0, 'default', ?, ?, ?, ?, ?)`,
+  ).run(id, `案件-${id}`, accountId, refs.tagId ?? null, refs.scenarioId ?? null, refs.isActive === false ? 0 : 1, TS);
 }
 
 function seedLink(refCode: string, offerId: string | null): void {
@@ -337,6 +337,29 @@ describe('N-212 承認確定時の案件動作', () => {
     const res = await patch('ev-free', { status: 'approved', expectedStatus: 'pending' });
     expect(res.status).toBe(200);
     expect(count(`SELECT COUNT(*) AS n FROM friend_tags WHERE friend_id='fr-1'`)).toBe(0);
+  });
+
+  test('停止中の案件は承認だけ成功し、タグ付与・シナリオ開始は走らない', async () => {
+    seedTag('tag-a', 'acc-1');
+    seedScenario('scn-a', 'acc-1');
+    seedOffer('off-1', 'acc-1', { tagId: 'tag-a', scenarioId: 'scn-a', isActive: false });
+    seedLink('REF-OK', 'off-1');
+    seedEvent('ev-1', 'REF-OK');
+
+    const res = await patch('ev-1', { status: 'approved', expectedStatus: 'pending' });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { success: boolean; data: { approvalStatus: string } };
+    expect(body.success).toBe(true);
+    expect(body.data.approvalStatus).toBe('approved');
+    expect(count(`SELECT COUNT(*) AS n FROM friend_tags WHERE friend_id='fr-1'`)).toBe(0);
+    expect(count(`SELECT COUNT(*) AS n FROM friend_scenarios WHERE friend_id='fr-1'`)).toBe(0);
+
+    // 案件を動かし直したあとに承認を再送すると、動作だけがあとから走る。
+    sqlite.raw.prepare(`UPDATE affiliate_offers SET is_active = 1 WHERE id = 'off-1'`).run();
+    const retry = await patch('ev-1', { status: 'approved', expectedStatus: 'approved' });
+    expect(retry.status).toBe(200);
+    expect(count(`SELECT COUNT(*) AS n FROM friend_tags WHERE friend_id='fr-1' AND tag_id='tag-a'`)).toBe(1);
+    expect(count(`SELECT COUNT(*) AS n FROM friend_scenarios WHERE friend_id='fr-1' AND scenario_id='scn-a'`)).toBe(1);
   });
 
   test('一括承認: 未完の動作は succeeded に混ぜず failed に分ける', async () => {
