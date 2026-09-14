@@ -146,9 +146,21 @@ const COMMON_VAR_USAGE_QUERIES: Array<{
            FROM scenario_actions sa JOIN scenarios s ON s.id = sa.scenario_id
            WHERE s.line_account_id = ? AND sa.action_type = 'common_var'
              AND json_extract(CASE WHEN json_valid(sa.config_json)
-                                   THEN sa.config_json ELSE 'null' END, '$.varKey') = ?`,
+                                   THEN sa.config_json ELSE 'null' END, '$.varKey') = ?
+           UNION ALL
+          -- N-186: 公開版スナップショットは編集中の下書きと別物。公開済み版から
+          -- 送られる通文は、版を固定した時点で写した内容で差し込まれるため、
+          -- 使用先として数える。下書き・廃止版は含めない。
+          SELECT v.id AS source_id, s.id AS source_parent_id,
+                 s.name || '・公開版v' || CAST(v.version_number AS TEXT) AS source_name,
+                 'published' AS source_status,
+                 v.steps_snapshot AS source_content, 0 AS is_historical
+            FROM scenario_versions v JOIN scenarios s ON s.id = v.scenario_id
+           WHERE s.line_account_id = ? AND v.status = 'published'
+             AND instr(coalesce(v.steps_snapshot, ''), ?) > 0`,
     values: (varKey, token, account) => [
       token, token, account, token, token, token, account, varKey,
+      account, token,
     ],
   },
   {
@@ -157,8 +169,18 @@ const COMMON_VAR_USAGE_QUERIES: Array<{
                  CASE WHEN r.is_active = 1 THEN 'active' ELSE 'stopped' END AS source_status,
                  rs.message_content AS source_content, 0 AS is_historical
             FROM reminder_steps rs JOIN reminders r ON r.id = rs.reminder_id
-           WHERE r.line_account_id = ? AND instr(coalesce(rs.message_content, ''), ?) > 0`,
-    values: (_varKey, token, account) => [account, token],
+           WHERE r.line_account_id = ? AND instr(coalesce(rs.message_content, ''), ?) > 0
+           UNION ALL
+          -- N-186: 公開版スナップショットは編集中の下書きと別物。下書き・
+          -- 失効版は含めない。所属は親のLINEアカウントで絞る。
+          SELECT v.id AS source_id, r.id AS source_parent_id,
+                 r.name || '・公開版v' || CAST(v.version_number AS TEXT) AS source_name,
+                 'published' AS source_status,
+                 v.settings_snapshot AS source_content, 0 AS is_historical
+            FROM reminder_versions v JOIN reminders r ON r.id = v.reminder_id
+           WHERE r.line_account_id = ? AND v.status = 'published'
+             AND instr(coalesce(v.settings_snapshot, ''), ?) > 0`,
+    values: (_varKey, token, account) => [account, token, account, token],
   },
   {
     kind: 'auto_reply',
