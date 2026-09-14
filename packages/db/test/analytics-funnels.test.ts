@@ -180,6 +180,10 @@ describe('V6ファネルの版・結果・一時対象者', () => {
     sqlite.prepare(
       `INSERT INTO forms (id, name, fields) VALUES ('form-1', '申込', '[]')`,
     ).run();
+    // N-282 (#802): 未割当legacyの参照は拒否が正本。STEPSで使うform-1はaccount-aへ割当てる。
+    sqlite.prepare(
+      `INSERT INTO form_accounts (form_id, line_account_id) VALUES ('form-1', 'account-a')`,
+    ).run();
     db = asD1(sqlite);
   });
 

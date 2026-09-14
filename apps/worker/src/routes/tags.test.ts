@@ -39,7 +39,7 @@ function app(role: 'owner' | 'admin' | 'staff' = 'owner') {
   const a = new Hono<TestEnv>();
   a.use('*', async (c, next) => {
     c.set('staff', { id: 'staff-1', role });
-    c.env = { DB: { prepare: () => ({ bind: (id: string) => ({ first: async () => /missing|nope|not-found/.test(id) ? null : { ...TAG_ROW, id, line_account_id: null } }) }) } as unknown as D1Database };
+    c.env = { DB: { prepare: () => ({ bind: (id: string) => ({ first: async () => /missing|nope|not-found/.test(id) ? null : { ...TAG_ROW, id, line_account_id: null }, run: async () => ({ success: true }) }) }) } as unknown as D1Database };
     await next();
   });
   a.route('/', tags);

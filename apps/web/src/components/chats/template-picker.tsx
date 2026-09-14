@@ -70,7 +70,9 @@ export default function TemplatePicker({
     setTemplatesStatus('loading')
     setFoldersStatus('loading')
     setLoadedAccountId(selectedAccountId)
-    void api.templates.list().then((res) => {
+    // N-136: 選択中のLINEアカウントで絞る。渡さないと可視範囲の
+    // 全部が見え、別アカウントの候補が出る。
+    void api.templates.list(undefined, selectedAccountId ?? undefined).then((res) => {
       if (cancelled) return
       if (res.success) {
         setTemplates(res.data as unknown as Template[])
