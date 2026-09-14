@@ -4373,9 +4373,11 @@ export const api = {
         method: 'POST',
         body: JSON.stringify(data),
       }),
-    /** 名前・色・一覧に出すかを変える。分類とマイルは別の受け口が持っている。 */
-    /* タグ自身は色を持たない。色は分類(フォルダ)に付ける。 */
-    update: (id: string, data: { name?: string; isStarred?: boolean }) =>
+    /**
+     * 一覧に出すか(★)だけを変える(#715)。版付き必須。名前の変更は
+     * `updateDefinition` を使う。タグ自身は色を持たない（色は分類に付ける）。
+     */
+    update: (id: string, data: { lineAccountId: string | null; expectedVersion: number; isStarred: boolean }) =>
       fetchApi<ApiResponse<Tag>>(`/api/tags/${id}`, {
         method: 'PATCH',
         body: JSON.stringify(data),

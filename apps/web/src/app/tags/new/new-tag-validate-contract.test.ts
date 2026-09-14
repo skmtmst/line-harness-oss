@@ -15,9 +15,9 @@ describe('タグ作成の名前検査の契約', () => {
   })
 
   it('タグの更新に色を渡さない', () => {
-    /* タグ自身は色を持たない。色は分類(フォルダ)に付ける。 */
-    expect(API).toContain('update: (id: string, data: { name?: string; isStarred?: boolean })')
-    expect(API).not.toContain('data: { name?: string; color?: string; isStarred?: boolean }')
+    /* タグ自身は色を持たない。色は分類(フォルダ)に付ける。版付き(#715)。 */
+    expect(API).toContain('update: (id: string, data: { lineAccountId: string | null; expectedVersion: number; isStarred: boolean })')
+    expect(API).not.toContain('color?: string; isStarred?: boolean')
   })
 
   it('旧作成画面を残さず、一覧と複製から現行V4作成画面へ進む', () => {

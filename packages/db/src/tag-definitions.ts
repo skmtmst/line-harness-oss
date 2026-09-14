@@ -287,11 +287,8 @@ export type UpdateTagDefinitionInput = {
  * 編集自体ができない。タグだけ「気づかず開けて、気づかず保存できる」
  * 状態だった）。
  *
- * この保護は `expectedVersion` 付きの更新（このファイルの
- * `updateTagDefinition`）にしか効かない。`PATCH /api/tags/:id` が
- * `expectedVersion` 無しで受けたときは、`tags.ts` の `updateTag`
- * （version も status も見ないレガシー経路）を通ってしまう。塞げていない。
- * 別票 #715 で扱う。
+ * `PATCH /api/tags/:id` は `expectedVersion` 必須（#715）のため、
+ * この保護の迂回経路は塞がっている。
  */
 function assertArchivedTagUpdateAllowed(current: Tag, input: UpdateTagDefinitionInput): void {
   if (current.status !== 'archived') return;
