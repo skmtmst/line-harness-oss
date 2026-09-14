@@ -19,6 +19,7 @@ export type AuditAction =
   | 'mileage.rule.create'
   | 'mileage.rule.update'
   | 'mileage.rule.delete'
+  | 'mileage.rule.publish'
   | 'mileage.event.create'
   | 'mileage.adjustment.create'
   | 'mileage.adjustment.policy.update'

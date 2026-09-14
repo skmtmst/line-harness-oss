@@ -298,6 +298,29 @@ function MileagePageInner() {
     }
   }
 
+  // N-231 案1: 下書きを公開版として固定し、実行へ反映する。取り消せない操作のため確認する。
+  const publishRule = async (rule: MileageEarningRuleV6) => {
+    if (!selectedAccountId) return
+    if (!window.confirm(`「${rule.draft.name}」の下書きを公開して反映します。公開後に受け付けたイベントから新しい内容になり、取り消せません。よろしいですか。`)) return
+    setSavingRuleId(rule.id)
+    setRuleActionError('')
+    try {
+      const res = await api.mileage.publishEarningRule(rule.id, {
+        accountId: selectedAccountId,
+        expectedVersion: rule.draftVersion,
+        idempotencyKey: crypto.randomUUID(),
+      })
+      if (!res.success) throw new Error(res.error)
+      await loadRules()
+    } catch (error) {
+      setRuleActionError(error instanceof Error && error.message
+        ? error.message
+        : '公開できませんでした。もう一度お試しください。')
+    } finally {
+      setSavingRuleId(null)
+    }
+  }
+
   const totalPages = Math.max(1, Math.ceil((overview?.pagination?.total ?? 0) / PAGE_SIZE))
   const currentPage = Math.floor(offset / PAGE_SIZE) + 1
 
@@ -639,6 +662,9 @@ function MileagePageInner() {
                   </td>
                   <td className="px-4 py-3 text-center">
                     {rule.published.status === 'published' ? <Chip tone="ok">動いています</Chip> : <Chip>止めています</Chip>}
+                    <p className="mt-1 text-xs text-ink-faint">
+                      {rule.publishedVersion == null ? '未公開' : `公開版 v${rule.publishedVersion}`}
+                    </p>
                   </td>
                   <td className="px-4 py-3 text-center">
                     <div className="flex items-center justify-center gap-1">
@@ -654,6 +680,13 @@ function MileagePageInner() {
                         {savingRuleId === rule.id
                           ? '反映しています'
                           : rule.published.status === 'published' ? '決めごとを停止' : '決めごとを再開'}
+                      </Button>
+                      <Button
+                        disabled={savingRuleId === rule.id}
+                        onClick={() => void publishRule(rule)}
+                        aria-label={`${rule.draft.name}の下書きを公開して反映する`}
+                      >
+                        {savingRuleId === rule.id ? '反映しています' : '公開して反映'}
                       </Button>
                     </div>
                   </td>

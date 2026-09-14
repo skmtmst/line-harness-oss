@@ -890,11 +890,19 @@ const spec = {
         responses: { '201': { description: 'Mileage rule created' }, '400': { description: 'LINE account is required' }, '403': { description: 'Owner or admin role or account scope required' } },
       },
     },
+    '/api/mileage/earning-rules/{id}/publish': {
+      post: {
+        tags: ['Mileage'], summary: 'たまる決めごとの下書きを公開版として固定し実行へ反映（N-231 案1）',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['accountId', 'expectedVersion'], properties: { accountId: { type: 'string' }, expectedVersion: { type: 'integer', minimum: 1 } } } } } },
+        responses: { '200': { description: 'Earning rule published' }, '400': { description: 'Confirmation or version required' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Not found in account scope' }, '409': { description: 'Draft version conflict or concurrent publish' }, '428': { description: 'Irreversible confirmation required' } },
+      },
+    },
     '/api/mileage/rules/{id}': {
       put: {
-        tags: ['Mileage'], summary: '所属LINEアカウント内のマイル付与ルールを更新',
+        tags: ['Mileage'], summary: '所属LINEアカウント内のマイル付与ルールを更新（停止・再開のみ。公開内容の直接変更は409）',
         parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
-        responses: { '200': { description: 'Mileage rule updated' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Not found in account scope' }, '409': { description: 'Legacy global rule is immutable' } },
+        responses: { '200': { description: 'Mileage rule updated' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Not found in account scope' }, '409': { description: 'Legacy global rule is immutable, or direct content edit is closed (N-231)' } },
       },
       delete: {
         tags: ['Mileage'], summary: '所属LINEアカウント内のマイル付与ルールを削除',

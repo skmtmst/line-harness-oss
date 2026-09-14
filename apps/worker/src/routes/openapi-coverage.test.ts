@@ -256,6 +256,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'POST /api/line-accounts',
   'POST /api/line-accounts/connect',
   'POST /api/line-accounts/connect/check',
+  'POST /api/mileage/earning-rules/{id}/publish',
   'POST /api/mileage/rules',
   'POST /api/nen-campaigns/deliveries/{id}/retry',
   'POST /api/notifications/operator-outbox/sweep',
