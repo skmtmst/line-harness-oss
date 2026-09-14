@@ -301,9 +301,11 @@ export default function RichMenusListPage() {
   }, [deferredQuery, folderFilter, page, pageSize, reordering, savedFilter, selectedAccount?.id, sortKey])
 
   const loadFolders = useCallback(async () => {
-    const res = await api.folders.list('rich_menu')
+    // #730: 選択中の1件に閉じた母集団で数える。未選択時は付けず、件数は不明（—）のまま。
+    const accountId = selectedAccount?.id ?? undefined
+    const res = await api.folders.list('rich_menu', accountId)
     if (res.success) setFolders(res.data)
-  }, [])
+  }, [selectedAccount?.id])
 
   useEffect(() => {
     reload()

@@ -118,17 +118,97 @@ describe('GET /api/folders の件数(#631) — 実DB結合', () => {
     expect(body.data.find((f) => f.id === 'folder-1')?.itemCount).toBe(5);
   });
 
-  it('対応表に無い種別(#730)は itemCount を返さない(0とは書かない)', async () => {
+  it('対応表に無い種別(event・friend_field・#730)は itemCount を返さない(0とは書かない)', async () => {
     accountAccess.getVisibleLineAccountScope.mockResolvedValue({
       accounts: [], allowedAccountIds: ['account-a'], canSeeUnassigned: false, ids: ['account-a'], isAccountScoped: true,
     });
     sqlite.prepare(`INSERT INTO folders (id, kind, name, display_order, created_at, updated_at)
-      VALUES ('folder-media', 'media', 'メディア用', 0, '2026-01-01', '2026-01-01')`).run();
+      VALUES ('folder-event', 'event', 'イベント用', 0, '2026-01-01', '2026-01-01')`).run();
 
-    const res = await req('/api/folders?kind=media');
+    const res = await req('/api/folders?kind=event');
     const body = await res.json() as { data: Array<Record<string, unknown>>; unfiledCount?: number };
     expect(body.data[0]).not.toHaveProperty('itemCount');
     expect(body.unfiledCount).toBeUndefined();
+  });
+
+  // #730: media / common_var / rich_menu は、選択中の1件に閉じた母集団で数える。
+  // account_id 指定時は未割当NULLを含めない（一覧に出ないため）。
+  describe('単一アカウント種別の件数(#730) — 実DB結合', () => {
+    beforeEach(() => {
+      sqlite.prepare(`INSERT INTO folders (id, kind, name, display_order, created_at, updated_at)
+        VALUES ('folder-media', 'media', 'メディア用', 0, '2026-01-01', '2026-01-01')`).run();
+      sqlite.prepare(`INSERT INTO folders (id, kind, name, display_order, created_at, updated_at)
+        VALUES ('folder-var', 'common_var', '変数用', 0, '2026-01-01', '2026-01-01')`).run();
+      sqlite.prepare(`INSERT INTO folders (id, kind, name, display_order, created_at, updated_at)
+        VALUES ('folder-rm', 'rich_menu', 'メニュー用', 0, '2026-01-01', '2026-01-01')`).run();
+
+      const insertMedia = sqlite.prepare(
+        `INSERT INTO media (id, folder_id, kind, filename, mime_type, size_bytes, r2_key, line_account_id)
+         VALUES (?, ?, 'image', ?, 'image/png', 10, ?, ?)`,
+      );
+      // account-a: folder-mediaに2件、未分類に1件
+      insertMedia.run('m-a1', 'folder-media', 'a1.png', 'r2-a1', 'account-a');
+      insertMedia.run('m-a2', 'folder-media', 'a2.png', 'r2-a2', 'account-a');
+      insertMedia.run('m-a3', null, 'a3.png', 'r2-a3', 'account-a');
+      // account-b: folder-mediaに1件(他人口の境界確認用)
+      insertMedia.run('m-b1', 'folder-media', 'b1.png', 'r2-b1', 'account-b');
+      // 未割当NULL: folder-mediaに1件。一覧に出ないため件数へ入れない。
+      insertMedia.run('m-n1', 'folder-media', 'n1.png', 'r2-n1', null);
+
+      const insertVar = sqlite.prepare(
+        `INSERT INTO common_vars (id, folder_id, name, var_key, line_account_id, archived_at)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+      );
+      // account-a: folder-varに1件、未分類に1件、アーカイブ済み1件(数えない)
+      insertVar.run('v-a1', 'folder-var', '変数A1', 'var_a1', 'account-a', null);
+      insertVar.run('v-a2', null, '変数A2', 'var_a2', 'account-a', null);
+      insertVar.run('v-a3', 'folder-var', '変数A3', 'var_a3', 'account-a', '2026-01-02');
+      // account-b: folder-varに1件(他人口の境界確認用)
+      insertVar.run('v-b1', 'folder-var', '変数B1', 'var_b1', 'account-b', null);
+
+      const insertRm = sqlite.prepare(
+        `INSERT INTO rich_menu_groups (id, account_id, folder_id, name, chat_bar_text, size)
+         VALUES (?, ?, ?, ?, 'メニュー', 'large')`,
+      );
+      // account-a: folder-rmに2件、未分類に1件
+      insertRm.run('g-a1', 'account-a', 'folder-rm', 'A1');
+      insertRm.run('g-a2', 'account-a', 'folder-rm', 'A2');
+      insertRm.run('g-a3', 'account-a', null, 'A3');
+      // account-b: folder-rmに1件(他人口の境界確認用)
+      insertRm.run('g-b1', 'account-b', 'folder-rm', 'B1');
+    });
+
+    function staffScope() {
+      // 両アカウントを見られる職員。account_id 指定時はこの全体ではなく
+      // 指定の1件に閉じて数えることが本題。
+      accountAccess.getVisibleLineAccountScope.mockResolvedValue({
+        accounts: [], allowedAccountIds: ['account-a', 'account-b'], canSeeUnassigned: true, ids: [], isAccountScoped: false,
+      });
+    }
+
+    it('media: 選択中1件だけを数え、他人口・NULL行を入れない', async () => {
+      staffScope();
+      const res = await req('/api/folders?kind=media&account_id=account-a');
+      const body = await res.json() as { data: Array<{ id: string; itemCount?: number }>; unfiledCount?: number };
+      expect(body.data.find((f) => f.id === 'folder-media')?.itemCount).toBe(2);
+      expect(body.unfiledCount).toBe(1);
+    });
+
+    it('common_var: アーカイブ済みを数えず、選択中1件の未分類と一致する', async () => {
+      staffScope();
+      const res = await req('/api/folders?kind=common_var&account_id=account-a');
+      const body = await res.json() as { data: Array<{ id: string; itemCount?: number }>; unfiledCount?: number };
+      expect(body.data.find((f) => f.id === 'folder-var')?.itemCount).toBe(1);
+      expect(body.unfiledCount).toBe(1);
+    });
+
+    it('rich_menu: account_id 列で選択中1件だけを数える', async () => {
+      staffScope();
+      const res = await req('/api/folders?kind=rich_menu&account_id=account-a');
+      const body = await res.json() as { data: Array<{ id: string; itemCount?: number }>; unfiledCount?: number };
+      expect(body.data.find((f) => f.id === 'folder-rm')?.itemCount).toBe(2);
+      expect(body.unfiledCount).toBe(1);
+    });
   });
 
   it('kind を指定しない呼び出しは itemCount を数えない', async () => {
