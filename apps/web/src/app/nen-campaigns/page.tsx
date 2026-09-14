@@ -24,11 +24,12 @@ type FriendOption = { id: string; displayName: string | null }
 function ColumnLinePreview({ column, onClose }: { column: NenColumn; onClose: () => void }) {
   return (
     <section id={`column-preview-${column.id}`} className="overflow-hidden rounded-v6-card border border-hairline bg-canvas lg:max-w-[920px]">
+      {/* 見出し帯はLINEのトーク見出しの再現。相当するトークンが無いため直書き(#728) */}
       <div className="flex min-h-[52px] items-center justify-between gap-3 bg-[#3f3f3f] px-4 py-3 text-white">
         <div><p className="text-sm font-bold">LINEプレビュー</p><p className="mt-0.5 text-xs text-gray-300">実際のトーク画面に近い見え方です</p></div>
         <Button onClick={onClose}>プレビューを隠す</Button>
       </div>
-      <div className="min-h-[220px] bg-[#8facd8] p-5"><div className="mx-auto max-w-[480px] rounded-v6-card rounded-tl-[4px] bg-white p-4 shadow-v6-card"><p className="whitespace-pre-wrap text-sm leading-[1.65] text-ink">{column.introText}</p><div className="mt-3 border-t border-hairline pt-3"><h4 className="font-bold tracking-[0.01em] text-ink">{column.title}</h4><p className="mt-2 text-sm leading-6 text-ink-secondary">{column.excerpt}</p><p className="mt-3 min-h-[36px] rounded-v6-control bg-v6-action py-2 text-center text-sm font-bold text-white">コラムを読む</p></div></div></div>
+      <div className="min-h-[220px] bg-line-preview p-5"><div className="mx-auto max-w-[480px] rounded-v6-card rounded-tl-[4px] bg-white p-4 shadow-v6-card"><p className="whitespace-pre-wrap text-sm leading-[1.65] text-ink">{column.introText}</p><div className="mt-3 border-t border-hairline pt-3"><h4 className="font-bold tracking-[0.01em] text-ink">{column.title}</h4><p className="mt-2 text-sm leading-6 text-ink-secondary">{column.excerpt}</p><p className="mt-3 min-h-[36px] rounded-v6-control bg-v6-action py-2 text-center text-sm font-bold text-white">コラムを読む</p></div></div></div>
     </section>
   )
 }
@@ -38,8 +39,9 @@ function CampaignLinePreview({ setting, onClose }: { setting: NenCampaignSetting
   const replaceSample = (value: string) => Object.entries(samples).reduce((result, [from, to]) => result.replaceAll(from, to), value)
   return (
     <section id={`campaign-preview-${setting.campaignKey}`} className="overflow-hidden rounded-v6-card border border-hairline bg-canvas lg:max-w-[920px]">
+      {/* 見出し帯はLINEのトーク見出しの再現。相当するトークンが無いため直書き(#728) */}
       <div className="flex min-h-[52px] items-center justify-between gap-3 bg-[#3f3f3f] px-4 py-3 text-white"><div><p className="text-sm font-bold">{setting.label}のLINEプレビュー</p><p className="mt-0.5 text-xs text-gray-300">お客様ごとの情報は見本に置き換えています</p></div><Button onClick={onClose}>プレビューを隠す</Button></div>
-      <div className="min-h-[220px] bg-[#8facd8] p-5"><div className="mx-auto min-h-[240px] max-w-[480px] rounded-v6-card rounded-tl-[4px] bg-white p-4 shadow-v6-card"><h4 className="font-bold leading-6 tracking-[0.01em] text-ink">{replaceSample(setting.title)}</h4><p className="mt-3 whitespace-pre-wrap text-sm leading-[1.65] text-ink-secondary">{replaceSample(setting.bodyText)}</p>{setting.buttonLabel ? <p className="mt-3 min-h-[36px] rounded-v6-control bg-v6-action py-2 text-center text-sm font-bold text-white">{setting.buttonLabel}</p> : null}</div></div>
+      <div className="min-h-[220px] bg-line-preview p-5"><div className="mx-auto min-h-[240px] max-w-[480px] rounded-v6-card rounded-tl-[4px] bg-white p-4 shadow-v6-card"><h4 className="font-bold leading-6 tracking-[0.01em] text-ink">{replaceSample(setting.title)}</h4><p className="mt-3 whitespace-pre-wrap text-sm leading-[1.65] text-ink-secondary">{replaceSample(setting.bodyText)}</p>{setting.buttonLabel ? <p className="mt-3 min-h-[36px] rounded-v6-control bg-v6-action py-2 text-center text-sm font-bold text-white">{setting.buttonLabel}</p> : null}</div></div>
     </section>
   )
 }
