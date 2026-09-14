@@ -120,9 +120,14 @@ function setupDb() {
       'https://verify.example.test/verify', '確認できませんでした');
     INSERT INTO forms (id, name, fields, layout, save_to_metadata, is_active, submit_count)
     VALUES ('form-tag', 'T', '[]', '${TAG_LAYOUT}', 0, 1, 0);
+    INSERT INTO forms (id, name, fields, layout, save_to_metadata, is_active, submit_count)
+    VALUES ('form-legacy', 'L', '[{"name":"visits","label":"来店回数","friendFieldId":"ff-num"},{"name":"pets","label":"好きな子","friendFieldId":"ff-multi"}]', NULL, 0, 1, 0);
     INSERT INTO form_accounts (form_id, line_account_id)
-    VALUES ('form-webhook', 'account-a'), ('form-tag', 'account-a');
+    VALUES ('form-webhook', 'account-a'), ('form-tag', 'account-a'), ('form-legacy', 'account-a');
     INSERT INTO tags (id, name) VALUES ('tag-dog', '犬');
+    INSERT INTO friend_fields (id, name, field_key, type) VALUES ('ff-num', '来店', 'visits', 'number');
+    INSERT INTO friend_fields (id, name, field_key, type, options_json)
+    VALUES ('ff-multi', '好きな子', 'pets', 'multi_select', '["犬","猫"]');
   `);
   injected = { current: null };
 }
@@ -516,5 +521,53 @@ describe('フォーム回答の冪等化(実DB)', () => {
     expect(badLink.status).toBe(400);
     expect(count('form_submissions')).toBe(0);
     expect(count('form_submit_claims')).toBe(0);
+  });
+});
+
+describe('N-042 型検証の接続(#702) F1旧項目対応表', () => {
+  const KEY1 = '11111111-1111-4333-8444-666666666666';
+  const KEY2 = '22222222-1111-4333-8444-666666666666';
+  const KEY3 = '33333333-1111-4333-8444-666666666666';
+
+  function fieldValue(fieldId: string): string | null {
+    const row = sqlite.prepare(
+      `SELECT value FROM friend_field_values WHERE friend_id = 'friend-1' AND field_id = ?`,
+    ).get(fieldId) as { value: string } | undefined;
+    return row?.value ?? null;
+  }
+
+  async function submitLegacy(data: Record<string, unknown>, key: string) {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ eligible: true }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    })));
+    const res = await app().fetch(submitRequest('form-legacy', data, key, 'user-1'), env());
+    const body = await res.json() as {
+      success: boolean;
+      data: { destinationWrite: { status: string; attempted: number; succeeded: number; failed: number } };
+    };
+    return { res, body };
+  }
+
+  test('F1 型に合わない回答は保存せず、回答自体は受け付ける', async () => {
+    const { res, body } = await submitLegacy({ visits: 'あいう' }, KEY1);
+    expect(res.status).toBe(201);
+    expect(body.data.destinationWrite).toMatchObject({ attempted: 1, succeeded: 0, failed: 1 });
+    expect(fieldValue('ff-num')).toBeNull();
+    expect(count('form_submissions')).toBe(1);
+  });
+
+  test('F1 正しい回答は正規化して保存する', async () => {
+    const { res, body } = await submitLegacy({ visits: '1,000' }, KEY2);
+    expect(res.status).toBe(201);
+    expect(body.data.destinationWrite).toMatchObject({ attempted: 1, succeeded: 1, failed: 0 });
+    expect(fieldValue('ff-num')).toBe('1000');
+  });
+
+  test('F1 multi_selectの配列回答は正規化JSONで保存する', async () => {
+    const { res, body } = await submitLegacy({ pets: ['犬', '猫'] }, KEY3);
+    expect(res.status).toBe(201);
+    expect(body.data.destinationWrite).toMatchObject({ attempted: 1, succeeded: 1, failed: 0 });
+    expect(fieldValue('ff-multi')).toBe(JSON.stringify(['犬', '猫']));
   });
 });
