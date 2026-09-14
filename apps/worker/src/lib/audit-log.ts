@@ -16,6 +16,7 @@ import type { Env } from '../index.js';
  */
 
 export type AuditAction =
+  | 'mileage.rule.export'
   | 'mileage.rule.create'
   | 'mileage.rule.update'
   | 'mileage.rule.delete'

@@ -58,6 +58,7 @@ import type { Env } from '../index.js';
 import { auditLog } from '../lib/audit-log.js';
 import { requireIrreversibleConfirmation, requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
+import { resolveRequestBoundary } from '../services/request-boundary.js';
 import { isValidIdempotencyKey } from '../services/outbound-idempotency.js';
 import { sha256Hex } from '../middleware/auth.js';
 import { deliverMileageReward } from '../services/mileage-reward-delivery.js';
@@ -954,6 +955,91 @@ scoring.get('/api/mileage/rules', requireRole('owner', 'admin', 'staff'), async 
     return c.json({ success: true, data: rules.map(serializeMileageRule) });
   } catch (err) {
     console.error('GET /api/mileage/rules error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+// N-237: 決めごとのCSVはサーバー側で作る。許可scope内の決めごとだけを出し、
+// 既存の監査契約へ残す。ブラウザだけで権限判定を完結させない。
+// 表示側(apps/web/src/app/mileage/page.tsx)の列・文言とそろえる。
+const MILEAGE_RULE_EVENT_LABELS: Record<string, string> = {
+  friend_added: '友だち登録',
+  message_received: 'メッセージ',
+  link_clicked: 'リンククリック',
+  broadcast_link_clicked: '配信リンククリック',
+  form_submitted: 'フォーム',
+  booking_created: '予約',
+  affiliate_conversion_approved: '紹介成果',
+  webinar_watch_5m: 'ウェビナー',
+  webinar_watch_15m: 'ウェビナー',
+  webinar_completed: 'ウェビナー完了',
+  webinar_cta_clicked: 'ウェビナーCTA',
+  instagram_dm_received: 'Instagram DM',
+  instagram_comment_created: 'Instagramコメント',
+  instagram_story_mentioned: 'ストーリーズ',
+  instagram_line_returned: 'LINE帰還',
+  inflow_return: 'LINE帰還',
+  friend_registered: '友だち登録',
+  friend_following_7d: '継続7日',
+  friend_following_30d: '継続30日',
+  friend_following_90d: '継続90日',
+  friend_following_180d: '継続180日',
+  friend_following_365d: '継続1年',
+  purchase_completed: '購入完了',
+};
+
+function mileageRuleEventLabel(eventType: string): string {
+  return MILEAGE_RULE_EVENT_LABELS[eventType] ?? 'その他の行動';
+}
+
+function mileageCsvCell(value: unknown): string {
+  const raw = value === null || value === undefined ? '' : String(value);
+  const safe = /^[=+\-@]/.test(raw) ? `'${raw}` : raw;
+  return `"${safe.replaceAll('"', '""')}"`;
+}
+
+scoring.get('/api/mileage/rules/export', requireRole('owner', 'admin', 'staff'), async (c) => {
+  try {
+    const staff = c.get('staff');
+    const accountId = (c.req.query('accountId') ?? '').trim();
+    if (!accountId) {
+      return c.json({ success: false, error: 'LINE account not found' }, 400);
+    }
+    const decision = await resolveRequestBoundary(c.env.DB, staff, accountId);
+    if (!decision.allowed) {
+      return c.json({ success: false, error: 'LINE account not found' }, 404);
+    }
+    type RuleItem = Awaited<ReturnType<typeof getMileageEarningRulesV6>>['items'][number];
+    const items: RuleItem[] = [];
+    let offset = 0;
+    for (;;) {
+      const data = await getMileageEarningRulesV6(c.env.DB, { lineAccountId: accountId, limit: 100, offset });
+      items.push(...data.items);
+      if (items.length >= data.pagination.total || data.items.length === 0) break;
+      offset += data.items.length;
+    }
+    const headers = ['決めごと', '対象の行動', 'たまるマイル', 'この30日の付与回数', '失効', '状態'];
+    const rows = items.map((item) => [
+      item.draft.name,
+      mileageRuleEventLabel(item.draft.eventType),
+      item.draft.amount,
+      item.metrics30d.granted,
+      item.draft.expiresAfterDays ?? '失効なし',
+      item.published.status === 'published' ? '動いています' : '止めています',
+    ]);
+    const csv = `\uFEFF${[headers, ...rows].map((row) => row.map(mileageCsvCell).join(',')).join('\r\n')}\r\n`;
+    auditLog(c, 'mileage.rule.export', { kind: 'mileage_earning_rule_export', id: accountId });
+    const day = new Date().toISOString().slice(0, 10);
+    return new Response(csv, {
+      status: 200,
+      headers: {
+        'content-type': 'text/csv; charset=utf-8',
+        'content-disposition': `attachment; filename="mileage-earning-rules-${day}.csv"`,
+        'cache-control': 'no-store',
+      },
+    });
+  } catch (err) {
+    console.error('GET /api/mileage/rules/export error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
