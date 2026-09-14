@@ -44,6 +44,8 @@ import {
   encryptCredential,
   MileageRewardError,
   publishMileageEarningRule,
+  ensureDefaultMileageProgram,
+  jstNow,
 } from '@line-crm/db';
 import type {
   ActionScoreFilter,
@@ -59,7 +61,12 @@ import { auditLog } from '../lib/audit-log.js';
 import { requireIrreversibleConfirmation, requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import { resolveRequestBoundary } from '../services/request-boundary.js';
-import { isValidIdempotencyKey } from '../services/outbound-idempotency.js';
+import {
+  completeOutboundSendStatement,
+  hashOutboundPayload,
+  isValidIdempotencyKey,
+  reserveOutboundSend,
+} from '../services/outbound-idempotency.js';
 import { sha256Hex } from '../middleware/auth.js';
 import { deliverMileageReward } from '../services/mileage-reward-delivery.js';
 import {
@@ -1093,6 +1100,106 @@ scoring.post('/api/mileage/events', requireRole('owner', 'admin'), async (c) => 
   }
 });
 
+/**
+ * N-240(#813): 決めごと作成の冪等。reminders の N-067 と同じ約束:
+ * - keyは `mileage-rule:<account>:<requestKey>` でaccountごとに名前空間を分ける
+ * - 同一key＋同一内容→同じrule ID・同じ応答（行は1件）
+ * - 同一key＋別内容→409（上書きしない）
+ * - 予約後・作成前の失敗は in_progress のまま残し、再送は同じ束で回収する
+ * - 同時押下はIDをkeyから決めるため何回通っても1行に収まる
+ * - 入力不備・権限拒否は予約を残さない（route側で先に検査する）
+ */
+async function mileageRuleIdForKey(namespacedKey: string): Promise<string> {
+  const hex = await hashOutboundPayload(namespacedKey);
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-8${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
+}
+
+type MileageRuleCreateInput = {
+  name: string;
+  eventType: string;
+  source: string | null;
+  amount: number;
+  initialStatus?: 'pending' | 'available';
+  conditions?: {
+    dailyCapActions?: number;
+    uniquePerSubject?: boolean;
+    uniquePerSubjectPerDay?: boolean;
+    ignoreMultiplier?: boolean;
+    beneficiary?: 'actor' | 'referrer';
+    uniquePerReferredFriend?: boolean;
+    uniquePerReferredFriendPerSubject?: boolean;
+  } | null;
+  validFrom: string | null;
+  validUntil: string | null;
+  lineAccountId: string;
+};
+
+async function createMileageRuleIdempotent(
+  db: D1Database,
+  args: MileageRuleCreateInput & { requestKey: string },
+): Promise<{ status: 201 | 409; body: unknown }> {
+  // 衝突判定は保存される値だけを正規化する。保存に影響しない余分は入れない。
+  const normalized = {
+    lineAccountId: args.lineAccountId,
+    name: args.name,
+    eventType: args.eventType,
+    source: args.source,
+    amount: args.amount,
+    initialStatus: args.initialStatus ?? 'available',
+    conditions: args.conditions ?? null,
+    validFrom: args.validFrom,
+    validUntil: args.validUntil,
+  };
+  const namespacedKey = `mileage-rule:${args.lineAccountId}:${args.requestKey}`;
+  const now = new Date().toISOString();
+  const reservation = await reserveOutboundSend(db, {
+    key: namespacedKey,
+    channel: 'line',
+    resourceId: args.lineAccountId,
+    payloadHash: await hashOutboundPayload(JSON.stringify(normalized)),
+    retryInProgress: true,
+    now,
+  });
+  if (reservation.kind === 'conflict') {
+    return { status: 409, body: { success: false, error: '同じ登録キーを別の内容には使用できません' } };
+  }
+  if (reservation.kind === 'replay') {
+    const existing = await getMileageRuleById(db, reservation.responseId);
+    if (existing) {
+      return { status: 201, body: { success: true, data: serializeMileageRule(existing) } };
+    }
+    // 成功確定のはずが行方不明。下の束で作り直す（INSERT OR IGNORE のため安全）。
+  }
+  const ruleId = await mileageRuleIdForKey(namespacedKey);
+  await ensureDefaultMileageProgram(db);
+  const nowJst = jstNow();
+  await db.batch([
+    db.prepare(
+      `INSERT OR IGNORE INTO mileage_rules
+         (id, program_id, name, event_type, source, amount, initial_status,
+          conditions, line_account_id, is_active, valid_from, valid_until, created_at, updated_at)
+       VALUES (?, 'default', ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)`,
+    ).bind(
+      ruleId,
+      args.name,
+      args.eventType,
+      args.source,
+      args.amount,
+      args.initialStatus ?? 'available',
+      args.conditions ? JSON.stringify(args.conditions) : null,
+      args.lineAccountId,
+      args.validFrom,
+      args.validUntil,
+      nowJst,
+      nowJst,
+    ),
+    completeOutboundSendStatement(db, { key: namespacedKey, responseId: ruleId, now }),
+  ]);
+  const created = await getMileageRuleById(db, ruleId);
+  if (!created) throw new Error('mileage rule idempotency recovery failed');
+  return { status: 201, body: { success: true, data: serializeMileageRule(created) } };
+}
+
 scoring.post('/api/mileage/rules', requireRole('owner', 'admin'), async (c) => {
   auditLog(c, 'mileage.rule.create', { kind: 'mileage_rule' });
   try {
@@ -1124,6 +1231,26 @@ scoring.post('/api/mileage/rules', requireRole('owner', 'admin'), async (c) => {
     }
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.lineAccountId])) {
       return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
+    }
+    // N-240: Idempotency-Key 付きの作成は二重作成しない。キーなしは従来通り。
+    const requestKey = c.req.header('Idempotency-Key')?.trim();
+    if (requestKey !== undefined && requestKey !== '') {
+      if (!isValidIdempotencyKey(requestKey)) {
+        return c.json({ success: false, error: '有効なIdempotency-Keyが必要です' }, 400);
+      }
+      const result = await createMileageRuleIdempotent(c.env.DB, {
+        name: body.name.trim(),
+        eventType: body.eventType.trim(),
+        source: body.source ?? null,
+        amount: body.amount!,
+        initialStatus: body.initialStatus,
+        conditions: body.conditions,
+        validFrom: body.validFrom ?? null,
+        validUntil: body.validUntil ?? null,
+        lineAccountId: body.lineAccountId,
+        requestKey,
+      });
+      return c.json(result.body, result.status);
     }
     const rule = await createMileageRule(c.env.DB, {
       name: body.name.trim(),
