@@ -71,11 +71,17 @@ describe('V6 EC integration screens', () => {
     expect(connector).not.toContain('inbound_secret_encrypted')
   })
 
-  it('shows connector impact and retry policy from the API contract', () => {
+  it('shows connector impact without a retry policy line (matches the null production value)', () => {
+    // #517 中5b: つなぎ先単位のやり直し方針は本番で常に null。モックだけが
+    // 別の文言を返していたので、モックを null に揃え、画面の死に分岐を消した。
+    const mockApi = readFileSync(join(import.meta.dirname, '..', '..', '..', '..', '..', 'scripts', 'visual-qa', 'mock-api.mjs'), 'utf8')
     expect(connector).toContain('Object.values(data?.impact ?? {})')
     expect(connector).toContain('このつなぎ先を止めると影響する設定・集計です。NEN配信・マイル・友だち属性は全体の件数です。')
-    expect(connector).toContain('data?.retryPolicy')
+    expect(connector).not.toContain('data?.retryPolicy')
+    expect(connector).not.toContain('やり直しの決めごと')
     expect(connector).not.toContain('いま影響件数を数える口は未接続です')
+    expect(mockApi).toContain('retryPolicy: null')
+    expect(mockApi).not.toContain('3回まで・10分あけて')
   })
 
   it('reads the normalized order/action mouths and retries only retryable failures', () => {
