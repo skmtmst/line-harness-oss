@@ -1,4 +1,4 @@
-import type { MileageHistoryItem } from '@/lib/api'
+import type { MileageAdminHistoryItem, MileageHistoryItem } from '@/lib/api'
 
 const ENTRY_TYPE_LABELS: Record<MileageHistoryItem['entryType'], string> = {
   grant: '付与',
@@ -63,6 +63,42 @@ export function mileageSourceNoteText(input: {
 }): string {
   const hasReference = (input.sourceReferenceId ?? '').trim().length > 0
   return hasReference || input.hasSourceEvent ? '元の記録あり' : '元の記録なし'
+}
+
+/**
+ * 明細表の1行。友だち向け履歴（`MileageHistoryItem`）は元記録の出来事IDを
+ * 持つが、管理向け履歴API（`MileageAdminHistoryItem`）は有無だけしか返さない。
+ * 管理系の行は `hasSourceEvent` を別途持ち、`sourceEventId` は空のままにする。
+ */
+export type MileageDetailHistoryItem = MileageHistoryItem & { hasSourceEvent?: boolean }
+
+export function mileageDetailHasSourceEvent(item: MileageDetailHistoryItem): boolean {
+  return item.hasSourceEvent ?? item.sourceEventId != null
+}
+
+/**
+ * 管理向け履歴の行を明細表示の形へ移す。
+ *
+ * 管理向けAPIは元記録の出来事IDを返さないので、台帳行自身のIDを元記録IDへ
+ * 偽装しない。有無だけを `hasSourceEvent` へ直通する(#816)。
+ */
+export function friendHistoryItem(item: MileageAdminHistoryItem): MileageDetailHistoryItem {
+  return {
+    id: item.id,
+    entryType: item.entryType,
+    status: item.status,
+    amount: item.amount,
+    reason: item.reason,
+    source: item.source,
+    sourceEventId: null,
+    hasSourceEvent: item.hasSourceEvent,
+    sourceReferenceId: item.sourceReferenceId,
+    ruleName: item.ruleName,
+    mode: item.mode,
+    executedByStaffName: item.executedByStaffName,
+    balanceAfter: item.balanceAfter,
+    occurredAt: item.occurredAt,
+  }
 }
 
 export function formatMileageChange(value: number): string {
