@@ -11,7 +11,7 @@ import {
   getConversionEvents,
   getConversionReport,
   getConversionApprovalQueue,
-  setConversionApproval,
+  decideConversionApproval,
   getConversionApprovalNotifyInfo,
   syncAffiliateConversionMileage,
   listConversionDefinitions,
@@ -34,6 +34,7 @@ import { notifyAffiliateApproval } from '../services/affiliate-notifier.js';
 import type { Env } from '../index.js';
 import { auditLog } from '../lib/audit-log.js';
 import { requireRole } from '../middleware/role-guard.js';
+import type { AuthenticatedStaff } from '../middleware/auth.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import { listLimit, listOffset } from './list-pagination.js';
 
@@ -1114,33 +1115,83 @@ conversions.get('/api/conversions/approvals', conversionPermission('view'), asyn
   }
 });
 
+/**
+ * 成果承認の門番(N-209)。
+ *
+ * owner/adminは通す。一般staffは「/conversions の利用権」と
+ * 「conversion.approval.edit の承認権」の両方を持つときだけ通す。
+ * どちらも無いstaff・権限外のtenant/アカウントはここで403/404に倒す。
+ */
+const requireApprovalPermission: MiddlewareHandler<Env> = async (c, next) => {
+  const staff = c.get('staff');
+  if (staff && (staff.role === 'owner' || staff.role === 'admin')) {
+    await next();
+    return;
+  }
+  const keys = staff?.permissionKeys ?? [];
+  if (staff && keys.includes('/conversions') && keys.includes('conversion.approval.edit')) {
+    await next();
+    return;
+  }
+  return c.json({ success: false, error: 'この機能を操作する権限がありません' }, 403);
+};
+
+type ApprovalDecision = 'approved' | 'rejected';
+type ApprovalRevision = 'pending' | 'approved' | 'rejected';
+
+function readApprovalDecision(body: { status?: unknown; expectedStatus?: unknown }):
+  | { ok: true; status: ApprovalDecision; expectedStatus: ApprovalRevision }
+  | { ok: false; error: string } {
+  if (body.status !== 'approved' && body.status !== 'rejected') {
+    return { ok: false, error: 'status must be approved or rejected' };
+  }
+  // 版の代わりに「いま見えている状態」を必ず送る。送らない・壊れている
+  // 要求は保存せず400にする(N-208)。
+  if (body.expectedStatus !== 'pending' && body.expectedStatus !== 'approved' && body.expectedStatus !== 'rejected') {
+    return { ok: false, error: 'expectedStatus must be pending, approved, or rejected' };
+  }
+  return { ok: true, status: body.status, expectedStatus: body.expectedStatus };
+}
+
 // PATCH /api/conversions/events/:id/approval - approve/reject an attributed CV
-conversions.patch('/api/conversions/events/:id/approval', requireRole('owner', 'admin'), requireVisibleConversionEvent, async (c) => {
+conversions.patch('/api/conversions/events/:id/approval', requireApprovalPermission, requireVisibleConversionEvent, async (c) => {
   // 監査は更新の成功が確定してから残す(#513 M7)。以前は検証の前に
   // 書いていたため、400/404の失敗も「更新」の記録に混ざっていた。
   try {
     const body = await c.req
-      .json<{ status?: string }>()
-      .catch(() => ({}) as { status?: string });
+      .json<{ status?: unknown; expectedStatus?: unknown }>()
+      .catch(() => ({}) as { status?: unknown; expectedStatus?: unknown });
 
-    if (body.status !== 'approved' && body.status !== 'rejected') {
-      return c.json(
-        { success: false, error: 'status must be approved or rejected' },
-        400,
-      );
+    const parsed = readApprovalDecision(body);
+    if (!parsed.ok) {
+      return c.json({ success: false, error: parsed.error }, 400);
     }
 
-    const updated = await setConversionApproval(
+    const decided = await decideConversionApproval(
       c.env.DB,
       c.req.param('id'),
-      body.status,
+      parsed.status,
+      parsed.expectedStatus,
     );
-    if (updated === false) {
+    if (decided.outcome === 'not_found') {
       // Missing event OR non-attributed CV (approval flow only applies to
       // affiliate-attributed rows) — both surface as 404.
       return c.json(
         { success: false, error: 'Attributed conversion event not found' },
         404,
+      );
+    }
+    if (decided.outcome === 'conflict') {
+      // ほかの人が先に別の判断をしている。上書きせず409で返し、画面は
+      // 読み直しを促す。DBには何も残さない。
+      return c.json(
+        {
+          success: false,
+          code: 'approval_conflict',
+          error: 'ほかの人が先に判断しました。一覧を読み直して確認してください。',
+          data: { id: c.req.param('id'), currentStatus: decided.currentStatus },
+        },
+        409,
       );
     }
     auditLog(c, 'conversion.approval.update', { kind: 'conversion_event', id: c.req.param('id') });
@@ -1151,22 +1202,22 @@ conversions.patch('/api/conversions/events/:id/approval', requireRole('owner', '
     await syncAffiliateConversionMileage(
       c.env.DB,
       c.req.param('id'),
-      body.status,
+      parsed.status,
     );
 
-    if (updated === 'already_set') {
+    if (decided.outcome === 'already_set') {
       // Idempotent re-click: the status is already set to the requested value.
       // Return 200 so the UI does not show an error to the operator.
       return c.json({
         success: true,
-        data: { id: c.req.param('id'), approvalStatus: body.status },
+        data: { id: c.req.param('id'), approvalStatus: parsed.status, alreadySet: true },
       });
     }
 
     // ASP: notify the attributed affiliate on approval only (never on reject).
     // Best-effort — notifyAffiliateApproval swallows its own errors, but guard
     // the info lookup too so a push failure can never fail the approval request.
-    if (body.status === 'approved') {
+    if (parsed.status === 'approved' && decided.outcome === 'updated') {
       try {
         const info = await getConversionApprovalNotifyInfo(c.env.DB, c.req.param('id'));
         if (info) {
@@ -1183,9 +1234,92 @@ conversions.patch('/api/conversions/events/:id/approval', requireRole('owner', '
       }
     }
 
-    return c.json({ success: true, data: { id: c.req.param('id'), approvalStatus: body.status } });
+    return c.json({ success: true, data: { id: c.req.param('id'), approvalStatus: parsed.status } });
   } catch (err) {
     console.error('PATCH /api/conversions/events/:id/approval error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+/**
+ * POST /api/conversions/approvals/bulk — まとめて承認・却下する(N-213)。
+ *
+ * 単体と同じ契約を各対象へ適用する。結果は成功ID・競合ID・権限拒否ID・
+ * その他失敗IDに分けて返し、途中失敗を全成功と表示させない。
+ */
+const BULK_APPROVAL_MAX_ITEMS = 100;
+
+interface BulkApprovalItemResult {
+  succeeded: string[];
+  conflicted: Array<{ id: string; currentStatus: ApprovalRevision }>;
+  denied: string[];
+  failed: Array<{ id: string; error: string }>;
+}
+
+async function isEventVisibleToStaff(db: D1Database, staff: AuthenticatedStaff | undefined, eventId: string): Promise<boolean> {
+  const row = await db.prepare(
+    `SELECT cp.line_account_id FROM conversion_events ce
+       JOIN conversion_points cp ON cp.id = ce.conversion_point_id
+      WHERE ce.id = ?`,
+  ).bind(eventId).first<{ line_account_id: string | null }>();
+  if (!row) return false;
+  return canAccessAllLineAccounts(db, staff, [row.line_account_id]);
+}
+
+conversions.post('/api/conversions/approvals/bulk', requireApprovalPermission, async (c) => {
+  try {
+    const body = await c.req
+      .json<{ items?: unknown }>()
+      .catch(() => ({}) as { items?: unknown });
+    if (!Array.isArray(body.items) || body.items.length === 0 || body.items.length > BULK_APPROVAL_MAX_ITEMS) {
+      return c.json(
+        { success: false, error: `items must be 1-${BULK_APPROVAL_MAX_ITEMS} approval decisions` },
+        400,
+      );
+    }
+    const result: BulkApprovalItemResult = { succeeded: [], conflicted: [], denied: [], failed: [] };
+    for (const raw of body.items) {
+      const item = (raw ?? {}) as { id?: unknown; status?: unknown; expectedStatus?: unknown };
+      if (typeof item.id !== 'string' || !item.id) {
+        result.failed.push({ id: '', error: 'id is required' });
+        continue;
+      }
+      const parsed = readApprovalDecision(item);
+      if (!parsed.ok) {
+        result.failed.push({ id: item.id, error: parsed.error });
+        continue;
+      }
+      const visible = await isEventVisibleToStaff(c.env.DB, c.get('staff'), item.id);
+      if (!visible) {
+        result.denied.push(item.id);
+        continue;
+      }
+      const decided = await decideConversionApproval(c.env.DB, item.id, parsed.status, parsed.expectedStatus);
+      if (decided.outcome === 'conflict') {
+        result.conflicted.push({ id: item.id, currentStatus: decided.currentStatus });
+        continue;
+      }
+      if (decided.outcome === 'not_found') {
+        result.failed.push({ id: item.id, error: 'Attributed conversion event not found' });
+        continue;
+      }
+      auditLog(c, 'conversion.approval.update', { kind: 'conversion_event', id: item.id });
+      await syncAffiliateConversionMileage(c.env.DB, item.id, parsed.status);
+      if (parsed.status === 'approved' && decided.outcome === 'updated') {
+        try {
+          const info = await getConversionApprovalNotifyInfo(c.env.DB, item.id);
+          if (info) {
+            await notifyAffiliateApproval(c.env.DB, c.env, info.affiliateId, info.offerName, info.rewardAmount);
+          }
+        } catch (err) {
+          console.error('Affiliate approval notify failed (non-blocking):', err);
+        }
+      }
+      result.succeeded.push(item.id);
+    }
+    return c.json({ success: true, data: result });
+  } catch (err) {
+    console.error('POST /api/conversions/approvals/bulk error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

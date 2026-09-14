@@ -9205,15 +9205,25 @@ export const api = {
         `/api/conversions/approvals${qs ? `?${qs}` : ''}`,
       )
     },
-    approve: (eventId: string) =>
-      fetchApi<{ success: boolean; data?: { id: string; approvalStatus: string }; error?: string }>(
+    approve: (eventId: string, expectedStatus: 'pending' | 'approved' | 'rejected') =>
+      fetchApi<{ success: boolean; data?: { id: string; approvalStatus: string }; error?: string; code?: string }>(
         `/api/conversions/events/${eventId}/approval`,
-        { method: 'PATCH', body: JSON.stringify({ status: 'approved' }) },
+        { method: 'PATCH', body: JSON.stringify({ status: 'approved', expectedStatus }) },
       ),
-    reject: (eventId: string) =>
-      fetchApi<{ success: boolean; data?: { id: string; approvalStatus: string }; error?: string }>(
+    reject: (eventId: string, expectedStatus: 'pending' | 'approved' | 'rejected') =>
+      fetchApi<{ success: boolean; data?: { id: string; approvalStatus: string }; error?: string; code?: string }>(
         `/api/conversions/events/${eventId}/approval`,
-        { method: 'PATCH', body: JSON.stringify({ status: 'rejected' }) },
+        { method: 'PATCH', body: JSON.stringify({ status: 'rejected', expectedStatus }) },
+      ),
+    bulkDecide: (items: Array<{ id: string; status: 'approved' | 'rejected'; expectedStatus: 'pending' | 'approved' | 'rejected' }>) =>
+      fetchApi<{ success: boolean; data?: {
+        succeeded: string[]
+        conflicted: Array<{ id: string; currentStatus: string }>
+        denied: string[]
+        failed: Array<{ id: string; error: string }>
+      }; error?: string }>(
+        '/api/conversions/approvals/bulk',
+        { method: 'POST', body: JSON.stringify({ items }) },
       ),
   },
   /**
