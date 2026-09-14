@@ -1223,11 +1223,11 @@ function serializeCommonVarChangeImpact(
  * 使い回しは保存で版が進むため自然に無効になる。署名は付けない——正しさは
  * 保存時に使用先を組み直して確かめるため、写しの偽造では通らない。
  */
-export function buildCommonVarImpactToken(varId: string, version: number, usageHex: string): string {
+export function buildCommonVarImpactProof(varId: string, version: number, usageHex: string): string {
   return `${varId}.${version}.${usageHex}`;
 }
 
-export function parseCommonVarImpactToken(presented: unknown): {
+export function parseCommonVarImpactProof(presented: unknown): {
   varId: string; version: number; hex: string;
 } | null {
   if (typeof presented !== 'string') return null;
@@ -1484,32 +1484,32 @@ contents.patch('/api/common-vars/:id', requireRole('owner', 'admin'), async (c) 
     }
     // N-185: 影響確認なしの保存を止める。確認値は対象ID・版・使用先集合の写し。
     // 形の検査は先に済ませているため、ここからは確認値だけを見る。
-    const presentedToken = parseCommonVarImpactToken(body.impactToken);
-    if (!presentedToken) {
+    const presentedProof = parseCommonVarImpactProof(body.impactProof);
+    if (!presentedProof) {
       return c.json({
         success: false,
         code: 'impact_confirmation_required',
         error: '影響を確認してから保存してください。値を確認画面で見直すと確認値が発行されます。',
       }, 428);
     }
-    if (presentedToken.varId !== id) {
+    if (presentedProof.varId !== id) {
       return c.json({
         success: false,
-        code: 'impact_token_mismatch',
+        code: 'impact_proof_mismatch',
         error: '別の共通情報の確認値です。保存する項目で影響を確認し直してください。',
       }, 409);
     }
-    if (presentedToken.version !== existing.version) {
+    if (presentedProof.version !== existing.version) {
       return c.json({
         success: false,
-        code: 'impact_token_stale',
+        code: 'impact_proof_stale',
         error: '別の担当者が先に更新しました。最新内容を読み直してください。',
         currentVersion: existing.version,
       }, 409);
     }
     const freshImpact = await getCommonVarUsageImpact(c.env.DB, existing.var_key, accountId);
     const freshHex = await commonVarUsageRevision(existing, freshImpact);
-    if (freshHex !== presentedToken.hex) {
+    if (freshHex !== presentedProof.hex) {
       return c.json({
         success: false,
         code: 'impact_usage_changed',
@@ -1604,7 +1604,7 @@ contents.post('/api/common-vars/:id/impact-preview', requireRole('owner', 'admin
           item.source_status === 'active' || item.source_status === 'sending').length,
         usageRevision: usageHex,
         // N-185: 保存口へ添える確認値。対象ID・版・使用先集合の写しで使い回し不可。
-        impactToken: buildCommonVarImpactToken(existing.id, existing.version, usageHex),
+        impactProof: buildCommonVarImpactProof(existing.id, existing.version, usageHex),
       },
     });
   } catch (err) {

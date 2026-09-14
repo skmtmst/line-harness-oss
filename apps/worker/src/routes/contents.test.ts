@@ -1080,8 +1080,8 @@ describe('共通情報', () => {
       accountId: 'account-1', nextValue: '11-20',
     });
     expect(preview.status).toBe(200);
-    const { impactToken } = (await preview.json() as { data: { impactToken: string } }).data;
-    const res = await req('/api/common-vars/cv-1?accountId=account-1', 'PATCH', { value: '11-20', impactToken });
+    const { impactProof } = (await preview.json() as { data: { impactProof: string } }).data;
+    const res = await req('/api/common-vars/cv-1?accountId=account-1', 'PATCH', { value: '11-20', impactProof });
     expect(res.status).toBe(200);
   });
 
@@ -1131,8 +1131,8 @@ describe('共通情報', () => {
     const preview = await req('/api/common-vars/cv-1/impact-preview?accountId=account-1', 'POST', {
       accountId: 'account-1', nextValue: '11-20',
     });
-    const { impactToken } = (await preview.json() as { data: { impactToken: string } }).data;
-    const res = await req('/api/common-vars/cv-1?accountId=account-1', 'PATCH', { value: '11-20', impactToken });
+    const { impactProof } = (await preview.json() as { data: { impactProof: string } }).data;
+    const res = await req('/api/common-vars/cv-1?accountId=account-1', 'PATCH', { value: '11-20', impactProof });
     expect(res.status).toBe(200);
     expect(mocks.updateCommonVar).toHaveBeenCalledWith(env.DB, 'cv-1', 'account-1', expect.objectContaining({
       expectedVersion: undefined,
@@ -1149,8 +1149,8 @@ describe('共通情報', () => {
     const preview = await req('/api/common-vars/cv-1/impact-preview?accountId=account-1', 'POST', {
       accountId: 'account-1', nextValue: '10-19',
     });
-    const { impactToken } = (await preview.json() as { data: { impactToken: string } }).data;
-    expect((await req('/api/common-vars/cv-1?accountId=account-1', 'PATCH', { folderId: 'other-folder', impactToken })).status)
+    const { impactProof } = (await preview.json() as { data: { impactProof: string } }).data;
+    expect((await req('/api/common-vars/cv-1?accountId=account-1', 'PATCH', { folderId: 'other-folder', impactProof })).status)
       .toBe(400);
   });
 

@@ -372,7 +372,7 @@ export type CommonVarChangeImpactDetail = CommonVarChangeImpact & {
   scheduledUsageCount: number
   publishedUsageCount: number
   usageRevision: string
-  impactToken: string
+  impactProof: string
 }
 
 export type CommonVarReplacementCandidate = {
@@ -5357,7 +5357,7 @@ export const api = {
       folderId?: string | null
       expectedVersion?: number
       changeReason?: string
-      impactToken?: string
+      impactProof?: string
     }) =>
       fetchApi<ApiResponse<CommonVar>>(`/api/common-vars/${id}?accountId=${encodeURIComponent(accountId)}`, {
         method: 'PATCH',

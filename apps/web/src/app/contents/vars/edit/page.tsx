@@ -228,7 +228,7 @@ function EditCommonVarInner() {
         memo,
         folderId: folderId || null,
         expectedVersion: item.version,
-        impactToken: preview.data.impactToken,
+        impactProof: preview.data.impactProof,
       })
       if (accountAtRequest !== latestAccountRef.current) return
       if (!res.success) {
