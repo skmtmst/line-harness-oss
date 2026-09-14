@@ -786,20 +786,28 @@ tags.patch('/api/tags/:id', requireRole('owner', 'admin'), async (c) => {
     }
     // expectedVersion は必須(#715)。無し・不正は400、古い版は409。
     // 保管済み(archived)タグの保護(#710)は updateTagDefinition 側（変更なし）。
-    if (body.expectedVersion === undefined) {
-      return c.json({ success: false, error: 'expectedVersion is required' }, 400);
-    }
-    const expectedVersion = Number(body.expectedVersion);
-    if (!Number.isInteger(expectedVersion) || expectedVersion < 1) {
-      return c.json({ success: false, error: 'expectedVersion must be a positive integer' }, 400);
-    }
+    // 順序は秘匿が先(#715差し戻し)。範囲外・不在は404で伏せ、許可対象にだけ
+    // 版の400を返す。版を先にすると範囲外のIDの有無が400/404で見分けられる。
     {
       const lineAccountId = requestedLineAccountId(c, body);
+      if (lineAccountId) {
+        const denied = await requireVisibleLineAccount(c, lineAccountId);
+        if (denied) return denied;
+      } else {
+        const current = await visibleTag(c, c.req.param('id'));
+        if (current instanceof Response) return current;
+      }
+      if (body.expectedVersion === undefined) {
+        return c.json({ success: false, error: 'expectedVersion is required' }, 400);
+      }
+      const expectedVersion = Number(body.expectedVersion);
+      if (!Number.isInteger(expectedVersion) || expectedVersion < 1) {
+        return c.json({ success: false, error: 'expectedVersion must be a positive integer' }, 400);
+      }
+      // 版付き経路は従来どおり担当必須。ここへ来るのは範囲内の対象だけ。
       if (!lineAccountId) {
         return c.json({ success: false, error: 'lineAccountId is required' }, 400);
       }
-      const denied = await requireVisibleLineAccount(c, lineAccountId);
-      if (denied) return denied;
       const name = text(body.name);
       if (body.name !== undefined && (!name || name.length > 80)) {
         return c.json({ success: false, error: 'name must be between 1 and 80 characters' }, 400);
