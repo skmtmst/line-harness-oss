@@ -54,7 +54,7 @@ import {
 } from '../services/broadcast-preflight.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import type { AuthenticatedStaff } from '../middleware/auth.js';
-import { fetchQuota } from '../services/broadcast-quota-guard.js';
+import { fetchQuota, releaseQuotaSlot } from '../services/broadcast-quota-guard.js';
 import { dispatchOperatorEvent } from '../services/operator-notification-dispatch.js';
 
 const broadcasts = new Hono<Env>();
@@ -2016,11 +2016,15 @@ broadcasts.post('/api/broadcasts/:id/send', requireRole('owner', 'admin'), requi
     if (!afterActionCheck.ok) {
       return c.json({ success: false, error: afterActionCheck.error }, 409);
     }
-    const quotaCheck = await guardScheduledBroadcastQuota(c.env.DB, existing, sendAccountId);
+    const quotaCheck = await guardScheduledBroadcastQuota(c.env.DB, existing, sendAccountId, { reserveBroadcastId: id });
     if (quotaCheck.blocked) {
       return c.json({ success: false, error: quotaCheck.message ?? '送信枠が足りないため送れません' }, 409);
     }
 
+    // 予約はこの後 claim→送信の成否に関わらず外す（置き去りは30分で無効になる）。
+    // 注釈の言い換え: 別配信間の残枠競合はこの予約台帳で排他する。配信単位の
+    // claim は行の二重送信を防ぎ、枠の超過は台帳の合計で防ぐ。
+    try {
     // atomic lock — 'draft' と 'scheduled' を分けて単一 UPDATE で claim する。
     // 各 UPDATE は単一 write statement なので read-then-write transaction の
     // SQLITE_BUSY_SNAPSHOT を引き起こさず、claim 成功時の status も WHERE 句から
@@ -2071,6 +2075,9 @@ broadcasts.post('/api/broadcasts/:id/send', requireRole('owner', 'admin'), requi
       }
     }
     return c.json({ success: true, data: result ? serializeBroadcast(result) : null });
+    } finally {
+      if (sendAccountId) await releaseQuotaSlot(c.env.DB, sendAccountId, id);
+    }
   } catch (err) {
     console.error('POST /api/broadcasts/:id/send error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);

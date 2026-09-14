@@ -6,11 +6,15 @@ import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 // N-062: 即時送信の直前に送信枠と後続アクション版を見直す。
 // 実 route＋実DBで確かめる。通信の境界だけ差し替える：
 // LINE API の枠取得は global fetch、LINE 送信は LineClient。
-const lineCalls = vi.hoisted(() => ({ broadcast: 0 }));
+const lineCalls = vi.hoisted(() => ({ broadcast: 0, failTimes: 0 }));
 vi.mock('@line-crm/line-sdk', () => ({
   LineClient: class {
     async broadcast() {
       lineCalls.broadcast++;
+      if (lineCalls.failTimes > 0) {
+        lineCalls.failTimes--;
+        throw new Error('LINE temporarily unavailable');
+      }
       return { requestId: 'req-1' };
     }
     async multicast() {
@@ -110,6 +114,7 @@ function rowOf(raw: SqliteD1['raw']) {
 describe('N-062 即時送信の直前再確認', () => {
   beforeEach(() => {
     lineCalls.broadcast = 0;
+    lineCalls.failTimes = 0;
     vi.unstubAllGlobals();
   });
 
@@ -177,6 +182,54 @@ describe('N-062 即時送信の直前再確認', () => {
     const res = await send(setupApp(testDb));
     expect(res.status).toBe(200);
     expect(lineCalls.broadcast).toBe(1);
+    expect(rowOf(testDb.raw).status).toBe('sent');
+  });
+
+  test('残枠1で他配信が予約中なら送らず409・LINE送信0', async () => {
+    const testDb = createTestD1();
+    seedBase(testDb.raw);
+    // 別の配信が枠1を予約して持ち去った形（上限5・使用4・他予約1）。
+    testDb.raw.prepare(
+      `INSERT INTO account_settings (id, line_account_id, key, value)
+       VALUES ('quota-reservations-acc-1', 'acc-1', 'broadcast_quota_reservations', ?)`,
+    ).run(JSON.stringify([{ broadcastId: 'bc-2', planned: 1, reservedAt: Date.now() }]));
+    stubQuota(5, 4);
+    const res = await send(setupApp(testDb));
+    expect(res.status).toBe(409);
+    expect(lineCalls.broadcast).toBe(0);
+    expect(rowOf(testDb.raw)).toEqual({ status: 'draft' });
+  });
+
+  test('予約が外れれば送れる（古い置き去りは数えない）', async () => {
+    const testDb = createTestD1();
+    seedBase(testDb.raw);
+    // 31分前の置き去り予約は無効。他配信の有効な予約はない。
+    testDb.raw.prepare(
+      `INSERT INTO account_settings (id, line_account_id, key, value)
+       VALUES ('quota-reservations-acc-1', 'acc-1', 'broadcast_quota_reservations', ?)`,
+    ).run(JSON.stringify([{ broadcastId: 'bc-2', planned: 1, reservedAt: Date.now() - 31 * 60 * 1000 }]));
+    stubQuota(5, 4);
+    const res = await send(setupApp(testDb));
+    expect(res.status).toBe(200);
+    expect(lineCalls.broadcast).toBe(1);
+    expect(rowOf(testDb.raw).status).toBe('sent');
+  });
+
+  test('送信失敗時は予約を外し下書きを保ち、次は送れる', async () => {
+    const testDb = createTestD1();
+    seedBase(testDb.raw);
+    stubQuota(5, 0);
+    const app = setupApp(testDb);
+    lineCalls.failTimes = 1;
+    await send(app);
+    // 失敗しても下書きに戻り、予約行は外れている。
+    expect(rowOf(testDb.raw).status).toBe('draft');
+    const reservations = testDb.raw.prepare(
+      `SELECT value FROM account_settings WHERE line_account_id = 'acc-1' AND key = 'broadcast_quota_reservations'`,
+    ).get() as { value: string } | undefined;
+    expect(reservations === undefined || reservations.value === '[]').toBe(true);
+    const second = await send(app);
+    expect(second.status).toBe(200);
     expect(rowOf(testDb.raw).status).toBe('sent');
   });
 });

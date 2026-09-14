@@ -419,10 +419,13 @@ export async function processBroadcastSend(
  * ようにするため（何通足りないか、次に何をすればよいか）。
  */
 // N-062: 即時送信の直前再確認でも使うため公開する。中身と通知は予約経路と同じ。
+// REJECT対応: reserveBroadcastId を渡すと、枠内と分かった時点でその分を予約台帳に
+// 積む。別配信と残枠を同時に読んでも、台帳の合計で残枠を超えない。
 export async function guardScheduledBroadcastQuota(
   db: D1Database,
   broadcast: Broadcast,
   accountId: string | null,
+  opts?: { reserveBroadcastId?: string },
 ): Promise<{ blocked: boolean; message?: string }> {
   if (!accountId) return { blocked: false };
 
@@ -438,7 +441,18 @@ export async function guardScheduledBroadcastQuota(
   if (planned === null || planned === 0) return { blocked: false };
 
   const check = evaluateQuota(await fetchQuota(account.channel_access_token), planned);
-  if (check.state !== 'short') return { blocked: false };
+  if (check.state !== 'short') {
+    if (opts?.reserveBroadcastId && check.state === 'ok') {
+      const { tryReserveQuotaSlot } = await import('./broadcast-quota-guard.js');
+      const reserved = await tryReserveQuotaSlot(
+        db, accountId, opts.reserveBroadcastId, planned, check.used, check.limit,
+      );
+      if (!reserved) {
+        return { blocked: true, message: 'ほかの送信が枠を使っています。少し待って送り直してください' };
+      }
+    }
+    return { blocked: false };
+  }
 
   const shortfall = shortfallMessage(check, planned);
   const { createNotification } = await import('@line-crm/db');
