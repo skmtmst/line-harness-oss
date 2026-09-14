@@ -445,6 +445,7 @@ export const NEN_SKIPPED_REASONS = [
   'campaign_snapshot_missing',
   'campaign_disabled',
   'campaign_form_already_submitted',
+  'frequency_suppressed',
 ] as const;
 
 export type NenSkippedReason = (typeof NEN_SKIPPED_REASONS)[number];
@@ -476,6 +477,7 @@ function safeFailureReason(status: string, error: string | null, attempts: numbe
     campaign_snapshot_missing: '予約時の配信内容を確認できません',
     campaign_disabled: '配信の決めごとが停止中です',
     campaign_form_already_submitted: 'すでに回答済みのため送りません',
+    frequency_suppressed: '近い時期に同じ配信があるため送りません',
   };
   if (error && known[error]) return known[error];
   return attempts >= MAX_DELIVERY_ATTEMPTS

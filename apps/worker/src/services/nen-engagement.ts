@@ -120,6 +120,7 @@ type DeliveryJob = {
   source_key: string;
   payload: string;
   campaign_snapshot: string | null;
+  scheduled_at: string;
   retry_generation?: number;
 };
 
@@ -200,6 +201,43 @@ async function alreadyRespondedToCampaignForm(
     `SELECT 1 AS found FROM form_submissions WHERE form_id = ? AND friend_id = ? LIMIT 1`,
   ).bind(formId, friendId).first<{ found: number }>();
   return response?.found === 1;
+}
+
+/*
+ * #749 案2: 送信直前の窓の見直し。積む側の抑止は残したまま、claim 後に
+ * 最新のアカウント別設定を正として代表1件だけを送る。
+ * 代表は同一 campaign_key・friend_id の窓内 job を (scheduled_at, id) の
+ * 昇順で並べた先頭。自分より先の pending/processing/sent/failed が1件でも
+ * あれば後続は送らない。同時 tick で両方 send/両方 skip にならないよう、
+ * 自分自身は比較対象から除く。窓の測り方（scheduled_at の近さ・日単位）は
+ * 積む側の INSERT 抑止と同じにする。
+ */
+export async function hasEarlierWindowDelivery(
+  db: D1Database,
+  input: {
+    campaignKey: string;
+    friendId: string;
+    jobId: string;
+    scheduledAt: string;
+    windowDays: number;
+  },
+): Promise<boolean> {
+  if (!Number.isInteger(input.windowDays) || input.windowDays <= 0) return false;
+  const earlier = await db.prepare(
+    `SELECT 1 AS found FROM nen_delivery_jobs other
+      WHERE other.campaign_key = ?
+        AND other.friend_id = ?
+        AND other.id != ?
+        AND other.status IN ('pending', 'processing', 'sent', 'failed')
+        AND ABS(julianday(other.scheduled_at) - julianday(?)) < ?
+        AND (other.scheduled_at < ? OR (other.scheduled_at = ? AND other.id < ?))
+      LIMIT 1`,
+  ).bind(
+    input.campaignKey, input.friendId, input.jobId,
+    input.scheduledAt, input.windowDays,
+    input.scheduledAt, input.scheduledAt, input.jobId,
+  ).first<{ found: number }>();
+  return earlier?.found === 1;
 }
 
 export function readNenCampaignSnapshot(value: string | null, campaignKey: string): CampaignRow | null {
@@ -715,7 +753,7 @@ export async function processNenDeliveries(
   // 上限ぶん先頭を占めたまま、後ろに並ぶ動作中アカウントの配信が進まない。
   const jobs = await db.prepare(
     `SELECT id, campaign_key, friend_id, line_account_id, source_key, payload, campaign_snapshot,
-            retry_generation
+            scheduled_at, retry_generation
        FROM nen_delivery_jobs
       WHERE ${dueWhere}
         AND NOT ${campaignsOff}
@@ -782,6 +820,22 @@ export async function processNenDeliveries(
         await db.prepare(
           `UPDATE nen_delivery_jobs SET status = 'skipped', last_error = ?, updated_at = ? WHERE id = ?`,
         ).bind('campaign_form_already_submitted', jstNow(), job.id).run();
+        skipped++;
+        continue;
+      }
+      // #749 案2: claim 後に最新のアカウント別設定を正として窓を見直す。
+      // 0なら頻度抑止なし。代表より後なら新しい固定理由で skip し、監査に残す。
+      const windowDays = currentCampaign.dedup_window_days ?? 30;
+      if (await hasEarlierWindowDelivery(db, {
+        campaignKey: job.campaign_key,
+        friendId: job.friend_id,
+        jobId: job.id,
+        scheduledAt: job.scheduled_at,
+        windowDays,
+      })) {
+        await db.prepare(
+          `UPDATE nen_delivery_jobs SET status = 'skipped', last_error = ?, updated_at = ? WHERE id = ?`,
+        ).bind('frequency_suppressed', jstNow(), job.id).run();
         skipped++;
         continue;
       }

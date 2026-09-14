@@ -101,6 +101,7 @@ const skippedNoRetryNote: Record<string, string> = {
   campaign_snapshot_missing: '予約内容が残っていないため、この記録は再送できません。',
   line_account_mismatch: 'アカウントが一致しないため、この記録は再送できません。',
   campaign_form_already_submitted: 'すでに回答済みのため、この記録は再送しません。',
+  frequency_suppressed: '近い時期の同じ配信を代表1件にまとめたため、この記録は再送しません。',
 }
 
 function skippedReasonsDetail(skippedReasons: Record<string, number> | undefined): string | null {
