@@ -8,6 +8,7 @@ const mocks = {
   getTags: vi.fn(),
   getTagsWithUsage: vi.fn(),
   createTag: vi.fn(),
+  assertTagNameAvailable: vi.fn(),
   deleteTag: vi.fn(),
   updateTagMileageSettings: vi.fn(),
   enqueueHistoricTagMileage: vi.fn(),
@@ -31,7 +32,7 @@ app.use('*', async (c, next) => {
   return next();
 });
 app.route('/', tags);
-const env = { DB: { prepare: () => ({ bind: (id: string) => ({ first: async () => id === 't-1' ? TAG : null }) }) } as unknown as D1Database };
+const env = { DB: { prepare: () => ({ bind: (id: string) => ({ first: async () => id === 't-1' ? TAG : null, run: async () => ({ success: true }) }) }) } as unknown as D1Database };
 
 function req(path: string, method: string, body?: unknown) {
   return app.fetch(
@@ -181,6 +182,8 @@ describe('タグの所属', () => {
   });
 
   it('タグの作成時に分類を指定できる', async () => {
+    // N-048(#803): 作り先所属の分類だけ受け付ける。
+    mocks.getFolderById.mockResolvedValue({ ...GROUP, kind: 'tag', account_id: 'account-1' });
     mocks.createTag.mockResolvedValue(TAG);
     const res = await req('/api/tags', 'POST', { name: '腰痛', groupId: 'g-1' });
     expect(res.status).toBe(201);
