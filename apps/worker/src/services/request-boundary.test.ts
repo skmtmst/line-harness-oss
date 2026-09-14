@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import type { AuthenticatedStaff } from '../middleware/auth.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
-import { resolveRequestBoundary } from './request-boundary.js';
+import { resolveRequestBoundaries, resolveRequestBoundary } from './request-boundary.js';
 
 // board #800: 権限・tenant・LINEアカウント境界の共通土台。
 // 実SQLiteで確かめる。SQLそのものが仕様のため、手書きモックでは意味がない。
@@ -10,8 +10,15 @@ import { resolveRequestBoundary } from './request-boundary.js';
 const TENANT_B = 'tenant-B';
 const NOW = '2026-09-14T00:00:00+09:00';
 
-function staff(id: string, tenantId: string | null): AuthenticatedStaff {
-  return { id, name: id, role: 'owner', readOnly: false, tenantId } as AuthenticatedStaff;
+function staff(
+  id: string,
+  tenantId: string | null,
+  options: { permissionKeys?: string[]; readOnly?: boolean } = {},
+): AuthenticatedStaff {
+  return {
+    id, name: id, role: 'owner', readOnly: options.readOnly ?? false,
+    permissionKeys: options.permissionKeys, tenantId,
+  } as AuthenticatedStaff;
 }
 
 function seed(testDb: SqliteD1): void {
@@ -98,5 +105,59 @@ describe('request-boundary', () => {
     const decision = await resolveRequestBoundary(testDb.db, staff('owner-1', DEFAULT_TENANT_ID), 'no-such-account');
     expect(decision.allowed).toBe(false);
     if (!decision.allowed) expect(decision.reason).toBe('outside-scope');
+  });
+
+  it('必須キー持ちは許可し、キーなし・部分一致は不許可', async () => {
+    const testDb = createTestD1();
+    seed(testDb);
+    const key = { requiredPermissionKey: 'forms.edit' };
+    const withKey = staff('owner-1', DEFAULT_TENANT_ID, { permissionKeys: ['forms.edit'] });
+    expect((await resolveRequestBoundary(testDb.db, withKey, 'acc-1', key)).allowed).toBe(true);
+    const withoutKey = staff('owner-1', DEFAULT_TENANT_ID, { permissionKeys: ['forms.view'] });
+    const denied = await resolveRequestBoundary(testDb.db, withoutKey, 'acc-1', key);
+    expect(denied.allowed).toBe(false);
+    if (!denied.allowed) expect(denied.reason).toBe('forbidden');
+    // 部分一致は許可しない。「forms.edit.all」持ちで「forms.edit」要求は通さない。
+    const broader = staff('owner-1', DEFAULT_TENANT_ID, { permissionKeys: ['forms.edit.all'] });
+    expect((await resolveRequestBoundary(testDb.db, broader, 'acc-1', key)).allowed).toBe(false);
+    // 逆(狭い持ちで広い要求)も通さない。
+    const narrower = staff('owner-1', DEFAULT_TENANT_ID, { permissionKeys: ['forms'] });
+    expect((await resolveRequestBoundary(testDb.db, narrower, 'acc-1', key)).allowed).toBe(false);
+  });
+
+  it('readOnlyはキー持ちでも必須キー要求で不許可', async () => {
+    const testDb = createTestD1();
+    seed(testDb);
+    const reader = staff('owner-1', DEFAULT_TENANT_ID, { permissionKeys: ['forms.edit'], readOnly: true });
+    const decision = await resolveRequestBoundary(
+      testDb.db, reader, 'acc-1', { requiredPermissionKey: 'forms.edit' },
+    );
+    expect(decision.allowed).toBe(false);
+    if (!decision.allowed) expect(decision.reason).toBe('forbidden');
+  });
+
+  it('複数IDは全て範囲内なら許可、1件でも範囲外なら不許可', async () => {
+    const testDb = createTestD1();
+    seed(testDb);
+    const me = staff('owner-1', DEFAULT_TENANT_ID);
+    expect((await resolveRequestBoundaries(testDb.db, me, ['acc-1', 'acc-2'])).allowed).toBe(true);
+    const denied = await resolveRequestBoundaries(testDb.db, me, ['acc-1', 'acc-b']);
+    expect(denied.allowed).toBe(false);
+    if (!denied.allowed) expect(denied.reason).toBe('outside-scope');
+    // 個別範囲のstaffは割当だけ通る。
+    const scoped = staff('scoped-1', DEFAULT_TENANT_ID);
+    expect((await resolveRequestBoundaries(testDb.db, scoped, ['acc-1'])).allowed).toBe(true);
+    expect((await resolveRequestBoundaries(testDb.db, scoped, ['acc-1', 'acc-2'])).allowed).toBe(false);
+  });
+
+  it('複数IDのnullは未割当可視のときだけ通る', async () => {
+    const testDb = createTestD1();
+    seed(testDb);
+    expect((await resolveRequestBoundaries(
+      testDb.db, staff('owner-1', DEFAULT_TENANT_ID), ['acc-1', null],
+    )).allowed).toBe(true);
+    expect((await resolveRequestBoundaries(
+      testDb.db, staff('b-1', TENANT_B), ['acc-b', null],
+    )).allowed).toBe(false);
   });
 });

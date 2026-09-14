@@ -2,16 +2,21 @@
 
 ## 土台の使い方
 
-- 1つの関数だけ使う: `resolveRequestBoundary(db, staff, requestedAccountId)`
-  (apps/worker/src/services/request-boundary.ts)。
-- 中身の判定は既存 `getVisibleLineAccountScope` の再利用。tenantの壁→個別範囲→
-  機能範囲の順序は変えていない。
+- 2つの関数だけ使う(apps/worker/src/services/request-boundary.ts):
+  `resolveRequestBoundary(db, staff, requestedAccountId, options?)` と
+  `resolveRequestBoundaries(db, staff, requestedAccountIds, options?)`。
+- 中身の判定は既存関数の再利用だけ。tenantの壁→個別範囲→機能範囲の順序は
+  変えない。複数IDは既存 `canAccessAllLineAccounts` へ委譲する。
+- `options.requiredPermissionKey`: 必須の個別権限キー。完全一致で比べる
+  (部分一致は許可しない)。指定時は readOnly を必ず拒否する。
 - 使い分け:
-  - 単票・単操作(指定IDあり): 戻りの `allowed` が false なら 403/404 で止める。
+  - 単票・単操作(指定IDあり): 戻りの `allowed` が false なら止める。
     `reason` が `unauthenticated` なら401、`outside-scope` なら404扱いを推奨
-    (存在の有無を漏らさない)。
+    (存在の有無を漏らさない)。`forbidden` は403。
   - 一覧(指定なし): `allowed` は true 固定。`scope.allowedAccountIds` で絞り込む。
     未割当行を読むときだけ `scope.canSeeUnassigned` を見る。
+  - 複数ID(付属先・一括先など): `resolveRequestBoundaries` を使う。1件でも
+    範囲外なら全体を不許可にする(fail-closed)。
 - 今回は各機能routeへ配線していない。下の表の後続票がこの関数を呼ぶ。
 
 ## 後続N/E-ID接続表
