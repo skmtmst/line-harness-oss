@@ -90,7 +90,8 @@ describe('V6 登録メディア一覧の契約', () => {
   })
 
   it('フォルダを取得し、未分類と分けて一覧を絞り込む', () => {
-    expect(PAGE).toContain("api.folders.list('media')")
+    // #730: 選択中の1件に閉じた母集団で数えるよう、選択中IDを渡す。
+    expect(PAGE).toContain("api.folders.list('media', accountAtRequest)")
     expect(PAGE).toContain("api.folders.create({ kind: 'media', name })")
     expect(PAGE).toContain('folderId: folderFilter || undefined')
     expect(PAGE).toContain('<FolderPanel')
