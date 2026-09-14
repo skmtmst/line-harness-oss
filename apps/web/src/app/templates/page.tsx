@@ -138,6 +138,9 @@ export default function TemplatesPage() {
     空のフォルダが作れず、名前を直すと中身が散らばる。
   */
   const [folders, setFolders] = useState<Folder[]>([])
+  // #721: 未分類の件数は GET /api/folders の unfiledCount をそのまま出す。
+  // 来ないときは null（FolderPanel が「—」と出す）。
+  const [unfiledCount, setUnfiledCount] = useState<number | null>(null)
   const [folderError, setFolderError] = useState('')
   const [folderDialogOpen, setFolderDialogOpen] = useState(false)
   const [editingFolder, setEditingFolder] = useState<Folder | null>(null)
@@ -286,8 +289,10 @@ export default function TemplatesPage() {
     setFolderError('')
     try {
       const res = await api.folders.list('template')
-      if (res.success) setFolders(res.data)
-      else setFolderError('フォルダを読み込めませんでした。')
+      if (res.success) {
+        setFolders(res.data)
+        setUnfiledCount(res.unfiledCount ?? null)
+      } else setFolderError('フォルダを読み込めませんでした。')
     } catch {
       setFolderError('フォルダを読み込めませんでした。')
     }
@@ -621,7 +626,10 @@ export default function TemplatesPage() {
             ...folders.map((folder, index) => ({
               id: folder.id,
               label: folder.name,
-              count: templates.filter((t) => t.folderId === folder.id).length,
+              // #721: フォルダ件数はAPI(itemCount)をそのまま出す。読み込み
+              // 済み範囲だけを数える計算は、黙って別の母集団にすり替わるため
+              // 廃止。来ないときは FolderPanel が「—」と出す。
+              count: folder.itemCount ?? null,
               color: folder.color,
               // 設計 `CzndJ` と同じ操作メニューを、文言に依存せず撮影する。
               qaOpen: folder.name === '予約' ? 'CzndJ' : undefined,
@@ -635,7 +643,7 @@ export default function TemplatesPage() {
             {
               id: 'unfiled',
               label: '未分類',
-              count: templates.filter((t) => t.folderId === null).length,
+              count: unfiledCount,
             },
           ]}
         >
