@@ -288,4 +288,18 @@ describe('印が付く前に当ててしまった作り直し', () => {
       expect(checkMigration('DROP TABLE x;', name).ok).toBe(true);
     }
   });
+
+  it('354 は実ファイルを通し、例外は 354 だけに閉じる(#742)', () => {
+    // 検証 D1 へ適用済みのため本体は書き換えず、一覧で救済する。
+    const sql354 = readFileSync(
+      new URL('../packages/db/migrations/354_analytics_cross_lease_generation.sql', import.meta.url),
+      'utf8',
+    );
+    expect(checkMigration(sql354, '354_analytics_cross_lease_generation.sql')).toEqual({ ok: true });
+    // 同じ中身でも別名では通さない。一覧が「何でも通る札」になっていない。
+    expect(checkMigration(sql354, '355_something_else.sql').ok).toBe(false);
+    // 印を後付けしても `_v1` 命名の逆向き手順は coherence 不合格のまま。
+    // 救済は一覧だけで、規則自体は弱めていない。
+    expect(checkMigration(`-- migration-policy: table-rebuild\n${sql354}`, '355_something_else.sql').ok).toBe(false);
+  });
 });
