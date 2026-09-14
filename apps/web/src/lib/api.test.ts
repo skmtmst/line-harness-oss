@@ -823,6 +823,32 @@ describe('eventsApi.createSlots', () => {
     await expect(eventsApi.createSlots('account', 'event', many)).rejects.toThrow('500件を超える一括作成はできません')
     expect(fetchSpy).not.toHaveBeenCalled()
   })
+
+  it('500 slots are accepted and posted in 400/100 chunks (点検#520の中9補足)', async () => {
+    // 500 と 400 の出どころ:
+    // - 500 はクライアント側の誤指定ガード(createSlots の例外。列車189で導入。
+    //   「誤指定で何千件も作らないよう」以外の根拠は無い)。
+    // - 400 はサーバ側の1口上限(apps/worker/src/routes/events.ts の
+    //   `body.slots.length > 400` → 422)に合わせた分割幅。
+    // 500 ちょうどは受け付けて 400+100 の2口で送る。どちらかの数を変えたら
+    // この試験が壊れる(数を合わせた契約)。
+    const fetchSpy = vi.fn(async (_url: string, init?: RequestInit) => {
+      const sent = JSON.parse(init?.body as string) as { slots: unknown[] }
+      return new Response(JSON.stringify({ items: sent.slots }), { status: 201 })
+    })
+    vi.stubGlobal('fetch', fetchSpy)
+    const exactly500 = Array.from({ length: 500 }, (_, index) => ({
+      starts_at: new Date(Date.UTC(2099, 0, 1, 0, index)).toISOString(),
+      ends_at: new Date(Date.UTC(2099, 0, 1, 0, index + 1)).toISOString(),
+      capacity: null,
+    }))
+
+    const response = await eventsApi.createSlots('account', 'event', exactly500)
+
+    expect(fetchSpy).toHaveBeenCalledTimes(2)
+    expect(fetchSpy.mock.calls.map((call) => JSON.parse(call[1]?.body as string).slots.length)).toEqual([400, 100])
+    expect(response.items).toHaveLength(500)
+  })
 })
 
 describe('api.friendAddRules V6 data contract', () => {
