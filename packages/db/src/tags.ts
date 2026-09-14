@@ -1207,8 +1207,15 @@ export async function enqueueHistoricTagMileage(
   const inserted = await db
     .prepare(
       `INSERT OR IGNORE INTO mileage_event_queue
-         (engagement_event_id, status, attempts, available_at, created_at, updated_at)
-       SELECT ee.id, 'pending', 0, ?, ?, ?
+         (engagement_event_id, status, attempts, available_at,
+          applied_published_snapshot, created_at, updated_at)
+       SELECT ee.id, 'pending', 0, ?,
+              -- N-231 案1: 受付(補完実行)時点で適用版の集合を固定する。
+              (SELECT json_group_object(r.id, COALESCE(r.published_version_number, 0))
+                 FROM friends f
+                 JOIN mileage_rules r ON r.line_account_id = f.line_account_id
+                WHERE f.id = ee.actor_friend_id),
+              ?, ?
          FROM engagement_events ee
         WHERE ee.event_type = 'tag_added'
           AND ee.source = 'tag'

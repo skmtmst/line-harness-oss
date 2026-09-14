@@ -6,6 +6,7 @@ import MileageRewardsTab from './mileage-rewards-tab'
 import Breadcrumb from '@/components/shared/breadcrumb'
 import Button from '@/components/shared/button'
 import Chip from '@/components/shared/chip'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
@@ -152,6 +153,8 @@ function MileagePageInner() {
   const [loadError, setLoadError] = useState('')
   const [savingRuleId, setSavingRuleId] = useState<string | null>(null)
   const [ruleActionError, setRuleActionError] = useState('')
+  const [publishTarget, setPublishTarget] = useState<MileageEarningRuleV6 | null>(null)
+  const [publishError, setPublishError] = useState('')
   const [savingRuleOrder, setSavingRuleOrder] = useState(false)
   const [ruleOrder, setRuleOrder] = useState<string[]>([])
   const [ruleOrderDirty, setRuleOrderDirty] = useState(false)
@@ -293,6 +296,28 @@ function MileagePageInner() {
       await loadRules()
     } catch {
       setRuleActionError('たまる決めごとを更新できませんでした。もう一度お試しください。')
+    } finally {
+      setSavingRuleId(null)
+    }
+  }
+
+  // N-231 案1: 下書きを公開版として固定し、実行へ反映する。確認は共通の確認窓で行う。
+  const publishRule = async (rule: MileageEarningRuleV6) => {
+    if (!selectedAccountId || savingRuleId !== null) return
+    setSavingRuleId(rule.id)
+    setPublishError('')
+    try {
+      const res = await api.mileage.publishEarningRule(rule.id, {
+        accountId: selectedAccountId,
+        expectedVersion: rule.draftVersion,
+        idempotencyKey: crypto.randomUUID(),
+      })
+      if (!res.success) throw new Error(res.error)
+      setPublishTarget(null)
+      await loadRules()
+    } catch {
+      // 口の返事をそのまま出さない。運用者にできることは同じ——読み直して確かめる。
+      setPublishError('公開できませんでした。下書きを読み直して内容を確かめてから、もう一度お試しください。')
     } finally {
       setSavingRuleId(null)
     }
@@ -639,6 +664,9 @@ function MileagePageInner() {
                   </td>
                   <td className="px-4 py-3 text-center">
                     {rule.published.status === 'published' ? <Chip tone="ok">動いています</Chip> : <Chip>止めています</Chip>}
+                    <p className="mt-1 text-xs text-ink-faint">
+                      {rule.publishedVersion == null ? '未公開' : `公開版 v${rule.publishedVersion}`}
+                    </p>
                   </td>
                   <td className="px-4 py-3 text-center">
                     <div className="flex items-center justify-center gap-1">
@@ -654,6 +682,13 @@ function MileagePageInner() {
                         {savingRuleId === rule.id
                           ? '反映しています'
                           : rule.published.status === 'published' ? '決めごとを停止' : '決めごとを再開'}
+                      </Button>
+                      <Button
+                        disabled={savingRuleId !== null}
+                        onClick={() => { setPublishError(''); setPublishTarget(rule) }}
+                        aria-label={`${rule.draft.name}の下書きを公開して反映する`}
+                      >
+                        公開して反映
                       </Button>
                     </div>
                   </td>
@@ -677,6 +712,18 @@ function MileagePageInner() {
         </>
         )}
       </div>}
+
+      <ConfirmDialog
+        open={publishTarget !== null}
+        title={publishTarget ? `「${publishTarget.draft.name}」の下書きを公開して反映しますか？` : '下書きを公開して反映しますか？'}
+        description="公開後に受け付けたイベントから新しい内容になります。公開前に受け付けた分と、すでについたマイルは変わりません。取り消せません。"
+        confirmLabel="公開して反映"
+        destructive
+        busy={publishTarget !== null && savingRuleId === publishTarget.id}
+        error={publishError || undefined}
+        onCancel={() => { if (savingRuleId === null) setPublishTarget(null) }}
+        onConfirm={() => { if (publishTarget) void publishRule(publishTarget) }}
+      />
 
       {tab === 'history' && selectedAccountId ? <MileageHistoryTab key={selectedAccountId} accountId={selectedAccountId} /> : null}
 
