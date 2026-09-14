@@ -1,0 +1,102 @@
+import { describe, expect, it } from 'vitest';
+import { DEFAULT_TENANT_ID } from '@line-crm/shared';
+import type { AuthenticatedStaff } from '../middleware/auth.js';
+import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
+import { resolveRequestBoundary } from './request-boundary.js';
+
+// board #800: 権限・tenant・LINEアカウント境界の共通土台。
+// 実SQLiteで確かめる。SQLそのものが仕様のため、手書きモックでは意味がない。
+
+const TENANT_B = 'tenant-B';
+const NOW = '2026-09-14T00:00:00+09:00';
+
+function staff(id: string, tenantId: string | null): AuthenticatedStaff {
+  return { id, name: id, role: 'owner', readOnly: false, tenantId } as AuthenticatedStaff;
+}
+
+function seed(testDb: SqliteD1): void {
+  testDb.raw.prepare(`INSERT OR IGNORE INTO tenants (id, name) VALUES (?, '既定統括'), (?, '支社')`)
+    .run(DEFAULT_TENANT_ID, TENANT_B);
+  for (const [id, tenant] of [['acc-1', DEFAULT_TENANT_ID], ['acc-2', DEFAULT_TENANT_ID], ['acc-b', TENANT_B]] as const) {
+    testDb.raw.prepare(
+      `INSERT INTO line_accounts (id, channel_id, name, channel_access_token, channel_secret, is_active, tenant_id)
+       VALUES (?, ?, ?, 'token', 'secret', 1, ?)`,
+    ).run(id, `channel-${id}`, id, tenant);
+  }
+  testDb.raw.prepare(
+    `INSERT INTO staff_members (id, name, role, api_key, tenant_id, account_scope)
+     VALUES ('owner-1', 'owner-1', 'owner', 'key-1', ?, 'all'),
+            ('scoped-1', 'scoped-1', 'staff', 'key-2', ?, 'accounts'),
+            ('b-1', 'b-1', 'admin', 'key-3', ?, 'all')`,
+  ).run(DEFAULT_TENANT_ID, DEFAULT_TENANT_ID, TENANT_B);
+  testDb.raw.prepare(
+    `INSERT INTO staff_account_scopes (staff_id, line_account_id, created_at) VALUES ('scoped-1', 'acc-1', ?)`,
+  ).run(NOW);
+}
+
+describe('request-boundary', () => {
+  it('未認証は常に不許可で理由はunauthenticated', async () => {
+    const testDb = createTestD1();
+    seed(testDb);
+    const decision = await resolveRequestBoundary(testDb.db, undefined, 'acc-1');
+    expect(decision).toEqual({
+      allowed: false,
+      reason: 'unauthenticated',
+      scope: { accounts: [], allowedAccountIds: [], canSeeUnassigned: false, ids: [], isAccountScoped: true },
+    });
+  });
+
+  it('既定統括のownerは自統括のアカウント指定を許可する', async () => {
+    const testDb = createTestD1();
+    seed(testDb);
+    const decision = await resolveRequestBoundary(testDb.db, staff('owner-1', DEFAULT_TENANT_ID), 'acc-2');
+    expect(decision.allowed).toBe(true);
+    if (decision.allowed) {
+      expect(decision.scope.allowedAccountIds).toEqual(['acc-1', 'acc-2']);
+    }
+  });
+
+  it('指定なしは一覧用に許可し、絞り込み用の範囲を返す', async () => {
+    const testDb = createTestD1();
+    seed(testDb);
+    for (const requested of [undefined, ''] as const) {
+      const decision = await resolveRequestBoundary(testDb.db, staff('owner-1', DEFAULT_TENANT_ID), requested);
+      expect(decision.allowed).toBe(true);
+    }
+  });
+
+  it('別統括のアカウント指定は不許可で理由はoutside-scope', async () => {
+    const testDb = createTestD1();
+    seed(testDb);
+    const denied = await resolveRequestBoundary(testDb.db, staff('b-1', TENANT_B), 'acc-1');
+    expect(denied.allowed).toBe(false);
+    if (!denied.allowed) expect(denied.reason).toBe('outside-scope');
+    const allowed = await resolveRequestBoundary(testDb.db, staff('b-1', TENANT_B), 'acc-b');
+    expect(allowed.allowed).toBe(true);
+  });
+
+  it('個別範囲のstaffは割当外のアカウントを指定できない', async () => {
+    const testDb = createTestD1();
+    seed(testDb);
+    const me = staff('scoped-1', DEFAULT_TENANT_ID);
+    expect((await resolveRequestBoundary(testDb.db, me, 'acc-1')).allowed).toBe(true);
+    const denied = await resolveRequestBoundary(testDb.db, me, 'acc-2');
+    expect(denied.allowed).toBe(false);
+    if (!denied.allowed) expect(denied.reason).toBe('outside-scope');
+  });
+
+  it('未割当(null)の参照は既定統括だけが許可される', async () => {
+    const testDb = createTestD1();
+    seed(testDb);
+    expect((await resolveRequestBoundary(testDb.db, staff('owner-1', DEFAULT_TENANT_ID), null)).allowed).toBe(true);
+    expect((await resolveRequestBoundary(testDb.db, staff('b-1', TENANT_B), null)).allowed).toBe(false);
+  });
+
+  it('存在しないIDの指定は不許可', async () => {
+    const testDb = createTestD1();
+    seed(testDb);
+    const decision = await resolveRequestBoundary(testDb.db, staff('owner-1', DEFAULT_TENANT_ID), 'no-such-account');
+    expect(decision.allowed).toBe(false);
+    if (!decision.allowed) expect(decision.reason).toBe('outside-scope');
+  });
+});
