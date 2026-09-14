@@ -32,6 +32,7 @@ import type { Env } from '../index.js';
 import { resolveLineToken } from '../services/line-token.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
+import { resolveRequestBoundaries } from '../services/request-boundary.js';
 import {
   completeOutboundSendStatement,
   hashOutboundPayload,
@@ -1028,6 +1029,38 @@ friends.post('/api/friends/:id/tags', requireRole('owner', 'admin', 'staff'), re
     }
 
     const db = c.env.DB;
+    const tag = await db.prepare(
+      'SELECT id, line_account_id, manual_assignment_allowed FROM tags WHERE id = ?',
+    ).bind(body.tagId).first<Pick<DbTag, 'id' | 'line_account_id' | 'manual_assignment_allowed'>>();
+    if (!tag) {
+      return c.json({ success: false, error: 'Tag not found' }, 404);
+    }
+    const friend = await getFriendById(db, friendId);
+    if (!friend) {
+      return c.json({ success: false, error: 'Friend not found' }, 404);
+    }
+    const friendAccountId = ((friend as unknown as Record<string, unknown>).line_account_id as string | null) ?? null;
+    const tagAccountId = tag.line_account_id ?? null;
+    // N-041/N-044(#803): friends行とtags行の所属をDBから解決し、共通境界へ渡す。
+    const boundary = await resolveRequestBoundaries(db, c.get('staff'), [friendAccountId, tagAccountId]);
+    if (!boundary.allowed) {
+      if (boundary.reason === 'unauthenticated') {
+        return c.json({ success: false, error: 'Unauthorized' }, 401);
+      }
+      if (boundary.reason === 'forbidden') {
+        return c.json({ success: false, error: 'Forbidden' }, 403);
+      }
+      return c.json({ success: false, error: 'Tag not found' }, 404);
+    }
+    // 別所属の組合せは存在を漏らさず拒否する。所属なしタグ(共通)は従来どおり付けられる。
+    if (tagAccountId !== null && tagAccountId !== friendAccountId) {
+      return c.json({ success: false, error: 'Tag not found' }, 404);
+    }
+    // 手動付与禁止のタグは付けられない。
+    if (Number(tag.manual_assignment_allowed ?? 1) !== 1) {
+      return c.json({ success: false, error: 'Tag not found' }, 404);
+    }
+
     await addTagToFriend(db, friendId, body.tagId);
 
     // Enroll in tag_added scenarios that match this tag
