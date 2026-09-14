@@ -13,17 +13,23 @@ const mocks = vi.hoisted(() => ({
   attachTag: vi.fn(),
 }));
 
-vi.mock('@line-crm/db', () => ({
-  countChoiceUsage: mocks.countChoiceUsage,
-  countFormSubmissionsByFriend: mocks.countFormSubmissionsByFriend,
-  enrollFriendInReminder: mocks.enrollFriendInReminder,
-  enrollFriendInScenario: mocks.enrollFriendInScenario,
-  getFriendFieldById: mocks.getFriendFieldById,
-  getMessageTemplateById: mocks.getMessageTemplateById,
-  removeTagFromFriend: mocks.removeTagFromFriend,
-  setFriendFieldValue: mocks.setFriendFieldValue,
-  jstNow: () => '2026-08-19T12:00:00+09:00',
-}));
+vi.mock('@line-crm/db', async (importOriginal) => {
+  // N-042: 検証だけは本物を使う。mock にすると「検証を外す逆変異」が
+  // 捕まらなくなる。書き込み(get/set)は上の差し替えのまま。
+  const actual = await importOriginal<typeof import('@line-crm/db')>();
+  return {
+    countChoiceUsage: mocks.countChoiceUsage,
+    countFormSubmissionsByFriend: mocks.countFormSubmissionsByFriend,
+    enrollFriendInReminder: mocks.enrollFriendInReminder,
+    enrollFriendInScenario: mocks.enrollFriendInScenario,
+    getFriendFieldById: mocks.getFriendFieldById,
+    getMessageTemplateById: mocks.getMessageTemplateById,
+    removeTagFromFriend: mocks.removeTagFromFriend,
+    setFriendFieldValue: mocks.setFriendFieldValue,
+    validateFriendFieldValue: actual.validateFriendFieldValue,
+    jstNow: () => '2026-08-19T12:00:00+09:00',
+  };
+});
 
 vi.mock('./friend-tag-attach.js', () => ({
   attachTagAndFireSideEffects: mocks.attachTag,
@@ -75,9 +81,21 @@ beforeEach(() => {
   mocks.countFormSubmissionsByFriend.mockResolvedValue(0);
   mocks.enrollFriendInReminder.mockResolvedValue(undefined);
   mocks.enrollFriendInScenario.mockResolvedValue(undefined);
-  mocks.getFriendFieldById.mockResolvedValue({ id: 'ff-1', ec_is_master: 0 });
+  mocks.getFriendFieldById.mockResolvedValue({
+    id: 'ff-1',
+    ec_is_master: 0,
+    type: 'text',
+    options_json: null,
+  });
   mocks.setFriendFieldValue.mockResolvedValue(undefined);
 });
+
+const TEXT_FIELD = {
+  id: 'ff-1',
+  ec_is_master: 0,
+  type: 'text',
+  options_json: null,
+};
 
 describe('受け付けてよいかの判定', () => {
   const base = {
@@ -214,6 +232,7 @@ describe('回答を配る', () => {
       fieldId: 'ff-1',
       value: '山田太郎',
       updatedBy: 'form',
+      field: TEXT_FIELD,
     });
   });
 
@@ -306,10 +325,11 @@ describe('回答を配る', () => {
       fieldId: 'ff-1',
       value: 'premium',
       updatedBy: 'form',
+      field: TEXT_FIELD,
     });
 
     vi.clearAllMocks();
-    mocks.getFriendFieldById.mockResolvedValue({ id: 'ff-1', ec_is_master: 0 });
+    mocks.getFriendFieldById.mockResolvedValue({ ...TEXT_FIELD });
     await applyFormLayoutEffects({ db, layout, friendId: 'f1', answers: { plan: '竹' } });
     expect(mocks.setFriendFieldValue).toHaveBeenCalledWith(
       db,
@@ -660,5 +680,204 @@ describe('回答を配る', () => {
     });
     expect(mocks.enrollFriendInReminder).not.toHaveBeenCalled();
     expect(result.failedEffects).toEqual([]);
+  });
+});
+
+describe('N-042 型検証の接続(#702)', () => {
+  const numberField = (id: string) => ({ id, ec_is_master: 0, type: 'number', options_json: null });
+
+  test('F2 数値項目へ文字の回答は保存せず失敗に数える', async () => {
+    mocks.getFriendFieldById.mockResolvedValue(numberField('ff-num'));
+    const layout = layoutWith([
+      input({ name: 'count', label: '回数', destinations: { friendFieldIds: ['ff-num'] } }),
+    ]);
+    const { db } = fakeDb();
+
+    const result = await applyFormLayoutEffects({
+      db,
+      layout,
+      friendId: 'f1',
+      answers: { count: 'あいう' },
+    });
+
+    expect(mocks.setFriendFieldValue).not.toHaveBeenCalled();
+    expect(result.destinationWrites).toEqual({ attempted: 1, succeeded: 0, failed: 1 });
+  });
+
+  test('F2 数値のカンマは正規化して保存する', async () => {
+    const field = numberField('ff-num');
+    mocks.getFriendFieldById.mockResolvedValue(field);
+    const layout = layoutWith([
+      input({ name: 'count', label: '回数', destinations: { friendFieldIds: ['ff-num'] } }),
+    ]);
+    const { db } = fakeDb();
+
+    const result = await applyFormLayoutEffects({
+      db,
+      layout,
+      friendId: 'f1',
+      answers: { count: '1,000' },
+    });
+
+    expect(mocks.setFriendFieldValue).toHaveBeenCalledWith(db, {
+      friendId: 'f1',
+      fieldId: 'ff-num',
+      value: '1000',
+      updatedBy: 'form',
+      field,
+    });
+    expect(result.destinationWrites).toEqual({ attempted: 1, succeeded: 1, failed: 0 });
+  });
+
+  test('F2 multi_selectの配列回答は正規化JSONで保存する', async () => {
+    const field = {
+      id: 'ff-multi',
+      ec_is_master: 0,
+      type: 'multi_select',
+      options_json: JSON.stringify(['犬', '猫']),
+    };
+    mocks.getFriendFieldById.mockResolvedValue(field);
+    const layout = layoutWith([
+      input({ name: 'pet', label: '飼っている子', destinations: { friendFieldIds: ['ff-multi'] } }),
+    ]);
+    const { db } = fakeDb();
+
+    const result = await applyFormLayoutEffects({
+      db,
+      layout,
+      friendId: 'f1',
+      answers: { pet: ['犬', '猫'] },
+    });
+
+    expect(mocks.setFriendFieldValue).toHaveBeenCalledWith(db, {
+      friendId: 'f1',
+      fieldId: 'ff-multi',
+      value: JSON.stringify(['犬', '猫']),
+      updatedBy: 'form',
+      field,
+    });
+    expect(result.destinationWrites).toEqual({ attempted: 1, succeeded: 1, failed: 0 });
+  });
+
+  test('F2 multi_selectの選択肢外は保存しない', async () => {
+    mocks.getFriendFieldById.mockResolvedValue({
+      id: 'ff-multi',
+      ec_is_master: 0,
+      type: 'multi_select',
+      options_json: JSON.stringify(['犬', '猫']),
+    });
+    const layout = layoutWith([
+      input({ name: 'pet', label: '飼っている子', destinations: { friendFieldIds: ['ff-multi'] } }),
+    ]);
+    const { db } = fakeDb();
+
+    const result = await applyFormLayoutEffects({
+      db,
+      layout,
+      friendId: 'f1',
+      answers: { pet: ['恐竜'] },
+    });
+
+    expect(mocks.setFriendFieldValue).not.toHaveBeenCalled();
+    expect(result.destinationWrites).toEqual({ attempted: 1, succeeded: 0, failed: 1 });
+  });
+
+  test('F3 選択肢の値が項目の選択肢に無ければ保存しない', async () => {
+    const field = {
+      id: 'ff-sel',
+      ec_is_master: 0,
+      type: 'select',
+      options_json: JSON.stringify(['松', '竹']),
+    };
+    mocks.getFriendFieldById.mockResolvedValue(field);
+    const layout = layoutWith([
+      input({
+        name: 'plan',
+        label: 'プラン',
+        type: 'radio',
+        choiceMode: 'friendField',
+        choiceFriendFieldId: 'ff-sel',
+        choices: [{ id: 'c1', label: '松', value: 'premium' }],
+      }),
+    ]);
+    const { db } = fakeDb();
+
+    const result = await applyFormLayoutEffects({
+      db,
+      layout,
+      friendId: 'f1',
+      answers: { plan: '松' },
+    });
+
+    expect(mocks.setFriendFieldValue).not.toHaveBeenCalled();
+    expect(result.destinationWrites).toEqual({ attempted: 1, succeeded: 0, failed: 1 });
+  });
+
+  test('F3 選択肢の値が項目に合えば正規化して保存する', async () => {
+    const field = {
+      id: 'ff-sel',
+      ec_is_master: 0,
+      type: 'select',
+      options_json: JSON.stringify([{ id: 'premium', label: '松' }, { id: 'std', label: '竹' }]),
+    };
+    mocks.getFriendFieldById.mockResolvedValue(field);
+    const layout = layoutWith([
+      input({
+        name: 'plan',
+        label: 'プラン',
+        type: 'radio',
+        choiceMode: 'friendField',
+        choiceFriendFieldId: 'ff-sel',
+        choices: [{ id: 'c1', label: '松', value: 'premium' }],
+      }),
+    ]);
+    const { db } = fakeDb();
+
+    const result = await applyFormLayoutEffects({
+      db,
+      layout,
+      friendId: 'f1',
+      answers: { plan: '松' },
+    });
+
+    expect(mocks.setFriendFieldValue).toHaveBeenCalledWith(db, {
+      friendId: 'f1',
+      fieldId: 'ff-sel',
+      value: 'premium',
+      updatedBy: 'form',
+      field,
+    });
+    expect(result.destinationWrites).toEqual({ attempted: 1, succeeded: 1, failed: 0 });
+  });
+
+  test('F4 回答後動作の型外の値は保存せず失敗に数える', async () => {
+    mocks.getFriendFieldById.mockResolvedValue(numberField('ff-num'));
+    const layout = emptyLayout();
+    layout.options.afterActions = [{ kind: 'friend_field', fieldId: 'ff-num', value: 'あいう' }];
+    const { db } = fakeDb();
+
+    const result = await applyFormLayoutEffects({ db, layout, friendId: 'f1', answers: {} });
+
+    expect(mocks.setFriendFieldValue).not.toHaveBeenCalled();
+    expect(result.destinationWrites).toEqual({ attempted: 1, succeeded: 0, failed: 1 });
+  });
+
+  test('F4 回答後動作の正しい値は保存する', async () => {
+    const field = numberField('ff-num');
+    mocks.getFriendFieldById.mockResolvedValue(field);
+    const layout = emptyLayout();
+    layout.options.afterActions = [{ kind: 'friend_field', fieldId: 'ff-num', value: '42' }];
+    const { db } = fakeDb();
+
+    const result = await applyFormLayoutEffects({ db, layout, friendId: 'f1', answers: {} });
+
+    expect(mocks.setFriendFieldValue).toHaveBeenCalledWith(db, {
+      friendId: 'f1',
+      fieldId: 'ff-num',
+      value: '42',
+      updatedBy: 'form',
+      field,
+    });
+    expect(result.destinationWrites).toEqual({ attempted: 1, succeeded: 1, failed: 0 });
   });
 });
