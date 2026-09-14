@@ -786,6 +786,14 @@ export interface ConversionApprovalRow {
    * duplicate heuristic reapplied per affiliate. Fraud-review signal only.
    */
   duplicateFlag: boolean;
+  /**
+   * 承認済みで案件の付帯動作(タグ付与・シナリオ開始)がまだ終わっていない行。
+   * runApprovedConversionOfferActions の「成功」と同じ判定を一覧時に計算する:
+   * タグは付与済みかつ台帳未完なし、シナリオは未完購読または
+   * 'conversion-offer:'+eventId の購読行(完了含む)があれば済み。
+   * 停止中の案件・動作未設定・未承認の行は false。
+   */
+  offerActionsIncomplete: boolean;
 }
 
 /**
@@ -850,7 +858,29 @@ export async function getConversionApprovalQueue(
          cp.value AS value,
          ce.approval_status AS approval_status,
          (${identityKeySql}) AS identity_key,
-         CASE WHEN dk.identity_key IS NOT NULL THEN 1 ELSE 0 END AS duplicate_flag
+         CASE WHEN dk.identity_key IS NOT NULL THEN 1 ELSE 0 END AS duplicate_flag,
+         CASE WHEN ce.approval_status = 'approved'
+                AND off.id IS NOT NULL AND off.is_active = 1
+                AND al.affiliate_id = ce.affiliate_id
+                AND (
+                  (off.tag_id IS NOT NULL AND (
+                      NOT EXISTS (SELECT 1 FROM friend_tags ft
+                                   WHERE ft.friend_id = ce.friend_id
+                                     AND ft.tag_id = off.tag_id)
+                      OR EXISTS (SELECT 1 FROM friend_tag_side_effect_runs tr
+                                  WHERE tr.friend_id = ce.friend_id
+                                    AND tr.tag_id = off.tag_id
+                                    AND tr.status != 'completed')))
+               OR (off.scenario_id IS NOT NULL
+                      AND NOT EXISTS (SELECT 1 FROM friend_scenarios fs
+                                       WHERE fs.friend_id = ce.friend_id
+                                         AND fs.scenario_id = off.scenario_id
+                                         AND fs.status != 'completed')
+                      AND NOT EXISTS (SELECT 1 FROM friend_scenarios fsd
+                                       WHERE fsd.id = 'conversion-offer:' || ce.id
+                                         AND fsd.friend_id = ce.friend_id
+                                         AND fsd.scenario_id = off.scenario_id)))
+              THEN 1 ELSE 0 END AS offer_actions_incomplete
        FROM conversion_events ce
        JOIN friends ON friends.id = ce.friend_id
        LEFT JOIN affiliates a ON a.id = ce.affiliate_id
@@ -881,6 +911,7 @@ export async function getConversionApprovalQueue(
       value: number | null;
       approval_status: 'pending' | 'approved' | 'rejected';
       duplicate_flag: number;
+      offer_actions_incomplete: number;
     }>();
 
   return result.results.map((r) => ({
@@ -897,5 +928,6 @@ export async function getConversionApprovalQueue(
     value: r.value,
     approvalStatus: r.approval_status,
     duplicateFlag: r.duplicate_flag === 1,
+    offerActionsIncomplete: r.offer_actions_incomplete === 1,
   }));
 }

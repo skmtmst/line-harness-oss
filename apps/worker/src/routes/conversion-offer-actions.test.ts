@@ -48,6 +48,10 @@ function patch(eventId: string, body: unknown, staff: AuthenticatedStaff = owner
   });
 }
 
+function listApprovals(status: 'pending' | 'approved' | 'rejected', staff: AuthenticatedStaff = owner) {
+  return app(staff).request(`/api/conversions/approvals?status=${status}`);
+}
+
 function bulk(items: unknown, staff: AuthenticatedStaff = owner) {
   return app(staff).request('/api/conversions/approvals/bulk', {
     method: 'POST',
@@ -316,6 +320,31 @@ describe('N-212 承認確定時の案件動作', () => {
     expect(count(`SELECT COUNT(*) AS n FROM friend_scenarios WHERE friend_id='fr-1' AND scenario_id='scn-nopub'`)).toBe(1);
     // 修復でタグが二重付与されていない。
     expect(count(`SELECT COUNT(*) AS n FROM friend_tags WHERE friend_id='fr-1' AND tag_id='tag-a'`)).toBe(1);
+  });
+
+  test('承認済みで動作未完の行は一覧で offerActionsIncomplete が立ち、修復で下りる', async () => {
+    seedTag('tag-a', 'acc-1');
+    seedOffer('off-1', 'acc-1', { tagId: 'tag-a', scenarioId: 'scn-missing' });
+    seedLink('REF-OK', 'off-1');
+    seedEvent('ev-1', 'REF-OK');
+
+    const res = await patch('ev-1', { status: 'approved', expectedStatus: 'pending' });
+    expect(res.status).toBe(422);
+
+    const incompleteFlag = async () => {
+      const list = await listApprovals('approved');
+      expect(list.status).toBe(200);
+      const body = (await list.json()) as { data: { eventId: string; offerActionsIncomplete: boolean }[] };
+      return body.data.find((row) => row.eventId === 'ev-1')?.offerActionsIncomplete;
+    };
+    expect(await incompleteFlag()).toBe(true);
+
+    // 案件のシナリオ参照を有効なものに直して承認を再送 → 修復され旗が下りる。
+    seedScenario('scn-a', 'acc-1');
+    sqlite.raw.prepare(`UPDATE affiliate_offers SET scenario_id='scn-a' WHERE id='off-1'`).run();
+    const retry = await patch('ev-1', { status: 'approved', expectedStatus: 'approved' });
+    expect(retry.status).toBe(200);
+    expect(await incompleteFlag()).toBe(false);
   });
 
   test('却下では案件の動作を実行しない', async () => {
