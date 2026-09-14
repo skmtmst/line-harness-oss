@@ -85,13 +85,6 @@ interface PendingDelete {
   accountId: string | null
 }
 
-type VisualFolder = Folder & {
-  itemCount?: number
-  listTotal?: number
-  activeTotal?: number
-  monthlyTotal?: number
-}
-
 /**
  * 応答したときに行うことを、短い言葉で並べる。
  *
@@ -180,6 +173,9 @@ export default function AutoRepliesPage() {
    */
   const [loadState, setLoadState] = useState<LoadState>('loading')
   const [folders, setFolders] = useState<Folder[]>([])
+  // #721: 未分類の件数は GET /api/folders の unfiledCount をそのまま出す。
+  // 来ないときは null（FolderPanel が「—」と出す）。
+  const [unfiledCount, setUnfiledCount] = useState<number | null>(null)
   /** 選んでいるフォルダ。空は「すべて」、UNFILED は「未分類」。 */
   const [folderFilter, setFolderFilter] = useState('')
   const [folderDialogOpen, setFolderDialogOpen] = useState(false)
@@ -248,7 +244,10 @@ export default function AutoRepliesPage() {
 
   const loadFolders = useCallback(async () => {
     const res = await api.folders.list('auto_reply')
-    if (res.success) setFolders(res.data)
+    if (res.success) {
+      setFolders(res.data)
+      setUnfiledCount(res.unfiledCount ?? null)
+    }
   }, [])
 
   useEffect(() => { load() }, [load])
@@ -471,10 +470,12 @@ export default function AutoRepliesPage() {
   const shownInFolder = sortedItems.slice(0, pageSize)
   const hiddenCount = sortedItems.length - shownInFolder.length
 
-  const visualSummary = folders[0] as VisualFolder | undefined
-  const visualTotal = visualSummary?.listTotal ?? items.length
-  const visualActive = visualSummary?.activeTotal ?? items.filter((item) => item.isActive).length
-  const visualMonthly = visualSummary?.monthlyTotal ?? monthlyHits
+  // #721: KPI の総数は読み込んだ一覧そのままを出す。以前は folders[0] を
+  // 独自拡張型へキャストして件数を読む形だったが、その値を返す API は存在
+  // せず常にフォールバック側が実行されていた（表示は変わらない）。
+  const visualTotal = items.length
+  const visualActive = items.filter((item) => item.isActive).length
+  const visualMonthly = monthlyHits
 
   return (
     <div>
@@ -482,9 +483,7 @@ export default function AutoRepliesPage() {
         <div className="bg-canvas rounded-card border-hairline border p-4">
           <p className="text-ink-faint text-xs">ルール数</p>
           <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
-            {visualSummary
-              ? metricWord(visibleLoadState, visualTotal)
-              : metricWord(visibleLoadState, items.length)}
+            {metricWord(visibleLoadState, visualTotal)}
             {ready && <span className="text-ink-faint ml-0.5 text-xs font-normal">件</span>}
           </p>
           <p className="text-ink-faint mt-0.5 text-xs">
@@ -496,9 +495,7 @@ export default function AutoRepliesPage() {
         <div className="bg-canvas rounded-card border-hairline border p-4">
           <p className="text-ink-faint text-xs">今月の応答</p>
           <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
-            {visualSummary
-              ? metricWord(visibleLoadState, visualMonthly)
-              : metricWord(visibleLoadState, monthlyHits)}
+            {metricWord(visibleLoadState, visualMonthly)}
             {ready && <span className="text-ink-faint ml-0.5 text-xs font-normal">回</span>}
           </p>
           <p className="text-ink-faint mt-0.5 text-xs">
@@ -644,13 +641,16 @@ export default function AutoRepliesPage() {
             ...folders.map((f) => ({
               id: f.id,
               label: f.name,
-              count: (f as VisualFolder).itemCount ?? items.filter((r) => r.folderId === f.id).length,
+              // #721: フォルダ件数はAPI(itemCount)をそのまま出す。?? で
+              // 現在ページの行数を数えるフォールバックは、黙って別の母集団に
+              // すり替わるため廃止。来ないときは FolderPanel が「—」と出す。
+              count: f.itemCount ?? null,
               color: f.color,
             })),
             {
               id: UNFILED,
               label: '未分類',
-              count: items.filter((r) => !r.folderId).length,
+              count: unfiledCount,
             },
           ]}
         >

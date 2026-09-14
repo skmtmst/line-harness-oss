@@ -75,6 +75,9 @@ function VarsPageInner() {
 
   const [items, setItems] = useState<CommonVar[]>([])
   const [folders, setFolders] = useState<Folder[]>([])
+  // #721: 未分類の件数は GET /api/folders の unfiledCount をそのまま出す。
+  // kind=common_var は件数未対応のため来ない。来ないときは null（「—」表示）。
+  const [unfiledCount, setUnfiledCount] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   /** 一覧が件数上限で切られたときに絞り込み誘導を出す。 */
@@ -135,7 +138,10 @@ function VarsPageInner() {
         setItems(vars.data)
         setListLimited(vars.meta?.limited ?? false)
       }
-      if (folderList.success) setFolders(folderList.data)
+      if (folderList.success) {
+        setFolders(folderList.data)
+        setUnfiledCount(folderList.unfiledCount ?? null)
+      }
     } catch (e) {
       // 権限なしと通信障害で文言を分ける。同じ文言だと運用者が接続を
       // 確かめ続け、権限申請に気づけない。
@@ -589,12 +595,16 @@ function VarsPageInner() {
               {
                 id: UNGROUPED,
                 label: '未分類',
-                count: items.filter((item) => item.folderId === null).length,
+                count: unfiledCount,
               },
               ...folders.map((folder) => ({
                 id: folder.id,
                 label: folder.name,
-                count: items.filter((item) => item.folderId === folder.id).length,
+                // #721: フォルダ件数はAPI(itemCount)をそのまま出す。
+                // kind=common_var は件数未対応で来ないため「—」になる。
+                // 読み込み済み範囲だけを数える計算は、黙って別の母集団に
+                // すり替わるため廃止。
+                count: folder.itemCount ?? null,
                 color: folder.color,
               })),
             ]}
