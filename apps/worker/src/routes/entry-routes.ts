@@ -15,6 +15,7 @@ import type { EntryRoute, EntryRouteGenre } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
+import { resolveRequestBoundary } from '../services/request-boundary.js';
 
 const entryRoutes = new Hono<Env>();
 
@@ -100,9 +101,21 @@ entryRoutes.patch('/api/entry-route-genres/:id', requireRole('owner', 'admin'), 
 // GET /api/entry-routes — list all
 entryRoutes.get('/api/entry-routes', async (c) => {
   try {
-    const tenantId = c.get('staff').tenantId ?? DEFAULT_TENANT_ID;
+    const staff = c.get('staff');
+    const tenantId = staff.tenantId ?? DEFAULT_TENANT_ID;
+    // N-011: 選択accountをAPIへ渡し、DBの行と共通境界で照合する。
+    // 範囲外の指定は「ない」ものとして404にする。
+    const requested = (c.req.query('account_id') ?? '').trim();
+    const decision = await resolveRequestBoundary(c.env.DB, staff, requested || undefined);
+    if (!decision.allowed) return c.json({ success: false, error: 'Not found' }, 404);
+    const scope = decision.scope;
     const rows = await getEntryRoutes(c.env.DB, tenantId);
-    return c.json({ success: true, data: rows.map(serialize) });
+    const visible = rows.filter((row) => {
+      const accountId = (row as { line_account_id?: string | null }).line_account_id ?? null;
+      if (requested) return accountId === requested;
+      return accountId == null ? scope.canSeeUnassigned : scope.allowedAccountIds.includes(accountId);
+    });
+    return c.json({ success: true, data: visible.map(serialize) });
   } catch (err) {
     console.error('GET /api/entry-routes error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);

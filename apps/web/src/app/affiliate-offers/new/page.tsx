@@ -83,7 +83,10 @@ export default function NewAffiliateOfferPage() {
 
   useEffect(() => {
     let cancelled = false
-    void Promise.allSettled([api.tags.list(), api.scenarios.list()]).then(
+    // N-211: 選択accountのタグ・シナリオだけを選べるようにする。
+    // 保存時の所属再検査はサーバーが済ませている(案件routeの参照検査)。
+    const accountParams = selectedAccountId ? { accountId: selectedAccountId } : undefined
+    void Promise.allSettled([api.tags.list(accountParams), api.scenarios.list(accountParams)]).then(
       ([t, s]) => {
         if (cancelled) return
         if (t.status === 'fulfilled' && t.value.success) setTags(t.value.data)
