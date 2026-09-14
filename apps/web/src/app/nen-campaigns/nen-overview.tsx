@@ -73,6 +73,32 @@ const categoryLabel: Record<NenCampaignSetting['category'], string> = {
   birthday: '記念日',
 }
 
+// #727: skipped の5理由の日本語文言(worker の safeFailureReason と同じ意味)。
+const skippedReasonLabel: Record<string, string> = {
+  friend_unavailable: '友だちが配信対象ではありません',
+  line_account_unavailable: 'LINE公式アカウントの送信設定を確認できません',
+  line_account_mismatch: '友だちと配信元のLINE公式アカウントが一致しません',
+  campaign_snapshot_missing: '予約時の配信内容を確認できません',
+  campaign_disabled: '配信の決めごとが停止中です',
+  unknown: '理由を確認できません',
+}
+
+// #727: skipped のうち運用で直せる2理由。接続設定のやり直し・配信のオン戻しで解消する。
+const skippedFixableReasons = new Set(['line_account_unavailable', 'campaign_disabled'])
+
+function skippedReasonsDetail(skippedReasons: Record<string, number> | undefined): string | null {
+  if (!skippedReasons) return null
+  const entries = Object.entries(skippedReasons).filter(([, count]) => count > 0)
+  if (entries.length === 0) return null
+  const fixable = entries
+    .filter(([reason]) => skippedFixableReasons.has(reason))
+    .reduce((sum, [, count]) => sum + count, 0)
+  const breakdown = entries
+    .map(([reason, count]) => `${skippedReasonLabel[reason] ?? reason}${skippedFixableReasons.has(reason) ? '(直せます)' : ''} ${count}`)
+    .join('・')
+  return `送らなかった内訳 ${breakdown}(うち直せる ${fixable})`
+}
+
 function Kpis({
   tab,
   flowMetrics,
@@ -122,7 +148,7 @@ function Kpis({
         : [
             { title: '送りました', value: deliveryList?.summary.sent ?? null, unit: '通', detail: deliveryList ? `1日あたり ${Math.round((deliveryList.summary.sent / deliveryList.range.days) * 10) / 10}通` : 'この30日の合計' },
             { title: 'これから送る', value: deliveryList ? deliveryList.summary.pending + deliveryList.summary.processing : null, unit: '通', detail: nextDelivery ? `いちばん近いのは ${formatNenJobDateTime(nextDelivery.scheduledAt)}` : '送信待ちはありません' },
-            { title: '届かなかった', value: deliveryList ? deliveryList.summary.failed + deliveryList.summary.skipped : null, unit: '通', detail: `ブロック ${deliveryList?.summary.unmetReasons?.blocked ?? 0}・退会 ${deliveryList?.summary.unmetReasons?.unfollowed ?? 0}・その他 ${deliveryList?.summary.unmetReasons?.other ?? 0}` },
+            { title: '届かなかった', value: deliveryList ? deliveryList.summary.failed + deliveryList.summary.skipped : null, unit: '通', detail: [`ブロック ${deliveryList?.summary.unmetReasons?.blocked ?? 0}・退会 ${deliveryList?.summary.unmetReasons?.unfollowed ?? 0}・その他 ${deliveryList?.summary.unmetReasons?.other ?? 0}`, deliveryList?.summary.skippedReasons ? skippedReasonsDetail(deliveryList.summary.skippedReasons as Record<string, number>) : null].filter(Boolean).join(' ／ ') },
             { title: 'やり直しが必要', value: deliveryList?.summary.retryRequired ?? null, unit: '通', detail: '最大回数まで失敗した記録' },
           ]
 
@@ -543,7 +569,7 @@ function HistoryPanel({ deliveryList, detail, onShowDetail, onRetry, onChangeVie
   onChangeView: (status?: string, cursor?: string) => void
 }) {
   const [search, setSearch] = useState('')
-  const [filter, setFilter] = useState<'all' | 'sent' | 'pending' | 'failed'>('all')
+  const [filter, setFilter] = useState<'all' | 'sent' | 'pending' | 'failed' | 'skipped'>('all')
   const [retryReasons, setRetryReasons] = useState<Record<string, string>>({})
   const deliveries = deliveryList?.deliveries ?? []
   const shown = useMemo(() => deliveries.filter((delivery) => {
@@ -558,17 +584,29 @@ function HistoryPanel({ deliveryList, detail, onShowDetail, onRetry, onChangeVie
     <>
       <NoteBar>いつ・だれに・何を送ったかの記録です。届かなかったものもここで分かります。</NoteBar>
       <div className="flex flex-wrap items-center justify-between gap-3"><div className="w-full" style={{ maxWidth: 460 }}><SearchField value={search} onChange={setSearch} onClear={() => setSearch('')} placeholder="友だちの名前・配信の名前で検索" /></div><div className="flex gap-2"><span className="rounded-v6-control border border-hairline bg-canvas px-3 py-2 text-sm text-ink-secondary">{rangeLabel}</span><span className="rounded-v6-control border border-hairline bg-canvas px-3 py-2 text-sm text-ink-secondary">{limit}件表示</span></div></div>
+      {/* #727: チップに出ている数を押したら、その数だけ並ぶ。failed と skipped は
+          どちらも溜まり続け運用者のやることが違うため別チップで単一状態ずつ絞る。
+          「これから」は processing がごく短い一時状態でそこだけ見る場面がないため、
+          チップは1つのまま pending,processing の複数状態で絞る。 */}
       <div className="flex flex-wrap gap-2">{[
         ['all', `すべて ${deliveryList?.pagination.total ?? '—'}`],
         ['sent', `送りました ${summary?.sent ?? '—'}`],
         ['pending', `これから ${summary ? summary.pending + summary.processing : '—'}`],
-        ['failed', `届きませんでした ${summary ? summary.failed + summary.skipped : '—'}`],
-      ].map(([value, label]) => <FilterChip key={value} selected={filter === value} onChange={(selected) => { const next = selected ? value as typeof filter : 'all'; setFilter(next); onChangeView(next === 'all' ? undefined : next === 'pending' ? 'pending' : next) }}>{label}</FilterChip>)}<span className="rounded-v6-control border border-hairline bg-canvas px-3 py-2 text-sm text-ink-secondary">送った日が新しい順</span></div>
+        ['failed', `届きませんでした ${summary?.failed ?? '—'}`],
+        ['skipped', `送りませんでした ${summary?.skipped ?? '—'}`],
+      ].map(([value, label]) => <FilterChip key={value} selected={filter === value} onChange={(selected) => { const next = selected ? value as typeof filter : 'all'; setFilter(next); onChangeView(deliveryViewStatus(next)) }}>{label}</FilterChip>)}<span className="rounded-v6-control border border-hairline bg-canvas px-3 py-2 text-sm text-ink-secondary">送った日が新しい順</span></div>
       {shown.length === 0 ? <ListState kind="empty" title="配信履歴はまだありません" description="配信が予約されると、送信前からここに記録が並びます。" /> : <section className="overflow-hidden rounded-v6-card border border-hairline bg-canvas shadow-v6-card"><table className="w-full table-fixed text-sm"><thead className="bg-surface-muted text-left text-xs text-ink-faint"><TableHeadRow><Th style={{ width: '24%' }}>いつ・だれに</Th><Th style={{ width: '18%' }}>配信</Th><Th style={{ width: '18%' }}>状態</Th><Th style={{ width: '15%' }}>きっかけ</Th><Th style={{ width: '12%' }}>到達率・クリック率</Th><Th style={{ width: '13%' }}>操作</Th></TableHeadRow></thead><tbody>{shown.map((delivery) => <Fragment key={delivery.id}><tr><td className="border-t border-hairline px-3 py-3"><p className="font-bold text-ink">{formatNenJobDateTime(delivery.sentAt || delivery.scheduledAt)} ／ {delivery.friendName || '名前未取得'}</p><p className="mt-1 text-xs text-ink-faint">{delivery.lineAccountName}</p></td><td className="border-t border-hairline px-3 py-3 text-ink">{delivery.label}</td><td className="border-t border-hairline px-3 py-3"><p className="font-semibold text-ink">{statusLabel[delivery.status] ?? '状態を確認できません'}</p>{delivery.unmetReason ? <p className="mt-1 text-xs text-danger">{delivery.unmetReason}</p> : null}</td><td className="border-t border-hairline px-3 py-3 text-xs text-ink-faint">{deliveryTriggerLabel(delivery.campaignKey)}</td><td className="border-t border-hairline px-3 py-3 text-xs text-ink-faint" title={delivery.reaction.reason}>取得不可</td><td className="border-t border-hairline px-3 py-3"><Button onClick={() => onShowDetail(delivery.id)}>{detail?.id === delivery.id ? '閉じる' : '中身を見る'}</Button></td></tr>{detail?.id === delivery.id ? <tr><td colSpan={6} className="border-t border-hairline bg-surface-muted p-4"><div className="grid gap-4 lg:grid-cols-3"><div className="lg:col-span-2"><p className="text-xs font-bold text-ink-faint">{detail.trigger}</p><h3 className="mt-1 font-bold text-ink">{detail.content.title || detail.label}</h3><p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-ink-secondary">{detail.content.bodyText || detail.content.reason}</p>{detail.content.buttonLabel ? <p className="mt-2 text-sm font-bold text-v6-action">{detail.content.buttonLabel}</p> : null}</div>{delivery.status === 'failed' && delivery.attempts >= 5 ? <div><label className="text-xs font-bold text-ink">再送する理由（500文字まで）<textarea value={retryReasons[delivery.id] ?? ''} onChange={(event) => setRetryReasons((current) => ({ ...current, [delivery.id]: event.target.value }))} rows={3} maxLength={500} className="mt-2 block w-full rounded-v6-control border border-hairline bg-canvas px-3 py-2 text-sm" /></label><Button variant="primary" disabled={!(retryReasons[delivery.id] ?? '').trim()} onClick={() => onRetry(delivery.id, delivery.version, retryReasons[delivery.id] ?? '')}>再送待ちへ戻す</Button></div> : <p className="text-xs text-ink-faint">再送は最大回数まで失敗した記録だけ行えます。</p>}</div></td></tr> : null}</Fragment>)}</tbody></table></section>}
       <p className="text-xs text-ink-faint">記録 {deliveryList?.pagination.total ?? 0}件中 {shown.length === 0 ? 0 : cursor + 1}〜{cursor + shown.length}件を表示</p>
-      {deliveryList && (cursor > 0 || deliveryList.pagination.nextCursor) ? <div className="flex justify-end gap-2" aria-label="配信履歴のページ送り"><Button disabled={cursor === 0} onClick={() => onChangeView(filter === 'all' ? undefined : filter, String(Math.max(0, cursor - limit)))}>前へ</Button><Button disabled={!deliveryList.pagination.nextCursor} onClick={() => onChangeView(filter === 'all' ? undefined : filter, deliveryList.pagination.nextCursor ?? undefined)}>次へ</Button></div> : null}
+      {deliveryList && (cursor > 0 || deliveryList.pagination.nextCursor) ? <div className="flex justify-end gap-2" aria-label="配信履歴のページ送り"><Button disabled={cursor === 0} onClick={() => onChangeView(deliveryViewStatus(filter), String(Math.max(0, cursor - limit)))}>前へ</Button><Button disabled={!deliveryList.pagination.nextCursor} onClick={() => onChangeView(deliveryViewStatus(filter), deliveryList.pagination.nextCursor ?? undefined)}>次へ</Button></div> : null}
     </>
   )
+}
+
+// #727: チップの選択を配信状態の絞り込み文字列へ変える。「これから」だけ複数状態。
+function deliveryViewStatus(filter: 'all' | 'sent' | 'pending' | 'failed' | 'skipped'): string | undefined {
+  if (filter === 'all') return undefined
+  if (filter === 'pending') return 'pending,processing'
+  return filter
 }
 
 function deliveryTriggerLabel(campaignKey: string) {

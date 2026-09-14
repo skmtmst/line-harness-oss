@@ -415,13 +415,47 @@ export async function getNenPetMetrics(
 
 const DELIVERY_STATUSES = new Set(['pending', 'processing', 'sent', 'skipped', 'failed', 'cancelled']);
 
+// #727: 絞り込みは複数状態を受け付ける(カンマ区切り)。
+// failed と skipped は単一状態の別チップで絞り、「これから」チップだけが
+// pending,processing の複数状態で絞る。processing は配信処理中のごく短い
+// 一時状態で、そこだけを見たい場面がないため、ほぼ常に 0 のチップを
+// 増やさないよう1つのまま合算する。failed と skipped はどちらも溜まり続け、
+// 運用者のやることが違う(接続設定の見直し・配信のオン戻し等)ため分ける。
 export function normalizeDeliveryStatus(value: unknown): string | undefined {
   if (value === undefined || value === null || value === '') return undefined;
-  if (typeof value !== 'string' || !DELIVERY_STATUSES.has(value)) {
+  if (typeof value !== 'string') {
     throw new NenCampaignMetricsError('status_invalid', '配信状態が正しくありません', 400, 'status');
   }
-  return value;
+  const statuses = [...new Set(
+    value.split(',').map((part) => part.trim()).filter((part) => part !== ''),
+  )];
+  if (statuses.length === 0) return undefined;
+  for (const status of statuses) {
+    if (!DELIVERY_STATUSES.has(status)) {
+      throw new NenCampaignMetricsError('status_invalid', '配信状態が正しくありません', 400, 'status');
+    }
+  }
+  return statuses.join(',');
 }
+
+export const NEN_SKIPPED_REASONS = [
+  'friend_unavailable',
+  'line_account_unavailable',
+  'line_account_mismatch',
+  'campaign_snapshot_missing',
+  'campaign_disabled',
+] as const;
+
+export type NenSkippedReason = (typeof NEN_SKIPPED_REASONS)[number];
+
+// #727: skipped のうち運用で直せるもの。line_account_unavailable は
+// LINE公式アカウントの接続設定のやり直し、campaign_disabled は配信を
+// オンに戻すことで解消する。残り3つは友だち側の事情かデータ不整合で
+// 運用操作では直せない。line_account_mismatch は要調査のため含めない。
+export const NEN_SKIPPED_FIXABLE_REASONS: ReadonlySet<string> = new Set([
+  'line_account_unavailable',
+  'campaign_disabled',
+]);
 
 function safeFailureReason(status: string, error: string | null, attempts: number): string | null {
   if (status !== 'failed' && status !== 'skipped') return null;
@@ -464,8 +498,13 @@ export async function listNenDeliveries(
     limit: number;
   },
 ) {
-  const statusSql = input.status ? ' AND j.status = ?' : '';
-  const statusBinds = input.status ? [input.status] : [];
+  const statuses = input.status
+    ? [...new Set(input.status.split(',').map((part) => part.trim()).filter((part) => part !== '') )]
+    : [];
+  const statusSql = statuses.length > 0
+    ? ` AND j.status IN (${statuses.map(() => '?').join(', ')})`
+    : '';
+  const statusBinds = statuses;
   const baseBinds = [input.lineAccountId, input.range.fromSql, input.range.toSql, ...statusBinds];
   const summaryRows = await db.prepare(
     `SELECT j.status, COUNT(*) AS total FROM nen_delivery_jobs j
@@ -474,6 +513,10 @@ export async function listNenDeliveries(
       GROUP BY j.status`,
   ).bind(input.lineAccountId, input.range.fromSql, input.range.toSql)
     .all<{ status: string; total: number }>();
+  // #727: failed 側の分類は触らない(文字列一致のまま)。skipped は
+  // 5つの理由コードのどれも block/unfollow 等の語を含まないため、
+  // 従来はすべて other に落ちていた。skipped は対象外にして、
+  // 内訳は下の理由コード集計(skippedReasons)で出す。
   const unmetRows = await db.prepare(
     `SELECT CASE
               WHEN lower(COALESCE(last_error, '')) LIKE '%block%' THEN 'blocked'
@@ -482,11 +525,20 @@ export async function listNenDeliveries(
               ELSE 'other'
             END AS reason, COUNT(*) AS total
        FROM nen_delivery_jobs
-      WHERE line_account_id = ? AND status IN ('failed', 'skipped')
+      WHERE line_account_id = ? AND status = 'failed'
         AND datetime(scheduled_at) >= datetime(?) AND datetime(scheduled_at) < datetime(?)
       GROUP BY reason`,
   ).bind(input.lineAccountId, input.range.fromSql, input.range.toSql)
     .all<{ reason: 'blocked' | 'unfollowed' | 'other'; total: number }>();
+  // #727: skipped の内訳は5つの理由コードそのままで数える。文字列一致は使わない。
+  const skippedRows = await db.prepare(
+    `SELECT COALESCE(last_error, '') AS reason, COUNT(*) AS total
+       FROM nen_delivery_jobs
+      WHERE line_account_id = ? AND status = 'skipped'
+        AND datetime(scheduled_at) >= datetime(?) AND datetime(scheduled_at) < datetime(?)
+      GROUP BY reason`,
+  ).bind(input.lineAccountId, input.range.fromSql, input.range.toSql)
+    .all<{ reason: string; total: number }>();
   const totalRow = await db.prepare(
     `SELECT COUNT(*) AS total FROM nen_delivery_jobs j
       WHERE j.line_account_id = ?
@@ -518,6 +570,9 @@ export async function listNenDeliveries(
       ...summary,
       retryRequired: await countRetryRequired(db, input.lineAccountId, input.range),
       unmetReasons: Object.fromEntries((unmetRows.results ?? []).map((row) => [row.reason, Number(row.total ?? 0)])),
+      skippedReasons: Object.fromEntries(
+        (skippedRows.results ?? []).map((row) => [row.reason === '' ? 'unknown' : row.reason, Number(row.total ?? 0)]),
+      ),
     },
     deliveries: (rows.results ?? []).map((row) => ({
       id: row.id,
