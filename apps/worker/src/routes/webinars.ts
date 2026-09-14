@@ -65,6 +65,7 @@ import {
   type WebinarActionType,
   type WebinarEditorSettings,
   type WebinarEditorSettingsInput,
+  type WebinarParticipantStat,
 } from '@line-crm/db';
 import { verifyCallerLineUserId } from '../services/liff-auth.js';
 import { attachTagAndFireSideEffects } from '../services/friend-tag-attach.js';
@@ -1749,11 +1750,17 @@ webinarRoutes.get('/api/webinars/:id/analytics', async (c) => {
     const id = c.req.param('id');
     const row = await getWebinarById(c.env.DB, id);
     if (!row) return c.json({ success: false, error: 'Not found' }, 404);
+    // 個人の視聴履歴(participants)はオーナー・管理者だけ。staff には
+    // summary/daily/dropoff などの集計だけ返し、個人配列は取りに行かない。
+    const role = c.get('staff')?.role;
+    const canSeeIndividuals = role === 'owner' || role === 'admin';
     const completionThreshold = Math.max(1, Math.floor(row.duration_seconds * 0.9));
     const [sessions, dropoff, participants, summary, daily, formFunnel, viewSegments, editor] = await Promise.all([
       getWebinarSessionStats(c.env.DB, id),
       getWebinarDropoff(c.env.DB, id),
-      getWebinarParticipantStats(c.env.DB, id, 200),
+      canSeeIndividuals
+        ? getWebinarParticipantStats(c.env.DB, id, 200)
+        : Promise.resolve<WebinarParticipantStat[]>([]),
       getWebinarAnalyticsSummary(c.env.DB, id, completionThreshold),
       getWebinarDailyStats(c.env.DB, id),
       getWebinarFormFunnelStats(c.env.DB, id),
@@ -1831,7 +1838,10 @@ webinarRoutes.get('/api/webinars/:id/analytics', async (c) => {
   }
 });
 
-webinarRoutes.get('/api/webinars/:id/participants', async (c) => {
+webinarRoutes.get(
+  '/api/webinars/:id/participants',
+  requireRole('owner', 'admin'),
+  async (c) => {
   try {
     const id = c.req.param('id');
     const limit = Math.min(200, Math.max(1, Number(c.req.query('limit') ?? 50) || 50));
@@ -1863,7 +1873,8 @@ webinarRoutes.get('/api/webinars/:id/participants', async (c) => {
     console.error('GET /api/webinars/:id/participants error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
-});
+  },
+);
 
 function csvCell(value: unknown): string {
   let text = value === null || value === undefined ? '' : String(value);

@@ -367,6 +367,7 @@ function ParticipantAvatar({
 function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytics, analyticsState, webinarStatus, onRetry }: { webinarId: string; durationSeconds: number; view?: 'participants' | 'analytics' | 'legacy'; analytics: WebinarAnalytics | null; analyticsState: 'idle' | 'loading' | 'ready' | 'error'; webinarStatus: Webinar['status']; onRetry: () => void }) {
   const [userComments, setUserComments] = useState<WebinarUserComment[]>([])
   const [participantPage, setParticipantPage] = useState<WebinarParticipantPage | null>(null)
+  const [participantsDenied, setParticipantsDenied] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [attempt, setAttempt] = useState(0)
 
@@ -376,11 +377,25 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytic
   */
   useEffect(() => {
     setError(null)
+    setParticipantsDenied(false)
+    /*
+      個人の参加履歴はオーナー・管理者だけの口。staff には 403 が返るので、
+      失敗扱いにせず「見られない」とだけ覚えて集計の表示は続ける。
+    */
+    const participantsRequest = webinarApi.participants(webinarId, undefined, 8).catch((cause) => {
+      if (cause instanceof ApiError && cause.status === 403) return null
+      throw cause
+    })
     // 参加者は8件だけ表示するので、初回は8件取得に抑える。
-    Promise.all([webinarApi.userComments(webinarId), webinarApi.participants(webinarId, undefined, 8)])
+    Promise.all([webinarApi.userComments(webinarId), participantsRequest])
       .then(([commentsRes, participantsRes]) => {
         setUserComments(commentsRes.data)
-        setParticipantPage(participantsRes.data)
+        if (participantsRes === null) {
+          setParticipantPage(null)
+          setParticipantsDenied(true)
+        } else {
+          setParticipantPage(participantsRes.data)
+        }
       })
       .catch((err) => setError(err instanceof Error ? err.message : String(err)))
   }, [webinarId, attempt])
@@ -400,6 +415,21 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytic
   const participationRows = (participantPage?.items ?? analytics.participants).slice(0, 8)
 
   if (view === 'participants') {
+    if (participantsDenied) {
+      return (
+        <div className="border-hairline bg-canvas rounded-card border p-8 text-center shadow-card" role="note">
+          <p className="text-ink text-sm font-bold">個人の参加履歴はオーナーと管理者だけが確認できます。</p>
+          <p className="text-ink-faint mt-2 text-xs">友だちごとの視聴・申込の記録を出す権限がないため、この段は表示できません。集計だけは「分析」から確認できます。</p>
+        </div>
+      )
+    }
+    /*
+      許可の判定が届くまで一覧とCSVを描かない。staff に一瞬だけ
+      使えない導線と「まだ参加者がいません」の誤表示を見せないため。
+    */
+    if (participantPage === null && participationRows.length === 0) {
+      return <div className="text-gray-500 text-sm">読み込み中...</div>
+    }
     const unviewed = Math.max(0, summary.reservations - summary.viewers)
     const watching = Math.max(0, summary.viewers - summary.completed)
     return (
@@ -450,7 +480,7 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytic
     const largestDropoff = largestDropoffAt(analytics.viewSegments ?? [])
     return (
       <div className="space-y-4" data-design-node="yxyzQ">
-        <div className="flex flex-wrap items-center justify-between gap-3"><nav aria-label="この段の見出しへ移動" className="flex flex-wrap gap-2">{[{ label: '概要', href: '#webinar-overview' }, { label: '視聴', href: '#webinar-watch-funnel' }, { label: '離脱', href: '#webinar-dropoff' }, { label: 'CTA', href: '#webinar-cta-funnel' }, { label: '申込', href: '#webinar-recent' }].map((item) => <a key={item.label} href={item.href} className="border-hairline bg-canvas text-ink-secondary rounded-control border px-3 py-2 text-sm font-semibold hover:underline">{item.label}</a>)}</nav><Button href={webinarApi.participantsCsvUrl(webinarId)}>CSVで書き出す</Button></div>
+        <div className="flex flex-wrap items-center justify-between gap-3"><nav aria-label="この段の見出しへ移動" className="flex flex-wrap gap-2">{[{ label: '概要', href: '#webinar-overview' }, { label: '視聴', href: '#webinar-watch-funnel' }, { label: '離脱', href: '#webinar-dropoff' }, { label: 'CTA', href: '#webinar-cta-funnel' }, { label: '申込', href: '#webinar-recent' }].map((item) => <a key={item.label} href={item.href} className="border-hairline bg-canvas text-ink-secondary rounded-control border px-3 py-2 text-sm font-semibold hover:underline">{item.label}</a>)}</nav>{participantPage && <Button href={webinarApi.participantsCsvUrl(webinarId)}>CSVで書き出す</Button>}</div>
         <div className="flex flex-col gap-4 xl:flex-row">
           <div className="min-w-0 flex-1 space-y-3">
             <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card"><h2 className="text-ink text-base font-bold">視聴結果</h2><p className="text-ink-faint mt-1 text-xs">申込・再生・完了率を確認します。</p><dl className="divide-hairline mt-4 divide-y rounded-control border border-hairline"><div className="flex justify-between gap-4 px-4 py-4"><dt className="text-ink-faint text-xs font-semibold">申込</dt><dd className="text-ink text-sm font-bold">{summary.reservations.toLocaleString('ja-JP')}人</dd></div><div className="flex justify-between gap-4 px-4 py-4"><dt className="text-ink-faint text-xs font-semibold">再生</dt><dd className="text-ink text-sm font-bold">{summary.viewers.toLocaleString('ja-JP')}人（{percent(summary.viewers, summary.reservations)}）</dd></div></dl></section>
@@ -542,9 +572,11 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytic
             <h2 className="text-ink text-lg font-bold">参加者管理</h2>
             <p className="text-ink-faint mt-1 text-xs">申込・視聴・CTA・フォームの結果を友だち単位で確認します。</p>
           </div>
-          <Button href={webinarApi.participantsCsvUrl(webinarId)}>
-            参加者をCSVで書き出す
-          </Button>
+          {participantPage && (
+            <Button href={webinarApi.participantsCsvUrl(webinarId)}>
+              参加者をCSVで書き出す
+            </Button>
+          )}
         </div>
         <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <div className="border-hairline bg-canvas rounded-card border p-4">
