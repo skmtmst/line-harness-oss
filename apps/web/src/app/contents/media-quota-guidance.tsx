@@ -18,12 +18,10 @@ export function MediaQuotaGuidance({
       <p className={failed ? 'text-danger text-xs' : 'text-ink-faint text-xs'}>保存容量を確認できませんでした。</p>
     )
   }
-  const barTone =
-    quota.state === 'full' ? 'bg-danger' : quota.state === 'warning' || quota.state === 'notice' ? 'bg-warning' : 'bg-accent-deep'
   return (
     <>
       <div className="bg-canvas-sunken mt-1 ml-auto h-1.5 w-56 overflow-hidden rounded-pill" role="progressbar" aria-label="保存容量" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.min(100, Math.round(quota.usageRate * 100))}>
-        <div className={`h-full rounded-pill ${barTone}`} style={{ width: `${Math.min(100, quota.usageRate * 100)}%` }} />
+        <div className={`h-full rounded-pill ${quota.state === 'full' ? 'bg-danger' : quota.state === 'warning' || quota.state === 'notice' ? 'bg-warning' : 'bg-accent-deep'}`} style={{ width: `${Math.min(100, quota.usageRate * 100)}%` }} />
       </div>
       <p className="text-ink-faint mt-1 text-xs">残り {formatMediaSize(quota.remainingBytes)}{quota.reservedBytes > 0 ? `（送信のため確保中 ${formatMediaSize(quota.reservedBytes)} を含む）` : ''}</p>
       {quota.state === 'full' ? (
