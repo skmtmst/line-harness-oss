@@ -53,6 +53,7 @@ import {
   previewAudience,
 } from '../services/broadcast-preflight.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
+import { resolveRequestBoundaries } from '../services/request-boundary.js';
 import type { AuthenticatedStaff } from '../middleware/auth.js';
 import { fetchQuota, releaseQuotaSlot } from '../services/broadcast-quota-guard.js';
 import { dispatchOperatorEvent } from '../services/operator-notification-dispatch.js';
@@ -87,6 +88,29 @@ async function canAccessBroadcast(
   broadcast: DbBroadcast,
 ): Promise<boolean> {
   return canAccessAllLineAccounts(db, staff, broadcastAccountIds(broadcast));
+}
+
+/**
+ * 配信の作成・更新・送信の共通境界(N-061)。
+ *
+ * owner/adminは従来の範囲確認だけ通す(動作・状態を変えない)。一般staffは
+ * 既存 /broadcasts を操作権限キーとして共通土台へ渡す。新しい権限キーは
+ * 増やさない。readOnlyは土台が拒否する。
+ */
+async function broadcastWriteBoundary(
+  c: Context<Env>,
+  accountIds: Array<string | null | undefined>,
+): Promise<{ allowed: true } | { allowed: false; reason: 'forbidden' | 'outside-scope' }> {
+  const staff = c.get('staff');
+  if (staff && (staff.role === 'owner' || staff.role === 'admin')) {
+    const ok = await canAccessAllLineAccounts(c.env.DB, staff, accountIds);
+    return ok ? { allowed: true } : { allowed: false, reason: 'outside-scope' };
+  }
+  const decision = await resolveRequestBoundaries(c.env.DB, staff, accountIds, {
+    requiredPermissionKey: '/broadcasts',
+  });
+  if (decision.allowed) return { allowed: true };
+  return { allowed: false, reason: decision.reason === 'forbidden' ? 'forbidden' : 'outside-scope' };
 }
 
 function unsupportedVariablesError(content: string): string | null {
@@ -871,7 +895,7 @@ broadcasts.post('/api/broadcasts/preflight', requireRole('owner', 'admin'), asyn
   }
 });
 
-broadcasts.post('/api/broadcasts', requireRole('owner', 'admin'), async (c) => {
+broadcasts.post('/api/broadcasts', async (c) => {
   try {
     const body = await c.req.json<CreateBroadcastBody>();
     const idempotencyKey = c.req.header('Idempotency-Key')?.trim();
@@ -900,8 +924,12 @@ broadcasts.post('/api/broadcasts', requireRole('owner', 'admin'), async (c) => {
     const requestedAccountIds = targetType === 'multi-account-dedup'
       ? (Array.isArray(body.accountIds) ? body.accountIds : [null])
       : [body.lineAccountId ?? null];
-    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), requestedAccountIds)) {
-      return c.json({ success: false, error: ACCOUNT_ACCESS_ERROR }, 403);
+    // N-061: 要求accountを共通境界へ渡す。/broadcasts持ちstaffだけが作れる。
+    const createBoundary = await broadcastWriteBoundary(c, requestedAccountIds);
+    if (!createBoundary.allowed) {
+      return createBoundary.reason === 'forbidden'
+        ? c.json({ success: false, error: 'この機能を操作する権限がありません' }, 403)
+        : c.json({ success: false, error: ACCOUNT_ACCESS_ERROR }, 403);
     }
 
     let messageParts: ReturnType<typeof parseBroadcastMessageParts> = [];
@@ -1065,7 +1093,7 @@ broadcasts.post('/api/broadcasts', requireRole('owner', 'admin'), async (c) => {
 });
 
 // PUT /api/broadcasts/:id - update draft
-broadcasts.put('/api/broadcasts/:id', requireRole('owner', 'admin'), async (c) => {
+broadcasts.put('/api/broadcasts/:id', async (c) => {
   try {
     const id = c.req.param('id');
     const existing = await getBroadcastById(c.env.DB, id);
@@ -1130,8 +1158,12 @@ broadcasts.put('/api/broadcasts/:id', requireRole('owner', 'admin'), async (c) =
       : [body.lineAccountId !== undefined
           ? body.lineAccountId
           : (existingRaw.line_account_id as string | null | undefined) ?? null];
-    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), requestedAccountIds)) {
-      return c.json({ success: false, error: ACCOUNT_ACCESS_ERROR }, 403);
+    // N-061: 変更後の宛先accountも共通境界へ渡す。/broadcasts持ちstaffだけが変えられる。
+    const updateBoundary = await broadcastWriteBoundary(c, requestedAccountIds);
+    if (!updateBoundary.allowed) {
+      return updateBoundary.reason === 'forbidden'
+        ? c.json({ success: false, error: 'この機能を操作する権限がありません' }, 403)
+        : c.json({ success: false, error: ACCOUNT_ACCESS_ERROR }, 403);
     }
     const resultingAccountId = resultingTargetType === 'multi-account-dedup'
       ? null
@@ -1692,7 +1724,7 @@ broadcasts.delete('/api/broadcasts/:id', requireRole('owner', 'admin'), async (c
 // 既存の lock 修正 (a27ad9f / bffcdf8 / 3ac2fec) は cron / scheduled 経路を
 // 守ったが、API direct 経路は未対応のままだった。
 // 友だちへ実際に届き、取り消せない。権限に加えて明示的な確認を要求する。
-broadcasts.post('/api/broadcasts/:id/send', requireRole('owner', 'admin'), requireIrreversibleConfirmation('broadcast-send'), async (c) => {
+broadcasts.post('/api/broadcasts/:id/send', requireIrreversibleConfirmation('broadcast-send'), async (c) => {
   try {
     const id = c.req.param('id');
     const existing = await getBroadcastById(c.env.DB, id);
@@ -1702,6 +1734,13 @@ broadcasts.post('/api/broadcasts/:id/send', requireRole('owner', 'admin'), requi
     }
     if (!await canAccessBroadcast(c.env.DB, c.get('staff'), existing)) {
       return c.json({ success: false, error: 'Broadcast not found' }, 404);
+    }
+    // N-061: 行のaccountを共通境界へ渡す。/broadcasts持ちstaffだけが送れる。
+    const sendBoundary = await broadcastWriteBoundary(c, broadcastAccountIds(existing));
+    if (!sendBoundary.allowed) {
+      return sendBoundary.reason === 'forbidden'
+        ? c.json({ success: false, error: 'この機能を操作する権限がありません' }, 403)
+        : c.json({ success: false, error: 'Broadcast not found' }, 404);
     }
 
     let existingParts;

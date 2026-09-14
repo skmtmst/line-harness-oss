@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import type { Context } from 'hono';
+import type { Context, MiddlewareHandler } from 'hono';
 import {
   getScenarioById,
   createScenario,
@@ -39,6 +39,7 @@ import type {
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
+import { resolveRequestBoundary } from '../services/request-boundary.js';
 import { validateTemplateMessage } from '../services/template-message-validation.js';
 import {
   getScenarioRuns,
@@ -91,6 +92,37 @@ async function requireScenarioAccountScope(c: Context<Env>, lineAccountId: strin
     return c.json({ success: false, error: 'シナリオが見つかりません' }, 404);
   }
   return null;
+}
+
+/**
+ * シナリオ変更の共通境界(N-051)。
+ *
+ * owner/adminは従来どおり通す。一般staffはシナリオ行のaccountをDB解決し、
+ * 共通土台へ渡す。表示権限だけのstaff・readOnly・範囲外は止める。
+ * 存在しない行はここでは通し、後段の404に任せる。
+ */
+const requireScenarioEditBoundary: MiddlewareHandler<Env> = async (c, next) => {
+  const staff = c.get('staff');
+  if (staff && (staff.role === 'owner' || staff.role === 'admin')) {
+    await next();
+    return;
+  }
+  const scenario = await getScenarioById(c.env.DB, c.req.param('id') ?? '');
+  if (!scenario) {
+    await next();
+    return;
+  }
+  const accountId = (scenario as { line_account_id?: string | null }).line_account_id ?? null;
+  const decision = await resolveRequestBoundary(c.env.DB, staff, accountId, {
+    requiredPermissionKey: 'scenario.definition.edit',
+  });
+  if (!decision.allowed) {
+    if (decision.reason === 'forbidden') {
+      return c.json({ success: false, error: 'この機能を操作する権限がありません' }, 403);
+    }
+    return c.json({ success: false, error: 'Scenario not found' }, 404);
+  }
+  await next();
 }
 
 async function requireVisibleScenario(c: Context<Env>, next: () => Promise<void>) {
@@ -572,7 +604,7 @@ scenarios.post('/api/scenarios', requireRole('owner', 'admin'), async (c) => {
 });
 
 // PUT /api/scenarios/:id - update (accepts camelCase fields from clients)
-scenarios.put('/api/scenarios/:id', requireRole('owner', 'admin'), async (c) => {
+scenarios.put('/api/scenarios/:id', requireScenarioEditBoundary, async (c) => {
   try {
     const id = c.req.param('id');
     const body = await c.req.json<{
@@ -1391,7 +1423,7 @@ scenarios.post('/api/scenarios/:id/enroll/:friendId', requireRole('owner', 'admi
 // 下書きの編集は公開するまで配信へ混入しない。購読は開始時の版へ固定され、
 // 開始後の編集は次に公開した版の購読から使う（N-050 / #644）。
 // アカウント境界は /api/scenarios/:id 系の共通ミドルウェアで 404 にする。
-scenarios.post('/api/scenarios/:id/publish', requireRole('owner', 'admin'), async (c) => {
+scenarios.post('/api/scenarios/:id/publish', requireScenarioEditBoundary, async (c) => {
   try {
     const requestKey = c.req.header('Idempotency-Key');
     if (!validScenarioPublishKey(requestKey)) {
@@ -1858,7 +1890,7 @@ scenarios.get('/api/scenarios/:id/triggers', scenarioPermission('view'), async (
   }
 });
 
-scenarios.post('/api/scenarios/:id/triggers', requireRole('owner', 'admin'), async (c) => {
+scenarios.post('/api/scenarios/:id/triggers', requireScenarioEditBoundary, async (c) => {
   try {
     const scenarioId = c.req.param('id');
     const body = await c.req.json<{ kind?: string; tagId?: string | null }>();
