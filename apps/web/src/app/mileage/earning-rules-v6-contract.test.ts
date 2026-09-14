@@ -84,6 +84,21 @@ describe('V6 たまる決めごと（N46cQ）の画面', () => {
     expect(PAGE).not.toContain("setLoadError('たまる決めごとを更新できませんでした")
   })
 
+  it('N-231 案1: 下書きの公開は保存と別の操作で、版を見せて確認窓で確かめる', () => {
+    // 公開して反映ボタン・公開版表示・下書き版の受け渡し。
+    expect(PAGE).toContain('api.mileage.publishEarningRule')
+    expect(PAGE).toContain('公開して反映')
+    expect(PAGE).toContain('rule.publishedVersion')
+    expect(PAGE).toContain('公開版 v${rule.publishedVersion}')
+    expect(PAGE).toContain('expectedVersion: rule.draftVersion')
+    // 取り消せない操作のため共通の確認窓で確かめる。ブラウザのconfirmは使わない。
+    expect(PAGE).toContain("import ConfirmDialog from '@/components/shared/confirm-dialog'")
+    expect(PAGE).toContain('<ConfirmDialog')
+    expect(PAGE).toContain('の下書きを公開して反映しますか？')
+    expect(PAGE).toContain('取り消せません')
+    expect(PAGE).not.toContain('window.confirm')
+  })
+
   it('読込中・取得失敗・空を言い分ける', () => {
     expect(PAGE).toContain('title="たまる決めごとを読み込んでいます"')
     expect(PAGE).toContain('title="たまる決めごとを読み込めませんでした"')

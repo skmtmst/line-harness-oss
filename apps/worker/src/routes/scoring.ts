@@ -43,6 +43,7 @@ import {
   updateMileageRewardDraft,
   encryptCredential,
   MileageRewardError,
+  publishMileageEarningRule,
 } from '@line-crm/db';
 import type {
   ActionScoreFilter,
@@ -607,6 +608,49 @@ scoring.patch('/api/mileage/earning-rules/:id/draft', requireRole('owner', 'admi
   }
 });
 
+// POST /api/mileage/earning-rules/:id/publish — 下書きを公開版として固定し、実行へ反映する。
+//
+// N-231 案1。公開後に受け付けたイベントだけ新版で、公開前にキューへ入った
+// 未処理イベントは旧版のまま。既存の台帳・残高は変えない。
+scoring.post(
+  '/api/mileage/earning-rules/:id/publish',
+  requireRole('owner', 'admin'),
+  requireIrreversibleConfirmation('mileage-earning-rule-publish'),
+  async (c) => {
+    try {
+      type Body = { accountId?: unknown; expectedVersion?: unknown };
+      const body = await c.req.json<Body>().catch((): Body => ({}));
+      const accountId = typeof body.accountId === 'string' ? body.accountId.trim() : '';
+      if (!await canUseMileageAccount(c, accountId)) {
+        return c.json({ success: false, error: 'LINE account not found' }, accountId ? 404 : 400);
+      }
+      const idempotencyKey = c.req.header('Idempotency-Key');
+      if (!isValidIdempotencyKey(idempotencyKey)) {
+        return c.json({ success: false, error: '公開には有効な冪等キーが必要です' }, 400);
+      }
+      const expectedVersion = typeof body.expectedVersion === 'number'
+        ? body.expectedVersion
+        : Number.NaN;
+      if (!Number.isInteger(expectedVersion) || expectedVersion < 1) {
+        return c.json({ success: false, error: '公開する下書きの版が必要です' }, 400);
+      }
+      const data = await publishMileageEarningRule(c.env.DB, {
+        ruleId: c.req.param('id'),
+        lineAccountId: accountId,
+        expectedVersion,
+        staffId: c.get('staff').id,
+        idempotencyKey,
+      });
+      auditLog(c, 'mileage.rule.publish', {
+        kind: 'mileage_rule', id: c.req.param('id'),
+      });
+      return c.json({ success: true, data });
+    } catch (error) {
+      return mileageV6Error(c, error);
+    }
+  },
+);
+
 scoring.get('/api/mileage/overview', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
     const accountId = c.req.query('accountId')?.trim() ?? '';
@@ -1044,7 +1088,17 @@ scoring.put('/api/mileage/rules/:id', requireRole('owner', 'admin'), async (c) =
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [existing.line_account_id])) {
       return c.json({ success: false, error: 'Not found' }, 404);
     }
-    const updated = await updateMileageRule(c.env.DB, existing.id, body);
+    // N-231 案1: 公開内容の直接変更は閉じる。下書き→公開の口を使ってください。
+    // 停止・再開(isActive)だけは公開内容を変えないため、このまま許可する。
+    const directContentKeys = (['name', 'eventType', 'source', 'amount', 'initialStatus', 'conditions'] as const)
+      .filter((key) => body[key] !== undefined);
+    if (directContentKeys.length > 0) {
+      return c.json({
+        success: false,
+        error: '公開内容は直接変更できません。下書きを保存して「公開して反映」してください',
+      }, 409);
+    }
+    const updated = await updateMileageRule(c.env.DB, existing.id, { isActive: body.isActive });
     if (!updated) return c.json({ success: false, error: 'Not found' }, 404);
     return c.json({ success: true, data: serializeMileageRule(updated) });
   } catch (err) {

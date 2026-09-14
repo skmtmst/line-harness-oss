@@ -2474,6 +2474,8 @@ export type MileageEarningRuleV6 = {
   draft: MileageEarningRuleDraftV6
   draftVersion: number
   draftUpdatedAt: string
+  /** N-231 案1: いま公開中の版。null は未公開。 */
+  publishedVersion: number | null
   metrics30d: { eligible: number; granted: number; excluded: number }
 }
 
@@ -8298,6 +8300,27 @@ export const api = {
     }>>(`/api/mileage/earning-rules/${encodeURIComponent(id)}/draft`, {
       method: 'PATCH',
       body: JSON.stringify(data),
+    }),
+    /**
+     * N-231 案1: 下書きを公開版として固定し実行へ反映する。
+     * 取り消せない操作のため確認ヘッダーと冪等キーが必須。
+     */
+    publishEarningRule: (id: string, data: {
+      accountId: string
+      expectedVersion: number
+      idempotencyKey: string
+    }) => fetchApi<ApiResponse<{
+      ruleId: string
+      versionId: string
+      versionNumber: number
+      publishedAt: string
+    }>>(`/api/mileage/earning-rules/${encodeURIComponent(id)}/publish`, {
+      method: 'POST',
+      headers: {
+        'X-Confirm-Irreversible': 'mileage-earning-rule-publish',
+        'Idempotency-Key': data.idempotencyKey,
+      },
+      body: JSON.stringify({ accountId: data.accountId, expectedVersion: data.expectedVersion }),
     }),
     history: (params: {
       accountId: string
