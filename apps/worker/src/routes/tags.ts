@@ -4,6 +4,7 @@ import {
   getTagsWithUsage,
   getTagDeleteImpact,
   createTag,
+  assertTagNameAvailable,
   createTagsBulk,
   deleteTag,
   updateTagMileageSettings,
@@ -140,6 +141,29 @@ async function visibleTag(c: Context<Env>, id: string): Promise<DbTag | Response
     return c.json({ success: false, error: 'Not found' }, 404);
   }
   return tag;
+}
+
+/**
+ * N-048(#803): 旧作成・CSV一括の作り先所属を決める。
+ *
+ * 要求の自己申告だけを信じない。明示IDは許可scopeで検証し、指定なしは
+ * 割当が1件に絞れるときだけ自動確定する。所属なし・既定統括への補完は作らない。
+ */
+async function resolveLegacyTagAccount(
+  c: Context<Env>,
+  body?: Record<string, unknown>,
+): Promise<{ accountId: string } | { error: Response }> {
+  const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+  const explicit = requestedLineAccountId(c, body);
+  if (explicit) {
+    const denied = await requireVisibleLineAccount(c, explicit);
+    if (denied) return { error: denied };
+    return { accountId: explicit };
+  }
+  if (scope.allowedAccountIds.length === 1) {
+    return { accountId: scope.allowedAccountIds[0] };
+  }
+  return { error: c.json({ success: false, error: 'lineAccountId is required' }, 400) };
 }
 
 async function visibleTagFolder(c: Context<Env>, id: string, accountId?: string | null): Promise<Response | null> {
@@ -399,9 +423,16 @@ function planTagImport(
 async function loadTagImportPlan(
   db: D1Database,
   inputRows: TagCsvImportInputRow[],
+  lineAccountId: string,
 ): Promise<PlannedTagImportRow[]> {
-  const [allTags, groups] = await Promise.all([getTags(db), getTagGroups(db)]);
-  const existingTags = allTags.filter((tag) => tag.line_account_id == null);
+  const [allTags, groups] = await Promise.all([
+    getTags(db),
+    getTagGroups(db, { allowedAccountIds: [lineAccountId], canSeeUnassigned: false }),
+  ]);
+  // 同名の衝突先は作り先所属と所属なし(全体一意のため)だけを見る。
+  const existingTags = allTags.filter(
+    (tag) => tag.line_account_id == null || tag.line_account_id === lineAccountId,
+  );
   return planTagImport(inputRows, existingTags, groups);
 }
 
@@ -594,13 +625,14 @@ tags.get('/api/tags', async (c) => {
 // POST /api/tags/import/preview - CSVから読み取った行を保存せずに検査する
 tags.post('/api/tags/import/preview', requireRole('owner', 'admin'), async (c) => {
   try {
-    const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
-    if (!scope.canSeeUnassigned) return c.json({ success: false, error: 'lineAccountId is required' }, 400);
+    // N-048(#803): 確認だけでも作り先所属を確定し、所属なし行の計画を作らない。
+    const resolved = await resolveLegacyTagAccount(c);
+    if ('error' in resolved) return resolved.error;
     const input = await readImportRows(c);
     if (!input.ok) {
       return c.json({ success: false, error: input.error }, input.status);
     }
-    const planned = await loadTagImportPlan(c.env.DB, input.rows);
+    const planned = await loadTagImportPlan(c.env.DB, input.rows, resolved.accountId);
     const rows = planned.map(publicImportRow);
     const data: TagCsvImportPreview = { summary: importSummary(rows), rows };
     return c.json({ success: true, data });
@@ -613,13 +645,15 @@ tags.post('/api/tags/import/preview', requireRole('owner', 'admin'), async (c) =
 // POST /api/tags/import - 検査をやり直し、登録可能な行だけを登録する
 tags.post('/api/tags/import', requireRole('owner', 'admin'), async (c) => {
   try {
-    const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
-    if (!scope.canSeeUnassigned) return c.json({ success: false, error: 'lineAccountId is required' }, 400);
+    // N-048(#803): 作り先所属を確定し、所属なし行を作らない。
+    const resolved = await resolveLegacyTagAccount(c);
+    if ('error' in resolved) return resolved.error;
+    const importAccountId = resolved.accountId;
     const input = await readImportRows(c);
     if (!input.ok) {
       return c.json({ success: false, error: input.error }, input.status);
     }
-    const planned = await loadTagImportPlan(c.env.DB, input.rows);
+    const planned = await loadTagImportPlan(c.env.DB, input.rows, importAccountId);
     const readyRows = planned.filter((row) => row.status === 'ready');
     const created = readyRows.length > 0
       ? await createTagsBulk(
@@ -627,11 +661,13 @@ tags.post('/api/tags/import', requireRole('owner', 'admin'), async (c) => {
           readyRows.map((row) => ({ name: row.name, groupId: row.groupId ?? null })),
         )
       : [];
+    const createdTagIds: string[] = [];
     let createIndex = 0;
     const rows: TagCsvImportRowResult[] = planned.map((row) => {
       if (row.status !== 'ready') return publicImportRow(row);
       const result = created[createIndex++];
-      if (result?.status === 'created') {
+      if (result?.status === 'created' && result.tagId) {
+        createdTagIds.push(result.tagId);
         return { ...publicImportRow(row), status: 'created', tagId: result.tagId };
       }
       if (result?.status === 'skipped') {
@@ -649,6 +685,28 @@ tags.post('/api/tags/import', requireRole('owner', 'admin'), async (c) => {
         message: 'タグを登録できませんでした',
       };
     });
+
+    // 一括作成は所属なしで入るため、確定した所属を付け直す(D1の100バインド上限に収める)。
+    // 付け直しに失敗したら所属なし行を残さず消してから500にする。
+    const deleteCreatedTags = async () => {
+      for (let offset = 0; offset < createdTagIds.length; offset += 90) {
+        const chunk = createdTagIds.slice(offset, offset + 90);
+        await c.env.DB.prepare(
+          `DELETE FROM tags WHERE id IN (${chunk.map(() => '?').join(',')})`,
+        ).bind(...chunk).run();
+      }
+    };
+    try {
+      for (let offset = 0; offset < createdTagIds.length; offset += 90) {
+        const chunk = createdTagIds.slice(offset, offset + 90);
+        await c.env.DB.prepare(
+          `UPDATE tags SET line_account_id = ? WHERE id IN (${chunk.map(() => '?').join(',')})`,
+        ).bind(importAccountId, ...chunk).run();
+      }
+    } catch (updateError) {
+      await deleteCreatedTags();
+      throw updateError;
+    }
 
     const summary = importSummary(rows);
     const data: TagCsvImportResult = { summary, rows, outcome: importOutcome(summary) };
@@ -996,19 +1054,36 @@ tags.post('/api/tags', requireRole('owner', 'admin'), async (c) => {
       return c.json({ success: false, error: 'tag color is not supported; set the folder color instead' }, 400);
     }
 
-    const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
-    if (!scope.canSeeUnassigned) return c.json({ success: false, error: 'lineAccountId is required' }, 400);
+    // N-048(#803): 所属はstaffの許可scopeから確定し、所属なし行を作らない。
+    const resolved = await resolveLegacyTagAccount(c, body);
+    if ('error' in resolved) return resolved.error;
+    const legacyAccountId = resolved.accountId;
     if (body.groupId) {
-      const denied = await visibleTagFolder(c, String(body.groupId), null);
+      const denied = await visibleTagFolder(c, String(body.groupId), legacyAccountId);
       if (denied) return denied;
     }
-    const tag = await createTag(c.env.DB, {
+    // 名前一意は所属ごと。作り先所属でも先に確かめないと、重複時に所属なし行が残る。
+    await assertTagNameAvailable(c.env.DB, name, legacyAccountId);
+    const createdTag = await createTag(c.env.DB, {
       name,
       groupId:
         body.groupId === null || body.groupId === '' || body.groupId === undefined
           ? null
           : String(body.groupId),
     });
+    try {
+      await c.env.DB.prepare('UPDATE tags SET line_account_id = ? WHERE id = ?')
+        .bind(legacyAccountId, createdTag.id).run();
+    } catch (updateError) {
+      // 付け直しに失敗したら所属なし行を残さず消してから500にする。
+      await c.env.DB.prepare('DELETE FROM tags WHERE id = ?').bind(createdTag.id).run();
+      throw updateError;
+    }
+    const tag = await c.env.DB.prepare('SELECT * FROM tags WHERE id = ?')
+      .bind(createdTag.id).first<DbTag>();
+    if (!tag) {
+      return c.json({ success: false, error: 'Internal server error' }, 500);
+    }
 
     return c.json({ success: true, data: serializeTag(tag) }, 201);
   } catch (err) {

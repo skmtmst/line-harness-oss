@@ -43,16 +43,21 @@ async function request(path: string, method: string, body: unknown) {
 
 describe('legacy tags after migration 382: real SQLite and HTTP', () => {
   test('same-name POST returns 409, including pre-existing NULL normalized_name', async () => {
+    // N-048(#803): 旧作成の作り先は単一割当へ自動確定する。NULL行は作らない。
+    sql.prepare("INSERT INTO line_accounts(id,name,channel_id,channel_access_token,channel_secret) VALUES ('a1','A','fixture-a1','x','x')").run();
     sql.exec("INSERT INTO tags(id,name) VALUES ('old','ＶＩＰ　会員')");
     expect((await request('/api/tags', 'POST', { name: 'vip 会員' })).status).toBe(409);
     const first = await request('/api/tags', 'POST', { name: 'ＧＯＬＤ　会員' });
     expect(first.status).toBe(201);
-    expect(sql.prepare('SELECT line_account_id,normalized_name FROM tags WHERE id=?').get(first.body.data.id)).toEqual({ line_account_id: null, normalized_name: 'gold 会員' });
+    expect(sql.prepare('SELECT line_account_id,normalized_name FROM tags WHERE id=?').get(first.body.data.id)).toEqual({ line_account_id: 'a1', normalized_name: 'gold 会員' });
     expect((await request('/api/tags', 'POST', { name: 'gold 会員' })).status).toBe(409);
     expect(sql.prepare('SELECT count(*) n FROM tags').get()).toEqual({ n: 2 });
+    expect(sql.prepare("SELECT count(*) n FROM tags WHERE line_account_id IS NULL AND id != 'old'").get()).toEqual({ n: 0 });
   });
 
   test('concurrent CSV imports that both passed preflight create one row and report a skip', async () => {
+    // N-048(#803): 一括作成の作り先は単一割当へ自動確定する。NULL行は作らない。
+    sql.prepare("INSERT INTO line_accounts(id,name,channel_id,channel_access_token,channel_secret) VALUES ('a1','A','fixture-a1','x','x')").run();
     let arrived = 0, release!: () => void;
     const bothReady = new Promise<void>(resolve => { release = resolve; });
     beforeBulkInsert = async () => { if (++arrived === 2) release(); await bothReady; };
@@ -65,7 +70,7 @@ describe('legacy tags after migration 382: real SQLite and HTTP', () => {
     expect(responses.map(r => r.status)).toEqual([200, 200]);
     expect(responses.map(r => r.body.data.rows[0].status).sort()).toEqual(['created', 'skipped']);
     expect(sql.prepare('SELECT name,line_account_id,normalized_name FROM tags').all()).toEqual([
-      { name: 'ＣＳＶ　会員', line_account_id: null, normalized_name: 'csv 会員' },
+      { name: 'ＣＳＶ　会員', line_account_id: 'a1', normalized_name: 'csv 会員' },
     ]);
   });
 
