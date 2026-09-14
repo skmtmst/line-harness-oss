@@ -164,11 +164,16 @@ export async function enqueueMileageEvent(
   input: EnqueueMileageEventInput,
 ): Promise<EngagementEvent> {
   const friend = await db
-    .prepare(`SELECT id, user_id FROM friends WHERE id = ?`)
+    .prepare(`SELECT id, user_id, line_account_id FROM friends WHERE id = ?`)
     .bind(input.friendId)
-    .first<{ id: string; user_id: string | null }>();
+    .first<{ id: string; user_id: string | null; line_account_id: string | null }>();
   if (!friend) throw new Error(`Mileage friend not found: ${input.friendId}`);
 
+  // N-231 案1: 受付時点で適用版の集合を固定する。後で公開されてもこの行は旧版のまま。
+  const versionMap = friend.line_account_id
+    ? await getAccountRuleVersionMap(db, friend.line_account_id)
+    : {};
+  const snapshot = JSON.stringify(versionMap);
   const now = jstNow();
   const event = await recordEngagementEvent(db, {
     idempotencyKey: `${input.source}:${input.eventType}:${input.sourceEventId}`,
@@ -187,10 +192,11 @@ export async function enqueueMileageEvent(
   await db
     .prepare(
       `INSERT OR IGNORE INTO mileage_event_queue
-         (engagement_event_id, status, attempts, available_at, created_at, updated_at)
-       VALUES (?, 'pending', 0, ?, ?, ?)`,
+         (engagement_event_id, status, attempts, available_at,
+          applied_published_snapshot, created_at, updated_at)
+       VALUES (?, 'pending', 0, ?, ?, ?, ?)`,
     )
-    .bind(event.id, now, now, now)
+    .bind(event.id, now, snapshot, now, now)
     .run();
   return event;
 }
@@ -1114,6 +1120,151 @@ export async function createMileageRule(
   return created;
 }
 
+/**
+ * N-231 公開版(案1)。受付時点で固定する適用版の集合 {rule_id: version_number}。
+ * 0 は未公開(旧口で作ったまま)で、処理時は live を読む。単一IDへ潰さない。
+ */
+export async function getAccountRuleVersionMap(
+  db: D1Database,
+  lineAccountId: string,
+): Promise<Record<string, number>> {
+  const rows = await db
+    .prepare(
+      `SELECT id, COALESCE(published_version_number, 0) AS version_number
+         FROM mileage_rules
+        WHERE line_account_id = ?`,
+    )
+    .bind(lineAccountId)
+    .all<{ id: string; version_number: number }>();
+  const map: Record<string, number> = {};
+  for (const row of rows.results) {
+    map[row.id] = Number(row.version_number ?? 0);
+  }
+  return map;
+}
+
+/**
+ * queue 行の snapshot を読む。壊れていたら NULL 扱い(=旧来どおり live 読み)にする。
+ * 受付の安全は落とさず、処理だけが旧来動作へ退がる。
+ */
+export function parsePublishedSnapshot(value: string | null | undefined): Record<string, number> | null {
+  if (value === null || value === undefined || value === '') return null;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value);
+  } catch {
+    return null;
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+  const map: Record<string, number> = {};
+  for (const [key, version] of Object.entries(parsed as Record<string, unknown>)) {
+    if (typeof key !== 'string' || key === '') return null;
+    if (!Number.isInteger(version) || (version as number) < 0) return null;
+    map[key] = version as number;
+  }
+  return map;
+}
+
+export async function getPublishedVersionContent(
+  db: D1Database,
+  ruleId: string,
+  versionNumber: number,
+): Promise<PublishedEarningRuleContent | null> {
+  const row = await db
+    .prepare(
+      `SELECT content_json FROM mileage_earning_rule_published_versions
+        WHERE rule_id = ? AND version_number = ?`,
+    )
+    .bind(ruleId, versionNumber)
+    .first<{ content_json: string }>();
+  if (!row) return null;
+  try {
+    return JSON.parse(row.content_json) as PublishedEarningRuleContent;
+  } catch {
+    return null;
+  }
+}
+
+/** 公開版の中身。is_active は含めない。停止・再開は live の稼働で見る。 */
+export interface PublishedEarningRuleContent {
+  name: string;
+  event_type: string;
+  source: string | null;
+  amount: number;
+  initial_status: 'pending' | 'available';
+  conditions: string | null;
+  valid_from: string | null;
+  valid_until: string | null;
+}
+
+export function publishedRuleContentFromDraft(
+  draft: {
+    name: string;
+    eventType: string;
+    source: string | null;
+    amount: number;
+    initialStatus: 'pending' | 'available';
+    validFrom: string | null;
+    validUntil: string | null;
+  },
+  /** 下書きが持たない実行条件は、いまの live を引き継ぐ(消さない)。 */
+  currentConditions: string | null,
+): PublishedEarningRuleContent {
+  return {
+    name: draft.name,
+    event_type: draft.eventType,
+    source: draft.source,
+    amount: draft.amount,
+    initial_status: draft.initialStatus,
+    conditions: currentConditions,
+    valid_from: draft.validFrom,
+    valid_until: draft.validUntil,
+  };
+}
+
+/**
+ * snapshot で固定された版を1ルール分だけ実行用の行にする。
+ * version 0 は「受付時に未公開」。初公開で残した v0 があればそれを使い、
+ * 無ければ live を使う(受付から初公開まで live は誰も書き換えられない)。
+ * 行が無ければ null(適用しない)。
+ * 停止・再開(is_active)はいまの live を見る。公開内容は変えない。
+ */
+export async function resolvePinnedRuleRow(
+  db: D1Database,
+  input: { ruleId: string; versionNumber: number },
+): Promise<MileageRuleRow | null> {
+  const live = await getMileageRuleById(db, input.ruleId);
+  if (!live) return null;
+  if (input.versionNumber <= 0) {
+    const v0 = await getPublishedVersionContent(db, input.ruleId, 0);
+    if (!v0) return live;
+    return {
+      ...live,
+      name: v0.name,
+      event_type: v0.event_type,
+      source: v0.source,
+      amount: v0.amount,
+      initial_status: v0.initial_status,
+      conditions: v0.conditions,
+      valid_from: v0.valid_from,
+      valid_until: v0.valid_until,
+    };
+  }
+  const content = await getPublishedVersionContent(db, input.ruleId, input.versionNumber);
+  if (!content) return null;
+  return {
+    ...live,
+    name: content.name,
+    event_type: content.event_type,
+    source: content.source,
+    amount: content.amount,
+    initial_status: content.initial_status,
+    conditions: content.conditions,
+    valid_from: content.valid_from,
+    valid_until: content.valid_until,
+  };
+}
+
 export async function updateMileageRule(
   db: D1Database,
   id: string,
@@ -1177,6 +1328,12 @@ export interface ApplyMileageRulesInput {
   subjectKey?: string | null;
   metadata?: Record<string, unknown> | null;
   occurredAt?: string;
+  /**
+   * N-231 案1: 受付時に固定した適用版の集合。null は旧来互換でそのまま live を読む。
+   * 空集合 {} は「所属ルールなし」(全店共通のみ)で、旧来の持ち主不明行と同じ結果になる。
+   * 版 0 は「受付時に未公開」。後の初公開で残る v0 があれば v0、無ければ live。
+   */
+  publishedSnapshot?: Record<string, number> | null;
 }
 
 interface MileageMultiplier {
@@ -1304,20 +1461,62 @@ async function applyMileageRulesImmediately(
     occurredAt,
   });
 
-  const rulesResult = await db
-    .prepare(
-      `SELECT * FROM mileage_rules
-        WHERE program_id = 'default'
-          AND event_type = ?
-          AND (source IS NULL OR source = ?)
-          AND is_active = 1
-          AND (line_account_id IS NULL OR line_account_id = ?)
-          AND (valid_from IS NULL OR valid_from <= ?)
-          AND (valid_until IS NULL OR valid_until >= ?)
-        ORDER BY created_at ASC, id ASC`,
-    )
-    .bind(input.eventType, input.source, friend.line_account_id, occurredAt, occurredAt)
-    .all<MileageRuleRow>();
+  // N-231 案1: snapshot がある行は固定版を、無い行(NULL 互換)は従来どおり live を読む。
+  // 全店共通(line_account_id IS NULL)は版を持たないので、どちらの場合も live を読む。
+  const pinned = input.publishedSnapshot ?? null;
+  let ruleRows: MileageRuleRow[];
+  if (pinned === null) {
+    const rulesResult = await db
+      .prepare(
+        `SELECT * FROM mileage_rules
+          WHERE program_id = 'default'
+            AND event_type = ?
+            AND (source IS NULL OR source = ?)
+            AND is_active = 1
+            AND (line_account_id IS NULL OR line_account_id = ?)
+            AND (valid_from IS NULL OR valid_from <= ?)
+            AND (valid_until IS NULL OR valid_until >= ?)
+          ORDER BY created_at ASC, id ASC`,
+      )
+      .bind(input.eventType, input.source, friend.line_account_id, occurredAt, occurredAt)
+      .all<MileageRuleRow>();
+    ruleRows = rulesResult.results;
+  } else {
+    const resolved: MileageRuleRow[] = [];
+    for (const [ruleId, versionNumber] of Object.entries(pinned)) {
+      const row = await resolvePinnedRuleRow(db, { ruleId, versionNumber });
+      if (!row) continue;
+      if (row.program_id !== 'default') continue;
+      if (row.event_type !== input.eventType) continue;
+      if (row.source !== null && row.source !== input.source) continue;
+      if (row.is_active !== 1) continue;
+      // 固定したのは所属ルールだけ。全店共通は下の live 読みで拾う。
+      if (row.line_account_id === null) continue;
+      if (row.line_account_id !== friend.line_account_id) continue;
+      if (row.valid_from !== null && row.valid_from > occurredAt) continue;
+      if (row.valid_until !== null && row.valid_until < occurredAt) continue;
+      resolved.push(row);
+    }
+    const globalsResult = await db
+      .prepare(
+        `SELECT * FROM mileage_rules
+          WHERE program_id = 'default'
+            AND event_type = ?
+            AND (source IS NULL OR source = ?)
+            AND is_active = 1
+            AND line_account_id IS NULL
+            AND (valid_from IS NULL OR valid_from <= ?)
+            AND (valid_until IS NULL OR valid_until >= ?)
+          ORDER BY created_at ASC, id ASC`,
+      )
+      .bind(input.eventType, input.source, occurredAt, occurredAt)
+      .all<MileageRuleRow>();
+    ruleRows = [...resolved, ...globalsResult.results].sort((a, b) =>
+      a.created_at < b.created_at ? -1
+      : a.created_at > b.created_at ? 1
+      : a.id < b.id ? -1 : a.id > b.id ? 1 : 0,
+    );
+  }
 
   const identityKey = friend.user_id ? `user:${friend.user_id}` : `friend:${friend.id}`;
   const granted: MileageLedgerEntry[] = [];
@@ -1390,7 +1589,7 @@ async function applyMileageRulesImmediately(
     }
   }
 
-  for (const rule of rulesResult.results) {
+  for (const rule of ruleRows) {
     let conditions: MileageRuleConditions = {};
     if (rule.conditions) {
       try { conditions = JSON.parse(rule.conditions) as MileageRuleConditions; } catch { conditions = {}; }
@@ -1539,7 +1738,7 @@ export async function processPendingMileageEvents(
   // 先頭を占めたままON中の他アカウントが永久に回らない。
   const due = await db
     .prepare(
-      `SELECT q.engagement_event_id
+      `SELECT q.engagement_event_id, q.applied_published_snapshot
          FROM mileage_event_queue q
         WHERE q.status IN ('pending','failed')
           AND q.attempts < 5
@@ -1549,7 +1748,7 @@ export async function processPendingMileageEvents(
         LIMIT ?`,
     )
     .bind(now, limit)
-    .all<{ engagement_event_id: string }>();
+    .all<{ engagement_event_id: string; applied_published_snapshot: string | null }>();
 
   const result: MileageQueueResult = { claimed: 0, processed: 0, failed: 0, granted: 0 };
   for (const item of due.results) {
@@ -1599,6 +1798,8 @@ export async function processPendingMileageEvents(
         subjectKey: typeof metadata.subjectKey === 'string' ? metadata.subjectKey : null,
         metadata,
         occurredAt: event.occurred_at,
+        // N-231 案1: 現在版ではなく受付時に固定した版を読む。NULL は旧来互換。
+        publishedSnapshot: parsePublishedSnapshot(item.applied_published_snapshot),
       });
       result.granted += projection.granted.length;
       result.processed += 1;
@@ -1699,8 +1900,14 @@ export async function enqueueFollowingMileageMilestones(
     const queued = await db
       .prepare(
         `INSERT OR IGNORE INTO mileage_event_queue
-           (engagement_event_id, status, attempts, available_at, created_at, updated_at)
-         SELECT ee.id, 'pending', 0, ?, ?, ?
+           (engagement_event_id, status, attempts, available_at,
+            applied_published_snapshot, created_at, updated_at)
+         SELECT ee.id, 'pending', 0, ?,
+                (SELECT json_group_object(r.id, COALESCE(r.published_version_number, 0))
+                   FROM friends f2
+                   JOIN mileage_rules r ON r.line_account_id = f2.line_account_id
+                  WHERE f2.id = ee.actor_friend_id),
+                ?, ?
            FROM engagement_events ee
            LEFT JOIN friends f ON f.id = ee.actor_friend_id
           WHERE ee.event_type = ?

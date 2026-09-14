@@ -1,4 +1,6 @@
 import { getActionScoreBands } from './action-score-rules';
+import { publishedRuleContentFromDraft } from './mileage.js';
+import { jstNow } from './utils.js';
 
 const CONDITION_TYPES = new Set([
   'tag_exists', 'tag_not_exists', 'tag_all', 'tag_not_all',
@@ -253,6 +255,7 @@ export async function getMileageEarningRulesV6(
     db.prepare(
       `SELECT r.id, r.name, r.event_type, r.source, r.amount, r.initial_status,
               r.is_active, r.valid_from, r.valid_until, r.created_at, r.updated_at,
+              r.published_version_number,
               d.version, d.draft_json, d.updated_at AS draft_updated_at,
               (SELECT COUNT(*) FROM engagement_events ee
                 JOIN friends ef ON ef.id = ee.actor_friend_id
@@ -291,6 +294,10 @@ export async function getMileageEarningRulesV6(
         draft: JSON.parse(String(row.draft_json)) as MileageEarningRuleDraft,
         draftVersion: Number(row.version),
         draftUpdatedAt: row.draft_updated_at,
+        // N-231 案1: いま公開中の版。null は未公開。
+        publishedVersion: row.published_version_number === null || row.published_version_number === undefined
+          ? null
+          : Number(row.published_version_number),
         metrics30d: { eligible, granted, excluded: Math.max(0, eligible - granted) },
       };
     }),
@@ -612,4 +619,172 @@ export async function markMileageAdjustmentNotification(
   ).bind(input.id).first<NotificationRow>();
   if (!row) throw new MileageV6Error('notification_not_found', '通知の送信記録が見つかりません', 404);
   return mapNotification(row);
+}
+
+export interface MileageEarningRulePublishResult {
+  ruleId: string;
+  versionId: string;
+  versionNumber: number;
+  publishedAt: string;
+}
+
+/**
+ * N-231 公開(案1)。下書きを不変の公開版として固定し、実行項目へ写す。
+ *
+ * 1回の batch で次をまとめて行う。増えるのは公開版の行だけで、
+ * 既存の台帳・残高には触らない。
+ * 1. 下書きから公開版を作る(初公開だけ v0=公開前の live も残す)
+ * 2. 以前の公開版を履歴扱いにする
+ * 3. live の実行項目を公開版の内容へ写す(停止・再開と実行条件は変えない)
+ * 4. 現在の公開版ポインタを更新する
+ */
+export async function publishMileageEarningRule(
+  db: D1Database,
+  input: {
+    ruleId: string;
+    lineAccountId: string;
+    expectedVersion: number;
+    staffId?: string | null;
+    idempotencyKey: string;
+  },
+): Promise<MileageEarningRulePublishResult> {
+  const draftRow = await db.prepare(
+    `SELECT rule_id, line_account_id, version, draft_json, updated_at
+       FROM mileage_earning_rule_drafts WHERE rule_id = ?`,
+  ).bind(input.ruleId).first<DraftRow>();
+  if (!draftRow || draftRow.line_account_id !== input.lineAccountId) {
+    throw new MileageV6Error('draft_not_found', '公開する下書きが見つかりません', 404);
+  }
+  if (Number(draftRow.version) !== input.expectedVersion) {
+    throw new MileageV6Error('version_conflict', '下書きを読み直してください', 409);
+  }
+  const live = await db.prepare(
+    `SELECT id, name, event_type, source, amount, initial_status, conditions,
+            line_account_id, is_active, valid_from, valid_until, published_version_number
+       FROM mileage_rules WHERE id = ?`,
+  ).bind(input.ruleId).first<{
+    id: string; name: string; event_type: string; source: string | null; amount: number;
+    initial_status: string; conditions: string | null; line_account_id: string | null;
+    is_active: number; valid_from: string | null; valid_until: string | null;
+    published_version_number: number | null;
+  }>();
+  if (!live || live.line_account_id !== input.lineAccountId) {
+    throw new MileageV6Error('rule_not_found', '付与ルールが見つかりません', 404);
+  }
+
+  const replayed = await db.prepare(
+    `SELECT id, version_number, published_at
+       FROM mileage_earning_rule_published_versions
+      WHERE rule_id = ? AND publish_idempotency_key = ?`,
+  ).bind(input.ruleId, input.idempotencyKey)
+    .first<{ id: string; version_number: number; published_at: string }>();
+  if (replayed) {
+    return {
+      ruleId: input.ruleId,
+      versionId: replayed.id,
+      versionNumber: Number(replayed.version_number),
+      publishedAt: replayed.published_at,
+    };
+  }
+
+  const draft = JSON.parse(draftRow.draft_json) as MileageEarningRuleDraft;
+  const content = publishedRuleContentFromDraft(
+    {
+      name: draft.name,
+      eventType: draft.eventType,
+      source: draft.source,
+      amount: draft.amount,
+      initialStatus: draft.initialStatus,
+      validFrom: draft.validFrom,
+      validUntil: draft.validUntil,
+    },
+    live.conditions,
+  );
+  const contentJson = JSON.stringify(content);
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const nextRow = await db.prepare(
+      `SELECT COALESCE(MAX(version_number), 0) + 1 AS version_number
+         FROM mileage_earning_rule_published_versions WHERE rule_id = ?`,
+    ).bind(input.ruleId).first<{ version_number: number }>();
+    const versionNumber = Number(nextRow?.version_number ?? 1);
+    // 同時公開で先に初公開が入ったら v0 を重ねない。毎回読み直す。
+    const pointer = await db.prepare(
+      `SELECT published_version_number FROM mileage_rules WHERE id = ?`,
+    ).bind(input.ruleId).first<{ published_version_number: number | null }>();
+    const firstPublish = pointer?.published_version_number === null
+      || pointer?.published_version_number === undefined;
+    const now = jstNow();
+    const versionId = crypto.randomUUID();
+    try {
+      const statements: D1PreparedStatement[] = [];
+      if (firstPublish) {
+        // 初公開だけ、公開前の live を v0 として残す。公開前に受け付けた行は
+        // 旧版(v0)で処理する。なおさないと公開前の行が新版で付与される。
+        statements.push(db.prepare(
+          `INSERT INTO mileage_earning_rule_published_versions
+             (id, rule_id, version_number, content_json, status,
+              publish_idempotency_key, published_at, published_by_staff_id, created_at)
+           VALUES (?, ?, 0, ?, 'retired', NULL, ?, ?, ?)`,
+        ).bind(
+          crypto.randomUUID(), input.ruleId,
+          JSON.stringify({
+            name: live.name, event_type: live.event_type, source: live.source,
+            amount: live.amount, initial_status: live.initial_status,
+            conditions: live.conditions, valid_from: live.valid_from, valid_until: live.valid_until,
+          }),
+          now, input.staffId ?? null, now,
+        ));
+      }
+      statements.push(db.prepare(
+        `INSERT INTO mileage_earning_rule_published_versions
+           (id, rule_id, version_number, content_json, status,
+            publish_idempotency_key, published_at, published_by_staff_id, created_at)
+         VALUES (?, ?, ?, ?, 'published', ?, ?, ?, ?)`,
+      ).bind(
+        versionId, input.ruleId, versionNumber, contentJson,
+        input.idempotencyKey, now, input.staffId ?? null, now,
+      ));
+      statements.push(db.prepare(
+        `UPDATE mileage_earning_rule_published_versions
+            SET status = 'retired'
+          WHERE rule_id = ? AND status = 'published' AND id != ?`,
+      ).bind(input.ruleId, versionId));
+      statements.push(db.prepare(
+        `UPDATE mileage_rules
+            SET name = ?, event_type = ?, source = ?, amount = ?,
+                initial_status = ?, valid_from = ?, valid_until = ?,
+                published_version_number = ?, updated_at = ?
+          WHERE id = ? AND line_account_id = ?`,
+      ).bind(
+        content.name, content.event_type, content.source, content.amount,
+        content.initial_status, content.valid_from, content.valid_until,
+        versionNumber, now, input.ruleId, input.lineAccountId,
+      ));
+      await db.batch(statements);
+      return { ruleId: input.ruleId, versionId, versionNumber, publishedAt: now };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (/UNIQUE constraint failed/i.test(message) && message.includes('publish_idempotency_key')) {
+        const raced = await db.prepare(
+          `SELECT id, version_number, published_at
+             FROM mileage_earning_rule_published_versions
+            WHERE rule_id = ? AND publish_idempotency_key = ?`,
+        ).bind(input.ruleId, input.idempotencyKey)
+          .first<{ id: string; version_number: number; published_at: string }>();
+        if (raced) {
+          return {
+            ruleId: input.ruleId,
+            versionId: raced.id,
+            versionNumber: Number(raced.version_number),
+            publishedAt: raced.published_at,
+          };
+        }
+        throw new MileageV6Error('publish_conflict', '同時公開が競合しました。もう一度公開してください', 409);
+      }
+      if (/UNIQUE constraint failed/i.test(message) && message.includes('version_number')) continue;
+      throw error;
+    }
+  }
+  throw new MileageV6Error('publish_conflict', '同時公開が競合しました。もう一度公開してください', 409);
 }

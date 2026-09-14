@@ -3328,6 +3328,21 @@ CREATE TABLE mileage_earning_rule_drafts (
   updated_at          TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+CREATE TABLE mileage_earning_rule_published_versions (
+  id                      TEXT PRIMARY KEY,
+  rule_id                 TEXT NOT NULL REFERENCES mileage_rules(id) ON DELETE CASCADE,
+  version_number          INTEGER NOT NULL CHECK (version_number >= 0),
+  content_json            TEXT NOT NULL CHECK (json_valid(content_json)),
+  status                  TEXT NOT NULL DEFAULT 'published'
+                          CHECK (status IN ('published', 'retired')),
+  publish_idempotency_key TEXT,
+  published_at            TEXT NOT NULL,
+  published_by_staff_id   TEXT,
+  created_at              TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE (rule_id, version_number),
+  UNIQUE (rule_id, publish_idempotency_key)
+);
+
 CREATE TABLE mileage_event_queue (
   engagement_event_id   TEXT PRIMARY KEY REFERENCES engagement_events(id) ON DELETE CASCADE,
   status                TEXT NOT NULL DEFAULT 'pending'
@@ -3339,7 +3354,8 @@ CREATE TABLE mileage_event_queue (
   last_error            TEXT,
   created_at            TEXT NOT NULL,
   updated_at            TEXT NOT NULL
-);
+, applied_published_snapshot TEXT NULL
+  CHECK (applied_published_snapshot IS NULL OR json_valid(applied_published_snapshot)));
 
 CREATE TABLE mileage_grant_lots (
   ledger_entry_id       TEXT PRIMARY KEY REFERENCES mileage_ledger(id),
@@ -3518,7 +3534,7 @@ CREATE TABLE mileage_rules (
   valid_until    TEXT,
   created_at     TEXT NOT NULL,
   updated_at     TEXT NOT NULL
-);
+, published_version_number INTEGER NULL);
 
 CREATE TABLE mileage_spend_allocations (
   id                TEXT PRIMARY KEY,
@@ -6644,6 +6660,9 @@ CREATE INDEX idx_mileage_adjustment_notifications_retry
 
 CREATE INDEX idx_mileage_earning_rule_drafts_account
   ON mileage_earning_rule_drafts(line_account_id, updated_at DESC);
+
+CREATE INDEX idx_mileage_earning_rule_published_versions_rule
+  ON mileage_earning_rule_published_versions(rule_id, version_number);
 
 CREATE INDEX idx_mileage_event_queue_due
   ON mileage_event_queue(status, available_at, created_at);
