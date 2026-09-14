@@ -253,6 +253,14 @@ export const FEATURE_ROUTE_PATTERN_MANIFEST: readonly FeatureRoutePatternMetadat
     classification: { kind: 'feature', featureId: 'affiliates' },
   },
   {
+    // 管理者確認専用口(#724)。公開の :id 表示と紛らわしいため、固有経路を先に置く。
+    // requireRole('owner', 'admin') で認証必須。公開口にしない。
+    pattern: /^\/api\/forms\/unassigned$/,
+    methods: ['GET'],
+    accountResolver: 'request-or-resource',
+    classification: { kind: 'feature', featureId: 'forms' },
+  },
+  {
     pattern: /^\/api\/forms\/[^/]+$/,
     methods: ['GET'],
     accountResolver: 'none',
