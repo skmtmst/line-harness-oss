@@ -470,9 +470,23 @@ export default function BroadcastDetail({ broadcastId }: BroadcastDetailProps) {
             <SegmentBuilder
               initialConditions={broadcast.segmentConditions}
               onApply={async (conditions) => {
-                await api.broadcasts.update(id, { segmentConditions: conditions })
-                setShowSegmentBuilder(false)
-                load()
+                // #772: 現在の版を送る。409時は古い入力を送り直さず読み直す。
+                try {
+                  await api.broadcasts.update(id, {
+                    segmentConditions: conditions,
+                    expectedVersion: broadcast.version ?? 1,
+                  })
+                  setShowSegmentBuilder(false)
+                  load()
+                } catch (e) {
+                  if (e instanceof ApiError && e.status === 409) {
+                    setShowSegmentBuilder(false)
+                    setError('別の画面で更新されたため読み直しました')
+                    load()
+                  } else {
+                    throw e
+                  }
+                }
               }}
               onCancel={() => setShowSegmentBuilder(false)}
             />
@@ -490,9 +504,16 @@ export default function BroadcastDetail({ broadcastId }: BroadcastDetailProps) {
               onChange={async (e) => {
                 const trackLinks = e.target.checked
                 try {
-                  await api.broadcasts.update(id, { trackLinks })
+                  // #772: 現在の版を送る。409時は読み直して案内する。
+                  await api.broadcasts.update(id, { trackLinks, expectedVersion: broadcast.version ?? 1 })
                   load()
-                } catch { /* keep previous state on failure */ }
+                } catch (err) {
+                  if (err instanceof ApiError && err.status === 409) {
+                    setError('別の画面で更新されたため読み直しました')
+                    load()
+                  }
+                  /* keep previous state on failure */
+                }
               }}
             />
             このメッセージでリンクを短縮する（クリック計測）

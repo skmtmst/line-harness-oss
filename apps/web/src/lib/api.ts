@@ -5832,7 +5832,8 @@ export const api = {
         internalMemo?: string | null
         messageOptions?: BroadcastMessageOptions | null
         afterActionVersionId?: string | null
-        expectedVersion?: number
+        // #772: 版なしの更新は 400 で拒否される。
+        expectedVersion: number
       }
     ) =>
       fetchApi<ApiResponse<ApiBroadcast>>(`/api/broadcasts/${id}`, {

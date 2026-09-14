@@ -1073,8 +1073,16 @@ broadcasts.put('/api/broadcasts/:id', requireRole('owner', 'admin'), async (c) =
       expectedVersion?: number;
     }>();
 
-    if (body.expectedVersion !== undefined
-        && (!Number.isInteger(body.expectedVersion) || body.expectedVersion < 1)) {
+    // #772: 版を必須化する。認可・境界・存在の判定は上で済ませてあるため、
+    // 他アカウントIDは従来どおり404のまま、ここへは来ない。
+    if (body.expectedVersion === undefined) {
+      return c.json({
+        success: false,
+        error: 'expectedVersion（画面が読み込んだ版）が必要です。',
+        code: 'EXPECTED_VERSION_REQUIRED',
+      }, 400);
+    }
+    if (!Number.isInteger(body.expectedVersion) || body.expectedVersion < 1) {
       return c.json({ success: false, error: 'expectedVersion must be a positive integer' }, 400);
     }
     if (body.draftStep !== undefined && body.draftStep !== null
@@ -1199,11 +1207,9 @@ broadcasts.put('/api/broadcasts/:id', requireRole('owner', 'admin'), async (c) =
         ? { after_action_version_id: body.afterActionVersionId }
         : {}),
     };
-    const updated = body.expectedVersion === undefined
-      ? await updateBroadcast(c.env.DB, id, updates)
-      : await updateBroadcast(c.env.DB, id, updates, body.expectedVersion);
+    const updated = await updateBroadcast(c.env.DB, id, updates, body.expectedVersion);
 
-    if (!updated && body.expectedVersion !== undefined) {
+    if (!updated) {
       return c.json({ success: false, error: '別の画面で下書きが更新されました', code: 'VERSION_CONFLICT' }, 409);
     }
 

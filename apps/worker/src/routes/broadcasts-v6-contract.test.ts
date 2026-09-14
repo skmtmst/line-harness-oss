@@ -81,16 +81,62 @@ describe('V6 broadcast data contracts', () => {
       content: { text: `${index + 1}通目` },
     }));
 
+    // #772: 版を付けて更新する（版なしは400になる）。
     const accepted = await app(testDb.db).request('/api/broadcasts/draft-five', json('PUT', {
       messageBubbles: bubbles,
+      expectedVersion: 1,
     }));
     expect(accepted.status).toBe(200);
 
     const rejected = await app(testDb.db).request('/api/broadcasts/draft-five', json('PUT', {
       messageBubbles: [...bubbles, bubbles[0]],
+      expectedVersion: 2,
     }));
     expect(rejected.status).toBe(400);
     await expect(rejected.json()).resolves.toMatchObject({ error: 'messageBubbles must contain 1 to 5 items' });
+  });
+
+  // #772: 版なしPUTは400で止め、行を変えない。不正値も400。
+  it('版なし・不正版のPUTは400で止める', async () => {
+    seedBroadcast(testDb, 'draft-noversion', { status: 'draft', sent_at: null });
+    for (const body of [
+      { title: '版なし' },
+      { title: '文字版', expectedVersion: '1' },
+      { title: '小数版', expectedVersion: 1.5 },
+      { title: '零版', expectedVersion: 0 },
+    ]) {
+      const res = await app(testDb.db).request('/api/broadcasts/draft-noversion', json('PUT', body));
+      expect(res.status).toBe(400);
+    }
+    const missing = await app(testDb.db).request('/api/broadcasts/draft-noversion', json('PUT', { title: '版なし' }));
+    await expect(missing.json()).resolves.toMatchObject({ success: false, code: 'EXPECTED_VERSION_REQUIRED' });
+    expect(testDb.raw.prepare(`SELECT title, lock_version FROM broadcasts WHERE id = 'draft-noversion'`).get())
+      .toEqual({ title: 'draft-noversion', lock_version: 1 });
+  });
+
+  // #772: 他アカウントの行は版の有無にかかわらず404のまま（版チェックより先）。
+  it('他アカウントのPUTは版なしでも404にする', async () => {
+    seedBroadcast(testDb, 'draft-foreign', { status: 'draft', sent_at: null, line_account_id: 'account-2' });
+    const res = await app(testDb.db).request('/api/broadcasts/draft-foreign', json('PUT', { title: '越境' }));
+    expect(res.status).toBe(404);
+  });
+
+  // #772: 2編集者の競合は先勝ち・後は409で、先の変更が残る。
+  it('2編集者の同時更新は先勝ち・後409にする', async () => {
+    seedBroadcast(testDb, 'draft-race', { status: 'draft', sent_at: null });
+    const first = await app(testDb.db).request('/api/broadcasts/draft-race', json('PUT', {
+      title: 'A案', expectedVersion: 1,
+    }));
+    expect(first.status).toBe(200);
+    await expect(first.json()).resolves.toMatchObject({ data: { version: 2 } });
+
+    const second = await app(testDb.db).request('/api/broadcasts/draft-race', json('PUT', {
+      title: 'B案', expectedVersion: 1,
+    }));
+    expect(second.status).toBe(409);
+    await expect(second.json()).resolves.toMatchObject({ success: false, code: 'VERSION_CONFLICT' });
+    expect(testDb.raw.prepare(`SELECT title, lock_version FROM broadcasts WHERE id = 'draft-race'`).get())
+      .toEqual({ title: 'A案', lock_version: 2 });
   });
 
   it('通常: 対象3人・除外理由・送信枠・同時刻配信・21条件軸を実データで返す', async () => {
