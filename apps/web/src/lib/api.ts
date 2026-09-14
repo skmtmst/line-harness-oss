@@ -8392,8 +8392,10 @@ export const api = {
       validUntil?: string | null
       /** #532(#521): 帰属するLINEアカウント。口で必須。 */
       lineAccountId: string
-    }) => fetchApi<ApiResponse<MileageRule>>('/api/mileage/rules', {
+    }, options?: { idempotencyKey?: string }) =>
+      fetchApi<ApiResponse<MileageRule>>('/api/mileage/rules', {
       method: 'POST',
+      headers: options?.idempotencyKey ? { 'Idempotency-Key': options.idempotencyKey } : undefined,
       body: JSON.stringify(data),
     }),
     updateRule: (id: string, data: Partial<Pick<MileageRule,
