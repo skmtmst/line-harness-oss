@@ -314,6 +314,51 @@ describe('V6オートメーション実行エンジン', () => {
     ]);
   });
 
+  // #736: 実行中の押し直しは通さず、副作用は1回だけにする。時刻の主張はしない。
+  // 1回目の retry が waiting へ変えた後なので、2回目の結果は待ち合わせに依らない。
+  it('実行中の再送は通さず副作用を1回にする', async () => {
+    const setup = addPublishedAutomation(testDb.raw, {
+      actions: [action('slow')],
+    });
+    const created = await start(testDb.db, setup);
+    expect(await processAutomationRun(testDb.db, created.runId!, {
+      now: T0,
+      executors: {
+        record: async () => {
+          throw new AutomationActionError('permanent', '入力を直してください', false);
+        },
+      },
+    })).toBe('failed');
+
+    expect(await retryAutomationRun(testDb.db, {
+      runId: created.runId!,
+      allowedAccountIds: [setup.lineAccountId],
+      now: T0,
+    })).toMatchObject({ status: 'waiting' });
+
+    const calls: string[] = [];
+    const processing = processAutomationRun(testDb.db, created.runId!, {
+      now: T0,
+      executors: {
+        record: async ({ action: current }) => {
+          calls.push(current.id);
+          await new Promise((resolve) => setTimeout(resolve, 50));
+        },
+      },
+    });
+    const second = await retryAutomationRun(testDb.db, {
+      runId: created.runId!,
+      allowedAccountIds: [setup.lineAccountId],
+      now: T0,
+    }).then(
+      () => 'unexpected-success',
+      (error: unknown) => (error as { code?: string }).code ?? 'unknown',
+    );
+    expect(second).toBe('not_retryable');
+    await expect(processing).resolves.toBe('success');
+    expect(calls).toEqual(['slow']);
+  });
+
   it('実行開始時に共通アクション版を固定する', async () => {
     const setup = addPublishedAutomation(testDb.raw, {
       actions: [action('shared', 'common_action', { commonActionId: 'common-1' })],

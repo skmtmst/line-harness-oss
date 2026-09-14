@@ -7274,7 +7274,8 @@ export const api = {
     },
     get: (id: string) =>
       fetchApi<ApiResponse<Automation & { logs?: AutomationLog[] }>>(`/api/automations/${id}`),
-    update: (id: string, data: Partial<Pick<Automation, 'name' | 'description' | 'eventType' | 'conditions' | 'actions' | 'isActive' | 'priority'>>) =>
+    // #736: 旧 PUT は isActive boolean だけ受け付ける。ほかは 400 で拒否される。
+    update: (id: string, data: { isActive: boolean }) =>
       fetchApi<ApiResponse<Automation>>(`/api/automations/${id}`, {
         method: 'PUT',
         body: JSON.stringify(data),

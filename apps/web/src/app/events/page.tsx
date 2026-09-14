@@ -9,6 +9,8 @@ import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
 import SelectField from '@/components/shared/select-field'
+// #740: bookings の EventKpi と一字一句同じだったため、機能内共有の1部品へ統合した。
+import EventKpi from '@/components/events/event-kpi'
 import { daysUntilEvent, summarizeEventAttention } from './event-attention'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
@@ -157,7 +159,7 @@ export default function EventsListPage() {
       </section>
 
       <div data-design="KPIs" className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">
-        <Kpi
+        <EventKpi
           title="これからの回"
           value={dataReady ? String(attention.upcoming.length) : '—'}
           unit={dataReady ? '回' : ''}
@@ -167,7 +169,7 @@ export default function EventsListPage() {
             nearest ? `いちばん近いのは ${formatShortJpDate(nearest.next_slot_starts_at)}` : '予定されている回はありません',
           )}
         />
-        <Kpi
+        <EventKpi
           title="申込"
           value={dataReady ? String(attention.applied) : '—'}
           unit={dataReady ? '人' : ''}
@@ -179,7 +181,7 @@ export default function EventsListPage() {
               : `定員${attention.capacity}人に対して ${attention.fillRate}%`,
           )}
         />
-        <Kpi
+        <EventKpi
           title="あと少しで満席"
           value={dataReady ? String(attention.nearlyFull.length) : '—'}
           unit={dataReady ? '回' : ''}
@@ -189,7 +191,7 @@ export default function EventsListPage() {
             attention.nearlyFull.length > 0 ? '声をかけると埋まります' : '該当する回はありません',
           )}
         />
-        <Kpi
+        <EventKpi
           title="申し込みが少ない"
           value={dataReady ? String(attention.lowApplications.length) : '—'}
           unit={dataReady ? '回' : ''}
@@ -424,28 +426,5 @@ function Th({ children, className = '' }: { children: React.ReactNode; className
     <th className={`text-ink-faint px-4 py-3 text-left text-xs font-semibold ${className}`}>
       {children}
     </th>
-  )
-}
-
-function Kpi({
-  title,
-  value,
-  unit,
-  detail,
-}: {
-  title: string
-  value: string
-  unit: string
-  detail: string
-}) {
-  return (
-    <div className="bg-canvas rounded-card border-hairline border p-4">
-      <p className="text-ink-faint text-xs">{title}</p>
-      <p className="text-ink mt-1 text-2xl font-semibold tabular-nums">
-        {value}
-        <span className="text-ink-faint ml-1 text-xs font-normal">{unit}</span>
-      </p>
-      <p className="text-ink-faint mt-1 text-xs">{detail}</p>
-    </div>
   )
 }
