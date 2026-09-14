@@ -693,18 +693,28 @@ export default function TagsPageV4({
     if (!result.success) { setError(result.error); void load() }
   }
 
-  /** 友だち一覧への表示（★）。設計 `zMlMX`。押した瞬間に切り替える。 */
+  /** 友だち一覧への表示（★）。設計 `zMlMX`。押した瞬間に切り替える。版付き(#715)。 */
   const toggleStar = async (tag: Tag) => {
     const next = !tag.isStarred
     /* 成功は手元だけ直す。withCounts 付き全件の取り直しは要らない。 */
     setItems((current) => current.map((item) => item.id === tag.id ? { ...item, isStarred: next } : item))
     try {
-      const res = await api.tags.update(tag.id, { isStarred: next })
+      const res = await api.tags.update(tag.id, {
+        lineAccountId: tag.lineAccountId ?? null,
+        expectedVersion: tag.version ?? 1,
+        isStarred: next,
+      })
       if (!res.success) throw new Error(res.error)
+      /* 返ってきた版へ進める。古い版のままだと次の操作が409になる。 */
+      const version = res.data?.version
+      if (typeof version === 'number') {
+        setItems((current) => current.map((item) => item.id === tag.id ? { ...item, version } : item))
+      }
     } catch (reason) {
-      /* 失敗は元に戻して理由を出す。全面再取得は失敗時のみ。 */
+      /* 失敗は元に戻して理由を出し、取り直す。黙って上書きしない。 */
       setItems((current) => current.map((item) => item.id === tag.id ? { ...item, isStarred: tag.isStarred } : item))
       setError(reason instanceof ApiError ? reason.message : '表示の切り替えに失敗しました')
+      void load()
     }
   }
 

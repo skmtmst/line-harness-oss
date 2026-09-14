@@ -15,7 +15,7 @@ const dbMocks = {
   updateTagGroup: vi.fn(),
   deleteTagGroup: vi.fn(),
   assignTagToGroup: vi.fn(),
-  updateTag: vi.fn(),
+  updateTagDefinition: vi.fn(),
   reorderTags: vi.fn(),
   normalizeTagNameForCleanup: (name: string) => name
     .normalize('NFKC')
@@ -494,7 +494,6 @@ describe('DELETE /api/tags/:id', () => {
 describe('PATCH /api/tags/reorder', () => {
   beforeEach(() => {
     for (const fn of Object.values(dbMocks)) if ('mockReset' in fn) fn.mockReset();
-    dbMocks.updateTag.mockResolvedValue(null);
   });
 
   test('渡された並びをそのまま保存する', async () => {
@@ -508,7 +507,7 @@ describe('PATCH /api/tags/reorder', () => {
     // タグIDとして扱われ、並び替えのつもりが名前の変更として届く。
     await patch('/api/tags/reorder', { ids: ['a'] });
     expect(dbMocks.reorderTags).toHaveBeenCalled();
-    expect(dbMocks.updateTag).not.toHaveBeenCalled();
+    expect(dbMocks.updateTagDefinition).not.toHaveBeenCalled();
   });
 
   test('配列でないものは断る', async () => {
@@ -592,9 +591,14 @@ describe('旧タグ経路の名前検査と色の受付終了', () => {
     dbMocks.createTag.mockImplementation(async (_db: unknown, input: { name: string; groupId: string | null }) => ({
       ...TAG_ROW, id: 'tag-new', name: input.name, folder_id: input.groupId,
     }));
-    dbMocks.updateTag.mockImplementation(async (_db: unknown, id: string, patch: Record<string, unknown>) => ({
-      ...TAG_ROW, id, ...patch,
+    accountAccessMocks.getVisibleLineAccountScope.mockResolvedValue({
+      allowedAccountIds: ['a1'], ids: ['a1'], canSeeUnassigned: false, isAccountScoped: false, accounts: [],
+    });
+    dbMocks.updateTagDefinition.mockImplementation(async (_db: unknown, input: { tagId: string; expectedVersion: number; isStarred?: boolean }) => ({
+      tag: { ...TAG_ROW, id: input.tagId, line_account_id: 'a1', version: input.expectedVersion + 1, is_starred: input.isStarred ? 1 : 0 },
+      automation: null,
     }));
+    dbMocks.enqueueHistoricTagMileage.mockResolvedValue(0);
   });
 
   test('作成で81文字・制御文字は400で書かない', async () => {
@@ -607,11 +611,12 @@ describe('旧タグ経路の名前検査と色の受付終了', () => {
   });
 
   test('更新で81文字・制御文字は400で書かない', async () => {
-    const longName = await patch('/api/tags/tag-1', { name: 'あ'.repeat(81) });
+    const base = { lineAccountId: 'a1', expectedVersion: 1 };
+    const longName = await patch('/api/tags/tag-1', { ...base, name: 'あ'.repeat(81) });
     expect(longName.status).toBe(400);
-    const controlName = await patch('/api/tags/tag-1', { name: 'VIP\x07計画' });
+    const controlName = await patch('/api/tags/tag-1', { ...base, name: 'VIP\x07計画' });
     expect(controlName.status).toBe(400);
-    expect(dbMocks.updateTag).not.toHaveBeenCalled();
+    expect(dbMocks.updateTagDefinition).not.toHaveBeenCalled();
   });
 
   test('作成・更新で color が来たら400で案内して書かない', async () => {
@@ -621,6 +626,45 @@ describe('旧タグ経路の名前検査と色の受付終了', () => {
     expect(dbMocks.createTag).not.toHaveBeenCalled();
     const updated = await patch('/api/tags/tag-1', { color: '#FF0000' });
     expect(updated.status).toBe(400);
-    expect(dbMocks.updateTag).not.toHaveBeenCalled();
+    expect(dbMocks.updateTagDefinition).not.toHaveBeenCalled();
+  });
+});
+
+describe('PATCH /api/tags/:id は expectedVersion 必須(#715)', () => {
+  beforeEach(() => {
+    for (const fn of Object.values(dbMocks)) if (fn && 'mockReset' in fn) (fn as { mockReset(): void }).mockReset();
+    accountAccessMocks.getVisibleLineAccountScope.mockResolvedValue({
+      allowedAccountIds: ['a1'], ids: ['a1'], canSeeUnassigned: false, isAccountScoped: false, accounts: [],
+    });
+    dbMocks.updateTagDefinition.mockImplementation(async (_db: unknown, input: { tagId: string; expectedVersion: number; isStarred?: boolean }) => ({
+      tag: { ...TAG_ROW, id: input.tagId, line_account_id: 'a1', version: input.expectedVersion + 1, is_starred: input.isStarred ? 1 : 0 },
+      automation: null,
+    }));
+    dbMocks.enqueueHistoricTagMileage.mockResolvedValue(0);
+  });
+
+  test('版が無いと400で定義口へ進まない', async () => {
+    const res = await patch('/api/tags/tag-1', { lineAccountId: 'a1', isStarred: true });
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toMatchObject({ error: 'expectedVersion is required' });
+    expect(dbMocks.updateTagDefinition).not.toHaveBeenCalled();
+  });
+
+  test('不正な版は400で定義口へ進まない', async () => {
+    for (const expectedVersion of [0, -1, 1.5, 'x']) {
+      const res = await patch('/api/tags/tag-1', { lineAccountId: 'a1', expectedVersion, isStarred: true });
+      expect(res.status).toBe(400);
+    }
+    expect(dbMocks.updateTagDefinition).not.toHaveBeenCalled();
+  });
+
+  test('正しい版なら200で進んだ版が返る', async () => {
+    const res = await patch('/api/tags/tag-1', { lineAccountId: 'a1', expectedVersion: 3, isStarred: true });
+    expect(res.status).toBe(200);
+    expect(dbMocks.updateTagDefinition).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ tagId: 'tag-1', lineAccountId: 'a1', expectedVersion: 3, isStarred: true }),
+    );
+    await expect(res.json()).resolves.toMatchObject({ success: true, data: { version: 4 } });
   });
 });
