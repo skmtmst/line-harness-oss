@@ -10049,6 +10049,23 @@ export const bookingApi = {
       withAccount(`/api/booking/admin/staff/${staffId}/menus`, accountId),
       { method: 'PUT', body: JSON.stringify({ menus }) },
     ),
+  // 全スタッフ分を1要求で保存する一括口。全件成功または全件不適用。
+  putStaffMenusBulk: (
+    accountId: string,
+    staff: Array<{
+      staff_id: string;
+      menus: Array<{
+        menu_id: string;
+        is_offered: boolean;
+        override_duration_minutes?: number | null;
+        override_price?: number | null;
+      }>;
+    }>,
+  ) =>
+    fetchApi<{ ok: true }>(withAccount('/api/booking/admin/staff-menus', accountId), {
+      method: 'PUT',
+      body: JSON.stringify({ staff }),
+    }),
   // Shifts
   getShifts: (accountId: string, staffId: string) =>
     fetchApi<{ shifts: BookingShift[] }>(

@@ -2831,11 +2831,35 @@ booking.put('/api/booking/admin/staff/:id/menus', requireRole('owner', 'admin'),
         .all<{ id: string }>()
     ).results.map((r) => r.id),
   );
-  await c.env.DB.prepare(`DELETE FROM staff_menus WHERE staff_id = ?`).bind(staffId).run();
+  if (!Array.isArray(b.menus)) return c.json({ error: 'invalid_menus' }, 400);
   const filtered = b.menus.filter((m) => validMenuIds.has(m.menu_id));
-  if (filtered.length > 0) {
-    const stmts = filtered.map((m) =>
-      c.env.DB
+  // DELETE と INSERT を同一 batch に入れて原子化する。分けると INSERT 側の
+  // 失敗で割り当てが全消えする。
+  await c.env.DB.batch(
+    staffMenusReplaceStatements(c.env.DB, staffId, filtered),
+  );
+  return c.json({ ok: true });
+});
+
+type StaffMenuAssignment = {
+  menu_id: string;
+  is_offered: boolean;
+  override_duration_minutes?: number | null;
+  override_price?: number | null;
+};
+
+// 担当者1人分の割り当てを「消して入れ直す」文を返す。呼び出し側が
+// db.batch にまとめて渡し、DELETE と INSERT が別トランザクションに
+// 分かれないようにする。
+function staffMenusReplaceStatements(
+  db: D1Database,
+  staffId: string,
+  menus: StaffMenuAssignment[],
+): D1PreparedStatement[] {
+  return [
+    db.prepare(`DELETE FROM staff_menus WHERE staff_id = ?`).bind(staffId),
+    ...menus.map((m) =>
+      db
         .prepare(
           `INSERT INTO staff_menus
             (staff_id, menu_id, is_offered, override_duration_minutes, override_price)
@@ -2848,9 +2872,58 @@ booking.put('/api/booking/admin/staff/:id/menus', requireRole('owner', 'admin'),
           m.override_duration_minutes ?? null,
           m.override_price ?? null,
         ),
-    );
-    await c.env.DB.batch(stmts);
+    ),
+  ];
+}
+
+// 画面の一括保存を1要求で受ける口。全担当者分を1 batch で適用する。
+// staff_id / menu_id が1件でも別account・不存在なら全体を拒否する
+// （単独PUTと違い、menu_id の黙っての取りこぼしはしない）。
+booking.put('/api/booking/admin/staff-menus', requireRole('owner', 'admin'), async (c) => {
+  const accountId = await resolveAccountIdAdmin(c);
+  if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
+  const b = await c.req.json<{
+    staff: Array<{ staff_id: string; menus: StaffMenuAssignment[] }>;
+  }>();
+  if (!Array.isArray(b.staff)) return c.json({ error: 'invalid_staff' }, 400);
+  const seen = new Set<string>();
+  for (const entry of b.staff) {
+    if (typeof entry.staff_id !== 'string' || !Array.isArray(entry.menus)) {
+      return c.json({ error: 'invalid_staff' }, 400);
+    }
+    if (seen.has(entry.staff_id)) return c.json({ error: 'duplicate_staff_id' }, 422);
+    seen.add(entry.staff_id);
   }
+  if (b.staff.length === 0) return c.json({ ok: true });
+  const validStaffIds = new Set(
+    (
+      await c.env.DB
+        .prepare(`SELECT id FROM staff WHERE line_account_id = ? AND deleted_at IS NULL`)
+        .bind(accountId)
+        .all<{ id: string }>()
+    ).results.map((r) => r.id),
+  );
+  if (b.staff.some((entry) => !validStaffIds.has(entry.staff_id))) {
+    return c.json({ error: 'staff_not_found_in_account' }, 404);
+  }
+  const validMenuIds = new Set(
+    (
+      await c.env.DB
+        .prepare(`SELECT id FROM menus WHERE line_account_id = ? AND deleted_at IS NULL`)
+        .bind(accountId)
+        .all<{ id: string }>()
+    ).results.map((r) => r.id),
+  );
+  for (const entry of b.staff) {
+    if (entry.menus.some((m) => !validMenuIds.has(m.menu_id))) {
+      return c.json({ error: 'menu_not_found_in_account' }, 404);
+    }
+  }
+  await c.env.DB.batch(
+    b.staff.flatMap((entry) =>
+      staffMenusReplaceStatements(c.env.DB, entry.staff_id, entry.menus),
+    ),
+  );
   return c.json({ ok: true });
 });
 
