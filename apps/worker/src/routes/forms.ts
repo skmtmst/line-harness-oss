@@ -61,7 +61,7 @@ import type {
 import type { Env } from '../index.js';
 import { resolveLineToken } from '../services/line-token.js';
 import { requireRole } from '../middleware/role-guard.js';
-import { canAccessAllLineAccounts } from '../services/account-access.js';
+import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import { applyMileageRulesForEvent } from '@line-crm/db';
 import { createBroadcastRetryKey } from '../services/broadcast-retry-key.js';
 import { dispatchAutomationEventWithLogging } from '../services/automation-triggers.js';
@@ -79,6 +79,7 @@ import {
   normalizeLayout,
   parseLayout,
   type FormLayout,
+  DEFAULT_TENANT_ID,
 } from '@line-crm/shared';
 
 const forms = new Hono<Env>();
@@ -530,6 +531,51 @@ forms.get('/api/forms', requireRole('owner', 'admin', 'staff'), async (c) => {
     return c.json({ success: true, data });
   } catch (err) {
     console.error('GET /api/forms error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+/**
+ * GET /api/forms/unassigned — 管理者確認専用。担当の決まっていない旧フォームだけを返す(#724)。
+ *
+ * 通常の `account_id` 指定一覧へは混ぜない。この口を選んだときだけ未割当を返す。
+ * 見られるのは既定テナントの owner / admin と環境 owner だけ。一般 staff、
+ * アカウント制限付き・機能スコープ付き・別テナントは不可。現行 canSeeUnassigned は
+ * 一般 staff も含むため、その値だけでは許可せず role も requireRole で絞る。
+ * 割当操作は置かない(#771)。
+ *
+ * `account_id` は必須（通常一覧と同じ）。結果には使わず、立ち位置の確認にだけ使う。
+ * 無いと機能 enforcement が一覧用の絞り込みを staff へ書き込み、canSeeUnassigned が
+ * 全員 false になって本番で誰も見られなくなる。そのため残さず受け取る。
+ */
+forms.get('/api/forms/unassigned', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const accountId = c.req.query('account_id');
+    if (!accountId) {
+      return c.json({ success: false, error: 'account_id is required' }, 400);
+    }
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
+    const staff = c.get('staff');
+    if ((staff?.tenantId ?? DEFAULT_TENANT_ID) !== DEFAULT_TENANT_ID) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
+    const scope = await getVisibleLineAccountScope(c.env.DB, staff);
+    if (!scope.canSeeUnassigned) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
+    const items = await getFormsWithStats(c.env.DB, { lineAccountIds: [], includeUnassigned: true });
+    const data = items.map((row) =>
+      serializeForm(row, {
+        lastSubmittedAt: row.last_submitted_at,
+        usedByAccounts: row.used_by_accounts,
+        accountScopeReviewRequired: row.account_scope_review_required,
+      }),
+    );
+    return c.json({ success: true, data });
+  } catch (err) {
+    console.error('GET /api/forms/unassigned error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

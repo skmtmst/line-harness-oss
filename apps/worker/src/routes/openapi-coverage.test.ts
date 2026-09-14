@@ -159,6 +159,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'GET /api/conversions/events',
   'GET /api/conversions/points',
   'GET /api/conversions/report',
+  'GET /api/forms/unassigned',
   'GET /api/friends',
   'GET /api/friends/{friendId}/reminders',
   'GET /api/friends/{id}',
