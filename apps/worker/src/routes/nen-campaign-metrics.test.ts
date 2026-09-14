@@ -84,6 +84,19 @@ describe('NEN campaign V6 metric routes', () => {
     );
   });
 
+  // #727: 「これから」チップの pending,processing を複数状態のまま service へ渡す。
+  it('複数状態の絞り込みをそのままserviceへ渡す', async () => {
+    const response = await app('staff').request(
+      '/api/nen-campaigns/deliveries?lineAccountId=account-a&status=pending,processing',
+    );
+    expect(response.status).toBe(200);
+    expect(metricsMocks.listNenDeliveries).toHaveBeenCalledWith(
+      expect.anything(), expect.objectContaining({
+        lineAccountId: 'account-a', status: 'pending,processing',
+      }),
+    );
+  });
+
   it('DB失敗を500で返し、空状態へ置き換えない', async () => {
     metricsMocks.getNenPetMetrics.mockRejectedValueOnce(new Error('db unavailable'));
     const response = await app().request(
