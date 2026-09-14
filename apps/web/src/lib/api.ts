@@ -372,6 +372,7 @@ export type CommonVarChangeImpactDetail = CommonVarChangeImpact & {
   scheduledUsageCount: number
   publishedUsageCount: number
   usageRevision: string
+  impactToken: string
 }
 
 export type CommonVarReplacementCandidate = {
@@ -5348,7 +5349,7 @@ export const api = {
         method: 'POST',
         body: JSON.stringify(data),
       }),
-    /** varKey は変えられない（テンプレートの差し込みが空になるため）。 */
+    /** varKey は変えられない（テンプレートの差し込みが空になるため）。保存には影響確認の確認値が要る。 */
     update: (id: string, accountId: string, data: {
       name?: string
       value?: string
@@ -5356,6 +5357,7 @@ export const api = {
       folderId?: string | null
       expectedVersion?: number
       changeReason?: string
+      impactToken?: string
     }) =>
       fetchApi<ApiResponse<CommonVar>>(`/api/common-vars/${id}?accountId=${encodeURIComponent(accountId)}`, {
         method: 'PATCH',

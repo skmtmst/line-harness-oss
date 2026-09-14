@@ -209,12 +209,26 @@ function EditCommonVarInner() {
     setError('')
     setSaved(false)
     try {
+      // N-185: 保存の直前に影響を確認し、その確認値を添えて送る。確認なしの
+      // 保存は口が428で止める。確認口が落ちているときは送らず待ってもらう。
+      let preview: Awaited<ReturnType<typeof api.commonVars.impactPreview>> | null = null
+      try {
+        preview = await api.commonVars.impactPreview(item.id, accountAtRequest, value, item.version)
+      } catch {
+        preview = null
+      }
+      if (accountAtRequest !== latestAccountRef.current) return
+      if (!preview || !preview.success) {
+        setError('影響を確認できませんでした。しばらく待って保存し直してください')
+        return
+      }
       const res = await api.commonVars.update(item.id, accountAtRequest, {
         name: name.trim(),
         value,
         memo,
         folderId: folderId || null,
         expectedVersion: item.version,
+        impactToken: preview.data.impactToken,
       })
       if (accountAtRequest !== latestAccountRef.current) return
       if (!res.success) {
@@ -227,6 +241,13 @@ function EditCommonVarInner() {
     } catch (e) {
       // `fetchApi` は2xx以外を投げる。ここで一言にまとめてしまうと、
       // 権限が無いのか対象が消えたのかが運用者に届かない。
+      // 428・409（確認切れ・競合）は文面のまま見せ、最新を読み直す。
+      if (e instanceof ApiError && (e.status === 428 || e.status === 409)) {
+        if (accountAtRequest !== latestAccountRef.current) return
+        setError(saveErrorText(e))
+        void load()
+        return
+      }
       setError(saveErrorText(e))
     } finally {
       setSaving(false)

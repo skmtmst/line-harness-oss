@@ -1074,8 +1074,14 @@ describe('共通情報', () => {
     expect(mocks.updateCommonVar).not.toHaveBeenCalled();
   });
 
-  it('値だけの変更は通る', async () => {
-    const res = await req('/api/common-vars/cv-1?accountId=account-1', 'PATCH', { value: '11-20' });
+  it('値だけの変更は確認値つきで通る', async () => {
+    // N-185: 保存には影響確認の確認値が要る。確認口で発行した値を添える。
+    const preview = await req('/api/common-vars/cv-1/impact-preview?accountId=account-1', 'POST', {
+      accountId: 'account-1', nextValue: '11-20',
+    });
+    expect(preview.status).toBe(200);
+    const { impactToken } = (await preview.json() as { data: { impactToken: string } }).data;
+    const res = await req('/api/common-vars/cv-1?accountId=account-1', 'PATCH', { value: '11-20', impactToken });
     expect(res.status).toBe(200);
   });
 
@@ -1121,7 +1127,12 @@ describe('共通情報', () => {
   });
 
   it('#544 N5 版番号なしの上書きは許す(衝突検出は版番号つきのみ)', async () => {
-    const res = await req('/api/common-vars/cv-1?accountId=account-1', 'PATCH', { value: '11-20' });
+    // N-185: 確認値は必須だが、版番号の添付は任意のまま。
+    const preview = await req('/api/common-vars/cv-1/impact-preview?accountId=account-1', 'POST', {
+      accountId: 'account-1', nextValue: '11-20',
+    });
+    const { impactToken } = (await preview.json() as { data: { impactToken: string } }).data;
+    const res = await req('/api/common-vars/cv-1?accountId=account-1', 'PATCH', { value: '11-20', impactToken });
     expect(res.status).toBe(200);
     expect(mocks.updateCommonVar).toHaveBeenCalledWith(env.DB, 'cv-1', 'account-1', expect.objectContaining({
       expectedVersion: undefined,
@@ -1134,7 +1145,12 @@ describe('共通情報', () => {
       accountId: 'account-1', name: 'x', varKey: 'ok_key', folderId: 'other-folder',
     })).status).toBe(400);
     mocks.updateCommonVar.mockRejectedValueOnce(new MockCommonVarFolderError());
-    expect((await req('/api/common-vars/cv-1?accountId=account-1', 'PATCH', { folderId: 'other-folder' })).status)
+    // N-185: フォルダ検査まで進めるため確認値を添える。
+    const preview = await req('/api/common-vars/cv-1/impact-preview?accountId=account-1', 'POST', {
+      accountId: 'account-1', nextValue: '10-19',
+    });
+    const { impactToken } = (await preview.json() as { data: { impactToken: string } }).data;
+    expect((await req('/api/common-vars/cv-1?accountId=account-1', 'PATCH', { folderId: 'other-folder', impactToken })).status)
       .toBe(400);
   });
 

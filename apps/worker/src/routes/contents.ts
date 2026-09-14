@@ -1218,6 +1218,26 @@ function serializeCommonVarChangeImpact(
   };
 }
 
+/*
+ * N-185: 影響確認の確認値。対象ID・版番号・使用先集合の写しを `.` でつなぐ。
+ * 使い回しは保存で版が進むため自然に無効になる。署名は付けない——正しさは
+ * 保存時に使用先を組み直して確かめるため、写しの偽造では通らない。
+ */
+export function buildCommonVarImpactToken(varId: string, version: number, usageHex: string): string {
+  return `${varId}.${version}.${usageHex}`;
+}
+
+export function parseCommonVarImpactToken(presented: unknown): {
+  varId: string; version: number; hex: string;
+} | null {
+  if (typeof presented !== 'string') return null;
+  const parts = presented.split('.');
+  if (parts.length !== 3 || !parts[0] || !/^[0-9a-f]{64}$/.test(parts[2])) return null;
+  const version = Number(parts[1]);
+  if (!Number.isInteger(version) || version < 1) return null;
+  return { varId: parts[0], version, hex: parts[2] };
+}
+
 async function commonVarUsageRevision(
   variable: CommonVar,
   impact: CommonVarUsageImpact,
@@ -1462,6 +1482,40 @@ contents.patch('/api/common-vars/:id', requireRole('owner', 'admin'), async (c) 
     if (patchMemo !== undefined && patchMemo.length > 1000) {
       return c.json({ success: false, error: 'メモは1000文字までで入力してください' }, 400);
     }
+    // N-185: 影響確認なしの保存を止める。確認値は対象ID・版・使用先集合の写し。
+    // 形の検査は先に済ませているため、ここからは確認値だけを見る。
+    const presentedToken = parseCommonVarImpactToken(body.impactToken);
+    if (!presentedToken) {
+      return c.json({
+        success: false,
+        code: 'impact_confirmation_required',
+        error: '影響を確認してから保存してください。値を確認画面で見直すと確認値が発行されます。',
+      }, 428);
+    }
+    if (presentedToken.varId !== id) {
+      return c.json({
+        success: false,
+        code: 'impact_token_mismatch',
+        error: '別の共通情報の確認値です。保存する項目で影響を確認し直してください。',
+      }, 409);
+    }
+    if (presentedToken.version !== existing.version) {
+      return c.json({
+        success: false,
+        code: 'impact_token_stale',
+        error: '別の担当者が先に更新しました。最新内容を読み直してください。',
+        currentVersion: existing.version,
+      }, 409);
+    }
+    const freshImpact = await getCommonVarUsageImpact(c.env.DB, existing.var_key, accountId);
+    const freshHex = await commonVarUsageRevision(existing, freshImpact);
+    if (freshHex !== presentedToken.hex) {
+      return c.json({
+        success: false,
+        code: 'impact_usage_changed',
+        error: '確認後に使用先が変わりました。影響を確認し直してください。',
+      }, 409);
+    }
     const updated = await updateCommonVar(c.env.DB, id, accountId, {
       name: patchName,
       value: patchValue,
@@ -1538,6 +1592,7 @@ contents.post('/api/common-vars/:id/impact-preview', requireRole('owner', 'admin
     }
     const impact = await getCommonVarUsageImpact(c.env.DB, existing.var_key, accountId);
     const serialized = serializeCommonVarChangeImpact(existing, impact, body.nextValue);
+    const usageHex = await commonVarUsageRevision(existing, impact);
     return c.json({
       success: true,
       data: {
@@ -1547,7 +1602,9 @@ contents.post('/api/common-vars/:id/impact-preview', requireRole('owner', 'admin
         scheduledUsageCount: impact.items.filter((item) => item.source_status === 'scheduled').length,
         publishedUsageCount: impact.items.filter((item) =>
           item.source_status === 'active' || item.source_status === 'sending').length,
-        usageRevision: await commonVarUsageRevision(existing, impact),
+        usageRevision: usageHex,
+        // N-185: 保存口へ添える確認値。対象ID・版・使用先集合の写しで使い回し不可。
+        impactToken: buildCommonVarImpactToken(existing.id, existing.version, usageHex),
       },
     });
   } catch (err) {
