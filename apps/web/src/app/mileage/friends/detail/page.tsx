@@ -15,7 +15,6 @@ import {
   type FriendDetail,
   type MileageConnectedAccount,
   type MileageFriendV6,
-  type MileageAdminHistoryItem,
   type MileageHistoryItem,
   type MileageSelfInsights,
   type MileageSummary,
@@ -23,10 +22,13 @@ import {
 import {
   formatMileageChange,
   formatMileageDate,
+  friendHistoryItem,
+  mileageDetailHasSourceEvent,
   mileageEntryTypeLabel,
   mileageSourceLabel,
   mileageSourceNoteText,
   mileageStatusLabel,
+  type MileageDetailHistoryItem,
 } from '../../mileage-display'
 import { mileageConnectedAccounts, mileageRewardedActions } from '../../mileage-response-state'
 import MileageAdjustmentDialog from './mileage-adjustment-dialog'
@@ -38,24 +40,6 @@ type MileageDetail = {
   connections: MileageConnectedAccount[]
 }
 
-function friendHistoryItem(item: MileageAdminHistoryItem): MileageHistoryItem {
-  return {
-    id: item.id,
-    entryType: item.entryType,
-    status: item.status,
-    amount: item.amount,
-    reason: item.reason,
-    source: item.source,
-    sourceEventId: item.hasSourceEvent ? item.id : null,
-    sourceReferenceId: item.sourceReferenceId,
-    ruleName: item.ruleName,
-    mode: item.mode,
-    executedByStaffName: item.executedByStaffName,
-    balanceAfter: item.balanceAfter,
-    occurredAt: item.occurredAt,
-  }
-}
-
 function FriendMileageInner() {
   const searchParams = useSearchParams()
   const friendId = searchParams.get('id') ?? ''
@@ -65,7 +49,7 @@ function FriendMileageInner() {
   const [friend, setFriend] = useState<FriendDetail | null>(null)
   const [mileage, setMileage] = useState<MileageDetail | null>(null)
   const [v6Friend, setV6Friend] = useState<MileageFriendV6 | null>(null)
-  const [v6History, setV6History] = useState<MileageHistoryItem[] | null>(null)
+  const [v6History, setV6History] = useState<MileageDetailHistoryItem[] | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
   const [canAdjust, setCanAdjust] = useState(false)
@@ -178,7 +162,7 @@ function FriendMileageInner() {
   const available = v6Friend?.available ?? mileage.summary.available
   const rewardedActions = mileageRewardedActions(mileage.insights)
   const connectedAccounts = mileageConnectedAccounts(mileage.connections)
-  const displayedHistory = v6History ?? mileage.history
+  const displayedHistory: MileageDetailHistoryItem[] = v6History ?? mileage.history
   const reasonSummary = displayedHistory.reduce<Array<{ reason: string; count: number; amount: number }>>((items, item) => {
     const found = items.find((candidate) => candidate.reason === item.reason)
     if (found) { found.count += 1; found.amount += item.amount } else items.push({ reason: item.reason, count: 1, amount: item.amount })
@@ -263,7 +247,7 @@ function FriendMileageInner() {
                   <Td>
                     <p>{mileageSourceLabel(item.source)}</p>
                     <p className="mt-1 text-xs text-ink-faint">
-                      {mileageSourceNoteText({ sourceReferenceId: item.sourceReferenceId, hasSourceEvent: item.sourceEventId != null })}
+                      {mileageSourceNoteText({ sourceReferenceId: item.sourceReferenceId, hasSourceEvent: mileageDetailHasSourceEvent(item) })}
                     </p>
                   </Td>
                   <Td><p>{item.ruleName ?? '—'}</p><p className="mt-1 text-xs text-ink-faint">{item.mode === 'manual' ? item.executedByStaffName ?? '実行者は未取得' : '自動処理'}</p></Td>

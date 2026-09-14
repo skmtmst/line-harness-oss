@@ -58,6 +58,15 @@ function bookingRulesErrorMessage(error: unknown, action: '読み込み' | '保�
   return `予約の基本ルールを${action}できませんでした。通信状態を確認して、もう一度お試しください。`
 }
 
+/**
+ * 一覧の金額列。料金モードが先で、金額はその次。
+ * 「お問い合わせ」は金額ではないので ¥ を付けず、無料とも混ぜない。
+ */
+function menuPriceLabel(menu: BookingMenu): string {
+  if (menu.price_mode === 'inquiry') return 'お問い合わせ'
+  return menu.base_price === 0 ? '無料' : `¥${menu.base_price.toLocaleString()}`
+}
+
 function supportingDetail(
   hasAccount: boolean,
   state: SupportingLoadState,
@@ -176,9 +185,18 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
     }
   }, [])
 
+  /**
+   * モーダル保存は読み込んだ版を expectedVersion として送る。
+   * 版が無ければ送らずに読み直し、Worker 側で古い版は 409 に倒れる。
+   */
   async function save(m: BookingMenu) {
     if (!selectedAccountId) return
-    await bookingApi.updateMenu(selectedAccountId, m.id, m)
+    const version = m.version
+    if (typeof version !== 'number' || !Number.isInteger(version) || version < 1) {
+      await load()
+      throw new ApiError(409, 'version_conflict', 'version_conflict')
+    }
+    await bookingApi.updateMenu(selectedAccountId, m.id, version, m)
     setEditing(null)
     await load()
   }
@@ -360,8 +378,8 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
                     <td className="px-4 py-3 text-sm text-ink-secondary tabular-nums">
                       {m.duration_minutes} 分
                     </td>
-                    <td className={`px-4 py-3 text-sm text-right tabular-nums ${m.base_price === 0 ? 'text-accent font-semibold' : ''}`}>
-                      {m.base_price === 0 ? '無料' : `¥${m.base_price.toLocaleString()}`}
+                    <td className={`px-4 py-3 text-sm text-right tabular-nums ${menuPriceLabel(m) === '無料' ? 'text-accent font-semibold' : ''}`}>
+                      {menuPriceLabel(m)}
                     </td>
                     <td className="px-4 py-3 text-sm text-ink-secondary">
                       {!m.is_active ? (
@@ -412,6 +430,10 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
           accountId={selectedAccountId}
           canManageResources={canManageResources}
           onSave={save}
+          onReloadLatest={async () => {
+            await load()
+            setEditing(null)
+          }}
           onResourcesSaved={(menuId, version, assignedResources) => {
             setItems((current) => current.map((item) => item.id === menuId
               ? { ...item, version, assigned_resources: assignedResources }
@@ -651,6 +673,7 @@ function EditMenuModal({
   accountId,
   canManageResources,
   onSave,
+  onReloadLatest,
   onResourcesSaved,
   onClose,
 }: {
@@ -659,6 +682,8 @@ function EditMenuModal({
   accountId: string | null
   canManageResources: boolean
   onSave: (m: BookingMenu) => Promise<void>
+  /** 版競合(409)のとき。一覧を読み直して、この窓は閉じる。 */
+  onReloadLatest: () => Promise<void>
   onResourcesSaved: (
     menuId: string,
     version: number,
@@ -669,6 +694,7 @@ function EditMenuModal({
   const [form, setForm] = useState<BookingMenu>(menu)
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState<string | null>(null)
+  const [conflict, setConflict] = useState(false)
   const [resources, setResources] = useState<BookingResource[]>([])
   const [resourceLoadError, setResourceLoadError] = useState<string | null>(null)
   const [resourceSaving, setResourceSaving] = useState(false)
@@ -736,10 +762,17 @@ function EditMenuModal({
     }
     setSaving(true)
     setErr(null)
+    setConflict(false)
     try {
       await onSave(form)
     } catch (e) {
-      setErr(bookingErrorMessage(e, '保存'))
+      if (e instanceof ApiError && e.status === 409) {
+        // 窓は閉じず、読み直してからやり直す流れをここに出す。
+        setConflict(true)
+        setErr('ほかの担当者が先に保存しました。最新の内容を読み直してから、もう一度変更してください。')
+      } else {
+        setErr(bookingErrorMessage(e, '保存'))
+      }
     } finally {
       setSaving(false)
     }
@@ -843,6 +876,27 @@ function EditMenuModal({
               placeholder="顧客に表示される説明文"
             />
           </Field>
+          <Field label="料金の形" required>
+            <SelectField
+              aria-label="料金の形"
+              value={form.price_mode ?? 'fixed'}
+              onChange={(e) => {
+                const mode = e.target.value as NonNullable<BookingMenu['price_mode']>
+                // 無料・お問い合わせは金額を持たない。DB CHECK と Worker の
+                // readPriceModeAndAmount に合わせて base_price=0 にそろえる。
+                setForm((current) => ({
+                  ...current,
+                  price_mode: mode,
+                  base_price: mode === 'fixed' ? current.base_price : 0,
+                }))
+              }}
+              options={[
+                { value: 'fixed', label: '固定料金' },
+                { value: 'free', label: '無料' },
+                { value: 'inquiry', label: 'お問い合わせ' },
+              ]}
+            />
+          </Field>
           <div className="grid grid-cols-2 gap-3">
             <NumField
               label="所要時間（分）"
@@ -855,12 +909,14 @@ function EditMenuModal({
               value={form.buffer_after_minutes ?? 0}
               onChange={(v) => set('buffer_after_minutes', v)}
             />
-            <NumField
-              label="料金（円）"
-              required
-              value={form.base_price ?? 0}
-              onChange={(v) => set('base_price', v)}
-            />
+            {(form.price_mode ?? 'fixed') === 'fixed' && (
+              <NumField
+                label="料金（円）"
+                required
+                value={form.base_price ?? 0}
+                onChange={(v) => set('base_price', v)}
+              />
+            )}
             <NumField
               label="並び順"
               value={form.sort_order ?? 0}
@@ -1025,7 +1081,20 @@ function EditMenuModal({
             />
             有効（顧客に表示する）
           </label>
-          {err && <p className="text-xs text-red-600">{err}</p>}
+          {err && (
+            <div role="alert">
+              <p className="text-xs text-red-600">{err}</p>
+              {conflict && (
+                <button
+                  type="button"
+                  onClick={() => void onReloadLatest()}
+                  className="text-accent mt-1 text-xs font-semibold underline"
+                >
+                  最新の内容を読み直す
+                </button>
+              )}
+            </div>
+          )}
         </div>
         <div className="px-6 py-4 border-t border-hairline flex gap-2 justify-end">
           <button
