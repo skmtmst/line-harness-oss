@@ -1192,8 +1192,58 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     try {
       const now = new Date().toISOString()
       let currentRevision = chatDetail?.revision
+      // N-022: 画像と本文が両方あるときは1回の結合送信にする。
+      // 2回に分けると画像だけ届く部分送信になる。
+      const useCombined = Boolean(pendingImage && pendingImage.mode === 'line-image' && messageContent.trim())
+      if (useCombined && pendingImage && pendingImage.mode === 'line-image') {
+        const content = messageContent.trim()
+        const imgPayload = JSON.stringify({
+          originalContentUrl: pendingImage.originalContentUrl,
+          previewImageUrl: pendingImage.previewImageUrl,
+        })
+        const signature = JSON.stringify({ chatId: sendingChatId, combined: true, image: imgPayload, content })
+        const sendResult = await api.chats.sendCombined(sendingChatId,
+          {
+            image: {
+              originalContentUrl: pendingImage.originalContentUrl,
+              previewImageUrl: pendingImage.previewImageUrl,
+            },
+            text: content,
+            revision: currentRevision,
+          },
+          sendKeysRef.current.get(signature),
+        )
+        if (sendResult.success) currentRevision = sendResult.data.revision
+        sendKeysRef.current.clear(signature)
+        setPendingImage(null)
+        setMessageContent('')
+        const staffName = sendResult.success ? sendResult.data.sentByStaffName : '自分'
+        const combinedMessages = [
+          buildOutgoingMessage({ messageType: 'image', content: imgPayload, sentByStaffName: staffName, sentAt: now }),
+          buildOutgoingMessage({ messageType: 'text', content, sentByStaffName: staffName, sentAt: now }),
+        ]
+        setChatDetail((prev) => (prev && prev.id === sendingChatId) ? {
+          ...prev,
+          lastMessageAt: now,
+          status: 'in_progress',
+          revision: sendResult.success ? sendResult.data.revision : prev.revision,
+          messages: [...(prev.messages ?? []), ...combinedMessages],
+        } : prev)
+        setChats((prev) => {
+          const exists = prev.some((c) => c.id === sendingChatId)
+          if (!exists) return prev
+          return refreshChatListAfterSend(prev, statusFilterRef.current, (c) => (c.id === sendingChatId ? {
+            ...c,
+            lastMessageAt: now,
+            status: 'in_progress' as const,
+            lastMessageContent: content,
+            lastMessageDirection: 'outgoing' as const,
+            lastMessageType: 'text' as const,
+          } : c))
+        })
+      }
       // --- Image send path (runs first when image is present) ---
-      if (pendingImage && pendingImage.mode === 'line-image') {
+      if (!useCombined && pendingImage && pendingImage.mode === 'line-image') {
         const imgPayload = JSON.stringify({
           originalContentUrl: pendingImage.originalContentUrl,
           previewImageUrl: pendingImage.previewImageUrl,
@@ -1235,7 +1285,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
         })
       }
       // --- Text send path (runs independently — both paths execute when both image and text are present) ---
-      if (messageContent.trim()) {
+      if (!useCombined && messageContent.trim()) {
         const content = messageContent.trim()
         const signature = JSON.stringify({ chatId: sendingChatId, messageType: 'text', content })
         const sendResult = await api.chats.send(sendingChatId,
