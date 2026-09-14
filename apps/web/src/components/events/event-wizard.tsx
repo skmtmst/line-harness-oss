@@ -10,6 +10,13 @@ import { generateBulkSlots } from './bulk-slot-generator'
 import { formatSlotJp, jstHHMMToUtcIso, splitBand, todayJst } from './jst'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { TextInput } from '@/components/shared/form-controls'
+// #740: 下書きの初期値と字数上限は編集画面と共有する。片方だけ変えないこと。
+import {
+  EVENT_DEFAULT_DRAFT,
+  EVENT_DESCRIPTION_MAX_LENGTH,
+  EVENT_NAME_MAX_LENGTH,
+  resolveEventMultiAccountIds,
+} from './event-draft-shared'
 
 /**
  * イベントを作る（設計 V2 8-3-2 / 8-3-3 / 8-3-4）。
@@ -30,30 +37,7 @@ const STEPS: Array<{ no: 1 | 2 | 3; label: string; todo: string; done: string }>
   { no: 3, label: '公開設定', todo: '承認制・リマインダ・公開', done: '承認制・リマインダ' },
 ]
 
-const DEFAULT_DRAFT: EventDetail = {
-  id: '',
-  name: '',
-  venue_name: null,
-  venue_url: null,
-  image_url: null,
-  description: null,
-  description_centered: 0,
-  max_bookings_per_friend: null,
-  requires_approval: 0,
-  cancel_deadline_hours_before: null,
-  reminder_day_before_enabled: 1,
-  reminder_hours_before: null,
-  is_published: 0,
-  sort_order: 0,
-  confirmation_message_extra: null,
-  reminder_message_extra: null,
-  og_title: null,
-  og_description: null,
-  og_image_url: null,
-  visible_tag_id: null,
-  waitlist_enabled: 0,
-  entry_cutoff_hours_before: null,
-}
+const DEFAULT_DRAFT: EventDetail = EVENT_DEFAULT_DRAFT
 
 type FirstSlotDraft = {
   date: string
@@ -187,6 +171,10 @@ export default function EventWizard({ accountId, eventId, step }: EventWizardPro
       waitlist_enabled: d.waitlist_enabled ?? 0,
       entry_cutoff_hours_before: d.entry_cutoff_hours_before ?? null,
       target_type: d.target_type ?? 'single',
+      // #740: 複数横断を選んだら現アカウントを必ず含めて送る。入れないと
+      // サーバの multi 契約（非空配列）に触れて 422 になる。単一のときは
+      // 従来どおり送らない（既存挙動を変えない）。
+      account_ids: resolveEventMultiAccountIds(d, accountId),
     }
   }
 
@@ -197,11 +185,11 @@ export default function EventWizard({ accountId, eventId, step }: EventWizardPro
       setError('イベント名は必須です')
       return
     }
-    if (draft.name.length > 255) {
+    if (draft.name.length > EVENT_NAME_MAX_LENGTH) {
       setError('イベント名は255字以内で入力してください')
       return
     }
-    if (draft.description && draft.description.length > 20000) {
+    if (draft.description && draft.description.length > EVENT_DESCRIPTION_MAX_LENGTH) {
       setError('イベント詳細は20,000字以内で入力してください')
       return
     }
@@ -420,7 +408,7 @@ function OverviewStep({
               id="ev-name"
               value={draft.name}
               onChange={(e) => update('name', e.target.value)}
-              maxLength={255}
+              maxLength={EVENT_NAME_MAX_LENGTH}
               placeholder="例：第1回 定期便のはじめ方 説明会"
               className={inputClass}
             />

@@ -205,6 +205,12 @@ const GRANDFATHERED_REBUILDS = new Set([
   '192_inbox_v6_foundation.sql',
   '202_ec_event_account_and_identity.sql',
   '265_nen_shared_friend_add_coupon.sql',
+  // #742: 354 は旧形式の作り直し（印なし・`_v1` 命名の逆向き手順）で、
+  // #744 の記録により検証 D1 へ適用済み（380・381 まで適用、382 のみ未適用）。
+  // 適用済みのため本体は書き換えず、ここで救済する。実質は正しい作り直し
+  // （全行を世代0埋めで写してから旧表を落とす）で、禁止規則・coherence 条件
+  // 自体は弱めない。これ以降の追加はしないこと（新規は印を使う）。
+  '354_analytics_cross_lease_generation.sql',
 ]);
 
 export function checkMigration(sql: string, fileName?: string): CheckResult {
