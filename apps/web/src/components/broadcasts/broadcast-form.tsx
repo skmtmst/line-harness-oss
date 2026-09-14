@@ -6,6 +6,7 @@ import { useSearchParams } from 'next/navigation'
 import type { Tag } from '@line-crm/shared'
 import { AlertTriangle, ArrowRight, CheckCircle2, Eye, GripVertical, Paperclip, Plus, Save, Send, Trash2, Zap } from 'lucide-react'
 import {
+  ApiError,
   api,
   type ApiBroadcast,
   type BroadcastBubble,
@@ -899,21 +900,38 @@ export default function BroadcastForm({
     }
   }
 
-  /** テスト後の修正も同じ下書きへ上書きし、予約時に別レコードを作らない。 */
-  const persistDraft = async (scheduledAt: string | null, saveAsDraft = false): Promise<ApiBroadcast> => {
+  /**
+   * テスト後の修正も同じ下書きへ上書きし、予約時に別レコードを作らない。
+   * #772: 更新は保持している版をその場で付けて送り、成功応答の版へ進める。
+   * 版を閉じ込めた古い関数は作らない。409時は送り直さず、最新版を読み直して案内する。
+   */
+  const persistDraft = async (scheduledAt: string | null, saveAsDraft = false): Promise<ApiBroadcast | null> => {
     const accountId = selectedAccountId || null
     const payload = draftPayload(scheduledAt, saveAsDraft)
-    const result = await persistBroadcastDraft(
-      draftSession.current,
-      accountId,
-      payload,
-      {
-        create: api.broadcasts.create,
-        update: api.broadcasts.update,
-      },
-    )
-    draftSession.current = result.session
-    return result.broadcast
+    try {
+      const result = await persistBroadcastDraft(
+        draftSession.current,
+        accountId,
+        payload,
+        {
+          create: api.broadcasts.create,
+          update: (id, draftPayload, expectedVersion) =>
+            api.broadcasts.update(id, { ...draftPayload, expectedVersion }),
+        },
+      )
+      draftSession.current = result.session
+      return result.broadcast
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 409 && draftSession.current.draftId) {
+        const current = await api.broadcasts.get(draftSession.current.draftId)
+        if (current.success) {
+          draftSession.current = { ...draftSession.current, version: current.data.version ?? null }
+        }
+        setError('別の画面で更新されたため読み直しました')
+        return null
+      }
+      throw e
+    }
   }
 
   const saveDraftNow = async () => {
@@ -921,8 +939,8 @@ export default function BroadcastForm({
     setError('')
     setDraftSaved(false)
     try {
-      await persistDraft(scheduledAtIso(), true)
-      setDraftSaved(true)
+      // #772: 409時は persistDraft が案内ずみで null を返すため、保存ずみにはしない。
+      if (await persistDraft(scheduledAtIso(), true)) setDraftSaved(true)
     } catch {
       setError('下書きを保存できませんでした')
     } finally {
@@ -947,6 +965,7 @@ export default function BroadcastForm({
     setTestResult('')
     try {
       const draft = await persistDraft(null, true)
+      if (!draft) return
       const res = await api.broadcasts.testSend(draft.id)
       if (res.success) {
         setTestResult(`テスト送信しました（${res.sent ?? 0}件）`)
@@ -1062,6 +1081,7 @@ export default function BroadcastForm({
     setSaving(true); setError('')
     try {
       const saved = await persistDraft(scheduledAtIso())
+      if (!saved) return
       setConfirmOpen(false)
       onSuccess(saved)
     } catch { setError('下書きを保存できませんでした') } finally { setSaving(false) }
