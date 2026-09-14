@@ -228,6 +228,142 @@ describe('NEN campaign metrics', () => {
     })).rejects.toMatchObject({ code: 'version_conflict', status: 409 });
   });
 
+  // #733: skipped の直せる2理由は、前提が直っていれば attempts を問わず再送できる。
+  it('直せる2理由のskippedは前提の回復を確認して再送待ちへ戻す', async () => {
+    insertJob(testDb.raw, {
+      id: 'skip-token', accountId: 'account-a', friendId: 'friend-a', status: 'skipped',
+      attempts: 0, sentAt: null, lastError: 'line_account_unavailable',
+    });
+    insertJob(testDb.raw, {
+      id: 'skip-disabled', accountId: 'account-a', friendId: 'friend-a', status: 'skipped',
+      attempts: 2, sentAt: null, lastError: 'campaign_disabled',
+    });
+
+    const tokenResult = await retryNenDelivery(testDb.db, {
+      id: 'skip-token', lineAccountId: 'account-a', expectedVersion: 1,
+      reason: '接続設定をやり直した', staffId: 'staff-a',
+    });
+    expect(tokenResult).toMatchObject({ status: 'pending', attempts: 0, retryGeneration: 1, version: 2 });
+    const disabledResult = await retryNenDelivery(testDb.db, {
+      id: 'skip-disabled', lineAccountId: 'account-a', expectedVersion: 1,
+      reason: '配信をオンに戻した', staffId: 'staff-a',
+    });
+    expect(disabledResult).toMatchObject({ status: 'pending', attempts: 0, retryGeneration: 1, version: 2 });
+    expect(testDb.raw.prepare(
+      `SELECT status, attempts, last_error, last_retry_reason FROM nen_delivery_jobs WHERE id = 'skip-token'`,
+    ).get()).toEqual({
+      status: 'pending', attempts: 0, last_error: null, last_retry_reason: '接続設定をやり直した',
+    });
+  });
+
+  // #733: 前提が直っていなければ送らず、何を直すかを409で返す。
+  it('前提が直っていないskippedの再送は409で直す場所を返す', async () => {
+    testDb.raw.prepare(`UPDATE line_accounts SET channel_access_token = '' WHERE id = 'account-b'`).run();
+    insertJob(testDb.raw, {
+      id: 'skip-token-ng', accountId: 'account-b', friendId: 'friend-b', status: 'skipped',
+      attempts: 0, sentAt: null, lastError: 'line_account_unavailable',
+    });
+    testDb.raw.prepare(
+      `UPDATE nen_campaign_settings SET is_enabled = 0 WHERE campaign_key = 'arrival_check'`,
+    ).run();
+    insertJob(testDb.raw, {
+      id: 'skip-disabled-ng', accountId: 'account-a', friendId: 'friend-a', status: 'skipped',
+      attempts: 0, sentAt: null, lastError: 'campaign_disabled',
+    });
+
+    await expect(retryNenDelivery(testDb.db, {
+      id: 'skip-token-ng', lineAccountId: 'account-b', expectedVersion: 1,
+      reason: 'まだ直していない', staffId: 'staff-a',
+    })).rejects.toMatchObject({
+      code: 'retry_precondition_unmet', status: 409,
+      message: 'LINE公式アカウントの送信設定を直してから再送してください',
+    });
+    await expect(retryNenDelivery(testDb.db, {
+      id: 'skip-disabled-ng', lineAccountId: 'account-a', expectedVersion: 1,
+      reason: 'まだ直していない', staffId: 'staff-a',
+    })).rejects.toMatchObject({
+      code: 'retry_precondition_unmet', status: 409,
+      message: '配信の決めごとをオンに戻してから再送してください',
+    });
+    // 送っていないので状態は変わらない。
+    expect(testDb.raw.prepare(
+      `SELECT status FROM nen_delivery_jobs WHERE id IN ('skip-token-ng', 'skip-disabled-ng') ORDER BY id`,
+    ).all()).toEqual([{ status: 'skipped' }, { status: 'skipped' }]);
+  });
+
+  // #733: 直せない4理由は理由ごとに409で止め、文言を理由別に返す。
+  it('直せない4理由のskippedは理由別の文言で409にする', async () => {
+    const cases = [
+      { reason: 'friend_unavailable', message: '友だちが配信対象ではないため、この記録は再送できません' },
+      { reason: 'campaign_snapshot_missing', message: '予約時の配信内容を確認できないため、この記録は再送できません' },
+      { reason: 'line_account_mismatch', message: '友だちと配信元のアカウントが一致しないため、この記録は再送できません' },
+      { reason: 'campaign_form_already_submitted', message: 'すでに回答済みのため、この記録は再送しません' },
+    ] as const;
+    for (const [index, entry] of cases.entries()) {
+      const id = `skip-blocked-${index}`;
+      insertJob(testDb.raw, {
+        id, accountId: 'account-a', friendId: 'friend-a', status: 'skipped',
+        attempts: 0, sentAt: null, lastError: entry.reason,
+      });
+      await expect(retryNenDelivery(testDb.db, {
+        id, lineAccountId: 'account-a', expectedVersion: 1,
+        reason: '再送したい', staffId: 'staff-a',
+      })).rejects.toMatchObject({ code: 'retry_unavailable', status: 409, message: entry.message });
+    }
+  });
+
+  // #733: 既知の6理由以外は理由コードを出さず、生文の秘密値を漏らさない。
+  it('未知の理由コードは出さず秘密値を漏らさない', async () => {
+    insertJob(testDb.raw, {
+      id: 'skip-unknown', accountId: 'account-a', friendId: 'friend-a', status: 'skipped',
+      attempts: 0, sentAt: null, lastError: 'upstream secret: token-xyz',
+    });
+    const list = await listNenDeliveries(testDb.db, {
+      lineAccountId: 'account-a', range: RANGE, cursor: 0, limit: 50,
+    });
+    const row = list.deliveries.find((entry) => entry.id === 'skip-unknown');
+    expect(row?.unmetReasonCode).toBeNull();
+    expect(list.summary.skippedReasons).toEqual({ unknown: 1 });
+    expect(JSON.stringify(list)).not.toContain('token-xyz');
+    const detail = await getNenDeliveryDetail(testDb.db, 'skip-unknown', 'account-a');
+    expect(detail.unmetReasonCode).toBeNull();
+    expect(JSON.stringify(detail)).not.toContain('token-xyz');
+  });
+
+  // #733: 二人同時押し・古い版・確認後の状態変化は送らず409にする。
+  it('同時押しと確認後の状態変化は送らず409にする', async () => {
+    insertJob(testDb.raw, {
+      id: 'skip-race', accountId: 'account-a', friendId: 'friend-a', status: 'skipped',
+      attempts: 0, sentAt: null, lastError: 'campaign_disabled',
+    });
+    await retryNenDelivery(testDb.db, {
+      id: 'skip-race', lineAccountId: 'account-a', expectedVersion: 1,
+      reason: '一人目', staffId: 'staff-a',
+    });
+    // 二人目は確認時から状態が変わっているため送らない。
+    await expect(retryNenDelivery(testDb.db, {
+      id: 'skip-race', lineAccountId: 'account-a', expectedVersion: 1,
+      reason: '二人目', staffId: 'staff-b',
+    })).rejects.toMatchObject({ code: 'retry_unavailable', status: 409 });
+    // 版を合わせても状態も理由も確認時から変わっているため送らない。
+    await expect(retryNenDelivery(testDb.db, {
+      id: 'skip-race', lineAccountId: 'account-a', expectedVersion: 2,
+      reason: '二人目', staffId: 'staff-b',
+    })).rejects.toMatchObject({ code: 'retry_unavailable', status: 409 });
+    // 前提も理由も変わっていないが版だけ古い行は、条件付きUPDATEが止める。
+    insertJob(testDb.raw, {
+      id: 'skip-stale', accountId: 'account-a', friendId: 'friend-a', status: 'skipped',
+      attempts: 0, sentAt: null, lastError: 'campaign_disabled',
+    });
+    await expect(retryNenDelivery(testDb.db, {
+      id: 'skip-stale', lineAccountId: 'account-a', expectedVersion: 99,
+      reason: '古い版', staffId: 'staff-b',
+    })).rejects.toMatchObject({ code: 'version_conflict', status: 409 });
+    expect(testDb.raw.prepare(
+      `SELECT status, retry_generation, last_retry_requested_by FROM nen_delivery_jobs WHERE id = 'skip-race'`,
+    ).get()).toEqual({ status: 'pending', retry_generation: 1, last_retry_requested_by: 'staff-a' });
+  });
+
   it('DB障害を成功や空状態へ変換しない', async () => {
     const broken = {
       prepare: () => ({ all: async () => { throw new Error('db unavailable'); } }),
@@ -291,9 +427,10 @@ describe('NEN campaign metrics', () => {
     expect(upcoming.pagination.total).toBe(2);
   });
 
-  // #727: skipped の内訳は5つの理由コードそのまま。運用で直せる2理由が
+  // #727: skipped の内訳は理由コードそのまま。運用で直せる2理由が
   // 「その他」に落ちないこと。failed 側の文字列一致分類は触らない。
-  it('skippedの内訳を5理由で出し、直せる2理由がその他に落ちない', async () => {
+  // #733: 6つ目の campaign_form_already_submitted も既知理由として数え、説明を出す。
+  it('skippedの内訳を6理由で出し、直せる2理由がその他に落ちない', async () => {
     insertJob(testDb.raw, {
       id: 'skip-fixable-a', accountId: 'account-a', friendId: 'friend-a', status: 'skipped',
       attempts: 0, sentAt: null, lastError: 'line_account_unavailable',
@@ -307,6 +444,10 @@ describe('NEN campaign metrics', () => {
       attempts: 0, sentAt: null, lastError: 'friend_unavailable',
     });
     insertJob(testDb.raw, {
+      id: 'skip-answered', accountId: 'account-a', friendId: 'friend-a', status: 'skipped',
+      attempts: 0, sentAt: null, lastError: 'campaign_form_already_submitted',
+    });
+    insertJob(testDb.raw, {
       id: 'failed-block', accountId: 'account-a', friendId: 'friend-a', status: 'failed',
       attempts: 5, sentAt: null, lastError: 'blocked by user',
     });
@@ -316,7 +457,10 @@ describe('NEN campaign metrics', () => {
     });
     expect(list.summary.skippedReasons).toMatchObject({
       line_account_unavailable: 1, campaign_disabled: 1, friend_unavailable: 1,
+      campaign_form_already_submitted: 1,
     });
+    expect(list.deliveries.find((row) => row.id === 'skip-answered')?.unmetReason)
+      .toBe('すでに回答済みのため送りません');
     // failed 側の分類は従来どおり文字列一致。
     expect(list.summary.unmetReasons).toMatchObject({ blocked: 1 });
     // skipped が other に混ざらないこと。

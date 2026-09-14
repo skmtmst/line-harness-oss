@@ -1,4 +1,4 @@
-import { jstNow } from '@line-crm/db';
+import { getLineAccountById, jstNow } from '@line-crm/db';
 
 import { getNenCampaign } from './nen-engagement.js';
 
@@ -444,18 +444,28 @@ export const NEN_SKIPPED_REASONS = [
   'line_account_mismatch',
   'campaign_snapshot_missing',
   'campaign_disabled',
+  'campaign_form_already_submitted',
 ] as const;
 
 export type NenSkippedReason = (typeof NEN_SKIPPED_REASONS)[number];
 
 // #727: skipped のうち運用で直せるもの。line_account_unavailable は
 // LINE公式アカウントの接続設定のやり直し、campaign_disabled は配信を
-// オンに戻すことで解消する。残り3つは友だち側の事情かデータ不整合で
-// 運用操作では直せない。line_account_mismatch は要調査のため含めない。
+// オンに戻すことで解消する。残り4つは友だち側の事情かデータ不整合か
+// 回答済みで運用操作では直せない。line_account_mismatch は要調査のため含めない。
+// #733: 直せる2理由だけ手動再送できる。前提の再確認は retryNenDelivery が行う。
 export const NEN_SKIPPED_FIXABLE_REASONS: ReadonlySet<string> = new Set([
   'line_account_unavailable',
   'campaign_disabled',
 ]);
+
+// #733: 画面の出し分け用に理由コードを返す。last_error は送信失敗時に
+// 上流の生文(秘密値を含むことがある)が入るため、既知の6理由のどれかに
+// 一致する時だけそのまま返し、それ以外は出さない。
+function safeReasonCode(status: string, error: string | null): string | null {
+  if (status !== 'skipped' || error === null) return null;
+  return (NEN_SKIPPED_REASONS as readonly string[]).includes(error) ? error : null;
+}
 
 function safeFailureReason(status: string, error: string | null, attempts: number): string | null {
   if (status !== 'failed' && status !== 'skipped') return null;
@@ -465,6 +475,7 @@ function safeFailureReason(status: string, error: string | null, attempts: numbe
     line_account_mismatch: '友だちと配信元のLINE公式アカウントが一致しません',
     campaign_snapshot_missing: '予約時の配信内容を確認できません',
     campaign_disabled: '配信の決めごとが停止中です',
+    campaign_form_already_submitted: 'すでに回答済みのため送りません',
   };
   if (error && known[error]) return known[error];
   return attempts >= MAX_DELIVERY_ATTEMPTS
@@ -530,9 +541,15 @@ export async function listNenDeliveries(
       GROUP BY reason`,
   ).bind(input.lineAccountId, input.range.fromSql, input.range.toSql)
     .all<{ reason: 'blocked' | 'unfollowed' | 'other'; total: number }>();
-  // #727: skipped の内訳は5つの理由コードそのままで数える。文字列一致は使わない。
+  // #727: skipped の内訳は理由コードそのままで数える。文字列一致は使わない。
+  // #733: 理由は6つ(campaign_form_already_submitted を含む)。last_error に
+  // 上流の生文(秘密値を含むことがある)が入るため、既知の6理由以外は
+  // unknown にまとめ、生文をキーとして出さない。
   const skippedRows = await db.prepare(
-    `SELECT COALESCE(last_error, '') AS reason, COUNT(*) AS total
+    `SELECT CASE WHEN last_error IN (
+              'friend_unavailable', 'line_account_unavailable', 'line_account_mismatch',
+              'campaign_snapshot_missing', 'campaign_disabled', 'campaign_form_already_submitted'
+            ) THEN last_error ELSE 'unknown' END AS reason, COUNT(*) AS total
        FROM nen_delivery_jobs
       WHERE line_account_id = ? AND status = 'skipped'
         AND datetime(scheduled_at) >= datetime(?) AND datetime(scheduled_at) < datetime(?)
@@ -586,6 +603,8 @@ export async function listNenDeliveries(
       status: row.status,
       attempts: Number(row.attempts ?? 0),
       unmetReason: safeFailureReason(row.status, row.last_error, Number(row.attempts ?? 0)),
+      // #733: 画面が直せる理由か判断できるよう、既知の理由コードだけ返す。
+      unmetReasonCode: safeReasonCode(row.status, row.last_error),
       reaction: unavailable('この配信記録に対応する個人の反応は取得できません'),
       version: Number(row.version),
       updatedAt: row.updated_at,
@@ -655,6 +674,8 @@ export async function getNenDeliveryDetail(
     status: row.status,
     attempts: Number(row.attempts ?? 0),
     unmetReason: safeFailureReason(row.status, row.last_error, Number(row.attempts ?? 0)),
+    // #733: 詳細画面の再送ボタン出し分け用。既知の理由コードだけ返す。
+    unmetReasonCode: safeReasonCode(row.status, row.last_error),
     trigger: triggerLabel(row.campaign_key),
     content: snapshot ? {
       title: text('title'),
@@ -691,6 +712,48 @@ function triggerLabel(campaignKey: string): string {
   return labels[campaignKey] ?? '配信の決めごと';
 }
 
+// #733: 再送できない記録へ、何を直す必要があるかを返す。failed 側の
+// 従来文言は変えない。skipped の直せない4理由は理由ごとに止める。
+function skippedRetryBlockedMessage(status: string, lastError: string | null): string {
+  if (status === 'skipped') {
+    switch (lastError) {
+      case 'friend_unavailable':
+        return '友だちが配信対象ではないため、この記録は再送できません';
+      case 'campaign_snapshot_missing':
+        return '予約時の配信内容を確認できないため、この記録は再送できません';
+      case 'line_account_mismatch':
+        return '友だちと配信元のアカウントが一致しないため、この記録は再送できません';
+      case 'campaign_form_already_submitted':
+        return 'すでに回答済みのため、この記録は再送しません';
+      default:
+        return 'この理由の記録は再送できません';
+    }
+  }
+  return '最大回数まで失敗した配信だけ、手動で再送できます';
+}
+
+// #733: 送信時と同じ見方で前提を再確認する。送信側は
+// getLineAccountById の channel_access_token を使うため、同じ getter で見る。
+async function hasUsableLineAccountToken(
+  db: D1Database,
+  lineAccountId: string | null,
+): Promise<boolean> {
+  if (!lineAccountId) return false;
+  const account = await getLineAccountById(db, lineAccountId);
+  return Boolean(account?.channel_access_token);
+}
+
+// #733: 送信時と同じ見方で決めごとの有効を確認する。送信側は
+// getNenCampaign(db, key, accountId) の is_enabled を使うため、同じ呼び方で見る。
+async function isNenCampaignEnabled(
+  db: D1Database,
+  campaignKey: string,
+  lineAccountId: string | null,
+): Promise<boolean> {
+  const campaign = await getNenCampaign(db, campaignKey, lineAccountId);
+  return campaign?.is_enabled === 1;
+}
+
 export async function retryNenDelivery(
   db: D1Database,
   input: {
@@ -709,30 +772,55 @@ export async function retryNenDelivery(
     throw new NenCampaignMetricsError('reason_invalid', '再送理由を1〜500文字で入力してください', 400, 'reason');
   }
   const current = await db.prepare(
-    `SELECT id, status, attempts, version, retry_generation
+    `SELECT id, campaign_key, line_account_id, status, attempts, last_error, version, retry_generation
        FROM nen_delivery_jobs WHERE id = ? AND line_account_id = ?`,
   ).bind(input.id, input.lineAccountId).first<{
-    id: string; status: string; attempts: number; version: number; retry_generation: number;
+    id: string; campaign_key: string; line_account_id: string | null; status: string;
+    attempts: number; last_error: string | null; version: number; retry_generation: number;
   }>();
   if (!current) throw new NenCampaignMetricsError('not_found', '配信記録が見つかりません', 404);
-  if (current.status !== 'failed' || Number(current.attempts) < MAX_DELIVERY_ATTEMPTS) {
+  const attempts = Number(current.attempts ?? 0);
+  const skippedFixable = current.status === 'skipped'
+    && current.last_error !== null && NEN_SKIPPED_FIXABLE_REASONS.has(current.last_error);
+  if (!(current.status === 'failed' && attempts >= MAX_DELIVERY_ATTEMPTS) && !skippedFixable) {
     throw new NenCampaignMetricsError(
       'retry_unavailable',
-      '最大回数まで失敗した配信だけ、手動で再送できます',
+      skippedRetryBlockedMessage(current.status, current.last_error),
       409,
     );
   }
+  // #733: skipped の再送は運用で直した前提が今も直っているか確かめ直す。
+  // 判定は送信時と同じ getter・同じ見方で行う(getter本体は触らない)。
+  if (skippedFixable) {
+    const recovered = current.last_error === 'line_account_unavailable'
+      ? await hasUsableLineAccountToken(db, current.line_account_id)
+      : await isNenCampaignEnabled(db, current.campaign_key, current.line_account_id);
+    if (!recovered) {
+      throw new NenCampaignMetricsError(
+        'retry_precondition_unmet',
+        current.last_error === 'line_account_unavailable'
+          ? 'LINE公式アカウントの送信設定を直してから再送してください'
+          : '配信の決めごとをオンに戻してから再送してください',
+        409,
+      );
+    }
+  }
   const now = jstNow();
+  // #733: skipped は attempts を問わず、直せる2理由のままの行だけ戻す。
+  // 確認後に状態・理由・版のどれかが変わった行は1件も更新されず409になる。
   const result = await db.prepare(
     `UPDATE nen_delivery_jobs
         SET status = 'pending', attempts = 0, scheduled_at = ?, last_error = NULL,
             retry_generation = retry_generation + 1, version = version + 1,
             last_retry_reason = ?, last_retry_requested_by = ?, last_retry_requested_at = ?,
             updated_at = ?
-      WHERE id = ? AND line_account_id = ? AND status = 'failed' AND attempts >= ? AND version = ?`,
+      WHERE id = ? AND line_account_id = ?
+        AND ((status = 'failed' AND attempts >= ?)
+          OR (status = 'skipped' AND last_error IN (?, ?)))
+        AND version = ?`,
   ).bind(
     now, reason, input.staffId, now, now, input.id, input.lineAccountId,
-    MAX_DELIVERY_ATTEMPTS, input.expectedVersion,
+    MAX_DELIVERY_ATTEMPTS, 'line_account_unavailable', 'campaign_disabled', input.expectedVersion,
   ).run();
   if (Number(result.meta.changes ?? 0) === 0) {
     throw new NenCampaignMetricsError(

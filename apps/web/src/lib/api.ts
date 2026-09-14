@@ -3658,11 +3658,11 @@ export type NenPetMetrics = {
 export type NenDelivery = {
   id: string; campaignKey: string; label: string; friendId: string; friendName: string
   lineAccountName: string; scheduledAt: string; sentAt: string | null; status: string
-  attempts: number; unmetReason: string | null; reaction: NenUnavailableMetric
+  attempts: number; unmetReason: string | null; unmetReasonCode: string | null; reaction: NenUnavailableMetric
   version: number; updatedAt: string
 }
 
-export type NenSkippedReasonCode = 'friend_unavailable' | 'line_account_unavailable' | 'line_account_mismatch' | 'campaign_snapshot_missing' | 'campaign_disabled' | 'unknown'
+export type NenSkippedReasonCode = 'friend_unavailable' | 'line_account_unavailable' | 'line_account_mismatch' | 'campaign_snapshot_missing' | 'campaign_disabled' | 'campaign_form_already_submitted' | 'unknown'
 
 export type NenDeliveryList = {
   range: NenMetricsRange
@@ -5410,8 +5410,8 @@ export const api = {
      * （#730）では省かれる（`undefined`）。**`0` と紛れないよう、
      * 呼び出し側は存在チェックしてから使うこと。**
      */
-    list: (kind?: string) =>
-      fetchApi<ApiResponse<Folder[]> & { unfiledCount?: number }>(`/api/folders${kind ? `?kind=${kind}` : ''}`),
+    list: (kind?: string, accountId?: string) =>
+      fetchApi<ApiResponse<Folder[]> & { unfiledCount?: number }>(`/api/folders${kind ? `?kind=${kind}` : ''}${kind && accountId ? `&account_id=${encodeURIComponent(accountId)}` : ''}`),
     /** 色（#RRGGBB）はフォルダに付く。中身の印にこの色が出る。 */
     create: (data: { kind: string; name: string; parentId?: string | null; color?: string | null }) =>
       fetchApi<ApiResponse<Folder>>('/api/folders', {

@@ -112,8 +112,8 @@ describe('getFolderItemCounts(#631)', () => {
     expect(asBoth!.byFolderId['folder-1']).toBe(7)
   })
 
-  it('対応表に無い種別（#730）は undefined を返す。0件と混同しない', async () => {
-    const counts = await getFolderItemCounts(db, 'media', {
+  it('対応表に無い種別（event・#730）は undefined を返す。0件と混同しない', async () => {
+    const counts = await getFolderItemCounts(db, 'event', {
       allowedAccountIds: ['account-a'],
       canSeeUnassigned: false,
     })
@@ -190,18 +190,18 @@ describe('FOLDER_ITEM_COUNT_TABLES(#631)', () => {
     }
   })
 
-  it('対応表は統一パターンの6種別ちょうど。新しい種別が増減したらこの試験が気づく', () => {
+  it('対応表は統一パターンの9種別ちょうど。新しい種別が増減したらこの試験が気づく', () => {
     expect(Object.keys(FOLDER_ITEM_COUNT_TABLES).sort()).toEqual(
-      ['auto_reply', 'broadcast', 'reminder', 'scenario', 'tag', 'template'].sort(),
+      ['auto_reply', 'broadcast', 'common_var', 'media', 'reminder', 'rich_menu', 'scenario', 'tag', 'template'].sort(),
     )
   })
 
-  it('対応表に無い残り9種別(webinarを除く)は、理由コメント付きで意図して外している', () => {
+  it('対応表に無い残り6種別(webinarを除く)は、理由コメント付きで意図して外している', () => {
     const covered = new Set(Object.keys(FOLDER_ITEM_COUNT_TABLES))
     covered.add('webinar') // 別実装(getWebinarFolderCounts)でカバー済み
     const uncovered = FOLDER_KINDS.filter((kind) => !covered.has(kind))
     expect(uncovered.sort()).toEqual(
-      ['automation', 'common_var', 'entry_route', 'event', 'form', 'friend_field', 'media', 'mileage_rule', 'rich_menu'].sort(),
+      ['automation', 'entry_route', 'event', 'form', 'friend_field', 'mileage_rule'].sort(),
     )
   })
 })
