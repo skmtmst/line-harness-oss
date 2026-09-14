@@ -13,6 +13,7 @@ import {
   getScenarioPublishedVersion,
   publishScenarioVersion,
   computeNextDeliveryAt,
+  validateScenarioActionReferences,
 } from '@line-crm/db';
 import { reorderScenarios } from '@line-crm/db';
 import { computeScenarioStats } from '../services/scenario-stats.js';
@@ -1593,6 +1594,19 @@ scenarios.post('/api/scenarios/:id/actions', requireRole('owner', 'admin'), asyn
     const conditionCheck = validateConditionForStorage(body.condition, 'アクションの実行');
     if (!conditionCheck.ok) return c.json({ success: false, error: conditionCheck.error }, 400);
 
+    // N-053: 参照先の存在と所属を保存前に確かめる。幽霊・他アカウントは
+    // 1行も書かず 400 で返す。実行時の読み飛ばしに頼らない。
+    const scenarioRow = await c.env.DB.prepare(
+      `SELECT line_account_id FROM scenarios WHERE id = ?`,
+    )
+      .bind(scenarioId)
+      .first<{ line_account_id: string | null }>();
+    if (!scenarioRow) return c.json({ success: false, error: 'シナリオが見つかりません。' }, 404);
+    const refCheck = await validateScenarioActionReferences(
+      c.env.DB, scenarioRow.line_account_id, actionType, body.config,
+    );
+    if (!refCheck.ok) return c.json({ success: false, error: refCheck.issue.message }, 400);
+
     // 並び順を渡されなければ、同じ発火点の末尾に置く。
     let sortOrder = body.sortOrder;
     if (sortOrder === undefined) {
@@ -1660,6 +1674,18 @@ scenarios.put('/api/scenarios/:id/actions/:actionId', requireRole('owner', 'admi
     if (body.config !== undefined) {
       const check = validateActionConfig(existing.action_type, body.config);
       if (!check.ok) return c.json({ success: false, error: check.error }, 400);
+      // N-053: 新しく保存する設定だけ確かめる。並び順だけの変更や既存の
+      // 幽霊参照には触らない（既存データの読み・実行を壊さない）。
+      const scenarioRow = await c.env.DB.prepare(
+        `SELECT line_account_id FROM scenarios WHERE id = ?`,
+      )
+        .bind(scenarioId)
+        .first<{ line_account_id: string | null }>();
+      if (!scenarioRow) return c.json({ success: false, error: 'シナリオが見つかりません。' }, 404);
+      const refCheck = await validateScenarioActionReferences(
+        c.env.DB, scenarioRow.line_account_id, existing.action_type, body.config,
+      );
+      if (!refCheck.ok) return c.json({ success: false, error: refCheck.issue.message }, 400);
       fields.push('config_json = ?');
       values.push(JSON.stringify(body.config));
     }

@@ -1026,6 +1026,160 @@ export interface ScenarioReferenceMismatch {
   origin: string;
 }
 
+export interface ScenarioActionReferenceIssue {
+  /** config内の場所（tagIds[3] のような指し示し）。 */
+  field: string;
+  /** missing=幽霊 / cross-account=別アカウント（契約のない共通を含む）。 */
+  reason: 'missing' | 'cross-account';
+  message: string;
+}
+
+type ActionReferenceCheck =
+  | { ok: true }
+  | { ok: false; issue: ScenarioActionReferenceIssue };
+
+/** 行が無ければ undefined、共通（NULL）なら null、アカウント付きならその ID。 */
+async function resourceAccount(
+  db: D1Database,
+  table: string,
+  id: string,
+): Promise<string | null | undefined> {
+  const row = await db
+    .prepare(`SELECT line_account_id AS account_id FROM ${table} WHERE id = ?`)
+    .bind(id)
+    .first<{ account_id: string | null }>();
+  if (!row) return undefined;
+  return row.account_id;
+}
+
+async function resourceExists(db: D1Database, table: string, id: string): Promise<boolean> {
+  const row = await db
+    .prepare(`SELECT id FROM ${table} WHERE id = ?`)
+    .bind(id)
+    .first<{ id: string }>();
+  return !!row;
+}
+
+/**
+ * N-053: アクション保存前の参照検証。存在しない参照・別アカウント参照を弾く。
+ *
+ * #644 の既存契約に合わせる。シナリオ側が共通（NULL）なら確かめない。
+ * 資源側の共通（NULL）は tag/template/scenario の3種だけ通し、それ以外へは
+ * 推測で広げない。通すのは「ある」だけでなく「そのシナリオで使える」行だけ。
+ * 書き込みはしない。呼び側が保存の前に呼ぶ。
+ */
+export async function validateScenarioActionReferences(
+  db: D1Database,
+  scenarioAccountId: string | null,
+  actionType: string,
+  config: unknown,
+): Promise<ActionReferenceCheck> {
+  if (!scenarioAccountId) return { ok: true };
+  const c = (typeof config === 'object' && config !== null && !Array.isArray(config))
+    ? config as Record<string, unknown>
+    : {};
+  const nonEmpty = (value: unknown): value is string =>
+    typeof value === 'string' && value !== '';
+
+  const scoped = async (
+    table: 'tags' | 'scenarios' | 'templates',
+    label: string,
+    field: string,
+    id: string,
+  ): Promise<ActionReferenceCheck> => {
+    const account = await resourceAccount(db, table, id);
+    if (account === undefined) {
+      return { ok: false, issue: { field, reason: 'missing', message: `${label}が見つかりません。選び直してください。` } };
+    }
+    if (account === null || account === scenarioAccountId) return { ok: true };
+    return { ok: false, issue: { field, reason: 'cross-account', message: `別のLINEアカウントの${label}は使えません。` } };
+  };
+
+  const global = async (
+    table: 'tag_groups' | 'friend_fields' | 'support_marks' | 'reminders',
+    label: string,
+    field: string,
+    id: string,
+  ): Promise<ActionReferenceCheck> => {
+    if (await resourceExists(db, table, id)) return { ok: true };
+    return { ok: false, issue: { field, reason: 'missing', message: `${label}が見つかりません。選び直してください。` } };
+  };
+
+  switch (actionType) {
+    case 'tag': {
+      if (Array.isArray(c.tagIds)) {
+        for (let index = 0; index < c.tagIds.length; index += 1) {
+          const tagId = (c.tagIds as unknown[])[index];
+          if (typeof tagId !== 'string' || tagId === '') continue;
+          const checked = await scoped('tags', 'タグ', `tagIds[${index}]`, tagId);
+          if (!checked.ok) return checked;
+        }
+      }
+      if (nonEmpty(c.folderId)) {
+        return global('tag_groups', 'タグのフォルダ', 'folderId', c.folderId);
+      }
+      return { ok: true };
+    }
+    case 'friend_field':
+      if (!nonEmpty(c.fieldId)) return { ok: true };
+      return global('friend_fields', '友だち情報欄', 'fieldId', c.fieldId);
+    case 'support_mark':
+      if (c.markId === null || c.markId === undefined || c.markId === '') return { ok: true };
+      if (typeof c.markId !== 'string') {
+        return { ok: false, issue: { field: 'markId', reason: 'missing', message: '対応マークの指定が不正です。' } };
+      }
+      return global('support_marks', '対応マーク', 'markId', c.markId);
+    case 'scenario':
+      if (!nonEmpty(c.scenarioId)) return { ok: true };
+      return scoped('scenarios', 'シナリオ', 'scenarioId', c.scenarioId);
+    case 'common_var': {
+      // 実行は (var_key, その友だちのアカウント, 未アーカイブ) の完全一致で読む。
+      // 共通（NULL）行は実行で拾われないので、既存契約に無いものとして通さない。
+      if (!nonEmpty(c.varKey)) return { ok: true };
+      const row = await db
+        .prepare(
+          `SELECT id FROM common_vars
+            WHERE var_key = ? AND line_account_id = ? AND archived_at IS NULL`,
+        )
+        .bind(c.varKey, scenarioAccountId)
+        .first<{ id: string }>();
+      if (row) return { ok: true };
+      const other = await db
+        .prepare(`SELECT id FROM common_vars WHERE var_key = ? AND archived_at IS NULL`)
+        .bind(c.varKey)
+        .first<{ id: string }>();
+      if (other) {
+        return { ok: false, issue: { field: 'varKey', reason: 'cross-account', message: '別のLINEアカウントの共通情報は使えません。' } };
+      }
+      return { ok: false, issue: { field: 'varKey', reason: 'missing', message: '共通情報が見つかりません。選び直してください。' } };
+    }
+    case 'send_message':
+      return { ok: true };
+    case 'send_template':
+      if (!nonEmpty(c.templateId)) return { ok: true };
+      return scoped('templates', 'テンプレート', 'templateId', c.templateId);
+    case 'reminder':
+      if (!nonEmpty(c.reminderId)) return { ok: true };
+      return global('reminders', 'リマインダ', 'reminderId', c.reminderId);
+    case 'event_booking': {
+      if (!nonEmpty(c.eventId)) return { ok: true };
+      const row = await db
+        .prepare(`SELECT line_account_id AS account_id, deleted_at FROM events WHERE id = ?`)
+        .bind(c.eventId)
+        .first<{ account_id: string | null; deleted_at: string | null }>();
+      if (!row || row.deleted_at !== null) {
+        return { ok: false, issue: { field: 'eventId', reason: 'missing', message: 'イベントが見つかりません。選び直してください。' } };
+      }
+      if (row.account_id !== scenarioAccountId) {
+        return { ok: false, issue: { field: 'eventId', reason: 'cross-account', message: '別のLINEアカウントのイベントは使えません。' } };
+      }
+      return { ok: true };
+    }
+    default:
+      return { ok: false, issue: { field: '', reason: 'missing', message: `知らないアクション種別です: ${actionType}` } };
+  }
+}
+
 /**
  * いま保存されている参照のうち、シナリオと別アカウントのものを洗い出す。
  *
