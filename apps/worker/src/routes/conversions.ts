@@ -13,6 +13,11 @@ import {
   getConversionApprovalQueue,
   decideConversionApproval,
   getConversionApprovalNotifyInfo,
+  getConversionOfferActionPlan,
+  enrollFriendInScenario,
+  createNotification,
+  listUnfinishedFriendTagSideEffectRuns,
+  canAutoRetryFriendTagSideEffect,
   syncAffiliateConversionMileage,
   listConversionDefinitions,
   getConversionDefinitionDetail,
@@ -31,6 +36,7 @@ import {
 } from '@line-crm/db';
 import { IDENTITY_KEY_SQL } from '../lib/identity-key.js';
 import { notifyAffiliateApproval } from '../services/affiliate-notifier.js';
+import { attachTagAndFireSideEffects } from '../services/friend-tag-attach.js';
 import type { Env } from '../index.js';
 import { auditLog } from '../lib/audit-log.js';
 import { requireRole } from '../middleware/role-guard.js';
@@ -39,6 +45,7 @@ import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../service
 import { listLimit, listOffset } from './list-pagination.js';
 
 import type {
+  ConversionOfferActionPlan,
   ConversionPoint,
   ConversionMeasureMethod,
   ConversionDefinitionRange,
@@ -1153,6 +1160,216 @@ function readApprovalDecision(body: { status?: unknown; expectedStatus?: unknown
   return { ok: true, status: body.status, expectedStatus: body.expectedStatus };
 }
 
+/**
+ * 承認確定で案件の動作を実行した結果、未完に残ったもの(N-212)。
+ *
+ * `retryable` は「同じ承認をもう一度送れば走り直すか」。無効な参照は
+ * 再送しても直らない（案件の設定を直す必要がある）ので false。
+ */
+interface OfferActionFailure {
+  action: 'tag' | 'scenario';
+  refId: string;
+  reason: string;
+  retryable: boolean;
+}
+
+const OFFER_ACTION_FAILED_EVENT = 'affiliate_offer_action_failed';
+
+/**
+ * 失敗を運用者が見る場所（通知センター）へ1件残す。
+ *
+ * 再送するたびに増えないよう、同じ成果・同じ動作の失敗は1件だけにする。
+ * 通知の書き込み自体が落ちても本題を巻き添えにしない。
+ */
+async function notifyOfferActionFailure(
+  db: D1Database,
+  plan: ConversionOfferActionPlan,
+  failure: OfferActionFailure,
+): Promise<void> {
+  try {
+    const existing = await db
+      .prepare(
+        `SELECT id FROM notifications
+          WHERE event_type = ? AND metadata LIKE ? AND metadata LIKE ?
+          LIMIT 1`,
+      )
+      .bind(
+        OFFER_ACTION_FAILED_EVENT,
+        `%"conversionEventId":"${plan.eventId}"%`,
+        `%"action":"${failure.action}"%`,
+      )
+      .first<{ id: string }>();
+    if (existing) return;
+    const actionLabel = failure.action === 'tag' ? 'タグ付与' : 'シナリオ開始';
+    await createNotification(db, {
+      eventType: OFFER_ACTION_FAILED_EVENT,
+      title: '案件の動作を完了できませんでした',
+      body:
+        `成果の承認後に案件「${plan.offerName}」の${actionLabel}を実行できませんでした。` +
+        (failure.retryable
+          ? 'もう一度承認を送ると完了していない分だけやり直します。'
+          : '案件に設定された参照が無効です。案件の設定を確認してください。') +
+        ` 理由: ${failure.reason}`,
+      channel: 'dashboard',
+      category: 'error',
+      lineAccountId: plan.offerAccountId,
+      metadata: JSON.stringify({
+        conversionEventId: plan.eventId,
+        offerId: plan.offerId,
+        action: failure.action,
+        refId: failure.refId,
+        retryable: failure.retryable,
+        reason: failure.reason,
+      }),
+    });
+  } catch (error) {
+    console.error(`offer action failure notice failed (event=${plan.eventId} action=${failure.action}):`, error);
+  }
+}
+
+/**
+ * 承認確定時に、成果の帰属先案件に設定されたタグ付与・シナリオ開始を
+ * 実行する(N-212)。
+ *
+ * - 冪等: タグは attachTagAndFireSideEffects（friend_tags の INSERT OR IGNORE +
+ *   friend_tag_side_effect_runs 台帳）、シナリオは enrollFriendInScenario の
+ *   決定的な sourceEnrollmentId で、同じ判断の再送は二重実行にならない。
+ *   already_set の再送でも呼ばれ、前回落ちた分の修復になる。
+ * - 部分成功を成功にしない: どちらかが未完なら失敗を返し、呼び出し側は
+ *   成功応答を返さない。失敗は通知センターにも残す。
+ * - 古い不正参照（他アカウント・削除・無効）は黙って実行しない。実行計画の
+ *   時点で所属と有効性を掛け直し、外れた参照は実行せず失敗として残す。
+ *
+ * 例外は投げない。個別の動作の失敗は戻り値へ集める。実行計画の読み込み
+ * 自体の失敗だけは呼び出し側の catch へ任せる（マイル連携と同じ扱い）。
+ */
+async function runApprovedConversionOfferActions(
+  db: D1Database,
+  eventId: string,
+): Promise<OfferActionFailure[]> {
+  const plan = await getConversionOfferActionPlan(db, eventId);
+  const failures: OfferActionFailure[] = [];
+  if (!plan || (!plan.tagId && !plan.scenarioId)) return failures;
+
+  if (plan.tagId) {
+    const attached = await db
+      .prepare(`SELECT 1 AS present FROM friend_tags WHERE friend_id = ? AND tag_id = ?`)
+      .bind(plan.friendId, plan.tagId)
+      .first<{ present: number }>();
+    if (!attached && !plan.tagExecutable) {
+      // まだ付いていないのに実行できない参照 = 実行してはいけない古い不正参照。
+      failures.push({
+        action: 'tag',
+        refId: plan.tagId,
+        reason: '案件に設定されたタグが存在しない・他アカウントのもの・またはアーカイブ済みです',
+        retryable: false,
+      });
+    } else {
+      // 付与済みなら参照の今の有効性は見ない — 付与は済んでいるので、
+      // 台帳の未完工程の走り直しだけが残る（既存契約どおり）。
+      let attachError: unknown = null;
+      try {
+        await attachTagAndFireSideEffects(db, plan.friendId, plan.tagId);
+      } catch (error) {
+        console.error(`offer tag action failed (event=${eventId} tag=${plan.tagId}):`, error);
+        attachError = error;
+      }
+      // 例外を投げない失敗（マイル工程・走り直し経路の失敗）も未完として拾う。
+      // 台帳が正本なので、残っている工程があるなら完了とは言わない。
+      // 読み取り自体が落ちたときは「未完なし」に見せかけず、そのまま上へ
+      // 投げる — 単体は500、一括は failed に分かれる。
+      const unfinished = await listUnfinishedFriendTagSideEffectRuns(db, plan.friendId, plan.tagId);
+      if (attachError !== null || unfinished.length > 0) {
+        failures.push({
+          action: 'tag',
+          refId: plan.tagId,
+          reason:
+            attachError instanceof Error
+              ? attachError.message
+              : `タグ付与後の処理が残っています（${unfinished.map((r) => r.step_key).join(', ')}）`,
+          // 未完工程が全部自動で走り直せるものなら再送で修復する。止まった
+          // 工程(走り直さないと決めたもの)が混ざるときは人の確認が要る。
+          retryable: unfinished.every((r) => canAutoRetryFriendTagSideEffect(r)),
+        });
+      }
+    }
+  }
+
+  if (plan.scenarioId) {
+    const ongoing = await db
+      .prepare(
+        `SELECT 1 AS present FROM friend_scenarios
+          WHERE friend_id = ? AND scenario_id = ? AND status != 'completed' LIMIT 1`,
+      )
+      .bind(plan.friendId, plan.scenarioId)
+      .first<{ present: number }>();
+    if (!ongoing) {
+      if (!plan.scenarioExecutable) {
+        failures.push({
+          action: 'scenario',
+          refId: plan.scenarioId,
+          reason: '案件に設定されたシナリオが存在しない・他アカウントのもの・または停止中です',
+          retryable: false,
+        });
+      } else {
+        try {
+          // 成果イベントIDを購読IDにする。完了済み（通0本）でも同じIDで
+          // 既存行を回収するので、再送で同じシナリオが二重に始まらない。
+          const enrollment = await enrollFriendInScenario(
+            db,
+            plan.friendId,
+            plan.scenarioId,
+            `conversion-offer:${eventId}`,
+          );
+          if (!enrollment) {
+            const recheck = await db
+              .prepare(
+                `SELECT 1 AS present FROM friend_scenarios
+                  WHERE friend_id = ? AND scenario_id = ? AND status != 'completed' LIMIT 1`,
+              )
+              .bind(plan.friendId, plan.scenarioId)
+              .first<{ present: number }>();
+            if (!recheck) {
+              // 並行制限で弾かれた・公開版が無い等。登録は起きていない。
+              failures.push({
+                action: 'scenario',
+                refId: plan.scenarioId,
+                reason: 'シナリオを開始できませんでした（他のシナリオ実行中か、公開版がありません）',
+                retryable: true,
+              });
+            }
+          }
+        } catch (error) {
+          console.error(`offer scenario action failed (event=${eventId} scenario=${plan.scenarioId}):`, error);
+          failures.push({
+            action: 'scenario',
+            refId: plan.scenarioId,
+            reason: error instanceof Error ? error.message : String(error),
+            retryable: true,
+          });
+        }
+      }
+    }
+  }
+
+  for (const failure of failures) {
+    await notifyOfferActionFailure(db, plan, failure);
+  }
+  return failures;
+}
+
+/** 未完の動作を運用者向けの短い文言にする。応答と一括結果で共用。 */
+function offerActionFailureMessage(failures: OfferActionFailure[]): string {
+  const labels = failures.map((f) => (f.action === 'tag' ? 'タグ付与' : 'シナリオ開始'));
+  const hasPermanent = failures.some((f) => !f.retryable);
+  return (
+    `成果は承認されましたが、案件の動作（${[...new Set(labels)].join('・')}）を完了できませんでした。` +
+    (hasPermanent
+      ? '再送しても直らない項目があります。案件の設定と通知センターの詳細を確認してください。'
+      : 'もう一度送ると完了していない分だけやり直します。')
+  );
+}
+
 // PATCH /api/conversions/events/:id/approval - approve/reject an attributed CV
 conversions.patch('/api/conversions/events/:id/approval', requireApprovalPermission, requireVisibleConversionEvent, async (c) => {
   // 監査は更新の成功が確定してから残す(#513 M7)。以前は検証の前に
@@ -1205,18 +1422,12 @@ conversions.patch('/api/conversions/events/:id/approval', requireApprovalPermiss
       parsed.status,
     );
 
-    if (decided.outcome === 'already_set') {
-      // Idempotent re-click: the status is already set to the requested value.
-      // Return 200 so the UI does not show an error to the operator.
-      return c.json({
-        success: true,
-        data: { id: c.req.param('id'), approvalStatus: parsed.status, alreadySet: true },
-      });
-    }
-
     // ASP: notify the attributed affiliate on approval only (never on reject).
     // Best-effort — notifyAffiliateApproval swallows its own errors, but guard
     // the info lookup too so a push failure can never fail the approval request.
+    // 判断が変わった1回だけ送る。案件動作の結果には左右されない（承認そのものは
+    // 成立している）。後段の動作が落ちたときの再送は already_set 側なので、
+    // ここを先に済ませておかないと紹介者への通知が欠ける。
     if (parsed.status === 'approved' && decided.outcome === 'updated') {
       try {
         const info = await getConversionApprovalNotifyInfo(c.env.DB, c.req.param('id'));
@@ -1232,6 +1443,39 @@ conversions.patch('/api/conversions/events/:id/approval', requireApprovalPermiss
       } catch (err) {
         console.error('Affiliate approval notify failed (non-blocking):', err);
       }
+    }
+
+    // 承認確定で案件の動作（タグ付与・シナリオ開始）を実行する(N-212)。
+    // already_set の再送でも走らせて未完の修復にする。未完が残ったら
+    // 成功とは返さない — 運用者は再送するか案件の設定を直す。
+    // 422 を返す: fetchApi は BODY_MESSAGE_STATUSES の本文だけを文言として
+    // 画面へ渡す。500 だと「API error: 500」に潰れて理由が届かない。
+    if (parsed.status === 'approved') {
+      const actionFailures = await runApprovedConversionOfferActions(c.env.DB, c.req.param('id'));
+      if (actionFailures.length > 0) {
+        return c.json(
+          {
+            success: false,
+            code: 'offer_actions_incomplete',
+            error: offerActionFailureMessage(actionFailures),
+            data: {
+              id: c.req.param('id'),
+              approvalStatus: 'approved',
+              actionFailures,
+            },
+          },
+          422,
+        );
+      }
+    }
+
+    if (decided.outcome === 'already_set') {
+      // Idempotent re-click: the status is already set to the requested value.
+      // Return 200 so the UI does not show an error to the operator.
+      return c.json({
+        success: true,
+        data: { id: c.req.param('id'), approvalStatus: parsed.status, alreadySet: true },
+      });
     }
 
     return c.json({ success: true, data: { id: c.req.param('id'), approvalStatus: parsed.status } });
@@ -1313,6 +1557,21 @@ conversions.post('/api/conversions/approvals/bulk', requireApprovalPermission, a
           }
         } catch (err) {
           console.error('Affiliate approval notify failed (non-blocking):', err);
+        }
+      }
+      // 単体と同じく、承認確定で案件の動作を実行する(N-212)。未完は
+      // succeeded へ入れず failed に分け、全成功とは表示させない。
+      if (parsed.status === 'approved') {
+        try {
+          const actionFailures = await runApprovedConversionOfferActions(c.env.DB, item.id);
+          if (actionFailures.length > 0) {
+            result.failed.push({ id: item.id, error: offerActionFailureMessage(actionFailures) });
+            continue;
+          }
+        } catch (err) {
+          console.error(`offer actions failed (bulk, event=${item.id}):`, err);
+          result.failed.push({ id: item.id, error: '案件の動作を実行できませんでした' });
+          continue;
         }
       }
       result.succeeded.push(item.id);

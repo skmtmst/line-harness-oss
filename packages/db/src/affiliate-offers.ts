@@ -407,6 +407,97 @@ export async function decideConversionApproval(
   return { outcome: 'conflict', currentStatus: current };
 }
 
+/**
+ * 承認確定時に走らせる案件の動作（タグ付与・シナリオ開始）の実行計画(N-212)。
+ *
+ * 案件に設定された参照は「案件と同じLINEアカウントで、いま有効なもの」だけを
+ * 実行してよい。保存時の検査 (offerReferenceError) をすり抜けた古い参照や、
+ * あとから停止・アーカイブ・削除された参照が残っていることがあるため、
+ * 実行時にもここで同じ条件を掛け直す。案件の所属が NULL の古い行は
+ * 「どのアカウントのものか」を確認できないので、どの参照も実行しない。
+ */
+export interface ConversionOfferActionPlan {
+  eventId: string;
+  /** 成果を出した友だち。タグ・シナリオはこの人へ効く。 */
+  friendId: string;
+  offerId: string;
+  offerName: string;
+  offerAccountId: string | null;
+  /** 案件に設定されたタグID。未設定は null。 */
+  tagId: string | null;
+  /** tagId が実行してよい参照か（存在・同じアカウント・active）。 */
+  tagExecutable: boolean;
+  /** 案件に設定されたシナリオID。未設定は null。 */
+  scenarioId: string | null;
+  /** scenarioId が実行してよい参照か（存在・同じアカウント・有効）。 */
+  scenarioExecutable: boolean;
+}
+
+/**
+ * 帰属成果が通ったリンクの案件を引き、設定された動作の実行可否まで返す。
+ *
+ * リンクの紐づけは attributed_ref_code に加えて affiliate_id も条件に入れる
+ * （ref_code はグローバル UNIQUE だが、帰属した紹介者本人のリンク以外の
+ * 案件を誤って拾わないための二重の守り）。
+ *
+ * 成果が無い・帰属でない・案件を結んでいないリンク経由のときは null。
+ * 案件が停止中でも実行計画は返す — 承認は「すでに起きた成果」への判断なので、
+ * 停止した案件の報酬確定と同じく、設定された動作もその成果へ適用する。
+ */
+export async function getConversionOfferActionPlan(
+  db: D1Database,
+  eventId: string,
+): Promise<ConversionOfferActionPlan | null> {
+  const row = await db
+    .prepare(
+      `SELECT ce.id AS event_id,
+              ce.friend_id AS friend_id,
+              off.id AS offer_id,
+              off.name AS offer_name,
+              off.line_account_id AS offer_account_id,
+              off.tag_id AS tag_id,
+              off.scenario_id AS scenario_id,
+              CASE WHEN off.tag_id IS NOT NULL AND t.id IS NOT NULL
+                    AND t.status = 'active' AND t.line_account_id = off.line_account_id
+                   THEN 1 ELSE 0 END AS tag_executable,
+              CASE WHEN off.scenario_id IS NOT NULL AND s.id IS NOT NULL
+                    AND s.is_active = 1 AND s.line_account_id = off.line_account_id
+                   THEN 1 ELSE 0 END AS scenario_executable
+         FROM conversion_events ce
+         JOIN affiliate_links al
+           ON al.ref_code = ce.attributed_ref_code
+          AND al.affiliate_id = ce.affiliate_id
+         JOIN affiliate_offers off ON off.id = al.offer_id
+         LEFT JOIN tags t ON t.id = off.tag_id
+         LEFT JOIN scenarios s ON s.id = off.scenario_id
+        WHERE ce.id = ? AND ce.affiliate_id IS NOT NULL`,
+    )
+    .bind(eventId)
+    .first<{
+      event_id: string;
+      friend_id: string;
+      offer_id: string;
+      offer_name: string;
+      offer_account_id: string | null;
+      tag_id: string | null;
+      scenario_id: string | null;
+      tag_executable: number;
+      scenario_executable: number;
+    }>();
+  if (!row) return null;
+  return {
+    eventId: row.event_id,
+    friendId: row.friend_id,
+    offerId: row.offer_id,
+    offerName: row.offer_name,
+    offerAccountId: row.offer_account_id,
+    tagId: row.tag_id,
+    tagExecutable: row.tag_executable === 1,
+    scenarioId: row.scenario_id,
+    scenarioExecutable: row.scenario_executable === 1,
+  };
+}
+
 /** Resolved attribution detail for an affiliate-attributed conversion event. */
 export interface ConversionApprovalNotifyInfo {
   affiliateId: string;
