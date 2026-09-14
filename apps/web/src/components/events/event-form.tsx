@@ -81,7 +81,8 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
       setCopiedValue(v)
       setTimeout(() => setCopiedValue(null), 2000)
     } catch {
-      window.prompt('コピーしてください:', v)
+      // 押した欄の隣に読取専用の選択欄があるので何も出さない(点検#520の軽15)。
+      // 書けない環境では欄を押して範囲選択し、手でコピーできる。
     }
   }
 
@@ -224,7 +225,8 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     } catch {
-      window.prompt('コピーしてください:', liffUrl)
+      // 予約URL欄が隣に読取専用で置いてあるので何も出さない(点検#520の軽15)。
+      // 書けない環境では欄を押して範囲選択し、手でコピーできる。
     }
   }
 
