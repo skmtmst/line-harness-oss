@@ -1,4 +1,5 @@
 import type { FormLayout } from '@line-crm/shared';
+import { buildFormSubmitHeaders, toFormIdempotencyKey } from '@line-crm/shared';
 import { getIdToken, getLiffId } from './liff-auth.js';
 
 const BASE = import.meta.env.VITE_API_BASE ?? '';
@@ -261,13 +262,17 @@ export const api = {
   submitForm: async (
     id: string,
     body: { data: Record<string, unknown>; trackedLinkId?: string },
+    // #729: 第3引数は必須のまま(付け忘れは従来どおり型で落ちる)。
+    // 共有ヘッダ関数へ渡す際に UUID 検証を通す。呼び出し側(Form.tsx)は
+    // 所有パス外のため、この境界で検証する形に留める。
     idempotencyKey: string,
   ): Promise<{ status: number; body: FormSubmitResponse | null }> => {
     const url = new URL(`${BASE}/api/forms/${id}/submit`, window.location.origin);
     url.searchParams.set('liffId', getLiffId());
     const res = await fetch(url.toString(), {
       method: 'POST',
-      headers: authHeaders({ 'Content-Type': 'application/json', 'Idempotency-Key': idempotencyKey }),
+      // #729: ヘッダ組立は共有部品へ寄せる。認証の取得・URL・応答判定はここに残す。
+      headers: authHeaders(buildFormSubmitHeaders(toFormIdempotencyKey(idempotencyKey))),
       body: JSON.stringify(body),
     });
     let parsed: FormSubmitResponse | null = null;

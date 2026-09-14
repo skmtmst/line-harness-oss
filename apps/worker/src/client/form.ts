@@ -10,6 +10,17 @@
  * URL format: https://liff.line.me/{LIFF_ID}?page=form&id={FORM_ID}
  */
 
+/*
+ * 送信ヘッダの組み立ては共有部品に寄せる(#729)。Idempotency-Key の
+ * 付け忘れは型で落ちる形にする。fetch・認証取得・再送フローはここに残す。
+ */
+import {
+  buildFormSubmitHeaders,
+  newFormIdempotencyKey,
+  toFormIdempotencyKey,
+  type FormIdempotencyKey,
+} from '@line-crm/shared';
+
 declare const liff: {
   init(config: { liffId: string }): Promise<void>;
   isLoggedIn(): boolean;
@@ -63,7 +74,7 @@ interface FormState {
    * 連打・通信再送を同じ回答としてまとめる。送り直しは同じキーで行い、
    * 新しいキーへの付け替えは利用者の明示の送り直し操作のときだけ行う。
    */
-  submitIdempotencyKey: string | null;
+  submitIdempotencyKey: FormIdempotencyKey | null;
   submitting: boolean;
   verifiedXUsername: string;
   /**
@@ -747,11 +758,11 @@ class FormSubmitConflictError extends Error {
 export async function postFormSubmit(
   path: string,
   body: Record<string, unknown>,
-  key: string,
+  key: FormIdempotencyKey,
 ): Promise<FormSubmitPayload> {
   const res = await apiCall(path, {
     method: 'POST',
-    headers: { 'Idempotency-Key': key },
+    headers: buildFormSubmitHeaders(key),
     body: JSON.stringify(body),
   });
   const json = await res.clone().json().catch(() => null) as FormSubmitPayload['json'];
@@ -765,8 +776,8 @@ export async function postFormSubmit(
 async function postFormSubmitWithResume(
   path: string,
   body: Record<string, unknown>,
-  key: string,
-): Promise<{ payload: FormSubmitPayload; key: string }> {
+  key: FormIdempotencyKey,
+): Promise<{ payload: FormSubmitPayload; key: FormIdempotencyKey }> {
   let currentKey = key;
   let last: FormSubmitPayload = { status: 0, json: null };
   for (let attempt = 0; attempt < 5; attempt += 1) {
@@ -779,8 +790,8 @@ async function postFormSubmitWithResume(
       ? last.json?.idempotencyKey
       : undefined;
     if (last.status === 409 && guided && guided !== currentKey) {
-      currentKey = guided;
-      state.submitIdempotencyKey = guided;
+      currentKey = toFormIdempotencyKey(guided);
+      state.submitIdempotencyKey = currentKey;
       continue;
     }
     return { payload: last, key: currentKey };
@@ -824,7 +835,7 @@ async function submitForm(): Promise<void> {
     submitBtn.textContent = '送信中...';
   }
   // 論理送信単位の安定したキー。連打・通信再送は同じキーで送る。
-  if (!state.submitIdempotencyKey) state.submitIdempotencyKey = crypto.randomUUID();
+  if (!state.submitIdempotencyKey) state.submitIdempotencyKey = newFormIdempotencyKey();
   const idemKey = state.submitIdempotencyKey;
 
   try {
@@ -924,7 +935,7 @@ async function submitForm(): Promise<void> {
       resendBtn.style.cssText = 'display:block;margin:8px auto;padding:8px 16px;';
       resendBtn.onclick = () => {
         resendBtn.remove();
-        state.submitIdempotencyKey = crypto.randomUUID();
+        state.submitIdempotencyKey = newFormIdempotencyKey();
         void submitForm();
       };
       errEl.after(resendBtn);
