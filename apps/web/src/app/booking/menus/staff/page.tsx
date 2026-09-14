@@ -15,8 +15,9 @@ import { usePageTitle } from '@/components/shell/page-chrome'
  * いないのか」を1画面で見つけること。担当が0人のメニューは公開して
  * いても予約フォームに枠が出ないのに、それに気づく場所が無かった。
  *
- * staff_menus は staff_id × menu_id が主キー。書き込みはスタッフ単位に
- * まとめてしか送れないので、保存は人数ぶんのPUTになる。
+ * staff_menus は staff_id × menu_id が主キー。保存は一括口
+ * （PUT /api/booking/admin/staff-menus）に全スタッフ分を1回で送り、
+ * 途中失敗で半分だけ残る状態を作らない。
  */
 function MenuStaffMatrixContent() {
   usePageTitle('予約設定')
@@ -91,11 +92,11 @@ function MenuStaffMatrixContent() {
     setSaving(true)
     setError(null)
     try {
-      for (const s of staff) {
-        await bookingApi.putStaffMenus(
-          selectedAccountId,
-          s.id,
-          menus.map((m) => {
+      await bookingApi.putStaffMenusBulk(
+        selectedAccountId,
+        staff.map((s) => ({
+          staff_id: s.id,
+          menus: menus.map((m) => {
             const row = grid[s.id]?.[m.id]
             return {
               menu_id: m.id,
@@ -104,11 +105,15 @@ function MenuStaffMatrixContent() {
               override_price: row?.override_price ?? null,
             }
           }),
-        )
-      }
+        })),
+      )
       setSavedAt(Date.now())
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      // 全件不適用のはずだが、画面の表示とDBの状態が食い違う可能性を
+      // 残さないため再読み込みを促す。
+      setError(
+        `${e instanceof Error ? e.message : String(e)}（保存は取り消されました。画面を再読み込みして最新の状態を確認してください）`,
+      )
     } finally {
       setSaving(false)
     }
