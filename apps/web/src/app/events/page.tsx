@@ -428,5 +428,3 @@ function Th({ children, className = '' }: { children: React.ReactNode; className
     </th>
   )
 }
-
-
