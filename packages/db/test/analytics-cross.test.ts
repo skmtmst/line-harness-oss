@@ -683,6 +683,8 @@ describe('V6クロス分析の世代別staging(2接続)', () => {
     periodTo: '2026-08-07T23:59:59.999Z',
   };
 
+  // fixtureはbootstrap.sql全体を再生するため、CI負荷下で既定の10秒を超える。
+  // テスト本文ではなく準備だけに余裕を持たせる。
   beforeEach(() => {
     directory = mkdtempSync(join(tmpdir(), 'lh-analytics-cross-'));
     file = join(directory, 'cross.sqlite');
@@ -713,7 +715,7 @@ describe('V6クロス分析の世代別staging(2接続)', () => {
     seed.close();
     sqliteA = new Database(file);
     sqliteB = new Database(file);
-  });
+  }, 60_000);
 
   afterEach(() => {
     sqliteA.close();

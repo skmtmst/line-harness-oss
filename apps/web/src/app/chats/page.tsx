@@ -1431,10 +1431,21 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     setAttentionSaving(true)
     setChatDetail((current) => current?.id === updatingChatId ? { ...current, isAttention: next } : current)
     try {
-      await api.friends.updateMetadata(chatDetail.friendId, { __attention: next ? '1' : null })
-    } catch {
+      // N-040(#808): 友だちの現行改訂値を読んでから送り、競合は上書きしない。
+      const detail = await fetchApi<{ success: boolean; data: { updatedAt: string } }>(
+        `/api/friends/${chatDetail.friendId}`,
+      )
+      await fetchApi<{ success: boolean; data: unknown }>(
+        `/api/friends/${chatDetail.friendId}/metadata?expectedUpdatedAt=${encodeURIComponent(detail.data.updatedAt)}`,
+        { method: 'PUT', body: JSON.stringify({ __attention: next ? '1' : null }) },
+      )
+    } catch (error) {
       setChatDetail((current) => current?.id === updatingChatId ? { ...current, isAttention: !next } : current)
-      setError('注目の変更に失敗しました。')
+      if (error instanceof ApiError && error.status === 409) {
+        setError('ほかの変更が先に保存されました。最新の状態で確認してもう一度お試しください。')
+      } else {
+        setError('注目の変更に失敗しました。')
+      }
     } finally {
       setAttentionSaving(false)
     }
