@@ -11,6 +11,14 @@ describe('NEN配信の表示', () => {
     })).toBe('誕生日の3日前 10:00')
   })
 
+  it('コラムは予約した日時と紹介文＋コラムで表示する(#728案C)', () => {
+    expect(formatCampaignTiming({
+      campaignKey: 'column',
+      delayDays: 0,
+      deliveryTime: '10:00',
+    })).toBe('予約した日時')
+  })
+
   it('購入後フォローは注文からの実際の段階を表示する', () => {
     expect(formatCampaignTiming({
       campaignKey: 'arrival_check',
@@ -26,7 +34,11 @@ describe('NEN配信の表示', () => {
 
   it('配信キーに対応する中身の種類を表示する', () => {
     expect(formatCampaignContent({ campaignKey: 'arrival_check', buttonLabel: '見る' })).toBe('カルーセル 3枚')
-    expect(formatCampaignContent({ campaignKey: 'care_check', buttonLabel: '答える' })).toBe('質問（2択）')
+    // care_check は出さない・止めたキー(#728)。死んだ選択肢の表示は消し、
+    // 実キー5つだけを表に持つ。汎用文の動きは次の unknown で見る。
+    expect(formatCampaignContent({ campaignKey: 'care_check', buttonLabel: '答える' })).toBe('テキスト＋リンク')
+    expect(formatCampaignContent({ campaignKey: 'review_request', buttonLabel: '書く' })).toBe('リッチメッセージ')
+    expect(formatCampaignContent({ campaignKey: 'column', buttonLabel: 'コラムを読む' })).toBe('紹介文＋コラム')
     expect(formatCampaignContent({ campaignKey: 'unknown', buttonLabel: null })).toBe('テキスト')
   })
 
