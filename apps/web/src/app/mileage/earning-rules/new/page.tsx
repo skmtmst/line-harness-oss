@@ -1,7 +1,7 @@
 'use client'
 
 import SelectField from '@/components/shared/select-field'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Tag } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import { usePageTitle } from '@/components/shell/page-chrome'
@@ -151,6 +151,9 @@ export default function NewMileageRulePage() {
   const [isActive, setIsActive] = useState(true)
   const [notifyFriend, setNotifyFriend] = useState(true)
   const [tags, setTags] = useState<Tag[]>([])
+  // N-240: 応答が読めなかった再送で決めごとが2行できないよう、
+  // 同じ内容の保存には同じキーを使い回す。内容を変えたら新しいキー。
+  const createKeyRef = useRef<{ fingerprint: string; key: string } | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -204,7 +207,7 @@ export default function NewMileageRulePage() {
         return null
       }}
       onSave={async () => {
-        const res = await api.mileage.createRule({
+        const payload = {
           name: name.trim(),
           eventType,
           source: source || null,
@@ -220,7 +223,12 @@ export default function NewMileageRulePage() {
           },
           validFrom: validFrom || null,
           validUntil: validUntil || null,
-        })
+        }
+        const fingerprint = JSON.stringify(payload)
+        if (createKeyRef.current?.fingerprint !== fingerprint) {
+          createKeyRef.current = { fingerprint, key: crypto.randomUUID() }
+        }
+        const res = await api.mileage.createRule(payload, { idempotencyKey: createKeyRef.current.key })
         if (!res.success) throw new Error(res.error)
         const draftResponse = await api.mileage.saveEarningRuleDraft(res.data.id, {
           accountId: selectedAccountId!,
