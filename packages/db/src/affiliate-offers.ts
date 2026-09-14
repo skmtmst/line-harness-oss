@@ -342,6 +342,71 @@ export async function setConversionApproval(
   return 'already_set';
 }
 
+export type ApprovalDecisionStatus = 'pending' | 'approved' | 'rejected';
+
+export interface ApprovalDecisionResult {
+  outcome: 'updated' | 'already_set' | 'conflict' | 'not_found';
+  /** 判断時点の状態。NULLは未判断(pending)として返す。 */
+  currentStatus: ApprovalDecisionStatus;
+}
+
+/**
+ * 期待した状態付きで成果を承認・却下する(N-208)。
+ *
+ * conversion_eventsに版列は無いため、版の代わりに「いま見えている状態」
+ * そのものをCASの比較対象にする。UPDATEのWHEREへ期待状態を埋め込むので、
+ * 同じ未判断を見た2主体の同時承認・同時却下は片方だけが通り、もう片方は
+ * 上書きせずconflictになる。同じ判断の再送はalready_setで冪等に扱う。
+ */
+export async function decideConversionApproval(
+  db: D1Database,
+  eventId: string,
+  status: 'approved' | 'rejected',
+  expectedStatus: ApprovalDecisionStatus,
+): Promise<ApprovalDecisionResult> {
+  const now = jstNow();
+  // 期待状態と求める判断が同じときは書き換えが無いのでUPDATEを撃たない。
+  // 読み直し側でalready_set（修復付き）かconflictに振り分ける。こうしないと
+  // 同じ判断の再送が「変更1件」になり、反対仕訳などを二重に起こしてしまう。
+  if (expectedStatus !== status) {
+    const expectedSql = expectedStatus === 'pending'
+      ? `(approval_status IS NULL OR approval_status = 'pending')`
+      : `approval_status = ?`;
+    const expectedBinds = expectedStatus === 'pending' ? [] : [expectedStatus];
+    const result = await db
+      .prepare(
+        `UPDATE conversion_events
+            SET approval_status = ?, approved_at = ?
+          WHERE id = ? AND affiliate_id IS NOT NULL AND ${expectedSql}`,
+      )
+      .bind(status, now, eventId, ...expectedBinds)
+      .run();
+    if ((result.meta?.changes ?? 0) > 0) {
+      if (status === 'approved') await ensureConversionRewardSnapshot(db, eventId, now);
+      if (status === 'rejected') await reverseSettledRewardOnRejection(db, eventId, now);
+      return { outcome: 'updated', currentStatus: status };
+    }
+  }
+
+  const row = await db
+    .prepare(
+      `SELECT approval_status FROM conversion_events WHERE id = ? AND affiliate_id IS NOT NULL`,
+    )
+    .bind(eventId)
+    .first<{ approval_status: string | null }>();
+  if (!row) return { outcome: 'not_found', currentStatus: 'pending' };
+  const current: ApprovalDecisionStatus = row.approval_status === 'approved' || row.approval_status === 'rejected'
+    ? row.approval_status
+    : 'pending';
+  if (current === status) {
+    // 同じ判断の再送は冪等成功にし、版・反対仕訳の欠落だけ修復する。
+    if (status === 'approved') await ensureConversionRewardSnapshot(db, eventId, now);
+    if (status === 'rejected') await reverseSettledRewardOnRejection(db, eventId, now);
+    return { outcome: 'already_set', currentStatus: current };
+  }
+  return { outcome: 'conflict', currentStatus: current };
+}
+
 /** Resolved attribution detail for an affiliate-attributed conversion event. */
 export interface ConversionApprovalNotifyInfo {
   affiliateId: string;

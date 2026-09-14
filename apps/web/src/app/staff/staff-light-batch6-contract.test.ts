@@ -46,6 +46,9 @@ describe('ログインユーザーの軽修正(#581)', () => {
     for (const [, key, label] of pairs) {
       expect(PERMISSION_LABELS[key], `${key} が正本に無い`).toBe(label)
     }
-    expect(Object.keys(PERMISSION_LABELS).length, '正本の件数が変わっている').toBe(28)
+    // 操作権限は定数参照で分類表に載せる（魔法文字列を増やさない）。
+    expect(groupBlock, '操作権限が分類表に無い').toContain('CONVERSION_APPROVAL_EDIT_KEY')
+    expect(PERMISSION_LABELS['conversion.approval.edit'], '操作権限の表示名が正本に無い').toBe('成果を承認・却下する')
+    expect(Object.keys(PERMISSION_LABELS).length, '正本の件数が変わっている').toBe(29)
   })
 })

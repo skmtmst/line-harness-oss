@@ -14,6 +14,7 @@ const dbMocks = {
   getConversionEvents: vi.fn(),
   getConversionApprovalQueue: vi.fn(),
   setConversionApproval: vi.fn(),
+  decideConversionApproval: vi.fn(),
   syncAffiliateConversionMileage: vi.fn().mockResolvedValue(undefined),
   getConversionApprovalNotifyInfo: vi.fn().mockResolvedValue(null),
   ConversionDefinitionError: class ConversionDefinitionError extends Error {},
@@ -134,10 +135,10 @@ describe('承認 PATCH の監査は成功後だけ (#513 M7)', () => {
   });
 
   it('成功の 200 では監査を残す', async () => {
-    dbMocks.setConversionApproval.mockResolvedValue(true);
+    dbMocks.decideConversionApproval.mockResolvedValue({ outcome: 'updated', currentStatus: 'approved' });
     const log = vi.spyOn(console, 'log').mockImplementation(() => {});
     try {
-      const res = await request('PATCH', '/api/conversions/events/ev-1/approval', 'owner', [], { status: 'approved' });
+      const res = await request('PATCH', '/api/conversions/events/ev-1/approval', 'owner', [], { status: 'approved', expectedStatus: 'pending' });
       expect(res.status).toBe(200);
       expect(auditLogged(log.mock.calls)).toBe(true);
     } finally {
