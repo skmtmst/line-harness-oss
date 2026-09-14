@@ -145,6 +145,12 @@ function MileagePageInner() {
   useEffect(() => {
     latestAccountRef.current = selectedAccountId
   }, [selectedAccountId])
+  /*
+   * N-243: loadRules の世代番号。アカウント切替や保存後の読み直しで
+   * 新しい読み込みが始まるたびに進む。遅れて届いた古い世代の応答
+   * (旧アカウントの2ページ目など)は、この番号がずれているかで捨てる。
+   */
+  const rulesGenerationRef = useRef(0)
   const [overview, setOverview] = useState<MileageFriendsV6Overview | null>(null)
   const [ruleOverview, setRuleOverview] = useState<MileageEarningRulesV6Overview | null>(null)
   const [ruleSummary, setRuleSummary] = useState<EarningRuleSummary | null>(null)
@@ -170,6 +176,9 @@ function MileagePageInner() {
 
   const loadRules = useCallback(async () => {
     const accountAtRequest = selectedAccountId
+    const generation = ++rulesGenerationRef.current
+    const isStale = () =>
+      generation !== rulesGenerationRef.current || accountAtRequest !== latestAccountRef.current
     if (!accountAtRequest) {
       setRuleOverview(null)
       setRuleSummary(null)
@@ -186,14 +195,30 @@ function MileagePageInner() {
       }),
       api.mileage.friendsV6({ accountId: accountAtRequest, limit: 1, offset: 0 }),
     ])
-    if (accountAtRequest !== latestAccountRef.current) return
+    if (isStale()) return
     if (!res.success || !isMileageEarningRulesV6Overview(res.data)) throw new Error('invalid_mileage_rules')
     if (!historyRes.success || !friendsRes.success || !isMileageFriendsV6Overview(friendsRes.data)) {
       throw new Error('invalid_mileage_rule_summary')
     }
+    /*
+     * 決めごとに件数の上限は無い。並び順の一括口はアカウントの全IDを
+     * 要求するため、100件ずつ全頁を読み切る(N-243)。各頁の到着ごとに
+     * 世代を見て、古い読み込みの続きはここで捨てる。
+     */
+    const items = [...res.data.items]
+    const total = res.data.pagination.total
+    while (items.length < total) {
+      const next = await api.mileage.earningRulesV6({
+        accountId: accountAtRequest, limit: 100, offset: items.length,
+      })
+      if (isStale()) return
+      if (!next.success || !isMileageEarningRulesV6Overview(next.data)) throw new Error('invalid_mileage_rules')
+      if (next.data.items.length === 0) break
+      items.push(...next.data.items)
+    }
     const grant = (historyRes.data as MileageAdminHistory).summary.byType
       .find((item) => item.entryType === 'grant')
-    setRuleOverview(res.data)
+    setRuleOverview({ ...res.data, items })
     setRuleSummary({
       grantedMiles: grant?.amount ?? 0,
       grantedCount: grant?.count ?? 0,
@@ -201,7 +226,7 @@ function MileagePageInner() {
         ? Math.round(friendsRes.data.summary.available / friendsRes.data.summary.withBalanceCount)
         : null,
     })
-    setRuleOrder(res.data.items.map((rule) => rule.id))
+    setRuleOrder(items.map((rule) => rule.id))
     setRuleOrderDirty(false)
     setRulePage(1)
   }, [selectedAccountId])
@@ -704,7 +729,7 @@ function MileagePageInner() {
         <div className="mt-3 flex items-center justify-between gap-3">
           <p className="text-xs font-semibold tabular-nums text-ink-faint">
             {shownRules.length === rules.length
-              ? `決めごと ${rules.length}件のうち ${Math.min((rulePage - 1) * RULE_PAGE_SIZE + 1, shownRules.length)}〜${Math.min(rulePage * RULE_PAGE_SIZE, shownRules.length)}件を表示${rules.length >= 100 ? '(100件までしか読み込んでいないため、古いものは出ません)' : ''}`
+              ? `決めごと ${rules.length}件のうち ${Math.min((rulePage - 1) * RULE_PAGE_SIZE + 1, shownRules.length)}〜${Math.min(rulePage * RULE_PAGE_SIZE, shownRules.length)}件を表示`
               : `${shownRules.length}件 / 全 ${rules.length}件`}
           </p>
           {rulePageCount > 1 ? (
