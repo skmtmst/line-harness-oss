@@ -61,7 +61,7 @@ import type {
 import type { Env } from '../index.js';
 import { resolveLineToken } from '../services/line-token.js';
 import { requireRole } from '../middleware/role-guard.js';
-import { canAccessAllLineAccounts } from '../services/account-access.js';
+import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import { applyMileageRulesForEvent } from '@line-crm/db';
 import { createBroadcastRetryKey } from '../services/broadcast-retry-key.js';
 import { dispatchAutomationEventWithLogging } from '../services/automation-triggers.js';
@@ -79,6 +79,7 @@ import {
   normalizeLayout,
   parseLayout,
   type FormLayout,
+  DEFAULT_TENANT_ID,
 } from '@line-crm/shared';
 
 const forms = new Hono<Env>();
@@ -530,6 +531,39 @@ forms.get('/api/forms', requireRole('owner', 'admin', 'staff'), async (c) => {
     return c.json({ success: true, data });
   } catch (err) {
     console.error('GET /api/forms error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+/**
+ * GET /api/forms/unassigned — 管理者確認専用。担当の決まっていない旧フォームだけを返す(#724)。
+ *
+ * 通常の `account_id` 指定一覧へは混ぜない。この口を選んだときだけ未割当を返す。
+ * 見られるのは既定テナントの owner / admin と環境 owner だけ。一般 staff、
+ * アカウント制限付き・機能スコープ付き・別テナントは不可。現行 canSeeUnassigned は
+ * 一般 staff も含むため、その値だけでは許可しない。割当操作は置かない(#771)。
+ */
+forms.get('/api/forms/unassigned', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const staff = c.get('staff');
+    if ((staff?.tenantId ?? DEFAULT_TENANT_ID) !== DEFAULT_TENANT_ID) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
+    const scope = await getVisibleLineAccountScope(c.env.DB, staff);
+    if (!scope.canSeeUnassigned) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
+    const items = await getFormsWithStats(c.env.DB, { lineAccountIds: [], includeUnassigned: true });
+    const data = items.map((row) =>
+      serializeForm(row, {
+        lastSubmittedAt: row.last_submitted_at,
+        usedByAccounts: row.used_by_accounts,
+        accountScopeReviewRequired: row.account_scope_review_required,
+      }),
+    );
+    return c.json({ success: true, data });
+  } catch (err) {
+    console.error('GET /api/forms/unassigned error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

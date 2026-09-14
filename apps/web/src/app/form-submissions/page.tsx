@@ -44,6 +44,7 @@ interface Form {
   updatedAt: string | null
   lastSubmittedAt: string | null
   usedByAccounts: UsedByAccount[]
+  accountScopeReviewRequired?: boolean
 }
 
 interface FormFolder {
@@ -134,6 +135,12 @@ export default function FormSubmissionsPage() {
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
   const [query, setQuery] = useState(() => searchParams.get('q') || '')
+  /**
+   * 管理者確認モード(#724)。通常一覧へ混ぜず、選んだときだけ未割当専用口を叩く。
+   * URLには載せない。通常一覧の絞り込み・ページ送りの挙動を変えないため。
+   */
+  const [reviewMode, setReviewMode] = useState(false)
+  const [reviewForbidden, setReviewForbidden] = useState(false)
   const [formFilter, setFormFilter] = useState<FormFilter>(() => validFilter(searchParams.get('filter')))
   const [formSort, setFormSort] = useState<FormSort>(() => validSort(searchParams.get('sort')))
   const [pageSize, setPageSize] = useState(() => validPageSize(searchParams.get('limit')))
@@ -154,6 +161,37 @@ export default function FormSubmissionsPage() {
 
   const loadForms = useCallback(async () => {
     const request = ++formRequest.current
+    if (reviewMode) {
+      setLoading(true)
+      setLoadError('')
+      setReviewForbidden(false)
+      try {
+        const res = await fetchApi<{ success: boolean; data: Form[] }>(`/api/forms/unassigned`)
+        if (!res.success) throw new Error('load_failed')
+        if (request !== formRequest.current) return
+        setForms(res.data)
+        setFolders([])
+        setFormTotal(res.data.length)
+      } catch (error) {
+        if (request !== formRequest.current) return
+        // 権限が無い人（staff・制限付き・別テナント）は専用口が403/404を返す。
+        // エラー画面にせず「確認できるものは無い」と伝える(#724)。
+        if (error instanceof ApiError && (error.status === 403 || error.status === 404)) {
+          setReviewForbidden(true)
+          setForms([])
+          setFolders([])
+          setFormTotal(0)
+        } else {
+          setLoadError('回答フォームを読み込めませんでした。')
+          setForms([])
+          setFolders([])
+          setFormTotal(0)
+        }
+      } finally {
+        if (request === formRequest.current) setLoading(false)
+      }
+      return
+    }
     if (!selectedAccountId) {
       setForms([])
       setFolders([])
@@ -184,7 +222,7 @@ export default function FormSubmissionsPage() {
     } finally {
       if (request === formRequest.current) setLoading(false)
     }
-  }, [selectedAccountId])
+  }, [reviewMode, selectedAccountId])
 
   useEffect(() => {
     void loadForms()
@@ -453,10 +491,27 @@ export default function FormSubmissionsPage() {
             })}
           </div>
 
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              aria-pressed={reviewMode}
+              onClick={() => { setReviewMode((mode) => !mode); setPage(1) }}
+              className={`rounded-pill cursor-pointer border px-3 py-1 text-xs ${reviewMode ? 'border-accent bg-accent-soft text-ink' : 'border-hairline bg-white text-ink-secondary'}`}
+            >
+              {reviewMode ? '通常の一覧に戻る' : '管理者確認（担当未割当）'}
+            </button>
+          </div>
+          {reviewMode && (
+            <div className="border-hairline rounded-card mb-3 border bg-white p-3 text-xs text-ink-secondary">
+              <p><span className="font-bold text-ink">管理者確認中のフォーム</span> — 担当アカウントが決まっていない旧フォームだけを出しています。公開URLは生きているため回答は入り続けます。</p>
+              <p className="mt-1">担当の割り当ては後続の対応（#771）で行います。この画面では割り当て操作はできません。</p>
+            </div>
+          )}
+
           {createError && <p className="mb-3 text-sm text-danger">{createError}</p>}
           {accountLoading ? (
           <ListState kind="loading" title="LINE公式アカウントを確認しています" />
-        ) : !selectedAccountId ? (
+        ) : !reviewMode && !selectedAccountId ? (
           <ListState
             kind="empty"
             title="LINE公式アカウントを選んでください"
@@ -474,6 +529,18 @@ export default function FormSubmissionsPage() {
             title="表示できませんでした"
             description="再読み込みしても直らないときは、エラー報告へお知らせください。"
             onRetry={() => void loadForms()}
+          />
+        ) : reviewMode && reviewForbidden ? (
+          <ListState
+            kind="empty"
+            title="確認できる未割当フォームはありません"
+            description="管理者確認は既定テナントの管理者のみ利用できます。"
+          />
+        ) : reviewMode && forms.length === 0 ? (
+          <ListState
+            kind="empty"
+            title="担当未割当のフォームはありません"
+            description="担当の決まっていない旧フォームはここに出ます。"
           />
         ) : forms.length === 0 ? (
           <ListState
@@ -521,7 +588,14 @@ export default function FormSubmissionsPage() {
               return (
                 <tr key={form.id} className="text-ink-secondary">
                   <td className="px-3 py-2.5">
-                    <Link href={`/form-submissions/edit?id=${encodeURIComponent(form.id)}&tab=basic`} className="block truncate font-semibold text-ink hover:underline" title={normalizedName}>{normalizedName}</Link>
+                    {reviewMode ? (
+                      <span className="block truncate font-semibold text-ink" title={normalizedName}>
+                        {normalizedName}
+                        {form.accountScopeReviewRequired && <span className="border-accent bg-accent-soft rounded-pill ml-2 border px-2 py-0.5 text-xs text-ink">管理者確認</span>}
+                      </span>
+                    ) : (
+                      <Link href={`/form-submissions/edit?id=${encodeURIComponent(form.id)}&tab=basic`} className="block truncate font-semibold text-ink hover:underline" title={normalizedName}>{normalizedName}</Link>
+                    )}
                     <span className="block truncate text-xs text-ink-faint">{form.description || `${form.fields.length}ブロック`}</span>
                   </td>
                   <td className="px-3 py-2.5 text-xs">{form.isActive ? '公開中' : '下書き'}</td>
@@ -532,9 +606,20 @@ export default function FormSubmissionsPage() {
                   </td>
                   <td className="px-3 py-2.5 text-xs tabular-nums" title={form.updatedAt ? undefined : '更新日時を取得できません'}>{displayUpdatedAt(form.updatedAt)}</td>
                   <td className="px-3 py-2.5 text-right text-xs">
-                    <Link href={`/form-submissions/responses?id=${encodeURIComponent(form.id)}`} aria-label={`${normalizedName}の集まった回答を見る`} className="text-accent hover:underline whitespace-nowrap">回答を見る</Link>
-                    <button type="button" onClick={() => openRename(form)} className="ml-2 text-accent hover:underline">編集</button>
-                    <button type="button" onClick={() => void openDelete(form)} className="ml-2 text-danger hover:underline" aria-label={`${normalizedName}を削除`} title="回答フォームを削除">削除</button>
+                    {/*
+                     * 管理者確認モードは読み取り専用(#724)。編集・削除・回答の口は
+                     * 担当アカウント経由しか受けないため、未割当フォームには使えない。
+                     * 押せる口を置くと失敗するだけなので、割り当て（#771）まで置かない。
+                     */}
+                    {reviewMode ? (
+                      <span className="text-ink-faint">—</span>
+                    ) : (
+                      <>
+                        <Link href={`/form-submissions/responses?id=${encodeURIComponent(form.id)}`} aria-label={`${normalizedName}の集まった回答を見る`} className="text-accent hover:underline whitespace-nowrap">回答を見る</Link>
+                        <button type="button" onClick={() => openRename(form)} className="ml-2 text-accent hover:underline">編集</button>
+                        <button type="button" onClick={() => void openDelete(form)} className="ml-2 text-danger hover:underline" aria-label={`${normalizedName}を削除`} title="回答フォームを削除">削除</button>
+                      </>
+                    )}
                   </td>
                 </tr>
               )
