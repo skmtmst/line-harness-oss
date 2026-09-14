@@ -40,10 +40,6 @@ describe('アクション保存前の参照検証（N-053）', () => {
     sqlite.prepare(`INSERT INTO tag_groups (id, name, created_at, updated_at)
                     VALUES ('grp-1', 'まとめ', '2026-08-16', '2026-08-16')`).run();
     sqlite.prepare(
-      `INSERT INTO friend_fields (id, name, field_key, type) VALUES ('fld-1', '項目', 'pet_name', 'text')`,
-    ).run();
-    sqlite.prepare(`INSERT INTO support_marks (id, name) VALUES ('mark-1', '要対応')`).run();
-    sqlite.prepare(
       `INSERT INTO scenarios (id, name, trigger_type, is_active, delivery_mode, created_at, updated_at, line_account_id) VALUES
          ('scn-a', 'Aの案内', 'manual', 1, 'relative', '2026-08-16', '2026-08-16', 'acc-a'),
          ('scn-b', 'Bの案内', 'manual', 1, 'relative', '2026-08-16', '2026-08-16', 'acc-b'),
@@ -62,7 +58,46 @@ describe('アクション保存前の参照検証（N-053）', () => {
          ('var-archived', '捨てた変数', 'old_key', 'acc-a', '2026-08-01'),
          ('var-common', '共通の変数', 'common_key', NULL, NULL)`,
     ).run();
-    sqlite.prepare(`INSERT INTO reminders (id, name) VALUES ('rem-1', '誕生日')`).run();
+    // 既定統括の行は bootstrap 済み。統括1・2だけ足す。
+    sqlite.prepare(
+      `INSERT INTO tenants (id, name) VALUES ('ten-1', '統括1'), ('ten-2', '統括2')`,
+    ).run();
+    sqlite.prepare(`UPDATE line_accounts SET tenant_id = 'ten-1' WHERE id IN ('acc-a', 'acc-b')`).run();
+    sqlite.exec(`INSERT INTO line_accounts (id, channel_id, name, channel_access_token, channel_secret, tenant_id)
+                 VALUES ('acc-c', 'channel-c', '公式C', 'token', 'secret', 'ten-2')`);
+    sqlite.prepare(
+      `INSERT INTO reminders (id, name, line_account_id, deleted_at) VALUES
+         ('rem-1', '誕生日', 'acc-a', NULL),
+         ('rem-b', 'Bの記念日', 'acc-b', NULL),
+         ('rem-common', '共通の記念日', NULL, NULL),
+         ('rem-deleted', '消した記念日', 'acc-a', '2026-08-01')`,
+    ).run();
+    sqlite.prepare(
+      `INSERT INTO support_marks (id, name, archived_at) VALUES
+         ('mark-1', '要対応', NULL),
+         ('mark-a', 'Aの要対応', NULL),
+         ('mark-b', 'Bの要対応', NULL),
+         ('mark-tenant2', '統括2の要対応', NULL),
+         ('mark-legacy', '昔の要対応', NULL),
+         ('mark-archived', '捨てた要対応', '2026-08-01')`,
+    ).run();
+    sqlite.prepare(
+      `INSERT INTO support_mark_scopes (mark_id, tenant_id, line_account_id, created_at) VALUES
+         ('mark-a', 'ten-1', 'acc-a', '2026-08-16'),
+         ('mark-b', 'ten-1', 'acc-b', '2026-08-16'),
+         ('mark-tenant2', 'ten-2', 'acc-c', '2026-08-16')`,
+    ).run();
+    sqlite.prepare(
+      `INSERT INTO friend_fields (id, name, field_key, type, status) VALUES
+         ('fld-1', '項目', 'pet_name', 'text', 'active'),
+         ('fld-b', 'Bの項目', 'b_code', 'text', 'active'),
+         ('fld-archived', '捨てた項目', 'old_code', 'text', 'archived')`,
+    ).run();
+    sqlite.prepare(
+      `INSERT INTO friend_field_scopes (field_id, tenant_id, line_account_id, created_at) VALUES
+         ('fld-1', 'ten-1', 'acc-a', '2026-08-16'),
+         ('fld-b', 'ten-1', 'acc-b', '2026-08-16')`,
+    ).run();
     sqlite.prepare(
       `INSERT INTO events (id, line_account_id, name, deleted_at) VALUES
          ('ev-a', 'acc-a', 'Aの会', NULL),
@@ -78,7 +113,7 @@ describe('アクション保存前の参照検証（N-053）', () => {
       .toEqual({ ok: true });
     expect(await validateScenarioActionReferences(db, 'acc-a', 'support_mark', { markId: null }))
       .toEqual({ ok: true });
-    expect(await validateScenarioActionReferences(db, 'acc-a', 'support_mark', { markId: 'mark-1' }))
+    expect(await validateScenarioActionReferences(db, 'acc-a', 'support_mark', { markId: 'mark-a' }))
       .toEqual({ ok: true });
     expect(await validateScenarioActionReferences(db, 'acc-a', 'scenario', { op: 'start', scenarioId: 'scn-a' }))
       .toEqual({ ok: true });
@@ -157,6 +192,39 @@ describe('アクション保存前の参照検証（N-053）', () => {
     // 共通の変数に既存契約は無い。実行でも拾われないので通さない。
     expect(await validateScenarioActionReferences(db, 'acc-a', 'common_var', { varKey: 'common_key', op: 'add' }))
       .toMatchObject({ ok: false, issue: { field: 'varKey', reason: 'cross-account' } });
+  });
+
+  test('別アカウントのリマインダを cross-account で弾く（R1）', async () => {
+    expect(await validateScenarioActionReferences(db, 'acc-a', 'reminder', { reminderId: 'rem-b' }))
+      .toMatchObject({ ok: false, issue: { field: 'reminderId', reason: 'cross-account' } });
+    expect(await validateScenarioActionReferences(db, 'acc-a', 'reminder', { reminderId: 'rem-common' }))
+      .toEqual({ ok: true });
+    expect(await validateScenarioActionReferences(db, 'acc-a', 'reminder', { reminderId: 'rem-deleted' }))
+      .toMatchObject({ ok: false, issue: { field: 'reminderId', reason: 'missing' } });
+  });
+
+  test('対応マークは統括とアカウントの所有境界で弾く（R2）', async () => {
+    // 自分の統括・自分のアカウントは通る。
+    expect(await validateScenarioActionReferences(db, 'acc-a', 'support_mark', { markId: 'mark-a' }))
+      .toEqual({ ok: true });
+    // 同じ統括の別アカウントは cross-account。
+    expect(await validateScenarioActionReferences(db, 'acc-a', 'support_mark', { markId: 'mark-b' }))
+      .toMatchObject({ ok: false, issue: { field: 'markId', reason: 'cross-account' } });
+    // 別統括は cross-tenant。範囲表が無く既定統括の共通扱いの昔の行も、統括が違えば通さない。
+    expect(await validateScenarioActionReferences(db, 'acc-a', 'support_mark', { markId: 'mark-tenant2' }))
+      .toMatchObject({ ok: false, issue: { field: 'markId', reason: 'cross-tenant' } });
+    expect(await validateScenarioActionReferences(db, 'acc-a', 'support_mark', { markId: 'mark-legacy' }))
+      .toMatchObject({ ok: false, issue: { field: 'markId', reason: 'cross-tenant' } });
+    // 捨てた行は幽霊扱い。
+    expect(await validateScenarioActionReferences(db, 'acc-a', 'support_mark', { markId: 'mark-archived' }))
+      .toMatchObject({ ok: false, issue: { field: 'markId', reason: 'missing' } });
+  });
+
+  test('友だち情報欄も同じ所有境界で弾く', async () => {
+    expect(await validateScenarioActionReferences(db, 'acc-a', 'friend_field', { fieldId: 'fld-b', op: 'set' }))
+      .toMatchObject({ ok: false, issue: { field: 'fieldId', reason: 'cross-account' } });
+    expect(await validateScenarioActionReferences(db, 'acc-a', 'friend_field', { fieldId: 'fld-archived', op: 'set' }))
+      .toMatchObject({ ok: false, issue: { field: 'fieldId', reason: 'missing' } });
   });
 
   test('検証は書き込まない', async () => {

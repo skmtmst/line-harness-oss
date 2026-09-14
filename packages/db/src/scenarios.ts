@@ -1029,28 +1029,17 @@ export interface ScenarioReferenceMismatch {
 export interface ScenarioActionReferenceIssue {
   /** config内の場所（tagIds[3] のような指し示し）。 */
   field: string;
-  /** missing=幽霊 / cross-account=別アカウント（契約のない共通を含む）。 */
-  reason: 'missing' | 'cross-account';
+  /** missing=幽霊 / cross-account=別アカウント（契約のない共通を含む）/ cross-tenant=別統括。 */
+  reason: 'missing' | 'cross-account' | 'cross-tenant';
   message: string;
 }
+
+// 176: tenant_id 未設定の既存行は既定統括に属する。support-marks.ts と同じ値。
+const SCENARIO_LEGACY_TENANT_ID = '00000000-0000-4000-8000-000000000001';
 
 type ActionReferenceCheck =
   | { ok: true }
   | { ok: false; issue: ScenarioActionReferenceIssue };
-
-/** 行が無ければ undefined、共通（NULL）なら null、アカウント付きならその ID。 */
-async function resourceAccount(
-  db: D1Database,
-  table: string,
-  id: string,
-): Promise<string | null | undefined> {
-  const row = await db
-    .prepare(`SELECT line_account_id AS account_id FROM ${table} WHERE id = ?`)
-    .bind(id)
-    .first<{ account_id: string | null }>();
-  if (!row) return undefined;
-  return row.account_id;
-}
 
 async function resourceExists(db: D1Database, table: string, id: string): Promise<boolean> {
   const row = await db
@@ -1081,17 +1070,82 @@ export async function validateScenarioActionReferences(
   const nonEmpty = (value: unknown): value is string =>
     typeof value === 'string' && value !== '';
 
+  // シナリオ側の統括。未設定の既存行は既定統括（176・283 と同じ扱い）。
+  const accountRow = await db
+    .prepare(`SELECT tenant_id AS tenant_id FROM line_accounts WHERE id = ?`)
+    .bind(scenarioAccountId)
+    .first<{ tenant_id: string | null }>();
+  const scenarioTenantId = accountRow?.tenant_id ?? SCENARIO_LEGACY_TENANT_ID;
+
   const scoped = async (
-    table: 'tags' | 'scenarios' | 'templates',
+    table: 'tags' | 'scenarios' | 'templates' | 'reminders',
+    label: string,
+    field: string,
+    id: string,
+    opts: { skipDeleted?: boolean } = {},
+  ): Promise<ActionReferenceCheck> => {
+    const deleted = opts.skipDeleted ? ' AND deleted_at IS NULL' : '';
+    const row = await db
+      .prepare(`SELECT line_account_id AS account_id FROM ${table} WHERE id = ?${deleted}`)
+      .bind(id)
+      .first<{ account_id: string | null }>();
+    if (!row) {
+      return { ok: false, issue: { field, reason: 'missing', message: `${label}が見つかりません。選び直してください。` } };
+    }
+    if (row.account_id === null || row.account_id === scenarioAccountId) return { ok: true };
+    return { ok: false, issue: { field, reason: 'cross-account', message: `別のLINEアカウントの${label}は使えません。` } };
+  };
+
+  /**
+   * N-053 R2: 範囲表つき資源（対応マーク・友だち情報欄）の所有境界。
+   * 可視条件は各機能の取得口と同一にする（support-marks.ts・friend-fields.ts）。
+   * 範囲表が無い昔の行は既定統括の共通扱い（196・198 と同じ扱い）。
+   */
+  const tenantScoped = async (
+    table: 'support_marks' | 'friend_fields',
+    scopeTable: 'support_mark_scopes' | 'friend_field_scopes',
+    scopeColumn: 'mark_id' | 'field_id',
+    statusColumn: 'archived_at' | 'status',
     label: string,
     field: string,
     id: string,
   ): Promise<ActionReferenceCheck> => {
-    const account = await resourceAccount(db, table, id);
-    if (account === undefined) {
+    const statusGuard = statusColumn === 'archived_at'
+      ? 'AND t.archived_at IS NULL'
+      : `AND t.status != 'archived'`;
+    const usable = await db
+      .prepare(
+        `SELECT t.id AS id
+           FROM ${table} t
+           LEFT JOIN ${scopeTable} s ON s.${scopeColumn} = t.id
+          WHERE t.id = ? ${statusGuard}
+            AND COALESCE(s.tenant_id, '${SCENARIO_LEGACY_TENANT_ID}') = ?
+            AND (s.line_account_id = ? OR s.line_account_id IS NULL)`,
+      )
+      .bind(id, scenarioTenantId, scenarioAccountId)
+      .first<{ id: string }>();
+    if (usable) return { ok: true };
+    const row = await db
+      .prepare(
+        statusColumn === 'archived_at'
+          ? `SELECT id, archived_at AS retired FROM ${table} WHERE id = ?`
+          : `SELECT id, status AS retired FROM ${table} WHERE id = ?`,
+      )
+      .bind(id)
+      .first<{ id: string; retired: string | null }>();
+    // 行が無い・捨てた行は幽霊扱い（捨てたイベント・共通情報と同じ）。
+    const retired = !row || (statusColumn === 'archived_at' ? row.retired !== null : row.retired === 'archived');
+    if (retired) {
       return { ok: false, issue: { field, reason: 'missing', message: `${label}が見つかりません。選び直してください。` } };
     }
-    if (account === null || account === scenarioAccountId) return { ok: true };
+    const scope = await db
+      .prepare(`SELECT tenant_id, line_account_id FROM ${scopeTable} WHERE ${scopeColumn} = ?`)
+      .bind(id)
+      .first<{ tenant_id: string; line_account_id: string | null }>();
+    const ownerTenant = scope?.tenant_id ?? SCENARIO_LEGACY_TENANT_ID;
+    if (ownerTenant !== scenarioTenantId) {
+      return { ok: false, issue: { field, reason: 'cross-tenant', message: `別の統括の${label}は使えません。` } };
+    }
     return { ok: false, issue: { field, reason: 'cross-account', message: `別のLINEアカウントの${label}は使えません。` } };
   };
 
@@ -1122,13 +1176,13 @@ export async function validateScenarioActionReferences(
     }
     case 'friend_field':
       if (!nonEmpty(c.fieldId)) return { ok: true };
-      return global('friend_fields', '友だち情報欄', 'fieldId', c.fieldId);
+      return tenantScoped('friend_fields', 'friend_field_scopes', 'field_id', 'status', '友だち情報欄', 'fieldId', c.fieldId);
     case 'support_mark':
       if (c.markId === null || c.markId === undefined || c.markId === '') return { ok: true };
       if (typeof c.markId !== 'string') {
         return { ok: false, issue: { field: 'markId', reason: 'missing', message: '対応マークの指定が不正です。' } };
       }
-      return global('support_marks', '対応マーク', 'markId', c.markId);
+      return tenantScoped('support_marks', 'support_mark_scopes', 'mark_id', 'archived_at', '対応マーク', 'markId', c.markId);
     case 'scenario':
       if (!nonEmpty(c.scenarioId)) return { ok: true };
       return scoped('scenarios', 'シナリオ', 'scenarioId', c.scenarioId);
@@ -1160,7 +1214,7 @@ export async function validateScenarioActionReferences(
       return scoped('templates', 'テンプレート', 'templateId', c.templateId);
     case 'reminder':
       if (!nonEmpty(c.reminderId)) return { ok: true };
-      return global('reminders', 'リマインダ', 'reminderId', c.reminderId);
+      return scoped('reminders', 'リマインダ', 'reminderId', c.reminderId, { skipDeleted: true });
     case 'event_booking': {
       if (!nonEmpty(c.eventId)) return { ok: true };
       const row = await db

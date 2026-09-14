@@ -14,7 +14,7 @@ import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite';
 import { scenarios } from './scenarios';
 
 const owner: AuthenticatedStaff = {
-  id: 'owner-1', name: 'オーナー', role: 'owner', readOnly: false, tenantId: 'tenant-1',
+  id: 'owner-1', name: 'オーナー', role: 'owner', readOnly: false, tenantId: 'ten-1',
 };
 
 function app(db: D1Database) {
@@ -58,7 +58,29 @@ function seed(testDb: SqliteD1): void {
        ('var-a', 'Aの変数', 'shop_hours', 'acc-a', NULL),
        ('var-b', 'Bの変数', 'shop_hours', 'acc-b', NULL)`,
   ).run();
-  raw.prepare(`INSERT INTO reminders (id, name) VALUES ('rem-1', '誕生日')`).run();
+  // 統括1は seed 済み。統括2とその口座だけ足す。口座の統括は seed の tenant-1 から ten-1 へ寄せる。
+  raw.prepare(`INSERT INTO tenants (id, name) VALUES ('ten-1', '統括1'), ('ten-2', '統括2')`).run();
+  raw.prepare(
+    `INSERT INTO line_accounts
+       (id, channel_id, name, channel_access_token, channel_secret, is_active, tenant_id)
+     VALUES ('acc-c', 'channel-acc-c', '公式C', 'token', 'secret', 1, 'ten-2')`,
+  ).run();
+  raw.prepare(`UPDATE line_accounts SET tenant_id = 'ten-1' WHERE id IN ('acc-a', 'acc-b')`).run();
+  raw.prepare(
+    `INSERT INTO reminders (id, name, line_account_id, deleted_at) VALUES
+       ('rem-a', 'Aの記念日', 'acc-a', NULL),
+       ('rem-b', 'Bの記念日', 'acc-b', NULL)`,
+  ).run();
+  raw.prepare(
+    `INSERT INTO support_marks (id, name, archived_at) VALUES
+       ('mk-a', 'Aの要対応', NULL),
+       ('mk-other-tenant', '統括2の要対応', NULL)`,
+  ).run();
+  raw.prepare(
+    `INSERT INTO support_mark_scopes (mark_id, tenant_id, line_account_id, created_at) VALUES
+       ('mk-a', 'ten-1', 'acc-a', '2026-08-16'),
+       ('mk-other-tenant', 'ten-2', 'acc-c', '2026-08-16')`,
+  ).run();
   raw.prepare(
     `INSERT INTO events (id, line_account_id, name, deleted_at) VALUES
        ('ev-a', 'acc-a', 'Aの会', NULL)`,
@@ -125,6 +147,30 @@ describe('シナリオアクションの参照検証（N-053・実route＋実SQL
     const response = await postAction(db, 'scn-a', tagBody({ op: 'add', tagIds: ['tag-a'] }));
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ success: true });
+    expect(actionCount(testDb)).toBe(1);
+  });
+
+  it('別アカウントのリマインダは400で残さない（R1）', async () => {
+    const cross = await postAction(db, 'scn-a', {
+      hook: 'scenario_completed', actionType: 'reminder', config: { reminderId: 'rem-b' },
+    });
+    expect(cross.status).toBe(400);
+    const same = await postAction(db, 'scn-a', {
+      hook: 'scenario_completed', actionType: 'reminder', config: { reminderId: 'rem-a' },
+    });
+    expect(same.status).toBe(200);
+    expect(actionCount(testDb)).toBe(1);
+  });
+
+  it('別テナントの対応マークは400で残さない（R2）', async () => {
+    const cross = await postAction(db, 'scn-a', {
+      hook: 'scenario_completed', actionType: 'support_mark', config: { markId: 'mk-other-tenant' },
+    });
+    expect(cross.status).toBe(400);
+    const same = await postAction(db, 'scn-a', {
+      hook: 'scenario_completed', actionType: 'support_mark', config: { markId: 'mk-a' },
+    });
+    expect(same.status).toBe(200);
     expect(actionCount(testDb)).toBe(1);
   });
 
