@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { EC_EVENT_LABELS, type EcEventType } from '@line-crm/shared'
 import Button from '@/components/shared/button'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
 import SummaryCard from '@/components/shared/summary-card'
@@ -59,6 +60,9 @@ export default function ConnectorPanel({ accountId }: { accountId: string | null
   const [state, setState] = useState<'loading' | 'ready' | 'empty' | 'error' | 'forbidden'>('loading')
   const [saving, setSaving] = useState(false)
   const [notice, setNotice] = useState<{ tone: 'success' | 'error'; text: string } | null>(null)
+  // #517 軽7: 全部外し自体は止めない(止めたい場面がある)。保存の直前で
+  // 確認を1枚だけ挟み、押した人が自覚できる形にする。
+  const [emptyConfirm, setEmptyConfirm] = useState<{ events: boolean; rules: boolean } | null>(null)
 
   const load = useCallback(async () => {
     if (!accountId) {
@@ -87,6 +91,17 @@ export default function ConnectorPanel({ accountId }: { accountId: string | null
       const next = values.includes(value) ? values.filter((item) => item !== value) : [...values, value]
       return { ...current, [field]: next }
     })
+  }
+
+  const requestSave = () => {
+    if (!accountId || saving) return
+    const events = form.eventTypes.length === 0
+    const rules = form.identityRules.length === 0
+    if (events || rules) {
+      setEmptyConfirm({ events, rules })
+      return
+    }
+    void save()
   }
 
   const save = async () => {
@@ -150,7 +165,7 @@ export default function ConnectorPanel({ accountId }: { accountId: string | null
             <div className={styles.ruleList}>{IDENTITY_RULES.map(([value, label, note], index) => <label className={styles.rule} key={value}><input type="checkbox" checked={form.identityRules.includes(value)} onChange={() => toggle('identityRules', value)} /><span className={styles.ruleNumber}>{index + 1}</span><span><strong>{label}</strong><small>{note}</small></span></label>)}</div>
             <div className={styles.actions}>
               {connector ? <Button type="button" onClick={() => setForm({ ...form, status: form.status === 'paused' ? 'connected' : 'paused' })}>{form.status === 'paused' ? '取り込みを再開する' : '取り込みを止める'}</Button> : null}
-              <Button type="button" variant="primary" disabled={saving || !form.shopDomain || (!connector?.secretConfigured && form.inboundSecret.length < 32)} onClick={() => void save()}>{saving ? '保存しています…' : '設定を保存'}</Button>
+              <Button type="button" variant="primary" disabled={saving || !form.shopDomain || (!connector?.secretConfigured && form.inboundSecret.length < 32)} onClick={requestSave}>{saving ? '保存しています…' : '設定を保存'}</Button>
             </div>
           </section>
         </div>
@@ -167,16 +182,43 @@ export default function ConnectorPanel({ accountId }: { accountId: string | null
           </section>
           <section className={styles.card}>
             <h2 className={styles.cardTitle}>つながる先</h2>
+            {/*
+             * #517 中5b: つなぎ先単位のやり直し方針は口に無い(本番・モックとも
+             * `retryPolicy: null`)。再試行は実行単位で持ち、画面の別箇所
+             * (retryAvailable / もう一度やる)で扱う。根拠の無い分岐を残さない。
+             */}
             <p className={styles.cardNote}>
               {Object.values(data?.impact ?? {}).every((value) => typeof value === 'number')
                 ? 'このつなぎ先を止めると影響する設定・集計です。NEN配信・マイル・友だち属性は全体の件数です。'
                 : '取得できない影響件数は「未取得」と表示します。0件とは限りません。'}
-              {data?.retryPolicy ? <><br />やり直しの決めごと：{data.retryPolicy}</> : null}
             </p>
             {[['NEN配信', data?.impact.nenCampaigns], ['コンバージョン', data?.impact.conversions], ['マイル', data?.impact.mileageRules], ['友だち属性', data?.impact.friendFields], ['分析', data?.impact.analytics]].map(([label, value]) => <div className={styles.impactRow} key={String(label)}><span>{label}</span><strong>{typeof value === 'number' ? `${value}件` : '— 未取得'}</strong></div>)}
           </section>
         </aside>
       </div>
+      <ConfirmDialog
+        open={emptyConfirm !== null}
+        title={emptyConfirm?.events && emptyConfirm?.rules
+          ? '取り込みと照合をすべて止めますか？'
+          : emptyConfirm?.events
+            ? 'すべての出来事の取り込みを止めますか？'
+            : '自動の照合をすべて止めますか？'}
+        description={[
+          emptyConfirm?.events ? '取り込む出来事が1つも選ばれていません。保存すると、すべての出来事の取り込みが止まります。' : null,
+          emptyConfirm?.rules ? '人を照らし合わせる決めごとが1つも選ばれていません。保存すると、自動の照合がすべて止まります。' : null,
+        ].filter(Boolean).join('')}
+        confirmLabel="止めて保存する"
+        destructive
+        busy={saving}
+        onConfirm={() => {
+          setEmptyConfirm(null)
+          void save()
+        }}
+        onCancel={() => {
+          if (saving) return
+          setEmptyConfirm(null)
+        }}
+      />
     </>
   )
 }

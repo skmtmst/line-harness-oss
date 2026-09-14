@@ -1,3 +1,5 @@
+import { REVENUE_IMPACT_KEYS } from '@line-crm/shared';
+
 export type EcOrderState = 'current' | 'refunded' | 'cancelled';
 export type EcActionExecutionStatus =
   | 'pending'
@@ -599,7 +601,7 @@ export async function listEcIdentityCandidates(
   }));
   const revenueValues = items.flatMap((item) => Array.isArray(item.impact)
     ? (item.impact as Array<Record<string, unknown>>)
-      .filter((metric) => ['sales', 'revenue', 'order_amount'].includes(String(metric.key)))
+      .filter((metric) => REVENUE_IMPACT_KEYS.includes(String(metric.key)))
       .map((metric) => typeof metric.value === 'number' ? metric.value : null)
     : []).filter((value): value is number => value !== null);
   return {

@@ -2,6 +2,7 @@ import Database from 'better-sqlite3';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { beforeEach, describe, expect, it } from 'vitest';
+import { ORDER_IMPACT_KEYS, REVENUE_IMPACT_KEYS } from '@line-crm/shared';
 import {
   listEcActionExecutions,
   listEcIdentityCandidates,
@@ -170,5 +171,45 @@ describe('migration 320 EC order and action read models', () => {
     expect(await listEcIdentityCandidates(db, {
       tenantId: TENANT_ID, lineAccountId: 'account-2', status: 'pending', limit: 20, offset: 0,
     })).toMatchObject({ total: 0, items: [] });
+  });
+
+  it('未知の計量キーは売上集計に入れず、既知のキーは共有の一覧どおりに数える', async () => {
+    // #517 軽4: キー名がずれても画面は黙って「—」になる。共有の一覧を本物で
+    // import し、未知キーの除外と既知キーの集計を両方見張る。共有からキーを
+    // 抜く・ずらす逆変異は、ここで赤になる。
+    expect(ORDER_IMPACT_KEYS).toContain('orders');
+    expect(REVENUE_IMPACT_KEYS).toContain('order_amount');
+    insertEvent({
+      id: 'event-unknown-key', accountId: 'account-1', status: 'identity_pending',
+      payload: { occurred_at: '2026-09-07' },
+    });
+    sqlite.prepare(
+      `INSERT INTO identity_candidates (
+         id, tenant_id, kind, status, version, confidence_score, detector_version,
+         left_subject_kind, left_subject_id, left_line_account_id, left_shop_key, left_snapshot_json,
+         right_subject_kind, right_subject_id, right_line_account_id, right_shop_key, right_snapshot_json,
+         source_key, external_customer_id, evidence_fingerprint, evidence_json, impact_json,
+         detected_at, created_at, updated_at
+       ) VALUES (?, ?, 'ec_member', 'pending', 1, 88, 'ec-v1',
+         'ec_event', ?, ?, 'shop-1', ?, 'friend', 'friend-1', ?, 'shop-1', ?,
+         'eccube:account-1', 'customer-1', 'fingerprint', ?, ?, ?, ?, ?)`,
+    ).run(
+      'candidate-unknown-key', TENANT_ID, 'event-unknown-key', 'account-1',
+      JSON.stringify({ label: '田中', attributes: [] }),
+      'account-1',
+      JSON.stringify({ label: '田中 花子', attributes: [] }),
+      JSON.stringify([]),
+      JSON.stringify([
+        { key: 'order_amount', label: '売上', value: 4200, unit: '円' },
+        { key: 'orders', label: '注文', value: 6, unit: '件' },
+        { key: 'revenue_next', label: '未知の売上', value: 9999, unit: '円' },
+      ]),
+      '2026-09-07T00:00:00.000Z', '2026-09-07T00:00:00.000Z', '2026-09-07T00:00:00.000Z',
+    );
+    const result = await listEcIdentityCandidates(db, {
+      tenantId: TENANT_ID, lineAccountId: 'account-1', status: 'pending', limit: 20, offset: 0,
+    });
+    // 未知キー 9999 は足さない。既知の order_amount 4200 だけを数える。
+    expect(result).toMatchObject({ summary: { potentialRevenue: 4200 } });
   });
 });

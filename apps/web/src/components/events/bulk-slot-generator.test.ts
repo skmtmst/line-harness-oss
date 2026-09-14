@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { generateBulkSlots } from './bulk-slot-generator.js';
+import { jstHHMMToUtcIso } from './jst.js';
 
 describe('generateBulkSlots', () => {
   test('weekly Mon/Wed 10:00-12:00 over a 2-week window', () => {
@@ -69,6 +70,21 @@ describe('generateBulkSlots', () => {
       capacity: 1,
     });
     expect(slots[0].starts_at).toBe('2099-06-01T14:00:00.000Z');
+  });
+
+  test('uses the canonical jst.ts conversion (点検#520の軽11)', () => {
+    // generateBulkSlots が自前の変換を持たず jst.ts の正本を使うことを固定する。
+    // ここだけ書き直されると作成画面と編集画面で9時間ずれるが、型検査では気づけない。
+    const slots = generateBulkSlots({
+      start_date: '2099-06-01',
+      end_date: '2099-06-01',
+      weekdays: [1],
+      time_patterns: [{ start: '10:00', end: '12:00' }],
+      capacity: null,
+    });
+    expect(slots).toHaveLength(1);
+    expect(slots[0].starts_at).toBe(jstHHMMToUtcIso('2099-06-01', '10:00'));
+    expect(slots[0].ends_at).toBe(jstHHMMToUtcIso('2099-06-01', '12:00'));
   });
 
   test('weekdays filter excludes non-matching days', () => {

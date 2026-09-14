@@ -539,7 +539,10 @@ const EC_CONNECTOR = {
   },
   health: { today: 148, last30Days: 2486, failed: 2, lastReceivedAt: '2026-09-06T09:58:00+09:00', lastSucceededAt: '2026-09-06T09:58:00+09:00' },
   impact: { ...EC_OVERVIEW.impact },
-  retryPolicy: '3回まで・10分あけて',
+  // 本番の口は retryPolicy を常に null で返す(#517 中5b)。つなぎ先単位の
+  // やり直し方針は無く、再試行は実行単位(next_retry_at / max_attempts)で持つ。
+  // 目視確認が本番と別物にならないよう、モックも null に揃える。
+  retryPolicy: null,
 }
 
 /**

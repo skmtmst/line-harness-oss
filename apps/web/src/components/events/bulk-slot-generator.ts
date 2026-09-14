@@ -3,6 +3,11 @@
 //
 // Inputs are JST (Asia/Tokyo); outputs are UTC ISO8601 (Z-suffixed) ready
 // to POST to /api/events/admin/events/:id/slots.
+//
+// 時刻変換は ./jst の jstHHMMToUtcIso が正本。ここに二重実装しない
+// (点検#520の軽11: 片方だけ9時間ずれると試験・型検査では気づけないため)。
+
+import { jstHHMMToUtcIso } from './jst';
 
 export interface BulkSlotInput {
   start_date: string; // YYYY-MM-DD (JST)
@@ -16,18 +21,6 @@ export interface GeneratedSlot {
   starts_at: string; // UTC ISO8601
   ends_at: string;
   capacity: number | null;
-}
-
-const JST_OFFSET_MIN = 9 * 60;
-
-function jstHHMMToUtcIso(date: string, hhmm: string): string {
-  const [h, m] = hhmm.split(':').map(Number);
-  const totalMin = h * 60 + m - JST_OFFSET_MIN;
-  // Negative means previous UTC day; we accept negative and let Date handle.
-  const [y, mo, d] = date.split('-').map(Number);
-  // Build UTC date for `date` then add totalMin.
-  const t = Date.UTC(y, mo - 1, d) + totalMin * 60_000;
-  return new Date(t).toISOString();
 }
 
 export function generateBulkSlots(input: BulkSlotInput): GeneratedSlot[] {
