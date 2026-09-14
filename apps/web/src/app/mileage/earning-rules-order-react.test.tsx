@@ -48,9 +48,10 @@ interface RecordedCall {
 const calls: RecordedCall[] = []
 /*
  * 旧アカウント(acc-a)の2ページ目を遅らせるための門。試験ごとにセットする。
- * null の間は全リクエストを即座に通す。
+ * null の間は全リクエストを即座に通す。解放時の値 'ok' は成功応答、
+ * 'fail' は通信失敗(fetchのreject)を再現する。
  */
-let slowPageGate: Promise<void> | null = null
+let slowPageGate: Promise<'ok' | 'fail'> | null = null
 
 const lineAccounts = [
   { id: ACC_A, channelId: `channel-${ACC_A}`, name: '店A', isActive: true, country: null, role: null, displayOrder: 0 },
@@ -111,7 +112,8 @@ function installFetch(): void {
       parsed.searchParams.get('accountId') === ACC_A &&
       Number(parsed.searchParams.get('offset') ?? '0') >= 100
     ) {
-      await slowPageGate
+      const verdict = await slowPageGate
+      if (verdict === 'fail') throw new Error('network error')
     }
     if (parsed.pathname.startsWith('/api/mileage/')) {
       const headers = new Headers(init?.headers)
@@ -284,8 +286,8 @@ describe('たまる決めごとの並び順保存(本物のReact + 本物のrout
     for (let i = 0; i < 3; i += 1) bIds.push(await makeRule(ACC_B, `店Bの決めごと${i}`, i))
 
     // acc-a の2頁目だけ試験側で押さえる。
-    let releaseSlowPage!: () => void
-    slowPageGate = new Promise<void>((resolve) => { releaseSlowPage = resolve })
+    let releaseSlowPage!: (verdict: 'ok' | 'fail') => void
+    slowPageGate = new Promise<'ok' | 'fail'>((resolve) => { releaseSlowPage = resolve })
     installFetch()
     await renderPage()
 
@@ -305,7 +307,7 @@ describe('たまる決めごとの並び順保存(本物のReact + 本物のrout
     await waitForText('店Bの決めごと0')
 
     // ここで acc-a の遅かった2頁目を解放する。世代がずれているので捨てられる。
-    releaseSlowPage()
+    releaseSlowPage('ok')
     slowPageGate = null
     await settle(10)
 
@@ -327,5 +329,44 @@ describe('たまる決めごとの並び順保存(本物のReact + 本物のrout
     expect(sent.accountId).toBe(ACC_B)
     expect(sent.ids).toHaveLength(3)
     expect(sent.ids).toEqual([bIds[1], bIds[0], bIds[2]])
+  })
+
+  it('旧アカウントの遅い2ページ目が失敗しても、新しいアカウントへエラーを残さない', async () => {
+    // acc-a は101件(2頁)、acc-b は3件(1頁)。
+    for (let i = 0; i < 101; i += 1) await makeRule(ACC_A, `店Aの決めごと${i}`, i)
+    for (let i = 0; i < 3; i += 1) await makeRule(ACC_B, `店Bの決めごと${i}`, i)
+
+    let releaseSlowPage!: (verdict: 'ok' | 'fail') => void
+    slowPageGate = new Promise<'ok' | 'fail'>((resolve) => { releaseSlowPage = resolve })
+    installFetch()
+    await renderPage()
+
+    // acc-a の2頁目が呼ばれて門で止まるのを待つ。
+    await vi.waitFor(async () => {
+      const held = calls.filter((call) => {
+        const u = new URL(call.url)
+        return u.pathname === '/api/mileage/earning-rules'
+          && u.searchParams.get('accountId') === ACC_A
+          && Number(u.searchParams.get('offset') ?? '0') >= 100
+      })
+      expect(held.length).toBeGreaterThanOrEqual(1)
+    })
+
+    // acc-b へ切り替え、その読み込みを終わらせる。
+    await act(async () => { selectedAccount?.setSelectedAccountId(ACC_B) })
+    await waitForText('店Bの決めごと0')
+
+    // ここで acc-a の遅かった2頁目を「失敗」で解放する。
+    // 世代がずれているので reject は飲まれ、新しい画面に何も残らない。
+    releaseSlowPage('fail')
+    slowPageGate = null
+    await settle(10)
+
+    // acc-b の一覧はそのまま。旧アカウント由来のエラーも出ない。
+    expect(container.textContent ?? '').toContain('決めごと 3件のうち')
+    expect(container.textContent ?? '').toContain('店Bの決めごと0')
+    expect(container.textContent ?? '').not.toContain('マイルデータを読み込めませんでした')
+    expect(container.textContent ?? '').not.toContain('並び順を保存できませんでした')
+    expect(container.textContent ?? '').not.toContain('決めごと 101件のうち')
   })
 })

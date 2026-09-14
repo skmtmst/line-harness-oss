@@ -184,51 +184,61 @@ function MileagePageInner() {
       setRuleSummary(null)
       return
     }
-    const [res, historyRes, friendsRes] = await Promise.all([
-      api.mileage.earningRulesV6({ accountId: accountAtRequest, limit: 100, offset: 0 }),
-      api.mileage.history({
-        accountId: accountAtRequest,
-        from: dateOnlyDaysAgo(29),
-        to: dateOnlyDaysAgo(0),
-        limit: 1,
-        offset: 0,
-      }),
-      api.mileage.friendsV6({ accountId: accountAtRequest, limit: 1, offset: 0 }),
-    ])
-    if (isStale()) return
-    if (!res.success || !isMileageEarningRulesV6Overview(res.data)) throw new Error('invalid_mileage_rules')
-    if (!historyRes.success || !friendsRes.success || !isMileageFriendsV6Overview(friendsRes.data)) {
-      throw new Error('invalid_mileage_rule_summary')
-    }
-    /*
-     * 決めごとに件数の上限は無い。並び順の一括口はアカウントの全IDを
-     * 要求するため、100件ずつ全頁を読み切る(N-243)。各頁の到着ごとに
-     * 世代を見て、古い読み込みの続きはここで捨てる。
-     */
-    const items = [...res.data.items]
-    const total = res.data.pagination.total
-    while (items.length < total) {
-      const next = await api.mileage.earningRulesV6({
-        accountId: accountAtRequest, limit: 100, offset: items.length,
-      })
+    try {
+      const [res, historyRes, friendsRes] = await Promise.all([
+        api.mileage.earningRulesV6({ accountId: accountAtRequest, limit: 100, offset: 0 }),
+        api.mileage.history({
+          accountId: accountAtRequest,
+          from: dateOnlyDaysAgo(29),
+          to: dateOnlyDaysAgo(0),
+          limit: 1,
+          offset: 0,
+        }),
+        api.mileage.friendsV6({ accountId: accountAtRequest, limit: 1, offset: 0 }),
+      ])
       if (isStale()) return
-      if (!next.success || !isMileageEarningRulesV6Overview(next.data)) throw new Error('invalid_mileage_rules')
-      if (next.data.items.length === 0) break
-      items.push(...next.data.items)
+      if (!res.success || !isMileageEarningRulesV6Overview(res.data)) throw new Error('invalid_mileage_rules')
+      if (!historyRes.success || !friendsRes.success || !isMileageFriendsV6Overview(friendsRes.data)) {
+        throw new Error('invalid_mileage_rule_summary')
+      }
+      /*
+       * 決めごとに件数の上限は無い。並び順の一括口はアカウントの全IDを
+       * 要求するため、100件ずつ全頁を読み切る(N-243)。各頁の到着ごとに
+       * 世代を見て、古い読み込みの続きはここで捨てる。
+       */
+      const items = [...res.data.items]
+      const total = res.data.pagination.total
+      while (items.length < total) {
+        const next = await api.mileage.earningRulesV6({
+          accountId: accountAtRequest, limit: 100, offset: items.length,
+        })
+        if (isStale()) return
+        if (!next.success || !isMileageEarningRulesV6Overview(next.data)) throw new Error('invalid_mileage_rules')
+        if (next.data.items.length === 0) break
+        items.push(...next.data.items)
+      }
+      const grant = (historyRes.data as MileageAdminHistory).summary.byType
+        .find((item) => item.entryType === 'grant')
+      setRuleOverview({ ...res.data, items })
+      setRuleSummary({
+        grantedMiles: grant?.amount ?? 0,
+        grantedCount: grant?.count ?? 0,
+        averageBalance: friendsRes.data.summary.withBalanceCount > 0
+          ? Math.round(friendsRes.data.summary.available / friendsRes.data.summary.withBalanceCount)
+          : null,
+      })
+      setRuleOrder(items.map((rule) => rule.id))
+      setRuleOrderDirty(false)
+      setRulePage(1)
+    } catch (error) {
+      /*
+       * 古い世代の失敗(旧アカウントの遅い2頁目のreject等)は新しい画面へ
+       * 出さない。ここで飲まないと reloadAll の catch が新しいアカウントの
+       * エラー表示を書き、finally が新しい読み込み中の loading を下ろす。
+       */
+      if (isStale()) return
+      throw error
     }
-    const grant = (historyRes.data as MileageAdminHistory).summary.byType
-      .find((item) => item.entryType === 'grant')
-    setRuleOverview({ ...res.data, items })
-    setRuleSummary({
-      grantedMiles: grant?.amount ?? 0,
-      grantedCount: grant?.count ?? 0,
-      averageBalance: friendsRes.data.summary.withBalanceCount > 0
-        ? Math.round(friendsRes.data.summary.available / friendsRes.data.summary.withBalanceCount)
-        : null,
-    })
-    setRuleOrder(items.map((rule) => rule.id))
-    setRuleOrderDirty(false)
-    setRulePage(1)
   }, [selectedAccountId])
 
   const loadOverview = useCallback(async () => {
@@ -249,16 +259,24 @@ function MileagePageInner() {
     setOverview(res.data)
   }, [offset, search, selectedAccountId])
 
+  /*
+   * N-243: reloadAll の世代番号。古い実行(旧アカウントの読み込みなど)が
+   * あとから終わっても、catch のエラー表示と finally の loading 解除は
+   * 最新の実行だけに許す。
+   */
+  const reloadGenerationRef = useRef(0)
   const reloadAll = useCallback(async () => {
+    const generation = ++reloadGenerationRef.current
+    const isCurrent = () => generation === reloadGenerationRef.current
     setLoading(true)
     setLoadError('')
     try {
       if (tab === 'balances') await loadOverview()
       if (tab === 'earning-rules') await loadRules()
     } catch {
-      setLoadError('マイルデータを読み込めませんでした。')
+      if (isCurrent()) setLoadError('マイルデータを読み込めませんでした。')
     } finally {
-      setLoading(false)
+      if (isCurrent()) setLoading(false)
     }
   }, [loadOverview, loadRules, tab])
 
