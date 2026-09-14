@@ -825,6 +825,44 @@ const spec = {
         },
       },
     },
+    /*
+     * 画像と本文を1回の送信単位にする（N-022）。2回に分けると画像だけが
+     * 先に届く部分送信になる。片方だけの送信もこの口で受け付ける。
+     */
+    '/api/chats/{id}/send-combined': {
+      post: {
+        tags: ['Chats'],
+        summary: '画像と本文を1回で送信',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  image: {
+                    type: 'object',
+                    properties: {
+                      originalContentUrl: { type: 'string' },
+                      previewImageUrl: { type: 'string' },
+                    },
+                  },
+                  text: { type: 'string' },
+                  revision: { type: 'integer' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': { description: 'Sent' },
+          '400': { description: 'Idempotency-Key が無い／内容が壊れている' },
+          '404': { description: 'Chat not found' },
+          '409': { description: '版が食い違う／同じ鍵で内容が違う' },
+        },
+      },
+    },
     '/api/common-actions/resources': {
       get: {
         tags: ['Common actions'],
