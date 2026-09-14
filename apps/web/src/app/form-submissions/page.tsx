@@ -161,12 +161,13 @@ export default function FormSubmissionsPage() {
 
   const loadForms = useCallback(async () => {
     const request = ++formRequest.current
-    if (reviewMode) {
+    if (reviewMode && selectedAccountId) {
       setLoading(true)
       setLoadError('')
       setReviewForbidden(false)
       try {
-        const res = await fetchApi<{ success: boolean; data: Form[] }>(`/api/forms/unassigned`)
+        const account = `account_id=${encodeURIComponent(selectedAccountId)}`
+        const res = await fetchApi<{ success: boolean; data: Form[] }>(`/api/forms/unassigned?${account}`)
         if (!res.success) throw new Error('load_failed')
         if (request !== formRequest.current) return
         setForms(res.data)
@@ -511,7 +512,7 @@ export default function FormSubmissionsPage() {
           {createError && <p className="mb-3 text-sm text-danger">{createError}</p>}
           {accountLoading ? (
           <ListState kind="loading" title="LINE公式アカウントを確認しています" />
-        ) : !reviewMode && !selectedAccountId ? (
+        ) : !selectedAccountId ? (
           <ListState
             kind="empty"
             title="LINE公式アカウントを選んでください"

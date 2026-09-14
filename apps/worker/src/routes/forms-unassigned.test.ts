@@ -74,7 +74,7 @@ describe('GET /api/forms/unassigned(#724)', () => {
     seed(testDb);
 
     for (const current of [staff('owner-1', 'owner', DEFAULT_TENANT_ID), staff('admin-1', 'admin', DEFAULT_TENANT_ID)]) {
-      const response = await get(testDb, current, '/api/forms/unassigned');
+      const response = await get(testDb, current, '/api/forms/unassigned?account_id=acc-a');
       expect(response.status).toBe(200);
       const body = (await response.json()) as ListBody;
       expect(body.data.map((item) => item.id)).toEqual(['form-legacy']);
@@ -85,23 +85,31 @@ describe('GET /api/forms/unassigned(#724)', () => {
   it('環境ownerは見られる', async () => {
     const testDb = createTestD1();
     seed(testDb);
-    const response = await get(testDb, staff('env-owner', 'owner'), '/api/forms/unassigned');
+    const response = await get(testDb, staff('env-owner', 'owner'), '/api/forms/unassigned?account_id=acc-a');
     expect(response.status).toBe(200);
     expect(((await response.json()) as ListBody).data.map((item) => item.id)).toEqual(['form-legacy']);
   });
 
-  it('staff・制限付き・機能スコープ付き・別テナント・未認証は確認できない', async () => {
+  it('account_idが無いと400', async () => {
     const testDb = createTestD1();
     seed(testDb);
-    const denied: Array<AuthenticatedStaff | null> = [
-      staff('staff-1', 'staff', DEFAULT_TENANT_ID),
-      staff('scoped-1', 'owner', DEFAULT_TENANT_ID),
-      staff('owner-1', 'owner', DEFAULT_TENANT_ID, ['acc-a']),
-      staff('owner-x', 'owner', OTHER_TENANT),
-      null,
+    const response = await get(testDb, staff('owner-1', 'owner', DEFAULT_TENANT_ID), '/api/forms/unassigned');
+    expect(response.status).toBe(400);
+  });
+
+  it('staff・制限付き・機能スコープ付き・別テナント・未認証・範囲外アカウントは確認できない', async () => {
+    const testDb = createTestD1();
+    seed(testDb);
+    const denied: Array<{ current: AuthenticatedStaff | null; path: string }> = [
+      { current: staff('staff-1', 'staff', DEFAULT_TENANT_ID), path: '/api/forms/unassigned?account_id=acc-a' },
+      { current: staff('scoped-1', 'owner', DEFAULT_TENANT_ID), path: '/api/forms/unassigned?account_id=acc-a' },
+      { current: staff('owner-1', 'owner', DEFAULT_TENANT_ID, ['acc-a']), path: '/api/forms/unassigned?account_id=acc-a' },
+      { current: staff('owner-x', 'owner', OTHER_TENANT), path: '/api/forms/unassigned?account_id=acc-b' },
+      { current: null, path: '/api/forms/unassigned?account_id=acc-a' },
+      { current: staff('owner-1', 'owner', DEFAULT_TENANT_ID), path: '/api/forms/unassigned?account_id=acc-b' },
     ];
-    for (const current of denied) {
-      const response = await get(testDb, current, '/api/forms/unassigned');
+    for (const { current, path } of denied) {
+      const response = await get(testDb, current, path);
       expect(response.status).not.toBe(200);
     }
   });

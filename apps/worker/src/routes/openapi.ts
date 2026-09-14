@@ -2032,6 +2032,9 @@ const spec = {
       get: {
         tags: ['Forms'],
         summary: '担当の決まっていない旧フォームだけを返す（管理者確認 #724）',
+        parameters: [
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
         responses: {
           '200': { description: '未割り当てフォームの一覧' },
           '403': { description: 'Owner or admin role required' },
