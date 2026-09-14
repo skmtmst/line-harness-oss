@@ -84,6 +84,18 @@ describe('V6 たまる決めごと（N46cQ）の画面', () => {
     expect(PAGE).not.toContain("setLoadError('たまる決めごとを更新できませんでした")
   })
 
+  it('N-231 案1: 下書きの公開は保存と別の操作で、版を見せて失敗を行内の帯で出す', () => {
+    // 公開して反映ボタン・公開版表示・サーバーの案内文の受け渡し。
+    expect(PAGE).toContain('api.mileage.publishEarningRule')
+    expect(PAGE).toContain('公開して反映')
+    expect(PAGE).toContain('rule.publishedVersion')
+    expect(PAGE).toContain('公開版 v${rule.publishedVersion}')
+    expect(PAGE).toContain('expectedVersion: rule.draftVersion')
+    // 取り消せない操作のため送る前に確認する。保存とは別の文言にする。
+    expect(PAGE).toContain('window.confirm')
+    expect(PAGE).toContain('取り消せません')
+  })
+
   it('読込中・取得失敗・空を言い分ける', () => {
     expect(PAGE).toContain('title="たまる決めごとを読み込んでいます"')
     expect(PAGE).toContain('title="たまる決めごとを読み込めませんでした"')

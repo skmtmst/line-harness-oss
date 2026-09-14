@@ -16,6 +16,7 @@ const dbMocks = {
   createMileageRule: vi.fn(),
   updateMileageRule: vi.fn(),
   deleteMileageRule: vi.fn(),
+  publishMileageEarningRule: vi.fn(),
   getScoringRules: vi.fn(),
   getScoringRuleById: vi.fn(),
   createScoringRule: vi.fn(),
@@ -892,5 +893,83 @@ describe('mileage admin API', () => {
     });
     expect(hidden.status).toBe(404);
     expect(dbMocks.addScore).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('mileage earning rule publish (N-231 案1)', () => {
+  const publishKey = '11111111-2222-4333-8444-555555555555';
+  const confirmHeaders = {
+    'Idempotency-Key': publishKey,
+    'X-Confirm-Irreversible': 'mileage-earning-rule-publish',
+  };
+  const publishBody = { accountId: 'account-1', expectedVersion: 2 };
+
+  it('PUT refuses direct content edits but keeps stop/resume', async () => {
+    dbMocks.getMileageRuleById.mockResolvedValue({ id: 'rule-1', line_account_id: 'account-1' });
+    const refused = await call('/api/mileage/rules/rule-1', {
+      method: 'PUT', body: JSON.stringify({ amount: 200 }),
+    });
+    expect(refused.status).toBe(409);
+    expect(await refused.json()).toMatchObject({ success: false });
+    expect(dbMocks.updateMileageRule).not.toHaveBeenCalled();
+
+    dbMocks.updateMileageRule.mockResolvedValue({ id: 'rule-1' });
+    const stopped = await call('/api/mileage/rules/rule-1', {
+      method: 'PUT', body: JSON.stringify({ isActive: false }),
+    });
+    expect(stopped.status).toBe(200);
+    expect(dbMocks.updateMileageRule).toHaveBeenCalledWith(env.DB, 'rule-1', { isActive: false });
+  });
+
+  it('publish requires the irreversible confirmation', async () => {
+    const response = await call('/api/mileage/earning-rules/rule-1/publish', {
+      method: 'POST',
+      headers: { 'Idempotency-Key': publishKey },
+      body: JSON.stringify(publishBody),
+    });
+    expect(response.status).toBe(428);
+    expect(dbMocks.publishMileageEarningRule).not.toHaveBeenCalled();
+  });
+
+  it('publish requires a valid idempotency key and draft version', async () => {
+    const badKey = await call('/api/mileage/earning-rules/rule-1/publish', {
+      method: 'POST',
+      headers: { 'Idempotency-Key': 'short', 'X-Confirm-Irreversible': 'mileage-earning-rule-publish' },
+      body: JSON.stringify(publishBody),
+    });
+    expect(badKey.status).toBe(400);
+    const noVersion = await call('/api/mileage/earning-rules/rule-1/publish', {
+      method: 'POST',
+      headers: confirmHeaders,
+      body: JSON.stringify({ accountId: 'account-1' }),
+    });
+    expect(noVersion.status).toBe(400);
+    expect(dbMocks.publishMileageEarningRule).not.toHaveBeenCalled();
+  });
+
+  it('publish delegates to the atomic handler with account and version', async () => {
+    dbMocks.publishMileageEarningRule.mockResolvedValue({
+      ruleId: 'rule-1', versionId: 'version-1', versionNumber: 3, publishedAt: '2026-08-10T00:00:00.000+09:00',
+    });
+    const response = await call('/api/mileage/earning-rules/rule-1/publish', {
+      method: 'POST', headers: confirmHeaders, body: JSON.stringify(publishBody),
+    });
+    expect(response.status).toBe(200);
+    expect(dbMocks.publishMileageEarningRule).toHaveBeenCalledWith(env.DB, {
+      ruleId: 'rule-1', lineAccountId: 'account-1', expectedVersion: 2,
+      staffId: expect.any(String), idempotencyKey: publishKey,
+    });
+    expect(await response.json()).toMatchObject({ success: true, data: { versionNumber: 3 } });
+  });
+
+  it('publish surfaces a stale draft version as 409', async () => {
+    dbMocks.publishMileageEarningRule.mockRejectedValue(
+      new dbMocks.MileageV6Error('version_conflict', '下書きを読み直してください', 409),
+    );
+    const response = await call('/api/mileage/earning-rules/rule-1/publish', {
+      method: 'POST', headers: confirmHeaders, body: JSON.stringify(publishBody),
+    });
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ success: false });
   });
 });
