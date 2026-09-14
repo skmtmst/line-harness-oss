@@ -255,8 +255,13 @@ describe('一覧の画面が置き換え表を通す', () => {
   })
 
   it('4指標を実APIから数え、未取得を 0 と出さない', () => {
-    expect(PAGE).toContain('metricWord(visibleLoadState, items.length)')
-    expect(PAGE).toContain('metricWord(visibleLoadState, monthlyHits)')
+    // #721: 指標1は visualTotal 経由で読む。visualTotal は読み込んだ一覧の
+    // 件数そのもの（到達不能なキャスト分岐を消したため1行になった）。
+    // 2文で「呼ぶ側」と「数える元」の両方を固定する。
+    expect(PAGE).toContain('metricWord(visibleLoadState, visualTotal)')
+    expect(PAGE).toContain('const visualTotal = items.length')
+    expect(PAGE).toContain('metricWord(visibleLoadState, visualMonthly)')
+    expect(PAGE).toContain('const visualMonthly = monthlyHits')
     expect(PAGE).toContain('const actionExecutionsAllKnown = items.every')
     expect(PAGE).toContain('api.autoReplies.summary(selectedAccountId)')
     expect(PAGE).toContain("actionExecutionCount != null ? actionExecutionCount : '—'")

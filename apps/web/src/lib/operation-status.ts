@@ -93,17 +93,46 @@ export function overallSeverity(rows: OperationHealthRow[]): OperationSeverity {
   return 'normal'
 }
 
+/**
+ * 運用の日時を出す。入力の形は2種類ある(#738)。
+ *
+ * - 素の壁時計（`2026-09-11 07:31`、`2026-09-02T21:04`、日付だけ）。時差を
+ *   持たないので JST として読む。端末時計で読むと、端末の時差ぶんずれる。
+ * - オフセット付きISO（`...+09:00`、`Z`）。絶対時刻なのでそのまま読む。
+ *
+ * 描くときは必ず JST に固定する。端末時計で描くと、見る人の時差で違う
+ * 時刻が出て「何時に入ったのか」が食い違う（15:00 と書いたものが
+ * 13:00 と出た不具合と同じ形）。
+ */
 export function formatOperationDate(value: string | null): string {
   if (!value) return 'まだありません'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '日時不明'
+  const text = value.trim()
+  if (!text) return 'まだありません'
+  const date = parseOperationDate(text)
+  if (!date) return '日時不明'
   return date.toLocaleString('ja-JP', {
+    timeZone: 'Asia/Tokyo',
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
     hour: '2-digit',
     minute: '2-digit',
   })
+}
+
+const OFFSET_SUFFIX = /(?:[zZ]|[+-]\d{2}:?\d{2})$/
+
+function parseOperationDate(text: string): Date | null {
+  let parsed: Date
+  if (OFFSET_SUFFIX.test(text)) {
+    parsed = new Date(text)
+  } else {
+    const iso = text.replace(' ', 'T')
+    if (/\d{2}:\d{2}:\d{2}$/.test(iso)) parsed = new Date(`${iso}+09:00`)
+    else if (/[T]\d{2}:\d{2}$/.test(iso)) parsed = new Date(`${iso}:00+09:00`)
+    else parsed = new Date(`${iso}T00:00:00+09:00`)
+  }
+  return Number.isNaN(parsed.getTime()) ? null : parsed
 }
 
 export function buildResearchReport(input: {

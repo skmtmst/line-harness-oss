@@ -114,6 +114,9 @@ export default function MediaLibraryPage() {
   const [error, setError] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
   const [folders, setFolders] = useState<Folder[]>([])
+  // #721: 未分類の件数は GET /api/folders の unfiledCount をそのまま出す。
+  // kind=media は件数未対応のため来ない。来ないときは null（「—」表示）。
+  const [unfiledCount, setUnfiledCount] = useState<number | null>(null)
   const [folderFilter, setFolderFilter] = useState('')
   const [addingFolder, setAddingFolder] = useState(false)
   const [folderName, setFolderName] = useState('')
@@ -265,7 +268,10 @@ export default function MediaLibraryPage() {
         setItems(res.data.items)
         setTotal(res.data.total)
       }
-      if (folderResponse.success) setFolders(folderResponse.data)
+      if (folderResponse.success) {
+        setFolders(folderResponse.data)
+        setUnfiledCount(folderResponse.unfiledCount ?? null)
+      }
       if (quotaResponse?.success) setQuota(quotaResponse.data)
       else {
         setQuota(null)
@@ -614,10 +620,13 @@ export default function MediaLibraryPage() {
             ...folders.map((folder) => ({
               id: folder.id,
               label: folder.name,
-              count: items.filter((item) => item.folderId === folder.id).length,
+              // #721: フォルダ件数はAPI(itemCount)をそのまま出す。kind=media
+              // は件数未対応で来ないため「—」になる。読み込み済み範囲だけを
+              // 数える計算は、黙って別の母集団にすり替わるため廃止。
+              count: folder.itemCount ?? null,
               color: folder.color,
             })),
-            { id: UNGROUPED, label: '未分類', count: items.filter((item) => item.folderId === null).length },
+            { id: UNGROUPED, label: '未分類', count: unfiledCount },
           ]}
         >
           {addingFolder ? (
