@@ -15,8 +15,11 @@ import {
   addTagToFriend,
   removeTagFromFriend,
   enrollFriendInScenario,
+  getFriendFieldById,
   isResourceInScenarioAccount,
   jstNow,
+  setFriendFieldValue,
+  validateFriendFieldValue,
   type PinnedScenarioAction,
 } from '@line-crm/db'
 import { matchesCondition, parseCondition } from './segment-query.js'
@@ -531,7 +534,11 @@ async function resolveTagIds(
  * 友だち情報欄を書き換える。
  *
  * 加算・減算は数として扱う。値が数でなければ 0 とみなす。ここで例外にすると、
- * 1人ぶんの値が壊れているだけで以降の配信が全部止まる。
+ * 1人ぶんの値が壊れているだけで以降の配信が全部止まる(呼び出し側が
+ * 失敗数に数え、残りのアクションと配信は続ける)。
+ *
+ * N-042: 書き込む値は項目の型で検証し、合わなければ保存せず例外にする。
+ * 設定値が型に合わないまま配信されると、不正値が情報欄へ残るため。
  */
 async function applyFriendField(
   db: D1Database,
@@ -539,7 +546,8 @@ async function applyFriendField(
   c: FriendFieldActionConfig,
 ): Promise<void> {
   if (!c.fieldId) throw new Error('friend_field action requires fieldId')
-  const now = jstNow()
+  const target = await getFriendFieldById(db, c.fieldId)
+  if (!target) throw new Error(`friend_field action: field not found: ${c.fieldId}`)
 
   if (c.op === 'clear') {
     await db
@@ -549,7 +557,7 @@ async function applyFriendField(
     return
   }
 
-  let next = c.value ?? ''
+  let raw: unknown = c.value ?? ''
   if (c.op === 'add' || c.op === 'sub') {
     const current = await db
       .prepare(`SELECT value FROM friend_field_values WHERE friend_id = ? AND field_id = ?`)
@@ -559,18 +567,18 @@ async function applyFriendField(
     const delta = Number(c.value ?? 0)
     const safeBase = Number.isFinite(base) ? base : 0
     const safeDelta = Number.isFinite(delta) ? delta : 0
-    next = String(c.op === 'add' ? safeBase + safeDelta : safeBase - safeDelta)
+    raw = String(c.op === 'add' ? safeBase + safeDelta : safeBase - safeDelta)
   }
 
-  await db
-    .prepare(
-      `INSERT INTO friend_field_values (friend_id, field_id, value, updated_by, updated_at)
-       VALUES (?, ?, ?, 'scenario', ?)
-       ON CONFLICT (friend_id, field_id)
-       DO UPDATE SET value = excluded.value, updated_by = 'scenario', updated_at = excluded.updated_at`,
-    )
-    .bind(friendId, c.fieldId, next, now)
-    .run()
+  const checked = validateFriendFieldValue(target, raw)
+  if (!checked.ok) throw new Error(`invalid friend field value: ${checked.error}`)
+  await setFriendFieldValue(db, {
+    friendId,
+    fieldId: c.fieldId,
+    value: checked.value,
+    updatedBy: 'scenario',
+    field: target,
+  })
 }
 
 /**
