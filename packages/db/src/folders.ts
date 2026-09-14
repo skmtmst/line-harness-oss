@@ -207,17 +207,14 @@ export async function countFoldersByKind(db: D1Database): Promise<Record<string,
  * 同じ形で揃っている6種別だけ。**残り9種別（`webinar` を除く）は、機械的に
  * 数えると母集団を誤るため、意図して対応表に入れていない。**
  *
- * 対応表に無い理由（#730 で扱う）:
- * - `media` / `common_var`: 一覧APIが `accountId` 単体必須で、複数アカウント
- *   横断で絞る `allowedAccountIds` 配列と前提が噛み合わない
- * - `rich_menu`: 対象テーブル(`rich_menu_groups`)の列名が `account_id`
- *   （他は `line_account_id`）で、一覧用に一般化されたスコープ取得口が無い
- * - `event`: `target_type='multi-account-dedup'` のとき、実際は複数アカウント
- *   に跨るものを代表1件だけ `line_account_id` へ「センチネル」として保存する
- *   （`apps/worker/src/routes/events.ts`）。単純な `line_account_id` の
- *   COUNTでは正しい母集団を数えられない
- * - `friend_field`: `friend_fields` テーブルに `line_account_id`/`account_id`
- *   のどちらの列も無く、アカウントで絞るという前提自体が成り立たない
+ * 対応表に無い理由:
+ * - `event`: 正しい数え方は `account_ids` JSON 基準で確定しているが（#730 調査）、
+ *   現時点では events 画面にフォルダ UI も `folders.list('event')` の利用先も無い。
+ *   使われない集計は増やさない。将来フォルダ UI を接続する票で、B視点の数え漏らし
+ *   試験と一緒に実装する（#730 裁定）。
+ * - `friend_field`: scope 表（`friend_field_scopes`）基準が正しいことは確定しているが
+ *   （#730 調査）、現時点では件数の利用先が無い。利用画面を作る時に接続する。
+ *   テナント全体の無条件集計は採らない（他テナント混入のため）（#730 裁定）。
  * - `automation` / `entry_route` / `mileage_rule` / `form`: `folder_id` 列を
  *   持つテーブルが存在せず、どの画面からも `kind` 指定で呼ばれていない
  *   （汎用フォルダ機構が未使用の種別）
@@ -245,6 +242,13 @@ export const FOLDER_ITEM_COUNT_TABLES: Partial<Record<FolderKind, {
   template: { table: 'templates', accountColumn: 'line_account_id' },
   auto_reply: { table: 'auto_replies', accountColumn: 'line_account_id' },
   broadcast: { table: 'broadcasts', accountColumn: 'line_account_id' },
+  // #730: media / common_var / rich_menu は一覧が単一アカウントに閉じて
+  // いるため、単一アカウント方式で数える。common_var は一覧と同じく
+  // archived（archived_at IS NOT NULL）を除く。media の kind 等の追加絞りは
+  // 件数へ入れず、選択中アカウント内のフォルダ総数にする（#631 の流儀）。
+  media: { table: 'media', accountColumn: 'line_account_id' },
+  common_var: { table: 'common_vars', accountColumn: 'line_account_id', listFilter: 'archived_at IS NULL' },
+  rich_menu: { table: 'rich_menu_groups', accountColumn: 'account_id' },
 };
 
 export interface FolderItemCountScope {

@@ -1388,7 +1388,9 @@ friendAttributes.get('/api/folders', async (c) => {
 
     const itemCounts = await getFolderItemCounts(c.env.DB, kind, {
       allowedAccountIds: requestedAccountId ? [requestedAccountId] : scope.allowedAccountIds,
-      canSeeUnassigned: scope.canSeeUnassigned,
+      // #730: account_id 指定（一覧画面が選んだ1件）は、その1件に閉じた母集団で
+      // 数える。未割当の NULL 行は単一アカウントの一覧に一切出ないため含めない。
+      canSeeUnassigned: requestedAccountId ? false : scope.canSeeUnassigned,
     });
     return c.json({
       success: true,

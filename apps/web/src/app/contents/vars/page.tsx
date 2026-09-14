@@ -131,7 +131,8 @@ function VarsPageInner() {
     try {
       const [vars, folderList] = await Promise.all([
         api.commonVars.list(accountAtRequest),
-        api.folders.list('common_var'),
+        // #730: 選択中の1件に閉じた母集団で数える。
+        api.folders.list('common_var', accountAtRequest),
       ])
       if (accountAtRequest !== latestAccountRef.current) return
       if (vars.success) {

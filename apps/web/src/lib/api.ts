@@ -5410,8 +5410,8 @@ export const api = {
      * （#730）では省かれる（`undefined`）。**`0` と紛れないよう、
      * 呼び出し側は存在チェックしてから使うこと。**
      */
-    list: (kind?: string) =>
-      fetchApi<ApiResponse<Folder[]> & { unfiledCount?: number }>(`/api/folders${kind ? `?kind=${kind}` : ''}`),
+    list: (kind?: string, accountId?: string) =>
+      fetchApi<ApiResponse<Folder[]> & { unfiledCount?: number }>(`/api/folders${kind ? `?kind=${kind}` : ''}${kind && accountId ? `&account_id=${encodeURIComponent(accountId)}` : ''}`),
     /** 色（#RRGGBB）はフォルダに付く。中身の印にこの色が出る。 */
     create: (data: { kind: string; name: string; parentId?: string | null; color?: string | null }) =>
       fetchApi<ApiResponse<Folder>>('/api/folders', {
