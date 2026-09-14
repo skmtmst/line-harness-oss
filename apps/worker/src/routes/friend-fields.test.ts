@@ -28,6 +28,8 @@ const mocks = {
   getFriendFieldsWithValues: vi.fn(),
   getFriendById: vi.fn(),
   setFriendFieldValue: vi.fn(),
+  setFriendFieldValuesBulk: vi.fn(),
+  jstNow: () => '2026-09-14T00:00:00.000+09:00',
   recordLoginAudit: vi.fn(),
   validateFriendFieldValue: vi.fn(),
   validateFieldKey: (key: unknown) =>
@@ -565,6 +567,7 @@ describe('一括変更', () => {
     });
     expect(res.status).toBe(400);
     expect(mocks.setFriendFieldValue).not.toHaveBeenCalled();
+    expect(mocks.setFriendFieldValuesBulk).not.toHaveBeenCalled();
   });
 
   it('対象が空なら400', async () => {
@@ -606,7 +609,18 @@ describe('一括変更', () => {
       value: 'ポチ',
     });
     expect(res.status).toBe(200);
-    expect(mocks.setFriendFieldValue).toHaveBeenCalledTimes(2);
+    // N-046(#812): 書き込みは1回のbatchにまとめる。
+    expect(mocks.setFriendFieldValue).not.toHaveBeenCalled();
+    expect(mocks.setFriendFieldValuesBulk).toHaveBeenCalledTimes(1);
+    expect(mocks.setFriendFieldValuesBulk).toHaveBeenCalledWith(expect.anything(), {
+      fieldId: 'ff-1',
+      entries: [
+        { friendId: 'f-1', value: 'ポチ' },
+        { friendId: 'f-2', value: 'ポチ' },
+      ],
+      updatedBy: 'u-1',
+      now: '2026-09-14T00:00:00.000+09:00',
+    });
   });
 });
 
@@ -631,7 +645,7 @@ describe('一括変更のアカウント境界（N-043）', () => {
       value: 'ポチ',
     });
     expect(res.status).toBe(200);
-    expect(mocks.setFriendFieldValue).toHaveBeenCalledTimes(2);
+    expect(mocks.setFriendFieldValuesBulk).toHaveBeenCalledTimes(1);
     expect(accountMocks.getVisibleLineAccountScope).toHaveBeenCalledWith(
       env.DB,
       expect.objectContaining({ id: 'u-1' }),
@@ -653,6 +667,7 @@ describe('一括変更のアカウント境界（N-043）', () => {
     });
     expect(res.status).toBe(404);
     expect(mocks.setFriendFieldValue).not.toHaveBeenCalled();
+    expect(mocks.setFriendFieldValuesBulk).not.toHaveBeenCalled();
     const text = await res.text();
     expect(text).not.toContain('account-2');
     expect(text).not.toContain('秘密の値');
@@ -668,6 +683,7 @@ describe('一括変更のアカウント境界（N-043）', () => {
     });
     expect(res.status).toBe(404);
     expect(mocks.setFriendFieldValue).not.toHaveBeenCalled();
+    expect(mocks.setFriendFieldValuesBulk).not.toHaveBeenCalled();
     const text = await res.text();
     expect(text).not.toContain('account-2');
     expect(text).not.toContain('秘密の値');
@@ -682,7 +698,7 @@ describe('一括変更のアカウント境界（N-043）', () => {
       value: 'ポチ',
     });
     expect(res.status).toBe(200);
-    expect(mocks.setFriendFieldValue).toHaveBeenCalledTimes(2);
+    expect(mocks.setFriendFieldValuesBulk).toHaveBeenCalledTimes(1);
   });
 
   it('全部が他アカウントでも404で更新しない', async () => {
@@ -695,6 +711,7 @@ describe('一括変更のアカウント境界（N-043）', () => {
     });
     expect(res.status).toBe(404);
     expect(mocks.setFriendFieldValue).not.toHaveBeenCalled();
+    expect(mocks.setFriendFieldValuesBulk).not.toHaveBeenCalled();
     const text = await res.text();
     expect(text).not.toContain('account-2');
   });
@@ -709,6 +726,7 @@ describe('一括変更のアカウント境界（N-043）', () => {
     });
     expect(res.status).toBe(404);
     expect(mocks.setFriendFieldValue).not.toHaveBeenCalled();
+    expect(mocks.setFriendFieldValuesBulk).not.toHaveBeenCalled();
     expect(mocks.getFriendFieldByIdForScope).not.toHaveBeenCalled();
   });
 
@@ -723,6 +741,7 @@ describe('一括変更のアカウント境界（N-043）', () => {
     });
     expect(res.status).toBe(404);
     expect(mocks.setFriendFieldValue).not.toHaveBeenCalled();
+    expect(mocks.setFriendFieldValuesBulk).not.toHaveBeenCalled();
   });
 
   it('存在しない友だち混じりは404で更新しない', async () => {
@@ -735,6 +754,7 @@ describe('一括変更のアカウント境界（N-043）', () => {
     });
     expect(res.status).toBe(404);
     expect(mocks.setFriendFieldValue).not.toHaveBeenCalled();
+    expect(mocks.setFriendFieldValuesBulk).not.toHaveBeenCalled();
     const text = await res.text();
     expect(text).not.toContain('f-ghost');
   });
@@ -746,7 +766,7 @@ describe('一括変更のアカウント境界（N-043）', () => {
     const second = await req(makeApp(), '/api/friend-fields/bulk', 'POST', body);
     expect(first.status).toBe(200);
     expect(second.status).toBe(200);
-    expect(mocks.setFriendFieldValue).toHaveBeenCalledTimes(4);
+    expect(mocks.setFriendFieldValuesBulk).toHaveBeenCalledTimes(2);
   });
 });
 
@@ -905,19 +925,24 @@ describe('値の型検証（N-042 一括）', () => {
     const body = (await res.json()) as { code: string };
     expect(body.code).toBe('FIELD_VALUE_INVALID');
     expect(mocks.setFriendFieldValue).not.toHaveBeenCalled();
+    expect(mocks.setFriendFieldValuesBulk).not.toHaveBeenCalled();
   });
 
   it('通った値は正規化して人数ぶん保存する', async () => {
     mocks.getFriendFieldByIdForScope.mockResolvedValue({ ...NUMBER_FIELD, line_account_id: 'account-1', tenant_id: 'tenant-1', is_inherited: 0 });
     const res = await req(makeApp(), '/api/friend-fields/bulk', 'POST', bulk('ff-num', '1,000'));
     expect(res.status).toBe(200);
-    expect(mocks.setFriendFieldValue).toHaveBeenCalledTimes(2);
-    expect(mocks.setFriendFieldValue).toHaveBeenCalledWith(expect.anything(), {
-      friendId: 'f-1',
+    // N-046(#812): 正規化ずみを1回のbatchにまとめる。
+    expect(mocks.setFriendFieldValue).not.toHaveBeenCalled();
+    expect(mocks.setFriendFieldValuesBulk).toHaveBeenCalledTimes(1);
+    expect(mocks.setFriendFieldValuesBulk).toHaveBeenCalledWith(expect.anything(), {
       fieldId: 'ff-num',
-      value: '1000',
+      entries: [
+        { friendId: 'f-1', value: '1000' },
+        { friendId: 'f-2', value: '1000' },
+      ],
       updatedBy: 'u-1',
-      field: expect.objectContaining({ type: 'number' }),
+      now: '2026-09-14T00:00:00.000+09:00',
     });
   });
 
@@ -925,12 +950,15 @@ describe('値の型検証（N-042 一括）', () => {
     mocks.getFriendFieldByIdForScope.mockResolvedValue({ ...SELECT_FIELD, line_account_id: 'account-1', tenant_id: 'tenant-1', is_inherited: 0 });
     const res = await req(makeApp(), '/api/friend-fields/bulk', 'POST', bulk('ff-sel', '柴犬'));
     expect(res.status).toBe(200);
-    expect(mocks.setFriendFieldValue).toHaveBeenCalledWith(expect.anything(), {
-      friendId: 'f-1',
+    expect(mocks.setFriendFieldValue).not.toHaveBeenCalled();
+    expect(mocks.setFriendFieldValuesBulk).toHaveBeenCalledWith(expect.anything(), {
       fieldId: 'ff-sel',
-      value: 'opt-1',
+      entries: [
+        { friendId: 'f-1', value: 'opt-1' },
+        { friendId: 'f-2', value: 'opt-1' },
+      ],
       updatedBy: 'u-1',
-      field: expect.objectContaining({ type: 'select' }),
+      now: '2026-09-14T00:00:00.000+09:00',
     });
   });
 
@@ -938,5 +966,6 @@ describe('値の型検証（N-042 一括）', () => {
     const res = await req(makeApp('owner', null), '/api/friend-fields/bulk', 'POST', bulk('ff-1', 'ポチ'));
     expect(res.status).toBe(403);
     expect(mocks.setFriendFieldValue).not.toHaveBeenCalled();
+    expect(mocks.setFriendFieldValuesBulk).not.toHaveBeenCalled();
   });
 });

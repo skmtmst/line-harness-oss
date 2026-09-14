@@ -22,6 +22,8 @@ import {
   getFriendFieldsWithValues,
   getFriendById,
   setFriendFieldValue,
+  setFriendFieldValuesBulk,
+  jstNow,
   validateFieldKey,
   validateFriendFieldValue,
   FRIEND_FIELD_TYPES,
@@ -182,6 +184,31 @@ function validateDefaultValue(
 async function sha256(value: string): Promise<string> {
   const bytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
   return Array.from(new Uint8Array(bytes), (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+/**
+ * N-046(#812): 一括更新のIdempotency-Key検査。サーバ状態を持たず、
+ * key自体へ内容を束縛する。作り方は `ffbulk_<sha256hex>`、正準形は
+ * `v1\n<lineAccountId>\n<fieldId>\n<friendIds昇順,区切り>\n<JSON.stringify(value)>`。
+ *
+ * なし→素通し（既存互換・原子性はbatchで担保）。形式違い→400。
+ * 同一key＋同一内容→素通し（SET再実行で収束し同じ結果）。同一key＋別内容→409。
+ * account違いの流用は正準形が変わるため必ず409になり、keyを共有しない。
+ */
+async function checkBulkIdempotencyKey(
+  c: Context<Env>,
+  input: { accountId: string; fieldId: string; friendIds: string[]; value: string | null },
+): Promise<Response | null> {
+  const raw = c.req.header('Idempotency-Key')?.trim();
+  if (!raw) return null;
+  if (!/^ffbulk_[0-9a-f]{64}$/.test(raw)) {
+    return c.json({ success: false, code: 'INVALID_IDEMPOTENCY_KEY', error: '有効なIdempotency-Keyが必要です' }, 400);
+  }
+  const canonical = ['v1', input.accountId, input.fieldId, [...input.friendIds].sort().join(','), JSON.stringify(input.value)].join('\n');
+  if (raw !== `ffbulk_${await sha256(canonical)}`) {
+    return c.json({ success: false, code: 'IDEMPOTENCY_CONFLICT', error: '同じ送信キーを別の内容には使用できません' }, 409);
+  }
+  return null;
 }
 
 function migrationSnapshot(
@@ -876,15 +903,26 @@ friendFields.post('/api/friend-fields/bulk', requireRole('owner', 'admin'), asyn
       }
     }
 
-    for (const friendId of friendIds) {
-      await setFriendFieldValue(c.env.DB, {
-        friendId,
-        fieldId: field.id,
-        value: checked.value,
-        updatedBy: staff?.id ?? 'unknown',
-        field,
-      });
-    }
+    // N-046(#812): 冪等keyは内容に束縛する。同じkey＋同じ内容は収束再実行、
+    // 同じkey＋別内容は409、account違いの流用も409。keyなしは従来どおり。
+    // keyの正準形はクライアントが送った値そのままで作る（正規化前で一致する）。
+    const rawValue = typeof body.value === 'string' ? body.value : null;
+    const idempotencyError = await checkBulkIdempotencyKey(c, {
+      accountId: lineAccountId,
+      fieldId: field.id,
+      friendIds,
+      value: rawValue,
+    });
+    if (idempotencyError) return idempotencyError;
+
+    // N-046(#812): 書き込みは1回のbatchで原子化する。途中で1文でも失敗したら
+    // 永続変更は0件になる。値は事前validateずみの正規化ずみを使う。
+    await setFriendFieldValuesBulk(c.env.DB, {
+      fieldId: field.id,
+      entries: friendIds.map((friendId) => ({ friendId, value: checked.value })),
+      updatedBy: staff?.id ?? 'unknown',
+      now: jstNow(),
+    });
     return c.json({ success: true, data: { updated: friendIds.length } });
   } catch (err) {
     console.error('POST /api/friend-fields/bulk error:', err);
