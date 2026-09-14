@@ -595,7 +595,8 @@ describe('店舗共通の予約設定API', () => {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        name: '相談', duration_minutes: 60, base_price: 8000, is_active: 0, auto_tag_id: 'tag-b',
+        name: '相談', duration_minutes: 60, base_price: 8000, is_active: 0,
+        auto_tag_id: 'tag-b', expectedVersion: 1,
       }),
     }, env);
     expect(invalidPutTag.status).toBe(400);
@@ -604,7 +605,7 @@ describe('店舗共通の予約設定API', () => {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        name: '相談', duration_minutes: 60, base_price: 8000, is_active: 0,
+        name: '相談', duration_minutes: 60, base_price: 8000, is_active: 0, expectedVersion: 1,
       }),
     }, env);
     expect(numericInactive.status).toBe(200);
@@ -614,12 +615,12 @@ describe('店舗共通の予約設定API', () => {
     const toggled = await app.request('/api/booking/admin/menus/menu-a?account_id=account-a', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ expectedVersion: 1, is_active: false }),
+      body: JSON.stringify({ expectedVersion: 2, is_active: false }),
     }, env);
     expect(toggled.status).toBe(200);
     expect(sqlite.prepare(`SELECT name, duration_minutes, base_price, is_active, version
       FROM menus WHERE id = 'menu-a'`).get()).toEqual({
-      name: '相談', duration_minutes: 60, base_price: 8000, is_active: 0, version: 2,
+      name: '相談', duration_minutes: 60, base_price: 8000, is_active: 0, version: 3,
     });
   });
 

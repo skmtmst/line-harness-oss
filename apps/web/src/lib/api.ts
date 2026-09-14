@@ -9976,10 +9976,10 @@ export const bookingApi = {
       method: 'POST',
       body: JSON.stringify(body),
     }),
-  updateMenu: (accountId: string, id: string, body: Partial<BookingMenu>) =>
-    fetchApi<{ ok: true }>(withAccount(`/api/booking/admin/menus/${id}`, accountId), {
+  updateMenu: (accountId: string, id: string, expectedVersion: number, body: Partial<BookingMenu>) =>
+    fetchApi<{ ok: true; version: number }>(withAccount(`/api/booking/admin/menus/${id}`, accountId), {
       method: 'PUT',
-      body: JSON.stringify(body),
+      body: JSON.stringify({ ...body, expectedVersion }),
     }),
   saveMenuResources: (
     accountId: string,

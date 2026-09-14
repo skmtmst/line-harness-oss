@@ -1914,7 +1914,15 @@ booking.put('/api/booking/admin/menus/:id', requireRole('owner', 'admin'), async
     sort_order?: number;
     is_active?: boolean | number;
     auto_tag_id?: string | null;
+    expectedVersion?: number;
   } & MenuBookingRuleBody>();
+
+  // 編集窓は一覧が返した version をそのまま送る。版なしの全体上書きは
+  // 同時編集の後勝ちを黙って起こすので、必須にして拒否する。
+  const expectedVersion = Number(b.expectedVersion);
+  if (!Number.isInteger(expectedVersion) || expectedVersion < 1) {
+    return c.json({ error: 'expectedVersionは1以上の整数で指定してください' }, 400);
+  }
 
   const base = readMenuBase(b);
   if (!base.ok) return c.json({ error: base.error }, 400);
@@ -1972,16 +1980,33 @@ booking.put('/api/booking/admin/menus/:id', requireRole('owner', 'admin'), async
     values.push(value);
   }
 
-  await c.env.DB
+  // version を WHERE に入れて読んだ時点の行へだけ書き、成功時だけ 1 進める。
+  // PATCH /resources と同じ形で、ずれていたら現在版を返して読み直させる。
+  const result = await c.env.DB
     .prepare(
       `UPDATE menus
           SET ${sets.join(', ')},
+              version = version + 1,
               updated_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')
-        WHERE id = ? AND line_account_id = ?`,
+        WHERE id = ? AND line_account_id = ? AND deleted_at IS NULL AND version = ?`,
     )
-    .bind(...values, id, accountId)
+    .bind(...values, id, accountId, expectedVersion)
     .run();
-  return c.json({ ok: true });
+  if ((result.meta.changes ?? 0) > 0) {
+    return c.json({ ok: true, version: expectedVersion + 1 });
+  }
+  const current = await c.env.DB
+    .prepare(`SELECT version FROM menus
+        WHERE id = ? AND line_account_id = ? AND deleted_at IS NULL`)
+    .bind(id, accountId)
+    .first<{ version: number }>();
+  if (!current) return c.json({ error: 'not_found' }, 404);
+  return c.json({
+    success: false,
+    code: 'version_conflict',
+    error: '予約メニューが更新されています。読み直してください',
+    data: { currentVersion: Number(current.version) },
+  }, 409);
 });
 
 booking.patch('/api/booking/admin/menus/:id', requireRole('owner', 'admin'), async (c) => {

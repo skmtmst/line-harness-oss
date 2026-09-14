@@ -11,6 +11,7 @@ import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
 import Pagination from '@/components/shared/pagination'
+import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
 import SummaryCard from '@/components/shared/summary-card'
 import { TableHeadRow, Th } from '@/components/shared/table'
@@ -166,14 +167,6 @@ function MileagePageInner() {
   const [canAdjustMileage, setCanAdjustMileage] = useState(false)
   const overviewTotal = mileagePaginationTotal(overview)
   const rules = ruleOverview?.items ?? []
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      setOffset(0)
-      setSearch(searchInput.trim())
-    }, 300)
-    return () => window.clearTimeout(timer)
-  }, [searchInput])
 
   const loadRules = useCallback(async () => {
     const accountAtRequest = selectedAccountId
@@ -499,12 +492,21 @@ function MileagePageInner() {
         友だちごとにたまっているマイルです。どうやってたまるかは「たまる決めごと」、何と交換できるかは「使い道」で決めます。
       </NoteBar>
       <div className="mb-3 flex flex-wrap items-center gap-2">
-        <input
+        <SearchField
+          aria-label="友だちの名前で検索"
           value={searchInput}
-          onChange={(event) => setSearchInput(event.target.value)}
+          onChange={setSearchInput}
+          onClear={() => { setSearchInput(''); setSearch(''); setOffset(0) }}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') {
+              setOffset(0)
+              setSearch(searchInput.trim())
+            }
+          }}
           placeholder="友だちの名前で検索"
-          className="h-10 min-w-64 rounded-control border border-hairline bg-canvas px-3 text-sm text-ink outline-none focus:border-accent"
+          className="min-w-64 max-w-96 flex-1"
         />
+        <Button onClick={() => { setOffset(0); setSearch(searchInput.trim()) }}>検索</Button>
         <Button onClick={() => void reloadAll()}>残高を再読み込み</Button>
         <Button onClick={exportBalancesCsv} disabled={members.length === 0} className="ml-auto">この頁の残高をCSVで書き出す</Button>
       </div>
