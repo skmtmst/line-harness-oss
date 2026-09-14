@@ -352,7 +352,8 @@
     "391_booking_business_hours_configured.sql",
     "392_booking_resource_consumptions.sql",
     "393_booking_resource_version.sql",
-    "394_mileage_earning_rule_publish.sql"
+    "394_mileage_earning_rule_publish.sql",
+    "395_form_folder.sql"
   ],
-  "migrationCount": 353
+  "migrationCount": 354
 }
