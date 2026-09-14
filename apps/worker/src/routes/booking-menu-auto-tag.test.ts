@@ -173,6 +173,7 @@ describe('E-03 #657 予約メニューの自動タグ: 保存時と実行時の 
         method: 'PUT',
         body: JSON.stringify({
           name: 'カット', duration_minutes: 60, buffer_after_minutes: 0, base_price: 8000,
+          expectedVersion: 1,
           ...body,
         }),
         headers: { 'Content-Type': 'application/json' },
