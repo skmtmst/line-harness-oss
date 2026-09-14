@@ -3658,11 +3658,11 @@ export type NenPetMetrics = {
 export type NenDelivery = {
   id: string; campaignKey: string; label: string; friendId: string; friendName: string
   lineAccountName: string; scheduledAt: string; sentAt: string | null; status: string
-  attempts: number; unmetReason: string | null; reaction: NenUnavailableMetric
+  attempts: number; unmetReason: string | null; unmetReasonCode: string | null; reaction: NenUnavailableMetric
   version: number; updatedAt: string
 }
 
-export type NenSkippedReasonCode = 'friend_unavailable' | 'line_account_unavailable' | 'line_account_mismatch' | 'campaign_snapshot_missing' | 'campaign_disabled' | 'unknown'
+export type NenSkippedReasonCode = 'friend_unavailable' | 'line_account_unavailable' | 'line_account_mismatch' | 'campaign_snapshot_missing' | 'campaign_disabled' | 'campaign_form_already_submitted' | 'unknown'
 
 export type NenDeliveryList = {
   range: NenMetricsRange
