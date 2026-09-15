@@ -3,6 +3,9 @@ import {
   completedDestinationWrites,
   destinationWriteText,
   nextVisitPeople,
+  postActionsNeedRetry,
+  postActionsText,
+  postActionStepLabel,
   type FormSubmissionSummary,
 } from './response-summary'
 
@@ -49,5 +52,34 @@ describe('回答フォームの全件集計表示', () => {
     expect(destinationWriteText({ status: 'failed', attempted: 2, succeeded: 0, failed: 2 }))
       .toBe('書き込めませんでした（0/2件を書き込み）')
     expect(destinationWriteText(undefined)).toContain('取得できませんでした')
+  })
+})
+
+describe('回答後アクションの未完表示(N-168)', () => {
+  it('未完の工程名を運用者向けの言葉にする', () => {
+    expect(postActionStepLabel('reply')).toBe('確認メッセージの送信')
+    expect(postActionStepLabel('tag')).toBe('タグ付け')
+    expect(postActionStepLabel('layout:afterAction:0')).toBe('回答後アクション')
+    expect(postActionStepLabel('layout:destinations:blk1')).toBe('登録先への書き込み')
+    expect(postActionStepLabel('unknown-step')).toBe('unknown-step')
+  })
+
+  it('未完があるときだけ再実行の口を出す', () => {
+    expect(postActionsNeedRetry({ state: 'failed', pending: ['reply'] })).toBe(true)
+    expect(postActionsNeedRetry({ state: 'in_progress', pending: ['tag'] })).toBe(true)
+    expect(postActionsNeedRetry({ state: 'completed', pending: [] })).toBe(false)
+    expect(postActionsNeedRetry({ state: 'untracked', pending: [] })).toBe(false)
+    expect(postActionsNeedRetry(null)).toBe(false)
+    expect(postActionsNeedRetry(undefined)).toBe(false)
+  })
+
+  it('状態ごとに結果を言い分ける。未完なら工程名を出す', () => {
+    expect(postActionsText({ state: 'completed', pending: [] })).toBe('すべて完了')
+    expect(postActionsText({ state: 'failed', pending: ['reply', 'tag'] }))
+      .toBe('未完: 確認メッセージの送信、タグ付け')
+    expect(postActionsText({ state: 'in_progress', pending: ['reply'] }))
+      .toBe('処理中です（未完: 確認メッセージの送信）')
+    expect(postActionsText({ state: 'failed', pending: [] })).toBe('中断しています')
+    expect(postActionsText(null)).toContain('記録がありません')
   })
 })
