@@ -925,6 +925,8 @@ export type ConversionApprovalItem = {
   value: number | null
   approvalStatus: 'pending' | 'approved' | 'rejected'
   duplicateFlag: boolean
+  /** 承認済みで案件の付帯動作(タグ付与・シナリオ開始)が未完の行だけ true */
+  offerActionsIncomplete: boolean
 }
 
 export type ConversionDefinitionStatus = 'active' | 'stopped'

@@ -1330,6 +1330,22 @@ function OfferFormModal({ initial, accounts, tags, scenarios, onClose, onSaved }
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
 
+  // 選べるタグ・シナリオは「いま選んでいるLINEアカウントの有効なもの」だけに
+  // 絞る（#798）。別アカウントのものを選ばせると保存時にサーバーが止める。
+  // アカウント未選択のときは候補を出さない（先にアカウントを選ばせる）。
+  // 既存案件に古い不正参照が残っているときは、選択中の値だけ別枠で見せて
+  // 直せるようにする（黙って消すと保存のたびに参照が変わる）。
+  const accountTags = tags.filter(
+    (t) => lineAccountId !== '' && t.lineAccountId === lineAccountId && (t.status ?? 'active') === 'active',
+  )
+  const accountScenarios = scenarios.filter(
+    (s) => lineAccountId !== '' && s.lineAccountId === lineAccountId && s.isActive !== false,
+  )
+  const tagIdStale = tagId !== '' && !accountTags.some((t) => t.id === tagId)
+  const scenarioIdStale = scenarioId !== '' && !accountScenarios.some((s) => s.id === scenarioId)
+  const staleTagName = tags.find((t) => t.id === tagId)?.name
+  const staleScenarioName = scenarios.find((s) => s.id === scenarioId)?.name
+
   const handleSubmit = useCallback(async () => {
     if (submitting) return
     setFormError(null)
@@ -1365,7 +1381,9 @@ function OfferFormModal({ initial, accounts, tags, scenarios, onClose, onSaved }
           isActive,
         })
         if (!res.success) {
-          setFormError('更新に失敗しました')
+          // 失敗応答は非2xxで fetchApi が例外にするので、ここに来るのは
+          // 2xx なのに success:false の形だけ。それでも文言があれば見せる。
+          setFormError((res as { error?: string }).error ?? '更新に失敗しました')
           setSubmitting(false)
           return
         }
@@ -1380,7 +1398,7 @@ function OfferFormModal({ initial, accounts, tags, scenarios, onClose, onSaved }
           scenarioId: scenarioId || null,
         })
         if (!res.success) {
-          setFormError('作成に失敗しました')
+          setFormError((res as { error?: string }).error ?? '作成に失敗しました')
           setSubmitting(false)
           return
         }
@@ -1494,11 +1512,16 @@ function OfferFormModal({ initial, accounts, tags, scenarios, onClose, onSaved }
               className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">— 選択しない —</option>
-              {tags.map((tag) => (
+              {accountTags.map((tag) => (
                 <option key={tag.id} value={tag.id}>
                   {tag.name}
                 </option>
               ))}
+              {tagIdStale && (
+                <option value={tagId}>
+                  {staleTagName ?? tagId}（このアカウントでは使えません）
+                </option>
+              )}
             </select>
           </div>
 
@@ -1510,11 +1533,16 @@ function OfferFormModal({ initial, accounts, tags, scenarios, onClose, onSaved }
               className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">— 選択しない —</option>
-              {scenarios.map((s) => (
+              {accountScenarios.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.name}
                 </option>
               ))}
+              {scenarioIdStale && (
+                <option value={scenarioId}>
+                  {staleScenarioName ?? scenarioId}（このアカウントでは使えません）
+                </option>
+              )}
             </select>
           </div>
 
@@ -1747,6 +1775,10 @@ export function ApprovalQueue() {
   const approvalPageCount = pageCountOf(shownItems.length, pageSize)
   const currentPage = Math.min(page, approvalPageCount)
   const pagedItems = pageOf(shownItems, currentPage, pageSize)
+  // 承認済みタブで付帯動作が未完の行があるときだけ「やり直す」列を出す。
+  // 承認自体は済んでいるので、列が要らないページでは列自体を足さない。
+  const showActionRetry = status === 'approved'
+    && pagedItems.some((item) => item.offerActionsIncomplete)
   const safePendingIds = pagedItems
     .filter((item) => item.approvalStatus === 'pending' && !item.duplicateFlag)
     .map((item) => item.eventId)
@@ -1948,6 +1980,9 @@ export function ApprovalQueue() {
                 {status === 'pending' && (
                   <Th align="center">決める</Th>
                 )}
+                {showActionRetry && (
+                  <Th align="center">付帯動作</Th>
+                )}
               </TableHeadRow>
             </thead>
             <tbody className="divide-hairline divide-y">
@@ -2015,6 +2050,19 @@ export function ApprovalQueue() {
                         </AffiliateButton>
                         <AffiliateButton onClick={() => setDetailItem(item)}>見る</AffiliateButton>
                       </div>
+                    </td>
+                  )}
+                  {showActionRetry && (
+                    <td className="px-4 py-3 text-center">
+                      {item.offerActionsIncomplete && (
+                        <AffiliateButton
+                          onClick={() => { void handleApprove(item.eventId, 'approved') }}
+                          disabled={actioning !== null}
+                          title="承認は済んでいます。案件に設定されたタグ付与・シナリオ開始だけをやり直します"
+                        >
+                          付帯動作をやり直す
+                        </AffiliateButton>
+                      )}
                     </td>
                   )}
                 </tr>
