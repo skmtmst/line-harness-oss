@@ -421,6 +421,10 @@ export interface CommonVar {
   varKey: string;
   type: "text" | "url" | "image" | "number" | "long_text" | "date" | "datetime" | "boolean";
   value: string;
+  validFrom: string | null;
+  validUntil: string | null;
+  fallbackValue: string | null;
+  expiryBehavior: "stop" | "fallback";
   createdAt: string;
   updatedAt: string;
   nextSchedule?: {
