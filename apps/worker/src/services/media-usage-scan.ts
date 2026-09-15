@@ -1,4 +1,6 @@
 import {
+  getMediaUsageMatchTokenMap,
+  getMediaUsageMatchTokens,
   getMediaUsageScanState,
   recordMediaUsage,
   recordMediaUsages,
@@ -55,27 +57,51 @@ type MediaToScan = { id: string; r2_key: string };
 const MAX_SOURCE_ROWS = 4_000;
 const MAX_USAGE_WRITES = 4_000;
 const MAX_PRUNE_ROWS = 1_000;
+/** LIKEのbind数が上限を超えないよう、1問い合わせのトークン数を絞る。 */
+const MATCH_TOKEN_CHUNK = 24;
 
 function isMissingSourceTable(error: unknown, table: string): boolean {
   const message = error instanceof Error ? error.message : String(error);
   return message.includes('no such table') && message.includes(table);
 }
 
+/**
+ * メディアを指す本文中の文字列。
+ *
+ * 固定参照は版ごとのr2_key（旧版を指すものも使用中）、ライブ参照は
+ * メディアIDの公開パス `/media/<id>/content`。どちらもr2_key基準の
+ * 走査と同じ LIKE 照合で拾えるよう、トークンとしてまとめて渡す。
+ */
+function usageMatchTokens(item: MediaToScan, versionTokens: string[]): string[] {
+  return [...new Set([item.r2_key, ...versionTokens])].filter((token) => token.length > 0);
+}
+
 async function findMatches(
   db: D1Database,
-  item: MediaToScan,
+  tokens: string[],
 ): Promise<Array<{ refKind: MediaRefKind; refId: string }>> {
   const matches: Array<{ refKind: MediaRefKind; refId: string }> = [];
+  const seen = new Set<string>();
   for (const source of SOURCES) {
-    const conditions = source.columns.map((col) => `${col} LIKE ?`).join(' OR ');
-    const binds = source.columns.map(() => `%${item.r2_key}%`);
-    const rows = await db
-      .prepare(
-        `SELECT ${source.idColumn} AS ref_id FROM ${source.table} WHERE ${conditions}`,
-      )
-      .bind(...binds)
-      .all<{ ref_id: string }>();
-    for (const row of rows.results) matches.push({ refKind: source.refKind, refId: row.ref_id });
+    for (let index = 0; index < tokens.length; index += MATCH_TOKEN_CHUNK) {
+      const chunk = tokens.slice(index, index + MATCH_TOKEN_CHUNK);
+      const conditions = source.columns
+        .flatMap((col) => chunk.map(() => `${col} LIKE ?`))
+        .join(' OR ');
+      const binds = source.columns.flatMap(() => chunk.map((token) => `%${token}%`));
+      const rows = await db
+        .prepare(
+          `SELECT ${source.idColumn} AS ref_id FROM ${source.table} WHERE ${conditions}`,
+        )
+        .bind(...binds)
+        .all<{ ref_id: string }>();
+      for (const row of rows.results) {
+        const key = `${source.refKind}:${row.ref_id}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        matches.push({ refKind: source.refKind, refId: row.ref_id });
+      }
+    }
   }
   return matches;
 }
@@ -91,7 +117,10 @@ export async function scanSingleMediaUsage(
   now: string,
   item: MediaToScan,
 ): Promise<ScanResult> {
-  const matches = await findMatches(db, item);
+  const matches = await findMatches(
+    db,
+    usageMatchTokens(item, await getMediaUsageMatchTokens(db, item.id)),
+  );
   for (const match of matches) {
     await recordMediaUsage(db, {
       mediaId: item.id,
@@ -167,6 +196,12 @@ export async function scanMediaUsage(
   }
 
   const source = SOURCES[sourceIndex];
+  // 固定参照の版r2_key（旧版も）とライブ参照パスをメディアごとの
+  // 照合トークンとしてまとめて取る。
+  const tokenMap = await getMediaUsageMatchTokenMap(
+    db,
+    media.results.map((item) => item.id),
+  );
   // 参照行と使用先の既存行確認を各4,000件までにし、media 500件・state 1件を
   // 足しても1回のcronで読むDB行を1万件未満に固定する。
   const rowLimit = Math.min(Math.max(opts.sourceRowLimit ?? 1_000, 1), MAX_SOURCE_ROWS);
@@ -200,7 +235,8 @@ export async function scanMediaUsage(
       .join('\n');
     const rowUsages: typeof usages = [];
     for (const item of media.results) {
-      if (item.r2_key && searchable.includes(item.r2_key)) {
+      const tokens = usageMatchTokens(item, tokenMap.get(item.id) ?? []);
+      if (tokens.some((token) => searchable.includes(token))) {
         rowUsages.push({ mediaId: item.id, refKind: source.refKind, refId: String(row.ref_id) });
       }
     }

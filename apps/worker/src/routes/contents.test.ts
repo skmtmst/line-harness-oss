@@ -26,6 +26,12 @@ class MockCommonVarKeyConflictError extends Error {
   }
 }
 
+class MockMediaUsageReferenceError extends Error {
+  constructor(readonly code: string) {
+    super(code);
+  }
+}
+
 const mocks = {
   getMedia: vi.fn(),
   countMedia: vi.fn(),
@@ -39,6 +45,20 @@ const mocks = {
   getMediaReplacementPlan: vi.fn(),
   applyMediaReplacementPlan: vi.fn(),
   getMediaStorageQuota: vi.fn(),
+  getMediaVersionList: vi.fn(),
+  getMediaLiveTarget: vi.fn(),
+  getMediaUsageReferenceStates: vi.fn(),
+  retargetMediaUsageReference: vi.fn(),
+  MediaUsageReferenceError: MockMediaUsageReferenceError,
+  MEDIA_REF_KINDS: [
+    'template',
+    'broadcast',
+    'rich_menu',
+    'scenario_step',
+    'nen_column',
+    'event',
+    'webinar',
+  ],
   createMediaUploadSession: vi.fn(),
   getMediaUploadSession: vi.fn(),
   failMediaUploadSession: vi.fn(),
@@ -288,6 +308,13 @@ beforeEach(() => {
   mocks.getMediaReplacementPlan.mockResolvedValue(REPLACEMENT_PLAN);
   mocks.applyMediaReplacementPlan.mockResolvedValue(1);
   mocks.getMediaStorageQuota.mockResolvedValue(QUOTA);
+  mocks.getMediaVersionList.mockResolvedValue([]);
+  mocks.getMediaUsageReferenceStates.mockResolvedValue([]);
+  mocks.getMediaLiveTarget.mockResolvedValue(null);
+  mocks.retargetMediaUsageReference.mockResolvedValue({
+    changed: true,
+    state: { mode: 'live', versionNo: null },
+  });
   mocks.createMediaUploadSession.mockResolvedValue(UPLOAD_SESSION);
   mocks.getMediaUploadSession.mockResolvedValue(UPLOAD_SESSION);
   mocks.verifyMediaUploadSession.mockResolvedValue({
