@@ -19,6 +19,7 @@ const fixture = vi.hoisted(() => {
     replace: vi.fn(),
     update: vi.fn(),
     fetchApi: vi.fn(),
+    staffMe: vi.fn(),
   }
 })
 
@@ -52,6 +53,7 @@ vi.mock('@/lib/api', () => ({
     scenarios: { list: async () => ({ success: true, data: [] }) },
     pools: { list: async () => ({ success: true, data: [] }) },
     templates: { list: async () => ({ success: true, data: [] }) },
+    staff: { me: fixture.staffMe },
   },
 }))
 
@@ -74,6 +76,10 @@ beforeEach(() => {
   fixture.fetchApi.mockReset().mockImplementation(async (path: string) => {
     if (path.startsWith('/api/analytics/ref/')) return { success: true, data: { friends: [] } }
     return { success: true }
+  })
+  fixture.staffMe.mockReset().mockResolvedValue({
+    success: true,
+    data: { role: 'owner' },
   })
 })
 
@@ -163,5 +169,28 @@ describe('流入経路の削除確認操作 (N-246/N-250 #906)', () => {
 
     await act(async () => { release?.() })
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+  })
+
+  it('staffは編集と受付停止を使えるが、完全削除は表示しない', async () => {
+    fixture.staffMe.mockResolvedValue({
+      success: true,
+      data: { role: 'staff', permissionKeys: ['/inflow-links'] },
+    })
+    render(<InflowLinkDetailPage />)
+
+    expect(await screen.findByRole('button', { name: 'この経路を編集' })).toBeTruthy()
+    const opener = await screen.findByRole('button', { name: '店頭QRの受付停止を確認' })
+    await act(async () => { fireEvent.click(opener) })
+    const dialog = await screen.findByRole('dialog')
+
+    expect(within(dialog).queryByRole('button', { name: /このまま削除する/ })).toBeNull()
+    await act(async () => {
+      fireEvent.click(within(dialog).getByRole('button', { name: '受けるのをやめる' }))
+    })
+    expect(fixture.update).toHaveBeenCalledWith(route.id, { isActive: false })
+    expect(fixture.fetchApi).not.toHaveBeenCalledWith(
+      `/api/entry-routes/${route.id}`,
+      expect.objectContaining({ method: 'DELETE' }),
+    )
   })
 })

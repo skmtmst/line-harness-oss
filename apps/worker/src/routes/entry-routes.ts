@@ -1,4 +1,4 @@
-import { Hono } from 'hono';
+import { Hono, type MiddlewareHandler } from 'hono';
 import {
   getEntryRoutes,
   getEntryRouteById,
@@ -18,6 +18,26 @@ import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 import { resolveRequestBoundary } from '../services/request-boundary.js';
 
 const entryRoutes = new Hono<Env>();
+const INFLOW_LINKS_PERMISSION = '/inflow-links';
+
+/**
+ * 流入経路の運用は、役割ではなく画面権限にも委譲する。
+ * 完全削除は不可逆なので、この門番を使わず従来どおり owner/admin に限定する。
+ */
+function requireEntryRouteManagement(): MiddlewareHandler<Env> {
+  return async (c, next) => {
+    const staff = c.get('staff');
+    const allowed = staff && (
+      staff.role === 'owner'
+      || staff.role === 'admin'
+      || (staff.role === 'staff' && staff.permissionKeys?.includes(INFLOW_LINKS_PERMISSION))
+    );
+    if (!allowed) {
+      return c.json({ success: false, error: 'この機能を操作する権限がありません' }, 403);
+    }
+    return next();
+  };
+}
 
 function serialize(row: EntryRoute) {
   return {
@@ -149,7 +169,7 @@ entryRoutes.get('/api/entry-routes/:id', async (c) => {
 });
 
 // POST /api/entry-routes — create
-entryRoutes.post('/api/entry-routes', requireRole('owner', 'admin'), async (c) => {
+entryRoutes.post('/api/entry-routes', requireEntryRouteManagement(), async (c) => {
   try {
     const body = await c.req.json<{
       refCode: string;
@@ -188,7 +208,7 @@ entryRoutes.post('/api/entry-routes', requireRole('owner', 'admin'), async (c) =
 });
 
 // PATCH /api/entry-routes/:id — update
-entryRoutes.patch('/api/entry-routes/:id', requireRole('owner', 'admin'), async (c) => {
+entryRoutes.patch('/api/entry-routes/:id', requireEntryRouteManagement(), async (c) => {
   try {
     const id = c.req.param('id');
     const tenantId = c.get('staff').tenantId ?? DEFAULT_TENANT_ID;
