@@ -1,12 +1,15 @@
 import {
   getAccountSetting,
+  getTenantBilling,
   getVersionedAccountSetting,
   recordAuditEvent,
 } from '@line-crm/db';
 import {
+  FEATURE_CATALOG,
   featureCatalogEntry,
   type FeatureId,
 } from '@line-crm/shared';
+import { featureContractIsAvailable, resolveEntitlements } from './billing-plans.js';
 
 const FEATURE_SETTINGS_BUNDLE_KEY = 'feature.settings_bundle_v1';
 
@@ -385,30 +388,215 @@ export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
   },
 ];
 
-export async function accountFeatureIsEnabled(
+async function accountCompanyFeatureSettings(
   db: D1Database,
   accountId: string,
-  featureId: FeatureId,
-): Promise<boolean> {
+  featureIds: readonly FeatureId[],
+): Promise<Partial<Record<FeatureId, boolean>>> {
   const bundle = await getVersionedAccountSetting<FeatureSettingsBundle>(
     db,
     accountId,
     FEATURE_SETTINGS_BUNDLE_KEY,
   );
-  const bundled = bundle?.data.features?.[featureId];
-  if (typeof bundled === 'boolean') return bundled;
+  const entries = await Promise.all(featureIds.map(async (featureId) => {
+    const bundled = bundle?.data.features?.[featureId];
+    if (typeof bundled === 'boolean') return [featureId, bundled] as const;
 
-  const legacy = await getAccountSetting(db, accountId, `feature.${featureId}`);
-  if (legacy) {
-    try {
-      const parsed = JSON.parse(legacy) as boolean | { enabled?: boolean };
-      if (typeof parsed === 'boolean') return parsed;
-      if (typeof parsed.enabled === 'boolean') return parsed.enabled;
-    } catch {
-      // 壊れた旧値はカタログの既定値へ戻す。設定画面の読取と同じ扱い。
+    const legacy = await getAccountSetting(db, accountId, `feature.${featureId}`);
+    if (legacy) {
+      try {
+        const parsed = JSON.parse(legacy) as boolean | { enabled?: boolean };
+        if (typeof parsed === 'boolean') return [featureId, parsed] as const;
+        if (typeof parsed.enabled === 'boolean') return [featureId, parsed.enabled] as const;
+      } catch {
+        // 壊れた旧値はカタログの既定値へ戻す。設定画面の読取と同じ扱い。
+      }
     }
+    return [featureId, featureCatalogEntry(featureId).defaultEnabled] as const;
+  }));
+  return Object.fromEntries(entries) as Partial<Record<FeatureId, boolean>>;
+}
+
+export type FeatureUnavailableReason =
+  | 'contract_unavailable'
+  | 'company_disabled'
+  | 'dependency_disabled';
+
+export type FeatureAvailability = {
+  featureId: FeatureId;
+  contractAvailable: boolean;
+  companyEnabled: boolean;
+  dependenciesEnabled: boolean;
+  effectiveEnabled: boolean;
+  reason: FeatureUnavailableReason | null;
+  message: string | null;
+  disabledDependencies: FeatureId[];
+};
+
+export type FeatureAvailabilityRequestContext = {
+  tenantIdsByAccount: ReadonlyMap<string, string | null>;
+  entitlementsByTenant: Map<string, Promise<ReturnType<typeof resolveEntitlements>>>;
+};
+
+/** 同じHTTP request内で、account所属とtenant料金を使い回す。request外へ持ち出さない。 */
+export function createFeatureAvailabilityRequestContext(
+  accounts: readonly { id: string; tenant_id: string | null }[] = [],
+): FeatureAvailabilityRequestContext {
+  return {
+    tenantIdsByAccount: new Map(accounts.map((account) => [account.id, account.tenant_id])),
+    entitlementsByTenant: new Map(),
+  };
+}
+
+async function tenantEntitlements(
+  db: D1Database,
+  tenantId: string,
+  context?: FeatureAvailabilityRequestContext,
+): Promise<ReturnType<typeof resolveEntitlements>> {
+  const load = async () => resolveEntitlements(await getTenantBilling(db, tenantId));
+  if (!context) return load();
+  const cached = context.entitlementsByTenant.get(tenantId);
+  if (cached) return cached;
+  const pending = load();
+  context.entitlementsByTenant.set(tenantId, pending);
+  return pending;
+}
+
+async function contractAvailability(
+  db: D1Database,
+  accountId: string,
+  featureIds: readonly FeatureId[] = FEATURE_CATALOG.map(({ featureId }) => featureId),
+  context?: FeatureAvailabilityRequestContext,
+): Promise<Record<FeatureId, boolean>> {
+  const allIncluded = featureIds.every(
+    (featureId) => featureCatalogEntry(featureId).entitlementKey === 'included',
+  );
+  if (allIncluded || typeof db.prepare !== 'function') {
+    return Object.fromEntries(
+      FEATURE_CATALOG.map(({ featureId }) => [featureId, true]),
+    ) as Record<FeatureId, boolean>;
   }
-  return featureCatalogEntry(featureId).defaultEnabled;
+  // 古い試験・移行行のようにアカウント所有者を解決できない場合は、従来どおり
+  // 契約で止めない。実アカウントは tenant_id から必ず料金状態を読む。
+  const tenantKnown = context?.tenantIdsByAccount.has(accountId) ?? false;
+  const tenantId = tenantKnown
+    ? context!.tenantIdsByAccount.get(accountId) ?? null
+    : (await db.prepare('SELECT tenant_id FROM line_accounts WHERE id = ?')
+      .bind(accountId).first<{ tenant_id: string | null }>())?.tenant_id ?? null;
+  const entitlements = tenantId
+    ? await tenantEntitlements(db, tenantId, context)
+    : resolveEntitlements(null);
+  return Object.fromEntries(FEATURE_CATALOG.map((entry) => [
+    entry.featureId,
+    featureContractIsAvailable(entitlements, entry.entitlementKey),
+  ])) as Record<FeatureId, boolean>;
+}
+
+function resolveFeatureAvailability(
+  featureId: FeatureId,
+  companySettings: Partial<Record<FeatureId, boolean>>,
+  contracts: Record<FeatureId, boolean>,
+  resolved: Map<FeatureId, FeatureAvailability>,
+): FeatureAvailability {
+  const cached = resolved.get(featureId);
+  if (cached) return cached;
+  const entry = featureCatalogEntry(featureId);
+  const dependencies = entry.dependencies as readonly FeatureId[];
+  const disabledDependencies = dependencies.filter(
+    (dependency) => !resolveFeatureAvailability(
+      dependency,
+      companySettings,
+      contracts,
+      resolved,
+    ).effectiveEnabled,
+  );
+  const contractAvailable = contracts[featureId];
+  const companyEnabled = companySettings[featureId] ?? entry.defaultEnabled;
+  const dependenciesEnabled = disabledDependencies.length === 0;
+  const reason: FeatureUnavailableReason | null = !contractAvailable
+    ? 'contract_unavailable'
+    : !companyEnabled
+      ? 'company_disabled'
+      : !dependenciesEnabled
+        ? 'dependency_disabled'
+        : null;
+  const message = reason === 'contract_unavailable'
+    ? 'ご契約ではこの機能を利用できません'
+    : reason === 'company_disabled'
+      ? 'この機能は設定でオフになっています'
+      : reason === 'dependency_disabled'
+        ? '必要な機能がオフになっているため利用できません'
+        : null;
+  const state: FeatureAvailability = {
+    featureId,
+    contractAvailable,
+    companyEnabled,
+    dependenciesEnabled,
+    effectiveEnabled: reason === null,
+    reason,
+    message,
+    disabledDependencies,
+  };
+  resolved.set(featureId, state);
+  return state;
+}
+
+export async function accountFeatureAvailabilityMap(
+  db: D1Database,
+  accountId: string,
+  knownCompanySettings?: Partial<Record<FeatureId, boolean>>,
+  context?: FeatureAvailabilityRequestContext,
+): Promise<Record<FeatureId, FeatureAvailability>> {
+  const missingFeatureIds = FEATURE_CATALOG
+    .map(({ featureId }) => featureId)
+    .filter((featureId) => typeof knownCompanySettings?.[featureId] !== 'boolean');
+  const [loadedCompanySettings, contracts] = await Promise.all([
+    missingFeatureIds.length > 0
+      ? accountCompanyFeatureSettings(db, accountId, missingFeatureIds)
+      : Promise.resolve({}),
+    contractAvailability(db, accountId, undefined, context),
+  ]);
+  const companySettings = {
+    ...loadedCompanySettings,
+    ...knownCompanySettings,
+  } as Record<FeatureId, boolean>;
+  const resolved = new Map<FeatureId, FeatureAvailability>();
+  return Object.fromEntries(
+    FEATURE_CATALOG.map(({ featureId }) => [
+      featureId,
+      resolveFeatureAvailability(featureId, companySettings, contracts, resolved),
+    ]),
+  ) as Record<FeatureId, FeatureAvailability>;
+}
+
+export async function accountFeatureAvailability(
+  db: D1Database,
+  accountId: string,
+  featureId: FeatureId,
+  context?: FeatureAvailabilityRequestContext,
+): Promise<FeatureAvailability> {
+  const requiredFeatureIds = new Set<FeatureId>();
+  const collect = (current: FeatureId): void => {
+    if (requiredFeatureIds.has(current)) return;
+    requiredFeatureIds.add(current);
+    for (const dependency of featureCatalogEntry(current).dependencies as readonly FeatureId[]) {
+      collect(dependency);
+    }
+  };
+  collect(featureId);
+  const [companySettings, contracts] = await Promise.all([
+    accountCompanyFeatureSettings(db, accountId, [...requiredFeatureIds]),
+    contractAvailability(db, accountId, [...requiredFeatureIds], context),
+  ]);
+  return resolveFeatureAvailability(featureId, companySettings, contracts, new Map());
+}
+
+export async function accountFeatureIsEnabled(
+  db: D1Database,
+  accountId: string,
+  featureId: FeatureId,
+): Promise<boolean> {
+  return (await accountFeatureAvailability(db, accountId, featureId)).effectiveEnabled;
 }
 
 export async function recordFeatureExecutionSkipped(

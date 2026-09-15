@@ -3,7 +3,11 @@ import type { FeatureId } from '@line-crm/shared';
 import type { Env } from '../index.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
 import { dbFor } from '../services/db-router.js';
-import { accountFeatureIsEnabled } from '../services/feature-enforcement.js';
+import {
+  accountFeatureAvailability,
+  createFeatureAvailabilityRequestContext,
+  type FeatureAvailability,
+} from '../services/feature-enforcement.js';
 
 export type RouteClassification =
   | { kind: 'feature'; featureId: FeatureId }
@@ -394,21 +398,33 @@ export const featureEnforcementMiddleware: MiddlewareHandler<Env> = async (c, ne
   const accountIds = await requestAccountIds(c);
   const staff = c.get('staff');
   const db = dbFor(c.env);
-  if (accountIds.length === 0 && c.req.method === 'GET' && staff) {
+  const isReadOperation = c.req.method === 'GET' || c.req.method === 'HEAD';
+  if (accountIds.length === 0 && isReadOperation && staff) {
     const scope = await getVisibleLineAccountScope(db, staff);
-    const states = await Promise.all(scope.ids.map(async (accountId) => ({
-      accountId,
-      enabled: await accountFeatureIsEnabled(db, accountId, classification.featureId),
-    })));
-    const enabledIds = states.filter(({ enabled }) => enabled).map(({ accountId }) => accountId);
-    const excluded = states.length - enabledIds.length;
-    if (enabledIds.length === 0) {
+    if (scope.ids.length === 0) {
       return c.json({
         success: false,
         error: 'この機能は設定でオフになっています',
         code: 'FEATURE_DISABLED',
         featureId: classification.featureId,
       }, 403);
+    }
+    const requestContext = createFeatureAvailabilityRequestContext(scope.accounts);
+    const states = await Promise.all(scope.ids.map(async (accountId) => ({
+      accountId,
+      availability: await accountFeatureAvailability(
+        db,
+        accountId,
+        classification.featureId,
+        requestContext,
+      ),
+    })));
+    const enabledIds = states
+      .filter(({ availability }) => availabilityAllowsOperation(availability, c.req.method))
+      .map(({ accountId }) => accountId);
+    const excluded = states.length - enabledIds.length;
+    if (enabledIds.length === 0) {
+      return unavailableResponse(c, states[0]!.availability);
     }
     c.set('staff', { ...staff, featureEnabledLineAccountIds: enabledIds });
     await next();
@@ -422,6 +438,7 @@ export const featureEnforcementMiddleware: MiddlewareHandler<Env> = async (c, ne
       code: 'LINE_ACCOUNT_REQUIRED',
     }, 400);
   }
+  let requestContext: ReturnType<typeof createFeatureAvailabilityRequestContext> | undefined;
   if (staff) {
     const scope = await getVisibleLineAccountScope(db, staff);
     if (accountIds.some((accountId) => !scope.ids.includes(accountId))) {
@@ -430,15 +447,42 @@ export const featureEnforcementMiddleware: MiddlewareHandler<Env> = async (c, ne
         error: 'このLINEアカウントを操作する権限がありません',
       }, 403);
     }
+    requestContext = createFeatureAvailabilityRequestContext(scope.accounts);
   }
-  const enabled = await Promise.all(accountIds.map(
-    (accountId) => accountFeatureIsEnabled(db, accountId, classification.featureId),
+  const states = await Promise.all(accountIds.map(
+    (accountId) => accountFeatureAvailability(
+      db,
+      accountId,
+      classification.featureId,
+      requestContext,
+    ),
   ));
-  if (enabled.every(Boolean)) return next();
+  if (states.every((availability) => availabilityAllowsOperation(availability, c.req.method))) {
+    return next();
+  }
+  return unavailableResponse(
+    c,
+    states.find((availability) => !availabilityAllowsOperation(availability, c.req.method))!,
+  );
+};
+
+function availabilityAllowsOperation(availability: FeatureAvailability, method: string): boolean {
+  if (availability.effectiveEnabled) return true;
+  const readOperation = method === 'GET' || method === 'HEAD';
+  return readOperation && availability.reason === 'contract_unavailable';
+}
+
+function unavailableResponse(c: Context<Env>, availability: FeatureAvailability) {
+  const code = availability.reason === 'contract_unavailable'
+    ? 'FEATURE_NOT_ENTITLED'
+    : availability.reason === 'dependency_disabled'
+      ? 'FEATURE_DEPENDENCY_DISABLED'
+      : 'FEATURE_DISABLED';
   return c.json({
     success: false,
-    error: 'この機能は設定でオフになっています',
-    code: 'FEATURE_DISABLED',
-    featureId: classification.featureId,
+    error: availability.message,
+    code,
+    featureId: availability.featureId,
+    reason: availability.reason,
   }, 403);
-};
+}
