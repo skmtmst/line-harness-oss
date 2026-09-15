@@ -2,7 +2,7 @@
 
 import SelectField from '@/components/shared/select-field'
 import StatusBadge from '@/components/shared/status-badge'
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { api, ApiError, type BroadcastAssetKind, type TemplateQuestion } from '@/lib/api'
 import FlexPreviewComponent from '@/components/flex-preview'
 import ImageUploader from '@/components/shared/image-uploader'
@@ -114,6 +114,11 @@ function formatCount(value: number): string {
   return new Intl.NumberFormat('ja-JP').format(value)
 }
 
+/** 検索欄と検索対象を、大小文字・全半角・空白の違いで外れない形へそろえる。 */
+function normalizeTemplateSearchText(value: string): string {
+  return value.normalize('NFKC').toLocaleLowerCase('ja-JP').trim().replace(/\s+/gu, ' ')
+}
+
 export default function TemplatesPage() {
   const { selectedAccountId, accounts, loading: accountLoading } = useAccount()
   const activeAccountRef = useRef<string | null>(selectedAccountId)
@@ -126,8 +131,8 @@ export default function TemplatesPage() {
   /** 操作（更新・削除）が失敗したときの帯。一覧の読み込み失敗とは別。 */
   const [error, setError] = useState('')
   const [showCreate, setShowCreate] = useState(false)
-  // 名前の絞り込み（設計 `Body` の「テンプレート名で検索」）。
-  const [nameQuery, setNameQuery] = useState('')
+  // 案内どおり、名前・本文・差し込んでいる項目を同じ検索欄で絞る。
+  const [templateQuery, setTemplateQuery] = useState('')
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all')
   const [selectedCategory, setSelectedCategory] = useState('all')
   const [form, setForm] = useState({ name: '', category: 'general', messageType: 'text', messageContent: '' })
@@ -264,25 +269,38 @@ export default function TemplatesPage() {
   // reset edits when drawer changes
   useEffect(() => { setEditContent(null); setEditName(null) }, [drawerId])
 
-  const filteredTemplates = templates.filter((t) => {
-    // 名前は手元で絞る。打つたびに取り直すと重い。
-    if (nameQuery.trim() && !t.name.toLowerCase().includes(nameQuery.trim().toLowerCase())) {
-      return false
-    }
+  /*
+    本文は最大5万字あり、一覧はページングされていない。入力のたびに全本文を
+    NFKC変換すると、1000件なら毎回5000万字を走査する。取得・変更で templates
+    が替わったときだけ検索索引を作り、入力中は正規化済み文字列だけを比べる。
+    差し込み項目の文字列は messageContent 自体に含まれるため、別の正規表現走査は不要。
+  */
+  const templateSearchIndex = useMemo(() => templates.map((template) => ({
+    template,
+    normalizedSearchText: [template.name, template.messageContent]
+      .map(normalizeTemplateSearchText)
+      .join('\0'),
+  })), [templates])
+  const normalizedTemplateQuery = useMemo(
+    () => normalizeTemplateSearchText(templateQuery),
+    [templateQuery],
+  )
+  const filteredTemplates = useMemo(() => templateSearchIndex.flatMap(({ template: t, normalizedSearchText }) => {
+    // 一覧で受け取った名前・本文・差し込み項目を手元で絞る。打つたびに取り直さない。
+    if (normalizedTemplateQuery && !normalizedSearchText.includes(normalizedTemplateQuery)) return []
     /*
       フォルダで絞る。**`category` の文字列ではなく `folderId` で見る。**
       `unfiled` は置き場の無いもの。
     */
-    if (selectedCategory === 'unfiled' && t.folderId !== null) return false
-    if (selectedCategory !== 'all' && selectedCategory !== 'unfiled' && t.folderId !== selectedCategory) return false
-    if (typeFilter === 'all') return true
-    if (typeFilter === 'unused') return t.usageCount === 0
-    if (typeFilter === 'question') return Boolean(t.question)
-    if (typeFilter === 'single') return t.question === null && t.messageType !== 'carousel'
-    if (typeFilter === 'multiple') return t.messageType === 'carousel' || t.messageContent.includes('\n\n')
-    if (typeFilter === 'variables') return t.messageContent.includes('{{')
-    return true
-  })
+    if (selectedCategory === 'unfiled' && t.folderId !== null) return []
+    if (selectedCategory !== 'all' && selectedCategory !== 'unfiled' && t.folderId !== selectedCategory) return []
+    if (typeFilter === 'unused' && t.usageCount !== 0) return []
+    if (typeFilter === 'question' && !t.question) return []
+    if (typeFilter === 'single' && (t.question !== null || t.messageType === 'carousel')) return []
+    if (typeFilter === 'multiple' && t.messageType !== 'carousel' && !t.messageContent.includes('\n\n')) return []
+    if (typeFilter === 'variables' && !t.messageContent.includes('{{')) return []
+    return [t]
+  }), [normalizedTemplateQuery, selectedCategory, templateSearchIndex, typeFilter])
 
   /** フォルダを読み直す。並び順は API の `displayOrder` に従う。 */
   const loadFolders = useCallback(async () => {
@@ -664,10 +682,10 @@ export default function TemplatesPage() {
       <div className="bg-canvas rounded-card border-hairline mb-3 flex flex-wrap items-center gap-2 border p-3">
         <input
           type="search"
-          placeholder="名前・本文・差し込んでいる項目で検索"
+          placeholder="テンプレート名で検索（本文・差し込んでいる項目も対象）"
           aria-label="名前・本文・差し込んでいる項目で検索"
-          value={nameQuery}
-          onChange={(e) => setNameQuery(e.target.value)}
+          value={templateQuery}
+          onChange={(e) => setTemplateQuery(e.target.value)}
           className="border-hairline rounded-control focus:ring-accent min-w-0 flex-1 border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
         />
         <span className="bg-canvas-sunken rounded-control px-3 py-2 text-sm font-medium">保存した検索</span>

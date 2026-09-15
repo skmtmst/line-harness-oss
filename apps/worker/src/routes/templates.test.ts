@@ -231,6 +231,33 @@ describe('テンプレートの作成・更新の返し', () => {
     updated_at: '2026-01-13T00:00:00.000Z',
   };
 
+  it.each([
+    ['不正JSON', '{'], ['片方欠落', JSON.stringify({ originalContentUrl: 'https://example.com/a.png' })],
+    ['非HTTPS', JSON.stringify({ originalContentUrl: 'http://example.com/a.png', previewImageUrl: 'https://example.com/b.png' })],
+    ['data URL', JSON.stringify({ originalContentUrl: 'data:image/png,x', previewImageUrl: 'https://example.com/b.png' })],
+    ['javascript URL', JSON.stringify({ originalContentUrl: 'javascript:alert(1)', previewImageUrl: 'https://example.com/b.png' })],
+    ['壊れたURL', JSON.stringify({ originalContentUrl: 'https://', previewImageUrl: 'https://example.com/b.png' })],
+  ])('画像テンプレートの%sを422で拒否する', async (_label, messageContent) => {
+    const response = await makeApp().fetch(new Request('https://example.com/api/templates', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ accountId: 'account-1', name: '画像', category: 'general', messageType: 'image', messageContent }) }), env);
+    expect(response.status).toBe(422); expect(mocks.createTemplate).not.toHaveBeenCalled();
+  });
+
+  it('画像テンプレートのHTTPS URLは作成できる', async () => {
+    const messageContent = JSON.stringify({
+      originalContentUrl: 'https://assets.example.com/original.png',
+      previewImageUrl: 'https://assets.example.com/preview.png',
+    });
+    mocks.createTemplate.mockResolvedValue({ ...row, message_type: 'image', message_content: messageContent });
+
+    const response = await makeApp().fetch(new Request('https://example.com/api/templates', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ accountId: 'account-1', name: '画像', category: 'general', messageType: 'image', messageContent }),
+    }), env);
+
+    expect(response.status).toBe(201);
+    expect(mocks.createTemplate).toHaveBeenCalledTimes(1);
+  });
+
   it('軽11: 作成(201)の返しは更新と同じ形（本文・更新日時を含む）', async () => {
     mocks.createTemplate.mockResolvedValue(row);
     const response = await makeApp().fetch(
