@@ -2,6 +2,7 @@ import { Hono, type Context, type MiddlewareHandler } from 'hono';
 import {
   getFriends,
   getFriendById,
+  getFriendWithFirstTrackedLinkName,
   getFriendAddBreakdown,
   addTagToFriend,
   removeTagFromFriend,
@@ -959,7 +960,10 @@ friends.get('/api/friends/:id', requireVisibleFriend, async (c) => {
     const db = c.env.DB;
 
     const [friend, tags, formSubmissions, support] = await Promise.all([
-      getFriendById(db, id),
+      // 一覧と同じ first_tracked_link_id → tracked_links.name 基準で
+      // 流入元名を添える（N-036）。無い・消えた流入元は null で、
+      // 画面側は従来どおり「不明」を出す。
+      getFriendWithFirstTrackedLinkName(db, id),
       getFriendTags(db, id),
       getFormSubmissionsByFriend(db, id, 10),
       /*
@@ -994,6 +998,7 @@ friends.get('/api/friends/:id', requireVisibleFriend, async (c) => {
       success: true,
       data: {
         ...serializeFriend(friend),
+        firstTrackedLinkName: friend.first_tracked_link_name ?? null,
         tags: tags.map(serializeTag),
         support: support
           ? {

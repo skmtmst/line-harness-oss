@@ -34,6 +34,7 @@ type Fixture = {
   friends: Row[]
   chats: Row[]
   messagesLog: Row[]
+  trackedLinks: Row[]
 }
 
 function fixture(): Fixture {
@@ -81,6 +82,7 @@ function fixture(): Fixture {
       friend('friend-b', ACCOUNT_B, 'B社 花子'),
     ],
     chats: [],
+    trackedLinks: [],
     messagesLog: [{
       id: 'message-a',
       friend_id: 'friend-a',
@@ -122,6 +124,20 @@ function createDb(data: Fixture): unknown {
     }
     if (text.includes('FROM friends WHERE id = ?')) {
       return data.friends.filter((row) => row.id === binds[0])
+    }
+    /*
+     * N-036で詳細取得は `friends f LEFT JOIN tracked_links tl` の1問に
+     * 変わった。WHERE f.id = ? の対象へ、実際のJOINと同じく
+     * first_tracked_link_id から tracked_links.name を引いた
+     * first_tracked_link_name 列を添えて返す。リンク無しは null。
+     */
+    if (text.includes('FROM friends f') && text.includes('WHERE f.id = ?')) {
+      return data.friends
+        .filter((row) => row.id === binds[0])
+        .map((row) => {
+          const link = data.trackedLinks.find((l) => l.id === row.first_tracked_link_id)
+          return { ...row, first_tracked_link_name: (link?.name as string | null) ?? null }
+        })
     }
     if (text.includes('FROM messages_log')) {
       return data.messagesLog.filter((row) => row.friend_id === binds[0])
