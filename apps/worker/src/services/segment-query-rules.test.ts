@@ -59,6 +59,21 @@ describe('タグ', () => {
   })
 })
 
+describe('固定した配信対象', () => {
+  it('確認時点のIDだけを1 bindで固定し、多数でもD1のbind上限を越えない', async () => {
+    const ids = [...Array.from({ length: 240 }, (_, index) => `other-${index}`), 'a', 'c', 'a']
+    const condition: SegmentCondition = { operator: 'AND', rules: [{ type: 'friend_id_in', value: ids }] }
+    const { sql, bindings } = buildSegmentQuery(condition)
+    expect(sql).toContain('json_each(?)')
+    expect(bindings).toHaveLength(1)
+    expect(await idsMatching(condition)).toEqual(['a', 'c'])
+  })
+
+  it('空の固定対象は全員一致にせず拒否する', () => {
+    expect(() => buildSegmentQuery({ operator: 'AND', rules: [{ type: 'friend_id_in', value: [] }] })).toThrow()
+  })
+})
+
 describe('名前', () => {
   it('半角スペース区切りはいずれかに一致（OR）', async () => {
     expect(

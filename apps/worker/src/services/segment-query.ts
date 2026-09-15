@@ -47,6 +47,8 @@ export interface SegmentRule {
     | 'last_reaction_at'
     | 'reaction_state'
     | 'score_range'
+    /** 内部用途: 作成時点の宛先IDを固定した配信。画面の条件ビルダーには出さない。 */
+    | 'friend_id_in'
   value: unknown
 }
 
@@ -167,6 +169,12 @@ function buildRuleClause(rule: SegmentRule): { sql: string; bindings: unknown[] 
   const bindings: unknown[] = []
 
   switch (rule.type) {
+    case 'friend_id_in': {
+      const ids = [...new Set(asStringArray(rule.value, 'friend_id_in'))];
+      // IDごとの ? を並べるとD1のbind上限へ当たる。JSONは1 bindで展開する。
+      bindings.push(JSON.stringify(ids));
+      return { sql: `f.id IN (SELECT value FROM json_each(?))`, bindings };
+    }
     /*
      * タグIDが空のまま通すと、誰にも一致しない条件が黙って保存される。
      * 「タグで絞ったのに1人も届かない」という形で出るので、原因に辿り

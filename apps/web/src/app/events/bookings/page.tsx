@@ -9,9 +9,18 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
+import SelectField from '@/components/shared/select-field'
 // #740: 一覧の Kpi と一字一句同じだったため、機能内共有の1部品へ統合した。
 import EventKpi from '@/components/events/event-kpi'
-import { eventsApi, type EventBookingItem, type EventBookingSummary, type EventDetail } from '@/lib/api'
+import {
+  api,
+  eventsApi,
+  type EventBookingItem,
+  type EventBookingSummary,
+  type EventDetail,
+  type EventOccurrenceApplicants,
+  type EventSlot,
+} from '@/lib/api'
 import { describeBookingCapacity } from '../event-attention'
 
 const PAGE_SIZE = 20
@@ -74,6 +83,96 @@ function bookingActionKey(accountId: string, eventId: string, bookingId: string)
 const EMPTY_MARKING_KEYS: ReadonlySet<string> = new Set<string>()
 const EMPTY_MARK_ERRORS: Record<string, string> = {}
 
+function OccurrenceApplicantsPanel({
+  data,
+  promoting,
+  error,
+  onPromote,
+  csvHref,
+}: {
+  data: EventOccurrenceApplicants
+  promoting: boolean
+  error: string
+  onPromote: () => void
+  csvHref: string
+}) {
+  const waitlistRows = data.applicants.filter((applicant) => applicant.source === 'waitlist')
+  const waitingCount = waitlistRows.filter((applicant) => applicant.status === 'waiting').length
+
+  return (
+    <div>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <p className="text-ink-secondary text-sm">
+          申込 {data.summary.bookingCount}人・キャンセル待ち {data.summary.waitingCount}人
+          {data.occurrence.capacity == null ? '' : ` / 定員 ${data.occurrence.capacity}人`}
+        </p>
+        <div className="flex items-center gap-3">
+          <a href={csvHref} className="text-accent text-xs font-medium hover:underline">CSVを書き出す</a>
+          <Button
+            onClick={onPromote}
+            disabled={promoting || waitingCount === 0}
+            data-occurrence-action="promote-waitlist"
+          >
+            {promoting ? '案内を準備中…' : '次の方へ案内'}
+          </Button>
+        </div>
+      </div>
+      {error && <p className="text-danger mb-3 text-sm" role="alert">{error}</p>}
+      {data.applicants.length === 0 ? (
+        <p className="text-ink-faint py-4 text-sm">この開催回には申込者もキャンセル待ちもいません。</p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[720px] text-sm">
+            <thead className="bg-canvas-sunken text-ink-secondary">
+              <tr>
+                <th className="px-3 py-2 text-left font-medium">申込者</th>
+                <th className="px-3 py-2 text-left font-medium">区分・順位</th>
+                <th className="px-3 py-2 text-left font-medium">状態</th>
+                <th className="px-3 py-2 text-left font-medium">案内期限</th>
+                <th className="px-3 py-2 text-right font-medium">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.applicants.map((applicant) => {
+                const waitlistRank = applicant.source === 'waitlist'
+                  ? waitlistRows.findIndex((row) => row.id === applicant.id) + 1
+                  : 0
+                return (
+                  <tr key={`${applicant.source}:${applicant.id}`} className="border-hairline border-t">
+                    <td className="text-ink px-3 py-2">
+                      <span className="block font-medium">{applicant.displayName ?? '友だちは未取得'}</span>
+                      <span className="text-ink-faint text-xs">{applicant.partySize}人</span>
+                    </td>
+                    <td className="text-ink-secondary px-3 py-2">
+                      {applicant.source === 'waitlist' ? `キャンセル待ち ${waitlistRank}番` : '申込'}
+                    </td>
+                    <td className="text-ink-secondary px-3 py-2">
+                      {STATUS_LABELS.get(applicant.status) ?? applicant.status}
+                    </td>
+                    <td className="text-ink-secondary px-3 py-2 text-xs">
+                      {applicant.offerExpiresAt
+                        ? formatJp(applicant.offerExpiresAt, '期限は未取得')
+                        : applicant.status === 'waiting' ? '案内前' : '—'}
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      <Link
+                        href={`/chats?friend=${encodeURIComponent(applicant.friendId)}`}
+                        className="text-accent text-xs font-medium hover:underline"
+                      >
+                        個別トーク
+                      </Link>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function BookingsInner() {
   const params = useSearchParams()
   const eventId = params.get('id')
@@ -82,6 +181,17 @@ function BookingsInner() {
   const [items, setItems] = useState<EventBookingItem[]>([])
   const [bookingsTotal, setBookingsTotal] = useState(0)
   const [summary, setSummary] = useState<EventBookingSummary | null>(null)
+  const [occurrenceSlots, setOccurrenceSlots] = useState<EventSlot[]>([])
+  const [selectedOccurrenceId, setSelectedOccurrenceId] = useState('')
+  const [occurrenceApplicants, setOccurrenceApplicants] = useState<EventOccurrenceApplicants | null>(null)
+  const [occurrenceStatus, setOccurrenceStatus] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [promotingWaitlist, setPromotingWaitlist] = useState(false)
+  const [occurrenceActionError, setOccurrenceActionError] = useState('')
+  const [broadcastMessage, setBroadcastMessage] = useState('')
+  const [broadcastPreview, setBroadcastPreview] = useState<{ broadcastId: string; recipientCount: number } | null>(null)
+  const [broadcastBusy, setBroadcastBusy] = useState(false)
+  const [broadcastConfirmOpen, setBroadcastConfirmOpen] = useState(false)
+  const [broadcastError, setBroadcastError] = useState('')
   const [summaryStatus, setSummaryStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [tab, setTab] = useState<string>('requested')
   const [page, setPage] = useState(1)
@@ -119,6 +229,9 @@ function BookingsInner() {
   /** 切り替え前の遅い応答を、次のイベント・次の絞り込みの一覧へ混ぜない。 */
   const loadRequestRef = useRef(0)
   const summaryRequestRef = useRef(0)
+  const occurrenceSlotsRequestRef = useRef(0)
+  const occurrenceApplicantsRequestRef = useRef(0)
+  const broadcastPreviewKeyRef = useRef<string | null>(null)
 
   /*
    * **アカウント・イベントを切り替えたら、進行中の記録を失効させる。**
@@ -285,6 +398,62 @@ function BookingsInner() {
     }
   }, [refreshSummary])
 
+  /*
+   * 申込者はイベント全体ではなく開催回ごとに扱う。枠を選ばずに待機列を
+   * まとめると、別日の人へ案内してしまうため、選択中の開催回だけを読む。
+   */
+  const refreshOccurrenceSlots = useCallback(async () => {
+    if (!selectedAccountId || !eventId) return
+    const requestId = ++occurrenceSlotsRequestRef.current
+    setOccurrenceStatus('loading')
+    setOccurrenceActionError('')
+    try {
+      const response = await eventsApi.listSlots(selectedAccountId, eventId)
+      if (requestId !== occurrenceSlotsRequestRef.current || scopeRef.current !== scope) return
+      const slots = Array.isArray(response?.items) ? response.items.filter((slot) => slot.is_active === 1) : []
+      setOccurrenceSlots(slots)
+      setSelectedOccurrenceId((current) => slots.some((slot) => slot.id === current) ? current : (slots[0]?.id ?? ''))
+      if (slots.length === 0) {
+        setOccurrenceApplicants(null)
+        setOccurrenceStatus('ready')
+      }
+    } catch {
+      if (requestId !== occurrenceSlotsRequestRef.current || scopeRef.current !== scope) return
+      setOccurrenceSlots([])
+      setSelectedOccurrenceId('')
+      setOccurrenceApplicants(null)
+      setOccurrenceStatus('error')
+    }
+  }, [selectedAccountId, eventId, scope])
+
+  const refreshOccurrenceApplicants = useCallback(async () => {
+    if (!selectedAccountId || !selectedOccurrenceId) return
+    const requestId = ++occurrenceApplicantsRequestRef.current
+    setOccurrenceStatus('loading')
+    setOccurrenceActionError('')
+    try {
+      const data = await eventsApi.getOccurrenceApplicants(selectedAccountId, selectedOccurrenceId)
+      if (requestId !== occurrenceApplicantsRequestRef.current || scopeRef.current !== scope) return
+      setOccurrenceApplicants(data)
+      setOccurrenceStatus('ready')
+    } catch {
+      if (requestId !== occurrenceApplicantsRequestRef.current || scopeRef.current !== scope) return
+      setOccurrenceApplicants(null)
+      setOccurrenceStatus('error')
+    }
+  }, [selectedAccountId, selectedOccurrenceId, scope])
+
+  useEffect(() => {
+    setOccurrenceApplicants(null)
+    setSelectedOccurrenceId('')
+    void refreshOccurrenceSlots()
+  }, [refreshOccurrenceSlots])
+
+  useEffect(() => {
+    if (!selectedOccurrenceId) return
+    void refreshOccurrenceApplicants()
+  }, [refreshOccurrenceApplicants, selectedOccurrenceId])
+
   useEffect(() => {
     setPage(1)
   }, [selectedAccountId, eventId])
@@ -420,6 +589,69 @@ function BookingsInner() {
     }
   }
 
+  async function promoteWaitlist() {
+    const accountId = selectedAccountId
+    const occurrence = occurrenceApplicants?.occurrence
+    if (!accountId || !occurrence || promotingWaitlist) return
+    const startedScope = scope
+    setPromotingWaitlist(true)
+    setOccurrenceActionError('')
+    try {
+      await eventsApi.promoteOccurrenceWaitlist(accountId, occurrence.id, occurrence.version)
+      if (scopeRef.current !== startedScope) return
+      await refreshOccurrenceApplicants()
+    } catch {
+      if (scopeRef.current !== startedScope) return
+      /* 409を含め、再読込して最新の順位・期限を先に見せる。 */
+      setOccurrenceActionError('案内を更新できませんでした。ほかの操作で順番や空席が変わった可能性があります。最新の状態を読み直してから、もう一度お試しください。')
+      await refreshOccurrenceApplicants()
+    } finally {
+      if (scopeRef.current === startedScope) setPromotingWaitlist(false)
+    }
+  }
+
+  async function previewOccurrenceBroadcast() {
+    const accountId = selectedAccountId
+    const occurrence = occurrenceApplicants?.occurrence
+    const message = broadcastMessage.trim()
+    if (!accountId || !occurrence || !message || broadcastBusy) return
+    const startedScope = scope
+    setBroadcastBusy(true)
+    setBroadcastError('')
+    try {
+      const idempotencyKey = broadcastPreviewKeyRef.current ?? crypto.randomUUID()
+      broadcastPreviewKeyRef.current = idempotencyKey
+      const result = await eventsApi.previewOccurrenceBroadcast(accountId, occurrence.id, {
+        title: `${event?.name ?? 'イベント'}の申込者への案内`,
+        messageContent: message,
+      }, idempotencyKey)
+      if (scopeRef.current !== startedScope) return
+      setBroadcastPreview(result)
+    } catch {
+      if (scopeRef.current !== startedScope) return
+      setBroadcastError('対象を確定できませんでした。内容を確認して、もう一度お試しください。')
+    } finally {
+      if (scopeRef.current === startedScope) setBroadcastBusy(false)
+    }
+  }
+
+  async function sendOccurrenceBroadcast() {
+    if (!broadcastPreview || broadcastBusy) return
+    setBroadcastBusy(true)
+    setBroadcastError('')
+    try {
+      await api.broadcasts.send(broadcastPreview.broadcastId)
+      setBroadcastConfirmOpen(false)
+      setBroadcastMessage('')
+      setBroadcastPreview(null)
+      broadcastPreviewKeyRef.current = null
+    } catch {
+      setBroadcastError('送信を開始できませんでした。まだ送られていない可能性があるため、配信一覧で状態を確認してから再試行してください。')
+    } finally {
+      setBroadcastBusy(false)
+    }
+  }
+
   const confirmed = summary?.confirmed ?? 0
   const pending = summary?.requested ?? 0
   const cancelled = summary?.cancelled ?? 0
@@ -522,6 +754,85 @@ function BookingsInner() {
             : '取得できませんでした'}
         />
       </div>
+
+      <section className="bg-canvas rounded-card border-hairline mb-4 border p-4" aria-labelledby="occurrence-applicants-title">
+        <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h3 id="occurrence-applicants-title" className="text-ink font-semibold">開催回ごとの申込者とキャンセル待ち</h3>
+            <p className="text-ink-faint mt-1 text-xs">待ち順と案内期限を確認してから、次の方へ案内します。</p>
+          </div>
+          {occurrenceSlots.length > 0 && (
+            <label className="text-ink-secondary grid gap-1 text-xs font-medium">
+              開催回
+              <SelectField
+                aria-label="開催回を選ぶ"
+                value={selectedOccurrenceId}
+                onChange={(event) => setSelectedOccurrenceId(event.target.value)}
+                options={occurrenceSlots.map((slot) => ({ value: slot.id, label: formatJp(slot.starts_at, '日時未取得') }))}
+              />
+            </label>
+          )}
+        </div>
+
+        {occurrenceStatus === 'loading' ? (
+          <p className="text-ink-faint text-sm">申込者を読み込んでいます…</p>
+        ) : occurrenceStatus === 'error' ? (
+          <ListState
+            kind="error"
+            description="申込者は消えていません。開催回を読み直してから、もう一度お試しください。"
+            action={<Button onClick={() => void refreshOccurrenceSlots()}>開催回を再読み込み</Button>}
+          />
+        ) : occurrenceSlots.length === 0 ? (
+          <p className="text-ink-faint text-sm">有効な開催回がありません。</p>
+        ) : occurrenceApplicants ? (
+          <>
+            <OccurrenceApplicantsPanel
+              data={occurrenceApplicants}
+              promoting={promotingWaitlist}
+              error={occurrenceActionError}
+              onPromote={() => void promoteWaitlist()}
+              csvHref={eventsApi.occurrenceApplicantsCsvUrl(selectedAccountId!, occurrenceApplicants.occurrence.id)}
+            />
+            <div className="border-hairline mt-4 border-t pt-4">
+              <h4 className="text-ink font-medium">この開催回の申込者へ一斉送信</h4>
+              <p className="text-ink-faint mt-1 text-xs">対象はこの確認時点の申込者で固定します。確認後の申込・取消・タグ変更では宛先を入れ替えません。</p>
+              <textarea
+                value={broadcastMessage}
+                onChange={(event) => {
+                  setBroadcastMessage(event.target.value)
+                  setBroadcastPreview(null)
+                  setBroadcastError('')
+                  broadcastPreviewKeyRef.current = null
+                }}
+                rows={3}
+                maxLength={5000}
+                aria-label="申込者へ送るメッセージ"
+                placeholder="申込者へ送るご案内を書いてください"
+                className="border-hairline rounded-control mt-3 w-full border px-3 py-2 text-sm"
+              />
+              <div className="mt-2 flex flex-wrap items-center gap-3">
+                <Button onClick={() => void previewOccurrenceBroadcast()} disabled={broadcastBusy || broadcastMessage.trim() === ''}>
+                  {broadcastBusy ? '対象を確定中…' : '対象と内容を確認'}
+                </Button>
+                {broadcastPreview && <span className="text-ink-secondary text-sm">送信対象 {broadcastPreview.recipientCount}人</span>}
+                {broadcastPreview && <Button onClick={() => setBroadcastConfirmOpen(true)} disabled={broadcastBusy}>送信前の最終確認へ</Button>}
+              </div>
+              {broadcastError && <p className="text-danger mt-2 text-sm" role="alert">{broadcastError}</p>}
+            </div>
+            <ConfirmDialog
+              open={broadcastConfirmOpen}
+              title="この申込者へ送信を開始しますか？"
+              description={`確認済みの ${broadcastPreview?.recipientCount ?? 0} 人へ送信します。送信開始後は取り消せません。`}
+              confirmLabel="送信を開始"
+              cancelLabel="戻る"
+              busy={broadcastBusy}
+              error={broadcastError}
+              onConfirm={() => void sendOccurrenceBroadcast()}
+              onCancel={() => { if (!broadcastBusy) setBroadcastConfirmOpen(false) }}
+            />
+          </>
+        ) : null}
+      </section>
 
 
         {/*

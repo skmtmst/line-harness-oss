@@ -135,6 +135,22 @@ describe('V6 event waitlist and applicants', () => {
     });
   });
 
+  test('案内中の待機者だけに、案内期限を開催回の申込者応答へ返す', async () => {
+    await seedOffered('offer-expiry-view-token-123456789012345678901234567890', '2099-06-02T00:00:00.000Z');
+
+    const data = await getEventOccurrenceApplicants(db, {
+      occurrenceId: 'slot-a', lineAccountId: 'account-a',
+    });
+
+    expect(data?.applicants).toEqual([
+      expect.objectContaining({
+        source: 'waitlist', id: 'wait-a', status: 'offered',
+        offeredAt: '2099-05-31T00:00:00.000Z',
+        offerExpiresAt: '2099-06-02T00:00:00.000Z',
+      }),
+    ]);
+  });
+
   test('繰上げURLを本人が承諾すると、回答内容を保った確定予約へ一度だけ変換する', async () => {
     const token = 'valid-offer-token-123456789012345678901234567890';
     await seedOffered(token);

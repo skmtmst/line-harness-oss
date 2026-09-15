@@ -2835,6 +2835,29 @@ describe('V6 occurrence applicants / waitlist promotion routes', () => {
     await expect(empty.json()).resolves.toMatchObject({ success: true, data: { applicants: [] } });
   });
 
+  test('CSVは表示ページではなく開催回の全申込者を、所属アカウントだけから書き出す', async () => {
+    waitlistMocks.getEventOccurrenceApplicants.mockResolvedValueOnce({
+      occurrence: { id: 's1', eventId: 'e1', startsAt: '2099-01-01', endsAt: '2099-01-02', capacity: 2, activeSeats: 1, version: 1 },
+      summary: { bookingCount: 1, waitingCount: 1, activeSeats: 1 },
+      applicants: [
+        { source: 'booking', id: 'b1', friendId: 'f1', displayName: '=式にしない', status: 'confirmed', partySize: 1, appliedAt: '2099-01-01T00:00:00.000Z', offerExpiresAt: null },
+        { source: 'waitlist', id: 'w1', friendId: 'f2', displayName: '待機者', status: 'offered', partySize: 2, appliedAt: '2099-01-01T01:00:00.000Z', offerExpiresAt: '2099-01-02T00:00:00.000Z' },
+      ],
+    });
+    const app = setupApp(structuredClone(state));
+    const csv = await app.request('/api/events/admin/occurrences/s1/applicants.csv?account_id=la1');
+    expect(csv.status).toBe(200);
+    expect(csv.headers.get('content-type')).toContain('text/csv');
+    await expect(csv.text()).resolves.toContain("'=式にしない");
+    expect(waitlistMocks.getEventOccurrenceApplicants).toHaveBeenCalledWith(
+      expect.anything(), { occurrenceId: 's1', lineAccountId: 'la1' },
+    );
+
+    waitlistMocks.getEventOccurrenceApplicants.mockResolvedValueOnce(null);
+    const outside = await app.request('/api/events/admin/occurrences/s1/applicants.csv?account_id=other');
+    expect(outside.status).toBe(403);
+  });
+
   test('not found / forbidden: 所属外を404、認証なしを403にする', async () => {
     waitlistMocks.getEventOccurrenceApplicants.mockResolvedValueOnce(null);
     const app = setupApp(structuredClone(state));

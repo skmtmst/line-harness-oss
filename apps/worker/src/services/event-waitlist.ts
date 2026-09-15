@@ -63,6 +63,8 @@ interface WaitlistApplicantRow {
   first_participation_attended_count: number | null;
   first_participation_checked_at: string | null;
   created_at: string;
+  offered_at: string | null;
+  offer_expires_at: string | null;
   display_name: string | null;
   picture_url: string | null;
 }
@@ -97,6 +99,10 @@ export interface EventOccurrenceApplicants {
       attendedCount: number | null;
       checkedAt: string | null;
     };
+    /** キャンセル待ちへの案内中だけ入る。予約済み行は null のまま。 */
+    offeredAt: string | null;
+    /** 案内を受け付ける期限。案内中でなければ null。 */
+    offerExpiresAt: string | null;
   }>;
 }
 
@@ -238,7 +244,7 @@ export async function getEventOccurrenceApplicants(
       .prepare(
         `SELECT w.id, w.friend_id, w.status, w.party_size, w.answer_snapshot_json,
                 w.first_participation, w.first_participation_attended_count,
-                w.first_participation_checked_at, w.created_at,
+                w.first_participation_checked_at, w.created_at, w.offered_at, w.offer_expires_at,
                 f.display_name, f.picture_url
            FROM event_waitlist w
            LEFT JOIN friends f ON f.id = w.friend_id
@@ -265,6 +271,8 @@ export async function getEventOccurrenceApplicants(
       row.first_participation_attended_count,
       row.first_participation_checked_at,
     ),
+    offeredAt: null,
+    offerExpiresAt: null,
   }));
   const waitlistApplicants = (waitlist.results ?? []).map((row) => ({
     source: 'waitlist' as const,
@@ -281,6 +289,8 @@ export async function getEventOccurrenceApplicants(
       row.first_participation_attended_count,
       row.first_participation_checked_at,
     ),
+    offeredAt: row.offered_at,
+    offerExpiresAt: row.offer_expires_at,
   }));
   const applicants = [...bookingApplicants, ...waitlistApplicants]
     .sort((a, b) => a.appliedAt.localeCompare(b.appliedAt) || a.id.localeCompare(b.id));

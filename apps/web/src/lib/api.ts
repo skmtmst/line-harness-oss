@@ -10422,6 +10422,40 @@ export interface EventWaitlistItem {
   friend_name: string | null;
 }
 
+/** 開催回ごとの予約・キャンセル待ち。画面表示と操作を同じ版で扱う。 */
+export interface EventOccurrenceApplicant {
+  source: 'booking' | 'waitlist';
+  id: string;
+  friendId: string;
+  displayName: string | null;
+  pictureUrl: string | null;
+  status: string;
+  partySize: number;
+  appliedAt: string;
+  answers: unknown | null;
+  firstParticipation: { isFirst: boolean | null; attendedCount: number | null; checkedAt: string | null };
+  offeredAt: string | null;
+  offerExpiresAt: string | null;
+}
+
+export interface EventOccurrenceApplicants {
+  occurrence: {
+    id: string;
+    eventId: string;
+    startsAt: string;
+    endsAt: string;
+    capacity: number | null;
+    activeSeats: number;
+    version: number;
+  };
+  summary: { bookingCount: number; waitingCount: number; activeSeats: number };
+  applicants: EventOccurrenceApplicant[];
+}
+
+export type EventWaitlistPromotionResult =
+  | { kind: 'promoted'; occurrenceVersion: number; promoted: { waitlistId: string; friendId: string; partySize: number; status: 'offered'; offeredAt: string; expiresAt: string } }
+  | { kind: 'noop'; occurrenceVersion: number; promoted: null; reason: string };
+
 export const eventsApi = {
   listEvents: (
     accountId: string,
@@ -10506,6 +10540,22 @@ export const eventsApi = {
     fetchApi<{ waitlist: EventWaitlistItem[] }>(
       withAccount(`/api/events/admin/events/${eventId}/waitlist`, accountId),
     ),
+  getOccurrenceApplicants: (accountId: string, occurrenceId: string) =>
+    fetchApi<{ success: true; data: EventOccurrenceApplicants }>(
+      withAccount(`/api/events/admin/occurrences/${encodeURIComponent(occurrenceId)}/applicants`, accountId),
+    ).then((response) => response.data),
+  occurrenceApplicantsCsvUrl: (accountId: string, occurrenceId: string) =>
+    withAccount(`/api/events/admin/occurrences/${encodeURIComponent(occurrenceId)}/applicants.csv`, accountId),
+  previewOccurrenceBroadcast: (accountId: string, occurrenceId: string, data: { title: string; messageContent: string }, idempotencyKey: string) =>
+    fetchApi<{ success: true; data: { broadcastId: string; recipientCount: number } }>(
+      withAccount(`/api/events/admin/occurrences/${encodeURIComponent(occurrenceId)}/applicant-broadcasts/preview`, accountId),
+      { method: 'POST', headers: { 'Idempotency-Key': idempotencyKey }, body: JSON.stringify(data) },
+    ).then((response) => response.data),
+  promoteOccurrenceWaitlist: (accountId: string, occurrenceId: string, expectedVersion: number) =>
+    fetchApi<{ success: true; data: EventWaitlistPromotionResult }>(
+      withAccount(`/api/events/admin/occurrences/${encodeURIComponent(occurrenceId)}/waitlist/promote`, accountId),
+      { method: 'POST', body: JSON.stringify({ expectedVersion }) },
+    ).then((response) => response.data),
   listBookings: (
     accountId: string,
     eventId: string,
