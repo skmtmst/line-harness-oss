@@ -419,7 +419,7 @@ export interface CommonVar {
   folderId: string | null;
   name: string;
   varKey: string;
-  type: "text" | "url" | "image" | "number";
+  type: "text" | "url" | "image" | "number" | "long_text" | "date" | "datetime" | "boolean";
   value: string;
   createdAt: string;
   updatedAt: string;
