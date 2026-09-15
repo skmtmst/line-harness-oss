@@ -1,4 +1,4 @@
-import type { AnalyticsUsageOverview } from '@/lib/api'
+import type { AnalyticsMetric, AnalyticsUsageOverview } from '@/lib/api'
 import {
   DEFAULT_FEATURES,
   SPECIALIZED_FEATURE_KEYS,
@@ -36,6 +36,20 @@ export function usageObservation(
   }
   if (item.unused.value === 0) return { text: 'すべて利用中です', tone: 'normal' }
   return { text: item.unused.reason ?? '利用状況を確認できません', tone: 'unknown' }
+}
+
+export function referenceHealthText(metric: AnalyticsMetric<number>): string {
+  const reason = metric.reason ? `: ${metric.reason}` : ''
+  if (metric.state === 'failed') return `参照切れ 取得失敗${reason}`
+  if (metric.state === 'unavailable' || metric.state === 'pending') {
+    return `参照切れ 未取得${reason}`
+  }
+  if (metric.state === 'partial') {
+    const value = metric.value === null ? '—' : metric.value.toLocaleString('ja-JP')
+    return `参照切れ ${value}（一部のみ）${reason}`
+  }
+  if (metric.state === 'insufficient') return `参照切れ 未取得${reason}`
+  return `参照切れ ${(metric.value ?? 0).toLocaleString('ja-JP')}`
 }
 
 export function canTidyUsage(
