@@ -12,10 +12,11 @@ import {
 import { createFeatureJobGate } from './feature-enforcement.js';
 
 /**
- * メディアの使用箇所を数え直す。
+ * メディアの使用台帳の欠損を補修する。
  *
  * 画像を消す前に「5か所で使われています」と出すための表を作る。
- * 本文の中にURLが文字として埋まっているだけなので、走査するしかない。
+ * 日常の作成・更新・参照解除は保存と同じ原子処理で台帳へ反映する。
+ * ここは旧データや一時的な欠損を後から直すための補修経路である。
  *
  * 走査した時点の情報でしかない。それでも「何も分からないまま消す」より
  * はるかにましだ、という判断で入れている。画面にもその旨を書いてある。
@@ -23,7 +24,12 @@ import { createFeatureJobGate } from './feature-enforcement.js';
 
 /** どのテーブルの、どの列を見るか。 */
 const SOURCES: Array<{ refKind: MediaRefKind; table: string; idColumn: string; columns: string[] }> = [
-  { refKind: 'template', table: 'templates', idColumn: 'id', columns: ['message_content'] },
+  {
+    refKind: 'template',
+    table: 'templates',
+    idColumn: 'id',
+    columns: ['message_content', 'draft_message_content'],
+  },
   {
     refKind: 'broadcast',
     table: 'broadcasts',

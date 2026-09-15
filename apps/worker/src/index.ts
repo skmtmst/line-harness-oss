@@ -1469,6 +1469,7 @@ async function runSixHourlyHeavyJobs(
       },
     },
     {
+      // 日常更新は各保存経路で原子的に行う。ここは欠損補修だけの経路。
       name: 'media usage scan',
       run: async () => {
         const { scanMediaUsage } = await import('./services/media-usage-scan.js');

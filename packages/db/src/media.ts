@@ -68,6 +68,94 @@ export interface MediaUsage {
   scanned_at: string;
 }
 
+/** 保存先と別のLINEアカウントのメディアが本文に含まれる。 */
+export class MediaReferenceAccountError extends Error {
+  constructor() {
+    super('MEDIA_REFERENCE_ACCOUNT_MISMATCH');
+    this.name = 'MediaReferenceAccountError';
+  }
+}
+
+type MediaUsageMutationResult = { meta?: { changes?: number } };
+
+/**
+ * 本文が指すライブURL・固定版R2キーを解決し、本体の保存と使用台帳を1原子処理で書く。
+ *
+ * 参照保存だけが成功して台帳が0件になる窓を作らないため、呼び出し側の
+ * INSERT/UPDATEも同じ `db.batch` へ渡す。別accountのキーはbatch開始前に拒否し、
+ * 台帳INSERTが失敗した場合はD1のbatch rollbackで本体も戻す。
+ *
+ * `usageGuard` はCAS付き更新用。更新に負けた実行が、勝った実行の台帳を
+ * 古い候補で上書きしないよう、各台帳文に現在行の条件を付ける。
+ */
+export async function applyMediaUsageMutation(
+  db: D1Database,
+  input: {
+    lineAccountId: string | null;
+    refKind: MediaRefKind;
+    refId: string;
+    searchableContent: Array<string | null | undefined>;
+    mutationStatements: D1PreparedStatement[];
+    usageGuard?: { sql: string; binds: unknown[] };
+  },
+): Promise<MediaUsageMutationResult[]> {
+  const content = input.searchableContent.filter(
+    (value): value is string => typeof value === 'string' && value.length > 0,
+  );
+  let referenced: Array<{ id: string; line_account_id: string | null }> = [];
+  if (content.length > 0) {
+    const matchOne = `(
+      instr(?, m.r2_key) > 0
+      OR (mv.r2_key IS NOT NULL AND instr(?, mv.r2_key) > 0)
+      OR instr(?, '/media/' || m.id || '/content') > 0
+    )`;
+    const rows = await db.prepare(
+      `SELECT DISTINCT m.id, m.line_account_id
+         FROM media m
+         LEFT JOIN media_versions mv ON mv.media_id = m.id
+        WHERE ${content.map(() => matchOne).join(' OR ')}`,
+    ).bind(...content.flatMap((value) => [value, value, value]))
+      .all<{ id: string; line_account_id: string | null }>();
+    referenced = rows.results;
+  }
+  if (referenced.some((row) => row.line_account_id !== input.lineAccountId)) {
+    throw new MediaReferenceAccountError();
+  }
+
+  const guardSql = input.usageGuard ? ` AND (${input.usageGuard.sql})` : '';
+  const guardBinds = input.usageGuard?.binds ?? [];
+  const statements = [
+    ...input.mutationStatements,
+    db.prepare(
+      `DELETE FROM media_usages
+        WHERE ref_kind = ? AND ref_id = ?${guardSql}`,
+    ).bind(input.refKind, input.refId, ...guardBinds),
+  ];
+  const scannedAt = jstNow();
+  for (let index = 0; index < referenced.length; index += MEDIA_USAGE_WRITE_CHUNK) {
+    const chunk = referenced.slice(index, index + MEDIA_USAGE_WRITE_CHUNK);
+    if (input.usageGuard) {
+      statements.push(db.prepare(
+        `WITH pending(media_id, ref_kind, ref_id, scanned_at) AS (
+           VALUES ${chunk.map(() => '(?, ?, ?, ?)').join(',')}
+         )
+         INSERT INTO media_usages (media_id, ref_kind, ref_id, scanned_at)
+         SELECT media_id, ref_kind, ref_id, scanned_at FROM pending
+          WHERE ${input.usageGuard.sql}`,
+      ).bind(
+        ...chunk.flatMap((row) => [row.id, input.refKind, input.refId, scannedAt]),
+        ...guardBinds,
+      ));
+      continue;
+    }
+    statements.push(db.prepare(
+      `INSERT INTO media_usages (media_id, ref_kind, ref_id, scanned_at)
+       VALUES ${chunk.map(() => '(?, ?, ?, ?)').join(',')}`,
+    ).bind(...chunk.flatMap((row) => [row.id, input.refKind, input.refId, scannedAt])));
+  }
+  return db.batch(statements) as Promise<MediaUsageMutationResult[]>;
+}
+
 /** 削除影響と、その表示を作った同一時点の使用先行。 */
 export interface MediaDeleteImpactSnapshot {
   impact: MediaDeleteImpact;
@@ -277,9 +365,9 @@ export async function deleteMedia(db: D1Database, id: string, lineAccountId: str
 /**
  * 使用箇所。
  *
- * 削除する前に「5か所で使われています」と出すための表。本文を
- * スキャンして作り直すので、最後のスキャン時点の情報でしかない。
- * それでも「何も分からないまま消す」よりはるかにましだ、という判断。
+ * 削除する前に「5か所で使われています」と出すための表。
+ * 対応済みの保存経路では本文と同じ原子処理で更新し、走査は旧データや
+ * 一時的な欠損を補修する安全網としてだけ残す。
  */
 export async function getMediaUsages(db: D1Database, mediaId: string): Promise<MediaUsage[]> {
   const result = await db

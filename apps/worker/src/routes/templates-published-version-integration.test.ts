@@ -28,14 +28,14 @@ function app() {
   return hono;
 }
 
-function json(method: string, path: string, body: unknown, key?: string) {
+function json(method: string, path: string, body: unknown, key?: string, db = store.db) {
   const headers: Record<string, string> = { 'content-type': 'application/json' };
   if (key) headers['Idempotency-Key'] = key;
   return app().request(path, {
     method,
     headers,
     body: JSON.stringify(body),
-  }, { DB: store.db } as Env['Bindings']);
+  }, { DB: db } as Env['Bindings']);
 }
 
 let store: SqliteD1;
@@ -129,6 +129,175 @@ describe('実DB: 新規は未公開で始まり、初回公開で版1になる',
 
     const response = await json('POST', `/api/templates/${id}/publish`, { expectedVersion: 0, expectedDraftRevision: 1 }, 'e2e-key-0002');
     expect(response.status).toBe(404);
+  });
+});
+
+function seedMedia(id: string, accountId: string, key: string): void {
+  store.raw.prepare(`
+    INSERT INTO media
+      (id, line_account_id, kind, filename, mime_type, size_bytes, r2_key, created_at)
+    VALUES (?, ?, 'image', ?, 'image/png', 10, ?, '2026-09-16')
+  `).run(id, accountId, `${id}.png`, key);
+}
+
+function mediaImageContent(key: string): string {
+  const url = `https://worker.example.com/images/${key}`;
+  return JSON.stringify({ originalContentUrl: url, previewImageUrl: url });
+}
+
+function usageCount(mediaId: string): number {
+  return Number((store.raw.prepare(
+    `SELECT COUNT(*) AS c FROM media_usages WHERE media_id = ?`,
+  ).get(mediaId) as { c: number }).c);
+}
+
+describe('実route・実DB: メディア参照と使用台帳を原子更新する', () => {
+  it('作成・更新・参照解除を保存直後の使用件数へ反映する', async () => {
+    seedMedia('media-a', 'account-1', 'media/account-1/a.png');
+    seedMedia('media-b', 'account-1', 'media/account-1/b.png');
+    const created = await json('POST', '/api/templates', {
+      accountId: 'account-1', name: '画像', messageType: 'image',
+      messageContent: mediaImageContent('media/account-1/a.png'),
+    });
+    expect(created.status).toBe(201);
+    const id = ((await created.json()) as { data: { id: string } }).data.id;
+    expect(usageCount('media-a')).toBe(1);
+
+    expect((await json('PUT', `/api/templates/${id}`, {
+      messageType: 'image', messageContent: mediaImageContent('media/account-1/b.png'),
+    })).status).toBe(200);
+    expect(usageCount('media-a')).toBe(1);
+    expect(usageCount('media-b')).toBe(1);
+
+    expect((await json('POST', `/api/templates/${id}/publish`, {
+      expectedVersion: 0, expectedDraftRevision: 2,
+    }, 'route-media-publish-1')).status).toBe(200);
+    expect(usageCount('media-a')).toBe(0);
+    expect(usageCount('media-b')).toBe(1);
+
+    expect((await json('PUT', `/api/templates/${id}`, {
+      messageType: 'image', messageContent: mediaImageContent('external/not-library.png'),
+    })).status).toBe(200);
+    expect((await json('POST', `/api/templates/${id}/publish`, {
+      expectedVersion: 1, expectedDraftRevision: 1,
+    }, 'route-media-publish-2')).status).toBe(200);
+    expect(usageCount('media-b')).toBe(0);
+  });
+
+  it('別account参照は422で拒否し書込み0件', async () => {
+    seedMedia('media-other', 'account-2', 'media/account-2/other.png');
+    const response = await json('POST', '/api/templates', {
+      accountId: 'account-1', name: '別account', messageType: 'image',
+      messageContent: mediaImageContent('media/account-2/other.png'),
+    });
+    expect(response.status).toBe(422);
+    expect(store.raw.prepare(`SELECT COUNT(*) AS c FROM templates`).get()).toEqual({ c: 0 });
+    expect(usageCount('media-other')).toBe(0);
+  });
+
+  it('既存テンプレートの別account参照更新も422で拒否する', async () => {
+    seedMedia('media-a', 'account-1', 'media/account-1/a.png');
+    seedMedia('media-other', 'account-2', 'media/account-2/other.png');
+    const created = await json('POST', '/api/templates', {
+      accountId: 'account-1', name: '画像', messageType: 'image',
+      messageContent: mediaImageContent('media/account-1/a.png'),
+    });
+    const id = ((await created.json()) as { data: { id: string } }).data.id;
+
+    const response = await json('PUT', `/api/templates/${id}`, {
+      messageType: 'image', messageContent: mediaImageContent('media/account-2/other.png'),
+    });
+    expect(response.status).toBe(422);
+    const row = store.raw.prepare(
+      `SELECT draft_message_content, draft_revision FROM templates WHERE id = ?`,
+    ).get(id) as { draft_message_content: string; draft_revision: number };
+    expect(row.draft_message_content).toContain('media/account-1/a.png');
+    expect(row.draft_revision).toBe(1);
+    expect(usageCount('media-a')).toBe(1);
+    expect(usageCount('media-other')).toBe(0);
+  });
+
+  it('台帳書込み失敗は500で参照保存も0件にrollbackする', async () => {
+    seedMedia('media-a', 'account-1', 'media/account-1/a.png');
+    store.raw.exec(`
+      CREATE TRIGGER fail_media_usage_insert
+      BEFORE INSERT ON media_usages
+      BEGIN SELECT RAISE(ABORT, 'forced_media_usage_failure'); END;
+    `);
+    const response = await json('POST', '/api/templates', {
+      accountId: 'account-1', name: '失敗', messageType: 'image',
+      messageContent: mediaImageContent('media/account-1/a.png'),
+    });
+    expect(response.status).toBe(500);
+    expect(store.raw.prepare(`SELECT COUNT(*) AS c FROM templates`).get()).toEqual({ c: 0 });
+    expect(usageCount('media-a')).toBe(0);
+  });
+
+  it('PUT読取後の同時公開は409にし、勝者の本文と台帳を変えない', async () => {
+    seedMedia('media-a', 'account-1', 'media/account-1/a.png');
+    seedMedia('media-b', 'account-1', 'media/account-1/b.png');
+    seedMedia('media-c', 'account-1', 'media/account-1/c.png');
+    const created = await json('POST', '/api/templates', {
+      accountId: 'account-1', name: '画像', messageType: 'image',
+      messageContent: mediaImageContent('media/account-1/a.png'),
+    });
+    const id = ((await created.json()) as { data: { id: string } }).data.id;
+    const baseDb = store.db;
+    let raced = false;
+    const racingDb = {
+      ...baseDb,
+      prepare(query: string) {
+        const statement = baseDb.prepare(query);
+        if (!query.includes('draft_revision = draft_revision + 1')) return statement;
+        return {
+          ...statement,
+          bind(...values: unknown[]) {
+            if (!raced) {
+              raced = true;
+              store.raw.transaction(() => {
+                store.raw.prepare(`
+                  UPDATE templates
+                     SET message_content = ?, draft_message_content = NULL,
+                         draft_message_type = NULL, draft_revision = 0,
+                         published_version = 1
+                   WHERE id = ?
+                `).run(mediaImageContent('media/account-1/b.png'), id);
+                store.raw.prepare(
+                  `DELETE FROM media_usages WHERE ref_kind = 'template' AND ref_id = ?`,
+                ).run(id);
+                store.raw.prepare(`
+                  INSERT INTO media_usages (media_id, ref_kind, ref_id, scanned_at)
+                  VALUES ('media-b', 'template', ?, '2026-09-16')
+                `).run(id);
+              })();
+            }
+            return statement.bind(...values);
+          },
+        } as D1PreparedStatement;
+      },
+    } as D1Database;
+
+    const response = await json('PUT', `/api/templates/${id}`, {
+      messageType: 'image', messageContent: mediaImageContent('media/account-1/c.png'),
+    }, undefined, racingDb);
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ success: false });
+    const row = store.raw.prepare(`
+      SELECT message_content, draft_message_content, published_version, draft_revision
+      FROM templates WHERE id = ?
+    `).get(id) as {
+      message_content: string;
+      draft_message_content: string | null;
+      published_version: number;
+      draft_revision: number;
+    };
+    expect(row.message_content).toContain('media/account-1/b.png');
+    expect(row).toMatchObject({
+      draft_message_content: null, published_version: 1, draft_revision: 0,
+    });
+    expect(usageCount('media-a')).toBe(0);
+    expect(usageCount('media-b')).toBe(1);
+    expect(usageCount('media-c')).toBe(0);
   });
 });
 
