@@ -54,6 +54,18 @@ const EMPTY_DEFINITION: FriendAddRuleDefinition = {
   timeWindows: [{ start: '08:00', end: '21:00' }],
 }
 
+/** 保存済みかの比較には版番号を含めない。保存成功でサーバが版を進めても、入力が変わった扱いにしない。 */
+function editorSnapshot(rule: EditorRule, definition: FriendAddRuleDefinition) {
+  return JSON.stringify({
+    name: rule.name,
+    folderName: rule.folderName,
+    priority: rule.priority,
+    friendKind: rule.friendKind,
+    isFallback: rule.isFallback,
+    definition,
+  })
+}
+
 export default function FriendAddRuleEditor({ ruleId }: { ruleId?: string }) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -80,6 +92,8 @@ export default function FriendAddRuleEditor({ ruleId }: { ruleId?: string }) {
   // `txMO9` は3件目の「配信済み」タグを選んで確認を開いた状態が正本。
   const [actionTarget, setActionTarget] = useState(actionDialogOpen ? 'tag-delivered' : '')
   const saveIdempotencyKey = useRef(crypto.randomUUID())
+  const saveInFlight = useRef(false)
+  const savedSnapshot = useRef<string | null>(null)
 
   const load = useCallback(async () => {
     if (!selectedAccountId) { setLoading(false); return }
@@ -90,7 +104,7 @@ export default function FriendAddRuleEditor({ ruleId }: { ruleId?: string }) {
         const response = await api.friendAddRules.get(selectedAccountId, ruleId)
         if (!response.success) { setError(response.error); return }
         const conflicts = await api.friendAddRules.conflicts(selectedAccountId, response.data.rule.friendKind)
-        setRule({
+        const loadedRule: EditorRule = {
           name: response.data.rule.name,
           folderName: response.data.rule.folderName,
           priority: response.data.rule.priority,
@@ -100,8 +114,10 @@ export default function FriendAddRuleEditor({ ruleId }: { ruleId?: string }) {
           matchedLast7Days: response.data.rule.matchedLast7Days,
           lastTestStatus: response.data.rule.lastTestStatus,
           version: response.data.rule.version,
-        })
+        }
+        setRule(loadedRule)
         setDefinition(response.data.rule.definition)
+        savedSnapshot.current = editorSnapshot(loadedRule, response.data.rule.definition)
         setOptions({ ...response.data.options, folders: response.data.options.folders ?? [] })
         setMatchedLast28Days(conflicts.success
           ? conflicts.data.rules.find((item) => item.id === ruleId)?.matchedLast28Days ?? 0
@@ -118,7 +134,11 @@ export default function FriendAddRuleEditor({ ruleId }: { ruleId?: string }) {
         const maxPriority = conflictRes.success
           ? conflictRes.data.rules.reduce((max, item) => Math.max(max, item.priority), 0)
           : response.data.items.filter((item) => !item.isFallback).length
-        setRule((current) => ({ ...current, priority: Math.max(1, maxPriority + 1) }))
+        setRule((current) => {
+          const initialRule = { ...current, priority: Math.max(1, maxPriority + 1) }
+          savedSnapshot.current = editorSnapshot(initialRule, EMPTY_DEFINITION)
+          return initialRule
+        })
       }
     } catch {
       setError('設定を読み込めませんでした。')
@@ -146,6 +166,9 @@ export default function FriendAddRuleEditor({ ruleId }: { ruleId?: string }) {
     }
   }
 
+  const hasUnsavedChanges = savedSnapshot.current !== null
+    && savedSnapshot.current !== editorSnapshot(rule, definition)
+
   const validate = () => {
     if (!rule.name.trim()) return '設定名を入力してください。'
     // 再追加で「何も配信しない」ときはシナリオを使わない (サーバも同じ判断)。
@@ -156,11 +179,15 @@ export default function FriendAddRuleEditor({ ruleId }: { ruleId?: string }) {
   }
 
   const save = async (nextStep?: Step): Promise<string | null> => {
+    // disabledが描画される前の連打もここで止める。状態だけでは同じ描画内の
+    // 2回目を防げないため、同期refを保存完了まで保持する。
+    if (saveInFlight.current) return null
     const payload = input()
     if (!payload) { setError('LINE公式アカウントを選んでください。'); return null }
     const problem = validate()
     if (problem && step !== 'basic') { setError(problem); return null }
     if (!rule.name.trim()) { setError('設定名を入力してください。'); return null }
+    saveInFlight.current = true
     setSaving(true)
     setError('')
     setNotice('')
@@ -179,6 +206,7 @@ export default function FriendAddRuleEditor({ ruleId }: { ruleId?: string }) {
       if (typeof savedVersion === 'number') {
         setRule((current) => ({ ...current, version: savedVersion }))
       }
+      savedSnapshot.current = editorSnapshot(rule, definition)
       setNotice('下書きを保存しました。')
       if (!ruleId || nextStep) router.replace(`/friend-add-settings?view=edit&id=${encodeURIComponent(savedId)}&step=${nextStep ?? step}`)
       return savedId
@@ -186,8 +214,20 @@ export default function FriendAddRuleEditor({ ruleId }: { ruleId?: string }) {
       setError('下書きを保存できませんでした。通信を確認して、もう一度お試しください。')
       return null
     } finally {
+      saveInFlight.current = false
       setSaving(false)
     }
+  }
+
+  const moveToStep = (nextStep: Step) => {
+    if (nextStep === step || saving) return
+    // 保存済みの段を見直すだけなら通信せずに移動する。入力が変わっているとき
+    // だけ、保存成功後に遷移するので失敗・競合時に表示中の値を失わない。
+    if (!hasUnsavedChanges) {
+      router.replace(hrefFor(nextStep))
+      return
+    }
+    void save(nextStep)
   }
 
   const runTest = async () => {
@@ -243,7 +283,7 @@ export default function FriendAddRuleEditor({ ruleId }: { ruleId?: string }) {
       <a className={'friend-add-editor-backLink'} href="/friend-add-settings">← 友だち追加時の配信</a>
       <nav className={'friend-add-editor-steps'} aria-label="友だち追加時配信の作成手順">
         {STEPS.map((item, index) => (
-          <button key={item.key} type="button" aria-current={item.key === step ? 'step' : undefined} onClick={() => router.replace(hrefFor(item.key))}>
+          <button key={item.key} type="button" aria-current={item.key === step ? 'step' : undefined} onClick={() => moveToStep(item.key)}>
             <span className={index < currentIndex ? 'friend-add-editor-stepDone' : item.key === step ? 'friend-add-editor-stepCurrent' : 'friend-add-editor-stepTodo'}>{index < currentIndex ? <Check size={14} /> : item.order}</span>
             <span><small>STEP {item.order}</small><strong>{item.label}</strong></span>
           </button>
@@ -257,14 +297,14 @@ export default function FriendAddRuleEditor({ ruleId }: { ruleId?: string }) {
         <main className={step === 'preview' ? 'friend-add-editor-panel friend-add-editor-panelSplit' : 'friend-add-editor-panel'}>
           {step === 'basic' && <BasicStep rule={rule} setRule={setRule} definition={definition} setDefinition={setDefinition} options={options} />}
           {step === 'routes' && <RoutesStep rule={rule} definition={definition} options={options} toggleRoute={toggleRoute} setDefinition={setDefinition} />}
-          {step === 'message' && <MessageStep definition={definition} setDefinition={setDefinition} openActions={() => router.replace(hrefFor('actions'))} />}
+          {step === 'message' && <MessageStep definition={definition} setDefinition={setDefinition} openActions={() => moveToStep('actions')} />}
           {step === 'actions' && <ActionsStep definition={definition} setDefinition={setDefinition} options={options} actionType={actionType} actionTarget={actionTarget} setActionType={setActionType} setActionTarget={setActionTarget} openDialog={() => router.replace(hrefFor('actions', '&dialog=add'))} />}
           {step === 'preview' && <PreviewStep definition={definition} result={testResult} />}
         </main>
         <Summary step={step} rule={rule} definition={definition} options={options} matchedLast28Days={matchedLast28Days} pendingAction={actionDialogOpen && Boolean(actionTarget)} />
       </div>
 
-      <StickyBar className="friend-add-editor-sticky" status={notice || undefined} actions={<><Button href="/friend-add-settings">キャンセル</Button><Button type="button" onClick={() => void save()} disabled={saving}>下書き保存</Button>{step === 'preview' ? <Button type="button" variant="primary" onClick={() => void runTest()} disabled={saving}>{saving ? 'テスト中…' : 'テスト送信'}</Button> : <Button type="button" variant="primary" onClick={() => void save(STEPS[Math.min(currentIndex + 1, 4)].key)} disabled={saving}>{STEPS[Math.min(currentIndex + 1, 4)].label}へ</Button>}</>} />
+      <StickyBar className="friend-add-editor-sticky" status={notice || undefined} actions={<><Button href="/friend-add-settings">キャンセル</Button><Button type="button" onClick={() => void save()} disabled={saving}>下書き保存</Button>{step === 'preview' ? <Button type="button" variant="primary" onClick={() => void runTest()} disabled={saving}>{saving ? 'テスト中…' : 'テスト送信'}</Button> : <Button type="button" variant="primary" onClick={() => moveToStep(STEPS[Math.min(currentIndex + 1, 4)].key)} disabled={saving}>{STEPS[Math.min(currentIndex + 1, 4)].label}へ</Button>}</>} />
 
       {actionDialogOpen && (
         <div data-design-node="txMO9">

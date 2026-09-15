@@ -742,6 +742,37 @@ export type OperationHealthSnapshot = {
   serverNow: string
 }
 
+export type OperationAlert = {
+  id: string
+  lineAccountId: string
+  checkKey: OperationHealthCheckKey
+  status: 'open' | 'acknowledged' | 'resolved'
+  severity: 'unknown' | 'warning' | 'danger'
+  summary: string
+  sourceRunId: string
+  firstDetectedAt: string
+  lastDetectedAt: string
+  acknowledgedAt: string | null
+  acknowledgedById: string | null
+  acknowledgementNote: string | null
+  resolvedAt: string | null
+  version: number
+  reopenedCount: number
+  createdAt: string
+  updatedAt: string
+  notification: { queued: number; sending: number; sent: number; failed: number; unconfigured: number; total: number }
+  events: Array<{
+    id: string
+    action: 'opened' | 'escalated' | 'acknowledged' | 'resolved' | 'reopened'
+    severity: 'unknown' | 'warning' | 'danger'
+    summary: string
+    actorId: string | null
+    note: string | null
+    alertVersion: number
+    createdAt: string
+  }>
+}
+
 export type OperationHistoryEntry = OperationIncident & {
   historyKind?: 'incident' | 'deployment'
   occurredAt?: string
@@ -9406,6 +9437,18 @@ export const api = {
       fetchApi<ApiResponse<OperationHealthSnapshot>>('/api/operations/health/runs', {
         method: 'POST',
         body: JSON.stringify({ lineAccountId: accountId }),
+      }),
+    alerts: (accountId: string, includeResolved = false) =>
+      fetchApi<ApiResponse<OperationAlert[]>>(
+        `/api/operations/alerts?account_id=${encodeURIComponent(accountId)}${includeResolved ? '&include_resolved=1' : ''}`,
+      ),
+    acknowledgeAlert: (id: string, body: { lineAccountId: string; expectedVersion: number; note?: string }) =>
+      fetchApi<ApiResponse<OperationAlert> & { duplicate?: boolean }>(`/api/operations/alerts/${encodeURIComponent(id)}/acknowledge`, {
+        method: 'POST', body: JSON.stringify(body),
+      }),
+    retryAlertNotifications: (id: string, lineAccountId: string) =>
+      fetchApi<ApiResponse<{ retried: number }>>(`/api/operations/alerts/${encodeURIComponent(id)}/notifications/retry`, {
+        method: 'POST', body: JSON.stringify({ lineAccountId }),
       }),
     stepUp: (code: string) =>
       fetchApi<ApiResponse<{ token: string; purpose: 'operations.control'; expiresAt: string }>>(

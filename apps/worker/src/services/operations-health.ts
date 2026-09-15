@@ -1,6 +1,8 @@
 import {
   completeOperationHealthRun,
+  enqueuePendingOperationAlertNotifications,
   failOperationHealthRun,
+  reconcileOperationHealthAlerts,
   startOperationHealthRun,
   type OperationHealthResultInput,
   type OperationHealthStatus,
@@ -137,7 +139,16 @@ export async function runOperationHealthChecks(
   input: { lineAccountId: string; source: 'scheduled' | 'manual'; actorId?: string | null; now?: string },
 ) {
   const started = await startOperationHealthRun(db, input);
-  if (!started.created) return { duplicate: true, run: started.run };
+  if (!started.created) {
+    if (started.run.status === 'completed') {
+      await reconcileOperationHealthAlerts(db, {
+        lineAccountId: input.lineAccountId, runId: started.run.id, results: started.run.results,
+      });
+      await enqueuePendingOperationAlertNotifications(db, { lineAccountId: input.lineAccountId });
+    }
+    return { duplicate: true, run: started.run };
+  }
+  let completed = false;
   try {
     const account = await db.prepare(
       'SELECT id, channel_access_token, is_active FROM line_accounts WHERE id = ?',
@@ -145,10 +156,16 @@ export async function runOperationHealthChecks(
     if (!account || account.is_active !== 1) throw new Error('line_account_not_active');
     const observedAt = input.now ?? new Date().toISOString();
     const results = await collectChecks(db, account, observedAt);
-    return { duplicate: false, run: await completeOperationHealthRun(db, started.run.id, results, observedAt) };
+    const run = await completeOperationHealthRun(db, started.run.id, results, observedAt);
+    completed = true;
+    await reconcileOperationHealthAlerts(db, { lineAccountId: input.lineAccountId, runId: run.id, results: run.results });
+    await enqueuePendingOperationAlertNotifications(db, { lineAccountId: input.lineAccountId });
+    return { duplicate: false, run };
   } catch (error) {
-    await failOperationHealthRun(db, started.run.id,
-      error instanceof Error ? error.message : 'health_check_failed');
+    if (!completed) {
+      await failOperationHealthRun(db, started.run.id,
+        error instanceof Error ? error.message : 'health_check_failed');
+    }
     throw error;
   }
 }
