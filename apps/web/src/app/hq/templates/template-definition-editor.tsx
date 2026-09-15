@@ -98,7 +98,7 @@ function MessageEditor({ value, disabled, onChange, onBusyChange }: { value: Mes
     { value: 'text', label: 'テキスト' },
     { value: 'flex', label: 'カード型' },
     { value: 'image', label: '画像' },
-    // 既存データを開いて保存しても形式を落とさない。店舗側の専用編集画面へ
+    // 既存データを開いて保存しても形式を落とさない。アカウント側の専用編集画面へ
     // 移されるまで、HQで作成済みのカルーセルも選択肢として保持する。
     { value: 'carousel', label: 'カルーセル' },
   ]
@@ -117,7 +117,7 @@ function MessageEditor({ value, disabled, onChange, onBusyChange }: { value: Mes
       onTargetDateChange={setTargetDate}
       references={EMPTY_TEMPLATE_REFERENCES}
       referenceAccountId={null}
-      referenceUnavailableHint="友だち情報と共通情報は店舗ごとに異なるため、配布先のLINEアカウントで設定してください。"
+      referenceUnavailableHint="友だち情報と共通情報はアカウントごとに異なるため、配布先のLINEアカウントで設定してください。"
       disabled={disabled}
       typeOptions={messageTypeOptions}
       bodyAriaLabel="配信する本文"

@@ -10,8 +10,9 @@
  * - token_expires_at is NULL (legacy, unknown expiry — refresh once to start tracking)
  */
 
-import { getLineAccounts, updateLineAccount } from '@line-crm/db';
+import { getLineAccounts, updateLineAccount, updateLineAccountFields } from '@line-crm/db';
 import type { LineAccount } from '@line-crm/db';
+import { fetchBotProfile } from '../lib/bot-profile.js';
 
 const REFRESH_THRESHOLD_MS = 7 * 24 * 60 * 60_000; // 7 days
 const JST_OFFSET_MS = 9 * 60 * 60_000;
@@ -25,6 +26,12 @@ function shouldRefresh(account: LineAccount): boolean {
   if (!account.token_expires_at) return true; // unknown expiry
   const expiresAt = new Date(account.token_expires_at).getTime();
   return expiresAt - Date.now() < REFRESH_THRESHOLD_MS;
+}
+
+function shouldSyncProfile(account: LineAccount): boolean {
+  if (!account.line_profile_synced_at) return true;
+  const syncedAt = new Date(account.line_profile_synced_at).getTime();
+  return !Number.isFinite(syncedAt) || Date.now() - syncedAt >= 24 * 60 * 60_000;
 }
 
 export interface TokenResponse {
@@ -103,21 +110,40 @@ export async function refreshLineAccessTokens(db: D1Database): Promise<void> {
 
   for (const account of accounts) {
     if (!account.is_active) continue;
-    if (!shouldRefresh(account)) continue;
+    let accessToken = account.channel_access_token;
 
-    try {
-      const token = await issueLineAccessToken(account.channel_id, account.channel_secret);
-      const expiresAt = new Date(Date.now() + token.expires_in * 1000 + JST_OFFSET_MS);
-      const expiresAtJst = expiresAt.toISOString().slice(0, -1) + '+09:00';
+    if (shouldRefresh(account)) {
+      try {
+        const token = await issueLineAccessToken(account.channel_id, account.channel_secret);
+        const expiresAt = new Date(Date.now() + token.expires_in * 1000 + JST_OFFSET_MS);
+        const expiresAtJst = expiresAt.toISOString().slice(0, -1) + '+09:00';
 
-      await updateLineAccount(db, account.id, {
-        channel_access_token: token.access_token,
-        token_expires_at: expiresAtJst,
-      });
+        await updateLineAccount(db, account.id, {
+          channel_access_token: token.access_token,
+          token_expires_at: expiresAtJst,
+        });
+        accessToken = token.access_token;
 
-      console.log(`🔄 Token refreshed: ${account.name} (expires ${expiresAtJst})`);
-    } catch (err) {
-      console.error(`❌ Token refresh failed for ${account.name}:`, err);
+        console.log(`🔄 Token refreshed: ${account.name} (expires ${expiresAtJst})`);
+      } catch (err) {
+        console.error(`❌ Token refresh failed for ${account.name}:`, err);
+      }
+    }
+
+    if (shouldSyncProfile(account)) {
+      try {
+        const profile = await fetchBotProfile(accessToken);
+        if (profile.displayName || profile.pictureUrl || profile.basicId) {
+          await updateLineAccountFields(db, account.id, {
+            lineDisplayName: profile.displayName ?? null,
+            linePictureUrl: profile.pictureUrl ?? null,
+            lineBasicId: profile.basicId ?? null,
+            lineProfileSyncedAt: jstNow(),
+          });
+        }
+      } catch (err) {
+        console.error(`❌ LINE profile sync failed for ${account.name}:`, err);
+      }
     }
   }
 }

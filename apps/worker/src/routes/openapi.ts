@@ -2159,6 +2159,24 @@ const spec = {
         },
       },
     },
+    '/api/forms/{id}/submissions/{submissionId}/retry-effects': {
+      post: {
+        tags: ['Forms'],
+        summary: '完了しなかった回答の後処理だけを、予約(claim)の工程記録に沿って再実行する(N-168)',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'submissionId', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: '再実行結果。完了済みの回答は complete: true で返す' },
+          '403': { description: 'Owner or admin role required' },
+          '404': { description: 'フォーム・回答が無い、または権限範囲外' },
+          '409': { description: '後処理の記録(claim)が無い回答' },
+          '429': { description: '別の処理が進行中' },
+        },
+      },
+    },
     '/api/forms/{id}/publish': {
       post: {
         tags: ['Forms'],

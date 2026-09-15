@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest'
 const here = dirname(fileURLToPath(import.meta.url))
 const source = readFileSync(join(here, 'top-bar.tsx'), 'utf8')
 const css = readFileSync(join(here, 'top-bar.module.css'), 'utf8')
+const appTopBar = readFileSync(join(here, '..', 'shell', 'app-top-bar.tsx'), 'utf8')
 
 describe('V6共通トップバー', () => {
   it('Pencilの実ノードと7つの表示要素を固定する', () => {
@@ -30,5 +31,12 @@ describe('V6共通トップバー', () => {
   it('押せる要素のキーボードフォーカスを消さない', () => {
     expect(css).toContain(':focus-visible')
     expect(css).not.toMatch(/outline:\s*(?:0|none)/)
+  })
+
+  it('統括配下だけLINEアカウント切替と隣の区切りを描かない', () => {
+    expect(source).toContain('showAccountSwitcher = true')
+    expect(source).toContain('showAccountSwitcher ? <>')
+    expect(appTopBar).toContain("pathname === '/hq' || pathname.startsWith('/hq/')")
+    expect(appTopBar).toContain('showAccountSwitcher={!isHq}')
   })
 })

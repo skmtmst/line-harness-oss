@@ -13,7 +13,7 @@ import { logoutAndGoToLogin } from '@/lib/logout'
  * 統括メニューの下端「ログイン中のアカウント」と、押すと上に開くアカウントメニュー。
  * Pencil ★V6 36-1 `qAvlC/X6G9j6`（ブロック）と `qAvlC/bfhe6`（メニュー）。
  *
- * `docs/v6-common-rules.md` §1-2 の統括だけの例外。店舗の画面には置かない。
+ * `docs/v6-common-rules.md` §1-2 の統括だけの例外。アカウントの画面には置かない。
  *
  * プランの札（無料トライアル・残り日数）は課金の状態（`api.hqBilling.summary`）から出す。
  * 課金対象外（運営）の統括には札を出さず、役割の札だけにする。
@@ -120,7 +120,7 @@ export default function HqAccountMenu() {
               <Users aria-hidden="true" className="h-4.5 w-4.5 text-ink-secondary" />
               <span className="whitespace-nowrap">メンバー管理</span>
               <span className="flex-1" />
-              <span className="whitespace-nowrap text-micro font-normal text-ink-faint">権限者・担当店舗</span>
+              <span className="whitespace-nowrap text-micro font-normal text-ink-faint">権限者・担当アカウント</span>
             </Link>
             {me?.role !== 'staff' ? (
               // 担当者には出さない（権限表: 課金プランは担当者 不可）。

@@ -122,7 +122,13 @@ beforeEach(() => {
     return rows.filter((row: { id: string }) => ids.includes(row.id));
   });
   dbMocks.getLineAccountListStats.mockResolvedValue({
-    'acc-1': { friendCount: 12, activeScenarios: 3, messagesThisMonth: 8 },
+    'acc-1': {
+      friendCount: 12,
+      activeScenarios: 3,
+      messagesThisMonth: 8,
+      staffCount: 2,
+      connection: { status: 'ok', checkedAt: '2026-09-15T10:00:00.000Z' },
+    },
   });
   dbMocks.getLineAccountCredentialHealth.mockResolvedValue(null);
   dbMocks.getLineAccountById.mockResolvedValue(fakeAccount);
@@ -482,6 +488,10 @@ describe('POST /api/line-accounts/connect', () => {
       loginChannelId: '2007123456',
       liffId: '2007123456-auto',
       timezone: 'Asia/Tokyo',
+      lineDisplayName: 'LINE公式名',
+      linePictureUrl: 'https://example.com/icon.png',
+      lineBasicId: '@line',
+      lineProfileSyncedAt: '2026-08-10T12:00:00.000+09:00',
     });
     expect(dbMocks.saveLineAccountConnectionChecks.mock.calls[0][1].checks)
       .toContainEqual(expect.objectContaining({ kind: 'webhook_endpoint', webhookActive: true }));
@@ -550,6 +560,8 @@ describe('POST /api/line-accounts', () => {
       loginChannelSecret: 'login-secret',
       liffId: '2009624792-XXXX',
       tenantId: 'tenant-line-owner',
+      lineDisplayName: 'テスト',
+      lineProfileSyncedAt: '2026-08-10T12:00:00.000+09:00',
     });
 
     const body = (await res.json()) as { success: boolean; data: { loginChannelId: string | null; liffId: string | null; loginChannelSecret?: string | null; loginChannelSecretConfigured: boolean } };
@@ -764,6 +776,12 @@ describe('POST /api/line-accounts/:id/connection-checks', () => {
       result: expected,
       registeredUrl: endpoint?.endpoint || null,
     });
+    expect(dbMocks.updateLineAccountFields).toHaveBeenCalledWith(expect.anything(), 'acc-1', {
+      lineDisplayName: 'テスト',
+      linePictureUrl: null,
+      lineBasicId: null,
+      lineProfileSyncedAt: '2026-08-10T12:00:00.000+09:00',
+    });
     await expect(res.json()).resolves.toMatchObject({
       data: {
         accountId: 'acc-1',
@@ -944,7 +962,13 @@ describe('GET /api/line-accounts', () => {
     }));
     dbMocks.getLineAccounts.mockResolvedValue(accounts);
     dbMocks.getLineAccountListStats.mockResolvedValue({
-      'acc-1': { friendCount: 12, activeScenarios: 3, messagesThisMonth: 8 },
+      'acc-1': {
+        friendCount: 12,
+        activeScenarios: 3,
+        messagesThisMonth: 8,
+        staffCount: 2,
+        connection: { status: 'ok', checkedAt: '2026-09-15T10:00:00.000Z' },
+      },
     });
 
     const res = await setupApp('owner').request('/api/line-accounts');
@@ -953,10 +977,44 @@ describe('GET /api/line-accounts', () => {
     expect(dbMocks.getLineAccountListStats).toHaveBeenCalledTimes(1);
     expect(dbMocks.getLineAccountListStats).toHaveBeenCalledWith(expect.anything(), accounts.map((item) => item.id));
     expect(fetch).not.toHaveBeenCalled();
-    const body = (await res.json()) as { data: Array<{ stats: { friendCount: number } }> };
+    const body = (await res.json()) as { data: Array<{ stats: { friendCount: number; staffCount: number }; connection: { status: string } }> };
     expect(body.data).toHaveLength(40);
     expect(body.data[0].stats.friendCount).toBe(12);
+    expect(body.data[0].stats.staffCount).toBe(2);
+    expect(body.data[0].connection.status).toBe('ok');
     expect(body.data[1].stats.friendCount).toBe(0);
+    expect(body.data[1].connection.status).toBe('unknown');
+  });
+
+  test('通常一覧はDBのLINE公式プロフィールと接続状態3分岐を返す', async () => {
+    const accounts = [
+      {
+        ...fakeAccount,
+        id: 'acc-1',
+        line_display_name: 'LINE公式名',
+        line_picture_url: 'https://example.com/line.png',
+        line_basic_id: '@line',
+      },
+      { ...fakeAccount, id: 'acc-2', channel_id: '2', name: '要確認' },
+      { ...fakeAccount, id: 'acc-3', channel_id: '3', name: '未確認' },
+    ];
+    dbMocks.getLineAccounts.mockResolvedValue(accounts);
+    dbMocks.getLineAccountListStats.mockResolvedValue({
+      'acc-1': { friendCount: 1, activeScenarios: 0, messagesThisMonth: 2, staffCount: 3, connection: { status: 'ok', checkedAt: '2026-09-15T10:00:00.000Z' } },
+      'acc-2': { friendCount: 0, activeScenarios: 0, messagesThisMonth: 0, staffCount: 0, connection: { status: 'warn', checkedAt: '2026-09-15T10:01:00.000Z' } },
+      'acc-3': { friendCount: 0, activeScenarios: 0, messagesThisMonth: 0, staffCount: 0, connection: { status: 'unknown', checkedAt: null } },
+    });
+
+    const res = await setupApp('owner').request('/api/line-accounts');
+    expect(res.status).toBe(200);
+    const body = await res.json() as { data: Array<Record<string, unknown>> };
+    expect(body.data[0]).toMatchObject({
+      displayName: 'LINE公式名', pictureUrl: 'https://example.com/line.png', basicId: '@line',
+      stats: { staffCount: 3 }, connection: { status: 'ok' },
+    });
+    expect(body.data[1]).toMatchObject({ displayName: '要確認', pictureUrl: null, basicId: null, connection: { status: 'warn' } });
+    expect(body.data[2]).toMatchObject({ connection: { status: 'unknown', checkedAt: null } });
+    expect(fetch).not.toHaveBeenCalled();
   });
 
   test('一括集計に失敗したときは全件0と偽らず500を返す', async () => {

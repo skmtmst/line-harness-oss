@@ -128,11 +128,13 @@ export function resolveSwitcherActions(pages: PageInput[], groupId: string): Pag
       if (area.actionType !== 'richmenuswitch') return area;
       const targetPageId = area.actionData.targetPageId as string | undefined;
       if (!targetPageId) {
-        throw new Error(`richmenuswitch action missing targetPageId on page ${page.id}`);
+        throw new RichMenuValidationError(`ページ「${page.name}」の切替ボタンに遷移先が設定されていません`);
       }
       const alias = aliasByPageId.get(targetPageId);
       if (!alias) {
-        throw new Error(`richmenuswitch target page ${targetPageId} not found in group ${groupId}`);
+        throw new RichMenuValidationError(
+          `切替ボタンの遷移先ページ ${targetPageId} がこのグループにありません`,
+        );
       }
       const inner = `switch-to-${targetPageId}`;
       return {
@@ -238,10 +240,17 @@ function validateAreaByIntent(area: AreaInput, prefix: string, group: GroupInput
       }
       return;
     }
+    default:
+      // intent は DB の TEXT 列で、保存時の型とずれた値が残ることがある。
+      // 知らない種類は action を組み立てられないので LINE を呼ぶ前に止める。
+      throw new RichMenuValidationError(`${prefix}: ボタンの種類を確認できません`);
   }
 }
 
 export function validateRichMenuGroupForPublish(group: GroupInput): void {
+  // #827 (N-159): 「ページを切り替える」だけのボタンは、押しても別ページが
+  // 出るだけで、押すと何か起きる行き先にはならない。到達可能な行き先として数えない。
+  let destinationCount = 0;
   for (const page of group.pages) {
     for (let i = 0; i < page.areas.length; i++) {
       const area = page.areas[i];
@@ -250,13 +259,19 @@ export function validateRichMenuGroupForPublish(group: GroupInput): void {
         ? `ページ「${page.name}」の「${label}」`
         : `ページ「${page.name}」のタップ領域${i + 1}`;
 
+      // #827 (N-155): ボタン名は端末の読み上げ(アクセシビリティ)にも使うため
+      // 必須・20字以内。既存行や DB 直接更新を通った値もここで止める。
+      if (!label) {
+        throw new RichMenuValidationError(`${prefix}: ボタン名（読み上げラベル）を入力してください`);
+      }
+      if (!limited(label, 20)) {
+        throw new RichMenuValidationError(`${prefix}: ボタン名（読み上げラベル）は20文字以内にしてください`);
+      }
+
       // intent がある area は intent で見る。無いものは今までどおり actionType で見る。
       if (area.intent) {
         validateAreaByIntent(area, prefix, group);
-        continue;
-      }
-
-      if (area.actionType === 'message') {
+      } else if (area.actionType === 'message') {
         const text = area.actionData.text;
         if (!requiredString(text)) {
           throw new RichMenuValidationError(`${prefix}: 送信テキストを入力してください`);
@@ -288,8 +303,20 @@ export function validateRichMenuGroupForPublish(group: GroupInput): void {
         if (!requiredString(area.actionData.richMenuAliasId) || !requiredString(area.actionData.data)) {
           throw new RichMenuValidationError(`${prefix}: 遷移先ページを選択してください`);
         }
+      } else {
+        // action_type は CHECK 制約で4種に限定されるが、検証関数は
+        // 予約スナップショットの復元値にも掛かるため、知らない種類は止める。
+        throw new RichMenuValidationError(`${prefix}: ボタンの動作（${area.actionType}）には対応していません`);
       }
+
+      const isSwitch = area.intent ? area.intent === 'switch' : area.actionType === 'richmenuswitch';
+      if (!isSwitch) destinationCount += 1;
     }
+  }
+  if (destinationCount === 0) {
+    throw new RichMenuValidationError(
+      '公開するには、ページ切替以外の行き先（URLを開く・テキストを送るなど）を持つボタンを1つ以上設定してください',
+    );
   }
 }
 

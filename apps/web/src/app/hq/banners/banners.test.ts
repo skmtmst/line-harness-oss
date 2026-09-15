@@ -82,11 +82,11 @@ describe('統括 バナー生成', () => {
     expect(modal).toContain('useOverlayFocus')
   })
 
-  it('店舗へ渡すは、渡し済みの店舗を灰色にして二度渡さない', () => {
+  it('アカウントへ渡すは、渡し済みのアカウントを灰色にして二度渡さない', () => {
     expect(modal).toContain('delivered.has(account.id)')
     expect(modal).toContain('disabled={already || busy}')
     expect(modal).toContain('渡し済み')
-    expect(modal).toContain('店舗へ渡す')
+    expect(modal).toContain('アカウントへ渡す')
   })
 
   it('「削除」ではなく「一覧から外す」「アーカイブ」と言う', () => {

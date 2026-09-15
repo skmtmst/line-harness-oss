@@ -41,6 +41,11 @@ export interface AccountWithStats {
     friendCount: number
     activeScenarios: number
     messagesThisMonth: number
+    staffCount: number
+  }
+  connection?: {
+    status: 'ok' | 'warn' | 'unknown'
+    checkedAt: string | null
   }
 }
 

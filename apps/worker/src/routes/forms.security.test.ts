@@ -27,6 +27,8 @@ const mocks = vi.hoisted(() => ({
   readFormSubmitClaimEffectStats: vi.fn(),
   saveFormSubmitClaimEffectStats: vi.fn(),
   findUnfinishedFormSubmitClaimByHash: vi.fn(),
+  getFormSubmitClaimsBySubmissionIds: vi.fn(),
+  getFormVersionContentsByIds: vi.fn(),
   getFormSubmissionById: vi.fn(),
   createForm: vi.fn(),
   getFormSubmissions: vi.fn(),
@@ -74,6 +76,8 @@ vi.mock('@line-crm/db', () => ({
   readFormSubmitClaimEffectStats: mocks.readFormSubmitClaimEffectStats,
   saveFormSubmitClaimEffectStats: mocks.saveFormSubmitClaimEffectStats,
   findUnfinishedFormSubmitClaimByHash: mocks.findUnfinishedFormSubmitClaimByHash,
+  getFormSubmitClaimsBySubmissionIds: mocks.getFormSubmitClaimsBySubmissionIds,
+  getFormVersionContentsByIds: mocks.getFormVersionContentsByIds,
   getFormSubmissionById: mocks.getFormSubmissionById,
   updateFormSubmissionDestinationWriteResult: mocks.updateFormSubmissionDestinationWriteResult,
   getFriendByLineUserIdForAccount: mocks.getFriendByLineUserIdForAccount,
@@ -215,6 +219,8 @@ beforeEach(() => {
   mocks.completeFormSubmitClaim.mockResolvedValue(true);
   mocks.failFormSubmitClaim.mockResolvedValue(true);
   mocks.findUnfinishedFormSubmitClaimByHash.mockResolvedValue(null);
+  mocks.getFormSubmitClaimsBySubmissionIds.mockResolvedValue(new Map());
+  mocks.getFormVersionContentsByIds.mockResolvedValue(new Map());
   mocks.readFormSubmitClaimEffectStats.mockReturnValue({});
   mocks.saveFormSubmitClaimEffectStats.mockResolvedValue(true);
   mocks.ensureFormSubmitOutboxEvent.mockImplementation(async (_db, _scope, _kind, eventId) => ({

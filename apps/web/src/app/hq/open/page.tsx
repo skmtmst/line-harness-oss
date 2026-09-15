@@ -35,7 +35,7 @@ export default function HqOpenPage() {
         setAccounts(response.data as AccountWithStats[])
       })
       .catch(() => {
-        if (!cancelled) setError('店舗情報を読み込めませんでした。時間をおいてもう一度お試しください。')
+        if (!cancelled) setError('アカウント情報を読み込めませんでした。時間をおいてもう一度お試しください。')
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -62,27 +62,27 @@ export default function HqOpenPage() {
       <header data-design="Head" className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
           <p className="text-sm font-semibold text-accent">統括コンソール</p>
-          <h1 className="mt-1 text-2xl font-bold tracking-tight text-ink">どの店舗の{target.label}を開きますか</h1>
-          <p className="mt-1 text-sm text-ink-secondary">店舗を選ぶと、その店舗の管理画面へ移動します。</p>
+          <h1 className="mt-1 text-2xl font-bold tracking-tight text-ink">どのアカウントの{target.label}を開きますか</h1>
+          <p className="mt-1 text-sm text-ink-secondary">アカウントを選ぶと、そのアカウントの管理画面へ移動します。</p>
         </div>
-        <Button href="/hq" variant="secondary" className="shrink-0">店舗管理へ戻る</Button>
+        <Button href="/hq" variant="secondary" className="shrink-0">アカウント管理へ戻る</Button>
       </header>
 
       {error ? <div className="rounded-card bg-danger-bg p-4 text-sm text-danger" role="alert">{error}</div> : null}
       {!error && loading ? (
-        <div className="flex min-h-64 items-center justify-center" role="status" aria-label="店舗を読み込み中">
+        <div className="flex min-h-64 items-center justify-center" role="status" aria-label="アカウントを読み込み中">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-hairline border-t-accent" />
         </div>
       ) : null}
       {!error && !loading && accounts.length === 0 ? (
         <section data-design="Empty" className="rounded-card border border-hairline bg-canvas px-6 py-16 text-center shadow-sm">
-          <h2 className="text-xl font-bold text-ink">まだ店舗がありません</h2>
+          <h2 className="text-xl font-bold text-ink">まだアカウントがありません</h2>
           <p className="mt-2 text-sm text-ink-secondary">最初のLINE公式アカウントを登録してください。</p>
           <Button href="/accounts/new" variant="primary" className="mt-6">＋LINEアカウントを新規登録</Button>
         </section>
       ) : null}
       {!error && !loading && accounts.length > 0 ? (
-        <HqAccountList accounts={accounts} onSelect={openStorePage} selectLabel="この店舗を選ぶ" />
+        <HqAccountList accounts={accounts} onSelect={openStorePage} selectLabel="このアカウントを選ぶ" />
       ) : null}
     </div>
   )

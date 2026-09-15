@@ -51,11 +51,11 @@ export function lastLoginLabel(iso: string | undefined, now = new Date()): strin
   return `${get('month')}/${get('day')}`
 }
 
-/** 担当範囲の文。「全店舗」か店舗名の列挙。 */
+/** 担当範囲の文。「全アカウント」かアカウント名の列挙。 */
 export function scopeLabel(member: Pick<StaffMember, 'accountScope' | 'scopedLineAccountIds'>, accountNames: Map<string, string>): string {
-  if (member.accountScope !== 'accounts') return '全店舗'
-  const names = (member.scopedLineAccountIds ?? []).map((id) => accountNames.get(id) ?? '不明な店舗')
-  return names.length > 0 ? names.join('、') : '店舗なし'
+  if (member.accountScope !== 'accounts') return '全アカウント'
+  const names = (member.scopedLineAccountIds ?? []).map((id) => accountNames.get(id) ?? '不明なアカウント')
+  return names.length > 0 ? names.join('、') : 'アカウントなし'
 }
 
 /** 数値カード帯の4つ。 */

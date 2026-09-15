@@ -274,6 +274,70 @@ export type PublishFormVersionResult =
   | { kind: 'not_found' }
   | { kind: 'conflict'; form: Form };
 
+/**
+ * バージョン1行の中身(N-168)。
+ *
+ * 失敗した後処理の再実行は、回答が作られた当時の版の定義
+ * (fields/layout/後処理の指定)をそのまま使う。回答が持つ
+ * `form_version_id` からここで引き直す。
+ */
+export interface FormVersionContent {
+  id: string;
+  form_id: string;
+  name: string;
+  description: string | null;
+  fields: string;
+  layout: string | null;
+  on_submit_tag_id: string | null;
+  on_submit_scenario_id: string | null;
+  on_submit_message_type: 'text' | 'flex' | null;
+  on_submit_message_content: string | null;
+  on_submit_webhook_url: string | null;
+  on_submit_webhook_headers: string | null;
+  on_submit_webhook_fail_message: string | null;
+  save_to_metadata: number;
+}
+
+export async function getFormVersionContent(
+  db: D1Database,
+  versionId: string,
+): Promise<FormVersionContent | null> {
+  return db
+    .prepare(
+      `SELECT id, form_id, name, description, fields, layout,
+              on_submit_tag_id, on_submit_scenario_id,
+              on_submit_message_type, on_submit_message_content,
+              on_submit_webhook_url, on_submit_webhook_headers,
+              on_submit_webhook_fail_message, save_to_metadata
+         FROM form_versions WHERE id = ?`,
+    )
+    .bind(versionId)
+    .first<FormVersionContent>();
+}
+
+/** 一覧表示用に、版 id の束から中身をまとめて読む。 */
+export async function getFormVersionContentsByIds(
+  db: D1Database,
+  versionIds: string[],
+): Promise<Map<string, FormVersionContent>> {
+  const unique = [...new Set(versionIds)].filter(Boolean);
+  const versions = new Map<string, FormVersionContent>();
+  if (unique.length === 0) return versions;
+  const result = await db
+    .prepare(
+      `SELECT id, form_id, name, description, fields, layout,
+              on_submit_tag_id, on_submit_scenario_id,
+              on_submit_message_type, on_submit_message_content,
+              on_submit_webhook_url, on_submit_webhook_headers,
+              on_submit_webhook_fail_message, save_to_metadata
+         FROM form_versions WHERE id IN (${unique.map(() => '?').join(', ')})`,
+    )
+    .bind(...unique)
+    .all<FormVersionContent>();
+  for (const row of result.results) versions.set(row.id, row);
+  return versions;
+}
+
 /** 編集中の1行を不変版へ写し、回答URLの参照先を原子的に切り替える。 */
 export async function publishFormVersion(
   db: D1Database,
@@ -1222,6 +1286,42 @@ export async function getFormSubmitClaim(
     .prepare(`SELECT * FROM form_submit_claims WHERE ${CLAIM_SCOPE_WHERE}`)
     .bind(...claimBindings(scope))
     .first<FormSubmitClaim>();
+}
+
+/**
+ * 回答 id から予約を読む(N-168)。
+ *
+ * 管理画面が「この回答の後処理はどこまで終わったか」を出し、失敗した工程
+ * だけを再実行する入口で使う。予約は回答の保存と同じ id を持つ。
+ */
+export async function getFormSubmitClaimBySubmissionId(
+  db: D1Database,
+  submissionId: string,
+): Promise<FormSubmitClaim | null> {
+  return db
+    .prepare(`SELECT * FROM form_submit_claims WHERE submission_id = ?`)
+    .bind(submissionId)
+    .first<FormSubmitClaim>();
+}
+
+/** 回答一覧用に、回答 id の束から予約をまとめて読む。 */
+export async function getFormSubmitClaimsBySubmissionIds(
+  db: D1Database,
+  submissionIds: string[],
+): Promise<Map<string, FormSubmitClaim>> {
+  const unique = [...new Set(submissionIds)].filter(Boolean);
+  const claims = new Map<string, FormSubmitClaim>();
+  if (unique.length === 0) return claims;
+  const result = await db
+    .prepare(
+      `SELECT * FROM form_submit_claims WHERE submission_id IN (${unique.map(() => '?').join(', ')})`,
+    )
+    .bind(...unique)
+    .all<FormSubmitClaim>();
+  for (const row of result.results) {
+    if (row.submission_id) claims.set(row.submission_id, row);
+  }
+  return claims;
 }
 
 export interface CreateFormSubmitClaimInput extends FormSubmitClaimScope {
