@@ -789,6 +789,7 @@ function usageCategory(input: UsageCategoryInput) {
 interface UsageReferenceHealthRow {
   templates_broken: number;
   scenarios_broken: number;
+  forms_broken: number;
   rich_menus_broken: number;
   friend_attributes_broken: number;
   inflow_conversion_broken: number;
@@ -812,6 +813,7 @@ async function collectUsageReferenceHealth(
   const supportedKeys = [
     'templates',
     'scenarios',
+    'forms',
     'rich_menus',
     'friend_attributes',
     'inflow_conversion',
@@ -847,11 +849,26 @@ async function collectUsageReferenceHealth(
               JOIN reminders r ON r.id = rs.reminder_id
               LEFT JOIN templates t ON t.id = rs.template_id
                AND (t.line_account_id = r.line_account_id OR t.line_account_id IS NULL)
-             WHERE r.line_account_id = ? AND rs.template_id IS NOT NULL AND t.id IS NULL)
+             WHERE r.line_account_id = ? AND r.current_published_version_id IS NULL
+               AND rs.template_id IS NOT NULL AND t.id IS NULL)
          + (SELECT COUNT(*) FROM tracked_links l
               LEFT JOIN templates t ON t.id = l.template_id
                AND (t.line_account_id = l.line_account_id OR t.line_account_id IS NULL)
              WHERE l.line_account_id = ? AND l.template_id IS NOT NULL AND t.id IS NULL)
+         + (SELECT COUNT(*) FROM tracked_links l
+              LEFT JOIN message_templates t ON t.id = l.intro_template_id
+             WHERE l.line_account_id = ? AND l.intro_template_id IS NOT NULL AND t.id IS NULL)
+         + (SELECT COUNT(*) FROM tracked_links l
+              LEFT JOIN message_templates t ON t.id = l.reward_template_id
+             WHERE l.line_account_id = ? AND l.reward_template_id IS NOT NULL AND t.id IS NULL)
+         + (SELECT COUNT(*) FROM entry_routes e
+              LEFT JOIN message_templates t ON t.id = e.intro_template_id
+             WHERE e.line_account_id = ? AND e.intro_template_id IS NOT NULL AND t.id IS NULL)
+         + (SELECT COUNT(*) FROM reminder_version_steps rs
+              JOIN reminders r ON r.current_published_version_id = rs.reminder_version_id
+              LEFT JOIN templates t ON t.id = rs.template_id
+               AND (t.line_account_id = r.line_account_id OR t.line_account_id IS NULL)
+             WHERE r.line_account_id = ? AND rs.template_id IS NOT NULL AND t.id IS NULL)
          + (SELECT COUNT(*) FROM automations a
               JOIN json_each(CASE WHEN json_valid(a.actions) THEN a.actions ELSE '[]' END) action
               LEFT JOIN templates t
@@ -887,7 +904,39 @@ async function collectUsageReferenceHealth(
                AND (target.line_account_id = source.line_account_id OR target.line_account_id IS NULL)
              WHERE source.line_account_id = ? AND sa.action_type = 'scenario'
                AND json_type(sa.config_json, '$.scenarioId') = 'text' AND target.id IS NULL)
+         + (SELECT COUNT(*) FROM rich_menu_areas a
+              JOIN rich_menu_pages p ON p.id = a.page_id
+              JOIN rich_menu_groups g ON g.id = p.group_id
+              LEFT JOIN scenarios target
+                ON target.id = json_extract(
+                  CASE WHEN json_valid(a.action_data) THEN a.action_data ELSE '{}' END,
+                  '$.scenarioId'
+                )
+               AND (target.line_account_id = g.account_id OR target.line_account_id IS NULL)
+             WHERE g.account_id = ?
+               AND json_type(
+                 CASE WHEN json_valid(a.action_data) THEN a.action_data ELSE '{}' END,
+                 '$.scenarioId'
+               ) = 'text' AND target.id IS NULL)
+         + (SELECT COUNT(*) FROM forms f
+              JOIN form_accounts fa ON fa.form_id = f.id
+              JOIN form_versions v
+                ON v.id = f.current_published_version_id AND v.form_id = f.id
+              LEFT JOIN scenarios target ON target.id = v.on_submit_scenario_id
+               AND (target.line_account_id = fa.line_account_id OR target.line_account_id IS NULL)
+             WHERE fa.line_account_id = ? AND v.on_submit_scenario_id IS NOT NULL
+               AND target.id IS NULL)
            AS scenarios_broken,
+
+         (SELECT COUNT(*) FROM rich_menu_areas a
+            JOIN rich_menu_pages p ON p.id = a.page_id
+            JOIN rich_menu_groups g ON g.id = p.group_id
+            LEFT JOIN forms f ON f.id = a.form_id AND f.status = 'active'
+            LEFT JOIN form_accounts fa
+              ON fa.form_id = f.id AND fa.line_account_id = g.account_id
+           WHERE g.account_id = ? AND a.form_id IS NOT NULL
+             AND (f.id IS NULL OR fa.form_id IS NULL))
+           AS forms_broken,
 
          (SELECT COUNT(*) FROM rich_menu_assignments a
             LEFT JOIN rich_menu_groups g ON g.id = a.group_id AND g.account_id = a.line_account_id
@@ -901,6 +950,20 @@ async function collectUsageReferenceHealth(
          + (SELECT COUNT(*) FROM rich_menu_groups g
               LEFT JOIN rich_menu_pages p ON p.id = g.default_page_id AND p.group_id = g.id
              WHERE g.account_id = ? AND g.default_page_id IS NOT NULL AND p.id IS NULL)
+         + (SELECT COUNT(*) FROM rich_menu_areas a
+              JOIN rich_menu_pages source_page ON source_page.id = a.page_id
+              JOIN rich_menu_groups source_group ON source_group.id = source_page.group_id
+              LEFT JOIN rich_menu_pages target_page
+                ON target_page.id = json_extract(
+                  CASE WHEN json_valid(a.action_data) THEN a.action_data ELSE '{}' END,
+                  '$.targetPageId'
+                )
+               AND target_page.group_id = source_group.id
+             WHERE source_group.account_id = ? AND a.action_type = 'richmenuswitch'
+               AND json_type(
+                 CASE WHEN json_valid(a.action_data) THEN a.action_data ELSE '{}' END,
+                 '$.targetPageId'
+               ) = 'text' AND target_page.id IS NULL)
            AS rich_menus_broken,
 
          (SELECT COUNT(*) FROM scenario_steps ss
@@ -932,6 +995,33 @@ async function collectUsageReferenceHealth(
                AND (t.line_account_id = s.line_account_id OR t.line_account_id IS NULL)
              WHERE s.line_account_id = ? AND sa.action_type = 'tag'
                AND tag_ref.type = 'text' AND t.id IS NULL)
+         + (SELECT COUNT(*) FROM reminders r
+              LEFT JOIN friend_fields f ON f.id = r.trigger_field_id
+             WHERE r.line_account_id = ? AND r.trigger_type = 'friend_field'
+               AND r.trigger_field_id IS NOT NULL AND f.id IS NULL)
+         + (SELECT COUNT(*) FROM rich_menu_areas a
+              JOIN rich_menu_pages p ON p.id = a.page_id
+              JOIN rich_menu_groups g ON g.id = p.group_id
+              JOIN json_each(CASE WHEN json_valid(a.tag_ids) THEN a.tag_ids ELSE '[]' END) tag_ref
+              LEFT JOIN tags t ON t.id = CAST(tag_ref.value AS TEXT)
+               AND (t.line_account_id = g.account_id OR t.line_account_id IS NULL)
+             WHERE g.account_id = ? AND tag_ref.type = 'text' AND t.id IS NULL)
+         + (SELECT COUNT(*) FROM forms f
+              JOIN form_accounts fa ON fa.form_id = f.id
+              JOIN form_versions v
+                ON v.id = f.current_published_version_id AND v.form_id = f.id
+              LEFT JOIN tags t ON t.id = v.on_submit_tag_id
+               AND (t.line_account_id = fa.line_account_id OR t.line_account_id IS NULL)
+             WHERE fa.line_account_id = ? AND v.on_submit_tag_id IS NOT NULL AND t.id IS NULL)
+         + (SELECT COUNT(*) FROM forms f
+              JOIN form_accounts fa ON fa.form_id = f.id
+              JOIN form_versions v
+                ON v.id = f.current_published_version_id AND v.form_id = f.id
+              JOIN json_each(CASE WHEN json_valid(v.fields) THEN v.fields ELSE '[]' END) field
+              LEFT JOIN friend_fields target
+                ON target.id = json_extract(field.value, '$.friendFieldId')
+             WHERE fa.line_account_id = ?
+               AND json_type(field.value, '$.friendFieldId') = 'text' AND target.id IS NULL)
            AS friend_attributes_broken,
 
          (SELECT COUNT(*) FROM rich_menu_areas a
@@ -945,6 +1035,9 @@ async function collectUsageReferenceHealth(
               LEFT JOIN conversion_points p
                 ON p.id = e.conversion_point_id AND p.line_account_id = f.line_account_id
              WHERE f.line_account_id = ? AND p.id IS NULL)
+         + (SELECT COUNT(*) FROM entry_routes e
+              LEFT JOIN traffic_pools p ON p.id = e.pool_id
+             WHERE e.line_account_id = ? AND e.pool_id IS NOT NULL AND p.id IS NULL)
            AS inflow_conversion_broken,
 
          (SELECT COUNT(*) FROM common_action_bindings b
@@ -969,7 +1062,7 @@ async function collectUsageReferenceHealth(
              WHERE line_account_id = ? AND consumer_type NOT IN ('automation', 'tag')
              ORDER BY consumer_type
           )) AS unsupported_consumer_types`,
-    ).bind(...Array(29).fill(lineAccountId)).first<UsageReferenceHealthRow>();
+    ).bind(...Array(42).fill(lineAccountId)).first<UsageReferenceHealthRow>();
 
     if (!row) {
       return Object.fromEntries(supportedKeys.map((key) => [
@@ -981,11 +1074,16 @@ async function collectUsageReferenceHealth(
     return {
       templates: metric(Number(row.templates_broken ?? 0)),
       scenarios: metric(Number(row.scenarios_broken ?? 0)),
+      forms: metric(
+        Number(row.forms_broken ?? 0),
+        'partial',
+        'リッチメニューからの参照だけを確認しています。回答フォーム自体に単一のLINEアカウント所属がないため、ほかの利用先は除外しています',
+      ),
       rich_menus: metric(Number(row.rich_menus_broken ?? 0)),
       friend_attributes: metric(
         Number(row.friend_attributes_broken ?? 0),
         'partial',
-        '回答フォームはLINEアカウント所属を持たないため、フォーム内のタグ・友だち情報参照を除外しています',
+        '所属を確認できる公開フォームと型の決まった参照だけを集計し、型を安全に特定できない条件JSONは除外しています',
       ),
       inflow_conversion: metric(Number(row.inflow_conversion_broken ?? 0)),
       automations: metric(
@@ -1117,7 +1215,7 @@ export async function getAnalyticsUsageOverview(
   const categories = [
     usageCategory({ key: 'templates', label: 'テンプレート', href: '/templates', created: Number(templates?.created ?? 0), inUse: Number(templates?.in_use ?? 0), lastUsedAt: templates?.last_used_at ?? null, brokenReferences: referenceHealth.templates }),
     usageCategory({ key: 'scenarios', label: 'シナリオ', href: '/scenarios', created: Number(scenarios?.created ?? 0), inUse: Number(scenarios?.in_use ?? 0), lastUsedAt: scenarios?.last_used_at ?? null, brokenReferences: referenceHealth.scenarios }),
-    usageCategory({ key: 'forms', label: '回答フォーム', href: '/form-submissions', created: Number(forms?.created ?? 0), inUse: Number(forms?.in_use ?? 0), lastUsedAt: forms?.last_used_at ?? null, state: 'partial', reason: '回答実績から所属を確認できるフォームのみです', brokenReferences: metric<number>(null, 'unavailable', '回答フォーム自体にLINEアカウント所属がないため、安全に参照切れを判定できません') }),
+    usageCategory({ key: 'forms', label: '回答フォーム', href: '/form-submissions', created: Number(forms?.created ?? 0), inUse: Number(forms?.in_use ?? 0), lastUsedAt: forms?.last_used_at ?? null, state: 'partial', reason: '回答実績から所属を確認できるフォームのみです', brokenReferences: referenceHealth.forms }),
     usageCategory({ key: 'rich_menus', label: 'リッチメニュー', href: '/rich-menus', created: Number(richMenus?.created ?? 0), inUse: Number(richMenus?.in_use ?? 0), lastUsedAt: richMenus?.last_used_at ?? null, brokenReferences: referenceHealth.rich_menus }),
     usageCategory({ key: 'friend_attributes', label: 'タグ・友だち情報', href: '/tags', created: Number(tagsFields?.created ?? 0), inUse: Number(tagsFields?.in_use ?? 0), lastUsedAt: tagsFields?.last_used_at ?? null, state: 'partial', reason: '旧共通項目はLINEアカウント所属を持たないため、利用実績から判定しています', brokenReferences: referenceHealth.friend_attributes }),
     usageCategory({ key: 'inflow_conversion', label: '流入リンク・成果地点', href: '/inflow-links', created: Number(inflow?.created ?? 0), inUse: Number(inflow?.in_use ?? 0), lastUsedAt: inflow?.last_used_at ?? null, brokenReferences: referenceHealth.inflow_conversion }),
