@@ -299,6 +299,58 @@ describe('V6分析の概要API', () => {
     );
   });
 
+  it('使われ方は参照切れの0・partial・failedと確認時刻を変えずに返す', async () => {
+    mocks.getAnalyticsUsageOverview.mockResolvedValueOnce({
+      lineAccountId: 'account-a',
+      timeZone: 'Asia/Tokyo',
+      period: { from: '2026-08-01', to: '2026-08-30' },
+      dataCutoffAt: '2026-08-30T16:00:00.000Z',
+      data: {
+        state: 'partial',
+        stateReason: '一部の参照を確認できません',
+        checkedAt: '2026-08-30T16:00:00.000Z',
+        automaticDeletion: false,
+        summary: {
+          brokenReferences: {
+            value: 1,
+            state: 'partial',
+            reason: '確認できた分類だけの合計です',
+          },
+        },
+        categories: [
+          { key: 'templates', brokenReferences: { value: 0, state: 'available', reason: null } },
+          { key: 'automations', brokenReferences: { value: 1, state: 'partial', reason: '未対応の参照種別があります' } },
+          { key: 'rich_menus', brokenReferences: { value: null, state: 'failed', reason: '参照を確認できませんでした' } },
+        ],
+      },
+    });
+
+    const res = await req(`/api/analytics/usage?${ACCOUNT}&from=2026-08-01&to=2026-08-30`);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      success: true,
+      data: {
+        lineAccountId: 'account-a',
+        data: {
+          checkedAt: '2026-08-30T16:00:00.000Z',
+          summary: { brokenReferences: { value: 1, state: 'partial' } },
+          categories: [
+            { key: 'templates', brokenReferences: { value: 0, state: 'available' } },
+            { key: 'automations', brokenReferences: { value: 1, state: 'partial' } },
+            { key: 'rich_menus', brokenReferences: { value: null, state: 'failed' } },
+          ],
+        },
+      },
+    });
+  });
+
+  it('使われ方の取得自体に失敗したとき正常な空データにせず500を返す', async () => {
+    mocks.getAnalyticsUsageOverview.mockRejectedValueOnce(new Error('D1 unavailable'));
+    const res = await req(`/api/analytics/usage?${ACCOUNT}`);
+    expect(res.status).toBe(500);
+    expect(await res.json()).toEqual({ success: false, error: 'Internal server error' });
+  });
+
   it('存在しない日付と13か月を超える期間を弾く', async () => {
     expect((await req(`/api/analytics/friends?${ACCOUNT}&from=2026-02-31`)).status).toBe(400);
     expect((await req(
