@@ -361,7 +361,8 @@
     "400_rich_menu_manual_publish_idempotency.sql",
     "401_rich_menu_manual_publish_execution_token.sql",
     "402_ad_click_selection_snapshot.sql",
-    "403_common_var_extended_types.sql"
+    "403_common_var_extended_types.sql",
+    "404_platform_admins.sql"
   ],
-  "migrationCount": 362
+  "migrationCount": 363
 }

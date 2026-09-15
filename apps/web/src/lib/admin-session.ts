@@ -24,11 +24,24 @@ export function captureTwoFactorChallenge(): string {
   if (typeof window === 'undefined') return ''
   const params = new URLSearchParams(window.location.hash.replace(/^#/, ''))
   const token = params.get('lh_2fa') || ''
+  // 運営コンソール（/ops）から来たときは、認証のあと /ops へ戻す（★V6 37-1）。
+  const next = params.get('lh_next')
+  if (next === 'ops') sessionStorage.setItem(TWO_FACTOR_NEXT_STORAGE_KEY, 'ops')
   if (token) {
     sessionStorage.setItem(TWO_FACTOR_CHALLENGE_STORAGE_KEY, token)
     window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`)
   }
   return token || sessionStorage.getItem(TWO_FACTOR_CHALLENGE_STORAGE_KEY) || ''
+}
+
+const TWO_FACTOR_NEXT_STORAGE_KEY = 'lh_2fa_next'
+
+/** 2 要素認証のあとの戻り先。'/ops' か '/'。読んだら消す。 */
+export function takeTwoFactorNextPath(): string {
+  if (typeof window === 'undefined') return '/'
+  const next = sessionStorage.getItem(TWO_FACTOR_NEXT_STORAGE_KEY)
+  sessionStorage.removeItem(TWO_FACTOR_NEXT_STORAGE_KEY)
+  return next === 'ops' ? '/ops' : '/'
 }
 
 export function clearTwoFactorChallenge(): void {
