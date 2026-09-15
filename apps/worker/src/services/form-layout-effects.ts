@@ -12,6 +12,7 @@
  * 「送信できませんでした」と出すのは、利用者にとって嘘になる。
  */
 
+import type { Message } from '@line-crm/line-sdk';
 import {
   collectInputs,
   hasChoices,
@@ -34,6 +35,7 @@ import {
   validateFriendFieldValue,
 } from '@line-crm/db';
 import { attachTagAndFireSideEffects } from './friend-tag-attach.js';
+import { buildMessage } from './line-message.js';
 
 /** 回答1件。キーは入力ブロックの name。 */
 export type FormAnswers = Record<string, unknown>;
@@ -217,6 +219,8 @@ function toText(value: unknown): string {
  * 再送キーに使い分ける(連番にすると再開時にずれて二重送信になる)。
  */
 export type PushText = (text: string, stableSuffix: string) => Promise<void>;
+/** 組み立て済みのメッセージ(Flex等)を送る手段。pushText と同じ再送キー規則。 */
+export type PushMessage = (message: Message, stableSuffix: string) => Promise<void>;
 
 export interface FormEffectInput {
   db: D1Database;
@@ -227,6 +231,12 @@ export interface FormEffectInput {
   push?: { defaultAccessToken: string; workerUrl?: string };
   /** テキスト送信・テンプレート送信で使う。無ければその動作は飛ばす */
   pushText?: PushText;
+  /**
+   * Flex などテキスト以外のメッセージ送信で使う。send_template で
+   * 非テキストのテンプレートが選ばれたとき、ここが無いと「送れない」を
+   * 失敗として記録する(黙って素通りしない)。
+   */
+  pushMessage?: PushMessage;
   /**
    * 回答送信の再開時に二重登録を避ける接頭辞。例: `form-submit:<answerId>`。
    * 付けるとリマインダ登録に安定した sourceEventId を付けて重複を避ける。
@@ -303,6 +313,28 @@ export async function applyFormLayoutEffects(input: FormEffectInput): Promise<Fo
   }
 
   return { destinationWrites, failedEffects };
+}
+
+/**
+ * layout の後処理が進める内側の工程 id の一覧(N-168)。
+ *
+ * `applyFormLayoutEffects` は工程ごとに `layout:<id>` という記録を残す。
+ * 回答とレイアウトから「あるべき工程」をここで組み立て、予約(claim)の
+ * 記録に無いものが未完=失敗/中断の工程になる。実際に進める順番と同じ
+ * 順で返す。
+ */
+export function layoutEffectStepIds(layout: FormLayout, answers: FormAnswers): string[] {
+  const ids: string[] = [];
+  for (const block of collectInputs(layout)) {
+    if (answers[block.name] === undefined) continue;
+    ids.push(`destinations:${block.id}`);
+    if (hasChoices(block)) ids.push(`choices:${block.id}`);
+    if (block.type === 'date' && block.reminder?.reminderId) {
+      ids.push(`reminder:${block.id}`);
+    }
+  }
+  (layout.options?.afterActions ?? []).forEach((_, index) => ids.push(`afterAction:${index}`));
+  return ids;
 }
 
 /**
@@ -565,15 +597,25 @@ export async function runFormAction(
       if (!input.pushText || !action.templateId) return;
       const template = await getMessageTemplateById(db, action.templateId);
       if (!template) return;
-      // テキストのテンプレートだけを送る。Flex は組み立てと差し込みが
-      // 配信側の仕組みに乗っているので、そちらを通さずに送らない。
-      if (template.message_type !== 'text') {
-        console.warn('form action: skipped non-text template', action.templateId);
+      // テキストは従来どおり本文をそのまま送る。Flex などそれ以外は
+      // 配信側と同じ組み立て(buildMessage)を通して実際に送る。
+      // N-177: 以前は非テキストを warn して素通りしていたため、選んだ
+      // テンプレートが顧客にも運用にも見えず届かなかった。
+      if (template.message_type === 'text') {
+        if (template.message_content) {
+          await input.pushText(template.message_content, pushSuffix ?? `send_template:${action.templateId}`);
+        }
         return;
       }
-      if (template.message_content) {
-        await input.pushText(template.message_content, pushSuffix ?? `send_template:${action.templateId}`);
+      if (!input.pushMessage) {
+        // 送信経路が無いのに黙って終わると、届かないことが誰にも分からない。
+        // 工程の失敗として記録し、再実行で補完できるようにする。
+        throw new Error(`form send_template: no push channel for ${template.message_type} template`);
       }
+      await input.pushMessage(
+        buildMessage(template.message_type, template.message_content, template.name),
+        pushSuffix ?? `send_template:${action.templateId}`,
+      );
       return;
     }
 

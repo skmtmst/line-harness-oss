@@ -291,6 +291,15 @@ function insertGroup(
   }
 }
 
+/** #827 以降、公開には「切替以外の行き先を持つボタン」が1つ必要。検証を通る最小のボタン。 */
+const VALID_AREA = {
+  id: 'a1',
+  bounds: { x: 0, y: 0, width: 100, height: 100 },
+  actionType: 'uri',
+  actionData: { uri: 'https://example.com' },
+  label: 'リンク',
+}
+
 /** 予約スナップショット(GroupInput形)。 areas空の素直なメニュー。 */
 function snapshotFor(groupId: string, pages: string[], isDefault: boolean) {
   return JSON.stringify({
@@ -305,7 +314,7 @@ function snapshotFor(groupId: string, pages: string[], isDefault: boolean) {
       imageR2Key: 'img-key',
       imageContentType: 'image/jpeg',
       lineRichmenuId: null,
-      areas: [],
+      areas: [VALID_AREA],
     })),
   })
 }
@@ -361,7 +370,7 @@ function depsFor(
           imageR2Key: page.image_r2_key,
           imageContentType: page.image_content_type,
           lineRichMenuId: page.line_richmenu_id,
-          areas: [],
+          areas: [VALID_AREA],
         })),
       }
       const { shells } = await createRichMenuShells(input as never, line as never, fakeR2 as never, heartbeat)
@@ -387,7 +396,7 @@ function depsFor(
           imageR2Key: null,
           imageContentType: null,
           lineRichMenuId: shell.oldLineRichMenuId,
-          areas: [],
+          areas: [VALID_AREA],
         })),
       } as never, shells.map((shell) => ({
         pageId: shell.pageId,
@@ -966,7 +975,7 @@ describe('executor 段階公開（実D1 + fake LINE）', () => {
       }
       await unpublishRichMenuGroup({
         id: 'menu-1', size: 'large', chatBarText: '', isDefaultForAll: true,
-        pages: [{ id: 'p1', orderIndex: 0, name: '', imageR2Key: null, imageContentType: null, lineRichMenuId: 'line-old-1', areas: [] }],
+        pages: [{ id: 'p1', orderIndex: 0, name: '', imageR2Key: null, imageContentType: null, lineRichMenuId: 'line-old-1', areas: [VALID_AREA] }],
       } as never, line as never)
       if (!(await markRichMenuGroupUnpublished(dbB, 'menu-1', stopFence))) stopOutcome = 'blocked'
       await releasePublishLease(dbB, 'menu-1', stopFence)
@@ -1127,8 +1136,8 @@ describe('executor 段階公開（実D1 + fake LINE）', () => {
       id: 'menu-1', size: 'large' as const, chatBarText: 'test', isDefaultForAll: true,
       formBaseUrl: null,
       pages: [
-        { id: 'p1', orderIndex: 0, name: 'p1', imageR2Key: 'img', imageContentType: 'image/jpeg', lineRichMenuId: 'line-old-a', areas: [] },
-        { id: 'p2', orderIndex: 1, name: 'p2', imageR2Key: 'img', imageContentType: 'image/jpeg', lineRichMenuId: 'line-old-b', areas: [] },
+        { id: 'p1', orderIndex: 0, name: 'p1', imageR2Key: 'img', imageContentType: 'image/jpeg', lineRichMenuId: 'line-old-a', areas: [VALID_AREA] },
+        { id: 'p2', orderIndex: 1, name: 'p2', imageR2Key: 'img', imageContentType: 'image/jpeg', lineRichMenuId: 'line-old-b', areas: [VALID_AREA] },
       ],
     }
 
@@ -1210,7 +1219,7 @@ describe('executor 段階公開（実D1 + fake LINE）', () => {
           pages: input.shells.map((shell) => ({
             id: shell.pageId, orderIndex: shell.orderIndex, name: '',
             imageR2Key: null, imageContentType: null,
-            lineRichMenuId: shell.oldLineRichMenuId, areas: [],
+            lineRichMenuId: shell.oldLineRichMenuId, areas: [VALID_AREA],
           })),
         } as never, input.shells.map((shell) => ({
           pageId: shell.pageId, orderIndex: shell.orderIndex, newRichMenuId: shell.newRichMenuId,

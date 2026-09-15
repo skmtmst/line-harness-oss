@@ -576,9 +576,43 @@ describe('回答を配る', () => {
     })).rejects.toThrow('claim ownership lost');
   });
 
-  test('テキストではないテンプレートは送らない', async () => {
+  // N-177: Flex テンプレートは組み立てて実際に送る。以前は warn して
+  // 素通りしていたため、選んだテンプレートが静かに不達になっていた。
+  test('Flex のテンプレートは組み立てて送る', async () => {
     mocks.getMessageTemplateById.mockResolvedValue({
       id: 'tpl-1',
+      name: '診断カード',
+      message_type: 'flex',
+      message_content: '{"type":"bubble","body":{"type":"box","layout":"vertical","contents":[{"type":"text","text":"結果です"}]}}',
+    });
+    const layout = emptyLayout();
+    layout.options.afterActions = [{ kind: 'send_template', templateId: 'tpl-1' }];
+    const { db } = fakeDb();
+    const sent: unknown[] = [];
+
+    const result = await applyFormLayoutEffects({
+      db,
+      layout,
+      friendId: 'f1',
+      answers: {},
+      pushText: async () => {},
+      pushMessage: async (message, stableSuffix) => {
+        sent.push({ message, stableSuffix });
+      },
+    });
+    expect(result.failedEffects).toEqual([]);
+    expect(sent).toHaveLength(1);
+    const sentMessage = (sent[0] as { message: { type: string; contents?: unknown } }).message;
+    expect(sentMessage.type).toBe('flex');
+    // 再送キーは pushText と同じく工程 id(afterAction:N)を使う。
+    // 同じテンプレートを別の動作で送っても衝突しない。
+    expect((sent[0] as { stableSuffix: string }).stableSuffix).toBe('afterAction:0');
+  });
+
+  test('非テキストを送る経路が無いときは、黙らず工程の失敗にする', async () => {
+    mocks.getMessageTemplateById.mockResolvedValue({
+      id: 'tpl-1',
+      name: '診断カード',
       message_type: 'flex',
       message_content: '{}',
     });
@@ -587,7 +621,7 @@ describe('回答を配る', () => {
     const { db } = fakeDb();
     const sent: string[] = [];
 
-    await applyFormLayoutEffects({
+    const result = await applyFormLayoutEffects({
       db,
       layout,
       friendId: 'f1',
@@ -597,6 +631,8 @@ describe('回答を配る', () => {
       },
     });
     expect(sent).toEqual([]);
+    // 静かな不達にしない。未完として残り、再実行の対象になる。
+    expect(result.failedEffects).toEqual(['afterAction:0']);
   });
 
   test('答えていない欄には、何も起こさない', async () => {
