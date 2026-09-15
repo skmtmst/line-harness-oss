@@ -30,6 +30,22 @@ beforeAll(async () => {
   } = await import('./api'))
 })
 
+describe('api.audit attention filter', () => {
+  it('sends the server-side union flag with the selected account and pagination', async () => {
+    const fetchSpy = vi.fn(async () => new Response(
+      JSON.stringify({ success: true, data: { items: [], pagination: { total: 0, limit: 20, offset: 20 } } }),
+      { status: 200, headers: { 'content-type': 'application/json' } },
+    ))
+    vi.stubGlobal('fetch', fetchSpy)
+
+    await api.audit.events({ lineAccountId: 'account/a', attention: true, limit: 20, offset: 20 })
+
+    expect(fetchSpy.mock.calls.map(([url]) => url)).toEqual([
+      'https://worker.example.com/api/audit/events?lineAccountId=account%2Fa&attention=true&limit=20&offset=20',
+    ])
+  })
+})
+
 describe('bookingApi 予約設備CRUD', () => {
   it('accountをqueryへ固定し、版付きPATCH/DELETEを送る', async () => {
     const fetchSpy = vi.fn(async (_url: string | URL | Request) => new Response(

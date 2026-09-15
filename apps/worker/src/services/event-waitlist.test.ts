@@ -164,6 +164,67 @@ describe('V6 event waitlist and applicants', () => {
       .toEqual({ count: 1 });
   });
 
+  test('移行済み待機者はイベントと枠の編集後に繰り上げても旧snapshotで案内・予約する', async () => {
+    seedWaitlist();
+    const oldSnapshot = JSON.stringify({
+      eventName: '移行時のイベント名',
+      venueName: '移行時の会場',
+      venueUrl: 'https://example.test/old-map',
+      confirmationMessageExtra: '移行時の確認文',
+      slotStartsAt: '2099-06-01T01:00:00.000Z',
+      slotEndsAt: '2099-06-01T03:00:00.000Z',
+      approvalDeadlineHours: 24,
+    });
+    sqlite.prepare(
+      `INSERT INTO event_versions
+         (id, event_id, line_account_id, version_number, snapshot_json,
+          approval_deadline_hours, published_at)
+       VALUES ('event-version:event-a:1', 'event-a', 'account-a', 1, ?, 24,
+               '2026-09-01T00:00:00.000Z')`,
+    ).run(oldSnapshot);
+    sqlite.prepare(
+      `UPDATE event_waitlist SET event_version_id = 'event-version:event-a:1',
+              event_snapshot_json = ? WHERE id = 'wait-a'`,
+    ).run(oldSnapshot);
+    sqlite.exec(`
+      UPDATE events SET name = '編集後のイベント名', venue_name = '編集後の会場',
+             venue_url = 'https://example.test/new-map' WHERE id = 'event-a';
+      UPDATE event_slots SET starts_at = '2099-07-01T01:00:00.000Z',
+             ends_at = '2099-07-01T03:00:00.000Z' WHERE id = 'slot-a';
+    `);
+
+    const sender = vi.fn<EventWaitlistOfferSender>().mockResolvedValue(undefined);
+    const promoted = await promoteEventWaitlist(db, {
+      occurrenceId: 'slot-a', lineAccountId: 'account-a',
+      now: new Date('2026-09-07T00:00:00.000Z'), sender,
+    });
+    expect(promoted.kind).toBe('promoted');
+    expect(sender).toHaveBeenCalledWith(expect.objectContaining({
+      eventName: '移行時のイベント名',
+      startsAt: '2099-06-01T01:00:00.000Z',
+      venueName: '移行時の会場',
+      venueUrl: 'https://example.test/old-map',
+    }));
+    const token = sender.mock.calls[0][0].token;
+
+    await expect(acceptEventWaitlistOffer(db, {
+      token, callerLineUserId: 'Ub', now: new Date('2026-09-07T01:00:00.000Z'),
+    })).resolves.toMatchObject({
+      kind: 'accepted', eventName: '移行時のイベント名',
+      startsAt: '2099-06-01T01:00:00.000Z', venueName: '移行時の会場',
+    });
+    expect(sqlite.prepare(
+      `SELECT event_version_id,
+              json_extract(event_snapshot_json, '$.eventName') AS event_name,
+              json_extract(event_snapshot_json, '$.slotStartsAt') AS slot_starts_at
+         FROM event_bookings WHERE id = 'event-waitlist:wait-a'`,
+    ).get()).toEqual({
+      event_version_id: 'event-version:event-a:1',
+      event_name: '移行時のイベント名',
+      slot_starts_at: '2099-06-01T01:00:00.000Z',
+    });
+  });
+
   test('繰上げURLが漏れても、別のLINEユーザーは承諾できない', async () => {
     const token = 'private-offer-token-12345678901234567890123456789';
     await seedOffered(token);

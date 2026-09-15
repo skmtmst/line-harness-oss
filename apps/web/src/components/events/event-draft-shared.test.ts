@@ -58,6 +58,20 @@ describe('イベント作成・編集の共有契約(#740)', () => {
     expect(EVENT_DESCRIPTION_MAX_LENGTH).toBe(20000)
   })
 
+  it('作成・編集の両方で承認期限2/24/72時間と版競合を同じ契約で送る', () => {
+    expect(EVENT_DEFAULT_DRAFT.approval_deadline_hours).toBe(24)
+    for (const source of [FORM, WIZARD]) {
+      expect(source).toContain('approval_deadline_hours')
+      expect(source).toContain("{ value: '2', label: '申込から2時間' }")
+      expect(source).toContain("{ value: '24', label: '申込から24時間' }")
+      expect(source).toContain("{ value: '72', label: '申込から72時間' }")
+      expect(source).toContain('options={APPROVAL_DEADLINE_OPTIONS}')
+      expect(source).toMatch(/eventsApi\.updateEvent\([\s\S]*?draft\.version \?\? 1/)
+      expect(source).toContain("e.status === 409 && e.code === 'version_conflict'")
+      expect(source).toContain('別の画面でイベントが更新されました。開き直してからもう一度保存してください。')
+    }
+  })
+
   it('両画面が同じ既定値・上限・multi解決を参照する', () => {
     for (const source of [FORM, WIZARD]) {
       expect(source).toContain('EVENT_DEFAULT_DRAFT')

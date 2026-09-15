@@ -18,6 +18,7 @@ import {
   EVENT_DESCRIPTION_MAX,
   CUSTOMER_NOTE_MAX,
   EVENT_IDEMPOTENCY_TTL_MINUTES,
+  EVENT_APPROVAL_DEADLINE_HOURS,
   type EventTargetType,
 } from '../services/event-booking-types.js';
 import { getSlotsWithRemaining } from '../services/event-availability.js';
@@ -94,6 +95,46 @@ function getAccountId(c: Context<Env>): string | null {
 const EVENT_PARTY_SIZE_MAX = 20;
 const EVENT_ANSWER_SNAPSHOT_MAX_BYTES = 16_384;
 
+type EventSnapshotSource = {
+  name: string;
+  image_url?: string | null;
+  description?: string | null;
+  venue_name?: string | null;
+  venue_url?: string | null;
+  cancel_deadline_hours_before?: number | null;
+  confirmation_message_extra?: string | null;
+  approval_deadline_hours?: number | null;
+};
+
+type EventOccurrenceSnapshotSource = {
+  starts_at: string;
+  ends_at?: string | null;
+};
+
+function eventDefinitionSnapshot(event: EventSnapshotSource): Record<string, unknown> {
+  return {
+    eventName: event.name,
+    eventImageUrl: event.image_url ?? null,
+    eventDescription: event.description ?? null,
+    venueName: event.venue_name ?? null,
+    venueUrl: event.venue_url ?? null,
+    cancelDeadlineHoursBefore: event.cancel_deadline_hours_before ?? null,
+    confirmationMessageExtra: event.confirmation_message_extra ?? null,
+    approvalDeadlineHours: event.approval_deadline_hours ?? 24,
+  };
+}
+
+function eventBookingSnapshot(
+  event: EventSnapshotSource,
+  slot: EventOccurrenceSnapshotSource,
+): string {
+  return JSON.stringify({
+    ...eventDefinitionSnapshot(event),
+    slotStartsAt: slot.starts_at,
+    slotEndsAt: slot.ends_at ?? null,
+  });
+}
+
 function serializeAnswerSnapshot(value: unknown): { ok: true; json: string | null } | { ok: false } {
   if (value == null) return { ok: true, json: null };
   if (typeof value !== 'object' || Array.isArray(value)) return { ok: false };
@@ -127,6 +168,7 @@ interface EventInput {
   description_centered?: number;
   max_bookings_per_friend?: number | null;
   requires_approval?: number;
+  approval_deadline_hours?: number;
   cancel_deadline_hours_before?: number | null;
   reminder_day_before_enabled?: number;
   reminder_hours_before?: number | null;
@@ -198,6 +240,12 @@ function validateEventInput(
       return { ok: false, code: 'invalid_sort_order' };
     }
   }
+  if (has('approval_deadline_hours')) {
+    const hours = body.approval_deadline_hours;
+    if (!EVENT_APPROVAL_DEADLINE_HOURS.includes(hours as 2 | 24 | 72)) {
+      return { ok: false, code: 'invalid_approval_deadline_hours' };
+    }
+  }
   if (has('target_type') && body.target_type != null) {
     if (body.target_type !== 'single' && body.target_type !== 'multi-account-dedup') {
       return { ok: false, code: 'invalid_target_type' };
@@ -244,20 +292,33 @@ events.post('/api/events/admin/events', requireRole('owner', 'admin'), async (c)
     targetType === 'multi-account-dedup' ? ((body.dedup_priority as string[] | undefined) ?? null) : null;
   // line_account_id sentinel: multi では account_ids[0] を保存 (NOT NULL 制約回避)
   const lineAccountIdToWrite = targetType === 'multi-account-dedup' ? accountIds![0] : account_id;
+  const isPublished = ((body.is_published as number | undefined) ?? 0) === 1;
+  const publishedVersionId = isPublished ? crypto.randomUUID() : null;
+  const approvalDeadlineHours = (body.approval_deadline_hours as number | undefined) ?? 24;
+  const createdSnapshot = JSON.stringify(eventDefinitionSnapshot({
+    name: body.name as string,
+    image_url: (body.image_url as string | null | undefined) ?? null,
+    description: (body.description as string | null | undefined) ?? null,
+    venue_name: (body.venue_name as string | null | undefined) ?? null,
+    venue_url: (body.venue_url as string | null | undefined) ?? null,
+    cancel_deadline_hours_before: (body.cancel_deadline_hours_before as number | null | undefined) ?? null,
+    confirmation_message_extra: (body.confirmation_message_extra as string | null | undefined) ?? null,
+    approval_deadline_hours: approvalDeadlineHours,
+  }));
 
-  await c.env.DB
-    .prepare(
+  const insertEvent = c.env.DB.prepare(
       `INSERT INTO events (
          id, line_account_id, name, venue_name, venue_url, image_url,
          description, description_centered,
-         max_bookings_per_friend, requires_approval, cancel_deadline_hours_before,
+         max_bookings_per_friend, requires_approval, approval_deadline_hours, cancel_deadline_hours_before,
          reminder_day_before_enabled, reminder_hours_before,
          is_published, sort_order,
          target_type, account_ids, dedup_priority,
          confirmation_message_extra, reminder_message_extra,
          og_title, og_description, og_image_url,
-         visible_tag_id, waitlist_enabled, entry_cutoff_hours_before
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         visible_tag_id, waitlist_enabled, entry_cutoff_hours_before,
+         current_published_version_id
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -270,6 +331,7 @@ events.post('/api/events/admin/events', requireRole('owner', 'admin'), async (c)
       (body.description_centered as number | undefined) ?? 0,
       (body.max_bookings_per_friend as number | null | undefined) ?? null,
       (body.requires_approval as number | undefined) ?? 0,
+      approvalDeadlineHours,
       (body.cancel_deadline_hours_before as number | null | undefined) ?? null,
       (body.reminder_day_before_enabled as number | undefined) ?? 1,
       (body.reminder_hours_before as number | null | undefined) ?? null,
@@ -286,8 +348,28 @@ events.post('/api/events/admin/events', requireRole('owner', 'admin'), async (c)
       (body.visible_tag_id as string | null | undefined) ?? null,
       (body.waitlist_enabled as number | undefined) ?? 0,
       (body.entry_cutoff_hours_before as number | null | undefined) ?? null,
-    )
-    .run();
+      publishedVersionId,
+    );
+  if (publishedVersionId) {
+    await c.env.DB.batch([
+      insertEvent,
+      c.env.DB.prepare(
+        `INSERT INTO event_versions
+           (id, event_id, line_account_id, version_number, snapshot_json,
+            approval_deadline_hours, published_at)
+         VALUES (?, ?, ?, 1, ?, ?, ?)`,
+      ).bind(
+        publishedVersionId,
+        id,
+        lineAccountIdToWrite,
+        createdSnapshot,
+        approvalDeadlineHours,
+        new Date().toISOString(),
+      ),
+    ]);
+  } else {
+    await insertEvent.run();
+  }
   const row = await c.env.DB
     .prepare(`SELECT * FROM events WHERE id = ?`)
     .bind(id)
@@ -417,7 +499,7 @@ events.put('/api/events/admin/events/:id', requireRole('owner', 'admin'), async 
   const id = c.req.param('id');
   const exists = await c.env.DB
     .prepare(
-      `SELECT id FROM events
+      `SELECT * FROM events
         WHERE id = ? AND deleted_at IS NULL AND (
           (target_type = 'single' AND line_account_id = ?)
           OR (target_type = 'multi-account-dedup'
@@ -425,9 +507,13 @@ events.put('/api/events/admin/events/:id', requireRole('owner', 'admin'), async 
         )`,
     )
     .bind(id, account_id, account_id)
-    .first();
+    .first<Record<string, unknown>>();
   if (!exists) return bad(c, 'not_found', 404);
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+  const expectedVersion = body.expected_version ?? body.expectedVersion;
+  if (!Number.isInteger(expectedVersion) || (expectedVersion as number) < 1) {
+    return bad(c, 'expected_version_required', 422);
+  }
   const v = validateEventInput(body, false);
   if (!v.ok) return bad(c, v.code, 422);
 
@@ -445,6 +531,7 @@ events.put('/api/events/admin/events/:id', requireRole('owner', 'admin'), async 
     'description_centered',
     'max_bookings_per_friend',
     'requires_approval',
+    'approval_deadline_hours',
     'cancel_deadline_hours_before',
     'reminder_day_before_enabled',
     'reminder_hours_before',
@@ -492,15 +579,65 @@ events.put('/api/events/admin/events/:id', requireRole('owner', 'admin'), async 
     setValues.push(account_id);
   }
   if (setClauses.length === 0) {
+    if (exists.version !== expectedVersion) return bad(c, 'version_conflict', 409);
     const row = await c.env.DB.prepare(`SELECT * FROM events WHERE id = ?`).bind(id).first();
     return c.json(row);
   }
+  const nextVersion = (expectedVersion as number) + 1;
+  const nextPublished = (body.is_published ?? exists.is_published) === 1;
+  const writeToken = crypto.randomUUID();
+  const publishedVersionId = nextPublished ? crypto.randomUUID() : null;
+  const nextEvent = { ...exists, ...body } as Record<string, unknown>;
+  const snapshotJson = JSON.stringify(eventDefinitionSnapshot({
+    name: nextEvent.name as string,
+    image_url: nextEvent.image_url as string | null | undefined,
+    description: nextEvent.description as string | null | undefined,
+    venue_name: nextEvent.venue_name as string | null | undefined,
+    venue_url: nextEvent.venue_url as string | null | undefined,
+    cancel_deadline_hours_before: nextEvent.cancel_deadline_hours_before as number | null | undefined,
+    confirmation_message_extra: nextEvent.confirmation_message_extra as string | null | undefined,
+    approval_deadline_hours: nextEvent.approval_deadline_hours as number | null | undefined,
+  }));
+  setClauses.push('version = version + 1');
+  setClauses.push('version_write_token = ?');
+  setValues.push(writeToken);
   setClauses.push(`updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')`);
-  setValues.push(id);
-  await c.env.DB
-    .prepare(`UPDATE events SET ${setClauses.join(', ')} WHERE id = ?`)
-    .bind(...setValues)
-    .run();
+  setValues.push(id, expectedVersion);
+  const update = c.env.DB
+    .prepare(`UPDATE events SET ${setClauses.join(', ')} WHERE id = ? AND version = ?`)
+    .bind(...setValues);
+  const results = nextPublished && publishedVersionId
+    ? await c.env.DB.batch([
+        update,
+        c.env.DB.prepare(
+          `INSERT INTO event_versions
+             (id, event_id, line_account_id, version_number, snapshot_json,
+              approval_deadline_hours, published_at)
+           SELECT ?, id, line_account_id, version, ?, approval_deadline_hours, ?
+             FROM events
+            WHERE id = ? AND version = ? AND version_write_token = ?`,
+        ).bind(
+          publishedVersionId,
+          snapshotJson,
+          new Date().toISOString(),
+          id,
+          nextVersion,
+          writeToken,
+        ),
+        c.env.DB.prepare(
+          `UPDATE events
+              SET current_published_version_id = ?, version_write_token = NULL
+            WHERE id = ? AND version = ? AND version_write_token = ?`,
+        ).bind(publishedVersionId, id, nextVersion, writeToken),
+      ])
+    : await c.env.DB.batch([
+        update,
+        c.env.DB.prepare(
+          `UPDATE events SET version_write_token = NULL
+            WHERE id = ? AND version = ? AND version_write_token = ?`,
+        ).bind(id, nextVersion, writeToken),
+      ]);
+  if ((results[0]?.meta?.changes ?? 0) === 0) return bad(c, 'version_conflict', 409);
   // If reminder settings changed, rebuild pending reminders for confirmed
   // bookings on this event so they reflect the new schedule.
   if (
@@ -969,28 +1106,36 @@ events.get('/api/liff/events/me', async (c) => {
   const sql =
     tab === 'upcoming'
       ? `SELECT b.id, b.event_id, b.status, b.customer_note, b.requested_at, b.decided_at, b.cancelled_at,
-                e.name AS event_name, e.image_url AS event_image_url,
-                e.venue_name, e.venue_url, e.cancel_deadline_hours_before,
-                s.starts_at AS slot_starts_at, s.ends_at AS slot_ends_at
+                CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.eventName') ELSE e.name END AS event_name,
+                CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.eventImageUrl') ELSE e.image_url END AS event_image_url,
+                CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.venueName') ELSE e.venue_name END AS venue_name,
+                CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.venueUrl') ELSE e.venue_url END AS venue_url,
+                CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.cancelDeadlineHoursBefore') ELSE e.cancel_deadline_hours_before END AS cancel_deadline_hours_before,
+                CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.slotStartsAt') ELSE s.starts_at END AS slot_starts_at,
+                CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.slotEndsAt') ELSE s.ends_at END AS slot_ends_at
            FROM event_bookings b
            JOIN events e ON e.id = b.event_id
            JOIN event_slots s ON s.id = b.slot_id
           WHERE b.friend_id = ?
             AND b.line_account_id = ?
             AND b.status IN ('requested','confirmed')
-            AND s.starts_at >= ?
-          ORDER BY s.starts_at ASC`
+            AND CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.slotStartsAt') ELSE s.starts_at END >= ?
+          ORDER BY slot_starts_at ASC`
       : `SELECT b.id, b.event_id, b.status, b.customer_note, b.requested_at, b.decided_at, b.cancelled_at,
-                e.name AS event_name, e.image_url AS event_image_url,
-                e.venue_name, e.venue_url, e.cancel_deadline_hours_before,
-                s.starts_at AS slot_starts_at, s.ends_at AS slot_ends_at
+                CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.eventName') ELSE e.name END AS event_name,
+                CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.eventImageUrl') ELSE e.image_url END AS event_image_url,
+                CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.venueName') ELSE e.venue_name END AS venue_name,
+                CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.venueUrl') ELSE e.venue_url END AS venue_url,
+                CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.cancelDeadlineHoursBefore') ELSE e.cancel_deadline_hours_before END AS cancel_deadline_hours_before,
+                CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.slotStartsAt') ELSE s.starts_at END AS slot_starts_at,
+                CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.slotEndsAt') ELSE s.ends_at END AS slot_ends_at
            FROM event_bookings b
            JOIN events e ON e.id = b.event_id
            JOIN event_slots s ON s.id = b.slot_id
           WHERE b.friend_id = ?
             AND b.line_account_id = ?
-            AND (b.status NOT IN ('requested','confirmed') OR s.starts_at < ?)
-          ORDER BY s.starts_at DESC`;
+            AND (b.status NOT IN ('requested','confirmed') OR CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.slotStartsAt') ELSE s.starts_at END < ?)
+          ORDER BY slot_starts_at DESC`;
   const { results } = await c.env.DB
     .prepare(sql)
     .bind(friend.id, account_id, nowIso)
@@ -1012,11 +1157,15 @@ events.get('/api/liff/events/me/:bookingId', async (c) => {
   const row = await c.env.DB
     .prepare(
       `SELECT b.id, b.event_id, b.status, b.customer_note, b.requested_at, b.decided_at, b.cancelled_at,
-              e.name AS event_name, e.image_url AS event_image_url,
-              e.venue_name, e.venue_url, e.cancel_deadline_hours_before,
-              e.description AS event_description,
-              CASE WHEN b.status = 'confirmed' THEN e.confirmation_message_extra ELSE NULL END AS confirmation_message_extra,
-              s.starts_at AS slot_starts_at, s.ends_at AS slot_ends_at
+              CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.eventName') ELSE e.name END AS event_name,
+              CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.eventImageUrl') ELSE e.image_url END AS event_image_url,
+              CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.venueName') ELSE e.venue_name END AS venue_name,
+              CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.venueUrl') ELSE e.venue_url END AS venue_url,
+              CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.cancelDeadlineHoursBefore') ELSE e.cancel_deadline_hours_before END AS cancel_deadline_hours_before,
+              CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.eventDescription') ELSE e.description END AS event_description,
+              CASE WHEN b.status = 'confirmed' THEN CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.confirmationMessageExtra') ELSE e.confirmation_message_extra END ELSE NULL END AS confirmation_message_extra,
+              CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.slotStartsAt') ELSE s.starts_at END AS slot_starts_at,
+              CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.slotEndsAt') ELSE s.ends_at END AS slot_ends_at
          FROM event_bookings b
          JOIN events e ON e.id = b.event_id
          JOIN event_slots s ON s.id = b.slot_id
@@ -1044,7 +1193,8 @@ events.post('/api/liff/events/me/:bookingId/cancel', async (c) => {
   const row = await c.env.DB
     .prepare(
       `SELECT b.id, b.status, b.line_account_id, b.event_id, b.slot_id,
-              e.cancel_deadline_hours_before, s.starts_at AS slot_starts_at
+              CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.cancelDeadlineHoursBefore') ELSE e.cancel_deadline_hours_before END AS cancel_deadline_hours_before,
+              CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.slotStartsAt') ELSE s.starts_at END AS slot_starts_at
          FROM event_bookings b
          JOIN events e ON e.id = b.event_id
          JOIN event_slots s ON s.id = b.slot_id
@@ -1256,6 +1406,8 @@ interface EventDbRow {
   venue_name: string | null;
   venue_url: string | null;
   requires_approval: number;
+  approval_deadline_hours: number;
+  current_published_version_id: string | null;
   max_bookings_per_friend: number | null;
   reminder_day_before_enabled: number;
   reminder_hours_before: number | null;
@@ -1271,6 +1423,7 @@ interface SlotDbRow {
   id: string;
   event_id: string;
   starts_at: string;
+  ends_at: string;
   is_active: number;
   deleted_at: string | null;
 }
@@ -1457,7 +1610,10 @@ events.post('/api/liff/events/:id/bookings', async (c) => {
 
   const event = await c.env.DB
     .prepare(
-      `SELECT id, name, venue_name, venue_url, requires_approval, max_bookings_per_friend,
+      `SELECT id, name, image_url, description, venue_name, venue_url,
+              confirmation_message_extra, cancel_deadline_hours_before,
+              requires_approval, approval_deadline_hours, current_published_version_id,
+              max_bookings_per_friend,
               reminder_day_before_enabled, reminder_hours_before,
               visible_tag_id, waitlist_enabled, entry_cutoff_hours_before
          FROM events
@@ -1505,13 +1661,14 @@ events.post('/api/liff/events/:id/bookings', async (c) => {
 
   const slot = await c.env.DB
     .prepare(
-      `SELECT id, event_id, starts_at, is_active, deleted_at
+      `SELECT id, event_id, starts_at, ends_at, is_active, deleted_at
          FROM event_slots WHERE id = ? AND event_id = ? AND deleted_at IS NULL`,
     )
     .bind(body.slot_id, event.id)
     .first<SlotDbRow>();
   if (!slot || slot.is_active !== 1) return finalize(409, { error: 'slot_inactive' });
   if (new Date(slot.starts_at).getTime() <= Date.now()) return finalize(410, { error: 'slot_started' });
+  const bookingSnapshotJson = eventBookingSnapshot(event, slot);
 
   // 公開対象を絞っているイベントは、そのタグを持つ人だけが申し込める。
   // 一覧や詳細でも同じ条件で隠すが、URL を直接叩けば素通りするので
@@ -1558,8 +1715,8 @@ events.post('/api/liff/events/:id/bookings', async (c) => {
            (id, line_account_id, event_id, slot_id, friend_id, identity_key, status,
             party_size, answer_snapshot_json, first_participation,
             first_participation_attended_count, first_participation_checked_at,
-            created_at, updated_at)
-         SELECT ?, ?, ?, ?, ?, ?, 'waiting', ?, ?, ?, ?, ?, ?, ?
+            event_version_id, event_snapshot_json, created_at, updated_at)
+         SELECT ?, ?, ?, ?, ?, ?, 'waiting', ?, ?, ?, ?, ?, ?, ?, ?, ?
           WHERE NOT EXISTS (
             SELECT 1 FROM event_bookings
              WHERE event_id = ? AND slot_id = ? AND identity_key = ?
@@ -1583,6 +1740,8 @@ events.post('/api/liff/events/:id/bookings', async (c) => {
         firstParticipationIsFirst,
         priorAttendedCount,
         firstParticipationCheckedAt,
+        event.current_published_version_id,
+        bookingSnapshotJson,
         firstParticipationCheckedAt,
         firstParticipationCheckedAt,
         event.id, slot.id, identityKey,
@@ -1683,14 +1842,18 @@ events.post('/api/liff/events/:id/bookings', async (c) => {
   const status = event.requires_approval === 1 ? 'requested' : 'confirmed';
   const id = crypto.randomUUID();
   const nowIso = firstParticipationCheckedAt;
+  const approvalExpiresAt = status === 'requested'
+    ? new Date(Date.parse(nowIso) + event.approval_deadline_hours * 3600_000).toISOString()
+    : null;
   const bookingInserted = await c.env.DB
     .prepare(
       `INSERT INTO event_bookings
          (id, line_account_id, event_id, slot_id, friend_id, status, customer_note,
           requested_at, identity_key, party_size, answer_snapshot_json,
           first_participation, first_participation_attended_count,
-          first_participation_checked_at)
-       SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+          first_participation_checked_at, event_version_id, event_snapshot_json,
+          approval_expires_at)
+       SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
         WHERE NOT EXISTS (
           SELECT 1 FROM event_waitlist
            WHERE event_id = ? AND slot_id = ? AND identity_key = ?
@@ -1708,6 +1871,7 @@ events.post('/api/liff/events/:id/bookings', async (c) => {
       body.customer_note ?? null, nowIso, identityKey, partySize,
       answerSnapshot.json, firstParticipationIsFirst, priorAttendedCount,
       firstParticipationCheckedAt,
+      event.current_published_version_id, bookingSnapshotJson, approvalExpiresAt,
       event.id, slot.id, identityKey,
       event.max_bookings_per_friend, event.id, identityKey,
       event.id, identityKey, event.max_bookings_per_friend,
