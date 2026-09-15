@@ -553,6 +553,7 @@ export default function MediaLibraryPage() {
         item={detailsFor}
         accountId={selectedAccountId}
         folderName={detailsFor.folderId ? folders.find((folder) => folder.id === detailsFor.folderId)?.name ?? '—（未取得）' : '未分類'}
+        canManage={canManageMedia}
         onClose={() => setDetailsFor(null)}
         onOpenReplacement={(item) => {
           setDetailsFor(null)

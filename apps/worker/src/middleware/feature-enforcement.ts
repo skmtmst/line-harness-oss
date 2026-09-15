@@ -189,6 +189,7 @@ export const FEATURE_ROUTE_MANIFEST: readonly FeatureRouteMetadata[] = [
   exempt('/book', 'public', '公開予約導線'),
   exempt('/pool', 'public', '公開流入プール'),
   exempt('/images', 'public', '署名付き画像配信'),
+  exempt('/media', 'public', 'メディアIDで最新版へ解決する公開配信（ライブ参照）'),
   exempt('/setup', 'public', '初期設定画面'),
   exempt('/webinar-assets', 'public', '署名付きウェビナー素材'),
   exempt('/line-api', 'system', '監査付きLINE API proxy'),

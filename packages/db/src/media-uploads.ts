@@ -216,6 +216,26 @@ export async function completeNewMediaUpload(
   return media;
 }
 
+/**
+ * メディアの版履歴を新しい順で返す。
+ *
+ * 使用先ごとの固定版切替で「第何版に固定するか」を選ぶため、版番号・
+ * 実体キー・検査状態・公開時刻をまとめて渡す。
+ */
+export async function getMediaVersionList(
+  db: D1Database,
+  mediaId: string,
+  lineAccountId: string,
+): Promise<MediaVersion[]> {
+  const rows = await db.prepare(
+    `SELECT v.* FROM media_versions v
+       JOIN media m ON m.id = v.media_id
+      WHERE v.media_id = ? AND m.line_account_id = ?
+      ORDER BY v.version_no DESC`,
+  ).bind(mediaId, lineAccountId).all<MediaVersion>();
+  return rows.results;
+}
+
 export async function getCurrentMediaVersionNo(
   db: D1Database,
   mediaId: string,

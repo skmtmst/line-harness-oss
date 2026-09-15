@@ -68,6 +68,12 @@ export interface MediaUsage {
   scanned_at: string;
 }
 
+/** 削除影響と、その表示を作った同一時点の使用先行。 */
+export interface MediaDeleteImpactSnapshot {
+  impact: MediaDeleteImpact;
+  usages: MediaUsage[];
+}
+
 export interface MediaReplacementPlan {
   source: Media;
   replacement: Media;
@@ -419,12 +425,12 @@ async function describeMediaUsage(
  * 別アカウントだったりして名前を安全に返せない場合も、その参照自体は落とさず
  * unavailable として削除を止める。
  */
-export async function getMediaDeleteImpact(
+export async function getMediaDeleteImpactSnapshot(
   db: D1Database,
   mediaId: string,
   lineAccountId: string,
   checkedAt: string,
-): Promise<MediaDeleteImpact | null> {
+): Promise<MediaDeleteImpactSnapshot | null> {
   const media = await getMediaById(db, mediaId, lineAccountId);
   if (!media) return null;
 
@@ -440,18 +446,31 @@ export async function getMediaDeleteImpact(
   );
 
   return {
-    media: {
-      id: media.id,
-      filename: media.filename,
-      kind: media.kind as MediaDeleteImpact['media']['kind'],
+    usages,
+    impact: {
+      media: {
+        id: media.id,
+        filename: media.filename,
+        kind: media.kind as MediaDeleteImpact['media']['kind'],
+      },
+      usageCount: references.length,
+      references,
+      checkedAt,
+      lastScannedAt,
+      canDelete: references.length === 0,
+      recommendedAction: references.length === 0 ? 'delete' : 'review_references',
     },
-    usageCount: references.length,
-    references,
-    checkedAt,
-    lastScannedAt,
-    canDelete: references.length === 0,
-    recommendedAction: references.length === 0 ? 'delete' : 'review_references',
   };
+}
+
+/** 既存の削除口用。参照IDが必要な画面は snapshot 版を使う。 */
+export async function getMediaDeleteImpact(
+  db: D1Database,
+  mediaId: string,
+  lineAccountId: string,
+  checkedAt: string,
+): Promise<MediaDeleteImpact | null> {
+  return (await getMediaDeleteImpactSnapshot(db, mediaId, lineAccountId, checkedAt))?.impact ?? null;
 }
 
 async function describeMediaReplacementUsage(
@@ -547,6 +566,74 @@ export async function getMediaReplacementPlan(
   };
 }
 
+/**
+ * 使用先本文の中でメディアを指している文字列の置き換え対。
+ *
+ * 固定参照は版ごとのr2_key（旧版を指すものも使用中）、ライブ参照は
+ * メディアIDの公開パス。どちらも文字列置換で差し替え先へ付け替えられる。
+ */
+function mediaReferenceReplacePairs(
+  sourceId: string,
+  sourceKeys: string[],
+  replacement: Media,
+): Array<[string, string]> {
+  const pairs: Array<[string, string]> = [];
+  for (const key of sourceKeys) pairs.push([key, replacement.r2_key]);
+  pairs.push([mediaLiveContentPath(sourceId), mediaLiveContentPath(replacement.id)]);
+  return pairs;
+}
+
+/**
+ * 置き換え文をD1のbind上限内に収める。
+ *
+ * 置き換え対が少ない通常時は表ごとに1文（従来どおり、行は1回だけ数える）。
+ * 版数が多くて対が膨らんだときだけ列・対ごとに分け、LIKE条件で実際に
+ * そのトークンを含む行だけを対象にする。
+ */
+const USAGE_REPLACE_PAIR_CHUNK = 24;
+
+function usageReplaceStatements(
+  db: D1Database,
+  opts: {
+    table: string;
+    columns: string[];
+    scopeSql: string;
+    scopeBinds: unknown[];
+    idSubquery: string;
+    idSubqueryBinds: unknown[];
+    pairs: Array<[string, string]>;
+  },
+): D1PreparedStatement[] {
+  if (opts.pairs.length <= USAGE_REPLACE_PAIR_CHUNK) {
+    const setClause = opts.columns
+      .map((column) => `${column} = ${opts.pairs.reduce((expr) => `REPLACE(${expr}, ?, ?)`, column)}`)
+      .join(', ');
+    const binds = opts.columns.flatMap(() => opts.pairs.flatMap(([from, to]) => [from, to]));
+    return [db.prepare(
+      `UPDATE ${opts.table} SET ${setClause}
+        WHERE ${opts.scopeSql} AND id IN (${opts.idSubquery})`,
+    ).bind(...binds, ...opts.scopeBinds, ...opts.idSubqueryBinds)];
+  }
+  const statements: D1PreparedStatement[] = [];
+  for (const column of opts.columns) {
+    for (let index = 0; index < opts.pairs.length; index += USAGE_REPLACE_PAIR_CHUNK) {
+      const chunk = opts.pairs.slice(index, index + USAGE_REPLACE_PAIR_CHUNK);
+      const expression = chunk.reduce((expr) => `REPLACE(${expr}, ?, ?)`, column);
+      const guard = chunk.map(() => `${column} LIKE ?`).join(' OR ');
+      statements.push(db.prepare(
+        `UPDATE ${opts.table} SET ${column} = ${expression}
+          WHERE ${opts.scopeSql} AND id IN (${opts.idSubquery}) AND (${guard})`,
+      ).bind(
+        ...chunk.flatMap(([from, to]) => [from, to]),
+        ...opts.scopeBinds,
+        ...opts.idSubqueryBinds,
+        ...chunk.map(([from]) => `%${from}%`),
+      ));
+    }
+  }
+  return statements;
+}
+
 /** 影響確認済みの使用先をD1の1回のbatchで差し替える。 */
 export async function applyMediaReplacementPlan(
   db: D1Database,
@@ -554,50 +641,455 @@ export async function applyMediaReplacementPlan(
   lineAccountId: string,
 ): Promise<number> {
   if (!plan.impact.canReplace) throw new Error('media_replacement_blocked');
-  const oldKey = plan.source.r2_key;
-  const newKey = plan.replacement.r2_key;
   const sourceId = plan.source.id;
+  // 現行版だけでなく旧版を指す固定参照とライブ参照も同じ使用先なので、
+  // 版の全r2_keyとライブ参照パスをまとめて差し替え先へ置き換える。
+  const sourceKeys = [
+    ...new Set([
+      plan.source.r2_key,
+      ...(await getMediaVersionKeys(db, sourceId)),
+    ]),
+  ].filter((key) => key.length > 0);
+  const pairs = mediaReferenceReplacePairs(sourceId, sourceKeys, plan.replacement);
   const usageIds = (kind: MediaRefKind) =>
     `SELECT ref_id FROM media_usages WHERE media_id = ? AND ref_kind = '${kind}'`;
+  const scoped = (scopeSql: string, scopeBinds: unknown[], kind: MediaRefKind, columns: string[], table: string) =>
+    usageReplaceStatements(db, {
+      table,
+      columns,
+      scopeSql,
+      scopeBinds,
+      idSubquery: usageIds(kind),
+      idSubqueryBinds: [sourceId],
+      pairs,
+    });
   const statements: D1PreparedStatement[] = [
-    db.prepare(`UPDATE templates SET message_content = REPLACE(message_content, ?, ?)
-      WHERE line_account_id = ? AND id IN (${usageIds('template')})`)
-      .bind(oldKey, newKey, lineAccountId, sourceId),
-    db.prepare(`UPDATE broadcasts
-      SET message_content = REPLACE(message_content, ?, ?),
-          message_bubbles_json = REPLACE(message_bubbles_json, ?, ?)
-      WHERE line_account_id = ?
-        AND (account_ids IS NULL OR json_array_length(account_ids) <= 1)
-        AND id IN (${usageIds('broadcast')})`)
-      .bind(oldKey, newKey, oldKey, newKey, lineAccountId, sourceId),
-    db.prepare(`UPDATE rich_menu_pages SET image_r2_key = REPLACE(image_r2_key, ?, ?)
-      WHERE EXISTS (SELECT 1 FROM rich_menu_groups g
-        WHERE g.id = rich_menu_pages.group_id AND g.account_id = ?)
-        AND id IN (${usageIds('rich_menu')})`)
-      .bind(oldKey, newKey, lineAccountId, sourceId),
-    db.prepare(`UPDATE scenario_steps
-      SET message_content = REPLACE(message_content, ?, ?),
-          message_bubbles_json = REPLACE(message_bubbles_json, ?, ?)
-      WHERE EXISTS (SELECT 1 FROM scenarios s
-        WHERE s.id = scenario_steps.scenario_id AND s.line_account_id = ?)
-        AND id IN (${usageIds('scenario_step')})`)
-      .bind(oldKey, newKey, oldKey, newKey, lineAccountId, sourceId),
-    db.prepare(`UPDATE nen_columns SET image_url = REPLACE(image_url, ?, ?)
-      WHERE line_account_id = ? AND id IN (${usageIds('nen_column')})`)
-      .bind(oldKey, newKey, lineAccountId, sourceId),
-    db.prepare(`UPDATE events
-      SET image_url = REPLACE(image_url, ?, ?), og_image_url = REPLACE(og_image_url, ?, ?)
-      WHERE line_account_id = ?
-        AND (account_ids IS NULL OR json_array_length(account_ids) <= 1)
-        AND id IN (${usageIds('event')})`)
-      .bind(oldKey, newKey, oldKey, newKey, lineAccountId, sourceId),
+    ...scoped('line_account_id = ?', [lineAccountId], 'template', ['message_content'], 'templates'),
+    ...scoped(
+      'line_account_id = ? AND (account_ids IS NULL OR json_array_length(account_ids) <= 1)',
+      [lineAccountId], 'broadcast', ['message_content', 'message_bubbles_json'], 'broadcasts',
+    ),
+    ...scoped(
+      `EXISTS (SELECT 1 FROM rich_menu_groups g
+        WHERE g.id = rich_menu_pages.group_id AND g.account_id = ?)`,
+      [lineAccountId], 'rich_menu', ['image_r2_key'], 'rich_menu_pages',
+    ),
+    ...scoped(
+      `EXISTS (SELECT 1 FROM scenarios s
+        WHERE s.id = scenario_steps.scenario_id AND s.line_account_id = ?)`,
+      [lineAccountId], 'scenario_step', ['message_content', 'message_bubbles_json'], 'scenario_steps',
+    ),
+    ...scoped('line_account_id = ?', [lineAccountId], 'nen_column', ['image_url'], 'nen_columns'),
+    ...scoped(
+      'line_account_id = ? AND (account_ids IS NULL OR json_array_length(account_ids) <= 1)',
+      [lineAccountId], 'event', ['image_url', 'og_image_url'], 'events',
+    ),
     db.prepare(`INSERT OR IGNORE INTO media_usages (media_id, ref_kind, ref_id, scanned_at)
       SELECT ?, ref_kind, ref_id, ? FROM media_usages WHERE media_id = ?`)
       .bind(plan.replacement.id, plan.impact.checkedAt, sourceId),
     db.prepare(`DELETE FROM media_usages WHERE media_id = ?`).bind(sourceId),
   ];
   const results = await db.batch(statements);
-  return results.slice(0, 6).reduce((sum, result) => sum + Number(result.meta?.changes ?? 0), 0);
+  // 末尾2件はmedia_usagesの付け替えなので、本文を書き換えた件数だけ数える。
+  return results.slice(0, results.length - 2)
+    .reduce((sum, result) => sum + Number(result.meta?.changes ?? 0), 0);
+}
+
+/**
+ * ライブ参照の公開パス。
+ *
+ * 使用先本文には「版ごとのr2_key」か、このメディアIDのパスを
+ * `/media/<id>/content` の形で埋め込む。版のr2_keyはその版を指し続け
+ * （固定参照）、メディアIDのパスは配信時に最新版へ解決される
+ * （ライブ参照）。どちらも本文内の文字列として表せるため、使用先の
+ * 記録へ列を足さずに使用先ごとの切り替えができる。
+ */
+export function mediaLiveContentPath(mediaId: string): string {
+  return `/media/${mediaId}/content`;
+}
+
+/** メディアの全版のr2_key（現行・旧版を問わず、固定参照が指し得る実体）。 */
+export async function getMediaVersionKeys(
+  db: D1Database,
+  mediaId: string,
+): Promise<string[]> {
+  const rows = await db
+    .prepare(`SELECT r2_key FROM media_versions WHERE media_id = ?`)
+    .bind(mediaId)
+    .all<{ r2_key: string }>();
+  return rows.results.map((row) => row.r2_key);
+}
+
+/**
+ * 使用先本文を照合するトークン。
+ *
+ * 固定参照は版ごとのr2_key（旧版を指すものも使用中）、ライブ参照は
+ * メディアIDの公開パスで見つける。
+ */
+export async function getMediaUsageMatchTokens(
+  db: D1Database,
+  mediaId: string,
+): Promise<string[]> {
+  return [...new Set([...await getMediaVersionKeys(db, mediaId), mediaLiveContentPath(mediaId)])];
+}
+
+/** 複数メディア分を1回で取る。media_id → 照合トークン。 */
+export async function getMediaUsageMatchTokenMap(
+  db: D1Database,
+  mediaIds: string[],
+): Promise<Map<string, string[]>> {
+  const map = new Map<string, string[]>();
+  for (const id of mediaIds) map.set(id, [mediaLiveContentPath(id)]);
+  for (let index = 0; index < mediaIds.length; index += LOOKUP_CHUNK) {
+    const chunk = mediaIds.slice(index, index + LOOKUP_CHUNK);
+    const placeholders = chunk.map(() => '?').join(',');
+    const rows = await db
+      .prepare(`SELECT media_id, r2_key FROM media_versions WHERE media_id IN (${placeholders})`)
+      .bind(...chunk)
+      .all<{ media_id: string; r2_key: string }>();
+    for (const row of rows.results) {
+      const tokens = map.get(row.media_id) ?? [mediaLiveContentPath(row.media_id)];
+      if (!tokens.includes(row.r2_key)) tokens.push(row.r2_key);
+      map.set(row.media_id, tokens);
+    }
+  }
+  return map;
+}
+
+/** 公開のライブ配信がメディアIDから最新版へ解決するための最小限の行。 */
+export async function getMediaLiveTarget(
+  db: D1Database,
+  id: string,
+): Promise<Pick<Media, 'id' | 'r2_key' | 'mime_type' | 'filename'> | null> {
+  return db.prepare(
+    `SELECT id, r2_key, mime_type, filename FROM media WHERE id = ?`,
+  ).bind(id).first<Pick<Media, 'id' | 'r2_key' | 'mime_type' | 'filename'>>();
+}
+
+export type MediaUsageReferenceMode = 'live' | 'pinned' | 'mixed' | 'unknown' | 'unavailable';
+
+export interface MediaUsageReferenceState {
+  mode: MediaUsageReferenceMode;
+  /** pinned のとき参照している版。混在・判別不能・使用先不明は null。 */
+  versionNo: number | null;
+}
+
+interface UsageContentRow {
+  /** 複数のLINEアカウントで共有している正本。この画面からは書き換えない。 */
+  shared: boolean;
+  columns: Record<string, string>;
+}
+
+function usageTextColumns(row: Record<string, unknown>, columns: string[]): Record<string, string> {
+  const result: Record<string, string> = {};
+  for (const column of columns) {
+    const value = row[column];
+    if (typeof value === 'string' && value) result[column] = value;
+  }
+  return result;
+}
+
+/**
+ * 使用先の正本行を読み、参照が埋まっている列だけを返す。
+ *
+ * 表示側（describeMediaUsage）と同じ所属判定で、見せられる使用先だけを
+ * 扱う。共有されている配信・イベントは内容の書き換えを止める目印として
+ * `shared` を立てる。
+ */
+async function loadUsageContent(
+  db: D1Database,
+  usage: { ref_kind: string; ref_id: string },
+  lineAccountId: string,
+): Promise<UsageContentRow | null> {
+  switch (usage.ref_kind) {
+    case 'template': {
+      const row = await db.prepare(
+        `SELECT message_content FROM templates WHERE id = ? AND line_account_id = ?`,
+      ).bind(usage.ref_id, lineAccountId).first<Record<string, unknown>>();
+      return row ? { shared: false, columns: usageTextColumns(row, ['message_content']) } : null;
+    }
+    case 'broadcast': {
+      const row = await db.prepare(
+        `SELECT message_content, message_bubbles_json,
+                line_account_id AS account_id, account_ids
+           FROM broadcasts WHERE id = ?`,
+      ).bind(usage.ref_id).first<Record<string, unknown> & NamedReference>();
+      if (!row || !belongsToAccount(row, lineAccountId)) return null;
+      return {
+        shared: row.account_id !== lineAccountId
+          || accountIdsOf(row).some((id) => id !== lineAccountId),
+        columns: usageTextColumns(row, ['message_content', 'message_bubbles_json']),
+      };
+    }
+    case 'rich_menu': {
+      const row = await db.prepare(
+        `SELECT p.image_r2_key FROM rich_menu_pages p
+           JOIN rich_menu_groups g ON g.id = p.group_id
+          WHERE p.id = ? AND g.account_id = ?`,
+      ).bind(usage.ref_id, lineAccountId).first<Record<string, unknown>>();
+      return row ? { shared: false, columns: usageTextColumns(row, ['image_r2_key']) } : null;
+    }
+    case 'scenario_step': {
+      const row = await db.prepare(
+        `SELECT ss.message_content, ss.message_bubbles_json
+           FROM scenario_steps ss
+           JOIN scenarios s ON s.id = ss.scenario_id
+          WHERE ss.id = ? AND s.line_account_id = ?`,
+      ).bind(usage.ref_id, lineAccountId).first<Record<string, unknown>>();
+      return row
+        ? { shared: false, columns: usageTextColumns(row, ['message_content', 'message_bubbles_json']) }
+        : null;
+    }
+    case 'nen_column': {
+      const row = await db.prepare(
+        `SELECT image_url FROM nen_columns WHERE id = ? AND line_account_id = ?`,
+      ).bind(usage.ref_id, lineAccountId).first<Record<string, unknown>>();
+      return row ? { shared: false, columns: usageTextColumns(row, ['image_url']) } : null;
+    }
+    case 'event': {
+      const row = await db.prepare(
+        `SELECT image_url, og_image_url, line_account_id AS account_id, account_ids
+           FROM events WHERE id = ?`,
+      ).bind(usage.ref_id).first<Record<string, unknown> & NamedReference>();
+      if (!row || !belongsToAccount(row, lineAccountId)) return null;
+      return {
+        shared: row.account_id !== lineAccountId
+          || accountIdsOf(row).some((id) => id !== lineAccountId),
+        columns: usageTextColumns(row, ['image_url', 'og_image_url']),
+      };
+    }
+    case 'webinar': {
+      const row = await db.prepare(
+        `SELECT video_prefix FROM webinars WHERE id = ? AND account_id = ?`,
+      ).bind(usage.ref_id, lineAccountId).first<Record<string, unknown>>();
+      return row ? { shared: false, columns: usageTextColumns(row, ['video_prefix']) } : null;
+    }
+    default:
+      return null;
+  }
+}
+
+function detectUsageReferenceState(
+  mediaId: string,
+  versions: Array<{ version_no: number; r2_key: string }>,
+  columns: Record<string, string>,
+): MediaUsageReferenceState {
+  const text = Object.values(columns).join('\n');
+  const live = text.includes(mediaLiveContentPath(mediaId));
+  const hits = versions.filter((version) => version.r2_key && text.includes(version.r2_key));
+  if (live) return hits.length > 0
+    ? { mode: 'mixed', versionNo: null }
+    : { mode: 'live', versionNo: null };
+  if (hits.length === 1) return { mode: 'pinned', versionNo: Number(hits[0].version_no) };
+  if (hits.length > 1) return { mode: 'mixed', versionNo: null };
+  // 記録はあるが本文からは今の形を判別できない。触らずそのまま知らせる。
+  return { mode: 'unknown', versionNo: null };
+}
+
+/**
+ * 記録済み使用先ごとの参照モードと固定版を読む。
+ *
+ * 返す配列は `usages` と同じ順番。正本が別アカウントへ移った等で読めない
+ * 使用先は `unavailable` として残す。
+ */
+export async function getMediaUsageReferenceStates(
+  db: D1Database,
+  input: {
+    media: Media;
+    usages: MediaUsage[];
+    versions: Array<{ version_no: number; r2_key: string }>;
+    lineAccountId: string;
+  },
+): Promise<MediaUsageReferenceState[]> {
+  return Promise.all(input.usages.map(async (usage) => {
+    const row = await loadUsageContent(db, usage, input.lineAccountId);
+    if (!row) return { mode: 'unavailable' as const, versionNo: null };
+    return detectUsageReferenceState(input.media.id, input.versions, row.columns);
+  }));
+}
+
+export type MediaUsageReferenceErrorCode =
+  | 'media_usage_not_found'
+  | 'media_usage_shared'
+  | 'media_reference_unsupported'
+  | 'media_version_not_found'
+  | 'media_reference_stale';
+
+export class MediaUsageReferenceError extends Error {
+  constructor(readonly code: MediaUsageReferenceErrorCode) {
+    super(code);
+    this.name = 'MediaUsageReferenceError';
+  }
+}
+
+/**
+ * 1つの使用先の参照を、ライブ参照または指定した固定版へ書き換える。
+ *
+ * 本文に埋まっている現在の参照文字列（全版のr2_key・ライブ参照パス）を
+ * 見つけ、その使用先の行だけを対象に置き換える。同じメディアを使う
+ * 他の使用先の行には一切触れない。
+ *
+ * ライブ参照はURLとして読まれる列（テンプレート・一斉配信・シナリオ・
+ * NEN・イベント）でのみ使える。リッチメニューはR2キーで渡す列のため
+ * 固定版だけ、ウェビナー動画は一式を持つため対象外とする。
+ */
+export async function retargetMediaUsageReference(
+  db: D1Database,
+  input: {
+    media: Media;
+    lineAccountId: string;
+    refKind: string;
+    refId: string;
+    target: { mode: 'live' } | { mode: 'pinned'; versionNo: number };
+    /** 同じPATCHで保存するメディア名・フォルダ。参照切替と同じbatchへ載せる。 */
+    mediaUpdate?: { filename?: string; folderId?: string | null };
+  },
+): Promise<{ changed: boolean; state: MediaUsageReferenceState }> {
+  if (input.refKind === 'webinar') {
+    throw new MediaUsageReferenceError('media_reference_unsupported');
+  }
+  if (input.target.mode === 'live' && input.refKind === 'rich_menu') {
+    throw new MediaUsageReferenceError('media_reference_unsupported');
+  }
+  const versionRows = (await db.prepare(
+    `SELECT version_no, r2_key, scan_status FROM media_versions WHERE media_id = ?`,
+  ).bind(input.media.id).all<{ version_no: number; r2_key: string; scan_status: string }>()).results;
+  const targetVersionNo = input.target.mode === 'pinned' ? input.target.versionNo : null;
+  const targetKey = targetVersionNo === null
+    ? undefined
+    : versionRows.find(
+        (version) => Number(version.version_no) === targetVersionNo
+          && version.scan_status === 'verified',
+      )?.r2_key;
+  if (input.target.mode === 'pinned' && !targetKey) {
+    throw new MediaUsageReferenceError('media_version_not_found');
+  }
+
+  const usage = { ref_kind: input.refKind, ref_id: input.refId };
+  const row = await loadUsageContent(db, usage, input.lineAccountId);
+  if (!row) throw new MediaUsageReferenceError('media_usage_not_found');
+  if (row.shared) throw new MediaUsageReferenceError('media_usage_shared');
+
+  const livePath = mediaLiveContentPath(input.media.id);
+  const state = detectUsageReferenceState(input.media.id, versionRows, row.columns);
+  const mediaSets: string[] = [];
+  const mediaValues: unknown[] = [];
+  if (input.mediaUpdate?.filename !== undefined) {
+    mediaSets.push('filename = ?');
+    mediaValues.push(input.mediaUpdate.filename);
+  }
+  if (input.mediaUpdate && 'folderId' in input.mediaUpdate) {
+    mediaSets.push('folder_id = ?');
+    mediaValues.push(input.mediaUpdate.folderId ?? null);
+  }
+  const mediaUpdateStatement = mediaSets.length > 0
+    ? db.prepare(`UPDATE media SET ${mediaSets.join(', ')} WHERE id = ? AND line_account_id = ?`)
+      .bind(...mediaValues, input.media.id, input.lineAccountId)
+    : null;
+  const already = input.target.mode === 'live'
+    ? state.mode === 'live'
+    : state.mode === 'pinned' && state.versionNo === input.target.versionNo;
+  if (already) {
+    if (mediaUpdateStatement) await db.batch([mediaUpdateStatement]);
+    return { changed: false, state };
+  }
+  if (state.mode === 'unknown') {
+    // このメディアを指す文字列が本文に無い＝記録だけが残っている。
+    // 置き換える正本が分からないので、無闇に書き換えず読み直しを促す。
+    throw new MediaUsageReferenceError('media_reference_stale');
+  }
+
+  const scope = (() => {
+    switch (input.refKind) {
+      case 'template':
+      case 'nen_column':
+        return { sql: 'line_account_id = ?', binds: [input.lineAccountId] };
+      case 'broadcast':
+      case 'event':
+        return {
+          sql: `line_account_id = ?
+            AND (account_ids IS NULL OR json_array_length(account_ids) <= 1)`,
+          binds: [input.lineAccountId],
+        };
+      case 'rich_menu':
+        return {
+          sql: `EXISTS (SELECT 1 FROM rich_menu_groups g
+            WHERE g.id = rich_menu_pages.group_id AND g.account_id = ?)`,
+          binds: [input.lineAccountId],
+        };
+      case 'scenario_step':
+        return {
+          sql: `EXISTS (SELECT 1 FROM scenarios s
+            WHERE s.id = scenario_steps.scenario_id AND s.line_account_id = ?)`,
+          binds: [input.lineAccountId],
+        };
+      default:
+        throw new MediaUsageReferenceError('media_reference_unsupported');
+    }
+  })();
+  const table: Record<string, string> = {
+    template: 'templates',
+    broadcast: 'broadcasts',
+    rich_menu: 'rich_menu_pages',
+    scenario_step: 'scenario_steps',
+    nen_column: 'nen_columns',
+    event: 'events',
+  };
+  const targetTable = table[input.refKind];
+  if (!targetTable) throw new MediaUsageReferenceError('media_reference_unsupported');
+
+  const statements: D1PreparedStatement[] = mediaUpdateStatement ? [mediaUpdateStatement] : [];
+  for (const [column, value] of Object.entries(row.columns)) {
+    const pairs: Array<[string, string]> = [];
+    if (input.target.mode === 'live') {
+      for (const version of versionRows) {
+        if (!version.r2_key || !value.includes(version.r2_key)) continue;
+        // URL形の埋め込みはURLごと、単体のキーはパスへ置き換える。
+        pairs.push([`/images/${version.r2_key}`, livePath]);
+        pairs.push([version.r2_key, livePath]);
+      }
+    } else {
+      for (const version of versionRows) {
+        if (!version.r2_key || !value.includes(version.r2_key)) continue;
+        pairs.push([version.r2_key, targetKey!]);
+      }
+      if (value.includes(livePath)) pairs.push([livePath, `/images/${targetKey}`]);
+    }
+    if (pairs.length === 0) continue;
+    // D1 は1文100 bindまで。置換2＋LIKE1ずつに対象ID・所属を足すため、
+    // 24対ずつに分ける（最大74 bind）。
+    for (let index = 0; index < pairs.length; index += USAGE_REPLACE_PAIR_CHUNK) {
+      const chunk = pairs.slice(index, index + USAGE_REPLACE_PAIR_CHUNK);
+      const expression = chunk.reduce((expr) => `REPLACE(${expr}, ?, ?)`, column);
+      const guard = chunk.map(() => `${column} LIKE ?`).join(' OR ');
+      statements.push(db.prepare(
+        `UPDATE ${targetTable} SET ${column} = ${expression}
+          WHERE id = ? AND ${scope.sql} AND (${guard})`,
+      ).bind(
+        ...chunk.flatMap(([from, to]) => [from, to]),
+        input.refId,
+        ...scope.binds,
+        ...chunk.map(([from]) => `%${from}%`),
+      ));
+    }
+  }
+  if (statements.length === (mediaUpdateStatement ? 1 : 0)) {
+    throw new MediaUsageReferenceError('media_reference_stale');
+  }
+  const results = await db.batch(statements);
+  const changed = results.some((result) => Number(result.meta?.changes ?? 0) > 0);
+
+  // 書いた結果を読み直して確認する。途中で本文が変わっていた場合に
+  // 「切り替わった」と誤って見せないため。
+  const after = await loadUsageContent(db, usage, input.lineAccountId);
+  const afterState = after
+    ? detectUsageReferenceState(input.media.id, versionRows, after.columns)
+    : null;
+  const ok = afterState && (input.target.mode === 'live'
+    ? afterState.mode === 'live'
+    : afterState.mode === 'pinned' && afterState.versionNo === input.target.versionNo);
+  if (!ok) throw new MediaUsageReferenceError('media_reference_stale');
+  return { changed, state: afterState! };
 }
 
 export async function recordMediaUsage(
