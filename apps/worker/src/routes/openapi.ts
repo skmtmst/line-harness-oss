@@ -795,6 +795,22 @@ const spec = {
         },
       },
     },
+    '/api/media/{id}': {
+      get: {
+        tags: ['Contents'],
+        summary: '登録メディアの管理用詳細をアカウント範囲内で取得',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'accountId', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: 'Media detail and its folder name' },
+          '400': { description: 'Account id is required' },
+          '403': { description: 'Owner or admin role required' },
+          '404': { description: 'Media not found in account scope' },
+        },
+      },
+    },
     '/api/media/{id}/download': {
       get: {
         tags: ['Contents'],
