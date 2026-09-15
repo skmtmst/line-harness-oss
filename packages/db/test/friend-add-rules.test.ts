@@ -11,6 +11,7 @@ import {
   publishFriendAddRule,
   recordFriendAddRuleTest,
   saveFriendAddRuleDraft,
+  stopFriendAddRule,
   type FriendAddRuleDefinition,
 } from '../src/friend-add-rules.js';
 
@@ -70,6 +71,42 @@ const definition: FriendAddRuleDefinition = {
   activeFrom: null,
   activeUntil: null,
 };
+
+function insertPublishedRule(
+  sqlite: Database.Database,
+  input: {
+    id: string;
+    accountId?: string;
+    kind?: 'first_time' | 'returning';
+    fallback?: boolean;
+    status?: 'published' | 'stopped';
+  },
+): void {
+  const accountId = input.accountId ?? 'account-1';
+  const kind = input.kind ?? 'first_time';
+  const status = input.status ?? 'published';
+  const versionId = `${input.id}-version`;
+  sqlite.prepare(
+    `INSERT INTO friend_add_rules
+      (id, line_account_id, friend_kind, name, priority, is_unknown_route_fallback,
+       status, current_version_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(
+    input.id,
+    accountId,
+    kind,
+    input.id,
+    input.fallback ? 9999 : 1,
+    input.fallback ? 1 : 0,
+    status,
+    versionId,
+  );
+  sqlite.prepare(
+    `INSERT INTO friend_add_rule_versions
+      (id, rule_id, version_number, definition_snapshot, status)
+     VALUES (?, ?, 1, ?, 'published')`,
+  ).run(versionId, input.id, JSON.stringify({ ...definition, routeIds: input.fallback ? [] : ['route-1'] }));
+}
 
 describe('friend add V6 rules', () => {
   let sqlite: Database.Database;
@@ -149,5 +186,55 @@ describe('friend add V6 rules', () => {
     ).run();
     await expect(archiveFriendAddRule(db, { lineAccountId: 'account-1', ruleId: 'fallback' }))
       .rejects.toThrow('FRIEND_ADD_RULE_NOT_ARCHIVED');
+  });
+
+  test('有効な同一アカウント・同一対象の受け皿がない停止を拒否する', async () => {
+    insertPublishedRule(sqlite, { id: 'target' });
+
+    await expect(stopFriendAddRule(db, {
+      lineAccountId: 'account-1', ruleId: 'target', staffId: 'staff-1',
+      idempotencyKey: 'stop-target-0001', expectedVersion: 1,
+    })).rejects.toThrow('FRIEND_ADD_RULE_FALLBACK_REQUIRED');
+    expect(sqlite.prepare("SELECT status, lock_version FROM friend_add_rules WHERE id = 'target'").get())
+      .toEqual({ status: 'published', lock_version: 1 });
+  });
+
+  test('別アカウントと停止済みの受け皿を代替として数えない', async () => {
+    insertPublishedRule(sqlite, { id: 'target' });
+    insertPublishedRule(sqlite, { id: 'foreign-fallback', accountId: 'account-2', fallback: true });
+    insertPublishedRule(sqlite, { id: 'stopped-fallback', fallback: true, status: 'stopped' });
+
+    await expect(stopFriendAddRule(db, {
+      lineAccountId: 'account-1', ruleId: 'target', staffId: 'staff-1',
+      idempotencyKey: 'stop-target-0002', expectedVersion: 1,
+    })).rejects.toThrow('FRIEND_ADD_RULE_FALLBACK_REQUIRED');
+    expect(sqlite.prepare("SELECT status FROM friend_add_rules WHERE id = 'target'").get())
+      .toEqual({ status: 'published' });
+  });
+
+  test('同時停止でも受け皿を公開中に残し、旧経路へ戻る状態を作らない', async () => {
+    insertPublishedRule(sqlite, { id: 'target' });
+    insertPublishedRule(sqlite, { id: 'fallback', fallback: true });
+
+    const results = await Promise.allSettled([
+      stopFriendAddRule(db, {
+        lineAccountId: 'account-1', ruleId: 'target', staffId: 'staff-1',
+        idempotencyKey: 'stop-target-0003', expectedVersion: 1,
+      }),
+      stopFriendAddRule(db, {
+        lineAccountId: 'account-1', ruleId: 'fallback', staffId: 'staff-1',
+        idempotencyKey: 'stop-fallback-001', expectedVersion: 1,
+      }),
+    ]);
+
+    expect(results.map((result) => result.status).sort()).toEqual(['fulfilled', 'rejected']);
+    expect(sqlite.prepare(
+      `SELECT id, status FROM friend_add_rules
+        WHERE line_account_id = 'account-1' AND friend_kind = 'first_time'
+        ORDER BY id`,
+    ).all()).toEqual([
+      { id: 'fallback', status: 'published' },
+      { id: 'target', status: 'stopped' },
+    ]);
   });
 });
