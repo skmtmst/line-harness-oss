@@ -1,3 +1,5 @@
+import { DEFAULT_TENANT_ID } from '@line-crm/shared';
+
 export const OPERATION_HEALTH_CHECK_KEYS = [
   'line_connection',
   'message_quota',
@@ -45,6 +47,7 @@ export type OperationAlertNotificationSummary = {
   sending: number;
   sent: number;
   failed: number;
+  unconfigured: number;
   total: number;
 };
 
@@ -207,6 +210,9 @@ type OperationAlertEventRow = {
   actor_id: string | null;
   note: string | null;
   alert_version: number;
+  notification_enqueued_at?: string | null;
+  notification_recipient_count?: number;
+  notification_missing_contact_count?: number;
   created_at: string;
 };
 
@@ -514,18 +520,31 @@ async function operationAlertNotificationSummary(
 ): Promise<OperationAlertNotificationSummary> {
   const row = await db.prepare(
     `SELECT
-       SUM(CASE WHEN o.status = 'queued' THEN 1 ELSE 0 END) AS queued,
-       SUM(CASE WHEN o.status = 'sending' THEN 1 ELSE 0 END) AS sending,
-       SUM(CASE WHEN o.status = 'sent' THEN 1 ELSE 0 END) AS sent,
-       SUM(CASE WHEN o.status = 'failed' THEN 1 ELSE 0 END) AS failed,
-       COUNT(o.id) AS total
-       FROM operation_alert_notification_outbox o
-       JOIN operation_alert_events e ON e.id = o.event_id
-      WHERE e.alert_id = ?`,
-  ).bind(alertId).first<Record<string, number | null>>();
+       (SELECT SUM(CASE WHEN o.status = 'queued' THEN 1 ELSE 0 END)
+          FROM operation_alert_notification_outbox o JOIN operation_alert_events e ON e.id = o.event_id
+         WHERE e.alert_id = ?) AS queued,
+       (SELECT SUM(CASE WHEN o.status = 'sending' THEN 1 ELSE 0 END)
+          FROM operation_alert_notification_outbox o JOIN operation_alert_events e ON e.id = o.event_id
+         WHERE e.alert_id = ?) AS sending,
+       (SELECT SUM(CASE WHEN o.status = 'sent' THEN 1 ELSE 0 END)
+          FROM operation_alert_notification_outbox o JOIN operation_alert_events e ON e.id = o.event_id
+         WHERE e.alert_id = ?) AS sent,
+       (SELECT SUM(CASE WHEN o.status = 'failed' THEN 1 ELSE 0 END)
+          FROM operation_alert_notification_outbox o JOIN operation_alert_events e ON e.id = o.event_id
+         WHERE e.alert_id = ?) AS failed,
+       (SELECT COUNT(o.id)
+          FROM operation_alert_notification_outbox o JOIN operation_alert_events e ON e.id = o.event_id
+         WHERE e.alert_id = ?) AS total,
+       (SELECT SUM(CASE
+          WHEN e.notification_enqueued_at IS NULL THEN 0
+          WHEN e.notification_recipient_count = 0 THEN 1
+          ELSE e.notification_missing_contact_count END)
+          FROM operation_alert_events e WHERE e.alert_id = ?) AS unconfigured`,
+  ).bind(alertId, alertId, alertId, alertId, alertId, alertId).first<Record<string, number | null>>();
   return {
     queued: Number(row?.queued ?? 0), sending: Number(row?.sending ?? 0),
-    sent: Number(row?.sent ?? 0), failed: Number(row?.failed ?? 0), total: Number(row?.total ?? 0),
+    sent: Number(row?.sent ?? 0), failed: Number(row?.failed ?? 0),
+    unconfigured: Number(row?.unconfigured ?? 0), total: Number(row?.total ?? 0),
   };
 }
 
@@ -550,11 +569,75 @@ export async function listOperationAlerts(
       ORDER BY CASE status WHEN 'open' THEN 0 WHEN 'acknowledged' THEN 1 ELSE 2 END,
                updated_at DESC, id DESC LIMIT ?`,
   ).bind(input.lineAccountId, input.includeResolved ? 1 : 0, limit).all<OperationAlertRow>();
-  return Promise.all((rows.results ?? []).map(async (row) => mapOperationAlert(
-    row,
-    await operationAlertNotificationSummary(db, row.id),
-    await operationAlertEvents(db, row.id),
-  )));
+  const selected = `
+    SELECT id FROM operation_alerts
+     WHERE line_account_id = ? AND (? = 1 OR status != 'resolved')
+     ORDER BY CASE status WHEN 'open' THEN 0 WHEN 'acknowledged' THEN 1 ELSE 2 END,
+              updated_at DESC, id DESC LIMIT ?`;
+  const summaries = await db.prepare(
+    `WITH selected_alerts AS (${selected}),
+      outbox_totals AS (
+        SELECT e.alert_id,
+               SUM(CASE WHEN o.status = 'queued' THEN 1 ELSE 0 END) AS queued,
+               SUM(CASE WHEN o.status = 'sending' THEN 1 ELSE 0 END) AS sending,
+               SUM(CASE WHEN o.status = 'sent' THEN 1 ELSE 0 END) AS sent,
+               SUM(CASE WHEN o.status = 'failed' THEN 1 ELSE 0 END) AS failed,
+               COUNT(o.id) AS total
+          FROM operation_alert_events e
+          JOIN operation_alert_notification_outbox o ON o.event_id = e.id
+         JOIN selected_alerts s ON s.id = e.alert_id
+         GROUP BY e.alert_id
+      ),
+      gap_totals AS (
+        SELECT e.alert_id,
+               SUM(CASE
+                 WHEN e.notification_enqueued_at IS NULL THEN 0
+                 WHEN e.notification_recipient_count = 0 THEN 1
+                 ELSE e.notification_missing_contact_count END) AS unconfigured
+          FROM operation_alert_events e
+          JOIN selected_alerts s ON s.id = e.alert_id
+         GROUP BY e.alert_id
+      )
+      SELECT s.id AS alert_id,
+             COALESCE(o.queued, 0) AS queued, COALESCE(o.sending, 0) AS sending,
+             COALESCE(o.sent, 0) AS sent, COALESCE(o.failed, 0) AS failed,
+             COALESCE(g.unconfigured, 0) AS unconfigured, COALESCE(o.total, 0) AS total
+        FROM selected_alerts s
+        LEFT JOIN outbox_totals o ON o.alert_id = s.id
+        LEFT JOIN gap_totals g ON g.alert_id = s.id`,
+  ).bind(input.lineAccountId, input.includeResolved ? 1 : 0, limit).all<{
+    alert_id: string; queued: number; sending: number; sent: number;
+    failed: number; unconfigured: number; total: number;
+  }>();
+  const eventRows = await db.prepare(
+    `WITH selected_alerts AS (${selected}),
+      ranked_events AS (
+        SELECT e.*,
+               ROW_NUMBER() OVER (PARTITION BY e.alert_id ORDER BY e.created_at DESC, e.id DESC) AS event_rank
+          FROM operation_alert_events e
+          JOIN selected_alerts s ON s.id = e.alert_id
+      )
+      SELECT id, alert_id, line_account_id, source_run_id, action, severity, summary,
+             actor_id, note, alert_version, created_at
+        FROM ranked_events WHERE event_rank <= 20
+       ORDER BY alert_id, created_at DESC, id DESC`,
+  ).bind(input.lineAccountId, input.includeResolved ? 1 : 0, limit).all<OperationAlertEventRow>();
+  const summaryByAlert = new Map((summaries.results ?? []).map((row) => [row.alert_id, {
+    queued: Number(row.queued), sending: Number(row.sending), sent: Number(row.sent),
+    failed: Number(row.failed), unconfigured: Number(row.unconfigured), total: Number(row.total),
+  }]));
+  const eventsByAlert = new Map<string, OperationAlertEvent[]>();
+  for (const row of eventRows.results ?? []) {
+    const events = eventsByAlert.get(row.alert_id) ?? [];
+    events.push(mapOperationAlertEvent(row));
+    eventsByAlert.set(row.alert_id, events);
+  }
+  const emptySummary: OperationAlertNotificationSummary = {
+    queued: 0, sending: 0, sent: 0, failed: 0, unconfigured: 0, total: 0,
+  };
+  return (rows.results ?? []).map((row) => mapOperationAlert(
+    row, summaryByAlert.get(row.id) ?? emptySummary, eventsByAlert.get(row.id) ?? [],
+  ));
 }
 
 export async function getOperationAlert(
@@ -582,7 +665,11 @@ export async function acknowledgeOperationAlert(
     .bind(input.id, input.lineAccountId).first<OperationAlertRow>();
   if (!row) return { status: 'not_found', alert: null };
   if (Number(changed.meta?.changes ?? 0) !== 1) {
-    return { status: row.status === 'acknowledged' ? 'duplicate' : 'conflict', alert: await getOperationAlert(db, row.id) };
+    const duplicate = row.status === 'acknowledged'
+      && row.version === input.expectedVersion
+      && row.acknowledged_by_id === input.actorId
+      && row.acknowledgement_note === note;
+    return { status: duplicate ? 'duplicate' : 'conflict', alert: await getOperationAlert(db, row.id) };
   }
   await recordOperationAlertEvent(db, { alert: row, action: 'acknowledged', actorId: input.actorId, note, now });
   return { status: 'changed', alert: await getOperationAlert(db, row.id) };
@@ -607,12 +694,22 @@ export async function enqueuePendingOperationAlertNotifications(
          FROM staff_members sm
          JOIN line_accounts la ON la.id = ?
         WHERE sm.is_active = 1 AND sm.role IN ('owner', 'admin')
-          AND COALESCE(sm.tenant_id, 'default') = COALESCE(la.tenant_id, 'default')
-          AND (COALESCE(sm.account_scope, 'all') = 'all' OR sm.assigned_line_account_id = ?)
+          AND COALESCE(sm.tenant_id, ?) = COALESCE(la.tenant_id, ?)
+          AND (
+            COALESCE(sm.account_scope, 'all') = 'all'
+            OR EXISTS (
+              SELECT 1 FROM staff_account_scopes sas
+               WHERE sas.staff_id = sm.id AND sas.line_account_id = ?
+            )
+          )
         ORDER BY sm.id`,
-    ).bind(event.line_account_id, event.line_account_id).all<{ id: string; email: string | null; line_user_id: string | null }>();
+    ).bind(
+      event.line_account_id, DEFAULT_TENANT_ID, DEFAULT_TENANT_ID, event.line_account_id,
+    ).all<{ id: string; email: string | null; line_user_id: string | null }>();
     const statements: D1PreparedStatement[] = [];
+    let missingContactCount = 0;
     for (const recipient of recipients.results ?? []) {
+      if (!recipient.line_user_id && !recipient.email) missingContactCount += 1;
       if (recipient.line_user_id) statements.push(db.prepare(
         `INSERT OR IGNORE INTO operation_alert_notification_outbox
            (id, event_id, line_account_id, staff_id, channel, status, attempt_count,
@@ -627,8 +724,11 @@ export async function enqueuePendingOperationAlertNotifications(
       ).bind(crypto.randomUUID(), event.id, event.line_account_id, recipient.id, now, now, now));
     }
     statements.push(db.prepare(
-      'UPDATE operation_alert_events SET notification_enqueued_at = ? WHERE id = ? AND notification_enqueued_at IS NULL',
-    ).bind(now, event.id));
+      `UPDATE operation_alert_events
+          SET notification_enqueued_at = ?, notification_recipient_count = ?,
+              notification_missing_contact_count = ?
+        WHERE id = ? AND notification_enqueued_at IS NULL`,
+    ).bind(now, (recipients.results ?? []).length, missingContactCount, event.id));
     await db.batch(statements);
   }
 }
@@ -638,14 +738,23 @@ export async function retryOperationAlertNotifications(
   input: { alertId: string; lineAccountId: string; now?: string },
 ): Promise<number> {
   const now = input.now ?? new Date().toISOString();
-  const result = await db.prepare(
-    `UPDATE operation_alert_notification_outbox
-        SET status = 'queued', next_attempt_at = ?, last_error = NULL, updated_at = ?
-      WHERE status = 'failed' AND event_id IN (
-        SELECT id FROM operation_alert_events WHERE alert_id = ? AND line_account_id = ?
-      )`,
-  ).bind(now, now, input.alertId, input.lineAccountId).run();
-  return Number(result.meta?.changes ?? 0);
+  const results = await db.batch([
+    db.prepare(
+      `UPDATE operation_alert_notification_outbox
+          SET status = 'queued', next_attempt_at = ?, last_error = NULL, updated_at = ?
+        WHERE status = 'failed' AND event_id IN (
+          SELECT id FROM operation_alert_events WHERE alert_id = ? AND line_account_id = ?
+        )`,
+    ).bind(now, now, input.alertId, input.lineAccountId),
+    db.prepare(
+      `UPDATE operation_alert_events
+          SET notification_enqueued_at = NULL, notification_recipient_count = 0,
+              notification_missing_contact_count = 0
+        WHERE alert_id = ? AND line_account_id = ? AND notification_enqueued_at IS NOT NULL
+          AND (notification_recipient_count = 0 OR notification_missing_contact_count > 0)`,
+    ).bind(input.alertId, input.lineAccountId),
+  ]);
+  return Number(results[0]?.meta?.changes ?? 0) + Number(results[1]?.meta?.changes ?? 0);
 }
 
 export async function createStepUpGrant(

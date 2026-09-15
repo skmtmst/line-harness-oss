@@ -4,6 +4,7 @@ import {
   OPERATION_CAPABILITIES,
   acknowledgeOperationAlert,
   consumeStepUpGrant,
+  enqueuePendingOperationAlertNotifications,
   enqueueOperationNotifications,
   getLatestOperationHealthRun,
   getOperationControlSet,
@@ -234,6 +235,7 @@ operations.post('/api/operations/alerts/:id/notifications/retry', requireRole('o
   }
   try {
     const retried = await retryOperationAlertNotifications(c.env.DB, { alertId: alert.id, lineAccountId: accountId });
+    await enqueuePendingOperationAlertNotifications(c.env.DB, { lineAccountId: accountId });
     await recordOperation(c.env.DB, {
       targetKind: 'emergency_control', targetId: alert.id, action: 'changed',
       actorId: c.get('staff')!.id, detail: { action: 'alert_notification_retry_queued', lineAccountId: accountId, retried },

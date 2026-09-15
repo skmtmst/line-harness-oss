@@ -15,6 +15,8 @@ type OutboxRow = {
   summary: string;
 };
 
+export const OPERATION_ALERT_NOTIFICATION_LEASE_MS = 10 * 60_000;
+
 function alertText(row: OutboxRow): string {
   const action = row.action === 'opened' ? '異常を検知しました'
     : row.action === 'escalated' ? '異常の深刻度が上がりました'
@@ -34,6 +36,7 @@ export async function processOperationAlertNotificationOutbox(
   limit = 50,
 ): Promise<{ sent: number; failed: number }> {
   const now = new Date().toISOString();
+  const leaseExpiresAt = new Date(Date.parse(now) + OPERATION_ALERT_NOTIFICATION_LEASE_MS).toISOString();
   const rows = await env.DB.prepare(
     `SELECT o.id, o.channel, o.staff_id, sm.email, sm.line_user_id, la.channel_access_token,
             e.action, e.severity, e.summary
@@ -41,7 +44,7 @@ export async function processOperationAlertNotificationOutbox(
        JOIN operation_alert_events e ON e.id = o.event_id
        JOIN staff_members sm ON sm.id = o.staff_id
        JOIN line_accounts la ON la.id = o.line_account_id
-      WHERE o.status IN ('queued', 'failed') AND o.next_attempt_at <= ?
+      WHERE o.status IN ('queued', 'failed', 'sending') AND o.next_attempt_at <= ?
       ORDER BY o.next_attempt_at, o.id LIMIT ?`,
   ).bind(now, Math.max(1, Math.min(limit, 100))).all<OutboxRow>();
   let sent = 0;
@@ -49,9 +52,10 @@ export async function processOperationAlertNotificationOutbox(
   for (const row of rows.results ?? []) {
     const claimed = await env.DB.prepare(
       `UPDATE operation_alert_notification_outbox
-          SET status = 'sending', attempt_count = attempt_count + 1, updated_at = ?
-        WHERE id = ? AND status IN ('queued', 'failed') AND next_attempt_at <= ?`,
-    ).bind(now, row.id, now).run();
+          SET status = 'sending', attempt_count = attempt_count + 1,
+              next_attempt_at = ?, updated_at = ?
+        WHERE id = ? AND status IN ('queued', 'failed', 'sending') AND next_attempt_at <= ?`,
+    ).bind(leaseExpiresAt, now, row.id, now).run();
     if (Number(claimed.meta?.changes ?? 0) !== 1) continue;
     try {
       const text = alertText(row);

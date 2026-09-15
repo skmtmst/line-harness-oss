@@ -509,6 +509,160 @@ describe('運用状態checkと配備履歴', () => {
   });
 });
 
+describe('運用異常alertのaccount境界と受領', () => {
+  function seedAlert(): void {
+    testDb.raw.prepare(
+      `INSERT INTO operation_health_runs
+         (id, scope_key, line_account_id, window_started_at, source, status, overall_status, started_at, completed_at)
+       VALUES ('run-alert-1', 'account-1', 'account-1', '2026-09-16T00:00:00.000Z',
+               'scheduled', 'completed', 'warning', '2026-09-16T00:00:00.000Z', '2026-09-16T00:00:00.000Z')`,
+    ).run();
+    testDb.raw.prepare(
+      `INSERT INTO operation_alerts
+         (id, line_account_id, check_key, status, severity, summary, source_run_id,
+          first_detected_at, last_detected_at, version, reopened_count, created_at, updated_at)
+       VALUES ('alert-1', 'account-1', 'webhook', 'open', 'warning', 'Webhook受信に失敗があります',
+               'run-alert-1', '2026-09-16T00:00:00.000Z', '2026-09-16T00:00:00.000Z', 1, 0,
+               '2026-09-16T00:00:00.000Z', '2026-09-16T00:00:00.000Z')`,
+    ).run();
+    testDb.raw.prepare(
+      `INSERT INTO operation_alert_events
+         (id, alert_id, line_account_id, source_run_id, action, severity, summary, alert_version, created_at)
+       VALUES ('alert-event-1', 'alert-1', 'account-1', 'run-alert-1', 'opened', 'warning',
+               'Webhook受信に失敗があります', 1, '2026-09-16T00:00:00.000Z')`,
+    ).run();
+  }
+
+  function seedScopedAdmin(accountId: string): void {
+    testDb.raw.prepare(
+      `INSERT INTO staff_members (id, name, role, api_key, account_scope)
+       VALUES ('admin-1', 'Admin', 'admin', 'admin-alert-key', 'accounts')`,
+    ).run();
+    testDb.raw.prepare(
+      `INSERT INTO staff_account_scopes (staff_id, line_account_id, created_at)
+       VALUES ('admin-1', ?, '2026-09-16T00:00:00.000Z')`,
+    ).run(accountId);
+  }
+
+  it('owner/admin以外には一覧も受領も返さない', async () => {
+    seedAlert();
+    expect((await app('staff').request(
+      '/api/operations/alerts?account_id=account-1', {}, bindings(),
+    )).status).toBe(403);
+    expect((await app('staff').request('/api/operations/alerts/alert-1/acknowledge', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ lineAccountId: 'account-1', expectedVersion: 1 }),
+    }, bindings())).status).toBe(403);
+  });
+
+  it('割当account内だけ一覧と受領を許可し、actor/noteを保存する', async () => {
+    seedAlert();
+    seedScopedAdmin('account-1');
+
+    const listed = await app('admin').request(
+      '/api/operations/alerts?account_id=account-1', {}, bindings(),
+    );
+    expect(listed.status).toBe(200);
+    expect(await listed.json()).toMatchObject({
+      success: true,
+      data: [expect.objectContaining({ id: 'alert-1', status: 'open', version: 1 })],
+    });
+
+    const acknowledged = await app('admin').request('/api/operations/alerts/alert-1/acknowledge', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ lineAccountId: 'account-1', expectedVersion: 1, note: 'Webhook設定を確認中' }),
+    }, bindings());
+    expect(acknowledged.status).toBe(200);
+    expect(await acknowledged.json()).toMatchObject({
+      success: true,
+      data: {
+        status: 'acknowledged', version: 2,
+        acknowledgedById: 'admin-1', acknowledgementNote: 'Webhook設定を確認中',
+      },
+    });
+
+    const conflicting = await app('owner').request('/api/operations/alerts/alert-1/acknowledge', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ lineAccountId: 'account-1', expectedVersion: 2, note: '別の担当内容' }),
+    }, bindings());
+    expect(conflicting.status).toBe(409);
+    expect(await conflicting.json()).toMatchObject({ success: false, code: 'VERSION_CONFLICT' });
+  });
+
+  it('別accountだけを割り当てたadminの一覧・受領・通知再開を構造化403にする', async () => {
+    testDb.raw.prepare(
+      `INSERT INTO line_accounts (id, channel_id, name, channel_access_token, channel_secret)
+       VALUES ('account-2', 'channel-2', 'LINE 2', 'token', 'secret')`,
+    ).run();
+    seedAlert();
+    seedScopedAdmin('account-2');
+
+    const list = await app('admin').request(
+      '/api/operations/alerts?account_id=account-1', {}, bindings(),
+    );
+    expect(list.status).toBe(403);
+    expect(await list.json()).toMatchObject({ success: false, code: 'EMERGENCY_SCOPE_FORBIDDEN' });
+
+    for (const path of [
+      '/api/operations/alerts/alert-1/acknowledge',
+      '/api/operations/alerts/alert-1/notifications/retry',
+    ]) {
+      const response = await app('admin').request(path, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ lineAccountId: 'account-1', expectedVersion: 1 }),
+      }, bindings());
+      expect(response.status).toBe(403);
+      expect(await response.json()).toMatchObject({ success: false, code: 'EMERGENCY_SCOPE_FORBIDDEN' });
+    }
+  });
+
+  it('解消済みalertの通知失敗も取得し、運用画面から再送待ちへ戻す', async () => {
+    seedAlert();
+    testDb.raw.prepare(
+      "UPDATE operation_alerts SET status = 'resolved', resolved_at = '2026-09-16T00:10:00.000Z', version = 2 WHERE id = 'alert-1'",
+    ).run();
+    testDb.raw.prepare(
+      `INSERT INTO operation_alert_notification_outbox
+         (id, event_id, line_account_id, staff_id, channel, status, attempt_count,
+          next_attempt_at, last_error, created_at, updated_at)
+       VALUES ('alert-outbox-1', 'alert-event-1', 'account-1', 'owner-1', 'email', 'failed', 1,
+               '2026-09-16T00:05:00.000Z', 'provider unavailable',
+               '2026-09-16T00:00:00.000Z', '2026-09-16T00:05:00.000Z')`,
+    ).run();
+
+    const activeOnly = await app('owner').request(
+      '/api/operations/alerts?account_id=account-1', {}, bindings(),
+    );
+    expect(await activeOnly.json()).toMatchObject({ success: true, data: [] });
+    const withResolved = await app('owner').request(
+      '/api/operations/alerts?account_id=account-1&include_resolved=1', {}, bindings(),
+    );
+    const withResolvedBody = await withResolved.json() as {
+      success: boolean;
+      data: Array<{ id: string; status: string; notification: { failed: number; total: number } }>;
+    };
+    expect(withResolvedBody.success).toBe(true);
+    expect(withResolvedBody.data).toHaveLength(1);
+    expect(withResolvedBody.data[0]).toMatchObject({
+      id: 'alert-1', status: 'resolved', notification: { failed: 1, total: 1 },
+    });
+
+    const retried = await app('owner').request('/api/operations/alerts/alert-1/notifications/retry', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ lineAccountId: 'account-1' }),
+    }, bindings());
+    expect(await retried.json()).toMatchObject({ success: true, data: { retried: 1 } });
+    expect(testDb.raw.prepare(
+      "SELECT status, last_error FROM operation_alert_notification_outbox WHERE id = 'alert-outbox-1'",
+    ).get()).toEqual({ status: 'queued', last_error: null });
+  });
+});
+
 describe('停止不可理由の機械コード(N-453/N-455)', () => {
   async function grant(token: string, staffId: string): Promise<void> {
     const expiresAt = new Date(Date.now() + 60 * 60_000).toISOString();

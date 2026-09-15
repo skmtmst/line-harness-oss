@@ -760,7 +760,7 @@ export type OperationAlert = {
   reopenedCount: number
   createdAt: string
   updatedAt: string
-  notification: { queued: number; sending: number; sent: number; failed: number; total: number }
+  notification: { queued: number; sending: number; sent: number; failed: number; unconfigured: number; total: number }
   events: Array<{
     id: string
     action: 'opened' | 'escalated' | 'acknowledged' | 'resolved' | 'reopened'
@@ -9437,12 +9437,12 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ lineAccountId: accountId }),
       }),
-    alerts: (accountId: string) =>
+    alerts: (accountId: string, includeResolved = false) =>
       fetchApi<ApiResponse<OperationAlert[]>>(
-        `/api/operations/alerts?account_id=${encodeURIComponent(accountId)}`,
+        `/api/operations/alerts?account_id=${encodeURIComponent(accountId)}${includeResolved ? '&include_resolved=1' : ''}`,
       ),
     acknowledgeAlert: (id: string, body: { lineAccountId: string; expectedVersion: number; note?: string }) =>
-      fetchApi<ApiResponse<OperationAlert>>(`/api/operations/alerts/${encodeURIComponent(id)}/acknowledge`, {
+      fetchApi<ApiResponse<OperationAlert> & { duplicate?: boolean }>(`/api/operations/alerts/${encodeURIComponent(id)}/acknowledge`, {
         method: 'POST', body: JSON.stringify(body),
       }),
     retryAlertNotifications: (id: string, lineAccountId: string) =>

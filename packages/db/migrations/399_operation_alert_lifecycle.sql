@@ -39,6 +39,8 @@ CREATE TABLE operation_alert_events (
   note                  TEXT,
   alert_version         INTEGER NOT NULL CHECK (alert_version > 0),
   notification_enqueued_at TEXT,
+  notification_recipient_count INTEGER NOT NULL DEFAULT 0 CHECK (notification_recipient_count >= 0),
+  notification_missing_contact_count INTEGER NOT NULL DEFAULT 0 CHECK (notification_missing_contact_count >= 0),
   created_at            TEXT NOT NULL,
   UNIQUE (alert_id, alert_version)
 );

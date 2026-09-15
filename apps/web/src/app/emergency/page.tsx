@@ -335,23 +335,25 @@ function OperationAlertsPanel({
 }) {
   const [notes, setNotes] = useState<Record<string, string>>({})
   if (failed) return <section className="rounded-card border border-warning bg-warning-bg px-4 py-3 text-xs font-medium text-warning" role="alert">異常の受領・通知記録を取得できませんでした。異常なしとは扱いません。時間をおいて読み直してください。</section>
-  if (alerts.length === 0) return <section className="rounded-card border border-success bg-success-bg px-4 py-3 text-xs font-medium text-success"><strong>受領待ちの異常はありません。</strong> 健全性チェックで新しい異常が見つかると、ここで担当者と通知結果を確認できます。</section>
+  if (alerts.length === 0) return <section className="rounded-card border border-success bg-success-bg px-4 py-3 text-xs font-medium text-success"><strong>異常の記録はありません。</strong> 健全性チェックで新しい異常が見つかると、ここで担当者と通知結果を確認できます。</section>
   return <section className="border-hairline rounded-card overflow-hidden border bg-canvas" aria-label="異常の受領と通知">
-    <div className="border-hairline border-b px-4 py-3"><h2 className="text-base font-bold text-ink">対応が必要な異常</h2><p className="mt-1 text-xs text-ink-faint">同じ異常はまとめます。悪化・解消・再発は履歴と通知に残ります。</p></div>
+    <div className="border-hairline border-b px-4 py-3"><h2 className="text-base font-bold text-ink">異常の対応履歴と通知</h2><p className="mt-1 text-xs text-ink-faint">同じ異常はまとめます。悪化・解消・再発は履歴と通知に残ります。</p></div>
     <div className="divide-y divide-hairline">{alerts.map((alert) => {
       const busy = busyId === alert.id
       const lastEvent = alert.events[0]
-      const notification = alert.notification.total === 0
-        ? '送信先のowner/adminに連絡先がなく、管理画面表示だけです。'
+      const notification = alert.notification.unconfigured > 0
+        ? `${alert.notification.unconfigured}件の通知先が未設定です。担当者または連絡先を設定して再確認できます。`
         : alert.notification.failed > 0
           ? `${alert.notification.failed}件の通知が送れませんでした。再送できます。`
+          : alert.notification.total === 0
+            ? '通知の準備を確認しています。'
           : alert.notification.queued + alert.notification.sending > 0
             ? '通知を送っています。'
             : `${alert.notification.sent}件の通知を送信しました。`
       return <div key={alert.id} className="space-y-3 px-4 py-4">
-        <div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><div className="flex items-center gap-2"><StatusPill severity={alert.severity} /><p className="text-sm font-bold text-ink">{CHECK_DEFINITIONS.find((item) => HEALTH_CHECK_ID[alert.checkKey] === item.id)?.label ?? alert.checkKey}</p>{alert.status === 'acknowledged' && <span className="rounded-pill bg-info-bg px-2 py-1 text-xs font-bold text-info">受領済み</span>}</div><p className="mt-2 text-xs text-ink-secondary">{alert.summary}</p><p className="mt-1 text-xs text-ink-faint">{lastEvent ? `${ALERT_ACTION_LABEL[lastEvent.action]}：${formatOperationDate(lastEvent.createdAt)}` : formatOperationDate(alert.lastDetectedAt)}</p></div><p className={`text-xs font-bold ${alert.notification.failed > 0 ? 'text-danger' : 'text-ink-faint'}`}>{notification}</p></div>
+        <div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><div className="flex items-center gap-2"><StatusPill severity={alert.severity} /><p className="text-sm font-bold text-ink">{CHECK_DEFINITIONS.find((item) => HEALTH_CHECK_ID[alert.checkKey] === item.id)?.label ?? alert.checkKey}</p>{alert.status === 'acknowledged' && <span className="rounded-pill bg-info-bg px-2 py-1 text-xs font-bold text-info">受領済み</span>}{alert.status === 'resolved' && <span className="rounded-pill bg-success-bg px-2 py-1 text-xs font-bold text-success">解消済み</span>}</div><p className="mt-2 text-xs text-ink-secondary">{alert.summary}</p><p className="mt-1 text-xs text-ink-faint">{lastEvent ? `${ALERT_ACTION_LABEL[lastEvent.action]}：${formatOperationDate(lastEvent.createdAt)}` : formatOperationDate(alert.lastDetectedAt)}</p></div><p className={`text-xs font-bold ${alert.notification.failed + alert.notification.unconfigured > 0 ? 'text-danger' : 'text-ink-faint'}`}>{notification}</p></div>
         {alert.status === 'open' && <div className="flex flex-wrap items-end gap-2"><label className="min-w-56 flex-1 text-xs font-bold text-ink-secondary" htmlFor={`operation-alert-note-${alert.id}`}>受領メモ（任意）<input id={`operation-alert-note-${alert.id}`} value={notes[alert.id] ?? ''} maxLength={500} onChange={(event) => setNotes((current) => ({ ...current, [alert.id]: event.target.value }))} disabled={busy} className="border-hairline rounded-control mt-1 block min-h-9 w-full border bg-canvas px-3 text-sm font-normal text-ink" /></label><button type="button" disabled={busy} onClick={() => void onAcknowledge(alert, notes[alert.id] ?? '')} className="rounded-control min-h-9 bg-accent-deep px-3 text-xs font-bold text-on-accent disabled:opacity-50">{busy ? '保存中…' : '受領する'}</button></div>}
-        {alert.notification.failed > 0 && <button type="button" disabled={busy} onClick={() => void onRetry(alert)} className="rounded-control min-h-9 border border-danger px-3 text-xs font-bold text-danger disabled:opacity-50">{busy ? '再送を準備中…' : '失敗した通知を再送する'}</button>}
+        {alert.notification.failed + alert.notification.unconfigured > 0 && <button type="button" disabled={busy} onClick={() => void onRetry(alert)} className="rounded-control min-h-9 border border-danger px-3 text-xs font-bold text-danger disabled:opacity-50">{busy ? '再送を準備中…' : alert.notification.unconfigured > 0 ? '通知先を再確認する' : '失敗した通知を再送する'}</button>}
       </div>
     })}</div>
   </section>
@@ -406,6 +408,7 @@ function HealthPanel({
   }, [])
 
   const load = useCallback(async (manual: boolean) => {
+    const generation = ++alertRequestGeneration.current
     if (hasLoaded.current) setRefreshing(true)
     else setLoading(true)
     if (!accountId) {
@@ -427,27 +430,26 @@ function HealthPanel({
       return
     }
     try {
-      const generation = ++alertRequestGeneration.current
       const [response, preview, alertResponse] = await Promise.all([
         manual ? api.operations.runHealth(accountId) : api.operations.health(accountId),
         api.operations.preview(accountId).catch(() => null),
-        api.operations.alerts(accountId).catch(() => null),
+        api.operations.alerts(accountId, true).catch(() => null),
       ])
+      if (generation !== alertRequestGeneration.current) return
       if (!response.success) throw new Error(response.error)
       applySnapshot(response.data)
-      if (generation === alertRequestGeneration.current) {
-        if (alertResponse?.success) {
-          setAlerts(alertResponse.data)
-          setAlertsFailed(false)
-        } else {
-          setAlerts([])
-          setAlertsFailed(true)
-        }
+      if (alertResponse?.success) {
+        setAlerts(alertResponse.data)
+        setAlertsFailed(false)
+      } else {
+        setAlerts([])
+        setAlertsFailed(true)
       }
       setControlSummary(preview?.success
         ? operationControlSummary(preview.data.control)
         : { value: '未確認', note: '停止状態を取得できませんでした' })
     } catch {
+      if (generation !== alertRequestGeneration.current) return
       setChecks(CHECK_DEFINITIONS.map((definition) => ({
         ...definition,
         detail: 'サーバーの確認記録を取得できませんでした',
@@ -461,9 +463,11 @@ function HealthPanel({
       setAlerts([])
       setAlertsFailed(true)
     } finally {
-      setLoading(false)
-      setRefreshing(false)
-      hasLoaded.current = true
+      if (generation === alertRequestGeneration.current) {
+        setLoading(false)
+        setRefreshing(false)
+        hasLoaded.current = true
+      }
     }
   }, [accountId, applySnapshot])
 
@@ -512,7 +516,7 @@ function HealthPanel({
     try {
       const response = await api.operations.retryAlertNotifications(alert.id, accountId)
       if (!response.success) throw new Error(response.error)
-      setAlertNotice({ tone: 'success', text: response.data.retried > 0 ? `${response.data.retried}件の通知を再送待ちへ戻しました。` : '再送できる失敗通知はありません。' })
+      setAlertNotice({ tone: 'success', text: response.data.retried > 0 ? `${response.data.retried}件の通知または通知先を再確認しました。` : '再確認できる通知はありません。' })
       await load(false)
     } catch (error) {
       setAlertNotice({ tone: 'danger', text: operationFailureText(error, '通知を再送待ちへ戻せませんでした。') })
@@ -1084,6 +1088,8 @@ function EmergencyPage() {
 EmergencyPage.__test = {
   EmergencyControlFeedback,
   EmergencyControlPanel,
+  HealthPanel,
+  OperationAlertsPanel,
   emergencySafetyTransition,
   isEmergencyMutationLocked,
   runCurrentRequest,
