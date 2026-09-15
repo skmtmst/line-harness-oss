@@ -37,6 +37,7 @@ import {
   listMileageRedemptions,
   importMileageRewardCodes,
   publishMileageReward,
+  reorderMileageEarningRules,
   reorderMileageRewards,
   reserveMileageRewardRedemption,
   setMileageRewardStatus,
@@ -581,6 +582,34 @@ scoring.get('/api/mileage/earning-rules', requireRole('owner', 'admin', 'staff')
       offset: Number.isFinite(requestedOffset) ? Math.max(0, requestedOffset) : 0,
     });
     return c.json({ success: true, data });
+  } catch (error) {
+    return mileageV6Error(c, error);
+  }
+});
+
+/*
+ * PUT /api/mileage/earning-rules-order — 「たまる決めごと」の並び順を
+ * 全件まとめて保存する(N-243)。1件ずつ下書きPATCHを並列に投げる従来方式は
+ * 途中失敗で一部だけ反映され得るため、rewards-order と同じ一括口の構造で
+ * アカウントの一覧と一致する全順序だけを受け付ける。
+ */
+scoring.put('/api/mileage/earning-rules-order', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const body = await c.req.json<{ accountId?: unknown; ids?: unknown }>();
+    const accountId = typeof body.accountId === 'string' ? body.accountId.trim() : '';
+    if (!await canUseMileageAccount(c, accountId)) {
+      return c.json({ success: false, error: 'LINE公式アカウントが見つかりません' }, 404);
+    }
+    const ids = Array.isArray(body.ids) && body.ids.every((id) => typeof id === 'string')
+      ? body.ids as string[]
+      : [];
+    await reorderMileageEarningRules(c.env.DB, {
+      lineAccountId: accountId,
+      ids,
+      updatedByStaffId: c.get('staff').id,
+    });
+    auditLog(c, 'mileage.rule.update', { kind: 'mileage_rule' }, { lineAccountId: accountId });
+    return c.json({ success: true, data: null });
   } catch (error) {
     return mileageV6Error(c, error);
   }
