@@ -2,16 +2,20 @@ import { Hono } from 'hono';
 import type { Context, Next } from 'hono';
 import {
   OPERATION_CAPABILITIES,
+  acknowledgeOperationAlert,
   consumeStepUpGrant,
   enqueueOperationNotifications,
   getLatestOperationHealthRun,
   getOperationControlSet,
+  getOperationAlert,
   getOperationIncident,
   getOperationRequestReceipt,
   listOperationDeploymentEvents,
+  listOperationAlerts,
   listOperationIncidents,
   recordOperationDeploymentEvent,
   recordOperation,
+  retryOperationAlertNotifications,
   restoreOperationIncident,
   saveOperationRequestReceipt,
   stopOperationCapabilities,
@@ -158,6 +162,86 @@ operations.post('/api/operations/health/runs', requireRole('owner', 'admin'), as
   } catch (error) {
     console.error('POST /api/operations/health/runs error:', error);
     return c.json({ success: false, error: '運用状態を確認できませんでした' }, 500);
+  }
+});
+
+operations.get('/api/operations/alerts', requireRole('owner', 'admin'), async (c) => {
+  const accountId = requestedAccountId(c.req.query('account_id'));
+  if (!accountId) return c.json({ success: false, error: 'LINEアカウントを指定してください' }, 400);
+  if (!await canReadScope(c, accountId)) {
+    return c.json({ success: false, error: 'このアカウントの異常を表示する権限がありません', code: 'EMERGENCY_SCOPE_FORBIDDEN' }, 403);
+  }
+  try {
+    return c.json({
+      success: true,
+      data: await listOperationAlerts(c.env.DB, {
+        lineAccountId: accountId,
+        includeResolved: c.req.query('include_resolved') === '1',
+      }),
+    });
+  } catch (error) {
+    console.error('GET /api/operations/alerts error:', error);
+    return c.json({ success: false, error: '異常の一覧を取得できませんでした' }, 500);
+  }
+});
+
+operations.post('/api/operations/alerts/:id/acknowledge', requireRole('owner', 'admin'), async (c) => {
+  const body = await c.req.json<{ lineAccountId?: unknown; expectedVersion?: unknown; note?: unknown }>()
+    .catch(() => ({} as { lineAccountId?: unknown; expectedVersion?: unknown; note?: unknown }));
+  if (typeof body.lineAccountId !== 'string' || !body.lineAccountId.trim()
+    || !Number.isInteger(body.expectedVersion) || Number(body.expectedVersion) < 1
+    || (body.note !== undefined && typeof body.note !== 'string')) {
+    return c.json({ success: false, error: '受領内容を確認してから、もう一度読み直してください' }, 400);
+  }
+  const accountId = body.lineAccountId.trim();
+  const alert = await getOperationAlert(c.env.DB, c.req.param('id'));
+  if (!alert) return c.json({ success: false, error: '異常の記録が見つかりません' }, 404);
+  if (alert.lineAccountId !== accountId || !await canReadScope(c, accountId)) {
+    return c.json({ success: false, error: 'このアカウントの異常を受領する権限がありません', code: 'EMERGENCY_SCOPE_FORBIDDEN' }, 403);
+  }
+  try {
+    const saved = await acknowledgeOperationAlert(c.env.DB, {
+      id: alert.id, lineAccountId: accountId, actorId: c.get('staff')!.id,
+      expectedVersion: Number(body.expectedVersion), note: body.note,
+    });
+    if (saved.status === 'conflict') {
+      return c.json({ success: false, error: '別の管理者が先に状態を更新しました。最新の状態を読み直してください。', code: 'VERSION_CONFLICT', data: saved.alert }, 409);
+    }
+    if (saved.status === 'not_found' || !saved.alert) return c.json({ success: false, error: '異常の記録が見つかりません' }, 404);
+    await recordOperation(c.env.DB, {
+      targetKind: 'emergency_control', targetId: alert.id,
+      action: 'changed',
+      actorId: c.get('staff')!.id,
+      detail: { action: saved.status === 'changed' ? 'alert_acknowledged' : 'alert_acknowledgement_replayed', lineAccountId: accountId },
+    });
+    return c.json({ success: true, duplicate: saved.status === 'duplicate', data: saved.alert });
+  } catch (error) {
+    console.error('POST /api/operations/alerts/:id/acknowledge error:', error);
+    return c.json({ success: false, error: '異常の受領を保存できませんでした' }, 500);
+  }
+});
+
+operations.post('/api/operations/alerts/:id/notifications/retry', requireRole('owner', 'admin'), async (c) => {
+  const body = await c.req.json<{ lineAccountId?: unknown }>().catch(() => ({} as { lineAccountId?: unknown }));
+  if (typeof body.lineAccountId !== 'string' || !body.lineAccountId.trim()) {
+    return c.json({ success: false, error: 'LINEアカウントを指定してください' }, 400);
+  }
+  const accountId = body.lineAccountId.trim();
+  const alert = await getOperationAlert(c.env.DB, c.req.param('id'));
+  if (!alert) return c.json({ success: false, error: '異常の記録が見つかりません' }, 404);
+  if (alert.lineAccountId !== accountId || !await canReadScope(c, accountId)) {
+    return c.json({ success: false, error: 'このアカウントの通知を再送する権限がありません', code: 'EMERGENCY_SCOPE_FORBIDDEN' }, 403);
+  }
+  try {
+    const retried = await retryOperationAlertNotifications(c.env.DB, { alertId: alert.id, lineAccountId: accountId });
+    await recordOperation(c.env.DB, {
+      targetKind: 'emergency_control', targetId: alert.id, action: 'changed',
+      actorId: c.get('staff')!.id, detail: { action: 'alert_notification_retry_queued', lineAccountId: accountId, retried },
+    });
+    return c.json({ success: true, data: { retried } });
+  } catch (error) {
+    console.error('POST /api/operations/alerts/:id/notifications/retry error:', error);
+    return c.json({ success: false, error: '通知の再送を受け付けられませんでした' }, 500);
   }
 });
 
