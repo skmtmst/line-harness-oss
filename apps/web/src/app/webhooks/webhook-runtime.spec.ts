@@ -12,9 +12,33 @@ async function prepareSession(page: Page) {
   })
 }
 
+/*
+  `route.fetch()` はテスト側からモックAPIへ別途TCPを張る。稀に ECONNRESET の
+  ような一時切断で、画面とは無関係に契約試験が落ちる（#826）。
+
+  HTTP応答（4xx/5xx）やJSONの形は従来どおり失敗させたまま、**接続が張れ
+  なかった場合だけ**上限3回まで取り直す。応答を握り替えたりHTTPエラーを
+  隠したりしない。
+*/
+const TRANSIENT_FETCH_ERRORS = ['ECONNRESET', 'ECONNREFUSED', 'ETIMEDOUT', 'EPIPE', 'ECONNABORTED']
+
+async function fetchWithTransientRetry(route: Route, maxAttempts = 3) {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await route.fetch()
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      const transient = TRANSIENT_FETCH_ERRORS.some((code) => message.includes(code))
+      if (!transient || attempt === maxAttempts) throw error
+      await new Promise((resolve) => setTimeout(resolve, 100))
+    }
+  }
+  throw new Error('unreachable')
+}
+
 async function provideSecondAccount(page: Page) {
   await page.route((url) => url.pathname === '/api/line-accounts', async (route) => {
-    const response = await route.fetch()
+    const response = await fetchWithTransientRetry(route)
     const body = await response.json() as { success: boolean; data: Array<Record<string, unknown>> }
     const first = body.data[0]
     await route.fulfill({
