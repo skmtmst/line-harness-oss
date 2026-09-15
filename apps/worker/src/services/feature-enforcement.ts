@@ -436,7 +436,16 @@ export type FeatureAvailability = {
 async function contractAvailability(
   db: D1Database,
   accountId: string,
+  featureIds: readonly FeatureId[] = FEATURE_CATALOG.map(({ featureId }) => featureId),
 ): Promise<Record<FeatureId, boolean>> {
+  const allIncluded = featureIds.every(
+    (featureId) => featureCatalogEntry(featureId).entitlementKey === 'included',
+  );
+  if (allIncluded || typeof db.prepare !== 'function') {
+    return Object.fromEntries(
+      FEATURE_CATALOG.map(({ featureId }) => [featureId, true]),
+    ) as Record<FeatureId, boolean>;
+  }
   // 古い試験・移行行のようにアカウント所有者を解決できない場合は、従来どおり
   // 契約で止めない。実アカウントは tenant_id から必ず料金状態を読む。
   const account = await db.prepare('SELECT tenant_id FROM line_accounts WHERE id = ?')
@@ -541,7 +550,7 @@ export async function accountFeatureAvailability(
   collect(featureId);
   const [companySettings, contracts] = await Promise.all([
     accountCompanyFeatureSettings(db, accountId, [...requiredFeatureIds]),
-    contractAvailability(db, accountId),
+    contractAvailability(db, accountId, [...requiredFeatureIds]),
   ]);
   return resolveFeatureAvailability(featureId, companySettings, contracts, new Map());
 }
