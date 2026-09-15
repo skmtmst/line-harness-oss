@@ -884,7 +884,7 @@ describe('N-423 staff deny-by-default (#670)', () => {
       ['GET', '/api/capabilities'],
       ['GET', '/api/line-accounts'],
       ['GET', '/api/line-accounts/summary'],
-      ['GET', '/api/settings/features'],
+      ['GET', '/api/settings/features/visibility'],
       ['POST', '/api/images'],
     ] as const) {
       expect(isStaffSelfEndpoint(method, path, 'abc')).toBe(true);
@@ -906,6 +906,7 @@ describe('N-423 staff deny-by-default (#670)', () => {
       ['POST', '/api/capabilities'],
       ['POST', '/api/line-accounts'],
       ['GET', '/api/line-accounts/abc'],
+      ['GET', '/api/settings/features'],
       ['PUT', '/api/settings/features'],
       ['GET', '/api/images'],
       ['DELETE', '/api/images/abc'],

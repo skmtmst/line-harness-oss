@@ -233,8 +233,8 @@ const STAFF_SELF_ENDPOINTS: Array<[method: string, path: string]> = [
   ['GET', '/api/capabilities'],
   ['GET', '/api/line-accounts'],
   ['GET', '/api/line-accounts/summary'],
-  // 殻の表示に要る機能設定の読み取り。更新は owner/admin 専用。
-  ['GET', '/api/settings/features'],
+  // 殻の表示に要る最小boolean。管理用の機能設定GETは owner/admin 専用。
+  ['GET', '/api/settings/features/visibility'],
   // 共通アップローダ。受信箱の 1 対 1 返信など staff の付与機能から使う。
   // 読み取りは公開の /images/* 経由で、鍵は機能 API の応答で渡る。
   ['POST', '/api/images'],

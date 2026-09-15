@@ -1,19 +1,23 @@
 import type { AnalyticsUsageOverview } from '@/lib/api'
 import {
   DEFAULT_FEATURES,
+  SPECIALIZED_FEATURE_KEYS,
   itemIsEnabled,
   visibleFeatureGroups,
 } from '@/lib/feature-settings'
 
 type FeatureSettings = {
   features: Record<string, boolean>
-  specializedFeatureKeys: string[]
+  specializedFeatureKeys?: string[]
 }
 
 export function summarizeMenuFeatures(settings: FeatureSettings): { enabled: number; total: number } {
   const features = { ...DEFAULT_FEATURES, ...settings.features }
   const items = visibleFeatureGroups({
-    specializedFeatureKeys: settings.specializedFeatureKeys,
+    // staff向けread-modelは専用目録を返さない。表示可否へ畳み込まれた
+    // booleanから、実際に表示できる専用項目だけを復元する。
+    specializedFeatureKeys: settings.specializedFeatureKeys
+      ?? SPECIALIZED_FEATURE_KEYS.filter((key) => settings.features[key] === true),
   }).flatMap((group) => group.items)
   return {
     enabled: items.filter((item) => itemIsEnabled(item, features)).length,

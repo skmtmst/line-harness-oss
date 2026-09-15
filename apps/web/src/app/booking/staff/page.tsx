@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
+import { BOOKING_STAFF_LIMITS, parseBookingStaffInput } from '@line-crm/shared'
 import ImageUploader from '@/components/shared/image-uploader'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
@@ -226,10 +227,15 @@ function Modal({
   }
 
   async function submit() {
-    setSaving(true)
     setErr(null)
+    const parsed = parseBookingStaffInput(form, form.id ? 'update' : 'create')
+    if (!parsed.ok) {
+      setErr(parsed.error)
+      return
+    }
+    setSaving(true)
     try {
-      await onSave(form)
+      await onSave(form.id ? { id: form.id, ...parsed.value } : parsed.value)
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e))
     } finally {
@@ -249,6 +255,7 @@ function Modal({
               type="text"
               value={form.name ?? ''}
               onChange={(e) => set('name', e.target.value)}
+              maxLength={BOOKING_STAFF_LIMITS.name}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
               placeholder="例: yamada-taro"
             />
@@ -258,6 +265,7 @@ function Modal({
               type="text"
               value={form.display_name ?? ''}
               onChange={(e) => set('display_name', e.target.value)}
+              maxLength={BOOKING_STAFF_LIMITS.displayName}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
               placeholder="顧客に表示される名前"
             />
@@ -267,6 +275,7 @@ function Modal({
               type="text"
               value={form.role ?? ''}
               onChange={(e) => set('role', e.target.value)}
+              maxLength={BOOKING_STAFF_LIMITS.role}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
               placeholder="例: トップスタイリスト"
             />
@@ -277,10 +286,14 @@ function Modal({
             onChange={(v) => set('profile_image_url', v?.mode === 'url' ? v.url : '')}
             label="プロフィール画像"
           />
+          <p className="text-ink-faint -mt-3 text-xs">
+            http:// または https:// で始まるURLを入力してください。
+          </p>
           <Field label="紹介文">
             <textarea
               value={form.bio ?? ''}
               onChange={(e) => set('bio', e.target.value)}
+              maxLength={BOOKING_STAFF_LIMITS.bio}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-y"
               rows={2}
             />
@@ -290,6 +303,9 @@ function Modal({
               type="number"
               value={form.sort_order ?? 0}
               onChange={(e) => set('sort_order', Number(e.target.value))}
+              min={BOOKING_STAFF_LIMITS.sortOrderMin}
+              max={BOOKING_STAFF_LIMITS.sortOrderMax}
+              step={1}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 tabular-nums"
             />
           </Field>
