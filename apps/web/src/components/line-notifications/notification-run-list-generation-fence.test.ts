@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { ApiError, type EcNotificationRun, type EcNotificationRunList } from '@/lib/api'
 import {
   loadNotificationRuns,
+  resolveNotificationRun,
+  retryNotificationErrorMessage,
   retryNotificationRun,
   type NotificationRunEnv,
   type NotificationRunPorts,
@@ -13,6 +15,7 @@ import {
 
 type DeliveriesResult = Awaited<ReturnType<NotificationRunPorts['deliveries']>>
 type RetryResult = Awaited<ReturnType<NotificationRunPorts['retryDelivery']>>
+type ResolutionResult = Awaited<ReturnType<NotificationRunPorts['resolveDelivery']>>
 
 type Deferred<T> = {
   promise: Promise<T>
@@ -87,15 +90,18 @@ function ok(items: EcNotificationRun[], failed: number): DeliveriesResult {
 
 function harness() {
   const requestRef = { current: 0 }
+  const mutationRef: NotificationRunEnv['mutationRef'] = { current: null }
   const scopeRef: { current: NotificationRunScope } = { current: { key: '', generation: 0 } }
   const loads: ScopedLoadState[] = []
   const notices: ScopedNotice[] = []
   const retryings: ScopedRetrying[] = []
   const deliveryCalls: Array<{ lineAccountId: string; deferred: Deferred<DeliveriesResult> }> = []
   const retryCalls: Array<{ id: string; lineAccountId: string; deferred: Deferred<RetryResult> }> = []
+  const resolutionCalls: Array<{ id: string; resolved: boolean; deferred: Deferred<ResolutionResult> }> = []
 
   const env: NotificationRunEnv = {
     requestRef,
+    mutationRef,
     scopeRef,
     ports: {
       deliveries: (params) => {
@@ -108,6 +114,11 @@ function harness() {
       retryDelivery: (id, data) => {
         const call = { id, lineAccountId: data.lineAccountId, deferred: deferred<RetryResult>() }
         retryCalls.push(call)
+        return call.deferred.promise
+      },
+      resolveDelivery: (id, data) => {
+        const call = { id, resolved: data.resolved, deferred: deferred<ResolutionResult>() }
+        resolutionCalls.push(call)
         return call.deferred.promise
       },
     },
@@ -125,6 +136,7 @@ function harness() {
     env,
     deliveryCalls,
     retryCalls,
+    resolutionCalls,
     loads,
     notices,
     retryings,
@@ -133,6 +145,8 @@ function harness() {
       loadNotificationRuns(env, { generation, lineAccountId, mode: 'failures', page: 1 }),
     retry: (generation: number, lineAccountId: string, item: EcNotificationRun, reload: () => Promise<void>) =>
       retryNotificationRun(env, { generation, lineAccountId, item, reload }),
+    resolve: (generation: number, lineAccountId: string, item: EcNotificationRun, resolved: boolean, reload: () => Promise<void>) =>
+      resolveNotificationRun(env, { generation, lineAccountId, item, resolved, reload }),
     /** 画面が実際に見せている状態。世代が合わない結果は描かれない。 */
     visible: (generation: number) => {
       const last = loads[loads.length - 1]
@@ -147,6 +161,13 @@ function harness() {
 }
 
 describe('LINE通知一覧の世代フェンス（純粋関数レベル）', () => {
+  it('送信枠不足・取得不能を同時操作409や一般障害と区別して案内する', () => {
+    expect(retryNotificationErrorMessage(new ApiError(409, '不足', 'quota_insufficient')))
+      .toBe('今月の送信枠が足りないため、再試行を止めました。')
+    expect(retryNotificationErrorMessage(new ApiError(503, '取得不能', 'quota_unavailable')))
+      .toBe('送信枠を確認できないため、再試行を止めました。')
+  })
+
   it('Aの表示後にBへ切り替えると、Bの応答が来るまでAの行と集計を出さない', async () => {
     const h = harness()
     h.enterGeneration(0, 'account-a:failures')
@@ -261,6 +282,28 @@ describe('LINE通知一覧の世代フェンス（純粋関数レベル）', () 
       await settle()
       expect(failing.visibleNotice(0)).toEqual({ tone: 'error', text })
     }
+  })
+
+  it('同じ世代では再試行と対応済み操作を合わせて1要求だけにする', async () => {
+    const h = harness()
+    h.enterGeneration(0, 'account-a:failures')
+    const item = run('single-flight')
+    void h.retry(0, 'account-a', item, async () => {})
+    void h.retry(0, 'account-a', item, async () => {})
+    void h.resolve(0, 'account-a', item, true, async () => {})
+    expect(h.retryCalls).toHaveLength(1)
+    expect(h.resolutionCalls).toHaveLength(0)
+    h.retryCalls[0].deferred.resolve({ success: true } as RetryResult)
+    await settle()
+
+    void h.resolve(0, 'account-a', item, true, async () => {})
+    expect(h.resolutionCalls).toHaveLength(1)
+    h.resolutionCalls[0].deferred.resolve({
+      success: true,
+      data: { id: item.id, resolved: true, version: 2 },
+    })
+    await settle()
+    expect(h.visibleNotice(0)?.text).toBe('この失敗を対応済みにしました。')
   })
 
   it('取得失敗・権限なし・実値0を別の状態として区別する', async () => {
