@@ -7052,6 +7052,15 @@ export const api = {
       return fetchApi<ApiResponse<AutoReplyRunsResponse>>(`/api/auto-reply-runs${suffix}`)
     },
     /*
+     * N-081: 失敗した後続処理だけを保存済みの内容でやり直す。
+     * LINE への返信は送り直さない。409 は「もう処理中または完了済み」。
+     */
+    retryRun: (evaluationId: string) =>
+      fetchApi<ApiResponse<{ evaluationId: string; retriedCount: number; status: string }>>(
+        `/api/auto-reply-runs/${encodeURIComponent(evaluationId)}/retry`,
+        { method: 'POST' },
+      ),
+    /*
       公開までの4段（下書き→検査→競合→試験→公開）。**口はすべて
       `apps/worker/src/routes/auto-replies.ts` に在るものを読むだけ。**
       公開は `Idempotency-Key` を付ける——二度押しで2回公開すると、
