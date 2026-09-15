@@ -307,22 +307,21 @@ function clearStoredCrossRun(accountId: string): void {
 }
 
 function CrossTab({ accountId, canManage }: { accountId: string; canManage: boolean }) {
-  // 親は accountId をkeyにも使うため、切替時はCrossTab自体が作り直される。
-  // その最初の1回だけ保存runを読むことで、別アカウントのIDを一瞬でも表示しない。
-  const [initialStoredCrossRun] = useState<StoredCrossRun | null>(() => readStoredCrossRun(accountId))
   const [fields, setFields] = useState<FriendField[]>([])
   // 友だち情報欄が取れないのに空表示のままにすると、項目を作り直す事故になる。
   const [fieldsError, setFieldsError] = useState('')
   const [fieldId, setFieldId] = useState('')
   const [rowKind, setRowKind] = useState<'tag' | 'route' | 'score_band' | 'conversion_point' | 'booking_status' | 'purchase_status'>('tag')
   const [crossResult, setCrossResult] = useState<AnalyticsCrossResult | null>(null)
-  const [crossRunId, setCrossRunId] = useState(() => initialStoredCrossRun?.id ?? '')
-  const [crossResultId, setCrossResultId] = useState(() => initialStoredCrossRun?.id ?? '')
+  const [crossRunId, setCrossRunId] = useState('')
+  const [crossResultId, setCrossResultId] = useState('')
   const [crossQueue, setCrossQueue] = useState<CrossQueueStatus | null>(null)
   const [crossAutoStopped, setCrossAutoStopped] = useState(false)
   const [crossRecheck, setCrossRecheck] = useState(0)
-  const [loading, setLoading] = useState(() => initialStoredCrossRun !== null)
-  const [restoredCrossRun, setRestoredCrossRun] = useState(() => initialStoredCrossRun !== null)
+  const [loading, setLoading] = useState(false)
+  const [restoredCrossRun, setRestoredCrossRun] = useState(false)
+  // sessionStorageはSSRの初期HTMLでは読まない。hydration完了後に一度だけ読む。
+  const [crossStorageRestored, setCrossStorageRestored] = useState(false)
   const [error, setError] = useState('')
   const [crossDays, setCrossDays] = useState(30)
   const [audience, setAudience] = useState<{ id: string; memberCount: number; expiresAt: string } | null>(null)
@@ -357,6 +356,19 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
     }
   }, [accountId])
 
+  // 親はaccountIdをkeyにも使うため、切替時はCrossTab自体が作り直される。
+  // 初期HTMLとhydration時の表示を同じに保ったうえで、同じアカウントのrunだけを復元する。
+  useEffect(() => {
+    const stored = readStoredCrossRun(accountId)
+    if (stored) {
+      setCrossRunId(stored.id)
+      setCrossResultId(stored.id)
+      setLoading(true)
+      setRestoredCrossRun(true)
+    }
+    setCrossStorageRestored(true)
+  }, [accountId])
+
   // アカウントを切り替える、または画面を離れると世代が1つ進む。切替の前に投げた
   // 通信が後から返っても、世代が合わないので表示へ入れない(前のアカウントの
   // run ID・結果・対象者が新しいアカウントの画面に出るのを防ぐ)。
@@ -380,7 +392,8 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
   // 「結果をもう一度確認」で同じrunへ再接続する。一時的な確認失敗でもrun IDを
   // 消さず、順番表示を残したまま間隔を空けて確認を続ける。
   useEffect(() => {
-    if (!crossRunId) return
+    // storage復元前はSSR/hydration直後の表示だけを保ち、GETを始めない。
+    if (!crossStorageRestored || !crossRunId) return
     let active = true
     let timer: number | undefined
     let attempts = 0
@@ -478,11 +491,11 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
       active = false
       if (timer !== undefined) window.clearTimeout(timer)
     }
-  }, [accountId, clearCrossRun, crossRunId, crossRecheck])
+  }, [accountId, clearCrossRun, crossRunId, crossRecheck, crossStorageRestored])
 
   // 時間切れ後もrun IDを保持しているため、同じ集計へ再接続できる。
   const recheckCross = () => {
-    if (!crossRunId) return
+    if (!crossStorageRestored || !crossRunId) return
     setCrossAutoStopped(false)
     setError('')
     setLoading(true)
@@ -490,7 +503,7 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
   }
 
   const runCross = async () => {
-    if (!fieldId || crossRunId || crossStartInFlight.current) return
+    if (!crossStorageRestored || !fieldId || crossRunId || crossStartInFlight.current) return
     crossStartInFlight.current = true
     const generation = viewGeneration.current
     setLoading(true)
@@ -696,7 +709,7 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
               }))}
             />
           </div>
-          <Button onClick={() => void runCross()} disabled={loading || !fieldId || Boolean(crossRunId)} variant="primary">
+          <Button onClick={() => void runCross()} disabled={loading || !crossStorageRestored || !fieldId || Boolean(crossRunId)} variant="primary">
             {loading ? '集計中' : `この${crossDays}日を集計`}
           </Button>
         </div>

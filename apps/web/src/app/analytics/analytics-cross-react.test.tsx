@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import React, { act } from 'react'
-import { createRoot, type Root } from 'react-dom/client'
+import { createRoot, hydrateRoot, type Root } from 'react-dom/client'
+import { renderToString } from 'react-dom/server'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import AnalyticsPage from './page'
 import { ApiError } from '@/lib/api'
@@ -367,6 +368,24 @@ describe('クロス分析の待機表示の実挙動(#633)', () => {
     await wait(0)
     expect(crossResultCallsFor('run-reload')).toBe(1)
     expect(crossStartCalls()).toBe(0)
+  })
+
+  it('保存runがあってもSSR初期HTMLとhydration表示を一致させてから同じrunを復元する', async () => {
+    net.handler = baseHandler((url) => {
+      if (url.startsWith('/api/analytics/cross/results/run-hydrate?')) return Promise.resolve(pending('run-hydrate', null))
+      return Promise.reject(new Error(`未設定: ${url}`))
+    })
+    const initialHtml = renderToString(<AnalyticsPage />)
+    expect(initialHtml).not.toContain('進行中の集計を確認しています。')
+    saveStoredRun('account-a', 'run-hydrate')
+    await act(async () => { root.unmount() })
+    host.innerHTML = initialHtml
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    await act(async () => { root = hydrateRoot(host, <AnalyticsPage />) })
+    await wait(0)
+    expect(consoleError).not.toHaveBeenCalled()
+    expect(host.textContent).toContain('進行中の集計を確認しています。')
+    expect(crossResultCallsFor('run-hydrate')).toBe(1)
   })
 
   it('アカウントごとの保存runだけを復元し、別アカウントのrunを表示しない', async () => {

@@ -69,7 +69,9 @@ describe('クロス分析の待ち順と処理目安 (Issue #633)', () => {
 
   it('再読込時は同じアカウントのrunだけ復元し、恒久4xxの再試行を止める', () => {
     expect(PAGE).toContain("CROSS_RUN_STORAGE_PREFIX = 'lh:analytics:cross-run:v1:'")
-    expect(PAGE).toContain('readStoredCrossRun(accountId)')
+    expect(PAGE).toContain('sessionStorageはSSRの初期HTMLでは読まない')
+    expect(PAGE).toContain('setCrossStorageRestored(true)')
+    expect(PAGE).toContain('!crossStorageRestored || !crossRunId')
     expect(PAGE).toContain('saveStoredCrossRun(accountId')
     expect(PAGE).toContain('clearStoredCrossRun(accountId)')
     expect(PAGE).toContain('crossStartInFlight')
