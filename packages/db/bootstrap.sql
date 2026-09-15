@@ -4611,7 +4611,7 @@ CREATE TABLE rich_menu_manual_publish_requests (
   last_error_code       TEXT,
   requested_by_staff_id TEXT NOT NULL,
   created_at            TEXT NOT NULL,
-  updated_at            TEXT NOT NULL,
+  updated_at            TEXT NOT NULL, execution_token TEXT,
   UNIQUE (account_id, idempotency_key)
 );
 

@@ -543,8 +543,8 @@ function Editor({
           : 'LINEへ登録できませんでした。下書きは保存されていません。しばらくおいてから、もう一度お試しください。',
       )
     } finally {
-      publishAttempt.current.finish()
       setPublishing(false)
+      publishAttempt.current.finish()
     }
   }
 

@@ -29,6 +29,7 @@ import {
   createRichMenuManualPublishRequestAtomic,
   getRichMenuManualPublishRequest,
   getRichMenuManualPublishShells,
+  claimRichMenuManualPublishRequest,
   markRichMenuManualPublishFailed,
   markRichMenuManualPublishSucceeded,
   recordRichMenuManualPublishShells,
@@ -62,6 +63,8 @@ import {
   createRichMenuShells,
   switchRichMenuLive,
   deleteRichMenuShells,
+  resolveSwitcherActions,
+  validateRichMenuGroupForPublish,
   unpublishRichMenuGroup,
   linkRichMenuBulkChunked,
   PublishLeaseLostError,
@@ -170,6 +173,33 @@ function manualPublishFingerprint(row: RichMenuGroupWithPages): string {
       })),
     })),
   });
+}
+
+/**
+ * LINE create の成功とD1 journalの間でWorkerが止まっても、次回のlist照合で
+ * 同じshellを回収できる決定名。通常・予約公開の従来名とは接頭辞を分ける。
+ * request/page は内部UUIDなので、最大でもLINEの300文字制限を十分下回る。
+ */
+export function manualPublishShellName(requestId: string, pageId: string): string {
+  return `lhm:${requestId}:${pageId}`;
+}
+
+async function recoverManualPublishShellsFromLine(
+  line: LineRichMenuClient,
+  requestId: string,
+  pages: Array<{ id: string; order_index: number }>,
+): Promise<Array<{ pageId: string; orderIndex: number; newRichMenuId: string }>> {
+  const lineMenus = await line.listRichMenus();
+  const recovered: Array<{ pageId: string; orderIndex: number; newRichMenuId: string }> = [];
+  for (const page of pages) {
+    const expectedName = manualPublishShellName(requestId, page.id);
+    const matches = lineMenus.filter((menu) => menu.name === expectedName);
+    if (matches.length > 1) throw new Error('manual publish recovery found duplicate LINE shells');
+    if (matches.length === 1) {
+      recovered.push({ pageId: page.id, orderIndex: page.order_index, newRichMenuId: matches[0].richMenuId });
+    }
+  }
+  return recovered;
 }
 
 type ExternalLineArea = {
@@ -1644,6 +1674,18 @@ function createLineClient(channelAccessToken: string): LineRichMenuClient {
       if (!res.ok) throw new Error(`LINE createRichMenu failed: ${res.status} ${await res.text()}`);
       return res.json() as Promise<{ richMenuId: string }>;
     },
+    async listRichMenus() {
+      const res = await fetch('https://api.line.me/v2/bot/richmenu/list', {
+        headers: { Authorization: auth },
+      });
+      if (!res.ok) throw new Error(`LINE listRichMenus failed: ${res.status} ${await res.text()}`);
+      const body = await res.json() as { richmenus?: Array<{ richMenuId?: string; name?: string }> };
+      return (body.richmenus ?? []).flatMap((menu) => (
+        typeof menu.richMenuId === 'string'
+          ? [{ richMenuId: menu.richMenuId, name: typeof menu.name === 'string' ? menu.name : null }]
+          : []
+      ));
+    },
     async uploadRichMenuImage(richMenuId, image, contentType) {
       const res = await fetch(`https://api-data.line.me/v2/bot/richmenu/${richMenuId}/content`, {
         method: 'POST',
@@ -1788,6 +1830,7 @@ richMenuGroups.post('/api/rich-menu-groups/:groupId/publish', requireRole('owner
   const publishGeneration = await acquirePublishLease(c.env.DB, groupId, publishOwner, new Date().toISOString());
   if (publishGeneration === null) return c.json({ success: false, error: 'failed to acquire publish lock' }, 409);
   const publishFence = { owner: publishOwner, generation: publishGeneration };
+  const executionToken = crypto.randomUUID();
 
   try {
     // 別要求が「running」を読んだ直後に先行要求が成功・lease解放した場合でも、
@@ -1804,9 +1847,14 @@ richMenuGroups.post('/api/rich-menu-groups/:groupId/publish', requireRole('owner
         throw new Error('manual publish result is invalid');
       }
     }
+    if (!await claimRichMenuManualPublishRequest(c.env.DB, request.id, executionToken)) {
+      await releasePublishLease(c.env.DB, groupId, publishFence);
+      return c.json({ success: false, error: '公開処理の担当が切り替わりました。最新の状態を確認してください。' }, 409);
+    }
     // lease取得前後の下書き更新を必ず拒否する。古い版を作成・切替しない。
     const latestGroup = await getRichMenuGroupWithPages(c.env.DB, groupId);
     if (!latestGroup || manualPublishFingerprint(latestGroup) !== fingerprint) {
+      await markRichMenuManualPublishFailed(c.env.DB, request.id, executionToken, 'manual publish target changed');
       await releasePublishLease(c.env.DB, groupId, publishFence);
       return c.json({ success: false, error: '公開対象が更新されました。画面を更新してからもう一度お試しください。' }, 409);
     }
@@ -1842,21 +1890,51 @@ richMenuGroups.post('/api/rich-menu-groups/:groupId/publish', requireRole('owner
         })),
       })),
     };
+    // LINEの一覧照合より先に、下書きの不備を止める。無効な定義で外部APIを読む必要はない。
+    validateRichMenuGroupForPublish({
+      ...groupInput,
+      pages: resolveSwitcherActions(groupInput.pages, groupInput.id),
+    });
     const heartbeat = async () => {
       const alive = await renewPublishLease(c.env.DB, groupId, publishFence, new Date().toISOString());
       if (!alive) throw new PublishLeaseLostError();
     };
 
     let shells = await getRichMenuManualPublishShells(c.env.DB, request.id);
-    if (shells.length === 0) {
-      const created = await createRichMenuShells(groupInput, line, r2Adapter, heartbeat);
-      const oldByPage = new Map(latestGroup.pages.map((page) => [page.id, page.line_richmenu_id]));
-      await recordRichMenuManualPublishShells(c.env.DB, request.id, created.shells.map((shell) => ({
+    const oldByPage = new Map(latestGroup.pages.map((page) => [page.id, page.line_richmenu_id]));
+    // create成功後、D1書込前にWorkerが止まっても、決定名のLINE menuを先に回収する。
+    // 既にjournal済みの同pageとIDが食い違う場合は別requestを混ぜず停止する。
+    const recovered = await recoverManualPublishShellsFromLine(line, request.id, latestGroup.pages);
+    const journalByPage = new Map(shells.map((shell) => [shell.page_id, shell]));
+    for (const shell of recovered) {
+      const journaled = journalByPage.get(shell.pageId);
+      if (journaled && journaled.new_richmenu_id !== shell.newRichMenuId) {
+        throw new Error('manual publish shell recovery conflicts with journal');
+      }
+    }
+    const recoveredUnjournaled = recovered.filter((shell) => !journalByPage.has(shell.pageId));
+    if (recoveredUnjournaled.length > 0) {
+      await recordRichMenuManualPublishShells(c.env.DB, request.id, recoveredUnjournaled.map((shell) => ({
         ...shell,
         oldRichMenuId: oldByPage.get(shell.pageId) ?? null,
       })));
       shells = await getRichMenuManualPublishShells(c.env.DB, request.id);
     }
+    await createRichMenuShells(groupInput, line, r2Adapter, heartbeat, {
+      existingShells: shells.map((shell) => ({
+        pageId: shell.page_id,
+        orderIndex: shell.order_index,
+        newRichMenuId: shell.new_richmenu_id,
+      })),
+      shellName: (page) => manualPublishShellName(request.id, page.id),
+      onShellCreated: async (shell) => {
+        await recordRichMenuManualPublishShells(c.env.DB, request.id, [{
+          ...shell,
+          oldRichMenuId: oldByPage.get(shell.pageId) ?? null,
+        }]);
+      },
+    });
+    shells = await getRichMenuManualPublishShells(c.env.DB, request.id);
     if (shells.length !== latestGroup.pages.length || shells.some((shell) => !latestGroup.pages.some((page) => page.id === shell.page_id))) {
       throw new Error('manual publish shell journal does not match the requested version');
     }
@@ -1872,12 +1950,14 @@ richMenuGroups.post('/api/rich-menu-groups/:groupId/publish', requireRole('owner
     // 最初の版で控えた旧IDだけを消す。再開時に現在page行の新IDを旧IDと誤認しない。
     await deleteRichMenuShells(line, shells.flatMap((shell) => shell.old_richmenu_id ? [shell.old_richmenu_id] : []));
     const result = { pages: shells.map((shell) => ({ pageId: shell.page_id, newRichMenuId: shell.new_richmenu_id })) };
-    await markRichMenuManualPublishSucceeded(c.env.DB, request.id, JSON.stringify(result));
+    if (!await markRichMenuManualPublishSucceeded(c.env.DB, request.id, executionToken, JSON.stringify(result))) {
+      throw new PublishLeaseLostError();
+    }
     await releasePublishLease(c.env.DB, groupId, publishFence);
     return c.json({ success: true, data: result });
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
-    await markRichMenuManualPublishFailed(c.env.DB, request.id, message);
+    await markRichMenuManualPublishFailed(c.env.DB, request.id, executionToken, message);
     await releasePublishLease(c.env.DB, groupId, publishFence);
     if (e instanceof PublishLeaseLostError) {
       return c.json({ success: false, error: '公開の担当が別の処理へ移りました。最新の状態を確認して、もう一度お試しください。' }, 409);

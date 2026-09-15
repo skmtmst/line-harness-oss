@@ -10,6 +10,7 @@ export type RichMenuManualPublishRequest = {
   status: 'running' | 'succeeded' | 'failed';
   result_json: string | null;
   last_error_code: string | null;
+  execution_token: string | null;
   requested_by_staff_id: string;
   created_at: string;
   updated_at: string;
@@ -114,25 +115,43 @@ export async function recordRichMenuManualPublishShells(
 export async function markRichMenuManualPublishSucceeded(
   db: D1Database,
   requestId: string,
+  executionToken: string,
   resultJson: string,
-): Promise<void> {
-  await db.prepare(
+): Promise<boolean> {
+  const result = await db.prepare(
     `UPDATE rich_menu_manual_publish_requests
         SET status = 'succeeded', result_json = ?, last_error_code = NULL, updated_at = ?
-      WHERE id = ?`,
-  ).bind(resultJson, jstNow(), requestId).run();
+      WHERE id = ? AND status = 'running' AND execution_token = ?`,
+  ).bind(resultJson, jstNow(), requestId, executionToken).run();
+  return (result.meta?.changes ?? 0) > 0;
 }
 
 export async function markRichMenuManualPublishFailed(
   db: D1Database,
   requestId: string,
+  executionToken: string,
   errorCode: string,
-): Promise<void> {
-  await db.prepare(
+): Promise<boolean> {
+  const result = await db.prepare(
     `UPDATE rich_menu_manual_publish_requests
         SET status = 'failed', last_error_code = ?, updated_at = ?
-      WHERE id = ?`,
-  ).bind(errorCode.slice(0, 240), jstNow(), requestId).run();
+      WHERE id = ? AND status = 'running' AND execution_token = ?`,
+  ).bind(errorCode.slice(0, 240), jstNow(), requestId, executionToken).run();
+  return (result.meta?.changes ?? 0) > 0;
+}
+
+/** lease取得後に実行世代を確定する。古い世代は成功・失敗を更新できない。 */
+export async function claimRichMenuManualPublishRequest(
+  db: D1Database,
+  requestId: string,
+  executionToken: string,
+): Promise<boolean> {
+  const result = await db.prepare(
+    `UPDATE rich_menu_manual_publish_requests
+        SET execution_token = ?, updated_at = ?
+      WHERE id = ? AND status = 'running'`,
+  ).bind(executionToken, jstNow(), requestId).run();
+  return (result.meta?.changes ?? 0) > 0;
 }
 
 /** 失敗リトライの開始を記録する。成功済み行をrunningへ戻さない。 */
@@ -142,7 +161,7 @@ export async function restartRichMenuManualPublishRequest(
 ): Promise<boolean> {
   const result = await db.prepare(
     `UPDATE rich_menu_manual_publish_requests
-        SET status = 'running', last_error_code = NULL, updated_at = ?
+        SET status = 'running', last_error_code = NULL, execution_token = NULL, updated_at = ?
       WHERE id = ? AND status = 'failed'`,
   ).bind(jstNow(), requestId).run();
   return (result.meta?.changes ?? 0) > 0;

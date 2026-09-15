@@ -5,7 +5,9 @@ import { describe, expect, it } from 'vitest';
 import {
   createRichMenuManualPublishRequestAtomic,
   getRichMenuManualPublishShells,
+  claimRichMenuManualPublishRequest,
   markRichMenuManualPublishSucceeded,
+  markRichMenuManualPublishFailed,
   recordRichMenuManualPublishShells,
 } from '../src/rich-menu-manual-publish.js';
 
@@ -48,6 +50,21 @@ function input(key = 'key-1', fingerprint = 'v1', accountId = 'a1', groupId = 'g
 }
 
 describe('400 rich menu manual publish idempotency', () => {
+  it('401は400時点のrequest表へD1互換のALTERだけで実行できる', () => {
+    const sqlite = new Database(':memory:');
+    sqlite.exec(`CREATE TABLE rich_menu_manual_publish_requests (
+      id TEXT PRIMARY KEY, group_id TEXT NOT NULL, account_id TEXT NOT NULL,
+      definition_snapshot TEXT NOT NULL, request_fingerprint TEXT NOT NULL,
+      idempotency_key TEXT NOT NULL, status TEXT NOT NULL, result_json TEXT,
+      last_error_code TEXT, requested_by_staff_id TEXT NOT NULL,
+      created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+    )`);
+    sqlite.exec(readFileSync(join(ROOT, 'migrations/401_rich_menu_manual_publish_execution_token.sql'), 'utf8'));
+    const columns = sqlite.prepare('PRAGMA table_info(rich_menu_manual_publish_requests)').all() as Array<{ name: string }>;
+    expect(columns.map((column) => column.name)).toContain('execution_token');
+    sqlite.close();
+  });
+
   it('同key同版の同時要求は1件だけ作り、成功結果は同じrequestから再生できる', async () => {
     const db = setup();
     const [first, second] = await Promise.all([
@@ -57,7 +74,8 @@ describe('400 rich menu manual publish idempotency', () => {
     expect([first.outcome, second.outcome].sort()).toEqual(['created', 'existing']);
     const requestId = first.request.id;
     await recordRichMenuManualPublishShells(db, requestId, [{ pageId: 'p1', orderIndex: 0, newRichMenuId: 'line-new-1', oldRichMenuId: 'line-old-1' }]);
-    await markRichMenuManualPublishSucceeded(db, requestId, JSON.stringify({ pages: [{ pageId: 'p1', newRichMenuId: 'line-new-1' }] }));
+    expect(await claimRichMenuManualPublishRequest(db, requestId, 'attempt-1')).toBe(true);
+    expect(await markRichMenuManualPublishSucceeded(db, requestId, 'attempt-1', JSON.stringify({ pages: [{ pageId: 'p1', newRichMenuId: 'line-new-1' }] }))).toBe(true);
     const replay = await createRichMenuManualPublishRequestAtomic(db, input());
     expect(replay.outcome).toBe('existing');
     expect(replay.request.status).toBe('succeeded');
@@ -71,5 +89,17 @@ describe('400 rich menu manual publish idempotency', () => {
     await createRichMenuManualPublishRequestAtomic(db, input());
     await expect(createRichMenuManualPublishRequestAtomic(db, input('key-1', 'v2'))).resolves.toMatchObject({ outcome: 'conflict' });
     await expect(createRichMenuManualPublishRequestAtomic(db, input('key-1', 'v1', 'a2', 'g2'))).resolves.toMatchObject({ outcome: 'created' });
+  });
+
+  it('古い実行世代は新しい世代の成功をfailedへ戻せない', async () => {
+    const db = setup();
+    const created = await createRichMenuManualPublishRequestAtomic(db, input());
+    expect(await claimRichMenuManualPublishRequest(db, created.request.id, 'old-holder')).toBe(true);
+    // lease切替後の実行者が同じrunning行を新世代として取得する。
+    expect(await claimRichMenuManualPublishRequest(db, created.request.id, 'new-holder')).toBe(true);
+    expect(await markRichMenuManualPublishSucceeded(db, created.request.id, 'new-holder', JSON.stringify({ pages: [] }))).toBe(true);
+    expect(await markRichMenuManualPublishFailed(db, created.request.id, 'old-holder', 'stale failure')).toBe(false);
+    const replay = await createRichMenuManualPublishRequestAtomic(db, input());
+    expect(replay.request.status).toBe('succeeded');
   });
 });
