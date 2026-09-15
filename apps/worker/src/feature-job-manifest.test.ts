@@ -2,7 +2,11 @@ import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, test } from 'vitest';
 import { FEATURE_IDS } from '@line-crm/shared';
-import { FEATURE_JOB_MANIFEST } from './services/feature-enforcement.js';
+import {
+  DELIVERY_DISPATCH_JOB_NAMES,
+  FEATURE_JOB_MANIFEST,
+} from './services/feature-enforcement.js';
+import { OPERATION_DISPATCH_JOB_CROSSWALK } from './services/operation-dispatch-health.js';
 
 const REPO_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 
@@ -33,8 +37,17 @@ describe('feature job manifest', () => {
       'broadcast deliveries',
       'reminder deliveries',
     ];
-    const names = FEATURE_JOB_MANIFEST.map(({ name }) => name);
-    expect(requiredDeliveryJobs.filter((name) => !names.includes(name))).toEqual([]);
+    expect(DELIVERY_DISPATCH_JOB_NAMES).toEqual(requiredDeliveryJobs);
+    expect(OPERATION_DISPATCH_JOB_CROSSWALK.map(({ jobName }) => jobName)).toEqual(requiredDeliveryJobs);
+  });
+
+  test('delivery dispatcherは全件heartbeat観測を通る', () => {
+    const source = readFileSync(new URL('./index.ts', import.meta.url), 'utf8');
+    const scheduledSection = source.slice(source.indexOf('async function scheduled('));
+    const observed = [...scheduledSection.matchAll(/observeDispatch\('([^']+)'/g)]
+      .map((match) => match[1]!);
+    expect(new Set(observed).size).toBe(observed.length);
+    expect([...observed].sort()).toEqual([...DELIVERY_DISPATCH_JOB_NAMES].sort());
   });
 
   test('job 名は一意で featureId は共有カタログ内に限る', () => {

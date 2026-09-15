@@ -354,7 +354,8 @@
     "393_booking_resource_version.sql",
     "394_mileage_earning_rule_publish.sql",
     "395_form_folder.sql",
-    "396_line_account_profile.sql"
+    "396_line_account_profile.sql",
+    "397_operation_dispatcher_heartbeats.sql"
   ],
-  "migrationCount": 355
+  "migrationCount": 356
 }

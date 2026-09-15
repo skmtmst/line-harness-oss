@@ -4,6 +4,7 @@ import { Hono } from 'hono';
 import type { Env } from '../index.js';
 import { createTestD1 } from '../test-utils/d1-sqlite.js';
 import { signOperationsEvent } from '../services/operations-signature.js';
+import { DELIVERY_DISPATCH_JOB_NAMES } from '../services/feature-enforcement.js';
 import { EMERGENCY_CONTROL_PERMISSION, operations } from './operations.js';
 
 function app(
@@ -55,7 +56,10 @@ beforeEach(async () => {
   ).run(await hash('step-up-restore'), expiresAt, new Date().toISOString());
 });
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.useRealTimers();
+  vi.unstubAllGlobals();
+});
 
 function bindings(overrides: Partial<Env['Bindings']> = {}): Env['Bindings'] {
   return { DB: testDb.db, ...overrides } as Env['Bindings'];
@@ -351,6 +355,15 @@ describe('緊急停止の保存API', () => {
 });
 
 describe('運用状態checkと配備履歴', () => {
+  function seedFreshDispatcherHeartbeats(now: string): void {
+    const insert = testDb.raw.prepare(
+      `INSERT INTO operation_dispatcher_heartbeats
+         (job_name, last_started_at, last_completed_at, last_status, updated_at)
+       VALUES (?, ?, ?, 'succeeded', ?)`,
+    );
+    for (const jobName of DELIVERY_DISPATCH_JOB_NAMES) insert.run(jobName, now, now, now);
+  }
+
   it('未実行はunknown/stale、権限外scopeは403で返す', async () => {
     const empty = await app('admin').request(
       '/api/operations/health?account_id=account-1', {}, bindings(),
@@ -406,6 +419,57 @@ describe('運用状態checkと配備履歴', () => {
       duplicate: true,
       data: { latestRun: { id: firstBody.data.latestRun.id } },
     });
+  });
+
+  it('実routeでもautomation以外の配信遅延をdangerで返す', async () => {
+    const now = '2026-09-15T03:00:00.000Z';
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(now));
+    seedFreshDispatcherHeartbeats(now);
+    testDb.raw.prepare(
+      `INSERT INTO broadcasts
+         (id, title, message_type, message_content, target_type, status, scheduled_at,
+          created_at, line_account_id)
+       VALUES ('broadcast-delayed', '遅延', 'text', '{}', 'all', 'scheduled', ?, ?, 'account-1')`,
+    ).run('2026-09-15T01:00:00.000Z', '2026-09-15T01:00:00.000Z');
+    vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request) => {
+      return String(input).endsWith('/quota/consumption')
+        ? Response.json({ totalUsage: 100 })
+        : Response.json({ type: 'limited', value: 1_000 });
+    }));
+
+    const response = await app('admin').request('/api/operations/health/runs', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ lineAccountId: 'account-1', now }),
+    }, bindings());
+    expect(response.status).toBe(201);
+    const body = await response.json() as {
+      data: { latestRun: { results: Array<{ checkKey: string; status: string; value: unknown }> } };
+    };
+    expect(body.data.latestRun.results.find(({ checkKey }) => checkKey === 'dispatch_jobs'))
+      .toMatchObject({ status: 'danger', value: { pendingCount: 1, delayMinutes: 120 } });
+  });
+
+  it('配信jobの取得失敗を実routeでnormalにしない', async () => {
+    const now = '2026-09-15T03:00:00.000Z';
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(now));
+    seedFreshDispatcherHeartbeats(now);
+    testDb.raw.exec('DROP TABLE broadcasts');
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ type: 'limited', value: 1_000 })));
+
+    const response = await app('admin').request('/api/operations/health/runs', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ lineAccountId: 'account-1', now }),
+    }, bindings());
+    expect(response.status).toBe(201);
+    const body = await response.json() as {
+      data: { latestRun: { results: Array<{ checkKey: string; status: string }> } };
+    };
+    expect(body.data.latestRun.results.find(({ checkKey }) => checkKey === 'dispatch_jobs'))
+      .toMatchObject({ status: 'unknown' });
   });
 
   it('署名なしの配備eventを拒否し、署名済みeventを履歴へ一度だけ追加する', async () => {
