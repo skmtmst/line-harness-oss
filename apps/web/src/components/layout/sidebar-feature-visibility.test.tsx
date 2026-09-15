@@ -111,8 +111,12 @@ describe('Sidebarのstaff向け機能表示read-model', () => {
     expect(view.getAllByText('一斉配信')).not.toHaveLength(0)
   })
 
-  it('古い応答にfeaturesがなくても画面全体を落とさない', async () => {
-    fixture.visibility.mockResolvedValue({ success: true, data: {} } as never)
+  it.each([
+    ['features欠落', { success: true, data: {} }],
+    ['featuresが配列', { success: true, data: { features: [] } }],
+    ['値がboolean以外', { success: true, data: { features: { scenarios: 'false' } } }],
+  ])('古い・不正な応答（%s）をstateへ入れず画面全体を落とさない', async (_label, response) => {
+    fixture.visibility.mockResolvedValue(response as never)
     const view = render(<Sidebar />)
 
     await waitFor(() => {

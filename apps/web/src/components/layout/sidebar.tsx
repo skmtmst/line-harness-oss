@@ -42,6 +42,13 @@ function NavIcon({ d }: { d: string }) {
   )
 }
 
+function isBooleanRecord(value: unknown): value is Record<string, boolean> {
+  return typeof value === 'object'
+    && value !== null
+    && !Array.isArray(value)
+    && Object.values(value).every((entry) => typeof entry === 'boolean')
+}
+
 export default function Sidebar({
   friendAttributesV2Mode = false,
   preview = false,
@@ -115,12 +122,13 @@ export default function Sidebar({
       void import('@/lib/api')
         .then(async ({ api }) => {
           const visibility = await api.featureSettings.visibility(selectedAccountId)
-          if (!cancelled && visibility.success) {
+          const features = visibility.success ? visibility.data?.features : undefined
+          if (!cancelled && isBooleanRecord(features)) {
             setSectionOrder(null)
             setItemOrder(null)
-            // 一時的に古いWorkerや試験用モックへ繋がっても、欠けたread-modelで
-            // サイドバーごと落とさない。直URLの可否はWorker側の強制が正本。
-            setFeatureVisibility(visibility.data?.features ?? {})
+            // 一時的に古いWorkerや試験用モックへ繋がっても、不正なread-modelを
+            // stateへ入れてサイドバーごと落とさない。直URLの可否はWorker側が正本。
+            setFeatureVisibility(features)
             // 専用機能の目録はbooleanへ畳み込み済み。名前の配列は受け取らない。
             setSpecializedFeatureKeys(SPECIALIZED_FEATURE_KEYS)
           }
