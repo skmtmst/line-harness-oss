@@ -217,7 +217,19 @@ describe('V6回答フォームの未実装3画面', () => {
     expect(RESPONSES_PAGE).toContain('summary.completionRate.toLocaleString')
     expect(RESPONSES_PAGE).toContain('destinationWriteText(item.destinationWrite)')
     expect(RESPONSES_PAGE).toContain('回答単位の版は未取得')
-    expect(RESPONSES_PAGE).toContain('回答後アクションの結果は未取得')
+  })
+
+  it('後処理の未完を一覧・詳細へ出し、未完分だけを再実行する口を持つ(N-168)', () => {
+    // 「結果は未取得」のまま黙らせない。API が返す工程記録を表示に使う。
+    expect(RESPONSES_PAGE).not.toContain('回答後アクションの結果は未取得')
+    expect(RESPONSES_PAGE).toContain('postActionsText(item.postActions)')
+    expect(RESPONSES_PAGE).toContain('postActionsNeedRetry(item.postActions)')
+    expect(RESPONSES_PAGE).toContain('後処理に未完があります')
+    // 再実行はその回答の未完分だけを頼む専用の口。
+    expect(RESPONSES_PAGE).toContain('retry-effects?account_id=')
+    expect(RESPONSES_PAGE).toContain('未完の工程だけ再実行する')
+    // 再実行の応答で一覧と詳細を同じ状態へ更新する。
+    expect(RESPONSES_PAGE).toContain('row.id === updated.id ? updated : row')
   })
 })
 

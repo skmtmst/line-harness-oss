@@ -17,8 +17,11 @@ import {
   completedDestinationWrites,
   destinationWriteText,
   nextVisitPeople,
+  postActionsNeedRetry,
+  postActionsText,
   type DestinationWrite,
   type FormSubmissionSummary,
+  type SubmissionPostActions,
 } from './response-summary'
 
 type Submission = {
@@ -28,6 +31,8 @@ type Submission = {
   friendName: string | null
   data: Record<string, unknown> | string
   destinationWrite: DestinationWrite
+  // N-168: 後処理の状態。未完の工程があれば一覧・詳細へ出し、再実行する。
+  postActions?: SubmissionPostActions | null
   createdAt: string
 }
 
@@ -98,6 +103,8 @@ function FormResponsesInner() {
   const [query, setQuery] = useState('')
   const [view, setView] = useState<'rows' | 'summary'>('rows')
   const [selected, setSelected] = useState<Submission | null>(null)
+  const [retrying, setRetrying] = useState(false)
+  const [retryError, setRetryError] = useState('')
   const [exporting, setExporting] = useState(false)
   const [exportError, setExportError] = useState('')
   const [exportProgress, setExportProgress] = useState('')
@@ -242,6 +249,37 @@ function FormResponsesInner() {
     }
   }
 
+  // N-168: 未完の工程だけを再実行する。応答の最新の状態で一覧と詳細を更新する。
+  const retryPostActions = async (item: Submission) => {
+    if (!selectedAccountId || retrying) return
+    setRetrying(true)
+    setRetryError('')
+    try {
+      const result = await fetchApi<{
+        success: boolean
+        data?: { submission?: Submission; pendingEffects?: string[] }
+        error?: string
+      }>(
+        `/api/forms/${formId}/submissions/${item.id}/retry-effects?account_id=${encodeURIComponent(selectedAccountId)}`,
+        { method: 'POST' },
+      )
+      if (!result.success || !result.data?.submission) {
+        throw new Error(result.error ?? 'retry_failed')
+      }
+      const updated = normalizedSubmission(result.data.submission)
+      setItems((prev) => prev.map((row) => (row.id === updated.id ? updated : row)))
+      setSelected(updated)
+    } catch (error) {
+      setRetryError(
+        error instanceof Error && error.message && error.message !== 'retry_failed'
+          ? error.message
+          : '後処理の再実行に失敗しました。もう一度お試しください。',
+      )
+    } finally {
+      setRetrying(false)
+    }
+  }
+
   if (accountLoading || loading) return <ListState kind="loading" title="集まった回答を読み込んでいます" />
   if (!formId) return <ListState kind="empty" title="回答フォームが指定されていません" />
   if (!selectedAccountId) return <ListState kind="empty" title="LINE公式アカウントを選んでください" />
@@ -330,7 +368,7 @@ function FormResponsesInner() {
               <tbody className="divide-hairline divide-y">
                 {shown.map((item) => (
                   <tr key={item.id} className="hover:bg-canvas-sunken cursor-pointer" onClick={() => setSelected(item)}>
-                    <td className="px-3 py-3"><p className="text-ink truncate text-sm font-semibold" title={item.friendName ?? '不明'}>{item.friendName ?? '不明'}</p><p className="text-ink-faint mt-1 truncate text-xs" title={valueText(Object.values(item.data as Record<string, unknown>)[0])}>{valueText(Object.values(item.data as Record<string, unknown>)[0])}</p></td>
+                    <td className="px-3 py-3"><p className="text-ink truncate text-sm font-semibold" title={item.friendName ?? '不明'}>{item.friendName ?? '不明'}</p><p className="text-ink-faint mt-1 truncate text-xs" title={valueText(Object.values(item.data as Record<string, unknown>)[0])}>{valueText(Object.values(item.data as Record<string, unknown>)[0])}</p>{postActionsNeedRetry(item.postActions) && <p className="text-danger mt-1 text-xs">後処理に未完があります</p>}</td>
                     <td className="text-ink-secondary px-3 py-3 text-xs whitespace-nowrap">{new Date(item.createdAt).toLocaleString('ja-JP', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}</td>
                     {fieldKeys.slice(0, 3).map((key) => <td key={key} className="text-ink-secondary truncate px-3 py-3 text-sm" title={valueText((item.data as Record<string, unknown>)[key])}>{valueText((item.data as Record<string, unknown>)[key])}</td>)}
                     <td className="text-ink-faint px-3 py-3 text-center">•••</td>
@@ -349,7 +387,17 @@ function FormResponsesInner() {
         </>
       )}
 
-      {selected && <ResponseDetail item={selected} fieldKeys={fieldKeys} labels={labels} onClose={() => setSelected(null)} />}
+      {selected && (
+        <ResponseDetail
+          item={selected}
+          fieldKeys={fieldKeys}
+          labels={labels}
+          onClose={() => setSelected(null)}
+          retrying={retrying}
+          retryError={retryError}
+          onRetryPostActions={() => void retryPostActions(selected)}
+        />
+      )}
     </div>
   )
 }
@@ -367,7 +415,23 @@ function Kpi({ label, value, note }: { label: string; value: string; note: strin
   return <section className="bg-canvas rounded-card border-hairline border p-4"><p className="text-ink-faint text-xs font-medium">{label}</p><p className="text-ink mt-2 text-2xl font-bold tabular-nums">{value}</p><p className="text-ink-faint mt-1 text-xs">{note}</p></section>
 }
 
-function ResponseDetail({ item, fieldKeys, labels, onClose }: { item: Submission; fieldKeys: string[]; labels: Record<string, string>; onClose: () => void }) {
+function ResponseDetail({
+  item,
+  fieldKeys,
+  labels,
+  onClose,
+  retrying,
+  retryError,
+  onRetryPostActions,
+}: {
+  item: Submission
+  fieldKeys: string[]
+  labels: Record<string, string>
+  onClose: () => void
+  retrying: boolean
+  retryError: string
+  onRetryPostActions: () => void
+}) {
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
       <button type="button" className="bg-ink/30 absolute inset-0" onClick={onClose} aria-label="回答詳細を閉じる" />
@@ -379,7 +443,18 @@ function ResponseDetail({ item, fieldKeys, labels, onClose }: { item: Submission
           <Detail label="フォームの版" value="—（回答単位の版は未取得）" />
           {fieldKeys.map((key) => <Detail key={key} label={labels[key] ?? key} value={valueText((item.data as Record<string, unknown>)[key])} />)}
           <Detail label="友だち情報欄への書き込み" value={destinationWriteText(item.destinationWrite)} />
-          <Detail label="アクション結果" value="—（回答後アクションの結果は未取得）" />
+          <div>
+            <dt className="text-ink-faint text-xs">アクション結果</dt>
+            <dd className="text-ink mt-1 break-words text-sm whitespace-pre-wrap">{postActionsText(item.postActions)}</dd>
+            {postActionsNeedRetry(item.postActions) && (
+              <div className="mt-2">
+                <Button onClick={onRetryPostActions} disabled={retrying}>
+                  {retrying ? '再実行しています' : '未完の工程だけ再実行する'}
+                </Button>
+                {retryError && <p className="text-danger mt-2 text-xs">{retryError}</p>}
+              </div>
+            )}
+          </div>
           <Detail label="Webhook結果" value="—（回答単位の結果は未取得）" />
         </dl>
         {item.friendId && <Button className="mt-6" href={`/chats?friend=${encodeURIComponent(item.friendId)}`}>友だち詳細を開く</Button>}
