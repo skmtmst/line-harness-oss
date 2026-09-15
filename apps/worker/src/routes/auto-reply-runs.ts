@@ -10,6 +10,10 @@ import {
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
+import {
+  AutoReplyActionRetryError,
+  retryAutoReplyActionRuns,
+} from '../services/auto-reply.js';
 
 const autoReplyRuns = new Hono<Env>();
 
@@ -80,6 +84,18 @@ const DOMAIN_STATUSES = new Set<AutoReplyEvaluationStatus>([
   'reply_failed',
   'actions_running',
   'completed',
+  'partial_failed',
+  'failed',
+]);
+
+/*
+ * 再実行ボタンを出してよい評価の終了状態。
+ * 処理中（received/evaluated/matched/actions_running）や、何もしなかった
+ * （skipped。選んだルールが見送られた表示もここに入る）、全部済んだ
+ * （completed/reply_accepted）評価には出さない。
+ */
+const RETRYABLE_DOMAIN_STATUSES = new Set<AutoReplyEvaluationStatus>([
+  'reply_failed',
   'partial_failed',
   'failed',
 ]);
@@ -161,7 +177,9 @@ function serializeRun(
     status: commonStatus(domainStatus),
     detail: detail(row, domainStatus),
     durationMs: row.duration_ms,
-    canRetry: false,
+    // permanent_failed の処理行が残る終了済みの評価だけ再実行できる。
+    // 返信の失敗だけ・成功・処理中・見送り（選択ルールの見送り表示を含む）には出さない。
+    canRetry: row.has_failed_action_run === 1 && RETRYABLE_DOMAIN_STATUSES.has(domainStatus),
     autoReplyId: selectedRule?.id ?? row.winning_auto_reply_id,
     autoReplyName: selectedRule?.name || selectedRule?.keyword || row.rule_name,
     friendId: row.friend_id,
@@ -293,6 +311,34 @@ autoReplyRuns.get(
     } catch (error) {
       console.error('GET /api/auto-reply-runs failed', error);
       return c.json({ success: false, error: '自動応答の実行結果を表示できませんでした' }, 500);
+    }
+  },
+);
+
+/*
+ * N-081: permanent_failed の処理行だけを、保存済みの写しでやり直す。
+ * LINE の返信・受信イベント・現在のルール定義は一切触らない。
+ * 更新系なのでオーナー・管理者だけ。スタッフは403。
+ */
+autoReplyRuns.post(
+  '/api/auto-reply-runs/:id/retry',
+  requireRole('owner', 'admin'),
+  async (c) => {
+    try {
+      const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+      const outcome = await retryAutoReplyActionRuns(c.env.DB, {
+        evaluationId: c.req.param('id'),
+        allowedAccountIds: scope.allowedAccountIds,
+        canSeeUnassigned: scope.canSeeUnassigned,
+      });
+      return c.json({ success: true, data: outcome });
+    } catch (error) {
+      if (error instanceof AutoReplyActionRetryError) {
+        const status = error.code === 'not_found' ? 404 : 409;
+        return c.json({ success: false, error: error.message, code: error.code }, status);
+      }
+      console.error('POST /api/auto-reply-runs/:id/retry failed', error);
+      return c.json({ success: false, error: '失敗した処理をもう一度実行できませんでした' }, 500);
     }
   },
 );

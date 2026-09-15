@@ -1,17 +1,20 @@
 import type { LineClient } from '@line-crm/line-sdk';
 import { getSendPermissionForAccount } from './send-entitlements.js';
 import {
+  claimPermanentFailedAutoReplyActionRuns,
   ensureAutoReplyPublishedVersion,
   finishAutoReplyActionRun,
+  getAutoReplyEvaluationById,
   getTemplateById,
   markAutoReplyEvaluationFinished,
   markAutoReplyEvaluationMatched,
   markAutoReplyEvaluationSkipped,
   recordAutoReplyEvaluationDetail,
+  recomputeAutoReplyEvaluationFromActions,
   reserveAutoReplyActionRun,
   reserveAutoReplyEvaluation,
 } from '@line-crm/db';
-import type { AutoReply, Friend } from '@line-crm/db';
+import type { AutoReply, AutoReplyEvaluationStatus, Friend } from '@line-crm/db';
 import { logOutgoingMessage } from './event-bus.js';
 import { evaluateAutoReplyConditions } from './auto-reply-conditions.js';
 import {
@@ -671,4 +674,171 @@ export async function matchAndReply(
   }
 
   return { matched: true, replyTokenConsumed };
+}
+
+const RETRY_ACTION_TYPES = new Set<ScenarioActionRow['action_type']>([
+  'tag',
+  'friend_field',
+  'support_mark',
+  'scenario',
+  'common_var',
+  'send_message',
+  'send_template',
+  'reminder',
+  'event_booking',
+]);
+const RETRY_ACTION_HOOKS = new Set<ScenarioActionRow['hook']>([
+  'step_sent',
+  'scenario_completed',
+  'choice_selected',
+]);
+
+/**
+ * 保存済みの action_snapshot を ScenarioActionRow として厳しく読む。
+ *
+ * 形が違う写しは実行しない。読めない写しを `runActionRows` へ流すと、
+ * 未知の action_type などが例外になって失敗扱いされる——その場合も
+ * 副作用は起きないが、「何が壊れていたか」を台帳へ区別して残せるよう
+ * ここで弾く。
+ */
+export function parseAutoReplyActionSnapshot(raw: string): ScenarioActionRow | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+  const row = parsed as Record<string, unknown>;
+  if (typeof row.id !== 'string' || row.id === '') return null;
+  if (typeof row.scenario_id !== 'string') return null;
+  if (typeof row.hook !== 'string' || !RETRY_ACTION_HOOKS.has(row.hook as ScenarioActionRow['hook'])) {
+    return null;
+  }
+  if (row.step_id !== null && typeof row.step_id !== 'string') return null;
+  if (row.choice_index !== null && !Number.isInteger(row.choice_index)) return null;
+  if (!Number.isInteger(row.sort_order)) return null;
+  if (typeof row.action_type !== 'string'
+    || !RETRY_ACTION_TYPES.has(row.action_type as ScenarioActionRow['action_type'])) {
+    return null;
+  }
+  if (typeof row.config_json !== 'string') return null;
+  try {
+    JSON.parse(row.config_json);
+  } catch {
+    return null;
+  }
+  if (row.condition_json !== null && typeof row.condition_json !== 'string') return null;
+  if (!Number.isInteger(row.repeat_on_refire)) return null;
+  if (row.fires_key !== undefined && typeof row.fires_key !== 'string') return null;
+  return {
+    id: row.id,
+    scenario_id: row.scenario_id,
+    hook: row.hook as ScenarioActionRow['hook'],
+    step_id: row.step_id,
+    choice_index: row.choice_index as number | null,
+    sort_order: row.sort_order as number,
+    action_type: row.action_type as ScenarioActionRow['action_type'],
+    config_json: row.config_json,
+    condition_json: row.condition_json,
+    repeat_on_refire: row.repeat_on_refire as number,
+    ...(typeof row.fires_key === 'string' ? { fires_key: row.fires_key } : {}),
+  };
+}
+
+export class AutoReplyActionRetryError extends Error {
+  constructor(
+    readonly code: 'not_found' | 'not_retryable',
+    message: string,
+  ) {
+    super(message);
+    this.name = 'AutoReplyActionRetryError';
+  }
+}
+
+export interface AutoReplyActionRetryOutcome {
+  /** 確保して処理した行数。壊れた写しは動作せず permanent_failed へ戻る。 */
+  retriedCount: number;
+  /** 再計算した評価の状態。 */
+  status: AutoReplyEvaluationStatus;
+}
+
+/**
+ * permanent_failed の処理行だけを、保存済みの写しでやり直す（N-081）。
+ *
+ * - LINE の返信トークン/API、受信イベント、matchAndReply には一切触れない。
+ * - 現在のルール定義は読み直さない。予約時に固定した action_snapshot だけを動かす。
+ * - 確保は条件付き UPDATE。同時に呼ばれても1回だけ副作用が起きる。
+ * - 動作が成功したあと完了記録だけ失敗した場合は claimed のまま残す。
+ *   permanent_failed へ戻すと再実行対象になり、成功した動作を二重に動かす。
+ */
+export async function retryAutoReplyActionRuns(
+  db: D1Database,
+  input: {
+    evaluationId: string;
+    allowedAccountIds: string[];
+    canSeeUnassigned: boolean;
+  },
+): Promise<AutoReplyActionRetryOutcome> {
+  const evaluation = await getAutoReplyEvaluationById(db, input.evaluationId);
+  const visible = evaluation && (evaluation.line_account_id == null
+    ? input.canSeeUnassigned
+    : input.allowedAccountIds.includes(evaluation.line_account_id));
+  if (!evaluation || !visible) {
+    throw new AutoReplyActionRetryError('not_found', '実行結果が見つかりません');
+  }
+
+  const claimed = await claimPermanentFailedAutoReplyActionRuns(db, evaluation.id);
+  if (claimed.length === 0) {
+    throw new AutoReplyActionRetryError(
+      'not_retryable',
+      '処理中または完了済みのため、もう一度実行できません',
+    );
+  }
+
+  let retriedCount = 0;
+  for (const run of claimed) {
+    const action = parseAutoReplyActionSnapshot(run.action_snapshot);
+    if (!action) {
+      await finishAutoReplyActionRun(db, {
+        id: run.id,
+        status: 'permanent_failed',
+        errorCode: 'invalid_action_snapshot',
+      });
+      continue;
+    }
+    let result: RunActionsResult;
+    try {
+      result = await runActionRows(db, [action], evaluation.friend_id);
+    } catch (error) {
+      // 動作そのものが失敗した。失敗のまま戻し、また直せる状態にする。
+      try {
+        await finishAutoReplyActionRun(db, {
+          id: run.id,
+          status: 'permanent_failed',
+          errorCode: safeErrorCode(error),
+        });
+      } catch (finishError) {
+        console.error('[auto-reply] retry: failed to mark action run failed', finishError);
+      }
+      continue;
+    }
+    try {
+      await finishAutoReplyActionRun(db, {
+        id: run.id,
+        status: actionResultStatus(result),
+        errorCode: result.failed > 0 ? 'action_failed' : null,
+        result: { ...result },
+      });
+    } catch (finishError) {
+      // 動作は済んだのに完了の記録だけ書けなかった。行は claimed のまま
+      // 残す——permanent_failed へ戻すと、成功した動作がもう一度動く。
+      console.error('[auto-reply] retry: failed to write action run outcome', finishError);
+      continue;
+    }
+    retriedCount += 1;
+  }
+
+  const outcome = await recomputeAutoReplyEvaluationFromActions(db, evaluation.id);
+  return { retriedCount, status: outcome?.status ?? evaluation.status };
 }
