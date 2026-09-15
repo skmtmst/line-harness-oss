@@ -47,4 +47,15 @@ describe('feature route manifest', () => {
       kind: 'feature', featureId: 'mileage',
     });
   });
+
+  test('予約台帳の実routeは旧キーではなくbookingで停止判定する', () => {
+    expect(routeClassification('/api/booking/admin/requests', 'GET')).toEqual({
+      kind: 'feature', featureId: 'booking',
+    });
+    expect(FEATURE_ROUTE_MANIFEST.some(({ classification }) => (
+      classification.kind === 'feature'
+      && ['reservation_ledger', 'multi_store_bulk_updates', 'external_reservations', 'google_business_profile']
+        .includes(classification.featureId)
+    ))).toBe(false);
+  });
 });
