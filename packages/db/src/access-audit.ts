@@ -370,6 +370,7 @@ export type ListAuditEventsInput = {
   lineAccountId?: string;
   category?: AuditCategory;
   result?: AuditResult;
+  attentionOnly?: boolean;
   actorId?: string;
   action?: string;
   query?: string;
@@ -433,6 +434,9 @@ export async function listAuditEvents(db: D1Database, input: ListAuditEventsInpu
   const values = [...scoped.values];
   if (input.category) { conditions.push('ae.category = ?'); values.push(input.category); }
   if (input.result) { conditions.push('ae.result = ?'); values.push(input.result); }
+  if (input.attentionOnly) {
+    conditions.push("(ae.result <> 'success' OR ae.risk_level <> 'normal')");
+  }
   if (input.actorId) { conditions.push('ae.actor_principal_id = ?'); values.push(input.actorId); }
   if (input.action) { conditions.push('ae.action LIKE ?'); values.push(`%${input.action}%`); }
   if (input.from) { conditions.push('ae.created_at >= ?'); values.push(input.from); }

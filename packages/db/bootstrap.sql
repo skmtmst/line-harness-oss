@@ -1979,7 +1979,7 @@ CREATE TABLE event_bookings (
     answer_snapshot_json IS NULL OR json_valid(answer_snapshot_json)
   ), first_participation INTEGER CHECK (first_participation IN (0, 1)), first_participation_attended_count INTEGER CHECK (
     first_participation_attended_count IS NULL OR first_participation_attended_count >= 0
-  ), first_participation_checked_at TEXT,
+  ), first_participation_checked_at TEXT, event_version_id TEXT REFERENCES event_versions(id), event_snapshot_json TEXT CHECK (event_snapshot_json IS NULL OR json_valid(event_snapshot_json)), approval_expires_at TEXT,
   FOREIGN KEY (line_account_id) REFERENCES line_accounts(id),
   FOREIGN KEY (event_id) REFERENCES events(id),
   FOREIGN KEY (slot_id) REFERENCES event_slots(id),
@@ -1998,6 +1998,20 @@ CREATE TABLE event_slots (
   created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')), version INTEGER NOT NULL DEFAULT 1 CHECK (version >= 1),
   FOREIGN KEY (event_id) REFERENCES events(id)
+);
+
+CREATE TABLE event_versions (
+  id                       TEXT PRIMARY KEY,
+  event_id                 TEXT NOT NULL,
+  line_account_id          TEXT NOT NULL,
+  version_number           INTEGER NOT NULL,
+  snapshot_json            TEXT NOT NULL CHECK (json_valid(snapshot_json)),
+  approval_deadline_hours  INTEGER NOT NULL CHECK (approval_deadline_hours IN (2, 24, 72)),
+  published_at             TEXT NOT NULL,
+  created_at               TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+  FOREIGN KEY (event_id) REFERENCES events(id),
+  FOREIGN KEY (line_account_id) REFERENCES line_accounts(id),
+  UNIQUE (event_id, version_number)
 );
 
 CREATE TABLE "event_waitlist" (
@@ -2028,7 +2042,7 @@ CREATE TABLE "event_waitlist" (
   notified_at                    TEXT,
   version                        INTEGER NOT NULL DEFAULT 1 CHECK (version >= 1),
   created_at                     TEXT NOT NULL,
-  updated_at                     TEXT NOT NULL,
+  updated_at                     TEXT NOT NULL, event_version_id TEXT REFERENCES event_versions(id), event_snapshot_json TEXT CHECK (event_snapshot_json IS NULL OR json_valid(event_snapshot_json)),
   FOREIGN KEY (line_account_id) REFERENCES line_accounts(id),
   FOREIGN KEY (event_id) REFERENCES events(id),
   FOREIGN KEY (slot_id) REFERENCES event_slots(id),
@@ -2077,7 +2091,8 @@ CREATE TABLE events (
   CHECK (target_type IN ('single', 'multi-account-dedup')), account_ids TEXT
   CHECK (account_ids IS NULL OR json_valid(account_ids)), dedup_priority TEXT
   CHECK (dedup_priority IS NULL OR json_valid(dedup_priority)), failed_account_ids TEXT
-  CHECK (failed_account_ids IS NULL OR json_valid(failed_account_ids)), confirmation_message_extra TEXT, reminder_message_extra TEXT, og_title TEXT, og_description TEXT, og_image_url TEXT, visible_tag_id TEXT, waitlist_enabled INTEGER NOT NULL DEFAULT 0, entry_cutoff_hours_before INTEGER,
+  CHECK (failed_account_ids IS NULL OR json_valid(failed_account_ids)), confirmation_message_extra TEXT, reminder_message_extra TEXT, og_title TEXT, og_description TEXT, og_image_url TEXT, visible_tag_id TEXT, waitlist_enabled INTEGER NOT NULL DEFAULT 0, entry_cutoff_hours_before INTEGER, version INTEGER NOT NULL DEFAULT 1, current_published_version_id TEXT, version_write_token TEXT, approval_deadline_hours INTEGER NOT NULL DEFAULT 24
+  CHECK (approval_deadline_hours IN (2, 24, 72)),
   FOREIGN KEY (line_account_id) REFERENCES line_accounts(id)
 );
 
@@ -6271,9 +6286,15 @@ CREATE INDEX idx_event_bookings_friend_requested ON event_bookings (friend_id, r
 CREATE INDEX idx_event_bookings_identity_status
   ON event_bookings (event_id, identity_key, status);
 
+CREATE INDEX idx_event_bookings_requested_expiry
+  ON event_bookings (status, approval_expires_at);
+
 CREATE INDEX idx_event_bookings_slot_status ON event_bookings (slot_id, status);
 
 CREATE INDEX idx_event_slots_event_starts ON event_slots (event_id, starts_at);
+
+CREATE INDEX idx_event_versions_account_event
+  ON event_versions (line_account_id, event_id, version_number DESC);
 
 CREATE INDEX idx_event_waitlist_offer_expiry
   ON event_waitlist(status, offer_expires_at);

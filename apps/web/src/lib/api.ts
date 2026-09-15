@@ -5014,6 +5014,7 @@ export const api = {
       lineAccountId?: string
       category?: 'auth' | 'business'
       result?: 'success' | 'denied' | 'failed'
+      attention?: boolean
       actorId?: string
       action?: string
       query?: string
@@ -5026,6 +5027,7 @@ export const api = {
       if (params?.lineAccountId) q.set('lineAccountId', params.lineAccountId)
       if (params?.category) q.set('category', params.category)
       if (params?.result) q.set('result', params.result)
+      if (params?.attention !== undefined) q.set('attention', String(params.attention))
       if (params?.actorId) q.set('actorId', params.actorId)
       if (params?.action) q.set('action', params.action)
       if (params?.query) q.set('query', params.query)
@@ -10242,6 +10244,7 @@ export interface EventListItem {
   description_centered: number;
   max_bookings_per_friend: number | null;
   requires_approval: number;
+  approval_deadline_hours: number;
   cancel_deadline_hours_before: number | null;
   reminder_day_before_enabled: number;
   reminder_hours_before: number | null;
@@ -10249,6 +10252,7 @@ export interface EventListItem {
   sort_order: number;
   created_at: string;
   updated_at: string;
+  version: number;
   next_slot_starts_at: string | null;
   total_capacity: number | null;
   total_active: number;
@@ -10273,6 +10277,7 @@ export interface EventDetail {
   description_centered: number;
   max_bookings_per_friend: number | null;
   requires_approval: number;
+  approval_deadline_hours: number;
   cancel_deadline_hours_before: number | null;
   reminder_day_before_enabled: number;
   reminder_hours_before: number | null;
@@ -10295,6 +10300,7 @@ export interface EventDetail {
   account_ids?: string | string[] | null;
   dedup_priority?: string | string[] | null;
   line_account_id?: string;
+  version?: number;
 }
 
 export interface EventSlot {
@@ -10393,10 +10399,10 @@ export const eventsApi = {
       withAccount('/api/events/admin/events', accountId),
       { method: 'POST', body: JSON.stringify(body) },
     ),
-  updateEvent: (accountId: string, id: string, body: Partial<EventDetail>) =>
+  updateEvent: (accountId: string, id: string, body: Partial<EventDetail>, expectedVersion: number) =>
     fetchApi<EventDetail>(
       withAccount(`/api/events/admin/events/${id}`, accountId),
-      { method: 'PUT', body: JSON.stringify(body) },
+      { method: 'PUT', body: JSON.stringify({ ...body, expected_version: expectedVersion }) },
     ),
   deleteEvent: (accountId: string, id: string) =>
     fetchApi<void>(
