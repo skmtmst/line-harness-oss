@@ -21,6 +21,8 @@ import {
   backfillWebhookSecrets,
   hasWebhookSecret,
   resolveWebhookSecret,
+  isKnownOutgoingEventType,
+  KNOWN_OUTGOING_EVENT_TYPES,
   WEBHOOK_SECRET_MIN_LENGTH as MIN_SECRET_LENGTH,
   type WebhookInteractionRow,
   type IncomingWebhookIdentityMatch,
@@ -28,7 +30,7 @@ import {
 } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { sha256Hex } from '../middleware/auth.js';
-import { reserveIncomingWebhook, type IncomingWebhookExecution } from '../services/incoming-webhook-receipts.js';
+import { countRecentIncomingReceipts, reserveIncomingWebhook, type IncomingWebhookExecution } from '../services/incoming-webhook-receipts.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import {
@@ -198,6 +200,10 @@ function readMaxRetries(raw: unknown): { ok: true; value: number } | { ok: false
 const MAX_WEBHOOK_NAME_LENGTH = 120;
 const MAX_EVENT_TYPES = 20;
 const MAX_EVENT_TYPE_LENGTH = 100;
+// #829 N-384: 受信本文の上限と、受信口ごとの短時間回数制限。
+const MAX_INCOMING_BODY_BYTES = 256 * 1024;
+const RECEIVE_RATE_LIMIT = 60;
+const RECEIVE_RATE_WINDOW_MS = 60_000;
 
 /**
  * 名前と種別の上限。極端な値で一覧表示が崩れる・DBが膨らむのを防ぐ(#506 軽)。
@@ -218,6 +224,11 @@ function validateEventTypes(eventTypes: unknown): string | null {
   for (const item of eventTypes) {
     if (typeof item !== 'string' || !item.trim() || item.trim().length > MAX_EVENT_TYPE_LENGTH) {
       return `each eventType must be 1-${MAX_EVENT_TYPE_LENGTH} characters`;
+    }
+    // N-383: 実際に発火する種別だけを受け付ける。誤記や不発パターンは
+    // 無音の不達になるため、有効な種別の一覧を添えて拒否する。
+    if (!isKnownOutgoingEventType(item.trim())) {
+      return `unknown eventType "${item.trim()}". available: ${KNOWN_OUTGOING_EVENT_TYPES.join(', ')}, incoming_webhook.<source_type>, *`;
     }
   }
   return null;
@@ -663,7 +674,7 @@ webhooks.post('/api/webhooks/outgoing', requireRole('owner'), async (c) => {
     const item = await createOutgoingWebhook(c.env.DB, {
       name: body.name,
       url: body.url,
-      eventTypes: body.eventTypes ?? [],
+      eventTypes: (body.eventTypes ?? []).map((item) => item.trim()),
       secret: body.secret as string,
       maxRetries,
       lineAccountId,
@@ -780,7 +791,11 @@ webhooks.put('/api/webhooks/outgoing/:id', requireRole('owner'), async (c) => {
         );
       }
     }
-    await updateOutgoingWebhook(c.env.DB, id, lineAccountId, { ...body, maxRetries }, webhookKeysOf(c));
+    await updateOutgoingWebhook(c.env.DB, id, lineAccountId, {
+      ...body,
+      eventTypes: body.eventTypes?.map((item) => item.trim()),
+      maxRetries,
+    }, webhookKeysOf(c));
     const updated = await getOutgoingWebhookById(c.env.DB, id, lineAccountId);
     if (!updated) return c.json({ success: false, error: 'Not found' }, 404);
     return c.json({
@@ -1049,6 +1064,12 @@ webhooks.post('/api/webhooks/incoming/:id/receive', async (c) => {
     if (!wh || !wh.is_active) {
       return c.json({ success: false, error: 'Webhook not found or inactive' }, 404);
     }
+    // N-384: 巨大な本文を署名計算の前に止める。申告サイズが超えていれば
+    // 読まずに413、申告が無くても実バイト数で止める。
+    const declaredLength = Number(c.req.header('content-length') ?? '');
+    if (Number.isFinite(declaredLength) && declaredLength > MAX_INCOMING_BODY_BYTES) {
+      return c.json({ success: false, error: 'Payload too large' }, 413);
+    }
     // 照合の直前に復号する。鍵不足・復号失敗は fail-closed(#650)。
     let verifySecret: string | null;
     try {
@@ -1067,6 +1088,9 @@ webhooks.post('/api/webhooks/incoming/:id/receive', async (c) => {
     }
 
     const rawBody = await c.req.text();
+    if (new TextEncoder().encode(rawBody).byteLength > MAX_INCOMING_BODY_BYTES) {
+      return c.json({ success: false, error: 'Payload too large' }, 413);
+    }
     const expected = await computeHmacSha256Hex(verifySecret, rawBody);
     if (!safeEqualHex(signatureHeader.toLowerCase(), expected)) {
       return c.json({ success: false, error: 'Invalid signature' }, 401);
@@ -1077,6 +1101,16 @@ webhooks.post('/api/webhooks/incoming/:id/receive', async (c) => {
       payload = JSON.parse(rawBody);
     } catch {
       return c.json({ success: false, error: 'Invalid JSON body' }, 400);
+    }
+
+    // N-384: 受信口ごとの短時間回数制限。receipts の行数で数えるので
+    // 追加の表は要らない。上限超えは受領記録を消費せず 429 で返し、
+    // 窓が明けたあとの正規再送を残す。
+    const recentCount = await countRecentIncomingReceipts(
+      c.env.DB, wh.id, new Date(Date.now() - RECEIVE_RATE_WINDOW_MS).toISOString());
+    if (recentCount >= RECEIVE_RATE_LIMIT) {
+      c.header('Retry-After', String(Math.ceil(RECEIVE_RATE_WINDOW_MS / 1000)));
+      return c.json({ success: false, error: 'Too many requests' }, 429);
     }
 
     /*
@@ -1147,13 +1181,15 @@ webhooks.post('/api/webhooks/incoming/:id/receive', async (c) => {
         console.error('受信Webhookの記録開始に失敗:', logError);
       }
     }
+    let actionResult: { matchedFriendId: string | null; executed: number; failed: number } =
+      { matchedFriendId: null, executed: 0, failed: 0 };
     try {
       const identityMatching = safeJson<IncomingWebhookIdentityMatch>(wh.identity_match_json, {
         methods: [], onNotFound: 'do_nothing',
       });
       const configuredActions = safeJson<IncomingWebhookActionRef[]>(wh.action_refs_json, []);
-      const actionResult = wh.line_account_id
-        ? await execution.step('actions', async () => {
+      if (wh.line_account_id) {
+        actionResult = await execution.step('actions', async () => {
           const result = await executeIncomingWebhookActions(execution!.db, {
           lineAccountId: wh.line_account_id!,
           webhookId: wh.id,
@@ -1166,8 +1202,8 @@ webhooks.post('/api/webhooks/incoming/:id/receive', async (c) => {
           });
           if (result.failed > 0) throw new Error('incoming_actions_failed');
           return result;
-        })
-        : { matchedFriendId: null, executed: 0, failed: 0 };
+        });
+      }
       await execution.step('event', () => fireEvent(execution!.db, eventType, {
         sourceEventId: execution!.sourceEventId,
         sourceKind: 'incoming_webhook_receipt',
@@ -1207,7 +1243,18 @@ webhooks.post('/api/webhooks/incoming/:id/receive', async (c) => {
     }
 
     await execution.complete();
-    return c.json({ success: true, data: { received: true, source: wh.source_type } });
+    return c.json({
+      success: true,
+      data: {
+        received: true,
+        source: wh.source_type,
+        // N-378: 「受理したが処理対象がいない」を送り主が判別できるよう、
+        // 照合結果と実行件数を添える。received:true の契約はそのまま。
+        matched: actionResult.matchedFriendId !== null,
+        executed: actionResult.executed,
+        failed: actionResult.failed,
+      },
+    });
   } catch (err) {
     if (execution) {
       try { await execution.fail(); } catch { /* The lease lets a later retry recover even during a DB outage. */ }
