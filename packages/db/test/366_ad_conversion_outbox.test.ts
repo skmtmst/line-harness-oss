@@ -15,6 +15,10 @@ const migration = readFileSync(
   join(import.meta.dirname, '../migrations/366_ad_conversion_outbox.sql'),
   'utf8',
 );
+const clickSnapshotMigration = readFileSync(
+  join(import.meta.dirname, '../migrations/402_ad_click_selection_snapshot.sql'),
+  'utf8',
+);
 
 function asD1(sqlite: Database.Database): D1Database {
   function prepare(query: string): D1PreparedStatement {
@@ -45,6 +49,7 @@ function asD1(sqlite: Database.Database): D1Database {
 const BASE_SCHEMA = `
   CREATE TABLE line_accounts (id TEXT PRIMARY KEY);
   CREATE TABLE friends (id TEXT PRIMARY KEY, line_account_id TEXT REFERENCES line_accounts(id));
+  CREATE TABLE ref_tracking (id TEXT PRIMARY KEY, friend_id TEXT, created_at TEXT NOT NULL);
   CREATE TABLE ad_platforms (
     id TEXT PRIMARY KEY, name TEXT NOT NULL,
     config TEXT NOT NULL DEFAULT '{}', is_active INTEGER DEFAULT 1,
@@ -56,6 +61,7 @@ function seedDb(): { db: D1Database; raw: Database.Database } {
   const raw = new Database(':memory:');
   raw.exec(BASE_SCHEMA);
   raw.exec(migration);
+  raw.exec(clickSnapshotMigration);
   raw.exec(`INSERT INTO line_accounts (id) VALUES ('a1')`);
   raw.exec(`INSERT INTO friends (id, line_account_id) VALUES ('f1', 'a1')`);
   raw.exec(`INSERT INTO ad_platforms (id, name, line_account_id) VALUES ('p1', 'meta', 'a1')`);
