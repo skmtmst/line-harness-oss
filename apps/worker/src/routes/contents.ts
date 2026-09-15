@@ -693,6 +693,36 @@ contents.get('/api/media', async (c) => {
 });
 
 /**
+ * 詳細URLから1件だけ復元する。IDだけで探すと別アカウントの存在を漏らすため、
+ * 担当者のaccount範囲を先に確かめ、同じaccount条件を付けた取得だけを行う。
+ */
+contents.get('/api/media/:id', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const accountId = c.req.query('accountId')?.trim();
+    if (!accountId) return c.json({ success: false, error: 'accountId query param required' }, 400);
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
+    const media = await getMediaById(c.env.DB, c.req.param('id'), accountId);
+    if (!media) return c.json({ success: false, error: 'Not found' }, 404);
+    const folder = media.folder_id ? await getFolderById(c.env.DB, media.folder_id) : null;
+    const folderName = folder
+      && folder.kind === 'media'
+      && (folder.account_id === null || folder.account_id === accountId)
+      ? folder.name
+      : null;
+    const workerUrl = c.env.WORKER_URL || new URL(c.req.url).origin;
+    return c.json({
+      success: true,
+      data: { item: serializeMedia(media, workerUrl), folderName },
+    });
+  } catch (err) {
+    console.error('GET /api/media/:id error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+/**
  * 管理画面がメディアの中身を読むための共通処理。
  *
  * 一覧が返す `url` は配信用の公開URL（配信本文に文字列として埋まり、
