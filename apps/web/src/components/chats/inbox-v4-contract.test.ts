@@ -96,12 +96,15 @@ describe('受信箱V4の画面契約', () => {
     expect(PAGE).toContain('新しい順')
   })
 
-  it('メール表示と並び順の形をLINEにそろえる', () => {
+  it('メール表示と固定の並び順をLINEにそろえる', () => {
     expect(PAGE).toContain('MAIL')
     expect(PAGE).toContain('aria-label={item.label}')
     expect(PAGE).toContain("{item.key === 'all' && item.label}")
     expect(PAGE).not.toContain('{item.label}\n                </button>')
-    expect(PAGE).toContain('aria-label="並び順"')
+    expect(PAGE).toContain('data-inbox-sort="fixed"')
+    expect(PAGE).toContain('並び順：新しい順')
+    expect(PAGE).not.toContain('aria-label="並び順"')
+    expect(PAGE).not.toContain('defaultValue="newest"')
     expect(PAGE).toContain('shrink-0 items-center')
     expect(PAGE).toContain('whitespace-nowrap')
     expect(PAGE).not.toContain('新しい順⌄')

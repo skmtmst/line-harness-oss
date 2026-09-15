@@ -1,11 +1,19 @@
 'use client'
 
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
-import type { MediaDeleteImpact, MediaDeleteImpactReference, MediaItem } from '@line-crm/shared'
+import type { MediaDeleteImpactReference, MediaItem } from '@line-crm/shared'
 import { ApiError, api, type MediaVersionPreview } from '@/lib/api'
 import Button from '@/components/shared/button'
+import Select from '@/components/shared/select'
 import { formatMediaSize } from './media-usage-display'
 import { checkedAtText, referenceKindText, referenceNameText } from './media-delete-impact'
+import {
+  setMediaUsageReference,
+  type MediaUsageImpact,
+  type MediaUsageReferenceItem,
+  type MediaUsageReferenceState,
+  type MediaUsageReferenceTarget,
+} from './media-usage-references'
 import {
   fileMatchesMediaKind,
   mediaAcceptForKind,
@@ -44,10 +52,36 @@ function mediaDimensions(item: MediaItem): string {
   return '—（未取得）'
 }
 
+/** 使用先の今の参照方法を短い言葉で。切替選択肢の現在値でも使う。 */
+function usageModeText(reference: MediaUsageReferenceState | null): string {
+  if (!reference) return '参照方法は未取得'
+  switch (reference.mode) {
+    case 'live':
+      return '常に最新版（ライブ参照）'
+    case 'pinned':
+      return `第${reference.versionNo ?? '?'}版に固定`
+    case 'mixed':
+      return '複数の参照が混在しています'
+    case 'unknown':
+      return '参照の形を判別できません'
+    default:
+      return '参照の形を判別できません'
+  }
+}
+
+/** 切替セレクトの現在値。ライブ・固定以外は選択肢を出さない。 */
+function usageSelectValue(reference: MediaUsageReferenceState | null): string | null {
+  if (!reference) return null
+  if (reference.mode === 'live') return 'live'
+  if (reference.mode === 'pinned' && reference.versionNo != null) return `v:${reference.versionNo}`
+  return null
+}
+
 export default function MediaDetailDialog({
   item,
   accountId,
   folderName,
+  canManage,
   onClose,
   onOpenReplacement,
   onVersionCreated,
@@ -55,13 +89,17 @@ export default function MediaDetailDialog({
   item: MediaItem | null
   accountId: string | null
   folderName: string
+  /** owner/admin のみ true。staff には押して失敗する口を見せない。 */
+  canManage: boolean
   onClose: () => void
   onOpenReplacement: (item: MediaItem) => void
   onVersionCreated: (message: string) => void
 }) {
   const fileInputId = useId()
   const requestRef = useRef(0)
-  const [impact, setImpact] = useState<MediaDeleteImpact | null>(null)
+  const [impact, setImpact] = useState<MediaUsageImpact | null>(null)
+  const [usageSwitching, setUsageSwitching] = useState<string | null>(null)
+  const [usageError, setUsageError] = useState('')
   const [phase, setPhase] = useState<'loading' | 'ready' | 'error'>('loading')
   const [versionFile, setVersionFile] = useState<File | null>(null)
   const [versionPhase, setVersionPhase] = useState<'idle' | 'uploading' | 'preview' | 'publishing' | 'error'>('idle')
@@ -104,16 +142,47 @@ export default function MediaDetailDialog({
     requestRef.current = request
     setImpact(null)
     setPhase('loading')
+    setUsageError('')
     try {
       const response = await api.media.deleteImpact(item.id, accountId)
       if (requestRef.current !== request) return
       if (!response.success) throw new Error('impact_failed')
-      setImpact(response.data)
+      // 応答には使用先ごとの参照モードと版一覧が足されている。
+      setImpact(response.data as MediaUsageImpact)
       setPhase('ready')
     } catch {
       if (requestRef.current === request) setPhase('error')
     }
   }, [accountId, item])
+
+  /** 1つの使用先だけを、ライブ参照または指定した版へ切り替える。 */
+  async function switchUsageReference(reference: MediaUsageReferenceItem, value: string) {
+    if (!item || !accountId || !reference.refKind || !reference.refId || usageSwitching) return
+    let target: MediaUsageReferenceTarget | null = null
+    if (value === 'live') {
+      target = { refKind: reference.refKind, refId: reference.refId, mode: 'live' }
+    } else if (value.startsWith('v:')) {
+      const versionNo = Number.parseInt(value.slice(2), 10)
+      if (Number.isInteger(versionNo) && versionNo >= 1) {
+        target = { refKind: reference.refKind, refId: reference.refId, mode: 'pinned', versionNo }
+      }
+    }
+    if (!target) return
+    const request = `${reference.refKind}:${reference.refId}`
+    setUsageSwitching(request)
+    setUsageError('')
+    try {
+      const response = await setMediaUsageReference(item.id, accountId, target)
+      if (!response.success) throw new Error(response.error)
+      await loadImpact()
+    } catch (caught) {
+      setUsageError(caught instanceof ApiError || caught instanceof Error
+        ? caught.message
+        : '参照方法を切り替えられませんでした')
+    } finally {
+      setUsageSwitching(null)
+    }
+  }
 
   useEffect(() => {
     void loadImpact()
@@ -354,17 +423,50 @@ export default function MediaDetailDialog({
               </div>
             ) : impact && impact.references.length > 0 ? (
               <ul className="mt-3 space-y-2">
-                {impact.references.map((reference: MediaDeleteImpactReference, index) => (
-                  <li key={`${reference.kind}-${index}`} className="border-hairline rounded-control border p-3 text-xs">
-                    <p className="text-ink font-semibold">{referenceKindText(reference.kind)}「{referenceNameText(reference)}」</p>
-                    <p className="text-ink-faint mt-1">場所・版・予約状態は未取得</p>
-                    {reference.href ? <a href={reference.href} className="text-action mt-2 inline-flex font-semibold">ここを開く</a> : <p className="text-ink-faint mt-2">この画面からは開けません</p>}
-                  </li>
-                ))}
+                {impact.references.map((reference: MediaDeleteImpactReference, index) => {
+                  const usage = reference as MediaUsageReferenceItem
+                  const selectValue = usageSelectValue(usage.reference)
+                  const canSwitch = canManage
+                    && usage.state === 'available'
+                    && usage.refKind !== null
+                    && usage.refId !== null
+                    && usage.refKind !== 'webinar'
+                    && selectValue !== null
+                  const options = [
+                    ...(usage.refKind === 'rich_menu' ? [] : [{ value: 'live', label: '常に最新版（ライブ参照）' }]),
+                    ...(impact.versions ?? []).map((version) => ({
+                      value: `v:${version.versionNo}`,
+                      label: `第${version.versionNo}版に固定${version.isCurrent ? '（最新）' : ''}`,
+                    })),
+                  ]
+                  const itemKey = `${usage.refKind}:${usage.refId}`
+                  return (
+                    <li key={`${reference.kind}-${index}`} className="border-hairline rounded-control border p-3 text-xs">
+                      <p className="text-ink font-semibold">{referenceKindText(reference.kind)}「{referenceNameText(reference)}」</p>
+                      <p className="text-ink-faint mt-1">{usageModeText(usage.reference)}</p>
+                      {canSwitch ? (
+                        <div className="mt-2">
+                          <Select
+                            aria-label="この場所の参照方法"
+                            value={selectValue}
+                            options={options}
+                            onChange={(value) => void switchUsageReference(usage, value)}
+                            disabled={usageSwitching !== null}
+                          />
+                          {usageSwitching === itemKey ? (
+                            <p className="text-ink-faint mt-1" aria-live="polite">切り替えています…</p>
+                          ) : null}
+                        </div>
+                      ) : null}
+                      {reference.href ? <a href={reference.href} className="text-action mt-2 inline-flex font-semibold">ここを開く</a> : <p className="text-ink-faint mt-2">この画面からは開けません</p>}
+                    </li>
+                  )
+                })}
               </ul>
             ) : (
               <p className="text-ink-faint mt-3 text-xs">どこでも使われていません。</p>
             )}
+            {usageError ? <p className="text-danger mt-3 text-xs" role="alert">{usageError}</p> : null}
             {impact ? <p className="text-ink-faint mt-3 text-xs">{checkedAtText(impact.checkedAt)} 時点で確認</p> : null}
             {impact && impact.usageCount > 0 ? (
               <p className="text-ink-faint mt-3 text-xs leading-5">使われているあいだは削除できません。先にこの{impact.usageCount}か所から外してください。</p>

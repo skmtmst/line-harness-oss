@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const dbMocks = {
   getMediaUsageScanState: vi.fn(),
+  getMediaUsageMatchTokens: vi.fn(async () => [] as string[]),
+  getMediaUsageMatchTokenMap: vi.fn(async () => new Map<string, string[]>()),
   recordMediaUsage: vi.fn(),
   recordMediaUsages: vi.fn(),
   pruneStaleMediaUsages: vi.fn(),
@@ -43,11 +45,12 @@ function makeDb(
                     .slice(0, limit),
                 };
               }
-              const key = String(binds[0] ?? '').replaceAll('%', '');
+              const keys = binds.map((bind) => String(bind).replaceAll('%', ''));
               return {
                 results: sourceRows[table]
                   .filter((row) => Object.values(row).some(
-                    (value) => typeof value === 'string' && value.includes(key),
+                    (value) => typeof value === 'string'
+                      && keys.some((key) => value.includes(key)),
                   ))
                   .map((row) => ({ ref_id: row.ref_id })),
               };
