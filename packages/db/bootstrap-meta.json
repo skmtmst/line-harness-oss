@@ -357,7 +357,9 @@
     "396_line_account_profile.sql",
     "397_operation_dispatcher_heartbeats.sql",
     "398_event_versions_and_booking_expiry.sql",
-    "399_operation_alert_lifecycle.sql"
+    "399_operation_alert_lifecycle.sql",
+    "400_rich_menu_manual_publish_idempotency.sql",
+    "401_rich_menu_manual_publish_execution_token.sql"
   ],
-  "migrationCount": 358
+  "migrationCount": 360
 }

@@ -57,6 +57,14 @@ function patchGenre(id: string, body: unknown) {
 
 beforeEach(() => vi.clearAllMocks());
 
+function deleteRoute(id: string, confirmationName?: string) {
+  return app.fetch(new Request(`https://example.com/api/entry-routes/${id}`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: confirmationName === undefined ? undefined : JSON.stringify({ confirmationName }),
+  }), env);
+}
+
 describe('POST /api/entry-routes', () => {
   it('creates a named link inside a genre', async () => {
     mocks.createEntryRoute.mockResolvedValue({
@@ -137,6 +145,99 @@ describe('entry route tenant scope', () => {
     }), env);
     expect(response.status).toBe(404);
     expect(mocks.deleteEntryRoute).not.toHaveBeenCalled();
+  });
+});
+
+describe('DELETE /api/entry-routes/:id safety', () => {
+  const ownRoute = {
+    id: 'route-a', ref_code: 'a-ref', genre: null, name: '店頭QR', tag_id: null,
+    scenario_id: null, redirect_url: null, pool_id: null, intro_template_id: null,
+    run_account_friend_add_scenarios: 1, is_active: 1, tenant_id: 'tenant-a',
+    line_account_id: 'account-a', created_at: '2026-09-16', updated_at: '2026-09-16',
+  };
+
+  beforeEach(() => {
+    mocks.getEntryRouteById.mockResolvedValue(ownRoute);
+    mocks.getLineAccountScopeEntries.mockResolvedValue([
+      { id: 'account-a', tenant_id: 'tenant-a' },
+    ] as never);
+  });
+
+  it('経路名の欠落・不一致は422で、DB削除を呼ばない', async () => {
+    expect((await deleteRoute(ownRoute.id)).status).toBe(422);
+    const mismatch = await deleteRoute(ownRoute.id, '店頭ＱＲ');
+    expect(mismatch.status).toBe(422);
+    expect(await mismatch.json()).toMatchObject({
+      code: 'ENTRY_ROUTE_NAME_CONFIRMATION_MISMATCH',
+    });
+    expect(mocks.deleteEntryRoute).not.toHaveBeenCalled();
+  });
+
+  it('不正JSONも422へ倒し、DB削除を呼ばない', async () => {
+    const response = await app.fetch(new Request(`https://example.com/api/entry-routes/${ownRoute.id}`, {
+      method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: '{',
+    }), env);
+    expect(response.status).toBe(422);
+    expect(await response.json()).toMatchObject({
+      code: 'ENTRY_ROUTE_NAME_CONFIRMATION_MISMATCH',
+    });
+    expect(mocks.deleteEntryRoute).not.toHaveBeenCalled();
+  });
+
+  it('利用履歴ありは409で、停止を案内して経路を残す', async () => {
+    mocks.deleteEntryRoute.mockResolvedValue('in_use');
+    const response = await deleteRoute(ownRoute.id, ownRoute.name);
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({
+      code: 'ENTRY_ROUTE_IN_USE',
+      error: expect.stringContaining('受付停止'),
+    });
+    expect(mocks.deleteEntryRoute).toHaveBeenCalledWith(env.DB, ownRoute.id, ownRoute.name);
+  });
+
+  it('未利用かつ現在名が完全一致した場合だけ200にする', async () => {
+    mocks.deleteEntryRoute.mockResolvedValue('deleted');
+    const response = await deleteRoute(ownRoute.id, ownRoute.name);
+    expect(response.status).toBe(200);
+  });
+
+  it('別accountの実在経路は404で、削除を呼ばない', async () => {
+    mocks.getEntryRouteById.mockResolvedValue({ ...ownRoute, line_account_id: 'account-b' });
+    const response = await deleteRoute(ownRoute.id, ownRoute.name);
+    expect(response.status).toBe(404);
+    expect(mocks.deleteEntryRoute).not.toHaveBeenCalled();
+  });
+
+  it('別accountの経路は受付停止への更新も0件にする', async () => {
+    mocks.getEntryRouteById.mockResolvedValue({ ...ownRoute, line_account_id: 'account-b' });
+    const response = await app.fetch(new Request(`https://example.com/api/entry-routes/${ownRoute.id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ isActive: false }),
+    }), env);
+    expect(response.status).toBe(404);
+    expect(mocks.updateEntryRoute).not.toHaveBeenCalled();
+  });
+
+  it('staff権限は完全削除・受付停止とも実在経路を読まず、書き込み0件にする', async () => {
+    const staffApp = new Hono<Env>();
+    staffApp.use('*', async (c, next) => {
+      c.set('staff', { id: 'staff-1', name: 'Staff', role: 'staff', readOnly: false, tenantId: 'tenant-a' });
+      return next();
+    });
+    staffApp.route('/', entryRoutes);
+    const deletion = await staffApp.fetch(new Request(`https://example.com/api/entry-routes/${ownRoute.id}`, {
+      method: 'DELETE', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ confirmationName: ownRoute.name }),
+    }), env);
+    const stop = await staffApp.fetch(new Request(`https://example.com/api/entry-routes/${ownRoute.id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ isActive: false }),
+    }), env);
+    expect(deletion.status).toBe(403);
+    expect(stop.status).toBe(403);
+    expect(mocks.getEntryRouteById).not.toHaveBeenCalled();
+    expect(mocks.deleteEntryRoute).not.toHaveBeenCalled();
+    expect(mocks.updateEntryRoute).not.toHaveBeenCalled();
   });
 });
 
