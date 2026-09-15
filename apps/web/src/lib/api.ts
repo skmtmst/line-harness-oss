@@ -8995,10 +8995,10 @@ export const api = {
     delete: (groupId: string) =>
       fetchApi<ApiResponse<null>>(`/api/rich-menu-groups/${groupId}`, { method: 'DELETE' }),
 
-    publish: (groupId: string) =>
+    publish: (groupId: string, idempotencyKey: string) =>
       fetchApi<ApiResponse<{ pages: Array<{ pageId: string; newRichMenuId: string }> }>>(
         `/api/rich-menu-groups/${groupId}/publish`,
-        { method: 'POST' },
+        { method: 'POST', headers: { 'Idempotency-Key': idempotencyKey } },
       ),
 
     unpublish: (groupId: string) =>

@@ -26,6 +26,12 @@ import {
   clearRichMenuAssignmentsForGroup,
   listRichMenuSchedulesByGroup,
   cancelRichMenuSchedule,
+  createRichMenuManualPublishRequestAtomic,
+  getRichMenuManualPublishShells,
+  markRichMenuManualPublishFailed,
+  markRichMenuManualPublishSucceeded,
+  recordRichMenuManualPublishShells,
+  restartRichMenuManualPublishRequest,
   jstNow,
   type RichMenuGroup,
   type RichMenuGroupWithPages,
@@ -52,7 +58,9 @@ import {
   type SegmentCondition,
 } from '../services/segment-query.js';
 import {
-  publishRichMenuGroup,
+  createRichMenuShells,
+  switchRichMenuLive,
+  deleteRichMenuShells,
   unpublishRichMenuGroup,
   linkRichMenuBulkChunked,
   PublishLeaseLostError,
@@ -116,6 +124,51 @@ function serializeGroupWithPages(row: RichMenuGroupWithPages) {
       })),
     })),
   };
+}
+
+/**
+ * 同じ公開操作かを比べる版。公開の結果として変わるstatus・updatedAt・LINEのIDは
+ * 含めない。ここに含めると成功済み応答を再生するだけの押し直しまで409になる。
+ */
+function manualPublishFingerprint(row: RichMenuGroupWithPages): string {
+  return JSON.stringify({
+    id: row.id,
+    accountId: row.account_id,
+    name: row.name,
+    chatBarText: row.chat_bar_text,
+    size: row.size,
+    defaultPageId: row.default_page_id,
+    isDefaultForAll: row.is_default_for_all === 1,
+    targetingCondition: row.targeting_condition,
+    targetingPriority: row.targeting_priority,
+    targetingEnabled: row.targeting_enabled === 1,
+    folderId: row.folder_id,
+    displayOrder: row.display_order,
+    pages: row.pages.map((page) => ({
+      id: page.id,
+      orderIndex: page.order_index,
+      name: page.name,
+      aliasId: page.alias_id,
+      imageR2Key: page.image_r2_key,
+      imageContentType: page.image_content_type,
+      areas: page.areas.map((area) => ({
+        id: area.id,
+        boundsX: area.bounds_x,
+        boundsY: area.bounds_y,
+        boundsWidth: area.bounds_width,
+        boundsHeight: area.bounds_height,
+        actionType: area.action_type,
+        actionData: area.actionData,
+        intent: area.intent,
+        label: area.label,
+        tagIds: area.tagIds,
+        scoreChange: area.score_change,
+        templateId: area.template_id,
+        formId: area.form_id,
+        trackedLinkId: area.tracked_link_id,
+      })),
+    })),
+  });
 }
 
 type ExternalLineArea = {
@@ -1692,25 +1745,56 @@ richMenuGroups.post('/api/rich-menu-groups/:groupId/publish', requireRole('owner
   if (!group || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [group.account_id])) {
     return c.json({ success: false, error: 'not found' }, 404);
   }
-  // 有効なlease保持中だけ409。期限切れ・旧形式の残留は取得時に回収される。
+  const idempotencyKey = c.req.header('Idempotency-Key')?.trim();
+  if (!idempotencyKey) {
+    return c.json({ success: false, error: 'Idempotency-Key header required' }, 400);
+  }
+  const fingerprint = manualPublishFingerprint(group);
+  const requestResult = await createRichMenuManualPublishRequestAtomic(c.env.DB, {
+    id: crypto.randomUUID(),
+    groupId,
+    accountId: group.account_id,
+    definitionSnapshot: JSON.stringify(serializeGroupWithPages(group)),
+    requestFingerprint: fingerprint,
+    idempotencyKey,
+    requestedByStaffId: c.get('staff').id,
+    now: jstNow(),
+  });
+  if (requestResult.outcome === 'conflict') {
+    return c.json({ success: false, error: 'Idempotency-Key is already used with different content' }, 409);
+  }
+  const request = requestResult.request;
+  if (request.status === 'succeeded') {
+    try {
+      return c.json({ success: true, data: JSON.parse(request.result_json ?? '') }, 200, {
+        'Idempotency-Replayed': 'true',
+      });
+    } catch {
+      // 成功済み行の壊れた応答を直すためにLINEを再実行してはいけない。
+      return c.json({ success: false, error: '公開結果を再取得できません。最新状態を確認してください。' }, 500);
+    }
+  }
+  if (request.status === 'failed') await restartRichMenuManualPublishRequest(c.env.DB, request.id);
+
+  // 有効なlease保持中だけ409。ここで止まった同keyは、lease解放後に同じjournalから再開できる。
   if (await isPublishLeaseHeld(c.env.DB, groupId, new Date().toISOString())) {
     return c.json({ success: false, error: 'already publishing' }, 409);
   }
-
   const account = await getLineAccountById(c.env.DB, group.account_id);
   if (!account) return c.json({ success: false, error: 'line account not found' }, 500);
 
-  // 手動公開も予約実行と同じlease取得関数を使う(所有者付き・期限付き・世代付き)。
-  const publishOwner = `manual-${crypto.randomUUID()}`;
-  const publishGeneration = await acquirePublishLease(
-    c.env.DB, groupId, publishOwner, new Date().toISOString(),
-  );
-  if (publishGeneration === null) {
-    return c.json({ success: false, error: 'failed to acquire publish lock' }, 409);
-  }
+  const publishOwner = `manual-${request.id}`;
+  const publishGeneration = await acquirePublishLease(c.env.DB, groupId, publishOwner, new Date().toISOString());
+  if (publishGeneration === null) return c.json({ success: false, error: 'failed to acquire publish lock' }, 409);
   const publishFence = { owner: publishOwner, generation: publishGeneration };
 
   try {
+    // lease取得前後の下書き更新を必ず拒否する。古い版を作成・切替しない。
+    const latestGroup = await getRichMenuGroupWithPages(c.env.DB, groupId);
+    if (!latestGroup || manualPublishFingerprint(latestGroup) !== fingerprint) {
+      await releasePublishLease(c.env.DB, groupId, publishFence);
+      return c.json({ success: false, error: '公開対象が更新されました。画面を更新してからもう一度お試しください。' }, 409);
+    }
     const line = createLineClient(account.channel_access_token);
     const r2Adapter: R2Like = {
       async get(key) {
@@ -1719,89 +1803,71 @@ richMenuGroups.post('/api/rich-menu-groups/:groupId/publish', requireRole('owner
         return { body: obj.body as ReadableStream };
       },
     };
-    // 「URLを開く」で計測リンクを選んでいるボタンの、実際の飛び先をまとめて引く。
     const trackedLinkUrls = await resolveTrackedLinkUrls(
       c.env.DB,
-      () =>
-        resolveTrackedLinkBaseUrl(c.env.DB, c.env.WORKER_URL || new URL(c.req.url).origin),
-      group,
+      () => resolveTrackedLinkBaseUrl(c.env.DB, c.env.WORKER_URL || new URL(c.req.url).origin),
+      latestGroup,
     );
-    // 「回答フォームを開く」の飛び先。アカウント固有の LIFF を優先する
-    // (共通 LIFF に飛ばすと、未同意のチャネルで同意画面が出てしまう)。
-    const formBaseUrl = account.liff_id
-      ? `https://liff.line.me/${account.liff_id}`
-      : (c.env.LIFF_URL ?? null);
-
+    const formBaseUrl = account.liff_id ? `https://liff.line.me/${account.liff_id}` : (c.env.LIFF_URL ?? null);
     const groupInput: GroupInput = {
-      id: group.id,
-      size: group.size,
-      chatBarText: group.chat_bar_text,
-      isDefaultForAll: group.is_default_for_all === 1,
+      id: latestGroup.id,
+      size: latestGroup.size,
+      chatBarText: latestGroup.chat_bar_text,
+      isDefaultForAll: latestGroup.is_default_for_all === 1,
       formBaseUrl,
-      pages: group.pages.map((p) => ({
-        id: p.id,
-        orderIndex: p.order_index,
-        name: p.name,
-        imageR2Key: p.image_r2_key,
-        imageContentType: p.image_content_type,
-        lineRichMenuId: p.line_richmenu_id,
+      pages: latestGroup.pages.map((p) => ({
+        id: p.id, orderIndex: p.order_index, name: p.name,
+        imageR2Key: p.image_r2_key, imageContentType: p.image_content_type, lineRichMenuId: p.line_richmenu_id,
         areas: p.areas.map((a) => ({
           id: a.id,
           bounds: { x: a.bounds_x, y: a.bounds_y, width: a.bounds_width, height: a.bounds_height },
-          actionType: a.action_type,
-          actionData: a.actionData,
-          intent: a.intent,
-          label: a.label,
-          tagIds: a.tagIds,
-          scoreChange: a.score_change,
-          templateId: a.template_id,
-          formId: a.form_id,
-          trackedLinkUrl: a.tracked_link_id
-            ? (trackedLinkUrls.get(a.tracked_link_id) ?? null)
-            : null,
+          actionType: a.action_type, actionData: a.actionData, intent: a.intent, label: a.label,
+          tagIds: a.tagIds, scoreChange: a.score_change, templateId: a.template_id, formId: a.form_id,
+          trackedLinkUrl: a.tracked_link_id ? (trackedLinkUrls.get(a.tracked_link_id) ?? null) : null,
         })),
       })),
     };
-    /*
-     * LINE への公開はページ数ぶんの作成・画像upload・alias切替・旧削除で
-     * 何分もかかる。その間ずっと lease を延ばさないと、自分が動いている最中に
-     * 期限切れで予約実行や別の手動公開に回収される。外部呼び出しの直前ごとに
-     * 実時刻で延ばし、失権していたらそこで止める。
-     */
     const heartbeat = async () => {
-      const alive = await renewPublishLease(
-        c.env.DB, groupId, publishFence, new Date().toISOString(),
-      );
+      const alive = await renewPublishLease(c.env.DB, groupId, publishFence, new Date().toISOString());
       if (!alive) throw new PublishLeaseLostError();
     };
-    const result = await publishRichMenuGroup(groupInput, line, r2Adapter, heartbeat);
-    for (const r of result.pages) {
-      // 札付きで書く。回収されていたら書かない(新しい所有者の反映を壊さない)。
-      if (!(await setPageRichMenuId(c.env.DB, r.pageId, r.newRichMenuId, publishFence))) {
+
+    let shells = await getRichMenuManualPublishShells(c.env.DB, request.id);
+    if (shells.length === 0) {
+      const created = await createRichMenuShells(groupInput, line, r2Adapter, heartbeat);
+      const oldByPage = new Map(latestGroup.pages.map((page) => [page.id, page.line_richmenu_id]));
+      await recordRichMenuManualPublishShells(c.env.DB, request.id, created.shells.map((shell) => ({
+        ...shell,
+        oldRichMenuId: oldByPage.get(shell.pageId) ?? null,
+      })));
+      shells = await getRichMenuManualPublishShells(c.env.DB, request.id);
+    }
+    if (shells.length !== latestGroup.pages.length || shells.some((shell) => !latestGroup.pages.some((page) => page.id === shell.page_id))) {
+      throw new Error('manual publish shell journal does not match the requested version');
+    }
+    await switchRichMenuLive(line, groupInput, shells.map((shell) => ({
+      pageId: shell.page_id, orderIndex: shell.order_index, newRichMenuId: shell.new_richmenu_id,
+    })), heartbeat);
+    for (const shell of shells) {
+      if (!(await setPageRichMenuId(c.env.DB, shell.page_id, shell.new_richmenu_id, publishFence))) {
         throw new PublishLeaseLostError();
       }
     }
-    // 確定と同時にleaseも空く(mark側で掃除)。空けてよいのは持ち主だけなので札を渡す。
-    // false は失権。ここを無視すると、書けていないのに成功と返してしまう。
-    if (!(await markRichMenuGroupPublished(c.env.DB, groupId, publishFence))) {
-      throw new PublishLeaseLostError();
-    }
-    // 確定と解放は別。ここまで来て初めて lease を手放す。
+    if (!(await markRichMenuGroupPublished(c.env.DB, groupId, publishFence))) throw new PublishLeaseLostError();
+    // 最初の版で控えた旧IDだけを消す。再開時に現在page行の新IDを旧IDと誤認しない。
+    await deleteRichMenuShells(line, shells.flatMap((shell) => shell.old_richmenu_id ? [shell.old_richmenu_id] : []));
+    const result = { pages: shells.map((shell) => ({ pageId: shell.page_id, newRichMenuId: shell.new_richmenu_id })) };
+    await markRichMenuManualPublishSucceeded(c.env.DB, request.id, JSON.stringify(result));
     await releasePublishLease(c.env.DB, groupId, publishFence);
     return c.json({ success: true, data: result });
   } catch (e) {
-    await releasePublishLease(c.env.DB, groupId, publishFence);
     const message = e instanceof Error ? e.message : String(e);
+    await markRichMenuManualPublishFailed(c.env.DB, request.id, message);
+    await releasePublishLease(c.env.DB, groupId, publishFence);
     if (e instanceof PublishLeaseLostError) {
-      // 別の公開に引き継がれた。成功扱いにはしない。
-      return c.json(
-        { success: false, error: '公開の担当が別の処理へ移りました。最新の状態を確認して、もう一度お試しください。' },
-        409,
-      );
+      return c.json({ success: false, error: '公開の担当が別の処理へ移りました。最新の状態を確認して、もう一度お試しください。' }, 409);
     }
-    if (e instanceof RichMenuValidationError) {
-      return c.json({ success: false, error: message }, 400);
-    }
+    if (e instanceof RichMenuValidationError) return c.json({ success: false, error: message }, 400);
     return c.json({ success: false, error: message }, 500);
   }
 });

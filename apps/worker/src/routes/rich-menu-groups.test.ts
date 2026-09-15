@@ -28,6 +28,12 @@ const dbMocks = {
   listRichMenuSchedulesByGroup: vi.fn(),
   cancelRichMenuSchedule: vi.fn(),
   createRichMenuScheduleAtomic: vi.fn((): Promise<any> => Promise.resolve({ outcome: 'created', id: 'new-schedule' })),
+  createRichMenuManualPublishRequestAtomic: vi.fn(),
+  getRichMenuManualPublishShells: vi.fn(),
+  markRichMenuManualPublishFailed: vi.fn(),
+  markRichMenuManualPublishSucceeded: vi.fn(),
+  recordRichMenuManualPublishShells: vi.fn(),
+  restartRichMenuManualPublishRequest: vi.fn(),
 };
 vi.mock('@line-crm/db', () => dbMocks);
 
@@ -127,6 +133,10 @@ beforeEach(() => {
   dbMocks.clearRichMenuAssignmentsForGroup.mockResolvedValue(undefined);
   dbMocks.jstNow.mockReturnValue('2026-09-07T12:00:00.000');
   dbMocks.createRichMenuScheduleAtomic.mockResolvedValue({ outcome: 'created', id: 'new-schedule' });
+  dbMocks.createRichMenuManualPublishRequestAtomic.mockResolvedValue({
+    outcome: 'created', request: { id: 'manual-1', status: 'running' },
+  });
+  dbMocks.getRichMenuManualPublishShells.mockResolvedValue([]);
 });
 
 // ----- GET /api/rich-menu-groups -----
@@ -1138,9 +1148,42 @@ describe('POST /api/rich-menu-groups/:groupId/publish', () => {
     // 有効なlease保持中だけ409。旧形式の残留だけでは塞がない。
     dbMocks.isPublishLeaseHeld.mockResolvedValue(true);
     const app = setupApp();
-    const res = await app.request('/api/rich-menu-groups/g1/publish', { method: 'POST' });
+    const res = await app.request('/api/rich-menu-groups/g1/publish', {
+      method: 'POST', headers: { 'Idempotency-Key': 'manual-publish-1' },
+    });
     expect(res.status).toBe(409);
     // 期限切れでない他人所有は取りに行かない。
+    expect(dbMocks.acquirePublishLease).not.toHaveBeenCalled();
+  });
+
+  test('同じkeyの成功済み公開はLINEを再実行せず結果を再生する', async () => {
+    dbMocks.getRichMenuGroupWithPages.mockResolvedValue({
+      id: 'g1', account_id: 'a', name: 'x', chat_bar_text: 'x', size: 'large', pages: [],
+      default_page_id: null, is_default_for_all: 0, status: 'published', created_at: '', updated_at: '',
+    });
+    dbMocks.createRichMenuManualPublishRequestAtomic.mockResolvedValue({
+      outcome: 'existing', request: { id: 'manual-1', status: 'succeeded', result_json: JSON.stringify({ pages: [] }) },
+    });
+    const res = await setupApp().request('/api/rich-menu-groups/g1/publish', {
+      method: 'POST', headers: { 'Idempotency-Key': 'manual-publish-replay' },
+    });
+    expect(res.status).toBe(200);
+    expect(res.headers.get('Idempotency-Replayed')).toBe('true');
+    expect(dbMocks.acquirePublishLease).not.toHaveBeenCalled();
+  });
+
+  test('同じkeyを別版へ使った場合は409でLINEを実行しない', async () => {
+    dbMocks.getRichMenuGroupWithPages.mockResolvedValue({
+      id: 'g1', account_id: 'a', name: 'x', chat_bar_text: 'x', size: 'large', pages: [],
+      default_page_id: null, is_default_for_all: 0, status: 'draft', created_at: '', updated_at: '',
+    });
+    dbMocks.createRichMenuManualPublishRequestAtomic.mockResolvedValue({
+      outcome: 'conflict', request: { id: 'manual-1', status: 'running' },
+    });
+    const res = await setupApp().request('/api/rich-menu-groups/g1/publish', {
+      method: 'POST', headers: { 'Idempotency-Key': 'manual-publish-conflict' },
+    });
+    expect(res.status).toBe(409);
     expect(dbMocks.acquirePublishLease).not.toHaveBeenCalled();
   });
 
@@ -1169,7 +1212,9 @@ describe('POST /api/rich-menu-groups/:groupId/publish', () => {
     dbMocks.acquirePublishLease.mockResolvedValue(1);
 
     const app = setupApp();
-    const res = await app.request('/api/rich-menu-groups/gid12345-aaaa/publish', { method: 'POST' });
+    const res = await app.request('/api/rich-menu-groups/gid12345-aaaa/publish', {
+      method: 'POST', headers: { 'Idempotency-Key': 'manual-publish-2' },
+    });
     expect(res.status).toBe(400);
     await expect(res.json()).resolves.toEqual({
       success: false,
@@ -1209,7 +1254,9 @@ describe('POST /api/rich-menu-groups/:groupId/publish', () => {
     dbMocks.acquirePublishLease.mockResolvedValue(1);
 
     const app = setupApp();
-    const res = await app.request('/api/rich-menu-groups/gid12345-aaaa/publish', { method: 'POST' });
+    const res = await app.request('/api/rich-menu-groups/gid12345-aaaa/publish', {
+      method: 'POST', headers: { 'Idempotency-Key': 'manual-publish-3' },
+    });
     expect(res.status).toBe(500);
     expect(dbMocks.releasePublishLease).toHaveBeenCalledWith(
       expect.anything(),

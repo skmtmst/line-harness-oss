@@ -252,6 +252,8 @@ function Editor({
   }
 
   const fileInput = useRef<HTMLInputElement>(null)
+  // LINEへの公開は結果が届くまで同じ鍵で再試行する。成功後の次の公開だけ新しい鍵にする。
+  const publishIdempotencyKey = useRef<string | null>(null)
 
   const reload = useCallback(async () => {
     setLoading(true)
@@ -522,10 +524,13 @@ function Editor({
     try {
       await persistDraft()
       draftSaved = true
-      const res = await api.richMenuGroups.publish(groupId)
+      const idempotencyKey = publishIdempotencyKey.current ?? crypto.randomUUID()
+      publishIdempotencyKey.current = idempotencyKey
+      const res = await api.richMenuGroups.publish(groupId, idempotencyKey)
       // 失敗を握りつぶさない。返事を見ずに閉じると、登録できていないのに
       // 終わったように見える。
       if (!res.success) throw new Error(res.error ?? 'publish failed')
+      publishIdempotencyKey.current = null
       setConfirmKind(null)
       setNotice('LINEへの登録が終わりました。友だちのトーク画面に出すには、一覧の「友だちに表示」を実行してください。')
       await reload()
