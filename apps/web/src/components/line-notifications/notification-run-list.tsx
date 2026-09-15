@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ApiError, api, type EcNotificationRun, type EcNotificationRunList } from '@/lib/api'
+import { ApiError, api, fetchApi, type EcNotificationRun, type EcNotificationRunList } from '@/lib/api'
 import Button from '@/components/shared/button'
 import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
@@ -12,6 +12,22 @@ import SummaryCard from '@/components/shared/summary-card'
 import { DataTable, NameCell, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 
 const PAGE_SIZE = 20
+
+type DeliveryAttempt = {
+  number: number
+  outcome: 'provider_accepted' | 'retry_wait' | 'failed'
+  attemptedAt: string
+  providerRequestId: string | null
+  errorCode: string | null
+  error: string | null
+}
+
+type NotificationRunItem = EcNotificationRun & {
+  resolved?: boolean
+  resolvedAt?: string | null
+  resolvedBy?: string | null
+  attemptHistory?: DeliveryAttempt[]
+}
 
 const STATUS_LABEL: Record<EcNotificationRun['status'], string> = {
   pending: '送信処理中',
@@ -112,6 +128,10 @@ export type NotificationRunPorts = {
   deliveries: typeof api.lineNotifications.deliveries
   notificationRuns: typeof api.ecCommerce.notificationRuns
   retryDelivery: typeof api.lineNotifications.retryDelivery
+  resolveDelivery: (
+    id: string,
+    data: { lineAccountId: string; expectedVersion: number; resolved: boolean },
+  ) => Promise<{ success: true; data: { id: string; resolved: boolean; version: number } }>
 }
 
 /**
@@ -121,6 +141,7 @@ export type NotificationRunPorts = {
  */
 export type NotificationRunEnv = {
   requestRef: { current: number }
+  mutationRef: { current: { generation: number; id: string } | null }
   scopeRef: { current: NotificationRunScope }
   ports: NotificationRunPorts
   setLoaded: (next: ScopedLoadState) => void
@@ -189,13 +210,25 @@ export async function loadNotificationRuns(env: NotificationRunEnv, params: Noti
 export type NotificationRunRetryParams = {
   generation: number
   lineAccountId: string | null
-  item: EcNotificationRun
+  item: NotificationRunItem
   reload: () => Promise<void>
+}
+
+export function retryNotificationErrorMessage(error: unknown): string {
+  if (!(error instanceof ApiError)) return '送信を再試行できませんでした。時間をおいて読み直してください。'
+  if (error.status === 403) return '送信の再試行は店長だけができます。'
+  if (error.code === 'quota_insufficient') return '今月の送信枠が足りないため、再試行を止めました。'
+  if (error.code === 'quota_unavailable') return '送信枠を確認できないため、再試行を止めました。'
+  if (error.code === 'retry_unavailable' || error.code === 'invalid_template') return error.message
+  if (error.status === 409) return 'ほかの担当者が先に再試行しました。最新の記録を読み直してください。'
+  return '送信を再試行できませんでした。時間をおいて読み直してください。'
 }
 
 export async function retryNotificationRun(env: NotificationRunEnv, params: NotificationRunRetryParams): Promise<void> {
   const { item, lineAccountId, generation } = params
   if (!lineAccountId || !item.retryAvailable) return
+  if (env.mutationRef.current?.generation === generation) return
+  env.mutationRef.current = { generation, id: item.id }
   /*
    * 再試行の応答は、押した時の世代へだけ返す。待っている間に世代が
    * 進んでいたら、知らせも読み直しも捨てる。env.scopeRef.current は
@@ -215,15 +248,58 @@ export async function retryNotificationRun(env: NotificationRunEnv, params: Noti
     await params.reload()
   } catch (error) {
     if (!isCurrent()) return
-    const text = error instanceof ApiError && error.status === 403
-      ? '送信の再試行は店長だけができます。'
-      : error instanceof ApiError && error.status === 409
-        ? 'ほかの担当者が先に再試行しました。最新の記録を読み直してください。'
-        : '送信を再試行できませんでした。時間をおいて読み直してください。'
+    const text = retryNotificationErrorMessage(error)
     env.setNotice({ generation, notice: { tone: 'error', text } })
   } finally {
+    if (env.mutationRef.current?.generation === generation && env.mutationRef.current.id === item.id) {
+      env.mutationRef.current = null
+    }
     // 切替後に別の行で始まった再試行の表示までは消さない。
     env.setRetrying((current) => (current.generation === generation && current.id === item.id ? { generation, id: null } : current))
+  }
+}
+
+export async function resolveNotificationRun(
+  env: NotificationRunEnv,
+  params: NotificationRunRetryParams & { resolved: boolean },
+): Promise<void> {
+  const { item, lineAccountId, generation, resolved } = params
+  if (!lineAccountId || (item.status !== 'failed' && item.status !== 'excluded')) return
+  if (env.mutationRef.current?.generation === generation) return
+  env.mutationRef.current = { generation, id: item.id }
+  const isCurrent = () => env.scopeRef.current.generation === generation
+  env.setRetrying(() => ({ generation, id: item.id }))
+  env.setNotice({ generation, notice: null })
+  try {
+    await env.ports.resolveDelivery(item.id, {
+      lineAccountId,
+      expectedVersion: item.recordVersion,
+      resolved,
+    })
+    if (!isCurrent()) return
+    env.setNotice({
+      generation,
+      notice: {
+        tone: 'success',
+        text: resolved ? 'この失敗を対応済みにしました。' : 'この失敗を未対応に戻しました。',
+      },
+    })
+    await params.reload()
+  } catch (error) {
+    if (!isCurrent()) return
+    const text = error instanceof ApiError && error.status === 403
+      ? '対応状態を変更する権限がありません。'
+      : error instanceof ApiError && error.status === 409
+        ? 'ほかの担当者が先に変更しました。最新の記録を読み直してください。'
+        : '対応状態を変更できませんでした。時間をおいて読み直してください。'
+    env.setNotice({ generation, notice: { tone: 'error', text } })
+  } finally {
+    if (env.mutationRef.current?.generation === generation && env.mutationRef.current.id === item.id) {
+      env.mutationRef.current = null
+    }
+    env.setRetrying((current) => (current.generation === generation && current.id === item.id
+      ? { generation, id: null }
+      : current))
   }
 }
 
@@ -261,14 +337,28 @@ export default function NotificationRunList({
   const [notice, setNotice] = useState<ScopedNotice>({ generation: -1, notice: null })
   // 再試行口は店長専用。担当者にはボタンを出さない。
   const [canRetry, setCanRetry] = useState(false)
+  const [canResolve, setCanResolve] = useState(false)
   const requestRef = useRef(0)
+  const mutationRef = useRef<{ generation: number; id: string } | null>(null)
   const env = useMemo<NotificationRunEnv>(() => ({
     requestRef,
+    mutationRef,
     scopeRef,
     ports: {
       deliveries: api.lineNotifications.deliveries,
       notificationRuns: api.ecCommerce.notificationRuns,
       retryDelivery: api.lineNotifications.retryDelivery,
+      resolveDelivery: (id, data) => fetchApi(
+        `/api/line-notifications/deliveries/${encodeURIComponent(id)}/retry`,
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            lineAccountId: data.lineAccountId,
+            expectedVersion: data.expectedVersion,
+            action: data.resolved ? 'resolve' : 'reopen',
+          }),
+        },
+      ),
     },
     setLoaded,
     setNotice,
@@ -278,7 +368,10 @@ export default function NotificationRunList({
   useEffect(() => {
     let active = true
     void api.staff.me().then((response) => {
-      if (active && response.success) setCanRetry(response.data.role === 'owner')
+      if (active && response.success) {
+        setCanRetry(response.data.role === 'owner')
+        setCanResolve(response.data.role === 'owner' || response.data.role === 'admin')
+      }
     }).catch(() => {})
     return () => { active = false }
   }, [])
@@ -298,10 +391,17 @@ export default function NotificationRunList({
 
   useEffect(() => { void load() }, [load])
 
-  const retry = (item: EcNotificationRun) => retryNotificationRun(env, {
+  const retry = (item: NotificationRunItem) => retryNotificationRun(env, {
     generation,
     lineAccountId,
     item,
+    reload: load,
+  })
+  const resolve = (item: NotificationRunItem, resolved: boolean) => resolveNotificationRun(env, {
+    generation,
+    lineAccountId,
+    item,
+    resolved,
     reload: load,
   })
 
@@ -313,7 +413,7 @@ export default function NotificationRunList({
   const scopedTotal = loaded.generation === generation ? loaded.total : 0
   const visibleNotice = notice.generation === generation ? notice.notice : null
   const visibleRetryingId = retrying.generation === generation ? retrying.id : null
-  const items = useMemo(() => scopedResult?.items ?? [], [scopedResult])
+  const items = useMemo(() => (scopedResult?.items ?? []) as NotificationRunItem[], [scopedResult])
   const summary = scopedResult?.summary ?? null
   const pageCount = Math.max(1, Math.ceil(scopedTotal / PAGE_SIZE))
   const summaryDetail = (ready: string): string => {
@@ -330,7 +430,7 @@ export default function NotificationRunList({
     status: filter,
     recipient: recipientFilter,
     period: periodFilter,
-  }), [filter, items, periodFilter, query, recipientFilter])
+  }) as NotificationRunItem[], [filter, items, periodFilter, query, recipientFilter])
   const listState = !lineAccountId
     ? 'account-required'
     : visibleState === 'ready' && items.length === 0
@@ -453,14 +553,43 @@ export default function NotificationRunList({
                   </Td>
                   <Td>
                     <span className="block text-sm leading-5 text-ink-secondary">{item.reason || '—'}</span>
+                    {item.resolved ? (
+                      <span className="mt-1 block text-xs font-semibold text-success">
+                        対応済み {formatJst(item.resolvedAt ?? null)}{item.resolvedBy ? `／${item.resolvedBy}` : ''}
+                      </span>
+                    ) : null}
+                    {(item.attemptHistory?.length ?? 0) > 0 ? (
+                      <details className="mt-2 text-xs text-ink-secondary">
+                        <summary className="cursor-pointer font-semibold text-accent">試行履歴を確認</summary>
+                        <ul className="mt-1 space-y-1">
+                          {item.attemptHistory!.map((attempt) => (
+                            <li key={`${item.id}-${attempt.number}`}>
+                              {attempt.number}回目 {formatJst(attempt.attemptedAt)}／
+                              {attempt.outcome === 'provider_accepted' ? 'LINE API受付済み' : attempt.error || '送信失敗'}
+                            </li>
+                          ))}
+                        </ul>
+                      </details>
+                    ) : null}
                     {mode === 'failures' && item.friendId ? (
                       <Link href={`/chats?friend=${encodeURIComponent(item.friendId)}`} className="mt-1 inline-block whitespace-nowrap text-xs font-semibold text-accent hover:underline">
                         受信箱で連絡
                       </Link>
                     ) : null}
                     {mode === 'failures' && item.retryAvailable && canRetry ? (
-                      <Button className="mt-2" disabled={visibleRetryingId === item.id} onClick={() => void retry(item)}>
+                      <Button className="mt-2" disabled={visibleRetryingId !== null} onClick={() => void retry(item)}>
                         {visibleRetryingId === item.id ? '再試行中' : '送信を再試行'}
+                      </Button>
+                    ) : null}
+                    {mode === 'failures' && canResolve ? (
+                      <Button
+                        className="mt-2"
+                        disabled={visibleRetryingId !== null}
+                        onClick={() => void resolve(item, !item.resolved)}
+                      >
+                        {visibleRetryingId === item.id
+                          ? '保存中'
+                          : item.resolved ? '未対応に戻す' : '対応済みにする'}
                       </Button>
                     ) : null}
                   </Td>

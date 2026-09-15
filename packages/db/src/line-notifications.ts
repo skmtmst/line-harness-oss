@@ -272,6 +272,19 @@ export interface NotificationDeliveryListRow {
   definition_version: number | null;
   friend_name: string | null;
   clicked_at: string | null;
+  resolution_action: 'resolved' | 'reopened' | null;
+  resolved_at: string | null;
+  resolved_by_name: string | null;
+}
+
+export interface NotificationDeliveryAttemptRow {
+  delivery_id: string;
+  attempt_number: number;
+  outcome: 'provider_accepted' | 'retry_wait' | 'failed';
+  provider_request_id: string | null;
+  error_code: string | null;
+  error_message_safe: string | null;
+  attempted_at: string;
 }
 
 export async function listNotificationDeliveries(
@@ -287,6 +300,20 @@ export async function listNotificationDeliveries(
     : '';
   const [items, count, summary] = await Promise.all([
     db.prepare(`
+      WITH resolution_latest AS (
+        SELECT id, target_id, action, actor_id, created_at
+          FROM (
+            SELECT oa.*,
+                   ROW_NUMBER() OVER (
+                     PARTITION BY oa.target_id
+                     ORDER BY CAST(json_extract(oa.detail_json, '$.version') AS INTEGER) DESC,
+                              oa.created_at DESC, oa.id DESC
+                   ) AS row_number
+              FROM operation_audit oa
+             WHERE oa.target_kind = 'notification_delivery'
+               AND oa.action IN ('resolved', 'reopened')
+          ) WHERE row_number = 1
+      )
       SELECT d.id, d.audience_type, d.recipient_type, d.recipient_id, d.channel,
              d.status, d.retryable, d.attempts, d.next_retry_at, d.provider_status,
              d.error_code, d.error_message_safe, d.queued_at, d.accepted_at,
@@ -295,7 +322,10 @@ export async function listNotificationDeliveries(
              def.name AS definition_name, ver.version_number AS definition_version,
              CASE WHEN d.recipient_type = 'friend' THEN f.display_name ELSE NULL END AS friend_name,
              (SELECT MAX(x.clicked_at) FROM notification_interactions x
-               WHERE x.delivery_id = d.id) AS clicked_at
+               WHERE x.delivery_id = d.id) AS clicked_at,
+             resolution.action AS resolution_action,
+             CASE WHEN resolution.action = 'resolved' THEN resolution.created_at ELSE NULL END AS resolved_at,
+             CASE WHEN resolution.action = 'resolved' THEN resolver.name ELSE NULL END AS resolved_by_name
         FROM notification_deliveries d
         JOIN notification_instances i ON i.id = d.instance_id AND i.line_account_id = d.line_account_id
         LEFT JOIN customer_notification_definitions def
@@ -303,6 +333,8 @@ export async function listNotificationDeliveries(
         LEFT JOIN customer_notification_versions ver ON ver.id = i.definition_version_id
         LEFT JOIN friends f
           ON f.id = d.recipient_id AND f.line_account_id = d.line_account_id
+        LEFT JOIN resolution_latest resolution ON resolution.target_id = d.id
+        LEFT JOIN staff_members resolver ON resolver.id = resolution.actor_id
        WHERE d.line_account_id = ? ${filter}
        ORDER BY d.queued_at DESC, d.id DESC LIMIT ? OFFSET ?
     `).bind(input.lineAccountId, input.limit, input.offset).all<NotificationDeliveryListRow>(),
@@ -310,12 +342,29 @@ export async function listNotificationDeliveries(
                  WHERE d.line_account_id = ? ${filter}`)
       .bind(input.lineAccountId).first<{ count: number }>(),
     db.prepare(`
+      WITH resolution_latest AS (
+        SELECT target_id, action
+          FROM (
+            SELECT oa.target_id, oa.action,
+                   ROW_NUMBER() OVER (
+                     PARTITION BY oa.target_id
+                     ORDER BY CAST(json_extract(oa.detail_json, '$.version') AS INTEGER) DESC,
+                              oa.created_at DESC, oa.id DESC
+                   ) AS row_number
+              FROM operation_audit oa
+             WHERE oa.target_kind = 'notification_delivery'
+               AND oa.action IN ('resolved', 'reopened')
+          ) WHERE row_number = 1
+      )
       SELECT
-        SUM(CASE WHEN status = 'provider_accepted' THEN 1 ELSE 0 END) AS accepted,
-        SUM(CASE WHEN status IN ('retry_wait', 'failed') THEN 1 ELSE 0 END) AS failed,
-        SUM(CASE WHEN status = 'excluded' THEN 1 ELSE 0 END) AS excluded,
-        SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) AS pending
-      FROM notification_deliveries WHERE line_account_id = ?
+        SUM(CASE WHEN d.status = 'provider_accepted' THEN 1 ELSE 0 END) AS accepted,
+        SUM(CASE WHEN d.status IN ('retry_wait', 'failed')
+                  AND COALESCE(resolution.action, 'reopened') != 'resolved' THEN 1 ELSE 0 END) AS failed,
+        SUM(CASE WHEN d.status = 'excluded' THEN 1 ELSE 0 END) AS excluded,
+        SUM(CASE WHEN d.status = 'pending' THEN 1 ELSE 0 END) AS pending
+      FROM notification_deliveries d
+      LEFT JOIN resolution_latest resolution ON resolution.target_id = d.id
+      WHERE d.line_account_id = ?
     `).bind(input.lineAccountId).first<{
       accepted: number | null; failed: number | null; excluded: number | null; pending: number | null;
     }>(),
@@ -332,6 +381,32 @@ export async function listNotificationDeliveries(
   };
 }
 
+/** 表示中の送達だけに絞り、試行履歴をアカウント境界の内側でまとめて読む。 */
+export async function listNotificationDeliveryAttempts(
+  db: D1Database,
+  lineAccountId: string,
+  deliveryIds: string[],
+): Promise<NotificationDeliveryAttemptRow[]> {
+  if (deliveryIds.length === 0) return [];
+  // D1は1文100 bindまで。accountIdの1個を含めても余裕がある90件ずつで読む。
+  const chunks: string[][] = [];
+  for (let offset = 0; offset < deliveryIds.length; offset += 90) {
+    chunks.push(deliveryIds.slice(offset, offset + 90));
+  }
+  const results = await Promise.all(chunks.map(async (ids) => {
+    const placeholders = ids.map(() => '?').join(', ');
+    return db.prepare(`
+      SELECT a.delivery_id, a.attempt_number, a.outcome, a.provider_request_id,
+             a.error_code, a.error_message_safe, a.attempted_at
+        FROM notification_delivery_attempts a
+        JOIN notification_deliveries d ON d.id = a.delivery_id
+       WHERE d.line_account_id = ? AND a.delivery_id IN (${placeholders})
+       ORDER BY a.delivery_id, a.attempt_number DESC
+    `).bind(lineAccountId, ...ids).all<NotificationDeliveryAttemptRow>();
+  }));
+  return results.flatMap((result) => result.results);
+}
+
 export interface NotificationRetryRow {
   id: string;
   line_account_id: string;
@@ -344,8 +419,9 @@ export interface NotificationRetryRow {
   recipient_type: string;
   recipient_id: string;
   line_user_id: string | null;
-  channel_access_token: string | null;
   line_template_json: string | null;
+  friend_is_following: number | null;
+  resolution_action: 'resolved' | 'reopened' | null;
 }
 
 export async function getNotificationDeliveryForRetry(
@@ -356,7 +432,13 @@ export async function getNotificationDeliveryForRetry(
   return db.prepare(`
     SELECT d.id, d.line_account_id, d.status, d.retryable, d.attempts,
            d.idempotency_key, d.version, d.channel, d.recipient_type, d.recipient_id,
-           f.line_user_id, a.channel_access_token, v.line_template_json
+           f.line_user_id, v.line_template_json,
+           f.is_following AS friend_is_following,
+           (SELECT oa.action FROM operation_audit oa
+             WHERE oa.target_kind = 'notification_delivery' AND oa.target_id = d.id
+               AND oa.action IN ('resolved', 'reopened')
+             ORDER BY CAST(json_extract(oa.detail_json, '$.version') AS INTEGER) DESC,
+                      oa.created_at DESC, oa.id DESC LIMIT 1) AS resolution_action
       FROM notification_deliveries d
       JOIN notification_instances i ON i.id = d.instance_id AND i.line_account_id = d.line_account_id
       JOIN line_accounts a ON a.id = d.line_account_id
@@ -390,18 +472,20 @@ export async function finishNotificationDeliveryRetry(
     errorMessageSafe?: string | null;
     nextRetryAt?: string | null;
   },
-): Promise<void> {
+): Promise<boolean> {
   const attemptedAt = jstNow();
   const nextAttempt = Number(input.delivery.attempts) + 1;
-  await db.batch([
+  const results = await db.batch([
     db.prepare(`
       INSERT INTO notification_delivery_attempts
         (id, delivery_id, attempt_number, retry_key, outcome, provider_request_id,
          error_code, error_message_safe, attempted_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      SELECT ?, d.id, ?, ?, ?, ?, ?, ?, ?
+        FROM notification_deliveries d
+       WHERE d.id = ? AND d.line_account_id = ? AND d.status = 'pending'
+         AND d.version = ? AND d.attempts = ?
     `).bind(
       crypto.randomUUID(),
-      input.delivery.id,
       nextAttempt,
       input.delivery.idempotency_key,
       input.outcome,
@@ -409,6 +493,10 @@ export async function finishNotificationDeliveryRetry(
       input.errorCode ?? null,
       input.errorMessageSafe ?? null,
       attemptedAt,
+      input.delivery.id,
+      input.delivery.line_account_id,
+      Number(input.delivery.version) + 1,
+      input.delivery.attempts,
     ),
     db.prepare(`
       UPDATE notification_deliveries
@@ -418,7 +506,8 @@ export async function finishNotificationDeliveryRetry(
              failed_at = CASE WHEN ? IN ('retry_wait', 'failed') THEN ? ELSE NULL END,
              retryable = CASE WHEN ? = 'retry_wait' THEN 1 ELSE 0 END,
              updated_at = ?
-       WHERE id = ? AND line_account_id = ?
+       WHERE id = ? AND line_account_id = ? AND status = 'pending'
+         AND version = ? AND attempts = ?
     `).bind(
       input.outcome,
       nextAttempt,
@@ -435,8 +524,63 @@ export async function finishNotificationDeliveryRetry(
       attemptedAt,
       input.delivery.id,
       input.delivery.line_account_id,
+      Number(input.delivery.version) + 1,
+      input.delivery.attempts,
     ),
   ]);
+  return Number(results[0]?.meta.changes ?? 0) === 1
+    && Number(results[1]?.meta.changes ?? 0) === 1;
+}
+
+/**
+ * 対応済み/未対応の切替を、監査記録と送達版の同一guard付きbatchで保存する。
+ * 新しい台帳は作らず、既存operation_auditを状態履歴として使う。
+ */
+export async function setNotificationDeliveryResolution(
+  db: D1Database,
+  input: {
+    id: string;
+    lineAccountId: string;
+    expectedVersion: number;
+    resolved: boolean;
+    staffId: string;
+  },
+): Promise<'updated' | 'not_found' | 'unavailable' | 'version_conflict'> {
+  const current = await db.prepare(`
+    SELECT status, version FROM notification_deliveries
+     WHERE id = ? AND line_account_id = ?
+  `).bind(input.id, input.lineAccountId).first<{ status: NotificationDeliveryStatus; version: number }>();
+  if (!current) return 'not_found';
+  if (current.status !== 'excluded' && current.status !== 'retry_wait' && current.status !== 'failed') {
+    return 'unavailable';
+  }
+  if (Number(current.version) !== input.expectedVersion) return 'version_conflict';
+
+  const now = jstNow();
+  const action = input.resolved ? 'resolved' : 'reopened';
+  const results = await db.batch([
+    db.prepare(`
+      INSERT INTO operation_audit
+        (id, target_kind, target_id, action, actor_id, detail_json, created_at)
+      SELECT ?, 'notification_delivery', d.id, ?, ?, ?, ?
+        FROM notification_deliveries d
+       WHERE d.id = ? AND d.line_account_id = ? AND d.version = ?
+         AND d.status IN ('excluded', 'retry_wait', 'failed')
+    `).bind(
+      crypto.randomUUID(), action, input.staffId,
+      JSON.stringify({ lineAccountId: input.lineAccountId, version: input.expectedVersion + 1 }), now,
+      input.id, input.lineAccountId, input.expectedVersion,
+    ),
+    db.prepare(`
+      UPDATE notification_deliveries SET version = version + 1, updated_at = ?
+       WHERE id = ? AND line_account_id = ? AND version = ?
+         AND status IN ('excluded', 'retry_wait', 'failed')
+    `).bind(now, input.id, input.lineAccountId, input.expectedVersion),
+  ]);
+  return Number(results[0]?.meta.changes ?? 0) === 1
+    && Number(results[1]?.meta.changes ?? 0) === 1
+    ? 'updated'
+    : 'version_conflict';
 }
 
 export interface NotificationMetricRow {

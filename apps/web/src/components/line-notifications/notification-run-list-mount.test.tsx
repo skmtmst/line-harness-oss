@@ -193,6 +193,34 @@ function noticeText(container: HTMLDivElement): string | null {
 }
 
 describe('LINE通知一覧のReact実mount試験', () => {
+  it('失敗詳細・試行履歴・次回時刻・対応済み状態を実一覧行に表示する', async () => {
+    const { container, nextDelivery } = await setup()
+    const detailed = Object.assign(run('詳細'), {
+      nextRetryAt: '2026-09-09T12:00:00+09:00',
+      resolved: true,
+      resolvedAt: '2026-09-09T11:30:00+09:00',
+      resolvedBy: '店長',
+      retryAvailable: false,
+      attemptHistory: [{
+        number: 2,
+        outcome: 'retry_wait',
+        attemptedAt: '2026-09-09T11:05:00+09:00',
+        providerRequestId: null,
+        errorCode: 'provider_response_unknown',
+        error: 'LINEの応答を確認できません',
+      }],
+    })
+    await act(async () => {
+      nextDelivery('account-a').resolve(ok([detailed], 0))
+      await drainMicrotasks()
+    })
+    expect(container.textContent).toContain('次回 2026/09/09 12:00')
+    expect(container.textContent).toContain('対応済み 2026/09/09 11:30／店長')
+    expect(container.textContent).toContain('試行履歴を確認')
+    expect(container.textContent).toContain('未対応に戻す')
+    expect(container.textContent).not.toContain('送信を再試行')
+  })
+
   it.each([
     ['success', 200, null] as const,
     ['403', 403, '送信の再試行は店長だけができます。'] as const,
