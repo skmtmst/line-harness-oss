@@ -10,6 +10,7 @@ import { DELIVERY_DISPATCH_JOB_NAMES } from './feature-enforcement.js';
 
 const WARNING_MINUTES = 10;
 const DANGER_MINUTES = 30;
+export const OPERATION_DISPATCH_COMPOUND_SELECT_LIMIT = 5;
 
 type DispatchState = 'queued' | 'sending' | 'retrying' | 'dead';
 
@@ -303,6 +304,44 @@ type DispatchRow = {
 
 type DispatchCounts = Record<DispatchState, number>;
 
+export type OperationDispatchQueryBatch = {
+  readonly sql: string;
+  readonly bindings: readonly string[];
+  readonly compoundSelectCount: number;
+};
+
+export function chunkOperationDispatchCompoundSelects<T>(items: readonly T[]): T[][] {
+  const chunks: T[][] = [];
+  for (let offset = 0; offset < items.length; offset += OPERATION_DISPATCH_COMPOUND_SELECT_LIMIT) {
+    chunks.push(items.slice(offset, offset + OPERATION_DISPATCH_COMPOUND_SELECT_LIMIT));
+  }
+  return chunks;
+}
+
+export function buildOperationDispatchQueryBatches(
+  lineAccountId: string,
+): OperationDispatchQueryBatch[] {
+  const queryItems = OPERATION_DISPATCH_JOB_CROSSWALK.flatMap((job) =>
+    job.queries.map((sourceQuery) => ({ jobName: job.jobName, sourceQuery })));
+  const batches: OperationDispatchQueryBatch[] = [];
+  for (const items of chunkOperationDispatchCompoundSelects(queryItems)) {
+    const bindings: string[] = [];
+    const parts = items.map(({ jobName, sourceQuery }) => {
+      bindings.push(
+        jobName,
+        ...Array.from({ length: sourceQuery.accountBindingCount }, () => lineAccountId),
+      );
+      return `SELECT ? AS job_name, state, item_count, oldest_at FROM (${sourceQuery.sql})`;
+    });
+    batches.push({
+      sql: parts.join('\nUNION ALL\n'),
+      bindings,
+      compoundSelectCount: parts.length,
+    });
+  }
+  return batches;
+}
+
 function emptyCounts(): DispatchCounts {
   return { queued: 0, sending: 0, retrying: 0, dead: 0 };
 }
@@ -355,22 +394,15 @@ export async function collectOperationDispatchHealth(
   const manifestOnly = manifestNames.filter((name) => !crosswalkNames.includes(name));
   const crosswalkOnly = crosswalkNames.filter((name) => !manifestNames.includes(name));
 
-  const queryParts: string[] = [];
-  const queryBindings: string[] = [];
-  for (const job of OPERATION_DISPATCH_JOB_CROSSWALK) {
-    for (const sourceQuery of job.queries) {
-      queryParts.push(`SELECT ? AS job_name, state, item_count, oldest_at FROM (${sourceQuery.sql})`);
-      queryBindings.push(
-        job.jobName,
-        ...Array.from({ length: sourceQuery.accountBindingCount }, () => lineAccountId),
-      );
-    }
-  }
-  // accountごとの状態は1本のUNIONで取得し、dispatcher数ぶんのD1往復を発生させない。
-  const [heartbeats, dispatchRows] = await Promise.all([
+  const queryBatches = buildOperationDispatchQueryBatches(lineAccountId);
+  // D1のcompound SELECT上限は5項。dispatcherごとの往復には戻さず、
+  // 最大5項ずつへ機械分割して全状態を取得する。
+  const [heartbeats, batchResults] = await Promise.all([
     listOperationDispatcherHeartbeats(db),
-    db.prepare(queryParts.join('\nUNION ALL\n')).bind(...queryBindings).all<DispatchRow>(),
+    Promise.all(queryBatches.map((batch) =>
+      db.prepare(batch.sql).bind(...batch.bindings).all<DispatchRow>())),
   ]);
+  const dispatchRows = batchResults.flatMap(({ results }) => results ?? []);
   const knownNames = new Set(crosswalkNames);
   const unknownHeartbeatNames = heartbeats
     .map(({ jobName }) => jobName)
@@ -390,7 +422,7 @@ export async function collectOperationDispatchHealth(
     countsByJob.set(job.jobName, emptyCounts());
     oldestByJob.set(job.jobName, null);
   }
-  for (const row of dispatchRows.results ?? []) {
+  for (const row of dispatchRows) {
     const counts = countsByJob.get(row.job_name);
     if (!counts || !(row.state in counts)) {
       throw new Error(`unknown_dispatch_state:${row.job_name}:${row.state}`);

@@ -7,7 +7,10 @@ import {
 import { DELIVERY_DISPATCH_JOB_NAMES } from './feature-enforcement.js';
 import {
   collectOperationDispatchHealth,
+  buildOperationDispatchQueryBatches,
+  chunkOperationDispatchCompoundSelects,
   observeOperationDispatcher,
+  OPERATION_DISPATCH_COMPOUND_SELECT_LIMIT,
   OPERATION_DISPATCH_JOB_CROSSWALK,
 } from './operation-dispatch-health.js';
 import { createTestD1 } from '../test-utils/d1-sqlite.js';
@@ -63,6 +66,28 @@ describe('operation dispatch health', () => {
           expect.arrayContaining([...source.requiredColumns]),
         );
       }
+    }
+  });
+
+  it('D1のcompound SELECT上限5項をquery数が増減しても越えない', () => {
+    const batches = buildOperationDispatchQueryBatches('account-1');
+    const sourceQueryCount = OPERATION_DISPATCH_JOB_CROSSWALK
+      .reduce((count, job) => count + job.queries.length, 0);
+    expect(batches.reduce((count, batch) => count + batch.compoundSelectCount, 0))
+      .toBe(sourceQueryCount);
+    expect(batches.every(
+      ({ compoundSelectCount }) => compoundSelectCount <= OPERATION_DISPATCH_COMPOUND_SELECT_LIMIT,
+    )).toBe(true);
+    for (const batch of batches) {
+      expect((batch.sql.match(/\bUNION ALL\b/g)?.length ?? 0) + 1)
+        .toBe(batch.compoundSelectCount);
+    }
+    for (let count = 0; count <= 20; count += 1) {
+      const items = Array.from({ length: count }, (_, index) => index);
+      const chunks = chunkOperationDispatchCompoundSelects(items);
+      expect(chunks.flat()).toEqual(items);
+      expect(chunks.every((chunk) => chunk.length <= OPERATION_DISPATCH_COMPOUND_SELECT_LIMIT))
+        .toBe(true);
     }
   });
 
