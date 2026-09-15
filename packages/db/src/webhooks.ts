@@ -1,3 +1,4 @@
+import { EC_EVENT_TYPES } from '@line-crm/shared';
 import { CredentialEncryptionKeyError, decryptCredential, encryptCredential } from './credential-crypto.js';
 import { jstNow, toJstString } from './utils.js';
 // Webhook IN/OUT クエリヘルパー
@@ -7,6 +8,38 @@ import { jstNow, toJstString } from './utils.js';
  * この値だけを見る。apps/worker/src/routes/webhooks.ts はこれを読み替えて使う。
  */
 export const WEBHOOK_SECRET_MIN_LENGTH = 32;
+
+/**
+ * 送信WebhookのeventTypesに指定できる種別の正本(#829 N-383)。
+ * 実際にイベントバスへ発火され送信Webhookへ届く種別だけを載せる。
+ * `*` は全種別を受け取る明示規約。受信口の発火は `incoming_webhook.<source_type>` で届く。
+ */
+export const KNOWN_OUTGOING_EVENT_TYPES: readonly string[] = [
+  'friend_add',
+  'friend_unfollow',
+  'message_received',
+  'postback_received',
+  'tag_change',
+  'cv_fire',
+  'staff_assigned',
+  'manual_reply_sent',
+  ...EC_EVENT_TYPES,
+];
+
+const INCOMING_WEBHOOK_EVENT_PREFIX = 'incoming_webhook.';
+
+/**
+ * 送信Webhookの購読種別として有効か。
+ * `*` は全件、`incoming_webhook.<source>` は受信口ごとの発火に一致する。
+ * `incoming_webhook.*` は照合規約上どの発火にも一致しないので通さない。
+ */
+export function isKnownOutgoingEventType(eventType: string): boolean {
+  if (eventType === '*') return true;
+  if (KNOWN_OUTGOING_EVENT_TYPES.includes(eventType)) return true;
+  if (!eventType.startsWith(INCOMING_WEBHOOK_EVENT_PREFIX)) return false;
+  const sourceType = eventType.slice(INCOMING_WEBHOOK_EVENT_PREFIX.length);
+  return sourceType.length > 0 && !sourceType.includes('*');
+}
 
 export interface IncomingWebhookRow {
   id: string;

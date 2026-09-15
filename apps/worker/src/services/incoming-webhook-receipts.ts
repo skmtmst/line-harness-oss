@@ -22,6 +22,19 @@ export async function stableWebhookStepId(sourceEventId: string, key: string): P
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
+/**
+ * 受信口ごとの直近受信件数を数える(#829 N-384)。
+ * receipts は受領ごとに1行残るので、回数制限のために新しい表は要らない。
+ */
+export async function countRecentIncomingReceipts(
+  db: D1Database, webhookId: string, sinceIso: string,
+): Promise<number> {
+  const row = await db.prepare(`SELECT COUNT(*) AS n FROM incoming_webhook_receipts
+    WHERE webhook_id = ? AND received_at >= ?`)
+    .bind(webhookId, sinceIso).first<{ n: number }>();
+  return Number(row?.n ?? 0);
+}
+
 export async function reserveIncomingWebhook(
   db: D1Database, webhookId: string, signatureHash: string,
 ): Promise<{ kind: 'completed' } | { kind: 'busy' } | { kind: 'acquired'; execution: IncomingWebhookExecution }> {
