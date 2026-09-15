@@ -736,6 +736,17 @@ describe('PATCH /api/rich-menu-groups/:groupId', () => {
     expect(res.status).toBe(404);
   });
 
+  test('Idempotency-Keyなしの手動公開はLINE処理を始めず400', async () => {
+    dbMocks.getRichMenuGroupWithPages.mockResolvedValue({
+      id: 'g1', account_id: 'a', name: 'x', chat_bar_text: 'x', size: 'large', pages: [],
+      default_page_id: null, is_default_for_all: 0, status: 'draft', created_at: '', updated_at: '',
+    });
+    const res = await setupApp().request('/api/rich-menu-groups/g1/publish', { method: 'POST' });
+    expect(res.status).toBe(400);
+    expect(dbMocks.createRichMenuManualPublishRequestAtomic).not.toHaveBeenCalled();
+    expect(dbMocks.acquirePublishLease).not.toHaveBeenCalled();
+  });
+
   test('updates meta fields', async () => {
     dbMocks.getRichMenuGroupById.mockResolvedValue({ id: 'g1' });
     dbMocks.getRichMenuGroupWithPages.mockResolvedValue({

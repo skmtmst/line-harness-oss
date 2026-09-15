@@ -254,6 +254,8 @@ function Editor({
   const fileInput = useRef<HTMLInputElement>(null)
   // LINEへの公開は結果が届くまで同じ鍵で再試行する。成功後の次の公開だけ新しい鍵にする。
   const publishIdempotencyKey = useRef<string | null>(null)
+  // state反映より先に2回clickされた場合も、通信を二重に始めない。
+  const publishInFlight = useRef(false)
 
   const reload = useCallback(async () => {
     setLoading(true)
@@ -513,7 +515,8 @@ function Editor({
   async function handlePublish() {
     // 二度押しを受け付けない。窓のボタンも `busy` で止まるが、
     // 二重の登録が走ると LINE 側に同じメニューが2つ出る。
-    if (publishing || unpublishing || saving || busy) return
+    if (publishInFlight.current || publishing || unpublishing || saving || busy) return
+    publishInFlight.current = true
     setPublishing(true)
     setError(null)
     setConfirmError('')
@@ -542,6 +545,7 @@ function Editor({
           : 'LINEへ登録できませんでした。下書きは保存されていません。しばらくおいてから、もう一度お試しください。',
       )
     } finally {
+      publishInFlight.current = false
       setPublishing(false)
     }
   }
