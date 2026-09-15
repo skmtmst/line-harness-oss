@@ -53,6 +53,14 @@ type FeatureSettingsData = {
 
 type FeatureSettingsState = FeatureSettingsData & { version: number };
 
+type FeatureVisibilityData = {
+  /**
+   * サイドバーに項目を出せるかだけを返す。会社の保存値、契約、依存理由は
+   * 管理情報なので、一般staff向けの応答へ混ぜない。
+   */
+  features: Record<FeatureId, boolean>;
+};
+
 /** 共有カタログで既定オフの機能。記録が無いアカウントではこの状態から始める。 */
 export const DEFAULT_DISABLED_FEATURES = new Set<ToggleableFeature>(
   FEATURE_CATALOG.filter(({ defaultEnabled }) => !defaultEnabled).map(({ featureId }) => featureId),
@@ -869,12 +877,77 @@ async function loadFeatureSettings(
   };
 }
 
-featureSettings.get('/api/settings/features', async (c) => {
+async function loadFeatureVisibility(
+  db: D1Database,
+  accountId: string,
+  restaurantEnabled: boolean,
+): Promise<FeatureVisibilityData> {
+  const state = await loadFeatureSettings(db, accountId, restaurantEnabled);
+  const [featureStates, specializedRaw] = await Promise.all([
+    accountFeatureAvailabilityMap(db, accountId, state.features),
+    getAccountSetting(db, accountId, SPECIALIZED_CATALOG_KEY),
+  ]);
+  const specialized = new Set(specializedCatalog(specializedRaw));
+  return {
+    features: Object.fromEntries(TOGGLEABLE_FEATURES.map((featureId) => [
+      featureId,
+      featureStates[featureId].effectiveEnabled
+        && (!NEN_SPECIALIZED_FEATURES.includes(featureId) || specialized.has(featureId)),
+    ])) as Record<FeatureId, boolean>,
+  };
+}
+
+/**
+ * 一般staffの画面の殻専用。表示可否のboolean以外は返さず、管理GETと分離する。
+ * account境界は応答を作る前に検査し、空scope・別accountを同じ403へ倒す。
+ */
+featureSettings.get('/api/settings/features/visibility', async (c) => {
   try {
     const accountId = getAccountId(c);
-    if (!accountId) return c.json({ success: false, error: 'account_id が必要です' }, 400);
+    if (!accountId) {
+      return c.json({
+        success: false,
+        error: 'account_id が必要です',
+        code: 'FEATURE_SETTINGS_ACCOUNT_REQUIRED',
+      }, 400);
+    }
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
-      return c.json({ success: false, error: 'Forbidden' }, 403);
+      return c.json({
+        success: false,
+        error: 'このLINEアカウントの機能表示を確認する権限がありません',
+        code: 'FEATURE_SETTINGS_SCOPE_FORBIDDEN',
+      }, 403);
+    }
+    return c.json({
+      success: true,
+      data: await loadFeatureVisibility(
+        c.env.DB,
+        accountId,
+        restaurantTestEnabled(c.env),
+      ),
+    });
+  } catch (err) {
+    console.error('GET /api/settings/features/visibility error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+featureSettings.get('/api/settings/features', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const accountId = getAccountId(c);
+    if (!accountId) {
+      return c.json({
+        success: false,
+        error: 'account_id が必要です',
+        code: 'FEATURE_SETTINGS_ACCOUNT_REQUIRED',
+      }, 400);
+    }
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+      return c.json({
+        success: false,
+        error: 'このLINEアカウントの機能設定を表示する権限がありません',
+        code: 'FEATURE_SETTINGS_SCOPE_FORBIDDEN',
+      }, 403);
     }
     const state = await loadFeatureSettings(
       c.env.DB,

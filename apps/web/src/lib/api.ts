@@ -4732,6 +4732,11 @@ export const api = {
    * 切ったものだけが記録され、記録が無ければ有効。
    */
   featureSettings: {
+    /** 一般staffの画面の殻に使う、表示可否booleanだけの応答。 */
+    visibility: (accountId: string) =>
+      fetchApi<ApiResponse<{ features: Record<string, boolean> }>>(
+        `/api/settings/features/visibility?account_id=${encodeURIComponent(accountId)}`,
+      ),
     get: (accountId: string) =>
       fetchApi<ApiResponse<{
         features: Record<string, boolean>

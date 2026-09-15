@@ -34,6 +34,7 @@ import {
   type BookingInterval,
   type BookingPriceMode,
 } from '@line-crm/db';
+import { parseBookingStaffInput } from '@line-crm/shared';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { cancelByTrigger, enrollByTrigger } from '../services/reminder-trigger.js';
@@ -2697,33 +2698,36 @@ booking.get('/api/booking/admin/staff', async (c) => {
 booking.post('/api/booking/admin/staff', requireRole('owner', 'admin'), async (c) => {
   const accountId = await resolveAccountIdAdmin(c);
   if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
-  const b = await c.req.json<{
-    name: string;
-    display_name: string;
-    role?: string | null;
-    profile_image_url?: string | null;
-    bio?: string | null;
-    sort_order?: number;
-    is_designation_optional?: boolean;
-  }>();
+  const raw = await c.req.json<unknown>().catch(() => null);
+  if (raw === null) return c.json({ error: 'invalid_json' }, 400);
+  const parsed = parseBookingStaffInput(raw, 'create');
+  if (!parsed.ok) {
+    return c.json({
+      code: 'booking_staff_validation_failed',
+      error: parsed.error,
+      field: parsed.field,
+    }, 422);
+  }
+  const b = parsed.value;
   const id = crypto.randomUUID();
   await c.env.DB
     .prepare(
       `INSERT INTO staff
         (id, line_account_id, name, display_name, role, profile_image_url, bio,
-         sort_order, is_designation_optional)
-       VALUES (?,?,?,?,?,?,?,?,?)`,
+         sort_order, is_designation_optional, is_active)
+       VALUES (?,?,?,?,?,?,?,?,?,?)`,
     )
     .bind(
       id,
       accountId,
-      b.name,
-      b.display_name,
-      b.role ?? null,
-      b.profile_image_url ?? null,
-      b.bio ?? null,
-      b.sort_order ?? 0,
-      b.is_designation_optional ? 1 : 0,
+      b.name!,
+      b.display_name!,
+      b.role!,
+      b.profile_image_url!,
+      b.bio!,
+      b.sort_order!,
+      b.is_designation_optional!,
+      b.is_active!,
     )
     .run();
   return c.json({ id }, 201);
@@ -2733,37 +2737,40 @@ booking.put('/api/booking/admin/staff/:id', requireRole('owner', 'admin'), async
   const accountId = await resolveAccountIdAdmin(c);
   if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
   const id = c.req.param('id');
-  const b = await c.req.json<{
-    name: string;
-    display_name: string;
-    role?: string | null;
-    profile_image_url?: string | null;
-    bio?: string | null;
-    sort_order?: number;
-    is_designation_optional?: boolean;
-    is_active?: boolean;
-  }>();
-  await c.env.DB
-    .prepare(
-      `UPDATE staff
-          SET name = ?, display_name = ?, role = ?, profile_image_url = ?, bio = ?,
-              sort_order = ?, is_designation_optional = ?, is_active = ?,
-              updated_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')
-        WHERE id = ? AND line_account_id = ?`,
-    )
-    .bind(
-      b.name,
-      b.display_name,
-      b.role ?? null,
-      b.profile_image_url ?? null,
-      b.bio ?? null,
-      b.sort_order ?? 0,
-      b.is_designation_optional ? 1 : 0,
-      b.is_active === false ? 0 : 1,
-      id,
-      accountId,
-    )
-    .run();
+  const raw = await c.req.json<unknown>().catch(() => null);
+  if (raw === null) return c.json({ error: 'invalid_json' }, 400);
+  const parsed = parseBookingStaffInput(raw, 'update');
+  if (!parsed.ok) {
+    return c.json({
+      code: 'booking_staff_validation_failed',
+      error: parsed.error,
+      field: parsed.field,
+    }, 422);
+  }
+  const updates: string[] = [];
+  const values: Array<string | number | null> = [];
+  for (const [field, column] of [
+    ['name', 'name'],
+    ['display_name', 'display_name'],
+    ['role', 'role'],
+    ['profile_image_url', 'profile_image_url'],
+    ['bio', 'bio'],
+    ['sort_order', 'sort_order'],
+    ['is_designation_optional', 'is_designation_optional'],
+    ['is_active', 'is_active'],
+  ] as const) {
+    if (Object.prototype.hasOwnProperty.call(parsed.value, field)) {
+      updates.push(`${column} = ?`);
+      values.push(parsed.value[field]!);
+    }
+  }
+  const result = await c.env.DB.prepare(
+    `UPDATE staff
+        SET ${updates.join(', ')},
+            updated_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')
+      WHERE id = ? AND line_account_id = ?`,
+  ).bind(...values, id, accountId).run();
+  if (result.meta.changes === 0) return c.json({ error: 'staff_not_found' }, 404);
   return c.json({ ok: true });
 });
 
