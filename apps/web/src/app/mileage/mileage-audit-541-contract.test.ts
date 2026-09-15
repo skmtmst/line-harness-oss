@@ -35,8 +35,9 @@ describe('点検 #511(中)の再発防止(#541)', () => {
     expect(NEW_RULE).toContain('作りかけの決めごと')
   })
 
-  it('決めごとが100件の上限に達したら件数表示で注意する(#511-11)', () => {
-    expect(PAGE).toContain('rules.length >= 100')
-    expect(PAGE).toContain('100件までしか読み込んでいないため')
+  it('決めごとは100件ずつ全頁を読み、打ち切り注意書きを出さない(#511-11/#817)', () => {
+    expect(PAGE).toContain('while (items.length < total)')
+    expect(PAGE).toContain('offset: items.length')
+    expect(PAGE).not.toContain('100件までしか読み込んでいないため')
   })
 })
