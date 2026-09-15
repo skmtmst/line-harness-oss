@@ -91,12 +91,14 @@ describe('GET /api/ec-commerce/notification-runs compatibility route', () => {
     );
     expect(response.status).toBe(200);
     expect(access).toHaveBeenCalledWith(db, expect.anything(), ['account-a']);
-    expect(db.calls).toHaveLength(3);
+    expect(db.calls).toHaveLength(4);
     for (const call of db.calls) {
       expect(call.sql).toContain('notification_deliveries');
       expect(call.sql).not.toContain('ec_events');
       expect(call.bindings[0]).toBe('account-a');
     }
+    expect(db.calls[3].sql).toContain('notification_delivery_attempts');
+    expect(db.calls[3].bindings).toEqual(['account-a', 'delivery-a']);
   });
 
   it('returns provider acceptance, attempts, clicks and the frozen definition version', async () => {

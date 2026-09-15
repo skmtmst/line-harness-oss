@@ -30,6 +30,7 @@ const fixture = vi.hoisted(() => ({
   testSend: vi.fn(),
   definitions: vi.fn(),
   metrics: vi.fn(),
+  quota: vi.fn(),
   updateDraft: vi.fn(),
   publishDefinition: vi.fn(),
   stopDefinition: vi.fn(),
@@ -89,6 +90,7 @@ vi.mock('@/lib/api', () => {
   }
   return {
     ApiError,
+    fetchApi: fixture.quota,
     api: {
       notifications: { operatorRules: { list: fixture.operatorList } },
       ecCommerce: {
@@ -265,6 +267,12 @@ beforeEach(() => {
   fixture.overview.mockResolvedValue({ success: true, data: { last24h: 0, failed: 0, byType: [] } })
   fixture.definitions.mockResolvedValue({ success: true, data: [] })
   fixture.metrics.mockResolvedValue({ success: true, data: { items: [] } })
+  fixture.quota.mockResolvedValue({
+    success: true,
+    data: {
+      quota: { state: 'available', total: 500, used: 10, remaining: 490, asOf: '2026-09-15T00:00:00Z' },
+    },
+  })
   fixture.updateSetting.mockResolvedValue({ success: true, data: {} })
   fixture.testSend.mockResolvedValue({ success: true, data: { sent: 1 } })
   // vitest は esbuild の既定で古い JSX 変換になる。画面側は React を import

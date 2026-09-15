@@ -7,11 +7,14 @@ import {
   getNotificationDeliveryForRetry,
   claimNotificationDeliveryRetry,
   finishNotificationDeliveryRetry,
+  getLineAccountById,
   listCustomerNotificationDefinitions,
+  listNotificationDeliveryAttempts,
   listNotificationDeliveries,
   listNotificationMetrics,
   publishCustomerNotificationDefinition,
   stopCustomerNotificationDefinition,
+  setNotificationDeliveryResolution,
   updateCustomerNotificationDraft,
   type CustomerNotificationDefinitionRow,
   type CustomerNotificationVersionRow,
@@ -21,6 +24,10 @@ import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import { auditLog } from '../lib/audit-log.js';
+import {
+  releaseQuotaSlot,
+  tryReserveQuotaSlot,
+} from '../services/broadcast-quota-guard.js';
 
 const lineNotifications = new Hono<Env>();
 
@@ -342,6 +349,20 @@ export async function notificationDeliveriesResponse(c: Context<Env>): Promise<R
     return c.json({ success: false, error: '表示条件が正しくありません' }, 400);
   }
   const result = await listNotificationDeliveries(c.env.DB, { lineAccountId, view, limit, offset });
+  const attempts = await listNotificationDeliveryAttempts(
+    c.env.DB,
+    lineAccountId,
+    result.items.map((row) => row.id),
+  );
+  const attemptsByDelivery = new Map<string, typeof attempts>();
+  for (const attempt of attempts) {
+    const current = attemptsByDelivery.get(attempt.delivery_id) ?? [];
+    current.push(attempt);
+    attemptsByDelivery.set(attempt.delivery_id, current);
+  }
+  const quota = c.req.query('includeQuota') === '1'
+    ? await notificationQuotaForAccount(c, lineAccountId)
+    : null;
   return c.json({
     success: true,
     data: {
@@ -366,10 +387,21 @@ export async function notificationDeliveriesResponse(c: Context<Env>): Promise<R
           clickedAt: row.clicked_at,
           version: row.definition_version == null ? null : Number(row.definition_version),
           executionMode: row.execution_mode,
-          retryAvailable: Number(row.retryable) === 1
+          retryAvailable: row.resolution_action !== 'resolved' && Number(row.retryable) === 1
             && (row.status === 'retry_wait' || row.status === 'failed'),
           recordVersion: Number(row.version),
           providerStatus: row.provider_status,
+          resolved: row.resolution_action === 'resolved',
+          resolvedAt: row.resolved_at,
+          resolvedBy: row.resolved_by_name,
+          attemptHistory: (attemptsByDelivery.get(row.id) ?? []).map((attempt) => ({
+            number: Number(attempt.attempt_number),
+            outcome: attempt.outcome,
+            attemptedAt: attempt.attempted_at,
+            providerRequestId: attempt.provider_request_id,
+            errorCode: attempt.error_code,
+            error: attempt.error_message_safe,
+          })),
         };
       }),
       summary: result.summary,
@@ -379,6 +411,7 @@ export async function notificationDeliveriesResponse(c: Context<Env>): Promise<R
         attemptHistoryAvailable: true,
         retryAvailable: true,
       },
+      ...(quota ? { quota } : {}),
     },
     pagination: { total: result.total, limit, offset },
   });
@@ -389,6 +422,73 @@ lineNotifications.get(
   requireRole('owner', 'admin', 'staff'),
   notificationDeliveriesResponse,
 );
+
+type NotificationQuota =
+  | { state: 'available'; total: number; used: number; remaining: number; asOf: string }
+  | { state: 'unlimited'; total: null; used: number; remaining: null; asOf: string }
+  | { state: 'unavailable'; total: null; used: null; remaining: null; asOf: null; reason: string };
+
+async function notificationQuota(channelAccessToken: string): Promise<NotificationQuota> {
+  const headers = { Authorization: `Bearer ${channelAccessToken}` };
+  try {
+    const [quotaResponse, consumptionResponse] = await Promise.all([
+      fetch('https://api.line.me/v2/bot/message/quota', {
+        headers,
+        signal: AbortSignal.timeout(10_000),
+      }),
+      fetch('https://api.line.me/v2/bot/message/quota/consumption', {
+        headers,
+        signal: AbortSignal.timeout(10_000),
+      }),
+    ]);
+    if (!quotaResponse.ok || !consumptionResponse.ok) {
+      return { state: 'unavailable', total: null, used: null, remaining: null, asOf: null, reason: 'LINEから送信枠を取得できませんでした' };
+    }
+    const quota = await quotaResponse.json() as { type?: unknown; value?: unknown };
+    const consumption = await consumptionResponse.json() as { totalUsage?: unknown };
+    const used = typeof consumption.totalUsage === 'number'
+      && Number.isFinite(consumption.totalUsage) && consumption.totalUsage >= 0
+      ? Math.floor(consumption.totalUsage)
+      : null;
+    if (used === null) {
+      return { state: 'unavailable', total: null, used: null, remaining: null, asOf: null, reason: '今月の送信数を取得できませんでした' };
+    }
+    const asOf = new Date().toISOString();
+    if (quota.type === 'none') {
+      return { state: 'unlimited', total: null, used, remaining: null, asOf };
+    }
+    const total = quota.type === 'limited' && typeof quota.value === 'number'
+      && Number.isFinite(quota.value) && quota.value >= 0
+      ? Math.floor(quota.value)
+      : null;
+    if (total === null) {
+      return { state: 'unavailable', total: null, used: null, remaining: null, asOf: null, reason: '送信枠の総量を取得できませんでした' };
+    }
+    return { state: 'available', total, used, remaining: Math.max(0, total - used), asOf };
+  } catch {
+    return { state: 'unavailable', total: null, used: null, remaining: null, asOf: null, reason: 'LINEから送信枠を取得できませんでした' };
+  }
+}
+
+async function notificationQuotaForAccount(
+  c: Context<Env>,
+  lineAccountId: string,
+): Promise<NotificationQuota> {
+  try {
+    const account = await getLineAccountById(
+      c.env.DB,
+      lineAccountId,
+      c.env.LINE_CREDENTIAL_ENCRYPTION_KEY,
+    );
+    const token = account?.channel_access_token?.trim();
+    if (!token) {
+      return { state: 'unavailable', total: null, used: null, remaining: null, asOf: null, reason: 'LINEの接続設定を確認してください' };
+    }
+    return notificationQuota(token);
+  } catch {
+    return { state: 'unavailable', total: null, used: null, remaining: null, asOf: null, reason: 'LINEの接続設定を確認してください' };
+  }
+}
 
 lineNotifications.get(
   '/api/line-notifications/metrics',
@@ -442,9 +542,15 @@ function isTransientLineError(error: unknown): boolean {
   return /\b429\b|\b5\d\d\b|timeout|timed out|network|fetch|connection|socket/i.test(message);
 }
 
+function lineErrorStatus(error: unknown): number | null {
+  if (typeof error !== 'object' || error === null || !('status' in error)) return null;
+  const status = (error as { status?: unknown }).status;
+  return typeof status === 'number' && Number.isInteger(status) ? status : null;
+}
+
 lineNotifications.post(
   '/api/line-notifications/deliveries/:id/retry',
-  requireRole('owner'),
+  requireRole('owner', 'admin'),
   async (c) => {
     const body = await c.req.json<Record<string, unknown>>().catch(() => null);
     const lineAccountId = bodyString(body?.lineAccountId);
@@ -454,46 +560,116 @@ lineNotifications.post(
     }
     const denied = await requireAccount(c, lineAccountId);
     if (denied) return denied;
+    const action = bodyString(body?.action);
+    if (action === 'resolve' || action === 'reopen') {
+      const resolved = action === 'resolve';
+      const result = await setNotificationDeliveryResolution(c.env.DB, {
+        id: c.req.param('id'), lineAccountId, expectedVersion, resolved, staffId: c.get('staff').id,
+      });
+      if (result === 'not_found') return c.json({ success: false, error: '送信記録が見つかりません' }, 404);
+      if (result === 'unavailable') {
+        return c.json({ success: false, code: 'resolution_unavailable', error: '失敗または送信対象外の記録だけ対応状況を変更できます' }, 409);
+      }
+      if (result === 'version_conflict') {
+        return c.json({ success: false, code: 'version_conflict', error: 'ほかの担当者が先に変更しました' }, 409);
+      }
+      return c.json({ success: true, data: { id: c.req.param('id'), resolved, version: expectedVersion + 1 } });
+    }
+    if (action !== null) {
+      return c.json({ success: false, error: '操作の種類が正しくありません' }, 400);
+    }
+    if (c.get('staff').role !== 'owner') {
+      return c.json({ success: false, error: '送信の再試行は店長だけができます' }, 403);
+    }
     const delivery = await getNotificationDeliveryForRetry(c.env.DB, c.req.param('id'), lineAccountId);
     if (!delivery) return c.json({ success: false, error: '送信記録が見つかりません' }, 404);
     if (delivery.channel !== 'line' || delivery.recipient_type !== 'friend'
-      || !delivery.line_user_id || !delivery.channel_access_token || !delivery.line_template_json) {
+      || !delivery.line_user_id || Number(delivery.friend_is_following) !== 1
+      || !delivery.line_template_json) {
       return c.json({ success: false, code: 'retry_unavailable', error: 'この記録はLINEで再試行できません' }, 409);
+    }
+    if (delivery.resolution_action === 'resolved') {
+      return c.json({ success: false, code: 'retry_unavailable', error: '対応済みを未対応に戻してから再試行してください' }, 409);
     }
     if (!Number(delivery.retryable)
       || (delivery.status !== 'retry_wait' && delivery.status !== 'failed')) {
       return c.json({ success: false, code: 'retry_unavailable', error: '一時的な失敗だけ再試行できます' }, 409);
     }
-    if (Number(delivery.version) !== expectedVersion
-      || !await claimNotificationDeliveryRetry(c.env.DB, {
-        id: delivery.id, lineAccountId, expectedVersion,
-      })) {
-      return c.json({ success: false, code: 'version_conflict', error: 'ほかの担当者が先に再試行しました' }, 409);
-    }
-
     let messages: Message[];
     try {
       const parsed = JSON.parse(delivery.line_template_json) as unknown;
       if (!Array.isArray(parsed) || parsed.length === 0) throw new Error('invalid template');
       messages = parsed as Message[];
     } catch {
-      await finishNotificationDeliveryRetry(c.env.DB, {
-        delivery,
-        outcome: 'failed',
-        errorCode: 'invalid_template',
-        errorMessageSafe: '送信内容を確認してください',
-      });
       return c.json({ success: false, code: 'invalid_template', error: '送信内容を確認してください' }, 409);
     }
 
+    let account;
     try {
-      const result = await new LineClient(delivery.channel_access_token)
+      account = await getLineAccountById(c.env.DB, lineAccountId, c.env.LINE_CREDENTIAL_ENCRYPTION_KEY);
+    } catch {
+      account = null;
+    }
+    const token = account?.channel_access_token?.trim();
+    if (!account || !account.is_active || account.archived_at || !token) {
+      return c.json({ success: false, code: 'retry_unavailable', error: 'LINEの接続設定を確認してください' }, 409);
+    }
+    const quota = await notificationQuota(token);
+    if (quota.state === 'unavailable') {
+      return c.json({ success: false, code: 'quota_unavailable', error: '送信枠を確認できないため、再試行を止めました' }, 503);
+    }
+    if (quota.state === 'available' && quota.remaining < 1) {
+      return c.json({ success: false, code: 'quota_insufficient', error: '今月の送信枠が残っていないため、再試行できません' }, 409);
+    }
+    const reservationId = `notification:${delivery.id}:${expectedVersion}`;
+    const reserved = quota.state === 'available'
+      ? await tryReserveQuotaSlot(c.env.DB, lineAccountId, reservationId, 1, quota.used, quota.total)
+      : false;
+    if (quota.state === 'available' && !reserved) {
+      return c.json({ success: false, code: 'quota_insufficient', error: '同時送信を含めると送信枠が足りないため、再試行できません' }, 409);
+    }
+    try {
+      if (Number(delivery.version) !== expectedVersion
+        || !await claimNotificationDeliveryRetry(c.env.DB, {
+          id: delivery.id, lineAccountId, expectedVersion,
+        })) {
+        return c.json({ success: false, code: 'version_conflict', error: 'ほかの担当者が先に再試行しました' }, 409);
+      }
+
+      let result: { data: unknown; requestId: string | null };
+      try {
+        result = await new LineClient(token)
         .pushMessageWithRequestId(delivery.line_user_id, messages, delivery.idempotency_key);
-      await finishNotificationDeliveryRetry(c.env.DB, {
+      } catch (error) {
+        const responseUnknown = lineErrorStatus(error) === null;
+        const transient = responseUnknown || isTransientLineError(error);
+        const nextRetryAt = transient ? new Date(Date.now() + 5 * 60 * 1000).toISOString() : null;
+        const finished = await finishNotificationDeliveryRetry(c.env.DB, {
+          delivery,
+          outcome: transient ? 'retry_wait' : 'failed',
+          errorCode: responseUnknown
+            ? 'provider_response_unknown'
+            : transient ? 'provider_temporary_error' : 'provider_permanent_error',
+          errorMessageSafe: responseUnknown
+            ? 'LINEの応答を確認できません。同じ通知として再試行を待っています'
+            : transient
+              ? 'LINEへの再試行を待っています'
+              : 'LINEが送信を受け付けませんでした。設定と送信内容を確認してください',
+          nextRetryAt,
+        });
+        if (!finished) throw new Error('notification retry result was not recorded');
+        return c.json({
+          success: false,
+          code: transient ? 'retry_scheduled' : 'retry_failed',
+          error: transient ? '一時的な失敗のため、再試行待ちに戻しました' : '再試行できませんでした',
+        }, transient ? 503 : 422);
+      }
+      const finished = await finishNotificationDeliveryRetry(c.env.DB, {
         delivery,
         outcome: 'provider_accepted',
         providerRequestId: result.requestId,
       });
+      if (!finished) throw new Error('notification retry result was not recorded');
       auditLog(c, 'line_notification.delivery.retry', { kind: 'notification_delivery', id: delivery.id });
       return c.json({
         success: true,
@@ -504,23 +680,8 @@ lineNotifications.post(
           version: expectedVersion + 1,
         },
       });
-    } catch (error) {
-      const transient = isTransientLineError(error);
-      const nextRetryAt = transient ? new Date(Date.now() + 5 * 60 * 1000).toISOString() : null;
-      await finishNotificationDeliveryRetry(c.env.DB, {
-        delivery,
-        outcome: transient ? 'retry_wait' : 'failed',
-        errorCode: transient ? 'provider_temporary_error' : 'provider_permanent_error',
-        errorMessageSafe: transient
-          ? 'LINEへの再試行を待っています'
-          : 'LINEが送信を受け付けませんでした。設定と送信内容を確認してください',
-        nextRetryAt,
-      });
-      return c.json({
-        success: false,
-        code: transient ? 'retry_scheduled' : 'retry_failed',
-        error: transient ? '一時的な失敗のため、再試行待ちに戻しました' : '再試行できませんでした',
-      }, transient ? 503 : 422);
+    } finally {
+      if (reserved) await releaseQuotaSlot(c.env.DB, lineAccountId, reservationId);
     }
   },
 );
