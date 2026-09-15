@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+/* eslint-disable @typescript-eslint/no-explicit-any -- lightweight component mocks for interaction coverage */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
