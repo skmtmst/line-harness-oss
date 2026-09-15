@@ -59,7 +59,7 @@ export default function HqAccountList({
                     <AccountIcon account={account} />
                     <div className="min-w-0">
                       <p className="max-w-72 truncate text-sm font-semibold text-ink" title={account.displayName || account.name}>{account.displayName || account.name}</p>
-                      <p className="mt-0.5 max-w-72 truncate text-xs text-ink-faint" title={account.basicId || ''}>{account.basicId || '—'}</p>
+                      <p className="mt-0.5 max-w-72 truncate text-xs text-ink-faint" title={account.basicId || ''}>{account.basicId || 'LINE ID未取得'}</p>
                     </div>
                   </div>
                 </td>

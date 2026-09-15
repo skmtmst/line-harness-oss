@@ -2,12 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { api } from '@/lib/api'
+import { api, fetchApi } from '@/lib/api'
 import { useAccount, type AccountWithStats } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
 import HqAccountList from '@/components/hq/account-list'
 import AccountEditModal from '@/components/accounts/account-edit-modal'
-import NoteBar from '@/components/shared/note-bar'
 import SummaryCard from '@/components/shared/summary-card'
 
 export default function HqPage() {
@@ -17,6 +16,9 @@ export default function HqPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [editingAccount, setEditingAccount] = useState<AccountWithStats | null>(null)
+  const [checkingConnections, setCheckingConnections] = useState(false)
+  const [connectionProgress, setConnectionProgress] = useState('')
+  const [connectionResult, setConnectionResult] = useState('')
 
   const load = useCallback(async () => {
     setError('')
@@ -41,6 +43,43 @@ export default function HqPage() {
     await Promise.all([load(), refreshAccounts()])
   }
 
+  const refreshConnectionInfo = async () => {
+    if (checkingConnections || accounts.length === 0) return
+    setCheckingConnections(true)
+    setConnectionResult('')
+    let succeeded = 0
+    let failed = 0
+    for (const [index, account] of accounts.entries()) {
+      setConnectionProgress(`接続情報を更新中（${index + 1}/${accounts.length}）`)
+      const expectedRevision = account.revision
+      if (typeof expectedRevision !== 'number' || !Number.isInteger(expectedRevision) || expectedRevision < 1) {
+        failed += 1
+        continue
+      }
+      try {
+        await fetchApi(`/api/line-accounts/${encodeURIComponent(account.id)}/connection-checks`, {
+          method: 'POST',
+          headers: { 'Idempotency-Key': `hq-check-${account.id}-${crypto.randomUUID()}` },
+          body: JSON.stringify({ expectedRevision }),
+        })
+        succeeded += 1
+      } catch {
+        failed += 1
+      }
+    }
+    try {
+      await Promise.all([load(), refreshAccounts()])
+      setConnectionResult(failed === 0
+        ? `${succeeded}件のLINE IDと接続状態を更新しました。`
+        : `${succeeded}件を更新し、${failed}件は更新できませんでした。`)
+    } catch {
+      setConnectionResult(`${succeeded}件を確認しましたが、一覧を再読み込みできませんでした。`)
+    } finally {
+      setConnectionProgress('')
+      setCheckingConnections(false)
+    }
+  }
+
   const login = (accountId: string) => {
     setSelectedAccountId(accountId)
     router.push('/')
@@ -56,11 +95,22 @@ export default function HqPage() {
 
   return (
     <div data-design-node="MjMCg">
-      <div data-design="Actions" data-design-node="x5Tkb6" className="mb-4 flex justify-end">
+      <div data-design="Actions" data-design-node="x5Tkb6" className="mb-4 flex flex-wrap justify-end gap-2">
+        <Button
+          type="button"
+          variant="secondary"
+          disabled={checkingConnections || loading || accounts.length === 0}
+          onClick={() => { void refreshConnectionInfo() }}
+        >
+          {checkingConnections ? '接続情報を更新中' : 'LINE ID・接続状態を更新'}
+        </Button>
         <Button href="/accounts/new" variant="primary" className="shrink-0">
           ＋ LINEアカウントを新規登録
         </Button>
       </div>
+
+      {connectionProgress ? <p className="mb-4 text-sm text-ink-secondary" role="status">{connectionProgress}</p> : null}
+      {connectionResult ? <p className="mb-4 rounded-card bg-accent-soft p-4 text-sm text-ink" role="status">{connectionResult}</p> : null}
 
       {error ? <div className="rounded-card bg-danger-bg p-4 text-sm text-danger" role="alert">{error}</div> : null}
 
@@ -78,9 +128,6 @@ export default function HqPage() {
             <SummaryCard variant="v6" title="今月の配信" value={totals.messages} unit="通" detail={`${month}/1 から今日まで`} />
             <SummaryCard variant="v6" title="要確認" value={totals.warnings} unit="件" detail="接続に問題があるアカウント" valueTone="warning" />
           </section>
-          <div data-design="Note" data-design-node="d61vBH" className="mb-4">
-            <NoteBar>LINE公式アカウントごとに管理画面へ入れます。アイコンと名前はLINE公式アカウントの設定をそのまま表示します。</NoteBar>
-          </div>
         </>
       ) : null}
 
