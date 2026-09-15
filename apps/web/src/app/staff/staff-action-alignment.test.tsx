@@ -147,6 +147,25 @@ describe('ログインユーザー操作の表示と実処理 (#834)', () => {
     expect(screen.getByRole('button', { name: 'コピー元さん（見るだけ）' })).toBeTruthy()
   })
 
+  it('見せる範囲の保存を同一render内で二度押ししても更新は1回だけになる', async () => {
+    let release: (() => void) | null = null
+    fixture.updateStaff.mockImplementation(() => new Promise((resolve) => {
+      release = () => resolve({ success: true, data: state.members[0] })
+    }))
+    await mount()
+    fireEvent.click(within(rowFor('対象者')).getByRole('button', { name: '中身を見る' }))
+
+    const save = screen.getByRole('button', { name: /見せる範囲を保存/ })
+    await act(async () => {
+      fireEvent.click(save)
+      fireEvent.click(save)
+    })
+
+    expect(fixture.updateStaff).toHaveBeenCalledTimes(1)
+    await act(async () => { release?.() })
+    await waitFor(() => expect(screen.queryByRole('button', { name: /見せる範囲を保存/ })).toBeNull())
+  })
+
   it('二段階認証は本人だけ操作でき、他人は状態表示だけになる', async () => {
     await mount()
 

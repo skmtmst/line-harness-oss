@@ -159,6 +159,7 @@ function PermissionScopeView({ user, memberId, canSave, copyCandidates, onClose,
   )
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
+  const savingRef = useRef(false)
   const [copyOpen, setCopyOpen] = useState(false)
   const [copySourceId, setCopySourceId] = useState('')
   const [copyNotice, setCopyNotice] = useState('')
@@ -170,6 +171,8 @@ function PermissionScopeView({ user, memberId, canSave, copyCandidates, onClose,
   const save = async () => {
     if (!memberId) return setSaveError('スタッフ情報と結び付いていないため保存できません。名前とメールを確認してください。')
     if (!canSave) return setSaveError('権限のかたまりは管理者だけが変えられます。')
+    if (savingRef.current) return
+    savingRef.current = true
     setSaving(true)
     setSaveError('')
     try {
@@ -179,6 +182,7 @@ function PermissionScopeView({ user, memberId, canSave, copyCandidates, onClose,
     } catch (caught) {
       setSaveError(messageOf(caught))
     } finally {
+      savingRef.current = false
       setSaving(false)
     }
   }
