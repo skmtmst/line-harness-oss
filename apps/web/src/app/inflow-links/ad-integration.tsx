@@ -152,6 +152,14 @@ export default function AdIntegration({ view }: { view: AdView }) {
   const load = useCallback(async () => {
     const generation = ++loadGenerationRef.current
     const accountAtRequest = selectedAccountId
+    if (!accountAtRequest) {
+      setPlatforms([])
+      setLogs([])
+      setLogTotal(0)
+      setFailed(false)
+      setLoading(false)
+      return
+    }
     const isCurrent = () => generation === loadGenerationRef.current && accountAtRequest === latestAccountRef.current
     setLoading(true)
     setFailed(false)
@@ -204,6 +212,16 @@ export default function AdIntegration({ view }: { view: AdView }) {
     anchor.download = `広告への送信履歴_${new Date().toISOString().slice(0, 10)}.csv`
     anchor.click()
     URL.revokeObjectURL(url)
+  }
+
+  if (!selectedAccountId) {
+    return (
+      <ListState
+        kind="empty"
+        title="LINEアカウントを選択してください"
+        description="選んだLINEアカウントの広告費だけを表示します。"
+      />
+    )
   }
 
   if (loading) {

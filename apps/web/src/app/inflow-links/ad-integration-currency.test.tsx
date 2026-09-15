@@ -7,7 +7,7 @@ import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const fixture = vi.hoisted(() => ({ accountId: 'account-a' }))
+const fixture = vi.hoisted(() => ({ accountId: 'account-a' as string | null }))
 
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: fixture.accountId, selectedAccount: null, loading: false }),
@@ -33,7 +33,7 @@ let handler: (path: string) => Promise<unknown> = async () => ({ success: true, 
 let host: HTMLDivElement
 let root: Root
 
-function platform(name: string, monthlyCost: number | undefined, currency: unknown, accountId = fixture.accountId): Platform {
+function platform(name: string, monthlyCost: number | undefined, currency: unknown, accountId = fixture.accountId ?? 'unselected'): Platform {
   return {
     id: `${accountId}-${name}`,
     name,
@@ -144,5 +144,34 @@ describe('N-251 広告費の通貨表示とaccount切替', () => {
     expect(host.textContent).not.toContain('￥999')
     expect(requestedUrls.some((url) => url.includes('lineAccountId=account-a'))).toBe(true)
     expect(requestedUrls.some((url) => url.includes('lineAccountId=account-b'))).toBe(true)
+  })
+
+  it('account未選択では通信せず、選択・解除の両方向で金額を残さない', async () => {
+    const selectedPlatforms = deferred<unknown>()
+    fixture.accountId = null
+    handler = async (path) => {
+      if (path.startsWith('/api/ad-platforms/logs')) return logs()
+      return selectedPlatforms.promise
+    }
+
+    await act(async () => { root.render(<AdIntegration view="metrics" />) })
+    await settle()
+    expect(host.textContent).toContain('LINEアカウントを選択してください')
+    expect(requestedUrls).toHaveLength(0)
+
+    fixture.accountId = 'account-b'
+    await act(async () => { root.render(<AdIntegration view="metrics" />) })
+    await settle()
+    expect(requestedUrls.some((url) => url.includes('lineAccountId=account-b'))).toBe(true)
+
+    fixture.accountId = null
+    await act(async () => { root.render(<AdIntegration view="metrics" />) })
+    await settle()
+    const callsAfterClearing = requestedUrls.length
+    selectedPlatforms.resolve({ success: true, data: [platform('google', 2000, 'USD', 'account-b')] })
+    await settle()
+    expect(host.textContent).toContain('LINEアカウントを選択してください')
+    expect(host.textContent).not.toContain('$2,000.00')
+    expect(requestedUrls).toHaveLength(callsAfterClearing)
   })
 })
