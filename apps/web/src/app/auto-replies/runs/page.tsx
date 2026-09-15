@@ -277,7 +277,7 @@ export default function AutoReplyRunsPage() {
                         <StatusBadge tone={view.tone} size="compact">{view.label}</StatusBadge>
                         <time className={styles.time} dateTime={item.occurredAt}>{formatTime(item.occurredAt)}</time>
                         {item.canRetry ? (
-                          <div className={styles.retryRow}>
+                          <div data-retry-row>
                             <Button
                               variant="secondary"
                               size="field"
