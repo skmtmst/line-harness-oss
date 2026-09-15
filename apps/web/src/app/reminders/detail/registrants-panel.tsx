@@ -1,16 +1,15 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useParams } from 'next/navigation'
 import { api, type ReminderRegistrant } from '@/lib/api'
-import { usePageTitle } from '@/components/shell/page-chrome'
+import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
-import Breadcrumb from '@/components/shared/breadcrumb'
 import Card, { CardHeader } from '@/components/shared/card'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
 import { TextInput } from '@/components/shared/form-controls'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
+
 
 function dateTimeLocal(value: string): string {
   const date = new Date(value)
@@ -27,15 +26,14 @@ function formatDate(value: string): string {
   }).format(date)
 }
 
-export function ReminderRegistrantsPage({ reminderId }: { reminderId: string }) {
-  const [name, setName] = useState('')
+export function ReminderRegistrantsPanel({ reminderId }: { reminderId: string }) {
+  const { selectedAccountId } = useAccount()
   const [items, setItems] = useState<ReminderRegistrant[]>([])
   const [draftDates, setDraftDates] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [actioningId, setActioningId] = useState<string | null>(null)
   const [notice, setNotice] = useState('')
-  usePageTitle(name ? `${name}・登録者` : 'リマインダ登録者')
 
   const load = useCallback(async () => {
     if (!reminderId) {
@@ -46,12 +44,8 @@ export function ReminderRegistrantsPage({ reminderId }: { reminderId: string }) 
     setLoading(true)
     setError('')
     try {
-      const [reminder, registrants] = await Promise.all([
-        api.reminders.get(reminderId),
-        api.reminders.registrants.list(reminderId),
-      ])
-      if (!reminder.success || !registrants.success) throw new Error('load failed')
-      setName(reminder.data.name)
+      const registrants = await api.reminders.registrants.list(reminderId)
+      if (!registrants.success) throw new Error('load failed')
       setItems(registrants.data)
       setDraftDates(Object.fromEntries(registrants.data.map((item) => [item.id, dateTimeLocal(item.targetDate)])))
     } catch {
@@ -62,7 +56,12 @@ export function ReminderRegistrantsPage({ reminderId }: { reminderId: string }) 
     }
   }, [reminderId])
 
-  useEffect(() => { void load() }, [load])
+  useEffect(() => {
+    // アカウント切替直後に前の店舗の一覧を見せたままにしない。
+    setItems([])
+    setDraftDates({})
+    void load()
+  }, [load, selectedAccountId])
 
   const activeCount = useMemo(() => items.filter((item) => item.status === 'active').length, [items])
   const apply = (id: string, value: { targetDate: string; status: string; lockVersion: number }) => {
@@ -108,14 +107,9 @@ export function ReminderRegistrantsPage({ reminderId }: { reminderId: string }) 
     } finally { setActioningId(null) }
   }
 
-  return <main className="space-y-4">
-    <Breadcrumb items={[{ label: 'リマインダ', href: '/reminders' }, { label: name || '登録者' }]} />
-    <div className="flex flex-wrap items-start justify-between gap-3">
-      <div><h1 className="text-xl font-bold">{name || 'リマインダ'}の登録者</h1><p className="text-ink-faint mt-1 text-sm">基準日の変更・取消・再開を行えます。送信済みの履歴は消えません。</p></div>
-      <div className="flex gap-2"><Button href={`/reminders/edit?id=${encodeURIComponent(reminderId)}`}>設定を編集</Button><Button href={`/reminders/detail?id=${encodeURIComponent(reminderId)}`}>実行履歴</Button></div>
-    </div>
+  return <section className="space-y-4" aria-label="登録者を管理">
     {notice ? <NoteBar tone="info">{notice}</NoteBar> : null}
-    <Card padding="default"><CardHeader title="登録状況" meta={`登録 ${items.length}件 / 有効 ${activeCount}件`} /></Card>
+    <Card padding="default"><CardHeader title="登録者を管理" meta={`登録 ${items.length}件 / 有効 ${activeCount}件`} /><p className="text-ink-faint mt-1 text-sm">基準日の変更・取消・再開を行えます。送信済みの履歴は消えません。</p></Card>
     {loading ? <ListState kind="loading" /> : error ? <ListState kind="error" title="登録者を表示できませんでした" description={error} onRetry={() => void load()} /> : items.length === 0 ? <ListState kind="empty" emptyPreset="readonly" title="登録者はいません" description="このリマインダに登録すると、ここで基準日と状態を管理できます。" /> : (
       <DataTable><thead><TableHeadRow><Th>友だち</Th><Th>基準日</Th><Th>状態</Th><Th>登録</Th><Th align="right">操作</Th></TableHeadRow></thead><tbody>
         {items.map((item) => <Tr key={item.id}>
@@ -130,11 +124,5 @@ export function ReminderRegistrantsPage({ reminderId }: { reminderId: string }) 
         </Tr>)}
       </tbody></DataTable>
     )}
-  </main>
-}
-
-export default function ReminderRegistrantsRoute() {
-  const params = useParams<{ id?: string | string[] }>()
-  const reminderId = typeof params.id === 'string' ? params.id : ''
-  return <ReminderRegistrantsPage reminderId={reminderId} />
+  </section>
 }

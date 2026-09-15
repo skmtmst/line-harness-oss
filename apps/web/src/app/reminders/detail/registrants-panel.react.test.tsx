@@ -2,7 +2,7 @@
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { ReminderRegistrantsPage } from './page'
+import { ReminderRegistrantsPanel } from './registrants-panel'
 
 const apiMock = vi.hoisted(() => ({
   get: vi.fn(),
@@ -13,8 +13,8 @@ const apiMock = vi.hoisted(() => ({
 }))
 
 vi.mock('next/link', () => ({ default: ({ children }: { children: unknown }) => <>{children}</> }))
-vi.mock('next/navigation', () => ({ useParams: () => ({ id: 'reminder-1' }) }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined }))
+const account = vi.hoisted(() => ({ selectedAccountId: 'account-a' }))
+vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: account.selectedAccountId }) }))
 vi.mock('@/lib/api', () => ({
   api: { reminders: {
     get: apiMock.get,
@@ -37,7 +37,7 @@ let host: HTMLDivElement
 let root: Root
 
 beforeEach(() => {
-  apiMock.get.mockResolvedValue({ success: true, data: { name: '来店前の案内', steps: [] } })
+  account.selectedAccountId = 'account-a'
   apiMock.list.mockResolvedValue({ success: true, data: [registrant] })
   apiMock.updateTargetDate.mockResolvedValue({ success: true, data: { id: registrant.id, friendId: registrant.friendId, targetDate: '2026-10-08T00:00:00.000Z', status: 'active', reminderVersionId: 'snapshot-1', lockVersion: 5, replayed: false } })
   apiMock.cancel.mockResolvedValue({ success: true, data: { id: registrant.id, friendId: registrant.friendId, targetDate: registrant.targetDate, status: 'cancelled', reminderVersionId: 'snapshot-1', lockVersion: 5, replayed: false } })
@@ -56,7 +56,7 @@ afterEach(async () => {
 
 async function render() {
   await act(async () => {
-    root.render(<ReminderRegistrantsPage reminderId="reminder-1" />)
+    root.render(<ReminderRegistrantsPanel reminderId="reminder-1" />)
     await Promise.resolve()
     await Promise.resolve()
   })
@@ -67,7 +67,7 @@ async function click(label: string) {
   await act(async () => { button.click(); await Promise.resolve(); await Promise.resolve() })
 }
 
-describe('リマインダ登録者の正本URL画面 (#868)', () => {
+describe('リマインダ詳細の登録者管理 (#868)', () => {
   it('直URLの登録者一覧から基準日を保存し、リマインダID・版番号を実APIへ渡す', async () => {
     await render()
     expect(host.textContent).toContain('田中 花子')
@@ -105,5 +105,20 @@ describe('リマインダ登録者の正本URL画面 (#868)', () => {
     apiMock.list.mockResolvedValueOnce({ success: false, error: 'not found' })
     await render()
     expect(host.textContent).toContain('登録者を表示できませんでした')
+  })
+
+  it('アカウント切替では前の登録者を残さず、対象を読み直す', async () => {
+    apiMock.list.mockResolvedValueOnce({ success: true, data: [registrant] }).mockResolvedValueOnce({ success: true, data: [] })
+    await render()
+    expect(host.textContent).toContain('田中 花子')
+    account.selectedAccountId = 'account-b'
+    await act(async () => {
+      root.render(<ReminderRegistrantsPanel reminderId="reminder-1" />)
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+    expect(apiMock.list).toHaveBeenCalledTimes(2)
+    expect(host.textContent).toContain('登録者はいません')
+    expect(host.textContent).not.toContain('田中 花子')
   })
 })

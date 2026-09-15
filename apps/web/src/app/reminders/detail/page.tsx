@@ -20,6 +20,7 @@ import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-ba
 import { LinePreview, ReminderFooter } from '@/components/reminders/reminder-v6-ui'
 import styles from './reminder-runs.module.css'
 import { csvCell } from '@/lib/presentation'
+import { ReminderRegistrantsPanel } from './registrants-panel'
 
 const PAGE_SIZE = 20
 
@@ -258,6 +259,7 @@ export default function ReminderRunsPage() {
 
       <div className={styles.columns}>
         <main className={styles.main}>
+          <ReminderRegistrantsPanel reminderId={reminderId} />
           <Card overflow="hidden">
             <CardHeader title="通知実績" />
             <p className={styles.sectionNote}>ステップごとの送信状況を確認できます。</p>

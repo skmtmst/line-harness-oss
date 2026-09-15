@@ -18,6 +18,7 @@ const FRIEND_B = 'friend-b';
 const ENROLLMENT_A = 'registration-a';
 const ENROLLMENT_B = 'registration-b';
 const OWNER_KEY = 'owner-registrants-key';
+const ADMIN_KEY = 'admin-registrants-key';
 const STAFF_A_KEY = 'staff-a-registrants-key';
 const STAFF_B_KEY = 'staff-b-registrants-key';
 
@@ -32,6 +33,8 @@ function seed() {
   }
   sqlite.raw.prepare(`INSERT INTO staff_members (id, name, role, api_key, tenant_id, account_scope) VALUES ('owner', 'オーナー', 'owner', ?, ?, 'all')`)
     .run(OWNER_KEY, TENANT);
+  sqlite.raw.prepare(`INSERT INTO staff_members (id, name, role, api_key, tenant_id, account_scope) VALUES ('admin', '管理者', 'admin', ?, ?, 'all')`)
+    .run(ADMIN_KEY, TENANT);
   for (const [id, key, accountId] of [['staff-a', STAFF_A_KEY, ACC_A], ['staff-b', STAFF_B_KEY, ACC_B]] as const) {
     sqlite.raw.prepare(`INSERT INTO staff_members (id, name, role, api_key, tenant_id, account_scope, permission_keys) VALUES (?, ?, 'staff', ?, ?, 'accounts', '["/reminders"]')`)
       .run(id, id, key, TENANT);
@@ -114,6 +117,15 @@ describe('リマインダ登録者の変更・取消・再開 (N-064)', () => {
     expect(replay.status).toBe(200);
     expect((await replay.json() as { data: { replayed: boolean } }).data.replayed).toBe(true);
     expect(readEnrollment().lock_version).toBe(1);
+  });
+
+  test('admin は従来どおり登録者一覧と操作を行える', async () => {
+    expect((await request(`/api/reminders/${REMINDER_A}/registrants`, ADMIN_KEY)).status).toBe(200);
+    const changed = await request(`/api/reminders/${REMINDER_A}/registrants/${ENROLLMENT_A}`, ADMIN_KEY, 'PATCH', {
+      targetDate: '2026-10-03T10:00:00+09:00', expectedLockVersion: 0,
+    });
+    expect(changed.status).toBe(200);
+    expect(readEnrollment()).toMatchObject({ lock_version: 1, status: 'active' });
   });
 
   test('取消と再開は同じ版を二重変更せず、再開しても過去の送信・旧runを復活させない', async () => {
