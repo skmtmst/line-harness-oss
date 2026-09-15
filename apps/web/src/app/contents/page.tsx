@@ -100,6 +100,13 @@ function isKnownUnused(item: MediaItem): boolean {
 /** 格子と一覧。**中身は同じ。並べ方だけを切り替える。** */
 type MediaView = 'grid' | 'list'
 type MediaManagementPermission = 'loading' | 'allowed' | 'denied' | 'error'
+type MediaDetailPhase = 'idle' | 'loading' | 'ready' | 'unavailable'
+
+function mediaDetailIdFromLocation(): string | null {
+  if (typeof window === 'undefined') return null
+  const id = new URLSearchParams(window.location.search).get('id')?.trim()
+  return id || null
+}
 
 export default function MediaLibraryPage() {
   const [view, setView] = useState<MediaView>('grid')
@@ -150,7 +157,13 @@ export default function MediaLibraryPage() {
    */
   const displaySrc = (item: MediaItem): string =>
     selectedAccountId ? api.media.contentUrl(item.id, selectedAccountId) : ''
+  const [urlReady, setUrlReady] = useState(false)
+  const [detailId, setDetailId] = useState<string | null>(null)
   const [detailsFor, setDetailsFor] = useState<MediaItem | null>(null)
+  const [detailFolderName, setDetailFolderName] = useState<string | null>(null)
+  const [detailPhase, setDetailPhase] = useState<MediaDetailPhase>('idle')
+  const detailRequestRef = useRef(0)
+  const detailAccountRef = useRef<string | null | undefined>(undefined)
   const [replacementFor, setReplacementFor] = useState<MediaItem | null>(null)
   /*
     1件ずつの削除確認（設計 `YfTfJ`）。**窓を開けてから読む。**
@@ -189,6 +202,24 @@ export default function MediaLibraryPage() {
   */
   const [mediaManagementPermission, setMediaManagementPermission] = useState<MediaManagementPermission>('loading')
 
+  const setDetailUrl = useCallback((id: string | null, mode: 'push' | 'replace' = 'push') => {
+    const url = new URL(window.location.href)
+    if (id) url.searchParams.set('id', id)
+    else url.searchParams.delete('id')
+    const nextUrl = `${url.pathname}${url.search}${url.hash}`
+    if (mode === 'replace') window.history.replaceState(window.history.state, '', nextUrl)
+    else window.history.pushState(window.history.state, '', nextUrl)
+    setDetailId(id)
+  }, [])
+
+  useEffect(() => {
+    const syncFromUrl = () => setDetailId(mediaDetailIdFromLocation())
+    syncFromUrl()
+    setUrlReady(true)
+    window.addEventListener('popstate', syncFromUrl)
+    return () => window.removeEventListener('popstate', syncFromUrl)
+  }, [])
+
   useEffect(() => {
     let active = true
     void api.staff.me().then((response) => {
@@ -207,6 +238,51 @@ export default function MediaLibraryPage() {
       active = false
     }
   }, [])
+
+  useEffect(() => {
+    if (!urlReady || accountLoading) return
+    const previousAccount = detailAccountRef.current
+    detailAccountRef.current = selectedAccountId
+    if (previousAccount !== undefined && previousAccount !== selectedAccountId) {
+      detailRequestRef.current += 1
+      setDetailsFor(null)
+      setDetailFolderName(null)
+      setDetailPhase('idle')
+      if (detailId) setDetailUrl(null, 'replace')
+      return
+    }
+    const request = detailRequestRef.current + 1
+    detailRequestRef.current = request
+    setDetailsFor(null)
+    setDetailFolderName(null)
+    if (!detailId) {
+      setDetailPhase('idle')
+      return
+    }
+    if (!selectedAccountId) {
+      setDetailPhase('unavailable')
+      return
+    }
+    const accountAtRequest = selectedAccountId
+    setDetailPhase('loading')
+    void api.media.detail(detailId, accountAtRequest).then((response) => {
+      if (detailRequestRef.current !== request || latestAccountRef.current !== accountAtRequest) return
+      if (!response.success) {
+        setDetailPhase('unavailable')
+        return
+      }
+      setDetailsFor(response.data.item)
+      setDetailFolderName(response.data.folderName)
+      setDetailPhase('ready')
+    }).catch(() => {
+      if (detailRequestRef.current === request && latestAccountRef.current === accountAtRequest) {
+        setDetailPhase('unavailable')
+      }
+    })
+    return () => {
+      if (detailRequestRef.current === request) detailRequestRef.current += 1
+    }
+  }, [accountLoading, detailId, selectedAccountId, setDetailUrl, urlReady])
 
   const canManageMedia = mediaManagementPermission === 'allowed'
   const managementPermissionReason = mediaManagementPermission === 'loading'
@@ -296,8 +372,8 @@ export default function MediaLibraryPage() {
   }, [accountLoading, selectedAccountId])
 
   useEffect(() => {
-    if (!accountLoading) void load()
-  }, [accountLoading, load])
+    if (!accountLoading && urlReady && !detailId) void load()
+  }, [accountLoading, detailId, load, urlReady])
 
   const rename = async () => {
     if (!renaming || !selectedAccountId || renamingBusy) return
@@ -547,20 +623,35 @@ export default function MediaLibraryPage() {
   const removable = items.filter(isKnownUnused)
   const allSelected = removable.length > 0 && removable.every((item) => selected.has(item.id))
 
+  if (!urlReady || (detailId && (detailPhase === 'idle' || detailPhase === 'loading'))) {
+    return <ListState kind="loading" title="メディアの詳細を読み込んでいます" />
+  }
+
+  if (detailId && (detailPhase === 'unavailable' || !detailsFor)) {
+    return (
+      <ListState
+        kind="empty"
+        title="メディアの詳細を開けません"
+        description="メディアが存在しないか、このLINEアカウントでは表示できません。"
+        action={<Button type="button" onClick={() => setDetailUrl(null)}>登録メディア一覧へ戻る</Button>}
+      />
+    )
+  }
+
   if (detailsFor) {
     return (
       <MediaDetailDialog
         item={detailsFor}
         accountId={selectedAccountId}
-        folderName={detailsFor.folderId ? folders.find((folder) => folder.id === detailsFor.folderId)?.name ?? '—（未取得）' : '未分類'}
+        folderName={detailsFor.folderId ? detailFolderName ?? '—（未取得）' : '未分類'}
         canManage={canManageMedia}
-        onClose={() => setDetailsFor(null)}
+        onClose={() => setDetailUrl(null)}
         onOpenReplacement={(item) => {
-          setDetailsFor(null)
+          setDetailUrl(null)
           setReplacementFor(item)
         }}
         onVersionCreated={(message) => {
-          setDetailsFor(null)
+          setDetailUrl(null)
           setSuccessMessage(message)
           void load()
         }}
@@ -919,7 +1010,7 @@ export default function MediaLibraryPage() {
 
                 <div className="mt-auto flex items-center justify-end gap-1 pt-1">
                   <button
-                    onClick={() => setDetailsFor(item)}
+                    onClick={() => setDetailUrl(item.id)}
                     disabled={!canManageMedia}
                     title={canManageMedia ? '使用箇所を見る' : managementPermissionReason}
                     aria-label={`${item.filename}の使用箇所`}

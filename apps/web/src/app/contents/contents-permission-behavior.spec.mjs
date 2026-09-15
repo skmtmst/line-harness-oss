@@ -117,6 +117,13 @@ async function respond(url, staffMe, role) {
   }
   if (path === '/api/media/quota') return ok(MEDIA_QUOTA)
   if (/^\/api\/media\/[^/]+\/delete-impact$/.test(path)) return ok(DELETE_IMPACT)
+  if (/^\/api\/media\/[^/]+$/.test(path)) {
+    const accountId = url.searchParams.get('accountId') ?? ACCOUNTS[0].id
+    const item = mediaItems(accountId).find((candidate) => candidate.id === path.split('/').at(-1))
+    return item
+      ? ok({ item, folderName: item.folderId ? FOLDERS[0].name : null })
+      : { status: 404, body: { success: false, error: 'メディアが見つかりません' } }
+  }
   /*
     ここに無い口は「用意していない」と返す。空配列などを一律に返すと、
     形が合わないまま画面が描けてしまい、落ちる理由が分からなくなる。

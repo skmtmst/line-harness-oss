@@ -49,6 +49,17 @@ function setup() {
     );
     CREATE TABLE friend_bulk_runs (id TEXT PRIMARY KEY, operation_json TEXT NOT NULL);
     CREATE TABLE friend_bulk_run_items (run_id TEXT NOT NULL, line_account_id TEXT);
+    -- 現在のtemplate repositoryは保存時にメディア使用台帳も同じbatchで更新する。
+    -- 252→347だけを再現するこのfixtureにも、その後追加された必要最小表を置く。
+    CREATE TABLE media (id TEXT PRIMARY KEY, line_account_id TEXT, r2_key TEXT NOT NULL);
+    CREATE TABLE media_versions (media_id TEXT NOT NULL, r2_key TEXT NOT NULL);
+    CREATE TABLE media_usages (
+      media_id TEXT NOT NULL,
+      ref_kind TEXT NOT NULL,
+      ref_id TEXT NOT NULL,
+      scanned_at TEXT NOT NULL,
+      PRIMARY KEY (media_id, ref_kind, ref_id)
+    );
   `)
   sqlite.exec(migration)
   sqlite.exec(migration347)
