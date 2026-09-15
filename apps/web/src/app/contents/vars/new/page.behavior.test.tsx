@@ -62,10 +62,10 @@ async function render() {
   await act(async () => { root.render(React.createElement(NewCommonVarPage)) })
 }
 
-function byId(id: string): HTMLInputElement | HTMLTextAreaElement {
+function byId(id: string): HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement {
   const el = host.querySelector(`#${id}`)
   if (!el) throw new Error(`見つかりません: #${id}`)
-  return el as HTMLInputElement | HTMLTextAreaElement
+  return el as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
 }
 
 /** 「登録」の完全一致だけを拾う。部分一致だと秘密値警告側の
@@ -76,12 +76,15 @@ function byExactText(tag: string, text: string): HTMLElement {
   return found as HTMLElement
 }
 
-async function setValue(element: HTMLInputElement | HTMLTextAreaElement, value: string) {
-  const proto = element instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype
+async function setValue(element: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement, value: string) {
+  const proto = element instanceof HTMLTextAreaElement
+    ? HTMLTextAreaElement.prototype
+    : element instanceof HTMLSelectElement ? HTMLSelectElement.prototype : HTMLInputElement.prototype
   const setter = Object.getOwnPropertyDescriptor(proto, 'value')!.set!
   await act(async () => {
     setter.call(element, value)
     element.dispatchEvent(new Event('input', { bubbles: true }))
+    if (element instanceof HTMLSelectElement) element.dispatchEvent(new Event('change', { bubbles: true }))
   })
 }
 
@@ -106,6 +109,26 @@ afterEach(async () => {
 })
 
 describe('共通情報の新規作成(実React)', () => {
+  it.each([
+    ['long_text', '案内'.repeat(5_000), 'TEXTAREA', null],
+    ['date', '2028-02-29', 'INPUT', 'date'],
+    ['datetime', '2028-02-29T23:59', 'INPUT', 'datetime-local'],
+    ['boolean', 'true', 'SELECT', null],
+  ])('%sを選ぶと適切な入力欄で保存payloadへ渡す', async (type, value, tagName, inputType) => {
+    await render()
+    await setValue(byId('cv-name'), `${type}の項目`)
+    await setValue(byId('cv-key'), `${type}_value`)
+    await click(host.querySelector(`input[name="cv-type"][value="${type}"]`) as HTMLInputElement)
+
+    const control = byId('cv-value')
+    expect(control.tagName).toBe(tagName)
+    if (inputType) expect((control as HTMLInputElement).type).toBe(inputType)
+    await setValue(control, value)
+    await click(byExactText('button', '登録'))
+
+    expect(api.create).toHaveBeenCalledWith(expect.objectContaining({ type, value }))
+  })
+
   it('日本語の秘密値ラベルを社内メモに書くと、送信前に警告して止める', async () => {
     await render()
     await setValue(byId('cv-name'), '営業時間')
