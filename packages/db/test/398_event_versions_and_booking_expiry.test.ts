@@ -40,7 +40,11 @@ function legacyDb(): Database.Database {
       status TEXT NOT NULL,
       requested_at TEXT NOT NULL
     );
-    CREATE TABLE event_waitlist (id TEXT PRIMARY KEY);
+    CREATE TABLE event_waitlist (
+      id TEXT PRIMARY KEY,
+      event_id TEXT NOT NULL,
+      slot_id TEXT NOT NULL
+    );
   `);
   return db;
 }
@@ -63,6 +67,10 @@ describe('migration 398 event versions and booking expiry', () => {
     db.prepare(
       `INSERT INTO event_bookings (id, event_id, slot_id, status, requested_at)
        VALUES ('booking-1', 'event-1', 'slot-1', 'requested', '2026-09-10T01:02:03.000Z')`,
+    ).run();
+    db.prepare(
+      `INSERT INTO event_waitlist (id, event_id, slot_id)
+       VALUES ('waitlist-1', 'event-1', 'slot-1')`,
     ).run();
 
     db.exec(migration);
@@ -91,6 +99,16 @@ describe('migration 398 event versions and booking expiry', () => {
     ).get()).toEqual({
       event_version_id: 'event-version:event-1:1',
       approval_expires_at: '2026-09-11T01:02:03.000Z',
+      event_name: '旧イベント',
+      slot_starts_at: '2026-10-01T01:00:00.000Z',
+    });
+    expect(db.prepare(
+      `SELECT event_version_id,
+              json_extract(event_snapshot_json, '$.eventName') AS event_name,
+              json_extract(event_snapshot_json, '$.slotStartsAt') AS slot_starts_at
+         FROM event_waitlist WHERE id = 'waitlist-1'`,
+    ).get()).toEqual({
+      event_version_id: 'event-version:event-1:1',
       event_name: '旧イベント',
       slot_starts_at: '2026-10-01T01:00:00.000Z',
     });

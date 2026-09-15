@@ -36,6 +36,7 @@ interface WaitingRow {
   party_size: number;
   version: number;
   created_at: string;
+  event_snapshot_json: string | null;
 }
 
 interface BookingApplicantRow {
@@ -611,7 +612,8 @@ export async function promoteEventWaitlist(
 
   const waiting = await db
     .prepare(
-      `SELECT id, line_account_id, friend_id, party_size, version, created_at
+      `SELECT id, line_account_id, friend_id, party_size, version, created_at,
+              event_snapshot_json
          FROM event_waitlist
         WHERE slot_id = ? AND status = 'waiting'
         ORDER BY created_at ASC, id ASC
@@ -731,14 +733,19 @@ export async function promoteEventWaitlist(
   }
 
   try {
+    const snapshot = parseSnapshot(waiting.event_snapshot_json) as Record<string, unknown> | null;
     await params.sender({
       waitlistId: waiting.id,
       lineAccountId: waiting.line_account_id,
       friendId: waiting.friend_id,
-      eventName: occurrence.event_name,
-      startsAt: occurrence.starts_at,
-      venueName: occurrence.venue_name,
-      venueUrl: occurrence.venue_url,
+      eventName: typeof snapshot?.eventName === 'string'
+        ? snapshot.eventName : occurrence.event_name,
+      startsAt: typeof snapshot?.slotStartsAt === 'string'
+        ? snapshot.slotStartsAt : occurrence.starts_at,
+      venueName: snapshot?.venueName === null || typeof snapshot?.venueName === 'string'
+        ? snapshot.venueName : occurrence.venue_name,
+      venueUrl: snapshot?.venueUrl === null || typeof snapshot?.venueUrl === 'string'
+        ? snapshot.venueUrl : occurrence.venue_url,
       token,
       expiresAt,
     });

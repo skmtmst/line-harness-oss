@@ -19,6 +19,7 @@ type TestEnv = {
 
 function setup() {
   const testDb = createTestD1({ foreignKeys: true });
+  let requestDb = testDb.db;
   testDb.raw.prepare(`INSERT INTO tenants (id, name) VALUES ('tenant-a', 'A社'), ('tenant-b', 'B社')`).run();
   testDb.raw.prepare(
     `INSERT INTO line_accounts
@@ -34,11 +35,59 @@ function setup() {
   const app = new Hono<TestEnv>();
   app.use('*', async (c, next) => {
     c.set('staff', { id: 'staff-a', role: 'owner', tenantId: 'tenant-a' });
-    c.env = { DB: testDb.db };
+    c.env = { DB: requestDb };
     await next();
   });
   app.route('/', events);
-  return { app, ...testDb };
+  return {
+    app,
+    ...testDb,
+    setRequestDb(db: D1Database) { requestDb = db; },
+  };
+}
+
+function concurrentUpdateDb(base: D1Database): D1Database {
+  let reads = 0;
+  let releaseReads!: () => void;
+  const bothRead = new Promise<void>((resolve) => { releaseReads = resolve; });
+  let batchTail = Promise.resolve();
+
+  function wrap(statement: D1PreparedStatement, barrier: boolean): D1PreparedStatement {
+    return {
+      bind(...values: unknown[]) {
+        return wrap(statement.bind(...values), barrier);
+      },
+      async first<T>(column?: string) {
+        if (barrier && reads < 2) {
+          reads++;
+          if (reads === 2) releaseReads();
+          await bothRead;
+        }
+        return column === undefined ? statement.first<T>() : statement.first<T>(column);
+      },
+      all: <T>() => statement.all<T>(),
+      run: <T>() => statement.run<T>(),
+      raw: <T>() => statement.raw<T>(),
+    } as unknown as D1PreparedStatement;
+  }
+
+  return {
+    prepare(query: string) {
+      const isInitialEventRead = /SELECT \* FROM events[\s\S]*WHERE id = \? AND deleted_at IS NULL/.test(query);
+      return wrap(base.prepare(query), isInitialEventRead);
+    },
+    async batch(statements: D1PreparedStatement[]) {
+      let releaseBatch!: () => void;
+      const prior = batchTail;
+      batchTail = new Promise<void>((resolve) => { releaseBatch = resolve; });
+      await prior;
+      try {
+        return await base.batch(statements);
+      } finally {
+        releaseBatch();
+      }
+    },
+  } as unknown as D1Database;
 }
 
 async function createPublishedEvent(
@@ -69,6 +118,37 @@ beforeEach(() => {
 });
 
 describe('N-418 公開版と申込履歴の固定', () => {
+  test('同じexpected versionの並行更新は1件だけ成功し、version 2を1行だけ作る', async () => {
+    const { app, raw, db, setRequestDb } = setup();
+    const event = await createPublishedEvent(app);
+    setRequestDb(concurrentUpdateDb(db));
+
+    const update = (body: Record<string, unknown>) => app.request(
+      `/api/events/admin/events/${event.id}?account_id=account-a`,
+      {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ ...body, expected_version: 1 }),
+      },
+    );
+    const responses = await Promise.all([
+      update({ name: '並行更新A' }),
+      update({ venue_name: '並行更新B' }),
+    ]);
+
+    expect(responses.map((response) => response.status).sort()).toEqual([200, 409]);
+    expect((raw.prepare(
+      `SELECT version, version_write_token FROM events WHERE id = ?`,
+    ).get(event.id))).toEqual({ version: 2, version_write_token: null });
+    expect(raw.prepare(
+      `SELECT version_number, COUNT(*) AS count
+         FROM event_versions WHERE event_id = ? GROUP BY version_number ORDER BY version_number`,
+    ).all(event.id)).toEqual([
+      { version_number: 1, count: 1 },
+      { version_number: 2, count: 1 },
+    ]);
+  });
+
   test('expected versionが古い更新は409となり、イベントも公開版も増えない', async () => {
     const { app, raw } = setup();
     const event = await createPublishedEvent(app);

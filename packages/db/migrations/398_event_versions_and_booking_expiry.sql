@@ -85,3 +85,28 @@ SET event_version_id = (
         THEN strftime('%Y-%m-%dT%H:%M:%fZ', requested_at, '+24 hours')
       ELSE NULL
     END;
+
+-- A waitlist entry is also an application. Freeze the version and occurrence
+-- text now so a later promotion cannot turn a pre-migration application into
+-- the event's latest edited definition.
+UPDATE event_waitlist
+SET event_version_id = (
+      SELECT e.current_published_version_id FROM events e WHERE e.id = event_waitlist.event_id
+    ),
+    event_snapshot_json = (
+      SELECT json_object(
+        'eventName', e.name,
+        'eventImageUrl', e.image_url,
+        'eventDescription', e.description,
+        'venueName', e.venue_name,
+        'venueUrl', e.venue_url,
+        'cancelDeadlineHoursBefore', e.cancel_deadline_hours_before,
+        'confirmationMessageExtra', e.confirmation_message_extra,
+        'slotStartsAt', s.starts_at,
+        'slotEndsAt', s.ends_at,
+        'approvalDeadlineHours', 24
+      )
+      FROM events e
+      JOIN event_slots s ON s.id = event_waitlist.slot_id
+      WHERE e.id = event_waitlist.event_id
+    );
