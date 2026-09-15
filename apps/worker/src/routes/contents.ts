@@ -50,11 +50,13 @@ import {
   validateFieldKey,
   COMMON_VAR_TYPES,
   normalizeCommonVarValue,
+  normalizeCommonVarValidityAt,
   type Media,
   type MediaKind,
   type CommonVar,
   type CommonVarSchedule,
   type CommonVarType,
+  type CommonVarExpiryBehavior,
   type CommonVarUsageImpact,
   type CommonVarUsageItem,
   type CommonVarReplacementPlan,
@@ -1176,6 +1178,10 @@ function serializeVar(row: CommonVar) {
     type: row.type,
     value: row.value,
     memo: row.memo ?? '',
+    validFrom: row.valid_from ?? null,
+    validUntil: row.valid_until ?? null,
+    fallbackValue: row.fallback_value ?? null,
+    expiryBehavior: row.expiry_behavior ?? 'stop',
     version: Number(row.version ?? 1),
     archivedAt: row.archived_at ?? null,
     createdAt: row.created_at,
@@ -1187,6 +1193,36 @@ function serializeVar(row: CommonVar) {
     usageCount: Number(row.usage_count ?? 0),
     usageByKind: row.usage_by_kind ?? null,
   };
+}
+
+function parseCommonVarValidity(body: Record<string, unknown>, existing?: CommonVar) {
+  const parseAt = (key: 'validFrom' | 'validUntil', current: string | null = null) => {
+    if (!(key in body)) return { value: current, present: false };
+    const raw = body[key];
+    if (raw === null || raw === '') return { value: null, present: true };
+    const value = normalizeCommonVarValidityAt(raw);
+    if (!value) throw new RequestBodyError(400, `${key === 'validFrom' ? '有効開始' : '有効終了'}の日時が正しくありません`);
+    return { value, present: true };
+  };
+  const validFrom = parseAt('validFrom', existing?.valid_from ?? null);
+  const validUntil = parseAt('validUntil', existing?.valid_until ?? null);
+  if (validFrom.value && validUntil.value && validFrom.value >= validUntil.value) {
+    throw new RequestBodyError(400, '有効終了は有効開始より後にしてください');
+  }
+  const expiryRaw = body.expiryBehavior ?? existing?.expiry_behavior ?? 'stop';
+  if (expiryRaw !== 'stop' && expiryRaw !== 'fallback') {
+    throw new RequestBodyError(400, '期限切れ時の動作が正しくありません');
+  }
+  const expiryBehavior = expiryRaw as CommonVarExpiryBehavior;
+  const fallbackPresent = 'fallbackValue' in body;
+  const fallbackRaw = fallbackPresent ? body.fallbackValue : existing?.fallback_value;
+  const fallbackValue = fallbackRaw === null || fallbackRaw === undefined || fallbackRaw === ''
+    ? null
+    : String(fallbackRaw);
+  if (expiryBehavior === 'fallback' && fallbackValue === null) {
+    throw new RequestBodyError(400, '期限切れ時に使う代替値を入力してください');
+  }
+  return { validFrom, validUntil, expiryBehavior, fallbackValue, fallbackPresent };
 }
 
 function serializeSchedule(row: CommonVarSchedule) {
@@ -1591,6 +1627,13 @@ contents.post('/api/common-vars', requireRole('owner', 'admin'), async (c) => {
     if (memo.length > 1000) {
       return c.json({ success: false, error: 'メモは1000文字までで入力してください' }, 400);
     }
+    const validity = parseCommonVarValidity(body);
+    const fallbackValue = validity.fallbackValue === null
+      ? null
+      : normalizeCommonVarValue(type, validity.fallbackValue);
+    if (validity.fallbackValue !== null && fallbackValue === null) {
+      return c.json({ success: false, error: '代替値は種別に合う値を入力してください' }, 400);
+    }
 
     const created = await createCommonVar(c.env.DB, {
       lineAccountId: accountId,
@@ -1601,9 +1644,16 @@ contents.post('/api/common-vars', requireRole('owner', 'admin'), async (c) => {
       memo,
       actorId: c.get('staff').id,
       folderId: body.folderId ? String(body.folderId) : null,
+      validFrom: validity.validFrom.value,
+      validUntil: validity.validUntil.value,
+      fallbackValue,
+      expiryBehavior: validity.expiryBehavior,
     });
     return c.json({ success: true, data: serializeVar(created) }, 201);
   } catch (err) {
+    if (err instanceof RequestBodyError) {
+      return c.json({ success: false, error: err.message }, err.status);
+    }
     if (err instanceof CommonVarFolderError) {
       return c.json({ success: false, error: '指定のフォルダが見つかりません。フォルダを選び直してください' }, 400);
     }
@@ -1661,6 +1711,13 @@ contents.patch('/api/common-vars/:id', requireRole('owner', 'admin'), async (c) 
     if (patchMemo !== undefined && patchMemo.length > 1000) {
       return c.json({ success: false, error: 'メモは1000文字までで入力してください' }, 400);
     }
+    const validity = parseCommonVarValidity(body, existing);
+    const normalizedFallback = validity.fallbackValue === null
+      ? null
+      : normalizeCommonVarValue(existing.type as CommonVarType, validity.fallbackValue);
+    if (validity.fallbackValue !== null && normalizedFallback === null) {
+      return c.json({ success: false, error: '代替値は種別に合う値を入力してください' }, 400);
+    }
     // N-185: 影響確認なしの保存を止める。確認値は対象ID・版・使用先集合の写し。
     // 形の検査は先に済ませているため、ここからは確認値だけを見る。
     const presentedProof = parseCommonVarImpactProof(body.impactProof);
@@ -1702,10 +1759,17 @@ contents.patch('/api/common-vars/:id', requireRole('owner', 'admin'), async (c) 
       expectedVersion,
       actorId: c.get('staff').id,
       changeReason: typeof body.changeReason === 'string' ? body.changeReason : undefined,
+      ...(validity.validFrom.present ? { validFrom: validity.validFrom.value } : {}),
+      ...(validity.validUntil.present ? { validUntil: validity.validUntil.value } : {}),
+      ...(validity.fallbackPresent ? { fallbackValue: normalizedFallback } : {}),
+      ...(body.expiryBehavior !== undefined ? { expiryBehavior: validity.expiryBehavior } : {}),
       ...(('folderId' in body) ? { folderId: body.folderId ? String(body.folderId) : null } : {}),
     });
     return c.json({ success: true, data: serializeVar(updated!) });
   } catch (err) {
+    if (err instanceof RequestBodyError) {
+      return c.json({ success: false, error: err.message }, err.status);
+    }
     if (err instanceof CommonVarFolderError) {
       return c.json({ success: false, error: '指定のフォルダが見つかりません。フォルダを選び直してください' }, 400);
     }

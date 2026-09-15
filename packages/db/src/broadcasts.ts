@@ -43,6 +43,10 @@ export interface Broadcast {
   track_links: number;
   /** 何分かけて配るか。0なら一気に送る。 */
   stealth_spread_minutes?: number;
+  /** 初回実行時に固定した、account別の共通情報値・版。 */
+  common_var_snapshot?: string | null;
+  /** Worker再試行でも変えない共通情報の判定時刻。 */
+  common_var_snapshot_at?: string | null;
   /** SegmentConditionのJSON。segment配信だけが持つ。 */
   segment_conditions?: string | null;
   folder_id?: string | null;

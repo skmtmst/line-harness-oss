@@ -5387,6 +5387,10 @@ export const api = {
       value?: string
       memo?: string
       folderId?: string | null
+      validFrom?: string | null
+      validUntil?: string | null
+      fallbackValue?: string | null
+      expiryBehavior?: 'stop' | 'fallback'
     }) =>
       fetchApi<ApiResponse<CommonVar>>('/api/common-vars', {
         method: 'POST',
@@ -5401,6 +5405,10 @@ export const api = {
       expectedVersion?: number
       changeReason?: string
       impactProof?: string
+      validFrom?: string | null
+      validUntil?: string | null
+      fallbackValue?: string | null
+      expiryBehavior?: 'stop' | 'fallback'
     }) =>
       fetchApi<ApiResponse<CommonVar>>(`/api/common-vars/${id}?accountId=${encodeURIComponent(accountId)}`, {
         method: 'PATCH',

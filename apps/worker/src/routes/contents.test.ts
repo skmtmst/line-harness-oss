@@ -109,6 +109,13 @@ const mocks = {
     }
     return value.length <= 200 ? value : null;
   },
+  normalizeCommonVarValidityAt: (value: unknown) => {
+    if (value === null || value === undefined || value === '') return null;
+    if (typeof value !== 'string') return null;
+    const source = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value) ? `${value}:00+09:00` : value;
+    const at = new Date(source);
+    return Number.isFinite(at.getTime()) ? at.toISOString() : null;
+  },
   validateFieldKey: (key: unknown) =>
     typeof key === 'string' && /^[a-z][a-z0-9_]{0,31}$/.test(key) && key !== 'name'
       ? { ok: true as const }

@@ -49,6 +49,13 @@ function jstNowLocalInput(): { date: string; time: string } {
   return { date: jst.slice(0, 10), time: jst.slice(11, 16) }
 }
 
+function utcToJstLocalInput(value: string | null): string {
+  if (!value) return ''
+  const parsed = new Date(value)
+  if (!Number.isFinite(parsed.getTime())) return ''
+  return new Date(parsed.getTime() + 9 * 3600_000).toISOString().slice(0, 16)
+}
+
 function EditCommonVarInner() {
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const latestAccountRef = useRef(selectedAccountId)
@@ -70,6 +77,10 @@ function EditCommonVarInner() {
   const [folderId, setFolderId] = useState('')
   const [value, setValue] = useState('')
   const [memo, setMemo] = useState('')
+  const [validFrom, setValidFrom] = useState('')
+  const [validUntil, setValidUntil] = useState('')
+  const [expiryBehavior, setExpiryBehavior] = useState<'stop' | 'fallback'>('stop')
+  const [fallbackValue, setFallbackValue] = useState('')
 
   /** 予約を足す窓。開いていない間は null。 */
   const [draft, setDraft] = useState<{ date: string; time: string; value: string } | null>(null)
@@ -187,6 +198,10 @@ function EditCommonVarInner() {
       setFolderId(found.folderId ?? '')
       setValue(found.value)
       setMemo(found.memo)
+      setValidFrom(utcToJstLocalInput(found.validFrom))
+      setValidUntil(utcToJstLocalInput(found.validUntil))
+      setExpiryBehavior(found.expiryBehavior ?? 'stop')
+      setFallbackValue(found.fallbackValue ?? '')
     } catch {
       if (accountAtRequest === latestAccountRef.current) setError('読み込みに失敗しました')
     } finally {
@@ -203,6 +218,14 @@ function EditCommonVarInner() {
     const accountAtRequest = selectedAccountId
     if (!name.trim()) {
       setError('共通情報名を入力してください')
+      return
+    }
+    if (validFrom && validUntil && validFrom >= validUntil) {
+      setError('有効終了は有効開始より後にしてください')
+      return
+    }
+    if (expiryBehavior === 'fallback' && !fallbackValue) {
+      setError('期限切れ時に使う代替値を入力してください')
       return
     }
     setSaving(true)
@@ -229,6 +252,10 @@ function EditCommonVarInner() {
         folderId: folderId || null,
         expectedVersion: item.version,
         impactProof: preview.data.impactProof,
+        validFrom: validFrom || null,
+        validUntil: validUntil || null,
+        expiryBehavior,
+        fallbackValue: expiryBehavior === 'fallback' ? fallbackValue : null,
       })
       if (accountAtRequest !== latestAccountRef.current) return
       if (!res.success) {
@@ -480,6 +507,31 @@ function EditCommonVarInner() {
                     placeholder="運用上の注意や、この値の使い方を書きます"
                   />
                 </div>
+
+                <fieldset className="border-hairline rounded-control space-y-3 border p-4">
+                  <legend className="text-ink-secondary px-1 text-sm font-medium">配信で使える期間</legend>
+                  <p className="text-ink-faint text-xs">予約配信は送信を始める時刻で判定します。空欄なら期間を制限しません。</p>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div>
+                      <label htmlFor="cv-valid-from" className="text-ink-secondary mb-1 block text-xs font-medium">有効開始</label>
+                      <input id="cv-valid-from" type="datetime-local" value={validFrom} onChange={(e) => { setSaved(false); setValidFrom(e.target.value) }} className="border-hairline rounded-control w-full border px-3 py-2 text-sm" />
+                    </div>
+                    <div>
+                      <label htmlFor="cv-valid-until" className="text-ink-secondary mb-1 block text-xs font-medium">有効終了</label>
+                      <input id="cv-valid-until" type="datetime-local" value={validUntil} onChange={(e) => { setSaved(false); setValidUntil(e.target.value) }} className="border-hairline rounded-control w-full border px-3 py-2 text-sm" />
+                    </div>
+                  </div>
+                  <div>
+                    <label htmlFor="cv-expiry-behavior" className="text-ink-secondary mb-1 block text-xs font-medium">期間外の動作</label>
+                    <SelectField id="cv-expiry-behavior" value={expiryBehavior} onChange={(e) => { setSaved(false); setExpiryBehavior(e.target.value as 'stop' | 'fallback') }} options={[{ value: 'stop', label: '配信を止める' }, { value: 'fallback', label: '代替値を使う' }]} />
+                  </div>
+                  {expiryBehavior === 'fallback' && (
+                    <div>
+                      <label htmlFor="cv-fallback-value" className="text-ink-secondary mb-1 block text-xs font-medium">代替値</label>
+                      <input id="cv-fallback-value" type={item.type === 'number' ? 'number' : 'text'} value={fallbackValue} onChange={(e) => { setSaved(false); setFallbackValue(e.target.value) }} className="border-hairline rounded-control w-full border px-3 py-2 text-sm" />
+                    </div>
+                  )}
+                </fieldset>
 
                 <p className="text-ink-faint text-xs">
                   種別：{VAR_TYPE_LABELS[item.type] ?? item.type}（登録後は変更できません）
