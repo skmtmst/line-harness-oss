@@ -131,7 +131,6 @@ export default function LoginAudit({ userId }: { userId?: string }) {
         ? undefined
         : new Date(Date.now() - Number(periodFilter) * 24 * 60 * 60 * 1000).toISOString()
       const category = actionFilter === 'login' ? 'auth' as const : undefined
-      const resultFilter = actionFilter === 'attention' ? 'failed' as const : undefined
       const action = actionFilter === 'deleted'
         ? 'delete'
         : actionFilter === 'sent'
@@ -145,7 +144,7 @@ export default function LoginAudit({ userId }: { userId?: string }) {
         query: query.trim() || undefined,
         from,
         category,
-        result: resultFilter,
+        attention: actionFilter === 'attention' ? true : undefined,
         action,
         limit: pageSize,
         offset: (page - 1) * pageSize,

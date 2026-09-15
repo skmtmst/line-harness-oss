@@ -45,6 +45,13 @@ function enumQuery<T extends string>(raw: string | undefined, allowed: readonly 
   return allowed.includes(raw as T) ? raw as T : null;
 }
 
+function booleanQuery(raw: string | undefined): boolean | undefined | null {
+  if (raw === undefined || raw === '') return undefined;
+  if (raw === 'true') return true;
+  if (raw === 'false') return false;
+  return null;
+}
+
 function dateQuery(raw: string | undefined): string | undefined | null {
   if (raw === undefined || raw === '') return undefined;
   return Number.isNaN(Date.parse(raw)) ? null : raw;
@@ -150,11 +157,12 @@ access.get(
   async (c) => {
     const category = enumQuery(c.req.query('category'), AUDIT_CATEGORIES);
     const result = enumQuery(c.req.query('result'), AUDIT_RESULTS);
+    const attention = booleanQuery(c.req.query('attention'));
     const from = dateQuery(c.req.query('from'));
     const to = dateQuery(c.req.query('to'));
     const limit = integerQuery(c.req.query('limit'), 20, 1, 200);
     const offset = integerQuery(c.req.query('offset'), 0, 0, 100_000);
-    if (category === null || result === null || from === null || to === null || limit === null || offset === null) {
+    if (category === null || result === null || attention === null || from === null || to === null || limit === null || offset === null) {
       return c.json({ success: false, error: '絞り込み条件を確認してください' }, 400);
     }
     if (from && to && Date.parse(from) > Date.parse(to)) {
@@ -170,6 +178,7 @@ access.get(
         lineAccountId: accessScope.lineAccountId,
         category,
         result,
+        attentionOnly: attention,
         actorId: c.req.query('actorId')?.trim() || undefined,
         action: c.req.query('action')?.trim() || undefined,
         query: c.req.query('query')?.trim() || undefined,

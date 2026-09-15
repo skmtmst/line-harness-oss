@@ -33,10 +33,14 @@ export async function runEventBookingExpirer(
       `SELECT b.id, b.line_account_id, b.friend_id, b.event_id, b.slot_id, s.starts_at
          FROM event_bookings b
          LEFT JOIN event_slots s ON s.id = b.slot_id
-        WHERE b.status = 'requested' AND b.requested_at < ?
+        WHERE b.status = 'requested'
+          AND (
+            (b.approval_expires_at IS NOT NULL AND b.approval_expires_at <= ?)
+            OR (b.approval_expires_at IS NULL AND b.requested_at <= ?)
+          )
         LIMIT 200`,
     )
-    .bind(cutoff)
+    .bind(params.now.toISOString(), cutoff)
     .all<StaleRow>();
 
   let expired = 0;

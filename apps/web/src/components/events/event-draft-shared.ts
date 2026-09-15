@@ -29,6 +29,7 @@ export const EVENT_DEFAULT_DRAFT: EventDetail = {
   description_centered: 0,
   max_bookings_per_friend: null,
   requires_approval: 0,
+  approval_deadline_hours: 24,
   cancel_deadline_hours_before: null,
   reminder_day_before_enabled: 1,
   reminder_hours_before: null,
@@ -42,6 +43,7 @@ export const EVENT_DEFAULT_DRAFT: EventDetail = {
   visible_tag_id: null,
   waitlist_enabled: 0,
   entry_cutoff_hours_before: null,
+  version: 1,
 }
 
 /**
