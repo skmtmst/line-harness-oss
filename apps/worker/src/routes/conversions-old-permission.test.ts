@@ -17,6 +17,8 @@ const dbMocks = {
   decideConversionApproval: vi.fn(),
   syncAffiliateConversionMileage: vi.fn().mockResolvedValue(undefined),
   getConversionApprovalNotifyInfo: vi.fn().mockResolvedValue(null),
+  // N-212 の案件動作はここでは対象外 — 案件なしとして通す。
+  getConversionOfferActionPlan: vi.fn().mockResolvedValue(null),
   ConversionDefinitionError: class ConversionDefinitionError extends Error {},
   CONVERSION_DEFINITION_USAGE_KINDS: [],
 };

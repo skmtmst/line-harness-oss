@@ -15,6 +15,8 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 const fixture = vi.hoisted(() => ({
   listImpl: null as null | ((params?: unknown) => Promise<unknown>),
   bulkDecideImpl: null as null | ((items: unknown) => Promise<unknown>),
+  approveImpl: null as null | ((eventId: string, expectedStatus: string) => Promise<unknown>),
+  approveCalls: [] as Array<{ eventId: string; expectedStatus: string }>,
   bulkDecideCalls: [] as unknown[],
 }))
 
@@ -22,7 +24,10 @@ vi.mock('@/lib/api', () => ({
   api: {
     conversionApprovals: {
       list: (params?: unknown) => fixture.listImpl!(params),
-      approve: vi.fn(),
+      approve: (eventId: string, expectedStatus: string) => {
+        fixture.approveCalls.push({ eventId, expectedStatus })
+        return fixture.approveImpl!(eventId, expectedStatus)
+      },
       reject: vi.fn(),
       bulkDecide: (items: unknown) => {
         fixture.bulkDecideCalls.push(items)
@@ -49,11 +54,14 @@ function item(eventId: string, friendName: string) {
     value: 1000,
     approvalStatus: 'pending',
     duplicateFlag: false,
+    offerActionsIncomplete: false,
   }
 }
 
 beforeEach(() => {
   fixture.bulkDecideCalls = []
+  fixture.approveCalls = []
+  fixture.approveImpl = async () => ({ success: true, data: { id: 'x', approvalStatus: 'approved' } })
   let decided = false
   fixture.listImpl = async (params?: unknown) => {
     const status = (params as { status?: string } | undefined)?.status
@@ -161,5 +169,112 @@ describe('一括承認の確認と結果表示', () => {
     const reopened = await screen.findByRole('dialog')
     expect(within(reopened).queryByText('利用者1／紹介者1／案件A')).toBeNull()
     expect(within(reopened).getByText('利用者2／紹介者1／案件A')).toBeTruthy()
+  })
+})
+
+/*
+ * 付帯動作のやり直し(N-212)。
+ * 承認は済んでいて案件のタグ付与・シナリオ開始だけ未完の行に
+ * 「付帯動作をやり直す」を出す。押下は既存の承認PATCHの already_set
+ * 経路を使い、成功したら一覧を読み直す。
+ */
+describe('付帯動作のやり直し', () => {
+  function useApprovedList(flagged: { current: boolean }) {
+    fixture.listImpl = async (params?: unknown) => {
+      const status = (params as { status?: string } | undefined)?.status
+      if (status === 'approved') {
+        return {
+          success: true,
+          data: [
+            { ...item('ev-1', '利用者1'), approvalStatus: 'approved', offerActionsIncomplete: flagged.current },
+            { ...item('ev-2', '利用者2'), approvalStatus: 'approved', offerActionsIncomplete: false },
+          ],
+        }
+      }
+      return { success: true, data: [] }
+    }
+  }
+
+  async function openApprovedTab() {
+    render(<ApprovalQueue />)
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /認めた/ })).toBeTruthy()
+    })
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /認めた/ }))
+    })
+  }
+
+  test('未完の行にだけボタンが出て、クリックで既存approveが呼ばれ、成功後に再読込で消える', async () => {
+    const flagged = { current: true }
+    useApprovedList(flagged)
+    fixture.approveImpl = async () => {
+      flagged.current = false
+      return { success: true, data: { id: 'ev-1', approvalStatus: 'approved' } }
+    }
+
+    await openApprovedTab()
+    // flag が立った行にだけ出る（ev-2 には出ない）。
+    const retry = await screen.findByRole('button', { name: '付帯動作をやり直す' })
+    expect(screen.getAllByRole('button', { name: '付帯動作をやり直す' })).toHaveLength(1)
+
+    await act(async () => {
+      fireEvent.click(retry)
+    })
+    expect(fixture.approveCalls).toEqual([{ eventId: 'ev-1', expectedStatus: 'approved' }])
+    // 成功で読み直し → flag が下りると列ごと消える。
+    await waitFor(() => {
+      expect(screen.queryByRole('button', { name: '付帯動作をやり直す' })).toBeNull()
+    })
+  })
+
+  test('失敗は一覧のエラー領域に理由が出る', async () => {
+    useApprovedList({ current: true })
+    fixture.approveImpl = async () => {
+      throw new Error('タグ付与後の処理が残っています')
+    }
+
+    await openApprovedTab()
+    await act(async () => {
+      fireEvent.click(await screen.findByRole('button', { name: '付帯動作をやり直す' }))
+    })
+    await waitFor(() => {
+      expect(screen.getByText('タグ付与後の処理が残っています')).toBeTruthy()
+    })
+  })
+
+  test('実行中はボタンが無効になり二重にrequestが出ない', async () => {
+    useApprovedList({ current: true })
+    let resolveApprove!: (value: unknown) => void
+    fixture.approveImpl = () => new Promise((resolve) => { resolveApprove = resolve })
+
+    await openApprovedTab()
+    const retry = await screen.findByRole('button', { name: '付帯動作をやり直す' })
+    fireEvent.click(retry)
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: '付帯動作をやり直す' })).toHaveProperty('disabled', true)
+    })
+    fireEvent.click(screen.getByRole('button', { name: '付帯動作をやり直す' }))
+    expect(fixture.approveCalls).toHaveLength(1)
+    await act(async () => {
+      resolveApprove({ success: true, data: { id: 'ev-1', approvalStatus: 'approved' } })
+    })
+  })
+
+  test('未承認・却下タブにはボタンを出さない', async () => {
+    // 既定のlistImpl（pending 2件・approved/rejected 0件）のまま。
+    render(<ApprovalQueue />)
+    await waitFor(() => {
+      expect(screen.getByLabelText('利用者1の成果を選ぶ')).toBeTruthy()
+    })
+    expect(screen.queryByRole('button', { name: '付帯動作をやり直す' })).toBeNull()
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /却下した/ }))
+    })
+    await waitFor(() => {
+      expect(screen.getByText('条件に合う成果がありません')).toBeTruthy()
+    })
+    expect(screen.queryByRole('button', { name: '付帯動作をやり直す' })).toBeNull()
   })
 })
