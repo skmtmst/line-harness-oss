@@ -18,8 +18,8 @@ function fixture(messageText = 'ご案内') {
     sql.raw.prepare("INSERT INTO scenarios(id,name,trigger_type,line_account_id) VALUES (?,?,'manual',?)").run(`scenario-${account}`, 'Scenario', account);
   }
   const definition: RichMenuHqDefinition = { schemaVersion: 1, richMenu: { id: 'menu', name: 'Menu', chatBarText: '開く', size: 'large', defaultPageId: 'p1', pages: [
-    { id: 'p1', name: 'One', imageR2Key: 'hq-templates/tenant/image1', areas: [{ id: 'ar1', bounds: { x: 0, y: 0, width: 100, height: 100 }, actionType: 'uri', actionData: {}, intent: 'form', formId: 'source-form' }, { id: 'ar3', bounds: { x: 100, y: 0, width: 100, height: 100 }, actionType: 'message', actionData: { text: messageText }, intent: 'text', tagIds: ['source-tag'] }, { id: 'ar4', bounds: { x: 200, y: 0, width: 100, height: 100 }, actionType: 'postback', actionData: {}, intent: 'template', templateId: 'source-template' }] },
-    { id: 'p2', name: 'Two', imageR2Key: 'hq-templates/tenant/image2', areas: [{ id: 'ar2', bounds: { x: 0, y: 0, width: 100, height: 100 }, actionType: 'richmenuswitch', actionData: { targetPageId: 'p1' }, intent: 'switch' }] },
+    { id: 'p1', name: 'One', imageR2Key: 'hq-templates/tenant/image1', areas: [{ id: 'ar1', bounds: { x: 0, y: 0, width: 100, height: 100 }, actionType: 'uri', actionData: {}, intent: 'form', formId: 'source-form', label: 'フォーム' }, { id: 'ar3', bounds: { x: 100, y: 0, width: 100, height: 100 }, actionType: 'message', actionData: { text: messageText }, intent: 'text', tagIds: ['source-tag'], label: 'ご案内' }, { id: 'ar4', bounds: { x: 200, y: 0, width: 100, height: 100 }, actionType: 'postback', actionData: {}, intent: 'template', templateId: 'source-template', label: 'テンプレ' }] },
+    { id: 'p2', name: 'Two', imageR2Key: 'hq-templates/tenant/image2', areas: [{ id: 'ar2', bounds: { x: 0, y: 0, width: 100, height: 100 }, actionType: 'richmenuswitch', actionData: { targetPageId: 'p1' }, intent: 'switch', label: '1ページ目' }] },
   ] } };
   const input = { templateVersionId: 'version', definitionJson: JSON.stringify(definition) };
   sql.raw.prepare("INSERT INTO hq_templates(id,tenant_id,template_type,name) VALUES ('template','tenant','rich_menu','Menu')").run();
@@ -133,7 +133,7 @@ describe('rich-menu HQ store atomic adapter', () => {
     const row = f.raw.prepare('SELECT * FROM rich_menu_groups').get() as any;
     const pages = (f.raw.prepare('SELECT * FROM rich_menu_pages WHERE group_id=? ORDER BY order_index').all(row.id) as any[]).map(p => ({
       id: p.id, orderIndex: p.order_index, name: p.name, imageR2Key: p.image_r2_key, imageContentType: p.image_content_type, lineRichMenuId: p.line_richmenu_id,
-      areas: (f.raw.prepare('SELECT * FROM rich_menu_areas WHERE page_id=? ORDER BY rowid').all(p.id) as any[]).map(a => ({ id: a.id, bounds: { x: a.bounds_x, y: a.bounds_y, width: a.bounds_width, height: a.bounds_height }, actionType: a.action_type, actionData: JSON.parse(a.action_data), intent: a.intent, formId: a.form_id, templateId: a.template_id, tagIds: JSON.parse(a.tag_ids) })),
+      areas: (f.raw.prepare('SELECT * FROM rich_menu_areas WHERE page_id=? ORDER BY rowid').all(p.id) as any[]).map(a => ({ id: a.id, bounds: { x: a.bounds_x, y: a.bounds_y, width: a.bounds_width, height: a.bounds_height }, actionType: a.action_type, actionData: JSON.parse(a.action_data), intent: a.intent, formId: a.form_id, templateId: a.template_id, tagIds: JSON.parse(a.tag_ids), label: a.label })),
     }));
     const group: GroupInput = { id: row.id, size: row.size, chatBarText: row.chat_bar_text, isDefaultForAll: false, formBaseUrl: 'https://liff.line.me/fixture-a', pages };
     const createRichMenu = vi.fn(async (_payload: unknown) => ({ richMenuId: `fake-${crypto.randomUUID()}` }));
@@ -177,8 +177,8 @@ describe('rich-menu HQ store atomic adapter', () => {
   it('rejects more than 100 snapshot guard bindings before resolving refs or querying DB', () => {
     const f = fixture(), resolveReference = vi.fn();
     const definitionWithTags = (count: number) => ({ ...f.definition, richMenu: { ...f.definition.richMenu, pages: [{ ...f.definition.richMenu.pages[0], areas: [
-      { id: 'many-1', bounds: { x: 0, y: 0, width: 100, height: 100 }, actionType: 'message', actionData: { text: '案内' }, intent: 'text', tagIds: Array.from({ length: Math.min(count, 30) }, (_, i) => `source-${i}`) },
-      { id: 'many-2', bounds: { x: 100, y: 0, width: 100, height: 100 }, actionType: 'message', actionData: { text: '案内' }, intent: 'text', tagIds: Array.from({ length: Math.max(0, count - 30) }, (_, i) => `source-${i + 30}`) },
+      { id: 'many-1', bounds: { x: 0, y: 0, width: 100, height: 100 }, actionType: 'message', actionData: { text: '案内' }, intent: 'text', label: 'ボタン1', tagIds: Array.from({ length: Math.min(count, 30) }, (_, i) => `source-${i}`) },
+      { id: 'many-2', bounds: { x: 100, y: 0, width: 100, height: 100 }, actionType: 'message', actionData: { text: '案内' }, intent: 'text', label: 'ボタン2', tagIds: Array.from({ length: Math.max(0, count - 30) }, (_, i) => `source-${i + 30}`) },
     ] }] } });
     const build = (count: number) => createRichMenuHqTemplateAdapter({ ...f.options, resolveReference, input: { ...f.input, definitionJson: JSON.stringify(definitionWithTags(count)) } });
     expect(() => build(46)).not.toThrow(); // 7 root + 92 refs + 1 expected = 100.

@@ -40,7 +40,7 @@ describe('resolveSwitcherActions', () => {
       {
         id: 'p2', orderIndex: 1, name: 'p2',
         imageR2Key: null, imageContentType: null, lineRichMenuId: null,
-        areas: [],
+        areas: [VALID_AREA],
       },
     ];
     const resolved = resolveSwitcherActions(pages, groupId);
@@ -132,6 +132,17 @@ function makeMockR2(): R2Like {
   };
 }
 
+/**
+ * #827 以降、公開には「切替以外の行き先を持つボタン」が1つ必要で、全ボタンに
+ * 読み上げラベルが必須。publish を通す group はこれを1つ含める。
+ */
+const VALID_AREA = {
+  bounds: { x: 0, y: 0, width: 100, height: 100 },
+  actionType: 'uri' as const,
+  actionData: { uri: 'https://example.com' },
+  label: 'リンク',
+};
+
 describe('publishRichMenuGroup', () => {
   it('空の message action は LINE API を呼ぶ前に分かりやすく拒否する', async () => {
     const line = makeMockLineClient();
@@ -148,13 +159,14 @@ describe('publishRichMenuGroup', () => {
               bounds: { x: 0, y: 0, width: 100, height: 100 },
               actionType: 'message',
               actionData: { text: '' },
+              label: '送信ボタン',
             }],
           }],
         },
         line,
         r2,
       ),
-    ).rejects.toThrow('ページ「基本メニュー」のタップ領域1: 送信テキストを入力してください');
+    ).rejects.toThrow('ページ「基本メニュー」の「送信ボタン」: 送信テキストを入力してください');
     expect(line.calls).toEqual([]);
   });
 
@@ -171,6 +183,7 @@ describe('publishRichMenuGroup', () => {
           bounds: { x: 0, y: 0, width: 100, height: 100 },
           actionType: 'uri' as const,
           actionData: { uri: '   ' },
+          label: 'リンク',
         }],
       }],
     };
@@ -203,6 +216,7 @@ describe('validateRichMenuGroupForPublish', () => {
         bounds: { x: 0, y: 0, width: 100, height: 100 },
         actionType,
         actionData,
+        label: 'ボタン',
       }],
     }],
   });
@@ -287,16 +301,54 @@ describe('validateRichMenuGroupForPublish', () => {
     });
 
     it('alias と data が揃っていれば許可する', () => {
-      accepts(
-        groupWith('richmenuswitch', { richMenuAliasId: 'lhx-gid12345-1', data: 'switch-to-p2' }),
-      );
+      const group = groupWith('richmenuswitch', { richMenuAliasId: 'lhx-gid12345-1', data: 'switch-to-p2' });
+      // 切替だけでは行き先ゼロなので、行き先のあるボタンを1つ足す。
+      group.pages[0].areas.push(VALID_AREA);
+      accepts(group);
     });
   });
 
   it('どのページのどの領域かをメッセージに含める', () => {
     const group = groupWith('message', { text: '' }, 'クーポン');
     expect(() => validateRichMenuGroupForPublish(group))
-      .toThrow('ページ「クーポン」のタップ領域1: 送信テキストを入力してください');
+      .toThrow('ページ「クーポン」の「ボタン」: 送信テキストを入力してください');
+  });
+
+  describe('#827: 読み上げラベルと行き先', () => {
+    it.each([
+      ['未設定', undefined],
+      ['空文字', ''],
+      ['空白のみ', '   '],
+    ])('ボタン名が %s なら拒否する', (_label, label) => {
+      const group = groupWith('uri', { uri: 'https://x.example' });
+      group.pages[0].areas[0].label = label as unknown as string;
+      rejects(group, 'ボタン名（読み上げラベル）を入力してください');
+    });
+
+    it('ボタン名が21文字なら拒否する', () => {
+      const group = groupWith('uri', { uri: 'https://x.example' });
+      group.pages[0].areas[0].label = 'あ'.repeat(21);
+      rejects(group, '20文字以内');
+    });
+
+    it('ボタン名がちょうど20文字なら許可する', () => {
+      const group = groupWith('uri', { uri: 'https://x.example' });
+      group.pages[0].areas[0].label = 'あ'.repeat(20);
+      accepts(group);
+    });
+
+    it('切替ボタンしか無いグループは、行き先ゼロとして拒否する', () => {
+      rejects(
+        groupWith('richmenuswitch', { richMenuAliasId: 'lhx-gid12345-1', data: 'switch-to-p2' }),
+        'ページ切替以外の行き先',
+      );
+    });
+
+    it('ボタンが1つも無いグループは拒否する', () => {
+      const group = groupWith('uri', { uri: 'https://x.example' });
+      group.pages[0].areas = [];
+      rejects(group, 'ページ切替以外の行き先');
+    });
   });
 });
 
@@ -316,6 +368,7 @@ describe('publishRichMenuGroup', () => {
               bounds: { x: 0, y: 0, width: 100, height: 100 },
               actionType: 'message',
               actionData: { text: '' },
+              label: '送信ボタン',
             }],
           }],
         },
@@ -340,6 +393,7 @@ describe('publishRichMenuGroup', () => {
             bounds: { x: 0, y: 0, width: 100, height: 100 },
             actionType: 'postback',
             actionData: { data: 'go', displayText: '' },
+            label: 'ボタン',
           }],
         }],
       },
@@ -367,6 +421,7 @@ describe('publishRichMenuGroup', () => {
             bounds: { x: 0, y: 0, width: 100, height: 100 },
             actionType: 'postback',
             actionData: { data: 'go', displayText: '受付しました' },
+            label: 'ボタン',
           }],
         }],
       },
@@ -393,7 +448,7 @@ describe('publishRichMenuGroup', () => {
           id: 'p1', orderIndex: 0, name: 'p1',
           imageR2Key: 'rich-menus/test/p1.png', imageContentType: 'image/png',
           lineRichMenuId: 'old-1',
-          areas: [],
+          areas: [VALID_AREA],
         }],
       },
       line,
@@ -415,8 +470,8 @@ describe('publishRichMenuGroup', () => {
       {
         id: 'gid12345-aaaa', size: 'large', chatBarText: 'm', isDefaultForAll: false,
         pages: [
-          { id: 'p1', orderIndex: 0, name: 'p1', imageR2Key: 'a.png', imageContentType: 'image/png', lineRichMenuId: null, areas: [] },
-          { id: 'p2', orderIndex: 1, name: 'p2', imageR2Key: 'b.png', imageContentType: 'image/png', lineRichMenuId: null, areas: [] },
+          { id: 'p1', orderIndex: 0, name: 'p1', imageR2Key: 'a.png', imageContentType: 'image/png', lineRichMenuId: null, areas: [VALID_AREA] },
+          { id: 'p2', orderIndex: 1, name: 'p2', imageR2Key: 'b.png', imageContentType: 'image/png', lineRichMenuId: null, areas: [VALID_AREA] },
         ],
       },
       line,
@@ -439,7 +494,7 @@ describe('publishRichMenuGroup', () => {
         pages: [{
           id: 'p1', orderIndex: 0, name: 'p1',
           imageR2Key: 'a.png', imageContentType: 'image/png',
-          lineRichMenuId: null, areas: [],
+          lineRichMenuId: null, areas: [VALID_AREA],
         }],
       },
       line,
@@ -460,7 +515,7 @@ describe('publishRichMenuGroup', () => {
         pages: [{
           id: 'p1', orderIndex: 0, name: 'p1',
           imageR2Key: 'a.png', imageContentType: 'image/png',
-          lineRichMenuId: 'old-1', areas: [],
+          lineRichMenuId: 'old-1', areas: [VALID_AREA],
         }],
       },
       line,
@@ -481,7 +536,7 @@ describe('publishRichMenuGroup', () => {
         pages: [{
           id: 'p1', orderIndex: 0, name: 'p1',
           imageR2Key: 'a.png', imageContentType: 'image/png',
-          lineRichMenuId: 'old-1', areas: [],
+          lineRichMenuId: 'old-1', areas: [VALID_AREA],
         }],
       },
       line,
@@ -503,7 +558,7 @@ describe('publishRichMenuGroup', () => {
         pages: [{
           id: 'p1', orderIndex: 0, name: 'p1',
           imageR2Key: 'a.png', imageContentType: 'image/png',
-          lineRichMenuId: null, areas: [],
+          lineRichMenuId: null, areas: [VALID_AREA],
         }],
       },
       line,
@@ -523,7 +578,7 @@ describe('publishRichMenuGroup', () => {
           pages: [{
             id: 'p1', orderIndex: 0, name: 'p1',
             imageR2Key: 'missing.png', imageContentType: 'image/png',
-            lineRichMenuId: null, areas: [],
+            lineRichMenuId: null, areas: [VALID_AREA],
           }],
         },
         line,
@@ -543,8 +598,8 @@ describe('publishRichMenuGroup', () => {
       {
         id: 'gid12345-aaaa', size: 'large', chatBarText: 'm', isDefaultForAll: false,
         pages: [
-          { id: 'p1', orderIndex: 0, name: 'p1', imageR2Key: 'a.png', imageContentType: 'image/png', lineRichMenuId: 'old-1', areas: [] },
-          { id: 'p2', orderIndex: 1, name: 'p2', imageR2Key: 'missing.png', imageContentType: 'image/png', lineRichMenuId: 'old-2', areas: [] },
+          { id: 'p1', orderIndex: 0, name: 'p1', imageR2Key: 'a.png', imageContentType: 'image/png', lineRichMenuId: 'old-1', areas: [VALID_AREA] },
+          { id: 'p2', orderIndex: 1, name: 'p2', imageR2Key: 'missing.png', imageContentType: 'image/png', lineRichMenuId: 'old-2', areas: [VALID_AREA] },
         ],
       },
       line,
@@ -563,8 +618,8 @@ describe('publishRichMenuGroup', () => {
       {
         id: 'gid12345-aaaa', size: 'large', chatBarText: 'm', isDefaultForAll: false,
         pages: [
-          { id: 'p1', orderIndex: 0, name: 'p1', imageR2Key: 'a.png', imageContentType: 'image/png', lineRichMenuId: 'old-1', areas: [] },
-          { id: 'p2', orderIndex: 1, name: 'p2', imageR2Key: 'b.png', imageContentType: 'image/png', lineRichMenuId: 'old-2', areas: [] },
+          { id: 'p1', orderIndex: 0, name: 'p1', imageR2Key: 'a.png', imageContentType: 'image/png', lineRichMenuId: 'old-1', areas: [VALID_AREA] },
+          { id: 'p2', orderIndex: 1, name: 'p2', imageR2Key: 'b.png', imageContentType: 'image/png', lineRichMenuId: 'old-2', areas: [VALID_AREA] },
         ],
       },
       line,
@@ -586,8 +641,8 @@ describe('publishRichMenuGroup', () => {
       {
         id: 'gid12345-aaaa', size: 'large', chatBarText: 'm', isDefaultForAll: false,
         pages: [
-          { id: 'p1', orderIndex: 0, name: 'p1', imageR2Key: 'a.png', imageContentType: 'image/png', lineRichMenuId: 'old-1', areas: [] },
-          { id: 'p2', orderIndex: 1, name: 'p2', imageR2Key: 'b.png', imageContentType: 'image/png', lineRichMenuId: 'old-2', areas: [] },
+          { id: 'p1', orderIndex: 0, name: 'p1', imageR2Key: 'a.png', imageContentType: 'image/png', lineRichMenuId: 'old-1', areas: [VALID_AREA] },
+          { id: 'p2', orderIndex: 1, name: 'p2', imageR2Key: 'b.png', imageContentType: 'image/png', lineRichMenuId: 'old-2', areas: [VALID_AREA] },
         ],
       },
       line,
@@ -608,7 +663,7 @@ describe('publishRichMenuGroup', () => {
         id: 'gid12345-aaaa', size: 'large', chatBarText: 'm', isDefaultForAll: true,
         pages: [{
           id: 'p1', orderIndex: 0, name: 'p1', imageR2Key: 'a.png',
-          imageContentType: 'image/png', lineRichMenuId: 'old-1', areas: [],
+          imageContentType: 'image/png', lineRichMenuId: 'old-1', areas: [VALID_AREA],
         }],
       },
       line,
@@ -633,8 +688,8 @@ describe('publishRichMenuGroup', () => {
       {
         id: 'gid12345-aaaa', size: 'large', chatBarText: 'm', isDefaultForAll: false,
         pages: [
-          { id: 'p1', orderIndex: 0, name: 'p1', imageR2Key: 'a.png', imageContentType: 'image/png', lineRichMenuId: 'old-1', areas: [] },
-          { id: 'p2', orderIndex: 1, name: 'p2', imageR2Key: 'b.png', imageContentType: 'image/png', lineRichMenuId: 'old-2', areas: [] },
+          { id: 'p1', orderIndex: 0, name: 'p1', imageR2Key: 'a.png', imageContentType: 'image/png', lineRichMenuId: 'old-1', areas: [VALID_AREA] },
+          { id: 'p2', orderIndex: 1, name: 'p2', imageR2Key: 'b.png', imageContentType: 'image/png', lineRichMenuId: 'old-2', areas: [VALID_AREA] },
         ],
       },
       line,
@@ -654,7 +709,7 @@ describe('publishRichMenuGroup', () => {
           pages: [{
             id: 'p1', orderIndex: 0, name: 'p1',
             imageR2Key: null, imageContentType: null,
-            lineRichMenuId: null, areas: [],
+            lineRichMenuId: null, areas: [VALID_AREA],
           }],
         },
         line,
@@ -671,8 +726,8 @@ describe('unpublishRichMenuGroup', () => {
       {
         id: 'gid12345-aaaa', size: 'large', chatBarText: 'm', isDefaultForAll: true,
         pages: [
-          { id: 'p1', orderIndex: 0, name: 'p1', imageR2Key: null, imageContentType: null, lineRichMenuId: 'lm-old-1', areas: [] },
-          { id: 'p2', orderIndex: 1, name: 'p2', imageR2Key: null, imageContentType: null, lineRichMenuId: 'lm-old-2', areas: [] },
+          { id: 'p1', orderIndex: 0, name: 'p1', imageR2Key: null, imageContentType: null, lineRichMenuId: 'lm-old-1', areas: [VALID_AREA] },
+          { id: 'p2', orderIndex: 1, name: 'p2', imageR2Key: null, imageContentType: null, lineRichMenuId: 'lm-old-2', areas: [VALID_AREA] },
         ],
       },
       line,
@@ -695,7 +750,7 @@ describe('unpublishRichMenuGroup', () => {
       {
         id: 'gid12345-aaaa', size: 'large', chatBarText: 'm', isDefaultForAll: false,
         pages: [
-          { id: 'p1', orderIndex: 0, name: 'p1', imageR2Key: null, imageContentType: null, lineRichMenuId: 'lm-mine', areas: [] },
+          { id: 'p1', orderIndex: 0, name: 'p1', imageR2Key: null, imageContentType: null, lineRichMenuId: 'lm-mine', areas: [VALID_AREA] },
         ],
       },
       line,
@@ -712,7 +767,7 @@ describe('unpublishRichMenuGroup', () => {
       {
         id: 'gid12345-aaaa', size: 'large', chatBarText: 'm', isDefaultForAll: false,
         pages: [
-          { id: 'p1', orderIndex: 0, name: 'p1', imageR2Key: null, imageContentType: null, lineRichMenuId: null, areas: [] },
+          { id: 'p1', orderIndex: 0, name: 'p1', imageR2Key: null, imageContentType: null, lineRichMenuId: null, areas: [VALID_AREA] },
         ],
       },
       line,
@@ -794,7 +849,8 @@ function groupWithAreas(
         imageR2Key: 'rich-menus/test/p1.png',
         imageContentType: 'image/png',
         lineRichMenuId: null,
-        areas,
+        // #827: 読み上げラベルは必須。試験対象の area にラベルが無ければ既定を足す。
+        areas: areas.map((area) => ({ label: 'ボタン', ...area })),
       },
     ],
   };
@@ -971,6 +1027,7 @@ describe('intent から LINE の action への変換', () => {
               actionType: 'richmenuswitch' as const,
               actionData: { targetPageId: 'p2' },
               intent: 'switch' as const,
+              label: '2ページ目へ',
             },
           ],
         },
@@ -981,7 +1038,7 @@ describe('intent から LINE の action への変換', () => {
           imageR2Key: 'rich-menus/test/p2.png',
           imageContentType: 'image/png',
           lineRichMenuId: null,
-          areas: [],
+          areas: [VALID_AREA],
         },
       ],
     };
@@ -1054,7 +1111,7 @@ describe('段階公開 (E-08 #621 案A)', () => {
     pages: [{
       id: 'p1', orderIndex: 0, name: 'p1',
       imageR2Key: 'a.png', imageContentType: 'image/png',
-      lineRichMenuId: 'old-1', areas: [],
+      lineRichMenuId: 'old-1', areas: [VALID_AREA],
     }],
   };
 
