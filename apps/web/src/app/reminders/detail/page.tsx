@@ -241,7 +241,7 @@ export default function ReminderRunsPage() {
       <div className={styles.topActions}>
         <Breadcrumb items={[{ label: 'リマインダ一覧', href: '/reminders' }, { label: isPlannedView ? '配信予定' : '実行結果' }]} />
         <div className="flex gap-2">
-          <Button href={`/reminders/${encodeURIComponent(reminderId)}`}>登録者を管理</Button>
+          <Button href={`/reminders/detail?id=${encodeURIComponent(reminderId)}`}>登録者を管理</Button>
           <Button onClick={() => void exportCsv()} disabled={exporting || loading}>
             {exporting ? 'CSVを準備しています' : 'CSVで書き出す'}
           </Button>

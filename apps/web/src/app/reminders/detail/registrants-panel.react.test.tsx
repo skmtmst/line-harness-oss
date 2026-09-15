@@ -1,5 +1,7 @@
 // @vitest-environment happy-dom
 import React, { act } from 'react'
+import fs from 'node:fs'
+import path from 'node:path'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ReminderRegistrantsPanel } from './registrants-panel'
@@ -32,6 +34,8 @@ const registrant = {
   status: 'active', reminderVersionId: 'snapshot-1', sourceKind: 'manual', createdAt: '2026-09-01T00:00:00.000Z',
   updatedAt: '2026-09-01T00:00:00.000Z', cancelledAt: null, lockVersion: 4,
 }
+const detailSource = fs.readFileSync(path.join(__dirname, 'page.tsx'), 'utf8')
+const listSource = fs.readFileSync(path.join(__dirname, '..', 'page.tsx'), 'utf8')
 
 let host: HTMLDivElement
 let root: Root
@@ -68,6 +72,13 @@ async function click(label: string) {
 }
 
 describe('リマインダ詳細の登録者管理 (#868)', () => {
+  it('正本URLはstatic exportで再読込できるdetail?idに統一し、動的URLを作らない', () => {
+    expect(detailSource).toContain('`/reminders/detail?id=${encodeURIComponent(reminderId)}`')
+    expect(listSource).toContain('`/reminders/detail?id=${encodeURIComponent(reminder.id)}`')
+    expect(detailSource).not.toContain('`/reminders/${encodeURIComponent(reminderId)}`')
+    expect(listSource).not.toContain('`/reminders/${encodeURIComponent(reminder.id)}`')
+  })
+
   it('直URLの登録者一覧から基準日を保存し、リマインダID・版番号を実APIへ渡す', async () => {
     await render()
     expect(host.textContent).toContain('田中 花子')
@@ -120,5 +131,16 @@ describe('リマインダ詳細の登録者管理 (#868)', () => {
     expect(apiMock.list).toHaveBeenCalledTimes(2)
     expect(host.textContent).toContain('登録者はいません')
     expect(host.textContent).not.toContain('田中 花子')
+  })
+
+  it('端末がJST以外でも、UTCの基準日をJSTで表示し同じ瞬間を保存する', async () => {
+    const jstRegistrant = { ...registrant, targetDate: '2026-09-16T01:00:00.000Z' }
+    apiMock.list.mockResolvedValueOnce({ success: true, data: [jstRegistrant] })
+    await render()
+    const input = host.querySelector('input[aria-label="田中 花子の基準日"]') as HTMLInputElement
+    // 実行端末はUTC+7でも、01:00ZはJST 10:00として画面に出す。
+    expect(input.value).toBe('2026-09-16T10:00')
+    await click('基準日を保存')
+    expect(apiMock.updateTargetDate).toHaveBeenCalledWith('reminder-1', 'registration-1', '2026-09-16T01:00:00.000Z', 4)
   })
 })

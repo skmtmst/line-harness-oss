@@ -11,11 +11,33 @@ import { TextInput } from '@/components/shared/form-controls'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 
 
-function dateTimeLocal(value: string): string {
+const JST_PARTS = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'Asia/Tokyo',
+  year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+})
+
+/** APIのUTC ISOを、どの端末でも同じJSTのdatetime-local値へ変える。 */
+export function dateTimeLocalJst(value: string): string {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return ''
-  const pad = (part: number) => String(part).padStart(2, '0')
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
+  const parts = Object.fromEntries(JST_PARTS.formatToParts(date).filter((part) => part.type !== 'literal').map((part) => [part.type, part.value]))
+  return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}`
+}
+
+/** datetime-localのJST壁時計時刻を、曖昧さなくUTC ISOへ変える。 */
+export function dateTimeLocalJstToUtcIso(value: string): string | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(value)
+  if (!match) return null
+  const [, yearRaw, monthRaw, dayRaw, hourRaw, minuteRaw] = match
+  const year = Number(yearRaw)
+  const month = Number(monthRaw)
+  const day = Number(dayRaw)
+  const hour = Number(hourRaw)
+  const minute = Number(minuteRaw)
+  if (month < 1 || month > 12 || day < 1 || hour > 23 || minute > 59) return null
+  const utc = new Date(Date.UTC(year, month - 1, day, hour - 9, minute))
+  // 2月30日などをDateが翌月へ丸めても保存しない。
+  return dateTimeLocalJst(utc.toISOString()) === value ? utc.toISOString() : null
 }
 
 function formatDate(value: string): string {
@@ -47,7 +69,7 @@ export function ReminderRegistrantsPanel({ reminderId }: { reminderId: string })
       const registrants = await api.reminders.registrants.list(reminderId)
       if (!registrants.success) throw new Error('load failed')
       setItems(registrants.data)
-      setDraftDates(Object.fromEntries(registrants.data.map((item) => [item.id, dateTimeLocal(item.targetDate)])))
+      setDraftDates(Object.fromEntries(registrants.data.map((item) => [item.id, dateTimeLocalJst(item.targetDate)])))
     } catch {
       setItems([])
       setError('登録者を読み込めませんでした。時間を置いてもう一度お試しください。')
@@ -66,21 +88,21 @@ export function ReminderRegistrantsPanel({ reminderId }: { reminderId: string })
   const activeCount = useMemo(() => items.filter((item) => item.status === 'active').length, [items])
   const apply = (id: string, value: { targetDate: string; status: string; lockVersion: number }) => {
     setItems((current) => current.map((item) => item.id === id ? { ...item, ...value, updatedAt: new Date().toISOString() } : item))
-    setDraftDates((current) => ({ ...current, [id]: dateTimeLocal(value.targetDate) }))
+    setDraftDates((current) => ({ ...current, [id]: dateTimeLocalJst(value.targetDate) }))
   }
 
   const saveDate = async (item: ReminderRegistrant) => {
     if (actioningId) return
     const local = draftDates[item.id]
-    const parsed = local ? new Date(local) : null
-    if (!parsed || Number.isNaN(parsed.getTime())) {
+    const targetDate = local ? dateTimeLocalJstToUtcIso(local) : null
+    if (!targetDate) {
       setNotice('基準日を正しく入力してください。')
       return
     }
     setActioningId(item.id)
     setNotice('')
     try {
-      const response = await api.reminders.registrants.updateTargetDate(reminderId, item.id, parsed.toISOString(), item.lockVersion)
+      const response = await api.reminders.registrants.updateTargetDate(reminderId, item.id, targetDate, item.lockVersion)
       if (!response.success) throw new Error(response.error)
       apply(item.id, response.data)
       setNotice(response.data.replayed ? '同じ変更を確認しました。基準日は変更済みです。' : '基準日を変更しました。未送信分だけ新しい日程で組み直します。')
