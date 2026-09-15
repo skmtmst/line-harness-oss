@@ -140,6 +140,29 @@ afterEach(async () => {
 })
 
 describe('共通情報: 保存した社内メモの再表示(実React)', () => {
+  it('UTC保存値をJSTの入力へ戻し、変更した期間外動作を保存する', async () => {
+    api.detail.mockResolvedValue({
+      success: true,
+      data: {
+        id: 'var-1', name: '期間案内', varKey: 'period_notice', type: 'text', value: '受付中',
+        memo: '', folderId: null, version: 3, history: [],
+        validFrom: '2026-09-16T01:00:00.000Z', validUntil: '2026-09-16T03:00:00.000Z',
+        expiryBehavior: 'stop', fallbackValue: null,
+      },
+    })
+    await mount(React.createElement(EditCommonVarPage))
+    await settle()
+    expect(byId('cv-valid-from').value).toBe('2026-09-16T10:00')
+    expect(byId('cv-valid-until').value).toBe('2026-09-16T12:00')
+    await setValue(byId('cv-expiry-behavior'), 'fallback')
+    await setValue(byId('cv-fallback-value'), '受付終了')
+    await click(byExactText('button', '共通情報を保存'))
+    expect(api.update).toHaveBeenCalledWith('var-1', 'account-1', expect.objectContaining({
+      expectedVersion: 3, validFrom: '2026-09-16T10:00', validUntil: '2026-09-16T12:00',
+      expiryBehavior: 'fallback', fallbackValue: '受付終了',
+    }))
+  })
+
   it.each([
     ['long_text', '案内'.repeat(5_000), 'TEXTAREA', null, '更新した案内'],
     ['date', '2028-02-29', 'INPUT', 'date', '2028-03-01'],

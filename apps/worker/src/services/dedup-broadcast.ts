@@ -214,6 +214,10 @@ import {
   varyTextMessages,
   type BroadcastMessagePart,
 } from './broadcast-message-set.js';
+import {
+  commonVarValuesForAccount,
+  parseBroadcastCommonVarSnapshot,
+} from './common-var-snapshot.js';
 
 // LINE の multicast は 1 リクエストで最大 500 人まで宛先に取れる（LINE の仕様）。
 // これ以上に増やすことはできない。
@@ -323,6 +327,7 @@ export async function processMultiAccountDedupBroadcast(
     aggregation_unit?: string | null;
     /** 送信の試行番号。失敗分の再送で進む。台帳と provider の再送キーに使う。 */
     send_attempt_no?: number | null;
+    common_var_snapshot?: string | null;
   },
   lineClientFactory: (token: string) => LineClient = (t) => new LineClient(t),
   opts: { maxRunMs?: number; now?: () => number } = {},
@@ -423,7 +428,14 @@ export async function processMultiAccountDedupBroadcast(
     let accountVars: Record<string, string> | undefined;
     if (sourceParts.some((part) => /\{\{\s*var\./.test(part.messageContent))) {
       try {
-        accountVars = await getCommonVarMap(db, account.id);
+        const fixedSnapshot = parseBroadcastCommonVarSnapshot(broadcast.common_var_snapshot);
+        accountVars = fixedSnapshot
+          ? commonVarValuesForAccount(fixedSnapshot, account.id)
+          : await getCommonVarMap(db, account.id);
+        if (!accountVars) {
+          failedAccountIds.push(account.id);
+          continue;
+        }
       } catch (err) {
         console.error(`[multi-account-dedup] account ${account.id} failed to load common vars:`, err);
         failedAccountIds.push(account.id);
