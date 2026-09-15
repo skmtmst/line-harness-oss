@@ -47,7 +47,7 @@ function insertRef(
 }
 
 describe('402 媒体別広告クリック選択', () => {
-  it('検証済みLINE経路の記録時にaccountと同意時刻を固定する', async () => {
+  it('同意入力のないLINE経路はaccountだけを固定し同意を推測しない', async () => {
     const { raw, db } = setup();
 
     const recorded = await recordRefTracking(db, {
@@ -58,12 +58,24 @@ describe('402 媒体別広告クリック選択', () => {
       line_account_id: 'a1',
       fbclid: 'fb-recorded',
     });
-    expect(recorded.ad_conversion_consent_at).toBeTruthy();
+    expect(recorded.ad_conversion_consent_at).toBeNull();
     const stored = raw.prepare(`
       SELECT line_account_id, ad_conversion_consent_at FROM ref_tracking WHERE id = ?
     `).get(recorded.id) as { line_account_id: string | null; ad_conversion_consent_at: string | null };
     expect(stored.line_account_id).toBe('a1');
-    expect(stored.ad_conversion_consent_at).toBeTruthy();
+    expect(stored.ad_conversion_consent_at).toBeNull();
+  });
+
+  it('明示的に渡された同意時刻だけを記録する', async () => {
+    const { db } = setup();
+    const consentAt = '2026-09-16T00:00:00.000Z';
+
+    const recorded = await recordRefTracking(db, {
+      refCode: 'ref', friendId: 'f1', fbclid: 'fb-recorded',
+      adConversionConsentAt: consentAt,
+    });
+
+    expect(recorded.ad_conversion_consent_at).toBe(consentAt);
   });
 
   it('新しいGoogle行があってもXは直近の有効twclidを選ぶ', async () => {

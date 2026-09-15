@@ -405,8 +405,9 @@ export async function recordRefTracking(
     userAgent?: string | null;
     ipAddress?: string | null;
     /**
-     * undefined は、現在この関数を呼ぶ検証済みLINE Login / LIFF経路で
-     * 同意が成立した時刻を記録する。将来の同意前サイト計測は明示的にnullを渡す。
+     * 広告媒体への送信同意を実際に取得した時刻。
+     * LINE Login / LIFFの完了は広告送信への同意ではないため、
+     * 未指定は同意なし(null)としてfail-closedにする。
      */
     adConversionConsentAt?: string | null;
   },
@@ -439,7 +440,7 @@ export async function recordRefTracking(
       opts.userAgent ?? null,
       opts.ipAddress ?? null,
       opts.friendId ?? null,
-      opts.adConversionConsentAt === undefined ? now : opts.adConversionConsentAt,
+      opts.adConversionConsentAt ?? null,
       now,
     )
     .run();
