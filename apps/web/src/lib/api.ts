@@ -4116,7 +4116,8 @@ export type FriendAddRunList = {
     id: string
     receivedAt: string
     processedAt: string | null
-    friend: { id: string; displayName: string | null }
+    /** staff の応答は顧客を特定できない read model。 */
+    friend: { id: string; displayName: string | null; redacted: false } | { displayName: string; redacted: true }
     friendKind: FriendAddRuleKind
     attribution: {
       status: FriendAddEventAttributionStatus
