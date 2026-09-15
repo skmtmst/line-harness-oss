@@ -418,7 +418,20 @@ const RUN_STATUSES = new Set(['pending', 'completed', 'failed', 'suppressed', 'p
 
 const RUN_ATTRIBUTIONS = new Set(['captured', 'unavailable']);
 
+/**
+ * 担当者は実行状況を確認できれば足りる。顧客を特定するIDや表示名は、
+ * クライアントで隠すのではなく read model から外す。
+ */
+function runFriendReadModel(
+  row: { friend_id: string; display_name: string | null },
+  isStaff: boolean,
+): { id: string; displayName: string | null; redacted: false } | { displayName: string; redacted: true } {
+  if (isStaff) return { displayName: '顧客名は非表示', redacted: true };
+  return { id: row.friend_id, displayName: row.display_name, redacted: false };
+}
+
 friendAddRules.get('/api/friend-add-runs', requireRole('owner', 'admin', 'staff'), async (c) => {
+  const isStaff = c.get('staff').role === 'staff';
   const accountId = accountIdFrom(c);
   const status = c.req.query('status');
   const ruleId = c.req.query('rule_id');
@@ -509,7 +522,7 @@ friendAddRules.get('/api/friend-add-runs', requireRole('owner', 'admin', 'staff'
           id: row.id,
           receivedAt: row.occurred_at,
           processedAt: row.processed_at,
-          friend: { id: row.friend_id, displayName: row.display_name },
+          friend: runFriendReadModel(row, isStaff),
           friendKind: row.friend_kind,
           attribution: {
             status: row.attribution_status,
@@ -553,6 +566,7 @@ friendAddRules.get('/api/friend-add-runs', requireRole('owner', 'admin', 'staff'
 });
 
 friendAddRules.get('/api/friend-add-runs/:id', requireRole('owner', 'admin', 'staff'), async (c) => {
+  const isStaff = c.get('staff').role === 'staff';
   const accountId = accountIdFrom(c);
   if (!accountId) return c.json({ success: false, error: 'account_id が必要です' }, 400);
   try {
@@ -592,7 +606,7 @@ friendAddRules.get('/api/friend-add-runs/:id', requireRole('owner', 'admin', 'st
         id: row.id,
         receivedAt: row.occurred_at,
         processedAt: row.processed_at,
-        friend: { id: row.friend_id, displayName: row.display_name },
+        friend: runFriendReadModel(row, isStaff),
         friendKind: row.friend_kind,
         attribution: {
           status: row.attribution_status,
@@ -605,9 +619,9 @@ friendAddRules.get('/api/friend-add-runs/:id', requireRole('owner', 'admin', 'st
           name: row.rule_name,
           versionId: row.version_id,
           versionNumber: row.version_number,
-          definition,
+          ...(isStaff ? {} : { definition }),
         } : null,
-        configuredActions: definition?.actions ?? [],
+        ...(isStaff ? {} : { configuredActions: definition?.actions ?? [] }),
         actionRuns: (actions.results ?? []).map((action) => ({
           id: action.id,
           stableId: action.action_stable_id,
