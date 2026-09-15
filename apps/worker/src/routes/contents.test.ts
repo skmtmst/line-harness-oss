@@ -327,7 +327,9 @@ beforeEach(() => {
   mocks.getMedia.mockResolvedValue([MEDIA]);
   mocks.countMedia.mockResolvedValue(1);
   mocks.getMediaById.mockResolvedValue(MEDIA);
-  mocks.getFolderById.mockResolvedValue({ id: 'folder-1', kind: 'media', name: '配信用' });
+  mocks.getFolderById.mockResolvedValue({
+    id: 'folder-1', kind: 'media', account_id: 'account-1', name: '配信用',
+  });
   mocks.updateMedia.mockResolvedValue(MEDIA);
   mocks.countMediaUsages.mockResolvedValue(0);
   mocks.getMediaUsages.mockResolvedValue([]);
@@ -416,6 +418,50 @@ beforeEach(() => {
 });
 
 describe('メディアのアップロード', () => {
+  it('詳細URL用の1件取得はaccount条件を付けてメディアと分類名を返す', async () => {
+    mocks.getMediaById.mockResolvedValueOnce({ ...MEDIA, folder_id: 'folder-1' });
+    const res = await req('/api/media/md-1?accountId=account-1', 'GET');
+    expect(res.status).toBe(200);
+    expect(mocks.getMediaById).toHaveBeenCalledWith(env.DB, 'md-1', 'account-1');
+    expect(await res.json()).toMatchObject({
+      data: {
+        item: { id: 'md-1', lineAccountId: 'account-1', filename: 'a.png' },
+        folderName: '配信用',
+      },
+    });
+  });
+
+  it.each(['unknown-id', 'deleted-id'])('%s の詳細は同じ404で安全に拒否する', async (id) => {
+    mocks.getMediaById.mockResolvedValueOnce(null);
+    const res = await req(`/api/media/${id}?accountId=account-1`, 'GET');
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ success: false, error: 'Not found' });
+  });
+
+  it('別accountの実在IDと架空IDは同じ404になり、行の内容を返さない', async () => {
+    mocks.getMediaById.mockResolvedValue(null);
+    const crossAccount = await req('/api/media/account-2-media?accountId=account-1', 'GET');
+    const unknown = await req('/api/media/unknown?accountId=account-1', 'GET');
+    expect(crossAccount.status).toBe(404);
+    expect(unknown.status).toBe(404);
+    expect(await crossAccount.json()).toEqual(await unknown.json());
+    expect(mocks.getMediaById).toHaveBeenNthCalledWith(1, env.DB, 'account-2-media', 'account-1');
+    expect(mocks.getMediaById).toHaveBeenNthCalledWith(2, env.DB, 'unknown', 'account-1');
+  });
+
+  it('閲覧範囲外accountはメディアを探す前に404へそろえる', async () => {
+    accessMocks.canAccessAllLineAccounts.mockResolvedValueOnce(false);
+    const res = await req('/api/media/md-1?accountId=account-2', 'GET');
+    expect(res.status).toBe(404);
+    expect(mocks.getMediaById).not.toHaveBeenCalled();
+  });
+
+  it('staffは管理詳細を取得できず、メディアを探さない', async () => {
+    const res = await req('/api/media/md-1?accountId=account-1', 'GET', undefined, 'staff');
+    expect(res.status).toBe(403);
+    expect(mocks.getMediaById).not.toHaveBeenCalled();
+  });
+
   it('一覧に使用先件数を含める', async () => {
     const res = await req('/api/media?accountId=account-1', 'GET');
     expect(res.status).toBe(200);

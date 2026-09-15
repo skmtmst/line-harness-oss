@@ -5267,6 +5267,10 @@ export const api = {
   },
   /** メディアライブラリ。1か所に置いて使い回す。 */
   media: {
+    detail: (id: string, accountId: string) =>
+      fetchApi<ApiResponse<{ item: MediaItem; folderName: string | null }>>(
+        `/api/media/${encodeURIComponent(id)}?accountId=${encodeURIComponent(accountId)}`,
+      ),
     list: (accountId: string, params?: {
       kind?: string
       folderId?: string

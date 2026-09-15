@@ -292,7 +292,16 @@ export default function MediaDetailDialog({
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
           <nav aria-label="現在位置" className="text-action flex flex-wrap items-center gap-2 text-xs font-semibold">
-            <a href="/contents" onClick={onClose} className="hover:underline">登録メディア</a>
+            <a
+              href="/contents"
+              onClick={(event) => {
+                event.preventDefault()
+                onClose()
+              }}
+              className="hover:underline"
+            >
+              登録メディア
+            </a>
             <span aria-hidden="true">›</span>
             <span>{folderName}</span>
             <span aria-hidden="true">›</span>
