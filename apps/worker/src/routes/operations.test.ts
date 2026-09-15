@@ -620,6 +620,29 @@ describe('運用異常alertのaccount境界と受領', () => {
     }
   });
 
+  it('別accountの実在alert IDと架空IDを、受領・通知再開とも同じ404にする', async () => {
+    testDb.raw.prepare(
+      `INSERT INTO line_accounts (id, channel_id, name, channel_access_token, channel_secret)
+       VALUES ('account-2', 'channel-2', 'LINE 2', 'token', 'secret')`,
+    ).run();
+    seedAlert();
+
+    for (const suffix of ['acknowledge', 'notifications/retry']) {
+      const responses = await Promise.all(['alert-1', 'alert-does-not-exist'].map((id) =>
+        app('owner').request(`/api/operations/alerts/${id}/${suffix}`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ lineAccountId: 'account-2', expectedVersion: 1 }),
+        }, bindings()),
+      ));
+      expect(responses.map(({ status }) => status)).toEqual([404, 404]);
+      expect(await Promise.all(responses.map((response) => response.json()))).toEqual([
+        { success: false, error: '異常の記録が見つかりません' },
+        { success: false, error: '異常の記録が見つかりません' },
+      ]);
+    }
+  });
+
   it('解消済みalertの通知失敗も取得し、運用画面から再送待ちへ戻す', async () => {
     seedAlert();
     testDb.raw.prepare(

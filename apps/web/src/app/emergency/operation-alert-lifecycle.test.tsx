@@ -13,6 +13,8 @@ vi.hoisted(() => {
 const alertRequest = vi.hoisted(() => ({
   promise: null as Promise<unknown> | null,
   resolve: null as ((value: unknown) => void) | null,
+  handler: null as ((accountId: string) => Promise<unknown>) | null,
+  retry: null as ((accountId: string) => Promise<unknown>) | null,
 }))
 
 vi.mock('@/lib/api', async (importOriginal) => {
@@ -34,7 +36,12 @@ vi.mock('@/lib/api', async (importOriginal) => {
           },
         }),
         preview: () => Promise.resolve({ success: false as const, error: 'not prepared' }),
-        alerts: () => alertRequest.promise as Promise<never>,
+        alerts: (accountId: string) => (
+          alertRequest.handler?.(accountId) ?? alertRequest.promise
+        ) as Promise<never>,
+        retryAlertNotifications: (_id: string, accountId: string) => (
+          alertRequest.retry?.(accountId) ?? Promise.resolve({ success: true, data: { retried: 0 } })
+        ) as Promise<never>,
       },
     },
   }
@@ -70,7 +77,13 @@ function alert(overrides: Partial<OperationAlert> = {}): OperationAlert {
   }
 }
 
-afterEach(() => cleanup())
+afterEach(() => {
+  cleanup()
+  alertRequest.promise = null
+  alertRequest.resolve = null
+  alertRequest.handler = null
+  alertRequest.retry = null
+})
 
 describe('運用異常の受領・通知再開UI', () => {
   it('未受領alertへメモを入力して受領できる', () => {
@@ -190,6 +203,38 @@ describe('運用異常の受領・通知再開UI', () => {
     await waitFor(() => {
       expect(screen.queryByText('旧accountの異常')).toBeNull()
       expect(screen.getAllByText(/LINEアカウントを選択してください/).length).toBeGreaterThan(0)
+    })
+  })
+
+  it('旧accountの遅い通知再開が完了しても、新accountの表示を上書きしない', async () => {
+    let resolveRetry: ((value: unknown) => void) | null = null
+    alertRequest.handler = async (accountId) => ({
+      success: true,
+      data: [alert({
+        id: `alert-${accountId}`,
+        lineAccountId: accountId,
+        summary: `${accountId}の異常`,
+        notification: accountId === 'account-A'
+          ? { queued: 0, sending: 0, sent: 0, failed: 1, unconfigured: 0, total: 1 }
+          : { queued: 0, sending: 0, sent: 1, failed: 0, unconfigured: 0, total: 1 },
+      })],
+    })
+    alertRequest.retry = () => new Promise((resolve) => { resolveRetry = resolve })
+    const { rerender } = render(<HealthPanel accountId="account-A" manualRunRequest={0} onSeverity={vi.fn()} />)
+    await screen.findByText('account-Aの異常')
+    fireEvent.click(screen.getByRole('button', { name: '失敗した通知を再送する' }))
+
+    rerender(<HealthPanel accountId="account-B" manualRunRequest={0} onSeverity={vi.fn()} />)
+    await screen.findByText('account-Bの異常')
+    await act(async () => {
+      resolveRetry?.({ success: true, data: { retried: 1 } })
+      await Promise.resolve()
+    })
+
+    await waitFor(() => {
+      expect(screen.getByText('account-Bの異常')).toBeTruthy()
+      expect(screen.queryByText('account-Aの異常')).toBeNull()
+      expect(screen.queryByText(/通知または通知先を再確認しました/)).toBeNull()
     })
   })
 })

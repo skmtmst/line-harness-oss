@@ -1,6 +1,7 @@
 'use client'
 
 import SelectField from '@/components/shared/select-field'
+import Button from '@/components/shared/button'
 import Link from 'next/link'
 import React, { Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import type { LineAccount } from '@line-crm/shared'
@@ -352,8 +353,8 @@ function OperationAlertsPanel({
             : `${alert.notification.sent}件の通知を送信しました。`
       return <div key={alert.id} className="space-y-3 px-4 py-4">
         <div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><div className="flex items-center gap-2"><StatusPill severity={alert.severity} /><p className="text-sm font-bold text-ink">{CHECK_DEFINITIONS.find((item) => HEALTH_CHECK_ID[alert.checkKey] === item.id)?.label ?? alert.checkKey}</p>{alert.status === 'acknowledged' && <span className="rounded-pill bg-info-bg px-2 py-1 text-xs font-bold text-info">受領済み</span>}{alert.status === 'resolved' && <span className="rounded-pill bg-success-bg px-2 py-1 text-xs font-bold text-success">解消済み</span>}</div><p className="mt-2 text-xs text-ink-secondary">{alert.summary}</p><p className="mt-1 text-xs text-ink-faint">{lastEvent ? `${ALERT_ACTION_LABEL[lastEvent.action]}：${formatOperationDate(lastEvent.createdAt)}` : formatOperationDate(alert.lastDetectedAt)}</p></div><p className={`text-xs font-bold ${alert.notification.failed + alert.notification.unconfigured > 0 ? 'text-danger' : 'text-ink-faint'}`}>{notification}</p></div>
-        {alert.status === 'open' && <div className="flex flex-wrap items-end gap-2"><label className="min-w-56 flex-1 text-xs font-bold text-ink-secondary" htmlFor={`operation-alert-note-${alert.id}`}>受領メモ（任意）<input id={`operation-alert-note-${alert.id}`} value={notes[alert.id] ?? ''} maxLength={500} onChange={(event) => setNotes((current) => ({ ...current, [alert.id]: event.target.value }))} disabled={busy} className="border-hairline rounded-control mt-1 block min-h-9 w-full border bg-canvas px-3 text-sm font-normal text-ink" /></label><button type="button" disabled={busy} onClick={() => void onAcknowledge(alert, notes[alert.id] ?? '')} className="rounded-control min-h-9 bg-accent-deep px-3 text-xs font-bold text-on-accent disabled:opacity-50">{busy ? '保存中…' : '受領する'}</button></div>}
-        {alert.notification.failed + alert.notification.unconfigured > 0 && <button type="button" disabled={busy} onClick={() => void onRetry(alert)} className="rounded-control min-h-9 border border-danger px-3 text-xs font-bold text-danger disabled:opacity-50">{busy ? '再送を準備中…' : alert.notification.unconfigured > 0 ? '通知先を再確認する' : '失敗した通知を再送する'}</button>}
+        {alert.status === 'open' && <div className="flex flex-wrap items-end gap-2"><label className="min-w-56 flex-1 text-xs font-bold text-ink-secondary" htmlFor={`operation-alert-note-${alert.id}`}>受領メモ（任意）<input id={`operation-alert-note-${alert.id}`} value={notes[alert.id] ?? ''} maxLength={500} onChange={(event) => setNotes((current) => ({ ...current, [alert.id]: event.target.value }))} disabled={busy} className="border-hairline rounded-control mt-1 block min-h-9 w-full border bg-canvas px-3 text-sm font-normal text-ink" /></label><Button variant="primary" disabled={busy} onClick={() => void onAcknowledge(alert, notes[alert.id] ?? '')}>{busy ? '保存中…' : '受領する'}</Button></div>}
+        {alert.notification.failed + alert.notification.unconfigured > 0 && <button type="button" disabled={busy} onClick={() => void onRetry(alert)} className="rounded-control min-h-9 border border-danger px-3 text-xs font-bold text-danger disabled:opacity-50">{busy ? '処理しています…' : alert.notification.unconfigured > 0 ? '通知先を再確認する' : '失敗した通知を再送する'}</button>}
       </div>
     })}</div>
   </section>
@@ -390,6 +391,8 @@ function HealthPanel({
   const [alertBusyId, setAlertBusyId] = useState<string | null>(null)
   const [alertNotice, setAlertNotice] = useState<ControlMessage | null>(null)
   const alertRequestGeneration = useRef(0)
+  const currentAccountIdRef = useRef(accountId)
+  currentAccountIdRef.current = accountId
 
   const applySnapshot = useCallback((snapshot: OperationHealthSnapshot) => {
     const results = snapshot.latestRun?.results ?? []
@@ -408,6 +411,7 @@ function HealthPanel({
   }, [])
 
   const load = useCallback(async (manual: boolean) => {
+    const requestedAccountId = accountId
     const generation = ++alertRequestGeneration.current
     if (hasLoaded.current) setRefreshing(true)
     else setLoading(true)
@@ -435,7 +439,7 @@ function HealthPanel({
         api.operations.preview(accountId).catch(() => null),
         api.operations.alerts(accountId, true).catch(() => null),
       ])
-      if (generation !== alertRequestGeneration.current) return
+      if (generation !== alertRequestGeneration.current || requestedAccountId !== currentAccountIdRef.current) return
       if (!response.success) throw new Error(response.error)
       applySnapshot(response.data)
       if (alertResponse?.success) {
@@ -449,7 +453,7 @@ function HealthPanel({
         ? operationControlSummary(preview.data.control)
         : { value: '未確認', note: '停止状態を取得できませんでした' })
     } catch {
-      if (generation !== alertRequestGeneration.current) return
+      if (generation !== alertRequestGeneration.current || requestedAccountId !== currentAccountIdRef.current) return
       setChecks(CHECK_DEFINITIONS.map((definition) => ({
         ...definition,
         detail: 'サーバーの確認記録を取得できませんでした',
@@ -463,13 +467,18 @@ function HealthPanel({
       setAlerts([])
       setAlertsFailed(true)
     } finally {
-      if (generation === alertRequestGeneration.current) {
+      if (generation === alertRequestGeneration.current && requestedAccountId === currentAccountIdRef.current) {
         setLoading(false)
         setRefreshing(false)
         hasLoaded.current = true
       }
     }
   }, [accountId, applySnapshot])
+
+  useEffect(() => {
+    setAlertBusyId(null)
+    setAlertNotice(null)
+  }, [accountId])
 
   useEffect(() => {
     void load(manualRunRequest > 0)
@@ -495,33 +504,39 @@ function HealthPanel({
 
   const acknowledgeAlert = useCallback(async (alert: OperationAlert, note: string) => {
     if (!accountId) return
+    const requestedAccountId = accountId
     setAlertBusyId(alert.id)
     try {
       const response = await api.operations.acknowledgeAlert(alert.id, {
         lineAccountId: accountId, expectedVersion: alert.version, note,
       })
       if (!response.success) throw new Error(response.error)
+      if (requestedAccountId !== currentAccountIdRef.current) return
       setAlerts((current) => current.map((item) => item.id === alert.id ? response.data : item))
       setAlertNotice({ tone: 'success', text: response.duplicate ? 'この異常はすでに受領済みです。' : '異常を受領しました。対応内容は履歴に残ります。' })
     } catch (error) {
+      if (requestedAccountId !== currentAccountIdRef.current) return
       setAlertNotice({ tone: 'danger', text: operationFailureText(error, '異常を受領できませんでした。最新の状態を読み直してください。') })
     } finally {
-      setAlertBusyId(null)
+      if (requestedAccountId === currentAccountIdRef.current) setAlertBusyId(null)
     }
   }, [accountId])
 
   const retryAlertNotifications = useCallback(async (alert: OperationAlert) => {
     if (!accountId) return
+    const requestedAccountId = accountId
     setAlertBusyId(alert.id)
     try {
       const response = await api.operations.retryAlertNotifications(alert.id, accountId)
       if (!response.success) throw new Error(response.error)
+      if (requestedAccountId !== currentAccountIdRef.current) return
       setAlertNotice({ tone: 'success', text: response.data.retried > 0 ? `${response.data.retried}件の通知または通知先を再確認しました。` : '再確認できる通知はありません。' })
       await load(false)
     } catch (error) {
+      if (requestedAccountId !== currentAccountIdRef.current) return
       setAlertNotice({ tone: 'danger', text: operationFailureText(error, '通知を再送待ちへ戻せませんでした。') })
     } finally {
-      setAlertBusyId(null)
+      if (requestedAccountId === currentAccountIdRef.current) setAlertBusyId(null)
     }
   }, [accountId, load])
 

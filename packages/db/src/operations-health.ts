@@ -643,9 +643,13 @@ export async function listOperationAlerts(
 export async function getOperationAlert(
   db: D1Database,
   id: string,
+  lineAccountId?: string,
 ): Promise<OperationAlert | null> {
-  const row = await db.prepare('SELECT * FROM operation_alerts WHERE id = ?')
-    .bind(id).first<OperationAlertRow>();
+  const row = lineAccountId === undefined
+    ? await db.prepare('SELECT * FROM operation_alerts WHERE id = ?')
+      .bind(id).first<OperationAlertRow>()
+    : await db.prepare('SELECT * FROM operation_alerts WHERE id = ? AND line_account_id = ?')
+      .bind(id, lineAccountId).first<OperationAlertRow>();
   return row ? mapOperationAlert(row, await operationAlertNotificationSummary(db, row.id), await operationAlertEvents(db, row.id)) : null;
 }
 

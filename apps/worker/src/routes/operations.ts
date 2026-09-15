@@ -195,11 +195,11 @@ operations.post('/api/operations/alerts/:id/acknowledge', requireRole('owner', '
     return c.json({ success: false, error: '受領内容を確認してから、もう一度読み直してください' }, 400);
   }
   const accountId = body.lineAccountId.trim();
-  const alert = await getOperationAlert(c.env.DB, c.req.param('id'));
-  if (!alert) return c.json({ success: false, error: '異常の記録が見つかりません' }, 404);
-  if (alert.lineAccountId !== accountId || !await canReadScope(c, accountId)) {
+  if (!await canReadScope(c, accountId)) {
     return c.json({ success: false, error: 'このアカウントの異常を受領する権限がありません', code: 'EMERGENCY_SCOPE_FORBIDDEN' }, 403);
   }
+  const alert = await getOperationAlert(c.env.DB, c.req.param('id'), accountId);
+  if (!alert) return c.json({ success: false, error: '異常の記録が見つかりません' }, 404);
   try {
     const saved = await acknowledgeOperationAlert(c.env.DB, {
       id: alert.id, lineAccountId: accountId, actorId: c.get('staff')!.id,
@@ -228,11 +228,11 @@ operations.post('/api/operations/alerts/:id/notifications/retry', requireRole('o
     return c.json({ success: false, error: 'LINEアカウントを指定してください' }, 400);
   }
   const accountId = body.lineAccountId.trim();
-  const alert = await getOperationAlert(c.env.DB, c.req.param('id'));
-  if (!alert) return c.json({ success: false, error: '異常の記録が見つかりません' }, 404);
-  if (alert.lineAccountId !== accountId || !await canReadScope(c, accountId)) {
+  if (!await canReadScope(c, accountId)) {
     return c.json({ success: false, error: 'このアカウントの通知を再送する権限がありません', code: 'EMERGENCY_SCOPE_FORBIDDEN' }, 403);
   }
+  const alert = await getOperationAlert(c.env.DB, c.req.param('id'), accountId);
+  if (!alert) return c.json({ success: false, error: '異常の記録が見つかりません' }, 404);
   try {
     const retried = await retryOperationAlertNotifications(c.env.DB, { alertId: alert.id, lineAccountId: accountId });
     await enqueuePendingOperationAlertNotifications(c.env.DB, { lineAccountId: accountId });
