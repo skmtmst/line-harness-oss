@@ -39,6 +39,34 @@ function post(body: unknown) {
   }), env);
 }
 
+function appForStaff(
+  role: 'owner' | 'admin' | 'staff',
+  permissionKeys: string[] = [],
+) {
+  const roleApp = new Hono<Env>();
+  roleApp.use('*', async (c, next) => {
+    c.set('staff', {
+      id: `${role}-1`, name: role, role, readOnly: false, tenantId: 'tenant-a', permissionKeys,
+    });
+    return next();
+  });
+  roleApp.route('/', entryRoutes);
+  return roleApp;
+}
+
+function mutateWith(
+  roleApp: Hono<Env>,
+  method: 'POST' | 'PATCH' | 'DELETE',
+  path: string,
+  body: unknown,
+) {
+  return roleApp.fetch(new Request(`https://example.com${path}`, {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  }), env);
+}
+
 function postGenre(body: unknown) {
   return app.fetch(new Request('https://example.com/api/entry-route-genres', {
     method: 'POST',
@@ -99,6 +127,51 @@ describe('POST /api/entry-routes', () => {
     const response = await post({ genre: 'A店', name: 'Instagram', refCode: 'duplicate' });
     expect(response.status).toBe(409);
     expect(await response.json()).toMatchObject({ error: 'この ref_code は既に使われています' });
+  });
+
+  it.each(['owner', 'admin'] as const)('%sは従来どおり作成できる', async (role) => {
+    mocks.createEntryRoute.mockResolvedValue({
+      id: `route-${role}`, ref_code: `${role}-ref`, genre: null, name: role,
+      tag_id: null, scenario_id: null, redirect_url: null, pool_id: null,
+      intro_template_id: null, run_account_friend_add_scenarios: 1, is_active: 1,
+      tenant_id: 'tenant-a', created_at: '2026-09-16', updated_at: '2026-09-16',
+    });
+    const response = await mutateWith(
+      appForStaff(role),
+      'POST',
+      '/api/entry-routes',
+      { name: role, refCode: `${role}-ref` },
+    );
+    expect(response.status).toBe(201);
+    expect(mocks.createEntryRoute).toHaveBeenCalledTimes(1);
+  });
+
+  it('inflow-links権限を持つstaffは作成できる', async () => {
+    mocks.createEntryRoute.mockResolvedValue({
+      id: 'route-staff', ref_code: 'staff-ref', genre: null, name: '担当者経路',
+      tag_id: null, scenario_id: null, redirect_url: null, pool_id: null,
+      intro_template_id: null, run_account_friend_add_scenarios: 1, is_active: 1,
+      tenant_id: 'tenant-a', created_at: '2026-09-16', updated_at: '2026-09-16',
+    });
+    const response = await mutateWith(
+      appForStaff('staff', ['/inflow-links']),
+      'POST',
+      '/api/entry-routes',
+      { name: '担当者経路', refCode: 'staff-ref' },
+    );
+    expect(response.status).toBe(201);
+    expect(mocks.createEntryRoute).toHaveBeenCalledTimes(1);
+  });
+
+  it('権限なしstaffは作成を403にしてDB書き込み0件にする', async () => {
+    const response = await mutateWith(
+      appForStaff('staff'),
+      'POST',
+      '/api/entry-routes',
+      { name: '拒否対象', refCode: 'denied-ref' },
+    );
+    expect(response.status).toBe(403);
+    expect(mocks.createEntryRoute).not.toHaveBeenCalled();
   });
 });
 
@@ -218,13 +291,8 @@ describe('DELETE /api/entry-routes/:id safety', () => {
     expect(mocks.updateEntryRoute).not.toHaveBeenCalled();
   });
 
-  it('staff権限は完全削除・受付停止とも実在経路を読まず、書き込み0件にする', async () => {
-    const staffApp = new Hono<Env>();
-    staffApp.use('*', async (c, next) => {
-      c.set('staff', { id: 'staff-1', name: 'Staff', role: 'staff', readOnly: false, tenantId: 'tenant-a' });
-      return next();
-    });
-    staffApp.route('/', entryRoutes);
+  it('権限なしstaffは完全削除・受付停止とも実在経路を読まず、書き込み0件にする', async () => {
+    const staffApp = appForStaff('staff');
     const deletion = await staffApp.fetch(new Request(`https://example.com/api/entry-routes/${ownRoute.id}`, {
       method: 'DELETE', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ confirmationName: ownRoute.name }),
@@ -238,6 +306,71 @@ describe('DELETE /api/entry-routes/:id safety', () => {
     expect(mocks.getEntryRouteById).not.toHaveBeenCalled();
     expect(mocks.deleteEntryRoute).not.toHaveBeenCalled();
     expect(mocks.updateEntryRoute).not.toHaveBeenCalled();
+  });
+
+  it('inflow-links権限staffは自accountの編集・受付停止ができる', async () => {
+    const staffApp = appForStaff('staff', ['/inflow-links']);
+    mocks.getEntryRouteById.mockResolvedValue(ownRoute);
+    mocks.updateEntryRoute.mockResolvedValue({ ...ownRoute, name: '店頭QR更新', is_active: 0 });
+
+    const edit = await mutateWith(
+      staffApp,
+      'PATCH',
+      `/api/entry-routes/${ownRoute.id}`,
+      { name: ' 店頭QR更新 ' },
+    );
+    const stop = await mutateWith(
+      staffApp,
+      'PATCH',
+      `/api/entry-routes/${ownRoute.id}`,
+      { isActive: false },
+    );
+
+    expect(edit.status).toBe(200);
+    expect(stop.status).toBe(200);
+    expect(mocks.updateEntryRoute).toHaveBeenNthCalledWith(1, env.DB, ownRoute.id, { name: '店頭QR更新' });
+    expect(mocks.updateEntryRoute).toHaveBeenNthCalledWith(2, env.DB, ownRoute.id, { isActive: false });
+  });
+
+  it('inflow-links権限staffでも別accountは404で書き込み0件にする', async () => {
+    const staffApp = appForStaff('staff', ['/inflow-links']);
+    mocks.getEntryRouteById.mockResolvedValue({ ...ownRoute, line_account_id: 'account-b' });
+
+    const response = await mutateWith(
+      staffApp,
+      'PATCH',
+      `/api/entry-routes/${ownRoute.id}`,
+      { isActive: false },
+    );
+
+    expect(response.status).toBe(404);
+    expect(mocks.updateEntryRoute).not.toHaveBeenCalled();
+  });
+
+  it('inflow-links権限staffでも完全削除は403で読み書き0件にする', async () => {
+    const response = await mutateWith(
+      appForStaff('staff', ['/inflow-links']),
+      'DELETE',
+      `/api/entry-routes/${ownRoute.id}`,
+      { confirmationName: ownRoute.name },
+    );
+
+    expect(response.status).toBe(403);
+    expect(mocks.getEntryRouteById).not.toHaveBeenCalled();
+    expect(mocks.deleteEntryRoute).not.toHaveBeenCalled();
+  });
+
+  it.each(['owner', 'admin'] as const)('%sは従来どおり受付停止できる', async (role) => {
+    mocks.getEntryRouteById.mockResolvedValue(ownRoute);
+    mocks.updateEntryRoute.mockResolvedValue({ ...ownRoute, is_active: 0 });
+    const response = await mutateWith(
+      appForStaff(role),
+      'PATCH',
+      `/api/entry-routes/${ownRoute.id}`,
+      { isActive: false },
+    );
+    expect(response.status).toBe(200);
+    expect(mocks.updateEntryRoute).toHaveBeenCalledWith(env.DB, ownRoute.id, { isActive: false });
   });
 });
 

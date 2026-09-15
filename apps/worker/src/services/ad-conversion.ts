@@ -12,24 +12,106 @@ import {
   enqueueAdConversionOutbox,
   finishAdConversionSend,
   finishAdConversionOutbox,
+  getAdConversionOutboxById,
   getActiveAdPlatforms,
   getAdPlatformById,
   getPinnedAdConversionAccount,
-  getRefTrackingWithClickIds,
+  selectAdClickForPlatform,
   takeAdConversionOutboxRow,
+  type AdConversionOutboxRow,
   type AdPlatform,
   type AdPlatformConfig,
   type RefTracking,
 } from '@line-crm/db';
 
-function clickIdForPlatform(platformName: string, ref: RefTracking): { clickId: string; clickIdType: string } | null {
-  switch (platformName) {
-    case 'meta': return ref.fbclid ? { clickId: ref.fbclid, clickIdType: 'fbclid' } : null;
-    case 'x': return ref.twclid ? { clickId: ref.twclid, clickIdType: 'twclid' } : null;
-    case 'google': return ref.gclid ? { clickId: ref.gclid, clickIdType: 'gclid' } : null;
-    case 'tiktok': return ref.ttclid ? { clickId: ref.ttclid, clickIdType: 'ttclid' } : null;
-    default: return null;
+const SUPPORTED_AD_PLATFORMS = ['meta', 'x', 'google', 'tiktok'] as const;
+type SupportedAdPlatform = typeof SUPPORTED_AD_PLATFORMS[number];
+
+function isSupportedAdPlatform(value: string): value is SupportedAdPlatform {
+  return (SUPPORTED_AD_PLATFORMS as readonly string[]).includes(value);
+}
+
+function configuredClickValidityDays(config: AdPlatformConfig): number | null {
+  const value = config.click_id_validity_days;
+  return Number.isSafeInteger(value) && Number(value) > 0 ? Number(value) : null;
+}
+
+async function clickSnapshotForPlatform(
+  db: D1Database,
+  input: { platform: AdPlatform; friendId: string; lineAccountId: string; now?: Date },
+): Promise<NonNullable<Parameters<typeof enqueueAdConversionOutbox>[1]['clickSnapshot']>> {
+  let config: AdPlatformConfig;
+  try {
+    config = JSON.parse(input.platform.config) as AdPlatformConfig;
+  } catch {
+    return { reason: 'validity_not_configured' };
   }
+  const validityDays = configuredClickValidityDays(config);
+  if (!isSupportedAdPlatform(input.platform.name)) return { reason: 'unsupported_platform' };
+  if (validityDays === null) return { reason: 'validity_not_configured' };
+
+  const selection = await selectAdClickForPlatform(db, {
+    friendId: input.friendId,
+    lineAccountId: input.lineAccountId,
+    platformName: input.platform.name,
+    validityDays,
+    now: input.now,
+  });
+  if (selection.status === 'missing_click_id') {
+    return { clickIdType: selection.clickIdType, reason: selection.status };
+  }
+  if (selection.status !== 'eligible') {
+    return {
+      refTrackingId: selection.refTrackingId,
+      clickId: selection.clickId,
+      clickIdType: selection.clickIdType,
+      recordedAt: selection.recordedAt,
+      expiresAt: selection.expiresAt,
+      reason: selection.status,
+    };
+  }
+  return {
+    refTrackingId: selection.refTrackingId,
+    clickId: selection.clickId,
+    clickIdType: selection.clickIdType,
+    recordedAt: selection.recordedAt,
+    expiresAt: selection.expiresAt,
+    consentAt: selection.consentAt,
+    context: { ipAddress: selection.ipAddress, userAgent: selection.userAgent },
+    reason: selection.status,
+  };
+}
+
+function refFromOutboxSnapshot(row: AdConversionOutboxRow): RefTracking | null {
+  if (row.selection_reason !== 'eligible'
+    || !row.ref_tracking_id || !row.click_id || !row.click_id_type
+    || !row.click_recorded_at || !row.click_expires_at || !row.click_consent_at) return null;
+  let context: { ipAddress?: string | null; userAgent?: string | null } = {};
+  try {
+    context = row.click_context_json ? JSON.parse(row.click_context_json) as typeof context : {};
+  } catch {
+    return null;
+  }
+  const clicks = {
+    fbclid: null, gclid: null, twclid: null, ttclid: null,
+    [row.click_id_type]: row.click_id,
+  } as Pick<RefTracking, 'fbclid' | 'gclid' | 'twclid' | 'ttclid'>;
+  return {
+    id: row.ref_tracking_id,
+    ref_code: '',
+    friend_id: row.friend_id,
+    entry_route_id: null,
+    source_url: null,
+    ...clicks,
+    utm_source: null,
+    utm_medium: null,
+    utm_campaign: null,
+    user_agent: context.userAgent ?? null,
+    ip_address: context.ipAddress ?? null,
+    line_account_id: row.line_account_id,
+    ad_conversion_consent_at: row.click_consent_at,
+    created_at: row.click_recorded_at,
+  };
 }
 
 /** 通貨ごとの補助単位の桁数。無い通貨は2桁扱い、通貨不明は換算しない。 */
@@ -63,6 +145,8 @@ export async function sendAdConversions(
     currency?: string | null;
     /** 金額が補助単位(セント等)のとき true。通貨不明のときは換算しない。 */
     amountInMinorUnit?: boolean;
+    /** 期限境界を同じ時計で判定する内部用入力。 */
+    now?: Date;
   },
 ): Promise<void> {
   // 呼び出しをまたいだ重複送信を止める安定キー。無いときは今回限りの鍵にする。
@@ -92,19 +176,24 @@ export async function sendAdConversions(
     if (platform.line_account_id !== lineAccountId) continue;
     // 媒体側の重複排除ID。初回確保時に決めて行に残し、再送・付け替え後も同じ値を使う。
     const providerEventId = hasStableKey ? `${idempotencyKey}:${platform.id}` : crypto.randomUUID();
+    const clickSnapshot = await clickSnapshotForPlatform(db, {
+      platform, friendId, lineAccountId, now: opts?.now,
+    });
     // 要求を先に残す。落ちても取り出し側が送る。同じ鍵は初回の1行。
     const outboxId = await enqueueAdConversionOutbox(db, {
       platformId: platform.id, friendId, lineAccountId, eventName,
       eventValue, currency: opts?.currency, amountInMinorUnit: opts?.amountInMinorUnit,
-      idempotencyKey, providerEventId,
+      idempotencyKey, providerEventId, clickSnapshot,
     });
     const outboxLease = await takeAdConversionOutboxRow(db, outboxId);
     if (!outboxLease) continue; // 他が送り中・送り済み
+    const outboxRow = await getAdConversionOutboxById(db, outboxId);
+    if (!outboxRow) continue;
     await attemptPlatformSend(db, {
       platform, friendId, lineAccountId, eventName,
       eventValue, currency: opts?.currency, amountInMinorUnit: opts?.amountInMinorUnit,
       idempotencyKey, providerEventId,
-    }, { id: outboxId, lease: outboxLease });
+    }, { row: outboxRow, lease: outboxLease });
   }
 }
 
@@ -116,15 +205,30 @@ async function attemptPlatformSend(
     eventValue?: number; currency?: string | null; amountInMinorUnit?: boolean;
     idempotencyKey: string; providerEventId: string;
   },
-  outbox: { id: string; lease: string },
-): Promise<void> {
-  const finishOutbox = (status: 'sent' | 'failed' | 'pending', errorMessage?: string): Promise<void> =>
-    finishAdConversionOutbox(db, { id: outbox.id, lease: outbox.lease, status, errorMessage: errorMessage ?? null });
+  outbox: { row: AdConversionOutboxRow; lease: string },
+): Promise<'sent' | 'failed' | 'pending'> {
+  const finishOutbox = (
+    status: 'sent' | 'failed' | 'pending',
+    errorMessage?: string,
+    retryable = true,
+  ): Promise<void> => finishAdConversionOutbox(db, {
+    id: outbox.row.id,
+    lease: outbox.lease,
+    status,
+    errorMessage: errorMessage ?? null,
+    retryable,
+  });
 
-  const ref = await getRefTrackingWithClickIds(db, args.friendId);
-  if (!ref) { await finishOutbox('failed', 'ref tracking not found'); return; }
-  const click = clickIdForPlatform(args.platform.name, ref);
-  if (!click) { await finishOutbox('failed', `no click id for platform: ${args.platform.name}`); return; }
+  if (outbox.row.selection_reason !== 'eligible') {
+    await finishOutbox('failed', outbox.row.selection_reason, false);
+    return 'failed';
+  }
+  const ref = refFromOutboxSnapshot(outbox.row);
+  if (!ref) {
+    await finishOutbox('failed', 'click_snapshot_invalid', false);
+    return 'failed';
+  }
+  const click = { clickId: outbox.row.click_id!, clickIdType: outbox.row.click_id_type! };
   const config: AdPlatformConfig = JSON.parse(args.platform.config);
   // 金額は主単位・通貨付きに正規化してから確保・送信する。通貨が変われば別内容。
   const currency = toCurrencyCode(args.currency);
@@ -136,11 +240,14 @@ async function attemptPlatformSend(
     clickId: click.clickId, clickIdType: click.clickIdType, eventValue: majorValue,
     currency, idempotencyKey: args.idempotencyKey, providerEventId: args.providerEventId,
   });
-  if (claim.disposition === 'skip-sent') { await finishOutbox('sent'); return; }
+  if (claim.disposition === 'skip-sent') { await finishOutbox('sent'); return 'sent'; }
   if (claim.disposition !== 'send' || !claim.lease) {
     // skip-inflightは他が送り中のため戻す。mismatchは同じ内容では送れないため失敗で残す。
-    if (claim.disposition === 'mismatch') { await finishOutbox('failed', 'idempotency key content mismatch'); return; }
-    await finishOutbox('pending'); return;
+    if (claim.disposition === 'mismatch') {
+      await finishOutbox('failed', 'idempotency key content mismatch', false);
+      return 'failed';
+    }
+    await finishOutbox('pending'); return 'pending';
   }
   const lease = claim.lease;
   const stableProviderEventId = claim.providerEventId ?? args.providerEventId;
@@ -177,11 +284,13 @@ async function attemptPlatformSend(
         break;
       default:
         await markDone('failed', `unsupported platform: ${args.platform.name}`);
-        return;
+        return 'failed';
     }
     await markDone('sent');
+    return 'sent';
   } catch (error) {
     await markDone('failed', String(error));
+    return 'failed';
   }
 }
 
@@ -206,14 +315,15 @@ export async function drainAdConversionOutbox(
       if (platform.line_account_id !== row.line_account_id) {
         throw new Error(`platform account changed: ${row.ad_platform_id}`);
       }
-      await attemptPlatformSend(db, {
+      const result = await attemptPlatformSend(db, {
         platform, friendId: row.friend_id, lineAccountId: row.line_account_id,
         eventName: row.event_name, eventValue: row.event_value ?? undefined,
         currency: row.currency, amountInMinorUnit: row.amount_in_minor_unit === 1,
         idempotencyKey: row.idempotency_key,
         providerEventId: row.provider_event_id ?? `${row.idempotency_key}:${row.ad_platform_id}`,
-      }, { id: row.id, lease: row.lease_token ?? '' });
-      sent++;
+      }, { row, lease: row.lease_token ?? '' });
+      if (result === 'sent') sent++;
+      if (result === 'failed') failed++;
     } catch (error) {
       await finishAdConversionOutbox(db, {
         id: row.id, lease: row.lease_token ?? '', status: 'failed', errorMessage: String(error),
