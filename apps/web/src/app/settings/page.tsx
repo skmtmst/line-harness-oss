@@ -367,6 +367,8 @@ export default function SettingsPage() {
   const [impactGroups, setImpactGroups] = useState<FeatureImpactGroup[]>([])
   const [impactBusy, setImpactBusy] = useState(false)
   const [impactError, setImpactError] = useState('')
+  /** 既定値へ初期化する前の確認。保存済み設定へ戻す操作には使わない。 */
+  const [resetToDefaultsOpen, setResetToDefaultsOpen] = useState(false)
   /** dirtyなまま画面を離れようとした導線。空なら確認窓を閉じる。 */
   const [leaveTarget, setLeaveTarget] = useState<LeaveTarget | null>(null)
   const allowHistoryLeaveRef = useRef(false)
@@ -396,6 +398,7 @@ export default function SettingsPage() {
       setImpactOpen(false)
       setImpactGroups([])
       setImpactError('')
+      setResetToDefaultsOpen(false)
       setLeaveTarget(null)
     }
   }, [selectedAccountId, accountGuard])
@@ -614,6 +617,25 @@ export default function SettingsPage() {
     const ids = group.items.map((item) => item.id)
     setItemOrder((current) => ({ ...current, [groupId]: moveItemWithinGroup(ids, itemId, direction) }))
     setNotice('')
+  }
+
+  /** 最後に取得または保存成功した、現在のアカウントの状態へだけ戻す。 */
+  const discardChanges = () => {
+    if (loading || saving) return
+    setFeatures({ ...savedFeatures })
+    setItemOrder({ ...savedItemOrder })
+    setError('')
+    setNotice('保存済みの機能設定に戻しました。')
+  }
+
+  /** 既定値を下書きへ入れる。ここではAPIを呼ばず、保存を押すまでサーバーは変えない。 */
+  const resetToDefaults = () => {
+    if (loading || saving) return
+    setFeatures({ ...CATALOG_DEFAULT_FEATURES })
+    setItemOrder({})
+    setError('')
+    setNotice('初期値を下書きに入れました。保存すると反映されます。')
+    setResetToDefaultsOpen(false)
   }
 
   /** 機能の目印→表示名。確認ダイアログで内部IDを出さないために使う。 */
@@ -850,11 +872,15 @@ export default function SettingsPage() {
           </Button>
           <Button
             variant="secondary"
-            onClick={() => {
-              setFeatures({ ...CATALOG_DEFAULT_FEATURES })
-              setItemOrder({})
-              setNotice('')
-            }}
+            onClick={discardChanges}
+            disabled={loading || saving || !dirty}
+            title={!dirty && !loading ? '変更すると取り消せます' : undefined}
+          >
+            変更を取り消す
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={() => setResetToDefaultsOpen(true)}
             disabled={loading || saving}
           >
             初期値に戻す
@@ -948,6 +974,18 @@ export default function SettingsPage() {
         オフ前の影響確認(票643)。止まる仕事の件数と対象種別を並べ、
         確認したうえで保存する。標準の確認窓は使わない。
       */}
+      <ConfirmDialog
+        open={resetToDefaultsOpen}
+        title="初期値に戻しますか？"
+        description="機能の表示と並び順を初期値の下書きに置き換えます。保存するまで、他の利用者やサイドメニューには反映されません。"
+        confirmLabel="初期値を下書きに入れる"
+        cancelLabel="キャンセル"
+        onCancel={() => {
+          if (!saving) setResetToDefaultsOpen(false)
+        }}
+        onConfirm={resetToDefaults}
+      />
+
       <ConfirmDialog
         open={leaveTarget !== null}
         title="未保存の変更があります"

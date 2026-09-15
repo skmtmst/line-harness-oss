@@ -109,6 +109,34 @@ afterEach(async () => {
 })
 
 describe('共通情報の新規作成(実React)', () => {
+  it('有効期間と期間外の代替値を保存payloadへ渡す', async () => {
+    await render()
+    await setValue(byId('cv-name'), '期間限定案内')
+    await setValue(byId('cv-key'), 'limited_notice')
+    await setValue(byId('cv-value'), '受付中')
+    await setValue(byId('cv-valid-from'), '2026-09-16T10:00')
+    await setValue(byId('cv-valid-until'), '2026-09-16T12:00')
+    await setValue(byId('cv-expiry-behavior'), 'fallback')
+    await setValue(byId('cv-fallback-value'), '受付終了')
+    await click(byExactText('button', '登録'))
+
+    expect(api.create).toHaveBeenCalledWith(expect.objectContaining({
+      validFrom: '2026-09-16T10:00', validUntil: '2026-09-16T12:00',
+      expiryBehavior: 'fallback', fallbackValue: '受付終了',
+    }))
+  })
+
+  it('終了が開始と同時刻なら送信せず画面で止める', async () => {
+    await render()
+    await setValue(byId('cv-name'), '不正期間')
+    await setValue(byId('cv-key'), 'invalid_window')
+    await setValue(byId('cv-valid-from'), '2026-09-16T10:00')
+    await setValue(byId('cv-valid-until'), '2026-09-16T10:00')
+    await click(byExactText('button', '登録'))
+    expect(api.create).not.toHaveBeenCalled()
+    expect(host.textContent).toContain('有効終了は有効開始より後にしてください')
+  })
+
   it.each([
     ['long_text', '案内'.repeat(5_000), 'TEXTAREA', null],
     ['date', '2028-02-29', 'INPUT', 'date'],
