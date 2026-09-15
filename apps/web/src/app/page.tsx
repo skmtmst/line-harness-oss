@@ -364,7 +364,7 @@ function OperationalAlertsCard({ risk, healthIssues, oldestWaitMinutes, twoFacto
         1時間未満は分、1日未満は時間、それ以上は日で言う。
       */}
       <p>・最も古い未対応：{oldestWaitMinutes === null ? '—' : formatWaitRough(oldestWaitMinutes)}</p>
-      <p>・二段階認証：{twoFactor === null ? '—' : `${twoFactor.enabled} / ${twoFactor.total}人`}</p>
+      <p>・組織全体の二段階認証：{twoFactor === null ? '—' : `${twoFactor.enabled} / ${twoFactor.total}人`}</p>
     </div>
     <Link href="/emergency" className="text-action mt-3 inline-block text-xs font-medium hover:underline">運用状態を見る →</Link>
   </Card>

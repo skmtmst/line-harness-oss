@@ -19,6 +19,7 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import Button from '@/components/shared/button'
+import { useOverlayFocus } from '@/components/shared/overlay-utils'
 
 export type DashboardCardId =
   | 'today-inbox'
@@ -253,12 +254,9 @@ export default function DashboardEditor({ open, preferences, saving = false, onC
     }
   }, [open, preferences])
 
-  useEffect(() => {
-    if (!open) return
-    const previous = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => { document.body.style.overflow = previous }
-  }, [open])
+  // Escape・Tabの循環・背景スクロール停止・閉じたあとのフォーカス戻しは
+  // 共通のoverlay作法に揃える。保存中は確定途中の内容を失わないよう閉じない。
+  const panelRef = useOverlayFocus(open, onCancel, saving)
 
   if (!open) return null
 
@@ -279,15 +277,15 @@ export default function DashboardEditor({ open, preferences, saving = false, onC
   }
 
   return (
-    <div data-design="Editor" className="bg-ink/30 fixed inset-0 z-50 flex justify-end" role="presentation" onMouseDown={onCancel}>
-      <aside role="dialog" aria-modal="true" aria-labelledby="dashboard-editor-title" className="bg-canvas flex h-full w-full max-w-[540px] flex-col shadow-[-8px_0_28px_rgba(26,28,26,0.14)]" onMouseDown={(event) => event.stopPropagation()}>
+    <div data-design="Editor" className="bg-ink/30 fixed inset-0 z-50 flex justify-end" role="presentation" onMouseDown={() => { if (!saving) onCancel() }}>
+      <aside ref={panelRef} role="dialog" aria-modal="true" aria-labelledby="dashboard-editor-title" className="bg-canvas flex h-full w-full max-w-[540px] flex-col shadow-[-8px_0_28px_rgba(26,28,26,0.14)]" onMouseDown={(event) => event.stopPropagation()}>
         <header className="border-hairline border-b px-[22px] pb-4 pt-5">
           <div className="flex items-start justify-between gap-4">
             <div>
               <h2 id="dashboard-editor-title" className="text-ink text-lg font-bold">ダッシュボード編集</h2>
               <p className="text-ink-faint mt-1 text-xs leading-relaxed">表示するカードと位置を変更します</p>
             </div>
-            <button type="button" onClick={onCancel} aria-label="閉じる" className="text-ink-faint hover:text-ink rounded-control p-1.5"><CloseIcon /></button>
+            <button type="button" onClick={onCancel} disabled={saving} aria-label="閉じる" className="text-ink-faint hover:text-ink rounded-control p-1.5"><CloseIcon /></button>
           </div>
           <div className="mt-4 flex items-center justify-between gap-4">
             <p className="text-ink-secondary text-xs">持ち手をドラッグして移動。スイッチで表示を切り替えます。</p>
@@ -337,7 +335,7 @@ export default function DashboardEditor({ open, preferences, saving = false, onC
         </div>
 
         <footer className="border-hairline flex items-center justify-center gap-2 border-t px-[22px] py-4">
-          <Button onClick={onCancel}>キャンセル</Button>
+          <Button onClick={onCancel} disabled={saving}>キャンセル</Button>
           <Button onClick={() => onApply(draft)} disabled={saving} aria-busy={saving} variant="primary">{saving ? '保存中…' : 'ダッシュボードに反映'}</Button>
         </footer>
       </aside>
