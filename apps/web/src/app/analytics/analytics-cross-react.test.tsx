@@ -3,6 +3,7 @@ import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import AnalyticsPage from './page'
+import { ApiError } from '@/lib/api'
 
 /**
  * クロス分析の待機表示を本物のReactで動かす試験(#633)。
@@ -69,6 +70,9 @@ const RESULT_URL = /^\/api\/analytics\/cross\/results\/([^?]+)\?/
 const crossResultCalls = () => net.calls.filter((url) => RESULT_URL.test(url)).length
 const crossResultCallsFor = (id: string) =>
   net.calls.filter((url) => url.startsWith(`/api/analytics/cross/results/${id}?`)).length
+const crossStartCalls = () => net.calls.filter((url) => url.startsWith('/api/analytics/cross/query')).length
+const storedCrossRunKey = (accountId: string) => `lh:analytics:cross-run:v1:${encodeURIComponent(accountId)}`
+const CROSS_STORED_RUN_TTL_MS = 24 * 60 * 60_000
 
 /** 待機中の応答。estimatedWaitMs を返すと画面は打ち切り時刻を延ばす。 */
 function pending(id: string, estimatedWaitMs: number | null) {
@@ -181,6 +185,16 @@ function button(label: string): HTMLButtonElement {
 async function click(label: string) {
   const target = button(label)
   await act(async () => { target.click() })
+}
+
+async function remount() {
+  await act(async () => { root.unmount() })
+  root = createRoot(host)
+  await render()
+}
+
+function saveStoredRun(accountId: string, id: string, createdAt = Date.now()) {
+  sessionStorage.setItem(storedCrossRunKey(accountId), JSON.stringify({ id, createdAt }))
 }
 
 /** 友だち情報欄と権限だけ返し、クロス分析は試験ごとに差し替える。 */
@@ -330,5 +344,150 @@ describe('クロス分析の待機表示の実挙動(#633)', () => {
     expect(host.textContent).toContain('たて・よこの軸を選び')
     // 切替後に前のアカウントのrunを追いかけ直さない。
     expect(crossResultCallsFor('run-a')).toBe(1)
+  })
+
+  it('修正前は再読込でrun IDを失うが、修正後は同じrunへ再接続しPOSTを増やさない', async () => {
+    net.handler = baseHandler((url) => {
+      if (url.startsWith('/api/analytics/cross/query')) {
+        return Promise.resolve({ success: true, data: { id: 'run-reload', state: 'pending' } })
+      }
+      if (url.startsWith('/api/analytics/cross/results/run-reload?')) {
+        return Promise.resolve(pending('run-reload', 5 * 60_000))
+      }
+      return Promise.reject(new Error(`未設定: ${url}`))
+    })
+
+    await render()
+    await click('この30日を集計')
+    await wait(0)
+    expect(sessionStorage.getItem(storedCrossRunKey('account-a'))).toContain('run-reload')
+
+    net.calls.length = 0
+    await remount()
+    await wait(0)
+    expect(crossResultCallsFor('run-reload')).toBe(1)
+    expect(crossStartCalls()).toBe(0)
+  })
+
+  it('アカウントごとの保存runだけを復元し、別アカウントのrunを表示しない', async () => {
+    saveStoredRun('account-a', 'run-account-a')
+    saveStoredRun('account-b', 'run-account-b')
+    net.handler = baseHandler((url) => {
+      if (url.startsWith('/api/analytics/cross/results/run-account-a?')) return Promise.resolve(pending('run-account-a', null))
+      if (url.startsWith('/api/analytics/cross/results/run-account-b?')) return Promise.resolve(pending('run-account-b', null))
+      return Promise.reject(new Error(`未設定: ${url}`))
+    })
+
+    await render()
+    await wait(0)
+    expect(crossResultCallsFor('run-account-a')).toBe(1)
+    expect(crossResultCallsFor('run-account-b')).toBe(0)
+    expect(crossStartCalls()).toBe(0)
+
+    fixture.accountId = 'account-b'
+    await render()
+    await wait(0)
+    expect(crossResultCallsFor('run-account-b')).toBe(1)
+    expect(crossStartCalls()).toBe(0)
+  })
+
+  it('完了・failed・404では保存runを消す', async () => {
+    saveStoredRun('account-a', 'run-finished')
+    net.handler = baseHandler((url) => {
+      if (url.startsWith('/api/analytics/cross/results/run-finished?')) return Promise.resolve(finished('run-finished', '犬'))
+      return Promise.reject(new Error(`未設定: ${url}`))
+    })
+    await render()
+    await wait(0)
+    expect(sessionStorage.getItem(storedCrossRunKey('account-a'))).toBeNull()
+
+    await remount()
+    saveStoredRun('account-a', 'run-failed')
+    net.handler = baseHandler((url) => {
+      if (url.startsWith('/api/analytics/cross/results/run-failed?')) {
+        return Promise.resolve({ success: true, data: { ...pending('run-failed', null).data, state: 'failed', errorCode: 'analytics_cross_failed' } })
+      }
+      return Promise.reject(new Error(`未設定: ${url}`))
+    })
+    await remount()
+    await wait(0)
+    expect(sessionStorage.getItem(storedCrossRunKey('account-a'))).toBeNull()
+
+    saveStoredRun('account-a', 'run-missing')
+    net.handler = baseHandler((url) => {
+      if (url.startsWith('/api/analytics/cross/results/run-missing?')) return Promise.reject(new ApiError(404, 'Not found'))
+      return Promise.reject(new Error(`未設定: ${url}`))
+    })
+    await remount()
+    await wait(0)
+    expect(sessionStorage.getItem(storedCrossRunKey('account-a'))).toBeNull()
+  })
+
+  it('401は再ログイン用に保存runを残して自動確認を止め、恒久4xxは消して止める', async () => {
+    saveStoredRun('account-a', 'run-login')
+    net.handler = baseHandler((url) => {
+      if (url.startsWith('/api/analytics/cross/results/run-login?')) return Promise.reject(new ApiError(401, 'Unauthorized'))
+      return Promise.reject(new Error(`未設定: ${url}`))
+    })
+    await render()
+    await wait(0)
+    expect(sessionStorage.getItem(storedCrossRunKey('account-a'))).toContain('run-login')
+    expect(host.textContent).toContain('ログインし直した後、同じ集計を確認できます')
+    const callsAfterLoginFailure = crossResultCallsFor('run-login')
+    await wait(30_000)
+    expect(crossResultCallsFor('run-login')).toBe(callsAfterLoginFailure)
+
+    await remount()
+    saveStoredRun('account-a', 'run-forbidden')
+    net.handler = baseHandler((url) => {
+      if (url.startsWith('/api/analytics/cross/results/run-forbidden?')) return Promise.reject(new ApiError(403, 'Forbidden'))
+      return Promise.reject(new Error(`未設定: ${url}`))
+    })
+    await remount()
+    await wait(0)
+    expect(sessionStorage.getItem(storedCrossRunKey('account-a'))).toBeNull()
+    const callsAfterForbidden = crossResultCallsFor('run-forbidden')
+    await wait(30_000)
+    expect(crossResultCallsFor('run-forbidden')).toBe(callsAfterForbidden)
+  })
+
+  it('破損値・期限切れは復元せず消し、一時通信失敗は保存runを保持する', async () => {
+    sessionStorage.setItem(storedCrossRunKey('account-a'), '{broken')
+    await render()
+    await wait(0)
+    expect(sessionStorage.getItem(storedCrossRunKey('account-a'))).toBeNull()
+    expect(crossResultCalls()).toBe(0)
+
+    saveStoredRun('account-a', 'run-expired', Date.now() - CROSS_STORED_RUN_TTL_MS - 1)
+    await remount()
+    await wait(0)
+    expect(sessionStorage.getItem(storedCrossRunKey('account-a'))).toBeNull()
+    expect(crossResultCallsFor('run-expired')).toBe(0)
+
+    saveStoredRun('account-a', 'run-offline')
+    net.handler = baseHandler((url) => {
+      if (url.startsWith('/api/analytics/cross/results/run-offline?')) return Promise.reject(new Error('offline'))
+      return Promise.reject(new Error(`未設定: ${url}`))
+    })
+    await remount()
+    await wait(0)
+    expect(sessionStorage.getItem(storedCrossRunKey('account-a'))).toContain('run-offline')
+  })
+
+  it('同じ描画内で集計ボタンを連続して押してもPOSTは1回だけ', async () => {
+    const accepted = deferred<unknown>()
+    net.handler = baseHandler((url) => {
+      if (url.startsWith('/api/analytics/cross/query')) return accepted.promise
+      if (RESULT_URL.test(url)) return Promise.resolve(pending('run-once', null))
+      return Promise.reject(new Error(`未設定: ${url}`))
+    })
+
+    await render()
+    await act(async () => {
+      button('この30日を集計').click()
+      button('この30日を集計').click()
+    })
+    expect(crossStartCalls()).toBe(1)
+    await act(async () => { accepted.resolve({ success: true, data: { id: 'run-once', state: 'pending' } }) })
   })
 })
