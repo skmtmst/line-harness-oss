@@ -61,6 +61,7 @@ export default function AppTopBar() {
   }, [pathname])
 
   const shownTitle = title ?? defaultTitleForPath(pathname)
+  const isHq = pathname === '/hq' || pathname.startsWith('/hq/')
 
   const options = useMemo(
     () => accounts.map((a) => ({ id: a.id, label: a.displayName || a.name })),
@@ -90,6 +91,7 @@ export default function AppTopBar() {
       accounts={options}
       selectedAccountId={selectedAccountId ?? ''}
       onAccountChange={setSelectedAccountId}
+      showAccountSwitcher={!isHq}
       roleLabel={ROLE_LABELS[staffRole] ?? ''}
       onRoleClick={canReturnToHq ? returnToHq : undefined}
       userName={staffName}

@@ -19,6 +19,7 @@ export type SummaryCardProps = {
   hidden?: boolean
   id?: string
   'aria-label'?: string
+  valueTone?: 'default' | 'warning'
 }
 
 /**
@@ -35,6 +36,7 @@ export default function SummaryCard({
   loading = false,
   variant = 'v5',
   className,
+  valueTone = 'default',
   ...cardProps
 }: SummaryCardProps) {
   const variantClass = {
@@ -68,7 +70,7 @@ export default function SummaryCard({
       {loading ? (
         <div className={styles.skeleton} aria-hidden="true" />
       ) : (
-        <p className={styles.value}>
+        <p className={[styles.value, valueTone === 'warning' && styles.valueWarning].filter(Boolean).join(' ')}>
           {value === null ? '—' : value.toLocaleString('ja-JP')}
           {unit}
         </p>

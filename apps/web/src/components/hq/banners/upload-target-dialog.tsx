@@ -59,7 +59,7 @@ export default function UploadTargetDialog({
     <Dialog
       open={open}
       title="画像を取り込む"
-      description="手持ちの画像をプロジェクトへ入れます。PNG・JPEG・WebP、10MB まで。取り込んだ画像も生成した画像と同じように店舗へ渡せます。"
+      description="手持ちの画像をプロジェクトへ入れます。PNG・JPEG・WebP、10MB まで。取り込んだ画像も生成した画像と同じようにアカウントへ渡せます。"
       onCancel={onClose}
       error={error || undefined}
       footer={

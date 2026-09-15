@@ -133,7 +133,7 @@ function ProjectInner() {
     void api.lineAccounts.list().then((res) => {
       if (res.success) setAccounts(res.data as AccountWithStats[])
     }).catch(() => {
-      // 店舗が取れなくても生成はできる。渡す先の一覧だけ空になる。
+      // アカウントが取れなくても生成はできる。渡す先の一覧だけ空になる。
     })
   }, [])
 
@@ -292,7 +292,7 @@ function ProjectInner() {
       if (!res.success) throw new Error(res.error)
       replaceImage(res.data.image)
     } catch (caught) {
-      setModalError(caught instanceof Error && caught.message ? caught.message : '店舗へ渡せませんでした。もう一度お試しください。')
+      setModalError(caught instanceof Error && caught.message ? caught.message : 'アカウントへ渡せませんでした。もう一度お試しください。')
     } finally {
       setModalBusy(false)
     }
@@ -463,7 +463,7 @@ function ProjectInner() {
             <span className="flex-1" />
             <FilterChip selected={filter === 'all'} onChange={() => setFilter('all')}>すべて</FilterChip>
             <FilterChip selected={filter === 'favorite'} onChange={(on) => setFilter(on ? 'favorite' : 'all')}>お気に入り</FilterChip>
-            <FilterChip selected={filter === 'delivered'} onChange={(on) => setFilter(on ? 'delivered' : 'all')}>店舗へ渡し済み</FilterChip>
+            <FilterChip selected={filter === 'delivered'} onChange={(on) => setFilter(on ? 'delivered' : 'all')}>アカウントへ渡し済み</FilterChip>
           </div>
           <div className="border-t border-hairline" />
           {generationError ? (
@@ -584,7 +584,7 @@ function ProjectInner() {
         <ConfirmDialog
           open
           title={`「${project.name}」をアーカイブしますか？`}
-          description="一覧から見えなくなります。画像は消えず、店舗へ渡した画像もそのまま使えます。「アーカイブを見る」からいつでも復元できます。"
+          description="一覧から見えなくなります。画像は消えず、アカウントへ渡した画像もそのまま使えます。「アーカイブを見る」からいつでも復元できます。"
           confirmLabel="アーカイブする"
           destructive
           busy={busy}

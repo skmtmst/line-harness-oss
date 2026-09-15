@@ -353,7 +353,8 @@
     "392_booking_resource_consumptions.sql",
     "393_booking_resource_version.sql",
     "394_mileage_earning_rule_publish.sql",
-    "395_form_folder.sql"
+    "395_form_folder.sql",
+    "396_line_account_profile.sql"
   ],
-  "migrationCount": 354
+  "migrationCount": 355
 }
