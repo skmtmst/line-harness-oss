@@ -100,6 +100,7 @@ async function search(input: HTMLElement, query: string) {
 describe('テンプレート一覧の検索', () => {
   test('名前・本文・差し込み項目をNFKC・大小文字非依存・空白正規化で検索する', async () => {
     const { input } = await renderPage()
+    expect(input.getAttribute('placeholder')).toBe('テンプレート名で検索（本文・差し込んでいる項目も対象）')
 
     await search(input, '  welcome vip  ')
     expect(screen.queryByText(/ＷＥＬＣＯＭＥ/)).toBeTruthy()

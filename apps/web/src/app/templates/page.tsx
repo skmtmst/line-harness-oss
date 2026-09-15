@@ -682,7 +682,7 @@ export default function TemplatesPage() {
       <div className="bg-canvas rounded-card border-hairline mb-3 flex flex-wrap items-center gap-2 border p-3">
         <input
           type="search"
-          placeholder="名前・本文・差し込んでいる項目で検索"
+          placeholder="テンプレート名で検索（本文・差し込んでいる項目も対象）"
           aria-label="名前・本文・差し込んでいる項目で検索"
           value={templateQuery}
           onChange={(e) => setTemplateQuery(e.target.value)}
