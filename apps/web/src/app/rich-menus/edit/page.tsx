@@ -17,6 +17,7 @@ import { usePageTitle } from '@/components/shell/page-chrome'
 import { RICH_MENU_DIMENSIONS } from '@line-crm/shared'
 import { datetimeLocalJstToUtcIso } from '@/lib/jst-datetime'
 import { useScheduleSubmit } from './schedule-submit'
+import { ManualPublishAttempt } from './manual-publish-attempt'
 
 /**
  * 保存されている条件を読む。
@@ -252,6 +253,8 @@ function Editor({
   }
 
   const fileInput = useRef<HTMLInputElement>(null)
+  // LINEへの公開は結果が届くまで同じ鍵で再試行する。成功後の次の公開だけ新しい鍵にする。
+  const publishAttempt = useRef(new ManualPublishAttempt())
 
   const reload = useCallback(async () => {
     setLoading(true)
@@ -512,6 +515,8 @@ function Editor({
     // 二度押しを受け付けない。窓のボタンも `busy` で止まるが、
     // 二重の登録が走ると LINE 側に同じメニューが2つ出る。
     if (publishing || unpublishing || saving || busy) return
+    const idempotencyKey = publishAttempt.current.begin()
+    if (!idempotencyKey) return
     setPublishing(true)
     setError(null)
     setConfirmError('')
@@ -522,10 +527,11 @@ function Editor({
     try {
       await persistDraft()
       draftSaved = true
-      const res = await api.richMenuGroups.publish(groupId)
+      const res = await api.richMenuGroups.publish(groupId, idempotencyKey)
       // 失敗を握りつぶさない。返事を見ずに閉じると、登録できていないのに
       // 終わったように見える。
       if (!res.success) throw new Error(res.error ?? 'publish failed')
+      publishAttempt.current.succeed()
       setConfirmKind(null)
       setNotice('LINEへの登録が終わりました。友だちのトーク画面に出すには、一覧の「友だちに表示」を実行してください。')
       await reload()
@@ -538,6 +544,7 @@ function Editor({
       )
     } finally {
       setPublishing(false)
+      publishAttempt.current.finish()
     }
   }
 

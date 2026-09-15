@@ -1847,6 +1847,18 @@ async function scheduled(
         if (!res.ok) throw new Error(`LINE createRichMenu failed: ${res.status} ${await res.text()}`);
         return res.json() as Promise<{ richMenuId: string }>;
       },
+      async listRichMenus() {
+        const res = await fetch('https://api.line.me/v2/bot/richmenu/list', {
+          headers: { Authorization: auth },
+        });
+        if (!res.ok) throw new Error(`LINE listRichMenus failed: ${res.status}`);
+        const body = (await res.json()) as { richmenus?: Array<{ richMenuId?: string; name?: string }> };
+        return (body.richmenus ?? []).flatMap((menu) => (
+          typeof menu.richMenuId === 'string'
+            ? [{ richMenuId: menu.richMenuId, name: typeof menu.name === 'string' ? menu.name : null }]
+            : []
+        ));
+      },
       async uploadRichMenuImage(richMenuId: string, image: Uint8Array, contentType: string) {
         const res = await fetch(`https://api-data.line.me/v2/bot/richmenu/${richMenuId}/content`, {
           method: 'POST',
