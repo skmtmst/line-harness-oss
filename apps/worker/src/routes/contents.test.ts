@@ -26,6 +26,12 @@ class MockCommonVarKeyConflictError extends Error {
   }
 }
 
+class MockMediaUsageReferenceError extends Error {
+  constructor(readonly code: string) {
+    super(code);
+  }
+}
+
 const mocks = {
   getMedia: vi.fn(),
   countMedia: vi.fn(),
@@ -36,9 +42,24 @@ const mocks = {
   getMediaUsages: vi.fn(),
   countMediaUsages: vi.fn(),
   getMediaDeleteImpact: vi.fn(),
+  getMediaDeleteImpactSnapshot: vi.fn(),
   getMediaReplacementPlan: vi.fn(),
   applyMediaReplacementPlan: vi.fn(),
   getMediaStorageQuota: vi.fn(),
+  getMediaVersionList: vi.fn(),
+  getMediaLiveTarget: vi.fn(),
+  getMediaUsageReferenceStates: vi.fn(),
+  retargetMediaUsageReference: vi.fn(),
+  MediaUsageReferenceError: MockMediaUsageReferenceError,
+  MEDIA_REF_KINDS: [
+    'template',
+    'broadcast',
+    'rich_menu',
+    'scenario_step',
+    'nen_column',
+    'event',
+    'webinar',
+  ],
   createMediaUploadSession: vi.fn(),
   getMediaUploadSession: vi.fn(),
   failMediaUploadSession: vi.fn(),
@@ -285,9 +306,17 @@ beforeEach(() => {
   mocks.countMediaUsages.mockResolvedValue(0);
   mocks.getMediaUsages.mockResolvedValue([]);
   mocks.getMediaDeleteImpact.mockResolvedValue(DELETE_IMPACT);
+  mocks.getMediaDeleteImpactSnapshot.mockResolvedValue({ impact: DELETE_IMPACT, usages: [] });
   mocks.getMediaReplacementPlan.mockResolvedValue(REPLACEMENT_PLAN);
   mocks.applyMediaReplacementPlan.mockResolvedValue(1);
   mocks.getMediaStorageQuota.mockResolvedValue(QUOTA);
+  mocks.getMediaVersionList.mockResolvedValue([]);
+  mocks.getMediaUsageReferenceStates.mockResolvedValue([]);
+  mocks.getMediaLiveTarget.mockResolvedValue(null);
+  mocks.retargetMediaUsageReference.mockResolvedValue({
+    changed: true,
+    state: { mode: 'live', versionNo: null },
+  });
   mocks.createMediaUploadSession.mockResolvedValue(UPLOAD_SESSION);
   mocks.getMediaUploadSession.mockResolvedValue(UPLOAD_SESSION);
   mocks.verifyMediaUploadSession.mockResolvedValue({
@@ -551,7 +580,7 @@ describe('メディアの容量・直接アップロード・版', () => {
 
 describe('メディアの削除', () => {
   it('影響確認は使用先の名前と導線を返す', async () => {
-    mocks.getMediaDeleteImpact.mockResolvedValue({
+    mocks.getMediaDeleteImpactSnapshot.mockResolvedValue({ impact: {
       ...DELETE_IMPACT,
       usageCount: 1,
       canDelete: false,
@@ -564,7 +593,7 @@ describe('メディアの削除', () => {
         state: 'available',
         scannedAt: '2026-08-31T10:00:00.000',
       }],
-    });
+    }, usages: [{ media_id: 'md-1', ref_kind: 'broadcast', ref_id: 'broadcast-1', scanned_at: '2026-08-31T10:00:00.000' }] });
     const res = await req('/api/media/md-1/delete-impact?accountId=account-1', 'GET');
     expect(res.status).toBe(200);
     expect(await res.json()).toMatchObject({
@@ -574,6 +603,34 @@ describe('メディアの削除', () => {
         canDelete: false,
       },
     });
+  });
+
+  it('走査が途中で使用先を更新しても、同じsnapshotのIDだけを一覧へ結合する', async () => {
+    mocks.getMediaDeleteImpactSnapshot.mockResolvedValue({
+      impact: {
+        ...DELETE_IMPACT,
+        usageCount: 1,
+        canDelete: false,
+        references: [{
+          kind: 'template', name: '固定された参照先', href: '/templates/edit?id=template-stable',
+          state: 'available', scannedAt: '2026-08-31T10:00:00.000',
+        }],
+      },
+      usages: [{
+        media_id: 'md-1', ref_kind: 'template', ref_id: 'template-stable',
+        scanned_at: '2026-08-31T10:00:00.000',
+      }],
+    });
+    // 旧実装なら二度目の読込でこの別IDをindex結合してしまう。
+    mocks.getMediaUsages.mockResolvedValue([{ media_id: 'md-1', ref_kind: 'broadcast', ref_id: 'newer-row' }]);
+    mocks.getMediaUsageReferenceStates.mockResolvedValue([{ mode: 'pinned', versionNo: 1 }]);
+
+    const res = await req('/api/media/md-1/delete-impact?accountId=account-1', 'GET');
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      data: { references: [{ refKind: 'template', refId: 'template-stable' }] },
+    });
+    expect(mocks.getMediaUsages).not.toHaveBeenCalled();
   });
 
   it('影響を取得できないときは0件を作らず503', async () => {
@@ -742,7 +799,7 @@ describe('#667 N-197 編集・削除のAPIはowner/adminのみ', () => {
   it('ownerの影響確認は通る', async () => {
     const res = await req('/api/media/md-1/delete-impact?accountId=account-1', 'GET', undefined, 'owner');
     expect(res.status).toBe(200);
-    expect(mocks.getMediaDeleteImpact).toHaveBeenCalled();
+    expect(mocks.getMediaDeleteImpactSnapshot).toHaveBeenCalled();
   });
 
   /* 読める操作まで取り上げない。読取権限と編集権限を混同しないための一行。 */
