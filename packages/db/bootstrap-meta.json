@@ -358,7 +358,8 @@
     "397_operation_dispatcher_heartbeats.sql",
     "398_event_versions_and_booking_expiry.sql",
     "399_operation_alert_lifecycle.sql",
-    "400_common_var_extended_types.sql"
+    "400_rich_menu_manual_publish_idempotency.sql",
+    "401_rich_menu_manual_publish_execution_token.sql"
   ],
-  "migrationCount": 359
+  "migrationCount": 360
 }

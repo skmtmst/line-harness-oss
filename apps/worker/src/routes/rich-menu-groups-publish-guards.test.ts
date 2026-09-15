@@ -331,7 +331,9 @@ describe('N-159: 有効な行き先ゼロの公開拒否', () => {
     insertGroup('g1', 'draft');
     insertPage('g1', 'p1', 0, true);
 
-    const { path, init } = authed('/api/rich-menu-groups/g1/publish', { method: 'POST' });
+    const { path, init } = authed('/api/rich-menu-groups/g1/publish', {
+      method: 'POST', headers: { 'Idempotency-Key': 'mixed-switch-destination-0001' },
+    });
     const res = await setupApp(db, r2).request(path, init);
 
     expect(res.status).toBe(400);
@@ -356,7 +358,9 @@ describe('N-159: 有効な行き先ゼロの公開拒否', () => {
       label: '前のページ',
     });
 
-    const { path, init } = authed('/api/rich-menu-groups/g1/publish', { method: 'POST' });
+    const { path, init } = authed('/api/rich-menu-groups/g1/publish', {
+      method: 'POST', headers: { 'Idempotency-Key': 'label-boundary-20chars-0001' },
+    });
     const res = await setupApp(db, r2).request(path, init);
 
     expect(res.status).toBe(400);
@@ -374,7 +378,9 @@ describe('N-159: 有効な行き先ゼロの公開拒否', () => {
       label: 'どこかへ',
     });
 
-    const { path, init } = authed('/api/rich-menu-groups/g1/publish', { method: 'POST' });
+    const { path, init } = authed('/api/rich-menu-groups/g1/publish', {
+      method: 'POST', headers: { 'Idempotency-Key': 'mixed-switch-destination-0001' },
+    });
     const res = await setupApp(db, r2).request(path, init);
 
     expect(res.status).toBe(400);
@@ -394,7 +400,9 @@ describe('N-159: 有効な行き先ゼロの公開拒否', () => {
     });
     insertArea('p2', 'a2', { label: 'サイトを開く' });
 
-    const { path, init } = authed('/api/rich-menu-groups/g1/publish', { method: 'POST' });
+    const { path, init } = authed('/api/rich-menu-groups/g1/publish', {
+      method: 'POST', headers: { 'Idempotency-Key': 'label-boundary-20chars-0001' },
+    });
     const res = await setupApp(db, r2).request(path, init);
 
     expect(res.status).toBe(200);
@@ -414,7 +422,9 @@ describe('N-155: 読み上げラベルの必須化と20字上限', () => {
     insertPage('g1', 'p1', 0, true);
     insertArea('p1', 'a1', { label: null });
 
-    const { path, init } = authed('/api/rich-menu-groups/g1/publish', { method: 'POST' });
+    const { path, init } = authed('/api/rich-menu-groups/g1/publish', {
+      method: 'POST', headers: { 'Idempotency-Key': 'label-boundary-20chars-0001' },
+    });
     const res = await setupApp(db, r2).request(path, init);
 
     expect(res.status).toBe(400);
@@ -464,7 +474,9 @@ describe('N-155: 読み上げラベルの必須化と20字上限', () => {
     insertPage('g1', 'p1', 0, true);
     insertArea('p1', 'a1', { label: 'あ'.repeat(20) });
 
-    const { path, init } = authed('/api/rich-menu-groups/g1/publish', { method: 'POST' });
+    const { path, init } = authed('/api/rich-menu-groups/g1/publish', {
+      method: 'POST', headers: { 'Idempotency-Key': 'label-boundary-20chars-0001' },
+    });
     const res = await setupApp(db, r2).request(path, init);
 
     expect(res.status).toBe(200);

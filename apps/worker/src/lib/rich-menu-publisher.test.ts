@@ -95,6 +95,7 @@ function makeMockLineClient(opts: { currentDefault?: string | null } = {}): Mock
       calls.push('create');
       return { richMenuId: `lm-${calls.filter((c) => c === 'create').length}` };
     }),
+    listRichMenus: vi.fn(async () => []),
     uploadRichMenuImage: vi.fn(async () => {
       calls.push('upload');
     }),
