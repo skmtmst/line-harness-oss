@@ -89,7 +89,14 @@ const mocks = {
   getCommonVarSchedules: vi.fn(),
   createCommonVarSchedule: vi.fn(),
   deleteCommonVarSchedule: vi.fn(),
-  COMMON_VAR_TYPES: ['text', 'url', 'image', 'number'],
+  COMMON_VAR_TYPES: ['text', 'url', 'image', 'number', 'long_text', 'date', 'datetime', 'boolean'],
+  normalizeCommonVarValue: (type: string, value: string) => {
+    if (type === 'long_text') return value.length <= 10_000 ? value : null;
+    if (type === 'boolean') return value === 'true' || value === 'false' ? value : null;
+    if (type === 'date') return /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : null;
+    if (type === 'datetime') return /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value) ? value : null;
+    return value.length <= 200 ? value : null;
+  },
   validateFieldKey: (key: unknown) =>
     typeof key === 'string' && /^[a-z][a-z0-9_]{0,31}$/.test(key) && key !== 'name'
       ? { ok: true as const }
