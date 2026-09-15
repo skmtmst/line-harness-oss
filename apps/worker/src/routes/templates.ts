@@ -570,6 +570,9 @@ templates.put('/api/templates/:id', requireRole('owner', 'admin'), async (c) => 
     if (err instanceof MediaReferenceAccountError) {
       return c.json({ success: false, error: '別のLINEアカウントのメディアは使用できません' }, 422);
     }
+    if (err instanceof Error && err.message === 'TEMPLATE_DRAFT_CONFLICT') {
+      return c.json({ success: false, error: '編集中に公開状態が変わりました。読み直してください' }, 409);
+    }
     console.error('PUT /api/templates/:id error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }

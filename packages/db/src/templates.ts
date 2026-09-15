@@ -376,6 +376,9 @@ export async function saveTemplateDraft(
   const draftQuestionStatus = updates.questionStatus
     ?? current.draft_question_status
     ?? current.question_status;
+  const expectedVersion = Number(current.published_version ?? 0);
+  const expectedDraftRevision = Number(current.draft_revision ?? 0);
+  const nextDraftRevision = expectedDraftRevision + 1;
   const mutation = db.prepare(
     `UPDATE templates
         SET draft_message_type = ?,
@@ -387,7 +390,8 @@ export async function saveTemplateDraft(
             draft_question_status = ?,
             draft_revision = draft_revision + 1,
             updated_at = ?
-      WHERE id = ?`,
+      WHERE id = ? AND published_version = ? AND draft_revision = ?
+        AND message_content IS ?`,
   ).bind(
     draftMessageType,
     draftMessageContent,
@@ -398,15 +402,28 @@ export async function saveTemplateDraft(
     draftQuestionStatus,
     jstNow(),
     id,
+    expectedVersion,
+    expectedDraftRevision,
+    current.message_content,
   );
-  await applyMediaUsageMutation(db, {
+  const [updated] = await applyMediaUsageMutation(db, {
     lineAccountId: current.line_account_id,
     refKind: 'template',
     refId: id,
     // 公開中の本文は下書き保存では消えない。両方を数える。
     searchableContent: [current.message_content, draftMessageContent],
     mutationStatements: [mutation],
+    usageGuard: {
+      sql: `EXISTS (
+        SELECT 1 FROM templates
+         WHERE id = ? AND published_version = ? AND draft_revision = ?
+           AND message_content IS ? AND draft_message_content IS ?
+      )`,
+      binds: [id, expectedVersion, nextDraftRevision,
+        current.message_content, draftMessageContent],
+    },
   });
+  if ((updated?.meta?.changes ?? 0) === 0) throw new Error('TEMPLATE_DRAFT_CONFLICT');
   return (await getTemplateById(db, id))!;
 }
 

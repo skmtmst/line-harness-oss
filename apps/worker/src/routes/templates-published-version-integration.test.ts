@@ -28,14 +28,14 @@ function app() {
   return hono;
 }
 
-function json(method: string, path: string, body: unknown, key?: string) {
+function json(method: string, path: string, body: unknown, key?: string, db = store.db) {
   const headers: Record<string, string> = { 'content-type': 'application/json' };
   if (key) headers['Idempotency-Key'] = key;
   return app().request(path, {
     method,
     headers,
     body: JSON.stringify(body),
-  }, { DB: store.db } as Env['Bindings']);
+  }, { DB: db } as Env['Bindings']);
 }
 
 let store: SqliteD1;
@@ -231,6 +231,73 @@ describe('実route・実DB: メディア参照と使用台帳を原子更新す�
     expect(response.status).toBe(500);
     expect(store.raw.prepare(`SELECT COUNT(*) AS c FROM templates`).get()).toEqual({ c: 0 });
     expect(usageCount('media-a')).toBe(0);
+  });
+
+  it('PUT読取後の同時公開は409にし、勝者の本文と台帳を変えない', async () => {
+    seedMedia('media-a', 'account-1', 'media/account-1/a.png');
+    seedMedia('media-b', 'account-1', 'media/account-1/b.png');
+    seedMedia('media-c', 'account-1', 'media/account-1/c.png');
+    const created = await json('POST', '/api/templates', {
+      accountId: 'account-1', name: '画像', messageType: 'image',
+      messageContent: mediaImageContent('media/account-1/a.png'),
+    });
+    const id = ((await created.json()) as { data: { id: string } }).data.id;
+    const baseDb = store.db;
+    let raced = false;
+    const racingDb = {
+      ...baseDb,
+      prepare(query: string) {
+        const statement = baseDb.prepare(query);
+        if (!query.includes('draft_revision = draft_revision + 1')) return statement;
+        return {
+          ...statement,
+          bind(...values: unknown[]) {
+            if (!raced) {
+              raced = true;
+              store.raw.transaction(() => {
+                store.raw.prepare(`
+                  UPDATE templates
+                     SET message_content = ?, draft_message_content = NULL,
+                         draft_message_type = NULL, draft_revision = 0,
+                         published_version = 1
+                   WHERE id = ?
+                `).run(mediaImageContent('media/account-1/b.png'), id);
+                store.raw.prepare(
+                  `DELETE FROM media_usages WHERE ref_kind = 'template' AND ref_id = ?`,
+                ).run(id);
+                store.raw.prepare(`
+                  INSERT INTO media_usages (media_id, ref_kind, ref_id, scanned_at)
+                  VALUES ('media-b', 'template', ?, '2026-09-16')
+                `).run(id);
+              })();
+            }
+            return statement.bind(...values);
+          },
+        } as D1PreparedStatement;
+      },
+    } as D1Database;
+
+    const response = await json('PUT', `/api/templates/${id}`, {
+      messageType: 'image', messageContent: mediaImageContent('media/account-1/c.png'),
+    }, undefined, racingDb);
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ success: false });
+    const row = store.raw.prepare(`
+      SELECT message_content, draft_message_content, published_version, draft_revision
+      FROM templates WHERE id = ?
+    `).get(id) as {
+      message_content: string;
+      draft_message_content: string | null;
+      published_version: number;
+      draft_revision: number;
+    };
+    expect(row.message_content).toContain('media/account-1/b.png');
+    expect(row).toMatchObject({
+      draft_message_content: null, published_version: 1, draft_revision: 0,
+    });
+    expect(usageCount('media-a')).toBe(0);
+    expect(usageCount('media-b')).toBe(1);
+    expect(usageCount('media-c')).toBe(0);
   });
 });
 

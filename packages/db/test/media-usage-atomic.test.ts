@@ -25,6 +25,8 @@ function setup(): { raw: Database.Database; db: D1Database } {
             'media/account-1/a.png', '2026-09-16'),
            ('media-b', 'account-1', 'image', 'b.png', 'image/png', 10,
             'media/account-1/b.png', '2026-09-16'),
+           ('media-c', 'account-1', 'image', 'c.png', 'image/png', 10,
+            'media/account-1/c.png', '2026-09-16'),
            ('media-other', 'account-2', 'image', 'other.png', 'image/png', 10,
             'media/account-2/other.png', '2026-09-16');
   `);
@@ -192,5 +194,68 @@ describe('media usage とテンプレート保存の原子更新', () => {
     })).rejects.toThrow('TEMPLATE_VERSION_CONFLICT');
     expect(await countMediaUsages(db, 'media-a')).toBe(0);
     expect(await countMediaUsages(db, 'media-b')).toBe(1);
+  });
+
+  it('読取後に公開された下書き保存は競合になり、勝者の本文と台帳を変えない', async () => {
+    const { raw, db } = setup();
+    const created = await createTemplate(db, {
+      name: '画像', category: 'general', messageType: 'image',
+      messageContent: imageBody('media/account-1/a.png'), lineAccountId: 'account-1',
+    });
+    const baseDb = asD1(raw);
+    let raced = false;
+    const racingDb = {
+      ...baseDb,
+      prepare(query: string) {
+        const statement = baseDb.prepare(query);
+        if (!query.includes('draft_revision = draft_revision + 1')) return statement;
+        return {
+          ...statement,
+          bind(...values: unknown[]) {
+            if (!raced) {
+              raced = true;
+              raw.transaction(() => {
+                raw.prepare(`
+                  UPDATE templates
+                     SET message_content = ?, draft_message_content = NULL,
+                         draft_message_type = NULL, draft_revision = 0,
+                         published_version = 1
+                   WHERE id = ?
+                `).run(imageBody('media/account-1/b.png'), created.id);
+                raw.prepare(
+                  `DELETE FROM media_usages WHERE ref_kind = 'template' AND ref_id = ?`,
+                ).run(created.id);
+                raw.prepare(`
+                  INSERT INTO media_usages (media_id, ref_kind, ref_id, scanned_at)
+                  VALUES ('media-b', 'template', ?, '2026-09-16')
+                `).run(created.id);
+              })();
+            }
+            return statement.bind(...values);
+          },
+        } as D1PreparedStatement;
+      },
+    } as D1Database;
+
+    await expect(saveTemplateDraft(racingDb, created.id, {
+      messageType: 'image', messageContent: imageBody('media/account-1/c.png'),
+    })).rejects.toThrow('TEMPLATE_DRAFT_CONFLICT');
+
+    const row = raw.prepare(`
+      SELECT message_content, draft_message_content, published_version, draft_revision
+      FROM templates WHERE id = ?
+    `).get(created.id) as {
+      message_content: string;
+      draft_message_content: string | null;
+      published_version: number;
+      draft_revision: number;
+    };
+    expect(row.message_content).toContain('media/account-1/b.png');
+    expect(row).toMatchObject({
+      draft_message_content: null, published_version: 1, draft_revision: 0,
+    });
+    expect(await countMediaUsages(db, 'media-a')).toBe(0);
+    expect(await countMediaUsages(db, 'media-b')).toBe(1);
+    expect(await countMediaUsages(db, 'media-c')).toBe(0);
   });
 });
