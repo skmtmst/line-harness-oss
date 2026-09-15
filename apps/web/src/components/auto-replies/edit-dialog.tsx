@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { api } from '@/lib/api'
 import type { AutoReplyDraftInput, AutoReplyDraftVersion } from '@line-crm/shared'
 import type { SegmentCondition } from '@/lib/segment-condition'
@@ -265,9 +265,13 @@ export default function EditDialog({
   // アクションで選ぶもの（タグ・友だち情報・対応マーク・シナリオ・共通情報）。
   const actionOptions = useActionOptions()
   // 一覧内で開く編集窓は共通のoverlay制御へ寄せる。Escape・Tab循環・背景
-  // スクロール停止・閉じたあとのフォーカス復元を同じ作法にし、保存中だけは
-  // 確定途中の入力を失わないよう閉じない。ページ表示にはoverlayを使わない。
-  const dialogRef = useOverlayFocus(!page, onClose, saving)
+  // スクロール停止・閉じたあとのフォーカス復元を同じ作法にする。保存中の
+  // 閉鎖抑止は closeDisabled に渡さずここで判定する。そうしないと保存状態の
+  // 切替で共通hookがcleanupされ、開いた起点への復元先を失ってしまう。
+  const closeOverlay = useCallback(() => {
+    if (!saving) onClose()
+  }, [onClose, saving])
+  const dialogRef = useOverlayFocus(!page, closeOverlay)
 
   useEffect(() => {
     let active = true
@@ -466,8 +470,8 @@ export default function EditDialog({
       className={page ? 'space-y-4' : 'fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4'}
       data-design-node={page ? step === 'basic' ? 'K7vg2' : step === 'trigger' ? 'nzWIX' : 'ivDoe' : undefined}
       role={page ? undefined : 'presentation'}
-      onMouseDown={page || saving ? undefined : (event) => {
-        if (event.target === event.currentTarget) onClose()
+      onMouseDown={page ? undefined : (event) => {
+        if (event.target === event.currentTarget) closeOverlay()
       }}
     >
       {page && (

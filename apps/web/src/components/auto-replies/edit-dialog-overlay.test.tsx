@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { act, type ReactNode } from 'react'
+import { act, type ReactNode, useState } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import EditDialog, { type AutoReplyDraft } from './edit-dialog'
@@ -131,5 +131,24 @@ describe('E-02 自動応答編集ダイアログのoverlay制御', () => {
     act(() => { host.firstElementChild?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true })) })
     expect(onClose).not.toHaveBeenCalled()
     await act(async () => { finishSave?.() })
+  })
+
+  it('保存成功で親が閉じても、開いた起点へフォーカスを戻す', async () => {
+    function Owner() {
+      const [open, setOpen] = useState(true)
+      return open
+        ? <EditDialog draft={draft} templates={[]} onClose={() => setOpen(false)} onSaved={() => setOpen(false)} />
+        : null
+    }
+
+    act(() => { root.render(<Owner />) })
+    await flush()
+    const save = Array.from(dialog().querySelectorAll('button')).find((button) => button.textContent === '保存')
+    if (!save) throw new Error('save button not found')
+    act(() => { save.click() })
+    await flush()
+    expect(mocks.create).toHaveBeenCalledTimes(1)
+    expect(host.querySelector('[role="dialog"]')).toBeNull()
+    expect(document.activeElement).toBe(opener)
   })
 })
