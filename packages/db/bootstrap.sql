@@ -172,7 +172,8 @@ CREATE TABLE ad_conversion_outbox (
   provider_event_id TEXT,
   last_error        TEXT,
   created_at        TEXT NOT NULL,
-  updated_at        TEXT NOT NULL,
+  updated_at        TEXT NOT NULL, ref_tracking_id TEXT, click_id TEXT, click_id_type TEXT, click_recorded_at TEXT, click_expires_at TEXT, click_consent_at TEXT, click_context_json TEXT, selection_reason TEXT NOT NULL DEFAULT 'legacy_unsnapshotted', is_retryable INTEGER NOT NULL DEFAULT 1
+  CHECK (is_retryable IN (0, 1)),
   UNIQUE (ad_platform_id, friend_id, event_name, idempotency_key)
 );
 
@@ -4403,7 +4404,7 @@ CREATE TABLE ref_tracking (
   entry_route_id  TEXT REFERENCES entry_routes (id) ON DELETE SET NULL,
   source_url      TEXT,
   created_at      TEXT NOT NULL DEFAULT (datetime('now'))
-, fbclid TEXT, gclid TEXT, twclid TEXT, ttclid TEXT, utm_source TEXT, utm_medium TEXT, utm_campaign TEXT, user_agent TEXT, ip_address TEXT);
+, fbclid TEXT, gclid TEXT, twclid TEXT, ttclid TEXT, utm_source TEXT, utm_medium TEXT, utm_campaign TEXT, user_agent TEXT, ip_address TEXT, line_account_id TEXT REFERENCES line_accounts(id) ON DELETE SET NULL, ad_conversion_consent_at TEXT);
 
 CREATE TABLE reminder_delivery_runs (
   id                         TEXT PRIMARY KEY,
@@ -5850,6 +5851,9 @@ CREATE INDEX idx_ad_conversion_outbox_due
 CREATE INDEX idx_ad_conversion_outbox_friend
   ON ad_conversion_outbox(friend_id);
 
+CREATE INDEX idx_ad_conversion_outbox_retryable_due
+  ON ad_conversion_outbox(is_retryable, status, next_attempt_at);
+
 CREATE INDEX idx_ad_platforms_account ON ad_platforms(line_account_id);
 
 CREATE UNIQUE INDEX idx_ad_platforms_account_name
@@ -6986,6 +6990,9 @@ CREATE INDEX idx_recipe_clone_runs_v316_account
 
 CREATE INDEX idx_recipe_clone_runs_v316_recipe
   ON recipe_clone_runs(recipe_id, created_at DESC);
+
+CREATE INDEX idx_ref_tracking_ad_click_scope
+  ON ref_tracking(friend_id, line_account_id, created_at DESC);
 
 CREATE INDEX idx_ref_tracking_friend ON ref_tracking (friend_id);
 
