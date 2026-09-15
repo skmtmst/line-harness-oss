@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import PageHeader from '@/components/shared/page-header'
@@ -109,6 +110,10 @@ type FeatureSaveResponse = {
   error: string
   data: { version: number }
 }
+
+type LeaveTarget =
+  | { kind: 'link'; href: string }
+  | { kind: 'history-back' }
 
 const USAGE_ITEM_IDS_BY_KEY: Record<string, string[]> = {
   templates: ['templates'],
@@ -338,6 +343,7 @@ function SidebarPreview({ groups, features }: {
 
 export default function SettingsPage() {
   const { selectedAccountId } = useAccount()
+  const router = useRouter()
   const [savedFeatures, setSavedFeatures] = useState<Record<string, boolean>>(CATALOG_DEFAULT_FEATURES)
   const [features, setFeatures] = useState<Record<string, boolean>>(CATALOG_DEFAULT_FEATURES)
   const [savedItemOrder, setSavedItemOrder] = useState<MenuItemOrder>({})
@@ -361,6 +367,9 @@ export default function SettingsPage() {
   const [impactGroups, setImpactGroups] = useState<FeatureImpactGroup[]>([])
   const [impactBusy, setImpactBusy] = useState(false)
   const [impactError, setImpactError] = useState('')
+  /** dirtyなまま画面を離れようとした導線。空なら確認窓を閉じる。 */
+  const [leaveTarget, setLeaveTarget] = useState<LeaveTarget | null>(null)
+  const allowHistoryLeaveRef = useRef(false)
   /**
    * 世代guard。アカウントが変わったら古い応答を捨てる。
    * Aの応答をBの画面へ混ぜないし、Aの版でBへ保存しない。
@@ -371,6 +380,22 @@ export default function SettingsPage() {
     if (accountRef.current !== selectedAccountId) {
       accountRef.current = selectedAccountId
       accountGuard.advance()
+      // Aの未保存状態をBへ持ち込まない。Bの値は load() が改めて確定する。
+      setSavedFeatures(CATALOG_DEFAULT_FEATURES)
+      setFeatures(CATALOG_DEFAULT_FEATURES)
+      setSavedItemOrder({})
+      setItemOrder({})
+      setSettingsVersion(0)
+      setSpecializedFeatureKeys([])
+      setUsageCategories([])
+      setUsageFailed(false)
+      setOrdering(false)
+      setError('')
+      setNotice('')
+      setImpactOpen(false)
+      setImpactGroups([])
+      setImpactError('')
+      setLeaveTarget(null)
     }
   }, [selectedAccountId, accountGuard])
 
@@ -401,6 +426,14 @@ export default function SettingsPage() {
 
   const load = useCallback(async () => {
     if (!selectedAccountId) {
+      setSavedFeatures(CATALOG_DEFAULT_FEATURES)
+      setFeatures(CATALOG_DEFAULT_FEATURES)
+      setSavedItemOrder({})
+      setItemOrder({})
+      setSettingsVersion(0)
+      setSpecializedFeatureKeys([])
+      setUsageCategories([])
+      setLeaveTarget(null)
       setLoading(false)
       return
     }
@@ -453,6 +486,77 @@ export default function SettingsPage() {
     savedOrder: itemOrderFromGroups(savedGroups),
     currentOrder,
   })
+  const dirtyRef = useRef(dirty)
+  dirtyRef.current = dirty
+
+  /*
+   * ブラウザ再読込・タブ終了だけは画面内のDialogを出せないので、標準の確認を
+   * dirtyな間だけ登録する。保存成功・account切替・unmountではeffect cleanupで外れる。
+   */
+  useEffect(() => {
+    if (!dirty) return
+    const onBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (!dirtyRef.current) return
+      event.preventDefault()
+      event.returnValue = ''
+    }
+    window.addEventListener('beforeunload', onBeforeUnload)
+    return () => window.removeEventListener('beforeunload', onBeforeUnload)
+  }, [dirty])
+
+  /*
+   * 左メニュー等のLinkも含めて、同一タブの画面内遷移を捕まえる。
+   * browser backはブラウザ側が先に履歴を動かすため対象外にし、ここでは
+   * 「クリックして別の管理画面へ行く」導線だけを安全に止める。
+   */
+  useEffect(() => {
+    if (!dirty) return
+    const onDocumentClick = (event: MouseEvent) => {
+      if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+      const target = event.target as { closest?: (selector: string) => Element | null } | null
+      const anchor = target?.closest?.('a[href]') as HTMLAnchorElement | null
+      if (!anchor || anchor.target || anchor.hasAttribute('download')) return
+      const destination = new URL(anchor.href, window.location.href)
+      const current = new URL(window.location.href)
+      if (destination.origin !== current.origin || destination.href === current.href) return
+      event.preventDefault()
+      if (!saving) setLeaveTarget({ kind: 'link', href: `${destination.pathname}${destination.search}${destination.hash}` })
+    }
+    document.addEventListener('click', onDocumentClick, true)
+    return () => document.removeEventListener('click', onDocumentClick, true)
+  }, [dirty, saving])
+
+  /*
+   * App Routerにはpages routerのbeforePopStateがないため、戻る操作はpopstateで
+   * ただちに元の履歴位置へ戻してから確認する。確認後だけ次のpopstateを通す。
+   */
+  useEffect(() => {
+    if (!dirty) return
+    const onPopState = () => {
+      if (allowHistoryLeaveRef.current) {
+        allowHistoryLeaveRef.current = false
+        return
+      }
+      window.history.go(1)
+      if (!saving) setLeaveTarget({ kind: 'history-back' })
+    }
+    window.addEventListener('popstate', onPopState)
+    return () => window.removeEventListener('popstate', onPopState)
+  }, [dirty, saving])
+
+  const leaveWithoutSaving = useCallback(() => {
+    if (!leaveTarget || saving) return
+    // 遷移が始まる前にdirtyを外す。beforeunloadも不要な警告を出さない。
+    setSavedFeatures({ ...features })
+    setSavedItemOrder(currentOrder)
+    setLeaveTarget(null)
+    if (leaveTarget.kind === 'history-back') {
+      allowHistoryLeaveRef.current = true
+      window.history.back()
+      return
+    }
+    router.push(leaveTarget.href)
+  }, [leaveTarget, saving, features, currentOrder, router])
 
   const usageByItemId = useMemo(() => {
     const result = new Map<string, UsageCategory>()
@@ -834,6 +938,20 @@ export default function SettingsPage() {
         オフ前の影響確認(票643)。止まる仕事の件数と対象種別を並べ、
         確認したうえで保存する。標準の確認窓は使わない。
       */}
+      <ConfirmDialog
+        open={leaveTarget !== null}
+        title="未保存の変更があります"
+        description="保存せずに移動すると、この画面で変更した機能の表示・並び順は失われます。"
+        confirmLabel="保存せずに離れる"
+        cancelLabel="この画面に残る"
+        destructive
+        busy={saving}
+        onCancel={() => {
+          if (!saving) setLeaveTarget(null)
+        }}
+        onConfirm={leaveWithoutSaving}
+      />
+
       <ConfirmDialog
         open={impactOpen}
         title="オフにする前に確認"
