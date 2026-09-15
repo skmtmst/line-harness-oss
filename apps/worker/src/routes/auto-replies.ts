@@ -1127,8 +1127,9 @@ autoReplies.put('/api/auto-replies/:id/draft', requireRole('owner', 'admin'), as
   }
 });
 
-// 下書きの確認・試運転は、下書きを書ける人だけ。test は成功・失敗どちらの
-// 経路でも版の最終テスト状態を書き換える（DB 書込）ため、閲覧権限では叩けない。
+// validate と conflicts は公開判断に使う管理操作なので、下書きを書ける人だけ。
+// test は本番状態を変えない試運転で、実施結果と担当者だけを監査用に記録する。
+// staff にはこの test だけを許可し、作成・更新・公開の権限は広げない。
 autoReplies.post('/api/auto-replies/:id/validate', requireRole('owner', 'admin'), async (c) => {
   try {
     const version = await getAutoReplyDraftVersion(c.env.DB, c.req.param('id'));
@@ -1155,7 +1156,7 @@ autoReplies.get('/api/auto-replies/:id/conflicts', requireRole('owner', 'admin')
   }
 });
 
-autoReplies.post('/api/auto-replies/:id/test', requireRole('owner', 'admin'), async (c) => {
+autoReplies.post('/api/auto-replies/:id/test', requireRole('owner', 'admin', 'staff'), async (c) => {
   let version: AutoReplyVersionRow | null = null;
   try {
     const id = c.req.param('id');

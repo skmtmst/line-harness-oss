@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import type { AnalyticsUsageOverview } from '@/lib/api'
-import { canTidyUsage, summarizeMenuFeatures, usageObservation } from './analytics-usage'
+import {
+  canTidyUsage,
+  referenceHealthText,
+  summarizeMenuFeatures,
+  usageObservation,
+} from './analytics-usage'
 
 type Category = AnalyticsUsageOverview['data']['categories'][number]
 
@@ -56,5 +61,15 @@ describe('分析・使われ方', () => {
     expect(usageObservation(category({
       brokenReferences: { value: 2, state: 'available', reason: null },
     }))).toEqual({ text: '参照切れが2件あります', tone: 'warning' })
+  })
+
+  it('参照切れの実測0・未取得・一部・失敗を別の文言にする', () => {
+    expect(referenceHealthText(category().brokenReferences)).toBe('参照切れ 0')
+    expect(referenceHealthText({ value: null, state: 'unavailable', reason: '所属がありません' }))
+      .toBe('参照切れ 未取得: 所属がありません')
+    expect(referenceHealthText({ value: 1, state: 'partial', reason: '未対応種別を除外' }))
+      .toBe('参照切れ 1（一部のみ）: 未対応種別を除外')
+    expect(referenceHealthText({ value: null, state: 'failed', reason: '照合失敗' }))
+      .toBe('参照切れ 取得失敗: 照合失敗')
   })
 })
