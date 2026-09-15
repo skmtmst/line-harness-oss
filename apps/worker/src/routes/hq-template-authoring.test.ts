@@ -65,7 +65,8 @@ describe('HQ authoring Web payload to HTTP/SQLite/R2 distribution',()=>{
   });
   test('rich menu upload supports actual three-store draft and null LINE ID',async()=>{
     const uploaded=await upload('rich_menu');expect(uploaded.status).toBe(201);
-    const value=freshDefinition('rich_menu') as RichMenuDefinition;value.richMenu.name='メニュー';value.richMenu.pages[0].imageR2Key=uploaded.body.data.r2Key;
+    const value=freshDefinition('rich_menu') as any;value.richMenu.name='メニュー';value.richMenu.pages[0].imageR2Key=uploaded.body.data.r2Key;
+    value.richMenu.pages[0].areas.push({id:'main-area',bounds:{x:0,y:0,width:100,height:100},actionType:'message',actionData:{text:'案内'},intent:'text',label:'案内'});
     await distribute(await save('rich_menu',value));
     const rows=sql.raw.prepare('SELECT g.status,g.account_id,p.image_r2_key,p.line_richmenu_id FROM rich_menu_groups g JOIN rich_menu_pages p ON p.group_id=g.id').all() as any[];
     expect(rows).toHaveLength(3);for(const row of rows){expect(row.status).toBe('draft');expect(row.line_richmenu_id).toBeNull();expect(row.image_r2_key).toMatch(new RegExp(`^rich-menus/${row.account_id}/hq/`))}
@@ -75,7 +76,7 @@ describe('HQ authoring Web payload to HTTP/SQLite/R2 distribution',()=>{
     sql.raw.exec("INSERT INTO tags(id,name,line_account_id) VALUES ('source-tag','会員','a'),('target-b','会員','b'),('target-c','会員','c')");
     sql.raw.exec("UPDATE tags SET color='#123456' WHERE id='source-tag'; UPDATE tags SET color='#abcdef' WHERE id='target-c'");
     const value=freshDefinition('rich_menu') as any;value.richMenu.name='参照メニュー';value.richMenu.pages[0].imageR2Key=uploaded.body.data.r2Key;
-    value.richMenu.pages[0].areas.push({id:'tag-area',bounds:{x:0,y:0,width:100,height:100},actionType:'message',actionData:{text:'会員'},intent:'text',tagIds:['source-tag']});
+    value.richMenu.pages[0].areas.push({id:'tag-area',bounds:{x:0,y:0,width:100,height:100},actionType:'message',actionData:{text:'会員'},intent:'text',label:'会員',tagIds:['source-tag']});
     const id=await save('rich_menu',value),p=await request(`/${id}/preflight`,'POST',{accountIds:['a','b','c']});expect(p.status,JSON.stringify(p.body)).toBe(200);
     for(const store of p.body.data.stores) {
       const item=store.items.find((candidate:any)=>candidate.sourceId==='tag:source-tag');
@@ -98,7 +99,7 @@ describe('HQ authoring Web payload to HTTP/SQLite/R2 distribution',()=>{
     const uploaded=await upload('rich_menu');expect(uploaded.status).toBe(201);
     sql.raw.exec("INSERT INTO tags(id,name,line_account_id) VALUES ('source-tag','会員','a')");
     const value=freshDefinition('rich_menu') as any;value.richMenu.name='参照複製メニュー';value.richMenu.pages[0].imageR2Key=uploaded.body.data.r2Key;
-    value.richMenu.pages[0].areas.push({id:'tag-area',bounds:{x:0,y:0,width:100,height:100},actionType:'message',actionData:{text:'会員'},intent:'text',tagIds:['source-tag']});
+    value.richMenu.pages[0].areas.push({id:'tag-area',bounds:{x:0,y:0,width:100,height:100},actionType:'message',actionData:{text:'会員'},intent:'text',label:'会員',tagIds:['source-tag']});
     const id=await save('rich_menu',value),p=await request(`/${id}/preflight`,'POST',{accountIds:['a','b','c']});expect(p.status,JSON.stringify(p.body)).toBe(200);
     for(const store of p.body.data.stores) {
       const item=store.items.find((candidate:any)=>candidate.sourceId==='tag:source-tag');

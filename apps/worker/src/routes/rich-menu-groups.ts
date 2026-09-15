@@ -210,8 +210,11 @@ function parseAreaInput(raw: unknown): Parsed<RichMenuAreaInput> {
   if (r.label !== undefined && r.label !== null && typeof r.label !== 'string') {
     return { ok: false, error: 'area.label must be string' };
   }
-  if (typeof r.label === 'string' && [...r.label].length > 60) {
-    return { ok: false, error: 'area.label must be 60 characters or fewer' };
+  // #827 (N-155): ボタン名は端末の読み上げ(アクセシビリティ)にも使うため
+  // 20 字まで。公開時の必須・上限検査と同じ上限を保存口でも掛けて、
+  // 21 字以上の値を DB へ残さない。
+  if (typeof r.label === 'string' && [...r.label].length > 20) {
+    return { ok: false, error: 'area.label must be 20 characters or fewer' };
   }
   if (r.tagIds !== undefined && r.tagIds !== null) {
     if (!Array.isArray(r.tagIds) || r.tagIds.some((t) => typeof t !== 'string' || t.length === 0)) {
@@ -1341,6 +1344,25 @@ richMenuGroups.patch('/api/rich-menu-groups/:groupId', requireRole('owner', 'adm
   const parsed = parsePatchBody(body);
   if (!parsed.ok) return c.json({ success: false, error: parsed.error }, 400);
 
+  // #827 (N-158): 公開中の定義(LINEに出ている形)は直接上書きしない。ページ構成・
+  // トークバー文言・全員既定の指定を変えるには、いったん取り下げて下書きへ戻すか、
+  // 取り込み/新規作成で別IDの下書きを作る。名前・出し分け条件・フォルダ・並び順は
+  // 公開中でも運用変更として従来どおり許す。
+  if (
+    existing.status === 'published'
+    && (parsed.value.pages !== undefined
+      || parsed.value.meta.chatBarText !== undefined
+      || parsed.value.meta.isDefaultForAll !== undefined)
+  ) {
+    return c.json(
+      {
+        success: false,
+        error: '公開中のメニューは直接変更できません。LINEから取り下げて下書きに戻してから編集してください',
+      },
+      409,
+    );
+  }
+
   await updateRichMenuGroupMeta(c.env.DB, groupId, parsed.value.meta);
   if (parsed.value.pages) {
     await replaceRichMenuPages(c.env.DB, groupId, parsed.value.pages);
@@ -1450,6 +1472,17 @@ richMenuGroups.post('/api/rich-menu-groups/:groupId/pages/:pageId/image', requir
   const group = await getRichMenuGroupById(c.env.DB, groupId);
   if (!group || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [group.account_id])) {
     return c.json({ success: false, error: 'group not found' }, 404);
+  }
+  // #827 (N-158): ページ画像も公開中の定義の一部。LINE上の表示とずれるだけなので、
+  // 本文を読む前・R2へ書く前に断る。
+  if (group.status === 'published') {
+    return c.json(
+      {
+        success: false,
+        error: '公開中のメニューは直接変更できません。LINEから取り下げて下書きに戻してから編集してください',
+      },
+      409,
+    );
   }
   const contentType = c.req.header('content-type') ?? '';
   if (contentType !== 'image/png' && contentType !== 'image/jpeg') {

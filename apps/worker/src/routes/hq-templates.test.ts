@@ -257,7 +257,7 @@ describe('HQ tag HTTP and real SQLite boundaries', () => {
     const definitions = {
       tag: definition,
       template: { schemaVersion: 1, template: { id: 'notice', name: 'お知らせ', messageType: 'text', messageContent: 'ご案内' }, media: [] },
-      rich_menu: { schemaVersion: 1, richMenu: { id: 'menu', name: 'ご案内', chatBarText: 'メニュー', size: 'large', defaultPageId: 'page', pages: [{ id: 'page', name: 'メイン', imageR2Key: 'hq-templates/tenant-a/menu.png', areas: [{ id: 'area', bounds: { x: 0, y: 0, width: 100, height: 100 }, actionType: 'message', actionData: { text: 'ご案内' }, intent: 'text' }] }] } },
+      rich_menu: { schemaVersion: 1, richMenu: { id: 'menu', name: 'ご案内', chatBarText: 'メニュー', size: 'large', defaultPageId: 'page', pages: [{ id: 'page', name: 'メイン', imageR2Key: 'hq-templates/tenant-a/menu.png', areas: [{ id: 'area', bounds: { x: 0, y: 0, width: 100, height: 100 }, actionType: 'message', actionData: { text: 'ご案内' }, intent: 'text', label: 'ご案内' }] }] } },
       form: { schemaVersion: 1, form: { name: 'アンケート', description: null, fields: [{ name: 'answer', label: '回答', type: 'text', required: true }], layout: null, on_submit_tag_id: null, on_submit_scenario_id: null, save_to_metadata: true } },
     } as const;
     for (const type of ['tag', 'template', 'rich_menu', 'form'] as const) {
