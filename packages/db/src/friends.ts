@@ -150,6 +150,30 @@ export async function getFriendById(
 }
 
 /**
+ * 友だち詳細用の1件取得。一覧（GET /api/friends?includeChatStatus=true）
+ * と同じ `first_tracked_link_id → tracked_links.name` の LEFT JOIN で
+ * 流入元名を添える。リンクが無い・消えている場合は null になる。
+ */
+export interface FriendWithFirstTrackedLinkName extends Friend {
+  first_tracked_link_name: string | null;
+}
+
+export async function getFriendWithFirstTrackedLinkName(
+  db: D1Database,
+  id: string,
+): Promise<FriendWithFirstTrackedLinkName | null> {
+  return db
+    .prepare(
+      `SELECT f.*, tl.name AS first_tracked_link_name
+         FROM friends f
+         LEFT JOIN tracked_links tl ON tl.id = f.first_tracked_link_id
+        WHERE f.id = ?`,
+    )
+    .bind(id)
+    .first<FriendWithFirstTrackedLinkName>();
+}
+
+/**
  * Set friend.first_tracked_link_id ONLY if it is currently NULL.
  * Used to authoritatively pin a friend to the campaign they entered through,
  * without ever overwriting once set. The conditional `WHERE ... IS NULL` clause
