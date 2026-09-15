@@ -7,6 +7,7 @@ interface BookingRow {
   id: string;
   status: string;
   requested_at: string;
+  approval_expires_at?: string | null;
   decided_at: string | null;
   updated_at: string | null;
 }
@@ -29,9 +30,13 @@ function memDB(state: { bookings: BookingRow[]; reminders: ReminderRow[]; idem: 
         async first<T>() { return null as T | null; },
         async all<T>() {
           if (sql.includes('FROM event_bookings')) {
-            const [cutoff] = bound as [string];
+            const [nowIso, legacyCutoff] = bound as [string, string];
             const items = state.bookings.filter(
-              (b) => b.status === 'requested' && b.requested_at < cutoff,
+              (b) => b.status === 'requested' && (
+                b.approval_expires_at != null
+                  ? b.approval_expires_at <= nowIso
+                  : b.requested_at <= legacyCutoff
+              ),
             );
             return { results: items as unknown as T[] };
           }
@@ -214,6 +219,47 @@ describe('runEventBookingExpirer の V6 連動', () => {
       `SELECT id, status, cancel_reason FROM friend_reminders WHERE source_event_id = ?`,
     ).get(sourceId) as { id: string; status: string; cancel_reason: string | null };
   }
+
+  test('申込時点の期限は直前・同時刻・直後を実DBで判定し、旧行は24時間を保つ', async () => {
+    const { db, raw } = createTestD1();
+    seedBase(raw);
+    const rows = [
+      ['v6ev-before', '2026-09-09T22:00:00.000Z'],
+      ['v6ev-equal', '2026-09-09T22:00:00.000Z'],
+      ['v6ev-after', '2026-09-09T22:00:00.000Z'],
+      ['v6ev-legacy-equal', '2026-09-09T00:00:00.000Z'],
+      ['v6ev-legacy-after', '2026-09-09T00:00:00.001Z'],
+    ] as const;
+    for (const [id, requestedAt] of rows) {
+      seedEventBooking(raw, id, {
+        accountId: ACCOUNT_1,
+        eventId: 'v6ev-event-1',
+        slotId: 'v6ev-slot-a',
+        friendId: 'v6ev-f1',
+        requestedAt,
+        status: 'requested',
+      });
+    }
+    raw.prepare(`UPDATE event_bookings SET approval_expires_at = ? WHERE id = 'v6ev-before'`)
+      .run('2026-09-09T23:59:59.999Z');
+    raw.prepare(`UPDATE event_bookings SET approval_expires_at = ? WHERE id = 'v6ev-equal'`)
+      .run(NOW_V6.toISOString());
+    raw.prepare(`UPDATE event_bookings SET approval_expires_at = ? WHERE id = 'v6ev-after'`)
+      .run('2026-09-10T00:00:00.001Z');
+
+    const result = await runEventBookingExpirer(db, { now: NOW_V6 });
+    expect(result.expired).toBe(3);
+    const statuses = Object.fromEntries((raw.prepare(
+      `SELECT id, status FROM event_bookings WHERE id LIKE 'v6ev-%' ORDER BY id`,
+    ).all() as Array<{ id: string; status: string }>).map((row) => [row.id, row.status]));
+    expect(statuses).toMatchObject({
+      'v6ev-before': 'expired',
+      'v6ev-equal': 'expired',
+      'v6ev-after': 'requested',
+      'v6ev-legacy-equal': 'expired',
+      'v6ev-legacy-after': 'requested',
+    });
+  });
 
   test('未送信だけ止め、送信済み履歴を残す。再実行は無変更', async () => {
     const { db, raw } = createTestD1();

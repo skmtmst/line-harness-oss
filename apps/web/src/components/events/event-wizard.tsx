@@ -3,13 +3,14 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { api, eventsApi, type EventDetail, type EventSlot } from '@/lib/api'
+import { api, ApiError, eventsApi, type EventDetail, type EventSlot } from '@/lib/api'
 import ImageUploader from '@/components/shared/image-uploader'
 import { AsideCard, ChoiceCard, Field, FormSection, inputClass } from '@/components/shared/create-page'
 import { generateBulkSlots } from './bulk-slot-generator'
 import { formatSlotJp, jstHHMMToUtcIso, splitBand, todayJst } from './jst'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { TextInput } from '@/components/shared/form-controls'
+import Select from '@/components/shared/select'
 // #740: 下書きの初期値と字数上限は編集画面と共有する。片方だけ変えないこと。
 import {
   EVENT_DEFAULT_DRAFT,
@@ -38,6 +39,11 @@ const STEPS: Array<{ no: 1 | 2 | 3; label: string; todo: string; done: string }>
 ]
 
 const DEFAULT_DRAFT: EventDetail = EVENT_DEFAULT_DRAFT
+const APPROVAL_DEADLINE_OPTIONS = [
+  { value: '2', label: '申込から2時間' },
+  { value: '24', label: '申込から24時間' },
+  { value: '72', label: '申込から72時間' },
+]
 
 type FirstSlotDraft = {
   date: string
@@ -160,6 +166,7 @@ export default function EventWizard({ accountId, eventId, step }: EventWizardPro
       description_centered: d.description_centered,
       max_bookings_per_friend: d.max_bookings_per_friend,
       requires_approval: d.requires_approval,
+      approval_deadline_hours: d.approval_deadline_hours,
       cancel_deadline_hours_before: d.cancel_deadline_hours_before,
       reminder_day_before_enabled: d.reminder_day_before_enabled,
       reminder_hours_before: d.reminder_hours_before,
@@ -198,7 +205,7 @@ export default function EventWizard({ accountId, eventId, step }: EventWizardPro
     try {
       let id = eventId
       if (id) {
-        const updated = await eventsApi.updateEvent(accountId, id, payloadOf(draft))
+        const updated = await eventsApi.updateEvent(accountId, id, payloadOf(draft), draft.version ?? 1)
         setDraft(updated)
       } else {
         const created = await eventsApi.createEvent(accountId, payloadOf(draft))
@@ -221,7 +228,11 @@ export default function EventWizard({ accountId, eventId, step }: EventWizardPro
       }
       router.replace(`/events/new?step=${goto}&id=${id}`)
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      setError(
+        e instanceof ApiError && e.status === 409 && e.code === 'version_conflict'
+          ? '別の画面でイベントが更新されました。開き直してからもう一度保存してください。'
+          : e instanceof Error ? e.message : String(e),
+      )
     } finally {
       setSaving(false)
     }
@@ -610,6 +621,17 @@ function OverviewStep({
             </span>
           </span>
         </label>
+        <Field label="承認の期限" htmlFor="approval-deadline-hours">
+          <Select
+            id="approval-deadline-hours"
+            aria-label="承認の期限"
+            value={String(draft.approval_deadline_hours)}
+            disabled={draft.requires_approval !== 1}
+            onChange={(value) => update('approval_deadline_hours', Number(value))}
+            options={APPROVAL_DEADLINE_OPTIONS}
+            size="full"
+          />
+        </Field>
         <label className="text-ink-secondary flex items-start gap-2 text-sm">
           <input
             type="checkbox"
@@ -1242,6 +1264,17 @@ function PublishStep({
               onClick={() => update('requires_approval', 1)}
             />
           </div>
+          <Field label="承認の期限" htmlFor="publish-approval-deadline-hours">
+            <Select
+              id="publish-approval-deadline-hours"
+              aria-label="承認の期限"
+              value={String(draft.approval_deadline_hours)}
+              disabled={draft.requires_approval !== 1}
+              onChange={(value) => update('approval_deadline_hours', Number(value))}
+              options={APPROVAL_DEADLINE_OPTIONS}
+              size="full"
+            />
+          </Field>
           <label className="text-ink-secondary flex items-start gap-2 text-sm">
             <input
               type="checkbox"

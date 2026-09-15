@@ -101,6 +101,8 @@ export interface EventBookingReminderRow {
 export const EVENT_NAME_MAX = 255;
 export const EVENT_DESCRIPTION_MAX = 20000;
 export const CUSTOMER_NOTE_MAX = 5000;
+export const EVENT_APPROVAL_DEADLINE_HOURS = [2, 24, 72] as const;
+export type EventApprovalDeadlineHours = typeof EVENT_APPROVAL_DEADLINE_HOURS[number];
 export const REQUESTED_EXPIRE_HOURS = 24;
 export const REMINDER_MAX_RETRY = 3;
 export const EVENT_IDEMPOTENCY_TTL_MINUTES = 60 * 24;

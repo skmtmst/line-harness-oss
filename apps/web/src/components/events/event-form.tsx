@@ -4,13 +4,15 @@ import StickyBar from '@/components/shared/sticky-bar'
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { api, eventsApi, type EventDetail, type EventSlot } from '@/lib/api'
+import { api, ApiError, eventsApi, type EventDetail, type EventSlot } from '@/lib/api'
 import ImageUploader from '@/components/shared/image-uploader'
 import OgEditor from '@/components/shared/og-editor'
 import { useAccount } from '@/contexts/account-context'
 import { generateBulkSlots, type BulkSlotInput } from './bulk-slot-generator'
 import { jstHHMMToUtcIso } from './jst'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Select from '@/components/shared/select'
+import { Field } from '@/components/shared/form-controls'
 // #740: 下書きの初期値と字数上限は作成画面と共有する。片方だけ変えないこと。
 import { EVENT_DEFAULT_DRAFT, EVENT_DESCRIPTION_MAX_LENGTH, EVENT_NAME_MAX_LENGTH } from './event-draft-shared'
 
@@ -23,6 +25,11 @@ const TABS: Array<{ key: Tab; label: string; saveLabel: string; sub: string }> =
 ]
 
 const DEFAULT_DRAFT: EventDetail = EVENT_DEFAULT_DRAFT
+const APPROVAL_DEADLINE_OPTIONS = [
+  { value: '2', label: '申込から2時間' },
+  { value: '24', label: '申込から24時間' },
+  { value: '72', label: '申込から72時間' },
+]
 
 export interface EventFormProps {
   accountId: string
@@ -160,6 +167,7 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
         description_centered: draft.description_centered,
         max_bookings_per_friend: draft.max_bookings_per_friend,
         requires_approval: draft.requires_approval,
+        approval_deadline_hours: draft.approval_deadline_hours,
         cancel_deadline_hours_before: draft.cancel_deadline_hours_before,
         reminder_day_before_enabled: draft.reminder_day_before_enabled,
         reminder_hours_before: draft.reminder_hours_before,
@@ -181,7 +189,7 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
           : null,
       }
       if (eventId) {
-        const updated = await eventsApi.updateEvent(accountId, eventId, payload)
+        const updated = await eventsApi.updateEvent(accountId, eventId, payload, draft.version ?? 1)
         setDraft(updated)
         flashToast('保存しました')
         if (nextTab) setTab(nextTab)
@@ -191,7 +199,11 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
         router.replace(`/events/edit?id=${created.id}`)
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      setError(
+        e instanceof ApiError && e.status === 409 && e.code === 'version_conflict'
+          ? '別の画面でイベントが更新されました。開き直してからもう一度保存してください。'
+          : e instanceof Error ? e.message : String(e),
+      )
     } finally {
       setSaving(false)
     }
@@ -1151,6 +1163,22 @@ function PublishTab({
           </div>
         </div>
       </label>
+
+      <Field
+        label="承認の期限"
+        htmlFor="ev-approval-deadline"
+        note="期限を過ぎた申請は自動で期限切れになり、席を戻します。"
+      >
+        <Select
+          id="ev-approval-deadline"
+          aria-label="承認の期限"
+          value={String(draft.approval_deadline_hours)}
+          disabled={draft.requires_approval !== 1}
+          onChange={(value) => update('approval_deadline_hours', Number(value))}
+          options={APPROVAL_DEADLINE_OPTIONS}
+          size="full"
+        />
+      </Field>
 
       <label className="flex items-start gap-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
         <input
