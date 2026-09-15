@@ -943,6 +943,13 @@ const spec = {
         responses: { '200': { description: 'Earning rule published' }, '400': { description: 'Confirmation or version required' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Not found in account scope' }, '409': { description: 'Draft version conflict or concurrent publish' }, '428': { description: 'Irreversible confirmation required' } },
       },
     },
+    '/api/mileage/earning-rules-order': {
+      put: {
+        tags: ['Mileage'], summary: 'たまる決めごとの並び順を全件まとめて保存（N-243。一覧と一致しない並びは拒否）',
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['accountId', 'ids'], properties: { accountId: { type: 'string' }, ids: { type: 'array', items: { type: 'string' }, minItems: 1 } } } } } },
+        responses: { '200': { description: 'Earning rule order saved' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'LINE account not found in account scope' }, '409': { description: 'Ids do not match the current earning rule list' }, '422': { description: 'Ids are empty, duplicated, or invalid' } },
+      },
+    },
     '/api/mileage/rules/{id}': {
       put: {
         tags: ['Mileage'], summary: '所属LINEアカウント内のマイル付与ルールを更新（停止・再開のみ。公開内容の直接変更は409）',

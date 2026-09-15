@@ -291,6 +291,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'PUT /api/broadcasts/{id}',
   'PUT /api/friends/{id}/fields',
   'PUT /api/line-accounts/{id}',
+  'PUT /api/mileage/earning-rules-order',
   'PUT /api/mileage/rules/{id}',
   'PUT /api/scenarios/{id}',
   'PUT /api/scenarios/{id}/draft',
