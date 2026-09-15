@@ -12,6 +12,8 @@ import AppTopBar from './shell/app-top-bar'
 import { PageChromeProvider, usePageChrome } from './shell/page-chrome'
 import styles from './app-shell.module.css'
 import { isPublicAuthPath } from '@/lib/auth-email'
+import OpsShell from './ops/ops-shell'
+import ImpersonationNotice from './ops/impersonation-notice'
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
@@ -21,6 +23,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   if (isPublicAuthPath(pathname)) {
     return <>{children}</>
+  }
+
+  // 運営コンソール（★V6 37）。統括・店舗の共通メニューとは別の外枠を使う。
+  if (pathname === '/ops' || pathname.startsWith('/ops/')) {
+    return <OpsShell>{children}</OpsShell>
   }
 
   // 参照画像との比較専用。開発中だけ表示し、実データの取得・保存は行わない。
@@ -56,6 +63,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                   admin shell. Renders nothing while loading; one of latest/fork/
                   upgrade once /admin/version + manifest resolve. */}
               <UpdateBanner />
+              {/* 代理ログイン中の赤い帯（★V6 37-5）。運営マスター以外には出ない。 */}
+              <ImpersonationNotice />
               <div className={`${styles.workspace} ${isFriendAttributesV2 ? 'friend-attributes-v2-shell' : ''}`}>
                 <Sidebar friendAttributesV2Mode={isFriendAttributesV2} />
                 <Workspace>

@@ -141,6 +141,8 @@ import { dashboard } from './routes/dashboard.js';
 import { siteTracking } from './routes/site-tracking.js';
 import { restaurantTest } from './routes/restaurant-test.js';
 import { tenants } from './routes/tenants.js';
+import { ops } from './routes/ops.js';
+import { piiMaskMiddleware, type ImpersonationContext } from './middleware/impersonation.js';
 import { hqBanners } from './routes/hq-banners.js';
 import { hqSupport } from './routes/hq-support.js';
 import { hqBilling } from './routes/hq-billing.js';
@@ -332,6 +334,8 @@ export type Env = {
     staff: AuthenticatedStaff;
     /** route固有の監査を残した場合、共通middlewareとの二重記録を防ぐ。 */
     auditRecorded?: boolean;
+    /** 代理ログイン中（★V6 37-5）。middleware/impersonation.ts が入れる。 */
+    impersonation?: ImpersonationContext;
   };
 };
 
@@ -382,6 +386,8 @@ app.use('*', authMiddleware);
 // Tenant boundary — authenticated admin APIs may only select LINE accounts
 // that belong to the signed-in staff member's tenant.
 app.use('*', tenantScopeMiddleware);
+// 代理ログイン中の個人情報の伏せ字。認証の後ろ、各ルートの前。
+app.use('/api/*', piiMaskMiddleware);
 
 // 認証済み管理APIの変更を共通監査へ残す。route固有の監査がある場合は重複させない。
 app.use('/api/*', businessAuditMiddleware);
@@ -395,6 +401,7 @@ app.route('/', webhook);
 app.route('/', gettingStarted);
 app.route('/', recipes);
 app.route('/', hqTemplates);
+app.route('/', ops);
 app.route('/', manualLinks);
 app.route('/', accountHandovers);
 app.route('/', friendBulkRuns);
