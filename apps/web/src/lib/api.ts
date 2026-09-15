@@ -9501,14 +9501,15 @@ export const api = {
       ),
   },
   adPlatforms: {
-    list: () =>
-      fetchApi<ApiResponse<AdPlatform[]>>('/api/ad-platforms'),
-    logsPage: (params?: { page?: number; limit?: number; status?: string; query?: string }) => {
+    list: (lineAccountId?: string | null) =>
+      fetchApi<ApiResponse<AdPlatform[]>>(`/api/ad-platforms${lineAccountId ? `?lineAccountId=${encodeURIComponent(lineAccountId)}` : ''}`),
+    logsPage: (params?: { page?: number; limit?: number; status?: string; query?: string; lineAccountId?: string | null }) => {
       const query = new URLSearchParams()
       query.set('page', String(params?.page ?? 1))
       query.set('limit', String(params?.limit ?? 20))
       if (params?.status && params.status !== 'all') query.set('status', params.status)
       if (params?.query?.trim()) query.set('query', params.query.trim())
+      if (params?.lineAccountId) query.set('lineAccountId', params.lineAccountId)
       return fetchApi<ApiResponse<{
         items: AdConversionLog[]
         total: number
