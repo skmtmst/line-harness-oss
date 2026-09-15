@@ -206,7 +206,7 @@ export default function HqSupportPage() {
             />
           </Field>
 
-          <Field label="関係する店舗" note="任意" htmlFor={`${uid}-account`}>
+          <Field label="関係するアカウント" note="任意" htmlFor={`${uid}-account`}>
             <SelectField
               id={`${uid}-account`}
               className="w-full"

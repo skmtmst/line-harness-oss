@@ -129,7 +129,7 @@ export default function LibrarySection({
       replaceImage(res.data.image)
       onChanged()
     } catch (caught) {
-      setModalError(caught instanceof Error && caught.message ? caught.message : '店舗へ渡せませんでした。もう一度お試しください。')
+      setModalError(caught instanceof Error && caught.message ? caught.message : 'アカウントへ渡せませんでした。もう一度お試しください。')
     } finally {
       setModalBusy(false)
     }
@@ -178,7 +178,7 @@ export default function LibrarySection({
         <div className="flex flex-wrap items-center gap-2 px-4 pb-4">
           <FilterChip selected={filter === 'all'} onChange={() => setFilter('all')}>すべて</FilterChip>
           <FilterChip selected={filter === 'favorite'} onChange={(on) => setFilter(on ? 'favorite' : 'all')}>お気に入り</FilterChip>
-          <FilterChip selected={filter === 'delivered'} onChange={(on) => setFilter(on ? 'delivered' : 'all')}>店舗へ渡し済み</FilterChip>
+          <FilterChip selected={filter === 'delivered'} onChange={(on) => setFilter(on ? 'delivered' : 'all')}>アカウントへ渡し済み</FilterChip>
           <FilterChip selected={filter === 'unused'} onChange={(on) => setFilter(on ? 'unused' : 'all')}>未使用</FilterChip>
           <span className="mx-1 h-5 border-l border-hairline" aria-hidden="true" />
           <span className="text-caption font-semibold text-ink-faint">用途</span>

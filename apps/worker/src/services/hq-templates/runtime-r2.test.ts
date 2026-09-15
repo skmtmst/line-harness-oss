@@ -20,7 +20,7 @@ async function fixture(type:'template'|'rich_menu'='rich_menu') {
     put:vi.fn(async(key:string,data:Uint8Array,options:R2PutOptions)=>{putNo++;if(objects.has(key))return null;const o={bytes:data.slice(),size:data.length,etag:`put-${putNo}`,httpMetadata:options.httpMetadata as {contentType:string},customMetadata:options.customMetadata};objects.set(key,o);return o}),
     delete:vi.fn(async(key:string)=>{objects.delete(key)}),
   };
-  const rich={schemaVersion:1,richMenu:{id:'menu',name:'Menu',chatBarText:'Open',size:'large',defaultPageId:'p1',pages:[1,2].map(n=>({id:`p${n}`,name:`Page ${n}`,imageR2Key:`hq-templates/tenant/image${n}`,areas:[{id:`a${n}`,bounds:{x:0,y:0,width:100,height:100},actionType:'message',actionData:{text:'Hello'},intent:'text'}]}))}};
+  const rich={schemaVersion:1,richMenu:{id:'menu',name:'Menu',chatBarText:'Open',size:'large',defaultPageId:'p1',pages:[1,2].map(n=>({id:`p${n}`,name:`Page ${n}`,imageR2Key:`hq-templates/tenant/image${n}`,areas:[{id:`a${n}`,bounds:{x:0,y:0,width:100,height:100},actionType:'message',actionData:{text:'Hello'},intent:'text',label:'ご案内'}]}))}};
   const message={schemaVersion:1,template:{id:'source-template',name:'Message',category:'general',messageType:'image',messageContent:'hq-templates/tenant/image1',carouselActionsJson:null,carouselTapLimitMode:'none',carouselTapLimitText:null,questionJson:null,questionStatus:'draft'},media:[{id:'source-media',kind:'image',filename:'image.png',mimeType:'image/png',sizeBytes:3,width:null,height:null,durationMs:null,r2Key:'hq-templates/tenant/image1',publicUrl:null,versionId:'media-v1',versionNo:1,contentHash}]};
   sql.raw.exec("INSERT INTO templates(id,name,message_type,message_content,line_account_id) VALUES ('source-template','Source','text','fixture','source');INSERT INTO media(id,line_account_id,kind,filename,mime_type,size_bytes,r2_key) VALUES ('source-media','source','image','image.png','image/png',3,'media/source/original')");
   sql.raw.prepare("INSERT INTO media_versions(id,media_id,version_no,r2_key,mime_type,size_bytes,content_hash,scan_status) VALUES ('media-v1','source-media',1,'media/source/original','image/png',3,?,'verified')").run(contentHash);
@@ -143,8 +143,8 @@ describe('DB-bound R2 store executor',()=>{
     `);
     const areas=f.rich.richMenu.pages[0].areas as Array<Record<string,unknown>>;
     Object.assign(areas[0],{tagIds:['source-tag'],scenarioId:'source-scenario'});
-    areas.push({id:'form-area',bounds:{x:100,y:0,width:100,height:100},actionType:'uri',actionData:{},intent:'form',formId:'source-form'});
-    areas.push({id:'template-area',bounds:{x:200,y:0,width:100,height:100},actionType:'postback',actionData:{},intent:'template',templateId:'source-template'});
+    areas.push({id:'form-area',bounds:{x:100,y:0,width:100,height:100},actionType:'uri',actionData:{},intent:'form',formId:'source-form',label:'フォーム'});
+    areas.push({id:'template-area',bounds:{x:200,y:0,width:100,height:100},actionType:'postback',actionData:{},intent:'template',templateId:'source-template',label:'テンプレ'});
     const json=JSON.stringify(f.rich);f.raw.prepare("UPDATE hq_template_versions SET definition_json=?,content_hash=? WHERE id='v'").run(json,await digest(json));
     const info=await inspectR2RuntimeStore(f.binding,'a');
     const refs=info.items.filter(item=>item.itemKind!=='rich_menu');
@@ -295,8 +295,8 @@ describe('DB-bound R2 store executor',()=>{
     `);
     const areas=f.rich.richMenu.pages[0].areas as Array<Record<string,unknown>>;
     Object.assign(areas[0],{tagIds:['source-tag'],scenarioId:'source-scenario'});
-    areas.push({id:'form-area',bounds:{x:100,y:0,width:100,height:100},actionType:'uri',actionData:{},intent:'form',formId:'source-form'});
-    areas.push({id:'template-area',bounds:{x:200,y:0,width:100,height:100},actionType:'postback',actionData:{},intent:'template',templateId:'source-template'});
+    areas.push({id:'form-area',bounds:{x:100,y:0,width:100,height:100},actionType:'uri',actionData:{},intent:'form',formId:'source-form',label:'フォーム'});
+    areas.push({id:'template-area',bounds:{x:200,y:0,width:100,height:100},actionType:'postback',actionData:{},intent:'template',templateId:'source-template',label:'テンプレ'});
     const json=JSON.stringify(f.rich);f.raw.prepare("UPDATE hq_template_versions SET definition_json=?,content_hash=? WHERE id='v'").run(json,await digest(json));
     const info=await inspectR2RuntimeStore(f.binding,'a'),references=info.items.filter(item=>item.itemKind!=='rich_menu');
     expect(references.map(item=>[item.itemKind,'operation' in item?item.operation:undefined,item.allowedModes,item.duplicate])).toEqual([
@@ -340,7 +340,7 @@ describe('DB-bound R2 store executor',()=>{
 
     const movedOwner=await fixture();
     movedOwner.raw.exec("INSERT INTO forms(id,name,fields,layout) VALUES ('source-form','申込','[]','[]'); INSERT INTO form_accounts(form_id,line_account_id) VALUES ('source-form','source')");
-    Object.assign(movedOwner.rich.richMenu.pages[0].areas[0] as unknown as Record<string,unknown>,{actionType:'uri',actionData:{},intent:'form',formId:'source-form'});
+    Object.assign(movedOwner.rich.richMenu.pages[0].areas[0] as unknown as Record<string,unknown>,{actionType:'uri',actionData:{},intent:'form',formId:'source-form',label:'フォーム'});
     json=JSON.stringify(movedOwner.rich);movedOwner.raw.prepare("UPDATE hq_template_versions SET definition_json=?,content_hash=? WHERE id='v'").run(json,await digest(json));
     const ownerContext=await movedOwner.preflight();
     movedOwner.raw.exec("UPDATE line_accounts SET tenant_id='other' WHERE id='source'");
@@ -351,21 +351,21 @@ describe('DB-bound R2 store executor',()=>{
   test('ambiguous destination references and non-portable source dependencies fail closed',async()=>{
     const ambiguous=await fixture();
     ambiguous.raw.exec("INSERT INTO forms(id,name) VALUES ('source-form','申込'),('target-form-1','申込'),('target-form-2','申込'); INSERT INTO form_accounts(form_id,line_account_id) VALUES ('source-form','source'),('target-form-1','a'),('target-form-2','a')");
-    Object.assign(ambiguous.rich.richMenu.pages[0].areas[0] as unknown as Record<string,unknown>,{actionType:'uri',actionData:{},intent:'form',formId:'source-form'});
+    Object.assign(ambiguous.rich.richMenu.pages[0].areas[0] as unknown as Record<string,unknown>,{actionType:'uri',actionData:{},intent:'form',formId:'source-form',label:'フォーム'});
     let json=JSON.stringify(ambiguous.rich);ambiguous.raw.prepare("UPDATE hq_template_versions SET definition_json=?,content_hash=? WHERE id='v'").run(json,await digest(json));
     await expect(ambiguous.preflight()).rejects.toThrow('REFERENCE_UNAVAILABLE');
     expect(ambiguous.bucket.put).not.toHaveBeenCalled();
 
     const unsupported=await fixture();
     unsupported.raw.exec("UPDATE templates SET message_type='image',message_content='media/source/image' WHERE id='source-template'");
-    Object.assign(unsupported.rich.richMenu.pages[0].areas[0] as unknown as Record<string,unknown>,{actionType:'postback',actionData:{},intent:'template',templateId:'source-template'});
+    Object.assign(unsupported.rich.richMenu.pages[0].areas[0] as unknown as Record<string,unknown>,{actionType:'postback',actionData:{},intent:'template',templateId:'source-template',label:'テンプレ'});
     json=JSON.stringify(unsupported.rich);unsupported.raw.prepare("UPDATE hq_template_versions SET definition_json=?,content_hash=? WHERE id='v'").run(json,await digest(json));
     await expect(unsupported.preflight()).rejects.toThrow('UNSUPPORTED_REFERENCE');
     expect(unsupported.bucket.put).not.toHaveBeenCalled();
 
     const formDependency=await fixture();
     formDependency.raw.exec(`INSERT INTO forms(id,name,fields,layout) VALUES ('source-form','申込','[{"name":"email","friendFieldId":"source-field"}]','[]'); INSERT INTO form_accounts(form_id,line_account_id) VALUES ('source-form','source')`);
-    Object.assign(formDependency.rich.richMenu.pages[0].areas[0] as unknown as Record<string,unknown>,{actionType:'uri',actionData:{},intent:'form',formId:'source-form'});
+    Object.assign(formDependency.rich.richMenu.pages[0].areas[0] as unknown as Record<string,unknown>,{actionType:'uri',actionData:{},intent:'form',formId:'source-form',label:'フォーム'});
     json=JSON.stringify(formDependency.rich);formDependency.raw.prepare("UPDATE hq_template_versions SET definition_json=?,content_hash=? WHERE id='v'").run(json,await digest(json));
     await expect(formDependency.preflight()).rejects.toThrow('UNSUPPORTED_REFERENCE');
     expect(formDependency.bucket.put).not.toHaveBeenCalled();
@@ -376,7 +376,7 @@ describe('DB-bound R2 store executor',()=>{
     f.raw.exec("INSERT INTO tags(id,name,line_account_id) VALUES ('source-tag','会員','source'); INSERT INTO forms(id,name,fields,layout) VALUES ('source-form','申込','[]','[]'); INSERT INTO form_accounts(form_id,line_account_id) VALUES ('source-form','source')");
     const areas=f.rich.richMenu.pages[0].areas as Array<Record<string,unknown>>;
     Object.assign(areas[0],{tagIds:['source-tag']});
-    areas.push({id:'form-area',bounds:{x:100,y:0,width:100,height:100},actionType:'uri',actionData:{},intent:'form',formId:'source-form'});
+    areas.push({id:'form-area',bounds:{x:100,y:0,width:100,height:100},actionType:'uri',actionData:{},intent:'form',formId:'source-form',label:'フォーム'});
     const json=JSON.stringify(f.rich);f.raw.prepare("UPDATE hq_template_versions SET definition_json=?,content_hash=? WHERE id='v'").run(json,await digest(json));
     const context=await f.preflight();
     f.raw.exec("CREATE TRIGGER reject_cloned_form_owner BEFORE INSERT ON form_accounts WHEN NEW.line_account_id='a' BEGIN SELECT RAISE(ABORT,'fixture'); END");

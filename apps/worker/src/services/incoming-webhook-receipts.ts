@@ -23,25 +23,33 @@ export async function stableWebhookStepId(sourceEventId: string, key: string): P
 }
 
 /**
- * 受信口ごとの直近受信件数を数える(#829 N-384)。
+ * 受信口ごとの短時間回数制限の条件(#829 N-384)。
  * receipts は受領ごとに1行残るので、回数制限のために新しい表は要らない。
  */
-export async function countRecentIncomingReceipts(
-  db: D1Database, webhookId: string, sinceIso: string,
-): Promise<number> {
-  const row = await db.prepare(`SELECT COUNT(*) AS n FROM incoming_webhook_receipts
-    WHERE webhook_id = ? AND received_at >= ?`)
-    .bind(webhookId, sinceIso).first<{ n: number }>();
-  return Number(row?.n ?? 0);
+export interface IncomingReceiptRateLimit {
+  limit: number;
+  windowMs: number;
 }
 
 export async function reserveIncomingWebhook(
-  db: D1Database, webhookId: string, signatureHash: string,
-): Promise<{ kind: 'completed' } | { kind: 'busy' } | { kind: 'acquired'; execution: IncomingWebhookExecution }> {
+  db: D1Database, webhookId: string, signatureHash: string, rateLimit: IncomingReceiptRateLimit,
+): Promise<{ kind: 'completed' } | { kind: 'busy' } | { kind: 'rate_limited' }
+  | { kind: 'acquired'; execution: IncomingWebhookExecution }> {
   const now = Date.now();
+  /*
+   * N-384: 受領行の作成に窓内件数の条件を乗せる。件数の確認と行の作成を
+   * 1文にすると、並行受信がどちらも「まだ上限内」と読んで上限を超える
+   * 隙間がなくなる。上限超えの新規受信は行を残さないので、窓が明けた
+   * あとの正規再送を邪魔しない。同じ署名の再送は OR IGNORE で行を増やさず、
+   * 既存行の状態(完了→200重複 / 処理中→503 / 失敗・期限切れ→再開)に従う。
+   */
   await db.prepare(`INSERT OR IGNORE INTO incoming_webhook_receipts
-    (webhook_id,signature_hash,source_event_id,received_at) VALUES (?,?,?,?)`)
-    .bind(webhookId, signatureHash, crypto.randomUUID(), new Date(now).toISOString()).run();
+    (webhook_id,signature_hash,source_event_id,received_at)
+    SELECT ?,?,?,?
+    WHERE (SELECT COUNT(*) FROM incoming_webhook_receipts
+      WHERE webhook_id=? AND received_at>=?) < ?`)
+    .bind(webhookId, signatureHash, crypto.randomUUID(), new Date(now).toISOString(),
+      webhookId, new Date(now - rateLimit.windowMs).toISOString(), rateLimit.limit).run();
   const owner = crypto.randomUUID();
   const claimed = await db.prepare(`UPDATE incoming_webhook_receipts
     SET status='processing',lease_owner=?,lease_expires_at=?,attempt_count=attempt_count+1,last_error_code=NULL
@@ -51,7 +59,8 @@ export async function reserveIncomingWebhook(
   const row = await db.prepare(`SELECT source_event_id,status,received_at,attempt_count FROM incoming_webhook_receipts
     WHERE webhook_id=? AND signature_hash=?`).bind(webhookId, signatureHash)
     .first<{ source_event_id: string; status: string; received_at: string; attempt_count: number }>();
-  if (!row) throw new Error('incoming_receipt_unavailable');
+  // 行が無いのは、窓いっぱいで新規受領の INSERT が条件に落ちたときだけ。
+  if (!row) return { kind: 'rate_limited' };
   if ((claimed.meta?.changes ?? 0) !== 1) return { kind: row.status === 'completed' ? 'completed' : 'busy' };
 
   const renew = async () => {

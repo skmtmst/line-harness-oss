@@ -68,7 +68,6 @@ const ALLOWED_H1: Record<string, string> = {
   'app/login/two-factor/page.tsx': 'ログインはトップバーの外',
   // 出しているのはテナント名（「株式会社 然」）で、画面名ではない。
   // 画面名の「統括コンソール」は、その上に小さく出る別の行。
-  'app/hq/page.tsx': '出しているのはテナント名',
   'app/hq/open/page.tsx': '出しているのはテナント名',
   // 消す予定の画面。docs/v6-directives.md §4「/updates を /emergency へ
   // 一本化」「V2/V3 の検証島を消す」。触らない。

@@ -24,6 +24,8 @@ export interface TopBarProps {
   accounts: TopBarAccount[]
   selectedAccountId: string
   onAccountChange: (accountId: string) => void
+  /** 統括配下ではアカウントを切り替えないため非表示にする。 */
+  showAccountSwitcher?: boolean
   roleLabel: string
   /**
    * 権限バッジを押したときの行き先。渡さなければ押せない印のまま。
@@ -48,6 +50,7 @@ export default function TopBar({
   accounts,
   selectedAccountId,
   onAccountChange,
+  showAccountSwitcher = true,
   roleLabel,
   onRoleClick,
   userName,
@@ -70,7 +73,8 @@ export default function TopBar({
       </div>
 
       <div className={styles.actions}>
-        <label className={styles.accountField}>
+        {showAccountSwitcher ? <>
+          <label className={styles.accountField}>
           <span>LINEアカウント</span>
           {/*
             Pencil `cBSCb/xvrTI` は「印 ＋ 名前 ＋ ▾」の白い札。印は `select` の
@@ -93,9 +97,9 @@ export default function TopBar({
               ))}
             </select>
           </span>
-        </label>
-
-        <span className={styles.separator} aria-hidden="true" />
+          </label>
+          <span className={styles.separator} aria-hidden="true" />
+        </> : null}
 
         <div className={styles.identity}>
           {onRoleClick

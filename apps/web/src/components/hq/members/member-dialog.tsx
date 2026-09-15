@@ -19,7 +19,7 @@ export type MemberDialogValue = {
 /**
  * 権限者を招待する／変更する。★V6 36-5 の「＋ 権限者を招待」と「変更」。
  *
- * 招待では名前・メール・役割・最初に表示する店舗・担当範囲を聞く。
+ * 招待では名前・メール・役割・最初に表示するアカウント・担当範囲を聞く。
  * 変更では役割・担当範囲・状態（有効／無効）だけ。名前とメールは本人が持つ。
  */
 export default function MemberDialog({
@@ -61,10 +61,10 @@ export default function MemberDialog({
     if (!member) {
       if (!value.name.trim()) return setLocalError('名前を入力してください')
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.email.trim())) return setLocalError('正しいメールアドレスを入力してください')
-      if (!value.assignedLineAccountId) return setLocalError('最初に表示する店舗を選んでください')
+      if (!value.assignedLineAccountId) return setLocalError('最初に表示するアカウントを選んでください')
     }
     if (value.accountScope === 'accounts' && value.scopedLineAccountIds.length === 0) {
-      return setLocalError('担当する店舗を1つ以上選んでください')
+      return setLocalError('担当するアカウントを1つ以上選んでください')
     }
     setLocalError('')
     onSubmit({ ...value, name: value.name.trim(), email: value.email.trim() })
@@ -115,7 +115,7 @@ export default function MemberDialog({
             />
           </Field>
           {!member ? (
-            <Field label="最初に表示する店舗" htmlFor={`${uid}-assigned`}>
+            <Field label="最初に表示するアカウント" htmlFor={`${uid}-assigned`}>
               <SelectField
                 id={`${uid}-assigned`}
                 className="w-full"
@@ -149,11 +149,11 @@ export default function MemberDialog({
           <div className="flex flex-wrap gap-4">
             <label className="flex items-center gap-2 text-label text-ink">
               <input type="radio" name={`${uid}-scope`} className="accent-accent-deep" checked={value.accountScope === 'all'} onChange={() => { set('accountScope', 'all'); set('scopedLineAccountIds', []) }} />
-              全店舗
+              全アカウント
             </label>
             <label className="flex items-center gap-2 text-label text-ink">
               <input type="radio" name={`${uid}-scope`} className="accent-accent-deep" checked={value.accountScope === 'accounts'} onChange={() => set('accountScope', 'accounts')} />
-              指定した店舗だけ
+              指定したアカウントだけ
             </label>
           </div>
           {value.accountScope === 'accounts' ? (
@@ -164,10 +164,10 @@ export default function MemberDialog({
                   <span className="truncate">{account.name}</span>
                 </label>
               ))}
-              {accounts.length === 0 ? <p className="text-caption text-ink-faint">店舗がまだありません。</p> : null}
+              {accounts.length === 0 ? <p className="text-caption text-ink-faint">アカウントがまだありません。</p> : null}
             </div>
           ) : (
-            <p className="text-micro text-ink-faint">統括のすべての店舗を見て操作できます。</p>
+            <p className="text-micro text-ink-faint">統括のすべてのアカウントを見て操作できます。</p>
           )}
         </fieldset>
       </form>

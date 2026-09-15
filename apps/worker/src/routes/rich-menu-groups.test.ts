@@ -1159,6 +1159,7 @@ describe('POST /api/rich-menu-groups/:groupId/publish', () => {
           id: 'a1', page_id: 'p1',
           bounds_x: 0, bounds_y: 0, bounds_width: 100, bounds_height: 100,
           action_type: 'message', action_data: '{"text":""}', actionData: { text: '' },
+          label: '送信ボタン',
           created_at: '', updated_at: '',
         }],
       }],
@@ -1172,7 +1173,7 @@ describe('POST /api/rich-menu-groups/:groupId/publish', () => {
     expect(res.status).toBe(400);
     await expect(res.json()).resolves.toEqual({
       success: false,
-      error: 'ページ「基本メニュー」のタップ領域1: 送信テキストを入力してください',
+      error: 'ページ「基本メニュー」の「送信ボタン」: 送信テキストを入力してください',
     });
     // 所有者付きで解放する。
     expect(dbMocks.releasePublishLease).toHaveBeenCalledWith(
@@ -1192,7 +1193,15 @@ describe('POST /api/rich-menu-groups/:groupId/publish', () => {
         id: 'p1', group_id: 'gid12345-aaaa', order_index: 0, name: 'p1',
         alias_id: 'lhx-gid12345-0', line_richmenu_id: null,
         image_r2_key: null, image_content_type: null,
-        created_at: '', updated_at: '', areas: [],
+        created_at: '', updated_at: '',
+        areas: [{
+          id: 'a1', page_id: 'p1',
+          bounds_x: 0, bounds_y: 0, bounds_width: 100, bounds_height: 100,
+          action_type: 'uri', action_data: '{"uri":"https://x.example"}',
+          actionData: { uri: 'https://x.example' },
+          label: 'リンク',
+          created_at: '', updated_at: '',
+        }],
       }],
     });
     dbMocks.getLineAccountById.mockResolvedValue({ channel_access_token: 'tk' });

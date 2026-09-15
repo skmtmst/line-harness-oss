@@ -1040,6 +1040,12 @@ export interface LineAccount {
   channelId: string;
   /** アカウント名 */
   name: string;
+  /** LINE公式アカウントに設定された表示名。未同期時は運用名。 */
+  displayName?: string;
+  /** LINE公式アカウントの公開画像。 */
+  pictureUrl?: string | null;
+  /** LINE公式アカウントのベーシックID。 */
+  basicId?: string | null;
   /** 新しい値を保存するときだけ送る。保存後のレスポンスには含まれない。 */
   channelAccessToken?: string;
   /** 新しい値を保存するときだけ送る。保存後のレスポンスには含まれない。 */
@@ -1098,6 +1104,21 @@ export interface LineAccount {
     actualUrl: string | null;
     active: boolean | null;
     status: 'matched' | 'mismatched' | 'unconfigured' | 'unknown';
+  };
+  stats?: {
+    friendCount: number;
+    activeScenarios: number;
+    messagesThisMonth: number;
+    staffCount: number;
+  };
+  connection?: {
+    /** 一覧APIの最新接続判定。 */
+    status?: 'ok' | 'warn' | 'unknown';
+    checkedAt?: string | null;
+    /** 詳細APIのWebhook試験・受信履歴。 */
+    lastTestAt?: string | null;
+    lastTestStatus?: 'succeeded' | 'failed' | null;
+    lastReceivedAt?: string | null;
   };
 }
 

@@ -10,7 +10,7 @@ vi.mock('@/lib/hq-templates-api', () => ({ hqTemplatesApi: { uploadImage: vi.fn(
 afterEach(cleanup)
 
 describe('TemplateDefinitionEditor', () => {
-  it('統括メッセージでも店舗と同じ編集面を使い、非表示の保存項目を保持する', () => {
+  it('統括メッセージでもアカウントと同じ編集面を使い、非表示の保存項目を保持する', () => {
     const value = freshDefinition('template') as MessageTemplateDefinition
     value.template.messageContent = 'ご案内：'
     value.template.carouselActionsJson = '{"keep":true}'
@@ -96,7 +96,7 @@ describe('TemplateDefinitionEditor', () => {
     expect(definitionError('rich_menu', { ...value, richMenu: { ...value.richMenu, pages: [{ ...value.richMenu.pages[0], areas: [{ ...value.richMenu.pages[0].areas[0], scenarioId: 'invalid id' }] }] } }, 'tenant-a')).toBe('追加で開始するシナリオの元IDを正しく入力してください。')
   })
 
-  it('高度な回答フォームを店舗と同じブロック編集面で開き、layoutを保って保存する', async () => {
+  it('高度な回答フォームをアカウントと同じブロック編集面で開き、layoutを保って保存する', async () => {
     const value: FormDefinition = {
       schemaVersion: 1,
       form: {
