@@ -12,6 +12,7 @@ import {
   deleteTemplate,
   getCarouselTapTotals,
   getFolderById,
+  MediaReferenceAccountError,
 } from '@line-crm/db';
 import type { TemplateRow } from '@line-crm/db';
 import type { Env } from '../index.js';
@@ -448,6 +449,9 @@ templates.post('/api/templates', requireRole('owner', 'admin'), async (c) => {
     // 差し戻し対応(要件4): 作った直後は未公開(版0・公開日時なし・下書きあり)。
     return c.json({ success: true, data: { id: item.id, name: item.name, category: item.category, messageType: item.message_type, messageContent: item.message_content, question: questionValue(item.question_json), questionStatus: item.question_status, folderId: item.folder_id ?? null, hasDraft: true, publishedVersion: 0, publishedAt: null, draftRevision: 1, createdAt: item.created_at, updatedAt: item.updated_at } }, 201);
   } catch (err) {
+    if (err instanceof MediaReferenceAccountError) {
+      return c.json({ success: false, error: '別のLINEアカウントのメディアは使用できません' }, 422);
+    }
     console.error('POST /api/templates error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
@@ -563,6 +567,9 @@ templates.put('/api/templates/:id', requireRole('owner', 'admin'), async (c) => 
       },
     });
   } catch (err) {
+    if (err instanceof MediaReferenceAccountError) {
+      return c.json({ success: false, error: '別のLINEアカウントのメディアは使用できません' }, 422);
+    }
     console.error('PUT /api/templates/:id error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
@@ -655,6 +662,9 @@ templates.post('/api/templates/:id/publish', requireRole('owner', 'admin'), asyn
     }
     if (code === 'TEMPLATE_PUBLISH_KEY_CONFLICT') {
       return c.json({ success: false, error: '同じ確認キーが別の公開操作で使われています' }, 409);
+    }
+    if (err instanceof MediaReferenceAccountError) {
+      return c.json({ success: false, error: '別のLINEアカウントのメディアは使用できません' }, 422);
     }
     console.error('POST /api/templates/:id/publish error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);

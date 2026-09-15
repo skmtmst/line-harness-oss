@@ -1,4 +1,5 @@
 import { jstNow } from './utils.js';
+import { applyMediaUsageMutation } from './media.js';
 // テンプレート管理クエリヘルパー
 
 export interface TemplateRow {
@@ -198,8 +199,7 @@ export async function createTemplate(
   const tapLimitText = input.carouselTapLimitText ?? null;
   const questionJson = input.questionJson ?? null;
   const questionStatus = input.questionStatus ?? 'published';
-  await db
-    .prepare(
+  const insert = db.prepare(
       `INSERT INTO templates
          (id, name, category, message_type, message_content,
           carousel_actions_json, carousel_tap_limit_mode, carousel_tap_limit_text,
@@ -210,8 +210,7 @@ export async function createTemplate(
           draft_question_json, draft_question_status, draft_revision)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, NULL,
                ?, ?, ?, ?, ?, ?, ?, 1)`,
-    )
-    .bind(
+    ).bind(
       id,
       input.name,
       input.category ?? 'general',
@@ -233,8 +232,14 @@ export async function createTemplate(
       tapLimitText,
       questionJson,
       questionStatus,
-    )
-    .run();
+    );
+  await applyMediaUsageMutation(db, {
+    lineAccountId: input.lineAccountId ?? null,
+    refKind: 'template',
+    refId: id,
+    searchableContent: [input.messageContent],
+    mutationStatements: [insert],
+  });
   return (await getTemplateById(db, id))!;
 }
 
@@ -297,11 +302,27 @@ export async function updateTemplate(
   sets.push('updated_at = ?');
   values.push(jstNow());
   values.push(id);
-  await db.prepare(`UPDATE templates SET ${sets.join(', ')} WHERE id = ?`).bind(...values).run();
+  const mutation = db.prepare(`UPDATE templates SET ${sets.join(', ')} WHERE id = ?`).bind(...values);
+  if (updates.messageContent !== undefined) {
+    const current = await getTemplateById(db, id);
+    if (!current) return;
+    await applyMediaUsageMutation(db, {
+      lineAccountId: current.line_account_id,
+      refKind: 'template',
+      refId: id,
+      searchableContent: [updates.messageContent, current.draft_message_content],
+      mutationStatements: [mutation],
+    });
+    return;
+  }
+  await mutation.run();
 }
 
 export async function deleteTemplate(db: D1Database, id: string): Promise<void> {
-  await db.prepare(`DELETE FROM templates WHERE id = ?`).bind(id).run();
+  await db.batch([
+    db.prepare(`DELETE FROM templates WHERE id = ?`).bind(id),
+    db.prepare(`DELETE FROM media_usages WHERE ref_kind = 'template' AND ref_id = ?`).bind(id),
+  ]);
 }
 
 export interface TemplateDraftUpdates {
@@ -355,7 +376,7 @@ export async function saveTemplateDraft(
   const draftQuestionStatus = updates.questionStatus
     ?? current.draft_question_status
     ?? current.question_status;
-  await db.prepare(
+  const mutation = db.prepare(
     `UPDATE templates
         SET draft_message_type = ?,
             draft_message_content = ?,
@@ -377,7 +398,15 @@ export async function saveTemplateDraft(
     draftQuestionStatus,
     jstNow(),
     id,
-  ).run();
+  );
+  await applyMediaUsageMutation(db, {
+    lineAccountId: current.line_account_id,
+    refKind: 'template',
+    refId: id,
+    // 公開中の本文は下書き保存では消えない。両方を数える。
+    searchableContent: [current.message_content, draftMessageContent],
+    mutationStatements: [mutation],
+  });
   return (await getTemplateById(db, id))!;
 }
 
@@ -540,7 +569,22 @@ export async function publishTemplate(
         publishedFingerprint, current.draft_message_type, current.draft_message_content),
     );
   }
-  const [updated] = await db.batch(publishBatch) as Array<{ meta?: { changes?: number } }>;
+  const publishResults = await applyMediaUsageMutation(db, {
+    lineAccountId: current.line_account_id,
+    refKind: 'template',
+    refId: id,
+    searchableContent: [current.draft_message_content],
+    mutationStatements: publishBatch,
+    usageGuard: {
+      sql: `EXISTS (
+        SELECT 1 FROM templates
+         WHERE id = ? AND published_version = ? AND draft_revision = 0
+           AND updated_at = ? AND message_content IS ?
+      )`,
+      binds: [id, nextVersion, now, current.draft_message_content],
+    },
+  });
+  const [updated] = publishResults;
   if ((updated?.meta?.changes ?? 0) === 0) {
     // 同時公開の負け。同じ確認キーで相手が勝っていたら再試行として返す。
     // 履歴表への記録より先に相手の UPDATE が終わっている場合があるので、
