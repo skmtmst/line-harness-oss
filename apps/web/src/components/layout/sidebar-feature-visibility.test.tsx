@@ -23,6 +23,7 @@ Object.defineProperty(window, 'localStorage', {
 const fixture = vi.hoisted(() => ({
   visibility: vi.fn(),
   get: vi.fn(),
+  accountId: 'account-1',
 }))
 
 vi.mock('next/navigation', () => ({ usePathname: () => '/' }))
@@ -30,7 +31,7 @@ vi.mock('next/link', async () => {
   const React = await import('react')
   return { default: ({ href, children, ...props }: { href: string; children: React.ReactNode }) => React.createElement('a', { href, ...props }, children) }
 })
-vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-1' }) }))
+vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: fixture.accountId }) }))
 vi.mock('@/lib/use-brand', () => ({ useBrand: () => ({ name: '会社', iconUrl: null }) }))
 vi.mock('@/components/layout/sidebar-identity', () => ({ default: () => <div>identity</div> }))
 vi.mock('@/components/hq/account-menu', () => ({ default: () => <div>hq</div> }))
@@ -50,6 +51,7 @@ import Sidebar from './sidebar'
 
 describe('Sidebarのstaff向け機能表示read-model', () => {
   beforeEach(() => {
+    fixture.accountId = 'account-1'
     window.localStorage.clear()
     fixture.visibility.mockReset()
     fixture.get.mockReset()
@@ -115,14 +117,45 @@ describe('Sidebarのstaff向け機能表示read-model', () => {
     ['features欠落', { success: true, data: {} }],
     ['featuresが配列', { success: true, data: { features: [] } }],
     ['値がboolean以外', { success: true, data: { features: { scenarios: 'false' } } }],
-  ])('古い・不正な応答（%s）をstateへ入れず画面全体を落とさない', async (_label, response) => {
+  ])('古い・不正な応答（%s）では任意機能を出さず、画面全体を落とさない', async (_label, response) => {
     fixture.visibility.mockResolvedValue(response as never)
     const view = render(<Sidebar />)
 
-    await waitFor(() => {
-      act(() => window.dispatchEvent(new CustomEvent('line-harness:feature-settings-updated')))
-      expect(fixture.visibility).toHaveBeenCalledWith('account-1')
-      expect(view.getAllByText('一斉配信')).not.toHaveLength(0)
-    })
+    await waitFor(() => expect(fixture.visibility).toHaveBeenCalledWith('account-1'))
+    await waitFor(() => expect(view.queryAllByText('一斉配信')).toHaveLength(0))
+    await waitFor(() => expect(view.getAllByText('もう一度読み込む')).not.toHaveLength(0))
+    expect(view.getAllByText('ダッシュボード')).not.toHaveLength(0)
+  })
+
+  it('loading/error/retryとaccount切替の遅延応答で、未確認・古い任意機能を表示しない', async () => {
+    window.localStorage.setItem('lh_staff_role', 'staff')
+    window.localStorage.setItem('lh_staff_permissions', JSON.stringify(['/broadcasts']))
+    fixture.visibility
+      .mockRejectedValueOnce(new Error('temporary network error'))
+      .mockResolvedValueOnce({ success: true, data: { features: { broadcasts: true } } })
+    const view = render(<Sidebar />)
+
+    // 初回の未確認状態も、失敗状態も必須ナビだけを残す。
+    expect(view.queryAllByText('一斉配信')).toHaveLength(0)
+    expect(view.getAllByText('ダッシュボード')).not.toHaveLength(0)
+    await waitFor(() => expect(view.getAllByText('もう一度読み込む')).not.toHaveLength(0))
+    await act(async () => { view.getAllByText('もう一度読み込む')[0]?.click() })
+    await waitFor(() => expect(view.getAllByText('一斉配信')).not.toHaveLength(0))
+
+    let resolveOld: ((value: unknown) => void) | undefined
+    let resolveCurrent: ((value: unknown) => void) | undefined
+    fixture.visibility.mockImplementationOnce(() => new Promise((resolve) => { resolveOld = resolve }))
+    fixture.visibility.mockImplementationOnce(() => new Promise((resolve) => { resolveCurrent = resolve }))
+    fixture.accountId = 'account-old'
+    view.rerender(<Sidebar />)
+    await waitFor(() => expect(fixture.visibility).toHaveBeenCalledWith('account-old'))
+    expect(view.queryAllByText('一斉配信')).toHaveLength(0)
+    fixture.accountId = 'account-current'
+    view.rerender(<Sidebar />)
+    await waitFor(() => expect(fixture.visibility).toHaveBeenCalledWith('account-current'))
+    await act(async () => { resolveCurrent?.({ success: true, data: { features: { broadcasts: true } } }) })
+    await waitFor(() => expect(view.getAllByText('一斉配信')).not.toHaveLength(0))
+    await act(async () => { resolveOld?.({ success: true, data: { features: { broadcasts: false } } }) })
+    expect(view.getAllByText('一斉配信')).not.toHaveLength(0)
   })
 })
