@@ -1,6 +1,7 @@
 'use client'
 
 import type { ReactNode } from 'react'
+import Link from 'next/link'
 import Button, { type ButtonProps } from '@/components/shared/button'
 import StatusBadge from '@/components/shared/status-badge'
 import StickyBar from '@/components/shared/sticky-bar'
@@ -11,7 +12,7 @@ const STEPS = ['基本設定', '対象者', '通知ステップ', '送信設定'
 export function ReminderWizard({ current }: { current: number }) {
   return (
     <div className={styles.wizard} aria-label="リマインダ設定の手順">
-      <a href="/reminders" className={styles.back}>リマインダ一覧</a>
+      <Link href="/reminders" className={styles.back}>リマインダ一覧</Link>
       <ol className={styles.steps}>
         {STEPS.map((label, index) => {
           const number = index + 1
