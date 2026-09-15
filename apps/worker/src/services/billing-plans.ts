@@ -1,4 +1,5 @@
 import type { TenantBilling } from '@line-crm/db';
+import type { FeatureEntitlementKey } from '@line-crm/shared';
 
 /**
  * 料金プランと、いま何ができるか（権利）の判定。★V6 36-2。
@@ -188,6 +189,14 @@ export function resolveEntitlements(
     return allowed('trialing', TRIAL_MONTHLY_IMAGES, daysLeft);
   }
   return blocked('trial_expired', '無料トライアルが終了したため、配信とバナー生成は止まっています。課金プランからプランを選ぶと再開します');
+}
+
+/** 共有カタログの契約キーを、既存の料金プラン判定へ接続する。 */
+export function featureContractIsAvailable(
+  entitlements: Pick<Entitlements, 'canSend'>,
+  entitlementKey: FeatureEntitlementKey,
+): boolean {
+  return entitlementKey === 'send' ? entitlements.canSend : true;
 }
 
 /** 「10/12 まで」の形。画面の札に使う。 */

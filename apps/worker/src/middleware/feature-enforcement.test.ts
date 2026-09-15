@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   getAccountSetting: vi.fn(),
   getVersionedAccountSetting: vi.fn(),
   getVisibleLineAccountScope: vi.fn(),
+  accountFeatureAvailability: vi.fn(),
 }));
 
 vi.mock('@line-crm/db', async (importOriginal) => ({
@@ -17,6 +18,11 @@ vi.mock('@line-crm/db', async (importOriginal) => ({
 vi.mock('../services/account-access.js', async (importOriginal) => ({
   ...await importOriginal<typeof import('../services/account-access.js')>(),
   getVisibleLineAccountScope: mocks.getVisibleLineAccountScope,
+}));
+
+vi.mock('../services/feature-enforcement.js', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../services/feature-enforcement.js')>(),
+  accountFeatureAvailability: mocks.accountFeatureAvailability,
 }));
 
 import { featureEnforcementMiddleware } from './feature-enforcement.js';
@@ -33,6 +39,8 @@ function testApp(handler = vi.fn((c) => c.json({ success: true }))) {
   app.use('/api/*', featureEnforcementMiddleware);
   app.get('/api/webinars', handler);
   app.post('/api/webinars', handler);
+  app.get('/api/broadcasts', handler);
+  app.post('/api/broadcasts', handler);
   app.get('/api/settings/features', handler);
   app.get('/api/not-in-manifest', handler);
   return { app, handler };
@@ -45,6 +53,23 @@ describe('featureEnforcementMiddleware', () => {
     vi.clearAllMocks();
     mocks.getVersionedAccountSetting.mockResolvedValue(null);
     mocks.getVisibleLineAccountScope.mockResolvedValue({ ids: ['account-1'], all: true });
+    mocks.accountFeatureAvailability.mockImplementation(async (_db, accountId, featureId) => {
+      const bundle = await mocks.getVersionedAccountSetting(_db, accountId, 'feature.settings_bundle_v1');
+      const bundled = bundle?.data?.features?.[featureId];
+      const raw = typeof bundled === 'boolean'
+        ? bundled
+        : JSON.parse((await mocks.getAccountSetting(_db, accountId, `feature.${featureId}`)) ?? 'false').enabled;
+      return {
+        featureId,
+        contractAvailable: true,
+        companyEnabled: raw,
+        dependenciesEnabled: true,
+        effectiveEnabled: raw,
+        reason: raw ? null : 'company_disabled',
+        message: raw ? null : 'この機能は設定でオフになっています',
+        disabledDependencies: [],
+      };
+    });
   });
 
   test('会社設定がオフなら handler を実行せず 403 + FEATURE_DISABLED を返す', async () => {
@@ -58,8 +83,65 @@ describe('featureEnforcementMiddleware', () => {
       error: 'この機能は設定でオフになっています',
       code: 'FEATURE_DISABLED',
       featureId: 'webinars',
+      reason: 'company_disabled',
     });
     expect(handler).not.toHaveBeenCalled();
+  });
+
+  test.each([
+    {
+      reason: 'contract_unavailable',
+      code: 'FEATURE_NOT_ENTITLED',
+      message: 'ご契約ではこの機能を利用できません',
+    },
+    {
+      reason: 'dependency_disabled',
+      code: 'FEATURE_DEPENDENCY_DISABLED',
+      message: '必要な機能がオフになっているため利用できません',
+    },
+  ])('$reason は理由別の403を返し handler を実行しない', async ({ reason, code, message }) => {
+    mocks.accountFeatureAvailability.mockResolvedValue({
+      featureId: 'broadcasts',
+      contractAvailable: reason !== 'contract_unavailable',
+      companyEnabled: true,
+      dependenciesEnabled: reason !== 'dependency_disabled',
+      effectiveEnabled: false,
+      reason,
+      message,
+      disabledDependencies: reason === 'dependency_disabled' ? ['templates'] : [],
+    });
+    const { app, handler } = testApp();
+    const response = await app.request('/api/broadcasts?account_id=account-1', {
+      method: reason === 'contract_unavailable' ? 'POST' : 'GET',
+    }, env);
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toMatchObject({
+      success: false,
+      error: message,
+      code,
+      featureId: 'broadcasts',
+      reason,
+    });
+    expect(handler).not.toHaveBeenCalled();
+  });
+
+  test('契約だけが停止理由なら閲覧GETは従来処理へ進む', async () => {
+    mocks.accountFeatureAvailability.mockResolvedValue({
+      featureId: 'broadcasts',
+      contractAvailable: false,
+      companyEnabled: true,
+      dependenciesEnabled: true,
+      effectiveEnabled: false,
+      reason: 'contract_unavailable',
+      message: 'ご契約ではこの機能を利用できません',
+      disabledDependencies: [],
+    });
+    const { app, handler } = testApp();
+    const response = await app.request('/api/broadcasts?account_id=account-1', {}, env);
+
+    expect(response.status).toBe(200);
+    expect(handler).toHaveBeenCalledOnce();
   });
 
   test('会社設定がオンなら従来の handler と入力契約へ進む', async () => {
@@ -110,6 +192,26 @@ describe('featureEnforcementMiddleware', () => {
       data: ['account-1'],
       meta: { featureDisabledAccounts: 1 },
     });
+  });
+
+  test('可視 account が0件の GET 一覧は構造化403を返す', async () => {
+    mocks.getVisibleLineAccountScope.mockResolvedValue({
+      ids: [],
+      allowedAccountIds: [],
+      accounts: [],
+      canSeeUnassigned: false,
+      isAccountScoped: true,
+    });
+    const { app, handler } = testApp();
+    const response = await app.request('/api/broadcasts', {}, env);
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toMatchObject({
+      success: false,
+      code: 'FEATURE_DISABLED',
+      featureId: 'broadcasts',
+    });
+    expect(handler).not.toHaveBeenCalled();
   });
 
   test('core API は機能設定に関係なく従来処理へ進む', async () => {
