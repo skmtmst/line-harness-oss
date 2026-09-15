@@ -1,0 +1,109 @@
+// @vitest-environment happy-dom
+import React, { act } from 'react'
+import { createRoot, type Root } from 'react-dom/client'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { ReminderRegistrantsPage } from './page'
+
+const apiMock = vi.hoisted(() => ({
+  get: vi.fn(),
+  list: vi.fn(),
+  updateTargetDate: vi.fn(),
+  cancel: vi.fn(),
+  resume: vi.fn(),
+}))
+
+vi.mock('next/link', () => ({ default: ({ children }: { children: unknown }) => <>{children}</> }))
+vi.mock('next/navigation', () => ({ useParams: () => ({ id: 'reminder-1' }) }))
+vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined }))
+vi.mock('@/lib/api', () => ({
+  api: { reminders: {
+    get: apiMock.get,
+    registrants: {
+      list: apiMock.list,
+      updateTargetDate: apiMock.updateTargetDate,
+      cancel: apiMock.cancel,
+      resume: apiMock.resume,
+    },
+  } },
+}))
+
+const registrant = {
+  id: 'registration-1', friendId: 'friend-1', friendName: '田中 花子', targetDate: '2026-10-01T00:00:00.000Z',
+  status: 'active', reminderVersionId: 'snapshot-1', sourceKind: 'manual', createdAt: '2026-09-01T00:00:00.000Z',
+  updatedAt: '2026-09-01T00:00:00.000Z', cancelledAt: null, lockVersion: 4,
+}
+
+let host: HTMLDivElement
+let root: Root
+
+beforeEach(() => {
+  apiMock.get.mockResolvedValue({ success: true, data: { name: '来店前の案内', steps: [] } })
+  apiMock.list.mockResolvedValue({ success: true, data: [registrant] })
+  apiMock.updateTargetDate.mockResolvedValue({ success: true, data: { id: registrant.id, friendId: registrant.friendId, targetDate: '2026-10-08T00:00:00.000Z', status: 'active', reminderVersionId: 'snapshot-1', lockVersion: 5, replayed: false } })
+  apiMock.cancel.mockResolvedValue({ success: true, data: { id: registrant.id, friendId: registrant.friendId, targetDate: registrant.targetDate, status: 'cancelled', reminderVersionId: 'snapshot-1', lockVersion: 5, replayed: false } })
+  apiMock.resume.mockResolvedValue({ success: true, data: { id: registrant.id, friendId: registrant.friendId, targetDate: registrant.targetDate, status: 'active', reminderVersionId: 'snapshot-1', lockVersion: 6, replayed: false } })
+  host = document.createElement('div')
+  document.body.appendChild(host)
+  root = createRoot(host)
+  ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
+})
+
+afterEach(async () => {
+  await act(async () => { root.unmount() })
+  host.remove()
+  vi.clearAllMocks()
+})
+
+async function render() {
+  await act(async () => {
+    root.render(<ReminderRegistrantsPage reminderId="reminder-1" />)
+    await Promise.resolve()
+    await Promise.resolve()
+  })
+}
+async function click(label: string) {
+  const button = Array.from(host.querySelectorAll('button')).find((item) => item.textContent === label)
+  if (!button) throw new Error(`${label} が見つかりません`)
+  await act(async () => { button.click(); await Promise.resolve(); await Promise.resolve() })
+}
+
+describe('リマインダ登録者の正本URL画面 (#868)', () => {
+  it('直URLの登録者一覧から基準日を保存し、リマインダID・版番号を実APIへ渡す', async () => {
+    await render()
+    expect(host.textContent).toContain('田中 花子')
+    const input = host.querySelector('input[aria-label="田中 花子の基準日"]') as HTMLInputElement
+    expect(input).not.toBeNull()
+    await act(async () => {
+      // React の controlled input として値を入れる。直接代入だけでは
+      // happy-dom 側の value tracker が変化を通知しない。
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(input, '2026-10-08T09:00')
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+      input.dispatchEvent(new Event('change', { bubbles: true }))
+    })
+    await click('基準日を保存')
+    expect(apiMock.updateTargetDate).toHaveBeenCalledWith('reminder-1', 'registration-1', expect.stringMatching(/^2026-10-08T/), 4)
+    expect(host.textContent).toContain('未送信分だけ新しい日程で組み直します。')
+  })
+
+  it('取消後は再開だけを表示し、再開には取消後の版番号を渡す', async () => {
+    await render()
+    await click('取消')
+    expect(apiMock.cancel).toHaveBeenCalledWith('reminder-1', 'registration-1', 4)
+    expect(host.textContent).toContain('取消済み')
+    await click('再開')
+    expect(apiMock.resume).toHaveBeenCalledWith('reminder-1', 'registration-1', 5)
+    expect(host.textContent).toContain('未送信分だけを次の配信処理で組み直します。')
+  })
+
+  it('登録者0件と読込失敗を区別して表示する', async () => {
+    apiMock.list.mockResolvedValueOnce({ success: true, data: [] })
+    await render()
+    expect(host.textContent).toContain('登録者はいません')
+    await act(async () => { root.unmount() })
+    host.replaceChildren()
+    root = createRoot(host)
+    apiMock.list.mockResolvedValueOnce({ success: false, error: 'not found' })
+    await render()
+    expect(host.textContent).toContain('登録者を表示できませんでした')
+  })
+})
