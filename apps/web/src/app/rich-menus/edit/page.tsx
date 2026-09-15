@@ -17,6 +17,7 @@ import { usePageTitle } from '@/components/shell/page-chrome'
 import { RICH_MENU_DIMENSIONS } from '@line-crm/shared'
 import { datetimeLocalJstToUtcIso } from '@/lib/jst-datetime'
 import { useScheduleSubmit } from './schedule-submit'
+import { ManualPublishAttempt } from './manual-publish-attempt'
 
 /**
  * 保存されている条件を読む。
@@ -253,9 +254,7 @@ function Editor({
 
   const fileInput = useRef<HTMLInputElement>(null)
   // LINEへの公開は結果が届くまで同じ鍵で再試行する。成功後の次の公開だけ新しい鍵にする。
-  const publishIdempotencyKey = useRef<string | null>(null)
-  // state反映より先に2回clickされた場合も、通信を二重に始めない。
-  const publishInFlight = useRef(false)
+  const publishAttempt = useRef(new ManualPublishAttempt())
 
   const reload = useCallback(async () => {
     setLoading(true)
@@ -515,8 +514,9 @@ function Editor({
   async function handlePublish() {
     // 二度押しを受け付けない。窓のボタンも `busy` で止まるが、
     // 二重の登録が走ると LINE 側に同じメニューが2つ出る。
-    if (publishInFlight.current || publishing || unpublishing || saving || busy) return
-    publishInFlight.current = true
+    if (publishing || unpublishing || saving || busy) return
+    const idempotencyKey = publishAttempt.current.begin()
+    if (!idempotencyKey) return
     setPublishing(true)
     setError(null)
     setConfirmError('')
@@ -527,13 +527,11 @@ function Editor({
     try {
       await persistDraft()
       draftSaved = true
-      const idempotencyKey = publishIdempotencyKey.current ?? crypto.randomUUID()
-      publishIdempotencyKey.current = idempotencyKey
       const res = await api.richMenuGroups.publish(groupId, idempotencyKey)
       // 失敗を握りつぶさない。返事を見ずに閉じると、登録できていないのに
       // 終わったように見える。
       if (!res.success) throw new Error(res.error ?? 'publish failed')
-      publishIdempotencyKey.current = null
+      publishAttempt.current.succeed()
       setConfirmKind(null)
       setNotice('LINEへの登録が終わりました。友だちのトーク画面に出すには、一覧の「友だちに表示」を実行してください。')
       await reload()
@@ -545,7 +543,7 @@ function Editor({
           : 'LINEへ登録できませんでした。下書きは保存されていません。しばらくおいてから、もう一度お試しください。',
       )
     } finally {
-      publishInFlight.current = false
+      publishAttempt.current.finish()
       setPublishing(false)
     }
   }

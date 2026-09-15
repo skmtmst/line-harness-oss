@@ -29,6 +29,7 @@ const dbMocks = {
   cancelRichMenuSchedule: vi.fn(),
   createRichMenuScheduleAtomic: vi.fn((): Promise<any> => Promise.resolve({ outcome: 'created', id: 'new-schedule' })),
   createRichMenuManualPublishRequestAtomic: vi.fn(),
+  getRichMenuManualPublishRequest: vi.fn(),
   getRichMenuManualPublishShells: vi.fn(),
   markRichMenuManualPublishFailed: vi.fn(),
   markRichMenuManualPublishSucceeded: vi.fn(),
@@ -137,6 +138,7 @@ beforeEach(() => {
     outcome: 'created', request: { id: 'manual-1', status: 'running' },
   });
   dbMocks.getRichMenuManualPublishShells.mockResolvedValue([]);
+  dbMocks.getRichMenuManualPublishRequest.mockResolvedValue({ id: 'manual-1', status: 'running' });
 });
 
 // ----- GET /api/rich-menu-groups -----

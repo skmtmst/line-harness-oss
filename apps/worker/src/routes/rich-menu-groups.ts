@@ -27,6 +27,7 @@ import {
   listRichMenuSchedulesByGroup,
   cancelRichMenuSchedule,
   createRichMenuManualPublishRequestAtomic,
+  getRichMenuManualPublishRequest,
   getRichMenuManualPublishShells,
   markRichMenuManualPublishFailed,
   markRichMenuManualPublishSucceeded,
@@ -1763,7 +1764,7 @@ richMenuGroups.post('/api/rich-menu-groups/:groupId/publish', requireRole('owner
   if (requestResult.outcome === 'conflict') {
     return c.json({ success: false, error: 'Idempotency-Key is already used with different content' }, 409);
   }
-  const request = requestResult.request;
+  let request = requestResult.request;
   if (request.status === 'succeeded') {
     try {
       return c.json({ success: true, data: JSON.parse(request.result_json ?? '') }, 200, {
@@ -1789,6 +1790,20 @@ richMenuGroups.post('/api/rich-menu-groups/:groupId/publish', requireRole('owner
   const publishFence = { owner: publishOwner, generation: publishGeneration };
 
   try {
+    // 別要求が「running」を読んだ直後に先行要求が成功・lease解放した場合でも、
+    // lease取得後に必ず再読する。古いstatusのままLINE切替をもう一度実行しない。
+    const latestRequest = await getRichMenuManualPublishRequest(c.env.DB, group.account_id, idempotencyKey);
+    if (!latestRequest) throw new Error('manual publish request disappeared');
+    request = latestRequest;
+    if (request.status === 'succeeded') {
+      try {
+        const data = JSON.parse(request.result_json ?? '');
+        await releasePublishLease(c.env.DB, groupId, publishFence);
+        return c.json({ success: true, data }, 200, { 'Idempotency-Replayed': 'true' });
+      } catch {
+        throw new Error('manual publish result is invalid');
+      }
+    }
     // lease取得前後の下書き更新を必ず拒否する。古い版を作成・切替しない。
     const latestGroup = await getRichMenuGroupWithPages(c.env.DB, groupId);
     if (!latestGroup || manualPublishFingerprint(latestGroup) !== fingerprint) {
