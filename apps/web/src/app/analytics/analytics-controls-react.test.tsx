@@ -174,9 +174,12 @@ describe('分析の対象者種別・期間選択(#835)', () => {
     await render()
     await act(async () => { await Promise.resolve(); await Promise.resolve(); await Promise.resolve() })
 
-    const stage = host.querySelector('button[aria-label="申込の段"]') as HTMLButtonElement | null
-    expect(stage).not.toBeNull()
-    await act(async () => { stage?.click(); await Promise.resolve() })
+    // 先頭段は「前段との差」が無いので、旧実装ではdisabledだった。到達/進行中も
+    // 選べる契約を、実際に先頭段を押して確かめる。
+    const firstStage = host.querySelector('button[aria-label="案内の段"]') as HTMLButtonElement | null
+    expect(firstStage).not.toBeNull()
+    expect(firstStage?.disabled).toBe(false)
+    await act(async () => { firstStage?.click(); await Promise.resolve() })
 
     for (const selection of ['reached', 'stopped', 'in_progress'] as const) {
       await select('funnel-audience-selection', selection)
@@ -188,14 +191,27 @@ describe('分析の対象者種別・期間選択(#835)', () => {
       })
     }
 
+    const secondStage = host.querySelector('button[aria-label="申込の段"]') as HTMLButtonElement | null
+    expect(secondStage).not.toBeNull()
+    await act(async () => { secondStage?.click(); await Promise.resolve() })
+    await select('funnel-audience-selection', 'stopped')
+    await click('友だち一覧で見る')
+    const secondRequest = net.calls.filter((call) => call.path.startsWith('/api/analytics/results/run-1/audiences?')).at(-1)
+    expect(JSON.parse(String(secondRequest?.init?.body))).toMatchObject({ stepOrder: 2, selection: 'stopped' })
+
     for (const days of [7, 30, 90]) {
       await click(`${days}日`)
       await click(`この${days}日を再集計`)
       const request = net.calls.filter((call) => call.path.includes('/api/analytics/funnels/funnel-1/run?')).at(-1)
-      expect(JSON.parse(String(request?.init?.body))).toEqual({
-        cohortFrom: `${expectedRange(days).from}T00:00:00.000Z`,
+      const body = JSON.parse(String(request?.init?.body))
+      expect(body).toEqual({
+        cohortFrom: `${expectedRange(days).from}T00:00:00.000+09:00`,
         cohortTo: '2026-09-09T00:00:00.000Z',
       })
+      // DBはcutoff（実行時刻）より未来のcohortToを拒否する。開始だけをJSTの
+      // 日付境界に固定し、終了は必ず現在時刻以下へ置く。
+      expect(Date.parse(body.cohortTo)).toBeLessThanOrEqual(Date.now())
+      expect(Date.parse(body.cohortFrom)).toBeLessThanOrEqual(Date.parse(body.cohortTo))
     }
   })
 
@@ -213,10 +229,15 @@ describe('分析の対象者種別・期間選択(#835)', () => {
     }
     await render()
     await act(async () => { await Promise.resolve(); await Promise.resolve(); await Promise.resolve() })
-    await click('この30日を再集計')
+    expect(host.textContent).toContain('まだ集計がありません。「この30日を再集計」を押してください')
+    await click('7日')
+    expect(host.textContent).toContain('まだ集計がありません。「この7日を再集計」を押してください')
+    await click('この7日を再集計')
 
     fixture.accountId = 'account-b'
     await render()
+    const currentRunButton = Array.from(host.querySelectorAll('button')).find((item) => item.textContent === 'この7日を再集計') as HTMLButtonElement | undefined
+    expect(currentRunButton?.disabled).toBe(false)
     late.resolve({ success: true, data: funnelRun('古い申込') })
     await act(async () => { await Promise.resolve(); await Promise.resolve() })
 

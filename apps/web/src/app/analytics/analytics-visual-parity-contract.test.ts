@@ -6,7 +6,7 @@ const PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
 describe('V6 機能20の画面比較で直した契約', () => {
   it('概要4画面に設計の判断材料を残す', () => {
     for (const text of [
-      '日ごとの増減（この30日）',
+      '日ごとの増減（この{days}日）',
       '送った時間ごとの「押された回数」',
       '売上から広告費を引いた残り',
       '項目が多いほど良い、ではありません',

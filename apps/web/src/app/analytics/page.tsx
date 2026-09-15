@@ -113,11 +113,23 @@ function weekdayOf(date: string): string {
   return WEEKDAY_JP[new Date(`${date}T00:00:00+09:00`).getDay()] ?? ''
 }
 
-function rangeFor(days: number): { from: string; to: string } {
-  const jstNow = new Date(Date.now() + 9 * 3600_000)
+function rangeFor(days: number, now = new Date()): { from: string; to: string } {
+  const jstNow = new Date(now.getTime() + 9 * 3600_000)
   return {
     from: new Date(jstNow.getTime() - days * 24 * 3600_000).toISOString().slice(0, 10),
     to: jstNow.toISOString().slice(0, 10),
+  }
+}
+
+// 概要のfrom/toと同じ日本時間の日付範囲を、ファネルAPIが受け取る明示的な
+// timestampへ直す。「7日」は6日前の0時から、実行時点までを対象にする。
+function funnelCohortRange(days: number, now = new Date()): { cohortFrom: string; cohortTo: string } {
+  const range = rangeFor(days - 1, now)
+  return {
+    cohortFrom: `${range.from}T00:00:00.000+09:00`,
+    // WorkerはdataCutoffAt（=現在）より未来の終了時刻を拒否する。日末ではなく
+    // 実行時刻で閉じ、今日を含む選択日数の暦日範囲にする。
+    cohortTo: now.toISOString(),
   }
 }
 
@@ -913,6 +925,7 @@ function FunnelTab({ accountId, canManage }: { accountId: string; canManage: boo
     setRun(null)
     setRunError('')
     setNoRun(false)
+    setRunning(false)
     void api.analytics.v6Funnels.latestRun(accountId, selected).then((res) => {
       if (!active) return
       if (res.success) {
@@ -927,17 +940,22 @@ function FunnelTab({ accountId, canManage }: { accountId: string; canManage: boo
     }
   }, [accountId, selected])
 
+  // 条件切替後は、前の世代のfinallyに表示状態を任せない。前の通信が後から
+  // 終わっても新しい条件で再集計できるよう、現世代のボタンを必ず戻す。
+  useEffect(() => {
+    setRunning(false)
+  }, [accountId, selected, funnelDays])
+
   const runNow = async () => {
     if (!selected) return
     const generation = viewGeneration.current
     setRunning(true)
     setRunError('')
-    const now = new Date()
-    const from = new Date(now.getTime() - (funnelDays - 1) * 24 * 3600_000)
+    const { cohortFrom, cohortTo } = funnelCohortRange(funnelDays)
     try {
       const response = await api.analytics.v6Funnels.run(accountId, selected, {
-        cohortFrom: from.toISOString(),
-        cohortTo: now.toISOString(),
+        cohortFrom,
+        cohortTo,
       })
       if (!response.success) throw new Error(response.error)
       if (generation !== viewGeneration.current) return
@@ -969,14 +987,14 @@ function FunnelTab({ accountId, canManage }: { accountId: string; canManage: boo
   }, [run])
 
   const prepareFunnelAudience = async () => {
-    if (!run?.runId || picked === null || !result?.[picked - 1] || !activeGroup) return
+    if (!run?.runId || picked === null || !result?.[picked] || !activeGroup) return
     const generation = viewGeneration.current
     setRunError('')
     try {
       const response = await api.analytics.createResultAudience(accountId, run.runId, {
         sourceKind: 'funnel',
         groupKey: activeGroup.key,
-        stepOrder: result[picked - 1].stepOrder,
+        stepOrder: result[picked].stepOrder,
         selection: audienceSelection,
       })
       if (!response.success) throw new Error(response.error)
@@ -1092,6 +1110,7 @@ function FunnelTab({ accountId, canManage }: { accountId: string; canManage: boo
                     setFunnelDays(days)
                     setPicked(null)
                     setFunnelAudience(null)
+                    setRunning(false)
                   }}
                 />
                 <Button onClick={() => void runNow()} disabled={running} variant="secondary">
@@ -1150,7 +1169,7 @@ function FunnelTab({ accountId, canManage }: { accountId: string; canManage: boo
               ／データ締切 {formatAnalyticsDateTime(run.dataCutoffAt)}
             </p>}
             {runError && <p className="text-danger mt-2 text-xs">{runError}</p>}
-            {noRun && !run && <p className="text-ink-faint mt-2 text-xs">まだ集計がありません。「この30日を再集計」を押してください</p>}
+            {noRun && !run && <p className="text-ink-faint mt-2 text-xs">まだ集計がありません。「この{funnelDays}日を再集計」を押してください</p>}
             {run?.stateReason && <p className="text-warning mt-2 text-xs">{run.stateReason}</p>}
             {run && run.groups.length > 1 && (
               <div className="mt-3 max-w-xs">
@@ -1233,9 +1252,8 @@ function FunnelTab({ accountId, canManage }: { accountId: string; canManage: boo
                       <button
                         onClick={() => {
                           setFunnelAudience(null)
-                          setPicked(lost > 0 ? i : null)
+                          setPicked(i)
                         }}
-                        disabled={lost <= 0}
                         className="bg-canvas-sunken block h-6 w-full overflow-hidden rounded text-left"
                         aria-label={`${step.label}の段`}
                       >
@@ -1260,7 +1278,7 @@ function FunnelTab({ accountId, canManage }: { accountId: string; canManage: boo
               </div>
 
               <div className="border-hairline mt-4 border-t pt-3">
-                {picked != null && result[picked] && result[picked - 1] ? (
+                {picked != null && result[picked] ? (
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="space-y-2">
                       <SelectField
@@ -1277,10 +1295,10 @@ function FunnelTab({ accountId, canManage }: { accountId: string; canManage: boo
                       />
                       <p className="text-ink text-sm">
                         {audienceSelection === 'stopped'
-                          ? `「${result[picked - 1].label}まで進んで${result[picked].label}に至っていない ${(result[picked - 1].reached - result[picked].reached).toLocaleString('ja-JP')}人」を選択中`
+                          ? `「${result[picked].label}で止まった人」を選択中`
                           : audienceSelection === 'reached'
-                            ? `「${result[picked - 1].label}まで到達した人」を選択中`
-                            : `「${result[picked - 1].label}で進行中の人」を選択中`}
+                            ? `「${result[picked].label}まで到達した人」を選択中`
+                            : `「${result[picked].label}で進行中の人」を選択中`}
                       </p>
                     </div>
                     {canManage && <Button onClick={() => void prepareFunnelAudience()} variant="secondary">友だち一覧で見る</Button>}
