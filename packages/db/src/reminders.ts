@@ -67,6 +67,19 @@ export interface FriendReminderRow {
   lock_version: number;
 }
 
+/**
+ * リマインダ側から見る登録者の行。friend_reminders だけでは一覧に表示する
+ * 名前が分からないため、friends と同じアカウントで結合して返す。
+ */
+export interface ReminderRegistrantRow extends FriendReminderRow {
+  friend_name: string | null;
+  friend_line_account_id: string | null;
+}
+
+export type ReminderRegistrantMutation =
+  | { state: 'updated' | 'replayed'; row: FriendReminderRow }
+  | { state: 'conflict' | 'not_found' };
+
 export interface ReminderDraftStepInput {
   stableStepId: string;
   offsetMinutes: number;
@@ -800,6 +813,162 @@ export async function getFriendReminders(db: D1Database, friendId: string): Prom
   const result = await db.prepare(`SELECT * FROM friend_reminders WHERE friend_id = ? ORDER BY target_date ASC`)
     .bind(friendId).all<FriendReminderRow>();
   return result.results;
+}
+
+/** リマインダの登録者一覧。壊れた別アカウント行は表示・操作の対象にしない。 */
+export async function listReminderRegistrants(
+  db: D1Database,
+  reminderId: string,
+): Promise<ReminderRegistrantRow[]> {
+  const result = await db.prepare(
+    `SELECT fr.*, f.display_name AS friend_name, f.line_account_id AS friend_line_account_id
+       FROM friend_reminders fr
+       JOIN friends f ON f.id = fr.friend_id
+       JOIN reminders r ON r.id = fr.reminder_id
+      WHERE fr.reminder_id = ?
+        AND (r.line_account_id IS NULL OR f.line_account_id IS NULL OR r.line_account_id = f.line_account_id)
+      ORDER BY fr.target_date ASC, fr.created_at ASC, fr.id ASC`,
+  ).bind(reminderId).all<ReminderRegistrantRow>();
+  return result.results;
+}
+
+/**
+ * 一覧操作の対象行を、リマインダ・友だちの所属が一致する場合だけ読む。
+ * route 側のリマインダ可視性チェックに加え、移行前の不正な結合を通さない。
+ */
+export async function getReminderRegistrantById(
+  db: D1Database,
+  reminderId: string,
+  enrollmentId: string,
+): Promise<FriendReminderRow | null> {
+  return db.prepare(
+    `SELECT fr.*
+       FROM friend_reminders fr
+       JOIN friends f ON f.id = fr.friend_id
+       JOIN reminders r ON r.id = fr.reminder_id
+      WHERE fr.id = ? AND fr.reminder_id = ?
+        AND (r.line_account_id IS NULL OR f.line_account_id IS NULL OR r.line_account_id = f.line_account_id)`,
+  ).bind(enrollmentId, reminderId).first<FriendReminderRow>();
+}
+
+function replayOrConflict(
+  row: FriendReminderRow | null,
+  expectedLockVersion: number,
+  expectedStatus: string,
+  expectedTargetDate?: string,
+): ReminderRegistrantMutation {
+  if (!row) return { state: 'not_found' };
+  // 同じ操作の応答だけ失った場合は、直後の版（+1）だけを replay とする。
+  // さらに別の操作が入った行を古い画面が成功扱いにすることはない。
+  const isExpected = row.status === expectedStatus
+    && (expectedTargetDate === undefined || row.target_date === expectedTargetDate)
+    && (row.lock_version === expectedLockVersion || row.lock_version === expectedLockVersion + 1);
+  return isExpected ? { state: 'replayed', row } : { state: 'conflict' };
+}
+
+/**
+ * 基準日を変える。送信済み履歴は残し、旧基準日の未送信実行だけを同じ batch で止める。
+ * 次の cron は保存済み reminder_version_id と未送信履歴から新しい予定だけを作り直す。
+ */
+export async function moveReminderRegistrantTargetDate(
+  db: D1Database,
+  input: { reminderId: string; enrollmentId: string; targetDate: string; expectedLockVersion: number; now?: string },
+): Promise<ReminderRegistrantMutation> {
+  const current = await getReminderRegistrantById(db, input.reminderId, input.enrollmentId);
+  if (!current) return { state: 'not_found' };
+  if (current.status !== 'active' || current.lock_version !== input.expectedLockVersion || current.target_date === input.targetDate) {
+    return replayOrConflict(current, input.expectedLockVersion, 'active', input.targetDate);
+  }
+  const now = input.now ?? jstNow();
+  const results = await db.batch([
+    db.prepare(
+      `UPDATE friend_reminders
+          SET target_date = ?, updated_at = ?, lock_version = lock_version + 1
+        WHERE id = ? AND reminder_id = ? AND status = 'active' AND lock_version = ?`,
+    ).bind(input.targetDate, now, input.enrollmentId, input.reminderId, input.expectedLockVersion),
+    db.prepare(
+      `UPDATE reminder_delivery_runs
+          SET status = 'cancelled', completed_at = ?, updated_at = ?
+        WHERE friend_reminder_id = ?
+          AND status IN ('queued', 'retry_wait', 'claimed')
+          AND EXISTS (
+            SELECT 1 FROM friend_reminders fr
+             WHERE fr.id = reminder_delivery_runs.friend_reminder_id
+               AND fr.reminder_id = ? AND fr.status = 'active'
+               AND fr.target_date = ? AND fr.lock_version = ?
+          )`,
+    ).bind(now, now, input.enrollmentId, input.reminderId, input.targetDate, input.expectedLockVersion + 1),
+  ]);
+  if (Number(results[0]?.meta?.changes ?? 0) === 0) {
+    return replayOrConflict(
+      await getReminderRegistrantById(db, input.reminderId, input.enrollmentId),
+      input.expectedLockVersion,
+      'active',
+      input.targetDate,
+    );
+  }
+  return { state: 'updated', row: (await getReminderRegistrantById(db, input.reminderId, input.enrollmentId))! };
+}
+
+/** 手動取消。外部送信済み・送信履歴は消さず、未送信の実行だけを止める。 */
+export async function cancelReminderRegistrant(
+  db: D1Database,
+  input: { reminderId: string; enrollmentId: string; expectedLockVersion: number; cancelReason: string; now?: string },
+): Promise<ReminderRegistrantMutation> {
+  const current = await getReminderRegistrantById(db, input.reminderId, input.enrollmentId);
+  if (!current) return { state: 'not_found' };
+  if (current.status !== 'active' || current.lock_version !== input.expectedLockVersion) {
+    return replayOrConflict(current, input.expectedLockVersion, 'cancelled');
+  }
+  const now = input.now ?? jstNow();
+  const results = await db.batch([
+    db.prepare(
+      `UPDATE friend_reminders
+          SET status = 'cancelled', cancel_reason = ?, updated_at = ?, lock_version = lock_version + 1
+        WHERE id = ? AND reminder_id = ? AND status = 'active' AND lock_version = ?`,
+    ).bind(input.cancelReason, now, input.enrollmentId, input.reminderId, input.expectedLockVersion),
+    db.prepare(
+      `UPDATE reminder_delivery_runs
+          SET status = 'cancelled', completed_at = ?, updated_at = ?
+        WHERE friend_reminder_id = ?
+          AND status IN ('queued', 'retry_wait', 'claimed')
+          AND EXISTS (
+            SELECT 1 FROM friend_reminders fr
+             WHERE fr.id = reminder_delivery_runs.friend_reminder_id
+               AND fr.reminder_id = ? AND fr.status = 'cancelled'
+               AND fr.lock_version = ?
+          )`,
+    ).bind(now, now, input.enrollmentId, input.reminderId, input.expectedLockVersion + 1),
+  ]);
+  if (Number(results[0]?.meta?.changes ?? 0) === 0) {
+    return replayOrConflict(await getReminderRegistrantById(db, input.reminderId, input.enrollmentId), input.expectedLockVersion, 'cancelled');
+  }
+  return { state: 'updated', row: (await getReminderRegistrantById(db, input.reminderId, input.enrollmentId))! };
+}
+
+/**
+ * 取消済み登録を再開する。旧実行行は復活させず、保存済み版と送信済み履歴から
+ * cron が未送信分だけを作り直すので、過去の送信内容・残高には触れない。
+ */
+export async function resumeReminderRegistrant(
+  db: D1Database,
+  input: { reminderId: string; enrollmentId: string; expectedLockVersion: number; now?: string },
+): Promise<ReminderRegistrantMutation> {
+  const current = await getReminderRegistrantById(db, input.reminderId, input.enrollmentId);
+  if (!current) return { state: 'not_found' };
+  if (current.status !== 'cancelled' || current.lock_version !== input.expectedLockVersion) {
+    return replayOrConflict(current, input.expectedLockVersion, 'active');
+  }
+  const now = input.now ?? jstNow();
+  const result = await db.prepare(
+    `UPDATE friend_reminders
+        SET status = 'active', cancel_reason = NULL, completed_at = NULL, updated_at = ?, lock_version = lock_version + 1
+      WHERE id = ? AND reminder_id = ? AND status = 'cancelled' AND lock_version = ?`,
+  ).bind(now, input.enrollmentId, input.reminderId, input.expectedLockVersion).run();
+  if (Number(result.meta?.changes ?? 0) === 0) {
+    return replayOrConflict(await getReminderRegistrantById(db, input.reminderId, input.enrollmentId), input.expectedLockVersion, 'active');
+  }
+  return { state: 'updated', row: (await getReminderRegistrantById(db, input.reminderId, input.enrollmentId))! };
 }
 
 export async function cancelFriendReminder(db: D1Database, id: string): Promise<void> {
