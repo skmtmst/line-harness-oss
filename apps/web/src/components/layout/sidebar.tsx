@@ -97,8 +97,9 @@ export default function Sidebar({
     return () => window.removeEventListener('popstate', sync)
   }, [pathname])
 
-  // 表示可否を読む。一般staffへ管理用の設定・契約理由・並び順を渡さない。
-  // owner/adminだけは、設定画面と同じ管理GETから保存済みの並びも読む。
+  // 表示可否は全roleがstaff向けread-modelから読む。localStorageのroleは古い・
+  // 改ざん済みの可能性があるので、管理GETを選ぶ根拠にはしない。
+  // owner/admin表示のときだけ、管理GETから保存済みの並びを追加で読む。
   // 取れなくても既定の並び・表示で使えるので、失敗は握る。
   useEffect(() => {
     if (!selectedAccountId) {
@@ -113,23 +114,23 @@ export default function Sidebar({
     const loadSettings = () => {
       void import('@/lib/api')
         .then(async ({ api }) => {
-          if (canManageFeatureSettings) {
-            const res = await api.featureSettings.get(selectedAccountId)
-            if (!cancelled && res.success) {
-              setSectionOrder(res.data.sidebarOrder)
-              setItemOrder(res.data.sidebarItemOrder)
-              setFeatureVisibility(res.data.features)
-              setSpecializedFeatureKeys(res.data.specializedFeatureKeys)
-            }
-            return
-          }
-          const res = await api.featureSettings.visibility(selectedAccountId)
-          if (!cancelled && res.success) {
+          const visibility = await api.featureSettings.visibility(selectedAccountId)
+          if (!cancelled && visibility.success) {
             setSectionOrder(null)
             setItemOrder(null)
-            setFeatureVisibility(res.data.features)
+            setFeatureVisibility(visibility.data.features)
             // 専用機能の目録はbooleanへ畳み込み済み。名前の配列は受け取らない。
             setSpecializedFeatureKeys(SPECIALIZED_FEATURE_KEYS)
+          }
+          if (!canManageFeatureSettings) return
+          try {
+            const settings = await api.featureSettings.get(selectedAccountId)
+            if (!cancelled && settings.success) {
+              setSectionOrder(settings.data.sidebarOrder)
+              setItemOrder(settings.data.sidebarItemOrder)
+            }
+          } catch {
+            // 権限降格後など管理GETが拒否されても、最小read-modelの表示可否は残す。
           }
         })
         .catch(() => {

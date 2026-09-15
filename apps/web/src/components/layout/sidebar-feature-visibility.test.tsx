@@ -85,13 +85,29 @@ describe('Sidebarのstaff向け機能表示read-model', () => {
     expect(fixture.get).not.toHaveBeenCalled()
   })
 
-  it('ownerは従来の管理GETから保存済みの並びを読む', async () => {
+  it('ownerも表示可否は最小read-modelから読み、管理GETは並び用に追加する', async () => {
     window.localStorage.setItem('lh_staff_role', 'owner')
     expect(window.localStorage.getItem('lh_staff_role')).toBe('owner')
     render(<Sidebar />)
     await waitFor(() => {
       act(() => window.dispatchEvent(new CustomEvent('line-harness:feature-settings-updated')))
+      expect(fixture.visibility).toHaveBeenCalledWith('account-1')
       expect(fixture.get).toHaveBeenCalledWith('account-1')
     })
+  })
+
+  it('保存roleがadminでも管理GETが403なら、staff向け表示可否を捨てない', async () => {
+    window.localStorage.setItem('lh_staff_role', 'admin')
+    window.localStorage.setItem('lh_staff_permissions', JSON.stringify(['/scenarios', '/broadcasts']))
+    fixture.get.mockRejectedValue(new Error('403 Forbidden'))
+    const view = render(<Sidebar />)
+
+    await waitFor(() => {
+      act(() => window.dispatchEvent(new CustomEvent('line-harness:feature-settings-updated')))
+      expect(fixture.visibility).toHaveBeenCalledWith('account-1')
+      expect(fixture.get).toHaveBeenCalledWith('account-1')
+      expect(view.queryAllByText('シナリオ配信')).toHaveLength(0)
+    })
+    expect(view.getAllByText('一斉配信')).not.toHaveLength(0)
   })
 })
