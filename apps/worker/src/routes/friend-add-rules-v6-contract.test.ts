@@ -13,6 +13,9 @@ const owner: AuthenticatedStaff = {
 const staff: AuthenticatedStaff = {
   ...owner, id: 'staff-1', name: '担当者', role: 'staff', permissionKeys: ['/friend-add-settings'],
 };
+const admin: AuthenticatedStaff = {
+  ...owner, id: 'admin-1', name: '管理者', role: 'admin', readOnly: false,
+};
 
 function app(db: D1Database, actor: AuthenticatedStaff = owner) {
   const instance = new Hono<Env>();
@@ -144,7 +147,8 @@ describe('V6 friend-add rule data contracts', () => {
     ).run();
     testDb.raw.prepare(
       `INSERT INTO staff_members (id, name, role, api_key, tenant_id)
-       VALUES ('owner-1', 'オーナー', 'owner', 'owner-key', 'tenant-1')`,
+       VALUES ('owner-1', 'オーナー', 'owner', 'owner-key', 'tenant-1'),
+              ('admin-1', '管理者', 'admin', 'admin-key', 'tenant-1')`,
     ).run();
   });
 
@@ -185,6 +189,48 @@ describe('V6 friend-add rule data contracts', () => {
     await expect(detail.json()).resolves.toMatchObject({
       data: { id: 'run-1', rule: { id: 'rule-1', versionId: 'version-1' }, actionRuns: [{ stableId: 'action-1' }] },
     });
+  });
+
+  it('staffの実行結果read modelは顧客名・顧客ID・メッセージ本文を返さず、adminは詳細を維持する', async () => {
+    seedRuleAndRun(testDb);
+
+    const staffList = await app(testDb.db, staff).request('/api/friend-add-runs?account_id=account-1');
+    expect(staffList.status).toBe(200);
+    const staffListBody = await staffList.json() as {
+      data: { items: Array<{ friend: Record<string, unknown> }> };
+    };
+    expect(staffListBody.data.items[0].friend).toEqual({ displayName: '顧客名は非表示', redacted: true });
+    expect(JSON.stringify(staffListBody)).not.toContain('山田 太郎');
+    expect(JSON.stringify(staffListBody)).not.toContain('friend-1');
+
+    const staffDetail = await app(testDb.db, staff).request('/api/friend-add-runs/run-1?account_id=account-1');
+    expect(staffDetail.status).toBe(200);
+    const staffDetailBody = await staffDetail.json() as {
+      data: { friend: Record<string, unknown>; rule: Record<string, unknown>; configuredActions?: unknown };
+    };
+    expect(staffDetailBody.data.friend).toEqual({ displayName: '顧客名は非表示', redacted: true });
+    expect(staffDetailBody.data.rule).not.toHaveProperty('definition');
+    expect(staffDetailBody.data).not.toHaveProperty('configuredActions');
+    expect(JSON.stringify(staffDetailBody)).not.toContain('山田 太郎');
+    expect(JSON.stringify(staffDetailBody)).not.toContain('友だち追加ありがとうございます');
+
+    const adminDetail = await app(testDb.db, admin).request('/api/friend-add-runs/run-1?account_id=account-1');
+    expect(adminDetail.status).toBe(200);
+    const adminDetailBody = await adminDetail.json() as {
+      data: { friend: { id: string; displayName: string | null; redacted: boolean }; rule: { definition: { messageText: string } }; configuredActions: unknown[] };
+    };
+    expect(adminDetailBody.data.friend).toEqual({ id: 'friend-1', displayName: '山田 太郎', redacted: false });
+    expect(adminDetailBody.data.rule.definition.messageText).toBe('友だち追加ありがとうございます');
+    expect(adminDetailBody.data.configuredActions).toHaveLength(1);
+
+    const ownerDetail = await app(testDb.db, owner).request('/api/friend-add-runs/run-1?account_id=account-1');
+    expect(ownerDetail.status).toBe(200);
+    await expect(ownerDetail.json()).resolves.toMatchObject({
+      data: { friend: { id: 'friend-1', displayName: '山田 太郎', redacted: false } },
+    });
+
+    const otherAccount = await app(testDb.db, staff).request('/api/friend-add-runs?account_id=account-2');
+    expect(otherAccount.status).toBe(404);
   });
 
   it('空: 実行結果が無いときも0件と未取得を区別して返す', async () => {

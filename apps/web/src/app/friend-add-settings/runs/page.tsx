@@ -374,7 +374,11 @@ export default function FriendAddRunsPage() {
                       {displayName.slice(0, 1)}
                     </span>
                     <div className="min-w-0 flex-1">
-                      <Link className="block truncate text-sm font-bold hover:underline" href={`/friends/detail?id=${encodeURIComponent(item.friend.id)}`} title={displayName}>{displayName}</Link>
+                      {item.friend.redacted ? (
+                        <span className="block truncate text-sm font-bold" title={displayName}>{displayName}</span>
+                      ) : (
+                        <Link className="block truncate text-sm font-bold hover:underline" href={`/friends/detail?id=${encodeURIComponent(item.friend.id)}`} title={displayName}>{displayName}</Link>
+                      )}
                       <p className="truncate text-xs text-ink-faint" title={`流入：${routeName}`}>流入：{routeName}</p>
                       {item.rule && <p className="truncate text-xs text-ink-faint" title={`${item.rule.name ?? '名前は未取得'} 第${item.rule.versionNumber ?? '—'}版`}>{item.rule.name ?? '名前は未取得'}・第{item.rule.versionNumber ?? '—'}版</p>}
                     </div>

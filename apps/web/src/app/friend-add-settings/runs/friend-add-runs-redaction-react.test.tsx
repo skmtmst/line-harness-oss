@@ -1,0 +1,71 @@
+// @vitest-environment happy-dom
+/* eslint-disable @typescript-eslint/no-explicit-any -- ページのread model表示を実DOMで確認するための最小mock */
+import React, { act } from 'react'
+import { createRoot, type Root } from 'react-dom/client'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+const state = vi.hoisted(() => ({ redacted: true }))
+vi.mock('next/link', () => ({ default: ({ href, children, ...props }: any) => <a href={href} {...props}>{children}</a> }))
+vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-1', accounts: [{ id: 'account-1' }], loading: false }) }))
+vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined }))
+vi.mock('@/components/shared/button', () => ({ default: ({ href, children, ...props }: any) => href ? <a href={href} {...props}>{children}</a> : <button {...props}>{children}</button> }))
+vi.mock('@/components/shared/confirm-dialog', () => ({ default: () => null }))
+vi.mock('@/components/shared/list-state', () => ({ default: ({ title }: { title: string }) => <div>{title}</div> }))
+vi.mock('@/components/shared/select', () => ({ default: () => null }))
+vi.mock('@/components/shared/status-badge', () => ({ default: ({ children }: { children: React.ReactNode }) => <span>{children}</span> }))
+vi.mock('@/components/shared/summary-card', () => ({ default: () => null }))
+vi.mock('@/components/shared/sticky-bar', () => ({ default: ({ actions }: { actions: React.ReactNode }) => <div>{actions}</div> }))
+vi.mock('@/lib/api', () => ({ api: { friendAddRules: {
+  runs: vi.fn(async () => ({ success: true, data: {
+    items: [{
+      id: 'run-1', receivedAt: '2026-09-16T09:00:00+09:00', processedAt: null,
+      friend: state.redacted ? { displayName: '顧客名は非表示', redacted: true } : { id: 'friend-1', displayName: '山田 太郎', redacted: false },
+      friendKind: 'first_time', attribution: { status: 'unavailable', routeId: null, routeName: null, reason: null },
+      rule: null, scenario: null, actions: { total: 0, failed: 0 }, deliveryCount: 0, status: 'completed', errorCode: null,
+    }],
+    total: 1, nextCursor: null,
+    summary: { totalRuns: 1, cumulativeDeliveries: 0, scenarioStarts: 0, averageSendTimeMs: null, failed: 0, staffHandoffs: { value: null, state: 'unavailable', reason: null } },
+  } })),
+  get: vi.fn(async () => ({ success: false })), stop: vi.fn(),
+} } }))
+
+const { default: FriendAddRunsPage } = await import('./page')
+let host: HTMLDivElement
+let root: Root
+
+beforeEach(() => {
+  state.redacted = true
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
+  host = document.createElement('div')
+  document.body.appendChild(host)
+  root = createRoot(host)
+})
+afterEach(async () => {
+  await act(async () => { root.unmount() })
+  host.remove()
+  vi.restoreAllMocks()
+})
+
+async function render() {
+  await act(async () => {
+    root.render(<FriendAddRunsPage />)
+    await Promise.resolve()
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    await Promise.resolve()
+  })
+}
+
+describe('N-106 友だち追加時配信のstaff read model', () => {
+  it('マスクされた顧客は名前を表示しても詳細画面へのID導線を作らない', async () => {
+    await render()
+    expect(host.textContent).toContain('顧客名は非表示')
+    expect(host.querySelector('a[href^="/friends/detail"]')).toBeNull()
+  })
+
+  it('admin read modelだけが顧客詳細へ進める', async () => {
+    state.redacted = false
+    await render()
+    expect(host.textContent).toContain('山田 太郎')
+    expect(host.querySelector('a[href="/friends/detail?id=friend-1"]')).not.toBeNull()
+  })
+})
