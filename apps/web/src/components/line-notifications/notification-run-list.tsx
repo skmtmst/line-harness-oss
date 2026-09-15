@@ -288,10 +288,10 @@ export async function resolveNotificationRun(
   } catch (error) {
     if (!isCurrent()) return
     const text = error instanceof ApiError && error.status === 403
-      ? '対応状態を変更する権限がありません。'
+      ? '対応状況を変更する権限がありません。'
       : error instanceof ApiError && error.status === 409
         ? 'ほかの担当者が先に変更しました。最新の記録を読み直してください。'
-        : '対応状態を変更できませんでした。時間をおいて読み直してください。'
+        : '対応状況を変更できませんでした。時間をおいて読み直してください。'
     env.setNotice({ generation, notice: { tone: 'error', text } })
   } finally {
     if (env.mutationRef.current?.generation === generation && env.mutationRef.current.id === item.id) {
@@ -455,7 +455,7 @@ export default function NotificationRunList({
 
       <div className="rounded-control border border-warning bg-warning-bg px-4 py-3 text-sm leading-6 text-warning">
         {mode === 'failures'
-          ? '発送や返金のお知らせが届いていない場合は、その日のうちに受信箱など別の手だてで連絡してください。対応済みの記録は、送信台帳に項目が追加された後に表示します。'
+          ? '発送や返金のお知らせが届いていない場合は、その日のうちに受信箱など別の手だてで連絡してください。確認を終えた記録は、この一覧で対応済みにできます。'
           : '選択中のLINEアカウントと結び付きを確認できたEC通知だけを表示します。個人の既読は取得せず、押されたかどうかは自社の短縮URLだけで数えます。'}
         <span className="mt-1 block text-xs">個人の既読は取得できません。試行回数と次の再試行予定は送信台帳の記録を表示します。</span>
       </div>

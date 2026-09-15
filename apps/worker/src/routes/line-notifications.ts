@@ -568,7 +568,7 @@ lineNotifications.post(
       });
       if (result === 'not_found') return c.json({ success: false, error: '送信記録が見つかりません' }, 404);
       if (result === 'unavailable') {
-        return c.json({ success: false, code: 'resolution_unavailable', error: '失敗または送信対象外の記録だけ対応状態を変更できます' }, 409);
+        return c.json({ success: false, code: 'resolution_unavailable', error: '失敗または送信対象外の記録だけ対応状況を変更できます' }, 409);
       }
       if (result === 'version_conflict') {
         return c.json({ success: false, code: 'version_conflict', error: 'ほかの担当者が先に変更しました' }, 409);

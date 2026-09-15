@@ -219,6 +219,7 @@ describe('LINE通知一覧のReact実mount試験', () => {
     expect(container.textContent).toContain('試行履歴を確認')
     expect(container.textContent).toContain('未対応に戻す')
     expect(container.textContent).not.toContain('送信を再試行')
+    expect(container.textContent).not.toContain('項目が追加された後に表示します')
   })
 
   it.each([
