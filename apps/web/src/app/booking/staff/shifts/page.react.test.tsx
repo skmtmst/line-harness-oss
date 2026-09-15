@@ -154,8 +154,11 @@ afterEach(() => {
 })
 
 async function renderEditor() {
+  const availabilityCallsBeforeRender = fixture.getAvailability.mock.calls.length
   render(<StaffShiftsPage />)
   await screen.findByRole('button', { name: '営業時間を保存' })
+  await waitFor(() => expect(fixture.getAvailability.mock.calls.length).toBeGreaterThan(availabilityCallsBeforeRender))
+  await act(async () => { await Promise.resolve() })
 }
 
 describe('店舗営業時間の編集', () => {
