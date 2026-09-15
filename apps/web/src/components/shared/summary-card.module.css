@@ -99,6 +99,10 @@
   font-variant-numeric: tabular-nums;
 }
 
+.valueWarning {
+  color: var(--color-warning);
+}
+
 .detail {
   color: var(--color-ink-faint);
   font-size: var(--text-micro);

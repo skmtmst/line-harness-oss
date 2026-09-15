@@ -28,7 +28,7 @@ import type {
 } from '@line-crm/db';
 import { CredentialEncryptionKeyError } from '@line-crm/db';
 import { requireRole } from '../middleware/role-guard.js';
-import { fetchBotProfile } from '../lib/bot-profile.js';
+import { fetchBotProfile, type BotProfile } from '../lib/bot-profile.js';
 import {
   detectFollowerImportCapability,
   getFollowerImportState,
@@ -101,6 +101,9 @@ function serializeLineAccount(row: DbLineAccount) {
     id: row.id,
     channelId: row.channel_id,
     name: row.name,
+    displayName: row.line_display_name || row.name,
+    pictureUrl: row.line_picture_url ?? null,
+    basicId: row.line_basic_id ?? null,
     isActive: Boolean(row.is_active),
     isDefault: Boolean(row.is_default),
     archivedAt: row.archived_at ?? null,
@@ -186,15 +189,19 @@ lineAccounts.get('/api/line-accounts', async (c) => {
       c.env.LINE_CREDENTIAL_ENCRYPTION_KEY,
     );
     const statsByAccount = await getLineAccountListStats(db, items.map((item) => item.id));
-    const serializeWithStats = (item: DbLineAccount) => ({
-      ...serializeLineAccount(item),
-      displayName: item.name,
-      stats: statsByAccount[item.id] ?? {
-        friendCount: 0,
-        activeScenarios: 0,
-        messagesThisMonth: 0,
-      },
-    });
+    const serializeWithStats = (item: DbLineAccount) => {
+      const overview = statsByAccount[item.id];
+      return {
+        ...serializeLineAccount(item),
+        stats: {
+          friendCount: overview?.friendCount ?? 0,
+          activeScenarios: overview?.activeScenarios ?? 0,
+          messagesThisMonth: overview?.messagesThisMonth ?? 0,
+          staffCount: overview?.staffCount ?? 0,
+        },
+        connection: overview?.connection ?? { status: 'unknown' as const, checkedAt: null },
+      };
+    };
 
     if (c.req.query('live') !== '1') {
       return c.json({
@@ -264,6 +271,7 @@ type ConnectionVerification = {
   lineLogin: boolean;
   liff: boolean;
   webhookUrl: string | null;
+  botProfile: BotProfile | null;
   errors: string[];
 };
 
@@ -316,13 +324,15 @@ async function collectConnectionChecks(
   account: DbLineAccount,
   expectedWebhookUrl: string,
   expectedLiffEndpointUrl: string | null,
-): Promise<ConnectionCheckDraft[]> {
+): Promise<{ checks: ConnectionCheckDraft[]; botProfile: BotProfile | null }> {
   const checks: ConnectionCheckDraft[] = [];
   const headers = { Authorization: `Bearer ${account.channel_access_token}` };
   let botOk = false;
+  let botProfile: BotProfile | null = null;
   try {
     const response = await fetch('https://api.line.me/v2/bot/info', { headers });
     botOk = response.ok;
+    if (response.ok) botProfile = await response.json<BotProfile>();
     checks.push({ kind: 'bot_info', result: response.ok ? 'ok' : 'failed', httpStatus: response.status });
   } catch {
     checks.push({ kind: 'bot_info', result: 'failed', httpStatus: null });
@@ -403,7 +413,7 @@ async function collectConnectionChecks(
     expectedUrl: expectedLiffEndpointUrl,
     registeredUrl: null,
   });
-  return checks;
+  return { checks, botProfile };
 }
 
 async function verifyConnection(input: {
@@ -419,6 +429,7 @@ async function verifyConnection(input: {
     lineLogin: /^\d+$/.test(input.loginChannelId),
     liff: /^\d+-[A-Za-z0-9]+$/.test(input.liffId),
     webhookUrl: null,
+    botProfile: null,
     errors: [],
   };
   if (!input.loginChannelSecret.trim()) result.lineLogin = false;
@@ -429,6 +440,7 @@ async function verifyConnection(input: {
   try {
     const botResponse = await fetch('https://api.line.me/v2/bot/info', { headers });
     result.messagingApi = botResponse.ok;
+    if (botResponse.ok) result.botProfile = await botResponse.json<BotProfile>();
     if (!botResponse.ok) result.errors.push('Messaging APIのChannel Access Tokenを確認してください');
   } catch {
     result.errors.push('Messaging APIへ接続できませんでした');
@@ -539,7 +551,7 @@ lineAccounts.post(
         return c.json({ success: false, error: 'REVISION_CONFLICT', currentRevision }, 409);
       }
 
-      const checks = await collectConnectionChecks(account, urls.webhook, urls.liffEndpoint);
+      const collected = await collectConnectionChecks(account, urls.webhook, urls.liffEndpoint);
       const rows = await saveLineAccountConnectionChecks(c.env.DB, {
         lineAccountId: id,
         expectedRevision: Number(body.expectedRevision),
@@ -547,8 +559,16 @@ lineAccounts.post(
         checkedAt: jstNow(),
         correlationId: c.req.header('X-Correlation-ID')?.trim() || crypto.randomUUID(),
         idempotencyKey,
-        checks,
+        checks: collected.checks,
       });
+      if (collected.botProfile) {
+        await updateLineAccountFields(c.env.DB, id, {
+          lineDisplayName: collected.botProfile.displayName ?? null,
+          linePictureUrl: collected.botProfile.pictureUrl ?? null,
+          lineBasicId: collected.botProfile.basicId ?? null,
+          lineProfileSyncedAt: jstNow(),
+        });
+      }
       return c.json({ success: true, data: connectionCheckResponse(account, rows, urls) });
     } catch (error) {
       if (error instanceof LineAccountRevisionConflictError) {
@@ -1044,10 +1064,11 @@ lineAccounts.post('/api/line-accounts/connect', requireRole('owner'), async (c) 
       liffId: prepared.liffId,
       timezone: 'Asia/Tokyo',
       tenantId: c.get('staff').tenantId ?? DEFAULT_TENANT_ID,
+      lineDisplayName: prepared.bot.displayName ?? null,
+      linePictureUrl: prepared.bot.pictureUrl ?? null,
+      lineBasicId: prepared.bot.basicId ?? null,
+      lineProfileSyncedAt: jstNow(),
     }, c.env.LINE_CREDENTIAL_ENCRYPTION_KEY);
-    if (prepared.bot.pictureUrl) {
-      await updateLineAccountFields(c.env.DB, account.id, { iconUrl: prepared.bot.pictureUrl });
-    }
 
     const followerState = await detectFollowerImportCapability(
       c.env.DB,
@@ -1263,6 +1284,10 @@ lineAccounts.post('/api/line-accounts', requireRole('owner'), async (c) => {
       role,
       parentLineAccountId,
       tenantId: currentStaff.tenantId ?? DEFAULT_TENANT_ID,
+      lineDisplayName: verification.botProfile?.displayName ?? null,
+      linePictureUrl: verification.botProfile?.pictureUrl ?? null,
+      lineBasicId: verification.botProfile?.basicId ?? null,
+      lineProfileSyncedAt: verification.botProfile ? jstNow() : null,
     }, c.env.LINE_CREDENTIAL_ENCRYPTION_KEY);
 
     if (copyFromAccountId && copyItems.length > 0) {

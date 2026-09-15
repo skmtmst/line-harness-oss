@@ -207,7 +207,7 @@ export default function ProjectsSection({
               <ListState
                 kind="empty"
                 title="まだプロジェクトがありません"
-                description="案件やキャンペーンごとにプロジェクトを作り、その中で画像を生成します。作った画像は店舗へ渡せます。"
+                description="案件やキャンペーンごとにプロジェクトを作り、その中で画像を生成します。作った画像はアカウントへ渡せます。"
                 action={
                   <Button variant="primary" onClick={() => setFormOpen(true)}>
                     <Plus aria-hidden="true" className="h-4 w-4" />
