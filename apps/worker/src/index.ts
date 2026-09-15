@@ -151,6 +151,7 @@ import { clientErrors } from './routes/client-errors.js';
 import { lineWebhookEvents } from './routes/line-webhook-events.js';
 import { operations } from './routes/operations.js';
 import { runScheduledOperationHealthChecks } from './services/operations-health.js';
+import { observeOperationDispatcher } from './services/operation-dispatch-health.js';
 import { processOperationNotificationOutbox } from './services/operation-notifications.js';
 import {
   OPERATOR_NOTIFICATION_SWEEP_LIMIT,
@@ -1584,6 +1585,9 @@ async function scheduled(
   }
 
   const defaultLineClient = new LineClient(env.LINE_CHANNEL_ACCESS_TOKEN);
+  const dispatchObservedAt = new Date(event.scheduledTime).toISOString();
+  const observeDispatch = <T>(jobName: string, run: () => Promise<T>) =>
+    observeOperationDispatcher(env.DB, jobName, run, dispatchObservedAt);
 
   // 配信系は1回だけ実行（内部でfriendのline_account_idから正しいlineClientを動的解決）
   // 以前はアカウントごとにループしていたが、アカウントフィルタなしのDBクエリで
@@ -1614,61 +1618,67 @@ async function scheduled(
   // V6オートメーションの日時指定を起動し、待機・一時失敗中の実行を再開する。
   // 同じ5分Cronにまとめても、実行・処理ごとの冪等キーで二重実行を防ぐ。
   try {
-    const now = new Date(event.scheduledTime).toISOString();
-    const executors = createAutomationActionExecutors({
-      credentialEncryptionKey: env.LINE_CREDENTIAL_ENCRYPTION_KEY,
-    });
-    const scheduledResult = await processScheduledAutomationTriggers(env.DB, {
-      now, executors, limit: 100,
-    });
-    const overdueResults = await processOverdueSupportMarkTriggers(env.DB, {
-      now, executors, limit: 100,
-    });
-    for (const result of [...scheduledResult.results, ...overdueResults]) {
-      if (result.kind === 'configuration_error') {
-        console.error(JSON.stringify({
-          event: 'automation_v6_scheduled_trigger_failed',
-          automationId: result.automationId,
-          reason: result.error,
+    await observeDispatch('automation deliveries', async () => {
+      const now = new Date(event.scheduledTime).toISOString();
+      const executors = createAutomationActionExecutors({
+        credentialEncryptionKey: env.LINE_CREDENTIAL_ENCRYPTION_KEY,
+      });
+      const scheduledResult = await processScheduledAutomationTriggers(env.DB, {
+        now, executors, limit: 100,
+      });
+      const overdueResults = await processOverdueSupportMarkTriggers(env.DB, {
+        now, executors, limit: 100,
+      });
+      for (const result of [...scheduledResult.results, ...overdueResults]) {
+        if (result.kind === 'configuration_error') {
+          console.error(JSON.stringify({
+            event: 'automation_v6_scheduled_trigger_failed',
+            automationId: result.automationId,
+            reason: result.error,
+          }));
+        }
+      }
+      const dueResult = await processDueAutomationRuns(env.DB, {
+        now, executors, limit: 100,
+      });
+      if (scheduledResult.results.length + overdueResults.length + dueResult.processed > 0) {
+        console.log(JSON.stringify({
+          event: 'automation_v6_cron',
+          scheduled: scheduledResult.results.length,
+          support_mark_overdue: overdueResults.length,
+          resumed: dueResult.processed,
         }));
       }
-    }
-    const dueResult = await processDueAutomationRuns(env.DB, {
-      now, executors, limit: 100,
     });
-    if (scheduledResult.results.length + overdueResults.length + dueResult.processed > 0) {
-      console.log(JSON.stringify({
-        event: 'automation_v6_cron',
-        scheduled: scheduledResult.results.length,
-        support_mark_overdue: overdueResults.length,
-        resumed: dueResult.processed,
-      }));
-    }
   } catch (e) {
     console.error('automation-v6 cron error:', e);
   }
 
   try {
-    const result = await processDueReminders(env.DB, {
-      now: new Date(),
-      sender: sendBookingNotification,
-      reminderHoursBefore: DEFAULT_ACCOUNT_SETTINGS.reminder_hours_before,
+    await observeDispatch('booking reminders', async () => {
+      const result = await processDueReminders(env.DB, {
+        now: new Date(),
+        sender: sendBookingNotification,
+        reminderHoursBefore: DEFAULT_ACCOUNT_SETTINGS.reminder_hours_before,
+      });
+      if (result.sent + result.failed > 0) {
+        console.log(`[booking-reminders] sent=${result.sent} failed=${result.failed}`);
+      }
     });
-    if (result.sent + result.failed > 0) {
-      console.log(`[booking-reminders] sent=${result.sent} failed=${result.failed}`);
-    }
   } catch (e) {
     console.error('booking-reminders error:', e);
   }
 
   try {
-    const result = await processDueEventReminders(env.DB, {
-      now: new Date(),
-      sender: sendEventBookingNotification,
+    await observeDispatch('event reminders', async () => {
+      const result = await processDueEventReminders(env.DB, {
+        now: new Date(),
+        sender: sendEventBookingNotification,
+      });
+      if (result.sent + result.failed > 0) {
+        console.log(`[event-booking-reminders] sent=${result.sent} failed=${result.failed}`);
+      }
     });
-    if (result.sent + result.failed > 0) {
-      console.log(`[event-booking-reminders] sent=${result.sent} failed=${result.failed}`);
-    }
   } catch (e) {
     console.error('event-booking-reminders error:', e);
   }
@@ -1692,15 +1702,17 @@ async function scheduled(
   // 外部Google Calendarで確定したMeet個別相談。前日・1時間前のLINE通知を
   // D1で管理し、送信は必ずLINE Harness Proxyを通す。
   try {
-    const result = await processDueMeetConsultationReminders(env.DB, {
-      now: new Date(),
-      proxyBaseUrl:
-        env.WORKER_PUBLIC_URL ?? 'https://your-worker.your-subdomain.workers.dev',
-      proxyDispatch: (request) => Promise.resolve(lineProxy.fetch(request, env, ctx)),
+    await observeDispatch('meet consultation reminders', async () => {
+      const result = await processDueMeetConsultationReminders(env.DB, {
+        now: new Date(),
+        proxyBaseUrl:
+          env.WORKER_PUBLIC_URL ?? 'https://your-worker.your-subdomain.workers.dev',
+        proxyDispatch: (request) => Promise.resolve(lineProxy.fetch(request, env, ctx)),
+      });
+      if (result.sent + result.failed > 0) {
+        console.log(`[meet-consultation-reminders] sent=${result.sent} failed=${result.failed}`);
+      }
     });
-    if (result.sent + result.failed > 0) {
-      console.log(`[meet-consultation-reminders] sent=${result.sent} failed=${result.failed}`);
-    }
   } catch (e) {
     console.error('meet-consultation-reminders error:', e);
   }
@@ -1708,21 +1720,23 @@ async function scheduled(
   // ウェビナー予約リマインド (セッション選択メニュー)。時刻厳守・軽量なので
   // booking 系リマインドと同じく重いジョブより先に実行する。
   try {
-    const { processWebinarReminders } = await import('./services/webinar-reminders.js');
-    const liffMatch = /liff\.line\.me\/([^/?]+)/.exec(env.LIFF_URL ?? '');
-    const result = await processWebinarReminders(
-      env.DB,
-      {
-        proxyBaseUrl:
-          env.WORKER_PUBLIC_URL ?? 'https://your-worker.your-subdomain.workers.dev',
-        defaultAccessToken: env.LINE_CHANNEL_ACCESS_TOKEN,
-        defaultLiffId: liffMatch?.[1] ?? null,
-        proxyDispatch: (request) => Promise.resolve(lineProxy.fetch(request, env, ctx)),
-      },
-    );
-    if (result.sent + result.failed > 0) {
-      console.log(`[webinar-reminders] sent=${result.sent} failed=${result.failed}`);
-    }
+    await observeDispatch('webinar reminders', async () => {
+      const { processWebinarReminders } = await import('./services/webinar-reminders.js');
+      const liffMatch = /liff\.line\.me\/([^/?]+)/.exec(env.LIFF_URL ?? '');
+      const result = await processWebinarReminders(
+        env.DB,
+        {
+          proxyBaseUrl:
+            env.WORKER_PUBLIC_URL ?? 'https://your-worker.your-subdomain.workers.dev',
+          defaultAccessToken: env.LINE_CHANNEL_ACCESS_TOKEN,
+          defaultLiffId: liffMatch?.[1] ?? null,
+          proxyDispatch: (request) => Promise.resolve(lineProxy.fetch(request, env, ctx)),
+        },
+      );
+      if (result.sent + result.failed > 0) {
+        console.log(`[webinar-reminders] sent=${result.sent} failed=${result.failed}`);
+      }
+    });
   } catch (e) {
     console.error('webinar-reminders error:', e);
   }
@@ -1730,40 +1744,44 @@ async function scheduled(
   // V6で設定した複数時点の通知。既存の5分前通知とはDB上で排他的にし、
   // 同じ申込へ二重送信しない。
   try {
-    const { processWebinarNotificationJobs } = await import('./services/webinar-notifications.js');
-    const liffMatch = /liff\.line\.me\/([^/?]+)/.exec(env.LIFF_URL ?? '');
-    const result = await processWebinarNotificationJobs(env.DB, {
-      proxyBaseUrl:
-        env.WORKER_PUBLIC_URL ?? 'https://your-worker.your-subdomain.workers.dev',
-      defaultAccessToken: env.LINE_CHANNEL_ACCESS_TOKEN,
-      defaultLiffId: liffMatch?.[1] ?? null,
-      proxyDispatch: (request) => Promise.resolve(lineProxy.fetch(request, env, ctx)),
+    await observeDispatch('webinar notifications', async () => {
+      const { processWebinarNotificationJobs } = await import('./services/webinar-notifications.js');
+      const liffMatch = /liff\.line\.me\/([^/?]+)/.exec(env.LIFF_URL ?? '');
+      const result = await processWebinarNotificationJobs(env.DB, {
+        proxyBaseUrl:
+          env.WORKER_PUBLIC_URL ?? 'https://your-worker.your-subdomain.workers.dev',
+        defaultAccessToken: env.LINE_CHANNEL_ACCESS_TOKEN,
+        defaultLiffId: liffMatch?.[1] ?? null,
+        proxyDispatch: (request) => Promise.resolve(lineProxy.fetch(request, env, ctx)),
+      });
+      if (result.sent + result.failed + result.skipped > 0) {
+        console.log(`[webinar-notifications] sent=${result.sent} failed=${result.failed} skipped=${result.skipped}`);
+      }
     });
-    if (result.sent + result.failed + result.skipped > 0) {
-      console.log(`[webinar-notifications] sent=${result.sent} failed=${result.failed} skipped=${result.skipped}`);
-    }
   } catch (e) {
     console.error('webinar-notifications error:', e);
   }
 
   // NEN専用の購入後フォローと誕生日クーポン。自動配信なのでmanualヘッダーは付けない。
   try {
-    const { processNenDeliveries, enqueueBirthdayCoupons } = await import('./services/nen-engagement.js');
-    const birthdayQueued = await enqueueBirthdayCoupons(
-      env.DB,
-      new Date(),
-      env.NEN_EC_BASE_URL && env.ECCUBE_WEBHOOK_SECRET
-        ? { baseUrl: env.NEN_EC_BASE_URL, secret: env.ECCUBE_WEBHOOK_SECRET }
-        : undefined,
-    );
-    const result = await processNenDeliveries(env.DB, {
-      proxyBaseUrl: env.WORKER_PUBLIC_URL ?? 'https://your-worker.your-subdomain.workers.dev',
-      defaultAccessToken: env.LINE_CHANNEL_ACCESS_TOKEN,
-      proxyDispatch: (request) => Promise.resolve(lineProxy.fetch(request, env, ctx)),
+    await observeDispatch('NEN campaign deliveries', async () => {
+      const { processNenDeliveries, enqueueBirthdayCoupons } = await import('./services/nen-engagement.js');
+      const birthdayQueued = await enqueueBirthdayCoupons(
+        env.DB,
+        new Date(),
+        env.NEN_EC_BASE_URL && env.ECCUBE_WEBHOOK_SECRET
+          ? { baseUrl: env.NEN_EC_BASE_URL, secret: env.ECCUBE_WEBHOOK_SECRET }
+          : undefined,
+      );
+      const result = await processNenDeliveries(env.DB, {
+        proxyBaseUrl: env.WORKER_PUBLIC_URL ?? 'https://your-worker.your-subdomain.workers.dev',
+        defaultAccessToken: env.LINE_CHANNEL_ACCESS_TOKEN,
+        proxyDispatch: (request) => Promise.resolve(lineProxy.fetch(request, env, ctx)),
+      });
+      if (birthdayQueued + result.sent + result.failed + result.skipped > 0) {
+        console.log(JSON.stringify({ event: 'nen_campaign_tick', birthdayQueued, ...result }));
+      }
     });
-    if (birthdayQueued + result.sent + result.failed + result.skipped > 0) {
-      console.log(JSON.stringify({ event: 'nen_campaign_tick', birthdayQueued, ...result }));
-    }
   } catch (e) {
     console.error('nen-campaign delivery error:', e);
   }
@@ -1775,10 +1793,12 @@ async function scheduled(
   // 失敗しても他の処理は続ける。営業時間の表記が1周ぶん古いままなのと、
   // 配信そのものが止まるのとでは、後者の方がはるかに重い。
   try {
-    const { applyDueCommonVarSchedules } = await import('@line-crm/db');
-    const jstNowIso = new Date(Date.now() + 9 * 3600_000).toISOString().replace('Z', '');
-    const applied = await applyDueCommonVarSchedules(env.DB, jstNowIso);
-    if (applied > 0) console.log(JSON.stringify({ event: 'common_var_schedule_applied', applied }));
+    await observeDispatch('common variable schedules', async () => {
+      const { applyDueCommonVarSchedules } = await import('@line-crm/db');
+      const jstNowIso = new Date(Date.now() + 9 * 3600_000).toISOString().replace('Z', '');
+      const applied = await applyDueCommonVarSchedules(env.DB, jstNowIso);
+      if (applied > 0) console.log(JSON.stringify({ event: 'common_var_schedule_applied', applied }));
+    });
   } catch (e) {
     console.error('common-var schedule error:', e);
   }
@@ -2172,18 +2192,20 @@ async function scheduled(
   // 予約画面の未予約、予約後の未視聴、フォーム途中離脱、回答後の相談未予約を
   // 段階別に自動追客する。対象は followup config で有効化したウェビナーだけ。
   try {
-    const { processWebinarFollowups } = await import('./services/webinar-followups.js');
-    const liffMatch = /liff\.line\.me\/([^/?]+)/.exec(env.LIFF_URL ?? '');
-    const result = await processWebinarFollowups(env.DB, {
-      proxyBaseUrl:
-        env.WORKER_PUBLIC_URL ?? 'https://your-worker.your-subdomain.workers.dev',
-      defaultAccessToken: env.LINE_CHANNEL_ACCESS_TOKEN,
-      defaultLiffId: liffMatch?.[1] ?? null,
-      proxyDispatch: (request) => Promise.resolve(lineProxy.fetch(request, env, ctx)),
+    await observeDispatch('webinar followups', async () => {
+      const { processWebinarFollowups } = await import('./services/webinar-followups.js');
+      const liffMatch = /liff\.line\.me\/([^/?]+)/.exec(env.LIFF_URL ?? '');
+      const result = await processWebinarFollowups(env.DB, {
+        proxyBaseUrl:
+          env.WORKER_PUBLIC_URL ?? 'https://your-worker.your-subdomain.workers.dev',
+        defaultAccessToken: env.LINE_CHANNEL_ACCESS_TOKEN,
+        defaultLiffId: liffMatch?.[1] ?? null,
+        proxyDispatch: (request) => Promise.resolve(lineProxy.fetch(request, env, ctx)),
+      });
+      if (result.sent + result.failed > 0) {
+        console.log(`[webinar-followups] sent=${result.sent} failed=${result.failed}`);
+      }
     });
-    if (result.sent + result.failed > 0) {
-      console.log(`[webinar-followups] sent=${result.sent} failed=${result.failed}`);
-    }
   } catch (e) {
     console.error('webinar-followups error:', e);
   }
@@ -2193,13 +2215,19 @@ async function scheduled(
   // (barrier 化すると長い scheduled 送信が queue 処理を待たせる)。scheduled dedup は
   // status='sending', batch_offset=0 に enqueue され、同 tick もしくは次 tick (最大5分、
   // 5分 cron の粒度内) で processQueuedBroadcasts に拾われて分割送信される。
-  const jobs = [];
+  const jobs: Promise<unknown>[] = [];
   jobs.push(
-    processStepDeliveries(env.DB, defaultLineClient, env.WORKER_URL),
-    processScheduledBroadcasts(env.DB, defaultLineClient, env.WORKER_URL),
-    processReminderDeliveries(env.DB, defaultLineClient),
+    observeDispatch('scenario deliveries',
+      () => processStepDeliveries(env.DB, defaultLineClient, env.WORKER_URL)),
+    observeDispatch('broadcast deliveries', async () => {
+      await Promise.all([
+        processScheduledBroadcasts(env.DB, defaultLineClient, env.WORKER_URL),
+        processQueuedBroadcasts(env.DB, defaultLineClient, env.WORKER_URL),
+      ]);
+    }),
+    observeDispatch('reminder deliveries',
+      () => processReminderDeliveries(env.DB, defaultLineClient)),
   );
-  jobs.push(processQueuedBroadcasts(env.DB, defaultLineClient, env.WORKER_URL));
 
   await Promise.allSettled(jobs);
 
