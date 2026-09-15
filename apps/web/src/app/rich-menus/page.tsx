@@ -507,6 +507,20 @@ export default function RichMenusListPage() {
       : groupKpiState === 'loading'
         ? '読み込んでいます'
         : '一覧を取得できませんでした'
+  const tapKpiState = !selectedAccount?.id
+    ? 'unselected'
+    : loading
+      ? 'loading'
+      : tapStats
+        ? 'ready'
+        : 'error'
+  const tapKpiReady = tapKpiState === 'ready'
+  const tapKpiUnavailableText =
+    tapKpiState === 'unselected'
+      ? 'LINEアカウントを選ぶと表示します'
+      : tapKpiState === 'loading'
+        ? '読み込んでいます'
+        : '集計を取れませんでした'
 
   const effectivePageSize = reordering ? 200 : pageSize
   const pageCount = Math.max(1, Math.ceil(groupTotal / effectivePageSize))
@@ -538,8 +552,8 @@ export default function RichMenusListPage() {
       ) : null}
       <div
         data-design="KPIs"
-        hidden
         data-group-kpi-state={groupKpiState}
+        data-tap-kpi-state={tapKpiState}
         className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4"
       >
         <div className="bg-canvas rounded-card border-hairline border p-4">
@@ -556,12 +570,12 @@ export default function RichMenusListPage() {
         </div>
         <div className="bg-canvas rounded-card border-hairline border p-4">
           <p className="text-ink-faint text-xs">今月のタップ</p>
-          <p className={`mt-1 text-2xl font-bold tabular-nums ${tapStats ? 'text-ink' : 'text-ink-faint'}`}>
-            {tapStats ? tapStats.total : '—'}
-            {tapStats && <span className="text-ink-faint ml-0.5 text-xs font-normal">回</span>}
+          <p className={`mt-1 text-2xl font-bold tabular-nums ${tapKpiReady ? 'text-ink' : 'text-ink-faint'}`}>
+            {tapKpiReady ? (tapStats?.total ?? '—') : '—'}
+            {tapKpiReady && <span className="text-ink-faint ml-0.5 text-xs font-normal">回</span>}
           </p>
           <p className="text-ink-faint mt-0.5 text-xs">
-            {tapStats ? 'ボタンが押された回数' : '集計を取れませんでした'}
+            {tapKpiReady ? 'ボタンが押された回数' : tapKpiUnavailableText}
           </p>
         </div>
         <div className="bg-canvas rounded-card border-hairline border p-4">
@@ -575,7 +589,9 @@ export default function RichMenusListPage() {
           <p className="text-ink-faint mt-0.5 text-xs">
             {topArea
               ? `${topArea.taps}回・タップ数の内訳は編集画面で見られます`
-              : 'まだ押されていません'}
+              : tapKpiReady
+                ? 'まだ押されていません'
+                : tapKpiUnavailableText}
           </p>
         </div>
         <div className="bg-canvas rounded-card border-hairline border p-4">
