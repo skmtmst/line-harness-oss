@@ -204,8 +204,10 @@ describe('V6分析の概要4画面', () => {
     const mediaVars = result.data.categories.find((item) => item.key === 'media_vars');
     expect(templates?.created.value).toBe(1);
     expect(templates?.inUse.value).toBe(1);
+    expect(templates?.brokenReferences).toEqual({ value: 0, state: 'available', reason: null });
     expect(mediaVars?.created).toMatchObject({ value: null, state: 'unavailable' });
     expect(result.data).toMatchObject({ state: 'partial', automaticDeletion: false });
+    expect(result.data.summary.brokenReferences).toMatchObject({ value: 0, state: 'partial' });
   });
 
   it('使われ方の自動実行と手動送信は選択中アカウント・期間・テストを分ける', async () => {
@@ -245,6 +247,98 @@ describe('V6分析の概要4画面', () => {
     });
     expect(result.data.summary.automaticRuns.reason).toContain('オートメーションの実行記録だけ');
     expect(result.data.summary.unusedItems.state).toBe('partial');
+  });
+
+  it('使われ方の参照切れは存在・削除済み・別アカウント・未対応種別を分ける', async () => {
+    sqlite.pragma('foreign_keys = OFF');
+    sqlite.prepare(
+      `INSERT INTO templates (id, name, message_type, message_content, line_account_id)
+       VALUES ('template-ok','利用可','text','ok','account-a'),
+              ('template-deleted','削除前','text','deleted','account-a'),
+              ('template-other','別店舗','text','other','account-b')`,
+    ).run();
+    sqlite.prepare(
+      `INSERT INTO auto_replies (
+         id, keyword, response_type, response_content, template_id, line_account_id
+       ) VALUES ('reply-ok','ok','text','ok','template-ok','account-a'),
+                ('reply-deleted','deleted','text','deleted','template-deleted','account-a'),
+                ('reply-other','other','text','other','template-other','account-a'),
+                ('reply-b','b','text','b','missing-b','account-b')`,
+    ).run();
+    // 古いDBや移行途中で参照元だけが残る実データを再現する。
+    sqlite.prepare(`DELETE FROM templates WHERE id = 'template-deleted'`).run();
+
+    sqlite.prepare(
+      `INSERT INTO common_action_bindings (
+         id, line_account_id, common_action_id, common_action_version_id,
+         consumer_type, consumer_id, consumer_path
+       ) VALUES ('unsupported-binding','account-a','missing-action','missing-version',
+                 'future_consumer','future-1','future.path')`,
+    ).run();
+
+    const result = await getAnalyticsUsageOverview(db, CONTEXT);
+    const templates = result.data.categories.find((item) => item.key === 'templates');
+    const automations = result.data.categories.find((item) => item.key === 'automations');
+    const mediaVars = result.data.categories.find((item) => item.key === 'media_vars');
+
+    expect(templates?.brokenReferences).toEqual({ value: 2, state: 'available', reason: null });
+    expect(automations?.brokenReferences).toMatchObject({ value: 0, state: 'partial' });
+    expect(automations?.brokenReferences.reason).toContain('future_consumer');
+    expect(mediaVars?.brokenReferences).toMatchObject({ value: null, state: 'unavailable' });
+    expect(result.data.summary.brokenReferences).toMatchObject({ value: 2, state: 'partial' });
+    expect(result.data.summary.brokenReferences.reason).toContain('確認できた参照だけ');
+    expect(result.data.checkedAt).toBe(CONTEXT.dataCutoffAt);
+  });
+
+  it('参照件数が増えても一覧取得やN+1をせず、固定1問で集計する', async () => {
+    sqlite.pragma('foreign_keys = OFF');
+    sqlite.prepare(
+      `INSERT INTO templates (id, name, message_type, message_content, line_account_id)
+       VALUES ('template-ok','利用可','text','ok','account-a')`,
+    ).run();
+    const insert = sqlite.prepare(
+      `INSERT INTO auto_replies (
+         id, keyword, response_type, response_content, template_id, line_account_id
+       ) VALUES (?, ?, 'text', 'ok', ?, 'account-a')`,
+    );
+    for (let index = 0; index < 250; index += 1) {
+      insert.run(`reply-${index}`, `keyword-${index}`, index % 2 === 0 ? 'template-ok' : `missing-${index}`);
+    }
+
+    const preparedSql: string[] = [];
+    const countedDb = {
+      ...db,
+      prepare(sql: string) {
+        preparedSql.push(sql);
+        return db.prepare(sql);
+      },
+    } as D1Database;
+    const result = await getAnalyticsUsageOverview(countedDb, CONTEXT);
+    const healthSql = preparedSql.filter((sql) => sql.includes('usage-reference-health'));
+
+    expect(result.data.categories.find((item) => item.key === 'templates')?.brokenReferences.value)
+      .toBe(125);
+    expect(healthSql).toHaveLength(1);
+    expect(healthSql[0]?.toUpperCase()).not.toContain('UNION');
+  });
+
+  it('参照集計だけが失敗したとき0件にせずfailedで返す', async () => {
+    const failedDb = {
+      ...db,
+      prepare(sql: string) {
+        if (sql.includes('usage-reference-health')) {
+          throw new Error('reference query failed');
+        }
+        return db.prepare(sql);
+      },
+    } as D1Database;
+
+    const result = await getAnalyticsUsageOverview(failedDb, CONTEXT);
+    expect(result.data.categories.find((item) => item.key === 'templates')?.brokenReferences)
+      .toMatchObject({ value: null, state: 'failed' });
+    expect(result.data.summary.brokenReferences)
+      .toMatchObject({ value: null, state: 'failed' });
+    expect(result.data.state).toBe('partial');
   });
 
   it('URLクリックは取得開始前の到達人数を0件と断定しない', async () => {
