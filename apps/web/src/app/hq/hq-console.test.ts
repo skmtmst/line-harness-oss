@@ -23,8 +23,24 @@ describe('統括コンソール', () => {
     for (const label of ['アカウント', '友だち数', '今月の配信数', '接続状態', '担当者数', '状態', '操作']) {
       expect(accountList).toContain(label)
     }
-    for (const node of ['MjMCg', 'x5Tkb6', 'w7yY6', 'd61vBH']) expect(page).toContain(node)
+    for (const node of ['MjMCg', 'x5Tkb6', 'w7yY6']) expect(page).toContain(node)
     expect(accountList).toContain('vLMQ5')
+  })
+
+  it('LINE IDと接続状態を明示操作で一括更新し、結果を再読込する', () => {
+    expect(page).toContain('LINE ID・接続状態を更新')
+    expect(page).toContain('/connection-checks')
+    expect(page).toContain("'Idempotency-Key'")
+    expect(page).toContain('const expectedRevision = account.revision')
+    expect(page).toContain('body: JSON.stringify({ expectedRevision })')
+    expect(page).toContain('if (checkingConnections || accounts.length === 0) return')
+    expect(page).toContain('await Promise.all([load(), refreshAccounts()])')
+    expect(accountList).toContain('LINE ID未取得')
+  })
+
+  it('LINE公式アカウントの説明バーを表示しない', () => {
+    expect(page).not.toContain('NoteBar')
+    expect(page).not.toContain('LINE公式アカウントごとに管理画面へ入れます。')
   })
 
   it('各アカウントの設定から既存編集モーダルを開き、保存後に一覧を再読込する', () => {

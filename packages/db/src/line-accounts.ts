@@ -662,7 +662,7 @@ export async function getLineAccountListStats(
            INNER JOIN requested_accounts requested
              ON requested.line_account_id = checks.line_account_id
           WHERE checks.check_kind IN (
-            'webhook_endpoint', 'webhook_test', 'liff_config', 'token_refresh'
+            'bot_info', 'webhook_endpoint', 'webhook_test', 'token_refresh'
           )
        ), connection_rollup AS (
          SELECT line_account_id,
