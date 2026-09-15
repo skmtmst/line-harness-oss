@@ -8,6 +8,7 @@ const STORAGE_KEY = 'lh_selected_account'
 
 export interface AccountWithStats {
   id: string
+  revision?: number
   channelId: string
   name: string
   displayName?: string
