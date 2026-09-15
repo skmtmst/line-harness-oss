@@ -1,7 +1,12 @@
 import { describe, expect, test, vi, beforeEach } from 'vitest';
 import { Hono } from 'hono';
 
-vi.mock('@line-crm/db', () => ({
+vi.mock('@line-crm/db', async (importOriginal) => {
+  // N-383: 発火種別の正本リストと判定は純粋関数なので実物を通す。
+  const actual = await importOriginal<typeof import('@line-crm/db')>();
+  return {
+  KNOWN_OUTGOING_EVENT_TYPES: actual.KNOWN_OUTGOING_EVENT_TYPES,
+  isKnownOutgoingEventType: actual.isKnownOutgoingEventType,
   getIncomingWebhooks: vi.fn(),
   getIncomingWebhookById: vi.fn(),
   createIncomingWebhook: vi.fn(),
@@ -32,7 +37,8 @@ vi.mock('@line-crm/db', () => ({
     return (row?.secret as string | null) ?? null;
   }),
   WEBHOOK_SECRET_MIN_LENGTH: 32,
-}));
+  };
+});
 
 vi.mock('../services/webhook-interactions.js', () => ({
   retryWebhookInteraction: vi.fn(),
@@ -1322,7 +1328,7 @@ describe('名前・種別の上限 (#506 軽)', () => {
     baseEnv,
   );
   const validOutgoing = {
-    name: 'test', url: 'https://example.com/hook', eventTypes: ['order.created'],
+    name: 'test', url: 'https://example.com/hook', eventTypes: ['friend_add'],
     secret: VALID_SECRET, lineAccountId: ACCOUNT_ID,
     secret_encrypted: null,
   };
@@ -1345,6 +1351,73 @@ describe('名前・種別の上限 (#506 軽)', () => {
     });
     expect(res.status).toBe(400);
     expect(createIncomingWebhook).not.toHaveBeenCalled();
+  });
+});
+
+// =====================================================
+// #829 N-383: eventTypes は実際に発火する種別だけを受け付ける
+// =====================================================
+//
+// 形だけ見ていた検査では `mesage_received` のような誤記や
+// `incoming_webhook.*` のような不発パターンが無音で保存され、
+// イベントは一度も送られなかった。未知の種別は一覧を添えて400で拒否する。
+
+describe('N-383 送信eventTypesは実発火種別と照合する', () => {
+  const post = (body: unknown) => setupApp().request(
+    '/api/webhooks/outgoing',
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) },
+    baseEnv,
+  );
+  const put = (body: unknown) => setupApp().request(
+    `/api/webhooks/outgoing/wh-1?lineAccountId=${ACCOUNT_ID}`,
+    { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) },
+    baseEnv,
+  );
+  const validBody = {
+    name: 'test', url: 'https://example.com/hook',
+    secret: VALID_SECRET, lineAccountId: ACCOUNT_ID,
+  };
+
+  test.each([
+    'mesage_received',       // 誤記
+    'friend.added',          // 実在しない旧形に見える誤記
+    'incoming_webhook.*',    // 照合規約上どの受信イベントにも一致しない誤用
+    'calendar_booked',       // 自動化専用で送信Webhookへは届かない種別
+  ])('未知の種別 %j の作成は400で一覧を添えて拒否する', async (eventType) => {
+    const res = await post({ ...validBody, eventTypes: [eventType] });
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { success: boolean; error: string };
+    expect(body.success).toBe(false);
+    expect(body.error).toContain(eventType);
+    expect(body.error).toContain('friend_add');
+    expect(createOutgoingWebhook).not.toHaveBeenCalled();
+  });
+
+  test('未知の種別への更新は400で拒否し、POSTと同じ検査を通る', async () => {
+    const res = await put({ eventTypes: ['friend_add', 'mesage_received'] });
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toContain('mesage_received');
+    expect(updateOutgoingWebhook).not.toHaveBeenCalled();
+  });
+
+  test.each([
+    '*',                          // 全部送る明示規約
+    'friend_add',                 // 実発火種別
+    'ec.order.confirmed',         // EC連携の実発火種別
+    'incoming_webhook.custom',    // 受信口ごとの実発火種別
+  ])('有効な種別 %j は作成を通す', async (eventType) => {
+    vi.mocked(createOutgoingWebhook).mockResolvedValueOnce({
+      id: 'wh-new', name: 'test', url: 'https://example.com/hook',
+      event_types: JSON.stringify([eventType]), secret: VALID_SECRET, secret_encrypted: null,
+      is_active: 1, max_retries: 0, consecutive_failures: 0, last_failed_at: null,
+      created_at: '2026-05-08T00:00:00.000+09:00', updated_at: '2026-05-08T00:00:00.000+09:00',
+    });
+    const res = await post({ ...validBody, eventTypes: [eventType] });
+    expect(res.status).toBe(201);
+    expect(createOutgoingWebhook).toHaveBeenCalledWith(
+      baseEnv.DB, expect.objectContaining({ eventTypes: [eventType] }), expect.anything(),
+    );
   });
 });
 
