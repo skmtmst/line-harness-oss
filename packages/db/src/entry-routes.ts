@@ -35,8 +35,34 @@ export interface RefTracking {
   utm_campaign: string | null;
   user_agent: string | null;
   ip_address: string | null;
+  line_account_id: string | null;
+  ad_conversion_consent_at: string | null;
   created_at: string;
 }
+
+export type AdClickIdType = 'fbclid' | 'gclid' | 'twclid' | 'ttclid';
+
+export type AdClickSelection =
+  | {
+      status: 'eligible';
+      refTrackingId: string;
+      clickId: string;
+      clickIdType: AdClickIdType;
+      recordedAt: string;
+      expiresAt: string;
+      consentAt: string;
+      ipAddress: string | null;
+      userAgent: string | null;
+    }
+  | {
+      status: 'missing_consent' | 'expired';
+      refTrackingId: string;
+      clickId: string;
+      clickIdType: AdClickIdType;
+      recordedAt: string;
+      expiresAt: string;
+    }
+  | { status: 'missing_click_id'; clickIdType: AdClickIdType };
 
 export interface CreateEntryRouteInput {
   refCode: string;
@@ -378,6 +404,12 @@ export async function recordRefTracking(
     utmCampaign?: string | null;
     userAgent?: string | null;
     ipAddress?: string | null;
+    /**
+     * 広告媒体への送信同意を実際に取得した時刻。
+     * LINE Login / LIFFの完了は広告送信への同意ではないため、
+     * 未指定は同意なし(null)としてfail-closedにする。
+     */
+    adConversionConsentAt?: string | null;
   },
 ): Promise<RefTracking> {
   const id = crypto.randomUUID();
@@ -388,8 +420,9 @@ export async function recordRefTracking(
       `INSERT INTO ref_tracking
        (id, ref_code, friend_id, entry_route_id, source_url,
         fbclid, gclid, twclid, ttclid, utm_source, utm_medium, utm_campaign,
-        user_agent, ip_address, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        user_agent, ip_address, line_account_id, ad_conversion_consent_at, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+         (SELECT line_account_id FROM friends WHERE id = ?), ?, ?)`,
     )
     .bind(
       id,
@@ -406,6 +439,8 @@ export async function recordRefTracking(
       opts.utmCampaign ?? null,
       opts.userAgent ?? null,
       opts.ipAddress ?? null,
+      opts.friendId ?? null,
+      opts.adConversionConsentAt ?? null,
       now,
     )
     .run();
@@ -421,6 +456,94 @@ export async function recordRefTracking(
     .prepare(`SELECT * FROM ref_tracking WHERE id = ?`)
     .bind(id)
     .first<RefTracking>())!;
+}
+
+const CLICK_COLUMN_BY_PLATFORM = {
+  meta: 'fbclid',
+  google: 'gclid',
+  x: 'twclid',
+  tiktok: 'ttclid',
+} as const;
+
+/**
+ * 媒体ごとに、同じaccountで直近の利用可能なクリックIDを選ぶ。
+ * 期限は [記録時刻, 記録時刻+日数) とし、満了時刻ちょうどは期限切れ。
+ */
+export async function selectAdClickForPlatform(
+  db: D1Database,
+  input: {
+    friendId: string;
+    lineAccountId: string;
+    platformName: keyof typeof CLICK_COLUMN_BY_PLATFORM;
+    validityDays: number;
+    now?: Date;
+  },
+): Promise<AdClickSelection> {
+  const clickIdType = CLICK_COLUMN_BY_PLATFORM[input.platformName];
+  const now = input.now ?? new Date();
+  const rows = await db
+    .prepare(
+      `SELECT id, ${clickIdType} AS click_id, created_at,
+              strftime('%Y-%m-%dT%H:%M:%fZ', created_at, '+' || ? || ' days') AS expires_at,
+              ad_conversion_consent_at, ip_address, user_agent
+       FROM ref_tracking
+       WHERE friend_id = ? AND line_account_id = ?
+         AND ${clickIdType} IS NOT NULL AND TRIM(${clickIdType}) <> ''
+       ORDER BY
+         CASE
+           WHEN ad_conversion_consent_at IS NOT NULL
+             AND julianday(created_at, '+' || ? || ' days') > julianday(?) THEN 0
+           WHEN ad_conversion_consent_at IS NULL
+             AND julianday(created_at, '+' || ? || ' days') > julianday(?) THEN 1
+           ELSE 2
+         END,
+         julianday(created_at) DESC, id DESC
+       LIMIT 1`,
+    )
+    .bind(
+      input.validityDays,
+      input.friendId,
+      input.lineAccountId,
+      input.validityDays,
+      now.toISOString(),
+      input.validityDays,
+      now.toISOString(),
+    )
+    .all<{
+      id: string;
+      click_id: string;
+      created_at: string;
+      expires_at: string | null;
+      ad_conversion_consent_at: string | null;
+      ip_address: string | null;
+      user_agent: string | null;
+    }>();
+  const row = rows.results[0];
+  if (!row) return { status: 'missing_click_id', clickIdType };
+
+  const recordedAtMs = new Date(row.created_at).getTime();
+  const expiresAt = row.expires_at ?? row.created_at;
+  const expiresAtMs = new Date(expiresAt).getTime();
+  const common = {
+    refTrackingId: row.id,
+    clickId: row.click_id,
+    clickIdType,
+    recordedAt: row.created_at,
+    expiresAt,
+  };
+  if (!row.ad_conversion_consent_at && expiresAtMs > now.getTime()) {
+    return { status: 'missing_consent', ...common };
+  }
+  if (!Number.isFinite(recordedAtMs) || expiresAtMs <= now.getTime()) {
+    return { status: 'expired', ...common };
+  }
+  return {
+    status: 'eligible',
+    ...common,
+    consentAt: row.ad_conversion_consent_at!,
+    ipAddress: row.ip_address,
+    userAgent: row.user_agent,
+  };
 }
 
 export async function getRefTrackingWithClickIds(
