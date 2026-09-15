@@ -638,7 +638,7 @@ export default function MediaLibraryPage() {
     )
   }
 
-  if (detailId && detailsFor) {
+  if (detailsFor) {
     return (
       <MediaDetailDialog
         item={detailsFor}
