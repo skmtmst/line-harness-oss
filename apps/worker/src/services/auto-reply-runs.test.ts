@@ -202,6 +202,51 @@ describe('自動応答の受信イベント台帳', () => {
     }));
   });
 
+  it('動作が済んだあと完了記録だけ落ちても、成功した動作を permanent_failed に書き換えない', async () => {
+    // 副作用は成功したのに台帳の完了書き込みだけ失敗したとき、
+    // permanent_failed を書くと「もう一度実行」で成功した動作が二度動く。
+    dbMocks.finishAutoReplyActionRun.mockRejectedValue(new Error('ledger write failed'));
+    const db = dbWithRules([rule('silent', [
+      { actionType: 'tag', config: { op: 'add', tagIds: ['tag-1'] } },
+    ])]);
+    const line = { replyMessageWithRequestId: vi.fn() } as unknown as LineClient;
+
+    const result = await matchAndReply(db, line, friend, '予約したい', 'reply-token', opts());
+
+    expect(result.matched).toBe(true);
+    // permanent_failed への書き換えを試みない（行は claimed のまま残る）。
+    expect(dbMocks.finishAutoReplyActionRun).toHaveBeenCalledTimes(1);
+    expect(dbMocks.finishAutoReplyActionRun).not.toHaveBeenCalledWith(
+      db,
+      expect.objectContaining({ status: 'permanent_failed' }),
+    );
+    // 動作自体は成功として集計・完了する。
+    expect(dbMocks.markAutoReplyEvaluationFinished).toHaveBeenCalledWith(db, expect.objectContaining({
+      status: 'completed',
+      replyStatus: 'not_attempted',
+    }));
+  });
+
+  it('動作そのものが失敗したときは permanent_failed として残し、失敗の記録も止まらない', async () => {
+    actionMocks.runActionRows.mockRejectedValue(new Error('action broke'));
+    const db = dbWithRules([rule('silent', [
+      { actionType: 'tag', config: { op: 'add', tagIds: ['tag-1'] } },
+    ])]);
+    const line = { replyMessageWithRequestId: vi.fn() } as unknown as LineClient;
+
+    const result = await matchAndReply(db, line, friend, '予約したい', 'reply-token', opts());
+
+    expect(result.matched).toBe(true);
+    expect(dbMocks.finishAutoReplyActionRun).toHaveBeenCalledWith(db, expect.objectContaining({
+      id: 'action-run-1',
+      status: 'permanent_failed',
+    }));
+    expect(dbMocks.markAutoReplyEvaluationFinished).toHaveBeenCalledWith(db, expect.objectContaining({
+      status: 'partial_failed',
+      replyStatus: 'not_attempted',
+    }));
+  });
+
   it('条件に合わないだけの受信は失敗にせず、何もしなかった理由を残す', async () => {
     conditionMocks.evaluateAutoReplyConditions.mockResolvedValue({
       matches: false,

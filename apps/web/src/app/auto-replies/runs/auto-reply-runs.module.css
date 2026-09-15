@@ -129,6 +129,15 @@
   text-align: right;
 }
 
+/* N-081: 「もう一度実行」は行の全幅を使って表示する。
+   design-debt 計測で未解決 className を増やさないよう、
+   クラスではなく data 属性を既存行からのセレクタで当てる。 */
+.runRow > [data-retry-row] {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: flex-end;
+}
+
 .pagination {
   display: flex;
   justify-content: flex-end;

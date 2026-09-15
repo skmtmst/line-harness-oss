@@ -51,6 +51,7 @@ import {
   getWebinarPublicAccount,
   getWebinarActions,
   replaceWebinarActions,
+  countInvalidWebinarActionReferences,
   getFriendByLineUserId,
   getFriendByLineUserIdForAccount,
   getFormById,
@@ -923,17 +924,6 @@ const WEBINAR_ACTION_TYPES = new Set<WebinarActionType>([
   'switch_rich_menu', 'remove_rich_menu',
 ]);
 
-function requiredWebinarActionConfigKey(type: WebinarActionType): string | null {
-  if (type === 'add_tag' || type === 'remove_tag') return 'tagId';
-  if (type === 'start_scenario' || type === 'stop_scenario' || type === 'resume_scenario') {
-    return 'scenarioId';
-  }
-  if (type === 'send_message') return 'templateId';
-  if (type === 'send_webhook') return 'webhookId';
-  if (type === 'switch_rich_menu') return 'richMenuPageId';
-  return null;
-}
-
 function serializeWebinarAction(row: Awaited<ReturnType<typeof getWebinarActions>>[number]) {
   let config: Record<string, unknown> = {};
   try { config = JSON.parse(row.config_json) as Record<string, unknown>; } catch { config = {}; }
@@ -958,10 +948,6 @@ function parseWebinarActions(value: unknown): WebinarActionInput[] | null {
     if (!row.config || typeof row.config !== 'object' || Array.isArray(row.config)) return null;
     const actionType = row.actionType as WebinarActionType;
     const config = row.config as Record<string, unknown>;
-    const requiredKey = requiredWebinarActionConfigKey(actionType);
-    if (requiredKey && (typeof config[requiredKey] !== 'string' || !config[requiredKey].trim())) {
-      return null;
-    }
     parsed.push({
       trigger: row.trigger as WebinarActionInput['trigger'],
       actionType,
@@ -1230,6 +1216,15 @@ async function buildPublishValidation(c: Context<Env>, row: Webinar) {
     getWebinarCtas(c.env.DB, row.id),
     getWebinarActions(c.env.DB, row.id),
   ]);
+  // 保存後に参照先が消えた（または旧版が残った）設定でも、公開前に同じ検証で
+  // 安全側に止める。保存時と同じ関数を使い、account_id の基準も合わせる。
+  const invalidActionRefs = actions.length === 0
+    ? 0
+    : await countInvalidWebinarActionReferences(
+      c.env.DB,
+      row.account_id,
+      actions.map(serializeWebinarAction),
+    );
   const notificationTest = editor.notificationTest as { status?: unknown } | null;
   const publicPageTest = editor.publicPage.test as { status?: unknown } | null;
   const checks = [
@@ -1277,8 +1272,14 @@ async function buildPublishValidation(c: Context<Env>, row: Webinar) {
     {
       key: 'action_dependencies',
       label: '視聴後アクションの参照先が有効です',
-      status: actions.length > 0 ? 'passed' : 'warning',
-      detail: actions.length > 0 ? `${actions.length}件のアクションを確認しました` : '視聴後アクションは未設定です',
+      status: actions.length === 0
+        ? 'warning'
+        : invalidActionRefs > 0 ? 'failed' : 'passed',
+      detail: actions.length === 0
+        ? '視聴後アクションは未設定です'
+        : invalidActionRefs > 0
+          ? `${invalidActionRefs}件のアクションの参照先が確認できません`
+          : `${actions.length}件のアクションを確認しました`,
     },
   ];
   return {
@@ -1561,6 +1562,13 @@ webinarRoutes.put('/api/webinars/:id/actions', requireRole('owner', 'admin'), as
     const body = await c.req.json<{ actions?: unknown }>();
     const actions = parseWebinarActions(body.actions);
     if (!actions) return c.json({ success: false, error: 'invalid_actions' }, 400);
+    // 参照検証の基準は対象ウェビナーの account_id。可視性は middleware 済みだが、
+    // ここで行を取り直して参照先の所属アカウントを確実にこの値へ固定する。
+    const webinar = await getWebinarById(c.env.DB, c.req.param('id'));
+    if (!webinar) return c.json({ success: false, error: 'Not found' }, 404);
+    if (await countInvalidWebinarActionReferences(c.env.DB, webinar.account_id, actions) > 0) {
+      return c.json({ success: false, error: 'invalid_action_reference' }, 422);
+    }
     const saved = await replaceWebinarActions(c.env.DB, c.req.param('id'), actions);
     return c.json({ success: true, data: saved.map(serializeWebinarAction) });
   } catch (err) {
