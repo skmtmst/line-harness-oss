@@ -21,6 +21,9 @@ const api = vi.hoisted(() => ({
   foldersList: vi.fn(),
   detail: vi.fn(),
   schedules: vi.fn(),
+  update: vi.fn(),
+  impactPreview: vi.fn(),
+  deleteImpact: vi.fn(),
 }))
 
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
@@ -34,6 +37,9 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
         create: api.create,
         detail: api.detail,
         schedules: api.schedules,
+        update: api.update,
+        impactPreview: api.impactPreview,
+        deleteImpact: api.deleteImpact,
       },
       folders: { ...actual.api.folders, list: api.foldersList },
     },
@@ -80,10 +86,10 @@ async function settle() {
   await act(async () => { await new Promise((resolve) => setTimeout(resolve, 30)) })
 }
 
-function byId(id: string): HTMLInputElement | HTMLTextAreaElement {
+function byId(id: string): HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement {
   const el = host.querySelector(`#${id}`)
   if (!el) throw new Error(`見つかりません: #${id}`)
-  return el as HTMLInputElement | HTMLTextAreaElement
+  return el as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
 }
 
 function byExactText(tag: string, text: string): HTMLElement {
@@ -101,12 +107,15 @@ function memoInput(): HTMLInputElement {
   return found as HTMLInputElement
 }
 
-async function setValue(element: HTMLInputElement | HTMLTextAreaElement, value: string) {
-  const proto = element instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype
+async function setValue(element: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement, value: string) {
+  const proto = element instanceof HTMLTextAreaElement
+    ? HTMLTextAreaElement.prototype
+    : element instanceof HTMLSelectElement ? HTMLSelectElement.prototype : HTMLInputElement.prototype
   const setter = Object.getOwnPropertyDescriptor(proto, 'value')!.set!
   await act(async () => {
     setter.call(element, value)
     element.dispatchEvent(new Event('input', { bubbles: true }))
+    if (element instanceof HTMLSelectElement) element.dispatchEvent(new Event('change', { bubbles: true }))
   })
 }
 
@@ -120,6 +129,9 @@ beforeEach(() => {
   api.foldersList.mockResolvedValue({ success: true, data: [] })
   api.create.mockResolvedValue({ success: true, data: { id: 'var-1' } })
   api.schedules.mockResolvedValue({ success: true, data: [] })
+  api.impactPreview.mockResolvedValue({ success: true, data: { impactProof: 'proof-1' } })
+  api.deleteImpact.mockResolvedValue({ success: true, data: { total: 0, blockingTotal: 0, byKind: {}, items: [], checkedAt: '2026-09-16T00:00:00Z' } })
+  api.update.mockResolvedValue({ success: true, data: { id: 'var-1' } })
 })
 
 afterEach(async () => {
@@ -128,6 +140,34 @@ afterEach(async () => {
 })
 
 describe('共通情報: 保存した社内メモの再表示(実React)', () => {
+  it.each([
+    ['long_text', '案内'.repeat(5_000), 'TEXTAREA', null, '更新した案内'],
+    ['date', '2028-02-29', 'INPUT', 'date', '2028-03-01'],
+    ['datetime', '2028-02-29T23:59', 'INPUT', 'datetime-local', '2028-03-01T00:00'],
+    ['boolean', 'false', 'SELECT', null, 'true'],
+  ])('%sの既存値を適切な入力欄へ再表示し、保存値をAPIへ渡す', async (type, originalValue, tagName, inputType, nextValue) => {
+    api.detail.mockResolvedValue({
+      success: true,
+      data: {
+        id: 'var-1', name: `${type}の項目`, varKey: `${type}_value`, type, value: originalValue,
+        memo: '', folderId: null, version: 1, history: [],
+      },
+    })
+    await mount(React.createElement(EditCommonVarPage))
+    await settle()
+
+    const control = byId('cv-value')
+    expect(control.tagName).toBe(tagName)
+    if (inputType) expect((control as HTMLInputElement).type).toBe(inputType)
+    expect(control.value).toBe(originalValue)
+    await setValue(control, nextValue)
+    await click(byExactText('button', '共通情報を保存'))
+
+    expect(api.update).toHaveBeenCalledWith('var-1', 'account-1', expect.objectContaining({
+      value: nextValue, expectedVersion: 1, impactProof: 'proof-1',
+    }))
+  })
+
   it('新規作成で保存した社内メモが、編集画面を開き直すと同じ内容で表示される', async () => {
     // 1. 新規作成画面で社内メモを含めて保存する。
     await mount(React.createElement(NewCommonVarPage))
