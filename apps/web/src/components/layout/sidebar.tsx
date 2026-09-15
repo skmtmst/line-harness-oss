@@ -42,6 +42,13 @@ function NavIcon({ d }: { d: string }) {
   )
 }
 
+function isBooleanRecord(value: unknown): value is Record<string, boolean> {
+  return typeof value === 'object'
+    && value !== null
+    && !Array.isArray(value)
+    && Object.values(value).every((entry) => typeof entry === 'boolean')
+}
+
 export default function Sidebar({
   friendAttributesV2Mode = false,
   preview = false,
@@ -97,7 +104,10 @@ export default function Sidebar({
     return () => window.removeEventListener('popstate', sync)
   }, [pathname])
 
-  // 設定を読む。取れなくても既定の並び・表示で使えるので、失敗は握る。
+  // 表示可否は全roleがstaff向けread-modelから読む。localStorageのroleは古い・
+  // 改ざん済みの可能性があるので、管理GETを選ぶ根拠にはしない。
+  // owner/admin表示のときだけ、管理GETから保存済みの並びを追加で読む。
+  // 取れなくても既定の並び・表示で使えるので、失敗は握る。
   useEffect(() => {
     if (!selectedAccountId) {
       setSectionOrder(null)
@@ -107,15 +117,30 @@ export default function Sidebar({
       return
     }
     let cancelled = false
+    const canManageFeatureSettings = staffRole === 'owner' || staffRole === 'admin'
     const loadSettings = () => {
       void import('@/lib/api')
-        .then(({ api }) => api.featureSettings.get(selectedAccountId))
-        .then((res) => {
-          if (!cancelled && res.success) {
-            setSectionOrder(res.data.sidebarOrder)
-            setItemOrder(res.data.sidebarItemOrder)
-            setFeatureVisibility(res.data.features)
-            setSpecializedFeatureKeys(res.data.specializedFeatureKeys)
+        .then(async ({ api }) => {
+          const visibility = await api.featureSettings.visibility(selectedAccountId)
+          const features = visibility.success ? visibility.data?.features : undefined
+          if (!cancelled && isBooleanRecord(features)) {
+            setSectionOrder(null)
+            setItemOrder(null)
+            // 一時的に古いWorkerや試験用モックへ繋がっても、不正なread-modelを
+            // stateへ入れてサイドバーごと落とさない。直URLの可否はWorker側が正本。
+            setFeatureVisibility(features)
+            // 専用機能の目録はbooleanへ畳み込み済み。名前の配列は受け取らない。
+            setSpecializedFeatureKeys(SPECIALIZED_FEATURE_KEYS)
+          }
+          if (!canManageFeatureSettings) return
+          try {
+            const settings = await api.featureSettings.get(selectedAccountId)
+            if (!cancelled && settings.success) {
+              setSectionOrder(settings.data.sidebarOrder)
+              setItemOrder(settings.data.sidebarItemOrder)
+            }
+          } catch {
+            // 権限降格後など管理GETが拒否されても、最小read-modelの表示可否は残す。
           }
         })
         .catch(() => {
@@ -132,7 +157,7 @@ export default function Sidebar({
       cancelled = true
       window.removeEventListener(FEATURE_SETTINGS_UPDATED_EVENT, onSettingsUpdated)
     }
-  }, [selectedAccountId])
+  }, [selectedAccountId, staffRole])
   // 区分の中の並びを当ててから、区分そのものの並びを当てる。
   const storeSections = orderedMenuSections(itemOrder)
   const normalizedSectionOrder = sectionOrder?.map((label) => label === 'NEN運用' ? '専用機能' : label)

@@ -36,6 +36,7 @@ interface WaitingRow {
   party_size: number;
   version: number;
   created_at: string;
+  event_snapshot_json: string | null;
 }
 
 interface BookingApplicantRow {
@@ -375,8 +376,12 @@ export async function acceptEventWaitlistOffer(
     .prepare(
       `SELECT w.id, w.line_account_id, w.friend_id, f.line_user_id,
               w.event_id, w.slot_id, w.status, w.offer_expires_at,
-              e.name AS event_name, s.starts_at, e.venue_name, e.venue_url,
-              e.confirmation_message_extra, e.reminder_day_before_enabled,
+              CASE WHEN w.event_snapshot_json IS NOT NULL THEN json_extract(w.event_snapshot_json, '$.eventName') ELSE e.name END AS event_name,
+              CASE WHEN w.event_snapshot_json IS NOT NULL THEN json_extract(w.event_snapshot_json, '$.slotStartsAt') ELSE s.starts_at END AS starts_at,
+              CASE WHEN w.event_snapshot_json IS NOT NULL THEN json_extract(w.event_snapshot_json, '$.venueName') ELSE e.venue_name END AS venue_name,
+              CASE WHEN w.event_snapshot_json IS NOT NULL THEN json_extract(w.event_snapshot_json, '$.venueUrl') ELSE e.venue_url END AS venue_url,
+              CASE WHEN w.event_snapshot_json IS NOT NULL THEN json_extract(w.event_snapshot_json, '$.confirmationMessageExtra') ELSE e.confirmation_message_extra END AS confirmation_message_extra,
+              e.reminder_day_before_enabled,
               e.reminder_hours_before
          FROM event_waitlist w
          JOIN friends f ON f.id = w.friend_id AND f.line_account_id = w.line_account_id
@@ -459,11 +464,13 @@ export async function acceptEventWaitlistOffer(
          id, line_account_id, event_id, slot_id, friend_id, status, requested_at,
          identity_key, party_size, answer_snapshot_json, first_participation,
          first_participation_attended_count, first_participation_checked_at,
+         event_version_id, event_snapshot_json, approval_expires_at,
          created_at, updated_at
        )
        SELECT ?, w.line_account_id, w.event_id, w.slot_id, w.friend_id, 'confirmed', ?,
               w.identity_key, w.party_size, w.answer_snapshot_json, w.first_participation,
-              w.first_participation_attended_count, w.first_participation_checked_at, ?, ?
+              w.first_participation_attended_count, w.first_participation_checked_at,
+              w.event_version_id, w.event_snapshot_json, NULL, ?, ?
          FROM event_waitlist w
          JOIN friends f ON f.id = w.friend_id AND f.line_account_id = w.line_account_id
          JOIN events e ON e.id = w.event_id AND e.deleted_at IS NULL
@@ -605,7 +612,8 @@ export async function promoteEventWaitlist(
 
   const waiting = await db
     .prepare(
-      `SELECT id, line_account_id, friend_id, party_size, version, created_at
+      `SELECT id, line_account_id, friend_id, party_size, version, created_at,
+              event_snapshot_json
          FROM event_waitlist
         WHERE slot_id = ? AND status = 'waiting'
         ORDER BY created_at ASC, id ASC
@@ -725,14 +733,19 @@ export async function promoteEventWaitlist(
   }
 
   try {
+    const snapshot = parseSnapshot(waiting.event_snapshot_json) as Record<string, unknown> | null;
     await params.sender({
       waitlistId: waiting.id,
       lineAccountId: waiting.line_account_id,
       friendId: waiting.friend_id,
-      eventName: occurrence.event_name,
-      startsAt: occurrence.starts_at,
-      venueName: occurrence.venue_name,
-      venueUrl: occurrence.venue_url,
+      eventName: typeof snapshot?.eventName === 'string'
+        ? snapshot.eventName : occurrence.event_name,
+      startsAt: typeof snapshot?.slotStartsAt === 'string'
+        ? snapshot.slotStartsAt : occurrence.starts_at,
+      venueName: snapshot?.venueName === null || typeof snapshot?.venueName === 'string'
+        ? snapshot.venueName : occurrence.venue_name,
+      venueUrl: snapshot?.venueUrl === null || typeof snapshot?.venueUrl === 'string'
+        ? snapshot.venueUrl : occurrence.venue_url,
       token,
       expiresAt,
     });

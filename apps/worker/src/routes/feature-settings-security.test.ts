@@ -10,13 +10,13 @@ vi.mock('../services/account-access.js', () => ({
 
 const { featureSettings } = await import('./feature-settings.js');
 
-function app() {
+function app(role: 'owner' | 'admin' | 'staff' = 'owner') {
   const instance = new Hono<Env>();
   instance.use('*', async (c, next) => {
     c.set('staff', {
-      id: 'owner',
-      name: 'Owner',
-      role: 'owner',
+      id: role,
+      name: role,
+      role,
       readOnly: false,
       tenantId: 'tenant-a',
     });
@@ -32,6 +32,95 @@ beforeEach(() => {
 });
 
 describe('feature settings scope and versioning', () => {
+  it('管理GETはstaffを拒否し、owner/adminだけに返す', async () => {
+    const testDb = createTestD1();
+    try {
+      for (const role of ['owner', 'admin'] as const) {
+        const response = await app(role).request(
+          '/api/settings/features?account_id=account-1',
+          {},
+          { DB: testDb.db, RESTAURANT_TEST_ENABLED: 'false' },
+        );
+        expect(response.status).toBe(200);
+      }
+      const denied = await app('staff').request(
+        '/api/settings/features?account_id=account-1',
+        {},
+        { DB: testDb.db, RESTAURANT_TEST_ENABLED: 'false' },
+      );
+      expect(denied.status).toBe(403);
+      expect(await denied.json()).toMatchObject({ success: false, error: expect.any(String) });
+    } finally {
+      testDb.raw.close();
+    }
+  });
+
+  it('staff用GETは表示booleanだけを返し、契約・理由・保存値・並び・版を返さない', async () => {
+    const testDb = createTestD1();
+    try {
+      testDb.raw.prepare(
+        `INSERT INTO account_settings (id, line_account_id, key, value)
+         VALUES ('setting-scenarios', 'account-1', 'feature.scenarios', '{"enabled":false}'),
+                ('setting-catalog', 'account-1', 'feature.specialized.catalog', '[]')`,
+      ).run();
+      const response = await app('staff').request(
+        '/api/settings/features/visibility?account_id=account-1',
+        {},
+        { DB: testDb.db, RESTAURANT_TEST_ENABLED: 'false' },
+      );
+      expect(response.status).toBe(200);
+      const body = await response.json() as {
+        success: boolean;
+        data: { features: Record<string, unknown> };
+      };
+      expect(Object.keys(body)).toEqual(['success', 'data']);
+      expect(Object.keys(body.data)).toEqual(['features']);
+      expect(Object.values(body.data.features).every((value) => typeof value === 'boolean')).toBe(true);
+      expect(body.data.features.scenarios).toBe(false);
+      expect(body.data.features.nen_campaigns).toBe(false);
+      for (const forbidden of [
+        'featureStates', 'version', 'sidebarOrder', 'sidebarItemOrder',
+        'parentChildMode', 'specializedFeatureKeys', 'contract', 'reason', 'history',
+      ]) {
+        expect(forbidden in body.data).toBe(false);
+      }
+    } finally {
+      testDb.raw.close();
+    }
+  });
+
+  it.each([
+    '/api/settings/features/visibility',
+    '/api/settings/features',
+  ])('%s はaccount_idなしを構造化400にする', async (path) => {
+    const response = await app(path.endsWith('/visibility') ? 'staff' : 'admin').request(
+      path,
+      {},
+      { DB: { prepare: vi.fn() } as unknown as D1Database },
+    );
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({
+      success: false,
+      code: 'FEATURE_SETTINGS_ACCOUNT_REQUIRED',
+    });
+  });
+
+  it('staff用GETは空scope・別accountをDB読取前に構造化403にする', async () => {
+    access.canAccess.mockResolvedValue(false);
+    const prepare = vi.fn();
+    const response = await app('staff').request(
+      '/api/settings/features/visibility?account_id=other',
+      {},
+      { DB: { prepare } as unknown as D1Database },
+    );
+    expect(response.status).toBe(403);
+    expect(await response.json()).toMatchObject({
+      success: false,
+      code: 'FEATURE_SETTINGS_SCOPE_FORBIDDEN',
+    });
+    expect(prepare).not.toHaveBeenCalled();
+  });
+
   it.each(['GET', 'PUT'] as const)('%s rejects an inaccessible account before DB reads', async (method) => {
     access.canAccess.mockResolvedValue(false);
     const prepare = vi.fn();

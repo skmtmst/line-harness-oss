@@ -356,7 +356,8 @@
     "395_form_folder.sql",
     "396_line_account_profile.sql",
     "397_operation_dispatcher_heartbeats.sql",
+    "398_event_versions_and_booking_expiry.sql",
     "399_operation_alert_lifecycle.sql"
   ],
-  "migrationCount": 357
+  "migrationCount": 358
 }

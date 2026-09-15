@@ -202,6 +202,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'GET /api/scenarios/{id}/runs',
   'GET /api/scenarios/{id}/stats',
   'GET /api/scenarios/{id}/triggers',
+  'GET /api/settings/features/visibility',
   'GET /api/staff/last-logins',
   'GET /api/tags',
   'GET /api/tags/{id}',
@@ -1172,7 +1173,7 @@ const ALLOWLIST = new Set<string>([
   'GET /api/public/nen/adopted-photos',
   'GET /api/public/nen/gallery-preview',
 
-  // core：機能を再度オンにするため停止対象外（OpenAPI未記載・順次記載）（2件）
+  // core：機能設定（OpenAPI未記載・順次記載）（2件）
   'GET /api/settings/features',
   'PUT /api/settings/features',
 
