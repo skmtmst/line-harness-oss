@@ -1184,6 +1184,57 @@ describe('admin CRUD', () => {
     expect(body.data.schedule).toEqual([{ type: 'once', at: '2026-07-29T20:00:00+09:00' }]);
   });
 
+  test.each([
+    ['0秒', 0],
+    ['負数', -1],
+    ['数値文字列', '60'],
+    ['null', null],
+  ])('POST — 視聴時間が%sなら422で保存しない', async (_label, durationSeconds) => {
+    dbMocks.getWebinarBySlug.mockResolvedValue(null);
+
+    const res = await adminReq('/api/webinars', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        accountId: 'account-a', title: '境界確認', slug: 'duration-boundary', durationSeconds,
+      }),
+    });
+
+    expect(res.status).toBe(422);
+    await expect(res.json()).resolves.toEqual({ success: false, error: 'invalid_duration' });
+    expect(dbMocks.createWebinar).not.toHaveBeenCalled();
+  });
+
+  test('POST — 視聴時間1秒は保存できる', async () => {
+    dbMocks.getWebinarBySlug.mockResolvedValue(null);
+    dbMocks.createWebinar.mockResolvedValue(makeWebinar({ duration_seconds: 1 }));
+
+    const res = await adminReq('/api/webinars', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        accountId: 'account-a', title: '1秒ウェビナー', slug: 'one-second', durationSeconds: 1,
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(dbMocks.createWebinar).toHaveBeenCalledWith(
+      expect.anything(), expect.objectContaining({ durationSeconds: 1 }),
+    );
+  });
+
+  test('POST — 別アカウント指定は視聴時間を検証・保存しない', async () => {
+    accountAccessMock.canAccessAllLineAccounts.mockResolvedValue(false);
+
+    const res = await adminReq('/api/webinars', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        accountId: 'account-other', title: '別アカウント', slug: 'other-account', durationSeconds: 1,
+      }),
+    });
+
+    expect(res.status).toBe(403);
+    expect(dbMocks.createWebinar).not.toHaveBeenCalled();
+  });
+
   test('POST — ウェビナーフォルダと公開期間を検証して保存する', async () => {
     dbMocks.getWebinarBySlug.mockResolvedValue(null);
     dbMocks.createWebinar.mockResolvedValue(makeWebinar({
@@ -1643,6 +1694,52 @@ describe('admin CRUD', () => {
       body: JSON.stringify({ title: '  ' }),
     });
     expect(res.status).toBe(400);
+    expect(dbMocks.updateWebinar).not.toHaveBeenCalled();
+  });
+
+  test.each([
+    ['0秒', 0],
+    ['負数', -1],
+    ['数値文字列', '60'],
+    ['null', null],
+  ])('PUT /api/webinars/:id — 視聴時間が%sなら422で更新しない', async (_label, durationSeconds) => {
+    dbMocks.getWebinarById.mockResolvedValue(makeWebinar({ account_id: 'account-a' }));
+
+    const res = await adminReq('/api/webinars/w1', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ durationSeconds }),
+    });
+
+    expect(res.status).toBe(422);
+    await expect(res.json()).resolves.toEqual({ success: false, error: 'invalid_duration' });
+    expect(dbMocks.updateWebinar).not.toHaveBeenCalled();
+  });
+
+  test('PUT /api/webinars/:id — 視聴時間1秒は更新できる', async () => {
+    dbMocks.getWebinarById.mockResolvedValue(makeWebinar({ account_id: 'account-a' }));
+    dbMocks.updateWebinar.mockResolvedValue(makeWebinar({ account_id: 'account-a', duration_seconds: 1 }));
+
+    const res = await adminReq('/api/webinars/w1', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ durationSeconds: 1 }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(dbMocks.updateWebinar).toHaveBeenCalledWith(
+      expect.anything(), 'w1', expect.objectContaining({ durationSeconds: 1 }),
+    );
+  });
+
+  test('PUT /api/webinars/:id — 別アカウントの実在IDは404で更新しない', async () => {
+    dbMocks.getWebinarById.mockResolvedValue(makeWebinar({ id: 'other-webinar', account_id: 'account-other' }));
+    accountAccessMock.canAccessAllLineAccounts.mockResolvedValue(false);
+
+    const res = await adminReq('/api/webinars/other-webinar', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ durationSeconds: 1 }),
+    });
+
+    expect(res.status).toBe(404);
     expect(dbMocks.updateWebinar).not.toHaveBeenCalled();
   });
 });

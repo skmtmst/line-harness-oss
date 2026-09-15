@@ -973,7 +973,7 @@ function validateWebinarBody(
     return 'invalid_status';
   }
   if (body.durationSeconds !== undefined) {
-    if (!Number.isFinite(body.durationSeconds) || body.durationSeconds < 0) {
+    if (!Number.isFinite(body.durationSeconds) || body.durationSeconds < 1) {
       return 'invalid_duration';
     }
   }
@@ -1094,7 +1094,12 @@ webinarRoutes.post('/api/webinars', requireRole('owner', 'admin'), async (c) => 
       return c.json({ success: false, error: 'Forbidden' }, 403);
     }
     const input = validateWebinarBody(body, { requireCore: true });
-    if (typeof input === 'string') return c.json({ success: false, error: input }, 400);
+    if (typeof input === 'string') {
+      return c.json(
+        { success: false, error: input },
+        input === 'invalid_duration' ? 422 : 400,
+      );
+    }
     if (body.folderId) {
       const folder = await getFolderById(c.env.DB, body.folderId);
       if (!folder || folder.kind !== 'webinar' || folder.account_id !== body.accountId) {
@@ -1527,7 +1532,12 @@ webinarRoutes.put('/api/webinars/:id', requireRole('owner', 'admin'), async (c) 
       return c.json({ success: false, error: 'Forbidden' }, 403);
     }
     const input = validateWebinarBody(body, { requireCore: false });
-    if (typeof input === 'string') return c.json({ success: false, error: input }, 400);
+    if (typeof input === 'string') {
+      return c.json(
+        { success: false, error: input },
+        input === 'invalid_duration' ? 422 : 400,
+      );
+    }
     if (body.folderId) {
       const folder = await getFolderById(c.env.DB, body.folderId);
       const targetAccountId = body.accountId ?? row.account_id;
