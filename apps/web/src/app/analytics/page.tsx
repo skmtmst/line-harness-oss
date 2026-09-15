@@ -28,7 +28,12 @@ import { TableHeadRow, Th } from '@/components/shared/table'
 import { useAccount } from '@/contexts/account-context'
 import { csvCell } from '@/lib/presentation'
 import { formatAnalyticsDateTime } from './analytics-time'
-import { canTidyUsage, summarizeMenuFeatures, usageObservation } from './analytics-usage'
+import {
+  canTidyUsage,
+  referenceHealthText,
+  summarizeMenuFeatures,
+  usageObservation,
+} from './analytics-usage'
 
 // 実行間隔ガード(点検#508の中4)の符号を、運用の言葉に言い換える。
 function explainStartError(code: string, fallback: string): string {
@@ -1945,6 +1950,12 @@ function UsageOverviewTab({ accountId }: { accountId: string }) {
         action={(shownValue(overview.summary.unusedItems) ?? 0) > 0 ? { label: '片づける', href: '#usage-items' } : undefined}
       />
       <KpiCard
+        title="確認できた参照切れ"
+        value={shownValue(overview.summary.brokenReferences)}
+        unit="件"
+        detail={overview.summary.brokenReferences.reason ?? '対応済みの参照をすべて確認'}
+      />
+      <KpiCard
         title="自動で動いた回数"
         value={shownValue(overview.summary.automaticRuns)}
         unit="回"
@@ -1962,7 +1973,7 @@ function UsageOverviewTab({ accountId }: { accountId: string }) {
       <thead><TableHeadRow><Th>機能</Th><Th align="right">作成</Th><Th align="right">利用中</Th><Th align="right">未使用</Th><Th>気づいたこと</Th><Th align="right">操作</Th></TableHeadRow></thead>
       <tbody className="divide-hairline divide-y">{overview.categories.map((item) => {
         const observation = usageObservation(item)
-        return <tr key={item.key} className="text-sm"><td className="px-4 py-3"><p className="font-medium">{item.label}</p><p className="text-ink-faint mt-1 truncate text-xs">最終利用 <DateTimeMetricCell metric={item.lastUsedAt} /></p></td><td className="px-3 py-3 text-right"><MetricCell metric={item.created} /></td><td className="px-3 py-3 text-right"><MetricCell metric={item.inUse} /></td><td className="px-3 py-3 text-right"><MetricCell metric={item.unused} /></td><td className="px-3 py-3"><p className={`truncate ${observation.tone === 'warning' ? 'text-warning' : observation.tone === 'unknown' ? 'text-ink-faint' : 'text-success'}`} title={observation.text}>{observation.text}</p><p className="text-ink-faint mt-1 text-xs">参照切れ <MetricCell metric={item.brokenReferences} /></p></td><td className="px-3 py-2"><div className="flex justify-end gap-2 whitespace-nowrap"><Button href={item.href} variant="secondary">中身を見る</Button>{canTidyUsage(item) && <Button href={item.href} variant="secondary" className="border-warning text-warning">片づける</Button>}</div></td></tr>
+        return <tr key={item.key} className="text-sm"><td className="px-4 py-3"><p className="font-medium">{item.label}</p><p className="text-ink-faint mt-1 truncate text-xs">最終利用 <DateTimeMetricCell metric={item.lastUsedAt} /></p></td><td className="px-3 py-3 text-right"><MetricCell metric={item.created} /></td><td className="px-3 py-3 text-right"><MetricCell metric={item.inUse} /></td><td className="px-3 py-3 text-right"><MetricCell metric={item.unused} /></td><td className="px-3 py-3"><p className={`truncate ${observation.tone === 'warning' ? 'text-warning' : observation.tone === 'unknown' ? 'text-ink-faint' : 'text-success'}`} title={observation.text}>{observation.text}</p><p className="text-ink-faint mt-1 truncate text-xs" title={item.brokenReferences.reason ?? undefined}>{referenceHealthText(item.brokenReferences)}</p></td><td className="px-3 py-2"><div className="flex justify-end gap-2 whitespace-nowrap"><Button href={item.href} variant="secondary">中身を見る</Button>{canTidyUsage(item) && <Button href={item.href} variant="secondary" className="border-warning text-warning">片づける</Button>}</div></td></tr>
       })}</tbody>
     </table></div>
     <div className="flex flex-wrap items-center justify-between gap-2 text-xs">

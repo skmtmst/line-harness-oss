@@ -204,8 +204,10 @@ describe('V6分析の概要4画面', () => {
     const mediaVars = result.data.categories.find((item) => item.key === 'media_vars');
     expect(templates?.created.value).toBe(1);
     expect(templates?.inUse.value).toBe(1);
+    expect(templates?.brokenReferences).toEqual({ value: 0, state: 'available', reason: null });
     expect(mediaVars?.created).toMatchObject({ value: null, state: 'unavailable' });
     expect(result.data).toMatchObject({ state: 'partial', automaticDeletion: false });
+    expect(result.data.summary.brokenReferences).toMatchObject({ value: 0, state: 'partial' });
   });
 
   it('使われ方の自動実行と手動送信は選択中アカウント・期間・テストを分ける', async () => {
@@ -245,6 +247,326 @@ describe('V6分析の概要4画面', () => {
     });
     expect(result.data.summary.automaticRuns.reason).toContain('オートメーションの実行記録だけ');
     expect(result.data.summary.unusedItems.state).toBe('partial');
+  });
+
+  it('使われ方の参照切れは存在・削除済み・別アカウント・未対応種別を分ける', async () => {
+    sqlite.pragma('foreign_keys = OFF');
+    sqlite.prepare(
+      `INSERT INTO templates (id, name, message_type, message_content, line_account_id)
+       VALUES ('template-ok','利用可','text','ok','account-a'),
+              ('template-deleted','削除前','text','deleted','account-a'),
+              ('template-other','別店舗','text','other','account-b')`,
+    ).run();
+    sqlite.prepare(
+      `INSERT INTO auto_replies (
+         id, keyword, response_type, response_content, template_id, line_account_id
+       ) VALUES ('reply-ok','ok','text','ok','template-ok','account-a'),
+                ('reply-deleted','deleted','text','deleted','template-deleted','account-a'),
+                ('reply-other','other','text','other','template-other','account-a'),
+                ('reply-b','b','text','b','missing-b','account-b')`,
+    ).run();
+    // 古いDBや移行途中で参照元だけが残る実データを再現する。
+    sqlite.prepare(`DELETE FROM templates WHERE id = 'template-deleted'`).run();
+
+    sqlite.prepare(
+      `INSERT INTO message_templates (id, name, message_type, message_content)
+       VALUES ('link-intro-ok','リンク案内・利用可','text','ok'),
+              ('link-intro-deleted','リンク案内・削除前','text','deleted'),
+              ('link-reward-ok','リンク特典・利用可','text','ok'),
+              ('link-reward-deleted','リンク特典・削除前','text','deleted'),
+              ('route-intro-ok','経路案内・利用可','text','ok'),
+              ('route-intro-deleted','経路案内・削除前','text','deleted')`,
+    ).run();
+    sqlite.prepare(
+      `INSERT INTO tracked_links (
+         id, name, original_url, intro_template_id, reward_template_id, line_account_id
+       ) VALUES ('link-intro-ok','案内あり','https://example.com/intro-ok','link-intro-ok',NULL,'account-a'),
+                ('link-intro-deleted','案内削除','https://example.com/intro-deleted','link-intro-deleted',NULL,'account-a'),
+                ('link-intro-other','別店舗案内','https://example.com/intro-other','missing-intro-other',NULL,'account-b'),
+                ('link-reward-ok','特典あり','https://example.com/reward-ok',NULL,'link-reward-ok','account-a'),
+                ('link-reward-deleted','特典削除','https://example.com/reward-deleted',NULL,'link-reward-deleted','account-a'),
+                ('link-reward-other','別店舗特典','https://example.com/reward-other',NULL,'missing-reward-other','account-b')`,
+    ).run();
+    sqlite.prepare(
+      `INSERT INTO entry_routes (id, ref_code, name, intro_template_id, line_account_id)
+       VALUES ('route-intro-ok','route-intro-ok','経路案内あり','route-intro-ok','account-a'),
+              ('route-intro-deleted','route-intro-deleted','経路案内削除','route-intro-deleted','account-a'),
+              ('route-intro-other','route-intro-other','別店舗経路案内','missing-route-other','account-b')`,
+    ).run();
+    sqlite.prepare(
+      `DELETE FROM message_templates
+        WHERE id IN ('link-intro-deleted','link-reward-deleted','route-intro-deleted')`,
+    ).run();
+
+    sqlite.prepare(
+      `INSERT INTO common_action_bindings (
+         id, line_account_id, common_action_id, common_action_version_id,
+         consumer_type, consumer_id, consumer_path
+       ) VALUES ('unsupported-binding','account-a','missing-action','missing-version',
+                 'future_consumer','future-1','future.path')`,
+    ).run();
+
+    const result = await getAnalyticsUsageOverview(db, CONTEXT);
+    const templates = result.data.categories.find((item) => item.key === 'templates');
+    const automations = result.data.categories.find((item) => item.key === 'automations');
+    const mediaVars = result.data.categories.find((item) => item.key === 'media_vars');
+
+    expect(templates?.brokenReferences).toEqual({ value: 5, state: 'available', reason: null });
+    expect(automations?.brokenReferences).toMatchObject({ value: 0, state: 'partial' });
+    expect(automations?.brokenReferences.reason).toContain('future_consumer');
+    expect(mediaVars?.brokenReferences).toMatchObject({ value: null, state: 'unavailable' });
+    expect(result.data.summary.brokenReferences).toMatchObject({ value: 5, state: 'partial' });
+    expect(result.data.summary.brokenReferences.reason).toContain('確認できた参照だけ');
+    expect(result.data.checkedAt).toBe(CONTEXT.dataCutoffAt);
+  });
+
+  it('使われ方は運用中の型付き参照だけを参照元アカウント内で照合する', async () => {
+    sqlite.pragma('foreign_keys = OFF');
+    sqlite.prepare(
+      `INSERT INTO templates (id, name, message_type, message_content, line_account_id)
+       VALUES ('reminder-template-ok','リマインダ利用可','text','ok','account-a'),
+              ('reminder-template-deleted','リマインダ削除前','text','deleted','account-a'),
+              ('reminder-template-other','リマインダ別店舗','text','other','account-b')`,
+    ).run();
+    sqlite.prepare(
+      `INSERT INTO friend_fields (id, name, field_key, type)
+       VALUES ('field-ok','利用可','field_ok','date'),
+              ('field-deleted','削除前','field_deleted','date')`,
+    ).run();
+    sqlite.prepare(
+      `INSERT INTO tags (id, name, line_account_id)
+       VALUES ('tag-ok','利用可','account-a'),
+              ('tag-deleted','削除前','account-a'),
+              ('tag-other','別店舗','account-b')`,
+    ).run();
+    sqlite.prepare(
+      `INSERT INTO scenarios (id, name, trigger_type, line_account_id, is_active)
+       VALUES ('scenario-ok','利用可','manual','account-a',1),
+              ('scenario-other','別店舗','manual','account-b',1)`,
+    ).run();
+
+    sqlite.prepare(
+      `INSERT INTO reminders (
+         id, name, line_account_id, trigger_type, trigger_field_id, current_published_version_id
+       ) VALUES ('reminder-ok','利用可','account-a','friend_field','field-ok','reminder-version-ok'),
+                ('reminder-deleted','削除参照','account-a','friend_field','field-deleted','reminder-version-deleted'),
+                ('reminder-other','別店舗','account-b','friend_field','missing-field-other','reminder-version-other')`,
+    ).run();
+    sqlite.prepare(
+      `INSERT INTO reminder_versions (
+         id, reminder_id, version_number, status, settings_snapshot, published_at, created_at, updated_at
+       ) VALUES ('reminder-version-ok','reminder-ok',1,'draft','{}',NULL,'2026-08-01','2026-08-01'),
+                ('reminder-version-deleted','reminder-deleted',1,'draft','{}',NULL,'2026-08-01','2026-08-01'),
+                ('reminder-version-other','reminder-other',1,'draft','{}',NULL,'2026-08-01','2026-08-01')`,
+    ).run();
+    sqlite.prepare(
+      `INSERT INTO reminder_version_steps (
+         id, reminder_version_id, stable_step_id, offset_minutes,
+         message_type, message_content, template_id, created_at
+       ) VALUES ('reminder-step-ok','reminder-version-ok','step-ok',0,'text','ok','reminder-template-ok','2026-08-01'),
+                ('reminder-step-deleted','reminder-version-deleted','step-deleted',0,'text','deleted','reminder-template-deleted','2026-08-01'),
+                ('reminder-step-other','reminder-version-ok','step-other',1,'text','other','reminder-template-other','2026-08-01'),
+                ('reminder-step-account-b','reminder-version-other','step-b',0,'text','b','missing-template-b','2026-08-01')`,
+    ).run();
+    sqlite.prepare(
+      `UPDATE reminder_versions SET status = 'published', published_at = '2026-08-01'`,
+    ).run();
+    // 公開時は同じ論理stepが互換表にも同期される。公開版があるreminderでは1件として数える。
+    sqlite.prepare(
+      `INSERT INTO reminder_steps (
+         id, reminder_id, offset_minutes, message_type, message_content, template_id
+       ) VALUES ('reminder-step-deleted-mirror','reminder-deleted',0,'text','deleted','reminder-template-deleted')`,
+    ).run();
+
+    sqlite.prepare(
+      `INSERT INTO forms (id, name) VALUES
+         ('form-ok','利用可'), ('form-deleted','削除前'),
+         ('form-other','別店舗')`,
+    ).run();
+    sqlite.prepare(
+      `INSERT INTO forms (
+         id, name, fields, on_submit_tag_id, on_submit_scenario_id
+       ) VALUES (
+         'form-hooks','後処理','[{"name":"birthday","friendFieldId":"field-deleted"}]',
+         'tag-other','scenario-other'
+       )`,
+    ).run();
+    sqlite.prepare(
+      `INSERT INTO form_accounts (form_id, line_account_id)
+       VALUES ('form-ok','account-a'), ('form-deleted','account-a'),
+              ('form-other','account-b'), ('form-hooks','account-a')`,
+    ).run();
+    sqlite.prepare(
+      `INSERT INTO rich_menu_groups (id, account_id, name, chat_bar_text, size)
+       VALUES ('menu-a','account-a','A','メニュー','large'),
+              ('menu-b','account-b','B','メニュー','large')`,
+    ).run();
+    sqlite.prepare(
+      `INSERT INTO rich_menu_pages (id, group_id, order_index, name, alias_id)
+       VALUES ('page-a','menu-a',0,'A','alias-a'),
+              ('page-a-target','menu-a',1,'A2','alias-a2'),
+              ('page-b','menu-b',0,'B','alias-b')`,
+    ).run();
+    const insertArea = sqlite.prepare(
+      `INSERT INTO rich_menu_areas (
+         id, page_id, bounds_x, bounds_y, bounds_width, bounds_height,
+         action_type, action_data, tag_ids, form_id
+       ) VALUES (?, ?, 0, 0, 100, 100, ?, ?, ?, ?)`,
+    );
+    insertArea.run('area-valid', 'page-a', 'message', '{}', '["tag-ok"]', 'form-ok');
+    insertArea.run(
+      'area-broken', 'page-a', 'message', '{"scenarioId":"scenario-other"}',
+      '["tag-deleted","tag-other"]', 'form-deleted',
+    );
+    insertArea.run(
+      'area-form-other', 'page-a', 'message', '{}', '[]', 'form-other',
+    );
+    insertArea.run(
+      'area-switch-valid', 'page-a', 'richmenuswitch', '{"targetPageId":"page-a-target"}', '[]', null,
+    );
+    insertArea.run(
+      'area-switch-other', 'page-a', 'richmenuswitch', '{"targetPageId":"page-b"}', '[]', null,
+    );
+    insertArea.run(
+      'area-account-b', 'page-b', 'message', '{"scenarioId":"missing-scenario-b"}',
+      '["missing-tag-b"]', 'missing-form-b',
+    );
+
+    sqlite.prepare(
+      `INSERT INTO traffic_pools (id, slug, name, active_account_id, created_at, updated_at)
+       VALUES ('pool-ok','pool-ok','利用可','account-a','2026-08-01','2026-08-01')`,
+    ).run();
+    sqlite.prepare(
+      `INSERT INTO entry_routes (id, ref_code, name, pool_id, line_account_id)
+       VALUES ('route-pool-ok','pool-ok','利用可','pool-ok','account-a'),
+              ('route-pool-missing','pool-missing','削除参照','missing-pool','account-a'),
+              ('route-pool-other','pool-other','別店舗','missing-pool-b','account-b')`,
+    ).run();
+    sqlite.prepare(
+      `INSERT INTO rich_menu_assignments (
+         id, friend_id, line_account_id, group_id, version_id, line_richmenu_id,
+         reason_kind, assigned_at, updated_at
+       ) VALUES ('assignment-legacy','friend-a','account-a','menu-a','legacy-reserved','line-menu','manual','2026-08-01','2026-08-01')`,
+    ).run();
+
+    sqlite.prepare(`DELETE FROM templates WHERE id = 'reminder-template-deleted'`).run();
+    sqlite.prepare(`DELETE FROM friend_fields WHERE id = 'field-deleted'`).run();
+    sqlite.prepare(`DELETE FROM tags WHERE id = 'tag-deleted'`).run();
+    sqlite.prepare(`DELETE FROM forms WHERE id = 'form-deleted'`).run();
+
+    const result = await getAnalyticsUsageOverview(db, CONTEXT);
+    const referenceByKey = Object.fromEntries(
+      result.data.categories.map((item) => [item.key, item.brokenReferences]),
+    );
+    expect(referenceByKey.templates).toMatchObject({ value: 2, state: 'available' });
+    expect(referenceByKey.scenarios).toMatchObject({ value: 2, state: 'available' });
+    expect(referenceByKey.forms).toMatchObject({ value: 2, state: 'partial' });
+    expect(referenceByKey.rich_menus).toMatchObject({ value: 1, state: 'available' });
+    expect(referenceByKey.friend_attributes).toMatchObject({ value: 5, state: 'partial' });
+    expect(referenceByKey.inflow_conversion).toMatchObject({ value: 1, state: 'available' });
+    // version_id は現行writerが常にNULLにし、解決先テーブルもない予約列なので数えない。
+    expect(result.data.summary.brokenReferences.value).toBe(13);
+  });
+
+  it('公開版と互換表に同じ壊れたリマインダテンプレートがあっても1件と数える', async () => {
+    sqlite.pragma('foreign_keys = OFF');
+    sqlite.prepare(
+      `INSERT INTO templates (id, name, message_type, message_content, line_account_id)
+       VALUES ('reminder-template-mirrored','公開前','text','deleted','account-a')`,
+    ).run();
+    sqlite.prepare(
+      `INSERT INTO reminders (id, name, line_account_id, current_published_version_id)
+       VALUES ('reminder-mirrored','公開済み','account-a','reminder-version-mirrored')`,
+    ).run();
+    sqlite.prepare(
+      `INSERT INTO reminder_versions (
+         id, reminder_id, version_number, status, settings_snapshot,
+         published_at, created_at, updated_at
+       ) VALUES (
+         'reminder-version-mirrored','reminder-mirrored',1,'draft','{}',
+         NULL,'2026-08-01','2026-08-01'
+       )`,
+    ).run();
+    sqlite.prepare(
+      `INSERT INTO reminder_version_steps (
+         id, reminder_version_id, stable_step_id, offset_minutes,
+         message_type, message_content, template_id, created_at
+       ) VALUES (
+         'reminder-version-step-mirrored','reminder-version-mirrored','step-mirrored',0,
+         'text','deleted','reminder-template-mirrored','2026-08-01'
+       )`,
+    ).run();
+    sqlite.prepare(
+      `UPDATE reminder_versions
+       SET status = 'published', published_at = '2026-08-01'
+       WHERE id = 'reminder-version-mirrored'`,
+    ).run();
+    sqlite.prepare(
+      `INSERT INTO reminder_steps (
+         id, reminder_id, offset_minutes, message_type, message_content, template_id
+       ) VALUES (
+         'reminder-step-mirrored','reminder-mirrored',0,
+         'text','deleted','reminder-template-mirrored'
+       )`,
+    ).run();
+    sqlite.prepare(`DELETE FROM templates WHERE id = 'reminder-template-mirrored'`).run();
+
+    const result = await getAnalyticsUsageOverview(db, CONTEXT);
+    expect(result.data.categories.find((item) => item.key === 'templates')?.brokenReferences)
+      .toEqual({ value: 1, state: 'available', reason: null });
+  });
+
+  it('参照件数が増えても一覧取得やN+1をせず、固定1問で集計する', async () => {
+    sqlite.pragma('foreign_keys = OFF');
+    sqlite.prepare(
+      `INSERT INTO templates (id, name, message_type, message_content, line_account_id)
+       VALUES ('template-ok','利用可','text','ok','account-a')`,
+    ).run();
+    const insert = sqlite.prepare(
+      `INSERT INTO auto_replies (
+         id, keyword, response_type, response_content, template_id, line_account_id
+       ) VALUES (?, ?, 'text', 'ok', ?, 'account-a')`,
+    );
+    for (let index = 0; index < 250; index += 1) {
+      insert.run(`reply-${index}`, `keyword-${index}`, index % 2 === 0 ? 'template-ok' : `missing-${index}`);
+    }
+
+    const preparedSql: string[] = [];
+    const countedDb = {
+      ...db,
+      prepare(sql: string) {
+        preparedSql.push(sql);
+        return db.prepare(sql);
+      },
+    } as D1Database;
+    const result = await getAnalyticsUsageOverview(countedDb, CONTEXT);
+    const healthSql = preparedSql.filter((sql) => sql.includes('usage-reference-health'));
+
+    expect(result.data.categories.find((item) => item.key === 'templates')?.brokenReferences.value)
+      .toBe(125);
+    expect(healthSql).toHaveLength(1);
+    expect(healthSql[0]?.toUpperCase()).not.toContain('UNION');
+    expect(healthSql[0]?.match(/\?/g)).toHaveLength(42);
+    expect(healthSql[0]?.match(/\?/g)?.length).toBeLessThanOrEqual(100);
+  });
+
+  it('参照集計だけが失敗したとき0件にせずfailedで返す', async () => {
+    const failedDb = {
+      ...db,
+      prepare(sql: string) {
+        if (sql.includes('usage-reference-health')) {
+          throw new Error('reference query failed');
+        }
+        return db.prepare(sql);
+      },
+    } as D1Database;
+
+    const result = await getAnalyticsUsageOverview(failedDb, CONTEXT);
+    expect(result.data.categories.find((item) => item.key === 'templates')?.brokenReferences)
+      .toMatchObject({ value: null, state: 'failed' });
+    expect(result.data.summary.brokenReferences)
+      .toMatchObject({ value: null, state: 'failed' });
+    expect(result.data.state).toBe('partial');
   });
 
   it('URLクリックは取得開始前の到達人数を0件と断定しない', async () => {
