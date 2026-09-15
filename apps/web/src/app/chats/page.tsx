@@ -1,6 +1,5 @@
 'use client'
 
-import SelectField from '@/components/shared/select-field'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -1935,7 +1934,12 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                   {item.key === 'all' && item.label}
                 </button>
               ))}
-              <SelectField aria-label="並び順" defaultValue="newest" options={[{ value: "newest", label: "新しい順" }]} className="ml-auto shrink-0 rounded-lg border border-[#E5E7EB] bg-canvas px-1.5 py-1 text-[11px] font-semibold whitespace-nowrap text-[#2563EB] outline-none focus:border-[#2563EB] focus:ring-2 focus:ring-[#2563EB]/15" />
+              <span
+                data-inbox-sort="fixed"
+                className="ml-auto shrink-0 text-[11px] font-semibold whitespace-nowrap text-[#667085]"
+              >
+                並び順：新しい順
+              </span>
             </div>
           </div>
 
