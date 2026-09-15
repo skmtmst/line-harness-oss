@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { BOOKING_STAFF_LIMITS, parseBookingStaffInput } from '@line-crm/shared'
 import { bookingApi, type BookingMenu } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import CreatePage, {
@@ -56,6 +57,15 @@ export default function NewBookingStaffPage() {
   }
 
   const shownName = displayName.trim() || name.trim() || 'スタッフ'
+  const staffInput = () => ({
+    name,
+    display_name: displayName.trim() || name,
+    role,
+    profile_image_url: imageUrl,
+    bio,
+    is_designation_optional: isDesignationOptional,
+    is_active: isActive,
+  })
 
   return (
     <CreatePage
@@ -65,7 +75,8 @@ export default function NewBookingStaffPage() {
       saveLabel="スタッフを登録"
       validate={() => {
         if (!selectedAccountId) return '先に上部でLINEアカウントを選んでください'
-        if (!name.trim()) return 'スタッフ名を入力してください'
+        const parsed = parseBookingStaffInput(staffInput(), 'create')
+        if (!parsed.ok) return parsed.error
         if (offered.size === 0)
           return '担当メニューを1つ以上選んでください。0だと予約画面に表示されません'
         return null
@@ -77,15 +88,9 @@ export default function NewBookingStaffPage() {
         setOffered(new Set())
       }}
       onSave={async () => {
-        const res = await bookingApi.createStaff(selectedAccountId!, {
-          name: name.trim(),
-          display_name: displayName.trim() || name.trim(),
-          role: role.trim() || null,
-          profile_image_url: imageUrl.trim() || null,
-          bio: bio.trim() || null,
-          is_designation_optional: isDesignationOptional ? 1 : 0,
-          is_active: isActive ? 1 : 0,
-        })
+        const parsed = parseBookingStaffInput(staffInput(), 'create')
+        if (!parsed.ok) throw new Error(parsed.error)
+        const res = await bookingApi.createStaff(selectedAccountId!, parsed.value)
         // 担当メニューは staff_menus に入る。作ってから流し込む。
         await bookingApi.putStaffMenus(
           selectedAccountId!,
@@ -148,6 +153,7 @@ export default function NewBookingStaffPage() {
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
+            maxLength={BOOKING_STAFF_LIMITS.name}
             placeholder="例: 田中 美咲"
             className={inputClass}
           />
@@ -163,6 +169,7 @@ export default function NewBookingStaffPage() {
             type="text"
             value={displayName}
             onChange={(e) => setDisplayName(e.target.value)}
+            maxLength={BOOKING_STAFF_LIMITS.displayName}
             placeholder="例: みさき"
             className={inputClass}
           />
@@ -174,6 +181,7 @@ export default function NewBookingStaffPage() {
             type="text"
             value={role}
             onChange={(e) => setRole(e.target.value)}
+            maxLength={BOOKING_STAFF_LIMITS.role}
             placeholder="例: トリミング担当"
             className={inputClass}
           />
@@ -190,6 +198,7 @@ export default function NewBookingStaffPage() {
               type="url"
               value={imageUrl}
               onChange={(e) => setImageUrl(e.target.value)}
+              maxLength={BOOKING_STAFF_LIMITS.profileImageUrl}
               placeholder="https://…"
               className={inputClass}
             />
@@ -212,6 +221,7 @@ export default function NewBookingStaffPage() {
             rows={3}
             value={bio}
             onChange={(e) => setBio(e.target.value)}
+            maxLength={BOOKING_STAFF_LIMITS.bio}
             placeholder="例: トリミング歴10年。小型犬が得意です。"
             className={`${inputClass} resize-y`}
           />

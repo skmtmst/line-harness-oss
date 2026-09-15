@@ -1788,6 +1788,19 @@ const spec = {
       },
     },
     // ── Settings ─────────────────────────────────────────────────────────────
+    '/api/settings/features/visibility': {
+      get: {
+        tags: ['Settings'],
+        summary: '一般スタッフ向けの機能表示可否を取得',
+        description: '画面の殻に必要な機能ごとの表示可否booleanだけを返す。契約、会社設定、依存理由、並び順などの管理情報は返さない。',
+        parameters: [{ name: 'account_id', in: 'query', required: true, schema: { type: 'string' } }],
+        responses: {
+          '200': { description: 'Feature visibility booleans only' },
+          '400': { description: 'account_id is required' },
+          '403': { description: 'Account scope denied' },
+        },
+      },
+    },
     '/api/settings/features/impact': {
       post: {
         tags: ['Settings'],

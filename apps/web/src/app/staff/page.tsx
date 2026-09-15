@@ -159,6 +159,8 @@ function PermissionScopeView({ user, memberId, canSave, copyCandidates, onClose,
   )
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
+  const [saveConfirmOpen, setSaveConfirmOpen] = useState(false)
+  const [saveConfirmError, setSaveConfirmError] = useState('')
   const savingRef = useRef(false)
   const [copyOpen, setCopyOpen] = useState(false)
   const [copySourceId, setCopySourceId] = useState('')
@@ -168,19 +170,29 @@ function PermissionScopeView({ user, memberId, canSave, copyCandidates, onClose,
    * 受付に更新口の書き分けは無いので運用へ寄る(保存後に読み直すと
    * 「運用」と出る)。結び付いていない人・管理者以外は理由を出す。
    */
-  const save = async () => {
+  const requestSave = () => {
     if (!memberId) return setSaveError('スタッフ情報と結び付いていないため保存できません。名前とメールを確認してください。')
     if (!canSave) return setSaveError('権限のかたまりは管理者だけが変えられます。')
-    if (savingRef.current) return
+    setSaveError('')
+    setSaveConfirmError('')
+    setSaveConfirmOpen(true)
+  }
+  const save = async () => {
+    if (!memberId || !canSave || savingRef.current) return
     savingRef.current = true
     setSaving(true)
     setSaveError('')
+    setSaveConfirmError('')
     try {
-      await api.staff.update(memberId, { role: scopeBundleToStaffRole(bundle) })
+      const result = await api.staff.update(memberId, { role: scopeBundleToStaffRole(bundle) })
+      if (!result.success) throw new Error(result.error)
+      setSaveConfirmOpen(false)
       await onSaved()
       onClose()
     } catch (caught) {
-      setSaveError(messageOf(caught))
+      const message = messageOf(caught)
+      setSaveError(message)
+      setSaveConfirmError(message)
     } finally {
       savingRef.current = false
       setSaving(false)
@@ -209,9 +221,19 @@ function PermissionScopeView({ user, memberId, canSave, copyCandidates, onClose,
         <section className="rounded-card border border-hairline bg-canvas p-4"><h2 className="text-base font-bold text-ink">かたまりから選ぶ</h2><p className="mt-1 text-xs text-ink-faint">よく使う組み合わせを用意しています。選んでから、下で細かく直せます。</p><div className="mt-3 grid grid-cols-4 gap-3">{bundles.map(([value, label, count, note]) => <button key={value} type="button" onClick={() => setBundle(value)} className={`rounded-control border p-3 text-left ${bundle === value ? 'border-accent bg-accent-soft' : 'border-divider-soft bg-canvas'}`}><span className="flex items-center justify-between"><span className="text-sm font-bold text-ink">{label}</span><span className="text-xs text-ink-faint">{count}</span></span><span className={`mt-2 block text-xs ${bundle === value ? 'font-semibold text-success' : 'text-ink-faint'}`}>{note}</span></button>)}</div></section>
         <section className="overflow-hidden rounded-card border border-hairline bg-canvas"><div className="px-4 py-4"><h2 className="text-base font-bold text-ink">項目ごとに決める</h2><p className="mt-1 text-xs text-ink-faint">「変えられる」「見えるだけ」「出さない」の3つから選びます。</p></div><div className="grid items-center border-y border-hairline bg-canvas-sunken px-4 py-3 text-xs font-bold text-ink-faint" style={{ gridTemplateColumns: '1.45fr repeat(3, 140px) 1.2fr' }}><span>メニューの項目</span><span className="text-center">変えられる</span><span className="text-center">見えるだけ</span><span className="text-center">出さない</span><span>補足</span></div><div className="divide-y divide-hairline">{SCOPE_ROWS.map(([label, note, full, partial, none], index) => <div key={label} className="grid items-center px-4" style={{ minHeight: 46, gridTemplateColumns: '1.45fr repeat(3, 140px) 1.2fr' }}><div><p className="text-xs font-bold text-ink">{label}</p><p className="mt-0.5 text-xs text-ink-faint">{note}</p></div>{[full, partial, none].map((text, option) => { const selected = bundle === 'reception' ? option === (index === 1 || index === 6 ? 2 : index === 5 || index === 7 ? 1 : 0) : option === (bundle === 'administrator' ? 0 : bundle === 'view_only' ? 2 : 1); return <button key={`${option}:${text}`} type="button" aria-label={`${label}を${text}`} className={`mx-auto flex h-5 w-5 items-center justify-center rounded-full border text-xs ${selected ? 'border-accent text-accent' : 'border-divider-soft text-transparent'}`}>✓</button> })}<p className="text-xs font-semibold text-warning">{index === 1 ? '電話番号と住所は伏せます' : index === 2 ? '誤送信を防ぐためです' : index === 5 ? '売上の数字が見えます' : ''}</p></div>)}</div></section>
       </main>
-      <aside className="space-y-3"><section className="rounded-card border border-hairline bg-canvas p-4"><h2 className="text-sm font-bold text-ink">この決め方で、この人にはこう見えます</h2><div className="mt-3 space-y-3 text-xs text-ink-secondary"><p><b className="text-ink">◉　サイドメニューに出るのは4項目</b><br />　　受信箱・友だち・友だち属性・予約管理・コンテンツ</p><p><b className="text-ink">◉　出さない項目はURLを直に打っても開けません</b><br />　　「見る権限がありません」と出ます</p><p><b className="text-ink">◉　電話番号と住所は伏せます</b><br />　　下4桁だけが見えます。コピーもできません</p></div></section><section className="rounded-card border border-hairline bg-canvas p-4"><h2 className="text-sm font-bold text-ink">つながる先</h2><div className="mt-3 space-y-3 text-xs"><p className="font-bold text-action">→ 機能設定</p><p className="font-bold text-action">→ 入った記録</p><p className="font-bold text-action">→ 運用状態</p><p className="font-bold text-action">→ 予約設定</p></div></section><section className="rounded-card border border-warning bg-warning-bg p-4"><h2 className="text-sm font-bold text-warning">気をつけること</h2><p className="mt-2 text-xs font-bold text-warning">配信を出さないと、受信箱からの返信もできません</p><p className="mt-2 text-xs text-warning">権限を変えると、その場で効きます。</p></section></aside>
+      <aside className="space-y-3"><section className="rounded-card border border-hairline bg-canvas p-4"><h2 className="text-sm font-bold text-ink">この決め方で、この人にはこう見えます</h2><div className="mt-3 space-y-3 text-xs text-ink-secondary"><p><b className="text-ink">◉　サイドメニューに出るのは4項目</b><br />　　受信箱・友だち・友だち属性・予約管理・コンテンツ</p><p><b className="text-ink">◉　出さない項目はURLを直に打っても開けません</b><br />　　「見る権限がありません」と出ます</p><p><b className="text-ink">◉　電話番号と住所は伏せます</b><br />　　下4桁だけが見えます。コピーもできません</p></div></section><section className="rounded-card border border-hairline bg-canvas p-4"><h2 className="text-sm font-bold text-ink">つながる先</h2><div className="mt-3 space-y-3 text-xs"><p className="font-bold text-action">→ 機能設定</p><p className="font-bold text-action">→ 入った記録</p><p className="font-bold text-action">→ 運用状態</p><p className="font-bold text-action">→ 予約設定</p></div></section><section className="rounded-card border border-warning bg-warning-bg p-4"><h2 className="text-sm font-bold text-warning">気をつけること</h2><p className="mt-2 text-xs font-bold text-warning">配信を出さないと、受信箱からの返信もできません</p><p className="mt-2 text-xs text-warning">保存すると、対象者はもう一度ログインする必要があります。</p></section></aside>
     </div>
-    <div className="fixed bottom-0 right-0 z-20 flex items-center justify-between gap-3 border-t border-hairline bg-canvas px-8 shadow-lg" style={{ left: 'var(--sidebar-width, 240px)', height: 72 }}>{saveError ? <p className="text-xs font-medium text-danger">{saveError}</p> : <p className="text-xs text-ink-faint">{user.name}さんはいま「{ACCESS_ROLE_LABEL[user.roleBundle]}」です。保存すると、この場で切り替わります。</p>}<div className="flex gap-2"><Button variant="secondary" onClick={onClose}>×　キャンセル</Button><Button disabled={saving} onClick={() => void save()}>✓　{saving ? '保存中…' : '見せる範囲を保存'}</Button></div></div>
+    <div className="fixed bottom-0 right-0 z-20 flex items-center justify-between gap-3 border-t border-hairline bg-canvas px-8 shadow-lg" style={{ left: 'var(--sidebar-width, 240px)', height: 72 }}>{saveError ? <p className="text-xs font-medium text-danger">{saveError}</p> : <p className="text-xs text-ink-faint">{user.name}さんはいま「{ACCESS_ROLE_LABEL[user.roleBundle]}」です。保存前に、対象者が再ログインすることを確認します。</p>}<div className="flex gap-2"><Button variant="secondary" onClick={onClose}>×　キャンセル</Button><Button disabled={saving} onClick={requestSave}>✓　{saving ? '保存中…' : '見せる範囲を保存'}</Button></div></div>
+    <ConfirmDialog
+      open={saveConfirmOpen}
+      title={`${user.name}さんの見せる範囲を保存しますか？`}
+      description="保存すると、対象者のすべてのログインが終了します。新しい権限で使うには、対象者がもう一度ログインする必要があります。"
+      confirmLabel="保存する"
+      busy={saving}
+      error={saveConfirmError}
+      onConfirm={() => void save()}
+      onCancel={() => { if (saving) return; setSaveConfirmOpen(false); setSaveConfirmError('') }}
+    />
   </div>
 }
 
@@ -308,6 +330,7 @@ function StaffPageHost() {
   const [disablingTarget, setDisablingTarget] = useState<StaffMember | null>(null), [disablingTwoFactor, setDisablingTwoFactor] = useState(false), [disableError, setDisableError] = useState('')
   const [removingTarget, setRemovingTarget] = useState<StaffMember | null>(null), [removing, setRemoving] = useState(false), [removeError, setRemoveError] = useState('')
   const [resendingId, setResendingId] = useState<string | null>(null), [resendNotice, setResendNotice] = useState(''), [resendError, setResendError] = useState('')
+  const [permissionSaveNotice, setPermissionSaveNotice] = useState('')
   /* 送信中の掛け金。state は次の描画まで古いままなので、素早い二度押しの2回目を止められない。 */
   const resendingRef = useRef(false)
   const removingRef = useRef(false)
@@ -363,8 +386,12 @@ function StaffPageHost() {
     }
     return map
   }, [accessUsers, members])
-  const activeUsers = accessUsers.filter((user) => user.status === 'active' || user.status === 'suspended')
-  const openPermissions = (user: AccessUserItem) => setPermissionTarget(user)
+  const activeUsers = accessUsers.filter((user) => user.status === 'active')
+  const openPermissions = (user: AccessUserItem) => { setPermissionSaveNotice(''); setPermissionTarget(user) }
+  const finishPermissionSave = async () => {
+    await load()
+    setPermissionSaveNotice('見せる範囲を保存しました。対象者のすべてのログインを終了したため、新しい権限で使うにはもう一度ログインが必要です。')
+  }
   const invitedUsers = accessUsers.filter((user) => user.status === 'invited' || user.status === 'expired')
   const staffTabs = [
     { key: 'members', label: `いまいる人 ${accessSummary.active}` },
@@ -449,7 +476,7 @@ function StaffPageHost() {
     const copyCandidates = accessUsers.filter((candidate): candidate is CopyableAccessUser => (
       candidate.id !== permissionTarget.id && candidate.roleBundle !== 'custom'
     ))
-    return <PermissionScopeView user={permissionTarget} memberId={memberById.get(permissionTarget.id)?.id ?? null} canSave={administrator} copyCandidates={copyCandidates} onClose={() => setPermissionTarget(null)} onSaved={load} />
+    return <PermissionScopeView user={permissionTarget} memberId={memberById.get(permissionTarget.id)?.id ?? null} canSave={administrator} copyCandidates={copyCandidates} onClose={() => setPermissionTarget(null)} onSaved={finishPermissionSave} />
   }
   return <div data-design-node="e3jz3"><div className="mb-4"><MergedTabs basePath="/staff" tabs={staffTabs} active={tab} defaultKey="members" actions={tabAction} /></div>
     {tab === 'audit' ? <div data-design-node="jwVlo"><LoginAudit /></div> : <>
@@ -459,6 +486,7 @@ function StaffPageHost() {
     {error && <div className="mb-4 flex items-center justify-between gap-4 rounded-control bg-danger-bg p-3 text-sm text-danger"><p>{error}</p><Button variant="secondary" onClick={() => void load()}>もう一度読み込む</Button></div>}
     {resendNotice && <div className="mb-4 rounded-control bg-info-bg px-4 py-3 text-sm font-medium text-accent" role="status"><p>{resendNotice}</p></div>}
     {resendError && <div className="mb-4 rounded-control bg-danger-bg p-3 text-sm text-danger" role="alert"><p>{resendError}</p></div>}
+    {permissionSaveNotice && <div className="mb-4 rounded-control bg-info-bg px-4 py-3 text-sm font-medium text-accent" role="status"><p>{permissionSaveNotice}</p></div>}
     {tab === 'roles' && <div className="mb-4 grid gap-3 md:grid-cols-2 xl:grid-cols-5">{accessRoles.map((role) => <div key={role.id} className="rounded-card border border-hairline bg-canvas p-4"><div className="flex items-start justify-between gap-2"><p className="font-semibold text-ink">{role.name}</p><span className="rounded-full bg-accent-soft px-2 py-1 text-[11px] font-semibold text-accent">{role.assignedUserCount}人</span></div><p className="mt-2 text-xs leading-5 text-ink-secondary">{role.description}</p><p className="mt-3 text-xs text-ink-faint">{role.requiresMfa ? '2段階の確認が必要' : role.featureAccess === 'view' ? '閲覧のみ' : role.featureAccess === 'custom' ? '機能ごとに設定' : '編集できる'}</p></div>)}</div>}
     <div className="mb-3 flex flex-wrap items-center gap-3"><SearchField value={query} onChange={setQuery} onClear={() => setQuery('')} placeholder="人の名前・メールで検索" className="min-w-64 flex-1" /><Select aria-label="並び順" value={sort} onChange={setSort} options={LIST_SORT_OPTIONS} /></div>
     <div className="mb-3"><Tabs items={[{ label: 'すべて', count: tabUsers.length, current: roleFilter === 'all', onClick: () => setRoleFilter('all') }, ...(['administrator', 'operations', 'reception', 'view_only', 'custom'] as const).map((role) => ({ label: ACCESS_ROLE_LABEL[role], count: tabUsers.filter((user) => user.roleBundle === role).length, current: roleFilter === role, onClick: () => setRoleFilter(role) }))]} /></div>
