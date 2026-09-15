@@ -1941,23 +1941,40 @@ richMenuGroups.post('/api/rich-menu-groups/:groupId/publish', requireRole('owner
     await switchRichMenuLive(line, groupInput, shells.map((shell) => ({
       pageId: shell.page_id, orderIndex: shell.order_index, newRichMenuId: shell.new_richmenu_id,
     })), heartbeat);
+    // switch完了後も、D1の確定に入る直前にleaseを延長・照合する。ここで別keyの
+    // 実行に引き継がれていたら、古い実行結果を確定/返却してはいけない。
+    await heartbeat();
     for (const shell of shells) {
       if (!(await setPageRichMenuId(c.env.DB, shell.page_id, shell.new_richmenu_id, publishFence))) {
         throw new PublishLeaseLostError();
       }
     }
+    await heartbeat();
     if (!(await markRichMenuGroupPublished(c.env.DB, groupId, publishFence))) throw new PublishLeaseLostError();
     // 最初の版で控えた旧IDだけを消す。再開時に現在page行の新IDを旧IDと誤認しない。
     await deleteRichMenuShells(line, shells.flatMap((shell) => shell.old_richmenu_id ? [shell.old_richmenu_id] : []));
     const result = { pages: shells.map((shell) => ({ pageId: shell.page_id, newRichMenuId: shell.new_richmenu_id })) };
-    if (!await markRichMenuManualPublishSucceeded(c.env.DB, request.id, executionToken, JSON.stringify(result))) {
+    // 成功recordは、leaseを最後に延長した直後の同一fenceでのみ確定する。外部切替後に
+    // 期限切れ・別keyへの引継ぎが起きた古い実行が、自分の古いpagesを成功応答へ固定しない。
+    await heartbeat();
+    if (!await markRichMenuManualPublishSucceeded(c.env.DB, request.id, executionToken, JSON.stringify(result), {
+      groupId,
+      owner: publishFence.owner,
+      generation: publishFence.generation,
+      nowIso: new Date().toISOString(),
+    })) {
       throw new PublishLeaseLostError();
     }
     await releasePublishLease(c.env.DB, groupId, publishFence);
     return c.json({ success: true, data: result });
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
-    await markRichMenuManualPublishFailed(c.env.DB, request.id, executionToken, message);
+    await markRichMenuManualPublishFailed(c.env.DB, request.id, executionToken, message, {
+      groupId,
+      owner: publishFence.owner,
+      generation: publishFence.generation,
+      nowIso: new Date().toISOString(),
+    });
     await releasePublishLease(c.env.DB, groupId, publishFence);
     if (e instanceof PublishLeaseLostError) {
       return c.json({ success: false, error: '公開の担当が別の処理へ移りました。最新の状態を確認して、もう一度お試しください。' }, 409);

@@ -19,6 +19,7 @@ const dbMocks = {
   setRichMenuPageImage: vi.fn(),
   pageBelongsToGroup: vi.fn(),
   acquirePublishLease: vi.fn(),
+  renewPublishLease: vi.fn(),
   releasePublishLease: vi.fn(),
   isPublishLeaseHeld: vi.fn(),
   setPageRichMenuId: vi.fn(),
@@ -34,6 +35,7 @@ const dbMocks = {
   markRichMenuManualPublishFailed: vi.fn(),
   markRichMenuManualPublishSucceeded: vi.fn(),
   recordRichMenuManualPublishShells: vi.fn(),
+  claimRichMenuManualPublishRequest: vi.fn(),
   restartRichMenuManualPublishRequest: vi.fn(),
 };
 vi.mock('@line-crm/db', () => dbMocks);
@@ -139,6 +141,8 @@ beforeEach(() => {
   });
   dbMocks.getRichMenuManualPublishShells.mockResolvedValue([]);
   dbMocks.getRichMenuManualPublishRequest.mockResolvedValue({ id: 'manual-1', status: 'running' });
+  dbMocks.claimRichMenuManualPublishRequest.mockResolvedValue(true);
+  dbMocks.renewPublishLease.mockResolvedValue(true);
 });
 
 // ----- GET /api/rich-menu-groups -----

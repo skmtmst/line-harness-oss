@@ -160,4 +160,21 @@ describe('手動公開のroute冪等性', () => {
     expect(db.createRichMenuManualPublishRequestAtomic).not.toHaveBeenCalled();
     expect(publisher.createRichMenuShells).not.toHaveBeenCalled();
   });
+
+  it('live切替後にleaseを失った古い実行は、request成功を確定せず409で止まる', async () => {
+    // group確定までは自分の札、request成功の直前に別keyの新しい実行へleaseが移った形。
+    // 古いrequestを成功にすると、古いpagesを成功応答として再生してしまう。
+    db.renewPublishLease
+      .mockResolvedValueOnce(true) // page IDの確定前
+      .mockResolvedValueOnce(true) // group publishedの確定前
+      .mockResolvedValueOnce(false); // request成功の確定前
+
+    const response = await post();
+
+    expect(response.status).toBe(409);
+    expect(db.markRichMenuManualPublishSucceeded).not.toHaveBeenCalled();
+    expect(db.markRichMenuManualPublishFailed).toHaveBeenCalledWith(
+      expect.anything(), 'r1', expect.any(String), expect.any(String), expect.objectContaining({ groupId: 'g1' }),
+    );
+  });
 });

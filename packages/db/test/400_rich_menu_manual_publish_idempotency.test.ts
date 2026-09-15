@@ -102,4 +102,27 @@ describe('400 rich menu manual publish idempotency', () => {
     const replay = await createRichMenuManualPublishRequestAtomic(db, input());
     expect(replay.request.status).toBe('succeeded');
   });
+
+  it('別keyへleaseが移った古い実行は、自分のrequestを成功にできない', async () => {
+    const db = setup();
+    const created = await createRichMenuManualPublishRequestAtomic(db, input('old-key'));
+    expect(await claimRichMenuManualPublishRequest(db, created.request.id, 'old-holder')).toBe(true);
+    const now = '2026-09-16T00:00:00.000Z';
+    // owner/generation は新しい別keyの実行者へ移った。old-holderのrequestにtokenが
+    // 残っていても、group fenceを満たさなければ成功として固定できない。
+    await db.prepare(
+      `UPDATE rich_menu_groups
+          SET publishing_owner = ?, publishing_generation = ?, publishing_expires_at = ?
+        WHERE id = ?`,
+    ).bind('manual-new-request', 2, '2026-09-16T00:10:00.000Z', 'g1').run();
+    expect(await markRichMenuManualPublishSucceeded(
+      db,
+      created.request.id,
+      'old-holder',
+      JSON.stringify({ pages: [] }),
+      { groupId: 'g1', owner: 'manual-old-request', generation: 1, nowIso: now },
+    )).toBe(false);
+    const replay = await createRichMenuManualPublishRequestAtomic(db, input('old-key'));
+    expect(replay.request.status).toBe('running');
+  });
 });

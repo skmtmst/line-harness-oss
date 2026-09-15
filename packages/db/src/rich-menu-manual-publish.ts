@@ -25,6 +25,18 @@ export type RichMenuManualPublishShell = {
   created_at: string;
 };
 
+/**
+ * 手動公開requestの成功/失敗を確定する直前に照合するgroup leaseの札。
+ * requestのexecution tokenだけでは、別keyの新しい公開へleaseが移ったあとに
+ * 古い処理が自分のrequestを成功として返すことまでは防げない。
+ */
+export type RichMenuManualPublishLeaseFence = {
+  groupId: string;
+  owner: string;
+  generation: number;
+  nowIso: string;
+};
+
 export type CreateRichMenuManualPublishRequestInput = {
   id: string;
   groupId: string;
@@ -117,12 +129,28 @@ export async function markRichMenuManualPublishSucceeded(
   requestId: string,
   executionToken: string,
   resultJson: string,
+  fence?: RichMenuManualPublishLeaseFence,
 ): Promise<boolean> {
+  const fenceClause = fence
+    ? ` AND EXISTS (
+          SELECT 1 FROM rich_menu_groups
+           WHERE id = ?
+             AND publishing_owner = ?
+             AND publishing_generation = ?
+             AND publishing_expires_at > ?
+        )`
+    : '';
   const result = await db.prepare(
     `UPDATE rich_menu_manual_publish_requests
         SET status = 'succeeded', result_json = ?, last_error_code = NULL, updated_at = ?
-      WHERE id = ? AND status = 'running' AND execution_token = ?`,
-  ).bind(resultJson, jstNow(), requestId, executionToken).run();
+      WHERE id = ? AND status = 'running' AND execution_token = ?${fenceClause}`,
+  ).bind(
+    resultJson,
+    jstNow(),
+    requestId,
+    executionToken,
+    ...(fence ? [fence.groupId, fence.owner, fence.generation, fence.nowIso] : []),
+  ).run();
   return (result.meta?.changes ?? 0) > 0;
 }
 
@@ -131,12 +159,28 @@ export async function markRichMenuManualPublishFailed(
   requestId: string,
   executionToken: string,
   errorCode: string,
+  fence?: RichMenuManualPublishLeaseFence,
 ): Promise<boolean> {
+  const fenceClause = fence
+    ? ` AND EXISTS (
+          SELECT 1 FROM rich_menu_groups
+           WHERE id = ?
+             AND publishing_owner = ?
+             AND publishing_generation = ?
+             AND publishing_expires_at > ?
+        )`
+    : '';
   const result = await db.prepare(
     `UPDATE rich_menu_manual_publish_requests
         SET status = 'failed', last_error_code = ?, updated_at = ?
-      WHERE id = ? AND status = 'running' AND execution_token = ?`,
-  ).bind(errorCode.slice(0, 240), jstNow(), requestId, executionToken).run();
+      WHERE id = ? AND status = 'running' AND execution_token = ?${fenceClause}`,
+  ).bind(
+    errorCode.slice(0, 240),
+    jstNow(),
+    requestId,
+    executionToken,
+    ...(fence ? [fence.groupId, fence.owner, fence.generation, fence.nowIso] : []),
+  ).run();
   return (result.meta?.changes ?? 0) > 0;
 }
 
