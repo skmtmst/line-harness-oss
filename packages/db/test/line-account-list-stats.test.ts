@@ -44,9 +44,13 @@ beforeEach(() => {
            ('message-b-legacy', 'friend-b1', 'outgoing', 'text', 'b', NULL, datetime('now', 'start of month', '+1 day'));
     INSERT INTO line_account_connection_checks
       (id, line_account_id, check_kind, result, checked_by, checked_at, correlation_id, idempotency_key, account_revision)
-    VALUES ('check-a-webhook', 'account-a', 'webhook_endpoint', 'matched', 'staff-all', '2026-09-15T10:00:00.000Z', 'corr-a', 'idem-a', 1),
+    VALUES ('check-a-bot', 'account-a', 'bot_info', 'ok', 'staff-all', '2026-09-15T09:59:00.000Z', 'corr-a', 'idem-a', 1),
+           ('check-a-webhook', 'account-a', 'webhook_endpoint', 'matched', 'staff-all', '2026-09-15T10:00:00.000Z', 'corr-a', 'idem-a', 1),
            ('check-a-test', 'account-a', 'webhook_test', 'ok', 'staff-all', '2026-09-15T10:01:00.000Z', 'corr-a', 'idem-a', 1),
+           ('check-a-liff', 'account-a', 'liff_config', 'unknown', 'staff-all', '2026-09-15T10:01:30.000Z', 'corr-a', 'idem-a', 1),
+           ('check-b-bot', 'account-b', 'bot_info', 'ok', 'staff-all', '2026-09-15T10:01:00.000Z', 'corr-b', 'idem-b', 1),
            ('check-b-webhook', 'account-b', 'webhook_endpoint', 'mismatched', 'staff-all', '2026-09-15T10:02:00.000Z', 'corr-b', 'idem-b', 1),
+           ('check-b-test', 'account-b', 'webhook_test', 'unknown', 'staff-all', '2026-09-15T10:02:30.000Z', 'corr-b', 'idem-b', 1),
            ('check-d-webhook', 'account-d', 'webhook_endpoint', 'matched', 'staff-all', '2026-09-15T10:03:00.000Z', 'corr-d', 'idem-d', 1);
   `);
   db = asD1(sqlite);
@@ -67,7 +71,7 @@ describe('LINEアカウント一覧の一括集計', () => {
       getLineAccountListStats(countingDb, ['account-a', 'account-b', 'account-c', 'account-d']),
     ).resolves.toEqual({
       'account-a': { friendCount: 2, activeScenarios: 1, messagesThisMonth: 1, staffCount: 2, connection: { status: 'ok', checkedAt: '2026-09-15T10:01:00.000Z' } },
-      'account-b': { friendCount: 1, activeScenarios: 1, messagesThisMonth: 1, staffCount: 1, connection: { status: 'warn', checkedAt: '2026-09-15T10:02:00.000Z' } },
+      'account-b': { friendCount: 1, activeScenarios: 1, messagesThisMonth: 1, staffCount: 1, connection: { status: 'warn', checkedAt: '2026-09-15T10:02:30.000Z' } },
       'account-c': { friendCount: 0, activeScenarios: 0, messagesThisMonth: 0, staffCount: 1, connection: { status: 'unknown', checkedAt: null } },
       'account-d': { friendCount: 0, activeScenarios: 0, messagesThisMonth: 0, staffCount: 1, connection: { status: 'warn', checkedAt: '2026-09-15T10:03:00.000Z' } },
     });
