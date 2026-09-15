@@ -7,6 +7,7 @@ import {
 } from '@line-crm/db';
 
 import { fetchQuota } from './broadcast-quota-guard.js';
+import { collectOperationDispatchHealth } from './operation-dispatch-health.js';
 
 type AccountRow = { id: string; channel_access_token: string; is_active: number };
 
@@ -106,23 +107,8 @@ async function collectChecks(
         { eventCount: Number(row.event_count), failedCount: failed, lastReceivedAt: row.last_received_at },
         { warningFailures: 1, dangerFailures: 3 });
     }),
-    isolate('dispatch_jobs', observedAt, async () => {
-      const row = await db.prepare(
-        `SELECT COUNT(*) AS pending_count, MIN(created_at) AS oldest_at
-           FROM automation_runs
-          WHERE line_account_id = ? AND status IN ('queued', 'running', 'waiting')`,
-      ).bind(account.id).first<{ pending_count: number; oldest_at: string | null }>();
-      const oldestMs = row?.oldest_at ? Date.parse(row.oldest_at) : Number.NaN;
-      const delayMinutes = Number.isFinite(oldestMs)
-        ? Math.max(0, Math.floor((Date.parse(observedAt) - oldestMs) / 60_000))
-        : 0;
-      const status: OperationHealthStatus = delayMinutes >= 30 ? 'danger' : delayMinutes >= 10 ? 'warning' : 'normal';
-      return result('dispatch_jobs', status,
-        status === 'normal' ? '自動処理の滞留はありません' : '自動処理が滞留しています',
-        'automation_runs', observedAt,
-        { pendingCount: Number(row?.pending_count ?? 0), oldestAt: row?.oldest_at ?? null, delayMinutes },
-        { warningMinutes: 10, dangerMinutes: 30 });
-    }),
+    isolate('dispatch_jobs', observedAt,
+      () => collectOperationDispatchHealth(db, account.id, observedAt)),
     isolate('friend_change', observedAt, async () => {
       const rows = await db.prepare(
         `SELECT date, active, added, blocked

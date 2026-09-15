@@ -1,11 +1,12 @@
 'use client'
 
 import SelectField from '@/components/shared/select-field'
-import { Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import type { FriendField } from '@line-crm/shared'
 import {
   api,
+  ApiError,
   type AnalyticsFriendsOverview,
   type AnalyticsCrossAxis,
   type AnalyticsCrossResult,
@@ -252,6 +253,59 @@ const CROSS_AUTO_POLL_MAX_MS = 15 * 60_000
 // 一時的な確認失敗の後の待ち時間。run IDを消さず間隔を空けて続け、実行中の集計へ再接続できるようにする。
 const CROSS_POLL_ERROR_BACKOFF_MS = 10_000
 
+// 画面を開き直しても、同じタブ・同じLINEアカウント内なら実行中の集計へ
+// 戻れるようにする。保存するのは不透明なrun IDと作成時刻だけで、条件や
+// 友だち情報は端末へ残さない。runは通常数分で終わるので、古い控えを何日も
+// 追いかけないよう1日で捨てる。サーバーが先に消した場合は404でも捨てる。
+const CROSS_RUN_STORAGE_PREFIX = 'lh:analytics:cross-run:v1:'
+const CROSS_STORED_RUN_TTL_MS = 24 * 60 * 60_000
+
+type StoredCrossRun = {
+  id: string
+  createdAt: number
+}
+
+function crossRunStorageKey(accountId: string): string {
+  return `${CROSS_RUN_STORAGE_PREFIX}${encodeURIComponent(accountId)}`
+}
+
+function validStoredCrossRun(value: unknown, now = Date.now()): value is StoredCrossRun {
+  if (!value || typeof value !== 'object') return false
+  const candidate = value as Partial<StoredCrossRun>
+  return typeof candidate.id === 'string'
+    && /^[A-Za-z0-9-]{1,128}$/.test(candidate.id)
+    && typeof candidate.createdAt === 'number'
+    && Number.isFinite(candidate.createdAt)
+    && candidate.createdAt > 0
+    && candidate.createdAt <= now
+    && now - candidate.createdAt <= CROSS_STORED_RUN_TTL_MS
+}
+
+function readStoredCrossRun(accountId: string): StoredCrossRun | null {
+  if (typeof window === 'undefined') return null
+  const key = crossRunStorageKey(accountId)
+  try {
+    const raw = window.sessionStorage.getItem(key)
+    if (!raw) return null
+    const parsed: unknown = JSON.parse(raw)
+    if (validStoredCrossRun(parsed)) return parsed
+  } catch {
+    // storageが無効な端末でも、新規の集計や結果確認を止めない。
+  }
+  try { window.sessionStorage.removeItem(key) } catch { /* storage unavailable */ }
+  return null
+}
+
+function saveStoredCrossRun(accountId: string, run: StoredCrossRun): void {
+  if (typeof window === 'undefined') return
+  try { window.sessionStorage.setItem(crossRunStorageKey(accountId), JSON.stringify(run)) } catch { /* storage unavailable */ }
+}
+
+function clearStoredCrossRun(accountId: string): void {
+  if (typeof window === 'undefined') return
+  try { window.sessionStorage.removeItem(crossRunStorageKey(accountId)) } catch { /* storage unavailable */ }
+}
+
 function CrossTab({ accountId, canManage }: { accountId: string; canManage: boolean }) {
   const [fields, setFields] = useState<FriendField[]>([])
   // 友だち情報欄が取れないのに空表示のままにすると、項目を作り直す事故になる。
@@ -265,6 +319,9 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
   const [crossAutoStopped, setCrossAutoStopped] = useState(false)
   const [crossRecheck, setCrossRecheck] = useState(0)
   const [loading, setLoading] = useState(false)
+  const [restoredCrossRun, setRestoredCrossRun] = useState(false)
+  // sessionStorageはSSRの初期HTMLでは読まない。hydration完了後に一度だけ読む。
+  const [crossStorageRestored, setCrossStorageRestored] = useState(false)
   const [error, setError] = useState('')
   const [crossDays, setCrossDays] = useState(30)
   const [audience, setAudience] = useState<{ id: string; memberCount: number; expiresAt: string } | null>(null)
@@ -277,6 +334,8 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
   } | null>(null)
   // いま表示してよい応答の世代。アカウント切替・画面破棄で進む。
   const viewGeneration = useRef(0)
+  // Reactがloading状態を描く前の連続clickでもPOSTを1回に留める。
+  const crossStartInFlight = useRef(false)
 
   useEffect(() => {
     let active = true
@@ -297,15 +356,17 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
     }
   }, [accountId])
 
+  // 親はaccountIdをkeyにも使うため、切替時はCrossTab自体が作り直される。
+  // 初期HTMLとhydration時の表示を同じに保ったうえで、同じアカウントのrunだけを復元する。
   useEffect(() => {
-    setCrossResult(null)
-    setCrossRunId('')
-    setCrossResultId('')
-    setCrossQueue(null)
-    setCrossAutoStopped(false)
-    setPicked(null)
-    setAudience(null)
-    setError('')
+    const stored = readStoredCrossRun(accountId)
+    if (stored) {
+      setCrossRunId(stored.id)
+      setCrossResultId(stored.id)
+      setLoading(true)
+      setRestoredCrossRun(true)
+    }
+    setCrossStorageRestored(true)
   }, [accountId])
 
   // アカウントを切り替える、または画面を離れると世代が1つ進む。切替の前に投げた
@@ -316,6 +377,14 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
     return () => { viewGeneration.current = generation + 1 }
   }, [accountId])
 
+  const clearCrossRun = useCallback(() => {
+    clearStoredCrossRun(accountId)
+    setCrossRunId('')
+    setCrossResultId('')
+    setCrossQueue(null)
+    setRestoredCrossRun(false)
+  }, [accountId])
+
   // 結果待ちの読み直し。終わらない集計があると無限に叩き続け、端末の電池と
   // 回線、D1の読み取り枠を消費するため、打ち切り時刻を過ぎたら自動確認は止める。
   // 打ち切りは最低6分(5分cronの最初の処理機会をまたぐ)で、観測した最短目安+3分
@@ -323,7 +392,8 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
   // 「結果をもう一度確認」で同じrunへ再接続する。一時的な確認失敗でもrun IDを
   // 消さず、順番表示を残したまま間隔を空けて確認を続ける。
   useEffect(() => {
-    if (!crossRunId) return
+    // storage復元前はSSR/hydration直後の表示だけを保ち、GETを始めない。
+    if (!crossStorageRestored || !crossRunId) return
     let active = true
     let timer: number | undefined
     let attempts = 0
@@ -367,21 +437,35 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
         }
         if (response.data.result) {
           setCrossResult(response.data.result)
-          setCrossRunId('')
-          setCrossQueue(null)
+          clearCrossRun()
           setLoading(false)
           return
         }
         if (response.data.state === 'failed') {
           setError(response.data.errorCode || 'クロス分析に失敗しました。条件を変えずにもう一度集計できます')
-          setCrossRunId('')
-          setCrossQueue(null)
+          clearCrossRun()
           setLoading(false)
           return
         }
-      } catch {
+      } catch (caught) {
         if (!active) return
-        // 一時的な確認失敗でrun IDを消すと、実行中の集計へ再接続できなくなる。
+        if (caught instanceof ApiError && caught.status === 401) {
+          // セッション切れは再ログイン後に同じrunを復元できるよう控えを残す。
+          // ただし認証なしで10秒ごとに叩き続けない。
+          setCrossAutoStopped(true)
+          setError('ログインを確認できません。ログインし直した後、同じ集計を確認できます')
+          setLoading(false)
+          return
+        }
+        if (caught instanceof ApiError && [400, 403, 404, 410].includes(caught.status)) {
+          // 不正なrun ID・権限不足・削除済み・期限切れは、再試行しても解消しない。
+          // 控えを消してPOSTも自動確認も止め、次の操作を利用者に委ねる。
+          clearCrossRun()
+          setError('前回のクロス分析は利用できません。もう一度集計してください')
+          setLoading(false)
+          return
+        }
+        // 通信断・5xxなど一時的な確認失敗でrun IDを消すと、実行中の集計へ再接続できなくなる。
         // 順番表示は残し、間隔を空けて確認を続ける。ただし打ち切り時刻を過ぎて
         // いたら、間隔を空ける前にここで止める(失敗が続くほど間隔が延びるため、
         // 打ち切りを後回しにすると上限を大きく越える)。
@@ -407,11 +491,11 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
       active = false
       if (timer !== undefined) window.clearTimeout(timer)
     }
-  }, [accountId, crossRunId, crossRecheck])
+  }, [accountId, clearCrossRun, crossRunId, crossRecheck, crossStorageRestored])
 
   // 時間切れ後もrun IDを保持しているため、同じ集計へ再接続できる。
   const recheckCross = () => {
-    if (!crossRunId) return
+    if (!crossStorageRestored || !crossRunId) return
     setCrossAutoStopped(false)
     setError('')
     setLoading(true)
@@ -419,7 +503,8 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
   }
 
   const runCross = async () => {
-    if (!fieldId) return
+    if (!crossStorageRestored || !fieldId || crossRunId || crossStartInFlight.current) return
+    crossStartInFlight.current = true
     const generation = viewGeneration.current
     setLoading(true)
     setError('')
@@ -428,6 +513,7 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
     setCrossResult(null)
     setCrossQueue(null)
     setCrossAutoStopped(false)
+    setRestoredCrossRun(false)
     const now = new Date()
     const from = new Date(now.getTime() - crossDays * 24 * 3600_000)
     const rowAxis: AnalyticsCrossAxis = { kind: rowKind }
@@ -444,6 +530,7 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
       // 切替の前に投げた集計の受付が後から返っても、前のアカウントのrun IDで
       // 待機表示やポーリングを始めない。
       if (viewGeneration.current !== generation) return
+      saveStoredCrossRun(accountId, { id: response.data.id, createdAt: Date.now() })
       setCrossResultId(response.data.id)
       setCrossRunId(response.data.id)
     } catch (caught) {
@@ -451,6 +538,8 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
       const code = caught instanceof Error ? caught.message : ''
       setError(explainStartError(code, code || 'クロス分析を開始できませんでした'))
       setLoading(false)
+    } finally {
+      crossStartInFlight.current = false
     }
   }
 
@@ -620,7 +709,7 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
               }))}
             />
           </div>
-          <Button onClick={() => void runCross()} disabled={loading || !fieldId} variant="primary">
+          <Button onClick={() => void runCross()} disabled={loading || !crossStorageRestored || !fieldId || Boolean(crossRunId)} variant="primary">
             {loading ? '集計中' : `この${crossDays}日を集計`}
           </Button>
         </div>
@@ -659,7 +748,7 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
 
       {loading ? (
         <div className="bg-canvas rounded-card border-hairline border p-8 text-center text-sm" role="status">
-          <p className="text-ink font-medium">集計を受け付けました。終わるまでこの画面で確認しています。</p>
+          <p className="text-ink font-medium">{restoredCrossRun ? '進行中の集計を確認しています。' : '集計を受け付けました。終わるまでこの画面で確認しています。'}</p>
           <p className="text-ink-secondary mt-2">
             現在の状態: {crossQueue?.state === 'running' ? '処理中です' : 'このLINEアカウント内で待ち順に並んでいます'}
           </p>

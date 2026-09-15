@@ -67,6 +67,22 @@ describe('クロス分析の待ち順と処理目安 (Issue #633)', () => {
     expect(PAGE).toMatch(/stopIfDeadlinePassed\(\)\) return\n\s*\/\/ 失敗が続くほど間隔を空ける/)
   })
 
+  it('再読込時は同じアカウントのrunだけ復元し、恒久4xxの再試行を止める', () => {
+    expect(PAGE).toContain("CROSS_RUN_STORAGE_PREFIX = 'lh:analytics:cross-run:v1:'")
+    expect(PAGE).toContain('sessionStorageはSSRの初期HTMLでは読まない')
+    expect(PAGE).toContain('setCrossStorageRestored(true)')
+    expect(PAGE).toContain('!crossStorageRestored || !crossRunId')
+    expect(PAGE).toContain('saveStoredCrossRun(accountId')
+    expect(PAGE).toContain('clearStoredCrossRun(accountId)')
+    expect(PAGE).toContain('crossStartInFlight')
+    expect(PAGE).toContain('Boolean(crossRunId)')
+    // 認証切れは再ログイン後に復元できるよう控えを残すが、無限再試行はしない。
+    expect(PAGE).toContain('caught.status === 401')
+    expect(PAGE).toContain('ログインし直した後、同じ集計を確認できます')
+    // 不正/権限不足/削除済み/期限切れのrunを15分叩き続けない。
+    expect(PAGE).toContain('[400, 403, 404, 410].includes(caught.status)')
+  })
+
   it('アカウント切替で作り直し、前のアカウントの遅延応答を表示へ入れない', () => {
     // 画面ごと作り直す(key)。加えて世代fenceで、切替前に投げた通信の応答を落とす。
     expect(PAGE).toContain('<CrossTab key={selectedAccountId} accountId={selectedAccountId}')
