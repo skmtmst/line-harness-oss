@@ -63,6 +63,7 @@ interface EventRow {
   description_centered: number;
   max_bookings_per_friend: number | null;
   requires_approval: number;
+  approval_deadline_hours: number;
   cancel_deadline_hours_before: number | null;
   reminder_day_before_enabled: number;
   reminder_hours_before: number | null;
@@ -72,6 +73,9 @@ interface EventRow {
   deleted_at: string | null;
   created_at: string;
   updated_at: string;
+  version: number;
+  current_published_version_id: string | null;
+  version_write_token?: string | null;
   target_type?: 'single' | 'multi-account-dedup';
   account_ids?: string | null;
   dedup_priority?: string | null;
@@ -243,12 +247,16 @@ function makeEventDb(state: {
             return { id: f.id } as T;
           }
           // LIFF event row for booking creation: SELECT id, name, ... FROM events WHERE ...
-          if (sql.includes('SELECT id, name, venue_name')) {
+          if (sql.includes('SELECT id, name, image_url, description, venue_name')) {
             const [id, account] = bound as [string, string];
             const e = state.events.find(
               (x) => x.id === id && x.line_account_id === account && x.deleted_at == null && x.is_published === 1,
             );
-            return (e ?? null) as T | null;
+            return (e ? {
+              ...e,
+              approval_deadline_hours: e.approval_deadline_hours ?? 24,
+              current_published_version_id: e.current_published_version_id ?? null,
+            } : null) as T | null;
           }
           // SELECT capacity FROM event_slots WHERE id = ?
           if (sql.startsWith('SELECT capacity FROM event_slots')) {
@@ -257,7 +265,7 @@ function makeEventDb(state: {
             return (s ? { capacity: s.capacity } : null) as T | null;
           }
           // SELECT id, event_id, starts_at, is_active, deleted_at FROM event_slots WHERE id = ? AND event_id = ?
-          if (sql.startsWith('SELECT id, event_id, starts_at, is_active, deleted_at')) {
+          if (sql.startsWith('SELECT id, event_id, starts_at, ends_at, is_active, deleted_at')) {
             const [id, event_id] = bound as [string, string];
             const s = (state.slots ?? []).find(
               (x) => x.id === id && x.event_id === event_id && x.deleted_at == null,
@@ -687,7 +695,9 @@ function makeEventDb(state: {
           // LIFF history JOIN: FROM event_bookings b JOIN events e JOIN event_slots s
           if (sql.includes('FROM event_bookings b') && sql.includes('event_name')) {
             const [friend_id, account_id, nowIso] = bound as [string, string, string];
-            const isUpcoming = sql.includes("status IN ('requested','confirmed')\n            AND s.starts_at >=");
+            const isUpcoming = sql.includes("status IN ('requested','confirmed')")
+              && sql.includes("json_extract(b.event_snapshot_json, '$.slotStartsAt')")
+              && sql.includes('>= ?');
             const items = (state.bookings ?? [])
               .filter((b) => {
                 const r = b as Record<string, unknown>;
@@ -758,6 +768,7 @@ function makeEventDb(state: {
               id, line_account_id, event_id, slot_id, friend_id, identity_key,
               party_size, answer_snapshot_json, first_participation,
               first_participation_attended_count, first_participation_checked_at,
+              event_version_id, event_snapshot_json,
               created_at, updated_at,
             ] = bound as string[];
             const dup = (state.waitlist ?? []).some(
@@ -777,6 +788,8 @@ function makeEventDb(state: {
               first_participation,
               first_participation_attended_count,
               first_participation_checked_at,
+              event_version_id,
+              event_snapshot_json,
               created_at,
               updated_at,
             });
@@ -840,10 +853,12 @@ function makeEventDb(state: {
               id, line_account_id, event_id, slot_id, friend_id, status, customer_note,
               requested_at, identity_key, party_size, answer_snapshot_json,
               first_participation, first_participation_attended_count,
-              first_participation_checked_at,
+              first_participation_checked_at, event_version_id, event_snapshot_json,
+              approval_expires_at,
             ] = bound as [
               string, string, string, string, string, string, string | null,
               string, string | undefined, number, string | null, number, number, string,
+              string | null, string | null, string | null,
             ];
             (state.bookings ?? []).push({
               id, event_id, status,
@@ -857,6 +872,9 @@ function makeEventDb(state: {
               first_participation,
               first_participation_attended_count,
               first_participation_checked_at,
+              event_version_id,
+              event_snapshot_json,
+              approval_expires_at,
             } as BookingRow & Record<string, unknown>);
             return { success: true, meta: { changes: 1 } };
           }
@@ -899,14 +917,14 @@ function makeEventDb(state: {
             const [
               id, line_account_id, name, venue_name, venue_url, image_url,
               description, description_centered,
-              max_bookings_per_friend, requires_approval, cancel_deadline_hours_before,
+              max_bookings_per_friend, requires_approval, approval_deadline_hours, cancel_deadline_hours_before,
               reminder_day_before_enabled, reminder_hours_before,
               is_published, sort_order,
               target_type, account_ids, dedup_priority,
             ] = bound as [
               string, string, string, string | null, string | null, string | null,
               string | null, number,
-              number | null, number, number | null,
+              number | null, number, number, number | null,
               number, number | null,
               number, number,
               string, string | null, string | null,
@@ -923,6 +941,7 @@ function makeEventDb(state: {
               description_centered,
               max_bookings_per_friend,
               requires_approval,
+              approval_deadline_hours,
               cancel_deadline_hours_before,
               reminder_day_before_enabled,
               reminder_hours_before,
@@ -935,6 +954,8 @@ function makeEventDb(state: {
               target_type: target_type as 'single' | 'multi-account-dedup',
               account_ids,
               dedup_priority,
+              version: 1,
+              current_published_version_id: (bound[27] as string | null) ?? null,
             });
             return { success: true, meta: { changes: 1 } };
           }
@@ -954,14 +975,23 @@ function makeEventDb(state: {
           }
           if (sql.startsWith('UPDATE events SET ')) {
             // Generic field update — parse SET ... WHERE id = ?
-            const id = bound[bound.length - 1] as string;
+            const conditionalVersion = sql.includes('AND version = ?');
+            const conditionalToken = sql.includes('AND version_write_token = ?');
+            const id = bound[bound.length - (conditionalToken ? 3 : conditionalVersion ? 2 : 1)] as string;
             const e = state.events.find((x) => x.id === id);
             if (!e) return { success: true, meta: { changes: 0 } };
+            if (conditionalVersion && e.version !== bound[bound.length - 1]) {
+              return { success: true, meta: { changes: 0 } };
+            }
             // Extract column list from SET clause
             const setPart = sql.substring('UPDATE events SET '.length, sql.indexOf(' WHERE'));
             const cols = setPart.split(',').map((s) => s.trim());
             let valIdx = 0;
             for (const col of cols) {
+              if (/^version\s*=\s*version\s*\+\s*1$/.test(col)) {
+                e.version += 1;
+                continue;
+              }
               const m = /^(\w+)\s*=\s*(\?|strftime)/.exec(col);
               if (!m) continue;
               const colName = m[1];
@@ -1509,7 +1539,7 @@ describe('PUT /api/events/admin/events/:id', () => {
     const res = await app.request('/api/events/admin/events/e1?account_id=la1', {
       method: 'PUT',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ name: 'new', requires_approval: 1 }),
+      body: JSON.stringify({ name: 'new', requires_approval: 1, expected_version: 1 }),
     });
     expect(res.status).toBe(200);
     expect(state.events[0].name).toBe('new');
@@ -1522,7 +1552,7 @@ describe('PUT /api/events/admin/events/:id', () => {
     const res = await app.request('/api/events/admin/events/e1?account_id=la1', {
       method: 'PUT',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ name: 'x' }),
+      body: JSON.stringify({ name: 'x', expected_version: 1 }),
     });
     expect(res.status).toBe(404);
   });
@@ -1539,7 +1569,7 @@ describe('PUT /api/events/admin/events/:id', () => {
       method: 'PUT',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
-        target_type: 'multi-account-dedup', account_ids: ['la1', 'other'],
+        target_type: 'multi-account-dedup', account_ids: ['la1', 'other'], expected_version: 1,
       }),
     });
     expect(res.status).toBe(403);
@@ -1552,7 +1582,7 @@ describe('PUT /api/events/admin/events/:id', () => {
     const res = await app.request('/api/events/admin/events/e1?account_id=la1', {
       method: 'PUT',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ description: 'x'.repeat(20001) }),
+      body: JSON.stringify({ description: 'x'.repeat(20001), expected_version: 1 }),
     });
     expect(res.status).toBe(422);
   });
@@ -2856,6 +2886,7 @@ function baseEvent(over: Partial<EventRow>): EventRow {
     description_centered: 0,
     max_bookings_per_friend: null,
     requires_approval: 0,
+    approval_deadline_hours: 24,
     cancel_deadline_hours_before: null,
     reminder_day_before_enabled: 1,
     reminder_hours_before: null,
@@ -2865,6 +2896,8 @@ function baseEvent(over: Partial<EventRow>): EventRow {
     deleted_at: null,
     created_at: now,
     updated_at: now,
+    version: 1,
+    current_published_version_id: null,
     target_type: 'single',
     account_ids: null,
     dedup_priority: null,
