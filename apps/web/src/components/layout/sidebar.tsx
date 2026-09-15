@@ -97,7 +97,9 @@ export default function Sidebar({
     return () => window.removeEventListener('popstate', sync)
   }, [pathname])
 
-  // 設定を読む。取れなくても既定の並び・表示で使えるので、失敗は握る。
+  // 表示可否を読む。一般staffへ管理用の設定・契約理由・並び順を渡さない。
+  // owner/adminだけは、設定画面と同じ管理GETから保存済みの並びも読む。
+  // 取れなくても既定の並び・表示で使えるので、失敗は握る。
   useEffect(() => {
     if (!selectedAccountId) {
       setSectionOrder(null)
@@ -107,15 +109,27 @@ export default function Sidebar({
       return
     }
     let cancelled = false
+    const canManageFeatureSettings = staffRole === 'owner' || staffRole === 'admin'
     const loadSettings = () => {
       void import('@/lib/api')
-        .then(({ api }) => api.featureSettings.get(selectedAccountId))
-        .then((res) => {
+        .then(async ({ api }) => {
+          if (canManageFeatureSettings) {
+            const res = await api.featureSettings.get(selectedAccountId)
+            if (!cancelled && res.success) {
+              setSectionOrder(res.data.sidebarOrder)
+              setItemOrder(res.data.sidebarItemOrder)
+              setFeatureVisibility(res.data.features)
+              setSpecializedFeatureKeys(res.data.specializedFeatureKeys)
+            }
+            return
+          }
+          const res = await api.featureSettings.visibility(selectedAccountId)
           if (!cancelled && res.success) {
-            setSectionOrder(res.data.sidebarOrder)
-            setItemOrder(res.data.sidebarItemOrder)
+            setSectionOrder(null)
+            setItemOrder(null)
             setFeatureVisibility(res.data.features)
-            setSpecializedFeatureKeys(res.data.specializedFeatureKeys)
+            // 専用機能の目録はbooleanへ畳み込み済み。名前の配列は受け取らない。
+            setSpecializedFeatureKeys(SPECIALIZED_FEATURE_KEYS)
           }
         })
         .catch(() => {
@@ -132,7 +146,7 @@ export default function Sidebar({
       cancelled = true
       window.removeEventListener(FEATURE_SETTINGS_UPDATED_EVENT, onSettingsUpdated)
     }
-  }, [selectedAccountId])
+  }, [selectedAccountId, staffRole])
   // 区分の中の並びを当ててから、区分そのものの並びを当てる。
   const storeSections = orderedMenuSections(itemOrder)
   const normalizedSectionOrder = sectionOrder?.map((label) => label === 'NEN運用' ? '専用機能' : label)

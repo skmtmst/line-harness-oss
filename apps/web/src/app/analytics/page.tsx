@@ -1821,7 +1821,7 @@ function UsageOverviewTab({ accountId }: { accountId: string }) {
     let active = true
     setMenuFeatures(null)
     setMenuFeaturesError('')
-    void api.featureSettings.get(accountId).then((response) => {
+    void api.featureSettings.visibility(accountId).then((response) => {
       if (!active) return
       if (!response.success) {
         setMenuFeaturesError('メニューに出している機能を確認できません')
