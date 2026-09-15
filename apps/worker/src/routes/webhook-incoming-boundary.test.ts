@@ -57,6 +57,14 @@ function seed(db: SqliteD1): void {
   `).run(SECRET);
 }
 
+/*
+ * 受信口には経路全体の rateLimitMiddleware(未認証はIPごと100件/分)が
+ * 先に効く。テストごとに別IPを名乗らないと、ファイル内の受信が同じ
+ * `ip:0.0.0.0` バケツを使い回して経路手前の429と受領側の429が混ざる。
+ */
+let clientIp = '0.0.0.0';
+let testIpSeq = 0;
+
 /** 署名を付けて受信口を叩く。 */
 async function receive(
   env: never,
@@ -68,7 +76,11 @@ async function receive(
     `/api/webhooks/incoming/${options?.webhookId ?? 'iwh-1'}/receive?accountId=account-1`,
     {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Webhook-Signature': signature },
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Webhook-Signature': signature,
+        'cf-connecting-ip': clientIp,
+      },
       body,
     },
     env,
@@ -90,6 +102,7 @@ describe('#829 受信Webhookの受理境界', () => {
 
   beforeEach(() => {
     fireEvent.mockReset().mockResolvedValue(undefined);
+    clientIp = `10.200.${testIpSeq++}.7`;
     db = createTestD1();
     seed(db);
     env = { DB: db.db } as never;
@@ -232,6 +245,48 @@ describe('#829 受信Webhookの受理境界', () => {
       expect(dupBody.data).toMatchObject({ received: true, duplicate: true });
       // 重複応答は新しい受領記録を消費しない。
       expect(receiptCount()).toBe(60);
+    });
+
+    it('残り1枠へ異なる署名が同時に届いても、通るのは最大1件で残りは429', async () => {
+      // 59件埋まった窓の空きは1件分だけ。異なる署名が同じ空きを
+      // 奪い合っても、INSERT内側の件数条件で1件までしか通らない。
+      const now = new Date().toISOString();
+      for (let i = 0; i < 59; i++) {
+        db.raw.prepare(`INSERT INTO incoming_webhook_receipts
+          (webhook_id, signature_hash, source_event_id, received_at)
+          VALUES ('iwh-1', ?, ?, ?)`).run(`race-${i}`, `race-event-${i}`, now);
+      }
+      const results = await Promise.all(
+        Array.from({ length: 10 }, (_, i) =>
+          receive(env, JSON.stringify({ order_id: `last-slot-${i}` }))),
+      );
+      const statuses = results.map((res) => res.status);
+      const succeeded = statuses.filter((s) => s === 200).length;
+      expect(succeeded).toBeLessThanOrEqual(1);
+      expect(statuses.filter((s) => s === 429)).toHaveLength(10 - succeeded);
+      expect(receiptCount()).toBe(60);
+    });
+
+    it('429で止めた受信は受領を残さず、窓が明ければ同じ本文の再送が200になる', async () => {
+      const now = new Date().toISOString();
+      for (let i = 0; i < 60; i++) {
+        db.raw.prepare(`INSERT INTO incoming_webhook_receipts
+          (webhook_id, signature_hash, source_event_id, received_at)
+          VALUES ('iwh-1', ?, ?, ?)`).run(`full-${i}`, `full-event-${i}`, now);
+      }
+      const body = JSON.stringify({ order_id: 'retry-after-window' });
+      const limited = await receive(env, body);
+      expect(limited.status).toBe(429);
+      // 429で止めた分は受領行を作らないので、後から送り直せる。
+      expect(receiptCount()).toBe(60);
+      // 受領をすべて窓の外へ追いやると、同じ本文・同じ署名が新規として通る。
+      db.raw.prepare(`UPDATE incoming_webhook_receipts SET received_at=? WHERE webhook_id='iwh-1'`)
+        .run(new Date(Date.now() - 10 * 60_000).toISOString());
+      const retry = await receive(env, body);
+      expect(retry.status).toBe(200);
+      const retryBody = await retry.json() as { data: ReceiveData };
+      expect(retryBody.data).toMatchObject({ received: true });
+      expect(receiptCount()).toBe(61);
     });
   });
 });
