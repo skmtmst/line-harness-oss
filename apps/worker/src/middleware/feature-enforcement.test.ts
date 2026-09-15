@@ -40,6 +40,7 @@ function testApp(handler = vi.fn((c) => c.json({ success: true }))) {
   app.get('/api/webinars', handler);
   app.post('/api/webinars', handler);
   app.get('/api/broadcasts', handler);
+  app.post('/api/broadcasts', handler);
   app.get('/api/settings/features', handler);
   app.get('/api/not-in-manifest', handler);
   return { app, handler };
@@ -110,7 +111,9 @@ describe('featureEnforcementMiddleware', () => {
       disabledDependencies: reason === 'dependency_disabled' ? ['templates'] : [],
     });
     const { app, handler } = testApp();
-    const response = await app.request('/api/broadcasts?account_id=account-1', {}, env);
+    const response = await app.request('/api/broadcasts?account_id=account-1', {
+      method: reason === 'contract_unavailable' ? 'POST' : 'GET',
+    }, env);
 
     expect(response.status).toBe(403);
     expect(await response.json()).toMatchObject({
@@ -121,6 +124,24 @@ describe('featureEnforcementMiddleware', () => {
       reason,
     });
     expect(handler).not.toHaveBeenCalled();
+  });
+
+  test('契約だけが停止理由なら閲覧GETは従来処理へ進む', async () => {
+    mocks.accountFeatureAvailability.mockResolvedValue({
+      featureId: 'broadcasts',
+      contractAvailable: false,
+      companyEnabled: true,
+      dependenciesEnabled: true,
+      effectiveEnabled: false,
+      reason: 'contract_unavailable',
+      message: 'ご契約ではこの機能を利用できません',
+      disabledDependencies: [],
+    });
+    const { app, handler } = testApp();
+    const response = await app.request('/api/broadcasts?account_id=account-1', {}, env);
+
+    expect(response.status).toBe(200);
+    expect(handler).toHaveBeenCalledOnce();
   });
 
   test('会社設定がオンなら従来の handler と入力契約へ進む', async () => {
@@ -171,6 +192,26 @@ describe('featureEnforcementMiddleware', () => {
       data: ['account-1'],
       meta: { featureDisabledAccounts: 1 },
     });
+  });
+
+  test('可視 account が0件の GET 一覧は構造化403を返す', async () => {
+    mocks.getVisibleLineAccountScope.mockResolvedValue({
+      ids: [],
+      allowedAccountIds: [],
+      accounts: [],
+      canSeeUnassigned: false,
+      isAccountScoped: true,
+    });
+    const { app, handler } = testApp();
+    const response = await app.request('/api/broadcasts', {}, env);
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toMatchObject({
+      success: false,
+      code: 'FEATURE_DISABLED',
+      featureId: 'broadcasts',
+    });
+    expect(handler).not.toHaveBeenCalled();
   });
 
   test('core API は機能設定に関係なく従来処理へ進む', async () => {

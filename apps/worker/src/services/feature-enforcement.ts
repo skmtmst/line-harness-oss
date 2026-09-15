@@ -433,10 +433,40 @@ export type FeatureAvailability = {
   disabledDependencies: FeatureId[];
 };
 
+export type FeatureAvailabilityRequestContext = {
+  tenantIdsByAccount: ReadonlyMap<string, string | null>;
+  entitlementsByTenant: Map<string, Promise<ReturnType<typeof resolveEntitlements>>>;
+};
+
+/** 同じHTTP request内で、account所属とtenant料金を使い回す。request外へ持ち出さない。 */
+export function createFeatureAvailabilityRequestContext(
+  accounts: readonly { id: string; tenant_id: string | null }[] = [],
+): FeatureAvailabilityRequestContext {
+  return {
+    tenantIdsByAccount: new Map(accounts.map((account) => [account.id, account.tenant_id])),
+    entitlementsByTenant: new Map(),
+  };
+}
+
+async function tenantEntitlements(
+  db: D1Database,
+  tenantId: string,
+  context?: FeatureAvailabilityRequestContext,
+): Promise<ReturnType<typeof resolveEntitlements>> {
+  const load = async () => resolveEntitlements(await getTenantBilling(db, tenantId));
+  if (!context) return load();
+  const cached = context.entitlementsByTenant.get(tenantId);
+  if (cached) return cached;
+  const pending = load();
+  context.entitlementsByTenant.set(tenantId, pending);
+  return pending;
+}
+
 async function contractAvailability(
   db: D1Database,
   accountId: string,
   featureIds: readonly FeatureId[] = FEATURE_CATALOG.map(({ featureId }) => featureId),
+  context?: FeatureAvailabilityRequestContext,
 ): Promise<Record<FeatureId, boolean>> {
   const allIncluded = featureIds.every(
     (featureId) => featureCatalogEntry(featureId).entitlementKey === 'included',
@@ -448,10 +478,14 @@ async function contractAvailability(
   }
   // 古い試験・移行行のようにアカウント所有者を解決できない場合は、従来どおり
   // 契約で止めない。実アカウントは tenant_id から必ず料金状態を読む。
-  const account = await db.prepare('SELECT tenant_id FROM line_accounts WHERE id = ?')
-    .bind(accountId).first<{ tenant_id: string | null }>();
-  const billing = account?.tenant_id ? await getTenantBilling(db, account.tenant_id) : null;
-  const entitlements = resolveEntitlements(billing);
+  const tenantKnown = context?.tenantIdsByAccount.has(accountId) ?? false;
+  const tenantId = tenantKnown
+    ? context!.tenantIdsByAccount.get(accountId) ?? null
+    : (await db.prepare('SELECT tenant_id FROM line_accounts WHERE id = ?')
+      .bind(accountId).first<{ tenant_id: string | null }>())?.tenant_id ?? null;
+  const entitlements = tenantId
+    ? await tenantEntitlements(db, tenantId, context)
+    : resolveEntitlements(null);
   return Object.fromEntries(FEATURE_CATALOG.map((entry) => [
     entry.featureId,
     featureContractIsAvailable(entitlements, entry.entitlementKey),
@@ -511,6 +545,7 @@ export async function accountFeatureAvailabilityMap(
   db: D1Database,
   accountId: string,
   knownCompanySettings?: Partial<Record<FeatureId, boolean>>,
+  context?: FeatureAvailabilityRequestContext,
 ): Promise<Record<FeatureId, FeatureAvailability>> {
   const missingFeatureIds = FEATURE_CATALOG
     .map(({ featureId }) => featureId)
@@ -519,7 +554,7 @@ export async function accountFeatureAvailabilityMap(
     missingFeatureIds.length > 0
       ? accountCompanyFeatureSettings(db, accountId, missingFeatureIds)
       : Promise.resolve({}),
-    contractAvailability(db, accountId),
+    contractAvailability(db, accountId, undefined, context),
   ]);
   const companySettings = {
     ...loadedCompanySettings,
@@ -538,6 +573,7 @@ export async function accountFeatureAvailability(
   db: D1Database,
   accountId: string,
   featureId: FeatureId,
+  context?: FeatureAvailabilityRequestContext,
 ): Promise<FeatureAvailability> {
   const requiredFeatureIds = new Set<FeatureId>();
   const collect = (current: FeatureId): void => {
@@ -550,7 +586,7 @@ export async function accountFeatureAvailability(
   collect(featureId);
   const [companySettings, contracts] = await Promise.all([
     accountCompanyFeatureSettings(db, accountId, [...requiredFeatureIds]),
-    contractAvailability(db, accountId, [...requiredFeatureIds]),
+    contractAvailability(db, accountId, [...requiredFeatureIds], context),
   ]);
   return resolveFeatureAvailability(featureId, companySettings, contracts, new Map());
 }

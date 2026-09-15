@@ -5,6 +5,7 @@ import { getVisibleLineAccountScope } from '../services/account-access.js';
 import { dbFor } from '../services/db-router.js';
 import {
   accountFeatureAvailability,
+  createFeatureAvailabilityRequestContext,
   type FeatureAvailability,
 } from '../services/feature-enforcement.js';
 
@@ -397,14 +398,29 @@ export const featureEnforcementMiddleware: MiddlewareHandler<Env> = async (c, ne
   const accountIds = await requestAccountIds(c);
   const staff = c.get('staff');
   const db = dbFor(c.env);
-  if (accountIds.length === 0 && c.req.method === 'GET' && staff) {
+  const isReadOperation = c.req.method === 'GET' || c.req.method === 'HEAD';
+  if (accountIds.length === 0 && isReadOperation && staff) {
     const scope = await getVisibleLineAccountScope(db, staff);
+    if (scope.ids.length === 0) {
+      return c.json({
+        success: false,
+        error: 'この機能は設定でオフになっています',
+        code: 'FEATURE_DISABLED',
+        featureId: classification.featureId,
+      }, 403);
+    }
+    const requestContext = createFeatureAvailabilityRequestContext(scope.accounts);
     const states = await Promise.all(scope.ids.map(async (accountId) => ({
       accountId,
-      availability: await accountFeatureAvailability(db, accountId, classification.featureId),
+      availability: await accountFeatureAvailability(
+        db,
+        accountId,
+        classification.featureId,
+        requestContext,
+      ),
     })));
     const enabledIds = states
-      .filter(({ availability }) => availability.effectiveEnabled)
+      .filter(({ availability }) => availabilityAllowsOperation(availability, c.req.method))
       .map(({ accountId }) => accountId);
     const excluded = states.length - enabledIds.length;
     if (enabledIds.length === 0) {
@@ -422,6 +438,7 @@ export const featureEnforcementMiddleware: MiddlewareHandler<Env> = async (c, ne
       code: 'LINE_ACCOUNT_REQUIRED',
     }, 400);
   }
+  let requestContext: ReturnType<typeof createFeatureAvailabilityRequestContext> | undefined;
   if (staff) {
     const scope = await getVisibleLineAccountScope(db, staff);
     if (accountIds.some((accountId) => !scope.ids.includes(accountId))) {
@@ -430,13 +447,30 @@ export const featureEnforcementMiddleware: MiddlewareHandler<Env> = async (c, ne
         error: 'このLINEアカウントを操作する権限がありません',
       }, 403);
     }
+    requestContext = createFeatureAvailabilityRequestContext(scope.accounts);
   }
   const states = await Promise.all(accountIds.map(
-    (accountId) => accountFeatureAvailability(db, accountId, classification.featureId),
+    (accountId) => accountFeatureAvailability(
+      db,
+      accountId,
+      classification.featureId,
+      requestContext,
+    ),
   ));
-  if (states.every(({ effectiveEnabled }) => effectiveEnabled)) return next();
-  return unavailableResponse(c, states.find(({ effectiveEnabled }) => !effectiveEnabled)!);
+  if (states.every((availability) => availabilityAllowsOperation(availability, c.req.method))) {
+    return next();
+  }
+  return unavailableResponse(
+    c,
+    states.find((availability) => !availabilityAllowsOperation(availability, c.req.method))!,
+  );
 };
+
+function availabilityAllowsOperation(availability: FeatureAvailability, method: string): boolean {
+  if (availability.effectiveEnabled) return true;
+  const readOperation = method === 'GET' || method === 'HEAD';
+  return readOperation && availability.reason === 'contract_unavailable';
+}
 
 function unavailableResponse(c: Context<Env>, availability: FeatureAvailability) {
   const code = availability.reason === 'contract_unavailable'
