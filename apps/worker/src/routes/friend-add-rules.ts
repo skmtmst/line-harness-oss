@@ -1063,6 +1063,13 @@ friendAddRules.post('/api/friend-add-rules/:id/stop', requireRole('owner', 'admi
     if (error instanceof Error && error.message === 'FRIEND_ADD_RULE_NOT_STOPPED') {
       return c.json({ success: false, code: 'STATE_CONFLICT', error: 'この配信ルールは停止できる状態ではありません' }, 409);
     }
+    if (error instanceof Error && error.message === 'FRIEND_ADD_RULE_FALLBACK_REQUIRED') {
+      return c.json({
+        success: false,
+        code: 'FALLBACK_REQUIRED',
+        error: '経路が分からない人の有効な受け皿がないため停止できません',
+      }, 409);
+    }
     throw error;
   }
 });
