@@ -12,6 +12,7 @@ const dbMocks = {
   archiveWebinar: vi.fn(),
   getWebinarActions: vi.fn(),
   replaceWebinarActions: vi.fn(),
+  countInvalidWebinarActionReferences: vi.fn(),
   getWebinarComments: vi.fn(),
   getWebinarCtas: vi.fn(),
   replaceWebinarCtas: vi.fn(),
@@ -166,6 +167,7 @@ beforeEach(() => {
   dbMocks.getFolderById.mockResolvedValue({ id: 'folder-1', kind: 'webinar', account_id: 'account-a' });
   dbMocks.getWebinarActions.mockResolvedValue([]);
   dbMocks.replaceWebinarActions.mockResolvedValue([]);
+  dbMocks.countInvalidWebinarActionReferences.mockResolvedValue(0);
   dbMocks.getWebinarComments.mockResolvedValue([
     { id: 'c1', webinar_id: 'w1', at_seconds: 10, author_name: '田中', body: '楽しみ!', created_at: 'x' },
   ]);
@@ -1607,15 +1609,17 @@ describe('admin CRUD', () => {
     expect(dbMocks.replaceWebinarActions).not.toHaveBeenCalled();
   });
 
-  test('視聴後アクションは参照先IDが空の設定を拒否する', async () => {
+  test('視聴後アクションは参照先が無効なら422で保存しない', async () => {
     dbMocks.getWebinarById.mockResolvedValue(makeWebinar({ status: 'draft' }));
+    dbMocks.countInvalidWebinarActionReferences.mockResolvedValue(1);
     const res = await adminReq('/api/webinars/w1/actions', {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         actions: [{ trigger: 'completed', actionType: 'add_tag', config: { tagId: '  ' } }],
       }),
     });
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(422);
+    await expect(res.json()).resolves.toMatchObject({ error: 'invalid_action_reference' });
     expect(dbMocks.replaceWebinarActions).not.toHaveBeenCalled();
   });
 
