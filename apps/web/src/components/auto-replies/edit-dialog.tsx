@@ -21,6 +21,7 @@ import {
 import ImageUploader from '@/components/shared/image-uploader'
 import Button from '@/components/shared/button'
 import StickyBar from '@/components/shared/sticky-bar'
+import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import { MESSAGE_KIND_WORDS, messageKindWord } from '@/app/auto-replies/auto-reply-words'
 
 export interface AutoReplyDraft {
@@ -263,6 +264,10 @@ export default function EditDialog({
   const [error, setError] = useState('')
   // アクションで選ぶもの（タグ・友だち情報・対応マーク・シナリオ・共通情報）。
   const actionOptions = useActionOptions()
+  // 一覧内で開く編集窓は共通のoverlay制御へ寄せる。Escape・Tab循環・背景
+  // スクロール停止・閉じたあとのフォーカス復元を同じ作法にし、保存中だけは
+  // 確定途中の入力を失わないよう閉じない。ページ表示にはoverlayを使わない。
+  const dialogRef = useOverlayFocus(!page, onClose, saving)
 
   useEffect(() => {
     let active = true
@@ -460,6 +465,10 @@ export default function EditDialog({
     <div
       className={page ? 'space-y-4' : 'fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4'}
       data-design-node={page ? step === 'basic' ? 'K7vg2' : step === 'trigger' ? 'nzWIX' : 'ivDoe' : undefined}
+      role={page ? undefined : 'presentation'}
+      onMouseDown={page || saving ? undefined : (event) => {
+        if (event.target === event.currentTarget) onClose()
+      }}
     >
       {page && (
         <ol aria-label="自動応答を作る進み方" style={{ minHeight: 55 }} className="mt-4 flex flex-wrap items-center justify-between gap-3 text-xs">
@@ -474,9 +483,16 @@ export default function EditDialog({
         </ol>
       )}
       <div className={page ? 'grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_390px]' : ''}>
-      <div className={page ? 'bg-canvas rounded-card border-hairline w-full border' : 'max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-lg bg-white shadow-xl'}>
+      <div
+        ref={dialogRef}
+        className={page ? 'bg-canvas rounded-card border-hairline w-full border' : 'max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-lg bg-white shadow-xl'}
+        role={page ? undefined : 'dialog'}
+        aria-modal={page ? undefined : true}
+        aria-labelledby={page ? undefined : 'auto-reply-edit-dialog-title'}
+        tabIndex={page ? undefined : -1}
+      >
         <div className={`border-hairline border-b px-5 ${page ? 'py-3' : 'py-4'}`}>
-          <h3 className="text-base font-semibold">
+          <h3 id={page ? undefined : 'auto-reply-edit-dialog-title'} className="text-base font-semibold">
             {page
               ? step === 'basic'
                 ? '基本設定'
