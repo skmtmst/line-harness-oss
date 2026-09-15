@@ -479,7 +479,26 @@ export async function stopFriendAddRule(
         SET status = 'stopped', stop_idempotency_key = ?, stopped_at = ?,
             stopped_by_staff_id = ?, updated_at = ?, lock_version = lock_version + 1
       WHERE id = ? AND line_account_id = ? AND status = 'published'
-        AND archived_at IS NULL AND lock_version = ?`,
+        AND archived_at IS NULL AND lock_version = ?
+        AND EXISTS (
+          SELECT 1
+            FROM friend_add_rules fallback
+            JOIN friend_add_rule_versions fallback_version
+              ON fallback_version.id = fallback.current_version_id
+             AND fallback_version.status = 'published'
+           WHERE fallback.id != friend_add_rules.id
+             AND fallback.line_account_id = friend_add_rules.line_account_id
+             AND fallback.friend_kind = friend_add_rules.friend_kind
+             AND fallback.is_unknown_route_fallback = 1
+             AND fallback.status = 'published'
+             AND fallback.archived_at IS NULL
+             AND (json_extract(fallback_version.definition_snapshot, '$.activeFrom') IS NULL
+                  OR json_extract(fallback_version.definition_snapshot, '$.activeFrom')
+                     <= strftime('%Y-%m-%dT%H:%M', 'now', '+9 hours'))
+             AND (json_extract(fallback_version.definition_snapshot, '$.activeUntil') IS NULL
+                  OR json_extract(fallback_version.definition_snapshot, '$.activeUntil')
+                     >= strftime('%Y-%m-%dT%H:%M', 'now', '+9 hours'))
+        )`,
   ).bind(
     input.idempotencyKey, now, input.staffId, now,
     input.ruleId, input.lineAccountId, input.expectedVersion,
@@ -488,6 +507,29 @@ export async function stopFriendAddRule(
     const current = await getFriendAddRule(db, input);
     if (current && current.lock_version !== input.expectedVersion) {
       throw new Error('FRIEND_ADD_RULE_VERSION_CONFLICT');
+    }
+    if (current?.status === 'published') {
+      const fallback = await db.prepare(
+        `SELECT 1 AS ok
+           FROM friend_add_rules replacement
+           JOIN friend_add_rule_versions replacement_version
+             ON replacement_version.id = replacement.current_version_id
+            AND replacement_version.status = 'published'
+          WHERE replacement.id != ?
+            AND replacement.line_account_id = ?
+            AND replacement.friend_kind = ?
+            AND replacement.is_unknown_route_fallback = 1
+            AND replacement.status = 'published'
+            AND replacement.archived_at IS NULL
+            AND (json_extract(replacement_version.definition_snapshot, '$.activeFrom') IS NULL
+                 OR json_extract(replacement_version.definition_snapshot, '$.activeFrom')
+                    <= strftime('%Y-%m-%dT%H:%M', 'now', '+9 hours'))
+            AND (json_extract(replacement_version.definition_snapshot, '$.activeUntil') IS NULL
+                 OR json_extract(replacement_version.definition_snapshot, '$.activeUntil')
+                    >= strftime('%Y-%m-%dT%H:%M', 'now', '+9 hours'))
+          LIMIT 1`,
+      ).bind(input.ruleId, input.lineAccountId, current.friend_kind).first<{ ok: number }>();
+      if (!fallback) throw new Error('FRIEND_ADD_RULE_FALLBACK_REQUIRED');
     }
     throw new Error('FRIEND_ADD_RULE_NOT_STOPPED');
   }

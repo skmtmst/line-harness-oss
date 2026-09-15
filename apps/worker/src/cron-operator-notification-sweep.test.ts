@@ -25,6 +25,7 @@ import { createTestD1, type SqliteD1 } from './test-utils/d1-sqlite.js';
 const pushMessageWithRequestId = vi.hoisted(() => vi.fn());
 const sendOperationEmail = vi.hoisted(() => vi.fn());
 const processOperationNotificationOutbox = vi.hoisted(() => vi.fn());
+const processOperationAlertNotificationOutbox = vi.hoisted(() => vi.fn());
 
 vi.mock('@line-crm/line-sdk', () => ({
   LineClient: class {
@@ -34,6 +35,9 @@ vi.mock('@line-crm/line-sdk', () => ({
 vi.mock('./services/operation-notifications.js', () => ({
   sendOperationEmail,
   processOperationNotificationOutbox,
+}));
+vi.mock('./services/operation-alert-notifications.js', () => ({
+  processOperationAlertNotificationOutbox,
 }));
 
 const { default: worker } = await import('./index.js');
@@ -138,6 +142,8 @@ describe('N-327 #663 cron からの運用者通知の回収', () => {
     sendOperationEmail.mockResolvedValue(undefined);
     processOperationNotificationOutbox.mockReset();
     processOperationNotificationOutbox.mockResolvedValue(undefined);
+    processOperationAlertNotificationOutbox.mockReset();
+    processOperationAlertNotificationOutbox.mockResolvedValue(undefined);
     testDb = createTestD1();
     seed(testDb);
   });

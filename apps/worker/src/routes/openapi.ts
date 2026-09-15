@@ -1811,6 +1811,69 @@ const spec = {
         responses: { '200': { description: 'Feature impacts with target ids and confirmation token' }, '400': { description: 'Unknown feature or invalid value' }, '403': { description: 'Staff role required' }, '409': { description: 'Version conflict, reread required' } },
       },
     },
+    // ── Operation alerts ────────────────────────────────────────────────────
+    '/api/operations/alerts': {
+      get: {
+        tags: ['Operations'],
+        summary: '運用異常の対応状況と通知結果を一覧する',
+        description: '指定したLINEアカウント内だけの異常、受領・解消・再開履歴、通知結果をowner/adminへ返す。',
+        parameters: [
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+          { name: 'include_resolved', in: 'query', required: false, schema: { type: 'string', enum: ['0', '1'] } },
+        ],
+        responses: {
+          '200': { description: '運用異常の一覧、通知集計、イベント履歴' },
+          '400': { description: 'LINEアカウントが未指定' },
+          '403': { description: 'owner/adminではない、またはアカウント範囲外' },
+          '500': { description: '一覧取得失敗' },
+        },
+      },
+    },
+    '/api/operations/alerts/{id}/acknowledge': {
+      post: {
+        tags: ['Operations'],
+        summary: '運用異常を受領して対応中にする',
+        description: '表示中の版をexpectedVersionとして受け取り、同じ管理者・同じメモの再試行だけを重複成功として扱う。',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: { required: true, content: { 'application/json': { schema: {
+          type: 'object',
+          required: ['lineAccountId', 'expectedVersion'],
+          properties: {
+            lineAccountId: { type: 'string' },
+            expectedVersion: { type: 'integer', minimum: 1 },
+            note: { type: 'string' },
+          },
+        } } } },
+        responses: {
+          '200': { description: '受領済みの異常。duplicate=trueは同一内容の再試行' },
+          '400': { description: '受領内容が不正' },
+          '403': { description: 'owner/adminではない、またはアカウント範囲外' },
+          '404': { description: '指定アカウント内に異常が存在しない' },
+          '409': { description: '版、管理者、またはメモが競合' },
+          '500': { description: '受領の保存失敗' },
+        },
+      },
+    },
+    '/api/operations/alerts/{id}/notifications/retry': {
+      post: {
+        tags: ['Operations'],
+        summary: '失敗または未設定だった運用異常通知を再試行する',
+        description: '連絡先を設定した後を含め、指定アカウント内の未送信通知を再び送信待ちへ戻す。',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: { required: true, content: { 'application/json': { schema: {
+          type: 'object',
+          required: ['lineAccountId'],
+          properties: { lineAccountId: { type: 'string' } },
+        } } } },
+        responses: {
+          '200': { description: '再試行へ戻した通知件数' },
+          '400': { description: 'LINEアカウントが未指定' },
+          '403': { description: 'owner/adminではない、またはアカウント範囲外' },
+          '404': { description: '指定アカウント内に異常が存在しない' },
+          '500': { description: '再試行受付失敗' },
+        },
+      },
+    },
     // ── AI development reports ──────────────────────────────────────────────
     '/api/integrations/ai-loop/reports': {
       post: {

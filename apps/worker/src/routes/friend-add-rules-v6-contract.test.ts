@@ -107,6 +107,28 @@ function seedRuleAndRun(testDb: SqliteD1): void {
   ).run();
 }
 
+function seedFallback(
+  testDb: SqliteD1,
+  input: { id: string; accountId: string; status: 'published' | 'stopped' },
+): void {
+  const versionId = `${input.id}-version`;
+  testDb.raw.prepare(
+    `INSERT INTO friend_add_rules
+      (id, line_account_id, friend_kind, name, priority, is_unknown_route_fallback,
+       status, current_version_id, created_at, updated_at)
+     VALUES (?, ?, 'first_time', '経路が分からなかった人', 9999, 1, ?, ?,
+             '2026-09-07T08:00:00.000', '2026-09-07T08:00:00.000')`,
+  ).run(input.id, input.accountId, input.status, versionId);
+  testDb.raw.prepare(
+    `INSERT INTO friend_add_rule_versions
+      (id, rule_id, version_number, definition_snapshot, status, published_at)
+     VALUES (?, ?, 1, ?, 'published', '2026-09-07T08:00:00.000')`,
+  ).run(versionId, input.id, JSON.stringify({
+    routeIds: [], scenarioId: 'scenario-1', messageType: 'scenario', messageText: '',
+    timing: 'scenario', actions: [], friendCondition: '', activeFrom: null, activeUntil: null,
+  }));
+}
+
 describe('V6 friend-add rule data contracts', () => {
   let testDb: SqliteD1;
 
@@ -217,6 +239,43 @@ describe('V6 friend-add rule data contracts', () => {
       'POST', { version: 0 }, 'friend-add-stop-000001',
     ));
     expect(stop.status).toBe(409);
+  });
+
+  it('停止routeは別account・停止済みの受け皿を数えず、公開中ルールを保つ', async () => {
+    seedRuleAndRun(testDb);
+    seedFallback(testDb, { id: 'fallback-other', accountId: 'account-2', status: 'published' });
+    seedFallback(testDb, { id: 'fallback-stopped', accountId: 'account-1', status: 'stopped' });
+
+    const response = await app(testDb.db).request(
+      '/api/friend-add-rules/rule-1/stop?account_id=account-1',
+      json('POST', { version: 1 }, 'friend-add-stop-guard-0001'),
+    );
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toMatchObject({
+      success: false,
+      code: 'FALLBACK_REQUIRED',
+    });
+    expect(testDb.raw.prepare("SELECT status, lock_version FROM friend_add_rules WHERE id = 'rule-1'").get())
+      .toEqual({ status: 'published', lock_version: 1 });
+  });
+
+  it('停止routeは同一account・同一対象の公開済み受け皿があるときだけ停止する', async () => {
+    seedRuleAndRun(testDb);
+    seedFallback(testDb, { id: 'fallback-own', accountId: 'account-1', status: 'published' });
+
+    const response = await app(testDb.db).request(
+      '/api/friend-add-rules/rule-1/stop?account_id=account-1',
+      json('POST', { version: 1 }, 'friend-add-stop-guard-0002'),
+    );
+
+    expect(response.status).toBe(200);
+    expect(testDb.raw.prepare(
+      "SELECT id, status FROM friend_add_rules WHERE id IN ('rule-1', 'fallback-own') ORDER BY id",
+    ).all()).toEqual([
+      { id: 'fallback-own', status: 'published' },
+      { id: 'rule-1', status: 'stopped' },
+    ]);
   });
 
   it('実行結果の種類・経路の絞り込みをサーバ側で行い、不正な値は400にする', async () => {
