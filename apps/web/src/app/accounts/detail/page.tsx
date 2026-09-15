@@ -25,11 +25,6 @@ import {
 type AccountDetailView = LineAccount & {
   timezone?: string
   stats?: { friendCount: number; activeScenarios: number; messagesThisMonth: number }
-  connection?: {
-    lastTestAt: string | null
-    lastTestStatus: 'succeeded' | 'failed' | null
-    lastReceivedAt: string | null
-  }
 }
 
 /** 設計 ★V6 33-3（`T9rA9`）。概要 / 接続の確認 / 資格情報 / 乗り換え の 4 タブ。 */

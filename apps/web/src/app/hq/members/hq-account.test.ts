@@ -14,7 +14,7 @@ const topBar = read('../../../components/shell/app-top-bar.tsx')
  * 正本は Pencil `V6正本.pen` と `docs/v6-requirements/v6-36-hq-account-billing-requirements-draft.md`。
  */
 describe('統括の左下アカウントメニュー', () => {
-  it('統括のサイドバーだけに置き、店舗の画面は下端に何も置かない（§1-2 の例外）', () => {
+  it('統括のサイドバーだけに置き、アカウントの画面は下端に何も置かない（§1-2 の例外）', () => {
     expect(sidebar).toContain("{isHq ? <HqAccountMenu /> : <div className={styles.footer} />}")
   })
 
@@ -78,11 +78,11 @@ describe('メンバー管理（36-5）', () => {
 })
 
 describe('お問い合わせ（36-3）', () => {
-  it('種類・件名・本文は必須、店舗と画像は任意', () => {
+  it('種類・件名・本文は必須、アカウントと画像は任意', () => {
     expect(support).toContain('label="種類" required')
     expect(support).toContain('label="件名" required')
     expect(support).toContain('label="本文" required')
-    expect(support).toContain('label="関係する店舗" note="任意"')
+    expect(support).toContain('label="関係するアカウント" note="任意"')
     expect(support).toContain('accept="image/png,image/jpeg"')
   })
 

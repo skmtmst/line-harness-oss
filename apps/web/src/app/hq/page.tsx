@@ -1,39 +1,35 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { api } from '@/lib/api'
 import { useAccount, type AccountWithStats } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
 import HqAccountList from '@/components/hq/account-list'
 import AccountEditModal from '@/components/accounts/account-edit-modal'
+import NoteBar from '@/components/shared/note-bar'
+import SummaryCard from '@/components/shared/summary-card'
 
 export default function HqPage() {
   const router = useRouter()
   const { setSelectedAccountId, refreshAccounts } = useAccount()
   const [accounts, setAccounts] = useState<AccountWithStats[]>([])
-  const [tenantName, setTenantName] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [editingAccount, setEditingAccount] = useState<AccountWithStats | null>(null)
 
   const load = useCallback(async () => {
     setError('')
-    const [accountResponse, tenantResponse] = await Promise.all([
-      api.lineAccounts.list(),
-      api.tenants.me(),
-    ])
+    const accountResponse = await api.lineAccounts.list()
     if (!accountResponse.success) throw new Error(accountResponse.error)
-    if (!tenantResponse.success) throw new Error(tenantResponse.error)
     setAccounts(accountResponse.data as AccountWithStats[])
-    setTenantName(tenantResponse.data.name)
   }, [])
 
   useEffect(() => {
     let cancelled = false
     void load()
       .catch(() => {
-        if (!cancelled) setError('統括の店舗情報を読み込めませんでした。時間をおいてもう一度お試しください。')
+        if (!cancelled) setError('統括のアカウント情報を読み込めませんでした。時間をおいてもう一度お試しください。')
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -50,35 +46,50 @@ export default function HqPage() {
     router.push('/')
   }
 
+  const totals = useMemo(() => accounts.reduce((sum, account) => ({
+    friends: sum.friends + (account.stats?.friendCount ?? 0),
+    messages: sum.messages + (account.stats?.messagesThisMonth ?? 0),
+    warnings: sum.warnings + (account.connection?.status === 'warn' ? 1 : 0),
+    active: sum.active + (account.isActive ? 1 : 0),
+  }), { friends: 0, messages: 0, warnings: 0, active: 0 }), [accounts])
+  const month = new Date().getMonth() + 1
+
   return (
-    <div>
-      <header data-design="Head" className="mb-6 flex flex-wrap items-start justify-between gap-4">
-        <div className="min-w-0">
-          <p className="text-sm font-semibold text-accent">統括コンソール</p>
-          <h1 className="mt-1 truncate text-2xl font-bold tracking-tight text-ink" title={tenantName || '統括'}>
-            {tenantName || (loading ? '統括を読み込み中…' : '統括')}
-          </h1>
-          <p className="mt-1 text-sm text-ink-secondary">LINE公式アカウントごとに店舗の管理画面へ移動できます。</p>
-        </div>
+    <div data-design-node="MjMCg">
+      <div data-design="Actions" data-design-node="x5Tkb6" className="mb-4 flex justify-end">
         <Button href="/accounts/new" variant="primary" className="shrink-0">
-          ＋LINEアカウントを新規登録
+          ＋ LINEアカウントを新規登録
         </Button>
-      </header>
+      </div>
 
       {error ? <div className="rounded-card bg-danger-bg p-4 text-sm text-danger" role="alert">{error}</div> : null}
 
       {!error && loading ? (
-        <div className="flex min-h-64 items-center justify-center" role="status" aria-label="店舗を読み込み中">
+        <div className="flex min-h-64 items-center justify-center" role="status" aria-label="アカウントを読み込み中">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-hairline border-t-accent" />
         </div>
       ) : null}
 
+      {!error && !loading ? (
+        <>
+          <section data-design="KPIs" data-design-node="w7yY6" className="mb-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <SummaryCard variant="v6" title="アカウント" value={accounts.length} unit="件" detail={`有効 ${totals.active}・停止中 ${accounts.length - totals.active}`} />
+            <SummaryCard variant="v6" title="友だち合計" value={totals.friends} unit="人" detail="全アカウントの合計" />
+            <SummaryCard variant="v6" title="今月の配信" value={totals.messages} unit="通" detail={`${month}/1 から今日まで`} />
+            <SummaryCard variant="v6" title="要確認" value={totals.warnings} unit="件" detail="接続に問題があるアカウント" valueTone="warning" />
+          </section>
+          <div data-design="Note" data-design-node="d61vBH" className="mb-4">
+            <NoteBar>LINE公式アカウントごとに管理画面へ入れます。アイコンと名前はLINE公式アカウントの設定をそのまま表示します。</NoteBar>
+          </div>
+        </>
+      ) : null}
+
       {!error && !loading && accounts.length === 0 ? (
         <section data-design="Empty" className="rounded-card border border-hairline bg-canvas px-6 py-16 text-center shadow-sm">
-          <h2 className="text-xl font-bold text-ink">まだ店舗がありません</h2>
-          <p className="mt-2 text-sm text-ink-secondary">最初のLINE公式アカウントを登録すると、ここから店舗へログインできます。</p>
+          <h2 className="text-xl font-bold text-ink">まだアカウントがありません</h2>
+          <p className="mt-2 text-sm text-ink-secondary">最初のLINE公式アカウントを登録すると、ここからアカウントへログインできます。</p>
           <Button href="/accounts/new" variant="primary" className="mt-6">
-            ＋LINEアカウントを新規登録
+            ＋ LINEアカウントを新規登録
           </Button>
         </section>
       ) : null}

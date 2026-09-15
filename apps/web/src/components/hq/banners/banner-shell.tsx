@@ -84,10 +84,10 @@ export function BannerKpis({
       />
       <SummaryCard
         variant="v6"
-        title="店舗へ渡した画像"
+        title="アカウントへ渡した画像"
         value={stats ? stats.deliveredImages : null}
         unit="枚"
-        detail={stats ? `${stats.deliveredAccounts}店舗` : '—'}
+        detail={stats ? `${stats.deliveredAccounts}アカウント` : '—'}
         loading={loading}
       />
     </div>
@@ -99,7 +99,7 @@ export function BannerNote() {
   return (
     <div data-design-node="Z59tV">
       <NoteBar tone="info">
-        作った画像は統括の登録メディアに保存されます。店舗へ渡すと、その店舗の配信・リッチメニュー・回答フォームから選べるようになります。
+        作った画像は統括の登録メディアに保存されます。アカウントへ渡すと、そのアカウントの配信・リッチメニュー・回答フォームから選べるようになります。
       </NoteBar>
     </div>
   )
