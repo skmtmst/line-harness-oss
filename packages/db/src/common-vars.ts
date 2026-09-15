@@ -9,8 +9,17 @@ import { getAccountSetting, getVersionedAccountSetting } from './account-setting
  * 探して回らなくてよくなる。
  */
 
-export const COMMON_VAR_TYPES = ['text', 'url', 'image', 'number'] as const;
+export const COMMON_VAR_TYPES = ['text', 'url', 'image', 'number', 'long_text', 'date', 'datetime', 'boolean'] as const;
 export type CommonVarType = (typeof COMMON_VAR_TYPES)[number];
+
+/** 値は文字列のまま差し込む。型ごとの表記だけをここで一意に整える。 */
+export function normalizeCommonVarValue(type: CommonVarType, value: string): string | null {
+  if (type === 'long_text') return value.length <= 10_000 ? value : null;
+  if (type === 'boolean') return value === 'true' || value === 'false' ? value : null;
+  if (type === 'date') return /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(`${value}T00:00:00Z`)) ? value : null;
+  if (type === 'datetime') return /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value) && !Number.isNaN(Date.parse(`${value}:00Z`)) ? value : null;
+  return value.length <= 200 ? value : null;
+}
 
 export interface CommonVar {
   id: string;

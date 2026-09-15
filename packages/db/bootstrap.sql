@@ -1527,56 +1527,24 @@ CREATE TABLE common_actions (
   archived_at                  TEXT
 );
 
-CREATE TABLE "common_var_replacement_runs" (
-  id                    TEXT PRIMARY KEY,
-  line_account_id       TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
-  source_common_var_id  TEXT NOT NULL REFERENCES "common_vars"(id),
-  replacement_common_var_id TEXT NOT NULL REFERENCES "common_vars"(id),
-  source_version        INTEGER NOT NULL,
-  expected_usage_count  INTEGER NOT NULL,
-  replaced_usage_count  INTEGER NOT NULL,
-  actor_id              TEXT,
-  status                TEXT NOT NULL CHECK (status IN ('completed', 'partial')),
-  created_at            TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours'))
-);
+CREATE TABLE "common_var_replacement_runs" (id TEXT PRIMARY KEY, line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE, source_common_var_id TEXT NOT NULL REFERENCES "common_vars"(id), replacement_common_var_id TEXT NOT NULL REFERENCES "common_vars"(id), source_version INTEGER NOT NULL, expected_usage_count INTEGER NOT NULL, replaced_usage_count INTEGER NOT NULL, actor_id TEXT, status TEXT NOT NULL CHECK (status IN ('completed', 'partial')), created_at TEXT NOT NULL);
 
-CREATE TABLE "common_var_schedules" (
-  id             TEXT PRIMARY KEY,
-  var_id         TEXT NOT NULL REFERENCES "common_vars"(id) ON DELETE CASCADE,
-  effective_from TEXT NOT NULL,
-  value          TEXT NOT NULL,
-  applied_at     TEXT
-);
+CREATE TABLE "common_var_schedules" (id TEXT PRIMARY KEY, var_id TEXT NOT NULL REFERENCES "common_vars"(id) ON DELETE CASCADE, effective_from TEXT NOT NULL, value TEXT NOT NULL, applied_at TEXT);
 
-CREATE TABLE "common_var_versions" (
-  id             TEXT PRIMARY KEY,
-  common_var_id  TEXT NOT NULL REFERENCES "common_vars"(id) ON DELETE CASCADE,
-  version_no     INTEGER NOT NULL,
-  name           TEXT NOT NULL,
-  value          TEXT NOT NULL,
-  memo           TEXT NOT NULL DEFAULT '',
-  change_reason  TEXT NOT NULL,
-  actor_id       TEXT,
-  created_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours')),
-  UNIQUE(common_var_id, version_no)
-);
+CREATE TABLE "common_var_versions" (id TEXT PRIMARY KEY, common_var_id TEXT NOT NULL REFERENCES "common_vars"(id) ON DELETE CASCADE, version_no INTEGER NOT NULL, name TEXT NOT NULL, value TEXT NOT NULL, memo TEXT NOT NULL DEFAULT '', change_reason TEXT NOT NULL, actor_id TEXT, created_at TEXT NOT NULL, UNIQUE(common_var_id, version_no));
 
 CREATE TABLE "common_vars" (
-  id                 TEXT PRIMARY KEY,
-  folder_id          TEXT REFERENCES folders(id) ON DELETE SET NULL,
-  name               TEXT NOT NULL,
-  var_key            TEXT NOT NULL,
-  type               TEXT NOT NULL DEFAULT 'text'
-                       CHECK (type IN ('text','url','image','number')),
-  value              TEXT NOT NULL DEFAULT '',
-  created_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours')),
-  updated_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours')),
-  line_account_id    TEXT REFERENCES line_accounts(id) ON DELETE CASCADE,
-  memo               TEXT NOT NULL DEFAULT '',
-  version            INTEGER NOT NULL DEFAULT 1,
-  updated_by         TEXT,
-  archived_at        TEXT,
-  replacement_run_id TEXT,
+  id TEXT PRIMARY KEY,
+  folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL,
+  name TEXT NOT NULL,
+  var_key TEXT NOT NULL,
+  type TEXT NOT NULL DEFAULT 'text' CHECK (type IN ('text','url','image','number','long_text','date','datetime','boolean')),
+  value TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  line_account_id TEXT REFERENCES line_accounts(id) ON DELETE CASCADE,
+  memo TEXT NOT NULL DEFAULT '', version INTEGER NOT NULL DEFAULT 1,
+  updated_by TEXT, archived_at TEXT, replacement_run_id TEXT,
   UNIQUE(line_account_id, var_key)
 );
 
@@ -6207,20 +6175,13 @@ CREATE INDEX idx_common_action_versions_action_status
 CREATE INDEX idx_common_actions_account_status
   ON common_actions(line_account_id, status, updated_at DESC);
 
-CREATE INDEX idx_common_var_replacement_runs_v338_source
-  ON common_var_replacement_runs(source_common_var_id, created_at DESC);
+CREATE INDEX idx_common_var_replacement_runs_v400_source ON common_var_replacement_runs(source_common_var_id, created_at DESC);
 
-CREATE INDEX idx_common_var_schedules_v338_pending
-  ON common_var_schedules(var_id, effective_from) WHERE applied_at IS NULL;
+CREATE INDEX idx_common_var_schedules_v400_pending ON common_var_schedules(var_id, effective_from) WHERE applied_at IS NULL;
 
-CREATE INDEX idx_common_var_versions_v338_history
-  ON common_var_versions(common_var_id, version_no DESC);
+CREATE INDEX idx_common_var_versions_v400_history ON common_var_versions(common_var_id, version_no DESC);
 
-CREATE INDEX idx_common_vars_v338_account_active
-  ON common_vars(line_account_id, archived_at, name, id);
-
-CREATE INDEX idx_common_vars_v338_account_name
-  ON common_vars(line_account_id, name, id);
+CREATE INDEX idx_common_vars_v400_account_active ON common_vars(line_account_id, archived_at, name, id);
 
 CREATE INDEX idx_conversion_definition_operations_point
   ON conversion_definition_operations(conversion_point_id, created_at DESC);

@@ -49,6 +49,7 @@ import {
   deleteCommonVarSchedule,
   validateFieldKey,
   COMMON_VAR_TYPES,
+  normalizeCommonVarValue,
   type Media,
   type MediaKind,
   type CommonVar,
@@ -1578,13 +1579,14 @@ contents.post('/api/common-vars', requireRole('owner', 'admin'), async (c) => {
 
     // 編集画面の入力欄と同じ上限を口でも守る。超えた値は送信時に落ち、
     // 原因がこの操作と結びつかなくなる。
-    const value = body.value == null ? '' : String(body.value);
+    const rawValue = body.value == null ? '' : String(body.value);
+    const value = normalizeCommonVarValue(type, rawValue);
     const memo = body.memo == null ? '' : String(body.memo);
     if (name.length > 200) {
       return c.json({ success: false, error: '名前は200文字までで入力してください' }, 400);
     }
-    if (value.length > 200) {
-      return c.json({ success: false, error: '差し込まれる文字は200文字までで入力してください' }, 400);
+    if (value === null) {
+      return c.json({ success: false, error: '種別に合う値を入力してください' }, 400);
     }
     if (memo.length > 1000) {
       return c.json({ success: false, error: 'メモは1000文字までで入力してください' }, 400);
@@ -1651,9 +1653,9 @@ contents.patch('/api/common-vars/:id', requireRole('owner', 'admin'), async (c) 
     if (patchName !== undefined && patchName.length > 200) {
       return c.json({ success: false, error: '名前は200文字までで入力してください' }, 400);
     }
-    const patchValue = body.value === undefined ? undefined : String(body.value);
-    if (patchValue !== undefined && patchValue.length > 200) {
-      return c.json({ success: false, error: '差し込まれる文字は200文字までで入力してください' }, 400);
+    const patchValue = body.value === undefined ? undefined : normalizeCommonVarValue(existing.type as CommonVarType, String(body.value));
+    if (patchValue === null) {
+      return c.json({ success: false, error: '種別に合う値を入力してください' }, 400);
     }
     const patchMemo = body.memo === undefined ? undefined : String(body.memo);
     if (patchMemo !== undefined && patchMemo.length > 1000) {

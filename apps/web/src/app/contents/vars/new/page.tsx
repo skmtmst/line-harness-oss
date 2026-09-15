@@ -48,6 +48,10 @@ const TYPES: Array<{ key: string; label: string; mark: string; note: string; pla
     note: 'ロゴやバナーなど、画像のURLを差し込みたい時に選択します。',
     placeholder: 'https://example.com/logo.png',
   },
+  { key: 'long_text', label: '長文', mark: '長文', note: '案内文など、200文字を超える文章を差し込みます。', placeholder: '詳しいご案内' },
+  { key: 'date', label: '年月日', mark: '日付', note: '日付を差し込みます。', placeholder: '2026-09-16' },
+  { key: 'datetime', label: '日時', mark: '日時', note: '日時を差し込みます。', placeholder: '2026-09-16T10:00' },
+  { key: 'boolean', label: '真偽', mark: '真偽', note: 'true または false を差し込みます。', placeholder: 'true' },
 ]
 
 const NAME_MAX = 200
@@ -141,6 +145,7 @@ export default function NewCommonVarPage() {
   const [error, setError] = useState('')
   const [secretWarningFields, setSecretWarningFields] = useState<string[] | null>(null)
   const valueRef = useRef<HTMLInputElement>(null)
+  const longValueRef = useRef<HTMLTextAreaElement>(null)
   const memoRef = useRef<HTMLTextAreaElement>(null)
   const secretWarningRef = useRef<HTMLDivElement>(null)
   // 入力欄と秘密値警告は「表示時のLINEアカウント」に紐づく。切替後は
@@ -378,11 +383,10 @@ export default function NewCommonVarPage() {
           <label htmlFor="cv-value" className="text-ink-secondary mb-1 block text-sm font-medium">
             値
           </label>
-          <input
-            ref={valueRef}
+          {type === 'long_text' ? <textarea
+            ref={longValueRef}
             id="cv-value"
-            type={type === 'number' ? 'number' : 'text'}
-            maxLength={type === 'number' ? undefined : VALUE_MAX}
+            maxLength={10000}
             value={value}
             onChange={(e) => {
               setValue(e.target.value)
@@ -390,8 +394,17 @@ export default function NewCommonVarPage() {
             }}
             placeholder={spec.placeholder}
             className="border-hairline rounded-control w-full max-w-md border px-3 py-2 text-sm"
-          />
-          {type !== 'number' && (
+          /> : <input
+            ref={valueRef}
+            id="cv-value"
+            type={type === 'number' ? 'number' : type === 'date' ? 'date' : type === 'datetime' ? 'datetime-local' : 'text'}
+            maxLength={type === 'number' ? undefined : VALUE_MAX}
+            value={value}
+            onChange={(e) => { setValue(e.target.value); setSecretWarningFields(null) }}
+            placeholder={spec.placeholder}
+            className="border-hairline rounded-control w-full max-w-md border px-3 py-2 text-sm"
+          />}
+          {type !== 'number' && type !== 'boolean' && (
             <p className="text-ink-faint mt-1 max-w-md text-right text-xs tabular-nums">
               {value.length}/{VALUE_MAX}
             </p>

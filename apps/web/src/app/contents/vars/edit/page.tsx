@@ -448,14 +448,14 @@ function EditCommonVarInner() {
                     <label htmlFor="cv-value" className="text-ink-secondary text-sm font-medium">差し込まれる文字</label>
                     <span className="text-ink-faint text-xs tabular-nums">{value.length} / 200</span>
                   </div>
-                  <input
+                  {(item.type as string) === 'long_text' ? <textarea id="cv-value" maxLength={10000} value={value} onChange={(e) => { setSaved(false); setValue(e.target.value) }} className="border-hairline rounded-control w-full border px-3 py-3 text-sm" rows={5} /> : <input
                     id="cv-value"
-                    type={item.type === 'number' ? 'number' : 'text'}
+                    type={item.type === 'number' ? 'number' : (item.type as string) === 'date' ? 'date' : (item.type as string) === 'datetime' ? 'datetime-local' : 'text'}
                     maxLength={item.type === 'number' ? undefined : 200}
                     value={value}
                     onChange={(e) => { setSaved(false); setValue(e.target.value) }}
                     className="border-hairline rounded-control w-full border px-3 py-3 text-sm"
-                  />
+                  />}
                 </div>
 
                 {impactState === 'ready' && impact ? (
