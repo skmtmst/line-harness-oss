@@ -8,9 +8,16 @@ import {
   deleteMedia,
   getMediaUsages,
   getMediaDeleteImpact,
+  getMediaDeleteImpactSnapshot,
   getMediaReplacementPlan,
   applyMediaReplacementPlan,
   getMediaStorageQuota,
+  getMediaVersionList,
+  getMediaLiveTarget,
+  getMediaUsageReferenceStates,
+  retargetMediaUsageReference,
+  MediaUsageReferenceError,
+  MEDIA_REF_KINDS,
   createMediaUploadSession,
   getMediaUploadSession,
   failMediaUploadSession,
@@ -220,6 +227,8 @@ function hasMediaSignature(bytes: Uint8Array, mimeType: string): boolean {
  * LINEのサーバーが認証なしで取りに行くため、公開のままにしている。
  * 管理画面の表示・ダウンロードには使わず、認証付きの
  * `/api/media/:id/content`・`/api/media/:id/download` を使う。
+ * `liveUrl` はライブ参照用の公開URL。メディアIDだけを含み、
+ * 配信時にその時点の最新版へ解決される。
  */
 function serializeMedia(row: Media, workerUrl: string) {
   return {
@@ -234,6 +243,7 @@ function serializeMedia(row: Media, workerUrl: string) {
     height: row.height,
     durationMs: row.duration_ms,
     url: row.public_url ?? `${workerUrl}/images/${row.r2_key}`,
+    liveUrl: `${workerUrl}/media/${row.id}/content`,
     uploadedBy: row.uploaded_by,
     createdAt: row.created_at,
     usageCount: row.usage_count === undefined ? undefined : Number(row.usage_count),
@@ -755,6 +765,40 @@ contents.get('/api/media/:id/content', requireRole('owner', 'admin', 'staff'), a
   }
 });
 
+/**
+ * ライブ参照の公開配信。
+ *
+ * 使用先へライブ参照を選んだ場所には、このメディアIDのURLが
+ * 配信本文へ埋め込まれる。取りに来た時点の最新版へ解決するため、
+ * 版を追加するとこのURLの中身は新しい版へ切り替わる。
+ * `/images/*` の版固定URLと同じく、知っている人だけが取れる能力URL
+ * で、中身が版ごとに変わるURLの実体上書きはしない。
+ * 固定参照は変わらないようimmutableで返すが、こちらは再検証させる。
+ */
+contents.get('/media/:id/content', async (c) => {
+  try {
+    const media = await getMediaLiveTarget(c.env.DB, c.req.param('id'));
+    if (!media) return c.json({ success: false, error: 'Not found' }, 404);
+    const object = await c.env.IMAGES.get(media.r2_key);
+    if (!object) return c.json({ success: false, error: 'Not found' }, 404);
+    const etag = typeof object.etag === 'string' && object.etag ? object.etag : null;
+    if (etag && c.req.header('if-none-match') === etag) {
+      return new Response(null, { status: 304 });
+    }
+    return new Response(object.body, {
+      headers: {
+        'Content-Type': media.mime_type,
+        'Content-Disposition': `inline; filename*=UTF-8''${encodeURIComponent(media.filename)}`,
+        'Cache-Control': 'public, max-age=0, must-revalidate',
+        ...(etag ? { ETag: etag } : {}),
+      },
+    });
+  } catch (err) {
+    console.error('GET /media/:id/content error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
 contents.patch('/api/media/:id', requireRole('owner', 'admin'), async (c) => {
   try {
     const id = c.req.param('id');
@@ -765,7 +809,16 @@ contents.patch('/api/media/:id', requireRole('owner', 'admin'), async (c) => {
     }
     const existing = await getMediaById(c.env.DB, id, accountId);
     if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
-    const body = await c.req.json<{ filename?: string; folderId?: string | null }>();
+    const body = await c.req.json<{
+      filename?: string;
+      folderId?: string | null;
+      usageReference?: {
+        refKind?: unknown;
+        refId?: unknown;
+        mode?: unknown;
+        versionNo?: unknown;
+      };
+    }>();
     // 名前は空・長すぎ・制御文字を受け付けない（直接アップロードの申告時と同じ決まり）。
     const filename = body.filename === undefined ? undefined : String(body.filename).trim();
     if (filename !== undefined) {
@@ -788,12 +841,101 @@ contents.patch('/api/media/:id', requireRole('owner', 'admin'), async (c) => {
         }
       }
     }
-    const media = await updateMedia(c.env.DB, id, accountId, {
-      ...(filename !== undefined ? { filename } : {}),
-      ...(folderId !== undefined ? { folderId } : {}),
-    });
     const workerUrl = c.env.WORKER_URL || new URL(c.req.url).origin;
-    return c.json({ success: true, data: serializeMedia(media!, workerUrl) });
+    if (body.usageReference === undefined) {
+      const media = await updateMedia(c.env.DB, id, accountId, {
+        ...(filename !== undefined ? { filename } : {}),
+        ...(folderId !== undefined ? { folderId } : {}),
+      });
+      return c.json({ success: true, data: serializeMedia(media!, workerUrl) });
+    }
+
+    /*
+      使用先ごとの参照切替。指定した1か所の本文だけを書き換え、
+      他の使用先には触れない。切り替え後は走査し直して使用先の記録を
+      新しい参照の形へ合わせる。
+    */
+    const usageReference = body.usageReference;
+    const refKind = typeof usageReference?.refKind === 'string' ? usageReference.refKind : '';
+    const refId = typeof usageReference?.refId === 'string' ? usageReference.refId.trim() : '';
+    if (!refId || !(MEDIA_REF_KINDS as readonly string[]).includes(refKind)) {
+      return c.json({ success: false, error: '切り替える使用先を指定してください' }, 400);
+    }
+    const versionNo = usageReference?.versionNo;
+    const target = usageReference?.mode === 'live'
+      ? { mode: 'live' as const }
+      : usageReference?.mode === 'pinned'
+        && Number.isInteger(versionNo)
+        && Number(versionNo) >= 1
+        ? { mode: 'pinned' as const, versionNo: Number(versionNo) }
+        : null;
+    if (!target) {
+      return c.json({ success: false, error: '参照方法（常に最新・固定する版）を指定してください' }, 400);
+    }
+    try {
+      const result = await retargetMediaUsageReference(c.env.DB, {
+        media: existing,
+        lineAccountId: accountId,
+        refKind,
+        refId,
+        target,
+        mediaUpdate: {
+          ...(filename !== undefined ? { filename } : {}),
+          ...(folderId !== undefined ? { folderId } : {}),
+        },
+      });
+      try {
+        await scanSingleMediaUsage(c.env.DB, jstNow(), {
+          id: existing.id,
+          r2_key: existing.r2_key,
+        });
+      } catch (scanError) {
+        // 切替自体は確定済み。記録の更新は次の走査でも追いつく。
+        console.error('usage rescan after reference switch failed:', scanError);
+      }
+      const fresh = await getMediaById(c.env.DB, id, accountId);
+      return c.json({
+        success: true,
+        data: {
+          ...serializeMedia(fresh ?? existing, workerUrl),
+          usageReference: {
+            refKind,
+            refId,
+            mode: result.state.mode,
+            versionNo: result.state.versionNo,
+            changed: result.changed,
+          },
+        },
+      });
+    } catch (error) {
+      if (error instanceof MediaUsageReferenceError) {
+        switch (error.code) {
+          case 'media_usage_not_found':
+            return c.json({ success: false, error: 'その使用先は見つかりませんでした' }, 404);
+          case 'media_version_not_found':
+            return c.json({ success: false, error: '指定の版が見つかりませんでした' }, 404);
+          case 'media_usage_shared':
+            return c.json({
+              success: false,
+              code: 'media_reference_shared',
+              error: '複数のLINEアカウントで共有しているため、この画面からは切り替えられません',
+            }, 409);
+          case 'media_reference_unsupported':
+            return c.json({
+              success: false,
+              code: 'media_reference_unsupported',
+              error: 'この使用先ではその参照方法を使えません',
+            }, 409);
+          default:
+            return c.json({
+              success: false,
+              code: 'media_reference_changed',
+              error: '使用先の内容が変わりました。読み直してから、もう一度お試しください',
+            }, 409);
+        }
+      }
+      throw error;
+    }
   } catch (err) {
     console.error('PATCH /api/media/:id error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
@@ -815,9 +957,44 @@ contents.get('/api/media/:id/delete-impact', requireRole('owner', 'admin'), asyn
       id: existing.id,
       r2_key: existing.r2_key,
     });
-    const impact = await getMediaDeleteImpact(c.env.DB, c.req.param('id'), accountId, checkedAt);
-    if (!impact) return c.json({ success: false, error: 'Not found' }, 404);
-    return c.json({ success: true, data: impact });
+    const snapshot = await getMediaDeleteImpactSnapshot(c.env.DB, c.req.param('id'), accountId, checkedAt);
+    if (!snapshot) return c.json({ success: false, error: 'Not found' }, 404);
+    const { impact, usages } = snapshot;
+    /*
+      使用先ごとの参照モード（ライブ参照・固定する版）と、切替に使う
+      版の一覧も一緒に返す。references と usages は同じsnapshotから
+      作られているので、index対応中に別走査の行が混ざらない。
+    */
+    const versions = await getMediaVersionList(c.env.DB, existing.id, accountId);
+    const states = await getMediaUsageReferenceStates(c.env.DB, {
+      media: existing,
+      usages,
+      versions,
+      lineAccountId: accountId,
+    });
+    const workerUrl = c.env.WORKER_URL || new URL(c.req.url).origin;
+    return c.json({
+      success: true,
+      data: {
+        ...impact,
+        references: impact.references.map((reference, index) => ({
+          ...reference,
+          refKind: usages[index]?.ref_kind ?? null,
+          refId: usages[index]?.ref_id ?? null,
+          reference: states[index] ?? null,
+        })),
+        versions: versions.map((version) => ({
+          versionNo: Number(version.version_no),
+          mimeType: version.mime_type,
+          sizeBytes: Number(version.size_bytes),
+          changeReason: version.change_reason,
+          createdAt: version.created_at,
+          publishedAt: version.published_at,
+          isCurrent: version.r2_key === existing.r2_key,
+        })),
+        liveUrl: `${workerUrl}/media/${existing.id}/content`,
+      },
+    });
   } catch (err) {
     console.error('GET /api/media/:id/delete-impact error:', err);
     return c.json(
