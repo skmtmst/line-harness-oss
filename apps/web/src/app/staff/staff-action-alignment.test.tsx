@@ -25,7 +25,7 @@ vi.mock('next/navigation', () => ({
 }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: null }) }))
 vi.mock('@/components/layout/merged-tabs', () => ({
-  default: () => <nav aria-label="ログインユーザーのタブ" />,
+  default: ({ tabs }: { tabs: Array<{ key: string; label: string }> }) => <nav aria-label="ログインユーザーのタブ">{tabs.map((tab) => <span key={tab.key}>{tab.label}</span>)}</nav>,
   useMergedTab: () => 'members',
 }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined }))
@@ -87,7 +87,7 @@ vi.mock('@/lib/api', () => {
           data: {
             items: state.users,
             summary: {
-              active: 3, invited: 0, expiredInvitations: 0, unused90Days: 0, mfaEnabled: 0, mfaRate: 0,
+              active: state.users.filter((user) => user.status === 'active').length, invited: 0, expiredInvitations: 0, unused90Days: 0, mfaEnabled: 0, mfaRate: 0,
               roleCounts: { administrator: 1, operations: 1, reception: 0, view_only: 1, custom: 0 },
             },
             pagination: { total: state.users.length, limit: 200, offset: 0 },
@@ -133,6 +133,8 @@ describe('ログインユーザー操作の表示と実処理 (#834)', () => {
     expect(screen.getByRole('status').textContent).toContain('コピー元さんの「見るだけ」を下書きに反映しました')
 
     fireEvent.click(screen.getByRole('button', { name: /見せる範囲を保存/ }))
+    expect(fixture.updateStaff).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: '保存する' }))
     await waitFor(() => expect(fixture.updateStaff).toHaveBeenCalledTimes(1))
     expect(fixture.updateStaff).toHaveBeenCalledWith('target', { role: 'viewer' })
   })
@@ -159,6 +161,13 @@ describe('ログインユーザー操作の表示と実処理 (#834)', () => {
     await act(async () => {
       fireEvent.click(save)
       fireEvent.click(save)
+    })
+
+    expect(fixture.updateStaff).not.toHaveBeenCalled()
+    const confirm = screen.getByRole('button', { name: '保存する' })
+    await act(async () => {
+      fireEvent.click(confirm)
+      fireEvent.click(confirm)
     })
 
     expect(fixture.updateStaff).toHaveBeenCalledTimes(1)
@@ -206,5 +215,43 @@ describe('ログインユーザー操作の表示と実処理 (#834)', () => {
     await waitFor(() => expect(screen.getByText('最後の管理者は外せません')).toBeTruthy())
     expect(fixture.deleteStaff).toHaveBeenCalledTimes(1)
     expect((screen.getByRole('button', { name: '外す' }) as HTMLButtonElement).disabled).toBe(false)
+  })
+
+  it('いまいる人には利用停止中の人を混ぜず、件数と行をactiveだけに揃える', async () => {
+    state.members.push(member({ id: 'suspended', name: '利用停止中の人', email: 'suspended@example.test', isActive: false }))
+    state.users.push(accessUser({ id: 'suspended', name: '利用停止中の人', email: 'suspended@example.test', status: 'suspended' }))
+    try {
+      await mount()
+
+      expect(screen.getByText('いまいる人 3')).toBeTruthy()
+      expect(screen.queryByText('利用停止中の人')).toBeNull()
+      expect(screen.getByText('ログインユーザー 3人中 3人を表示')).toBeTruthy()
+    } finally {
+      state.members.pop()
+      state.users.pop()
+    }
+  })
+
+  it('見せる範囲の保存は再ログインを確認し、取消・成功・失敗を正しく出す', async () => {
+    await mount()
+    fireEvent.click(within(rowFor('対象者')).getByRole('button', { name: '中身を見る' }))
+    fireEvent.click(screen.getByRole('button', { name: /見せる範囲を保存/ }))
+
+    expect(screen.getByText('保存すると、対象者のすべてのログインが終了します。新しい権限で使うには、対象者がもう一度ログインする必要があります。')).toBeTruthy()
+    expect(screen.getByText('保存すると、対象者はもう一度ログインする必要があります。')).toBeTruthy()
+    expect(screen.queryByText('権限を変えると、その場で効きます。')).toBeNull()
+    expect(fixture.updateStaff).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'キャンセル' }))
+    expect(fixture.updateStaff).not.toHaveBeenCalled()
+
+    fixture.updateStaff.mockRejectedValueOnce(new Error('保存できません'))
+    fireEvent.click(screen.getByRole('button', { name: /見せる範囲を保存/ }))
+    fireEvent.click(screen.getByRole('button', { name: '保存する' }))
+    await waitFor(() => expect(screen.getByRole('alert').textContent).toBe('保存できません'))
+    expect(screen.getByRole('button', { name: '保存する' })).toBeTruthy()
+
+    fixture.updateStaff.mockResolvedValueOnce({ success: true, data: state.members[0] })
+    fireEvent.click(screen.getByRole('button', { name: '保存する' }))
+    await waitFor(() => expect(screen.getByRole('status').textContent).toContain('対象者のすべてのログインを終了したため、新しい権限で使うにはもう一度ログインが必要です。'))
   })
 })

@@ -30,6 +30,17 @@ describe('分析・使われ方', () => {
     expect(hidden.enabled).toBe(all.enabled - 2)
   })
 
+  it('staff向けbooleanだけでも、非表示の専用項目を総数へ混ぜない', () => {
+    const summary = summarizeMenuFeatures({
+      features: { nen_campaigns: false, photo_review: true },
+    })
+    const explicit = summarizeMenuFeatures({
+      features: { nen_campaigns: false, photo_review: true },
+      specializedFeatureKeys: ['photo_review'],
+    })
+    expect(summary).toEqual(explicit)
+  })
+
   it('未使用と未取得を混ぜず、片づける導線は実値があるときだけ出す', () => {
     expect(usageObservation(category()).text).toBe('1個は使われていません')
     expect(canTidyUsage(category())).toBe(true)

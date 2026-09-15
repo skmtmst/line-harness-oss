@@ -19,3 +19,4 @@ export * from "./automation-draft-options";
 export * from "./ec-events";
 export * from "./nen-campaign-limits";
 export * from "./form-submit-idempotency";
+export * from "./booking-staff";
