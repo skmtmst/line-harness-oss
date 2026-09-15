@@ -232,7 +232,7 @@ function selectDefinitionsSql(): string {
 }
 
 function orderBy(sort: ConversionDefinitionSort): string {
-  if (sort === 'value_desc') return 'net_value DESC, cp.updated_at DESC, cp.id ASC';
+  if (sort === 'value_desc') return 'cp.value DESC, cp.updated_at DESC, cp.id ASC';
   if (sort === 'name_asc') return 'cp.name ASC, cp.id ASC';
   if (sort === 'updated_desc') return 'cp.updated_at DESC, cp.id ASC';
   return 'recorded_count DESC, cp.updated_at DESC, cp.id ASC';
