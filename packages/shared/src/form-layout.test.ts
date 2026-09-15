@@ -65,6 +65,27 @@ describe("昔の fields から持ち上げる", () => {
     expect(first.destinations?.friendFieldIds).toEqual(["ff-1"]);
     expect(second.choices?.map((c) => c.label)).toEqual(["犬", "猫"]);
   });
+
+  test("期限・1人1回・定員は旧 fields へ書く場所が無い(N-178)", () => {
+    // N-178: 期限・1人1回・全体/選択肢の定員は layout.options と
+    // choice.capacity にしか置き場が無い。旧形式の fields(FormFieldCompat)
+    // にその規格は無く、forms テーブル列・公開版・旧編集画面のどこにも
+    // 書き込み経路が存在しない。万一データへ似たキーが紛れていても、
+    // 持ち上げは設定として読まない。
+    const layout = fieldsToLayout([
+      { name: "x", label: "お名前", type: "text", required: true },
+      { name: "y", label: "回", type: "radio", options: ["午前"] },
+      { deadline: { enabled: true, endsAt: "2020-01-01T00:00" } },
+      { oncePerFriend: { enabled: true } },
+      { totalLimit: { enabled: true, max: 0 } },
+    ]);
+
+    expect(layout.options.deadline?.enabled).toBeFalsy();
+    expect(layout.options.oncePerFriend?.enabled).toBeFalsy();
+    expect(layout.options.totalLimit?.enabled).toBeFalsy();
+    const radio = collectInputs(layout).find((b) => b.name === "y");
+    expect(radio?.choices?.every((c) => !c.capacity?.enabled)).toBe(true);
+  });
 });
 
 describe("互換の fields を作り直す", () => {

@@ -400,4 +400,28 @@ describe('送信の入口が、レイアウトの判定につながっている'
     expect(mocks.countFormSubmissionsByFriend).not.toHaveBeenCalled();
     expect(mocks.countChoiceUsage).not.toHaveBeenCalled();
   });
+
+  test('旧形式に期限らしきキーが紛れていても、設定としては読まれない(N-178)', async () => {
+    // N-178: 旧形式は fields しか持たず、期限・1人1回・定員を書く規格が
+    // 無い(FormFieldCompat 参照)。forms テーブルにも公開版にも列が無く、
+    // 旧編集画面も書き込まなかった。この送信契約は fields の必須だけを
+    // 見るので、似たキーを載せても判定には届かない。効かせるには保存
+    // 場所の設計から必要になる。
+    mocks.getFormById.mockResolvedValue(
+      formRow(null, {
+        fields: JSON.stringify([
+          { name: 'full_name', label: 'お名前', type: 'text', required: true },
+          { deadline: { enabled: true, endsAt: '2020-01-01T00:00' } },
+          { oncePerFriend: { enabled: true } },
+          { totalLimit: { enabled: true, max: 0 } },
+        ]),
+      }),
+    );
+
+    // totalLimit.max=0 は読めば必ず断る設定。通れば読んでいない証拠。
+    const res = await app().fetch(submit({ full_name: '山田' }), env());
+    expect(res.status).toBe(201);
+    expect(mocks.countFormSubmissionsByFriend).not.toHaveBeenCalled();
+    expect(mocks.countChoiceUsage).not.toHaveBeenCalled();
+  });
 });
