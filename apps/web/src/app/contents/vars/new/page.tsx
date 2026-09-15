@@ -383,7 +383,7 @@ export default function NewCommonVarPage() {
           <label htmlFor="cv-value" className="text-ink-secondary mb-1 block text-sm font-medium">
             値
           </label>
-          {type === 'long_text' ? <textarea
+          {type === 'boolean' ? <select id="cv-value" value={value} onChange={(e) => { setValue(e.target.value); setSecretWarningFields(null) }} className="border-hairline rounded-control w-full max-w-md border px-3 py-2 text-sm"><option value="">選んでください</option><option value="true">true</option><option value="false">false</option></select> : type === 'long_text' ? <textarea
             ref={longValueRef}
             id="cv-value"
             maxLength={10000}
@@ -406,7 +406,7 @@ export default function NewCommonVarPage() {
           />}
           {type !== 'number' && type !== 'boolean' && (
             <p className="text-ink-faint mt-1 max-w-md text-right text-xs tabular-nums">
-              {value.length}/{VALUE_MAX}
+              {value.length}/{type === 'long_text' ? 10000 : VALUE_MAX}
             </p>
           )}
           <p className="text-ink-faint mt-1 text-xs">

@@ -6201,13 +6201,15 @@ CREATE INDEX idx_common_action_versions_action_status
 CREATE INDEX idx_common_actions_account_status
   ON common_actions(line_account_id, status, updated_at DESC);
 
-CREATE INDEX idx_common_var_replacement_runs_v400_source ON common_var_replacement_runs(source_common_var_id, created_at DESC);
+CREATE INDEX idx_common_var_replacement_runs_v403_source ON common_var_replacement_runs(source_common_var_id, created_at DESC);
 
-CREATE INDEX idx_common_var_schedules_v400_pending ON common_var_schedules(var_id, effective_from) WHERE applied_at IS NULL;
+CREATE INDEX idx_common_var_schedules_v403_pending ON common_var_schedules(var_id, effective_from) WHERE applied_at IS NULL;
 
-CREATE INDEX idx_common_var_versions_v400_history ON common_var_versions(common_var_id, version_no DESC);
+CREATE INDEX idx_common_var_versions_v403_history ON common_var_versions(common_var_id, version_no DESC);
 
-CREATE INDEX idx_common_vars_v400_account_active ON common_vars(line_account_id, archived_at, name, id);
+CREATE INDEX idx_common_vars_v403_account_active ON common_vars(line_account_id, archived_at, name, id);
+
+CREATE INDEX idx_common_vars_v403_account_name ON common_vars(line_account_id, name, id);
 
 CREATE INDEX idx_conversion_definition_operations_point
   ON conversion_definition_operations(conversion_point_id, created_at DESC);
