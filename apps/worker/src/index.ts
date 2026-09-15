@@ -153,6 +153,7 @@ import { operations } from './routes/operations.js';
 import { runScheduledOperationHealthChecks } from './services/operations-health.js';
 import { observeOperationDispatcher } from './services/operation-dispatch-health.js';
 import { processOperationNotificationOutbox } from './services/operation-notifications.js';
+import { processOperationAlertNotificationOutbox } from './services/operation-alert-notifications.js';
 import {
   OPERATOR_NOTIFICATION_SWEEP_LIMIT,
   sweepOperatorNotifications,
@@ -1553,6 +1554,12 @@ async function scheduled(
     await processOperationNotificationOutbox(env);
   } catch (error) {
     console.error('operation notification outbox error:', error);
+  }
+
+  try {
+    await processOperationAlertNotificationOutbox(env);
+  } catch (error) {
+    console.error('operation alert notification outbox error:', error);
   }
 
   // N-327 (#663): 公開済み運用者通知ルールの送り残しを回収する。
