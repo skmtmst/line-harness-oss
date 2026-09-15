@@ -183,6 +183,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'GET /api/hq/templates/{id}/distributions/{runId}',
   'GET /api/line-accounts',
   'GET /api/line-accounts/{id}',
+  'GET /api/media/{id}',
   'GET /api/media/{id}/content',
   'GET /api/media/{id}/download',
   'GET /api/mileage/redemptions',
