@@ -397,7 +397,9 @@ describe('admin webinar tenant scope', () => {
 
     const create = await adminReq('/api/webinars', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: '拒否', slug: 'denied', accountId: 'account-b' }),
+      body: JSON.stringify({
+        title: '拒否', slug: 'denied', accountId: 'account-b', durationSeconds: 7200,
+      }),
     });
     const update = await adminReq('/api/webinars/w1', {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
@@ -1204,6 +1206,21 @@ describe('admin CRUD', () => {
     expect(dbMocks.createWebinar).not.toHaveBeenCalled();
   });
 
+  test('POST — 視聴時間省略は422で保存しない', async () => {
+    dbMocks.getWebinarBySlug.mockResolvedValue(null);
+
+    const res = await adminReq('/api/webinars', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        accountId: 'account-a', title: '省略確認', slug: 'duration-omitted',
+      }),
+    });
+
+    expect(res.status).toBe(422);
+    await expect(res.json()).resolves.toEqual({ success: false, error: 'invalid_duration' });
+    expect(dbMocks.createWebinar).not.toHaveBeenCalled();
+  });
+
   test('POST — 視聴時間1秒は保存できる', async () => {
     dbMocks.getWebinarBySlug.mockResolvedValue(null);
     dbMocks.createWebinar.mockResolvedValue(makeWebinar({ duration_seconds: 1 }));
@@ -1248,6 +1265,7 @@ describe('admin CRUD', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         accountId: 'account-a', title: '期間公開', slug: 'period-webinar',
+        durationSeconds: 7200,
         folderId: 'folder-1',
         publicationStartsAt: '2026-08-01T00:00:00.000Z',
         publicationEndsAt: '2026-08-31T00:00:00.000Z',
@@ -1269,13 +1287,14 @@ describe('admin CRUD', () => {
     const invalidFolder = await adminReq('/api/webinars', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        accountId: 'account-a', title: '不正', slug: 'invalid-folder', folderId: 'folder-1',
+        accountId: 'account-a', title: '不正', slug: 'invalid-folder', durationSeconds: 7200,
+        folderId: 'folder-1',
       }),
     });
     const invalidPeriod = await adminReq('/api/webinars', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        accountId: 'account-a', title: '不正', slug: 'invalid-period',
+        accountId: 'account-a', title: '不正', slug: 'invalid-period', durationSeconds: 7200,
         publicationStartsAt: '2026-09-01T00:00:00.000Z',
         publicationEndsAt: '2026-08-01T00:00:00.000Z',
       }),
@@ -1294,7 +1313,8 @@ describe('admin CRUD', () => {
     const res = await adminReq('/api/webinars', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        accountId: 'account-a', title: '不正', slug: 'wrong-account-folder', folderId: 'folder-other',
+        accountId: 'account-a', title: '不正', slug: 'wrong-account-folder',
+        durationSeconds: 7200, folderId: 'folder-other',
       }),
     });
 
@@ -1306,12 +1326,14 @@ describe('admin CRUD', () => {
     dbMocks.getWebinarBySlug.mockResolvedValue(null);
     const noTitle = await adminReq('/api/webinars', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ accountId: 'account-a', slug: 'x' }),
+      body: JSON.stringify({ accountId: 'account-a', slug: 'x', durationSeconds: 7200 }),
     });
     expect(noTitle.status).toBe(400);
     const badSlug = await adminReq('/api/webinars', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ accountId: 'account-a', title: 't', slug: 'Bad Slug!' }),
+      body: JSON.stringify({
+        accountId: 'account-a', title: 't', slug: 'Bad Slug!', durationSeconds: 7200,
+      }),
     });
     expect(badSlug.status).toBe(400);
   });
@@ -1320,7 +1342,7 @@ describe('admin CRUD', () => {
     dbMocks.getWebinarBySlug.mockResolvedValue(null);
     const res = await adminReq('/api/webinars', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: '未所属', slug: 'missing-account' }),
+      body: JSON.stringify({ title: '未所属', slug: 'missing-account', durationSeconds: 7200 }),
     });
     expect(res.status).toBe(400);
     expect(await res.json()).toMatchObject({ error: 'account_id_required' });
@@ -1728,6 +1750,28 @@ describe('admin CRUD', () => {
     expect(dbMocks.updateWebinar).toHaveBeenCalledWith(
       expect.anything(), 'w1', expect.objectContaining({ durationSeconds: 1 }),
     );
+  });
+
+  test('PUT /api/webinars/:id — 視聴時間省略は既存の正値を保つ', async () => {
+    dbMocks.getWebinarById.mockResolvedValue(makeWebinar({
+      account_id: 'account-a', duration_seconds: 7200,
+    }));
+    dbMocks.updateWebinar.mockResolvedValue(makeWebinar({
+      account_id: 'account-a', title: '名称だけ更新', duration_seconds: 7200,
+    }));
+
+    const res = await adminReq('/api/webinars/w1', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: '名称だけ更新' }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(dbMocks.updateWebinar).toHaveBeenCalledWith(
+      expect.anything(), 'w1', expect.not.objectContaining({ durationSeconds: expect.anything() }),
+    );
+    await expect(res.json()).resolves.toMatchObject({
+      success: true, data: { durationSeconds: 7200 },
+    });
   });
 
   test('PUT /api/webinars/:id — 別アカウントの実在IDは404で更新しない', async () => {

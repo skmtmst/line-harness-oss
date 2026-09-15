@@ -972,6 +972,9 @@ function validateWebinarBody(
   if (body.status !== undefined && !['draft', 'active', 'archived'].includes(body.status)) {
     return 'invalid_status';
   }
+  if (requireCore && body.durationSeconds === undefined) {
+    return 'invalid_duration';
+  }
   if (body.durationSeconds !== undefined) {
     if (!Number.isFinite(body.durationSeconds) || body.durationSeconds < 1) {
       return 'invalid_duration';
