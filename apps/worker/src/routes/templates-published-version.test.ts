@@ -122,6 +122,31 @@ beforeEach(() => {
 });
 
 describe('編集・保存は下書きへだけ書く', () => {
+  it.each([
+    '{',
+    JSON.stringify({ originalContentUrl: 'https://example.com/a' }),
+    JSON.stringify({ originalContentUrl: 'http://example.com/a', previewImageUrl: 'https://example.com/b' }),
+  ])('画像下書きの不正URLを保存しない', async (messageContent) => {
+    mocks.getTemplateById.mockResolvedValue(liveRow());
+    const response = await put({ messageType: 'image', messageContent });
+    expect(response.status).toBe(422); expect(mocks.saveTemplateDraft).not.toHaveBeenCalled();
+  });
+
+  it('HTTPS画像下書きは保存する', async () => {
+    const messageContent = JSON.stringify({
+      originalContentUrl: 'https://assets.example.com/original.png',
+      previewImageUrl: 'https://assets.example.com/preview.png',
+    });
+    mocks.getTemplateById.mockResolvedValue(liveRow({ draft_message_type: 'image', draft_message_content: messageContent }));
+    mocks.saveTemplateDraft.mockResolvedValue(liveRow({ draft_message_type: 'image', draft_message_content: messageContent }));
+
+    const response = await put({ messageType: 'image', messageContent });
+
+    expect(response.status).toBe(200);
+    expect(mocks.saveTemplateDraft).toHaveBeenCalledWith(bindings.DB, 'tpl-1', expect.objectContaining({
+      messageType: 'image', messageContent,
+    }));
+  });
   it('本文の保存は公開版を触らず、下書きへ回す', async () => {
     // 1回目は存在確認、2回目は保存後の再読込(下書き付きで返る)。
     mocks.getTemplateById
@@ -178,6 +203,29 @@ describe('編集・保存は下書きへだけ書く', () => {
 });
 
 describe('公開口の契約', () => {
+  it.each(['{', JSON.stringify({ originalContentUrl: 'https://example.com/a' }), JSON.stringify({ originalContentUrl: 'http://example.com/a', previewImageUrl: 'https://example.com/b' })])('壊れた画像下書きは公開しない', async (draft_message_content) => {
+    mocks.getTemplateById.mockResolvedValue(liveRow({ draft_message_type: 'image', draft_message_content }));
+    const response = await publish({ expectedVersion: 1, expectedDraftRevision: 0 });
+    expect(response.status).toBe(422); expect(mocks.publishTemplate).not.toHaveBeenCalled();
+  });
+
+  it('HTTPS画像下書きは公開処理へ進む', async () => {
+    const messageContent = JSON.stringify({
+      originalContentUrl: 'https://assets.example.com/original.png',
+      previewImageUrl: 'https://assets.example.com/preview.png',
+    });
+    mocks.getTemplateById.mockResolvedValue(liveRow({ draft_message_type: 'image', draft_message_content: messageContent }));
+    mocks.publishTemplate.mockResolvedValue({
+      row: liveRow({ message_type: 'image', message_content: messageContent, published_version: 2 }),
+      published: true,
+      replayed: false,
+    });
+
+    const response = await publish({ expectedVersion: 1, expectedDraftRevision: 0 });
+
+    expect(response.status).toBe(200);
+    expect(mocks.publishTemplate).toHaveBeenCalledTimes(1);
+  });
   it('確認キーがなければ公開しない', async () => {
     mocks.getTemplateById.mockResolvedValue(liveRow({ draft_message_content: '編集中' }));
 

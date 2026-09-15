@@ -202,6 +202,23 @@ function checkCarousel(
   return { ok: false, error: errors.map((e) => e.message).join(' / ') };
 }
 
+function checkImageTemplate(messageType: string | undefined, messageContent: string | undefined): { ok: true } | { ok: false; error: string } {
+  if (messageType !== 'image') return { ok: true };
+  if (!messageContent) return { ok: false, error: '画像URLを入力してください' };
+  try {
+    const value: unknown = JSON.parse(messageContent);
+    if (!value || Array.isArray(value) || typeof value !== 'object') return { ok: false, error: '画像の指定が不正です' };
+    const image = value as Record<string, unknown>;
+    const urls = [image.originalContentUrl, image.previewImageUrl];
+    const valid = (value: unknown) => {
+      if (typeof value !== 'string') return false;
+      try { const url = new URL(value); return url.protocol === 'https:' && Boolean(url.hostname); } catch { return false; }
+    };
+    if (urls.some((url) => !valid(url))) return { ok: false, error: '画像URLはHTTPSで指定してください' };
+    return { ok: true };
+  } catch { return { ok: false, error: '画像の指定が読み取れません' }; }
+}
+
 
 templates.get('/api/templates', async (c) => {
   try {
@@ -402,6 +419,8 @@ templates.post('/api/templates', requireRole('owner', 'admin'), async (c) => {
     }
     const carousel = checkCarousel(body.messageType, body.messageContent);
     if (!carousel.ok) return c.json({ success: false, error: carousel.error }, 422);
+    const image = checkImageTemplate(body.messageType, body.messageContent);
+    if (!image.ok) return c.json({ success: false, error: image.error }, 422);
     const structured = checkStructuredSize(body.messageType, body.messageContent);
     if (!structured.ok) return c.json({ success: false, error: structured.error }, 422);
     const options = readCarouselOptions(body as unknown as Record<string, unknown>);
@@ -480,6 +499,8 @@ templates.put('/api/templates/:id', requireRole('owner', 'admin'), async (c) => 
     }
     const carousel = checkCarousel(baseMessageType, baseMessageContent);
     if (!carousel.ok) return c.json({ success: false, error: carousel.error }, 422);
+    const image = checkImageTemplate(baseMessageType, baseMessageContent);
+    if (!image.ok) return c.json({ success: false, error: image.error }, 422);
     const structured = checkStructuredSize(baseMessageType, baseMessageContent);
     if (!structured.ok) return c.json({ success: false, error: structured.error }, 422);
     const options = readCarouselOptions(body as unknown as Record<string, unknown>);
@@ -598,6 +619,8 @@ templates.post('/api/templates/:id/publish', requireRole('owner', 'admin'), asyn
       }
       const carousel = checkCarousel(draftType, draftContent);
       if (!carousel.ok) return c.json({ success: false, error: carousel.error }, 422);
+      const image = checkImageTemplate(draftType, draftContent);
+      if (!image.ok) return c.json({ success: false, error: image.error }, 422);
       const structured = checkStructuredSize(draftType, draftContent);
       if (!structured.ok) return c.json({ success: false, error: structured.error }, 422);
     }
