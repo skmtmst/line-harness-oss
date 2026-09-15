@@ -30,6 +30,24 @@ export function normalizeCommonVarValue(type: CommonVarType, value: string): str
   return value.length <= 200 ? value : null;
 }
 
+/** datetime-local は管理画面のJST入力として受け、DBでは比較可能なUTC ISOにそろえる。 */
+export function normalizeCommonVarValidityAt(value: unknown): string | null {
+  if (value === null || value === undefined || value === '') return null;
+  if (typeof value !== 'string') return null;
+  const local = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(value);
+  if (local) {
+    const [, year, month, day, hour, minute] = local;
+    const jstAsUtc = Date.UTC(
+      Number(year), Number(month) - 1, Number(day), Number(hour), Number(minute),
+    );
+    const roundTrip = new Date(jstAsUtc).toISOString().slice(0, 16);
+    if (roundTrip !== value) return null;
+    return new Date(jstAsUtc - 9 * 60 * 60_000).toISOString();
+  }
+  const at = new Date(value);
+  return Number.isFinite(at.getTime()) ? at.toISOString() : null;
+}
+
 export interface CommonVar {
   id: string;
   line_account_id: string | null;
@@ -43,6 +61,10 @@ export interface CommonVar {
   updated_by: string | null;
   archived_at: string | null;
   replacement_run_id: string | null;
+  valid_from: string | null;
+  valid_until: string | null;
+  fallback_value: string | null;
+  expiry_behavior: CommonVarExpiryBehavior;
   created_at: string;
   updated_at: string;
   /** 一覧用。未反映の次回予約を一覧APIでまとめて返し、行ごとのAPI呼出を避ける。 */
@@ -52,6 +74,110 @@ export interface CommonVar {
   /** 一覧用。現在・過去を含め、差し込まれている場所の合計。 */
   usage_count?: number;
   usage_by_kind?: Record<CommonVarUsageKind, number>;
+}
+
+export type CommonVarExpiryBehavior = 'stop' | 'fallback';
+
+export type CommonVarResolutionFailureReason =
+  | 'missing'
+  | 'not_started'
+  | 'expired'
+  | 'fallback_missing'
+  | 'invalid_window';
+
+export interface CommonVarResolutionEntry {
+  id: string;
+  varKey: string;
+  version: number;
+  value: string;
+  source: 'primary' | 'fallback';
+}
+
+export type CommonVarResolution =
+  | { ok: true; values: Record<string, string>; entries: CommonVarResolutionEntry[] }
+  | { ok: false; failures: Array<{ varKey: string; reason: CommonVarResolutionFailureReason }> };
+
+/**
+ * 実行時刻を1つに固定して、本文が参照する共通情報だけを解決する。
+ *
+ * 有効期間は [valid_from, valid_until) の半開区間。終了時刻ちょうどは
+ * 期限切れとして扱う。呼び出し側は entries の id/version をsnapshotと一緒に
+ * 保存し、外部送信前に同じ版かをCAS確認する。
+ */
+export async function resolveCommonVarValuesAt(
+  db: D1Database,
+  lineAccountId: string,
+  varKeys: string[],
+  executionAt: string,
+): Promise<CommonVarResolution> {
+  const uniqueKeys = [...new Set(varKeys)];
+  if (uniqueKeys.length === 0) return { ok: true, values: {}, entries: [] };
+  const executionMs = Date.parse(executionAt);
+  if (!Number.isFinite(executionMs)) {
+    return {
+      ok: false,
+      failures: uniqueKeys.map((varKey) => ({ varKey, reason: 'invalid_window' })),
+    };
+  }
+  const rows = await db.prepare(
+    `SELECT id, var_key, value, fallback_value, valid_from, valid_until,
+            expiry_behavior, version
+       FROM common_vars
+      WHERE line_account_id = ? AND archived_at IS NULL`,
+  ).bind(lineAccountId).all<Pick<
+    CommonVar,
+    'id' | 'var_key' | 'value' | 'fallback_value' | 'valid_from' | 'valid_until' | 'expiry_behavior' | 'version'
+  >>();
+  const byKey = new Map(rows.results.map((row) => [row.var_key, row]));
+  const values: Record<string, string> = {};
+  const entries: CommonVarResolutionEntry[] = [];
+  const failures: Array<{ varKey: string; reason: CommonVarResolutionFailureReason }> = [];
+
+  for (const varKey of uniqueKeys) {
+    const row = byKey.get(varKey);
+    if (!row) {
+      failures.push({ varKey, reason: 'missing' });
+      continue;
+    }
+    const fromMs = row.valid_from === null ? null : Date.parse(row.valid_from);
+    const untilMs = row.valid_until === null ? null : Date.parse(row.valid_until);
+    const invalidWindow = (fromMs !== null && !Number.isFinite(fromMs))
+      || (untilMs !== null && !Number.isFinite(untilMs))
+      || (fromMs !== null && untilMs !== null && fromMs >= untilMs);
+    const before = !invalidWindow && fromMs !== null && executionMs < fromMs;
+    const expired = !invalidWindow && untilMs !== null && executionMs >= untilMs;
+    if (!invalidWindow && !before && !expired) {
+      values[varKey] = row.value;
+      entries.push({
+        id: row.id,
+        varKey,
+        version: Number(row.version),
+        value: row.value,
+        source: 'primary',
+      });
+      continue;
+    }
+    if (row.expiry_behavior === 'fallback' && row.fallback_value !== null) {
+      values[varKey] = row.fallback_value;
+      entries.push({
+        id: row.id,
+        varKey,
+        version: Number(row.version),
+        value: row.fallback_value,
+        source: 'fallback',
+      });
+      continue;
+    }
+    failures.push({
+      varKey,
+      reason: invalidWindow
+        ? 'invalid_window'
+        : row.expiry_behavior === 'fallback'
+          ? 'fallback_missing'
+          : before ? 'not_started' : 'expired',
+    });
+  }
+  return failures.length > 0 ? { ok: false, failures } : { ok: true, values, entries };
 }
 
 export interface CommonVarVersion {
@@ -566,6 +692,10 @@ export async function createCommonVar(
     folderId?: string | null;
     memo?: string;
     actorId?: string | null;
+    validFrom?: string | null;
+    validUntil?: string | null;
+    fallbackValue?: string | null;
+    expiryBehavior?: CommonVarExpiryBehavior;
   },
 ): Promise<CommonVar> {
   const id = crypto.randomUUID();
@@ -584,11 +714,14 @@ export async function createCommonVar(
       db.prepare(
         `INSERT INTO common_vars
            (id, line_account_id, folder_id, name, var_key, type, value, memo, version,
-            updated_by, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`,
+            updated_by, created_at, updated_at, valid_from, valid_until, fallback_value,
+            expiry_behavior)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?)`,
       ).bind(
         id, input.lineAccountId, input.folderId ?? null, input.name, input.varKey,
         input.type ?? 'text', value, memo, input.actorId ?? null, now, now,
+        input.validFrom ?? null, input.validUntil ?? null, input.fallbackValue ?? null,
+        input.expiryBehavior ?? 'stop',
       ),
       db.prepare(
         `INSERT INTO common_var_versions
@@ -620,6 +753,10 @@ export async function updateCommonVar(
     expectedVersion?: number;
     actorId?: string | null;
     changeReason?: string;
+    validFrom?: string | null;
+    validUntil?: string | null;
+    fallbackValue?: string | null;
+    expiryBehavior?: CommonVarExpiryBehavior;
   },
 ): Promise<CommonVar | null> {
   const existing = await getCommonVarById(db, id, lineAccountId);
@@ -645,6 +782,22 @@ export async function updateCommonVar(
     if (input.folderId) await assertCommonVarFolder(db, input.folderId);
     sets.push('folder_id = ?');
     values.push(input.folderId ?? null);
+  }
+  if ('validFrom' in input) {
+    sets.push('valid_from = ?');
+    values.push(input.validFrom ?? null);
+  }
+  if ('validUntil' in input) {
+    sets.push('valid_until = ?');
+    values.push(input.validUntil ?? null);
+  }
+  if ('fallbackValue' in input) {
+    sets.push('fallback_value = ?');
+    values.push(input.fallbackValue ?? null);
+  }
+  if (input.expiryBehavior !== undefined) {
+    sets.push('expiry_behavior = ?');
+    values.push(input.expiryBehavior);
   }
   if (sets.length > 0) {
     const now = jstNow();

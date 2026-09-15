@@ -14,6 +14,10 @@ import {
   enrollFriendInReminder,
   getFriendReminders,
   cancelFriendReminder,
+  listReminderRegistrants,
+  moveReminderRegistrantTargetDate,
+  cancelReminderRegistrant,
+  resumeReminderRegistrant,
   getFolderById,
   getReminderDeliveryRunById,
   getReminderDeliveryRunSummary,
@@ -78,6 +82,18 @@ function commonRunStatus(status: ReminderDeliveryRunStatus) {
   if (status === 'skipped') return 'skipped' as const;
   if (status === 'cancelled') return 'cancelled' as const;
   return 'pending' as const;
+}
+
+function canonicalTargetDate(value: unknown): string | null {
+  // `datetime-local` のような曖昧な時刻を Worker 側で勝手に店舗時刻へ解釈しない。
+  // API は必ず offset/Z つきの時刻だけを受け、保存値を UTC ISO へ正規化する。
+  if (typeof value !== 'string' || !/(Z|[+-]\d{2}:\d{2})$/.test(value)) return null;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
+}
+
+function isNonNegativeInteger(value: unknown): value is number {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0;
 }
 
 type ReminderListRow = Awaited<ReturnType<typeof getReminders>>[number] & {
@@ -1137,6 +1153,112 @@ reminders.post('/api/reminders/:id/enroll/:friendId', requireRole('owner', 'admi
     }, 201);
   } catch (err) {
     console.error('POST /api/reminders/:id/enroll/:friendId error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+function publicRegistrant(row: Awaited<ReturnType<typeof listReminderRegistrants>>[number]) {
+  return {
+    id: row.id,
+    friendId: row.friend_id,
+    friendName: row.friend_name,
+    targetDate: row.target_date,
+    status: row.status,
+    reminderVersionId: row.reminder_version_id,
+    sourceKind: row.source_kind,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    cancelledAt: row.completed_at,
+    lockVersion: row.lock_version,
+  };
+}
+
+function mutationResponse(
+  c: Context<Env>,
+  mutation: Awaited<ReturnType<typeof moveReminderRegistrantTargetDate>>,
+) {
+  if (mutation.state === 'not_found') return c.json({ success: false, error: '登録者が見つかりません' }, 404);
+  if (mutation.state === 'conflict') return c.json({ success: false, error: 'ほかの担当者による変更があります。一覧を読み直してください。' }, 409);
+  if (!('row' in mutation)) return c.json({ success: false, error: '登録者を更新できません' }, 500);
+  const row = mutation.row;
+  return c.json({
+    success: true,
+    data: {
+      id: row.id,
+      friendId: row.friend_id,
+      targetDate: row.target_date,
+      status: row.status,
+      reminderVersionId: row.reminder_version_id,
+      lockVersion: row.lock_version,
+      replayed: mutation.state === 'replayed',
+    },
+  });
+}
+
+/** N-064: リマインダ別の登録者を、直接URLから安全に確認できる一覧。 */
+reminders.get('/api/reminders/:id/registrants', requireRole('owner', 'admin', 'staff'), async (c) => {
+  try {
+    const items = await listReminderRegistrants(c.env.DB, c.req.param('id'));
+    return c.json({ success: true, data: items.map(publicRegistrant) });
+  } catch (err) {
+    console.error('GET /api/reminders/:id/registrants error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+/** 基準日を変える。旧日程の未送信だけを止め、送信済み履歴は残す。 */
+reminders.patch('/api/reminders/:id/registrants/:enrollmentId', requireRole('owner', 'admin', 'staff'), async (c) => {
+  try {
+    const body = await c.req.json<{ targetDate?: unknown; expectedLockVersion?: unknown }>();
+    const targetDate = canonicalTargetDate(body.targetDate);
+    if (!targetDate || !isNonNegativeInteger(body.expectedLockVersion)) {
+      return c.json({ success: false, error: 'targetDate と expectedLockVersion を正しく指定してください' }, 400);
+    }
+    return mutationResponse(c, await moveReminderRegistrantTargetDate(c.env.DB, {
+      reminderId: c.req.param('id'),
+      enrollmentId: c.req.param('enrollmentId'),
+      targetDate,
+      expectedLockVersion: body.expectedLockVersion,
+    }));
+  } catch (err) {
+    console.error('PATCH /api/reminders/:id/registrants/:enrollmentId error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+/** 取消は送信済み履歴を消さず、未送信行だけを止める。 */
+reminders.post('/api/reminders/:id/registrants/:enrollmentId/cancel', requireRole('owner', 'admin', 'staff'), async (c) => {
+  try {
+    const body = await c.req.json<{ expectedLockVersion?: unknown }>();
+    if (!isNonNegativeInteger(body.expectedLockVersion)) {
+      return c.json({ success: false, error: 'expectedLockVersion を正しく指定してください' }, 400);
+    }
+    return mutationResponse(c, await cancelReminderRegistrant(c.env.DB, {
+      reminderId: c.req.param('id'),
+      enrollmentId: c.req.param('enrollmentId'),
+      expectedLockVersion: body.expectedLockVersion,
+      cancelReason: 'manual_registration_cancelled',
+    }));
+  } catch (err) {
+    console.error('POST /api/reminders/:id/registrants/:enrollmentId/cancel error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+/** 再開では旧実行行を復活させない。未送信だけが次回処理で再計算される。 */
+reminders.post('/api/reminders/:id/registrants/:enrollmentId/resume', requireRole('owner', 'admin', 'staff'), async (c) => {
+  try {
+    const body = await c.req.json<{ expectedLockVersion?: unknown }>();
+    if (!isNonNegativeInteger(body.expectedLockVersion)) {
+      return c.json({ success: false, error: 'expectedLockVersion を正しく指定してください' }, 400);
+    }
+    return mutationResponse(c, await resumeReminderRegistrant(c.env.DB, {
+      reminderId: c.req.param('id'),
+      enrollmentId: c.req.param('enrollmentId'),
+      expectedLockVersion: body.expectedLockVersion,
+    }));
+  } catch (err) {
+    console.error('POST /api/reminders/:id/registrants/:enrollmentId/resume error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
