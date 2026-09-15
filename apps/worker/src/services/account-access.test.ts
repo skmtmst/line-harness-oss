@@ -41,6 +41,8 @@ function account(
     og_default_image_url: null, og_default_description: null, official_profile_url: null,
     friend_capacity: null,
     capacity_warn_at: null, icon_url: null,
+    line_display_name: null, line_picture_url: null, line_basic_id: null,
+    line_profile_synced_at: null,
     tenant_id: options.tenantId === undefined ? DEFAULT_TENANT_ID : options.tenantId,
     created_at: '', updated_at: '',
   };

@@ -54,7 +54,7 @@ function HqBannersInner() {
     void api.lineAccounts.list().then((res) => {
       if (res.success) setAccounts(res.data as AccountWithStats[])
     }).catch(() => {
-      // 店舗が取れなくても一覧は使える。渡す先の一覧だけ空になる。
+      // アカウントが取れなくても一覧は使える。渡す先の一覧だけ空になる。
     })
   }, [loadSummary])
 
