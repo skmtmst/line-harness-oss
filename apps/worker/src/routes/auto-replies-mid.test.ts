@@ -2,7 +2,8 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { Hono } from 'hono';
 import type { Env } from '../index.js';
 import type { AuthenticatedStaff } from '../middleware/auth.js';
-import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
+import { authMiddleware } from '../middleware/auth.js';
+import { createTestD1, insertFriend, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { autoReplies } from './auto-replies.js';
 
 const admin: AuthenticatedStaff = {
@@ -23,6 +24,22 @@ function app(db: D1Database, currentStaff: AuthenticatedStaff = admin) {
   });
   instance.route('/', autoReplies);
   return { instance, bindings: { DB: db, WORKER_URL: 'https://worker.test' } as Env['Bindings'] };
+}
+
+function authenticatedApp(db: D1Database) {
+  const instance = new Hono<Env>();
+  instance.use('*', authMiddleware);
+  instance.route('/', autoReplies);
+  const bindings = { DB: db, WORKER_URL: 'https://worker.test' } as Env['Bindings'];
+  return {
+    request: (path: string, token: string, init: RequestInit) => instance.request(path, {
+      ...init,
+      headers: {
+        Authorization: `Bearer ${token}`,
+        ...(init.headers ?? {}),
+      },
+    }, bindings),
+  };
 }
 
 function settings(overrides: Record<string, unknown> = {}) {
@@ -83,6 +100,29 @@ describe('点検・中: 自動応答の下書き確認・上限・ページ送�
          (id, channel_id, name, channel_access_token, channel_secret, is_active, tenant_id)
        VALUES ('account-1', 'channel-1', '店舗1', '', '', 1, 'tenant-1')`,
     ).run();
+    testDb.raw.prepare(
+      `INSERT INTO line_accounts
+         (id, channel_id, name, channel_access_token, channel_secret, is_active, tenant_id)
+       VALUES ('account-2', 'channel-2', '店舗2', '', '', 1, 'tenant-1')`,
+    ).run();
+    for (const [id, name, role, apiKey, permissionKeys, accountScope] of [
+      ['admin-1', '管理者', 'admin', 'admin-key', '[]', 'all'],
+      ['staff-allowed', 'テスト担当', 'staff', 'staff-key', '["/auto-replies"]', 'accounts'],
+      ['staff-denied', '権限なし', 'staff', 'no-permission-key', '[]', 'all'],
+      ['staff-other', '別店舗担当', 'staff', 'other-account-key', '["/auto-replies"]', 'accounts'],
+    ]) {
+      testDb.raw.prepare(
+        `INSERT INTO staff_members
+           (id, name, role, api_key, permission_keys, tenant_id, account_scope)
+         VALUES (?, ?, ?, ?, ?, 'tenant-1', ?)`,
+      ).run(id, name, role, apiKey, permissionKeys, accountScope);
+    }
+    testDb.raw.prepare(
+      `INSERT INTO staff_account_scopes (staff_id, line_account_id, created_at)
+       VALUES ('staff-allowed', 'account-1', '2026-09-01T00:00:00.000'),
+              ('staff-other', 'account-2', '2026-09-01T00:00:00.000')`,
+    ).run();
+    insertFriend(testDb.raw, 'friend-1', { line_account_id: 'account-1' });
     insertRule(testDb.raw, 'rule-1', '予約', 1);
     insertRule(testDb.raw, 'rule-2', '予約変更', 2);
   });
@@ -110,7 +150,6 @@ describe('点検・中: 自動応答の下書き確認・上限・ページ送�
   it.each([
     ['validate', 'POST', '/api/auto-replies/rule-1/validate'],
     ['conflicts', 'GET', '/api/auto-replies/rule-1/conflicts'],
-    ['test', 'POST', '/api/auto-replies/rule-1/test'],
   ])('中5: 下書きの%sはstaffに403を返す', async (_label, method, path) => {
     const target = app(testDb.db, staff);
     const response = await target.instance.request(path, method === 'GET' ? { method } : {
@@ -120,6 +159,60 @@ describe('点検・中: 自動応答の下書き確認・上限・ページ送�
     }, target.bindings);
 
     expect(response.status).toBe(403);
+  });
+
+  it('N-084: 公開前テストだけを権限とアカウント境界の内側のstaffへ許可する', async () => {
+    const target = authenticatedApp(testDb.db);
+    const runTest = (token: string) => target.request('/api/auto-replies/rule-1/test', token, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        friendId: 'friend-1',
+        incomingText: '予約したいです',
+        occurredAt: '2026-09-01T00:00:00.000Z',
+      }),
+    });
+
+    expect((await runTest('admin-key')).status).toBe(200);
+    const staffTest = await runTest('staff-key');
+    expect(staffTest.status).toBe(200);
+    expect(await staffTest.json()).toMatchObject({
+      success: true,
+      data: { draftWon: true, stateChanged: false },
+    });
+    expect((await runTest('no-permission-key')).status).toBe(403);
+    expect((await runTest('other-account-key')).status).toBe(404);
+    expect(testDb.raw.prepare(
+      `SELECT status, last_test_status, last_tested_by_staff_id
+         FROM auto_reply_versions WHERE id = 'version-rule-1'`,
+    ).get()).toEqual({
+      status: 'draft',
+      last_test_status: 'succeeded',
+      last_tested_by_staff_id: 'staff-allowed',
+    });
+
+    const staffMutation = (path: string, method: string, body: unknown) => target.request(
+      path,
+      'staff-key',
+      {
+        method,
+        headers: { 'content-type': 'application/json', 'Idempotency-Key': 'staff-mutation-0001' },
+        body: JSON.stringify(body),
+      },
+    );
+    expect((await staffMutation('/api/auto-replies/drafts', 'POST', settings())).status).toBe(403);
+    expect((await staffMutation('/api/auto-replies/rule-1/draft', 'PUT', {
+      ...settings(), expectedVersion: 2,
+    })).status).toBe(403);
+    expect((await staffMutation('/api/auto-replies/rule-1/publish', 'POST', {})).status).toBe(403);
+    expect(testDb.raw.prepare('SELECT COUNT(*) AS count FROM auto_replies').get()).toEqual({ count: 2 });
+    expect(testDb.raw.prepare(
+      `SELECT current_draft_version_id, current_published_version_id
+         FROM auto_replies WHERE id = 'rule-1'`,
+    ).get()).toEqual({
+      current_draft_version_id: 'version-rule-1',
+      current_published_version_id: null,
+    });
   });
 
   it('中5: 下書きのvalidateはadminなら403にならない', async () => {

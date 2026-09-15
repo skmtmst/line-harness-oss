@@ -1511,6 +1511,7 @@ export type AnalyticsUsageOverview = AnalyticsEnvelope<{
   automaticDeletion: false
   summary: {
     unusedItems: AnalyticsMetric<number>
+    brokenReferences: AnalyticsMetric<number>
     automaticRuns: AnalyticsMetric<number>
     manualSends: AnalyticsMetric<number>
     estimatedHoursSaved: AnalyticsMetric<number>

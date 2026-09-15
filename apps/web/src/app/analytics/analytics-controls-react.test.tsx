@@ -66,6 +66,40 @@ function funnelRun(label = '申込') {
   }
 }
 
+function usageOverview(accountId: string, categories = [
+  { key: 'templates', label: 'テンプレート', state: 'available', value: 0, reason: null },
+  { key: 'forms', label: '回答フォーム', state: 'unavailable', value: null, reason: '所属を確認できません' },
+  { key: 'automations', label: 'オートメーション', state: 'partial', value: 1, reason: '未対応種別を除外' },
+  { key: 'rich_menus', label: 'リッチメニュー', state: 'failed', value: null, reason: '照合失敗' },
+]) {
+  const numberMetric = { value: 0, state: 'available', reason: null }
+  return {
+    success: true,
+    data: {
+      lineAccountId: accountId,
+      timeZone: 'Asia/Tokyo',
+      period: { from: '2026-08-11', to: '2026-09-09' },
+      dataCutoffAt: '2026-09-09T00:00:00.000Z',
+      data: {
+        state: 'partial', stateReason: null,
+        checkedAt: '2026-09-09T00:00:00.000Z', automaticDeletion: false,
+        summary: {
+          unusedItems: numberMetric,
+          brokenReferences: { value: 1, state: 'partial', reason: '確認できた参照だけの合計です' },
+          automaticRuns: numberMetric,
+          manualSends: numberMetric, estimatedHoursSaved: numberMetric,
+        },
+        categories: categories.map((item) => ({
+          key: item.key, label: item.label, href: '/analytics',
+          created: numberMetric, inUse: numberMetric, unused: numberMetric,
+          brokenReferences: { value: item.value, state: item.state, reason: item.reason },
+          lastUsedAt: { value: null, state: 'unavailable', reason: '利用記録なし' },
+        })),
+      },
+    },
+  }
+}
+
 class MemoryStorage implements Storage {
   private readonly values = new Map<string, string>()
   get length() { return this.values.size }
@@ -242,5 +276,42 @@ describe('分析の対象者種別・期間選択(#835)', () => {
     await act(async () => { await Promise.resolve(); await Promise.resolve() })
 
     expect(host.textContent).not.toContain('古い申込')
+  })
+
+  it('使われ方は参照状態を描き分け、アカウント切替前の遅い応答を捨てる', async () => {
+    fixture.tab = 'usage'
+    const late = deferred<unknown>()
+    net.handler = async (path) => {
+      if (path.startsWith('/api/staff/me')) {
+        return { success: true, data: { role: 'admin' } }
+      }
+      if (path.startsWith('/api/settings/features/visibility?')) {
+        return { success: true, data: { features: {} } }
+      }
+      if (path.startsWith('/api/analytics/usage?')) {
+        const accountId = new URL(path, 'https://example.invalid').searchParams.get('accountId')
+        return accountId === 'account-a' ? late.promise : usageOverview('account-b')
+      }
+      throw new Error(`未設定: ${path}`)
+    }
+
+    await render()
+    fixture.accountId = 'account-b'
+    await render()
+    await act(async () => { await Promise.resolve(); await Promise.resolve() })
+
+    expect(host.textContent).toContain('参照切れ 0')
+    expect(host.textContent).toContain('参照切れ 未取得: 所属を確認できません')
+    expect(host.textContent).toContain('参照切れ 1（一部のみ）: 未対応種別を除外')
+    expect(host.textContent).toContain('参照切れ 取得失敗: 照合失敗')
+    expect(host.textContent).toContain('確認できた参照切れ')
+    expect(host.textContent).toContain('確認できた参照だけの合計です')
+
+    late.resolve(usageOverview('account-a', [
+      { key: 'templates', label: '古い店舗のテンプレート', state: 'available', value: 9, reason: null },
+    ]))
+    await act(async () => { await Promise.resolve(); await Promise.resolve() })
+    expect(host.textContent).not.toContain('古い店舗のテンプレート')
+    expect(host.textContent).toContain('テンプレート')
   })
 })
