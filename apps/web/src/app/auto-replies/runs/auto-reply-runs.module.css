@@ -129,6 +129,13 @@
   text-align: right;
 }
 
+/* N-081: 「もう一度実行」は行の全幅を使って表示する */
+.retryRow {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: flex-end;
+}
+
 .pagination {
   display: flex;
   justify-content: flex-end;
