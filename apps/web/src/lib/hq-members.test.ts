@@ -35,7 +35,7 @@ describe('メンバー管理の計算', () => {
     const names = new Map([['a1', '然-NEN- TEST']])
     const scoped: StaffMember = { ...base, id: 's2', role: 'viewer', accountScope: 'accounts', scopedLineAccountIds: ['a1'] }
     const invited: StaffMember = { ...base, id: 's3', role: 'staff', isActive: false, inviteStatus: 'pending_email' }
-    expect(scopeLabel(base, names)).toBe('全店舗')
+    expect(scopeLabel(base, names)).toBe('全アカウント')
     expect(scopeLabel(scoped, names)).toBe('然-NEN- TEST')
     expect(memberKpis([base, scoped, invited])).toEqual({ total: 3, active: 2, invited: 1, viewers: 1, scopedAccounts: 1, allScope: 2 })
     expect(sortMembers([invited, scoped, base], 's2').map((m) => m.id)).toEqual(['s2', 's1', 's3'])

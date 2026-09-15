@@ -2116,6 +2116,7 @@ export type LineAccountConnectStep = {
   state: 'passed' | 'failed' | 'skipped'
   message: string
 }
+
 export type LineAccountConnectData = {
   steps: LineAccountConnectStep[]
   id?: string

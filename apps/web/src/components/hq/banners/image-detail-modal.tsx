@@ -16,7 +16,7 @@ import {
 } from '@/lib/hq-banners'
 
 /**
- * 画像の詳細と店舗へ渡す。Pencil 35-3-A `k0JKm`（幅1160）。
+ * 画像の詳細とアカウントへ渡す。Pencil 35-3-A `k0JKm`（幅1160）。
  *
  * 全面1枚のオーバーレイに中央そろえで置く（`docs/v6-common-rules.md` §1-7）。
  * 幅は `min(1160px, 100%)`。1920 や 1160 を固定で書かない。
@@ -143,11 +143,11 @@ export default function ImageDetailModal({
 
             <section data-design-node="qyeVH" className="flex flex-col gap-2 rounded-card border border-hairline bg-canvas p-4">
               <div className="flex items-baseline gap-2">
-                <h3 className="text-body font-bold text-ink">店舗へ渡す</h3>
-                <p className="text-caption text-ink-faint">渡した店舗の登録メディアに入ります</p>
+                <h3 className="text-body font-bold text-ink">アカウントへ渡す</h3>
+                <p className="text-caption text-ink-faint">渡したアカウントの登録メディアに入ります</p>
               </div>
               {accounts.length === 0 ? (
-                <p className="text-caption text-ink-faint">この統括に店舗がありません。</p>
+                <p className="text-caption text-ink-faint">この統括にアカウントがありません。</p>
               ) : (
                 <ul className="flex flex-col">
                   {accounts.map((account) => {
@@ -231,7 +231,7 @@ export default function ImageDetailModal({
             onClick={() => void onDeliver(selected).then(() => setSelected([]))}
           >
             <Store aria-hidden="true" className="h-4 w-4" />
-            {busy ? '渡しています…' : `${selected.length}店舗へ渡す`}
+            {busy ? '渡しています…' : `${selected.length}アカウントへ渡す`}
           </Button>
         </div>
       </div>
@@ -240,7 +240,7 @@ export default function ImageDetailModal({
         <ConfirmDialog
           open
           title="この画像を一覧から外しますか？"
-          description="統括の一覧に出なくなります。すでに店舗へ渡した画像は、その店舗の登録メディアに残ります。"
+          description="統括の一覧に出なくなります。すでにアカウントへ渡した画像は、そのアカウントの登録メディアに残ります。"
           confirmLabel="一覧から外す"
           destructive
           busy={busy}

@@ -172,12 +172,12 @@ function MembersInner() {
             <SummaryCard variant="v6" title="権限者" value={status === 'ready' ? kpis.total : null} unit="人" detail={status === 'ready' ? `有効 ${kpis.active}人` : '—'} loading={status === 'loading'} />
             <SummaryCard variant="v6" title="招待中" value={status === 'ready' ? kpis.invited : null} unit="人" detail="未承諾の招待" loading={status === 'loading'} />
             <SummaryCard variant="v6" title="閲覧のみ" value={status === 'ready' ? kpis.viewers : null} unit="人" detail="編集できない権限者" loading={status === 'loading'} />
-            <SummaryCard variant="v6" title="担当店舗の割り当て" value={status === 'ready' ? kpis.scopedAccounts : null} unit="店舗" detail={status === 'ready' ? `全店舗を担当 ${kpis.allScope}人` : '—'} loading={status === 'loading'} />
+            <SummaryCard variant="v6" title="担当アカウントの割り当て" value={status === 'ready' ? kpis.scopedAccounts : null} unit="アカウント" detail={status === 'ready' ? `全アカウントを担当 ${kpis.allScope}人` : '—'} loading={status === 'loading'} />
           </div>
 
           <div data-design="Note" data-design-node="Y1EarL">
             <NoteBar tone="info">
-              権限者は統括の管理画面に入れる人です。担当店舗を限定すると、その店舗の管理画面だけが見えます。招待メールの有効期限は48時間です。
+              権限者は統括の管理画面に入れる人です。担当アカウントを限定すると、そのアカウントの管理画面だけが見えます。招待メールの有効期限は48時間です。
             </NoteBar>
           </div>
 
@@ -192,7 +192,7 @@ function MembersInner() {
             ) : status === 'error' ? (
               <ListState kind="error" title="権限者を読み込めませんでした" description="通信の状態を確認して、もう一度お試しください。" onRetry={() => void load()} />
             ) : restricted ? (
-              <ListState kind="forbidden" title="全店舗の担当者だけが権限者を管理できます" description="担当店舗が限定されているため、権限者の一覧と変更はできません。" />
+              <ListState kind="forbidden" title="全アカウントの担当者だけが権限者を管理できます" description="担当アカウントが限定されているため、権限者の一覧と変更はできません。" />
             ) : (
               <DataTable>
                 <thead>
@@ -356,7 +356,7 @@ function TenantInfoTab({ canEdit }: { canEdit: boolean }) {
 
   return (
     <>
-      <NoteBar tone="info">統括名は、統括コンソールとメールの差出人に使われます。店舗の名前はそれぞれの店舗の設定で変えます。</NoteBar>
+      <NoteBar tone="info">統括名は、統括コンソールとメールの差出人に使われます。アカウントの名前はそれぞれのアカウントの設定で変えます。</NoteBar>
       <form onSubmit={save} className="flex max-w-2xl flex-col gap-4 rounded-card border border-hairline bg-canvas p-5">
         <div className="flex flex-col gap-1.5">
           <label htmlFor="tenant-name" className="text-label font-bold text-ink">統括名</label>

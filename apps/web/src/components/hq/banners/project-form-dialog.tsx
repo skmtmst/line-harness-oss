@@ -57,7 +57,7 @@ export default function ProjectFormDialog({
     <Dialog
       open={open}
       title={project ? '名前と説明を変える' : 'プロジェクトを作る'}
-      description={project ? undefined : '案件やキャンペーンごとに1つ作ります。中で生成した画像は、あとで店舗へ渡せます。'}
+      description={project ? undefined : '案件やキャンペーンごとに1つ作ります。中で生成した画像は、あとでアカウントへ渡せます。'}
       confirmLabel={project ? '変更を保存' : 'プロジェクトを作る'}
       busy={busy}
       error={localError || error}

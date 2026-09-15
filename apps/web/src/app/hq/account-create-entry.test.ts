@@ -11,7 +11,7 @@ const hqOpenPage = readFileSync(join(here, 'open', 'page.tsx'), 'utf8')
 describe('HQ account create entry', () => {
   it('HQ page links to the general account flow', () => {
     assert.equal(hqPage.match(/href="\/accounts\/new"/g)?.length, 2)
-    assert.equal(hqPage.match(/＋LINEアカウントを新規登録/g)?.length, 2)
+    assert.equal(hqPage.match(/＋ LINEアカウントを新規登録/g)?.length, 2)
     assert.doesNotMatch(hqPage, /restaurant-test\/stores\/new/)
   })
 

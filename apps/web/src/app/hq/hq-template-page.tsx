@@ -10,7 +10,7 @@ import TemplateConsole from './templates/template-console'
 
 function Unavailable({ label, target }: { label: string; target: HqOpenTargetKey }) {
   usePageTitle(label)
-  return <section aria-label={`統括の${label}`}><p>統括からの作成・配布は現在利用できません。</p><Link href={hqOpenHref(target)}>店舗を選んで{label}を開く</Link></section>
+  return <section aria-label={`統括の${label}`}><p>統括からの作成・配布は現在利用できません。</p><Link href={hqOpenHref(target)}>アカウントを選んで{label}を開く</Link></section>
 }
 
 export default function HqTemplatePage({ type, label, target }: { type: TemplateType; label: string; target: HqOpenTargetKey }) {
