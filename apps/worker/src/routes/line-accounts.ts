@@ -519,7 +519,7 @@ lineAccounts.post(
 // Persisted re-check for the account list, detail, and operations dashboard.
 lineAccounts.post(
   '/api/line-accounts/:id/connection-checks',
-  requireRole('owner'),
+  requireRole('owner', 'admin'),
   async (c) => {
     try {
       const id = c.req.param('id')!;
