@@ -65,6 +65,7 @@ vi.mock('@line-crm/db', async (importOriginal) => {
 import { verifySignature } from '@line-crm/line-sdk';
 import { liffRoutes } from './liff.js';
 import { webhook } from './webhook.js';
+import { sendAdConversions } from '../services/ad-conversion.js';
 
 let currentSub = 'U1';
 
@@ -248,6 +249,41 @@ describe('停止由来の引き継ぎ (N-244差戻・実DB)', () => {
     expect(lastEvent().attribution_status).toBe('captured');
     expect(count('friend_scenarios')).toBeGreaterThan(0);
     expect(sentCount()).toBeGreaterThan(0);
+  });
+
+  test('T0b production経路: LIFF連携だけでは広告同意にせず外部送信し0件', async () => {
+    currentSub = 'U0b';
+    const { app, env } = setupApp(dbs.db);
+    const cb = await postCallback(app, env, 'A', { fbclid: 'fb-no-consent' });
+    expect(cb.status).toBe(200);
+
+    const friend = friendRow('U0b');
+    const tracking = dbs.raw.prepare(`
+      SELECT fbclid, ad_conversion_consent_at
+      FROM ref_tracking WHERE friend_id = ? ORDER BY created_at DESC LIMIT 1
+    `).get(friend.id) as { fbclid: string | null; ad_conversion_consent_at: string | null };
+    expect(tracking).toEqual({ fbclid: 'fb-no-consent', ad_conversion_consent_at: null });
+
+    dbs.raw.prepare(`
+      INSERT INTO ad_platforms
+        (id, name, display_name, config, is_active, line_account_id)
+      VALUES ('meta-t0b', 'meta', 'Meta', ?, 1, 'acc1')
+    `).run(JSON.stringify({
+      pixel_id: 'pixel', access_token: 'token', click_id_validity_days: 30,
+    }));
+    vi.mocked(fetch).mockClear();
+
+    await sendAdConversions(dbs.db, String(friend.id), 'Purchase', 1000, {
+      idempotencyKey: 'route-no-consent', now: new Date(),
+    });
+
+    expect(vi.mocked(fetch)).not.toHaveBeenCalled();
+    expect(dbs.raw.prepare(`
+      SELECT status, selection_reason, last_error
+      FROM ad_conversion_outbox WHERE idempotency_key = 'route-no-consent'
+    `).get()).toMatchObject({
+      status: 'failed', selection_reason: 'missing_consent', last_error: 'missing_consent',
+    });
   });
 
   test('T1 callback→follow: 停止callback後の別followは抑止される', async () => {
