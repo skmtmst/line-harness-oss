@@ -917,6 +917,13 @@ const spec = {
         responses: { '200': { description: 'Visible auto replies' }, '403': { description: 'Staff role required' }, '404': { description: 'LINE account not found in account scope' } },
       },
     },
+    '/api/auto-reply-runs/{id}/retry': {
+      post: {
+        tags: ['Auto replies'], summary: '恒久失敗した後続処理だけを保存済みの内容でやり直す（LINEへの返信は送り直さない）（N-081）',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'Retry executed; evaluation recomputed from all action runs' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Evaluation not found in account scope' }, '409': { description: 'No permanent_failed action runs to claim (already processing or completed)' } },
+      },
+    },
     '/api/mileage/rules': {
       get: {
         tags: ['Mileage'], summary: 'LINEアカウント範囲内のマイル付与ルールを取得',

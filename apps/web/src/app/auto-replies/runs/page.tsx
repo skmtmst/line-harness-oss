@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { ArrowLeft, Download, Eye, Pause, Pencil, TriangleAlert } from 'lucide-react'
+import { ArrowLeft, Download, Eye, Pause, Pencil, RotateCcw, TriangleAlert } from 'lucide-react'
 import type { AutoReplyRun, AutoReplyRunsResponse, ExecutionRunStatus } from '@line-crm/shared'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
@@ -13,7 +13,7 @@ import Pagination from '@/components/shared/pagination'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
 import StickyBar from '@/components/shared/sticky-bar'
 import SummaryCard from '@/components/shared/summary-card'
-import { api } from '@/lib/api'
+import { api, ApiError } from '@/lib/api'
 import styles from './auto-reply-runs.module.css'
 
 const PAGE_SIZE = 20
@@ -104,6 +104,7 @@ export default function AutoReplyRunsPage() {
   const [page, setPage] = useState(1)
   const [actionMessage, setActionMessage] = useState('')
   const [pausing, setPausing] = useState(false)
+  const [retryingId, setRetryingId] = useState<string | null>(null)
   const [exporting, setExporting] = useState(false)
   const exportCancelledRef = useRef(false)
 
@@ -153,6 +154,28 @@ export default function AutoReplyRunsPage() {
       setActionMessage('一時停止できませんでした。状態を読み直してからお試しください。')
     } finally {
       setPausing(false)
+    }
+  }
+
+  // N-081: 失敗した後続処理だけをやり直す。LINE への返信は送り直さない。
+  const retryRun = async (item: AutoReplyRun) => {
+    if (!item.canRetry || retryingId !== null) return
+    setRetryingId(item.id)
+    setActionMessage('')
+    try {
+      const response = await api.autoReplies.retryRun(item.id)
+      if (!response.success) throw new Error(response.error)
+      setActionMessage('失敗した処理をもう一度実行しました。')
+      await load()
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 409) {
+        setActionMessage('すでに処理中または完了しています。最新の状態を読み直しました。')
+        await load()
+      } else {
+        setActionMessage('失敗した処理をもう一度実行できませんでした。時間を置いてお試しください。')
+      }
+    } finally {
+      setRetryingId(null)
     }
   }
 
@@ -253,6 +276,19 @@ export default function AutoReplyRunsPage() {
                         <span className={styles.actionLabel} title={actionLabel(item)}>{actionLabel(item)}</span>
                         <StatusBadge tone={view.tone} size="compact">{view.label}</StatusBadge>
                         <time className={styles.time} dateTime={item.occurredAt}>{formatTime(item.occurredAt)}</time>
+                        {item.canRetry ? (
+                          <div data-retry-row>
+                            <Button
+                              variant="secondary"
+                              size="field"
+                              onClick={() => void retryRun(item)}
+                              disabled={retryingId !== null}
+                            >
+                              <RotateCcw size={14} />
+                              {retryingId === item.id ? '実行しています' : 'もう一度実行'}
+                            </Button>
+                          </div>
+                        ) : null}
                       </article>
                     )
                   })}
