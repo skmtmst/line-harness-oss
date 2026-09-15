@@ -2764,6 +2764,31 @@ export type ReminderDeliveryRunsResponse = {
   pagination: { total: number; limit: number; offset: number }
 }
 
+/** リマインダごとの登録者。画面はこの版番号で競合を検知する。 */
+export type ReminderRegistrant = {
+  id: string
+  friendId: string
+  friendName: string | null
+  targetDate: string
+  status: 'active' | 'cancelled' | string
+  reminderVersionId: string | null
+  sourceKind: string
+  createdAt: string
+  updatedAt: string
+  cancelledAt: string | null
+  lockVersion: number
+}
+
+export type ReminderRegistrantMutation = {
+  id: string
+  friendId: string
+  targetDate: string
+  status: string
+  reminderVersionId: string | null
+  lockVersion: number
+  replayed: boolean
+}
+
 /** 質問テンプレート。シナリオの質問と同じ契約を使う。 */
 export type TemplateQuestion = {
   intro?: string
@@ -5391,6 +5416,10 @@ export const api = {
       value?: string
       memo?: string
       folderId?: string | null
+      validFrom?: string | null
+      validUntil?: string | null
+      fallbackValue?: string | null
+      expiryBehavior?: 'stop' | 'fallback'
     }) =>
       fetchApi<ApiResponse<CommonVar>>('/api/common-vars', {
         method: 'POST',
@@ -5405,6 +5434,10 @@ export const api = {
       expectedVersion?: number
       changeReason?: string
       impactProof?: string
+      validFrom?: string | null
+      validUntil?: string | null
+      fallbackValue?: string | null
+      expiryBehavior?: 'stop' | 'fallback'
     }) =>
       fetchApi<ApiResponse<CommonVar>>(`/api/common-vars/${id}?accountId=${encodeURIComponent(accountId)}`, {
         method: 'PATCH',
@@ -8168,6 +8201,25 @@ export const api = {
     },
     get: (id: string) =>
       fetchApi<ApiResponse<Reminder & { steps: ReminderStep[] }>>(`/api/reminders/${id}`),
+    registrants: {
+      list: (reminderId: string) =>
+        fetchApi<ApiResponse<ReminderRegistrant[]>>(`/api/reminders/${encodeURIComponent(reminderId)}/registrants`),
+      updateTargetDate: (reminderId: string, enrollmentId: string, targetDate: string, expectedLockVersion: number) =>
+        fetchApi<ApiResponse<ReminderRegistrantMutation>>(
+          `/api/reminders/${encodeURIComponent(reminderId)}/registrants/${encodeURIComponent(enrollmentId)}`,
+          { method: 'PATCH', body: JSON.stringify({ targetDate, expectedLockVersion }) },
+        ),
+      cancel: (reminderId: string, enrollmentId: string, expectedLockVersion: number) =>
+        fetchApi<ApiResponse<ReminderRegistrantMutation>>(
+          `/api/reminders/${encodeURIComponent(reminderId)}/registrants/${encodeURIComponent(enrollmentId)}/cancel`,
+          { method: 'POST', body: JSON.stringify({ expectedLockVersion }) },
+        ),
+      resume: (reminderId: string, enrollmentId: string, expectedLockVersion: number) =>
+        fetchApi<ApiResponse<ReminderRegistrantMutation>>(
+          `/api/reminders/${encodeURIComponent(reminderId)}/registrants/${encodeURIComponent(enrollmentId)}/resume`,
+          { method: 'POST', body: JSON.stringify({ expectedLockVersion }) },
+        ),
+    },
     /** この友だちをこのリマインダに登録する（1人ぶん）。 */
     /**
      * 友だちをリマインダに登録する。

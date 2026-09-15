@@ -139,6 +139,30 @@ function parseJsonArray(s: unknown): string[] | null {
   }
 }
 
+function canonicalJsonValue(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(canonicalJsonValue);
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>)
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([key, nested]) => [key, canonicalJsonValue(nested)]),
+    );
+  }
+  return value;
+}
+
+/** JSON列とrequest値を、objectのkey順に依存せず比較する。array順は送信順なので維持する。 */
+function sameJsonMeaning(stored: unknown, requested: unknown): boolean {
+  try {
+    const storedValue = typeof stored === 'string' ? JSON.parse(stored) as unknown : stored;
+    return JSON.stringify(canonicalJsonValue(storedValue ?? null))
+      === JSON.stringify(canonicalJsonValue(requested ?? null));
+  } catch {
+    // 壊れた既存JSONを「同じ」と扱ってsnapshotを再利用しない。
+    return false;
+  }
+}
+
 type CreateBroadcastBody = {
   title?: string;
   messageType?: BroadcastMessageType;
@@ -1242,6 +1266,20 @@ broadcasts.put('/api/broadcasts/:id', async (c) => {
       statusUpdate = body.scheduledAt ? 'scheduled' : 'draft';
     }
 
+    const snapshotSemanticsChanged = (
+      (body.messageType !== undefined && body.messageType !== existing.message_type)
+      || (body.messageContent !== undefined && body.messageContent !== existing.message_content)
+      || (body.messageBubbles !== undefined
+        && !sameJsonMeaning(existing.message_bubbles_json, body.messageBubbles))
+      || (body.targetType !== undefined && body.targetType !== existing.target_type)
+      || (body.targetTagId !== undefined && body.targetTagId !== existing.target_tag_id)
+      || (segmentConditions !== undefined
+        && !sameJsonMeaning(existingRaw.segment_conditions, body.segmentConditions))
+    );
+    const unresolvedAttemptRestarted = !existing.common_var_snapshot
+      && Boolean(existing.common_var_snapshot_at)
+      && (body.scheduledAt !== undefined || snapshotSemanticsChanged);
+
     const updates: Parameters<typeof updateBroadcast>[2] = {
       title: body.title,
       message_type: body.messageType,
@@ -1269,6 +1307,10 @@ broadcasts.put('/api/broadcasts/:id', async (c) => {
       ...(body.afterActionVersionId !== undefined
         ? { after_action_version_id: body.afterActionVersionId }
         : {}),
+      // 解決失敗の再予約、またはsnapshotの意味を実際に変える編集だけを新しい試行にする。
+      // 画面は未変更項目もPUTへ含めるため、presenceだけで判定するとprovider再試行で
+      // 固定snapshotを誤って捨ててしまう。
+      resetCommonVarSnapshot: unresolvedAttemptRestarted || snapshotSemanticsChanged,
     };
     const updated = await updateBroadcast(c.env.DB, id, updates, body.expectedVersion);
 
@@ -1330,7 +1372,8 @@ broadcasts.post('/api/broadcasts/:id/cancel', requireRole('owner', 'admin'), asy
 
     const result = await c.env.DB.prepare(
       `UPDATE broadcasts
-       SET status = 'draft', scheduled_at = NULL, batch_lock_at = NULL
+       SET status = 'draft', scheduled_at = NULL, batch_lock_at = NULL,
+           common_var_snapshot = NULL, common_var_snapshot_at = NULL
        WHERE id = ? AND status = 'scheduled' AND scheduled_at IS NOT NULL`,
     ).bind(id).run();
     if ((result.meta.changes ?? 0) !== 1) {
