@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { BILLING_PLANS, formatJstMonthDay, planKeyForPrice, priceIdForPlan, resolveEntitlements } from './billing-plans.js';
+import {
+  BILLING_PLANS,
+  featureContractIsAvailable,
+  formatJstMonthDay,
+  planKeyForPrice,
+  priceIdForPlan,
+  resolveEntitlements,
+} from './billing-plans.js';
 
 const now = new Date('2026-09-13T00:00:00Z');
 
@@ -30,6 +37,15 @@ describe('プランと権利の判定', () => {
     expect(resolveEntitlements({ plan_key: 'standard', plan_status: 'active', trial_ends_at: null }, { now })).toMatchObject({ state: 'active', monthlyImages: 150, canSend: true });
     expect(resolveEntitlements({ plan_key: 'light', plan_status: 'past_due', trial_ends_at: null }, { now })).toMatchObject({ state: 'past_due', monthlyImages: 50, canSend: true });
     expect(resolveEntitlements({ plan_key: 'pro', plan_status: 'canceled', trial_ends_at: null }, { now })).toMatchObject({ state: 'canceled', canSend: false, canGenerate: false });
+  });
+
+  it('契約停止は送信権利だけを対象外にし、契約と無関係な機能を混ぜない', () => {
+    const canceled = resolveEntitlements(
+      { plan_key: 'standard', plan_status: 'canceled', trial_ends_at: null },
+      { now },
+    );
+    expect(featureContractIsAvailable(canceled, 'send')).toBe(false);
+    expect(featureContractIsAvailable(canceled, 'included')).toBe(true);
   });
 
   it('価格 ID とプランの対応は env から引く（値は書かない）', () => {

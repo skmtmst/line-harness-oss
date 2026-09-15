@@ -15,6 +15,7 @@ import type { Env } from '../index.js';
 import { restaurantTestEnabled } from '../lib/environment-features.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
+import { accountFeatureAvailabilityMap } from '../services/feature-enforcement.js';
 
 /**
  * 機能のオン／オフ。
@@ -880,6 +881,11 @@ featureSettings.get('/api/settings/features', async (c) => {
       accountId,
       restaurantTestEnabled(c.env),
     );
+    const featureStates = await accountFeatureAvailabilityMap(
+      c.env.DB,
+      accountId,
+      state.features,
+    );
 
     const [parentChildRaw, specializedRaw] = await Promise.all([
       getAccountSetting(c.env.DB, accountId, PARENT_CHILD_MODE_KEY),
@@ -890,6 +896,7 @@ featureSettings.get('/api/settings/features', async (c) => {
       success: true,
       data: {
         features: state.features,
+        featureStates,
         sidebarOrder: state.sidebarOrder,
         sidebarItemOrder: state.sidebarItemOrder,
         version: state.version,

@@ -103,6 +103,6 @@ describe('V6 機能20 分析', () => {
 
   it('未集計のファネルは壊れた表示にせず案内を出す(点検#508軽13)', () => {
     expect(PAGE).toContain('setNoRun')
-    expect(PAGE).toContain('まだ集計がありません。「この30日を再集計」を押してください')
+    expect(PAGE).toContain('まだ集計がありません。「この{funnelDays}日を再集計」を押してください')
   })
 })

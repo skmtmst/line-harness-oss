@@ -100,15 +100,36 @@ function RangePicker({ days, onChange }: { days: number; onChange: (days: number
   )
 }
 
+function AnalyticsPeriodControl({ days, onChange }: { days: number; onChange: (days: number) => void }) {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-2">
+      <p className="text-xs font-medium text-ink-secondary">集計期間</p>
+      <RangePicker days={days} onChange={onChange} />
+    </div>
+  )
+}
+
 function weekdayOf(date: string): string {
   return WEEKDAY_JP[new Date(`${date}T00:00:00+09:00`).getDay()] ?? ''
 }
 
-function rangeFor(days: number): { from: string; to: string } {
-  const jstNow = new Date(Date.now() + 9 * 3600_000)
+function rangeFor(days: number, now = new Date()): { from: string; to: string } {
+  const jstNow = new Date(now.getTime() + 9 * 3600_000)
   return {
     from: new Date(jstNow.getTime() - days * 24 * 3600_000).toISOString().slice(0, 10),
     to: jstNow.toISOString().slice(0, 10),
+  }
+}
+
+// 概要のfrom/toと同じ日本時間の日付範囲を、ファネルAPIが受け取る明示的な
+// timestampへ直す。「7日」は6日前の0時から、実行時点までを対象にする。
+function funnelCohortRange(days: number, now = new Date()): { cohortFrom: string; cohortTo: string } {
+  const range = rangeFor(days - 1, now)
+  return {
+    cohortFrom: `${range.from}T00:00:00.000+09:00`,
+    // WorkerはdataCutoffAt（=現在）より未来の終了時刻を拒否する。日末ではなく
+    // 実行時刻で閉じ、今日を含む選択日数の暦日範囲にする。
+    cohortTo: now.toISOString(),
   }
 }
 
@@ -851,7 +872,18 @@ function FunnelTab({ accountId, canManage }: { accountId: string; canManage: boo
   const [listError, setListError] = useState('')
   const [creating, setCreating] = useState(false)
   const [picked, setPicked] = useState<number | null>(null)
+  const [funnelDays, setFunnelDays] = useState(30)
+  const [audienceSelection, setAudienceSelection] = useState<'reached' | 'stopped' | 'in_progress'>('stopped')
   const [funnelAudience, setFunnelAudience] = useState<{ id: string; memberCount: number; expiresAt: string } | null>(null)
+  // アカウント・ファネル・期間を切り替えた瞬間に世代を進める。effectのcleanupを
+  // 待つだけでは、切替直後に返った古い「再集計」や対象者作成の応答を表示できてしまう。
+  const viewGeneration = useRef(0)
+  const scope = `${accountId}:${selected}:${funnelDays}`
+  const scopeRef = useRef(scope)
+  if (scopeRef.current !== scope) {
+    scopeRef.current = scope
+    viewGeneration.current += 1
+  }
 
   useEffect(() => {
     let active = true
@@ -893,6 +925,7 @@ function FunnelTab({ accountId, canManage }: { accountId: string; canManage: boo
     setRun(null)
     setRunError('')
     setNoRun(false)
+    setRunning(false)
     void api.analytics.v6Funnels.latestRun(accountId, selected).then((res) => {
       if (!active) return
       if (res.success) {
@@ -907,25 +940,33 @@ function FunnelTab({ accountId, canManage }: { accountId: string; canManage: boo
     }
   }, [accountId, selected])
 
+  // 条件切替後は、前の世代のfinallyに表示状態を任せない。前の通信が後から
+  // 終わっても新しい条件で再集計できるよう、現世代のボタンを必ず戻す。
+  useEffect(() => {
+    setRunning(false)
+  }, [accountId, selected, funnelDays])
+
   const runNow = async () => {
     if (!selected) return
+    const generation = viewGeneration.current
     setRunning(true)
     setRunError('')
-    const now = new Date()
-    const from = new Date(now.getTime() - 30 * 24 * 3600_000)
+    const { cohortFrom, cohortTo } = funnelCohortRange(funnelDays)
     try {
       const response = await api.analytics.v6Funnels.run(accountId, selected, {
-        cohortFrom: from.toISOString(),
-        cohortTo: now.toISOString(),
+        cohortFrom,
+        cohortTo,
       })
       if (!response.success) throw new Error(response.error)
+      if (generation !== viewGeneration.current) return
       setRun(response.data)
       setGroupKey(response.data.groups[0]?.key ?? 'all')
     } catch (error) {
+      if (generation !== viewGeneration.current) return
       const code = error instanceof Error ? error.message : ''
       setRunError(explainStartError(code, code || '再集計できませんでした'))
     } finally {
-      setRunning(false)
+      if (generation === viewGeneration.current) setRunning(false)
     }
   }
 
@@ -946,18 +987,21 @@ function FunnelTab({ accountId, canManage }: { accountId: string; canManage: boo
   }, [run])
 
   const prepareFunnelAudience = async () => {
-    if (!run?.runId || picked === null || !result?.[picked - 1] || !activeGroup) return
+    if (!run?.runId || picked === null || !result?.[picked] || !activeGroup) return
+    const generation = viewGeneration.current
     setRunError('')
     try {
       const response = await api.analytics.createResultAudience(accountId, run.runId, {
         sourceKind: 'funnel',
         groupKey: activeGroup.key,
-        stepOrder: result[picked - 1].stepOrder,
-        selection: 'stopped',
+        stepOrder: result[picked].stepOrder,
+        selection: audienceSelection,
       })
       if (!response.success) throw new Error(response.error)
+      if (generation !== viewGeneration.current) return
       setFunnelAudience(response.data)
     } catch (error) {
+      if (generation !== viewGeneration.current) return
       setRunError(error instanceof Error ? error.message : '対象者を準備できませんでした')
     }
   }
@@ -1060,8 +1104,17 @@ function FunnelTab({ accountId, canManage }: { accountId: string; canManage: boo
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
+                <RangePicker
+                  days={funnelDays}
+                  onChange={(days) => {
+                    setFunnelDays(days)
+                    setPicked(null)
+                    setFunnelAudience(null)
+                    setRunning(false)
+                  }}
+                />
                 <Button onClick={() => void runNow()} disabled={running} variant="secondary">
-                  {running ? '再集計中' : 'この30日を再集計'}
+                  {running ? '再集計中' : `この${funnelDays}日を再集計`}
                 </Button>
                 {canManage && (
                   <button
@@ -1116,7 +1169,7 @@ function FunnelTab({ accountId, canManage }: { accountId: string; canManage: boo
               ／データ締切 {formatAnalyticsDateTime(run.dataCutoffAt)}
             </p>}
             {runError && <p className="text-danger mt-2 text-xs">{runError}</p>}
-            {noRun && !run && <p className="text-ink-faint mt-2 text-xs">まだ集計がありません。「この30日を再集計」を押してください</p>}
+            {noRun && !run && <p className="text-ink-faint mt-2 text-xs">まだ集計がありません。「この{funnelDays}日を再集計」を押してください</p>}
             {run?.stateReason && <p className="text-warning mt-2 text-xs">{run.stateReason}</p>}
             {run && run.groups.length > 1 && (
               <div className="mt-3 max-w-xs">
@@ -1199,9 +1252,8 @@ function FunnelTab({ accountId, canManage }: { accountId: string; canManage: boo
                       <button
                         onClick={() => {
                           setFunnelAudience(null)
-                          setPicked(lost > 0 ? i : null)
+                          setPicked(i)
                         }}
-                        disabled={lost <= 0}
                         className="bg-canvas-sunken block h-6 w-full overflow-hidden rounded text-left"
                         aria-label={`${step.label}の段`}
                       >
@@ -1228,15 +1280,32 @@ function FunnelTab({ accountId, canManage }: { accountId: string; canManage: boo
               <div className="border-hairline mt-4 border-t pt-3">
                 {picked != null && result[picked] ? (
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="text-ink text-sm">
-                      「{result[picked - 1]?.label}まで進んで{result[picked].label}に至っていない{' '}
-                      {(result[picked - 1].reached - result[picked].reached).toLocaleString('ja-JP')}人」を選択中
-                    </p>
+                    <div className="space-y-2">
+                      <SelectField
+                        id="funnel-audience-selection"
+                        value={audienceSelection}
+                        onChange={(event) => setAudienceSelection(event.target.value as 'reached' | 'stopped' | 'in_progress')}
+                        aria-label="対象者の種類"
+                        className="v6-select w-full sm:w-64"
+                        options={[
+                          { value: 'reached', label: 'この段まで到達した人' },
+                          { value: 'stopped', label: 'この段で止まった人' },
+                          { value: 'in_progress', label: 'この段で進行中の人' },
+                        ]}
+                      />
+                      <p className="text-ink text-sm">
+                        {audienceSelection === 'stopped'
+                          ? `「${result[picked].label}で止まった人」を選択中`
+                          : audienceSelection === 'reached'
+                            ? `「${result[picked].label}まで到達した人」を選択中`
+                            : `「${result[picked].label}で進行中の人」を選択中`}
+                      </p>
+                    </div>
                     {canManage && <Button onClick={() => void prepareFunnelAudience()} variant="secondary">友だち一覧で見る</Button>}
                   </div>
                 ) : (
                   <p className="text-ink-faint text-xs">
-                    段を押すと、そこで止まっている人を選べます。
+                    段を押すと、到達・停止・進行中の人を選べます。
                   </p>
                 )}
                 {funnelAudience && (
@@ -1592,13 +1661,14 @@ function RouteBreakdown({ accountId, from, to }: { accountId: string; from: stri
 }
 
 function FriendsOverviewTab({ accountId }: { accountId: string }) {
-  const range = useMemo(() => rangeFor(29), [])
+  const [days, setDays] = useState(30)
+  const range = useMemo(() => rangeFor(days - 1), [days])
   const [selectedDate, setSelectedDate] = useState('')
   const state = useOverview<AnalyticsFriendsOverview>(
     () => api.analytics.friendsOverview(accountId, range),
     `${accountId}:${range.from}:${range.to}:friends`,
   )
-  if (!state.data) return <OverviewState loading={state.loading} error={state.error} />
+  if (!state.data) return <div className="space-y-4"><AnalyticsPeriodControl days={days} onChange={setDays} /><OverviewState loading={state.loading} error={state.error} /></div>
   const overview = state.data.data
   const addedValue = shownValue(overview.metrics.added)
   const removedValue = shownValue(overview.metrics.removed)
@@ -1615,21 +1685,25 @@ function FriendsOverviewTab({ accountId }: { accountId: string }) {
   const selectedDay = overview.days.find((day) => day.date === selectedDate) ?? overview.days.at(-1) ?? null
   const selectedCampaigns = overview.campaigns.filter((item) => item.date === selectedDay?.date)
   return <div data-design-node="Zxezb" className="space-y-4">
+    <AnalyticsPeriodControl days={days} onChange={setDays} />
     {overview.state !== 'available' && overview.stateReason && <div className="bg-warning-bg border-warning rounded-card border px-4 py-3 text-sm">{overview.stateReason}</div>}
     <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
-      <KpiCard title="現在つながっている" value={shownValue(overview.metrics.currentFriends)} unit="人" detail={overview.metrics.currentFriends.reason ?? (netValue === null ? pendingReason : `この30日の差し引き ${netValue > 0 ? '+' : ''}${netValue}人`)} />
-      <KpiCard title="増えた友だち" value={addedValue} unit="人" detail={overview.metrics.added.reason ?? (addedValue === null ? pendingReason : `この30日。初回 ${metricText(overview.metrics.firstTime)}人`)} />
-      <KpiCard title="減った友だち" value={removedValue} unit="人" detail={overview.metrics.removed.reason ?? (removedValue === null ? pendingReason : 'この30日。ブロック・友だち解除')} />
+      <KpiCard title="現在つながっている" value={shownValue(overview.metrics.currentFriends)} unit="人" detail={overview.metrics.currentFriends.reason ?? (netValue === null ? pendingReason : `この${days}日の差し引き ${netValue > 0 ? '+' : ''}${netValue}人`)} />
+      <KpiCard title="増えた友だち" value={addedValue} unit="人" detail={overview.metrics.added.reason ?? (addedValue === null ? pendingReason : `この${days}日。初回 ${metricText(overview.metrics.firstTime)}人`)} />
+      <KpiCard title="減った友だち" value={removedValue} unit="人" detail={overview.metrics.removed.reason ?? (removedValue === null ? pendingReason : `この${days}日。ブロック・友だち解除`)} />
       <KpiCard title="差し引き" value={netValue} unit="人" detail={remainingRate === null ? pendingReason : `増加 − 減少。残っている割合 ${remainingRate.toFixed(1)}%`} />
     </div>
     <AnalyticsNotice>増えた人と減った人を日ごとに並べています。減りが増えた日に何を配信したかも、同じ日付で確かめられます。</AnalyticsNotice>
     <section className="bg-canvas rounded-card border-hairline border p-4">
       <div className="mb-4 flex flex-wrap items-start justify-between gap-2">
-        <div><h2 className="font-semibold text-ink">日ごとの増減（この30日）</h2><p className="mt-1 text-xs text-ink-faint">上が増えた人、下が減った人です。</p></div>
+        <div><h2 className="font-semibold text-ink">日ごとの増減（この{days}日）</h2><p className="mt-1 text-xs text-ink-faint">上が増えた人、下が減った人です。</p></div>
         <span className="text-xs tabular-nums text-ink-faint">{state.data.period.from}〜{state.data.period.to}</span>
       </div>
       {!daysShown ? <p className="p-8 text-center text-sm text-ink-faint">{pendingReason}</p> : (
-        <div className="grid h-44 grid-cols-[repeat(30,minmax(0,1fr))] items-center gap-1 border-y border-hairline py-3">
+        <div
+          className="grid h-44 items-center gap-1 border-y border-hairline py-3"
+          style={{ gridTemplateColumns: `repeat(${Math.max(1, overview.days.length)}, minmax(0, 1fr))` }}
+        >
           {overview.days.map((day, index) => {
             const max = Math.max(1, ...overview.days.flatMap((item) => [item.added, item.removed]))
             const campaigns = overview.campaigns.filter((item) => item.date === day.date)
@@ -1646,27 +1720,29 @@ function FriendsOverviewTab({ accountId }: { accountId: string }) {
       {selectedDay && <div className="mt-3 rounded-control bg-canvas-sunken px-3 py-2 text-xs text-ink-secondary"><strong className="text-ink">{selectedDay.date}（{weekdayOf(selectedDay.date)}）</strong>　増加 {selectedDay.added}人・減少 {selectedDay.removed}人・差し引き {selectedDay.net > 0 ? '+' : ''}{selectedDay.net}人　施策 {selectedCampaigns.length ? selectedCampaigns.map((item) => item.name).join('、') : 'なし'}</div>}
     </section>
     <section className="overflow-hidden rounded-card border border-hairline bg-canvas">
-      <div className="border-b border-hairline px-4 py-3"><h2 className="font-semibold text-ink">どこから増えたか</h2><p className="mt-1 text-xs text-ink-faint">「経路と成果」に接続された経路ごとの、この30日の実測です。</p></div>
+      <div className="border-b border-hairline px-4 py-3"><h2 className="font-semibold text-ink">どこから増えたか</h2><p className="mt-1 text-xs text-ink-faint">「経路と成果」に接続された経路ごとの、この{days}日の実測です。</p></div>
       <RouteBreakdown accountId={accountId} from={range.from} to={range.to} />
     </section>
   </div>
 }
 
 function ReactionsOverviewTab({ accountId }: { accountId: string }) {
-  const range = useMemo(() => rangeFor(29), [])
+  const [days, setDays] = useState(30)
+  const range = useMemo(() => rangeFor(days - 1), [days])
   const state = useOverview<AnalyticsReactionsOverview>(
     () => api.analytics.reactionsOverview(accountId, range),
     `${accountId}:${range.from}:${range.to}:reactions`,
   )
-  if (!state.data) return <OverviewState loading={state.loading} error={state.error} />
+  if (!state.data) return <div className="space-y-4"><AnalyticsPeriodControl days={days} onChange={setDays} /><OverviewState loading={state.loading} error={state.error} /></div>
   const overview = state.data.data
   const delivered = shownValue(overview.metrics.delivered)
   const clicked = shownValue(overview.metrics.lineClicked)
   const clickRate = delivered && clicked !== null ? clicked / delivered * 100 : null
   const maxHourly = Math.max(1, ...overview.trackedClickHours.map((item) => item.clicks))
   return <div data-design-node="J6Inc" className="space-y-4">
+    <AnalyticsPeriodControl days={days} onChange={setDays} />
     <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
-      <KpiCard title="この30日に送った" value={overview.campaigns.length} unit="回" detail="一覧に取得できた配信" />
+      <KpiCard title={`この${days}日に送った`} value={overview.campaigns.length} unit="回" detail="一覧に取得できた配信" />
       <KpiCard title="届いた人" value={delivered} unit="人" detail={overview.metrics.delivered.reason ?? '配信ごとの到達数の合計'} />
       <KpiCard title="押された割合" value={clickRate} unit="%" detail="LINEクリック ÷ 届いた人" />
       <KpiCard title="取得できない配信" value={shownValue(overview.metrics.unavailableCampaigns)} unit="件" detail={overview.metrics.unavailableCampaigns.reason ?? '開封などを取得できない配信'} />
@@ -1690,12 +1766,13 @@ function ReactionsOverviewTab({ accountId }: { accountId: string }) {
 }
 
 function RoutesOverviewTab({ accountId }: { accountId: string }) {
-  const range = useMemo(() => rangeFor(29), [])
+  const [days, setDays] = useState(30)
+  const range = useMemo(() => rangeFor(days - 1), [days])
   const state = useOverview<AnalyticsRoutesOverview>(
     () => api.analytics.routesOverview(accountId, range),
     `${accountId}:${range.from}:${range.to}:routes`,
   )
-  if (!state.data) return <OverviewState loading={state.loading} error={state.error} />
+  if (!state.data) return <div className="space-y-4"><AnalyticsPeriodControl days={days} onChange={setDays} /><OverviewState loading={state.loading} error={state.error} /></div>
   const overview = state.data.data
   const clicks = metricSum(overview.routes.map((item) => item.clicks))
   const friends = metricSum(overview.routes.map((item) => item.friendAdds))
@@ -1711,8 +1788,9 @@ function RoutesOverviewTab({ accountId }: { accountId: string }) {
     { label: '成果になった', value: conversions },
   ]
   return <div data-design-node="YBGtm" className="space-y-4">
+    <AnalyticsPeriodControl days={days} onChange={setDays} />
     <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
-      <KpiCard title="この30日の成果" value={conversions} unit="件" detail={revenue === null ? '売上は未取得です' : `売上 ${revenue.toLocaleString('ja-JP')}円`} />
+      <KpiCard title={`この${days}日の成果`} value={conversions} unit="件" detail={revenue === null ? '売上は未取得です' : `売上 ${revenue.toLocaleString('ja-JP')}円`} />
       <KpiCard title="かかった広告費" value={adCost} unit="円" detail="接続済みの経路を合計" />
       <KpiCard title="差し引き" value={profit} unit="円" detail="売上から広告費を引いた残り" />
       <KpiCard title="費用を取得できない経路" value={overview.routes.filter((item) => shownValue(item.adCost) === null).length} unit="件" detail="0円として計算しません" />
@@ -1731,7 +1809,8 @@ function RoutesOverviewTab({ accountId }: { accountId: string }) {
 }
 
 function UsageOverviewTab({ accountId }: { accountId: string }) {
-  const range = useMemo(() => rangeFor(29), [])
+  const [days, setDays] = useState(30)
+  const range = useMemo(() => rangeFor(days - 1), [days])
   const [menuFeatures, setMenuFeatures] = useState<{ enabled: number; total: number } | null>(null)
   const [menuFeaturesError, setMenuFeaturesError] = useState('')
   const state = useOverview<AnalyticsUsageOverview>(
@@ -1754,13 +1833,14 @@ function UsageOverviewTab({ accountId }: { accountId: string }) {
     })
     return () => { active = false }
   }, [accountId])
-  if (!state.data) return <OverviewState loading={state.loading} error={state.error} />
+  if (!state.data) return <div className="space-y-4"><AnalyticsPeriodControl days={days} onChange={setDays} /><OverviewState loading={state.loading} error={state.error} /></div>
   const overview = state.data.data
   const estimatedHoursSavedValue = overview.summary.estimatedHoursSaved.state === 'available'
     || overview.summary.estimatedHoursSaved.state === 'partial'
     ? overview.summary.estimatedHoursSaved.value
     : null
   return <div data-design-node="QQ1SR" className="space-y-4">
+    <AnalyticsPeriodControl days={days} onChange={setDays} />
     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
       <KpiCard
         title="使っている機能"
@@ -1779,7 +1859,7 @@ function UsageOverviewTab({ accountId }: { accountId: string }) {
         title="自動で動いた回数"
         value={shownValue(overview.summary.automaticRuns)}
         unit="回"
-        detail={`この30日。${overview.summary.automaticRuns.reason ?? '実行記録から集計'}。手で送ったのは${overview.summary.manualSends.value?.toLocaleString('ja-JP') ?? '—'}回`}
+        detail={`この${days}日。${overview.summary.automaticRuns.reason ?? '実行記録から集計'}。手で送ったのは${overview.summary.manualSends.value?.toLocaleString('ja-JP') ?? '—'}回`}
       />
       <KpiCard
         title="手作業が減った時間"
@@ -1804,13 +1884,14 @@ function UsageOverviewTab({ accountId }: { accountId: string }) {
 }
 
 function UrlClicksOverviewTab({ accountId }: { accountId: string }) {
-  const range = useMemo(() => rangeFor(29), [])
+  const [days, setDays] = useState(30)
+  const range = useMemo(() => rangeFor(days - 1), [days])
   const [query, setQuery] = useState('')
   const state = useOverview<AnalyticsUrlClicksOverview>(
     () => api.analytics.urlClicksOverview(accountId, { ...range, limit: 200 }),
     `${accountId}:${range.from}:${range.to}:url-clicks`,
   )
-  if (!state.data) return <OverviewState loading={state.loading} error={state.error} />
+  if (!state.data) return <div className="space-y-4"><AnalyticsPeriodControl days={days} onChange={setDays} /><OverviewState loading={state.loading} error={state.error} /></div>
   const overview = state.data.data
   const visibleLinks = overview.links.filter((item) => `${item.name} ${item.originalUrl} ${item.usageLocations.join(' ')}`.toLowerCase().includes(query.trim().toLowerCase()))
   const clicks = metricSum(overview.links.map((item) => item.clicks))
@@ -1821,8 +1902,9 @@ function UrlClicksOverviewTab({ accountId }: { accountId: string }) {
     ...visibleLinks.map((item) => [item.name, item.originalUrl, shownValue(item.clicks), shownValue(item.knownClickPeople), item.usageLocations.join('、')]),
   ])
   return <div data-design-node="Fh2Qj" className="space-y-4">
+    <AnalyticsPeriodControl days={days} onChange={setDays} />
     <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
-      <KpiCard title="押された回数" value={clicks} unit="回" detail="この30日の中継URL" />
+      <KpiCard title="押された回数" value={clicks} unit="回" detail={`この${days}日の中継URL`} />
       <KpiCard title="押した人（URLごとの合計）" value={people} unit="人" detail="URLをまたぐ重複は除けません" />
       <KpiCard title="計測中のURL" value={overview.links.filter((item) => item.isActive).length} unit="件" detail="この画面に取得できたもの" />
       <KpiCard title="押されていないURL" value={zeroLinks} unit="件" detail="実測できたURLのうち" />
