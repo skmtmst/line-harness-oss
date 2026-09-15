@@ -925,6 +925,8 @@ export type ConversionApprovalItem = {
   value: number | null
   approvalStatus: 'pending' | 'approved' | 'rejected'
   duplicateFlag: boolean
+  /** 承認済みで案件の付帯動作(タグ付与・シナリオ開始)が未完の行だけ true */
+  offerActionsIncomplete: boolean
 }
 
 export type ConversionDefinitionStatus = 'active' | 'stopped'
@@ -8310,6 +8312,15 @@ export const api = {
       method: 'PATCH',
       body: JSON.stringify(data),
     }),
+    /**
+     * N-243: 並び順はアカウントの全件を1回で保存する一括口。
+     * 1件ずつPATCHすると途中失敗で部分適用になるため使い分ける。
+     */
+    saveEarningRulesOrder: (data: { accountId: string; ids: string[] }) =>
+      fetchApi<ApiResponse<null>>('/api/mileage/earning-rules-order', {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }),
     /**
      * N-231 案1: 下書きを公開版として固定し実行へ反映する。
      * 取り消せない操作のため確認ヘッダーと冪等キーが必須。

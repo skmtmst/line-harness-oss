@@ -28,11 +28,12 @@ describe('V6 たまる決めごと（N46cQ）の画面', () => {
     expect(PAGE).toContain('aria-label="並び順"')
   })
 
-  it('V6下書きの口へ並び順を保存する', () => {
-    expect(PAGE).toContain('api.mileage.saveEarningRuleDraft')
+  it('並び順は一括口へまとめて保存する(N-243)', () => {
+    // 1件ずつPATCHすると途中失敗で一部だけ反映されるため、全順序を1回で送る。
+    expect(PAGE).toContain('api.mileage.saveEarningRulesOrder')
+    expect(PAGE).toContain('ids: ruleOrder')
     expect(PAGE).toContain("{savingRuleOrder ? '保存しています' : '並び順を保存'}")
-    expect(PAGE).toContain('draft: { ...rule.draft, sortOrder }')
-    expect(PAGE).toContain('expectedVersion: rule.draftVersion')
+    expect(PAGE).not.toContain('api.mileage.saveEarningRuleDraft')
   })
 
   it('利用対象条件と公開版の中身を一覧から確認できる', () => {

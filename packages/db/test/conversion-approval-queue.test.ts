@@ -125,16 +125,62 @@ function insertOfferAndLink(
     affiliateId: string;
     refCode: string;
     rewardMiles?: number;
+    tagId?: string | null;
+    scenarioId?: string | null;
+    isActive?: boolean;
   },
 ): void {
   s.prepare(
     `INSERT INTO affiliate_offers (id, name, description, reward_amount, reward_miles, line_account_id, tag_id, scenario_id, is_active, created_at)
-     VALUES (?, ?, NULL, 500, ?, NULL, NULL, NULL, 1, '2026-01-01T00:00:00.000+09:00')`,
-  ).run(opts.offerId, opts.offerName, opts.rewardMiles ?? 0);
+     VALUES (?, ?, NULL, 500, ?, NULL, ?, ?, ?, '2026-01-01T00:00:00.000+09:00')`,
+  ).run(
+    opts.offerId, opts.offerName, opts.rewardMiles ?? 0,
+    opts.tagId ?? null, opts.scenarioId ?? null,
+    opts.isActive === false ? 0 : 1,
+  );
   s.prepare(
     `INSERT INTO affiliate_links (id, affiliate_id, ref_code, label, line_account_id, offer_id, is_active, created_at, click_count)
      VALUES (?, ?, ?, NULL, NULL, ?, 1, '2026-01-01T00:00:00.000+09:00', 0)`,
   ).run(`link-${opts.refCode}`, opts.affiliateId, opts.refCode, opts.offerId);
+}
+
+function insertTag(s: Database.Database, id: string): void {
+  s.prepare(`INSERT INTO tags (id, name) VALUES (?, ?)`).run(id, `tag-${id}`);
+}
+
+function attachTag(s: Database.Database, friendId: string, tagId: string): void {
+  s.prepare(`INSERT INTO friend_tags (friend_id, tag_id) VALUES (?, ?)`).run(friendId, tagId);
+}
+
+function insertTagRun(
+  s: Database.Database,
+  friendId: string,
+  tagId: string,
+  stepKey: string,
+  status: string,
+): void {
+  s.prepare(
+    `INSERT INTO friend_tag_side_effect_runs
+       (friend_id, tag_id, step_key, assigned_at, status, attempt_count, created_at, updated_at)
+     VALUES (?, ?, ?, '2026-02-01T00:00:00.000+09:00', ?, 0,
+             '2026-02-01T00:00:00.000+09:00', '2026-02-01T00:00:00.000+09:00')`,
+  ).run(friendId, tagId, stepKey, status);
+}
+
+function insertScenario(s: Database.Database, id: string): void {
+  s.prepare(
+    `INSERT INTO scenarios (id, name, trigger_type) VALUES (?, ?, 'manual')`,
+  ).run(id, `scn-${id}`);
+}
+
+function enrollScenario(
+  s: Database.Database,
+  opts: { id: string; friendId: string; scenarioId: string; status?: string },
+): void {
+  s.prepare(
+    `INSERT INTO friend_scenarios (id, friend_id, scenario_id, status)
+     VALUES (?, ?, ?, ?)`,
+  ).run(opts.id, opts.friendId, opts.scenarioId, opts.status ?? 'active');
 }
 
 function insertConversion(
@@ -335,5 +381,87 @@ describe('setConversionApproval', () => {
     expect(await setConversionApproval(db, 'cv2', 'approved')).toBe(false);
     // Missing CV → no update.
     expect(await setConversionApproval(db, 'nope', 'rejected')).toBe(false);
+  });
+});
+
+/*
+ * offerActionsIncomplete — 承認済みの行に「案件の付帯動作がまだ終わって
+ * いない」目印を立てる(N-212)。判定は runApprovedConversionOfferActions の
+ * 成功条件と同じ: タグは付与済みかつ台帳未完なし、シナリオは未完購読か
+ * 'conversion-offer:'+eventId の購読(完了含む)があれば済み。
+ */
+describe('offerActionsIncomplete', () => {
+  async function flagOf(eventId: string, status: 'pending' | 'approved' | 'rejected' = 'approved') {
+    const rows = await getConversionApprovalQueue(db, { status, scope: ALL_SCOPE, identityKeySql: IDENTITY_KEY_SQL });
+    return new Map(rows.map((r) => [r.eventId, r.offerActionsIncomplete])).get(eventId);
+  }
+
+  test('承認済み+稼働案件+タグ未付与ならtrue', async () => {
+    insertFriend(sqlite, 'f1');
+    insertAffiliate(sqlite, 'aff1');
+    insertPoint(sqlite, 'p1', 100);
+    insertTag(sqlite, 't1');
+    insertOfferAndLink(sqlite, { offerId: 'off1', offerName: 'O', affiliateId: 'aff1', refCode: 'rc1', tagId: 't1' });
+    insertConversion(sqlite, { id: 'cv1', pointId: 'p1', friendId: 'f1', affiliateId: 'aff1', refCode: 'rc1', approvalStatus: 'approved', createdAt: '2026-02-01T00:00:00.000+09:00' });
+
+    expect(await flagOf('cv1')).toBe(true);
+  });
+
+  test('タグ付与済みかつ台帳全工程完了ならfalse、未完工程が残ればtrue', async () => {
+    insertFriend(sqlite, 'f1');
+    insertAffiliate(sqlite, 'aff1');
+    insertPoint(sqlite, 'p1', 100);
+    insertTag(sqlite, 't1');
+    insertOfferAndLink(sqlite, { offerId: 'off1', offerName: 'O', affiliateId: 'aff1', refCode: 'rc1', tagId: 't1' });
+    insertConversion(sqlite, { id: 'cv1', pointId: 'p1', friendId: 'f1', affiliateId: 'aff1', refCode: 'rc1', approvalStatus: 'approved', createdAt: '2026-02-01T00:00:00.000+09:00' });
+
+    attachTag(sqlite, 'f1', 't1');
+    insertTagRun(sqlite, 'f1', 't1', 'mileage', 'completed');
+    expect(await flagOf('cv1')).toBe(false);
+
+    insertTagRun(sqlite, 'f1', 't1', 'scenario_enroll', 'failed');
+    expect(await flagOf('cv1')).toBe(true);
+  });
+
+  test('シナリオ未購読ならtrue。未完購読または conversion-offer 由来購読(完了含む)があればfalse', async () => {
+    insertFriend(sqlite, 'f1');
+    insertFriend(sqlite, 'f2');
+    insertAffiliate(sqlite, 'aff1');
+    insertPoint(sqlite, 'p1', 100);
+    insertScenario(sqlite, 's1');
+    insertOfferAndLink(sqlite, { offerId: 'off1', offerName: 'O', affiliateId: 'aff1', refCode: 'rc1', scenarioId: 's1' });
+    insertConversion(sqlite, { id: 'cv1', pointId: 'p1', friendId: 'f1', affiliateId: 'aff1', refCode: 'rc1', approvalStatus: 'approved', createdAt: '2026-02-01T00:00:00.000+09:00' });
+    insertConversion(sqlite, { id: 'cv2', pointId: 'p1', friendId: 'f2', affiliateId: 'aff1', refCode: 'rc1', approvalStatus: 'approved', createdAt: '2026-02-02T00:00:00.000+09:00' });
+
+    expect(await flagOf('cv1')).toBe(true);
+    expect(await flagOf('cv2')).toBe(true);
+
+    // cv1: 別経路の未完購読があれば executor は「済み」と見なす → false。
+    enrollScenario(sqlite, { id: 'other-src', friendId: 'f1', scenarioId: 's1', status: 'active' });
+    expect(await flagOf('cv1')).toBe(false);
+
+    // cv2: 完了済みでも conversion-offer:cv2 の購読行があれば executor は成功にする → false。
+    enrollScenario(sqlite, { id: 'conversion-offer:cv2', friendId: 'f2', scenarioId: 's1', status: 'completed' });
+    expect(await flagOf('cv2')).toBe(false);
+  });
+
+  test('未承認・停止中の案件・動作未設定・案件なしはfalse', async () => {
+    insertFriend(sqlite, 'f1');
+    insertAffiliate(sqlite, 'aff1');
+    insertPoint(sqlite, 'p1', 100);
+    insertTag(sqlite, 't1');
+    insertScenario(sqlite, 's1');
+    insertOfferAndLink(sqlite, { offerId: 'off1', offerName: 'O', affiliateId: 'aff1', refCode: 'rc1', tagId: 't1' });
+    insertOfferAndLink(sqlite, { offerId: 'off2', offerName: 'O2', affiliateId: 'aff1', refCode: 'rc2', tagId: 't1', isActive: false });
+    insertOfferAndLink(sqlite, { offerId: 'off3', offerName: 'O3', affiliateId: 'aff1', refCode: 'rc3' });
+    insertConversion(sqlite, { id: 'cv-pending', pointId: 'p1', friendId: 'f1', affiliateId: 'aff1', refCode: 'rc1', approvalStatus: 'pending', createdAt: '2026-02-01T00:00:00.000+09:00' });
+    insertConversion(sqlite, { id: 'cv-stopped', pointId: 'p1', friendId: 'f1', affiliateId: 'aff1', refCode: 'rc2', approvalStatus: 'approved', createdAt: '2026-02-02T00:00:00.000+09:00' });
+    insertConversion(sqlite, { id: 'cv-noaction', pointId: 'p1', friendId: 'f1', affiliateId: 'aff1', refCode: 'rc3', approvalStatus: 'approved', createdAt: '2026-02-03T00:00:00.000+09:00' });
+    insertConversion(sqlite, { id: 'cv-nooffer', pointId: 'p1', friendId: 'f1', affiliateId: 'aff1', refCode: null, approvalStatus: 'approved', createdAt: '2026-02-04T00:00:00.000+09:00' });
+
+    expect(await flagOf('cv-pending', 'pending')).toBe(false);
+    expect(await flagOf('cv-stopped')).toBe(false);
+    expect(await flagOf('cv-noaction')).toBe(false);
+    expect(await flagOf('cv-nooffer')).toBe(false);
   });
 });
