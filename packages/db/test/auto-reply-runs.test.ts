@@ -4,6 +4,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  claimAutoReplyEvaluationForRetry,
   claimPermanentFailedAutoReplyActionRuns,
   getAutoReplyEvaluationById,
   getAutoReplyEvaluationSummary,
@@ -299,6 +300,65 @@ describe('失敗した処理行の再実行（N-081、実DB）', () => {
     expect(await claimPermanentFailedAutoReplyActionRuns(db, 'evaluation-1')).toHaveLength(1);
     // 先に確保された行は permanent_failed ではなくなっているので取りこぼす。
     expect(await claimPermanentFailedAutoReplyActionRuns(db, 'evaluation-1')).toHaveLength(0);
+  });
+
+  it('確保は1文の条件付きUPDATEで失敗行をまとめて取る（文が分かれると2並行で分け合ってしまう）', async () => {
+    seedEvaluation(sqlite);
+    seedActionRun(sqlite, { id: 'run-a' });
+    seedActionRun(sqlite, { id: 'run-b', action_stable_id: 'a-1' });
+    const statements: string[] = [];
+    const inner = db;
+    const counted = {
+      prepare(query: string) {
+        statements.push(query);
+        return inner.prepare(query);
+      },
+      batch: inner.batch.bind(inner),
+    } as unknown as D1Database;
+
+    const claimed = await claimPermanentFailedAutoReplyActionRuns(counted, 'evaluation-1');
+
+    // 2行とも1回の確保で取れ、UPDATE は1文だけ走る。SELECT＋行ごとの
+    // UPDATE だと文の合間に別リクエストが残り行を取り、両方が副作用を起こす。
+    expect(claimed.map((row) => row.id).sort()).toEqual(['run-a', 'run-b']);
+    expect(
+      statements.filter((sql) => /UPDATE\s+auto_reply_action_runs/i.test(sql)),
+    ).toHaveLength(1);
+    // 確保済みの行は二度目の確保を受けない。
+    expect(await claimPermanentFailedAutoReplyActionRuns(counted, 'evaluation-1')).toHaveLength(0);
+  });
+
+  it('再実行の入口は評価側の条件付きUPDATEが1回だけ通す', async () => {
+    seedEvaluation(sqlite);
+    seedActionRun(sqlite);
+
+    expect(await claimAutoReplyEvaluationForRetry(db, 'evaluation-1')).toBe(true);
+    let row = sqlite.prepare(`SELECT status FROM auto_reply_evaluations WHERE id = 'evaluation-1'`).get() as { status: string };
+    expect(row.status).toBe('actions_running');
+
+    // 処理中はもう1本入れない（claimed の行がある＝生きている再実行）。
+    seedActionRun(sqlite, { id: 'run-live', action_stable_id: 'a-9', status: 'claimed' });
+    expect(await claimAutoReplyEvaluationForRetry(db, 'evaluation-1')).toBe(false);
+  });
+
+  it('再実行できない評価状態・失敗行なしでは入口を通さない', async () => {
+    seedEvaluation(sqlite, { id: 'ev-done', status: 'completed' });
+    seedActionRun(sqlite, { evaluation_id: 'ev-done', status: 'permanent_failed' });
+    seedEvaluation(sqlite, { id: 'ev-none', status: 'partial_failed', incoming_event_id: 'event-none' });
+
+    expect(await claimAutoReplyEvaluationForRetry(db, 'ev-done')).toBe(false);
+    expect(await claimAutoReplyEvaluationForRetry(db, 'ev-none')).toBe(false);
+    const done = sqlite.prepare(`SELECT status FROM auto_reply_evaluations WHERE id = 'ev-done'`).get() as { status: string };
+    expect(done.status).toBe('completed');
+  });
+
+  it('途中で止まった再実行（actions_running＋失敗行残り・処理中行なし）はもう一度入れる', async () => {
+    seedEvaluation(sqlite, { status: 'actions_running' });
+    seedActionRun(sqlite); // permanent_failed のまま残った行
+
+    expect(await claimAutoReplyEvaluationForRetry(db, 'evaluation-1')).toBe(true);
+    const row = sqlite.prepare(`SELECT status FROM auto_reply_evaluations WHERE id = 'evaluation-1'`).get() as { status: string };
+    expect(row.status).toBe('actions_running');
   });
 
   it('一覧の各行に permanent_failed の有無を付ける', async () => {

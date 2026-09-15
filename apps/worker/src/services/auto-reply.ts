@@ -1,6 +1,7 @@
 import type { LineClient } from '@line-crm/line-sdk';
 import { getSendPermissionForAccount } from './send-entitlements.js';
 import {
+  claimAutoReplyEvaluationForRetry,
   claimPermanentFailedAutoReplyActionRuns,
   ensureAutoReplyPublishedVersion,
   finishAutoReplyActionRun,
@@ -569,19 +570,30 @@ export async function matchAndReply(
       try {
         const result = await runActionRows(db, [action], friend.id);
         addActionResult(actionSummary, result);
-        await finishAutoReplyActionRun(db, {
-          id: reserved.id,
-          status: actionResultStatus(result),
-          errorCode: result.failed > 0 ? 'action_failed' : null,
-          result: { ...result },
-        });
+        try {
+          await finishAutoReplyActionRun(db, {
+            id: reserved.id,
+            status: actionResultStatus(result),
+            errorCode: result.failed > 0 ? 'action_failed' : null,
+            result: { ...result },
+          });
+        } catch (finishError) {
+          // 動作は済んだのに完了の記録だけ書けなかった。ここで
+          // permanent_failed を書くと、成功した動作が「もう一度実行」の
+          // 対象になり二度動いてしまう。行は claimed のまま残す。
+          console.error('[auto-reply] failed to write action run outcome', finishError);
+        }
       } catch (err) {
         actionSummary.failed += 1;
-        await finishAutoReplyActionRun(db, {
-          id: reserved.id,
-          status: 'permanent_failed',
-          errorCode: safeErrorCode(err),
-        });
+        try {
+          await finishAutoReplyActionRun(db, {
+            id: reserved.id,
+            status: 'permanent_failed',
+            errorCode: safeErrorCode(err),
+          });
+        } catch (finishError) {
+          console.error('[auto-reply] failed to mark action run failed', finishError);
+        }
         console.error('[auto-reply] failed to run action', err);
       }
     }
@@ -788,6 +800,18 @@ export async function retryAutoReplyActionRuns(
     throw new AutoReplyActionRetryError('not_found', '実行結果が見つかりません');
   }
 
+  // 入口は評価側の条件付きUPDATE。終了済みで失敗行が残る評価だけ
+  // actions_running へ進められるので、同時に来た2本はここで1本に絞られる。
+  // canRetry と同じ条件——終了済み（completed 等）や見送りの評価は通さない。
+  const admitted = await claimAutoReplyEvaluationForRetry(db, evaluation.id);
+  if (!admitted) {
+    throw new AutoReplyActionRetryError(
+      'not_retryable',
+      '処理中または完了済みのため、もう一度実行できません',
+    );
+  }
+  // 失敗行の確保は1文のUPDATE。入口を通ったあと別の再実行が先に全行を
+  // 取った場合だけ0件になる——その側が最後に再計算するので409だけ返す。
   const claimed = await claimPermanentFailedAutoReplyActionRuns(db, evaluation.id);
   if (claimed.length === 0) {
     throw new AutoReplyActionRetryError(

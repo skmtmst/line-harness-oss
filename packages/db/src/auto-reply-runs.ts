@@ -821,47 +821,60 @@ export async function listAutoReplyActionRuns(
 }
 
 /**
- * permanent_failed の処理行だけを claimed へ進めて返す。
+ * 再実行の入口。評価を actions_running へ進める条件付きUPDATE。
  *
- * 確保は1行ごとの条件付き UPDATE。同じ行を2度確保しないので、
- * 同時に呼ばれても副作用が重ならない。先に他の呼び出しが確保した
- * 行は changes=0 で取りこぼす。
+ * permanent_failed の処理行が残る終了済みの評価だけ通す。同時に2本
+ * 来ても、このUPDATEを通れた側だけが先へ進める（負けた側は409）。
+ * 途中で止まった再実行（actions_running のまま失敗行が残り、確保済み
+ * の行が無い）は「生きている再実行ではない」とみなしてもう一度入れる。
  */
+export async function claimAutoReplyEvaluationForRetry(
+  db: D1Database,
+  evaluationId: string,
+): Promise<boolean> {
+  const claimed = await db
+    .prepare(
+      `UPDATE auto_reply_evaluations
+          SET status = 'actions_running', updated_at = ?
+        WHERE id = ?
+          AND EXISTS (
+            SELECT 1 FROM auto_reply_action_runs
+             WHERE evaluation_id = auto_reply_evaluations.id
+               AND status = 'permanent_failed'
+          )
+          AND (
+            status IN ('reply_failed', 'partial_failed', 'failed')
+            OR (
+              status = 'actions_running'
+              AND NOT EXISTS (
+                SELECT 1 FROM auto_reply_action_runs
+                 WHERE evaluation_id = auto_reply_evaluations.id
+                   AND status IN ('queued', 'claimed')
+              )
+            )
+          )`,
+    )
+    .bind(jstNow(), evaluationId)
+    .run();
+  return (claimed.meta?.changes ?? 0) === 1;
+}
+
 export async function claimPermanentFailedAutoReplyActionRuns(
   db: D1Database,
   evaluationId: string,
 ): Promise<AutoReplyActionRunRow[]> {
-  const candidates = await db
-    .prepare(
-      `SELECT id FROM auto_reply_action_runs
-        WHERE evaluation_id = ? AND status = 'permanent_failed'
-        ORDER BY created_at ASC, id ASC`,
-    )
-    .bind(evaluationId)
-    .all<{ id: string }>();
   const now = jstNow();
-  const claimedIds: string[] = [];
-  for (const candidate of candidates.results) {
-    const claimed = await db
-      .prepare(
-        `UPDATE auto_reply_action_runs
-            SET status = 'claimed', attempt_count = attempt_count + 1,
-                started_at = ?, completed_at = NULL, updated_at = ?
-          WHERE id = ? AND status = 'permanent_failed'`,
-      )
-      .bind(now, now, candidate.id)
-      .run();
-    if ((claimed.meta?.changes ?? 0) === 1) claimedIds.push(candidate.id);
-  }
-  if (claimedIds.length === 0) return [];
-  const placeholders = claimedIds.map(() => '?').join(', ');
+  // SELECT→行ごとのUPDATEに分けると、文の合間に別リクエストが残り行を
+  // 取って両方が副作用を起こす。1文のUPDATEで失敗行をまとめて取る。
   const rows = await db
     .prepare(
-      `SELECT * FROM auto_reply_action_runs
-        WHERE id IN (${placeholders})
-        ORDER BY created_at ASC, id ASC`,
+      `UPDATE auto_reply_action_runs
+          SET status = 'claimed', attempt_count = attempt_count + 1,
+              started_at = ?, completed_at = NULL, updated_at = ?
+        WHERE evaluation_id = ? AND status = 'permanent_failed'
+        RETURNING *`,
     )
-    .bind(...claimedIds)
+    .bind(now, now, evaluationId)
     .all<AutoReplyActionRunRow>();
   return rows.results;
 }
@@ -964,6 +977,8 @@ export interface AutoReplyRunListRow extends AutoReplyEvaluationRow {
   candidate_reason_codes: string | null;
   /** 再実行できる失敗済みの処理行が残っているか（0/1）。 */
   has_failed_action_run: number;
+  /** 確保済み・待機中の処理行が残っているか（0/1）。生きている再実行の目印。 */
+  has_inflight_action_run: number;
 }
 
 function visibleAccountClause(input: {
@@ -1068,7 +1083,12 @@ export async function listAutoReplyEvaluationRuns(
                 SELECT 1 FROM auto_reply_action_runs failed_run
                  WHERE failed_run.evaluation_id = are.id
                    AND failed_run.status = 'permanent_failed'
-              ) AS has_failed_action_run
+              ) AS has_failed_action_run,
+              EXISTS (
+                SELECT 1 FROM auto_reply_action_runs inflight_run
+                 WHERE inflight_run.evaluation_id = are.id
+                   AND inflight_run.status IN ('queued', 'claimed')
+              ) AS has_inflight_action_run
          ${join}
         WHERE ${filter.where}
         ORDER BY are.evaluated_at DESC, are.id DESC

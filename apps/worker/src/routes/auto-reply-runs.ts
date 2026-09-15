@@ -179,7 +179,12 @@ function serializeRun(
     durationMs: row.duration_ms,
     // permanent_failed の処理行が残る終了済みの評価だけ再実行できる。
     // 返信の失敗だけ・成功・処理中・見送り（選択ルールの見送り表示を含む）には出さない。
-    canRetry: row.has_failed_action_run === 1 && RETRYABLE_DOMAIN_STATUSES.has(domainStatus),
+    // ただし途中で止まった再実行（actions_running のまま失敗行が残り、
+    // 確保済みの行が無い）は再実行の入口が通るのでボタンを出す。
+    canRetry: row.has_failed_action_run === 1 && (
+      RETRYABLE_DOMAIN_STATUSES.has(domainStatus)
+      || (row.status === 'actions_running' && row.has_inflight_action_run === 0)
+    ),
     autoReplyId: selectedRule?.id ?? row.winning_auto_reply_id,
     autoReplyName: selectedRule?.name || selectedRule?.keyword || row.rule_name,
     friendId: row.friend_id,

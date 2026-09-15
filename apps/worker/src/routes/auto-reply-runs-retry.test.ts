@@ -254,6 +254,37 @@ describe('POST /api/auto-reply-runs/:id/retry (N-081、実DB)', () => {
     expect(friendTagIds(testDb.raw, 'friend-1')).toEqual([]);
   });
 
+  it('終了済みの評価でも permanent_failed 行が残るだけでは再実行しない', async () => {
+    // completed 評価に失敗行が残るのは不整合データ。canRetry=false と
+    // 揃えて、POST 側も409で閉じる。
+    seedEvaluation(testDb.raw, { status: 'completed' });
+    const runId = seedActionRun(testDb.raw);
+    const res = await setupApp(testDb.db).request('/api/auto-reply-runs/evaluation-1/retry', { method: 'POST' });
+    expect(res.status).toBe(409);
+    expect(runRow(testDb.raw, runId).status).toBe('permanent_failed');
+    expect(friendTagIds(testDb.raw, 'friend-1')).toEqual([]);
+  });
+
+  it('処理中の評価は409で、生きている確保行を二重に動かさない', async () => {
+    seedEvaluation(testDb.raw, { status: 'actions_running', completed_at: null });
+    seedActionRun(testDb.raw, { id: 'run-live', status: 'claimed' });
+    seedActionRun(testDb.raw, { id: 'run-failed', action_stable_id: 'a-9' });
+    const res = await setupApp(testDb.db).request('/api/auto-reply-runs/evaluation-1/retry', { method: 'POST' });
+    expect(res.status).toBe(409);
+    expect(runRow(testDb.raw, 'run-live').status).toBe('claimed');
+    expect(friendTagIds(testDb.raw, 'friend-1')).toEqual([]);
+  });
+
+  it('途中で止まった再実行（actions_running＋失敗行残り・処理中行なし）はやり直せる', async () => {
+    seedEvaluation(testDb.raw, { status: 'actions_running', completed_at: null });
+    const runId = seedActionRun(testDb.raw);
+    const res = await setupApp(testDb.db).request('/api/auto-reply-runs/evaluation-1/retry', { method: 'POST' });
+    expect(res.status).toBe(200);
+    expect(friendTagIds(testDb.raw, 'friend-1')).toEqual(['tag-1']);
+    expect(runRow(testDb.raw, runId).status).toBe('succeeded');
+    expect(evaluationRow(testDb.raw, 'evaluation-1').status).toBe('completed');
+  });
+
   it('同時に2度呼んでも1回だけ動き、負けた側は409', async () => {
     seedEvaluation(testDb.raw);
     seedActionRun(testDb.raw);
