@@ -31,15 +31,18 @@ function seedPlatform(
 ): void {
   testDb.raw.prepare(
     `INSERT INTO ad_platforms (id, name, display_name, config, is_active, line_account_id, created_at, updated_at)
-     VALUES (?, 'meta', 'Meta広告', '{"pixel_id":"PIXEL-1","access_token":"token-1234567890"}', ?, ?, '2026-09-08T00:00:00+09:00', '2026-09-08T00:00:00+09:00')`,
+     VALUES (?, 'meta', 'Meta広告', '{"pixel_id":"PIXEL-1","access_token":"token-1234567890","click_id_validity_days":3650}', ?, ?, '2026-09-08T00:00:00+09:00', '2026-09-08T00:00:00+09:00')`,
   ).run(id, opts.active === false ? 0 : 1, lineAccountId);
 }
 
 function seedRef(testDb: SqliteD1, id: string, friendId: string): void {
   testDb.raw.prepare(
-    `INSERT INTO ref_tracking (id, ref_code, friend_id, fbclid, created_at)
-     VALUES (?, 'ref-1', ?, 'fb-click-1', '2026-09-08T00:00:00+09:00')`,
-  ).run(id, friendId);
+    `INSERT INTO ref_tracking
+       (id, ref_code, friend_id, fbclid, line_account_id, ad_conversion_consent_at, created_at)
+     VALUES (?, 'ref-1', ?, 'fb-click-1',
+       (SELECT line_account_id FROM friends WHERE id = ?),
+       '2026-09-08T00:00:00+09:00', '2026-09-08T00:00:00+09:00')`,
+  ).run(id, friendId, friendId);
 }
 
 function seedTwoAccounts(): SqliteD1 {
@@ -243,8 +246,9 @@ describe('sendAdConversions のアカウント境界(#638)', () => {
   it('Xは資格情報がそろわなければ送らず失敗で残す', async () => {
     const testDb = seedTwoAccounts();
     testDb.raw.prepare(`UPDATE ad_platforms SET name = 'x', line_account_id = 'a1' WHERE id = 'p1'`).run();
-    testDb.raw.prepare(`INSERT INTO ref_tracking (id, ref_code, friend_id, twclid, created_at)
-                        VALUES ('ref-x', 'ref-1', 'f1', 'tw-1', '2026-09-09T00:00:00+09:00')`).run();
+    testDb.raw.prepare(`INSERT INTO ref_tracking
+      (id, ref_code, friend_id, twclid, line_account_id, ad_conversion_consent_at, created_at)
+      VALUES ('ref-x', 'ref-1', 'f1', 'tw-1', 'a1', '2026-09-09T00:00:00+09:00', '2026-09-09T00:00:00+09:00')`).run();
     mockFetchOk();
 
     await sendAdConversions(testDb.db, 'f1', 'Purchase', 1000, { idempotencyKey: 'x:evt-1' });
@@ -276,8 +280,9 @@ describe('sendAdConversions のアカウント境界(#638)', () => {
   it('Googleの部分失敗は失敗で残し、安定注文IDを付ける', async () => {
     const testDb = seedTwoAccounts();
     testDb.raw.prepare(`UPDATE ad_platforms SET name = 'google', line_account_id = 'a1' WHERE id = 'p1'`).run();
-    testDb.raw.prepare(`INSERT INTO ref_tracking (id, ref_code, friend_id, gclid, created_at)
-                        VALUES ('ref-g', 'ref-1', 'f1', 'g-1', '2026-09-09T00:00:00+09:00')`).run();
+    testDb.raw.prepare(`INSERT INTO ref_tracking
+      (id, ref_code, friend_id, gclid, line_account_id, ad_conversion_consent_at, created_at)
+      VALUES ('ref-g', 'ref-1', 'f1', 'g-1', 'a1', '2026-09-09T00:00:00+09:00', '2026-09-09T00:00:00+09:00')`).run();
     vi.stubGlobal('fetch', vi.fn(async (url: string, init?: { body?: string }) => {
       sentRequests.push({ url, body: init?.body ? JSON.parse(init.body) : null });
       return {
@@ -312,10 +317,11 @@ describe('sendAdConversions のアカウント境界(#638)', () => {
   it('補助単位の金額は通貨の桁数で主単位へ直して送る', async () => {
     const testDb = seedTwoAccounts();
     testDb.raw.prepare(`UPDATE ad_platforms SET name = 'google', line_account_id = 'a1',
-                        config = '{"customer_id":"123","conversion_action_id":"456","oauth_token":"t","developer_token":"d"}'
+                        config = '{"customer_id":"123","conversion_action_id":"456","oauth_token":"t","developer_token":"d","click_id_validity_days":3650}'
                         WHERE id = 'p1'`).run();
-    testDb.raw.prepare(`INSERT INTO ref_tracking (id, ref_code, friend_id, gclid, created_at)
-                        VALUES ('ref-g2', 'ref-1', 'f1', 'g-2', '2026-09-09T00:00:00+09:00')`).run();
+    testDb.raw.prepare(`INSERT INTO ref_tracking
+      (id, ref_code, friend_id, gclid, line_account_id, ad_conversion_consent_at, created_at)
+      VALUES ('ref-g2', 'ref-1', 'f1', 'g-2', 'a1', '2026-09-09T00:00:00+09:00', '2026-09-09T00:00:00+09:00')`).run();
     vi.stubGlobal('fetch', vi.fn(async (url: string, init?: { body?: string }) => {
       sentRequests.push({ url, body: init?.body ? JSON.parse(init.body) : null });
       return { ok: true, status: 200, json: async () => ({}), text: async () => 'ok' };
@@ -351,10 +357,11 @@ describe('sendAdConversions のアカウント境界(#638)', () => {
   it('Xはpixel入りパス・出来事IDと重複排除鍵の正しい対応で送る', async () => {
     const testDb = seedTwoAccounts();
     testDb.raw.prepare(`UPDATE ad_platforms SET name = 'x', line_account_id = 'a1',
-                        config = '{"pixel_id":"oka17","api_key":"k","api_secret":"s","x_oauth_token":"t","x_oauth_token_secret":"ts","conversion_id":"23294827"}'
+                        config = '{"pixel_id":"oka17","api_key":"k","api_secret":"s","x_oauth_token":"t","x_oauth_token_secret":"ts","conversion_id":"23294827","click_id_validity_days":3650}'
                         WHERE id = 'p1'`).run();
-    testDb.raw.prepare(`INSERT INTO ref_tracking (id, ref_code, friend_id, twclid, created_at)
-                        VALUES ('ref-x2', 'ref-1', 'f1', 'tw-1', '2026-09-09T00:00:00+09:00')`).run();
+    testDb.raw.prepare(`INSERT INTO ref_tracking
+      (id, ref_code, friend_id, twclid, line_account_id, ad_conversion_consent_at, created_at)
+      VALUES ('ref-x2', 'ref-1', 'f1', 'tw-1', 'a1', '2026-09-09T00:00:00+09:00', '2026-09-09T00:00:00+09:00')`).run();
     mockFetchOk();
 
     await sendAdConversions(testDb.db, 'f1', 'Purchase', 1000, { idempotencyKey: 'x:evt-2' });
@@ -385,10 +392,11 @@ describe('sendAdConversions のアカウント境界(#638)', () => {
   it('Xは出来事IDの設定がなければ送らず失敗で残す', async () => {
     const testDb = seedTwoAccounts();
     testDb.raw.prepare(`UPDATE ad_platforms SET name = 'x', line_account_id = 'a1',
-                        config = '{"pixel_id":"oka17","api_key":"k","api_secret":"s","x_oauth_token":"t","x_oauth_token_secret":"ts"}'
+                        config = '{"pixel_id":"oka17","api_key":"k","api_secret":"s","x_oauth_token":"t","x_oauth_token_secret":"ts","click_id_validity_days":3650}'
                         WHERE id = 'p1'`).run();
-    testDb.raw.prepare(`INSERT INTO ref_tracking (id, ref_code, friend_id, twclid, created_at)
-                        VALUES ('ref-x3', 'ref-1', 'f1', 'tw-1', '2026-09-09T00:00:00+09:00')`).run();
+    testDb.raw.prepare(`INSERT INTO ref_tracking
+      (id, ref_code, friend_id, twclid, line_account_id, ad_conversion_consent_at, created_at)
+      VALUES ('ref-x3', 'ref-1', 'f1', 'tw-1', 'a1', '2026-09-09T00:00:00+09:00', '2026-09-09T00:00:00+09:00')`).run();
     mockFetchOk();
 
     await sendAdConversions(testDb.db, 'f1', 'Purchase', 1000, { idempotencyKey: 'x:evt-3' });

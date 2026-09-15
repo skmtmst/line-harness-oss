@@ -21,6 +21,8 @@ export class AdPlatformAccountMismatchError extends Error {
 }
 
 export interface AdPlatformConfig {
+  /** 媒体設定で確定したクリックIDの利用日数。未設定・不正値は送信しない。 */
+  click_id_validity_days?: number;
   // Meta
   pixel_id?: string;
   access_token?: string;
@@ -545,6 +547,15 @@ export interface AdConversionOutboxRow {
   next_attempt_at: string | null;
   lease_token: string | null;
   provider_event_id: string | null;
+  ref_tracking_id: string | null;
+  click_id: string | null;
+  click_id_type: string | null;
+  click_recorded_at: string | null;
+  click_expires_at: string | null;
+  click_consent_at: string | null;
+  click_context_json: string | null;
+  selection_reason: string;
+  is_retryable: number;
   last_error: string | null;
   created_at: string;
   updated_at: string;
@@ -566,6 +577,16 @@ export async function enqueueAdConversionOutbox(
     amountInMinorUnit?: boolean;
     idempotencyKey: string;
     providerEventId?: string | null;
+    clickSnapshot?: {
+      refTrackingId?: string | null;
+      clickId?: string | null;
+      clickIdType?: string | null;
+      recordedAt?: string | null;
+      expiresAt?: string | null;
+      consentAt?: string | null;
+      context?: { ipAddress: string | null; userAgent: string | null } | null;
+      reason: string;
+    };
   },
 ): Promise<string> {
   const now = jstNow();
@@ -573,8 +594,10 @@ export async function enqueueAdConversionOutbox(
     .prepare(
       `INSERT OR IGNORE INTO ad_conversion_outbox
        (id, ad_platform_id, friend_id, line_account_id, event_name, event_value, currency,
-        amount_in_minor_unit, idempotency_key, provider_event_id, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        amount_in_minor_unit, idempotency_key, provider_event_id,
+        ref_tracking_id, click_id, click_id_type, click_recorded_at, click_expires_at,
+        click_consent_at, click_context_json, selection_reason, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       crypto.randomUUID(),
@@ -587,6 +610,14 @@ export async function enqueueAdConversionOutbox(
       opts.amountInMinorUnit ? 1 : 0,
       opts.idempotencyKey,
       opts.providerEventId ?? null,
+      opts.clickSnapshot?.refTrackingId ?? null,
+      opts.clickSnapshot?.clickId ?? null,
+      opts.clickSnapshot?.clickIdType ?? null,
+      opts.clickSnapshot?.recordedAt ?? null,
+      opts.clickSnapshot?.expiresAt ?? null,
+      opts.clickSnapshot?.consentAt ?? null,
+      opts.clickSnapshot?.context ? JSON.stringify(opts.clickSnapshot.context) : null,
+      opts.clickSnapshot?.reason ?? 'legacy_unsnapshotted',
       now,
       now,
     )
@@ -620,7 +651,7 @@ export async function claimAdConversionOutboxDue(
       `UPDATE ad_conversion_outbox SET status = 'sending', lease_token = ?, attempt_count = attempt_count + 1, updated_at = ?
        WHERE id IN (
          SELECT id FROM ad_conversion_outbox
-         WHERE attempt_count < ?
+         WHERE is_retryable = 1 AND attempt_count < ?
            AND (next_attempt_at IS NULL OR next_attempt_at <= ?)
            AND (status IN ('pending', 'failed')
                 OR (status = 'sending' AND updated_at < ?))
@@ -637,6 +668,16 @@ export async function claimAdConversionOutboxDue(
   return result.results;
 }
 
+export async function getAdConversionOutboxById(
+  db: D1Database,
+  id: string,
+): Promise<AdConversionOutboxRow | null> {
+  return db
+    .prepare(`SELECT * FROM ad_conversion_outbox WHERE id = ?`)
+    .bind(id)
+    .first<AdConversionOutboxRow>();
+}
+
 /**
  * 取り出し分の結果を残す。持ち主の証が合う行だけ書き換える。
  * 失敗時は待ち時間を延ばす。成功時はそのまま sent で残す。
@@ -651,7 +692,7 @@ export async function takeAdConversionOutboxRow(db: D1Database, id: string): Pro
   const result = await db
     .prepare(
       `UPDATE ad_conversion_outbox SET status = 'sending', lease_token = ?, attempt_count = attempt_count + 1, updated_at = ?
-       WHERE id = ? AND status IN ('pending', 'failed', 'sent')`,
+       WHERE id = ? AND is_retryable = 1 AND status IN ('pending', 'failed', 'sent')`,
     )
     .bind(lease, jstNow(), id)
     .run<{ success: boolean; meta?: { changes?: number } }>();
@@ -661,7 +702,14 @@ export async function takeAdConversionOutboxRow(db: D1Database, id: string): Pro
 
 export async function finishAdConversionOutbox(
   db: D1Database,
-  opts: { id: string; lease: string; status: 'sent' | 'failed' | 'pending'; errorMessage?: string | null; now?: Date },
+  opts: {
+    id: string;
+    lease: string;
+    status: 'sent' | 'failed' | 'pending';
+    errorMessage?: string | null;
+    retryable?: boolean;
+    now?: Date;
+  },
 ): Promise<void> {
   const nowStr = toJstString(opts.now ?? new Date());
   if (opts.status === 'pending') {
@@ -687,6 +735,17 @@ export async function finishAdConversionOutbox(
     .bind(opts.id, opts.lease)
     .first<{ attempt_count: number }>();
   if (!row) return;
+  if (opts.retryable === false) {
+    await db
+      .prepare(
+        `UPDATE ad_conversion_outbox
+         SET status = 'failed', is_retryable = 0, last_error = ?, next_attempt_at = NULL, updated_at = ?
+         WHERE id = ? AND lease_token = ?`,
+      )
+      .bind(opts.errorMessage ?? null, nowStr, opts.id, opts.lease)
+      .run();
+    return;
+  }
   const waitMinutes = Math.min(
     AD_CONVERSION_OUTBOX_RETRY_BASE_MINUTES * 2 ** Math.max(0, row.attempt_count - 1),
     12 * 60,

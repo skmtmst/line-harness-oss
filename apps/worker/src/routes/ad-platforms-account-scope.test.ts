@@ -36,12 +36,14 @@ function seed(testDb: SqliteD1): void {
   insertFriend(testDb.raw, 'f2', { line_account_id: 'a2' });
   insertFriend(testDb.raw, 'fb', { line_account_id: 'b1' });
   testDb.raw.prepare(
-    `INSERT INTO ref_tracking (id, ref_code, friend_id, fbclid, created_at) VALUES ('ref-1', 'ref-1', 'f1', 'fb-1', ?)`,
-  ).run(NOW);
+    `INSERT INTO ref_tracking
+      (id, ref_code, friend_id, fbclid, line_account_id, ad_conversion_consent_at, created_at)
+     VALUES ('ref-1', 'ref-1', 'f1', 'fb-1', 'a1', ?, ?)`,
+  ).run(NOW, NOW);
   for (const [id, account] of [['p1', 'a1'], ['p2', 'a2'], ['pb', 'b1']] as const) {
     testDb.raw.prepare(
       `INSERT INTO ad_platforms (id, name, display_name, config, is_active, line_account_id, created_at, updated_at)
-       VALUES (?, 'meta', 'Meta広告', '{"pixel_id":"PIXEL-1","access_token":"token-1234567890"}', 1, ?, ?, ?)`,
+       VALUES (?, 'meta', 'Meta広告', '{"pixel_id":"PIXEL-1","access_token":"token-1234567890","click_id_validity_days":3650}', 1, ?, ?, ?)`,
     ).run(id, account, NOW, NOW);
   }
   testDb.raw.prepare(
@@ -128,7 +130,11 @@ describe('広告設定ルートのアカウント境界(#638)', () => {
     expect((await target.request('/api/ad-platforms/p1', { method: 'DELETE' }, env)).status).toBe(200);
     const created = await target.request('/api/ad-platforms', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: 'meta', config: { pixel_id: 'NEW', access_token: 'token-1234567890' }, lineAccountId: 'a1' }),
+      body: JSON.stringify({
+        name: 'meta',
+        config: { pixel_id: 'NEW', access_token: 'token-1234567890', click_id_validity_days: 3650 },
+        lineAccountId: 'a1',
+      }),
     }, env);
     expect(created.status).toBe(201);
     const createdBody = await created.json() as { data: { id: string } };
@@ -169,8 +175,9 @@ describe('広告設定ルートのアカウント境界(#638)', () => {
   it('テスト送信は友だち所属の設定を使い、認可対象と一致する', async () => {
     const testDb = createTestD1();
     seed(testDb);
-    testDb.raw.prepare(`INSERT INTO ref_tracking (id, ref_code, friend_id, fbclid, created_at)
-                        VALUES ('ref-2', 'ref-1', 'f2', 'fb-2', ?)`).run(NOW);
+    testDb.raw.prepare(`INSERT INTO ref_tracking
+      (id, ref_code, friend_id, fbclid, line_account_id, ad_conversion_consent_at, created_at)
+      VALUES ('ref-2', 'ref-1', 'f2', 'fb-2', 'a2', ?, ?)`).run(NOW, NOW);
     mockFetchOk();
     const target = app(staff('owner-1', 'tenant-1'));
     const env = { DB: testDb.db } as Env['Bindings'];
@@ -258,10 +265,12 @@ describe('広告設定ルートのアカウント境界(#638)', () => {
     seed(testDb);
     testDb.raw.prepare(
       `INSERT INTO ad_platforms (id, name, display_name, config, is_active, line_account_id, created_at, updated_at)
-       VALUES ('pg', 'google', 'Google広告', '{"customer_id":"1","conversion_action_id":"2","oauth_token":"t"}', 1, 'a1', ?, ?)`,
+       VALUES ('pg', 'google', 'Google広告', '{"customer_id":"1","conversion_action_id":"2","oauth_token":"t","click_id_validity_days":3650}', 1, 'a1', ?, ?)`,
     ).run(NOW, NOW);
-    testDb.raw.prepare(`INSERT INTO ref_tracking (id, ref_code, friend_id, fbclid, gclid, created_at)
-                        VALUES ('ref-both', 'ref-1', 'f1', 'fb-1', 'g-1', '2026-09-10T00:00:00+09:00')`).run();
+    testDb.raw.prepare(`INSERT INTO ref_tracking
+      (id, ref_code, friend_id, fbclid, gclid, line_account_id, ad_conversion_consent_at, created_at)
+      VALUES ('ref-both', 'ref-1', 'f1', 'fb-1', 'g-1', 'a1',
+        '2026-09-10T00:00:00+09:00', '2026-09-10T00:00:00+09:00')`).run();
     mockFetchOk();
     const target = app(staff('owner-1', 'tenant-1'));
     const env = { DB: testDb.db } as Env['Bindings'];
