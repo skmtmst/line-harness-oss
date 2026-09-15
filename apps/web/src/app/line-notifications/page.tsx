@@ -12,13 +12,18 @@ import Pagination from '@/components/shared/pagination'
 import {
   ApiError,
   api,
+  fetchApi,
   type EcCommerceOverview,
   type EcNotificationSetting,
   type LineNotificationDefinition,
   type LineNotificationMetric,
 } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
-import { canOpenCustomerNotificationKpi, customerNotificationKpis } from './customer-kpis'
+import {
+  canOpenCustomerNotificationKpi,
+  customerNotificationKpis,
+  type LineNotificationQuota,
+} from './customer-kpis'
 import styles from './customer-notifications.module.css'
 
 const customerFilters = [
@@ -558,6 +563,7 @@ function LineNotificationsPage() {
   const [overview, setOverview] = useState<EcCommerceOverview | null>(null)
   const [definitions, setDefinitions] = useState<LineNotificationDefinition[]>([])
   const [metrics, setMetrics] = useState<LineNotificationMetric[]>([])
+  const [quota, setQuota] = useState<LineNotificationQuota | null>(null)
   const [filter, setFilter] = useState<CustomerFilter>('all')
   const [customerPage, setCustomerPage] = useState(1)
   const [expanded, setExpanded] = useState<string | null>(null)
@@ -586,6 +592,7 @@ function LineNotificationsPage() {
     setOverview(null)
     setDefinitions([])
     setMetrics([])
+    setQuota(null)
     setNotice(null)
     setCloseConfirmOpen(false)
     setOperatorCount(null)
@@ -623,7 +630,7 @@ function LineNotificationsPage() {
     // 設定口は列車側で店別になったため、持ち回しはしない。
     const needCustomer = tab === 'customer'
     try {
-      const [settingRes, overviewRes, definitionRes, metricRes] = await Promise.all([
+      const [settingRes, overviewRes, definitionRes, metricRes, quotaRes] = await Promise.all([
         api.ecCommerce.settings(selectedAccountId), api.ecCommerce.overview(selectedAccountId),
         needCustomer
           ? api.lineNotifications.definitions(selectedAccountId).catch((error: unknown) => {
@@ -635,6 +642,26 @@ function LineNotificationsPage() {
           ? api.lineNotifications.metrics(selectedAccountId).catch((error: unknown) => {
               if (error instanceof ApiError && error.status === 403) throw error
               return null
+            })
+          : Promise.resolve(null),
+        needCustomer
+          ? fetchApi<{ success: true; data: { quota: LineNotificationQuota } }>(
+              `/api/line-notifications/deliveries?lineAccountId=${encodeURIComponent(selectedAccountId)}&view=all&limit=1&offset=0&includeQuota=1`,
+            ).catch((error: unknown) => {
+              if (error instanceof ApiError && error.status === 403) throw error
+              return {
+                success: true as const,
+                data: {
+                  quota: {
+                    state: 'unavailable' as const,
+                    total: null,
+                    used: null,
+                    remaining: null,
+                    asOf: null,
+                    reason: 'LINEから送信枠を取得できませんでした',
+                  },
+                },
+              }
             })
           : Promise.resolve(null),
       ])
@@ -681,6 +708,7 @@ function LineNotificationsPage() {
       setOverview(overviewRes.data)
       setDefinitions(loadedDefinitions)
       setMetrics(metricRes?.success ? metricRes.data.items : [])
+      setQuota(quotaRes?.success ? quotaRes.data.quota : null)
       setExpanded((current) => withDrafts.some((setting) => setting.eventType === current) ? current : null)
       if (restoredEvents.length > 0) {
         setDirtyEvents(restoredEvents)
@@ -730,6 +758,7 @@ function LineNotificationsPage() {
     sentToday: overview?.last24h ?? null,
     sentBreakdown,
     failed: overview?.failed ?? null,
+    quota,
   })
   const tabsWithCounts = TABS.map((item) => {
     if (item.key === 'customer') return { ...item, label: `${item.label} ${loadState === 'ready' ? settings.length : '—'}` }
@@ -908,7 +937,7 @@ function LineNotificationsPage() {
           <p className="text-ink-faint text-xs">{label}</p>
           <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
             {value === null ? '—' : value}
-            {value === null ? null : <span className="text-ink-faint ml-1 text-xs font-normal">{unit}</span>}
+            {value === null || unit === null ? null : <span className="text-ink-faint ml-1 text-xs font-normal">{unit}</span>}
           </p>
           <p className="text-ink-faint mt-0.5 text-xs">{note}</p>
         </>

@@ -1,10 +1,11 @@
 import { Hono } from 'hono';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Env } from '../index';
 import type { AuthenticatedStaff } from '../middleware/auth';
 import { createTestD1, insertFriend, type SqliteD1 } from '../test-utils/d1-sqlite';
 
 const pushMessageWithRequestId = vi.hoisted(() => vi.fn());
+const lineFetch = vi.hoisted(() => vi.fn());
 vi.mock('@line-crm/line-sdk', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@line-crm/line-sdk')>();
   return {
@@ -22,6 +23,9 @@ const owner: AuthenticatedStaff = {
 };
 const staff: AuthenticatedStaff = {
   ...owner, id: 'staff-1', name: '担当者', role: 'staff',
+};
+const admin: AuthenticatedStaff = {
+  ...owner, id: 'admin-1', name: '管理者', role: 'admin',
 };
 
 function app(db: D1Database, actor: AuthenticatedStaff = owner) {
@@ -41,6 +45,31 @@ function json(method: string, body: unknown) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   };
+}
+
+/** 本番D1の1文100 bind制限を、実SQLiteへ渡す直前に再現する。 */
+function withBindingLimit(db: D1Database, maxBindings: number): D1Database {
+  return new Proxy(db, {
+    get(target, property, receiver) {
+      if (property !== 'prepare') return Reflect.get(target, property, receiver);
+      return (sql: string) => {
+        const statement = target.prepare(sql);
+        return new Proxy(statement, {
+          get(statementTarget, statementProperty, statementReceiver) {
+            if (statementProperty !== 'bind') {
+              return Reflect.get(statementTarget, statementProperty, statementReceiver);
+            }
+            return (...values: unknown[]) => {
+              if (values.length > maxBindings) {
+                throw new Error(`D1 bind limit exceeded: ${values.length}`);
+              }
+              return statementTarget.bind(...values);
+            };
+          },
+        });
+      };
+    },
+  });
 }
 
 function seedDefinition(db: SqliteD1): void {
@@ -109,6 +138,14 @@ describe('V6 LINE notification APIs', () => {
   beforeEach(() => {
     pushMessageWithRequestId.mockReset();
     pushMessageWithRequestId.mockResolvedValue({ data: {}, requestId: 'line-request-1' });
+    lineFetch.mockReset();
+    lineFetch.mockImplementation(async (input: string | URL | Request) => {
+      const url = String(input);
+      if (url.endsWith('/quota/consumption')) return Response.json({ totalUsage: 10 });
+      if (url.endsWith('/quota')) return Response.json({ type: 'limited', value: 100 });
+      return new Response(null, { status: 404 });
+    });
+    vi.stubGlobal('fetch', lineFetch);
     testDb = createTestD1();
     testDb.raw.prepare(`INSERT INTO tenants (id, name) VALUES ('tenant-1', '統括1')`).run();
     testDb.raw.prepare(`INSERT INTO tenants (id, name) VALUES ('tenant-2', '統括2')`).run();
@@ -123,6 +160,10 @@ describe('V6 LINE notification APIs', () => {
       VALUES ('account-2', 'channel-2', '店舗2', 'token-2', 'secret-2', 1, 'tenant-2')
     `).run();
     insertFriend(testDb.raw, 'friend-1', { line_account_id: 'account-1', display_name: '山田 太郎' });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it('pending・accepted・excluded・failed を同じ契約とページ情報で返す', async () => {
@@ -172,6 +213,27 @@ describe('V6 LINE notification APIs', () => {
       '/api/line-notifications/deliveries?lineAccountId=account-2',
     );
     expect(forbidden.status).toBe(403);
+  });
+
+  it('100件一覧でもD1の100 bind上限を超えず試行履歴を返す', async () => {
+    seedDefinition(testDb);
+    for (let index = 0; index < 100; index += 1) {
+      seedDelivery(testDb, `delivery-page-${String(index).padStart(3, '0')}`, 'retry_wait', { retryable: 1 });
+    }
+    testDb.raw.prepare(`
+      INSERT INTO notification_delivery_attempts
+        (id, delivery_id, attempt_number, retry_key, outcome, error_message_safe, attempted_at)
+      VALUES ('attempt-page-99', 'delivery-page-099', 1, 'retry-key-delivery-page-099',
+              'retry_wait', '一時的な問題です', '2026-09-07T10:01:00+09:00')
+    `).run();
+
+    const response = await app(withBindingLimit(testDb.db, 100)).request(
+      '/api/line-notifications/deliveries?lineAccountId=account-1&view=all&limit=100&offset=0',
+    );
+    expect(response.status).toBe(200);
+    const body = await response.json() as { data: { items: Array<{ id: string; attemptHistory: unknown[] }> } };
+    expect(body.data.items).toHaveLength(100);
+    expect(body.data.items.find((item) => item.id === 'delivery-page-099')?.attemptHistory).toHaveLength(1);
   });
 
   it('下書きを楽観ロックし、公開済み版を変えずに新版を作る', async () => {
@@ -292,6 +354,17 @@ describe('V6 LINE notification APIs', () => {
       SELECT retry_key, outcome FROM notification_delivery_attempts
        WHERE delivery_id = 'delivery-retry'
     `).get()).toEqual({ retry_key: 'retry-key-delivery-retry', outcome: 'provider_accepted' });
+    const detail = await app(testDb.db).request(
+      '/api/line-notifications/deliveries?lineAccountId=account-1&view=all',
+    );
+    await expect(detail.json()).resolves.toMatchObject({
+      data: {
+        items: [{
+          id: 'delivery-retry',
+          attemptHistory: [{ number: 2, outcome: 'provider_accepted', attemptedAt: expect.any(String) }],
+        }],
+      },
+    });
 
     const duplicate = await app(testDb.db).request(
       '/api/line-notifications/deliveries/delivery-retry/retry',
@@ -299,6 +372,204 @@ describe('V6 LINE notification APIs', () => {
     );
     expect(duplicate.status).toBe(409);
     expect(pushMessageWithRequestId).toHaveBeenCalledTimes(1);
+  });
+
+  it('同時再送はCASで1件だけを送り、成功済みは新しい版でも再送しない', async () => {
+    seedDefinition(testDb);
+    seedDelivery(testDb, 'delivery-race', 'retry_wait', { retryable: 1 });
+    const [first, second] = await Promise.all([
+      app(testDb.db).request(
+        '/api/line-notifications/deliveries/delivery-race/retry',
+        json('POST', { lineAccountId: 'account-1', expectedVersion: 1 }),
+      ),
+      app(testDb.db).request(
+        '/api/line-notifications/deliveries/delivery-race/retry',
+        json('POST', { lineAccountId: 'account-1', expectedVersion: 1 }),
+      ),
+    ]);
+    expect([first.status, second.status].sort()).toEqual([200, 409]);
+    expect(pushMessageWithRequestId).toHaveBeenCalledTimes(1);
+
+    const accepted = await app(testDb.db).request(
+      '/api/line-notifications/deliveries/delivery-race/retry',
+      json('POST', { lineAccountId: 'account-1', expectedVersion: 2 }),
+    );
+    expect(accepted.status).toBe(409);
+    expect(pushMessageWithRequestId).toHaveBeenCalledTimes(1);
+  });
+
+  it('送信枠が不足または取得不能なら台帳をclaimせず送信しない', async () => {
+    seedDefinition(testDb);
+    seedDelivery(testDb, 'delivery-no-quota', 'retry_wait', { retryable: 1 });
+    lineFetch.mockImplementation(async (input: string | URL | Request) => {
+      const url = String(input);
+      if (url.endsWith('/quota/consumption')) return Response.json({ totalUsage: 100 });
+      if (url.endsWith('/quota')) return Response.json({ type: 'limited', value: 100 });
+      return new Response(null, { status: 404 });
+    });
+    const short = await app(testDb.db).request(
+      '/api/line-notifications/deliveries/delivery-no-quota/retry',
+      json('POST', { lineAccountId: 'account-1', expectedVersion: 1 }),
+    );
+    expect(short.status).toBe(409);
+    await expect(short.json()).resolves.toMatchObject({ code: 'quota_insufficient' });
+
+    lineFetch.mockResolvedValue(new Response(null, { status: 503 }));
+    const unavailable = await app(testDb.db).request(
+      '/api/line-notifications/deliveries/delivery-no-quota/retry',
+      json('POST', { lineAccountId: 'account-1', expectedVersion: 1 }),
+    );
+    expect(unavailable.status).toBe(503);
+    await expect(unavailable.json()).resolves.toMatchObject({ code: 'quota_unavailable' });
+    expect(pushMessageWithRequestId).not.toHaveBeenCalled();
+    expect(testDb.raw.prepare(`
+      SELECT status, attempts, version FROM notification_deliveries
+       WHERE id = 'delivery-no-quota'
+    `).get()).toEqual({ status: 'retry_wait', attempts: 1, version: 1 });
+  });
+
+  it('provider応答消失は同じretry keyの試行履歴と次回時刻を残す', async () => {
+    seedDefinition(testDb);
+    seedDelivery(testDb, 'delivery-unknown', 'retry_wait', { retryable: 1 });
+    pushMessageWithRequestId.mockRejectedValueOnce(new TypeError('fetch failed'));
+    const response = await app(testDb.db).request(
+      '/api/line-notifications/deliveries/delivery-unknown/retry',
+      json('POST', { lineAccountId: 'account-1', expectedVersion: 1 }),
+    );
+    expect(response.status).toBe(503);
+    expect(testDb.raw.prepare(`
+      SELECT status, retryable, attempts, error_code, next_retry_at, version
+        FROM notification_deliveries WHERE id = 'delivery-unknown'
+    `).get()).toMatchObject({
+      status: 'retry_wait', retryable: 1, attempts: 2,
+      error_code: 'provider_response_unknown', version: 2,
+      next_retry_at: expect.any(String),
+    });
+    expect(testDb.raw.prepare(`
+      SELECT retry_key, outcome, error_code FROM notification_delivery_attempts
+       WHERE delivery_id = 'delivery-unknown'
+    `).get()).toEqual({
+      retry_key: 'retry-key-delivery-unknown', outcome: 'retry_wait',
+      error_code: 'provider_response_unknown',
+    });
+  });
+
+  it('対象が解除済み・別tenantなら送信前に拒否する', async () => {
+    seedDefinition(testDb);
+    seedDelivery(testDb, 'delivery-unfollowed', 'retry_wait', { retryable: 1 });
+    testDb.raw.prepare(`UPDATE friends SET is_following = 0 WHERE id = 'friend-1'`).run();
+    const unfollowed = await app(testDb.db).request(
+      '/api/line-notifications/deliveries/delivery-unfollowed/retry',
+      json('POST', { lineAccountId: 'account-1', expectedVersion: 1 }),
+    );
+    expect(unfollowed.status).toBe(409);
+
+    seedDelivery(testDb, 'delivery-other-tenant', 'retry_wait', { retryable: 1, accountId: 'account-2' });
+    const forbidden = await app(testDb.db).request(
+      '/api/line-notifications/deliveries/delivery-other-tenant/retry',
+      json('POST', { lineAccountId: 'account-2', expectedVersion: 1 }),
+    );
+    expect(forbidden.status).toBe(403);
+    const hidden = await app(testDb.db).request(
+      '/api/line-notifications/deliveries/delivery-other-tenant/retry',
+      json('POST', { lineAccountId: 'account-1', expectedVersion: 1 }),
+    );
+    expect(hidden.status).toBe(404);
+    expect(pushMessageWithRequestId).not.toHaveBeenCalled();
+  });
+
+  it('実送信枠の総量・使用・残りと取得不能をアカウント境界内で返す', async () => {
+    const available = await app(testDb.db).request('/api/line-notifications/deliveries?lineAccountId=account-1&view=all&limit=1&includeQuota=1');
+    expect(available.status).toBe(200);
+    await expect(available.json()).resolves.toMatchObject({
+      data: { quota: { state: 'available', total: 100, used: 10, remaining: 90, asOf: expect.any(String) } },
+    });
+
+    lineFetch.mockImplementation(async (input: string | URL | Request) => {
+      const url = String(input);
+      if (url.endsWith('/quota/consumption')) return Response.json({ totalUsage: 27 });
+      if (url.endsWith('/quota')) return Response.json({ type: 'none' });
+      return new Response(null, { status: 404 });
+    });
+    const unlimited = await app(testDb.db).request('/api/line-notifications/deliveries?lineAccountId=account-1&view=all&limit=1&includeQuota=1');
+    await expect(unlimited.json()).resolves.toMatchObject({
+      data: { quota: { state: 'unlimited', total: null, used: 27, remaining: null, asOf: expect.any(String) } },
+    });
+
+    lineFetch.mockResolvedValue(new Response(null, { status: 503 }));
+    const unavailable = await app(testDb.db).request('/api/line-notifications/deliveries?lineAccountId=account-1&view=all&limit=1&includeQuota=1');
+    await expect(unavailable.json()).resolves.toMatchObject({
+      data: { quota: { state: 'unavailable', total: null, used: null, remaining: null, reason: expect.any(String) } },
+    });
+    const forbidden = await app(testDb.db).request('/api/line-notifications/deliveries?lineAccountId=account-2&view=all&limit=1&includeQuota=1');
+    expect(forbidden.status).toBe(403);
+  });
+
+  it('対応済み履歴を既存監査台帳へ保存し、再送対象と未対応件数から外す', async () => {
+    seedDefinition(testDb);
+    seedDelivery(testDb, 'delivery-resolved', 'retry_wait', { retryable: 1 });
+    const resolved = await app(testDb.db, admin).request(
+      '/api/line-notifications/deliveries/delivery-resolved/retry',
+      json('POST', { lineAccountId: 'account-1', expectedVersion: 1, action: 'resolve' }),
+    );
+    expect(resolved.status).toBe(200);
+    expect(testDb.raw.prepare(`
+      SELECT action, actor_id FROM operation_audit
+       WHERE target_kind = 'notification_delivery' AND target_id = 'delivery-resolved'
+    `).get()).toEqual({ action: 'resolved', actor_id: 'admin-1' });
+
+    const listed = await app(testDb.db).request(
+      '/api/line-notifications/deliveries?lineAccountId=account-1&view=failures',
+    );
+    const body = await listed.json() as {
+      data: { items: Array<Record<string, unknown>>; summary: { failed: number } };
+    };
+    expect(body.data.summary.failed).toBe(0);
+    expect(body.data.items[0]).toMatchObject({ resolved: true, retryAvailable: false, resolvedAt: expect.any(String) });
+
+    const retryResolved = await app(testDb.db).request(
+      '/api/line-notifications/deliveries/delivery-resolved/retry',
+      json('POST', { lineAccountId: 'account-1', expectedVersion: 2 }),
+    );
+    expect(retryResolved.status).toBe(409);
+    const reopened = await app(testDb.db, admin).request(
+      '/api/line-notifications/deliveries/delivery-resolved/retry',
+      json('POST', { lineAccountId: 'account-1', expectedVersion: 2, action: 'reopen' }),
+    );
+    expect(reopened.status).toBe(200);
+  });
+
+  it('対応状態は同じ版で1回だけ変更し、版なしと別tenantのIDを安全に拒否する', async () => {
+    seedDefinition(testDb);
+    seedDelivery(testDb, 'delivery-resolution-race', 'retry_wait', { retryable: 1 });
+    const first = await app(testDb.db, admin).request(
+      '/api/line-notifications/deliveries/delivery-resolution-race/retry',
+      json('POST', { lineAccountId: 'account-1', expectedVersion: 1, action: 'resolve' }),
+    );
+    const stale = await app(testDb.db, owner).request(
+      '/api/line-notifications/deliveries/delivery-resolution-race/retry',
+      json('POST', { lineAccountId: 'account-1', expectedVersion: 1, action: 'resolve' }),
+    );
+    expect(first.status).toBe(200);
+    expect(stale.status).toBe(409);
+    expect(testDb.raw.prepare(`
+      SELECT COUNT(*) AS count FROM operation_audit
+       WHERE target_kind = 'notification_delivery'
+         AND target_id = 'delivery-resolution-race' AND action = 'resolved'
+    `).get()).toEqual({ count: 1 });
+
+    const missingVersion = await app(testDb.db, admin).request(
+      '/api/line-notifications/deliveries/delivery-resolution-race/retry',
+      json('POST', { lineAccountId: 'account-1', action: 'reopen' }),
+    );
+    expect(missingVersion.status).toBe(400);
+
+    seedDelivery(testDb, 'delivery-resolution-other', 'retry_wait', { retryable: 1, accountId: 'account-2' });
+    const hidden = await app(testDb.db, admin).request(
+      '/api/line-notifications/deliveries/delivery-resolution-other/retry',
+      json('POST', { lineAccountId: 'account-1', expectedVersion: 1, action: 'resolve' }),
+    );
+    expect(hidden.status).toBe(404);
   });
 
   it('恒久失敗とstaffの手動再試行を拒否する', async () => {
@@ -314,6 +585,11 @@ describe('V6 LINE notification APIs', () => {
       json('POST', { lineAccountId: 'account-1', expectedVersion: 1 }),
     );
     expect(noPermission.status).toBe(403);
+    const adminRetry = await app(testDb.db, admin).request(
+      '/api/line-notifications/deliveries/delivery-permanent/retry',
+      json('POST', { lineAccountId: 'account-1', expectedVersion: 1 }),
+    );
+    expect(adminRetry.status).toBe(403);
     expect(pushMessageWithRequestId).not.toHaveBeenCalled();
   });
 
