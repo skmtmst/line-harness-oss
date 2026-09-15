@@ -1,8 +1,9 @@
 'use client'
 
-import { Fragment, useCallback, useEffect, useState } from 'react'
+import { Fragment, useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { api } from '@/lib/api'
 import type { AdConversionLog, AdPlatform } from '@/lib/api'
+import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
@@ -59,6 +60,41 @@ function configNumber(platforms: AdPlatform[], key: string): number | null {
   return null
 }
 
+function currencyCode(platform: AdPlatform): string | null {
+  const value = platform.config.currency
+  if (typeof value !== 'string' || !/^[A-Z]{3}$/.test(value.trim().toUpperCase())) return null
+  return value.trim().toUpperCase()
+}
+
+function formatCurrency(value: number, currency: string): string {
+  return new Intl.NumberFormat('ja-JP', { style: 'currency', currency }).format(value)
+}
+
+function currencyAmounts(platforms: AdPlatform[]): { value: ReactNode; detail: string } {
+  const totals = new Map<string, number>()
+  let unknown = false
+  for (const platform of platforms) {
+    const amount = platform.config.monthly_cost
+    if (typeof amount !== 'number' || !Number.isFinite(amount)) continue
+    const currency = currencyCode(platform)
+    if (!currency) { unknown = true; continue }
+    totals.set(currency, (totals.get(currency) ?? 0) + amount)
+  }
+  if (totals.size === 0 && !unknown) return { value: '未設定', detail: '広告費が設定されていません' }
+  const values = [...totals].map(([currency, total]) => formatCurrency(total, currency))
+  if (unknown) values.push('通貨を確認')
+  return {
+    value: <span className="flex flex-wrap gap-x-2 gap-y-1">{values.map((value) => <span key={value}>{value}</span>)}</span>,
+    detail: unknown ? '通貨が不明な設定があります。通貨ごとに合算せず表示しています' : '通貨ごとに分けて表示しています',
+  }
+}
+
+function platformCost(platform: AdPlatform | undefined): string {
+  if (!platform || typeof platform.config.monthly_cost !== 'number' || !Number.isFinite(platform.config.monthly_cost)) return '未設定'
+  const currency = currencyCode(platform)
+  return currency ? formatCurrency(platform.config.monthly_cost, currency) : '通貨を確認'
+}
+
 /**
  * #514-8: 送信履歴の口が返すのは id・adPlatformId・friendId・eventName・
  * clickId(clickIdType)・status・errorMessage・createdAt だけ。口の返さない
@@ -97,6 +133,10 @@ function safeCsv(logs: AdConversionLog[]): string {
 }
 
 export default function AdIntegration({ view }: { view: AdView }) {
+  const { selectedAccountId } = useAccount()
+  const latestAccountRef = useRef(selectedAccountId)
+  const loadGenerationRef = useRef(0)
+  latestAccountRef.current = selectedAccountId
   const [platforms, setPlatforms] = useState<AdPlatform[]>([])
   const [logs, setLogs] = useState<AdConversionLog[]>([])
   const [logTotal, setLogTotal] = useState(0)
@@ -110,13 +150,25 @@ export default function AdIntegration({ view }: { view: AdView }) {
   const [expandedLogId, setExpandedLogId] = useState<string | null>(null)
 
   const load = useCallback(async () => {
+    const generation = ++loadGenerationRef.current
+    const accountAtRequest = selectedAccountId
+    if (!accountAtRequest) {
+      setPlatforms([])
+      setLogs([])
+      setLogTotal(0)
+      setFailed(false)
+      setLoading(false)
+      return
+    }
+    const isCurrent = () => generation === loadGenerationRef.current && accountAtRequest === latestAccountRef.current
     setLoading(true)
     setFailed(false)
     try {
       const [platformResponse, logResponse] = await Promise.all([
-        api.adPlatforms.list(),
-        api.adPlatforms.logsPage({ page: logPage, limit: LOG_PAGE_SIZE, status, query }),
+        api.adPlatforms.list(accountAtRequest),
+        api.adPlatforms.logsPage({ page: logPage, limit: LOG_PAGE_SIZE, status, query, lineAccountId: accountAtRequest }),
       ])
+      if (!isCurrent()) return
       if (!platformResponse.success || !logResponse.success) {
         setFailed(true)
         return
@@ -125,14 +177,20 @@ export default function AdIntegration({ view }: { view: AdView }) {
       setLogs(logResponse.data.items)
       setLogTotal(logResponse.data.total)
     } catch {
+      if (!isCurrent()) return
       setFailed(true)
     } finally {
-      setLoading(false)
+      if (isCurrent()) setLoading(false)
     }
-  }, [logPage, query, status])
+  }, [logPage, query, selectedAccountId, status])
 
   useEffect(() => {
+    // 切替直後は前accountの金額を残さず、遅れて届いた旧応答もgenerationで捨てる。
+    setPlatforms([])
+    setLogs([])
+    setLogTotal(0)
     void load()
+    return () => { loadGenerationRef.current += 1 }
   }, [load])
 
   const connected = platforms.filter((platform) => platform.isActive)
@@ -144,6 +202,7 @@ export default function AdIntegration({ view }: { view: AdView }) {
   const visibleLogs = logs
   const logPageCount = Math.max(1, Math.ceil(logTotal / LOG_PAGE_SIZE))
   const safeLogPage = Math.min(logPage, logPageCount)
+  const monthlyCost = currencyAmounts(platforms)
 
   const exportLogs = () => {
     const blob = new Blob([`\uFEFF${safeCsv(visibleLogs)}`], { type: 'text/csv;charset=utf-8' })
@@ -153,6 +212,16 @@ export default function AdIntegration({ view }: { view: AdView }) {
     anchor.download = `広告への送信履歴_${new Date().toISOString().slice(0, 10)}.csv`
     anchor.click()
     URL.revokeObjectURL(url)
+  }
+
+  if (!selectedAccountId) {
+    return (
+      <ListState
+        kind="empty"
+        title="LINEアカウントを選択してください"
+        description="選んだLINEアカウントの広告費だけを表示します。"
+      />
+    )
   }
 
   if (loading) {
@@ -396,12 +465,12 @@ export default function AdIntegration({ view }: { view: AdView }) {
       */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Metric label="つないだ広告" value={connected.length} detail={connected.length > 0 ? connected.map(platformLabel).join('・') : 'まだ接続がありません'} />
-        <Metric label="今月の広告費" value={configNumber(platforms, 'monthly_cost') == null ? null : platforms.reduce((sum, platform) => sum + (typeof platform.config.monthly_cost === 'number' ? platform.config.monthly_cost : 0), 0)} detail="つないだ広告の今月ぶんの合計" prefix="¥" />
+        <Metric label="今月の広告費" value={monthlyCost.value} detail={monthlyCost.detail} />
         <Metric label="友だち1人あたり" value={null} detail="広告ごとの費用と人数は未接続のため表示できません" prefix="¥" />
         <Metric label="成果1件あたり" value={null} detail="認めた成果の件数は未接続のため表示できません" prefix="¥" />
       </div>
 
-      <section className="grid grid-cols-1 gap-3 lg:grid-cols-3">{['google','meta','yahoo'].map((name) => { const platform = platforms.find((item) => item.name === name); const label = name === 'google' ? 'Google広告' : name === 'meta' ? 'Meta広告' : 'Yahoo!広告'; const cost = platform && typeof platform.config.monthly_cost === 'number' ? platform.config.monthly_cost : null; const synced = platform ? syncLabel(platform) : null; return <div key={name} className="rounded-card border border-hairline bg-canvas p-4"><div className="flex items-center justify-between"><div><p className="text-sm font-semibold text-ink">{label}</p><p className="text-xs text-ink-faint">{platform?.isActive ? (synced ? `つながっています ／ ${synced} に取り込みました` : 'つながっています ／ 取り込み日時は取得できません') : 'つないでいません'}</p></div><span className="font-bold text-ink">{cost == null ? '—' : `¥${cost.toLocaleString('ja-JP')}`}</span></div></div> })}</section>
+      <section className="grid grid-cols-1 gap-3 lg:grid-cols-3">{['google','meta','yahoo'].map((name) => { const platform = platforms.find((item) => item.name === name); const label = name === 'google' ? 'Google広告' : name === 'meta' ? 'Meta広告' : 'Yahoo!広告'; const synced = platform ? syncLabel(platform) : null; return <div key={name} className="rounded-card border border-hairline bg-canvas p-4"><div className="flex items-center justify-between"><div><p className="text-sm font-semibold text-ink">{label}</p><p className="text-xs text-ink-faint">{platform?.isActive ? (synced ? `つながっています ／ ${synced} に取り込みました` : 'つながっています ／ 取り込み日時は取得できません') : 'つないでいません'}</p></div><span className="font-bold text-ink">{platformCost(platform)}</span></div></div> })}</section>
 
       <section className="rounded-card border border-hairline bg-canvas p-4">
         <h3 className="text-sm font-bold text-ink">広告のまとまり別の成果</h3>
@@ -425,7 +494,7 @@ function Metric({
   prefix = '',
 }: {
   label: string
-  value: number | null
+  value: number | ReactNode | null
   detail: string
   tone?: 'default' | 'danger'
   prefix?: string
@@ -434,7 +503,7 @@ function Metric({
     <div className="rounded-card border border-hairline bg-canvas p-4">
       <p className="text-xs text-ink-faint">{label}</p>
       <p className={`mt-1 text-2xl font-bold tabular-nums ${tone === 'danger' ? 'text-status-danger' : 'text-ink'}`}>
-        {value == null ? '—' : `${prefix}${value.toLocaleString('ja-JP')}`}
+        {value == null ? '—' : typeof value === 'number' ? `${prefix}${value.toLocaleString('ja-JP')}` : value}
       </p>
       <p className="mt-1 text-xs leading-relaxed text-ink-faint">{detail}</p>
     </div>

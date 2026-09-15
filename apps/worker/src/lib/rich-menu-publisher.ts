@@ -96,6 +96,8 @@ export class RichMenuValidationError extends Error {
 
 export interface LineRichMenuClient {
   createRichMenu(payload: unknown): Promise<{ richMenuId: string }>;
+  /** 手動公開の途中でWorkerが止まっても、決定的なnameから作成済みshellを回収する。 */
+  listRichMenus(): Promise<Array<{ richMenuId: string; name: string | null }>>;
   uploadRichMenuImage(richMenuId: string, image: Uint8Array, contentType: string): Promise<void>;
   deleteRichMenuAlias(aliasId: string): Promise<void>;
   createRichMenuAlias(aliasId: string, richMenuId: string): Promise<void>;
@@ -441,6 +443,15 @@ export type RichMenuShell = {
   newRichMenuId: string;
 };
 
+export type RichMenuShellCreationOptions = {
+  /** すでにjournalまたはLINE名照合で回収済みのshell。画像は安全に再uploadする。 */
+  existingShells?: RichMenuShell[];
+  /** create直後にjournalへ確定する。ここが失敗したshellだけを補償削除する。 */
+  onShellCreated?: (shell: RichMenuShell) => Promise<void>;
+  /** 手動公開ではrequest/pageを含む決定名を使い、DB未記録時にもLINEから回収できる。 */
+  shellName?: (page: PageInput) => string;
+};
+
 /** 切替前のLINE状態。切替失敗の補償でここへ戻す。 */
 export type PreSwitchLiveState = {
   oldIds: Array<{ pageId: string; orderIndex: number; lineRichMenuId: string | null }>;
@@ -457,13 +468,22 @@ export async function createRichMenuShells(
   line: LineRichMenuClient,
   r2: R2Like,
   heartbeat?: PublishHeartbeat,
+  options?: RichMenuShellCreationOptions,
 ): Promise<{ shells: RichMenuShell[]; pages: PageInput[] }> {
   const resolvedPages = resolveSwitcherActions(group.pages, group.id);
   resolvedPages.sort((a, b) => a.orderIndex - b.orderIndex);
   validateRichMenuGroupForPublish({ ...group, pages: resolvedPages });
 
   const dimensions = RICH_MENU_DIMENSIONS[group.size];
-  const shells: RichMenuShell[] = [];
+  const existingByPage = new Map((options?.existingShells ?? []).map((shell) => [shell.pageId, shell]));
+  if (existingByPage.size !== (options?.existingShells ?? []).length) {
+    throw new Error('rich menu shell journal has duplicate pages');
+  }
+  if ([...existingByPage.keys()].some((pageId) => !resolvedPages.some((page) => page.id === pageId))) {
+    throw new Error('rich menu shell journal does not match pages');
+  }
+  const shells: RichMenuShell[] = [...existingByPage.values()];
+  const unjournaledShellIds: string[] = [];
 
   // LINE 側へ変更を加える前に、全ページの画像が読めることを確認する。
   // 2ページ目の画像不備で1ページ目だけ公開される事故を防ぐ。
@@ -478,17 +498,37 @@ export async function createRichMenuShells(
   try {
     for (const page of resolvedPages) {
       await heartbeat?.();
+      const existing = existingByPage.get(page.id);
+      if (existing) {
+        // uploadは同じIDへ安全に再実行できる。前回がcreate直後に止まった場合も
+        // ここで画像を完成させ、LINE menuを作り直さない。
+        await line.uploadRichMenuImage(
+          existing.newRichMenuId,
+          imageBytes.get(page.id)!,
+          page.imageContentType!,
+        );
+        continue;
+      }
       const created = await line.createRichMenu({
         size: dimensions,
         selected: false,
-        name: `${group.id.slice(0, 8)} - ${page.name}`,
+        name: options?.shellName?.(page) ?? `${group.id.slice(0, 8)} - ${page.name}`,
         chatBarText: group.chatBarText,
         areas: page.areas.map((a) => ({
           bounds: a.bounds,
           action: toLineAction(a, group),
         })),
       });
-      shells.push({ pageId: page.id, orderIndex: page.orderIndex, newRichMenuId: created.richMenuId });
+      const shell = { pageId: page.id, orderIndex: page.orderIndex, newRichMenuId: created.richMenuId };
+      shells.push(shell);
+      unjournaledShellIds.push(shell.newRichMenuId);
+      // DBに書けないときは、作成済みLINE menuの決定名から次回回収できる。
+      // 書けたものは途中失敗でも消さず、同じIDへのuploadから再開する。
+      if (options?.onShellCreated) {
+        await options.onShellCreated(shell);
+        const journaledAt = unjournaledShellIds.indexOf(shell.newRichMenuId);
+        if (journaledAt >= 0) unjournaledShellIds.splice(journaledAt, 1);
+      }
       await heartbeat?.();
       await line.uploadRichMenuImage(
         created.richMenuId,
@@ -499,7 +539,7 @@ export async function createRichMenuShells(
   } catch (error) {
     await deleteRichMenuShells(
       line,
-      shells.map((shell) => shell.newRichMenuId),
+      unjournaledShellIds,
     );
     throw error;
   }

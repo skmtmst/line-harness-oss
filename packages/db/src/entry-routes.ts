@@ -14,6 +14,8 @@ export interface EntryRoute {
   run_account_friend_add_scenarios: number;
   is_active: number;
   tenant_id: string | null;
+  /** migration 308 より前の互換行は未割当のため null。 */
+  line_account_id?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -217,8 +219,53 @@ export async function updateEntryRoute(
     .first<EntryRoute>();
 }
 
-export async function deleteEntryRoute(db: D1Database, id: string): Promise<void> {
-  await db.prepare(`DELETE FROM entry_routes WHERE id = ?`).bind(id).run();
+export type DeleteEntryRouteResult = 'deleted' | 'not_found' | 'name_mismatch' | 'in_use';
+
+/**
+ * 取り消せない完全削除は、現在名の一致と利用履歴0件をDBのDELETE条件にも入れる。
+ * route取得後にクリック等が増えた場合も、確認と削除の間で履歴だけを孤立させない。
+ */
+export async function deleteEntryRoute(
+  db: D1Database,
+  id: string,
+  expectedName: string,
+): Promise<DeleteEntryRouteResult> {
+  const result = await db.prepare(
+    `DELETE FROM entry_routes
+      WHERE id = ?
+        AND name = ?
+        AND NOT EXISTS (
+          SELECT 1 FROM ref_tracking rt
+           WHERE rt.entry_route_id = ? OR rt.ref_code = entry_routes.ref_code
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM friends f
+           WHERE f.ref_code = entry_routes.ref_code OR f.last_ref_code = entry_routes.ref_code
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM friend_add_events fae
+           WHERE fae.entry_route_id = ? OR fae.ref_code = entry_routes.ref_code
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM friend_add_attribution_candidates fac
+           WHERE fac.entry_route_id = ? OR fac.ref_code = entry_routes.ref_code
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM conversion_events ce
+           WHERE ce.attributed_ref_code = entry_routes.ref_code
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM entry_route_stop_suppressions ers
+           WHERE ers.ref_code = entry_routes.ref_code
+        )`,
+  ).bind(id, expectedName, id, id, id).run();
+
+  if ((result.meta.changes ?? 0) > 0) return 'deleted';
+
+  const existing = await getEntryRouteById(db, id);
+  if (!existing) return 'not_found';
+  if (existing.name !== expectedName) return 'name_mismatch';
+  return 'in_use';
 }
 
 export async function getEntryRouteById(

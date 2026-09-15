@@ -50,6 +50,18 @@ function canAccessEntryRoute(row: EntryRoute, tenantId: string): boolean {
   return row.tenant_id === tenantId || (row.tenant_id === null && tenantId === DEFAULT_TENANT_ID);
 }
 
+async function canAccessEntryRouteAccount(
+  db: D1Database,
+  staff: NonNullable<Env['Variables']['staff']>,
+  row: EntryRoute,
+): Promise<boolean> {
+  // migration 308 より前の未割当行は従来どおりtenant境界で扱う。
+  // 所有accountがある行は、同じtenantのowner/adminでも担当外なら変更させない。
+  const accountId = row.line_account_id ?? null;
+  if (accountId === null) return true;
+  return (await resolveRequestBoundary(db, staff, accountId)).allowed;
+}
+
 entryRoutes.get('/api/entry-route-genres', async (c) => {
   try {
     const rows = await getEntryRouteGenres(c.env.DB);
@@ -182,6 +194,9 @@ entryRoutes.patch('/api/entry-routes/:id', requireRole('owner', 'admin'), async 
     const tenantId = c.get('staff').tenantId ?? DEFAULT_TENANT_ID;
     const existing = await getEntryRouteById(c.env.DB, id);
     if (!existing || !canAccessEntryRoute(existing, tenantId)) return c.json({ success: false, error: 'Not found' }, 404);
+    if (!await canAccessEntryRouteAccount(c.env.DB, c.get('staff'), existing)) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
     const body = await c.req.json<
       Partial<{
         refCode: string;
@@ -227,7 +242,35 @@ entryRoutes.delete('/api/entry-routes/:id', requireRole('owner', 'admin'), async
     const tenantId = c.get('staff').tenantId ?? DEFAULT_TENANT_ID;
     const existing = await getEntryRouteById(c.env.DB, id);
     if (!existing || !canAccessEntryRoute(existing, tenantId)) return c.json({ success: false, error: 'Not found' }, 404);
-    await deleteEntryRoute(c.env.DB, id);
+    if (!await canAccessEntryRouteAccount(c.env.DB, c.get('staff'), existing)) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
+    const body: { confirmationName?: unknown } = await c.req
+      .json<{ confirmationName?: unknown }>()
+      .catch(() => ({}));
+    if (typeof body.confirmationName !== 'string' || body.confirmationName !== existing.name) {
+      return c.json({
+        success: false,
+        error: '完全削除する経路名を正確に入力してください。',
+        code: 'ENTRY_ROUTE_NAME_CONFIRMATION_MISMATCH',
+      }, 422);
+    }
+    const result = await deleteEntryRoute(c.env.DB, id, body.confirmationName);
+    if (result === 'not_found') return c.json({ success: false, error: 'Not found' }, 404);
+    if (result === 'name_mismatch') {
+      return c.json({
+        success: false,
+        error: '経路名が変更されています。画面を読み直してから、もう一度確認してください。',
+        code: 'ENTRY_ROUTE_NAME_CONFIRMATION_MISMATCH',
+      }, 422);
+    }
+    if (result === 'in_use') {
+      return c.json({
+        success: false,
+        error: '利用履歴がある経路は完全削除できません。受付停止を選んでください。',
+        code: 'ENTRY_ROUTE_IN_USE',
+      }, 409);
+    }
     return c.json({ success: true });
   } catch (err) {
     console.error('DELETE /api/entry-routes/:id error:', err);
