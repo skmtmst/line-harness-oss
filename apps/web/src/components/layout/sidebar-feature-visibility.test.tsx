@@ -110,4 +110,15 @@ describe('Sidebarのstaff向け機能表示read-model', () => {
     })
     expect(view.getAllByText('一斉配信')).not.toHaveLength(0)
   })
+
+  it('古い応答にfeaturesがなくても画面全体を落とさない', async () => {
+    fixture.visibility.mockResolvedValue({ success: true, data: {} } as never)
+    const view = render(<Sidebar />)
+
+    await waitFor(() => {
+      act(() => window.dispatchEvent(new CustomEvent('line-harness:feature-settings-updated')))
+      expect(fixture.visibility).toHaveBeenCalledWith('account-1')
+      expect(view.getAllByText('一斉配信')).not.toHaveLength(0)
+    })
+  })
 })

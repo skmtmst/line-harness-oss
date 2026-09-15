@@ -118,7 +118,9 @@ export default function Sidebar({
           if (!cancelled && visibility.success) {
             setSectionOrder(null)
             setItemOrder(null)
-            setFeatureVisibility(visibility.data.features)
+            // 一時的に古いWorkerや試験用モックへ繋がっても、欠けたread-modelで
+            // サイドバーごと落とさない。直URLの可否はWorker側の強制が正本。
+            setFeatureVisibility(visibility.data?.features ?? {})
             // 専用機能の目録はbooleanへ畳み込み済み。名前の配列は受け取らない。
             setSpecializedFeatureKeys(SPECIALIZED_FEATURE_KEYS)
           }
