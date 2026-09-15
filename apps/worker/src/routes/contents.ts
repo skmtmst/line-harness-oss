@@ -8,6 +8,7 @@ import {
   deleteMedia,
   getMediaUsages,
   getMediaDeleteImpact,
+  getMediaDeleteImpactSnapshot,
   getMediaReplacementPlan,
   applyMediaReplacementPlan,
   getMediaStorageQuota,
@@ -840,12 +841,12 @@ contents.patch('/api/media/:id', requireRole('owner', 'admin'), async (c) => {
         }
       }
     }
-    const media = await updateMedia(c.env.DB, id, accountId, {
-      ...(filename !== undefined ? { filename } : {}),
-      ...(folderId !== undefined ? { folderId } : {}),
-    });
     const workerUrl = c.env.WORKER_URL || new URL(c.req.url).origin;
     if (body.usageReference === undefined) {
+      const media = await updateMedia(c.env.DB, id, accountId, {
+        ...(filename !== undefined ? { filename } : {}),
+        ...(folderId !== undefined ? { folderId } : {}),
+      });
       return c.json({ success: true, data: serializeMedia(media!, workerUrl) });
     }
 
@@ -878,6 +879,10 @@ contents.patch('/api/media/:id', requireRole('owner', 'admin'), async (c) => {
         refKind,
         refId,
         target,
+        mediaUpdate: {
+          ...(filename !== undefined ? { filename } : {}),
+          ...(folderId !== undefined ? { folderId } : {}),
+        },
       });
       try {
         await scanSingleMediaUsage(c.env.DB, jstNow(), {
@@ -892,7 +897,7 @@ contents.patch('/api/media/:id', requireRole('owner', 'admin'), async (c) => {
       return c.json({
         success: true,
         data: {
-          ...serializeMedia(fresh ?? media!, workerUrl),
+          ...serializeMedia(fresh ?? existing, workerUrl),
           usageReference: {
             refKind,
             refId,
@@ -952,17 +957,15 @@ contents.get('/api/media/:id/delete-impact', requireRole('owner', 'admin'), asyn
       id: existing.id,
       r2_key: existing.r2_key,
     });
-    const impact = await getMediaDeleteImpact(c.env.DB, c.req.param('id'), accountId, checkedAt);
-    if (!impact) return c.json({ success: false, error: 'Not found' }, 404);
+    const snapshot = await getMediaDeleteImpactSnapshot(c.env.DB, c.req.param('id'), accountId, checkedAt);
+    if (!snapshot) return c.json({ success: false, error: 'Not found' }, 404);
+    const { impact, usages } = snapshot;
     /*
       使用先ごとの参照モード（ライブ参照・固定する版）と、切替に使う
-      版の一覧も一緒に返す。references と usages はどちらも
-      getMediaUsages の同じ並びで作られるので、indexで対応付ける。
+      版の一覧も一緒に返す。references と usages は同じsnapshotから
+      作られているので、index対応中に別走査の行が混ざらない。
     */
-    const [usages, versions] = await Promise.all([
-      getMediaUsages(c.env.DB, existing.id),
-      getMediaVersionList(c.env.DB, existing.id, accountId),
-    ]);
+    const versions = await getMediaVersionList(c.env.DB, existing.id, accountId);
     const states = await getMediaUsageReferenceStates(c.env.DB, {
       media: existing,
       usages,

@@ -68,6 +68,12 @@ export interface MediaUsage {
   scanned_at: string;
 }
 
+/** 削除影響と、その表示を作った同一時点の使用先行。 */
+export interface MediaDeleteImpactSnapshot {
+  impact: MediaDeleteImpact;
+  usages: MediaUsage[];
+}
+
 export interface MediaReplacementPlan {
   source: Media;
   replacement: Media;
@@ -419,12 +425,12 @@ async function describeMediaUsage(
  * 別アカウントだったりして名前を安全に返せない場合も、その参照自体は落とさず
  * unavailable として削除を止める。
  */
-export async function getMediaDeleteImpact(
+export async function getMediaDeleteImpactSnapshot(
   db: D1Database,
   mediaId: string,
   lineAccountId: string,
   checkedAt: string,
-): Promise<MediaDeleteImpact | null> {
+): Promise<MediaDeleteImpactSnapshot | null> {
   const media = await getMediaById(db, mediaId, lineAccountId);
   if (!media) return null;
 
@@ -440,18 +446,31 @@ export async function getMediaDeleteImpact(
   );
 
   return {
-    media: {
-      id: media.id,
-      filename: media.filename,
-      kind: media.kind as MediaDeleteImpact['media']['kind'],
+    usages,
+    impact: {
+      media: {
+        id: media.id,
+        filename: media.filename,
+        kind: media.kind as MediaDeleteImpact['media']['kind'],
+      },
+      usageCount: references.length,
+      references,
+      checkedAt,
+      lastScannedAt,
+      canDelete: references.length === 0,
+      recommendedAction: references.length === 0 ? 'delete' : 'review_references',
     },
-    usageCount: references.length,
-    references,
-    checkedAt,
-    lastScannedAt,
-    canDelete: references.length === 0,
-    recommendedAction: references.length === 0 ? 'delete' : 'review_references',
   };
+}
+
+/** 既存の削除口用。参照IDが必要な画面は snapshot 版を使う。 */
+export async function getMediaDeleteImpact(
+  db: D1Database,
+  mediaId: string,
+  lineAccountId: string,
+  checkedAt: string,
+): Promise<MediaDeleteImpact | null> {
+  return (await getMediaDeleteImpactSnapshot(db, mediaId, lineAccountId, checkedAt))?.impact ?? null;
 }
 
 async function describeMediaReplacementUsage(
@@ -922,6 +941,8 @@ export async function retargetMediaUsageReference(
     refKind: string;
     refId: string;
     target: { mode: 'live' } | { mode: 'pinned'; versionNo: number };
+    /** 同じPATCHで保存するメディア名・フォルダ。参照切替と同じbatchへ載せる。 */
+    mediaUpdate?: { filename?: string; folderId?: string | null };
   },
 ): Promise<{ changed: boolean; state: MediaUsageReferenceState }> {
   if (input.refKind === 'webinar') {
@@ -951,10 +972,27 @@ export async function retargetMediaUsageReference(
 
   const livePath = mediaLiveContentPath(input.media.id);
   const state = detectUsageReferenceState(input.media.id, versionRows, row.columns);
+  const mediaSets: string[] = [];
+  const mediaValues: unknown[] = [];
+  if (input.mediaUpdate?.filename !== undefined) {
+    mediaSets.push('filename = ?');
+    mediaValues.push(input.mediaUpdate.filename);
+  }
+  if (input.mediaUpdate && 'folderId' in input.mediaUpdate) {
+    mediaSets.push('folder_id = ?');
+    mediaValues.push(input.mediaUpdate.folderId ?? null);
+  }
+  const mediaUpdateStatement = mediaSets.length > 0
+    ? db.prepare(`UPDATE media SET ${mediaSets.join(', ')} WHERE id = ? AND line_account_id = ?`)
+      .bind(...mediaValues, input.media.id, input.lineAccountId)
+    : null;
   const already = input.target.mode === 'live'
     ? state.mode === 'live'
     : state.mode === 'pinned' && state.versionNo === input.target.versionNo;
-  if (already) return { changed: false, state };
+  if (already) {
+    if (mediaUpdateStatement) await db.batch([mediaUpdateStatement]);
+    return { changed: false, state };
+  }
   if (state.mode === 'unknown') {
     // このメディアを指す文字列が本文に無い＝記録だけが残っている。
     // 置き換える正本が分からないので、無闇に書き換えず読み直しを促す。
@@ -1000,7 +1038,7 @@ export async function retargetMediaUsageReference(
   const targetTable = table[input.refKind];
   if (!targetTable) throw new MediaUsageReferenceError('media_reference_unsupported');
 
-  const statements: D1PreparedStatement[] = [];
+  const statements: D1PreparedStatement[] = mediaUpdateStatement ? [mediaUpdateStatement] : [];
   for (const [column, value] of Object.entries(row.columns)) {
     const pairs: Array<[string, string]> = [];
     if (input.target.mode === 'live') {
@@ -1018,19 +1056,24 @@ export async function retargetMediaUsageReference(
       if (value.includes(livePath)) pairs.push([livePath, `/images/${targetKey}`]);
     }
     if (pairs.length === 0) continue;
-    const expression = pairs.reduce((expr) => `REPLACE(${expr}, ?, ?)`, column);
-    const guard = pairs.map(() => `${column} LIKE ?`).join(' OR ');
-    statements.push(db.prepare(
-      `UPDATE ${targetTable} SET ${column} = ${expression}
-        WHERE id = ? AND ${scope.sql} AND (${guard})`,
-    ).bind(
-      ...pairs.flatMap(([from, to]) => [from, to]),
-      input.refId,
-      ...scope.binds,
-      ...pairs.map(([from]) => `%${from}%`),
-    ));
+    // D1 は1文100 bindまで。置換2＋LIKE1ずつに対象ID・所属を足すため、
+    // 24対ずつに分ける（最大74 bind）。
+    for (let index = 0; index < pairs.length; index += USAGE_REPLACE_PAIR_CHUNK) {
+      const chunk = pairs.slice(index, index + USAGE_REPLACE_PAIR_CHUNK);
+      const expression = chunk.reduce((expr) => `REPLACE(${expr}, ?, ?)`, column);
+      const guard = chunk.map(() => `${column} LIKE ?`).join(' OR ');
+      statements.push(db.prepare(
+        `UPDATE ${targetTable} SET ${column} = ${expression}
+          WHERE id = ? AND ${scope.sql} AND (${guard})`,
+      ).bind(
+        ...chunk.flatMap(([from, to]) => [from, to]),
+        input.refId,
+        ...scope.binds,
+        ...chunk.map(([from]) => `%${from}%`),
+      ));
+    }
   }
-  if (statements.length === 0) {
+  if (statements.length === (mediaUpdateStatement ? 1 : 0)) {
     throw new MediaUsageReferenceError('media_reference_stale');
   }
   const results = await db.batch(statements);

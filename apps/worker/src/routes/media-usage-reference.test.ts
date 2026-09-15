@@ -32,6 +32,7 @@ const pinnedUrl = (key: string) => `${WORKER}/images/${key}`;
 
 let testDb: SqliteD1;
 let warn: ReturnType<typeof vi.spyOn>;
+let enforceD1BindLimit = false;
 
 function insertAccount(id: string, tenantId: string | null): void {
   testDb.raw.prepare(`INSERT INTO line_accounts
@@ -102,6 +103,12 @@ function insertRichMenuPage(pageId: string, accountId: string, r2Key: string): v
     VALUES (?, ?, 0, ?, ?, ?)`).run(pageId, `g-${pageId}`, `page-${pageId}`, `alias-${pageId}`, r2Key);
 }
 
+function insertMediaFolder(id = 'folder-media'): void {
+  testDb.raw.prepare(`INSERT INTO folders(id,kind,name,account_id,created_at,updated_at)
+    VALUES (?, 'media', ?, 'acc-1', '2026-09-01T00:00:00.000', '2026-09-01T00:00:00.000')`)
+    .run(id, id);
+}
+
 function templateContent(id: string): string {
   const row = testDb.raw.prepare(
     `SELECT message_content FROM templates WHERE id = ?`,
@@ -140,7 +147,19 @@ function environment(): Env['Bindings'] {
     [V3_KEY]: 'PNG-V3',
   };
   return {
-    DB: testDb.db,
+    DB: enforceD1BindLimit ? ({
+      prepare(sql: string) {
+        const statement = testDb.db.prepare(sql);
+        return {
+          ...statement,
+          bind(...args: unknown[]) {
+            if (args.length > 100) throw new Error(`D1 bind limit exceeded: ${args.length} > 100`);
+            return statement.bind(...args);
+          },
+        } as D1PreparedStatement;
+      },
+      batch: testDb.db.batch.bind(testDb.db),
+    } as D1Database) : testDb.db,
     IMAGES: {
       get: async (key: string) =>
         key in bodies
@@ -169,17 +188,26 @@ function patchUsageReference(
   usageReference: unknown,
   mediaId = 'md-1',
   accountId = 'acc-1',
+  mediaUpdate: { filename?: string; folderId?: string | null } = {},
 ): Promise<Response> {
   return request(`/api/media/${mediaId}?accountId=${accountId}`, {
     method: 'PATCH',
     apiKey,
-    body: { usageReference },
+    body: { ...mediaUpdate, usageReference },
   });
+}
+
+function mediaMetadata(id = 'md-1'): { filename: string; folder_id: string | null } {
+  return testDb.raw.prepare(`SELECT filename, folder_id FROM media WHERE id = ?`).get(id) as {
+    filename: string;
+    folder_id: string | null;
+  };
 }
 
 beforeEach(() => {
   warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
   testDb = createTestD1();
+  enforceD1BindLimit = false;
   insertAccount('acc-1', DEFAULT_TENANT_ID);
   insertAccount('acc-2', 'tenant-B');
   insertStaff('owner-1', OWNER_KEY, 'owner', '[]');
@@ -382,6 +410,64 @@ describe('使用先ごとの参照切替', () => {
       mode: 'unknown-mode',
     });
     expect(bad.status).toBe(400);
+  });
+
+  it('参照切替が失敗したとき、同じPATCHの名前・フォルダも一切保存しない', async () => {
+    insertMediaFolder();
+    const before = mediaMetadata();
+    const update = { filename: 'renamed.png', folderId: 'folder-media' };
+    const unchanged = () => expect(mediaMetadata()).toEqual(before);
+
+    const invalid = await patchUsageReference(OWNER_KEY, {
+      refKind: 'unknown', refId: 'missing', mode: 'live',
+    }, 'md-1', 'acc-1', update);
+    expect(invalid.status).toBe(400);
+    unchanged();
+
+    const missingVersion = await patchUsageReference(OWNER_KEY, {
+      refKind: 'template', refId: 't-pinned', mode: 'pinned', versionNo: 99,
+    }, 'md-1', 'acc-1', update);
+    expect(missingVersion.status).toBe(404);
+    unchanged();
+
+    insertTemplate('t-stale', 'acc-1', 'https://example.com/not-this-media.png');
+    const stale = await patchUsageReference(OWNER_KEY, {
+      refKind: 'template', refId: 't-stale', mode: 'live',
+    }, 'md-1', 'acc-1', update);
+    expect(stale.status).toBe(409);
+    unchanged();
+
+    insertRichMenuPage('p-unsupported', 'acc-1', V1_KEY);
+    const unsupported = await patchUsageReference(OWNER_KEY, {
+      refKind: 'rich_menu', refId: 'p-unsupported', mode: 'live',
+    }, 'md-1', 'acc-1', update);
+    expect(unsupported.status).toBe(409);
+    unchanged();
+
+    testDb.raw.prepare(`UPDATE broadcasts SET account_ids = '["acc-1","acc-3"]' WHERE id = 'b-live'`).run();
+    const shared = await patchUsageReference(OWNER_KEY, {
+      refKind: 'broadcast', refId: 'b-live', mode: 'pinned', versionNo: 1,
+    }, 'md-1', 'acc-1', update);
+    expect(shared.status).toBe(409);
+    unchanged();
+  });
+
+  it('17版以上が混在する使用先もD1の100 bind以内でライブ参照へ切り替える', async () => {
+    const keys = [V1_KEY];
+    for (let versionNo = 2; versionNo <= 17; versionNo += 1) {
+      const key = `media/acc-1/a-v${versionNo}.png`;
+      keys.push(key);
+      addMediaVersion('md-1', versionNo, key);
+    }
+    testDb.raw.prepare(`UPDATE broadcasts SET message_content = ? WHERE id = 'b-live'`)
+      .run(JSON.stringify({ images: keys.map((key) => pinnedUrl(key)) }));
+    enforceD1BindLimit = true;
+    const res = await patchUsageReference(OWNER_KEY, {
+      refKind: 'broadcast', refId: 'b-live', mode: 'live',
+    });
+    expect(res.status).toBe(200);
+    expect(broadcastContent('b-live')).toContain('/media/md-1/content');
+    for (const key of keys) expect(broadcastContent('b-live')).not.toContain(key);
   });
 
   it('使用中のメディアは削除できず、外すと削除できる（既存の削除事前確認）', async () => {
