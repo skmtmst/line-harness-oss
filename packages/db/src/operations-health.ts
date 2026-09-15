@@ -37,6 +37,72 @@ export type OperationHealthRun = {
   results: OperationHealthResult[];
 };
 
+export type OperationDispatcherHeartbeat = {
+  jobName: string;
+  lastStartedAt: string;
+  lastCompletedAt: string | null;
+  lastStatus: 'running' | 'succeeded' | 'failed';
+  updatedAt: string;
+};
+
+type OperationDispatcherHeartbeatRow = {
+  job_name: string;
+  last_started_at: string;
+  last_completed_at: string | null;
+  last_status: 'running' | 'succeeded' | 'failed';
+  updated_at: string;
+};
+
+function mapDispatcherHeartbeat(row: OperationDispatcherHeartbeatRow): OperationDispatcherHeartbeat {
+  return {
+    jobName: row.job_name,
+    lastStartedAt: row.last_started_at,
+    lastCompletedAt: row.last_completed_at,
+    lastStatus: row.last_status,
+    updatedAt: row.updated_at,
+  };
+}
+
+export async function startOperationDispatcherHeartbeat(
+  db: D1Database,
+  jobName: string,
+  observedAt = new Date().toISOString(),
+): Promise<void> {
+  await db.prepare(
+    `INSERT INTO operation_dispatcher_heartbeats
+       (job_name, last_started_at, last_completed_at, last_status, updated_at)
+     VALUES (?, ?, NULL, 'running', ?)
+     ON CONFLICT(job_name) DO UPDATE SET
+       last_started_at = excluded.last_started_at,
+       last_status = 'running',
+       updated_at = excluded.updated_at`,
+  ).bind(jobName, observedAt, observedAt).run();
+}
+
+export async function finishOperationDispatcherHeartbeat(
+  db: D1Database,
+  jobName: string,
+  status: 'succeeded' | 'failed',
+  observedAt = new Date().toISOString(),
+  startedAt?: string,
+): Promise<void> {
+  await db.prepare(
+    `UPDATE operation_dispatcher_heartbeats
+        SET last_completed_at = ?, last_status = ?, updated_at = ?
+      WHERE job_name = ? AND (? IS NULL OR last_started_at = ?)`,
+  ).bind(observedAt, status, observedAt, jobName, startedAt ?? null, startedAt ?? null).run();
+}
+
+export async function listOperationDispatcherHeartbeats(
+  db: D1Database,
+): Promise<OperationDispatcherHeartbeat[]> {
+  const rows = await db.prepare(
+    `SELECT job_name, last_started_at, last_completed_at, last_status, updated_at
+       FROM operation_dispatcher_heartbeats ORDER BY job_name`,
+  ).all<OperationDispatcherHeartbeatRow>();
+  return (rows.results ?? []).map(mapDispatcherHeartbeat);
+}
+
 type HealthRunRow = {
   id: string;
   scope_key: string;

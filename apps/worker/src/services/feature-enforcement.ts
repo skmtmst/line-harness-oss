@@ -37,6 +37,8 @@ export type FeatureJobEnforcement =
 
 export type FeatureJobMetadata = {
   name: string;
+  /** delivery Cron で送信・通知を取り出す dispatcher だけに付ける。 */
+  dispatchLane?: 'delivery';
   classification:
     | { kind: 'feature'; featureId: FeatureId }
     | { kind: 'core'; reason: string };
@@ -256,6 +258,7 @@ export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
   },
   {
     name: 'automation deliveries',
+    dispatchLane: 'delivery',
     classification: { kind: 'feature', featureId: 'automations' },
     enforcement: {
       mode: 'gated',
@@ -265,6 +268,7 @@ export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
   },
   {
     name: 'booking reminders',
+    dispatchLane: 'delivery',
     classification: { kind: 'feature', featureId: 'booking' },
     enforcement: {
       mode: 'gated',
@@ -274,6 +278,7 @@ export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
   },
   {
     name: 'event reminders',
+    dispatchLane: 'delivery',
     classification: { kind: 'feature', featureId: 'events' },
     enforcement: {
       mode: 'gated',
@@ -283,6 +288,7 @@ export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
   },
   {
     name: 'meet consultation reminders',
+    dispatchLane: 'delivery',
     classification: { kind: 'feature', featureId: 'booking' },
     enforcement: {
       mode: 'gated',
@@ -292,6 +298,7 @@ export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
   },
   {
     name: 'webinar reminders',
+    dispatchLane: 'delivery',
     classification: { kind: 'feature', featureId: 'webinars' },
     enforcement: {
       mode: 'gated',
@@ -301,6 +308,7 @@ export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
   },
   {
     name: 'webinar notifications',
+    dispatchLane: 'delivery',
     classification: { kind: 'feature', featureId: 'webinars' },
     enforcement: {
       mode: 'gated',
@@ -310,6 +318,7 @@ export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
   },
   {
     name: 'webinar followups',
+    dispatchLane: 'delivery',
     classification: { kind: 'feature', featureId: 'webinars' },
     enforcement: {
       mode: 'gated',
@@ -319,6 +328,7 @@ export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
   },
   {
     name: 'NEN campaign deliveries',
+    dispatchLane: 'delivery',
     classification: { kind: 'feature', featureId: 'nen_campaigns' },
     enforcement: {
       mode: 'gated',
@@ -331,6 +341,7 @@ export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
   },
   {
     name: 'common variable schedules',
+    dispatchLane: 'delivery',
     classification: { kind: 'feature', featureId: 'common_vars' },
     enforcement: {
       mode: 'gated',
@@ -340,6 +351,7 @@ export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
   },
   {
     name: 'scenario deliveries',
+    dispatchLane: 'delivery',
     classification: { kind: 'feature', featureId: 'scenarios' },
     enforcement: {
       mode: 'gated',
@@ -357,6 +369,7 @@ export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
   },
   {
     name: 'broadcast deliveries',
+    dispatchLane: 'delivery',
     classification: { kind: 'feature', featureId: 'broadcasts' },
     enforcement: {
       mode: 'gated',
@@ -366,6 +379,7 @@ export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
   },
   {
     name: 'reminder deliveries',
+    dispatchLane: 'delivery',
     classification: { kind: 'feature', featureId: 'reminders' },
     enforcement: {
       mode: 'gated',
@@ -387,6 +401,11 @@ export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
     },
   },
 ];
+
+/** 運用監視とscheduled実行が共有するdelivery dispatcherの正本。 */
+export const DELIVERY_DISPATCH_JOB_NAMES = FEATURE_JOB_MANIFEST
+  .filter(({ dispatchLane }) => dispatchLane === 'delivery')
+  .map(({ name }) => name);
 
 async function accountCompanyFeatureSettings(
   db: D1Database,
