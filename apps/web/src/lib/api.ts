@@ -5009,6 +5009,7 @@ export const api = {
       lineAccountId?: string
       category?: 'auth' | 'business'
       result?: 'success' | 'denied' | 'failed'
+      attention?: boolean
       actorId?: string
       action?: string
       query?: string
@@ -5021,6 +5022,7 @@ export const api = {
       if (params?.lineAccountId) q.set('lineAccountId', params.lineAccountId)
       if (params?.category) q.set('category', params.category)
       if (params?.result) q.set('result', params.result)
+      if (params?.attention !== undefined) q.set('attention', String(params.attention))
       if (params?.actorId) q.set('actorId', params.actorId)
       if (params?.action) q.set('action', params.action)
       if (params?.query) q.set('query', params.query)
