@@ -137,7 +137,7 @@ describe('N-445 機能設定の未保存離脱確認', () => {
     expect(navigation.push).toHaveBeenCalledWith('/settings/manual-links')
   })
 
-  it('dirtyの戻る操作は確認を出し、残ると履歴を進め、離れると戻る', async () => {
+  it('dirtyの戻る操作は復元側popstateを一度だけ通し、次の戻るで確認を出す', async () => {
     const go = vi.spyOn(window.history, 'go')
     const back = vi.spyOn(window.history, 'back')
     await render()
@@ -145,9 +145,12 @@ describe('N-445 機能設定の未保存離脱確認', () => {
     await act(async () => { window.dispatchEvent(new PopStateEvent('popstate')) })
     expect(go).toHaveBeenCalledWith(1)
     expect(document.body.textContent).toContain('未保存の変更があります')
+    await act(async () => { window.dispatchEvent(new PopStateEvent('popstate')) })
+    expect(go).toHaveBeenCalledTimes(1)
     await act(async () => { button('この画面に残る').click() })
     expect(back).not.toHaveBeenCalled()
     await act(async () => { window.dispatchEvent(new PopStateEvent('popstate')) })
+    expect(go).toHaveBeenCalledTimes(2)
     await act(async () => { button('保存せずに離れる').click() })
     expect(back).toHaveBeenCalledTimes(1)
   })

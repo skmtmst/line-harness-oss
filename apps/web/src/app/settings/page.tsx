@@ -370,6 +370,7 @@ export default function SettingsPage() {
   /** dirtyなまま画面を離れようとした導線。空なら確認窓を閉じる。 */
   const [leaveTarget, setLeaveTarget] = useState<LeaveTarget | null>(null)
   const allowHistoryLeaveRef = useRef(false)
+  const skipRestoredPopRef = useRef(false)
   /**
    * 世代guard。アカウントが変わったら古い応答を捨てる。
    * Aの応答をBの画面へ混ぜないし、Aの版でBへ保存しない。
@@ -531,12 +532,21 @@ export default function SettingsPage() {
    * ただちに元の履歴位置へ戻してから確認する。確認後だけ次のpopstateを通す。
    */
   useEffect(() => {
-    if (!dirty) return
+    if (!dirty) {
+      skipRestoredPopRef.current = false
+      return
+    }
     const onPopState = () => {
       if (allowHistoryLeaveRef.current) {
         allowHistoryLeaveRef.current = false
         return
       }
+      // history.go(1)で現在画面へ戻った直後のpopstateは、もう一度止めない。
+      if (skipRestoredPopRef.current) {
+        skipRestoredPopRef.current = false
+        return
+      }
+      skipRestoredPopRef.current = true
       window.history.go(1)
       if (!saving) setLeaveTarget({ kind: 'history-back' })
     }
