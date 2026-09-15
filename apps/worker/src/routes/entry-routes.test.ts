@@ -218,20 +218,26 @@ describe('DELETE /api/entry-routes/:id safety', () => {
     expect(mocks.updateEntryRoute).not.toHaveBeenCalled();
   });
 
-  it('staff権限は実在経路を読まず、書き込み0件にする', async () => {
+  it('staff権限は完全削除・受付停止とも実在経路を読まず、書き込み0件にする', async () => {
     const staffApp = new Hono<Env>();
     staffApp.use('*', async (c, next) => {
       c.set('staff', { id: 'staff-1', name: 'Staff', role: 'staff', readOnly: false, tenantId: 'tenant-a' });
       return next();
     });
     staffApp.route('/', entryRoutes);
-    const response = await staffApp.fetch(new Request(`https://example.com/api/entry-routes/${ownRoute.id}`, {
+    const deletion = await staffApp.fetch(new Request(`https://example.com/api/entry-routes/${ownRoute.id}`, {
       method: 'DELETE', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ confirmationName: ownRoute.name }),
     }), env);
-    expect(response.status).toBe(403);
+    const stop = await staffApp.fetch(new Request(`https://example.com/api/entry-routes/${ownRoute.id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ isActive: false }),
+    }), env);
+    expect(deletion.status).toBe(403);
+    expect(stop.status).toBe(403);
     expect(mocks.getEntryRouteById).not.toHaveBeenCalled();
     expect(mocks.deleteEntryRoute).not.toHaveBeenCalled();
+    expect(mocks.updateEntryRoute).not.toHaveBeenCalled();
   });
 });
 
