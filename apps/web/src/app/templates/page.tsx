@@ -15,7 +15,7 @@ import Dialog from '@/components/shared/dialog'
 import { Tabs } from '@/components/shared/tabs'
 import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
-import type { Folder } from '@line-crm/shared'
+import { listInterpolations, type Folder } from '@line-crm/shared'
 import {
   createBlockedReason,
   failureOf,
@@ -114,6 +114,21 @@ function formatCount(value: number): string {
   return new Intl.NumberFormat('ja-JP').format(value)
 }
 
+/** 検索欄と検索対象を、大小文字・全半角・空白の違いで外れない形へそろえる。 */
+function normalizeTemplateSearchText(value: string): string {
+  return value.normalize('NFKC').toLocaleLowerCase('ja-JP').trim().replace(/\s+/gu, ' ')
+}
+
+function matchesTemplateSearch(template: Template, normalizedQuery: string): boolean {
+  if (!normalizedQuery) return true
+  const searchableValues = [
+    template.name,
+    template.messageContent,
+    ...listInterpolations(template.messageContent),
+  ]
+  return searchableValues.some((value) => normalizeTemplateSearchText(value).includes(normalizedQuery))
+}
+
 export default function TemplatesPage() {
   const { selectedAccountId, accounts, loading: accountLoading } = useAccount()
   const activeAccountRef = useRef<string | null>(selectedAccountId)
@@ -126,8 +141,8 @@ export default function TemplatesPage() {
   /** 操作（更新・削除）が失敗したときの帯。一覧の読み込み失敗とは別。 */
   const [error, setError] = useState('')
   const [showCreate, setShowCreate] = useState(false)
-  // 名前の絞り込み（設計 `Body` の「テンプレート名で検索」）。
-  const [nameQuery, setNameQuery] = useState('')
+  // 案内どおり、名前・本文・差し込んでいる項目を同じ検索欄で絞る。
+  const [templateQuery, setTemplateQuery] = useState('')
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all')
   const [selectedCategory, setSelectedCategory] = useState('all')
   const [form, setForm] = useState({ name: '', category: 'general', messageType: 'text', messageContent: '' })
@@ -264,11 +279,10 @@ export default function TemplatesPage() {
   // reset edits when drawer changes
   useEffect(() => { setEditContent(null); setEditName(null) }, [drawerId])
 
+  const normalizedTemplateQuery = normalizeTemplateSearchText(templateQuery)
   const filteredTemplates = templates.filter((t) => {
-    // 名前は手元で絞る。打つたびに取り直すと重い。
-    if (nameQuery.trim() && !t.name.toLowerCase().includes(nameQuery.trim().toLowerCase())) {
-      return false
-    }
+    // 一覧で受け取った名前・本文・差し込み項目を手元で絞る。打つたびに取り直さない。
+    if (!matchesTemplateSearch(t, normalizedTemplateQuery)) return false
     /*
       フォルダで絞る。**`category` の文字列ではなく `folderId` で見る。**
       `unfiled` は置き場の無いもの。
@@ -666,8 +680,8 @@ export default function TemplatesPage() {
           type="search"
           placeholder="名前・本文・差し込んでいる項目で検索"
           aria-label="名前・本文・差し込んでいる項目で検索"
-          value={nameQuery}
-          onChange={(e) => setNameQuery(e.target.value)}
+          value={templateQuery}
+          onChange={(e) => setTemplateQuery(e.target.value)}
           className="border-hairline rounded-control focus:ring-accent min-w-0 flex-1 border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
         />
         <span className="bg-canvas-sunken rounded-control px-3 py-2 text-sm font-medium">保存した検索</span>
