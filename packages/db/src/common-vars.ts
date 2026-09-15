@@ -9,8 +9,26 @@ import { getAccountSetting, getVersionedAccountSetting } from './account-setting
  * 探して回らなくてよくなる。
  */
 
-export const COMMON_VAR_TYPES = ['text', 'url', 'image', 'number'] as const;
+export const COMMON_VAR_TYPES = ['text', 'url', 'image', 'number', 'long_text', 'date', 'datetime', 'boolean'] as const;
 export type CommonVarType = (typeof COMMON_VAR_TYPES)[number];
+
+/** 値は文字列のまま差し込む。型ごとの表記だけをここで一意に整える。 */
+export function normalizeCommonVarValue(type: CommonVarType, value: string): string | null {
+  if (type === 'long_text') return value.length <= 10_000 ? value : null;
+  if (type === 'boolean') return value === 'true' || value === 'false' ? value : null;
+  if (type === 'date' || type === 'datetime') {
+    const match = type === 'date'
+      ? /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
+      : /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(value);
+    if (!match) return null;
+    const [year, month, day, hour = '00', minute = '00'] = match.slice(1);
+    const at = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day), Number(hour), Number(minute)));
+    return at.getUTCFullYear() === Number(year) && at.getUTCMonth() === Number(month) - 1
+      && at.getUTCDate() === Number(day) && at.getUTCHours() === Number(hour)
+      && at.getUTCMinutes() === Number(minute) ? value : null;
+  }
+  return value.length <= 200 ? value : null;
+}
 
 export interface CommonVar {
   id: string;

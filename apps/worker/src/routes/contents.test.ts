@@ -89,7 +89,26 @@ const mocks = {
   getCommonVarSchedules: vi.fn(),
   createCommonVarSchedule: vi.fn(),
   deleteCommonVarSchedule: vi.fn(),
-  COMMON_VAR_TYPES: ['text', 'url', 'image', 'number'],
+  COMMON_VAR_TYPES: ['text', 'url', 'image', 'number', 'long_text', 'date', 'datetime', 'boolean'],
+  // Route is tested through the production Hono handler. Keep this mock's public
+  // contract identical to the DB normalizer, including calendar round-trips:
+  // a shape-only regex would let 2/30 or 24:00 through this boundary test.
+  normalizeCommonVarValue: (type: string, value: string) => {
+    if (type === 'long_text') return value.length <= 10_000 ? value : null;
+    if (type === 'boolean') return value === 'true' || value === 'false' ? value : null;
+    if (type === 'date' || type === 'datetime') {
+      const match = type === 'date'
+        ? /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
+        : /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(value);
+      if (!match) return null;
+      const [year, month, day, hour = '00', minute = '00'] = match.slice(1);
+      const at = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day), Number(hour), Number(minute)));
+      return at.getUTCFullYear() === Number(year) && at.getUTCMonth() === Number(month) - 1
+        && at.getUTCDate() === Number(day) && at.getUTCHours() === Number(hour)
+        && at.getUTCMinutes() === Number(minute) ? value : null;
+    }
+    return value.length <= 200 ? value : null;
+  },
   validateFieldKey: (key: unknown) =>
     typeof key === 'string' && /^[a-z][a-z0-9_]{0,31}$/.test(key) && key !== 'name'
       ? { ok: true as const }
@@ -1227,6 +1246,95 @@ describe('共通情報', () => {
       accountId: 'account-1', name: 'x', varKey: 'ok_key', type: 'bogus',
     })).status).toBe(400);
     expect(mocks.createCommonVar).not.toHaveBeenCalled();
+  });
+
+  it('N-187 追加4型をPOST/PATCHの本番routeで型ごとに保存し、境界外はDBへ渡さない', async () => {
+    const longText = '案内'.repeat(5_000);
+    const postCases = [
+      ['long_text', longText],
+      ['date', '2028-02-29'],
+      ['datetime', '2028-02-29T23:59'],
+      ['boolean', 'true'],
+      // 既存型も新しい分岐で退行していない。
+      ['text', 'これまでの文字列'],
+    ] as const;
+
+    for (const [type, value] of postCases) {
+      const response = await req('/api/common-vars', 'POST', {
+        accountId: 'account-1', name: `${type}の項目`, varKey: `${type}_value`, type, value,
+      });
+      expect(response.status).toBe(201);
+    }
+    expect(mocks.createCommonVar).toHaveBeenCalledTimes(postCases.length);
+    for (const [index, [type, value]] of postCases.entries()) {
+      expect(mocks.createCommonVar.mock.calls[index]?.[1]).toMatchObject({ type, value });
+    }
+
+    const rejectedCreates = [
+      ['long_text', 'あ'.repeat(10_001)],
+      ['date', '2026-02-30'],
+      ['datetime', '2026-02-30T24:00'],
+      ['boolean', 'yes'],
+    ] as const;
+    for (const [type, value] of rejectedCreates) {
+      const response = await req('/api/common-vars', 'POST', {
+        accountId: 'account-1', name: `${type}の不正値`, varKey: `${type}_invalid`, type, value,
+      });
+      expect(response.status).toBe(400);
+    }
+    expect(mocks.createCommonVar).toHaveBeenCalledTimes(postCases.length);
+
+    mocks.getCommonVarById
+      .mockResolvedValueOnce({ ...VAR, type: 'boolean', value: 'false' })
+      .mockResolvedValueOnce({ ...VAR, type: 'boolean', value: 'false' });
+    const preview = await req('/api/common-vars/cv-1/impact-preview?accountId=account-1', 'POST', {
+      accountId: 'account-1', nextValue: 'true', expectedVersion: 3,
+    });
+    const { impactProof } = (await preview.json() as { data: { impactProof: string } }).data;
+    const patched = await req('/api/common-vars/cv-1?accountId=account-1', 'PATCH', {
+      value: 'true', expectedVersion: 3, impactProof,
+    });
+    expect(patched.status).toBe(200);
+    expect(mocks.updateCommonVar).toHaveBeenLastCalledWith(env.DB, 'cv-1', 'account-1', expect.objectContaining({
+      value: 'true', expectedVersion: 3,
+    }));
+
+    // PATCH uses the persisted type, so an invalid calendar value must not get as
+    // far as the impact scan or update even if the client forged a proof.
+    mocks.getCommonVarById.mockResolvedValueOnce({ ...VAR, type: 'date' });
+    const invalidPatch = await req('/api/common-vars/cv-1?accountId=account-1', 'PATCH', {
+      value: '2026-02-30', impactProof: 'forged', expectedVersion: 3,
+    });
+    expect(invalidPatch.status).toBe(400);
+
+    // Account access and stale versions are rejected before a write. This remains
+    // true for a newly added type, not only for the legacy text fixture.
+    accessMocks.canAccessAllLineAccounts.mockResolvedValueOnce(false);
+    const otherAccount = await req('/api/common-vars/cv-1?accountId=other-account', 'PATCH', {
+      value: 'true', impactProof: 'forged', expectedVersion: 3,
+    });
+    expect(otherAccount.status).toBe(404);
+    mocks.getCommonVarById.mockResolvedValueOnce({ ...VAR, type: 'boolean' });
+    const stale = await req('/api/common-vars/cv-1/impact-preview?accountId=account-1', 'POST', {
+      accountId: 'account-1', nextValue: 'true', expectedVersion: 2,
+    });
+    expect(stale.status).toBe(409);
+
+    // The version can change after preview. The production PATCH route must turn
+    // the DB's optimistic-lock error into a conflict rather than overwriting it.
+    mocks.getCommonVarById
+      .mockResolvedValueOnce({ ...VAR, type: 'boolean', value: 'false' })
+      .mockResolvedValueOnce({ ...VAR, type: 'boolean', value: 'false' });
+    const conflictPreview = await req('/api/common-vars/cv-1/impact-preview?accountId=account-1', 'POST', {
+      accountId: 'account-1', nextValue: 'true', expectedVersion: 3,
+    });
+    const { impactProof: conflictProof } = (await conflictPreview.json() as { data: { impactProof: string } }).data;
+    mocks.updateCommonVar.mockRejectedValueOnce(new MockCommonVarVersionConflictError(4));
+    const conflict = await req('/api/common-vars/cv-1?accountId=account-1', 'PATCH', {
+      value: 'true', expectedVersion: 3, impactProof: conflictProof,
+    });
+    expect(conflict.status).toBe(409);
+    expect(await conflict.json()).toMatchObject({ code: 'common_var_version_conflict', currentVersion: 4 });
   });
 
   it('#544 N5 版番号なしの上書きは許す(衝突検出は版番号つきのみ)', async () => {

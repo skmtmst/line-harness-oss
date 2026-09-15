@@ -9,7 +9,7 @@
 /**
  * 種別の呼び名。
  *
- * 保存できる種別は text / url / image / number の4つ（common_vars の
+ * 保存できる種別は text / url / image / number / long_text / date / datetime / boolean（common_vars の
  * CHECK 制約）。Lステップの「標準・数値・長文・年月日」とは中身が違うので、
  * 「標準」だけ名前を合わせ、残りは実際に保存できるものの名前を出す。
  */
@@ -18,6 +18,10 @@ export const VAR_TYPE_LABELS: Record<string, string> = {
   url: 'URL',
   image: '画像',
   number: '数値',
+  long_text: '長文',
+  date: '年月日',
+  datetime: '日時',
+  boolean: '真偽',
 }
 
 /** 「2026-08-26T10:00」→「2026/08/26(水) 10:00」。列に収まる長さにする。 */
