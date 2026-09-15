@@ -7,6 +7,7 @@ import type { EntryRoute } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import Button from '@/components/shared/button'
 import SelectField from '@/components/shared/select-field'
+import { useOverlayFocus } from '@/components/shared/overlay-utils'
 
 /**
  * 友だち追加のQRコード（設計 V2 1-1-1）。
@@ -135,6 +136,10 @@ export default function QrDialog({
     }
   }, [link])
 
+  // Escape・Tabの循環・背景スクロール停止・閉じたあとのフォーカス戻しは
+  // 共通のoverlay作法に揃える。保存中の処理はないためEscapeは常に閉じる。
+  const panelRef = useOverlayFocus(open, onClose)
+
   if (!open) return null
 
   const qrSrc = `${base}/api/qr?size=${size}&format=${format}&data=${encodeURIComponent(link)}`
@@ -200,6 +205,7 @@ export default function QrDialog({
       onClick={onClose}
     >
       <div
+        ref={panelRef}
         className="bg-canvas rounded-panel border-hairline max-h-[90vh] w-full overflow-y-auto border p-8 shadow-[1px_1px_2px_rgba(29,29,31,0.13)]"
         style={{ maxWidth: 820 }}
         onClick={(e) => e.stopPropagation()}
