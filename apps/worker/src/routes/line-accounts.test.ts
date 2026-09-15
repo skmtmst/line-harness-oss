@@ -795,6 +795,13 @@ describe('POST /api/line-accounts/:id/connection-checks', () => {
     });
   });
 
+  test('統括画面の管理者も接続情報を更新できる', async () => {
+    const res = await requestCheck(setupApp('admin'));
+
+    expect(res.status).toBe(200);
+    expect(dbMocks.saveLineAccountConnectionChecks).toHaveBeenCalledOnce();
+  });
+
   test('LIFF実値を取得できない場合はnullとunknownを保存する', async () => {
     dbMocks.getLineAccountById.mockResolvedValue({
       ...fakeAccount,
@@ -846,8 +853,7 @@ describe('POST /api/line-accounts/:id/connection-checks', () => {
     });
   });
 
-  test('adminとstaffは403、担当範囲外は404、入力不備は422', async () => {
-    expect((await requestCheck(setupApp('admin'))).status).toBe(403);
+  test('staffは403、担当範囲外は404、入力不備は422', async () => {
     expect((await requestCheck(setupApp('staff'))).status).toBe(403);
 
     dbMocks.getLineAccounts.mockResolvedValue([]);
