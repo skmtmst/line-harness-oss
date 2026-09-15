@@ -2,7 +2,7 @@
 
 import SelectField from '@/components/shared/select-field'
 import StatusBadge from '@/components/shared/status-badge'
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { api, ApiError, type BroadcastAssetKind, type TemplateQuestion } from '@/lib/api'
 import FlexPreviewComponent from '@/components/flex-preview'
 import ImageUploader from '@/components/shared/image-uploader'
@@ -15,7 +15,7 @@ import Dialog from '@/components/shared/dialog'
 import { Tabs } from '@/components/shared/tabs'
 import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
-import { listInterpolations, type Folder } from '@line-crm/shared'
+import type { Folder } from '@line-crm/shared'
 import {
   createBlockedReason,
   failureOf,
@@ -117,16 +117,6 @@ function formatCount(value: number): string {
 /** 検索欄と検索対象を、大小文字・全半角・空白の違いで外れない形へそろえる。 */
 function normalizeTemplateSearchText(value: string): string {
   return value.normalize('NFKC').toLocaleLowerCase('ja-JP').trim().replace(/\s+/gu, ' ')
-}
-
-function matchesTemplateSearch(template: Template, normalizedQuery: string): boolean {
-  if (!normalizedQuery) return true
-  const searchableValues = [
-    template.name,
-    template.messageContent,
-    ...listInterpolations(template.messageContent),
-  ]
-  return searchableValues.some((value) => normalizeTemplateSearchText(value).includes(normalizedQuery))
 }
 
 export default function TemplatesPage() {
@@ -279,24 +269,38 @@ export default function TemplatesPage() {
   // reset edits when drawer changes
   useEffect(() => { setEditContent(null); setEditName(null) }, [drawerId])
 
-  const normalizedTemplateQuery = normalizeTemplateSearchText(templateQuery)
-  const filteredTemplates = templates.filter((t) => {
+  /*
+    本文は最大5万字あり、一覧はページングされていない。入力のたびに全本文を
+    NFKC変換すると、1000件なら毎回5000万字を走査する。取得・変更で templates
+    が替わったときだけ検索索引を作り、入力中は正規化済み文字列だけを比べる。
+    差し込み項目の文字列は messageContent 自体に含まれるため、別の正規表現走査は不要。
+  */
+  const templateSearchIndex = useMemo(() => templates.map((template) => ({
+    template,
+    normalizedSearchText: [template.name, template.messageContent]
+      .map(normalizeTemplateSearchText)
+      .join('\0'),
+  })), [templates])
+  const normalizedTemplateQuery = useMemo(
+    () => normalizeTemplateSearchText(templateQuery),
+    [templateQuery],
+  )
+  const filteredTemplates = useMemo(() => templateSearchIndex.flatMap(({ template: t, normalizedSearchText }) => {
     // 一覧で受け取った名前・本文・差し込み項目を手元で絞る。打つたびに取り直さない。
-    if (!matchesTemplateSearch(t, normalizedTemplateQuery)) return false
+    if (normalizedTemplateQuery && !normalizedSearchText.includes(normalizedTemplateQuery)) return []
     /*
       フォルダで絞る。**`category` の文字列ではなく `folderId` で見る。**
       `unfiled` は置き場の無いもの。
     */
-    if (selectedCategory === 'unfiled' && t.folderId !== null) return false
-    if (selectedCategory !== 'all' && selectedCategory !== 'unfiled' && t.folderId !== selectedCategory) return false
-    if (typeFilter === 'all') return true
-    if (typeFilter === 'unused') return t.usageCount === 0
-    if (typeFilter === 'question') return Boolean(t.question)
-    if (typeFilter === 'single') return t.question === null && t.messageType !== 'carousel'
-    if (typeFilter === 'multiple') return t.messageType === 'carousel' || t.messageContent.includes('\n\n')
-    if (typeFilter === 'variables') return t.messageContent.includes('{{')
-    return true
-  })
+    if (selectedCategory === 'unfiled' && t.folderId !== null) return []
+    if (selectedCategory !== 'all' && selectedCategory !== 'unfiled' && t.folderId !== selectedCategory) return []
+    if (typeFilter === 'unused' && t.usageCount !== 0) return []
+    if (typeFilter === 'question' && !t.question) return []
+    if (typeFilter === 'single' && (t.question !== null || t.messageType === 'carousel')) return []
+    if (typeFilter === 'multiple' && t.messageType !== 'carousel' && !t.messageContent.includes('\n\n')) return []
+    if (typeFilter === 'variables' && !t.messageContent.includes('{{')) return []
+    return [t]
+  }), [normalizedTemplateQuery, selectedCategory, templateSearchIndex, typeFilter])
 
   /** フォルダを読み直す。並び順は API の `displayOrder` に従う。 */
   const loadFolders = useCallback(async () => {
