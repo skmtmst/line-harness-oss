@@ -666,7 +666,8 @@ export async function getConversionEvents(
     values.push(opts.startDate);
   }
   if (opts.endDate) {
-    conditions.push('ce.created_at <= ?');
+    // endDate は暦日なので、当日の成果も拾えるよう翌日0時を排他上限にする。
+    conditions.push(`ce.created_at < date(?, '+1 day')`);
     values.push(opts.endDate);
   }
 
@@ -707,7 +708,8 @@ export async function getConversionReport(
     values.push(opts.startDate);
   }
   if (opts.endDate) {
-    conditions.push('ce.created_at <= ?');
+    // endDate は暦日なので、当日の成果も拾えるよう翌日0時を排他上限にする。
+    conditions.push(`ce.created_at < date(?, '+1 day')`);
     values.push(opts.endDate);
   }
 
