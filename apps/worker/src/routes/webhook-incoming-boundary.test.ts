@@ -12,6 +12,8 @@
  *   1. 処理0件の受信が「成功」としか読めない応答に戻る
  *   2. 上限・回数制限を取り除くと正常受信まで巻き添えで落ちる
  *   3. 429で止めた受信が受領記録を消費し、窓が明けても再送できない
+ *   4. 件数確認と受領記録の作成が別々だと、並行受信が「まだ上限内」を
+ *      同時に読んで上限を超える(件数条件は INSERT 文の内側に置く)
  *
  * source 文字列ではなく、実アプリ(`app`・全 middleware 込み)と実 SQLite を叩く。
  */
@@ -182,6 +184,54 @@ describe('#829 受信Webhookの受理境界', () => {
       const res = await receive(env, JSON.stringify({ order_id: 'within-limit' }));
       expect(res.status).toBe(200);
       expect(receiptCount()).toBe(61);
+    });
+
+    it('窓内60件目までは受け付け、61件目の新規受信から429を返す', async () => {
+      const now = new Date().toISOString();
+      for (let i = 0; i < 59; i++) {
+        db.raw.prepare(`INSERT INTO incoming_webhook_receipts
+          (webhook_id, signature_hash, source_event_id, received_at)
+          VALUES ('iwh-1', ?, ?, ?)`).run(`edge-${i}`, `edge-event-${i}`, now);
+      }
+      const ok = await receive(env, JSON.stringify({ order_id: 'boundary-60' }));
+      expect(ok.status).toBe(200);
+      expect(receiptCount()).toBe(60);
+      const over = await receive(env, JSON.stringify({ order_id: 'boundary-61' }));
+      expect(over.status).toBe(429);
+      expect(receiptCount()).toBe(60);
+    });
+
+    it('同時に届いた新規受信が上限を超えても、受領は上限件数で止まる', async () => {
+      // 件数確認と受領作成が別文だと、並行受信が同じ「まだ上限内」を読んで
+      // 全員通ってしまう。上限は INSERT 文の内側で効かせる。
+      const results = await Promise.all(
+        Array.from({ length: 80 }, (_, i) =>
+          receive(env, JSON.stringify({ order_id: `burst-${i}` }))),
+      );
+      const statuses = results.map((res) => res.status);
+      expect(statuses.filter((s) => s === 200)).toHaveLength(60);
+      expect(statuses.filter((s) => s === 429)).toHaveLength(20);
+      expect(receiptCount()).toBe(60);
+    });
+
+    it('窓がいっぱいでも完了済みの再送は429ではなく重複応答を返す', async () => {
+      const body = JSON.stringify({ order_id: 'dup-in-full-window' });
+      const first = await receive(env, body);
+      expect(first.status).toBe(200);
+      // 直近ウィンドウを上限まで埋める(自分の受領1件+59件)。
+      const now = new Date().toISOString();
+      for (let i = 0; i < 59; i++) {
+        db.raw.prepare(`INSERT INTO incoming_webhook_receipts
+          (webhook_id, signature_hash, source_event_id, received_at)
+          VALUES ('iwh-1', ?, ?, ?)`).run(`fill-${i}`, `fill-event-${i}`, now);
+      }
+      expect(receiptCount()).toBe(60);
+      const dup = await receive(env, body);
+      expect(dup.status).toBe(200);
+      const dupBody = await dup.json() as { data: ReceiveData };
+      expect(dupBody.data).toMatchObject({ received: true, duplicate: true });
+      // 重複応答は新しい受領記録を消費しない。
+      expect(receiptCount()).toBe(60);
     });
   });
 });

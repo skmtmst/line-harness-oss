@@ -30,7 +30,7 @@ import {
 } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { sha256Hex } from '../middleware/auth.js';
-import { countRecentIncomingReceipts, reserveIncomingWebhook, type IncomingWebhookExecution } from '../services/incoming-webhook-receipts.js';
+import { reserveIncomingWebhook, type IncomingWebhookExecution } from '../services/incoming-webhook-receipts.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import {
@@ -1103,16 +1103,6 @@ webhooks.post('/api/webhooks/incoming/:id/receive', async (c) => {
       return c.json({ success: false, error: 'Invalid JSON body' }, 400);
     }
 
-    // N-384: 受信口ごとの短時間回数制限。receipts の行数で数えるので
-    // 追加の表は要らない。上限超えは受領記録を消費せず 429 で返し、
-    // 窓が明けたあとの正規再送を残す。
-    const recentCount = await countRecentIncomingReceipts(
-      c.env.DB, wh.id, new Date(Date.now() - RECEIVE_RATE_WINDOW_MS).toISOString());
-    if (recentCount >= RECEIVE_RATE_LIMIT) {
-      c.header('Retry-After', String(Math.ceil(RECEIVE_RATE_WINDOW_MS / 1000)));
-      return c.json({ success: false, error: 'Too many requests' }, 429);
-    }
-
     /*
      * N-365 (#746): 同じ署名の使い回しを弾く。
      *
@@ -1127,7 +1117,17 @@ webhooks.post('/api/webhooks/incoming/:id/receive', async (c) => {
      * 入れるのは署名そのものではなく SHA-256(台帳に使い回せる値を残さない)。
      */
     const signatureHash = await sha256Hex(expected);
-    const reserved = await reserveIncomingWebhook(c.env.DB, wh.id, signatureHash);
+    // N-384: 受領の予約に窓内件数の上限を載せて1文で判定する。
+    // 上限超えの新規受信は受領記録を消費せず 429 で返し、
+    // 窓が明けたあとの正規再送を残す。
+    const reserved = await reserveIncomingWebhook(c.env.DB, wh.id, signatureHash, {
+      limit: RECEIVE_RATE_LIMIT,
+      windowMs: RECEIVE_RATE_WINDOW_MS,
+    });
+    if (reserved.kind === 'rate_limited') {
+      c.header('Retry-After', String(Math.ceil(RECEIVE_RATE_WINDOW_MS / 1000)));
+      return c.json({ success: false, error: 'Too many requests' }, 429);
+    }
     if (reserved.kind === 'busy') {
       c.header('Retry-After', '5');
       return c.json({ success: false, error: 'Webhook processing in progress' }, 503);
