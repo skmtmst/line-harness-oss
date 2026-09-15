@@ -1775,6 +1775,10 @@ export function ApprovalQueue() {
   const approvalPageCount = pageCountOf(shownItems.length, pageSize)
   const currentPage = Math.min(page, approvalPageCount)
   const pagedItems = pageOf(shownItems, currentPage, pageSize)
+  // 承認済みタブで付帯動作が未完の行があるときだけ「やり直す」列を出す。
+  // 承認自体は済んでいるので、列が要らないページでは列自体を足さない。
+  const showActionRetry = status === 'approved'
+    && pagedItems.some((item) => item.offerActionsIncomplete)
   const safePendingIds = pagedItems
     .filter((item) => item.approvalStatus === 'pending' && !item.duplicateFlag)
     .map((item) => item.eventId)
@@ -1976,6 +1980,9 @@ export function ApprovalQueue() {
                 {status === 'pending' && (
                   <Th align="center">決める</Th>
                 )}
+                {showActionRetry && (
+                  <Th align="center">付帯動作</Th>
+                )}
               </TableHeadRow>
             </thead>
             <tbody className="divide-hairline divide-y">
@@ -2043,6 +2050,19 @@ export function ApprovalQueue() {
                         </AffiliateButton>
                         <AffiliateButton onClick={() => setDetailItem(item)}>見る</AffiliateButton>
                       </div>
+                    </td>
+                  )}
+                  {showActionRetry && (
+                    <td className="px-4 py-3 text-center">
+                      {item.offerActionsIncomplete && (
+                        <AffiliateButton
+                          onClick={() => { void handleApprove(item.eventId, 'approved') }}
+                          disabled={actioning !== null}
+                          title="承認は済んでいます。案件に設定されたタグ付与・シナリオ開始だけをやり直します"
+                        >
+                          付帯動作をやり直す
+                        </AffiliateButton>
+                      )}
                     </td>
                   )}
                 </tr>
