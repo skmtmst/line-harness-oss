@@ -75,6 +75,7 @@ const statusFilters: { key: StatusFilter; label: string }[] = [
 ]
 
 import { normalizeSavedViewConditions, type InboxSavedViewConditions } from './saved-view-types'
+import { savedViewFailureMessage } from './saved-view-failure'
 import { savedViewSummary } from './saved-view-summary'
 import { buildOutgoingMessage, refreshChatListAfterSend } from './send-optimistic'
 import { describeSendFailure } from './send-failure'
@@ -743,13 +744,13 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
         // ページ丁度いっぱい返ってきた = 続きがある可能性が高い
         setHasMoreChats(rows.length === CHAT_PAGE_SIZE)
       } else {
+        // 一覧の失敗は一覧の中の失敗行(再読み込みボタンつき)が伝える。
+        // 上部の汎用 error は送信・詳細など別の操作の失敗に使う(N-030)。
         setChatListFailed(true)
-        setError('チャットの読み込みに失敗しました。もう一度お試しください。')
       }
     } catch {
       if (listFilterKeyRef.current !== listFilterKey || chatListRequestRef.current !== requestId) return
       setChatListFailed(true)
-      setError('チャットの読み込みに失敗しました。もう一度お試しください。')
     } finally {
       if (listFilterKeyRef.current === listFilterKey && chatListRequestRef.current === requestId) {
         setChatListCompletedKey(listFilterKey)
@@ -982,9 +983,14 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
       setSavedViewsOpen(true)
       setSavedViewSuccess(true)
       return { success: true }
-    } catch {
-      // API番号や通信ライブラリの文を、そのまま運用者へ見せない。
-      const message = '保存できませんでした。時間を置いてもう一度お試しください。'
+    } catch (reason) {
+      /*
+        **失敗の種類で言い分ける。** fetchApi は !ok を ApiError として投げる
+        ので、409(同名の競合)も403(権限)も通信障害もここへ来る。全部を
+        「時間を置いて」と言うと、名前を変えれば直る競合まで待たせてしまう
+        (N-027)。文言は運用者向けに作り、APIの内部文言は素通ししない。
+      */
+      const message = savedViewFailureMessage(reason)
       setSavedViewError(message)
       return { success: false, error: message }
     } finally {
@@ -1992,6 +1998,24 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                       className="mt-1.5 text-sm font-semibold text-danger underline underline-offset-2"
                     >
                       メールを読み込み直す
+                    </button>
+                  </div>
+                )}
+                {/*
+                  LINE一覧の失敗行。メールだけ見ているときは出さない。
+                  「もう一度お試しください」とだけ書かれた帯では、直す手段が
+                  ページ全体の再読み込みしかない(N-030)。失敗した一覧の場所で
+                  同じ条件の再取得へ戻れるようにする。
+                */}
+                {channel !== 'email' && chatListFailed && (
+                  <div role="alert" className="border-b border-hairline bg-danger-bg px-4 py-3">
+                    <p className="text-sm text-danger">チャットの読み込みに失敗しました。</p>
+                    <button
+                      type="button"
+                      onClick={() => { void loadChats() }}
+                      className="mt-1.5 text-sm font-semibold text-danger underline underline-offset-2"
+                    >
+                      会話を読み込み直す
                     </button>
                   </div>
                 )}
