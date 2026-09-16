@@ -53,8 +53,9 @@ const DESIGN: Array<{ section: string | null; items: string[] }> = [
   },
   { section: '自動化', items: ['オートメーション', '外部連携'] },
   { section: '予約', items: ['予約管理', '予約設定', 'イベント予約'] },
-  // LINE通知はV4作成前から運用中の承認済み追加機能なので、専用機能の末尾に残す。
-  { section: '専用機能', items: ['NEN配信', '写真審査', 'EC連携', 'LINE通知'] },
+  // 2026-09-16（Masato の決定）: 専用機能は「会員／投稿／NEN配信」。写真審査は「投稿」に改名。
+  // EC連携・LINE通知は「ECとLINEをつなぐ配管の点検口」なので「設定」へ移した。
+  { section: '専用機能', items: ['会員', '投稿', 'NEN配信'] },
   // D-3: 店舗の追加・設定・一覧は統括へ集約し、店舗側の重複導線を戻さない。
   /*
     2026-09-04: 「設定」区分の先頭に「はじめの設定」と「LINEアカウント」を足した。
@@ -62,7 +63,7 @@ const DESIGN: Array<{ section: string | null; items: string[] }> = [
     LINEアカウントはその段1の飛び先。LINEアカウントは要件 v6-33 §5-3。
     **統括の店舗管理（/hq）とは別**で、送受信に使う LINE公式アカウントそのものの設定。
   */
-  { section: '設定', items: ['はじめの設定', 'LINEアカウント', 'ログインユーザー', '機能設定', '運用状態'] },
+  { section: '設定', items: ['はじめの設定', 'LINEアカウント', 'ログインユーザー', '機能設定', '運用状態', 'EC連携', 'LINE通知'] },
   {
     section: '飲食店向け（テスト）',
     items: [
@@ -120,11 +121,12 @@ const ROUTES: Record<string, string> = {
   予約管理: '/booking/bookings',
   予約設定: '/booking/menus',
   イベント予約: '/events',
+  会員: '/nen/members',
   NEN配信: '/nen-campaigns',
   // 仕様書 §2 は /health と書いているが、/health は「BAN検知ダッシュボード」。
-  // 写真審査の画面は /nen-members。§3-1 が BAN検知を「運用状態」へ
+  // 写真審査（いまの名前は「投稿」）の画面は /nen-members。§3-1 が BAN検知を「運用状態」へ
   // 統合すると書いているので、そちらに合わせている。
-  写真審査: '/nen-members',
+  投稿: '/nen-members',
   EC連携: '/ec-commerce',
   LINE通知: '/line-notifications',
   はじめの設定: '/getting-started',
@@ -157,13 +159,14 @@ describe('サイドバーが V6正式共通メニューの契約と一致する'
     },
   );
 
-  it('項目の総数が設計どおり（43）', () => {
+  it('項目の総数が設計どおり（44）', () => {
     // 設計に無いものを足すと、ここで気づける。
     // 統括一覧を独立した /hq へ移し、店舗側は飲食店向け9項目を維持する。
     // 2026-09-04: 「設定」区分の先頭に「はじめの設定」（要件 v6-34 §5-2）と
     // 「LINEアカウント」（要件 v6-33 §5-3）を足して 43。
+    // 2026-09-16: 専用機能に「会員」（★V6 37-1）を足して 44。
     const total = actual.reduce((sum, s) => sum + s.items.length, 0);
-    expect(total).toBe(43);
+    expect(total).toBe(44);
   });
 
   it('項目の行き先が仕様どおり', () => {

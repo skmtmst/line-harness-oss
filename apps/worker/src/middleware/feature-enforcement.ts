@@ -123,6 +123,10 @@ export const FEATURE_ROUTE_MANIFEST: readonly FeatureRouteMetadata[] = [
   feature('/api/notifications/rules', 'line_notifications'),
   feature('/api/nen-campaigns', 'nen_campaigns'),
   feature('/api/nen-members', 'photo_review'),
+  // 然の会員（ランク・マイル）はECとの連携が前提。EC連携と同じ機能で止める。
+  feature('/api/nen/rank-settings', 'ec_commerce'),
+  feature('/api/nen/lifetime-milestones', 'ec_commerce'),
+  feature('/api/nen/members', 'ec_commerce'),
   feature('/api/restaurant-test', 'restaurant_test'),
 
   exempt('/api/settings', 'core', '機能を再度オンにするため停止対象外'),

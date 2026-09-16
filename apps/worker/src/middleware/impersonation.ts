@@ -91,6 +91,7 @@ const PII_MASK_PREFIXES = [
   '/api/conversations',
   '/api/support',
   '/api/nen-members',
+  '/api/nen/members',
   '/api/form-submissions',
   '/api/forms/',
 ];
