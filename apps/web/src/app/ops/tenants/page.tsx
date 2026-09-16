@@ -144,15 +144,16 @@ export default function OpsTenantsPage() {
         <DataTable>
           <thead>
             <TableHeadRow>
-              <Th className="w-72">統括名</Th>
+              {/* 列幅は画面が決める（部品は幅を持たない）。1,440px 幅で操作列まで収まるよう、日付系は狭く。 */}
+              <Th>統括名</Th>
               <Th className="w-28">プラン</Th>
-              <Th className="w-28">状態</Th>
+              <Th className="w-24">状態</Th>
               <Th className="w-28">契約日</Th>
-              <Th className="w-32">トライアル期限</Th>
-              <Th className="w-20" align="right">店舗</Th>
-              <Th className="w-20" align="right">権限者</Th>
-              <Th className="w-40">最終ログイン</Th>
-              <Th align="right">操作</Th>
+              <Th className="w-28">期限</Th>
+              <Th className="w-16" align="right">店舗</Th>
+              <Th className="w-16" align="right">権限者</Th>
+              <Th className="w-36">最終ログイン</Th>
+              <Th className="w-28" align="right">操作</Th>
             </TableHeadRow>
           </thead>
           <tbody>
@@ -174,12 +175,10 @@ export default function OpsTenantsPage() {
                 <Td align="right"><span className="text-label text-ink">{row.staff_count}</span></Td>
                 <Td><span className="text-caption text-ink-secondary">{formatDateTime(row.last_login_at)}</span></Td>
                 <Td align="right">
-                  <span className="inline-flex gap-2">
-                    <Button href={tenantDetailHref(row.id)} size="field">詳細</Button>
-                    <Button size="field" onClick={() => void impersonate(row)} disabled={busyId === row.id || row.status === 'archived'}>
-                      代理ログイン
-                    </Button>
-                  </span>
+                  {/* 「詳細」は統括名のリンクと重複するので置かない。操作は代理ログインだけ。 */}
+                  <Button size="field" onClick={() => void impersonate(row)} disabled={busyId === row.id || row.status === 'archived'}>
+                    代理ログイン
+                  </Button>
                 </Td>
               </Tr>
             ))}

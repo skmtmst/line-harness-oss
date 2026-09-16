@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import {
+  activatePlatformAdminIfAwaitingTotp,
   getStaffMembers, getStaffById, getStaffByInviteTokenHash,
   createStaffMember, updateStaffMember, deleteStaffMember, countLoginAudit, getLastLoginByStaff,
   getStaffAccountScopeIds, getStaffAccountScopeMap, replaceStaffAccountScopes, revokeStaffAuthentication,
@@ -646,6 +647,8 @@ staff.post('/api/staff/:id/two-factor/confirm', async (c) => {
   });
   if (updated) {
     await clearTwoFactorSetupAttempts(c.env.DB, id);
+    // 運営メンバーの招待（★V6 37-10）: 2要素認証の登録が終わった時点で登録完了にする
+    await activatePlatformAdminIfAwaitingTotp(c.env.DB, id);
     await revokeStaffAuthentication(c.env.DB, id);
   }
   return c.json({ success: true, data: await serializeStaff(c.env.DB, updated!) });

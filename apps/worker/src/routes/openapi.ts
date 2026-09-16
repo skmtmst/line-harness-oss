@@ -380,6 +380,20 @@ const spec = {
         responses: { '200': { description: 'Password updated and session issued' }, '400': { description: 'Invalid or expired token' } },
       },
     },
+    '/api/auth/ops-invite/check': {
+      get: {
+        tags: ['Auth'], summary: '運営メンバーの招待を確認（★V6 37-10-A）', security: [],
+        parameters: [{ name: 'token', in: 'query', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'Invite is valid; email, name, needsPassword' }, '404': { description: 'Unknown invite' }, '410': { description: 'Expired or used' } },
+      },
+    },
+    '/api/auth/ops-invite/accept': {
+      post: {
+        tags: ['Auth'], summary: '運営メンバーの招待を受ける（名前・パスワード設定 → 2要素認証待ち）', security: [],
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['token'], properties: { token: { type: 'string' }, name: { type: 'string' }, password: { type: 'string' } } } } } },
+        responses: { '200': { description: 'Session issued; next = two-factor-setup' }, '400': { description: 'Invalid name or password' }, '404': { description: 'Unknown invite' }, '410': { description: 'Expired or used' } },
+      },
+    },
     // ── HQ Banners ─────────────────────────────────────────────────────────
     '/api/hq/banners/presets': {
       get: {
@@ -640,6 +654,9 @@ const spec = {
     '/api/ops/members': {
       get: { tags: ['Ops Console'], summary: '運営メンバーの一覧', responses: { '200': { description: 'Platform admins and monthly summary' } } },
       post: { tags: ['Ops Console'], summary: '既存の権限者を運営メンバーに加える', requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', properties: { staffId: { type: 'string' }, email: { type: 'string' } } } } } }, responses: { '201': { description: 'Added; approved by the caller' }, '400': { description: 'Cannot add yourself' }, '404': { description: 'Staff not found' } } },
+    },
+    '/api/ops/members/{staffId}/resend-invite': {
+      post: { tags: ['Ops Console'], summary: '招待メールを送り直す（招待中・2要素認証待ちの人だけ）', parameters: [{ name: 'staffId', in: 'path', required: true, schema: { type: 'string' } }], responses: { '200': { description: 'Resent' }, '400': { description: 'Already active' }, '404': { description: 'Invite not found' } } },
     },
     '/api/ops/members/{staffId}': {
       patch: { tags: ['Ops Console'], summary: '運営メンバーの停止・再開', parameters: [{ name: 'staffId', in: 'path', required: true, schema: { type: 'string' } }], requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['isActive'], properties: { isActive: { type: 'boolean' } } } } } }, responses: { '200': { description: 'Updated' }, '400': { description: 'Self or last member' }, '404': { description: 'Staff not found' } } },

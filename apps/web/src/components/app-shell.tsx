@@ -25,6 +25,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     return <>{children}</>
   }
 
+  // 2要素認証の設定（★V6 37-10-B）は、まだ運営メンバーでない人も開く。外枠を付けない。
+  if (pathname === '/ops/two-factor') {
+    return <>{children}</>
+  }
+
   // 運営コンソール（★V6 37）。統括・店舗の共通メニューとは別の外枠を使う。
   if (pathname === '/ops' || pathname.startsWith('/ops/')) {
     return <OpsShell>{children}</OpsShell>

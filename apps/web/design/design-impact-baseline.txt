@@ -90,10 +90,12 @@ shared-button-importer app/nen-members/page.tsx
 shared-button-importer app/nen-members/photo-publications.tsx
 shared-button-importer app/nen-members/photo-review-detail.tsx
 shared-button-importer app/ops/audit/page.tsx
+shared-button-importer app/ops/invite/page.tsx
 shared-button-importer app/ops/login/page.tsx
 shared-button-importer app/ops/members/page.tsx
 shared-button-importer app/ops/tenants/detail/page.tsx
 shared-button-importer app/ops/tenants/page.tsx
+shared-button-importer app/ops/two-factor/page.tsx
 shared-button-importer app/page.tsx
 shared-button-importer app/password/forgot/page.tsx
 shared-button-importer app/password/reset/page.tsx
