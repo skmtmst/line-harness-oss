@@ -187,7 +187,12 @@ function InflowLinksPageInner() {
           success: false as const,
           data: [] as EntryRouteGenre[],
         })),
-        api.pools.list(),
+        // プールは補助データ。multi_store_hierarchy がオフでも画面全体を
+        // 共通ゲートへ切り替えず、プール列だけ無しで既存リンクを表示する。
+        api.pools.list({ suppressFeatureDisabledEvent: true }).catch(() => ({
+          success: false as const,
+          data: [] as TrafficPool[],
+        })),
         api.scenarios.list(),
         api.messageTemplates.list(),
         api.tags.list().catch(() => ({ success: false, data: [] as Tag[] })),
@@ -227,7 +232,10 @@ function InflowLinksPageInner() {
       // many pools exist.
       if (p.success) {
         const batch = p.data.length > 0
-          ? await api.pools.listAccounts(p.data.map((pool) => pool.id))
+          ? await api.pools.listAccounts(
+              p.data.map((pool) => pool.id),
+              { suppressFeatureDisabledEvent: true },
+            )
           : { success: true as const, data: [] }
         if (!isCurrent()) return
         if (batch.success) {

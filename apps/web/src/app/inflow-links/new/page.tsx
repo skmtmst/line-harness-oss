@@ -63,7 +63,8 @@ export default function NewInflowLinkPage() {
     void Promise.allSettled([
       api.tags.list(),
       api.scenarios.list(),
-      api.pools.list(),
+      // プールは補助データ。機能がオフでもリンク発行画面そのものは止めない。
+      api.pools.list({ suppressFeatureDisabledEvent: true }),
       api.templates.list(),
       api.tagGroups.list(),
     ]).then(([t, s, p, tp, tg]) => {

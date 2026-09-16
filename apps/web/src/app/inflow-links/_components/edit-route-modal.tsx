@@ -60,7 +60,10 @@ export default function EditRouteModal({
     let cancelled = false
     ;(async () => {
       const result = pools.length > 0
-        ? await api.pools.listAccounts(pools.map((pool) => pool.id))
+        ? await api.pools.listAccounts(
+            pools.map((pool) => pool.id),
+            { suppressFeatureDisabledEvent: true },
+          ).catch(() => ({ success: false as const, data: [] }))
         : { success: true as const, data: [] }
       if (!cancelled && result.success) {
         setPoolMembers(Object.fromEntries(result.data.map(({ poolId, accounts }) => [
