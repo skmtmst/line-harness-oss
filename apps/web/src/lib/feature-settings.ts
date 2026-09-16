@@ -32,6 +32,9 @@ export type FeatureKey =
   | 'line_notifications'
   | 'restaurant_test'
   | 'multi_store_hierarchy'
+  | 'friend_fields'
+  | 'support_marks'
+  | 'saved_searches'
 
 export interface FeatureItem {
   id: string
@@ -83,6 +86,9 @@ export const DEFAULT_FEATURES: Record<FeatureKey, boolean> = {
   line_notifications: true,
   restaurant_test: true,
   multi_store_hierarchy: false,
+  friend_fields: true,
+  support_marks: true,
+  saved_searches: true,
 }
 
 function toFeatureItem(item: MenuItem): FeatureItem {

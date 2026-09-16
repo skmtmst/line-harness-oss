@@ -87,9 +87,9 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
       const [savedSearches, tagResult, markResult, scenarioResult, fieldResult] = await Promise.allSettled([
         api.savedSearches.list(accountId, { limit: 50 }),
         api.tags.list(),
-        api.supportMarks.list(accountId),
+        api.supportMarks.list(accountId, { suppressFeatureDisabledEvent: true }),
         api.scenarios.list({ accountId }),
-        api.friendFields.list(accountId),
+        api.friendFields.list(accountId, undefined, { suppressFeatureDisabledEvent: true }),
       ])
       if (sequence !== loadSequence.current) return
       if (savedSearches.status === 'rejected') throw savedSearches.reason

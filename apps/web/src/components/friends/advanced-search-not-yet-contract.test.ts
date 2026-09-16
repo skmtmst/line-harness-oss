@@ -53,7 +53,7 @@ describe('詳細条件のORの軸は、黙って消えない', () => {
 
   it('固定4状態と自由分類の対応マークを別の軸にする', () => {
     expect(DIALOG).toContain("chat_status: '対応状況'")
-    expect(DIALOG).toContain("{ label: '対応マーク', make:")
+    expect(DIALOG).toContain("{ label: '対応マーク', feature: 'support_marks', make:")
   })
 
   it('選択肢待ちの軸だけ無効にし、理由を画面に出す', () => {

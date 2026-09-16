@@ -345,7 +345,7 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
   useEffect(() => {
     let active = true
     setFieldsError('')
-    void api.friendFields.list(accountId).then((res) => {
+    void api.friendFields.list(accountId, undefined, { suppressFeatureDisabledEvent: true }).then((res) => {
       if (!active) return
       if (res.success) {
         setFields(res.data)

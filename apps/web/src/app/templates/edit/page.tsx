@@ -28,7 +28,7 @@ interface ReferenceLoaders {
 async function loadTemplateReferences(
   accountId: string,
   loaders: ReferenceLoaders = {
-    friendFields: (id) => api.friendFields.list(id),
+    friendFields: (id) => api.friendFields.list(id, undefined, { suppressFeatureDisabledEvent: true }),
     commonVars: (id) => api.commonVars.list(id),
   },
 ): Promise<TemplateReferences> {

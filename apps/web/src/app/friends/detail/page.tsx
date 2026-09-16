@@ -5,6 +5,9 @@ import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import type { FriendField } from '@line-crm/shared'
 import { api, type FriendDetail, type MileageSummary } from '@/lib/api'
+import { useAccount } from '@/contexts/account-context'
+import { useFeatureVisibility } from '@/lib/use-feature-visibility'
+import { FeatureDisabledScreen } from '@/components/feature-disabled-gate'
 import TagBadge from '@/components/friends/tag-badge'
 import { FIELD_TYPE_LABELS } from '@/components/friend-fields/field-list'
 import Button from '@/components/shared/button'
@@ -211,6 +214,10 @@ function FriendDetailInner() {
   // ID切替で遅い返事が新しい画面に残らないよう、世代で捨てる(#496-20。一覧側と同型)。
   const loadRequestRef = useRef(0)
   const group = params.get('group') ?? BASIC_GROUP
+  // 情報欄タブは friend_fields の画面。オフのaccountではタブごと出さない。
+  const { selectedAccountId } = useAccount()
+  const fieldsEnabled = useFeatureVisibility(selectedAccountId).enabled('friend_fields')
+  const visibleTabs = fieldsEnabled ? TABS : TABS.filter((t) => t.key !== 'info')
 
   const load = useCallback(async () => {
     if (!friendId) {
@@ -225,7 +232,7 @@ function FriendDetailInner() {
       // マイル・リッチメニュー・フォルダは、取れなくても詳細は出す。
       const [friendRes, fieldsRes, mileageRes, menuRes] = await Promise.all([
         api.friends.get(friendId),
-        api.friendFields.forFriend(friendId),
+        api.friendFields.forFriend(friendId, { suppressFeatureDisabledEvent: true }).catch(() => null),
         api.friends.mileage(friendId, 1).catch(() => null),
         api.friends.richMenu(friendId).catch(() => null),
       ])
@@ -235,7 +242,7 @@ function FriendDetailInner() {
       if (menuRes?.success) setRichMenu(menuRes.data)
       else setRichMenuFailed(true)
       if (friendRes.success) setFriend(friendRes.data)
-      if (fieldsRes.success) {
+      if (fieldsRes?.success) {
         setFields(fieldsRes.data.items)
         setHiddenPersonalCount(fieldsRes.data.hiddenPersonalCount)
         const next: Record<string, string> = {}
@@ -523,7 +530,7 @@ function FriendDetailInner() {
           {/* 右：タブ */}
           <div data-design="Right">
             <div className="border-hairline mb-4 flex flex-wrap gap-1 border-b">
-              {TABS.map((t) => (
+              {visibleTabs.map((t) => (
                 <Link
                   key={t.key}
                   href={`/friends/detail?id=${friendId}&tab=${t.key}${
@@ -576,7 +583,8 @@ function FriendDetailInner() {
               ) : null,
             )}
 
-            {tab === 'info' && (
+            {tab === 'info' && !fieldsEnabled && <FeatureDisabledScreen featureId="friend_fields" />}
+            {tab === 'info' && fieldsEnabled && (
               <div className="bg-canvas rounded-card border-hairline border p-5">
                 {inGroup.length === 0 ? (
                   <p className="text-ink-faint py-6 text-center text-sm">
