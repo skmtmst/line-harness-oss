@@ -136,7 +136,7 @@ describe('ログインユーザー操作の表示と実処理 (#834)', () => {
     expect(fixture.updateStaff).not.toHaveBeenCalled()
     fireEvent.click(screen.getByRole('button', { name: '保存する' }))
     await waitFor(() => expect(fixture.updateStaff).toHaveBeenCalledTimes(1))
-    expect(fixture.updateStaff).toHaveBeenCalledWith('target', { role: 'viewer' })
+    expect(fixture.updateStaff).toHaveBeenCalledWith('target', { role: 'viewer' }, undefined)
   })
 
   it('コピー元には対象本人を出さない', async () => {
@@ -199,7 +199,7 @@ describe('ログインユーザー操作の表示と実処理 (#834)', () => {
       fireEvent.click(confirm)
     })
     expect(fixture.deleteStaff).toHaveBeenCalledTimes(1)
-    expect(fixture.deleteStaff).toHaveBeenCalledWith('target')
+    expect(fixture.deleteStaff).toHaveBeenCalledWith('target', undefined)
 
     await act(async () => { release?.() })
     await waitFor(() => expect(screen.queryByRole('button', { name: '外す' })).toBeNull())

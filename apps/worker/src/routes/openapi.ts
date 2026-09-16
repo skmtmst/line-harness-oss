@@ -408,6 +408,32 @@ const spec = {
         responses: { '200': { description: 'Session issued; next = two-factor-setup' }, '400': { description: 'Invalid name or password' }, '404': { description: 'Unknown invite' }, '410': { description: 'Expired or used' } },
       },
     },
+    '/api/auth/sessions': {
+      get: {
+        tags: ['Auth'], summary: '本人のアクティブなセッション一覧',
+        responses: { '200': { description: 'Sessions with current flag, user agent, masked IP' }, '401': { description: 'Not authenticated' } },
+      },
+    },
+    '/api/auth/sessions/{tokenHash}': {
+      delete: {
+        tags: ['Auth'], summary: '本人のセッションを1件失効（現在のセッションは confirmCurrent=1 が必須）',
+        parameters: [{ name: 'tokenHash', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'Session revoked' }, '401': { description: 'Not authenticated' }, '404': { description: 'Session not found or not owned' }, '409': { description: 'Current-session confirmation required' } },
+      },
+    },
+    '/api/auth/sessions/revoke-others': {
+      post: {
+        tags: ['Auth'], summary: '今のセッション以外をまとめて失効',
+        responses: { '200': { description: 'Count of revoked sessions' }, '401': { description: 'Not authenticated' } },
+      },
+    },
+    '/api/auth/step-up': {
+      post: {
+        tags: ['Auth'], summary: '高危険操作用の5分・1回限り再認証grantを発行',
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['code', 'purpose'], properties: { code: { type: 'string' }, purpose: { type: 'string', enum: ['operations.control', 'affiliate.payout.export', 'photo.original.download', 'staff.permissions.change', 'staff.two_factor.remove'] } } } } } },
+        responses: { '201': { description: 'Step-up grant issued' }, '400': { description: 'Invalid or wrong code' }, '403': { description: 'TOTP not configured' }, '409': { description: 'Code already used' }, '429': { description: 'Attempt limit exceeded' } },
+      },
+    },
     // ── HQ Banners ─────────────────────────────────────────────────────────
     '/api/hq/banners/presets': {
       get: {

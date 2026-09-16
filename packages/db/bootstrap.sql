@@ -192,7 +192,7 @@ CREATE TABLE admin_sessions (
   staff_id   TEXT NOT NULL,
   expires_at TEXT NOT NULL,
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')), selected_restaurant_store_id TEXT
-  REFERENCES rt_stores(id) ON DELETE SET NULL,
+  REFERENCES rt_stores(id) ON DELETE SET NULL, user_agent TEXT, ip_prefix TEXT,
   FOREIGN KEY (staff_id) REFERENCES staff_members(id) ON DELETE CASCADE
 );
 

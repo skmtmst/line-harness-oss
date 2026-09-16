@@ -15,15 +15,18 @@ import {
   expiredCookie,
   sha256Hex,
 } from '../middleware/auth.js';
-import { clientIp, issueSession, randomToken, startTwoFactorChallenge, twoFactorLoginUrl, twoFactorRequired, twoFactorSetupUrl } from '../services/admin-session.js';
+import { clientIp, issueSession, maskIpPrefix, randomToken, startTwoFactorChallenge, twoFactorLoginUrl, twoFactorRequired, twoFactorSetupUrl } from '../services/admin-session.js';
 import { resolveAdminAuthConfig } from '../middleware/admin-auth-config.js';
-import { recordLoginAudit } from '@line-crm/db';
+import { recordAuditEvent, recordLoginAudit } from '@line-crm/db';
 import {
   activatePlatformAdminIfAwaitingTotp,
   claimStaffTotpStep,
   createStepUpGrant,
   deleteAdminSession,
+  deleteAdminSessionForStaff,
+  deleteOtherAdminSessions,
   deleteTwoFactorChallenge,
+  listAdminSessionsByStaff,
   getStaffById,
   getStaffByInviteTokenHash,
   getStaffByLineUserId,
@@ -425,7 +428,7 @@ adminAuth.post('/api/auth/step-up', async (c) => {
   const body = await c.req.json<{ code?: string; purpose?: string }>()
     .catch(() => ({} as { code?: string; purpose?: string }));
   const code = body.code?.trim() ?? '';
-  if (!['operations.control', 'affiliate.payout.export', 'photo.original.download'].includes(body.purpose ?? '')
+  if (!['operations.control', 'affiliate.payout.export', 'photo.original.download', 'staff.permissions.change', 'staff.two_factor.remove'].includes(body.purpose ?? '')
       || !/^\d{6}$/.test(code)) {
     return c.json({ success: false, error: '6桁の認証コードを入力してください' }, 400);
   }
@@ -587,4 +590,100 @@ adminAuth.get('/api/auth/session', async (c) => {
   const active = platformAdmin ? await getActiveImpersonation(c.env.DB, staff.id) : null;
   const impersonation = active ? toImpersonationContext(active) : null;
   return c.json({ success: true, data: { ...staff, platformAdmin, platformAdminState, impersonation }, csrfToken });
+});
+
+/**
+ * 今のリクエストを通したセッションの生token。cookie優先、無ければBearer。
+ * 見つからなければ null（API key ログイン等、セッション表へ載らない経路）。
+ */
+function currentSessionToken(c: Context<Env>): string | null {
+  const fromCookie = adminSessionTokenFromCookie(c);
+  if (fromCookie) return fromCookie;
+  const authorization = c.req.header('Authorization') || '';
+  const bearerPrefix = `Bearer ${ADMIN_SESSION_BEARER_PREFIX}`;
+  return authorization.startsWith(bearerPrefix) ? authorization.slice(bearerPrefix.length) : null;
+}
+
+/** GET /api/auth/sessions — 本人のアクティブなセッションだけを返す。 */
+adminAuth.get('/api/auth/sessions', async (c) => {
+  const staff = c.get('staff');
+  if (!staff) return c.json({ success: false, error: 'Unauthorized' }, 401);
+  const currentHash = (token => token ? sha256Hex(token) : Promise.resolve(null))(currentSessionToken(c));
+  const rows = await listAdminSessionsByStaff(c.env.DB, staff.id, new Date().toISOString());
+  const sessions = rows.map((row) => ({
+    id: row.token_hash,
+    createdAt: row.created_at,
+    expiresAt: row.expires_at,
+    userAgent: row.user_agent,
+    ipPrefix: row.ip_prefix,
+    current: false as boolean,
+  }));
+  const hash = await currentHash;
+  for (const session of sessions) session.current = session.id === hash;
+  return c.json({ success: true, data: { sessions } });
+});
+
+/**
+ * DELETE /api/auth/sessions/:tokenHash — 本人のセッションを1件失効する。
+ *
+ * 他人の token_hash を指定しても 404（存在も明かさない）。今のセッションを
+ * 消すときは `?confirmCurrent=1` か body の `confirmCurrent: true` が必須で、
+ * 確認付きなら cookie も期限切れにして再利用を防ぐ。
+ */
+adminAuth.delete('/api/auth/sessions/:tokenHash', async (c) => {
+  const staff = c.get('staff');
+  if (!staff) return c.json({ success: false, error: 'Unauthorized' }, 401);
+  const tokenHash = c.req.param('tokenHash');
+  const currentToken = currentSessionToken(c);
+  const currentHash = currentToken ? await sha256Hex(currentToken) : null;
+  const body = await c.req.json<{ confirmCurrent?: boolean }>().catch(() => ({} as { confirmCurrent?: boolean }));
+  const confirmed = body.confirmCurrent === true || c.req.query('confirmCurrent') === '1';
+  if (currentHash === tokenHash && !confirmed) {
+    return c.json({
+      success: false,
+      error: '今使っている端末のログインを切るには confirmCurrent=1 を付けてください',
+      code: 'CURRENT_SESSION_CONFIRMATION_REQUIRED',
+    }, 409);
+  }
+  if (!await deleteAdminSessionForStaff(c.env.DB, staff.id, tokenHash)) {
+    return c.json({ success: false, error: 'Session not found' }, 404);
+  }
+  if (currentHash === tokenHash) {
+    const { sameSite } = resolveAdminAuthConfig(c.env, { requestOrigin: new URL(c.req.url).origin });
+    c.header('Set-Cookie', expiredCookie(ADMIN_AUTH_COOKIE, sameSite), { append: true });
+    c.header('Set-Cookie', expiredCookie(CSRF_COOKIE, sameSite), { append: true });
+  }
+  return c.json({ success: true, data: { revoked: 1, current: currentHash === tokenHash } });
+});
+
+/** POST /api/auth/sessions/revoke-others — 今のセッション以外をまとめて失効する。 */
+adminAuth.post('/api/auth/sessions/revoke-others', async (c) => {
+  const staff = c.get('staff');
+  if (!staff) return c.json({ success: false, error: 'Unauthorized' }, 401);
+  const currentToken = currentSessionToken(c);
+  const currentHash = currentToken ? await sha256Hex(currentToken) : null;
+  const revoked = currentHash
+    ? await deleteOtherAdminSessions(c.env.DB, staff.id, currentHash)
+    : 0;
+  // 一括失効は乗っ取り対応で使われる高危険操作。記録失敗で失効自体は止めない。
+  try {
+    await recordAuditEvent(c.env.DB, {
+      category: 'auth',
+      action: 'auth.sessions_revoked',
+      actorPrincipalId: staff.id,
+      actorRole: staff.readOnly ? 'view_only' : staff.role === 'owner' || staff.role === 'admin' ? 'administrator' : 'operations',
+      targetKind: 'staff',
+      targetId: staff.id,
+      tenantId: staff.tenantId,
+      result: 'success',
+      riskLevel: 'high',
+      retentionClass: 'security',
+      reason: 'revoke_other_sessions',
+      ipPrefix: maskIpPrefix(clientIp(c)),
+      after: { revoked },
+    });
+  } catch (error) {
+    console.error('[admin-auth] sessions_revoked audit failed', error instanceof Error ? error.name : 'unknown');
+  }
+  return c.json({ success: true, data: { revoked } });
 });
