@@ -3329,7 +3329,7 @@ CREATE TABLE messages_log (
   line_account_id  TEXT,
   sent_by_staff_id TEXT,
   created_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-, origin_kind TEXT, origin_id TEXT, scenario_version_step_id TEXT, line_message_id TEXT, line_message_account_key TEXT, unsent_at TEXT);
+, origin_kind TEXT, origin_id TEXT, scenario_version_step_id TEXT, line_message_id TEXT, line_message_account_key TEXT, unsent_at TEXT, quote_token TEXT, quoted_message_id TEXT);
 
 CREATE TABLE mileage_adjustment_notifications (
   id                TEXT PRIMARY KEY,
@@ -5214,6 +5214,32 @@ CREATE TABLE scenarios (
   updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 , line_account_id TEXT, folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL, display_order INTEGER NOT NULL DEFAULT 0, allow_concurrent INTEGER NOT NULL DEFAULT 0, audience_condition_json TEXT, on_complete_mode TEXT NOT NULL DEFAULT 'pause', on_complete_scenario_id TEXT REFERENCES scenarios (id) ON DELETE SET NULL, created_from_recipe_id TEXT REFERENCES recipes(id), recipe_clone_run_id TEXT REFERENCES recipe_clone_runs(id), current_published_version_id TEXT);
 
+CREATE TABLE scheduled_chat_sends (
+  id TEXT PRIMARY KEY,
+  friend_id TEXT NOT NULL,
+  line_account_id TEXT,
+  staff_id TEXT NOT NULL,
+  message_type TEXT NOT NULL DEFAULT 'text',
+  content TEXT NOT NULL,
+  quoted_message_id TEXT,
+  idempotency_key TEXT NOT NULL UNIQUE,
+  scheduled_at TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'scheduled'
+    CHECK (status IN ('scheduled', 'sending', 'sent', 'failed', 'cancelled')),
+  lease_token TEXT,
+  lease_expires_at TEXT,
+  attempt_count INTEGER NOT NULL DEFAULT 0,
+  last_error_code TEXT,
+  last_error TEXT,
+  sent_message_id TEXT,
+  sent_at TEXT,
+  failed_at TEXT,
+  cancelled_by_staff_id TEXT,
+  cancelled_at TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
 CREATE TABLE scoring_rules (
   id          TEXT PRIMARY KEY,
   name        TEXT NOT NULL,
@@ -6902,6 +6928,9 @@ CREATE UNIQUE INDEX idx_messages_log_line_message_scope
 CREATE INDEX idx_messages_log_origin
   ON messages_log (origin_kind, created_at);
 
+CREATE INDEX idx_messages_log_quoted
+  ON messages_log (quoted_message_id);
+
 CREATE INDEX idx_messages_log_version_step
   ON messages_log (friend_id, scenario_version_step_id)
   WHERE scenario_version_step_id IS NOT NULL;
@@ -7351,6 +7380,15 @@ CREATE INDEX idx_scenarios_order ON scenarios (display_order);
 
 CREATE INDEX idx_schedule_publications_schedule
   ON rich_menu_schedule_publications (schedule_id, kind);
+
+CREATE INDEX idx_scheduled_chat_sends_due
+  ON scheduled_chat_sends (status, scheduled_at);
+
+CREATE INDEX idx_scheduled_chat_sends_friend
+  ON scheduled_chat_sends (friend_id, status, scheduled_at);
+
+CREATE INDEX idx_scheduled_chat_sends_lease
+  ON scheduled_chat_sends (status, lease_expires_at);
 
 CREATE INDEX idx_shifts_staff_date ON staff_shifts (staff_id, work_date);
 

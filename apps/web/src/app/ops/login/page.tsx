@@ -58,8 +58,9 @@ export default function OpsLoginPage() {
     }
     sessionStorage.removeItem(AUTH_SELECTION_CLEARED_KEY)
     if (res.data.twoFactor && res.data.challengeToken) {
-      // 2 要素認証のあとは統括の入口に戻る。運営コンソールへは /ops を開き直す。
-      window.location.assign(`/login/two-factor#${new URLSearchParams({ lh_2fa: res.data.challengeToken, lh_next: 'ops' }).toString()}`)
+      // `next=ops` は URL に残す。シークレットモードで別サイト Cookie が止まっても、
+      // 二段階認証のあと通常ログインへ戻らず、運営コンソールへ確実に戻す。
+      window.location.assign(`/login/two-factor?next=ops#${new URLSearchParams({ lh_2fa: res.data.challengeToken }).toString()}`)
       return
     }
     if (res.data.sessionToken) storeAdminSession(res.data.sessionToken, res.csrfToken)

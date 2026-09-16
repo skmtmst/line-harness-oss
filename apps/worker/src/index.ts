@@ -1286,6 +1286,22 @@ async function runFrequentHeavyJobs(
       },
     },
     {
+      // 1対1トークの送信予約。lease付きclaimで二重起動を防ぎ、
+      // LINEへは予約のidempotency_keyをそのまま渡して二重pushを防ぐ。
+      name: 'scheduled chat sends',
+      run: async () => {
+        const { processDueScheduledChatSends } = await import(
+          './services/scheduled-chat-sends.js'
+        );
+        const result = await processDueScheduledChatSends(env, {
+          now: new Date(event.scheduledTime).toISOString(),
+        });
+        if (result.claimed > 0) {
+          console.log(JSON.stringify({ event: 'scheduled_chat_sends', ...result }));
+        }
+      },
+    },
+    {
       name: 'mileage reward delivery retry',
       run: async () => {
         const result = await processDueMileageRewardDeliveries(env.DB, {

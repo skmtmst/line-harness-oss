@@ -49,6 +49,8 @@ export function buildOutgoingMessage(input: {
   content: string
   sentByStaffName: string
   sentAt: string
+  /** 引用返信のとき、口の応答が来るまで画面へ出す引用元の要約。 */
+  quoted?: ChatDetailMessage['quoted']
 }): ChatDetailMessage {
   return {
     id: crypto.randomUUID(),
@@ -61,6 +63,7 @@ export function buildOutgoingMessage(input: {
     sentByStaffId: null,
     sentByStaffName: input.sentByStaffName,
     scenarioName: null,
+    quoted: input.quoted ?? null,
     createdAt: input.sentAt,
   }
 }

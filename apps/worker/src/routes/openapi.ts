@@ -1003,6 +1003,7 @@ const spec = {
                   },
                   text: { type: 'string' },
                   revision: { type: 'integer' },
+                  quotedMessageId: { type: 'string' },
                 },
               },
             },
@@ -1013,6 +1014,122 @@ const spec = {
           '400': { description: 'Idempotency-Key が無い／内容が壊れている' },
           '404': { description: 'Chat not found' },
           '409': { description: '版が食い違う／同じ鍵で内容が違う' },
+        },
+      },
+    },
+    /*
+     * N-026: 送信内容の差し込み解決プレビュー。/send と同じ解決器を通し、
+     * 未解決のまま残る差し込み名を返す(送信はそれらを400で拒否する)。
+     * 読み取りのみ。LINE呼出し・履歴書込みは行わない。
+     */
+    '/api/chats/{id}/render-preview': {
+      post: {
+        tags: ['Chats'],
+        summary: '差し込みを解決した送信プレビューを返す',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  messageType: { type: 'string' },
+                  content: { type: 'string' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': { description: '解決済み本文と未解決の差し込み名' },
+          '400': { description: 'content が無い／壊れている' },
+          '404': { description: 'Chat not found' },
+        },
+      },
+    },
+    /*
+     * N-025: 返信の送信予約。作成は Idempotency-Key 必須で、時刻は未来のみ。
+     * 予約の実行はcronのscheduledジョブがlease付きで行う。
+     */
+    '/api/chats/{id}/schedule': {
+      post: {
+        tags: ['Chats'],
+        summary: '返信を予約送信する',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  content: { type: 'string' },
+                  scheduledAt: { type: 'string', format: 'date-time' },
+                  quotedMessageId: { type: 'string' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': { description: 'Scheduled' },
+          '400': { description: 'Idempotency-Key・本文・日時のいずれかが不正' },
+          '404': { description: 'Chat not found／引用元のメッセージが無い' },
+        },
+      },
+    },
+    '/api/chats/{id}/scheduled': {
+      get: {
+        tags: ['Chats'],
+        summary: '会話の送信予約一覧（待機中・送信中）',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: {
+          '200': { description: 'Pending scheduled sends' },
+          '404': { description: 'Chat not found' },
+        },
+      },
+    },
+    '/api/chats/{id}/scheduled/{scheduleId}': {
+      patch: {
+        tags: ['Chats'],
+        summary: '送信予約の日時・本文を変更',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'scheduleId', in: 'path', required: true, schema: { type: 'string' } },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  scheduledAt: { type: 'string', format: 'date-time' },
+                  content: { type: 'string' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': { description: 'Updated' },
+          '400': { description: '変更項目が無い／値が不正' },
+          '404': { description: '予約が見つかりません' },
+          '409': { description: '送信処理が始まっている／処理済み' },
+        },
+      },
+      delete: {
+        tags: ['Chats'],
+        summary: '送信予約を取消',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'scheduleId', in: 'path', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: 'Cancelled' },
+          '404': { description: '予約が見つかりません' },
+          '409': { description: '送信処理が始まっている／処理済み' },
         },
       },
     },
