@@ -68,3 +68,13 @@ SQL を流さない手順（推奨）: `platform_admins` が空の間は、既�
 - 2 要素認証の画面を通ったあとは `/ops` へ戻る（`lh_next=ops`）
 - 伏せ字は `/api/friends` `/api/chats` `/api/inbox` `/api/conversations` `/api/support` `/api/nen-members` `/api/form-submissions` `/api/forms/` の応答に掛かる。ほかの経路で氏名を返す API があれば `middleware/impersonation.ts` の `PII_MASK_PREFIXES` に足す
 - 代理ログインでも止める操作は `isForbiddenWhileImpersonating`（権限者の削除・LINE アカウントの削除・課金ポータル・契約状態の変更）
+
+## 運営メンバーの招待（★V6 37-10、2026-09-16 決定）
+
+- 「既存の権限者のメールを入れると即登録」はやめた。メンバー管理 →「運営メンバーを招待」にメールを入れる → 招待メール（24 時間有効）
+- 相手はメールのリンク（`/ops/invite#invite=…`）を開き、パスワードが無ければ名前とパスワードを設定 → そのまま `/ops/two-factor` で 2要素認証を登録 → 登録完了で運営マスターになる
+- 状態は `platform_admins.activation_state`（invited → awaiting_totp → active）。active だけを運営マスターとして扱う（`getPlatformAdminByStaffId`）
+- 新しいメールは運営会社（既定の統括）の権限者（role staff）として作る。別の統括の権限者はメール招待では加えられない（Kenta / Kyohei は初期の特例）
+- 既存の 3 名（2要素認証 未設定）はそのまま使える（決定 1-A）。左下メニューの「2要素認証の設定」→ `/ops/two-factor` から登録できる。全員が設定を終えたら、未設定の人を `/ops` に入れない切り替え（1-B）を検討する
+- 招待メールを送り直すと前のリンクは失効する。2要素認証の確認（`/api/staff/:id/two-factor/confirm`）が通った瞬間に `activatePlatformAdminIfAwaitingTotp` が active にする
+- 公開の口は `/api/auth/ops-invite/check` と `/api/auth/ops-invite/accept`（トークンだけで守る。Turnstile は使わない）

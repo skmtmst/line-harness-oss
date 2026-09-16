@@ -4421,6 +4421,17 @@ CREATE TABLE pii_reveal_logs (
   created_at                TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
 
+CREATE TABLE platform_admin_invites (
+  id          TEXT PRIMARY KEY,
+  staff_id    TEXT NOT NULL REFERENCES staff_members(id) ON DELETE CASCADE,
+  email       TEXT NOT NULL,
+  token_hash  TEXT NOT NULL UNIQUE,
+  invited_by  TEXT,
+  expires_at  TEXT NOT NULL,
+  consumed_at TEXT,
+  created_at  TEXT NOT NULL
+);
+
 CREATE TABLE platform_admins (
   staff_id      TEXT PRIMARY KEY REFERENCES staff_members(id) ON DELETE CASCADE,
   is_active     INTEGER NOT NULL DEFAULT 1,
@@ -4428,7 +4439,8 @@ CREATE TABLE platform_admins (
   approved_by   TEXT REFERENCES staff_members(id) ON DELETE SET NULL,
   created_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-);
+, activation_state TEXT NOT NULL DEFAULT 'active'
+  CHECK (activation_state IN ('invited', 'awaiting_totp', 'active')), invited_by TEXT, invited_at TEXT, activated_at TEXT);
 
 CREATE TABLE platform_audit_logs (
   id                 TEXT PRIMARY KEY,
@@ -7144,6 +7156,8 @@ CREATE INDEX idx_outgoing_webhooks_line_account
 
 CREATE INDEX idx_pii_reveal_logs_tenant
   ON pii_reveal_logs(tenant_id, created_at DESC);
+
+CREATE INDEX idx_platform_admin_invites_staff ON platform_admin_invites(staff_id, created_at DESC);
 
 CREATE INDEX idx_platform_audit_logs_action
   ON platform_audit_logs(action, created_at DESC);

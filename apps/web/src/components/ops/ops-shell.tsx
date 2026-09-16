@@ -50,11 +50,12 @@ export default function OpsShell({ children }: { children: ReactNode }) {
       captureAdminSessionHandoff()
       const res = await fetch(`${apiUrl}/api/auth/session`, { credentials: 'include', headers: adminSessionHeaders() })
       if (!res.ok) throw new Error('unauthenticated')
-      const body = await res.json() as { success?: boolean; data?: { platformAdmin?: boolean }; csrfToken?: string }
+      const body = await res.json() as { success?: boolean; data?: { platformAdmin?: boolean; platformAdminState?: string | null }; csrfToken?: string }
       if (!body.success || !body.data) throw new Error('unauthenticated')
       if (body.csrfToken) localStorage.setItem('lh_csrf', body.csrfToken)
       if (!body.data.platformAdmin) {
-        router.replace('/ops/login?error=not_platform_admin')
+        // 招待を受けて 2要素認証待ちの人は、設定画面へ（★V6 37-10-B）
+        router.replace(body.data.platformAdminState === 'awaiting_totp' ? '/ops/two-factor' : '/ops/login?error=not_platform_admin')
         return
       }
       const meRes = await api.ops.me()
@@ -168,12 +169,12 @@ function OpsAccountMenu({ me }: { me: OpsMe }) {
           <div className="h-px bg-divider-soft" />
           <MenuLink href="/staff" icon={UserRound}>プロフィールを編集</MenuLink>
           <MenuLink href="/ops/members" icon={Users} highlight>メンバー管理</MenuLink>
-          <MenuLink href="/staff" icon={ShieldCheck}>2要素認証の設定</MenuLink>
+          <MenuLink href="/ops/two-factor" icon={ShieldCheck}>{me.totpEnabled ? '2要素認証（設定済み）' : '2要素認証の設定'}</MenuLink>
           <div className="h-px bg-divider-soft" />
           <button
             type="button"
             role="menuitem"
-            onClick={() => void logoutAndGoToLogin()}
+            onClick={() => void logoutAndGoToLogin('/ops/login')}
             className="flex h-10 w-full items-center gap-2.5 px-3.5 text-label font-bold text-status-danger hover:bg-status-danger-soft"
           >
             <LogOut aria-hidden="true" className="h-4 w-4" />

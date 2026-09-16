@@ -4333,13 +4333,19 @@ export type OpsMember = {
   totpEnabled: boolean
   lineLinked: boolean
   inviteStatus: string
+  activationState: OpsMemberActivationState
+  invitedAt: string | null
   approvedBy: string | null
   lastLoginAt: string | null
   createdAt: string
 }
 
+export type OpsMemberActivationState = 'invited' | 'awaiting_totp' | 'active'
+
 export type OpsMemberSummary = {
   members: number
+  invited: number
+  awaitingTotp: number
   totpEnabled: number
   impersonationsThisMonth: number
   writeImpersonationsThisMonth: number
@@ -6319,7 +6325,9 @@ export const api = {
     },
     members: () => fetchApi<ApiResponse<OpsMember[]> & { summary: OpsMemberSummary }>('/api/ops/members'),
     addMember: (input: { staffId?: string; email?: string }) =>
-      fetchApi<ApiResponse<{ staffId: string }>>('/api/ops/members', { method: 'POST', body: JSON.stringify(input) }),
+      fetchApi<ApiResponse<{ staffId: string; activationState: OpsMemberActivationState }>>('/api/ops/members', { method: 'POST', body: JSON.stringify(input) }),
+    resendInvite: (staffId: string) =>
+      fetchApi<ApiResponse<{ staffId: string; activationState: OpsMemberActivationState }>>(`/api/ops/members/${encodeURIComponent(staffId)}/resend-invite`, { method: 'POST', body: JSON.stringify({}) }),
     setMemberActive: (staffId: string, isActive: boolean) =>
       fetchApi<ApiResponse<{ staffId: string; isActive: boolean }>>(`/api/ops/members/${encodeURIComponent(staffId)}`, { method: 'PATCH', body: JSON.stringify({ isActive }) }),
   },
