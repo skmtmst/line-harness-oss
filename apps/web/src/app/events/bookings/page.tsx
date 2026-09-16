@@ -51,6 +51,9 @@ const statusBadge: Record<string, string> = {
 const STATUS_LABELS = new Map([
   ...STATUS_TABS.map(({ key, label }) => [key, label] as const),
   ['waitlist', 'キャンセル待ち'] as const,
+  ['waiting', '待機中'] as const,
+  ['offered', '案内中'] as const,
+  ['accepted', '受諾済み'] as const,
 ])
 
 function formatJp(iso: string | null | undefined, fallback: string): string {
@@ -98,7 +101,8 @@ function OccurrenceApplicantsPanel({
   csvHref: string
 }) {
   const waitlistRows = data.applicants.filter((applicant) => applicant.source === 'waitlist')
-  const waitingCount = waitlistRows.filter((applicant) => applicant.status === 'waiting').length
+  const waitingRows = waitlistRows.filter((applicant) => applicant.status === 'waiting')
+  const waitingCount = waitingRows.length
 
   return (
     <div>
@@ -130,14 +134,16 @@ function OccurrenceApplicantsPanel({
           </thead>
             <tbody>
               {data.applicants.map((applicant) => {
-                const waitlistRank = applicant.source === 'waitlist'
-                  ? waitlistRows.findIndex((row) => row.id === applicant.id) + 1
+                const waitlistRank = applicant.source === 'waitlist' && applicant.status === 'waiting'
+                  ? waitingRows.findIndex((row) => row.id === applicant.id) + 1
                   : 0
                 return (
                   <Tr key={`${applicant.source}:${applicant.id}`}>
                     <NameCell name={applicant.displayName ?? '友だちは未取得'} sub={`${applicant.partySize}人`} />
                     <Td>
-                      {applicant.source === 'waitlist' ? `キャンセル待ち ${waitlistRank}番` : '申込'}
+                      {applicant.source === 'waitlist'
+                        ? applicant.status === 'waiting' ? `キャンセル待ち ${waitlistRank}番` : 'キャンセル待ち'
+                        : '申込'}
                     </Td>
                     <Td>
                       {STATUS_LABELS.get(applicant.status) ?? applicant.status}
@@ -180,7 +186,7 @@ function BookingsInner() {
   const [promotingWaitlist, setPromotingWaitlist] = useState(false)
   const [occurrenceActionError, setOccurrenceActionError] = useState('')
   const [broadcastMessage, setBroadcastMessage] = useState('')
-  const [broadcastPreview, setBroadcastPreview] = useState<{ broadcastId: string; recipientCount: number } | null>(null)
+  const [broadcastPreview, setBroadcastPreview] = useState<{ broadcastId: string; recipientCount: number; scope: string } | null>(null)
   const [broadcastBusy, setBroadcastBusy] = useState(false)
   const [broadcastConfirmOpen, setBroadcastConfirmOpen] = useState(false)
   const [broadcastError, setBroadcastError] = useState('')
@@ -246,6 +252,22 @@ function BookingsInner() {
     markGenerationRef.current += 1
     markRequestRef.current.clear()
     markingKeysRef.current.clear()
+  }
+  /*
+   * Aの操作中表示をBへ持ち込まない。旧Promiseのfinallyはscope guardで
+   * 書き戻せないため、切替直後のB側で操作状態を新しい空へ戻す。
+   */
+  const [occurrenceOperationScope, setOccurrenceOperationScope] = useState(scope)
+  if (occurrenceOperationScope !== scope) {
+    setOccurrenceOperationScope(scope)
+    setPromotingWaitlist(false)
+    setOccurrenceActionError('')
+    setBroadcastBusy(false)
+    setBroadcastConfirmOpen(false)
+    setBroadcastPreview(null)
+    broadcastPreviewKeyRef.current = null
+    setBroadcastMessage('')
+    setBroadcastError('')
   }
   /*
    * 行の「記録中…」と失敗文も、Bを画面へ出す前に畳む。描画中に
@@ -598,8 +620,10 @@ function BookingsInner() {
     } catch {
       if (scopeRef.current !== startedScope) return
       /* 409を含め、再読込して最新の順位・期限を先に見せる。 */
-      setOccurrenceActionError('案内を更新できませんでした。ほかの操作で順番や空席が変わった可能性があります。最新の状態を読み直してから、もう一度お試しください。')
       await refreshOccurrenceApplicants()
+      if (scopeRef.current === startedScope) {
+        setOccurrenceActionError('案内を更新できませんでした。ほかの操作で順番や空席が変わった可能性があります。最新の状態を読み直してから、もう一度お試しください。')
+      }
     } finally {
       if (scopeRef.current === startedScope) setPromotingWaitlist(false)
     }
@@ -622,7 +646,7 @@ function BookingsInner() {
         snapshotId: occurrenceApplicants.snapshotId,
       }, idempotencyKey)
       if (scopeRef.current !== startedScope) return
-      setBroadcastPreview(result)
+      setBroadcastPreview({ ...result, scope: startedScope })
     } catch {
       if (scopeRef.current !== startedScope) return
       setBroadcastError('対象を確定できませんでした。内容を確認して、もう一度お試しください。')
@@ -632,19 +656,22 @@ function BookingsInner() {
   }
 
   async function sendOccurrenceBroadcast() {
-    if (!broadcastPreview || broadcastBusy) return
+    if (!broadcastPreview || broadcastPreview.scope !== scope || broadcastBusy) return
+    const startedScope = scope
     setBroadcastBusy(true)
     setBroadcastError('')
     try {
       await api.broadcasts.send(broadcastPreview.broadcastId)
+      if (scopeRef.current !== startedScope) return
       setBroadcastConfirmOpen(false)
       setBroadcastMessage('')
       setBroadcastPreview(null)
       broadcastPreviewKeyRef.current = null
     } catch {
+      if (scopeRef.current !== startedScope) return
       setBroadcastError('送信を開始できませんでした。まだ送られていない可能性があるため、配信一覧で状態を確認してから再試行してください。')
     } finally {
-      setBroadcastBusy(false)
+      if (scopeRef.current === startedScope) setBroadcastBusy(false)
     }
   }
 
@@ -655,6 +682,9 @@ function BookingsInner() {
   const capacity = summary?.totalCapacity ?? 0
   const pageCount = Math.max(1, Math.ceil(bookingsTotal / PAGE_SIZE))
   const currentPage = Math.min(page, pageCount)
+  const selectedAccountRole = accounts.find((account) => account.id === selectedAccountId)?.role
+  const canManageApplicantBroadcast = selectedAccountRole === 'owner' || selectedAccountRole === 'admin'
+  const activeBroadcastPreview = broadcastPreview?.scope === scope ? broadcastPreview : null
 
   return (
     <div>
@@ -789,43 +819,47 @@ function BookingsInner() {
               onPromote={() => void promoteWaitlist()}
               csvHref={eventsApi.occurrenceApplicantsCsvUrl(selectedAccountId!, occurrenceApplicants.occurrence.id, occurrenceApplicants.snapshotId)}
             />
-            <div className="border-hairline mt-4 border-t pt-4">
-              <h4 className="text-ink font-medium">この開催回の申込者へ一斉送信</h4>
-              <p className="text-ink-faint mt-1 text-xs">対象はこの確認時点の申込者で固定します。確認後の申込・取消・タグ変更では宛先を入れ替えません。</p>
-              <textarea
-                value={broadcastMessage}
-                onChange={(event) => {
-                  setBroadcastMessage(event.target.value)
-                  setBroadcastPreview(null)
-                  setBroadcastError('')
-                  broadcastPreviewKeyRef.current = null
-                }}
-                rows={3}
-                maxLength={5000}
-                aria-label="申込者へ送るメッセージ"
-                placeholder="申込者へ送るご案内を書いてください"
-                className="border-hairline rounded-control mt-3 w-full border px-3 py-2 text-sm"
-              />
-              <div className="mt-2 flex flex-wrap items-center gap-3">
-                <Button onClick={() => void previewOccurrenceBroadcast()} disabled={broadcastBusy || broadcastMessage.trim() === ''}>
-                  {broadcastBusy ? '対象を確定中…' : '対象と内容を確認'}
-                </Button>
-                {broadcastPreview && <span className="text-ink-secondary text-sm">送信対象 {broadcastPreview.recipientCount}人</span>}
-                {broadcastPreview && <Button onClick={() => setBroadcastConfirmOpen(true)} disabled={broadcastBusy}>送信前の最終確認へ</Button>}
-              </div>
-              {broadcastError && <p className="text-danger mt-2 text-sm" role="alert">{broadcastError}</p>}
-            </div>
-            <ConfirmDialog
-              open={broadcastConfirmOpen}
-              title="この申込者へ送信を開始しますか？"
-              description={`確認済みの ${broadcastPreview?.recipientCount ?? 0} 人へ送信します。送信開始後は取り消せません。`}
-              confirmLabel="送信を開始"
-              cancelLabel="戻る"
-              busy={broadcastBusy}
-              error={broadcastError}
-              onConfirm={() => void sendOccurrenceBroadcast()}
-              onCancel={() => { if (!broadcastBusy) setBroadcastConfirmOpen(false) }}
-            />
+            {canManageApplicantBroadcast && (
+              <>
+                <div className="border-hairline mt-4 border-t pt-4">
+                  <h4 className="text-ink font-medium">この開催回の申込者へ一斉送信</h4>
+                  <p className="text-ink-faint mt-1 text-xs">対象はこの確認時点の申込者で固定します。確認後の申込・取消・タグ変更では宛先を入れ替えません。</p>
+                  <textarea
+                    value={broadcastMessage}
+                    onChange={(event) => {
+                      setBroadcastMessage(event.target.value)
+                      setBroadcastPreview(null)
+                      setBroadcastError('')
+                      broadcastPreviewKeyRef.current = null
+                    }}
+                    rows={3}
+                    maxLength={5000}
+                    aria-label="申込者へ送るメッセージ"
+                    placeholder="申込者へ送るご案内を書いてください"
+                    className="border-hairline rounded-control mt-3 w-full border px-3 py-2 text-sm"
+                  />
+                  <div className="mt-2 flex flex-wrap items-center gap-3">
+                    <Button onClick={() => void previewOccurrenceBroadcast()} disabled={broadcastBusy || broadcastMessage.trim() === ''}>
+                      {broadcastBusy ? '対象を確定中…' : '対象と内容を確認'}
+                    </Button>
+                    {activeBroadcastPreview && <span className="text-ink-secondary text-sm">送信対象 {activeBroadcastPreview.recipientCount}人</span>}
+                    {activeBroadcastPreview && <Button onClick={() => setBroadcastConfirmOpen(true)} disabled={broadcastBusy}>送信前の最終確認へ</Button>}
+                  </div>
+                  {broadcastError && <p className="text-danger mt-2 text-sm" role="alert">{broadcastError}</p>}
+                </div>
+                <ConfirmDialog
+                  open={broadcastConfirmOpen && activeBroadcastPreview !== null}
+                  title="この申込者へ送信を開始しますか？"
+                  description={`確認済みの ${activeBroadcastPreview?.recipientCount ?? 0} 人へ送信します。送信開始後は取り消せません。`}
+                  confirmLabel="送信を開始"
+                  cancelLabel="戻る"
+                  busy={broadcastBusy}
+                  error={broadcastError}
+                  onConfirm={() => void sendOccurrenceBroadcast()}
+                  onCancel={() => { if (!broadcastBusy) setBroadcastConfirmOpen(false) }}
+                />
+              </>
+            )}
           </>
         ) : null}
       </section>
