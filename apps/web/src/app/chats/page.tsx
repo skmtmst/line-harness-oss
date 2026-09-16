@@ -28,6 +28,7 @@ import ImageUploader, { type ImageUploaderValue } from '@/components/shared/imag
 import { Suspense } from 'react'
 import EmailThread from '@/components/support/email-thread'
 import Button from '@/components/shared/button'
+import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import { MoreAction } from '@/components/shared/row-actions'
 import { CheckCircle2, Link2, NotebookPen, PanelRightClose, PanelRightOpen, Star, X } from 'lucide-react'
 
@@ -75,6 +76,7 @@ const statusFilters: { key: StatusFilter; label: string }[] = [
 ]
 
 import { normalizeSavedViewConditions, type InboxSavedViewConditions } from './saved-view-types'
+import { savedViewFailureMessage } from './saved-view-failure'
 import { savedViewSummary } from './saved-view-summary'
 import { buildOutgoingMessage, refreshChatListAfterSend } from './send-optimistic'
 import { describeSendFailure } from './send-failure'
@@ -743,13 +745,13 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
         // ページ丁度いっぱい返ってきた = 続きがある可能性が高い
         setHasMoreChats(rows.length === CHAT_PAGE_SIZE)
       } else {
+        // 一覧の失敗は一覧の中の失敗行(再読み込みボタンつき)が伝える。
+        // 上部の汎用 error は送信・詳細など別の操作の失敗に使う(N-030)。
         setChatListFailed(true)
-        setError('チャットの読み込みに失敗しました。もう一度お試しください。')
       }
     } catch {
       if (listFilterKeyRef.current !== listFilterKey || chatListRequestRef.current !== requestId) return
       setChatListFailed(true)
-      setError('チャットの読み込みに失敗しました。もう一度お試しください。')
     } finally {
       if (listFilterKeyRef.current === listFilterKey && chatListRequestRef.current === requestId) {
         setChatListCompletedKey(listFilterKey)
@@ -982,9 +984,14 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
       setSavedViewsOpen(true)
       setSavedViewSuccess(true)
       return { success: true }
-    } catch {
-      // API番号や通信ライブラリの文を、そのまま運用者へ見せない。
-      const message = '保存できませんでした。時間を置いてもう一度お試しください。'
+    } catch (reason) {
+      /*
+        **失敗の種類で言い分ける。** fetchApi は !ok を ApiError として投げる
+        ので、409(同名の競合)も403(権限)も通信障害もここへ来る。全部を
+        「時間を置いて」と言うと、名前を変えれば直る競合まで待たせてしまう
+        (N-027)。文言は運用者向けに作り、APIの内部文言は素通ししない。
+      */
+      const message = savedViewFailureMessage(reason)
       setSavedViewError(message)
       return { success: false, error: message }
     } finally {
@@ -1584,6 +1591,24 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     }
   }
 
+  /*
+   * 内部メモの紙を閉じる。Escape・キャンセル・フォーカス戻しで
+   * 共通なので1か所にする(N-031)。
+   */
+  const closeMemoEditor = useCallback(() => {
+    setMemoDraft(chatDetail?.notes ?? '')
+    setMemoError('')
+    setShowMemoEditor(false)
+  }, [chatDetail?.notes])
+
+  /*
+   * role="dialog" の紙なのに Tab が裏の送信欄へ抜け、閉じても
+   * フォーカスがボタンへ戻らなかった(N-031)。共通部品と同じ
+   * useOverlayFocus で、Tabを紙の中に留め・Escapeで閉じ・
+   * 閉じたら開いたボタンへフォーカスを戻す。
+   */
+  const memoPopoverRef = useOverlayFocus(showMemoEditor, closeMemoEditor, memoSaving)
+
   const handleSaveMemo = async () => {
     if (!selectedChatId || memoSaving) return
     setMemoSaving(true)
@@ -1992,6 +2017,24 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                       className="mt-1.5 text-sm font-semibold text-danger underline underline-offset-2"
                     >
                       メールを読み込み直す
+                    </button>
+                  </div>
+                )}
+                {/*
+                  LINE一覧の失敗行。メールだけ見ているときは出さない。
+                  「もう一度お試しください」とだけ書かれた帯では、直す手段が
+                  ページ全体の再読み込みしかない(N-030)。失敗した一覧の場所で
+                  同じ条件の再取得へ戻れるようにする。
+                */}
+                {channel !== 'email' && chatListFailed && (
+                  <div role="alert" className="border-b border-hairline bg-danger-bg px-4 py-3">
+                    <p className="text-sm text-danger">チャットの読み込みに失敗しました。</p>
+                    <button
+                      type="button"
+                      onClick={() => { void loadChats() }}
+                      className="mt-1.5 text-sm font-semibold text-danger underline underline-offset-2"
+                    >
+                      会話を読み込み直す
                     </button>
                   </div>
                 )}
@@ -2671,13 +2714,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                     role="dialog"
                     aria-labelledby="chat-internal-memo-title"
                     data-inbox-v6="internal-memo-popover"
-                    onKeyDown={(event) => {
-                      if (event.key !== 'Escape') return
-                      event.stopPropagation()
-                      setMemoDraft(chatDetail?.notes ?? '')
-                      setMemoError('')
-                      setShowMemoEditor(false)
-                    }}
+                    ref={memoPopoverRef}
                     className="border-hairline rounded-panel shadow-float absolute bottom-full left-4 z-30 mb-2 w-[calc(100%-2rem)] max-w-[760px] border bg-canvas p-5"
                   >
                     <div className="flex items-start justify-between gap-3">
@@ -2698,7 +2735,6 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                       value={memoDraft}
                       onChange={(event) => setMemoDraft(event.target.value)}
                       rows={4}
-                      autoFocus
                       placeholder="例：次回返信時に配送先住所を確認する"
                       className="border-hairline focus:border-accent focus:ring-accent/15 rounded-control mt-3 w-full resize-y border bg-canvas px-3 py-2 text-sm leading-6 outline-none focus:ring-2"
                     />
@@ -2708,11 +2744,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                       <div className="flex shrink-0 items-center gap-2">
                         {/* 設計 `B7CER8` の2つは h36・角丸8・13px・600。共通ボタンと同値。 */}
                         <Button
-                          onClick={() => {
-                            setMemoDraft(chatDetail?.notes ?? '')
-                            setMemoError('')
-                            setShowMemoEditor(false)
-                          }}
+                          onClick={closeMemoEditor}
                         >
                           キャンセル
                         </Button>

@@ -2,7 +2,7 @@
 
 import SelectField from '@/components/shared/select-field'
 import { useEffect, useState } from 'react'
-import { api } from '@/lib/api'
+import { api, ApiError } from '@/lib/api'
 import type { TrafficPool, PoolAccount, LineAccount } from '@line-crm/shared'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -18,11 +18,19 @@ export default function PoolsPage() {
   const load = async () => {
     setLoading(true)
     setError('')
-    const [poolsRes, accRes] = await Promise.all([api.pools.list(), api.lineAccounts.list()])
-    if (poolsRes.success) setPools(poolsRes.data)
-    else setError('プール一覧の取得に失敗しました')
-    if (accRes.success) setAccounts(accRes.data)
-    setLoading(false)
+    try {
+      const [poolsRes, accRes] = await Promise.all([api.pools.list(), api.lineAccounts.list()])
+      if (poolsRes.success) setPools(poolsRes.data)
+      else setError('プール一覧の取得に失敗しました')
+      if (accRes.success) setAccounts(accRes.data)
+    } catch (err) {
+      // FEATURE_DISABLED は共通ゲートが案内へ切り替える。それ以外だけここで伝える。
+      if (!(err instanceof ApiError && err.code === 'FEATURE_DISABLED')) {
+        setError('プール一覧の取得に失敗しました')
+      }
+    } finally {
+      setLoading(false)
+    }
   }
 
   useEffect(() => {

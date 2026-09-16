@@ -14,6 +14,9 @@ import { shouldShowReferralRow } from './visibility'
 import { exportFileName, jstTodayString, toCsv } from './inflow-export'
 import { Suspense } from 'react'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
+import { FeatureDisabledScreen } from '@/components/feature-disabled-gate'
+import { useFeatureVisibility } from '@/lib/use-feature-visibility'
+import type { FeatureKey } from '@/lib/feature-settings'
 import AdIntegration from './ad-integration'
 import SiteScript from '@/components/inflow-links/site-script'
 import { TableHeadRow, Th } from '@/components/shared/table'
@@ -112,6 +115,14 @@ const MERGED_TABS = [
   { key: 'connections', label: '広告とのつなぎ 5' },
 ]
 
+/**
+ * タブと機能キーの対応。サイトスクリプトは site_tracking(#859)で止める。
+ * 流入経路・広告連携は inflow_tracking のまま（ページ自体のキー）。
+ */
+const TAB_FEATURE: Partial<Record<string, FeatureKey>> = {
+  script: 'site_tracking',
+}
+
 function InflowLinksPageInner() {
   const { selectedAccountId } = useAccount()
   const latestAccountRef = useRef(selectedAccountId)
@@ -187,7 +198,12 @@ function InflowLinksPageInner() {
           success: false as const,
           data: [] as EntryRouteGenre[],
         })),
-        api.pools.list(),
+        // プールは補助データ。multi_store_hierarchy がオフでも画面全体を
+        // 共通ゲートへ切り替えず、プール列だけ無しで既存リンクを表示する。
+        api.pools.list({ suppressFeatureDisabledEvent: true }).catch(() => ({
+          success: false as const,
+          data: [] as TrafficPool[],
+        })),
         api.scenarios.list(),
         api.messageTemplates.list(),
         api.tags.list().catch(() => ({ success: false, data: [] as Tag[] })),
@@ -227,7 +243,10 @@ function InflowLinksPageInner() {
       // many pools exist.
       if (p.success) {
         const batch = p.data.length > 0
-          ? await api.pools.listAccounts(p.data.map((pool) => pool.id))
+          ? await api.pools.listAccounts(
+              p.data.map((pool) => pool.id),
+              { suppressFeatureDisabledEvent: true },
+            )
           : { success: true as const, data: [] }
         if (!isCurrent()) return
         if (batch.success) {
@@ -1178,16 +1197,34 @@ function ReferralQrModal({
 }
 
 function InflowLinksPageHost() {
+  const { selectedAccountId } = useAccount()
+  const visibility = useFeatureVisibility(selectedAccountId)
   const tab = useMergedTab(MERGED_TABS)
   const params = useSearchParams()
   const adView = params.get('view') === 'history' ? 'history' : 'connections'
+  const visibleTabs = MERGED_TABS.filter(
+    (item) => !TAB_FEATURE[item.key] || visibility.enabled(TAB_FEATURE[item.key]!),
+  )
+  const tabFeature = TAB_FEATURE[tab]
+  // 直URL（?tab=script）でも本文へ進ませず、機能設定への導線を出す。
+  const tabBlocked =
+    !!tabFeature && visibility.status === 'ready' && !visibility.enabled(tabFeature)
   return (
     <div>
-      <MergedTabs basePath="/inflow-links" tabs={MERGED_TABS} active={tab} />
-      {tab === 'links' && <InflowLinksPageInner />}
-      {tab === 'script' && <SiteScript />}
-      {tab === 'ads' && <AdIntegration view="metrics" />}
-      {tab === 'connections' && <AdIntegration view={adView} />}
+      <MergedTabs basePath="/inflow-links" tabs={visibleTabs} active={tab} />
+      {tabBlocked ? (
+        <FeatureDisabledScreen featureId={tabFeature} />
+      ) : (
+        <>
+          {tab === 'links' && <InflowLinksPageInner />}
+          {/* 機能状態が確定するまで SiteScript を載せない。読み込み中の
+              一瞬に計測APIを呼ぶと、offのaccountで403が画面全体のゲートを
+              起こしてしまう。 */}
+          {tab === 'script' && visibility.status === 'ready' && <SiteScript />}
+          {tab === 'ads' && <AdIntegration view="metrics" />}
+          {tab === 'connections' && <AdIntegration view={adView} />}
+        </>
+      )}
     </div>
   )
 }

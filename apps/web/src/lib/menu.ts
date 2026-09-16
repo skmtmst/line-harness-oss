@@ -99,7 +99,7 @@ export const MENU_SECTIONS: MenuSection[] = [
       { href: '/templates', label: 'テンプレート', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' , id: 'templates', note: '差し込み変数付きの文面', featureKey: 'templates' },
       { href: '/rich-menus', label: 'リッチメニュー', icon: 'M4 4h6v6H4V4zm0 10h6v6H4v-6zm10-10h6v6h-6V4zm0 10h6v6h-6v-6z' , id: 'rich-menus', note: 'トーク下部のメニューと出し分け', featureKey: 'rich_menus' },
       { href: '/form-submissions', label: '回答フォーム', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2' , id: 'forms', note: 'フォームの作成と、友だち情報欄への記録', featureKey: 'forms' },
-      { href: '/contents/vars', label: '共通情報', icon: 'M4 7V4h16v3M9 20h6M12 4v16' , id: 'common-vars', note: '会社名・営業時間など、アカウント内で共通に使う文字。テンプレートに差し込める', featureKey: 'media' },
+      { href: '/contents/vars', label: '共通情報', icon: 'M4 7V4h16v3M9 20h6M12 4v16' , id: 'common-vars', note: '会社名・営業時間など、アカウント内で共通に使う文字。テンプレートに差し込める', featureKey: 'common_vars' },
       { href: '/contents', label: '登録メディア一覧', icon: 'M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z' , id: 'contents', note: '配信で使う画像・動画・ファイルの置き場', featureKey: 'media' },
     ],
   },
@@ -158,6 +158,8 @@ export const MENU_SECTIONS: MenuSection[] = [
       // **統括の店舗管理（/hq）とは別のもの。** こちらは送受信に使う
       // LINE公式アカウントそのものの設定。
       { href: '/accounts', label: 'LINEアカウント', icon: 'M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.86 9.86 0 01-4-.8L3 21l1.9-3.8A7.9 7.9 0 013 12c0-4.418 4.03-8 9-8s9 3.582 9 8z' , id: 'line-accounts', note: '送受信に使うLINE公式アカウントと接続の状態', required: true },
+      // 複数のLINEアカウントを「店舗のまとまり」へ振り分ける層。multi_store_hierarchy の受け口。
+      { href: '/pools', label: 'プール管理', icon: 'M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10' , id: 'pools', note: '複数のLINEアカウントを店舗のまとまりとして管理します', featureKey: 'multi_store_hierarchy' },
       { href: '/staff', label: 'ログインユーザー', icon: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z' , id: 'staff', note: '管理画面に入る人と、その権限', required: true },
       { href: '/settings', label: '機能設定', icon: 'M4 6h16M4 12h16M4 18h7' , id: 'settings', note: 'この画面。項目の表示と並びを決めます', required: true },
       { href: '/emergency', label: '運用状態', icon: 'M13 10V3L4 14h7v7l9-11h-7z', badge: 'operations' , id: 'emergency', note: '配信の停止・再開と、異常の記録', required: true },

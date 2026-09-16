@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import type { EntryRoute, NotificationCenterData, NotificationCenterItem } from '@line-crm/shared'
 import { ApiError, api, bookingApi, type BookingRequest, type DashboardOverview } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
+import { useFeatureVisibility } from '@/lib/use-feature-visibility'
 import { formatDurationMinutes, formatWaitRough } from '@/lib/format-duration'
 import PendingInboxCard, { type PendingInboxSummary } from '@/components/support/pending-inbox-card'
 import ShipmentPanel, { type ShipmentSummary } from '@/components/dashboard/shipment-panel'
@@ -422,7 +423,11 @@ export default function DashboardPage() {
   selectedAccountIdRef.current = selectedAccountId
   notificationFilterRef.current = notificationFilter
   const visibleMain = preferences.main.filter((item) => item.visible)
-  const visibleRight = preferences.right.filter((item) => item.visible)
+  // 対応状況カードは support_marks の画面。オフのaccountではカードごと出さない。
+  const supportMarksEnabled = useFeatureVisibility(selectedAccountId).enabled('support_marks')
+  const visibleRight = preferences.right
+    .filter((item) => item.visible)
+    .filter((item) => item.id !== 'support-mark-status' || supportMarksEnabled)
   const visibleToday = preferences.today.filter((item) => item.visible)
   const shipmentVisible = visibleMain.some((item) => item.id === 'shipment')
   const needsPhotos = visibleToday.some((item) => item.id === 'today-photo-review')
@@ -644,7 +649,7 @@ export default function DashboardPage() {
       needsBookings ? bookingApi.listRequests(selectedAccountId, 'all', { from: todayStartIso, limit: 100 }) : Promise.resolve(null),
       needsHealth ? api.health.getHealth(selectedAccountId) : Promise.resolve(null),
       needsTwoFactor ? api.staff.list() : Promise.resolve(null),
-      needsSupportMarks ? api.supportMarks.list(selectedAccountId) : Promise.resolve(null),
+      needsSupportMarks ? api.supportMarks.list(selectedAccountId, { suppressFeatureDisabledEvent: true }) : Promise.resolve(null),
     ]).then(([photoResult, bookingResult, healthResult, staffResult, supportMarkResult]) => {
       if (cancelled) return
       const photoCount = photoResult.status === 'fulfilled' && photoResult.value?.success

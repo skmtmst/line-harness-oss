@@ -88,6 +88,44 @@ describe('Sidebarのstaff向け機能表示read-model', () => {
     expect(fixture.get).not.toHaveBeenCalled()
   })
 
+  it('multi_store_hierarchy: offと応答欠落では「プール管理」を出さず、onで出す(#860)', async () => {
+    window.localStorage.setItem('lh_staff_role', 'staff')
+    window.localStorage.setItem('lh_staff_permissions', JSON.stringify(['/broadcasts', '/pools']))
+    fixture.visibility.mockResolvedValue({
+      success: true,
+      data: { features: { multi_store_hierarchy: false, broadcasts: true } },
+    })
+    const view = render(<Sidebar />)
+    await waitFor(() => expect(fixture.visibility).toHaveBeenCalledWith('account-1'))
+    act(() => window.dispatchEvent(new CustomEvent('line-harness:feature-settings-updated')))
+    await waitFor(() => expect(view.getAllByText('一斉配信')).not.toHaveLength(0))
+    expect(view.queryAllByText('プール管理')).toHaveLength(0)
+    // 必須の基本ナビは機能キーを持たないので残る。
+    expect(view.getAllByText('ダッシュボード')).not.toHaveLength(0)
+    cleanup()
+
+    fixture.visibility.mockResolvedValue({
+      success: true,
+      data: { features: { broadcasts: true } },
+    })
+    const missing = render(<Sidebar />)
+    await waitFor(() => expect(fixture.visibility).toHaveBeenCalledTimes(2))
+    act(() => window.dispatchEvent(new CustomEvent('line-harness:feature-settings-updated')))
+    await waitFor(() => expect(missing.getAllByText('一斉配信')).not.toHaveLength(0))
+    expect(missing.queryAllByText('プール管理')).toHaveLength(0)
+    cleanup()
+
+    fixture.visibility.mockResolvedValue({
+      success: true,
+      data: { features: { multi_store_hierarchy: true, broadcasts: true } },
+    })
+    const enabled = render(<Sidebar />)
+    await waitFor(() => expect(fixture.visibility).toHaveBeenCalled())
+    act(() => window.dispatchEvent(new CustomEvent('line-harness:feature-settings-updated')))
+    await waitFor(() => expect(enabled.getAllByText('プール管理')).not.toHaveLength(0))
+    expect(enabled.getAllByText('一斉配信')).not.toHaveLength(0)
+  })
+
   it('ownerも表示可否は最小read-modelから読み、管理GETは並び用に追加する', async () => {
     window.localStorage.setItem('lh_staff_role', 'owner')
     expect(window.localStorage.getItem('lh_staff_role')).toBe('owner')

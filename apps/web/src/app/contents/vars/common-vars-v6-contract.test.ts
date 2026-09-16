@@ -93,4 +93,15 @@ describe('V6共通情報一覧', () => {
     expect(WORKER).toContain('canAccessAllLineAccounts')
     expect(WORKER).toContain('getCommonVarUsageSummaries')
   })
+
+  it('一覧・新規・編集は共通情報キーのゲートの内側にある(#862)', () => {
+    for (const [name, src] of [['一覧', PAGE], ['新規', NEW_PAGE], ['編集', EDIT_PAGE]] as const) {
+      expect(src, name).toContain('FeatureGate')
+      expect(src, name).toContain('feature="common_vars"')
+    }
+    // 登録メディア一覧はメディアキーで閉じる（共通情報とは別キー）。
+    const mediaPage = readFileSync(join(HERE, '..', 'page.tsx'), 'utf8')
+    expect(mediaPage).toContain('FeatureGate')
+    expect(mediaPage).toContain('feature="media"')
+  })
 })

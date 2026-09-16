@@ -31,6 +31,12 @@ export type FeatureKey =
   | 'ec_commerce'
   | 'line_notifications'
   | 'restaurant_test'
+  | 'multi_store_hierarchy'
+  | 'friend_fields'
+  | 'support_marks'
+  | 'saved_searches'
+  | 'common_vars'
+  | 'site_tracking'
 
 export interface FeatureItem {
   id: string
@@ -81,6 +87,12 @@ export const DEFAULT_FEATURES: Record<FeatureKey, boolean> = {
   ec_commerce: true,
   line_notifications: true,
   restaurant_test: true,
+  multi_store_hierarchy: false,
+  friend_fields: true,
+  support_marks: true,
+  saved_searches: true,
+  common_vars: true,
+  site_tracking: true,
 }
 
 function toFeatureItem(item: MenuItem): FeatureItem {

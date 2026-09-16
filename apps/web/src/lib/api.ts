@@ -2038,7 +2038,17 @@ function reportServerFailure(path: string, status: number): void {
   })()
 }
 
-export async function fetchApi<T>(path: string, options?: RequestInit): Promise<T> {
+/**
+ * fetchApi の呼び出し側だけが決める挙動。
+ * 機能の本体画面ではない場所（流入計測のプール候補など）から補助データとして
+ * 任意機能のAPIを呼ぶとき、その機能がオフでも画面全体を共通ゲートへ
+ * 切り替えないよう FEATURE_DISABLED の合図を出さない。
+ */
+export interface FetchApiOptions extends RequestInit {
+  suppressFeatureDisabledEvent?: boolean
+}
+
+export async function fetchApi<T>(path: string, options?: FetchApiOptions): Promise<T> {
   const method = (options?.method ?? 'GET').toUpperCase()
   const csrfHeaders: Record<string, string> = {}
   if (MUTATING_METHODS.has(method)) {
@@ -2071,7 +2081,7 @@ export async function fetchApi<T>(path: string, options?: RequestInit): Promise<
   if (!res.ok) {
     const raw = await res.text()
     const code = extractApiErrorCode(raw)
-    announceFeatureDisabled(res.status, code, raw)
+    if (!options?.suppressFeatureDisabledEvent) announceFeatureDisabled(res.status, code, raw)
     throw new ApiError(
       res.status,
       extractApiErrorMessage(raw, res.status),
@@ -4667,7 +4677,7 @@ export const api = {
    * 既存の値の意味が変わったり、テンプレートの差し込みが空になったりする。
    */
   friendFields: {
-    list: (accountId: string, params?: { folderId?: string; withUsage?: boolean }) => {
+    list: (accountId: string, params?: { folderId?: string; withUsage?: boolean }, options?: FetchApiOptions) => {
       const q = new URLSearchParams()
       q.set('lineAccountId', accountId)
       if (params?.folderId) q.set('folderId', params.folderId)
@@ -4675,6 +4685,7 @@ export const api = {
       const query = q.toString()
       return fetchApi<ApiResponse<FriendField[]>>(
         `/api/friend-fields${query ? `?${query}` : ''}`,
+        options,
       )
     },
     stats: (accountId: string) =>
@@ -4728,9 +4739,10 @@ export const api = {
         { method: 'DELETE' },
       ),
     /** 1人ぶんの全項目と値。個人情報は役割で絞られる。 */
-    forFriend: (friendId: string) =>
+    forFriend: (friendId: string, options?: FetchApiOptions) =>
       fetchApi<ApiResponse<{ items: FriendField[]; hiddenPersonalCount: number }>>(
         `/api/friends/${friendId}/fields`,
+        options,
       ),
     /** まとめて更新。EC が正の項目は無視され warnings に理由が入る。 */
     saveForFriend: (friendId: string, values: Record<string, string | null>) =>
@@ -4746,9 +4758,10 @@ export const api = {
   },
   /** 対応マーク。友だちの対応状況を運用側の言葉で持つ。 */
   supportMarks: {
-    list: (accountId: string) =>
+    list: (accountId: string, options?: FetchApiOptions) =>
       fetchApi<ApiResponse<SupportMarkListItem[]>>(
         `/api/support-marks?lineAccountId=${encodeURIComponent(accountId)}`,
+        options,
       ),
     create: (accountId: string, data: {
       name: string
@@ -5571,9 +5584,10 @@ export const api = {
   },
   /** 共通情報。営業時間などを1か所で直す。 */
   commonVars: {
-    list: (accountId: string, params?: { folderId?: string }) =>
+    list: (accountId: string, params?: { folderId?: string }, options?: FetchApiOptions) =>
       fetchApi<CommonVarsListResponse>(
         `/api/common-vars?accountId=${encodeURIComponent(accountId)}${params?.folderId ? `&folderId=${encodeURIComponent(params.folderId)}` : ''}`,
+        options,
       ),
     detail: (id: string, accountId: string) =>
       fetchApi<ApiResponse<CommonVarDetail>>(
@@ -9465,10 +9479,12 @@ export const api = {
       >('/api/tracked-links'),
   },
   pools: {
-    list: () => fetchApi<ApiResponse<TrafficPool[]>>('/api/traffic-pools'),
-    listAccounts: (ids: string[]) =>
+    list: (options?: FetchApiOptions) =>
+      fetchApi<ApiResponse<TrafficPool[]>>('/api/traffic-pools', options),
+    listAccounts: (ids: string[], options?: FetchApiOptions) =>
       fetchApi<ApiResponse<Array<{ poolId: string; accounts: PoolAccount[] }>>>(
         `/api/traffic-pools/accounts?ids=${encodeURIComponent(ids.join(','))}`,
+        options,
       ),
     get: (id: string) => fetchApi<ApiResponse<TrafficPool>>(`/api/traffic-pools/${id}`),
     create: (data: { slug: string; name: string; activeAccountId: string }) =>
@@ -9671,9 +9687,10 @@ export const api = {
       ),
   },
   friendSavedViews: {
-    list: (accountId: string) =>
+    list: (accountId: string, options?: FetchApiOptions) =>
       fetchApi<ApiResponse<{ items: FriendSavedView[]; total: number }>>(
         `/api/friends/saved-views?lineAccountId=${encodeURIComponent(accountId)}`,
+        options,
       ),
     create: (accountId: string, body: { name: string; conditions: SavedSearchConditions; isShared?: boolean }) =>
       fetchApi<ApiResponse<FriendSavedView>>(

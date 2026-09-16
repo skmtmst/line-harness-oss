@@ -63,7 +63,7 @@ const DESIGN: Array<{ section: string | null; items: string[] }> = [
     LINEアカウントはその段1の飛び先。LINEアカウントは要件 v6-33 §5-3。
     **統括の店舗管理（/hq）とは別**で、送受信に使う LINE公式アカウントそのものの設定。
   */
-  { section: '設定', items: ['はじめの設定', 'LINEアカウント', 'ログインユーザー', '機能設定', '運用状態', 'EC連携', 'LINE通知'] },
+  { section: '設定', items: ['はじめの設定', 'LINEアカウント', 'プール管理', 'ログインユーザー', '機能設定', '運用状態', 'EC連携', 'LINE通知'] },
   {
     section: '飲食店向け（テスト）',
     items: [
@@ -131,6 +131,7 @@ const ROUTES: Record<string, string> = {
   LINE通知: '/line-notifications',
   はじめの設定: '/getting-started',
   LINEアカウント: '/accounts',
+  プール管理: '/pools',
   ログインユーザー: '/staff',
   機能設定: '/settings',
   運用状態: '/emergency',
@@ -165,8 +166,9 @@ describe('サイドバーが V6正式共通メニューの契約と一致する'
     // 2026-09-04: 「設定」区分の先頭に「はじめの設定」（要件 v6-34 §5-2）と
     // 「LINEアカウント」（要件 v6-33 §5-3）を足して 43。
     // 2026-09-16: 専用機能に「会員」（★V6 37-1）を足して 44。
+    // 2026-09-21: 「設定」に「プール管理」（multi_store_hierarchy の受け口、#860）を足して 45。
     const total = actual.reduce((sum, s) => sum + s.items.length, 0);
-    expect(total).toBe(44);
+    expect(total).toBe(45);
   });
 
   it('項目の行き先が仕様どおり', () => {

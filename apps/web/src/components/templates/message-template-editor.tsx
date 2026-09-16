@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useRef, type ReactNode } from 'react'
 import { listInterpolations, type CommonVar, type FriendField } from '@line-crm/shared'
+import { useFeatureVisibility } from '@/lib/use-feature-visibility'
 import Button from '@/components/shared/button'
 import { Field, TextArea } from '@/components/shared/form-controls'
 import SelectField from '@/components/shared/select-field'
@@ -169,6 +170,10 @@ export function TemplateInsertControls({
   commonVars,
   onInsert,
 }: InsertControlsProps) {
+  // 友だち情報・共通情報は任意機能。オフのaccountでは差し込み口ごと出さない。
+  const featureVisibility = useFeatureVisibility(accountId)
+  const fieldsEnabled = featureVisibility.enabled('friend_fields')
+  const varsEnabled = featureVisibility.enabled('common_vars')
   const choose = (value: string) => {
     if (value) onInsert(value)
   }
@@ -176,8 +181,12 @@ export function TemplateInsertControls({
     <div aria-label="利用できる差し込み項目" className="space-y-2">
       <div className="flex flex-wrap gap-2">
         <Button size="field" disabled={disabled} onClick={() => onInsert('{{name}}')}>名前</Button>
-        <SelectField aria-label="友だち情報を差し込む" value="" disabled={disabled || !accountId || state !== 'ready' || friendFields.length === 0} onChange={(event) => choose(event.target.value)} options={[{ value: '', label: state === 'loading' ? '友だち情報を読込中' : '友だち情報を選ぶ' }, ...friendFields.map((field) => ({ value: `{{field.${field.fieldKey}}}`, label: field.name }))]} />
-        <SelectField aria-label="共通情報を差し込む" value="" disabled={disabled || !accountId || state !== 'ready' || commonVars.length === 0} onChange={(event) => choose(event.target.value)} options={[{ value: '', label: state === 'loading' ? '共通情報を読込中' : '共通情報を選ぶ' }, ...commonVars.map((item) => ({ value: `{{var.${item.varKey}}}`, label: item.name }))]} />
+        {fieldsEnabled && (
+          <SelectField aria-label="友だち情報を差し込む" value="" disabled={disabled || !accountId || state !== 'ready' || friendFields.length === 0} onChange={(event) => choose(event.target.value)} options={[{ value: '', label: state === 'loading' ? '友だち情報を読込中' : '友だち情報を選ぶ' }, ...friendFields.map((field) => ({ value: `{{field.${field.fieldKey}}}`, label: field.name }))]} />
+        )}
+        {varsEnabled && (
+          <SelectField aria-label="共通情報を差し込む" value="" disabled={disabled || !accountId || state !== 'ready' || commonVars.length === 0} onChange={(event) => choose(event.target.value)} options={[{ value: '', label: state === 'loading' ? '共通情報を読込中' : '共通情報を選ぶ' }, ...commonVars.map((item) => ({ value: `{{var.${item.varKey}}}`, label: item.name }))]} />
+        )}
         <SelectField aria-label="配信日を差し込む" value="" disabled={disabled} onChange={(event) => choose(event.target.value)} options={[{ value: '', label: '配信日を選ぶ' }, ...DATE_OPTIONS]} />
         <SelectField aria-label="その他の差し込みを選ぶ" value="" disabled={disabled} onChange={(event) => choose(event.target.value)} options={[{ value: '', label: 'その他を選ぶ' }, ...OTHER_OPTIONS]} />
         <label className="flex items-center gap-2 text-xs text-ink-secondary">
