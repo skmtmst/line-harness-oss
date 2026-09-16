@@ -53,6 +53,22 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
 }))
 
+// N-411: 画面は localStorage の権限表を読む。happy-dom では未定義なので
+// インメモリに差し替え、既定を owner（全通過）にする。
+const memStorage = vi.hoisted(() => {
+  const values = new Map<string, string>()
+  return {
+    get length() { return values.size },
+    clear: () => values.clear(),
+    getItem: (key: string) => values.get(key) ?? null,
+    key: (index: number) => [...values.keys()][index] ?? null,
+    removeItem: (key: string) => { values.delete(key) },
+    setItem: (key: string, value: string) => { values.set(key, String(value)) },
+  }
+})
+vi.stubGlobal('localStorage', memStorage)
+memStorage.setItem('lh_staff_role', 'owner')
+
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: useControllableAccount() }),
 }))

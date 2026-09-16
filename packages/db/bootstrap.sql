@@ -5292,7 +5292,7 @@ CREATE TABLE staff (
   is_active                INTEGER NOT NULL DEFAULT 1,
   deleted_at               TEXT,
   created_at               TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
-  updated_at               TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  updated_at               TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')), staff_member_id TEXT,
   FOREIGN KEY (line_account_id) REFERENCES line_accounts(id)
 );
 
@@ -7418,6 +7418,8 @@ CREATE INDEX idx_staff_break_dates_staff
 
 CREATE INDEX idx_staff_breaks_staff
   ON staff_breaks (staff_id, weekday);
+
+CREATE INDEX idx_staff_member_link ON staff (staff_member_id);
 
 CREATE UNIQUE INDEX idx_staff_members_api_key ON staff_members(api_key);
 

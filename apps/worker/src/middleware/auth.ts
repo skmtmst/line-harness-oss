@@ -225,6 +225,16 @@ const STAFF_API_PERMISSIONS: Array<[string, string]> = [
  * cannot inherit chat or friend-attribute access from the friends permission.
  */
 const STAFF_API_PERMISSION_OVERRIDES: Array<[RegExp, string]> = [
+  // 予約の細かい権限（N-411）。広い '/api/booking' → '/booking/bookings' より先に評価する。
+  // 本人勤務は route 側で「自分に紐づく予約スタッフか」を確認する。
+  [/^\/api\/booking\/admin\/staff\/me(?:\/|$)/, 'booking.staff.own'],
+  [/^\/api\/booking\/admin\/staff\/[^/]+\/(?:availability-rules|breaks|break-dates|shifts|google-calendar)(?:\/|$)/, 'booking.staff.own'],
+    // メニューと担当割当は「予約メニュー」の鍵。
+  [/^\/api\/booking\/admin\/staff-menus(?:\/|$)/, '/booking/menus'],
+  [/^\/api\/booking\/admin\/staff\/[^/]+\/menus(?:\/|$)/, '/booking/menus'],
+  [/^\/api\/booking\/admin\/menus(?:\/|$)/, '/booking/menus'],
+  // 予約設定（受付枠・資源・例外）の GET は予約の閲覧に含め、
+  // 変更は route 側で 'booking.settings' を要求する（後方互換のため）。
   // 運用状態の健全性サマリは '/health' 権限で守る（N-424）。
   // /api/accounts 全体ではなくこの配下だけを対象にする。
   [/^\/api\/accounts\/health-summary(?:\/|$)/, '/health'],

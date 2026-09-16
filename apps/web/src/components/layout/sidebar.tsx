@@ -197,9 +197,12 @@ export default function Sidebar({
         if (friendAttributesV2Mode && item.href === '/analytics') return false
         if (item.href === '/staff' && staffRole !== 'owner' && staffRole !== 'admin') return false
         if (item.href === '/accounts' && staffRole === 'staff') return false
+        // N-411: staff 専用項目（自分の勤務）は owner/admin には出さない。
+        if (item.staffOnly && staffRole !== 'staff') return false
         // 失敗時にも必須ナビは残す。任意機能だけを権限・可視性で絞る。
         // 変えられる権限でも見えるだけ権限でも、メニューには出す（N-424）。
-        if (staffRole === 'staff' && !item.required && !staffPermissions.includes(item.href) && !staffViewPermissions.includes(item.href)) return false
+        const permissionKey = item.permissionKey ?? item.href
+        if (staffRole === 'staff' && !item.required && !staffPermissions.includes(permissionKey) && !staffViewPermissions.includes(permissionKey)) return false
         const featureKey = SIDEBAR_FEATURE_BY_HREF[item.href]
         if (!featureKey) return true
         if (!currentVisibility || currentVisibility[featureKey] !== true) return false

@@ -10048,6 +10048,8 @@ export interface BookingStaff {
   sort_order: number;
   is_designation_optional: number;
   is_active: number;
+  /** N-411: 本人勤務の対象となるログインユーザー。 */
+  staff_member_id?: string | null;
 }
 
 export interface BookingMenuStaff {
@@ -10468,6 +10470,11 @@ export const bookingApi = {
   // Staff
   listStaff: (accountId: string) =>
     fetchApi<{ staff: BookingStaff[] }>(withAccount('/api/booking/admin/staff', accountId)),
+  // N-411: 自分に紐づく予約スタッフ。本人勤務の画面が自分のレコードを特定するために使う。
+  listMyStaff: (accountId?: string) =>
+    fetchApi<{ staff: BookingStaff[] }>(
+      accountId ? withAccount('/api/booking/admin/staff/me', accountId) : '/api/booking/admin/staff/me',
+    ),
   createStaff: (accountId: string, body: Partial<BookingStaff>) =>
     fetchApi<{ id: string }>(withAccount('/api/booking/admin/staff', accountId), {
       method: 'POST',
