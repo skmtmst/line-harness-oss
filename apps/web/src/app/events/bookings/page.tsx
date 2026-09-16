@@ -10,6 +10,7 @@ import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
 import SelectField from '@/components/shared/select-field'
+import { ActionCell, DataTable, NameCell, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 // #740: 一覧の Kpi と一字一句同じだったため、機能内共有の1部品へ統合した。
 import EventKpi from '@/components/events/event-kpi'
 import {
@@ -113,7 +114,7 @@ function OccurrenceApplicantsPanel({
             disabled={promoting || waitingCount === 0}
             data-occurrence-action="promote-waitlist"
           >
-            {promoting ? '案内を準備中…' : '次の方へ案内'}
+            {promoting ? '案内を送信中…' : '次の方へ案内'}
           </Button>
         </div>
       </div>
@@ -121,53 +122,44 @@ function OccurrenceApplicantsPanel({
       {data.applicants.length === 0 ? (
         <p className="text-ink-faint py-4 text-sm">この開催回には申込者もキャンセル待ちもいません。</p>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[720px] text-sm">
-            <thead className="bg-canvas-sunken text-ink-secondary">
-              <tr>
-                <th className="px-3 py-2 text-left font-medium">申込者</th>
-                <th className="px-3 py-2 text-left font-medium">区分・順位</th>
-                <th className="px-3 py-2 text-left font-medium">状態</th>
-                <th className="px-3 py-2 text-left font-medium">案内期限</th>
-                <th className="px-3 py-2 text-right font-medium">操作</th>
-              </tr>
-            </thead>
+        <DataTable>
+          <thead>
+            <TableHeadRow>
+              <Th>申込者</Th><Th>区分・順位</Th><Th>状態</Th><Th>案内期限</Th><Th align="right">操作</Th>
+            </TableHeadRow>
+          </thead>
             <tbody>
               {data.applicants.map((applicant) => {
                 const waitlistRank = applicant.source === 'waitlist'
                   ? waitlistRows.findIndex((row) => row.id === applicant.id) + 1
                   : 0
                 return (
-                  <tr key={`${applicant.source}:${applicant.id}`} className="border-hairline border-t">
-                    <td className="text-ink px-3 py-2">
-                      <span className="block font-medium">{applicant.displayName ?? '友だちは未取得'}</span>
-                      <span className="text-ink-faint text-xs">{applicant.partySize}人</span>
-                    </td>
-                    <td className="text-ink-secondary px-3 py-2">
+                  <Tr key={`${applicant.source}:${applicant.id}`}>
+                    <NameCell name={applicant.displayName ?? '友だちは未取得'} sub={`${applicant.partySize}人`} />
+                    <Td>
                       {applicant.source === 'waitlist' ? `キャンセル待ち ${waitlistRank}番` : '申込'}
-                    </td>
-                    <td className="text-ink-secondary px-3 py-2">
+                    </Td>
+                    <Td>
                       {STATUS_LABELS.get(applicant.status) ?? applicant.status}
-                    </td>
-                    <td className="text-ink-secondary px-3 py-2 text-xs">
+                    </Td>
+                    <Td className="text-xs">
                       {applicant.offerExpiresAt
                         ? formatJp(applicant.offerExpiresAt, '期限は未取得')
                         : applicant.status === 'waiting' ? '案内前' : '—'}
-                    </td>
-                    <td className="px-3 py-2 text-right">
+                    </Td>
+                    <ActionCell>
                       <Link
                         href={`/chats?friend=${encodeURIComponent(applicant.friendId)}`}
                         className="text-accent text-xs font-medium hover:underline"
                       >
                         個別トーク
                       </Link>
-                    </td>
-                  </tr>
+                    </ActionCell>
+                  </Tr>
                 )
               })}
             </tbody>
-          </table>
-        </div>
+        </DataTable>
       )}
     </div>
   )
@@ -408,7 +400,7 @@ function BookingsInner() {
     setOccurrenceStatus('loading')
     setOccurrenceActionError('')
     try {
-      const response = await eventsApi.listSlots(selectedAccountId, eventId)
+      const response = await eventsApi.listOccurrenceSelector(selectedAccountId, eventId)
       if (requestId !== occurrenceSlotsRequestRef.current || scopeRef.current !== scope) return
       const slots = Array.isArray(response?.items) ? response.items.filter((slot) => slot.is_active === 1) : []
       setOccurrenceSlots(slots)

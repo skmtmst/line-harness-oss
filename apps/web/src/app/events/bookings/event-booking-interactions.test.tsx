@@ -10,7 +10,7 @@ const apiMocks = vi.hoisted(() => ({
   decideBooking: vi.fn(),
   adminCancelBooking: vi.fn(),
   listEvents: vi.fn(),
-  listSlots: vi.fn(),
+  listOccurrenceSelector: vi.fn(),
   getOccurrenceApplicants: vi.fn(),
   promoteOccurrenceWaitlist: vi.fn(),
   occurrenceApplicantsCsvUrl: vi.fn((accountId: string, occurrenceId: string, snapshotId: string) => `/api/events/admin/occurrences/${occurrenceId}/applicants.csv?account_id=${accountId}&snapshot_id=${snapshotId}`),
@@ -238,7 +238,7 @@ beforeEach(() => {
   apiMocks.decideBooking.mockResolvedValue({ ok: true })
   apiMocks.adminCancelBooking.mockResolvedValue({ ok: true })
   apiMocks.listEvents.mockResolvedValue({ items: [], total: 0 })
-  apiMocks.listSlots.mockResolvedValue({
+  apiMocks.listOccurrenceSelector.mockResolvedValue({
     items: [{ id: 'slot-1', starts_at: '2099-06-01T01:00:00.000Z', ends_at: '2099-06-01T02:00:00.000Z', is_active: 1 }],
   })
   apiMocks.getOccurrenceApplicants.mockResolvedValue({
@@ -403,6 +403,7 @@ describe('Issue #684 イベント予約の実操作', () => {
     })
     const view = await mount(<EventBookingsPage />)
 
+    expect(apiMocks.listOccurrenceSelector).toHaveBeenCalledWith('account-a', 'event-1')
     expect(view.container.textContent).toContain('キャンセル待ち 1番')
     expect(view.container.textContent).toContain('待機 花子')
     expect(view.container.textContent).toContain('2099/05/04')

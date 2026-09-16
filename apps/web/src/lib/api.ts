@@ -10553,6 +10553,11 @@ export const eventsApi = {
     fetchApi<{ items: EventSlot[] }>(
       withAccount(`/api/events/admin/events/${eventId}/slots`, accountId),
     ),
+  /** 申込者画面の開催回選択だけに使う最小応答。集計や予約一覧は含めない。 */
+  listOccurrenceSelector: (accountId: string, eventId: string) =>
+    fetchApi<{ items: EventSlot[] }>(
+      withAccount(`/api/events/admin/events/${eventId}/occurrence-selector`, accountId),
+    ),
   createSlots: (
     accountId: string,
     eventId: string,

@@ -743,6 +743,14 @@ function makeEventDb(state: {
             return { results: items as unknown as T[] };
           }
           // admin slots list: SELECT s.*, COUNT(...) AS active_count FROM event_slots s
+          if (sql.includes('SELECT id, event_id, starts_at, ends_at, capacity, is_active, sort_order')
+            && sql.includes('FROM event_slots WHERE event_id = ?')) {
+            const [event_id] = bound as [string];
+            const items = (state.slots ?? [])
+              .filter((slot) => slot.event_id === event_id && slot.deleted_at == null && slot.is_active === 1)
+              .sort((a, b) => a.sort_order - b.sort_order || a.starts_at.localeCompare(b.starts_at));
+            return { results: items as unknown as T[] };
+          }
           if (sql.includes('FROM event_slots s')) {
             const [event_id] = bound as [string];
             const items = (state.slots ?? [])
@@ -1620,6 +1628,27 @@ describe('DELETE /api/events/admin/events/:id', () => {
 });
 
 describe('event_slots admin', () => {
+  test('GET occurrence-selector returns only active owned slots without booking aggregates', async () => {
+    const state = {
+      events: [baseEvent({ id: 'e1', line_account_id: 'la1' })],
+      slots: [
+        { id: 's-active', event_id: 'e1', starts_at: '2099-06-01T10:00:00Z', ends_at: '2099-06-01T12:00:00Z', capacity: 5, is_active: 1, sort_order: 1, deleted_at: null },
+        { id: 's-inactive', event_id: 'e1', starts_at: '2099-06-01T13:00:00Z', ends_at: '2099-06-01T15:00:00Z', capacity: 5, is_active: 0, sort_order: 0, deleted_at: null },
+      ],
+    };
+    const res = await setupApp(state).request('/api/events/admin/events/e1/occurrence-selector?account_id=la1');
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { items: Array<Pick<SlotRow, 'id' | 'event_id' | 'starts_at' | 'ends_at' | 'capacity' | 'is_active' | 'sort_order'>> };
+    expect(body.items).toEqual([expect.objectContaining({ id: 's-active', event_id: 'e1' })]);
+    expect(body.items[0]).not.toHaveProperty('active_count');
+  });
+
+  test('GET occurrence-selector hides a cross-account event', async () => {
+    const state = { events: [baseEvent({ id: 'e1', line_account_id: 'la2' })], slots: [] };
+    const res = await setupApp(state).request('/api/events/admin/events/e1/occurrence-selector?account_id=la1');
+    expect(res.status).toBe(404);
+  });
+
   test('GET /:id/slots returns slots with active_count', async () => {
     const state = {
       events: [baseEvent({ id: 'e1', line_account_id: 'la1' })],

@@ -857,6 +857,20 @@ events.get('/api/events/admin/events/:id/slots', async (c) => {
   return c.json({ items: results ?? [] });
 });
 
+// 申込者画面の開催回選択だけに使う。予約/集計を載せないため、画面を開くたびに
+// 大きな一覧を読む必要がない。
+events.get('/api/events/admin/events/:id/occurrence-selector', async (c) => {
+  const accountId = getAccountId(c);
+  if (!accountId) return bad(c, 'account_id_required', 400);
+  if (!(await ownsEvent(c.env.DB, c.req.param('id'), accountId))) return bad(c, 'not_found', 404);
+  const { results } = await c.env.DB.prepare(
+    `SELECT id, event_id, starts_at, ends_at, capacity, is_active, sort_order
+       FROM event_slots WHERE event_id = ? AND deleted_at IS NULL AND is_active = 1
+       ORDER BY sort_order ASC, starts_at ASC`,
+  ).bind(c.req.param('id')).all();
+  return c.json({ items: results ?? [] });
+});
+
 // GET /api/events/admin/events/:id/waitlist — キャンセル待ちの一覧
 //
 // 空きが出たときに誰へ案内したかも含めて見るための互換一覧。
@@ -974,7 +988,7 @@ events.post(
       if (!snapshotId) return bad(c, 'applicant_snapshot_required', 422);
 
       const occurrenceId = c.req.param('id');
-      const replayExisting = (existing: Broadcast): Response | null => {
+      const replayExisting = (existing: Broadcast): Response => {
         const draft = eventApplicantBroadcastDraft(existing.draft_payload_json);
         if (existing.title !== title || existing.message_content !== messageContent
           || existing.line_account_id !== accountId || existing.target_type !== 'segment'
