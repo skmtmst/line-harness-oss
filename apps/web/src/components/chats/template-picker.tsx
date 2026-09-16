@@ -26,10 +26,14 @@ export default function TemplatePicker({
   open,
   onClose,
   onPick,
+  chatId,
 }: {
   open: boolean
   onClose: () => void
   onPick: (content: string) => void
+  // N-026: 差し込みを含むテンプレートのプレビューを、送信と同じ解決器で
+  // 表示するために会話IDを受け取る。無いときは生の本文を見せる従来表示。
+  chatId?: string | null
 }) {
   const { selectedAccountId } = useAccount()
   const [templates, setTemplates] = useState<Template[]>([])
@@ -41,6 +45,11 @@ export default function TemplatePicker({
   const [templatesStatus, setTemplatesStatus] = useState<TemplateLoadStatus>('idle')
   const [foldersStatus, setFoldersStatus] = useState<TemplateFolderStatus>('loading')
   const [loadedAccountId, setLoadedAccountId] = useState<string | null>(selectedAccountId)
+  const [resolvedPreview, setResolvedPreview] = useState<{
+    forId: string
+    content: string
+    unresolved: string[]
+  } | null>(null)
   const accountDataCurrent = loadedAccountId === selectedAccountId
   const scopedTemplates = accountDataCurrent ? templates : []
   const scopedFolders = accountDataCurrent ? folders : []
@@ -174,9 +183,46 @@ export default function TemplatePicker({
     return filtered
   }, [category, textTemplates, search, folderId, selectedFolderIds])
 
+  const selectedTemplate = useMemo(
+    () => textTemplates.find((t) => t.id === selectedId) ?? shown[0] ?? null,
+    [textTemplates, selectedId, shown],
+  )
+
+  // N-026: 差し込みを含むテンプレートは、送信と同じ解決器の結果をプレビューに
+  // 出す。生の `{{name}}` のまま見せると「送ったらどう届くか」が分からず、
+  // 解決できない差し込みも送信まで気づけない。
+  useEffect(() => {
+    if (!open || !selectedTemplate || !chatId || !selectedTemplate.messageContent.includes('{{')) {
+      setResolvedPreview(null)
+      return
+    }
+    let cancelled = false
+    const templateId = selectedTemplate.id
+    void api.chats.renderPreview(chatId, {
+      content: selectedTemplate.messageContent,
+      messageType: 'text',
+    }).then((res) => {
+      if (cancelled) return
+      setResolvedPreview(
+        res.success
+          ? { forId: templateId, content: res.data.content, unresolved: res.data.unresolved }
+          : null,
+      )
+    }).catch(() => {
+      if (!cancelled) setResolvedPreview(null)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [open, selectedTemplate, chatId])
+
   if (!open) return null
 
-  const selected = textTemplates.find((t) => t.id === selectedId) ?? shown[0] ?? null
+  const selected = selectedTemplate
+  const previewContent =
+    resolvedPreview && selected && resolvedPreview.forId === selected.id
+      ? resolvedPreview.content
+      : null
 
   return createPortal(
     <div
@@ -286,8 +332,13 @@ export default function TemplatePicker({
                 <p className="mt-5 text-xs font-semibold text-[#667085]">送信内容のプレビュー</p>
                 <div className="mt-3 min-h-[250px] rounded-[12px] bg-[#7292BD] p-5 shadow-[1px_1px_2px_rgba(29,29,31,0.13)]">
                   <div className="flex justify-center"><span className="rounded-full bg-canvas/85 px-3 py-1 text-[11px] text-[#667085]">今日</span></div>
-                  <div className="mt-4 max-w-[78%] rounded-[12px] rounded-tl-[4px] bg-canvas px-4 py-3 text-sm leading-6 whitespace-pre-wrap text-[#344054] shadow-sm">{selected.messageContent}</div>
+                  <div className="mt-4 max-w-[78%] rounded-[12px] rounded-tl-[4px] bg-canvas px-4 py-3 text-sm leading-6 whitespace-pre-wrap text-[#344054] shadow-sm">{previewContent ?? selected.messageContent}</div>
                 </div>
+                {previewContent !== null && resolvedPreview?.unresolved.length ? (
+                  <p className="mt-3 text-xs leading-6 text-danger" role="alert">
+                    解決できない差し込みがあります: {resolvedPreview.unresolved.map((v) => `{{${v}}}`).join(' ')}。このまま送信するとエラーになります。
+                  </p>
+                ) : null}
                 <div className="mt-3 rounded-lg bg-[#F7F8F6] px-4 py-3 text-xs leading-6 text-[#667085]">
                   この操作ではまだ送信されません。入力欄へ内容を挿入します。<br />
                   種類：テキスト

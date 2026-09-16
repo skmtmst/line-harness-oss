@@ -10,6 +10,7 @@ import {
 } from '@line-crm/db';
 import { resolveLineToken } from './line-token.js';
 import { classifyLineOutboundFailure } from './outbound-idempotency.js';
+import { renderChatMessageContent } from './manual-send-interpolation.js';
 
 // N-025: 期限が来た送信予約をLINEへpushするcron側の処理。
 // 二重送信防止は3層: claimのCAS(status) + lease_token照合 + LINEへ同じ
@@ -25,7 +26,7 @@ const RETRY_BACKOFF_MS = 5 * 60_000;
 async function resolveSendTarget(
   env: ScheduleDispatchEnv,
   row: ScheduledChatSendRow,
-): Promise<{ lineUserId: string; accessToken: string } | null> {
+): Promise<{ friend: NonNullable<Awaited<ReturnType<typeof getFriendById>>>; accessToken: string; liffId: string | null } | null> {
   const friend = await getFriendById(env.DB, row.friend_id);
   if (!friend) return null;
   const account = friend.line_account_id
@@ -37,7 +38,7 @@ async function resolveSendTarget(
     accountId: friend.line_account_id,
     context: 'scheduled-chat-send',
   });
-  return { lineUserId: friend.line_user_id, accessToken };
+  return { friend, accessToken, liffId: account?.liff_id ?? null };
 }
 
 /**
@@ -74,16 +75,46 @@ async function dispatchOne(
     quoteToken = quoted?.quote_token ?? null;
   }
 
+  // N-026: 差し込みは送信時の情報で解決する(予約時点と値が変わり得る)。
+  // 解決しきれない `{{…}}` が残るなら LINE を呼ばず、行だけ失敗で残す。
+  const rendered = await renderChatMessageContent(
+    env.DB, target.friend, row.message_type, row.content, target.liffId,
+  );
+  if (rendered.unresolved.length > 0) {
+    await markScheduledChatSendFailed(env.DB, {
+      id: row.id,
+      leaseToken: row.lease_token!,
+      errorCode: 'unresolved_template_variables',
+      error: `差し込みを解決できません: ${rendered.unresolved.map((v) => `{{${v}}}`).join(', ')}`,
+      retryable: false,
+      now: nowIso,
+    });
+    return;
+  }
+
+  // 展開でLINEの上限を超えた分はLINEを呼ばず失敗で残す(400で落ちるのが分かりきっている)。
+  if (rendered.content.length > 5000) {
+    await markScheduledChatSendFailed(env.DB, {
+      id: row.id,
+      leaseToken: row.lease_token!,
+      errorCode: 'content_too_long',
+      error: '差し込みを解決した本文が5000文字を超えています',
+      retryable: false,
+      now: nowIso,
+    });
+    return;
+  }
+
   const { LineClient } = await import('@line-crm/line-sdk');
   const lineClient = new LineClient(target.accessToken);
   const message = {
     type: 'text' as const,
-    text: row.content,
+    text: rendered.content,
     ...(quoteToken ? { quoteToken } : {}),
   };
 
   try {
-    await lineClient.pushMessage(target.lineUserId, [message], row.idempotency_key);
+    await lineClient.pushMessage(target.friend.line_user_id, [message], row.idempotency_key);
   } catch (error) {
     const failure = classifyLineOutboundFailure(error, nowIso);
     // unknown(送達可否が分からない)は自動再送すると二重送信になり得るため
@@ -122,7 +153,7 @@ async function dispatchOne(
         messageId,
         row.friend_id,
         row.message_type,
-        row.content,
+        rendered.content,
         row.line_account_id,
         row.staff_id,
         sentAt,

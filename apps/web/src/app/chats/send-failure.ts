@@ -62,6 +62,15 @@ export function describeSendFailure(error: unknown, now: Date = new Date()): str
       : 'LINEの送信制限に達しています。少し待ってからもう一度送信してください。'
   }
 
+  // N-026: 差し込みが残ったままだと送信口が止める。LINEの拒否ではなく
+  // 本文側の問題なので、直せる変数名をそのまま伝える。
+  if (error.code === 'UNRESOLVED_TEMPLATE_VARIABLES') {
+    const vars = (error.data as { variables?: string[] } | undefined)?.variables
+    return vars?.length
+      ? `差し込みを解決できませんでした: ${vars.map((v) => `{{${v}}}`).join(' ')}。内容を修正して送り直してください。`
+      : '差し込みを解決できませんでした。内容を修正して送り直してください。'
+  }
+
   if (error.status === 400) {
     return 'LINEがこの送信を受け付けませんでした。内容を見直して送り直してください。'
   }

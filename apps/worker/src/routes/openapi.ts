@@ -1018,6 +1018,37 @@ const spec = {
       },
     },
     /*
+     * N-026: 送信内容の差し込み解決プレビュー。/send と同じ解決器を通し、
+     * 未解決のまま残る差し込み名を返す(送信はそれらを400で拒否する)。
+     * 読み取りのみ。LINE呼出し・履歴書込みは行わない。
+     */
+    '/api/chats/{id}/render-preview': {
+      post: {
+        tags: ['Chats'],
+        summary: '差し込みを解決した送信プレビューを返す',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  messageType: { type: 'string' },
+                  content: { type: 'string' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': { description: '解決済み本文と未解決の差し込み名' },
+          '400': { description: 'content が無い／壊れている' },
+          '404': { description: 'Chat not found' },
+        },
+      },
+    },
+    /*
      * N-025: 返信の送信予約。作成は Idempotency-Key 必須で、時刻は未来のみ。
      * 予約の実行はcronのscheduledジョブがlease付きで行う。
      */

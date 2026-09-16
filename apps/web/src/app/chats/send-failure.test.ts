@@ -56,6 +56,17 @@ describe('describeSendFailure: N-028/N-029 失敗理由の言い換え', () => {
     expect(describeSendFailure(error, NOW)).toContain('受け付けませんでした')
   })
 
+  // N-026: 差し込みの未解決はLINEの拒否ではなく本文側の問題。変数名まで伝える。
+  it('差し込み未解決の400は変数名と修正方法を伝える', () => {
+    const error = new ApiError(400, '', 'UNRESOLVED_TEMPLATE_VARIABLES', {
+      variables: ['pet_name'],
+    })
+    const text = describeSendFailure(error, NOW)
+    expect(text).toContain('差し込み')
+    expect(text).toContain('{{pet_name}}')
+    expect(text).not.toContain('LINE')
+  })
+
   it('502は一時障害として待機時間つきで伝える', () => {
     const error = new ApiError(502, '', 'LINE_TEMPORARILY_UNAVAILABLE', {
       retryable: true,

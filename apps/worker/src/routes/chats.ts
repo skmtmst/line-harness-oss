@@ -54,6 +54,11 @@ import {
   releaseInboxReplyLease,
 } from '../services/inbox-events.js';
 import { fireEvent } from '../services/event-bus.js';
+import { findUnsupportedInterpolations } from '@line-crm/shared';
+import {
+  renderChatMessageContent,
+  unresolvedVariablesPayload,
+} from '../services/manual-send-interpolation.js';
 
 const chats = new Hono<Env>();
 
@@ -431,14 +436,14 @@ async function resolveFriendAndAccessToken(
 ) {
   const friend = await getFriendById(db, friendId);
   if (!friend) {
-    return { friend: null, accessToken: defaultAccessToken };
+    return { friend: null, accessToken: defaultAccessToken, liffId: null };
   }
 
   if (!friend.line_account_id) {
     return { friend, accessToken: resolveLineToken({
       accountToken: null, defaultToken: defaultAccessToken,
       accountId: friend.line_account_id, context,
-    }) };
+    }), liffId: null };
   }
 
   const account = await getLineAccountById(db, friend.line_account_id);
@@ -446,10 +451,10 @@ async function resolveFriendAndAccessToken(
     return { friend, accessToken: resolveLineToken({
       accountToken: null, defaultToken: defaultAccessToken,
       accountId: friend.line_account_id, context,
-    }) };
+    }), liffId: null };
   }
 
-  return { friend, accessToken: account.channel_access_token };
+  return { friend, accessToken: account.channel_access_token, liffId: account.liff_id ?? null };
 }
 
 // ========== オペレーターCRUD ==========
@@ -1470,7 +1475,7 @@ chats.post('/api/chats/:id/send', requireRole('owner', 'admin', 'staff'), requir
       }, 409);
     }
 
-    const { friend, accessToken } = await resolveFriendAndAccessToken(
+    const { friend, accessToken, liffId } = await resolveFriendAndAccessToken(
       c.env.DB,
       chat.friend_id,
       c.env.LINE_CHANNEL_ACCESS_TOKEN,
@@ -1486,8 +1491,16 @@ chats.post('/api/chats/:id/send', requireRole('owner', 'admin', 'staff'), requir
       return c.json({ success: false, error: 'Chat not found' }, 404);
     }
 
-    // 引用元の検証は外部送信より前に行う。別friend・別アカウント・取消済みを
-    // 指定されてもここで止め、LINE呼び出しも保存もしない。
+    // N-026: 差し込みは一斉配信と同じ解決器で置き換える。解決しきれない
+    // `{{…}}` が残るなら、LINE呼出し0・履歴書込み0のまま構造化して拒否する。
+    // lease・冪等予約より前に置くので、拒否時はDBへ何も書かない。
+    const rendered = await renderChatMessageContent(
+      c.env.DB, friend, body.messageType ?? 'text', body.content, liffId,
+    );
+    if (rendered.unresolved.length > 0) {
+      return c.json({ success: false, ...unresolvedVariablesPayload(rendered.unresolved) }, 400);
+    }
+
     // 引用元の検証は外部送信より前に行う。別friend・別アカウント・取消済みを
     // 指定されてもここで止め、LINE呼び出しも保存もしない。
     let quoted: QuotedMessageRow | null = null;
@@ -1529,15 +1542,16 @@ chats.post('/api/chats/:id/send', requireRole('owner', 'admin', 'staff'), requir
     if (messageType === 'text') {
       // LINEのtext上限(5000字)を超える本文はここで止める。送ってから弾かれると
       // 送信済みか未送信かが分からなくなり、運用者が二重送信しかねない。
-      if (body.content.length > 5000) {
+      // 差し込みは解決後の長さで判定する(展開で5000字を超え得る)。
+      if (rendered.content.length > 5000) {
         return c.json({ success: false, error: 'メッセージは5000文字以内で入力してください' }, 400);
       }
-      message = { type: 'text', text: body.content };
+      message = { type: 'text', text: rendered.content };
     } else if (messageType === 'flex') {
       // 壊れたJSONは外側catchの500に落とさず400で返す(形式が合うJSONは従来どおり送る)。
       let contents: FlexContainer;
       try {
-        contents = JSON.parse(body.content) as FlexContainer;
+        contents = JSON.parse(rendered.content) as FlexContainer;
       } catch {
         return c.json({ success: false, error: 'Flexメッセージの形式が正しくありません' }, 400);
       }
@@ -1548,7 +1562,7 @@ chats.post('/api/chats/:id/send', requireRole('owner', 'admin', 'staff'), requir
         previewImageUrl: string;
       };
       try {
-        parsed = JSON.parse(body.content) as {
+        parsed = JSON.parse(rendered.content) as {
           originalContentUrl: string;
           previewImageUrl: string;
         };
@@ -1684,7 +1698,7 @@ chats.post('/api/chats/:id/send', requireRole('owner', 'admin', 'staff'), requir
             logId,
             friend.id,
             messageType,
-            body.content,
+            rendered.content,
             friend.line_account_id ?? null,
             c.get('staff').id,
             sentAt,
@@ -1789,6 +1803,51 @@ chats.post('/api/chats/:id/send', requireRole('owner', 'admin', 'staff'), requir
 });
 
 /**
+ * POST /api/chats/:id/render-preview — 送信内容の差し込み解決プレビュー(N-026)。
+ *
+ * 送信口(`/send`)と同じ解決器を通した本文を返す。読み取りだけで
+ * LINE呼出し・履歴書込みはしない。`unresolved` に残る差し込みは
+ * 送信時にそのまま拒否されるので、画面はここで事前に見せられる。
+ */
+chats.post('/api/chats/:id/render-preview', requireRole('owner', 'admin', 'staff'), requireVisibleChat, async (c) => {
+  try {
+    const chat = await resolveOrCreateChat(c.env.DB, c.req.param('id'));
+    if (!chat) return c.json({ success: false, error: 'Chat not found' }, 404);
+
+    let body: { messageType?: unknown; content?: unknown };
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ success: false, error: 'content is required' }, 400);
+    }
+    const content = typeof body.content === 'string' ? body.content : '';
+    if (!content) return c.json({ success: false, error: 'content is required' }, 400);
+    const messageType = typeof body.messageType === 'string' ? body.messageType : 'text';
+
+    const { friend, liffId } = await resolveFriendAndAccessToken(
+      c.env.DB, chat.friend_id, c.env.LINE_CHANNEL_ACCESS_TOKEN, 'chats.render-preview',
+    );
+    if (!friend) return c.json({ success: false, error: 'Friend not found' }, 404);
+    if (!await canAccessAllLineAccounts(
+      c.env.DB, c.get('staff'), [friend.line_account_id ?? null],
+    )) {
+      return c.json({ success: false, error: 'Chat not found' }, 404);
+    }
+
+    const rendered = await renderChatMessageContent(
+      c.env.DB, friend, messageType, content, liffId,
+    );
+    return c.json({
+      success: true,
+      data: { content: rendered.content, unresolved: rendered.unresolved },
+    });
+  } catch (err) {
+    console.error('POST /api/chats/:id/render-preview error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+/**
  * POST /api/chats/:id/send-combined — 画像と本文を1回の送信単位にする(N-022)。
  *
  * 単体送信口を2回呼ぶと、画像だけ届いて本文が落ちる部分送信になる。
@@ -1825,7 +1884,7 @@ chats.post('/api/chats/:id/send-combined', requireRole('owner', 'admin', 'staff'
       }, 409);
     }
 
-    const { friend, accessToken } = await resolveFriendAndAccessToken(
+    const { friend, accessToken, liffId } = await resolveFriendAndAccessToken(
       c.env.DB,
       chat.friend_id,
       c.env.LINE_CHANNEL_ACCESS_TOKEN,
@@ -1868,10 +1927,19 @@ chats.post('/api/chats/:id/send-combined', requireRole('owner', 'admin', 'staff'
     }
     let textPart: string | null = null;
     if (text) {
-      if (text.length > 5000) {
+      // N-026: 差し込みは単体送信口と同じ解決器・同じ拒否。片方だけ
+      // 素通しだと、画像つき送信が `{{name}}` をそのまま相手へ出す。
+      const renderedText = await renderChatMessageContent(
+        c.env.DB, friend, 'text', text, liffId,
+      );
+      if (renderedText.unresolved.length > 0) {
+        return c.json({ success: false, ...unresolvedVariablesPayload(renderedText.unresolved) }, 400);
+      }
+      // 上限は解決後の長さで判定する(展開で超え得る)。
+      if (renderedText.content.length > 5000) {
         return c.json({ success: false, error: 'メッセージは5000文字以内で入力してください' }, 400);
       }
-      textPart = text;
+      textPart = renderedText.content;
     }
     const messages: Message[] = [
       ...(imagePart ? [{ type: 'image', ...imagePart } as Message] : []),
@@ -2167,6 +2235,12 @@ chats.post('/api/chats/:id/schedule', requireRole('owner', 'admin', 'staff'), re
     if (content.length > 5000) {
       return c.json({ success: false, error: 'メッセージは5000文字以内で入力してください' }, 400);
     }
+    // N-026: 送信時に解決される差し込み(name/field/var/date等)は予約へ通すが、
+    // カタログに無い名前は将来も解決できないのでここで拒否する(予約行も作らない)。
+    const unsupported = findUnsupportedInterpolations(content);
+    if (unsupported.length > 0) {
+      return c.json({ success: false, ...unresolvedVariablesPayload(unsupported) }, 400);
+    }
     const time = validateScheduledAt(body.scheduledAt);
     if (!time.ok) {
       return c.json({ success: false, error: '未来の日時を指定してください' }, 400);
@@ -2274,6 +2348,11 @@ chats.patch('/api/chats/:id/scheduled/:scheduleId', requireRole('owner', 'admin'
       }
       if (body.content.length > 5000) {
         return c.json({ success: false, error: 'メッセージは5000文字以内で入力してください' }, 400);
+      }
+      // N-026: 予約作成と同じく、カタログに無い差し込み名はここで拒否する。
+      const unsupported = findUnsupportedInterpolations(body.content);
+      if (unsupported.length > 0) {
+        return c.json({ success: false, ...unresolvedVariablesPayload(unsupported) }, 400);
       }
       updates.content = body.content;
     }
