@@ -348,12 +348,18 @@ export async function revokeStaffAuthentication(db: D1Database, staffId: string)
   ]);
 }
 
+export type TwoFactorChallengePurpose = 'verify' | 'setup';
+
 export interface TwoFactorChallenge {
   token_hash: string;
   staff_id: string;
   expires_at: string;
   attempts: number;
   created_at: string;
+  /** 'verify' は登録済みの確認用、'setup' は未登録者の初回設定用。混ぜて使えない。 */
+  purpose: TwoFactorChallengePurpose;
+  /** 1 なら確認後に発行するセッションを 7 日、0 なら既定の 8 時間にする。 */
+  remember: number;
 }
 
 export async function createTwoFactorChallenge(
@@ -361,11 +367,12 @@ export async function createTwoFactorChallenge(
   tokenHash: string,
   staffId: string,
   expiresAt: string,
+  options: { purpose?: TwoFactorChallengePurpose; remember?: boolean } = {},
 ): Promise<void> {
   await db.prepare('DELETE FROM admin_two_factor_challenges WHERE staff_id = ?').bind(staffId).run();
   await db.prepare(
-    'INSERT INTO admin_two_factor_challenges (token_hash, staff_id, expires_at) VALUES (?, ?, ?)',
-  ).bind(tokenHash, staffId, expiresAt).run();
+    'INSERT INTO admin_two_factor_challenges (token_hash, staff_id, expires_at, purpose, remember) VALUES (?, ?, ?, ?, ?)',
+  ).bind(tokenHash, staffId, expiresAt, options.purpose ?? 'verify', options.remember ? 1 : 0).run();
 }
 
 export async function getTwoFactorChallenge(

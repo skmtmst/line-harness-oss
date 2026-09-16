@@ -68,7 +68,7 @@ function CompleteInner() {
     if (Object.values(next).some(Boolean)) return
     setBusy(true)
     setError('')
-    const res = await authRequest<{ tenantId: string; deviceMarker: string; sessionToken?: string }>('/api/auth/register/complete', {
+    const res = await authRequest<{ tenantId: string; deviceMarker: string; sessionToken?: string; twoFactorSetup?: boolean; challengeToken?: string }>('/api/auth/register/complete', {
       token,
       tenantName: tenantName.trim(),
       name: name.trim(),
@@ -83,6 +83,11 @@ function CompleteInner() {
     }
     storeDeviceMarker(res.data.deviceMarker)
     sessionStorage.removeItem(AUTH_SELECTION_CLEARED_KEY)
+    // オーナーは二段階認証が必須（N-426）。設定画面へ進み、完了後にセッションが出る。
+    if (res.data.twoFactorSetup && res.data.challengeToken) {
+      window.location.assign(`/login/two-factor/setup#${new URLSearchParams({ lh_2fa: res.data.challengeToken }).toString()}`)
+      return
+    }
     if (res.data.sessionToken) storeAdminSession(res.data.sessionToken, res.csrfToken)
     else if (res.csrfToken) localStorage.setItem('lh_csrf', res.csrfToken)
     window.location.assign('/hq')

@@ -17,8 +17,10 @@ import {
   hasStaffWithEmail,
   hasTenantWithDeviceMarker,
   readAuthThrottle,
+  recordAuditEvent,
   recordLoginAudit,
   revokeStaffAuthentication,
+  staffRequiresMfa,
   toJstString,
   updateStaffMember,
   type AuthEmailToken,
@@ -280,23 +282,19 @@ authEmail.post('/api/auth/register/complete', async (c) => {
   });
   if (!staff) return c.json({ success: false, error: '登録を完了できませんでした' }, 500);
 
-  const session = await issueSession(c, staff.id, config.sameSite);
+  // オーナーは管理者束のためTOTP登録が必須（N-426）。ここで通常セッションは
+  // 発行せず、設定専用の合言葉を返す。画面は二段階認証の設定へ進む。
+  if (!c.env.TOTP_ENCRYPTION_KEY) return c.json({ success: false, error: '二段階認証の設定に不備があります。運営にお問い合わせください' }, 500);
+  const challengeToken = await startTwoFactorChallenge(c, staff.id, { purpose: 'setup' });
   c.header('Set-Cookie', markerCookie(deviceMarker, config.sameSite), { append: true });
-  await recordLoginAudit(c.env.DB, {
-    adminUserId: staff.id,
-    action: 'login',
-    ip: clientIp(c),
-    userAgent: c.req.header('user-agent') ?? null,
-  });
   return c.json({
     success: true,
     data: {
       tenantId,
       deviceMarker,
-      // 別サイト構成のときだけ SPA にセッションを渡す（two-factor/verify と同じ）。
-      sessionToken: config.crossSite ? session.sessionToken : undefined,
+      twoFactorSetup: true,
+      challengeToken,
     },
-    csrfToken: session.csrfToken,
   });
 });
 
@@ -304,7 +302,7 @@ authEmail.post('/api/auth/register/complete', async (c) => {
 // メール＋パスワードのログイン
 // ---------------------------------------------------------------------------
 
-/** POST /api/auth/password/login { email, password } */
+/** POST /api/auth/password/login { email, password, remember? } */
 authEmail.post('/api/auth/password/login', async (c) => {
   const config = resolveAdminAuthConfig(c.env, { requestOrigin: new URL(c.req.url).origin });
   if (config.misconfigured) return c.json({ success: false, error: config.misconfigured }, 500);
@@ -312,6 +310,7 @@ authEmail.post('/api/auth/password/login', async (c) => {
   const body = await readBody(c);
   const email = normalizeEmail(body.email);
   const password = typeof body.password === 'string' ? body.password : '';
+  const remember = body.remember === true;
   if (!email || !password) return c.json({ success: false, error: 'メールアドレスとパスワードを入力してください' }, 400);
 
   const throttleKey = `login:${await sha256Hex(`${email}|${clientIp(c) ?? 'unknown'}`)}`;
@@ -336,11 +335,18 @@ authEmail.post('/api/auth/password/login', async (c) => {
   await clearAuthThrottle(c.env.DB, throttleKey);
   if (twoFactorRequired(staff)) {
     if (!c.env.TOTP_ENCRYPTION_KEY) return c.json({ success: false, error: '二段階認証の設定に不備があります。運営にお問い合わせください' }, 500);
-    const challengeToken = await startTwoFactorChallenge(c, staff.id);
+    const challengeToken = await startTwoFactorChallenge(c, staff.id, { purpose: 'verify', remember });
     return c.json({ success: true, data: { twoFactor: true, challengeToken } });
   }
+  // 管理者束はTOTP登録が必須。未登録のまま通常セッションは発行せず、
+  // 設定専用の合言葉へ回す（N-426）。
+  if (staffRequiresMfa(staff)) {
+    if (!c.env.TOTP_ENCRYPTION_KEY) return c.json({ success: false, error: '二段階認証の設定に不備があります。運営にお問い合わせください' }, 500);
+    const challengeToken = await startTwoFactorChallenge(c, staff.id, { purpose: 'setup', remember });
+    return c.json({ success: true, data: { twoFactorSetup: true, challengeToken } });
+  }
 
-  const session = await issueSession(c, staff.id, config.sameSite);
+  const session = await issueSession(c, staff.id, config.sameSite, remember);
   await recordLoginAudit(c.env.DB, {
     adminUserId: staff.id,
     action: 'login',
@@ -423,7 +429,14 @@ authEmail.get('/api/auth/password/reset/check', async (c) => {
   return c.json({ success: true, data: { email: row!.email } });
 });
 
-/** POST /api/auth/password/reset { token, password } — 設定後はその人のセッションをすべて失効させる。 */
+/**
+ * POST /api/auth/password/reset { token, password } — 設定後はその人のセッションをすべて失効させる。
+ *
+ * 復旧導線（N-426）: メールのURLを持てることは本人確認の代替になるため、
+ * 登録済みのTOTPもここで外す。認証アプリを失くした人は「メールで再設定 →
+ * パスワードでログイン → TOTPの再設定（必須）」の順で必ず復帰でき、
+ * ロックアウトで詰まない。TOTPを外した記録はログイン記録へ残す。
+ */
 authEmail.post('/api/auth/password/reset', async (c) => {
   const body = await readBody(c);
   const token = readToken(c, body);
@@ -448,11 +461,39 @@ authEmail.post('/api/auth/password/reset', async (c) => {
     return c.json({ success: false, error: TOKEN_STATE_MESSAGE.used, code: 'used' }, 410);
   }
   const now = toJstString(new Date());
+  const hadTotp = Boolean(staff.totp_enabled_at || staff.totp_secret_enc || staff.totp_pending_secret_enc);
   await updateStaffMember(c.env.DB, staff.id, {
     password_hash: await hashPassword(password),
     password_updated_at: now,
     email_verified_at: staff.email_verified_at ?? now,
+    // 復旧: メールのURLを持てた本人に限り、失くした認証アプリの縛りを外す。
+    totp_secret_enc: null,
+    totp_pending_secret_enc: null,
+    totp_enabled_at: null,
+    totp_last_used_step: null,
   });
   await revokeStaffAuthentication(c.env.DB, staff.id);
+  if (hadTotp) {
+    // MFA解除は高危険監査（要件 v6-30 §9-3 の復旧3段の記録）。
+    // 記録の失敗で再設定そのものを止めない（recordLoginAudit と同じ向き）。
+    try {
+      await recordAuditEvent(c.env.DB, {
+        category: 'auth',
+        action: 'auth.totp_reset',
+        actorPrincipalId: staff.id,
+        actorRole: staff.access_level === 'read_only' ? 'view_only' : staff.role === 'owner' || staff.role === 'admin' ? 'administrator' : 'operations',
+        targetKind: 'staff',
+        targetId: staff.id,
+        tenantId: staff.tenant_id,
+        result: 'success',
+        riskLevel: 'high',
+        retentionClass: 'security',
+        reason: 'password_reset_recovery',
+        ipPrefix: (clientIp(c) ?? '').split('.').slice(0, 2).join('.') || null,
+      });
+    } catch (error) {
+      console.error('[auth-email] totp_reset audit failed', error instanceof Error ? error.name : 'unknown');
+    }
+  }
   return c.json({ success: true, data: { email: row!.email } });
 });

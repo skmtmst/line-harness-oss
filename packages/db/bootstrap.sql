@@ -201,7 +201,7 @@ CREATE TABLE admin_two_factor_challenges (
   staff_id TEXT NOT NULL,
   expires_at TEXT NOT NULL,
   attempts INTEGER NOT NULL DEFAULT 0,
-  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')), purpose TEXT NOT NULL DEFAULT 'verify', remember INTEGER NOT NULL DEFAULT 0,
   FOREIGN KEY (staff_id) REFERENCES staff_members(id) ON DELETE CASCADE
 );
 
