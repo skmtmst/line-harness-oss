@@ -162,4 +162,40 @@ describe('送信予約のdispatcher(N-025)', () => {
     expect(row('s-nofriend').status).toBe('failed');
     expect(row('s-nofriend').last_error_code).toBe('friend_not_found');
   });
+
+  // N-026: 差し込みは「送る瞬間」の値で解決する。予約から送信までの間に
+  // 表示名が変わっていても、古い値ではなく新しい値が届く。
+  test('差し込みは送信時の値で解決され、履歴にも解決後の本文が残る', async () => {
+    await schedule({ id: 's-name', key: '88888888-2222-4333-8444-555555555555', at: '2026-01-09T23:00:00.000Z', content: '{{name}}さんへの連絡です' });
+    // 予約のあとで表示名が変わった想定。
+    sqlite.raw.prepare(`UPDATE friends SET display_name = '改名後' WHERE id = 'fr-1'`).run();
+
+    const result = await processDueScheduledChatSends(env(), { now: NOW });
+    expect(result).toEqual({ claimed: 1, sent: 1, failed: 0 });
+    const [, messages] = pushMessage.mock.calls[0] as [string, Array<{ text: string }>, string];
+    expect(messages[0].text).toBe('改名後さんへの連絡です');
+    const logged = sqlite.raw.prepare(
+      `SELECT content FROM messages_log WHERE id = 'scheduled:s-name'`,
+    ).get() as { content: string };
+    expect(logged.content).toBe('改名後さんへの連絡です');
+  });
+
+  // N-026: 解決しきれない差し込みが残る予約は、LINEを呼ばずにfailedへ
+  // 確定する(予約作成口は弾くが、項目削除や別経路で残り得る)。
+  test('解決できない差し込みが残る予約はLINEを呼ばずfailedへ確定する', async () => {
+    // {{name}} が残る状態を作るため表示名を消す。
+    sqlite.raw.prepare(`UPDATE friends SET display_name = NULL WHERE id = 'fr-1'`).run();
+    await schedule({ id: 's-unres', key: '99999999-2222-4333-8444-555555555555', at: '2026-01-09T23:00:00.000Z', content: '{{name}}さんへの連絡です' });
+
+    const result = await processDueScheduledChatSends(env(), { now: NOW });
+    expect(result.failed).toBe(1);
+    expect(pushMessage).not.toHaveBeenCalled();
+    expect(row('s-unres').status).toBe('failed');
+    expect(row('s-unres').last_error_code).toBe('unresolved_template_variables');
+    // 送信履歴も残らない。
+    const logged = sqlite.raw.prepare(
+      `SELECT COUNT(*) AS n FROM messages_log WHERE friend_id = 'fr-1'`,
+    ).get() as { n: number };
+    expect(logged.n).toBe(0);
+  });
 });

@@ -8341,6 +8341,13 @@ export const api = {
         headers: { 'Idempotency-Key': idempotencyKey },
         body: JSON.stringify(data),
       }),
+    // N-026: 送信と同じ解決器で差し込みを展開したプレビュー。
+    // unresolved に残る名は、送信すると UNRESOLVED_TEMPLATE_VARIABLES で拒否されるもの。
+    renderPreview: (id: string, data: { content: string; messageType?: string }) =>
+      fetchApi<ApiResponse<{ content: string; unresolved: string[] }>>(`/api/chats/${id}/render-preview`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
     // N-022: 画像と本文を1回の送信単位にする結合口。両方あるときだけ使う。
     sendCombined: (id: string, data: { image: { originalContentUrl: string; previewImageUrl: string }; text: string; revision?: number; quotedMessageId?: string }, idempotencyKey: string) =>
       fetchApi<ApiResponse<{ sent: true; messageId: string; messageIds: string[]; sentByStaffName: string; revision: number }>>(`/api/chats/${id}/send-combined`, {

@@ -3081,6 +3081,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                   <TemplatePicker
                     open={showTemplatePicker}
                     onClose={() => setShowTemplatePicker(false)}
+                    chatId={selectedChatId}
                     onPick={(content) =>
                       // 入力済みの文があれば消さずに続ける。書きかけを失わせない。
                       setMessageContent((prev) => (prev.trim() ? `${prev}\n${content}` : content))
