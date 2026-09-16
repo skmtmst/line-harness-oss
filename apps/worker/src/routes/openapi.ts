@@ -958,6 +958,22 @@ const spec = {
         },
       },
     },
+    '/api/chats/outbound-failures': {
+      get: {
+        tags: ['Chats'],
+        summary: '個別送信の失敗台帳をLINEアカウント範囲内で取得',
+        parameters: [
+          { name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } },
+          { name: 'limit', in: 'query', schema: { type: 'integer' } },
+        ],
+        responses: {
+          '200': { description: 'Scoped outbound send failures with safe failure codes' },
+          '400': { description: 'lineAccountId が未指定' },
+          '403': { description: 'Staff role required' },
+          '404': { description: 'LINE account not found in account scope' },
+        },
+      },
+    },
     '/api/common-actions/resources': {
       get: {
         tags: ['Common actions'],
