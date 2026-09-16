@@ -4321,7 +4321,7 @@ CREATE TABLE operators (
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
 
-CREATE TABLE outbound_send_requests (
+CREATE TABLE "outbound_send_requests" (
   idempotency_key TEXT PRIMARY KEY,
   channel         TEXT NOT NULL CHECK (channel IN ('line', 'email')),
   resource_id     TEXT NOT NULL,

@@ -181,7 +181,10 @@ describe('N-023 個別送信失敗台帳', () => {
     mocks.pushMessage.mockImplementationOnce(() => held);
     const first = send('chat-1', KEY4);
     const second = send('chat-1', KEY4);
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    // 負けた側はLINE呼出しを待たず409で返る。先にpushを解放すると負け側が
+    // 成功済みをreplayして200を返すため、409側の確定を待ってから解放する。
+    const loser = await Promise.race([first, second]);
+    expect(loser.status).toBe(409);
     releasePush();
     const responses = await Promise.all([first, second]);
     expect(responses.map((response) => response.status).sort()).toEqual([200, 409]);

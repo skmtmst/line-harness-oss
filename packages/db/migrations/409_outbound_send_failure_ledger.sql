@@ -1,12 +1,11 @@
+-- migration-policy: table-rebuild
 -- N-023: 個別送信の失敗を、安全な再試行可否と一緒に残す。
 --
 -- 旧表の in_progress は、LINE受理後に応答だけ失った可能性を否定できない。
 -- そのため移行時も in_progress のまま保持し、自動再送の対象にはしない。
 DROP INDEX IF EXISTS idx_outbound_send_requests_created;
 
-ALTER TABLE outbound_send_requests RENAME TO outbound_send_requests_legacy_409;
-
-CREATE TABLE outbound_send_requests (
+CREATE TABLE outbound_send_requests_new (
   idempotency_key TEXT PRIMARY KEY,
   channel         TEXT NOT NULL CHECK (channel IN ('line', 'email')),
   resource_id     TEXT NOT NULL,
@@ -35,16 +34,18 @@ CREATE TABLE outbound_send_requests (
   CHECK (status != 'unknown' OR retryable = 0)
 );
 
-INSERT INTO outbound_send_requests (
+INSERT INTO outbound_send_requests_new (
   idempotency_key, channel, resource_id, payload_hash, status, response_id,
   attempt_count, retryable, created_at, updated_at, completed_at
 )
 SELECT
   idempotency_key, channel, resource_id, payload_hash, status, response_id,
   1, 0, created_at, updated_at, completed_at
-FROM outbound_send_requests_legacy_409;
+FROM outbound_send_requests;
 
-DROP TABLE outbound_send_requests_legacy_409;
+DROP TABLE outbound_send_requests;
+
+ALTER TABLE outbound_send_requests_new RENAME TO outbound_send_requests;
 
 CREATE INDEX idx_outbound_send_requests_created
   ON outbound_send_requests(created_at);
