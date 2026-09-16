@@ -3734,7 +3734,7 @@ CREATE TABLE nen_ec_member_snapshots (
   point_balance INTEGER NOT NULL DEFAULT 0,
   member_rank TEXT NOT NULL DEFAULT '会員',
   synced_at TEXT NOT NULL
-);
+, annual_miles_yen INTEGER NOT NULL DEFAULT 0, lifetime_miles_yen INTEGER NOT NULL DEFAULT 0, member_rank_key TEXT, mile_rate_percent REAL, rank_valid_until TEXT, mile_balance INTEGER NOT NULL DEFAULT 0, miles_used_this_month INTEGER NOT NULL DEFAULT 0, last_purchased_at TEXT);
 
 CREATE TABLE "nen_friend_add_coupon_issues" (
   id              TEXT PRIMARY KEY,
@@ -3783,6 +3783,19 @@ CREATE TABLE nen_knowledge_articles (
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 , source_kind TEXT NOT NULL DEFAULT 'commercial_editorial', authority_rank INTEGER NOT NULL DEFAULT 40, language TEXT NOT NULL DEFAULT 'ja', reviewed_at TEXT);
+
+CREATE TABLE nen_lifetime_milestones (
+  id              TEXT PRIMARY KEY,
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  threshold_yen   INTEGER NOT NULL CHECK (threshold_yen > 0),
+  title           TEXT NOT NULL,
+  benefit_kind    TEXT,
+  benefit_note    TEXT,
+  notify_on_reach INTEGER NOT NULL DEFAULT 1 CHECK (notify_on_reach IN (0, 1)),
+  sort_order      INTEGER NOT NULL DEFAULT 0,
+  created_at      TEXT NOT NULL,
+  updated_at      TEXT NOT NULL
+);
 
 CREATE TABLE nen_pet_profiles (
   id TEXT PRIMARY KEY,
@@ -3996,6 +4009,35 @@ CREATE TABLE nen_point_ledger (
   reason TEXT NOT NULL,
   external_ref TEXT NOT NULL UNIQUE,
   created_at TEXT NOT NULL
+);
+
+CREATE TABLE nen_rank_rules (
+  line_account_id  TEXT PRIMARY KEY REFERENCES line_accounts(id) ON DELETE CASCADE,
+  year_start_month INTEGER NOT NULL DEFAULT 1 CHECK (year_start_month BETWEEN 1 AND 12),
+  apply_on_reach   TEXT NOT NULL DEFAULT 'immediate' CHECK (apply_on_reach IN ('immediate')),
+  keep_until       TEXT NOT NULL DEFAULT 'end_of_next_year' CHECK (keep_until IN ('end_of_next_year')),
+  count_orders     TEXT NOT NULL DEFAULT 'paid_excluding_cancel_refund' CHECK (count_orders IN ('paid_excluding_cancel_refund')),
+  -- 保存のたびに +1。ECはこの番号で冪等に受け取る。
+  version          INTEGER NOT NULL DEFAULT 1,
+  sync_status      TEXT NOT NULL DEFAULT 'pending' CHECK (sync_status IN ('pending', 'synced', 'failed')),
+  sync_error       TEXT,
+  synced_at        TEXT,
+  updated_at       TEXT NOT NULL
+);
+
+CREATE TABLE nen_rank_settings (
+  id                   TEXT PRIMARY KEY,
+  line_account_id      TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  rank_key             TEXT NOT NULL,
+  name                 TEXT NOT NULL,
+  annual_threshold_yen INTEGER NOT NULL DEFAULT 0 CHECK (annual_threshold_yen >= 0),
+  mile_rate_percent    REAL NOT NULL DEFAULT 1 CHECK (mile_rate_percent >= 0 AND mile_rate_percent <= 10),
+  -- 自動で付け替える友だち属性タグ（tags.id）。
+  tag_id               TEXT,
+  sort_order           INTEGER NOT NULL DEFAULT 0,
+  created_at           TEXT NOT NULL,
+  updated_at           TEXT NOT NULL,
+  UNIQUE (line_account_id, rank_key)
 );
 
 CREATE TABLE nen_rich_menu_jobs (
@@ -6954,6 +6996,9 @@ CREATE INDEX idx_nen_knowledge_animal ON nen_knowledge_articles(animal_type, is_
 CREATE INDEX idx_nen_knowledge_authority
   ON nen_knowledge_articles(is_active, animal_type, authority_rank DESC);
 
+CREATE INDEX idx_nen_lifetime_milestones_account
+  ON nen_lifetime_milestones(line_account_id, threshold_yen);
+
 CREATE INDEX idx_nen_member_rank ON nen_ec_member_snapshots(member_rank, purchase_amount DESC);
 
 CREATE INDEX idx_nen_pet_profiles_birthday
@@ -7018,6 +7063,9 @@ CREATE INDEX idx_nen_photos_status ON nen_photo_submissions(status, created_at D
 
 CREATE INDEX idx_nen_point_ledger_friend_created
   ON nen_point_ledger(friend_id, created_at DESC);
+
+CREATE INDEX idx_nen_rank_settings_account
+  ON nen_rank_settings(line_account_id, sort_order);
 
 CREATE INDEX idx_nen_rich_menu_jobs_status
   ON nen_rich_menu_jobs(status, created_at);

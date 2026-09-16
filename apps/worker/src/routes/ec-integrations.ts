@@ -112,6 +112,21 @@ export type EcEvent = {
   purchase_count?: number | null;
   purchase_amount?: number | null;
   line_user_id?: string | null;
+  /**
+   * ECが計算した会員ランク・マイル（★V6 37-1）。EC側が対応してから届く。
+   * 届いた値を正とし、LINE側で足し算しない。
+   */
+  membership?: {
+    annual_miles_yen?: number | null;
+    lifetime_miles_yen?: number | null;
+    member_rank_key?: string | null;
+    member_rank_name?: string | null;
+    mile_rate_percent?: number | null;
+    rank_valid_until?: string | null;
+    mile_balance?: number | null;
+    miles_used_this_month?: number | null;
+    last_purchased_at?: string | null;
+  } | null;
   order?: {
     number?: string;
     total?: number;
@@ -252,7 +267,7 @@ function memberRank(_count: number, amount: number): string {
   return '会員';
 }
 
-async function syncMemberSnapshot(db: D1Database, friendId: string, event: EcEvent, now: string): Promise<void> {
+export async function syncMemberSnapshot(db: D1Database, friendId: string, event: EcEvent, now: string): Promise<void> {
   const current = await db.prepare(`SELECT * FROM nen_ec_member_snapshots WHERE friend_id = ?`).bind(friendId).first<Record<string, unknown>>();
   let orders: Array<Record<string, unknown>> = current ? JSON.parse(String(current.orders_json || '[]')) : [];
   let subscription: Record<string, unknown> | null = current?.subscription_json ? JSON.parse(String(current.subscription_json)) : null;
@@ -298,6 +313,64 @@ async function syncMemberSnapshot(db: D1Database, friendId: string, event: EcEve
        purchase_amount=excluded.purchase_amount, point_balance=excluded.point_balance,
        member_rank=excluded.member_rank, synced_at=excluded.synced_at`,
   ).bind(friendId, event.customer_id == null ? null : String(event.customer_id), JSON.stringify(orders), subscription ? JSON.stringify(subscription) : null, count, amount, pointBalance, memberRank(count, amount), now).run();
+  await applyMembership(db, friendId, event, { amount, pointBalance, orderDate: event.event_type === 'ec.order.confirmed' ? event.occurred_at : null });
+}
+
+const nonNegativeInt = (value: unknown): number | null =>
+  Number.isFinite(value) ? Math.max(0, Math.round(Number(value))) : null;
+
+/**
+ * ECが計算した会員ランク・マイルを写す。
+ *
+ * `membership` が届いていればその値を正にする（通年・ライフタイム・ランク・残高）。
+ * 届いていない（EC側が未対応・古い注文イベント）ときは、暫定として
+ * ライフタイム＝これまでの足し算、残高＝ポイント残高だけを追いかけ、
+ * ランクキーは触らない（設定としきい値から画面側で求める）。
+ */
+async function applyMembership(
+  db: D1Database,
+  friendId: string,
+  event: EcEvent,
+  fallback: { amount: number; pointBalance: number; orderDate: string | null },
+): Promise<void> {
+  const membership = event.membership;
+  if (membership && typeof membership === 'object') {
+    const rankKey = typeof membership.member_rank_key === 'string' && membership.member_rank_key.trim() ? membership.member_rank_key.trim().slice(0, 64) : null;
+    const rankName = typeof membership.member_rank_name === 'string' && membership.member_rank_name.trim() ? membership.member_rank_name.trim().slice(0, 40) : null;
+    const rate = Number.isFinite(membership.mile_rate_percent) ? Math.max(0, Math.min(10, Number(membership.mile_rate_percent))) : null;
+    await db.prepare(
+      `UPDATE nen_ec_member_snapshots
+          SET annual_miles_yen = COALESCE(?, annual_miles_yen),
+              lifetime_miles_yen = COALESCE(?, lifetime_miles_yen),
+              member_rank_key = COALESCE(?, member_rank_key),
+              member_rank = COALESCE(?, member_rank),
+              mile_rate_percent = COALESCE(?, mile_rate_percent),
+              rank_valid_until = COALESCE(?, rank_valid_until),
+              mile_balance = COALESCE(?, mile_balance),
+              miles_used_this_month = COALESCE(?, miles_used_this_month),
+              last_purchased_at = COALESCE(?, last_purchased_at)
+        WHERE friend_id = ?`,
+    ).bind(
+      nonNegativeInt(membership.annual_miles_yen),
+      nonNegativeInt(membership.lifetime_miles_yen),
+      rankKey,
+      rankName,
+      rate,
+      typeof membership.rank_valid_until === 'string' ? membership.rank_valid_until.slice(0, 32) : null,
+      nonNegativeInt(membership.mile_balance),
+      nonNegativeInt(membership.miles_used_this_month),
+      typeof membership.last_purchased_at === 'string' ? membership.last_purchased_at.slice(0, 32) : null,
+      friendId,
+    ).run();
+    return;
+  }
+  await db.prepare(
+    `UPDATE nen_ec_member_snapshots
+        SET lifetime_miles_yen = MAX(lifetime_miles_yen, ?),
+            mile_balance = ?,
+            last_purchased_at = COALESCE(?, last_purchased_at)
+      WHERE friend_id = ? AND member_rank_key IS NULL`,
+  ).bind(fallback.amount, fallback.pointBalance, fallback.orderDate ? fallback.orderDate.slice(0, 32) : null, friendId).run();
 }
 
 export type EcMessageOptions = {

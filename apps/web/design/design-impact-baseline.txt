@@ -191,7 +191,6 @@ shared-button-importer components/store-selection-gate.tsx
 shared-button-importer components/templates/message-template-editor.tsx
 shared-button-importer components/users/user-row.tsx
 shared-button-importer components/webinars/webinar-notifications.tsx
-
 # 標準Buttonへ移行済みとして、見た目と主要導線を監視する画面本体。
 button-migration-target app/affiliates/tabs.tsx
 button-migration-target app/analytics/page.tsx
@@ -201,7 +200,6 @@ button-migration-target app/reminders/page.tsx
 button-migration-target app/templates/page.tsx
 button-migration-target app/webhooks/webhook-interactions.tsx
 button-migration-target components/friend-fields/tags-page-v4.tsx
-
 # 標準の表見出しへ移行済みとして監視する画面本体。
 table-header-migration-target app/affiliates/tabs.tsx
 table-header-migration-target app/conversions/page.tsx
@@ -209,8 +207,8 @@ table-header-migration-target app/inflow-links/page.tsx
 table-header-migration-target app/reminders/page.tsx
 table-header-migration-target app/templates/page.tsx
 table-header-migration-target app/webhooks/webhook-interactions.tsx
-
 # 詳細内テーブルのため、直書きthを残す既知の例外。
 native-table-header-exception app/affiliates/tabs.tsx
-
 shared-button-importer app/hq/templates/template-console.tsx
+shared-button-importer app/nen/members/lifetime-tab.tsx
+shared-button-importer app/nen/members/rank-settings-tab.tsx
