@@ -589,6 +589,8 @@ export interface ChatDetailMessage {
   direction: 'incoming' | 'outgoing'
   messageType: string
   content: string
+  /** LINE上で送信取消されたため、本文・添付は表示しない。 */
+  isUnsent: boolean
   source: string | null
   originKind: string | null
   sentByStaffId: string | null
