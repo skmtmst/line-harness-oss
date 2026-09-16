@@ -75,6 +75,7 @@ const statusFilters: { key: StatusFilter; label: string }[] = [
 ]
 
 import { normalizeSavedViewConditions, type InboxSavedViewConditions } from './saved-view-types'
+import { savedViewFailureMessage } from './saved-view-failure'
 import { savedViewSummary } from './saved-view-summary'
 import { buildOutgoingMessage, refreshChatListAfterSend } from './send-optimistic'
 import { describeSendFailure } from './send-failure'
@@ -982,9 +983,14 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
       setSavedViewsOpen(true)
       setSavedViewSuccess(true)
       return { success: true }
-    } catch {
-      // API番号や通信ライブラリの文を、そのまま運用者へ見せない。
-      const message = '保存できませんでした。時間を置いてもう一度お試しください。'
+    } catch (reason) {
+      /*
+        **失敗の種類で言い分ける。** fetchApi は !ok を ApiError として投げる
+        ので、409(同名の競合)も403(権限)も通信障害もここへ来る。全部を
+        「時間を置いて」と言うと、名前を変えれば直る競合まで待たせてしまう
+        (N-027)。文言は運用者向けに作り、APIの内部文言は素通ししない。
+      */
+      const message = savedViewFailureMessage(reason)
       setSavedViewError(message)
       return { success: false, error: message }
     } finally {
