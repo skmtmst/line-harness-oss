@@ -4221,6 +4221,93 @@ export type CommonVarsListResponse = ApiResponse<CommonVar[]> & {
   meta?: { total: number; limited: boolean; limit: number }
 }
 
+
+// ---------------------------------------------------------------------------
+// 運営コンソール（★V6 37）
+// ---------------------------------------------------------------------------
+
+export type OpsImpersonation = {
+  id: string
+  tenantId: string
+  tenantName?: string | null
+  mode: 'read' | 'write'
+  piiRevealed: boolean
+  startedAt: string
+}
+
+export type OpsMe = {
+  id: string
+  name: string
+  email: string | null
+  readOnly: boolean
+  totpEnabled: boolean
+  lineLinked: boolean
+  legacy: boolean
+  impersonation: OpsImpersonation | null
+}
+
+export type OpsTenantRow = {
+  id: string
+  name: string
+  status: 'active' | 'suspended' | 'archived'
+  featurePacks: string[]
+  plan_key: string | null
+  plan_status: 'exempt' | 'trialing' | 'active' | 'past_due' | 'canceled'
+  trial_ends_at: string | null
+  current_period_ends_at: string | null
+  created_at: string
+  updated_at: string
+  account_count: number
+  staff_count: number
+  last_login_at: string | null
+}
+
+export type OpsTenantSummary = { active: number; trialing: number; suspended: number; pastDue: number }
+
+export type OpsTenantDetail = {
+  tenant: OpsTenantRow
+  accounts: Array<{ id: string; name: string; is_active: number; archived_at: string | null; updated_at: string; friend_count: number }>
+  members: Array<{ id: string; name: string; email: string | null; role: string; access_level: string; is_active: number; invite_status: string; last_login_at: string | null }>
+  audit: OpsAuditRow[]
+}
+
+export type OpsAuditRow = {
+  id: string
+  staff_id: string
+  staff_name: string
+  tenant_id: string | null
+  tenant_name: string | null
+  action: string
+  reason: string | null
+  detail: string
+  ip: string | null
+  visible_to_tenant: number
+  created_at: string
+}
+
+export type OpsMember = {
+  staffId: string
+  name: string
+  email: string | null
+  isActive: boolean
+  totpEnabled: boolean
+  lineLinked: boolean
+  inviteStatus: string
+  approvedBy: string | null
+  lastLoginAt: string | null
+  createdAt: string
+}
+
+export type OpsMemberSummary = {
+  members: number
+  totpEnabled: number
+  impersonationsThisMonth: number
+  writeImpersonationsThisMonth: number
+  piiRevealsThisMonth: number
+}
+
+export type OperatorHistoryRow = { id: string; action: string; operatorName: string; reason: string | null; createdAt: string }
+
 export const api = {
   system: {
     health: () =>
@@ -6156,6 +6243,48 @@ export const api = {
     get: () =>
       fetchApi<ApiResponse<{ name: string | null; iconUrl: string | null }>>('/api/public/brand'),
   },
+  /** 運営コンソール（★V6 37）。形は `apps/worker/src/routes/ops.ts`。 */
+  ops: {
+    me: () => fetchApi<ApiResponse<OpsMe>>('/api/ops/me'),
+    tenants: (params?: { q?: string; status?: string }) => {
+      const query = new URLSearchParams()
+      if (params?.q) query.set('q', params.q)
+      if (params?.status) query.set('status', params.status)
+      const qs = query.toString()
+      return fetchApi<ApiResponse<OpsTenantRow[]> & { summary: OpsTenantSummary }>(`/api/ops/tenants${qs ? `?${qs}` : ''}`)
+    },
+    tenant: (id: string) => fetchApi<ApiResponse<OpsTenantDetail>>(`/api/ops/tenants/${encodeURIComponent(id)}`),
+    createTenant: (name: string) =>
+      fetchApi<ApiResponse<{ id: string; name: string }>>('/api/tenants', { method: 'POST', body: JSON.stringify({ name }) }),
+    changeTenantStatus: (id: string, input: { status: 'active' | 'suspended' | 'archived'; reason: string; confirmName?: string }) =>
+      fetchApi<ApiResponse<{ status: string }>>(`/api/ops/tenants/${encodeURIComponent(id)}/status`, { method: 'PATCH', body: JSON.stringify(input) }),
+    impersonation: {
+      current: () => fetchApi<ApiResponse<OpsImpersonation | null>>('/api/ops/impersonation/current'),
+      start: (tenantId: string) => fetchApi<ApiResponse<OpsImpersonation>>('/api/ops/impersonation/start', { method: 'POST', body: JSON.stringify({ tenantId }) }),
+      write: (reason: string) => fetchApi<ApiResponse<OpsImpersonation>>('/api/ops/impersonation/write', { method: 'POST', body: JSON.stringify({ reason }) }),
+      read: () => fetchApi<ApiResponse<OpsImpersonation>>('/api/ops/impersonation/read', { method: 'POST', body: '{}' }),
+      revealPii: (reason: string) => fetchApi<ApiResponse<OpsImpersonation>>('/api/ops/impersonation/pii-reveal', { method: 'POST', body: JSON.stringify({ reason }) }),
+      end: () => fetchApi<ApiResponse<null>>('/api/ops/impersonation/end', { method: 'POST', body: '{}' }),
+    },
+    audit: (params?: { tenantId?: string; action?: string; from?: string; to?: string; limit?: number; offset?: number }) => {
+      const query = new URLSearchParams()
+      if (params?.tenantId) query.set('tenant_id', params.tenantId)
+      if (params?.action) query.set('action', params.action)
+      if (params?.from) query.set('from', params.from)
+      if (params?.to) query.set('to', params.to)
+      if (params?.limit) query.set('limit', String(params.limit))
+      if (params?.offset) query.set('offset', String(params.offset))
+      const qs = query.toString()
+      return fetchApi<ApiResponse<OpsAuditRow[]> & { total: number }>(`/api/ops/audit${qs ? `?${qs}` : ''}`)
+    },
+    members: () => fetchApi<ApiResponse<OpsMember[]> & { summary: OpsMemberSummary }>('/api/ops/members'),
+    addMember: (input: { staffId?: string; email?: string }) =>
+      fetchApi<ApiResponse<{ staffId: string }>>('/api/ops/members', { method: 'POST', body: JSON.stringify(input) }),
+    setMemberActive: (staffId: string, isActive: boolean) =>
+      fetchApi<ApiResponse<{ staffId: string; isActive: boolean }>>(`/api/ops/members/${encodeURIComponent(staffId)}`, { method: 'PATCH', body: JSON.stringify({ isActive }) }),
+  },
+  /** 契約先（統括）から見える運営の操作履歴。書き込みを伴ったものだけ。 */
+  operatorHistory: () => fetchApi<ApiResponse<OperatorHistoryRow[]>>('/api/hq/operator-history'),
   tenants: {
     me: () => fetchApi<ApiResponse<{ name: string }>>('/api/tenants/me'),
     updateName: (name: string) =>
