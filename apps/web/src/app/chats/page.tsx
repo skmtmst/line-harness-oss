@@ -744,13 +744,13 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
         // ページ丁度いっぱい返ってきた = 続きがある可能性が高い
         setHasMoreChats(rows.length === CHAT_PAGE_SIZE)
       } else {
+        // 一覧の失敗は一覧の中の失敗行(再読み込みボタンつき)が伝える。
+        // 上部の汎用 error は送信・詳細など別の操作の失敗に使う(N-030)。
         setChatListFailed(true)
-        setError('チャットの読み込みに失敗しました。もう一度お試しください。')
       }
     } catch {
       if (listFilterKeyRef.current !== listFilterKey || chatListRequestRef.current !== requestId) return
       setChatListFailed(true)
-      setError('チャットの読み込みに失敗しました。もう一度お試しください。')
     } finally {
       if (listFilterKeyRef.current === listFilterKey && chatListRequestRef.current === requestId) {
         setChatListCompletedKey(listFilterKey)
@@ -1998,6 +1998,24 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                       className="mt-1.5 text-sm font-semibold text-danger underline underline-offset-2"
                     >
                       メールを読み込み直す
+                    </button>
+                  </div>
+                )}
+                {/*
+                  LINE一覧の失敗行。メールだけ見ているときは出さない。
+                  「もう一度お試しください」とだけ書かれた帯では、直す手段が
+                  ページ全体の再読み込みしかない(N-030)。失敗した一覧の場所で
+                  同じ条件の再取得へ戻れるようにする。
+                */}
+                {channel !== 'email' && chatListFailed && (
+                  <div role="alert" className="border-b border-hairline bg-danger-bg px-4 py-3">
+                    <p className="text-sm text-danger">チャットの読み込みに失敗しました。</p>
+                    <button
+                      type="button"
+                      onClick={() => { void loadChats() }}
+                      className="mt-1.5 text-sm font-semibold text-danger underline underline-offset-2"
+                    >
+                      会話を読み込み直す
                     </button>
                   </div>
                 )}
