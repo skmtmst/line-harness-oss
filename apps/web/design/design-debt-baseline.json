@@ -856,5 +856,8 @@
   },
   "app/hq/templates/template-definition-editor.tsx": {
     "unresolved-classname": 69
+  },
+  "app/login/two-factor/setup/page.tsx": {
+    "arbitrary-value": 1
   }
 }

@@ -75,6 +75,7 @@ function actionLabel(row: AuditEventItem): string {
   const action = row.action.toLowerCase()
   if (action === 'auth.login') return row.result === 'success' ? 'ログインしました' : 'ログインに失敗しました'
   if (action === 'auth.logout') return 'ログアウトしました'
+  if (action === 'auth.totp_reset') return '二段階認証の登録を外しました'
   if (action.includes('delete')) return '削除しました'
   if (action.includes('send') || action.includes('publish')) return '配信しました'
   if (action.includes('suspend')) return '利用を停止しました'

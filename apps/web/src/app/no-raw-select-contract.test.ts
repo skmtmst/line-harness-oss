@@ -52,7 +52,7 @@ const NOT_YET: Record<string, number> = {}
 
 describe('素の <select> を画面に書かない', () => {
   it('全ページを読めている', () => {
-    expect(PAGES.length).toBe(176)  // 2026-09-16: 運営コンソールの招待受付と2要素認証設定の2画面を足した後の実測値。
+    expect(PAGES.length).toBe(177)  // 2026-09-17: 管理者向け二段階認証の初回設定画面を足した後の実測値。
   })
 
   it('表に無い画面は素の <select> を持たない', () => {

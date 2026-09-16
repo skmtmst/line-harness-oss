@@ -25,6 +25,7 @@ function env(overrides: Partial<Env['Bindings']> = {}): Env['Bindings'] {
     ADMIN_ORIGIN: 'https://admin.example.com',
     ADMIN_PUBLIC_URL: 'https://admin.example.com',
     TURNSTILE_SECRET_KEY: 'turnstile-secret-for-test',
+    TOTP_ENCRYPTION_KEY: 'test-master-key-which-is-longer-than-32-characters',
     ...overrides,
   } as Env['Bindings'];
 }
@@ -46,6 +47,7 @@ type AuthJson = {
     deviceMarker: string;
     tenantId: string;
     twoFactor: boolean;
+    twoFactorSetup: boolean;
     challengeToken: string;
   };
 };
@@ -114,10 +116,14 @@ describe('会員登録（36-4）', () => {
     });
     expect(completed.status).toBe(200);
     const body = await json(completed);
-    expect(body.csrfToken).toBeTruthy();
+    // オーナーは管理者束のためTOTP登録が先。通常セッションはまだ出ない（N-426）。
+    expect(body.data.twoFactorSetup).toBe(true);
+    expect(body.data.challengeToken).toBeTruthy();
     expect(body.data.deviceMarker).toMatch(/^[A-Za-z0-9_-]{16,}$/);
-    expect(completed.headers.get('set-cookie')).toContain('lh_admin_session=');
+    expect(completed.headers.get('set-cookie') ?? '').not.toContain('lh_admin_session=');
     expect(completed.headers.get('set-cookie')).toContain('lh_signup_marker=');
+    expect(testDb.raw.prepare('SELECT COUNT(*) AS n FROM admin_sessions').get()).toEqual({ n: 0 });
+    expect(testDb.raw.prepare(`SELECT COUNT(*) AS n FROM admin_two_factor_challenges WHERE purpose = 'setup'`).get()).toEqual({ n: 1 });
 
     const tenant = testDb.raw.prepare('SELECT name, plan_status, trial_ends_at, signup_device_marker FROM tenants WHERE id = ?').get(body.data.tenantId) as Record<string, string>;
     expect(tenant.name).toBe('株式会社サンプル');
@@ -219,10 +225,11 @@ describe('メール＋パスワードのログイン', () => {
     const res = await call('POST', '/api/auth/password/login', { email: 'OWNER@example.com', password: 'Abcdefg1' });
     expect(res.status).toBe(200);
     const body = await json(res);
-    expect(body.csrfToken).toBeTruthy();
-    expect(body.data.twoFactor).toBe(false);
-    expect(res.headers.get('set-cookie')).toContain('lh_admin_session=');
-    expect(testDb.raw.prepare(`SELECT COUNT(*) AS n FROM login_audit WHERE action = 'login'`).get()).toEqual({ n: 1 });
+    // オーナーは管理者束のためTOTP未登録なら設定用の合言葉が返る（N-426）
+    expect(body.data.twoFactorSetup).toBe(true);
+    expect(body.data.challengeToken).toBeTruthy();
+    expect(res.headers.get('set-cookie') ?? '').not.toContain('lh_admin_session=');
+    expect(testDb.raw.prepare('SELECT COUNT(*) AS n FROM admin_sessions').get()).toEqual({ n: 0 });
   });
 
   it('違うパスワード・知らないメール・無効な権限者は同じ言葉で 401', async () => {
@@ -246,8 +253,10 @@ describe('メール＋パスワードのログイン', () => {
       expect((await call('POST', '/api/auth/password/login', { email: 'owner@example.com', password: 'wrong0000' })).status).toBe(401);
     }
     expect((await call('POST', '/api/auth/password/login', { email: 'owner@example.com', password: 'Abcdefg1' })).status).toBe(429);
-    // 別の接続元は別に数える
-    expect((await call('POST', '/api/auth/password/login', { email: 'owner@example.com', password: 'Abcdefg1' }, { ip: '198.51.100.7' })).status).toBe(200);
+    // 別の接続元は別に数える（TOTP未登録なので設定用の合言葉が返る）
+    const ok = await call('POST', '/api/auth/password/login', { email: 'owner@example.com', password: 'Abcdefg1' }, { ip: '198.51.100.7' });
+    expect(ok.status).toBe(200);
+    expect((await json(ok)).data.twoFactorSetup).toBe(true);
   });
 
   it('二段階認証を有効にしている人は合言葉を返し、セッションはまだ出さない', async () => {
@@ -280,7 +289,10 @@ describe('パスワード再設定（36-6）', () => {
     expect(testDb.raw.prepare('SELECT COUNT(*) AS n FROM admin_sessions').get()).toEqual({ n: 0 });
 
     expect((await call('POST', '/api/auth/password/login', { email: 'owner@example.com', password: 'Abcdefg1' })).status).toBe(401);
-    expect((await call('POST', '/api/auth/password/login', { email: 'owner@example.com', password: 'Newpass99' })).status).toBe(200);
+    // 新しいパスワードでは入れる。オーナーはTOTP必須のため設定用の合言葉が返る
+    const relogin = await call('POST', '/api/auth/password/login', { email: 'owner@example.com', password: 'Newpass99' });
+    expect(relogin.status).toBe(200);
+    expect((await json(relogin)).data.twoFactorSetup).toBe(true);
     expect((await call('POST', '/api/auth/password/reset', { token, password: 'Another11' })).status).toBe(410);
   });
 
@@ -290,7 +302,10 @@ describe('パスワード再設定（36-6）', () => {
     const token = lastMailToken();
     expect(token).toBeTruthy();
     expect((await call('POST', '/api/auth/password/reset', { token, password: 'Newpass99' })).status).toBe(200);
-    expect((await call('POST', '/api/auth/password/login', { email: 'line@example.com', password: 'Newpass99' })).status).toBe(200);
+    // admin なので TOTP 必須。設定用の合言葉が返り、セッションはまだ出ない
+    const login = await call('POST', '/api/auth/password/login', { email: 'line@example.com', password: 'Newpass99' });
+    expect(login.status).toBe(200);
+    expect((await json(login)).data.twoFactorSetup).toBe(true);
   });
 
   it('知らないメールでも返事は同じで、メールは送らない', async () => {
