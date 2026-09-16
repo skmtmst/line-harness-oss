@@ -23,6 +23,7 @@ type StaffAccessRow = {
   assigned_line_account_id: string | null;
   can_access_descendant_accounts: number;
   account_scope: 'all' | 'accounts';
+  role_bundle: string | null;
   scoped_line_account_ids: string | null;
   policy_version: number;
   created_at: string;
@@ -93,7 +94,13 @@ function parsePermissionKeys(value: string): string[] {
   }
 }
 
-function roleBundleFor(row: Pick<StaffAccessRow, 'role' | 'access_level'>): AccessRoleBundle {
+const STORED_ROLE_BUNDLES: readonly AccessRoleBundle[] = ['administrator', 'operations', 'reception', 'view_only', 'custom'];
+
+function roleBundleFor(row: { role: string; access_level: string; role_bundle?: string | null }): AccessRoleBundle {
+  // 明示保存された束があればそれが正本（N-424: 受付を運用へ潰さない）。
+  if (row.role_bundle && (STORED_ROLE_BUNDLES as readonly string[]).includes(row.role_bundle)) {
+    return row.role_bundle as AccessRoleBundle;
+  }
   if (row.access_level === 'read_only') return 'view_only';
   if (row.role === 'owner' || row.role === 'admin') return 'administrator';
   return 'operations';
@@ -105,7 +112,7 @@ function roleBundleFor(row: Pick<StaffAccessRow, 'role' | 'access_level'>): Acce
  * 役割束カタログ（ACCESS_ROLE_BUNDLES）で requiresMfa の束に入る人だけを
  * 対象にする。現状は「管理者」（owner/admin かつ閲覧専用でない人）。
  */
-export function staffRequiresMfa(row: Pick<StaffAccessRow, 'role' | 'access_level'>): boolean {
+export function staffRequiresMfa(row: { role: string; access_level: string; role_bundle?: string | null }): boolean {
   const bundle = ACCESS_ROLE_BUNDLES.find((item) => item.id === roleBundleFor(row));
   return bundle?.requiresMfa === true;
 }
@@ -178,7 +185,7 @@ export async function listAccessUsers(db: D1Database, input: ListAccessUsersInpu
     `SELECT sm.id, sm.name, sm.email, sm.role, sm.access_level, sm.is_active,
             sm.permission_keys, sm.invite_status, sm.invite_expires_at,
             sm.totp_enabled_at, sm.totp_secret_enc, sm.assigned_line_account_id,
-            sm.can_access_descendant_accounts, sm.account_scope, sm.policy_version,
+            sm.can_access_descendant_accounts, sm.account_scope, sm.role_bundle, sm.policy_version,
             sm.created_at, sm.updated_at,
             (SELECT GROUP_CONCAT(sas.line_account_id)
                FROM staff_account_scopes sas WHERE sas.staff_id = sm.id) AS scoped_line_account_ids,

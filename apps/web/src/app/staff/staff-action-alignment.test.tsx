@@ -136,7 +136,24 @@ describe('ログインユーザー操作の表示と実処理 (#834)', () => {
     expect(fixture.updateStaff).not.toHaveBeenCalled()
     fireEvent.click(screen.getByRole('button', { name: '保存する' }))
     await waitFor(() => expect(fixture.updateStaff).toHaveBeenCalledTimes(1))
-    expect(fixture.updateStaff).toHaveBeenCalledWith('target', { role: 'viewer' }, undefined)
+    // N-424: bundle名をそのまま送る（roleへ潰すと受付/運用が区別できない）。
+    expect(fixture.updateStaff).toHaveBeenCalledWith('target', { roleBundle: 'view_only', permissionScope: undefined, emailMask: undefined }, undefined)
+  })
+
+  it('「項目ごとに決める」を触ると3択表ごと更新口へ送る（N-424）', async () => {
+    await mount()
+    fireEvent.click(within(rowFor('対象者')).getByRole('button', { name: '中身を見る' }))
+
+    // 対象者は「運用」。プリセットでは「設定」は出さない → 「変えられる」へ直すと個別設定になる。
+    fireEvent.click(screen.getByRole('button', { name: '設定を変更できる' }))
+    fireEvent.click(screen.getByRole('button', { name: /見せる範囲を保存/ }))
+    fireEvent.click(screen.getByRole('button', { name: '保存する' }))
+    await waitFor(() => expect(fixture.updateStaff).toHaveBeenCalledTimes(1))
+    const [, payload] = fixture.updateStaff.mock.calls[0] as unknown as [string, { roleBundle?: string; permissionScope?: Record<string, string>; emailMask?: string }]
+    expect(payload.roleBundle).toBe('operations')
+    expect(payload.permissionScope?.settings).toBe('edit')
+    // 個人情報行はプリセットのまま伏せ字
+    expect(payload.emailMask).toBe('masked')
   })
 
   it('コピー元には対象本人を出さない', async () => {
