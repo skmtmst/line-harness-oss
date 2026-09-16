@@ -117,8 +117,8 @@ export default function FriendAddRunDetailPage() {
       <section className="rounded-card border border-hairline bg-canvas p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 className="text-lg font-bold">実行詳細</h1>
-            <p className="mt-1 text-sm text-ink-secondary">{displayName}・{detail.rule?.name ?? '使用ルールは未取得'}</p>
+            <p className="text-lg font-bold">{displayName}</p>
+            <p className="mt-1 text-sm text-ink-secondary">{detail.rule?.name ?? '使用ルールは未取得'}</p>
           </div>
           <StatusBadge tone={runStatus.tone}>{runStatus.label}</StatusBadge>
         </div>
