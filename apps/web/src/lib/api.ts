@@ -4171,6 +4171,41 @@ export type FriendAddRunList = {
   }
 }
 
+export type FriendAddRunDetail = {
+  id: string
+  receivedAt: string
+  processedAt: string | null
+  friend: { id: string; displayName: string | null; redacted: false } | { displayName: string; redacted: true }
+  friendKind: FriendAddRuleKind
+  attribution: {
+    status: FriendAddEventAttributionStatus
+    routeId: string | null
+    routeName: string | null
+    reason: string | null
+  }
+  rule: ({
+    id: string
+    name: string | null
+    versionId: string | null
+    versionNumber: number | null
+  } & { definition?: FriendAddRuleDefinition }) | null
+  configuredActions?: unknown[]
+  actionRuns: Array<{
+    id: string
+    stableId: string
+    type: string
+    status: 'pending' | 'running' | 'completed' | 'failed'
+    attemptCount: number
+    nextRetryAt: string | null
+    errorCode: string | null
+    startedAt: string
+    completedAt: string | null
+    updatedAt: string
+  }>
+  status: FriendAddEventRoutingStatus
+  errorCode: string | null
+}
+
 export type MediaQuota = {
   usageBytes: number
   reservedBytes: number
@@ -7900,6 +7935,15 @@ export const api = {
       if (params?.limit !== undefined) query.set('limit', String(params.limit))
       return fetchApi<ApiResponse<FriendAddRunList>>(`/api/friend-add-runs?${query}`)
     },
+    runDetail: (accountId: string, runId: string) =>
+      fetchApi<ApiResponse<FriendAddRunDetail>>(
+        `/api/friend-add-runs/${encodeURIComponent(runId)}?account_id=${encodeURIComponent(accountId)}`,
+      ),
+    retryRun: (accountId: string, runId: string) =>
+      fetchApi<ApiResponse<{ status: FriendAddEventRoutingStatus; retried: number }>>(
+        `/api/friend-add-runs/${encodeURIComponent(runId)}/retry?account_id=${encodeURIComponent(accountId)}`,
+        { method: 'POST' },
+      ),
     createDraft: (input: FriendAddRuleInput, idempotencyKey: string) =>
       fetchApi<ApiResponse<{ id: string }>>('/api/friend-add-rules/drafts', {
         method: 'POST',
@@ -10605,6 +10649,43 @@ export interface EventWaitlistItem {
   friend_name: string | null;
 }
 
+/** 開催回ごとの予約・キャンセル待ち。画面表示と操作を同じ版で扱う。 */
+export interface EventOccurrenceApplicant {
+  source: 'booking' | 'waitlist';
+  id: string;
+  friendId: string;
+  displayName: string | null;
+  pictureUrl: string | null;
+  status: string;
+  partySize: number;
+  appliedAt: string;
+  answers: unknown | null;
+  firstParticipation: { isFirst: boolean | null; attendedCount: number | null; checkedAt: string | null };
+  offeredAt: string | null;
+  offerExpiresAt: string | null;
+}
+
+export interface EventOccurrenceApplicants {
+  occurrence: {
+    id: string;
+    eventId: string;
+    startsAt: string;
+    endsAt: string;
+    capacity: number | null;
+    activeSeats: number;
+    version: number;
+  };
+  summary: { bookingCount: number; waitingCount: number; activeSeats: number };
+  applicants: EventOccurrenceApplicant[];
+  /** 表示・CSV・一斉案内を同じ対象で扱う短期サーバースナップショット。 */
+  snapshotId: string;
+  snapshotExpiresAt: string;
+}
+
+export type EventWaitlistPromotionResult =
+  | { kind: 'promoted'; occurrenceVersion: number; promoted: { waitlistId: string; friendId: string; partySize: number; status: 'offered'; offeredAt: string; expiresAt: string } }
+  | { kind: 'noop'; occurrenceVersion: number; promoted: null; reason: string };
+
 export const eventsApi = {
   listEvents: (
     accountId: string,
@@ -10646,6 +10727,11 @@ export const eventsApi = {
   listSlots: (accountId: string, eventId: string) =>
     fetchApi<{ items: EventSlot[] }>(
       withAccount(`/api/events/admin/events/${eventId}/slots`, accountId),
+    ),
+  /** 申込者画面の開催回選択だけに使う最小応答。集計や予約一覧は含めない。 */
+  listOccurrenceSelector: (accountId: string, eventId: string) =>
+    fetchApi<{ items: EventSlot[] }>(
+      withAccount(`/api/events/admin/events/${eventId}/occurrence-selector`, accountId),
     ),
   createSlots: (
     accountId: string,
@@ -10689,6 +10775,22 @@ export const eventsApi = {
     fetchApi<{ waitlist: EventWaitlistItem[] }>(
       withAccount(`/api/events/admin/events/${eventId}/waitlist`, accountId),
     ),
+  getOccurrenceApplicants: (accountId: string, occurrenceId: string) =>
+    fetchApi<{ success: true; data: EventOccurrenceApplicants }>(
+      withAccount(`/api/events/admin/occurrences/${encodeURIComponent(occurrenceId)}/applicants`, accountId),
+    ).then((response) => response.data),
+  occurrenceApplicantsCsvUrl: (accountId: string, occurrenceId: string, snapshotId: string) =>
+    withAccount(`/api/events/admin/occurrences/${encodeURIComponent(occurrenceId)}/applicants.csv?snapshot_id=${encodeURIComponent(snapshotId)}`, accountId),
+  previewOccurrenceBroadcast: (accountId: string, occurrenceId: string, data: { title: string; messageContent: string; snapshotId: string }, idempotencyKey: string) =>
+    fetchApi<{ success: true; data: { broadcastId: string; recipientCount: number } }>(
+      withAccount(`/api/events/admin/occurrences/${encodeURIComponent(occurrenceId)}/applicant-broadcasts/preview`, accountId),
+      { method: 'POST', headers: { 'Idempotency-Key': idempotencyKey }, body: JSON.stringify(data) },
+    ).then((response) => response.data),
+  promoteOccurrenceWaitlist: (accountId: string, occurrenceId: string, expectedVersion: number) =>
+    fetchApi<{ success: true; data: EventWaitlistPromotionResult }>(
+      withAccount(`/api/events/admin/occurrences/${encodeURIComponent(occurrenceId)}/waitlist/promote`, accountId),
+      { method: 'POST', body: JSON.stringify({ expectedVersion }) },
+    ).then((response) => response.data),
   listBookings: (
     accountId: string,
     eventId: string,

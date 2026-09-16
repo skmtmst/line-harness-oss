@@ -26,6 +26,7 @@ import {
   findFriendAddUnusableReferences,
   isValidFriendAddHhmm,
   parseFriendAddConditionAst,
+  retryFailedFriendAddActions,
 } from '../services/friend-add-routing.js';
 
 const friendAddRules = new Hono<Env>();
@@ -69,6 +70,10 @@ async function canUseAccount(c: Context<Env>, accountId: string): Promise<boolea
 function parseSnapshot(value: string | null): FriendAddRuleDefinition {
   const raw = value ? JSON.parse(value) as Partial<FriendAddRuleDefinition> : {};
   return normalizeDefinition(raw);
+}
+
+function safeActionErrorCode(value: string | null): string | null {
+  return value === 'action_failed' ? value : (value ? 'action_failed' : null);
 }
 
 function normalizeDefinition(raw: Partial<FriendAddRuleDefinition> | undefined): FriendAddRuleDefinition {
@@ -593,12 +598,13 @@ friendAddRules.get('/api/friend-add-runs/:id', requireRole('owner', 'admin', 'st
     if (!row) return c.json({ success: false, error: '実行結果が見つかりません' }, 404);
     const definition = row.definition_snapshot ? parseSnapshot(row.definition_snapshot) : null;
     const actions = await c.env.DB.prepare(
-      `SELECT id, action_stable_id, status, attempt_count, next_retry_at, last_error_code,
-              created_at, updated_at
+      `SELECT id, action_stable_id, action_type, status, attempt_count, next_retry_at,
+              last_error_code, started_at, completed_at, created_at, updated_at
          FROM friend_add_action_runs WHERE event_id = ? ORDER BY created_at ASC, id ASC`,
     ).bind(row.id).all<{
-      id: string; action_stable_id: string; status: string; attempt_count: number;
-      next_retry_at: string | null; last_error_code: string | null; created_at: string; updated_at: string;
+      id: string; action_stable_id: string; action_type: string; status: string; attempt_count: number;
+      next_retry_at: string | null; last_error_code: string | null; started_at: string | null;
+      completed_at: string | null; created_at: string; updated_at: string;
     }>();
     return c.json({
       success: true,
@@ -625,11 +631,13 @@ friendAddRules.get('/api/friend-add-runs/:id', requireRole('owner', 'admin', 'st
         actionRuns: (actions.results ?? []).map((action) => ({
           id: action.id,
           stableId: action.action_stable_id,
+          type: action.action_type,
           status: action.status,
           attemptCount: action.attempt_count,
           nextRetryAt: action.next_retry_at,
-          errorCode: action.last_error_code,
-          startedAt: action.created_at,
+          errorCode: safeActionErrorCode(action.last_error_code),
+          startedAt: action.started_at ?? action.created_at,
+          completedAt: action.completed_at,
           updatedAt: action.updated_at,
         })),
         status: row.routing_status,
@@ -639,6 +647,31 @@ friendAddRules.get('/api/friend-add-runs/:id', requireRole('owner', 'admin', 'st
   } catch (error) {
     console.error('GET /api/friend-add-runs/:id error:', error);
     return c.json({ success: false, error: '実行結果の詳細を取得できませんでした' }, 500);
+  }
+});
+
+friendAddRules.post('/api/friend-add-runs/:id/retry', requireRole('owner', 'admin'), async (c) => {
+  const accountId = accountIdFrom(c);
+  if (!accountId) return c.json({ success: false, error: 'account_id が必要です' }, 400);
+  try {
+    if (!await canUseAccount(c, accountId)) {
+      return c.json({ success: false, error: '実行結果が見つかりません' }, 404);
+    }
+    const result = await retryFailedFriendAddActions(c.env.DB, {
+      eventId: c.req.param('id'),
+      lineAccountId: accountId,
+    });
+    if (!result.found) return c.json({ success: false, error: '実行結果が見つかりません' }, 404);
+    if (!result.acquired) {
+      return c.json({ success: false, error: '再試行できる失敗処理がないか、すでに再試行中です' }, 409);
+    }
+    return c.json({
+      success: true,
+      data: { status: result.status, retried: result.retried ?? 0 },
+    });
+  } catch (error) {
+    console.error('POST /api/friend-add-runs/:id/retry error:', error);
+    return c.json({ success: false, error: '失敗した処理を再試行できませんでした' }, 500);
   }
 });
 

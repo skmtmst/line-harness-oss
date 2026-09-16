@@ -798,6 +798,19 @@ describe('POST /webhook — friend-add抑止理由の台帳記録 (#622)', () =>
     }));
   });
 
+  test('処理も送信も失敗したときは、処理再試行後に戻す送信結果を同時に記録する', async () => {
+    await sendFollowWithRouting({
+      routed: true, kind: 'returning', enrollments: [], timing: 'immediate',
+      suppressed: false, suppressReason: null, ruleId: 'rule-1', ruleVersionId: 'rule-1-v1',
+      actionFailureCount: 1,
+    });
+    expect(markFriendAddEventRouting).toHaveBeenCalledWith(baseEnv.DB, expect.objectContaining({
+      eventId: 'friend-add-event-1', lineAccountId: 'account-main',
+      status: 'partial_failed', errorCode: 'action_failed', deliveryCount: 0,
+      actionBaseStatus: 'partial_failed', actionBaseErrorCode: 'send_failed',
+    }));
+  });
+
   test('設定なしの受け皿経路で送れなかったときも partial_failed にする', async () => {
     await sendFollowWithRouting({ routed: false, suppressed: false, enrollments: [] });
     expect(markFriendAddEventRouting).toHaveBeenCalledWith(baseEnv.DB, expect.objectContaining({

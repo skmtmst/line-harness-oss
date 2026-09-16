@@ -7,7 +7,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import type Database from 'better-sqlite3'
 import { createTestD1, insertFriend } from '../test-utils/d1-sqlite.js'
-import { buildSegmentQuery, matchesCondition, type SegmentCondition } from './segment-query.js'
+import { buildPublicSegmentQuery, buildSegmentQuery, matchesCondition, type SegmentCondition } from './segment-query.js'
 
 let db: D1Database
 let raw: Database.Database
@@ -56,6 +56,25 @@ describe('タグ', () => {
 
   it('タグが空の配列なら組み立てを断る（全員一致を作らせない）', () => {
     expect(() => buildSegmentQuery({ operator: 'AND', rules: [{ type: 'tag_all', value: [] }] })).toThrow()
+  })
+})
+
+describe('固定した配信対象', () => {
+  it('確認時点のIDだけを1 bindで固定し、多数でもD1のbind上限を越えない', async () => {
+    const ids = [...Array.from({ length: 240 }, (_, index) => `other-${index}`), 'a', 'c', 'a']
+    const condition: SegmentCondition = { operator: 'AND', rules: [{ type: 'friend_id_in', value: ids }] }
+    const { sql, bindings } = buildSegmentQuery(condition)
+    expect(sql).toContain('json_each(?)')
+    expect(bindings).toHaveLength(1)
+    expect(await idsMatching(condition)).toEqual(['a', 'c'])
+  })
+
+  it('空の固定対象は全員一致にせず拒否する', () => {
+    expect(() => buildSegmentQuery({ operator: 'AND', rules: [{ type: 'friend_id_in', value: [] }] })).toThrow()
+  })
+
+  it('一般の条件保存口は内部snapshot用ID列を拒否する', () => {
+    expect(() => buildPublicSegmentQuery({ operator: 'AND', rules: [{ type: 'friend_id_in', value: ['a'] }] })).toThrow('reserved')
   })
 })
 
