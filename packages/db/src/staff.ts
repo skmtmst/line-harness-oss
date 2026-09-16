@@ -27,6 +27,12 @@ export interface StaffMember {
   can_access_descendant_accounts?: number;
   account_scope?: 'all' | 'accounts';
   policy_version?: number;
+  /** N-424: 明示保存された役割bundle。NULL は従来どおり role+access_level から導出。 */
+  role_bundle?: string | null;
+  /** N-424: 「見えるだけ」の permission key(JSON配列)。GET系だけを許可する。 */
+  view_permission_keys?: string | null;
+  /** N-424: スタッフのメール表示。'full'|'masked'|'none'、NULL は従来判定。 */
+  email_mask?: string | null;
   tenant_id: string | null;
   created_at: string;
   updated_at: string;
@@ -47,6 +53,9 @@ export interface CreateStaffInput {
   assigned_line_account_id?: string | null;
   can_access_descendant_accounts?: boolean;
   account_scope?: 'all' | 'accounts';
+  role_bundle?: string | null;
+  view_permission_keys?: string[];
+  email_mask?: string | null;
   tenant_id?: string | null;
 }
 
@@ -73,6 +82,9 @@ export interface UpdateStaffInput {
   assigned_line_account_id?: string | null;
   can_access_descendant_accounts?: boolean;
   account_scope?: 'all' | 'accounts';
+  role_bundle?: string | null;
+  view_permission_keys?: string[];
+  email_mask?: string | null;
 }
 
 function generateApiKey(): string {
@@ -151,8 +163,9 @@ export async function createStaffMember(
        (id, name, email, role, access_level, api_key, line_user_id, is_active,
         permission_keys, notification_preferences, invite_status, invite_token_hash,
         invite_expires_at, assigned_line_account_id, can_access_descendant_accounts,
-        account_scope, tenant_id, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        account_scope, role_bundle, view_permission_keys, email_mask,
+        tenant_id, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id, input.name, input.email ?? null, input.role, input.access_level ?? 'full', apiKey,
@@ -162,6 +175,9 @@ export async function createStaffMember(
       input.invite_expires_at ?? null, input.assigned_line_account_id ?? null,
       input.can_access_descendant_accounts ? 1 : 0,
       input.account_scope ?? 'all',
+      input.role_bundle ?? null,
+      input.view_permission_keys ? JSON.stringify(input.view_permission_keys) : null,
+      input.email_mask ?? null,
       input.tenant_id ?? DEFAULT_TENANT_ID, now, now,
     )
     .run();
@@ -203,6 +219,9 @@ export async function updateStaffMember(
   if (input.assigned_line_account_id !== undefined) { sets.push('assigned_line_account_id = ?'); values.push(input.assigned_line_account_id); }
   if (input.can_access_descendant_accounts !== undefined) { sets.push('can_access_descendant_accounts = ?'); values.push(input.can_access_descendant_accounts ? 1 : 0); }
   if (input.account_scope !== undefined) { sets.push('account_scope = ?'); values.push(input.account_scope); }
+  if (input.role_bundle !== undefined) { sets.push('role_bundle = ?'); values.push(input.role_bundle); }
+  if (input.view_permission_keys !== undefined) { sets.push('view_permission_keys = ?'); values.push(JSON.stringify(input.view_permission_keys)); }
+  if (input.email_mask !== undefined) { sets.push('email_mask = ?'); values.push(input.email_mask); }
 
   values.push(id);
   await db

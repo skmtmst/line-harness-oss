@@ -28,12 +28,13 @@ vi.mock('../services/account-access.js', () => ({
 const { access } = await import('./access.js');
 const env = { DB: {} as D1Database };
 
-function app(role: 'owner' | 'admin' | 'staff' = 'owner', permissionKeys: string[] = []) {
+function app(role: 'owner' | 'admin' | 'staff' = 'owner', permissionKeys: string[] = [], emailMask?: 'full' | 'masked' | 'none') {
   const instance = new Hono<Env>();
   instance.use('*', async (c, next) => {
     c.set('staff', {
       id: 'actor-1', name: '担当', role, readOnly: false, permissionKeys,
       tenantId: 'tenant-a', assignedLineAccountId: null, canAccessDescendantAccounts: false,
+      emailMask,
     });
     return next();
   });
@@ -41,8 +42,8 @@ function app(role: 'owner' | 'admin' | 'staff' = 'owner', permissionKeys: string
   return instance;
 }
 
-function request(path: string, role: 'owner' | 'admin' | 'staff' = 'owner', permissionKeys: string[] = []) {
-  return app(role, permissionKeys).fetch(new Request(`https://example.com${path}`), env);
+function request(path: string, role: 'owner' | 'admin' | 'staff' = 'owner', permissionKeys: string[] = [], emailMask?: 'full' | 'masked' | 'none') {
+  return app(role, permissionKeys, emailMask).fetch(new Request(`https://example.com${path}`), env);
 }
 
 const userResult = {
@@ -95,6 +96,23 @@ describe('access users and role bundle routes', () => {
     const body = await response.json() as { data: { items: Array<{ email: string }> } };
     expect(body.data.items[0].email).toBe('y***@example.com');
     expect(mocks.listAccessUsers).toHaveBeenCalledWith(env.DB, expect.objectContaining({ includeEmailInSearch: false }));
+  });
+
+  it('保存されたメール見せ方は役割より優先される（N-424）', async () => {
+    // none: 管理者でも返さない。masked: 伏せ字。full: 実アドレス。
+    const none = await request('/api/access/users', 'admin', [], 'none');
+    const noneBody = await none.json() as { data: { items: Array<{ email: string | null }> } };
+    expect(noneBody.data.items[0].email).toBeNull();
+    expect(mocks.listAccessUsers).toHaveBeenLastCalledWith(env.DB, expect.objectContaining({ includeEmailInSearch: false }));
+
+    const masked = await request('/api/access/users', 'admin', [], 'masked');
+    const maskedBody = await masked.json() as { data: { items: Array<{ email: string | null }> } };
+    expect(maskedBody.data.items[0].email).toBe('y***@example.com');
+
+    const full = await request('/api/access/users', 'staff', ['access.user.view'], 'full');
+    const fullBody = await full.json() as { data: { items: Array<{ email: string | null }> } };
+    expect(fullBody.data.items[0].email).toBe('yamamoto@example.com');
+    expect(mocks.listAccessUsers).toHaveBeenLastCalledWith(env.DB, expect.objectContaining({ includeEmailInSearch: true }));
   });
 
   it('returns all fixed bundles with actual assigned counts', async () => {

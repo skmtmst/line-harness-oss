@@ -1740,6 +1740,14 @@ export interface StaffMember {
   /** 担当範囲。accounts の場合は scopedLineAccountIds に対象店舗が入る。 */
   accountScope?: 'all' | 'accounts';
   scopedLineAccountIds?: string[];
+  /** N-424: 役割bundle。role は初期値、こちらが監査・画面の共通語彙。 */
+  roleBundle?: 'administrator' | 'operations' | 'reception' | 'view_only' | 'custom';
+  /** N-424: 「見えるだけ」のキー（GET系のみ許可）。 */
+  permissionViewKeys?: string[];
+  /** N-424: 機能ごとの3択（none/view/edit）。編集画面の復元用。 */
+  permissionScope?: Record<string, 'edit' | 'view' | 'none'>;
+  /** N-424: この人が他者のメールをどう見るか（full=実値/masked=伏せ字/none=出さない）。 */
+  emailMask?: 'full' | 'masked' | 'none' | null;
 }
 
 export interface StaffProfile {

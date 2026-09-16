@@ -22,7 +22,11 @@ const AUDIT_RESULTS: AuditResult[] = ['success', 'denied', 'failed'];
 
 function hasPermission(c: Context<Env>, permission: string): boolean {
   const staff = c.get('staff');
-  return staff.role === 'owner' || staff.role === 'admin' || staff.permissionKeys?.includes(permission) === true;
+  // N-424: 「見えるだけ」のキーは GET 系だけを許可する。
+  const safeRead = c.req.method === 'GET' || c.req.method === 'HEAD';
+  return staff.role === 'owner' || staff.role === 'admin'
+    || staff.permissionKeys?.includes(permission) === true
+    || (safeRead && staff.viewPermissionKeys?.includes(permission) === true);
 }
 
 function requirePermission(permission: string) {
@@ -88,7 +92,13 @@ access.get(
     const accessScope = await visibleScope(c);
     if (accessScope instanceof Response) return accessScope;
     try {
-      const canReadEmail = hasPermission(c, 'access.user.email.view');
+      // N-424: 保存されたメール見せ方(email_mask)が正本。
+      // 未設定の人だけ従来の access.user.email.view 判定へ落とす。
+      const viewer = c.get('staff');
+      const emailLevel = viewer.emailMask === 'full' || viewer.emailMask === 'masked' || viewer.emailMask === 'none'
+        ? viewer.emailMask
+        : hasPermission(c, 'access.user.email.view') ? 'full' : 'masked';
+      const canReadEmail = emailLevel === 'full';
       const result = await listAccessUsers(c.env.DB, {
         tenantId: c.get('staff').tenantId ?? DEFAULT_TENANT_ID,
         allowedLineAccountIds: accessScope.scope.allowedAccountIds,
@@ -105,7 +115,7 @@ access.get(
         data: {
           items: result.items.map((item) => ({
             ...item,
-            email: canReadEmail ? item.email : maskEmail(item.email),
+            email: emailLevel === 'full' ? item.email : emailLevel === 'masked' ? maskEmail(item.email) : null,
           })),
           summary: result.summary,
           pagination: { total: result.total, limit: result.limit, offset: result.offset },
