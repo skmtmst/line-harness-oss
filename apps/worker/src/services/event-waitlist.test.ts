@@ -151,6 +151,20 @@ describe('V6 event waitlist and applicants', () => {
     ]);
   });
 
+  test('取消・却下・期限切れを表示/CSV/配信の元になる申込者snapshotへ混ぜない', async () => {
+    seedBooking();
+    seedWaitlist();
+    sqlite.exec(`
+      INSERT INTO event_bookings (id, line_account_id, event_id, slot_id, friend_id, status, requested_at, identity_key)
+      VALUES ('booking-cancelled', 'account-a', 'event-a', 'slot-a', 'friend-c', 'cancelled', '2026-09-02T00:00:00.000Z', 'cancelled');
+      UPDATE event_bookings SET status = 'rejected' WHERE id = 'booking-a';
+      UPDATE event_waitlist SET status = 'converted' WHERE id = 'wait-a';
+    `);
+    const data = await getEventOccurrenceApplicants(db, { occurrenceId: 'slot-a', lineAccountId: 'account-a' });
+    expect(data?.applicants).toEqual([]);
+    expect(data?.summary).toMatchObject({ bookingCount: 0, waitingCount: 0 });
+  });
+
   test('繰上げURLを本人が承諾すると、回答内容を保った確定予約へ一度だけ変換する', async () => {
     const token = 'valid-offer-token-123456789012345678901234567890';
     await seedOffered(token);

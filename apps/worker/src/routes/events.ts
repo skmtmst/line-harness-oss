@@ -48,7 +48,7 @@ import { awardActivityMileage } from '../services/activity-mileage.js';
 import { dispatchAutomationEventWithLogging } from '../services/automation-triggers.js';
 import { applyActionScoreEvent } from '../services/action-score-events.js';
 import { resolveLineCredential } from '@line-crm/db';
-import { createBroadcast, getBroadcastById } from '@line-crm/db';
+import { createBroadcast, getBroadcastById, type Broadcast } from '@line-crm/db';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import {
   acceptEventWaitlistOffer,
@@ -974,8 +974,7 @@ events.post(
       if (!snapshotId) return bad(c, 'applicant_snapshot_required', 422);
 
       const occurrenceId = c.req.param('id');
-      const existing = await getBroadcastById(c.env.DB, idempotencyKey);
-      if (existing) {
+      const replayExisting = (existing: Broadcast): Response | null => {
         const draft = eventApplicantBroadcastDraft(existing.draft_payload_json);
         if (existing.title !== title || existing.message_content !== messageContent
           || existing.line_account_id !== accountId || existing.target_type !== 'segment'
@@ -986,6 +985,10 @@ events.post(
         if (existing.segment_conditions !== segmentConditions) return bad(c, 'idempotency_key_conflict', 409);
         c.header('Idempotency-Replayed', 'true');
         return c.json({ success: true, data: { broadcastId: existing.id, recipientCount: draft.recipientIds.length } });
+      };
+      const existing = await getBroadcastById(c.env.DB, idempotencyKey);
+      if (existing) {
+        return replayExisting(existing);
       }
       const loaded = await getEventApplicantSnapshot(c.env.DB, {
         id: snapshotId,
@@ -999,23 +1002,21 @@ events.post(
       const friendIds = [...new Set(loaded.snapshot.data.applicants.map((applicant) => applicant.friendId))];
       if (friendIds.length === 0) return bad(c, 'no_applicants_to_broadcast', 422);
       const segmentConditions = JSON.stringify({ operator: 'AND', rules: [{ type: 'friend_id_in', value: friendIds }] });
-      const broadcast = await createBroadcast(c.env.DB, {
-        id: idempotencyKey,
-        title,
-        messageType: 'text',
-        messageContent,
-        targetType: 'segment',
-        lineAccountId: accountId,
-        segmentConditions,
-        saveAsDraft: true,
-        draftStep: 'confirm',
-        draftPayloadJson: JSON.stringify({
-          kind: 'event_occurrence_applicant_snapshot',
-          snapshotId,
-          occurrenceId,
-          recipientIds: friendIds,
-        } satisfies EventApplicantBroadcastDraft),
-      });
+      let broadcast: Broadcast;
+      try {
+        broadcast = await createBroadcast(c.env.DB, {
+          id: idempotencyKey, title, messageType: 'text', messageContent, targetType: 'segment',
+          lineAccountId: accountId, segmentConditions, saveAsDraft: true, draftStep: 'confirm',
+          draftPayloadJson: JSON.stringify({
+            kind: 'event_occurrence_applicant_snapshot', snapshotId, occurrenceId, recipientIds: friendIds,
+          } satisfies EventApplicantBroadcastDraft),
+        });
+      } catch (error) {
+        // 同じkeyを同時に押した競合だけは、PK衝突を500にせず勝者の結果を再生する。
+        const raced = await getBroadcastById(c.env.DB, idempotencyKey);
+        if (raced) return replayExisting(raced);
+        throw error;
+      }
       return c.json({ success: true, data: { broadcastId: broadcast.id, recipientCount: friendIds.length } }, 201);
     } catch (error) {
       console.error('POST /api/events/admin/occurrences/:id/applicant-broadcasts/preview error:', error);

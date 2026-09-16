@@ -6369,6 +6369,9 @@ CREATE INDEX idx_event_bookings_requested_expiry
 
 CREATE INDEX idx_event_bookings_slot_status ON event_bookings (slot_id, status);
 
+CREATE INDEX idx_event_occurrence_applicant_snapshots_expiry
+  ON event_occurrence_applicant_snapshots(expires_at);
+
 CREATE INDEX idx_event_occurrence_applicant_snapshots_scope_expiry
   ON event_occurrence_applicant_snapshots(line_account_id, occurrence_id, staff_id, expires_at);
 

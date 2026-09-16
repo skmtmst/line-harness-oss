@@ -90,4 +90,27 @@ describe('event applicant broadcast preview', () => {
     expect(foreign.status).toBe(404);
     expect(broadcasts.createBroadcast).not.toHaveBeenCalled();
   });
+
+  test('同じIdempotency-Keyの同時previewはPK競合後に勝者のsnapshotを再生する', async () => {
+    const server = app();
+    let releaseFirst: (() => void) | undefined;
+    const firstInserted = new Promise<void>((resolve) => { releaseFirst = resolve; });
+    let winner: Record<string, unknown> | null = null;
+    broadcasts.createBroadcast.mockImplementationOnce(async (_db, input) => {
+      winner = { id: input.id, title: input.title, message_content: input.messageContent, line_account_id: input.lineAccountId, target_type: input.targetType, segment_conditions: input.segmentConditions, draft_payload_json: input.draftPayloadJson };
+      await firstInserted;
+      return winner;
+    }).mockRejectedValueOnce(new Error('UNIQUE constraint failed: broadcasts.id'));
+    broadcasts.getBroadcastById.mockImplementation(async () => winner);
+    const body = JSON.stringify({ title: '案内', messageContent: '本文', snapshotId: 'snapshot-a' });
+    const first = server.request('/api/events/admin/occurrences/slot-a/applicant-broadcasts/preview?account_id=account-a', { method: 'POST', headers: { 'content-type': 'application/json', 'Idempotency-Key': key }, body });
+    const second = server.request('/api/events/admin/occurrences/slot-a/applicant-broadcasts/preview?account_id=account-a', { method: 'POST', headers: { 'content-type': 'application/json', 'Idempotency-Key': key }, body });
+    await Promise.resolve();
+    releaseFirst?.();
+    const [firstResponse, secondResponse] = await Promise.all([first, second]);
+    expect([firstResponse.status, secondResponse.status].sort()).toEqual([200, 201]);
+    const [firstData, secondData] = await Promise.all([firstResponse.json(), secondResponse.json()]) as Array<{ data: { broadcastId: string; recipientCount: number } }>;
+    expect(firstData.data).toEqual(secondData.data);
+    expect(broadcasts.createBroadcast).toHaveBeenCalledTimes(2);
+  });
 });

@@ -12,3 +12,7 @@ CREATE TABLE event_occurrence_applicant_snapshots (
 
 CREATE INDEX idx_event_occurrence_applicant_snapshots_scope_expiry
   ON event_occurrence_applicant_snapshots(line_account_id, occurrence_id, staff_id, expires_at);
+
+-- create時の期限切れ掃除は全snapshotを対象にするため、scope先頭の索引とは分ける。
+CREATE INDEX idx_event_occurrence_applicant_snapshots_expiry
+  ON event_occurrence_applicant_snapshots(expires_at);

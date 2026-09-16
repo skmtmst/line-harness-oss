@@ -235,7 +235,7 @@ export async function getEventOccurrenceApplicants(
                 f.display_name, f.picture_url
            FROM event_bookings b
            JOIN friends f ON f.id = b.friend_id AND f.line_account_id = ?
-          WHERE b.slot_id = ?
+          WHERE b.slot_id = ? AND b.status IN ('requested', 'confirmed')
           ORDER BY b.requested_at ASC, b.id ASC`,
       )
       .bind(params.lineAccountId, params.occurrenceId)
@@ -248,7 +248,7 @@ export async function getEventOccurrenceApplicants(
                 f.display_name, f.picture_url
            FROM event_waitlist w
            JOIN friends f ON f.id = w.friend_id AND f.line_account_id = ?
-          WHERE w.slot_id = ?
+          WHERE w.slot_id = ? AND w.status IN ('waiting', 'offered', 'accepted')
           ORDER BY w.created_at ASC, w.id ASC`,
       )
       .bind(params.lineAccountId, params.occurrenceId)
