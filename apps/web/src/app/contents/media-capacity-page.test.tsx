@@ -39,6 +39,9 @@ vi.mock('@/lib/api', () => {
   return {
     ApiError,
     api: {
+      featureSettings: {
+        visibility: () => Promise.resolve({ success: true, data: { features: { media: true } } }),
+      },
       media: {
         list: (accountId: string, params?: unknown) => {
           fixture.listCalls.push({ accountId, params })

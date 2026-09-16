@@ -104,6 +104,21 @@ describe('機能設定とサイドメニューが同じ一覧を見る', () => {
     for (const key of ['friend_fields', 'support_marks', 'saved_searches']) {
       expect(FEATURE_IDS).toContain(key)
     }
+    // 共通情報は共通情報キー、登録メディアはメディアキー（#862）。
+    // 以前は共通情報が media キーに抱き合わせで、片方だけ切れなかった。
+    expect(SIDEBAR_FEATURE_BY_HREF['/contents/vars']).toBe('common_vars')
+    expect(DEFAULT_FEATURES.common_vars).toBe(true)
+    expect(FEATURE_IDS).toContain('common_vars')
+    const contentsSection = FEATURE_GROUPS.find((group) => group.id === 'contents')!
+    const varsItem = contentsSection.items.find((item) => item.id === 'common-vars')!
+    const mediaItem = contentsSection.items.find((item) => item.id === 'contents')!
+    expect(varsItem.keys).toEqual(['common_vars'])
+    expect(mediaItem.keys).toEqual(['media'])
+    // キーを個別に切ると、その項目だけが消える。
+    expect(itemIsEnabled(varsItem, { common_vars: false })).toBe(false)
+    expect(itemIsEnabled(mediaItem, { common_vars: false })).toBe(true)
+    expect(itemIsEnabled(varsItem, { media: false })).toBe(true)
+    expect(itemIsEnabled(mediaItem, { media: false })).toBe(false)
     expect(SIDEBAR_FEATURE_BY_HREF['/booking/bookings']).toBe('booking')
     expect(SIDEBAR_FEATURE_BY_HREF['/booking/menus']).toBe('booking')
     const used = MENU_SECTIONS.flatMap((section) => section.items.map((item) => item.featureKey))

@@ -43,9 +43,11 @@ import ConditionBuilder, {
   type SegmentCondition,
 } from '@/components/shared/condition-builder'
 import { useAccount } from '@/contexts/account-context'
+import { useFeatureVisibility } from '@/lib/use-feature-visibility'
 import { scenarioReferenceData } from './scenario-reference-data'
 
 export const ACTION_KINDS: {
+  feature?: 'friend_fields' | 'support_marks' | 'common_vars'
   type: ScenarioActionType
   label: string
   /** 札の上に出す目印（設計 18px）。文字だけだと5つが同じ形に見える。 */
@@ -56,10 +58,11 @@ export const ACTION_KINDS: {
   {
     type: 'friend_field',
     label: '友だち情報操作',
+    feature: 'friend_fields',
     icon: User,
     make: () => ({ fieldId: '', op: 'set', value: '' }),
   },
-  { type: 'support_mark', label: '対応マーク操作', icon: Flag, make: () => ({ markId: null }) },
+  { type: 'support_mark', label: '対応マーク操作', feature: 'support_marks', icon: Flag, make: () => ({ markId: null }) },
   {
     type: 'scenario',
     label: 'シナリオ操作',
@@ -69,6 +72,7 @@ export const ACTION_KINDS: {
   {
     type: 'common_var',
     label: '共通情報操作',
+    feature: 'common_vars',
     icon: Variable,
     make: () => ({ varKey: '', op: 'add', value: '1' }),
   },
@@ -189,6 +193,8 @@ export default function ActionEditor({
   onChanged,
 }: ActionEditorProps) {
   const { selectedAccountId } = useAccount()
+  // 任意機能の動作種は、そのaccountで機能がオフなら追加口ごと出さない。
+  const actionFeatureVisibility = useFeatureVisibility(selectedAccountId)
   const [actions, setActions] = useState<ScenarioAction[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -423,7 +429,7 @@ export default function ActionEditor({
                   </p>
                   {/* 設計は4×2。実装が持つ種別は5つなので、押せない札は並べない。 */}
                   <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                    {ACTION_KINDS.filter((kind) => kind.type !== 'common_var').map((kind) => {
+                    {ACTION_KINDS.filter((kind) => kind.type !== 'common_var' && (!kind.feature || actionFeatureVisibility.enabled(kind.feature))).map((kind) => {
                       const Icon = kind.icon
                       return (
                         <button

@@ -16,6 +16,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useAccount } from '@/contexts/account-context'
+import { useFeatureVisibility } from '@/lib/use-feature-visibility'
 import { scenarioReferenceData } from './scenario-reference-data'
 
 /** 日付の書き方。worker の interpolation-date.ts と同じ並び。 */
@@ -47,6 +48,10 @@ export interface InsertToolbarProps {
 
 export default function InsertToolbar({ targetRef, value, onChange, includeAnswerForm = false }: InsertToolbarProps) {
   const { selectedAccountId } = useAccount()
+  // 友だち情報・共通情報は任意機能。オフのaccountでは差し込み口ごと出さない。
+  const featureVisibility = useFeatureVisibility(selectedAccountId)
+  const fieldsEnabled = featureVisibility.enabled('friend_fields')
+  const varsEnabled = featureVisibility.enabled('common_vars')
   const [open, setOpen] = useState<string | null>(null)
   const [fields, setFields] = useState<Option[]>([])
   const [vars, setVars] = useState<Option[]>([])
@@ -60,8 +65,12 @@ export default function InsertToolbar({ targetRef, value, onChange, includeAnswe
     }
     void (async () => {
       const [fieldRes, varRes] = await Promise.all([
-        scenarioReferenceData.friendFields(selectedAccountId),
-        scenarioReferenceData.commonVars(selectedAccountId),
+        fieldsEnabled
+          ? scenarioReferenceData.friendFields(selectedAccountId)
+          : Promise.resolve({ success: false as const }),
+        varsEnabled
+          ? scenarioReferenceData.commonVars(selectedAccountId)
+          : Promise.resolve({ success: false as const }),
       ])
       if (fieldRes.success) {
         setFields(fieldRes.data.map((f) => ({ token: `{{field.${f.fieldKey}}}`, label: f.name })))
@@ -70,7 +79,7 @@ export default function InsertToolbar({ targetRef, value, onChange, includeAnswe
         setVars(varRes.data.map((v) => ({ token: `{{var.${v.varKey}}}`, label: v.name })))
       }
     })()
-  }, [selectedAccountId])
+  }, [selectedAccountId, fieldsEnabled, varsEnabled])
 
   // 外を押したら閉じる。開いたままだと下の入力欄が押せない。
   useEffect(() => {
@@ -152,16 +161,20 @@ export default function InsertToolbar({ targetRef, value, onChange, includeAnswe
         名前
       </button>
 
-      <div className="relative">
-        {menuButton('field', '友だち情報')}
-        {open === 'field' &&
-          list(fields, '友だち情報欄がまだありません')}
-      </div>
+      {fieldsEnabled && (
+        <div className="relative">
+          {menuButton('field', '友だち情報')}
+          {open === 'field' &&
+            list(fields, '友だち情報欄がまだありません')}
+        </div>
+      )}
 
-      <div className="relative">
-        {menuButton('var', '共通情報')}
-        {open === 'var' && list(vars, '共通情報がまだありません')}
-      </div>
+      {varsEnabled && (
+        <div className="relative">
+          {menuButton('var', '共通情報')}
+          {open === 'var' && list(vars, '共通情報がまだありません')}
+        </div>
+      )}
 
       {includeAnswerForm && menuButton('answer-form', '回答フォーム', '{{answer_form}}')}
 

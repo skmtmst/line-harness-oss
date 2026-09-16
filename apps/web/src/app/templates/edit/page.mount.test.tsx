@@ -170,6 +170,9 @@ async function fakeApi(input: string, init?: RequestInit): Promise<Response> {
   if (path === '/api/folders') {
     return jsonResponse({ success: true, data: [] })
   }
+  if (path === '/api/settings/features/visibility') {
+    return jsonResponse({ success: true, data: { features: { friend_fields: true, common_vars: true } } })
+  }
   if (path === '/api/friend-fields' || path === '/api/common-vars') {
     const accountId = (url.searchParams.get('lineAccountId') ?? url.searchParams.get('accountId')) as Account
     const field = FIELD_OF[accountId]

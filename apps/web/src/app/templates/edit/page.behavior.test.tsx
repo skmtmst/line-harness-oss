@@ -16,6 +16,18 @@ import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
+/*
+ * 差し込み口の機能連動は共通hookへ寄せたので、この試験では「全部on」を
+ * 固定で返す。オフの振る舞いは common-vars-feature-gate.test.tsx が見る。
+ */
+vi.mock('@/lib/use-feature-visibility', () => ({
+  useFeatureVisibility: () => ({
+    status: 'ready',
+    features: { friend_fields: true, common_vars: true },
+    enabled: () => true,
+  }),
+}))
+
 type PageModule = typeof import('./page')
 type Testing = PageModule['default']['__testing']
 

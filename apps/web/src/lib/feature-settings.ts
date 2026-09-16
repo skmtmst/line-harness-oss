@@ -35,6 +35,7 @@ export type FeatureKey =
   | 'friend_fields'
   | 'support_marks'
   | 'saved_searches'
+  | 'common_vars'
 
 export interface FeatureItem {
   id: string
@@ -89,6 +90,7 @@ export const DEFAULT_FEATURES: Record<FeatureKey, boolean> = {
   friend_fields: true,
   support_marks: true,
   saved_searches: true,
+  common_vars: true,
 }
 
 function toFeatureItem(item: MenuItem): FeatureItem {

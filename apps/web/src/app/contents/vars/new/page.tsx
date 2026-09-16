@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import type { Folder } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
+import FeatureGate from '@/components/feature-gate'
 import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
 import StickyBar from '@/components/shared/sticky-bar'
@@ -128,7 +129,7 @@ function suggestKey(name: string): string {
   return ascii.slice(0, 32)
 }
 
-export default function NewCommonVarPage() {
+function NewCommonVarInner() {
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const latestAccountRef = useRef(selectedAccountId)
   latestAccountRef.current = selectedAccountId
@@ -531,5 +532,14 @@ export default function NewCommonVarPage() {
         )}
       />
     </div>
+  )
+}
+
+export default function NewCommonVarPage() {
+  // 直URLでも共通情報オフのaccountには画面を出さない。
+  return (
+    <FeatureGate feature="common_vars">
+      <NewCommonVarInner />
+    </FeatureGate>
   )
 }
