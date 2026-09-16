@@ -216,6 +216,13 @@ export const FEATURE_ROUTE_PATTERN_MANIFEST: readonly FeatureRoutePatternMetadat
     classification: { kind: 'public', reason: '登録前・ログイン前にTurnstileと回数制限で守る認証経路' },
   },
   {
+    // 運営メンバーの招待を受ける口（★V6 37-10-A）。メールの URL のトークンだけで守る
+    pattern: /^\/api\/auth\/ops-invite\//,
+    methods: ['GET', 'POST'],
+    accountResolver: 'none',
+    classification: { kind: 'public', reason: '招待メールのトークンで本人確認する運営メンバー登録の入口' },
+  },
+  {
     pattern: /^\/api\/hq\/billing\/webhook$/,
     methods: ['POST'],
     accountResolver: 'none',

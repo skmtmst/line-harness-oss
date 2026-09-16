@@ -8,21 +8,23 @@ type OrderItem = { name?: string; quantity?: number; product_id?: string | numbe
 type CommerceOrder = { id?: string; number?: string; date?: string; orderDate?: string; total?: number; detailUrl?: string | null; items?: OrderItem[] };
 type MemberPhoto = { id: string; imageUrl: string; caption: string; status: string; awardedPoints: number; petName?: string };
 type SiteGalleryPhoto = { imageUrl: string; alt: string };
-type MemberData = { owner: { displayName: string | null }; pets: Pet[]; commerce: { orders: CommerceOrder[]; subscription: any; purchaseCount: number; purchaseAmount: number; points: number; rank: string }; photos: MemberPhoto[]; photoStats: { submittedCount: number; pendingCount: number; adoptedCount: number; earnedPoints: number } };
+type Membership = {
+  rankKey: string | null; rankName: string; mileRatePercent: number | null;
+  annualMilesYen: number; lifetimeMilesYen: number; mileBalance: number; validUntil: string | null;
+  next: { name: string; thresholdYen: number; remainingYen: number } | null;
+  ranks: Array<{ key: string; name: string; thresholdYen: number; mileRatePercent: number }>;
+  milestones: Array<{ thresholdYen: number; title: string; reached: boolean }>;
+  nextMilestone: { thresholdYen: number; title: string; remainingYen: number } | null;
+};
+type MemberData = { owner: { displayName: string | null }; membership?: Membership; pets: Pet[]; commerce: { orders: CommerceOrder[]; subscription: any; purchaseCount: number; purchaseAmount: number; points: number; rank: string }; photos: MemberPhoto[]; photoStats: { submittedCount: number; pendingCount: number; adoptedCount: number; earnedPoints: number } };
 type HealthLog = { id: string; pet_id: string; logged_on: string; weight_kg: number | null; heart_rate_bpm: number | null; respiratory_rate_bpm: number | null; stool_status: string; appetite: string; skin_status: string; tear_stain_status: string; note: string };
 type HealthMetric = 'weight_kg' | 'heart_rate_bpm' | 'respiratory_rate_bpm';
 type HealthPeriod = 'day' | 'week' | 'month';
-type Tab = 'home' | 'pets' | 'health' | 'orders' | 'photos' | 'advice';
+type Tab = 'home' | 'pets' | 'health' | 'orders' | 'photos';
 let root: Root | null = null;
 
-const ranks = [
-  { name: '会員', min: 0 },
-  { name: 'シルバー会員', min: 20_000 },
-  { name: 'ゴールド会員', min: 50_000 },
-  { name: 'プラチナ会員', min: 100_000 },
-] as const;
 const tabItems: Array<{ value: Tab; label: string }> = [
-  { value: 'home', label: 'ホーム' },
+  { value: 'home', label: 'マイページ' },
   { value: 'pets', label: 'ペット' },
   { value: 'health', label: '健康' },
   { value: 'orders', label: '注文' },
@@ -49,7 +51,6 @@ function TabIcon({ tab }: { tab: Tab }) {
     {tab === 'health' && <><path d="M20.8 5.7c-2-2-5.2-2-7.2 0L12 7.3l-1.6-1.6a5.1 5.1 0 0 0-7.2 7.2L12 21l8.8-8.1a5.1 5.1 0 0 0 0-7.2Z"/><path d="M7 13h3l1-3 2 6 1-3h3"/></>}
     {tab === 'orders' && <><path d="M4 5h2l2 10h9l2-7H7"/><circle cx="10" cy="19" r="1.2"/><circle cx="17" cy="19" r="1.2"/></>}
     {tab === 'photos' && <><rect x="3" y="5" width="18" height="15" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m5 18 5-5 3 3 2-2 4 4"/></>}
-    {tab === 'advice' && <><path d="M21 12a8 8 0 0 1-9 8 9 9 0 0 1-4-.9L3 21l1.7-4A8 8 0 1 1 21 12Z"/><path d="M8 12h.01M12 12h.01M16 12h.01"/></>}
   </svg>;
 }
 
@@ -68,12 +69,6 @@ function useAnimatedNumber(target: number, duration = 1100) {
     return () => cancelAnimationFrame(frame);
   }, [target, duration]);
   return value;
-}
-
-function rankFor(amount: number) {
-  let index = 0;
-  ranks.forEach((rank, i) => { if (amount >= rank.min) index = i; });
-  return { index, current: ranks[index], next: ranks[index + 1] || null };
 }
 
 type OptimizedPhoto = { data: string; mimeType: 'image/jpeg'; size: number; name: string };
@@ -259,7 +254,7 @@ function PhotoForm({ ctx, pets, onDone }: { ctx: Ctx; pets: Pet[]; onDone: () =>
   const choose = async (file?: File) => { if (!file) return; setBusy(true); setError(''); try { setPhoto(await optimizePhoto(file)); } catch (e) { setPhoto(null); setError(e instanceof Error ? e.message : '写真を読み込めませんでした'); } finally { setBusy(false); } };
   const submit = async () => { if (!photo || !petId) return; setBusy(true); setError(''); try { await call(ctx, '/api/liff/nen/photos', { method: 'POST', body: JSON.stringify({ petId, caption, mimeType: photo.mimeType, data: photo.data }) }); setPhoto(null); setCaption(''); onDone(); } catch (e) { setError(e instanceof Error ? e.message : '投稿できませんでした'); } finally { setBusy(false); } };
   if (!pets.length) return <Notice>先にマイペットを登録してください。</Notice>;
-  return <section className="nm-card nm-photo-card"><div className="nm-section-heading"><span>SHARE YOUR NEN MOMENT</span><h2>うちの子の“おいしい顔”を投稿</h2></div><p className="nm-sub">然を楽しむ表情や、ご家族らしい一枚をお送りください。採用された写真は公式サイトに掲載し、お買い物に使える5ポイントをプレゼントします。</p><Field label="ペット"><select value={petId} onChange={e => setPetId(e.target.value)}>{pets.map(p => <option key={p.id} value={p.id}>{p.name}ちゃん</option>)}</select></Field><label className="nm-photo-picker"><input type="file" accept="image/*" onChange={e => void choose(e.target.files?.[0])} />{photo ? <><img src={photo.data} alt="投稿前の確認" /><span><b>{photo.name}</b><small>{Math.ceil(photo.size / 1024).toLocaleString()}KBに最適化済み</small></span></> : <><strong>＋</strong><span><b>{busy ? '写真を最適化しています…' : '写真を選ぶ'}</b><small>iPhoneの大きな写真も自動で軽量化</small></span></>}</label><Field label="写真に添えるひとこと"><textarea value={caption} maxLength={300} placeholder="例：鹿肉ミンチの日は、待ちきれないこの笑顔です。" onChange={e => setCaption(e.target.value)} /></Field>{error && <p className="nm-error">{error}</p>}<button className="nm-primary" disabled={!photo || busy} onClick={() => void submit()}>{busy ? '処理中…' : 'この写真を投稿する'}</button><p className="nm-photo-note">投稿写真は管理者が内容を確認します。採用された写真だけが公開されます。</p></section>;
+  return <section className="nm-card nm-photo-card"><div className="nm-section-heading"><span>SHARE YOUR NEN MOMENT</span><h2>うちの子の“おいしい顔”を投稿</h2></div><p className="nm-sub">然を楽しむ表情や、ご家族らしい一枚をお送りください。採用された写真は公式サイトに掲載し、お買い物に使える5マイルをプレゼントします。</p><Field label="ペット"><select value={petId} onChange={e => setPetId(e.target.value)}>{pets.map(p => <option key={p.id} value={p.id}>{p.name}ちゃん</option>)}</select></Field><label className="nm-photo-picker"><input type="file" accept="image/*" onChange={e => void choose(e.target.files?.[0])} />{photo ? <><img src={photo.data} alt="投稿前の確認" /><span><b>{photo.name}</b><small>{Math.ceil(photo.size / 1024).toLocaleString()}KBに最適化済み</small></span></> : <><strong>＋</strong><span><b>{busy ? '写真を最適化しています…' : '写真を選ぶ'}</b><small>iPhoneの大きな写真も自動で軽量化</small></span></>}</label><Field label="写真に添えるひとこと"><textarea value={caption} maxLength={300} placeholder="例：鹿肉ミンチの日は、待ちきれないこの笑顔です。" onChange={e => setCaption(e.target.value)} /></Field>{error && <p className="nm-error">{error}</p>}<button className="nm-primary" disabled={!photo || busy} onClick={() => void submit()}>{busy ? '処理中…' : 'この写真を投稿する'}</button><p className="nm-photo-note">投稿写真は管理者が内容を確認します。採用された写真だけが公開されます。</p></section>;
 }
 
 function PhotoCampaign({ photos, sitePhotos, stats }: { photos: MemberPhoto[]; sitePhotos: SiteGalleryPhoto[]; stats: MemberData['photoStats'] }) {
@@ -268,63 +263,56 @@ function PhotoCampaign({ photos, sitePhotos, stats }: { photos: MemberPhoto[]; s
     ...sitePhotos.filter(site => !photos.some(photo => photo.imageUrl === site.imageUrl)).map((site, index) => ({ key: `site-${index}`, imageUrl: site.imageUrl, alt: site.alt || '公式サイト掲載中のご家族', name: 'NEN FAMILY', caption: '公式サイト掲載中' })),
   ];
   return <>
-    <section className="nm-photo-hero"><span>NEN PHOTO PROJECT</span><h2>夢中でぱくぱく、<br/>しあわせ顔をみんなへ。</h2><p>あなたの一枚が、次に然を知るご家族のきっかけになります。</p><div><b>採用1枚につき 5pt</b><small>ショッピングですぐ使えます</small></div></section>
+    <section className="nm-photo-hero"><span>NEN PHOTO PROJECT</span><h2>夢中でぱくぱく、<br/>しあわせ顔をみんなへ。</h2><p>あなたの一枚が、次に然を知るご家族のきっかけになります。</p><div><b>採用1枚につき 5マイル</b><small>ショッピングですぐ使えます</small></div></section>
     <section className="nm-photo-preview" aria-label="公式サイトへの掲載イメージ"><div className="nm-photo-preview-heading"><span>CUSTOMERS &amp; NEN</span><h2>夢中でぱくぱく、しあわせ顔。</h2><p>公式サイトで実際に掲載されている写真です。横へスワイプしてご覧いただけます。</p></div><div className="nm-photo-reel">{reel.length ? reel.map(photo => <figure key={photo.key}><img src={photo.imageUrl} alt={photo.alt} /><figcaption><b>{photo.name}</b><span>{photo.caption}</span></figcaption></figure>) : [1,2,3].map(index => <div className="nm-photo-placeholder" key={index}><i>＋</i><b>次に掲載されるのは<br/>あなたの家族かも</b></div>)}</div><a href="https://stg.nen-petfood.com/#nen-voices-title" target="_blank" rel="noreferrer">実際の掲載場所を見る <span>↗</span></a></section>
-    <section className="nm-photo-stats"><div><span>この企画で獲得</span><b>{stats.earnedPoints.toLocaleString()}<small>pt</small></b></div><div><span>採用された写真</span><b>{stats.adoptedCount}<small>枚</small></b></div><p>{stats.pendingCount > 0 ? `${stats.pendingCount}枚を審査しています。結果が決まり次第、掲載とポイントへ反映します。` : '心が動いた瞬間を、いつでもお待ちしています。'}</p></section>
+    <section className="nm-photo-stats"><div><span>この企画で獲得</span><b>{stats.earnedPoints.toLocaleString()}<small>マイル</small></b></div><div><span>採用された写真</span><b>{stats.adoptedCount}<small>枚</small></b></div><p>{stats.pendingCount > 0 ? `${stats.pendingCount}枚を審査しています。結果が決まり次第、掲載とマイルへ反映します。` : '心が動いた瞬間を、いつでもお待ちしています。'}</p></section>
   </>;
 }
 
-function Advice({ ctx, pets }: { ctx: Ctx; pets: Pet[] }) {
-  const initialAnimal = pets[0]?.animalType === 'cat' ? 'cat' : 'dog';
-  const [animalType, setAnimalType] = useState<'dog' | 'cat'>(initialAnimal);
-  const [petId, setPetId] = useState(pets.find(pet => pet.animalType === initialAnimal)?.id || '');
-  const [question, setQuestion] = useState('');
-  const [answer, setAnswer] = useState('');
-  const [visibleAnswer, setVisibleAnswer] = useState('');
-  const [safetyLevel, setSafetyLevel] = useState('general');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const matchingPets = pets.filter(pet => pet.animalType === animalType);
-  useEffect(() => { if (!matchingPets.some(pet => pet.id === petId)) setPetId(matchingPets[0]?.id || ''); }, [animalType, petId, matchingPets]);
-  useEffect(() => {
-    if (!answer) { setVisibleAnswer(''); return; }
-    let index = 0;
-    let timer = 0;
-    let cancelled = false;
-    const typeNext = () => {
-      if (cancelled) return;
-      index = Math.min(answer.length, index + 1);
-      setVisibleAnswer(answer.slice(0, index));
-      if (index >= answer.length) return;
-      const current = answer[index - 1] || '';
-      const delay = /[。！？\n]/.test(current) ? 150 : /[、，]/.test(current) ? 75 : 24;
-      timer = window.setTimeout(typeNext, delay);
-    };
-    timer = window.setTimeout(typeNext, 180);
-    return () => { cancelled = true; window.clearTimeout(timer); };
-  }, [answer]);
-  const run = async () => {
-    if (question.trim().length < 8) { setError('お悩みを8文字以上で詳しく教えてください。'); return; }
-    setLoading(true); setError(''); setAnswer('');
-    try {
-      const res = await call<{ data: { advice: string; safetyLevel: string } }>(ctx, '/api/liff/nen/consultations', { method: 'POST', body: JSON.stringify({ animalType, petId: petId || undefined, question: question.trim() }) });
-      setAnswer(res.data.advice); setSafetyLevel(res.data.safetyLevel);
-    } catch (e) { setError(e instanceof Error ? e.message : '回答を作成できませんでした。'); }
-    finally { setLoading(false); }
-  };
-  return <div className="nm-ai-page">
-    <section className="nm-ai-hero"><span>NEN AI CARE</span><h2>小さな気がかりを、<br/>ひとりで抱えないために。</h2><p>暮らしの中で気になったことを、いつもの言葉で教えてください。</p></section>
-    <section className="nm-ai-card"><div className="nm-section-heading"><span>AI CONSULTATION</span><h2>どちらのご相談ですか？</h2></div>
-      <div className="nm-ai-animal" role="radiogroup" aria-label="相談するペットの種別">{([['dog','わんちゃん'],['cat','ねこちゃん']] as const).map(([value,label]) => <button role="radio" aria-checked={animalType === value} className={animalType === value ? 'active' : ''} onClick={() => setAnimalType(value)} key={value}><i>{value === 'dog' ? '犬' : '猫'}</i><b>{label}</b><span>について相談する</span></button>)}</div>
-      {matchingPets.length > 0 && <Field label="登録ペット（任意）"><select value={petId} onChange={e => setPetId(e.target.value)}><option value="">選択しない</option>{matchingPets.map(pet => <option key={pet.id} value={pet.id}>{pet.name}ちゃん</option>)}</select></Field>}
-      <Field label="どんなことでお悩みですか？"><textarea className="nm-ai-question" maxLength={1000} value={question} onChange={e => setQuestion(e.target.value)} placeholder={animalType === 'dog' ? '例：6か月の柴犬が、昨日からご飯をあまり食べません。元気はありますが心配です。' : '例：2歳の猫が、最近トイレ以外でおしっこをするようになりました。'} /></Field>
-      <div className="nm-ai-count"><span>症状が始まった時期や普段との違いも書くと、回答しやすくなります。</span><b>{question.length}/1000</b></div>
-      <button className="nm-primary nm-ai-send" disabled={loading || question.trim().length < 8} onClick={() => void run()}>{loading ? 'NENナレッジを確認中' : 'AIに相談する'}</button>
-      {error && <p className="nm-error">{error}</p>}
+
+const yen = (value: number) => `¥${Math.round(value).toLocaleString()}`;
+const man = (value: number) => (value % 10_000 === 0 ? `${value / 10_000}` : (value / 10_000).toFixed(1));
+
+/**
+ * メンバーシップシート（★V6 37-2 `lCs4n`）。
+ * 弧＝通年（1〜12月の購入額）の進捗、節目の丸＝ランクのしきい値（到達で✓）、中央＝使えるマイルのカウントアップ。
+ * 画面を開くと弧は0から現在位置まで、数字は0から現在値まで約1.1秒で動く。
+ */
+function MembershipSheet({ membership, ownerName }: { membership: Membership; ownerName: string }) {
+  const ranks = membership.ranks.length ? membership.ranks : [{ key: 'regular', name: 'レギュラー', thresholdYen: 0, mileRatePercent: 1 }];
+  const top = Math.max(1, ranks[ranks.length - 1]!.thresholdYen);
+  const rankIndex = Math.max(0, ranks.findIndex(rank => rank.key === membership.rankKey));
+  const progress = Math.max(0, Math.min(1, membership.annualMilesYen / top));
+  const [drawn, setDrawn] = useState(0);
+  useEffect(() => { const frame = requestAnimationFrame(() => setDrawn(progress)); return () => cancelAnimationFrame(frame); }, [progress]);
+  const animatedMiles = useAnimatedNumber(membership.mileBalance);
+  const point = (fraction: number) => { const angle = Math.PI * (1 - fraction); return { x: 130 + 100 * Math.cos(angle), y: 130 - 100 * Math.sin(angle) }; };
+  const gaugeOffset = 314 * (1 - drawn);
+  return <header className="nm-member-header" data-rank={Math.min(3, rankIndex)}>
+    <div className="nm-brand-row"><div><p>NEN MEMBERS</p><h1>{ownerName}さん</h1></div><span>然 -NEN-</span></div>
+    <section className="nm-membership-sheet">
+      <div className="nm-rank-summary"><span className="nm-rank-pill">{membership.rankName}会員</span><small>MEMBERSHIP STATUS</small></div>
+      <div className="nm-gauge" aria-label={`使えるマイル ${membership.mileBalance.toLocaleString()}マイル。今年のマイル ${yen(membership.annualMilesYen)}`}>
+        <svg viewBox="0 0 260 150" aria-hidden="true">
+          <path className="nm-gauge-base" d="M30 130 A100 100 0 0 1 230 130"/>
+          <path className="nm-gauge-value" d="M30 130 A100 100 0 0 1 230 130" style={{ strokeDashoffset: gaugeOffset }}/>
+          {ranks.map(rank => { const reached = membership.annualMilesYen >= rank.thresholdYen && rankIndex >= ranks.indexOf(rank); const { x, y } = point(rank.thresholdYen / top); return <g className={`nm-gauge-checkpoint ${reached ? 'reached' : ''}`} key={rank.key}><circle cx={x} cy={y} r="10"/><text x={x} y={y + 3} textAnchor="middle">{reached ? '✓' : man(rank.thresholdYen)}</text></g>; })}
+        </svg>
+        <div className="nm-gauge-number"><strong>{animatedMiles.toLocaleString()}</strong><span>使えるマイル</span></div>
+      </div>
+      <div className="nm-rank-levels" style={{ gridTemplateColumns: `repeat(${ranks.length}, 1fr)` }}>{ranks.map((rank, index) => <div className={index <= rankIndex ? 'reached' : ''} key={rank.key}><i/><b>{rank.name}</b><span>{rank.thresholdYen === 0 ? '0円〜' : `年${man(rank.thresholdYen)}万円〜`}</span></div>)}</div>
+      <div className="nm-member-summary">
+        <div><span>通年</span><b>{yen(membership.annualMilesYen)}</b></div>
+        {membership.next
+          ? <p>あと <b>{yen(membership.next.remainingYen)}</b> で{membership.next.name}</p>
+          : <p>最高ランクです。いつもありがとうございます。</p>}
+      </div>
+      <div className="nm-member-foot">
+        <span>マイル還元 <b>{membership.mileRatePercent == null ? '—' : `${membership.mileRatePercent}%`}</b></span>
+        {membership.validUntil ? <span>{membership.rankName}は {displayDate(membership.validUntil)} まで維持</span> : null}
+      </div>
     </section>
-    {loading && <section className="nm-ai-thinking" aria-live="polite"><div className="nm-ai-orb"><i/><i/><i/></div><div><b>NEN AIが考えています</b><span>お悩みの内容を整理して、回答を作成しています</span></div></section>}
-    {visibleAnswer && <section className={`nm-ai-answer ${safetyLevel}`} aria-live="polite"><div className="nm-ai-answer-head"><span>NEN AI</span><b>{safetyLevel === 'urgent' ? '早めの対応が必要です' : 'お悩みへの回答'}</b></div><p>{visibleAnswer}{visibleAnswer.length < answer.length && <i className="nm-ai-caret"/>}</p>{visibleAnswer.length === answer.length && <div className="nm-ai-disclaimer">このAI相談は診断ではありません。症状が強い、続く、普段と明らかに違う場合は、動物病院へご相談ください。</div>}</section>}
-  </div>;
+  </header>;
 }
 
 function App({ ctx }: { ctx: Ctx }) {
@@ -340,29 +328,20 @@ function App({ ctx }: { ctx: Ctx }) {
       .catch(() => undefined);
     return () => { active = false; };
   }, []);
-  const animatedPoints = useAnimatedNumber(data?.commerce.points || 0);
   if (!data) return <main className="nm-app"><p>{error || '読み込み中…'}</p></main>;
-  const rank = rankFor(data.commerce.purchaseAmount);
-  const rankProgress = Math.max(0, Math.min(100, data.commerce.purchaseAmount / 100_000 * 100));
+  const membership: Membership = data.membership ?? { rankKey: null, rankName: data.commerce.rank || 'レギュラー', mileRatePercent: null, annualMilesYen: data.commerce.purchaseAmount, lifetimeMilesYen: data.commerce.purchaseAmount, mileBalance: data.commerce.points, validUntil: null, next: null, ranks: [], milestones: [], nextMilestone: null };
   const tabLabel = tabItems.find(item => item.value === tab)?.label || '';
-  const gaugeOffset = 314 * (1 - rankProgress / 100);
   const subscriptions = Array.isArray(data.commerce.subscription?.contracts)
     ? data.commerce.subscription.contracts
     : data.commerce.subscription ? [data.commerce.subscription] : [];
+  const recentOrders = data.commerce.orders.slice(0, 3);
   return <main className="nm-app">
-    {tab === 'home' ? <header className="nm-member-header" data-rank={rank.index}>
-      <div className="nm-brand-row"><div><p>NEN MEMBERS</p><h1>{data.owner.displayName || 'お客様'}さん</h1></div><span>然 -NEN-</span></div>
-      <section className="nm-membership-sheet">
-        <div className="nm-rank-summary"><span className="nm-rank-pill">{rank.current.name}</span><small>MEMBERSHIP STATUS</small></div>
-        <div className="nm-gauge" aria-label={`現在のポイント ${data.commerce.points.toLocaleString()}ポイント`}>
-          <svg viewBox="0 0 260 150" aria-hidden="true"><path className="nm-gauge-base" d="M30 130 A100 100 0 0 1 230 130"/><path className="nm-gauge-value" d="M30 130 A100 100 0 0 1 230 130" style={{ strokeDashoffset: gaugeOffset }}/>{([{label:'0',amount:0,x:30,y:130},{label:'2',amount:20_000,x:49.1,y:71.2},{label:'5',amount:50_000,x:130,y:30},{label:'10',amount:100_000,x:230,y:130}] as const).map(tick => { const reached = data.commerce.purchaseAmount >= tick.amount; return <g className={`nm-gauge-checkpoint ${reached ? 'reached' : ''}`} key={tick.label}><circle cx={tick.x} cy={tick.y} r="10"/><text x={tick.x} y={tick.y + 3} textAnchor="middle">{reached ? '✓' : tick.label}</text></g>; })}</svg>
-          <div className="nm-gauge-number"><strong>{animatedPoints.toLocaleString()}</strong><span>現在のポイント</span></div>
-        </div>
-        <div className="nm-rank-levels">{ranks.map((item, index) => <div className={index <= rank.index ? 'reached' : ''} key={item.name}><i/><b>{item.name}</b><span>{item.min === 0 ? '0円〜' : `累計${(item.min / 10_000).toLocaleString()}万円〜`}</span></div>)}</div>
-        <div className="nm-member-summary"><div><span>累計購入額</span><b>¥{data.commerce.purchaseAmount.toLocaleString()}</b></div>{rank.next ? <p>あと <b>¥{Math.max(0, rank.next.min - data.commerce.purchaseAmount).toLocaleString()}</b> で{rank.next.name}</p> : <p>最高ランクです。いつもありがとうございます。</p>}</div>
-      </section>
-    </header> : <header className="nm-page-header"><span>NEN MEMBERS</span><h1>{tabLabel}</h1></header>}
-    {tab === 'home' && <section className="nm-stack"><div className="nm-welcome"><span>WELCOME TO NEN</span><h2>毎日の健やかさを、<br />一緒に育てていきましょう。</h2></div><div className="nm-card"><div className="nm-section-heading"><span>MY PET</span><h2>マイペット</h2></div>{data.pets.length ? data.pets.map(p => <div className="nm-pet" key={p.id}><div><b>{p.name}ちゃん</b><span>{p.breed}・{p.weightKg}kg</span></div><p>フード目安 <strong>{p.recommendedDailyMinGrams}〜{p.recommendedDailyMaxGrams}g/日</strong></p><p>鹿肉トッピング目安 <strong>{p.venisonDailyGrams}g/日まで</strong></p><small>1kg：約{p.foodCycleDays}日分</small></div>) : <p>まだ登録がありません。</p>}</div><div className="nm-card"><div className="nm-section-heading"><span>MEMBER DATA</span><h2>会員情報</h2></div><div className="nm-stats"><div><b>{data.commerce.purchaseCount}</b><span>購入回数</span></div><div><b>¥{data.commerce.purchaseAmount.toLocaleString()}</b><span>累計購入額</span></div></div></div></section>}
+    {tab === 'home' ? <MembershipSheet membership={membership} ownerName={data.owner.displayName || 'お客様'} /> : <header className="nm-page-header"><span>NEN MEMBERS</span><h1>{tabLabel}</h1></header>}
+    {tab === 'home' && <section className="nm-stack">
+      <div className="nm-card nm-lifetime"><div className="nm-lifetime-row"><div><span>LIFETIME</span><h2>ライフタイム</h2></div><b>{yen(membership.lifetimeMilesYen)}</b></div><p className="nm-sub">{membership.nextMilestone ? `これまでの累計。あと ${yen(membership.nextMilestone.remainingYen)} で「${membership.nextMilestone.title}」。節目で限定グッズをご用意します。` : 'これまでの累計。節目で限定グッズをご用意します。'}</p></div>
+      <div className="nm-card"><div className="nm-section-heading nm-heading-row"><div><span>MY PET</span><h2>マイペット</h2></div><button type="button" className="nm-link" onClick={() => { setTab('pets'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>すべて見る</button></div>{data.pets.length ? data.pets.map(p => <div className="nm-pet nm-pet-row" key={p.id}><span className="nm-pet-avatar-frame nm-pet-avatar-small">{p.imageUrl ? <img src={p.imageUrl} alt="" /> : <TabIcon tab="pets" />}</span><div className="nm-pet-text"><b>{p.name}ちゃん</b><span>{[p.animalType === 'cat' ? '猫' : '犬', p.breed, p.weightKg ? `${p.weightKg}kg` : ''].filter(Boolean).join('・')}</span><strong>今日の目安 {p.recommendedDailyMinGrams}〜{p.recommendedDailyMaxGrams}g／日（然の主食）</strong></div></div>) : <p className="nm-empty-text">まだ登録がありません。</p>}<p className="nm-note">目安は体重と年齢から計算した参考値です。獣医師の判断に代わるものではありません。</p></div>
+      <div className="nm-card"><div className="nm-section-heading nm-heading-row"><div><span>RECENT ORDERS</span><h2>最近の注文</h2></div><button type="button" className="nm-link" onClick={() => { setTab('orders'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>注文・定期を見る</button></div>{recentOrders.length ? <ul className="nm-order-lines">{recentOrders.map((order, index) => <li key={order.id || order.number || index}><span>{displayDate(order.date || order.orderDate).replace(/^\d{4}\//, '')}</span><em>{order.items?.map(item => item.name).filter(Boolean).slice(0, 2).join('、') || `注文 ${order.number || ''}`}</em><b>{typeof order.total === 'number' ? yen(order.total) : ''}</b></li>)}</ul> : <p className="nm-empty-text">まだ注文がありません。</p>}</div>
+    </section>}
     {tab === 'pets' && <PetsView ctx={ctx} pets={data.pets} onChanged={() => void load()} />}
     {tab === 'health' && <HealthDiary ctx={ctx} pets={data.pets} />}
     {tab === 'orders' && <div className="nm-stack nm-orders-page"><section className="nm-card"><div className="nm-section-heading"><span>SUBSCRIPTION</span><h2>定期便の契約状況</h2></div>{subscriptions.length ? subscriptions.map((subscription: any, contractIndex: number) => <article className="nm-subscription-view" key={subscription.id || subscription.contract_number || contractIndex}><div><span>現在の状況</span><b>{subscription.status || '契約中'}</b></div><div><span>次回お届け</span><b>{displayDate(subscription.nextShippingDate || subscription.next_shipping_date) || '確認中'}</b></div><div><span>お届け周期</span><b>{subscription.cycle || '—'}</b></div>{Array.isArray(subscription.items) && subscription.items.length > 0 && <ul>{subscription.items.map((item: OrderItem, index: number) => <li key={`${item.name}-${index}`}><span>{item.name || '商品'}</span><b>× {item.quantity || 1}</b></li>)}</ul>}<p>変更・スキップ・解約のお手続きはこの画面では行いません。</p></article>) : <p className="nm-empty-text">契約中の定期便はありません。</p>}</section><section className="nm-card"><div className="nm-section-heading"><span>ORDER HISTORY</span><h2>通常購入の履歴</h2></div>{data.commerce.orders.length ? data.commerce.orders.map((order, index) => <article className="nm-order" key={order.id || index}><div className="nm-order-head"><div><b>注文番号 {order.number || index + 1}</b><time>{displayDate(order.date || order.orderDate)}</time></div><strong>¥{Number(order.total || 0).toLocaleString()}</strong></div>{Array.isArray(order.items) && order.items.length > 0 ? <div className="nm-order-items">{order.items.map((item, itemIndex) => { const productUrl = item.product_url || item.productUrl; return <div key={`${item.name}-${itemIndex}`}><span>{item.name || '商品'} <small>× {item.quantity || 1}</small></span>{productUrl && <a href={productUrl} target="_blank" rel="noreferrer">もう一度購入</a>}</div>; })}</div> : <p className="nm-order-no-item">商品情報を確認中です。</p>}{order.detailUrl && <a className="nm-order-detail" href={order.detailUrl} target="_blank" rel="noreferrer">注文内容を見る</a>}</article>) : <p className="nm-empty-text">通常購入の履歴はまだありません。</p>}</section></div>}

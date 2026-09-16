@@ -8,12 +8,30 @@ import { jstNow } from './utils.js';
  * 顧客の統括（tenants）とは別の器に置き、監査で運営の操作と顧客の操作を分ける。
  */
 
+export type PlatformAdminActivationState = 'invited' | 'awaiting_totp' | 'active';
+
 export interface PlatformAdmin {
   staff_id: string;
   is_active: number;
   approved_by: string | null;
+  /** 招待の進み具合（★V6 37-10）。active だけが運営マスターとして扱われる。 */
+  activation_state: PlatformAdminActivationState;
+  invited_by: string | null;
+  invited_at: string | null;
+  activated_at: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface PlatformAdminInvite {
+  id: string;
+  staff_id: string;
+  email: string;
+  token_hash: string;
+  invited_by: string | null;
+  expires_at: string;
+  consumed_at: string | null;
+  created_at: string;
 }
 
 export interface PlatformAdminMember extends PlatformAdmin {
@@ -26,12 +44,24 @@ export interface PlatformAdminMember extends PlatformAdmin {
   last_login_at: string | null;
 }
 
+/** 登録が完了して有効な運営マスターだけを返す。招待中・2要素認証待ちは null。 */
 export async function getPlatformAdminByStaffId(
   db: D1Database,
   staffId: string,
 ): Promise<PlatformAdmin | null> {
   return db
-    .prepare('SELECT * FROM platform_admins WHERE staff_id = ? AND is_active = 1')
+    .prepare(`SELECT * FROM platform_admins WHERE staff_id = ? AND is_active = 1 AND activation_state = 'active'`)
+    .bind(staffId)
+    .first<PlatformAdmin>();
+}
+
+/** 状態を問わず platform_admins の行を返す（招待の進み具合を見るため）。 */
+export async function getPlatformAdminRecord(
+  db: D1Database,
+  staffId: string,
+): Promise<PlatformAdmin | null> {
+  return db
+    .prepare('SELECT * FROM platform_admins WHERE staff_id = ?')
     .bind(staffId)
     .first<PlatformAdmin>();
 }
@@ -52,11 +82,12 @@ export async function listPlatformAdminMembers(db: D1Database): Promise<Platform
 
 export async function countActivePlatformAdmins(db: D1Database): Promise<number> {
   const row = await db
-    .prepare('SELECT COUNT(*) AS count FROM platform_admins WHERE is_active = 1')
+    .prepare(`SELECT COUNT(*) AS count FROM platform_admins WHERE is_active = 1 AND activation_state = 'active'`)
     .first<{ count: number }>();
   return row?.count ?? 0;
 }
 
+/** 登録完了の行を作る（最初の 1 人の自己登録など）。 */
 export async function createPlatformAdmin(
   db: D1Database,
   input: { staffId: string; approvedBy: string | null },
@@ -64,12 +95,96 @@ export async function createPlatformAdmin(
   const now = jstNow();
   await db
     .prepare(
-      `INSERT INTO platform_admins (staff_id, is_active, approved_by, created_at, updated_at)
-       VALUES (?, 1, ?, ?, ?)
-       ON CONFLICT(staff_id) DO UPDATE SET is_active = 1, approved_by = excluded.approved_by, updated_at = excluded.updated_at`,
+      `INSERT INTO platform_admins (staff_id, is_active, approved_by, activation_state, activated_at, created_at, updated_at)
+       VALUES (?, 1, ?, 'active', ?, ?, ?)
+       ON CONFLICT(staff_id) DO UPDATE SET is_active = 1, approved_by = excluded.approved_by,
+         activation_state = 'active', activated_at = excluded.activated_at, updated_at = excluded.updated_at`,
     )
-    .bind(input.staffId, input.approvedBy, now, now)
+    .bind(input.staffId, input.approvedBy, now, now, now)
     .run();
+}
+
+/**
+ * 招待の行を作る（★V6 37-10）。既に招待中・2要素認証待ちの行があれば招待し直し。
+ * 登録完了（active）の行は触らない（呼び出し側で先に断る）。
+ */
+export async function upsertPlatformAdminInvite(
+  db: D1Database,
+  input: { staffId: string; invitedBy: string; tokenHash: string; email: string; expiresAt: string },
+): Promise<void> {
+  const now = jstNow();
+  await db
+    .prepare(
+      `INSERT INTO platform_admins (staff_id, is_active, approved_by, activation_state, invited_by, invited_at, created_at, updated_at)
+       VALUES (?, 1, ?, 'invited', ?, ?, ?, ?)
+       ON CONFLICT(staff_id) DO UPDATE SET is_active = 1, invited_by = excluded.invited_by, invited_at = excluded.invited_at,
+         activation_state = CASE WHEN platform_admins.activation_state = 'active' THEN 'active' ELSE 'invited' END,
+         updated_at = excluded.updated_at`,
+    )
+    .bind(input.staffId, input.invitedBy, input.invitedBy, now, now, now)
+    .run();
+  // 前の招待リンクは失効させる（生き残るのは最後に送った 1 つだけ）
+  await db
+    .prepare('UPDATE platform_admin_invites SET consumed_at = ? WHERE staff_id = ? AND consumed_at IS NULL')
+    .bind(now, input.staffId)
+    .run();
+  await db
+    .prepare(
+      `INSERT INTO platform_admin_invites (id, staff_id, email, token_hash, invited_by, expires_at, consumed_at, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, NULL, ?)`,
+    )
+    .bind(crypto.randomUUID(), input.staffId, input.email, input.tokenHash, input.invitedBy, input.expiresAt, now)
+    .run();
+}
+
+export async function getPlatformAdminInviteByTokenHash(
+  db: D1Database,
+  tokenHash: string,
+): Promise<PlatformAdminInvite | null> {
+  return db
+    .prepare('SELECT * FROM platform_admin_invites WHERE token_hash = ?')
+    .bind(tokenHash)
+    .first<PlatformAdminInvite>();
+}
+
+export async function consumePlatformAdminInvite(db: D1Database, id: string): Promise<boolean> {
+  const result = await db
+    .prepare('UPDATE platform_admin_invites SET consumed_at = ? WHERE id = ? AND consumed_at IS NULL')
+    .bind(jstNow(), id)
+    .run();
+  return (result.meta.changes ?? 0) > 0;
+}
+
+/** 招待の進み具合を進める。active にするときは activated_at も入れる。 */
+export async function setPlatformAdminActivationState(
+  db: D1Database,
+  staffId: string,
+  state: PlatformAdminActivationState,
+): Promise<void> {
+  const now = jstNow();
+  await db
+    .prepare(
+      `UPDATE platform_admins SET activation_state = ?, activated_at = CASE WHEN ? = 'active' THEN ? ELSE activated_at END, updated_at = ?
+       WHERE staff_id = ?`,
+    )
+    .bind(state, state, now, now, staffId)
+    .run();
+}
+
+/**
+ * 2要素認証の登録が終わったら呼ぶ。2要素認証待ちの行だけを登録完了にする。
+ * 戻り値は「完了に変えたか」。
+ */
+export async function activatePlatformAdminIfAwaitingTotp(db: D1Database, staffId: string): Promise<boolean> {
+  const now = jstNow();
+  const result = await db
+    .prepare(
+      `UPDATE platform_admins SET activation_state = 'active', activated_at = ?, updated_at = ?
+       WHERE staff_id = ? AND activation_state = 'awaiting_totp'`,
+    )
+    .bind(now, now, staffId)
+    .run();
+  return (result.meta.changes ?? 0) > 0;
 }
 
 export async function setPlatformAdminActive(

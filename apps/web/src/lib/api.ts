@@ -701,10 +701,48 @@ export type OperationIncident = {
   stoppedSnapshot: OperationControlSnapshot | null
   restoredSnapshot: OperationControlSnapshot | null
   errorMessage: string | null
+  /** N-451: 停止時に記録した定義の指紋（版・期限）。旧incidentはnull。 */
+  stoppedDefinitionsJson: string | null
+  /** N-451: 直近の復旧試行の検査結果。 */
+  restoreReportJson: string | null
   stoppedAt: string | null
   resolvedAt: string | null
   createdAt: string
   updatedAt: string
+}
+
+/** N-451: 復旧前検査で見つかった1件のずれ。 */
+export type OperationDriftKind = 'changed' | 'deleted' | 'inactive' | 'added' | 'expired'
+
+export type OperationDefinitionDrift = {
+  id: string
+  kind: OperationDriftKind
+  beforeVersion: string | null
+  currentVersion: string | null
+  currentStatus: string | null
+  expiresAt: string | null
+}
+
+export type OperationCapabilityDrift = {
+  capability: OperationCapability
+  unchanged: string[]
+  drift: OperationDefinitionDrift[]
+  blocked: boolean
+}
+
+export type OperationRestoreDrift = {
+  accountInactive: boolean
+  capabilities: OperationCapabilityDrift[]
+  resumable: OperationCapability[]
+  expired: { capability: OperationCapability; id: string; expiresAt: string | null }[]
+}
+
+export type OperationRestoreReport = {
+  evaluatedAt: string
+  drift: OperationRestoreDrift
+  resumed: OperationCapability[]
+  heldExpired: { capability: OperationCapability; id: string; expiresAt: string | null }[]
+  remaining: OperationCapability[]
 }
 
 export type OperationHealthCheckKey =
@@ -4333,13 +4371,19 @@ export type OpsMember = {
   totpEnabled: boolean
   lineLinked: boolean
   inviteStatus: string
+  activationState: OpsMemberActivationState
+  invitedAt: string | null
   approvedBy: string | null
   lastLoginAt: string | null
   createdAt: string
 }
 
+export type OpsMemberActivationState = 'invited' | 'awaiting_totp' | 'active'
+
 export type OpsMemberSummary = {
   members: number
+  invited: number
+  awaitingTotp: number
   totpEnabled: number
   impersonationsThisMonth: number
   writeImpersonationsThisMonth: number
@@ -6319,7 +6363,9 @@ export const api = {
     },
     members: () => fetchApi<ApiResponse<OpsMember[]> & { summary: OpsMemberSummary }>('/api/ops/members'),
     addMember: (input: { staffId?: string; email?: string }) =>
-      fetchApi<ApiResponse<{ staffId: string }>>('/api/ops/members', { method: 'POST', body: JSON.stringify(input) }),
+      fetchApi<ApiResponse<{ staffId: string; activationState: OpsMemberActivationState }>>('/api/ops/members', { method: 'POST', body: JSON.stringify(input) }),
+    resendInvite: (staffId: string) =>
+      fetchApi<ApiResponse<{ staffId: string; activationState: OpsMemberActivationState }>>(`/api/ops/members/${encodeURIComponent(staffId)}/resend-invite`, { method: 'POST', body: JSON.stringify({}) }),
     setMemberActive: (staffId: string, isActive: boolean) =>
       fetchApi<ApiResponse<{ staffId: string; isActive: boolean }>>(`/api/ops/members/${encodeURIComponent(staffId)}`, { method: 'PATCH', body: JSON.stringify({ isActive }) }),
   },
@@ -9721,8 +9767,15 @@ export const api = {
         body: JSON.stringify(input),
       },
     ),
+    restorePreview: (incidentId: string) =>
+      fetchApi<ApiResponse<{
+        incidentId: string
+        status: OperationIncident['status']
+        capabilities: OperationCapability[]
+        drift: OperationRestoreDrift
+      }>>(`/api/operations/incidents/${encodeURIComponent(incidentId)}/restore-preview`, { method: 'POST' }),
     restore: (incidentId: string, input: { confirmation: '復旧'; expectedVersion: number }, stepUpToken: string, idempotencyKey: string) =>
-      fetchApi<ApiResponse<{ status: 'changed'; control: OperationControl; incident: OperationIncident }>>(
+      fetchApi<ApiResponse<{ status: 'restored' | 'partial'; control: OperationControl; incident: OperationIncident; report: OperationRestoreReport | null }>>(
         `/api/operations/incidents/${encodeURIComponent(incidentId)}/restore`,
         {
           method: 'POST',

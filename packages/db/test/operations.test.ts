@@ -110,8 +110,8 @@ describe('緊急停止のサーバースナップショット', () => {
       actorId: 'owner-2',
     });
 
-    expect(restored.status).toBe('changed');
-    if (restored.status !== 'changed') throw new Error('restore failed');
+    expect(restored.status).toBe('restored');
+    if (restored.status !== 'restored') throw new Error('restore failed');
     expect(restored.incident).toMatchObject({
       status: 'resolved',
       actorId: 'owner-1',
@@ -149,8 +149,8 @@ describe('緊急停止のサーバースナップショット', () => {
       actorId: 'owner-2',
     });
 
-    expect(restored.status).toBe('changed');
-    if (restored.status !== 'changed') throw new Error('restore failed');
+    expect(restored.status).toBe('restored');
+    if (restored.status !== 'restored') throw new Error('restore failed');
     expect(restored.control.states).toMatchObject({
       broadcast_dispatch: 'running',
       automation_actions: 'stopped',
