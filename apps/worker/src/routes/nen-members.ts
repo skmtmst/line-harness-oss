@@ -9,6 +9,7 @@ import {
   resolveLineCredential,
   findOrCreateGlobalTag,
 } from '@line-crm/db';
+import * as dbPackage from '@line-crm/db';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { requirePhotoPermission } from './nen-photo-operations.js';
@@ -339,6 +340,75 @@ export async function deliverPhotoReviewNotification(
   };
 }
 
+/**
+ * LIFF マイページ（★V6 37-2）に出す会員ランク・マイル。
+ * 設定（nen_rank_settings）とECから届いた値（nen_ec_member_snapshots）から組み立てる。
+ * ECの値が無い友だちは、これまでの足し算（purchase_amount）を通年の代わりに使う（暫定）。
+ * お客様に見せる呼び名は「マイル」。ここに「ポイント」は出さない。
+ */
+type RankLookup = { rank_key: string; name: string; annual_threshold_yen: number; mile_rate_percent: number };
+type MilestoneLookup = { threshold_yen: number; title: string };
+
+// packages/db の DEFAULT_NEN_RANKS と同じ値。多くのテストが @line-crm/db を丸ごと mock するため、
+// 設定の読み出しは実行時に引き、無ければこの値で組み立てる。
+const FALLBACK_RANKS: RankLookup[] = [
+  { rank_key: 'regular', name: 'レギュラー', annual_threshold_yen: 0, mile_rate_percent: 1 },
+  { rank_key: 'silver', name: 'シルバー', annual_threshold_yen: 30_000, mile_rate_percent: 1.5 },
+  { rank_key: 'gold', name: 'ゴールド', annual_threshold_yen: 60_000, mile_rate_percent: 2 },
+  { rank_key: 'platinum', name: 'プラチナ', annual_threshold_yen: 120_000, mile_rate_percent: 3 },
+];
+
+async function loadRankSetup(db: D1Database, lineAccountId: string | null): Promise<{ ranks: RankLookup[]; milestones: MilestoneLookup[] }> {
+  if (!lineAccountId) return { ranks: FALLBACK_RANKS, milestones: [] };
+  try {
+    // 丸ごと mock された @line-crm/db は、無い名前を読むだけで投げる。読み出しごと try に入れる。
+    const pkg = dbPackage as {
+      ensureNenRankDefaults?: (db: D1Database, id: string) => Promise<void>;
+      getNenRankSettings?: (db: D1Database, id: string) => Promise<RankLookup[]>;
+      getNenLifetimeMilestones?: (db: D1Database, id: string) => Promise<MilestoneLookup[]>;
+    };
+    const load = pkg.getNenRankSettings;
+    if (typeof load !== 'function') return { ranks: FALLBACK_RANKS, milestones: [] };
+    await pkg.ensureNenRankDefaults?.(db, lineAccountId);
+    const ranks = await load(db, lineAccountId);
+    const milestones = (await pkg.getNenLifetimeMilestones?.(db, lineAccountId)) ?? [];
+    return { ranks: ranks.length ? ranks : FALLBACK_RANKS, milestones };
+  } catch {
+    return { ranks: FALLBACK_RANKS, milestones: [] };
+  }
+}
+
+async function buildMembership(db: D1Database, lineAccountId: string | null, snapshot: Record<string, unknown> | null) {
+  const { ranks, milestones } = await loadRankSetup(db, lineAccountId);
+  const num = (value: unknown) => (Number.isFinite(Number(value)) ? Math.max(0, Math.round(Number(value))) : 0);
+  const ecRankKey = typeof snapshot?.member_rank_key === 'string' && snapshot.member_rank_key ? snapshot.member_rank_key : null;
+  const annualMilesYen = num(snapshot?.annual_miles_yen) || (ecRankKey ? 0 : num(snapshot?.purchase_amount));
+  const lifetimeMilesYen = Math.max(num(snapshot?.lifetime_miles_yen), num(snapshot?.purchase_amount));
+  const mileBalance = num(snapshot?.mile_balance) || num(snapshot?.point_balance);
+  const sortedRanks = [...ranks].sort((a, b) => a.annual_threshold_yen - b.annual_threshold_yen);
+  let index = ecRankKey ? sortedRanks.findIndex((r) => r.rank_key === ecRankKey) : -1;
+  if (index < 0) { index = 0; sortedRanks.forEach((r, i) => { if (annualMilesYen >= r.annual_threshold_yen) index = i; }); }
+  const rank = sortedRanks[index] ?? null;
+  const next = sortedRanks[index + 1] ?? null;
+  const sortedMilestones = [...milestones].sort((a, b) => a.threshold_yen - b.threshold_yen);
+  const nextMilestone = sortedMilestones.find((m) => m.threshold_yen > lifetimeMilesYen) ?? null;
+  return {
+    rankKey: rank?.rank_key ?? null,
+    rankName: rank?.name ?? String(snapshot?.member_rank ?? 'レギュラー'),
+    mileRatePercent: Number.isFinite(Number(snapshot?.mile_rate_percent)) && snapshot?.mile_rate_percent != null
+      ? Number(snapshot.mile_rate_percent)
+      : rank?.mile_rate_percent ?? null,
+    annualMilesYen,
+    lifetimeMilesYen,
+    mileBalance,
+    validUntil: typeof snapshot?.rank_valid_until === 'string' ? snapshot.rank_valid_until : null,
+    next: next ? { name: next.name, thresholdYen: next.annual_threshold_yen, remainingYen: Math.max(0, next.annual_threshold_yen - annualMilesYen) } : null,
+    ranks: sortedRanks.map((r) => ({ key: r.rank_key, name: r.name, thresholdYen: r.annual_threshold_yen, mileRatePercent: r.mile_rate_percent })),
+    milestones: sortedMilestones.map((m) => ({ thresholdYen: m.threshold_yen, title: m.title, reached: lifetimeMilesYen >= m.threshold_yen })),
+    nextMilestone: nextMilestone ? { thresholdYen: nextMilestone.threshold_yen, title: nextMilestone.title, remainingYen: nextMilestone.threshold_yen - lifetimeMilesYen } : null,
+  };
+}
+
 function mapPet(row: Record<string, unknown>) {
   return {
     id: row.id, customerId: row.customer_id, name: row.name, animalType: row.animal_type,
@@ -383,8 +453,10 @@ nenMembers.get('/api/liff/nen/member', async (c) => {
       FROM nen_photo_submissions WHERE friend_id = ?`).bind(friend.id).first<Record<string, unknown>>(),
     c.env.DB.prepare(`SELECT id, pet_id, topic, result_text, tag_name, created_at FROM nen_consultation_logs_v2 WHERE friend_id = ? ORDER BY created_at DESC LIMIT 20`).bind(friend.id).all<Record<string, unknown>>(),
   ]);
+  const membership = await buildMembership(c.env.DB, friend.line_account_id, snapshot);
   return c.json({ success: true, data: {
     owner: { displayName: friend.display_name, customerId: snapshot?.customer_id || null },
+    membership,
     pets: pets.results.map(mapPet),
     commerce: snapshot ? {
       orders: JSON.parse(String(snapshot.orders_json || '[]')),

@@ -346,3 +346,35 @@ button, input, select, textarea { font: inherit; }
   .nm-health-period { align-self: stretch; }
   .nm-health-period button { flex: 1; }
 }
+
+/* ★V6 37-2 マイページ：メンバーシップシートの下段（マイル還元・維持期限） */
+.nm-member-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 10px; padding: 0 4px; color: #6f8178; font-size: 9px; }
+.nm-member-foot b { color: var(--rank-deep); font-weight: 800; }
+
+/* ライフタイム（累計） */
+.nm-lifetime-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.nm-lifetime-row span { color: #6fa089; font-size: 9px; font-weight: 800; letter-spacing: .18em; }
+.nm-lifetime-row > b { color: #123f2b; font: 700 22px/1.2 Georgia, serif; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.nm-lifetime .nm-sub { margin: 8px 0 0; }
+
+/* 見出し行の右にある「すべて見る」 */
+.nm-heading-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.nm-link { padding: 0; border: 0; background: none; color: #0a6848; font-size: 12px; font-weight: 700; cursor: pointer; }
+
+/* マイペット（マイページの要約行） */
+.nm-pet-row { display: flex; align-items: center; gap: 12px; }
+.nm-pet-avatar-small { flex: 0 0 48px; width: 48px; height: 48px; border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center; background: #e6f1eb; color: #0a6848; }
+.nm-pet-avatar-small img { width: 100%; height: 100%; object-fit: cover; }
+.nm-pet-avatar-small svg { width: 24px; height: 24px; }
+.nm-pet-text { min-width: 0; flex: 1; display: grid; gap: 2px; }
+.nm-pet-text b { font-size: 15px; }
+.nm-pet-text span { color: #64748b; font-size: 11px; }
+.nm-pet-text strong { color: #0a6848; font-size: 11px; font-weight: 700; }
+.nm-note { margin: 12px 0 0; color: #93a29b; font-size: 10px; line-height: 1.6; }
+
+/* 最近の注文 */
+.nm-order-lines { margin: 8px 0 0; padding: 0; list-style: none; display: grid; gap: 10px; }
+.nm-order-lines li { display: flex; align-items: center; gap: 10px; font-size: 12px; }
+.nm-order-lines span { flex: 0 0 40px; color: #93a29b; font-weight: 700; }
+.nm-order-lines em { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #173f2e; font-style: normal; }
+.nm-order-lines b { color: #173f2e; font-variant-numeric: tabular-nums; }
