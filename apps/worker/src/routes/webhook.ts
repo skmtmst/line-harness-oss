@@ -231,9 +231,9 @@ webhook.post('/webhook', async (c) => {
   }
 
   const lineClient = new LineClient(channelAccessToken);
-  // DBの内部IDが取れないenv既定アカウントでも、LINEのdestinationを使えば
-  // 別の公式アカウントとmessage IDが衝突しない。
-  const lineMessageAccountKey = matchedAccountId ?? `destination:${body.destination}`;
+  // LINEのdestinationは公式アカウントごとに安定している。DBアカウントの
+  // 解決前後でキーを変えると、先着した取消墓標と後着messageが分断される。
+  const lineMessageAccountKey = `destination:${body.destination}`;
 
   // 非同期処理 — LINE は ~1s 以内のレスポンスを要求
   const processingPromise = processLineWebhookEvents({

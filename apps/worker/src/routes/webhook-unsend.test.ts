@@ -166,7 +166,7 @@ describe('N-024 LINE送信取消', () => {
     ]);
     expect(db.raw.prepare(`
       SELECT COUNT(*) AS count FROM line_message_unsends
-       WHERE line_message_account_key = 'account-a' AND line_message_id = 'line-message-shared'
+       WHERE line_message_account_key = 'destination:destination-a' AND line_message_id = 'line-message-shared'
     `).get()).toEqual({ count: 1 });
 
     const env = { DB: db.db } as Env['Bindings'];
@@ -212,7 +212,7 @@ describe('N-024 LINE送信取消', () => {
     expect(db.raw.prepare(`
       SELECT content, unsent_at IS NOT NULL AS is_unsent
         FROM messages_log
-       WHERE line_message_account_key = 'account-a' AND line_message_id = 'line-message-late'
+       WHERE line_message_account_key = 'destination:destination-a' AND line_message_id = 'line-message-late'
     `).get()).toEqual({ content: '', is_unsent: 1 });
     expect(autoReply).not.toHaveBeenCalled();
     expect(mileage).not.toHaveBeenCalled();
@@ -227,5 +227,49 @@ describe('N-024 LINE送信取消', () => {
     expect(text).toContain('"isUnsent":true');
     expect(text).not.toContain('後から届いた');
     expect(text).not.toContain('attachment.example');
+  });
+
+  it('DBアカウントが未解決から解決済みに変わっても同じdestination墓標へ結び付く', async () => {
+    // 最初のunsendではenv secretに一致するDBアカウントを見つけられない状態にする。
+    db.raw.prepare(
+      "UPDATE line_accounts SET channel_secret = 'old-secret-a' WHERE id = 'account-a'",
+    ).run();
+    await postUnsend(
+      db,
+      'a',
+      'event-unsend-before-account-resolution',
+      'line-message-resolution-change',
+      1_800_000_002_000,
+    );
+
+    // 同じLINE OAがDBアカウントへ解決できるようになったあとmessageが遅れて届く。
+    db.raw.prepare(
+      "UPDATE line_accounts SET channel_secret = 'secret-a' WHERE id = 'account-a'",
+    ).run();
+    await postText(
+      db,
+      'a',
+      'event-message-after-account-resolution',
+      'line-message-resolution-change',
+      '解決状態が変わっても復活してはいけない本文',
+      1_800_000_001_000,
+    );
+
+    expect(db.raw.prepare(`
+      SELECT line_account_id, line_message_account_key, content,
+             unsent_at IS NOT NULL AS is_unsent
+        FROM messages_log
+       WHERE line_message_id = 'line-message-resolution-change'
+    `).get()).toEqual({
+      line_account_id: 'account-a',
+      line_message_account_key: 'destination:destination-a',
+      content: '',
+      is_unsent: 1,
+    });
+    expect(db.raw.prepare(`
+      SELECT COUNT(*) AS count FROM line_message_unsends
+       WHERE line_message_account_key = 'destination:destination-a'
+         AND line_message_id = 'line-message-resolution-change'
+    `).get()).toEqual({ count: 1 });
   });
 });
