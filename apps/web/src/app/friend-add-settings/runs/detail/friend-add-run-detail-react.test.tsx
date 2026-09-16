@@ -83,6 +83,21 @@ describe('N-103 friend-add run detail', () => {
     expect(host.textContent).not.toContain('失敗した1件だけ再試行')
   })
 
+  it('処理再試行が成功しても送信失敗が残る実行を完了表示にしない', async () => {
+    apiMocks.runDetail.mockResolvedValue({
+      ...detail('account-1'),
+      data: {
+        ...detail('account-1').data,
+        actionRuns: [detail('account-1').data.actionRuns[0]],
+        status: 'partial_failed',
+        errorCode: 'send_failed',
+      },
+    })
+    await render()
+    expect(host.textContent).toContain('一部失敗')
+    expect(host.textContent).not.toContain('失敗した1件だけ再試行')
+  })
+
   it('account切替後は遅れて返った前accountの詳細を捨てる', async () => {
     let resolveOld!: (value: unknown) => void
     apiMocks.runDetail.mockImplementation((accountId: string) => accountId === 'account-1'

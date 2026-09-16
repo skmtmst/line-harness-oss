@@ -103,6 +103,13 @@ export default function FriendAddRunDetailPage() {
 
   const failed = detail.actionRuns.filter((action) => action.status === 'failed')
   const displayName = detail.friend.displayName || '名前は未取得'
+  const runStatus = detail.status === 'completed'
+    ? { label: '完了', tone: 'success' as const }
+    : detail.status === 'suppressed'
+      ? { label: '配信なし', tone: 'info' as const }
+      : detail.status === 'pending'
+        ? { label: '処理中', tone: 'info' as const }
+        : { label: '一部失敗', tone: 'danger' as const }
 
   return (
     <div className="space-y-4 pb-8">
@@ -113,7 +120,7 @@ export default function FriendAddRunDetailPage() {
             <h1 className="text-lg font-bold">実行詳細</h1>
             <p className="mt-1 text-sm text-ink-secondary">{displayName}・{detail.rule?.name ?? '使用ルールは未取得'}</p>
           </div>
-          <StatusBadge tone={failed.length > 0 ? 'danger' : 'success'}>{failed.length > 0 ? '一部失敗' : '完了'}</StatusBadge>
+          <StatusBadge tone={runStatus.tone}>{runStatus.label}</StatusBadge>
         </div>
       </section>
 
