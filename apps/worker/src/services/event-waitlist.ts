@@ -234,11 +234,11 @@ export async function getEventOccurrenceApplicants(
                 b.first_participation_checked_at, b.requested_at,
                 f.display_name, f.picture_url
            FROM event_bookings b
-           LEFT JOIN friends f ON f.id = b.friend_id
+           JOIN friends f ON f.id = b.friend_id AND f.line_account_id = ?
           WHERE b.slot_id = ?
           ORDER BY b.requested_at ASC, b.id ASC`,
       )
-      .bind(params.occurrenceId)
+      .bind(params.lineAccountId, params.occurrenceId)
       .all<BookingApplicantRow>(),
     db
       .prepare(
@@ -247,11 +247,11 @@ export async function getEventOccurrenceApplicants(
                 w.first_participation_checked_at, w.created_at, w.offered_at, w.offer_expires_at,
                 f.display_name, f.picture_url
            FROM event_waitlist w
-           LEFT JOIN friends f ON f.id = w.friend_id
+           JOIN friends f ON f.id = w.friend_id AND f.line_account_id = ?
           WHERE w.slot_id = ?
           ORDER BY w.created_at ASC, w.id ASC`,
       )
-      .bind(params.occurrenceId)
+      .bind(params.lineAccountId, params.occurrenceId)
       .all<WaitlistApplicantRow>(),
     getEventOccurrenceUsedSeats(db, params.occurrenceId),
   ]);

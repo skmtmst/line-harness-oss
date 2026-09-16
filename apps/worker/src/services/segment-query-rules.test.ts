@@ -7,7 +7,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import type Database from 'better-sqlite3'
 import { createTestD1, insertFriend } from '../test-utils/d1-sqlite.js'
-import { buildSegmentQuery, matchesCondition, type SegmentCondition } from './segment-query.js'
+import { buildPublicSegmentQuery, buildSegmentQuery, matchesCondition, type SegmentCondition } from './segment-query.js'
 
 let db: D1Database
 let raw: Database.Database
@@ -71,6 +71,10 @@ describe('固定した配信対象', () => {
 
   it('空の固定対象は全員一致にせず拒否する', () => {
     expect(() => buildSegmentQuery({ operator: 'AND', rules: [{ type: 'friend_id_in', value: [] }] })).toThrow()
+  })
+
+  it('一般の条件保存口は内部snapshot用ID列を拒否する', () => {
+    expect(() => buildPublicSegmentQuery({ operator: 'AND', rules: [{ type: 'friend_id_in', value: ['a'] }] })).toThrow('reserved')
   })
 })
 

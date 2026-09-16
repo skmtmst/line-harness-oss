@@ -58,6 +58,10 @@ import {
   getEventOccurrenceUsedSeats,
   promoteEventWaitlist,
 } from '../services/event-waitlist.js';
+import {
+  createEventApplicantSnapshot,
+  getEventApplicantSnapshot,
+} from '../services/event-applicant-snapshot.js';
 
 const events = new Hono<Env>();
 const ACCOUNT_ACCESS_ERROR = 'このLINEアカウントを操作する権限がありません';
@@ -104,6 +108,28 @@ function csvCell(value: unknown): string {
 const EVENT_PARTY_SIZE_MAX = 20;
 const EVENT_ANSWER_SNAPSHOT_MAX_BYTES = 16_384;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+type EventApplicantBroadcastDraft = {
+  kind: 'event_occurrence_applicant_snapshot';
+  snapshotId: string;
+  occurrenceId: string;
+  recipientIds: string[];
+};
+
+function eventApplicantBroadcastDraft(value: string | null | undefined): EventApplicantBroadcastDraft | null {
+  if (!value) return null;
+  try {
+    const parsed = JSON.parse(value) as Partial<EventApplicantBroadcastDraft>;
+    if (parsed.kind !== 'event_occurrence_applicant_snapshot'
+      || typeof parsed.snapshotId !== 'string'
+      || typeof parsed.occurrenceId !== 'string'
+      || !Array.isArray(parsed.recipientIds)
+      || parsed.recipientIds.some((id) => typeof id !== 'string')) return null;
+    return parsed as EventApplicantBroadcastDraft;
+  } catch {
+    return null;
+  }
+}
 
 type EventSnapshotSource = {
   name: string;
@@ -868,11 +894,18 @@ events.get(
       lineAccountId: accountId,
     });
     if (!data) return bad(c, 'not_found', 404);
-    return c.json({ success: true, data });
+    const snapshot = await createEventApplicantSnapshot(c.env.DB, {
+      lineAccountId: accountId,
+      occurrenceId: c.req.param('id'),
+      staffId: c.get('staff')!.id,
+      data,
+    });
+    return c.json({ success: true, data: { ...snapshot.data, snapshotId: snapshot.id, snapshotExpiresAt: snapshot.expiresAt } });
   },
 );
 
-// 表示している一頁ではなく、開催回の現在の全申込者をサーバーで読み直して出力する。
+// 表示時にサーバーが固定した全申込者を出力する。後続の申込/取消でCSVの対象を
+// 入れ替えないため、snapshot_idが無いリクエストは受け付けない。
 events.get(
   '/api/events/admin/occurrences/:id/applicants.csv',
   requireRole('owner', 'admin', 'staff'),
@@ -881,12 +914,18 @@ events.get(
       const accountId = getAccountId(c);
       if (!accountId) return bad(c, 'account_id_required', 400);
       const occurrenceId = c.req.param('id');
-      const data = await getEventOccurrenceApplicants(c.env.DB, {
-        occurrenceId,
+      const snapshotId = c.req.query('snapshot_id');
+      if (!snapshotId) return bad(c, 'applicant_snapshot_required', 422);
+      const loaded = await getEventApplicantSnapshot(c.env.DB, {
+        id: snapshotId,
         lineAccountId: accountId,
+        occurrenceId,
+        staffId: c.get('staff')!.id,
       });
-      if (!data) return bad(c, 'not_found', 404);
-      const rows = data.applicants.map((applicant) => [
+      if (loaded.kind === 'not_found') return bad(c, 'not_found', 404);
+      if (loaded.kind === 'expired') return bad(c, 'applicant_snapshot_expired', 410);
+      if (loaded.kind === 'invalid') return bad(c, 'applicant_snapshot_invalid', 409);
+      const rows = loaded.snapshot.data.applicants.map((applicant) => [
         applicant.displayName,
         applicant.source === 'waitlist' ? 'キャンセル待ち' : '申込',
         applicant.status,
@@ -926,34 +965,40 @@ events.post(
       if (!accountId) return bad(c, 'account_id_required', 400);
       const idempotencyKey = c.req.header('Idempotency-Key')?.trim();
       if (!idempotencyKey || !UUID_PATTERN.test(idempotencyKey)) return bad(c, 'idempotency_key_required', 400);
-      const body = await c.req.json<{ title?: unknown; messageContent?: unknown }>().catch(() => ({}));
+      const body = (await c.req.json<{ title?: unknown; messageContent?: unknown; snapshotId?: unknown }>()
+        .catch(() => ({}))) as { title?: unknown; messageContent?: unknown; snapshotId?: unknown };
       const title = typeof body.title === 'string' ? body.title.trim() : '';
       const messageContent = typeof body.messageContent === 'string' ? body.messageContent.trim() : '';
       if (!title || !messageContent || messageContent.length > 5_000) return bad(c, 'invalid_broadcast_content', 422);
+      const snapshotId = typeof body.snapshotId === 'string' ? body.snapshotId : '';
+      if (!snapshotId) return bad(c, 'applicant_snapshot_required', 422);
 
       const occurrenceId = c.req.param('id');
-      const applicants = await getEventOccurrenceApplicants(c.env.DB, { occurrenceId, lineAccountId: accountId });
-      if (!applicants) return bad(c, 'not_found', 404);
-      const sendableStatuses = new Set(['requested', 'confirmed', 'attended', 'no_show', 'waiting', 'offered', 'accepted']);
-      const friendIds = [...new Set(applicants.applicants
-        .filter((applicant) => sendableStatuses.has(applicant.status))
-        .map((applicant) => applicant.friendId))];
-      if (friendIds.length === 0) return bad(c, 'no_applicants_to_broadcast', 422);
-      const segmentConditions = JSON.stringify({
-        operator: 'AND',
-        rules: [{ type: 'friend_id_in', value: friendIds }],
-      });
-
       const existing = await getBroadcastById(c.env.DB, idempotencyKey);
       if (existing) {
+        const draft = eventApplicantBroadcastDraft(existing.draft_payload_json);
         if (existing.title !== title || existing.message_content !== messageContent
           || existing.line_account_id !== accountId || existing.target_type !== 'segment'
-          || existing.segment_conditions !== segmentConditions) {
+          || !draft || draft.snapshotId !== snapshotId || draft.occurrenceId !== occurrenceId) {
           return bad(c, 'idempotency_key_conflict', 409);
         }
+        const segmentConditions = JSON.stringify({ operator: 'AND', rules: [{ type: 'friend_id_in', value: draft.recipientIds }] });
+        if (existing.segment_conditions !== segmentConditions) return bad(c, 'idempotency_key_conflict', 409);
         c.header('Idempotency-Replayed', 'true');
-        return c.json({ success: true, data: { broadcastId: existing.id, recipientCount: friendIds.length } });
+        return c.json({ success: true, data: { broadcastId: existing.id, recipientCount: draft.recipientIds.length } });
       }
+      const loaded = await getEventApplicantSnapshot(c.env.DB, {
+        id: snapshotId,
+        lineAccountId: accountId,
+        occurrenceId,
+        staffId: c.get('staff')!.id,
+      });
+      if (loaded.kind === 'not_found') return bad(c, 'not_found', 404);
+      if (loaded.kind === 'expired') return bad(c, 'applicant_snapshot_expired', 410);
+      if (loaded.kind === 'invalid') return bad(c, 'applicant_snapshot_invalid', 409);
+      const friendIds = [...new Set(loaded.snapshot.data.applicants.map((applicant) => applicant.friendId))];
+      if (friendIds.length === 0) return bad(c, 'no_applicants_to_broadcast', 422);
+      const segmentConditions = JSON.stringify({ operator: 'AND', rules: [{ type: 'friend_id_in', value: friendIds }] });
       const broadcast = await createBroadcast(c.env.DB, {
         id: idempotencyKey,
         title,
@@ -964,6 +1009,12 @@ events.post(
         segmentConditions,
         saveAsDraft: true,
         draftStep: 'confirm',
+        draftPayloadJson: JSON.stringify({
+          kind: 'event_occurrence_applicant_snapshot',
+          snapshotId,
+          occurrenceId,
+          recipientIds: friendIds,
+        } satisfies EventApplicantBroadcastDraft),
       });
       return c.json({ success: true, data: { broadcastId: broadcast.id, recipientCount: friendIds.length } }, 201);
     } catch (error) {

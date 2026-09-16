@@ -10502,6 +10502,9 @@ export interface EventOccurrenceApplicants {
   };
   summary: { bookingCount: number; waitingCount: number; activeSeats: number };
   applicants: EventOccurrenceApplicant[];
+  /** 表示・CSV・一斉案内を同じ対象で扱う短期サーバースナップショット。 */
+  snapshotId: string;
+  snapshotExpiresAt: string;
 }
 
 export type EventWaitlistPromotionResult =
@@ -10596,9 +10599,9 @@ export const eventsApi = {
     fetchApi<{ success: true; data: EventOccurrenceApplicants }>(
       withAccount(`/api/events/admin/occurrences/${encodeURIComponent(occurrenceId)}/applicants`, accountId),
     ).then((response) => response.data),
-  occurrenceApplicantsCsvUrl: (accountId: string, occurrenceId: string) =>
-    withAccount(`/api/events/admin/occurrences/${encodeURIComponent(occurrenceId)}/applicants.csv`, accountId),
-  previewOccurrenceBroadcast: (accountId: string, occurrenceId: string, data: { title: string; messageContent: string }, idempotencyKey: string) =>
+  occurrenceApplicantsCsvUrl: (accountId: string, occurrenceId: string, snapshotId: string) =>
+    withAccount(`/api/events/admin/occurrences/${encodeURIComponent(occurrenceId)}/applicants.csv?snapshot_id=${encodeURIComponent(snapshotId)}`, accountId),
+  previewOccurrenceBroadcast: (accountId: string, occurrenceId: string, data: { title: string; messageContent: string; snapshotId: string }, idempotencyKey: string) =>
     fetchApi<{ success: true; data: { broadcastId: string; recipientCount: number } }>(
       withAccount(`/api/events/admin/occurrences/${encodeURIComponent(occurrenceId)}/applicant-broadcasts/preview`, accountId),
       { method: 'POST', headers: { 'Idempotency-Key': idempotencyKey }, body: JSON.stringify(data) },

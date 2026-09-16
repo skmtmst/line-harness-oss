@@ -530,6 +530,22 @@ export function buildSegmentQuery(condition: SegmentCondition): { sql: string; b
 }
 
 /**
+ * 画面や公開APIから受け取る条件を組み立てる。
+ * `friend_id_in` はイベント申込者を表示時のsnapshotへ固定する内部契約であり、
+ * 任意のID列を受け取る一般の条件保存口では許可しない。
+ */
+export function buildPublicSegmentQuery(condition: SegmentCondition): { sql: string; bindings: unknown[] } {
+  const visit = (node: SegmentCondition): void => {
+    for (const rule of node.rules ?? []) {
+      if (rule.type === 'friend_id_in') throw new Error('friend_id_in is reserved for internal snapshots');
+    }
+    for (const group of node.groups ?? []) visit(group);
+  };
+  visit(condition);
+  return buildSegmentQuery(condition);
+}
+
+/**
  * 1人が条件にあてはまるかを見る。
  *
  * 配信の直前と、アクションの実行前に呼ぶ。一覧用の SQL を組み立て直さずに

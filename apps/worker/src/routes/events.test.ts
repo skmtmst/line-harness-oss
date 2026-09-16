@@ -45,6 +45,12 @@ const waitlistMocks = {
 };
 vi.mock('../services/event-waitlist.js', () => waitlistMocks);
 
+const applicantSnapshotMocks = {
+  createEventApplicantSnapshot: vi.fn(),
+  getEventApplicantSnapshot: vi.fn(),
+};
+vi.mock('../services/event-applicant-snapshot.js', () => applicantSnapshotMocks);
+
 const { default: events } = await import('./events.js');
 
 type TestEnv = {
@@ -1062,9 +1068,13 @@ beforeEach(() => {
   for (const fn of Object.values(reminderMocks)) fn.mockReset();
   for (const fn of Object.values(notifierMocks)) fn.mockReset();
   for (const fn of Object.values(waitlistMocks)) fn.mockReset();
+  for (const fn of Object.values(applicantSnapshotMocks)) fn.mockReset();
   reminderMocks.computeRemindersForBooking.mockReturnValue([]);
   waitlistMocks.createEventWaitlistOfferSender.mockReturnValue(vi.fn());
   waitlistMocks.enqueueEventWaitlistPromotion.mockResolvedValue(true);
+  applicantSnapshotMocks.createEventApplicantSnapshot.mockImplementation(async (_db: D1Database, input: { data: unknown }) => ({
+    id: 'snapshot-1', data: input.data, expiresAt: '2099-01-01T00:15:00.000Z',
+  }));
 });
 
 describe('admin role guards (N-065 #623)', () => {
@@ -2818,7 +2828,7 @@ describe('V6 occurrence applicants / waitlist promotion routes', () => {
     expect(normal.status).toBe(200);
     await expect(normal.json()).resolves.toMatchObject({
       success: true,
-      data: { occurrence: { id: 's1', version: 1 }, applicants: [{ id: 'b1' }] },
+      data: { occurrence: { id: 's1', version: 1 }, applicants: [{ id: 'b1' }], snapshotId: 'snapshot-1' },
     });
     expect(waitlistMocks.getEventOccurrenceApplicants).toHaveBeenCalledWith(
       expect.anything(),
@@ -2835,27 +2845,41 @@ describe('V6 occurrence applicants / waitlist promotion routes', () => {
     await expect(empty.json()).resolves.toMatchObject({ success: true, data: { applicants: [] } });
   });
 
-  test('CSVは表示ページではなく開催回の全申込者を、所属アカウントだけから書き出す', async () => {
-    waitlistMocks.getEventOccurrenceApplicants.mockResolvedValueOnce({
+  test('CSVは表示時の全申込者snapshotを、所属アカウントだけから書き出す', async () => {
+    const snapshotData = {
       occurrence: { id: 's1', eventId: 'e1', startsAt: '2099-01-01', endsAt: '2099-01-02', capacity: 2, activeSeats: 1, version: 1 },
       summary: { bookingCount: 1, waitingCount: 1, activeSeats: 1 },
       applicants: [
         { source: 'booking', id: 'b1', friendId: 'f1', displayName: '=式にしない', status: 'confirmed', partySize: 1, appliedAt: '2099-01-01T00:00:00.000Z', offerExpiresAt: null },
         { source: 'waitlist', id: 'w1', friendId: 'f2', displayName: '待機者', status: 'offered', partySize: 2, appliedAt: '2099-01-01T01:00:00.000Z', offerExpiresAt: '2099-01-02T00:00:00.000Z' },
       ],
+    };
+    applicantSnapshotMocks.getEventApplicantSnapshot.mockResolvedValueOnce({
+      kind: 'found', snapshot: { id: 'snapshot-1', data: snapshotData, expiresAt: '2099-01-01T00:15:00.000Z' },
     });
     const app = setupApp(structuredClone(state));
-    const csv = await app.request('/api/events/admin/occurrences/s1/applicants.csv?account_id=la1');
+    const csv = await app.request('/api/events/admin/occurrences/s1/applicants.csv?account_id=la1&snapshot_id=snapshot-1');
     expect(csv.status).toBe(200);
     expect(csv.headers.get('content-type')).toContain('text/csv');
     await expect(csv.text()).resolves.toContain("'=式にしない");
-    expect(waitlistMocks.getEventOccurrenceApplicants).toHaveBeenCalledWith(
-      expect.anything(), { occurrenceId: 's1', lineAccountId: 'la1' },
+    expect(applicantSnapshotMocks.getEventApplicantSnapshot).toHaveBeenCalledWith(
+      expect.anything(), { id: 'snapshot-1', lineAccountId: 'la1', occurrenceId: 's1', staffId: 'staff-1' },
     );
 
     waitlistMocks.getEventOccurrenceApplicants.mockResolvedValueOnce(null);
-    const outside = await app.request('/api/events/admin/occurrences/s1/applicants.csv?account_id=other');
+    const outside = await app.request('/api/events/admin/occurrences/s1/applicants.csv?account_id=other&snapshot_id=snapshot-1');
     expect(outside.status).toBe(403);
+  });
+
+  test('CSVは期限切れ・別担当者のsnapshotを再読込せず拒否する', async () => {
+    const app = setupApp(structuredClone(state));
+    applicantSnapshotMocks.getEventApplicantSnapshot.mockResolvedValueOnce({ kind: 'expired' });
+    const expired = await app.request('/api/events/admin/occurrences/s1/applicants.csv?account_id=la1&snapshot_id=old');
+    expect(expired.status).toBe(410);
+    applicantSnapshotMocks.getEventApplicantSnapshot.mockResolvedValueOnce({ kind: 'not_found' });
+    const foreign = await app.request('/api/events/admin/occurrences/s1/applicants.csv?account_id=la1&snapshot_id=other-staff');
+    expect(foreign.status).toBe(404);
+    expect(waitlistMocks.getEventOccurrenceApplicants).not.toHaveBeenCalled();
   });
 
   test('not found / forbidden: 所属外を404、認証なしを403にする', async () => {

@@ -435,6 +435,9 @@ function BookingsInner() {
       const data = await eventsApi.getOccurrenceApplicants(selectedAccountId, selectedOccurrenceId)
       if (requestId !== occurrenceApplicantsRequestRef.current || scopeRef.current !== scope) return
       setOccurrenceApplicants(data)
+      setBroadcastPreview(null)
+      setBroadcastConfirmOpen(false)
+      broadcastPreviewKeyRef.current = null
       setOccurrenceStatus('ready')
     } catch {
       if (requestId !== occurrenceApplicantsRequestRef.current || scopeRef.current !== scope) return
@@ -624,6 +627,7 @@ function BookingsInner() {
       const result = await eventsApi.previewOccurrenceBroadcast(accountId, occurrence.id, {
         title: `${event?.name ?? 'イベント'}の申込者への案内`,
         messageContent: message,
+        snapshotId: occurrenceApplicants.snapshotId,
       }, idempotencyKey)
       if (scopeRef.current !== startedScope) return
       setBroadcastPreview(result)
@@ -791,7 +795,7 @@ function BookingsInner() {
               promoting={promotingWaitlist}
               error={occurrenceActionError}
               onPromote={() => void promoteWaitlist()}
-              csvHref={eventsApi.occurrenceApplicantsCsvUrl(selectedAccountId!, occurrenceApplicants.occurrence.id)}
+              csvHref={eventsApi.occurrenceApplicantsCsvUrl(selectedAccountId!, occurrenceApplicants.occurrence.id, occurrenceApplicants.snapshotId)}
             />
             <div className="border-hairline mt-4 border-t pt-4">
               <h4 className="text-ink font-medium">この開催回の申込者へ一斉送信</h4>

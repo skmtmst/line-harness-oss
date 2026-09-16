@@ -13,7 +13,7 @@ const apiMocks = vi.hoisted(() => ({
   listSlots: vi.fn(),
   getOccurrenceApplicants: vi.fn(),
   promoteOccurrenceWaitlist: vi.fn(),
-  occurrenceApplicantsCsvUrl: vi.fn((accountId: string, occurrenceId: string) => `/api/events/admin/occurrences/${occurrenceId}/applicants.csv?account_id=${accountId}`),
+  occurrenceApplicantsCsvUrl: vi.fn((accountId: string, occurrenceId: string, snapshotId: string) => `/api/events/admin/occurrences/${occurrenceId}/applicants.csv?account_id=${accountId}&snapshot_id=${snapshotId}`),
   previewOccurrenceBroadcast: vi.fn(),
   sendOccurrenceBroadcast: vi.fn(),
 }))
@@ -244,6 +244,7 @@ beforeEach(() => {
   apiMocks.getOccurrenceApplicants.mockResolvedValue({
     occurrence: { id: 'slot-1', eventId: 'event-1', startsAt: '2099-06-01T01:00:00.000Z', endsAt: '2099-06-01T02:00:00.000Z', capacity: 5, activeSeats: 1, version: 4 },
     summary: { bookingCount: 1, waitingCount: 1, activeSeats: 1 },
+    snapshotId: 'snapshot-1', snapshotExpiresAt: '2099-06-01T00:15:00.000Z',
     applicants: [
       { source: 'booking', id: 'booking-1', friendId: 'friend-booking', displayName: '申込 太郎', pictureUrl: null, status: 'confirmed', partySize: 1, appliedAt: '2099-05-01T01:00:00.000Z', answers: null, firstParticipation: { isFirst: null, attendedCount: null, checkedAt: null }, offeredAt: null, offerExpiresAt: null },
       { source: 'waitlist', id: 'wait-1', friendId: 'friend-waiting', displayName: '待機 花子', pictureUrl: null, status: 'waiting', partySize: 2, appliedAt: '2099-05-02T01:00:00.000Z', answers: null, firstParticipation: { isFirst: null, attendedCount: null, checkedAt: null }, offeredAt: null, offerExpiresAt: null },
@@ -394,7 +395,8 @@ describe('Issue #684 イベント予約の実操作', () => {
     apiMocks.promoteOccurrenceWaitlist.mockReturnValue(sending.promise)
     apiMocks.getOccurrenceApplicants.mockResolvedValue({
       occurrence: { id: 'slot-1', eventId: 'event-1', startsAt: '2099-06-01T01:00:00.000Z', endsAt: '2099-06-01T02:00:00.000Z', capacity: 5, activeSeats: 1, version: 4 },
-      summary: { bookingCount: 1, waitingCount: 1, activeSeats: 1 },
+    summary: { bookingCount: 1, waitingCount: 1, activeSeats: 1 },
+    snapshotId: 'snapshot-1', snapshotExpiresAt: '2099-06-01T00:15:00.000Z',
       applicants: [
         { source: 'waitlist', id: 'wait-1', friendId: 'friend-waiting', displayName: '待機 花子', pictureUrl: null, status: 'offered', partySize: 2, appliedAt: '2099-05-02T01:00:00.000Z', answers: null, firstParticipation: { isFirst: null, attendedCount: null, checkedAt: null }, offeredAt: '2099-05-03T01:00:00.000Z', offerExpiresAt: '2099-05-04T01:00:00.000Z' },
       ],
@@ -430,6 +432,9 @@ describe('Issue #684 イベント予約の実操作', () => {
     await click(previewButton)
     await click(previewButton)
     expect(apiMocks.previewOccurrenceBroadcast).toHaveBeenCalledTimes(1)
+    expect(apiMocks.previewOccurrenceBroadcast).toHaveBeenCalledWith(
+      'account-a', 'slot-1', expect.objectContaining({ snapshotId: 'snapshot-1' }), expect.any(String),
+    )
     preview.resolve({ broadcastId: 'broadcast-snapshot-1', recipientCount: 2 })
     await flush()
     expect(view.container.textContent).toContain('送信対象 2人')
