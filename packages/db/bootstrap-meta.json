@@ -369,7 +369,8 @@
     "408_line_message_unsends.sql",
     "409_outbound_send_failure_ledger.sql",
     "410_nen_member_ranks.sql",
-    "411_platform_admin_invites.sql"
+    "411_platform_admin_invites.sql",
+    "412_operation_incident_stopped_definitions.sql"
   ],
-  "migrationCount": 370
+  "migrationCount": 371
 }

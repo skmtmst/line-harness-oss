@@ -52,8 +52,14 @@ beforeEach(async () => {
   );
   testDb.raw.prepare(
     `INSERT INTO auth_step_up_grants (token_hash, staff_id, purpose, expires_at, created_at)
-     VALUES (?, 'owner-1', 'operations.control', ?, ?)`
-  ).run(await hash('step-up-restore'), expiresAt, new Date().toISOString());
+     VALUES (?, 'owner-1', 'operations.control', ?, ?),
+            (?, 'owner-1', 'operations.control', ?, ?),
+            (?, 'owner-1', 'operations.control', ?, ?)`
+  ).run(
+    await hash('step-up-restore'), expiresAt, new Date().toISOString(),
+    await hash('step-up-restore-b'), expiresAt, new Date().toISOString(),
+    await hash('step-up-restore-c'), expiresAt, new Date().toISOString(),
+  );
 });
 
 afterEach(() => {
@@ -345,6 +351,231 @@ describe('緊急停止の保存API', () => {
       { channel: 'email', status: 'queued' },
       { channel: 'line', status: 'queued' },
     ]);
+  });
+});
+
+describe('N-451 復旧前検査と安全な復旧', () => {
+  function addBroadcast(id: string, scheduledAt: string | null = '2099-01-01T00:00:00.000Z', accountId = 'account-1') {
+    testDb.raw.prepare(
+      `INSERT INTO broadcasts (id, title, message_type, message_content, status, scheduled_at, line_account_id)
+       VALUES (?, ?, 'text', 'body', 'scheduled', ?, ?)`,
+    ).run(id, `broadcast-${id}`, scheduledAt, accountId);
+  }
+
+  async function stopNow(capabilities = ['broadcast_dispatch']) {
+    const response = await app().request('/api/operations/incidents', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-confirm-irreversible': 'operation-stop',
+        'x-step-up-token': 'step-up-stop',
+        'idempotency-key': `stop-${crypto.randomUUID()}`,
+      },
+      body: JSON.stringify({
+        lineAccountId: 'account-1',
+        capabilities,
+        reason: '誤配信の防止',
+        expectedVersion: 0,
+        confirmation: '停止',
+      }),
+    }, bindings());
+    expect(response.status).toBe(201);
+    return (await response.json()) as {
+      data: { control: { version: number }; incident: { id: string } };
+    };
+  }
+
+  function restoreRequest(incidentId: string, expectedVersion: number, key: string, token: string): RequestInit {
+    return {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-confirm-irreversible': 'operation-restore',
+        'x-step-up-token': token,
+        'idempotency-key': key,
+      },
+      body: JSON.stringify({ expectedVersion, confirmation: '復旧' }),
+    };
+  }
+
+  it('restore-preview が停止中の編集・追加・期限切れを実routeで返す', async () => {
+    addBroadcast('b-changed');
+    addBroadcast('b-expired');
+    const stopped = await stopNow(['broadcast_dispatch', 'scenario_dispatch']);
+    const incidentId = stopped.data.incident.id;
+    // 停止中の編集・追加・期限切れ（期限切れは停止時に存在した予約が時間切れになる）
+    testDb.raw.prepare(`UPDATE broadcasts SET title = 'edited', lock_version = lock_version + 1 WHERE id = 'b-changed'`).run();
+    addBroadcast('b-added');
+    testDb.raw.prepare(`UPDATE broadcasts SET scheduled_at = '2000-01-01T00:00:00.000Z' WHERE id = 'b-expired'`).run();
+
+    const preview = await app('admin').request(
+      `/api/operations/incidents/${incidentId}/restore-preview`,
+      { method: 'POST' },
+      bindings(),
+    );
+    expect(preview.status).toBe(200);
+    const body = await preview.json() as {
+      data: {
+        drift: {
+          resumable: string[];
+          capabilities: Array<{ capability: string; blocked: boolean; drift: Array<{ id: string; kind: string }> }>;
+        };
+      };
+    };
+    const broadcast = body.data.drift.capabilities.find((entry) => entry.capability === 'broadcast_dispatch')!;
+    expect(broadcast.blocked).toBe(true);
+    expect(broadcast.drift).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'b-changed', kind: 'changed' }),
+      expect.objectContaining({ id: 'b-added', kind: 'added' }),
+      expect.objectContaining({ id: 'b-expired', kind: 'expired' }),
+    ]));
+    // 変更の無いシナリオは再開可能
+    expect(body.data.drift.resumable).toEqual(['scenario_dispatch']);
+  });
+
+  it('restore-preview は権限・範囲・停止中以外を拒否する', async () => {
+    const stopped = await stopNow();
+    const incidentId = stopped.data.incident.id;
+    const request = { method: 'POST' } as const;
+
+    expect((await app('staff').request(
+      `/api/operations/incidents/${incidentId}/restore-preview`, request, bindings(),
+    )).status).toBe(403);
+    expect((await app('admin', false).request(
+      `/api/operations/incidents/${incidentId}/restore-preview`, request, bindings(),
+    )).status).toBe(403);
+    expect((await app().request(
+      '/api/operations/incidents/no-such/restore-preview', request, bindings(),
+    )).status).toBe(404);
+
+    // 復旧済みのincidentは検査対象ではない
+    await app().request(
+      `/api/operations/incidents/${incidentId}/restore`,
+      restoreRequest(incidentId, stopped.data.control.version, 'restore-done', 'step-up-restore'),
+      bindings(),
+    );
+    expect((await app().request(
+      `/api/operations/incidents/${incidentId}/restore-preview`, request, bindings(),
+    )).status).toBe(409);
+  });
+
+  it('変更のある能力だけを止めたままにし、残りは実routeで復旧する', async () => {
+    addBroadcast('b-1');
+    const stopped = await stopNow(['broadcast_dispatch', 'scenario_dispatch']);
+    testDb.raw.prepare(`UPDATE broadcasts SET title = 'edited', lock_version = lock_version + 1 WHERE id = 'b-1'`).run();
+
+    const restored = await app().request(
+      `/api/operations/incidents/${stopped.data.incident.id}/restore`,
+      restoreRequest(stopped.data.incident.id, stopped.data.control.version, 'restore-partial', 'step-up-restore'),
+      bindings(),
+    );
+    expect(restored.status).toBe(200);
+    expect(await restored.json()).toMatchObject({
+      success: true,
+      data: {
+        status: 'partial',
+        control: { states: { broadcast_dispatch: 'stopped', scenario_dispatch: 'running' } },
+        report: { resumed: ['scenario_dispatch'], remaining: ['broadcast_dispatch'] },
+      },
+    });
+    // incidentは停止中のまま
+    const incident = await app().request(
+      `/api/operations/incidents/${stopped.data.incident.id}`, {}, bindings(),
+    );
+    expect(await incident.json()).toMatchObject({ data: { status: 'stopped' } });
+  });
+
+  it('全ての能力がずれているときは409で理由を返し、直せば同じキーで再試行できる', async () => {
+    addBroadcast('b-1');
+    const stopped = await stopNow(['broadcast_dispatch']);
+    testDb.raw.prepare(`UPDATE broadcasts SET title = 'edited', lock_version = lock_version + 1 WHERE id = 'b-1'`).run();
+
+    const blocked = await app().request(
+      `/api/operations/incidents/${stopped.data.incident.id}/restore`,
+      restoreRequest(stopped.data.incident.id, stopped.data.control.version, 'restore-blocked', 'step-up-restore'),
+      bindings(),
+    );
+    expect(blocked.status).toBe(409);
+    const blockedBody = await blocked.json() as {
+      code: string;
+      data: { report: { drift: { capabilities: Array<{ capability: string; drift: Array<{ kind: string }> }> } } };
+    };
+    expect(blockedBody.code).toBe('OPERATION_RESTORE_BLOCKED');
+    expect(blockedBody.data.report.drift.capabilities[0].drift).toEqual([
+      expect.objectContaining({ kind: 'changed' }),
+    ]);
+    // 制御状態もincidentも変えない
+    const control = await app().request('/api/operations/control?account_id=account-1', {}, bindings());
+    expect(await control.json()).toMatchObject({
+      data: { states: { broadcast_dispatch: 'stopped' }, activeIncidentId: stopped.data.incident.id },
+    });
+
+    // 運用者が対象を下書きへ戻す（=稼働対象から外れる）と、同じキーの再試行が復旧できる
+    testDb.raw.prepare(`UPDATE broadcasts SET status = 'draft', scheduled_at = NULL WHERE id = 'b-1'`).run();
+    const retry = await app().request(
+      `/api/operations/incidents/${stopped.data.incident.id}/restore`,
+      restoreRequest(stopped.data.incident.id, stopped.data.control.version, 'restore-blocked', 'step-up-restore-b'),
+      bindings(),
+    );
+    expect(retry.status).toBe(200);
+    expect(await retry.json()).toMatchObject({ data: { status: 'restored', incident: { status: 'resolved' } } });
+  });
+
+  it('期限切れの予約は下書きへ戻し、復旧しても過去時刻を送らせない', async () => {
+    addBroadcast('b-expired');
+    const stopped = await stopNow(['broadcast_dispatch']);
+    testDb.raw.prepare(`UPDATE broadcasts SET scheduled_at = '2000-01-01T00:00:00.000Z' WHERE id = 'b-expired'`).run();
+
+    const restored = await app().request(
+      `/api/operations/incidents/${stopped.data.incident.id}/restore`,
+      restoreRequest(stopped.data.incident.id, stopped.data.control.version, 'restore-expired', 'step-up-restore'),
+      bindings(),
+    );
+    expect(restored.status).toBe(200);
+    expect(await restored.json()).toMatchObject({
+      data: { status: 'restored', report: { heldExpired: [{ id: 'b-expired' }] } },
+    });
+    expect(testDb.raw.prepare(`SELECT status FROM broadcasts WHERE id = 'b-expired'`).get())
+      .toMatchObject({ status: 'draft' });
+  });
+
+  it('復旧の冪等再実行は完了済みの結果をそのまま返し、別内容の同キーは拒否する', async () => {
+    const stopped = await stopNow(['broadcast_dispatch']);
+    const incidentId = stopped.data.incident.id;
+    const version = stopped.data.control.version;
+
+    const first = await app().request(
+      `/api/operations/incidents/${incidentId}/restore`,
+      restoreRequest(incidentId, version, 'restore-same', 'step-up-restore'),
+      bindings(),
+    );
+    expect(first.status).toBe(200);
+
+    // 同じ内容の再実行は step-up 不要で前回の結果を返す
+    const replay = await app().request(
+      `/api/operations/incidents/${incidentId}/restore`,
+      restoreRequest(incidentId, version, 'restore-same', 'no-step-up-needed'),
+      bindings(),
+    );
+    expect(replay.status).toBe(200);
+    // N-451: 再実行でも最初の検査結果（report）を返す。落とすと画面が成功と誤認する。
+    expect(await replay.json()).toMatchObject({
+      duplicate: true,
+      data: {
+        status: 'restored',
+        incident: { id: incidentId, status: 'resolved' },
+        report: { resumed: ['broadcast_dispatch'], remaining: [] },
+      },
+    });
+
+    // 同じキーで別内容（別の版）は拒否する
+    const other = await app().request(
+      `/api/operations/incidents/${incidentId}/restore`,
+      restoreRequest(incidentId, version + 1, 'restore-same', 'step-up-restore-b'),
+      bindings(),
+    );
+    expect(other.status).toBe(409);
+    expect(await other.json()).toMatchObject({ code: 'IDEMPOTENCY_CONFLICT' });
   });
 });
 

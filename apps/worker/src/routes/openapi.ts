@@ -2179,6 +2179,21 @@ const spec = {
         },
       },
     },
+    '/api/operations/incidents/{id}/restore-preview': {
+      post: {
+        tags: ['Operations'],
+        summary: '復旧前に停止中の定義変更・追加・削除・期限切れを検査する',
+        description: '停止時に保存した定義の版・期限の指紋と現在の定義を比較し、能力ごとの再開可否と理由を返す。読み取り専用。',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: {
+          '200': { description: '能力ごとのdrift検査結果（unchanged/changed/deleted/inactive/added/expired）' },
+          '403': { description: 'owner/adminではない、緊急操作権限がない、またはアカウント範囲外' },
+          '404': { description: '緊急操作の記録が存在しない' },
+          '409': { description: '停止中のincidentではない' },
+          '500': { description: '検査失敗' },
+        },
+      },
+    },
     // ── AI development reports ──────────────────────────────────────────────
     '/api/integrations/ai-loop/reports': {
       post: {
