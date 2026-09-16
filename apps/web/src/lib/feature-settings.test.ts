@@ -94,6 +94,14 @@ describe('機能設定とサイドメニューが同じ一覧を見る', () => {
     expect(SIDEBAR_FEATURE_BY_HREF['/webhooks']).toBe('external_integrations')
     expect(SIDEBAR_FEATURE_BY_HREF['/events']).toBe('events')
     expect(SIDEBAR_FEATURE_BY_HREF['/booking/bookings']).toBe('booking')
+    expect(SIDEBAR_FEATURE_BY_HREF['/booking/menus']).toBe('booking')
+    const used = MENU_SECTIONS.flatMap((section) => section.items.map((item) => item.featureKey))
+    expect(used).not.toEqual(expect.arrayContaining([
+      'reservation_ledger',
+      'multi_store_bulk_updates',
+      'external_reservations',
+      'google_business_profile',
+    ]))
   })
 })
 
