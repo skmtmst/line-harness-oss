@@ -701,10 +701,48 @@ export type OperationIncident = {
   stoppedSnapshot: OperationControlSnapshot | null
   restoredSnapshot: OperationControlSnapshot | null
   errorMessage: string | null
+  /** N-451: 停止時に記録した定義の指紋（版・期限）。旧incidentはnull。 */
+  stoppedDefinitionsJson: string | null
+  /** N-451: 直近の復旧試行の検査結果。 */
+  restoreReportJson: string | null
   stoppedAt: string | null
   resolvedAt: string | null
   createdAt: string
   updatedAt: string
+}
+
+/** N-451: 復旧前検査で見つかった1件のずれ。 */
+export type OperationDriftKind = 'changed' | 'deleted' | 'inactive' | 'added' | 'expired'
+
+export type OperationDefinitionDrift = {
+  id: string
+  kind: OperationDriftKind
+  beforeVersion: string | null
+  currentVersion: string | null
+  currentStatus: string | null
+  expiresAt: string | null
+}
+
+export type OperationCapabilityDrift = {
+  capability: OperationCapability
+  unchanged: string[]
+  drift: OperationDefinitionDrift[]
+  blocked: boolean
+}
+
+export type OperationRestoreDrift = {
+  accountInactive: boolean
+  capabilities: OperationCapabilityDrift[]
+  resumable: OperationCapability[]
+  expired: { capability: OperationCapability; id: string; expiresAt: string | null }[]
+}
+
+export type OperationRestoreReport = {
+  evaluatedAt: string
+  drift: OperationRestoreDrift
+  resumed: OperationCapability[]
+  heldExpired: { capability: OperationCapability; id: string; expiresAt: string | null }[]
+  remaining: OperationCapability[]
 }
 
 export type OperationHealthCheckKey =
@@ -9721,8 +9759,15 @@ export const api = {
         body: JSON.stringify(input),
       },
     ),
+    restorePreview: (incidentId: string) =>
+      fetchApi<ApiResponse<{
+        incidentId: string
+        status: OperationIncident['status']
+        capabilities: OperationCapability[]
+        drift: OperationRestoreDrift
+      }>>(`/api/operations/incidents/${encodeURIComponent(incidentId)}/restore-preview`, { method: 'POST' }),
     restore: (incidentId: string, input: { confirmation: '復旧'; expectedVersion: number }, stepUpToken: string, idempotencyKey: string) =>
-      fetchApi<ApiResponse<{ status: 'changed'; control: OperationControl; incident: OperationIncident }>>(
+      fetchApi<ApiResponse<{ status: 'restored' | 'partial'; control: OperationControl; incident: OperationIncident; report: OperationRestoreReport | null }>>(
         `/api/operations/incidents/${encodeURIComponent(incidentId)}/restore`,
         {
           method: 'POST',
