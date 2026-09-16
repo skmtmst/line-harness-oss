@@ -50,10 +50,15 @@ vi.mock('@line-crm/db', () => ({
   }),
   getStaffByLineUserId: vi.fn(async (_db: unknown, lineUserId: string) => {
     if (lineUserId !== 'authorized-line-user') return null;
-    return { id: 'staff-1', name: 'Staff One', role: 'admin', is_active: 1 };
+    // 管理者束はTOTP必須のため、セッション発行の確認は必須でない役割で行う（N-426）。
+    return { id: 'staff-1', name: 'Staff One', role: 'staff', is_active: 1 };
   }),
   createAdminSession: vi.fn(async () => undefined),
   createTwoFactorChallenge: vi.fn(async () => undefined),
+  // N-426: 実装と同じ判定（owner/admin かつ閲覧専用でない人はMFA必須）。
+  staffRequiresMfa: vi.fn((row: { role: string; access_level?: string }) =>
+    (row.role === 'owner' || row.role === 'admin') && row.access_level !== 'read_only'),
+  activatePlatformAdminIfAwaitingTotp: vi.fn(async () => false),
   deleteExpiredTwoFactorChallenges: vi.fn(async () => undefined),
   getTwoFactorChallenge: vi.fn(async () => null),
   getStaffById: vi.fn(async () => null),
@@ -198,7 +203,8 @@ describe('admin login cookie attributes', () => {
     expect(session).toContain('HttpOnly');
     expect(session).toContain('Secure');
     expect(session).toContain('SameSite=None');
-    expect(session).toContain('Max-Age=604800');
+    // 既定は8時間（N-434）。「記憶する」選択時だけ7日。
+    expect(session).toContain('Max-Age=28800');
 
     const csrf = cookieFor(res, 'lh_csrf') ?? '';
     expect(csrf).toContain(`lh_csrf=${body.csrfToken}`);
@@ -292,6 +298,7 @@ describe('Authenticator verification', () => {
     const masterKey = 'test-master-key-which-is-longer-than-32-characters';
     vi.mocked(db.getTwoFactorChallenge).mockResolvedValueOnce({
       token_hash: 'hash', staff_id: 'staff-1', expires_at: new Date(Date.now() + 60_000).toISOString(), attempts: 0, created_at: new Date().toISOString(),
+      purpose: 'verify', remember: 0,
     });
     vi.mocked(db.getStaffById).mockResolvedValueOnce({
       id: 'staff-1', name: 'Staff One', email: 'staff@example.com', role: 'admin', access_level: 'full', api_key: 'hidden', line_user_id: 'U1', is_active: 1,

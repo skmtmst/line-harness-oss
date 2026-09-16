@@ -10,8 +10,12 @@ export const ADMIN_SESSION_BEARER_PREFIX = 'lh_session:';
 export const CSRF_COOKIE = 'lh_csrf';
 export const CSRF_HEADER = 'x-csrf-token';
 
-// 7 days, matching the previous localStorage session longevity.
-export const SESSION_MAX_AGE = 604800;
+// 既定は 8 時間（要件 v6-30 §10）。利用者が明示して「記憶する」を選んだ
+// ときだけ 7 日にする。cookie の Max-Age と admin_sessions.expires_at は
+// 必ずこの同じ秒数から作り、ブラウザ側とサーバー側の期限を一致させる。
+export const SESSION_DEFAULT_MAX_AGE = 8 * 60 * 60;
+export const SESSION_REMEMBER_MAX_AGE = 7 * 24 * 60 * 60;
+export const SESSION_MAX_AGE = SESSION_REMEMBER_MAX_AGE;
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
@@ -85,8 +89,8 @@ function buildCookie(
 }
 
 /** HttpOnly session cookie carrying the API token. */
-export function adminSessionCookie(token: string, sameSite: AdminSameSite): string {
-  return buildCookie(ADMIN_AUTH_COOKIE, token, sameSite, SESSION_MAX_AGE, true);
+export function adminSessionCookie(token: string, sameSite: AdminSameSite, maxAge = SESSION_DEFAULT_MAX_AGE): string {
+  return buildCookie(ADMIN_AUTH_COOKIE, token, sameSite, maxAge, true);
 }
 
 /**
@@ -97,8 +101,8 @@ export function adminSessionCookie(token: string, sameSite: AdminSameSite): stri
  * header against this cookie, which the browser does send back to the API
  * (SameSite=None).
  */
-export function csrfCookie(token: string, sameSite: AdminSameSite): string {
-  return buildCookie(CSRF_COOKIE, token, sameSite, SESSION_MAX_AGE, false);
+export function csrfCookie(token: string, sameSite: AdminSameSite, maxAge = SESSION_DEFAULT_MAX_AGE): string {
+  return buildCookie(CSRF_COOKIE, token, sameSite, maxAge, false);
 }
 
 export function expiredCookie(name: string, sameSite: AdminSameSite): string {
@@ -350,6 +354,9 @@ export function isPublicApiBoundary(method: string, path: string): boolean {
     path === '/api/auth/line' ||
     path === '/api/auth/line/callback' ||
     path === '/api/auth/two-factor/verify' ||
+    // TOTP未登録の管理者の初回設定。合言葉で本人確認する公開経路（N-426）。
+    path === '/api/auth/two-factor/setup' ||
+    path === '/api/auth/two-factor/setup/confirm' ||
     // 会員登録・メールログイン・パスワード再設定。Turnstile と回数制限で守る。
     /^\/api\/auth\/(register|password|ops-invite)\//.test(path) ||
     /^\/api\/staff\/invitations\/[^/]+\/verify$/.test(path) ||

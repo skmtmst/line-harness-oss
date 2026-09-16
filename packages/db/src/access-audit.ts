@@ -99,6 +99,17 @@ function roleBundleFor(row: Pick<StaffAccessRow, 'role' | 'access_level'>): Acce
   return 'operations';
 }
 
+/**
+ * その権限者に二段階認証の登録を義務づけるか。
+ *
+ * 役割束カタログ（ACCESS_ROLE_BUNDLES）で requiresMfa の束に入る人だけを
+ * 対象にする。現状は「管理者」（owner/admin かつ閲覧専用でない人）。
+ */
+export function staffRequiresMfa(row: Pick<StaffAccessRow, 'role' | 'access_level'>): boolean {
+  const bundle = ACCESS_ROLE_BUNDLES.find((item) => item.id === roleBundleFor(row));
+  return bundle?.requiresMfa === true;
+}
+
 function statusFor(row: Pick<StaffAccessRow, 'is_active' | 'invite_status' | 'invite_expires_at'>, now: string): AccessUserStatus {
   if (row.invite_status === 'pending_email' || row.invite_status === 'pending_line') {
     if (row.invite_expires_at && Date.parse(row.invite_expires_at) <= Date.parse(now)) return 'expired';

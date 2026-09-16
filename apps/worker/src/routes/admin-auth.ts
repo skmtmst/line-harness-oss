@@ -5,6 +5,8 @@ import {
   ADMIN_AUTH_COOKIE,
   ADMIN_SESSION_BEARER_PREFIX,
   CSRF_COOKIE,
+  SESSION_DEFAULT_MAX_AGE,
+  SESSION_REMEMBER_MAX_AGE,
   adminSessionCookie,
   adminSessionTokenFromCookie,
   authenticateApiToken,
@@ -13,10 +15,11 @@ import {
   expiredCookie,
   sha256Hex,
 } from '../middleware/auth.js';
-import { clientIp, issueSession, randomToken, startTwoFactorChallenge, twoFactorLoginUrl, twoFactorRequired } from '../services/admin-session.js';
+import { clientIp, issueSession, randomToken, startTwoFactorChallenge, twoFactorLoginUrl, twoFactorRequired, twoFactorSetupUrl } from '../services/admin-session.js';
 import { resolveAdminAuthConfig } from '../middleware/admin-auth-config.js';
 import { recordLoginAudit } from '@line-crm/db';
 import {
+  activatePlatformAdminIfAwaitingTotp,
   claimStaffTotpStep,
   createStepUpGrant,
   deleteAdminSession,
@@ -30,9 +33,10 @@ import {
   getTwoFactorChallenge,
   incrementTwoFactorChallengeAttempts,
   reserveStepUpAttempt,
+  staffRequiresMfa,
   updateStaffMember,
 } from '@line-crm/db';
-import { decryptTotpSecret, verifyTotp } from '../lib/totp.js';
+import { buildTotpUri, decryptTotpSecret, encryptTotpSecret, generateTotpSecret, verifyTotp } from '../lib/totp.js';
 import { toImpersonationContext } from '../middleware/impersonation.js';
 import { candidateFromStaffRow, isPlatformAdmin, isPlatformAdminRow } from '../middleware/platform-admin.js';
 
@@ -44,6 +48,8 @@ const OAUTH_VERIFIER_COOKIE = 'lh_line_verifier';
 const OAUTH_INVITE_COOKIE = 'lh_line_invite';
 /** ログイン後の戻り先。'ops' のときだけ運営コンソールへ（★V6 37-1）。 */
 const OAUTH_NEXT_COOKIE = 'lh_line_next';
+/** 「7日間ログインを保持」の選択をOAuth往復のあいだ保持するための印。 */
+const OAUTH_REMEMBER_COOKIE = 'lh_line_remember';
 const OAUTH_MAX_AGE = 600;
 const TWO_FACTOR_MAX_ATTEMPTS = 5;
 const STEP_UP_ATTEMPT_LIMIT_ERROR = '入力回数を超えました。しばらく待ってからやり直してください';
@@ -95,6 +101,7 @@ adminAuth.get('/api/auth/line', async (c) => {
   if (invite) c.header('Set-Cookie', oauthCookie(OAUTH_INVITE_COOKIE, invite), { append: true });
   const next = c.req.query('next');
   if (next === 'ops') c.header('Set-Cookie', oauthCookie(OAUTH_NEXT_COOKIE, next), { append: true });
+  if (c.req.query('remember') === '1') c.header('Set-Cookie', oauthCookie(OAUTH_REMEMBER_COOKIE, '1'), { append: true });
 
   const authorize = new URL('https://access.line.me/oauth2/v2.1/authorize');
   authorize.search = new URLSearchParams({
@@ -117,10 +124,11 @@ adminAuth.get('/api/auth/line/callback', async (c) => {
   const verifier = readCookie(cookies, OAUTH_VERIFIER_COOKIE);
   const invite = readCookie(cookies, OAUTH_INVITE_COOKIE);
   const next = readCookie(cookies, OAUTH_NEXT_COOKIE);
+  const remember = readCookie(cookies, OAUTH_REMEMBER_COOKIE) === '1';
   const state = c.req.query('state');
   const code = c.req.query('code');
 
-  for (const name of [OAUTH_STATE_COOKIE, OAUTH_NONCE_COOKIE, OAUTH_VERIFIER_COOKIE, OAUTH_INVITE_COOKIE, OAUTH_NEXT_COOKIE]) {
+  for (const name of [OAUTH_STATE_COOKIE, OAUTH_NONCE_COOKIE, OAUTH_VERIFIER_COOKIE, OAUTH_INVITE_COOKIE, OAUTH_NEXT_COOKIE, OAUTH_REMEMBER_COOKIE]) {
     c.header('Set-Cookie', oauthCookie(name, '', 0), { append: true });
   }
 
@@ -203,10 +211,17 @@ adminAuth.get('/api/auth/line/callback', async (c) => {
     // 向けは 2 要素の確認を省く（要件 §3 37-1・9 章「要確認」）。
     if (next !== 'ops' && twoFactorRequired(staff)) {
       if (!c.env.TOTP_ENCRYPTION_KEY) return c.redirect(adminLoginUrl(c, 'configuration_error'));
-      const challengeToken = await startTwoFactorChallenge(c, staff.id);
+      const challengeToken = await startTwoFactorChallenge(c, staff.id, { purpose: 'verify', remember });
       return c.redirect(twoFactorLoginUrl(c, challengeToken));
     }
-    const session = await issueSession(c, staff.id, config.sameSite);
+    // 管理者束（owner/admin・閲覧専用でない）はTOTP登録が必須。未登録のまま
+    // 通常セッションは渡さず、設定専用の合言葉だけを返す（N-426）。
+    if (next !== 'ops' && staffRequiresMfa(staff)) {
+      if (!c.env.TOTP_ENCRYPTION_KEY) return c.redirect(adminLoginUrl(c, 'configuration_error'));
+      const challengeToken = await startTwoFactorChallenge(c, staff.id, { purpose: 'setup', remember });
+      return c.redirect(twoFactorSetupUrl(c, challengeToken));
+    }
+    const session = await issueSession(c, staff.id, config.sameSite, remember);
     const adminUrl = new URL(c.env.ADMIN_PUBLIC_URL!.replace(/\/+$/, ''));
     if (next === 'ops') adminUrl.pathname = `${adminUrl.pathname.replace(/\/+$/, '')}/ops`;
     if (config.crossSite) {
@@ -239,7 +254,7 @@ adminAuth.post('/api/auth/two-factor/verify', async (c) => {
 
   const tokenHash = await sha256Hex(challengeToken);
   const challenge = await getTwoFactorChallenge(c.env.DB, tokenHash);
-  if (!challenge || Date.parse(challenge.expires_at) <= Date.now()) {
+  if (!challenge || challenge.purpose !== 'verify' || Date.parse(challenge.expires_at) <= Date.now()) {
     if (challenge) await deleteTwoFactorChallenge(c.env.DB, tokenHash);
     return c.json({ success: false, error: '認証の有効時間が切れました。LINEログインからやり直してください' }, 401);
   }
@@ -273,7 +288,7 @@ adminAuth.post('/api/auth/two-factor/verify', async (c) => {
     return c.json({ success: false, error: 'この認証コードは使用済みです。次のコードを入力してください' }, 409);
   }
   await deleteTwoFactorChallenge(c.env.DB, tokenHash);
-  const session = await issueSession(c, staff.id, config.sameSite);
+  const session = await issueSession(c, staff.id, config.sameSite, challenge.remember === 1);
   await recordLoginAudit(c.env.DB, {
     adminUserId: staff.id,
     action: 'login',
@@ -284,6 +299,120 @@ adminAuth.post('/api/auth/two-factor/verify', async (c) => {
     success: true,
     // Same-site deployments keep the credential HttpOnly. Only the documented
     // cross-site fallback hands the opaque session token to the SPA.
+    data: { sessionToken: config.crossSite ? session.sessionToken : undefined },
+    csrfToken: session.csrfToken,
+  });
+});
+
+/**
+ * POST /api/auth/two-factor/setup — TOTP未登録の管理者向けの初回設定を始める。
+ *
+ * 通常セッションを持てない人が通るため、認証済みセッションではなく
+ * setup 用途の合言葉だけで開ける。登録用の秘密をその場で発行して
+ * provisioning URI を返す。
+ */
+adminAuth.post('/api/auth/two-factor/setup', async (c) => {
+  const body = await c.req.json<{ challengeToken?: string }>()
+    .catch(() => ({} as { challengeToken?: string }));
+  const challengeToken = body.challengeToken?.trim() ?? '';
+  if (!challengeToken) {
+    return c.json({ success: false, error: '設定の合言葉がありません。ログインからやり直してください' }, 400);
+  }
+
+  const tokenHash = await sha256Hex(challengeToken);
+  const challenge = await getTwoFactorChallenge(c.env.DB, tokenHash);
+  if (!challenge || challenge.purpose !== 'setup' || Date.parse(challenge.expires_at) <= Date.now()) {
+    if (challenge) await deleteTwoFactorChallenge(c.env.DB, tokenHash);
+    return c.json({ success: false, error: '設定の有効時間が切れました。ログインからやり直してください' }, 401);
+  }
+
+  const staff = await getStaffById(c.env.DB, challenge.staff_id);
+  const masterKey = c.env.TOTP_ENCRYPTION_KEY;
+  if (!staff?.is_active || !masterKey) {
+    return c.json({ success: false, error: '二段階認証を設定できません' }, 401);
+  }
+  if (staff.totp_enabled_at && staff.totp_secret_enc) {
+    return c.json({ success: false, error: '二段階認証はすでに設定されています' }, 409);
+  }
+
+  const secret = generateTotpSecret();
+  await updateStaffMember(c.env.DB, staff.id, {
+    totp_pending_secret_enc: await encryptTotpSecret(secret, masterKey),
+  });
+  return c.json({
+    success: true,
+    data: {
+      provisioningUri: buildTotpUri(secret, staff.email || staff.name),
+      manualKey: secret.match(/.{1,4}/g)?.join(' ') ?? secret,
+    },
+  });
+});
+
+/**
+ * POST /api/auth/two-factor/setup/confirm — 初回設定の確認。
+ *
+ * 認証アプリの6桁が合えばTOTPを有効にし、そのまま通常セッションを発行する。
+ * 試行は合言葉ごとに5回まで。
+ */
+adminAuth.post('/api/auth/two-factor/setup/confirm', async (c) => {
+  const body = await c.req.json<{ challengeToken?: string; code?: string }>()
+    .catch(() => ({} as { challengeToken?: string; code?: string }));
+  const challengeToken = body.challengeToken?.trim() ?? '';
+  const code = body.code?.trim() ?? '';
+  if (!challengeToken || !/^\d{6}$/.test(code)) {
+    return c.json({ success: false, error: '6桁の認証コードを入力してください' }, 400);
+  }
+
+  const tokenHash = await sha256Hex(challengeToken);
+  const challenge = await getTwoFactorChallenge(c.env.DB, tokenHash);
+  if (!challenge || challenge.purpose !== 'setup' || Date.parse(challenge.expires_at) <= Date.now()) {
+    if (challenge) await deleteTwoFactorChallenge(c.env.DB, tokenHash);
+    return c.json({ success: false, error: '設定の有効時間が切れました。ログインからやり直してください' }, 401);
+  }
+  if (challenge.attempts >= TWO_FACTOR_MAX_ATTEMPTS) {
+    await deleteTwoFactorChallenge(c.env.DB, tokenHash);
+    return c.json({ success: false, error: '入力回数を超えました。ログインからやり直してください' }, 429);
+  }
+
+  const staff = await getStaffById(c.env.DB, challenge.staff_id);
+  const masterKey = c.env.TOTP_ENCRYPTION_KEY;
+  if (!staff?.is_active || !staff.totp_pending_secret_enc || !masterKey) {
+    return c.json({ success: false, error: '二段階認証を確認できません' }, 401);
+  }
+
+  const verified = await verifyTotp(
+    await decryptTotpSecret(staff.totp_pending_secret_enc, masterKey),
+    code,
+    Date.now(),
+  );
+  if (!verified.valid || verified.step === null) {
+    await incrementTwoFactorChallengeAttempts(c.env.DB, tokenHash);
+    return c.json({ success: false, error: '認証コードが正しくありません' }, 400);
+  }
+
+  const config = resolveAdminAuthConfig(c.env, { requestOrigin: new URL(c.req.url).origin });
+  if (config.misconfigured) return c.json({ success: false, error: config.misconfigured }, 500);
+
+  const updated = await updateStaffMember(c.env.DB, staff.id, {
+    totp_secret_enc: staff.totp_pending_secret_enc,
+    totp_pending_secret_enc: null,
+    totp_enabled_at: new Date().toISOString(),
+    // 登録に使ったコードをそのまま次のログインへ使い回せないよう刻む。
+    totp_last_used_step: verified.step,
+  });
+  if (!updated) return c.json({ success: false, error: '二段階認証を確認できません' }, 401);
+  await activatePlatformAdminIfAwaitingTotp(c.env.DB, staff.id);
+  await deleteTwoFactorChallenge(c.env.DB, tokenHash);
+
+  const session = await issueSession(c, staff.id, config.sameSite, challenge.remember === 1);
+  await recordLoginAudit(c.env.DB, {
+    adminUserId: staff.id,
+    action: 'login',
+    ip: clientIp(c),
+    userAgent: c.req.header('user-agent') ?? null,
+  });
+  return c.json({
+    success: true,
     data: { sessionToken: config.crossSite ? session.sessionToken : undefined },
     csrfToken: session.csrfToken,
   });
@@ -357,9 +486,10 @@ adminAuth.post('/api/auth/login', async (c) => {
   }
 
   const body = await c.req
-    .json<{ apiKey?: string }>()
-    .catch(() => ({}) as { apiKey?: string });
+    .json<{ apiKey?: string; remember?: boolean }>()
+    .catch(() => ({}) as { apiKey?: string; remember?: boolean });
   const apiKey = body.apiKey?.trim() ?? '';
+  const remember = body.remember === true;
   const staff = await authenticateApiToken(c, apiKey || null);
 
   if (!staff) {
@@ -378,10 +508,24 @@ adminAuth.post('/api/auth/login', async (c) => {
   if (staff.id === 'env-owner') {
     // Emergency recovery only. The normal UI never asks for or exposes this key.
     csrfToken = crypto.randomUUID();
-    c.header('Set-Cookie', adminSessionCookie(apiKey, config.sameSite), { append: true });
-    c.header('Set-Cookie', csrfCookie(csrfToken, config.sameSite), { append: true });
+    const maxAge = remember ? SESSION_REMEMBER_MAX_AGE : SESSION_DEFAULT_MAX_AGE;
+    c.header('Set-Cookie', adminSessionCookie(apiKey, config.sameSite, maxAge), { append: true });
+    c.header('Set-Cookie', csrfCookie(csrfToken, config.sameSite, maxAge), { append: true });
   } else {
-    csrfToken = (await issueSession(c, staff.id, config.sameSite)).csrfToken;
+    // APIキー経由でも管理者のMFA必須は迂回できない。セッション発行前に
+    // 二段階認証の確認・初回設定のどちらかへ回す（N-426）。
+    const staffRow = await getStaffById(c.env.DB, staff.id);
+    if (staffRow && twoFactorRequired(staffRow)) {
+      if (!c.env.TOTP_ENCRYPTION_KEY) return c.json({ success: false, error: '二段階認証の設定に不備があります' }, 500);
+      const challengeToken = await startTwoFactorChallenge(c, staff.id, { purpose: 'verify', remember });
+      return c.json({ success: true, data: { twoFactor: true, challengeToken } });
+    }
+    if (staffRow && staffRequiresMfa(staffRow)) {
+      if (!c.env.TOTP_ENCRYPTION_KEY) return c.json({ success: false, error: '二段階認証の設定に不備があります' }, 500);
+      const challengeToken = await startTwoFactorChallenge(c, staff.id, { purpose: 'setup', remember });
+      return c.json({ success: true, data: { twoFactorSetup: true, challengeToken } });
+    }
+    csrfToken = (await issueSession(c, staff.id, config.sameSite, remember)).csrfToken;
   }
   await recordLoginAudit(c.env.DB, {
     adminUserId: staff.id,

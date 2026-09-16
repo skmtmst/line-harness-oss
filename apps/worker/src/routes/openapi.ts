@@ -380,6 +380,20 @@ const spec = {
         responses: { '200': { description: 'Password updated and session issued' }, '400': { description: 'Invalid or expired token' } },
       },
     },
+    '/api/auth/two-factor/setup': {
+      post: {
+        tags: ['Auth'], summary: 'TOTP未登録の管理者向けに二段階認証の初回設定を開始', security: [],
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['challengeToken'], properties: { challengeToken: { type: 'string' } } } } } },
+        responses: { '200': { description: 'provisioningUri and manualKey issued' }, '400': { description: 'Missing challenge token' }, '401': { description: 'Invalid or expired setup challenge' }, '409': { description: 'TOTP already configured' } },
+      },
+    },
+    '/api/auth/two-factor/setup/confirm': {
+      post: {
+        tags: ['Auth'], summary: '二段階認証の初回設定を確認してセッションを発行', security: [],
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['challengeToken', 'code'], properties: { challengeToken: { type: 'string' }, code: { type: 'string' } } } } } },
+        responses: { '200': { description: 'TOTP enabled; session issued' }, '400': { description: 'Invalid code' }, '401': { description: 'Invalid or expired setup challenge' }, '429': { description: 'Attempt limit exceeded' } },
+      },
+    },
     '/api/auth/ops-invite/check': {
       get: {
         tags: ['Auth'], summary: '運営メンバーの招待を確認（★V6 37-10-A）', security: [],
