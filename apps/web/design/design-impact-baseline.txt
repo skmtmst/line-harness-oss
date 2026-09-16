@@ -55,6 +55,7 @@ shared-button-importer app/form-submissions/responses/page.tsx
 shared-button-importer app/friend-add-settings/friend-add-rule-editor.tsx
 shared-button-importer app/friend-add-settings/page.tsx
 shared-button-importer app/friend-add-settings/publish/page.tsx
+shared-button-importer app/friend-add-settings/runs/detail/page.tsx
 shared-button-importer app/friend-add-settings/runs/page.tsx
 shared-button-importer app/friends/detail/page.tsx
 shared-button-importer app/friends/identity-candidates/page.tsx
