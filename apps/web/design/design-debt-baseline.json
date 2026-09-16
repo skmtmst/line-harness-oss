@@ -859,5 +859,8 @@
   },
   "app/login/two-factor/setup/page.tsx": {
     "arbitrary-value": 1
+  },
+  "components/shared/step-up-dialog.tsx": {
+    "arbitrary-value": 1
   }
 }

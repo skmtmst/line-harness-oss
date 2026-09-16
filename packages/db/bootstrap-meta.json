@@ -372,7 +372,8 @@
     "411_platform_admin_invites.sql",
     "412_operation_incident_stopped_definitions.sql",
     "413_chat_quotes_and_scheduled_sends.sql",
-    "414_admin_two_factor_challenge_purpose.sql"
+    "414_admin_two_factor_challenge_purpose.sql",
+    "415_admin_session_device_info.sql"
   ],
-  "migrationCount": 373
+  "migrationCount": 374
 }

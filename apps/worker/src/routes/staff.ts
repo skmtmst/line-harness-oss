@@ -4,7 +4,7 @@ import {
   getStaffMembers, getStaffById, getStaffByInviteTokenHash,
   createStaffMember, updateStaffMember, deleteStaffMember, countLoginAudit, getLastLoginByStaff,
   getStaffAccountScopeIds, getStaffAccountScopeMap, replaceStaffAccountScopes, revokeStaffAuthentication,
-  reserveTwoFactorSetupAttempt, clearTwoFactorSetupAttempts,
+  reserveTwoFactorSetupAttempt, clearTwoFactorSetupAttempts, consumeStepUpGrant,
 } from '@line-crm/db';
 import type { StaffMember } from '@line-crm/db';
 import { requireRole } from '../middleware/role-guard.js';
@@ -20,6 +20,22 @@ const staff = new Hono<Env>();
 // 招待の有効期限は7日。要件 v6-30 §9-2・§17(既存の48時間招待はその期限のまま守り、新規・再送から7日)。
 const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const TWO_FACTOR_ATTEMPT_LIMIT_ERROR = '入力回数を超えました。しばらく待ってからやり直してください';
+
+/**
+ * 高危険な権限変更の直前再認証（N-427）。
+ *
+ * X-Step-Up-Token の grant は 5 分・1 回限り。消費は atomic なので
+ * 同じ token を 2 回使い回しても 2 回目は必ず失敗する。
+ */
+async function consumeStaffStepUp(c: { req: { header: (name: string) => string | undefined }; env: Env['Bindings']; get: (key: 'staff') => Env['Variables']['staff'] }, purpose: 'staff.permissions.change' | 'staff.two_factor.remove'): Promise<boolean> {
+  const token = c.req.header('X-Step-Up-Token')?.trim();
+  if (!token) return false;
+  return consumeStepUpGrant(c.env.DB, {
+    tokenHash: await sha256Hex(token),
+    staffId: c.get('staff').id,
+    purpose,
+  });
+}
 
 function invitationConfirmationUrl(c: { env: Env['Bindings']; req: { url: string } }, token: string): string {
   const base = c.env.ADMIN_PUBLIC_URL?.trim() || new URL(c.req.url).origin;
@@ -555,6 +571,20 @@ staff.patch('/api/staff/:id', async (c) => {
     return c.json({ success: false, error: '権限のないLINEアカウントは指定できません' }, 403);
   }
 
+  // 権限・利用状態・連携・見せる範囲の変更は乗っ取り悪用されやすい高危険操作。
+  // 判定は書き込みより前に行い、step-up無しならDBへ何も書かない（N-427）。
+  const authenticationPolicyChanged =
+    body.role !== undefined ||
+    body.isActive !== undefined ||
+    body.lineLinked === false ||
+    body.permissionKeys !== undefined ||
+    body.assignedLineAccountId !== undefined ||
+    body.canAccessDescendantAccounts !== undefined ||
+    body.accountScope !== undefined;
+  if (authenticationPolicyChanged && !await consumeStaffStepUp(c, 'staff.permissions.change')) {
+    return c.json({ success: false, error: '権限の変更には二段階認証による再認証が必要です', code: 'STEP_UP_REQUIRED' }, 428);
+  }
+
   const updated = await updateStaffMember(c.env.DB, id, {
     name: body.name, email: body.email,
     role: body.role === 'admin' ? 'admin' : body.role ? 'staff' : undefined,
@@ -576,14 +606,6 @@ staff.patch('/api/staff/:id', async (c) => {
   if (updated && accountScope.accountScope !== undefined) {
     await replaceStaffAccountScopes(c.env.DB, id, accountScope.scopedLineAccountIds);
   }
-  const authenticationPolicyChanged =
-    body.role !== undefined ||
-    body.isActive !== undefined ||
-    body.lineLinked === false ||
-    body.permissionKeys !== undefined ||
-    body.assignedLineAccountId !== undefined ||
-    body.canAccessDescendantAccounts !== undefined ||
-    body.accountScope !== undefined;
   if (updated && authenticationPolicyChanged) {
     await revokeStaffAuthentication(c.env.DB, id);
   }
@@ -659,6 +681,10 @@ staff.delete('/api/staff/:id/two-factor', async (c) => {
   const member = await getStaffById(c.env.DB, id);
   if (!member || !isInCurrentTenant(c, member)) return c.json({ success: false, error: 'Staff member not found' }, 404);
   if (!canEditMember(c, id)) return c.json({ success: false, error: '自分の二段階認証だけ解除できます' }, 403);
+  // 二段階認証の解除は本人・他人どちらでも高危険。解除後は対象の全セッションも切る（N-427）。
+  if (!await consumeStaffStepUp(c, 'staff.two_factor.remove')) {
+    return c.json({ success: false, error: '二段階認証の解除には再認証が必要です', code: 'STEP_UP_REQUIRED' }, 428);
+  }
   const updated = await updateStaffMember(c.env.DB, id, {
     totp_secret_enc: null,
     totp_pending_secret_enc: null,
@@ -676,6 +702,10 @@ staff.delete('/api/staff/:id', requireRole('owner', 'admin'), async (c) => {
   if (!target || !isInCurrentTenant(c, target)) return c.json({ success: false, error: 'Staff member not found' }, 404);
   const guard = await guardLastAdmin(c.env.DB, target, currentTenantId(c), { isActive: false, self: false });
   if (guard) return c.json({ success: false, error: guard }, 400);
+  // 利用停止は権限変更と同じ高危険操作として再認証を要求する（N-427）。
+  if (!await consumeStaffStepUp(c, 'staff.permissions.change')) {
+    return c.json({ success: false, error: 'スタッフの利用停止には二段階認証による再認証が必要です', code: 'STEP_UP_REQUIRED' }, 428);
+  }
   const updated = await updateStaffMember(c.env.DB, id, { is_active: 0 });
   await revokeStaffAuthentication(c.env.DB, id);
   return updated
