@@ -91,7 +91,11 @@ export default function Sidebar({
   const [sectionOrder, setSectionOrder] = useState<string[] | null>(null)
   /** 区分の中の項目の並び。機能設定の↑↓で決めたもの。 */
   const [itemOrder, setItemOrder] = useState<Record<string, string[]> | null>(null)
-  const [featureVisibility, setFeatureVisibility] = useState<Record<string, boolean>>({})
+  const [featureVisibility, setFeatureVisibility] = useState<Record<string, boolean> | null>(null)
+  /** 成功した可視性read-modelのaccount。切替直後に古い表示を使わない。 */
+  const [visibilityAccountId, setVisibilityAccountId] = useState<string | null>(null)
+  const [visibilityStatus, setVisibilityStatus] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [visibilityRetry, setVisibilityRetry] = useState(0)
   const [specializedFeatureKeys, setSpecializedFeatureKeys] = useState<string[]>([])
   const [currentSearch, setCurrentSearch] = useState('')
 
@@ -104,37 +108,43 @@ export default function Sidebar({
     return () => window.removeEventListener('popstate', sync)
   }, [pathname])
 
-  // 表示可否は全roleがstaff向けread-modelから読む。localStorageのroleは古い・
-  // 改ざん済みの可能性があるので、管理GETを選ぶ根拠にはしない。
+  // 表示可否は全roleがstaff向けread-modelから読む。未確認/失敗を「表示可」と
+  // みなすと別accountの任意機能を一瞬見せるので、必須ナビ以外はfail-closedにする。
   // owner/admin表示のときだけ、管理GETから保存済みの並びを追加で読む。
-  // 取れなくても既定の並び・表示で使えるので、失敗は握る。
   useEffect(() => {
     if (!selectedAccountId) {
       setSectionOrder(null)
       setItemOrder(null)
-      setFeatureVisibility({})
+      setFeatureVisibility(null)
+      setVisibilityAccountId(null)
+      setVisibilityStatus('ready')
       setSpecializedFeatureKeys([])
       return
     }
     let cancelled = false
+    const accountId = selectedAccountId
     const canManageFeatureSettings = staffRole === 'owner' || staffRole === 'admin'
+    setFeatureVisibility(null)
+    setVisibilityAccountId(null)
+    setVisibilityStatus('loading')
     const loadSettings = () => {
       void import('@/lib/api')
         .then(async ({ api }) => {
-          const visibility = await api.featureSettings.visibility(selectedAccountId)
+          const visibility = await api.featureSettings.visibility(accountId)
           const features = visibility.success ? visibility.data?.features : undefined
           if (!cancelled && isBooleanRecord(features)) {
             setSectionOrder(null)
             setItemOrder(null)
-            // 一時的に古いWorkerや試験用モックへ繋がっても、不正なread-modelを
-            // stateへ入れてサイドバーごと落とさない。直URLの可否はWorker側が正本。
             setFeatureVisibility(features)
-            // 専用機能の目録はbooleanへ畳み込み済み。名前の配列は受け取らない。
+            setVisibilityAccountId(accountId)
+            setVisibilityStatus('ready')
             setSpecializedFeatureKeys(SPECIALIZED_FEATURE_KEYS)
+          } else if (!cancelled) {
+            setVisibilityStatus('error')
           }
           if (!canManageFeatureSettings) return
           try {
-            const settings = await api.featureSettings.get(selectedAccountId)
+            const settings = await api.featureSettings.get(accountId)
             if (!cancelled && settings.success) {
               setSectionOrder(settings.data.sidebarOrder)
               setItemOrder(settings.data.sidebarItemOrder)
@@ -144,21 +154,22 @@ export default function Sidebar({
           }
         })
         .catch(() => {
-          // 設定が取れなくても、既定の並び・表示で使える。
+          if (!cancelled) setVisibilityStatus('error')
         })
     }
     loadSettings()
     const onSettingsUpdated = (event: Event) => {
       const accountId = (event as CustomEvent<{ accountId?: string }>).detail?.accountId
-      if (!accountId || accountId === selectedAccountId) loadSettings()
+      if (!accountId || accountId === selectedAccountId) setVisibilityRetry((current) => current + 1)
     }
     window.addEventListener(FEATURE_SETTINGS_UPDATED_EVENT, onSettingsUpdated)
     return () => {
       cancelled = true
       window.removeEventListener(FEATURE_SETTINGS_UPDATED_EVENT, onSettingsUpdated)
     }
-  }, [selectedAccountId, staffRole])
+  }, [selectedAccountId, staffRole, visibilityRetry])
   // 区分の中の並びを当ててから、区分そのものの並びを当てる。
+  const currentVisibility = visibilityAccountId === selectedAccountId ? featureVisibility : null
   const storeSections = orderedMenuSections(itemOrder)
   const normalizedSectionOrder = sectionOrder?.map((label) => label === 'NEN運用' ? '専用機能' : label)
   const orderedStoreSections = normalizedSectionOrder
@@ -184,14 +195,13 @@ export default function Sidebar({
         if (friendAttributesV2Mode && item.href === '/analytics') return false
         if (item.href === '/staff' && staffRole !== 'owner' && staffRole !== 'admin') return false
         if (item.href === '/accounts' && staffRole === 'staff') return false
-        if (staffRole === 'staff' && !staffPermissions.includes(item.href)) return false
+        // 失敗時にも必須ナビは残す。任意機能だけを権限・可視性で絞る。
+        if (staffRole === 'staff' && !item.required && !staffPermissions.includes(item.href)) return false
         const featureKey = SIDEBAR_FEATURE_BY_HREF[item.href]
-        if (
-          featureKey &&
-          SPECIALIZED_FEATURE_KEYS.includes(featureKey) &&
-          !specializedFeatureKeys.includes(featureKey)
-        ) return false
-        return !featureKey || featureVisibility[featureKey] !== false
+        if (!featureKey) return true
+        if (!currentVisibility || currentVisibility[featureKey] !== true) return false
+        if (SPECIALIZED_FEATURE_KEYS.includes(featureKey) && !specializedFeatureKeys.includes(featureKey)) return false
+        return true
       }),
     }))
     .filter((section) => section.items.length > 0)
@@ -370,6 +380,18 @@ export default function Sidebar({
 
       {/* ナビゲーション */}
       <nav className={`${styles.nav} ${preview ? 'overflow-hidden' : ''}`} data-design-node="J33xq">
+        {visibilityStatus === 'error' && selectedAccountId && (
+          <div className="mx-3 mb-2 rounded-control border border-warning bg-warning-bg px-3 py-2 text-xs text-ink-secondary">
+            <p>機能設定を読み込めませんでした。</p>
+            <button
+              type="button"
+              onClick={() => setVisibilityRetry((current) => current + 1)}
+              className="mt-1 cursor-pointer font-bold text-action underline"
+            >
+              もう一度読み込む
+            </button>
+          </div>
+        )}
         {visibleSections.map((section, si) => (
           <div key={si} className={styles.section}>
             {section.label && (
