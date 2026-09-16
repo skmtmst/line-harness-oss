@@ -168,7 +168,7 @@ const BROADCAST_ACCOUNT_SCOPE = `(b.line_account_id = ?
 const FORM_ACCOUNT_SCOPE = `EXISTS (SELECT 1 FROM form_accounts fa WHERE fa.form_id = f.id AND fa.line_account_id = ?)`;
 
 /**
- * 全33種の網羅表。切替対象の各機能が「何を数えるか」か
+ * 切替対象の網羅表。各機能が「何を数えるか」か
  * 「数えない理由」のどちらかを必ず持つ。FEATURE_CATALOGに機能を
  * 足したらここも足す。足さなければ型検査と契約テストが落ちる。
  *
@@ -401,22 +401,6 @@ export const FEATURE_IMPACT_COVERAGE: Readonly<Record<FeatureId, FeatureImpactCo
   multi_store_hierarchy: {
     scope: 'none',
     reason: '店舗束の構成設定で、待ち行を持たない',
-  },
-  multi_store_bulk_updates: {
-    scope: 'none',
-    reason: '一括更新の待ち行を表に持たない',
-  },
-  reservation_ledger: {
-    scope: 'none',
-    reason: '台帳の行にアカウント列がなく、アカウント単位で結び付けられない',
-  },
-  external_reservations: {
-    scope: 'none',
-    reason: '外部予約の待ち行を表に持たず、アカウント単位で結び付けられない',
-  },
-  google_business_profile: {
-    scope: 'none',
-    reason: '投稿の表にアカウント列がなく、アカウント単位で結び付けられない',
   },
   friend_fields: {
     scope: 'counted',
