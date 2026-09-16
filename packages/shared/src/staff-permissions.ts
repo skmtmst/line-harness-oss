@@ -36,6 +36,16 @@ export const ACCESS_USER_VIEW_KEY = 'access.user.view';
 export const ACCESS_AUDIT_VIEW_KEY = 'access.audit.view';
 
 /**
+ * 予約の細かい権限（N-411 / v6-30 §7-2「予約管理editでも予約設定は別permission」）。
+ * - `/booking/menus`: メニューと担当割当の編集・閲覧
+ * - `booking.settings`: 予約設定（受付枠・資源・例外・予約スタッフ登録）の変更
+ * - `booking.staff.own`: 本人に紐づく予約スタッフの勤務（シフト・休憩・連携）
+ */
+export const BOOKING_MENUS_KEY = '/booking/menus';
+export const BOOKING_SETTINGS_KEY = 'booking.settings';
+export const BOOKING_STAFF_OWN_KEY = 'booking.staff.own';
+
+/**
  * 「項目ごとに決める」の各行。keys は edit/view 両レベルで使う
  * permission key の集合（middleware の permissionForApiPath が返す値）。
  */
@@ -99,7 +109,31 @@ export const SCOPE_ITEMS: readonly ScopeItem[] = [
     label: '予約',
     note: '予約・イベントの受付',
     kind: 'feature',
-    keys: ['/booking/bookings', '/booking/menus', '/events'],
+    keys: ['/booking/bookings', '/events'],
+  },
+  {
+    id: 'booking_menus',
+    label: '予約メニュー',
+    note: 'メニューと担当の編集',
+    kind: 'feature',
+    keys: [BOOKING_MENUS_KEY],
+    hint: '予約の受付とは別に決められます',
+  },
+  {
+    id: 'booking_settings',
+    label: '予約設定',
+    note: '受付枠・資源・例外・予約スタッフ',
+    kind: 'feature',
+    keys: [BOOKING_SETTINGS_KEY],
+    hint: '予約の受付ができても設定は別権限です',
+  },
+  {
+    id: 'booking_own',
+    label: '本人の勤務',
+    note: '自分のシフト・休憩・外部連携',
+    kind: 'feature',
+    keys: [BOOKING_STAFF_OWN_KEY],
+    hint: '自分に紐づく予約スタッフだけを対象にします',
   },
   {
     id: 'analytics',
@@ -164,6 +198,9 @@ export const BUNDLE_PRESETS: Record<Exclude<AccessRoleBundleId, 'custom'>, Bundl
       delivery: 'edit',
       inbox: 'edit',
       booking: 'edit',
+      booking_menus: 'view',
+      booking_settings: 'view',
+      booking_own: 'edit',
       analytics: 'view',
       settings: 'none',
       operations: 'view',
@@ -177,6 +214,9 @@ export const BUNDLE_PRESETS: Record<Exclude<AccessRoleBundleId, 'custom'>, Bundl
       delivery: 'none',
       inbox: 'edit',
       booking: 'edit',
+      booking_menus: 'view',
+      booking_settings: 'view',
+      booking_own: 'edit',
       analytics: 'none',
       settings: 'none',
       operations: 'view',

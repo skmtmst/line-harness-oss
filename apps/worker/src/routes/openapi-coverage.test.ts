@@ -334,6 +334,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'POST /webhook',
   'PUT /api/booking/admin/settings',
   'PUT /api/affiliates/{id}',
+  'GET /api/booking/admin/staff/me',
   'PUT /api/booking/admin/staff-menus',
   'PUT /api/booking/admin/staff/{id}/break-dates',
   'PUT /api/booking/admin/staff/{id}/breaks',

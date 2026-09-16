@@ -40,7 +40,7 @@ describe('V6 予約スタッフ・受付時間の一覧状態', () => {
     expect(errorBranch).toBeGreaterThan(-1)
     expect(emptyBranch).toBeGreaterThan(errorBranch)
     expect(STAFF).toContain('登録したスタッフは消えていません。')
-    expect(STAFF).toContain("disabled={!selectedAccountId || loadStatus !== 'ready'}")
+    expect(STAFF).toContain("disabled={!canManageStaff || !selectedAccountId || loadStatus !== 'ready'}")
   })
 
   it('受付時間は読込失敗時に初期値の設定画面を出さない', () => {

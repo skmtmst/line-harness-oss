@@ -2,14 +2,16 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { BOOKING_STAFF_LIMITS, parseBookingStaffInput } from '@line-crm/shared'
+import { BOOKING_STAFF_LIMITS, parseBookingStaffInput, type StaffMember } from '@line-crm/shared'
 import ImageUploader from '@/components/shared/image-uploader'
+import Select from '@/components/shared/select'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import { bookingApi, type BookingStaff } from '@/lib/api'
+import { api, bookingApi, type BookingStaff } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import { canEditFeature } from '@/lib/staff-capability'
 
 const EMPTY: Partial<BookingStaff> = {
   name: '',
@@ -32,6 +34,8 @@ export default function BookingStaffPage() {
   const [loadStatus, setLoadStatus] = useState<LoadStatus>('loading')
   const [removeTarget, setRemoveTarget] = useState<BookingStaff | null>(null)
   const [deleting, setDeleting] = useState(false)
+  // N-411: 予約スタッフの登録・変更・削除は 'booking.settings' の実効permission。
+  const [canManageStaff, setCanManageStaff] = useState(false)
   const loadRequestRef = useRef(0)
 
   const load = useCallback(async () => {
@@ -55,6 +59,10 @@ export default function BookingStaffPage() {
       setLoadStatus('error')
     }
   }, [selectedAccountId])
+
+  useEffect(() => {
+    setCanManageStaff(canEditFeature('booking.settings'))
+  }, [])
 
   useEffect(() => {
     void load()
@@ -102,7 +110,8 @@ export default function BookingStaffPage() {
         <button
           data-design="Actions"
           onClick={() => setEditing(EMPTY)}
-          disabled={!selectedAccountId || loadStatus !== 'ready'}
+          disabled={!canManageStaff || !selectedAccountId || loadStatus !== 'ready'}
+          title={canManageStaff ? undefined : '予約設定の変更権限がありません'}
           className="bg-accent-deep text-on-accent rounded-control px-4 py-2 text-sm font-medium transition-colors hover:brightness-92 disabled:opacity-50"
         >
           + 新規スタッフ
@@ -178,11 +187,15 @@ export default function BookingStaffPage() {
                     </td>
                     <td className="px-4 py-3 text-right">
                       <div className="inline-flex gap-2 text-xs">
-                        <button onClick={() => setEditing(s)} className="text-blue-600 hover:underline">編集</button>
+                        {canManageStaff && (
+                          <button onClick={() => setEditing(s)} className="text-blue-600 hover:underline">編集</button>
+                        )}
                         <Link href={`/booking/staff/shifts?staff_id=${s.id}`} className="text-blue-600 hover:underline">
                           シフト
                         </Link>
-                        <button onClick={() => setRemoveTarget(s)} className="text-red-600 hover:underline">削除</button>
+                        {canManageStaff && (
+                          <button onClick={() => setRemoveTarget(s)} className="text-red-600 hover:underline">削除</button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -221,6 +234,18 @@ function Modal({
   const [form, setForm] = useState<Partial<BookingStaff>>(staff)
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState<string | null>(null)
+  // N-411 本人勤務: 予約スタッフをログインユーザーへ紐づけるための一覧。
+  const [members, setMembers] = useState<StaffMember[]>([])
+
+  useEffect(() => {
+    let cancelled = false
+    api.staff.list()
+      .then((res) => {
+        if (!cancelled && res.success) setMembers(res.data.filter((m) => m.isActive))
+      })
+      .catch(() => { /* 一覧が取れなくても紐づけ以外の編集は続けられる */ })
+    return () => { cancelled = true }
+  }, [])
 
   function set<K extends keyof BookingStaff>(k: K, v: BookingStaff[K]) {
     setForm((prev) => ({ ...prev, [k]: v }))
@@ -327,6 +352,21 @@ function Modal({
             />
             <span>有効（顧客に表示する）</span>
           </label>
+          <Field label="ログインユーザー（本人の勤務）">
+            <Select
+              aria-label="ログインユーザーとの紐づけ"
+              size="full"
+              value={form.staff_member_id ?? ''}
+              onChange={(v) => set('staff_member_id', v || null)}
+              options={[
+                { value: '', label: '紐づけない' },
+                ...members.map((m) => ({ value: m.id, label: `${m.name}${m.email ? `（${m.email}）` : ''}` })),
+              ]}
+            />
+            <span className="text-ink-faint mt-1 block text-xs">
+              紐づけると、そのログインユーザーが「本人の勤務」としてこの担当者のシフト・休憩・外部連携を管理できます。
+            </span>
+          </Field>
           {err && <p className="text-xs text-red-600">{err}</p>}
         </div>
         <div className="px-6 py-4 border-t border-hairline flex gap-2 justify-end">

@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import StaffDetail from './staff-detail'
 import {
@@ -13,6 +13,7 @@ import {
   type BookingSettings,
 } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
+import { canEditFeature, canViewFeature } from '@/lib/staff-capability'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import { shortDate } from '../../lib/format-time'
@@ -72,9 +73,11 @@ function businessHoursSaveError(error: unknown): string {
   return '営業時間を保存できませんでした。入力内容を確かめて、もう一度お試しください。'
 }
 
-function BusinessHoursEditor({ accountId, settings, onSaved, onReload }: {
+function BusinessHoursEditor({ accountId, settings, canEdit, onSaved, onReload }: {
   accountId: string
   settings: BookingSettings
+  /** false のとき閲覧のみ。入力を無効化し保存ボタンを出さない（APIも403で拒否）。 */
+  canEdit: boolean
   onSaved: (settings: BookingSettings) => void
   onReload: () => void
 }) {
@@ -157,6 +160,7 @@ function BusinessHoursEditor({ accountId, settings, onSaved, onReload }: {
           </p>
         ) : null}
       </div>
+      <fieldset disabled={!canEdit} className="contents">
       <div className="divide-hairline divide-y">
         {DAYS.map((day) => {
           const intervals = draft.find((item) => item.weekday === day.weekday)?.intervals ?? []
@@ -212,10 +216,13 @@ function BusinessHoursEditor({ accountId, settings, onSaved, onReload }: {
           </div>
         ) : null}
         {saved ? <p className="text-success mt-3 text-sm font-semibold" role="status">営業時間を保存しました。</p> : null}
-        <div className="mt-3 flex justify-end">
-          <Button variant="primary" onClick={() => void submit()} disabled={saving}>{saving ? '保存中…' : '営業時間を保存'}</Button>
-        </div>
+        {canEdit ? (
+          <div className="mt-3 flex justify-end">
+            <Button variant="primary" onClick={() => void submit()} disabled={saving}>{saving ? '保存中…' : '営業時間を保存'}</Button>
+          </div>
+        ) : <p className="text-ink-faint mt-3 text-xs">閲覧のみです。変更には予約設定の権限が必要です。</p>}
       </div>
+      </fieldset>
     </section>
   )
 }
@@ -243,11 +250,66 @@ export default function StaffShiftsPage() {
 }
 
 // ?staff_id= があるときは担当者別の勤務・シフト画面、ないときは従来のお店全体の受付枠。
+// staff ロールは「お店全体の受付枠」ではなく自分の勤務へ誘導する（N-411 本人勤務）。
+// 店舗設定の閲覧権限が無い人がここへ来ても、権限外の画面ではなく自分の画面へ着く。
 function StaffShiftsPageContent() {
   const staffId = useSearchParams().get('staff_id') ?? ''
+  const [isStaffRole] = useState(() =>
+    typeof window !== 'undefined' && window.localStorage.getItem('lh_staff_role') === 'staff')
   usePageTitle('予約設定')
   if (staffId) return <StaffDetail staffId={staffId} />
+  if (isStaffRole) return <OwnShiftEntry />
   return <StoreShiftsView />
+}
+
+// 自分に紐づく予約スタッフを /staff/me で解決し、自分の勤務画面へ送る。
+// 紐づけが無い場合: 店舗の受付枠を見られる権限があれば従来どおり店舗ビュー、
+// なければ「紐づけ待ち」の案内を出す（真っ白な403画面にしない）。
+function OwnShiftEntry() {
+  const router = useRouter()
+  const { selectedAccountId } = useAccount()
+  const [resolved, setResolved] = useState<'loading' | 'store' | 'missing'>('loading')
+
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      // 選択中アカウント優先。見つからなければ紐づく全件の先頭を使う。
+      const scoped = selectedAccountId
+        ? await bookingApi.listMyStaff(selectedAccountId).catch(() => null)
+        : null
+      const rows = scoped?.staff?.length
+        ? scoped.staff
+        : (await bookingApi.listMyStaff().catch(() => null))?.staff ?? []
+      if (cancelled) return
+      if (rows.length > 0) {
+        router.replace(`/booking/staff/shifts?staff_id=${rows[0].id}`)
+        return
+      }
+      const canSeeStore = canViewFeature('/booking/bookings')
+        || canViewFeature('booking.settings')
+        || canViewFeature('/booking/menus')
+      setResolved(canSeeStore ? 'store' : 'missing')
+    })()
+    return () => { cancelled = true }
+  }, [router, selectedAccountId])
+
+  if (resolved === 'store') return <StoreShiftsView />
+  if (resolved === 'missing') {
+    return (
+      <div className="space-y-4 pb-8">
+        <ListState
+          kind="empty"
+          title="紐づく予約スタッフがありません"
+          description="管理者が予約スタッフとログインユーザーの紐づけを設定すると、ここで自分の勤務を管理できます。"
+        />
+      </div>
+    )
+  }
+  return (
+    <div className="space-y-4 pb-8">
+      <ListState kind="loading" title="自分の勤務を探しています" />
+    </div>
+  )
 }
 
 function resourceSaveError(error: unknown): string {
@@ -420,6 +482,9 @@ function StoreShiftsView() {
   const [savingClosed, setSavingClosed] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [canManageResources, setCanManageResources] = useState(false)
+  // N-411: 受付枠・休業日・設備の変更はすべて 'booking.settings' の実効permission。
+  // 閲覧のみの人には入力を無効化し、保存ボタンを出さない（API側も403で拒否）。
+  const [canEditSettings, setCanEditSettings] = useState(false)
   const requestRef = useRef(0)
   const loadedAccountRef = useRef<string | null>(null)
   const activeAccountRef = useRef(selectedAccountId)
@@ -432,8 +497,9 @@ function StoreShiftsView() {
   const dates = useMemo(previewDates, [])
 
   useEffect(() => {
-    const role = window.localStorage.getItem('lh_staff_role')
-    setCanManageResources(role === 'owner' || role === 'admin')
+    const canEdit = canEditFeature('booking.settings')
+    setCanManageResources(canEdit)
+    setCanEditSettings(canEdit)
   }, [])
 
   useEffect(() => {
@@ -591,6 +657,7 @@ function StoreShiftsView() {
               key={selectedAccountId}
               accountId={selectedAccountId}
               settings={settings}
+              canEdit={canEditSettings}
               onReload={() => setReloadKey((value) => value + 1)}
               onSaved={(savedSettings) => {
                 setSettings(savedSettings)
@@ -604,7 +671,9 @@ function StoreShiftsView() {
                   <h2 className="text-ink font-semibold">休業日</h2>
                   <p className="text-ink-faint mt-1 text-xs">この日は、曜日の決めごとより優先して閉めます。</p>
                 </div>
-                <Button className="ml-auto" onClick={() => setAddingClosed((value) => !value)}>休業日を足す</Button>
+                {canEditSettings ? (
+                  <Button className="ml-auto" onClick={() => setAddingClosed((value) => !value)}>休業日を足す</Button>
+                ) : null}
               </div>
               {addingClosed ? (
                 <div className="border-hairline bg-canvas-sunken mt-4 grid gap-3 rounded-control border p-3 sm:grid-cols-3">

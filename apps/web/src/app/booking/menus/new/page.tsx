@@ -14,6 +14,8 @@ import CreatePage, {
 import SelectField from '@/components/shared/select-field'
 import SearchField from '@/components/shared/search-field'
 import Button from '@/components/shared/button'
+import ListState from '@/components/shared/list-state'
+import { canEditFeature } from '@/lib/staff-capability'
 import { bookingMenuError } from '../menu-validation'
 
 /**
@@ -25,6 +27,10 @@ import { bookingMenuError } from '../menu-validation'
  * 保存できてしまうのに予約が入らないという分かりにくい失敗をする。
  */
 export default function NewBookingMenuPage() {
+  // N-411: メニュー作成は '/booking/menus' の実効permission必須。
+  // 鍵の無い人がフォームを埋めて保存時403になるのを防ぐ。
+  const [canEditMenus] = useState(() =>
+    typeof window === 'undefined' ? true : canEditFeature('/booking/menus'))
   usePageTitle('予約メニューをつくる')
   const { selectedAccountId } = useAccount()
   const [name, setName] = useState('')
@@ -163,6 +169,18 @@ export default function NewBookingMenuPage() {
     : priceMode === 'free'
       ? '無料'
       : `¥${Number(basePrice).toLocaleString()}`
+
+  if (!canEditMenus) {
+    return (
+      <div data-design-node="GhOb3" className="mx-auto max-w-2xl p-6">
+        <ListState
+          kind="error"
+          title="予約メニューの変更権限がありません"
+          description="メニューの作成・変更は、予約メニューの権限を持つログインユーザーだけが実行できます。管理者へ権限の確認を依頼してください。"
+        />
+      </div>
+    )
+  }
 
   return (
     <CreatePage

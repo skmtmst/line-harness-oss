@@ -2685,6 +2685,21 @@ const spec = {
         responses: { '200': { description: 'Replaced with version' }, '400': { description: 'Invalid request' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Staff not in account' }, '409': { description: 'Version conflict' }, '422': { description: 'Invalid date, DST gap, overlap, outside hours, or time range' } },
       },
     },
+    // ── Booking staff self link (N-411 #866) ─────────────────────────────
+    '/api/booking/admin/staff/me': {
+      get: {
+        tags: ['Booking'],
+        summary: 'ログイン中ユーザーに紐づく予約スタッフの一覧（本人勤務の対象解決）',
+        parameters: [
+          { name: 'account_id', in: 'query', required: false, schema: { type: 'string' }, description: '指定時はそのアカウントの紐づけだけを返す。省略時は全アカウント分。' },
+        ],
+        responses: {
+          '200': { description: 'Linked booking staff records' },
+          '401': { description: 'Unauthorized' },
+          '403': { description: 'booking.staff.own permission required (staff role)' },
+        },
+      },
+    },
     // ── Booking staff×menu matrix bulk save (N-410 #819) ──────────────────
     '/api/booking/admin/staff-menus': {
       put: {
