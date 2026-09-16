@@ -25,7 +25,6 @@ import {
   getStaffByInviteTokenHash,
   getStaffByLineUserId,
   getStaffByLineUserIdIncludingInactive,
-  getPlatformAdminByStaffId,
   getActiveImpersonation,
   getTwoFactorChallenge,
   incrementTwoFactorChallengeAttempts,
@@ -34,6 +33,7 @@ import {
 } from '@line-crm/db';
 import { decryptTotpSecret, verifyTotp } from '../lib/totp.js';
 import { toImpersonationContext } from '../middleware/impersonation.js';
+import { candidateFromStaffRow, isPlatformAdmin, isPlatformAdminRow } from '../middleware/platform-admin.js';
 
 export const adminAuth = new Hono<Env>();
 
@@ -186,8 +186,9 @@ adminAuth.get('/api/auth/line/callback', async (c) => {
 
     // 運営コンソールへの LINE ログイン（★V6 37-1）。platform_admins に登録された
     // LINE ユーザーだけを通す。契約先の権限者や、契約者専用 LINE の友だちでは入れない。
+    // platform_admins が空の間だけ、既定の統括のオーナーを互換で通す（初期登録のため）。
     if (next === 'ops') {
-      const admin = await getPlatformAdminByStaffId(c.env.DB, staff.id);
+      const admin = await isPlatformAdminRow(c.env.DB, candidateFromStaffRow(staff));
       if (!admin) return c.redirect(adminLoginUrl(c, 'not_authorized', next));
     }
 
@@ -427,7 +428,9 @@ adminAuth.get('/api/auth/session', async (c) => {
     c.header('Set-Cookie', csrfCookie(csrfToken, config.sameSite), { append: true });
   }
   const staff = c.get('staff');
-  const platformAdmin = staff.id !== 'env-owner' && Boolean(await getPlatformAdminByStaffId(c.env.DB, staff.id));
+  // 運営マスターかどうか。platform_admins が空の間は既定の統括のオーナーも真になる
+  // （初期登録のため。API 側の requirePlatformAdmin と同じ判定）。
+  const platformAdmin = await isPlatformAdmin(c);
   // /api/auth/* は代理ログインの差し替え対象外なので、ここで直接引く。
   const active = platformAdmin ? await getActiveImpersonation(c.env.DB, staff.id) : null;
   const impersonation = active ? toImpersonationContext(active) : null;
