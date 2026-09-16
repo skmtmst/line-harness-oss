@@ -6,4 +6,3 @@ ALTER TABLE friend_add_action_runs ADD COLUMN action_snapshot TEXT NOT NULL DEFA
   CHECK (json_valid(action_snapshot));
 ALTER TABLE friend_add_action_runs ADD COLUMN started_at TEXT;
 ALTER TABLE friend_add_action_runs ADD COLUMN completed_at TEXT;
-
