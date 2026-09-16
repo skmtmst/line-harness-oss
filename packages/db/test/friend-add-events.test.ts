@@ -5,6 +5,10 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   captureFriendAddEventAttribution,
+  claimFailedFriendAddActionRuns,
+  claimFriendAddEventForActionRetry,
+  claimInitialFriendAddActionRun,
+  finishFriendAddActionRun,
   listFriendAddEvents,
   markFriendAddEventRouting,
   recordFriendAddAttributionCandidate,
@@ -153,5 +157,57 @@ describe('friend add V6 event ledger', () => {
     expect(list.items).toHaveLength(1);
     expect(list.items[0]).toMatchObject({ friendId: 'friend-1', displayName: '田中さん', kind: 'returning' });
     expect(list.summary).toMatchObject({ total: 1, returning: 1, firstTime: 0 });
+  });
+
+  test('処理の固定IDを一度だけ確保し、成功済みを再実行候補に戻さない', async () => {
+    const eventId = await recordFriendAddEvent(db, {
+      lineAccountId: 'account-1', friendId: 'friend-1', webhookEventId: 'webhook-action',
+      friendKind: 'first_time', occurredAt: '2026-08-24T13:00:00.000+09:00',
+    });
+    const input = {
+      eventId,
+      actionStableId: 'version-1:0',
+      actionType: 'tag',
+      actionSnapshot: JSON.stringify({ kind: 'row', actionType: 'tag', config: { op: 'add', tagIds: ['tag-1'] } }),
+      idempotencyKey: `friend-add-action:${eventId}:version-1:0`,
+    };
+    const first = await claimInitialFriendAddActionRun(db, input);
+    expect(first.acquired).toBe(true);
+    await finishFriendAddActionRun(db, { id: first.id, status: 'completed' });
+    const replay = await claimInitialFriendAddActionRun(db, input);
+    expect(replay).toEqual({ id: first.id, acquired: false, status: 'completed' });
+    expect(sqlite.prepare(
+      `SELECT status, attempt_count, action_type, json_valid(action_snapshot) AS valid
+         FROM friend_add_action_runs WHERE id = ?`,
+    ).get(first.id)).toEqual({ status: 'completed', attempt_count: 1, action_type: 'tag', valid: 1 });
+  });
+
+  test('失敗分の同時再試行は親CASで一勝し、成功済み処理を確保しない', async () => {
+    const eventId = await recordFriendAddEvent(db, {
+      lineAccountId: 'account-1', friendId: 'friend-1', webhookEventId: 'webhook-retry',
+      friendKind: 'first_time', occurredAt: '2026-08-24T14:00:00.000+09:00',
+    });
+    sqlite.prepare(`UPDATE friend_add_events SET routing_status = 'partial_failed' WHERE id = ?`).run(eventId);
+    sqlite.prepare(
+      `INSERT INTO friend_add_action_runs
+        (id, event_id, action_stable_id, action_type, action_snapshot, idempotency_key,
+         status, attempt_count, last_error_code)
+       VALUES ('ok', ?, 'v1:0', 'tag', '{}', 'retry-ok', 'completed', 1, NULL),
+              ('ng', ?, 'v1:1', 'tag', '{}', 'retry-ng', 'failed', 1, 'action_failed')`,
+    ).run(eventId, eventId);
+
+    const [first, second] = await Promise.all([
+      claimFriendAddEventForActionRetry(db, { eventId, lineAccountId: 'account-1' }),
+      claimFriendAddEventForActionRetry(db, { eventId, lineAccountId: 'account-1' }),
+    ]);
+    expect([first, second].filter(Boolean)).toHaveLength(1);
+    expect(await claimFriendAddEventForActionRetry(db, { eventId, lineAccountId: 'account-2' })).toBeNull();
+
+    const claimed = await claimFailedFriendAddActionRuns(db, eventId);
+    expect(claimed.map((row) => row.id)).toEqual(['ng']);
+    expect(sqlite.prepare(`SELECT status, attempt_count FROM friend_add_action_runs WHERE id = 'ok'`).get())
+      .toEqual({ status: 'completed', attempt_count: 1 });
+    expect(sqlite.prepare(`SELECT status, attempt_count FROM friend_add_action_runs WHERE id = 'ng'`).get())
+      .toEqual({ status: 'running', attempt_count: 2 });
   });
 });

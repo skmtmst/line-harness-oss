@@ -2269,7 +2269,8 @@ CREATE TABLE "friend_add_action_runs" (
   next_retry_at       TEXT,
   last_error_code     TEXT,
   created_at          TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
-  updated_at          TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  updated_at          TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')), action_type TEXT NOT NULL DEFAULT 'unknown', action_snapshot TEXT NOT NULL DEFAULT '{}'
+  CHECK (json_valid(action_snapshot)), started_at TEXT, completed_at TEXT,
   UNIQUE (event_id, action_stable_id)
 );
 
@@ -2311,7 +2312,8 @@ CREATE TABLE "friend_add_events" (
   scenario_enrollment_id TEXT REFERENCES friend_scenarios(id) ON DELETE SET NULL,
   delivery_count        INTEGER NOT NULL DEFAULT 0
                           CHECK (delivery_count >= 0),
-  first_delivery_sent_at TEXT,
+  first_delivery_sent_at TEXT, action_base_status TEXT
+  CHECK (action_base_status IS NULL OR action_base_status IN ('pending', 'completed', 'failed', 'suppressed', 'partial_failed')), action_base_error_code TEXT,
   UNIQUE (line_account_id, webhook_event_id)
 );
 

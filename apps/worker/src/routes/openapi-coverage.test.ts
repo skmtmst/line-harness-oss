@@ -242,6 +242,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'POST /api/auth/register/complete',
   'POST /api/auth/register/request',
   'POST /api/auto-reply-runs/{id}/retry',
+  'POST /api/friend-add-runs/{id}/retry',
   'POST /api/booking/admin/resources',
   'POST /api/broadcasts',
   'POST /api/broadcasts/{id}/resume',

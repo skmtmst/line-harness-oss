@@ -79,7 +79,9 @@ describe('previewFriendAddRoutingDefinition', () => {
 });
 
 describe('V6の流入経路別ルール', () => {
-  async function setupRule(routeIds: string[], options: { fallback?: boolean; scenarioId?: string | null; priority?: number } = {}) {
+  async function setupRule(routeIds: string[], options: {
+    fallback?: boolean; scenarioId?: string | null; priority?: number; actions?: unknown[];
+  } = {}) {
     const { db, raw } = createTestD1()
     raw.prepare(`INSERT INTO line_accounts (id, name, channel_id, channel_secret, channel_access_token)
                  VALUES ('acc-v6', 'テスト', 'c', 's', 't')`).run()
@@ -105,7 +107,7 @@ describe('V6の流入経路別ルール', () => {
       VALUES (?, ?, 1, ?, 'published')`).run(versionId, ruleId, JSON.stringify({
       routeIds,
       scenarioId: options.scenarioId === undefined ? 'scenario-v6' : options.scenarioId,
-      messageType: 'scenario', messageText: '', timing: 'scenario', actions: [],
+      messageType: 'scenario', messageText: '', timing: 'scenario', actions: options.actions ?? [],
       friendCondition: '', activeFrom: null, activeUntil: null,
     }))
     return { db, raw, ruleId, versionId }
@@ -127,6 +129,62 @@ describe('V6の流入経路別ルール', () => {
     )
     expect(result).toMatchObject({ routed: true, ruleId, ruleVersionId: versionId, suppressed: true })
     expect(result.enrollments).toEqual([])
+  })
+
+  test('本番振り分けは全処理を固定IDで記録し、失敗本文を保存せずWebhook再送でも成功済みを動かさない', async () => {
+    const { db, raw, versionId } = await setupRule(['route-actions'], {
+      actions: [
+        { type: 'add_tag', targetId: 'tag-ok' },
+        { type: 'add_tag', targetId: 'tag-fail' },
+      ],
+    })
+    raw.prepare(
+      `INSERT INTO tags (id, name, line_account_id)
+       VALUES ('tag-ok', '成功', 'acc-v6'), ('tag-fail', '失敗', 'acc-v6')`,
+    ).run()
+    raw.prepare(
+      `CREATE TRIGGER fail_friend_add_tag BEFORE INSERT ON friend_tags
+       WHEN NEW.tag_id = 'tag-fail'
+       BEGIN SELECT RAISE(FAIL, 'secret customer value'); END`,
+    ).run()
+    raw.prepare(
+      `INSERT INTO friend_add_events
+        (id, line_account_id, friend_id, webhook_event_id, friend_kind,
+         attribution_status, routing_status, occurred_at)
+       VALUES ('run-actions', 'acc-v6', 'friend-v6', 'webhook-actions', 'first_time',
+               'captured', 'pending', '2026-09-16T10:00:00.000')`,
+    ).run()
+
+    const first = await applyFriendAddRouting(
+      db, 'acc-v6', { id: 'friend-v6', unfollow_count: 0 }, undefined,
+      { eventId: 'run-actions', entryRouteId: 'route-actions' },
+    )
+    expect(first).toMatchObject({ actionFailureCount: 1, ruleVersionId: versionId })
+    expect(raw.prepare(
+      `SELECT action_stable_id, action_type, status, attempt_count, last_error_code
+         FROM friend_add_action_runs WHERE event_id = 'run-actions' ORDER BY action_stable_id`,
+    ).all()).toEqual([
+      { action_stable_id: `${versionId}:0`, action_type: 'tag', status: 'completed', attempt_count: 1, last_error_code: null },
+      { action_stable_id: `${versionId}:1`, action_type: 'tag', status: 'failed', attempt_count: 1, last_error_code: 'action_failed' },
+    ])
+    expect(JSON.stringify(raw.prepare(
+      `SELECT last_error_code FROM friend_add_action_runs WHERE event_id = 'run-actions'`,
+    ).all())).not.toContain('secret customer value')
+
+    const replay = await applyFriendAddRouting(
+      db, 'acc-v6', { id: 'friend-v6', unfollow_count: 0 }, undefined,
+      { eventId: 'run-actions', entryRouteId: 'route-actions' },
+    )
+    expect(replay.actionFailureCount).toBe(1)
+    expect(raw.prepare(
+      `SELECT action_stable_id, attempt_count FROM friend_add_action_runs
+        WHERE event_id = 'run-actions' ORDER BY action_stable_id`,
+    ).all()).toEqual([
+      { action_stable_id: `${versionId}:0`, attempt_count: 1 },
+      { action_stable_id: `${versionId}:1`, attempt_count: 1 },
+    ])
+    expect(raw.prepare(`SELECT tag_id FROM friend_tags WHERE friend_id = 'friend-v6'`).all())
+      .toEqual([{ tag_id: 'tag-ok' }])
   })
 })
 
