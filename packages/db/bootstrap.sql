@@ -4334,7 +4334,9 @@ CREATE TABLE operation_incidents (
   resolved_at           TEXT,
   created_at            TEXT NOT NULL,
   updated_at            TEXT NOT NULL
-);
+, stopped_definitions_json TEXT
+  CHECK (stopped_definitions_json IS NULL OR json_valid(stopped_definitions_json)), restore_report_json TEXT
+  CHECK (restore_report_json IS NULL OR json_valid(restore_report_json)));
 
 CREATE TABLE operation_notification_outbox (
   id              TEXT PRIMARY KEY,

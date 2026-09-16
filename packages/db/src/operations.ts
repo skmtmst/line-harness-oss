@@ -1,3 +1,10 @@
+import {
+  captureStoppedDefinitions,
+  holdExpiredBroadcasts,
+  inspectIncidentRestoreDrift,
+  type OperationRestoreDrift,
+} from './operation-restore-guard.js';
+
 export const OPERATION_CAPABILITIES = [
   'broadcast_dispatch',
   'scenario_dispatch',
@@ -50,6 +57,14 @@ export interface OperationIncident {
   stoppedSnapshot: OperationControlSnapshot | null;
   restoredSnapshot: OperationControlSnapshot | null;
   errorMessage: string | null;
+  /**
+   * N-451: 停止した瞬間に稼働対象だった定義の指紋（版・期限）のJSON。
+   * この仕組みより前に止めた incident では null で、復旧前検査は
+   * 「記録なし」として全ての変更検査をスキップしない（検査自体は走る）。
+   */
+  stoppedDefinitionsJson: string | null;
+  /** N-451: 直近の復旧試行の検査結果（再開した対象・理由つきで止めた対象）。 */
+  restoreReportJson: string | null;
   stoppedAt: string | null;
   resolvedAt: string | null;
   createdAt: string;
@@ -199,6 +214,8 @@ type IncidentRow = {
   stopped_snapshot_json: string | null;
   restored_snapshot_json: string | null;
   error_message: string | null;
+  stopped_definitions_json: string | null;
+  restore_report_json: string | null;
   stopped_at: string | null;
   resolved_at: string | null;
   created_at: string;
@@ -234,6 +251,8 @@ function mapIncident(row: IncidentRow): OperationIncident {
     stoppedSnapshot: parseSnapshot(row.stopped_snapshot_json),
     restoredSnapshot: parseSnapshot(row.restored_snapshot_json),
     errorMessage: row.error_message,
+    stoppedDefinitionsJson: row.stopped_definitions_json ?? null,
+    restoreReportJson: row.restore_report_json ?? null,
     stoppedAt: row.stopped_at,
     resolvedAt: row.resolved_at,
     createdAt: row.created_at,
@@ -312,6 +331,16 @@ export async function stopOperationCapabilities(
     return { status: 'conflict', control: current };
   }
 
+  /*
+   * N-451: 止める瞬間の「止まった定義」の指紋を取る。
+   * 復旧のとき、ここで記録した版・期限と現在の定義を比べて、
+   * 停止中の 編集・削除・追加・期限切れ を検査する。
+   * 制御状態を裏返す前に取るので、snapshotは必ず停止前の定義を指す。
+   */
+  const stoppedDefinitions = await captureStoppedDefinitions(
+    db, input.lineAccountId, input.capabilities,
+  );
+
   await insertIncident(db, {
     id: incidentId,
     lineAccountId: input.lineAccountId,
@@ -379,9 +408,16 @@ export async function stopOperationCapabilities(
   await db.prepare(
     `UPDATE operation_incidents
         SET status = 'stopped', control_version = ?, stopped_snapshot_json = ?,
-            stopped_at = ?, updated_at = ?
+            stopped_definitions_json = ?, stopped_at = ?, updated_at = ?
       WHERE id = ? AND status = 'preparing'`,
-  ).bind(control.version, JSON.stringify(snapshot(control, now)), now, now, incidentId).run();
+  ).bind(
+    control.version,
+    JSON.stringify(snapshot(control, now)),
+    JSON.stringify(stoppedDefinitions),
+    now,
+    now,
+    incidentId,
+  ).run();
   return {
     status: 'changed',
     control,
@@ -389,10 +425,39 @@ export async function stopOperationCapabilities(
   };
 }
 
+/** N-451: 復旧試行の検査結果。incident の restore_report_json と応答の両方に載せる。 */
+export interface OperationRestoreReport {
+  evaluatedAt: string;
+  drift: OperationRestoreDrift;
+  /** この試行で再開した capability。 */
+  resumed: OperationCapability[];
+  /** 期限切れで下書きへ戻した予約配信。 */
+  heldExpired: { capability: OperationCapability; id: string; expiresAt: string | null }[];
+  /** まだ止まったままの capability。 */
+  remaining: OperationCapability[];
+}
+
+export type RestoreOperationIncidentResult =
+  | { status: 'restored'; control: OperationControlSet; incident: OperationIncident; report: OperationRestoreReport }
+  | { status: 'partial'; control: OperationControlSet; incident: OperationIncident; report: OperationRestoreReport }
+  | { status: 'blocked'; control: OperationControlSet; incident: OperationIncident; report: OperationRestoreReport }
+  | { status: 'conflict'; control: OperationControlSet }
+  | { status: 'not_found' };
+
+/*
+ * N-451: 停止前snapshotを無条件には戻さない。
+ *
+ * 停止時に保存した定義の指紋と現在を比べ、
+ * - 変更・追加があった能力 → 再開せず理由つきで止めたままにする
+ * - 期限を過ぎた予約配信 → 下書きへ戻し、過去時刻を送らせない
+ * - 削除・人が止めたもの → もう動かないので記録だけする
+ * - 対象アカウントの無効化 → 全ての再開を止める
+ * という検査を通してから、残った能力だけを停止前の状態へ戻す。
+ */
 export async function restoreOperationIncident(
   db: D1Database,
   input: { incidentId: string; expectedVersion: number; actorId: string },
-): Promise<ChangeOperationControlResult | { status: 'not_found' }> {
+): Promise<RestoreOperationIncidentResult> {
   const incident = await getOperationIncident(db, input.incidentId);
   if (!incident || incident.status !== 'stopped') return { status: 'not_found' };
   const current = await getOperationControlSet(db, incident.lineAccountId);
@@ -400,18 +465,65 @@ export async function restoreOperationIncident(
     return { status: 'conflict', control: current };
   }
 
-  const restoredStates = { ...incident.beforeSnapshot.states };
   const now = new Date().toISOString();
+  const drift = await inspectIncidentRestoreDrift(db, incident);
+
+  // 期限切れの予約は再開の成否に関わらず下書きへ戻す。
+  // 「停止中」でも拾われる経路が残っているので、戻すこと自体が防波堤。
+  const heldIds = await holdExpiredBroadcasts(
+    db,
+    drift.expired
+      .filter((entry) => entry.capability === 'broadcast_dispatch')
+      .map((entry) => entry.id),
+    input.actorId,
+    now,
+  );
+  const heldExpired = drift.expired.filter((entry) => heldIds.includes(entry.id));
+
+  const stillStopped = incident.capabilities.filter(
+    (capability) => current.states[capability] === 'stopped',
+  );
+  const resumable = drift.resumable.filter((capability) => stillStopped.includes(capability));
+  const report: OperationRestoreReport = {
+    evaluatedAt: now,
+    drift,
+    resumed: resumable,
+    heldExpired,
+    remaining: stillStopped.filter((capability) => !resumable.includes(capability)),
+  };
+
+  if (resumable.length === 0) {
+    await db.prepare(
+      `UPDATE operation_incidents
+          SET restore_report_json = ?, updated_at = ?
+        WHERE id = ?`,
+    ).bind(JSON.stringify(report), now, incident.id).run();
+    return {
+      status: 'blocked',
+      control: current,
+      incident: (await getOperationIncident(db, incident.id))!,
+      report,
+    };
+  }
+
+  const nextStates = { ...current.states };
+  for (const capability of resumable) {
+    nextStates[capability] = incident.beforeSnapshot.states[capability];
+  }
+  const fullyResolved = report.remaining.length === 0;
   const nextVersion = current.version + 1;
   const result = await db.prepare(
     `UPDATE operation_control_sets
-        SET version = ?, states_json = ?, active_incident_id = NULL, reason = NULL,
-            actor_id = ?, stopped_at = NULL, updated_at = ?
+        SET version = ?, states_json = ?, active_incident_id = ?, reason = ?,
+            actor_id = ?, stopped_at = ?, updated_at = ?
       WHERE scope_key = ? AND version = ? AND active_incident_id = ?`,
   ).bind(
     nextVersion,
-    JSON.stringify(restoredStates),
+    JSON.stringify(nextStates),
+    fullyResolved ? null : incident.id,
+    fullyResolved ? null : current.reason,
     input.actorId,
+    fullyResolved ? null : current.stoppedAt,
     now,
     current.scopeKey,
     input.expectedVersion,
@@ -422,23 +534,33 @@ export async function restoreOperationIncident(
   }
 
   const control = await getOperationControlSet(db, incident.lineAccountId);
-  await db.prepare(
-    `UPDATE operation_incidents
-        SET status = 'resolved', control_version = ?, resolved_by_actor_id = ?,
-            restored_snapshot_json = ?, resolved_at = ?, updated_at = ?
-      WHERE id = ? AND status = 'stopped'`,
-  ).bind(
-    control.version,
-    input.actorId,
-    JSON.stringify(snapshot(control, now)),
-    now,
-    now,
-    incident.id,
-  ).run();
+  if (fullyResolved) {
+    await db.prepare(
+      `UPDATE operation_incidents
+          SET status = 'resolved', control_version = ?, resolved_by_actor_id = ?,
+              restored_snapshot_json = ?, restore_report_json = ?, resolved_at = ?, updated_at = ?
+        WHERE id = ? AND status = 'stopped'`,
+    ).bind(
+      control.version,
+      input.actorId,
+      JSON.stringify(snapshot(control, now)),
+      JSON.stringify(report),
+      now,
+      now,
+      incident.id,
+    ).run();
+  } else {
+    await db.prepare(
+      `UPDATE operation_incidents
+          SET control_version = ?, restore_report_json = ?, updated_at = ?
+        WHERE id = ? AND status = 'stopped'`,
+    ).bind(control.version, JSON.stringify(report), now, incident.id).run();
+  }
   return {
-    status: 'changed',
+    status: fullyResolved ? 'restored' : 'partial',
     control,
     incident: (await getOperationIncident(db, incident.id))!,
+    report,
   };
 }
 
