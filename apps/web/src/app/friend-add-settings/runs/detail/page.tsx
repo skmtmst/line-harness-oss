@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
@@ -35,8 +35,8 @@ function safeErrorMessage(code: string | null): string | null {
 
 export default function FriendAddRunDetailPage() {
   usePageTitle('友だち追加時配信・実行詳細')
-  const params = useParams<{ id: string }>()
-  const runId = typeof params.id === 'string' ? params.id : ''
+  const searchParams = useSearchParams()
+  const runId = searchParams.get('id') ?? ''
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const [detail, setDetail] = useState<FriendAddRunDetail | null>(null)
   const [loading, setLoading] = useState(true)

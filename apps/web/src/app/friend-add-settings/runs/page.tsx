@@ -386,7 +386,7 @@ export default function FriendAddRunsPage() {
                     <StatusBadge tone={status.tone} size="compact">{status.label}</StatusBadge>
                     <Link
                       className="shrink-0 text-xs font-bold text-accent hover:underline"
-                      href={`/friend-add-settings/runs/${encodeURIComponent(item.id)}`}
+                      href={`/friend-add-settings/runs/detail?id=${encodeURIComponent(item.id)}`}
                     >
                       詳細
                     </Link>
