@@ -129,6 +129,7 @@ const ALLOWLIST_MAX = 775;
  */
 const BASELINE_DOCUMENTED = new Set<string>([
   'DELETE /api/affiliates/{id}',
+  'DELETE /api/auth/sessions/{tokenHash}',
   'DELETE /api/booking/admin/resources/{id}',
   'DELETE /api/broadcasts/{id}',
   'DELETE /api/chats/{id}/scheduled/{scheduleId}',
@@ -151,6 +152,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'GET /api/auth/ops-invite/check',
   'GET /api/auth/password/reset/check',
   'GET /api/auth/register/check',
+  'GET /api/auth/sessions',
   'GET /api/booking/admin/staff/{id}/break-dates',
   'GET /api/booking/admin/staff/{id}/breaks',
   'GET /api/booking/admin/resources',
@@ -249,6 +251,8 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'POST /api/auth/password/reset',
   'POST /api/auth/register/complete',
   'POST /api/auth/register/request',
+  'POST /api/auth/sessions/revoke-others',
+  'POST /api/auth/step-up',
   'POST /api/auth/two-factor/setup',
   'POST /api/auth/two-factor/setup/confirm',
   'POST /api/auto-reply-runs/{id}/retry',
@@ -1123,7 +1127,6 @@ const ALLOWLIST = new Set<string>([
   'GET /api/auth/session',
   'POST /api/auth/login',
   'POST /api/auth/logout',
-  'POST /api/auth/step-up',
   'POST /api/auth/two-factor/verify',
 
   // core：統括管理（OpenAPI未記載・順次記載）（7件）

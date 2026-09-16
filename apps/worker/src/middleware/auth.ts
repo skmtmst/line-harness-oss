@@ -235,6 +235,9 @@ export function permissionForApiPath(path: string): string | null {
 const STAFF_SELF_ENDPOINTS: Array<[method: string, path: string]> = [
   ['GET', '/api/auth/session'],
   ['POST', '/api/auth/step-up'],
+  // 本人のログイン中セッション一覧と一括失効。handler が本人分だけを対象にする。
+  ['GET', '/api/auth/sessions'],
+  ['POST', '/api/auth/sessions/revoke-others'],
   ['GET', '/api/staff/me'],
   ['GET', '/api/tenants/me'],
   ['POST', '/api/client-errors'],
@@ -258,6 +261,7 @@ const STAFF_SELF_ROUTE_TEMPLATES: Array<[method: string, path: string]> = [
   ['POST', '/api/staff/:id/two-factor/setup'],
   ['POST', '/api/staff/:id/two-factor/confirm'],
   ['DELETE', '/api/staff/:id/two-factor'],
+  ['DELETE', '/api/auth/sessions/:tokenHash'],
 ];
 
 export function isStaffSelfRouteTemplate(method: string, path: string): boolean {
@@ -280,9 +284,18 @@ const STAFF_SELF_PATH_PATTERNS: Array<[method: string, pattern: RegExp]> = [
   ['DELETE', /^\/api\/staff\/([^/]+)\/two-factor$/],
 ];
 
+/**
+ * handler が本人の資産だけを対象にする口。path の可変部は staff id ではない
+ * ため id 比較をせず、認証済みなら誰でも通す（中身は本人分に閉じる）。
+ */
+const STAFF_SELF_SCOPED_PATTERNS: Array<[method: string, pattern: RegExp]> = [
+  ['DELETE', /^\/api\/auth\/sessions\/[^/]+$/],
+];
+
 export function isStaffSelfEndpoint(method: string, path: string, staffId?: string): boolean {
   const normalizedMethod = method.toUpperCase();
   if (STAFF_SELF_ENDPOINTS.some(([m, p]) => m === normalizedMethod && p === path)) return true;
+  if (STAFF_SELF_SCOPED_PATTERNS.some(([m, pattern]) => m === normalizedMethod && pattern.test(path))) return true;
   if (!staffId) return false;
   return STAFF_SELF_PATH_PATTERNS.some(([m, pattern]) => {
     if (m !== normalizedMethod) return false;

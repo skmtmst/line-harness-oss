@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense, useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import type { LineAccount, StaffMember } from '@line-crm/shared'
 import MemberDialog, { type MemberDialogValue } from '@/components/hq/members/member-dialog'
+import StepUpDialog from '@/components/shared/step-up-dialog'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
@@ -60,6 +61,10 @@ function MembersInner() {
   const [actionError, setActionError] = useState('')
   const [notice, setNotice] = useState('')
   const [resendingId, setResendingId] = useState<string | null>(null)
+  /* 権限変更が 428 で止まったときの本人確認。通ったら grant を付けて同じ保存をやり直す。 */
+  const [stepUp, setStepUp] = useState<null | { retry: (token: string) => Promise<void> }>(null)
+  const [stepUpBusy, setStepUpBusy] = useState(false)
+  const [stepUpError, setStepUpError] = useState('')
 
   const load = useCallback(async () => {
     setStatus('loading')
@@ -92,7 +97,7 @@ function MembersInner() {
   const canManage = me?.role === 'owner' || me?.role === 'admin'
   const restricted = me?.accountScope === 'accounts'
 
-  const submitDialog = async (value: MemberDialogValue) => {
+  const submitDialog = async (value: MemberDialogValue, stepUpToken?: string) => {
     setDialogBusy(true)
     setDialogError('')
     try {
@@ -103,7 +108,7 @@ function MembersInner() {
           accountScope: value.accountScope,
           scopedLineAccountIds: value.scopedLineAccountIds,
           managementContext: 'hq',
-        })
+        }, stepUpToken)
         if (!res.success) throw new Error(res.error)
         setNotice(`${dialog.member.name}さんの権限を変更しました。`)
       } else {
@@ -122,9 +127,29 @@ function MembersInner() {
       setDialog({ open: false, member: null })
       await load()
     } catch (caught) {
+      if (!stepUpToken && caught instanceof ApiError && caught.code === 'STEP_UP_REQUIRED') {
+        setStepUp({ retry: (token) => submitDialog(value, token) })
+        return
+      }
       setDialogError(caught instanceof Error && caught.message ? caught.message : '保存できませんでした。もう一度お試しください。')
     } finally {
       setDialogBusy(false)
+    }
+  }
+
+  const submitStepUp = async (code: string) => {
+    if (!stepUp || stepUpBusy) return
+    setStepUpBusy(true)
+    setStepUpError('')
+    try {
+      const grant = await api.staff.stepUp(code, 'staff.permissions.change')
+      if (!grant.success) throw new Error(grant.error)
+      await stepUp.retry(grant.data.token)
+      setStepUp(null)
+    } catch (caught) {
+      setStepUpError(caught instanceof Error && caught.message ? caught.message : '本人確認できませんでした。')
+    } finally {
+      setStepUpBusy(false)
     }
   }
 
@@ -304,6 +329,14 @@ function MembersInner() {
               if (dialogBusy) return
               setDialog({ open: false, member: null })
             }}
+          />
+          <StepUpDialog
+            open={stepUp !== null}
+            action="メンバーの権限を変更する"
+            busy={stepUpBusy}
+            error={stepUpError}
+            onSubmit={(code) => void submitStepUp(code)}
+            onCancel={() => { if (stepUpBusy) return; setStepUp(null); setStepUpError('') }}
           />
         </>
       )}

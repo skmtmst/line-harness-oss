@@ -23,6 +23,7 @@ const dbMocks = {
   getStaffAccountScopeMap: vi.fn(async () => new Map()),
   replaceStaffAccountScopes: vi.fn(),
   revokeStaffAuthentication: vi.fn(),
+  consumeStepUpGrant: vi.fn(async () => true),
 };
 vi.mock('@line-crm/db', () => dbMocks);
 
@@ -67,7 +68,7 @@ function send(path: string, method: 'GET' | 'POST' | 'PATCH' | 'DELETE', body?: 
   return worker.fetch(
     new Request(`https://worker.example.com${path}`, {
       method,
-      headers: new Headers({ Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' }),
+      headers: new Headers({ Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json', 'X-Step-Up-Token': 'test-step-up' }),
       body: body === undefined ? undefined : JSON.stringify(body),
     }),
     env,

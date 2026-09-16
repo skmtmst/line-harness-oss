@@ -37,11 +37,30 @@ export function clientIp(c: { req: { header: (name: string) => string | undefine
   );
 }
 
+/**
+ * 一覧画面で端末を見分けるための伏せた接続元。
+ *
+ * 生のIPは個人情報に近いので保存しない。IPv4は先頭2オクテット、
+ * IPv6は先頭3セグメントまで残す。
+ */
+export function maskIpPrefix(ip: string | null): string | null {
+  if (!ip) return null;
+  if (ip.includes('.')) {
+    const parts = ip.split('.');
+    return parts.length === 4 ? `${parts[0]}.${parts[1]}.*.*` : null;
+  }
+  const parts = ip.split(':');
+  return parts.length >= 3 ? `${parts.slice(0, 3).join(':')}::*` : null;
+}
+
 export async function issueSession(c: Context<Env>, staffId: string, sameSite: 'Strict' | 'Lax' | 'None', remember = false) {
   const sessionToken = randomToken();
   const maxAge = remember ? SESSION_REMEMBER_MAX_AGE : SESSION_DEFAULT_MAX_AGE;
   const expiresAt = new Date(Date.now() + maxAge * 1000).toISOString();
-  await createAdminSession(c.env.DB, await sha256Hex(sessionToken), staffId, expiresAt);
+  await createAdminSession(c.env.DB, await sha256Hex(sessionToken), staffId, expiresAt, {
+    userAgent: c.req.header('user-agent')?.slice(0, 300) ?? null,
+    ipPrefix: maskIpPrefix(clientIp(c)),
+  });
   const csrfToken = randomToken();
   c.header('Set-Cookie', adminSessionCookie(sessionToken, sameSite, maxAge), { append: true });
   c.header('Set-Cookie', csrfCookie(csrfToken, sameSite, maxAge), { append: true });

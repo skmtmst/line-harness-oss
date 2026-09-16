@@ -300,14 +300,67 @@ export async function createAdminSession(
   tokenHash: string,
   staffId: string,
   expiresAt: string,
+  device: { userAgent?: string | null; ipPrefix?: string | null } = {},
 ): Promise<void> {
   await db
     .prepare(
-      `INSERT INTO admin_sessions (token_hash, staff_id, expires_at)
-       VALUES (?, ?, ?)`,
+      `INSERT INTO admin_sessions (token_hash, staff_id, expires_at, user_agent, ip_prefix)
+       VALUES (?, ?, ?, ?, ?)`,
     )
-    .bind(tokenHash, staffId, expiresAt)
+    .bind(tokenHash, staffId, expiresAt, device.userAgent ?? null, device.ipPrefix ?? null)
     .run();
+}
+
+/** 本人のセッション一覧用。token_hash は漏れても認証に使えない指紋として返す。 */
+export interface AdminSessionSummary {
+  token_hash: string;
+  created_at: string;
+  expires_at: string;
+  user_agent: string | null;
+  ip_prefix: string | null;
+}
+
+export async function listAdminSessionsByStaff(
+  db: D1Database,
+  staffId: string,
+  now: string,
+): Promise<AdminSessionSummary[]> {
+  const result = await db
+    .prepare(
+      `SELECT token_hash, created_at, expires_at, user_agent, ip_prefix
+       FROM admin_sessions
+       WHERE staff_id = ? AND expires_at > ?
+       ORDER BY created_at DESC`,
+    )
+    .bind(staffId, now)
+    .all<AdminSessionSummary>();
+  return result.results ?? [];
+}
+
+/** 本人のセッションだけを消す。他人の token_hash を指定しても削除しない。 */
+export async function deleteAdminSessionForStaff(
+  db: D1Database,
+  staffId: string,
+  tokenHash: string,
+): Promise<boolean> {
+  const result = await db
+    .prepare('DELETE FROM admin_sessions WHERE staff_id = ? AND token_hash = ?')
+    .bind(staffId, tokenHash)
+    .run();
+  return (result.meta.changes ?? 0) > 0;
+}
+
+/** 今のセッション以外をまとめて失効させる。消した件数を返す。 */
+export async function deleteOtherAdminSessions(
+  db: D1Database,
+  staffId: string,
+  keepTokenHash: string,
+): Promise<number> {
+  const result = await db
+    .prepare('DELETE FROM admin_sessions WHERE staff_id = ? AND token_hash <> ?')
+    .bind(staffId, keepTokenHash)
+    .run();
+  return result.meta.changes ?? 0;
 }
 
 export async function getStaffByAdminSession(
