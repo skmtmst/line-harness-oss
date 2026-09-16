@@ -136,7 +136,8 @@ describe('DELETE /api/auth/sessions/:tokenHash', () => {
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ success: true, data: { revoked: 1, current: true } });
     expect(await getStaffByAdminSession(testDb.db, target, NOW)).toBeNull();
-    const cookies = res.headers.getSetCookie();
+    const headers = res.headers as Headers & { getSetCookie?: () => string[] };
+    const cookies = typeof headers.getSetCookie === 'function' ? headers.getSetCookie() : [res.headers.get('set-cookie') ?? ''];
     expect(cookies.some((cookie) => cookie.startsWith('lh_admin_session=') && /Max-Age=0|Expires=Thu, 01 Jan 1970/i.test(cookie))).toBe(true);
   });
 
