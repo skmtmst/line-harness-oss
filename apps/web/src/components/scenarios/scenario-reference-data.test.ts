@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
-import { ScenarioReferenceCache } from './scenario-reference-data'
+import { api, ApiError } from '@/lib/api'
+import { ScenarioReferenceCache, scenarioReferenceData } from './scenario-reference-data'
 
 describe('シナリオ編集の参照データ共有', () => {
   it('同じキーは期限内に1回だけ取得する', async () => {
@@ -37,5 +38,33 @@ describe('シナリオ編集の参照データ共有', () => {
     cache.delete('scenario:s-1')
     await expect(cache.load('scenario:s-1', loader)).resolves.toEqual({ name: '保存後' })
     expect(loader).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('任意機能オフ時の参照一覧(#861/#862)', () => {
+  it('機能オフ(403 FEATURE_DISABLED)は「候補なし」として解決し、窓全体を落とさない', async () => {
+    const spy = vi.spyOn(api.friendFields, 'list')
+      .mockRejectedValueOnce(new ApiError(403, 'disabled', 'FEATURE_DISABLED'))
+    const res = await scenarioReferenceData.friendFields('acc-feature-off')
+    expect(res.success).toBe(false)
+    // 共通ゲートへ画面を切り替えないよう、抑制印を付けて呼んでいる。
+    expect(spy).toHaveBeenCalledWith('acc-feature-off', undefined, { suppressFeatureDisabledEvent: true })
+    spy.mockRestore()
+  })
+
+  it('共通情報も同じく、機能オフは「候補なし」として解決する', async () => {
+    const spy = vi.spyOn(api.commonVars, 'list')
+      .mockRejectedValueOnce(new ApiError(403, 'disabled', 'FEATURE_DISABLED'))
+    const res = await scenarioReferenceData.commonVars('acc-common-vars-off')
+    expect(res.success).toBe(false)
+    expect(spy).toHaveBeenCalledWith('acc-common-vars-off', undefined, { suppressFeatureDisabledEvent: true })
+    spy.mockRestore()
+  })
+
+  it('機能オフ以外の失敗は投げ直す（空だと誤認させない・キャッシュに残さない）', async () => {
+    const spy = vi.spyOn(api.supportMarks, 'list')
+      .mockRejectedValueOnce(new ApiError(500, 'down'))
+    await expect(scenarioReferenceData.supportMarks('acc-server-down')).rejects.toMatchObject({ status: 500 })
+    spy.mockRestore()
   })
 })
