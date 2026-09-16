@@ -511,6 +511,47 @@ const spec = {
         responses: { '200': { description: 'Per-account delivery results' }, '400': { description: 'Invalid account selection' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Not found' } },
       },
     },
+    // ── NEN Members (会員ランク・ライフタイム・マイル ★V6 37-1) ──────────────
+    '/api/nen/rank-settings': {
+      get: {
+        tags: ['NEN Members'], summary: '会員ランク設定（ランク・決まり方・ライフタイムの節目・数値）を取得',
+        parameters: [{ name: 'accountId', in: 'query', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'Rank settings, rules, lifetime milestones and KPIs' }, '400': { description: 'accountId is required' }, '403': { description: 'Account not visible' } },
+      },
+      put: {
+        tags: ['NEN Members'], summary: 'ランク（名前・通年のしきい値・マイル還元）を一括保存し、ECへ同期してタグを付け替える',
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['accountId', 'ranks'], properties: { accountId: { type: 'string' }, ranks: { type: 'array', maxItems: 8, items: { type: 'object', required: ['name', 'annualThresholdYen', 'mileRatePercent'], properties: { id: { type: 'string', nullable: true }, name: { type: 'string', maxLength: 20 }, annualThresholdYen: { type: 'integer', minimum: 0 }, mileRatePercent: { type: 'number', minimum: 0, maximum: 10 } } } } } } } } },
+        responses: { '200': { description: 'Saved settings with sync result' }, '400': { description: 'Validation failed' }, '403': { description: 'Owner or admin role required' } },
+      },
+    },
+    '/api/nen/rank-settings/resync': {
+      post: {
+        tags: ['NEN Members'], summary: 'ランク設定をECへ送り直す',
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['accountId'], properties: { accountId: { type: 'string' } } } } } },
+        responses: { '200': { description: 'Settings with sync result' }, '403': { description: 'Owner or admin role required' } },
+      },
+    },
+    '/api/nen/lifetime-milestones': {
+      put: {
+        tags: ['NEN Members'], summary: 'ライフタイム（累計購入額）の節目を一括保存し、ECへ同期',
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['accountId', 'milestones'], properties: { accountId: { type: 'string' }, milestones: { type: 'array', maxItems: 12, items: { type: 'object', required: ['thresholdYen', 'title'], properties: { id: { type: 'string', nullable: true }, thresholdYen: { type: 'integer', minimum: 1 }, title: { type: 'string', maxLength: 30 }, notifyOnReach: { type: 'boolean' } } } } } } } } },
+        responses: { '200': { description: 'Saved milestones with sync result' }, '400': { description: 'Validation failed' }, '403': { description: 'Owner or admin role required' } },
+      },
+    },
+    '/api/nen/members': {
+      get: {
+        tags: ['NEN Members'], summary: '会員一覧（ランク・通年・ライフタイム・マイル残高・ペット）を取得',
+        parameters: [
+          { name: 'accountId', in: 'query', required: true, schema: { type: 'string' } },
+          { name: 'rank', in: 'query', schema: { type: 'string' } },
+          { name: 'pet', in: 'query', schema: { type: 'string', enum: ['any', 'with', 'without'] } },
+          { name: 'q', in: 'query', schema: { type: 'string' } },
+          { name: 'sort', in: 'query', schema: { type: 'string', enum: ['annual_desc', 'lifetime_desc', 'balance_desc', 'recent'] } },
+          { name: 'page', in: 'query', schema: { type: 'integer', minimum: 1 } },
+        ],
+        responses: { '200': { description: 'Paged members with KPIs and rank definitions' }, '400': { description: 'accountId is required' }, '403': { description: 'Account not visible' } },
+      },
+    },
     // ── HQ Billing ─────────────────────────────────────────────────────────
     '/api/hq/billing/summary': {
       get: {
