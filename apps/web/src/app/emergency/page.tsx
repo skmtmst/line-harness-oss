@@ -21,6 +21,13 @@ import {
 import { formatOperationDate, type OperationSeverity } from '@/lib/operation-status'
 import { operationImpactText, type EmergencyStopTarget } from '@/lib/operation-impact'
 import { operationControlSummary } from './control-summary'
+import {
+  CAPABILITY_LABEL as RESTORE_DRIFT_CAPABILITY_LABEL,
+  describeRestoreBlockers,
+  describeRestoreDrift,
+  describeRestoreResult,
+} from './restore-drift'
+import type { OperationRestoreDrift } from '@/lib/api'
 import releaseLog from '@/generated/release-log.json'
 import { useAccount } from '@/contexts/account-context'
 
@@ -53,15 +60,8 @@ const TARGET_CAPABILITIES: Record<StopTarget, OperationCapability[]> = {
   automations: ['automation_actions', 'auto_reply_dispatch'],
 }
 
-const CAPABILITY_LABEL: Record<OperationCapability, string> = {
-  broadcast_dispatch: '予約中の一斉配信',
-  scenario_dispatch: 'シナリオ配信',
-  reminder_dispatch: 'リマインダ',
-  automation_actions: 'オートメーション',
-  auto_reply_dispatch: '自動応答',
-  webhook_outgoing: '外部への通知',
-  ad_postback: '広告への成果通知',
-}
+/* N-451: drift文言の正本は restore-drift.ts。履歴表示も同じ名前を使う。 */
+const CAPABILITY_LABEL = RESTORE_DRIFT_CAPABILITY_LABEL
 
 /*
  * N-453/N-455: 止められない理由と競合後の再読込。
@@ -638,6 +638,12 @@ function EmergencyControlPanel({ accounts }: { accounts: LineAccount[] }) {
    * `operationBlockedText` で行う。口が古い版で欄が無いときは null。
    */
   const [previewBlockedCode, setPreviewBlockedCode] = useState<string | null>(null)
+  /*
+   * N-451: 停止中のincidentがあるとき、復旧前検査の結果（停止中の
+   * 編集・追加・期限切れ）を保持して確認画面へ出す。取得に失敗しても
+   * 復旧自体は口側の検査が同じ判断をするので進められる。
+   */
+  const [restoreDrift, setRestoreDrift] = useState<OperationRestoreDrift | null>(null)
   // N-455: 競合(409)後に最新状態の読み直しが必要な合図。成功後は消す。
   const [needsReload, setNeedsReload] = useState(false)
   const [reloading, setReloading] = useState(false)
@@ -724,6 +730,24 @@ function EmergencyControlPanel({ accounts }: { accounts: LineAccount[] }) {
       if (previewRequestGeneration.current === requestGeneration) previewRequestGeneration.current += 1
     }
   }, [applyPreview, clearPreview, requestPreview, targetAccountId])
+
+  /* N-451: 停止中のincidentが確定したら復旧前検査を取り、確認画面へ出す。 */
+  const activeIncidentId = control?.activeIncidentId ?? null
+  useEffect(() => {
+    if (!activeIncidentId) {
+      setRestoreDrift(null)
+      return
+    }
+    let cancelled = false
+    void api.operations.restorePreview(activeIncidentId)
+      .then((response) => {
+        if (!cancelled && response.success) setRestoreDrift(response.data.drift)
+      })
+      .catch(() => {
+        if (!cancelled) setRestoreDrift(null)
+      })
+    return () => { cancelled = true }
+  }, [activeIncidentId])
 
   const reloadControl = useCallback(async () => {
     const requestGeneration = ++previewRequestGeneration.current
@@ -849,11 +873,22 @@ function EmergencyControlPanel({ accounts }: { accounts: LineAccount[] }) {
       if (!response.success) throw new Error(response.error)
       setControl(response.data.control)
       setNeedsReload(false)
-      setMessage({ tone: 'success', text: 'サーバー共通の停止状態を復旧しました。期限を過ぎた予約は自動では送りません。' })
+      /* N-451: 全部戻った・一部だけ戻った・期限切れを下書きへ戻した、を分けて伝える。 */
+      setMessage(response.data.report
+        ? describeRestoreResult(response.data.report)
+        : { tone: 'success', text: 'サーバー共通の停止状態を復旧しました。' })
       setStepUpMode(null); setStepUpCode(''); setRequestKey('')
     } catch (error) {
       if (error instanceof ApiError && error.status === 409 && error.code === 'VERSION_CONFLICT') {
         handleConflict()
+      } else if (error instanceof ApiError && error.status === 409 && error.code === 'OPERATION_RESTORE_BLOCKED') {
+        /* N-451: 再開を止めた理由（編集・追加・権限喪失）を帯へ出す。 */
+        const report = (error.data as { report?: { drift?: OperationRestoreDrift } } | undefined)?.report
+        const reasons = report?.drift ? describeRestoreBlockers(report.drift) : []
+        handleOperationFailure([
+          operationFailureText(error, '停止中の変更があるため復旧を止めました。'),
+          ...reasons,
+        ].join(' '))
       } else if (error instanceof ApiError && error.status === 403) {
         handleForbidden(error.code)
       } else {
@@ -936,7 +971,11 @@ function EmergencyControlPanel({ accounts }: { accounts: LineAccount[] }) {
             <section className="rounded-control border border-danger bg-danger-bg p-4 text-danger"><p className="text-sm font-bold">{accountName}</p><div className="mt-3 divide-y divide-danger/15">{selectedTargets.map((key) => <div key={key} className="flex items-center justify-between gap-4 py-2" style={{ minHeight: 58 }}><div className="flex items-center gap-3"><span className="flex h-8 w-8 items-center justify-center rounded-full bg-canvas text-danger">■</span><div><p className="text-sm font-bold">{targetLabels[key].label}</p><p className="mt-0.5 text-xs">{targetLabels[key].note}</p></div></div><strong className="text-right text-sm">{impactText(key)}</strong></div>)}</div><p className="mt-3 text-xs font-bold">停止前にすでにLINEへ渡したものは取り消せません。</p></section>
             <section className="rounded-control bg-canvas-sunken px-4 py-3"><p className="text-xs font-bold text-ink">理由</p><p className="mt-1 text-sm text-ink-secondary">{fullReason}</p></section>
             <section className="rounded-control bg-success-bg px-4 py-3"><p className="text-xs font-bold text-success">止まらないもの</p><p className="mt-1 text-xs text-success">{targets.automations ? '受信箱からの手の返信と予約の受付は止まりません。' : '自動処理／受信箱からの手の返信／予約の受付は止まりません。'}</p></section>
-          </> : <section className="rounded-control border border-info bg-info-bg p-4 text-info"><p className="font-bold">{accountName}</p><p className="mt-1">期限を過ぎた予約は自動では送りません。</p></section>}
+          </> : <>
+            <section className="rounded-control border border-info bg-info-bg p-4 text-info"><p className="font-bold">{accountName}</p><p className="mt-1">期限を過ぎた予約は自動では送りません。</p></section>
+            {/* N-451: 停止中の変更・追加・期限切れを復旧の前に見せる。未取得なら出さない。 */}
+            {restoreDrift && describeRestoreDrift(restoreDrift).length > 0 && <section className="rounded-control border border-warning bg-warning-bg p-4 text-warning"><p className="text-sm font-bold">停止しているあいだに変わったものがあります</p><ul className="mt-2 list-disc space-y-1 pl-5 text-xs">{describeRestoreDrift(restoreDrift).map((line) => <li key={line}>{line}</li>)}</ul><p className="mt-2 text-xs">変更・追加があった配信は再開しません。期限切れの予約は下書きへ戻します。</p></section>}
+          </>}
             <div><label className="block text-sm font-bold text-ink-secondary" htmlFor="emergency-confirm-word">確認のため「{confirmMode === 'stop' ? '停止' : '復旧'}」と入力</label><input id="emergency-confirm-word" value={confirmWord} onChange={(event) => setConfirmWord(event.target.value)} autoFocus className="mt-2 min-h-11 rounded-control border border-hairline px-3 text-sm" style={{ width: 280 }} /><p className="mt-2 text-xs text-ink-faint">この操作は記録に残り、ログインユーザーへ通知されます。</p></div>
           </div>
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-hairline px-6 py-4" style={{ minHeight: 84 }}><p className="max-w-sm text-xs text-ink-faint">止めたことは、ログインユーザー全員のLINEとメールへ知らせます。</p><div className="flex gap-2"><button onClick={() => { setConfirmMode(null); setConfirmWord('') }} disabled={mutationLocked} className="min-h-11 rounded-control px-4 text-sm font-bold text-action hover:bg-action-soft">キャンセル</button><button onClick={() => { setStepUpMode(confirmMode); setConfirmMode(null); setStepUpCode('') }} disabled={mutationLocked || confirmWord !== (confirmMode === 'stop' ? '停止' : '復旧')} className={`min-h-11 rounded-control px-4 text-sm font-bold text-on-accent disabled:opacity-40 ${confirmMode === 'stop' ? 'bg-danger' : 'bg-info'}`}>{confirmMode === 'stop' ? '配信を緊急停止する' : '復旧を実行する'}</button></div></div>
