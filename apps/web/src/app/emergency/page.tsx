@@ -364,10 +364,12 @@ function HealthPanel({
   accountId,
   manualRunRequest,
   onSeverity,
+  onManualRunSettled,
 }: {
   accountId: string | null
   manualRunRequest: number
   onSeverity: (severity: OperationSeverity) => void
+  onManualRunSettled?: () => void
 }) {
   const [checks, setChecks] = useState<HealthCheckItem[]>(() =>
     CHECK_DEFINITIONS.map((item) => ({ ...item, detail: '確認しています…', severity: 'unknown', observedAt: null })),
@@ -431,6 +433,7 @@ function HealthPanel({
       setLoading(false)
       setRefreshing(false)
       hasLoaded.current = true
+      if (manual) onManualRunSettled?.()
       return
     }
     try {
@@ -472,16 +475,27 @@ function HealthPanel({
         setRefreshing(false)
         hasLoaded.current = true
       }
+      if (manual) onManualRunSettled?.()
     }
-  }, [accountId, applySnapshot])
+  }, [accountId, applySnapshot, onManualRunSettled])
 
   useEffect(() => {
     setAlertBusyId(null)
     setAlertNotice(null)
   }, [accountId])
 
+  /*
+   * クリック由来の増分だけ「手動実行」と見なす(N-458)。
+   * manualRunRequest が増えた後にアカウント切替などで load が
+   * 変わっても effect は再発火する。そのとき > 0 のままだと
+   * クリックしていないのに runHealth が走り、処理中の実行と
+   * 2本立つ。最後に処理した番号を覚えておき、新しい番号だけ手動扱いにする。
+   */
+  const handledManualRequest = useRef(manualRunRequest)
   useEffect(() => {
-    void load(manualRunRequest > 0)
+    const manual = manualRunRequest > handledManualRequest.current
+    handledManualRequest.current = manualRunRequest
+    void load(manual)
   }, [load, manualRunRequest])
 
   useEffect(() => {
@@ -1067,6 +1081,26 @@ function EmergencyPageInner() {
   const { selectedAccountId } = useAccount()
   const [severity, setSeverity] = useState<OperationSeverity>('unknown')
   const [manualRunRequest, setManualRunRequest] = useState(0)
+  /*
+   * 手動確認の連打・同時実行を止めるガード(N-458)。
+   *
+   * 以前はクリックのたびに manualRunRequest が増え、処理中でも
+   * runHealth が何本も発射された。ロック中のクリックは握りつぶし、
+   * HealthPanel が成否どちらでも終わった時点(settled)で外す。
+   * 古い応答は HealthPanel 側の世代照合で破棄される。
+   */
+  const [manualBusy, setManualBusy] = useState(false)
+  const manualRunLock = useRef(false)
+  const requestManualRun = useCallback(() => {
+    if (manualRunLock.current) return
+    manualRunLock.current = true
+    setManualBusy(true)
+    setManualRunRequest((current) => current + 1)
+  }, [])
+  const settleManualRun = useCallback(() => {
+    manualRunLock.current = false
+    setManualBusy(false)
+  }, [])
   const [accounts, setAccounts] = useState<LineAccount[]>([])
   const [accountsFailed, setAccountsFailed] = useState(false)
   /*
@@ -1091,9 +1125,9 @@ function EmergencyPageInner() {
       ? '止める配信を選び、理由を入力して緊急停止します。'
       : 'エラー、緊急停止、システム更新、設定変更を時間順に確認できます。'
   const headerAction = tab === 'health'
-    ? <button type="button" onClick={() => setManualRunRequest((current) => current + 1)} disabled={!selectedAccountId} className="rounded-control min-h-9 bg-accent-deep px-3 text-xs font-bold text-on-accent disabled:opacity-50">↻ いますぐ確かめる</button>
+    ? <button type="button" onClick={requestManualRun} disabled={!selectedAccountId || manualBusy} className="rounded-control min-h-9 bg-accent-deep px-3 text-xs font-bold text-on-accent disabled:opacity-50">{manualBusy ? '↻ 確認中…' : '↻ いますぐ確かめる'}</button>
     : severity === 'danger' || severity === 'warning' ? <StatusPill severity={severity} /> : undefined
-  return <div><OperationPageHeader description={tab === 'history' ? '' : description} action={headerAction} />{accountsFailed ? <div className="bg-warning-bg mt-3 flex flex-wrap items-center justify-between gap-2 rounded-control px-4 py-3 text-xs font-medium text-warning" role="alert"><p>アカウント一覧を取得できませんでした。個別のアカウントを選べず、全体が対象になります。</p><button type="button" onClick={() => loadAccounts()} className="rounded-control border border-warning px-3 py-1.5 font-bold hover:opacity-80">もう一度読む</button></div> : null}<MergedTabs basePath="/emergency" tabs={TABS} active={tab} />{tab === 'health' && <HealthPanel accountId={selectedAccountId} manualRunRequest={manualRunRequest} onSeverity={setSeverity} />}{tab === 'control' && <EmergencyControlPanel accounts={accounts} />}{tab === 'history' && <HistoryPanel />}</div>
+  return <div><OperationPageHeader description={tab === 'history' ? '' : description} action={headerAction} />{accountsFailed ? <div className="bg-warning-bg mt-3 flex flex-wrap items-center justify-between gap-2 rounded-control px-4 py-3 text-xs font-medium text-warning" role="alert"><p>アカウント一覧を取得できませんでした。個別のアカウントを選べず、全体が対象になります。</p><button type="button" onClick={() => loadAccounts()} className="rounded-control border border-warning px-3 py-1.5 font-bold hover:opacity-80">もう一度読む</button></div> : null}<MergedTabs basePath="/emergency" tabs={TABS} active={tab} />{tab === 'health' && <HealthPanel accountId={selectedAccountId} manualRunRequest={manualRunRequest} onSeverity={setSeverity} onManualRunSettled={settleManualRun} />}{tab === 'control' && <EmergencyControlPanel accounts={accounts} />}{tab === 'history' && <HistoryPanel />}</div>
 }
 
 function EmergencyPage() {
@@ -1103,6 +1137,7 @@ function EmergencyPage() {
 EmergencyPage.__test = {
   EmergencyControlFeedback,
   EmergencyControlPanel,
+  EmergencyPageInner,
   HealthPanel,
   OperationAlertsPanel,
   emergencySafetyTransition,
