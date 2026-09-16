@@ -1213,7 +1213,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
         lastMessageAt: chatDetail.lastMessageAt ?? lastMsg?.createdAt ?? null,
         lastMessageContent: chatDetail.lastMessageContent ?? lastMsg?.content ?? null,
         lastMessageDirection: chatDetail.lastMessageDirection ?? lastMsg?.direction ?? null,
-        lastMessageType: chatDetail.lastMessageType ?? lastMsg?.messageType ?? null,
+        lastMessageType: chatDetail.lastMessageType ?? (lastMsg?.isUnsent ? 'unsent' : lastMsg?.messageType) ?? null,
         isUnread: false,
         createdAt: chatDetail.createdAt,
         updatedAt: chatDetail.updatedAt ?? chatDetail.createdAt,
@@ -2113,6 +2113,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                     if (chat.lastMessageType === 'audio') return '音声'
                     if (chat.lastMessageType === 'file') return 'ファイル'
                     if (chat.lastMessageType === 'location') return '位置情報'
+                    if (chat.lastMessageType === 'unsent') return '送信を取り消しました'
                     return previewRaw.replace(/\n+/g, ' ').slice(0, 60)
                   })()
                   const node = (
@@ -2440,7 +2441,9 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
 
                     // メッセージ表示の分岐
                     let bubbleContent: React.ReactNode
-                    if (msg.messageType === 'flex') {
+                    if (msg.isUnsent) {
+                      bubbleContent = <span className="text-ink-faint">送信を取り消しました</span>
+                    } else if (msg.messageType === 'flex') {
                       bubbleContent = (
                         <div className="max-w-[300px]">
                           <FlexPreviewComponent content={msg.content} maxWidth={280} />

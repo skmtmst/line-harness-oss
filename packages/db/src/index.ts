@@ -28,6 +28,7 @@ export * from './booking-settings';
 export * from './booking-resources';
 export * from './booking-menu-resources';
 export * from './line-webhook-events';
+export * from './line-message-unsends';
 export * from './friend-add-events';
 export * from './friend-add-routing-versions';
 export * from './friend-add-rules';

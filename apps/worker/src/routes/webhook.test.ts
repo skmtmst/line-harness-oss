@@ -39,6 +39,10 @@ vi.mock('@line-crm/db', () => ({
   touchFriendAddSendClaim: vi.fn().mockResolvedValue(true),
   releaseFriendAddSendRight: vi.fn().mockResolvedValue(undefined),
   recordAnalyticsEvent: vi.fn().mockResolvedValue({ id: 'analytics-event-1' }),
+  recordIncomingLineMessage: vi.fn().mockImplementation(async (_db, input) => ({
+    id: input.id, inserted: true, isUnsent: false, unsentAt: null,
+  })),
+  recordLineMessageUnsend: vi.fn().mockResolvedValue(undefined),
   recordAutoReplyHit: vi.fn().mockResolvedValue(undefined),
   reserveAutoReplyEvaluation: vi.fn().mockImplementation(async (_db, input) => ({
     created: true,

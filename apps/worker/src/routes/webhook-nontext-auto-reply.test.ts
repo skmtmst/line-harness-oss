@@ -42,6 +42,11 @@ vi.mock('@line-crm/db', () => ({
   captureFriendAddEventAttribution: vi.fn().mockResolvedValue(null),
   markFriendAddEventRouting: vi.fn().mockResolvedValue(undefined),
   recordAnalyticsEvent: vi.fn().mockResolvedValue({ id: 'analytics-event-1' }),
+  recordIncomingLineMessage: vi.fn().mockImplementation(async (db, input) => {
+    await db.prepare('INSERT INTO messages_log').bind().run();
+    return { id: input.id, inserted: true, isUnsent: false, unsentAt: null };
+  }),
+  recordLineMessageUnsend: vi.fn().mockResolvedValue(undefined),
   recordAutoReplyHit: vi.fn().mockResolvedValue(undefined),
   // 二重実行の検証ができるよう、同じ incomingEventId の2回目は不成立にする。
   reserveAutoReplyEvaluation: vi.fn().mockImplementation(async (_db, input) => {

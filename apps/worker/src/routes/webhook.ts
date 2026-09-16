@@ -28,6 +28,8 @@ import {
   releaseFriendAddSendRight,
   toJstString,
   recordAnalyticsEvent,
+  recordIncomingLineMessage,
+  recordLineMessageUnsend,
 } from '@line-crm/db';
 import type { EntryRoute, Friend } from '@line-crm/db';
 import {
@@ -229,6 +231,9 @@ webhook.post('/webhook', async (c) => {
   }
 
   const lineClient = new LineClient(channelAccessToken);
+  // DBの内部IDが取れないenv既定アカウントでも、LINEのdestinationを使えば
+  // 別の公式アカウントとmessage IDが衝突しない。
+  const lineMessageAccountKey = matchedAccountId ?? `destination:${body.destination}`;
 
   // 非同期処理 — LINE は ~1s 以内のレスポンスを要求
   const processingPromise = processLineWebhookEvents({
@@ -241,6 +246,7 @@ webhook.post('/webhook', async (c) => {
       event,
       channelAccessToken,
       matchedAccountId,
+      lineMessageAccountKey,
       c.env.WORKER_URL || new URL(c.req.url).origin,
       c.env.LIFF_URL,
       c.env.IMAGES,
@@ -260,12 +266,23 @@ async function handleEvent(
   lineClient: LineClient,
   event: WebhookEvent,
   lineAccessToken: string,
-  lineAccountId: string | null = null,
+  lineAccountId: string | null,
+  lineMessageAccountKey: string,
   workerUrl?: string,
   liffUrl?: string,
   r2?: R2Bucket,
   ecommerce?: { baseUrl: string; secret: string },
 ): Promise<void> {
+  if (event.type === 'unsend') {
+    await recordLineMessageUnsend(db, {
+      lineMessageAccountKey,
+      lineMessageId: event.unsend.messageId,
+      sourceUserId: event.source.type === 'user' ? event.source.userId : null,
+      unsentAt: toJstString(new Date(event.timestamp)),
+    });
+    return;
+  }
+
   if (event.type === 'follow') {
     const userId =
       event.source.type === 'user' ? event.source.userId : undefined;
@@ -1165,13 +1182,19 @@ async function handleEvent(
     }
 
     const logId = crypto.randomUUID();
-    await db
-      .prepare(
-        `INSERT INTO messages_log (id, friend_id, direction, message_type, content, broadcast_id, scenario_step_id, source, line_account_id, created_at)
-         VALUES (?, ?, 'incoming', ?, ?, NULL, NULL, 'user', ?, ?)`,
-      )
-      .bind(logId, friend.id, msg.type, finalContent, lineAccountId, jstNow())
-      .run();
+    const recorded = await recordIncomingLineMessage(db, {
+      id: logId,
+      friendId: friend.id,
+      messageType: msg.type,
+      content: finalContent,
+      lineAccountId,
+      lineMessageAccountKey,
+      lineMessageId: msg.id,
+      createdAt: jstNow(),
+    });
+    // 別webhook IDで同じmessageが再送された場合と、先に取消済みの場合は
+    // マイル・自動応答・未読化などの副作用を繰り返さない。
+    if (!recorded.inserted || recorded.isUnsent) return;
     await awardActivityMileage(db, {
       eventType: 'message_received',
       source: 'line',
@@ -1226,14 +1249,19 @@ async function handleEvent(
     const now = jstNow();
     const logId = crypto.randomUUID();
 
-    // 受信メッセージをログに記録
-    await db
-      .prepare(
-        `INSERT INTO messages_log (id, friend_id, direction, message_type, content, broadcast_id, scenario_step_id, source, line_account_id, created_at)
-         VALUES (?, ?, 'incoming', 'text', ?, NULL, NULL, 'user', ?, ?)`,
-      )
-      .bind(logId, friend.id, incomingText, lineAccountId, now)
-      .run();
+    // 受信メッセージをLINE message ID単位で記録する。取消が先着していた
+    // 場合は本文を入れず、以後の副作用も起こさない。
+    const recorded = await recordIncomingLineMessage(db, {
+      id: logId,
+      friendId: friend.id,
+      messageType: 'text',
+      content: incomingText,
+      lineAccountId,
+      lineMessageAccountKey,
+      lineMessageId: textMessage.id,
+      createdAt: now,
+    });
+    if (!recorded.inserted || recorded.isUnsent) return;
 
     await awardActivityMileage(db, {
       eventType: 'message_received',

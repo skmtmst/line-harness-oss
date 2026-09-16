@@ -3058,6 +3058,15 @@ CREATE TABLE line_accounts (
   updated_at             TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 , login_channel_id TEXT, login_channel_secret TEXT, liff_id TEXT, token_expires_at TEXT, friend_capacity INTEGER, capacity_warn_at INTEGER, icon_url TEXT, parent_line_account_id TEXT REFERENCES line_accounts(id) ON DELETE SET NULL, tenant_id TEXT REFERENCES tenants(id), timezone TEXT NOT NULL DEFAULT 'Asia/Tokyo', provider_id TEXT, revision INTEGER NOT NULL DEFAULT 1, line_display_name TEXT, line_picture_url TEXT, line_basic_id TEXT, line_profile_synced_at TEXT);
 
+CREATE TABLE line_message_unsends (
+  line_message_account_key TEXT NOT NULL,
+  line_message_id          TEXT NOT NULL,
+  source_user_id           TEXT,
+  unsent_at                TEXT NOT NULL,
+  created_at               TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  PRIMARY KEY (line_message_account_key, line_message_id)
+);
+
 CREATE TABLE line_webhook_events (
   webhook_event_id TEXT PRIMARY KEY,
   line_account_id  TEXT,
@@ -3295,7 +3304,7 @@ CREATE TABLE messages_log (
   line_account_id  TEXT,
   sent_by_staff_id TEXT,
   created_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-, origin_kind TEXT, origin_id TEXT, scenario_version_step_id TEXT);
+, origin_kind TEXT, origin_id TEXT, scenario_version_step_id TEXT, line_message_id TEXT, line_message_account_key TEXT, unsent_at TEXT);
 
 CREATE TABLE mileage_adjustment_notifications (
   id                TEXT PRIMARY KEY,
@@ -6743,6 +6752,10 @@ CREATE INDEX idx_messages_log_friend_direction_source_created
 CREATE INDEX idx_messages_log_friend_id ON messages_log (friend_id);
 
 CREATE INDEX idx_messages_log_friend_source ON messages_log (friend_id, source);
+
+CREATE UNIQUE INDEX idx_messages_log_line_message_scope
+  ON messages_log (line_message_account_key, line_message_id)
+  WHERE line_message_id IS NOT NULL AND line_message_account_key IS NOT NULL;
 
 CREATE INDEX idx_messages_log_origin
   ON messages_log (origin_kind, created_at);
