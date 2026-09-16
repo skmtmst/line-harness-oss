@@ -21,7 +21,7 @@ vi.mock('./friend-tag-attach.js', () => ({
   detachTagAndFireSideEffects: tagMocks.detach,
 }));
 
-const { deriveEcTagIds, derivePetTagIds, NEN_TAG, refreshAllNenTags } =
+const { deriveEcTagIds, derivePetTagIds, NEN_TAG, RankTagResolver, refreshAllNenTags } =
   await import('./nen-tag-sync.js');
 
 beforeEach(() => {
@@ -158,7 +158,7 @@ function loadTestDb(friendCount: number, healthLogsPerFriend: number) {
 describe('NEN automatic tag rules', () => {
   const now = new Date('2026-08-11T03:00:00Z');
 
-  it('replaces rank and purchase-state tags from the current EC totals', () => {
+  it('replaces purchase-state tags from the current EC totals (rank tags come from the rank settings)', () => {
     const tags = deriveEcTagIds({
       customer_id: '33',
       orders_json: JSON.stringify([{ date: '2026-08-01T10:00:00+09:00', paymentMethod: 'Stripe credit card', items: [{ name: '毎日の鹿肉バランス4袋セット' }] }]),
@@ -169,7 +169,6 @@ describe('NEN automatic tag rules', () => {
     }, now);
 
     expect(tags).toEqual(expect.objectContaining(new Set([
-      NEN_TAG.rankGold,
       NEN_TAG.purchaseExperienced,
       NEN_TAG.purchaseRepeat,
       NEN_TAG.purchaseRecent30,
@@ -180,7 +179,49 @@ describe('NEN automatic tag rules', () => {
       NEN_TAG.productSet,
     ])));
     expect(tags.has(NEN_TAG.rankSilver)).toBe(false);
+    expect(tags.has(NEN_TAG.rankGold)).toBe(false);
     expect(tags.has(NEN_TAG.purchaseNone)).toBe(false);
+  });
+
+  it('ランクのタグは設定（nen_rank_settings）から選ぶ。設定が無ければ初期の4ランクで通年から決める', async () => {
+    const settings = new Map<string, Array<Record<string, unknown>>>();
+    const db = {
+      prepare(sql: string) {
+        return {
+          bind(...bindings: unknown[]) {
+            return {
+              async all() {
+                if (sql.includes('FROM nen_rank_settings')) return { results: settings.get(String(bindings[0])) ?? [] };
+                return { results: [] };
+              },
+              async first() { return null; },
+              async run() { return { meta: { changes: 0 } }; },
+            };
+          },
+        };
+      },
+    } as unknown as D1Database;
+    settings.set('account-custom', [
+      { rank_key: 'regular', name: 'レギュラー', annual_threshold_yen: 0, mile_rate_percent: 1, tag_id: NEN_TAG.rankBasic },
+      { rank_key: 'vip', name: 'VIP', annual_threshold_yen: 50_000, mile_rate_percent: 5, tag_id: 'tag-vip' },
+    ]);
+    const resolver = new RankTagResolver(db);
+    const snapshot = (annual: number, key: string | null, purchase = 0) => ({
+      customer_id: '1', orders_json: '[]', subscription_json: null, purchase_count: 1, purchase_amount: purchase,
+      member_rank: '会員', annual_miles_yen: annual, member_rank_key: key,
+    });
+
+    // 設定が無いアカウント：初期4ランク。通年 72,400 → ゴールド。
+    expect(await resolver.desiredTagId('account-default', snapshot(72_400, null))).toBe(NEN_TAG.rankGold);
+    // ECから届いたランクキーを優先する。
+    expect(await resolver.desiredTagId('account-default', snapshot(0, 'platinum'))).toBe(NEN_TAG.rankPlatinum);
+    // 通年が無い（EC未対応）友だちは、これまでの足し算で暫定判定する。
+    expect(await resolver.desiredTagId('account-default', snapshot(0, null, 35_000))).toBe(NEN_TAG.rankSilver);
+    // 連携前（スナップショット無し）はレギュラー。
+    expect(await resolver.desiredTagId('account-default', null)).toBe(NEN_TAG.rankBasic);
+    // 設定があるアカウント：設定のタグで判定し、付け替え対象には既存4つ＋設定のタグが含まれる。
+    expect(await resolver.desiredTagId('account-custom', snapshot(60_000, null))).toBe('tag-vip');
+    expect(await resolver.managedTagIds('account-custom')).toEqual(expect.arrayContaining([NEN_TAG.rankBasic, NEN_TAG.rankPlatinum, 'tag-vip']));
   });
 
   it('detects subscription status and a date within seven days', () => {

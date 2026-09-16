@@ -194,6 +194,8 @@ const STAFF_API_PERMISSIONS: Array<[string, string]> = [
   // 合う実経路は無いが、互換のため残す。
   ['/api/friend-add-rules', '/friend-add-settings'], ['/api/friend-add-runs', '/friend-add-settings'],
   ['/api/nen-campaigns', '/nen-campaigns'], ['/api/nen-members', '/nen-members'], ['/api/ec-commerce', '/ec-commerce'],
+  // 然の会員（★V6 37-1）。メニューの href は /nen/members。
+  ['/api/nen/rank-settings', '/nen/members'], ['/api/nen/lifetime-milestones', '/nen/members'], ['/api/nen/members', '/nen/members'],
 ];
 
 /**

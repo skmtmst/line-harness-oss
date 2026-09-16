@@ -193,6 +193,8 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'GET /api/mileage/redemptions',
   'GET /api/mileage/rules',
   'GET /api/mileage/rules/export',
+  'GET /api/nen/members',
+  'GET /api/nen/rank-settings',
   'GET /api/nen-campaigns/deliveries',
   'GET /api/nen-campaigns/deliveries/{id}',
   'GET /api/nen-campaigns/metrics/columns',
@@ -288,6 +290,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'POST /api/line-accounts/connect/check',
   'POST /api/mileage/earning-rules/{id}/publish',
   'POST /api/mileage/rules',
+  'POST /api/nen/rank-settings/resync',
   'POST /api/nen-campaigns/deliveries/{id}/retry',
   'POST /api/notifications/operator-outbox/sweep',
   'POST /api/operations/alerts/{id}/acknowledge',
@@ -328,6 +331,8 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'PUT /api/scenarios/{id}/draft',
   'PUT /api/scenarios/{id}/steps/{stepId}',
   'PUT /api/users/{id}',
+  'PUT /api/nen/lifetime-milestones',
+  'PUT /api/nen/rank-settings',
 ]);
 
 const ALLOWLIST = new Set<string>([
