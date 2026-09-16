@@ -5584,9 +5584,10 @@ export const api = {
   },
   /** 共通情報。営業時間などを1か所で直す。 */
   commonVars: {
-    list: (accountId: string, params?: { folderId?: string }) =>
+    list: (accountId: string, params?: { folderId?: string }, options?: FetchApiOptions) =>
       fetchApi<CommonVarsListResponse>(
         `/api/common-vars?accountId=${encodeURIComponent(accountId)}${params?.folderId ? `&folderId=${encodeURIComponent(params.folderId)}` : ''}`,
+        options,
       ),
     detail: (id: string, accountId: string) =>
       fetchApi<ApiResponse<CommonVarDetail>>(

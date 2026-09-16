@@ -4,7 +4,7 @@ import SelectField from '@/components/shared/select-field'
 import React, { Suspense, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { api } from '@/lib/api'
+import { api, ApiError } from '@/lib/api'
 import { type Folder } from '@line-crm/shared'
 import { Field, inputClass } from '@/components/shared/create-page'
 import { useAccount } from '@/contexts/account-context'
@@ -29,12 +29,22 @@ async function loadTemplateReferences(
   accountId: string,
   loaders: ReferenceLoaders = {
     friendFields: (id) => api.friendFields.list(id, undefined, { suppressFeatureDisabledEvent: true }),
-    commonVars: (id) => api.commonVars.list(id),
+    commonVars: (id) => api.commonVars.list(id, undefined, { suppressFeatureDisabledEvent: true }),
   },
 ): Promise<TemplateReferences> {
+  /*
+    友だち情報・共通情報は任意機能。機能オフの403でテンプレート編集そのものを
+    止めないよう、その失敗だけ「候補なし」として扱う。
+  */
+  const emptyOnDisabled = (error: unknown) => {
+    if (error instanceof ApiError && error.code === 'FEATURE_DISABLED') {
+      return { success: true as const, data: [] }
+    }
+    throw error
+  }
   const [fieldResponse, varResponse] = await Promise.all([
-    loaders.friendFields(accountId),
-    loaders.commonVars(accountId),
+    loaders.friendFields(accountId).catch(emptyOnDisabled),
+    loaders.commonVars(accountId).catch(emptyOnDisabled),
   ])
   if (!fieldResponse.success || !varResponse.success) {
     throw new Error('差し込み項目を読み込めませんでした')

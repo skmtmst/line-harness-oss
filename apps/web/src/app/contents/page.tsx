@@ -9,6 +9,7 @@ import type {
 } from '@line-crm/shared'
 import { LayoutGrid, List as ListIcon } from 'lucide-react'
 import { api, ApiError, type MediaQuota } from '@/lib/api'
+import FeatureGate from '@/components/feature-gate'
 import Button from '@/components/shared/button'
 import { formatMediaSize } from './media-usage-display'
 import Dialog from '@/components/shared/dialog'
@@ -109,6 +110,15 @@ function mediaDetailIdFromLocation(): string | null {
 }
 
 export default function MediaLibraryPage() {
+  // 直URLでも登録メディアオフのaccountには画面を出さない。
+  return (
+    <FeatureGate feature="media">
+      <MediaLibraryInner />
+    </FeatureGate>
+  )
+}
+
+function MediaLibraryInner() {
   const [view, setView] = useState<MediaView>('grid')
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const latestAccountRef = useRef(selectedAccountId)

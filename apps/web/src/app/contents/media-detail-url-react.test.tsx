@@ -47,6 +47,9 @@ vi.mock('@/lib/api', () => {
   return {
     ApiError,
     api: {
+      featureSettings: {
+        visibility: () => Promise.resolve({ success: true, data: { features: { media: true } } }),
+      },
       staff: {
         me: () => Promise.resolve({ success: true, data: { role: 'owner' } }),
       },

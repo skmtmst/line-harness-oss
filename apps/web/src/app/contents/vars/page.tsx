@@ -28,6 +28,7 @@ import {
   usageText,
 } from './delete-impact'
 import ListState from '@/components/shared/list-state'
+import FeatureGate from '@/components/feature-gate'
 import { useAccount } from '@/contexts/account-context'
 import SelectField from '@/components/shared/select-field'
 import {
@@ -1080,7 +1081,10 @@ export default function CommonVarsPage() {
   // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
   return (
     <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中...</div>}>
-      <VarsPageInner />
+      {/* 直URLでも共通情報オフのaccountには画面を出さない。 */}
+      <FeatureGate feature="common_vars">
+        <VarsPageInner />
+      </FeatureGate>
     </Suspense>
   )
 }

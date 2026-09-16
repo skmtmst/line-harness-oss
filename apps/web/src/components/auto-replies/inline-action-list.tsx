@@ -6,6 +6,7 @@ import type { ScenarioActionType } from '@/lib/api'
 import { ActionConfigEditor, ACTION_KINDS } from '@/components/scenarios/action-editor'
 import { newActionKey, type InlineAction } from './draft-fields'
 import { useAccount } from '@/contexts/account-context'
+import { useFeatureVisibility } from '@/lib/use-feature-visibility'
 
 /**
  * 応答したときに行うことの並び。
@@ -53,7 +54,7 @@ export function useActionOptions(): ActionOptions {
         api.friendFields.list(selectedAccountId, undefined, { suppressFeatureDisabledEvent: true }),
         api.supportMarks.list(selectedAccountId, { suppressFeatureDisabledEvent: true }),
         api.scenarios.list(),
-        api.commonVars.list(selectedAccountId),
+        api.commonVars.list(selectedAccountId, undefined, { suppressFeatureDisabledEvent: true }),
       ])
       if (cancelled) return
       setOptions({
@@ -101,6 +102,9 @@ export default function InlineActionList({
   scenarios,
   vars,
 }: Props) {
+  const { selectedAccountId } = useAccount()
+  // 任意機能の動作種は、そのaccountで機能がオフなら追加口ごと出さない。
+  const actionFeatureVisibility = useFeatureVisibility(selectedAccountId)
   function add(actionType: ScenarioActionType) {
     const kind = ACTION_KINDS.find((k) => k.type === actionType)
     onChange([...actions, { key: newActionKey(), actionType, config: kind?.make() ?? {} }])
@@ -193,7 +197,7 @@ export default function InlineActionList({
       ))}
 
       <div className="flex flex-wrap gap-1.5">
-        {ACTION_KINDS.map((kind) => (
+        {ACTION_KINDS.filter((kind) => !kind.feature || actionFeatureVisibility.enabled(kind.feature)).map((kind) => (
           <button
             key={kind.type}
             type="button"

@@ -12,6 +12,7 @@ import type {
   Folder,
 } from '@line-crm/shared'
 import { api, ApiError, type CommonVarDetail } from '@/lib/api'
+import FeatureGate from '@/components/feature-gate'
 import { VAR_TYPE_LABELS, formatStamp } from '@/lib/common-vars'
 import { useAccount } from '@/contexts/account-context'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -915,7 +916,10 @@ export default function EditCommonVarPage() {
   // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
   return (
     <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中...</div>}>
-      <EditCommonVarInner />
+      {/* 直URLでも共通情報オフのaccountには画面を出さない。 */}
+      <FeatureGate feature="common_vars">
+        <EditCommonVarInner />
+      </FeatureGate>
     </Suspense>
   )
 }
