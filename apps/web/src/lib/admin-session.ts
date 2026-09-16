@@ -1,5 +1,23 @@
 export const ADMIN_SESSION_STORAGE_KEY = 'lh_admin_session_fallback'
 export const TWO_FACTOR_CHALLENGE_STORAGE_KEY = 'lh_two_factor_challenge'
+const TWO_FACTOR_NEXT_STORAGE_KEY = 'lh_2fa_next'
+
+/**
+ * 運営コンソールから始めた二段階認証かを、URL と一時保存の両方から判定する。
+ *
+ * `next=ops` は秘密ではないので query に残してよい。シークレットモードでは
+ * タブをまたぐ Cookie / storage の扱いが通常モードより厳しいため、URL を正本に
+ * して、従来の hash と sessionStorage は後方互換として残す。
+ */
+export function isOpsTwoFactorReturn(
+  search: string,
+  hash: string,
+  storedNext: string | null,
+): boolean {
+  const query = new URLSearchParams(search.replace(/^\?/, ''))
+  const fragment = new URLSearchParams(hash.replace(/^#/, ''))
+  return query.get('next') === 'ops' || fragment.get('lh_next') === 'ops' || storedNext === 'ops'
+}
 
 export function storeAdminSession(sessionToken: string, csrfToken?: string): void {
   if (typeof window === 'undefined' || !sessionToken) return
@@ -25,8 +43,9 @@ export function captureTwoFactorChallenge(): string {
   const params = new URLSearchParams(window.location.hash.replace(/^#/, ''))
   const token = params.get('lh_2fa') || ''
   // 運営コンソール（/ops）から来たときは、認証のあと /ops へ戻す（★V6 37-1）。
-  const next = params.get('lh_next')
-  if (next === 'ops') sessionStorage.setItem(TWO_FACTOR_NEXT_STORAGE_KEY, 'ops')
+  if (isOpsTwoFactorReturn(window.location.search, window.location.hash, null)) {
+    sessionStorage.setItem(TWO_FACTOR_NEXT_STORAGE_KEY, 'ops')
+  }
   if (token) {
     sessionStorage.setItem(TWO_FACTOR_CHALLENGE_STORAGE_KEY, token)
     window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`)
@@ -34,14 +53,12 @@ export function captureTwoFactorChallenge(): string {
   return token || sessionStorage.getItem(TWO_FACTOR_CHALLENGE_STORAGE_KEY) || ''
 }
 
-const TWO_FACTOR_NEXT_STORAGE_KEY = 'lh_2fa_next'
-
 /** 2 要素認証のあとの戻り先。'/ops' か '/'。読んだら消す。 */
 export function takeTwoFactorNextPath(): string {
   if (typeof window === 'undefined') return '/'
   const next = sessionStorage.getItem(TWO_FACTOR_NEXT_STORAGE_KEY)
   sessionStorage.removeItem(TWO_FACTOR_NEXT_STORAGE_KEY)
-  return next === 'ops' ? '/ops' : '/'
+  return isOpsTwoFactorReturn(window.location.search, window.location.hash, next) ? '/ops' : '/'
 }
 
 export function clearTwoFactorChallenge(): void {
