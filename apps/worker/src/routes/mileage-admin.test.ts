@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 
 const dbMocks = {
+  getActiveImpersonation: vi.fn(async () => null),
+  getPlatformAdminByStaffId: vi.fn(async () => null),
   getStaffByApiKey: vi.fn().mockResolvedValue(null),
   getFriendById: vi.fn(),
   getMileageAdminOverview: vi.fn(),

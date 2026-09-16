@@ -149,6 +149,8 @@ export const FEATURE_ROUTE_MANIFEST: readonly FeatureRouteMetadata[] = [
   exempt('/api/internal', 'system', '内部サービス間経路'),
   exempt('/api/operations', 'system', '運用状態と監視'),
   exempt('/api/tenants', 'core', '統括管理'),
+  exempt('/api/ops', 'core', '運営コンソール（★V6 37）。ルート内で platform_admins を検証し、統括をまたいで読む'),
+  exempt('/api/hq/operator-history', 'core', '契約先から見える運営の操作履歴。ルート内で staff.tenantId に絞る'),
   exempt('/api/setup', 'core', '初期設定'),
   exempt('/api/getting-started', 'core', '初期設定'),
   exempt('/api/hq/banners', 'core', '統括バナー生成。ルート内でtenantと統括編集権限を検証'),

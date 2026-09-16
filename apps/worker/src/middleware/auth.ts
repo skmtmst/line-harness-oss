@@ -1,6 +1,8 @@
 import type { Context, Next } from 'hono';
 import { getStaffByAdminSession, getStaffByApiKey } from '@line-crm/db';
 import type { Env } from '../index.js';
+import { isForbiddenWhileImpersonating, resolveImpersonation } from './impersonation.js';
+
 import type { AdminSameSite } from './admin-auth-config.js';
 
 export const ADMIN_AUTH_COOKIE = 'lh_admin_session';
@@ -491,11 +493,22 @@ export async function authMiddleware(c: Context<Env>, next: Next): Promise<Respo
 
   const bearer = bearerToken(c);
   const cookie = adminSessionTokenFromCookie(c);
-  const staff = bearer
+  let staff = bearer
     ? await authenticateApiToken(c, bearer)
     : await authenticateCookieToken(c, cookie);
   if (!staff) {
     return c.json({ success: false, error: 'Unauthorized' }, 401);
+  }
+
+  // 代理ログイン（★V6 37-5）。運営マスターが契約先の画面に入っている間だけ、
+  // 見ている統括を差し替える。既定は閲覧のみなので、この直後の readOnly 判定に乗る。
+  const impersonated = await resolveImpersonation(c, staff, path);
+  if (impersonated) {
+    staff = impersonated.staff;
+    c.set('impersonation', impersonated.context);
+    if (isForbiddenWhileImpersonating(method, path)) {
+      return c.json({ success: false, error: '代理ログイン中はこの操作はできません（解約・権限者の削除・LINEアカウントの削除）' }, 403);
+    }
   }
 
   if (staff.readOnly && !SAFE_METHODS.has(method)) {
