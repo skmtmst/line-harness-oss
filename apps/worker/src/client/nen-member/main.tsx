@@ -25,9 +25,9 @@ let root: Root | null = null;
 
 const tabItems: Array<{ value: Tab; label: string }> = [
   { value: 'home', label: 'マイページ' },
-  { value: 'pets', label: 'ペット' },
-  { value: 'health', label: '健康' },
-  { value: 'orders', label: '注文' },
+  { value: 'pets', label: 'マイペット' },
+  { value: 'health', label: '健康日記' },
+  { value: 'orders', label: '注文・定期' },
   { value: 'photos', label: '投稿' },
 ];
 
@@ -286,33 +286,40 @@ function MembershipSheet({ membership, ownerName }: { membership: Membership; ow
   const [drawn, setDrawn] = useState(0);
   useEffect(() => { const frame = requestAnimationFrame(() => setDrawn(progress)); return () => cancelAnimationFrame(frame); }, [progress]);
   const animatedMiles = useAnimatedNumber(membership.mileBalance);
-  const point = (fraction: number) => { const angle = Math.PI * (1 - fraction); return { x: 130 + 100 * Math.cos(angle), y: 130 - 100 * Math.sin(angle) }; };
-  const gaugeOffset = 314 * (1 - drawn);
-  return <header className="nm-member-header" data-rank={Math.min(3, rankIndex)}>
-    <div className="nm-brand-row"><div><p>NEN MEMBERS</p><h1>{ownerName}さん</h1></div><span>然 -NEN-</span></div>
-    <section className="nm-membership-sheet">
+  const point = (fraction: number) => { const angle = Math.PI * (1 - fraction); return { x: 130 + 110 * Math.cos(angle), y: 130 - 110 * Math.sin(angle) }; };
+  const gaugeLength = 346;
+  const gaugeOffset = gaugeLength * (1 - drawn);
+  return <section className="nm-membership-sheet" data-rank={Math.min(3, rankIndex)} aria-label={`${ownerName}さんの会員情報`}>
       <div className="nm-rank-summary"><span className="nm-rank-pill">{membership.rankName}会員</span><small>MEMBERSHIP STATUS</small></div>
       <div className="nm-gauge" aria-label={`使えるマイル ${membership.mileBalance.toLocaleString()}マイル。今年のマイル ${yen(membership.annualMilesYen)}`}>
         <svg viewBox="0 0 260 150" aria-hidden="true">
-          <path className="nm-gauge-base" d="M30 130 A100 100 0 0 1 230 130"/>
-          <path className="nm-gauge-value" d="M30 130 A100 100 0 0 1 230 130" style={{ strokeDashoffset: gaugeOffset }}/>
-          {ranks.map(rank => { const reached = membership.annualMilesYen >= rank.thresholdYen && rankIndex >= ranks.indexOf(rank); const { x, y } = point(rank.thresholdYen / top); return <g className={`nm-gauge-checkpoint ${reached ? 'reached' : ''}`} key={rank.key}><circle cx={x} cy={y} r="10"/><text x={x} y={y + 3} textAnchor="middle">{reached ? '✓' : man(rank.thresholdYen)}</text></g>; })}
+          <path className="nm-gauge-base" d="M20 130 A110 110 0 0 1 240 130"/>
+          <path className="nm-gauge-value" d="M20 130 A110 110 0 0 1 240 130" style={{ strokeDashoffset: gaugeOffset }}/>
+          {ranks.map(rank => { const reached = membership.annualMilesYen >= rank.thresholdYen && rankIndex >= ranks.indexOf(rank); const { x, y } = point(rank.thresholdYen / top); return <g className={`nm-gauge-checkpoint ${reached ? 'reached' : ''}`} key={rank.key}><circle cx={x} cy={y} r="16"/><text x={x} y={y + 4} textAnchor="middle">{reached ? '✓' : man(rank.thresholdYen)}</text></g>; })}
         </svg>
         <div className="nm-gauge-number"><strong>{animatedMiles.toLocaleString()}</strong><span>使えるマイル</span></div>
       </div>
       <div className="nm-rank-levels" style={{ gridTemplateColumns: `repeat(${ranks.length}, 1fr)` }}>{ranks.map((rank, index) => <div className={index <= rankIndex ? 'reached' : ''} key={rank.key}><i/><b>{rank.name}</b><span>{rank.thresholdYen === 0 ? '0円〜' : `年${man(rank.thresholdYen)}万円〜`}</span></div>)}</div>
       <div className="nm-member-summary">
         <div><span>通年</span><b>{yen(membership.annualMilesYen)}</b></div>
-        {membership.next
-          ? <p>あと <b>{yen(membership.next.remainingYen)}</b> で{membership.next.name}</p>
-          : <p>最高ランクです。いつもありがとうございます。</p>}
+        <div className="nm-member-next">
+          {membership.next
+            ? <strong>{membership.next.name}まで あと {yen(membership.next.remainingYen)}</strong>
+            : <strong>最高ランクです</strong>}
+          {membership.validUntil ? <span>{membership.rankName}は {displayDate(membership.validUntil)} まで維持</span> : null}
+        </div>
       </div>
-      <div className="nm-member-foot">
-        <span>マイル還元 <b>{membership.mileRatePercent == null ? '—' : `${membership.mileRatePercent}%`}</b></span>
-        {membership.validUntil ? <span>{membership.rankName}は {displayDate(membership.validUntil)} まで維持</span> : null}
-      </div>
-    </section>
-  </header>;
+    </section>;
+}
+
+function petAge(birthday: string): string {
+  const born = new Date(`${birthday}T00:00:00`);
+  if (!Number.isFinite(born.getTime())) return '';
+  const today = new Date();
+  let years = today.getFullYear() - born.getFullYear();
+  const beforeBirthday = today.getMonth() < born.getMonth() || (today.getMonth() === born.getMonth() && today.getDate() < born.getDate());
+  if (beforeBirthday) years -= 1;
+  return years >= 0 ? `${years}歳` : '';
 }
 
 function App({ ctx }: { ctx: Ctx }) {
@@ -336,11 +343,12 @@ function App({ ctx }: { ctx: Ctx }) {
     : data.commerce.subscription ? [data.commerce.subscription] : [];
   const recentOrders = data.commerce.orders.slice(0, 3);
   return <main className="nm-app">
-    {tab === 'home' ? <MembershipSheet membership={membership} ownerName={data.owner.displayName || 'お客様'} /> : <header className="nm-page-header"><span>NEN MEMBERS</span><h1>{tabLabel}</h1></header>}
-    {tab === 'home' && <section className="nm-stack">
-      <div className="nm-card nm-lifetime"><div className="nm-lifetime-row"><div><span>LIFETIME</span><h2>ライフタイム</h2></div><b>{yen(membership.lifetimeMilesYen)}</b></div><p className="nm-sub">{membership.nextMilestone ? `これまでの累計。あと ${yen(membership.nextMilestone.remainingYen)} で「${membership.nextMilestone.title}」。節目で限定グッズをご用意します。` : 'これまでの累計。節目で限定グッズをご用意します。'}</p></div>
-      <div className="nm-card"><div className="nm-section-heading nm-heading-row"><div><span>MY PET</span><h2>マイペット</h2></div><button type="button" className="nm-link" onClick={() => { setTab('pets'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>すべて見る</button></div>{data.pets.length ? data.pets.map(p => <div className="nm-pet nm-pet-row" key={p.id}><span className="nm-pet-avatar-frame nm-pet-avatar-small">{p.imageUrl ? <img src={p.imageUrl} alt="" /> : <TabIcon tab="pets" />}</span><div className="nm-pet-text"><b>{p.name}ちゃん</b><span>{[p.animalType === 'cat' ? '猫' : '犬', p.breed, p.weightKg ? `${p.weightKg}kg` : ''].filter(Boolean).join('・')}</span><strong>今日の目安 {p.recommendedDailyMinGrams}〜{p.recommendedDailyMaxGrams}g／日（然の主食）</strong></div></div>) : <p className="nm-empty-text">まだ登録がありません。</p>}<p className="nm-note">目安は体重と年齢から計算した参考値です。獣医師の判断に代わるものではありません。</p></div>
-      <div className="nm-card"><div className="nm-section-heading nm-heading-row"><div><span>RECENT ORDERS</span><h2>最近の注文</h2></div><button type="button" className="nm-link" onClick={() => { setTab('orders'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>注文・定期を見る</button></div>{recentOrders.length ? <ul className="nm-order-lines">{recentOrders.map((order, index) => <li key={order.id || order.number || index}><span>{displayDate(order.date || order.orderDate).replace(/^\d{4}\//, '')}</span><em>{order.items?.map(item => item.name).filter(Boolean).slice(0, 2).join('、') || `注文 ${order.number || ''}`}</em><b>{typeof order.total === 'number' ? yen(order.total) : ''}</b></li>)}</ul> : <p className="nm-empty-text">まだ注文がありません。</p>}</div>
+    {tab === 'home' ? <header className="nm-home-header"><div><h1>マイページ</h1><span>然 -NEN-</span></div><p>{data.owner.displayName || 'お客様'}さん</p></header> : <header className="nm-page-header"><span>NEN MEMBERS</span><h1>{tabLabel}</h1></header>}
+    {tab === 'home' && <section className="nm-stack nm-home-stack">
+      <MembershipSheet membership={membership} ownerName={data.owner.displayName || 'お客様'} />
+      <div className="nm-card nm-lifetime"><div className="nm-lifetime-row"><span>ライフタイム</span><b>{yen(membership.lifetimeMilesYen)}</b></div><p className="nm-sub">{membership.nextMilestone ? `これまでの累計。あと ${yen(membership.nextMilestone.remainingYen)} で「${membership.nextMilestone.title}」。節目で限定グッズをご用意します` : 'これまでの累計。節目で限定グッズをご用意します'}</p></div>
+      <div className="nm-card nm-home-pets"><div className="nm-heading-row"><h2>マイペット</h2><button type="button" className="nm-link" onClick={() => { setTab('pets'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>すべて見る</button></div>{data.pets.length ? data.pets.map(p => <button type="button" className="nm-home-pet-row" onClick={() => { setTab('pets'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} key={p.id}><span className="nm-pet-avatar-frame nm-pet-avatar-small">{p.imageUrl ? <img src={p.imageUrl} alt="" /> : <TabIcon tab="pets" />}</span><span className="nm-pet-text"><b>{p.name}ちゃん</b><span>{[p.animalType === 'cat' ? '猫' : '犬', petAge(p.birthday), p.weightKg ? `${p.weightKg}kg` : ''].filter(Boolean).join('・')}</span><strong>今日の目安 {p.recommendedDailyMinGrams === p.recommendedDailyMaxGrams ? p.recommendedDailyMinGrams : `${p.recommendedDailyMinGrams}〜${p.recommendedDailyMaxGrams}`}g／日（然 鹿肉ごはん）</strong></span><i aria-hidden="true">›</i></button>) : <p className="nm-empty-text">まだ登録がありません。</p>}<p className="nm-note">目安は体重と年齢から計算した参考値です。獣医師の判断に代わるものではありません。</p></div>
+      <div className="nm-card nm-home-orders"><div className="nm-heading-row"><h2>最近の注文</h2><button type="button" className="nm-link" onClick={() => { setTab('orders'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>注文・定期を見る</button></div>{recentOrders.length ? <ul className="nm-order-lines">{recentOrders.map((order, index) => <li key={order.id || order.number || index}><span>{displayDate(order.date || order.orderDate).replace(/^\d{4}\//, '')}</span><em>{order.items?.map(item => item.name).filter(Boolean).slice(0, 2).join('、') || `注文 ${order.number || ''}`}</em><b>{typeof order.total === 'number' ? yen(order.total) : ''}</b></li>)}</ul> : <p className="nm-empty-text">まだ注文がありません。</p>}</div>
     </section>}
     {tab === 'pets' && <PetsView ctx={ctx} pets={data.pets} onChanged={() => void load()} />}
     {tab === 'health' && <HealthDiary ctx={ctx} pets={data.pets} />}
