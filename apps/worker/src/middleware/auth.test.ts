@@ -14,6 +14,9 @@ import { encryptTotpSecret, totpAtStep } from '../lib/totp.js';
 import type { Env } from '../index.js';
 
 vi.mock('@line-crm/db', () => ({
+  // 代理ログイン（★V6 37-5）。ここでは常に「無し」。
+  getActiveImpersonation: vi.fn(async () => null),
+  getPlatformAdminByStaffId: vi.fn(async () => null),
   getStaffByApiKey: vi.fn(async (_db: unknown, token: string) => {
     if (token === 'viewer-key') return { id: 'viewer-1', name: 'Viewer One', role: 'staff', access_level: 'read_only' };
     if (token === 'friends-key') return { id: 'friends-1', name: 'Friends Staff', role: 'staff', permission_keys: '["/friends"]' };
