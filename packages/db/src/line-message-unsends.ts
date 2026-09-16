@@ -1,0 +1,111 @@
+export type IncomingLineMessageRecord = {
+  id: string;
+  inserted: boolean;
+  isUnsent: boolean;
+  unsentAt: string | null;
+};
+
+/**
+ * LINEの受信messageをmessage ID単位で1回だけ記録する。
+ *
+ * 墓標の参照とINSERTを1文にまとめている。unsendと同時に届いても、
+ * 「取消を先に確定したあと本文だけが復活する」隙間を作らない。
+ */
+export async function recordIncomingLineMessage(
+  db: D1Database,
+  input: {
+    id: string;
+    friendId: string;
+    messageType: string;
+    content: string;
+    lineAccountId: string | null;
+    lineMessageAccountKey: string;
+    lineMessageId: string;
+    createdAt: string;
+  },
+): Promise<IncomingLineMessageRecord> {
+  const inserted = await db
+    .prepare(
+      `INSERT OR IGNORE INTO messages_log
+         (id, friend_id, direction, message_type, content, broadcast_id,
+          scenario_step_id, source, line_account_id, created_at,
+          line_message_id, line_message_account_key, unsent_at)
+       SELECT ?, ?, 'incoming', ?,
+              CASE WHEN u.line_message_id IS NULL THEN ? ELSE '' END,
+              NULL, NULL, 'user', ?, ?, ?, ?, u.unsent_at
+         FROM (SELECT 1) AS seed
+         LEFT JOIN line_message_unsends u
+           ON u.line_message_account_key = ? AND u.line_message_id = ?`,
+    )
+    .bind(
+      input.id,
+      input.friendId,
+      input.messageType,
+      input.content,
+      input.lineAccountId,
+      input.createdAt,
+      input.lineMessageId,
+      input.lineMessageAccountKey,
+      input.lineMessageAccountKey,
+      input.lineMessageId,
+    )
+    .run();
+
+  const row = await db
+    .prepare(
+      `SELECT id, unsent_at
+         FROM messages_log
+        WHERE line_message_account_key = ? AND line_message_id = ?`,
+    )
+    .bind(input.lineMessageAccountKey, input.lineMessageId)
+    .first<{ id: string; unsent_at: string | null }>();
+
+  if (!row) throw new Error('line message record unavailable');
+  return {
+    id: row.id,
+    inserted: (inserted.meta?.changes ?? 0) === 1,
+    isUnsent: row.unsent_at != null,
+    unsentAt: row.unsent_at,
+  };
+}
+
+/**
+ * 取消墓標の作成と、すでにある本文の消去を同じbatchで確定する。
+ * 同じunsendを何度受けても同じ最終状態になる。
+ */
+export async function recordLineMessageUnsend(
+  db: D1Database,
+  input: {
+    lineMessageAccountKey: string;
+    lineMessageId: string;
+    sourceUserId: string | null;
+    unsentAt: string;
+  },
+): Promise<void> {
+  await db.batch([
+    db.prepare(
+      `INSERT OR IGNORE INTO line_message_unsends
+         (line_message_account_key, line_message_id, source_user_id, unsent_at)
+       VALUES (?, ?, ?, ?)`,
+    ).bind(
+      input.lineMessageAccountKey,
+      input.lineMessageId,
+      input.sourceUserId,
+      input.unsentAt,
+    ),
+    db.prepare(
+      `UPDATE messages_log
+          SET content = '',
+              unsent_at = (
+                SELECT unsent_at FROM line_message_unsends
+                 WHERE line_message_account_key = ? AND line_message_id = ?
+              )
+        WHERE line_message_account_key = ? AND line_message_id = ?`,
+    ).bind(
+      input.lineMessageAccountKey,
+      input.lineMessageId,
+      input.lineMessageAccountKey,
+      input.lineMessageId,
+    ),
+  ]);
+}
