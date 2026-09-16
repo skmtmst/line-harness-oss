@@ -2940,6 +2940,19 @@ CREATE TABLE identity_events (
   correlation_id TEXT NOT NULL
 );
 
+CREATE TABLE impersonation_sessions (
+  id             TEXT PRIMARY KEY,
+  staff_id       TEXT NOT NULL REFERENCES staff_members(id) ON DELETE CASCADE,
+  tenant_id      TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  mode           TEXT NOT NULL DEFAULT 'read' CHECK (mode IN ('read', 'write')),
+  write_reason   TEXT,
+  -- 個人情報の一時表示。理由を入れると 1 になり、終了で戻る。
+  pii_revealed   INTEGER NOT NULL DEFAULT 0,
+  started_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  write_started_at TEXT,
+  ended_at       TEXT
+);
+
 CREATE TABLE inbox_conversation_events (
   id              TEXT PRIMARY KEY,
   channel         TEXT NOT NULL CHECK (channel IN ('line', 'email')),
@@ -4328,6 +4341,38 @@ CREATE TABLE outgoing_webhooks (
   created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 , max_retries INTEGER NOT NULL DEFAULT 0, consecutive_failures INTEGER NOT NULL DEFAULT 0, last_failed_at TEXT, line_account_id TEXT REFERENCES line_accounts(id), secret_encrypted TEXT);
+
+CREATE TABLE pii_reveal_logs (
+  id                        TEXT PRIMARY KEY,
+  impersonation_session_id  TEXT NOT NULL REFERENCES impersonation_sessions(id) ON DELETE CASCADE,
+  staff_id                  TEXT NOT NULL,
+  tenant_id                 TEXT NOT NULL,
+  reason                    TEXT NOT NULL,
+  created_at                TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+);
+
+CREATE TABLE platform_admins (
+  staff_id      TEXT PRIMARY KEY REFERENCES staff_members(id) ON DELETE CASCADE,
+  is_active     INTEGER NOT NULL DEFAULT 1,
+  -- 追加を承認した運営マスター（要件 §3 37-10。最初の 3 名は移行時に NULL）。
+  approved_by   TEXT REFERENCES staff_members(id) ON DELETE SET NULL,
+  created_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  updated_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+);
+
+CREATE TABLE platform_audit_logs (
+  id                 TEXT PRIMARY KEY,
+  staff_id           TEXT NOT NULL,
+  staff_name         TEXT NOT NULL DEFAULT '',
+  tenant_id          TEXT,
+  tenant_name        TEXT,
+  action             TEXT NOT NULL,
+  reason             TEXT,
+  detail             TEXT NOT NULL DEFAULT '{}',
+  ip                 TEXT,
+  visible_to_tenant  INTEGER NOT NULL DEFAULT 0,
+  created_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+);
 
 CREATE TABLE pool_accounts (
   id TEXT PRIMARY KEY,
@@ -6655,6 +6700,12 @@ CREATE INDEX idx_identity_events_candidate_history
 CREATE INDEX idx_identity_events_user_history
   ON identity_events(tenant_id, user_id, occurred_at DESC);
 
+CREATE INDEX idx_impersonation_sessions_active
+  ON impersonation_sessions(staff_id, ended_at);
+
+CREATE INDEX idx_impersonation_sessions_tenant
+  ON impersonation_sessions(tenant_id, started_at DESC);
+
 CREATE UNIQUE INDEX idx_inbox_conversation_events_correlation
   ON inbox_conversation_events (correlation_id, event_type);
 
@@ -7003,6 +7054,18 @@ CREATE INDEX idx_outbound_send_requests_created
 
 CREATE INDEX idx_outgoing_webhooks_line_account
   ON outgoing_webhooks(line_account_id, is_active, updated_at DESC);
+
+CREATE INDEX idx_pii_reveal_logs_tenant
+  ON pii_reveal_logs(tenant_id, created_at DESC);
+
+CREATE INDEX idx_platform_audit_logs_action
+  ON platform_audit_logs(action, created_at DESC);
+
+CREATE INDEX idx_platform_audit_logs_created
+  ON platform_audit_logs(created_at DESC);
+
+CREATE INDEX idx_platform_audit_logs_tenant
+  ON platform_audit_logs(tenant_id, created_at DESC);
 
 CREATE INDEX idx_recipe_clone_items_v316_run
   ON recipe_clone_items(run_id, created_at, id);

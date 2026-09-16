@@ -77,7 +77,7 @@ const ALLOWED_H1: Record<string, string> = {
 
 describe('画面名を本文とトップバーで2回出さない', () => {
   it('全ページを読めている', () => {
-    expect(PAGES.length).toBe(163)  // 2026-09-13: 統括3画面と会員登録・パスワード再設定5画面を足した統合後の実測値。
+    expect(PAGES.length).toBe(172)  // 2026-09-15: 運営コンソール（★V6 37）9画面を足した実測値。
   })
 
   it('page.tsx が h1 を直接持たない', () => {

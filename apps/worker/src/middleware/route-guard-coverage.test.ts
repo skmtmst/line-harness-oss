@@ -76,7 +76,9 @@ function collectUnguarded(): Finding[] {
   for (const entry of readdirSync(ROUTES_DIR)) {
     if (!entry.endsWith('.ts') || entry.includes('.test.')) continue;
     const source = readFileSync(join(ROUTES_DIR, entry), 'utf8');
-    const guarded = source.includes('requireRole');
+    // 運営コンソール（★V6 37）は requireRole ではなく requirePlatformAdminWrite で
+    // 更新系を全件守る（platform_admins 登録＋読み取り専用を拒否）。
+    const guarded = source.includes('requireRole') || source.includes('requirePlatformAdminWrite');
     if (guarded) continue;
     for (const match of source.matchAll(MUTATING)) {
       const [, method, path] = match;
@@ -233,6 +235,7 @@ const STAFF_FAIL_CLOSED_SNAPSHOT: string[] = [
     'GET /api/hq/banners/usage',
     'GET /api/hq/billing/invoices',
     'GET /api/hq/billing/summary',
+    'GET /api/hq/operator-history',
     'GET /api/hq/support/kinds',
     'GET /api/hq/support/requests',
     'GET /api/hq/templates',
@@ -269,6 +272,12 @@ const STAFF_FAIL_CLOSED_SNAPSHOT: string[] = [
     'GET /api/operations/health',
     'GET /api/operations/history',
     'GET /api/operations/incidents/:id',
+    'GET /api/ops/audit',
+    'GET /api/ops/impersonation/current',
+    'GET /api/ops/me',
+    'GET /api/ops/members',
+    'GET /api/ops/tenants',
+    'GET /api/ops/tenants/:id',
     'GET /api/recipes',
     'GET /api/recipes/:id',
     'GET /api/recipes/clone-runs/:runId',
@@ -295,6 +304,8 @@ const STAFF_FAIL_CLOSED_SNAPSHOT: string[] = [
     'PATCH /api/line-accounts/:id',
     'PATCH /api/line-accounts/hierarchy',
     'PATCH /api/line-accounts/order',
+    'PATCH /api/ops/members/:staffId',
+    'PATCH /api/ops/tenants/:id/status',
     'PATCH /api/restaurant-test/approvals/:id',
     'PATCH /api/restaurant-test/stores/:id',
     'PATCH /api/tenants/:id/feature-packs',
@@ -370,6 +381,12 @@ const STAFF_FAIL_CLOSED_SNAPSHOT: string[] = [
     'POST /api/operations/health/runs',
     'POST /api/operations/incidents',
     'POST /api/operations/incidents/:id/restore',
+    'POST /api/ops/impersonation/end',
+    'POST /api/ops/impersonation/pii-reveal',
+    'POST /api/ops/impersonation/read',
+    'POST /api/ops/impersonation/start',
+    'POST /api/ops/impersonation/write',
+    'POST /api/ops/members',
     'POST /api/recipes/:id/clone',
     'POST /api/restaurant-test/gbp/posts',
     'POST /api/restaurant-test/inbound/reservations',

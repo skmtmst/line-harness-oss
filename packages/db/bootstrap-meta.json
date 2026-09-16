@@ -363,7 +363,8 @@
     "402_ad_click_selection_snapshot.sql",
     "403_common_var_extended_types.sql",
     "404_common_var_validity.sql",
-    "405_event_occurrence_applicant_snapshots.sql"
+    "405_platform_admins.sql",
+    "406_event_occurrence_applicant_snapshots.sql"
   ],
-  "migrationCount": 364
+  "migrationCount": 365
 }
