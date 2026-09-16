@@ -35,7 +35,7 @@ describe('V6 保存した検索の画面契約', () => {
 
   it('条件は共通の日本語変換を使い、内部の演算子や値を直書きしない', () => {
     expect(list).toContain('describeSavedCondition')
-    expect(list).toContain('api.supportMarks.list(accountId)')
+    expect(list).toContain('api.supportMarks.list(accountId, { suppressFeatureDisabledEvent: true })')
     expect(list).toContain('api.scenarios.list({ accountId })')
     expect(list).not.toContain('function describeOne')
     expect(list).not.toContain("parts.map(String).join(' ')")

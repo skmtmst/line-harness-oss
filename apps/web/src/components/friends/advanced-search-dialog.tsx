@@ -48,9 +48,10 @@ const BLOCK_HELP: Record<Block['kind'], string> = {
 /** 新契約が受け取る OR 条件。選択肢が必要な軸だけ、取得前は無効にする。 */
 const OR_AXES: Array<{
   label: string
+  feature?: 'support_marks'
   make: (options: { markId?: string; scenarioId?: string }) => SavedSearchCondition | null
 }> = [
-  { label: '対応マーク', make: ({ markId }) => markId ? { kind: 'mark', op: 'eq', value: markId } : null },
+  { label: '対応マーク', feature: 'support_marks', make: ({ markId }) => markId ? { kind: 'mark', op: 'eq', value: markId } : null },
   { label: 'シナリオ', make: ({ scenarioId }) => scenarioId ? { kind: 'scenario', op: 'eq', value: scenarioId } : null },
   { label: 'イベント予約', make: () => ({ kind: 'event_booking', op: 'exists' }) },
   { label: 'カレンダー予約', make: () => ({ kind: 'calendar_booking', op: 'exists' }) },
@@ -95,6 +96,7 @@ export default function AdvancedSearchDialog({
   onClose,
   onLoadSaved,
   onApply,
+  features,
 }: {
   open: boolean
   accountId: string | null
@@ -106,12 +108,18 @@ export default function AdvancedSearchDialog({
   onClose: () => void
   onLoadSaved?: () => void
   onApply: (result: AdvancedSearchResult) => void
+  /** 機能設定でオフの入口は出さない。未指定は従来どおり全部出す。 */
+  features?: { savedSearch?: boolean; marks?: boolean; fields?: boolean }
 }) {
+  const savedSearchEnabled = features?.savedSearch !== false
+  const marksFeatureEnabled = features?.marks !== false
+  const fieldsFeatureEnabled = features?.fields !== false
   const [blocks, setBlocks] = useState<Block[]>([
     { kind: 'name', keyword: '' },
     { kind: 'tag', include: [], exclude: [] },
     { kind: 'field', key: '', op: 'eq', value: '' },
   ])
+
   const [visibility, setVisibility] = useState<'' | 'following' | 'blocked'>('following')
   const [any, setAny] = useState<SavedSearchCondition[]>([])
   const [sort, setSort] = useState<'recent' | 'oldest'>('recent')
@@ -132,7 +140,7 @@ export default function AdvancedSearchDialog({
         if (b.include.length) p.tagIds = b.include
         if (b.exclude.length) p.excludeTagIds = b.exclude
       }
-      if (b.kind === 'field' && b.key.trim() && b.value.trim()) {
+      if (b.kind === 'field' && fieldsFeatureEnabled && b.key.trim() && b.value.trim()) {
         const bag = b.op === 'eq' ? (p.metadata ??= {}) : (p.metadataNot ??= {})
         bag[b.key.trim()] = b.value.trim()
       }
@@ -149,7 +157,7 @@ export default function AdvancedSearchDialog({
       visibility: visibility === 'following' ? 'visible_only' : visibility === '' ? 'hidden_only' : 'all',
     }
     return p
-  }, [any, blocks, visibility, sort])
+  }, [any, blocks, visibility, sort, fieldsFeatureEnabled])
 
   const summary = useMemo(() => {
     const out: string[] = []
@@ -290,7 +298,8 @@ export default function AdvancedSearchDialog({
             <span className="text-ink text-sm font-bold">すべて満たす条件</span>
           </div>
 
-          {blocks.map((b, i) => (
+          {/* 友だち情報欄がオフのaccountでは、初期配置の field ブロックも出さない。 */}
+          {blocks.map((b, i) => (b.kind === 'field' && !fieldsFeatureEnabled ? null : (
             <section
               key={`${b.kind}-${i}`}
               className="mb-2 grid items-center gap-3 rounded-[9px] bg-[#F6F6F8] p-3 last:mb-0 sm:grid-cols-12"
@@ -401,10 +410,10 @@ export default function AdvancedSearchDialog({
                 外す
               </button>
             </section>
-          ))}
+          )))}
 
           <div className="mt-2 flex flex-wrap gap-2 px-1 pt-1">
-              {(Object.keys(BLOCK_LABEL) as Block['kind'][]).map((k) => (
+              {(Object.keys(BLOCK_LABEL) as Block['kind'][]).filter((k) => k !== 'field' || fieldsFeatureEnabled).map((k) => (
                 <button
                   key={k}
                   type="button"
@@ -423,7 +432,7 @@ export default function AdvancedSearchDialog({
               <span className="text-sm font-bold text-[#1D1D1F]">いずれか1つ以上満たす条件</span>
             </div>
             <div className="mt-3 flex flex-wrap gap-3">
-              {OR_AXES.map((item) => {
+              {OR_AXES.filter((item) => item.feature !== 'support_marks' || marksFeatureEnabled).map((item) => {
                 const condition = item.make({ markId: marks[0]?.id, scenarioId: scenarios[0]?.id })
                 return (
                 <div key={item.label} className="flex max-w-xs flex-col gap-1">
@@ -513,7 +522,7 @@ export default function AdvancedSearchDialog({
         </div>
 
         <div className="flex flex-wrap items-center gap-3 border-t border-[#EAEBED] px-6 py-4">
-          {onLoadSaved ? (
+          {onLoadSaved && savedSearchEnabled ? (
             <Button type="button" onClick={onLoadSaved}>
               保存した検索から読み込む
             </Button>
@@ -537,7 +546,9 @@ export default function AdvancedSearchDialog({
             キャンセル
           </button>
           {savedNotice ? <span className="text-xs font-semibold text-accent">{savedNotice}</span> : null}
-          <Button type="button" onClick={() => { setSaveOpen(true); setSaveError(''); setSavedNotice('') }}>条件を保存</Button>
+          {savedSearchEnabled ? (
+            <Button type="button" onClick={() => { setSaveOpen(true); setSaveError(''); setSavedNotice('') }}>条件を保存</Button>
+          ) : null}
           <button
             type="button"
             onClick={() => onApply({ params, summary })}

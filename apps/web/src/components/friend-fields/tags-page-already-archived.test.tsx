@@ -62,6 +62,12 @@ vi.mock('@/lib/api', () => {
         update: async () => ({ success: true, data: null }),
         delete: async () => ({ success: true, data: null }),
       },
+      featureSettings: {
+        visibility: async () => ({
+          success: true,
+          data: { features: { friend_fields: true, support_marks: true, saved_searches: true } },
+        }),
+      },
     },
   }
 })

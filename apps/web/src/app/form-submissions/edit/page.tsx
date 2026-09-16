@@ -221,7 +221,7 @@ function FormEditInner() {
         const accountFilter = selectedAccountId ? { accountId: selectedAccountId } : undefined
         const [tagRes, ffRes, scenarioRes, reminderRes, templateRes] = await Promise.all([
           fetchApi<{ success: boolean; data: Array<{ id: string; name: string }> }>(tagPath),
-          selectedAccountId ? api.friendFields.list(selectedAccountId) : Promise.resolve({ success: true as const, data: [] }),
+          selectedAccountId ? api.friendFields.list(selectedAccountId, undefined, { suppressFeatureDisabledEvent: true }) : Promise.resolve({ success: true as const, data: [] }),
           api.scenarios.list(accountFilter),
           api.reminders.list(accountFilter),
           api.templates.list(undefined, selectedAccountId ?? undefined),

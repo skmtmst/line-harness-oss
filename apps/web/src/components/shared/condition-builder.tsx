@@ -19,6 +19,7 @@
 import { useEffect, useState } from 'react'
 import { api } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
+import { useFeatureVisibility } from '@/lib/use-feature-visibility'
 import { TextField } from './text-field'
 import SelectField from './select-field'
 import {
@@ -38,14 +39,14 @@ export {
 export type { FieldOperator, SegmentCondition, SegmentRule } from '@/lib/segment-condition'
 
 /** 追加できる絞り込みの種類。並びは Lステップの並びに合わせてある。 */
-const RULE_KINDS: { type: string; label: string; make: () => SegmentRule }[] = [
+const RULE_KINDS: { type: string; label: string; feature?: 'support_marks' | 'friend_fields'; make: () => SegmentRule }[] = [
   { type: 'name', label: '名前', make: () => ({ type: 'name', value: { text: '', targets: ['display', 'real', 'system'] } }) },
   { type: 'private_memo', label: '個別メモ', make: () => ({ type: 'private_memo', value: '' }) },
   { type: 'status_message', label: 'ステータスメッセージ', make: () => ({ type: 'status_message', value: '' }) },
   { type: 'registered_at', label: '友だち登録日', make: () => ({ type: 'registered_at', value: { from: '', to: '' } }) },
-  { type: 'support_mark', label: '対応マーク', make: () => ({ type: 'support_mark', value: { markIds: [], exclude: false } }) },
+  { type: 'support_mark', label: '対応マーク', feature: 'support_marks' as const, make: () => ({ type: 'support_mark', value: { markIds: [], exclude: false } }) },
   { type: 'tag_exists', label: 'タグ', make: () => ({ type: 'tag_exists', value: '' }) },
-  { type: 'friend_field', label: '友だち情報', make: () => ({ type: 'friend_field', value: { fieldId: '', op: 'contains', text: '' } }) },
+  { type: 'friend_field', label: '友だち情報', feature: 'friend_fields' as const, make: () => ({ type: 'friend_field', value: { fieldId: '', op: 'contains', text: '' } }) },
   { type: 'scenario_subscribed', label: 'シナリオ購読', make: () => ({ type: 'scenario_subscribed', value: '' }) },
   { type: 'scenario_state', label: 'シナリオ', make: () => ({ type: 'scenario_state', value: { scenarioId: '', state: 'subscribed' } }) },
   { type: 'form_answered', label: '回答フォーム', make: () => ({ type: 'form_answered', value: '' }) },
@@ -113,6 +114,10 @@ export interface ConditionBuilderProps {
 
 export default function ConditionBuilder({ value, onChange, label, showCount = true }: ConditionBuilderProps) {
   const { selectedAccountId } = useAccount()
+  // 対応マーク・友だち情報は任意機能。オフのaccountでは条件の選択肢ごと出さない。
+  const featureVisibility = useFeatureVisibility(selectedAccountId)
+  const marksEnabled = featureVisibility.enabled('support_marks')
+  const fieldsEnabled = featureVisibility.enabled('friend_fields')
   const [tags, setTags] = useState<Option[]>([])
   const [fields, setFields] = useState<Option[]>([])
   const [marks, setMarks] = useState<Option[]>([])
@@ -131,8 +136,12 @@ export default function ConditionBuilder({ value, onChange, label, showCount = t
     void (async () => {
       const [tagRes, fieldRes, markRes, scenarioRes] = await Promise.all([
         api.tags.list(),
-        api.friendFields.list(selectedAccountId),
-        api.supportMarks.list(selectedAccountId),
+        fieldsEnabled
+          ? api.friendFields.list(selectedAccountId, undefined, { suppressFeatureDisabledEvent: true })
+          : Promise.resolve({ success: true as const, data: [] }),
+        marksEnabled
+          ? api.supportMarks.list(selectedAccountId, { suppressFeatureDisabledEvent: true })
+          : Promise.resolve({ success: true as const, data: [] }),
         api.scenarios.list(),
       ])
       if (cancelled) return
@@ -144,7 +153,7 @@ export default function ConditionBuilder({ value, onChange, label, showCount = t
     return () => {
       cancelled = true
     }
-  }, [selectedAccountId])
+  }, [selectedAccountId, fieldsEnabled, marksEnabled])
 
   /*
    * 該当件数。条件を書きながら人数が見えないと、絞りすぎ・絞り足りないに
@@ -248,7 +257,7 @@ export default function ConditionBuilder({ value, onChange, label, showCount = t
 
   const kindButtons = (groupIndex: number | null) => (
     <div className="mt-2 flex flex-wrap gap-1.5">
-      {RULE_KINDS.map((kind) => (
+      {RULE_KINDS.filter((kind) => !kind.feature || featureVisibility.enabled(kind.feature)).map((kind) => (
         <button
           key={kind.type}
           type="button"

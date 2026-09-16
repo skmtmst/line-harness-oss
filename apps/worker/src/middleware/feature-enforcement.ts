@@ -52,6 +52,7 @@ const exempt = (
 export const FEATURE_ROUTE_MANIFEST: readonly FeatureRouteMetadata[] = [
   feature('/api/friends/support-mark', 'support_marks'),
   feature('/api/friends/saved-searches', 'saved_searches'),
+  feature('/api/friends/saved-views', 'saved_searches'),
   feature('/api/friends/fields', 'friend_fields'),
   feature('/api/friend-fields-stats', 'friend_fields'),
   feature('/api/field-migrations', 'friend_fields'),

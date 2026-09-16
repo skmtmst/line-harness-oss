@@ -64,6 +64,10 @@ vi.mock('next/link', () => ({
     React.createElement('a', { href, ...rest }, children),
 }))
 
+vi.mock('@/contexts/account-context', () => ({
+  useAccount: () => ({ selectedAccountId: 'account-a', selectedAccount: null }),
+}))
+
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
   const actual = await importOriginal()
   return {
@@ -107,6 +111,13 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
           }
           return Promise.resolve({ success: true, data: { updated: 1 }, warnings: [] })
         },
+      },
+      featureSettings: {
+        ...actual.api.featureSettings,
+        visibility: async () => ({
+          success: true as const,
+          data: { features: { friend_fields: true } },
+        }),
       },
     },
   }
