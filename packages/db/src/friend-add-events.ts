@@ -119,7 +119,7 @@ export async function claimFailedFriendAddActionRuns(
 export async function finishFriendAddEventActionRetry(
   db: D1Database,
   input: { eventId: string; lineAccountId: string },
-): Promise<'completed' | 'partial_failed' | null> {
+): Promise<FriendAddRoutingStatus | null> {
   const now = jstNow();
   const row = await db.prepare(
     `UPDATE friend_add_events
@@ -128,20 +128,34 @@ export async function finishFriendAddEventActionRetry(
                 SELECT 1 FROM friend_add_action_runs ar
                  WHERE ar.event_id = friend_add_events.id AND ar.status != 'completed'
               ) THEN 'partial_failed'
-              ELSE 'completed'
+              ELSE COALESCE(action_base_status, 'completed')
             END,
             error_code = CASE
               WHEN EXISTS (
                 SELECT 1 FROM friend_add_action_runs ar
                  WHERE ar.event_id = friend_add_events.id AND ar.status != 'completed'
               ) THEN 'action_failed'
+              ELSE action_base_error_code
+            END,
+            processed_at = ?,
+            action_base_status = CASE
+              WHEN EXISTS (
+                SELECT 1 FROM friend_add_action_runs ar
+                 WHERE ar.event_id = friend_add_events.id AND ar.status != 'completed'
+              ) THEN action_base_status
               ELSE NULL
             END,
-            processed_at = ?
+            action_base_error_code = CASE
+              WHEN EXISTS (
+                SELECT 1 FROM friend_add_action_runs ar
+                 WHERE ar.event_id = friend_add_events.id AND ar.status != 'completed'
+              ) THEN action_base_error_code
+              ELSE NULL
+            END
       WHERE id = ? AND line_account_id = ? AND routing_status = 'pending'
       RETURNING routing_status`,
   ).bind(now, input.eventId, input.lineAccountId)
-    .first<{ routing_status: 'completed' | 'partial_failed' }>();
+    .first<{ routing_status: FriendAddRoutingStatus }>();
   return row?.routing_status ?? null;
 }
 
@@ -548,6 +562,9 @@ export async function markFriendAddEventRouting(
     errorCode?: string | null;
     scenarioEnrollmentId?: string | null;
     deliveryCount?: number;
+    /** 処理失敗を除いた送信側の結末。失敗分の再試行完了後にここへ戻す。 */
+    actionBaseStatus?: FriendAddRoutingStatus | null;
+    actionBaseErrorCode?: string | null;
     fence?: { friendId: string; generation: number };
   },
 ): Promise<boolean> {
@@ -566,6 +583,8 @@ export async function markFriendAddEventRouting(
     Math.max(0, Math.floor(input.deliveryCount ?? 0)),
     Math.max(0, Math.floor(input.deliveryCount ?? 0)),
     jstNow(),
+    input.actionBaseStatus ?? null,
+    input.actionBaseErrorCode ?? null,
     jstNow(),
     input.eventId,
     input.lineAccountId,
@@ -581,6 +600,7 @@ export async function markFriendAddEventRouting(
               WHEN ? > 0 THEN COALESCE(first_delivery_sent_at, ?)
               ELSE first_delivery_sent_at
             END,
+            action_base_status = ?, action_base_error_code = ?,
             processed_at = ?
       WHERE id = ? AND line_account_id = ?${fenceSql}`,
   ).bind(...bindings).run();

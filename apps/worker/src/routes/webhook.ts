@@ -842,8 +842,7 @@ async function handleEvent(
      */
     const deliveryUnknown = currentSendOutcome() === 'unknown';
     const actionFailed = (routing?.actionFailureCount ?? 0) > 0;
-    const ledgerErrorCode = (actionFailed ? 'action_failed' : null)
-      ?? (stoppedRefDiscarded ? 'entry_route_stopped' : null)
+    const deliveryErrorCode = (stoppedRefDiscarded ? 'entry_route_stopped' : null)
       ?? routing?.suppressReason
       ?? (claimError
         ? 'send_claim_unavailable'
@@ -852,6 +851,10 @@ async function handleEvent(
           : (!sendRight
             ? 'duplicate_in_flight'
             : (deliveryUnknown ? 'delivery_unknown' : (delivered ? null : 'send_failed')))));
+    const deliveryStatus = (stoppedRefDiscarded || routing?.suppressed)
+      ? 'suppressed' as const
+      : (delivered ? 'completed' as const : 'partial_failed' as const);
+    const ledgerErrorCode = actionFailed ? 'action_failed' : deliveryErrorCode;
     let ledgerFinalized = false;
     if (friendAddEventId && lineAccountId && !fencedOut) {
       try {
@@ -861,14 +864,15 @@ async function handleEvent(
           // N-244: 停止ref由来で振り分けを止めた場合も suppressed に倒す。
           status: actionFailed
             ? 'partial_failed'
-            : (stoppedRefDiscarded || routing?.suppressed)
-            ? 'suppressed'
-            : (delivered ? 'completed' : 'partial_failed'),
+            : deliveryStatus,
           routingRuleId: routing?.ruleId ?? null,
           winningRuleVersionId: routing?.ruleVersionId ?? null,
           errorCode: ledgerErrorCode,
           scenarioEnrollmentId,
           deliveryCount: friendAddDeliveryCount,
+          // 処理だけ失敗した場合、再試行完了後は送信側の元の結末へ戻す。
+          actionBaseStatus: actionFailed ? deliveryStatus : null,
+          actionBaseErrorCode: actionFailed ? deliveryErrorCode : null,
           // 予約を持って進んだ実行だけ、同じ予約の下で確定する。
           fence: claimedSendRight && !claimError && claimGeneration > 0
             ? { friendId: friend.id, generation: claimGeneration }

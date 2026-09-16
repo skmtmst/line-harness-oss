@@ -20,14 +20,18 @@ function setupApp(db: D1Database) {
   return app
 }
 
-function seedRun(testDb: SqliteD1, id: string): void {
+function seedRun(
+  testDb: SqliteD1,
+  id: string,
+  base?: { status: 'completed' | 'suppressed' | 'partial_failed'; errorCode: string | null },
+): void {
   testDb.raw.prepare(
     `INSERT INTO friend_add_events
       (id, line_account_id, friend_id, webhook_event_id, friend_kind, attribution_status,
-       routing_status, error_code, occurred_at, processed_at)
+       routing_status, error_code, action_base_status, action_base_error_code, occurred_at, processed_at)
      VALUES (?, 'account-1', 'friend-1', ?, 'first_time', 'unavailable',
-             'partial_failed', 'action_failed', '2026-09-16T10:00:00.000', '2026-09-16T10:00:01.000')`,
-  ).run(id, `webhook-${id}`)
+             'partial_failed', 'action_failed', ?, ?, '2026-09-16T10:00:00.000', '2026-09-16T10:00:01.000')`,
+  ).run(id, `webhook-${id}`, base?.status ?? null, base?.errorCode ?? null)
   const completedSnapshot = JSON.stringify({
     kind: 'row', actionType: 'tag', config: { op: 'add', tagIds: ['tag-completed'] },
   })
@@ -117,6 +121,28 @@ describe('N-102 friend-add failed-only action retry route', () => {
     expect(replay.status).toBe(409)
     expect(testDb.raw.prepare(`SELECT COUNT(*) AS count FROM friend_tags WHERE friend_id = 'friend-1'`).get())
       .toEqual({ count: 1 })
+  })
+
+  it('処理再試行の成功で、同時に起きていた送信失敗を成功へ上書きしない', async () => {
+    seedRun(testDb, 'run-send-failed', { status: 'partial_failed', errorCode: 'send_failed' })
+    const app = setupApp(testDb.db)
+    const response = await app.request(
+      '/api/friend-add-runs/run-send-failed/retry?account_id=account-1',
+      { method: 'POST' },
+    )
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({
+      success: true, data: { status: 'partial_failed', retried: 1 },
+    })
+    expect(testDb.raw.prepare(
+      `SELECT routing_status, error_code, action_base_status, action_base_error_code
+         FROM friend_add_events WHERE id = 'run-send-failed'`,
+    ).get()).toEqual({
+      routing_status: 'partial_failed',
+      error_code: 'send_failed',
+      action_base_status: null,
+      action_base_error_code: null,
+    })
   })
 
   it('同時再試行は一方だけが勝ち、別account指定は404', async () => {

@@ -2302,7 +2302,8 @@ CREATE TABLE "friend_add_events" (
   scenario_enrollment_id TEXT REFERENCES friend_scenarios(id) ON DELETE SET NULL,
   delivery_count        INTEGER NOT NULL DEFAULT 0
                           CHECK (delivery_count >= 0),
-  first_delivery_sent_at TEXT,
+  first_delivery_sent_at TEXT, action_base_status TEXT
+  CHECK (action_base_status IS NULL OR action_base_status IN ('pending', 'completed', 'failed', 'suppressed', 'partial_failed')), action_base_error_code TEXT,
   UNIQUE (line_account_id, webhook_event_id)
 );
 

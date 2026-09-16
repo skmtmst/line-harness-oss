@@ -20,6 +20,7 @@ import {
   finishFriendAddActionRun,
   finishFriendAddEventActionRetry,
   type FriendAddActionRunRow,
+  type FriendAddRoutingStatus,
   type FriendScenario,
   type FriendAddRuleDefinition,
   ensureFriendAddFallbackRules,
@@ -1485,7 +1486,7 @@ async function executeStoredFriendAddAction(
 export async function retryFailedFriendAddActions(
   db: D1Database,
   input: { eventId: string; lineAccountId: string },
-): Promise<{ found: boolean; acquired: boolean; status?: 'completed' | 'partial_failed'; retried?: number }> {
+): Promise<{ found: boolean; acquired: boolean; status?: FriendAddRoutingStatus; retried?: number }> {
   const event = await claimFriendAddEventForActionRetry(db, input);
   if (!event) {
     const exists = await db.prepare(

@@ -7809,7 +7809,7 @@ export const api = {
         `/api/friend-add-runs/${encodeURIComponent(runId)}?account_id=${encodeURIComponent(accountId)}`,
       ),
     retryRun: (accountId: string, runId: string) =>
-      fetchApi<ApiResponse<{ status: 'completed' | 'partial_failed'; retried: number }>>(
+      fetchApi<ApiResponse<{ status: FriendAddEventRoutingStatus; retried: number }>>(
         `/api/friend-add-runs/${encodeURIComponent(runId)}/retry?account_id=${encodeURIComponent(accountId)}`,
         { method: 'POST' },
       ),
