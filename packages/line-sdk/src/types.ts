@@ -24,12 +24,16 @@ export type Source = UserSource | GroupSource | RoomSource;
 export interface TextEventMessage {
   type: 'text';
   id: string;
+  /** LINEが付ける引用用トークン。返信メッセージの quoteToken にそのまま使う。 */
+  quoteToken?: string;
   text: string;
 }
 
 export interface ImageEventMessage {
   type: 'image';
   id: string;
+  /** LINEが付ける引用用トークン。返信メッセージの quoteToken にそのまま使う。 */
+  quoteToken?: string;
   contentProvider: {
     type: 'line' | 'external';
     originalContentUrl?: string;
@@ -40,6 +44,8 @@ export interface ImageEventMessage {
 export interface VideoEventMessage {
   type: 'video';
   id: string;
+  /** LINEが付ける引用用トークン。返信メッセージの quoteToken にそのまま使う。 */
+  quoteToken?: string;
   duration: number;
   contentProvider: {
     type: 'line' | 'external';
@@ -51,6 +57,8 @@ export interface VideoEventMessage {
 export interface AudioEventMessage {
   type: 'audio';
   id: string;
+  /** LINEが付ける引用用トークン。返信メッセージの quoteToken にそのまま使う。 */
+  quoteToken?: string;
   duration: number;
   contentProvider: {
     type: 'line' | 'external';
@@ -61,6 +69,8 @@ export interface AudioEventMessage {
 export interface FileEventMessage {
   type: 'file';
   id: string;
+  /** LINEが付ける引用用トークン。返信メッセージの quoteToken にそのまま使う。 */
+  quoteToken?: string;
   fileName: string;
   fileSize: number;
 }
@@ -68,6 +78,8 @@ export interface FileEventMessage {
 export interface LocationEventMessage {
   type: 'location';
   id: string;
+  /** LINEが付ける引用用トークン。返信メッセージの quoteToken にそのまま使う。 */
+  quoteToken?: string;
   title?: string;
   address?: string;
   latitude: number;
@@ -77,6 +89,8 @@ export interface LocationEventMessage {
 export interface StickerEventMessage {
   type: 'sticker';
   id: string;
+  /** LINEが付ける引用用トークン。返信メッセージの quoteToken にそのまま使う。 */
+  quoteToken?: string;
   packageId: string;
   stickerId: string;
   stickerResourceType: string;
@@ -166,30 +180,40 @@ export type FlexContainer = object;
 export interface TextMessage {
   type: 'text';
   text: string;
+  /** 引用返信。受信メッセージの quoteToken をそのまま指定する。 */
+  quoteToken?: string;
 }
 
 export interface ImageMessage {
   type: 'image';
   originalContentUrl: string;
   previewImageUrl: string;
+  /** 引用返信。受信メッセージの quoteToken をそのまま指定する。 */
+  quoteToken?: string;
 }
 
 export interface FlexMessage {
   type: 'flex';
   altText: string;
   contents: FlexContainer;
+  /** 引用返信。受信メッセージの quoteToken をそのまま指定する。 */
+  quoteToken?: string;
 }
 
 export interface VideoMessage {
   type: 'video';
   originalContentUrl: string;
   previewImageUrl: string;
+  /** 引用返信。受信メッセージの quoteToken をそのまま指定する。 */
+  quoteToken?: string;
 }
 
 export interface TemplateMessage {
   type: 'template';
   altText: string;
   template: Record<string, unknown>;
+  /** 引用返信。受信メッセージの quoteToken をそのまま指定する。 */
+  quoteToken?: string;
 }
 
 export interface ImageMapMessageType {
@@ -198,6 +222,8 @@ export interface ImageMapMessageType {
   altText: string;
   baseSize: { width: number; height: number };
   actions: Record<string, unknown>[];
+  /** 引用返信。受信メッセージの quoteToken をそのまま指定する。 */
+  quoteToken?: string;
 }
 
 /** 位置情報。LINE上では地図の吹き出しになる。 */
@@ -208,6 +234,8 @@ export interface LocationMessage {
   address: string;
   latitude: number;
   longitude: number;
+  /** 引用返信。受信メッセージの quoteToken をそのまま指定する。 */
+  quoteToken?: string;
 }
 
 /**
@@ -221,6 +249,8 @@ export interface StickerMessage {
   type: 'sticker';
   packageId: string;
   stickerId: string;
+  /** 引用返信。受信メッセージの quoteToken をそのまま指定する。 */
+  quoteToken?: string;
 }
 
 /** 音声。m4a のみ。duration はミリ秒。 */
@@ -228,6 +258,8 @@ export interface AudioMessage {
   type: 'audio';
   originalContentUrl: string;
   duration: number;
+  /** 引用返信。受信メッセージの quoteToken をそのまま指定する。 */
+  quoteToken?: string;
 }
 
 export type Message =

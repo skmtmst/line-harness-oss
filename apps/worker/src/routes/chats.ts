@@ -24,6 +24,12 @@ import {
   type InboxSavedViewConditions,
   type SavedSearch,
   type SavedSearchAccess,
+  createScheduledChatSend,
+  listPendingScheduledChatSends,
+  cancelScheduledChatSend,
+  updateScheduledChatSend,
+  normalizeScheduledAt,
+  type ScheduledChatSendRow,
   jstNow,
 } from '@line-crm/db';
 import type { Env } from '../index.js';
@@ -366,6 +372,55 @@ async function resolveOrCreateChat(db: D1Database, id: string): Promise<ChatLike
     .prepare(`SELECT * FROM chats WHERE friend_id = ? ORDER BY created_at DESC LIMIT 1`)
     .bind(friend.id)
     .first<ChatLike>())!;
+}
+
+type QuotedMessageRow = {
+  id: string;
+  direction: string;
+  message_type: string;
+  content: string;
+  quote_token: string | null;
+};
+
+/**
+ * 引用元の検証。同じfriend・同じLINEアカウント・取消されていない
+ * メッセージだけを引用できる。別アカウント・別friendの行を指定されても
+ * 「無い」と同じ扱いにし、存在自体を外へ漏らさない。
+ */
+async function resolveQuotedMessage(
+  db: D1Database,
+  input: {
+    friendId: string;
+    lineAccountId: string | null;
+    quotedMessageId: string;
+  },
+): Promise<QuotedMessageRow | null> {
+  return db
+    .prepare(
+      `SELECT id, direction, message_type, content, quote_token
+         FROM messages_log
+        WHERE id = ? AND friend_id = ?
+          AND line_account_id IS ?
+          AND unsent_at IS NULL
+          AND (delivery_type IS NULL OR delivery_type != 'test')`,
+    )
+    .bind(input.quotedMessageId, input.friendId, input.lineAccountId)
+    .first<QuotedMessageRow>();
+}
+
+/** 予約行を画面用の形へ写す。内部のlease情報は返さない。 */
+function scheduledSendResponse(row: ScheduledChatSendRow) {
+  return {
+    id: row.id,
+    messageType: row.message_type,
+    content: row.content,
+    quotedMessageId: row.quoted_message_id,
+    scheduledAt: row.scheduled_at,
+    status: row.status,
+    attemptCount: row.attempt_count,
+    lastErrorCode: row.last_error_code,
+    createdAt: row.created_at,
+  };
 }
 
 async function resolveFriendAndAccessToken(
@@ -901,20 +956,27 @@ chats.get('/api/chats/:id', requireVisibleChat, async (c) => {
     messageBindings.push(messageLimit + 1);
     const messages = await c.env.DB
       .prepare(
-        `SELECT id, friend_id, direction, message_type,
-                CASE WHEN unsent_at IS NOT NULL THEN '' ELSE content END AS content,
-                CASE WHEN unsent_at IS NOT NULL THEN 1 ELSE 0 END AS is_unsent,
-                source, origin_kind,
-                sent_by_staff_id,
+        `SELECT messages_log.id, messages_log.friend_id, messages_log.direction, messages_log.message_type,
+                CASE WHEN messages_log.unsent_at IS NOT NULL THEN '' ELSE messages_log.content END AS content,
+                CASE WHEN messages_log.unsent_at IS NOT NULL THEN 1 ELSE 0 END AS is_unsent,
+                messages_log.source, messages_log.origin_kind,
+                messages_log.sent_by_staff_id,
                 (SELECT name FROM staff_members sm WHERE sm.id = messages_log.sent_by_staff_id) AS sent_by_staff_name,
                 (SELECT s.name FROM scenario_steps ss
                   JOIN scenarios s ON s.id = ss.scenario_id
                   WHERE ss.id = messages_log.scenario_step_id) AS scenario_name,
-                created_at
+                messages_log.quoted_message_id,
+                q.direction AS quoted_direction,
+                q.message_type AS quoted_message_type,
+                CASE WHEN q.unsent_at IS NOT NULL THEN '' ELSE q.content END AS quoted_content,
+                CASE WHEN q.unsent_at IS NOT NULL THEN 1 ELSE 0 END AS quoted_is_unsent,
+                q.created_at AS quoted_created_at,
+                messages_log.created_at
          FROM messages_log
-         WHERE friend_id = ? AND (delivery_type IS NULL OR delivery_type != 'test')
-         ${useMessageCursor ? 'AND (created_at < ? OR (created_at = ? AND id < ?))' : ''}
-         ORDER BY created_at DESC, id DESC LIMIT ?`,
+         LEFT JOIN messages_log q ON q.id = messages_log.quoted_message_id
+         WHERE messages_log.friend_id = ? AND (messages_log.delivery_type IS NULL OR messages_log.delivery_type != 'test')
+         ${useMessageCursor ? 'AND (messages_log.created_at < ? OR (messages_log.created_at = ? AND messages_log.id < ?))' : ''}
+         ORDER BY messages_log.created_at DESC, messages_log.id DESC LIMIT ?`,
       )
       .bind(...messageBindings)
       .all();
@@ -952,6 +1014,16 @@ chats.get('/api/chats/:id', requireVisibleChat, async (c) => {
           sentByStaffId: m.sent_by_staff_id || null,
           sentByStaffName: m.sent_by_staff_name || null,
           scenarioName: m.scenario_name || null,
+          quoted: m.quoted_message_id
+            ? {
+                id: m.quoted_message_id,
+                direction: m.quoted_direction,
+                messageType: m.quoted_message_type,
+                content: m.quoted_content,
+                isUnsent: Boolean(m.quoted_is_unsent),
+                createdAt: m.quoted_created_at,
+              }
+            : null,
           createdAt: m.created_at,
         })),
       },
@@ -1382,9 +1454,9 @@ chats.post('/api/chats/:id/send', requireRole('owner', 'admin', 'staff'), requir
     if (!chat) return c.json({ success: false, error: 'Chat not found' }, 404);
 
     // 壊れたJSONは外側catchの500に落とさない。運用者が原因を判別できるよう400で返す。
-    let body: { messageType?: string; content: string; revision?: number };
+    let body: { messageType?: string; content: string; revision?: number; quotedMessageId?: string };
     try {
-      body = await c.req.json<{ messageType?: string; content: string; revision?: number }>();
+      body = await c.req.json<{ messageType?: string; content: string; revision?: number; quotedMessageId?: string }>();
     } catch {
       return c.json({ success: false, error: 'content is required' }, 400);
     }
@@ -1412,6 +1484,22 @@ chats.post('/api/chats/:id/send', requireRole('owner', 'admin', 'staff'), requir
       [friend.line_account_id ?? null],
     )) {
       return c.json({ success: false, error: 'Chat not found' }, 404);
+    }
+
+    // 引用元の検証は外部送信より前に行う。別friend・別アカウント・取消済みを
+    // 指定されてもここで止め、LINE呼び出しも保存もしない。
+    // 引用元の検証は外部送信より前に行う。別friend・別アカウント・取消済みを
+    // 指定されてもここで止め、LINE呼び出しも保存もしない。
+    let quoted: QuotedMessageRow | null = null;
+    if (body.quotedMessageId) {
+      quoted = await resolveQuotedMessage(c.env.DB, {
+        friendId: friend.id,
+        lineAccountId: friend.line_account_id ?? null,
+        quotedMessageId: body.quotedMessageId,
+      });
+      if (!quoted) {
+        return c.json({ success: false, error: '引用元のメッセージが見つかりません' }, 404);
+      }
     }
 
     const leaseNow = new Date();
@@ -1480,8 +1568,17 @@ chats.post('/api/chats/:id/send', requireRole('owner', 'admin', 'staff'), requir
       return c.json({ success: false, error: 'messageType is not supported' }, 400);
     }
 
+    // 引用元にLINEのquoteTokenが残っていれば、顧客側にも引用表示として届く。
+    if (quoted?.quote_token) message.quoteToken = quoted.quote_token;
+
     const payloadHash = await hashOutboundPayload(
-      JSON.stringify({ chatId: chat.id, friendId: friend.id, messageType, content: body.content }),
+      JSON.stringify({
+        chatId: chat.id,
+        friendId: friend.id,
+        messageType,
+        content: body.content,
+        quotedMessageId: quoted?.id ?? null,
+      }),
     );
     const reservation = await reserveOutboundSend(c.env.DB, {
       key: idempotencyKey,
@@ -1581,8 +1678,8 @@ chats.post('/api/chats/:id/send', requireRole('owner', 'admin', 'staff'), requir
         c.env.DB
           .prepare(`INSERT OR IGNORE INTO messages_log
             (id, friend_id, direction, message_type, content, source, line_account_id,
-             sent_by_staff_id, created_at)
-            VALUES (?, ?, 'outgoing', ?, ?, 'manual', ?, ?, ?)`)
+             sent_by_staff_id, created_at, quoted_message_id)
+            VALUES (?, ?, 'outgoing', ?, ?, 'manual', ?, ?, ?, ?)`)
           .bind(
             logId,
             friend.id,
@@ -1591,6 +1688,7 @@ chats.post('/api/chats/:id/send', requireRole('owner', 'admin', 'staff'), requir
             friend.line_account_id ?? null,
             c.get('staff').id,
             sentAt,
+            quoted?.id ?? null,
           ),
         completeOutboundSendStatement(c.env.DB, {
           key: idempotencyKey,
@@ -1709,7 +1807,7 @@ chats.post('/api/chats/:id/send-combined', requireRole('owner', 'admin', 'staff'
     const chat = await resolveOrCreateChat(c.env.DB, chatId);
     if (!chat) return c.json({ success: false, error: 'Chat not found' }, 404);
 
-    let body: { image?: { originalContentUrl?: unknown; previewImageUrl?: unknown } | null; text?: unknown; revision?: number };
+    let body: { image?: { originalContentUrl?: unknown; previewImageUrl?: unknown } | null; text?: unknown; revision?: number; quotedMessageId?: string };
     try {
       body = await c.req.json();
     } catch {
@@ -1743,6 +1841,19 @@ chats.post('/api/chats/:id/send-combined', requireRole('owner', 'admin', 'staff'
       return c.json({ success: false, error: 'Chat not found' }, 404);
     }
 
+    // 引用元の検証は外部送信より前に行う(単体送信口と同じ境界)。
+    let quoted: QuotedMessageRow | null = null;
+    if (body.quotedMessageId) {
+      quoted = await resolveQuotedMessage(c.env.DB, {
+        friendId: friend.id,
+        lineAccountId: friend.line_account_id ?? null,
+        quotedMessageId: body.quotedMessageId,
+      });
+      if (!quoted) {
+        return c.json({ success: false, error: '引用元のメッセージが見つかりません' }, 404);
+      }
+    }
+
     // 外部送信の前に両方を検証する。片方でも壊れていれば送らず保存しない。
     let imagePart: { originalContentUrl: string; previewImageUrl: string } | null = null;
     if (image) {
@@ -1766,6 +1877,10 @@ chats.post('/api/chats/:id/send-combined', requireRole('owner', 'admin', 'staff'
       ...(imagePart ? [{ type: 'image', ...imagePart } as Message] : []),
       ...(textPart !== null ? [{ type: 'text', text: textPart } as Message] : []),
     ];
+    // 引用は先頭のメッセージに付ける(1送信要求につき1つの引用元)。
+    if (quoted?.quote_token && messages.length > 0) {
+      messages[0].quoteToken = quoted.quote_token;
+    }
 
     const leaseNow = new Date();
     const lease = await acquireInboxReplyLease(c.env.DB, {
@@ -1793,6 +1908,7 @@ chats.post('/api/chats/:id/send-combined', requireRole('owner', 'admin', 'staff'
         combined: true,
         image: imagePart,
         text: textPart,
+        quotedMessageId: quoted?.id ?? null,
       }),
     );
     const reservation = await reserveOutboundSend(c.env.DB, {
@@ -1901,12 +2017,12 @@ chats.post('/api/chats/:id/send-combined', requireRole('owner', 'admin', 'staff'
     ];
     try {
       await c.env.DB.batch([
-        ...rows.map((row) =>
+        ...rows.map((row, index) =>
           c.env.DB
             .prepare(`INSERT OR IGNORE INTO messages_log
               (id, friend_id, direction, message_type, content, source, line_account_id,
-               sent_by_staff_id, created_at)
-              VALUES (?, ?, 'outgoing', ?, ?, 'manual', ?, ?, ?)`)
+               sent_by_staff_id, created_at, quoted_message_id)
+              VALUES (?, ?, 'outgoing', ?, ?, 'manual', ?, ?, ?, ?)`)
             .bind(
               row.id,
               friend.id,
@@ -1915,6 +2031,8 @@ chats.post('/api/chats/:id/send-combined', requireRole('owner', 'admin', 'staff'
               friend.line_account_id ?? null,
               c.get('staff').id,
               sentAt,
+              // 引用は先頭メッセージに付けたので、記録も先頭行にだけ持たせる。
+              index === 0 ? quoted?.id ?? null : null,
             ),
         ),
         completeOutboundSendStatement(c.env.DB, {
@@ -2004,6 +2122,217 @@ chats.post('/api/chats/:id/send-combined', requireRole('owner', 'admin', 'staff'
       }).catch(() => undefined);
     }
     console.error('POST /api/chats/:id/send-combined error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+// ========== 送信予約(N-025) ==========
+
+// 予約時刻は「いまより先」だけを受け付ける。画面のdatetime-localはJSTで
+// 入力されるが、保存はUTCへ正規化するため境界ずれは起きない。
+function validateScheduledAt(raw: unknown): { ok: true; scheduledAt: string } | { ok: false } {
+  if (typeof raw !== 'string' || !raw) return { ok: false };
+  let scheduledAt: string;
+  try {
+    scheduledAt = normalizeScheduledAt(raw);
+  } catch {
+    return { ok: false };
+  }
+  if (Date.parse(scheduledAt) <= Date.now()) return { ok: false };
+  return { ok: true, scheduledAt };
+}
+
+/**
+ * POST /api/chats/:id/schedule — 返信の予約作成。
+ * Idempotency-Keyは必須で、同じキーの再送は新しい予約を作らず既存を返す。
+ */
+chats.post('/api/chats/:id/schedule', requireRole('owner', 'admin', 'staff'), requireVisibleChat, async (c) => {
+  try {
+    const chatId = c.req.param('id');
+    const idempotencyKey = c.req.header('Idempotency-Key')?.trim();
+    if (!isValidIdempotencyKey(idempotencyKey)) {
+      return c.json({ success: false, error: '有効なIdempotency-Keyが必要です' }, 400);
+    }
+    const chat = await resolveOrCreateChat(c.env.DB, chatId);
+    if (!chat) return c.json({ success: false, error: 'Chat not found' }, 404);
+
+    let body: { content?: unknown; scheduledAt?: unknown; quotedMessageId?: unknown };
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ success: false, error: 'content is required' }, 400);
+    }
+    const content = typeof body.content === 'string' ? body.content : '';
+    if (!content) return c.json({ success: false, error: 'content is required' }, 400);
+    if (content.length > 5000) {
+      return c.json({ success: false, error: 'メッセージは5000文字以内で入力してください' }, 400);
+    }
+    const time = validateScheduledAt(body.scheduledAt);
+    if (!time.ok) {
+      return c.json({ success: false, error: '未来の日時を指定してください' }, 400);
+    }
+
+    const { friend } = await resolveFriendAndAccessToken(
+      c.env.DB,
+      chat.friend_id,
+      c.env.LINE_CHANNEL_ACCESS_TOKEN,
+      'chats.schedule-send',
+    );
+    if (!friend) return c.json({ success: false, error: 'Friend not found' }, 404);
+    if (!await canAccessAllLineAccounts(
+      c.env.DB,
+      c.get('staff'),
+      [friend.line_account_id ?? null],
+    )) {
+      return c.json({ success: false, error: 'Chat not found' }, 404);
+    }
+
+    // 引用元の検証は単体送信口と同じ境界。無効な引用は予約を作らない。
+    let quotedMessageId: string | null = null;
+    if (typeof body.quotedMessageId === 'string' && body.quotedMessageId) {
+      const quoted = await resolveQuotedMessage(c.env.DB, {
+        friendId: friend.id,
+        lineAccountId: friend.line_account_id ?? null,
+        quotedMessageId: body.quotedMessageId,
+      });
+      if (!quoted) {
+        return c.json({ success: false, error: '引用元のメッセージが見つかりません' }, 404);
+      }
+      quotedMessageId = quoted.id;
+    }
+
+    const { row, created } = await createScheduledChatSend(c.env.DB, {
+      id: crypto.randomUUID(),
+      friendId: friend.id,
+      lineAccountId: friend.line_account_id ?? null,
+      staffId: c.get('staff').id,
+      messageType: 'text',
+      content,
+      quotedMessageId,
+      idempotencyKey,
+      scheduledAt: time.scheduledAt,
+      now: new Date().toISOString(),
+    });
+
+    return c.json({
+      success: true,
+      data: { ...scheduledSendResponse(row), replayed: !created },
+    });
+  } catch (err) {
+    console.error('POST /api/chats/:id/schedule error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+/** GET /api/chats/:id/scheduled — 会話の待機中・送信中の予約一覧。 */
+chats.get('/api/chats/:id/scheduled', requireRole('owner', 'admin', 'staff'), requireVisibleChat, async (c) => {
+  try {
+    const chatId = c.req.param('id');
+    const chat = await getChatById(c.env.DB, chatId)
+      ?? await resolveOrCreateChat(c.env.DB, chatId).catch(() => null);
+    if (!chat) return c.json({ success: false, error: 'Chat not found' }, 404);
+    const rows = await listPendingScheduledChatSends(c.env.DB, chat.friend_id);
+    return c.json({
+      success: true,
+      data: { scheduled: rows.map(scheduledSendResponse) },
+    });
+  } catch (err) {
+    console.error('GET /api/chats/:id/scheduled error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+/**
+ * PATCH /api/chats/:id/scheduled/:scheduleId — 予約の時刻・本文変更。
+ * scheduled の行だけCASで書き換える。sending以降は409。
+ */
+chats.patch('/api/chats/:id/scheduled/:scheduleId', requireRole('owner', 'admin', 'staff'), requireVisibleChat, async (c) => {
+  try {
+    const chatId = c.req.param('id');
+    const scheduleId = c.req.param('scheduleId');
+    const chat = await getChatById(c.env.DB, chatId)
+      ?? await resolveOrCreateChat(c.env.DB, chatId).catch(() => null);
+    if (!chat) return c.json({ success: false, error: 'Chat not found' }, 404);
+
+    let body: { scheduledAt?: unknown; content?: unknown };
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ success: false, error: 'content is required' }, 400);
+    }
+    const updates: { scheduledAt?: string; content?: string } = {};
+    if (body.scheduledAt !== undefined) {
+      const time = validateScheduledAt(body.scheduledAt);
+      if (!time.ok) {
+        return c.json({ success: false, error: '未来の日時を指定してください' }, 400);
+      }
+      updates.scheduledAt = time.scheduledAt;
+    }
+    if (body.content !== undefined) {
+      if (typeof body.content !== 'string' || !body.content) {
+        return c.json({ success: false, error: 'content is required' }, 400);
+      }
+      if (body.content.length > 5000) {
+        return c.json({ success: false, error: 'メッセージは5000文字以内で入力してください' }, 400);
+      }
+      updates.content = body.content;
+    }
+    if (updates.scheduledAt === undefined && updates.content === undefined) {
+      return c.json({ success: false, error: '変更する項目がありません' }, 400);
+    }
+
+    const result = await updateScheduledChatSend(c.env.DB, {
+      id: scheduleId,
+      friendId: chat.friend_id,
+      scheduledAt: updates.scheduledAt,
+      content: updates.content,
+      now: new Date().toISOString(),
+    });
+    if (result === 'not_found') {
+      return c.json({ success: false, error: '予約が見つかりません' }, 404);
+    }
+    if (result === 'locked') {
+      return c.json({
+        success: false,
+        error: '送信処理が始まったか、すでに処理済みの予約です',
+        code: 'SCHEDULE_LOCKED',
+      }, 409);
+    }
+    return c.json({ success: true, data: { updated: true } });
+  } catch (err) {
+    console.error('PATCH /api/chats/:id/scheduled/:scheduleId error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+/** DELETE /api/chats/:id/scheduled/:scheduleId — 予約の取消。scheduled の行だけCAS。 */
+chats.delete('/api/chats/:id/scheduled/:scheduleId', requireRole('owner', 'admin', 'staff'), requireVisibleChat, async (c) => {
+  try {
+    const chatId = c.req.param('id');
+    const scheduleId = c.req.param('scheduleId');
+    const chat = await getChatById(c.env.DB, chatId)
+      ?? await resolveOrCreateChat(c.env.DB, chatId).catch(() => null);
+    if (!chat) return c.json({ success: false, error: 'Chat not found' }, 404);
+
+    const result = await cancelScheduledChatSend(c.env.DB, {
+      id: scheduleId,
+      friendId: chat.friend_id,
+      staffId: c.get('staff').id,
+      now: new Date().toISOString(),
+    });
+    if (result === 'not_found') {
+      return c.json({ success: false, error: '予約が見つかりません' }, 404);
+    }
+    if (result === 'locked') {
+      return c.json({
+        success: false,
+        error: '送信処理が始まったか、すでに処理済みの予約です',
+        code: 'SCHEDULE_LOCKED',
+      }, 409);
+    }
+    return c.json({ success: true, data: { cancelled: true } });
+  } catch (err) {
+    console.error('DELETE /api/chats/:id/scheduled/:scheduleId error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

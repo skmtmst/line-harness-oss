@@ -1155,6 +1155,7 @@ async function handleEvent(
       sticker_id?: string | number;
       stickerResourceType?: string | number;
       sticker_resource_type?: string | number;
+      quoteToken?: string;
     };
     const labels: Record<string, string> = {
       sticker: '[スタンプ]',
@@ -1200,6 +1201,7 @@ async function handleEvent(
       lineMessageAccountKey,
       lineMessageId: msg.id,
       createdAt: jstNow(),
+      quoteToken: msg.quoteToken ?? null,
     });
     // 別webhook IDで同じmessageが再送された場合と、先に取消済みの場合は
     // マイル・自動応答・未読化などの副作用を繰り返さない。
@@ -1269,6 +1271,7 @@ async function handleEvent(
       lineMessageAccountKey,
       lineMessageId: textMessage.id,
       createdAt: now,
+      quoteToken: textMessage.quoteToken ?? null,
     });
     if (!recorded.inserted || recorded.isUnsent) return;
 

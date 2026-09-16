@@ -596,6 +596,28 @@ export interface ChatDetailMessage {
   sentByStaffId: string | null
   sentByStaffName: string | null
   scenarioName: string | null
+  /** 引用返信のとき、引用元の要約。取り消された引用元は isUnsent: true で本文は空。 */
+  quoted: {
+    id: string
+    direction: 'incoming' | 'outgoing'
+    messageType: string
+    content: string
+    isUnsent: boolean
+    createdAt: string | null
+  } | null
+  createdAt: string
+}
+
+/** `GET /api/chats/:id/scheduled` が返す送信予約1件。 */
+export interface ScheduledChatSend {
+  id: string
+  messageType: string
+  content: string
+  quotedMessageId: string | null
+  scheduledAt: string
+  status: 'scheduled' | 'sending' | 'sent' | 'failed' | 'cancelled'
+  attemptCount: number
+  lastErrorCode: string | null
   createdAt: string
 }
 
@@ -8313,18 +8335,37 @@ export const api = {
         method: 'PUT',
         body: JSON.stringify(data),
       }),
-    send: (id: string, data: { content: string; messageType?: string; revision?: number }, idempotencyKey: string) =>
+    send: (id: string, data: { content: string; messageType?: string; revision?: number; quotedMessageId?: string }, idempotencyKey: string) =>
       fetchApi<ApiResponse<{ sent: true; messageId: string; sentByStaffName: string; revision: number }>>(`/api/chats/${id}/send`, {
         method: 'POST',
         headers: { 'Idempotency-Key': idempotencyKey },
         body: JSON.stringify(data),
       }),
     // N-022: 画像と本文を1回の送信単位にする結合口。両方あるときだけ使う。
-    sendCombined: (id: string, data: { image: { originalContentUrl: string; previewImageUrl: string }; text: string; revision?: number }, idempotencyKey: string) =>
+    sendCombined: (id: string, data: { image: { originalContentUrl: string; previewImageUrl: string }; text: string; revision?: number; quotedMessageId?: string }, idempotencyKey: string) =>
       fetchApi<ApiResponse<{ sent: true; messageId: string; messageIds: string[]; sentByStaffName: string; revision: number }>>(`/api/chats/${id}/send-combined`, {
         method: 'POST',
         headers: { 'Idempotency-Key': idempotencyKey },
         body: JSON.stringify(data),
+      }),
+    // N-025: 送信予約。scheduledAt は JST の datetime-local 値でも受け付ける
+    // (サーバー側でUTCへ正規化)。取消・変更は送信中以降になると409で拒否される。
+    schedule: (id: string, data: { content: string; scheduledAt: string; quotedMessageId?: string }, idempotencyKey: string) =>
+      fetchApi<ApiResponse<ScheduledChatSend & { replayed: boolean }>>(`/api/chats/${id}/schedule`, {
+        method: 'POST',
+        headers: { 'Idempotency-Key': idempotencyKey },
+        body: JSON.stringify(data),
+      }),
+    scheduled: (id: string) =>
+      fetchApi<ApiResponse<{ scheduled: ScheduledChatSend[] }>>(`/api/chats/${id}/scheduled`),
+    updateScheduled: (id: string, scheduleId: string, data: { scheduledAt?: string; content?: string }) =>
+      fetchApi<ApiResponse<{ updated: true }>>(`/api/chats/${id}/scheduled/${scheduleId}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }),
+    cancelScheduled: (id: string, scheduleId: string) =>
+      fetchApi<ApiResponse<{ cancelled: true }>>(`/api/chats/${id}/scheduled/${scheduleId}`, {
+        method: 'DELETE',
       }),
     markRead: (id: string) =>
       fetchApi<ApiResponse<{ isUnread: false }>>(`/api/chats/${id}/read`, {
