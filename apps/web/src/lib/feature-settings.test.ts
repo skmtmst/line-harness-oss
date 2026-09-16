@@ -93,6 +93,9 @@ describe('機能設定とサイドメニューが同じ一覧を見る', () => {
     expect(SIDEBAR_FEATURE_BY_HREF['/automations']).toBe('automations')
     expect(SIDEBAR_FEATURE_BY_HREF['/webhooks']).toBe('external_integrations')
     expect(SIDEBAR_FEATURE_BY_HREF['/events']).toBe('events')
+    // multi_store_hierarchy の受け口（#860）。off でメニューから消え、直URLは API が 403 で止める。
+    expect(SIDEBAR_FEATURE_BY_HREF['/pools']).toBe('multi_store_hierarchy')
+    expect(DEFAULT_FEATURES.multi_store_hierarchy).toBe(false)
     expect(SIDEBAR_FEATURE_BY_HREF['/booking/bookings']).toBe('booking')
     expect(SIDEBAR_FEATURE_BY_HREF['/booking/menus']).toBe('booking')
     const used = MENU_SECTIONS.flatMap((section) => section.items.map((item) => item.featureKey))

@@ -1200,6 +1200,24 @@ describe('機能オフの403契約', () => {
     expect(detail).toEqual({ featureId: 'webinars' })
   })
 
+  it('補助データの呼び出しでは suppressFeatureDisabledEvent で案内を出さず、エラー自体は返す(#860)', async () => {
+    const target = new EventTarget()
+    const listener = vi.fn()
+    target.addEventListener('lh-feature-disabled', listener)
+    stubBrowser(target)
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+      success: false,
+      error: 'この機能は設定でオフになっています',
+      code: 'FEATURE_DISABLED',
+      featureId: 'multi_store_hierarchy',
+    }), { status: 403 })))
+
+    // 抑制しても呼び出し自体は失敗として返る（画面が補助データを諦める判断をする）。
+    await expect(fetchApi('/api/traffic-pools', { suppressFeatureDisabledEvent: true }))
+      .rejects.toMatchObject({ status: 403, code: 'FEATURE_DISABLED' })
+    expect(listener).not.toHaveBeenCalled()
+  })
+
   it('通常の403では専用案内の合図を出さない', async () => {
     const target = new EventTarget()
     const listener = vi.fn()

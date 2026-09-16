@@ -83,7 +83,8 @@ function InflowLinkDetailPageContent() {
       api.entryRoutes.list(),
       api.tags.list(),
       api.scenarios.list(),
-      api.pools.list(),
+      // プールは補助データ。機能がオフでもリンク詳細画面そのものは止めない。
+      api.pools.list({ suppressFeatureDisabledEvent: true }),
       // 編集窓の「追加直後に送るメッセージ」選択肢に使う。
       api.templates.list(),
       api.staff.me(),
