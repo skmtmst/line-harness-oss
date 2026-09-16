@@ -25,12 +25,15 @@ import {
   getStaffByInviteTokenHash,
   getStaffByLineUserId,
   getStaffByLineUserIdIncludingInactive,
+  getPlatformAdminByStaffId,
+  getActiveImpersonation,
   getTwoFactorChallenge,
   incrementTwoFactorChallengeAttempts,
   reserveStepUpAttempt,
   updateStaffMember,
 } from '@line-crm/db';
 import { decryptTotpSecret, verifyTotp } from '../lib/totp.js';
+import { toImpersonationContext } from '../middleware/impersonation.js';
 
 export const adminAuth = new Hono<Env>();
 
@@ -38,6 +41,8 @@ const OAUTH_STATE_COOKIE = 'lh_line_state';
 const OAUTH_NONCE_COOKIE = 'lh_line_nonce';
 const OAUTH_VERIFIER_COOKIE = 'lh_line_verifier';
 const OAUTH_INVITE_COOKIE = 'lh_line_invite';
+/** ログイン後の戻り先。'ops' のときだけ運営コンソールへ（★V6 37-1）。 */
+const OAUTH_NEXT_COOKIE = 'lh_line_next';
 const OAUTH_MAX_AGE = 600;
 const TWO_FACTOR_MAX_ATTEMPTS = 5;
 const STEP_UP_ATTEMPT_LIMIT_ERROR = '入力回数を超えました。しばらく待ってからやり直してください';
@@ -61,10 +66,11 @@ function callbackUrl(c: Context<Env>): string {
   return `${new URL(c.req.url).origin}/api/auth/line/callback`;
 }
 
-function adminLoginUrl(c: Context<Env>, error?: string): string {
+function adminLoginUrl(c: Context<Env>, error?: string, next?: string | null): string {
   const base = c.env.ADMIN_PUBLIC_URL?.replace(/\/+$/, '');
   if (!base) throw new Error('ADMIN_PUBLIC_URL is not configured');
-  return `${base}/login${error ? `?error=${encodeURIComponent(error)}` : ''}`;
+  const path = next === 'ops' ? '/ops/login' : '/login';
+  return `${base}${path}${error ? `?error=${encodeURIComponent(error)}` : ''}`;
 }
 
 adminAuth.get('/api/auth/line', async (c) => {
@@ -86,6 +92,8 @@ adminAuth.get('/api/auth/line', async (c) => {
   c.header('Set-Cookie', oauthCookie(OAUTH_VERIFIER_COOKIE, verifier), { append: true });
   const invite = c.req.query('invite');
   if (invite) c.header('Set-Cookie', oauthCookie(OAUTH_INVITE_COOKIE, invite), { append: true });
+  const next = c.req.query('next');
+  if (next === 'ops') c.header('Set-Cookie', oauthCookie(OAUTH_NEXT_COOKIE, next), { append: true });
 
   const authorize = new URL('https://access.line.me/oauth2/v2.1/authorize');
   authorize.search = new URLSearchParams({
@@ -107,15 +115,16 @@ adminAuth.get('/api/auth/line/callback', async (c) => {
   const nonce = readCookie(cookies, OAUTH_NONCE_COOKIE);
   const verifier = readCookie(cookies, OAUTH_VERIFIER_COOKIE);
   const invite = readCookie(cookies, OAUTH_INVITE_COOKIE);
+  const next = readCookie(cookies, OAUTH_NEXT_COOKIE);
   const state = c.req.query('state');
   const code = c.req.query('code');
 
-  for (const name of [OAUTH_STATE_COOKIE, OAUTH_NONCE_COOKIE, OAUTH_VERIFIER_COOKIE, OAUTH_INVITE_COOKIE]) {
+  for (const name of [OAUTH_STATE_COOKIE, OAUTH_NONCE_COOKIE, OAUTH_VERIFIER_COOKIE, OAUTH_INVITE_COOKIE, OAUTH_NEXT_COOKIE]) {
     c.header('Set-Cookie', oauthCookie(name, '', 0), { append: true });
   }
 
   if (!code || !state || !expectedState || state !== expectedState || !nonce || !verifier) {
-    return c.redirect(adminLoginUrl(c, 'invalid_state'));
+    return c.redirect(adminLoginUrl(c, 'invalid_state', next));
   }
 
   try {
@@ -173,17 +182,27 @@ adminAuth.get('/api/auth/line/callback', async (c) => {
         });
       }
     }
-    if (!staff) return c.redirect(adminLoginUrl(c, 'not_authorized'));
+    if (!staff) return c.redirect(adminLoginUrl(c, 'not_authorized', next));
+
+    // 運営コンソールへの LINE ログイン（★V6 37-1）。platform_admins に登録された
+    // LINE ユーザーだけを通す。契約先の権限者や、契約者専用 LINE の友だちでは入れない。
+    if (next === 'ops') {
+      const admin = await getPlatformAdminByStaffId(c.env.DB, staff.id);
+      if (!admin) return c.redirect(adminLoginUrl(c, 'not_authorized', next));
+    }
 
     const config = resolveAdminAuthConfig(c.env, { requestOrigin: new URL(c.req.url).origin });
-    if (config.misconfigured) return c.redirect(adminLoginUrl(c, 'configuration_error'));
-    if (twoFactorRequired(staff)) {
+    if (config.misconfigured) return c.redirect(adminLoginUrl(c, 'configuration_error', next));
+    // LINE でログインしたときは LINE 側で本人確認が済んでいるため、運営コンソール
+    // 向けは 2 要素の確認を省く（要件 §3 37-1・9 章「要確認」）。
+    if (next !== 'ops' && twoFactorRequired(staff)) {
       if (!c.env.TOTP_ENCRYPTION_KEY) return c.redirect(adminLoginUrl(c, 'configuration_error'));
       const challengeToken = await startTwoFactorChallenge(c, staff.id);
       return c.redirect(twoFactorLoginUrl(c, challengeToken));
     }
     const session = await issueSession(c, staff.id, config.sameSite);
     const adminUrl = new URL(c.env.ADMIN_PUBLIC_URL!.replace(/\/+$/, ''));
+    if (next === 'ops') adminUrl.pathname = `${adminUrl.pathname.replace(/\/+$/, '')}/ops`;
     if (config.crossSite) {
       adminUrl.hash = new URLSearchParams({
         lh_session: session.sessionToken,
@@ -199,7 +218,7 @@ adminAuth.get('/api/auth/line/callback', async (c) => {
     return c.redirect(adminUrl.toString());
   } catch (error) {
     console.error('[admin-auth] LINE Login callback failed', error);
-    return c.redirect(adminLoginUrl(c, 'line_login_failed'));
+    return c.redirect(adminLoginUrl(c, 'line_login_failed', next));
   }
 });
 
@@ -407,5 +426,10 @@ adminAuth.get('/api/auth/session', async (c) => {
     csrfToken = crypto.randomUUID();
     c.header('Set-Cookie', csrfCookie(csrfToken, config.sameSite), { append: true });
   }
-  return c.json({ success: true, data: c.get('staff'), csrfToken });
+  const staff = c.get('staff');
+  const platformAdmin = staff.id !== 'env-owner' && Boolean(await getPlatformAdminByStaffId(c.env.DB, staff.id));
+  // /api/auth/* は代理ログインの差し替え対象外なので、ここで直接引く。
+  const active = platformAdmin ? await getActiveImpersonation(c.env.DB, staff.id) : null;
+  const impersonation = active ? toImpersonationContext(active) : null;
+  return c.json({ success: true, data: { ...staff, platformAdmin, impersonation }, csrfToken });
 });

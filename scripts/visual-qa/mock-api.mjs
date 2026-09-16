@@ -505,8 +505,6 @@ const FEATURES = {
   auto_replies: true, rich_menus: true, inflow_tracking: true, forms: true,
   photo_review: true, automations: true, external_integrations: true,
   friend_add_routing: true, multi_store_hierarchy: false,
-  multi_store_bulk_updates: false, reservation_ledger: false,
-  external_reservations: false, google_business_profile: false,
   friend_fields: true, support_marks: true, saved_searches: true,
   media: true, common_vars: true, analytics: true, site_tracking: true,
   webinars: false, events: true, booking: true, affiliates: false, mileage: true,

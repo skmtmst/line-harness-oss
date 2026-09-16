@@ -12,6 +12,7 @@
 import { Hono, type Context } from 'hono';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
+import { auditLog } from '../lib/audit-log.js';
 import { cancelByTrigger, enrollByTrigger, reconcileV6ToStartsAt, rescheduleByTrigger } from '../services/reminder-trigger.js';
 import {
   EVENT_NAME_MAX,
@@ -47,6 +48,7 @@ import { awardActivityMileage } from '../services/activity-mileage.js';
 import { dispatchAutomationEventWithLogging } from '../services/automation-triggers.js';
 import { applyActionScoreEvent } from '../services/action-score-events.js';
 import { resolveLineCredential } from '@line-crm/db';
+import { createBroadcast, getBroadcastById, type Broadcast } from '@line-crm/db';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import {
   acceptEventWaitlistOffer,
@@ -56,6 +58,10 @@ import {
   getEventOccurrenceUsedSeats,
   promoteEventWaitlist,
 } from '../services/event-waitlist.js';
+import {
+  createEventApplicantSnapshot,
+  getEventApplicantSnapshot,
+} from '../services/event-applicant-snapshot.js';
 
 const events = new Hono<Env>();
 const ACCOUNT_ACCESS_ERROR = 'このLINEアカウントを操作する権限がありません';
@@ -92,8 +98,38 @@ function getAccountId(c: Context<Env>): string | null {
   return c.req.query('account_id') ?? null;
 }
 
+function csvCell(value: unknown): string {
+  let text = value == null ? '' : String(value);
+  // CSVを開いた表計算ソフトで式として実行させない。
+  if (/^[=+\-@]/.test(text)) text = `'${text}`;
+  return `"${text.replaceAll('"', '""')}"`;
+}
+
 const EVENT_PARTY_SIZE_MAX = 20;
 const EVENT_ANSWER_SNAPSHOT_MAX_BYTES = 16_384;
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+type EventApplicantBroadcastDraft = {
+  kind: 'event_occurrence_applicant_snapshot';
+  snapshotId: string;
+  occurrenceId: string;
+  recipientIds: string[];
+};
+
+function eventApplicantBroadcastDraft(value: string | null | undefined): EventApplicantBroadcastDraft | null {
+  if (!value) return null;
+  try {
+    const parsed = JSON.parse(value) as Partial<EventApplicantBroadcastDraft>;
+    if (parsed.kind !== 'event_occurrence_applicant_snapshot'
+      || typeof parsed.snapshotId !== 'string'
+      || typeof parsed.occurrenceId !== 'string'
+      || !Array.isArray(parsed.recipientIds)
+      || parsed.recipientIds.some((id) => typeof id !== 'string')) return null;
+    return parsed as EventApplicantBroadcastDraft;
+  } catch {
+    return null;
+  }
+}
 
 type EventSnapshotSource = {
   name: string;
@@ -821,6 +857,20 @@ events.get('/api/events/admin/events/:id/slots', async (c) => {
   return c.json({ items: results ?? [] });
 });
 
+// 申込者画面の開催回選択だけに使う。予約/集計を載せないため、画面を開くたびに
+// 大きな一覧を読む必要がない。
+events.get('/api/events/admin/events/:id/occurrence-selector', async (c) => {
+  const accountId = getAccountId(c);
+  if (!accountId) return bad(c, 'account_id_required', 400);
+  if (!(await ownsEvent(c.env.DB, c.req.param('id'), accountId))) return bad(c, 'not_found', 404);
+  const { results } = await c.env.DB.prepare(
+    `SELECT id, event_id, starts_at, ends_at, capacity, is_active, sort_order
+       FROM event_slots WHERE event_id = ? AND deleted_at IS NULL AND is_active = 1
+       ORDER BY sort_order ASC, starts_at ASC`,
+  ).bind(c.req.param('id')).all();
+  return c.json({ items: results ?? [] });
+});
+
 // GET /api/events/admin/events/:id/waitlist — キャンセル待ちの一覧
 //
 // 空きが出たときに誰へ案内したかも含めて見るための互換一覧。
@@ -858,7 +908,134 @@ events.get(
       lineAccountId: accountId,
     });
     if (!data) return bad(c, 'not_found', 404);
-    return c.json({ success: true, data });
+    const snapshot = await createEventApplicantSnapshot(c.env.DB, {
+      lineAccountId: accountId,
+      occurrenceId: c.req.param('id'),
+      staffId: c.get('staff')!.id,
+      data,
+    });
+    return c.json({ success: true, data: { ...snapshot.data, snapshotId: snapshot.id, snapshotExpiresAt: snapshot.expiresAt } });
+  },
+);
+
+// 表示時にサーバーが固定した全申込者を出力する。後続の申込/取消でCSVの対象を
+// 入れ替えないため、snapshot_idが無いリクエストは受け付けない。
+events.get(
+  '/api/events/admin/occurrences/:id/applicants.csv',
+  requireRole('owner', 'admin', 'staff'),
+  async (c) => {
+    try {
+      const accountId = getAccountId(c);
+      if (!accountId) return bad(c, 'account_id_required', 400);
+      const occurrenceId = c.req.param('id');
+      const snapshotId = c.req.query('snapshot_id');
+      if (!snapshotId) return bad(c, 'applicant_snapshot_required', 422);
+      const loaded = await getEventApplicantSnapshot(c.env.DB, {
+        id: snapshotId,
+        lineAccountId: accountId,
+        occurrenceId,
+        staffId: c.get('staff')!.id,
+      });
+      if (loaded.kind === 'not_found') return bad(c, 'not_found', 404);
+      if (loaded.kind === 'expired') return bad(c, 'applicant_snapshot_expired', 410);
+      if (loaded.kind === 'invalid') return bad(c, 'applicant_snapshot_invalid', 409);
+      const rows = loaded.snapshot.data.applicants.map((applicant) => [
+        applicant.displayName,
+        applicant.source === 'waitlist' ? 'キャンセル待ち' : '申込',
+        applicant.status,
+        applicant.partySize,
+        applicant.appliedAt,
+        applicant.offerExpiresAt,
+      ].map(csvCell).join(','));
+      const safeId = occurrenceId.replace(/[^A-Za-z0-9_-]/g, '') || 'occurrence';
+      auditLog(c, 'event.applicant.export', { kind: 'event_occurrence', id: occurrenceId }, {
+        lineAccountId: accountId,
+      });
+      return new Response(`\uFEFF${[
+        ['申込者', '区分', '状態', '人数', '申込日時', '案内期限'].map(csvCell).join(','),
+        ...rows,
+      ].join('\r\n')}\r\n`, {
+        headers: {
+          'Content-Type': 'text/csv; charset=utf-8',
+          'Content-Disposition': `attachment; filename="event-${safeId}-applicants.csv"`,
+          'Cache-Control': 'no-store',
+        },
+      });
+    } catch (error) {
+      console.error('GET /api/events/admin/occurrences/:id/applicants.csv error:', error);
+      return c.json({ error: 'applicants_export_failed' }, 500);
+    }
+  },
+);
+
+// preview時点の申込者IDをbroadcastの条件へ保存する。confirm/send時に予約一覧を
+// 読み直さないため、その後の申込・取消・タグ変更で宛先が入れ替わらない。
+events.post(
+  '/api/events/admin/occurrences/:id/applicant-broadcasts/preview',
+  requireRole('owner', 'admin'),
+  async (c) => {
+    try {
+      const accountId = getAccountId(c);
+      if (!accountId) return bad(c, 'account_id_required', 400);
+      const idempotencyKey = c.req.header('Idempotency-Key')?.trim();
+      if (!idempotencyKey || !UUID_PATTERN.test(idempotencyKey)) return bad(c, 'idempotency_key_required', 400);
+      const body = (await c.req.json<{ title?: unknown; messageContent?: unknown; snapshotId?: unknown }>()
+        .catch(() => ({}))) as { title?: unknown; messageContent?: unknown; snapshotId?: unknown };
+      const title = typeof body.title === 'string' ? body.title.trim() : '';
+      const messageContent = typeof body.messageContent === 'string' ? body.messageContent.trim() : '';
+      if (!title || !messageContent || messageContent.length > 5_000) return bad(c, 'invalid_broadcast_content', 422);
+      const snapshotId = typeof body.snapshotId === 'string' ? body.snapshotId : '';
+      if (!snapshotId) return bad(c, 'applicant_snapshot_required', 422);
+
+      const occurrenceId = c.req.param('id');
+      const replayExisting = (existing: Broadcast): Response => {
+        const draft = eventApplicantBroadcastDraft(existing.draft_payload_json);
+        if (existing.title !== title || existing.message_content !== messageContent
+          || existing.line_account_id !== accountId || existing.target_type !== 'segment'
+          || !draft || draft.snapshotId !== snapshotId || draft.occurrenceId !== occurrenceId) {
+          return bad(c, 'idempotency_key_conflict', 409);
+        }
+        const segmentConditions = JSON.stringify({ operator: 'AND', rules: [{ type: 'friend_id_in', value: draft.recipientIds }] });
+        if (existing.segment_conditions !== segmentConditions) return bad(c, 'idempotency_key_conflict', 409);
+        c.header('Idempotency-Replayed', 'true');
+        return c.json({ success: true, data: { broadcastId: existing.id, recipientCount: draft.recipientIds.length } });
+      };
+      const existing = await getBroadcastById(c.env.DB, idempotencyKey);
+      if (existing) {
+        return replayExisting(existing);
+      }
+      const loaded = await getEventApplicantSnapshot(c.env.DB, {
+        id: snapshotId,
+        lineAccountId: accountId,
+        occurrenceId,
+        staffId: c.get('staff')!.id,
+      });
+      if (loaded.kind === 'not_found') return bad(c, 'not_found', 404);
+      if (loaded.kind === 'expired') return bad(c, 'applicant_snapshot_expired', 410);
+      if (loaded.kind === 'invalid') return bad(c, 'applicant_snapshot_invalid', 409);
+      const friendIds = [...new Set(loaded.snapshot.data.applicants.map((applicant) => applicant.friendId))];
+      if (friendIds.length === 0) return bad(c, 'no_applicants_to_broadcast', 422);
+      const segmentConditions = JSON.stringify({ operator: 'AND', rules: [{ type: 'friend_id_in', value: friendIds }] });
+      let broadcast: Broadcast;
+      try {
+        broadcast = await createBroadcast(c.env.DB, {
+          id: idempotencyKey, title, messageType: 'text', messageContent, targetType: 'segment',
+          lineAccountId: accountId, segmentConditions, saveAsDraft: true, draftStep: 'confirm',
+          draftPayloadJson: JSON.stringify({
+            kind: 'event_occurrence_applicant_snapshot', snapshotId, occurrenceId, recipientIds: friendIds,
+          } satisfies EventApplicantBroadcastDraft),
+        });
+      } catch (error) {
+        // 同じkeyを同時に押した競合だけは、PK衝突を500にせず勝者の結果を再生する。
+        const raced = await getBroadcastById(c.env.DB, idempotencyKey);
+        if (raced) return replayExisting(raced);
+        throw error;
+      }
+      return c.json({ success: true, data: { broadcastId: broadcast.id, recipientCount: friendIds.length } }, 201);
+    } catch (error) {
+      console.error('POST /api/events/admin/occurrences/:id/applicant-broadcasts/preview error:', error);
+      return c.json({ error: 'applicant_broadcast_preview_failed' }, 500);
+    }
   },
 );
 

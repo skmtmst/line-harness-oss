@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { captureTwoFactorChallenge, clearTwoFactorChallenge, storeAdminSession } from '@/lib/admin-session'
+import { captureTwoFactorChallenge, clearTwoFactorChallenge, takeTwoFactorNextPath, storeAdminSession } from '@/lib/admin-session'
 import { useBrand } from '@/lib/use-brand'
 
 export default function TwoFactorLoginPage() {
@@ -30,7 +30,7 @@ export default function TwoFactorLoginPage() {
       if (body.data?.sessionToken) storeAdminSession(body.data.sessionToken, body.csrfToken)
       else if (body.csrfToken) localStorage.setItem('lh_csrf', body.csrfToken)
       clearTwoFactorChallenge()
-      window.location.assign('/')
+      window.location.assign(takeTwoFactorNextPath())
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : '認証できませんでした')
       setDigits(['', '', '', '', '', ''])

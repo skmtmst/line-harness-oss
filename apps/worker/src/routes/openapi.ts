@@ -562,6 +562,50 @@ const spec = {
         responses: { '201': { description: 'Recorded; notification result is included' }, '400': { description: 'Invalid request' }, '403': { description: 'Read-only staff cannot submit' }, '404': { description: 'Line account not found in tenant scope' } },
       },
     },
+    // ── Ops Console（★V6 37 運営コンソール）─────────────────────────────
+    '/api/ops/me': {
+      get: { tags: ['Ops Console'], summary: 'ログイン中の運営マスター', responses: { '200': { description: 'Platform admin identity and active impersonation' }, '403': { description: 'Not a platform admin' } } },
+    },
+    '/api/ops/tenants': {
+      get: { tags: ['Ops Console'], summary: '契約先（統括）の一覧', parameters: [{ name: 'q', in: 'query', schema: { type: 'string' } }, { name: 'status', in: 'query', schema: { type: 'string', enum: ['active', 'suspended', 'archived'] } }], responses: { '200': { description: 'Tenants with counts and summary' }, '403': { description: 'Not a platform admin' } } },
+    },
+    '/api/ops/tenants/{id}': {
+      get: { tags: ['Ops Console'], summary: '契約先の詳細', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }], responses: { '200': { description: 'Tenant, accounts, members, recent audit' }, '404': { description: 'Tenant not found' } } },
+    },
+    '/api/ops/tenants/{id}/status': {
+      patch: { tags: ['Ops Console'], summary: '契約先の状態を変更（停止・アーカイブ・再開）', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }], requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['status', 'reason'], properties: { status: { type: 'string', enum: ['active', 'suspended', 'archived'] }, reason: { type: 'string', minLength: 4, maxLength: 500 }, confirmName: { type: 'string' } } } } } }, responses: { '200': { description: 'Status changed; audit recorded (visible to tenant)' }, '400': { description: 'Missing reason or name confirmation' }, '403': { description: 'Read-only or not a platform admin' } } },
+    },
+    '/api/ops/impersonation/current': {
+      get: { tags: ['Ops Console'], summary: '有効な代理ログイン', responses: { '200': { description: 'Active impersonation or null' } } },
+    },
+    '/api/ops/impersonation/start': {
+      post: { tags: ['Ops Console'], summary: '代理ログインを開始（既定は閲覧のみ）', requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['tenantId'], properties: { tenantId: { type: 'string' } } } } } }, responses: { '200': { description: 'Impersonation started in read mode' }, '400': { description: 'Archived tenant' }, '404': { description: 'Tenant not found' } } },
+    },
+    '/api/ops/impersonation/write': {
+      post: { tags: ['Ops Console'], summary: '書き込みに切り替える（理由必須）', requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['reason'], properties: { reason: { type: 'string', minLength: 4, maxLength: 500 } } } } } }, responses: { '200': { description: 'Switched to write mode; audit visible to tenant' }, '400': { description: 'Missing reason or not impersonating' } } },
+    },
+    '/api/ops/impersonation/read': {
+      post: { tags: ['Ops Console'], summary: '閲覧のみに戻す', responses: { '200': { description: 'Switched to read mode' }, '400': { description: 'Not impersonating' } } },
+    },
+    '/api/ops/impersonation/pii-reveal': {
+      post: { tags: ['Ops Console'], summary: '個人情報を一時的に表示（理由必須）', requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['reason'], properties: { reason: { type: 'string', minLength: 4, maxLength: 500 } } } } } }, responses: { '200': { description: 'PII revealed for this impersonation; logged' }, '400': { description: 'Missing reason or not impersonating' } } },
+    },
+    '/api/ops/impersonation/end': {
+      post: { tags: ['Ops Console'], summary: '代理ログインを終える', responses: { '200': { description: 'Ended (or nothing active)' } } },
+    },
+    '/api/ops/audit': {
+      get: { tags: ['Ops Console'], summary: '運営の操作記録', parameters: [{ name: 'tenant_id', in: 'query', schema: { type: 'string' } }, { name: 'action', in: 'query', schema: { type: 'string' } }, { name: 'from', in: 'query', schema: { type: 'string' } }, { name: 'to', in: 'query', schema: { type: 'string' } }, { name: 'limit', in: 'query', schema: { type: 'integer' } }, { name: 'offset', in: 'query', schema: { type: 'integer' } }], responses: { '200': { description: 'Audit rows and total' } } },
+    },
+    '/api/ops/members': {
+      get: { tags: ['Ops Console'], summary: '運営メンバーの一覧', responses: { '200': { description: 'Platform admins and monthly summary' } } },
+      post: { tags: ['Ops Console'], summary: '既存の権限者を運営メンバーに加える', requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', properties: { staffId: { type: 'string' }, email: { type: 'string' } } } } } }, responses: { '201': { description: 'Added; approved by the caller' }, '400': { description: 'Cannot add yourself' }, '404': { description: 'Staff not found' } } },
+    },
+    '/api/ops/members/{staffId}': {
+      patch: { tags: ['Ops Console'], summary: '運営メンバーの停止・再開', parameters: [{ name: 'staffId', in: 'path', required: true, schema: { type: 'string' } }], requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['isActive'], properties: { isActive: { type: 'boolean' } } } } } }, responses: { '200': { description: 'Updated' }, '400': { description: 'Self or last member' }, '404': { description: 'Staff not found' } } },
+    },
+    '/api/hq/operator-history': {
+      get: { tags: ['HQ Support'], summary: '契約先から見える運営の操作履歴（書き込みを伴ったものだけ）', responses: { '200': { description: 'Visible operator actions for the caller tenant' } } },
+    },
     // ── HQ Templates ───────────────────────────────────────────────────────
     '/api/hq/templates/media': {
       post: {
@@ -2464,6 +2508,75 @@ const spec = {
           '400': { description: '確認した編集版が不正' },
           '404': { description: 'フォームが無い、または権限範囲外' },
           '409': { description: '保存後に編集内容が変わった' },
+        },
+      },
+    },
+    // ── Event applicant operations ─────────────────────────────────────────
+    '/api/events/admin/events/{id}/occurrence-selector': {
+      get: {
+        tags: ['Events'],
+        summary: '申込者画面用の開催回選択肢を取得',
+        description: '予約件数・集計を含めず、指定LINEアカウントに属する有効な開催回だけを返す。',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: '開催回のID、日時、定員、並び順' },
+          '400': { description: 'account_id が無い' },
+          '403': { description: 'イベント閲覧権限が無い' },
+          '404': { description: 'イベントが無い、またはアカウント範囲外' },
+        },
+      },
+    },
+    '/api/events/admin/occurrences/{id}/applicants.csv': {
+      get: {
+        tags: ['Events'],
+        summary: '表示時に固定した開催回申込者をCSVで書き出す',
+        description: 'snapshot_id は申込者画面の取得時に発行される短期ID。後から申込・取消があっても、同じ表示対象だけを書き出す。',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+          { name: 'snapshot_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: 'UTF-8 BOM付きCSV', content: { 'text/csv': { schema: { type: 'string' } } } },
+          '400': { description: 'account_id が無い' },
+          '403': { description: 'イベント閲覧権限が無い' },
+          '404': { description: '開催回またはsnapshotがアカウント範囲外' },
+          '409': { description: 'snapshotの内容が不正' },
+          '410': { description: 'snapshotの期限切れ' },
+          '422': { description: 'snapshot_id が無い' },
+        },
+      },
+    },
+    '/api/events/admin/occurrences/{id}/applicant-broadcasts/preview': {
+      post: {
+        tags: ['Events'],
+        summary: '固定済みの開催回申込者を一斉案内の下書きへ保存',
+        description: '同じIdempotency-Keyと同じ内容は、後から申込者が変わっても固定済み宛先を再生する。',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+          { name: 'Idempotency-Key', in: 'header', required: true, schema: { type: 'string', format: 'uuid' } },
+        ],
+        requestBody: { required: true, content: { 'application/json': { schema: {
+          type: 'object', required: ['title', 'messageContent', 'snapshotId'],
+          properties: {
+            title: { type: 'string', minLength: 1 },
+            messageContent: { type: 'string', minLength: 1, maxLength: 5000 },
+            snapshotId: { type: 'string' },
+          },
+        } } } },
+        responses: {
+          '200': { description: '同じ冪等キーの下書きを再生', headers: { 'Idempotency-Replayed': { schema: { type: 'boolean' } } } },
+          '201': { description: '送信前確認用の下書きを作成' },
+          '400': { description: 'アカウント、冪等キー、または本文が不正' },
+          '403': { description: 'owner/admin権限が無い' },
+          '404': { description: '開催回またはsnapshotがアカウント範囲外' },
+          '409': { description: '冪等キーが別内容に使われた、またはsnapshotが不正' },
+          '410': { description: 'snapshotの期限切れ' },
+          '422': { description: 'snapshotId が無い' },
         },
       },
     },

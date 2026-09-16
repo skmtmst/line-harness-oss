@@ -4,6 +4,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // 一度これが通ると画面からは復旧できない（無効化された人を有効に戻せる人が
 // いなくなる）ので、db層はモックにして経路だけを厳密に見る。
 const dbMocks = {
+  getActiveImpersonation: vi.fn(async () => null),
+  getPlatformAdminByStaffId: vi.fn(async () => null),
   getLineAccounts: vi.fn().mockResolvedValue([]),
   getLineAccountScopeEntries: vi.fn(async (...args: unknown[]) => dbMocks.getLineAccounts(...args)),
   getStaffByApiKey: vi.fn(),

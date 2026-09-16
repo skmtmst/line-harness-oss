@@ -1019,8 +1019,8 @@ broadcasts.post('/api/broadcasts', async (c) => {
       try {
         // 保存する前に組み立ててみる。作れない条件をそのまま入れると、
         // 送信を押した時点で初めて失敗する。
-        const { buildSegmentQuery } = await import('../services/segment-query.js');
-        buildSegmentQuery(raw as SegmentCondition);
+        const { buildPublicSegmentQuery } = await import('../services/segment-query.js');
+        buildPublicSegmentQuery(raw as SegmentCondition);
       } catch (segmentError) {
         return c.json(
           { success: false, error: segmentError instanceof Error ? segmentError.message : 'invalid segmentConditions' },
@@ -1229,8 +1229,8 @@ broadcasts.put('/api/broadcasts/:id', async (c) => {
         );
       }
       try {
-        const { buildSegmentQuery } = await import('../services/segment-query.js');
-        buildSegmentQuery(raw as SegmentCondition);
+        const { buildPublicSegmentQuery } = await import('../services/segment-query.js');
+        buildPublicSegmentQuery(raw as SegmentCondition);
       } catch (segmentError) {
         return c.json(
           { success: false, error: segmentError instanceof Error ? segmentError.message : 'invalid segmentConditions' },
@@ -2212,8 +2212,8 @@ broadcasts.post('/api/broadcasts/:id/send-segment', requireRole('owner', 'admin'
     }
 
     if (segmentParts.some((part) => hasRecipientVariables(part.messageContent))) {
-      const { buildSegmentQuery } = await import('../services/segment-query.js');
-      const { sql, bindings } = buildSegmentQuery(body.conditions);
+      const { buildPublicSegmentQuery } = await import('../services/segment-query.js');
+      const { sql, bindings } = buildPublicSegmentQuery(body.conditions);
       const accountId = (existing as unknown as Record<string, unknown>).line_account_id as string | null;
       let audienceSql = `SELECT COUNT(*) AS total,
                                 SUM(CASE WHEN q.display_name IS NULL OR trim(q.display_name) = '' THEN 1 ELSE 0 END) AS missing_name
@@ -2732,8 +2732,8 @@ broadcasts.post('/api/segments/count', requireRole('owner', 'admin'), async (c) 
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.accountId ?? null])) {
       return c.json({ success: false, error: ACCOUNT_ACCESS_ERROR }, 403);
     }
-    const { buildSegmentQuery } = await import('../services/segment-query.js');
-    const { sql, bindings } = buildSegmentQuery(body.conditions as SegmentCondition);
+    const { buildPublicSegmentQuery } = await import('../services/segment-query.js');
+    const { sql, bindings } = buildPublicSegmentQuery(body.conditions as SegmentCondition);
 
     let accountSql = sql;
     const accountBindings = [...bindings];

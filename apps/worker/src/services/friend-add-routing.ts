@@ -897,10 +897,13 @@ export const FRIEND_ADD_CONDITION_MAX_DEPTH = 8;
 export const FRIEND_ADD_CONDITION_MAX_NODES = 200;
 
 /**
- * 条件で使えるルール種別。segment-query の `SegmentRule['type']` と
- * 1対1で持つ。片方だけ増えたら型検査で落ちる（下の網羅チェック）。
+ * 条件で使える公開ルール種別。内部専用の `friend_id_in` は、友だち追加時の
+ * 条件として保存させない。イベント申込者へ送る固定snapshotを別の導線から
+ * 作れてしまうと、条件ビルダーの権限境界を迂回するためである。
  */
-const SEGMENT_RULE_TYPE_MAP: Record<SegmentRule['type'], true> = {
+type FriendAddSegmentRuleType = Exclude<SegmentRule['type'], 'friend_id_in'>;
+
+const SEGMENT_RULE_TYPE_MAP: Record<FriendAddSegmentRuleType, true> = {
   tag_exists: true,
   tag_not_exists: true,
   tag_all: true,
@@ -954,7 +957,7 @@ function checkConditionNode(
     if (counter.n > FRIEND_ADD_CONDITION_MAX_NODES) return 'too_large';
     if (!rule || typeof rule !== 'object' || Array.isArray(rule)) return 'bad_rule';
     const type = (rule as { type?: unknown }).type;
-    if (typeof type !== 'string' || !SEGMENT_RULE_TYPES.has(type)) return 'bad_rule';
+    if (type === 'friend_id_in' || typeof type !== 'string' || !SEGMENT_RULE_TYPES.has(type)) return 'bad_rule';
   }
   if (record.groups !== undefined) {
     if (!Array.isArray(record.groups)) return 'bad_groups';

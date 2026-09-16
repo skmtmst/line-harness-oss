@@ -8,6 +8,7 @@ import Button from '@/components/shared/button'
 import HqAccountList from '@/components/hq/account-list'
 import AccountEditModal from '@/components/accounts/account-edit-modal'
 import SummaryCard from '@/components/shared/summary-card'
+import OperatorHistory from '@/components/hq/operator-history'
 
 export default function HqPage() {
   const router = useRouter()
@@ -144,6 +145,9 @@ export default function HqPage() {
       {!error && !loading && accounts.length > 0 ? (
         <HqAccountList accounts={accounts} onSelect={login} onSettings={setEditingAccount} />
       ) : null}
+
+      {/* 運営が書き込みを伴う操作をしたときだけ出る（★V6 37-5）。 */}
+      <OperatorHistory />
 
       {editingAccount ? (
         <AccountEditModal
