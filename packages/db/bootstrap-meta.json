@@ -374,7 +374,8 @@
     "413_chat_quotes_and_scheduled_sends.sql",
     "414_admin_two_factor_challenge_purpose.sql",
     "415_admin_session_device_info.sql",
-    "416_staff_role_bundle_view_keys_email_mask.sql"
+    "416_staff_role_bundle_view_keys_email_mask.sql",
+    "417_booking_staff_member_link.sql"
   ],
-  "migrationCount": 375
+  "migrationCount": 376
 }

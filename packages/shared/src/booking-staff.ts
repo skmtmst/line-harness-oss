@@ -18,6 +18,8 @@ export interface BookingStaffSaveInput {
   sort_order?: number;
   is_designation_optional?: 0 | 1;
   is_active?: 0 | 1;
+  /** N-411: 本人勤務の対象となるログインユーザー(staff_members.id)。null で解除。 */
+  staff_member_id?: string | null;
 }
 
 export type BookingStaffValidationResult =
@@ -159,6 +161,17 @@ export function parseBookingStaffInput(
       const parsed = binaryFlag(own(body, field) ? body[field] : defaultValue, field, label);
       if (!parsed.ok) return parsed;
       value[field] = parsed.value;
+    }
+  }
+
+  if (own(body, 'staff_member_id')) {
+    const rawMember = body.staff_member_id;
+    if (rawMember === null || rawMember === '') {
+      value.staff_member_id = null;
+    } else if (typeof rawMember !== 'string' || rawMember.trim().length > 200) {
+      return { ok: false, field: 'staff_member_id', error: 'ログインユーザーの指定が正しくありません' };
+    } else {
+      value.staff_member_id = rawMember.trim();
     }
   }
 

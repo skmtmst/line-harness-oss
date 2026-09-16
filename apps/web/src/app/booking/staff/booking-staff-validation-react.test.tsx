@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import React, { act } from 'react'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 
 const fixture = vi.hoisted(() => ({
@@ -11,6 +11,8 @@ const fixture = vi.hoisted(() => ({
   deleteStaff: vi.fn(),
   listMenus: vi.fn(),
   putStaffMenus: vi.fn(),
+  listMyStaff: vi.fn(),
+  staffList: vi.fn(),
   routerPush: vi.fn(),
 }))
 
@@ -58,11 +60,31 @@ vi.mock('@/lib/api', () => ({
     deleteStaff: (...args: unknown[]) => fixture.deleteStaff(...args),
     listMenus: (...args: unknown[]) => fixture.listMenus(...args),
     putStaffMenus: (...args: unknown[]) => fixture.putStaffMenus(...args),
+    listMyStaff: (...args: unknown[]) => fixture.listMyStaff(...args),
+  },
+  api: {
+    staff: {
+      list: (...args: unknown[]) => fixture.staffList(...args),
+    },
   },
 }))
 
 import BookingStaffPage from './page'
 import NewBookingStaffPage from './new/page'
+
+// happy-dom の localStorage はこの環境では未定義。権限表の読み取り
+// (staff-capability.ts) が参照するのでインメモリで差し替える。
+class MemoryStorage implements Storage {
+  private readonly values = new Map<string, string>()
+  get length() { return this.values.size }
+  clear() { this.values.clear() }
+  getItem(key: string) { return this.values.get(key) ?? null }
+  key(index: number) { return [...this.values.keys()][index] ?? null }
+  removeItem(key: string) { this.values.delete(key) }
+  setItem(key: string, value: string) { this.values.set(key, String(value)) }
+}
+const storage = new MemoryStorage()
+vi.stubGlobal('localStorage', storage)
 
 function deferred<T>() {
   let resolve!: (value: T) => void
@@ -90,12 +112,20 @@ beforeEach(() => {
   fixture.deleteStaff.mockReset().mockResolvedValue({ ok: true })
   fixture.listMenus.mockReset().mockResolvedValue({ menus: [] })
   fixture.putStaffMenus.mockReset().mockResolvedValue({ ok: true })
+  fixture.listMyStaff.mockReset().mockResolvedValue({ staff: [] })
+  fixture.staffList.mockReset().mockResolvedValue({ success: true, data: [] })
   fixture.routerPush.mockReset()
+  // N-411: 画面側の権限制御は localStorage の権限表を読む。
+  // 既定は owner（全通過）にし、権限試験では個別に上書きする。
+  storage.setItem('lh_staff_role', 'owner')
+  storage.setItem('lh_staff_permissions', '[]')
+  storage.setItem('lh_staff_view_permissions', '[]')
 })
 
 afterEach(() => {
   cleanup()
   accountSetters.clear()
+  storage.clear()
 })
 
 describe('予約スタッフ保存前検証（実React）', () => {
@@ -197,5 +227,72 @@ describe('予約スタッフ保存前検証（実React）', () => {
       menu_id: 'menu-a', is_offered: true,
       override_duration_minutes: null, override_price: null,
     }]))
+  })
+})
+
+describe('N-411 項目別権限と画面の一致（実React）', () => {
+  const STAFF_ROW = {
+    id: 'staff-1', name: 'sato', display_name: '佐藤', role: null,
+    profile_image_url: null, bio: null, sort_order: 0,
+    is_designation_optional: 0, is_active: 1, staff_member_id: null,
+  }
+
+  function asStaff(editKeys: string[] = [], viewKeys: string[] = []) {
+    storage.setItem('lh_staff_role', 'staff')
+    storage.setItem('lh_staff_permissions', JSON.stringify(editKeys))
+    storage.setItem('lh_staff_view_permissions', JSON.stringify(viewKeys))
+  }
+
+  test('予約設定の権限が無い staff には新規・編集・削除を出さない', async () => {
+    asStaff(['/booking/bookings'], [])
+    fixture.listStaff.mockResolvedValue({ staff: [STAFF_ROW] })
+    render(<BookingStaffPage />)
+    await screen.findByText('佐藤')
+    const create = screen.getByRole('button', { name: '+ 新規スタッフ' }) as HTMLButtonElement
+    expect(create.disabled).toBe(true)
+    expect(screen.queryByText('編集')).toBeNull()
+    expect(screen.queryByText('削除')).toBeNull()
+    // シフトへの導線は残す（閲覧権限があれば本人・他人どちらも開ける）
+    expect(screen.getByText('シフト')).toBeTruthy()
+  })
+
+  test('booking.settings の edit を持つ staff には編集操作を出す', async () => {
+    asStaff(['booking.settings'], [])
+    fixture.listStaff.mockResolvedValue({ staff: [STAFF_ROW] })
+    render(<BookingStaffPage />)
+    await screen.findByText('佐藤')
+    expect((screen.getByRole('button', { name: '+ 新規スタッフ' }) as HTMLButtonElement).disabled).toBe(false)
+    expect(screen.getByText('編集')).toBeTruthy()
+    expect(screen.getByText('削除')).toBeTruthy()
+  })
+
+  test('権限の無い staff が新規登録画面を直URLで開いても保存導線を出さない', async () => {
+    asStaff([], [])
+    render(<NewBookingStaffPage />)
+    expect(await screen.findByText('予約設定の変更権限がありません')).toBeTruthy()
+    expect(fixture.createStaff).not.toHaveBeenCalled()
+  })
+
+  test('編集モーダルでログインユーザーを選ぶと staff_member_id が保存される', async () => {
+    fixture.staffList.mockResolvedValue({
+      success: true,
+      data: [{
+        id: 'member-1', name: '山田', email: 'yamada@example.com', role: 'staff',
+        isActive: true,
+      }],
+    })
+    fixture.listStaff.mockResolvedValue({ staff: [STAFF_ROW] })
+    render(<BookingStaffPage />)
+    await screen.findByText('佐藤')
+    fireEvent.click(screen.getByText('編集'))
+    await screen.findByText('スタッフ編集')
+    // 共有 Select（button + listbox）。開いて選択肢のボタンを押す。
+    fireEvent.click(await screen.findByRole('button', { name: 'ログインユーザーとの紐づけ' }))
+    const option = await screen.findByRole('option', { name: '山田（yamada@example.com）' })
+    fireEvent.click(within(option).getByRole('button'))
+    fireEvent.click(screen.getByRole('button', { name: '保存' }))
+    await waitFor(() => expect(fixture.updateStaff).toHaveBeenCalledWith(
+      'account-a', 'staff-1', expect.objectContaining({ staff_member_id: 'member-1' }),
+    ))
   })
 })

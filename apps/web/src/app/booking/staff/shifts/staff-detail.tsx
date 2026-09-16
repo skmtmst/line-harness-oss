@@ -13,6 +13,7 @@ import {
   type BookingStaff,
 } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
+import { canEditFeature } from '@/lib/staff-capability'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
@@ -96,6 +97,14 @@ export default function StaffDetail({ staffId }: { staffId: string }) {
   const { selectedAccountId } = useAccount()
   const [staffList, setStaffList] = useState<BookingStaff[]>([])
   const [staffMissing, setStaffMissing] = useState(false)
+  // N-411 本人勤務: staff ロールは自分に紐づく予約スタッフだけを対象にする。
+  // 他人の staff_id を直指定しても Worker 側が 403 で拒否するが、
+  // 画面側でも「見せない」に揃える。
+  const [isStaffRole] = useState(() =>
+    typeof window !== 'undefined' && window.localStorage.getItem('lh_staff_role') === 'staff')
+  const [ownStaffId, setOwnStaffId] = useState<string | null>(null)
+  const [canEditOwn] = useState(() =>
+    typeof window === 'undefined' ? true : canEditFeature('booking.staff.own'))
   const [timeZone, setTimeZone] = useState('Asia/Tokyo')
   const [storeExceptions, setStoreExceptions] = useState<Array<{ dateFrom: string; dateTo: string; kind: string }>>([])
   const [menuId, setMenuId] = useState<string | null>(null)
@@ -193,24 +202,35 @@ export default function StaffDetail({ staffId }: { staffId: string }) {
     setShiftError(null)
     try {
       const [staffRes, settingsRes, menuRes] = await Promise.all([
-        bookingApi.listStaff(selectedAccountId),
-        bookingApi.getSettings(selectedAccountId),
-        bookingApi.listMenus(selectedAccountId),
+        // staff ロールは本人の予約スタッフだけを /staff/me から解決する。
+        // 一覧口は '/booking/bookings' 権限が要るため、本人勤務だけの人は通らない。
+        isStaffRole
+          ? bookingApi.listMyStaff(selectedAccountId)
+          : bookingApi.listStaff(selectedAccountId),
+        bookingApi.getSettings(selectedAccountId).catch(() => null),
+        bookingApi.listMenus(selectedAccountId).catch(() => null),
       ])
       if (requestId !== requestRef.current) return
-      if (!settingsRes.success) throw new Error(settingsRes.error)
+      // 管理者経路は従来どおり設定取得失敗をエラーとして扱う。
+      // staff ロール（本人勤務）は設定閲覧権限が無くても自分の勤務を見られるよう
+      // 取得失敗を許容し、プレビュー関連だけ既定値へ落とす。
+      if (!isStaffRole && (!settingsRes || !settingsRes.success)) {
+        throw new Error(settingsRes?.success === false ? settingsRes.error : 'settings_load_failed')
+      }
       const found = staffRes.staff.find((item) => item.id === staffId) ?? null
       if (!found) {
         setStaffList(staffRes.staff)
+        // staff ロールは /staff/me が本人分だけ返すので、不一致は「権限外」として扱う。
+        if (isStaffRole && staffRes.staff.length > 0) setOwnStaffId(staffRes.staff[0].id)
         setStaffMissing(true)
         setLoadStatus('ready')
         return
       }
-      const zone = settingsRes.data.timeZone || 'Asia/Tokyo'
-      const activeMenu = menuRes.menus.find((item) => item.is_active) ?? null
+      const zone = settingsRes?.success ? (settingsRes.data.timeZone || 'Asia/Tokyo') : 'Asia/Tokyo'
+      const activeMenu = menuRes?.menus.find((item) => item.is_active) ?? null
       setStaffList(staffRes.staff)
       setTimeZone(zone)
-      setStoreExceptions((settingsRes.data.exceptions ?? [])
+      setStoreExceptions((settingsRes?.success ? settingsRes.data.exceptions ?? [] : [])
         .filter((item) => !item.scopeKind || item.scopeKind === 'store')
         .map((item) => ({
           dateFrom: item.dateFrom || item.date || '',
@@ -290,7 +310,7 @@ export default function StaffDetail({ staffId }: { staffId: string }) {
       }
       setLoadStatus('error')
     }
-  }, [selectedAccountId, staffId, loadAvailability])
+  }, [selectedAccountId, staffId, isStaffRole, loadAvailability])
 
   useEffect(() => {
     void load()
@@ -753,6 +773,23 @@ export default function StaffDetail({ staffId }: { staffId: string }) {
   }
 
   if (staffMissing || !staff) {
+    // N-411: staff ロールで本人の予約スタッフ以外が指定された場合。
+    if (isStaffRole) {
+      return (
+        <div data-design-node="tksPcStaff" className="space-y-4 pb-8">
+          <ListState
+            kind="empty"
+            title={ownStaffId ? '自分の勤務だけを表示できます' : '紐づく予約スタッフがありません'}
+            description={ownStaffId
+              ? 'ほかの担当者の勤務は管理者だけが開けます。自分の勤務へ移動してください。'
+              : '管理者が予約スタッフとログインユーザーの紐づけを設定すると、ここで自分の勤務を管理できます。'}
+            action={ownStaffId
+              ? <Button href={`/booking/staff/shifts?staff_id=${ownStaffId}`}>自分の勤務を開く</Button>
+              : <Button href="/booking/bookings">予約の一覧へ戻る</Button>}
+          />
+        </div>
+      )
+    }
     return (
       <div data-design-node="tksPcStaff" className="space-y-4 pb-8">
         <nav aria-label="現在位置" className="text-ink-faint text-xs">
@@ -778,7 +815,10 @@ export default function StaffDetail({ staffId }: { staffId: string }) {
         <nav aria-label="現在位置" className="text-ink-faint text-xs">
           <Link href="/booking/bookings" className="text-accent hover:underline">予約</Link>
           <span className="mx-2">›</span>
-          <Link href="/booking/staff" className="text-accent hover:underline">担当スタッフ</Link>
+          {/* N-411: staff ロールは担当スタッフ一覧(要 /booking/bookings 権限)を開けない */}
+          {isStaffRole ? <span>自分の勤務</span> : (
+            <Link href="/booking/staff" className="text-accent hover:underline">担当スタッフ</Link>
+          )}
           <span className="mx-2">›</span>
           <span>{staff.display_name}の勤務とシフト</span>
         </nav>
@@ -801,6 +841,9 @@ export default function StaffDetail({ staffId }: { staffId: string }) {
         {staff.display_name}の出る時間と外の予定です。下の予約枠にすぐ反映されます。時間は店舗の時間（{timeZone}）で入れます。
       </div>
 
+      {/* N-411: 本人勤務が閲覧のみのときは全編集部品をまとめて無効化する。
+          fieldset disabled で配下の入力・ボタンを一括で止める（API 側も 403 で拒否）。 */}
+      <fieldset disabled={!canEditOwn} className="contents">
       <div className="flex flex-col gap-4 xl:flex-row">
         <div className="min-w-0 flex-1 space-y-4">
           <section className="bg-canvas border-hairline overflow-hidden rounded-card border">
@@ -1143,12 +1186,15 @@ export default function StaffDetail({ staffId }: { staffId: string }) {
           <section className="bg-canvas border-hairline rounded-card border p-4">
             <h2 className="text-ink font-semibold">つながる先</h2>
             <div className="mt-3 space-y-3 text-sm">
-              <Link href="/booking/staff" className="text-accent flex justify-between gap-3"><span>→ 担当スタッフ</span><span className="text-ink-faint text-xs">人の追加と削除</span></Link>
+              {!isStaffRole ? (
+                <Link href="/booking/staff" className="text-accent flex justify-between gap-3"><span>→ 担当スタッフ</span><span className="text-ink-faint text-xs">人の追加と削除</span></Link>
+              ) : null}
               <Link href="/booking/staff/shifts" className="text-accent flex justify-between gap-3"><span>→ 受付枠</span><span className="text-ink-faint text-xs">お店全体の時間と休業日</span></Link>
             </div>
           </section>
         </aside>
       </div>
+      </fieldset>
 
       <ConfirmDialog
         open={removeTarget !== null}

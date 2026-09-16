@@ -27,6 +27,11 @@ vi.mock('@line-crm/db', () => ({
     if (token === 'auto-replies-key') return { id: 'auto-replies-1', name: 'Auto Replies Staff', role: 'staff', permission_keys: '["/auto-replies"]' };
     if (token === 'automations-key') return { id: 'automations-1', name: 'Automations Staff', role: 'staff', permission_keys: '["/automations"]' };
     if (token === 'booking-key') return { id: 'booking-1', name: 'Booking Staff', role: 'staff', permission_keys: '["/booking/bookings"]' };
+    // N-411: 予約の細かい権限。管理(booking)・メニュー・設定・本人勤務は別キー。
+    if (token === 'booking-menus-key') return { id: 'bm-1', name: 'Menus Staff', role: 'staff', permission_keys: '["/booking/menus"]' };
+    if (token === 'booking-settings-key') return { id: 'bs-1', name: 'Settings Staff', role: 'staff', permission_keys: '["booking.settings"]' };
+    if (token === 'booking-own-key') return { id: 'bo-1', name: 'Own Shift Staff', role: 'staff', permission_keys: '["booking.staff.own"]' };
+    if (token === 'booking-own-view-key') return { id: 'bov-1', name: 'Own Shift Viewer', role: 'staff', view_permission_keys: '["booking.staff.own"]' };
     if (token === 'events-key') return { id: 'events-1', name: 'Events Staff', role: 'staff', permission_keys: '["/events"]' };
     if (token === 'contents-key') return { id: 'contents-1', name: 'Contents Staff', role: 'staff', permission_keys: '["/contents"]' };
     if (token === 'photo-view-key') return { id: 'photo-view-1', name: 'Photo Viewer', role: 'staff', permission_keys: '["photo.submission.view"]' };
@@ -142,6 +147,14 @@ function app() {
   a.get('/api/booking/admin/customers', (c) => c.json({ success: true }));
   a.post('/api/booking/admin/customers', (c) => c.json({ success: true }));
   a.patch('/api/booking/admin/requests/:id', (c) => c.json({ success: true }));
+  // N-411: 細かい権限の検証用スタブ（route 側ガードは別試験で担保）。
+  a.get('/api/booking/admin/menus', (c) => c.json({ success: true }));
+  a.post('/api/booking/admin/menus', (c) => c.json({ success: true }));
+  a.put('/api/booking/admin/settings', (c) => c.json({ success: true }));
+  a.get('/api/booking/admin/staff/me', (c) => c.json({ success: true }));
+  a.get('/api/booking/admin/staff/:id/shifts', (c) => c.json({ success: true }));
+  a.put('/api/booking/admin/staff/:id/shifts', (c) => c.json({ success: true }));
+  a.post('/api/booking/admin/staff', (c) => c.json({ success: true }));
   a.get('/api/meet-consultations', (c) => c.json({ success: true }));
   a.post('/api/meet-consultations', (c) => c.json({ success: true }));
   a.delete('/api/meet-consultations/:externalEventId', (c) => c.json({ success: true }));
@@ -574,6 +587,38 @@ describe('staff feature permissions', () => {
     expect(permissionForApiPath('/api/events/admin/events/ev-1/bookings/bk-1/cancel')).toBe('/events');
     // 公開コールバックは権限の対象外。
     expect(permissionForApiPath('/api/meet-callback')).toBeNull();
+    // N-411: 細かい権限のマッピング。広い /api/booking → /booking/bookings より先に解決する。
+    expect(permissionForApiPath('/api/booking/admin/menus')).toBe('/booking/menus');
+    expect(permissionForApiPath('/api/booking/admin/menus/m-1')).toBe('/booking/menus');
+    expect(permissionForApiPath('/api/booking/admin/staff-menus')).toBe('/booking/menus');
+    expect(permissionForApiPath('/api/booking/admin/staff/s-1/menus')).toBe('/booking/menus');
+    expect(permissionForApiPath('/api/booking/admin/staff/me')).toBe('booking.staff.own');
+    expect(permissionForApiPath('/api/booking/admin/staff/s-1/shifts')).toBe('booking.staff.own');
+    expect(permissionForApiPath('/api/booking/admin/staff/s-1/availability-rules')).toBe('booking.staff.own');
+    expect(permissionForApiPath('/api/booking/admin/staff/s-1/breaks')).toBe('booking.staff.own');
+    expect(permissionForApiPath('/api/booking/admin/staff/s-1/break-dates')).toBe('booking.staff.own');
+    expect(permissionForApiPath('/api/booking/admin/staff/s-1/google-calendar')).toBe('booking.staff.own');
+    // スタッフ登録・設定・予約台帳は従来の広いキーへ落ちる（route 側で細かいキーを要求）。
+    expect(permissionForApiPath('/api/booking/admin/staff')).toBe('/booking/bookings');
+    expect(permissionForApiPath('/api/booking/admin/settings')).toBe('/booking/bookings');
+    expect(permissionForApiPath('/api/booking/admin/bookings')).toBe('/booking/bookings');
+  });
+
+  test('N-411: 予約の細かい権限が middleware 第一段階で分離される', async () => {
+    // メニューは /booking/menus キー。予約管理だけでは通らない。
+    expect((await app().request('/api/booking/admin/menus', bearer('booking-menus-key'), crossSiteEnv())).status).toBe(200);
+    expect((await app().request('/api/booking/admin/menus', bearer('booking-key'), crossSiteEnv())).status).toBe(403);
+    // 本人勤務は booking.staff.own キー。予約管理・メニューでは通らない。
+    expect((await app().request('/api/booking/admin/staff/me', bearer('booking-own-key'), crossSiteEnv())).status).toBe(200);
+    expect((await app().request('/api/booking/admin/staff/s-1/shifts', bearer('booking-own-key'), crossSiteEnv())).status).toBe(200);
+    expect((await app().request('/api/booking/admin/staff/s-1/shifts', bearer('booking-key'), crossSiteEnv())).status).toBe(403);
+    expect((await app().request('/api/booking/admin/staff/s-1/shifts', bearer('booking-menus-key'), crossSiteEnv())).status).toBe(403);
+    // 見えるだけキーは GET だけ通し、変更系は 403。
+    expect((await app().request('/api/booking/admin/staff/s-1/shifts', bearer('booking-own-view-key'), crossSiteEnv())).status).toBe(200);
+    expect((await app().request('/api/booking/admin/staff/s-1/shifts', { ...bearer('booking-own-view-key'), method: 'PUT' }, crossSiteEnv())).status).toBe(403);
+    // キー無しは fail-closed。
+    expect((await app().request('/api/booking/admin/menus', bearer('no-permissions-key'), crossSiteEnv())).status).toBe(403);
+    expect((await app().request('/api/booking/admin/staff/me', bearer('no-permissions-key'), crossSiteEnv())).status).toBe(403);
   });
 
   test('写真審査は閲覧・判断・一括判断・原本取得の専用権限を分離する', async () => {
