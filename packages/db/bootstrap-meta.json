@@ -362,7 +362,8 @@
     "401_rich_menu_manual_publish_execution_token.sql",
     "402_ad_click_selection_snapshot.sql",
     "403_common_var_extended_types.sql",
-    "404_common_var_validity.sql"
+    "404_common_var_validity.sql",
+    "406_friend_add_action_run_details.sql"
   ],
-  "migrationCount": 363
+  "migrationCount": 364
 }

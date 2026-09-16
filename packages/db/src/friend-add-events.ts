@@ -6,6 +6,145 @@ export type FriendAddCandidateSource = 'line_login' | 'liff' | 'short_link';
 export type FriendAddCandidateStatus = 'pending' | 'consumed' | 'expired' | 'late';
 export type FriendAddRoutingStatus = 'pending' | 'completed' | 'failed' | 'suppressed' | 'partial_failed';
 
+export type FriendAddActionRunStatus = 'pending' | 'running' | 'completed' | 'failed';
+
+export interface FriendAddActionRunRow {
+  id: string;
+  event_id: string;
+  action_stable_id: string;
+  action_type: string;
+  action_snapshot: string;
+  idempotency_key: string;
+  status: FriendAddActionRunStatus;
+  attempt_count: number;
+  next_retry_at: string | null;
+  last_error_code: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * 初回実行の処理行を予約する。同じ event/action は一意なので、Webhook再送でも
+ * completed/running の処理をもう一度動かさない。
+ */
+export async function claimInitialFriendAddActionRun(
+  db: D1Database,
+  input: {
+    eventId: string;
+    actionStableId: string;
+    actionType: string;
+    actionSnapshot: string;
+    idempotencyKey: string;
+  },
+): Promise<{ id: string; acquired: boolean; status: FriendAddActionRunStatus }> {
+  const id = crypto.randomUUID();
+  const now = jstNow();
+  await db.prepare(
+    `INSERT OR IGNORE INTO friend_add_action_runs
+       (id, event_id, action_stable_id, action_type, action_snapshot,
+        idempotency_key, status, attempt_count, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, 'pending', 0, ?, ?)`,
+  ).bind(
+    id, input.eventId, input.actionStableId, input.actionType,
+    input.actionSnapshot, input.idempotencyKey, now, now,
+  ).run();
+  const row = await db.prepare(
+    `SELECT id, status FROM friend_add_action_runs
+      WHERE event_id = ? AND action_stable_id = ? LIMIT 1`,
+  ).bind(input.eventId, input.actionStableId).first<{ id: string; status: FriendAddActionRunStatus }>();
+  if (!row) throw new Error('friend_add_action_run_not_reserved');
+  const claimed = await db.prepare(
+    `UPDATE friend_add_action_runs
+        SET status = 'running', attempt_count = attempt_count + 1,
+            started_at = ?, completed_at = NULL, last_error_code = NULL, updated_at = ?
+      WHERE id = ? AND status = 'pending'`,
+  ).bind(now, now, row.id).run();
+  const acquired = (claimed.meta?.changes ?? 0) === 1;
+  return { id: row.id, acquired, status: acquired ? 'running' : row.status };
+}
+
+/** 成功/失敗だけを安全なコードで確定する。例外本文は永続化しない。 */
+export async function finishFriendAddActionRun(
+  db: D1Database,
+  input: { id: string; status: 'completed' | 'failed'; errorCode?: string | null },
+): Promise<void> {
+  const now = jstNow();
+  await db.prepare(
+    `UPDATE friend_add_action_runs
+        SET status = ?, last_error_code = ?, completed_at = ?, updated_at = ?
+      WHERE id = ? AND status = 'running'`,
+  ).bind(input.status, input.errorCode ?? null, now, now, input.id).run();
+}
+
+/**
+ * 実行単位を1文で再試行中へ進める。同時POSTはこのCASを通った1本だけが勝つ。
+ * 別アカウントは行が返らず、存在を明かさない。
+ */
+export async function claimFriendAddEventForActionRetry(
+  db: D1Database,
+  input: { eventId: string; lineAccountId: string },
+): Promise<{ friendId: string } | null> {
+  const row = await db.prepare(
+    `UPDATE friend_add_events
+        SET routing_status = 'pending', processed_at = NULL
+      WHERE id = ? AND line_account_id = ? AND routing_status = 'partial_failed'
+        AND EXISTS (
+          SELECT 1 FROM friend_add_action_runs ar
+           WHERE ar.event_id = friend_add_events.id AND ar.status = 'failed'
+        )
+      RETURNING friend_id`,
+  ).bind(input.eventId, input.lineAccountId).first<{ friend_id: string }>();
+  return row ? { friendId: row.friend_id } : null;
+}
+
+/** CASを勝った再試行だけが、失敗行をまとめて確保する。成功済み行は触らない。 */
+export async function claimFailedFriendAddActionRuns(
+  db: D1Database,
+  eventId: string,
+): Promise<FriendAddActionRunRow[]> {
+  const now = jstNow();
+  const rows = await db.prepare(
+    `UPDATE friend_add_action_runs
+        SET status = 'running', attempt_count = attempt_count + 1,
+            started_at = ?, completed_at = NULL, last_error_code = NULL, updated_at = ?
+      WHERE event_id = ? AND status = 'failed'
+      RETURNING *`,
+  ).bind(now, now, eventId).all<FriendAddActionRunRow>();
+  return rows.results ?? [];
+}
+
+/** 再試行後の親状態を、子処理行の現在値から確定する。 */
+export async function finishFriendAddEventActionRetry(
+  db: D1Database,
+  input: { eventId: string; lineAccountId: string },
+): Promise<'completed' | 'partial_failed' | null> {
+  const now = jstNow();
+  const row = await db.prepare(
+    `UPDATE friend_add_events
+        SET routing_status = CASE
+              WHEN EXISTS (
+                SELECT 1 FROM friend_add_action_runs ar
+                 WHERE ar.event_id = friend_add_events.id AND ar.status != 'completed'
+              ) THEN 'partial_failed'
+              ELSE 'completed'
+            END,
+            error_code = CASE
+              WHEN EXISTS (
+                SELECT 1 FROM friend_add_action_runs ar
+                 WHERE ar.event_id = friend_add_events.id AND ar.status != 'completed'
+              ) THEN 'action_failed'
+              ELSE NULL
+            END,
+            processed_at = ?
+      WHERE id = ? AND line_account_id = ? AND routing_status = 'pending'
+      RETURNING routing_status`,
+  ).bind(now, input.eventId, input.lineAccountId)
+    .first<{ routing_status: 'completed' | 'partial_failed' }>();
+  return row?.routing_status ?? null;
+}
+
 export interface FriendAddAttributionCandidate {
   id: string;
   lineAccountId: string;

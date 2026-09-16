@@ -4169,6 +4169,41 @@ export type FriendAddRunList = {
   }
 }
 
+export type FriendAddRunDetail = {
+  id: string
+  receivedAt: string
+  processedAt: string | null
+  friend: { id: string; displayName: string | null; redacted: false } | { displayName: string; redacted: true }
+  friendKind: FriendAddRuleKind
+  attribution: {
+    status: FriendAddEventAttributionStatus
+    routeId: string | null
+    routeName: string | null
+    reason: string | null
+  }
+  rule: ({
+    id: string
+    name: string | null
+    versionId: string | null
+    versionNumber: number | null
+  } & { definition?: FriendAddRuleDefinition }) | null
+  configuredActions?: unknown[]
+  actionRuns: Array<{
+    id: string
+    stableId: string
+    type: string
+    status: 'pending' | 'running' | 'completed' | 'failed'
+    attemptCount: number
+    nextRetryAt: string | null
+    errorCode: string | null
+    startedAt: string
+    completedAt: string | null
+    updatedAt: string
+  }>
+  status: FriendAddEventRoutingStatus
+  errorCode: string | null
+}
+
 export type MediaQuota = {
   usageBytes: number
   reservedBytes: number
@@ -7769,6 +7804,15 @@ export const api = {
       if (params?.limit !== undefined) query.set('limit', String(params.limit))
       return fetchApi<ApiResponse<FriendAddRunList>>(`/api/friend-add-runs?${query}`)
     },
+    runDetail: (accountId: string, runId: string) =>
+      fetchApi<ApiResponse<FriendAddRunDetail>>(
+        `/api/friend-add-runs/${encodeURIComponent(runId)}?account_id=${encodeURIComponent(accountId)}`,
+      ),
+    retryRun: (accountId: string, runId: string) =>
+      fetchApi<ApiResponse<{ status: 'completed' | 'partial_failed'; retried: number }>>(
+        `/api/friend-add-runs/${encodeURIComponent(runId)}/retry?account_id=${encodeURIComponent(accountId)}`,
+        { method: 'POST' },
+      ),
     createDraft: (input: FriendAddRuleInput, idempotencyKey: string) =>
       fetchApi<ApiResponse<{ id: string }>>('/api/friend-add-rules/drafts', {
         method: 'POST',

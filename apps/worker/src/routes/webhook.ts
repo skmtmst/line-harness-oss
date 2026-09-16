@@ -586,6 +586,7 @@ async function handleEvent(
             defaultAccessToken: lineAccessToken,
             workerUrl,
           }, {
+            eventId: friendAddEventId,
             entryRouteId: currentAttribution?.entryRouteId ?? referralRoute?.id ?? null,
             sendRight,
             claimError,
@@ -840,7 +841,9 @@ async function handleEvent(
      * 通を次のfollowが送り直す。
      */
     const deliveryUnknown = currentSendOutcome() === 'unknown';
-    const ledgerErrorCode = (stoppedRefDiscarded ? 'entry_route_stopped' : null)
+    const actionFailed = (routing?.actionFailureCount ?? 0) > 0;
+    const ledgerErrorCode = (actionFailed ? 'action_failed' : null)
+      ?? (stoppedRefDiscarded ? 'entry_route_stopped' : null)
       ?? routing?.suppressReason
       ?? (claimError
         ? 'send_claim_unavailable'
@@ -856,7 +859,9 @@ async function handleEvent(
           eventId: friendAddEventId,
           lineAccountId,
           // N-244: 停止ref由来で振り分けを止めた場合も suppressed に倒す。
-          status: (stoppedRefDiscarded || routing?.suppressed)
+          status: actionFailed
+            ? 'partial_failed'
+            : (stoppedRefDiscarded || routing?.suppressed)
             ? 'suppressed'
             : (delivered ? 'completed' : 'partial_failed'),
           routingRuleId: routing?.ruleId ?? null,

@@ -2259,7 +2259,8 @@ CREATE TABLE "friend_add_action_runs" (
   next_retry_at       TEXT,
   last_error_code     TEXT,
   created_at          TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
-  updated_at          TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  updated_at          TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')), action_type TEXT NOT NULL DEFAULT 'unknown', action_snapshot TEXT NOT NULL DEFAULT '{}'
+  CHECK (json_valid(action_snapshot)), started_at TEXT, completed_at TEXT,
   UNIQUE (event_id, action_stable_id)
 );
 

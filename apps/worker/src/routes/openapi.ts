@@ -1093,6 +1093,24 @@ const spec = {
         responses: { '200': { description: 'Retry executed; evaluation recomputed from all action runs' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Evaluation not found in account scope' }, '409': { description: 'No permanent_failed action runs to claim (already processing or completed)' } },
       },
     },
+    '/api/friend-add-runs/{id}/retry': {
+      post: {
+        tags: ['Webhook'],
+        summary: '友だち追加時配信で失敗した処理だけを固定済み内容から再試行（N-102/N-103）',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: 'Failed action runs retried; successful actions were not repeated' },
+          '400': { description: 'LINE account is required' },
+          '403': { description: 'Owner or admin role required' },
+          '404': { description: 'Run not found in account scope' },
+          '409': { description: 'No failed action is retryable or another retry already won' },
+          '500': { description: 'Retry failed safely' },
+        },
+      },
+    },
     '/api/mileage/rules': {
       get: {
         tags: ['Mileage'], summary: 'LINEアカウント範囲内のマイル付与ルールを取得',

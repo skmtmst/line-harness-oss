@@ -384,6 +384,12 @@ export default function FriendAddRunsPage() {
                     </div>
                     <div className="hidden min-w-0 flex-1 text-right text-sm font-bold lg:block">{action}</div>
                     <StatusBadge tone={status.tone} size="compact">{status.label}</StatusBadge>
+                    <Link
+                      className="shrink-0 text-xs font-bold text-accent hover:underline"
+                      href={`/friend-add-settings/runs/${encodeURIComponent(item.id)}`}
+                    >
+                      詳細
+                    </Link>
                     <time className="w-12 shrink-0 text-right text-xs text-ink-secondary" dateTime={item.receivedAt} title={formatJstDateTime(item.receivedAt)}>{formatJstTime(item.receivedAt)}</time>
                   </div>
                 )
