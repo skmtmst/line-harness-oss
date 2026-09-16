@@ -81,7 +81,8 @@ export type AuditAction =
   | 'webinar.publish'
   | 'webinar.pause'
   | 'webinar.duplicate'
-  | 'webinar.participant.export';
+  | 'webinar.participant.export'
+  | 'event.applicant.export';
 
 function commonAuditWriter(): typeof recordAuditEvent | null {
   try {

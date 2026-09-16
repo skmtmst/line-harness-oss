@@ -14,6 +14,7 @@ describe('V6 友だち追加時配信・実行結果の契約', () => {
     expect(PAGE).not.toContain('<Header')
     expect(SETTINGS).toContain('<Button href="/friend-add-settings/runs">実行結果を見る</Button>')
     expect(PAGE).toContain('href="/friend-add-settings">← 友だち追加時の配信</Link>')
+    expect(PAGE).toContain('href={`/friend-add-settings/runs/detail?id=${encodeURIComponent(item.id)}`}')
   })
 
   it('選択中のアカウントと実行状態を新しい実行結果APIへ渡す', () => {

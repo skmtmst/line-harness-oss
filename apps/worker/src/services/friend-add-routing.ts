@@ -14,6 +14,13 @@ import {
   enrollFriendInScenario,
   resumeFriendScenario,
   postMileageEntry,
+  claimInitialFriendAddActionRun,
+  claimFriendAddEventForActionRetry,
+  claimFailedFriendAddActionRuns,
+  finishFriendAddActionRun,
+  finishFriendAddEventActionRetry,
+  type FriendAddActionRunRow,
+  type FriendAddRoutingStatus,
   type FriendScenario,
   type FriendAddRuleDefinition,
   ensureFriendAddFallbackRules,
@@ -890,10 +897,13 @@ export const FRIEND_ADD_CONDITION_MAX_DEPTH = 8;
 export const FRIEND_ADD_CONDITION_MAX_NODES = 200;
 
 /**
- * 条件で使えるルール種別。segment-query の `SegmentRule['type']` と
- * 1対1で持つ。片方だけ増えたら型検査で落ちる（下の網羅チェック）。
+ * 条件で使える公開ルール種別。内部専用の `friend_id_in` は、友だち追加時の
+ * 条件として保存させない。イベント申込者へ送る固定snapshotを別の導線から
+ * 作れてしまうと、条件ビルダーの権限境界を迂回するためである。
  */
-const SEGMENT_RULE_TYPE_MAP: Record<SegmentRule['type'], true> = {
+type FriendAddSegmentRuleType = Exclude<SegmentRule['type'], 'friend_id_in'>;
+
+const SEGMENT_RULE_TYPE_MAP: Record<FriendAddSegmentRuleType, true> = {
   tag_exists: true,
   tag_not_exists: true,
   tag_all: true,
@@ -947,7 +957,7 @@ function checkConditionNode(
     if (counter.n > FRIEND_ADD_CONDITION_MAX_NODES) return 'too_large';
     if (!rule || typeof rule !== 'object' || Array.isArray(rule)) return 'bad_rule';
     const type = (rule as { type?: unknown }).type;
-    if (typeof type !== 'string' || !SEGMENT_RULE_TYPES.has(type)) return 'bad_rule';
+    if (type === 'friend_id_in' || typeof type !== 'string' || !SEGMENT_RULE_TYPES.has(type)) return 'bad_rule';
   }
   if (record.groups !== undefined) {
     if (!Array.isArray(record.groups)) return 'bad_groups';
@@ -1343,7 +1353,8 @@ async function runActions(
    * 前のアクションに時間がかかった間に奪われたことに気づけない。
    */
   fence?: () => Promise<boolean>,
-): Promise<void> {
+  ledger?: { eventId: string; ruleVersionId: string | null; lineAccountId: string },
+): Promise<{ total: number; failed: number }> {
   /*
    * シナリオと同じアクションは、シナリオと同じところで実行する。
    *
@@ -1351,34 +1362,46 @@ async function runActions(
    * 保つことになり、必ずどちらかがずれる。行の形だけ合わせて渡す。
    * `scenario_id` などはシナリオ側の都合の列なので、ここでは空で埋める。
    */
-  const rows = actions
-    .filter((a): a is Extract<FriendAddAction, { kind: 'row' }> => a.kind === 'row')
-    .map((a, i) => ({
-      id: `friend-add-${i}`,
-      scenario_id: '',
-      hook: 'on_enroll' as const,
-      step_id: null,
-      choice_index: null,
-      sort_order: i,
-      action_type: a.actionType,
-      config_json: JSON.stringify(a.config ?? {}),
-      condition_json: null,
-      repeat_on_refire: 1,
-    }));
-  if (rows.length > 0 && (!fence || await fence())) {
-    try {
-      const { runActionRows } = await import('./scenario-actions.js');
-      await runActionRows(db, rows as never, friendId);
-    } catch (err) {
-      // 1つ失敗しても配信は止めない。
-      console.error('[friend-add-routing] row actions failed:', err);
-    }
-  }
-
-  for (const action of actions) {
+  let failed = 0;
+  for (const [index, action] of actions.entries()) {
     if (fence && !(await fence())) break;
+    const actionType = action.kind === 'row' ? action.actionType : action.kind;
+    const snapshot = JSON.stringify(action);
+    let actionRunId: string | null = null;
+    if (ledger) {
+      const stableId = `${ledger.ruleVersionId ?? 'legacy'}:${index}`;
+      const claimed = await claimInitialFriendAddActionRun(db, {
+        eventId: ledger.eventId,
+        actionStableId: stableId,
+        actionType,
+        actionSnapshot: snapshot,
+        idempotencyKey: `friend-add-action:${ledger.eventId}:${stableId}`,
+      });
+      if (!claimed.acquired) {
+        if (claimed.status === 'failed') failed += 1;
+        continue;
+      }
+      actionRunId = claimed.id;
+    }
     try {
-      if (action.kind === 'tag') {
+      if (action.kind === 'row') {
+        const { runActionRows } = await import('./scenario-actions.js');
+        const result = await runActionRows(db, [{
+          id: actionRunId ?? `friend-add-${index}`,
+          scenario_id: '',
+          hook: 'on_enroll',
+          step_id: null,
+          choice_index: null,
+          sort_order: index,
+          action_type: action.actionType,
+          config_json: JSON.stringify(action.config ?? {}),
+          condition_json: null,
+          repeat_on_refire: 1,
+        }] as never, friendId, { accountId: ledger?.lineAccountId ?? null });
+        if (result.failed > 0 || result.skippedIncomplete > 0) {
+          throw new Error('friend_add_action_failed');
+        }
+      } else if (action.kind === 'tag') {
         // 読み込みで row へ直しているので、ここへは来ない。古い保存を
         // そのまま渡された場合の保険として残す。
         await attachTagAndFireSideEffects(db, friendId, action.tagId, push);
@@ -1392,15 +1415,109 @@ async function runActions(
           amount: action.amount,
           reason: '友だち追加',
           source: 'friend_add_routing',
-          sourceEventId: friendId,
-          idempotencyKey: `friend_add_routing:${friendId}:${action.amount}`,
+          sourceEventId: ledger?.eventId ?? friendId,
+          idempotencyKey: actionRunId
+            ? `friend_add_action:${actionRunId}`
+            : `friend_add_routing:${friendId}:${action.amount}`,
         });
+      }
+      if (actionRunId) {
+        await finishFriendAddActionRun(db, { id: actionRunId, status: 'completed' });
       }
     } catch (err) {
       // 1つ失敗しても残りは実行する。配信そのものは止めない。
       console.error(`[friend-add-routing] action ${action.kind} failed:`, err);
+      failed += 1;
+      if (actionRunId) {
+        await finishFriendAddActionRun(db, {
+          id: actionRunId,
+          status: 'failed',
+          // 例外本文は顧客情報や外部応答を含み得るため保存しない。
+          errorCode: 'action_failed',
+        });
+      }
     }
   }
+  return { total: actions.length, failed };
+}
+
+async function executeStoredFriendAddAction(
+  db: D1Database,
+  input: { run: FriendAddActionRunRow; friendId: string; lineAccountId: string },
+): Promise<void> {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(input.run.action_snapshot);
+  } catch {
+    throw new Error('friend_add_action_snapshot_invalid');
+  }
+  const [action] = normalizeActions([parsed]);
+  if (!action) throw new Error('friend_add_action_snapshot_invalid');
+  if (action.kind === 'row') {
+    const { runActionRows } = await import('./scenario-actions.js');
+    const result = await runActionRows(db, [{
+      id: input.run.id,
+      scenario_id: '',
+      hook: 'on_enroll',
+      step_id: null,
+      choice_index: null,
+      sort_order: 0,
+      action_type: action.actionType,
+      config_json: JSON.stringify(action.config ?? {}),
+      condition_json: null,
+      repeat_on_refire: 1,
+    }] as never, input.friendId, { accountId: input.lineAccountId });
+    if (result.failed > 0 || result.skippedIncomplete > 0) throw new Error('friend_add_action_failed');
+    return;
+  }
+  if (action.kind === 'mile') {
+    await postMileageEntry(db, {
+      beneficiaryFriendId: input.friendId,
+      entryType: 'grant',
+      amount: action.amount,
+      reason: '友だち追加',
+      source: 'friend_add_routing',
+      sourceEventId: input.run.event_id,
+      idempotencyKey: `friend_add_action:${input.run.id}`,
+    });
+    return;
+  }
+  throw new Error('friend_add_action_snapshot_invalid');
+}
+
+/** 画面の再試行用。失敗した処理だけを固定snapshotから再実行する。 */
+export async function retryFailedFriendAddActions(
+  db: D1Database,
+  input: { eventId: string; lineAccountId: string },
+): Promise<{ found: boolean; acquired: boolean; status?: FriendAddRoutingStatus; retried?: number }> {
+  const event = await claimFriendAddEventForActionRetry(db, input);
+  if (!event) {
+    const exists = await db.prepare(
+      `SELECT 1 AS found FROM friend_add_events WHERE id = ? AND line_account_id = ? LIMIT 1`,
+    ).bind(input.eventId, input.lineAccountId).first<{ found: number }>();
+    return { found: Boolean(exists), acquired: false };
+  }
+  const runs = await claimFailedFriendAddActionRuns(db, input.eventId);
+  for (const run of runs) {
+    try {
+      await executeStoredFriendAddAction(db, {
+        run,
+        friendId: event.friendId,
+        lineAccountId: input.lineAccountId,
+      });
+      await finishFriendAddActionRun(db, { id: run.id, status: 'completed' });
+    } catch (error) {
+      console.error('[friend-add-routing] retry action failed:', error);
+      await finishFriendAddActionRun(db, {
+        id: run.id,
+        status: 'failed',
+        errorCode: 'action_failed',
+      });
+    }
+  }
+  const status = await finishFriendAddEventActionRetry(db, input);
+  if (!status) throw new Error('friend_add_action_retry_not_finalized');
+  return { found: true, acquired: true, status, retried: runs.length };
 }
 
 export interface FriendAddEnrollment {
@@ -1434,6 +1551,8 @@ export interface FriendAddRoutingResult {
   /** V6の複数ルールで選ばれた設定と公開版。旧設定ではどちらもnull。 */
   ruleId: string | null;
   ruleVersionId: string | null;
+  /** 実行台帳上で失敗した処理数。配信結果とは分けて親台帳を確定する。 */
+  actionFailureCount?: number;
 }
 
 function ruleActions(value: unknown[]): FriendAddAction[] {
@@ -1606,6 +1725,8 @@ export async function applyFriendAddRouting(
   friend: FriendAddSubject,
   push?: ImmediatePushContext,
   routingContext?: {
+    /** 各処理をこの実行台帳へ結び付ける。Webhook本番経路では必須。 */
+    eventId?: string | null;
     entryRouteId?: string | null;
     now?: Date;
     sendRight?: boolean;
@@ -1632,6 +1753,7 @@ export async function applyFriendAddRouting(
     suppressReason: null,
     ruleId: null,
     ruleVersionId: null,
+    actionFailureCount: 0,
   };
   if (!accountId) return none;
 
@@ -1724,7 +1846,14 @@ export async function applyFriendAddRouting(
 
   // ② で「配信しない」を選んでいる
   if (classifiedKind === 'returning' && routing.returning.mode === 'none') {
-    await runActions(db, friend.id, routing.returning.actions, push, routingContext?.fence);
+    const actionResult = await runActions(
+      db, friend.id, routing.returning.actions, push, routingContext?.fence,
+      routingContext?.eventId ? {
+        eventId: routingContext.eventId,
+        ruleVersionId: matchedRule?.versionId ?? null,
+        lineAccountId: accountId,
+      } : undefined,
+    );
     return {
       routed: true,
       kind: classifiedKind,
@@ -1734,6 +1863,7 @@ export async function applyFriendAddRouting(
       suppressReason: 'delivery_disabled',
       ruleId: matchedRule?.ruleId ?? null,
       ruleVersionId: matchedRule?.versionId ?? null,
+      actionFailureCount: actionResult.failed,
     };
   }
 
@@ -1758,7 +1888,14 @@ export async function applyFriendAddRouting(
    */
   if (!branch.scenarioId) {
     if (matchedRule) {
-      await runActions(db, friend.id, branch.actions, push, routingContext?.fence);
+      const actionResult = await runActions(
+        db, friend.id, branch.actions, push, routingContext?.fence,
+        routingContext?.eventId ? {
+          eventId: routingContext.eventId,
+          ruleVersionId: matchedRule.versionId,
+          lineAccountId: accountId,
+        } : undefined,
+      );
       return {
         routed: true,
         kind: classifiedKind,
@@ -1768,6 +1905,7 @@ export async function applyFriendAddRouting(
         suppressReason: 'delivery_disabled',
         ruleId: matchedRule.ruleId,
         ruleVersionId: matchedRule.versionId,
+        actionFailureCount: actionResult.failed,
       };
     }
     if (classifiedKind === 'returning' && routing.returning.mode === 'other') {
@@ -1775,7 +1913,14 @@ export async function applyFriendAddRouting(
         `[friend-add-routing] ②で「別のシナリオ」を選んでシナリオが未設定のため配信しません`
         + `（friend=${friend.id}）。画面の設定を見直してください。`,
       );
-      await runActions(db, friend.id, routing.returning.actions, push, routingContext?.fence);
+      const actionResult = await runActions(
+        db, friend.id, routing.returning.actions, push, routingContext?.fence,
+        routingContext?.eventId ? {
+          eventId: routingContext.eventId,
+          ruleVersionId: null,
+          lineAccountId: accountId,
+        } : undefined,
+      );
       return {
         routed: true,
         kind: classifiedKind,
@@ -1785,6 +1930,7 @@ export async function applyFriendAddRouting(
         suppressReason: 'delivery_disabled',
         ruleId: null,
         ruleVersionId: null,
+        actionFailureCount: actionResult.failed,
       };
     }
     return none;
@@ -1835,7 +1981,14 @@ export async function applyFriendAddRouting(
     enrollments.push({ scenarioId: branch.scenarioId, enrollment: record, resumed });
   }
 
-  await runActions(db, friend.id, branch.actions, push, routingContext?.fence);
+  const actionResult = await runActions(
+    db, friend.id, branch.actions, push, routingContext?.fence,
+    routingContext?.eventId ? {
+      eventId: routingContext.eventId,
+      ruleVersionId: matchedRule?.versionId ?? null,
+      lineAccountId: accountId,
+    } : undefined,
+  );
 
   return {
     routed: true,
@@ -1846,6 +1999,7 @@ export async function applyFriendAddRouting(
     suppressReason: null,
     ruleId: matchedRule?.ruleId ?? null,
     ruleVersionId: matchedRule?.versionId ?? null,
+    actionFailureCount: actionResult.failed,
   };
 }
 

@@ -47,6 +47,8 @@ export interface SegmentRule {
     | 'last_reaction_at'
     | 'reaction_state'
     | 'score_range'
+    /** 内部用途: 作成時点の宛先IDを固定した配信。画面の条件ビルダーには出さない。 */
+    | 'friend_id_in'
   value: unknown
 }
 
@@ -167,6 +169,12 @@ function buildRuleClause(rule: SegmentRule): { sql: string; bindings: unknown[] 
   const bindings: unknown[] = []
 
   switch (rule.type) {
+    case 'friend_id_in': {
+      const ids = [...new Set(asStringArray(rule.value, 'friend_id_in'))];
+      // IDごとの ? を並べるとD1のbind上限へ当たる。JSONは1 bindで展開する。
+      bindings.push(JSON.stringify(ids));
+      return { sql: `f.id IN (SELECT value FROM json_each(?))`, bindings };
+    }
     /*
      * タグIDが空のまま通すと、誰にも一致しない条件が黙って保存される。
      * 「タグで絞ったのに1人も届かない」という形で出るので、原因に辿り
@@ -519,6 +527,22 @@ export function buildSegmentQuery(condition: SegmentCondition): { sql: string; b
     sql: `SELECT f.id, f.line_user_id, f.display_name FROM friends f WHERE ${where.sql} ORDER BY f.created_at ASC, f.id ASC`,
     bindings: where.bindings,
   }
+}
+
+/**
+ * 画面や公開APIから受け取る条件を組み立てる。
+ * `friend_id_in` はイベント申込者を表示時のsnapshotへ固定する内部契約であり、
+ * 任意のID列を受け取る一般の条件保存口では許可しない。
+ */
+export function buildPublicSegmentQuery(condition: SegmentCondition): { sql: string; bindings: unknown[] } {
+  const visit = (node: SegmentCondition): void => {
+    for (const rule of node.rules ?? []) {
+      if (rule.type === 'friend_id_in') throw new Error('friend_id_in is reserved for internal snapshots');
+    }
+    for (const group of node.groups ?? []) visit(group);
+  };
+  visit(condition);
+  return buildSegmentQuery(condition);
 }
 
 /**

@@ -1969,6 +1969,16 @@ CREATE TABLE event_bookings (
   FOREIGN KEY (friend_id) REFERENCES friends(id)
 );
 
+CREATE TABLE event_occurrence_applicant_snapshots (
+  id              TEXT PRIMARY KEY,
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  occurrence_id   TEXT NOT NULL REFERENCES event_slots(id) ON DELETE CASCADE,
+  staff_id        TEXT NOT NULL,
+  payload_json    TEXT NOT NULL CHECK (json_valid(payload_json)),
+  expires_at      TEXT NOT NULL,
+  created_at      TEXT NOT NULL
+);
+
 CREATE TABLE event_slots (
   id          TEXT PRIMARY KEY,
   event_id    TEXT NOT NULL,
@@ -2259,7 +2269,8 @@ CREATE TABLE "friend_add_action_runs" (
   next_retry_at       TEXT,
   last_error_code     TEXT,
   created_at          TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
-  updated_at          TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  updated_at          TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')), action_type TEXT NOT NULL DEFAULT 'unknown', action_snapshot TEXT NOT NULL DEFAULT '{}'
+  CHECK (json_valid(action_snapshot)), started_at TEXT, completed_at TEXT,
   UNIQUE (event_id, action_stable_id)
 );
 
@@ -2301,7 +2312,8 @@ CREATE TABLE "friend_add_events" (
   scenario_enrollment_id TEXT REFERENCES friend_scenarios(id) ON DELETE SET NULL,
   delivery_count        INTEGER NOT NULL DEFAULT 0
                           CHECK (delivery_count >= 0),
-  first_delivery_sent_at TEXT,
+  first_delivery_sent_at TEXT, action_base_status TEXT
+  CHECK (action_base_status IS NULL OR action_base_status IN ('pending', 'completed', 'failed', 'suppressed', 'partial_failed')), action_base_error_code TEXT,
   UNIQUE (line_account_id, webhook_event_id)
 );
 
@@ -6420,6 +6432,12 @@ CREATE INDEX idx_event_bookings_requested_expiry
   ON event_bookings (status, approval_expires_at);
 
 CREATE INDEX idx_event_bookings_slot_status ON event_bookings (slot_id, status);
+
+CREATE INDEX idx_event_occurrence_applicant_snapshots_expiry
+  ON event_occurrence_applicant_snapshots(expires_at);
+
+CREATE INDEX idx_event_occurrence_applicant_snapshots_scope_expiry
+  ON event_occurrence_applicant_snapshots(line_account_id, occurrence_id, staff_id, expires_at);
 
 CREATE INDEX idx_event_slots_event_starts ON event_slots (event_id, starts_at);
 

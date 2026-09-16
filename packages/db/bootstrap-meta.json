@@ -364,7 +364,9 @@
     "403_common_var_extended_types.sql",
     "404_common_var_validity.sql",
     "405_platform_admins.sql",
+    "406_event_occurrence_applicant_snapshots.sql",
+    "407_friend_add_action_run_details.sql",
     "409_outbound_send_failure_ledger.sql"
   ],
-  "migrationCount": 365
+  "migrationCount": 367
 }
