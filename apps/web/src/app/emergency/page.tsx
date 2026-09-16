@@ -947,6 +947,8 @@ function EmergencyControlPanel({ accounts }: { accounts: LineAccount[] }) {
   )
 }
 
+const HISTORY_FETCH_LIMIT = 200
+
 function HistoryPanel() {
   const [history, setHistory] = useState<OperationHistoryEntry[]>([])
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading')
@@ -954,7 +956,7 @@ function HistoryPanel() {
 
   useEffect(() => {
     let cancelled = false
-    api.operations.history(200)
+    api.operations.history(HISTORY_FETCH_LIMIT)
       .then((response) => {
         if (cancelled) return
         if (response.success && Array.isArray(response.data)) { setHistory(response.data); setState('ready') }
@@ -976,7 +978,15 @@ function HistoryPanel() {
    */
   const unreadableEntries = operations.filter((item) => Number.isNaN(Date.parse(item.createdAt)))
   const entries = operations.filter((item) => Date.parse(item.createdAt) >= cutoff)
-  const longestMinutes = operations.reduce((longest, item) => {
+  /*
+   * 一覧・回数・最長停止は同じ期間で数える(N-454)。
+   *
+   * 以前は一覧だけ期間で絞り、概要は取得分すべて(最大200件)を数えていた。
+   * 表示期間と食い違い、200件で打ち切られた総数を「全部」として見せていた。
+   * 打ち切りが起きたときは「以上」を付けて総数を誤表示しない。
+   */
+  const truncated = history.length >= HISTORY_FETCH_LIMIT
+  const longestMinutes = entries.reduce((longest, item) => {
     if (!item.stoppedAt || !item.resolvedAt) return longest
     return Math.max(longest, Math.round((Date.parse(item.resolvedAt) - Date.parse(item.stoppedAt)) / 60_000))
   }, 0)
@@ -1038,8 +1048,8 @@ function HistoryPanel() {
         <button type="button" onClick={downloadCsv} className="rounded-control min-h-9 px-3 text-xs font-bold text-action hover:bg-action-soft">CSVで書き出す</button>
       </div>
       <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
-        <SummaryCard label="止めた回数" value={state === 'ready' ? `${operations.length}回` : '—'} note="この1年" />
-        <SummaryCard label="いちばん長かった停止" value={longestMinutes > 0 ? `${longestMinutes}分` : '—'} note="サーバーに残る記録" />
+        <SummaryCard label="止めた回数" value={state === 'ready' ? `${entries.length}回${truncated ? '以上' : ''}` : '—'} note={period === '30days' ? 'この30日' : 'この1年'} />
+        <SummaryCard label="いちばん長かった停止" value={longestMinutes > 0 ? `${longestMinutes}分` : '—'} note={truncated ? '直近の記録から' : period === '30days' ? 'この30日' : 'この1年'} />
         <SummaryCard label="管理画面の更新" value={`${updateCount}回`} note="この30日" />
         <SummaryCard label="いまの版" value={currentVersion} note="反映済み" />
       </div>
@@ -1139,6 +1149,7 @@ EmergencyPage.__test = {
   EmergencyControlPanel,
   EmergencyPageInner,
   HealthPanel,
+  HistoryPanel,
   OperationAlertsPanel,
   emergencySafetyTransition,
   isEmergencyMutationLocked,

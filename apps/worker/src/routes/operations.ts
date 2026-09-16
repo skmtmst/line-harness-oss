@@ -280,18 +280,14 @@ operations.get('/api/operations/control/preview', requireRole('owner', 'admin'),
       automation_actions: impact.automation_actions.itemCount,
       auto_reply_dispatch: impact.auto_reply_dispatch.itemCount,
     };
+    /*
+     * N-456: 読み取りGETでは監査記録を書かない。
+     *
+     * 以前はプレビューを表示するたびに 'previewed' が operation_audit へ
+     * 増え、停止・復旧の操作記録が見るだけの記録に埋もれていた。
+     * 記録するのは操作・判断を伴う更新(停止・復旧・受領・再送)だけにする。
+     */
     const calculatedAt = new Date().toISOString();
-    await recordOperation(c.env.DB, {
-      targetKind: 'emergency_control',
-      targetId: accountId ?? '*',
-      action: 'previewed',
-      actorId: c.get('staff')!.id,
-      detail: {
-        counts,
-        hasUnknownAudience: Object.values(impact).some((metric) => metric.friendCount === null),
-        calculatedAt,
-      },
-    });
     const canControl = canControlEmergency(c);
     return c.json({
       success: true,

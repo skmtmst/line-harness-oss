@@ -201,34 +201,28 @@ describe('緊急停止の保存API', () => {
     )).status).toBe(200);
   });
 
-  it('影響人数の再計算を操作者と対象範囲付きで記録する', async () => {
-    const response = await app('owner').request(
-      '/api/operations/control/preview?account_id=account-1', {}, bindings(),
-    );
-    expect(response.status).toBe(200);
+  it('影響人数の読み取りGETを繰り返しても監査記録を増やさない', async () => {
+    for (let i = 0; i < 3; i += 1) {
+      const response = await app('owner').request(
+        '/api/operations/control/preview?account_id=account-1', {}, bindings(),
+      );
+      expect(response.status).toBe(200);
+    }
 
-    const row = testDb.raw.prepare(
-      `SELECT target_kind, target_id, action, actor_id, detail_json
-         FROM operation_audit
-        WHERE target_kind = 'emergency_control'`,
-    ).get() as {
-      target_kind: string;
-      target_id: string;
-      action: string;
-      actor_id: string;
-      detail_json: string;
-    };
-    expect(row).toMatchObject({
-      target_kind: 'emergency_control',
-      target_id: 'account-1',
-      action: 'previewed',
-      actor_id: 'owner-1',
-    });
-    expect(JSON.parse(row.detail_json)).toMatchObject({
-      counts: { broadcast_dispatch: 0 },
-      hasUnknownAudience: true,
-      calculatedAt: expect.any(String),
-    });
+    const auditCount = () => (testDb.raw.prepare(
+      `SELECT COUNT(*) AS n FROM operation_audit WHERE target_kind = 'emergency_control'`,
+    ).get() as { n: number }).n;
+    expect(auditCount()).toBe(0);
+
+    // 操作・判断を伴う更新(停止)は従来どおり操作履歴へ記録する
+    const stopped = await app('owner').request(
+      '/api/operations/incidents', stopRequest('account-1'), bindings(),
+    );
+    expect(stopped.status).toBe(201);
+    const incidents = testDb.raw.prepare(
+      `SELECT COUNT(*) AS n FROM operation_incidents WHERE line_account_id = 'account-1'`,
+    ).get() as { n: number };
+    expect(incidents.n).toBeGreaterThan(0);
   });
 
   it('別統括のアカウント影響数を返さない', async () => {
