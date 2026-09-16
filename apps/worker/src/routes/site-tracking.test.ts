@@ -19,6 +19,11 @@ vi.mock('../services/account-access.js', () => ({
   canAccessAllLineAccounts: mocks.canAccess,
   getVisibleLineAccountScope: mocks.getVisibleScope,
 }));
+// 公開収集口の機能検査はここでは on 固定にする。off の落とし方は
+// feature-enforcement-site-tracking-route.test.ts が実DBで確かめる。
+vi.mock('../services/feature-enforcement.js', () => ({
+  accountFeatureIsEnabled: vi.fn(async () => true),
+}));
 
 const { siteTracking } = await import('./site-tracking.js');
 

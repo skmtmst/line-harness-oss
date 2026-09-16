@@ -13,6 +13,7 @@ import {
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
+import { accountFeatureIsEnabled } from '../services/feature-enforcement.js';
 
 /**
  * 自社サイトの行動記録。
@@ -86,6 +87,12 @@ siteTracking.post('/api/site/collect', async (c) => {
     }
     const lineAccountId = await getSiteTrackingAccountId(c.env.DB, trackingKey);
     if (!lineAccountId) return c.body(null, 204, corsHeaders());
+
+    // 計測がオフのaccountへは書かない（#859 site_tracking）。それでも204を
+    // 返すのは、埋め込み先の公開サイトから設定状態を推測させないため。
+    if (!(await accountFeatureIsEnabled(c.env.DB, lineAccountId, 'site_tracking'))) {
+      return c.body(null, 204, corsHeaders());
+    }
 
     const eventType = String(body.eventType ?? 'page_view');
     if (!(SITE_EVENT_TYPES as readonly string[]).includes(eventType)) {
