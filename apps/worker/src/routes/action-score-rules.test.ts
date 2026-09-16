@@ -4,6 +4,7 @@ import { Hono } from 'hono';
 const dbMocks = {
   getActiveImpersonation: vi.fn(async () => null),
   getPlatformAdminByStaffId: vi.fn(async () => null),
+  getPlatformAdminRecord: vi.fn(async () => null),
   getStaffByApiKey: vi.fn().mockResolvedValue(null),
   getActionScoreBandOverview: vi.fn(),
   getActionScoreRuleConfiguration: vi.fn(),

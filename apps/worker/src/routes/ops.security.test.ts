@@ -1,11 +1,25 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
+import { activatePlatformAdminIfAwaitingTotp } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 import type { AuthenticatedStaff } from '../middleware/auth.js';
 import { maskPiiDeep, isForbiddenWhileImpersonating } from '../middleware/impersonation.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
-import { ops } from './ops.js';
+
+const mail = vi.hoisted(() => ({
+  sendPlainMail: vi.fn(async (_env: unknown, _message: { to: string; subject: string; body: string }) => {}),
+}));
+vi.mock('../services/plain-mail.js', () => ({ sendPlainMail: mail.sendPlainMail }));
+
+const { ops } = await import('./ops.js');
+const { opsInvite } = await import('./ops-invite.js');
+
+function publicApp() {
+  const instance = new Hono<Env>();
+  instance.route('/', opsInvite);
+  return instance;
+}
 
 /**
  * ★V6 37 運営コンソール。要件 §7 の合格条件のうち、境界と代理ログインの
@@ -26,7 +40,7 @@ function app(staff: AuthenticatedStaff) {
 }
 
 function environment(): Env['Bindings'] {
-  return { DB: testDb.db } as Env['Bindings'];
+  return { DB: testDb.db, ADMIN_ORIGIN: 'https://admin.example.com', ADMIN_PUBLIC_URL: 'https://admin.example.com', WORKER_URL: 'https://admin.example.com' } as Env['Bindings'];
 }
 
 const master: AuthenticatedStaff = { id: 'master-1', name: '坂本 真人', role: 'owner', readOnly: false, tenantId: null };
@@ -39,6 +53,7 @@ function json(body: unknown) {
 
 beforeEach(() => {
   testDb = createTestD1();
+  mail.sendPlainMail.mockClear();
   testDb.raw.prepare(`INSERT INTO tenants (id, name, status) VALUES (?, ?, 'active')`).run('tenant-a', '株式会社サンプル');
   testDb.raw.prepare(`INSERT INTO tenants (id, name, status) VALUES (?, ?, 'archived')`).run('tenant-z', 'テスト法人');
   for (const [id, name, tenant] of [
@@ -168,13 +183,72 @@ describe('代理ログイン', () => {
 });
 
 describe('運営メンバー', () => {
-  it('自分自身は加えられず、ほかの運営メンバーは加えられる', async () => {
+  it('自分自身は加えられない。別の統括の権限者もメール招待では加えられない', async () => {
     const self = await app(master).request('/api/ops/members', json({ staffId: 'master-1' }), environment());
     expect(self.status).toBe(400);
-    const other = await app(master).request('/api/ops/members', json({ staffId: 'owner-1' }), environment());
-    expect(other.status).toBe(201);
-    const row = testDb.raw.prepare('SELECT approved_by FROM platform_admins WHERE staff_id = ?').get('owner-1') as { approved_by: string };
-    expect(row.approved_by).toBe('master-1');
+    testDb.raw.prepare(`UPDATE staff_members SET email = 'yamada@tenant-a.example' WHERE id = 'owner-1'`).run();
+    const other = await app(master).request('/api/ops/members', json({ email: 'yamada@tenant-a.example' }), environment());
+    expect(other.status).toBe(409);
+    expect(mail.sendPlainMail).not.toHaveBeenCalled();
+  });
+
+  it('新しいメールを招待すると、運営会社の権限者が作られ招待メールが届く。2要素認証が終わるまで運営マスターではない', async () => {
+    const invited = await app(master).request('/api/ops/members', json({ email: 'Hanako@Example.jp' }), environment());
+    expect(invited.status).toBe(201);
+    const body = await invited.json() as { data: { staffId: string; activationState: string } };
+    expect(body.data.activationState).toBe('invited');
+    expect(mail.sendPlainMail).toHaveBeenCalledTimes(1);
+    const message = mail.sendPlainMail.mock.calls[0]![1] as { to: string; subject: string; body: string };
+    expect(message.to).toBe('hanako@example.jp');
+    expect(message.subject).toBe('【musubo】運営コンソールへの招待');
+    const token = message.body.match(/#invite=([^\s]+)/)?.[1] ?? '';
+    expect(token.length).toBeGreaterThan(20);
+
+    const staffRow = testDb.raw.prepare('SELECT tenant_id, role, is_active, invite_status FROM staff_members WHERE id = ?').get(body.data.staffId) as { tenant_id: string; role: string; is_active: number; invite_status: string };
+    expect(staffRow).toEqual({ tenant_id: DEFAULT_TENANT_ID, role: 'staff', is_active: 0, invite_status: 'pending_email' });
+    const admin = testDb.raw.prepare('SELECT activation_state, invited_by FROM platform_admins WHERE staff_id = ?').get(body.data.staffId) as { activation_state: string; invited_by: string };
+    expect(admin).toEqual({ activation_state: 'invited', invited_by: 'master-1' });
+
+    // 招待中の人は運営マスターではない（/api/ops/me は 403）
+    const pending: AuthenticatedStaff = { id: body.data.staffId, name: 'hanako', role: 'staff', tenantId: DEFAULT_TENANT_ID, readOnly: false };
+    expect((await app(pending).request('/api/ops/me', {}, environment())).status).toBe(403);
+
+    // 一覧には招待中として出る
+    const list = await app(master).request('/api/ops/members', {}, environment());
+    const listed = (await list.json() as { data: Array<{ staffId: string; activationState: string }>; summary: { members: number; invited: number } });
+    expect(listed.data.find((m) => m.staffId === body.data.staffId)?.activationState).toBe('invited');
+    expect(listed.summary).toMatchObject({ members: 3, invited: 1 });
+
+    // 招待を受ける（名前とパスワードを設定）→ 2要素認証待ち
+    const check = await publicApp().request(`/api/auth/ops-invite/check?token=${encodeURIComponent(token)}`, {}, environment());
+    expect(check.status).toBe(200);
+    expect((await check.json() as { data: { needsPassword: boolean; email: string } }).data).toMatchObject({ needsPassword: true, email: 'hanako@example.jp' });
+    const accepted = await publicApp().request('/api/auth/ops-invite/accept', json({ token, name: '山田 花子', password: 'Str0ng-Passw0rd!' }), environment());
+    expect(accepted.status, await accepted.clone().text()).toBe(200);
+    expect((await accepted.json() as { data: { next: string } }).data.next).toBe('two-factor-setup');
+    const afterAccept = testDb.raw.prepare('SELECT activation_state FROM platform_admins WHERE staff_id = ?').get(body.data.staffId) as { activation_state: string };
+    expect(afterAccept.activation_state).toBe('awaiting_totp');
+    expect((await app(pending).request('/api/ops/me', {}, environment())).status).toBe(403);
+    // 同じリンクは二度使えない
+    expect((await publicApp().request('/api/auth/ops-invite/accept', json({ token, name: 'x', password: 'Str0ng-Passw0rd!' }), environment())).status).toBe(410);
+
+    // 2要素認証の登録が終わると運営マスターになる
+    expect(await activatePlatformAdminIfAwaitingTotp(testDb.db, body.data.staffId)).toBe(true);
+    expect((await app(pending).request('/api/ops/me', {}, environment())).status).toBe(200);
+  });
+
+  it('招待中の人には招待メールを送り直せる。登録完了の人には送れない', async () => {
+    const invited = await app(master).request('/api/ops/members', json({ email: 'taro@example.jp' }), environment());
+    const { data } = await invited.json() as { data: { staffId: string } };
+    const resent = await app(master).request(`/api/ops/members/${data.staffId}/resend-invite`, json({}), environment());
+    expect(resent.status).toBe(200);
+    expect(mail.sendPlainMail).toHaveBeenCalledTimes(2);
+    const first = (mail.sendPlainMail.mock.calls[0]![1] as { body: string }).body.match(/#invite=([^\s]+)/)?.[1] ?? '';
+    // 前のリンクは失効
+    expect((await publicApp().request(`/api/auth/ops-invite/check?token=${encodeURIComponent(first)}`, {}, environment())).status).toBe(410);
+    testDb.raw.prepare(`UPDATE staff_members SET email = 'kyohei@example.jp' WHERE id = 'master-2'`).run();
+    const done = await app(master).request('/api/ops/members/master-2/resend-invite', json({}), environment());
+    expect(done.status).toBe(400);
   });
 
   it('platform_admins が空のときだけ、互換で入った既定の統括のオーナーが自分を最初の 1 人として登録できる', async () => {

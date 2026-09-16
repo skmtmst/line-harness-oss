@@ -387,6 +387,7 @@ const STAFF_FAIL_CLOSED_SNAPSHOT: string[] = [
     'POST /api/ops/impersonation/start',
     'POST /api/ops/impersonation/write',
     'POST /api/ops/members',
+    'POST /api/ops/members/:staffId/resend-invite',
     'POST /api/recipes/:id/clone',
     'POST /api/restaurant-test/gbp/posts',
     'POST /api/restaurant-test/inbound/reservations',

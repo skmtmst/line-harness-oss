@@ -26,6 +26,7 @@ import {
   getStaffByLineUserId,
   getStaffByLineUserIdIncludingInactive,
   getActiveImpersonation,
+  getPlatformAdminRecord,
   getTwoFactorChallenge,
   incrementTwoFactorChallengeAttempts,
   reserveStepUpAttempt,
@@ -189,7 +190,11 @@ adminAuth.get('/api/auth/line/callback', async (c) => {
     // platform_admins が空の間だけ、既定の統括のオーナーを互換で通す（初期登録のため）。
     if (next === 'ops') {
       const admin = await isPlatformAdminRow(c.env.DB, candidateFromStaffRow(staff));
-      if (!admin) return c.redirect(adminLoginUrl(c, 'not_authorized', next));
+      // 2要素認証待ちの人は通す（画面が設定へ案内する）。招待中のままの人はメールのリンクから
+      const pending = admin ? null : await getPlatformAdminRecord(c.env.DB, staff.id);
+      if (!admin && !(pending?.is_active === 1 && pending.activation_state === 'awaiting_totp')) {
+        return c.redirect(adminLoginUrl(c, 'not_authorized', next));
+      }
     }
 
     const config = resolveAdminAuthConfig(c.env, { requestOrigin: new URL(c.req.url).origin });
@@ -431,8 +436,11 @@ adminAuth.get('/api/auth/session', async (c) => {
   // 運営マスターかどうか。platform_admins が空の間は既定の統括のオーナーも真になる
   // （初期登録のため。API 側の requirePlatformAdmin と同じ判定）。
   const platformAdmin = await isPlatformAdmin(c);
+  // 招待の進み具合（★V6 37-10）。awaiting_totp なら画面は 2要素認証の設定へ案内する。
+  const platformAdminRecord = staff.id === 'env-owner' ? null : await getPlatformAdminRecord(c.env.DB, staff.id);
+  const platformAdminState = platformAdminRecord?.is_active === 1 ? platformAdminRecord.activation_state : null;
   // /api/auth/* は代理ログインの差し替え対象外なので、ここで直接引く。
   const active = platformAdmin ? await getActiveImpersonation(c.env.DB, staff.id) : null;
   const impersonation = active ? toImpersonationContext(active) : null;
-  return c.json({ success: true, data: { ...staff, platformAdmin, impersonation }, csrfToken });
+  return c.json({ success: true, data: { ...staff, platformAdmin, platformAdminState, impersonation }, csrfToken });
 });

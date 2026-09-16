@@ -77,7 +77,7 @@ const ALLOWED_H1: Record<string, string> = {
 
 describe('画面名を本文とトップバーで2回出さない', () => {
   it('全ページを読めている', () => {
-    expect(PAGES.length).toBe(174)  // 2026-09-16: 友だち追加時配信の実行詳細と、然の会員（★V6 37-1）を足した実測値。
+    expect(PAGES.length).toBe(176)  // 2026-09-16: 運営コンソールの招待受付と2要素認証設定の2画面を足した後の実測値。
   })
 
   it('page.tsx が h1 を直接持たない', () => {
