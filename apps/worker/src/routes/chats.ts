@@ -31,9 +31,12 @@ import { listLimit } from './list-pagination.js';
 import { resolveLineToken } from '../services/line-token.js';
 import { requireRole } from '../middleware/role-guard.js';
 import {
+  classifyLineOutboundFailure,
   completeOutboundSendStatement,
+  failOutboundSend,
   hashOutboundPayload,
   isValidIdempotencyKey,
+  listOutboundSendFailures,
   reserveOutboundSend,
 } from '../services/outbound-idempotency.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
@@ -469,6 +472,27 @@ chats.get('/api/chats/stats', requireRole('owner', 'admin', 'staff'), async (c) 
   } catch (err) {
     console.error('GET /api/chats/stats error:', err);
     return c.json({ success: false as const, error: '受信箱の集計を取得できませんでした' }, 500);
+  }
+});
+
+/** 個別送信の失敗台帳。必ずLINEアカウントを指定し、担当範囲の中だけ返す。 */
+chats.get('/api/chats/outbound-failures', requireRole('owner', 'admin', 'staff'), async (c) => {
+  try {
+    const lineAccountId = c.req.query('lineAccountId')?.trim();
+    if (!lineAccountId) {
+      return c.json({ success: false, error: 'LINE公式アカウントを選んでください' }, 400);
+    }
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
+      return c.json({ success: false, error: '送信失敗履歴が見つかりません' }, 404);
+    }
+    const failures = await listOutboundSendFailures(c.env.DB, {
+      lineAccountId,
+      limit: listLimit(c.req.query('limit'), 50, 100),
+    });
+    return c.json({ success: true, data: failures });
+  } catch (err) {
+    console.error('GET /api/chats/outbound-failures error:', err);
+    return c.json({ success: false, error: '送信失敗履歴を取得できませんでした' }, 500);
   }
 });
 
@@ -1464,7 +1488,9 @@ chats.post('/api/chats/:id/send', requireRole('owner', 'admin', 'staff'), requir
       channel: 'line',
       resourceId: chat.id,
       payloadHash,
-      retryInProgress: true,
+      lineAccountId: friend.line_account_id ?? null,
+      // in_progress はLINE受理後の応答喪失を含み得るため、自動再送しない。
+      retryInProgress: false,
       now: new Date().toISOString(),
     });
     if (reservation.kind === 'conflict') {
@@ -1475,7 +1501,31 @@ chats.post('/api/chats/:id/send', requireRole('owner', 'admin', 'staff'), requir
     if (reservation.kind === 'in_progress') {
       await releaseInboxReplyLease(c.env.DB, { channel: 'line', conversationId: friend.id, staffId: c.get('staff').id });
       leasedConversationId = null;
-      return c.json({ success: false, error: '同じメッセージを送信中です' }, 409);
+      return c.json({
+        success: false,
+        error: '同じメッセージを送信中か、送信結果を確認中です',
+        code: 'OUTBOUND_SEND_IN_PROGRESS',
+      }, 409);
+    }
+    if (reservation.kind === 'failed') {
+      await releaseInboxReplyLease(c.env.DB, { channel: 'line', conversationId: friend.id, staffId: c.get('staff').id });
+      leasedConversationId = null;
+      return c.json({
+        success: false,
+        error: reservation.retryable ? '再送できる時刻までお待ちください' : 'この送信は自動再送できません',
+        code: reservation.code,
+        data: { retryable: reservation.retryable, nextRetryAt: reservation.nextRetryAt },
+      }, 409);
+    }
+    if (reservation.kind === 'unknown') {
+      await releaseInboxReplyLease(c.env.DB, { channel: 'line', conversationId: friend.id, staffId: c.get('staff').id });
+      leasedConversationId = null;
+      return c.json({
+        success: false,
+        error: 'LINEへの送達結果を確認できないため、自動再送を停止しました',
+        code: reservation.code,
+        data: { retryable: false, nextRetryAt: null },
+      }, 409);
     }
     if (reservation.kind === 'replay') {
       await releaseInboxReplyLease(c.env.DB, { channel: 'line', conversationId: friend.id, staffId: c.get('staff').id });
@@ -1494,32 +1544,83 @@ chats.post('/api/chats/:id/send', requireRole('owner', 'admin', 'staff'), requir
 
     // LINE 側にも同じキーを渡す。DB保存前に通信が切れて再実行されても、
     // LINE API が同一リクエストを二重配信しない。
-    await lineClient.pushMessage(friend.line_user_id, [message], idempotencyKey);
+    const outboundLeaseToken = reservation.leaseToken;
+    try {
+      await lineClient.pushMessage(friend.line_user_id, [message], idempotencyKey);
+    } catch (error) {
+      const failedAt = new Date().toISOString();
+      const failure = classifyLineOutboundFailure(error, failedAt);
+      await failOutboundSend(c.env.DB, {
+        key: idempotencyKey,
+        leaseToken: outboundLeaseToken,
+        status: failure.status,
+        code: failure.code,
+        retryable: failure.retryable,
+        nextRetryAt: failure.nextRetryAt,
+        now: failedAt,
+      });
+      await releaseInboxReplyLease(c.env.DB, {
+        channel: 'line', conversationId: friend.id, staffId: c.get('staff').id,
+      });
+      leasedConversationId = null;
+      return c.json({
+        success: false,
+        error: failure.status === 'unknown'
+          ? 'LINEへの送達結果を確認できないため、自動再送を停止しました'
+          : 'LINEへ送信できませんでした',
+        code: failure.code,
+        data: { retryable: failure.retryable, nextRetryAt: failure.nextRetryAt },
+      }, failure.httpStatus);
+    }
 
     // メッセージログに記録
     const logId = idempotencyKey;
     const sentAt = jstNow();
-    await c.env.DB.batch([
-      c.env.DB
-        .prepare(`INSERT OR IGNORE INTO messages_log
-          (id, friend_id, direction, message_type, content, source, line_account_id,
-           sent_by_staff_id, created_at)
-          VALUES (?, ?, 'outgoing', ?, ?, 'manual', ?, ?, ?)`)
-        .bind(
-          logId,
-          friend.id,
-          messageType,
-          body.content,
-          friend.line_account_id ?? null,
-          c.get('staff').id,
-          sentAt,
-        ),
-      completeOutboundSendStatement(c.env.DB, {
+    try {
+      await c.env.DB.batch([
+        c.env.DB
+          .prepare(`INSERT OR IGNORE INTO messages_log
+            (id, friend_id, direction, message_type, content, source, line_account_id,
+             sent_by_staff_id, created_at)
+            VALUES (?, ?, 'outgoing', ?, ?, 'manual', ?, ?, ?)`)
+          .bind(
+            logId,
+            friend.id,
+            messageType,
+            body.content,
+            friend.line_account_id ?? null,
+            c.get('staff').id,
+            sentAt,
+          ),
+        completeOutboundSendStatement(c.env.DB, {
+          key: idempotencyKey,
+          responseId: logId,
+          now: new Date().toISOString(),
+          leaseToken: outboundLeaseToken,
+        }),
+      ]);
+    } catch {
+      const failedAt = new Date().toISOString();
+      await failOutboundSend(c.env.DB, {
         key: idempotencyKey,
-        responseId: logId,
-        now: new Date().toISOString(),
-      }),
-    ]);
+        leaseToken: outboundLeaseToken,
+        status: 'unknown',
+        code: 'OUTBOUND_CONFIRMATION_FAILED',
+        retryable: false,
+        nextRetryAt: null,
+        now: failedAt,
+      });
+      await releaseInboxReplyLease(c.env.DB, {
+        channel: 'line', conversationId: friend.id, staffId: c.get('staff').id,
+      });
+      leasedConversationId = null;
+      return c.json({
+        success: false,
+        error: 'LINEには受理された可能性がありますが、送信履歴を確定できませんでした',
+        code: 'OUTBOUND_CONFIRMATION_FAILED',
+        data: { retryable: false, nextRetryAt: null },
+      }, 503);
+    }
 
     // チャットの最終メッセージ日時を更新（chat.id を直接使う — friend_id で呼ばれても resolveOrCreateChat 済み）
     await updateChat(c.env.DB, chat.id, { status: 'in_progress', lastMessageAt: sentAt });
@@ -1699,7 +1800,8 @@ chats.post('/api/chats/:id/send-combined', requireRole('owner', 'admin', 'staff'
       channel: 'line',
       resourceId: chat.id,
       payloadHash,
-      retryInProgress: true,
+      lineAccountId: friend.line_account_id ?? null,
+      retryInProgress: false,
       now: new Date().toISOString(),
     });
     if (reservation.kind === 'conflict') {
@@ -1710,7 +1812,31 @@ chats.post('/api/chats/:id/send-combined', requireRole('owner', 'admin', 'staff'
     if (reservation.kind === 'in_progress') {
       await releaseInboxReplyLease(c.env.DB, { channel: 'line', conversationId: friend.id, staffId: c.get('staff').id });
       leasedConversationId = null;
-      return c.json({ success: false, error: '同じメッセージを送信中です' }, 409);
+      return c.json({
+        success: false,
+        error: '同じメッセージを送信中か、送信結果を確認中です',
+        code: 'OUTBOUND_SEND_IN_PROGRESS',
+      }, 409);
+    }
+    if (reservation.kind === 'failed') {
+      await releaseInboxReplyLease(c.env.DB, { channel: 'line', conversationId: friend.id, staffId: c.get('staff').id });
+      leasedConversationId = null;
+      return c.json({
+        success: false,
+        error: reservation.retryable ? '再送できる時刻までお待ちください' : 'この送信は自動再送できません',
+        code: reservation.code,
+        data: { retryable: reservation.retryable, nextRetryAt: reservation.nextRetryAt },
+      }, 409);
+    }
+    if (reservation.kind === 'unknown') {
+      await releaseInboxReplyLease(c.env.DB, { channel: 'line', conversationId: friend.id, staffId: c.get('staff').id });
+      leasedConversationId = null;
+      return c.json({
+        success: false,
+        error: 'LINEへの送達結果を確認できないため、自動再送を停止しました',
+        code: reservation.code,
+        data: { retryable: false, nextRetryAt: null },
+      }, 409);
     }
     if (reservation.kind === 'replay') {
       await releaseInboxReplyLease(c.env.DB, { channel: 'line', conversationId: friend.id, staffId: c.get('staff').id });
@@ -1730,7 +1856,34 @@ chats.post('/api/chats/:id/send-combined', requireRole('owner', 'admin', 'staff'
     // 1回のpush要求にまとめる。2回の独立pushにしない。
     const { LineClient } = await import('@line-crm/line-sdk');
     const lineClient = new LineClient(accessToken);
-    await lineClient.pushMessage(friend.line_user_id, messages, idempotencyKey);
+    const outboundLeaseToken = reservation.leaseToken;
+    try {
+      await lineClient.pushMessage(friend.line_user_id, messages, idempotencyKey);
+    } catch (error) {
+      const failedAt = new Date().toISOString();
+      const failure = classifyLineOutboundFailure(error, failedAt);
+      await failOutboundSend(c.env.DB, {
+        key: idempotencyKey,
+        leaseToken: outboundLeaseToken,
+        status: failure.status,
+        code: failure.code,
+        retryable: failure.retryable,
+        nextRetryAt: failure.nextRetryAt,
+        now: failedAt,
+      });
+      await releaseInboxReplyLease(c.env.DB, {
+        channel: 'line', conversationId: friend.id, staffId: c.get('staff').id,
+      });
+      leasedConversationId = null;
+      return c.json({
+        success: false,
+        error: failure.status === 'unknown'
+          ? 'LINEへの送達結果を確認できないため、自動再送を停止しました'
+          : 'LINEへ送信できませんでした',
+        code: failure.code,
+        data: { retryable: failure.retryable, nextRetryAt: failure.nextRetryAt },
+      }, failure.httpStatus);
+    }
 
     const logBaseId = idempotencyKey;
     const sentAt = jstNow();
@@ -1746,29 +1899,53 @@ chats.post('/api/chats/:id/send-combined', requireRole('owner', 'admin', 'staff'
         content: textPart,
       }] : []),
     ];
-    await c.env.DB.batch([
-      ...rows.map((row) =>
-        c.env.DB
-          .prepare(`INSERT OR IGNORE INTO messages_log
-            (id, friend_id, direction, message_type, content, source, line_account_id,
-             sent_by_staff_id, created_at)
-            VALUES (?, ?, 'outgoing', ?, ?, 'manual', ?, ?, ?)`)
-          .bind(
-            row.id,
-            friend.id,
-            row.messageType,
-            row.content,
-            friend.line_account_id ?? null,
-            c.get('staff').id,
-            sentAt,
-          ),
-      ),
-      completeOutboundSendStatement(c.env.DB, {
+    try {
+      await c.env.DB.batch([
+        ...rows.map((row) =>
+          c.env.DB
+            .prepare(`INSERT OR IGNORE INTO messages_log
+              (id, friend_id, direction, message_type, content, source, line_account_id,
+               sent_by_staff_id, created_at)
+              VALUES (?, ?, 'outgoing', ?, ?, 'manual', ?, ?, ?)`)
+            .bind(
+              row.id,
+              friend.id,
+              row.messageType,
+              row.content,
+              friend.line_account_id ?? null,
+              c.get('staff').id,
+              sentAt,
+            ),
+        ),
+        completeOutboundSendStatement(c.env.DB, {
+          key: idempotencyKey,
+          responseId: logBaseId,
+          now: new Date().toISOString(),
+          leaseToken: outboundLeaseToken,
+        }),
+      ]);
+    } catch {
+      const failedAt = new Date().toISOString();
+      await failOutboundSend(c.env.DB, {
         key: idempotencyKey,
-        responseId: logBaseId,
-        now: new Date().toISOString(),
-      }),
-    ]);
+        leaseToken: outboundLeaseToken,
+        status: 'unknown',
+        code: 'OUTBOUND_CONFIRMATION_FAILED',
+        retryable: false,
+        nextRetryAt: null,
+        now: failedAt,
+      });
+      await releaseInboxReplyLease(c.env.DB, {
+        channel: 'line', conversationId: friend.id, staffId: c.get('staff').id,
+      });
+      leasedConversationId = null;
+      return c.json({
+        success: false,
+        error: 'LINEには受理された可能性がありますが、送信履歴を確定できませんでした',
+        code: 'OUTBOUND_CONFIRMATION_FAILED',
+        data: { retryable: false, nextRetryAt: null },
+      }, 503);
+    }
 
     await updateChat(c.env.DB, chat.id, { status: 'in_progress', lastMessageAt: sentAt });
     const updatedChat = await getChatById(c.env.DB, chat.id);

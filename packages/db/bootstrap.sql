@@ -4330,16 +4330,33 @@ CREATE TABLE operators (
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
 
-CREATE TABLE outbound_send_requests (
+CREATE TABLE "outbound_send_requests" (
   idempotency_key TEXT PRIMARY KEY,
   channel         TEXT NOT NULL CHECK (channel IN ('line', 'email')),
   resource_id     TEXT NOT NULL,
   payload_hash    TEXT NOT NULL,
-  status          TEXT NOT NULL CHECK (status IN ('in_progress', 'succeeded')),
+  line_account_id TEXT REFERENCES line_accounts(id) ON DELETE SET NULL,
+  status          TEXT NOT NULL CHECK (status IN ('in_progress', 'succeeded', 'failed', 'unknown')),
   response_id     TEXT,
+  failure_code    TEXT,
+  attempt_count   INTEGER NOT NULL DEFAULT 1 CHECK (attempt_count >= 1),
+  retryable       INTEGER NOT NULL DEFAULT 0 CHECK (retryable IN (0, 1)),
+  next_retry_at   TEXT,
+  last_failed_at  TEXT,
+  lease_token     TEXT,
+  lease_expires_at TEXT,
   created_at      TEXT NOT NULL,
   updated_at      TEXT NOT NULL,
-  completed_at    TEXT
+  completed_at    TEXT,
+  CHECK (
+    (status = 'succeeded' AND response_id IS NOT NULL AND completed_at IS NOT NULL)
+    OR status != 'succeeded'
+  ),
+  CHECK (
+    (status IN ('failed', 'unknown') AND failure_code IS NOT NULL AND last_failed_at IS NOT NULL)
+    OR status NOT IN ('failed', 'unknown')
+  ),
+  CHECK (status != 'unknown' OR retryable = 0)
 );
 
 CREATE TABLE outgoing_webhooks (
@@ -7063,6 +7080,13 @@ CREATE UNIQUE INDEX idx_operator_notification_instance_source
     source_event_id
   )
   WHERE audience_type = 'operator';
+
+CREATE INDEX idx_outbound_send_requests_account_failure
+  ON outbound_send_requests(line_account_id, status, next_retry_at, updated_at DESC);
+
+CREATE INDEX idx_outbound_send_requests_active_lease
+  ON outbound_send_requests(status, lease_expires_at)
+  WHERE status = 'in_progress';
 
 CREATE INDEX idx_outbound_send_requests_created
   ON outbound_send_requests(created_at);
