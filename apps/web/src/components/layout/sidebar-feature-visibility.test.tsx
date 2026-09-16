@@ -78,12 +78,13 @@ describe('Sidebarのstaff向け機能表示read-model', () => {
     expect(window.localStorage.getItem('lh_staff_role')).toBe('staff')
     const view = render(<Sidebar />)
 
+    await waitFor(() => expect(fixture.visibility).toHaveBeenCalledWith('account-1'))
+    act(() => window.dispatchEvent(new CustomEvent('line-harness:feature-settings-updated')))
     await waitFor(() => {
-      act(() => window.dispatchEvent(new CustomEvent('line-harness:feature-settings-updated')))
       expect(fixture.visibility).toHaveBeenCalledWith('account-1')
       expect(view.queryAllByText('シナリオ配信')).toHaveLength(0)
+      expect(view.getAllByText('一斉配信')).not.toHaveLength(0)
     })
-    expect(view.getAllByText('一斉配信')).not.toHaveLength(0)
     expect(fixture.get).not.toHaveBeenCalled()
   })
 
@@ -91,8 +92,9 @@ describe('Sidebarのstaff向け機能表示read-model', () => {
     window.localStorage.setItem('lh_staff_role', 'owner')
     expect(window.localStorage.getItem('lh_staff_role')).toBe('owner')
     render(<Sidebar />)
+    await waitFor(() => expect(fixture.visibility).toHaveBeenCalledWith('account-1'))
+    act(() => window.dispatchEvent(new CustomEvent('line-harness:feature-settings-updated')))
     await waitFor(() => {
-      act(() => window.dispatchEvent(new CustomEvent('line-harness:feature-settings-updated')))
       expect(fixture.visibility).toHaveBeenCalledWith('account-1')
       expect(fixture.get).toHaveBeenCalledWith('account-1')
     })
@@ -104,13 +106,14 @@ describe('Sidebarのstaff向け機能表示read-model', () => {
     fixture.get.mockRejectedValue(new Error('403 Forbidden'))
     const view = render(<Sidebar />)
 
+    await waitFor(() => expect(fixture.visibility).toHaveBeenCalledWith('account-1'))
+    act(() => window.dispatchEvent(new CustomEvent('line-harness:feature-settings-updated')))
     await waitFor(() => {
-      act(() => window.dispatchEvent(new CustomEvent('line-harness:feature-settings-updated')))
       expect(fixture.visibility).toHaveBeenCalledWith('account-1')
       expect(fixture.get).toHaveBeenCalledWith('account-1')
       expect(view.queryAllByText('シナリオ配信')).toHaveLength(0)
+      expect(view.getAllByText('一斉配信')).not.toHaveLength(0)
     })
-    expect(view.getAllByText('一斉配信')).not.toHaveLength(0)
   })
 
   it.each([
