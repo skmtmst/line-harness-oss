@@ -491,7 +491,7 @@ function HealthPanel({
    * クリックしていないのに runHealth が走り、処理中の実行と
    * 2本立つ。最後に処理した番号を覚えておき、新しい番号だけ手動扱いにする。
    */
-  const handledManualRequest = useRef(0)
+  const handledManualRequest = useRef(manualRunRequest)
   useEffect(() => {
     const manual = manualRunRequest > handledManualRequest.current
     handledManualRequest.current = manualRunRequest

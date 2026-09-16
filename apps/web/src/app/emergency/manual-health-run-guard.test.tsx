@@ -191,9 +191,30 @@ describe('手動ヘルス確認の二重実行防止(N-458)', () => {
     expect(((await screen.findByRole('button', { name: '↻ いますぐ確かめる' })) as HTMLButtonElement).disabled).toBe(false)
   })
 
+  it('タブ往復の再マウントで処理済みの要求番号を手動実行として扱わない', async () => {
+    // 以前クリックで3まで進んだ番号のまま HealthPanel が再マウントされた状況
+    render(<HealthPanel
+      accountId="account-1"
+      manualRunRequest={3}
+      onSeverity={vi.fn()}
+      onManualRunSettled={vi.fn()}
+    />)
+    await flush()
+    expect(deferredList.run).toHaveLength(0)
+    expect(deferredList.read.at(-1)?.accountId).toBe('account-1')
+  })
+
   it('確認中にアンマウントしてもロック解放コールバックが呼ばれ、例外にならない', async () => {
     const onSettled = vi.fn()
     const view = render(<HealthPanel
+      accountId="account-1"
+      manualRunRequest={0}
+      onSeverity={vi.fn()}
+      onManualRunSettled={onSettled}
+    />)
+    await flush()
+    expect(deferredList.run).toHaveLength(0)
+    view.rerender(<HealthPanel
       accountId="account-1"
       manualRunRequest={1}
       onSeverity={vi.fn()}
