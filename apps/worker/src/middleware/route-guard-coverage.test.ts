@@ -186,18 +186,13 @@ const STAFF_FAIL_CLOSED_SNAPSHOT: string[] = [
     'DELETE /api/traffic-pools/:id',
     'DELETE /api/traffic-pools/:id/accounts/:accountId',
     'DELETE /api/users/:id',
-    'GET /api/access/roles',
-    'GET /api/access/users',
     'GET /api/account-handovers/:id',
     'GET /api/account-settings/link-base-url',
     'GET /api/account-settings/test-recipient-login-users',
     'GET /api/account-settings/test-recipients',
     'GET /api/account-settings/tracked-link-base-url',
-    'GET /api/accounts/:id/health',
-    // サイドバーの警告数をまとめて返す口。個別の
-    // `GET /api/accounts/:id/health` と同じ扱い(owner/admin 専用)。
-    // N+1 を1回にしただけで、見える範囲は広げていない(#630)。
-    'GET /api/accounts/health-summary',
+    // N-424: 健全性の2口は '/health' 権限へ帰属させた（運用状態の「見えるだけ」で見られる）。
+    // 権限表側へ移したので fail-closed の一覧からは外す。
     'GET /api/accounts/migrations',
     'GET /api/accounts/migrations/:migrationId',
     'GET /api/ad-platforms',
@@ -220,7 +215,6 @@ const STAFF_FAIL_CLOSED_SNAPSHOT: string[] = [
     'GET /api/affiliates/:id/journeys',
     'GET /api/affiliates/:id/links',
     'GET /api/affiliates/:id/report',
-    'GET /api/audit/events',
     'GET /api/broadcast-message-assets',
     'GET /api/duplicates/stats',
     'GET /api/field-migrations/:runId',

@@ -26,8 +26,9 @@ import {
   type AuditEventItem,
 } from '@/lib/api'
 import type { StaffMember } from '@line-crm/shared'
+import { SCOPE_ITEMS, BUNDLE_PRESETS, type FeatureAccessLevel, type ScopeLevels } from '@line-crm/shared'
 import { csvCell } from '@/lib/presentation'
-import { isActiveAdministrator, matchStaffMember, scopeBundleToStaffRole, staffActionPolicy } from './staff-actions'
+import { isActiveAdministrator, matchStaffMember, staffActionPolicy } from './staff-actions'
 import { CONVERSION_APPROVAL_EDIT_KEY, PERMISSION_LABELS, normalizeStaffPermissionKeys, permissionLabel, toggleStaffPermissionKey } from './permission-labels'
 
 type Channel = { email: boolean; line: boolean }
@@ -260,6 +261,14 @@ function PermissionScopeView({ user, memberId, canSave, copyCandidates, onClose,
   const [bundle, setBundle] = useState<Exclude<AccessRoleBundle, 'custom'>>(
     user.roleBundle === 'custom' ? 'reception' : user.roleBundle,
   )
+  /*
+   * 「項目ごとに決める」の上書き。null はbundle初期値のまま。
+   * 1項目でも触ると個別設定（custom）として保存される。
+   */
+  const [customLevels, setCustomLevels] = useState<ScopeLevels | null>(null)
+  const levels: ScopeLevels = customLevels ?? BUNDLE_PRESETS[bundle].levels
+  const setLevel = (itemId: string, level: FeatureAccessLevel) =>
+    setCustomLevels({ ...levels, [itemId]: level })
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
   const [saveConfirmOpen, setSaveConfirmOpen] = useState(false)
@@ -288,7 +297,14 @@ function PermissionScopeView({ user, memberId, canSave, copyCandidates, onClose,
     setSaveError('')
     setSaveConfirmError('')
     try {
-      const result = await api.staff.update(memberId, { role: scopeBundleToStaffRole(bundle) }, stepUpToken)
+      // N-424: bundle 名をそのまま送る。role へ潰すと「受付」と「運用」が区別できない。
+      // 項目を1つでも触っていたら3択表ごと送り、API側が個別設定として保存する。
+      const piiLevel = customLevels?.pii
+      const result = await api.staff.update(memberId, {
+        roleBundle: bundle,
+        permissionScope: customLevels ?? undefined,
+        emailMask: piiLevel === 'edit' ? 'full' : piiLevel === 'view' ? 'masked' : piiLevel === 'none' ? 'none' : undefined,
+      }, stepUpToken)
       if (!result.success) throw new Error(result.error)
       setSaveConfirmOpen(false)
       await onSaved()
@@ -327,7 +343,7 @@ function PermissionScopeView({ user, memberId, canSave, copyCandidates, onClose,
     <div className="grid items-start gap-4" style={{ gridTemplateColumns: 'minmax(0, 1fr) 390px' }}>
       <main className="space-y-3">
         <section className="rounded-card border border-hairline bg-canvas p-4"><h2 className="text-base font-bold text-ink">かたまりから選ぶ</h2><p className="mt-1 text-xs text-ink-faint">よく使う組み合わせを用意しています。選んでから、下で細かく直せます。</p><div className="mt-3 grid grid-cols-4 gap-3">{bundles.map(([value, label, count, note]) => <button key={value} type="button" onClick={() => setBundle(value)} className={`rounded-control border p-3 text-left ${bundle === value ? 'border-accent bg-accent-soft' : 'border-divider-soft bg-canvas'}`}><span className="flex items-center justify-between"><span className="text-sm font-bold text-ink">{label}</span><span className="text-xs text-ink-faint">{count}</span></span><span className={`mt-2 block text-xs ${bundle === value ? 'font-semibold text-success' : 'text-ink-faint'}`}>{note}</span></button>)}</div></section>
-        <section className="overflow-hidden rounded-card border border-hairline bg-canvas"><div className="px-4 py-4"><h2 className="text-base font-bold text-ink">項目ごとに決める</h2><p className="mt-1 text-xs text-ink-faint">「変えられる」「見えるだけ」「出さない」の3つから選びます。</p></div><div className="grid items-center border-y border-hairline bg-canvas-sunken px-4 py-3 text-xs font-bold text-ink-faint" style={{ gridTemplateColumns: '1.45fr repeat(3, 140px) 1.2fr' }}><span>メニューの項目</span><span className="text-center">変えられる</span><span className="text-center">見えるだけ</span><span className="text-center">出さない</span><span>補足</span></div><div className="divide-y divide-hairline">{SCOPE_ROWS.map(([label, note, full, partial, none], index) => <div key={label} className="grid items-center px-4" style={{ minHeight: 46, gridTemplateColumns: '1.45fr repeat(3, 140px) 1.2fr' }}><div><p className="text-xs font-bold text-ink">{label}</p><p className="mt-0.5 text-xs text-ink-faint">{note}</p></div>{[full, partial, none].map((text, option) => { const selected = bundle === 'reception' ? option === (index === 1 || index === 6 ? 2 : index === 5 || index === 7 ? 1 : 0) : option === (bundle === 'administrator' ? 0 : bundle === 'view_only' ? 2 : 1); return <button key={`${option}:${text}`} type="button" aria-label={`${label}を${text}`} className={`mx-auto flex h-5 w-5 items-center justify-center rounded-full border text-xs ${selected ? 'border-accent text-accent' : 'border-divider-soft text-transparent'}`}>✓</button> })}<p className="text-xs font-semibold text-warning">{index === 1 ? '電話番号と住所は伏せます' : index === 2 ? '誤送信を防ぐためです' : index === 5 ? '売上の数字が見えます' : ''}</p></div>)}</div></section>
+        <section className="overflow-hidden rounded-card border border-hairline bg-canvas"><div className="px-4 py-4"><h2 className="text-base font-bold text-ink">項目ごとに決める</h2><p className="mt-1 text-xs text-ink-faint">「変えられる」「見えるだけ」「出さない」の3つから選びます。</p></div><div className="grid items-center border-y border-hairline bg-canvas-sunken px-4 py-3 text-xs font-bold text-ink-faint" style={{ gridTemplateColumns: '1.45fr repeat(3, 140px) 1.2fr' }}><span>メニューの項目</span><span className="text-center">変えられる</span><span className="text-center">見えるだけ</span><span className="text-center">出さない</span><span>補足</span></div><div className="divide-y divide-hairline">{SCOPE_ROWS.map(([label, note, full, partial, none], index) => { const item = SCOPE_ITEMS[index]; const level = levels[item.id] ?? 'none'; return <div key={label} className="grid items-center px-4" style={{ minHeight: 46, gridTemplateColumns: '1.45fr repeat(3, 140px) 1.2fr' }}><div><p className="text-xs font-bold text-ink">{label}</p><p className="mt-0.5 text-xs text-ink-faint">{note}</p></div>{([full, partial, none] as const).map((text, option) => { const optionLevel: FeatureAccessLevel = option === 0 ? 'edit' : option === 1 ? 'view' : 'none'; const selected = level === optionLevel; return <button key={`${option}:${text}`} type="button" aria-label={`${label}を${text}`} aria-pressed={selected} disabled={!canSave} onClick={() => setLevel(item.id, optionLevel)} className={`mx-auto flex h-5 w-5 items-center justify-center rounded-full border text-xs ${selected ? 'border-accent text-accent' : 'border-divider-soft text-transparent'} ${canSave ? 'cursor-pointer' : 'cursor-not-allowed'}`}>✓</button> })}<p className="text-xs font-semibold text-warning">{index === 1 ? '電話番号と住所は伏せます' : index === 2 ? '誤送信を防ぐためです' : index === 5 ? '売上の数字が見えます' : ''}</p></div> })}</div></section>
       </main>
       <aside className="space-y-3"><section className="rounded-card border border-hairline bg-canvas p-4"><h2 className="text-sm font-bold text-ink">この決め方で、この人にはこう見えます</h2><div className="mt-3 space-y-3 text-xs text-ink-secondary"><p><b className="text-ink">◉　サイドメニューに出るのは4項目</b><br />　　受信箱・友だち・友だち属性・予約管理・コンテンツ</p><p><b className="text-ink">◉　出さない項目はURLを直に打っても開けません</b><br />　　「見る権限がありません」と出ます</p><p><b className="text-ink">◉　電話番号と住所は伏せます</b><br />　　下4桁だけが見えます。コピーもできません</p></div></section><section className="rounded-card border border-hairline bg-canvas p-4"><h2 className="text-sm font-bold text-ink">つながる先</h2><div className="mt-3 space-y-3 text-xs"><p className="font-bold text-action">→ 機能設定</p><p className="font-bold text-action">→ 入った記録</p><p className="font-bold text-action">→ 運用状態</p><p className="font-bold text-action">→ 予約設定</p></div></section><section className="rounded-card border border-warning bg-warning-bg p-4"><h2 className="text-sm font-bold text-warning">気をつけること</h2><p className="mt-2 text-xs font-bold text-warning">配信を出さないと、受信箱からの返信もできません</p><p className="mt-2 text-xs text-warning">保存すると、対象者はもう一度ログインする必要があります。</p></section></aside>
     </div>
