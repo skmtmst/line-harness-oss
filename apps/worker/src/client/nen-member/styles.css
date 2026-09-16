@@ -1,61 +1,64 @@
 @import "tailwindcss";
 
 :root {
-  font-family: "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif;
-  color: #173f2e;
-  background: #f5f8f5;
-  --nen: #087a4d;
-  --nen-dark: #075336;
-  --line: #dce8e1;
+  font-family: "Noto Sans JP", "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif;
+  color: #1d1d1f;
+  background: #f5f5f7;
+  --nen: #06c755;
+  --nen-dark: #068a3c;
+  --line: #dadde2;
 }
 * { box-sizing: border-box; }
-body { margin: 0; background: #f5f8f5; }
+body { margin: 0; background: #f5f5f7; }
 button, input, select, textarea { font: inherit; }
-.nm-app { max-width: 680px; margin: 0 auto; min-height: 100vh; padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
+.nm-app { max-width: 390px; margin: 0 auto; min-height: 100vh; padding-bottom: calc(64px + env(safe-area-inset-bottom)); background: #f5f5f7; }
 .nm-app > p { padding: 24px; }
 
-.nm-member-header { --rank: #0a6848; --rank-deep: #064a33; --rank-soft: #dff1e9; padding: 22px 15px 20px; background: linear-gradient(145deg, var(--rank-deep), var(--rank)); transition: background .3s ease; }
-.nm-member-header[data-rank="1"] { --rank: #697d75; --rank-deep: #43544e; --rank-soft: #e8eeeb; }
-.nm-member-header[data-rank="2"] { --rank: #a4771c; --rank-deep: #6d4b0c; --rank-soft: #f5ead1; }
-.nm-member-header[data-rank="3"] { --rank: #465867; --rank-deep: #273742; --rank-soft: #e4eaf0; }
-.nm-brand-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 2px 4px 18px; color: #fff; }
-.nm-brand-row p { margin: 0 0 4px; font-size: 9px; font-weight: 800; letter-spacing: .22em; opacity: .72; }
-.nm-brand-row h1 { margin: 0; font-size: 20px; line-height: 1.35; font-weight: 800; }
-.nm-brand-row > span { padding-top: 5px; font: 700 15px Georgia, "Yu Mincho", serif; letter-spacing: .04em; opacity: .78; }
-.nm-membership-sheet { padding: 18px 18px 16px; border-radius: 28px; background: #fff; color: #173f2e; box-shadow: 0 18px 40px rgba(0,0,0,.19); }
+.nm-home-header { display: grid; gap: 4px; padding: 18px 20px 14px; background: #fff; }
+.nm-home-header > div { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.nm-home-header h1 { margin: 0; color: #1d1d1f; font-size: 18px; line-height: 1.4; font-weight: 700; }
+.nm-home-header span { color: #6e7781; font-size: 12px; font-weight: 600; }
+.nm-home-header p { margin: 0; color: #4a5565; font-size: 13px; line-height: 1.5; }
+
+.nm-membership-sheet { --rank: #06c755; --rank-soft: #e8f8ee; --rank-chip: #e8f8ee; --rank-chip-ink: #068a3c; display: grid; width: 100%; gap: 10px; padding: 16px; place-items: center; border: 1px solid #dadde2; border-radius: 10px; background: #fff; color: #1d1d1f; }
+.nm-membership-sheet[data-rank="1"] { --rank-chip: #f1f3f2; --rank-chip-ink: #4a5565; }
+.nm-membership-sheet[data-rank="2"] { --rank-chip: #fff7e6; --rank-chip-ink: #a15c00; }
+.nm-membership-sheet[data-rank="3"] { --rank-chip: #eef0fe; --rank-chip-ink: #4f46e5; }
 .nm-rank-summary { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.nm-rank-summary small { color: #93a29b; font-size: 8px; font-weight: 800; letter-spacing: .14em; }
-.nm-rank-pill { padding: 7px 12px; border-radius: 999px; background: var(--rank); color: #fff; font-size: 11px; font-weight: 800; }
-.nm-gauge { position: relative; max-width: 330px; height: 170px; margin: 0 auto -3px; }
+.nm-rank-summary { width: 100%; }
+.nm-rank-summary small { color: #6e7781; font-size: 10px; font-weight: 700; letter-spacing: 1.5px; }
+.nm-rank-pill { display: inline-grid; min-height: 28px; padding: 0 12px; place-items: center; border-radius: 9999px; background: var(--rank-chip); color: var(--rank-chip-ink); font-size: 13px; font-weight: 700; }
+.nm-gauge { position: relative; width: 260px; height: 150px; margin: 0 auto; }
 .nm-gauge svg { display: block; width: 100%; height: 100%; overflow: visible; }
-.nm-gauge path { fill: none; stroke-linecap: round; stroke-width: 12; path-length: 314; }
-.nm-gauge-base { stroke: #e7ede9; }
-.nm-gauge-value { stroke: var(--rank); stroke-dasharray: 314; transition: stroke-dashoffset 1.15s cubic-bezier(.22,.8,.28,1); }
-.nm-gauge-checkpoint circle { fill: #edf1ef; stroke: #fff; stroke-width: 3; }
-.nm-gauge-checkpoint text { fill: #87968f; font: 800 8px/1 sans-serif; }
+.nm-gauge path { fill: none; stroke-linecap: butt; stroke-width: 18; path-length: 346; }
+.nm-gauge-base { stroke: #f5f5f7; }
+.nm-gauge-value { stroke: var(--rank); stroke-dasharray: 346; transition: stroke-dashoffset 1.15s cubic-bezier(.22,.8,.28,1); }
+.nm-gauge-checkpoint circle { fill: #f5f5f7; stroke: #fff; stroke-width: 3; }
+.nm-gauge-checkpoint text { fill: #6e7781; font: 700 12px/1 "Noto Sans JP", sans-serif; }
 .nm-gauge-checkpoint.reached circle { fill: var(--rank); }
-.nm-gauge-checkpoint.reached text { fill: #fff; font-size: 10px; }
-.nm-gauge-number { position: absolute; right: 0; bottom: 17px; left: 0; text-align: center; }
-.nm-gauge-number strong { display: block; color: var(--rank-deep); font: 700 43px/1 Georgia, serif; font-variant-numeric: tabular-nums; letter-spacing: -.04em; animation: nm-point-arrive .65s both; }
-.nm-gauge-number span { display: block; margin-top: 7px; color: #7c8e85; font-size: 10px; font-weight: 700; letter-spacing: .08em; }
+.nm-gauge-checkpoint.reached text { fill: #fff; }
+.nm-gauge-number { position: absolute; top: 66px; right: 40px; left: 40px; display: grid; gap: 2px; text-align: center; }
+.nm-gauge-number strong { display: block; color: #1d1d1f; font: 700 36px/1.1 "Noto Sans JP", sans-serif; font-variant-numeric: tabular-nums; letter-spacing: -.03em; animation: nm-point-arrive .65s both; }
+.nm-gauge-number span { display: block; color: #4a5565; font-size: 12px; font-weight: 700; }
 @keyframes nm-point-arrive { from { opacity: 0; transform: translateY(8px); } }
-.nm-rank-levels { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-top: 4px; }
-.nm-rank-levels > div { position: relative; padding-top: 11px; color: #a1ada7; text-align: center; }
-.nm-rank-levels > div::before { content: ""; position: absolute; top: 3px; right: 50%; left: -50%; height: 2px; background: #e3eae6; }
+.nm-rank-levels { display: grid; width: 100%; grid-template-columns: repeat(4, 1fr); gap: 0; }
+.nm-rank-levels > div { position: relative; display: grid; gap: 6px; padding-top: 18px; color: #6e7781; text-align: center; }
+.nm-rank-levels > div::before { content: ""; position: absolute; top: 5px; right: 50%; left: -50%; height: 2px; background: #dadde2; }
 .nm-rank-levels > div:first-child::before { display: none; }
-.nm-rank-levels i { position: absolute; z-index: 1; top: 0; left: calc(50% - 4px); width: 8px; height: 8px; border: 2px solid #dce5e0; border-radius: 50%; background: #fff; }
+.nm-rank-levels i { position: absolute; z-index: 1; top: 0; left: calc(50% - 6px); width: 12px; height: 12px; border: 2px solid #dadde2; border-radius: 50%; background: #fff; }
 .nm-rank-levels b, .nm-rank-levels span { display: block; }
-.nm-rank-levels b { font-size: 8px; white-space: nowrap; }
-.nm-rank-levels span { margin-top: 3px; font-size: 7px; white-space: nowrap; }
-.nm-rank-levels > div.reached { color: var(--rank); }
+.nm-rank-levels b { color: #1d1d1f; font-size: 10px; white-space: nowrap; }
+.nm-rank-levels span { font-size: 10px; white-space: nowrap; }
+.nm-rank-levels > div.reached { color: #1d1d1f; }
 .nm-rank-levels > div.reached i { border-color: var(--rank); background: var(--rank); }
 .nm-rank-levels > div.reached::before { background: var(--rank); }
-.nm-member-summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 15px; padding: 12px 13px; border-radius: 14px; background: var(--rank-soft); }
+.nm-member-summary { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; border-radius: 8px; background: #f5f5f7; }
 .nm-member-summary div span, .nm-member-summary div b { display: block; }
-.nm-member-summary div span { color: #6f8178; font-size: 8px; }
-.nm-member-summary div b { margin-top: 2px; color: var(--rank-deep); font: 700 17px Georgia, serif; }
-.nm-member-summary p { margin: 0; color: #566a60; font-size: 9px; text-align: right; }
-.nm-member-summary p b { color: var(--rank-deep); }
+.nm-member-summary div span { color: #6e7781; font-size: 10px; font-weight: 600; }
+.nm-member-summary div b { margin-top: 2px; color: #1d1d1f; font-size: 14px; font-weight: 700; }
+.nm-member-next { display: grid; gap: 2px; justify-items: end; text-align: right; }
+.nm-member-next strong { color: #068a3c; font-size: 12px; font-weight: 700; }
+.nm-member-next span { color: #6e7781; font-size: 10px; font-weight: 400; }
 .nm-page-header { padding: 24px 20px 15px; background: #fff; border-bottom: 1px solid var(--line); }
 .nm-page-header span { color: #6fa089; font-size: 9px; font-weight: 800; letter-spacing: .2em; }
 .nm-page-header h1 { margin: 4px 0 0; color: #123d2a; font: 700 25px/1.3 Georgia, "Yu Mincho", serif; }
@@ -326,55 +329,53 @@ button, input, select, textarea { font: inherit; }
 .nm-gallery figcaption small { overflow: hidden; margin-top: 4px; color: #74877d; font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
 .nm-gallery figcaption span { display: block; margin-top: 5px; color: var(--nen); font-weight: 700; }
 
-.nm-bottom-nav { position: fixed; z-index: 10; right: 0; bottom: 0; left: 0; display: grid; grid-template-columns: repeat(5, 1fr); max-width: 680px; margin: 0 auto; padding: 7px 5px calc(7px + env(safe-area-inset-bottom)); border-top: 1px solid #dce6e0; background: rgba(255,255,255,.96); box-shadow: 0 -8px 24px rgba(24, 57, 44, .08); backdrop-filter: blur(14px); }
-.nm-bottom-nav button { display: grid; min-width: 0; place-items: center; gap: 2px; padding: 4px 1px; border: 0; border-radius: 12px; background: transparent; color: #7b8c83; }
-.nm-bottom-nav button i { display: grid; width: 27px; height: 27px; place-items: center; border-radius: 9px; font: normal 700 20px/1 Georgia, serif; }
+.nm-bottom-nav { position: fixed; z-index: 10; right: 0; bottom: 0; left: 0; display: grid; height: calc(64px + env(safe-area-inset-bottom)); grid-template-columns: repeat(5, 1fr); max-width: 390px; margin: 0 auto; padding: 0 8px env(safe-area-inset-bottom); border-top: 1px solid #dadde2; background: #fff; }
+.nm-bottom-nav button { display: grid; min-width: 0; place-items: center; align-content: center; gap: 3px; padding: 0; border: 0; background: transparent; color: #6e7781; }
+.nm-bottom-nav button i { display: grid; width: 20px; height: 20px; place-items: center; font-style: normal; }
 .nm-bottom-nav button svg { width: 20px; height: 20px; }
-.nm-bottom-nav button span { font-size: 9px; font-weight: 700; white-space: nowrap; }
+.nm-bottom-nav button span { font-size: 10px; font-weight: 600; white-space: nowrap; }
 .nm-bottom-nav button.active { color: var(--nen); }
-.nm-bottom-nav button.active i { background: #e5f3eb; transform: translateY(-1px); }
+.nm-bottom-nav button.active span { font-weight: 700; }
 
 @media (max-width: 420px) {
   .nm-grid { grid-template-columns: 1fr; }
   .nm-card { margin: 12px; padding: 17px; }
-  .nm-member-header { padding-right: 12px; padding-left: 12px; }
-  .nm-membership-sheet { padding-right: 15px; padding-left: 15px; }
-  .nm-gauge-number strong { font-size: 40px; }
-  .nm-rank-levels b { font-size: 7px; }
-  .nm-rank-levels span { font-size: 6px; }
   .nm-health-toolbar { align-items: stretch; flex-direction: column; }
   .nm-health-period { align-self: stretch; }
   .nm-health-period button { flex: 1; }
 }
 
-/* ★V6 37-2 マイページ：メンバーシップシートの下段（マイル還元・維持期限） */
-.nm-member-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 10px; padding: 0 4px; color: #6f8178; font-size: 9px; }
-.nm-member-foot b { color: var(--rank-deep); font-weight: 800; }
+/* ★V6正本 lCs4n: V6 37-2 然・マイページ（LIFF・390） */
+.nm-home-stack { gap: 14px; padding: 14px 16px 96px; }
+.nm-home-stack > .nm-card { margin: 0; padding: 16px; border: 1px solid #dadde2; border-radius: 10px; background: #fff; box-shadow: none; }
+.nm-home-stack > .nm-lifetime { padding: 14px 16px; }
+.nm-home-stack .nm-card h2 { margin: 0; color: #1d1d1f; font-size: 14px; font-weight: 700; }
+.nm-lifetime-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.nm-lifetime-row span { color: #4a5565; font-size: 12px; font-weight: 600; }
+.nm-lifetime-row > b { color: #1d1d1f; font-size: 16px; line-height: 1.4; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.nm-lifetime .nm-sub { margin: 4px 0 0; color: #6e7781; font-size: 11px; line-height: 1.5; }
 
-/* ライフタイム（累計） */
-.nm-lifetime-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
-.nm-lifetime-row span { color: #6fa089; font-size: 9px; font-weight: 800; letter-spacing: .18em; }
-.nm-lifetime-row > b { color: #123f2b; font: 700 22px/1.2 Georgia, serif; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.nm-lifetime .nm-sub { margin: 8px 0 0; }
-
-/* 見出し行の右にある「すべて見る」 */
-.nm-heading-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
-.nm-link { padding: 0; border: 0; background: none; color: #0a6848; font-size: 12px; font-weight: 700; cursor: pointer; }
-
-/* マイペット（マイページの要約行） */
-.nm-pet-row { display: flex; align-items: center; gap: 12px; }
-.nm-pet-avatar-small { flex: 0 0 48px; width: 48px; height: 48px; border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center; background: #e6f1eb; color: #0a6848; }
+.nm-heading-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.nm-link { padding: 0; border: 0; background: none; color: #068a3c; font-size: 12px; font-weight: 600; cursor: pointer; }
+.nm-home-pets, .nm-home-orders { display: grid; gap: 12px; }
+.nm-home-pet-row { display: flex; width: 100%; align-items: center; gap: 12px; padding: 0; border: 0; background: transparent; color: #1d1d1f; text-align: left; cursor: pointer; }
+.nm-pet-avatar-small { position: relative; inset: auto; display: flex; overflow: hidden; width: 48px; height: 48px; flex: 0 0 48px; align-items: center; justify-content: center; border: 0; border-radius: 9999px; background: #e8f8ee; color: #068a3c; box-shadow: none; }
 .nm-pet-avatar-small img { width: 100%; height: 100%; object-fit: cover; }
 .nm-pet-avatar-small svg { width: 24px; height: 24px; }
-.nm-pet-text { min-width: 0; flex: 1; display: grid; gap: 2px; }
-.nm-pet-text b { font-size: 15px; }
-.nm-pet-text span { color: #64748b; font-size: 11px; }
-.nm-pet-text strong { color: #0a6848; font-size: 11px; font-weight: 700; }
-.nm-note { margin: 12px 0 0; color: #93a29b; font-size: 10px; line-height: 1.6; }
+.nm-pet-text { display: grid; min-width: 0; flex: 1; gap: 2px; }
+.nm-pet-text b { color: #1d1d1f; font-size: 13px; font-weight: 700; }
+.nm-pet-text span { color: #4a5565; font-size: 11px; }
+.nm-pet-text strong { color: #068a3c; font-size: 11px; font-weight: 600; }
+.nm-home-pet-row > i { color: #6e7781; font-size: 20px; font-style: normal; font-weight: 400; }
+.nm-note { margin: 0; color: #6e7781; font-size: 10px; line-height: 1.5; }
 
-/* 最近の注文 */
-.nm-order-lines { margin: 8px 0 0; padding: 0; list-style: none; display: grid; gap: 10px; }
-.nm-order-lines li { display: flex; align-items: center; gap: 10px; font-size: 12px; }
-.nm-order-lines span { flex: 0 0 40px; color: #93a29b; font-weight: 700; }
-.nm-order-lines em { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #173f2e; font-style: normal; }
-.nm-order-lines b { color: #173f2e; font-variant-numeric: tabular-nums; }
+.nm-order-lines { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; }
+.nm-order-lines li { display: flex; align-items: center; gap: 12px; font-size: 12px; }
+.nm-order-lines span { flex: 0 0 40px; color: #6e7781; font-weight: 600; }
+.nm-order-lines em { overflow: hidden; min-width: 0; flex: 1; color: #1d1d1f; font-style: normal; text-overflow: ellipsis; white-space: nowrap; }
+.nm-order-lines b { color: #1d1d1f; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+@media (max-width: 420px) {
+  .nm-home-stack > .nm-card { padding: 16px; }
+  .nm-home-stack > .nm-lifetime { padding: 14px 16px; }
+}
