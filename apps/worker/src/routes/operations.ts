@@ -11,6 +11,7 @@ import {
   getOperationAlert,
   getOperationIncident,
   getOperationRequestReceipt,
+  inspectIncidentRestoreDrift,
   listOperationDeploymentEvents,
   listOperationAlerts,
   listOperationIncidents,
@@ -469,6 +470,42 @@ operations.post(
   },
 );
 
+/*
+ * N-451: 復旧の前に、停止時snapshotと現在の定義のずれ（drift）を見せる口。
+ * 読み取り専用なので typed 確認・step-up・冪等キーは要らないが、
+ * 範囲の権限は復旧と同じだけ要求する。
+ */
+operations.post(
+  '/api/operations/incidents/:id/restore-preview',
+  requireRole('owner', 'admin'),
+  requireEmergencyControlPermission,
+  async (c) => {
+    try {
+      const incident = await getOperationIncident(c.env.DB, c.req.param('id'));
+      if (!incident) return c.json({ success: false, error: '緊急操作の記録が見つかりません' }, 404);
+      if (!await canControlScope(c, incident.lineAccountId)) {
+        return c.json({ success: false, error: 'この範囲を復旧する権限がありません', code: 'EMERGENCY_SCOPE_FORBIDDEN' }, 403);
+      }
+      if (incident.status !== 'stopped') {
+        return c.json({ success: false, error: '復旧できる緊急停止ではありません', code: 'OPERATION_NOT_STOPPED' }, 409);
+      }
+      const drift = await inspectIncidentRestoreDrift(c.env.DB, incident);
+      return c.json({
+        success: true,
+        data: {
+          incidentId: incident.id,
+          status: incident.status,
+          capabilities: incident.capabilities,
+          drift,
+        },
+      });
+    } catch (error) {
+      console.error('POST /api/operations/incidents/:id/restore-preview error:', error);
+      return c.json({ success: false, error: '復旧前の検査に失敗しました' }, 500);
+    }
+  },
+);
+
 operations.post(
   '/api/operations/incidents/:id/restore',
   requireRole('owner', 'admin'),
@@ -515,7 +552,25 @@ operations.post(
           eventKind: 'restored',
           payload: { lineAccountId: replayed.lineAccountId, actorId },
         });
-        return c.json({ success: true, duplicate: true, data: { status: 'changed', control, incident: replayed, notifications } });
+        /*
+         * N-451: 同じキーでの再実行にも最初の検査結果を返す。
+         * 画面は report を見て「一部だけ復旧」を出し分けるので、
+         * ここで落とすと成功表示へ誤認する。
+         */
+        const report = replayed.restoreReportJson
+          ? (JSON.parse(replayed.restoreReportJson) as unknown)
+          : null;
+        return c.json({
+          success: true,
+          duplicate: true,
+          data: {
+            status: replayed.status === 'resolved' ? 'restored' : 'partial',
+            control,
+            incident: replayed,
+            report,
+            notifications,
+          },
+        });
       }
       if (!await consumeOperationStepUp(c)) {
         return c.json({ success: false, error: '重要操作の再認証が必要です' }, 401);
@@ -534,6 +589,20 @@ operations.post(
           error: '別の管理者が先に変更しました。最新の状態を読み直してください。',
           code: 'VERSION_CONFLICT',
           data: result.control,
+        }, 409);
+      }
+      /*
+       * N-451: 停止中の編集・追加・権限喪失がある能力は再開しない。
+       * 1つも再開できなかったときは制御状態を変えず 409 で理由を返す。
+       * 冪等キーの receipt は実際に再開したときだけ保存するので、
+       * ずれを直したあと同じキーで試し直せる。
+       */
+      if (result.status === 'blocked') {
+        return c.json({
+          success: false,
+          error: '停止中に変更・追加があったため再開を止めました。内容を確認してからもう一度実行してください。',
+          code: 'OPERATION_RESTORE_BLOCKED',
+          data: { control: result.control, incident: result.incident, report: result.report },
         }, 409);
       }
       await saveOperationRequestReceipt(c.env.DB, {
