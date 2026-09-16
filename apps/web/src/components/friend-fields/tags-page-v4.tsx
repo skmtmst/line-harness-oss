@@ -19,6 +19,9 @@ import FriendFieldList from './field-list'
 import SupportMarkList from './mark-list'
 import SavedSearchList from './saved-search-list'
 import TagCsvImportDialog from './tag-csv-import-dialog'
+import { FeatureDisabledScreen } from '@/components/feature-disabled-gate'
+import { useFeatureVisibility } from '@/lib/use-feature-visibility'
+import type { FeatureKey } from '@/lib/feature-settings'
 import { isCurrentTagListRequest, type TagListRequestKey } from './tag-list-state'
 
 const TABS = [
@@ -28,6 +31,16 @@ const TABS = [
   ['searches', '保存した検索'],
 ] as const
 type TabKey = (typeof TABS)[number][0]
+
+/**
+ * タブと機能設定キーの対応。「タグ」自体は必須機能なのでキーを持たない。
+ * キーを持つタブは、担当accountの機能がオフならタブごと隠す。
+ */
+const TAB_FEATURE: Partial<Record<TabKey, FeatureKey>> = {
+  fields: 'friend_fields',
+  marks: 'support_marks',
+  searches: 'saved_searches',
+}
 const UNGROUPED = '__ungrouped__'
 
 /**
@@ -612,6 +625,17 @@ export default function TagsPageV4({
   const [csvOpen, setCsvOpen] = useState(false)
   const loadRequestRef = useRef<TagListRequestKey>({ accountId, generation: 0 })
 
+  // fixture は試験用の固定表示なので機能設定を読みに行かない。
+  const visibility = useFeatureVisibility(fixture ? null : accountId)
+  const tabEnabled = (key: TabKey) => {
+    if (fixture) return true
+    const featureKey = TAB_FEATURE[key]
+    return !featureKey || visibility.enabled(featureKey)
+  }
+  const currentTabFeature = TAB_FEATURE[tab]
+  const currentTabBlocked =
+    !fixture && !!currentTabFeature && visibility.status === 'ready' && !visibility.enabled(currentTabFeature)
+
   const load = useCallback(async () => {
     if (fixture) return
     const request = { accountId, generation: loadRequestRef.current.generation + 1 }
@@ -735,12 +759,12 @@ export default function TagsPageV4({
         <div data-design="GroupTabs">
       <Tabs
         className="mb-4"
-        items={TABS.map(([key, label]) => ({
+        items={TABS.filter(([key]) => tabEnabled(key)).map(([key, label]) => ({
           label,
           current: tab === key,
           onClick: () => fixture ? setFixtureTab(key) : router.replace(key === 'tags' ? '/tags' : `/tags?tab=${key}`),
         }))}
-        actions={tab === 'tags' && status !== 'forbidden' ? (
+        actions={currentTabBlocked ? undefined : tab === 'tags' && status !== 'forbidden' ? (
           /*
             設計 `Sn86o` はここに CSV だけ。作る操作は KPI の下（`HWP5R`）。
             `H374MR` から確認 `sfTEW`、完了 `op1rh`、一部失敗 `QzRsJ`
@@ -769,7 +793,10 @@ export default function TagsPageV4({
         `KPIs` はタブごとに数が変わるため、この中に入る。
       */}
       <div data-design="Body">
-      {tab === 'tags' ? <>
+      {currentTabBlocked ? (
+        // 直URL（?tab=fields など）でも本文へ進ませず、機能設定への導線を出す。
+        <FeatureDisabledScreen featureId={currentTabFeature} />
+      ) : tab === 'tags' ? <>
         {/*
           一覧の数は **サーバーが数えて返す**（`/api/list-stats`）。
           タグ一覧から計算しない。「付与済み友だち」は人の数で、タグごとの

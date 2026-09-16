@@ -14,6 +14,7 @@ import type {
 } from '@line-crm/shared'
 import { api, ApiError, type SavedSearchDetail, type SavedSearchMatchPreview } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
+import FeatureGate from '@/components/feature-gate'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import Breadcrumb from '@/components/layout/breadcrumb'
 import StickyBar from '@/components/shared/sticky-bar'
@@ -283,9 +284,9 @@ function SavedSearchEditInner() {
       api.savedSearches.detail(id, selectedAccountId),
       api.savedSearches.list(selectedAccountId, { limit: 50 }),
       api.tags.list(),
-      api.supportMarks.list(selectedAccountId).catch(() => null),
+      api.supportMarks.list(selectedAccountId, { suppressFeatureDisabledEvent: true }).catch(() => null),
       api.scenarios.list({ accountId: selectedAccountId }).catch(() => null),
-      api.friendFields.list(selectedAccountId).catch(() => null),
+      api.friendFields.list(selectedAccountId, undefined, { suppressFeatureDisabledEvent: true }).catch(() => null),
     ]).then(([detail, searches, tagResult, markResult, scenarioResult, fieldResult]) => {
       if (cancelled) return
       if (tagResult.success) setTags(tagResult.data)
@@ -497,5 +498,5 @@ function SavedSearchEditInner() {
 }
 
 export default function SavedSearchEditPage() {
-  return <Suspense fallback={<p className="text-sm text-ink-faint">読み込んでいます</p>}><SavedSearchEditInner /></Suspense>
+  return <FeatureGate feature="saved_searches"><Suspense fallback={<p className="text-sm text-ink-faint">読み込んでいます</p>}><SavedSearchEditInner /></Suspense></FeatureGate>
 }

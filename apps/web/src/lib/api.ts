@@ -4677,7 +4677,7 @@ export const api = {
    * 既存の値の意味が変わったり、テンプレートの差し込みが空になったりする。
    */
   friendFields: {
-    list: (accountId: string, params?: { folderId?: string; withUsage?: boolean }) => {
+    list: (accountId: string, params?: { folderId?: string; withUsage?: boolean }, options?: FetchApiOptions) => {
       const q = new URLSearchParams()
       q.set('lineAccountId', accountId)
       if (params?.folderId) q.set('folderId', params.folderId)
@@ -4685,6 +4685,7 @@ export const api = {
       const query = q.toString()
       return fetchApi<ApiResponse<FriendField[]>>(
         `/api/friend-fields${query ? `?${query}` : ''}`,
+        options,
       )
     },
     stats: (accountId: string) =>
@@ -4738,9 +4739,10 @@ export const api = {
         { method: 'DELETE' },
       ),
     /** 1人ぶんの全項目と値。個人情報は役割で絞られる。 */
-    forFriend: (friendId: string) =>
+    forFriend: (friendId: string, options?: FetchApiOptions) =>
       fetchApi<ApiResponse<{ items: FriendField[]; hiddenPersonalCount: number }>>(
         `/api/friends/${friendId}/fields`,
+        options,
       ),
     /** まとめて更新。EC が正の項目は無視され warnings に理由が入る。 */
     saveForFriend: (friendId: string, values: Record<string, string | null>) =>
@@ -4756,9 +4758,10 @@ export const api = {
   },
   /** 対応マーク。友だちの対応状況を運用側の言葉で持つ。 */
   supportMarks: {
-    list: (accountId: string) =>
+    list: (accountId: string, options?: FetchApiOptions) =>
       fetchApi<ApiResponse<SupportMarkListItem[]>>(
         `/api/support-marks?lineAccountId=${encodeURIComponent(accountId)}`,
+        options,
       ),
     create: (accountId: string, data: {
       name: string
@@ -9683,9 +9686,10 @@ export const api = {
       ),
   },
   friendSavedViews: {
-    list: (accountId: string) =>
+    list: (accountId: string, options?: FetchApiOptions) =>
       fetchApi<ApiResponse<{ items: FriendSavedView[]; total: number }>>(
         `/api/friends/saved-views?lineAccountId=${encodeURIComponent(accountId)}`,
+        options,
       ),
     create: (accountId: string, body: { name: string; conditions: SavedSearchConditions; isShared?: boolean }) =>
       fetchApi<ApiResponse<FriendSavedView>>(

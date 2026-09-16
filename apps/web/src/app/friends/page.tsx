@@ -11,6 +11,7 @@ import FriendListTable from '@/components/friends/friend-list-table'
 import AdvancedSearchDialog, { type AdvancedSearchResult } from '@/components/friends/advanced-search-dialog'
 import SingleFriendActions from '@/components/friends/single-friend-actions'
 import { useAccount } from '@/contexts/account-context'
+import { useFeatureVisibility } from '@/lib/use-feature-visibility'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import DuplicatesPage from '@/app/duplicates/page'
 import MergedUsersPage from '@/app/users/page'
@@ -59,6 +60,14 @@ function FriendsPageInner({
   onExportReady: (exporter: (() => void) | null) => void
 }) {
   const { selectedAccountId, selectedAccount } = useAccount()
+  /*
+    保存した検索・対応マークは任意機能。オフのaccountではAPIを呼ばず、
+    入口も出さない（呼ぶと 403 で画面全体が共通ゲートへ切り替わる）。
+    読み込み中・失敗は fail-closed で隠す（サイドバーと同じ）。
+  */
+  const featureVisibility = useFeatureVisibility(selectedAccountId)
+  const marksEnabled = featureVisibility.enabled('support_marks')
+  const savedSearchEnabled = featureVisibility.enabled('saved_searches')
   /* 一括操作はオーナーと管理者だけ。個別操作の権限を越えるため。 */
   const [bulkOpen, setBulkOpen] = useState(false)
   const searchParams = useSearchParams()
@@ -126,7 +135,9 @@ function FriendsPageInner({
         api.tags.list(),
         api.operators.list(),
         api.scenarios.list(selectedAccountId ? { accountId: selectedAccountId } : undefined),
-        selectedAccountId ? api.supportMarks.list(selectedAccountId) : Promise.resolve({ success: true as const, data: [] }),
+        selectedAccountId && marksEnabled
+          ? api.supportMarks.list(selectedAccountId, { suppressFeatureDisabledEvent: true })
+          : Promise.resolve({ success: true as const, data: [] }),
       ])
       if (tagResponse.success) setAllTags(tagResponse.data)
       if (operatorResponse.success) setOperators(operatorResponse.data)
@@ -138,7 +149,7 @@ function FriendsPageInner({
       // ただし「タグがない」と「取れなかった」の区別が付くよう一言出す(#496-19)。
       setOptionsFailed(true)
     }
-  }, [selectedAccountId])
+  }, [selectedAccountId, marksEnabled])
 
   const loadFriends = useCallback(async () => {
     const requestId = ++loadRequestRef.current
@@ -187,13 +198,14 @@ function FriendsPageInner({
   useEffect(() => void loadOptions(), [loadOptions])
   useEffect(() => setPage(1), [selectedAccountId])
   useEffect(() => {
-    if (!directSavedSearchId) return
+    // 保存した検索がオフのaccountでは ?savedSearch= 直URLも適用しない。
+    if (!directSavedSearchId || !savedSearchEnabled) return
     setAdvanced({
       params: { savedSearchId: directSavedSearchId },
       summary: ['保存した検索を適用中'],
     })
     setPage(1)
-  }, [directSavedSearchId])
+  }, [directSavedSearchId, savedSearchEnabled])
   useEffect(() => {
     void loadFriends()
     return () => {
@@ -307,14 +319,16 @@ function FriendsPageInner({
             <SlidersHorizontal aria-hidden="true" className="h-4 w-4" />
             詳細条件
           </button>
-          <button
-            type="button"
-            onClick={() => setSavedOpen(true)}
-            className={`${SEARCH_ROW_SECONDARY} w-32.5 text-action`}
-          >
-            <Bookmark aria-hidden="true" className="h-4 w-4" />
-            保存した検索
-          </button>
+          {savedSearchEnabled ? (
+            <button
+              type="button"
+              onClick={() => setSavedOpen(true)}
+              className={`${SEARCH_ROW_SECONDARY} w-32.5 text-action`}
+            >
+              <Bookmark aria-hidden="true" className="h-4 w-4" />
+              保存した検索
+            </button>
+          ) : null}
           {/* 並び順は共通 Select。設計の幅は未実測のため現行210pxを保つ。 */}
           <div className="w-52.5 shrink-0">
             <Select
@@ -489,13 +503,15 @@ function FriendsPageInner({
           scenarios={scenarios}
           onClose={() => setAdvancedOpen(false)}
           onLoadSaved={() => {
+            if (!savedSearchEnabled) return
             setAdvancedOpen(false)
             setSavedOpen(true)
           }}
           onApply={(result) => { setAdvanced(result); setAdvancedOpen(false); setPage(1) }}
+          features={{ savedSearch: savedSearchEnabled, marks: marksEnabled, fields: featureVisibility.enabled('friend_fields') }}
         />
       </div>
-      {savedOpen ? (
+      {savedOpen && savedSearchEnabled ? (
         <SavedSearchDialog
           accountId={selectedAccountId}
           tags={allTags}
@@ -561,7 +577,7 @@ function SavedSearchDialog({
       setLoading(false)
       return
     }
-    void api.friendSavedViews.list(accountId).then((res) => {
+    void api.friendSavedViews.list(accountId, { suppressFeatureDisabledEvent: true }).then((res) => {
       if (!cancelled && res.success) setSaved(res.data.items)
     }).catch(() => {
       if (!cancelled) setError('保存した検索を読み込めませんでした')

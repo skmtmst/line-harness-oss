@@ -60,9 +60,9 @@ export const scenarioReferenceData = {
   templates: (_accountId?: string | null) =>
     cache.load('templates:visible', () => api.templates.list()),
   friendFields: (accountId: string) =>
-    cache.load(`friend-fields:${accountId}`, () => api.friendFields.list(accountId)),
+    cache.load(`friend-fields:${accountId}`, () => api.friendFields.list(accountId, undefined, { suppressFeatureDisabledEvent: true })),
   supportMarks: (accountId: string) =>
-    cache.load(`support-marks:${accountId}`, () => api.supportMarks.list(accountId)),
+    cache.load(`support-marks:${accountId}`, () => api.supportMarks.list(accountId, { suppressFeatureDisabledEvent: true })),
   scenarios: (accountId?: string | null) =>
     cache.load(`scenarios:${scopeKey(accountId)}`, () =>
       api.scenarios.list({ ...(accountId ? { accountId } : {}), limit: 200 })),
