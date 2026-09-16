@@ -9,7 +9,7 @@ import { ops } from './ops.js';
 
 /**
  * ★V6 37 運営コンソール。要件 §7 の合格条件のうち、境界と代理ログインの
- * 決まりを D1（sqlite）で確かめる。bootstrap.sql に 404_platform_admins.sql が
+ * 決まりを D1（sqlite）で確かめる。bootstrap.sql に 405_platform_admins.sql が
  * 入っている必要がある（`pnpm --filter @line-crm/db build`）。
  */
 

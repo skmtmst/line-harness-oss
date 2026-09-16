@@ -9,7 +9,7 @@
 
 | 場所 | 内容 |
 |---|---|
-| `packages/db/migrations/404_platform_admins.sql` | `platform_admins` / `platform_audit_logs` / `impersonation_sessions` / `pii_reveal_logs` |
+| `packages/db/migrations/405_platform_admins.sql` | `platform_admins` / `platform_audit_logs` / `impersonation_sessions` / `pii_reveal_logs` |
 | `packages/db/src/platform-admins.ts` | 上記の読み書き |
 | `apps/worker/src/middleware/platform-admin.ts` | 運営マスターの門番。`platform_admins` が空の間だけ「既定の統括のオーナー」を互換で通す |
 | `apps/worker/src/middleware/impersonation.ts` | 代理ログイン中の統括の差し替え、閲覧のみの強制、個人情報の伏せ字、禁止操作 |
@@ -47,9 +47,9 @@ SQL を流さない手順（推奨）: `platform_admins` が空の間は、既�
 
 ## 動かし方（Codex）
 
-1. `pnpm --filter @line-crm/db build` — `bootstrap.sql` を作り直す（404 を含める）。テストはこれを読む
+1. `pnpm --filter @line-crm/db build` — `bootstrap.sql` を作り直す（405 を含める）。テストはこれを読む
 2. `pnpm --filter worker test` / `pnpm --filter web test` / `pnpm -r typecheck`
-3. 検証 D1 に 404 を適用（既存の手順どおり。本番には流さない）
+3. 検証 D1 に 405 を適用（既存の手順どおり。本番には流さない）
 4. 検証へ配備し、上の SQL で登録 → `/ops/login` から入る
 
 ## 確かめること（要件 §7 の第 1 段ぶん）
