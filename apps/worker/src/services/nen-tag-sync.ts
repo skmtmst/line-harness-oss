@@ -329,9 +329,14 @@ const DEFAULT_RANK_LOOKUP: RankTagLookup[] = [
 ];
 
 async function loadRankSettings(db: D1Database, lineAccountId: string): Promise<RankTagLookup[]> {
-  const loader = (dbPackage as { getNenRankSettings?: (db: D1Database, id: string) => Promise<NenRankSetting[]> }).getNenRankSettings;
-  if (typeof loader !== 'function') return [];
-  return loader(db, lineAccountId);
+  try {
+    // 丸ごと mock された @line-crm/db は、無い名前を読むだけで投げる。読み出しごと try に入れる。
+    const loader = (dbPackage as { getNenRankSettings?: (db: D1Database, id: string) => Promise<NenRankSetting[]> }).getNenRankSettings;
+    if (typeof loader !== 'function') return [];
+    return await loader(db, lineAccountId);
+  } catch {
+    return [];
+  }
 }
 
 function pickRank(ranks: RankTagLookup[], annualYen: number, preferredKey: string | null): RankTagLookup | null {
