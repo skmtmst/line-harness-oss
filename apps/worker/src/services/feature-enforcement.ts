@@ -59,6 +59,11 @@ export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
     enforcement: { mode: 'exempt', reason: '共通の一括操作で、単一機能に属さない' },
   },
   {
+    name: 'scheduled chat sends',
+    classification: { kind: 'core', reason: '1対1トークの送信予約' },
+    enforcement: { mode: 'exempt', reason: '受信箱の基本動作で、機能カタログの個別スイッチに属さない' },
+  },
+  {
     name: 'mileage reward delivery retry',
     classification: { kind: 'feature', featureId: 'mileage' },
     enforcement: {

@@ -58,6 +58,7 @@ export * from './traffic-pools';
 export * from './message-templates';
 export * from './rich-menus';
 export * from './rich-menu-schedules';
+export * from './scheduled-chat-sends';
 export * from './rich-menu-manual-publish';
 export * from './affiliate-links';
 export * from './affiliate-offers';

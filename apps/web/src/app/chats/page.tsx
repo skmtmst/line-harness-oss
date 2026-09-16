@@ -9,9 +9,11 @@ import {
   ApiError,
   fetchApi,
   type ChatDetail as ApiChatDetail,
+  type ChatDetailMessage,
   type ChatListItem,
   type FriendListItem,
   type InboxStats,
+  type ScheduledChatSend,
 } from '@/lib/api'
 import { buildSupportEmailInboxQuery } from './support-email-query'
 import { OperatorDropdown, StatusDropdown, type ChatStatus } from '@/components/chats/inbox-dropdown'
@@ -585,6 +587,14 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   const [messageContent, setMessageContent] = useState('')
   const [pendingImage, setPendingImage] = useState<ImageUploaderValue | null>(null)
   const [sending, setSending] = useState(false)
+  // N-025: 引用返信。会話の中の1件を引用して返す。
+  const [quotedMessage, setQuotedMessage] = useState<ChatDetailMessage | null>(null)
+  // N-025: 送信予約。JSTの datetime-local 値をそのまま口へ渡し、
+  // 保存はサーバー側でUTCへ正規化される。
+  const [scheduledSends, setScheduledSends] = useState<ScheduledChatSend[]>([])
+  const [scheduleInput, setScheduleInput] = useState('')
+  const [showSchedulePanel, setShowSchedulePanel] = useState(false)
+  const [scheduling, setScheduling] = useState(false)
   const sendLockRef = useRef(false)
   const sendKeysRef = useRef(new IdempotencyKeyStore())
   const [isMessageInputFocused, setIsMessageInputFocused] = useState(false)
@@ -1202,11 +1212,40 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     }
   }, [selectedChatId, loadChatDetail])
 
+  // N-025: 会話を開いた/変えたとき、その会話の送信予約を読む。
+  // 予約はfriend単位なので会話IDはそのまま使える。失敗しても画面は止めない。
+  const loadScheduledSends = useCallback(async (chatId: string) => {
+    try {
+      const res = await api.chats.scheduled(chatId)
+      // 口の形が変わったり古い環境の応答でも、一覧は必ず配列を保つ。
+      if (res.success) setScheduledSends(Array.isArray(res.data?.scheduled) ? res.data.scheduled : [])
+    } catch {
+      setScheduledSends([])
+    }
+  }, [])
+
+  useEffect(() => {
+    if (selectedChatId) {
+      void loadScheduledSends(selectedChatId)
+    } else {
+      setScheduledSends([])
+    }
+  }, [selectedChatId, loadScheduledSends])
+
   useEffect(() => {
     setMemoDraft(chatDetail?.notes ?? '')
     setMemoError('')
     setShowMemoEditor(false)
   }, [chatDetail?.id, chatDetail?.notes])
+
+  // 会話を切り替えたら引用中の選択と予約パネルは閉じる。
+  // 前の会話のメッセージを引用したまま別の会話へ送ると、別friendの
+  // メッセージ指定で口が404を返すため、ここで必ず外す。
+  useEffect(() => {
+    setQuotedMessage(null)
+    setShowSchedulePanel(false)
+    setScheduleInput('')
+  }, [selectedChatId])
 
   // Surface deep-linked chats in the sidebar even when the current account
   // filter or status filter would exclude them — otherwise the user replies
@@ -1342,7 +1381,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
           originalContentUrl: pendingImage.originalContentUrl,
           previewImageUrl: pendingImage.previewImageUrl,
         })
-        const signature = JSON.stringify({ chatId: sendingChatId, combined: true, image: imgPayload, content })
+        const signature = JSON.stringify({ chatId: sendingChatId, combined: true, image: imgPayload, content, quotedMessageId: quotedMessage?.id ?? null })
         const sendResult = await api.chats.sendCombined(sendingChatId,
           {
             image: {
@@ -1351,6 +1390,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
             },
             text: content,
             revision: currentRevision,
+            quotedMessageId: quotedMessage?.id,
           },
           sendKeysRef.current.get(signature),
         )
@@ -1389,9 +1429,9 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
           originalContentUrl: pendingImage.originalContentUrl,
           previewImageUrl: pendingImage.previewImageUrl,
         })
-        const signature = JSON.stringify({ chatId: sendingChatId, messageType: 'image', content: imgPayload })
+        const signature = JSON.stringify({ chatId: sendingChatId, messageType: 'image', content: imgPayload, quotedMessageId: quotedMessage?.id ?? null })
         const sendResult = await api.chats.send(sendingChatId,
-          { messageType: 'image', content: imgPayload, revision: currentRevision },
+          { messageType: 'image', content: imgPayload, revision: currentRevision, quotedMessageId: quotedMessage?.id },
           sendKeysRef.current.get(signature),
         )
         if (sendResult.success) currentRevision = sendResult.data.revision
@@ -1428,9 +1468,9 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
       // --- Text send path (runs independently — both paths execute when both image and text are present) ---
       if (!useCombined && messageContent.trim()) {
         const content = messageContent.trim()
-        const signature = JSON.stringify({ chatId: sendingChatId, messageType: 'text', content })
+        const signature = JSON.stringify({ chatId: sendingChatId, messageType: 'text', content, quotedMessageId: quotedMessage?.id ?? null })
         const sendResult = await api.chats.send(sendingChatId,
-          { content, revision: currentRevision },
+          { content, revision: currentRevision, quotedMessageId: quotedMessage?.id },
           sendKeysRef.current.get(signature),
         )
         if (sendResult.success) currentRevision = sendResult.data.revision
@@ -1471,6 +1511,8 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
       }
       // 手動返信で未対応が 1 件減るので、サイドバーのバッジを即時更新させる
       window.dispatchEvent(new Event(UNANSWERED_REFRESH_EVENT))
+      // 引用は1回の送信で使い切る。残すと次の返信にも同じ引用が付く。
+      setQuotedMessage(null)
     } catch (sendError) {
       // アカウントを切り替えたあとの古い応答は、新しいアカウントの画面へ出さない。
       if (detailAccountRef.current === sendingAccountId) {
@@ -1479,6 +1521,70 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     } finally {
       setSending(false)
       sendLockRef.current = false
+    }
+  }
+
+  /**
+   * N-025: 本文を予約送信する。画像つきは予約口がまだ持たないため止める。
+   * 成功したら入力と引用をクリアし、予約一覧を読み直す。
+   */
+  const handleScheduleSend = async () => {
+    if (!selectedChatId || scheduling) return
+    const content = messageContent.trim()
+    if (!content) return
+    if (!scheduleInput) {
+      setError('予約する日時を選んでください')
+      return
+    }
+    if (pendingImage) {
+      setError('画像つきの予約送信にはまだ対応していません')
+      return
+    }
+    const schedulingChatId = selectedChatId
+    setScheduling(true)
+    try {
+      const res = await api.chats.schedule(schedulingChatId, {
+        content,
+        scheduledAt: scheduleInput,
+        quotedMessageId: quotedMessage?.id,
+      }, crypto.randomUUID())
+      if (res.success) {
+        setMessageContent('')
+        setQuotedMessage(null)
+        setScheduleInput('')
+        setShowSchedulePanel(false)
+        await loadScheduledSends(schedulingChatId)
+      }
+    } catch (scheduleError) {
+      setError(describeSendFailure(scheduleError))
+    } finally {
+      setScheduling(false)
+    }
+  }
+
+  /** 予約の取消。送信中・送信済みは口が409で拒否し、一覧を読み直す。 */
+  const handleCancelScheduled = async (scheduleId: string) => {
+    if (!selectedChatId) return
+    try {
+      const res = await api.chats.cancelScheduled(selectedChatId, scheduleId)
+      if (res.success) {
+        setScheduledSends((prev) => prev.filter((row) => row.id !== scheduleId))
+      }
+    } catch {
+      setError('予約の取消に失敗しました。一覧を読み込み直してください。')
+      void loadScheduledSends(selectedChatId)
+    }
+  }
+
+  /** 予約時刻の変更。datetime-local の JST 値をそのまま口へ渡す。 */
+  const handleReschedule = async (scheduleId: string, nextAt: string) => {
+    if (!selectedChatId || !nextAt) return
+    try {
+      const res = await api.chats.updateScheduled(selectedChatId, scheduleId, { scheduledAt: nextAt })
+      if (res.success) await loadScheduledSends(selectedChatId)
+    } catch {
+      setError('予約時刻の変更に失敗しました。一覧を読み込み直してください。')
+      void loadScheduledSends(selectedChatId)
     }
   }
 
@@ -2580,11 +2686,41 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                               }`}
                               style={isOutgoing ? { backgroundColor: 'var(--color-accent)' } : undefined}
                             >
+                              {/* N-025: 引用元の表示。取り消された引用元は本文を出さない。 */}
+                              {msg.quoted && (
+                                <div
+                                  data-inbox-v6="quoted-message"
+                                  className={`mb-1.5 rounded border-l-2 py-0.5 pl-2 text-xs ${
+                                    isOutgoing ? 'border-on-accent/40 text-on-accent/80' : 'border-accent text-ink-faint'
+                                  }`}
+                                >
+                                  {msg.quoted.isUnsent
+                                    ? '取り消されたメッセージ'
+                                    : msg.quoted.messageType === 'text'
+                                      ? msg.quoted.content
+                                      : `[${msg.quoted.messageType}]`}
+                                </div>
+                              )}
                               {bubbleContent}
                             </div>
-                            {/* 時刻 */}
-                            <span className="text-xs text-on-accent/50 mt-0.5 px-1">
-                              {new Date(msg.createdAt).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}
+                            {/* 時刻と引用操作 */}
+                            <span className="mt-0.5 flex items-center gap-2 px-1">
+                              <span className="text-xs text-on-accent/50">
+                                {new Date(msg.createdAt).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                              {!msg.isUnsent && (
+                                <button
+                                  type="button"
+                                  data-inbox-v6="quote-reply"
+                                  onClick={() => {
+                                    setQuotedMessage(msg)
+                                    textareaRef.current?.focus()
+                                  }}
+                                  className="text-caption text-on-accent/60 underline-offset-2 hover:text-on-accent hover:underline"
+                                >
+                                  引用
+                                </button>
+                              )}
                             </span>
                           </div>
 
@@ -2760,6 +2896,99 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                   </div>
                 )}
 
+                {/* N-025: 引用中のメッセージ。×で外す。 */}
+                {quotedMessage && (
+                  <div
+                    data-inbox-v6="quote-preview"
+                    className="mb-2 flex items-center gap-2 rounded-lg border border-accent/40 bg-accent-soft px-3 py-1.5 text-xs"
+                  >
+                    <span className="shrink-0 font-semibold text-accent-deep">引用:</span>
+                    <span className="min-w-0 flex-1 truncate text-ink-secondary">
+                      {quotedMessage.isUnsent
+                        ? '取り消されたメッセージ'
+                        : quotedMessage.messageType === 'text'
+                          ? quotedMessage.content
+                          : `[${quotedMessage.messageType}]`}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setQuotedMessage(null)}
+                      aria-label="引用を解除"
+                      className="shrink-0 text-ink-faint hover:text-danger"
+                    >
+                      <X aria-hidden="true" size={14} />
+                    </button>
+                  </div>
+                )}
+
+                {/* N-025: 送信予約パネル。日時はJSTのdatetime-localで入力する。 */}
+                {showSchedulePanel && (
+                  <div
+                    data-inbox-v6="schedule-panel"
+                    className="mb-2 rounded-lg border border-hairline bg-canvas-sunken p-3"
+                  >
+                    <div className="flex flex-wrap items-center gap-2">
+                      <label htmlFor="schedule-at" className="text-ink-faint text-xs">
+                        送る日時:
+                      </label>
+                      <input
+                        id="schedule-at"
+                        type="datetime-local"
+                        value={scheduleInput}
+                        onChange={(e) => setScheduleInput(e.target.value)}
+                        className="rounded-control border border-hairline bg-canvas px-2 py-1 text-xs"
+                      />
+                      <Button
+                        variant="primary"
+                        type="button"
+                        onClick={() => void handleScheduleSend()}
+                        disabled={scheduling || !messageContent.trim() || !scheduleInput}
+                      >
+                        {scheduling ? '予約中...' : 'この日時で予約する'}
+                      </Button>
+                      <span className="text-ink-faint text-xs">入力した日時は日本時間です</span>
+                    </div>
+                    {scheduledSends.length > 0 && (
+                      <ul className="mt-2 space-y-1.5">
+                        {scheduledSends.map((row) => (
+                          <li
+                            key={row.id}
+                            data-inbox-v6="scheduled-row"
+                            className="flex items-center gap-2 rounded-control border border-hairline bg-canvas px-2.5 py-1.5 text-xs"
+                          >
+                            <span className="shrink-0 font-semibold text-ink">
+                              {new Date(row.scheduledAt).toLocaleString('ja-JP', {
+                                month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit',
+                              })}
+                              {row.status === 'sending' && '（送信中）'}
+                            </span>
+                            <span className="min-w-0 flex-1 truncate text-ink-secondary" title={row.content}>
+                              {row.content}
+                            </span>
+                            <input
+                              type="datetime-local"
+                              aria-label="予約時刻を変更"
+                              disabled={row.status !== 'scheduled'}
+                              onChange={(e) => {
+                                if (e.target.value) void handleReschedule(row.id, e.target.value)
+                              }}
+                              className="w-40 shrink-0 rounded-control border border-hairline bg-canvas px-1.5 py-0.5 text-xs disabled:opacity-40"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => void handleCancelScheduled(row.id)}
+                              disabled={row.status !== 'scheduled'}
+                              className="shrink-0 text-ink-faint hover:text-danger disabled:opacity-40"
+                            >
+                              取消
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                )}
+
                 <div className="rounded-[10px] border border-[#D0D5DD] bg-canvas p-2 focus-within:border-[#06C755] focus-within:ring-2 focus-within:ring-[#06C755]/15">
                   {/* 中段 */}
                   <textarea
@@ -2831,13 +3060,23 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                       </button>
                     )}
                   </span>
-                  <button
-                    onClick={handleSendMessage}
-                    disabled={sending || (!messageContent.trim() && !pendingImage)}
-                    className="rounded-lg bg-accent-deep px-5 py-2 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-deep/90 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {sending ? '送信中...' : '送信'}
-                  </button>
+                  <span className="flex items-center gap-2">
+                    <Button
+                      size="field"
+                      data-inbox-v6="schedule-toggle"
+                      onClick={() => setShowSchedulePanel((v) => !v)}
+                      aria-expanded={showSchedulePanel}
+                    >
+                      予約{scheduledSends.length > 0 ? `(${scheduledSends.length})` : ''}
+                    </Button>
+                    <button
+                      onClick={handleSendMessage}
+                      disabled={sending || (!messageContent.trim() && !pendingImage)}
+                      className="rounded-lg bg-accent-deep px-5 py-2 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-deep/90 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {sending ? '送信中...' : '送信'}
+                    </button>
+                  </span>
 
                   <TemplatePicker
                     open={showTemplatePicker}
