@@ -28,6 +28,7 @@ import ImageUploader, { type ImageUploaderValue } from '@/components/shared/imag
 import { Suspense } from 'react'
 import EmailThread from '@/components/support/email-thread'
 import Button from '@/components/shared/button'
+import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import { MoreAction } from '@/components/shared/row-actions'
 import { CheckCircle2, Link2, NotebookPen, PanelRightClose, PanelRightOpen, Star, X } from 'lucide-react'
 
@@ -1590,6 +1591,24 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     }
   }
 
+  /*
+   * 内部メモの紙を閉じる。Escape・キャンセル・フォーカス戻しで
+   * 共通なので1か所にする(N-031)。
+   */
+  const closeMemoEditor = useCallback(() => {
+    setMemoDraft(chatDetail?.notes ?? '')
+    setMemoError('')
+    setShowMemoEditor(false)
+  }, [chatDetail?.notes])
+
+  /*
+   * role="dialog" の紙なのに Tab が裏の送信欄へ抜け、閉じても
+   * フォーカスがボタンへ戻らなかった(N-031)。共通部品と同じ
+   * useOverlayFocus で、Tabを紙の中に留め・Escapeで閉じ・
+   * 閉じたら開いたボタンへフォーカスを戻す。
+   */
+  const memoPopoverRef = useOverlayFocus(showMemoEditor, closeMemoEditor, memoSaving)
+
   const handleSaveMemo = async () => {
     if (!selectedChatId || memoSaving) return
     setMemoSaving(true)
@@ -2695,13 +2714,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                     role="dialog"
                     aria-labelledby="chat-internal-memo-title"
                     data-inbox-v6="internal-memo-popover"
-                    onKeyDown={(event) => {
-                      if (event.key !== 'Escape') return
-                      event.stopPropagation()
-                      setMemoDraft(chatDetail?.notes ?? '')
-                      setMemoError('')
-                      setShowMemoEditor(false)
-                    }}
+                    ref={memoPopoverRef}
                     className="border-hairline rounded-panel shadow-float absolute bottom-full left-4 z-30 mb-2 w-[calc(100%-2rem)] max-w-[760px] border bg-canvas p-5"
                   >
                     <div className="flex items-start justify-between gap-3">
@@ -2722,7 +2735,6 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                       value={memoDraft}
                       onChange={(event) => setMemoDraft(event.target.value)}
                       rows={4}
-                      autoFocus
                       placeholder="例：次回返信時に配送先住所を確認する"
                       className="border-hairline focus:border-accent focus:ring-accent/15 rounded-control mt-3 w-full resize-y border bg-canvas px-3 py-2 text-sm leading-6 outline-none focus:ring-2"
                     />
@@ -2732,11 +2744,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                       <div className="flex shrink-0 items-center gap-2">
                         {/* 設計 `B7CER8` の2つは h36・角丸8・13px・600。共通ボタンと同値。 */}
                         <Button
-                          onClick={() => {
-                            setMemoDraft(chatDetail?.notes ?? '')
-                            setMemoError('')
-                            setShowMemoEditor(false)
-                          }}
+                          onClick={closeMemoEditor}
                         >
                           キャンセル
                         </Button>
