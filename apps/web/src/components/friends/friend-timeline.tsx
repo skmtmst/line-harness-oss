@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { fetchApi } from '@/lib/api'
 import { IdempotencyKeyStore } from '@/lib/idempotency-key-store'
 import TemplatePicker from '@/components/chats/template-picker'
+import { describeSendFailure } from '@/app/chats/send-failure'
 
 /**
  * 友だち詳細のタイムライン（設計 V2 2-2-1 の右カラム）。
@@ -76,6 +77,9 @@ export default function FriendTimeline({ friendId }: { friendId: string }) {
   const sendLock = useRef(false)
   const sendKeysRef = useRef(new IdempotencyKeyStore())
   const isComposing = useRef(false)
+  // 別の友だちへ切り替わったあとの古い応答を書き込まない。
+  const friendIdRef = useRef(friendId)
+  friendIdRef.current = friendId
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -122,8 +126,12 @@ export default function FriendTimeline({ friendId }: { friendId: string }) {
         },
       ])
       setText('')
-    } catch {
-      setError('送信できませんでした')
+    } catch (sendError) {
+      // 失敗しても入力は残す。同じ文の再送は同じ冪等キーを使い、
+      // LINE・DBへの追加書込は1回だけになる（N-023契約）。
+      if (friendIdRef.current === friendId) {
+        setError(describeSendFailure(sendError))
+      }
     } finally {
       setSending(false)
       sendLock.current = false

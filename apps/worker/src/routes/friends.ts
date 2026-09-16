@@ -35,7 +35,9 @@ import { requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import { resolveRequestBoundaries } from '../services/request-boundary.js';
 import {
+  classifyLineOutboundFailure,
   completeOutboundSendStatement,
+  failOutboundSend,
   hashOutboundPayload,
   isValidIdempotencyKey,
   reserveOutboundSend,
@@ -1340,6 +1342,9 @@ friends.post('/api/friends/:id/messages', requireRole('owner', 'admin', 'staff')
     }
 
     const messageType = body.messageType ?? 'text';
+    // アカウントは予約の範囲キーにも使うので先に解く（N-028/N-029）。
+    const friendAccountId =
+      ((friend as unknown as Record<string, unknown>).line_account_id as string | null) ?? null;
     const payloadHash = await hashOutboundPayload(
       JSON.stringify({
         friendId: friend.id,
@@ -1354,85 +1359,171 @@ friends.post('/api/friends/:id/messages', requireRole('owner', 'admin', 'staff')
       channel: 'line',
       resourceId: friend.id,
       payloadHash,
-      retryInProgress: true,
+      lineAccountId: friendAccountId,
+      // in_progress はLINE受理後の応答喪失を含み得るため、自動再送しない。
+      retryInProgress: false,
       now: new Date().toISOString(),
     });
     if (reservation.kind === 'conflict') {
       return c.json({ success: false, error: '同じ送信キーを別の内容には使用できません' }, 409);
     }
     if (reservation.kind === 'in_progress') {
-      return c.json({ success: false, error: '同じメッセージを送信中です' }, 409);
+      return c.json({
+        success: false,
+        error: '同じメッセージを送信中か、送信結果を確認中です',
+        code: 'OUTBOUND_SEND_IN_PROGRESS',
+      }, 409);
+    }
+    if (reservation.kind === 'failed') {
+      return c.json({
+        success: false,
+        error: reservation.retryable ? '再送できる時刻までお待ちください' : 'この送信は自動再送できません',
+        code: reservation.code,
+        data: { retryable: reservation.retryable, nextRetryAt: reservation.nextRetryAt },
+      }, 409);
+    }
+    if (reservation.kind === 'unknown') {
+      return c.json({
+        success: false,
+        error: 'LINEへの送達結果を確認できないため、自動再送を停止しました',
+        code: reservation.code,
+        data: { retryable: false, nextRetryAt: null },
+      }, 409);
     }
     if (reservation.kind === 'replay') {
       return c.json({ success: true, data: { messageId: reservation.responseId, replayed: true } });
     }
 
+    // LINE 側にも同じキーを渡す。DB保存前に通信が切れて再実行されても、
+    // LINE API が同一リクエストを二重配信しない。
+    const outboundLeaseToken = reservation.leaseToken;
     const { LineClient } = await import('@line-crm/line-sdk');
-    // Resolve access token from friend's account (multi-account support)
-    let accountToken: string | null = null;
-    const friendAccountId =
-      ((friend as unknown as Record<string, unknown>).line_account_id as string | null) ?? null;
-    if (friendAccountId) {
-      const { getLineAccountById } = await import('@line-crm/db');
-      const account = await getLineAccountById(db, friendAccountId);
-      accountToken = account?.channel_access_token ?? null;
-    }
-    const accessToken = resolveLineToken({
-      accountToken,
-      defaultToken: c.env.LINE_CHANNEL_ACCESS_TOKEN,
-      accountId: friendAccountId,
-      context: 'friends.direct-send',
-    });
-    const lineClient = new LineClient(accessToken);
+    let lineClient: InstanceType<typeof LineClient>;
+    let tracked: { messageType: string; content: string };
+    try {
+      // Resolve access token from friend's account (multi-account support)
+      let accountToken: string | null = null;
+      if (friendAccountId) {
+        const { getLineAccountById } = await import('@line-crm/db');
+        const account = await getLineAccountById(db, friendAccountId);
+        accountToken = account?.channel_access_token ?? null;
+      }
+      const accessToken = resolveLineToken({
+        accountToken,
+        defaultToken: c.env.LINE_CHANNEL_ACCESS_TOKEN,
+        accountId: friendAccountId,
+        context: 'friends.direct-send',
+      });
+      lineClient = new LineClient(accessToken);
 
-    // Auto-wrap URLs with tracking links (text with URLs → Flex with button)
-    // trackLinks=false で明示的に短縮 OFF (URL をそのまま送る)
-    const sendWorkerUrl = c.env.WORKER_URL || new URL(c.req.url).origin;
-    let tracked = { messageType, content: body.content };
-    if (body.trackLinks !== false) {
-      const { autoTrackContent } = await import('../services/auto-track.js');
-      tracked = await autoTrackContent(
-        db, messageType, body.content,
-        sendWorkerUrl,
-        { lineAccountId: friendAccountId },
-      );
-    }
-    // 1:1 送信なので /t リンクに f=<friendId> を焼き込み、LIFF 識別ホップなしで
-    // クリック帰属できるようにする（既存 /t リンクにも効くので trackLinks に関わらず実施）
-    {
+      // Auto-wrap URLs with tracking links (text with URLs → Flex with button)
+      // trackLinks=false で明示的に短縮 OFF (URL をそのまま送る)
+      const sendWorkerUrl = c.env.WORKER_URL || new URL(c.req.url).origin;
+      tracked = { messageType, content: body.content };
+      if (body.trackLinks !== false) {
+        const { autoTrackContent } = await import('../services/auto-track.js');
+        tracked = await autoTrackContent(
+          db, messageType, body.content,
+          sendWorkerUrl,
+          { lineAccountId: friendAccountId },
+        );
+      }
+      // 1:1 送信なので /t リンクに f=<friendId> を焼き込み、LIFF 識別ホップなしで
+      // クリック帰属できるようにする（既存 /t リンクにも効くので trackLinks に関わらず実施）
       const { appendFriendToTrackedLinks } = await import('../services/auto-track.js');
       tracked = {
         ...tracked,
         content: await appendFriendToTrackedLinks(db, tracked.content, sendWorkerUrl, friend.id),
       };
+    } catch (prepareError) {
+      // LINEへ届く前の失敗なので、再送しても二重送信にならない失敗として残す。
+      const failedAt = new Date().toISOString();
+      await failOutboundSend(db, {
+        key: idempotencyKey,
+        leaseToken: outboundLeaseToken,
+        status: 'failed',
+        code: 'OUTBOUND_PREPARATION_FAILED',
+        retryable: true,
+        nextRetryAt: null,
+        now: failedAt,
+      });
+      console.error('POST /api/friends/:id/messages prepare failed:', prepareError);
+      return c.json({
+        success: false,
+        error: '送信の準備に失敗しました',
+        code: 'OUTBOUND_PREPARATION_FAILED',
+        data: { retryable: true, nextRetryAt: null },
+      }, 500);
     }
 
     const message = buildMessage(tracked.messageType, tracked.content, body.altText);
-    await lineClient.pushMessage(friend.line_user_id, [message], idempotencyKey);
+    try {
+      await lineClient.pushMessage(friend.line_user_id, [message], idempotencyKey);
+    } catch (sendError) {
+      const failedAt = new Date().toISOString();
+      const failure = classifyLineOutboundFailure(sendError, failedAt);
+      await failOutboundSend(db, {
+        key: idempotencyKey,
+        leaseToken: outboundLeaseToken,
+        status: failure.status,
+        code: failure.code,
+        retryable: failure.retryable,
+        nextRetryAt: failure.nextRetryAt,
+        now: failedAt,
+      });
+      return c.json({
+        success: false,
+        error: failure.status === 'unknown'
+          ? 'LINEへの送達結果を確認できないため、自動再送を停止しました'
+          : 'LINEへ送信できませんでした',
+        code: failure.code,
+        data: { retryable: failure.retryable, nextRetryAt: failure.nextRetryAt },
+      }, failure.httpStatus);
+    }
 
     // Log outgoing message
     const logId = idempotencyKey;
     const sentAt = jstNow();
-    await db.batch([
-      db.prepare(
-        `INSERT OR IGNORE INTO messages_log (
-           id, friend_id, direction, message_type, content, broadcast_id,
-           scenario_step_id, source, line_account_id, created_at
-         ) VALUES (?, ?, 'outgoing', ?, ?, NULL, NULL, 'manual', ?, ?)`,
-      )
-        .bind(logId, friend.id, tracked.messageType, tracked.content, friendAccountId, sentAt),
-      completeOutboundSendStatement(db, {
+    try {
+      await db.batch([
+        db.prepare(
+          `INSERT OR IGNORE INTO messages_log (
+             id, friend_id, direction, message_type, content, broadcast_id,
+             scenario_step_id, source, line_account_id, created_at
+           ) VALUES (?, ?, 'outgoing', ?, ?, NULL, NULL, 'manual', ?, ?)`,
+        )
+          .bind(logId, friend.id, tracked.messageType, tracked.content, friendAccountId, sentAt),
+        completeOutboundSendStatement(db, {
+          key: idempotencyKey,
+          responseId: logId,
+          now: new Date().toISOString(),
+          leaseToken: outboundLeaseToken,
+        }),
+      ]);
+    } catch {
+      // pushは受理済みだが記録を確定できなかった。自動再送は二重送信になり得るので止める。
+      const failedAt = new Date().toISOString();
+      await failOutboundSend(db, {
         key: idempotencyKey,
-        responseId: logId,
-        now: new Date().toISOString(),
-      }),
-    ]);
+        leaseToken: outboundLeaseToken,
+        status: 'unknown',
+        code: 'OUTBOUND_CONFIRMATION_FAILED',
+        retryable: false,
+        nextRetryAt: null,
+        now: failedAt,
+      });
+      return c.json({
+        success: false,
+        error: 'LINEには受理された可能性がありますが、送信履歴を確定できませんでした',
+        code: 'OUTBOUND_CONFIRMATION_FAILED',
+        data: { retryable: false, nextRetryAt: null },
+      }, 503);
+    }
 
     return c.json({ success: true, data: { messageId: logId } });
   } catch (err) {
-    const errMsg = err instanceof Error ? err.message : String(err);
-    console.error('POST /api/friends/:id/messages error:', errMsg);
-    return c.json({ success: false, error: errMsg }, 500);
+    console.error('POST /api/friends/:id/messages error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
 

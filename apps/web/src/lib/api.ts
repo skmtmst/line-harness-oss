@@ -2038,8 +2038,11 @@ export async function fetchApi<T>(path: string, options?: RequestInit): Promise<
       res.status,
       extractApiErrorMessage(raw, res.status),
       code,
-      // 最新状態は409のときだけ保持する。500等の内部データは画面へ渡さない。
-      res.status === 409 ? extractApiErrorData(raw) : undefined,
+      // 409の最新状態と、N-023契約の再試行時刻(429/502のnextRetryAt)だけ保持する。
+      // それ以外の内部データは画面へ渡さない。
+      res.status === 409 || res.status === 429 || res.status === 502
+        ? extractApiErrorData(raw)
+        : undefined,
     )
   }
   if (res.status === 204) return undefined as T
