@@ -2493,6 +2493,75 @@ const spec = {
         },
       },
     },
+    // ── Event applicant operations ─────────────────────────────────────────
+    '/api/events/admin/events/{id}/occurrence-selector': {
+      get: {
+        tags: ['Events'],
+        summary: '申込者画面用の開催回選択肢を取得',
+        description: '予約件数・集計を含めず、指定LINEアカウントに属する有効な開催回だけを返す。',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: '開催回のID、日時、定員、並び順' },
+          '400': { description: 'account_id が無い' },
+          '403': { description: 'イベント閲覧権限が無い' },
+          '404': { description: 'イベントが無い、またはアカウント範囲外' },
+        },
+      },
+    },
+    '/api/events/admin/occurrences/{id}/applicants.csv': {
+      get: {
+        tags: ['Events'],
+        summary: '表示時に固定した開催回申込者をCSVで書き出す',
+        description: 'snapshot_id は申込者画面の取得時に発行される短期ID。後から申込・取消があっても、同じ表示対象だけを書き出す。',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+          { name: 'snapshot_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: 'UTF-8 BOM付きCSV', content: { 'text/csv': { schema: { type: 'string' } } } },
+          '400': { description: 'account_id が無い' },
+          '403': { description: 'イベント閲覧権限が無い' },
+          '404': { description: '開催回またはsnapshotがアカウント範囲外' },
+          '409': { description: 'snapshotの内容が不正' },
+          '410': { description: 'snapshotの期限切れ' },
+          '422': { description: 'snapshot_id が無い' },
+        },
+      },
+    },
+    '/api/events/admin/occurrences/{id}/applicant-broadcasts/preview': {
+      post: {
+        tags: ['Events'],
+        summary: '固定済みの開催回申込者を一斉案内の下書きへ保存',
+        description: '同じIdempotency-Keyと同じ内容は、後から申込者が変わっても固定済み宛先を再生する。',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+          { name: 'Idempotency-Key', in: 'header', required: true, schema: { type: 'string', format: 'uuid' } },
+        ],
+        requestBody: { required: true, content: { 'application/json': { schema: {
+          type: 'object', required: ['title', 'messageContent', 'snapshotId'],
+          properties: {
+            title: { type: 'string', minLength: 1 },
+            messageContent: { type: 'string', minLength: 1, maxLength: 5000 },
+            snapshotId: { type: 'string' },
+          },
+        } } } },
+        responses: {
+          '200': { description: '同じ冪等キーの下書きを再生', headers: { 'Idempotency-Replayed': { schema: { type: 'boolean' } } } },
+          '201': { description: '送信前確認用の下書きを作成' },
+          '400': { description: 'アカウント、冪等キー、または本文が不正' },
+          '403': { description: 'owner/admin権限が無い' },
+          '404': { description: '開催回またはsnapshotがアカウント範囲外' },
+          '409': { description: '冪等キーが別内容に使われた、またはsnapshotが不正' },
+          '410': { description: 'snapshotの期限切れ' },
+          '422': { description: 'snapshotId が無い' },
+        },
+      },
+    },
     // ── Event waitlist ────────────────────────────────────────────────────
     '/api/liff/events/waitlist/{token}/accept': {
       post: {

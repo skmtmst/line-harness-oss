@@ -1969,6 +1969,16 @@ CREATE TABLE event_bookings (
   FOREIGN KEY (friend_id) REFERENCES friends(id)
 );
 
+CREATE TABLE event_occurrence_applicant_snapshots (
+  id              TEXT PRIMARY KEY,
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  occurrence_id   TEXT NOT NULL REFERENCES event_slots(id) ON DELETE CASCADE,
+  staff_id        TEXT NOT NULL,
+  payload_json    TEXT NOT NULL CHECK (json_valid(payload_json)),
+  expires_at      TEXT NOT NULL,
+  created_at      TEXT NOT NULL
+);
+
 CREATE TABLE event_slots (
   id          TEXT PRIMARY KEY,
   event_id    TEXT NOT NULL,
@@ -6403,6 +6413,12 @@ CREATE INDEX idx_event_bookings_requested_expiry
   ON event_bookings (status, approval_expires_at);
 
 CREATE INDEX idx_event_bookings_slot_status ON event_bookings (slot_id, status);
+
+CREATE INDEX idx_event_occurrence_applicant_snapshots_expiry
+  ON event_occurrence_applicant_snapshots(expires_at);
+
+CREATE INDEX idx_event_occurrence_applicant_snapshots_scope_expiry
+  ON event_occurrence_applicant_snapshots(line_account_id, occurrence_id, staff_id, expires_at);
 
 CREATE INDEX idx_event_slots_event_starts ON event_slots (event_id, starts_at);
 
