@@ -699,8 +699,13 @@ chats.get('/api/chats', requireRole('owner', 'admin', 'staff'), async (c) => {
       ),
       any_agg AS (
         SELECT friend_id,
-          CASE WHEN message_type = 'text' THEN SUBSTR(content, 1, 200) ELSE NULL END AS content,
-          direction, message_type,
+          CASE
+            WHEN unsent_at IS NOT NULL THEN NULL
+            WHEN message_type = 'text' THEN SUBSTR(content, 1, 200)
+            ELSE NULL
+          END AS content,
+          direction,
+          CASE WHEN unsent_at IS NOT NULL THEN 'unsent' ELSE message_type END AS message_type,
           MAX(created_at) AS created_at
         FROM messages_log
         WHERE (delivery_type IS NULL OR delivery_type != 'test')
@@ -872,7 +877,10 @@ chats.get('/api/chats/:id', requireVisibleChat, async (c) => {
     messageBindings.push(messageLimit + 1);
     const messages = await c.env.DB
       .prepare(
-        `SELECT id, friend_id, direction, message_type, content, source, origin_kind,
+        `SELECT id, friend_id, direction, message_type,
+                CASE WHEN unsent_at IS NOT NULL THEN '' ELSE content END AS content,
+                CASE WHEN unsent_at IS NOT NULL THEN 1 ELSE 0 END AS is_unsent,
+                source, origin_kind,
                 sent_by_staff_id,
                 (SELECT name FROM staff_members sm WHERE sm.id = messages_log.sent_by_staff_id) AS sent_by_staff_name,
                 (SELECT s.name FROM scenario_steps ss
@@ -914,6 +922,7 @@ chats.get('/api/chats/:id', requireVisibleChat, async (c) => {
           direction: m.direction,
           messageType: m.message_type,
           content: m.content,
+          isUnsent: Boolean(m.is_unsent),
           source: m.source || null,
           originKind: m.origin_kind || null,
           sentByStaffId: m.sent_by_staff_id || null,

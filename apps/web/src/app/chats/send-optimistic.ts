@@ -55,6 +55,7 @@ export function buildOutgoingMessage(input: {
     direction: 'outgoing',
     messageType: input.messageType,
     content: input.content,
+    isUnsent: false,
     source: null,
     originKind: null,
     sentByStaffId: null,

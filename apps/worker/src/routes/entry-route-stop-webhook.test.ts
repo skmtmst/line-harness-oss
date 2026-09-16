@@ -30,6 +30,10 @@ vi.mock('@line-crm/db', () => ({
   captureFriendAddEventAttribution: vi.fn().mockResolvedValue(null),
   markFriendAddEventRouting: vi.fn().mockResolvedValue(undefined),
   recordAnalyticsEvent: vi.fn().mockResolvedValue({ id: 'analytics-event-1' }),
+  recordIncomingLineMessage: vi.fn().mockImplementation(async (_db, input) => ({
+    id: input.id, inserted: true, isUnsent: false, unsentAt: null,
+  })),
+  recordLineMessageUnsend: vi.fn().mockResolvedValue(undefined),
   toJstString: vi.fn().mockReturnValue('2026-09-08T00:00:00.000+09:00'),
 }));
 

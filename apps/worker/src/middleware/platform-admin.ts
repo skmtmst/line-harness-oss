@@ -29,9 +29,46 @@ export async function isPlatformAdmin(c: Context<Env>): Promise<boolean> {
 export async function legacyDefaultTenantOwner(c: Context<Env>): Promise<boolean> {
   const staff = c.get('staff');
   if (!staff) return false;
-  if (staff.role !== 'owner' || staff.readOnly) return false;
-  if ((staff.tenantId ?? DEFAULT_TENANT_ID) !== DEFAULT_TENANT_ID) return false;
-  const row = await dbFor(c.env)
+  return legacyDefaultTenantOwnerRow(dbFor(c.env), {
+    id: staff.id,
+    role: staff.role,
+    readOnly: Boolean(staff.readOnly),
+    tenantId: staff.tenantId ?? null,
+  });
+}
+
+/**
+ * ログイン処理の途中など、まだ c.get('staff') が無い場面向け。staff_members の
+ * 行（または同じ形）から同じ判定をする。LINE ログインの運営コンソール分岐
+ * （★V6 37-1）と /api/auth/session が使う。判定の中身は isPlatformAdmin と同じ。
+ */
+export type PlatformAdminCandidate = {
+  id: string;
+  role: string;
+  readOnly: boolean;
+  tenantId: string | null;
+};
+
+export function candidateFromStaffRow(row: { id: string; role: string; access_level?: string | null; tenant_id?: string | null }): PlatformAdminCandidate {
+  return {
+    id: row.id,
+    role: row.role,
+    readOnly: row.access_level === 'read_only',
+    tenantId: row.tenant_id ?? null,
+  };
+}
+
+export async function isPlatformAdminRow(db: D1Database, candidate: PlatformAdminCandidate): Promise<boolean> {
+  if (candidate.id === 'env-owner') return false;
+  const admin = await getPlatformAdminByStaffId(db, candidate.id);
+  if (admin) return true;
+  return legacyDefaultTenantOwnerRow(db, candidate);
+}
+
+async function legacyDefaultTenantOwnerRow(db: D1Database, candidate: PlatformAdminCandidate): Promise<boolean> {
+  if (candidate.role !== 'owner' || candidate.readOnly) return false;
+  if ((candidate.tenantId ?? DEFAULT_TENANT_ID) !== DEFAULT_TENANT_ID) return false;
+  const row = await db
     .prepare('SELECT COUNT(*) AS count FROM platform_admins WHERE is_active = 1')
     .first<{ count: number }>();
   return (row?.count ?? 0) === 0;
