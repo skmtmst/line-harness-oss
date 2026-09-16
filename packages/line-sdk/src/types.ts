@@ -120,6 +120,15 @@ export interface UnfollowEvent extends BaseEvent {
   source: UserSource | GroupSource | RoomSource;
 }
 
+/** LINEで利用者が送信済みメッセージを取り消したときのイベント。 */
+export interface UnsendEvent extends BaseEvent {
+  type: 'unsend';
+  source: UserSource | GroupSource | RoomSource;
+  unsend: {
+    messageId: string;
+  };
+}
+
 export interface PostbackEvent extends BaseEvent {
   type: 'postback';
   replyToken: string;
@@ -133,6 +142,7 @@ export type WebhookEvent =
   | MessageEvent
   | FollowEvent
   | UnfollowEvent
+  | UnsendEvent
   | PostbackEvent;
 
 export interface WebhookRequestBody {
