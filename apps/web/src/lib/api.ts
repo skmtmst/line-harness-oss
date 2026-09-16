@@ -2038,7 +2038,17 @@ function reportServerFailure(path: string, status: number): void {
   })()
 }
 
-export async function fetchApi<T>(path: string, options?: RequestInit): Promise<T> {
+/**
+ * fetchApi の呼び出し側だけが決める挙動。
+ * 機能の本体画面ではない場所（流入計測のプール候補など）から補助データとして
+ * 任意機能のAPIを呼ぶとき、その機能がオフでも画面全体を共通ゲートへ
+ * 切り替えないよう FEATURE_DISABLED の合図を出さない。
+ */
+export interface FetchApiOptions extends RequestInit {
+  suppressFeatureDisabledEvent?: boolean
+}
+
+export async function fetchApi<T>(path: string, options?: FetchApiOptions): Promise<T> {
   const method = (options?.method ?? 'GET').toUpperCase()
   const csrfHeaders: Record<string, string> = {}
   if (MUTATING_METHODS.has(method)) {
@@ -2071,7 +2081,7 @@ export async function fetchApi<T>(path: string, options?: RequestInit): Promise<
   if (!res.ok) {
     const raw = await res.text()
     const code = extractApiErrorCode(raw)
-    announceFeatureDisabled(res.status, code, raw)
+    if (!options?.suppressFeatureDisabledEvent) announceFeatureDisabled(res.status, code, raw)
     throw new ApiError(
       res.status,
       extractApiErrorMessage(raw, res.status),
@@ -9465,10 +9475,12 @@ export const api = {
       >('/api/tracked-links'),
   },
   pools: {
-    list: () => fetchApi<ApiResponse<TrafficPool[]>>('/api/traffic-pools'),
-    listAccounts: (ids: string[]) =>
+    list: (options?: FetchApiOptions) =>
+      fetchApi<ApiResponse<TrafficPool[]>>('/api/traffic-pools', options),
+    listAccounts: (ids: string[], options?: FetchApiOptions) =>
       fetchApi<ApiResponse<Array<{ poolId: string; accounts: PoolAccount[] }>>>(
         `/api/traffic-pools/accounts?ids=${encodeURIComponent(ids.join(','))}`,
+        options,
       ),
     get: (id: string) => fetchApi<ApiResponse<TrafficPool>>(`/api/traffic-pools/${id}`),
     create: (data: { slug: string; name: string; activeAccountId: string }) =>
