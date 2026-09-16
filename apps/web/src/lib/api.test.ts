@@ -1240,6 +1240,28 @@ describe('extractApiErrorData', () => {
         data: { currentVersion: 7 },
       })
   })
+
+  it('429/502の再試行時刻はdataへ渡すが、500の内部dataは渡さない', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+      success: false,
+      code: 'LINE_RATE_LIMITED',
+      data: { retryable: true, nextRetryAt: '2026-09-17T00:05:00.000Z' },
+    }), { status: 429, headers: { 'Content-Type': 'application/json' } })))
+    await expect(fetchApi('/api/friends/friend-1/messages', { method: 'POST' }))
+      .rejects.toMatchObject({
+        status: 429,
+        code: 'LINE_RATE_LIMITED',
+        data: { retryable: true, nextRetryAt: '2026-09-17T00:05:00.000Z' },
+      })
+
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+      success: false,
+      error: 'internal',
+      data: { stack: 'secret internals' },
+    }), { status: 500, headers: { 'Content-Type': 'application/json' } })))
+    await expect(fetchApi('/api/friends/friend-1/messages', { method: 'POST' }))
+      .rejects.toMatchObject({ status: 500, data: undefined })
+  })
 })
 
 describe('fetchApi error response', () => {

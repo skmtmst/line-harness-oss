@@ -77,6 +77,7 @@ const statusFilters: { key: StatusFilter; label: string }[] = [
 import { normalizeSavedViewConditions, type InboxSavedViewConditions } from './saved-view-types'
 import { savedViewSummary } from './saved-view-summary'
 import { buildOutgoingMessage, refreshChatListAfterSend } from './send-optimistic'
+import { describeSendFailure } from './send-failure'
 
 type InboxSavedView = {
   id: string
@@ -207,11 +208,15 @@ function DirectMessagePanel({ friendId, friend, onBack, onSent }: {
 }) {
   const [message, setMessage] = useState('')
   const [sending, setSending] = useState(false)
+  const [sendError, setSendError] = useState('')
   const [messages, setMessages] = useState<MessageLog[]>([])
   const [loadingMessages, setLoadingMessages] = useState(true)
   const isComposingRef = useRef(false)
   const sendLockRef = useRef(false)
   const sendKeysRef = useRef(new IdempotencyKeyStore())
+  // アカウント切替などでパネルが畳まれたあとの古い応答を書き込まない。
+  const aliveRef = useRef(true)
+  useEffect(() => () => { aliveRef.current = false }, [])
 
   useEffect(() => {
     const loadMessages = async () => {
@@ -241,15 +246,22 @@ function DirectMessagePanel({ friendId, friend, onBack, onSent }: {
         body: JSON.stringify({ content, messageType: 'text' }),
       })
       sendKeysRef.current.clear(signature)
-      setMessages((prev) => [...prev, {
-        id: crypto.randomUUID(),
-        direction: 'outgoing',
-        messageType: 'text',
-        content,
-        createdAt: new Date().toISOString(),
-      }])
-      setMessage('')
-    } catch { /* silent */ }
+      if (aliveRef.current) {
+        setMessages((prev) => [...prev, {
+          id: crypto.randomUUID(),
+          direction: 'outgoing',
+          messageType: 'text',
+          content,
+          createdAt: new Date().toISOString(),
+        }])
+        setMessage('')
+        setSendError('')
+      }
+    } catch (sendError) {
+      // 失敗しても入力は残す。同じ文の再送は同じ冪等キーを使い、
+      // LINE・DBへの追加書込は1回だけになる（N-023契約）。
+      if (aliveRef.current) setSendError(describeSendFailure(sendError))
+    }
     setSending(false)
     sendLockRef.current = false
   }
@@ -331,11 +343,14 @@ function DirectMessagePanel({ friendId, friend, onBack, onSent }: {
         )}
       </div>
       <div className="px-4 py-3 border-t border-hairline">
+        {sendError && (
+          <p className="mb-2 text-xs text-danger" role="alert">{sendError}</p>
+        )}
         <div className="flex gap-2">
           <input
             type="text"
             value={message}
-            onChange={(e) => setMessage(e.target.value)}
+            onChange={(e) => { setMessage(e.target.value); if (sendError) setSendError('') }}
             onCompositionStart={() => { isComposingRef.current = true }}
             onCompositionEnd={() => { isComposingRef.current = false }}
             onKeyDown={(e) => {
@@ -1305,6 +1320,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     if (!selectedChatId || sending || sendLockRef.current) return
     if (!messageContent.trim() && !pendingImage) return
     const sendingChatId = selectedChatId  // capture the chat id for this send
+    const sendingAccountId = selectedAccountId  // 送信開始時のアカウントを固定する
     sendLockRef.current = true
     setSending(true)
     try {
@@ -1449,11 +1465,10 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
       // 手動返信で未対応が 1 件減るので、サイドバーのバッジを即時更新させる
       window.dispatchEvent(new Event(UNANSWERED_REFRESH_EVENT))
     } catch (sendError) {
-      setError(
-        sendError instanceof ApiError && sendError.status === 409
-          ? 'ほかの担当者による更新または返信を確認しました。送信せず、会話を読み直してください。'
-          : 'メッセージの送信に失敗しました。',
-      )
+      // アカウントを切り替えたあとの古い応答は、新しいアカウントの画面へ出さない。
+      if (detailAccountRef.current === sendingAccountId) {
+        setError(describeSendFailure(sendError))
+      }
     } finally {
       setSending(false)
       sendLockRef.current = false
