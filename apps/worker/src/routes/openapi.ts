@@ -606,6 +606,29 @@ const spec = {
         responses: { '200': { description: 'Paged members with KPIs and rank definitions' }, '400': { description: 'accountId is required' }, '403': { description: 'Account not visible' } },
       },
     },
+    '/api/nen/feeding-products': {
+      get: {
+        tags: ['NEN Members'], summary: '主食のカロリー表（マイペットの「今日の目安」に使う）と係数表を取得',
+        parameters: [{ name: 'accountId', in: 'query', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'Feeding products, pet count and energy factors' }, '400': { description: 'accountId is required' }, '403': { description: 'Account not visible' } },
+      },
+      put: {
+        tags: ['NEN Members'], summary: '主食のカロリー表を一括保存し、登録済みペットの目安を計算し直す',
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['accountId', 'products'], properties: { accountId: { type: 'string' }, products: { type: 'array', maxItems: 20, items: { type: 'object', required: ['name', 'kcalPer100g'], properties: { id: { type: 'string', nullable: true }, name: { type: 'string', maxLength: 40 }, kcalPer100g: { type: 'number', minimum: 1, maximum: 1000 }, isDefault: { type: 'boolean' } } } } } } } } },
+        responses: { '200': { description: 'Saved products' }, '400': { description: 'Validation failed' }, '403': { description: 'Owner or admin role required' } },
+      },
+    },
+    // ── LIFF：然のマイページ（★V6 37-2） ──────────────────────────────────
+    '/api/liff/nen/pets/{id}': {
+      put: {
+        tags: ['NEN Members'], summary: 'マイペットの変更（体重・避妊去勢・運動量・主食）。保存すると「今日の目安」を計算し直す',
+        security: [],
+        description: 'LIFF の ID トークンで本人確認する（Authorization: Bearer）。本人のペットだけ変えられる。',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', properties: { name: { type: 'string', maxLength: 80 }, breed: { type: 'string', maxLength: 80 }, gender: { type: 'string', enum: ['male', 'female', 'unknown'] }, birthday: { type: 'string', format: 'date' }, weightKg: { type: 'number', minimum: 0.2, maximum: 150 }, concerns: { type: 'array', maxItems: 10, items: { type: 'string' } }, neutered: { type: 'string', enum: ['yes', 'no', 'unknown'] }, activityLevel: { type: 'string', enum: ['low', 'normal', 'high'] }, feedingProductId: { type: 'string', nullable: true } } } } } },
+        responses: { '200': { description: 'Updated pet with feeding plan' }, '400': { description: 'Validation failed' }, '401': { description: 'LIFF identity required' }, '404': { description: 'Pet not found' } },
+      },
+    },
     // ── HQ Billing ─────────────────────────────────────────────────────────
     '/api/hq/billing/summary': {
       get: {

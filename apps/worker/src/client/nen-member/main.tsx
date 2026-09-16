@@ -3,7 +3,11 @@ import { createRoot, type Root } from 'react-dom/client';
 import './styles.css';
 
 type Ctx = { liffId: string; lineUserId: string; idToken: string };
-type Pet = { id: string; name: string; animalType: string; breed: string; birthday: string; weightKg: number; concerns: string[]; recommendedDailyMinGrams: number; recommendedDailyMaxGrams: number; venisonDailyGrams: number; foodCycleDays: number; imageUrl?: string | null };
+type FeedingProduct = { id: string; name: string; kcalPer100g: number; isDefault?: boolean };
+type Feeding = { dailyKcal: number; dailyGrams: number | null; minGrams: number | null; maxGrams: number | null; rerKcal: number; factor: number; factorLabel: string; stage: string; stageLabel: string; ageMonths: number | null; product: FeedingProduct | null };
+type Neutered = 'yes' | 'no' | 'unknown';
+type Activity = 'low' | 'normal' | 'high';
+type Pet = { id: string; name: string; animalType: string; gender?: string; breed: string; birthday: string; weightKg: number; concerns: string[]; neutered?: Neutered; activityLevel?: Activity; feedingProductId?: string | null; feeding?: Feeding | null; recommendedDailyMinGrams: number; recommendedDailyMaxGrams: number; venisonDailyGrams: number; foodCycleDays: number; imageUrl?: string | null };
 type OrderItem = { name?: string; quantity?: number; product_id?: string | number | null; product_url?: string | null; productUrl?: string | null };
 type CommerceOrder = { id?: string; number?: string; date?: string; orderDate?: string; total?: number; detailUrl?: string | null; items?: OrderItem[] };
 type MemberPhoto = { id: string; imageUrl: string; caption: string; status: string; awardedPoints: number; petName?: string };
@@ -16,7 +20,7 @@ type Membership = {
   milestones: Array<{ thresholdYen: number; title: string; reached: boolean }>;
   nextMilestone: { thresholdYen: number; title: string; remainingYen: number } | null;
 };
-type MemberData = { owner: { displayName: string | null }; membership?: Membership; pets: Pet[]; commerce: { orders: CommerceOrder[]; subscription: any; purchaseCount: number; purchaseAmount: number; points: number; rank: string }; photos: MemberPhoto[]; photoStats: { submittedCount: number; pendingCount: number; adoptedCount: number; earnedPoints: number } };
+type MemberData = { owner: { displayName: string | null }; membership?: Membership; pets: Pet[]; feedingProducts?: FeedingProduct[]; commerce: { orders: CommerceOrder[]; subscription: any; purchaseCount: number; purchaseAmount: number; points: number; rank: string }; photos: MemberPhoto[]; photoStats: { submittedCount: number; pendingCount: number; adoptedCount: number; earnedPoints: number } };
 type HealthLog = { id: string; pet_id: string; logged_on: string; weight_kg: number | null; heart_rate_bpm: number | null; respiratory_rate_bpm: number | null; stool_status: string; appetite: string; skin_status: string; tear_stain_status: string; note: string };
 type HealthMetric = 'weight_kg' | 'heart_rate_bpm' | 'respiratory_rate_bpm';
 type HealthPeriod = 'day' | 'week' | 'month';
@@ -38,6 +42,69 @@ async function call<T>(ctx: Ctx, path: string, init?: RequestInit): Promise<T> {
   return data;
 }
 const concernLabels: Record<string, string> = { tear_stain: '涙やけ', coat: '毛並み', allergy: 'アレルギー', appetite: '食いつき', stool: '便', weight: '体重', other: 'その他' };
+const neuteredOptions: Array<[Neutered, string]> = [['unknown', 'わからない'], ['yes', '済み'], ['no', 'していない']];
+const activityOptions: Array<[Activity, string]> = [['low', '少なめ'], ['normal', 'ふつう'], ['high', '多め']];
+const neuteredChip: Record<Neutered, string> = { yes: '避妊・去勢済み', no: '避妊・去勢なし', unknown: '避妊・去勢 未回答' };
+const activityChip: Record<Activity, string> = { low: '運動 少なめ', normal: '運動 ふつう', high: '運動 多め' };
+/** 「今日の目安」の短い表記。主食が登録されていれば g、なければ kcal だけ。どちらも無ければ従来の幅。 */
+function feedingSummary(pet: Pet): string {
+  const f = pet.feeding;
+  if (f?.dailyGrams != null) return `${f.dailyGrams}g／日`;
+  if (f) return `${f.dailyKcal}kcal／日`;
+  return `${pet.recommendedDailyMinGrams}〜${pet.recommendedDailyMaxGrams}g／日`;
+}
+function petBasics(pet: Pet): string {
+  const gender = pet.gender === 'male' ? '男の子' : pet.gender === 'female' ? '女の子' : '';
+  const age = petAgeDetail(pet.birthday);
+  return [pet.animalType === 'cat' ? '猫' : '犬', pet.breed].filter(Boolean).join('・') + (age || gender ? `／${[age, gender].filter(Boolean).join('・')}` : '');
+}
+function petAgeDetail(birthday: string): string {
+  const born = new Date(`${birthday}T00:00:00`);
+  if (!birthday || Number.isNaN(born.getTime())) return '';
+  const today = new Date();
+  let months = (today.getFullYear() - born.getFullYear()) * 12 + (today.getMonth() - born.getMonth());
+  if (today.getDate() < born.getDate()) months -= 1;
+  if (months < 0) return '';
+  if (months < 12) return `${months}か月`;
+  return `${Math.floor(months / 12)}歳${months % 12 ? `${months % 12}か月` : ''}`;
+}
+/**
+ * 変更画面のプレビュー用。Worker `services/nen-feeding.ts` と同じ式・係数（NRC／FEDIAF）。
+ * 保存後の正の値はサーバーが返す。
+ */
+function previewFeeding(animalType: string, weightKg: number, birthday: string, neutered: Neutered, activity: Activity, product: FeedingProduct | null): { kcal: number; grams: number | null; label: string; formula: string } | null {
+  if (!Number.isFinite(weightKg) || weightKg <= 0) return null;
+  const cat = animalType === 'cat';
+  const born = new Date(`${birthday}T00:00:00`);
+  const today = new Date();
+  const months = Number.isNaN(born.getTime()) ? null : (today.getFullYear() - born.getFullYear()) * 12 + (today.getMonth() - born.getMonth()) - (today.getDate() < born.getDate() ? 1 : 0);
+  const stage = months == null ? 'adult' : months < 12 ? 'young' : months >= (cat ? 132 : 84) ? 'senior' : 'adult';
+  let factor: number; let label: string;
+  if (stage === 'young') { factor = cat ? 2.5 : months != null && months < 4 ? 3.0 : 2.0; label = cat ? '子猫' : months != null && months < 4 ? '子犬（4か月未満）' : '子犬'; }
+  else {
+    const intact = neutered === 'no';
+    factor = cat ? (stage === 'senior' ? (intact ? 1.3 : 1.1) : (intact ? 1.4 : 1.2)) : (stage === 'senior' ? (intact ? 1.6 : 1.4) : (intact ? 1.8 : 1.6));
+    const step = cat ? 0.1 : 0.2;
+    factor = Math.round((factor + (activity === 'high' ? step : activity === 'low' ? -step : 0)) * 100) / 100;
+    label = `${stage === 'senior' ? 'シニア' : cat ? '成猫' : '成犬'}${intact ? '' : '・避妊去勢済み'}${activity === 'high' ? '・運動多め' : activity === 'low' ? '・運動少なめ' : ''}`;
+  }
+  const rer = Math.round(70 * Math.pow(Math.round(weightKg * 10) / 10, 0.75));
+  const kcal = Math.round(rer * factor);
+  const grams = product ? Math.max(1, Math.round((kcal / product.kcalPer100g) * 100)) : null;
+  return { kcal, grams, label, formula: `70 × ${Math.round(weightKg * 10) / 10}^0.75 × ${factor}（${label}）${product ? ` ÷ ${product.kcalPer100g}kcal × 100` : ''}` };
+}
+function productFor(pet: Pet, products: FeedingProduct[]): FeedingProduct | null {
+  return pet.feeding?.product ?? products.find(p => p.id === pet.feedingProductId) ?? products.find(p => p.isDefault) ?? products[0] ?? null;
+}
+/** 避妊去勢・運動量・主食の入力（登録と変更で共通）。★V6 37-2-A-1 の3択と選択。 */
+function Segmented<T extends string>({ label, value, options, onChange }: { label: string; value: T; options: Array<[T, string]>; onChange: (next: T) => void }) {
+  return <div className="nm-seg-field"><span>{label}</span><div className="nm-seg" role="radiogroup" aria-label={label}>{options.map(([v, l]) => <button type="button" key={v} role="radio" aria-checked={value === v} className={value === v ? 'active' : ''} onClick={() => onChange(v)}>{l}</button>)}</div></div>;
+}
+function ProductSelect({ value, products, onChange }: { value: string; products: FeedingProduct[]; onChange: (next: string) => void }) {
+  if (products.length === 0) return null;
+  const fallback = products.find(p => p.isDefault) || products[0];
+  return <Field label="いつもの主食"><select value={value} onChange={e => onChange(e.target.value)}><option value="">おまかせ（{fallback.name}）</option>{products.map(p => <option key={p.id} value={p.id}>{p.name}（{p.kcalPer100g}kcal/100g）</option>)}</select></Field>;
+}
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) { return <label className="nm-field"><span>{label}</span>{children}</label>; }
 function Notice({ children }: { children: React.ReactNode }) { return <div className="nm-notice">{children}</div>; }
@@ -156,27 +223,63 @@ function PetPhotoCropper({ file, onDone, onCancel }: { file: File; onDone: (phot
   return <div className="nm-crop-modal" role="dialog" aria-modal="true" aria-label="ペット写真の位置調整"><div className="nm-crop-sheet"><div className="nm-crop-heading"><div><span>PET ICON</span><h2>写真の位置を調整</h2></div><button onClick={onCancel} aria-label="閉じる">×</button></div><p>丸の中をドラッグし、スライダーで拡大・縮小できます。</p><div className="nm-crop-stage" onPointerDown={e => { drag.current = { x: e.clientX, y: e.clientY, ox: offset.x, oy: offset.y }; e.currentTarget.setPointerCapture(e.pointerId); }} onPointerMove={e => { if (drag.current) setOffset(clamp({ x: drag.current.ox + e.clientX - drag.current.x, y: drag.current.oy + e.clientY - drag.current.y })); }} onPointerUp={() => { drag.current = null; }} onPointerCancel={() => { drag.current = null; }}>{source && <img src={source.url} alt="切り抜き位置の確認" draggable={false} style={{ width: dimensions.width, height: dimensions.height, transform: `translate(calc(-50% + ${offset.x}px), calc(-50% + ${offset.y}px))` }} />}<div className="nm-crop-mask" /></div><label className="nm-crop-zoom"><span>縮小</span><input type="range" min="1" max="3" step="0.01" value={zoom} onChange={e => changeZoom(Number(e.target.value))} /><span>拡大</span></label>{error && <p className="nm-error">{error}</p>}<div className="nm-crop-actions"><button onClick={onCancel}>キャンセル</button><button className="nm-primary" disabled={!source || busy} onClick={() => void save()}>{busy ? '最適化中…' : 'この位置で設定'}</button></div></div></div>;
 }
 
-function PetForm({ ctx, onDone, onCancel }: { ctx: Ctx; onDone: () => void; onCancel: () => void }) {
-  const [form, setForm] = useState({ name: '', animalType: 'dog', breed: '', gender: 'unknown', birthday: '', weightKg: '', concerns: [] as string[] });
+function PetForm({ ctx, products, onDone, onCancel }: { ctx: Ctx; products: FeedingProduct[]; onDone: () => void; onCancel: () => void }) {
+  const emptyForm = { name: '', animalType: 'dog', breed: '', gender: 'unknown', birthday: '', weightKg: '', concerns: [] as string[], neutered: 'unknown' as Neutered, activityLevel: 'normal' as Activity, feedingProductId: '' };
+  const [form, setForm] = useState(emptyForm);
   const [photo, setPhoto] = useState<OptimizedPhoto | null>(null); const [cropFile, setCropFile] = useState<File | null>(null); const [busy, setBusy] = useState(false); const [error, setError] = useState('');
-  const submit = async () => { setBusy(true); setError(''); try { await call(ctx, '/api/liff/nen/pets', { method: 'POST', body: JSON.stringify({ ...form, weightKg: Number(form.weightKg), photoData: photo?.data }) }); setForm({ name: '', animalType: 'dog', breed: '', gender: 'unknown', birthday: '', weightKg: '', concerns: [] }); onDone(); } catch (e) { setError(e instanceof Error ? e.message : '登録できませんでした'); } finally { setBusy(false); } };
+  const submit = async () => { setBusy(true); setError(''); try { await call(ctx, '/api/liff/nen/pets', { method: 'POST', body: JSON.stringify({ ...form, weightKg: Number(form.weightKg), feedingProductId: form.feedingProductId || null, photoData: photo?.data }) }); setForm(emptyForm); onDone(); } catch (e) { setError(e instanceof Error ? e.message : '登録できませんでした'); } finally { setBusy(false); } };
   return <section className="nm-card nm-pet-form"><button className="nm-back" type="button" onClick={onCancel}>← マイペットへ戻る</button><div className="nm-section-heading"><span>NEW PET</span><h2>マイペットを登録</h2></div><p className="nm-sub">多頭飼いの場合は、1頭ずつ追加できます。</p>
     <label className="nm-pet-photo-picker"><input type="file" accept="image/*" onChange={e => { const file = e.target.files?.[0]; if (file) setCropFile(file); e.target.value = ''; }} />{photo ? <img src={photo.data} alt="ペット写真の確認" /> : <span>＋</span>}<b>{photo ? '写真を変更' : 'ペットの写真を登録'}</b><small>任意・位置と大きさを調整できます</small></label>
     <div className="nm-grid"><Field label="ペット名"><input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} /></Field><fieldset className="nm-species-field"><legend>種別</legend><div className="nm-species">{([['dog','わんちゃん'],['cat','ねこちゃん']] as const).map(([value,label]) => <label className={form.animalType === value ? 'active' : ''} key={value}><input type="radio" name="animalType" value={value} checked={form.animalType === value} onChange={() => setForm({ ...form, animalType: value })}/><span>{label}</span></label>)}</div></fieldset><Field label="犬種・猫種"><input value={form.breed} onChange={e => setForm({ ...form, breed: e.target.value })} /></Field><Field label="誕生日"><input type="date" value={form.birthday} onChange={e => setForm({ ...form, birthday: e.target.value })} /></Field><Field label="体重（kg）"><input type="number" min="0.2" step="0.1" value={form.weightKg} onChange={e => setForm({ ...form, weightKg: e.target.value })} /></Field></div>
+    <Segmented label="避妊・去勢" value={form.neutered} options={neuteredOptions} onChange={neutered => setForm({ ...form, neutered })} /><Segmented label="運動量" value={form.activityLevel} options={activityOptions} onChange={activityLevel => setForm({ ...form, activityLevel })} /><ProductSelect value={form.feedingProductId} products={products} onChange={feedingProductId => setForm({ ...form, feedingProductId })} />
     <fieldset><legend>現在のお悩み（複数選択可）</legend><div className="nm-chips">{Object.entries(concernLabels).map(([key, label]) => <label key={key} className={form.concerns.includes(key) ? 'active' : ''}><input type="checkbox" checked={form.concerns.includes(key)} onChange={() => setForm({ ...form, concerns: form.concerns.includes(key) ? form.concerns.filter(v => v !== key) : [...form.concerns, key] })} />{label}</label>)}</div></fieldset>
     {error && <p className="nm-error">{error}</p>}<button className="nm-primary" disabled={busy} onClick={() => void submit()}>{busy ? '登録中…' : '登録する'}</button>{cropFile && <PetPhotoCropper file={cropFile} onCancel={() => setCropFile(null)} onDone={value => { setPhoto(value); setCropFile(null); }} />}</section>;
 }
 
-function PetProfileCard({ pet, ctx, onChanged }: { pet: Pet; ctx: Ctx; onChanged: () => void }) {
-  const [busy, setBusy] = useState(false); const [cropFile, setCropFile] = useState<File | null>(null); const [error, setError] = useState('');
+/** ★V6 37-2-A 然・マイペット：ペットカード（写真・印・今日の目安・基本情報・操作）。 */
+function PetProfileCard({ pet, ctx, products, onEdit, onHealth, onChanged }: { pet: Pet; ctx: Ctx; products: FeedingProduct[]; onEdit: () => void; onHealth: () => void; onChanged: () => void }) {
+  const [cropFile, setCropFile] = useState<File | null>(null); const [busy, setBusy] = useState(false); const [error, setError] = useState('');
   const updatePhoto = async (photo: OptimizedPhoto) => { setBusy(true); setError(''); try { await call(ctx, `/api/liff/nen/pets/${pet.id}/photo`, { method: 'POST', body: JSON.stringify({ data: photo.data }) }); setCropFile(null); onChanged(); } catch (e) { setError(e instanceof Error ? e.message : '写真を変更できませんでした'); } finally { setBusy(false); } };
-  return <article className="nm-pet-profile-card"><div className="nm-pet-profile-top"><label className="nm-pet-avatar"><input type="file" accept="image/*" onChange={e => { const file = e.target.files?.[0]; if (file) setCropFile(file); e.target.value = ''; }} /><span className="nm-pet-avatar-frame">{pet.imageUrl ? <img src={pet.imageUrl} alt={`${pet.name}ちゃん`} /> : <TabIcon tab="pets" />}</span><i>{busy ? '…' : '+'}</i></label><div><small>MY PET</small><h2>{pet.name}ちゃん</h2><p>{pet.animalType === 'cat' ? '猫' : '犬'}・{pet.breed}</p></div></div><div className="nm-pet-facts"><div><span>体重</span><b>{pet.weightKg}kg</b></div><div><span>誕生日</span><b>{pet.birthday}</b></div><div><span>フード目安</span><b>{pet.recommendedDailyMinGrams}〜{pet.recommendedDailyMaxGrams}g</b></div></div><p className="nm-pet-concerns">お悩み　{pet.concerns.map(v => concernLabels[v] || v).join('・') || '未登録'}</p>{error && <p className="nm-error">{error}</p>}{cropFile && <PetPhotoCropper file={cropFile} onCancel={() => setCropFile(null)} onDone={value => void updatePhoto(value)} />}</article>;
+  const f = pet.feeding; const product = productFor(pet, products);
+  return <article className="nm-card nm-v6-pet">
+    <div className="nm-v6-pet-top"><label className="nm-v6-pet-photo"><input type="file" accept="image/*" onChange={e => { const file = e.target.files?.[0]; if (file) setCropFile(file); e.target.value = ''; }} />{pet.imageUrl ? <img src={pet.imageUrl} alt={`${pet.name}ちゃん`} /> : <TabIcon tab="pets" />}<i aria-hidden="true">{busy ? '…' : '+'}</i></label>
+      <div className="nm-v6-pet-name"><h2>{pet.name}ちゃん</h2><p>{petBasics(pet)}</p><div className="nm-v6-chips"><span className="nm-v6-chip">{neuteredChip[pet.neutered || 'unknown']}</span><span className="nm-v6-chip nm-v6-chip-info">{activityChip[pet.activityLevel || 'normal']}</span></div></div></div>
+    <div className="nm-v6-guide"><div className="nm-v6-guide-row"><div><span>今日の目安</span><b>{f?.dailyGrams != null ? <>{f.dailyGrams}<small>g／日</small></> : f ? <>{f.dailyKcal}<small>kcal／日</small></> : <>{pet.recommendedDailyMinGrams}〜{pet.recommendedDailyMaxGrams}<small>g／日</small></>}</b></div>{f?.dailyGrams != null && <em>約 {f.dailyKcal} kcal</em>}</div>
+      <p>{f ? `${f.factorLabel} × 体重${pet.weightKg}kg${product ? ` → ${product.name}（${product.kcalPer100g}kcal/100g）` : '。主食のカロリーが登録されるとグラムで表示されます'}` : '体重と年齢から計算した参考値です。'}</p></div>
+    <div className="nm-v6-facts"><div><span>体重</span><b>{pet.weightKg}kg</b></div><div><span>誕生日</span><b>{pet.birthday.replaceAll('-', '.')}</b></div><div><span>いつもの主食</span><b>{product ? product.name : '未設定'}</b></div></div>
+    <p className="nm-v6-concerns">お悩み　{pet.concerns.map(v => concernLabels[v] || v).join('・') || '未登録'}</p>
+    <div className="nm-v6-actions"><button type="button" className="nm-v6-btn nm-v6-btn-accent" onClick={onEdit}>体重・運動量を変更</button><button type="button" className="nm-v6-btn" onClick={onHealth}>健康日記を見る</button></div>
+    {error && <p className="nm-error">{error}</p>}{cropFile && <PetPhotoCropper file={cropFile} onCancel={() => setCropFile(null)} onDone={value => void updatePhoto(value)} />}
+  </article>;
 }
 
-function PetsView({ ctx, pets, onChanged }: { ctx: Ctx; pets: Pet[]; onChanged: () => void }) {
-  const [registering, setRegistering] = useState(false);
-  if (registering) return <PetForm ctx={ctx} onCancel={() => setRegistering(false)} onDone={() => { setRegistering(false); onChanged(); }} />;
-  return <section className="nm-stack nm-pets-page">{pets.length > 0 && <div className="nm-pet-list"><div className="nm-list-heading"><span>REGISTERED PETS</span><h2>登録しているペット</h2></div>{pets.map(pet => <PetProfileCard key={pet.id} pet={pet} ctx={ctx} onChanged={onChanged} />)}</div>}<button className="nm-add-pet" onClick={() => setRegistering(true)}><span>＋</span><div><b>マイペットを登録</b><small>{pets.length ? '新しいペットを追加する' : 'はじめに、うちの子を登録しましょう'}</small></div><i>›</i></button></section>;
+/** ★V6 37-2-A-1 然・マイペット 変更：体重・避妊去勢・運動量・主食だけ。保存すると「今日の目安」が計算し直される。 */
+function PetEditView({ ctx, pet, products, onSaved, onCancel }: { ctx: Ctx; pet: Pet; products: FeedingProduct[]; onSaved: () => void; onCancel: () => void }) {
+  const [form, setForm] = useState({ weightKg: String(pet.weightKg ?? ''), neutered: (pet.neutered || 'unknown') as Neutered, activityLevel: (pet.activityLevel || 'normal') as Activity, feedingProductId: pet.feedingProductId || '' });
+  const [busy, setBusy] = useState(false); const [error, setError] = useState('');
+  const product = products.find(p => p.id === form.feedingProductId) || products.find(p => p.isDefault) || products[0] || null;
+  const preview = previewFeeding(pet.animalType, Number(form.weightKg), pet.birthday, form.neutered, form.activityLevel, product);
+  const submit = async () => { setBusy(true); setError(''); try { await call(ctx, `/api/liff/nen/pets/${pet.id}`, { method: 'PUT', body: JSON.stringify({ weightKg: Number(form.weightKg), neutered: form.neutered, activityLevel: form.activityLevel, feedingProductId: form.feedingProductId || null }) }); onSaved(); } catch (e) { setError(e instanceof Error ? e.message : '変更できませんでした'); } finally { setBusy(false); } };
+  return <section className="nm-stack nm-home-stack nm-v6-edit"><button className="nm-back" type="button" onClick={onCancel}>← マイペットへ戻る</button>
+    <div className="nm-v6-heading"><span>EDIT</span><h2>{pet.name}ちゃんの体重・運動量</h2><p>変えると「今日の目安」がその場で計算し直されます。</p></div>
+    <div className="nm-card nm-v6-form"><label className="nm-field"><span>体重（kg）</span><input inputMode="decimal" type="number" min="0.2" max="150" step="0.1" value={form.weightKg} onChange={e => setForm({ ...form, weightKg: e.target.value })} /></label>
+      <Segmented label="避妊・去勢" value={form.neutered} options={neuteredOptions} onChange={neutered => setForm({ ...form, neutered })} /><Segmented label="運動量" value={form.activityLevel} options={activityOptions} onChange={activityLevel => setForm({ ...form, activityLevel })} /><ProductSelect value={form.feedingProductId} products={products} onChange={feedingProductId => setForm({ ...form, feedingProductId })} /></div>
+    <div className="nm-v6-guide"><div className="nm-v6-guide-row"><div><span>この内容での今日の目安</span><b>{preview ? (preview.grams != null ? <>{preview.grams}<small>g／日</small></> : <>{preview.kcal}<small>kcal／日</small></>) : '—'}</b></div>{preview?.grams != null && <em>約 {preview.kcal} kcal</em>}</div>{preview && <p>{preview.formula}</p>}</div>
+    {error && <p className="nm-error">{error}</p>}<button className="nm-primary nm-v6-primary" disabled={busy || !Number.isFinite(Number(form.weightKg)) || Number(form.weightKg) <= 0} onClick={() => void submit()}>{busy ? '保存中…' : '保存して目安を計算し直す'}</button>
+    <p className="nm-note">目安は参考値です。体型や体調で前後します。獣医師の判断に代わるものではありません。</p></section>;
+}
+
+/** ★V6 37-2-A 然・マイペット：見出し行（登録する）→ ペットカード → 注記。 */
+function PetsView({ ctx, pets, products, onChanged, onHealth }: { ctx: Ctx; pets: Pet[]; products: FeedingProduct[]; onChanged: () => void; onHealth: () => void }) {
+  const [registering, setRegistering] = useState(false); const [editingId, setEditingId] = useState<string | null>(null);
+  const editing = pets.find(p => p.id === editingId);
+  if (registering) return <PetForm ctx={ctx} products={products} onCancel={() => setRegistering(false)} onDone={() => { setRegistering(false); onChanged(); }} />;
+  if (editing) return <PetEditView ctx={ctx} pet={editing} products={products} onCancel={() => setEditingId(null)} onSaved={() => { setEditingId(null); onChanged(); }} />;
+  return <section className="nm-stack nm-home-stack nm-v6-pets">
+    <div className="nm-v6-heading-row"><div className="nm-v6-heading"><span>MY PETS</span><h2>マイペット</h2></div><button type="button" className="nm-v6-add" onClick={() => setRegistering(true)}>＋ 登録する</button></div>
+    {pets.length ? pets.map(pet => <PetProfileCard key={pet.id} pet={pet} ctx={ctx} products={products} onEdit={() => setEditingId(pet.id)} onHealth={onHealth} onChanged={onChanged} />) : <button className="nm-add-pet" onClick={() => setRegistering(true)}><span>＋</span><div><b>マイペットを登録</b><small>はじめに、うちの子を登録しましょう</small></div><i>›</i></button>}
+    <p className="nm-note">目安は体重・年齢・避妊去勢・運動量から公的な指針（NRC／FEDIAF）の式で計算した参考値です。体型や体調で前後します。獣医師の判断に代わるものではありません。</p>
+  </section>;
 }
 
 const healthMetrics: Array<{ value: HealthMetric; label: string; short: string; unit: string; color: string }> = [
@@ -343,14 +446,14 @@ function App({ ctx }: { ctx: Ctx }) {
     : data.commerce.subscription ? [data.commerce.subscription] : [];
   const recentOrders = data.commerce.orders.slice(0, 3);
   return <main className="nm-app">
-    {tab === 'home' ? <header className="nm-home-header"><div><h1>マイページ</h1><span>然 -NEN-</span></div><p>{data.owner.displayName || 'お客様'}さん</p></header> : <header className="nm-page-header"><span>NEN MEMBERS</span><h1>{tabLabel}</h1></header>}
+    {tab === 'home' ? <header className="nm-home-header"><div><h1>マイページ</h1><span>然 -NEN-</span></div><p>{data.owner.displayName || 'お客様'}さん</p></header> : tab === 'pets' ? <header className="nm-home-header"><div><h1>マイペット</h1><span>然 -NEN-</span></div><p>{data.owner.displayName || 'お客様'}さん</p></header> : <header className="nm-page-header"><span>NEN MEMBERS</span><h1>{tabLabel}</h1></header>}
     {tab === 'home' && <section className="nm-stack nm-home-stack">
       <MembershipSheet membership={membership} ownerName={data.owner.displayName || 'お客様'} />
       <div className="nm-card nm-lifetime"><div className="nm-lifetime-row"><span>ライフタイム</span><b>{yen(membership.lifetimeMilesYen)}</b></div><p className="nm-sub">{membership.nextMilestone ? `これまでの累計。あと ${yen(membership.nextMilestone.remainingYen)} で「${membership.nextMilestone.title}」。節目で限定グッズをご用意します` : 'これまでの累計。節目で限定グッズをご用意します'}</p></div>
-      <div className="nm-card nm-home-pets"><div className="nm-heading-row"><h2>マイペット</h2><button type="button" className="nm-link" onClick={() => { setTab('pets'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>すべて見る</button></div>{data.pets.length ? data.pets.map(p => <button type="button" className="nm-home-pet-row" onClick={() => { setTab('pets'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} key={p.id}><span className="nm-pet-avatar-frame nm-pet-avatar-small">{p.imageUrl ? <img src={p.imageUrl} alt="" /> : <TabIcon tab="pets" />}</span><span className="nm-pet-text"><b>{p.name}ちゃん</b><span>{[p.animalType === 'cat' ? '猫' : '犬', petAge(p.birthday), p.weightKg ? `${p.weightKg}kg` : ''].filter(Boolean).join('・')}</span><strong>今日の目安 {p.recommendedDailyMinGrams === p.recommendedDailyMaxGrams ? p.recommendedDailyMinGrams : `${p.recommendedDailyMinGrams}〜${p.recommendedDailyMaxGrams}`}g／日（然 鹿肉ごはん）</strong></span><i aria-hidden="true">›</i></button>) : <p className="nm-empty-text">まだ登録がありません。</p>}<p className="nm-note">目安は体重と年齢から計算した参考値です。獣医師の判断に代わるものではありません。</p></div>
+      <div className="nm-card nm-home-pets"><div className="nm-heading-row"><h2>マイペット</h2><button type="button" className="nm-link" onClick={() => { setTab('pets'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>すべて見る</button></div>{data.pets.length ? data.pets.map(p => <button type="button" className="nm-home-pet-row" onClick={() => { setTab('pets'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} key={p.id}><span className="nm-pet-avatar-frame nm-pet-avatar-small">{p.imageUrl ? <img src={p.imageUrl} alt="" /> : <TabIcon tab="pets" />}</span><span className="nm-pet-text"><b>{p.name}ちゃん</b><span>{[p.animalType === 'cat' ? '猫' : '犬', petAge(p.birthday), p.weightKg ? `${p.weightKg}kg` : ''].filter(Boolean).join('・')}</span><strong>今日の目安 {feedingSummary(p)}{p.feeding?.product ? `（${p.feeding.product.name}）` : p.feeding ? '（主食の登録後にグラム表示）' : '（然の主食）'}</strong></span><i aria-hidden="true">›</i></button>) : <p className="nm-empty-text">まだ登録がありません。</p>}<p className="nm-note">目安は体重・年齢・避妊去勢・運動量から公的な指針（NRC／FEDIAF）の式で計算した参考値です。獣医師の判断に代わるものではありません。</p></div>
       <div className="nm-card nm-home-orders"><div className="nm-heading-row"><h2>最近の注文</h2><button type="button" className="nm-link" onClick={() => { setTab('orders'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>注文・定期を見る</button></div>{recentOrders.length ? <ul className="nm-order-lines">{recentOrders.map((order, index) => <li key={order.id || order.number || index}><span>{displayDate(order.date || order.orderDate).replace(/^\d{4}\//, '')}</span><em>{order.items?.map(item => item.name).filter(Boolean).slice(0, 2).join('、') || `注文 ${order.number || ''}`}</em><b>{typeof order.total === 'number' ? yen(order.total) : ''}</b></li>)}</ul> : <p className="nm-empty-text">まだ注文がありません。</p>}</div>
     </section>}
-    {tab === 'pets' && <PetsView ctx={ctx} pets={data.pets} onChanged={() => void load()} />}
+    {tab === 'pets' && <PetsView ctx={ctx} pets={data.pets} products={data.feedingProducts || []} onChanged={() => void load()} onHealth={() => { setTab('health'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} />}
     {tab === 'health' && <HealthDiary ctx={ctx} pets={data.pets} />}
     {tab === 'orders' && <div className="nm-stack nm-orders-page"><section className="nm-card"><div className="nm-section-heading"><span>SUBSCRIPTION</span><h2>定期便の契約状況</h2></div>{subscriptions.length ? subscriptions.map((subscription: any, contractIndex: number) => <article className="nm-subscription-view" key={subscription.id || subscription.contract_number || contractIndex}><div><span>現在の状況</span><b>{subscription.status || '契約中'}</b></div><div><span>次回お届け</span><b>{displayDate(subscription.nextShippingDate || subscription.next_shipping_date) || '確認中'}</b></div><div><span>お届け周期</span><b>{subscription.cycle || '—'}</b></div>{Array.isArray(subscription.items) && subscription.items.length > 0 && <ul>{subscription.items.map((item: OrderItem, index: number) => <li key={`${item.name}-${index}`}><span>{item.name || '商品'}</span><b>× {item.quantity || 1}</b></li>)}</ul>}<p>変更・スキップ・解約のお手続きはこの画面では行いません。</p></article>) : <p className="nm-empty-text">契約中の定期便はありません。</p>}</section><section className="nm-card"><div className="nm-section-heading"><span>ORDER HISTORY</span><h2>通常購入の履歴</h2></div>{data.commerce.orders.length ? data.commerce.orders.map((order, index) => <article className="nm-order" key={order.id || index}><div className="nm-order-head"><div><b>注文番号 {order.number || index + 1}</b><time>{displayDate(order.date || order.orderDate)}</time></div><strong>¥{Number(order.total || 0).toLocaleString()}</strong></div>{Array.isArray(order.items) && order.items.length > 0 ? <div className="nm-order-items">{order.items.map((item, itemIndex) => { const productUrl = item.product_url || item.productUrl; return <div key={`${item.name}-${itemIndex}`}><span>{item.name || '商品'} <small>× {item.quantity || 1}</small></span>{productUrl && <a href={productUrl} target="_blank" rel="noreferrer">もう一度購入</a>}</div>; })}</div> : <p className="nm-order-no-item">商品情報を確認中です。</p>}{order.detailUrl && <a className="nm-order-detail" href={order.detailUrl} target="_blank" rel="noreferrer">注文内容を見る</a>}</article>) : <p className="nm-empty-text">通常購入の履歴はまだありません。</p>}</section></div>}
     {tab === 'photos' && <div className="nm-stack nm-photo-page"><PhotoCampaign photos={data.photos} sitePhotos={sitePhotos} stats={data.photoStats} /><PhotoForm ctx={ctx} pets={data.pets} onDone={() => void load()} />{data.photos.length > 0 && <section className="nm-adopted-gallery"><div className="nm-list-heading"><span>NEN FAMILY GALLERY</span><h2>みんなの採用写真</h2></div><div className="nm-gallery">{data.photos.map(p => <figure key={p.id}><img src={p.imageUrl} alt={`${p.petName || 'ペット'}ちゃん`} /><figcaption><b>{p.petName || 'ペット'}ちゃん</b>{p.caption && <small>{p.caption}</small>}<span>公式サイト掲載中</span></figcaption></figure>)}</div></section>}</div>}
