@@ -201,6 +201,41 @@ const spec = {
           createdAt: { type: 'string', format: 'date-time' },
         },
       },
+      ReminderRegistrant: {
+        type: 'object',
+        required: [
+          'id', 'friendId', 'friendName', 'targetDate', 'status', 'reminderVersionId',
+          'sourceKind', 'createdAt', 'updatedAt', 'cancelledAt', 'lockVersion',
+        ],
+        properties: {
+          id: { type: 'string' },
+          friendId: { type: 'string' },
+          friendName: { type: ['string', 'null'] },
+          targetDate: { type: 'string', format: 'date-time' },
+          status: { type: 'string', enum: ['active', 'completed', 'cancelled'] },
+          reminderVersionId: { type: ['string', 'null'] },
+          sourceKind: { type: 'string' },
+          createdAt: { type: 'string', format: 'date-time' },
+          updatedAt: { type: 'string', format: 'date-time' },
+          cancelledAt: { type: ['string', 'null'], format: 'date-time' },
+          lockVersion: { type: 'integer', minimum: 0 },
+        },
+      },
+      ReminderRegistrantMutation: {
+        type: 'object',
+        required: [
+          'id', 'friendId', 'targetDate', 'status', 'reminderVersionId', 'lockVersion', 'replayed',
+        ],
+        properties: {
+          id: { type: 'string' },
+          friendId: { type: 'string' },
+          targetDate: { type: 'string', format: 'date-time' },
+          status: { type: 'string', enum: ['active', 'completed', 'cancelled'] },
+          reminderVersionId: { type: ['string', 'null'] },
+          lockVersion: { type: 'integer', minimum: 0 },
+          replayed: { type: 'boolean' },
+        },
+      },
       Broadcast: {
         type: 'object',
         properties: {
@@ -951,6 +986,124 @@ const spec = {
         tags: ['Reminders'], summary: 'LINEアカウント範囲内のリマインダ一覧を取得',
         parameters: [{ name: 'lineAccountId', in: 'query', schema: { type: 'string' } }],
         responses: { '200': { description: 'Visible reminders' }, '403': { description: 'Staff role required' }, '404': { description: 'LINE account not found in account scope' } },
+      },
+    },
+    '/api/reminders/{id}/registrants': {
+      get: {
+        tags: ['Reminders'], summary: 'リマインダの登録者を基準日順で取得',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: {
+          '200': {
+            description: 'Visible reminder registrants',
+            content: { 'application/json': { schema: {
+              type: 'object', required: ['success', 'data'],
+              properties: {
+                success: { type: 'boolean', const: true },
+                data: { type: 'array', items: { $ref: '#/components/schemas/ReminderRegistrant' } },
+              },
+            } } },
+          },
+          '401': { description: 'Bearer authentication required' },
+          '403': { description: 'Owner, admin, or reminders staff permission required' },
+          '404': { description: 'Reminder not found in account scope' },
+          '500': { description: 'Failed to read reminder registrants' },
+        },
+      },
+    },
+    '/api/reminders/{id}/registrants/{enrollmentId}': {
+      patch: {
+        tags: ['Reminders'], summary: '登録者の基準日を変更し、旧未送信予定を取り消す',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'enrollmentId', in: 'path', required: true, schema: { type: 'string' } },
+        ],
+        requestBody: { required: true, content: { 'application/json': { schema: {
+          type: 'object', required: ['targetDate', 'expectedLockVersion'],
+          properties: {
+            targetDate: { type: 'string', format: 'date-time' },
+            expectedLockVersion: { type: 'integer', minimum: 0 },
+          },
+        } } } },
+        responses: {
+          '200': {
+            description: 'Registrant target date updated or an identical retry replayed',
+            content: { 'application/json': { schema: {
+              type: 'object', required: ['success', 'data'],
+              properties: {
+                success: { type: 'boolean', const: true },
+                data: { $ref: '#/components/schemas/ReminderRegistrantMutation' },
+              },
+            } } },
+          },
+          '400': { description: 'Invalid targetDate or expectedLockVersion' },
+          '401': { description: 'Bearer authentication required' },
+          '403': { description: 'Owner, admin, or reminders staff permission required' },
+          '404': { description: 'Reminder or registrant not found in account scope' },
+          '409': { description: 'Registrant lock version conflict' },
+          '500': { description: 'Failed to update reminder registrant' },
+        },
+      },
+    },
+    '/api/reminders/{id}/registrants/{enrollmentId}/cancel': {
+      post: {
+        tags: ['Reminders'], summary: '登録者を取り消し、未送信予定だけを止める',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'enrollmentId', in: 'path', required: true, schema: { type: 'string' } },
+        ],
+        requestBody: { required: true, content: { 'application/json': { schema: {
+          type: 'object', required: ['expectedLockVersion'],
+          properties: { expectedLockVersion: { type: 'integer', minimum: 0 } },
+        } } } },
+        responses: {
+          '200': {
+            description: 'Registrant cancelled or an identical retry replayed',
+            content: { 'application/json': { schema: {
+              type: 'object', required: ['success', 'data'],
+              properties: {
+                success: { type: 'boolean', const: true },
+                data: { $ref: '#/components/schemas/ReminderRegistrantMutation' },
+              },
+            } } },
+          },
+          '400': { description: 'Invalid expectedLockVersion' },
+          '401': { description: 'Bearer authentication required' },
+          '403': { description: 'Owner, admin, or reminders staff permission required' },
+          '404': { description: 'Reminder or registrant not found in account scope' },
+          '409': { description: 'Registrant lock version conflict' },
+          '500': { description: 'Failed to cancel reminder registrant' },
+        },
+      },
+    },
+    '/api/reminders/{id}/registrants/{enrollmentId}/resume': {
+      post: {
+        tags: ['Reminders'], summary: '取消済み登録者を再開し、未送信予定を再計算対象へ戻す',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'enrollmentId', in: 'path', required: true, schema: { type: 'string' } },
+        ],
+        requestBody: { required: true, content: { 'application/json': { schema: {
+          type: 'object', required: ['expectedLockVersion'],
+          properties: { expectedLockVersion: { type: 'integer', minimum: 0 } },
+        } } } },
+        responses: {
+          '200': {
+            description: 'Registrant resumed or an identical retry replayed',
+            content: { 'application/json': { schema: {
+              type: 'object', required: ['success', 'data'],
+              properties: {
+                success: { type: 'boolean', const: true },
+                data: { $ref: '#/components/schemas/ReminderRegistrantMutation' },
+              },
+            } } },
+          },
+          '400': { description: 'Invalid expectedLockVersion' },
+          '401': { description: 'Bearer authentication required' },
+          '403': { description: 'Owner, admin, or reminders staff permission required' },
+          '404': { description: 'Reminder or registrant not found in account scope' },
+          '409': { description: 'Registrant lock version conflict' },
+          '500': { description: 'Failed to resume reminder registrant' },
+        },
       },
     },
     '/api/reminders/{id}/steps/{stepId}': {

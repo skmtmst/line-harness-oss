@@ -141,6 +141,10 @@ export default function NewCommonVarPage() {
   const [type, setType] = useState('text')
   const [value, setValue] = useState('')
   const [memo, setMemo] = useState('')
+  const [validFrom, setValidFrom] = useState('')
+  const [validUntil, setValidUntil] = useState('')
+  const [expiryBehavior, setExpiryBehavior] = useState<'stop' | 'fallback'>('stop')
+  const [fallbackValue, setFallbackValue] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [secretWarningFields, setSecretWarningFields] = useState<string[] | null>(null)
@@ -175,6 +179,10 @@ export default function NewCommonVarPage() {
     setType('text')
     setValue('')
     setMemo('')
+    setValidFrom('')
+    setValidUntil('')
+    setExpiryBehavior('stop')
+    setFallbackValue('')
     setSecretWarningFields(null)
     setSaving(false)
     setError(hadDraft ? 'LINEアカウントが切り替わったため、入力をやり直してください' : '')
@@ -209,6 +217,14 @@ export default function NewCommonVarPage() {
       setError('差し込み名を入力してください')
       return
     }
+    if (validFrom && validUntil && validFrom >= validUntil) {
+      setError('有効終了は有効開始より後にしてください')
+      return
+    }
+    if (expiryBehavior === 'fallback' && !fallbackValue) {
+      setError('期限切れ時に使う代替値を入力してください')
+      return
+    }
     const sensitiveFields = sensitiveFieldLabels(value, memo)
     if (sensitiveFields.length > 0 && !allowSensitive) {
       setSecretWarningFields(sensitiveFields)
@@ -227,6 +243,10 @@ export default function NewCommonVarPage() {
         value,
         memo,
         folderId: folderId || null,
+        validFrom: validFrom || null,
+        validUntil: validUntil || null,
+        expiryBehavior,
+        fallbackValue: expiryBehavior === 'fallback' ? fallbackValue : null,
       }
       const res = await api.commonVars.create(payload)
       if (accountAtRequest !== latestAccountRef.current) return
@@ -306,6 +326,31 @@ export default function NewCommonVarPage() {
             />
           </div>
         </div>
+
+        <fieldset className="border-hairline rounded-card max-w-xl space-y-4 border p-4">
+          <legend className="text-ink-secondary px-1 text-sm font-medium">配信で使える期間</legend>
+          <p className="text-ink-faint text-xs">予約配信は送信を始める時刻で判定します。空欄なら期間を制限しません。</p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label htmlFor="cv-valid-from" className="text-ink-secondary mb-1 block text-xs font-medium">有効開始</label>
+              <input id="cv-valid-from" type="datetime-local" value={validFrom} onChange={(e) => setValidFrom(e.target.value)} className="border-hairline rounded-control w-full border px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label htmlFor="cv-valid-until" className="text-ink-secondary mb-1 block text-xs font-medium">有効終了</label>
+              <input id="cv-valid-until" type="datetime-local" value={validUntil} onChange={(e) => setValidUntil(e.target.value)} className="border-hairline rounded-control w-full border px-3 py-2 text-sm" />
+            </div>
+          </div>
+          <div>
+            <label htmlFor="cv-expiry-behavior" className="text-ink-secondary mb-1 block text-xs font-medium">期間外の動作</label>
+            <SelectField id="cv-expiry-behavior" value={expiryBehavior} onChange={(e) => setExpiryBehavior(e.target.value as 'stop' | 'fallback')} options={[{ value: 'stop', label: '配信を止める' }, { value: 'fallback', label: '代替値を使う' }]} className="w-full" />
+          </div>
+          {expiryBehavior === 'fallback' && (
+            <div>
+              <label htmlFor="cv-fallback-value" className="text-ink-secondary mb-1 block text-xs font-medium">代替値</label>
+              <input id="cv-fallback-value" type={type === 'number' ? 'number' : 'text'} value={fallbackValue} onChange={(e) => setFallbackValue(e.target.value)} className="border-hairline rounded-control w-full border px-3 py-2 text-sm" />
+            </div>
+          )}
+        </fieldset>
 
         <div>
           <label htmlFor="cv-key" className="text-ink-secondary mb-1 block text-sm font-medium">

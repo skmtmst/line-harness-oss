@@ -1400,7 +1400,8 @@ CREATE TABLE "broadcasts" (
   CHECK (draft_payload_json IS NULL OR json_valid(draft_payload_json)), message_options_json TEXT
   CHECK (message_options_json IS NULL OR json_valid(message_options_json)), after_action_version_id TEXT
   REFERENCES common_action_versions(id) ON DELETE RESTRICT, lock_version INTEGER NOT NULL DEFAULT 1
-  CHECK (lock_version > 0), stopped_at TEXT, stopped_by TEXT, send_attempt_no INTEGER NOT NULL DEFAULT 1);
+  CHECK (lock_version > 0), stopped_at TEXT, stopped_by TEXT, send_attempt_no INTEGER NOT NULL DEFAULT 1, common_var_snapshot TEXT
+  CHECK (common_var_snapshot IS NULL OR json_valid(common_var_snapshot)), common_var_snapshot_at TEXT);
 
 CREATE TABLE calendar_bookings (
   id             TEXT PRIMARY KEY,
@@ -1530,6 +1531,18 @@ CREATE TABLE common_actions (
 
 CREATE TABLE "common_var_replacement_runs" (id TEXT PRIMARY KEY, line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE, source_common_var_id TEXT NOT NULL REFERENCES "common_vars"(id), replacement_common_var_id TEXT NOT NULL REFERENCES "common_vars"(id), source_version INTEGER NOT NULL, expected_usage_count INTEGER NOT NULL, replaced_usage_count INTEGER NOT NULL, actor_id TEXT, status TEXT NOT NULL CHECK (status IN ('completed', 'partial')), created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours')));
 
+CREATE TABLE common_var_resolution_failures (
+  id              TEXT PRIMARY KEY,
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  source_kind     TEXT NOT NULL CHECK (source_kind IN ('broadcast')),
+  source_id       TEXT NOT NULL,
+  var_key         TEXT NOT NULL,
+  reason          TEXT NOT NULL CHECK (reason IN ('missing', 'not_started', 'expired', 'fallback_missing', 'invalid_window')),
+  execution_at    TEXT NOT NULL,
+  created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours')),
+  UNIQUE(source_kind, source_id, var_key, execution_at)
+);
+
 CREATE TABLE "common_var_schedules" (id TEXT PRIMARY KEY, var_id TEXT NOT NULL REFERENCES "common_vars"(id) ON DELETE CASCADE, effective_from TEXT NOT NULL, value TEXT NOT NULL, applied_at TEXT);
 
 CREATE TABLE "common_var_versions" (id TEXT PRIMARY KEY, common_var_id TEXT NOT NULL REFERENCES "common_vars"(id) ON DELETE CASCADE, version_no INTEGER NOT NULL, name TEXT NOT NULL, value TEXT NOT NULL, memo TEXT NOT NULL DEFAULT '', change_reason TEXT NOT NULL, actor_id TEXT, created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours')), UNIQUE(common_var_id, version_no));
@@ -1545,7 +1558,8 @@ CREATE TABLE "common_vars" (
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours')),
   line_account_id TEXT REFERENCES line_accounts(id) ON DELETE CASCADE,
   memo TEXT NOT NULL DEFAULT '', version INTEGER NOT NULL DEFAULT 1,
-  updated_by TEXT, archived_at TEXT, replacement_run_id TEXT,
+  updated_by TEXT, archived_at TEXT, replacement_run_id TEXT, valid_from TEXT, valid_until TEXT, fallback_value TEXT, expiry_behavior TEXT NOT NULL DEFAULT 'stop'
+  CHECK (expiry_behavior IN ('stop', 'fallback')),
   UNIQUE(line_account_id, var_key)
 );
 
@@ -6251,6 +6265,9 @@ CREATE INDEX idx_common_actions_account_status
   ON common_actions(line_account_id, status, updated_at DESC);
 
 CREATE INDEX idx_common_var_replacement_runs_v403_source ON common_var_replacement_runs(source_common_var_id, created_at DESC);
+
+CREATE INDEX idx_common_var_resolution_failures_source
+  ON common_var_resolution_failures(source_kind, source_id, created_at DESC);
 
 CREATE INDEX idx_common_var_schedules_v403_pending ON common_var_schedules(var_id, effective_from) WHERE applied_at IS NULL;
 

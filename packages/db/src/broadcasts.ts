@@ -43,6 +43,10 @@ export interface Broadcast {
   track_links: number;
   /** 何分かけて配るか。0なら一気に送る。 */
   stealth_spread_minutes?: number;
+  /** 初回実行時に固定した、account別の共通情報値・版。 */
+  common_var_snapshot?: string | null;
+  /** Worker再試行でも変えない共通情報の判定時刻。 */
+  common_var_snapshot_at?: string | null;
   /** SegmentConditionのJSON。segment配信だけが持つ。 */
   segment_conditions?: string | null;
   folder_id?: string | null;
@@ -261,7 +265,10 @@ export type UpdateBroadcastInput = Partial<
     | 'message_options_json'
     | 'after_action_version_id'
   >
->;
+> & {
+  /** 運用者がsnapshotの意味を変える編集・再予約をしたときだけtrue。 */
+  resetCommonVarSnapshot?: boolean;
+};
 
 // #772: 版を必須にし、版なし迂回を残さない。呼び元は PUT 経路だけ。
 export async function updateBroadcast(
@@ -347,6 +354,11 @@ export async function updateBroadcast(
   }
 
   if (fields.length > 0) {
+    if (updates.resetCommonVarSnapshot) {
+      // 新しい試行だけ判定時刻・値を同じCAS更新内で捨てる。provider失敗後に
+      // 日時だけ入れ直す同一試行はfalseとして、固定済みsnapshotを維持する。
+      fields.push('common_var_snapshot = NULL', 'common_var_snapshot_at = NULL');
+    }
     fields.push('lock_version = lock_version + 1');
     const result = await db
       .prepare(`UPDATE broadcasts SET ${fields.join(', ')} WHERE id = ? AND lock_version = ?`)

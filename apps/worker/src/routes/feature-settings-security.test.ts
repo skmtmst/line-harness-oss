@@ -233,6 +233,104 @@ describe('feature settings scope and versioning', () => {
         success: false,
         error: '知らない機能です: not_in_feature_catalog',
       });
+
+      for (const removed of [
+        'reservation_ledger',
+        'multi_store_bulk_updates',
+        'external_reservations',
+        'google_business_profile',
+      ]) {
+        const response = await app().request('/api/settings/features?account_id=account-1', {
+          method: 'PUT',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ expectedVersion: 0, features: { [removed]: true } }),
+        }, { DB: testDb.db, RESTAURANT_TEST_ENABLED: 'true' });
+        expect(response.status).toBe(400);
+        expect(await response.json()).toMatchObject({
+          success: false,
+          error: `知らない機能です: ${removed}`,
+        });
+      }
+    } finally {
+      testDb.raw.close();
+    }
+  });
+
+  it('旧保存値の幽霊キーを応答へ戻さず、bookingの保存値だけを維持する', async () => {
+    const testDb = createTestD1();
+    try {
+      testDb.raw.prepare(`
+        INSERT INTO account_settings (id, line_account_id, key, value)
+        VALUES
+          ('legacy-reservation-ledger', 'account-1', 'feature.reservation_ledger', '{"enabled":true}'),
+          ('legacy-bulk', 'account-1', 'feature.multi_store_bulk_updates', '{"enabled":true}'),
+          ('legacy-external', 'account-1', 'feature.external_reservations', '{"enabled":true}'),
+          ('legacy-google', 'account-1', 'feature.google_business_profile', '{"enabled":true}'),
+          ('legacy-booking', 'account-1', 'feature.booking', '{"enabled":false}')
+      `).run();
+
+      const loaded = await app().request(
+        '/api/settings/features?account_id=account-1',
+        {},
+        { DB: testDb.db, RESTAURANT_TEST_ENABLED: 'true' },
+      );
+      expect(loaded.status).toBe(200);
+      const body = await loaded.json() as {
+        data: { features: Record<string, boolean>; featureStates: Record<string, unknown> };
+      };
+      expect(body.data.features.booking).toBe(false);
+      expect(body.data.featureStates.booking).toMatchObject({
+        featureId: 'booking',
+        companyEnabled: false,
+        reason: 'company_disabled',
+      });
+      for (const removed of [
+        'reservation_ledger',
+        'multi_store_bulk_updates',
+        'external_reservations',
+        'google_business_profile',
+      ]) {
+        expect(body.data.features).not.toHaveProperty(removed);
+        expect(body.data.featureStates).not.toHaveProperty(removed);
+      }
+
+      testDb.raw.prepare(`
+        INSERT INTO account_settings (id, line_account_id, key, value)
+        VALUES ('old-bundle', 'account-1', 'feature.settings_bundle_v1', ?)
+      `).run(JSON.stringify({
+        version: 7,
+        data: {
+          features: {
+            booking: true,
+            reservation_ledger: true,
+            multi_store_bulk_updates: true,
+            external_reservations: true,
+            google_business_profile: true,
+          },
+          sidebarOrder: null,
+          sidebarItemOrder: null,
+        },
+      }));
+      const bundled = await app().request(
+        '/api/settings/features?account_id=account-1',
+        {},
+        { DB: testDb.db, RESTAURANT_TEST_ENABLED: 'true' },
+      );
+      expect(bundled.status).toBe(200);
+      const bundledBody = await bundled.json() as {
+        data: { version: number; features: Record<string, boolean>; featureStates: Record<string, unknown> };
+      };
+      expect(bundledBody.data.version).toBe(7);
+      expect(bundledBody.data.features.booking).toBe(true);
+      for (const removed of [
+        'reservation_ledger',
+        'multi_store_bulk_updates',
+        'external_reservations',
+        'google_business_profile',
+      ]) {
+        expect(bundledBody.data.features).not.toHaveProperty(removed);
+        expect(bundledBody.data.featureStates).not.toHaveProperty(removed);
+      }
     } finally {
       testDb.raw.close();
     }

@@ -41,6 +41,10 @@ import {
   unsupportedMessageVariables,
   varyTextMessages,
 } from './broadcast-message-set.js';
+import {
+  commonVarValuesForAccount,
+  prepareBroadcastCommonVarSnapshot,
+} from './common-var-snapshot.js';
 
 // LINE の multicast は 1 リクエストで最大 500 人まで宛先に取れる（LINE の仕様）。
 // これ以上に増やすことはできない。
@@ -85,6 +89,7 @@ async function broadcastWideContext(
   db: D1Database,
   accountId: string | null,
   content: string,
+  fixedVars?: Record<string, string>,
 ): Promise<BroadcastRenderContext> {
   const context: BroadcastRenderContext = { deliveredAt: new Date() };
   if (accountId) {
@@ -94,8 +99,11 @@ async function broadcastWideContext(
   }
   // 共通情報は本文で使っているときだけ引く。使わない配信で毎回1クエリ増やさない。
   if (/\{\{\s*var\./.test(content)) {
-    const { getCommonVarMap } = await import('@line-crm/db');
-    context.vars = await getCommonVarMap(db, accountId);
+    if (fixedVars) context.vars = fixedVars;
+    else {
+      const { getCommonVarMap } = await import('@line-crm/db');
+      context.vars = await getCommonVarMap(db, accountId);
+    }
   }
   return context;
 }
@@ -120,6 +128,11 @@ export async function processBroadcastSend(
     messageBubblesJson: broadcast.message_bubbles_json,
     altText: broadcast.alt_text,
   });
+  const commonVarSnapshot = await prepareBroadcastCommonVarSnapshot(
+    db,
+    broadcast,
+    combinedMessageContent(storedParts),
+  );
 
   const unsupportedVariables = unsupportedMessageVariables(storedParts);
   if (unsupportedVariables.length > 0) {
@@ -260,7 +273,12 @@ export async function processBroadcastSend(
    * queue に委譲済みで到達しない。dedup の置換は dedup-broadcast.ts 側で
    * per-account に行う)。
    */
-  const wideContext = await broadcastWideContext(db, broadcastAccountId, combinedMessageContent(finalParts));
+  const wideContext = await broadcastWideContext(
+    db,
+    broadcastAccountId,
+    combinedMessageContent(finalParts),
+    commonVarValuesForAccount(commonVarSnapshot, broadcastAccountId),
+  );
   finalParts = renderMessageParts(finalParts, wideContext);
   assertMessagePartsResolved(finalParts);
   const messages = buildMessages(finalParts);
@@ -667,6 +685,11 @@ async function processQueuedBroadcastBatches(
     messageBubblesJson: broadcast.message_bubbles_json,
     altText: broadcast.alt_text,
   });
+  const commonVarSnapshot = await prepareBroadcastCommonVarSnapshot(
+    db,
+    broadcast,
+    combinedMessageContent(storedParts),
+  );
 
   // 排他ロック: batch_offset を -1 に設定して他のCronが拾わないようにする
   // WHERE batch_offset = ? で楽観ロック（既に他が処理中なら更新0行→スキップ）
@@ -718,7 +741,12 @@ async function processQueuedBroadcastBatches(
   // single account 経路のみ; multi は dedup 側で per-account に置換する。
   const queuedAccountId = raw.line_account_id as string | null;
   if (broadcast.target_type !== 'multi-account-dedup') {
-    const wide = await broadcastWideContext(db, queuedAccountId, combinedMessageContent(finalParts));
+    const wide = await broadcastWideContext(
+      db,
+      queuedAccountId,
+      combinedMessageContent(finalParts),
+      commonVarValuesForAccount(commonVarSnapshot, queuedAccountId),
+    );
     finalParts = renderMessageParts(finalParts, wide);
   }
   const messages = buildMessages(finalParts);
@@ -730,7 +758,11 @@ async function processQueuedBroadcastBatches(
   // 落ちる)。
   if (broadcast.target_type === 'multi-account-dedup') {
     const { processMultiAccountDedupBroadcast } = await import('./dedup-broadcast.js');
-    const broadcastForDedup = { ...broadcast, messageParts: finalParts };
+    const broadcastForDedup = {
+      ...broadcast,
+      messageParts: finalParts,
+      common_var_snapshot: commonVarSnapshot ? JSON.stringify(commonVarSnapshot) : null,
+    };
     const result = await processMultiAccountDedupBroadcast(db, broadcastForDedup);
     if (!result.complete) {
       // 時間バジェットに達して途中で yield した。status='sending' のまま batch_offset を

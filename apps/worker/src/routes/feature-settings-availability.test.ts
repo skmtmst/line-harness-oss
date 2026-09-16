@@ -109,43 +109,33 @@ describe('GET /api/settings/features availability', () => {
     }
   });
 
-  it('依存先offで子だけ実効offになり、復帰しても子の会社設定を失わない', async () => {
+  it('予約台帳はbookingの会社設定だけで停止する', async () => {
     const testDb = fixture();
     try {
-      setLegacy(testDb, 'multi_store_bulk_updates', true);
-      setLegacy(testDb, 'multi_store_hierarchy', false);
-
-      const disabled = await load(testDb);
-      expect(disabled.data.featureStates.multi_store_bulk_updates).toMatchObject({
-        companyEnabled: true,
-        dependenciesEnabled: false,
-        effectiveEnabled: false,
-        reason: 'dependency_disabled',
-        disabledDependencies: ['multi_store_hierarchy'],
-      });
-
-      setLegacy(testDb, 'multi_store_hierarchy', true);
-      const recovered = await load(testDb);
-      expect(recovered.data.features.multi_store_bulk_updates).toBe(true);
-      expect(recovered.data.featureStates.multi_store_bulk_updates).toMatchObject({
-        companyEnabled: true,
+      setLegacy(testDb, 'reservation_ledger', true);
+      setLegacy(testDb, 'booking', false);
+      const body = await load(testDb);
+      expect(body.data.featureStates.booking).toMatchObject({
+        featureId: 'booking',
+        companyEnabled: false,
         dependenciesEnabled: true,
-        effectiveEnabled: true,
-        reason: null,
+        effectiveEnabled: false,
+        reason: 'company_disabled',
       });
+      expect(body.data.features).not.toHaveProperty('reservation_ledger');
+      expect(body.data.featureStates).not.toHaveProperty('reservation_ledger');
     } finally {
       testDb.raw.close();
     }
   });
 
-  it('契約・会社設定・依存が有効ならenabledを返す', async () => {
+  it('bookingが有効なら予約台帳の実効状態をenabledで返す', async () => {
     const testDb = fixture();
     try {
-      setLegacy(testDb, 'multi_store_hierarchy', true);
-      setLegacy(testDb, 'multi_store_bulk_updates', true);
+      setLegacy(testDb, 'booking', true);
       const body = await load(testDb);
-      expect(body.data.featureStates.multi_store_bulk_updates).toEqual({
-        featureId: 'multi_store_bulk_updates',
+      expect(body.data.featureStates.booking).toEqual({
+        featureId: 'booking',
         contractAvailable: true,
         companyEnabled: true,
         dependenciesEnabled: true,
