@@ -4,6 +4,8 @@ import {
   countActivePlatformAdmins,
   countImpersonationsSince,
   createPlatformAdmin,
+  createStaffMember,
+  getPlatformAdminRecord,
   endImpersonation,
   getActiveImpersonation,
   getPlatformAdminByStaffId,
@@ -17,13 +19,17 @@ import {
   startImpersonation,
   switchImpersonationToRead,
   switchImpersonationToWrite,
+  upsertPlatformAdminInvite,
   type PlatformAuditAction,
 } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { requirePlatformAdmin, requirePlatformAdminWrite } from '../middleware/platform-admin.js';
 import { toImpersonationContext } from '../middleware/impersonation.js';
-import { clientIp } from '../services/admin-session.js';
+import { clientIp, randomToken } from '../services/admin-session.js';
+import { sha256Hex } from '../middleware/auth.js';
+import { OPS_INVITE_TTL_MS, sendOpsInviteMail } from '../services/ops-invite-mail.js';
 import { dbFor } from '../services/db-router.js';
+import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 
 /**
  * 運営コンソール（★V6 37 マスター）の API。すべて運営マスターだけが呼べる。
@@ -62,6 +68,12 @@ function reasonFrom(body: unknown): string | null {
   return trimmed;
 }
 
+/** 招待メールに書く URL（★V6 37-10-A）。トークンは # の後ろに置き、サーバーのログに残さない。 */
+function opsInviteUrl(c: Context<Env>, token: string): string {
+  const base = (c.env.ADMIN_PUBLIC_URL ?? new URL(c.req.url).origin).replace(/\/+$/, '');
+  return `${base}/ops/invite#${new URLSearchParams({ invite: token }).toString()}`;
+}
+
 async function tenantById(c: Context<Env>, id: string) {
   return dbFor(c.env)
     .prepare(`SELECT id, name, status, feature_packs, plan_key, plan_status, trial_ends_at,
@@ -81,6 +93,8 @@ ops.get('/api/ops/me', async (c) => {
   const admin = await getPlatformAdminByStaffId(db, staff.id);
   const row = await getStaffById(db, staff.id);
   const session = await getActiveImpersonation(db, staff.id);
+  // 帯に「◯◯ として閲覧中」と出すため、契約先の名前も一緒に返す。
+  const impersonatedTenant = session ? await tenantById(c, session.tenant_id) : null;
   return c.json({
     success: true,
     data: {
@@ -92,7 +106,7 @@ ops.get('/api/ops/me', async (c) => {
       lineLinked: Boolean(row?.line_user_id),
       // platform_admins に無い＝互換判定で通っている。画面に注意を出す。
       legacy: !admin,
-      impersonation: session ? toImpersonationContext(session) : null,
+      impersonation: session ? { ...toImpersonationContext(session), tenantName: impersonatedTenant?.name ?? null } : null,
     },
   });
 });
@@ -379,13 +393,18 @@ ops.get('/api/ops/members', async (c) => {
       totpEnabled: Boolean(m.totp_enabled_at),
       lineLinked: Boolean(m.line_user_id),
       inviteStatus: m.invite_status,
+      // 招待の進み具合（★V6 37-10）: invited → awaiting_totp → active
+      activationState: m.activation_state,
+      invitedAt: m.invited_at,
       approvedBy: m.approved_by,
       lastLoginAt: m.last_login_at,
       createdAt: m.created_at,
     })),
     summary: {
-      members: members.filter((m) => m.is_active === 1).length,
-      totpEnabled: members.filter((m) => m.is_active === 1 && m.totp_enabled_at).length,
+      members: members.filter((m) => m.is_active === 1 && m.activation_state === 'active').length,
+      invited: members.filter((m) => m.is_active === 1 && m.activation_state === 'invited').length,
+      awaitingTotp: members.filter((m) => m.is_active === 1 && m.activation_state === 'awaiting_totp').length,
+      totpEnabled: members.filter((m) => m.is_active === 1 && m.activation_state === 'active' && m.totp_enabled_at).length,
       impersonationsThisMonth: monthly.total,
       writeImpersonationsThisMonth: monthly.write,
       piiRevealsThisMonth: monthly.piiReveals,
@@ -394,38 +413,121 @@ ops.get('/api/ops/members', async (c) => {
 });
 
 /**
- * 既存の staff_members を運営マスターに加える。
- * 自分自身は加えられない（ほかの運営メンバーの承認、要件 §3 37-10）。
+ * 運営メンバーを招待する（★V6 37-10）。メールで招待 → パスワード設定 → 2要素認証の
+ * 登録が終わって初めて運営マスターになる。
  *
- * 例外は最初の 1 人だけ。platform_admins が空の間は互換判定（既定の統括の
- * オーナー）で入っているので、その人が自分を登録して初期化する（要件 §6-2
- * 「登録 → 確認 → 旧判定を外す」）。1 人でも登録されたあとは通常どおり。
+ * - 新しいメール: 運営会社（既定の統括）の権限者として staff_members を作り、招待を送る
+ * - 既定の統括に同じメールの権限者がいる: その人に招待を送る（LINE だけで入っていた人など）
+ * - 別の統括にいるメール: メール招待では加えられない（Kenta / Kyohei は初期の特例で登録済み）
+ * - 自分自身は加えられない。例外は最初の 1 人だけ（platform_admins が空の間の互換判定で
+ *   入っている人が自分を登録して初期化する。要件 §6-2「登録 → 確認 → 旧判定を外す」）
  */
 ops.post('/api/ops/members', requirePlatformAdminWrite(), async (c) => {
   const staff = c.get('staff');
   const db = dbFor(c.env);
   const body = await c.req.json<{ staffId?: unknown; email?: unknown }>().catch(() => null);
-  let target = typeof body?.staffId === 'string' ? await getStaffById(db, body.staffId) : null;
-  if (!target && typeof body?.email === 'string' && body.email.trim()) {
-    target = await db
-      .prepare('SELECT * FROM staff_members WHERE lower(email) = lower(?) AND is_active = 1 LIMIT 1')
-      .bind(body.email.trim())
-      .first();
+  const email = typeof body?.email === 'string' ? body.email.trim().toLowerCase() : '';
+  const selfBootstrap = typeof body?.staffId === 'string' && body.staffId === staff.id;
+
+  // 最初の 1 人の自己登録（画面は自分のメールを入れる。staffId 指定でも同じ）
+  const selfRow = await getStaffById(db, staff.id);
+  const isSelfEmail = Boolean(email) && (selfRow?.email ?? '').toLowerCase() === email;
+  if (selfBootstrap || isSelfEmail) {
+    if ((await countActivePlatformAdmins(db)) > 0) {
+      return c.json({ success: false, error: '自分自身を運営メンバーに加えることはできません。ほかの運営メンバーに依頼してください' }, 400);
+    }
+    await createPlatformAdmin(db, { staffId: staff.id, approvedBy: null });
+    await recordPlatformAudit(db, {
+      staffId: staff.id, staffName: staff.name, action: 'member.invite',
+      detail: { targetStaffId: staff.id, targetName: staff.name, bootstrap: true }, ip: clientIp(c), visibleToTenant: false,
+    });
+    return c.json({ success: true, data: { staffId: staff.id, activationState: 'active' } }, 201);
   }
-  if (!target) return c.json({ success: false, error: '対象の権限者が見つかりません' }, 404);
-  if (target.id === staff.id && (await countActivePlatformAdmins(db)) > 0) {
-    return c.json({ success: false, error: '自分自身を運営メンバーに加えることはできません。ほかの運営メンバーに依頼してください' }, 400);
+
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return c.json({ success: false, error: '正しいメールアドレスを入力してください' }, 400);
   }
-  await createPlatformAdmin(db, { staffId: target.id, approvedBy: target.id === staff.id ? null : staff.id });
+
+  // 同じメールの権限者を探す（統括を問わず）。
+  const existing = await db
+    .prepare('SELECT * FROM staff_members WHERE lower(email) = lower(?) ORDER BY created_at ASC')
+    .bind(email)
+    .all<{ id: string; name: string; tenant_id: string | null; is_active: number }>();
+  const rows = existing.results ?? [];
+  const inDefault = rows.find((r) => (r.tenant_id ?? DEFAULT_TENANT_ID) === DEFAULT_TENANT_ID);
+  if (!inDefault && rows.length > 0) {
+    return c.json({ success: false, error: 'このメールアドレスは別の統括の権限者として登録されています。メールでの招待では加えられません' }, 409);
+  }
+
+  let targetId: string;
+  let targetName: string;
+  if (inDefault) {
+    const record = await getPlatformAdminRecord(db, inDefault.id);
+    if (record?.is_active === 1 && record.activation_state === 'active') {
+      return c.json({ success: false, error: 'このメールアドレスはすでに運営メンバーです' }, 409);
+    }
+    targetId = inDefault.id;
+    targetName = inDefault.name;
+  } else {
+    // 運営会社（既定の統括）の権限者として作る。名前とパスワードは本人が招待の画面で決める。
+    const created = await createStaffMember(db, {
+      name: email.split('@')[0] ?? email,
+      email,
+      role: 'staff',
+      access_level: 'full',
+      is_active: 0,
+      invite_status: 'pending_email',
+      tenant_id: DEFAULT_TENANT_ID,
+    });
+    targetId = created.id;
+    targetName = created.name;
+  }
+
+  const token = randomToken();
+  const expiresAt = new Date(Date.now() + OPS_INVITE_TTL_MS).toISOString();
+  await upsertPlatformAdminInvite(db, { staffId: targetId, invitedBy: staff.id, tokenHash: await sha256Hex(token), email, expiresAt });
+  try {
+    await sendOpsInviteMail(c.env, {
+      email,
+      inviterName: staff.name,
+      acceptUrl: opsInviteUrl(c, token),
+      existingAccount: Boolean(inDefault),
+    });
+  } catch (error) {
+    console.error('POST /api/ops/members invite mail error:', error);
+    return c.json({ success: false, error: '招待メールを送信できませんでした' }, 500);
+  }
   await recordPlatformAudit(db, {
-    staffId: staff.id,
-    staffName: staff.name,
-    action: 'member.invite',
-    detail: { targetStaffId: target.id, targetName: target.name },
-    ip: clientIp(c),
-    visibleToTenant: false,
+    staffId: staff.id, staffName: staff.name, action: 'member.invite',
+    detail: { targetStaffId: targetId, targetName, email }, ip: clientIp(c), visibleToTenant: false,
   });
-  return c.json({ success: true, data: { staffId: target.id } }, 201);
+  return c.json({ success: true, data: { staffId: targetId, activationState: 'invited' } }, 201);
+});
+
+/** 招待メールを送り直す（招待中・2要素認証待ちの人だけ）。 */
+ops.post('/api/ops/members/:staffId/resend-invite', requirePlatformAdminWrite(), async (c) => {
+  const staff = c.get('staff');
+  const db = dbFor(c.env);
+  const targetId = c.req.param('staffId');
+  const target = await getStaffById(db, targetId);
+  const record = await getPlatformAdminRecord(db, targetId);
+  if (!target?.email || !record || record.is_active !== 1) return c.json({ success: false, error: '対象の招待が見つかりません' }, 404);
+  if (record.activation_state === 'active') return c.json({ success: false, error: 'この人は登録が完了しています' }, 400);
+  const token = randomToken();
+  const expiresAt = new Date(Date.now() + OPS_INVITE_TTL_MS).toISOString();
+  await upsertPlatformAdminInvite(db, { staffId: targetId, invitedBy: staff.id, tokenHash: await sha256Hex(token), email: target.email, expiresAt });
+  try {
+    await sendOpsInviteMail(c.env, {
+      email: target.email,
+      inviterName: staff.name,
+      acceptUrl: opsInviteUrl(c, token),
+      existingAccount: Boolean(target.password_hash),
+    });
+  } catch (error) {
+    console.error('POST /api/ops/members/:staffId/resend-invite mail error:', error);
+    return c.json({ success: false, error: '招待メールを送信できませんでした' }, 500);
+  }
+  return c.json({ success: true, data: { staffId: targetId, activationState: 'invited' } });
 });
 
 ops.patch('/api/ops/members/:staffId', requirePlatformAdminWrite(), async (c) => {

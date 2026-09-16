@@ -7,7 +7,8 @@ import { AUTH_SELECTION_CLEARED_KEY } from './hq-navigation'
  * サーバーのセッションを消し、手元に残した名前・権限・CSRF も消してから
  * ログイン画面へ移る。通信に失敗しても手元の後始末は必ず行う。
  */
-export async function logoutAndGoToLogin(): Promise<void> {
+/** `loginPath` は行き先。運営コンソール（★V6 37）からは '/ops/login' を渡す。 */
+export async function logoutAndGoToLogin(loginPath: string = '/login'): Promise<void> {
   try {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL
     if (apiUrl) {
@@ -31,5 +32,5 @@ export async function logoutAndGoToLogin(): Promise<void> {
     // ストレージが使えなくても、行き先だけは変える
   }
   clearAdminSession()
-  window.location.href = '/login'
+  window.location.href = loginPath
 }

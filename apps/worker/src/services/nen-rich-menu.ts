@@ -23,7 +23,7 @@ export async function installNenRichMenu(env: RichMenuEnv, accountId: string) {
     { x: 1667, width: 833 },
   ];
   const tabs = ['home', 'pets', 'health', 'orders', 'photos'];
-  const labels = ['ホーム', 'マイペット', '健康日記', '注文・定期', '投稿'];
+  const labels = ['マイページ', 'マイペット', '健康日記', '注文・定期', '投稿'];
   const areas = Array.from({ length: 6 }, (_, index) => ({
     bounds: {
       x: columns[index % 3].x,

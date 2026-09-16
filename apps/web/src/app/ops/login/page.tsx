@@ -69,8 +69,12 @@ export default function OpsLoginPage() {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL
     try {
       const session = await fetch(`${apiUrl}/api/auth/session`, { credentials: 'include', headers: adminSessionHeaders() })
-      const body = await session.json() as { data?: { platformAdmin?: boolean } }
+      const body = await session.json() as { data?: { platformAdmin?: boolean; platformAdminState?: string | null } }
       if (!body.data?.platformAdmin) {
+        if (body.data?.platformAdminState === 'awaiting_totp') {
+          window.location.assign('/ops/two-factor')
+          return
+        }
         setError('ログインはできましたが、運営メンバーではありません。')
         setBusy(null)
         return

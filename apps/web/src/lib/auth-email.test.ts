@@ -24,8 +24,8 @@ describe('会員登録・ログインの入力の決まり（36-4）', () => {
 })
 
 describe('ログイン前に開ける画面', () => {
-  it('ログイン・招待・登録 3 画面・再設定 2 画面・運営ログイン。末尾の / があっても同じ', () => {
-    expect([...PUBLIC_AUTH_PATHS]).toEqual(['/login', '/login/two-factor', '/staff/invite', '/register', '/register/sent', '/register/complete', '/password/forgot', '/password/reset', '/ops/login'])
+  it('ログイン・招待・登録 3 画面・再設定 2 画面・運営ログインと運営の招待。末尾の / があっても同じ', () => {
+    expect([...PUBLIC_AUTH_PATHS]).toEqual(['/login', '/login/two-factor', '/staff/invite', '/register', '/register/sent', '/register/complete', '/password/forgot', '/password/reset', '/ops/login', '/ops/invite'])
     expect(isPublicAuthPath('/staff/invite')).toBe(true)
     expect(isPublicAuthPath('/register/complete/')).toBe(true)
     expect(isPublicAuthPath('/hq')).toBe(false)
