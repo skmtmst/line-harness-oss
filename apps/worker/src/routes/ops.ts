@@ -389,7 +389,10 @@ ops.get('/api/ops/members', async (c) => {
       staffId: m.staff_id,
       name: m.name,
       email: m.email,
-      isActive: m.is_active === 1 && m.staff_is_active === 1,
+      // 停止・再開ボタンが操作するのは platform_admins.is_active。
+      // 招待前の staff_members は意図的に inactive なので、両方を AND すると
+      // 「招待中」が「停止」と誤表示され、招待の再送もできなくなる。
+      isActive: m.is_active === 1,
       totpEnabled: Boolean(m.totp_enabled_at),
       lineLinked: Boolean(m.line_user_id),
       inviteStatus: m.invite_status,

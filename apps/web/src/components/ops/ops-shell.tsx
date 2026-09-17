@@ -16,6 +16,7 @@ import {
   Users,
 } from 'lucide-react'
 import { api, type OpsMe } from '@/lib/api'
+import Button from '@/components/shared/button'
 import { adminSessionHeaders, captureAdminSessionHandoff } from '@/lib/admin-session'
 import { logoutAndGoToLogin } from '@/lib/logout'
 import OpsEnvBar from './ops-env-bar'
@@ -42,17 +43,23 @@ export default function OpsShell({ children }: { children: ReactNode }) {
   const pathname = usePathname()
   const [me, setMe] = useState<OpsMe | null>(null)
   const [checked, setChecked] = useState(false)
+  const [loadError, setLoadError] = useState('')
 
   const load = useCallback(async () => {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL
     try {
-      localStorage.removeItem('lh_api_key')
-      captureAdminSessionHandoff()
-      const res = await fetch(`${apiUrl}/api/auth/session`, { credentials: 'include', headers: adminSessionHeaders() })
-      if (!res.ok) throw new Error('unauthenticated')
+      try { localStorage.removeItem('lh_api_key') } catch { /* private-mode fallback uses the session handoff */ }
+      const handoffToken = captureAdminSessionHandoff()
+      const res = await fetch(`${apiUrl}/api/auth/session`, { credentials: 'include', headers: adminSessionHeaders(handoffToken) })
+      if (!res.ok) {
+        if (res.status === 401) { router.replace('/ops/login'); return }
+        throw new Error('運営コンソールのログイン状態を確認できませんでした')
+      }
       const body = await res.json() as { success?: boolean; data?: { platformAdmin?: boolean; platformAdminState?: string | null }; csrfToken?: string }
-      if (!body.success || !body.data) throw new Error('unauthenticated')
-      if (body.csrfToken) localStorage.setItem('lh_csrf', body.csrfToken)
+      if (!body.success || !body.data) throw new Error('運営コンソールのログイン状態を確認できませんでした')
+      if (body.csrfToken) {
+        try { localStorage.setItem('lh_csrf', body.csrfToken) } catch { /* Bearer session remains usable */ }
+      }
       if (!body.data.platformAdmin) {
         // 招待を受けて 2要素認証待ちの人は、設定画面へ（★V6 37-10-B）
         router.replace(body.data.platformAdminState === 'awaiting_totp' ? '/ops/two-factor' : '/ops/login?error=not_platform_admin')
@@ -61,18 +68,36 @@ export default function OpsShell({ children }: { children: ReactNode }) {
       const meRes = await api.ops.me()
       if (!meRes.success) throw new Error(meRes.error)
       setMe(meRes.data)
+      setLoadError('')
       setChecked(true)
-    } catch {
-      router.replace('/ops/login')
+    } catch (caught) {
+      // 認証済みなのに後続APIが失敗した場合までログインへ戻すと、原因を隠したまま
+      // ログイン画面とのループになる。401 だけを上で戻し、それ以外は画面に残す。
+      setLoadError(caught instanceof Error ? caught.message : '運営コンソールを読み込めませんでした')
+      setChecked(true)
     }
   }, [router])
 
   useEffect(() => { void load() }, [load])
 
-  if (!checked || !me) {
+  if (!checked) {
     return (
       <div className="flex min-h-svh items-center justify-center bg-canvas-sunken">
         <div className="h-8 w-8 animate-spin rounded-full border-2 border-hairline border-t-accent-deep" />
+      </div>
+    )
+  }
+
+  if (loadError || !me) {
+    return (
+      <div className="flex min-h-svh items-center justify-center bg-canvas-sunken px-4">
+        <div className="w-full max-w-md rounded-card border border-hairline bg-canvas p-6 text-center shadow-sm">
+          <p role="alert" className="text-label font-bold text-status-danger">{loadError || '運営コンソールを読み込めませんでした'}</p>
+          <div className="mt-4 flex justify-center gap-2">
+            <Button variant="primary" onClick={() => { setChecked(false); setLoadError(''); void load() }}>もう一度試す</Button>
+            <Button onClick={() => void logoutAndGoToLogin('/ops/login')}>ログインへ戻る</Button>
+          </div>
+        </div>
       </div>
     )
   }

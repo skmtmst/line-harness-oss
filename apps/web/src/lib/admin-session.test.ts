@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isOpsTwoFactorReturn } from './admin-session'
+import { adminSessionHandoffPath, isOpsTwoFactorReturn } from './admin-session'
 
 describe('二段階認証後の戻り先', () => {
   it('query の next=ops を最優先で運営コンソールとして扱う', () => {
@@ -14,5 +14,12 @@ describe('二段階認証後の戻り先', () => {
   it('通常のログインは運営コンソールへ送らない', () => {
     expect(isOpsTwoFactorReturn('', '#lh_2fa=challenge', null)).toBe(false)
     expect(isOpsTwoFactorReturn('?next=hq', '', null)).toBe(false)
+  })
+
+  it('クロスサイト用sessionを遷移先のfragmentにも引き渡す', () => {
+    expect(adminSessionHandoffPath('/ops', 'opaque+/token=', 'csrf token')).toBe(
+      '/ops#lh_session=opaque%2B%2Ftoken%3D&lh_csrf=csrf+token',
+    )
+    expect(adminSessionHandoffPath('/ops', undefined, 'csrf')).toBe('/ops')
   })
 })
