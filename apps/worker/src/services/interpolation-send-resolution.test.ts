@@ -11,6 +11,7 @@ import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import {
   resolveSendInterpolationExtra,
   resolveSendCommonVars,
+  expandSendCommonVars,
   CommonVarResolutionFailedError,
 } from './interpolation-context.js';
 
@@ -192,5 +193,61 @@ describe('送信経路の共通情報解決(N-189)', () => {
     ).catch((e: unknown) => e);
     expect(error).toBeInstanceOf(CommonVarResolutionFailedError);
     expect(ledgerRows()[0]).toMatchObject({ source_kind: 'broadcast', source_id: 'bc-1' });
+  });
+});
+
+describe('差し込み描画を持たない経路の厳格展開(N-189)', () => {
+  it('定義済みの共通情報は本文の値へ置き換える', async () => {
+    insertVar({ id: 'v-1', key: 'hours', value: '10時から18時' });
+    const expanded = await expandSendCommonVars(
+      db, '営業時間は{{var.hours}}です', { kind: 'automation', id: 'a-1' },
+      { lineAccountId: 'acc-1' },
+    );
+    expect(expanded).toBe('営業時間は10時から18時です');
+    expect(ledgerRows()).toHaveLength(0);
+  });
+
+  it('空白を含む表記もスキャンと同じく拾う', async () => {
+    insertVar({ id: 'v-1', key: 'hours', value: '10時から18時' });
+    const expanded = await expandSendCommonVars(
+      db, '{{ var.hours }}', { kind: 'automation', id: 'a-1' },
+      { lineAccountId: 'acc-1' },
+    );
+    expect(expanded).toBe('10時から18時');
+  });
+
+  it('未定義なら生の差し込み名を送らず止めて台帳へ残す', async () => {
+    await expect(expandSendCommonVars(
+      db, '前{{var.deleted_key}}後', { kind: 'rich_menu_tap', id: 'tpl-1' },
+      { lineAccountId: 'acc-1' },
+    )).rejects.toBeInstanceOf(CommonVarResolutionFailedError);
+    expect(ledgerRows()[0]).toMatchObject({
+      source_kind: 'rich_menu_tap', source_id: 'tpl-1', var_key: 'deleted_key',
+    });
+  });
+
+  it('継承プロパティ（constructorなど）は定義済みとみなさない', async () => {
+    await expect(expandSendCommonVars(
+      db, '{{var.constructor}}', { kind: 'automation', id: 'a-1' },
+      { lineAccountId: 'acc-1' },
+    )).rejects.toBeInstanceOf(CommonVarResolutionFailedError);
+  });
+
+  it('friendIdだけでもアカウントを引いて境界を守る', async () => {
+    insertVar({ id: 'v-other', accountId: 'acc-2', key: 'shop', value: '別店舗' });
+    await expect(expandSendCommonVars(
+      db, '{{var.shop}}', { kind: 'friend_direct', id: 'fr-1' },
+      { friendId: 'fr-1' },
+    )).rejects.toBeInstanceOf(CommonVarResolutionFailedError);
+    expect(ledgerRows()[0]?.line_account_id).toBe('acc-1');
+  });
+
+  it('差し込みの無い本文はそのまま返し、クエリも台帳も増やさない', async () => {
+    const expanded = await expandSendCommonVars(
+      db, 'ただの本文', { kind: 'automation', id: 'a-1' },
+      { friendId: 'fr-1' },
+    );
+    expect(expanded).toBe('ただの本文');
+    expect(ledgerRows()).toHaveLength(0);
   });
 });

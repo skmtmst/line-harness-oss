@@ -2699,6 +2699,7 @@ async function runFormPostEffects(input: {
         layout,
         friendId,
         answers: submissionData,
+        formId: input.formId,
         idempotencyPrefix: `form-submit:${submission.id}`,
         push: {
           defaultAccessToken: input.defaultAccessToken,

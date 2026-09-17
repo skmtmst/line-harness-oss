@@ -1345,11 +1345,36 @@ friends.post('/api/friends/:id/messages', requireRole('owner', 'admin', 'staff')
     // アカウントは予約の範囲キーにも使うので先に解く（N-028/N-029）。
     const friendAccountId =
       ((friend as unknown as Record<string, unknown>).line_account_id as string | null) ?? null;
+
+    // この経路は従来 {{var.*}} を展開せず生のまま送っていた。消えた共通情報は
+    // 空文字にせず止め、解決できるものは送信時点の値へ置き換える。
+    // 予約・追跡より先に行うので、拒否時はDBへ何も書かない。
+    let resolvedContent = body.content;
+    try {
+      const { expandSendCommonVars, CommonVarResolutionFailedError } = await import('../services/interpolation-context.js');
+      resolvedContent = await expandSendCommonVars(
+        db, body.content,
+        { kind: 'friend_direct', id: friend.id },
+        { lineAccountId: friendAccountId },
+      );
+    } catch (error) {
+      const { CommonVarResolutionFailedError } = await import('../services/interpolation-context.js');
+      if (error instanceof CommonVarResolutionFailedError) {
+        return c.json({
+          success: false,
+          error: `共通情報を解決できません: ${error.failures.map((f) => `{{var.${f.varKey}}}`).join(', ')}`,
+          code: 'UNRESOLVED_TEMPLATE_VARIABLES',
+          data: { variables: error.failures.map((f) => `var.${f.varKey}`) },
+        }, 422);
+      }
+      throw error;
+    }
+
     const payloadHash = await hashOutboundPayload(
       JSON.stringify({
         friendId: friend.id,
         messageType,
-        content: body.content,
+        content: resolvedContent,
         altText: body.altText,
         trackLinks: body.trackLinks !== false,
       }),
@@ -1419,11 +1444,11 @@ friends.post('/api/friends/:id/messages', requireRole('owner', 'admin', 'staff')
       // Auto-wrap URLs with tracking links (text with URLs → Flex with button)
       // trackLinks=false で明示的に短縮 OFF (URL をそのまま送る)
       const sendWorkerUrl = c.env.WORKER_URL || new URL(c.req.url).origin;
-      tracked = { messageType, content: body.content };
+      tracked = { messageType, content: resolvedContent };
       if (body.trackLinks !== false) {
         const { autoTrackContent } = await import('../services/auto-track.js');
         tracked = await autoTrackContent(
-          db, messageType, body.content,
+          db, messageType, resolvedContent,
           sendWorkerUrl,
           { lineAccountId: friendAccountId },
         );

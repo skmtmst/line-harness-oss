@@ -63,7 +63,13 @@ export type CommonVarSourceKind =
   | 'form_reply'
   | 'auto_reply'
   | 'test_send'
-  | 'chat';
+  | 'chat'
+  | 'automation'
+  | 'friend_direct'
+  | 'rich_menu_tap'
+  | 'carousel_tap'
+  | 'liff'
+  | 'notification';
 
 export interface CommonVarSendSource {
   kind: CommonVarSourceKind;
@@ -163,6 +169,47 @@ export async function resolveSendInterpolationExtra(
 /** 本文が友だち情報欄の差し込みを使うか。 */
 export function contentNeedsFriendFields(content: string): boolean {
   return FIELD_PATTERN.test(content);
+}
+
+/** 解決済みの共通情報を本文へ流し込む。描画側と同じ空白許容の表記で拾う。 */
+export function substituteCommonVars(
+  content: string,
+  vars: Record<string, string>,
+): string {
+  return content.replace(
+    /\{\{\s*var\.([a-z][a-z0-9_]*)\s*\}\}/g,
+    (_match, key: string) => vars[key],
+  );
+}
+
+/**
+ * 差し込み描画の仕組みを持たない送信経路（オートメーション・イベント連携・
+ * リッチメニュー・フォーム演出・カルーセル・LIFF・友だち詳細からの直接送信）
+ * 向けの厳格展開。
+ *
+ * これらの経路はテンプレート本文をそのまま LINE へ送るので、{{var.*}} を
+ * 含む本文は「未解決なら止める（fail-closed）・解決できたら値へ置き換える」
+ * のどちらかでなければならない。生の差し込み名をそのまま届けない。
+ * {{var.*}} を含まなければクエリを増やさずそのまま返す。
+ */
+export async function expandSendCommonVars(
+  db: D1Database,
+  content: string,
+  source: CommonVarSendSource,
+  target: { lineAccountId?: string | null; friendId?: string },
+  executionAt?: string,
+): Promise<string> {
+  const varKeys = commonVarKeysInContent(content);
+  if (varKeys.length === 0) return content;
+  let lineAccountId = target.lineAccountId;
+  if (!lineAccountId && target.friendId) {
+    const account = await db.prepare(
+      `SELECT line_account_id FROM friends WHERE id = ?`,
+    ).bind(target.friendId).first<{ line_account_id: string | null }>();
+    lineAccountId = account?.line_account_id;
+  }
+  const vars = await resolveSendCommonVars(db, lineAccountId, content, source, executionAt);
+  return substituteCommonVars(content, vars ?? {});
 }
 
 /**

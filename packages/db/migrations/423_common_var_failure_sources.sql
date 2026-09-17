@@ -11,7 +11,9 @@ CREATE TABLE common_var_resolution_failures_new (
   line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
   source_kind     TEXT NOT NULL CHECK (source_kind IN (
     'broadcast', 'scenario', 'first_step', 'reminder',
-    'form_reply', 'auto_reply', 'test_send', 'chat'
+    'form_reply', 'auto_reply', 'test_send', 'chat',
+    'automation', 'friend_direct', 'rich_menu_tap', 'carousel_tap', 'liff',
+    'notification'
   )),
   source_id       TEXT NOT NULL,
   var_key         TEXT NOT NULL,

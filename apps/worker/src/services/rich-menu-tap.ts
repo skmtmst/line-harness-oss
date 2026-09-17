@@ -139,8 +139,20 @@ export async function handleRichMenuTap(
   if (target.intent === 'template' && target.templateId) {
     try {
       const tpl = await getTemplateById(db, target.templateId);
+      // この経路は従来テンプレート本文を生のまま送っていた。
+      // {{var.*}} の共通情報は消えていれば fail-closed で止め、
+      // 解決できるものは送信時点の値へ置き換える。
+      let content = tpl?.message_content ?? '';
+      if (tpl) {
+        const { expandSendCommonVars } = await import('./interpolation-context.js');
+        content = await expandSendCommonVars(
+          db, tpl.message_content,
+          { kind: 'rich_menu_tap', id: target.templateId },
+          { lineAccountId, friendId: friend.id },
+        );
+      }
       const message = tpl
-        ? buildTemplateMessage(tpl.message_type, tpl.message_content, tpl.name)
+        ? buildTemplateMessage(tpl.message_type, content, tpl.name)
         : null;
       if (tpl && message) {
         let deliveryType: 'reply' | 'push' = 'push';
@@ -160,7 +172,7 @@ export async function handleRichMenuTap(
         await logOutgoingMessage(db, {
           friendId: friend.id,
           messageType: message.type,
-          content: tpl.message_content,
+          content,
           deliveryType,
           source: 'rich_menu',
           lineAccountId,

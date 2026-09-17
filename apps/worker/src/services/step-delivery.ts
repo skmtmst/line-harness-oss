@@ -130,8 +130,9 @@ export function expandVariables(
   });
 
   // 共通情報。営業時間や電話番号のように、全テンプレートで同じ値を使うもの。
+  // スキャン側（commonVarKeysInContent）と同じ空白許容の表記で拾う。
   const vars = extra?.vars ?? {};
-  result = result.replace(/\{\{var\.([a-z][a-z0-9_]*)\}\}/g, (_match, key: string) => {
+  result = result.replace(/\{\{\s*var\.([a-z][a-z0-9_]*)\s*\}\}/g, (_match, key: string) => {
     return vars[key] ?? '';
   });
   if (apiOrigin) {

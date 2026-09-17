@@ -180,22 +180,39 @@ describe('送信予約のdispatcher(N-025)', () => {
     expect(logged.content).toBe('改名後さんへの連絡です');
   });
 
-  // N-026: 解決しきれない差し込みが残る予約は、LINEを呼ばずにfailedへ
-  // 確定する(予約作成口は弾くが、項目削除や別経路で残り得る)。
-  test('解決できない差し込みが残る予約はLINEを呼ばずfailedへ確定する', async () => {
+  // N-026/N-189: 解決しきれない差し込みが残る予約は LINE を呼ばない。
+  // 消えた共通情報は運用者が直せば送れる失敗なので、バックオフ付きで
+  // 予約へ戻して再試行する(冪等キーは同じなので重複送信にならない)。
+  test('解決できない差し込みが残る予約はLINEを呼ばず再試行へ戻る', async () => {
     // {{name}} が残る状態を作るため表示名を消す。
     sqlite.raw.prepare(`UPDATE friends SET display_name = NULL WHERE id = 'fr-1'`).run();
     await schedule({ id: 's-unres', key: '99999999-2222-4333-8444-555555555555', at: '2026-01-09T23:00:00.000Z', content: '{{name}}さんへの連絡です' });
 
     const result = await processDueScheduledChatSends(env(), { now: NOW });
-    expect(result.failed).toBe(1);
+    expect(result.failed).toBe(0);
     expect(pushMessage).not.toHaveBeenCalled();
-    expect(row('s-unres').status).toBe('failed');
+    expect(row('s-unres').status).toBe('scheduled');
     expect(row('s-unres').last_error_code).toBe('unresolved_template_variables');
+    expect(row('s-unres').scheduled_at > '2026-01-09T23:00:00.000Z').toBe(true);
     // 送信履歴も残らない。
     const logged = sqlite.raw.prepare(
       `SELECT COUNT(*) AS n FROM messages_log WHERE friend_id = 'fr-1'`,
     ).get() as { n: number };
     expect(logged.n).toBe(0);
+  });
+
+  // 直しても上限回数を超えたら failed へ確定する(無限再試行はしない)。
+  test('解決失敗が上限回数を超えた予約はfailedへ確定する', async () => {
+    sqlite.raw.prepare(`UPDATE friends SET display_name = NULL WHERE id = 'fr-1'`).run();
+    await schedule({ id: 's-unres-max', key: '99999999-2222-4333-8444-555555555556', at: '2026-01-09T23:00:00.000Z', content: '{{name}}さんへの連絡です' });
+    sqlite.raw.prepare(
+      `UPDATE scheduled_chat_sends SET attempt_count = 3 WHERE id = 's-unres-max'`,
+    ).run();
+
+    const result = await processDueScheduledChatSends(env(), { now: NOW });
+    expect(result.failed).toBe(1);
+    expect(pushMessage).not.toHaveBeenCalled();
+    expect(row('s-unres-max').status).toBe('failed');
+    expect(row('s-unres-max').last_error_code).toBe('unresolved_template_variables');
   });
 });

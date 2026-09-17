@@ -858,3 +858,59 @@ describe('POST /webhook — 流入リンクの案内も同じ送信権の下 (#6
       .toEqual({ event_id: 'webhook-thief' });
   });
 });
+
+describe('POST /webhook — 流入リンクの案内の共通情報 (N-189)', () => {
+  // 紹介リンクの案内テンプレートにも {{var.*}} を書ける。消えた共通情報は
+  // 生のまま送らず fail-closed で止め、出所を台帳へ残す。
+  test('消えた共通情報を含む案内テンプレートは送らず、台帳へ残す', async () => {
+    raw.prepare(
+      `INSERT INTO message_templates (id, name, message_type, message_content)
+       VALUES ('tpl-1', '紹介あいさつ', 'text', '{"text":"営業時間は{{var.hours}}です"}')`,
+    ).run();
+    raw.prepare(`UPDATE entry_routes SET intro_template_id = 'tpl-1' WHERE id = 'route-1'`).run();
+    lineClientMocks.replyMessage.mockResolvedValue(undefined);
+    lineClientMocks.pushMessage.mockResolvedValue(undefined);
+
+    await postFollow('webhook-var-missing');
+
+    // 案内のpushは送られない(シナリオの初回配信がpushを使うならそちらも
+    // 未解決で止まる。いずれにせよ生の差し込み名は一切送らない)。
+    for (const call of lineClientMocks.pushMessage.mock.calls) {
+      const messages = call[1] as Array<{ text?: string }>;
+      for (const message of messages) {
+        expect(message.text ?? '').not.toContain('{{var.');
+      }
+    }
+    expect(raw.prepare(
+      `SELECT source_kind, source_id, var_key, reason FROM common_var_resolution_failures`,
+    ).all()).toEqual([
+      { source_kind: 'notification', source_id: 'route-1', var_key: 'hours', reason: 'missing' },
+    ]);
+  });
+
+  test('定義済みの共通情報は送信時点の値へ置き換えて案内を送る', async () => {
+    raw.prepare(
+      `INSERT INTO message_templates (id, name, message_type, message_content)
+       VALUES ('tpl-1', '紹介あいさつ', 'text', '{"text":"営業時間は{{var.hours}}です"}')`,
+    ).run();
+    raw.prepare(`UPDATE entry_routes SET intro_template_id = 'tpl-1' WHERE id = 'route-1'`).run();
+    raw.prepare(
+      `INSERT INTO common_vars (id, line_account_id, name, var_key, type, value)
+       VALUES ('cv-1', 'account-1', '営業時間', 'hours', 'text', '10時から18時')`,
+    ).run();
+    lineClientMocks.replyMessage.mockResolvedValue(undefined);
+    lineClientMocks.pushMessage.mockResolvedValue(undefined);
+
+    await postFollow('webhook-var-ok');
+
+    const intro = lineClientMocks.pushMessage.mock.calls.find((call) => {
+      const messages = call[1] as Array<{ text?: string }>;
+      return messages.some((m) => (m.text ?? '').includes('営業時間'));
+    });
+    expect(intro).toBeTruthy();
+    const messages = intro![1] as Array<{ text?: string }>;
+    // テキスト型の本文は {"text":"…"} のJSONで保持される
+    expect(messages[0].text).toContain('営業時間は10時から18時です');
+    expect(messages[0].text).not.toContain('{{var.');
+  });
+});

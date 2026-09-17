@@ -29,7 +29,38 @@ const SEND_PATHS: Array<{ file: string; mustCall: string; label: string }> = [
   { file: 'services/auto-reply.ts', mustCall: 'resolveSendInterpolationExtra', label: '自動応答の実送信' },
   { file: 'routes/forms.ts', mustCall: 'resolveSendInterpolationExtra', label: 'フォーム回答の自動返信' },
   { file: 'routes/broadcasts.ts', mustCall: 'resolveSendCommonVars', label: '一斉配信のテスト送信' },
+  { file: 'services/automation-action-executors.ts', mustCall: 'expandSendCommonVars', label: 'オートメーションの送信アクション' },
+  { file: 'services/event-bus.ts', mustCall: 'expandSendCommonVars', label: '旧イベント連携の送信アクション' },
+  { file: 'services/rich-menu-tap.ts', mustCall: 'expandSendCommonVars', label: 'リッチメニューのテンプレート送信' },
+  { file: 'services/form-layout-effects.ts', mustCall: 'expandSendCommonVars', label: 'フォーム演出の送信' },
+  { file: 'services/scenario-question-answer.ts', mustCall: 'expandSendCommonVars', label: '質問カードの返信' },
+  { file: 'services/carousel-tap.ts', mustCall: 'expandSendCommonVars', label: 'カルーセル制限時の返信' },
+  { file: 'routes/liff.ts', mustCall: 'expandSendCommonVars', label: 'LIFFの案内テンプレート送信' },
+  { file: 'routes/friends.ts', mustCall: 'expandSendCommonVars', label: '友だち詳細からの直接送信' },
+  { file: 'routes/webhook.ts', mustCall: 'expandSendCommonVars', label: '流入リンク案内・追加クーポン' },
+  { file: 'routes/ec-integrations.ts', mustCall: 'expandSendCommonVars', label: 'ECイベント通知' },
+  { file: 'routes/ec-commerce.ts', mustCall: 'expandSendCommonVars', label: 'EC通知のテスト送信' },
 ];
+
+/*
+ * LINE送信呼出しを持つが、運用者が書いた本文を使わない経路。
+ * システム生成の固定文（通知・集計レポート）や、友だち名・案件名のような
+ * データ差し込みだけの文はこちら。友だちの表示名などが "{{var.x}}" を
+ * 含んでも展開しないのが正しい（展開すると別データ経由で共通情報の値が
+ * 漏れうる）。この一覧は新規のLINE送信経路を足したとき必ず見直す。
+ */
+const NON_TEMPLATE_PATHS: Array<{ file: string; label: string }> = [
+  { file: 'services/affiliate-notifier.ts', label: 'アフィリエイト通知（固定文）' },
+  { file: 'services/analytics-reports.ts', label: '集計レポート通知（固定文）' },
+  { file: 'services/booking-notifier.ts', label: '予約通知（固定文）' },
+  { file: 'services/event-booking-notifier.ts', label: 'イベント予約通知（固定文）' },
+  { file: 'services/operation-notifications.ts', label: '運用アラート通知（固定文）' },
+  { file: 'routes/meet-callback.ts', label: 'Meet結果通知（固定文）' },
+  { file: 'services/segment-send.ts', label: '旧セグメント配信（呼出元なし・未使用）' },
+];
+
+// LINE API への実送信を示す呼出しパターン。
+const LINE_SEND_PATTERN = /\.(pushMessage|replyMessage|multicast|broadcast|narrowcast)\s*\(/;
 
 describe('全送信経路が共通情報の厳格resolverを通る(N-189)', () => {
   for (const { file, mustCall, label } of SEND_PATHS) {
@@ -73,6 +104,46 @@ describe('全送信経路が共通情報の厳格resolverを通る(N-189)', () =
     const previewCalls = dryRun.match(/previewAutoReplyContent\([^)]*\)/g) ?? [];
     for (const call of previewCalls) {
       expect(call).not.toContain('kind:');
+    }
+  });
+
+  it('LINE送信を持つファイルは「厳格resolver経路」か「固定文経路」のどちらかに分類されている', () => {
+    // LINE送信呼出しを持つファイルを全走査し、どちらの一覧にも無い
+    // ファイルがあれば落とす。新しい送信経路を足したとき、ここで
+    // 「厳格化するか・固定文と宣言するか」の判断を強制する。
+    const { readdirSync, statSync } = require('node:fs') as typeof import('node:fs');
+    const sendFiles = new Set<string>();
+    const walk = (dir: string) => {
+      for (const entry of readdirSync(dir)) {
+        const full = join(dir, entry);
+        if (statSync(full).isDirectory()) {
+          if (entry !== 'node_modules') walk(full);
+        } else if (entry.endsWith('.ts') && !entry.endsWith('.test.ts')) {
+          if (LINE_SEND_PATTERN.test(readFileSync(full, 'utf8'))) {
+            sendFiles.add(full.slice(SRC.length + 1));
+          }
+        }
+      }
+    };
+    walk(SRC);
+
+    const strict = new Set(SEND_PATHS.map((p) => p.file));
+    strict.add('routes/chats.ts');
+    strict.add('services/scheduled-chat-sends.ts');
+    const nonTemplate = new Set(NON_TEMPLATE_PATHS.map((p) => p.file));
+
+    for (const file of sendFiles) {
+      expect(
+        strict.has(file) || nonTemplate.has(file),
+        `${file} はLINE送信を持ちますが、厳格resolver経路・固定文経路のどちらにも分類されていません`,
+      ).toBe(true);
+    }
+    // 固定文経路の陳腐化も防ぐ: 宣言したが送信呼出しが消えたファイルは落とす
+    for (const file of nonTemplate) {
+      expect(
+        sendFiles.has(file),
+        `${file} は固定文経路として宣言されていますが、LINE送信呼出しが見つかりません`,
+      ).toBe(true);
     }
   });
 });
