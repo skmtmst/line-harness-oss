@@ -5030,6 +5030,8 @@ export const api = {
       sidebarItemOrder?: Record<string, string[]>
       /** GET で受けた版。付けると1行でまとめて保存し、古ければ409で返す。 */
       expectedVersion: number
+      /** 変更理由。空白だけはサーバーが400で拒否する。監査へ残る。 */
+      reason: string
     }) =>
       fetchApi<ApiResponse<{ version: number }>>(
         `/api/settings/features?account_id=${encodeURIComponent(accountId)}`,

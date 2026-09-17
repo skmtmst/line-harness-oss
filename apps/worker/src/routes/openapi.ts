@@ -1215,8 +1215,11 @@ const spec = {
     '/api/reminders': {
       get: {
         tags: ['Reminders'], summary: 'LINEアカウント範囲内のリマインダ一覧を取得',
-        parameters: [{ name: 'lineAccountId', in: 'query', schema: { type: 'string' } }],
-        responses: { '200': { description: 'Visible reminders' }, '403': { description: 'Staff role required' }, '404': { description: 'LINE account not found in account scope' } },
+        parameters: [
+          { name: 'lineAccountId', in: 'query', schema: { type: 'string' } },
+          { name: 'sort', in: 'query', schema: { type: 'string', enum: ['order', 'next', 'created', 'updated', 'name'] } },
+        ],
+        responses: { '200': { description: 'Visible reminders' }, '400': { description: 'Invalid sort or status' }, '403': { description: 'Staff role required' }, '404': { description: 'LINE account not found in account scope' } },
       },
     },
     '/api/reminders/{id}/registrants': {
