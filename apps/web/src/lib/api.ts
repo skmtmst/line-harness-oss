@@ -5126,6 +5126,20 @@ export const api = {
         `/api/analytics/report-schedules?account_id=${encodeURIComponent(accountId)}`,
         { method: 'POST', body: JSON.stringify(data) },
       ),
+      update: (accountId: string, id: string, data: Omit<
+        AnalyticsReportSchedule,
+        'id' | 'lineAccountId' | 'status' | 'isOneTime' | 'nextRunAt' | 'createdBy' | 'createdAt' | 'updatedAt'
+      > & { expectedUpdatedAt: string }) => fetchApi<ApiResponse<AnalyticsReportSchedule>>(
+        `/api/analytics/report-schedules/${encodeURIComponent(id)}?account_id=${encodeURIComponent(accountId)}`,
+        { method: 'PUT', body: JSON.stringify(data) },
+      ),
+      setStatus: (accountId: string, id: string, data: {
+        status: 'active' | 'paused' | 'archived'
+        expectedUpdatedAt: string
+      }) => fetchApi<ApiResponse<AnalyticsReportSchedule>>(
+        `/api/analytics/report-schedules/${encodeURIComponent(id)}/status?account_id=${encodeURIComponent(accountId)}`,
+        { method: 'PUT', body: JSON.stringify(data) },
+      ),
     },
     friendsOverview: (accountId: string, params?: { from?: string; to?: string }) =>
       fetchApi<ApiResponse<AnalyticsFriendsOverview>>(

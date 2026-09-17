@@ -72,6 +72,63 @@ export async function getAnalyticsReportSchedules(db: D1Database, lineAccountId:
   return result.results.map(serialize);
 }
 
+export async function getAnalyticsReportSchedule(db: D1Database, id: string, lineAccountId: string) {
+  const row = await db.prepare(
+    `SELECT * FROM analytics_report_schedules
+      WHERE id = ? AND line_account_id = ? AND status != 'archived'`,
+  ).bind(id, lineAccountId).first<ScheduleRow>();
+  return row ? serialize(row) : null;
+}
+
+export async function updateAnalyticsReportSchedule(db: D1Database, input: {
+  id: string; lineAccountId: string; expectedUpdatedAt: string;
+  name: string; sections: AnalyticsReportSection[]; savedAnalysisIds: string[];
+  cadence: AnalyticsReportCadence; weekday: number | null; monthDay: number | null;
+  sendTime: string; timeZone: string; periodDays: number;
+  recipients: AnalyticsReportRecipient[]; channels: AnalyticsReportChannel[];
+  alertRules: AnalyticsReportAlertRule[]; nextRunAt: string; now: string;
+}): Promise<'updated' | 'conflict' | 'missing'> {
+  const existing = await db.prepare(
+    `SELECT updated_at FROM analytics_report_schedules
+      WHERE id = ? AND line_account_id = ? AND status != 'archived'`,
+  ).bind(input.id, input.lineAccountId).first<{ updated_at: string }>();
+  if (!existing) return 'missing';
+  const result = await db.prepare(
+    `UPDATE analytics_report_schedules SET
+       name = ?, sections_json = ?, saved_analysis_ids_json = ?, cadence = ?,
+       weekday = ?, month_day = ?, send_time = ?, time_zone = ?, period_days = ?,
+       recipients_json = ?, channels_json = ?, alert_rules_json = ?,
+       next_run_at = ?, updated_at = ?
+      WHERE id = ? AND line_account_id = ? AND status != 'archived' AND updated_at = ?`,
+  ).bind(
+    input.name, JSON.stringify(input.sections), JSON.stringify(input.savedAnalysisIds),
+    input.cadence, input.weekday, input.monthDay, input.sendTime, input.timeZone,
+    input.periodDays, JSON.stringify(input.recipients), JSON.stringify(input.channels),
+    JSON.stringify(input.alertRules), input.nextRunAt, input.now,
+    input.id, input.lineAccountId, input.expectedUpdatedAt,
+  ).run();
+  return Number(result.meta.changes ?? 0) ? 'updated' : 'conflict';
+}
+
+export async function setAnalyticsReportScheduleStatus(db: D1Database, input: {
+  id: string; lineAccountId: string; status: 'active' | 'paused' | 'archived';
+  expectedUpdatedAt: string; nextRunAt?: string; now: string;
+}): Promise<'updated' | 'conflict' | 'missing'> {
+  const existing = await db.prepare(
+    `SELECT status, next_run_at FROM analytics_report_schedules
+      WHERE id = ? AND line_account_id = ? AND status != 'archived'`,
+  ).bind(input.id, input.lineAccountId).first<{ status: string; next_run_at: string }>();
+  if (!existing) return 'missing';
+  const result = await db.prepare(
+    `UPDATE analytics_report_schedules SET status = ?, next_run_at = ?, updated_at = ?
+      WHERE id = ? AND line_account_id = ? AND status != 'archived' AND updated_at = ?`,
+  ).bind(
+    input.status, input.nextRunAt ?? existing.next_run_at, input.now,
+    input.id, input.lineAccountId, input.expectedUpdatedAt,
+  ).run();
+  return Number(result.meta.changes ?? 0) ? 'updated' : 'conflict';
+}
+
 export async function createAnalyticsReportSchedule(db: D1Database, input: {
   lineAccountId: string; name: string; sections: AnalyticsReportSection[];
   savedAnalysisIds: string[]; cadence: AnalyticsReportCadence; weekday: number | null;
