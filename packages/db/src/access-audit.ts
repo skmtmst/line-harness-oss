@@ -309,15 +309,28 @@ function safeText(value: string | null | undefined, max: number): string | null 
   return value ? value.slice(0, max) : null;
 }
 
-export async function recordAuditEvent(db: D1Database, input: RecordAuditEventInput): Promise<void> {
-  await db.prepare(
-    `INSERT INTO audit_events
-       (id, source_kind, source_id, tenant_id, line_account_id, category,
-        actor_principal_id, actor_role, action, target_kind, target_id, result,
-        before_json, after_json, reason, request_trace_id, ip_prefix, device_family,
-        risk_level, retention_class, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-  ).bind(
+const AUDIT_EVENT_COLUMNS = `id, source_kind, source_id, tenant_id, line_account_id, category,
+  actor_principal_id, actor_role, action, target_kind, target_id, result,
+  before_json, after_json, reason, request_trace_id, ip_prefix, device_family,
+  risk_level, retention_class, created_at`;
+
+/**
+ * 監査イベントのINSERT文を組み立てる。
+ *
+ * `guard` を渡すと `INSERT ... SELECT ... WHERE <guard>` になり、
+ * 呼び出し側の一括保存（batch）の中へ原子性を保ったまま混ぜられる。
+ * 保存が負けて guard が0行を返したときは監査も書かれない。
+ */
+export function auditEventStatement(
+  db: D1Database,
+  input: RecordAuditEventInput,
+  guard?: { sql: string; params: unknown[] },
+): D1PreparedStatement {
+  const placeholders = '?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?';
+  const sql = guard
+    ? `INSERT INTO audit_events (${AUDIT_EVENT_COLUMNS}) SELECT ${placeholders} WHERE ${guard.sql}`
+    : `INSERT INTO audit_events (${AUDIT_EVENT_COLUMNS}) VALUES (${placeholders})`;
+  return db.prepare(sql).bind(
     input.id ?? crypto.randomUUID(),
     safeText(input.sourceKind, 80),
     safeText(input.sourceId, 160),
@@ -339,7 +352,12 @@ export async function recordAuditEvent(db: D1Database, input: RecordAuditEventIn
     input.riskLevel ?? 'normal',
     input.retentionClass ?? (input.category === 'auth' ? 'security' : 'general'),
     input.createdAt ?? jstNow(),
-  ).run();
+    ...(guard?.params ?? []),
+  );
+}
+
+export async function recordAuditEvent(db: D1Database, input: RecordAuditEventInput): Promise<void> {
+  await auditEventStatement(db, input).run();
 }
 
 export function maskAuditIp(ip: string | null | undefined): string | null {

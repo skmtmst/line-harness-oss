@@ -39,7 +39,14 @@ interface Reminder {
 }
 
 const UNFILED = '__unfiled__'
-const PER_PAGE = 20
+const PER_PAGE_OPTIONS = [20, 50, 100]
+const SORT_OPTIONS = [
+  { value: 'order', label: '並び替え順' },
+  { value: 'next', label: '次の送信が近い順' },
+  { value: 'created', label: '作成日が新しい順' },
+  { value: 'updated', label: '更新が新しい順' },
+  { value: 'name', label: '名前順' },
+]
 /** 行ごとに作ると件数分だけ重いため、外で1回作って使い回す (#489-19)。 */
 const lastSentFormat = new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 function rowView(reminder: Reminder) {
@@ -61,6 +68,8 @@ export default function RemindersPage() {
   const deferredNameQuery = useDeferredValue(nameQuery.trim())
   const [folderFilter, setFolderFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
+  const [perPage, setPerPage] = useState(20)
+  const [sort, setSort] = useState('order')
   const [folderDialogOpen, setFolderDialogOpen] = useState(false)
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [confirmOpen, setConfirmOpen] = useState(false)
@@ -95,14 +104,15 @@ export default function RemindersPage() {
     if (statusFilter) {
       query.set('status', statusFilter === '有効' ? 'active' : statusFilter === '下書き' ? 'draft' : statusFilter === '停止中' ? 'stopped' : 'failed')
     }
+    query.set('sort', sort)
     const response = await fetchApi<ApiResponse<ServerListResponse<Reminder>>>(`/api/reminders?${query}`, { signal })
     if (!response.success) throw new Error(response.error)
     return response.data
-  }, [deferredNameQuery, folderFilter, selectedAccountId, statusFilter])
+  }, [deferredNameQuery, folderFilter, selectedAccountId, sort, statusFilter])
   const reminderList = useOffsetServerList({
-    requestKey: JSON.stringify([selectedAccountId, deferredNameQuery, folderFilter, statusFilter]),
+    requestKey: JSON.stringify([selectedAccountId, deferredNameQuery, folderFilter, statusFilter, perPage, sort]),
     load: loadReminderPage,
-    initialLimit: PER_PAGE,
+    initialLimit: perPage,
   })
   const reminders = reminderList.items
   const loading = reminderList.loading
@@ -177,8 +187,8 @@ export default function RemindersPage() {
       />
       <div className="min-w-0">
         <div className="bg-canvas rounded-card border-hairline mb-3 border p-3">
-          <div className="flex items-center gap-2"><TextInput type="search" placeholder="名前・内容で検索" aria-label="名前・内容で検索" value={nameQuery} onChange={(event) => setNameQuery(event.target.value)} className="min-w-0 flex-1 text-xs" /><SelectField aria-label="表示件数" className="text-xs" defaultValue="20" options={[{ value: '20', label: '20件表示' }]} /></div>
-          <div className="mt-2 flex flex-wrap items-center gap-2">{['有効','下書き','停止中'].map((status) => <FilterChip key={status} selected={statusFilter === status} onChange={() => setStatusFilter(statusFilter === status ? '' : status)}>{status}</FilterChip>)}<FilterChip selected={statusFilter === '失敗あり'} onChange={() => setStatusFilter(statusFilter === '失敗あり' ? '' : '失敗あり')}>失敗あり</FilterChip><span className="text-ink-faint text-micro ml-2">基準日</span><span className="w-36"><TextInput type="date" defaultValue="2026-08-01" className="text-micro" /></span><span className="w-36"><TextInput type="date" defaultValue="2026-09-30" className="text-micro" /></span><span className="ml-auto w-44"><SelectField aria-label="並び順" className="text-micro" defaultValue="next" options={[{ value: 'next', label: '次の送信が近い順' }]} /></span></div>
+          <div className="flex items-center gap-2"><TextInput type="search" placeholder="名前・内容で検索" aria-label="名前・内容で検索" value={nameQuery} onChange={(event) => setNameQuery(event.target.value)} className="min-w-0 flex-1 text-xs" /><SelectField aria-label="表示件数" className="text-xs" value={String(perPage)} onChange={(event) => setPerPage(Number(event.target.value))} options={PER_PAGE_OPTIONS.map((n) => ({ value: String(n), label: `${n}件表示` }))} /></div>
+          <div className="mt-2 flex flex-wrap items-center gap-2">{['有効','下書き','停止中'].map((status) => <FilterChip key={status} selected={statusFilter === status} onChange={() => setStatusFilter(statusFilter === status ? '' : status)}>{status}</FilterChip>)}<FilterChip selected={statusFilter === '失敗あり'} onChange={() => setStatusFilter(statusFilter === '失敗あり' ? '' : '失敗あり')}>失敗あり</FilterChip><span className="ml-auto w-44"><SelectField aria-label="並び順" className="text-micro" value={sort} onChange={(event) => setSort(event.target.value)} options={SORT_OPTIONS} /></span></div>
         </div>
         <div className="bg-canvas rounded-card border-hairline overflow-hidden border">
           <table className="w-full table-fixed text-left text-xs"><thead className="bg-canvas-sunken text-ink-faint"><TableHeadRow><Th className="w-[31%]">リマインダ名</Th><Th className="w-1/12">状態</Th><Th className="w-1/5">基準日</Th><Th className="w-1/12">予定</Th><Th className="w-1/6">最終送信</Th><Th className="w-1/12" align="center">操作</Th></TableHeadRow></thead><tbody className="divide-y divide-hairline">
