@@ -67,6 +67,8 @@ import {
   type WebinarEditorSettings,
   type WebinarEditorSettingsInput,
   type WebinarParticipantStat,
+  getMediaById,
+  getMediaIdByR2Key,
 } from '@line-crm/db';
 import { verifyCallerLineUserId } from '../services/liff-auth.js';
 import { attachTagAndFireSideEffects } from '../services/friend-tag-attach.js';
@@ -791,6 +793,46 @@ function serializeWebinar(row: Webinar) {
   };
 }
 
+/**
+ * 管理APIの詳細・保存応答へ、動画の選択元メディアIDを添える。
+ * video_prefix は r2_key の保存値なので、同じアカウントのメディアへ
+ * 引き直して画面の選択状態へ戻す。ライブラリ外のprefixなら null。
+ */
+async function serializeWebinarWithVideoMedia(c: Context<Env>, row: Webinar) {
+  return {
+    ...serializeWebinar(row),
+    videoMediaId: row.video_prefix
+      ? await getMediaIdByR2Key(c.env.DB, row.video_prefix, row.account_id)
+      : null,
+  };
+}
+
+/**
+ * videoMediaId（メディア選択）を保存値 video_prefix へ解決する。
+ * 選べるのは対象ウェビナーと同じアカウントの kind='video' のメディアだけ。
+ * null は動画の解除。返り値はエラーコードで、問題なければ null。
+ */
+async function applyVideoMediaSelection(
+  db: D1Database,
+  input: Record<string, unknown>,
+  accountId: string | null,
+): Promise<string | null> {
+  if (input.videoMediaId === undefined) return null;
+  const mediaId = input.videoMediaId;
+  delete input.videoMediaId;
+  if (mediaId === null) {
+    input.videoPrefix = null;
+    return null;
+  }
+  const media = typeof mediaId === 'string' && mediaId
+    ? await getMediaById(db, mediaId, accountId)
+    : null;
+  if (!media) return 'video_media_not_found';
+  if (media.kind !== 'video') return 'video_media_not_video';
+  input.videoPrefix = media.r2_key;
+  return null;
+}
+
 function serializeWebinarList(row: WebinarListRow) {
   return {
     ...serializeWebinar(row),
@@ -902,6 +944,12 @@ interface WebinarBody {
   slug?: string;
   status?: string;
   videoPrefix?: string | null;
+  /**
+   * 動画はメディアライブラリの選択で指定する。保存値（video_prefix）は
+   * 選ばれたメディアの r2_key からサーバー側で生成し、自由入力させない。
+   * null は動画の解除。videoPrefix と同時には送れない。
+   */
+  videoMediaId?: string | null;
   durationSeconds?: number;
   schedule?: unknown[];
   cta?: { label?: string; url?: string; showAtSeconds?: number } | null;
@@ -1025,9 +1073,14 @@ function validateWebinarBody(
   if (body.title !== undefined) input.title = body.title.trim();
   if (body.slug !== undefined) input.slug = body.slug;
   if (body.status !== undefined) input.status = body.status;
+  if (body.videoPrefix !== undefined && body.videoMediaId !== undefined) {
+    // 動画の指定元が2つあるとどちらが保存されたか読めないため拒否する。
+    return 'ambiguous_video_source';
+  }
   if (body.videoPrefix !== undefined) {
     input.videoPrefix = body.videoPrefix?.replace(/^\/+|\/+$/g, '') || null;
   }
+  if (body.videoMediaId !== undefined) input.videoMediaId = body.videoMediaId;
   if (body.durationSeconds !== undefined) {
     input.durationSeconds = Math.floor(body.durationSeconds);
   }
@@ -1103,6 +1156,8 @@ webinarRoutes.post('/api/webinars', requireRole('owner', 'admin'), async (c) => 
         input === 'invalid_duration' ? 422 : 400,
       );
     }
+    const videoError = await applyVideoMediaSelection(c.env.DB, input, body.accountId);
+    if (videoError) return c.json({ success: false, error: videoError }, 400);
     if (body.folderId) {
       const folder = await getFolderById(c.env.DB, body.folderId);
       if (!folder || folder.kind !== 'webinar' || folder.account_id !== body.accountId) {
@@ -1120,7 +1175,7 @@ webinarRoutes.post('/api/webinars', requireRole('owner', 'admin'), async (c) => 
       publicDescription: body.publicDescription,
       registrationFormId: body.registrationFormId,
     });
-    return c.json({ success: true, data: serializeWebinar(created) });
+    return c.json({ success: true, data: await serializeWebinarWithVideoMedia(c, created) });
   } catch (err) {
     console.error('POST /api/webinars error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
@@ -1131,7 +1186,7 @@ webinarRoutes.get('/api/webinars/:id', async (c) => {
   try {
     const row = await getWebinarById(c.env.DB, c.req.param('id'));
     if (!row) return c.json({ success: false, error: 'Not found' }, 404);
-    return c.json({ success: true, data: serializeWebinar(row) });
+    return c.json({ success: true, data: await serializeWebinarWithVideoMedia(c, row) });
   } catch (err) {
     console.error('GET /api/webinars/:id error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
@@ -1541,6 +1596,10 @@ webinarRoutes.put('/api/webinars/:id', requireRole('owner', 'admin'), async (c) 
         input === 'invalid_duration' ? 422 : 400,
       );
     }
+    const videoError = await applyVideoMediaSelection(
+      c.env.DB, input, body.accountId ?? row.account_id,
+    );
+    if (videoError) return c.json({ success: false, error: videoError }, 400);
     if (body.folderId) {
       const folder = await getFolderById(c.env.DB, body.folderId);
       const targetAccountId = body.accountId ?? row.account_id;
@@ -1553,7 +1612,7 @@ webinarRoutes.put('/api/webinars/:id', requireRole('owner', 'admin'), async (c) 
       if (dupe) return c.json({ success: false, error: 'slug_taken' }, 409);
     }
     const updated = await updateWebinar(c.env.DB, id, input as Parameters<typeof updateWebinar>[2]);
-    return c.json({ success: true, data: serializeWebinar(updated!) });
+    return c.json({ success: true, data: await serializeWebinarWithVideoMedia(c, updated!) });
   } catch (err) {
     console.error('PUT /api/webinars/:id error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);

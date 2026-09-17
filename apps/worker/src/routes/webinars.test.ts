@@ -33,6 +33,8 @@ const dbMocks = {
   getWebinarFormFunnelStats: vi.fn(),
   getWebinarOverview: vi.fn(),
   getFolderById: vi.fn(),
+  getMediaById: vi.fn(),
+  getMediaIdByR2Key: vi.fn(),
   countWebinarList: vi.fn(),
   webinarListSort: vi.fn((filters: { sort?: string }) => {
     if (filters?.sort === 'created') return [{ field: 'createdAt', direction: 'desc' }];

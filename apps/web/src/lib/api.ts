@@ -11047,6 +11047,12 @@ export type Webinar = {
   slug: string
   status: 'draft' | 'active' | 'archived'
   videoPrefix: string | null
+  /**
+   * 動画の選択元メディアID。保存値 videoPrefix は選んだメディアの
+   * r2_key からサーバーが生成する。ライブラリ外の prefix なら null。
+   * 保存時にこちらを送ると videoPrefix より優先され、両方は送れない。
+   */
+  videoMediaId?: string | null
   durationSeconds: number
   schedule: WebinarScheduleRule[]
   cta: { label: string; url: string; showAtSeconds: number } | null

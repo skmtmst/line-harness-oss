@@ -7,6 +7,7 @@ import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import WebinarNotifications from '@/components/webinars/webinar-notifications'
 import { notificationPreview, videoPreview } from './preview-body'
+import { ctaCardProblems } from './cta-card-validation'
 import {
   STEPS,
   nextLabelOf,
@@ -1067,7 +1068,7 @@ function emptyCtaEditing(webinarId: string): CtaEditing {
   return { webinarId, loaded: false, ctas: [], times: [], message: null }
 }
 
-function CtasTab({ webinarId, forms, formsState, onRetryForms, onCtasLoaded }: { webinarId: string; forms: Array<{ id: string; name: string }>; formsState: FormCandidateState; onRetryForms: () => void; onCtasLoaded?: (ctas: WebinarCtaCard[] | null) => void }) {
+function CtasTab({ webinarId, durationSeconds, forms, formsState, onRetryForms, onCtasLoaded }: { webinarId: string; durationSeconds: number; forms: Array<{ id: string; name: string }>; formsState: FormCandidateState; onRetryForms: () => void; onCtasLoaded?: (ctas: WebinarCtaCard[] | null) => void }) {
   const [editing, setEditing] = useState<CtaEditing>(() => emptyCtaEditing(webinarId))
   const [saving, setSaving] = useState(false)
   /* 取得の世代印。切替後に遅れて届いた前のウェビナーの応答はここで捨てる。 */
@@ -1127,15 +1128,19 @@ function CtasTab({ webinarId, forms, formsState, onRetryForms, onCtasLoaded }: {
     /* 読めていない間は保存しない（空で全置換して既存 CTA を消さない）。 */
     if (!loaded) return
     setMessage(null)
-    const merged: WebinarCtaCard[] = []
-    for (let i = 0; i < ctas.length; i++) {
-      const at = parseMinSec(times[i] ?? '')
-      if (at === null) {
-        setMessage(`${i + 1}行目の表示時間が不正です（例: 45:00 または秒数）`)
-        return
-      }
-      merged.push({ ...ctas[i], atSeconds: at })
+    /*
+      保存前に「どのカードの何が足りないか」を枚数で示す。公開前検証で
+      止まる前に、ここで直し方まで伝える。1件でもあれば保存しない。
+    */
+    const problems = ctaCardProblems(ctas, times, durationSeconds, parseMinSec)
+    if (problems.length > 0) {
+      setMessage(problems.join('\n'))
+      return
     }
+    const merged: WebinarCtaCard[] = ctas.map((card, i) => ({
+      ...card,
+      atSeconds: parseMinSec(times[i] ?? '') as number,
+    }))
     setSaving(true)
     try {
       const sorted = [...merged].sort((a, b) => a.atSeconds - b.atSeconds)
@@ -1158,7 +1163,7 @@ function CtasTab({ webinarId, forms, formsState, onRetryForms, onCtasLoaded }: {
         フォーム機能のタグ付与・シナリオ発火が自動で動きます。「URL」は外部ページを開きます。
       </p>
       {message && (
-        <p className="rounded bg-blue-50 p-2 text-sm">
+        <p className="whitespace-pre-line rounded bg-blue-50 p-2 text-sm">
           {message}
           {!loaded && (
             <button type="button" onClick={() => void loadCtas()} className="ml-2 font-medium underline">もう一度読み込む</button>
@@ -1284,7 +1289,7 @@ function emptyFormCandidates(accountId: string | null): FormCandidates {
   return { accountId, state: accountId ? 'loading' : 'idle', items: [] }
 }
 
-function CtaDesignStep({ webinarId, accountId, editor, registrations, onEditorChange }: { webinarId: string; accountId: string | null; editor: WebinarEditor; registrations: number | null; onEditorChange: (editor: WebinarEditor) => void }) {
+function CtaDesignStep({ webinarId, accountId, durationSeconds, editor, registrations, onEditorChange }: { webinarId: string; accountId: string | null; durationSeconds: number; editor: WebinarEditor; registrations: number | null; onEditorChange: (editor: WebinarEditor) => void }) {
   /* 子から受け取った CTA も「どのウェビナーの分か」を一緒に持つ。 */
   const [reportedCtas, setReportedCtas] = useState<{ webinarId: string; items: WebinarCtaCard[] }>(() => ({ webinarId, items: [] }))
   const ctas = reportedCtas.webinarId === webinarId ? reportedCtas.items : []
@@ -1428,7 +1433,7 @@ function CtaDesignStep({ webinarId, accountId, editor, registrations, onEditorCh
             {registrationError ? <p className="text-danger text-sm" role="alert">{registrationError}</p> : null}
           </div>
         </section>
-        <EditorDetails label="CTAカードとフォームの詳細を編集する"><CtasTab webinarId={webinarId} forms={forms} formsState={registrationFormState} onRetryForms={loadRegistrationForms} onCtasLoaded={handleCtasLoaded} /></EditorDetails>
+        <EditorDetails label="CTAカードとフォームの詳細を編集する"><CtasTab webinarId={webinarId} durationSeconds={durationSeconds} forms={forms} formsState={registrationFormState} onRetryForms={loadRegistrationForms} onCtasLoaded={handleCtasLoaded} /></EditorDetails>
       </div>
       <SummaryAside rows={[
         ['CTA', `${ctas.length.toLocaleString('ja-JP')}件`],
@@ -1981,7 +1986,7 @@ function EditWebinarInner() {
 
       {pane === 'basic' && <WebinarForm key={`${webinar.id}-${webinar.updatedAt}`} initial={webinar} />}
       {pane === 'video' && <VideoDesignStep webinar={webinar} editor={editor} registrations={registrations} />}
-      {pane === 'cta' && <CtaDesignStep webinarId={webinar.id} accountId={webinar.accountId} editor={editor} registrations={registrations} onEditorChange={setEditor} />}
+      {pane === 'cta' && <CtaDesignStep webinarId={webinar.id} accountId={webinar.accountId} durationSeconds={webinar.durationSeconds} editor={editor} registrations={registrations} onEditorChange={setEditor} />}
       {pane === 'notifications' && <NotificationDesignStep webinarId={webinar.id} registrations={registrations} />}
       {pane === 'review' && <ReviewStep webinar={webinar} editor={editor} registrations={registrations} onBack={setPane} />}
       {pane === 'comments' && <CommentsTab webinarId={webinar.id} />}
