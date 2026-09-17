@@ -1,8 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { webinarApi, type Webinar, type WebinarInput, type WebinarScheduleRule } from '@/lib/api'
+import { api, webinarApi, type Webinar, type WebinarInput, type WebinarScheduleRule } from '@/lib/api'
+import type { MediaItem } from '@line-crm/shared'
 import { useAccount } from '@/contexts/account-context'
 import StickyBar from '@/components/shared/sticky-bar'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -44,7 +45,6 @@ export default function WebinarForm({ initial }: WebinarFormProps) {
   const [title, setTitle] = useState(initial?.title ?? '')
   const [slug, setSlug] = useState(initial?.slug ?? '')
   const [status, setStatus] = useState<Webinar['status']>(initial?.status ?? 'draft')
-  const [videoPrefix, setVideoPrefix] = useState(initial?.videoPrefix ?? '')
   const [durationMinutes, setDurationMinutes] = useState(
     initial ? Math.round(initial.durationSeconds / 60) : 120,
   )
@@ -53,15 +53,47 @@ export default function WebinarForm({ initial }: WebinarFormProps) {
   const [bulkStart, setBulkStart] = useState(initialDaily.start)
   const [bulkEnd, setBulkEnd] = useState(initialDaily.end)
   const [bulkInterval, setBulkInterval] = useState(initialDaily.interval)
-  const [ctaEnabled, setCtaEnabled] = useState(Boolean(initial?.cta))
-  const [ctaLabel, setCtaLabel] = useState(initial?.cta?.label ?? '今すぐ申し込む')
-  const [ctaUrl, setCtaUrl] = useState(initial?.cta?.url ?? '')
-  const [ctaShowMinutes, setCtaShowMinutes] = useState(
-    initial?.cta ? Math.round(initial.cta.showAtSeconds / 60) : 90,
+  /*
+    動画はメディアライブラリの動画から選ぶ。保存値はサーバーが選択から
+    生成するので、ここで R2 のパスを手入力させない。
+    EXTERNAL_VIDEO は「ライブラリ外のprefixが既に設定されている」ときだけ
+    選べる維持用の値で、選び直さない限り現在の設定を送らず残す。
+  */
+  const EXTERNAL_VIDEO = '__external__'
+  const [videoChoice, setVideoChoice] = useState<string>(
+    initial?.videoMediaId ?? (initial?.videoPrefix ? EXTERNAL_VIDEO : ''),
   )
+  const videoAccountId = initial?.accountId ?? selectedAccountId
+  const [videoMedia, setVideoMedia] = useState<MediaItem[] | null>(null)
+  const [videoMediaError, setVideoMediaError] = useState(false)
+  const [mediaLoadKey, setMediaLoadKey] = useState(0)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [publishConfirmOpen, setPublishConfirmOpen] = useState(false)
+
+  /* 動画の選択肢は同一アカウントの動画メディアだけ。選べるまで保存を待たせる
+     必要はないが、候補が読めないときは選択を空で誤保存させない。 */
+  useEffect(() => {
+    if (!videoAccountId) return
+    let cancelled = false
+    setVideoMedia(null)
+    setVideoMediaError(false)
+    api.media
+      .list(videoAccountId, { kind: 'video', limit: 100 })
+      .then((res) => {
+        if (cancelled) return
+        if (res.success) setVideoMedia(res.data.items)
+        else setVideoMediaError(true)
+      })
+      .catch(() => { if (!cancelled) setVideoMediaError(true) })
+    return () => { cancelled = true }
+  }, [videoAccountId, mediaLoadKey])
+
+  /* 公開判定に効くのは「今選ばれているもの」。外部prefixの維持を選んだ
+     ときだけ、既存の保存値をそのまま動画ありとして数える。 */
+  const videoReady = videoChoice === EXTERNAL_VIDEO
+    ? Boolean(initial?.videoPrefix?.trim())
+    : Boolean(videoChoice)
 
   /** 下書きから公開へ変えるときだけ、確認を挟む。 */
   const isPublishing = status === 'active' && initial?.status !== 'active'
@@ -71,7 +103,7 @@ export default function WebinarForm({ initial }: WebinarFormProps) {
    * 動画が無ければ視聴できず、枠が無ければ「次の回」が出ない。
    */
   const publicationProblem = (): string => {
-    if (!videoPrefix.trim()) return '公開する前に動画を設定してください。動画が無いままでは友だちが視聴できません。'
+    if (!videoReady) return '公開する前に動画を設定してください。動画が無いままでは友だちが視聴できません。'
     if (rules.length === 0) return '公開する前に配信枠を1件以上設定してください。'
     if (!Number.isFinite(durationMinutes) || durationMinutes < 1) return '動画の長さを1分以上で設定してください。'
     return ''
@@ -125,13 +157,12 @@ export default function WebinarForm({ initial }: WebinarFormProps) {
       title,
       slug,
       status,
-      videoPrefix: videoPrefix.trim() || null,
       durationSeconds: durationMinutes * 60,
       schedule: rules,
       ...(!initial ? { accountId: selectedAccountId } : {}),
-      cta: ctaEnabled
-        ? { label: ctaLabel, url: ctaUrl, showAtSeconds: ctaShowMinutes * 60 }
-        : null,
+      /* 動画はメディア選択のIDだけを送り、保存値はサーバーが生成する。
+         外部prefixの維持を選んだときは何も送らず既存値を残す。 */
+      ...(videoChoice === EXTERNAL_VIDEO ? {} : { videoMediaId: videoChoice || null }),
     }
     try {
       if (initial) {
@@ -206,8 +237,38 @@ export default function WebinarForm({ initial }: WebinarFormProps) {
               <input value={slug} onChange={(e) => setSlug(e.target.value)} placeholder="my-seminar" className={`${inputClass} font-mono text-xs`} />
             </div>
             <div>
-              <label className={labelClass}>動画 R2 プレフィックス</label>
-              <input value={videoPrefix} onChange={(e) => setVideoPrefix(e.target.value)} className={`${inputClass} font-mono text-xs`} />
+              <label className={labelClass}>配信動画（メディアライブラリの動画から選択）</label>
+              {!videoAccountId ? (
+                <p className="text-xs text-ink-faint">LINE公式アカウントに割り当てると動画を選べます。</p>
+              ) : videoMediaError ? (
+                <p className="text-xs text-danger" role="alert">
+                  動画の候補を読み込めませんでした。
+                  <button type="button" onClick={() => setMediaLoadKey((key) => key + 1)} className="ml-2 font-medium underline">もう一度読み込む</button>
+                </p>
+              ) : (
+                <select
+                  aria-label="配信動画"
+                  value={videoChoice}
+                  onChange={(e) => setVideoChoice(e.target.value)}
+                  disabled={videoMedia === null}
+                  className={inputClass}
+                >
+                  <option value="">設定しない</option>
+                  {videoChoice === EXTERNAL_VIDEO && (
+                    <option value={EXTERNAL_VIDEO}>現在の設定を維持（ライブラリ外の動画）</option>
+                  )}
+                  {(videoMedia ?? []).map((item) => (
+                    <option key={item.id} value={item.id}>{item.filename}</option>
+                  ))}
+                  {videoMedia && videoChoice && videoChoice !== EXTERNAL_VIDEO &&
+                    !videoMedia.some((item) => item.id === videoChoice) && (
+                    <option value={videoChoice}>現在の動画（ライブラリで見つかりません）</option>
+                  )}
+                </select>
+              )}
+              {videoChoice === EXTERNAL_VIDEO && initial?.videoPrefix && (
+                <p className="mt-1 text-micro text-ink-faint">現在の設定: {initial.videoPrefix}</p>
+              )}
             </div>
           </div>
         </details>
@@ -322,43 +383,6 @@ export default function WebinarForm({ initial }: WebinarFormProps) {
           </div>
         </details>
       </section>
-
-      <details className="group overflow-hidden rounded-2xl border border-hairline bg-canvas shadow-sm">
-        <summary className="flex cursor-pointer list-none items-center justify-between p-5 text-sm font-bold text-ink sm:p-6">従来CTAボタンの設定<span className="text-xs text-ink-faint group-open:rotate-180">▾</span></summary>
-        <section className="space-y-3 border-t border-hairline p-5 sm:p-6">
-        <label className="flex items-center gap-2 text-sm text-ink-secondary">
-          <input type="checkbox" checked={ctaEnabled} onChange={(e) => setCtaEnabled(e.target.checked)} />
-          CTA ボタンを表示する
-        </label>
-        {ctaEnabled && (
-          <>
-            <div>
-              <label className={labelClass}>ボタン文言</label>
-              <input value={ctaLabel} onChange={(e) => setCtaLabel(e.target.value)} className={inputClass} />
-            </div>
-            <div>
-              <label className={labelClass}>決済ページ URL</label>
-              <input
-                value={ctaUrl}
-                onChange={(e) => setCtaUrl(e.target.value)}
-                placeholder="https://..."
-                className={inputClass}
-              />
-            </div>
-            <div>
-              <label className={labelClass}>表示開始（開始から何分後）</label>
-              <input
-                type="number"
-                value={ctaShowMinutes}
-                min={0}
-                onChange={(e) => setCtaShowMinutes(Number(e.target.value))}
-                className={`${inputClass} w-32`}
-              />
-            </div>
-          </>
-        )}
-        </section>
-      </details>
 
       <StickyBar
         status="変更内容を確認して本番へ反映します"

@@ -34,7 +34,7 @@ describe('オーナー指示 #582 のフォルダ欄', () => {
     const page = readFileSync(resolve(APP, 'templates/page.tsx'), 'utf8')
     const styles = readFileSync(resolve(APP, 'templates/templates-v6.module.css'), 'utf8')
     expect(page).toContain('style={FOLDER_RAIL_STYLE}')
-    expect(page).toContain('onAddFolder={() => setFolderDialogOpen(true)}')
+    expect(page).toContain('onAddFolder={canMutateTemplates ? () => setFolderDialogOpen(true) : undefined}')
     expect(styles).toContain('width: var(--folder-rail-width)')
     expect(styles).toContain('flex: 0 0 var(--folder-rail-width)')
   })

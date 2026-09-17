@@ -68,6 +68,12 @@ vi.mock('@/lib/api', () => ({
 }))
 
 beforeEach(() => {
+  // N-144: 変更操作は owner/admin だけに出す。操作を試す試験は owner で立てる。
+  vi.stubGlobal('localStorage', {
+    getItem: (key: string) => (key === 'lh_staff_role' ? 'owner' : null),
+    setItem: () => {},
+    removeItem: () => {},
+  })
   mockState.selectedAccountId = 'account-a'
   mockState.templates = BASE_TEMPLATES
   mockState.folders = []
