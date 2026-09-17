@@ -138,7 +138,7 @@ export function Issue469ReminderStepEditor({ reminderId }: { reminderId: string 
 
   if (!settings) return <p className={error ? 'text-danger p-6 text-sm' : 'text-ink-faint p-6 text-sm'}>{error || '読み込んでいます'}</p>
 
-  const selectedIndex = settings.steps.findIndex((step) => step.stableStepId === selectedStepId) 
+  const selectedIndex = settings.steps.findIndex((step) => step.stableStepId === selectedStepId)
   const selectedStep = selectedIndex >= 0 ? settings.steps[selectedIndex] : settings.steps[0]
   const allStepsHaveContent = settings.steps.every((step) => Boolean(step.templateId || step.messageContent.trim()))
 
