@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import PageHeader from '@/components/shared/page-header'
+import { TextField } from '@/components/shared/text-field'
 import Toggle from '@/components/shared/toggle'
 import { useAccount } from '@/contexts/account-context'
 import { api, ApiError, fetchApi, type AnalyticsUsageOverview } from '@/lib/api'
@@ -360,6 +361,11 @@ export default function SettingsPage() {
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   /**
+   * 変更理由。サーバーが必須化しており、保存と同じ単位で監査へ残る。
+   * 保存成功・取り消し・アカウント切替で空に戻す。
+   */
+  const [reason, setReason] = useState('')
+  /**
    * オフ前の影響確認(票643)。止まる仕事があるときだけ開く。
    * トークンは保持せず、押すたびに取り直してから保存する。
    */
@@ -400,6 +406,7 @@ export default function SettingsPage() {
       setImpactError('')
       setResetToDefaultsOpen(false)
       setLeaveTarget(null)
+      setReason('')
     }
   }, [selectedAccountId, accountGuard])
 
@@ -624,6 +631,7 @@ export default function SettingsPage() {
     if (loading || saving) return
     setFeatures({ ...savedFeatures })
     setItemOrder({ ...savedItemOrder })
+    setReason('')
     setError('')
     setNotice('保存済みの機能設定に戻しました。')
   }
@@ -719,6 +727,7 @@ export default function SettingsPage() {
             features,
             sidebarItemOrder: currentOrder,
             expectedVersion: settingsVersion,
+            reason: reason.trim(),
             ...(impactToken ? { impactToken } : {}),
           }),
         },
@@ -758,6 +767,7 @@ export default function SettingsPage() {
         setSavedItemOrder(currentOrder)
         setItemOrder(currentOrder)
       }
+      setReason('')
       setNotice('機能設定を保存しました。サイドメニューにも反映されています。')
       window.dispatchEvent(new CustomEvent(FEATURE_SETTINGS_UPDATED_EVENT, { detail: { accountId: selectedAccountId } }))
       return true
@@ -798,6 +808,11 @@ export default function SettingsPage() {
    */
   const save = async () => {
     if (!selectedAccountId || !dirty) return
+    // サーバーが理由なしの保存を400にする。往復させる前にここで止める。
+    if (!reason.trim()) {
+      setError('変更理由を入力してください')
+      return
+    }
     const offKeys = Object.keys(features).filter(
       (key) => savedFeatures[key] === true && features[key] === false,
     )
@@ -919,6 +934,22 @@ export default function SettingsPage() {
             {error && <div className="border-danger bg-danger-bg text-danger mb-4 rounded-control border p-4 text-sm">{error}</div>}
             {notice && <div className="border-success bg-success-bg text-success mb-4 rounded-control border p-4 text-sm">{notice}</div>}
           </div>
+
+          {dirty && (
+            <div className="border-hairline bg-canvas rounded-card mb-4 flex flex-col gap-2 border p-4 sm:flex-row sm:items-center">
+              <label htmlFor="feature-settings-reason" className="text-ink shrink-0 text-sm font-bold">
+                変更理由（必須）
+              </label>
+              <TextField
+                id="feature-settings-reason"
+                value={reason}
+                onChange={(event) => setReason(event.target.value)}
+                placeholder="例: 使っていない配信機能を止めるため"
+                maxLength={300}
+                disabled={saving}
+              />
+            </div>
+          )}
 
           {loading ? (
             <div className="border-hairline bg-canvas text-ink-faint rounded-card border p-10 text-center text-sm">読み込み中…</div>

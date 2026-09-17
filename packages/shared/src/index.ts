@@ -21,3 +21,4 @@ export * from "./nen-campaign-limits";
 export * from "./form-submit-idempotency";
 export * from "./booking-staff";
 export * from "./staff-permissions";
+export * from "./menu-catalog";

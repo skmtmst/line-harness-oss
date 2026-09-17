@@ -8,7 +8,15 @@ vi.mock('../services/account-access.js', () => ({
   canAccessAllLineAccounts: access.canAccess,
 }));
 
-const { featureSettings } = await import('./feature-settings.js');
+import { expectedMenuItemOrder } from '@line-crm/shared';
+
+const { featureSettings, NEN_SPECIALIZED_FEATURES } = await import('./feature-settings.js');
+
+/** 画面が送るのと同じ、全区分・全項目の完全な並び。deliveryだけ入れ替える。 */
+const FULL_ITEM_ORDER = {
+  ...expectedMenuItemOrder(new Set(NEN_SPECIALIZED_FEATURES)),
+  delivery: ['broadcasts', 'scenarios', 'reminders', 'auto-replies', 'friend-add-settings', 'webinars'],
+};
 
 function app(role: 'owner' | 'admin' | 'staff' = 'owner') {
   const instance = new Hono<Env>();
@@ -144,8 +152,9 @@ describe('feature settings scope and versioning', () => {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           expectedVersion: 0,
+          reason: 'テスト',
           features: { scenarios: false },
-          sidebarItemOrder: { delivery: ['broadcasts', 'scenarios'] },
+          sidebarItemOrder: FULL_ITEM_ORDER,
         }),
       }, { DB: testDb.db, RESTAURANT_TEST_ENABLED: 'true' });
       expect(first.status).toBe(200);
@@ -154,7 +163,7 @@ describe('feature settings scope and versioning', () => {
       const stale = await app().request('/api/settings/features?account_id=account-1', {
         method: 'PUT',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ expectedVersion: 0, features: { scenarios: true } }),
+        body: JSON.stringify({ expectedVersion: 0, reason: 'テスト', features: { scenarios: true } }),
       }, { DB: testDb.db, RESTAURANT_TEST_ENABLED: 'true' });
       expect(stale.status).toBe(409);
 
@@ -168,7 +177,7 @@ describe('feature settings scope and versioning', () => {
         data: {
           version: 1,
           features: { scenarios: false },
-          sidebarItemOrder: { delivery: ['broadcasts', 'scenarios'] },
+          sidebarItemOrder: FULL_ITEM_ORDER,
         },
       });
     } finally {
@@ -184,6 +193,7 @@ describe('feature settings scope and versioning', () => {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           expectedVersion: 0,
+          reason: 'テスト',
           features: { restaurant_test: true, scenarios: false },
         }),
       }, { DB: testDb.db, RESTAURANT_TEST_ENABLED: 'false' });
@@ -211,6 +221,7 @@ describe('feature settings scope and versioning', () => {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           expectedVersion: 0,
+          reason: 'テスト',
           sidebarItemOrder: { delivery: ['scenarios', 'scenarios'] },
         }),
       }, { DB: testDb.db, RESTAURANT_TEST_ENABLED: 'true' });
@@ -219,14 +230,14 @@ describe('feature settings scope and versioning', () => {
       const invalid = await app().request('/api/settings/features?account_id=account-1', {
         method: 'PUT',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ expectedVersion: 0, features: { scenarios: 'off' } }),
+        body: JSON.stringify({ expectedVersion: 0, reason: 'テスト', features: { scenarios: 'off' } }),
       }, { DB: testDb.db, RESTAURANT_TEST_ENABLED: 'true' });
       expect(invalid.status).toBe(400);
 
       const unknown = await app().request('/api/settings/features?account_id=account-1', {
         method: 'PUT',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ expectedVersion: 0, features: { not_in_feature_catalog: true } }),
+        body: JSON.stringify({ expectedVersion: 0, reason: 'テスト', features: { not_in_feature_catalog: true } }),
       }, { DB: testDb.db, RESTAURANT_TEST_ENABLED: 'true' });
       expect(unknown.status).toBe(400);
       expect(await unknown.json()).toMatchObject({
@@ -243,7 +254,7 @@ describe('feature settings scope and versioning', () => {
         const response = await app().request('/api/settings/features?account_id=account-1', {
           method: 'PUT',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ expectedVersion: 0, features: { [removed]: true } }),
+          body: JSON.stringify({ expectedVersion: 0, reason: 'テスト', features: { [removed]: true } }),
         }, { DB: testDb.db, RESTAURANT_TEST_ENABLED: 'true' });
         expect(response.status).toBe(400);
         expect(await response.json()).toMatchObject({
