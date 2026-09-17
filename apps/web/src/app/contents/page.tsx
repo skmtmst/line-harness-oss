@@ -1104,7 +1104,7 @@ function MediaLibraryInner() {
                   </>
                 )}
 
-                <div className="mt-auto flex items-center justify-end gap-1 pt-1">
+                <div className="mt-auto flex flex-wrap items-center justify-end gap-1 pt-1">
                   <button
                     onClick={() => setDetailUrl(item.id)}
                     disabled={!canManageMedia}
