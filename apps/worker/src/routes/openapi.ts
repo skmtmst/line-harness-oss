@@ -847,6 +847,29 @@ const spec = {
         responses: { '200': { description: 'Distribution result' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Not found' } },
       },
     },
+    // ── Analytics ──────────────────────────────────────────────────────────
+    '/api/analytics/report-schedules/{id}': {
+      put: {
+        tags: ['Analytics'], summary: '定期レポートの内容を更新（楽観ロック: expectedUpdatedAt 必須、1回限りの依頼は不可）',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['expectedUpdatedAt'], properties: { expectedUpdatedAt: { type: 'string' }, name: { type: 'string' }, cadence: { type: 'string', enum: ['weekly', 'monthly'] }, weekday: { type: 'integer', minimum: 0, maximum: 6 }, monthDay: { type: 'integer', minimum: 1, maximum: 31 }, sendTime: { type: 'string' }, timeZone: { type: 'string' }, channels: { type: 'array', items: { type: 'string' } }, savedAnalysisIds: { type: 'array', items: { type: 'string' } }, recipients: { type: 'array', items: { type: 'object' } } } } } } },
+        responses: { '200': { description: 'Updated report schedule' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Not found' }, '409': { description: 'Updated elsewhere first' }, '422': { description: 'Validation failed' } },
+      },
+    },
+    '/api/analytics/report-schedules/{id}/status': {
+      put: {
+        tags: ['Analytics'], summary: '定期レポートの停止・再開・しまう（楽観ロック: expectedUpdatedAt 必須。再開は次回を未来へ置き直す）',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['status', 'expectedUpdatedAt'], properties: { status: { type: 'string', enum: ['paused', 'active', 'archived'] }, expectedUpdatedAt: { type: 'string' } } } } } },
+        responses: { '200': { description: 'Updated report schedule' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Not found' }, '409': { description: 'Updated elsewhere first' }, '422': { description: 'Validation failed' } },
+      },
+    },
     // ── Friends ─────────────────────────────────────────────────────────────
     '/api/friends': {
       get: {
