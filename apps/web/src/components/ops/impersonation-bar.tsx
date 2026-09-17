@@ -4,6 +4,7 @@ import { Eye, PencilLine } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useState, type ReactNode } from 'react'
 import { api, type OpsImpersonation } from '@/lib/api'
+import { opsCall } from '@/components/ops/ops-ui'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import NoteBar from '@/components/shared/note-bar'
 import { TextArea } from '@/components/shared/text-field'
@@ -36,14 +37,14 @@ export default function ImpersonationBar({
 
   const toRead = async () => {
     setBusy(true)
-    const res = await api.ops.impersonation.read()
+    const res = await opsCall(api.ops.impersonation.read())
     setBusy(false)
     if (res.success) update({ ...state, mode: 'read' })
   }
 
   const end = async () => {
     setBusy(true)
-    const res = await api.ops.impersonation.end()
+    const res = await opsCall(api.ops.impersonation.end())
     setBusy(false)
     if (res.success) {
       onChange?.(null)
@@ -57,8 +58,8 @@ export default function ImpersonationBar({
     setBusy(true)
     setError('')
     const res = dialog === 'write'
-      ? await api.ops.impersonation.write(reason)
-      : await api.ops.impersonation.revealPii(reason)
+      ? await opsCall(api.ops.impersonation.write(reason))
+      : await opsCall(api.ops.impersonation.revealPii(reason))
     setBusy(false)
     if (!res.success) { setError(res.error || '切り替えできませんでした'); return }
     update({ ...state, ...res.data, tenantName: state.tenantName })

@@ -207,6 +207,8 @@ export type Env = {
     RAW_MAIL?: R2Bucket;
     ASSETS: Fetcher;
     AI?: Ai;
+    /** 運営コンソールの返信下書きに使う Workers AI のモデル名。未設定なら routes/ops-support.ts の既定。 */
+    OPS_SUPPORT_AI_MODEL?: string;
     EMAIL?: SendEmail;
     CONTACT_EMAIL?: string;
     SUPPORT_INBOUND_EMAIL?: string;

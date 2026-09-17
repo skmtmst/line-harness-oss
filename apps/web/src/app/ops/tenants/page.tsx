@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { api, type OpsTenantRow, type OpsTenantSummary } from '@/lib/api'
 import OpsPageHeader from '@/components/ops/ops-page-header'
-import { formatDate, formatDateTime, planLabel, tenantDetailHref, tenantStatusChip } from '@/components/ops/ops-ui'
+import { formatDate, formatDateTime, planLabel, tenantDetailHref, tenantStatusChip, opsCall } from '@/components/ops/ops-ui'
 import Button from '@/components/shared/button'
 import Chip from '@/components/shared/chip'
 import FilterChip from '@/components/shared/filter-chip'
@@ -40,7 +40,7 @@ export default function OpsTenantsPage() {
 
   const load = useCallback(async () => {
     setError('')
-    const res = await api.ops.tenants({ q: q.trim() || undefined })
+    const res = await opsCall(api.ops.tenants({ q: q.trim() || undefined }))
     if (!res.success) { setError(res.error || '読み込めませんでした'); return }
     setRows(res.data)
     setSummary(res.summary)
@@ -62,7 +62,7 @@ export default function OpsTenantsPage() {
 
   const impersonate = async (tenant: OpsTenantRow) => {
     setBusyId(tenant.id)
-    const res = await api.ops.impersonation.start(tenant.id)
+    const res = await opsCall(api.ops.impersonation.start(tenant.id))
     setBusyId(null)
     if (!res.success) { setError(res.error || '代理ログインを始められませんでした'); return }
     // 契約先の統括コンソールへ。帯は AppShell が出す。
@@ -72,7 +72,7 @@ export default function OpsTenantsPage() {
   const create = async (event: FormEvent) => {
     event.preventDefault()
     if (!newName.trim()) return
-    const res = await api.ops.createTenant(newName.trim())
+    const res = await opsCall(api.ops.createTenant(newName.trim()))
     if (!res.success) { setError(res.error || '作成できませんでした'); return }
     setNewName('')
     setCreating(false)
